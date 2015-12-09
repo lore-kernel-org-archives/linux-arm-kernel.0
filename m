@@ -1,127 +1,62 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 9 Dec 2015 14:09:05 -0600
-Subject: [PATCH v1 1/8] pinctrl: rockchip: add support for the rk3228
-In-Reply-To: <1449651853-1667-2-git-send-email-jeffy.chen@rock-chips.com>
-References: <1449651853-1667-1-git-send-email-jeffy.chen@rock-chips.com>
- <1449651853-1667-2-git-send-email-jeffy.chen@rock-chips.com>
-Message-ID: <20151209200905.GA28970@rob-hp-laptop>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 9 Dec 2015 20:10:07 +0000
+Subject: [PATCH] cpufreq: tegra: add regulator dependency for T124
+In-Reply-To: <566865ED.3020106@nvidia.com>
+References: <2194927.eV2s2QmZs0@wuerfel> <5668188F.2080202@nvidia.com>
+ <20151209144734.GB5727@sirena.org.uk> <566865ED.3020106@nvidia.com>
+Message-ID: <20151209201007.GG5727@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 09, 2015 at 05:04:06PM +0800, Jeffy Chen wrote:
-> The pinctrl of rk3228 is much the same as rk3288's, but
-> without pmu.
-> 
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> 
-> ---
-> 
->  .../bindings/pinctrl/rockchip,pinctrl.txt          |  3 +-
+On Wed, Dec 09, 2015 at 05:33:33PM +0000, Jon Hunter wrote:
+> On 09/12/15 14:47, Mark Brown wrote:
 
-For the binding:
+> > If changes implemented by the clock driver are trashing the regulator
+> > settings I would expect the clock driver to be responsible for fixing
+> > things up rather than another driver that happens to use the clock.  I'd
+> > also expect some kind of internal documentation explaining what's going
+> > on, and possibly 
 
-Acked-by: Rob Herring <robh@kernel.org>
+> Yes, the DFLL clock driver could restore the voltage, however, that
+> does not guarantee that the voltage is still sufficient for the other
+> clock source.
 
->  drivers/pinctrl/pinctrl-rockchip.c                 | 53 ++++++++++++++++++++++
->  2 files changed, 55 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
-> index 391ef4b..0cd701b 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
-> @@ -21,7 +21,8 @@ defined as gpio sub-nodes of the pinmux controller.
->  Required properties for iomux controller:
->    - compatible: one of "rockchip,rk2928-pinctrl", "rockchip,rk3066a-pinctrl"
->  		       "rockchip,rk3066b-pinctrl", "rockchip,rk3188-pinctrl"
-> -		       "rockchip,rk3288-pinctrl", "rockchip,rk3368-pinctrl"
-> +		       "rockchip,rk3228-pinctrl", "rockchip,rk3288-pinctrl"
-> +		       "rockchip,rk3368-pinctrl"
->    - rockchip,grf: phandle referencing a syscon providing the
->  	 "general register files"
->  
-> diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
-> index a065112..faab36e 100644
-> --- a/drivers/pinctrl/pinctrl-rockchip.c
-> +++ b/drivers/pinctrl/pinctrl-rockchip.c
-> @@ -614,6 +614,40 @@ static void rk3288_calc_drv_reg_and_bit(struct rockchip_pin_bank *bank,
->  	}
->  }
->  
-> +#define RK3228_PULL_OFFSET		0x100
-> +
-> +static void rk3228_calc_pull_reg_and_bit(struct rockchip_pin_bank *bank,
-> +				    int pin_num, struct regmap **regmap,
-> +				    int *reg, u8 *bit)
-> +{
-> +	struct rockchip_pinctrl *info = bank->drvdata;
-> +
-> +	*regmap = info->regmap_base;
-> +	*reg = RK3228_PULL_OFFSET;
-> +	*reg += bank->bank_num * RK3188_PULL_BANK_STRIDE;
-> +	*reg += ((pin_num / RK3188_PULL_PINS_PER_REG) * 4);
-> +
-> +	*bit = (pin_num % RK3188_PULL_PINS_PER_REG);
-> +	*bit *= RK3188_PULL_BITS_PER_PIN;
-> +}
-> +
-> +#define RK3228_DRV_GRF_OFFSET		0x200
-> +
-> +static void rk3228_calc_drv_reg_and_bit(struct rockchip_pin_bank *bank,
-> +				    int pin_num, struct regmap **regmap,
-> +				    int *reg, u8 *bit)
-> +{
-> +	struct rockchip_pinctrl *info = bank->drvdata;
-> +
-> +	*regmap = info->regmap_base;
-> +	*reg = RK3228_DRV_GRF_OFFSET;
-> +	*reg += bank->bank_num * RK3288_DRV_BANK_STRIDE;
-> +	*reg += ((pin_num / RK3288_DRV_PINS_PER_REG) * 4);
-> +
-> +	*bit = (pin_num % RK3288_DRV_PINS_PER_REG);
-> +	*bit *= RK3288_DRV_BITS_PER_PIN;
-> +}
-> +
->  #define RK3368_PULL_GRF_OFFSET		0x100
->  #define RK3368_PULL_PMU_OFFSET		0x10
->  
-> @@ -2143,6 +2177,23 @@ static struct rockchip_pin_ctrl rk3188_pin_ctrl = {
->  		.pull_calc_reg		= rk3188_calc_pull_reg_and_bit,
->  };
->  
-> +static struct rockchip_pin_bank rk3228_pin_banks[] = {
-> +	PIN_BANK(0, 32, "gpio0"),
-> +	PIN_BANK(1, 32, "gpio1"),
-> +	PIN_BANK(2, 32, "gpio2"),
-> +	PIN_BANK(3, 32, "gpio3"),
-> +};
-> +
-> +static struct rockchip_pin_ctrl rk3228_pin_ctrl = {
-> +		.pin_banks		= rk3228_pin_banks,
-> +		.nr_banks		= ARRAY_SIZE(rk3228_pin_banks),
-> +		.label			= "RK3228-GPIO",
-> +		.type			= RK3288,
-> +		.grf_mux_offset		= 0x0,
-> +		.pull_calc_reg		= rk3228_calc_pull_reg_and_bit,
-> +		.drv_calc_reg		= rk3228_calc_drv_reg_and_bit,
-> +};
-> +
->  static struct rockchip_pin_bank rk3288_pin_banks[] = {
->  	PIN_BANK_IOMUX_FLAGS(0, 24, "gpio0", IOMUX_SOURCE_PMU,
->  					     IOMUX_SOURCE_PMU,
-> @@ -2220,6 +2271,8 @@ static const struct of_device_id rockchip_pinctrl_dt_match[] = {
->  		.data = (void *)&rk3066b_pin_ctrl },
->  	{ .compatible = "rockchip,rk3188-pinctrl",
->  		.data = (void *)&rk3188_pin_ctrl },
-> +	{ .compatible = "rockchip,rk3228-pinctrl",
-> +		.data = (void *)&rk3228_pin_ctrl },
->  	{ .compatible = "rockchip,rk3288-pinctrl",
->  		.data = (void *)&rk3288_pin_ctrl },
->  	{ .compatible = "rockchip,rk3368-pinctrl",
-> -- 
-> 2.1.4
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+But the code we've got won't do that either - it'l just set the voltage
+to whatever the last thing the regulator API had that might have been
+within its constraints.
+
+> > Setting the voltage you've read back sounds broken, if the hardware
+> > might randomly change things how do you know the settings we read were
+> > sane?  Shouldn't we know what voltage range the device requires in a
+> > given mode and set that - that's much more normal?
+
+> The hardware will not randomly change the voltage until the DFLL is
+> enabled and so you would have to do this before.
+
+I'm not clear that there's even a guarantee that the kernel will ever
+have seen this configuration, consider for example what happens if
+someone uses kexec?
+
+> Yes, setting the frequency and voltage as defined by a given operating
+> mode would make sense. However, I am not sure we have those defined in
+> the kernel for this PLL and would have to be added.
+
+I think given how you're describing the hardware that this will be
+required in order to provide something robust (and also to get the best
+power savings from the hardware).
+
+> I was thinking that during boot we could read the default voltage and
+> frequency set by the bootloader and use this as it should not be
+> changing dynamically at this point because the cpufreq driver has not
+> been activated yet.
+
+I'm a bit confused here, we're talking about a change to the cpufreq
+driver here aren't we?  Or alternatively why are we manipulating the
+clock tree like this if we don't yet have support for the hardware?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151209/fd5be391/attachment-0001.sig>
