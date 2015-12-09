@@ -1,51 +1,75 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Wed,  9 Dec 2015 09:57:17 +0000
-Subject: [RFC PATCH v3 6/8] arm64: Add hook for checking early CPU features
+Date: Wed,  9 Dec 2015 09:57:18 +0000
+Subject: [RFC PATCH v3 7/8] arm64: Add helper for extracting ASIDBits
 In-Reply-To: <1449655039-22022-1-git-send-email-suzuki.poulose@arm.com>
 References: <1449655039-22022-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1449655039-22022-7-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1449655039-22022-8-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds a hook for checking whether a secondary CPU has the
-features used already by the kernel during early boot, based
-on the boot CPU.
+Add a helper to extract ASIDBits on the current cpu
 
 Cc: Will Deacon <will.deacon@arm.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/kernel/cpufeature.c |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm64/mm/context.c |   36 +++++++++++++++++++++++-------------
+ 1 file changed, 23 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index b94a198..e63da0f 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -824,6 +824,14 @@ static u64 __raw_read_system_reg(u32 sys_id)
- }
+diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
+index e87f53f..643bf4b 100644
+--- a/arch/arm64/mm/context.c
++++ b/arch/arm64/mm/context.c
+@@ -40,6 +40,28 @@ static cpumask_t tlb_flush_pending;
+ #define ASID_FIRST_VERSION	(1UL << asid_bits)
+ #define NUM_USER_ASIDS		ASID_FIRST_VERSION
  
- /*
-+ * Check for CPU features that are used in early boot
-+ * based on the Boot CPU value.
-+ */
-+static void check_early_cpu_features(void)
++/* Get the ASIDBits supported by the current CPU */
++static u32 get_cpu_asid_bits(void)
 +{
++	u32 asid;
++	int fld = cpuid_feature_extract_field(read_cpuid(ID_AA64MMFR0_EL1),
++						ID_AA64MMFR0_ASID_SHIFT);
++
++	switch (fld) {
++	default:
++		pr_warn("CPU%d: Unknown ASID size (%d); assuming 8-bit\n",
++					smp_processor_id(),  fld);
++		/* Fallthrough */
++	case 0:
++		asid = 8;
++		break;
++	case 2:
++		asid = 16;
++	}
++
++	return asid;
 +}
 +
-+/*
-  * Run through the enabled system capabilities and enable() it on this CPU.
-  * The capabilities were decided based on the available CPUs at the boot time.
-  * Any new CPU should match the system wide status of the capability. If the
-@@ -836,6 +844,8 @@ void verify_local_cpu_capabilities(void)
+ static void flush_context(unsigned int cpu)
+ {
  	int i;
- 	const struct arm64_cpu_capabilities *caps;
+@@ -187,19 +209,7 @@ switch_mm_fastpath:
  
-+	check_early_cpu_features();
-+
- 	/*
- 	 * If we haven't computed the system capabilities, there is nothing
- 	 * to verify.
+ static int asids_init(void)
+ {
+-	int fld = cpuid_feature_extract_field(read_cpuid(ID_AA64MMFR0_EL1), 4);
+-
+-	switch (fld) {
+-	default:
+-		pr_warn("Unknown ASID size (%d); assuming 8-bit\n", fld);
+-		/* Fallthrough */
+-	case 0:
+-		asid_bits = 8;
+-		break;
+-	case 2:
+-		asid_bits = 16;
+-	}
+-
++	asid_bits = get_cpu_asid_bits();
+ 	/* If we end up with more CPUs than ASIDs, expect things to crash */
+ 	WARN_ON(NUM_USER_ASIDS < num_possible_cpus());
+ 	atomic64_set(&asid_generation, ASID_FIRST_VERSION);
 -- 
 1.7.9.5
