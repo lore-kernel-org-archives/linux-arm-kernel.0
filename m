@@ -1,71 +1,298 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Wed, 9 Dec 2015 12:03:27 +0000
-Subject: [PATCH] cpufreq: tegra: add regulator dependency for T124
-In-Reply-To: <2194927.eV2s2QmZs0@wuerfel>
-References: <2194927.eV2s2QmZs0@wuerfel>
-Message-ID: <5668188F.2080202@nvidia.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Wed, 09 Dec 2015 15:05:01 +0300
+Subject: [PATCH 1/2] net: thunderx: HW TSO support for pass-2 hardware
+In-Reply-To: <1449661081-15435-2-git-send-email-sunil.kovvuri@gmail.com>
+References: <y@samsung.com>
+ <1449661081-15435-2-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <00b701d13279$d54d9c80$7fe8d580$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+ Hello!
 
-On 08/12/15 21:52, Arnd Bergmann wrote:
-> This driver is the only one that calls regulator_sync_voltage(), but it
-> can currently be built with CONFIG_REGULATOR disabled, producing
-> this build error:
+> -----Original Message-----
+> From: netdev-owner at vger.kernel.org [mailto:netdev-owner at vger.kernel.org] On Behalf Of Sunil
+> Goutham
+> Sent: Wednesday, December 09, 2015 2:38 PM
+> To: netdev at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; p.fedin at samsung.com;
+> Sunil.Goutham at caviumnetworks.com; Sunil Goutham
+> Subject: [PATCH 1/2] net: thunderx: HW TSO support for pass-2 hardware
 > 
-> drivers/cpufreq/tegra124-cpufreq.c: In function 'tegra124_cpu_switch_to_pllx':
-> drivers/cpufreq/tegra124-cpufreq.c:68:2: error: implicit declaration of function 'regulator_sync_voltage' [-Werror=implicit-function-declaration]
->   regulator_sync_voltage(priv->vdd_cpu_reg);
+> From: Sunil Goutham <sgoutham@cavium.com>
 > 
-> My first attempt was to implement a helper for this function
-> for regulator_sync_voltage, but Mark Brown explained:
+> This adds support for offloading TCP segmentation to HW in pass-2
+> revision of hardware. Both driver level SW TSO for pass1.x chips
+> and HW TSO for pass-2 chip will co-exist.
 > 
->    We don't do this for *all* regulator API functions - there's some where
->    using them strongly suggests that there is actually a dependency on
->    the regulator API.  This does seem like it might be falling into the
->    specialist category [...]
->    Looking at the code I'm pretty unclear on what the authors think the
->    use of _sync_voltage() is doing in the first place so it may be even
->    better to just remove the call.  It seems to have been included in the
->    first commit so there's not changelog explaining things and there's
->    no comment either.  I'd *expect* it to be a noop as far as I can see.
-
-In this sequence we are switching from the DFLL clock source (which
-directly controls the voltage) back to a PLL (which does not control the
-voltage directly). What we want to do is to restore the voltage back to
-the voltage it was operating at before we switched to the DFLL clock
-(which could have changed it).
-
-I am not familiar with regulator_sync_voltage() but from the comment it
-does say that it will re-apply the last voltage that was configured for
-the regulator. So I can see what they were doing. The question I have
-is, if the consumer has not explicitly called regulator_set_voltage()
-then what does regulator_sync_voltage() do? I am wondering if we should
-have been doing a regulator_get_voltage() during the probe and a
-regulator_set_voltage() when switching back?
-
-> This adds the dependency to make the driver always build successfully
-> or not be enabled at all. Alternatively, we could investigate if the
-> driver should stop calling regulator_sync_voltage instead.
+> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
+> ---
+>  drivers/net/ethernet/cavium/thunder/nic.h          |   12 ++++++--
+>  drivers/net/ethernet/cavium/thunder/nic_main.c     |   11 ++-----
+>  drivers/net/ethernet/cavium/thunder/nicvf_main.c   |   15 ++++++++-
+>  drivers/net/ethernet/cavium/thunder/nicvf_queues.c |   20 ++++++++++---
+>  drivers/net/ethernet/cavium/thunder/q_struct.h     |   30 ++++++++++---------
+>  5 files changed, 56 insertions(+), 32 deletions(-)
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> diff --git a/drivers/net/ethernet/cavium/thunder/nic.h
+> b/drivers/net/ethernet/cavium/thunder/nic.h
+> index 39ca674..02571f4 100644
+> --- a/drivers/net/ethernet/cavium/thunder/nic.h
+> +++ b/drivers/net/ethernet/cavium/thunder/nic.h
+> @@ -262,9 +262,10 @@ struct nicvf {
+>  	struct pci_dev		*pdev;
+>  	u8			vf_id;
+>  	u8			node;
+> -	u8			tns_mode:1;
+> -	u8			sqs_mode:1;
+> -	u8			loopback_supported:1;
+> +	bool			tns_mode:1;
+> +	bool			sqs_mode:1;
+
+ These little refactors are creeping in your code without even being mentioned in the commit message, this is not good practice
+IMHO. Additionally, may be turn these two flags into something like:
+
+enum nicvf_mode {
+	NICVF_BYPASS,
+	NICVF_TNS,
+	NICVF_SQS
+};
+
+ ? Anyway, these modes are mutually exclusive.
+
+> +	bool			loopback_supported:1;
+> +	bool			hw_tso:1;
+>  	u16			mtu;
+>  	struct queue_set	*qs;
+>  #define	MAX_SQS_PER_VF_SINGLE_NODE		5
+> @@ -489,6 +490,11 @@ static inline int nic_get_node_id(struct pci_dev *pdev)
+>  	return ((addr >> NIC_NODE_ID_SHIFT) & NIC_NODE_ID_MASK);
+>  }
 > 
-> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-> index 235a1ba73d92..b1f8a73e5a94 100644
-> --- a/drivers/cpufreq/Kconfig.arm
-> +++ b/drivers/cpufreq/Kconfig.arm
-> @@ -226,7 +226,7 @@ config ARM_TEGRA20_CPUFREQ
->  
->  config ARM_TEGRA124_CPUFREQ
->  	tristate "Tegra124 CPUFreq support"
-> -	depends on ARCH_TEGRA && CPUFREQ_DT
-> +	depends on ARCH_TEGRA && CPUFREQ_DT && REGULATOR
->  	default y
->  	help
->  	  This adds the CPUFreq driver support for Tegra124 SOCs.
+> +static inline bool pass1_silicon(struct pci_dev *pdev)
+> +{
+> +	return pdev->revision < 8;
+> +}
+> +
+>  int nicvf_set_real_num_queues(struct net_device *netdev,
+>  			      int tx_queues, int rx_queues);
+>  int nicvf_open(struct net_device *netdev);
+> diff --git a/drivers/net/ethernet/cavium/thunder/nic_main.c
+> b/drivers/net/ethernet/cavium/thunder/nic_main.c
+> index 4b7fd63..9f80de4 100644
+> --- a/drivers/net/ethernet/cavium/thunder/nic_main.c
+> +++ b/drivers/net/ethernet/cavium/thunder/nic_main.c
+> @@ -55,11 +55,6 @@ struct nicpf {
+>  	bool			irq_allocated[NIC_PF_MSIX_VECTORS];
+>  };
+> 
+> -static inline bool pass1_silicon(struct nicpf *nic)
+> -{
+> -	return nic->pdev->revision < 8;
+> -}
+> -
+>  /* Supported devices */
+>  static const struct pci_device_id nic_id_table[] = {
+>  	{ PCI_DEVICE(PCI_VENDOR_ID_CAVIUM, PCI_DEVICE_ID_THUNDER_NIC_PF) },
+> @@ -123,7 +118,7 @@ static void nic_send_msg_to_vf(struct nicpf *nic, int vf, union nic_mbx
+> *mbx)
+>  	 * when PF writes to MBOX(1), in next revisions when
+>  	 * PF writes to MBOX(0)
+>  	 */
+> -	if (pass1_silicon(nic)) {
+> +	if (pass1_silicon(nic->pdev)) {
+>  		/* see the comment for nic_reg_write()/nic_reg_read()
+>  		 * functions above
+>  		 */
+> @@ -400,7 +395,7 @@ static void nic_config_cpi(struct nicpf *nic, struct cpi_cfg_msg *cfg)
+>  			padd = cpi % 8; /* 3 bits CS out of 6bits DSCP */
+> 
+>  		/* Leave RSS_SIZE as '0' to disable RSS */
+> -		if (pass1_silicon(nic)) {
+> +		if (pass1_silicon(nic->pdev)) {
+>  			nic_reg_write(nic, NIC_PF_CPI_0_2047_CFG | (cpi << 3),
+>  				      (vnic << 24) | (padd << 16) |
+>  				      (rssi_base + rssi));
+> @@ -470,7 +465,7 @@ static void nic_config_rss(struct nicpf *nic, struct rss_cfg_msg *cfg)
+>  	}
+> 
+>  	cpi_base = nic->cpi_base[cfg->vf_id];
+> -	if (pass1_silicon(nic))
+> +	if (pass1_silicon(nic->pdev))
+>  		idx_addr = NIC_PF_CPI_0_2047_CFG;
+>  	else
+>  		idx_addr = NIC_PF_MPI_0_2047_CFG;
+> diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+> b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+> index dde8dc7..c24cb2a 100644
+> --- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+> +++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+> @@ -525,14 +525,22 @@ static void nicvf_snd_pkt_handler(struct net_device *netdev,
+>  		   __func__, cqe_tx->sq_qs, cqe_tx->sq_idx,
+>  		   cqe_tx->sqe_ptr, hdr->subdesc_cnt);
+> 
+> -	nicvf_put_sq_desc(sq, hdr->subdesc_cnt + 1);
+>  	nicvf_check_cqe_tx_errs(nic, cq, cqe_tx);
+>  	skb = (struct sk_buff *)sq->skbuff[cqe_tx->sqe_ptr];
+> -	/* For TSO offloaded packets only one head SKB needs to be freed */
+> +	/* For TSO offloaded packets only one SQE will have a valid SKB */
+>  	if (skb) {
+> +		nicvf_put_sq_desc(sq, hdr->subdesc_cnt + 1);
+>  		prefetch(skb);
+>  		dev_consume_skb_any(skb);
+>  		sq->skbuff[cqe_tx->sqe_ptr] = (u64)NULL;
+> +	} else {
+> +		/* In case of HW TSO, HW sends a CQE for each segment of a TSO
+> +		 * packet instead of a single CQE for the whole TSO packet
+> +		 * transmitted. Each of this CQE points to the same SQE, so
+> +		 * avoid freeing same SQE multiple times.
+> +		 */
+> +		if (!nic->hw_tso)
+> +			nicvf_put_sq_desc(sq, hdr->subdesc_cnt + 1);
+>  	}
+>  }
+> 
+> @@ -1549,6 +1557,9 @@ static int nicvf_probe(struct pci_dev *pdev, const struct pci_device_id
+> *ent)
+> 
+>  	netdev->vlan_features = NETIF_F_SG | NETIF_F_IP_CSUM | NETIF_F_TSO;
+> 
+> +	if (!pass1_silicon(nic->pdev))
+> +		nic->hw_tso = true;
+> +
+>  	netdev->netdev_ops = &nicvf_netdev_ops;
+>  	netdev->watchdog_timeo = NICVF_TX_TIMEOUT;
+> 
+> diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+> b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+> index 1fbd908..b11fc09 100644
+> --- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+> +++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+> @@ -925,7 +925,7 @@ static int nicvf_sq_subdesc_required(struct nicvf *nic, struct sk_buff
+> *skb)
+>  {
+>  	int subdesc_cnt = MIN_SQ_DESC_PER_PKT_XMIT;
+> 
+> -	if (skb_shinfo(skb)->gso_size) {
+> +	if (skb_shinfo(skb)->gso_size && !nic->hw_tso) {
+>  		subdesc_cnt = nicvf_tso_count_subdescs(skb);
+>  		return subdesc_cnt;
+>  	}
+> @@ -940,7 +940,7 @@ static int nicvf_sq_subdesc_required(struct nicvf *nic, struct sk_buff
+> *skb)
+>   * First subdescriptor for every send descriptor.
+>   */
+>  static inline void
+> -nicvf_sq_add_hdr_subdesc(struct snd_queue *sq, int qentry,
+> +nicvf_sq_add_hdr_subdesc(struct nicvf *nic, struct snd_queue *sq, int qentry,
+>  			 int subdesc_cnt, struct sk_buff *skb, int len)
+>  {
+>  	int proto;
+> @@ -976,6 +976,15 @@ nicvf_sq_add_hdr_subdesc(struct snd_queue *sq, int qentry,
+>  			break;
+>  		}
+>  	}
+> +
+> +	if (nic->hw_tso && skb_shinfo(skb)->gso_size) {
+> +		hdr->tso = 1;
+> +		hdr->tso_start = skb_transport_offset(skb) + tcp_hdrlen(skb);
+> +		hdr->tso_max_paysize = skb_shinfo(skb)->gso_size;
+> +		/* For non-tunneled pkts, point this to L2 ethertype */
+> +		hdr->inner_l3_offset = skb_network_offset(skb) - 2;
+> +		nic->drv_stats.tx_tso++;
+> +	}
+>  }
+> 
+>  /* SQ GATHER subdescriptor
+> @@ -1045,7 +1054,7 @@ static int nicvf_sq_append_tso(struct nicvf *nic, struct snd_queue *sq,
+>  			data_left -= size;
+>  			tso_build_data(skb, &tso, size);
+>  		}
+> -		nicvf_sq_add_hdr_subdesc(sq, hdr_qentry,
+> +		nicvf_sq_add_hdr_subdesc(nic, sq, hdr_qentry,
+>  					 seg_subdescs - 1, skb, seg_len);
+>  		sq->skbuff[hdr_qentry] = (u64)NULL;
+>  		qentry = nicvf_get_nxt_sqentry(sq, qentry);
+> @@ -1098,11 +1107,12 @@ int nicvf_sq_append_skb(struct nicvf *nic, struct sk_buff *skb)
+>  	qentry = nicvf_get_sq_desc(sq, subdesc_cnt);
+> 
+>  	/* Check if its a TSO packet */
+> -	if (skb_shinfo(skb)->gso_size)
+> +	if (skb_shinfo(skb)->gso_size && !nic->hw_tso)
+>  		return nicvf_sq_append_tso(nic, sq, sq_num, qentry, skb);
+> 
+>  	/* Add SQ header subdesc */
+> -	nicvf_sq_add_hdr_subdesc(sq, qentry, subdesc_cnt - 1, skb, skb->len);
+> +	nicvf_sq_add_hdr_subdesc(nic, sq, qentry, subdesc_cnt - 1,
+> +				 skb, skb->len);
+> 
+>  	/* Add SQ gather subdescs */
+>  	qentry = nicvf_get_nxt_sqentry(sq, qentry);
+> diff --git a/drivers/net/ethernet/cavium/thunder/q_struct.h
+> b/drivers/net/ethernet/cavium/thunder/q_struct.h
+> index 3c1de97..9e6d987 100644
+> --- a/drivers/net/ethernet/cavium/thunder/q_struct.h
+> +++ b/drivers/net/ethernet/cavium/thunder/q_struct.h
+> @@ -545,25 +545,28 @@ struct sq_hdr_subdesc {
+>  	u64    subdesc_cnt:8;
+>  	u64    csum_l4:2;
+>  	u64    csum_l3:1;
+> -	u64    rsvd0:5;
+> +	u64    csum_inner_l4:2;
+> +	u64    csum_inner_l3:1;
+> +	u64    rsvd0:2;
+>  	u64    l4_offset:8;
+>  	u64    l3_offset:8;
+>  	u64    rsvd1:4;
+>  	u64    tot_len:20; /* W0 */
+> 
+> -	u64    tso_sdc_cont:8;
+> -	u64    tso_sdc_first:8;
+> -	u64    tso_l4_offset:8;
+> -	u64    tso_flags_last:12;
+> -	u64    tso_flags_first:12;
+> -	u64    rsvd2:2;
+> +	u64    rsvd2:24;
+> +	u64    inner_l4_offset:8;
+> +	u64    inner_l3_offset:8;
+> +	u64    tso_start:8;
+> +	u64    rsvd3:2;
+>  	u64    tso_max_paysize:14; /* W1 */
+>  #elif defined(__LITTLE_ENDIAN_BITFIELD)
+>  	u64    tot_len:20;
+>  	u64    rsvd1:4;
+>  	u64    l3_offset:8;
+>  	u64    l4_offset:8;
+> -	u64    rsvd0:5;
+> +	u64    rsvd0:2;
+> +	u64    csum_inner_l3:1;
+> +	u64    csum_inner_l4:2;
+>  	u64    csum_l3:1;
+>  	u64    csum_l4:2;
+>  	u64    subdesc_cnt:8;
+> @@ -574,12 +577,11 @@ struct sq_hdr_subdesc {
+>  	u64    subdesc_type:4; /* W0 */
+> 
+>  	u64    tso_max_paysize:14;
+> -	u64    rsvd2:2;
+> -	u64    tso_flags_first:12;
+> -	u64    tso_flags_last:12;
+> -	u64    tso_l4_offset:8;
+> -	u64    tso_sdc_first:8;
+> -	u64    tso_sdc_cont:8; /* W1 */
+> +	u64    rsvd3:2;
+> +	u64    tso_start:8;
+> +	u64    inner_l3_offset:8;
+> +	u64    inner_l4_offset:8;
+> +	u64    rsvd2:24; /* W1 */
+>  #endif
+>  };
+> 
+> --
+> 1.7.1
+> 
 
-Acked-by: Jon Hunter <jonathanh@nvidia.com>
-
-Cheers
-Jon
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
