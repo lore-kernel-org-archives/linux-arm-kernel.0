@@ -1,70 +1,156 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed,  9 Dec 2015 12:44:44 +0000
-Subject: [RFC PATCH 09/20] arm64: add function to install the idmap
+Date: Wed,  9 Dec 2015 12:44:42 +0000
+Subject: [RFC PATCH 07/20] arm64: unify idmap removal
 In-Reply-To: <1449665095-20774-1-git-send-email-mark.rutland@arm.com>
 References: <1449665095-20774-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1449665095-20774-10-git-send-email-mark.rutland@arm.com>
+Message-ID: <1449665095-20774-8-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In some cases (e.g. when making invasive changes to the kernel page
-tables) we will need to execute code from the idmap.
+We currently open-code the removal of the idmap and restoration of the
+current task's MMU state in a few places.
 
-Add a new helper which may be used to install the idmap, complementing
-the existing cpu_uninstall_idmap.
+Before introducing yet more copies of this sequence, unify these to call
+a new helper, cpu_uninstall_idmap.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Jeremy Linton <jeremy.linton@arm.com>
 Cc: Laura Abbott <labbott@fedoraproject.org>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/mmu_context.h | 16 ++++++++++++++--
- 1 file changed, 14 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/mmu_context.h | 25 +++++++++++++++++++++++++
+ arch/arm64/kernel/setup.c            |  1 +
+ arch/arm64/kernel/smp.c              |  4 +---
+ arch/arm64/kernel/suspend.c          | 20 ++++----------------
+ arch/arm64/mm/mmu.c                  |  4 +---
+ 5 files changed, 32 insertions(+), 22 deletions(-)
 
 diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-index b1b2514..944f273 100644
+index 600eacb..b1b2514 100644
 --- a/arch/arm64/include/asm/mmu_context.h
 +++ b/arch/arm64/include/asm/mmu_context.h
-@@ -74,7 +74,7 @@ static inline bool __cpu_uses_extended_idmap(void)
- /*
-  * Set TCR.T0SZ to its default value (based on VA_BITS)
-  */
--static inline void cpu_set_default_tcr_t0sz(void)
-+static inline void __cpu_set_tcr_t0sz(unsigned long t0sz)
- {
- 	unsigned long tcr;
+@@ -27,6 +27,7 @@
+ #include <asm-generic/mm_hooks.h>
+ #include <asm/cputype.h>
+ #include <asm/pgtable.h>
++#include <asm/tlbflush.h>
  
-@@ -87,9 +87,12 @@ static inline void cpu_set_default_tcr_t0sz(void)
- 	"	msr	tcr_el1, %0	;"
- 	"	isb"
- 	: "=&r" (tcr)
--	: "r"(TCR_T0SZ(VA_BITS)), "I"(TCR_T0SZ_OFFSET), "I"(TCR_TxSZ_WIDTH));
-+	: "r"(t0sz), "I"(TCR_T0SZ_OFFSET), "I"(TCR_TxSZ_WIDTH));
+ #ifdef CONFIG_PID_IN_CONTEXTIDR
+ static inline void contextidr_thread_switch(struct task_struct *next)
+@@ -90,6 +91,30 @@ static inline void cpu_set_default_tcr_t0sz(void)
  }
  
-+#define cpu_set_default_tcr_t0sz()	__cpu_set_tcr_t0sz(TCR_T0SZ(VA_BITS))
-+#define cpu_set_idmap_tcr_t0sz()	__cpu_set_tcr_t0sz(idmap_t0sz)
-+
  /*
-  * Remove the idmap from TTBR0_EL1 and install the pgd of the active mm.
-  *
-@@ -114,6 +117,15 @@ static inline void cpu_uninstall_idmap(void)
- 		cpu_switch_mm(mm->pgd, mm);
- }
- 
-+static inline void cpu_install_idmap(void)
++ * Remove the idmap from TTBR0_EL1 and install the pgd of the active mm.
++ *
++ * The idmap lives in the same VA range as userspace, but uses global entries
++ * and may use a different TCR_EL1.T0SZ. To avoid issues resulting from
++ * speculative TLB fetches, we must temporarily install the reserved page
++ * tables while we invalidate the TLBs and set up the correct TCR_EL1.T0SZ.
++ *
++ * If current is a not a user task, the mm covers the TTBR1_EL1 page tables,
++ * which should not be installed in TTBR0_EL1. In this case we can leave the
++ * reserved page tables in place.
++ */
++static inline void cpu_uninstall_idmap(void)
 +{
++	struct mm_struct *mm = current->active_mm;
++
 +	cpu_set_reserved_ttbr0();
 +	local_flush_tlb_all();
-+	cpu_set_idmap_tcr_t0sz();
++	cpu_set_default_tcr_t0sz();
 +
-+	cpu_switch_mm(idmap_pg_dir, &init_mm);
++	if (mm != &init_mm)
++		cpu_switch_mm(mm->pgd, mm);
 +}
 +
- /*
++/*
   * It would be nice to return ASIDs back to the allocator, but unfortunately
   * that introduces a race with a generation rollover where we could erroneously
+  * free an ASID allocated in a future generation. We could workaround this by
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 8119479..f6621ba 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -62,6 +62,7 @@
+ #include <asm/memblock.h>
+ #include <asm/efi.h>
+ #include <asm/xen/hypervisor.h>
++#include <asm/mmu_context.h>
+ 
+ phys_addr_t __fdt_pointer __initdata;
+ 
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index b1adc51..68e7f79 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -149,9 +149,7 @@ asmlinkage void secondary_start_kernel(void)
+ 	 * TTBR0 is only used for the identity mapping at this stage. Make it
+ 	 * point to zero page to avoid speculatively fetching new entries.
+ 	 */
+-	cpu_set_reserved_ttbr0();
+-	local_flush_tlb_all();
+-	cpu_set_default_tcr_t0sz();
++	cpu_uninstall_idmap();
+ 
+ 	preempt_disable();
+ 	trace_hardirqs_off();
+diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
+index 1095aa4..6605539 100644
+--- a/arch/arm64/kernel/suspend.c
++++ b/arch/arm64/kernel/suspend.c
+@@ -60,7 +60,6 @@ void __init cpu_suspend_set_dbg_restorer(void (*hw_bp_restore)(void *))
+  */
+ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+ {
+-	struct mm_struct *mm = current->active_mm;
+ 	int ret;
+ 	unsigned long flags;
+ 
+@@ -87,22 +86,11 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+ 	ret = __cpu_suspend_enter(arg, fn);
+ 	if (ret == 0) {
+ 		/*
+-		 * We are resuming from reset with TTBR0_EL1 set to the
+-		 * idmap to enable the MMU; set the TTBR0 to the reserved
+-		 * page tables to prevent speculative TLB allocations, flush
+-		 * the local tlb and set the default tcr_el1.t0sz so that
+-		 * the TTBR0 address space set-up is properly restored.
+-		 * If the current active_mm != &init_mm we entered cpu_suspend
+-		 * with mappings in TTBR0 that must be restored, so we switch
+-		 * them back to complete the address space configuration
+-		 * restoration before returning.
++		 * We are resuming from reset with the idmap active in TTBR0_EL1.
++		 * We must uninstall the idmap and restore the expected MMU
++		 * state before we can possibly return to userspace.
+ 		 */
+-		cpu_set_reserved_ttbr0();
+-		local_flush_tlb_all();
+-		cpu_set_default_tcr_t0sz();
+-
+-		if (mm != &init_mm)
+-			cpu_switch_mm(mm->pgd, mm);
++		cpu_uninstall_idmap();
+ 
+ 		/*
+ 		 * Restore per-cpu offset before any kernel
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 7559c22..98a98ac 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -450,9 +450,7 @@ void __init paging_init(void)
+ 	 * TTBR0 is only used for the identity mapping at this stage. Make it
+ 	 * point to zero page to avoid speculatively fetching new entries.
+ 	 */
+-	cpu_set_reserved_ttbr0();
+-	local_flush_tlb_all();
+-	cpu_set_default_tcr_t0sz();
++	cpu_uninstall_idmap();
+ }
+ 
+ /*
 -- 
 1.9.1
