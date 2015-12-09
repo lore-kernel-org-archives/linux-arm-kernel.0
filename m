@@ -1,125 +1,33 @@
-From: b18965@freescale.com (Alison Wang)
-Date: Wed, 9 Dec 2015 16:41:39 +0800
-Subject: [PATCH v2] ARM: multi_v7_defconfig: Enable some drivers for LS1021A
-Message-ID: <1449650499-28660-1-git-send-email-b18965@freescale.com>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Wed, 9 Dec 2015 16:47:52 +0800
+Subject: [PATCH v6 14/21] KVM: ARM64: Add reset and access handlers for
+ PMOVSSET and PMOVSCLR register
+In-Reply-To: <56670C5D.3020407@arm.com>
+References: <1449578860-15808-1-git-send-email-zhaoshenglong@huawei.com>
+ <1449578860-15808-15-git-send-email-zhaoshenglong@huawei.com>
+ <56670C5D.3020407@arm.com>
+Message-ID: <5667EAB8.9030502@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables some drivers for LS1021A, such as
-GIANFAR, WATCHDOG, AUDIO, QSPI, I2C, ESDHC, EDMA, FTM.
-QorIQ Clock Framework and Ramdisk support is also enabled.
 
-Signed-off-by: Alison Wang <alison.wang@freescale.com>
----
-Changes since v1:
-- Make some drivers as loadable modules.
 
- arch/arm/configs/multi_v7_defconfig | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+On 2015/12/9 0:59, Marc Zyngier wrote:
+>> > +	}
+>> > +
+>> > +	/* If all overflow bits are cleared, kick the vcpu to clear interrupt
+>> > +	 * pending status.
+>> > +	 */
+>> > +	if (val == 0)
+>> > +		kvm_vcpu_kick(vcpu);
+> Do we really need to do so? This will be dropped on the next entry
+> anyway, so i don't see the need to kick the vcpu again. Or am I missing
+> something?
+> 
+I thought maybe it could not set the interrupt low immediately when all
+the overflow bits are cleared for some reason, so add a kick to force it
+to sync the interrupt. But as you said, I'll remove this.
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index f6a2557..fb2159d 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -128,6 +128,7 @@ CONFIG_KEXEC=y
- CONFIG_CPU_FREQ=y
- CONFIG_CPU_FREQ_STAT_DETAILS=y
- CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
-+CONFIG_QORIQ_CPUFREQ=y
- CONFIG_CPU_IDLE=y
- CONFIG_ARM_CPUIDLE=y
- CONFIG_NEON=y
-@@ -182,8 +183,11 @@ CONFIG_MTD_NAND_ATMEL=y
- CONFIG_MTD_NAND_BRCMNAND=y
- CONFIG_MTD_NAND_DAVINCI=y
- CONFIG_MTD_SPI_NOR=y
-+CONFIG_SPI_FSL_QUADSPI=m
- CONFIG_MTD_UBI=y
- CONFIG_BLK_DEV_LOOP=y
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_BLK_DEV_RAM_SIZE=65536
- CONFIG_AD525X_DPOT=y
- CONFIG_AD525X_DPOT_I2C=y
- CONFIG_ATMEL_TCLIB=y
-@@ -210,6 +214,7 @@ CONFIG_HIX5HD2_GMAC=y
- CONFIG_SUN4I_EMAC=y
- CONFIG_MACB=y
- CONFIG_NET_CALXEDA_XGMAC=y
-+CONFIG_GIANFAR=y
- CONFIG_IGB=y
- CONFIG_MV643XX_ETH=y
- CONFIG_MVNETA=y
-@@ -226,6 +231,7 @@ CONFIG_MARVELL_PHY=y
- CONFIG_SMSC_PHY=y
- CONFIG_BROADCOM_PHY=y
- CONFIG_ICPLUS_PHY=y
-+CONFIG_REALTEK_PHY=y
- CONFIG_MICREL_PHY=y
- CONFIG_FIXED_PHY=y
- CONFIG_USB_PEGASUS=y
-@@ -312,6 +318,7 @@ CONFIG_I2C_DESIGNWARE_PLATFORM=y
- CONFIG_I2C_DIGICOLOR=m
- CONFIG_I2C_GPIO=m
- CONFIG_I2C_EXYNOS5=y
-+CONFIG_I2C_IMX=m
- CONFIG_I2C_MV64XXX=y
- CONFIG_I2C_RIIC=y
- CONFIG_I2C_RK3X=y
-@@ -330,6 +337,7 @@ CONFIG_SPI=y
- CONFIG_SPI_ATMEL=m
- CONFIG_SPI_CADENCE=y
- CONFIG_SPI_DAVINCI=y
-+CONFIG_SPI_FSL_DSPI=m
- CONFIG_SPI_OMAP24XX=y
- CONFIG_SPI_ORION=y
- CONFIG_SPI_PL022=y
-@@ -405,6 +413,7 @@ CONFIG_ARM_SP805_WATCHDOG=y
- CONFIG_ORION_WATCHDOG=y
- CONFIG_ST_LPC_WATCHDOG=y
- CONFIG_SUNXI_WATCHDOG=y
-+CONFIG_IMX2_WDT=y
- CONFIG_TEGRA_WATCHDOG=m
- CONFIG_MESON_WATCHDOG=y
- CONFIG_DIGICOLOR_WATCHDOG=y
-@@ -525,6 +534,7 @@ CONFIG_SND_USB_AUDIO=y
- CONFIG_SND_SOC=m
- CONFIG_SND_ATMEL_SOC=m
- CONFIG_SND_ATMEL_SOC_WM8904=m
-+CONFIG_SND_SOC_FSL_SAI=m
- CONFIG_SND_SOC_SH4_FSI=m
- CONFIG_SND_SOC_RCAR=m
- CONFIG_SND_SOC_RSRC_CARD=m
-@@ -537,6 +547,7 @@ CONFIG_SND_SOC_TEGRA_TRIMSLICE=m
- CONFIG_SND_SOC_TEGRA_ALC5632=m
- CONFIG_SND_SOC_TEGRA_MAX98090=m
- CONFIG_SND_SOC_AK4642=m
-+CONFIG_SND_SOC_SGTL5000=m
- CONFIG_SND_SOC_WM8978=m
- CONFIG_USB=y
- CONFIG_USB_XHCI_HCD=y
-@@ -577,6 +588,7 @@ CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_PLTFM=y
- CONFIG_MMC_SDHCI_OF_ARASAN=y
- CONFIG_MMC_SDHCI_OF_AT91=y
-+CONFIG_MMC_SDHCI_OF_ESDHC=m
- CONFIG_MMC_SDHCI_ESDHC_IMX=y
- CONFIG_MMC_SDHCI_DOVE=y
- CONFIG_MMC_SDHCI_TEGRA=y
-@@ -653,6 +665,7 @@ CONFIG_DMADEVICES=y
- CONFIG_DW_DMAC=y
- CONFIG_AT_HDMAC=y
- CONFIG_AT_XDMAC=y
-+CONFIG_FSL_EDMA=m
- CONFIG_MV_XOR=y
- CONFIG_TEGRA20_APB_DMA=y
- CONFIG_SH_DMAE=y
-@@ -712,6 +725,7 @@ CONFIG_AK8975=y
- CONFIG_PWM=y
- CONFIG_PWM_ATMEL=m
- CONFIG_PWM_ATMEL_TCB=m
-+CONFIG_PWM_FSL_FTM=m
- CONFIG_PWM_RENESAS_TPU=y
- CONFIG_PWM_ROCKCHIP=m
- CONFIG_PWM_SAMSUNG=m
+Thanks,
 -- 
-2.1.0.27.g96db324
+Shannon
