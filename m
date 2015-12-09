@@ -1,62 +1,100 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 9 Dec 2015 20:10:07 +0000
-Subject: [PATCH] cpufreq: tegra: add regulator dependency for T124
-In-Reply-To: <566865ED.3020106@nvidia.com>
-References: <2194927.eV2s2QmZs0@wuerfel> <5668188F.2080202@nvidia.com>
- <20151209144734.GB5727@sirena.org.uk> <566865ED.3020106@nvidia.com>
-Message-ID: <20151209201007.GG5727@sirena.org.uk>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 9 Dec 2015 14:12:00 -0600
+Subject: [PATCH v1 4/8] dt-bindings: add documentation of rk3228 clock
+ controller
+In-Reply-To: <1449651853-1667-5-git-send-email-jeffy.chen@rock-chips.com>
+References: <1449651853-1667-1-git-send-email-jeffy.chen@rock-chips.com>
+ <1449651853-1667-5-git-send-email-jeffy.chen@rock-chips.com>
+Message-ID: <20151209201200.GA29732@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 09, 2015 at 05:33:33PM +0000, Jon Hunter wrote:
-> On 09/12/15 14:47, Mark Brown wrote:
+On Wed, Dec 09, 2015 at 05:04:09PM +0800, Jeffy Chen wrote:
+> Add the devicetree binding for the cru on the rk3228 which quite similar
+> structured as previous clock controllers.
+> 
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 
-> > If changes implemented by the clock driver are trashing the regulator
-> > settings I would expect the clock driver to be responsible for fixing
-> > things up rather than another driver that happens to use the clock.  I'd
-> > also expect some kind of internal documentation explaining what's going
-> > on, and possibly 
+Seems like there is a lot of duplication across Rockchip cru bindings. 
+Perhaps they should be combined? Otherwise:
 
-> Yes, the DFLL clock driver could restore the voltage, however, that
-> does not guarantee that the voltage is still sufficient for the other
-> clock source.
+Acked-by: Rob Herring <robh@kernel.org>
 
-But the code we've got won't do that either - it'l just set the voltage
-to whatever the last thing the regulator API had that might have been
-within its constraints.
-
-> > Setting the voltage you've read back sounds broken, if the hardware
-> > might randomly change things how do you know the settings we read were
-> > sane?  Shouldn't we know what voltage range the device requires in a
-> > given mode and set that - that's much more normal?
-
-> The hardware will not randomly change the voltage until the DFLL is
-> enabled and so you would have to do this before.
-
-I'm not clear that there's even a guarantee that the kernel will ever
-have seen this configuration, consider for example what happens if
-someone uses kexec?
-
-> Yes, setting the frequency and voltage as defined by a given operating
-> mode would make sense. However, I am not sure we have those defined in
-> the kernel for this PLL and would have to be added.
-
-I think given how you're describing the hardware that this will be
-required in order to provide something robust (and also to get the best
-power savings from the hardware).
-
-> I was thinking that during boot we could read the default voltage and
-> frequency set by the bootloader and use this as it should not be
-> changing dynamically at this point because the cpufreq driver has not
-> been activated yet.
-
-I'm a bit confused here, we're talking about a change to the cpufreq
-driver here aren't we?  Or alternatively why are we manipulating the
-clock tree like this if we don't yet have support for the hardware?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151209/fd5be391/attachment-0001.sig>
+> ---
+> 
+>  .../bindings/clock/rockchip,rk3228-cru.txt         | 58 ++++++++++++++++++++++
+>  1 file changed, 58 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/rockchip,rk3228-cru.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/rockchip,rk3228-cru.txt b/Documentation/devicetree/bindings/clock/rockchip,rk3228-cru.txt
+> new file mode 100644
+> index 0000000..f323048
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/rockchip,rk3228-cru.txt
+> @@ -0,0 +1,58 @@
+> +* Rockchip RK3228 Clock and Reset Unit
+> +
+> +The RK3228 clock controller generates and supplies clock to various
+> +controllers within the SoC and also implements a reset controller for SoC
+> +peripherals.
+> +
+> +Required Properties:
+> +
+> +- compatible: should be "rockchip,rk3228-cru"
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +- #clock-cells: should be 1.
+> +- #reset-cells: should be 1.
+> +
+> +Optional Properties:
+> +
+> +- rockchip,grf: phandle to the syscon managing the "general register files"
+> +  If missing pll rates are not changeable, due to the missing pll lock status.
+> +
+> +Each clock is assigned an identifier and client nodes can use this identifier
+> +to specify the clock which they consume. All available clocks are defined as
+> +preprocessor macros in the dt-bindings/clock/rk3228-cru.h headers and can be
+> +used in device tree sources. Similar macros exist for the reset sources in
+> +these files.
+> +
+> +External clocks:
+> +
+> +There are several clocks that are generated outside the SoC. It is expected
+> +that they are defined using standard clock bindings with following
+> +clock-output-names:
+> + - "xin24m" - crystal input - required,
+> + - "ext_i2s" - external I2S clock - optional,
+> + - "ext_gmac" - external GMAC clock - optional
+> + - "ext_hsadc" - external HSADC clock - optional
+> + - "phy_50m_out" - output clock of the pll in the mac phy
+> +
+> +Example: Clock controller node:
+> +
+> +	cru: cru at 20000000 {
+> +		compatible = "rockchip,rk3228-cru";
+> +		reg = <0x20000000 0x1000>;
+> +		rockchip,grf = <&grf>;
+> +
+> +		#clock-cells = <1>;
+> +		#reset-cells = <1>;
+> +	};
+> +
+> +Example: UART controller node that consumes the clock generated by the clock
+> +  controller:
+> +
+> +	uart0: serial at 10110000 {
+> +		compatible = "snps,dw-apb-uart";
+> +		reg = <0x10110000 0x100>;
+> +		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
+> +		reg-shift = <2>;
+> +		reg-io-width = <4>;
+> +		clocks = <&cru SCLK_UART0>;
+> +	};
+> -- 
+> 2.1.4
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
