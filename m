@@ -1,56 +1,117 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 09 Dec 2015 16:32:11 +0100
-Subject: [PATCH v2 3/9] ARM: hisi: enable Hi3519 soc
-In-Reply-To: <56664878.8040805@huawei.com>
-References: <1449110565-23590-1-git-send-email-xuejiancheng@huawei.com>
- <56663897.7040901@huawei.com> <56664878.8040805@huawei.com>
-Message-ID: <4297924.YW2IR8MmHA@wuerfel>
+From: liviu.dudau@arm.com (Liviu Dudau)
+Date: Wed, 9 Dec 2015 15:45:33 +0000
+Subject: [PATCH 004/182] gpio: generic: factor into gpio_chip struct
+In-Reply-To: <1449666760-29876-1-git-send-email-linus.walleij@linaro.org>
+References: <1449666760-29876-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20151209154533.GO972@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 08 December 2015 11:03:20 xuejiancheng wrote:
-> >>
-> >> I think we should come up with a way to handle this in general for
-> >> ARCH_HISI. It's not problem to have a couple of sub-options, but I'd
-> >> rather not have one for each SoC because I'm sure that hisilicon has
-> >> made dozens or possibly hundreds of ARM based SoCs that belong into
-> >> a couple of families.
-> > 
-> > Agree with you.
-> > 
-> >>
-> >> The individual selection of IP blocks is not that important, because
-> >> those tend to just be generic device drivers that we can enable on
-> >> any platform using the defconfig files.
-> >>
-> >> You said that ARCH_HI3519 and HIP04 have an identical system controller,
-> >> but it's different for Hi36xx, correct?
-> > 
-> > No. The system controller of HI3519 is also different from HIP04. Maybe I gave you
-> > wrong descriptions. Sorry about that.
-> > 
-> >>
-> >> So maybe we can generalize the HIP04 option to include all chips with
-> >> that system controller as they appear to share a common ancestry regardless
-> >> of the target market?
-> >>
-> > 
-> > I agree that we generalize some options regardless of the product line and target market.
-> > 
-> >> The Hi35xx family includes some rather older chips as well based on ARM9
-> >> etc, correct? Are they closely related to the new one as well, or do they
-> >> just share the name?
-> > 
-> > Yes. It's correct. They may share some IP blocks. But they may be very different
-> > from the new one for the arch code. I also don't think it's a good idea to make
-> > them share the same name.
+On Wed, Dec 09, 2015 at 02:12:40PM +0100, Linus Walleij wrote:
+> The separate struct bgpio_chip has been a pain to handle, both
+> by being confusingly similar in name to struct gpio_chip and
+> for being contained inside a struct so that struct gpio_chip
+> is contained in a struct contained in a struct, making several
+> steps of dereferencing necessary.
 > 
-> I will use ARCH_HISI instead of ARCH_HI3519.
+> Make things simpler: include the fields directly into
+> <linux/gpio/driver.h>, #ifdef:ed for CONFIG_GENERIC_GPIO, and
+> get rid of the <linux/basic_mmio_gpio.h> altogether. Prefix
+> some of the member variables with bgpio_* and add proper
+> kerneldoc while we're at it.
 > 
+> Modify all users to handle the change and use a struct
+> gpio_chip directly. And while we're at it: replace all
+> container_of() dereferencing by gpiochip_get_data() and
+> registering the gpio_chip with gpiochip_add_data().
+> 
+> Cc: arm at kernel.org
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Cc: Alexander Shiyan <shc_work@mail.ru>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Cc: Alexandre Courbot <gnurou@gmail.com>
+> Cc: Gregory Fong <gregory.0xf0@gmail.com>
+> Cc: Brian Norris <computersforpeace@gmail.com>
+> Cc: Florian Fainelli <f.fainelli@gmail.com>
+> Cc: Liviu Dudau <liviu.dudau@arm.com>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
+> Cc: Rabin Vincent <rabin@rab.in>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-omap at vger.kernel.org
+> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: bcm-kernel-feedback-list at broadcom.com
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ARM SoC folks and Lee: it would be great if you could
+> ACK the few lines hitting arch/arm/* and drivers/mfd/* in this
+> so I can take it through the GPIO tree.
+> ---
+
+[....]
+
+>  drivers/mfd/vexpress-sysreg.c           |   8 +-
+
+[....]
+
+> diff --git a/drivers/mfd/vexpress-sysreg.c b/drivers/mfd/vexpress-sysreg.c
+> index 3e628df9280c..855c0204f09a 100644
+> --- a/drivers/mfd/vexpress-sysreg.c
+> +++ b/drivers/mfd/vexpress-sysreg.c
+> @@ -11,7 +11,7 @@
+>   * Copyright (C) 2012 ARM Limited
+>   */
+>  
+> -#include <linux/basic_mmio_gpio.h>
+> +#include <linux/gpio/driver.h>
+>  #include <linux/err.h>
+>  #include <linux/io.h>
+>  #include <linux/mfd/core.h>
+> @@ -164,7 +164,7 @@ static int vexpress_sysreg_probe(struct platform_device *pdev)
+>  {
+>  	struct resource *mem;
+>  	void __iomem *base;
+> -	struct bgpio_chip *mmc_gpio_chip;
+> +	struct gpio_chip *mmc_gpio_chip;
+>  	int master;
+>  	u32 dt_hbi;
+>  
+> @@ -201,8 +201,8 @@ static int vexpress_sysreg_probe(struct platform_device *pdev)
+>  		return -ENOMEM;
+>  	bgpio_init(mmc_gpio_chip, &pdev->dev, 0x4, base + SYS_MCI,
+>  			NULL, NULL, NULL, NULL, 0);
+> -	mmc_gpio_chip->gc.ngpio = 2;
+> -	gpiochip_add(&mmc_gpio_chip->gc);
+> +	mmc_gpio_chip->ngpio = 2;
+> +	gpiochip_add(mmc_gpio_chip);
+>  
+>  	return mfd_add_devices(&pdev->dev, PLATFORM_DEVID_AUTO,
+>  			vexpress_sysreg_cells,
+
+[....]
+
+> -- 
+> 2.4.3
 > 
 
-Do you mean you want to remove the other options as well?
+For the drivers/mfd/vexpress-sysreg.c part:
 
-We should do this consistently at least within the Kconfig file.
+Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
 
-	Arnd
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
