@@ -1,40 +1,75 @@
-From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
-Date: Wed, 9 Dec 2015 12:51:31 -0600
-Subject: [PATCH v5 5/5] gicv2m: acpi: Introducing GICv2m ACPI support
-In-Reply-To: <56687008.3020703@arm.com>
-References: <1449625686-5594-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1449625686-5594-6-git-send-email-Suravee.Suthikulpanit@amd.com>
- <20151209103806.41488405@why.wild-wind.fr.eu.org> <56686C9F.6060804@amd.com>
- <56687008.3020703@arm.com>
-Message-ID: <56687833.6040706@amd.com>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Wed, 09 Dec 2015 11:10:57 -0800
+Subject: [PATCH v2 4/5] arm64: dts: qcom: Alias pm8916 on msm8916 devices
+In-Reply-To: <1448062280-15406-5-git-send-email-sboyd@codeaurora.org>
+References: <1448062280-15406-1-git-send-email-sboyd@codeaurora.org>
+ <1448062280-15406-5-git-send-email-sboyd@codeaurora.org>
+Message-ID: <56687CC1.4040208@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/9/2015 12:16 PM, Marc Zyngier wrote:
->>>> diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
->>>> >>>[...]
->>>> >>>@@ -359,6 +368,8 @@ static int __init gicv2m_init_one(struct fwnode_handle *fwnode,
->>>> >>>
->>>> >>>   	if (to_of_node(fwnode))
->>>> >>>   		name = to_of_node(fwnode)->name;
->>>> >>>+	else
->>>> >>>+		name = irq_domain_get_irqchip_fwnode_name(fwnode);
->>> >>
->>> >>Don't bother with that, the name associated with the domain is
->>> >>absolutely meaningless. You are already printing the frame address,
->>> >>which is enough to identify it, should someone need to debug this.
->>> >>
->>> >>Drop the name from the previous patch as well, and that will make one
->>> >>less difference to care about. Patch #3 can die as well.
->>> >>
->> >
->> >Ok. I'll just leave them blank (i.e. const char *name ="")
-> No, just remove name altogether. Nobody reads that anyway, and if they
-> want to find out, there is the address that's clear enough.
->
-> Thanks,
->
-> 	M.
+On 11/20/2015 3:31 PM, Stephen Boyd wrote:
+> Add an alias for pm8916 on msm8916 based SoCs so that the newly
+> updated dtbTool can find the pmic compatible string and add the
+> pmic-id element to the QCDT header.
+> 
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi | 1 +
+>  arch/arm64/boot/dts/qcom/msm8916-mtp.dtsi | 1 +
+>  arch/arm64/boot/dts/qcom/pm8916.dtsi      | 6 +++---
+>  3 files changed, 5 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+> index 6b8abbe68746..46bfcb9b2e84 100644
+> --- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+> @@ -20,6 +20,7 @@
+>  	aliases {
+>  		serial0 = &blsp1_uart2;
+>  		serial1 = &blsp1_uart1;
+> +		usid0 = &pm8916_0;
+>  	};
+>  
+>  	chosen {
+> diff --git a/arch/arm64/boot/dts/qcom/msm8916-mtp.dtsi b/arch/arm64/boot/dts/qcom/msm8916-mtp.dtsi
+> index a1aa0b201e92..ceeb8a6feed6 100644
+> --- a/arch/arm64/boot/dts/qcom/msm8916-mtp.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/msm8916-mtp.dtsi
+> @@ -17,6 +17,7 @@
+>  / {
+>  	aliases {
+>  		serial0 = &blsp1_uart2;
+> +		usid0 = &pm8916_0;
+>  	};
+>  
+>  	chosen {
+> diff --git a/arch/arm64/boot/dts/qcom/pm8916.dtsi b/arch/arm64/boot/dts/qcom/pm8916.dtsi
+> index b222ece7e3d2..37432451ee4c 100644
+> --- a/arch/arm64/boot/dts/qcom/pm8916.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/pm8916.dtsi
+> @@ -4,8 +4,8 @@
+>  
+>  &spmi_bus {
+>  
+> -	usid0: pm8916 at 0 {
+> -		compatible = "qcom,spmi-pmic";
+> +	pm8916_0: pm8916 at 0 {
+> +		compatible = "qcom,pm8916", "qcom,spmi-pmic";
+>  		reg = <0x0 SPMI_USID>;
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> @@ -90,7 +90,7 @@
+>  		};
+>  	};
+>  
+> -	usid1: pm8916 at 1 {
+> +	pm8916_1: pm8916 at 1 {
+>  		compatible = "qcom,spmi-pmic";
+>  		reg = <0x1 SPMI_USID>;
+>  		#address-cells = <1>;
+> 
 
-Ok.
-Suravee
+Where are usid0 and usid1 documented?  I understand why they exist given the
+context of v1 and v2 of this patchset, but it will not be obvious to anyone
+who is just looking at the .dtsi files in the future.
