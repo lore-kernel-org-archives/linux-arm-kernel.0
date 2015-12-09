@@ -1,95 +1,35 @@
-From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Wed,  9 Dec 2015 09:57:19 +0000
-Subject: [RFC PATCH v3 8/8] arm64: Ensure the secondary CPUs have safe
- ASIDBits size
-In-Reply-To: <1449655039-22022-1-git-send-email-suzuki.poulose@arm.com>
-References: <1449655039-22022-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1449655039-22022-9-git-send-email-suzuki.poulose@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 09 Dec 2015 11:00:21 +0100
+Subject: arRe: [PATCH net-next 2/2] net: hns: enet specisies a reference
+ to dsaf (config and documents)
+In-Reply-To: <5667F379.2010108@huawei.com>
+References: <1449295856-31068-1-git-send-email-yankejian@huawei.com>
+ <1503684.BNZUVaD74W@wuerfel> <5667F379.2010108@huawei.com>
+Message-ID: <4902591.DhWVhdI4KP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ID_AA64MMFR0_EL1:ASIDBits determines the size of the mm context
-id and is used in the early boot to make decisions. The value is
-picked up from the Boot CPU and cannot be delayed until other CPUs
-are up. If a secondary CPU has a smaller size than that of the Boot
-CPU, things will break horribly and the usual SANITY check is not good
-enough to prevent the system from crashing. So, crash the system with
-enough information.
+On Wednesday 09 December 2015 17:25:13 Yankejian wrote:
+>  thanks a lot for pointing it out.
+> 
+>  It is great regret that this change breaks compatibility with old dtbs.
+>  this is a new driver which is run on developing boards, and all the
+>  clients' boards are developing boards. So we provide them a method to
+>  update the firmware on the board, once we update the dtsi and kernel,
+>  we require our clients to update the existed firmware and kernel.
+>  Therefore, these changes is actually under control. Shall we treat this
+>  by this way?
 
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
----
- arch/arm64/include/asm/mmu_context.h |    2 ++
- arch/arm64/kernel/cpufeature.c       |    2 ++
- arch/arm64/mm/context.c              |   16 ++++++++++++++++
- 3 files changed, 20 insertions(+)
+Ok, if you can show that the incompatible change is safe to do, that's
+fine. Just put the explanation above into the patch description to
+document that you have considered the effects of the change, and
+to ensure that it gets done atomically.
 
-diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-index 2416578..bd8a0b9 100644
---- a/arch/arm64/include/asm/mmu_context.h
-+++ b/arch/arm64/include/asm/mmu_context.h
-@@ -147,4 +147,6 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
- #define deactivate_mm(tsk,mm)	do { } while (0)
- #define activate_mm(prev,next)	switch_mm(prev, next, NULL)
- 
-+void verify_cpu_asid_bits(void);
-+
- #endif
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index e63da0f..f7bcd30 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -24,6 +24,7 @@
- #include <asm/cpu.h>
- #include <asm/cpufeature.h>
- #include <asm/cpu_ops.h>
-+#include <asm/mmu_context.h>
- #include <asm/processor.h>
- #include <asm/sysreg.h>
- 
-@@ -829,6 +830,7 @@ static u64 __raw_read_system_reg(u32 sys_id)
-  */
- static void check_early_cpu_features(void)
- {
-+	verify_cpu_asid_bits();
- }
- 
- /*
-diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
-index 643bf4b..b945bb4 100644
---- a/arch/arm64/mm/context.c
-+++ b/arch/arm64/mm/context.c
-@@ -24,6 +24,7 @@
- 
- #include <asm/cpufeature.h>
- #include <asm/mmu_context.h>
-+#include <asm/smp.h>
- #include <asm/tlbflush.h>
- 
- static u32 asid_bits;
-@@ -62,6 +63,21 @@ static u32 get_cpu_asid_bits(void)
- 	return asid;
- }
- 
-+/* Check if the current cpu's ASIDBits is compatible with asid_bits */
-+void verify_cpu_asid_bits(void)
-+{
-+	u32 asid = get_cpu_asid_bits();
-+
-+	if (asid < asid_bits) {
-+		/* Differing ASIDBits is dangerous, crash the system */
-+		pr_crit("CPU%d: has smaller ASIDBits(%u) than the one in use (%u)\n",
-+				smp_processor_id(), asid, asid_bits);
-+		update_cpu_boot_status(CPU_PANIC_KERNEL);
-+		isb();
-+		while(1);
-+	}
-+}
-+
- static void flush_context(unsigned int cpu)
- {
- 	int i;
--- 
-1.7.9.5
+Also, you have to merge the two patches into one to allow bisection,
+or do a series of three patches that need to be applied in order:
+
+1. add ae-handle property
+2. change driver to use that property
+3. remove ae-name property
+
+	Arnd
