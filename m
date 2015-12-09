@@ -1,129 +1,62 @@
-From: john@metanate.com (John Keeping)
-Date: Wed,  9 Dec 2015 10:32:26 +0000
-Subject: [PATCH 1/2] ASoC: rockchip: i2s: separate capture and playback
-Message-ID: <1449657147-26959-1-git-send-email-john@metanate.com>
+From: yankejian@huawei.com (Yankejian (Hackim Yim))
+Date: Wed, 9 Dec 2015 18:39:59 +0800
+Subject: [PATCH net-next 1/2] net: hns: enet specisies a reference to dsaf
+In-Reply-To: <56671D27.5070700@gmail.com>
+References: <1449302356-54658-1-git-send-email-yankejian@huawei.com>
+ <1449302356-54658-2-git-send-email-yankejian@huawei.com>
+ <56671D27.5070700@gmail.com>
+Message-ID: <566804FF.5000607@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we only clear the tx/rx state when both are disabled it is not
-possible to start/stop one multiple times while the other is running.
-Since the two are independently controlled, treat them as such and
-remove the false dependency between capture and playback.
 
-Signed-off-by: John Keeping <john@metanate.com>
----
- sound/soc/rockchip/rockchip_i2s.c | 72 +++++++++++++++++----------------------
- 1 file changed, 32 insertions(+), 40 deletions(-)
 
-diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
-index 83b1b9c..acc6225 100644
---- a/sound/soc/rockchip/rockchip_i2s.c
-+++ b/sound/soc/rockchip/rockchip_i2s.c
-@@ -82,8 +82,8 @@ static void rockchip_snd_txctrl(struct rk_i2s_dev *i2s, int on)
- 				   I2S_DMACR_TDE_ENABLE, I2S_DMACR_TDE_ENABLE);
- 
- 		regmap_update_bits(i2s->regmap, I2S_XFER,
--				   I2S_XFER_TXS_START | I2S_XFER_RXS_START,
--				   I2S_XFER_TXS_START | I2S_XFER_RXS_START);
-+				   I2S_XFER_TXS_START,
-+				   I2S_XFER_TXS_START);
- 
- 		i2s->tx_start = true;
- 	} else {
-@@ -92,27 +92,23 @@ static void rockchip_snd_txctrl(struct rk_i2s_dev *i2s, int on)
- 		regmap_update_bits(i2s->regmap, I2S_DMACR,
- 				   I2S_DMACR_TDE_ENABLE, I2S_DMACR_TDE_DISABLE);
- 
--		if (!i2s->rx_start) {
--			regmap_update_bits(i2s->regmap, I2S_XFER,
--					   I2S_XFER_TXS_START |
--					   I2S_XFER_RXS_START,
--					   I2S_XFER_TXS_STOP |
--					   I2S_XFER_RXS_STOP);
-+		regmap_update_bits(i2s->regmap, I2S_XFER,
-+				   I2S_XFER_TXS_START,
-+				   I2S_XFER_TXS_STOP);
- 
--			regmap_update_bits(i2s->regmap, I2S_CLR,
--					   I2S_CLR_TXC | I2S_CLR_RXC,
--					   I2S_CLR_TXC | I2S_CLR_RXC);
-+		regmap_update_bits(i2s->regmap, I2S_CLR,
-+				   I2S_CLR_TXC,
-+				   I2S_CLR_TXC);
- 
--			regmap_read(i2s->regmap, I2S_CLR, &val);
-+		regmap_read(i2s->regmap, I2S_CLR, &val);
- 
--			/* Should wait for clear operation to finish */
--			while (val) {
--				regmap_read(i2s->regmap, I2S_CLR, &val);
--				retry--;
--				if (!retry) {
--					dev_warn(i2s->dev, "fail to clear\n");
--					break;
--				}
-+		/* Should wait for clear operation to finish */
-+		while (val & I2S_CLR_TXC) {
-+			regmap_read(i2s->regmap, I2S_CLR, &val);
-+			retry--;
-+			if (!retry) {
-+				dev_warn(i2s->dev, "fail to clear\n");
-+				break;
- 			}
- 		}
- 	}
-@@ -128,8 +124,8 @@ static void rockchip_snd_rxctrl(struct rk_i2s_dev *i2s, int on)
- 				   I2S_DMACR_RDE_ENABLE, I2S_DMACR_RDE_ENABLE);
- 
- 		regmap_update_bits(i2s->regmap, I2S_XFER,
--				   I2S_XFER_TXS_START | I2S_XFER_RXS_START,
--				   I2S_XFER_TXS_START | I2S_XFER_RXS_START);
-+				   I2S_XFER_RXS_START,
-+				   I2S_XFER_RXS_START);
- 
- 		i2s->rx_start = true;
- 	} else {
-@@ -138,27 +134,23 @@ static void rockchip_snd_rxctrl(struct rk_i2s_dev *i2s, int on)
- 		regmap_update_bits(i2s->regmap, I2S_DMACR,
- 				   I2S_DMACR_RDE_ENABLE, I2S_DMACR_RDE_DISABLE);
- 
--		if (!i2s->tx_start) {
--			regmap_update_bits(i2s->regmap, I2S_XFER,
--					   I2S_XFER_TXS_START |
--					   I2S_XFER_RXS_START,
--					   I2S_XFER_TXS_STOP |
--					   I2S_XFER_RXS_STOP);
-+		regmap_update_bits(i2s->regmap, I2S_XFER,
-+				   I2S_XFER_RXS_START,
-+				   I2S_XFER_RXS_STOP);
- 
--			regmap_update_bits(i2s->regmap, I2S_CLR,
--					   I2S_CLR_TXC | I2S_CLR_RXC,
--					   I2S_CLR_TXC | I2S_CLR_RXC);
-+		regmap_update_bits(i2s->regmap, I2S_CLR,
-+				   I2S_CLR_RXC,
-+				   I2S_CLR_RXC);
- 
--			regmap_read(i2s->regmap, I2S_CLR, &val);
-+		regmap_read(i2s->regmap, I2S_CLR, &val);
- 
--			/* Should wait for clear operation to finish */
--			while (val) {
--				regmap_read(i2s->regmap, I2S_CLR, &val);
--				retry--;
--				if (!retry) {
--					dev_warn(i2s->dev, "fail to clear\n");
--					break;
--				}
-+		/* Should wait for clear operation to finish */
-+		while (val & I2S_CLR_RXC) {
-+			regmap_read(i2s->regmap, I2S_CLR, &val);
-+			retry--;
-+			if (!retry) {
-+				dev_warn(i2s->dev, "fail to clear\n");
-+				break;
- 			}
- 		}
- 	}
--- 
-2.6.3.462.gbe2c914
+On 2015/12/9 2:10, Florian Fainelli wrote:
+> Subject: s/specisies/specifies/?
+
+Thanks for pointing it out. i will change it in next patchset.
+
+Best Regards,
+yankejian
+
+> On 04/12/15 23:59, yankejian wrote:
+>> enet is associating with dasf. before this patch, the association is
+>> the same strings between ae-name and dsa-name. in a general way, enet
+>> specifies a reference to dsaf should be a good idea. so this patch
+>> deletes the ae-name in enet, and adds parsing the ae-handle
+>> from DT to set the associating with dsaf.
+>>
+>> Signed-off-by: yankejian <yankejian@huawei.com>
+>> ---
+> [snip]
+>
+>> diff --git a/drivers/net/ethernet/hisilicon/hns/hnae.c b/drivers/net/ethernet/hisilicon/hns/hnae.c
+>> index b364529..3bfe36f 100644
+>> --- a/drivers/net/ethernet/hisilicon/hns/hnae.c
+>> +++ b/drivers/net/ethernet/hisilicon/hns/hnae.c
+>> @@ -95,21 +95,17 @@ static struct hnae_buf_ops hnae_bops = {
+>>  static int __ae_match(struct device *dev, const void *data)
+>>  {
+>>  	struct hnae_ae_dev *hdev = cls_to_ae_dev(dev);
+>> -	const char *ae_id = data;
+>>  
+>> -	if (!strncmp(ae_id, hdev->name, AE_NAME_SIZE))
+>> -		return 1;
+>> -
+>> -	return 0;
+>> +	return hdev->dev->of_node == data;
+>>  }
+>>  
+>> -static struct hnae_ae_dev *find_ae(const char *ae_id)
+>> +static struct hnae_ae_dev *find_ae(const struct device_node *ae_node)
+>>  {
+>>  	struct device *dev;
+>>  
+>> -	WARN_ON(!ae_id);
+>> +	WARN_ON(!ae_node);
+>>  
+>> -	dev = class_find_device(hnae_class, NULL, ae_id, __ae_match);
+>> +	dev = class_find_device(hnae_class, NULL, ae_node, __ae_match);
+> of_find_net_device_by_node might be used for this maybe?
+it needs return hnae_ae_dev so we didn't decide to use of_find_net_device_by_node.
+Thanks
