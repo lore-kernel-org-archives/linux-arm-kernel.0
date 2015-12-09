@@ -1,45 +1,38 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 9 Dec 2015 12:56:43 +0900
-Subject: [PATCH v3] bus: uniphier-system-bus: add UniPhier System Bus
- driver
-In-Reply-To: <14233302.P9onBQovHz@wuerfel>
-References: <1449591718-21753-1-git-send-email-yamada.masahiro@socionext.com>
- <14233302.P9onBQovHz@wuerfel>
-Message-ID: <CAK7LNARJdgxKaP_Pg90LA4GR8gHUYSppdXDqYz8fYDPHKu9_Wg@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 08 Dec 2015 22:58:41 -0500 (EST)
+Subject: [PATCH] net: ezchip: fix address space confusion in nps_enet.c
+In-Reply-To: <33732958.3idC7H2UPT@wuerfel>
+References: <33732958.3idC7H2UPT@wuerfel>
+Message-ID: <20151208.225841.2073281401429339939.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Tue, 08 Dec 2015 16:28:59 +0100
 
-2015-12-09 1:59 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
->
-> Just a little thought about one thing I found odd:
->
->> +static int uniphier_system_bus_check_overlap(
->> +                                     struct uniphier_system_bus_priv tmp)
->> +{
->
-> Did you intentionally pass this by value?
+> The nps_enet driver happily mixes virtual, physical and __iomem
+> addresses, which are all different depending on the architecture
+> and configuration.  That causes a warning when building the code
+> on ARM with LPAE mode enabled:
+> 
+> drivers/net/ethernet/ezchip/nps_enet.c: In function 'nps_enet_send_frame':
+> drivers/net/ethernet/ezchip/nps_enet.c:370:13: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+> 
+> but will also fail to work for other reasons.
+> 
+> In this patch, I'm trying to change the code to use only normal
+> kernel pointers, which I assume is what the author actually meant:
+> 
+> * For reading or writing a 32-bit word that may be unaligned when
+>   an SKB contains unaligned data, I'm using get_unaligned/put_unaligned()
+>   rather than memcpy_fromio/toio.
+> 
+> * For converting a u8 pointer to a u32 pointer, I use a cast rather
+>   than the incorrect virt_to_phys.
+> 
+> * For copying a couple of bytes from one place to another while respecting
+>   alignment, I use memcpy instead of memcpy_toio.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Yes, I did not want to disturb the original one.
-
-It is copied to a temporary storage, and sorted by the base address,
-and discarded after the overlap checking.
-
-But, you are right.   It is possible (and simpler)
-to check the region overlap without sorting.
-
-
-> Maybe do it explicitly using a pointer
-> and memcpy to a local variable, which has a similar effect. Alternatively
-> just check each newly probed child node for conflicts with any of the
-> previous children. That is slightly more expensive at O(n^2) instead of O(n)
-> but n is always small here and you can avoid sorting first.
-
-Good idea.  I simplified this function in v4.
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+Applied, thanks Arnd.
