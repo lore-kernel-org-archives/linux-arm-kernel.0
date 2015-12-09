@@ -1,103 +1,318 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed,  9 Dec 2015 12:48:25 +0100
-Subject: [PATCH v2 12/14] ARM: dts: imx6: add Vivante GPU nodes
+Date: Wed,  9 Dec 2015 12:48:22 +0100
+Subject: [PATCH v2 09/14] drm/etnaviv: add GPU core dump functionality
 In-Reply-To: <1449661707-30532-1-git-send-email-l.stach@pengutronix.de>
 References: <1449661707-30532-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1449661707-30532-12-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1449661707-30532-9-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the device nodes for 2D, 3D and VG GPU cores.
+From: The etnaviv authors <dri-devel@lists.freedesktop.org>
 
+This adds functionality to allow post-portem GPU analysis.
+
+Signed-off-by: Christian Gmeiner <christian.gmeiner@gmail.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
- arch/arm/boot/dts/imx6dl.dtsi  |  5 +++++
- arch/arm/boot/dts/imx6q.dtsi   | 15 +++++++++++++++
- arch/arm/boot/dts/imx6qdl.dtsi | 22 ++++++++++++++++++++++
- 3 files changed, 42 insertions(+)
+ drivers/gpu/drm/etnaviv/etnaviv_dump.c | 227 +++++++++++++++++++++++++++++++++
+ drivers/gpu/drm/etnaviv/etnaviv_dump.h |  54 ++++++++
+ 2 files changed, 281 insertions(+)
+ create mode 100644 drivers/gpu/drm/etnaviv/etnaviv_dump.c
+ create mode 100644 drivers/gpu/drm/etnaviv/etnaviv_dump.h
 
-diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-index 4b0ec0703825..51c517a5cafd 100644
---- a/arch/arm/boot/dts/imx6dl.dtsi
-+++ b/arch/arm/boot/dts/imx6dl.dtsi
-@@ -104,6 +104,11 @@
- 		compatible = "fsl,imx-display-subsystem";
- 		ports = <&ipu1_di0>, <&ipu1_di1>;
- 	};
+diff --git a/drivers/gpu/drm/etnaviv/etnaviv_dump.c b/drivers/gpu/drm/etnaviv/etnaviv_dump.c
+new file mode 100644
+index 000000000000..bf8fa859e8be
+--- /dev/null
++++ b/drivers/gpu/drm/etnaviv/etnaviv_dump.c
+@@ -0,0 +1,227 @@
++/*
++ * Copyright (C) 2015 Etnaviv Project
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 as published by
++ * the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
 +
-+	gpu-subsystem {
-+		compatible = "fsl,imx-gpu-subsystem";
-+		cores = <&gpu_2d>, <&gpu_3d>;
-+	};
- };
- 
- &gpt {
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 399103b8e2c9..77d618b2870c 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -153,6 +153,16 @@
- 			status = "disabled";
- 		};
- 
-+		gpu_vg: gpu at 02204000 {
-+			compatible = "vivante,gc";
-+			reg = <0x02204000 0x4000>;
-+			interrupts = <0 11 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clks IMX6QDL_CLK_OPENVG_AXI>,
-+				 <&clks IMX6QDL_CLK_GPU2D_CORE>;
-+			clock-names = "bus", "core";
-+			power-domains = <&gpc 1>;
-+		};
++#include <linux/devcoredump.h>
++#include "etnaviv_dump.h"
++#include "etnaviv_gem.h"
++#include "etnaviv_gpu.h"
++#include "etnaviv_mmu.h"
++#include "state.xml.h"
++#include "state_hi.xml.h"
 +
- 		ipu2: ipu at 02800000 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -225,6 +235,11 @@
- 		compatible = "fsl,imx-display-subsystem";
- 		ports = <&ipu1_di0>, <&ipu1_di1>, <&ipu2_di0>, <&ipu2_di1>;
- 	};
++struct core_dump_iterator {
++	void *start;
++	struct etnaviv_dump_object_header *hdr;
++	void *data;
++};
 +
-+	gpu-subsystem {
-+		compatible = "fsl,imx-gpu-subsystem";
-+		cores = <&gpu_2d>, <&gpu_3d>, <&gpu_vg>;
-+	};
- };
- 
- &hdmi {
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 2b6cc8bf3c5c..018975b867e1 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -119,6 +119,28 @@
- 			status = "disabled";
- 		};
- 
++static const unsigned short etnaviv_dump_registers[] = {
++	VIVS_HI_AXI_STATUS,
++	VIVS_HI_CLOCK_CONTROL,
++	VIVS_HI_IDLE_STATE,
++	VIVS_HI_AXI_CONFIG,
++	VIVS_HI_INTR_ENBL,
++	VIVS_HI_CHIP_IDENTITY,
++	VIVS_HI_CHIP_FEATURE,
++	VIVS_HI_CHIP_MODEL,
++	VIVS_HI_CHIP_REV,
++	VIVS_HI_CHIP_DATE,
++	VIVS_HI_CHIP_TIME,
++	VIVS_HI_CHIP_MINOR_FEATURE_0,
++	VIVS_HI_CACHE_CONTROL,
++	VIVS_HI_AXI_CONTROL,
++	VIVS_PM_POWER_CONTROLS,
++	VIVS_PM_MODULE_CONTROLS,
++	VIVS_PM_MODULE_STATUS,
++	VIVS_PM_PULSE_EATER,
++	VIVS_MC_MMU_FE_PAGE_TABLE,
++	VIVS_MC_MMU_TX_PAGE_TABLE,
++	VIVS_MC_MMU_PE_PAGE_TABLE,
++	VIVS_MC_MMU_PEZ_PAGE_TABLE,
++	VIVS_MC_MMU_RA_PAGE_TABLE,
++	VIVS_MC_DEBUG_MEMORY,
++	VIVS_MC_MEMORY_BASE_ADDR_RA,
++	VIVS_MC_MEMORY_BASE_ADDR_FE,
++	VIVS_MC_MEMORY_BASE_ADDR_TX,
++	VIVS_MC_MEMORY_BASE_ADDR_PEZ,
++	VIVS_MC_MEMORY_BASE_ADDR_PE,
++	VIVS_MC_MEMORY_TIMING_CONTROL,
++	VIVS_MC_BUS_CONFIG,
++	VIVS_FE_DMA_STATUS,
++	VIVS_FE_DMA_DEBUG_STATE,
++	VIVS_FE_DMA_ADDRESS,
++	VIVS_FE_DMA_LOW,
++	VIVS_FE_DMA_HIGH,
++	VIVS_FE_AUTO_FLUSH,
++};
 +
-+		gpu_2d: gpu at 00134000 {
-+			compatible = "vivante,gc";
-+			reg = <0x00134000 0x4000>;
-+			interrupts = <0 10 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clks IMX6QDL_CLK_GPU2D_AXI>,
-+				 <&clks IMX6QDL_CLK_GPU2D_CORE>;
-+			clock-names = "bus", "core";
-+			power-domains = <&gpc 1>;
-+		};
++static void etnaviv_core_dump_header(struct core_dump_iterator *iter,
++	u32 type, void *data_end)
++{
++	struct etnaviv_dump_object_header *hdr = iter->hdr;
 +
-+		gpu_3d: gpu at 00130000 {
-+			compatible = "vivante,gc";
-+			reg = <0x00130000 0x4000>;
-+			interrupts = <0 9 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clks IMX6QDL_CLK_GPU3D_AXI>,
-+				 <&clks IMX6QDL_CLK_GPU3D_CORE>,
-+				 <&clks IMX6QDL_CLK_GPU3D_SHADER>;
-+			clock-names = "bus", "core", "shader";
-+			power-domains = <&gpc 1>;
-+		};
++	hdr->magic = cpu_to_le32(ETDUMP_MAGIC);
++	hdr->type = cpu_to_le32(type);
++	hdr->file_offset = cpu_to_le32(iter->data - iter->start);
++	hdr->file_size = cpu_to_le32(data_end - iter->data);
 +
- 		hdmi: hdmi at 0120000 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
++	iter->hdr++;
++	iter->data += hdr->file_size;
++}
++
++static void etnaviv_core_dump_registers(struct core_dump_iterator *iter,
++	struct etnaviv_gpu *gpu)
++{
++	struct etnaviv_dump_registers *reg = iter->data;
++	unsigned int i;
++
++	for (i = 0; i < ARRAY_SIZE(etnaviv_dump_registers); i++, reg++) {
++		reg->reg = etnaviv_dump_registers[i];
++		reg->value = gpu_read(gpu, etnaviv_dump_registers[i]);
++	}
++
++	etnaviv_core_dump_header(iter, ETDUMP_BUF_REG, reg);
++}
++
++static void etnaviv_core_dump_mmu(struct core_dump_iterator *iter,
++	struct etnaviv_gpu *gpu, size_t mmu_size)
++{
++	etnaviv_iommu_dump(gpu->mmu, iter->data);
++
++	etnaviv_core_dump_header(iter, ETDUMP_BUF_MMU, iter->data + mmu_size);
++}
++
++static void etnaviv_core_dump_mem(struct core_dump_iterator *iter, u32 type,
++	void *ptr, size_t size, u64 iova)
++{
++	memcpy(iter->data, ptr, size);
++
++	iter->hdr->iova = cpu_to_le64(iova);
++
++	etnaviv_core_dump_header(iter, type, iter->data + size);
++}
++
++void etnaviv_core_dump(struct etnaviv_gpu *gpu)
++{
++	struct core_dump_iterator iter;
++	struct etnaviv_vram_mapping *vram;
++	struct etnaviv_gem_object *obj;
++	struct etnaviv_cmdbuf *cmd;
++	unsigned int n_obj, n_bomap_pages;
++	size_t file_size, mmu_size;
++	__le64 *bomap, *bomap_start;
++
++	mmu_size = etnaviv_iommu_dump_size(gpu->mmu);
++
++	/* We always dump registers, mmu, ring and end marker */
++	n_obj = 4;
++	n_bomap_pages = 0;
++	file_size = ARRAY_SIZE(etnaviv_dump_registers) *
++			sizeof(struct etnaviv_dump_registers) +
++		    mmu_size + gpu->buffer->size;
++
++	/* Add in the active command buffers */
++	list_for_each_entry(cmd, &gpu->active_cmd_list, node) {
++		file_size += cmd->size;
++		n_obj++;
++	}
++
++	/* Add in the active buffer objects */
++	list_for_each_entry(vram, &gpu->mmu->mappings, mmu_node) {
++		if (!vram->use)
++			continue;
++
++		obj = vram->object;
++		file_size += obj->base.size;
++		n_bomap_pages += obj->base.size >> PAGE_SHIFT;
++		n_obj++;
++	}
++
++	/* If we have any buffer objects, add a bomap object */
++	if (n_bomap_pages) {
++		file_size += n_bomap_pages * sizeof(__le64);
++		n_obj++;
++	}
++
++	/* Add the size of the headers */
++	file_size += sizeof(*iter.hdr) * n_obj;
++
++	/* Allocate the file in vmalloc memory, it's likely to be big */
++	iter.start = vmalloc(file_size);
++	if (!iter.start) {
++		dev_warn(gpu->dev, "failed to allocate devcoredump file\n");
++		return;
++	}
++
++	/* Point the data member after the headers */
++	iter.hdr = iter.start;
++	iter.data = &iter.hdr[n_obj];
++
++	memset(iter.hdr, 0, iter.data - iter.start);
++
++	etnaviv_core_dump_registers(&iter, gpu);
++	etnaviv_core_dump_mmu(&iter, gpu, mmu_size);
++	etnaviv_core_dump_mem(&iter, ETDUMP_BUF_RING, gpu->buffer->vaddr,
++			      gpu->buffer->size, gpu->buffer->paddr);
++
++	list_for_each_entry(cmd, &gpu->active_cmd_list, node)
++		etnaviv_core_dump_mem(&iter, ETDUMP_BUF_CMD, cmd->vaddr,
++				      cmd->size, cmd->paddr);
++
++	/* Reserve space for the bomap */
++	if (n_bomap_pages) {
++		bomap_start = bomap = iter.data;
++		memset(bomap, 0, sizeof(*bomap) * n_bomap_pages);
++		etnaviv_core_dump_header(&iter, ETDUMP_BUF_BOMAP,
++					 bomap + n_bomap_pages);
++	} else {
++		/* Silence warning */
++		bomap_start = bomap = NULL;
++	}
++
++	list_for_each_entry(vram, &gpu->mmu->mappings, mmu_node) {
++		struct page **pages;
++		void *vaddr;
++
++		if (vram->use == 0)
++			continue;
++
++		obj = vram->object;
++
++		pages = etnaviv_gem_get_pages(obj);
++		if (pages) {
++			int j;
++
++			iter.hdr->data[0] = bomap - bomap_start;
++
++			for (j = 0; j < obj->base.size >> PAGE_SHIFT; j++)
++				*bomap++ = cpu_to_le64(page_to_phys(*pages++));
++		}
++
++		iter.hdr->iova = cpu_to_le64(vram->iova);
++
++		vaddr = etnaviv_gem_vaddr(&obj->base);
++		if (vaddr && !IS_ERR(vaddr))
++			memcpy(iter.data, vaddr, obj->base.size);
++
++		etnaviv_core_dump_header(&iter, ETDUMP_BUF_BO, iter.data +
++					 obj->base.size);
++	}
++
++	etnaviv_core_dump_header(&iter, ETDUMP_BUF_END, iter.data);
++
++	dev_coredumpv(gpu->dev, iter.start, iter.data - iter.start, GFP_KERNEL);
++}
+diff --git a/drivers/gpu/drm/etnaviv/etnaviv_dump.h b/drivers/gpu/drm/etnaviv/etnaviv_dump.h
+new file mode 100644
+index 000000000000..97f2f8db9133
+--- /dev/null
++++ b/drivers/gpu/drm/etnaviv/etnaviv_dump.h
+@@ -0,0 +1,54 @@
++/*
++ * Copyright (C) 2015 Etnaviv Project
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 as published by
++ * the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Etnaviv devcoredump file definitions
++ */
++#ifndef ETNAVIV_DUMP_H
++#define ETNAVIV_DUMP_H
++
++#include <linux/types.h>
++
++enum {
++	ETDUMP_MAGIC = 0x414e5445,
++	ETDUMP_BUF_REG = 0,
++	ETDUMP_BUF_MMU,
++	ETDUMP_BUF_RING,
++	ETDUMP_BUF_CMD,
++	ETDUMP_BUF_BOMAP,
++	ETDUMP_BUF_BO,
++	ETDUMP_BUF_END,
++};
++
++struct etnaviv_dump_object_header {
++	__le32 magic;
++	__le32 type;
++	__le32 file_offset;
++	__le32 file_size;
++	__le64 iova;
++	__le32 data[2];
++};
++
++/* Registers object, an array of these */
++struct etnaviv_dump_registers {
++	__le32 reg;
++	__le32 value;
++};
++
++#ifdef __KERNEL__
++struct etnaviv_gpu;
++void etnaviv_core_dump(struct etnaviv_gpu *gpu);
++#endif
++
++#endif
 -- 
 2.6.2
