@@ -1,40 +1,32 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 9 Dec 2015 11:25:36 +0000
-Subject: [PATCH v5 08/11] ARM: STi: Register CPUFreq device
-In-Reply-To: <3682335.fAt9xNcJFr@wuerfel>
-References: <1449585124-15596-1-git-send-email-lee.jones@linaro.org>
- <1449585124-15596-9-git-send-email-lee.jones@linaro.org>
- <3682335.fAt9xNcJFr@wuerfel>
-Message-ID: <20151209112536.GB17876@x1>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 9 Dec 2015 11:29:27 +0000
+Subject: [PATCH v4 01/13] mm/memblock: add MEMBLOCK_NOMAP attribute to
+ memblock memory table
+In-Reply-To: <20151208142341.b91ab5728f244a68231e3b87@linux-foundation.org>
+References: <1448886507-3216-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1448886507-3216-2-git-send-email-ard.biesheuvel@linaro.org>
+ <CAKv+Gu9oboT_Lk8heJWRcM=oxRW=EWioVCvZLH7N0YCkfU5tJw@mail.gmail.com>
+ <20151208120743.GG19612@arm.com>
+ <20151208142341.b91ab5728f244a68231e3b87@linux-foundation.org>
+Message-ID: <20151209112926.GA9303@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 09 Dec 2015, Arnd Bergmann wrote:
-
-> On Tuesday 08 December 2015 14:32:01 Lee Jones wrote:
-> > @@ -161,3 +166,11 @@ struct smp_operations __initdata sti_smp_ops = {
-> >         .smp_secondary_init     = sti_secondary_init,
-> >         .smp_boot_secondary     = sti_boot_secondary,
-> >  };
-> > +
-> > +/**
-> > + * CPUFreq Registration
-> > + */
-> > +void init_cpufreq(void)
-> > +{
-> > +       platform_device_register_simple("sti-cpufreq", -1, NULL, 0);
-> > +}
+On Tue, Dec 08, 2015 at 02:23:41PM -0800, Andrew Morton wrote:
+> On Tue, 8 Dec 2015 12:07:44 +0000 Will Deacon <will.deacon@arm.com> wrote:
+> 
+> > > I should note that this change should not affect any memblock users
+> > > that never set the MEMBLOCK_NOMAP flag, but please, if you see any
+> > > issues beyond 'this may conflict with other stuff we have queued for
+> > > 4.5', please do let me know.
 > > 
+> > Indeed, I can't see that this would cause any issues, but I would really
+> > like an Ack from one of the MM maintainers before taking this.
+> > 
+> > Please could somebody take a look?
 > 
-> Can you please do this under drivers/cpufreq somewhere?
-> 
-> I really don't want to any more of these in platform code. Requiring a
-> device to be created just to probe the driver is really silly.
+> It looks OK to me.  Please go ahead and merge it via an arm tree.
 
-Already on it.  Bear with.
+Will do, thanks Andrew.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Will
