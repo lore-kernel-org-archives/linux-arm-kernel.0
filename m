@@ -1,83 +1,47 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 9 Dec 2015 16:14:01 +0800
-Subject: [PATCH 1/3] usb: misc: generic_onboard_hub: add generic onboard
- USB HUB driver
-In-Reply-To: <2642877.CRz9VDfcGT@wuerfel>
-References: <1449538670-7954-1-git-send-email-peter.chen@freescale.com>
- <1449538670-7954-2-git-send-email-peter.chen@freescale.com>
- <2642877.CRz9VDfcGT@wuerfel>
-Message-ID: <20151209081400.GC941@shlinux2>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 9 Dec 2015 10:18:09 +0200
+Subject: [PATCH for 4.4 0/2] DT/dmaengine: edma: Convert 16bit arrays to 32bit
+Message-ID: <1449649091-9848-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 08, 2015 at 10:48:28AM +0100, Arnd Bergmann wrote:
-> On Tuesday 08 December 2015 09:37:48 Peter Chen wrote:
-> 
-> > +struct usb_hub_generic_data {
-> > +	struct clk *clk;
-> > +};
-> > +
-> > +static int usb_hub_generic_probe(struct platform_device *pdev)
-> > +{
-> > +	struct device *dev = &pdev->dev;
-> > +	struct usb_hub_generic_platform_data *pdata = dev->platform_data;
-> > +	struct usb_hub_generic_data *hub_data;
-> > +	int reset_pol = 0, duration_us = 50, ret = 0;
-> > +	struct gpio_desc *gpiod_reset = NULL;
-> > +
-> > +	hub_data = devm_kzalloc(dev, sizeof(*hub_data), GFP_KERNEL);
-> > +	if (!hub_data)
-> > +		return -ENOMEM;
-> > +
-> > +	if (dev->of_node) {
-> 
-> Let's not worry about the !DT case until someone adds a board file
-> that needs it. Just remove the if() here along and the whole else
-> block.
-> 
-> > +#ifdef CONFIG_OF
-> > +static const struct of_device_id usb_hub_generic_dt_ids[] = {
-> > +	{.compatible = "generic-onboard-hub"},
-> > +	{ },
-> > +};
-> > +MODULE_DEVICE_TABLE(of, usb_hub_generic_dt_ids);
-> > +#endif
-> > +
-> > +static struct platform_driver usb_hub_generic_driver = {
-> > +	.probe = usb_hub_generic_probe,
-> > +	.remove = usb_hub_generic_remove,
-> > +	.driver = {
-> > +		.name = "usb_hub_generic_onboard",
-> > +		.of_match_table = usb_hub_generic_dt_ids,
-> > +	 },
-> > +};
-> 
-> Build error when CONFIG_OF is disabled: Please remove the #ifdef around the device
-> table.
-> 
-> > diff --git a/include/linux/usb/generic_onboard_hub.h b/include/linux/usb/generic_onboard_hub.h
-> > new file mode 100644
-> > index 0000000..1b70ccc
-> > --- /dev/null
-> > +++ b/include/linux/usb/generic_onboard_hub.h
-> > @@ -0,0 +1,11 @@
-> > +#ifndef __LINUX_USB_GENERIC_HUB_H
-> > +#define __LINUX_USB_GENERIC_HUB_H
-> > +
-> > +struct usb_hub_generic_platform_data {
-> > +	int gpio_reset;
-> > +	int gpio_reset_polarity;
-> > +	int gpio_reset_duration_us;
-> > +	struct clk *ext_clk;
-> > +};
-> 
-> Merge this structure into struct usb_hub_generic_data and remove the header.
-> 
-> 	ARnd
+Hi,
 
-Agree.
+Based on the discussion regarding to (convert am33xx to use the new eDMA
+bindings):
+https://www.mail-archive.com/linux-omap at vger.kernel.org/msg122117.html
+
+This two patch will convert the new eDMA binding to not use 16bit arrays for
+memcpy channel selection and for marking slots reserved.
+The '/bits/ 16' seams to be causing confusion so it is probably better to just
+use standard type for the arrays.
+
+The new bindings for the eDMA is introduced for 4.4 and we do not have users of
+it, which means that we can still change it w/o the risk of breaking anything
+and we do not need to maintain the compatibility with 16bit arrays.
+
+The changes in the eDMA driver is local to the DT parsing and should not
+conflict with other changes (like the filter function mapping support). Hrm,
+there might be trivial conflict in the include/linux/platform_data/edma.h with
+the "dmaengine 'universal' API".
+
+Tony, Arnd, Vinod: Can you agree on the practicalities on how these patches are
+going to be handled? I would like to send the updated am33xx/am437x conversion
+for 4.5 based on these changes.
+
+Thanks and regards,
+Peter
+---
+Peter Ujfalusi (2):
+  dmaengine: edma: DT: Change memcpy channel array from 16bit to 32bit
+    type
+  dmaengine: edma: DT: Change reserved slot array from 16bit to 32bit
+    type
+
+ Documentation/devicetree/bindings/dma/ti-edma.txt | 10 ++---
+ drivers/dma/edma.c                                | 53 +++++++++++++++--------
+ include/linux/platform_data/edma.h                |  2 +-
+ 3 files changed, 40 insertions(+), 25 deletions(-)
 
 -- 
-
-Best Regards,
-Peter Chen
+2.6.3
