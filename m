@@ -1,114 +1,55 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Wed,  9 Dec 2015 17:04:06 +0800
-Subject: [PATCH v1 1/8] pinctrl: rockchip: add support for the rk3228
-In-Reply-To: <1449651853-1667-1-git-send-email-jeffy.chen@rock-chips.com>
-References: <1449651853-1667-1-git-send-email-jeffy.chen@rock-chips.com>
-Message-ID: <1449651853-1667-2-git-send-email-jeffy.chen@rock-chips.com>
+From: suzuki.poulose@arm.com (Suzuki K. Poulose)
+Date: Wed,  9 Dec 2015 09:57:14 +0000
+Subject: [RFC PATCH v3 3/8] arm64: head.S : Change register usage
+In-Reply-To: <1449655039-22022-1-git-send-email-suzuki.poulose@arm.com>
+References: <1449655039-22022-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1449655039-22022-4-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pinctrl of rk3228 is much the same as rk3288's, but
-without pmu.
+The stack information for a secondary CPU (struct secondary_data)
+is passed on in x21 before the MMU is turned on. The boot CPU uses
+x21 to store the FDT pointer. In a common code shared by these
+CPUs, it gets difficult to use the information. So, we use
+x22 for passing the secondary_data and initialise it with NULL
+for the booting CPU for consistency. This will be used in a following
+patch.
 
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
+ arch/arm64/kernel/head.S |    5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
- .../bindings/pinctrl/rockchip,pinctrl.txt          |  3 +-
- drivers/pinctrl/pinctrl-rockchip.c                 | 53 ++++++++++++++++++++++
- 2 files changed, 55 insertions(+), 1 deletion(-)
-
-diff --git a/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
-index 391ef4b..0cd701b 100644
---- a/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
-@@ -21,7 +21,8 @@ defined as gpio sub-nodes of the pinmux controller.
- Required properties for iomux controller:
-   - compatible: one of "rockchip,rk2928-pinctrl", "rockchip,rk3066a-pinctrl"
- 		       "rockchip,rk3066b-pinctrl", "rockchip,rk3188-pinctrl"
--		       "rockchip,rk3288-pinctrl", "rockchip,rk3368-pinctrl"
-+		       "rockchip,rk3228-pinctrl", "rockchip,rk3288-pinctrl"
-+		       "rockchip,rk3368-pinctrl"
-   - rockchip,grf: phandle referencing a syscon providing the
- 	 "general register files"
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 23cfc08..b225d34 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -221,6 +221,7 @@ ENTRY(stext)
+ 	 */
+ 	ldr	x27, =__mmap_switched		// address to jump to after
+ 						// MMU has been enabled
++	mov	x22, 0				// &secondary_data for Boot CPU
+ 	adr_l	lr, __enable_mmu		// return (PIC) address
+ 	b	__cpu_setup			// initialise processor
+ ENDPROC(stext)
+@@ -598,13 +599,13 @@ ENTRY(secondary_startup)
+ 	adrp	x26, swapper_pg_dir
+ 	bl	__cpu_setup			// initialise processor
  
-diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
-index a065112..faab36e 100644
---- a/drivers/pinctrl/pinctrl-rockchip.c
-+++ b/drivers/pinctrl/pinctrl-rockchip.c
-@@ -614,6 +614,40 @@ static void rk3288_calc_drv_reg_and_bit(struct rockchip_pin_bank *bank,
- 	}
- }
+-	ldr	x21, =secondary_data
++	ldr	x22, =secondary_data
+ 	ldr	x27, =__secondary_switched	// address to jump to after enabling the MMU
+ 	b	__enable_mmu
+ ENDPROC(secondary_startup)
  
-+#define RK3228_PULL_OFFSET		0x100
-+
-+static void rk3228_calc_pull_reg_and_bit(struct rockchip_pin_bank *bank,
-+				    int pin_num, struct regmap **regmap,
-+				    int *reg, u8 *bit)
-+{
-+	struct rockchip_pinctrl *info = bank->drvdata;
-+
-+	*regmap = info->regmap_base;
-+	*reg = RK3228_PULL_OFFSET;
-+	*reg += bank->bank_num * RK3188_PULL_BANK_STRIDE;
-+	*reg += ((pin_num / RK3188_PULL_PINS_PER_REG) * 4);
-+
-+	*bit = (pin_num % RK3188_PULL_PINS_PER_REG);
-+	*bit *= RK3188_PULL_BITS_PER_PIN;
-+}
-+
-+#define RK3228_DRV_GRF_OFFSET		0x200
-+
-+static void rk3228_calc_drv_reg_and_bit(struct rockchip_pin_bank *bank,
-+				    int pin_num, struct regmap **regmap,
-+				    int *reg, u8 *bit)
-+{
-+	struct rockchip_pinctrl *info = bank->drvdata;
-+
-+	*regmap = info->regmap_base;
-+	*reg = RK3228_DRV_GRF_OFFSET;
-+	*reg += bank->bank_num * RK3288_DRV_BANK_STRIDE;
-+	*reg += ((pin_num / RK3288_DRV_PINS_PER_REG) * 4);
-+
-+	*bit = (pin_num % RK3288_DRV_PINS_PER_REG);
-+	*bit *= RK3288_DRV_BITS_PER_PIN;
-+}
-+
- #define RK3368_PULL_GRF_OFFSET		0x100
- #define RK3368_PULL_PMU_OFFSET		0x10
- 
-@@ -2143,6 +2177,23 @@ static struct rockchip_pin_ctrl rk3188_pin_ctrl = {
- 		.pull_calc_reg		= rk3188_calc_pull_reg_and_bit,
- };
- 
-+static struct rockchip_pin_bank rk3228_pin_banks[] = {
-+	PIN_BANK(0, 32, "gpio0"),
-+	PIN_BANK(1, 32, "gpio1"),
-+	PIN_BANK(2, 32, "gpio2"),
-+	PIN_BANK(3, 32, "gpio3"),
-+};
-+
-+static struct rockchip_pin_ctrl rk3228_pin_ctrl = {
-+		.pin_banks		= rk3228_pin_banks,
-+		.nr_banks		= ARRAY_SIZE(rk3228_pin_banks),
-+		.label			= "RK3228-GPIO",
-+		.type			= RK3288,
-+		.grf_mux_offset		= 0x0,
-+		.pull_calc_reg		= rk3228_calc_pull_reg_and_bit,
-+		.drv_calc_reg		= rk3228_calc_drv_reg_and_bit,
-+};
-+
- static struct rockchip_pin_bank rk3288_pin_banks[] = {
- 	PIN_BANK_IOMUX_FLAGS(0, 24, "gpio0", IOMUX_SOURCE_PMU,
- 					     IOMUX_SOURCE_PMU,
-@@ -2220,6 +2271,8 @@ static const struct of_device_id rockchip_pinctrl_dt_match[] = {
- 		.data = (void *)&rk3066b_pin_ctrl },
- 	{ .compatible = "rockchip,rk3188-pinctrl",
- 		.data = (void *)&rk3188_pin_ctrl },
-+	{ .compatible = "rockchip,rk3228-pinctrl",
-+		.data = (void *)&rk3228_pin_ctrl },
- 	{ .compatible = "rockchip,rk3288-pinctrl",
- 		.data = (void *)&rk3288_pin_ctrl },
- 	{ .compatible = "rockchip,rk3368-pinctrl",
+ ENTRY(__secondary_switched)
+-	ldr	x0, [x21]			// get secondary_data.stack
++	ldr	x0, [x22]			// get secondary_data.stack
+ 	mov	sp, x0
+ 	mov	x29, #0
+ 	b	secondary_start_kernel
 -- 
-2.1.4
+1.7.9.5
