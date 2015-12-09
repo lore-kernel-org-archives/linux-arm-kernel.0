@@ -1,62 +1,61 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 9 Dec 2015 09:49:06 +0000
-Subject: [PATCH v6 15/21] KVM: ARM64: Add reset and access handlers for
- PMUSERENR register
-In-Reply-To: <5667F1CA.6060407@huawei.com>
-References: <1449578860-15808-1-git-send-email-zhaoshenglong@huawei.com>
- <1449578860-15808-16-git-send-email-zhaoshenglong@huawei.com>
- <56670D7C.9070902@arm.com> <5667F1CA.6060407@huawei.com>
-Message-ID: <20151209094906.7c812a3e@why.wild-wind.fr.eu.org>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 09 Dec 2015 09:47:03 +0000
+Subject: [PATCH v8 3/4] arm64: Add do_softirq_own_stack() and enable
+ irq_stacks
+In-Reply-To: <56671214.30402@arm.com>
+References: <1449226948-14251-1-git-send-email-james.morse@arm.com>
+ <1449226948-14251-4-git-send-email-james.morse@arm.com>
+ <20151207224805.GA20777@MBP.local> <20151208114321.GD19612@arm.com>
+ <4EBA6141-5CFB-4CAC-97D2-26346AAA91F0@gmail.com> <56671214.30402@arm.com>
+Message-ID: <5667F897.5070005@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 9 Dec 2015 17:18:02 +0800
-Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+On 08/12/15 17:23, James Morse wrote:
+> My only theory is that there is an off by one, and its reading what was
+> x29 instead. This wouldn't show up in these tests, but might be a
+> problem for aarch32 user-space, as presumably x29==0 when it switches to
+> aarch64 mode for el0_irq(). I will try this tomorrow.
 
-> 
-> 
-> On 2015/12/9 1:03, Marc Zyngier wrote:
-> > On 08/12/15 12:47, Shannon Zhao wrote:
-> >> > From: Shannon Zhao <shannon.zhao@linaro.org>
-> >> > 
-> >> > The reset value of PMUSERENR_EL0 is UNKNOWN, use reset_unknown.
-> >> > 
-> >> > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> >> > ---
-> >> >  arch/arm64/kvm/sys_regs.c | 5 +++--
-> >> >  1 file changed, 3 insertions(+), 2 deletions(-)
-> >> > 
-> >> > diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> >> > index c830fde..80b66c0 100644
-> >> > --- a/arch/arm64/kvm/sys_regs.c
-> >> > +++ b/arch/arm64/kvm/sys_regs.c
-> >> > @@ -880,7 +880,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
-> >> >  	  access_pmu_pmxevcntr },
-> >> >  	/* PMUSERENR_EL0 */
-> >> >  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1110), Op2(0b000),
-> >> > -	  trap_raz_wi },
-> >> > +	  access_pmu_regs, reset_unknown, PMUSERENR_EL0 },
-> > So while the 64bit view of the register resets as unknown, a CPU
-> > resetting in 32bit mode resets as 0. I suggest you reset it as zero, and
-> > document that choice. You may have to revisit all the other registers
-> > that do reset as unknown for 64bit as well.
-> > 
-> Sure.
-> 
-> BTW, here I didn't handle the bits of PMUSERENR which are used to
-> permit/forbid accessing some PMU registers from EL0. Does it need to add
-> the handler? Is there any way to get the exceptional level of the
-> accessing in hypervisor?
+Yup, this is what is happening. Its an off-by-one due to broken thinking
+about how the stack works. My broken thinking was:
 
-Ah, good point, I missed that. Yes, we need to be able to handle that.
+>   top ------------
+>       | dummy_lr | <- irq_stack_ptr
+>       ------------
+>       |   x29    |
+>       ------------
+>       |   x19    | <- irq_stack_ptr - 0x10
+>       ------------
+>       |   xzr    |
+>       ------------
 
-To find out, you can use vcpu_mode_priv(), which returns true if the
-CPU was in a high privilege mode (EL1 for 64bit, anything higher than
-USR on 32bit), and false otherwise. So far, the only user is
-arch/arm/kvm/perf.c.
+But the stack-pointer is decreased before use. So it actually looks like
+this:
+
+>       ------------
+>       |          |  <- irq_stack_ptr
+>   top ------------
+>       | dummy_lr |
+>       ------------
+>       |   x29    | <- irq_stack_ptr - 0x10
+>       ------------
+>       |   x19    |
+>       ------------
+>       |   xzr    | <- irq_stack_ptr - 0x20
+>       ------------
+
+The value being used as the original stack is x29, which in all the
+tests is sp but without the current frames data, hence there are no
+missing frames in the output.
+
+Jungseok Lee picked it up with a 32bit user space because aarch32 can't
+use x29, so it remains 0 forever. The fix he posted is correct.
+
+Will: do you want to take Jungseok Lee's patch as a 'Fixes:', or is it
+easier if I repost the series?
+
 
 Thanks,
 
-	M.
--- 
-Without deviation from the norm, progress is not possible.
+James
