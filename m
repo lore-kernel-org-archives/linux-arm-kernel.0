@@ -1,50 +1,106 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Wed, 9 Dec 2015 17:18:02 +0800
-Subject: [PATCH v6 15/21] KVM: ARM64: Add reset and access handlers for
- PMUSERENR register
-In-Reply-To: <56670D7C.9070902@arm.com>
-References: <1449578860-15808-1-git-send-email-zhaoshenglong@huawei.com>
- <1449578860-15808-16-git-send-email-zhaoshenglong@huawei.com>
- <56670D7C.9070902@arm.com>
-Message-ID: <5667F1CA.6060407@huawei.com>
+From: yankejian@huawei.com (Yankejian (Hackim Yim))
+Date: Wed, 9 Dec 2015 17:25:13 +0800
+Subject: arRe: [PATCH net-next 2/2] net: hns: enet specisies a reference
+ to dsaf (config and documents)
+In-Reply-To: <1503684.BNZUVaD74W@wuerfel>
+References: <1449295856-31068-1-git-send-email-yankejian@huawei.com>
+ <23027215.8RIhViTVaB@wuerfel> <566531C5.4050208@huawei.com>
+ <1503684.BNZUVaD74W@wuerfel>
+Message-ID: <5667F379.2010108@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 2015/12/9 1:03, Marc Zyngier wrote:
-> On 08/12/15 12:47, Shannon Zhao wrote:
->> > From: Shannon Zhao <shannon.zhao@linaro.org>
->> > 
->> > The reset value of PMUSERENR_EL0 is UNKNOWN, use reset_unknown.
->> > 
->> > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->> > ---
->> >  arch/arm64/kvm/sys_regs.c | 5 +++--
->> >  1 file changed, 3 insertions(+), 2 deletions(-)
->> > 
->> > diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
->> > index c830fde..80b66c0 100644
->> > --- a/arch/arm64/kvm/sys_regs.c
->> > +++ b/arch/arm64/kvm/sys_regs.c
->> > @@ -880,7 +880,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
->> >  	  access_pmu_pmxevcntr },
->> >  	/* PMUSERENR_EL0 */
->> >  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1110), Op2(0b000),
->> > -	  trap_raz_wi },
->> > +	  access_pmu_regs, reset_unknown, PMUSERENR_EL0 },
-> So while the 64bit view of the register resets as unknown, a CPU
-> resetting in 32bit mode resets as 0. I suggest you reset it as zero, and
-> document that choice. You may have to revisit all the other registers
-> that do reset as unknown for 64bit as well.
-> 
-Sure.
+On 2015/12/7 17:40, Arnd Bergmann wrote:
+> On Monday 07 December 2015 15:14:13 Yankejian wrote:
+>> On 2015/12/6 6:19, Arnd Bergmann wrote:
+>>> On Saturday 05 December 2015 14:10:56 yankejian wrote:
+>>>> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt b/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
+>>>> index 80411b2..ecacfa4 100644
+>>>> --- a/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
+>>>> +++ b/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
+>>>> @@ -4,8 +4,6 @@ Required properties:
+>>>>  - compatible: should be "hisilicon,hns-dsaf-v1" or "hisilicon,hns-dsaf-v2".
+>>>>    "hisilicon,hns-dsaf-v1" is for hip05.
+>>>>    "hisilicon,hns-dsaf-v2" is for Hi1610 and Hi1612.
+>>>> -- dsa-name: dsa fabric name who provide this interface.
+>>>> -  should be "dsafX", X is the dsaf id.
+>>>>  - mode: dsa fabric mode string. only support one of dsaf modes like these:
+>>>>                 "2port-64vf",
+>>>>                 "6port-16rss",
+>>>> @@ -26,9 +24,8 @@ Required properties:
+>>>>  
+>>>>  Example:
+>>>>  
+>>>> -dsa: dsa at c7000000 {
+>>>> +dsaf0: dsa at c7000000 {
+>>>>         compatible = "hisilicon,hns-dsaf-v1";
+>>>> -       dsa_name = "dsaf0";
+>>>>         mode = "6port-16rss";
+>>>>         interrupt-parent = <&mbigen_dsa>;
+>>>>         reg = <0x0 0xC0000000 0x0 0x420000
+>>>> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt b/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt
+>>>> index 41d19be..e6a9d1c 100644
+>>>> --- a/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt
+>>>> +++ b/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt
+>>>> @@ -4,8 +4,9 @@ Required properties:
+>>>>  - compatible: "hisilicon,hns-nic-v1" or "hisilicon,hns-nic-v2".
+>>>>    "hisilicon,hns-nic-v1" is for hip05.
+>>>>    "hisilicon,hns-nic-v2" is for Hi1610 and Hi1612.
+>>>> -- ae-name: accelerator name who provides this interface,
+>>>> -  is simply a name referring to the name of name in the accelerator node.
+>>>> +- ae-handle: accelerator engine handle for hns,
+>>>> +  specifies a reference to the associating hardware driver node.
+>>>> +  see Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
+>>>>  - port-id: is the index of port provided by DSAF (the accelerator). DSAF can
+>>>>    connect to 8 PHYs. Port 0 to 1 are both used for adminstration purpose. They
+>>>>    are called debug ports.
+>>>> @@ -41,7 +42,7 @@ Example:
+>>>>  
+>>>>
+>>> This looks like an incompatible change, as you add and remove
+>>> required properties. Is there a way to support both the old and
+>>> the new style?
+>>>
+>>>       Arnd
+>>>
+>>> .
+>> Hi Arnd,
+>> Thanks for your suggestions.  it must be set the same strings in dsaf node and every enet node before.
+>> it seems inappropriate. as Rob Herring <robh@kernel.org> 's suggestions, that would solve associating
+>> enet with a particular dsaf. so we discus the solution with Yisen Zhuang <yisen.zhuang@huawei.com>.
+>> we decide to use the new way instead of the old one.
+> I agree the new form looks better than the original way, but I'm worried
+> about the migration path. You don't explain in the patch description
+> how you want to ensure that nothing breaks for existing systems.
+>
+> We generally try to avoid doing incompatible changes altogether and
+> prefer to keep backwards compatibility, unless we can prove that no
+> other systems exist that would get impacted by the change.
+>
+> Are you sure that nobody ships a DTB file for this hardware with their
+> firmware that would now require an incompatible update which in turn
+> breaks old kernels?
+>
+> Are you sure that there is no hardware using the same dsa hardware
+> with out-of-tree dts files that need to make the same change but might
+> not be aware of the change?
+>
+> 	Arnd
+>
+> .
+ 
+ hi Arnd.
 
-BTW, here I didn't handle the bits of PMUSERENR which are used to
-permit/forbid accessing some PMU registers from EL0. Does it need to add
-the handler? Is there any way to get the exceptional level of the
-accessing in hypervisor?
+ thanks a lot for pointing it out.
 
-Thanks,
--- 
-Shannon
+ It is great regret that this change breaks compatibility with old dtbs.
+ this is a new driver which is run on developing boards, and all the
+ clients' boards are developing boards. So we provide them a method to
+ update the firmware on the board, once we update the dtsi and kernel,
+ we require our clients to update the existed firmware and kernel.
+ Therefore, these changes is actually under control. Shall we treat this
+ by this way?
+
+ thanks very much.
