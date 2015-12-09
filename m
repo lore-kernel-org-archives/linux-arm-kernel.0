@@ -1,101 +1,123 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed,  9 Dec 2015 12:44:38 +0000
-Subject: [RFC PATCH 03/20] arm64: mm: fold alternatives into .init
+Date: Wed,  9 Dec 2015 12:44:39 +0000
+Subject: [RFC PATCH 04/20] arm64: mm: assume PAGE SIZE for page table allocator
 In-Reply-To: <1449665095-20774-1-git-send-email-mark.rutland@arm.com>
 References: <1449665095-20774-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1449665095-20774-4-git-send-email-mark.rutland@arm.com>
+Message-ID: <1449665095-20774-5-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we treat the alternatives separately from other data that's
-only used during initialisation, using separate .altinstructions and
-.altinstr_replacement linker sections. These are freed for general
-allocation separately from .init*. This is problematic as:
+We pass a size parameter to early_alloc and late_alloc, but these are
+only ever used to allocate single pages. In late_alloc we always
+allocate a single page.
 
-* We do not remove execute permissions, as we do for .init, leaving the
-  memory executable.
-
-* We pad between them, making the kernel Image bianry up to PAGE_SIZE
-  bytes larger than necessary.
-
-This patch moves the two sections into the contiguous region used for
-.init*. This saves some memory, ensures that we remove execute
-permissions, and allows us to remove some code made redundant by this
-reorganisation.
+Remove the redundant size parameter.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Andre Przywara <andre.przywara@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Jeremy Linton <jeremy.linton@arm.com>
 Cc: Laura Abbott <labbott@fedoraproject.org>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/alternative.h | 1 -
- arch/arm64/kernel/alternative.c      | 6 ------
- arch/arm64/kernel/vmlinux.lds.S      | 5 ++---
- arch/arm64/mm/init.c                 | 1 -
- 4 files changed, 2 insertions(+), 11 deletions(-)
+ arch/arm64/mm/mmu.c | 27 ++++++++++++---------------
+ 1 file changed, 12 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
-index d56ec07..e4962f0 100644
---- a/arch/arm64/include/asm/alternative.h
-+++ b/arch/arm64/include/asm/alternative.h
-@@ -19,7 +19,6 @@ struct alt_instr {
- 
- void __init apply_alternatives_all(void);
- void apply_alternatives(void *start, size_t length);
--void free_alternatives_memory(void);
- 
- #define ALTINSTR_ENTRY(feature)						      \
- 	" .word 661b - .\n"				/* label           */ \
-diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
-index ab9db0e..d2ee1b2 100644
---- a/arch/arm64/kernel/alternative.c
-+++ b/arch/arm64/kernel/alternative.c
-@@ -158,9 +158,3 @@ void apply_alternatives(void *start, size_t length)
- 
- 	__apply_alternatives(&region);
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 7dfb4a9..304ff23 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -62,15 +62,15 @@ pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
  }
--
--void free_alternatives_memory(void)
--{
--	free_reserved_area(__alt_instructions, __alt_instructions_end,
--			   0, "alternatives");
--}
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index a64340d..f943a84 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -140,9 +140,6 @@ SECTIONS
+ EXPORT_SYMBOL(phys_mem_access_prot);
  
- 	PERCPU_SECTION(64)
- 
--	. = ALIGN(PAGE_SIZE);
--	__init_end = .;
--
- 	. = ALIGN(4);
- 	.altinstructions : {
- 		__alt_instructions = .;
-@@ -154,6 +151,8 @@ SECTIONS
- 	}
- 
- 	. = ALIGN(PAGE_SIZE);
-+	__init_end = .;
-+
- 	_data = .;
- 	_sdata = .;
- 	RW_DATA_SECTION(64, PAGE_SIZE, THREAD_SIZE)
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 17bf39a..9b979e0 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -360,7 +360,6 @@ void free_initmem(void)
+-static void __init *early_alloc(unsigned long sz)
++static void __init *early_alloc(void)
  {
- 	fixup_init();
- 	free_initmem_default(0);
--	free_alternatives_memory();
+ 	phys_addr_t phys;
+ 	void *ptr;
+ 
+-	phys = memblock_alloc(sz, sz);
++	phys = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
+ 	BUG_ON(!phys);
+ 	ptr = __va(phys);
+-	memset(ptr, 0, sz);
++	memset(ptr, 0, PAGE_SIZE);
+ 	return ptr;
  }
  
- #ifdef CONFIG_BLK_DEV_INITRD
+@@ -95,12 +95,12 @@ static void split_pmd(pmd_t *pmd, pte_t *pte)
+ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ 				  unsigned long end, unsigned long pfn,
+ 				  pgprot_t prot,
+-				  void *(*alloc)(unsigned long size))
++				  void *(*alloc)(void))
+ {
+ 	pte_t *pte;
+ 
+ 	if (pmd_none(*pmd) || pmd_sect(*pmd)) {
+-		pte = alloc(PTRS_PER_PTE * sizeof(pte_t));
++		pte = alloc();
+ 		if (pmd_sect(*pmd))
+ 			split_pmd(pmd, pte);
+ 		__pmd_populate(pmd, __pa(pte), PMD_TYPE_TABLE);
+@@ -130,7 +130,7 @@ static void split_pud(pud_t *old_pud, pmd_t *pmd)
+ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
+ 				  unsigned long addr, unsigned long end,
+ 				  phys_addr_t phys, pgprot_t prot,
+-				  void *(*alloc)(unsigned long size))
++				  void *(*alloc)(void))
+ {
+ 	pmd_t *pmd;
+ 	unsigned long next;
+@@ -139,7 +139,7 @@ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
+ 	 * Check for initial section mappings in the pgd/pud and remove them.
+ 	 */
+ 	if (pud_none(*pud) || pud_sect(*pud)) {
+-		pmd = alloc(PTRS_PER_PMD * sizeof(pmd_t));
++		pmd = alloc();
+ 		if (pud_sect(*pud)) {
+ 			/*
+ 			 * need to have the 1G of mappings continue to be
+@@ -195,13 +195,13 @@ static inline bool use_1G_block(unsigned long addr, unsigned long next,
+ static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
+ 				  unsigned long addr, unsigned long end,
+ 				  phys_addr_t phys, pgprot_t prot,
+-				  void *(*alloc)(unsigned long size))
++				  void *(*alloc)(void))
+ {
+ 	pud_t *pud;
+ 	unsigned long next;
+ 
+ 	if (pgd_none(*pgd)) {
+-		pud = alloc(PTRS_PER_PUD * sizeof(pud_t));
++		pud = alloc();
+ 		pgd_populate(mm, pgd, pud);
+ 	}
+ 	BUG_ON(pgd_bad(*pgd));
+@@ -247,7 +247,7 @@ static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
+ static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
+ 				    phys_addr_t phys, unsigned long virt,
+ 				    phys_addr_t size, pgprot_t prot,
+-				    void *(*alloc)(unsigned long size))
++				    void *(*alloc)(void))
+ {
+ 	unsigned long addr, length, end, next;
+ 
+@@ -262,12 +262,9 @@ static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
+ 	} while (pgd++, addr = next, addr != end);
+ }
+ 
+-static void *late_alloc(unsigned long size)
++static void *late_alloc(void)
+ {
+-	void *ptr;
+-
+-	BUG_ON(size > PAGE_SIZE);
+-	ptr = (void *)__get_free_page(PGALLOC_GFP);
++	void *ptr = (void *)__get_free_page(PGALLOC_GFP);
+ 	BUG_ON(!ptr);
+ 	return ptr;
+ }
 -- 
 1.9.1
