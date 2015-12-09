@@ -1,85 +1,114 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 9 Dec 2015 09:01:55 +0100
-Subject: [RESEND RFC PATCH 0/2] Expose the PIO_ISR register on SAMA5D3
-In-Reply-To: <1449544808-3163-1-git-send-email-peda@lysator.liu.se>
-References: <1449544808-3163-1-git-send-email-peda@lysator.liu.se>
-Message-ID: <20151209080155.GB7411@odux.rfo.atmel.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Wed, 9 Dec 2015 16:09:34 +0800
+Subject: [PATCH 2/3] doc: dt-binding: generic onboard USB HUB
+In-Reply-To: <1449568249.3691.15.camel@pengutronix.de>
+References: <1449538670-7954-1-git-send-email-peter.chen@freescale.com>
+ <1449538670-7954-3-git-send-email-peter.chen@freescale.com>
+ <1449568249.3691.15.camel@pengutronix.de>
+Message-ID: <20151209080933.GA941@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On Tue, Dec 08, 2015 at 10:50:49AM +0100, Philipp Zabel wrote:
+> Hi Peter,
+> 
+> Am Dienstag, den 08.12.2015, 09:37 +0800 schrieb Peter Chen:
+> > Add dt-binding documentation for generic onboard USB HUB.
+> > 
+> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > ---
+> >  .../bindings/usb/generic-onboard-hub.txt           | 28 ++++++++++++++++++++++
+> >  1 file changed, 28 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/usb/generic-onboard-hub.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/usb/generic-onboard-hub.txt b/Documentation/devicetree/bindings/usb/generic-onboard-hub.txt
+> > new file mode 100644
+> > index 0000000..ea92205
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/usb/generic-onboard-hub.txt
+> > @@ -0,0 +1,28 @@
+> > +Generic Onboard USB HUB
+> >+
+> > +Required properties:
+> > +- compatible: should be "generic-onboard-hub"
+> 
+> This something we don't have to define ad-hoc. The hub hangs off an USB
+> controller, right? The "Open Firmware recommended practice: USB"
+> document already describes how to represent USB devices in a generic
+> manner:
+> http://www.firmware.org/1275/bindings/usb/usb-1_0.ps
+> 
+> Is there a reason not to reuse this?
+> 
+> The usb hub node would be a child of the usb controller node, and it
+> could use
+> 	compatible = "usb,class9"; /* bDeviceClass 9 (Hub) */
+> 
 
-On Tue, Dec 08, 2015 at 04:20:06AM +0100, Peter Rosin wrote:
-> From: Peter Rosin <peda@axentia.se>
+Before writing this driver, I did consider how to let the USB core
+handle device tree, but without good solution.
+
+The controller (platform) driver should not handle specific USB device
+described at device tree, since we want this handling to be generic.
+And the USB device may not be recognized by controller without handling
+its properties, like clock, reset pins.
+
+With your suggestion, the dts likes below
+
+usbh1: usb at 02184000 {
+	compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
+	reg = <0x02184000 0x200>;
+	interrupts = <0 43 IRQ_TYPE_LEVEL_HIGH>;
+	clocks = <&clks IMX6QDL_CLK_USBOH3>;
+	usb_hub at 1 {
+		compatible = "usb,class9"
+		clocks = <&clks USB_HUB_CLK>;
+		....
+	};
+};
+
+I don't know how to handle above at USB bus, if you have any
+suggestions, give me some tips please.
+
 > 
-> Hi!
+> > +Optional properties:
+> > +- clocks: the input clock for HUB.
+> > +
+> > +- clock-names: Should be "external_clk"
 > 
-> I have a signal connected to a gpio pin which is the output of
-> a comparator. By changing the level of one of the inputs to the
-> comparator, I can detect the envelope of the other input to
-> the comparator by using a series of measurements much in the
-> same maner a manual ADC works, but watching for changes on the
-> comparator over a period of time instead of only the immediate
-> output.
+> Is clock-names necessary for a single clock?
 > 
-> Now, the input signal to the comparator might have a high frequency,
-> which will cause the output from the comparator (and thus the GPIO
-> input) to change rapidly.
+> > +- hub-reset-gpios: Should specify the GPIO for reset.
 > 
-> A common(?) idiom for this is to use the interrupt status register
-> to catch the glitches, but then not have any interrupt tied to
-> the pin as that could possibly generate pointless bursts of
-> (expensive) interrupts.
+> I'd prefer that to be just "reset-gpios", it is the only reset property
+> in the hub node after all. And use the GPIO_ACTIVE_HIGH/LOW flags to
+> indicate polarity.
+
+I will change to "clk" and "reset-gpios".
+
+> 
+> > +- hub-reset-active-high: the active reset signal is high, if this property is
+> > +  not set, the active reset signal is low.
+> 
+> Then this could be dropped.
+> 
+> > +- hub-reset-duration-us: the duration for assert reset signal, the time unit
+> > +  is microsecond.
+> 
+> And consequently, this could just be called "reset-duration-us".
+> It might make sense to define the same for other reset GPIOs, too.
+> The Freescale FEC, for example, has "phy-reset-duration" (in ms)
+> already.
 > 
 
-Well I don't know if this use case as already been considered. I
-understand you don't want to be overwhelmed by interrupts but why not
-using the interrupt to start polling the PDSR (Pin Data Status
-Register)?
+Agree.
 
-I am really not confortable about exposing the ISR since there is a
-clean on read. You have taken precautions by checking the IMR before but
-if there is a single driver using a gpio as an irq, you will never get
-the ISR.
+By the way: Felipe suggest using generic reset gpio driver to handle
+above, I find you have written similar things before [1], why it can't be
+accepted?
 
-Regards
+[1]http://comments.gmane.org/gmane.linux.ports.arm.kernel/255129
+-- 
 
-Ludovic
-
-> So, these two patches expose an interface to the PIO_ISR register
-> of the pio controllers on the platform I'm targetting. The first
-> patch adds some infrastructure to the gpio core and the second
-> patch hooks up "my" pin controller.
-> 
-> But hey, this seems like an old problem and I was surprised that
-> I had to touch the source to do it. Which makes me wonder what I'm
-> missing and what others needing to see short pulses on a pin but not
-> needing/wanting interrupts are doing?
-> 
-> Yes, there needs to be a way to select the interrupt edge w/o
-> actually arming the interrupt, that is missing. And probably
-> other things too, but I didn't want to do more work in case this
-> is a dead end for some reason...
-> 
-> Cheers,
-> Peter
-> 
-> Peter Rosin (2):
->   gpio: Add isr property of gpio pins
->   pinctrl: at91: expose the isr bit
-> 
->  Documentation/gpio/sysfs.txt   |   12 ++++++++++
->  drivers/gpio/gpiolib-sysfs.c   |   30 ++++++++++++++++++++++++
->  drivers/gpio/gpiolib.c         |   15 ++++++++++++
->  drivers/pinctrl/pinctrl-at91.c |   50 ++++++++++++++++++++++++++++++++++++----
->  include/linux/gpio/consumer.h  |    1 +
->  include/linux/gpio/driver.h    |    2 ++
->  6 files changed, 106 insertions(+), 4 deletions(-)
-> 
-> -- 
-> 1.7.10.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-gpio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Best Regards,
+Peter Chen
