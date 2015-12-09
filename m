@@ -1,56 +1,114 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 09 Dec 2015 10:52:27 +0100
-Subject: [PATCH v4 1/5] PCI: designware: add memory barrier after enabling
- region
-In-Reply-To: <CAHM4w1k_EAt+xBBYyG3B7W9Fegc4j+uRq5t_biUsxOGt+k+xUA@mail.gmail.com>
-References: <1449149725-27607-1-git-send-email-stanimir.varbanov@linaro.org>
- <56669C50.9060700@linaro.org>
- <CAHM4w1k_EAt+xBBYyG3B7W9Fegc4j+uRq5t_biUsxOGt+k+xUA@mail.gmail.com>
-Message-ID: <1975309.Hla8QhEqf4@wuerfel>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Wed,  9 Dec 2015 17:04:06 +0800
+Subject: [PATCH v1 1/8] pinctrl: rockchip: add support for the rk3228
+In-Reply-To: <1449651853-1667-1-git-send-email-jeffy.chen@rock-chips.com>
+References: <1449651853-1667-1-git-send-email-jeffy.chen@rock-chips.com>
+Message-ID: <1449651853-1667-2-git-send-email-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 December 2015 10:10:05 Pratyush Anand wrote:
-> On Tue, Dec 8, 2015 at 2:31 PM, Stanimir Varbanov
-> > > Signed-off-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
-> > > ---
-> > >  drivers/pci/host/pcie-designware.c |    5 +++++
-> > >  1 file changed, 5 insertions(+)
-> > >
-> > > diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> > > index 02a7452bdf23..ed4dc2e2553b 100644
-> > > --- a/drivers/pci/host/pcie-designware.c
-> > > +++ b/drivers/pci/host/pcie-designware.c
-> > > @@ -164,6 +164,11 @@ static void dw_pcie_prog_outbound_atu(struct pcie_port *pp, int index,
-> > >       dw_pcie_writel_rc(pp, upper_32_bits(pci_addr), PCIE_ATU_UPPER_TARGET);
-> > >       dw_pcie_writel_rc(pp, type, PCIE_ATU_CR1);
-> > >       dw_pcie_writel_rc(pp, PCIE_ATU_ENABLE, PCIE_ATU_CR2);
-> > > +     /*
-> > > +      * ensure that the ATU enable has been happaned before accessing
-> > > +      * pci configuration/io spaces through dw_pcie_cfg_[read|write].
-> > > +      */
-> > > +     wmb();
-> > >  }
-> > >
-> 
-> 
-> My understnading is that since writel() of dw_pcie_writel_rc() in
-> above code and readl(), writel() of dw_pcie_cfg_[read|write]() (which
-> will follow) goes through same device (ie PCIe host here). So, it is
-> guaranteed that 1st writel() will be executed before later
-> readl()/writel(). If that is true then we do not need any explicit
-> barrier here.
-> 
-> Arnd, Russel: whats your opinion here.
+The pinctrl of rk3228 is much the same as rk3288's, but
+without pmu.
 
-I think the ordering is only enforced if the two register accesses are
-on the same device as seen from the bus, and it's possible that the
-RC registers and the config space registers are not considered the
-same thing here.
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 
-For config write, this is not a problem, because the config space write
-has a wmb() that enforces ordering, but it's possible that the config
-space read may hit the device in parallel with the PCIE_ATU_ENABLE
-write.
+---
 
-	Arnd
+ .../bindings/pinctrl/rockchip,pinctrl.txt          |  3 +-
+ drivers/pinctrl/pinctrl-rockchip.c                 | 53 ++++++++++++++++++++++
+ 2 files changed, 55 insertions(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
+index 391ef4b..0cd701b 100644
+--- a/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
+@@ -21,7 +21,8 @@ defined as gpio sub-nodes of the pinmux controller.
+ Required properties for iomux controller:
+   - compatible: one of "rockchip,rk2928-pinctrl", "rockchip,rk3066a-pinctrl"
+ 		       "rockchip,rk3066b-pinctrl", "rockchip,rk3188-pinctrl"
+-		       "rockchip,rk3288-pinctrl", "rockchip,rk3368-pinctrl"
++		       "rockchip,rk3228-pinctrl", "rockchip,rk3288-pinctrl"
++		       "rockchip,rk3368-pinctrl"
+   - rockchip,grf: phandle referencing a syscon providing the
+ 	 "general register files"
+ 
+diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
+index a065112..faab36e 100644
+--- a/drivers/pinctrl/pinctrl-rockchip.c
++++ b/drivers/pinctrl/pinctrl-rockchip.c
+@@ -614,6 +614,40 @@ static void rk3288_calc_drv_reg_and_bit(struct rockchip_pin_bank *bank,
+ 	}
+ }
+ 
++#define RK3228_PULL_OFFSET		0x100
++
++static void rk3228_calc_pull_reg_and_bit(struct rockchip_pin_bank *bank,
++				    int pin_num, struct regmap **regmap,
++				    int *reg, u8 *bit)
++{
++	struct rockchip_pinctrl *info = bank->drvdata;
++
++	*regmap = info->regmap_base;
++	*reg = RK3228_PULL_OFFSET;
++	*reg += bank->bank_num * RK3188_PULL_BANK_STRIDE;
++	*reg += ((pin_num / RK3188_PULL_PINS_PER_REG) * 4);
++
++	*bit = (pin_num % RK3188_PULL_PINS_PER_REG);
++	*bit *= RK3188_PULL_BITS_PER_PIN;
++}
++
++#define RK3228_DRV_GRF_OFFSET		0x200
++
++static void rk3228_calc_drv_reg_and_bit(struct rockchip_pin_bank *bank,
++				    int pin_num, struct regmap **regmap,
++				    int *reg, u8 *bit)
++{
++	struct rockchip_pinctrl *info = bank->drvdata;
++
++	*regmap = info->regmap_base;
++	*reg = RK3228_DRV_GRF_OFFSET;
++	*reg += bank->bank_num * RK3288_DRV_BANK_STRIDE;
++	*reg += ((pin_num / RK3288_DRV_PINS_PER_REG) * 4);
++
++	*bit = (pin_num % RK3288_DRV_PINS_PER_REG);
++	*bit *= RK3288_DRV_BITS_PER_PIN;
++}
++
+ #define RK3368_PULL_GRF_OFFSET		0x100
+ #define RK3368_PULL_PMU_OFFSET		0x10
+ 
+@@ -2143,6 +2177,23 @@ static struct rockchip_pin_ctrl rk3188_pin_ctrl = {
+ 		.pull_calc_reg		= rk3188_calc_pull_reg_and_bit,
+ };
+ 
++static struct rockchip_pin_bank rk3228_pin_banks[] = {
++	PIN_BANK(0, 32, "gpio0"),
++	PIN_BANK(1, 32, "gpio1"),
++	PIN_BANK(2, 32, "gpio2"),
++	PIN_BANK(3, 32, "gpio3"),
++};
++
++static struct rockchip_pin_ctrl rk3228_pin_ctrl = {
++		.pin_banks		= rk3228_pin_banks,
++		.nr_banks		= ARRAY_SIZE(rk3228_pin_banks),
++		.label			= "RK3228-GPIO",
++		.type			= RK3288,
++		.grf_mux_offset		= 0x0,
++		.pull_calc_reg		= rk3228_calc_pull_reg_and_bit,
++		.drv_calc_reg		= rk3228_calc_drv_reg_and_bit,
++};
++
+ static struct rockchip_pin_bank rk3288_pin_banks[] = {
+ 	PIN_BANK_IOMUX_FLAGS(0, 24, "gpio0", IOMUX_SOURCE_PMU,
+ 					     IOMUX_SOURCE_PMU,
+@@ -2220,6 +2271,8 @@ static const struct of_device_id rockchip_pinctrl_dt_match[] = {
+ 		.data = (void *)&rk3066b_pin_ctrl },
+ 	{ .compatible = "rockchip,rk3188-pinctrl",
+ 		.data = (void *)&rk3188_pin_ctrl },
++	{ .compatible = "rockchip,rk3228-pinctrl",
++		.data = (void *)&rk3228_pin_ctrl },
+ 	{ .compatible = "rockchip,rk3288-pinctrl",
+ 		.data = (void *)&rk3288_pin_ctrl },
+ 	{ .compatible = "rockchip,rk3368-pinctrl",
+-- 
+2.1.4
