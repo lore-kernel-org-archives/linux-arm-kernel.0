@@ -1,72 +1,47 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 9 Dec 2015 16:50:22 +0800
-Subject: [PATCH 1/3] usb: misc: generic_onboard_hub: add generic onboard
- USB HUB driver
-In-Reply-To: <CANLsYkwfLSQKEw1a-Y_dguu-yutnTeQv73cMxPFooMjzTv4n1A@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 09 Dec 2015 09:55:43 +0100
+Subject: [PATCH 2/3] doc: dt-binding: generic onboard USB HUB
+In-Reply-To: <20151209081223.GB941@shlinux2>
 References: <1449538670-7954-1-git-send-email-peter.chen@freescale.com>
- <1449538670-7954-2-git-send-email-peter.chen@freescale.com>
- <CANLsYkwfLSQKEw1a-Y_dguu-yutnTeQv73cMxPFooMjzTv4n1A@mail.gmail.com>
-Message-ID: <20151209085021.GF941@shlinux2>
+ <20151209032403.GA3716@rob-hp-laptop> <20151209081223.GB941@shlinux2>
+Message-ID: <4048406.zTEffj2eJ2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 08, 2015 at 08:36:00AM -0700, Mathieu Poirier wrote:
-> On 7 December 2015 at 18:37, Peter Chen <peter.chen@freescale.com> wrote:
-> > +
-> > +       if (dev->of_node) {
-> > +               struct device_node *node = dev->of_node;
-> > +
-> > +               hub_data->clk = devm_clk_get(dev, "external_clk");
-> > +               if (IS_ERR(hub_data->clk)) {
-> > +                       dev_dbg(dev, "Can't get external clock: %ld\n",
-> > +                                       PTR_ERR(hub_data->clk));
-> > +               }
+On Wednesday 09 December 2015 16:12:24 Peter Chen wrote:
+> On Tue, Dec 08, 2015 at 09:24:03PM -0600, Rob Herring wrote:
+> > On Tue, Dec 08, 2015 at 10:58:48AM +0100, Arnd Bergmann wrote:
+> > > On Tuesday 08 December 2015 10:50:49 Philipp Zabel wrote:
+> > > > This something we don't have to define ad-hoc. The hub hangs off an USB
+> > > > controller, right? The "Open Firmware recommended practice: USB"
+> > > > document already describes how to represent USB devices in a generic
+> > > > manner:
+> > > > http://www.firmware.org/1275/bindings/usb/usb-1_0.ps
+> > > > 
+> > > > Is there a reason not to reuse this?
+> > > > 
+> > > > The usb hub node would be a child of the usb controller node, and it
+> > > > could use
+> > > > 	compatible = "usb,class9"; /* bDeviceClass 9 (Hub) */
+> > > 
+> > > Good point, I had not thought of that when I looked at the patches.
+> > >  
+> > > Yes, let's do this way. I don't know if we ever implemented the simple
+> > > patch to associate a USB device with a device_node, but if not, then
+> > > let's do it now for this driver. A lot of people have asked for it in
+> > > the past.
+> > 
+> > Agreed. Also, some hubs have I2C buses as well, but I still think under 
+> > the USB bus is the right place.
+> > 
+> > However, one complication here is often (probably this case) these 
+> > addtional signals need to be controlled before the device enumerates.
+> > 
 > 
-> Is the intended behaviour to keep going here event when there is an
-> error?  Can the "hub_data" really work without a clock?
+> Yes, I did not find a way to let the USB bus code handle it, so I had to
+> write a platform driver to do it
 
-Yes, some HUB may work with fixed 24M OSC at the board, but they need to
-reset through external IO, so the clock is not need at this case, but
-reset pin is mandatory.
+Looping in Ulf, he solved the same problem for SDIO devices recently,
+and probably remembers the details best.
 
-> > +       }
-> > +
-> > +       if (gpiod_reset) {
-> > +               /* Sanity check */
-> > +               if (duration_us > 1000000)
-> > +                       duration_us = 50;
-> > +               usleep_range(duration_us, duration_us + 100);
-> > +               gpiod_set_value(gpiod_reset, reset_pol ? 0 : 1);
-> 
-> What are these hard-coded values?  Shouldn't this be taken from the
-> DT?  If not then some comments explaining the values would be
-> appreciated.
-
-Yes, I did it wrongly, thanks.
-
-> > diff --git a/include/linux/usb/generic_onboard_hub.h b/include/linux/usb/generic_onboard_hub.h
-> > new file mode 100644
-> > index 0000000..1b70ccc
-> > --- /dev/null
-> > +++ b/include/linux/usb/generic_onboard_hub.h
-> > @@ -0,0 +1,11 @@
-> > +#ifndef __LINUX_USB_GENERIC_HUB_H
-> > +#define __LINUX_USB_GENERIC_HUB_H
-> > +
-> > +struct usb_hub_generic_platform_data {
-> > +       int gpio_reset;
-> > +       int gpio_reset_polarity;
-> > +       int gpio_reset_duration_us;
-> > +       struct clk *ext_clk;
-> > +};
-> 
-> Please document this structure in accordance with kernel documentation
-> standards.
-> 
-
-Thanks, it should be.
-
--- 
-
-Best Regards,
-Peter Chen
+	Arnd
