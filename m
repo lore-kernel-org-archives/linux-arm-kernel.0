@@ -1,47 +1,207 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 9 Dec 2015 16:15:52 +0100
-Subject: [PATCH v2] pinctrl: mvebu: complain about missing group after
- checking variant
-In-Reply-To: <1448706409-16912-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1448705645-13881-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1448706409-16912-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <CACRpkdYWzyeJNFJ8DzmsZ1rZ8w=ptkm4wGE4MgdGS=EcBzg1Rw@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 9 Dec 2015 15:19:45 +0000
+Subject: [PATCH v3] arm64: dts: juno: Add idle-states to device tree
+In-Reply-To: <1449654053.2818.6.camel@linaro.org>
+References: <1449654053.2818.6.camel@linaro.org>
+Message-ID: <20151209151945.GA7709@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 28, 2015 at 11:26 AM, Sebastian Hesselbarth
-<sebastian.hesselbarth@gmail.com> wrote:
+[CC'ed Arnd, Olof and Kevin]
 
-> Common MVEBU pinctrl driver core gets an array of controls to modify
-> a specific set of registers and an array of modes for each pingroup
-> from each of the different SoC families of MVEBU.
->
-> Some SoC families comprise different variants that differ in available
-> pingroups and also controls, but to ease driver development, we can
-> pass a variant mask to disable specific pingroups for some variants.
-> However, controls are limited to the true number of pinctrl groups
-> avaiable on a variant.
->
-> Now, when pinctrl core driver parses over above arrays, it tries to
-> match modes with available controls and complains about missing
-> controls for modes that are passed to the core but actually are not
-> avaiable on a variant with:
->
-> kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 36
->
-> This warning is a false-positive and annoying, so move the warning
-> after we checked the variant mask for each mode setting. Also, if
-> there is no supported setting for this variant, do not complain at
-> all.
->
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Reported-by: Linus Walleij <linus.walleij@linaro.org>
+On Wed, Dec 09, 2015 at 09:40:53AM +0000, Jon Medhurst (Tixy) wrote:
+> This patch adds idle-states bindings data collected through a set of
+> benchmarking experiments (latency and energy consumption) on Juno
+> boards. Latencies data represents the worst case scenarios as required
+> by the DT idle-states bindings.
+> 
+> Signed-off-by: Jon Medhurst <tixy@linaro.org>
+> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 > ---
-> Changelog:
-> v1->v2:
-> - modify settings loop to allow to check for !num_settings
+> 
+> I don't know if this needs any other Ack or can finally go in (through
+> arm soc tree?)
 
-Patch applied!
+I think it can be pulled as-is as far as I am concerned.
 
-Yours,
-Linus Walleij
+Thanks,
+Lorenzo
+
+> Changes since v2:
+> - Updated commit message to Lorenzo's suggested text.
+> 
+> Changes since v1:
+> - Updated latency times to those provided by Lorenzo
+> - Included Juno r1 dt
+> 
+>  arch/arm64/boot/dts/arm/juno-r1.dts | 28 ++++++++++++++++++++++++++++
+>  arch/arm64/boot/dts/arm/juno.dts    | 28 ++++++++++++++++++++++++++++
+>  2 files changed, 56 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
+> index 93bc3d7..8826f83 100644
+> --- a/arch/arm64/boot/dts/arm/juno-r1.dts
+> +++ b/arch/arm64/boot/dts/arm/juno-r1.dts
+> @@ -60,6 +60,28 @@
+>  			};
+>  		};
+>  
+> +		idle-states {
+> +			entry-method = "arm,psci";
+> +
+> +			CPU_SLEEP_0: cpu-sleep-0 {
+> +				compatible = "arm,idle-state";
+> +				arm,psci-suspend-param = <0x0010000>;
+> +				local-timer-stop;
+> +				entry-latency-us = <300>;
+> +				exit-latency-us = <1200>;
+> +				min-residency-us = <2000>;
+> +			};
+> +
+> +			CLUSTER_SLEEP_0: cluster-sleep-0 {
+> +				compatible = "arm,idle-state";
+> +				arm,psci-suspend-param = <0x1010000>;
+> +				local-timer-stop;
+> +				entry-latency-us = <300>;
+> +				exit-latency-us = <1200>;
+> +				min-residency-us = <2500>;
+> +			};
+> +		};
+> +
+>  		A57_0: cpu at 0 {
+>  			compatible = "arm,cortex-a57","arm,armv8";
+>  			reg = <0x0 0x0>;
+> @@ -67,6 +89,7 @@
+>  			enable-method = "psci";
+>  			next-level-cache = <&A57_L2>;
+>  			clocks = <&scpi_dvfs 0>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A57_1: cpu at 1 {
+> @@ -76,6 +99,7 @@
+>  			enable-method = "psci";
+>  			next-level-cache = <&A57_L2>;
+>  			clocks = <&scpi_dvfs 0>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A53_0: cpu at 100 {
+> @@ -85,6 +109,7 @@
+>  			enable-method = "psci";
+>  			next-level-cache = <&A53_L2>;
+>  			clocks = <&scpi_dvfs 1>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A53_1: cpu at 101 {
+> @@ -94,6 +119,7 @@
+>  			enable-method = "psci";
+>  			next-level-cache = <&A53_L2>;
+>  			clocks = <&scpi_dvfs 1>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A53_2: cpu at 102 {
+> @@ -103,6 +129,7 @@
+>  			enable-method = "psci";
+>  			next-level-cache = <&A53_L2>;
+>  			clocks = <&scpi_dvfs 1>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A53_3: cpu at 103 {
+> @@ -112,6 +139,7 @@
+>  			enable-method = "psci";
+>  			next-level-cache = <&A53_L2>;
+>  			clocks = <&scpi_dvfs 1>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A57_L2: l2-cache0 {
+> diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+> index 53442b5..dcfcf15 100644
+> --- a/arch/arm64/boot/dts/arm/juno.dts
+> +++ b/arch/arm64/boot/dts/arm/juno.dts
+> @@ -60,6 +60,28 @@
+>  			};
+>  		};
+>  
+> +		idle-states {
+> +			entry-method = "arm,psci";
+> +
+> +			CPU_SLEEP_0: cpu-sleep-0 {
+> +				compatible = "arm,idle-state";
+> +				arm,psci-suspend-param = <0x0010000>;
+> +				local-timer-stop;
+> +				entry-latency-us = <300>;
+> +				exit-latency-us = <1200>;
+> +				min-residency-us = <2000>;
+> +			};
+> +
+> +			CLUSTER_SLEEP_0: cluster-sleep-0 {
+> +				compatible = "arm,idle-state";
+> +				arm,psci-suspend-param = <0x1010000>;
+> +				local-timer-stop;
+> +				entry-latency-us = <300>;
+> +				exit-latency-us = <1200>;
+> +				min-residency-us = <2500>;
+> +			};
+> +		};
+> +
+>  		A57_0: cpu at 0 {
+>  			compatible = "arm,cortex-a57","arm,armv8";
+>  			reg = <0x0 0x0>;
+> @@ -67,6 +89,7 @@
+>  			enable-method = "psci";
+>  			next-level-cache = <&A57_L2>;
+>  			clocks = <&scpi_dvfs 0>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A57_1: cpu at 1 {
+> @@ -76,6 +99,7 @@
+>  			enable-method = "psci";
+>  			next-level-cache = <&A57_L2>;
+>  			clocks = <&scpi_dvfs 0>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A53_0: cpu at 100 {
+> @@ -85,6 +109,7 @@
+>  			enable-method = "psci";
+>  			next-level-cache = <&A53_L2>;
+>  			clocks = <&scpi_dvfs 1>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A53_1: cpu at 101 {
+> @@ -94,6 +119,7 @@
+>  			enable-method = "psci";
+>  			next-level-cache = <&A53_L2>;
+>  			clocks = <&scpi_dvfs 1>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A53_2: cpu at 102 {
+> @@ -103,6 +129,7 @@
+>  			enable-method = "psci";
+>  			next-level-cache = <&A53_L2>;
+>  			clocks = <&scpi_dvfs 1>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A53_3: cpu at 103 {
+> @@ -112,6 +139,7 @@
+>  			enable-method = "psci";
+>  			next-level-cache = <&A53_L2>;
+>  			clocks = <&scpi_dvfs 1>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A57_L2: l2-cache0 {
+> -- 
+> 2.1.4
+> 
+> 
+> 
