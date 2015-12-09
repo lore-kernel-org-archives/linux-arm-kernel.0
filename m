@@ -1,36 +1,35 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 09 Dec 2015 21:46:30 +0100
-Subject: [PATCH] ARM: pxa: mark ezx structures as __maybe_unused
-In-Reply-To: <7455848.ygDvrz6r6S@wuerfel> (Arnd Bergmann's message of "Wed, 09
- Dec 2015 17:36:03 +0100")
-References: <7455848.ygDvrz6r6S@wuerfel>
-Message-ID: <8737vbl595.fsf@belgarion.home>
+Date: Wed, 09 Dec 2015 22:00:49 +0100
+Subject: [PATCH] ARM: pxa: cm-x2xx: avoid duplicate macro warnings
+In-Reply-To: <5126103.CuC5iMSqYG@wuerfel> (Arnd Bergmann's message of "Wed, 09
+ Dec 2015 17:52:06 +0100")
+References: <5126103.CuC5iMSqYG@wuerfel>
+Message-ID: <87y4d3jq0u.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Arnd Bergmann <arnd@arndb.de> writes:
 
-> The ezx platform contains multiple machine descriptors, but not all
-> of them use all of the data structures, and it's possible to disable
-> all of the machines, which produces some harmless warnings:
+> In an old commit, we worked around the duplicate definition of
+> GPIO24_SSP1_SFRM in cm-x2xx.c, which includes files for both
+> pxa25x and pxa27x. Apparently the problem has come back and we
+> now have four additional duplicate symbols that cause warnings:
 >
-> mach-pxa/ezx.c:53:26: warning: 'ezx_pwm_lookup' defined but not used [-Wunused-variable]
-> mach-pxa/ezx.c:86:31: warning: 'ezx_fb_info_1' defined but not used [-Wunused-variable]
-> mach-pxa/ezx.c:107:31: warning: 'ezx_fb_info_2' defined but not used [-Wunused-variable]
-> mach-pxa/ezx.c:113:32: warning: 'ezx_devices' defined but not used [-Wunused-variable]
-> mach-pxa/ezx.c:117:22: warning: 'ezx_pin_config' defined but not used [-Wunused-variable]
+> In file included from /git/arm-soc/arch/arm/mach-pxa/pxa27x.h:7:0,
+>                  from /git/arm-soc/arch/arm/mach-pxa/cm-x2xx.c:27:
+> /git/arm-soc/arch/arm/mach-pxa/mfp-pxa27x.h:21:0: warning: "GPIO86_GPIO" redefined
+>  #define GPIO86_GPIO  MFP_CFG_IN(GPIO86, AF0)
 >
-> This marks all those structures as __maybe_unused to avoid the warnings.
-> Obviously a configuration that contains the ezx platform but no specific
-> model is a bit silly, but it should not cause compile-time warnings.
+> This uses the same hack as before and undefines all symbols that
+> are defined more than once. Fortunately, cm-x2xx does not need
+> any of these.
 >
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Digging out old patches of 2012, cool.
 Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
-I think you'll take that through your tree, as I'm passing the v4.5 pull. If you
-want me to take them, just tell me, but I think v4.5 is already prepared on your
-side as I've seen a mail from Boris talking about pxa patches going through mtd
-tree for v4.5.
+I suppose it's a necessary hack until I manage to kill the mfp interface in
+favor of pinctrl.
 
 Cheers.
 
