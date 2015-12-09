@@ -1,38 +1,198 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 08 Dec 2015 22:58:41 -0500 (EST)
-Subject: [PATCH] net: ezchip: fix address space confusion in nps_enet.c
-In-Reply-To: <33732958.3idC7H2UPT@wuerfel>
-References: <33732958.3idC7H2UPT@wuerfel>
-Message-ID: <20151208.225841.2073281401429339939.davem@davemloft.net>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 8 Dec 2015 22:25:40 -0600
+Subject: [PATCH v10.1 14/17] drm: bridge: analogix/dp: try force hpd
+ after plug in lookup failed
+In-Reply-To: <1449627039-15689-1-git-send-email-ykk@rock-chips.com>
+References: <1449470239-30667-1-git-send-email-ykk@rock-chips.com>
+ <1449627039-15689-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <20151209042540.GA14415@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Tue, 08 Dec 2015 16:28:59 +0100
+On Wed, Dec 09, 2015 at 10:10:39AM +0800, Yakir Yang wrote:
+> Some edp screen do not have hpd signal, so we can't just return
+> failed when hpd plug in detect failed.
+> 
+> This is an hardware property, so we need add a devicetree property
+> "analogix,need-force-hpd" to indicate this sutiation.
+> 
+> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-> The nps_enet driver happily mixes virtual, physical and __iomem
-> addresses, which are all different depending on the architecture
-> and configuration.  That causes a warning when building the code
-> on ARM with LPAE mode enabled:
-> 
-> drivers/net/ethernet/ezchip/nps_enet.c: In function 'nps_enet_send_frame':
-> drivers/net/ethernet/ezchip/nps_enet.c:370:13: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
-> 
-> but will also fail to work for other reasons.
-> 
-> In this patch, I'm trying to change the code to use only normal
-> kernel pointers, which I assume is what the author actually meant:
-> 
-> * For reading or writing a 32-bit word that may be unaligned when
->   an SKB contains unaligned data, I'm using get_unaligned/put_unaligned()
->   rather than memcpy_fromio/toio.
-> 
-> * For converting a u8 pointer to a u32 pointer, I use a cast rather
->   than the incorrect virt_to_phys.
-> 
-> * For copying a couple of bytes from one place to another while respecting
->   alignment, I use memcpy instead of memcpy_toio.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Rob Herring <robh@kernel.org>
 
-Applied, thanks Arnd.
+> ---
+> Changes in v10.1:
+> - Rename the "analogix,need-force-hpd" to common 'force-hpd' (Rob)
+> 
+> Changes in v9: None
+> Changes in v8: None
+> Changes in v7: None
+> Changes in v6: None
+> Changes in v5: None
+> Changes in v4: None
+> Changes in v3:
+> - Add "analogix,need-force-hpd" to indicate whether driver need foce
+>   hpd when hpd detect failed.
+> 
+> Changes in v2: None
+> 
+>  .../bindings/display/bridge/analogix_dp.txt        |  4 ++-
+>  .../bindings/display/exynos/exynos_dp.txt          |  1 +
+>  .../display/rockchip/analogix_dp-rockchip.txt      |  1 +
+>  drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 35 ++++++++++++++++++----
+>  drivers/gpu/drm/bridge/analogix/analogix_dp_core.h |  2 ++
+>  drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c  |  9 ++++++
+>  6 files changed, 46 insertions(+), 6 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt b/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
+> index 7659a7a..4f2ba8c 100644
+> --- a/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
+> +++ b/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
+> @@ -22,6 +22,9 @@ Required properties for dp-controller:
+>  		from general PHY binding: Should be "dp".
+>  
+>  Optional properties for dp-controller:
+> +	-force-hpd:
+> +		Indicate driver need force hpd when hpd detect failed, this
+> +		is used for some eDP screen which don't have hpd signal.
+>  	-hpd-gpios:
+>  		Hotplug detect GPIO.
+>  		Indicates which GPIO should be used for hotplug detection
+> @@ -31,7 +34,6 @@ Optional properties for dp-controller:
+>  		* Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
+>  		* Documentation/devicetree/bindings/video/analogix_dp-rockchip.txt
+>  
+> -
+>  [1]: Documentation/devicetree/bindings/media/video-interfaces.txt
+>  -------------------------------------------------------------------------------
+>  
+> diff --git a/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt b/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
+> index 9905081..8800164 100644
+> --- a/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
+> +++ b/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
+> @@ -41,6 +41,7 @@ For the below properties, please refer to Analogix DP binding document:
+>  	-phys (required)
+>  	-phy-names (required)
+>  	-hpd-gpios (optional)
+> +	-analogix,need-force-hpd (optional)
+>  	-video interfaces (optional)
+>  
+>  Deprecated properties for DisplayPort:
+> diff --git a/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
+> index dae86c4..187a708e 100644
+> --- a/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
+> +++ b/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
+> @@ -32,6 +32,7 @@ For the below properties, please refer to Analogix DP binding document:
+>  - phys (required)
+>  - phy-names (required)
+>  - hpd-gpios (optional)
+> +- force-hpd (optional)
+>  -------------------------------------------------------------------------------
+>  
+>  Example:
+> diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+> index a11504b..00aee44 100644
+> --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+> +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+> @@ -59,15 +59,38 @@ static int analogix_dp_detect_hpd(struct analogix_dp_device *dp)
+>  {
+>  	int timeout_loop = 0;
+>  
+> -	while (analogix_dp_get_plug_in_status(dp) != 0) {
+> +	while (timeout_loop < DP_TIMEOUT_LOOP_COUNT) {
+> +		if (analogix_dp_get_plug_in_status(dp) == 0)
+> +			return 0;
+> +
+>  		timeout_loop++;
+> -		if (timeout_loop > DP_TIMEOUT_LOOP_COUNT) {
+> -			dev_err(dp->dev, "failed to get hpd plug status\n");
+> -			return -ETIMEDOUT;
+> -		}
+>  		usleep_range(10, 11);
+>  	}
+>  
+> +	/*
+> +	 * Some edp screen do not have hpd signal, so we can't just
+> +	 * return failed when hpd plug in detect failed, DT property
+> +	 * "need-force-hpd" would indicate whether driver need this.
+> +	 */
+> +	if (!dp->force_hpd)
+> +		return -ETIMEDOUT;
+> +
+> +	/*
+> +	 * The eDP TRM indicate that if HPD_STATUS(RO) is 0, AUX CH
+> +	 * will not work, so we need to give a force hpd action to
+> +	 * set HPD_STATUS manually.
+> +	 */
+> +	dev_dbg(dp->dev, "failed to get hpd plug status, try to force hpd\n");
+> +
+> +	analogix_dp_force_hpd(dp);
+> +
+> +	if (analogix_dp_get_plug_in_status(dp) != 0) {
+> +		dev_err(dp->dev, "failed to get hpd plug in status\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	dev_dbg(dp->dev, "success to get plug in status after force hpd\n");
+> +
+>  	return 0;
+>  }
+>  
+> @@ -1246,6 +1269,8 @@ int analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
+>  	if (IS_ERR(dp->reg_base))
+>  		return PTR_ERR(dp->reg_base);
+>  
+> +	dp->force_hpd = of_property_read_bool(dev->of_node, "force-hpd");
+> +
+>  	dp->hpd_gpio = of_get_named_gpio(dev->of_node, "hpd-gpios", 0);
+>  	if (!gpio_is_valid(dp->hpd_gpio))
+>  		dp->hpd_gpio = of_get_named_gpio(dev->of_node,
+> diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+> index e6f8243..07e147c 100644
+> --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+> +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+> @@ -160,6 +160,7 @@ struct analogix_dp_device {
+>  	struct phy		*phy;
+>  	int			dpms_mode;
+>  	int			hpd_gpio;
+> +	bool                    force_hpd;
+>  
+>  	struct analogix_dp_plat_data *plat_data;
+>  };
+> @@ -180,6 +181,7 @@ void analogix_dp_set_analog_power_down(struct analogix_dp_device *dp,
+>  				       bool enable);
+>  void analogix_dp_init_analog_func(struct analogix_dp_device *dp);
+>  void analogix_dp_init_hpd(struct analogix_dp_device *dp);
+> +void analogix_dp_force_hpd(struct analogix_dp_device *dp);
+>  enum dp_irq_type analogix_dp_get_irq_type(struct analogix_dp_device *dp);
+>  void analogix_dp_clear_hotplug_interrupts(struct analogix_dp_device *dp);
+>  void analogix_dp_reset_aux(struct analogix_dp_device *dp);
+> diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+> index 21a3287..c7e2959 100644
+> --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+> +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+> @@ -365,6 +365,15 @@ void analogix_dp_init_hpd(struct analogix_dp_device *dp)
+>  	writel(reg, dp->reg_base + ANALOGIX_DP_SYS_CTL_3);
+>  }
+>  
+> +void analogix_dp_force_hpd(struct analogix_dp_device *dp)
+> +{
+> +	u32 reg;
+> +
+> +	reg = readl(dp->reg_base + ANALOGIX_DP_SYS_CTL_3);
+> +	reg = (F_HPD | HPD_CTRL);
+> +	writel(reg, dp->reg_base + ANALOGIX_DP_SYS_CTL_3);
+> +}
+> +
+>  enum dp_irq_type analogix_dp_get_irq_type(struct analogix_dp_device *dp)
+>  {
+>  	u32 reg;
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> http://lists.freedesktop.org/mailman/listinfo/dri-devel
