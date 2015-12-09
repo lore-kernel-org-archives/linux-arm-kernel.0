@@ -1,83 +1,104 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 9 Dec 2015 22:41:50 +0100
-Subject: regmap-mmio and paged registers
-Message-ID: <20151209214150.GH3515@piout.net>
+From: lho@apm.com (Loc Ho)
+Date: Wed, 9 Dec 2015 14:03:59 -0800
+Subject: [PATCH 1/2] acpi:apd: Add APM X-Gene ACPI I2C device support
+In-Reply-To: <1449542948.2175.41.camel@kxue-X58A-UD3R>
+References: <1449533774-22672-1-git-send-email-lho@apm.com>
+ <1449533774-22672-2-git-send-email-lho@apm.com>
+ <1449542948.2175.41.camel@kxue-X58A-UD3R>
+Message-ID: <CAPw-ZTkxhdEmOP_DN=Cv1MmPw5UsZHcd-kLVbqYFJU8-6=sc+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Ken,
 
-On AT91, we have a paged register inside a register range.
+On Mon, Dec 7, 2015 at 6:49 PM, Ken Xue <ken.xue@amd.com> wrote:
+>
+> On Mon, 2015-12-07 at 17:16 -0700, Loc Ho wrote:
+> > Add APM X-Gene ACPI I2C device support by hooks into existent
+> > ACPI apd driver. To fully enable support, require another
+> > patch to add the X-Gene ACPI node into the DW I2C driver.
+> >
+> > Signed-off-by: Loc Ho <lho@apm.com>
+> > ---
+> >  drivers/acpi/acpi_apd.c |    8 +++++++-
+> >  1 files changed, 7 insertions(+), 1 deletions(-)
+> >
+> > diff --git a/drivers/acpi/acpi_apd.c b/drivers/acpi/acpi_apd.c
+> > index a450e7a..6a9cb8d 100644
+> > --- a/drivers/acpi/acpi_apd.c
+> > +++ b/drivers/acpi/acpi_apd.c
+> > @@ -51,7 +51,7 @@ struct apd_private_data {
+> >       const struct apd_device_desc *dev_desc;
+> >  };
+> >
+> > -#ifdef CONFIG_X86_AMD_PLATFORM_DEVICE
+> > +#if defined(CONFIG_X86_AMD_PLATFORM_DEVICE) || defined(CONFIG_ARM64)
+> >  #define APD_ADDR(desc)       ((unsigned long)&desc)
+> >
+> >  static int acpi_apd_setup(struct apd_private_data *pdata)
+> > @@ -76,6 +76,11 @@ static struct apd_device_desc cz_i2c_desc = {
+> >       .fixed_clk_rate = 133000000,
+> >  };
+> >
+> > +static struct apd_device_desc xgene_i2c_desc = {
+> > +     .setup = acpi_apd_setup,
+> > +     .fixed_clk_rate = 100000000,
+> > +};
+> > +
+> >  static struct apd_device_desc cz_uart_desc = {
+> >       .setup = acpi_apd_setup,
+> >       .fixed_clk_rate = 48000000,
+> > @@ -135,6 +140,7 @@ static const struct acpi_device_id acpi_apd_device_ids[] = {
+> >       { "AMD0010", APD_ADDR(cz_i2c_desc) },
+> >       { "AMD0020", APD_ADDR(cz_uart_desc) },
+> >       { "AMD0030", },
+> > +     { "APMC0D0F", APD_ADDR(xgene_i2c_desc) },
+> It is better to split AMD devices and ARM devices with macros:
+> CONFIG_X86_AMD_PLATFORM_DEVICE and CONFIG_ARM64.
 
-This register looks like that:
+This gets pretty ugly to me with define as it would look like this:
 
-AT91_PMC_PCR:
-   31   30   29   28   27   26   25   24
- +----+----+----+----+----+----+----+----+
- | -- | -- | -- | EN | -- | -- | -- | -- |
- +----+----+----+----+----+----+----+----+
+#if defined(CONFIG_X86_AMD_PLATFORM_DEVICE) || defined(CONFIG_ARM64)
+#define APD_ADDR(desc) ((unsigned long)&desc)
 
-   23   22   21   20   19   18   17   16
- +----+----+----+----+----+----+----+----+
- | -- | -- | -- | -- | -- | -- |   DIV   |
- +----+----+----+----+----+----+----+----+
+static int acpi_apd_setup(struct apd_private_data *pdata)
+{
+   .....
+}
 
-   15   14   13   12   11   10   09   08
- +----+----+----+----+----+----+----+----+
- | -- | -- | -- |CMD | -- | -- | -- | -- |
- +----+----+----+----+----+----+----+----+
-
-   07   06   05   04   03   02   01   00
- +----+----+----+----+----+----+----+----+
- | -- | -- |             PID             |
- +----+----+----+----+----+----+----+----+
-
-PID is our selector, the other bits are the data.
-
-We described the regmap by creating a virtual range:
-
-#define AT91_PMC_VIRT_PCR(id)	(0x200 + id)
-
-static const struct regmap_range_cfg pmc_regmap_ranges[] = {
-	{
-		.range_min = AT91_PMC_VIRT_PCR(0),
-		.range_max = AT91_PMC_VIRT_PCR(AT91_PMC_PCR_PID_MASK),
-		.window_start = AT91_PMC_PCR,
-		.window_len = 1,
-		.selector_reg = AT91_PMC_PCR,
-		.selector_mask = 0xffffffff,
-	},
+#ifdef CONFIG_X86_AMD_PLATFORM_DEVICE
+static struct apd_device_desc cz_i2c_desc = {
+    ....
 };
 
-static struct regmap_config at91sam9x5_pmc_regmap_config = {
-	.reg_bits = 32,
-	.val_bits = 32,
-	.reg_stride = 4,
-	.ranges = pmc_regmap_ranges,
-	.num_ranges = ARRAY_SIZE(pmc_regmap_ranges),
-	.max_register = AT91_PMC_VIRT_PCR(AT91_PMC_PCR_PID_MASK),
+static struct apd_device_desc xgene_i2c_desc = {
+    ...
 };
+#endif
 
-The issue we have with that setup is that _regmap_select_page() does
-that check before writing the page number:
+#ifdef CONFIG_ARM64
+static struct apd_device_desc cz_uart_desc = {
+    ....
+};
+#endif
 
-	/* It is possible to have selector register inside data window.
-	   In that case, selector register is located on every page and
-	   it needs no page switching, when accessed alone. */
-	if (val_num > 1 ||
-	    range->window_start + win_offset != range->selector_reg) {
+#else
 
-So it ends up never writing the page number in the register.
+#define APD_ADDR(desc) (0UL)
 
-One possible solution would be to implement our own .read and .write to
-handle that paging but maybe you can think of something else.
+#endif /* CONFIG_X86_AMD_PLATFORM_DEVICE */
 
+And...
 
-The full datasheet is here, 27.16.26 PMC Peripheral Control Register,
-page 270
-http://www.atmel.com/Images/Atmel-11121-32-bit-Cortex-A5-Microcontroller-SAMA5D3_Datasheet.pdf
+#ifdef CONFIG_X86_AMD_PLATFORM_DEVICE
+{ "AMD0010", APD_ADDR(cz_i2c_desc) },
+{ "AMD0020", APD_ADDR(cz_uart_desc) },
+{ "AMD0030", },
+#endif
+#ifdef CONFIG_ARM64
+{ "APMC0D0F", APD_ADDR(xgene_i2c_desc) },
+#endif
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Sure you want this?
+
+-Loc
