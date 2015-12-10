@@ -1,122 +1,98 @@
-From: pmladek@suse.com (Petr Mladek)
-Date: Thu, 10 Dec 2015 16:26:06 +0100
-Subject: [PATCH v3 1/4] printk/nmi: Generic solution for safe printk in NMI
-In-Reply-To: <20151209155007.cab2f1afd7e76878a1733033@linux-foundation.org>
-References: <1449667265-17525-1-git-send-email-pmladek@suse.com>
- <1449667265-17525-2-git-send-email-pmladek@suse.com>
- <20151209155007.cab2f1afd7e76878a1733033@linux-foundation.org>
-Message-ID: <20151210152606.GD2946@pathway.suse.cz>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 10 Dec 2015 15:26:08 +0000
+Subject: [PATCHv3 1/5] arm-cci: Refactor CCI PMU enable/disable methods
+In-Reply-To: <1447783407-18027-2-git-send-email-suzuki.poulose@arm.com>
+References: <1447783407-18027-1-git-send-email-suzuki.poulose@arm.com>
+ <1447783407-18027-2-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20151210152608.GC495@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2015-12-09 15:50:07, Andrew Morton wrote:
-> On Wed,  9 Dec 2015 14:21:02 +0100 Petr Mladek <pmladek@suse.com> wrote:
+On Tue, Nov 17, 2015 at 06:03:23PM +0000, Suzuki K. Poulose wrote:
+> This patch refactors the CCI PMU driver code a little bit to
+> make it easier share the code for enabling/disabling the CCI
+> PMU. This will be used by the hooks to work around the special cases
+> where writing to a counter is not always that easy(e.g, CCI-500)
 > 
-> > printk() takes some locks and could not be used a safe way in NMI
-> > context.
-> > 
-> > The chance of a deadlock is real especially when printing
-> > stacks from all CPUs. This particular problem has been addressed
-> > on x86 by the commit a9edc8809328 ("x86/nmi: Perform a safe NMI stack
-> > trace on all CPUs").
-> > 
-> > This patch reuses most of the code and makes it generic. It is
-> > useful for all messages and architectures that support NMI.
-> > 
-> > The patch is heavily based on the draft from Peter Zijlstra,
-> > see https://lkml.org/lkml/2015/6/10/327
-> > 
+> No functional changes.
+
+Looks sensible to me:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Mark.
+
+> Cc: Punit Agrawal <punit.agrawal@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+> ---
+>  drivers/bus/arm-cci.c |   32 ++++++++++++++++++++++----------
+>  1 file changed, 22 insertions(+), 10 deletions(-)
 > 
-> I guess this code is useful even on CONFIG_SMP=n: to avoid corruption
-> of the printk internal structures whcih the problematic locking
-> protects.
-
-Yup and it is used even on CONFIG_SMP=n if I am not missing
-something. At least, CONFIG_PRINTK_NMI stays enabled here.
-
-
-> > +#define NMI_LOG_BUF_LEN (4096 - sizeof(atomic_t) - sizeof(struct irq_work))
-> > +
-> > +struct nmi_seq_buf {
-> > +	atomic_t		len;	/* length of written data */
-> > +	struct irq_work		work;	/* IRQ work that flushes the buffer */
-> > +	unsigned char		buffer[NMI_LOG_BUF_LEN];
+> diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+> index ee47e6b..f5793b9 100644
+> --- a/drivers/bus/arm-cci.c
+> +++ b/drivers/bus/arm-cci.c
+> @@ -667,6 +667,26 @@ static u32 pmu_get_max_counters(void)
+>  		CCI_PMCR_NCNT_MASK) >> CCI_PMCR_NCNT_SHIFT;
+>  }
+>  
+> +/* Should be called with cci_pmu->hw_events->pmu_lock held */
+> +static void __cci_pmu_enable(void)
+> +{
+> +	u32 val;
+> +
+> +	/* Enable all the PMU counters. */
+> +	val = readl_relaxed(cci_ctrl_base + CCI_PMCR) | CCI_PMCR_CEN;
+> +	writel(val, cci_ctrl_base + CCI_PMCR);
+> +}
+> +
+> +/* Should be called with cci_pmu->hw_events->pmu_lock held */
+> +static void __cci_pmu_disable(void)
+> +{
+> +	u32 val;
+> +
+> +	/* Disable all the PMU counters. */
+> +	val = readl_relaxed(cci_ctrl_base + CCI_PMCR) & ~CCI_PMCR_CEN;
+> +	writel(val, cci_ctrl_base + CCI_PMCR);
+> +}
+> +
+>  static int pmu_get_event_idx(struct cci_pmu_hw_events *hw, struct perf_event *event)
+>  {
+>  	struct cci_pmu *cci_pmu = to_cci_pmu(event->pmu);
+> @@ -880,16 +900,12 @@ static void cci_pmu_enable(struct pmu *pmu)
+>  	struct cci_pmu_hw_events *hw_events = &cci_pmu->hw_events;
+>  	int enabled = bitmap_weight(hw_events->used_mask, cci_pmu->num_cntrs);
+>  	unsigned long flags;
+> -	u32 val;
+>  
+>  	if (!enabled)
+>  		return;
+>  
+>  	raw_spin_lock_irqsave(&hw_events->pmu_lock, flags);
+> -
+> -	/* Enable all the PMU counters. */
+> -	val = readl_relaxed(cci_ctrl_base + CCI_PMCR) | CCI_PMCR_CEN;
+> -	writel(val, cci_ctrl_base + CCI_PMCR);
+> +	__cci_pmu_enable();
+>  	raw_spin_unlock_irqrestore(&hw_events->pmu_lock, flags);
+>  
+>  }
+> @@ -899,13 +915,9 @@ static void cci_pmu_disable(struct pmu *pmu)
+>  	struct cci_pmu *cci_pmu = to_cci_pmu(pmu);
+>  	struct cci_pmu_hw_events *hw_events = &cci_pmu->hw_events;
+>  	unsigned long flags;
+> -	u32 val;
+>  
+>  	raw_spin_lock_irqsave(&hw_events->pmu_lock, flags);
+> -
+> -	/* Disable all the PMU counters. */
+> -	val = readl_relaxed(cci_ctrl_base + CCI_PMCR) & ~CCI_PMCR_CEN;
+> -	writel(val, cci_ctrl_base + CCI_PMCR);
+> +	__cci_pmu_disable();
+>  	raw_spin_unlock_irqrestore(&hw_events->pmu_lock, flags);
+>  }
+>  
+> -- 
+> 1.7.9.5
 > 
-> When this buffer overflows, which characters get lost?  Most recent or
-> least recent?
-
-The most recent messages are lost when the buffer overflows. The other
-way would require to use a ring-buffer instead the seq_buf. We would need
-a lock-less synchronization for both, begin and end, pointers. It
-would add quite some complications.
-
-
-> I'm not sure which is best, really.  For an oops trace you probably
-> want to preserve the least recent output: the stuff at the start of the
-> output.
-
-I agree. Fortunately, this is easier and it works this way.
-
-
-> > +static void __printk_nmi_flush(struct irq_work *work)
-> > +{
-> > +	static raw_spinlock_t read_lock =
-> > +		__RAW_SPIN_LOCK_INITIALIZER(read_lock);
-> > +	struct nmi_seq_buf *s = container_of(work, struct nmi_seq_buf, work);
-> > +	int len, size, i, last_i;
-> > +
-> > +	/*
-> > +	 * The lock has two functions. First, one reader has to flush all
-> > +	 * available message to make the lockless synchronization with
-> > +	 * writers easier. Second, we do not want to mix messages from
-> > +	 * different CPUs. This is especially important when printing
-> > +	 * a backtrace.
-> > +	 */
-> > +	raw_spin_lock(&read_lock);
-> > +
-> > +	i = 0;
-> > +more:
-> > +	len = atomic_read(&s->len);
-> > +
-> > +	/*
-> > +	 * This is just a paranoid check that nobody has manipulated
-> > +	 * the buffer an unexpected way. If we printed something then
-> > +	 * @len must only increase.
-> > +	 */
-> > +	WARN_ON(i && i >= len);
-> 
-> hm, dumping a big backtrace in this context seems a poor idea.  Oh
-> well, shouldn't happen.
-
-I see and the backtrace probably would not help much because "len"
-might be manipulated also from NMI context. I am going to change
-this to:
-
-	if (i && i >= len)
-		pr_err("printk_nmi_flush: internal error: i=%d >=
-		len=%d)\n", i, len);
-
-
-
-> > +	if (!len)
-> > +		goto out; /* Someone else has already flushed the buffer. */
-> > +
-> > +	/* Make sure that data has been written up to the @len */
-> > +	smp_rmb();
-> > +
-> > +	size = min_t(int, len, sizeof(s->buffer));
-> 
-> len and size should have type size_t.
-
-OK
-
-> > --- /dev/null
-> > +++ b/kernel/printk/printk.h
-> 
-> I find it a bit irritating to have duplicated filenames.  We could
-> follow convention and call this "internal.h".
-
-No problem. I am going to send an updated patchset soon.
-
-Thanks a lot for review,
-Petr
