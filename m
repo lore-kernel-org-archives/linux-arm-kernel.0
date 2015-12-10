@@ -1,29 +1,24 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Dec 2015 19:04:38 +0100
-Subject: [PATCH v2 0/3] gpio support for Broadcom NSP
-In-Reply-To: <CACRpkdbnj1NCtPkMsaCQPb5cKXqz7D3dqF7vNf08NoK1sY_B5Q@mail.gmail.com>
-References: <1449248981-12102-1-git-send-email-yrdreddy@broadcom.com>
- <CACRpkdbnj1NCtPkMsaCQPb5cKXqz7D3dqF7vNf08NoK1sY_B5Q@mail.gmail.com>
-Message-ID: <CACRpkdYcYaG3J13gomnCtPzXcqE9SbTP_jWmyTE4Bgx4piELeg@mail.gmail.com>
+Date: Thu, 10 Dec 2015 19:07:21 +0100
+Subject: [PATCH] pinctrl: bcm2835: Fix initial value for direction_output
+In-Reply-To: <1447893147-9458-1-git-send-email-stefan.wahren@i2se.com>
+References: <1447893147-9458-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <CACRpkdYO50aSra3gAzpBwBd0aQPA_aiC3t2rVHDUuXWmDQr=eg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 10, 2015 at 6:47 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Fri, Dec 4, 2015 at 6:09 PM, Yendapally Reddy Dhananjaya Reddy
-> <yrdreddy@broadcom.com> wrote:
->
->> This is the second iteration in the series.
->>
->> Changes in v2:
->> Addressed the review comments on device tree bindings and
->> the device tree file.
->
-> I've merged this on a special branch so I can also pull it into the GPIO
-> tree for pending refactorings.
+On Thu, Nov 19, 2015 at 1:32 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
 
-Now generated two patches on top of this: one to chane .dev to .parent
-and one for dealing with gpiochip_get_data()/gpiochip_add_data() from
-my recent refactoring patch set.
+> Currently the provided initial value for bcm2835_gpio_direction_output
+> has no effect. So fix this issue by changing the value before
+> changing the GPIO direction. As a result we need to move the function below
+> bcm2835_gpio_set.
+>
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> CC: Martin Sperl <kernel@martin.sperl.org>
+> CC: Stephen Warren <swarren@wwwdotorg.org>
+
+Patch applied for fixes.
 
 Yours,
 Linus Walleij
