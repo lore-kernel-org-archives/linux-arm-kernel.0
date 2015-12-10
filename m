@@ -1,30 +1,46 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 10 Dec 2015 19:59:25 +0100
-Subject: [PATCH 6/6] pinctrl: activate pxa architecture
-In-Reply-To: <CACRpkdZyAqfCcaPWZ0RKxcPEYNJ_BxTe9SHV6FdT6x9rygHEEw@mail.gmail.com>
- (Linus Walleij's message of "Thu, 10 Dec 2015 16:14:55 +0100")
-References: <1448129093-20722-1-git-send-email-robert.jarzmik@free.fr>
- <1448129093-20722-7-git-send-email-robert.jarzmik@free.fr>
- <CACRpkdZyAqfCcaPWZ0RKxcPEYNJ_BxTe9SHV6FdT6x9rygHEEw@mail.gmail.com>
-Message-ID: <87zixii0z6.fsf@belgarion.home>
+From: dv@vollmann.ch (Detlef Vollmann)
+Date: Thu, 10 Dec 2015 20:03:18 +0100
+Subject: [PATCH 0/5] ARM: orion5x/dove/mv78xx0 multiplatform
+In-Reply-To: <27901501.7xKhhTyrKu@wuerfel>
+References: <1448466557-435335-1-git-send-email-arnd@arndb.de>
+ <56697665.1070609@vollmann.ch> <3908335.j4dogqtadm@wuerfel>
+ <27901501.7xKhhTyrKu@wuerfel>
+Message-ID: <5669CC76.4030606@vollmann.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij <linus.walleij@linaro.org> writes:
+On 12/10/15 14:43, Arnd Bergmann wrote:
+> On Thursday 10 December 2015 14:18:11 Arnd Bergmann wrote:
+>> On Thursday 10 December 2015 13:56:05 Detlef Vollmann wrote:
 
-> On Sat, Nov 21, 2015 at 7:04 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
->
->> As the pxa architecture, at least for pxa27x, supports pin control,
->> activate it in the pinctrl tree.
+>>> The bad news:
+>>> My own config (which is massivly stripped down) produces a kernel
+>>> image that's more than 26K bigger than on v4.4-rc3 without any
+>>> added functionality.
+>>> The DNS-323 is extremly constrained in space (the whole system
+>>> including boot loader, kernel and filesystem has to fit into 8M flash).
+>>> Any ideas how I can get rid of this additional overhead?
 >>
->> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
->
-> All 6 patches applied. I can see that you know what you're doing
-> so let's go ahead with this driver. Any issues can be patched
-> up later.
-Thanks Linus. Let's hope I live up to your expectations :)
+>> Can you send me your config file? I can have a look.
+>>
+> 
+> I've done a quick check with an allnoconfig-like test and it seems that
+> CONFIG_OF is weighing in at around 86K here, with all the other options
+> it pulls in, comparing an allnoconfig kernel for DS-323 with one that
+> has CONFIG_OF enabled as well.
+> 
+> The multiplatform kernel also enables CONFIG_OF unconditionally, but is
+> otherwise a little smaller than the mach-orion5x based one:
+> 
+>    text    data     bss     dec     hex filename
+>  942144   64112   17648 1023904   f9fa0 build/tmp/vmlinux-orion-allno
+> 1027516   54052   20824 1102392  10d238 build/tmp/vmlinux-multi-plus-orion
+> 1025320   66020   18744 1110084  10f044 build/tmp/vmlinux-orion-plus-of
+> 
+> The diff below shows all the differences between orion-allno and
+> multi-plus-orion.
+How did you get the orion-allno config and how did you get it compiled?
+I tried to apply your changes to my config and compile it, but
+it started silentoldconfig which introduced back 'ARCH_MULTIPLATFORM'
 
-Cheers.
-
--- 
-Robert
+  Detlef
