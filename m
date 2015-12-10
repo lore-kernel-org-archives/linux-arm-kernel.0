@@ -1,257 +1,304 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 10 Dec 2015 13:43:38 +0000
-Subject: [PATCH v12 12/16] arm64: kdump: implement machine_crash_shutdown()
-In-Reply-To: <56697638.2010501@linaro.org>
-References: <cover.1448403503.git.geoff@infradead.org>
- <9ae67f7515c66bfd747486c8dc1c1772913a8d46.1448403503.git.geoff@infradead.org>
- <56586B27.9080508@arm.com> <56696347.4060402@linaro.org>
- <56696593.2070703@arm.com> <56697638.2010501@linaro.org>
-Message-ID: <5669818A.5000405@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 10 Dec 2015 14:43:43 +0100
+Subject: [PATCH 0/5] ARM: orion5x/dove/mv78xx0 multiplatform
+In-Reply-To: <3908335.j4dogqtadm@wuerfel>
+References: <1448466557-435335-1-git-send-email-arnd@arndb.de>
+ <56697665.1070609@vollmann.ch> <3908335.j4dogqtadm@wuerfel>
+Message-ID: <27901501.7xKhhTyrKu@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/12/15 12:55, AKASHI Takahiro wrote:
-> On 12/10/2015 08:44 PM, Marc Zyngier wrote:
->> On 10/12/15 11:34, AKASHI Takahiro wrote:
->>> Marc,
->>>
->>> I was back from my vacation.
->>>
->>> On 11/27/2015 11:39 PM, Marc Zyngier wrote:
->>>> On 24/11/15 22:25, Geoff Levand wrote:
->>>>> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
->>>>>
->>>>> kdump calls machine_crash_shutdown() to shut down non-boot cpus and
->>>>> save registers' status in per-cpu ELF notes before starting the crash
->>>>> dump kernel. See kernel_kexec().
->>>>>
->>>>> ipi_cpu_stop() is a bit modified and used to support this behavior.
->>>>>
->>>>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
->>>>> ---
->>>>>    arch/arm64/include/asm/kexec.h    | 34 +++++++++++++++++++++++++++++++++-
->>>>>    arch/arm64/kernel/machine_kexec.c | 31 +++++++++++++++++++++++++++++--
->>>>>    arch/arm64/kernel/smp.c           | 16 ++++++++++++++--
->>>>>    3 files changed, 76 insertions(+), 5 deletions(-)
->>>>>
->>>>> diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
->>>>> index 46d63cd..555a955 100644
->>>>> --- a/arch/arm64/include/asm/kexec.h
->>>>> +++ b/arch/arm64/include/asm/kexec.h
->>>>> @@ -30,6 +30,8 @@
->>>>>
->>>>>    #if !defined(__ASSEMBLY__)
->>>>>
->>>>> +extern bool in_crash_kexec;
->>>>> +
->>>>>    /**
->>>>>     * crash_setup_regs() - save registers for the panic kernel
->>>>>     *
->>>>> @@ -40,7 +42,37 @@
->>>>>    static inline void crash_setup_regs(struct pt_regs *newregs,
->>>>>    				    struct pt_regs *oldregs)
->>>>>    {
->>>>> -	/* Empty routine needed to avoid build errors. */
->>>>> +	if (oldregs) {
->>>>> +		memcpy(newregs, oldregs, sizeof(*newregs));
->>>>> +	} else {
->>>>> +		__asm__ __volatile__ (
->>>>> +			"stp	 x0,   x1, [%3, #16 *  0]\n"
->>>>> +			"stp	 x2,   x3, [%3, #16 *  1]\n"
->>>>> +			"stp	 x4,   x5, [%3, #16 *  2]\n"
->>>>> +			"stp	 x6,   x7, [%3, #16 *  3]\n"
->>>>> +			"stp	 x8,   x9, [%3, #16 *  4]\n"
->>>>> +			"stp	x10,  x11, [%3, #16 *  5]\n"
->>>>> +			"stp	x12,  x13, [%3, #16 *  6]\n"
->>>>> +			"stp	x14,  x15, [%3, #16 *  7]\n"
->>>>> +			"stp	x16,  x17, [%3, #16 *  8]\n"
->>>>> +			"stp	x18,  x19, [%3, #16 *  9]\n"
->>>>> +			"stp	x20,  x21, [%3, #16 * 10]\n"
->>>>> +			"stp	x22,  x23, [%3, #16 * 11]\n"
->>>>> +			"stp	x24,  x25, [%3, #16 * 12]\n"
->>>>> +			"stp	x26,  x27, [%3, #16 * 13]\n"
->>>>> +			"stp	x28,  x29, [%3, #16 * 14]\n"
->>>>> +			"str	x30,	   [%3, #16 * 15]\n"
->>>>> +			"mov	%0, sp\n"
->>>>> +			"adr	%1, 1f\n"
->>>>> +			"mrs	%2, spsr_el1\n"
->>>>> +		"1:"
->>>>> +			: "=r" (newregs->sp),
->>>>> +			  "=r" (newregs->pc),
->>>>> +			  "=r" (newregs->pstate)
->>>>> +			: "r"  (&newregs->regs)
->>>>> +			: "memory"
->>>>> +		);
->>>>
->>>> I wonder how useful this thing is, given that it starts by corrupting
->>>> whatever register is holding newregs->regs. Maybe this is not supposed
->>>> to be accurate anyway...
->>>
->>> I'm not quite sure about what part of my code you're mentioning here, but
->>> crash_setup_regs() is solely called by crash_kexec(), and panic() is
->>> the only caller of crash_kexec() with NULL argument which, in turn, is
->>> used as 'oldregs' in crash_setup_regs().
->>
->> You have this assembly sequence:
->>
->> stp	 x0,   x1, [%3, #16 *  0]
->> [...]
->>
->> where %3 itself is one of the x[0..30] registers.
+On Thursday 10 December 2015 14:18:11 Arnd Bergmann wrote:
+> On Thursday 10 December 2015 13:56:05 Detlef Vollmann wrote:
+> > On 11/30/15 14:43, Gregory CLEMENT wrote:
+> > >> Detlef, Benjamin,
+> > >>
+> > >> could you test it on an Orion5x based board?
+> > Ok, I tested the v2 series on v4.4-rc3 on my
+> > DNS-323: Identified HW revision B1
+> > Orion ID: MV88F5182-A2. TCLK=166666667.
+> > 
+> > Only basic tests, serial port and network.
+> > 
+> > The good news:
+> > orion5x_defconfig works and is even slightly smaller than the
+> > original v4.4-rc3 kernel image.
+> > 
+> > The bad news:
+> > My own config (which is massivly stripped down) produces a kernel
+> > image that's more than 26K bigger than on v4.4-rc3 without any
+> > added functionality.
+> > The DNS-323 is extremly constrained in space (the whole system
+> > including boot loader, kernel and filesystem has to fit into 8M flash).
+> > Any ideas how I can get rid of this additional overhead?
 > 
-> Not only %3, but also
+> Can you send me your config file? I can have a look.
 > 
->> So you are saving
->> things that have already been corrupted by the saving procedure. Not
->> sure how useful that is, but as I said, maybe it is not supposed to be
->> completely accurate.
-> 
-> x0, x1 ... are the current values in panic(), and not the exact cpu contexts
-> at the place we are really interested in.
-> We have no way here in panic() to know them, but sp and pc would still be useful
-> for back-tracing in later investigation of dump file.
-> 
-> Please note that the same problem exists on arm (and x86) implementation.
 
-As I said: if people don't expect to have a precise dump of the register
-file, then fine.
+I've done a quick check with an allnoconfig-like test and it seems that
+CONFIG_OF is weighing in at around 86K here, with all the other options
+it pulls in, comparing an allnoconfig kernel for DS-323 with one that
+has CONFIG_OF enabled as well.
 
->>> Given this fact, I think that the values saved in newregs as indicated above
->>> will be the best estimate of current cpu contexts.
->>>
->>> The other caller of crash_kexec() is die() in traps.c, but here we call
->>> it with explicit cpu contexts at exception.
->>>
->>>>
->>>>> +	}
->>>>>    }
->>>>>
->>>>>    #endif /* !defined(__ASSEMBLY__) */
->>>>> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
->>>>> index da28a26..d2d7e90 100644
->>>>> --- a/arch/arm64/kernel/machine_kexec.c
->>>>> +++ b/arch/arm64/kernel/machine_kexec.c
->>>>> @@ -9,6 +9,7 @@
->>>>>     * published by the Free Software Foundation.
->>>>>     */
->>>>>
->>>>> +#include <linux/kernel.h>
->>>>>    #include <linux/kexec.h>
->>>>>    #include <linux/of_fdt.h>
->>>>>    #include <linux/slab.h>
->>>>> @@ -23,6 +24,7 @@
->>>>>    extern const unsigned char arm64_relocate_new_kernel[];
->>>>>    extern const unsigned long arm64_relocate_new_kernel_size;
->>>>>
->>>>> +bool in_crash_kexec;
->>>>>    static unsigned long kimage_start;
->>>>>
->>>>>    /**
->>>>> @@ -203,13 +205,38 @@ void machine_kexec(struct kimage *kimage)
->>>>>    	 */
->>>>>
->>>>>    	cpu_soft_restart(virt_to_phys(cpu_reset),
->>>>> -		is_hyp_mode_available(),
->>>>> +		in_crash_kexec ? 0 : is_hyp_mode_available(),
->>>>>    		reboot_code_buffer_phys, kimage->head, kimage_start);
->>>>>
->>>>>    	BUG(); /* Should never get here. */
->>>>>    }
->>>>>
->>>>> +/**
->>>>> + * machine_crash_shutdown - shutdown non-boot cpus and save registers
->>>>> + */
->>>>>    void machine_crash_shutdown(struct pt_regs *regs)
->>>>>    {
->>>>> -	/* Empty routine needed to avoid build errors. */
->>>>> +	struct pt_regs dummy_regs;
->>>>> +	int cpu;
->>>>> +
->>>>> +	local_irq_disable();
->>>>> +
->>>>> +	in_crash_kexec = true;
->>>>> +
->>>>> +	/*
->>>>> +	 * clear and initialize the per-cpu info. This is necessary
->>>>> +	 * because, otherwise, slots for offline cpus would never be
->>>>> +	 * filled up. See smp_send_stop().
->>>>> +	 */
->>>>> +	memset(&dummy_regs, 0, sizeof(dummy_regs));
->>>>> +	for_each_possible_cpu(cpu)
->>>>> +		crash_save_cpu(&dummy_regs, cpu);
->>>>> +
->>>>> +	/* shutdown non-boot cpus */
->>>>> +	smp_send_stop();
->>>>> +
->>>>> +	/* for boot cpu */
->>>>> +	crash_save_cpu(regs, smp_processor_id());
->>>>> +
->>>>> +	pr_info("Starting crashdump kernel...\n");
->>>>>    }
->>>>> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
->>>>> index b1adc51..15aabef 100644
->>>>> --- a/arch/arm64/kernel/smp.c
->>>>> +++ b/arch/arm64/kernel/smp.c
->>>>> @@ -37,6 +37,7 @@
->>>>>    #include <linux/completion.h>
->>>>>    #include <linux/of.h>
->>>>>    #include <linux/irq_work.h>
->>>>> +#include <linux/kexec.h>
->>>>>
->>>>>    #include <asm/alternative.h>
->>>>>    #include <asm/atomic.h>
->>>>> @@ -54,6 +55,8 @@
->>>>>    #include <asm/ptrace.h>
->>>>>    #include <asm/virt.h>
->>>>>
->>>>> +#include "cpu-reset.h"
->>>>> +
->>>>>    #define CREATE_TRACE_POINTS
->>>>>    #include <trace/events/ipi.h>
->>>>>
->>>>> @@ -683,8 +686,12 @@ static DEFINE_RAW_SPINLOCK(stop_lock);
->>>>>    /*
->>>>>     * ipi_cpu_stop - handle IPI from smp_send_stop()
->>>>>     */
->>>>> -static void ipi_cpu_stop(unsigned int cpu)
->>>>> +static void ipi_cpu_stop(unsigned int cpu, struct pt_regs *regs)
->>>>>    {
->>>>> +#ifdef CONFIG_KEXEC
->>>>> +	/* printing messages may slow down the shutdown. */
->>>>> +	if (!in_crash_kexec)
->>>>> +#endif
->>>>>    	if (system_state == SYSTEM_BOOTING ||
->>>>>    	    system_state == SYSTEM_RUNNING) {
->>>>>    		raw_spin_lock(&stop_lock);
->>>>
->>>> Irrespective of how useful this change is, how about having a predicate
->>>> instead? Something like:
->>>>
->>>> static inline bool is_in_crash_kexec(void)
->>>> {
->>>> #ifdef CONFIG_KEXEC
->>>> 	return in_crash_kexec;
->>>> #else
->>>> 	return false;
->>>> #endif
->>>> }
->>>
->>> OK, I will take your idea.
->>>
->>>> located in machine_kexec.c (making the in_crash_kernel static), and then
->>>
->>> but cannot make in_crash_kernel static because it is also used in both smp.c
->>> and machine_kexec.c.
->>
->> smp.c only reads from in_crash_kernel (at least from what I can see in
->> this patch), so it should be able to use the accessor.
-> 
-> Only if we define the accessor as a real function, not an inline function in a header :)
+The multiplatform kernel also enables CONFIG_OF unconditionally, but is
+otherwise a little smaller than the mach-orion5x based one:
 
-I'll leave the implementation details in your capable hands. :-)
+   text    data     bss     dec     hex filename
+ 942144   64112   17648 1023904   f9fa0 build/tmp/vmlinux-orion-allno
+1027516   54052   20824 1102392  10d238 build/tmp/vmlinux-multi-plus-orion
+1025320   66020   18744 1110084  10f044 build/tmp/vmlinux-orion-plus-of
 
-Thanks,
+The diff below shows all the differences between orion-allno and
+multi-plus-orion.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+	Arnd
+
+--- config-orion	2015-12-10 14:25:05.609113585 +0100
++++ .config	2015-12-10 14:24:29.646879038 +0100
+@@ -3,6 +3,8 @@
+ # Linux/arm 4.4.0-rc4 Kernel Configuration
+ #
+ CONFIG_ARM=y
++CONFIG_ARM_HAS_SG_CHAIN=y
++CONFIG_MIGHT_HAVE_PCI=y
+ CONFIG_SYS_SUPPORTS_APM_EMULATION=y
+ CONFIG_STACKTRACE_SUPPORT=y
+ CONFIG_LOCKDEP_SUPPORT=y
+@@ -14,8 +16,7 @@
+ CONFIG_NEED_DMA_MAP_STATE=y
+ CONFIG_ARCH_SUPPORTS_UPROBES=y
+ CONFIG_VECTORS_BASE=0xffff0000
+-# CONFIG_ARM_PATCH_PHYS_VIRT is not set
+-CONFIG_PHYS_OFFSET=0x0
++CONFIG_ARM_PATCH_PHYS_VIRT=y
+ CONFIG_PGTABLE_LEVELS=2
+ CONFIG_DEFCONFIG_LIST="/lib/modules/$UNAME_RELEASE/.config"
+ CONFIG_BUILDTIME_EXTABLE_SORT=y
+@@ -56,6 +57,7 @@
+ CONFIG_IRQ_DOMAIN=y
+ CONFIG_HANDLE_DOMAIN_IRQ=y
+ CONFIG_IRQ_FORCED_THREADING=y
++CONFIG_SPARSE_IRQ=y
+ CONFIG_GENERIC_CLOCKEVENTS=y
+ 
+ #
+@@ -186,7 +188,7 @@
+ # System Type
+ #
+ CONFIG_MMU=y
+-# CONFIG_ARCH_MULTIPLATFORM is not set
++CONFIG_ARCH_MULTIPLATFORM=y
+ # CONFIG_ARCH_VERSATILE is not set
+ # CONFIG_ARCH_CLPS711X is not set
+ # CONFIG_ARCH_GEMINI is not set
+@@ -198,9 +200,6 @@
+ # CONFIG_ARCH_IOP32X is not set
+ # CONFIG_ARCH_IOP33X is not set
+ # CONFIG_ARCH_IXP4XX is not set
+-# CONFIG_ARCH_DOVE is not set
+-# CONFIG_ARCH_MV78XX0 is not set
+-CONFIG_ARCH_ORION5X=y
+ # CONFIG_ARCH_KS8695 is not set
+ # CONFIG_ARCH_W90X900 is not set
+ # CONFIG_ARCH_LPC32XX is not set
+@@ -212,8 +211,29 @@
+ # CONFIG_ARCH_OMAP1 is not set
+ 
+ #
+-# Orion Implementations
++# Multiple platform selection
++#
++
+ #
++# CPU Core family selection
++#
++# CONFIG_ARCH_MULTI_V4 is not set
++# CONFIG_ARCH_MULTI_V4T is not set
++CONFIG_ARCH_MULTI_V5=y
++CONFIG_ARCH_MULTI_V4_V5=y
++# CONFIG_ARCH_MULTI_V6 is not set
++# CONFIG_ARCH_MULTI_V7 is not set
++CONFIG_ARCH_MULTI_CPU_AUTO=y
++# CONFIG_ARCH_MVEBU is not set
++# CONFIG_MACH_ASM9260 is not set
++# CONFIG_ARCH_AT91 is not set
++# CONFIG_ARCH_INTEGRATOR is not set
++# CONFIG_ARCH_MV78XX0 is not set
++# CONFIG_ARCH_MXC is not set
++# CONFIG_ARCH_MXS is not set
++# CONFIG_ARCH_NOMADIK is not set
++# CONFIG_ARCH_NSPIRE is not set
++CONFIG_ARCH_ORION5X=y
+ # CONFIG_ARCH_ORION5X_DT is not set
+ # CONFIG_MACH_DB88F5281 is not set
+ # CONFIG_MACH_RD88F5182 is not set
+@@ -237,6 +257,11 @@
+ # CONFIG_MACH_RD88F5181L_GE is not set
+ # CONFIG_MACH_RD88F5181L_FXO is not set
+ # CONFIG_MACH_RD88F6183AP_GE is not set
++# CONFIG_ARCH_MMP is not set
++# CONFIG_ARCH_REALVIEW is not set
++# CONFIG_PLAT_SPEAR is not set
++# CONFIG_ARCH_U300 is not set
++# CONFIG_ARCH_WM8505 is not set
+ CONFIG_PLAT_ORION=y
+ CONFIG_PLAT_ORION_LEGACY=y
+ 
+@@ -286,6 +311,10 @@
+ #
+ # PCI host controller drivers
+ #
++# CONFIG_PCI_HOST_GENERIC is not set
++# CONFIG_PCI_LAYERSCAPE is not set
++# CONFIG_PCIE_IPROC is not set
++# CONFIG_PCIE_ALTERA is not set
+ # CONFIG_PCIEPORTBUS is not set
+ # CONFIG_PCCARD is not set
+ 
+@@ -346,16 +375,16 @@
+ #
+ # Boot options
+ #
+-# CONFIG_USE_OF is not set
++CONFIG_USE_OF=y
+ CONFIG_ATAGS=y
+ # CONFIG_DEPRECATED_PARAM_STRUCT is not set
+ CONFIG_ZBOOT_ROM_TEXT=0
+ CONFIG_ZBOOT_ROM_BSS=0
++# CONFIG_ARM_APPENDED_DTB is not set
+ CONFIG_CMDLINE=""
+-# CONFIG_XIP_KERNEL is not set
+ # CONFIG_KEXEC is not set
+ # CONFIG_CRASH_DUMP is not set
+-# CONFIG_AUTO_ZRELADDR is not set
++CONFIG_AUTO_ZRELADDR=y
+ 
+ #
+ # CPU Power Management
+@@ -427,8 +456,20 @@
+ #
+ # CONFIG_BRCMSTB_GISB_ARB is not set
+ CONFIG_MVEBU_MBUS=y
++# CONFIG_VEXPRESS_CONFIG is not set
+ # CONFIG_MTD is not set
+-# CONFIG_OF is not set
++CONFIG_DTC=y
++CONFIG_OF=y
++# CONFIG_OF_UNITTEST is not set
++CONFIG_OF_FLATTREE=y
++CONFIG_OF_EARLY_FLATTREE=y
++CONFIG_OF_ADDRESS=y
++CONFIG_OF_ADDRESS_PCI=y
++CONFIG_OF_IRQ=y
++CONFIG_OF_PCI=y
++CONFIG_OF_PCI_IRQ=y
++CONFIG_OF_RESERVED_MEM=y
++# CONFIG_OF_OVERLAY is not set
+ CONFIG_ARCH_MIGHT_HAVE_PC_PARPORT=y
+ # CONFIG_PARPORT is not set
+ 
+@@ -550,17 +591,26 @@
+ # Enable PHYLIB and NETWORK_PHY_TIMESTAMPING to see the additional clocks.
+ #
+ CONFIG_ARCH_HAVE_CUSTOM_GPIO_H=y
++CONFIG_ARCH_WANT_OPTIONAL_GPIOLIB=y
+ CONFIG_ARCH_REQUIRE_GPIOLIB=y
+ CONFIG_GPIOLIB=y
+ CONFIG_GPIO_DEVRES=y
++CONFIG_OF_GPIO=y
+ # CONFIG_DEBUG_GPIO is not set
+ 
+ #
+ # Memory mapped GPIO drivers
+ #
++# CONFIG_GPIO_74XX_MMIO is not set
++# CONFIG_GPIO_ALTERA is not set
+ # CONFIG_GPIO_DWAPB is not set
++# CONFIG_GPIO_EM is not set
+ # CONFIG_GPIO_GENERIC_PLATFORM is not set
++# CONFIG_GPIO_GRGPIO is not set
++CONFIG_GPIO_MVEBU=y
+ # CONFIG_GPIO_VX855 is not set
++# CONFIG_GPIO_XILINX is not set
++# CONFIG_GPIO_ZEVIO is not set
+ # CONFIG_GPIO_ZX is not set
+ 
+ #
+@@ -597,8 +647,11 @@
+ # Multifunction device drivers
+ #
+ # CONFIG_MFD_CORE is not set
++# CONFIG_MFD_ATMEL_FLEXCOM is not set
++# CONFIG_MFD_ATMEL_HLCDC is not set
+ # CONFIG_MFD_CROS_EC is not set
+ # CONFIG_MFD_ASIC3 is not set
++# CONFIG_MFD_HI6421_PMIC is not set
+ # CONFIG_HTC_EGPIO is not set
+ # CONFIG_HTC_PASIC3 is not set
+ # CONFIG_LPC_ICH is not set
+@@ -670,6 +723,7 @@
+ #
+ # Common Clock Framework
+ #
++# CONFIG_CLK_QORIQ is not set
+ # CONFIG_COMMON_CLK_PXA is not set
+ 
+ #
+@@ -679,6 +733,8 @@
+ #
+ # Clock Source drivers
+ #
++CONFIG_CLKSRC_OF=y
++CONFIG_CLKSRC_PROBE=y
+ CONFIG_CLKSRC_MMIO=y
+ # CONFIG_ARM_TIMER_SP804 is not set
+ # CONFIG_ATMEL_PIT is not set
+@@ -711,6 +767,7 @@
+ # CONFIG_NTB is not set
+ # CONFIG_VME_BUS is not set
+ # CONFIG_PWM is not set
++CONFIG_IRQCHIP=y
+ # CONFIG_IPACK_BUS is not set
+ # CONFIG_RESET_CONTROLLER is not set
+ # CONFIG_FMC is not set
+@@ -907,7 +964,7 @@
+ CONFIG_DEBUG_UART_8250_SHIFT=2
+ # CONFIG_DEBUG_UART_8250_WORD is not set
+ # CONFIG_DEBUG_UART_8250_FLOW_CONTROL is not set
+-CONFIG_UNCOMPRESS_INCLUDE="mach/uncompress.h"
++CONFIG_UNCOMPRESS_INCLUDE="debug/uncompress.h"
+ # CONFIG_CORESIGHT is not set
+ 
+ #
+@@ -924,6 +981,8 @@
+ #
+ # Library routines
+ #
++CONFIG_BITREVERSE=y
++# CONFIG_HAVE_ARCH_BITREVERSE is not set
+ CONFIG_RATIONAL=y
+ CONFIG_GENERIC_STRNCPY_FROM_USER=y
+ CONFIG_GENERIC_STRNLEN_USER=y
+@@ -935,7 +994,12 @@
+ # CONFIG_CRC16 is not set
+ # CONFIG_CRC_T10DIF is not set
+ # CONFIG_CRC_ITU_T is not set
+-# CONFIG_CRC32 is not set
++CONFIG_CRC32=y
++# CONFIG_CRC32_SELFTEST is not set
++CONFIG_CRC32_SLICEBY8=y
++# CONFIG_CRC32_SLICEBY4 is not set
++# CONFIG_CRC32_SARWATE is not set
++# CONFIG_CRC32_BIT is not set
+ # CONFIG_CRC7 is not set
+ # CONFIG_LIBCRC32C is not set
+ # CONFIG_CRC8 is not set
+@@ -952,6 +1016,7 @@
+ CONFIG_ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE=y
+ # CONFIG_CORDIC is not set
+ # CONFIG_DDR is not set
++CONFIG_LIBFDT=y
+ # CONFIG_SG_SPLIT is not set
+-# CONFIG_ARCH_HAS_SG_CHAIN is not set
++CONFIG_ARCH_HAS_SG_CHAIN=y
+ # CONFIG_VIRTUALIZATION is not set
