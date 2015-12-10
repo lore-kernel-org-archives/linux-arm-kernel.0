@@ -1,42 +1,39 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 10 Dec 2015 15:21:10 -0600
-Subject: [PATCH 0/3] DT labels for connector device mapping
-Message-ID: <1449782473-20880-1-git-send-email-robh@kernel.org>
+Date: Thu, 10 Dec 2015 15:21:11 -0600
+Subject: [PATCH 1/3] arm64: dts: apq8016-sbc: enable UART0 on LS connector
+In-Reply-To: <1449782473-20880-1-git-send-email-robh@kernel.org>
+References: <1449782473-20880-1-git-send-email-robh@kernel.org>
+Message-ID: <1449782473-20880-2-git-send-email-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Having a common connector interface across different platforms can be 
-problematic for determining which SOC device is connected to which 
-connector pins. The standard DT property "label" is intended to provide 
-a human readable name for a device and can be used to provide this 
-information. Then userspace can can read the label to determine the 
-device mapping. For example:
+The LS UART0 is not used by anything else and should be enabled for
+expansion boards.
 
-for f in $(ls -d /sys/class/tty/tty*); do
-  label=$(cat $f/device/of_node/label)
-  if [ "$label" = "LS-UART1" ]; then
-    # you've found UART1, so do something with it.
-    # $f/dev is the major:minor for the /dev node
-  fi
-done
+Signed-off-by: Rob Herring <robh@kernel.org>
+Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Cc: Andy Gross <agross@codeaurora.org>
+---
+ arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-This series adds labels on hikey and dragonboard 410c devices for the 
-low speed and high speed connectors. Not tested at all.
-
-BTW, there are no platform maintainers listed for these files. Setting 
-them should be enforced for the dts files as DT maintainers mainly 
-review binding docs, not dts files.
-
-Rob
-
-Rob Herring (3):
-  arm64: dts: apq8016-sbc: enable UART0 on LS connector
-  arm64: dts: apq8016-sbc: add label properties for UART, I2C, and SPI
-  arm64: dts: hikey: add label properties to UARTs
-
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts |  7 +++++++
- arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi      | 14 ++++++++++++++
- 2 files changed, 21 insertions(+)
-
+diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+index 6b8abbe..7505fa3 100644
+--- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
++++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+@@ -27,6 +27,13 @@
+ 	};
+ 
+ 	soc {
++		serial at 78af000 {
++			status = "okay";
++			pinctrl-names = "default", "sleep";
++			pinctrl-0 = <&blsp1_uart1_default>;
++			pinctrl-1 = <&blsp1_uart1_sleep>;
++		};
++
+ 		serial at 78b0000 {
+ 			status = "okay";
+ 			pinctrl-names = "default", "sleep";
 -- 
 2.5.0
