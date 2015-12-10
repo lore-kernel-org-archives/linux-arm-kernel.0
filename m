@@ -1,124 +1,92 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 10 Dec 2015 09:00:16 +0100
-Subject: [PATCH v4 32/58] mtd: nand: omap2: use the mtd instance embedded in
- struct nand_chip
-In-Reply-To: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1449734442-18672-33-git-send-email-boris.brezillon@free-electrons.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 10 Dec 2015 08:06:32 +0000
+Subject: [PATCH 004/182] gpio: generic: factor into gpio_chip struct
+In-Reply-To: <1449666760-29876-1-git-send-email-linus.walleij@linaro.org>
+References: <1449666760-29876-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20151210080632.GC17876@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-struct nand_chip now embeds an mtd device. Make use of this mtd instance.
+On Wed, 09 Dec 2015, Linus Walleij wrote:
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
-Changes generated with the following coccinelle script
+> The separate struct bgpio_chip has been a pain to handle, both
+> by being confusingly similar in name to struct gpio_chip and
+> for being contained inside a struct so that struct gpio_chip
+> is contained in a struct contained in a struct, making several
+> steps of dereferencing necessary.
+> 
+> Make things simpler: include the fields directly into
+> <linux/gpio/driver.h>, #ifdef:ed for CONFIG_GENERIC_GPIO, and
+> get rid of the <linux/basic_mmio_gpio.h> altogether. Prefix
+> some of the member variables with bgpio_* and add proper
+> kerneldoc while we're at it.
+> 
+> Modify all users to handle the change and use a struct
+> gpio_chip directly. And while we're at it: replace all
+> container_of() dereferencing by gpiochip_get_data() and
+> registering the gpio_chip with gpiochip_add_data().
+> 
+> Cc: arm at kernel.org
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Cc: Alexander Shiyan <shc_work@mail.ru>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Cc: Alexandre Courbot <gnurou@gmail.com>
+> Cc: Gregory Fong <gregory.0xf0@gmail.com>
+> Cc: Brian Norris <computersforpeace@gmail.com>
+> Cc: Florian Fainelli <f.fainelli@gmail.com>
+> Cc: Liviu Dudau <liviu.dudau@arm.com>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
+> Cc: Rabin Vincent <rabin@rab.in>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-omap at vger.kernel.org
+> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: bcm-kernel-feedback-list at broadcom.com
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ARM SoC folks and Lee: it would be great if you could
+> ACK the few lines hitting arch/arm/* and drivers/mfd/* in this
+> so I can take it through the GPIO tree.
+> ---
+>  arch/arm/mach-clps711x/board-autcpu12.c |   2 +-
+>  arch/arm/mach-clps711x/board-p720t.c    |   2 +-
+>  arch/arm/mach-imx/mach-mx21ads.c        |   2 +-
+>  arch/arm/mach-omap1/board-ams-delta.c   |   2 +-
+>  arch/arm/mach-s3c64xx/mach-crag6410.c   |   2 +-
+>  drivers/gpio/gpio-74xx-mmio.c           |  37 ++--
+>  drivers/gpio/gpio-brcmstb.c             |  80 ++++-----
+>  drivers/gpio/gpio-clps711x.c            |  28 +--
+>  drivers/gpio/gpio-dwapb.c               |  92 +++++-----
+>  drivers/gpio/gpio-ep93xx.c              |  25 +--
+>  drivers/gpio/gpio-etraxfs.c             |  49 +++---
+>  drivers/gpio/gpio-ge.c                  |  24 +--
+>  drivers/gpio/gpio-generic.c             | 292 +++++++++++++++-----------------
+>  drivers/gpio/gpio-grgpio.c              |  73 ++++----
+>  drivers/gpio/gpio-moxart.c              |  29 ++--
+>  drivers/gpio/gpio-mxc.c                 |  27 ++-
+>  drivers/gpio/gpio-mxs.c                 |  33 ++--
+>  drivers/gpio/gpio-sodaville.c           |  13 +-
+>  drivers/gpio/gpio-xgene-sb.c            |  40 ++---
+>  drivers/mfd/vexpress-sysreg.c           |   8 +-
 
---->8---
-virtual patch
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
-@fix1@
-identifier __chipfield, __mtdfield;
-type __type;
-@@
-(
-	__type {
-		...
-		struct nand_chip __chipfield;
-		...
--		struct mtd_info __mtdfield;
-		...
-	};
-|
-	__type {
-		...
--		struct mtd_info __mtdfield;
-		...
-		struct nand_chip __chipfield;
-		...
-	};
-)
+>  include/linux/basic_mmio_gpio.h         |  80 ---------
+>  include/linux/gpio/driver.h             |  54 ++++++
+>  22 files changed, 442 insertions(+), 552 deletions(-)
+>  delete mode 100644 include/linux/basic_mmio_gpio.h
 
-@fix2 depends on fix1@
-identifier fix1.__chipfield, fix1.__mtdfield;
-identifier __subfield;
-type fix1.__type;
-__type *__priv;
-@@
-(
--	__priv->__mtdfield.__subfield
-+	nand_to_mtd(&__priv->__chipfield)->__subfield
-|
--	&(__priv->__mtdfield)
-+	nand_to_mtd(&__priv->__chipfield)
-)
---->8---
----
- drivers/mtd/nand/omap2.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+[...]
 
-diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
-index 1fb40db..f9d0b58 100644
---- a/drivers/mtd/nand/omap2.c
-+++ b/drivers/mtd/nand/omap2.c
-@@ -152,7 +152,6 @@ static struct nand_hw_control omap_gpmc_controller = {
- 
- struct omap_nand_info {
- 	struct omap_nand_platform_data	*pdata;
--	struct mtd_info			mtd;
- 	struct nand_chip		nand;
- 	struct platform_device		*pdev;
- 
-@@ -179,8 +178,9 @@ struct omap_nand_info {
- 
- static inline struct omap_nand_info *mtd_to_omap(struct mtd_info *mtd)
- {
--	return container_of(mtd, struct omap_nand_info, mtd);
-+	return container_of(mtd_to_nand(mtd), struct omap_nand_info, nand);
- }
-+
- /**
-  * omap_prefetch_enable - configures and starts prefetch transfer
-  * @cs: cs (chip select) number
-@@ -1670,10 +1670,10 @@ static int omap_nand_probe(struct platform_device *pdev)
- 	info->reg		= pdata->reg;
- 	info->of_node		= pdata->of_node;
- 	info->ecc_opt		= pdata->ecc_opt;
--	mtd			= &info->mtd;
-+	nand_chip		= &info->nand;
-+	mtd			= nand_to_mtd(nand_chip);
- 	mtd->priv		= &info->nand;
- 	mtd->dev.parent		= &pdev->dev;
--	nand_chip		= &info->nand;
- 	nand_chip->ecc.priv	= NULL;
- 	nand_set_flash_node(nand_chip, pdata->of_node);
- 
-@@ -1897,7 +1897,7 @@ static int omap_nand_probe(struct platform_device *pdev)
- 				ecclayout->eccpos[ecclayout->eccbytes - 1] + 1;
- 
- 		err = elm_config(info->elm_dev, BCH4_ECC,
--				 info->mtd.writesize / nand_chip->ecc.size,
-+				 mtd->writesize / nand_chip->ecc.size,
- 				 nand_chip->ecc.size, nand_chip->ecc.bytes);
- 		if (err < 0)
- 			goto return_error;
-@@ -1951,7 +1951,7 @@ static int omap_nand_probe(struct platform_device *pdev)
- 		nand_chip->ecc.write_page	= omap_write_page_bch;
- 
- 		err = elm_config(info->elm_dev, BCH8_ECC,
--				 info->mtd.writesize / nand_chip->ecc.size,
-+				 mtd->writesize / nand_chip->ecc.size,
- 				 nand_chip->ecc.size, nand_chip->ecc.bytes);
- 		if (err < 0)
- 			goto return_error;
-@@ -1981,7 +1981,7 @@ static int omap_nand_probe(struct platform_device *pdev)
- 		nand_chip->ecc.write_page	= omap_write_page_bch;
- 
- 		err = elm_config(info->elm_dev, BCH16_ECC,
--				 info->mtd.writesize / nand_chip->ecc.size,
-+				 mtd->writesize / nand_chip->ecc.size,
- 				 nand_chip->ecc.size, nand_chip->ecc.bytes);
- 		if (err < 0)
- 			goto return_error;
 -- 
-2.1.4
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
