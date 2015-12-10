@@ -1,71 +1,47 @@
-From: tom_usenet@optusnet.com.au (Tom Evans)
-Date: Fri, 11 Dec 2015 09:53:27 +1100
-Subject: can: flexcan: Ancient Freescale Reference FlexCAN Driver and bug
- fixes so it works.
-In-Reply-To: <566973A4.5000703@pengutronix.de>
-References: <1431603215-25546-1-git-send-email-bhupesh.sharma@freescale.com>
- <1431603215-25546-6-git-send-email-bhupesh.sharma@freescale.com>
- <5554C244.80809@pengutronix.de>
- <BY1PR0301MB130358076C3A5969406DE69182D80@BY1PR0301MB1303.namprd03.prod.outlook.com>
- <BY1PR0301MB130384E91308C49A850DEC4782E90@BY1PR0301MB1303.namprd03.prod.outlook.com>
- <56696582.7020503@optusnet.com.au> <566973A4.5000703@pengutronix.de>
-Message-ID: <566A0267.2080809@optusnet.com.au>
+From: rjui@broadcom.com (Ray Jui)
+Date: Thu, 10 Dec 2015 14:55:59 -0800
+Subject: [PATCH 0/3] pinmux support for Broadcom NSP SOC
+In-Reply-To: <1448042120-9212-1-git-send-email-yrdreddy@broadcom.com>
+References: <1448042120-9212-1-git-send-email-yrdreddy@broadcom.com>
+Message-ID: <566A02FF.9080708@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/12/2015 11:44 PM, Marc Kleine-Budde wrote:
-> On 12/10/2015 12:44 PM, Tom Evans wrote:
->> I've just had to delve back into the deep murky past and try to get
->> Freescale's Kernel 2.6.35 FlexCAN driver working...
+Hi,
 
-On an i.MX53. That's the last supported kernel Freescale ever released 
-for that series of parts.
-
-> 2.6.x I feel your pain. Another option would be to port the flexcan
-> driver to that old kernel. But I'm getting off topic here :)
-
-Been there. Options are to port 2.6.38 (Freescale's Android release) 
-which has the 2.6.38 mainstream driver, but looks to have a full 
-collection of all the bugs fixed since then. Some kind soul has already 
-done that and released a patch (but I don't like the bugs). Or the 3.4 
-version we're running with our 3.4 kernel or something more modern. I 
-don't trust later versions to even compile - the headers and interfaces 
-change. Then I can't use modern ones anyway as they use NAPI and that 
-simply doesn't work with Linux and CAN. So I'd have to apply all my 
-de-NAPI patches. The simplest path was to fix the simple and stupidly 
-obvious bugs in the existing driver rather than add new complicated bugs.
-
->> 2 - It can't receive in order, but you'd only need to sort on the
->> 3 - It can't transmit in order either (unless you drop it to one
+On 11/20/2015 9:55 AM, Yendapally Reddy Dhananjaya Reddy wrote:
+> This patchset contains the pinmux support for the Broadcom's
+> Northstar Plus (NSP) SOC.
 >
-> In order reception is crucial.
-
-So what mind-set at Freescale doesn't see this as a problem? I suspect 
-their CAN knowledge stopped at the HCS08 stage, making tiny devices that 
-control just one thing, like a door lock. So just receive and transmit 
-one or two messages where "priority order" is more important than 
-running any debug or diagnostic protocols.
-
->> Patches to fix all of it on the end of this thread:
->>
->> https://community.freescale.com/thread/303271
+> The first patch provides the documentation details and the
+> second patch contains the driver details. The third patch
+> contains the enable method.
 >
-> If there's interest in working with this prehistoric kernel, why isn't
-> there anyone that picks up all the patches and add them to a git repo.
+> This patchset has been tested on NSP bcm958625HR board.
+> This patchset is based on v4.4.0-rc1 and is available from github
+> repo: https://github.com/Broadcom/cygnus-linux.git
+> branch: nsp-pinmux-v1
+>
+> Yendapally Reddy Dhananjaya Reddy (3):
+>    pinctrl: Broadcom NSP pinctrl device tree bindings
+>    pinctrl: nsp: add pinmux driver support for Broadcom NSP SoC
+>    ARM: dts: enable pinctrl for Broadcom NSP
+>
+>   .../bindings/pinctrl/brcm,nsp-pinmux.txt           |  79 +++
+>   arch/arm/boot/dts/bcm-nsp.dtsi                     |   7 +
+>   arch/arm/boot/dts/bcm958625k.dts                   |   9 +
+>   drivers/pinctrl/bcm/Kconfig                        |  13 +
+>   drivers/pinctrl/bcm/Makefile                       |   1 +
+>   drivers/pinctrl/bcm/pinctrl-nsp-mux.c              | 650 +++++++++++++++++++++
+>   6 files changed, 759 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/pinctrl/brcm,nsp-pinmux.txt
+>   create mode 100644 drivers/pinctrl/bcm/pinctrl-nsp-mux.c
+>
 
-There was. That's what the above post is meant to be for. But the last 
-actual activity was in January 2013. It details how to submit patches, 
-but it is too onerous for me. It has to use their exact complete 
-distribution (of everything, not just the kernel) running on their exact 
-development board. It also needs your .gitconfig set up "just so" 
-matching your Freescale registration details. I'm using the thread as a 
-dumping ground for "useful patches for customers", and hope google or 
-Freescale's search can find them.
+This entire patch set looks good to me.
 
-> fsl doesn't seem to care either, maybe unless you're using
- > their newest product :(
+Reviewed-by: Ray Jui <rjui@broadcom.com>
 
-The team seems to disappear almost before the product is released. They 
-all moved to i.MX6 years ago.
+Thanks,
 
-Tom
+Ray
