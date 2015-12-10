@@ -1,65 +1,126 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 10 Dec 2015 08:59:49 +0100
-Subject: [PATCH v4 05/58] mtd: nand: ams-delta: use the mtd instance embedded
- in struct nand_chip
+Date: Thu, 10 Dec 2015 08:59:53 +0100
+Subject: [PATCH v4 09/58] mtd: nand: bf5xx: use the mtd instance embedded in
+ struct nand_chip
 In-Reply-To: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1449734442-18672-6-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1449734442-18672-10-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-struct nand_chip now embeds an mtd device. Make use of this mtd instance
-instead of allocating our own.
+struct nand_chip now embeds an mtd device. Make use of this mtd instance.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/mtd/nand/ams-delta.c | 13 +++++--------
- 1 file changed, 5 insertions(+), 8 deletions(-)
+Changes generated with the following coccinelle script
 
-diff --git a/drivers/mtd/nand/ams-delta.c b/drivers/mtd/nand/ams-delta.c
-index b2b49c4..0f638c6 100644
---- a/drivers/mtd/nand/ams-delta.c
-+++ b/drivers/mtd/nand/ams-delta.c
-@@ -183,19 +183,16 @@ static int ams_delta_init(struct platform_device *pdev)
- 		return -ENXIO;
+--->8---
+virtual patch
+
+@fix1@
+identifier __chipfield, __mtdfield;
+type __type;
+@@
+(
+	__type {
+		...
+		struct nand_chip __chipfield;
+		...
+-		struct mtd_info __mtdfield;
+		...
+	};
+|
+	__type {
+		...
+-		struct mtd_info __mtdfield;
+		...
+		struct nand_chip __chipfield;
+		...
+	};
+)
+
+@fix2 depends on fix1@
+identifier fix1.__chipfield, fix1.__mtdfield;
+identifier __subfield;
+type fix1.__type;
+__type *__priv;
+@@
+(
+-	__priv->__mtdfield.__subfield
++	nand_to_mtd(&__priv->__chipfield)->__subfield
+|
+-	&(__priv->__mtdfield)
++	nand_to_mtd(&__priv->__chipfield)
+)
+--->8---
+---
+ drivers/mtd/nand/bf5xx_nand.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/mtd/nand/bf5xx_nand.c b/drivers/mtd/nand/bf5xx_nand.c
+index d9da5ed..928d599 100644
+--- a/drivers/mtd/nand/bf5xx_nand.c
++++ b/drivers/mtd/nand/bf5xx_nand.c
+@@ -142,7 +142,6 @@ static struct nand_ecclayout bootrom_ecclayout = {
+ struct bf5xx_nand_info {
+ 	/* mtd info */
+ 	struct nand_hw_control		controller;
+-	struct mtd_info			mtd;
+ 	struct nand_chip		chip;
  
- 	/* Allocate memory for MTD device structure and private data */
--	ams_delta_mtd = kzalloc(sizeof(struct mtd_info) +
--				sizeof(struct nand_chip), GFP_KERNEL);
--	if (!ams_delta_mtd) {
-+	this = kzalloc(sizeof(struct nand_chip), GFP_KERNEL);
-+	if (!this) {
- 		printk (KERN_WARNING "Unable to allocate E3 NAND MTD device structure.\n");
- 		err = -ENOMEM;
- 		goto out;
- 	}
- 
-+	ams_delta_mtd = nand_to_mtd(this);
- 	ams_delta_mtd->owner = THIS_MODULE;
- 
--	/* Get pointer to private data */
--	this = (struct nand_chip *) (&ams_delta_mtd[1]);
--
- 	/* Link the private data with the MTD structure */
- 	ams_delta_mtd->priv = this;
- 
-@@ -256,7 +253,7 @@ out_gpio:
- 	gpio_free(AMS_DELTA_GPIO_PIN_NAND_RB);
- 	iounmap(io_base);
- out_free:
--	kfree(ams_delta_mtd);
-+	kfree(this);
-  out:
- 	return err;
+ 	/* platform info */
+@@ -160,7 +159,8 @@ struct bf5xx_nand_info {
+  */
+ static struct bf5xx_nand_info *mtd_to_nand_info(struct mtd_info *mtd)
+ {
+-	return container_of(mtd, struct bf5xx_nand_info, mtd);
++	return container_of(mtd_to_nand(mtd), struct bf5xx_nand_info,
++			    chip);
  }
-@@ -276,7 +273,7 @@ static int ams_delta_cleanup(struct platform_device *pdev)
- 	iounmap(io_base);
  
- 	/* Free the MTD device structure */
--	kfree(ams_delta_mtd);
-+	kfree(mtd_to_nand(ams_delta_mtd));
+ static struct bf5xx_nand_info *to_nand_info(struct platform_device *pdev)
+@@ -660,7 +660,7 @@ static int bf5xx_nand_hw_init(struct bf5xx_nand_info *info)
+  */
+ static int bf5xx_nand_add_partition(struct bf5xx_nand_info *info)
+ {
+-	struct mtd_info *mtd = &info->mtd;
++	struct mtd_info *mtd = nand_to_mtd(&info->chip);
+ 	struct mtd_partition *parts = info->platform->partitions;
+ 	int nr = info->platform->nr_partitions;
  
- 	return 0;
- }
+@@ -675,7 +675,7 @@ static int bf5xx_nand_remove(struct platform_device *pdev)
+ 	 * and their partitions, then go through freeing the
+ 	 * resources used
+ 	 */
+-	nand_release(&info->mtd);
++	nand_release(nand_to_mtd(&info->chip));
+ 
+ 	peripheral_free_list(bfin_nfc_pin_req);
+ 	bf5xx_nand_dma_remove(info);
+@@ -756,6 +756,7 @@ static int bf5xx_nand_probe(struct platform_device *pdev)
+ 
+ 	/* initialise chip data struct */
+ 	chip = &info->chip;
++	mtd = nand_to_mtd(&info->chip);
+ 
+ 	if (plat->data_width)
+ 		chip->options |= NAND_BUSWIDTH_16;
+@@ -772,7 +773,7 @@ static int bf5xx_nand_probe(struct platform_device *pdev)
+ 	chip->cmd_ctrl     = bf5xx_nand_hwcontrol;
+ 	chip->dev_ready    = bf5xx_nand_devready;
+ 
+-	chip->priv	   = &info->mtd;
++	chip->priv	   = mtd;
+ 	chip->controller   = &info->controller;
+ 
+ 	chip->IO_ADDR_R    = (void __iomem *) NFC_READ;
+@@ -781,7 +782,6 @@ static int bf5xx_nand_probe(struct platform_device *pdev)
+ 	chip->chip_delay   = 0;
+ 
+ 	/* initialise mtd info data struct */
+-	mtd 		= &info->mtd;
+ 	mtd->priv	= chip;
+ 	mtd->dev.parent = &pdev->dev;
+ 
 -- 
 2.1.4
