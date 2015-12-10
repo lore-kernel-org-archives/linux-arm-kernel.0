@@ -1,19 +1,40 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 10 Dec 2015 15:15:36 +0530
-Subject: [PICKME 0/2] cpufreq: New ST driver
-In-Reply-To: <1449740537-12619-1-git-send-email-lee.jones@linaro.org>
-References: <1449740537-12619-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20151210094536.GK6991@ubuntu>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 10 Dec 2015 11:04:31 +0100
+Subject: [PATCH 06/10] ARM: realview: enable multiplatform
+In-Reply-To: <1448469143-447355-7-git-send-email-arnd@arndb.de>
+References: <1448469143-447355-1-git-send-email-arnd@arndb.de>
+ <1448469143-447355-7-git-send-email-arnd@arndb.de>
+Message-ID: <CACRpkdZwD7=h7oXdWZ6a6j5sXRcY0pKc2xuY6QsVfyNzpaWBMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10-12-15, 09:42, Lee Jones wrote:
-> Hi Rafael,
-> 
-> Would you be kind enough to pick these 2 patches up please.
-> The have the required Acks.
+On Wed, Nov 25, 2015 at 5:32 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> All obstacles are out of the way by now, so we can finally move realview
+> to multiplatform.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+(...)
 
--- 
-viresh
+> -obj-y                                  := core.o
+>  obj-$(CONFIG_REALVIEW_DT)              += realview-dt.o
+> +ifdef $(CONFIG_ATAGS)
+> +obj-y                                  := core.o
+>  obj-$(CONFIG_MACH_REALVIEW_EB)         += realview_eb.o
+>  obj-$(CONFIG_MACH_REALVIEW_PB11MP)     += realview_pb11mp.o
+>  obj-$(CONFIG_MACH_REALVIEW_PB1176)     += realview_pb1176.o
+>  obj-$(CONFIG_MACH_REALVIEW_PBA8)       += realview_pba8.o
+>  obj-$(CONFIG_MACH_REALVIEW_PBX)                += realview_pbx.o
+> +endif
+
+This isn't working. Even if CONFIG_ATAGS is set, none of the files
+inside this ifdef $(CONFIG_ATAGS) are compiled. Does Kconfig
+only support if and not ifdef?
+
+I just removed it to get things to compile. (But sadly it doesn't
+boot...)
+
+Yours,
+Linus Walleij
