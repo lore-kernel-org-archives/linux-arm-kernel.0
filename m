@@ -1,10 +1,10 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 10 Dec 2015 09:00:36 +0100
-Subject: [PATCH v4 52/58] staging: mt29f_spinand: remove useless mtd->priv =
- chip assignment
+Date: Thu, 10 Dec 2015 09:00:35 +0100
+Subject: [PATCH v4 51/58] cris: nand: remove useless mtd->priv = chip
+ assignments
 In-Reply-To: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1449734442-18672-53-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1449734442-18672-52-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -33,20 +33,37 @@ struct nand_chip *c;
 )
 ---8<----
 ---
- drivers/staging/mt29f_spinand/mt29f_spinand.c | 1 -
- 1 file changed, 1 deletion(-)
+ arch/cris/arch-v32/drivers/mach-a3/nandflash.c | 3 ---
+ arch/cris/arch-v32/drivers/mach-fs/nandflash.c | 3 ---
+ 2 files changed, 6 deletions(-)
 
-diff --git a/drivers/staging/mt29f_spinand/mt29f_spinand.c b/drivers/staging/mt29f_spinand/mt29f_spinand.c
-index 8171b74..b7d429d 100644
---- a/drivers/staging/mt29f_spinand/mt29f_spinand.c
-+++ b/drivers/staging/mt29f_spinand/mt29f_spinand.c
-@@ -907,7 +907,6 @@ static int spinand_probe(struct spi_device *spi_nand)
+diff --git a/arch/cris/arch-v32/drivers/mach-a3/nandflash.c b/arch/cris/arch-v32/drivers/mach-a3/nandflash.c
+index ee74e45..5aa3f51 100644
+--- a/arch/cris/arch-v32/drivers/mach-a3/nandflash.c
++++ b/arch/cris/arch-v32/drivers/mach-a3/nandflash.c
+@@ -149,9 +149,6 @@ struct mtd_info *__init crisv32_nand_flash_probe(void)
+ 	this = &wrapper->chip;
+ 	crisv32_mtd = nand_to_mtd(this);
  
- 	dev_set_drvdata(&spi_nand->dev, mtd);
+-	/* Link the private data with the MTD structure */
+-	crisv32_mtd->priv = this;
+-
+ 	/* Set address of NAND IO lines */
+ 	this->IO_ADDR_R = read_cs;
+ 	this->IO_ADDR_W = write_cs;
+diff --git a/arch/cris/arch-v32/drivers/mach-fs/nandflash.c b/arch/cris/arch-v32/drivers/mach-fs/nandflash.c
+index 5626297..a7c17b0 100644
+--- a/arch/cris/arch-v32/drivers/mach-fs/nandflash.c
++++ b/arch/cris/arch-v32/drivers/mach-fs/nandflash.c
+@@ -140,9 +140,6 @@ struct mtd_info *__init crisv32_nand_flash_probe(void)
+ 	bif_cfg.gated_csp1 = regk_bif_core_wr;
+ 	REG_WR(bif_core, regi_bif_core, rw_grp3_cfg, bif_cfg);
  
--	mtd->priv = chip;
- 	mtd->dev.parent = &spi_nand->dev;
- 	mtd->oobsize = 64;
- 
+-	/* Link the private data with the MTD structure */
+-	crisv32_mtd->priv = this;
+-
+ 	/* Set address of NAND IO lines */
+ 	this->IO_ADDR_R = read_cs;
+ 	this->IO_ADDR_W = write_cs;
 -- 
 2.1.4
