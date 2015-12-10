@@ -1,67 +1,91 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 10 Dec 2015 11:19:58 +0900
-Subject: [PATCH 004/182] gpio: generic: factor into gpio_chip struct
-In-Reply-To: <1449666760-29876-1-git-send-email-linus.walleij@linaro.org>
-References: <1449666760-29876-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <5668E14E.8010302@samsung.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Wed, 9 Dec 2015 18:20:18 -0800
+Subject: [PATCH v6 0/4] gicv2m: acpi: Add ACPI support for GICv2m MSI
+In-Reply-To: <1449689074-30609-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+References: <1449689074-30609-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <CADaLNDkF_-6Odo6ygyuUVSNdcq93stC-pyGTXEoBDUizPzd99Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09.12.2015 22:12, Linus Walleij wrote:
-> The separate struct bgpio_chip has been a pain to handle, both
-> by being confusingly similar in name to struct gpio_chip and
-> for being contained inside a struct so that struct gpio_chip
-> is contained in a struct contained in a struct, making several
-> steps of dereferencing necessary.
-> 
-> Make things simpler: include the fields directly into
-> <linux/gpio/driver.h>, #ifdef:ed for CONFIG_GENERIC_GPIO, and
-> get rid of the <linux/basic_mmio_gpio.h> altogether. Prefix
-> some of the member variables with bgpio_* and add proper
-> kerneldoc while we're at it.
-> 
-> Modify all users to handle the change and use a struct
-> gpio_chip directly. And while we're at it: replace all
-> container_of() dereferencing by gpiochip_get_data() and
-> registering the gpio_chip with gpiochip_add_data().
-> 
-> Cc: arm at kernel.org
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Cc: Alexander Shiyan <shc_work@mail.ru>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Cc: Alexandre Courbot <gnurou@gmail.com>
-> Cc: Gregory Fong <gregory.0xf0@gmail.com>
-> Cc: Brian Norris <computersforpeace@gmail.com>
-> Cc: Florian Fainelli <f.fainelli@gmail.com>
-> Cc: Liviu Dudau <liviu.dudau@arm.com>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
-> Cc: Rabin Vincent <rabin@rab.in>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-omap at vger.kernel.org
-> Cc: linux-samsung-soc at vger.kernel.org
-> Cc: bcm-kernel-feedback-list at broadcom.com
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ARM SoC folks and Lee: it would be great if you could
-> ACK the few lines hitting arch/arm/* and drivers/mfd/* in this
-> so I can take it through the GPIO tree.
-> ---
->  arch/arm/mach-clps711x/board-autcpu12.c |   2 +-
->  arch/arm/mach-clps711x/board-p720t.c    |   2 +-
->  arch/arm/mach-imx/mach-mx21ads.c        |   2 +-
->  arch/arm/mach-omap1/board-ams-delta.c   |   2 +-
->  arch/arm/mach-s3c64xx/mach-crag6410.c   |   2 +-
+On Wed, Dec 9, 2015 at 11:24 AM, Suravee Suthikulpanit
+<Suravee.Suthikulpanit@amd.com> wrote:
+>
+> This patch series has been forked from the following patch series since
+> it no longer depends on the rest of the patches.
+>
+>   [PATCH v4 00/10] ACPI GIC Self-probing, GICv2m and GICv3 support
+>   https://lkml.org/lkml/2015/7/29/234
+>
+> It has been ported to use the newly introduced device fwnode_handle
+> for ACPI irqdmain introduced by Marc in the following patch series:
+>
+>   [PATCH v2 00/17] Divorcing irqdomain and device_node
+>
+> The following git branch contains the submitted patches along with
+> the pre-requsite patches (mainly for ARM64 PCI support for ACPI).
+>
+>   https://github.com/ssuthiku/linux.git v2m-multiframe-v6
+>
+> This has been tested on AMD Seattle (Overdrive) RevB system.
+>
+> NOTE: I have not tested ACPI GICv2m multiframe support since
+> I don't have access to such system. Any helps are appreciated.
 
-For s3c64xx:
-Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Hi Suravee,
 
-Best regards,
-Krzysztof
+I tested your v2m-multiframe-v6 branch with APM X-Gene 2 that has
+multiple GICv2m frames and it worked.
+
+Please feel free to add:
+Tested-by: Duc Dang <dhdang@apm.com>
+
+>
+> Thanks,
+> Suravee
+>
+> Changes from V5: (https://lkml.org/lkml/2015/12/08/763)
+>   - Remove previous patch 3
+>   - Clean up based on Marc's review (patch 1.4)
+>   - Add Ackedb-by and Reviewed-by (Patch 1,2,3)
+>   - Expose single gicv2m_init() function for both OF and ACPI
+>     (per Marc's suggestion)
+>   - Remove gicv2m name from pr_info since this is no longer useful
+>     (in patch 3) (per Marc's suggestion)
+>
+> Changes from V4: (https://lkml.org/lkml/2015/12/08/613)
+>   - Fix build error when not specifying CONFIG_IRQ_DOMAIN.
+>
+> Changes from V3: (https://lkml.org/lkml/2015/10/21/691)
+>   - Merged patch 2 into 1, and got rid off pci_msi_get_fwnode()
+>     since only ACPI will likely use this. (per Marc suggestion)
+>   - Rebased to 4.4.0-rc4
+>
+> Changes from V2: (https://lkml.org/lkml/2015/10/14/1010)
+>   - Minor clean up from Tomasz review comment in patch 6/6.
+>
+> Changes from V1: (https://lkml.org/lkml/2015/10/13/859)
+>   - Rebase on top of Marc's patch to addng support for multiple MSI frames
+>     (https://lkml.org/lkml/2015/10/14/271)
+>   - Adding fwnode convenient functions (patch 3 and 4)
+>
+> Suravee Suthikulpanit (4):
+>   acpi: pci: Setup MSI domain for ACPI based pci devices
+>   irqdomain: introduce is_fwnode_irqchip helper
+>   gicv2m: Refactor to prepare for ACPI support
+>   gicv2m: acpi: Introducing GICv2m ACPI support
+>
+>  drivers/irqchip/irq-gic-v2m.c   | 167 ++++++++++++++++++++++++++++++++++------
+>  drivers/irqchip/irq-gic.c       |   8 +-
+>  drivers/pci/pci-acpi.c          |  42 ++++++++++
+>  drivers/pci/probe.c             |   2 +
+>  include/linux/irqchip/arm-gic.h |   3 +-
+>  include/linux/irqdomain.h       |  10 +++
+>  include/linux/pci.h             |  10 +++
+>  kernel/irq/irqdomain.c          |   2 +-
+>  8 files changed, 218 insertions(+), 26 deletions(-)
+>
+> --
+> 2.1.0
+>
+Thanks,
+Duc Dang.
