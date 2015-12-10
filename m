@@ -1,48 +1,111 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Thu, 10 Dec 2015 18:32:30 +0000
-Subject: Domain faults when CONFIG_CPU_SW_DOMAIN_PAN is enabled
-In-Reply-To: <20151210162054.GM8644@n2100.arm.linux.org.uk>
-References: <f7774151e4a849e682ae5a607a98140b@EMAIL.axentia.se>
- <20151203115143.GM8644@n2100.arm.linux.org.uk>
- <533b0f1f264e42e78b94bbff9570fb50@EMAIL.axentia.se>
- <20151203133727.GN8644@n2100.arm.linux.org.uk>
- <94580382ca344ae2b64f66fb778c6ff7@EMAIL.axentia.se>
- <20151203164118.GR8644@n2100.arm.linux.org.uk>
- <20151203172708.GT8644@n2100.arm.linux.org.uk>
- <45b615420548463ebd1d582bc5da2eff@EMAIL.axentia.se>
- <20151210002213.GL8644@n2100.arm.linux.org.uk>
- <7e60a8ccde1940d68ec4780abe154cbd@EMAIL.axentia.se>
- <20151210162054.GM8644@n2100.arm.linux.org.uk>
-Message-ID: <86e315e4b2474fa5a20f6bffbfce6404@EMAIL.axentia.se>
+From: yang.shi@linaro.org (Shi, Yang)
+Date: Thu, 10 Dec 2015 10:44:18 -0800
+Subject: [PATCH v12 04/16] arm64: kvm: allows kvm cpu hotplug
+In-Reply-To: <56604A6E.60102@arm.com>
+References: <cover.1448403503.git.geoff@infradead.org>
+ <23ca498d5e28017549c6076812d60b18e86fa20e.1448403503.git.geoff@infradead.org>
+ <CAJ5Y-eYHqQCf=ZQzXb=D_P7VscM=vNc3YpYLJs+UtZLFswiaeQ@mail.gmail.com>
+ <56604A6E.60102@arm.com>
+Message-ID: <5669C802.7030103@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King wrote:
-> On Thu, Dec 10, 2015 at 03:29:37PM +0000, Peter Rosin wrote:
-> > Russell King wrote:
-> > > On Thu, Dec 03, 2015 at 09:37:51PM +0000, Peter Rosin wrote:
-> > > > I took both patches for a quick spin (a dozen boots and one hour 
-> > > > uptime after that for each patch) and no incidents. I have not 
-> > > > gathered data, but the crash on boot feels like it's quite a bit 
-> > > > above 50% when there is a problem so this feels good (I used 5 
-> > > > clean reboots when I bisected and that worked).
-> > > > 
-> > > > Reported-by: Peter Rosin <peda@axentia.se>
-> > > > Tested-by: Peter Rosin <peda@axentia.se>
-> > > > 
-> > > > (and please don't forget to cc stable)
-> > > 
-> > > I've decided to do a more in-depth fix, so that we also solve the 
-> > > issue that when we schedule in these down_read()s, we don't leak the 
-> > > permissive domain register setting into the switched-to context.
-> > > 
-> > > Can you test this patch please?  Thanks.
-> > 
-> > Still looking good.
-> 
-> Does that mean I can add your reported and tested-by to this latest patch?
+On 12/3/2015 5:58 AM, Marc Zyngier wrote:
+> On 02/12/15 22:40, Ashwin Chaugule wrote:
+>> Hello,
+>>
+>> On 24 November 2015 at 17:25, Geoff Levand <geoff@infradead.org> wrote:
+>>> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>>>
+>>> The current kvm implementation on arm64 does cpu-specific initialization
+>>> at system boot, and has no way to gracefully shutdown a core in terms of
+>>> kvm. This prevents, especially, kexec from rebooting the system on a boot
+>>> core in EL2.
+>>>
+>>> This patch adds a cpu tear-down function and also puts an existing cpu-init
+>>> code into a separate function, kvm_arch_hardware_disable() and
+>>> kvm_arch_hardware_enable() respectively.
+>>> We don't need arm64-specific cpu hotplug hook any more.
+>>>
+>>> Since this patch modifies common part of code between arm and arm64, one
+>>> stub definition, __cpu_reset_hyp_mode(), is added on arm side to avoid
+>>> compiling errors.
+>>>
+>>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>>> ---
+>>>   arch/arm/include/asm/kvm_host.h   | 10 ++++-
+>>>   arch/arm/include/asm/kvm_mmu.h    |  1 +
+>>>   arch/arm/kvm/arm.c                | 79 ++++++++++++++++++---------------------
+>>>   arch/arm/kvm/mmu.c                |  5 +++
+>>>   arch/arm64/include/asm/kvm_host.h | 16 +++++++-
+>>>   arch/arm64/include/asm/kvm_mmu.h  |  1 +
+>>>   arch/arm64/include/asm/virt.h     |  9 +++++
+>>>   arch/arm64/kvm/hyp-init.S         | 33 ++++++++++++++++
+>>>   arch/arm64/kvm/hyp.S              | 32 ++++++++++++++--
+>>>   9 files changed, 138 insertions(+), 48 deletions(-)
+>>
+>> [..]
+>>
+>>>
+>>>
+>>>   static struct notifier_block hyp_init_cpu_pm_nb = {
+>>> @@ -1108,11 +1119,6 @@ static int init_hyp_mode(void)
+>>>          }
+>>>
+>>>          /*
+>>> -        * Execute the init code on each CPU.
+>>> -        */
+>>> -       on_each_cpu(cpu_init_hyp_mode, NULL, 1);
+>>> -
+>>> -       /*
+>>>           * Init HYP view of VGIC
+>>>           */
+>>>          err = kvm_vgic_hyp_init();
+>>
+>> With this flow, the cpu_init_hyp_mode() is called only at VM guest
+>> creation, but vgic_hyp_init() is called at bootup. On a system with
+>> GICv3, it looks like we end up with bogus values from the ICH_VTR_EL2
+>> (to get the number of LRs), because we're not reading it from EL2
+>> anymore.
+>
+> Indeed, this is completely broken (I just reproduced the issue on a
+> model). I wish this kind of details had been checked earlier, but thanks
+> for pointing it out.
 
-Right, I thought that was obvious, sorry for the confusion.
+Sorry for chiming in late. I did run into something similar when I 
+tested some earlier version patches with Akashi San.
 
-Cheers,
-Peter
+The guest bootup just hangs with 4.1 kernel on my LS2085 board which has 
+GICv3. Not sure if this is the same issue. But, my bisect did point to 
+this patch.
+
+I used to think it is my kernel's problem (4.1 sounds a little bit old) 
+since Akashi San can't reproduce this on his Hikey board.
+
+Thanks,
+Yang
+
+>
+>> Whats the best way to fix this?
+>> - Call kvm_arch_hardware_enable() before vgic_hyp_init() and disable later?
+>> - Fold the VGIC init stuff back into hardware_enable()?
+>
+> None of that works - kvm_arch_hardware_enable() is called once per CPU,
+> while vgic_hyp_init() can only be called once. Also,
+> kvm_arch_hardware_enable() is called from interrupt context, and I
+> wouldn't feel comfortable starting probing DT and allocating stuff from
+> there.
+>
+>> - Read the VGIC number of LRs from the hyp stub?
+>
+> That's may UNDEF if called in the wrong context. Also, this defeats the
+> point of stubs, which is just to install the vectors for the hypervisor.
+>
+>> - ..
+>
+> Yeah, quite.
+>
+> Geoff, Takahiro?
+>
+> 	M.
+>
