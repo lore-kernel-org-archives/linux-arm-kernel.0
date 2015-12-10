@@ -1,36 +1,49 @@
-From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
-Date: Thu, 10 Dec 2015 10:11:01 -0600
-Subject: [PATCH v6 4/4] gicv2m: acpi: Introducing GICv2m ACPI support
-In-Reply-To: <56694272.5050706@arm.com>
-References: <1449689074-30609-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1449689074-30609-5-git-send-email-Suravee.Suthikulpanit@amd.com>
- <56694272.5050706@arm.com>
-Message-ID: <5669A415.60300@amd.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 10 Dec 2015 16:20:54 +0000
+Subject: Domain faults when CONFIG_CPU_SW_DOMAIN_PAN is enabled
+In-Reply-To: <7e60a8ccde1940d68ec4780abe154cbd@EMAIL.axentia.se>
+References: <f7774151e4a849e682ae5a607a98140b@EMAIL.axentia.se>
+ <20151203115143.GM8644@n2100.arm.linux.org.uk>
+ <533b0f1f264e42e78b94bbff9570fb50@EMAIL.axentia.se>
+ <20151203133727.GN8644@n2100.arm.linux.org.uk>
+ <94580382ca344ae2b64f66fb778c6ff7@EMAIL.axentia.se>
+ <20151203164118.GR8644@n2100.arm.linux.org.uk>
+ <20151203172708.GT8644@n2100.arm.linux.org.uk>
+ <45b615420548463ebd1d582bc5da2eff@EMAIL.axentia.se>
+ <20151210002213.GL8644@n2100.arm.linux.org.uk>
+ <7e60a8ccde1940d68ec4780abe154cbd@EMAIL.axentia.se>
+Message-ID: <20151210162054.GM8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/10/2015 3:14 AM, Marc Zyngier wrote:
->> +int __init gicv2m_init(struct fwnode_handle *parent_handle,
->> >+		       struct irq_domain *parent)
->> >+{
->> >+	int ret = gicv2m_of_init(parent_handle, parent);
->> >+
->> >+	if (ret)
->> >+		ret = gicv2m_acpi_init(parent);
->> >+	return ret;
-> This should really read:
->
-> 	if (is_of_node(parent_handle))
-> 		return gicv2m_of_init(parent_handle, parent);
-> 	
-> 	return gicv2m_acpi_init(parent);
->
-> and you can loose the test for NULL in gicv2m_of_init().
->
+On Thu, Dec 10, 2015 at 03:29:37PM +0000, Peter Rosin wrote:
+> Russell King wrote:
+> > On Thu, Dec 03, 2015 at 09:37:51PM +0000, Peter Rosin wrote:
+> > > I took both patches for a quick spin (a dozen boots and one hour uptime
+> > > after that for each patch) and no incidents. I have not gathered data,
+> > > but the crash on boot feels like it's quite a bit above 50% when there
+> > > is a problem so this feels good (I used 5 clean reboots when I bisected
+> > > and that worked).
+> > > 
+> > > Reported-by: Peter Rosin <peda@axentia.se>
+> > > Tested-by: Peter Rosin <peda@axentia.se>
+> > > 
+> > > (and please don't forget to cc stable)
+> > 
+> > I've decided to do a more in-depth fix, so that we also solve the issue
+> > that when we schedule in these down_read()s, we don't leak the permissive
+> > domain register setting into the switched-to context.
+> > 
+> > Can you test this patch please?  Thanks.
+> 
+> Still looking good.
 
-Right... Your style of returning which is cleaner ;)
+Does that mean I can add your reported and tested-by to this latest
+patch?
 
-I'll update in V7 and send it out shortly.
+Thanks.
 
-Thanks,
-Suravee
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
