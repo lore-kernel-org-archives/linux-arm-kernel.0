@@ -1,72 +1,92 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 10 Dec 2015 20:42:12 +0900
-Subject: [PATCH v12 12/16] arm64: kdump: implement machine_crash_shutdown()
-In-Reply-To: <20151203041525.GG14143@dhcppc13.redhat.com>
-References: <cover.1448403503.git.geoff@infradead.org>
- <9ae67f7515c66bfd747486c8dc1c1772913a8d46.1448403503.git.geoff@infradead.org>
- <20151203041525.GG14143@dhcppc13.redhat.com>
-Message-ID: <56696514.3030209@linaro.org>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Thu, 10 Dec 2015 19:36:35 +0800
+Subject: [PATCH v6 10/21] KVM: ARM64: Add access handler for PMEVCNTRn
+ and PMCCNTR register
+In-Reply-To: <56670594.7010604@arm.com>
+References: <1449578860-15808-1-git-send-email-zhaoshenglong@huawei.com>
+ <1449578860-15808-11-git-send-email-zhaoshenglong@huawei.com>
+ <56670594.7010604@arm.com>
+Message-ID: <566963C3.40904@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pratyush,
+Hi Marc,
 
-On 12/03/2015 01:15 PM, Pratyush Anand wrote:
-> Hi Akashi,
->
-> Some of the points which came while discussing with Mark Salter are worth
-> including in v13.
->
-> On 24/11/2015:10:25:34 PM, Geoff Levand wrote:
->> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
->
-> [...]
->
->> +/**
->> + * machine_crash_shutdown - shutdown non-boot cpus and save registers
->
-> "non-panic" would be correct in stead of "non-boot".
+On 2015/12/9 0:30, Marc Zyngier wrote:
+> On 08/12/15 12:47, Shannon Zhao wrote:
+>> > From: Shannon Zhao <shannon.zhao@linaro.org>
+>> > 
+>> > Since the reset value of PMEVCNTRn or PMCCNTR is UNKNOWN, use
+>> > reset_unknown for its reset handler. Add access handler which emulates
+>> > writing and reading PMEVCNTRn or PMCCNTR register. When reading
+>> > PMEVCNTRn or PMCCNTR, call perf_event_read_value to get the count value
+>> > of the perf event.
+>> > 
+>> > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>> > ---
+>> >  arch/arm64/kvm/sys_regs.c | 107 +++++++++++++++++++++++++++++++++++++++++++++-
+>> >  1 file changed, 105 insertions(+), 2 deletions(-)
+>> > 
+>> > diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+>> > index c116a1b..f7a73b5 100644
+>> > --- a/arch/arm64/kvm/sys_regs.c
+>> > +++ b/arch/arm64/kvm/sys_regs.c
+>> > @@ -525,6 +525,12 @@ static bool access_pmu_regs(struct kvm_vcpu *vcpu,
+>> >  
+>> >  	if (p->is_write) {
+>> >  		switch (r->reg) {
+>> > +		case PMEVCNTR0_EL0 ... PMCCNTR_EL0: {
+> Same problem as previously mentioned.
+> 
+>> > +			val = kvm_pmu_get_counter_value(vcpu,
+>> > +							r->reg - PMEVCNTR0_EL0);
+>> > +			vcpu_sys_reg(vcpu, r->reg) += (s64)p->regval - val;
+>> > +			break;
+>> > +		}
 
-OK, but for consistency with other places (say, arm/kernel/machine_kexec.c)
-I prefer "non-crashing cpus."
+If I use a handler to handle these accesses to PMEVCNTRn and PMCCNTR
+like below. It converts the register offset c14_PMEVCNTRn and c9_PMCCNTR
+to PMEVCNTRn_EL0 and PMCCNTR_EL0, uniformly uses vcpu_sys_reg and
+doesn't need to take care the big endian. What do you think about this?
 
->> +	/* shutdown non-boot cpus */
->
-> Ditto
->
->> +	smp_send_stop();
->> +
->> +	/* for boot cpu */
->
-> "for panic cpu"
+static bool access_pmu_evcntr(struct kvm_vcpu *vcpu,
+                              struct sys_reg_params *p,
+                              const struct sys_reg_desc *r)
+{
+        u64 idx, reg, val;
 
-Ditto.
-"for crashing cpu"
+        if (p->is_aarch32)
+                reg = r->reg / 2;
+        else
+                reg = r->reg;
 
->
->
-> [...]
->
->> @@ -697,6 +704,11 @@ static void ipi_cpu_stop(unsigned int cpu)
->>
->>   	local_irq_disable();
->
-> We have "set_cpu_online(cpu, false);" just before it.
-> Panic core is waiting for non-panic to go offline, i.e. for the above event.
->
->>
->> +#ifdef CONFIG_KEXEC
->> +	if (in_crash_kexec)
->> +		crash_save_cpu(regs, cpu);
->> +#endif /* CONFIG_KEXEC */
->
-> However, we are still saving crash info for non-panic core. So, it would be good
-> to move crash_save_cpu() before set_cpu_online() to avoid any race condition.
+        switch (reg) {
+        case PMEVCNTR0_EL0 ... PMEVCNTR30_EL0: {
+                idx = reg - PMEVCNTR0_EL0;
+                break;
+        }
+        case PMCCNTR_EL0: {
+                idx = ARMV8_CYCLE_IDX;
+                break;
+        }
+        default:
+                idx = vcpu_sys_reg(vcpu, PMSELR_EL0) & ARMV8_COUNTER_MASK;
+                if (!pmu_counter_idx_valid(vcpu, idx))
+                        return true;
+                reg = (idx == ARMV8_CYCLE_IDX) ? PMCCNTR_EL0 :
+PMEVCNTR0_EL0 + idx;
+                break;
+        }
 
-Good point, race will be very unlikely though. I will fix it.
+        val = kvm_pmu_get_counter_value(vcpu, idx);
+        if (p->is_write)
+                vcpu_sys_reg(vcpu, reg) = (s64)p->regval - val;
+        else
+                p->regval = val;
+
+        return true;
+}
 
 Thanks,
--Takahiro AKASHI
-
-> ~Pratyush
->
+-- 
+Shannon
