@@ -1,38 +1,69 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 10 Dec 2015 17:39:59 +0000
-Subject: [PATCH] arm64: mm: ensure that the zero page is visible to the page
- table walker
-Message-ID: <1449769199-31361-1-git-send-email-will.deacon@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 10 Dec 2015 09:44:08 -0800
+Subject: [PATCH v4 4/5] ARM: dts: DRA7: add entry for qspi mmap region
+In-Reply-To: <566907D7.6040003@ti.com>
+References: <1448860515-28336-1-git-send-email-vigneshr@ti.com>
+ <1448860515-28336-5-git-send-email-vigneshr@ti.com>
+ <20151130223408.GJ23396@atomide.com> <565D25E6.4070206@ti.com>
+ <20151201163950.GR23396@atomide.com> <566017A8.5040106@ti.com>
+ <566907D7.6040003@ti.com>
+Message-ID: <20151210174407.GF23396@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In paging_init, we allocate the zero page, memset it to zero and then
-point TTBR0 to it in order to avoid speculative fetches through the
-identity mapping.
+* Vignesh R <vigneshr@ti.com> [151209 21:05]:
+> 
+> 
+> On 12/03/2015 03:51 PM, Vignesh R wrote:
+> > 
+> > 
+> > On 12/01/2015 10:09 PM, Tony Lindgren wrote:
+> >> * Vignesh R <vigneshr@ti.com> [151130 20:46]:
+> >>> On 12/01/2015 04:04 AM, Tony Lindgren wrote:
+> >>>>
+> ...
+> >>
+> >> OK. They are both on L3 main so that won't cause any issues for separate
+> >> interconnect driver instances. As they are still separate targets flushing
+> >> a posted write to one area will not flush anything to the other.
+> >>
+> > 
+> > I didn't quite understand what you meant by interconnect driver instance.
+> > qspi_base and qspi_mmap region are tightly bound to each other and both
+> > needs to be accessed by ti-qspi driver (though different targets).
+> > Besides qspi_mmap region is only used to read data, there will not be
+> > any write accesses to this target. Are you saying this binding is not
+> > viable?
+> > 
+> 
+> As I stated above qspi_base and qspi_mmap region are tightly bound,
+> there is no way to use qspi_mmap region w/o accessing qspi_base. So I am
+> planning to keep them as it is. I will move qspi_ctrlmod to use syscon.
+> Something like:
+> 
+> qspi: qspi at 4b300000 {
+>        compatible = "ti,dra7xxx-qspi";
+>        reg = <0x4b300000 0x100>,
+>              <0x5c000000 0x4000000>,
+>        reg-names = "qspi_base", "qspi_mmap";
+>        syscon-chipselects = <&scm_conf 0x558>;
+>        #address-cells = <1>;
+>        #size-cells = <0>;
+>        spi-max-frequency = <48000000>;
+>        ti,hwmods = "qspi";
+> };
+> 
+> Do you think this is not viable in future?
 
-In order to guarantee that the freshly zeroed page is indeed visible to
-the page table walker, we need to execute a dsb instruction prior to
-writing the TTBR.
+That's OK, they are on the same interconnect instance. And with the
+syscon you're not directly tinkering with the SCM registers. So
+yeah, that should work in the long run too.
 
-Cc: <stable@vger.kernel.org> # v3.14+, for older kernels need to drop the 'ishst'
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/mm/mmu.c | 3 +++
- 1 file changed, 3 insertions(+)
+The absolute addresses will get changed to just offsets from the
+interconnect target. But if you use the Linux standard functions like
+platform_get_resource_byname + devm_request_mem_region + devm_ioremap
+then no changes are needed to your driver later on.
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index c04def90f3e4..c5bd5bca8e3d 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -464,6 +464,9 @@ void __init paging_init(void)
- 
- 	empty_zero_page = virt_to_page(zero_page);
- 
-+	/* Ensure the zero page is visible to the page table walker */
-+	dsb(ishst);
-+
- 	/*
- 	 * TTBR0 is only used for the identity mapping at this stage. Make it
- 	 * point to zero page to avoid speculatively fetching new entries.
--- 
-2.1.4
+Thanks,
+
+Tony
