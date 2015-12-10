@@ -1,32 +1,28 @@
-From: Frank.Li@freescale.com (Frank.Li at freescale.com)
-Date: Fri, 11 Dec 2015 07:12:11 +0800
-Subject: [PATCH 2/3] ARM: imx: select HAVE_ARM_ARCH_TIMER if selected i.MX7D
-In-Reply-To: <1449789132-18976-1-git-send-email-Frank.Li@freescale.com>
-References: <1449789132-18976-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <1449789132-18976-2-git-send-email-Frank.Li@freescale.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 11 Dec 2015 00:17:28 +0100
+Subject: [PATCH 03/10] ARM: debug-ll: rework ep93xx handling
+In-Reply-To: <1449268242-808553-4-git-send-email-arnd@arndb.de>
+References: <1449268242-808553-1-git-send-email-arnd@arndb.de>
+ <1449268242-808553-4-git-send-email-arnd@arndb.de>
+Message-ID: <CACRpkdb5QjPJTXh1R1-V04ydQbMkCteY6TCesnUpg8TicLW83Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Frank Li <Frank.Li@freescale.com>
+On Fri, Dec 4, 2015 at 11:30 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-i.MX7D Supported ARCH Timer.
+> This makes ep93xx debug-ll handling more consistent with the other
+> platforms, by adding a separate Kconfig symbol for it that
+> in turn selects the standard DEBUG_UART_PL01X symbol.
+>
+> We still have to pick a physical address even if DEBUG_LL is disabled
+> here, because the EP93xx uncompress output code uses
+> CONFIG_DEBUG_UART_PHYS. If we ever move to multiplatform support,
+> this can go away.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Signed-off-by: Frank Li <Frank.Li@freescale.com>
----
- arch/arm/mach-imx/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+Looks correct.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 0ac180f..061dea4 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -563,6 +563,7 @@ config SOC_IMX7D
- 	select ARM_GIC
- 	select HAVE_IMX_ANATOP
- 	select HAVE_IMX_MMDC
-+	select HAVE_ARM_ARCH_TIMER
- 	help
- 		This enables support for Freescale i.MX7 Dual processor.
- 
--- 
-2.5.2
+Yours,
+Linus Walleij
