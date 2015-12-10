@@ -1,33 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 10 Dec 2015 16:10:18 +0100
-Subject: [PATCH] overlayfs: include linux/pagemap.h for PAGE_CACHE_SIZE
-Message-ID: <7380785.3TF39KbbER@wuerfel>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 10 Dec 2015 16:10:58 +0100
+Subject: [PATCH 2/6] pinctrl: pxa: pxa2xx: add pin control skeleton
+In-Reply-To: <1448129093-20722-3-git-send-email-robert.jarzmik@free.fr>
+References: <1448129093-20722-1-git-send-email-robert.jarzmik@free.fr>
+ <1448129093-20722-3-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <CACRpkdaJB1JnThtY6ZmQKDMY3Naci8cEaaK7bXfDUC2pvdgLsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The overlayfs has started enforcing a maximum file size, but is missing
-the header file that defines the PAGE_CACHE_SIZE constant in some
-configurations.
+On Sat, Nov 21, 2015 at 7:04 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
 
-fs/overlayfs/super.c: In function 'ovl_fill_super':
-fs/overlayfs/super.c:939:29: error: 'PAGE_CACHE_SIZE' undeclared (first use in this function)
+> Add a pincontrol driver for pxa2xx architecture, encompassing all pxa25x
+> and pxa27x variants. This is only the pin muxing part of the driver.
+>
+> One specific consideration is also the memory space (MMIO), which is
+> intertwined with the GPIO registers. To make things worse, the GPIO
+> direction register also affect pin muxing, as it chooses the "kind" of
+> pin, ie. the 4 output functions or 4 input functions.
+>
+> The mapping between pinctrl notions and PXA Technical Reference Manual
+> is as follows :
+>  - a pin is obviously a pin
+>  - a group is also a pin, ie. group P101 is the pin 101
+>  - a mux function is an alternate function
+>    (ie. gpio-in, gpio-out, MMCLK, BTRTS, etc ...)
+>
+> The individual architecture (pxa27x, pxa25x) instantiate a pin control
+> by providing a table of pins, each pin being provided a list of
+> PXA_FUNCTION (alternate functions).
+>
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 7b1746cac878 ("ovl: setattr: check permissions before copy-up")
-Cc: <stable@vger.kernel.org>
----
-The patch that introduced this was marked for stable, so I'm marking this
-the same way.
+Patch applied.
 
-diff --git a/fs/overlayfs/super.c b/fs/overlayfs/super.c
-index ea94e50a3473..a4cbdf9824c7 100644
---- a/fs/overlayfs/super.c
-+++ b/fs/overlayfs/super.c
-@@ -9,6 +9,7 @@
- 
- #include <linux/fs.h>
- #include <linux/namei.h>
-+#include <linux/pagemap.h>
- #include <linux/xattr.h>
- #include <linux/security.h>
- #include <linux/mount.h>
+Yours,
+Linus Walleij
