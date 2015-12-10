@@ -1,50 +1,55 @@
-From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
-Date: Thu, 10 Dec 2015 12:40:54 -0200
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 10 Dec 2015 20:14:25 +0530
 Subject: [PATCH] [media] staging/davinci_vfpe: allow modular build
-In-Reply-To: <2029571.PWO4DcqdUl@wuerfel>
-References: <2029571.PWO4DcqdUl@wuerfel>
-Message-ID: <20151210124054.3c527f11@recife.lan>
+In-Reply-To: <20151210124054.3c527f11@recife.lan>
+References: <2029571.PWO4DcqdUl@wuerfel> <20151210124054.3c527f11@recife.lan>
+Message-ID: <56698FC9.5080209@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Thu, 10 Dec 2015 15:29:38 +0100
-Arnd Bergmann <arnd@arndb.de> escreveu:
+On Thursday 10 December 2015 08:10 PM, Mauro Carvalho Chehab wrote:
+> Em Thu, 10 Dec 2015 15:29:38 +0100
+> Arnd Bergmann <arnd@arndb.de> escreveu:
+> 
+>> It has never been possible to actually build this driver as
+>> a loadable module, only built-in because the Makefile attempts
+>> to build each file into its own module and fails:
+>>
+>> ERROR: "mbus_to_pix" [drivers/staging/media/davinci_vpfe/vpfe_video.ko] undefined!
+>> ERROR: "vpfe_resizer_register_entities" [drivers/staging/media/davinci_vpfe/vpfe_mc_capture.ko] undefined!
+>> ERROR: "rsz_enable" [drivers/staging/media/davinci_vpfe/dm365_resizer.ko] undefined!
+>> ERROR: "config_ipipe_hw" [drivers/staging/media/davinci_vpfe/dm365_ipipe.ko] undefined!
+>> ERROR: "ipipe_set_lutdpc_regs" [drivers/staging/media/davinci_vpfe/dm365_ipipe.ko] undefined!
+>>
+>> It took a long time to catch this bug with randconfig builds
+>> because at least 14 other Kconfig symbols have to be enabled in
+>> order to configure this one.
+>>
+>> The solution is really easy: this patch changes the Makefile to
+>> link all files into one module.
+>>
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> ---
+>>
+>> diff --git a/drivers/staging/media/davinci_vpfe/Makefile b/drivers/staging/media/davinci_vpfe/Makefile
+>> index c64515c644cd..3019c9ecd548 100644
+>> --- a/drivers/staging/media/davinci_vpfe/Makefile
+>> +++ b/drivers/staging/media/davinci_vpfe/Makefile
+>> @@ -1,3 +1,5 @@
+>> -obj-$(CONFIG_VIDEO_DM365_VPFE) += \
+>> +obj-$(CONFIG_VIDEO_DM365_VPFE) += davinci-vfpe.o
+>> +
+>> +davinci-vfpe-objs := \
+>>  	dm365_isif.o dm365_ipipe_hw.o dm365_ipipe.o \
+>>  	dm365_resizer.o dm365_ipipeif.o vpfe_mc_capture.o vpfe_video.o
+>>
+> 
+> That seems a bad signal to me... I guess either this driver was never
+> actually tested or it was tested only if compiled as built-in...
 
-> It has never been possible to actually build this driver as
-> a loadable module, only built-in because the Makefile attempts
-> to build each file into its own module and fails:
-> 
-> ERROR: "mbus_to_pix" [drivers/staging/media/davinci_vpfe/vpfe_video.ko] undefined!
-> ERROR: "vpfe_resizer_register_entities" [drivers/staging/media/davinci_vpfe/vpfe_mc_capture.ko] undefined!
-> ERROR: "rsz_enable" [drivers/staging/media/davinci_vpfe/dm365_resizer.ko] undefined!
-> ERROR: "config_ipipe_hw" [drivers/staging/media/davinci_vpfe/dm365_ipipe.ko] undefined!
-> ERROR: "ipipe_set_lutdpc_regs" [drivers/staging/media/davinci_vpfe/dm365_ipipe.ko] undefined!
-> 
-> It took a long time to catch this bug with randconfig builds
-> because at least 14 other Kconfig symbols have to be enabled in
-> order to configure this one.
-> 
-> The solution is really easy: this patch changes the Makefile to
-> link all files into one module.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> 
-> diff --git a/drivers/staging/media/davinci_vpfe/Makefile b/drivers/staging/media/davinci_vpfe/Makefile
-> index c64515c644cd..3019c9ecd548 100644
-> --- a/drivers/staging/media/davinci_vpfe/Makefile
-> +++ b/drivers/staging/media/davinci_vpfe/Makefile
-> @@ -1,3 +1,5 @@
-> -obj-$(CONFIG_VIDEO_DM365_VPFE) += \
-> +obj-$(CONFIG_VIDEO_DM365_VPFE) += davinci-vfpe.o
-> +
-> +davinci-vfpe-objs := \
->  	dm365_isif.o dm365_ipipe_hw.o dm365_ipipe.o \
->  	dm365_resizer.o dm365_ipipeif.o vpfe_mc_capture.o vpfe_video.o
-> 
+Most likely the later is true.
 
-That seems a bad signal to me... I guess either this driver was never
-actually tested or it was tested only if compiled as built-in...
++ Prabhakar to see if he remembers.
 
-Regards,
-Mauro
+Thanks,
+Sekhar
