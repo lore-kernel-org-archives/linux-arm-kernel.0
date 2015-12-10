@@ -1,48 +1,56 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Dec 2015 18:08:19 +0100
-Subject: [PATCH v2 4/9] pinctrl: Add support STM32 MCUs
-In-Reply-To: <CALszF6Cd=yei0m2Zs=+k=KT5RUzdesGWPK7PAQPdj_-Ouan=2A@mail.gmail.com>
-References: <1445102604-11502-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1445102604-11502-5-git-send-email-mcoquelin.stm32@gmail.com>
- <CALszF6Cd=yei0m2Zs=+k=KT5RUzdesGWPK7PAQPdj_-Ouan=2A@mail.gmail.com>
-Message-ID: <CACRpkda4eSHu57Tw6F-kmxY_EOSEhpRiowQN9o4LbPVgE_Xvkw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 10 Dec 2015 17:14:01 +0000
+Subject: next-20151210 build: 4 failures 43 warnings (next-20151210)
+In-Reply-To: <20151210165513.GO5727@sirena.org.uk>
+References: <E1a6wEp-0000hU-7o@optimist> <20151210165513.GO5727@sirena.org.uk>
+Message-ID: <20151210171401.GG21134@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 1, 2015 at 10:53 AM, Maxime Coquelin
-<mcoquelin.stm32@gmail.com> wrote:
-> 2015-10-17 19:23 GMT+02:00 Maxime Coquelin <mcoquelin.stm32@gmail.com>:
->> This patch adds pinctrl and GPIO support to STMicroelectronic's STM32
->> family of MCUs.
->>
->> While it only supports STM32F429 for now, it has been designed to enable
->> support of other MCUs of the family (e.g. STM32F746).
->>
->> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->> ---
->>  drivers/pinctrl/Kconfig                   |    1 +
->>  drivers/pinctrl/Makefile                  |    1 +
->>  drivers/pinctrl/stm32/Kconfig             |   16 +
->>  drivers/pinctrl/stm32/Makefile            |    5 +
->>  drivers/pinctrl/stm32/pinctrl-stm32.c     |  856 +++++++++++++++
->>  drivers/pinctrl/stm32/pinctrl-stm32.h     |   43 +
->>  drivers/pinctrl/stm32/pinctrl-stm32f429.c | 1598 +++++++++++++++++++++++++++++
->>  7 files changed, 2520 insertions(+)
->>  create mode 100644 drivers/pinctrl/stm32/Kconfig
->>  create mode 100644 drivers/pinctrl/stm32/Makefile
->>  create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32.c
->>  create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32.h
->>  create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32f429.c
->>
->
-> Gentle reminder, do you know when you will be able to review this driver?
+On Thu, Dec 10, 2015 at 04:55:13PM +0000, Mark Brown wrote:
+> On Thu, Dec 10, 2015 at 08:06:07AM +0000, Build bot for Mark Brown wrote:
+> 
+> Today's -next fails to build most arm64 configs with some rather
+> spectacular errors below introduced by 02598e94ed5a78 (mm, printk:
+> introduce new format string for flags) from Andrew's tree.  These in
+> turn stem from the fact that we introduce an inclusion of
+> linux/tracepoint.h into linux/mmdebug.h which through a chain of nested
+> inclusions means that we end up attempting to use definitions from
+> headers before they have finished including.  For example:
+> 
+> > 	arm64-allnoconfig
+> > ../include/linux/wait.h:1217:2: error: implicit declaration of function 'atomic_read' [-Werror=implicit-function-declaration]
+> 
+> is a result of:
+> 
+> In file included from include/linux/completion.h:11:0,
+>                  from include/linux/rcupdate.h:43,
+>                  from include/linux/tracepoint.h:19,
+>                  from include/linux/mmdebug.h:6,
+>                  from ./arch/arm64/include/asm/cmpxchg.h:22,
+>                  from ./arch/arm64/include/asm/atomic.h:41,
+>                  from include/linux/atomic.h:4,
+>                  from include/linux/spinlock.h:406,
+>                  from include/linux/seqlock.h:35,
+>                  from include/linux/time.h:5,
+>                  from include/uapi/linux/timex.h:56,
+>                  from include/linux/timex.h:56,
+>                  from include/linux/sched.h:19,
+>                  from arch/arm64/kernel/asm-offsets.c:21:
+> include/linux/wait.h: In function 'wait_on_atomic_t':
+> include/linux/wait.h:1218:2: error: implicit declaration of function 'atomic_read' [-Werror=implicit-function-declaration]
+>   if (atomic_read(val) == 0)
+> 
+> where atomic_read() will be defined in atomic.h which is part of the
+> inclusion chain above but hasn't yet parsed far enough to actually
+> define anything.  This is all a bit of a horrific mess the root cause of
+> which appears to be that arm64 is unusual in including linux/mmdebug.h
+> in asm/cmpxchg.h which triggers the mess.  There doesn't seem to be any
+> reason for this inclusion, I've just sent a patch removing it.  It'd be
+> good to get this into -next as a matter of urgency.
 
-I'm a bit overloaded so reviewing of large chunks of code takes time.
+I'll pick up your fix into the arm64 for-next/core branch.
 
-It would be great if I could have some Reviewed-by tags from someone
-else who's familiar with pin control.
+Cheers,
 
-Patrice: do you have a chance to review this driver and help us?
-
-Yours,
-Linus Walleij
+Will
