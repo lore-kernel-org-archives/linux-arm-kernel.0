@@ -1,33 +1,225 @@
-From: merker@debian.org (Karsten Merker)
-Date: Thu, 10 Dec 2015 21:32:01 +0100
-Subject: [PATCH 3/3] ARM: dts: sunxi: allwinner,
- sun4i-a10-lradc-keys binding: typo fix
-In-Reply-To: <1449779521-754-1-git-send-email-merker@debian.org>
-References: <1449779521-754-1-git-send-email-merker@debian.org>
-Message-ID: <1449779521-754-4-git-send-email-merker@debian.org>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Thu, 10 Dec 2015 14:48:03 -0600
+Subject: [PATCH V2 2/3] arm64: dts: Add Hi6220 gpio configuration nodes
+In-Reply-To: <1446692547-78129-2-git-send-email-zhongkaihua@huawei.com>
+References: <1446692547-78129-1-git-send-email-zhongkaihua@huawei.com>
+ <1446692547-78129-2-git-send-email-zhongkaihua@huawei.com>
+Message-ID: <CAL_JsqKUQ4wbGwC3=MOr=-nNAWeYX4+0KRes9utPQv7bDyxuww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Trivial typo fix ("mut" -> "must") in the sunxi LRADC-keys binding
-documentation.
+On Wed, Nov 4, 2015 at 9:02 PM, Zhong Kaihua <zhongkaihua@huawei.com> wrote:
+> arm64: dts: Add Hi6220 gpio configuration nodes
+>
+> Signed-off-by: Kaihua Zhong <zhongkaihua@huawei.com>
+> Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
 
-Signed-off-by: Karsten Merker <merker@debian.org>
----
- Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+[...]
 
-diff --git a/Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt b/Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt
-index b9c32f6..4357e49 100644
---- a/Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt
-+++ b/Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt
-@@ -12,7 +12,7 @@ Each key is represented as a sub-node of "allwinner,sun4i-a10-lradc-keys":
- Required subnode-properties:
- 	- label: Descriptive name of the key.
- 	- linux,code: Keycode to emit.
--	- channel: Channel this key is attached to, mut be 0 or 1.
-+	- channel: Channel this key is attached to, must be 0 or 1.
- 	- voltage: Voltage in ?V at lradc input when this key is pressed.
- 
- Example:
--- 
-2.1.4
+> diff --git a/arch/arm64/boot/dts/hisilicon/hikey-gpio.dtsi b/arch/arm64/boot/dts/hisilicon/hikey-gpio.dtsi
+> new file mode 100644
+> index 0000000..6eabf40
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/hisilicon/hikey-gpio.dtsi
+> @@ -0,0 +1,195 @@
+> +/*
+> + * gpio dts file for Hisilicon HiKey development board
+> + *
+> + */
+> +/ {
+> +       gpio_rstout_n:gpio_rstout_n {
+> +               gpios;
+> +       };
+> +       gpio_pmu_peri_en:gpio_pmu_peri_en {
+> +               gpios;
+> +       };
+> +       gpio_sysclk0_en:gpio_sysclk0_en {
+> +               gpios;
+> +       };
+> +       gpio_jtag_tdo:gpio_jtag_tdo {
+> +               gpios;
+> +       };
+> +       /* LCB: PWR_HOLD_GPIO0_0 */
+> +       gpio_pwr_hold:gpio_pwr_hold {
+> +               gpios = <&gpio0 0 0>;
+> +       };
+> +       /* LCB: DSI_SEL_GPIO0_1 */
+> +       gpio_dsi_sel:gpio_dsi_sel {
+> +               gpios = <&gpio0 1 0>;
+> +       };
+> +       /* LCB: USB_HUB_RESET_N_GPIO0_2 */
+> +       gpio_usb_hub_reset_n:gpio_usb_hub_reset_n {
+> +               gpios = <&gpio0 2 0>;
+> +       };
+> +       /* LCB: USB_SEL_GPIO0_3 */
+> +       gpio_usb_sel:gpio_usb_sel {
+> +               gpios = <&gpio0 3 0>;
+> +       };
+> +       /* LCB: HDMI_PD_GPIO0_4 */
+> +       gpio_hdmi_pd:gpio_hdmi_pd {
+> +               gpios = <&gpio0 4 0>;
+> +       };
+> +       /* LCB: WL_REG_ON_GPIO0_5 */
+> +       gpio_wl_en:gpio_wl_en {
+> +               gpios = <&gpio0 5 0>;
+> +       };
+> +       /* LCB: PWRON_DET_GPIO0_6 */
+> +       gpio_pwron_det:gpio_pwron_det {
+> +               gpios = <&gpio0 6 0>;
+> +       };
+> +       /* LCB: 5V_HUB_EN_GPIO0_7 */
+> +       gpio_usb_dev_det:gpio_usb_dev_det {
+> +               gpios = <&gpio0 7 0>;
+> +       };
+> +       /* LCB: SD_DET_GPIO1_0 */
+> +       gpio_sd_det:gpio_sd_det {
+> +               gpios = <&gpio1 0 0>;
+> +       };
+> +       /* LCB: HDMI_INT_GPIO1_1 */
+> +       gpio_hdmi_int:gpio_hdmi_int {
+> +               gpios = <&gpio1 1 0>;
+> +       };
+> +       /* LCB: PMU_IRQ_N_GPIO1_2 */
+> +       gpio_pmu_irq_n:gpio_pmu_irq_n {
+> +               gpios = <&gpio1 2 0>;
+> +       };
+> +       /* LCB: WL_HOST_WAKE_GPIO1_3 */
+> +       gpio_wl_host_wake:gpio_wl_host_wake {
+> +               gpios = <&gpio1 3 0>;
+> +       };
+> +       gpio_nfc_int:gpio_nfc_int {
+> +               gpios = <&gpio1 4 0>;
+> +       };
+> +       gpio_unused_001:gpio_unused_001 {
+> +               gpios = <&gpio1 5 0>;
+> +       };
+> +       /* LCB: BT_REG_ON_GPIO1_7 */
+> +       gpio_bt_reg_on:gpio_bt_reg_on {
+> +               gpios = <&gpio1 7 0>;
+> +       };
+> +       /* LCB: GPIO2_0, J2 */
+> +       gpio_j2_2_0:gpio_j2_2_0 {
+> +               gpios = <&gpio2 0 0>;
+> +       };
+> +       /* LCB: GPIO2_1, J2 */
+> +       gpio_j2_2_1:gpio_j2_2_1 {
+> +               gpios = <&gpio2 1 0>;
+> +       };
+> +       /* LCB: GPIO2_2, J2 */
+> +       gpio_j2_2_2:gpio_j2_2_2 {
+> +               gpios = <&gpio2 2 0>;
+> +       };
+> +       /* LCB: GPIO2_3, J2 */
+> +       gpio_j2_2_3:gpio_j2_2_3 {
+> +               gpios = <&gpio2 3 0>;
+> +       };
+> +       /* LCB: GPIO2_4, J2 */
+> +       gpio_j2_2_4:gpio_j2_2_4 {
+> +               gpios = <&gpio2 4 0>;
+> +       };
+> +       /* LCB: USB_ID_DET_GPIO2_5 */
+> +       gpio_usb_id_det:gpio_usb_id_det {
+> +               gpios = <&gpio2 5 0>;
+> +       };
+> +       /* LCB: USB_VBUS_DET_GPIO2_6 */
+> +       gpio_vbus_det:gpio_vbus_det {
+> +               gpios = <&gpio2 6 0>;
+> +       };
+> +       /* LCB: GPIO2_7, J2 */
+> +       gpio_j2_2_7:gpio_j2_2_7 {
+> +               gpios = <&gpio2 7 0>;
+> +       };
+> +       gpio_rf_reset0:gpio_rf_reset0 {
+> +               gpios;
+> +       };
+> +       gpio_rf_reset1:gpio_rf_reset1 {
+> +               gpios;
+> +       };
+> +       gpio_pmu_ssi:gpio_pmu_ssi {
+> +               gpios;
+> +       };
+> +       gpio_unused_002:gpio_unused_002 {
+> +               gpios;
+> +       };
+> +       gpio_hkadc_ssi:gpio_hkadc_ssi {
+> +               gpios;
+> +       };
+> +       gpio_codec_clk:gpio_codec_clk {
+> +               gpios;
+> +       };
+> +       gpio_bt_xclk:gpio_bt_xclk {
+> +               gpios;
+> +       };
+> +       gpio_bt_xfs:gpio_bt_xfs {
+> +               gpios;
+> +       };
+> +       gpio_bt_di:gpio_bt_di {
+> +               gpios;
+> +       };
+> +       gpio_bt_do:gpio_bt_do {
+> +               gpios;
+> +       };
+> +       gpio_usim0_clk:gpio_usim0_clk {
+> +               gpios;
+> +       };
+> +       gpio_usim0_data:gpio_usim0_data {
+> +               gpios;
+> +       };
+> +       gpio_usim0_rst:gpio_usim0_rst {
+> +               gpios;
+> +       };
+> +       gpio_emmc_clk:gpio_emmc_clk {
+> +               gpios;
+> +       };
+> +       gpio_emmc_cmd:gpio_emmc_cmd {
+> +               gpios;
+> +       };
+> +       gpio_emmc_data0:gpio_emmc_data0 {
+> +               gpios;
+> +       };
+> +       gpio_emmc_data1:gpio_emmc_data1 {
+> +               gpios;
+> +       };
+> +       gpio_emmc_data2:gpio_emmc_data2 {
+> +               gpios;
+> +       };
+> +       gpio_emmc_data3:gpio_emmc_data3 {
+> +               gpios;
+> +       };
+> +       gpio_emmc_data4:gpio_emmc_data4 {
+> +               gpios;
+> +       };
+> +       gpio_emmc_data5:gpio_emmc_data5 {
+> +               gpios;
+> +       };
+> +       gpio_emmc_data6:gpio_emmc_data6 {
+> +               gpios;
+> +       };
+> +       gpio_emmc_data7:gpio_emmc_data7 {
+> +               gpios;
+> +       };
+> +       gpio_emmc_rst_n:gpio_emmc_rst_n {
+> +               gpios;
+> +       };
+> +       gpio_unused_006:gpio_unused_006 {
+> +               gpios;
+> +       };
+> +       gpio_unused_007:gpio_unused_007 {
+> +               gpios;
+> +       };
+> +       gpio_rf_ssi0:gpio_rf_ssi0 {
+> +               gpios;
+> +       };
+> +       gpio_rf_tcvr_on0:gpio_rf_tcvr_on0 {
+> +               gpios;
+> +       };
+> +       gpio_rf_mipi_clk0:gpio_rf_mipi_clk0 {
+> +               gpios;
+> +       };
+
+All these should be dropped. GPIO connections should go to the device
+nodes they are attached to. There are some cases that don't really
+have a device connection, but need a defined function/use. We don't
+have a defined way to do that yet in DT.
+
+Rob
