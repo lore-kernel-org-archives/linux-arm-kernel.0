@@ -1,121 +1,76 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 10 Dec 2015 12:07:28 +0000
-Subject: [PATCH v6 10/21] KVM: ARM64: Add access handler for PMEVCNTRn
- and PMCCNTR register
-In-Reply-To: <566963C3.40904@huawei.com>
-References: <1449578860-15808-1-git-send-email-zhaoshenglong@huawei.com>
- <1449578860-15808-11-git-send-email-zhaoshenglong@huawei.com>
- <56670594.7010604@arm.com> <566963C3.40904@huawei.com>
-Message-ID: <56696B00.6090909@arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Thu, 10 Dec 2015 12:12:11 +0000
+Subject: [PATCH] cpufreq: tegra: add regulator dependency for T124
+In-Reply-To: <20151210113541.GL5727@sirena.org.uk>
+References: <2194927.eV2s2QmZs0@wuerfel> <5668188F.2080202@nvidia.com>
+ <20151209144734.GB5727@sirena.org.uk> <566865ED.3020106@nvidia.com>
+ <20151209201007.GG5727@sirena.org.uk> <56694EFA.7010901@nvidia.com>
+ <20151210113541.GL5727@sirena.org.uk>
+Message-ID: <56696C1B.3010503@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shannon,
 
-On 10/12/15 11:36, Shannon Zhao wrote:
-> Hi Marc,
+On 10/12/15 11:35, Mark Brown wrote:
+> * PGP Signed by an unknown key
 > 
-> On 2015/12/9 0:30, Marc Zyngier wrote:
->> On 08/12/15 12:47, Shannon Zhao wrote:
->>>> From: Shannon Zhao <shannon.zhao@linaro.org>
->>>>
->>>> Since the reset value of PMEVCNTRn or PMCCNTR is UNKNOWN, use
->>>> reset_unknown for its reset handler. Add access handler which emulates
->>>> writing and reading PMEVCNTRn or PMCCNTR register. When reading
->>>> PMEVCNTRn or PMCCNTR, call perf_event_read_value to get the count value
->>>> of the perf event.
->>>>
->>>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->>>> ---
->>>>  arch/arm64/kvm/sys_regs.c | 107 +++++++++++++++++++++++++++++++++++++++++++++-
->>>>  1 file changed, 105 insertions(+), 2 deletions(-)
->>>>
->>>> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
->>>> index c116a1b..f7a73b5 100644
->>>> --- a/arch/arm64/kvm/sys_regs.c
->>>> +++ b/arch/arm64/kvm/sys_regs.c
->>>> @@ -525,6 +525,12 @@ static bool access_pmu_regs(struct kvm_vcpu *vcpu,
->>>>  
->>>>  	if (p->is_write) {
->>>>  		switch (r->reg) {
->>>> +		case PMEVCNTR0_EL0 ... PMCCNTR_EL0: {
->> Same problem as previously mentioned.
->>
->>>> +			val = kvm_pmu_get_counter_value(vcpu,
->>>> +							r->reg - PMEVCNTR0_EL0);
->>>> +			vcpu_sys_reg(vcpu, r->reg) += (s64)p->regval - val;
->>>> +			break;
->>>> +		}
+> On Thu, Dec 10, 2015 at 10:07:54AM +0000, Jon Hunter wrote:
+>> On 09/12/15 20:10, Mark Brown wrote:
+>>> On Wed, Dec 09, 2015 at 05:33:33PM +0000, Jon Hunter wrote:
 > 
-> If I use a handler to handle these accesses to PMEVCNTRn and PMCCNTR
-> like below. It converts the register offset c14_PMEVCNTRn and c9_PMCCNTR
-> to PMEVCNTRn_EL0 and PMCCNTR_EL0, uniformly uses vcpu_sys_reg and
-> doesn't need to take care the big endian. What do you think about this?
+>>>> Yes, setting the frequency and voltage as defined by a given operating
+>>>> mode would make sense. However, I am not sure we have those defined in
+>>>> the kernel for this PLL and would have to be added.
 > 
-> static bool access_pmu_evcntr(struct kvm_vcpu *vcpu,
->                               struct sys_reg_params *p,
->                               const struct sys_reg_desc *r)
-> {
->         u64 idx, reg, val;
+>>> I think given how you're describing the hardware that this will be
+>>> required in order to provide something robust (and also to get the best
+>>> power savings from the hardware).
 > 
->         if (p->is_aarch32)
->                 reg = r->reg / 2;
-
-I'd prefer it if you actually decoded the reg itself. Something like:
-
-	if (p->is_aarch32) {
-		if (r->CRn == 9 && r->CRm == 13)
-			reg = (r->Op2 & 1) ? 0 : PMCCNTR_EL0;
-		if (r->CRn == 14 && (r->CRm & 0xc) == 8) {
-			reg = ((r->CRm & 3) << 2) & (r->Op2 & 7);
-			reg += PMEVCNTR0_EL0;
-		} else {
-			BUG();
-		}
-	} else {
-		....
-	}
-
-And then you can get rid of the c14_PMVCNTR* and c9_PMCCNTR macros.
-The only slightly ugly thing is this 0 value to represent PMXEVTYPER,
-but that's what we already have with your "default" clause below.
-
->         else
->                 reg = r->reg;
+>> Yes I agree it would be more robust. However, if you care about power
+>> savings then you should be using the DFLL/cpufreq anyway.
 > 
->         switch (reg) {
->         case PMEVCNTR0_EL0 ... PMEVCNTR30_EL0: {
->                 idx = reg - PMEVCNTR0_EL0;
->                 break;
->         }
->         case PMCCNTR_EL0: {
->                 idx = ARMV8_CYCLE_IDX;
->                 break;
->         }
->         default:
->                 idx = vcpu_sys_reg(vcpu, PMSELR_EL0) & ARMV8_COUNTER_MASK;
->                 if (!pmu_counter_idx_valid(vcpu, idx))
->                         return true;
->                 reg = (idx == ARMV8_CYCLE_IDX) ? PMCCNTR_EL0 :
-> PMEVCNTR0_EL0 + idx;
->                 break;
->         }
+> Without knowing anything about the hardware this is all a bit confusing
+> I'm afraid.  What is "DFLL/cpufreq" as opposed to "the PLL"?
+
+No problem.
+
+The two main clocks sources (there are others) used for the CPU complex
+are the PLLX and the DFLL. The PLLX is a normal PLL and you can
+configure to run at various frequencies. However, this PLL requires that
+you/software set the voltage appropriately. The DFLL has the ability to
+control the voltage itself per the frequency requested (no software
+management of the voltage required).
+
+There is no reason why you could not use the PLLX in conjunction with
+cpufreq, but for T124 we use the DFLL.
+
+Typically, T124 will boot using the PLLX and then if cpufreq is enabled,
+the DFLL will be enabled and we will switch to this clock.
+
+We would only ever switch back to the PLLX if cpufreq is removed and
+hence the DFLL is disabled. And this is where this patch comes in and I
+am wondering if this has ever been tested.
+
+>> From testing the t124 jetson and nyan-big, both of these boards have a
+>> different configuration for the PLL at boot time, so although we could
+>> pick a safe operating point for all t124 boards, I was thinking of just
+>> restoring their initial configuration.
 > 
->         val = kvm_pmu_get_counter_value(vcpu, idx);
->         if (p->is_write)
->                 vcpu_sys_reg(vcpu, reg) = (s64)p->regval - val;
+> This seems more complex, and also makes the idea of relying on the
+> initial configuration seem slightly concerning - other software seems to
+> be already changing the configuration before we get to the kernel so if
+> we don't fully understand the configuration we're doing we seem likely
+> to find some configuration where we miss things.
 
-Maybe I don't have my head screwed in the right way, but as long as
-we're only using u64 quantities, why do we need this s64 cast?
+I don't think so. At probe time for cpufreq, we know the clock source
+for the CPU complex and we can query the voltage and frequency. You may
+say what happens if you are already running from the DFLL that happened
+to be setup by the bootloader? It is probably not likely as there is
+more software setup involved before you can enable the DFLL. However, it
+could be handled.
 
->         else
->                 p->regval = val;
-> 
->         return true;
-> }
+By the way, I am not saying that we should do this, but if we don't we
+need to define a safe/default V-F for all devices to operate at. I guess
+that it could also be specified in the DTB and if not we use a default.
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Jon
