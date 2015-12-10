@@ -1,58 +1,50 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 10 Dec 2015 14:32:26 +0000
-Subject: [PATCH 1/2] ARM: l2x0: make it possible to disable outer sync
- from DT
-In-Reply-To: <1449756855-19473-1-git-send-email-linus.walleij@linaro.org>
-References: <1449756855-19473-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20151210142942.GB495@leverpostej>
+From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
+Date: Thu, 10 Dec 2015 12:40:54 -0200
+Subject: [PATCH] [media] staging/davinci_vfpe: allow modular build
+In-Reply-To: <2029571.PWO4DcqdUl@wuerfel>
+References: <2029571.PWO4DcqdUl@wuerfel>
+Message-ID: <20151210124054.3c527f11@recife.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 10, 2015 at 03:14:15PM +0100, Linus Walleij wrote:
-> Some RealView platforms have broken outer_sync, see:
-> http://marc.info/?l=linux-kernel&m=144846940516899&w=2
+Em Thu, 10 Dec 2015 15:29:38 +0100
+Arnd Bergmann <arnd@arndb.de> escreveu:
+
+> It has never been possible to actually build this driver as
+> a loadable module, only built-in because the Makefile attempts
+> to build each file into its own module and fails:
 > 
-> We got rid of the custom barriers from the machine by disabling
-> outer sync, but that was just for the boardfile case. We have
-> to be able to do the same in the device tree case.
+> ERROR: "mbus_to_pix" [drivers/staging/media/davinci_vpfe/vpfe_video.ko] undefined!
+> ERROR: "vpfe_resizer_register_entities" [drivers/staging/media/davinci_vpfe/vpfe_mc_capture.ko] undefined!
+> ERROR: "rsz_enable" [drivers/staging/media/davinci_vpfe/dm365_resizer.ko] undefined!
+> ERROR: "config_ipipe_hw" [drivers/staging/media/davinci_vpfe/dm365_ipipe.ko] undefined!
+> ERROR: "ipipe_set_lutdpc_regs" [drivers/staging/media/davinci_vpfe/dm365_ipipe.ko] undefined!
 > 
-> Since __l2c_init() is cloning and copying the L2C vtable,
-> we pass an argument to this function to optionally numb
-> the outer sync operation if desired, before initializing
-> the cache.
+> It took a long time to catch this bug with randconfig builds
+> because at least 14 other Kconfig symbols have to be enabled in
+> order to configure this one.
 > 
-> After this we can set up the cache correctly on the RealView
-> PB11MPCore, and it boots rock solid with the cache enabled.
-> Before this, spurious crashes would occur if we try to set
-> up the cache properly.
+> The solution is really easy: this patch changes the Makefile to
+> link all files into one module.
 > 
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: devicetree at vger.kernel.org
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
->  Documentation/devicetree/bindings/arm/l2cc.txt |  1 +
->  arch/arm/mm/cache-l2x0.c                       | 13 ++++++++++---
->  2 files changed, 11 insertions(+), 3 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
-> index d181b7c4c522..aae7387acbdb 100644
-> --- a/Documentation/devicetree/bindings/arm/l2cc.txt
-> +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
-> @@ -75,6 +75,7 @@ Optional properties:
->    specified to indicate that such transforms are precluded.
->  - arm,parity-enable : enable parity checking on the L2 cache (L220 or PL310).
->  - arm,parity-disable : disable parity checking on the L2 cache (L220 or PL310).
-> +- arm,outer-sync-disable : disable the outer sync operation on the L2 cache.
+> diff --git a/drivers/staging/media/davinci_vpfe/Makefile b/drivers/staging/media/davinci_vpfe/Makefile
+> index c64515c644cd..3019c9ecd548 100644
+> --- a/drivers/staging/media/davinci_vpfe/Makefile
+> +++ b/drivers/staging/media/davinci_vpfe/Makefile
+> @@ -1,3 +1,5 @@
+> -obj-$(CONFIG_VIDEO_DM365_VPFE) += \
+> +obj-$(CONFIG_VIDEO_DM365_VPFE) += davinci-vfpe.o
+> +
+> +davinci-vfpe-objs := \
+>  	dm365_isif.o dm365_ipipe_hw.o dm365_ipipe.o \
+>  	dm365_resizer.o dm365_ipipeif.o vpfe_mc_capture.o vpfe_video.o
+> 
 
-I'm not sure what this means from a HW perspective. The "outer sync"
-operation is Linux terminology and doesn't show up in the TRM for L220.
+That seems a bad signal to me... I guess either this driver was never
+actually tested or it was tested only if compiled as built-in...
 
-What is the (integration? HW?) bug that we're trying to avoid the effect
-of? It sounds like we should be describing that.
-
-We should at least have a better definition of what this means we must
-avoid.
-
-Thanks
-Mark.
+Regards,
+Mauro
