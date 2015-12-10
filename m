@@ -1,10 +1,10 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 10 Dec 2015 09:00:18 +0100
-Subject: [PATCH v4 34/58] mtd: nand: pasemi: use the mtd instance embedded in
- struct nand_chip
+Date: Thu, 10 Dec 2015 09:00:25 +0100
+Subject: [PATCH v4 41/58] mtd: nand: socrates: use the mtd instance embedded
+ in struct nand_chip
 In-Reply-To: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1449734442-18672-35-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1449734442-18672-42-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,51 +12,81 @@ struct nand_chip now embeds an mtd device. Make use of this mtd instance.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/mtd/nand/pasemi_nand.c | 12 +++++-------
- 1 file changed, 5 insertions(+), 7 deletions(-)
+Changes generated with the following coccinelle script
 
-diff --git a/drivers/mtd/nand/pasemi_nand.c b/drivers/mtd/nand/pasemi_nand.c
-index 0ececac..4dd2985 100644
---- a/drivers/mtd/nand/pasemi_nand.c
-+++ b/drivers/mtd/nand/pasemi_nand.c
-@@ -110,17 +110,15 @@ static int pasemi_nand_probe(struct platform_device *ofdev)
- 	pr_debug("pasemi_nand at %pR\n", &res);
+--->8---
+virtual patch
+
+@fix1@
+identifier __chipfield, __mtdfield;
+type __type;
+@@
+(
+	__type {
+		...
+		struct nand_chip __chipfield;
+		...
+-		struct mtd_info __mtdfield;
+		...
+	};
+|
+	__type {
+		...
+-		struct mtd_info __mtdfield;
+		...
+		struct nand_chip __chipfield;
+		...
+	};
+)
+
+@fix2 depends on fix1@
+identifier fix1.__chipfield, fix1.__mtdfield;
+identifier __subfield;
+type fix1.__type;
+__type *__priv;
+@@
+(
+-	__priv->__mtdfield.__subfield
++	nand_to_mtd(&__priv->__chipfield)->__subfield
+|
+-	&(__priv->__mtdfield)
++	nand_to_mtd(&__priv->__chipfield)
+)
+--->8---
+---
+ drivers/mtd/nand/socrates_nand.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/mtd/nand/socrates_nand.c b/drivers/mtd/nand/socrates_nand.c
+index 2dfb1e0..c0ca0fd 100644
+--- a/drivers/mtd/nand/socrates_nand.c
++++ b/drivers/mtd/nand/socrates_nand.c
+@@ -30,7 +30,6 @@
  
- 	/* Allocate memory for MTD device structure and private data */
--	pasemi_nand_mtd = kzalloc(sizeof(struct mtd_info) +
--				  sizeof(struct nand_chip), GFP_KERNEL);
--	if (!pasemi_nand_mtd) {
-+	chip = kzalloc(sizeof(struct nand_chip), GFP_KERNEL);
-+	if (!chip) {
- 		printk(KERN_WARNING
- 		       "Unable to allocate PASEMI NAND MTD device structure\n");
- 		err = -ENOMEM;
- 		goto out;
+ struct socrates_nand_host {
+ 	struct nand_chip	nand_chip;
+-	struct mtd_info		mtd;
+ 	void __iomem		*io_base;
+ 	struct device		*dev;
+ };
+@@ -159,8 +158,8 @@ static int socrates_nand_probe(struct platform_device *ofdev)
+ 		return -EIO;
  	}
  
--	/* Get pointer to private data */
--	chip = (struct nand_chip *)&pasemi_nand_mtd[1];
-+	pasemi_nand_mtd = nand_to_mtd(chip);
+-	mtd = &host->mtd;
+ 	nand_chip = &host->nand_chip;
++	mtd = nand_to_mtd(nand_chip);
+ 	host->dev = &ofdev->dev;
  
- 	/* Link the private data with the MTD structure */
- 	pasemi_nand_mtd->priv = chip;
-@@ -180,7 +178,7 @@ static int pasemi_nand_probe(struct platform_device *ofdev)
-  out_ior:
- 	iounmap(chip->IO_ADDR_R);
-  out_mtd:
--	kfree(pasemi_nand_mtd);
-+	kfree(chip);
-  out:
- 	return err;
- }
-@@ -202,7 +200,7 @@ static int pasemi_nand_remove(struct platform_device *ofdev)
- 	iounmap(chip->IO_ADDR_R);
+ 	nand_chip->priv = host;		/* link the private data structures */
+@@ -216,7 +215,7 @@ out:
+ static int socrates_nand_remove(struct platform_device *ofdev)
+ {
+ 	struct socrates_nand_host *host = dev_get_drvdata(&ofdev->dev);
+-	struct mtd_info *mtd = &host->mtd;
++	struct mtd_info *mtd = nand_to_mtd(&host->chip);
  
- 	/* Free the MTD device structure */
--	kfree(pasemi_nand_mtd);
-+	kfree(chip);
- 
- 	pasemi_nand_mtd = NULL;
+ 	nand_release(mtd);
  
 -- 
 2.1.4
