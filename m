@@ -1,83 +1,40 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 10 Dec 2015 11:14:47 +0100
-Subject: [PATCH 2/2] ARM: shmobile: r8a7793: Describe DMA for the serial
- ports
-In-Reply-To: <20151210045444.GC6964@verge.net.au>
-References: <1448589166-11612-1-git-send-email-horms+renesas@verge.net.au>
- <1448589166-11612-3-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdVfMp0awRZh6S7YiSPFpUyAvwGXSQb2RYU7DkK_SOwH9Q@mail.gmail.com>
- <20151210045444.GC6964@verge.net.au>
-Message-ID: <CAMuHMdWCc-fZwr0eNBk5k4_qMuER76DDQndRiWX9zhrk0gqSQw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 10 Dec 2015 10:17:51 +0000
+Subject: [PATCH v12 05/16] arm64: Add back cpu_reset routines
+In-Reply-To: <1449708562.24127.39.camel@infradead.org>
+References: <cover.1448403503.git.geoff@infradead.org>
+ <3279584774ba40f088b79f4df864d69a5b57b516.1448403503.git.geoff@infradead.org>
+ <56586679.8060403@arm.com>
+ <20151130052843.GG23908@dhcppc13.redhat.com>
+ <20151130104027.7eeaa273@why.wild-wind.fr.eu.org>
+ <1449097050.6139.80.camel@infradead.org>
+ <20151203093212.GC7023@arm.com>
+ <1449708562.24127.39.camel@infradead.org>
+Message-ID: <20151210101751.GA21134@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 10, 2015 at 5:54 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Wed, Dec 09, 2015 at 11:47:36AM +0100, Geert Uytterhoeven wrote:
->> Hi Simon,
->>
->> On Fri, Nov 27, 2015 at 2:52 AM, Simon Horman
->> <horms+renesas@verge.net.au> wrote:
->> > Add DMA properties to all SCIF, SCIFA, SCIFB, and HSCIF device nodes.
->> >
->> > Based on similar work for the r8a7791 by Geert Uytterhoeven.
->> >
->> > Cc: Geert Uytterhoeven <geert+renesas@glider.be>
->> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->> > ---
->> >  arch/arm/boot/dts/r8a7793.dtsi | 36 ++++++++++++++++++++++++++++++++++++
->> >  1 file changed, 36 insertions(+)
->> >
->> > diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
->> > index 3ac2ec0414a0..8d5cbdfc3d5d 100644
->> > --- a/arch/arm/boot/dts/r8a7793.dtsi
->> > +++ b/arch/arm/boot/dts/r8a7793.dtsi
->>
->> > @@ -394,6 +412,8 @@
->> >                 interrupts = <0 152 IRQ_TYPE_LEVEL_HIGH>;
->> >                 clocks = <&mstp7_clks R8A7793_CLK_SCIF0>;
->> >                 clock-names = "sci_ick";
->> > +               dmas = <&dmac0 0x29>, <&dmac0 0x2a>;
->> > +               dma-names = "tx", "rx";
->> >                 power-domains = <&cpg_clocks>;
->> >                 status = "disabled";
->> >         };
->> > @@ -404,6 +424,8 @@
->> >                 interrupts = <0 153 IRQ_TYPE_LEVEL_HIGH>;
->> >                 clocks = <&mstp7_clks R8A7793_CLK_SCIF1>;
->> >                 clock-names = "sci_ick";
->> > +               dmas = <&dmac0 0x29>, <&dmac0 0x2a>;
->>
->> This is duplicated from scif0, and should be:
->>
->>         dmas = <&dmac0 0x2d>, <&dmac0 0x2e>;
->>
->> > +               dma-names = "tx", "rx";
->>
->> After
->>
->>         sed -i -e 's/7791/779x/g' arch/arm/boot/dts/r8a7791.dtsi
->>         sed -i -e 's/7793/779x/g' arch/arm/boot/dts/r8a7793.dtsi
->>
->> arch/arm/boot/dts/r8a7791.dtsi and arch/arm/boot/dts/r8a7793.dtsi should
->> be identical ;-)
->
-> Thanks, I have fixed that in v2.
+On Wed, Dec 09, 2015 at 04:49:22PM -0800, Geoff Levand wrote:
+> On Thu, 2015-12-03 at 09:32 +0000, Will Deacon wrote:
+> > On Wed, Dec 02, 2015 at 02:57:30PM -0800, Geoff Levand wrote:
+> > > On Mon, 2015-11-30 at 10:40 +0000, Marc Zyngier wrote:
+> > > 
+> > > > All that can be solved in C, and mostly at compile time. Using an
+> > > > assembler trampoline is complicating things for no good reason:
+> > > 
+> > > I added this into my kexec-v12.1 branch.  After some more testing I'll
+> > > post a v13 to the list.
+> > 
+> > You may well need some notrace annotations if you want to run C code
+> > here. Can you give it a spin with things like ftrace and kprobes?
+> 
+> I tested ftrace with and without the notrace annotation on
+> cpu_soft_restart() and could do kexec re-boots either way.
+> 
+> When cpu_soft_restart() is called we've only done setup_mm_for_reboot(),
+> so I would think C code should still be OK.
 
-Haven't seen that patch, but feel free to add my
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-after having corrected the scif1 DMA names.
-The sooner it arrives in renesas-devel, the better (I have patches depending
-on it).
+Yeah, you're right. I mistakenly thought that cpu_soft_restart was running
+at the idmap address as opposed to the kernel virtual address.
 
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Will
