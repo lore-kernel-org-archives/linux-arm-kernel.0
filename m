@@ -1,571 +1,152 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 10 Dec 2015 01:19:38 +0100
-Subject: [PATCH v1 3/8] rockchip: add clock controller for rk3228
-In-Reply-To: <1449651853-1667-4-git-send-email-jeffy.chen@rock-chips.com>
-References: <1449651853-1667-1-git-send-email-jeffy.chen@rock-chips.com>
- <1449651853-1667-4-git-send-email-jeffy.chen@rock-chips.com>
-Message-ID: <1616223.BTcyQWGl1F@phil>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 10 Dec 2015 00:22:13 +0000
+Subject: Domain faults when CONFIG_CPU_SW_DOMAIN_PAN is enabled
+In-Reply-To: <45b615420548463ebd1d582bc5da2eff@EMAIL.axentia.se>
+References: <1267b061b66c4d1fa8af1955825bc97a@EMAIL.axentia.se>
+ <20151203110041.GK8644@n2100.arm.linux.org.uk>
+ <f7774151e4a849e682ae5a607a98140b@EMAIL.axentia.se>
+ <20151203115143.GM8644@n2100.arm.linux.org.uk>
+ <533b0f1f264e42e78b94bbff9570fb50@EMAIL.axentia.se>
+ <20151203133727.GN8644@n2100.arm.linux.org.uk>
+ <94580382ca344ae2b64f66fb778c6ff7@EMAIL.axentia.se>
+ <20151203164118.GR8644@n2100.arm.linux.org.uk>
+ <20151203172708.GT8644@n2100.arm.linux.org.uk>
+ <45b615420548463ebd1d582bc5da2eff@EMAIL.axentia.se>
+Message-ID: <20151210002213.GL8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeffy,
-
-Am Mittwoch, 9. Dezember 2015, 17:04:08 schrieb Jeffy Chen:
-> Add the clock tree definition for the new rk3228 SoC.
+On Thu, Dec 03, 2015 at 09:37:51PM +0000, Peter Rosin wrote:
+> I took both patches for a quick spin (a dozen boots and one hour uptime
+> after that for each patch) and no incidents. I have not gathered data,
+> but the crash on boot feels like it's quite a bit above 50% when there
+> is a problem so this feels good (I used 5 clean reboots when I bisected
+> and that worked).
 > 
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> ---
+> Reported-by: Peter Rosin <peda@axentia.se>
+> Tested-by: Peter Rosin <peda@axentia.se>
 > 
->  drivers/clk/rockchip/Makefile     |   1 +
->  drivers/clk/rockchip/clk-rk3228.c | 762 ++++++++++++++++++++++++++++++++++++++
->  drivers/clk/rockchip/clk.h        |  11 +-
->  3 files changed, 773 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/clk/rockchip/clk-rk3228.c
-> 
-> diff --git a/drivers/clk/rockchip/Makefile b/drivers/clk/rockchip/Makefile
-> index d599829..80b9a37 100644
-> --- a/drivers/clk/rockchip/Makefile
-> +++ b/drivers/clk/rockchip/Makefile
-> @@ -12,5 +12,6 @@ obj-$(CONFIG_RESET_CONTROLLER)	+= softrst.o
->  
->  obj-y	+= clk-rk3036.o
->  obj-y	+= clk-rk3188.o
-> +obj-y	+= clk-rk3228.o
->  obj-y	+= clk-rk3288.o
->  obj-y	+= clk-rk3368.o
-> diff --git a/drivers/clk/rockchip/clk-rk3228.c b/drivers/clk/rockchip/clk-rk3228.c
-> new file mode 100644
-> index 0000000..eb3701e
-> --- /dev/null
-> +++ b/drivers/clk/rockchip/clk-rk3228.c
-> @@ -0,0 +1,762 @@
-> +/*
-> + * Copyright (c) 2014 MundoReader S.L.
-> + * Author: Heiko Stuebner <heiko@sntech.de>
-> + *
-> + * Copyright (c) 2015 Rockchip Electronics Co. Ltd.
-> + * Author: Xing Zheng <zhengxing@rock-chips.com>
-> + *
-> + * Copyright (c) 2015 Rockchip Electronics Co. Ltd.
-> + * Author: Jeffy Chen <jeffy.chen@rock-chips.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/syscore_ops.h>
-> +#include <dt-bindings/clock/rk3228-cru.h>
-> +#include "clk.h"
-> +
-> +#define RK3228_GRF_SOC_STATUS0	0x480
-> +
-> +enum rk3228_plls {
-> +	apll, dpll, cpll, gpll,
-> +};
-> +
-> +static struct rockchip_pll_rate_table rk3228_pll_rates[] = {
-> +	/* _mhz, _refdiv, _fbdiv, _postdiv1, _postdiv2, _dsmpd, _frac */
-> +	RK3036_PLL_RATE(1608000000, 1, 67, 1, 1, 1, 0),
-> +	RK3036_PLL_RATE(1584000000, 1, 66, 1, 1, 1, 0),
-> +	RK3036_PLL_RATE(1560000000, 1, 65, 1, 1, 1, 0),
-> +	RK3036_PLL_RATE(1536000000, 1, 64, 1, 1, 1, 0),
-> +	RK3036_PLL_RATE(1512000000, 1, 63, 1, 1, 1, 0),
-> +	RK3036_PLL_RATE(1488000000, 1, 62, 1, 1, 1, 0),
-> +	RK3036_PLL_RATE(1464000000, 1, 61, 1, 1, 1, 0),
-> +	RK3036_PLL_RATE(1440000000, 1, 60, 1, 1, 1, 0),
-> +	RK3036_PLL_RATE(1416000000, 1, 59, 1, 1, 1, 0),
-> +	RK3036_PLL_RATE(1392000000, 1, 58, 1, 1, 1, 0),
-> +	RK3036_PLL_RATE(1368000000, 1, 57, 1, 1, 1, 0),
-> +	RK3036_PLL_RATE(1344000000, 1, 56, 1, 1, 1, 0),
-> +	RK3036_PLL_RATE(1320000000, 1, 55, 1, 1, 1, 0),
-> +	RK3036_PLL_RATE(1296000000, 1, 54, 1, 1, 1, 0),
-> +	RK3036_PLL_RATE(1272000000, 1, 53, 1, 1, 1, 0),
-> +	RK3036_PLL_RATE(1248000000, 1, 52, 1, 1, 1, 0),
-> +	RK3036_PLL_RATE(1200000000, 1, 50, 1, 1, 1, 0),
-> +	RK3036_PLL_RATE(1188000000, 2, 99, 1, 1, 1, 0),
-> +	RK3036_PLL_RATE(1104000000, 1, 46, 1, 1, 1, 0),
-> +	RK3036_PLL_RATE(1100000000, 12, 550, 1, 1, 1, 0),
-> +	RK3036_PLL_RATE(1008000000, 1, 84, 2, 1, 1, 0),
-> +	RK3036_PLL_RATE(1000000000, 6, 500, 2, 1, 1, 0),
-> +	RK3036_PLL_RATE( 984000000, 1, 82, 2, 1, 1, 0),
-> +	RK3036_PLL_RATE( 960000000, 1, 80, 2, 1, 1, 0),
-> +	RK3036_PLL_RATE( 936000000, 1, 78, 2, 1, 1, 0),
-> +	RK3036_PLL_RATE( 912000000, 1, 76, 2, 1, 1, 0),
-> +	RK3036_PLL_RATE( 900000000, 4, 300, 2, 1, 1, 0),
-> +	RK3036_PLL_RATE( 888000000, 1, 74, 2, 1, 1, 0),
-> +	RK3036_PLL_RATE( 864000000, 1, 72, 2, 1, 1, 0),
-> +	RK3036_PLL_RATE( 840000000, 1, 70, 2, 1, 1, 0),
-> +	RK3036_PLL_RATE( 816000000, 1, 68, 2, 1, 1, 0),
-> +	RK3036_PLL_RATE( 800000000, 6, 400, 2, 1, 1, 0),
-> +	RK3036_PLL_RATE( 700000000, 6, 350, 2, 1, 1, 0),
-> +	RK3036_PLL_RATE( 696000000, 1, 58, 2, 1, 1, 0),
-> +	RK3036_PLL_RATE( 600000000, 1, 75, 3, 1, 1, 0),
-> +	RK3036_PLL_RATE( 594000000, 2, 99, 2, 1, 1, 0),
-> +	RK3036_PLL_RATE( 504000000, 1, 63, 3, 1, 1, 0),
-> +	RK3036_PLL_RATE( 500000000, 6, 250, 2, 1, 1, 0),
-> +	RK3036_PLL_RATE( 408000000, 1, 68, 2, 2, 1, 0),
-> +	RK3036_PLL_RATE( 312000000, 1, 52, 2, 2, 1, 0),
-> +	RK3036_PLL_RATE( 216000000, 1, 72, 4, 2, 1, 0),
-> +	RK3036_PLL_RATE(  96000000, 1, 64, 4, 4, 1, 0),
-> +	{ /* sentinel */ },
-> +};
-> +
-> +#define RK3228_DIV_CPU_MASK		0x1f
-> +#define RK3228_DIV_CPU_SHIFT		8
-> +
-> +#define RK3228_DIV_PERI_MASK		0xf
-> +#define RK3228_DIV_PERI_SHIFT		0
-> +#define RK3228_DIV_ACLK_MASK		0x7
-> +#define RK3228_DIV_ACLK_SHIFT		4
-> +#define RK3228_DIV_HCLK_MASK		0x3
-> +#define RK3228_DIV_HCLK_SHIFT		8
-> +#define RK3228_DIV_PCLK_MASK		0x7
-> +#define RK3228_DIV_PCLK_SHIFT		12
-> +
-> +#define RK3228_CLKSEL1(_core_peri_div)					\
-> +	{									\
-> +		.reg = RK2928_CLKSEL_CON(1),					\
-> +		.val = HIWORD_UPDATE(_core_peri_div, RK3228_DIV_PERI_MASK,	\
-> +				RK3228_DIV_PERI_SHIFT)				\
-> +	}
-> +
-> +#define RK3228_CPUCLK_RATE(_prate, _core_peri_div)			\
-> +	{								\
-> +		.prate = _prate,					\
-> +		.divs = {						\
-> +			RK3228_CLKSEL1(_core_peri_div),		\
-> +		},							\
-> +	}
-> +
-> +static struct rockchip_cpuclk_rate_table rk3228_cpuclk_rates[] __initdata = {
-> +	RK3228_CPUCLK_RATE(816000000, 4),
-> +	RK3228_CPUCLK_RATE(600000000, 4),
-> +	RK3228_CPUCLK_RATE(312000000, 4),
-> +};
-> +
-> +static const struct rockchip_cpuclk_reg_data rk3228_cpuclk_data = {
-> +	.core_reg = RK2928_CLKSEL_CON(0),
-> +	.div_core_shift = 0,
-> +	.div_core_mask = 0x1f,
-> +	.mux_core_shift = 6,
-> +};
-> +
-> +PNAME(mux_pll_p)		= { "clk_24m", "xin24m" };
-> +
-> +PNAME(mux_ddrphy_p)		= { "dpll_ddr", "gpll_ddr", "apll_ddr" };
-> +PNAME(mux_armclk_p)		= { "apll_core", "gpll_core", "dpll_core" };
-> +PNAME(mux_usb480m_phy_p)	= { "usb480m_phy0", "usb480m_phy1" };
-> +PNAME(mux_usb480m_p)		= { "usb480m_phy", "xin24m" };
-> +PNAME(mux_hdmiphy_p)		= { "hdmiphy_phy", "xin24m" };
-> +PNAME(mux_aclk_cpu_src_p)	= { "cpll_aclk_cpu", "gpll_aclk_cpu", "hdmiphy_aclk_cpu" };
-> +
-> +PNAME(mux_pll_src_4plls_p)	= { "cpll", "gpll", "hdmiphy" "usb480m" };
-> +PNAME(mux_pll_src_3plls_p)	= { "cpll", "gpll", "hdmiphy" };
-> +PNAME(mux_pll_src_2plls_p)	= { "cpll", "gpll" };
-> +PNAME(mux_sclk_hdmi_cec_p)	= { "cpll", "gpll", "xin24m" };
-> +PNAME(mux_aclk_peri_src_p)	= { "cpll", "gpll", "hdmiphy" };
+> (and please don't forget to cc stable)
 
-isn't that the same as your mux_pll_src_3plls_p?
+I've decided to do a more in-depth fix, so that we also solve the issue
+that when we schedule in these down_read()s, we don't leak the permissive
+domain register setting into the switched-to context.
 
+Can you test this patch please?  Thanks.
 
-> +PNAME(mux_mmc_src_p)		= { "cpll", "gpll", "xin24m", "usb480m" };
-> +PNAME(mux_pll_src_cpll_gpll_usb480m_p)	= { "cpll", "gpll", "usb480m" };
-> +
-> +PNAME(mux_sclk_rga_p)		= { "gpll", "cpll", "sclk_rga_src" };
-> +
-> +PNAME(mux_sclk_vop_src_p)	= { "gpll_vop", "cpll_vop" };
-> +PNAME(mux_dclk_vop_p)		= { "hdmiphy", "sclk_vop_pre" };
-> +
-> +PNAME(mux_i2s0_p)		= { "i2s0_src", "i2s0_frac", "ext_i2s", "xin12m" };
-> +PNAME(mux_i2s1_pre_p)		= { "i2s1_src", "i2s1_frac", "ext_i2s", "xin12m" };
-> +PNAME(mux_i2s_out_p)		= { "i2s1_pre", "xin12m" };
-> +PNAME(mux_i2s2_p)		= { "i2s2_src", "i2s2_frac", "xin12m" };
-> +PNAME(mux_sclk_spdif_p)		= { "sclk_spdif_src", "spdif_frac", "xin12m" };
-> +
-> +PNAME(mux_aclk_gpu_pre_p)	= { "cpll_gpu", "gpll_gpu", "hdmiphy_gpu", "usb480m_gpu" };
-> +
-> +PNAME(mux_uart0_p)		= { "uart0_src", "uart0_frac", "xin24m" };
-> +PNAME(mux_uart1_p)		= { "uart1_src", "uart1_frac", "xin24m" };
-> +PNAME(mux_uart2_p)		= { "uart2_src", "uart2_frac", "xin24m" };
-> +
-> +PNAME(mux_sclk_macphy_50m_p)	= { "ext_gmac", "phy_50m_out" };
-> +PNAME(mux_sclk_gmac_pre_p)	= { "sclk_gmac_src", "sclk_macphy_50m" };
-> +PNAME(mux_sclk_macphy_p)	= { "sclk_gmac_src", "ext_gmac" };
-> +
-> +static struct rockchip_pll_clock rk3228_pll_clks[] __initdata = {
-> +	[apll] = PLL(pll_rk3036, PLL_APLL, "apll", mux_pll_p, 0, RK2928_PLL_CON(0),
-> +		     RK2928_MODE_CON, 0, 7, 0, rk3228_pll_rates),
-> +	[dpll] = PLL(pll_rk3036, PLL_DPLL, "dpll", mux_pll_p, 0, RK2928_PLL_CON(3),
-> +		     RK2928_MODE_CON, 4, 6, 0, NULL),
-> +	[cpll] = PLL(pll_rk3036, PLL_CPLL, "cpll", mux_pll_p, 0, RK2928_PLL_CON(6),
-> +		     RK2928_MODE_CON, 8, 8, 0, NULL),
-> +	[gpll] = PLL(pll_rk3036, PLL_GPLL, "gpll", mux_pll_p, 0, RK2928_PLL_CON(9),
-> +		     RK2928_MODE_CON, 12, 9, ROCKCHIP_PLL_SYNC_RATE, rk3228_pll_rates),
-> +};
-> +
-> +#define MFLAGS CLK_MUX_HIWORD_MASK
-> +#define DFLAGS CLK_DIVIDER_HIWORD_MASK
-> +#define GFLAGS (CLK_GATE_HIWORD_MASK | CLK_GATE_SET_TO_DISABLE)
-> +
-> +static struct rockchip_clk_branch rk3228_clk_branches[] __initdata = {
-> +	/*
-> +	 * Clock-Architecture Diagram 1
-> +	 */
-> +
-> +	DIV(0, "clk_24m", "xin24m", CLK_IGNORE_UNUSED,
-> +			RK2928_CLKSEL_CON(4), 8, 5, DFLAGS),
-> +
-> +	/* PD_DDR */
-> +	GATE(0, "apll_ddr", "apll", CLK_IGNORE_UNUSED,
-> +			RK2928_CLKGATE_CON(0), 2, GFLAGS),
-> +	GATE(0, "dpll_ddr", "dpll", CLK_IGNORE_UNUSED,
-> +			RK2928_CLKGATE_CON(0), 2, GFLAGS),
-> +	GATE(0, "gpll_ddr", "gpll", CLK_IGNORE_UNUSED,
-> +			RK2928_CLKGATE_CON(0), 2, GFLAGS),
-> +	COMPOSITE(0, "ddrphy4x", mux_ddrphy_p, CLK_IGNORE_UNUSED,
-> +			RK2928_CLKSEL_CON(26), 8, 2, MFLAGS,
-> +			0, 2, DFLAGS | CLK_DIVIDER_POWER_OF_TWO,
-> +			RK2928_CLKGATE_CON(7), 1, GFLAGS),
+8<====
+Subject: [PATCH] ARM: fix uaccess_with_memcpy() with SW_DOMAIN_PAN
 
-please keep the formatting the same as in the other clock drivers, as it
-makes reading this later easier when everything is always in the same place:
+The uaccess_with_memcpy() code is currently incompatible with the SW
+PAN code: it takes locks within the region that we've changed the DACR,
+potentially sleeping as a result.  As we do not save and restore the
+DACR across co-operative sleep events, can lead to an incorrect DACR
+value later in this code path.
 
-+	COMPOSITE(0, "ddrphy4x", mux_ddrphy_p, CLK_IGNORE_UNUSED,
-+			RK2928_CLKSEL_CON(26), 8, 2, MFLAGS, 0, 2, DFLAGS | CLK_DIVIDER_POWER_OF_TWO,
-+			RK2928_CLKGATE_CON(7), 1, GFLAGS),
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/include/asm/uaccess.h     |  4 ++++
+ arch/arm/lib/uaccess_with_memcpy.c | 29 +++++++++++++++++++++++------
+ 2 files changed, 27 insertions(+), 6 deletions(-)
 
-We're "flexible" with the 80col limit for this ;-)
+diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
+index 8cc85a4ebec2..35c9db857ebe 100644
+--- a/arch/arm/include/asm/uaccess.h
++++ b/arch/arm/include/asm/uaccess.h
+@@ -510,10 +510,14 @@ __copy_to_user_std(void __user *to, const void *from, unsigned long n);
+ static inline unsigned long __must_check
+ __copy_to_user(void __user *to, const void *from, unsigned long n)
+ {
++#ifndef CONFIG_UACCESS_WITH_MEMCPY
+ 	unsigned int __ua_flags = uaccess_save_and_enable();
+ 	n = arm_copy_to_user(to, from, n);
+ 	uaccess_restore(__ua_flags);
+ 	return n;
++#else
++	return arm_copy_to_user(to, from, n);
++#endif
+ }
+ 
+ extern unsigned long __must_check
+diff --git a/arch/arm/lib/uaccess_with_memcpy.c b/arch/arm/lib/uaccess_with_memcpy.c
+index d72b90905132..588bbc288396 100644
+--- a/arch/arm/lib/uaccess_with_memcpy.c
++++ b/arch/arm/lib/uaccess_with_memcpy.c
+@@ -88,6 +88,7 @@ pin_page_for_write(const void __user *_addr, pte_t **ptep, spinlock_t **ptlp)
+ static unsigned long noinline
+ __copy_to_user_memcpy(void __user *to, const void *from, unsigned long n)
+ {
++	unsigned long ua_flags;
+ 	int atomic;
+ 
+ 	if (unlikely(segment_eq(get_fs(), KERNEL_DS))) {
+@@ -118,7 +119,9 @@ __copy_to_user_memcpy(void __user *to, const void *from, unsigned long n)
+ 		if (tocopy > n)
+ 			tocopy = n;
+ 
++		ua_flags = uaccess_save_and_enable();
+ 		memcpy((void *)to, from, tocopy);
++		uaccess_restore(ua_flags);
+ 		to += tocopy;
+ 		from += tocopy;
+ 		n -= tocopy;
+@@ -145,14 +148,21 @@ arm_copy_to_user(void __user *to, const void *from, unsigned long n)
+ 	 * With frame pointer disabled, tail call optimization kicks in
+ 	 * as well making this test almost invisible.
+ 	 */
+-	if (n < 64)
+-		return __copy_to_user_std(to, from, n);
+-	return __copy_to_user_memcpy(to, from, n);
++	if (n < 64) {
++		unsigned long ua_flags = uaccess_save_and_enable();
++		n = __copy_to_user_std(to, from, n);
++		uaccess_restore(ua_flags);
++	} else {
++		n = __copy_to_user_memcpy(to, from, n);
++	}
++	return n;
+ }
+ 	
+ static unsigned long noinline
+ __clear_user_memset(void __user *addr, unsigned long n)
+ {
++	unsigned long ua_flags;
++
+ 	if (unlikely(segment_eq(get_fs(), KERNEL_DS))) {
+ 		memset((void *)addr, 0, n);
+ 		return 0;
+@@ -175,7 +185,9 @@ __clear_user_memset(void __user *addr, unsigned long n)
+ 		if (tocopy > n)
+ 			tocopy = n;
+ 
++		ua_flags = uaccess_save_and_enable();
+ 		memset((void *)addr, 0, tocopy);
++		uaccess_restore(ua_flags);
+ 		addr += tocopy;
+ 		n -= tocopy;
+ 
+@@ -193,9 +205,14 @@ __clear_user_memset(void __user *addr, unsigned long n)
+ unsigned long arm_clear_user(void __user *addr, unsigned long n)
+ {
+ 	/* See rational for this in __copy_to_user() above. */
+-	if (n < 64)
+-		return __clear_user_std(addr, n);
+-	return __clear_user_memset(addr, n);
++	if (n < 64) {
++		unsigned long ua_flags = uaccess_save_and_enable();
++		n = __clear_user_std(addr, n);
++		uaccess_restore(ua_flags);
++	} else {
++		n = __clear_user_memset(addr, n);
++	}
++	return n;
+ }
+ 
+ #if 0
+-- 
+2.1.0
 
-
-> +
-> +	/* PD_CORE */
-> +	GATE(0, "dpll_core", "dpll", CLK_IGNORE_UNUSED,
-> +			RK2928_CLKGATE_CON(0), 6, GFLAGS),
-> +	GATE(0, "apll_core", "apll", CLK_IGNORE_UNUSED,
-> +			RK2928_CLKGATE_CON(0), 6, GFLAGS),
-> +	GATE(0, "gpll_core", "gpll", CLK_IGNORE_UNUSED,
-> +			RK2928_CLKGATE_CON(0), 6, GFLAGS),
-> +	COMPOSITE_NOMUX(0, "pclk_dbg", "armclk", CLK_IGNORE_UNUSED,
-> +			RK2928_CLKSEL_CON(1), 0, 4, DFLAGS | CLK_DIVIDER_READ_ONLY,
-> +			RK2928_CLKGATE_CON(4), 1, GFLAGS),
-> +	COMPOSITE_NOMUX(0, "armcore", "armclk", CLK_IGNORE_UNUSED,
-> +			RK2928_CLKSEL_CON(1), 4, 3, DFLAGS | CLK_DIVIDER_READ_ONLY,
-> +			RK2928_CLKGATE_CON(4), 0, GFLAGS),
-> +
-> +	/* PD_MISC */
-> +	MUX(0, "hdmiphy", mux_hdmiphy_p, CLK_SET_RATE_PARENT,
-> +			RK2928_MISC_CON, 13, 1, MFLAGS),
-> +	MUX(0, "usb480m_phy", mux_usb480m_phy_p, CLK_SET_RATE_PARENT,
-> +			RK2928_MISC_CON, 14, 1, MFLAGS),
-> +	MUX(0, "usb480m", mux_usb480m_p, CLK_SET_RATE_PARENT,
-> +			RK2928_MISC_CON, 15, 1, MFLAGS),
-> +
-> +	/* PD_BUS */
-> +	GATE(0, "hdmiphy_aclk_cpu", "hdmiphy", CLK_IGNORE_UNUSED,
-> +			RK2928_CLKGATE_CON(0), 1, GFLAGS),
-> +	GATE(0, "gpll_aclk_cpu", "gpll", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(0), 1, GFLAGS),
-> +	GATE(0, "cpll_aclk_cpu", "cpll", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(0), 1, GFLAGS),
-> +	COMPOSITE_NOGATE(0, "aclk_cpu_src", mux_aclk_cpu_src_p, 0,
-> +			RK2928_CLKSEL_CON(0), 13, 2, MFLAGS, 8, 5, DFLAGS),
-> +	GATE(ARMCLK, "aclk_cpu", "aclk_cpu_src", 0,
-> +			RK2928_CLKGATE_CON(6), 0, GFLAGS),
-> +	COMPOSITE_NOMUX(0, "hclk_cpu", "aclk_cpu_src", 0,
-> +			RK2928_CLKSEL_CON(1), 8, 2, DFLAGS,
-> +			RK2928_CLKGATE_CON(6), 1, GFLAGS),
-> +	COMPOSITE_NOMUX(0, "pclk_bus_src", "aclk_cpu_src", 0,
-> +			RK2928_CLKSEL_CON(1), 12, 3, DFLAGS,
-> +			RK2928_CLKGATE_CON(6), 2, GFLAGS),
-> +	GATE(0, "pclk_cpu", "pclk_bus_src", 0,
-> +			RK2928_CLKGATE_CON(6), 3, GFLAGS),
-> +	GATE(0, "pclk_phy_pre", "pclk_bus_src", 0,
-> +			RK2928_CLKGATE_CON(6), 4, GFLAGS),
-> +	GATE(0, "pclk_ddr_pre", "pclk_bus_src", 0,
-> +			RK2928_CLKGATE_CON(6), 13, GFLAGS),
-> +
-> +	/* PD_VIDEO */
-> +	COMPOSITE(0, "aclk_vpu_pre", mux_pll_src_4plls_p, 0,
-> +			RK2928_CLKSEL_CON(32), 5, 2, MFLAGS,
-> +			0, 5, DFLAGS, RK2928_CLKGATE_CON(3), 11, GFLAGS),
-> +	GATE(0, "hclk_vpu_src", "aclk_vpu_pre", 0,
-> +			RK2928_CLKGATE_CON(4), 4, GFLAGS),
-> +
-> +	COMPOSITE(0, "aclk_rkvdec_pre", mux_pll_src_4plls_p, 0,
-> +			RK2928_CLKSEL_CON(28), 6, 2, MFLAGS,
-> +			0, 5, DFLAGS, RK2928_CLKGATE_CON(3), 2, GFLAGS),
-> +	GATE(0, "hclk_rkvdec_src", "aclk_rkvdec_pre", 0,
-> +			RK2928_CLKGATE_CON(4), 5, GFLAGS),
-> +
-> +	COMPOSITE(0, "sclk_vdec_cabac", mux_pll_src_4plls_p, 0,
-> +			RK2928_CLKSEL_CON(28), 14, 2, MFLAGS,
-> +			0, 5, DFLAGS, RK2928_CLKGATE_CON(3), 3, GFLAGS),
-> +
-> +	COMPOSITE(0, "sclk_vdec_core", mux_pll_src_4plls_p, 0,
-> +			RK2928_CLKSEL_CON(34), 13, 2, MFLAGS,
-> +			8, 5, DFLAGS, RK2928_CLKGATE_CON(3), 4, GFLAGS),
-> +
-> +	/* PD_VIO */
-> +	COMPOSITE(0, "aclk_iep_pre", mux_pll_src_4plls_p, 0,
-> +			RK2928_CLKSEL_CON(31), 5, 2, MFLAGS,
-> +			0, 5, DFLAGS, RK2928_CLKGATE_CON(3), 0, GFLAGS),
-> +	DIV(0, "hclk_vio_pre", "aclk_iep_pre", 0,
-> +			RK2928_CLKSEL_CON(2), 0, 5, DFLAGS),
-> +
-> +	COMPOSITE(0, "aclk_hdcp_pre", mux_pll_src_4plls_p, 0,
-> +			RK2928_CLKSEL_CON(31), 13, 2, MFLAGS,
-> +			8, 5, DFLAGS, RK2928_CLKGATE_CON(1), 4, GFLAGS),
-> +
-> +	MUX(0, "sclk_rga_src", mux_pll_src_4plls_p, 0,
-> +			RK2928_CLKSEL_CON(33), 13, 2, MFLAGS),
-> +	COMPOSITE_NOMUX(0, "aclk_rga_pre", "sclk_rga_src", 0,
-> +			RK2928_CLKSEL_CON(33), 8, 5, DFLAGS,
-> +			RK2928_CLKGATE_CON(1), 2, GFLAGS),
-> +	COMPOSITE(0, "sclk_rga", mux_sclk_rga_p, 0,
-> +			RK2928_CLKSEL_CON(22), 5, 2, MFLAGS,
-> +			0, 5, DFLAGS, RK2928_CLKGATE_CON(3), 6, GFLAGS),
-> +
-> +	COMPOSITE(0, "aclk_vop_pre", mux_pll_src_4plls_p, 0,
-> +			RK2928_CLKSEL_CON(33), 5, 2, MFLAGS,
-> +			0, 5, DFLAGS, RK2928_CLKGATE_CON(1), 1, GFLAGS),
-> +
-> +	COMPOSITE(0, "sclk_hdcp", mux_pll_src_3plls_p, 0,
-> +			RK2928_CLKSEL_CON(23), 14, 2, MFLAGS,
-> +			8, 6, DFLAGS, RK2928_CLKGATE_CON(3), 5, GFLAGS),
-> +
-> +	GATE(0, "sclk_hdmi_hdcp", "xin24m", 0,
-> +			RK2928_CLKGATE_CON(3), 7, GFLAGS),
-> +
-> +	COMPOSITE(0, "sclk_hdmi_cec", mux_sclk_hdmi_cec_p, 0,
-> +			RK2928_CLKSEL_CON(21), 14, 2, MFLAGS,
-> +			0, 14, DFLAGS, RK2928_CLKGATE_CON(3), 8, GFLAGS),
-> +
-> +	/* PD_PERI */
-> +	GATE(0, "cpll_peri", "cpll", CLK_IGNORE_UNUSED,
-> +			RK2928_CLKGATE_CON(2), 0, GFLAGS),
-> +	GATE(0, "gpll_peri", "gpll", CLK_IGNORE_UNUSED,
-> +			RK2928_CLKGATE_CON(2), 0, GFLAGS),
-> +	GATE(0, "hdmiphy_peri", "hdmiphy", CLK_IGNORE_UNUSED,
-> +			RK2928_CLKGATE_CON(2), 0, GFLAGS),
-> +	COMPOSITE_NOGATE(0, "aclk_peri_src", mux_aclk_peri_src_p, 0,
-> +			RK2928_CLKSEL_CON(10), 10, 2, MFLAGS, 0, 5, DFLAGS),
-> +	COMPOSITE_NOMUX(PCLK_PERI, "pclk_peri", "aclk_peri_src", 0,
-> +			RK2928_CLKSEL_CON(10), 12, 3, DFLAGS,
-> +			RK2928_CLKGATE_CON(5), 2, GFLAGS),
-> +	COMPOSITE_NOMUX(HCLK_PERI, "hclk_peri", "aclk_peri_src", 0,
-> +			RK2928_CLKSEL_CON(10), 8, 3, DFLAGS,
-> +			RK2928_CLKGATE_CON(5), 1, GFLAGS),
-> +	GATE(ACLK_PERI, "aclk_peri", "aclk_peri_src", 0,
-> +			RK2928_CLKGATE_CON(5), 0, GFLAGS),
-> +
-> +	GATE(SCLK_TIMER0, "sclk_timer0", "xin24m", 0,
-> +			RK2928_CLKGATE_CON(6), 5, GFLAGS),
-> +	GATE(SCLK_TIMER1, "sclk_timer1", "xin24m", 0,
-> +			RK2928_CLKGATE_CON(6), 6, GFLAGS),
-> +	GATE(SCLK_TIMER2, "sclk_timer2", "xin24m", 0,
-> +			RK2928_CLKGATE_CON(6), 7, GFLAGS),
-> +	GATE(SCLK_TIMER3, "sclk_timer3", "xin24m", 0,
-> +			RK2928_CLKGATE_CON(6), 8, GFLAGS),
-> +	GATE(SCLK_TIMER4, "sclk_timer4", "xin24m", 0,
-> +			RK2928_CLKGATE_CON(6), 9, GFLAGS),
-> +	GATE(SCLK_TIMER5, "sclk_timer5", "xin24m", 0,
-> +			RK2928_CLKGATE_CON(6), 10, GFLAGS),
-> +
-> +	COMPOSITE(0, "sclk_crypto", mux_pll_src_2plls_p, 0,
-> +			RK2928_CLKSEL_CON(24), 5, 1, MFLAGS,
-> +			0, 5, DFLAGS, RK2928_CLKGATE_CON(2), 7, GFLAGS),
-> +
-> +	GATE(0, "sclk_hsadc", "ext_hsadc", 0,
-> +			RK3288_CLKGATE_CON(10), 12, GFLAGS),
-> +
-> +	COMPOSITE(0, "sclk_wifi", mux_pll_src_cpll_gpll_usb480m_p, 0,
-> +			RK2928_CLKSEL_CON(23), 5, 2, MFLAGS,
-> +			0, 6, DFLAGS, RK2928_CLKGATE_CON(2), 15, GFLAGS),
-> +
-> +	COMPOSITE(SCLK_SDMMC, "sclk_sdmmc0", mux_mmc_src_p, 0,
-> +			RK2928_CLKSEL_CON(11), 8, 2, MFLAGS,
-> +			0, 8, DFLAGS, RK2928_CLKGATE_CON(2), 11, GFLAGS),
-> +
-> +	COMPOSITE_NODIV(0, "sclk_sdio_src", mux_mmc_src_p, 0,
-> +			RK2928_CLKSEL_CON(11), 10, 2, DFLAGS,
-> +			RK2928_CLKGATE_CON(2), 13, GFLAGS),
-> +	DIV(SCLK_SDIO, "sclk_sdio", "sclk_sdio_src", 0,
-> +			RK2928_CLKSEL_CON(12), 0, 8, DFLAGS),
-> +
-> +	COMPOSITE_NODIV(0, "sclk_emmc_src", mux_mmc_src_p, 0,
-> +			RK2928_CLKSEL_CON(11), 12, 2, DFLAGS,
-> +			RK2928_CLKGATE_CON(2), 14, GFLAGS),
-> +	DIV(SCLK_EMMC, "sclk_emmc", "sclk_emmc_src", 0,
-> +			RK2928_CLKSEL_CON(12), 8, 8, DFLAGS),
-> +
-> +	/*
-> +	 * Clock-Architecture Diagram 2
-> +	 */
-> +
-> +	GATE(0, "gpll_vop", "gpll", 0,
-> +			RK2928_CLKGATE_CON(3), 1, GFLAGS),
-> +	GATE(0, "cpll_vop", "cpll", 0,
-> +			RK2928_CLKGATE_CON(3), 1, GFLAGS),
-> +	MUX(0, "sclk_vop_src", mux_sclk_vop_src_p, 0,
-> +			RK2928_CLKSEL_CON(27), 0, 1, MFLAGS),
-> +	DIV(0, "dclk_hdmiphy", "sclk_vop_src", 0,
-> +			RK2928_CLKSEL_CON(29), 0, 3, DFLAGS),
-> +	DIV(0, "sclk_vop_pre", "sclk_vop_src", 0,
-> +			RK2928_CLKSEL_CON(27), 8, 8, DFLAGS),
-> +	MUX(0, "dclk_vop", mux_dclk_vop_p, 0,
-> +			RK2928_CLKSEL_CON(27), 1, 1, MFLAGS),
-> +
-> +	COMPOSITE(0, "i2s0_src", mux_pll_src_2plls_p, 0,
-> +			RK2928_CLKSEL_CON(9), 15, 1, MFLAGS,
-> +			0, 7, DFLAGS, RK2928_CLKGATE_CON(0), 3, GFLAGS),
-> +	COMPOSITE_FRAC(0, "i2s0_frac", "i2s0_src", CLK_SET_RATE_PARENT,
-> +			RK3288_CLKSEL_CON(8), 0,
-> +			RK3288_CLKGATE_CON(0), 4, GFLAGS),
-> +	COMPOSITE_NODIV(SCLK_I2S0, "sclk_i2s0", mux_i2s0_p, 0,
-> +			RK2928_CLKSEL_CON(9), 8, 2, DFLAGS,
-> +			RK2928_CLKGATE_CON(0), 5, GFLAGS),
-> +
-> +	COMPOSITE(0, "i2s1_src", mux_pll_src_2plls_p, 0,
-> +			RK2928_CLKSEL_CON(3), 15, 1, MFLAGS,
-> +			0, 7, DFLAGS, RK2928_CLKGATE_CON(0), 10, GFLAGS),
-> +	COMPOSITE_FRAC(0, "i2s1_frac", "i2s1_src", CLK_SET_RATE_PARENT,
-> +			RK3288_CLKSEL_CON(7), 0,
-> +			RK3288_CLKGATE_CON(0), 11, GFLAGS),
-> +	MUX(0, "i2s1_pre", mux_i2s1_pre_p, 0,
-> +			RK2928_CLKSEL_CON(3), 8, 2, MFLAGS),
-> +	GATE(SCLK_I2S1, "sclk_i2s1", "i2s1_pre", 0,
-> +			RK2928_CLKGATE_CON(0), 14, GFLAGS),
-> +	COMPOSITE_NODIV(SCLK_I2S_OUT, "i2s_out", mux_i2s_out_p, 0,
-> +			RK2928_CLKSEL_CON(3), 12, 1, DFLAGS,
-> +			RK2928_CLKGATE_CON(0), 13, GFLAGS),
-> +
-> +	COMPOSITE(0, "i2s2_src", mux_pll_src_2plls_p, 0,
-> +			RK2928_CLKSEL_CON(16), 15, 1, MFLAGS,
-> +			0, 7, DFLAGS, RK2928_CLKGATE_CON(0), 7, GFLAGS),
-> +	COMPOSITE_FRAC(0, "i2s2_frac", "i2s2_src", CLK_SET_RATE_PARENT,
-> +			RK3288_CLKSEL_CON(30), 0,
-> +			RK3288_CLKGATE_CON(0), 8, GFLAGS),
-> +	COMPOSITE_NODIV(SCLK_I2S2, "sclk_i2s2", mux_i2s2_p, 0,
-> +			RK2928_CLKSEL_CON(16), 8, 2, DFLAGS,
-> +			RK2928_CLKGATE_CON(0), 9, GFLAGS),
-> +
-> +	COMPOSITE(0, "sclk_spdif_src", mux_pll_src_2plls_p, 0,
-> +			RK2928_CLKSEL_CON(6), 15, 1, MFLAGS,
-> +			0, 7, DFLAGS, RK2928_CLKGATE_CON(2), 10, GFLAGS),
-> +	COMPOSITE_FRAC(0, "spdif_frac", "sclk_spdif_src", CLK_SET_RATE_PARENT,
-> +			RK3288_CLKSEL_CON(20), 0,
-> +			RK3288_CLKGATE_CON(2), 12, GFLAGS),
-> +	MUX(SCLK_SPDIF, "sclk_spdif", mux_sclk_spdif_p, 0,
-> +			RK2928_CLKSEL_CON(6), 8, 2, MFLAGS),
-> +
-> +	GATE(0, "jtag", "ext_jtag", 0,
-> +			RK2928_CLKGATE_CON(1), 3, GFLAGS),
-> +
-> +	GATE(0, "sclk_otgphy0", "xin24m", 0,
-> +			RK2928_CLKGATE_CON(1), 5, GFLAGS),
-> +	GATE(0, "sclk_otgphy1", "xin24m", 0,
-> +			RK2928_CLKGATE_CON(1), 6, GFLAGS),
-> +
-> +	COMPOSITE_NOMUX(0, "sclk_tsadc", "xin24m", 0,
-> +			RK2928_CLKSEL_CON(24), 6, 10, DFLAGS,
-> +			RK2928_CLKGATE_CON(2), 8, GFLAGS),
-> +
-> +	GATE(0, "cpll_gpu", "cpll", 0,
-> +			RK2928_CLKGATE_CON(3), 13, GFLAGS),
-> +	GATE(0, "gpll_gpu", "gpll", 0,
-> +			RK2928_CLKGATE_CON(3), 13, GFLAGS),
-> +	GATE(0, "hdmiphy_gpu", "hdmiphy", 0,
-> +			RK2928_CLKGATE_CON(3), 13, GFLAGS),
-> +	GATE(0, "usb480m_gpu", "usb480m", 0,
-> +			RK2928_CLKGATE_CON(3), 13, GFLAGS),
-> +	COMPOSITE_NOGATE(0, "aclk_gpu_pre", mux_aclk_gpu_pre_p, 0,
-> +			RK2928_CLKSEL_CON(34), 5, 2, MFLAGS, 0, 5, DFLAGS),
-> +
-> +	COMPOSITE(SCLK_SPI0, "sclk_spi0", mux_pll_src_2plls_p, 0,
-> +			RK2928_CLKSEL_CON(25), 8, 1, MFLAGS,
-> +			0, 7, DFLAGS, RK2928_CLKGATE_CON(2), 9, GFLAGS),
-> +
-> +	/* PD_UART */
-> +	COMPOSITE(0, "uart0_src", mux_pll_src_cpll_gpll_usb480m_p, 0,
-> +			RK2928_CLKSEL_CON(13), 12, 2, MFLAGS,
-> +			0, 7, DFLAGS, RK2928_CLKGATE_CON(1), 8, GFLAGS),
-> +	COMPOSITE(0, "uart1_src", mux_pll_src_cpll_gpll_usb480m_p, 0,
-> +			RK2928_CLKSEL_CON(14), 12, 2, MFLAGS,
-> +			0, 7, DFLAGS, RK2928_CLKGATE_CON(1), 10, GFLAGS),
-> +	COMPOSITE(0, "uart2_src", mux_pll_src_cpll_gpll_usb480m_p,
-> +			0, RK2928_CLKSEL_CON(15), 12, 2,
-> +			MFLAGS, 0, 7, DFLAGS, RK2928_CLKGATE_CON(1), 12, GFLAGS),
-> +	COMPOSITE_FRAC(0, "uart0_frac", "uart0_src", CLK_SET_RATE_PARENT,
-> +			RK2928_CLKSEL_CON(17), 0,
-> +			RK2928_CLKGATE_CON(1), 9, GFLAGS),
-> +	COMPOSITE_FRAC(0, "uart1_frac", "uart1_src", CLK_SET_RATE_PARENT,
-> +			RK2928_CLKSEL_CON(18), 0,
-> +			RK2928_CLKGATE_CON(1), 11, GFLAGS),
-> +	COMPOSITE_FRAC(0, "uart2_frac", "uart2_src", CLK_SET_RATE_PARENT,
-> +			RK2928_CLKSEL_CON(19), 0,
-> +			RK2928_CLKGATE_CON(1), 13, GFLAGS),
-> +	MUX(SCLK_UART0, "sclk_uart0", mux_uart0_p, CLK_SET_RATE_PARENT,
-> +			RK2928_CLKSEL_CON(13), 8, 2, MFLAGS),
-> +	MUX(SCLK_UART1, "sclk_uart1", mux_uart1_p, CLK_SET_RATE_PARENT,
-> +			RK2928_CLKSEL_CON(14), 8, 2, MFLAGS),
-> +	MUX(SCLK_UART2, "sclk_uart2", mux_uart2_p, CLK_SET_RATE_PARENT,
-> +			RK2928_CLKSEL_CON(15), 8, 2, MFLAGS),
-> +
-> +	COMPOSITE(SCLK_NANDC, "sclk_nandc", mux_pll_src_2plls_p, 0,
-> +			RK2928_CLKSEL_CON(2), 14, 1, MFLAGS,
-> +			8, 5, DFLAGS, RK2928_CLKGATE_CON(1), 0, GFLAGS),
-> +
-> +	COMPOSITE(0, "sclk_gmac_src", mux_pll_src_2plls_p, 0,
-> +			RK2928_CLKSEL_CON(5), 7, 1, MFLAGS,
-> +			0, 5, DFLAGS, RK2928_CLKGATE_CON(1), 7, GFLAGS),
-> +	MUX(0, "sclk_macphy_50m", mux_sclk_macphy_50m_p, 0,
-> +			RK2928_CLKSEL_CON(29), 10, 1, MFLAGS),
-> +	MUX(0, "sclk_gmac_pre", mux_sclk_gmac_pre_p, 0,
-> +			RK2928_CLKSEL_CON(5), 5, 1, MFLAGS),
-> +	GATE(0, "sclk_mac_refout", "sclk_gmac_pre", 0,
-> +			RK2928_CLKGATE_CON(5), 4, GFLAGS),
-> +	GATE(0, "sclk_mac_ref", "sclk_gmac_pre", 0,
-> +			RK2928_CLKGATE_CON(5), 3, GFLAGS),
-> +	GATE(0, "sclk_mac_rx", "sclk_gmac_pre", 0,
-> +			RK2928_CLKGATE_CON(5), 5, GFLAGS),
-> +	GATE(0, "sclk_mac_tx", "sclk_gmac_pre", 0,
-> +			RK2928_CLKGATE_CON(5), 6, GFLAGS),
-> +	COMPOSITE(0, "sclk_macphy", mux_sclk_macphy_p, 0,
-> +			RK2928_CLKSEL_CON(29), 12, 1, MFLAGS,
-> +			8, 2, DFLAGS, RK2928_CLKGATE_CON(5), 7, GFLAGS),
-> +	COMPOSITE(0, "sclk_gmac_out", mux_pll_src_2plls_p, 0,
-> +			RK2928_CLKSEL_CON(5), 15, 1, MFLAGS,
-> +			8, 5, DFLAGS, RK2928_CLKGATE_CON(2), 2, GFLAGS),
-> +
-> +	/*
-> +	 * Clock-Architecture Diagram 3
-> +	 */
-> +
-> +	/* PD_VOP */
-> +	GATE(0, "aclk_rga", "aclk_rga_pre", 0,
-> +			RK2928_CLKGATE_CON(13), 0, GFLAGS),
-
-the simple gate clocks from this diagram 3 can be on one line, as they
-really are only a big number of simple gates.
-
-Again similar to how the other socs do it.
-
-
-> +	GATE(0, "aclk_rga_noc", "aclk_rga_pre", 0,
-> +			RK2928_CLKGATE_CON(13), 11, GFLAGS),
-> +	GATE(0, "aclk_iep", "aclk_iep_pre", 0,
-> +			RK2928_CLKGATE_CON(13), 2, GFLAGS),
-> +	GATE(0, "aclk_iep_noc", "aclk_iep_pre", 0,
-> +			RK2928_CLKGATE_CON(13), 9, GFLAGS),
-
-Otherwise this looks great
-
-Heiko
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently@9.6Mbps down 400kbps up
+according to speedtest.net.
