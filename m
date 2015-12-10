@@ -1,35 +1,44 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Wed, 09 Dec 2015 16:49:22 -0800
-Subject: [PATCH v12 05/16] arm64: Add back cpu_reset routines
-In-Reply-To: <20151203093212.GC7023@arm.com>
-References: <cover.1448403503.git.geoff@infradead.org>
- <3279584774ba40f088b79f4df864d69a5b57b516.1448403503.git.geoff@infradead.org>
- <56586679.8060403@arm.com> <20151130052843.GG23908@dhcppc13.redhat.com>
- <20151130104027.7eeaa273@why.wild-wind.fr.eu.org>
- <1449097050.6139.80.camel@infradead.org> <20151203093212.GC7023@arm.com>
-Message-ID: <1449708562.24127.39.camel@infradead.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 9 Dec 2015 16:56:09 -0800
+Subject: [PATCH 02/10] clk: ti: Add few dm814x clock aliases
+In-Reply-To: <5667DD77.2000900@ti.com>
+References: <1449013103-23238-1-git-send-email-tony@atomide.com>
+ <1449013103-23238-3-git-send-email-tony@atomide.com>
+ <20151208165732.GY23396@atomide.com> <56672ED0.4050405@ti.com>
+ <20151208201136.GZ23396@atomide.com> <5667DD77.2000900@ti.com>
+Message-ID: <20151210005609.GE23396@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-On Thu, 2015-12-03 at 09:32 +0000, Will Deacon wrote:
-> On Wed, Dec 02, 2015 at 02:57:30PM -0800, Geoff Levand wrote:
-> > On Mon, 2015-11-30 at 10:40 +0000, Marc Zyngier wrote:
-> > 
-> > > All that can be solved in C, and mostly at compile time. Using an
-> > > assembler trampoline is complicating things for no good reason:
-> > 
-> > I added this into my kexec-v12.1 branch.  After some more testing I'll
-> > post a v13 to the list.
+* Tero Kristo <t-kristo@ti.com> [151208 23:50]:
+> On 12/08/2015 10:11 PM, Tony Lindgren wrote:
+> >* Tero Kristo <t-kristo@ti.com> [151208 11:25]:
+> >>On 12/08/2015 06:57 PM, Tony Lindgren wrote:
+> >>>
+> >>>Anybody from the clock department care to ack this one?
+> >>
+> >>Sorry been rather busy lately...
+> >>
+> >>>I'd like to
+> >>>get this series into Linux next as it fixes some some issues.
+> >>
+> >>Yeah looks good to me, don't have access to dm814x so can't test.
+> >>
+> >>Acked-by: Tero Kristo <t-kristo@ti.com>
+> >
+> >Thanks.
+> >
+> >>Are you planning to push this via omap tree if this is critical for you?
+> >
+> >Yes this series needs to be merged in certain order to keep t410
+> >booting. Should not conflict with anything else AFAIK.
 > 
-> You may well need some notrace annotations if you want to run C code
-> here. Can you give it a spin with things like ftrace and kprobes?
+> Ok at least I am fine with that. The dm81xx clock alias file is pretty
+> independent of anything else.
 
-I tested ftrace with and without the notrace annotation on
-cpu_soft_restart() and could do kexec re-boots either way.
+Pushing this series except for the GPIO reset change into
+omap-for-v4.5/81xx-fixes.
 
-When cpu_soft_restart() is called we've only done setup_mm_for_reboot(),
-so I would think C code should still be OK.
+Regards,
 
--Geoff
+Tony
