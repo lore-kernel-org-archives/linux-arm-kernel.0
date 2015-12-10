@@ -1,22 +1,34 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 10 Dec 2015 16:17:41 +0100
-Subject: [PATCH] i2c: allow building emev2 without slave mode again
-In-Reply-To: <2592093.cGKEcKVqLU@wuerfel>
-References: <201512102224.cVm7Hcp0%fengguang.wu@intel.com>
- <2592093.cGKEcKVqLU@wuerfel>
-Message-ID: <20151210151741.GE1573@katana>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 10 Dec 2015 08:23:54 -0700
+Subject: [PATCH] coresight: Fix a typo in Kconfig
+In-Reply-To: <1449697147-5819-1-git-send-email-afd@ti.com>
+References: <1449697147-5819-1-git-send-email-afd@ti.com>
+Message-ID: <CANLsYkx8ORd44jDWA=jGrDt_UOnYw=WzOHDah3tBC+m7bEY93w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Alternatively, the  inline could return an error, and both bus
-> drivers check for the error before using 'value'.
+On 9 December 2015 at 14:39, Andrew F. Davis <afd@ti.com> wrote:
+> Signed-off-by: Andrew F. Davis <afd@ti.com>
+> ---
+>  drivers/hwtracing/coresight/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/hwtracing/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
+> index 6c89211..c85935f 100644
+> --- a/drivers/hwtracing/coresight/Kconfig
+> +++ b/drivers/hwtracing/coresight/Kconfig
+> @@ -8,7 +8,7 @@ menuconfig CORESIGHT
+>           This framework provides a kernel interface for the CoreSight debug
+>           and trace drivers to register themselves with. It's intended to build
+>           a topological view of the CoreSight components based on a DT
+> -         specification and configure the right serie of components when a
+> +         specification and configure the right series of components when a
+>           trace source gets enabled.
+>
+>  if CORESIGHT
+> --
+> 1.9.1
+>
 
-I'll try to check these options tomorrow.
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151210/7fcd5b3c/attachment.sig>
+Applied - thanks.
+Mathieu
