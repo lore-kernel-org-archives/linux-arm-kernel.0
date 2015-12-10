@@ -1,24 +1,32 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Thu, 10 Dec 2015 23:03:39 +0900
-Subject: [PATCH v8 5/4] arm64: Fix off-by-one in stack tracing when
- stepping off irq stack
-In-Reply-To: <1449742961-11432-1-git-send-email-james.morse@arm.com>
-References: <1449226948-14251-1-git-send-email-james.morse@arm.com>
- <1449742961-11432-1-git-send-email-james.morse@arm.com>
-Message-ID: <27C55C8D-A1FA-4DB3-AD06-DE2D32A97FEF@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 10 Dec 2015 14:08:40 +0000
+Subject: [RFC PATCH 04/20] arm64: mm: assume PAGE SIZE for page table
+ allocator
+In-Reply-To: <1449665095-20774-5-git-send-email-mark.rutland@arm.com>
+References: <1449665095-20774-1-git-send-email-mark.rutland@arm.com>
+ <1449665095-20774-5-git-send-email-mark.rutland@arm.com>
+Message-ID: <20151210140840.GE21134@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Dec 10, 2015, at 7:22 PM, James Morse wrote:
+On Wed, Dec 09, 2015 at 12:44:39PM +0000, Mark Rutland wrote:
+> We pass a size parameter to early_alloc and late_alloc, but these are
+> only ever used to allocate single pages. In late_alloc we always
+> allocate a single page.
+> 
+> Remove the redundant size parameter.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Jeremy Linton <jeremy.linton@arm.com>
+> Cc: Laura Abbott <labbott@fedoraproject.org>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/mm/mmu.c | 27 ++++++++++++---------------
+>  1 file changed, 12 insertions(+), 15 deletions(-)
 
-Hi James,
+Looks sensible to me. Cosmetic nit, but we could we rename these to
+early_page_alloc/late_page_alloc instead, please?
 
-> From: Jungseok Lee <jungseoklee85@gmail.com>
-
-I'm satisfied with spotting the frame->sp issue ;) According to for-next/core
-branch, Will have already worked on this change with an informative commit msg.
-
-Thanks for your care!
-
-Best Regards
-Jungseok Lee
+Will
