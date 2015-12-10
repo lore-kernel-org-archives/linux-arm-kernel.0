@@ -1,91 +1,126 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 10 Dec 2015 08:59:47 +0100
-Subject: [PATCH v4 03/58] mtd: nand: nuc900: create and use mtd_to_nuc900()
+Date: Thu, 10 Dec 2015 08:59:46 +0100
+Subject: [PATCH v4 02/58] mtd: nand: fsmc: create and use mtd_to_fsmc()
 In-Reply-To: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1449734442-18672-4-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1449734442-18672-3-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create and use mtd_to_nuc900() instead of direct container_of() calls.
+Create and use mtd_to_fsmc() to avoid duplication of
+container_of(mtd, struct fsmc_nand_data, mtd) calls.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/mtd/nand/nuc900_nand.c | 25 ++++++++++---------------
- 1 file changed, 10 insertions(+), 15 deletions(-)
+ drivers/mtd/nand/fsmc_nand.c | 31 ++++++++++++++-----------------
+ 1 file changed, 14 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/mtd/nand/nuc900_nand.c b/drivers/mtd/nand/nuc900_nand.c
-index 8148cd6..65908c0 100644
---- a/drivers/mtd/nand/nuc900_nand.c
-+++ b/drivers/mtd/nand/nuc900_nand.c
-@@ -62,6 +62,11 @@ struct nuc900_nand {
- 	spinlock_t lock;
+diff --git a/drivers/mtd/nand/fsmc_nand.c b/drivers/mtd/nand/fsmc_nand.c
+index 1c6c399..499fc59 100644
+--- a/drivers/mtd/nand/fsmc_nand.c
++++ b/drivers/mtd/nand/fsmc_nand.c
+@@ -326,13 +326,18 @@ struct fsmc_nand_data {
+ 	void			(*select_chip)(uint32_t bank, uint32_t busw);
  };
  
-+static inline struct nuc900_nand *mtd_to_nuc900(struct mtd_info *mtd)
++static inline struct fsmc_nand_data *mtd_to_fsmc(struct mtd_info *mtd)
 +{
-+	return container_of(mtd, struct nuc900_nand, mtd);
++	return container_of(mtd, struct fsmc_nand_data, mtd);
 +}
 +
- static const struct mtd_partition partitions[] = {
- 	{
- 	 .name = "NAND FS 0",
-@@ -78,9 +83,7 @@ static const struct mtd_partition partitions[] = {
- static unsigned char nuc900_nand_read_byte(struct mtd_info *mtd)
+ /* Assert CS signal based on chipnr */
+ static void fsmc_select_chip(struct mtd_info *mtd, int chipnr)
  {
- 	unsigned char ret;
--	struct nuc900_nand *nand;
--
--	nand = container_of(mtd, struct nuc900_nand, mtd);
-+	struct nuc900_nand *nand = mtd_to_nuc900(mtd);
+ 	struct nand_chip *chip = mtd_to_nand(mtd);
+ 	struct fsmc_nand_data *host;
  
- 	ret = (unsigned char)read_data_reg(nand);
+-	host = container_of(mtd, struct fsmc_nand_data, mtd);
++	host = mtd_to_fsmc(mtd);
  
-@@ -91,9 +94,7 @@ static void nuc900_nand_read_buf(struct mtd_info *mtd,
- 				 unsigned char *buf, int len)
+ 	switch (chipnr) {
+ 	case -1:
+@@ -359,8 +364,7 @@ static void fsmc_select_chip(struct mtd_info *mtd, int chipnr)
+ static void fsmc_cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
  {
- 	int i;
--	struct nuc900_nand *nand;
--
--	nand = container_of(mtd, struct nuc900_nand, mtd);
-+	struct nuc900_nand *nand = mtd_to_nuc900(mtd);
+ 	struct nand_chip *this = mtd_to_nand(mtd);
+-	struct fsmc_nand_data *host = container_of(mtd,
+-					struct fsmc_nand_data, mtd);
++	struct fsmc_nand_data *host = mtd_to_fsmc(mtd);
+ 	void __iomem *regs = host->regs_va;
+ 	unsigned int bank = host->bank;
  
- 	for (i = 0; i < len; i++)
- 		buf[i] = (unsigned char)read_data_reg(nand);
-@@ -103,9 +104,7 @@ static void nuc900_nand_write_buf(struct mtd_info *mtd,
- 				  const unsigned char *buf, int len)
+@@ -445,8 +449,7 @@ static void fsmc_nand_setup(void __iomem *regs, uint32_t bank,
+  */
+ static void fsmc_enable_hwecc(struct mtd_info *mtd, int mode)
  {
- 	int i;
--	struct nuc900_nand *nand;
--
--	nand = container_of(mtd, struct nuc900_nand, mtd);
-+	struct nuc900_nand *nand = mtd_to_nuc900(mtd);
+-	struct fsmc_nand_data *host = container_of(mtd,
+-					struct fsmc_nand_data, mtd);
++	struct fsmc_nand_data *host = mtd_to_fsmc(mtd);
+ 	void __iomem *regs = host->regs_va;
+ 	uint32_t bank = host->bank;
  
- 	for (i = 0; i < len; i++)
- 		write_data_reg(nand, buf[i]);
-@@ -124,11 +123,9 @@ static int nuc900_check_rb(struct nuc900_nand *nand)
- 
- static int nuc900_nand_devready(struct mtd_info *mtd)
+@@ -466,8 +469,7 @@ static void fsmc_enable_hwecc(struct mtd_info *mtd, int mode)
+ static int fsmc_read_hwecc_ecc4(struct mtd_info *mtd, const uint8_t *data,
+ 				uint8_t *ecc)
  {
--	struct nuc900_nand *nand;
-+	struct nuc900_nand *nand = mtd_to_nuc900(mtd);
- 	int ready;
+-	struct fsmc_nand_data *host = container_of(mtd,
+-					struct fsmc_nand_data, mtd);
++	struct fsmc_nand_data *host = mtd_to_fsmc(mtd);
+ 	void __iomem *regs = host->regs_va;
+ 	uint32_t bank = host->bank;
+ 	uint32_t ecc_tmp;
+@@ -517,8 +519,7 @@ static int fsmc_read_hwecc_ecc4(struct mtd_info *mtd, const uint8_t *data,
+ static int fsmc_read_hwecc_ecc1(struct mtd_info *mtd, const uint8_t *data,
+ 				uint8_t *ecc)
+ {
+-	struct fsmc_nand_data *host = container_of(mtd,
+-					struct fsmc_nand_data, mtd);
++	struct fsmc_nand_data *host = mtd_to_fsmc(mtd);
+ 	void __iomem *regs = host->regs_va;
+ 	uint32_t bank = host->bank;
+ 	uint32_t ecc_tmp;
+@@ -674,9 +675,8 @@ static void fsmc_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
+  */
+ static void fsmc_read_buf_dma(struct mtd_info *mtd, uint8_t *buf, int len)
+ {
+-	struct fsmc_nand_data *host;
++	struct fsmc_nand_data *host  = mtd_to_fsmc(mtd);
  
--	nand = container_of(mtd, struct nuc900_nand, mtd);
--
- 	ready = (nuc900_check_rb(nand)) ? 1 : 0;
- 	return ready;
+-	host = container_of(mtd, struct fsmc_nand_data, mtd);
+ 	dma_xfer(host, buf, len, DMA_FROM_DEVICE);
  }
-@@ -137,9 +134,7 @@ static void nuc900_nand_command_lp(struct mtd_info *mtd, unsigned int command,
- 				   int column, int page_addr)
- {
- 	register struct nand_chip *chip = mtd_to_nand(mtd);
--	struct nuc900_nand *nand;
--
--	nand = container_of(mtd, struct nuc900_nand, mtd);
-+	struct nuc900_nand *nand = mtd_to_nuc900(mtd);
  
- 	if (command == NAND_CMD_READOOB) {
- 		column += mtd->writesize;
+@@ -689,9 +689,8 @@ static void fsmc_read_buf_dma(struct mtd_info *mtd, uint8_t *buf, int len)
+ static void fsmc_write_buf_dma(struct mtd_info *mtd, const uint8_t *buf,
+ 		int len)
+ {
+-	struct fsmc_nand_data *host;
++	struct fsmc_nand_data *host = mtd_to_fsmc(mtd);
+ 
+-	host = container_of(mtd, struct fsmc_nand_data, mtd);
+ 	dma_xfer(host, (void *)buf, len, DMA_TO_DEVICE);
+ }
+ 
+@@ -712,8 +711,7 @@ static void fsmc_write_buf_dma(struct mtd_info *mtd, const uint8_t *buf,
+ static int fsmc_read_page_hwecc(struct mtd_info *mtd, struct nand_chip *chip,
+ 				 uint8_t *buf, int oob_required, int page)
+ {
+-	struct fsmc_nand_data *host = container_of(mtd,
+-					struct fsmc_nand_data, mtd);
++	struct fsmc_nand_data *host = mtd_to_fsmc(mtd);
+ 	struct fsmc_eccplace *ecc_place = host->ecc_place;
+ 	int i, j, s, stat, eccsize = chip->ecc.size;
+ 	int eccbytes = chip->ecc.bytes;
+@@ -782,9 +780,8 @@ static int fsmc_read_page_hwecc(struct mtd_info *mtd, struct nand_chip *chip,
+ static int fsmc_bch8_correct_data(struct mtd_info *mtd, uint8_t *dat,
+ 			     uint8_t *read_ecc, uint8_t *calc_ecc)
+ {
+-	struct fsmc_nand_data *host = container_of(mtd,
+-					struct fsmc_nand_data, mtd);
+ 	struct nand_chip *chip = mtd_to_nand(mtd);
++	struct fsmc_nand_data *host = mtd_to_fsmc(mtd);
+ 	void __iomem *regs = host->regs_va;
+ 	unsigned int bank = host->bank;
+ 	uint32_t err_idx[8];
 -- 
 2.1.4
