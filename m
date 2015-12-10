@@ -1,29 +1,48 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Thu, 10 Dec 2015 10:31:48 -0800
-Subject: [PATCH v12 04/16] arm64: kvm: allows kvm cpu hotplug
-In-Reply-To: <56604A6E.60102@arm.com>
-References: <cover.1448403503.git.geoff@infradead.org>
- <23ca498d5e28017549c6076812d60b18e86fa20e.1448403503.git.geoff@infradead.org>
- <CAJ5Y-eYHqQCf=ZQzXb=D_P7VscM=vNc3YpYLJs+UtZLFswiaeQ@mail.gmail.com>
- <56604A6E.60102@arm.com>
-Message-ID: <1449772308.24127.59.camel@infradead.org>
+From: peda@axentia.se (Peter Rosin)
+Date: Thu, 10 Dec 2015 18:32:30 +0000
+Subject: Domain faults when CONFIG_CPU_SW_DOMAIN_PAN is enabled
+In-Reply-To: <20151210162054.GM8644@n2100.arm.linux.org.uk>
+References: <f7774151e4a849e682ae5a607a98140b@EMAIL.axentia.se>
+ <20151203115143.GM8644@n2100.arm.linux.org.uk>
+ <533b0f1f264e42e78b94bbff9570fb50@EMAIL.axentia.se>
+ <20151203133727.GN8644@n2100.arm.linux.org.uk>
+ <94580382ca344ae2b64f66fb778c6ff7@EMAIL.axentia.se>
+ <20151203164118.GR8644@n2100.arm.linux.org.uk>
+ <20151203172708.GT8644@n2100.arm.linux.org.uk>
+ <45b615420548463ebd1d582bc5da2eff@EMAIL.axentia.se>
+ <20151210002213.GL8644@n2100.arm.linux.org.uk>
+ <7e60a8ccde1940d68ec4780abe154cbd@EMAIL.axentia.se>
+ <20151210162054.GM8644@n2100.arm.linux.org.uk>
+Message-ID: <86e315e4b2474fa5a20f6bffbfce6404@EMAIL.axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+Russell King wrote:
+> On Thu, Dec 10, 2015 at 03:29:37PM +0000, Peter Rosin wrote:
+> > Russell King wrote:
+> > > On Thu, Dec 03, 2015 at 09:37:51PM +0000, Peter Rosin wrote:
+> > > > I took both patches for a quick spin (a dozen boots and one hour 
+> > > > uptime after that for each patch) and no incidents. I have not 
+> > > > gathered data, but the crash on boot feels like it's quite a bit 
+> > > > above 50% when there is a problem so this feels good (I used 5 
+> > > > clean reboots when I bisected and that worked).
+> > > > 
+> > > > Reported-by: Peter Rosin <peda@axentia.se>
+> > > > Tested-by: Peter Rosin <peda@axentia.se>
+> > > > 
+> > > > (and please don't forget to cc stable)
+> > > 
+> > > I've decided to do a more in-depth fix, so that we also solve the 
+> > > issue that when we schedule in these down_read()s, we don't leak the 
+> > > permissive domain register setting into the switched-to context.
+> > > 
+> > > Can you test this patch please?  Thanks.
+> > 
+> > Still looking good.
+> 
+> Does that mean I can add your reported and tested-by to this latest patch?
 
-On Thu, 2015-12-03 at 13:58 +0000, Marc Zyngier wrote:
-> Indeed, this is completely broken (I just reproduced the issue on a
-> model).
+Right, I thought that was obvious, sorry for the confusion.
 
-There are users out there that want kexec/kdump support.  I think we
-should remove this patch from the series, replace it with a temporary
-Kconfig conditional that allows only one of KVM or kexec to be enabled,
-and merge kexec and kdump support in for 4.5.  This will satisfy users
-who need kexec but not KVM, like kexec based bootloaders.  Once this
-KVM hot plug patch is fixed we then merge it, either for 4.5 or 4.6,
-depending on the timing.
-
-I'll prepare and post a v13 series that does the above.
-
--Geoff 
+Cheers,
+Peter
