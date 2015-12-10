@@ -1,55 +1,33 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 10 Dec 2015 14:34:46 +0100
-Subject: [PATCH] i2c: allow building emev2 without slave mode again
-In-Reply-To: <2144222.LfzPx9mJ0p@wuerfel>
-References: <2144222.LfzPx9mJ0p@wuerfel>
-Message-ID: <20151210133446.GC1573@katana>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 10 Dec 2015 21:36:30 +0800
+Subject: [PATCH 2/3] ARM: dts: sun9i: cubieboard4: Enable consumer IR receiver
+In-Reply-To: <1449754591-3999-1-git-send-email-wens@csie.org>
+References: <1449754591-3999-1-git-send-email-wens@csie.org>
+Message-ID: <1449754591-3999-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 10, 2015 at 02:14:49PM +0100, Arnd Bergmann wrote:
-> The emev2 driver stopped compiling in today's linux-next kernel:
-> 
-> drivers/i2c/busses/i2c-emev2.c: In function 'em_i2c_slave_irq':
-> drivers/i2c/busses/i2c-emev2.c:233:23: error: storage size of 'event' isn't known
-> drivers/i2c/busses/i2c-emev2.c:250:3: error: implicit declaration of function 'i2c_slave_event' [-Werror=implicit-function-declaration]
-> drivers/i2c/busses/i2c-emev2.c:250:32: error: 'I2C_SLAVE_STOP' undeclared (first use in this function)
-> 
-> It works again if we enable CONFIG_I2C_SLAVE, but it seems wrong
-> to add a dependency on that symbol:
-> 
-> * The symbol is user-selectable, but only one or two (including this
->   one) bus drivers actually implement it, and it makes no sense
->   if you don't have one of them.
-> 
-> * The other driver (R-Car) uses 'select I2C_SLAVE', which seems
->   reasonable in principle, but we should not do that on user
->   visible symbols.
-> 
-> * I2C slave mode could be implemented in a lot of other drivers
->   as an optional feature, but we shouldn't require enabling it
->   if we don't use it.
-> 
-> This changes the two drivers that provide I2C slave mode so they
-> can again build if the slave mode being disabled. To do this, I
-> move the definition of i2c_slave_event() and enum i2c_slave_event
-> out of the #ifdef and instead make the assignment of the reg_slave
-> and unreg_slave pointers optional in the bus drivers. The functions
-> implementing the feature are unused in that case, so they get
-> marked as __maybe_unused in order to still give compile-time
-> coverage.
+The Cubieboard4 has a consumer IR receiver. Enable it in the DT.
 
-Thanks a lot! Making this clear and consistent was on my todo-list,
-unfortunately below some other items.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun9i-a80-cubieboard4.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Both drivers have quite orthogonal slave_irq routines. What do you think
-about grouping this and the reg/unreg-calls together and compile them
-conditionally on I2C_SLAVE? I think the code savings are worth it.
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151210/29670801/attachment.sig>
+diff --git a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+index 8791d49bed2d..8c26b556e82a 100644
+--- a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
++++ b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+@@ -114,6 +114,10 @@
+ 	status = "okay";
+ };
+ 
++&r_ir {
++	status = "okay";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
+-- 
+2.6.2
