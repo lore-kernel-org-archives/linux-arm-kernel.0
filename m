@@ -1,10 +1,10 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 10 Dec 2015 09:00:40 +0100
-Subject: [PATCH v4 56/58] ARM: make use of nand_set/get_controller_data()
- helpers
+Date: Thu, 10 Dec 2015 09:00:42 +0100
+Subject: [PATCH v4 58/58] staging: mt29f_spinand: make use of
+ nand_set/get_controller_data() helpers
 In-Reply-To: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1449734442-18672-57-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1449734442-18672-59-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,30 +13,57 @@ them where appropriate.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- arch/arm/mach-ixp4xx/ixdp425-setup.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/staging/mt29f_spinand/mt29f_spinand.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-ixp4xx/ixdp425-setup.c b/arch/arm/mach-ixp4xx/ixdp425-setup.c
-index 333b0f9..508c2d7 100644
---- a/arch/arm/mach-ixp4xx/ixdp425-setup.c
-+++ b/arch/arm/mach-ixp4xx/ixdp425-setup.c
-@@ -77,7 +77,7 @@ static void
- ixdp425_flash_nand_cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
+diff --git a/drivers/staging/mt29f_spinand/mt29f_spinand.c b/drivers/staging/mt29f_spinand/mt29f_spinand.c
+index b7d429d..197d112 100644
+--- a/drivers/staging/mt29f_spinand/mt29f_spinand.c
++++ b/drivers/staging/mt29f_spinand/mt29f_spinand.c
+@@ -32,7 +32,7 @@
+ static inline struct spinand_state *mtd_to_state(struct mtd_info *mtd)
  {
- 	struct nand_chip *this = mtd_to_nand(mtd);
--	int offset = (int)this->priv;
-+	int offset = (int)nand_get_controller_data(this);
+ 	struct nand_chip *chip = mtd_to_nand(mtd);
+-	struct spinand_info *info = (struct spinand_info *)chip->priv;
++	struct spinand_info *info = nand_get_controller_data(chip);
+ 	struct spinand_state *state = (struct spinand_state *)info->priv;
  
- 	if (ctrl & NAND_CTRL_CHANGE) {
- 		if (ctrl & NAND_NCE) {
-@@ -88,7 +88,7 @@ ixdp425_flash_nand_cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
+ 	return state;
+@@ -633,7 +633,7 @@ static int spinand_read_page_hwecc(struct mtd_info *mtd, struct nand_chip *chip,
+ 	u8 *p = buf;
+ 	int eccsize = chip->ecc.size;
+ 	int eccsteps = chip->ecc.steps;
+-	struct spinand_info *info = (struct spinand_info *)chip->priv;
++	struct spinand_info *info = nand_get_controller_data(chip);
  
- 		offset = (ctrl & NAND_CLE) ? IXDP425_NAND_CMD_BYTE : 0;
- 		offset |= (ctrl & NAND_ALE) ? IXDP425_NAND_ADDR_BYTE : 0;
--		this->priv = (void *)offset;
-+		nand_set_controller_data(this, (void *)offset);
- 	}
+ 	enable_read_hw_ecc = 1;
  
- 	if (cmd != NAND_CMD_NONE)
+@@ -679,7 +679,7 @@ static u8 spinand_read_byte(struct mtd_info *mtd)
+ 
+ static int spinand_wait(struct mtd_info *mtd, struct nand_chip *chip)
+ {
+-	struct spinand_info *info = (struct spinand_info *)chip->priv;
++	struct spinand_info *info = nand_get_controller_data(chip);
+ 
+ 	unsigned long timeo = jiffies;
+ 	int retval, state = chip->state;
+@@ -745,7 +745,7 @@ static void spinand_cmdfunc(struct mtd_info *mtd, unsigned int command,
+ 			    int column, int page)
+ {
+ 	struct nand_chip *chip = mtd_to_nand(mtd);
+-	struct spinand_info *info = (struct spinand_info *)chip->priv;
++	struct spinand_info *info = nand_get_controller_data(chip);
+ 	struct spinand_state *state = (struct spinand_state *)info->priv;
+ 
+ 	switch (command) {
+@@ -894,7 +894,7 @@ static int spinand_probe(struct spi_device *spi_nand)
+ #endif
+ 
+ 	nand_set_flash_node(chip, spi_nand->dev.of_node);
+-	chip->priv	= info;
++	nand_set_controller_data(chip, info);
+ 	chip->read_buf	= spinand_read_buf;
+ 	chip->write_buf	= spinand_write_buf;
+ 	chip->read_byte	= spinand_read_byte;
 -- 
 2.1.4
