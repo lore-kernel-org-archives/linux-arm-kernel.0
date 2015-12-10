@@ -1,83 +1,83 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Thu, 10 Dec 2015 10:07:54 +0000
-Subject: [PATCH] cpufreq: tegra: add regulator dependency for T124
-In-Reply-To: <20151209201007.GG5727@sirena.org.uk>
-References: <2194927.eV2s2QmZs0@wuerfel> <5668188F.2080202@nvidia.com>
- <20151209144734.GB5727@sirena.org.uk> <566865ED.3020106@nvidia.com>
- <20151209201007.GG5727@sirena.org.uk>
-Message-ID: <56694EFA.7010901@nvidia.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 10 Dec 2015 11:14:47 +0100
+Subject: [PATCH 2/2] ARM: shmobile: r8a7793: Describe DMA for the serial
+ ports
+In-Reply-To: <20151210045444.GC6964@verge.net.au>
+References: <1448589166-11612-1-git-send-email-horms+renesas@verge.net.au>
+ <1448589166-11612-3-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdVfMp0awRZh6S7YiSPFpUyAvwGXSQb2RYU7DkK_SOwH9Q@mail.gmail.com>
+ <20151210045444.GC6964@verge.net.au>
+Message-ID: <CAMuHMdWCc-fZwr0eNBk5k4_qMuER76DDQndRiWX9zhrk0gqSQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Dec 10, 2015 at 5:54 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Wed, Dec 09, 2015 at 11:47:36AM +0100, Geert Uytterhoeven wrote:
+>> Hi Simon,
+>>
+>> On Fri, Nov 27, 2015 at 2:52 AM, Simon Horman
+>> <horms+renesas@verge.net.au> wrote:
+>> > Add DMA properties to all SCIF, SCIFA, SCIFB, and HSCIF device nodes.
+>> >
+>> > Based on similar work for the r8a7791 by Geert Uytterhoeven.
+>> >
+>> > Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+>> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>> > ---
+>> >  arch/arm/boot/dts/r8a7793.dtsi | 36 ++++++++++++++++++++++++++++++++++++
+>> >  1 file changed, 36 insertions(+)
+>> >
+>> > diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
+>> > index 3ac2ec0414a0..8d5cbdfc3d5d 100644
+>> > --- a/arch/arm/boot/dts/r8a7793.dtsi
+>> > +++ b/arch/arm/boot/dts/r8a7793.dtsi
+>>
+>> > @@ -394,6 +412,8 @@
+>> >                 interrupts = <0 152 IRQ_TYPE_LEVEL_HIGH>;
+>> >                 clocks = <&mstp7_clks R8A7793_CLK_SCIF0>;
+>> >                 clock-names = "sci_ick";
+>> > +               dmas = <&dmac0 0x29>, <&dmac0 0x2a>;
+>> > +               dma-names = "tx", "rx";
+>> >                 power-domains = <&cpg_clocks>;
+>> >                 status = "disabled";
+>> >         };
+>> > @@ -404,6 +424,8 @@
+>> >                 interrupts = <0 153 IRQ_TYPE_LEVEL_HIGH>;
+>> >                 clocks = <&mstp7_clks R8A7793_CLK_SCIF1>;
+>> >                 clock-names = "sci_ick";
+>> > +               dmas = <&dmac0 0x29>, <&dmac0 0x2a>;
+>>
+>> This is duplicated from scif0, and should be:
+>>
+>>         dmas = <&dmac0 0x2d>, <&dmac0 0x2e>;
+>>
+>> > +               dma-names = "tx", "rx";
+>>
+>> After
+>>
+>>         sed -i -e 's/7791/779x/g' arch/arm/boot/dts/r8a7791.dtsi
+>>         sed -i -e 's/7793/779x/g' arch/arm/boot/dts/r8a7793.dtsi
+>>
+>> arch/arm/boot/dts/r8a7791.dtsi and arch/arm/boot/dts/r8a7793.dtsi should
+>> be identical ;-)
+>
+> Thanks, I have fixed that in v2.
 
-On 09/12/15 20:10, Mark Brown wrote:
-> * PGP Signed by an unknown key
-> 
-> On Wed, Dec 09, 2015 at 05:33:33PM +0000, Jon Hunter wrote:
->> On 09/12/15 14:47, Mark Brown wrote:
-> 
->>> If changes implemented by the clock driver are trashing the regulator
->>> settings I would expect the clock driver to be responsible for fixing
->>> things up rather than another driver that happens to use the clock.  I'd
->>> also expect some kind of internal documentation explaining what's going
->>> on, and possibly 
-> 
->> Yes, the DFLL clock driver could restore the voltage, however, that
->> does not guarantee that the voltage is still sufficient for the other
->> clock source.
-> 
-> But the code we've got won't do that either - it'l just set the voltage
-> to whatever the last thing the regulator API had that might have been
-> within its constraints.
+Haven't seen that patch, but feel free to add my
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+after having corrected the scif1 DMA names.
+The sooner it arrives in renesas-devel, the better (I have patches depending
+on it).
 
-Today yes, however, I meant that we *could* change it to restore the
-previous voltage before the DFLL was enabled.
+Thanks!
 
->>> Setting the voltage you've read back sounds broken, if the hardware
->>> might randomly change things how do you know the settings we read were
->>> sane?  Shouldn't we know what voltage range the device requires in a
->>> given mode and set that - that's much more normal?
-> 
->> The hardware will not randomly change the voltage until the DFLL is
->> enabled and so you would have to do this before.
-> 
-> I'm not clear that there's even a guarantee that the kernel will ever
-> have seen this configuration, consider for example what happens if
-> someone uses kexec?
+Gr{oetje,eeting}s,
 
-True. I have not played around with kexec, but with something like the
-DFLL, we would need to make sure that this get disabled. Looks like the
-reboot notifier gets called by kexec and so I guess that could be used
-to disable the DFLL and switch back to the PLL.
+                        Geert
 
->> Yes, setting the frequency and voltage as defined by a given operating
->> mode would make sense. However, I am not sure we have those defined in
->> the kernel for this PLL and would have to be added.
-> 
-> I think given how you're describing the hardware that this will be
-> required in order to provide something robust (and also to get the best
-> power savings from the hardware).
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Yes I agree it would be more robust. However, if you care about power
-savings then you should be using the DFLL/cpufreq anyway.
-
->> I was thinking that during boot we could read the default voltage and
->> frequency set by the bootloader and use this as it should not be
->> changing dynamically at this point because the cpufreq driver has not
->> been activated yet.
-> 
-> I'm a bit confused here, we're talking about a change to the cpufreq
-> driver here aren't we?  Or alternatively why are we manipulating the
-> clock tree like this if we don't yet have support for the hardware?
-
-Yes, a change to the cpu-freq driver. When probing the cpufreq driver,
-we can query the clock-source, clock frequency and voltage and save
-this, so that if we ever disable the DFLL/cpufreq, we can switch back to
-the initial configuration.
-
->From testing the t124 jetson and nyan-big, both of these boards have a
-different configuration for the PLL at boot time, so although we could
-pick a safe operating point for all t124 boards, I was thinking of just
-restoring their initial configuration.
-
-Jon
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
