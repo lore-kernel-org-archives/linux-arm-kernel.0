@@ -1,83 +1,27 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 10 Dec 2015 09:00:11 +0100
-Subject: [PATCH v4 27/58] mtd: nand: mpc5121: use the mtd instance embedded in
- struct nand_chip
-In-Reply-To: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1449734442-18672-28-git-send-email-boris.brezillon@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 10 Dec 2015 09:04:10 +0100
+Subject: [PATCH v2 4/9] ARM: dts: add dts files for hi3519-demb board
+In-Reply-To: <56691C65.6090808@huawei.com>
+References: <1449110668-23647-1-git-send-email-xuejiancheng@huawei.com>
+ <5533669.m0KDLq8XOc@wuerfel> <56691C65.6090808@huawei.com>
+Message-ID: <2721289.3GUub5trUg@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-struct nand_chip now embeds an mtd device. Make use of this mtd instance.
+On Thursday 10 December 2015 14:32:05 xuejiancheng wrote:
+> > 
+> > This is not what I meant. You have to use "syscon" as the most generic
+> > "compatible" value here, but should add a machine specific string
+> > as a more specific one. "hisilicon,sysctrl" is not appropriate because
+> > it does not identify the IP block uniquely, you can only use that
+> > in combination with another more specific string.
+> 
+> OK. I will use "hisilicon,hi3519-syscon" and "syscon" as the compatible value
+> for the sysctrl node in hi3519.dtsi.
+> 
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
-Changes generated with the following coccinelle script
+Why hisilicon,hi3519-syscon instead of hisilicon,hi3519-sysctrl?
 
---->8---
-virtual patch
+Is this not called a sysctrl at all in the datasheet then?
 
-@fix1@
-identifier __chipfield, __mtdfield;
-type __type;
-@@
-(
-	__type {
-		...
-		struct nand_chip __chipfield;
-		...
--		struct mtd_info __mtdfield;
-		...
-	};
-|
-	__type {
-		...
--		struct mtd_info __mtdfield;
-		...
-		struct nand_chip __chipfield;
-		...
-	};
-)
-
-@fix2 depends on fix1@
-identifier fix1.__chipfield, fix1.__mtdfield;
-identifier __subfield;
-type fix1.__type;
-__type *__priv;
-@@
-(
--	__priv->__mtdfield.__subfield
-+	nand_to_mtd(&__priv->__chipfield)->__subfield
-|
--	&(__priv->__mtdfield)
-+	nand_to_mtd(&__priv->__chipfield)
-)
---->8---
----
- drivers/mtd/nand/mpc5121_nfc.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/drivers/mtd/nand/mpc5121_nfc.c b/drivers/mtd/nand/mpc5121_nfc.c
-index 642c486..8b4cd82 100644
---- a/drivers/mtd/nand/mpc5121_nfc.c
-+++ b/drivers/mtd/nand/mpc5121_nfc.c
-@@ -118,7 +118,6 @@
- #define NFC_TIMEOUT		(HZ / 10)	/* 1/10 s */
- 
- struct mpc5121_nfc_prv {
--	struct mtd_info		mtd;
- 	struct nand_chip	chip;
- 	int			irq;
- 	void __iomem		*regs;
-@@ -654,8 +653,8 @@ static int mpc5121_nfc_probe(struct platform_device *op)
- 	if (!prv)
- 		return -ENOMEM;
- 
--	mtd = &prv->mtd;
- 	chip = &prv->chip;
-+	mtd = nand_to_mtd(chip);
- 
- 	mtd->priv = chip;
- 	mtd->dev.parent = dev;
--- 
-2.1.4
+	Arnd
