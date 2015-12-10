@@ -1,34 +1,34 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Dec 2015 18:02:29 +0100
-Subject: [PATCH] pinctrl: freescale: add ZERO_OFFSET_VALID flag for vf610
- pinctrl
-In-Reply-To: <1448437251-21487-1-git-send-email-shawnguo@kernel.org>
-References: <1448437251-21487-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <CACRpkdZCakhg57S5rSNnzyUzx1zvHnAy_edx6RjDfpDvvBKw4Q@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 10 Dec 2015 18:04:55 +0100
+Subject: [PATCH 0/3] ARM: dts: sun9i: cubieboard4: Enable misc. peripherals
+In-Reply-To: <1449754591-3999-1-git-send-email-wens@csie.org>
+References: <1449754591-3999-1-git-send-email-wens@csie.org>
+Message-ID: <20151210170455.GD27957@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 25, 2015 at 8:40 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+On Thu, Dec 10, 2015 at 09:36:28PM +0800, Chen-Yu Tsai wrote:
+> Hi Maxime,
+> 
+> Here are some patches enabling some peripherals on the Cubieboard4.
+> 
+> Patch 1 enables the LEDs.
+> 
+> Patch 2 enables the IR receiver.
+> 
+> Patch 3 enables the RSB controller.
 
-> To support i.MX7D Low Power State Retention IOMUXC, commit e7b37a522aa9
-> ("pinctrl: freescale: imx: allow mux_reg offset zero") changes the way
-> of zero mux_reg offset support with a new flag ZERO_OFFSET_VALID.  But,
-> unfortunately, it forgot to add this flag for vf610 pinctrl which has
-> zero mux_reg offset be valid as well, and hence breaks the vf610
-> support.
->
-> Fix the regression by adding flag ZERO_OFFSET_VALID for vf610 pinctrl
-> driver.
->
-> Signed-off-by: Shawn Guo <shawnguo@kernel.org>
-> Fixes: e7b37a522aa9 ("pinctrl: freescale: imx: allow mux_reg offset zero")
-> Reported-by: Andrew Lunn <andrew@lunn.ch>
-> Tested-by: Andrew Lunn <andrew@lunn.ch>
-> Acked-by: Stefan Agner <stefan@agner.ch>
+Applied all three, thanks!
+Maxime
 
-Patch applied for fixes.
-
-Sorry for the delay.
-
-Yours,
-Linus Walleij
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151210/54bd8274/attachment.sig>
