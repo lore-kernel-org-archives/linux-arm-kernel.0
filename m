@@ -1,49 +1,29 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 10 Dec 2015 12:05:48 +0100 (CET)
-Subject: [PATCH RESEND] pinctrl: bcm2835: Fix initial value for
- direction_output
-In-Reply-To: <1449511825-6156-1-git-send-email-stefan.wahren@i2se.com>
-References: <1449511825-6156-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1330071479.188146.762be339-5c35-483f-b17c-6076dc1d3758.open-xchange@email.1und1.de>
+From: sgruszka@redhat.com (Stanislaw Gruszka)
+Date: Thu, 10 Dec 2015 12:08:02 +0100
+Subject: [PATCH] iwlegacy: mark il_adjust_beacon_interval as noinline
+In-Reply-To: <36263581.L8412YxJjp@wuerfel>
+References: <36263581.L8412YxJjp@wuerfel>
+Message-ID: <20151210110801.GA2010@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Wed, Dec 09, 2015 at 05:42:41PM +0100, Arnd Bergmann wrote:
+> With the new optimized do_div() code, some versions of gcc
+> produce obviously incorrect code that leads to a link error
+> in iwlegacy/common.o:
+> 
+> drivers/built-in.o: In function `il_send_rxon_timing':
+> :(.text+0xa6b4d4): undefined reference to `____ilog2_NaN'
+> :(.text+0xa6b4f0): undefined reference to `__aeabi_uldivmod'
+> 
+> In a few thousand randconfig builds, I have seen this problem
+> a couple of times in this file, but never anywhere else in the
+> kernel, so we can try to work around this in the only file
+> that shows the behavior, by marking the il_adjust_beacon_interval
+> function as noinline, which convinces gcc to use the unoptimized
+> do_div() all the time.
 
-> Stefan Wahren <stefan.wahren@i2se.com> hat am 7. Dezember 2015 um 19:10
-> geschrieben:
->
->
-> Currently the provided initial value for bcm2835_gpio_direction_output
-> has no effect. So fix this issue by changing the value before
-> changing the GPIO direction. As a result we need to move the function below
-> bcm2835_gpio_set.
->
-> Suggested-by: Martin Sperl <kernel@martin.sperl.org>
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> Fixes: e1b2dc70cd5b ("pinctrl: add bcm2835 driver")
-> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
-> Acked-by: Eric Anholt <eric@anholt.net>
-> ---
+I don't think this is good way to "fix" the issue, but also have
+nothing against to this particular change.
 
-on Nov 30 you wrote that you want Stephen's ACK and now it's there.
-
-But your current patch "[PATCH 092/182] pinctrl: bcm2835: use gpiochip data
-pointer" seems to conflict with my?
-
-Any wishes?
-
-Stefan
-
->
-> This patch was inspired by this discussion [1].
->
-> [1] -
-> http://lists.infradead.org/pipermail/linux-rpi-kernel/2015-April/001499.html
->
-> Changes:
-> - added suggested-by, fixes and acked-by tag since first submit
->
-> drivers/pinctrl/bcm/pinctrl-bcm2835.c | 13 +++++++------
-> 1 file changed, 7 insertions(+), 6 deletions(-)
->
+Acked-by: Stanislaw Gruszka <sgruszka@redhat.com>
