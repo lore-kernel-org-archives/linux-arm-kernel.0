@@ -1,56 +1,30 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 10 Dec 2015 08:34:10 +0530
-Subject: [PATCH for 4.4 0/2] DT/dmaengine: edma: Convert 16bit arrays to
- 32bit
-In-Reply-To: <20151209201226.GB23396@atomide.com>
-References: <1449649091-9848-1-git-send-email-peter.ujfalusi@ti.com>
- <20151209201226.GB23396@atomide.com>
-Message-ID: <20151210030410.GG1854@localhost>
+From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
+Date: Wed, 9 Dec 2015 21:07:25 -0600
+Subject: [PATCH v6 0/4] gicv2m: acpi: Add ACPI support for GICv2m MSI
+In-Reply-To: <CADaLNDkF_-6Odo6ygyuUVSNdcq93stC-pyGTXEoBDUizPzd99Q@mail.gmail.com>
+References: <1449689074-30609-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <CADaLNDkF_-6Odo6ygyuUVSNdcq93stC-pyGTXEoBDUizPzd99Q@mail.gmail.com>
+Message-ID: <5668EC6D.7020305@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 09, 2015 at 12:12:27PM -0800, Tony Lindgren wrote:
-> * Peter Ujfalusi <peter.ujfalusi@ti.com> [151209 00:19]:
-> > Hi,
-> > 
-> > Based on the discussion regarding to (convert am33xx to use the new eDMA
-> > bindings):
-> > https://www.mail-archive.com/linux-omap at vger.kernel.org/msg122117.html
-> > 
-> > This two patch will convert the new eDMA binding to not use 16bit arrays for
-> > memcpy channel selection and for marking slots reserved.
-> > The '/bits/ 16' seams to be causing confusion so it is probably better to just
-> > use standard type for the arrays.
-> > 
-> > The new bindings for the eDMA is introduced for 4.4 and we do not have users of
-> > it, which means that we can still change it w/o the risk of breaking anything
-> > and we do not need to maintain the compatibility with 16bit arrays.
-> > 
-> > The changes in the eDMA driver is local to the DT parsing and should not
-> > conflict with other changes (like the filter function mapping support). Hrm,
-> > there might be trivial conflict in the include/linux/platform_data/edma.h with
-> > the "dmaengine 'universal' API".
-> > 
-> > Tony, Arnd, Vinod: Can you agree on the practicalities on how these patches are
-> > going to be handled? I would like to send the updated am33xx/am437x conversion
-> > for 4.5 based on these changes.
-> 
-> Yes this should go into v4.4 as discussed, otherwise it will be a mess.
-> For both, please feel free to add:
-> 
-> Acked-by: Tony Lindgren <tony@atomide.com>
-> 
-> I suggest Vinod sets up an immutable branch against v4.4-rc1 with just these
-> two patches. Then it can get merged into whichever branch needs it, I
-> certainly will need it as most of my v4.5 branches are v4.4-rc1 or -rc2
-> based.
-> 
-> Then the immutable branch can be merged into v4.4 by Vinod or Arnd.
+On 12/9/2015 8:20 PM, Duc Dang wrote:
+>> This has been tested on AMD Seattle (Overdrive) RevB system.
+>> >
+>> >NOTE: I have not tested ACPI GICv2m multiframe support since
+>> >I don't have access to such system. Any helps are appreciated.
+> Hi Suravee,
+>
+> I tested your v2m-multiframe-v6 branch with APM X-Gene 2 that has
+> multiple GICv2m frames and it worked.
+>
+> Please feel free to add:
+> Tested-by: Duc Dang<dhdang@apm.com>
+>
 
-Applied to fix/edma. This is based on -rc1 and will not rebase.
+Thanks Duc.
 
-I am merging this to my fixes and will send to Linus in couple of days
+Marc, if you decide to add take V6 would you please also add the Tested-by?
 
-Thanks
--- 
-~Vinod
+Thanks,
+Suravee
