@@ -1,33 +1,26 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Dec 2015 16:10:58 +0100
-Subject: [PATCH 2/6] pinctrl: pxa: pxa2xx: add pin control skeleton
-In-Reply-To: <1448129093-20722-3-git-send-email-robert.jarzmik@free.fr>
+Date: Thu, 10 Dec 2015 16:12:05 +0100
+Subject: [PATCH 3/6] pinctrl: pxa: pxa2xx: add pin muxing
+In-Reply-To: <1448129093-20722-4-git-send-email-robert.jarzmik@free.fr>
 References: <1448129093-20722-1-git-send-email-robert.jarzmik@free.fr>
- <1448129093-20722-3-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <CACRpkdaJB1JnThtY6ZmQKDMY3Naci8cEaaK7bXfDUC2pvdgLsA@mail.gmail.com>
+ <1448129093-20722-4-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <CACRpkdYwFLW1muPDMkdxFxsJ6XOf8wwtwDLbZsWPuWwZb_-hkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Sat, Nov 21, 2015 at 7:04 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
 
-> Add a pincontrol driver for pxa2xx architecture, encompassing all pxa25x
-> and pxa27x variants. This is only the pin muxing part of the driver.
->
-> One specific consideration is also the memory space (MMIO), which is
-> intertwined with the GPIO registers. To make things worse, the GPIO
-> direction register also affect pin muxing, as it chooses the "kind" of
-> pin, ie. the 4 output functions or 4 input functions.
->
-> The mapping between pinctrl notions and PXA Technical Reference Manual
-> is as follows :
->  - a pin is obviously a pin
->  - a group is also a pin, ie. group P101 is the pin 101
->  - a mux function is an alternate function
->    (ie. gpio-in, gpio-out, MMCLK, BTRTS, etc ...)
->
-> The individual architecture (pxa27x, pxa25x) instantiate a pin control
-> by providing a table of pins, each pin being provided a list of
-> PXA_FUNCTION (alternate functions).
+> The driver is inspired from the sunxi driver. The pxa architecture
+> specificities leading to the driver are :
+>  - each pin has 8 possible alternate functions
+>  - 4 of these are output kind
+>  - 4 of these are input kind
+>  - there is always a "gpio input" and "gpio output" function
+>  - the function matrix is very scattered :
+>    - some functions can be found on 5 different pads
+>    - the number of functions is greater than the number of pins
+>    - there is no "topology" grouping of pins (such as all SPI in one
+>      corner of the die)
 >
 > Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
