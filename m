@@ -1,158 +1,79 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 10 Dec 2015 16:55:13 +0000
-Subject: next-20151210 build: 4 failures 43 warnings (next-20151210)
-In-Reply-To: <E1a6wEp-0000hU-7o@optimist>
-References: <E1a6wEp-0000hU-7o@optimist>
-Message-ID: <20151210165513.GO5727@sirena.org.uk>
+From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
+Date: Thu, 10 Dec 2015 08:55:26 -0800
+Subject: [PATCH v7 0/4] gicv2m: acpi: Add ACPI support for GICv2m MSI
+Message-ID: <1449766530-16935-1-git-send-email-Suravee.Suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 10, 2015 at 08:06:07AM +0000, Build bot for Mark Brown wrote:
+This patch series has been forked from the following patch series since
+it no longer depends on the rest of the patches.
 
-Today's -next fails to build most arm64 configs with some rather
-spectacular errors below introduced by 02598e94ed5a78 (mm, printk:
-introduce new format string for flags) from Andrew's tree.  These in
-turn stem from the fact that we introduce an inclusion of
-linux/tracepoint.h into linux/mmdebug.h which through a chain of nested
-inclusions means that we end up attempting to use definitions from
-headers before they have finished including.  For example:
+  [PATCH v4 00/10] ACPI GIC Self-probing, GICv2m and GICv3 support
+  https://lkml.org/lkml/2015/7/29/234
 
-> 	arm64-allnoconfig
-> ../include/linux/wait.h:1217:2: error: implicit declaration of function 'atomic_read' [-Werror=implicit-function-declaration]
+It has been ported to use the newly introduced device fwnode_handle 
+for ACPI irqdmain introduced by Marc in the following patch series:
 
-is a result of:
+  [PATCH v2 00/17] Divorcing irqdomain and device_node
 
-In file included from include/linux/completion.h:11:0,
-                 from include/linux/rcupdate.h:43,
-                 from include/linux/tracepoint.h:19,
-                 from include/linux/mmdebug.h:6,
-                 from ./arch/arm64/include/asm/cmpxchg.h:22,
-                 from ./arch/arm64/include/asm/atomic.h:41,
-                 from include/linux/atomic.h:4,
-                 from include/linux/spinlock.h:406,
-                 from include/linux/seqlock.h:35,
-                 from include/linux/time.h:5,
-                 from include/uapi/linux/timex.h:56,
-                 from include/linux/timex.h:56,
-                 from include/linux/sched.h:19,
-                 from arch/arm64/kernel/asm-offsets.c:21:
-include/linux/wait.h: In function 'wait_on_atomic_t':
-include/linux/wait.h:1218:2: error: implicit declaration of function 'atomic_read' [-Werror=implicit-function-declaration]
-  if (atomic_read(val) == 0)
+The following git branch contains the submitted patches along with
+the pre-requsite patches (mainly for ARM64 PCI support for ACPI).
 
-where atomic_read() will be defined in atomic.h which is part of the
-inclusion chain above but hasn't yet parsed far enough to actually
-define anything.  This is all a bit of a horrific mess the root cause of
-which appears to be that arm64 is unusual in including linux/mmdebug.h
-in asm/cmpxchg.h which triggers the mess.  There doesn't seem to be any
-reason for this inclusion, I've just sent a patch removing it.  It'd be
-good to get this into -next as a matter of urgency.
+  https://github.com/ssuthiku/linux.git	v2m-multiframe-v7
 
-> ../include/linux/jiffies.h:61:39: error: division by zero in #if
-> ../include/linux/jiffies.h:289:36: error: 'NSEC_PER_USEC' undeclared (first use in this function)
-> ../include/linux/jiffies.h:303:33: error: division by zero in #if
-> ../include/linux/jiffies.h:323:11: error: 'MSEC_PER_SEC' undeclared (first use in this function)
-> ../include/linux/jiffies.h:369:15: error: 'USEC_PER_SEC' undeclared (first use in this function)
-> ../include/linux/jiffies.h:417:9: error: variable 'ts' has initializer but incomplete type
-> ../include/linux/jiffies.h:417:9: error: implicit declaration of function 'timespec_to_timespec64' [-Werror=implicit-function-declaration]
-> ../include/linux/jiffies.h:417:48: error: dereferencing pointer to incomplete type
-> ../include/linux/jiffies.h:417:20: error: storage size of 'ts' isn't known
-> ../include/linux/jiffies.h:425:20: error: storage size of 'ts' isn't known
-> ../include/linux/jiffies.h:428:2: error: dereferencing pointer to incomplete type
-> ../include/linux/jiffies.h:428:2: error: implicit declaration of function 'timespec64_to_timespec' [-Werror=implicit-function-declaration]
-> ../include/linux/ktime.h:52:23: error: 'KTIME_SEC_MAX' undeclared (first use in this function)
-> ../include/linux/ktime.h:53:29: error: 'KTIME_MAX' undeclared (first use in this function)
-> ../include/linux/ktime.h:55:36: error: 'NSEC_PER_SEC' undeclared (first use in this function)
-> ../include/linux/ktime.h:81:57: error: parameter 1 ('ts') has incomplete type
-> ../include/linux/ktime.h:81:23: error: function declaration isn't a prototype [-Werror=strict-prototypes]
-> ../include/linux/ktime.h:87:61: error: parameter 1 ('ts') has incomplete type
-> ../include/linux/ktime.h:87:23: error: function declaration isn't a prototype [-Werror=strict-prototypes]
-> ../include/linux/ktime.h:93:55: error: parameter 1 ('tv') has incomplete type
-> ../include/linux/ktime.h:93:23: error: function declaration isn't a prototype [-Werror=strict-prototypes]
-> ../include/linux/ktime.h:95:43: error: 'NSEC_PER_USEC' undeclared (first use in this function)
-> ../include/linux/ktime.h:201:25: error: 'NSEC_PER_USEC' undeclared (first use in this function)
-> ../include/linux/ktime.h:206:25: error: 'NSEC_PER_MSEC' undeclared (first use in this function)
-> ../include/linux/ktime.h:221:33: error: 'NSEC_PER_USEC' undeclared (first use in this function)
-> ../include/linux/ktime.h:226:33: error: 'NSEC_PER_MSEC' undeclared (first use in this function)
-> ../include/linux/ktime.h:231:33: error: 'NSEC_PER_USEC' undeclared (first use in this function)
-> ../include/linux/ktime.h:248:3: error: dereferencing pointer to incomplete type
-> ../include/linux/ktime.h:248:3: error: implicit declaration of function 'ns_to_timespec' [-Werror=implicit-function-declaration]
-> ../include/linux/ktime.h:267:3: error: dereferencing pointer to incomplete type
-> ../include/linux/ktime.h:267:3: error: implicit declaration of function 'ns_to_timespec64' [-Werror=implicit-function-declaration]
-> ../include/linux/timekeeping.h:25:31: error: return type is an incomplete type
-> ../include/linux/timekeeping.h:27:9: error: variable 'now' has initializer but incomplete type
-> ../include/linux/timekeeping.h:27:9: error: invalid use of undefined type 'struct timespec64'
-> ../include/linux/timekeeping.h:27:20: error: storage size of 'now' isn't known
-> ../include/linux/timekeeping.h:38:8: error: unknown type name 'time64_t'
-> ../include/linux/timekeeping.h:39:8: error: unknown type name 'time64_t'
-> ../include/linux/timekeeping.h:79:31: error: return type is an incomplete type
-> ../include/linux/timekeeping.h:81:2: error: invalid use of undefined type 'struct timespec64'
-> ../include/linux/timekeeping.h:242:2: error: dereferencing pointer to incomplete type
-> ../include/linux/timekeeping.h:247:2: error: dereferencing pointer to incomplete type
-> ../include/linux/timekeeping.h:252:2: error: dereferencing pointer to incomplete type
-> ../include/linux/jump_label.h:187:2: error: implicit declaration of function 'atomic_inc' [-Werror=implicit-function-declaration]
-> ../include/linux/jump_label.h:193:2: error: implicit declaration of function 'atomic_dec' [-Werror=implicit-function-declaration]
-> ../include/linux/time64.h:45:31: error: conflicting types for 'timespec64_to_timespec'
-> ../include/linux/time64.h:50:33: error: conflicting types for 'timespec_to_timespec64'
-> ../include/linux/time.h:215:24: error: conflicting types for 'ns_to_timespec'
-> 
-> 	arm64-allmodconfig
-> ../include/linux/wait.h:40:2: error: unknown type name 'spinlock_t'
-> ../include/linux/wait.h:1217:2: error: implicit declaration of function 'atomic_read' [-Werror=implicit-function-declaration]
-> ../include/linux/wait.h:76:32: error: storage size of '__key' isn't known
-> ../include/linux/jiffies.h:61:39: error: division by zero in #if
-> ../include/linux/jiffies.h:289:36: error: 'NSEC_PER_USEC' undeclared (first use in this function)
-> ../include/linux/jiffies.h:303:33: error: division by zero in #if
-> ../include/linux/jiffies.h:323:11: error: 'MSEC_PER_SEC' undeclared (first use in this function)
-> ../include/linux/jiffies.h:369:15: error: 'USEC_PER_SEC' undeclared (first use in this function)
-> ../include/linux/jiffies.h:417:9: error: variable 'ts' has initializer but incomplete type
-> ../include/linux/jiffies.h:417:9: error: implicit declaration of function 'timespec_to_timespec64' [-Werror=implicit-function-declaration]
-> ../include/linux/jiffies.h:417:48: error: dereferencing pointer to incomplete type
-> ../include/linux/jiffies.h:417:20: error: storage size of 'ts' isn't known
-> ../include/linux/jiffies.h:425:20: error: storage size of 'ts' isn't known
-> ../include/linux/jiffies.h:428:2: error: dereferencing pointer to incomplete type
-> ../include/linux/jiffies.h:428:2: error: implicit declaration of function 'timespec64_to_timespec' [-Werror=implicit-function-declaration]
-> ../include/linux/ktime.h:52:23: error: 'KTIME_SEC_MAX' undeclared (first use in this function)
-> ../include/linux/ktime.h:53:29: error: 'KTIME_MAX' undeclared (first use in this function)
-> ../include/linux/ktime.h:55:36: error: 'NSEC_PER_SEC' undeclared (first use in this function)
-> ../include/linux/ktime.h:81:57: error: parameter 1 ('ts') has incomplete type
-> ../include/linux/ktime.h:81:23: error: function declaration isn't a prototype [-Werror=strict-prototypes]
-> ../include/linux/ktime.h:87:61: error: parameter 1 ('ts') has incomplete type
-> ../include/linux/ktime.h:87:23: error: function declaration isn't a prototype [-Werror=strict-prototypes]
-> ../include/linux/ktime.h:93:55: error: parameter 1 ('tv') has incomplete type
-> ../include/linux/ktime.h:93:23: error: function declaration isn't a prototype [-Werror=strict-prototypes]
-> ../include/linux/ktime.h:95:43: error: 'NSEC_PER_USEC' undeclared (first use in this function)
-> ../include/linux/ktime.h:201:25: error: 'NSEC_PER_USEC' undeclared (first use in this function)
-> ../include/linux/ktime.h:206:25: error: 'NSEC_PER_MSEC' undeclared (first use in this function)
-> ../include/linux/ktime.h:221:33: error: 'NSEC_PER_USEC' undeclared (first use in this function)
-> ../include/linux/ktime.h:226:33: error: 'NSEC_PER_MSEC' undeclared (first use in this function)
-> ../include/linux/ktime.h:231:33: error: 'NSEC_PER_USEC' undeclared (first use in this function)
-> ../include/linux/ktime.h:248:3: error: dereferencing pointer to incomplete type
-> ../include/linux/ktime.h:248:3: error: implicit declaration of function 'ns_to_timespec' [-Werror=implicit-function-declaration]
-> ../include/linux/ktime.h:267:3: error: dereferencing pointer to incomplete type
-> ../include/linux/ktime.h:267:3: error: implicit declaration of function 'ns_to_timespec64' [-Werror=implicit-function-declaration]
-> ../include/linux/timekeeping.h:25:31: error: return type is an incomplete type
-> ../include/linux/timekeeping.h:27:9: error: variable 'now' has initializer but incomplete type
-> ../include/linux/timekeeping.h:27:9: error: invalid use of undefined type 'struct timespec64'
-> ../include/linux/timekeeping.h:27:20: error: storage size of 'now' isn't known
-> ../include/linux/timekeeping.h:38:8: error: unknown type name 'time64_t'
-> ../include/linux/timekeeping.h:39:8: error: unknown type name 'time64_t'
-> ../include/linux/timekeeping.h:79:31: error: return type is an incomplete type
-> ../include/linux/timekeeping.h:81:2: error: invalid use of undefined type 'struct timespec64'
-> ../include/linux/timekeeping.h:242:2: error: dereferencing pointer to incomplete type
-> ../include/linux/timekeeping.h:247:2: error: dereferencing pointer to incomplete type
-> ../include/linux/timekeeping.h:252:2: error: dereferencing pointer to incomplete type
-> ../include/linux/rcupdate.h:490:2: error: implicit declaration of function 'lock_acquire' [-Werror=implicit-function-declaration]
-> ../include/linux/rcupdate.h:495:2: error: implicit declaration of function 'lock_release' [-Werror=implicit-function-declaration]
-> ../include/linux/rcupdate.h:572:2: error: implicit declaration of function 'lock_is_held' [-Werror=implicit-function-declaration]
-> ../include/linux/rcupdate.h:572:2: error: implicit declaration of function 'lockdep_rcu_suspicious' [-Werror=implicit-function-declaration]
-> ../include/linux/time64.h:45:31: error: conflicting types for 'timespec64_to_timespec'
-> ../include/linux/time64.h:50:33: error: conflicting types for 'timespec_to_timespec64'
-> ../include/linux/time.h:215:24: error: conflicting types for 'ns_to_timespec'
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151210/fb5a1e6e/attachment.sig>
+This has been tested on AMD Seattle (Overdrive) RevB system. 
+
+NOTE: I have not tested ACPI GICv2m multiframe support since
+I don't have access to such system. Any helps are appreciated.
+
+Thanks,
+Suravee
+
+Changes from V6: (https://lkml.org/lkml/2015/12/9/660)
+  - Minor logic change recommended by Marc
+  - Added Reviewed-by Marc for patch 4
+  - Added Tested-by Duc for patch 4 
+
+Changes from V5: (https://lkml.org/lkml/2015/12/08/763)
+  - Remove previous patch 3
+  - Clean up based on Marc's review (patch 1.4)
+  - Add Ackedb-by and Reviewed-by (Patch 1,2,3)
+  - Expose single gicv2m_init() function for both OF and ACPI
+    (per Marc's suggestion)
+  - Remove gicv2m name from pr_info since this is no longer useful
+    (in patch 3) (per Marc's suggestion)
+
+Changes from V4: (https://lkml.org/lkml/2015/12/08/613)
+  - Fix build error when not specifying CONFIG_IRQ_DOMAIN.
+
+Changes from V3: (https://lkml.org/lkml/2015/10/21/691)
+  - Merged patch 2 into 1, and got rid off pci_msi_get_fwnode()
+    since only ACPI will likely use this. (per Marc suggestion)
+  - Rebased to 4.4.0-rc4
+
+Changes from V2: (https://lkml.org/lkml/2015/10/14/1010)
+  - Minor clean up from Tomasz review comment in patch 6/6.
+
+Changes from V1: (https://lkml.org/lkml/2015/10/13/859)
+  - Rebase on top of Marc's patch to addng support for multiple MSI frames
+    (https://lkml.org/lkml/2015/10/14/271)
+  - Adding fwnode convenient functions (patch 3 and 4)
+
+Suravee Suthikulpanit (4):
+  acpi: pci: Setup MSI domain for ACPI based pci devices
+  irqdomain: introduce is_fwnode_irqchip helper
+  gicv2m: Refactor to prepare for ACPI support
+  gicv2m: acpi: Introducing GICv2m ACPI support
+
+ drivers/irqchip/irq-gic-v2m.c   | 163 ++++++++++++++++++++++++++++++++++------
+ drivers/irqchip/irq-gic.c       |   8 +-
+ drivers/pci/pci-acpi.c          |  42 +++++++++++
+ drivers/pci/probe.c             |   2 +
+ include/linux/irqchip/arm-gic.h |   3 +-
+ include/linux/irqdomain.h       |  10 +++
+ include/linux/pci.h             |  10 +++
+ kernel/irq/irqdomain.c          |   2 +-
+ 8 files changed, 214 insertions(+), 26 deletions(-)
+
+-- 
+2.1.0
