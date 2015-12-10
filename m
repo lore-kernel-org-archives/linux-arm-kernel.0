@@ -1,33 +1,46 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 10 Dec 2015 14:52:06 +0530
-Subject: [PATCH v6.1 08/10] cpufreq: st: Provide runtime initialised
- driver for ST's platforms
-In-Reply-To: <20151210091407.GF17876@x1>
-References: <1449676697-25432-1-git-send-email-lee.jones@linaro.org>
- <1449676697-25432-9-git-send-email-lee.jones@linaro.org>
- <20151210091407.GF17876@x1>
-Message-ID: <20151210092206.GC6991@ubuntu>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 10 Dec 2015 09:26:46 +0000
+Subject: [PATCH v6 0/4] gicv2m: acpi: Add ACPI support for GICv2m MSI
+In-Reply-To: <1449689074-30609-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+References: <1449689074-30609-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <56694556.3030809@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10-12-15, 09:14, Lee Jones wrote:
-> The bootloader is charged with the responsibility to provide platform
-> specific Dynamic Voltage and Frequency Scaling (DVFS) information via
-> Device Tree.  This driver takes the supplied configuration and
-> registers it with the new generic OPP framework, to then be used with
-> CPUFreq.
+On 09/12/15 19:24, Suravee Suthikulpanit wrote:
+> This patch series has been forked from the following patch series since
+> it no longer depends on the rest of the patches.
 > 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
-> Viresh,
->   This incremental submission contains fixes to your last requests.
+>   [PATCH v4 00/10] ACPI GIC Self-probing, GICv2m and GICv3 support
+>   https://lkml.org/lkml/2015/7/29/234
 > 
->  drivers/cpufreq/Kconfig.arm   |  10 ++
->  drivers/cpufreq/Makefile      |   1 +
->  drivers/cpufreq/sti-cpufreq.c | 294 ++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 305 insertions(+)
+> It has been ported to use the newly introduced device fwnode_handle 
+> for ACPI irqdmain introduced by Marc in the following patch series:
+> 
+>   [PATCH v2 00/17] Divorcing irqdomain and device_node
+> 
+> The following git branch contains the submitted patches along with
+> the pre-requsite patches (mainly for ARM64 PCI support for ACPI).
+> 
+>   https://github.com/ssuthiku/linux.git	v2m-multiframe-v6
+> 
+> This has been tested on AMD Seattle (Overdrive) RevB system. 
+> 
+> NOTE: I have not tested ACPI GICv2m multiframe support since
+> I don't have access to such system. Any helps are appreciated.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Suravee,
 
+This is starting to look OK, and you should be able to quickly fix the
+last patch. Now, I'm not sure how you want to get that merged.
+
+The first patch touches both ACPI and PCI, so it would at least requires
+Acks from Rafael and Bjorn (which is not cc-ed, and you may want to fix
+that in your next post, adding linux-pci for a good measure). If they
+are both happy with the change, I can pick up the series as a whole.
+
+Thanks,
+
+	M.
 -- 
-viresh
+Jazz is not dead. It just smells funny...
