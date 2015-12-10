@@ -1,45 +1,54 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Dec 2015 14:19:48 +0100
-Subject: [GIT PULL] RealView defconfig updates
-Message-ID: <CACRpkdbpOs24tx6pmPGaetDqu-VeD+pkUDb7BCw7n+KKUJP_oQ@mail.gmail.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Thu, 10 Dec 2015 13:27:38 +0000
+Subject: Tegra baseline test results for v4.4-rc2
+Message-ID: <56697DCA.7080408@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some updates to the RealView defconfigs, that make the
-system modern and testable. Mostly stuff that should have been
-enabled ages ago.
+Here are some basic Tegra test results for Linux v4.4-rc2.
+Logs and other details at:
 
-Whether it should go directly to the -rc:s or next merge window
-is up to the ARM SoC maintainers.
+    https://nvtb.github.io//linux/test_v4.4-rc2/20151210044354/
 
-Please pull it it!
 
-Yours,
-Linus Walleij
+Test summary
+------------
 
-The following changes since commit 527e9316f8ec44bd53d90fb9f611fa7ffff52bb9:
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
 
-  Linux 4.4-rc4 (2015-12-06 15:43:12 -0800)
+Build: Image:
+    Pass: ( 1/ 1): defconfig
 
-are available in the git repository at:
+Boot to userspace: defconfig:
+    Pass: ( 1/ 1): qemu-vexpress64
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-tags/realview-defconfig-for-armsoc
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
 
-for you to fetch changes up to 8948f8aeb2eaaf0d729aa70965e16d2a4482b48c:
+Boot to userspace: tegra_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
 
-  ARM: realview: add generic config options (2015-12-10 14:09:58 +0100)
 
-----------------------------------------------------------------
-RealView defconfig updates, details in the commit log.
+vmlinux object size
+(delta in bytes from test_v4.4-rc1 (8005c49d9aea74d382f474ce11afbbc7d7130bec)):
+   text     data      bss    total  kernel
+    +55        0        0      +55  defconfig
+  +6023     +320        0    +6343  multi_v7_defconfig
+   +927     +128        0    +1055  tegra_defconfig
 
-----------------------------------------------------------------
-Linus Walleij (4):
-      ARM: realview: refresh defconfig
-      ARM: realview: update SMP defconfig
-      ARM: realview: add generic config options
-      ARM: realview: add generic config options
 
- arch/arm/configs/realview-smp_defconfig | 29 +++++++++++------------------
- arch/arm/configs/realview_defconfig     | 26 +++++++++-----------------
- 2 files changed, 20 insertions(+), 35 deletions(-)
+Boot-time memory difference
+(delta in bytes from test_v4.4-rc1 (8005c49d9aea74d382f474ce11afbbc7d7130bec))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+     -12k      12k        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+     -12k      12k        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+     -12k      12k        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+     -12k      12k        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
