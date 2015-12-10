@@ -1,38 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 10 Dec 2015 10:31:27 +0000
-Subject: [PATCH] arm64: annotate irq off before schedule
-In-Reply-To: <CACVXFVOg5Gr9=EKtZq8306Q7G4oKqsNBV8Gdqaoi1C8DCCgucQ@mail.gmail.com>
-References: <1449645829-1070-1-git-send-email-ming.lei@canonical.com>
- <20151209105501.GC26759@e104818-lin.cambridge.arm.com>
- <CACVXFVOg5Gr9=EKtZq8306Q7G4oKqsNBV8Gdqaoi1C8DCCgucQ@mail.gmail.com>
-Message-ID: <20151210103126.GB21134@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 10 Dec 2015 11:55:17 +0100
+Subject: [PATCH 06/10] ARM: realview: enable multiplatform
+In-Reply-To: <CACRpkdZwD7=h7oXdWZ6a6j5sXRcY0pKc2xuY6QsVfyNzpaWBMA@mail.gmail.com>
+References: <1448469143-447355-1-git-send-email-arnd@arndb.de>
+ <1448469143-447355-7-git-send-email-arnd@arndb.de>
+ <CACRpkdZwD7=h7oXdWZ6a6j5sXRcY0pKc2xuY6QsVfyNzpaWBMA@mail.gmail.com>
+Message-ID: <90630654.JoEJDpXsxl@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 10, 2015 at 02:04:41PM +0800, Ming Lei wrote:
-> On Wed, Dec 9, 2015 at 6:55 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Wed, Dec 09, 2015 at 03:23:49PM +0800, Ming Lei wrote:
-> >> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> >> index 7ed3d75..4769190 100644
-> >> --- a/arch/arm64/kernel/entry.S
-> >> +++ b/arch/arm64/kernel/entry.S
-> >> @@ -634,6 +634,9 @@ work_pending:
-> >>       bl      do_notify_resume
-> >>       b       ret_to_user
-> >>  work_resched:
-> >> +#ifdef CONFIG_TRACE_IRQFLAGS
-> >> +     bl      trace_hardirqs_off
-> >> +#endif
-> >>       bl      schedule
-> >
-> > I think Will already queued a similar patch, though he hasn't pushed it
-> > out yet.
+On Thursday 10 December 2015 11:04:31 Linus Walleij wrote:
+> On Wed, Nov 25, 2015 at 5:32 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 > 
-> I tested the misc-patches branch of Will's tree on kerne.org, and looks
-> the locpdep warning still can be observed.
+> > All obstacles are out of the way by now, so we can finally move realview
+> > to multiplatform.
+> >
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> (...)
+> 
+> > -obj-y                                  := core.o
+> >  obj-$(CONFIG_REALVIEW_DT)              += realview-dt.o
+> > +ifdef $(CONFIG_ATAGS)
+> > +obj-y                                  := core.o
+> >  obj-$(CONFIG_MACH_REALVIEW_EB)         += realview_eb.o
+> >  obj-$(CONFIG_MACH_REALVIEW_PB11MP)     += realview_pb11mp.o
+> >  obj-$(CONFIG_MACH_REALVIEW_PB1176)     += realview_pb1176.o
+> >  obj-$(CONFIG_MACH_REALVIEW_PBA8)       += realview_pba8.o
+> >  obj-$(CONFIG_MACH_REALVIEW_PBX)                += realview_pbx.o
+> > +endif
+> 
+> This isn't working. Even if CONFIG_ATAGS is set, none of the files
+> inside this ifdef $(CONFIG_ATAGS) are compiled. Does Kconfig
+> only support if and not ifdef?
+> 
 
-That's the wrong tree. Try the arm64 for-next queue:
+Oh, it's a silly typo:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
+it should be "ifdef CONFIG_ATAGS", not "ifdef $(CONFIG_ATAGS)"
 
-Will
+Sorry about that.
+
+	Arnd
