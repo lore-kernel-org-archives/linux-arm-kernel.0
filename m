@@ -1,41 +1,38 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 10 Dec 2015 14:23:45 +0000
-Subject: [RFC PATCH 04/20] arm64: mm: assume PAGE SIZE for page table
- allocator
-In-Reply-To: <20151210140840.GE21134@arm.com>
-References: <1449665095-20774-1-git-send-email-mark.rutland@arm.com>
- <1449665095-20774-5-git-send-email-mark.rutland@arm.com>
- <20151210140840.GE21134@arm.com>
-Message-ID: <20151210142344.GA495@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 10 Dec 2015 15:29:38 +0100
+Subject: [PATCH] [media] staging/davinci_vfpe: allow modular build
+Message-ID: <2029571.PWO4DcqdUl@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 10, 2015 at 02:08:40PM +0000, Will Deacon wrote:
-> On Wed, Dec 09, 2015 at 12:44:39PM +0000, Mark Rutland wrote:
-> > We pass a size parameter to early_alloc and late_alloc, but these are
-> > only ever used to allocate single pages. In late_alloc we always
-> > allocate a single page.
-> > 
-> > Remove the redundant size parameter.
-> > 
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Jeremy Linton <jeremy.linton@arm.com>
-> > Cc: Laura Abbott <labbott@fedoraproject.org>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm64/mm/mmu.c | 27 ++++++++++++---------------
-> >  1 file changed, 12 insertions(+), 15 deletions(-)
-> 
-> Looks sensible to me. Cosmetic nit, but we could we rename these to
-> early_page_alloc/late_page_alloc instead, please?
+It has never been possible to actually build this driver as
+a loadable module, only built-in because the Makefile attempts
+to build each file into its own module and fails:
 
-Sure. I'll also s/alloc/page_alloc/ for the function pointer. Luckily
-this doesn't clash with the usual alloc_page function.
+ERROR: "mbus_to_pix" [drivers/staging/media/davinci_vpfe/vpfe_video.ko] undefined!
+ERROR: "vpfe_resizer_register_entities" [drivers/staging/media/davinci_vpfe/vpfe_mc_capture.ko] undefined!
+ERROR: "rsz_enable" [drivers/staging/media/davinci_vpfe/dm365_resizer.ko] undefined!
+ERROR: "config_ipipe_hw" [drivers/staging/media/davinci_vpfe/dm365_ipipe.ko] undefined!
+ERROR: "ipipe_set_lutdpc_regs" [drivers/staging/media/davinci_vpfe/dm365_ipipe.ko] undefined!
 
-I'll also fix up the zero page init, as I forgot to remove the PAGE_SIZE
-parameter in that early_alloc() call there.
+It took a long time to catch this bug with randconfig builds
+because at least 14 other Kconfig symbols have to be enabled in
+order to configure this one.
 
-Thanks,
-Mark.
+The solution is really easy: this patch changes the Makefile to
+link all files into one module.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+
+diff --git a/drivers/staging/media/davinci_vpfe/Makefile b/drivers/staging/media/davinci_vpfe/Makefile
+index c64515c644cd..3019c9ecd548 100644
+--- a/drivers/staging/media/davinci_vpfe/Makefile
++++ b/drivers/staging/media/davinci_vpfe/Makefile
+@@ -1,3 +1,5 @@
+-obj-$(CONFIG_VIDEO_DM365_VPFE) += \
++obj-$(CONFIG_VIDEO_DM365_VPFE) += davinci-vfpe.o
++
++davinci-vfpe-objs := \
+ 	dm365_isif.o dm365_ipipe_hw.o dm365_ipipe.o \
+ 	dm365_resizer.o dm365_ipipeif.o vpfe_mc_capture.o vpfe_video.o
