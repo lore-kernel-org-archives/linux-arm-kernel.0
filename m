@@ -1,52 +1,49 @@
-From: dannym@scratchpost.org (Danny Milosavljevic)
-Date: Thu, 10 Dec 2015 21:52:27 +0100
-Subject: [PATCH v5] sun4i-codec: add inputs
-In-Reply-To: <20151210175420.GH27957@lukather>
-References: <20151208042013.11d31f09@dayas> <20151210175420.GH27957@lukather>
-Message-ID: <20151210215227.6453acc8@dayas>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 10 Dec 2015 21:59:51 +0100
+Subject: [PATCH 0/5] ARM: orion5x/dove/mv78xx0 multiplatform
+In-Reply-To: <5669CC76.4030606@vollmann.ch>
+References: <1448466557-435335-1-git-send-email-arnd@arndb.de>
+ <27901501.7xKhhTyrKu@wuerfel> <5669CC76.4030606@vollmann.ch>
+Message-ID: <1802654.n0lYxNZ2px@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
-
-On Thu, 10 Dec 2015 18:54:20 +0100
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> > +	SOC_DAPM_SINGLE("Mic1-In Playback Switch", SUN4I_CODEC_DAC_ACTL,
-> > +			SUN4I_CODEC_DAC_ACTL_MIC1RS, 1, 0),
-> > +	SOC_DAPM_SINGLE("Mic2-In Playback Switch", SUN4I_CODEC_DAC_ACTL,
-> > +			SUN4I_CODEC_DAC_ACTL_MIC2RS, 1, 0),
-> >  };
+On Thursday 10 December 2015 20:03:18 Detlef Vollmann wrote:
+> On 12/10/15 14:43, Arnd Bergmann wrote:
+> > On Thursday 10 December 2015 14:18:11 Arnd Bergmann wrote:
+> >> On Thursday 10 December 2015 13:56:05 Detlef Vollmann wrote:
 > 
-> Do we need the -In part of FM, Mic1 and Mic2?
+> >>> The bad news:
+> >>> My own config (which is massivly stripped down) produces a kernel
+> >>> image that's more than 26K bigger than on v4.4-rc3 without any
+> >>> added functionality.
+> >>> The DNS-323 is extremly constrained in space (the whole system
+> >>> including boot loader, kernel and filesystem has to fit into 8M flash).
+> >>> Any ideas how I can get rid of this additional overhead?
+> >>
+> >> Can you send me your config file? I can have a look.
+> >>
+> > 
+> > I've done a quick check with an allnoconfig-like test and it seems that
+> > CONFIG_OF is weighing in at around 86K here, with all the other options
+> > it pulls in, comparing an allnoconfig kernel for DS-323 with one that
+> > has CONFIG_OF enabled as well.
+> > 
+> > The multiplatform kernel also enables CONFIG_OF unconditionally, but is
+> > otherwise a little smaller than the mach-orion5x based one:
+> > 
+> >    text    data     bss     dec     hex filename
+> >  942144   64112   17648 1023904   f9fa0 build/tmp/vmlinux-orion-allno
+> > 1027516   54052   20824 1102392  10d238 build/tmp/vmlinux-multi-plus-orion
+> > 1025320   66020   18744 1110084  10f044 build/tmp/vmlinux-orion-plus-of
+> > 
+> > The diff below shows all the differences between orion-allno and
+> > multi-plus-orion.
+> How did you get the orion-allno config and how did you get it compiled?
+> I tried to apply your changes to my config and compile it, but
+> it started silentoldconfig which introduced back 'ARCH_MULTIPLATFORM'
 
-For consistency to what's in linux-sunxi.git, I will remove the "-In" from 
-the Mic names in v7.
+The first and third row are without my patches, once they are applied,
+ARCH_ORION becomes a sub-option of ARCH_MULTIPLATFORM.
 
-For FM, do we? I don't know. Are there ALSA devices which output to FM?
-
-> Mic1 is already defined a few lines above.
-> And you have the Mixers routes a bit above too.
-
-Aha, Mic1 is there in <https://github.com/linux-sunxi/linux-sunxi.git> 
-branch "sunxi-next".
-In <git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git> 
-branch "sunxi/for-next", it's not there. 
-This patch is for the latter.
-
-I'm currently rebasing on the former, but it will take some time. 
-The differences between these driver versions are:
-- Mic1 Preamplifier is registered as PGA instead of switch in the former.
-- Mic1 is already an input in the former.
-- VMIC is handled in the former.
-- ADC Capturing support exists in the former.
-That's it.
-
-I'll retest a patch based on the former...
-
-> [global mutation]
-> We'll need to fix that, see the other discussion.
-
-Yeah, I think I found a nicer way to do it in v6.
-
-Thanks,
-   Danny
+	Arnd
