@@ -1,36 +1,59 @@
 From: merker@debian.org (Karsten Merker)
-Date: Thu, 10 Dec 2015 21:31:58 +0100
-Subject: [PATCH 0/3] ARM: dts: sun7i: Olimex A20-SOM-EVB: LRADC-keys,
- MMC3 and typo fix in the sunxi LRADC binding
-Message-ID: <1449779521-754-1-git-send-email-merker@debian.org>
+Date: Thu, 10 Dec 2015 21:32:00 +0100
+Subject: [PATCH 2/3] ARM: dts: sun7i: Olimex A20-SOM-EVB: Enable mmc3
+ (baseboard SD socket)
+In-Reply-To: <1449779521-754-1-git-send-email-merker@debian.org>
+References: <1449779521-754-1-git-send-email-merker@debian.org>
+Message-ID: <1449779521-754-3-git-send-email-merker@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The Olimex A20-SOM-EVB is an evaluation board for the Olimex
+A20-SOM system-on-module. The baseboard provides a full-size SD
+socket (connected to mmc3) in addition to the micro-SD socket on
+the SOM itself (which is connected to mmc0).
 
-the Olimex A20-SOM-EVB is an evaluation board for the Olimex
-A20-SOM system-on-module. This patchset adds/enables some more
-hardware features in the board dts:
+Enable the mmc3 controller in the dts.
 
-  - Patch 1 adds support for the LRADC-keys on the baseboard.
+Signed-off-by: Karsten Merker <merker@debian.org>
+---
+ arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-  - Patch 2 enables the MMC3 controller to allow use of the
-    full-size SD card socket on the baseboard.
-
-While adding the LRADC-keys support, I have stumbled over
-a typo in the bindings documentation. Patch 3 fixes that.
-
-Regards,
-Karsten
-
-Karsten Merker (3):
-  ARM: dts: sun7i: Olimex A20-SOM-EVB: Add LRADC keys
-  ARM: dts: sun7i: Olimex A20-SOM-EVB: Enable mmc3 (baseboard SD socket)
-  ARM: dts: sunxi: allwinner,sun4i-a10-lradc-keys binding: typo fix
-
- .../devicetree/bindings/input/sun4i-lradc-keys.txt |  2 +-
- arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts     | 73 ++++++++++++++++++++++
- 2 files changed, 74 insertions(+), 1 deletion(-)
-
+diff --git a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+index 6562a6bc..6a3d95d 100644
+--- a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
++++ b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+@@ -176,6 +176,16 @@
+ 	status = "okay";
+ };
+ 
++&mmc3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc3_pins_a>, <&mmc3_cd_pin_olimex_som_evb>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	cd-gpios = <&pio 7 0 GPIO_ACTIVE_HIGH>; /* PH0 */
++	cd-inverted;
++	status = "okay";
++};
++
+ &ohci0 {
+ 	status = "okay";
+ };
+@@ -198,6 +208,13 @@
+ 		allwinner,drive = <SUN4I_PINCTRL_20_MA>;
+ 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 	};
++
++	mmc3_cd_pin_olimex_som_evb: mmc3_cd_pin at 0 {
++		allwinner,pins = "PH0";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++	};
+ };
+ 
+ &reg_ahci_5v {
 -- 
 2.1.4
