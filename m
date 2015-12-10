@@ -1,59 +1,34 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 10 Dec 2015 16:57:22 +0100
-Subject: [PATCH v4 7/8] ARM: dts: Exynos5422: fix OPP tables
-In-Reply-To: <56669126.7050803@samsung.com>
-References: <1449512300-17230-1-git-send-email-b.zolnierkie@samsung.com>
- <1449512300-17230-8-git-send-email-b.zolnierkie@samsung.com>
- <56669126.7050803@samsung.com>
-Message-ID: <2192451.zF6EhNeeQc@amdc1976>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 10 Dec 2015 15:59:40 +0000
+Subject: [RFC PATCH 8/8] arm64: add sysfs cpu_capacity attribute
+In-Reply-To: <566988E8.3010308@arm.com>
+References: <1448288921-30307-1-git-send-email-juri.lelli@arm.com>
+ <1448288921-30307-9-git-send-email-juri.lelli@arm.com>
+ <566988E8.3010308@arm.com>
+Message-ID: <20151210155940.GN5727@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Dec 10, 2015 at 02:15:04PM +0000, Dietmar Eggemann wrote:
+> On 23/11/15 14:28, Juri Lelli wrote:
 
-Hi,
+> > The new attribute shows up as:
 
-On Tuesday, December 08, 2015 05:13:26 PM Krzysztof Kozlowski wrote:
-> On 08.12.2015 03:18, Bartlomiej Zolnierkiewicz wrote:
-> > From: Ben Gamari <ben@smart-cactus.org>
-> > 
-> > The Exynos 5422 is identical to the 5800 except for the fact that it
-> > boots from the A7 cores. Consequently, the core numbering is different:
-> > cores 0-3 are A7s whereas 4-7 are A15s.
-> > 
-> > We can reuse the device tree of the 5800 for the 5422 but we must take
-> > care to override the OPP tables and CPU clocks.  These are otherwise
-> > inherited from the exynos5800 devicetree, which has the CPU clusters
-> > reversed compared to the 5422. This results in the A15 cores only
-> > reaching 1.4GHz, the maximum rate of the KFC clock.
-> > 
-> > Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-> > Signed-off-by: Ben Gamari <ben@smart-cactus.org>
-> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> > ---
-> >  arch/arm/boot/dts/exynos5422-cpus.dtsi | 10 ++++++++++
-> >  1 file changed, 10 insertions(+)
-> > 
-> 
-> This looks like a very-non-atomic way of handling a change. You added
-> opp tables to exynos5420 before so at that time they will be applied to
-> Odroid XU3 family which uses different CPU order. After that you are
-> fixing the tables to proper CPU order. Direct bisectability probably
-> won't be an issue because all of DTS would go to separate branch... but
-> the logic behind confuses.
+> >  /sys/devices/system/cpu/cpu*/cpu_capacity
 
-It was done this way to preserve original authorship of changes and
-bisectability should not be affected unless patch #8 is merged before
-patch #7.
+> This sysfs interface is not really needed for arm or arm64. People can
+> build the dt blob if they want to change the values. Less code to carry
+> ... Let's focus on the core functionality, which is parsing cpu capacity
+> from dt file to task scheduler for heterogeneous systems.
 
-> I think this should be squashed into 3/8.
-
-OK.
-
-> Best regards,
-> Krzysztof
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+That does make the tuning process much more cumbersome - users have to
+rebuild and reboot to tweak the numbers rather than just tweaking the
+numbers and rerunning the benchmark (which seems like something people
+would want to automate).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151210/32fdc5d3/attachment.sig>
