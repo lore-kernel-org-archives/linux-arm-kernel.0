@@ -1,36 +1,34 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 10 Dec 2015 17:58:49 +0100
-Subject: [PATCH v5 7/7] ARM: Exynos: use generic cpufreq driver for
- Exynos5422/5800
-In-Reply-To: <1449766729-435-1-git-send-email-b.zolnierkie@samsung.com>
-References: <1449766729-435-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1449766729-435-8-git-send-email-b.zolnierkie@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 10 Dec 2015 18:02:29 +0100
+Subject: [PATCH] pinctrl: freescale: add ZERO_OFFSET_VALID flag for vf610
+ pinctrl
+In-Reply-To: <1448437251-21487-1-git-send-email-shawnguo@kernel.org>
+References: <1448437251-21487-1-git-send-email-shawnguo@kernel.org>
+Message-ID: <CACRpkdZCakhg57S5rSNnzyUzx1zvHnAy_edx6RjDfpDvvBKw4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new CPU clock type allows the use of generic cpufreq-dt driver
-for Exynos5422/5800.
+On Wed, Nov 25, 2015 at 8:40 AM, Shawn Guo <shawnguo@kernel.org> wrote:
 
-Cc: Tomasz Figa <tomasz.figa@gmail.com>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-Cc: Thomas Abraham <thomas.ab@samsung.com>
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
----
- arch/arm/mach-exynos/exynos.c | 1 +
- 1 file changed, 1 insertion(+)
+> To support i.MX7D Low Power State Retention IOMUXC, commit e7b37a522aa9
+> ("pinctrl: freescale: imx: allow mux_reg offset zero") changes the way
+> of zero mux_reg offset support with a new flag ZERO_OFFSET_VALID.  But,
+> unfortunately, it forgot to add this flag for vf610 pinctrl which has
+> zero mux_reg offset be valid as well, and hence breaks the vf610
+> support.
+>
+> Fix the regression by adding flag ZERO_OFFSET_VALID for vf610 pinctrl
+> driver.
+>
+> Signed-off-by: Shawn Guo <shawnguo@kernel.org>
+> Fixes: e7b37a522aa9 ("pinctrl: freescale: imx: allow mux_reg offset zero")
+> Reported-by: Andrew Lunn <andrew@lunn.ch>
+> Tested-by: Andrew Lunn <andrew@lunn.ch>
+> Acked-by: Stefan Agner <stefan@agner.ch>
 
-diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index 7a89c9d..cec8aeb 100644
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@ -232,6 +232,7 @@ static const struct of_device_id exynos_cpufreq_matches[] = {
- 	{ .compatible = "samsung,exynos5250", .data = "cpufreq-dt" },
- #ifndef CONFIG_BL_SWITCHER
- 	{ .compatible = "samsung,exynos5420", .data = "cpufreq-dt" },
-+	{ .compatible = "samsung,exynos5800", .data = "cpufreq-dt" },
- #endif
- 	{ /* sentinel */ }
- };
--- 
-1.9.1
+Patch applied for fixes.
+
+Sorry for the delay.
+
+Yours,
+Linus Walleij
