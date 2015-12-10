@@ -1,134 +1,45 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 10 Dec 2015 17:38:23 -0600
-Subject: [PATCH] MAINTAINERS: Add missing platform maintainers for dts files
-Message-ID: <1449790703-12054-1-git-send-email-robh@kernel.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 10 Dec 2015 15:39:08 -0800
+Subject: [GIT PULL] omap fixes against v4.4-rc4
+Message-ID: <20151210233907.GI23396@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Platform dts files need to be reviewed primarily by the platform
-maintainers as dts files typically go in thru their trees. Add the missing
-paths where there are existing maintainers listed.
+The following changes since commit 31ade3b83e1821da5fbb2f11b5b3d4ab2ec39db8:
 
-Signed-off-by: Rob Herring <robh@kernel.org>
----
- MAINTAINERS | 20 +++++++++++++++++++-
- 1 file changed, 19 insertions(+), 1 deletion(-)
+  Linux 4.4-rc3 (2015-11-29 18:58:26 -0800)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 69c8a9c..415b731 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -950,6 +950,8 @@ M:	Rob Herring <robh@kernel.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/mach-highbank/
-+F:	arch/arm/boot/dts/highbank.dts
-+F:	arch/arm/boot/dts/ecx-*.dts*
- 
- ARM/CAVIUM NETWORKS CNS3XXX MACHINE SUPPORT
- M:	Krzysztof Halasa <khalasa@piap.pl>
-@@ -1025,6 +1027,7 @@ M:	Barry Song <baohua@kernel.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
- S:	Maintained
-+F:	arch/arm/boot/dts/prima2*
- F:	arch/arm/mach-prima2/
- F:	drivers/clk/sirf/
- F:	drivers/clocksource/timer-prima2.c
-@@ -1126,6 +1129,10 @@ W:	http://www.hisilicon.com
- S:	Supported
- T:	git git://github.com/hisilicon/linux-hisi.git
- F:	arch/arm/mach-hisi/
-+F:	arch/arm/boot/dts/hi3*
-+F:	arch/arm/boot/dts/hip*
-+F:	arch/arm/boot/dts/hisi*
-+F:	arch/arm64/boot/dts/hisilicon/
- 
- ARM/HP JORNADA 7XX MACHINE SUPPORT
- M:	Kristoffer Ericson <kristoffer.ericson@gmail.com>
-@@ -1202,6 +1209,7 @@ M:	Santosh Shilimkar <ssantosh@kernel.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/mach-keystone/
-+F:	arch/arm/boot/dts/k2*
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
- 
- ARM/TEXAS INSTRUMENT KEYSTONE CLOCK FRAMEWORK
-@@ -1270,6 +1278,7 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/mach-berlin/
- F:	arch/arm/boot/dts/berlin*
-+F:	arch/arm64/boot/dts/marvell/berlin*
- 
- 
- ARM/Marvell Dove/MV78xx0/Orion SOC support
-@@ -1406,7 +1415,9 @@ M:	David Brown <davidb@codeaurora.org>
- L:	linux-arm-msm at vger.kernel.org
- L:	linux-soc at vger.kernel.org
- S:	Maintained
-+F:	arch/arm/boot/dts/qcom-*
- F:	arch/arm/mach-qcom/
-+F:	arch/arm64/boot/dts/qcom/*
- F:	drivers/soc/qcom/
- F:	drivers/tty/serial/msm_serial.h
- F:	drivers/tty/serial/msm_serial.c
-@@ -1456,6 +1467,8 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/boot/dts/s3c*
-+F:	arch/arm/boot/dts/s5p*
-+F:	arch/arm/boot/dts/samsung*
- F:	arch/arm/boot/dts/exynos*
- F:	arch/arm64/boot/dts/exynos/
- F:	arch/arm/plat-samsung/
-@@ -1536,6 +1549,7 @@ S:	Maintained
- F:	arch/arm/mach-socfpga/
- F:	arch/arm/boot/dts/socfpga*
- F:	arch/arm/configs/socfpga_defconfig
-+F:	arch/arm64/boot/dts/altera/
- W:	http://www.rocketboards.org
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git
- 
-@@ -1680,7 +1694,7 @@ M:	Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/boot/dts/vexpress*
--F:	arch/arm64/boot/dts/arm/vexpress*
-+F:	arch/arm64/boot/dts/arm/
- F:	arch/arm/mach-vexpress/
- F:	*/*/vexpress*
- F:	*/*/*/vexpress*
-@@ -2300,6 +2314,7 @@ F:	arch/arm/mach-bcm/
- F:	arch/arm/boot/dts/bcm113*
- F:	arch/arm/boot/dts/bcm216*
- F:	arch/arm/boot/dts/bcm281*
-+F:	arch/arm64/boot/dts/broadcom/
- F:	arch/arm/configs/bcm_defconfig
- F:	drivers/mmc/host/sdhci-bcm-kona.c
- F:	drivers/clocksource/bcm_kona_timer.c
-@@ -8627,6 +8642,7 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- T:	git git://github.com/hzhuang1/linux.git
- T:	git git://github.com/rjarzmik/linux.git
- S:	Maintained
-+F:	arch/arm/boot/dts/pxa*
- F:	arch/arm/mach-pxa/
- F:	drivers/dma/pxa*
- F:	drivers/pcmcia/pxa2xx*
-@@ -8649,6 +8665,7 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- T:	git git://github.com/hzhuang1/linux.git
- T:	git git://git.linaro.org/people/ycmiao/pxa-linux.git
- S:	Maintained
-+F:	arch/arm/boot/dts/mmp*
- F:	arch/arm/mach-mmp/
- 
- PXA MMCI DRIVER
-@@ -10068,6 +10085,7 @@ L:	spear-devel at list.st.com
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- W:	http://www.st.com/spear
- S:	Maintained
-+F:	arch/arm/boot/dts/spear*
- F:	arch/arm/mach-spear/
- 
- SPEAR CLOCK FRAMEWORK SUPPORT
--- 
-2.5.0
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.4/fixes-rc4
+
+for you to fetch changes up to 14054fb1da099fd89208b8b319a00e0b902c7645:
+
+  ARM: dts: am4372: fix clock source for arm twd and global timers (2015-12-09 16:46:25 -0800)
+
+----------------------------------------------------------------
+Few fixes for omaps for v4.4-rc cycle:
+
+- Fix clock source for ARM TWD and global timers on am437x
+
+- Always select REGULATOR_FIXED_VOLTAGE for omap2+ instead of
+  when MACH_OMAP3_PANDORA is selected
+
+- Fix SPI DMA handles for dm816x as only some were mapped
+
+- Fix up mbox cells for dm816x to make mailbox usable
+
+----------------------------------------------------------------
+Grygorii Strashko (2):
+      ARM: OMAP2+: enable REGULATOR_FIXED_VOLTAGE
+      ARM: dts: am4372: fix clock source for arm twd and global timers
+
+Neil Armstrong (2):
+      ARM: dts: add dm816x missing #mbox-cells
+      ARM: dts: add dm816x missing spi DT dma handles
+
+ arch/arm/boot/dts/am4372.dtsi        | 4 ++--
+ arch/arm/boot/dts/am43xx-clocks.dtsi | 8 ++++++++
+ arch/arm/boot/dts/dm816x.dtsi        | 8 ++++++--
+ arch/arm/mach-omap2/Kconfig          | 2 +-
+ 4 files changed, 17 insertions(+), 5 deletions(-)
