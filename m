@@ -1,33 +1,32 @@
 From: Frank.Li@freescale.com (Frank.Li at freescale.com)
-Date: Fri, 11 Dec 2015 07:12:12 +0800
-Subject: [PATCH 3/3] arm: imx: config: enable psci default
+Date: Fri, 11 Dec 2015 07:12:11 +0800
+Subject: [PATCH 2/3] ARM: imx: select HAVE_ARM_ARCH_TIMER if selected i.MX7D
 In-Reply-To: <1449789132-18976-1-git-send-email-Frank.Li@freescale.com>
 References: <1449789132-18976-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <1449789132-18976-3-git-send-email-Frank.Li@freescale.com>
+Message-ID: <1449789132-18976-2-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Frank Li <Frank.Li@freescale.com>
 
-i.MX7D uboot support psci firmware.
-Enabled psci default.
+i.MX7D Supported ARCH Timer.
 
 Signed-off-by: Frank Li <Frank.Li@freescale.com>
 ---
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
+ arch/arm/mach-imx/Kconfig | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 2d5253d..1e792ef 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -47,6 +47,7 @@ CONFIG_PCI=y
- CONFIG_PCI_MSI=y
- CONFIG_PCI_IMX6=y
- CONFIG_SMP=y
-+CONFIG_ARM_PSCI=y
- CONFIG_PREEMPT_VOLUNTARY=y
- CONFIG_AEABI=y
- CONFIG_HIGHMEM=y
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 0ac180f..061dea4 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -563,6 +563,7 @@ config SOC_IMX7D
+ 	select ARM_GIC
+ 	select HAVE_IMX_ANATOP
+ 	select HAVE_IMX_MMDC
++	select HAVE_ARM_ARCH_TIMER
+ 	help
+ 		This enables support for Freescale i.MX7 Dual processor.
+ 
 -- 
 2.5.2
