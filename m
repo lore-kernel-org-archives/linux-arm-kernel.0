@@ -1,49 +1,59 @@
 From: james.morse@arm.com (James Morse)
-Date: Thu, 10 Dec 2015 10:22:38 +0000
-Subject: [PATCH v8 5/4] arm64: Fix off-by-one in stack tracing when stepping
- off irq stack
-In-Reply-To: <1449226948-14251-1-git-send-email-james.morse@arm.com>
+Date: Thu, 10 Dec 2015 10:22:39 +0000
+Subject: [PATCH v8 6/4] arm64: Add this_cpu_ptr() assembler macro for use in
+ entry.S
+In-Reply-To: <1449742961-11432-1-git-send-email-james.morse@arm.com>
 References: <1449226948-14251-1-git-send-email-james.morse@arm.com>
-Message-ID: <1449742961-11432-1-git-send-email-james.morse@arm.com>
+ <1449742961-11432-1-git-send-email-james.morse@arm.com>
+Message-ID: <1449742961-11432-2-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jungseok Lee <jungseoklee85@gmail.com>
+irq_stack is a per_cpu variable, that needs to be access from entry.S.
+Use an assembler macro instead of the unreadable details.
 
-Signed-off-by: Jungseok Lee <jungseoklee85@gmail.com>
 Signed-off-by: James Morse <james.morse@arm.com>
 ---
-I believe Will already has this patch, its included here for completeness.
+ arch/arm64/include/asm/assembler.h | 11 +++++++++++
+ arch/arm64/kernel/entry.S          |  4 +---
+ 2 files changed, 12 insertions(+), 3 deletions(-)
 
- arch/arm64/include/asm/irq.h | 2 +-
- arch/arm64/kernel/entry.S    | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
-index 6fd25ab534ca..cdc2916a00f0 100644
---- a/arch/arm64/include/asm/irq.h
-+++ b/arch/arm64/include/asm/irq.h
-@@ -27,7 +27,7 @@ DECLARE_PER_CPU(unsigned long [IRQ_STACK_SIZE/sizeof(long)], irq_stack);
-  * The offset from irq_stack_ptr where entry.S will store the original
-  * stack pointer. Used by unwind_frame() and dump_backtrace().
-  */
--#define IRQ_STACK_TO_TASK_STACK(ptr) *((unsigned long *)(ptr - 0x10));
-+#define IRQ_STACK_TO_TASK_STACK(ptr) *((unsigned long *)(ptr - 0x20));
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index 12eff928ef8b..bb7b72734c24 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -193,6 +193,17 @@ lr	.req	x30		// link register
+ 	str	\src, [\tmp, :lo12:\sym]
+ 	.endm
  
- extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
- 
++	/*
++	 * @sym: The name of the per-cpu variable
++	 * @reg: Result of per_cpu(sym, smp_processor_id())
++	 * @tmp: scratch register
++	 */
++	.macro this_cpu_ptr, sym, reg, tmp
++	adr_l	\reg, \sym
++	mrs	\tmp, tpidr_el1
++	add	\reg, \reg, \tmp
++	.endm
++
+ /*
+  * Annotate a function as position independent, i.e., safe to be called before
+  * the kernel virtual mapping is activated.
 diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 2963050e5e9e..76e803118f57 100644
+index 76e803118f57..9a0450344335 100644
 --- a/arch/arm64/kernel/entry.S
 +++ b/arch/arm64/kernel/entry.S
-@@ -199,7 +199,7 @@ alternative_endif
- 	/* Add a dummy stack frame */
- 	stp     x29, \dummy_lr, [sp, #-16]!           // dummy stack frame
- 	mov	x29, sp
--	stp     xzr, x19, [sp, #-16]!
-+	stp     x19, xzr, [sp, #-16]!
+@@ -179,9 +179,7 @@ alternative_endif
+ 	.macro	irq_stack_entry, dummy_lr
+ 	mov	x19, sp			// preserve the original sp
  
- 9998:
- 	.endm
+-	adr_l	x25, irq_stack
+-	mrs	x26, tpidr_el1
+-	add	x25, x25, x26
++	this_cpu_ptr irq_stack, x25, x26
+ 
+ 	/*
+ 	 * Check the lowest address on irq_stack for the irq_count value,
 -- 
 2.6.2
