@@ -1,89 +1,48 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 10 Dec 2015 18:06:52 +0100
-Subject: [PATCH v3 00/13] ARM: at91: PMC driver rework
-In-Reply-To: <1449248628-3486-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1449248628-3486-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20151210180652.40eb8bc4@bbrezillon>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 10 Dec 2015 18:08:19 +0100
+Subject: [PATCH v2 4/9] pinctrl: Add support STM32 MCUs
+In-Reply-To: <CALszF6Cd=yei0m2Zs=+k=KT5RUzdesGWPK7PAQPdj_-Ouan=2A@mail.gmail.com>
+References: <1445102604-11502-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1445102604-11502-5-git-send-email-mcoquelin.stm32@gmail.com>
+ <CALszF6Cd=yei0m2Zs=+k=KT5RUzdesGWPK7PAQPdj_-Ouan=2A@mail.gmail.com>
+Message-ID: <CACRpkda4eSHu57Tw6F-kmxY_EOSEhpRiowQN9o4LbPVgE_Xvkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri,  4 Dec 2015 18:03:35 +0100
-Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+On Tue, Dec 1, 2015 at 10:53 AM, Maxime Coquelin
+<mcoquelin.stm32@gmail.com> wrote:
+> 2015-10-17 19:23 GMT+02:00 Maxime Coquelin <mcoquelin.stm32@gmail.com>:
+>> This patch adds pinctrl and GPIO support to STMicroelectronic's STM32
+>> family of MCUs.
+>>
+>> While it only supports STM32F429 for now, it has been designed to enable
+>> support of other MCUs of the family (e.g. STM32F746).
+>>
+>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>> ---
+>>  drivers/pinctrl/Kconfig                   |    1 +
+>>  drivers/pinctrl/Makefile                  |    1 +
+>>  drivers/pinctrl/stm32/Kconfig             |   16 +
+>>  drivers/pinctrl/stm32/Makefile            |    5 +
+>>  drivers/pinctrl/stm32/pinctrl-stm32.c     |  856 +++++++++++++++
+>>  drivers/pinctrl/stm32/pinctrl-stm32.h     |   43 +
+>>  drivers/pinctrl/stm32/pinctrl-stm32f429.c | 1598 +++++++++++++++++++++++++++++
+>>  7 files changed, 2520 insertions(+)
+>>  create mode 100644 drivers/pinctrl/stm32/Kconfig
+>>  create mode 100644 drivers/pinctrl/stm32/Makefile
+>>  create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32.c
+>>  create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32.h
+>>  create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32f429.c
+>>
+>
+> Gentle reminder, do you know when you will be able to review this driver?
 
-> Hi,
-> 
-> This patch set is a cleanup that properly separate drivers needing to access the
-> PMC (PM and USB) from the clock driver by exposing the PMC as a syscon.
-> 
-> This also allows to implement a fix for preempt-rt. Currently, at91 platform are
-> crashing when using preempt-rt because the irq handler are transformed in
-> threaded irq handler but at the time the pmc registers its clocks, it is not
-> possible to creat threads, leading to a NULL pointer dereference in the kernel.
-> 
-> The new infrastructure uses polling until it is late enough to register threaded
-> irqs.
-> 
-> Note that there is an ugly global spinlock for the peripheral and generated
-> clocks. More infrastructure is needed in syscon to get rid of that one. We will
-> be working on that.
+I'm a bit overloaded so reviewing of large chunks of code takes time.
 
-To the whole series,
+It would be great if I could have some Reviewed-by tags from someone
+else who's familiar with pin control.
 
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Patrice: do you have a chance to review this driver and help us?
 
-> 
-> Changes in v3:
->  - rebased on v4.4-rc1 and so included the sama5d2 and the generated clocks
->  - fixed comments from Wenyou
-> 
-> Alexandre Belloni (10):
->   clk: at91: clk-main: factorize irq handling
->   clk: at91: make IRQ optional and register them later
->   clk: at91: pmc: merge at91_pmc_init in atmel_pmc_probe
->   clk: at91: pmc: move pmc structures to C file
->   ARM: at91: pm: simply call at91_pm_init
->   ARM: at91: pm: find and remap the pmc
->   ARM: at91: pm: move idle functions to pm.c
->   ARM: at91: remove useless includes and function prototypes
->   usb: gadget: atmel: access the PMC using regmap
->   clk: at91: pmc: drop at91_pmc_base
-> 
-> Boris Brezillon (3):
->   clk: at91: make use of syscon to share PMC registers in several
->     drivers
->   clk: at91: make use of syscon/regmap internally
->   clk: at91: only disable available IRQs
-> 
->  arch/arm/mach-at91/Kconfig              |   1 +
->  arch/arm/mach-at91/at91rm9200.c         |   2 -
->  arch/arm/mach-at91/at91sam9.c           |   2 -
->  arch/arm/mach-at91/generic.h            |  13 +-
->  arch/arm/mach-at91/pm.c                 |  70 +++++-
->  arch/arm/mach-at91/sama5.c              |   2 +-
->  drivers/clk/at91/clk-generated.c        |  95 ++++---
->  drivers/clk/at91/clk-h32mx.c            |  32 ++-
->  drivers/clk/at91/clk-main.c             | 430 ++++++++++++++++++--------------
->  drivers/clk/at91/clk-master.c           | 134 ++++++----
->  drivers/clk/at91/clk-peripheral.c       | 135 +++++-----
->  drivers/clk/at91/clk-pll.c              | 190 +++++++++-----
->  drivers/clk/at91/clk-plldiv.c           |  42 ++--
->  drivers/clk/at91/clk-programmable.c     |  92 ++++---
->  drivers/clk/at91/clk-slow.c             |  27 +-
->  drivers/clk/at91/clk-smd.c              |  54 ++--
->  drivers/clk/at91/clk-system.c           | 129 +++++++---
->  drivers/clk/at91/clk-usb.c              | 121 +++++----
->  drivers/clk/at91/clk-utmi.c             | 116 ++++++---
->  drivers/clk/at91/pmc.c                  | 314 +++++------------------
->  drivers/clk/at91/pmc.h                  |  96 +------
->  drivers/usb/gadget/udc/atmel_usba_udc.c |  20 +-
->  drivers/usb/gadget/udc/atmel_usba_udc.h |   2 +
->  include/linux/clk/at91_pmc.h            |  12 -
->  24 files changed, 1111 insertions(+), 1020 deletions(-)
-> 
-
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Yours,
+Linus Walleij
