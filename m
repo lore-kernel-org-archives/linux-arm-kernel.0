@@ -1,63 +1,53 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Dec 2015 13:40:07 +0100
-Subject: [PATCH 4/4] ARM: realview: add generic config options
-Message-ID: <1449751207-13567-1-git-send-email-linus.walleij@linaro.org>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Thu, 10 Dec 2015 12:43:34 +0000
+Subject: Tegra baseline test results for v4.4-rc1
+Message-ID: <56697376.9060406@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a few features that are available on some
-or all of the RealView but never made it into the SMP
-defconfig file:
+Here are some basic Tegra test results for Linux v4.4-rc1.
+Logs and other details at:
 
-- Full tickless idle
-- High resolution timers
-- Perf events and HW perf events from the PMU
-- MTD AFS partition handling
-- MTD ROM partition handling
-- USB and ISP1760 USB driver
+    https://nvtb.github.io//linux/test_v4.4-rc1/20151208093330/
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/configs/realview-smp_defconfig | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/configs/realview-smp_defconfig b/arch/arm/configs/realview-smp_defconfig
-index c9cf3af7f2d7..b482b7277281 100644
---- a/arch/arm/configs/realview-smp_defconfig
-+++ b/arch/arm/configs/realview-smp_defconfig
-@@ -1,6 +1,10 @@
- # CONFIG_SWAP is not set
- CONFIG_SYSVIPC=y
-+CONFIG_NO_HZ_FULL=y
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
- CONFIG_LOG_BUF_SHIFT=14
-+CONFIG_PERF_EVENTS=y
- CONFIG_SLAB=y
- CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
-@@ -28,10 +32,12 @@ CONFIG_IP_PNP_BOOTP=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_MTD=y
- CONFIG_MTD_CMDLINE_PARTS=y
-+CONFIG_MTD_AFS_PARTS=y
- CONFIG_MTD_BLOCK=y
- CONFIG_MTD_CFI=y
- CONFIG_MTD_CFI_INTELEXT=y
- CONFIG_MTD_CFI_AMDSTD=y
-+CONFIG_MTD_ROM=y
- CONFIG_MTD_PHYSMAP=y
- CONFIG_ARM_CHARLCD=y
- CONFIG_NETDEVICES=y
-@@ -61,7 +67,8 @@ CONFIG_SND_MIXER_OSS=y
- CONFIG_SND_PCM_OSS=y
- # CONFIG_SND_DRIVERS is not set
- CONFIG_SND_ARMAACI=y
--# CONFIG_USB_SUPPORT is not set
-+CONFIG_USB=y
-+CONFIG_USB_ISP1760=y
- CONFIG_MMC=y
- CONFIG_MMC_ARMMMCI=y
- CONFIG_NEW_LEDS=y
--- 
-2.4.3
+Test summary
+------------
+
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Build: Image:
+    Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+    Pass: ( 1/ 1): qemu-vexpress64
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+vmlinux object size
+(delta in bytes from test_v4.3 (6a13feb9c82803e2b815eca72fa7a9f5561d7861)):
+   text     data      bss    total  kernel
++272788   +40576    +5824  +319188  defconfig
++260002   +38896     +320  +299218  multi_v7_defconfig
++286258   +14816     +944  +302018  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.3 (6a13feb9c82803e2b815eca72fa7a9f5561d7861))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+    -292k     292k   -8192k      24k tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+    -308k     308k   -8192k      12k tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+    -292k     292k   -8192k      24k  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+    -308k     308k   -8192k      12k  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+    -292k     292k   -8192k      24k    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+    -308k     308k   -8192k      12k    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+    -292k     292k   -8192k      24k       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+    -308k     308k   -8192k      12k       tegra30-beaver      tegra_defconfig       tegra30-beaver
