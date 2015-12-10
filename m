@@ -1,63 +1,49 @@
-From: bhupesh.sharma@freescale.com (Sharma Bhupesh)
-Date: Thu, 10 Dec 2015 11:05:49 +0000
-Subject: [PATCH v2 5/5] can: flexcan: Add support for non RX-FIFO mode
-In-Reply-To: <BY1PR0301MB130358076C3A5969406DE69182D80@BY1PR0301MB1303.namprd03.prod.outlook.com>
-References: <1431603215-25546-1-git-send-email-bhupesh.sharma@freescale.com>
- <1431603215-25546-6-git-send-email-bhupesh.sharma@freescale.com>
- <5554C244.80809@pengutronix.de>
- <BY1PR0301MB130358076C3A5969406DE69182D80@BY1PR0301MB1303.namprd03.prod.outlook.com>
-Message-ID: <BY1PR0301MB130384E91308C49A850DEC4782E90@BY1PR0301MB1303.namprd03.prod.outlook.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 10 Dec 2015 12:05:48 +0100 (CET)
+Subject: [PATCH RESEND] pinctrl: bcm2835: Fix initial value for
+ direction_output
+In-Reply-To: <1449511825-6156-1-git-send-email-stefan.wahren@i2se.com>
+References: <1449511825-6156-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1330071479.188146.762be339-5c35-483f-b17c-6076dc1d3758.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Linus,
 
-> -----Original Message-----
-> From: linux-arm-kernel [mailto:linux-arm-kernel-
-> bounces at lists.infradead.org] On Behalf Of Sharma Bhupesh
-> Sent: Thursday, May 14, 2015 9:14 PM
-> To: Marc Kleine-Budde; arnd at arndb.de; linux-can at vger.kernel.org
-> Cc: bhupesh.linux at gmail.com; linux-arm-kernel at lists.infradead.org; Arora
-> Sakar-B45205
-> Subject: RE: [PATCH v2 5/5] can: flexcan: Add support for non RX-FIFO
-> mode
-> 
-> > -----Original Message-----
-> > From: Marc Kleine-Budde [mailto:mkl at pengutronix.de]
-> > Sent: Thursday, May 14, 2015 9:12 PM
-> > To: Sharma Bhupesh-B45370; arnd at arndb.de; linux-can at vger.kernel.org
-> > Cc: bhupesh.linux at gmail.com; Arora Sakar-B45205; linux-arm-
-> > kernel at lists.infradead.org
-> > Subject: Re: [PATCH v2 5/5] can: flexcan: Add support for non RX-FIFO
-> > mode
-> >
-> > On 05/14/2015 01:33 PM, Bhupesh Sharma wrote:
-> > > This patch adds support for non RX-FIFO (legacy) mode in the flexcan
-> > > driver.
-> > >
-> > > On certain SoCs, the RX-FIFO support might be broken, as a result we
-> > > need to fall-back on the legacy (non RX-FIFO) mode to receive CAN
-> > > frames.
-> > >
-> > > Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
-> > > Signed-off-by: Sakar Arora <Sakar.Arora@freescale.com>
-> >
-> > The non FIFO mode doesn't guarantee the order of the incoming frames,
-> > not does not even try to...this is not acceptable. I'm currently
-> > working on a patch by David Jander that brings in non FIFO mode, but
-> > tries to keep the order of the frames.
-> 
-> That is already WIP at our end. V3 will contain the same change.
-> If you are already working on it, I don't know how to proceed further as
-> we had already v1 of this patchset with the non FIFO mode out since a
-> month or so.
+> Stefan Wahren <stefan.wahren@i2se.com> hat am 7. Dezember 2015 um 19:10
+> geschrieben:
+>
+>
+> Currently the provided initial value for bcm2835_gpio_direction_output
+> has no effect. So fix this issue by changing the value before
+> changing the GPIO direction. As a result we need to move the function below
+> bcm2835_gpio_set.
+>
+> Suggested-by: Martin Sperl <kernel@martin.sperl.org>
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> Fixes: e1b2dc70cd5b ("pinctrl: add bcm2835 driver")
+> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+> Acked-by: Eric Anholt <eric@anholt.net>
+> ---
 
-I don't remember seeing a patch from you which supports non-FIFO mode for flexcan IP.
-Since we now have Freescale LS1021A chip out in the field on which the FIFO mode broken,
-we cannot use the upstream flexcan driver for enabling flexcan IP on these chips.
+on Nov 30 you wrote that you want Stephen's ACK and now it's there.
 
-Do you still have plans to work on this? Or should I submit my v3 with in-order reception
-supported for rx frames.
+But your current patch "[PATCH 092/182] pinctrl: bcm2835: use gpiochip data
+pointer" seems to conflict with my?
 
-Regards,
-Bhupesh
+Any wishes?
+
+Stefan
+
+>
+> This patch was inspired by this discussion [1].
+>
+> [1] -
+> http://lists.infradead.org/pipermail/linux-rpi-kernel/2015-April/001499.html
+>
+> Changes:
+> - added suggested-by, fixes and acked-by tag since first submit
+>
+> drivers/pinctrl/bcm/pinctrl-bcm2835.c | 13 +++++++------
+> 1 file changed, 7 insertions(+), 6 deletions(-)
+>
