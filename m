@@ -1,38 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 10 Dec 2015 17:32:36 +0000
-Subject: [PATCH] ARM: ep93xx: Fix clocksource registration
-In-Reply-To: <565D72EA.9070609@gmail.com>
-References: <565513EA.6020603@gmail.com>
- <CACRpkdZy7TnrmkWrRerjm6dZW9m65Dsc_kp8TPHzbhTxz5Hbrw@mail.gmail.com>
- <565D72EA.9070609@gmail.com>
-Message-ID: <20151210173236.GO8644@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 10 Dec 2015 17:39:59 +0000
+Subject: [PATCH] arm64: mm: ensure that the zero page is visible to the page
+ table walker
+Message-ID: <1449769199-31361-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 01, 2015 at 11:14:02AM +0100, Alexander Sverdlin wrote:
-> Hello Linus,
-> 
-> On 01/12/15 11:09, Linus Walleij wrote:
-> >> clocksource_mmio_init() explicitly checks for counter's width and refuses to
-> >> > register anything with resolution higher than 32 bits. We need to use
-> >> > clocksource_register_hz() directly to repair HIGH_RES_TIMERS.
-> > Maybe tglx want to jump in on this.
-> > 
-> > Isn't it better to fix clocksource_mmio_init() to accept > 32 bits?
-> > 
-> > What is really prompting this in drivers/clocksource/mmio.c:
-> > 
-> > if (bits > 32 || bits < 16)
-> >                 return -EINVAL;
-> 
-> probably lack of >32bit access functions in the driver. But I do not know
-> the original intentions of the author. In any case, if we modify the check here,
-> probably the access function for 64 bits should be moved to the mmio.c?
+In paging_init, we allocate the zero page, memset it to zero and then
+point TTBR0 to it in order to avoid speculative fetches through the
+identity mapping.
 
-If people want to use it with 64-bit accessors, then yes.  So says
-the author of that file (me).
+In order to guarantee that the freshly zeroed page is indeed visible to
+the page table walker, we need to execute a dsb instruction prior to
+writing the TTBR.
 
+Cc: <stable@vger.kernel.org> # v3.14+, for older kernels need to drop the 'ishst'
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/mm/mmu.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index c04def90f3e4..c5bd5bca8e3d 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -464,6 +464,9 @@ void __init paging_init(void)
+ 
+ 	empty_zero_page = virt_to_page(zero_page);
+ 
++	/* Ensure the zero page is visible to the page table walker */
++	dsb(ishst);
++
+ 	/*
+ 	 * TTBR0 is only used for the identity mapping at this stage. Make it
+ 	 * point to zero page to avoid speculatively fetching new entries.
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.1.4
