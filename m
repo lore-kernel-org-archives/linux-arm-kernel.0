@@ -1,45 +1,100 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 10 Dec 2015 16:59:29 +0000
-Subject: [PATCH 0/4] ARM Versatile multi-platform support
-In-Reply-To: <CAFEAcA9Wkk+tAyrxuiLMOjQA2Y44qFGF+aXzhj7a9k6qnYobfQ@mail.gmail.com>
-References: <1449607458-16850-1-git-send-email-robh@kernel.org>
- <CAFEAcA9Wkk+tAyrxuiLMOjQA2Y44qFGF+aXzhj7a9k6qnYobfQ@mail.gmail.com>
-Message-ID: <5669AF71.4080806@arm.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Thu, 10 Dec 2015 17:58:42 +0100
+Subject: [PATCH v5 0/7] cpufreq: add generic cpufreq driver support for
+ Exynos542x/5800 platforms
+Message-ID: <1449766729-435-1-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/15 21:11, Peter Maydell wrote:
-> On 8 December 2015 at 20:44, Rob Herring <robh@kernel.org> wrote:
->> Arnd lit a fire under me to dust this off and get it merged. So here it
->> is. The main change from prior version is I merged all the code to a
->> single file. It's a bigger patch than I'd like, but I don't think trying
->> to do it in multiple steps is worth it.
->>
->> This is dependent on some solution for the default platform choice on
->> !MMU builds (allnoconfig) as it can't be Versatile after this series.
->> Arnd has some ideas on how to address that.
->>
->> This is tested under QEMU. Linus previously tested this on actual h/w
->> and had a problem with the display identification which needs
->> investigation or agreement to worry about it if and when someone
->> actually cares.
-> 
-> I handed my PB hardware and its PCI backplane back to Will
-> and Marc some time back, so they're in the best position to
-> do testing of the PCI part on real hardware if needed these days.
+Hi,
 
-I don't really have the bandwidth to test that stuff right now, but I
-recently managed to score a few PCI backplanes (backplane only, without
-the massive case, so an ATX power supply is required to make use of it).
-Some documentation is available at [1].
+This patch series adds generic cpufreq-dt driver support for
+Exynos542x/5800 (using the new CPU clock type which allows it).
 
-I could easily be convinced to part with one of them, and even drop it
-at a suitably located Linaro office, if that helps...
+It has been tested on Exynos5422 based ODROID-XU3 Lite board.
 
-Thanks,
+Depends on:
+- next-20151124 branch of linux-next kernel tree
 
-	M.
+Changes since v4:
+- renamed oppXX at hz to opp at hz
+- put Odroid changes in exynos5422-odroidxu3-common.dtsi
+- override CPU OPP properties for Exynos5422/5800 instead of
+  duplicating them
+- merged "ARM: dts: Exynos5422: fix OPP tables" patch with
+  "ARM: dts: Exynos5420: add CPU OPP properties" one
+- added missing Thomas' SoB line to "ARM: dts: Exynos5420:
+  add CPU OPP properties" patch
+- updated authorship of "ARM: Exynos: use generic cpufreq
+  driver for Exynos5420" and "ARM: Exynos: use generic
+  cpufreq driver for Exynos5422/5800" patches
+- updated Javier's and Mike's e-mail adresses
+- removed non-working e-mail address of Sachin Kamat
 
-[1] http://infocenter.arm.com/help/topic/com.arm.doc.dui0425f/Cfhffaei.html
+Changes since v3:
+- switched to using cpufreq-dt driver
+- updated patch descriptions to cover Exynos5422 support
+- added Acked-by from Sylwester to clock driver patches
+
+Changes since v2:
+- ported over next-20151124 branch
+- integrated missing CLK_RECALC_NEW_RATES flags fix to patch #3
+  (from Anand Moon)
+- added regulator supply properties for ODROID-XU3 Lite and
+  ODROID-XU4 in patch #2
+- ported CPU OPPs to operating-points-v2 (from Ben Gamari)
+- added "ARM: dts: Exynos5422: fix OPP tables" patch (from Ben
+  Gamari)
+- added "cpufreq: arm-big-little: accept operating-points-v2
+  nodes" patch (from Ben Gamari)
+- renamed OPP nodes as opp@<opp-hz>
+
+Changes since v1:
+- added CPU cluster regulator supply properties to
+  exynos5420-arndale-octa.dts, exynos5420-peach-pit.dts,
+  exynos5420-smdk5420.dts and exynos5800-peach-pi.dts
+
+Changes over Thomas' original v12 code:
+- split Exynos5420 and Exynos5800 support
+- moved E5420_[EGL,KFC]_DIV0() macros to clk-exynos5420.c
+- disabled cpufreq if big.LITTLE switcher support is enabled
+- enhanced arm_big_little[_dt] driver with CPU cluster regulator
+  support
+- fixed CPU clock configuration data for Exynos5800
+- fixed CPU operating points setup for Exynos5800
+- added CPU cluster regulator supplies for ODROID-XU3 board
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
+
+
+Bartlomiej Zolnierkiewicz (5):
+  ARM: dts: Exynos542x/5800: add cluster regulator supply properties
+  ARM: Exynos: use generic cpufreq driver for Exynos5420
+  clk: samsung: exynos5422/5800: fix cpu clock configuration data
+  ARM: dts: Exynos5800: fix CPU OPP
+  ARM: Exynos: use generic cpufreq driver for Exynos5422/5800
+
+Thomas Abraham (2):
+  clk: samsung: exynos5420: add cpu clock configuration data and
+    instantiate cpu clock
+  ARM: dts: Exynos542x/5800: add CPU OPP properties
+
+ arch/arm/boot/dts/exynos5420-arndale-octa.dts      |   8 ++
+ arch/arm/boot/dts/exynos5420-peach-pit.dts         |   8 ++
+ arch/arm/boot/dts/exynos5420-smdk5420.dts          |   8 ++
+ arch/arm/boot/dts/exynos5420.dtsi                  | 122 +++++++++++++++++++++
+ arch/arm/boot/dts/exynos5422-cpus.dtsi             |  10 ++
+ arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |   8 ++
+ arch/arm/boot/dts/exynos5800-peach-pi.dts          |   8 ++
+ arch/arm/boot/dts/exynos5800.dtsi                  | 108 ++++++++++++++++++
+ arch/arm/mach-exynos/exynos.c                      |   4 +
+ drivers/clk/samsung/clk-exynos5420.c               |  88 ++++++++++++++-
+ include/dt-bindings/clock/exynos5420.h             |   2 +
+ 11 files changed, 372 insertions(+), 2 deletions(-)
+
 -- 
-Jazz is not dead. It just smells funny...
+1.9.1
