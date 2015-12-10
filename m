@@ -1,35 +1,48 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Dec 2015 18:23:41 +0100
-Subject: [PATCH] ARM: ep93xx: Fix clocksource registration
-In-Reply-To: <565D72EA.9070609@gmail.com>
-References: <565513EA.6020603@gmail.com>
- <CACRpkdZy7TnrmkWrRerjm6dZW9m65Dsc_kp8TPHzbhTxz5Hbrw@mail.gmail.com>
- <565D72EA.9070609@gmail.com>
-Message-ID: <CACRpkdbn=EXFpCof6O4uP94N3yi3qTHsasRMzu3-zuneDJAaMQ@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 10 Dec 2015 11:23:53 -0600
+Subject: [PATCH 0/4] ARM Versatile multi-platform support
+In-Reply-To: <5669AF71.4080806@arm.com>
+References: <1449607458-16850-1-git-send-email-robh@kernel.org>
+ <CAFEAcA9Wkk+tAyrxuiLMOjQA2Y44qFGF+aXzhj7a9k6qnYobfQ@mail.gmail.com>
+ <5669AF71.4080806@arm.com>
+Message-ID: <CAL_JsqJXDAopCPLDx=6BAVfZdkwX+VihNKoL5Grs9amJe-HUGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 1, 2015 at 11:14 AM, Alexander Sverdlin
-<alexander.sverdlin@gmail.com> wrote:
-> On 01/12/15 11:09, Linus Walleij wrote:
->>> clocksource_mmio_init() explicitly checks for counter's width and refuses to
->>> > register anything with resolution higher than 32 bits. We need to use
->>> > clocksource_register_hz() directly to repair HIGH_RES_TIMERS.
->> Maybe tglx want to jump in on this.
+On Thu, Dec 10, 2015 at 10:59 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 08/12/15 21:11, Peter Maydell wrote:
+>> On 8 December 2015 at 20:44, Rob Herring <robh@kernel.org> wrote:
+>>> Arnd lit a fire under me to dust this off and get it merged. So here it
+>>> is. The main change from prior version is I merged all the code to a
+>>> single file. It's a bigger patch than I'd like, but I don't think trying
+>>> to do it in multiple steps is worth it.
+>>>
+>>> This is dependent on some solution for the default platform choice on
+>>> !MMU builds (allnoconfig) as it can't be Versatile after this series.
+>>> Arnd has some ideas on how to address that.
+>>>
+>>> This is tested under QEMU. Linus previously tested this on actual h/w
+>>> and had a problem with the display identification which needs
+>>> investigation or agreement to worry about it if and when someone
+>>> actually cares.
 >>
->> Isn't it better to fix clocksource_mmio_init() to accept > 32 bits?
->>
->> What is really prompting this in drivers/clocksource/mmio.c:
->>
->> if (bits > 32 || bits < 16)
->>                 return -EINVAL;
+>> I handed my PB hardware and its PCI backplane back to Will
+>> and Marc some time back, so they're in the best position to
+>> do testing of the PCI part on real hardware if needed these days.
 >
-> probably lack of >32bit access functions in the driver. But I do not know
-> the original intentions of the author. In any case, if we modify the check here,
-> probably the access function for 64 bits should be moved to the mmio.c?
+> I don't really have the bandwidth to test that stuff right now, but I
+> recently managed to score a few PCI backplanes (backplane only, without
+> the massive case, so an ATX power supply is required to make use of it).
+> Some documentation is available at [1].
+>
+> I could easily be convinced to part with one of them, and even drop it
+> at a suitably located Linaro office, if that helps...
 
-The clocksource returns a cycle_t which is 64 bits. I have sent a proper
-patch to Daniel+tglx fixing it up.
+How about in a canal? That will cut the install base in half. ;)
 
-Yours,
-Linus Walleij
+We'll settle for an ack meaning "I don't have time to test, working
+for qemu is good enough, we should merge this anyway and can pick up
+the pieces later if any of the 2 or 3 people that have a system ever
+really care."
+
+Rob
