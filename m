@@ -1,42 +1,89 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Thu, 10 Dec 2015 15:29:37 +0000
-Subject: Domain faults when CONFIG_CPU_SW_DOMAIN_PAN is enabled
-In-Reply-To: <20151210002213.GL8644@n2100.arm.linux.org.uk>
-References: <1267b061b66c4d1fa8af1955825bc97a@EMAIL.axentia.se>
- <20151203110041.GK8644@n2100.arm.linux.org.uk>
- <f7774151e4a849e682ae5a607a98140b@EMAIL.axentia.se>
- <20151203115143.GM8644@n2100.arm.linux.org.uk>
- <533b0f1f264e42e78b94bbff9570fb50@EMAIL.axentia.se>
- <20151203133727.GN8644@n2100.arm.linux.org.uk>
- <94580382ca344ae2b64f66fb778c6ff7@EMAIL.axentia.se>
- <20151203164118.GR8644@n2100.arm.linux.org.uk>
- <20151203172708.GT8644@n2100.arm.linux.org.uk>
- <45b615420548463ebd1d582bc5da2eff@EMAIL.axentia.se>
- <20151210002213.GL8644@n2100.arm.linux.org.uk>
-Message-ID: <7e60a8ccde1940d68ec4780abe154cbd@EMAIL.axentia.se>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 10 Dec 2015 15:32:23 +0000
+Subject: [PATCHv3 3/5] arm-cci: Add routines to enable/disable all counters
+In-Reply-To: <1447783407-18027-4-git-send-email-suzuki.poulose@arm.com>
+References: <1447783407-18027-1-git-send-email-suzuki.poulose@arm.com>
+ <1447783407-18027-4-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20151210153222.GE495@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King wrote:
-> On Thu, Dec 03, 2015 at 09:37:51PM +0000, Peter Rosin wrote:
-> > I took both patches for a quick spin (a dozen boots and one hour uptime
-> > after that for each patch) and no incidents. I have not gathered data,
-> > but the crash on boot feels like it's quite a bit above 50% when there
-> > is a problem so this feels good (I used 5 clean reboots when I bisected
-> > and that worked).
-> > 
-> > Reported-by: Peter Rosin <peda@axentia.se>
-> > Tested-by: Peter Rosin <peda@axentia.se>
-> > 
-> > (and please don't forget to cc stable)
+On Tue, Nov 17, 2015 at 06:03:25PM +0000, Suzuki K. Poulose wrote:
+> Adds helper routines to disable the counter controls for
+> all the counters on the CCI PMU and restore it back, by
+> preserving the original state in caller provided mask.
 > 
-> I've decided to do a more in-depth fix, so that we also solve the issue
-> that when we schedule in these down_read()s, we don't leak the permissive
-> domain register setting into the switched-to context.
+> Cc: Punit Agrawal <punit.agrawal@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+> ---
+> Changes since V2:
+>   - Rename the functions to pmu_restore_counters, pmu_disable_counters
+>   - Added comment describing why we use a private mask
+> ---
+>  drivers/bus/arm-cci.c |   38 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 38 insertions(+)
 > 
-> Can you test this patch please?  Thanks.
+> diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+> index 48936c8..91a9d5d 100644
+> --- a/drivers/bus/arm-cci.c
+> +++ b/drivers/bus/arm-cci.c
+> @@ -669,6 +669,44 @@ pmu_get_event(struct cci_pmu *cci_pmu, int idx)
+>  	return pmu_read_register(cci_pmu, idx, CCI_PMU_EVT_SEL);
+>  }
+>  
+> +
+> +/*
+> + * For all counters on the CCI-PMU, disable any 'enabled' counters,
+> + * saving the changed counters in the mask, so that we can restore
+> + * it later using pmu_restore_counters. The mask is private to the
+> + * caller. We cannot rely on the used_mask maintained by the CCI_PMU
+> + * as it only tells us if the counter is assigned to perf_event or not.
+> + * The state of the perf_event cannot be locked by the PMU layer, hence
+> + * we check the individual counter status (which can be locked by
+> + * cci_pm->hw_events->pmu_lock).
+> + */
+> +static void __maybe_unused
+> +pmu_disable_counters(struct cci_pmu *cci_pmu, unsigned long *mask)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < cci_pmu->num_cntrs; i++) {
+> +		if (pmu_counter_is_enabled(cci_pmu, i)) {
+> +			set_bit(i, mask);
+> +			pmu_disable_counter(cci_pmu, i);
+> +		} else
+> +			clear_bit(i, mask);
 
-Still looking good.
+Can we not assume a clean mask to begin with?
 
-Cheers,
-Peter
+> +	}
+> +}
+> +
+> +/*
+> + * Restore the status of the counters. Reversal of the pmu_disable_counters().
+> + * For each counter set in the mask, enable the counter back.
+> + */
+> +static void __maybe_unused
+> +pmu_restore_counters(struct cci_pmu *cci_pmu, unsigned long *mask)
+
+This would probably be better with s/restore/enable/ for consistency
+with pmu_disable_counters.
+
+Other than that this looks fine to me.
+
+Mark.
+
+> +{
+> +	int i;
+> +
+> +	for_each_set_bit(i, mask, cci_pmu->num_cntrs)
+> +		pmu_enable_counter(cci_pmu, i);
+> +}
+> +
+>  /*
+>   * Returns the number of programmable counters actually implemented
+>   * by the cci
+> -- 
+> 1.7.9.5
+> 
