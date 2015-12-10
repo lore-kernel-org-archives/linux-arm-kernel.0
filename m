@@ -1,19 +1,26 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 10 Dec 2015 09:49:04 +0530
-Subject: [PATCH 1/1] dmaengine: at_xdmac: fix at_xdmac_prep_dma_memcpy()
-In-Reply-To: <eec3de73336bf67938fab83951c04b33b7dfba49.1449500175.git.cyrille.pitchen@atmel.com>
-References: <eec3de73336bf67938fab83951c04b33b7dfba49.1449500175.git.cyrille.pitchen@atmel.com>
-Message-ID: <20151210041904.GP1854@localhost>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 10 Dec 2015 13:48:15 +0900
+Subject: [PATCH 1/2] ARM: shmobile: r8a7793: Add missing serial devices
+ to DT
+In-Reply-To: <CAMuHMdUXaO6PynwOaEP9e88F10uJSoc7u848RgnDVRdqyYFnTg@mail.gmail.com>
+References: <1448589166-11612-1-git-send-email-horms+renesas@verge.net.au>
+ <1448589166-11612-2-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdUXaO6PynwOaEP9e88F10uJSoc7u848RgnDVRdqyYFnTg@mail.gmail.com>
+Message-ID: <20151210044815.GB6964@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 07, 2015 at 03:58:56PM +0100, Cyrille Pitchen wrote:
-> This patch fixes at_xdmac_prep_dma_memcpy(). Indeed the data width field
-> of the Channel Configuration register was not updated properly in the
-> loop: the bits of the dwidth field were not cleared before adding their
-> new value.
+On Wed, Dec 09, 2015 at 11:42:35AM +0100, Geert Uytterhoeven wrote:
+> On Fri, Nov 27, 2015 at 2:52 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > Instantiate all serial devices in r8a7793 device tree
+> > and set them as disabled by default.
+> >
+> > Based on similar work for the r8a7791 by Laurent Pinchart.
+> >
+> > Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Applied, thanks
-
--- 
-~Vinod
+Thanks, I have queued this up.
