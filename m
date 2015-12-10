@@ -1,38 +1,44 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 10 Dec 2015 14:27:54 -0700
-Subject: [PATCH V6 00/26] Coresight integration with perf
-In-Reply-To: <20151208203414.GN11564@kernel.org>
-References: <1449176702-13213-1-git-send-email-mathieu.poirier@linaro.org>
- <CANLsYkxaOpMcC8ULcTvC1tOd5yEcjH2ZiNS5Rp6UyodzNsAD1g@mail.gmail.com>
- <20151208203414.GN11564@kernel.org>
-Message-ID: <CANLsYkzCjKNpNVDJax2nVrAMdgi1RR51fcXEf7gJjbFKVThVwg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 10 Dec 2015 22:29:39 +0100
+Subject: [PATCH 0/5] ARM: orion5x/dove/mv78xx0 multiplatform
+In-Reply-To: <5669EB31.4050700@vollmann.ch>
+References: <1448466557-435335-1-git-send-email-arnd@arndb.de>
+ <1802654.n0lYxNZ2px@wuerfel> <5669EB31.4050700@vollmann.ch>
+Message-ID: <2992463.fVOGazvIkH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 December 2015 at 13:34, Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
-> Em Tue, Dec 08, 2015 at 01:29:00PM -0700, Mathieu Poirier escreveu:
->> On 3 December 2015 at 14:04, Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
->>
->> Arnaldo, Peter and Ingo,
->>
->> I would like to queue this work for 4.5 but need your help with
->> reviewing patches 20 [1], 23 [2], 24 [3], 25 [4] and 26 [5].
->>
->> A "reviewed-by" would be greatly appreciated.
+On Thursday 10 December 2015 22:14:25 Detlef Vollmann wrote:
+> On 12/10/15 21:59, Arnd Bergmann wrote:
+> > On Thursday 10 December 2015 20:03:18 Detlef Vollmann wrote:
+> >> On 12/10/15 14:43, Arnd Bergmann wrote:
+> >>>    text    data     bss     dec     hex filename
+> >>>  942144   64112   17648 1023904   f9fa0 build/tmp/vmlinux-orion-allno
+> >>> 1027516   54052   20824 1102392  10d238 build/tmp/vmlinux-multi-plus-orion
+> >>> 1025320   66020   18744 1110084  10f044 build/tmp/vmlinux-orion-plus-of
+> >>>
+> >>> The diff below shows all the differences between orion-allno and
+> >>> multi-plus-orion.
+> >> How did you get the orion-allno config and how did you get it compiled?
+> >> I tried to apply your changes to my config and compile it, but
+> >> it started silentoldconfig which introduced back 'ARCH_MULTIPLATFORM'
+> > 
+> > The first and third row are without my patches, once they are applied,
+> > ARCH_ORION becomes a sub-option of ARCH_MULTIPLATFORM.
 >
-> I looked briefly at it and saw perf_session, IIRc, being passed to more
-> functions, which I think can be done otherwise, as, again IIRC, all you
-> need is available via perf_evlist, will look again.
+> So with your patches it's no longer possible to build a small kernel, correct?
 
-I just had a double take here and the only remnant of a "struct
-perf_session" I can see is in 26 [1], but that is following the
-upstream API [2].  I can send a fix for that but it would be outside
-the scope of this patch set.
+Correct. I was a bit surprised at how much object code enabling CONFIG_OF
+adds these days, it used to be a lot less, but you are right that
+disabling CONFIG_OF is not possible with the way that ARCH_MULTIPLATFORM
+is structured.
 
-Thanks,
-Mathieu
+It was always the plan to move all orion5x machines over to use CONFIG_OF
+eventually, so you get that overhead one way or another, and at least
+it looks like doing multiplatform on top of OF doesn't add any noticeable
+extra overhead (the total numbers are actually smaller).
 
-[1]. https://lkml.org/lkml/2015/12/3/684
-[2]. http://lxr.free-electrons.com/source/tools/perf/util/auxtrace.h#L293
->
-> - Arnaldo
+It may also be worth investigating what has made CONFIG_OF so costly,
+maybe we can reduce this a bit again.
+
+	Arnd
