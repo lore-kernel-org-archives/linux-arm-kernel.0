@@ -1,28 +1,24 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 11 Dec 2015 00:18:34 +0100
-Subject: [PATCH 05/10] ARM: debug-ll: rework integrator/versatile handling
-In-Reply-To: <1449268242-808553-6-git-send-email-arnd@arndb.de>
-References: <1449268242-808553-1-git-send-email-arnd@arndb.de>
- <1449268242-808553-6-git-send-email-arnd@arndb.de>
-Message-ID: <CACRpkdb8uUmcQgQ2nDRNkZgMs9h-OFyVnReaJ+mZDtyWMtExgg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 11 Dec 2015 00:20:26 +0100
+Subject: [GIT PULL] ARM: Exynos fixes for v4.4
+In-Reply-To: <1138242734.132831449018245518.JavaMail.weblogic@epmlwas05a>
+References: <1138242734.132831449018245518.JavaMail.weblogic@epmlwas05a>
+Message-ID: <6138852.vVurzf8e9k@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 4, 2015 at 11:30 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Wednesday 02 December 2015 01:04:05 Kukjin Kim wrote:
+> Krzysztof Kozlowski wrote:
+> > 
+> Hi Krzysztof,
+> 
+> Looks good to me, but I have no other fixes in my tree so this would be sent to
+> out arm-soc directly 
+> 
+> Hi Arnd, Olof, Kevin,
+> Please pull this for v4.4.
+> 
 
-> Enabling one of the integrator platforms in a multiplatform kernel
-> while trying to use DEBUG_LL for another platform can default to
-> the wrong UART address, as the options are purely based on the
-> architecture being enabled or not.
->
-> This changes the logic to use the integrator default addresses only
-> if we have also picked the respective Kconfig symbols introduced
-> here. Versatile is not yet part of multiplatform, but hopefully
-> soon will be, so we do the same change for versatile as well.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Pulled into fixes now, thanks!
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+	Arnd
