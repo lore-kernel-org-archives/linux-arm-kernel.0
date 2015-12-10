@@ -1,92 +1,126 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 10 Dec 2015 08:06:32 +0000
-Subject: [PATCH 004/182] gpio: generic: factor into gpio_chip struct
-In-Reply-To: <1449666760-29876-1-git-send-email-linus.walleij@linaro.org>
-References: <1449666760-29876-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20151210080632.GC17876@x1>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 10 Dec 2015 09:00:15 +0100
+Subject: [PATCH v4 31/58] mtd: nand: nuc900: use the mtd instance embedded in
+ struct nand_chip
+In-Reply-To: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1449734442-18672-32-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 09 Dec 2015, Linus Walleij wrote:
+struct nand_chip now embeds an mtd device. Make use of this mtd instance.
 
-> The separate struct bgpio_chip has been a pain to handle, both
-> by being confusingly similar in name to struct gpio_chip and
-> for being contained inside a struct so that struct gpio_chip
-> is contained in a struct contained in a struct, making several
-> steps of dereferencing necessary.
-> 
-> Make things simpler: include the fields directly into
-> <linux/gpio/driver.h>, #ifdef:ed for CONFIG_GENERIC_GPIO, and
-> get rid of the <linux/basic_mmio_gpio.h> altogether. Prefix
-> some of the member variables with bgpio_* and add proper
-> kerneldoc while we're at it.
-> 
-> Modify all users to handle the change and use a struct
-> gpio_chip directly. And while we're at it: replace all
-> container_of() dereferencing by gpiochip_get_data() and
-> registering the gpio_chip with gpiochip_add_data().
-> 
-> Cc: arm at kernel.org
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Cc: Alexander Shiyan <shc_work@mail.ru>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Cc: Alexandre Courbot <gnurou@gmail.com>
-> Cc: Gregory Fong <gregory.0xf0@gmail.com>
-> Cc: Brian Norris <computersforpeace@gmail.com>
-> Cc: Florian Fainelli <f.fainelli@gmail.com>
-> Cc: Liviu Dudau <liviu.dudau@arm.com>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
-> Cc: Rabin Vincent <rabin@rab.in>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-omap at vger.kernel.org
-> Cc: linux-samsung-soc at vger.kernel.org
-> Cc: bcm-kernel-feedback-list at broadcom.com
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ARM SoC folks and Lee: it would be great if you could
-> ACK the few lines hitting arch/arm/* and drivers/mfd/* in this
-> so I can take it through the GPIO tree.
-> ---
->  arch/arm/mach-clps711x/board-autcpu12.c |   2 +-
->  arch/arm/mach-clps711x/board-p720t.c    |   2 +-
->  arch/arm/mach-imx/mach-mx21ads.c        |   2 +-
->  arch/arm/mach-omap1/board-ams-delta.c   |   2 +-
->  arch/arm/mach-s3c64xx/mach-crag6410.c   |   2 +-
->  drivers/gpio/gpio-74xx-mmio.c           |  37 ++--
->  drivers/gpio/gpio-brcmstb.c             |  80 ++++-----
->  drivers/gpio/gpio-clps711x.c            |  28 +--
->  drivers/gpio/gpio-dwapb.c               |  92 +++++-----
->  drivers/gpio/gpio-ep93xx.c              |  25 +--
->  drivers/gpio/gpio-etraxfs.c             |  49 +++---
->  drivers/gpio/gpio-ge.c                  |  24 +--
->  drivers/gpio/gpio-generic.c             | 292 +++++++++++++++-----------------
->  drivers/gpio/gpio-grgpio.c              |  73 ++++----
->  drivers/gpio/gpio-moxart.c              |  29 ++--
->  drivers/gpio/gpio-mxc.c                 |  27 ++-
->  drivers/gpio/gpio-mxs.c                 |  33 ++--
->  drivers/gpio/gpio-sodaville.c           |  13 +-
->  drivers/gpio/gpio-xgene-sb.c            |  40 ++---
->  drivers/mfd/vexpress-sysreg.c           |   8 +-
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+Changes generated with the following coccinelle script
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
+--->8---
+virtual patch
 
->  include/linux/basic_mmio_gpio.h         |  80 ---------
->  include/linux/gpio/driver.h             |  54 ++++++
->  22 files changed, 442 insertions(+), 552 deletions(-)
->  delete mode 100644 include/linux/basic_mmio_gpio.h
+@fix1@
+identifier __chipfield, __mtdfield;
+type __type;
+@@
+(
+	__type {
+		...
+		struct nand_chip __chipfield;
+		...
+-		struct mtd_info __mtdfield;
+		...
+	};
+|
+	__type {
+		...
+-		struct mtd_info __mtdfield;
+		...
+		struct nand_chip __chipfield;
+		...
+	};
+)
 
-[...]
+@fix2 depends on fix1@
+identifier fix1.__chipfield, fix1.__mtdfield;
+identifier __subfield;
+type fix1.__type;
+__type *__priv;
+@@
+(
+-	__priv->__mtdfield.__subfield
++	nand_to_mtd(&__priv->__chipfield)->__subfield
+|
+-	&(__priv->__mtdfield)
++	nand_to_mtd(&__priv->__chipfield)
+)
+--->8---
+---
+ drivers/mtd/nand/nuc900_nand.c | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
+diff --git a/drivers/mtd/nand/nuc900_nand.c b/drivers/mtd/nand/nuc900_nand.c
+index 65908c0..4dad170 100644
+--- a/drivers/mtd/nand/nuc900_nand.c
++++ b/drivers/mtd/nand/nuc900_nand.c
+@@ -55,7 +55,6 @@
+ 	__raw_writel((val), (dev)->reg + REG_SMADDR)
+ 
+ struct nuc900_nand {
+-	struct mtd_info mtd;
+ 	struct nand_chip chip;
+ 	void __iomem *reg;
+ 	struct clk *clk;
+@@ -64,7 +63,7 @@ struct nuc900_nand {
+ 
+ static inline struct nuc900_nand *mtd_to_nuc900(struct mtd_info *mtd)
+ {
+-	return container_of(mtd, struct nuc900_nand, mtd);
++	return container_of(mtd_to_nand(mtd), struct nuc900_nand, chip);
+ }
+ 
+ static const struct mtd_partition partitions[] = {
+@@ -236,6 +235,7 @@ static int nuc900_nand_probe(struct platform_device *pdev)
+ {
+ 	struct nuc900_nand *nuc900_nand;
+ 	struct nand_chip *chip;
++	struct mtd_info *mtd;
+ 	struct resource *res;
+ 
+ 	nuc900_nand = devm_kzalloc(&pdev->dev, sizeof(struct nuc900_nand),
+@@ -243,9 +243,10 @@ static int nuc900_nand_probe(struct platform_device *pdev)
+ 	if (!nuc900_nand)
+ 		return -ENOMEM;
+ 	chip = &(nuc900_nand->chip);
++	mtd = nand_to_mtd(chip);
+ 
+-	nuc900_nand->mtd.priv	= chip;
+-	nuc900_nand->mtd.dev.parent = &pdev->dev;
++	mtd->priv		= chip;
++	mtd->dev.parent		= &pdev->dev;
+ 	spin_lock_init(&nuc900_nand->lock);
+ 
+ 	nuc900_nand->clk = devm_clk_get(&pdev->dev, NULL);
+@@ -269,11 +270,10 @@ static int nuc900_nand_probe(struct platform_device *pdev)
+ 
+ 	nuc900_nand_enable(nuc900_nand);
+ 
+-	if (nand_scan(&(nuc900_nand->mtd), 1))
++	if (nand_scan(mtd, 1))
+ 		return -ENXIO;
+ 
+-	mtd_device_register(&(nuc900_nand->mtd), partitions,
+-			    ARRAY_SIZE(partitions));
++	mtd_device_register(mtd, partitions, ARRAY_SIZE(partitions));
+ 
+ 	platform_set_drvdata(pdev, nuc900_nand);
+ 
+@@ -284,7 +284,7 @@ static int nuc900_nand_remove(struct platform_device *pdev)
+ {
+ 	struct nuc900_nand *nuc900_nand = platform_get_drvdata(pdev);
+ 
+-	nand_release(&nuc900_nand->mtd);
++	nand_release(nand_to_mtd(&nuc900_nand->chip));
+ 	clk_disable(nuc900_nand->clk);
+ 
+ 	return 0;
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.1.4
