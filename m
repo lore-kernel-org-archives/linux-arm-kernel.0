@@ -1,22 +1,24 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 11 Dec 2015 00:20:26 +0100
-Subject: [GIT PULL] ARM: Exynos fixes for v4.4
-In-Reply-To: <1138242734.132831449018245518.JavaMail.weblogic@epmlwas05a>
-References: <1138242734.132831449018245518.JavaMail.weblogic@epmlwas05a>
-Message-ID: <6138852.vVurzf8e9k@wuerfel>
+Date: Fri, 11 Dec 2015 00:23:53 +0100
+Subject: [GIT PULL v2] at91: fixes for 4.4 #2
+In-Reply-To: <20151206221706.GA25252@piout.net>
+References: <20151206221706.GA25252@piout.net>
+Message-ID: <16685847.9YucJUXR3U@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 December 2015 01:04:05 Kukjin Kim wrote:
-> Krzysztof Kozlowski wrote:
-> > 
-> Hi Krzysztof,
+On Sunday 06 December 2015 23:17:06 Alexandre Belloni wrote:
 > 
-> Looks good to me, but I have no other fixes in my tree so this would be sent to
-> out arm-soc directly 
+> As discussed with Arnd, there was an issue in the previous pinctrl
+> selection which is necessary to get sama5d2 to work.
 > 
-> Hi Arnd, Olof, Kevin,
-> Please pull this for v4.4.
+> That pull request replaces th previous one sent by Nicolas. His message
+> was:
+> 
+> "This is the second AT91 "fixes" for 4.4. This one allows the sama5d2 to
+> properly boot with its PIO4 controller and use one of its main interfaces,
+> with the 1.8 capable eMMC, on the sama5d2 Xplained reference platform."
+> 
 > 
 
 Pulled into fixes now, thanks!
