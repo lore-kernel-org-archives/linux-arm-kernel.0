@@ -1,10 +1,10 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 10 Dec 2015 08:59:57 +0100
-Subject: [PATCH v4 13/58] mtd: nand: cs553x: use the mtd instance embedded in
+Date: Thu, 10 Dec 2015 08:59:56 +0100
+Subject: [PATCH v4 12/58] mtd: nand: cmx270: use the mtd instance embedded in
  struct nand_chip
 In-Reply-To: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1449734442-18672-14-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1449734442-18672-13-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,63 +12,53 @@ struct nand_chip now embeds an mtd device. Make use of this mtd instance.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/mtd/nand/cs553x_nand.c | 17 ++++++++---------
- 1 file changed, 8 insertions(+), 9 deletions(-)
+ drivers/mtd/nand/cmx270_nand.c | 13 +++++--------
+ 1 file changed, 5 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/mtd/nand/cs553x_nand.c b/drivers/mtd/nand/cs553x_nand.c
-index 8904d68..386ae83 100644
---- a/drivers/mtd/nand/cs553x_nand.c
-+++ b/drivers/mtd/nand/cs553x_nand.c
-@@ -197,14 +197,13 @@ static int __init cs553x_init_one(int cs, int mmio, unsigned long adr)
- 	}
+diff --git a/drivers/mtd/nand/cmx270_nand.c b/drivers/mtd/nand/cmx270_nand.c
+index 43bded6..6b26e0c 100644
+--- a/drivers/mtd/nand/cmx270_nand.c
++++ b/drivers/mtd/nand/cmx270_nand.c
+@@ -160,10 +160,8 @@ static int __init cmx270_init(void)
+ 	gpio_direction_input(GPIO_NAND_RB);
  
  	/* Allocate memory for MTD device structure and private data */
--	new_mtd = kzalloc(sizeof(struct mtd_info) + sizeof(struct nand_chip), GFP_KERNEL);
--	if (!new_mtd) {
+-	cmx270_nand_mtd = kzalloc(sizeof(struct mtd_info) +
+-				  sizeof(struct nand_chip),
+-				  GFP_KERNEL);
+-	if (!cmx270_nand_mtd) {
 +	this = kzalloc(sizeof(struct nand_chip), GFP_KERNEL);
 +	if (!this) {
- 		err = -ENOMEM;
- 		goto out;
+ 		ret = -ENOMEM;
+ 		goto err_kzalloc;
+ 	}
+@@ -175,8 +173,7 @@ static int __init cmx270_init(void)
+ 		goto err_ioremap;
  	}
  
 -	/* Get pointer to private data */
--	this = (struct nand_chip *)(&new_mtd[1]);
-+	new_mtd = nand_to_mtd(this);
+-	this = (struct nand_chip *)(&cmx270_nand_mtd[1]);
++	cmx270_nand_mtd = nand_to_mtd(this);
  
  	/* Link the private data with the MTD structure */
- 	new_mtd->priv = this;
-@@ -257,7 +256,7 @@ out_free:
- out_ior:
- 	iounmap(this->IO_ADDR_R);
- out_mtd:
--	kfree(new_mtd);
+ 	cmx270_nand_mtd->owner = THIS_MODULE;
+@@ -216,7 +213,7 @@ static int __init cmx270_init(void)
+ err_scan:
+ 	iounmap(cmx270_nand_io);
+ err_ioremap:
+-	kfree(cmx270_nand_mtd);
 +	kfree(this);
- out:
- 	return err;
+ err_kzalloc:
+ 	gpio_free(GPIO_NAND_RB);
+ err_gpio_request:
+@@ -241,7 +238,7 @@ static void __exit cmx270_cleanup(void)
+ 	iounmap(cmx270_nand_io);
+ 
+ 	/* Free the MTD device structure */
+-	kfree (cmx270_nand_mtd);
++	kfree(mtd_to_nand(cmx270_nand_mtd));
  }
-@@ -337,19 +336,19 @@ static void __exit cs553x_cleanup(void)
- 		if (!mtd)
- 			continue;
- 
--		this = mtd_to_nand(cs553x_mtd[i]);
-+		this = mtd_to_nand(mtd);
- 		mmio_base = this->IO_ADDR_R;
- 
- 		/* Release resources, unregister device */
--		nand_release(cs553x_mtd[i]);
--		kfree(cs553x_mtd[i]->name);
-+		nand_release(mtd);
-+		kfree(mtd->name);
- 		cs553x_mtd[i] = NULL;
- 
- 		/* unmap physical address */
- 		iounmap(mmio_base);
- 
- 		/* Free the MTD device structure */
--		kfree(mtd);
-+		kfree(this);
- 	}
- }
+ module_exit(cmx270_cleanup);
  
 -- 
 2.1.4
