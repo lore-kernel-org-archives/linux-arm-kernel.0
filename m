@@ -1,215 +1,45 @@
-From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Thu, 10 Dec 2015 08:55:30 -0800
-Subject: [PATCH v7 4/4] gicv2m: acpi: Introducing GICv2m ACPI support
-In-Reply-To: <1449766530-16935-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-References: <1449766530-16935-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <1449766530-16935-5-git-send-email-Suravee.Suthikulpanit@amd.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 10 Dec 2015 16:59:29 +0000
+Subject: [PATCH 0/4] ARM Versatile multi-platform support
+In-Reply-To: <CAFEAcA9Wkk+tAyrxuiLMOjQA2Y44qFGF+aXzhj7a9k6qnYobfQ@mail.gmail.com>
+References: <1449607458-16850-1-git-send-email-robh@kernel.org>
+ <CAFEAcA9Wkk+tAyrxuiLMOjQA2Y44qFGF+aXzhj7a9k6qnYobfQ@mail.gmail.com>
+Message-ID: <5669AF71.4080806@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces gicv2m_acpi_init(), which uses information
-in MADT GIC MSI frames structure to initialize GICv2m driver.
-It also exposes gicv2m_init() function, which simplifies callers
-to a single GICv2m init function.
+On 08/12/15 21:11, Peter Maydell wrote:
+> On 8 December 2015 at 20:44, Rob Herring <robh@kernel.org> wrote:
+>> Arnd lit a fire under me to dust this off and get it merged. So here it
+>> is. The main change from prior version is I merged all the code to a
+>> single file. It's a bigger patch than I'd like, but I don't think trying
+>> to do it in multiple steps is worth it.
+>>
+>> This is dependent on some solution for the default platform choice on
+>> !MMU builds (allnoconfig) as it can't be Versatile after this series.
+>> Arnd has some ideas on how to address that.
+>>
+>> This is tested under QEMU. Linus previously tested this on actual h/w
+>> and had a problem with the display identification which needs
+>> investigation or agreement to worry about it if and when someone
+>> actually cares.
+> 
+> I handed my PB hardware and its PCI backplane back to Will
+> and Marc some time back, so they're in the best position to
+> do testing of the PCI part on real hardware if needed these days.
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Tested-by: Duc Dang <dhdang@apm.com>
-Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
----
- drivers/irqchip/irq-gic-v2m.c   | 110 +++++++++++++++++++++++++++++++++++++++-
- drivers/irqchip/irq-gic.c       |   6 ++-
- include/linux/irqchip/arm-gic.h |   3 +-
- 3 files changed, 116 insertions(+), 3 deletions(-)
+I don't really have the bandwidth to test that stuff right now, but I
+recently managed to score a few PCI backplanes (backplane only, without
+the massive case, so an ATX power supply is required to make use of it).
+Some documentation is available at [1].
 
-diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
-index 779c390..7e2975d 100644
---- a/drivers/irqchip/irq-gic-v2m.c
-+++ b/drivers/irqchip/irq-gic-v2m.c
-@@ -15,9 +15,11 @@
- 
- #define pr_fmt(fmt) "GICv2m: " fmt
- 
-+#include <linux/acpi.h>
- #include <linux/irq.h>
- #include <linux/irqdomain.h>
- #include <linux/kernel.h>
-+#include <linux/msi.h>
- #include <linux/of_address.h>
- #include <linux/of_pci.h>
- #include <linux/slab.h>
-@@ -138,6 +140,11 @@ static int gicv2m_irq_gic_domain_alloc(struct irq_domain *domain,
- 		fwspec.param[0] = 0;
- 		fwspec.param[1] = hwirq - 32;
- 		fwspec.param[2] = IRQ_TYPE_EDGE_RISING;
-+	} else if (is_fwnode_irqchip(domain->parent->fwnode)) {
-+		fwspec.fwnode = domain->parent->fwnode;
-+		fwspec.param_count = 2;
-+		fwspec.param[0] = hwirq;
-+		fwspec.param[1] = IRQ_TYPE_EDGE_RISING;
- 	} else {
- 		return -EINVAL;
- 	}
-@@ -255,6 +262,8 @@ static void gicv2m_teardown(void)
- 		kfree(v2m->bm);
- 		iounmap(v2m->base);
- 		of_node_put(to_of_node(v2m->fwnode));
-+		if (is_fwnode_irqchip(v2m->fwnode))
-+			irq_domain_free_fwnode(v2m->fwnode);
- 		kfree(v2m);
- 	}
- }
-@@ -373,9 +382,11 @@ static struct of_device_id gicv2m_device_id[] = {
- 	{},
- };
- 
--int __init gicv2m_of_init(struct device_node *node, struct irq_domain *parent)
-+static int __init gicv2m_of_init(struct fwnode_handle *parent_handle,
-+				 struct irq_domain *parent)
- {
- 	int ret = 0;
-+	struct device_node *node = to_of_node(parent_handle);
- 	struct device_node *child;
- 
- 	for (child = of_find_matching_node(node, gicv2m_device_id); child;
-@@ -411,3 +422,100 @@ int __init gicv2m_of_init(struct device_node *node, struct irq_domain *parent)
- 		gicv2m_teardown();
- 	return ret;
- }
-+
-+#ifdef CONFIG_ACPI
-+static int acpi_num_msi;
-+
-+static struct fwnode_handle *gicv2m_get_fwnode(struct device *dev)
-+{
-+	struct v2m_data *data;
-+
-+	if (WARN_ON(acpi_num_msi <= 0))
-+		return NULL;
-+
-+	/* We only return the fwnode of the first MSI frame. */
-+	data = list_first_entry_or_null(&v2m_nodes, struct v2m_data, entry);
-+	if (!data)
-+		return NULL;
-+
-+	return data->fwnode;
-+}
-+
-+static int __init
-+acpi_parse_madt_msi(struct acpi_subtable_header *header,
-+		    const unsigned long end)
-+{
-+	int ret;
-+	struct resource res;
-+	u32 spi_start = 0, nr_spis = 0;
-+	struct acpi_madt_generic_msi_frame *m;
-+	struct fwnode_handle *fwnode;
-+
-+	m = (struct acpi_madt_generic_msi_frame *)header;
-+	if (BAD_MADT_ENTRY(m, end))
-+		return -EINVAL;
-+
-+	res.start = m->base_address;
-+	res.end = m->base_address + SZ_4K;
-+
-+	if (m->flags & ACPI_MADT_OVERRIDE_SPI_VALUES) {
-+		spi_start = m->spi_base;
-+		nr_spis = m->spi_count;
-+
-+		pr_info("ACPI overriding V2M MSI_TYPER (base:%u, num:%u)\n",
-+			spi_start, nr_spis);
-+	}
-+
-+	fwnode = irq_domain_alloc_fwnode((void *)m->base_address);
-+	if (!fwnode) {
-+		pr_err("Unable to allocate GICv2m domain token\n");
-+		return -EINVAL;
-+	}
-+
-+	ret = gicv2m_init_one(fwnode, spi_start, nr_spis, &res);
-+	if (ret)
-+		irq_domain_free_fwnode(fwnode);
-+
-+	return ret;
-+}
-+
-+static int __init gicv2m_acpi_init(struct irq_domain *parent)
-+{
-+	int ret;
-+
-+	if (acpi_num_msi > 0)
-+		return 0;
-+
-+	acpi_num_msi = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_MSI_FRAME,
-+				      acpi_parse_madt_msi, 0);
-+
-+	if (acpi_num_msi <= 0)
-+		goto err_out;
-+
-+	ret = gicv2m_allocate_domains(parent);
-+	if (ret)
-+		goto err_out;
-+
-+	pci_msi_register_fwnode_provider(&gicv2m_get_fwnode);
-+
-+	return 0;
-+
-+err_out:
-+	gicv2m_teardown();
-+	return -EINVAL;
-+}
-+#else /* CONFIG_ACPI */
-+static int __init gicv2m_acpi_init(struct irq_domain *parent)
-+{
-+	return -EINVAL;
-+}
-+#endif /* CONFIG_ACPI */
-+
-+int __init gicv2m_init(struct fwnode_handle *parent_handle,
-+		       struct irq_domain *parent)
-+{
-+	if (is_of_node(parent_handle))
-+		return gicv2m_of_init(parent_handle, parent);
-+
-+	return gicv2m_acpi_init(parent);
-+}
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index fcd327f..644e8bb 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -1234,7 +1234,7 @@ gic_of_init(struct device_node *node, struct device_node *parent)
- 	}
- 
- 	if (IS_ENABLED(CONFIG_ARM_GIC_V2M))
--		gicv2m_of_init(node, gic_data[gic_cnt].domain);
-+		gicv2m_init(&node->fwnode, gic_data[gic_cnt].domain);
- 
- 	gic_cnt++;
- 	return 0;
-@@ -1359,6 +1359,10 @@ static int __init gic_v2_acpi_init(struct acpi_subtable_header *header,
- 	__gic_init_bases(0, -1, dist_base, cpu_base, 0, domain_handle);
- 
- 	acpi_set_irq_model(ACPI_IRQ_MODEL_GIC, domain_handle);
-+
-+	if (IS_ENABLED(CONFIG_ARM_GIC_V2M))
-+		gicv2m_init(NULL, gic_data[0].domain);
-+
- 	return 0;
- }
- IRQCHIP_ACPI_DECLARE(gic_v2, ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR,
-diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index bae69e5..febc6c3 100644
---- a/include/linux/irqchip/arm-gic.h
-+++ b/include/linux/irqchip/arm-gic.h
-@@ -106,7 +106,8 @@ int gic_cpu_if_down(unsigned int gic_nr);
- void gic_init(unsigned int nr, int start,
- 	      void __iomem *dist , void __iomem *cpu);
- 
--int gicv2m_of_init(struct device_node *node, struct irq_domain *parent);
-+int gicv2m_init(struct fwnode_handle *parent_handle,
-+		struct irq_domain *parent);
- 
- void gic_send_sgi(unsigned int cpu_id, unsigned int irq);
- int gic_get_cpu_id(unsigned int cpu);
+I could easily be convinced to part with one of them, and even drop it
+at a suitably located Linaro office, if that helps...
+
+Thanks,
+
+	M.
+
+[1] http://infocenter.arm.com/help/topic/com.arm.doc.dui0425f/Cfhffaei.html
 -- 
-2.1.0
+Jazz is not dead. It just smells funny...
