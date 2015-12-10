@@ -1,78 +1,254 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 10 Dec 2015 12:10:12 +0100
-Subject: [PATCH] gpio: zynq: Do PM initialization earlier to support gpio hogs
-Message-ID: <fc67101afc0d10efbaeeb6bc3d881ab49e3f4671.1449745801.git.michal.simek@xilinx.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 10 Dec 2015 20:34:31 +0900
+Subject: [PATCH v12 12/16] arm64: kdump: implement machine_crash_shutdown()
+In-Reply-To: <56586B27.9080508@arm.com>
+References: <cover.1448403503.git.geoff@infradead.org>
+ <9ae67f7515c66bfd747486c8dc1c1772913a8d46.1448403503.git.geoff@infradead.org>
+ <56586B27.9080508@arm.com>
+Message-ID: <56696347.4060402@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GPIO hogs registration is call at the end of gpiochip_add() function.
-Calling sequence is:
-gpiochip_add -> of_gpiochip_add -> of_gpiochip_scan_hogs ->
-gpiod_hog -> gpiochip_request_own_desc -> __gpiod_request ->
-chip->request -> zynq_gpio_request which calls pm_runtime_get_sync()
-which returns -13 because PM is not initialized yet.
+Marc,
 
-Initialize PM before gpiochip_add is called to fix this issue.
+I was back from my vacation.
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
+On 11/27/2015 11:39 PM, Marc Zyngier wrote:
+> On 24/11/15 22:25, Geoff Levand wrote:
+>> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>>
+>> kdump calls machine_crash_shutdown() to shut down non-boot cpus and
+>> save registers' status in per-cpu ELF notes before starting the crash
+>> dump kernel. See kernel_kexec().
+>>
+>> ipi_cpu_stop() is a bit modified and used to support this behavior.
+>>
+>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>> ---
+>>   arch/arm64/include/asm/kexec.h    | 34 +++++++++++++++++++++++++++++++++-
+>>   arch/arm64/kernel/machine_kexec.c | 31 +++++++++++++++++++++++++++++--
+>>   arch/arm64/kernel/smp.c           | 16 ++++++++++++++--
+>>   3 files changed, 76 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
+>> index 46d63cd..555a955 100644
+>> --- a/arch/arm64/include/asm/kexec.h
+>> +++ b/arch/arm64/include/asm/kexec.h
+>> @@ -30,6 +30,8 @@
+>>
+>>   #if !defined(__ASSEMBLY__)
+>>
+>> +extern bool in_crash_kexec;
+>> +
+>>   /**
+>>    * crash_setup_regs() - save registers for the panic kernel
+>>    *
+>> @@ -40,7 +42,37 @@
+>>   static inline void crash_setup_regs(struct pt_regs *newregs,
+>>   				    struct pt_regs *oldregs)
+>>   {
+>> -	/* Empty routine needed to avoid build errors. */
+>> +	if (oldregs) {
+>> +		memcpy(newregs, oldregs, sizeof(*newregs));
+>> +	} else {
+>> +		__asm__ __volatile__ (
+>> +			"stp	 x0,   x1, [%3, #16 *  0]\n"
+>> +			"stp	 x2,   x3, [%3, #16 *  1]\n"
+>> +			"stp	 x4,   x5, [%3, #16 *  2]\n"
+>> +			"stp	 x6,   x7, [%3, #16 *  3]\n"
+>> +			"stp	 x8,   x9, [%3, #16 *  4]\n"
+>> +			"stp	x10,  x11, [%3, #16 *  5]\n"
+>> +			"stp	x12,  x13, [%3, #16 *  6]\n"
+>> +			"stp	x14,  x15, [%3, #16 *  7]\n"
+>> +			"stp	x16,  x17, [%3, #16 *  8]\n"
+>> +			"stp	x18,  x19, [%3, #16 *  9]\n"
+>> +			"stp	x20,  x21, [%3, #16 * 10]\n"
+>> +			"stp	x22,  x23, [%3, #16 * 11]\n"
+>> +			"stp	x24,  x25, [%3, #16 * 12]\n"
+>> +			"stp	x26,  x27, [%3, #16 * 13]\n"
+>> +			"stp	x28,  x29, [%3, #16 * 14]\n"
+>> +			"str	x30,	   [%3, #16 * 15]\n"
+>> +			"mov	%0, sp\n"
+>> +			"adr	%1, 1f\n"
+>> +			"mrs	%2, spsr_el1\n"
+>> +		"1:"
+>> +			: "=r" (newregs->sp),
+>> +			  "=r" (newregs->pc),
+>> +			  "=r" (newregs->pstate)
+>> +			: "r"  (&newregs->regs)
+>> +			: "memory"
+>> +		);
+>
+> I wonder how useful this thing is, given that it starts by corrupting
+> whatever register is holding newregs->regs. Maybe this is not supposed
+> to be accurate anyway...
 
- drivers/gpio/gpio-zynq.c | 19 +++++++++----------
- 1 file changed, 9 insertions(+), 10 deletions(-)
+I'm not quite sure about what part of my code you're mentioning here, but
+crash_setup_regs() is solely called by crash_kexec(), and panic() is
+the only caller of crash_kexec() with NULL argument which, in turn, is
+used as 'oldregs' in crash_setup_regs().
 
-diff --git a/drivers/gpio/gpio-zynq.c b/drivers/gpio/gpio-zynq.c
-index 00306e70a420..a0cabd17c9d0 100644
---- a/drivers/gpio/gpio-zynq.c
-+++ b/drivers/gpio/gpio-zynq.c
-@@ -710,23 +710,23 @@ static int zynq_gpio_probe(struct platform_device *pdev)
- 	chip->base = -1;
- 	chip->ngpio = gpio->p_data->ngpio;
- 
--	/* Enable GPIO clock */
-+	/* Retrieve GPIO clock */
- 	gpio->clk = devm_clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(gpio->clk)) {
- 		dev_err(&pdev->dev, "input clock not found.\n");
- 		return PTR_ERR(gpio->clk);
- 	}
--	ret = clk_prepare_enable(gpio->clk);
--	if (ret) {
--		dev_err(&pdev->dev, "Unable to enable clock.\n");
-+
-+	pm_runtime_enable(&pdev->dev);
-+	ret = pm_runtime_get_sync(&pdev->dev);
-+	if (ret < 0)
- 		return ret;
--	}
- 
- 	/* report a bug if gpio chip registration fails */
- 	ret = gpiochip_add(chip);
- 	if (ret) {
- 		dev_err(&pdev->dev, "Failed to add gpio chip\n");
--		goto err_disable_clk;
-+		goto err_pm_put;
- 	}
- 
- 	/* disable interrupts for all banks */
-@@ -744,15 +744,14 @@ static int zynq_gpio_probe(struct platform_device *pdev)
- 	gpiochip_set_chained_irqchip(chip, &zynq_gpio_edge_irqchip, gpio->irq,
- 				     zynq_gpio_irqhandler);
- 
--	pm_runtime_set_active(&pdev->dev);
--	pm_runtime_enable(&pdev->dev);
-+	pm_runtime_put(&pdev->dev);
- 
- 	return 0;
- 
- err_rm_gpiochip:
- 	gpiochip_remove(chip);
--err_disable_clk:
--	clk_disable_unprepare(gpio->clk);
-+err_pm_put:
-+	pm_runtime_put(&pdev->dev);
- 
- 	return ret;
- }
--- 
-1.9.1
+Given this fact, I think that the values saved in newregs as indicated above
+will be the best estimate of current cpu contexts.
+
+The other caller of crash_kexec() is die() in traps.c, but here we call
+it with explicit cpu contexts at exception.
+
+>
+>> +	}
+>>   }
+>>
+>>   #endif /* !defined(__ASSEMBLY__) */
+>> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+>> index da28a26..d2d7e90 100644
+>> --- a/arch/arm64/kernel/machine_kexec.c
+>> +++ b/arch/arm64/kernel/machine_kexec.c
+>> @@ -9,6 +9,7 @@
+>>    * published by the Free Software Foundation.
+>>    */
+>>
+>> +#include <linux/kernel.h>
+>>   #include <linux/kexec.h>
+>>   #include <linux/of_fdt.h>
+>>   #include <linux/slab.h>
+>> @@ -23,6 +24,7 @@
+>>   extern const unsigned char arm64_relocate_new_kernel[];
+>>   extern const unsigned long arm64_relocate_new_kernel_size;
+>>
+>> +bool in_crash_kexec;
+>>   static unsigned long kimage_start;
+>>
+>>   /**
+>> @@ -203,13 +205,38 @@ void machine_kexec(struct kimage *kimage)
+>>   	 */
+>>
+>>   	cpu_soft_restart(virt_to_phys(cpu_reset),
+>> -		is_hyp_mode_available(),
+>> +		in_crash_kexec ? 0 : is_hyp_mode_available(),
+>>   		reboot_code_buffer_phys, kimage->head, kimage_start);
+>>
+>>   	BUG(); /* Should never get here. */
+>>   }
+>>
+>> +/**
+>> + * machine_crash_shutdown - shutdown non-boot cpus and save registers
+>> + */
+>>   void machine_crash_shutdown(struct pt_regs *regs)
+>>   {
+>> -	/* Empty routine needed to avoid build errors. */
+>> +	struct pt_regs dummy_regs;
+>> +	int cpu;
+>> +
+>> +	local_irq_disable();
+>> +
+>> +	in_crash_kexec = true;
+>> +
+>> +	/*
+>> +	 * clear and initialize the per-cpu info. This is necessary
+>> +	 * because, otherwise, slots for offline cpus would never be
+>> +	 * filled up. See smp_send_stop().
+>> +	 */
+>> +	memset(&dummy_regs, 0, sizeof(dummy_regs));
+>> +	for_each_possible_cpu(cpu)
+>> +		crash_save_cpu(&dummy_regs, cpu);
+>> +
+>> +	/* shutdown non-boot cpus */
+>> +	smp_send_stop();
+>> +
+>> +	/* for boot cpu */
+>> +	crash_save_cpu(regs, smp_processor_id());
+>> +
+>> +	pr_info("Starting crashdump kernel...\n");
+>>   }
+>> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+>> index b1adc51..15aabef 100644
+>> --- a/arch/arm64/kernel/smp.c
+>> +++ b/arch/arm64/kernel/smp.c
+>> @@ -37,6 +37,7 @@
+>>   #include <linux/completion.h>
+>>   #include <linux/of.h>
+>>   #include <linux/irq_work.h>
+>> +#include <linux/kexec.h>
+>>
+>>   #include <asm/alternative.h>
+>>   #include <asm/atomic.h>
+>> @@ -54,6 +55,8 @@
+>>   #include <asm/ptrace.h>
+>>   #include <asm/virt.h>
+>>
+>> +#include "cpu-reset.h"
+>> +
+>>   #define CREATE_TRACE_POINTS
+>>   #include <trace/events/ipi.h>
+>>
+>> @@ -683,8 +686,12 @@ static DEFINE_RAW_SPINLOCK(stop_lock);
+>>   /*
+>>    * ipi_cpu_stop - handle IPI from smp_send_stop()
+>>    */
+>> -static void ipi_cpu_stop(unsigned int cpu)
+>> +static void ipi_cpu_stop(unsigned int cpu, struct pt_regs *regs)
+>>   {
+>> +#ifdef CONFIG_KEXEC
+>> +	/* printing messages may slow down the shutdown. */
+>> +	if (!in_crash_kexec)
+>> +#endif
+>>   	if (system_state == SYSTEM_BOOTING ||
+>>   	    system_state == SYSTEM_RUNNING) {
+>>   		raw_spin_lock(&stop_lock);
+>
+> Irrespective of how useful this change is, how about having a predicate
+> instead? Something like:
+>
+> static inline bool is_in_crash_kexec(void)
+> {
+> #ifdef CONFIG_KEXEC
+> 	return in_crash_kexec;
+> #else
+> 	return false;
+> #endif
+> }
+
+OK, I will take your idea.
+
+> located in machine_kexec.c (making the in_crash_kernel static), and then
+
+but cannot make in_crash_kernel static because it is also used in both smp.c
+and machine_kexec.c.
+
+> 	if (!is_in_crash_kexec() && (systen_state == ... || ...) {
+>
+> It would certainly look better.
+
+Thanks,
+-Takahiro AKASHI
+
+>> @@ -697,6 +704,11 @@ static void ipi_cpu_stop(unsigned int cpu)
+>>
+>>   	local_irq_disable();
+>>
+>> +#ifdef CONFIG_KEXEC
+>> +	if (in_crash_kexec)
+>> +		crash_save_cpu(regs, cpu);
+>> +#endif /* CONFIG_KEXEC */
+>> +
+>
+> Same here.
+>
+>>   	while (1)
+>>   		cpu_relax();
+>>   }
+>> @@ -727,7 +739,7 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+>>
+>>   	case IPI_CPU_STOP:
+>>   		irq_enter();
+>> -		ipi_cpu_stop(cpu);
+>> +		ipi_cpu_stop(cpu, regs);
+>>   		irq_exit();
+>>   		break;
+>>
+>>
+>
+> Thanks,
+>
+> 	M.
+>
