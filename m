@@ -1,306 +1,111 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 10 Dec 2015 18:54:20 +0100
-Subject: [PATCH v5] sun4i-codec: add inputs
-In-Reply-To: <20151208042013.11d31f09@dayas>
-References: <20151208042013.11d31f09@dayas>
-Message-ID: <20151210175420.GH27957@lukather>
+From: juri.lelli@arm.com (Juri Lelli)
+Date: Thu, 10 Dec 2015 17:58:20 +0000
+Subject: [RFC PATCH 2/8] Documentation: arm: define DT cpu capacity
+ bindings
+In-Reply-To: <20151210153004.GA26758@sirena.org.uk>
+References: <1448288921-30307-1-git-send-email-juri.lelli@arm.com>
+ <1448288921-30307-3-git-send-email-juri.lelli@arm.com>
+ <20151124020631.GA15165@rob-hp-laptop>
+ <20151210153004.GA26758@sirena.org.uk>
+Message-ID: <20151210175820.GE14571@e106622-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Mark,
 
-On Tue, Dec 08, 2015 at 04:20:13AM +0100, Danny Milosavljevic wrote:
-> Hi,
+I certainly understand your (and Rob's) concerns, but let me try anyway
+to argument a bit more around this approach :-).
+
+On 10/12/15 15:30, Mark Brown wrote:
+> On Mon, Nov 23, 2015 at 08:06:31PM -0600, Rob Herring wrote:
 > 
-> this is the fifth version of the patch that adds inputs to sun4i-codec.
-> (Previous versions have been on the linux-sunxi mailing list only)
+> > I think you need something absolute and probably per MHz (like 
+> > dynamic-power-coefficient property). Perhaps the IPC (instructions per 
+> > clock) value?
 > 
-> The inputs added are:
-> - FM-In Left and Right
-> - Line-In Left and Right
-> - Mic1-In
-> - Mic2-In
+> > In other words, I want to see these numbers have a defined method 
+> > of determining them and don't want to see random values from every 
+> > vendor. ARM, Ltd. says core X has a value of Y would be good enough for 
+> > me. Vendor X's A57 having a value of 2 and Vendor Y's A57 having a 
+> > value of 1024 is not what I want to see. Of course things like cache 
+> > sizes can vary the performance, but is a baseline value good enough? 
 > 
-> Changes compared to v4 are:
-> - Mic preamplifier controls have more common names now.
-> - Mic preamplifier scale has a 0 dB entry as well now, as documented in the 
->   A20 user manual.
-> - Mic preamplifier has special cases for A20 and A10 now.
-> - Gain controls have "Gain" in the name now.
+> > However, no vendor will want to publish their values if these are 
+> > absolute values relative to other vendors.
 > 
-> I successfully tested it on an A20 board using alsamixer, headphones, a radio and 
-> my ears.
-> Note that because of missing capturing support I tested only the mixing, 
-> for Mic, Line, and FM.
+> > If you expect these to need frequent tuning, then don't put them in DT.
 > 
-> The patches are on top of <git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git>, 
-> branch "sunxi/for-next".
+> I agree strongly.  Putting what are essentially tuning numbers for the
+> system into the ABI is going to lead us into a mess long term since if
+> we change anything related to the performance of the system the numbers
+> may become invalid and we've no real way of recovering sensible
+> information.
 > 
-> Regards,
->    Danny
+> There is of course also the issue where people are getting the numbers
+> from in the first place - were the numbers picked for some particular
+> use case or to optimise some particular benchmark, what other conditions
+> existed at the time (cpufreq setup for example), what tuning goals did
+> the people picking the numbers have and do any of those things
+> correspond to what a given user wants?  If detailed tuning the numbers
+> for specific systems matters much will we get competing users patching
+> the in kernel DTs over and over, and what do we do about ACPI systems?
+> Having an absolute definition doesn't really help with this since the
+> concrete effect DT authors see is that these are tuning numbers.
 > 
-> Danny (1):
->  b/sound/soc/sunxi/sun4i-codec.c |  153 +++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 150 insertions(+), 3 deletions(-)
+
+I'm not entirely getting here why you consider capacity values to be
+tunables. As part of the EAS effort, we are proposing ways in which users
+should be able to fine tune their system as needed, when required
+(don't know if you had a chance to have a look at the SchedTune posting
+back in August for example [1]). This patch tries to only standardize
+where do we get default values from and how we specify them. I'm not
+seeing them changing much after an initial benchmarking phase has been
+done. Tuning should happen using different methods, not by changing
+these values, IMHO.
+
+> It would be better to have the DT describe concrete physical properties
+> of the system which we can then map onto numbers we like, that way if we
+> get better information in future or just decide that completely
+> different metrics are appropriate for tuning we can just do that without
+> having to worry about translating the old metrics into new ones.  We can
+> then expose the tuning knobs to userspace for override if that's needed.
+> If doing system specific tuning on vertically integrated systems really
+> is terribly important it's not going to matter too much where the tuning
+> is but we also have to consider more general purpose systems.
 > 
-> Signed-off-by: Danny Milosavljevic <dannym+a@scratchpost.org>
-> ---
-> diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-> index bcbf4da..106b568 100644
-> --- a/sound/soc/sunxi/sun4i-codec.c
-> +++ b/sound/soc/sunxi/sun4i-codec.c
-> @@ -57,9 +57,20 @@
->  #define SUN4I_CODEC_DAC_ACTL_DACAENR			(31)
->  #define SUN4I_CODEC_DAC_ACTL_DACAENL			(30)
->  #define SUN4I_CODEC_DAC_ACTL_MIXEN			(29)
-> +#define SUN4I_CODEC_DAC_ACTL_LNG			(26)
-> +#define SUN4I_CODEC_DAC_ACTL_FMG			(23)
-> +#define SUN4I_CODEC_DAC_ACTL_MICG			(20)
-> +#define SUN4I_CODEC_DAC_ACTL_LLNS			(19)
-> +#define SUN4I_CODEC_DAC_ACTL_RLNS			(18)
-> +#define SUN4I_CODEC_DAC_ACTL_LFMS			(17)
-> +#define SUN4I_CODEC_DAC_ACTL_RFMS			(16)
->  #define SUN4I_CODEC_DAC_ACTL_LDACLMIXS			(15)
->  #define SUN4I_CODEC_DAC_ACTL_RDACRMIXS			(14)
->  #define SUN4I_CODEC_DAC_ACTL_LDACRMIXS			(13)
-> +#define SUN4I_CODEC_DAC_ACTL_MIC1LS			(12)
-> +#define SUN4I_CODEC_DAC_ACTL_MIC1RS			(11)
-> +#define SUN4I_CODEC_DAC_ACTL_MIC2LS			(10)
-> +#define SUN4I_CODEC_DAC_ACTL_MIC2RS			(9)
->  #define SUN4I_CODEC_DAC_ACTL_DACPAS			(8)
->  #define SUN4I_CODEC_DAC_ACTL_MIXPAS			(7)
->  #define SUN4I_CODEC_DAC_ACTL_PA_MUTE			(6)
-> @@ -84,8 +95,11 @@
->  #define SUN4I_CODEC_ADC_ACTL_PREG1EN			(29)
->  #define SUN4I_CODEC_ADC_ACTL_PREG2EN			(28)
->  #define SUN4I_CODEC_ADC_ACTL_VMICEN			(27)
-> +#define SUN4I_CODEC_ADC_ACTL_PREG1_A10			(25)
-> +#define SUN4I_CODEC_ADC_ACTL_PREG2_A10			(23)
->  #define SUN4I_CODEC_ADC_ACTL_VADCG			(20)
->  #define SUN4I_CODEC_ADC_ACTL_ADCIS			(17)
-> +#define SUN4I_CODEC_ADC_ACTL_LNRDF			(16)
->  #define SUN4I_CODEC_ADC_ACTL_PA_EN			(4)
->  #define SUN4I_CODEC_ADC_ACTL_DDE			(3)
->  #define SUN4I_CODEC_ADC_DEBUG			(0x2c)
-> @@ -94,7 +108,18 @@
->  #define SUN4I_CODEC_DAC_TXCNT			(0x30)
->  #define SUN4I_CODEC_ADC_RXCNT			(0x34)
->  #define SUN4I_CODEC_AC_SYS_VERI			(0x38)
-> -#define SUN4I_CODEC_AC_MIC_PHONE_CAL		(0x3c)
-> +
-> +/* MIC_PHONE_CAL register offsets and bit fields (A20 only) */
-> +#define SUN7I_CODEC_AC_MIC_PHONE_CAL		(0x3c)
-> +#define SUN7I_CODEC_AC_MIC_PHONE_CAL_PREG1      (29)
-> +#define SUN7I_CODEC_AC_MIC_PHONE_CAL_PREG2      (26)
-> +/* note: no idea where the output pins for the following are. */
-> +#define SUN7I_CODEC_AC_MIC_PHONE_CAL_PHONEOUTG  (5)
-> +#define SUN7I_CODEC_AC_MIC_PHONE_CAL_PHONEOUTEN (4)
-> +#define SUN7I_CODEC_AC_MIC_PHONE_CAL_PHONEOUTS3 (3)
-> +#define SUN7I_CODEC_AC_MIC_PHONE_CAL_PHONEOUTS2 (2)
-> +#define SUN7I_CODEC_AC_MIC_PHONE_CAL_PHONEOUTS1 (1)
-> +#define SUN7I_CODEC_AC_MIC_PHONE_CAL_PHONEOUTS0 (0)
->  
->  struct sun4i_codec {
->  	struct device	*dev;
-> @@ -402,16 +427,94 @@ static const struct snd_kcontrol_new sun4i_codec_pa_mute =
->  			SUN4I_CODEC_DAC_ACTL_PA_MUTE, 1, 0);
->  
->  static DECLARE_TLV_DB_SCALE(sun4i_codec_pa_volume_scale, -6300, 100, 1);
-> +static DECLARE_TLV_DB_SCALE(sun4i_codec_linein_loopback_gain_scale, -150, 150, 0);
-> +static DECLARE_TLV_DB_SCALE(sun4i_codec_fmin_loopback_gain_scale, -450, 150, 0);
-> +static DECLARE_TLV_DB_SCALE(sun4i_codec_micin_loopback_gain_scale, -450, 150, 0);
-> +static DECLARE_TLV_DB_RANGE(sun7i_codec_micin_preamp_gain_scale,
-> +	0, 0, TLV_DB_SCALE_ITEM(0, 0, 0),
-> +	1, 7, TLV_DB_SCALE_ITEM(2400, 300, 0)
-> +);
-> +static DECLARE_TLV_DB_RANGE(sun4i_codec_micin_preamp_gain_scale_a10,
-> +	0, 0, TLV_DB_SCALE_ITEM(0, 0, 0),
-> +	1, 7, TLV_DB_SCALE_ITEM(3500, 300, 0)
-> +);
-> +
-> +struct snd_kcontrol_new sun7ionly_codec_widgets[] = {
-> +	SOC_SINGLE_TLV("Mic1-In Boost Gain",
-> +		       SUN7I_CODEC_AC_MIC_PHONE_CAL,
-> +		       SUN7I_CODEC_AC_MIC_PHONE_CAL_PREG1,
-> +		       7,
-> +		       0,
-> +		       sun7i_codec_micin_preamp_gain_scale),
-> +	SOC_SINGLE_TLV("Mic2-In Boost Gain",
-> +		       SUN7I_CODEC_AC_MIC_PHONE_CAL,
-> +		       SUN7I_CODEC_AC_MIC_PHONE_CAL_PREG2,
-> +		       7,
-> +		       0,
-> +		       sun7i_codec_micin_preamp_gain_scale),
-> +};
->  
-> -static const struct snd_kcontrol_new sun4i_codec_widgets[] = {
-> +/* Note: this is modified by the sun4i_codec_probe() function. */
-> +static struct snd_kcontrol_new sun4i_codec_widgets[] = {
->  	SOC_SINGLE_TLV("PA Volume", SUN4I_CODEC_DAC_ACTL,
->  		       SUN4I_CODEC_DAC_ACTL_PA_VOL, 0x3F, 0,
->  		       sun4i_codec_pa_volume_scale),
-> +	/* Line-In, FM-In, Mic1-In, Mic2-In */
-> +	SOC_SINGLE_TLV("Line-In Playback Gain",
-> +		       SUN4I_CODEC_DAC_ACTL,
-> +		       SUN4I_CODEC_DAC_ACTL_LNG,
-> +		       1,
-> +		       0,
-> +		       sun4i_codec_linein_loopback_gain_scale),
-> +	SOC_SINGLE_TLV("FM-In Playback Gain",
-> +		       SUN4I_CODEC_DAC_ACTL,
-> +		       SUN4I_CODEC_DAC_ACTL_FMG,
-> +		       3,
-> +		       0,
-> +		       sun4i_codec_fmin_loopback_gain_scale),
-> +	SOC_SINGLE_TLV("Mic-In Playback Gain",
-> +		       SUN4I_CODEC_DAC_ACTL,
-> +		       SUN4I_CODEC_DAC_ACTL_MICG,
-> +		       7,
-> +		       0,
-> +		       sun4i_codec_micin_loopback_gain_scale),
-> +	SOC_SINGLE_TLV("Mic1-In Boost Gain",
-> +		       SUN4I_CODEC_ADC_ACTL,
-> +		       SUN4I_CODEC_ADC_ACTL_PREG1_A10,
-> +		       3,
-> +		       0,
-> +		       sun4i_codec_micin_preamp_gain_scale_a10),
-> +	SOC_SINGLE_TLV("Mic2-In Boost Gain",
-> +		       SUN4I_CODEC_ADC_ACTL,
-> +		       SUN4I_CODEC_ADC_ACTL_PREG2_A10,
-> +		       3,
-> +		       0,
-> +		       sun4i_codec_micin_preamp_gain_scale_a10),
-> +	SOC_SINGLE_TLV("Mic1-In Boost Switch",
-> +		       SUN4I_CODEC_ADC_ACTL,
-> +		       SUN4I_CODEC_ADC_ACTL_PREG1EN,
-> +		       1,
-> +		       0,
-> +		       NULL),
-> +	SOC_SINGLE_TLV("Mic2-In Boost Switch",
-> +		       SUN4I_CODEC_ADC_ACTL,
-> +		       SUN4I_CODEC_ADC_ACTL_PREG2EN,
-> +		       1,
-> +		       0,
-> +		       NULL),
->  };
->  
->  static const struct snd_kcontrol_new sun4i_codec_left_mixer_controls[] = {
->  	SOC_DAPM_SINGLE("Left DAC Playback Switch", SUN4I_CODEC_DAC_ACTL,
->  			SUN4I_CODEC_DAC_ACTL_LDACLMIXS, 1, 0),
-> +	SOC_DAPM_SINGLE("Left Line-In Playback Switch", SUN4I_CODEC_DAC_ACTL,
-> +			SUN4I_CODEC_DAC_ACTL_LLNS, 1, 0),
-> +	SOC_DAPM_SINGLE("Left FM-In Playback Switch", SUN4I_CODEC_DAC_ACTL,
-> +			SUN4I_CODEC_DAC_ACTL_LFMS, 1, 0),
-> +	SOC_DAPM_SINGLE("Mic1-In Playback Switch", SUN4I_CODEC_DAC_ACTL,
-> +			SUN4I_CODEC_DAC_ACTL_MIC1LS, 1, 0),
-> +	SOC_DAPM_SINGLE("Mic2-In Playback Switch", SUN4I_CODEC_DAC_ACTL,
-> +			SUN4I_CODEC_DAC_ACTL_MIC2LS, 1, 0),
->  };
->  
->  static const struct snd_kcontrol_new sun4i_codec_right_mixer_controls[] = {
-> @@ -419,6 +522,14 @@ static const struct snd_kcontrol_new sun4i_codec_right_mixer_controls[] = {
->  			SUN4I_CODEC_DAC_ACTL_RDACRMIXS, 1, 0),
->  	SOC_DAPM_SINGLE("Left DAC Playback Switch", SUN4I_CODEC_DAC_ACTL,
->  			SUN4I_CODEC_DAC_ACTL_LDACRMIXS, 1, 0),
-> +	SOC_DAPM_SINGLE("Right Line-In Playback Switch", SUN4I_CODEC_DAC_ACTL,
-> +			SUN4I_CODEC_DAC_ACTL_RLNS, 1, 0),
-> +	SOC_DAPM_SINGLE("Right FM-In Playback Switch", SUN4I_CODEC_DAC_ACTL,
-> +			SUN4I_CODEC_DAC_ACTL_RFMS, 1, 0),
-> +	SOC_DAPM_SINGLE("Mic1-In Playback Switch", SUN4I_CODEC_DAC_ACTL,
-> +			SUN4I_CODEC_DAC_ACTL_MIC1RS, 1, 0),
-> +	SOC_DAPM_SINGLE("Mic2-In Playback Switch", SUN4I_CODEC_DAC_ACTL,
-> +			SUN4I_CODEC_DAC_ACTL_MIC2RS, 1, 0),
->  };
 
-Do we need the -In part of FM, Mic1 and Mic2?
+As replied to Rob, I'm not sure it is so easy to find any physical
+property that expresses what we essentially need (without maybe relying
+on a complex mix of hardware details and a model to extract numbers from
+them). Instead, we propose to have reasonable, per SoC, default numbers;
+and then let users fine tune their platform afterwards, without changing
+those default values.
 
->  
->  static const struct snd_kcontrol_new sun4i_codec_pa_mixer_controls[] = {
-> @@ -462,8 +573,16 @@ static const struct snd_soc_dapm_widget sun4i_codec_dapm_widgets[] = {
->  
->  	SND_SOC_DAPM_OUTPUT("HP Right"),
->  	SND_SOC_DAPM_OUTPUT("HP Left"),
-> +
-> +	SND_SOC_DAPM_INPUT("Line-In Right"),
-> +	SND_SOC_DAPM_INPUT("Line-In Left"),
-> +	SND_SOC_DAPM_INPUT("FM-In Right"),
-> +	SND_SOC_DAPM_INPUT("FM-In Left"),
-> +	SND_SOC_DAPM_INPUT("Mic1-In"),
+> We're not going to get out of having to pick numbers at some point,
+> pushing them into DT doesn't get us out of that but it does make the
+> situation harder to manage long term and makes the performance for the
+> general user less relaible.  It's also just more work all round,
+> everyone doing the DT for a SoC is going to have to do some combination
+> of cargo culting or repeating the callibration.
+> 
 
-Mic1 is already defined a few lines above.
+I'm most probably a bit naive here, but I see the calibration phase
+happening only once, after the platform is stable. You get default
+capacity values by running a pretty simple benchmark on a fixed
+configuration; and you put them somewhere (DTs still seem to be a
+sensible place to me). Then you'll be able to suit tuning needs using
+different interfaces.
 
-> +	SND_SOC_DAPM_INPUT("Mic2-In"),
->  };
->  
-> +/* {sink, control, source} */
->  static const struct snd_soc_dapm_route sun4i_codec_dapm_routes[] = {
->  	/* Left DAC Routes */
->  	{ "Left DAC", NULL, "DAC" },
-> @@ -490,6 +609,20 @@ static const struct snd_soc_dapm_route sun4i_codec_dapm_routes[] = {
->  	{ "Pre-Amplifier Mute", "Switch", "Pre-Amplifier" },
->  	{ "HP Right", NULL, "Pre-Amplifier Mute" },
->  	{ "HP Left", NULL, "Pre-Amplifier Mute" },
-> +
-> +	/* Line-In, FM-In */
-> +	{ "Right Mixer", "Right Line-In Playback Switch", "Line-In Right" },
-> +	{ "Left Mixer", "Left Line-In Playback Switch", "Line-In Left" },
-> +	{ "Right Mixer", "Right FM-In Playback Switch", "FM-In Right" },
-> +	{ "Left Mixer", "Left FM-In Playback Switch", "FM-In Left" },
-> +
-> +	/* Mic1-In */
-> +	{ "Right Mixer", "Mic1-In Playback Switch", "Mic1-In" },
-> +	{ "Left Mixer", "Mic1-In Playback Switch", "Mic1-In" },
-> +
-> +	/* Mic2-In */
-> +	{ "Right Mixer", "Mic2-In Playback Switch", "Mic2-In" },
-> +	{ "Left Mixer", "Mic2-In Playback Switch", "Mic2-In" },
+ABI changes have to be carefully considered, I know. But still, we need
+to agree on a way to provide these default capacity values someway. So,
+thanks for helping us carry on this discussion.
 
-And you have the Mixers routes a bit above too.
+Best,
 
->  };
->  
->  static struct snd_soc_codec_driver sun4i_codec_codec = {
-> @@ -537,7 +670,7 @@ static const struct regmap_config sun4i_codec_regmap_config = {
->  	.reg_bits	= 32,
->  	.reg_stride	= 4,
->  	.val_bits	= 32,
-> -	.max_register	= SUN4I_CODEC_AC_MIC_PHONE_CAL,
-> +	.max_register	= SUN7I_CODEC_AC_MIC_PHONE_CAL,
->  };
->  
->  static const struct of_device_id sun4i_codec_of_match[] = {
-> @@ -594,6 +727,20 @@ static int sun4i_codec_probe(struct platform_device *pdev)
->  	void __iomem *base;
->  	int ret;
->  
-> +	if (of_device_is_compatible(pdev->dev.of_node, "allwinner,sun7i-a20-codec")) {
-> +		size_t i, j;
-> +		for (i = 0; i < ARRAY_SIZE(sun7ionly_codec_widgets); ++i) {
-> +			struct snd_kcontrol_new *new_kcontrol;
-> +			new_kcontrol = &sun7ionly_codec_widgets[i];
-> +			for (j = 0; j < ARRAY_SIZE(sun4i_codec_widgets); ++j) {
-> +				struct snd_kcontrol_new *kcontrol;
-> +				kcontrol = &sun4i_codec_widgets[j];
-> +				if (strcmp(kcontrol->name, new_kcontrol->name) == 0)
-> +					memcpy(kcontrol, new_kcontrol, sizeof(*kcontrol));
-> +			}
-> +		}
-> +	}
-> +
+- Juri
 
-We'll need to fix that, see the other discussion.
+> I remember Peter remarking at one of the LPC discussions of this idea
+> that there had been some bad experiences with getting numbers from 
+> firmware on other systems.
 
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151210/c26ec51a/attachment.sig>
+[1] https://lkml.org/lkml/2015/8/19/419
