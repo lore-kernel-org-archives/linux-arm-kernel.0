@@ -1,33 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 10 Dec 2015 14:19:20 +0100
-Subject: [PATCH] ARM: davinci: only select WT cache if cache is enabled
-Message-ID: <2043568.VG8xo4jr1Z@wuerfel>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 10 Dec 2015 14:19:48 +0100
+Subject: [GIT PULL] RealView defconfig updates
+Message-ID: <CACRpkdbpOs24tx6pmPGaetDqu-VeD+pkUDb7BCw7n+KKUJP_oQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DA830 chip only works if the dcache is in writethrough mode,
-but that produces a harmless Kconfig warning if the cache happens
-to be disabled:
+Here are some updates to the RealView defconfigs, that make the
+system modern and testable. Mostly stuff that should have been
+enabled ages ago.
 
-warning: (ARCH_DAVINCI_DA830) selects CPU_DCACHE_WRITETHROUGH which has unmet direct dependencies ((CPU_ARM740T || CPU_ARM920T || CPU_ARM922T || CPU_ARM925T || CPU_ARM926T || CPU_ARM940T || CPU_ARM946E || CPU_ARM1020 || CPU_FA526) && !CPU_DCACHE_DISABLE)
+Whether it should go directly to the -rc:s or next merge window
+is up to the ARM SoC maintainers.
 
-This makes the select conditional so we don't have to worry
-about the warning in randconfig builds any more.
+Please pull it it!
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
+Yours,
+Linus Walleij
 
-diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
-index 88233824d1fe..83e0f40f9ff1 100644
---- a/arch/arm/mach-davinci/Kconfig
-+++ b/arch/arm/mach-davinci/Kconfig
-@@ -34,7 +34,8 @@ config ARCH_DAVINCI_DA830
- 	bool "DA830/OMAP-L137/AM17x based system"
- 	depends on !ARCH_DAVINCI_DMx || AUTO_ZRELADDR
- 	select ARCH_DAVINCI_DA8XX
--	select CPU_DCACHE_WRITETHROUGH # needed on silicon revs 1.0, 1.1
-+	# needed on silicon revs 1.0, 1.1:
-+	select CPU_DCACHE_WRITETHROUGH if !CPU_DCACHE_DISABLE
- 	select CP_INTC
- 
- config ARCH_DAVINCI_DA850
+The following changes since commit 527e9316f8ec44bd53d90fb9f611fa7ffff52bb9:
+
+  Linux 4.4-rc4 (2015-12-06 15:43:12 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
+tags/realview-defconfig-for-armsoc
+
+for you to fetch changes up to 8948f8aeb2eaaf0d729aa70965e16d2a4482b48c:
+
+  ARM: realview: add generic config options (2015-12-10 14:09:58 +0100)
+
+----------------------------------------------------------------
+RealView defconfig updates, details in the commit log.
+
+----------------------------------------------------------------
+Linus Walleij (4):
+      ARM: realview: refresh defconfig
+      ARM: realview: update SMP defconfig
+      ARM: realview: add generic config options
+      ARM: realview: add generic config options
+
+ arch/arm/configs/realview-smp_defconfig | 29 +++++++++++------------------
+ arch/arm/configs/realview_defconfig     | 26 +++++++++-----------------
+ 2 files changed, 20 insertions(+), 35 deletions(-)
