@@ -1,10 +1,10 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 10 Dec 2015 09:00:19 +0100
-Subject: [PATCH v4 35/58] mtd: nand: plat: use the mtd instance embedded in
+Date: Thu, 10 Dec 2015 09:00:16 +0100
+Subject: [PATCH v4 32/58] mtd: nand: omap2: use the mtd instance embedded in
  struct nand_chip
 In-Reply-To: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1449734442-18672-36-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1449734442-18672-33-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -54,74 +54,71 @@ __type *__priv;
 )
 --->8---
 ---
- drivers/mtd/nand/plat_nand.c | 15 ++++++++-------
- 1 file changed, 8 insertions(+), 7 deletions(-)
+ drivers/mtd/nand/omap2.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/mtd/nand/plat_nand.c b/drivers/mtd/nand/plat_nand.c
-index 06ac6c6..796eb7d 100644
---- a/drivers/mtd/nand/plat_nand.c
-+++ b/drivers/mtd/nand/plat_nand.c
-@@ -20,7 +20,6 @@
+diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
+index 1fb40db..f9d0b58 100644
+--- a/drivers/mtd/nand/omap2.c
++++ b/drivers/mtd/nand/omap2.c
+@@ -152,7 +152,6 @@ static struct nand_hw_control omap_gpmc_controller = {
  
- struct plat_nand_data {
- 	struct nand_chip	chip;
--	struct mtd_info		mtd;
- 	void __iomem		*io_base;
- };
+ struct omap_nand_info {
+ 	struct omap_nand_platform_data	*pdata;
+-	struct mtd_info			mtd;
+ 	struct nand_chip		nand;
+ 	struct platform_device		*pdev;
  
-@@ -31,6 +30,7 @@ static int plat_nand_probe(struct platform_device *pdev)
+@@ -179,8 +178,9 @@ struct omap_nand_info {
+ 
+ static inline struct omap_nand_info *mtd_to_omap(struct mtd_info *mtd)
  {
- 	struct platform_nand_data *pdata = dev_get_platdata(&pdev->dev);
- 	struct plat_nand_data *data;
-+	struct mtd_info *mtd;
- 	struct resource *res;
- 	const char **part_types;
- 	int err = 0;
-@@ -58,8 +58,9 @@ static int plat_nand_probe(struct platform_device *pdev)
+-	return container_of(mtd, struct omap_nand_info, mtd);
++	return container_of(mtd_to_nand(mtd), struct omap_nand_info, nand);
+ }
++
+ /**
+  * omap_prefetch_enable - configures and starts prefetch transfer
+  * @cs: cs (chip select) number
+@@ -1670,10 +1670,10 @@ static int omap_nand_probe(struct platform_device *pdev)
+ 	info->reg		= pdata->reg;
+ 	info->of_node		= pdata->of_node;
+ 	info->ecc_opt		= pdata->ecc_opt;
+-	mtd			= &info->mtd;
++	nand_chip		= &info->nand;
++	mtd			= nand_to_mtd(nand_chip);
+ 	mtd->priv		= &info->nand;
+ 	mtd->dev.parent		= &pdev->dev;
+-	nand_chip		= &info->nand;
+ 	nand_chip->ecc.priv	= NULL;
+ 	nand_set_flash_node(nand_chip, pdata->of_node);
  
- 	data->chip.priv = &data;
- 	nand_set_flash_node(&data->chip, pdev->dev.of_node);
--	data->mtd.priv = &data->chip;
--	data->mtd.dev.parent = &pdev->dev;
-+	mtd = nand_to_mtd(&data->chip);
-+	mtd->priv = &data->chip;
-+	mtd->dev.parent = &pdev->dev;
+@@ -1897,7 +1897,7 @@ static int omap_nand_probe(struct platform_device *pdev)
+ 				ecclayout->eccpos[ecclayout->eccbytes - 1] + 1;
  
- 	data->chip.IO_ADDR_R = data->io_base;
- 	data->chip.IO_ADDR_W = data->io_base;
-@@ -87,21 +88,21 @@ static int plat_nand_probe(struct platform_device *pdev)
- 	}
+ 		err = elm_config(info->elm_dev, BCH4_ECC,
+-				 info->mtd.writesize / nand_chip->ecc.size,
++				 mtd->writesize / nand_chip->ecc.size,
+ 				 nand_chip->ecc.size, nand_chip->ecc.bytes);
+ 		if (err < 0)
+ 			goto return_error;
+@@ -1951,7 +1951,7 @@ static int omap_nand_probe(struct platform_device *pdev)
+ 		nand_chip->ecc.write_page	= omap_write_page_bch;
  
- 	/* Scan to find existence of the device */
--	if (nand_scan(&data->mtd, pdata->chip.nr_chips)) {
-+	if (nand_scan(mtd, pdata->chip.nr_chips)) {
- 		err = -ENXIO;
- 		goto out;
- 	}
+ 		err = elm_config(info->elm_dev, BCH8_ECC,
+-				 info->mtd.writesize / nand_chip->ecc.size,
++				 mtd->writesize / nand_chip->ecc.size,
+ 				 nand_chip->ecc.size, nand_chip->ecc.bytes);
+ 		if (err < 0)
+ 			goto return_error;
+@@ -1981,7 +1981,7 @@ static int omap_nand_probe(struct platform_device *pdev)
+ 		nand_chip->ecc.write_page	= omap_write_page_bch;
  
- 	part_types = pdata->chip.part_probe_types;
- 
--	err = mtd_device_parse_register(&data->mtd, part_types, NULL,
-+	err = mtd_device_parse_register(mtd, part_types, NULL,
- 					pdata->chip.partitions,
- 					pdata->chip.nr_partitions);
- 
- 	if (!err)
- 		return err;
- 
--	nand_release(&data->mtd);
-+	nand_release(mtd);
- out:
- 	if (pdata->ctrl.remove)
- 		pdata->ctrl.remove(pdev);
-@@ -116,7 +117,7 @@ static int plat_nand_remove(struct platform_device *pdev)
- 	struct plat_nand_data *data = platform_get_drvdata(pdev);
- 	struct platform_nand_data *pdata = dev_get_platdata(&pdev->dev);
- 
--	nand_release(&data->mtd);
-+	nand_release(nand_to_mtd(&data->chip));
- 	if (pdata->ctrl.remove)
- 		pdata->ctrl.remove(pdev);
- 
+ 		err = elm_config(info->elm_dev, BCH16_ECC,
+-				 info->mtd.writesize / nand_chip->ecc.size,
++				 mtd->writesize / nand_chip->ecc.size,
+ 				 nand_chip->ecc.size, nand_chip->ecc.bytes);
+ 		if (err < 0)
+ 			goto return_error;
 -- 
 2.1.4
