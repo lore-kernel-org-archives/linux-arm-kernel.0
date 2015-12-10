@@ -1,48 +1,83 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Dec 2015 11:06:21 +0100
-Subject: [PATCH 09/10] ARM: realview: make all header files local
-In-Reply-To: <1448469143-447355-10-git-send-email-arnd@arndb.de>
-References: <1448469143-447355-1-git-send-email-arnd@arndb.de>
- <1448469143-447355-10-git-send-email-arnd@arndb.de>
-Message-ID: <CACRpkdZOi-R-Bxo2qnka7BxW-gw4E1S+joti6sxETdi3qEMcLg@mail.gmail.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Thu, 10 Dec 2015 10:07:54 +0000
+Subject: [PATCH] cpufreq: tegra: add regulator dependency for T124
+In-Reply-To: <20151209201007.GG5727@sirena.org.uk>
+References: <2194927.eV2s2QmZs0@wuerfel> <5668188F.2080202@nvidia.com>
+ <20151209144734.GB5727@sirena.org.uk> <566865ED.3020106@nvidia.com>
+ <20151209201007.GG5727@sirena.org.uk>
+Message-ID: <56694EFA.7010901@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 25, 2015 at 5:32 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-> Nothing includes these files any more, so we can simply move them
-> from arch/arm/mach-realview/include/mach/ to arch/arm/mach-realview.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+On 09/12/15 20:10, Mark Brown wrote:
+> * PGP Signed by an unknown key
+> 
+> On Wed, Dec 09, 2015 at 05:33:33PM +0000, Jon Hunter wrote:
+>> On 09/12/15 14:47, Mark Brown wrote:
+> 
+>>> If changes implemented by the clock driver are trashing the regulator
+>>> settings I would expect the clock driver to be responsible for fixing
+>>> things up rather than another driver that happens to use the clock.  I'd
+>>> also expect some kind of internal documentation explaining what's going
+>>> on, and possibly 
+> 
+>> Yes, the DFLL clock driver could restore the voltage, however, that
+>> does not guarantee that the voltage is still sufficient for the other
+>> clock source.
+> 
+> But the code we've got won't do that either - it'l just set the voltage
+> to whatever the last thing the regulator API had that might have been
+> within its constraints.
 
-This patchset has problems because the boardfiles aren't really
-compiled even if CONFIG_ATAGS is set. I had to apply this:
+Today yes, however, I meant that we *could* change it to restore the
+previous voltage before the DFLL was enabled.
 
-diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
-index 7cd543b1eace..baf174542e36 100644
---- a/arch/arm/mach-realview/core.c
-+++ b/arch/arm/mach-realview/core.c
-@@ -46,7 +46,6 @@
- #include <asm/mach/map.h>
+>>> Setting the voltage you've read back sounds broken, if the hardware
+>>> might randomly change things how do you know the settings we read were
+>>> sane?  Shouldn't we know what voltage range the device requires in a
+>>> given mode and set that - that's much more normal?
+> 
+>> The hardware will not randomly change the voltage until the DFLL is
+>> enabled and so you would have to do this before.
+> 
+> I'm not clear that there's even a guarantee that the kernel will ever
+> have seen this configuration, consider for example what happens if
+> someone uses kexec?
 
- #include "platform.h"
--#include "irqs.h"
+True. I have not played around with kexec, but with something like the
+DFLL, we would need to make sure that this get disabled. Looks like the
+reboot notifier gets called by kexec and so I guess that could be used
+to disable the DFLL and switch back to the PLL.
 
- #include <plat/sched_clock.h>
+>> Yes, setting the frequency and voltage as defined by a given operating
+>> mode would make sense. However, I am not sure we have those defined in
+>> the kernel for this PLL and would have to be added.
+> 
+> I think given how you're describing the hardware that this will be
+> required in order to provide something robust (and also to get the best
+> power savings from the hardware).
 
-diff --git a/arch/arm/mach-realview/irqs-pb1176.h
-b/arch/arm/mach-realview/irqs-pb1176.h
-index e96c63e4ac72..778edfd430e7 100644
---- a/arch/arm/mach-realview/irqs-pb1176.h
-+++ b/arch/arm/mach-realview/irqs-pb1176.h
-@@ -74,6 +74,4 @@
+Yes I agree it would be more robust. However, if you care about power
+savings then you should be using the DFLL/cpufreq anyway.
 
- #define IRQ_PB1176_SCTL                -1
+>> I was thinking that during boot we could read the default voltage and
+>> frequency set by the bootloader and use this as it should not be
+>> changing dynamically at this point because the cpufreq driver has not
+>> been activated yet.
+> 
+> I'm a bit confused here, we're talking about a change to the cpufreq
+> driver here aren't we?  Or alternatively why are we manipulating the
+> clock tree like this if we don't yet have support for the hardware?
 
--#endif /* CONFIG_MACH_REALVIEW_PB1176 */
--
- #endif /* __MACH_IRQS_PB1176_H */
+Yes, a change to the cpu-freq driver. When probing the cpufreq driver,
+we can query the clock-source, clock frequency and voltage and save
+this, so that if we ever disable the DFLL/cpufreq, we can switch back to
+the initial configuration.
 
-Yours,
-Linus Walleij
+>From testing the t124 jetson and nyan-big, both of these boards have a
+different configuration for the PLL at boot time, so although we could
+pick a safe operating point for all t124 boards, I was thinking of just
+restoring their initial configuration.
+
+Jon
