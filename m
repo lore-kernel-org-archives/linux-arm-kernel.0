@@ -1,49 +1,38 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 10 Dec 2015 10:02:06 +0100
-Subject: [PATCH] mtd: sh_flctl: pass FIFO as physical address
-In-Reply-To: <20151210022146.GH144338@google.com>
-References: <3152458.D3kElfhRW2@wuerfel>
- <CAMuHMdVWss6Kz8sVrcUR3a4iJ+Z8D1q1Er6eH_uRMoS5DCN5pw@mail.gmail.com>
- <20151210022146.GH144338@google.com>
-Message-ID: <CAMuHMdXjquhLKsby1QZ+U9JN7bVrxX4guPgC0EQuLXJcmVKACw@mail.gmail.com>
+From: xuejiancheng@huawei.com (xuejiancheng)
+Date: Thu, 10 Dec 2015 16:59:14 +0800
+Subject: [PATCH v2 4/9] ARM: dts: add dts files for hi3519-demb board
+In-Reply-To: <2721289.3GUub5trUg@wuerfel>
+References: <1449110668-23647-1-git-send-email-xuejiancheng@huawei.com>
+ <5533669.m0KDLq8XOc@wuerfel> <56691C65.6090808@huawei.com>
+ <2721289.3GUub5trUg@wuerfel>
+Message-ID: <56693EE2.20501@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian,
 
-On Thu, Dec 10, 2015 at 3:21 AM, Brian Norris
-<computersforpeace@gmail.com> wrote:
-> On Tue, Dec 08, 2015 at 05:30:02PM +0100, Geert Uytterhoeven wrote:
->> On Tue, Dec 8, 2015 at 4:38 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > By convention, the FIFO address we pass using dmaengine_slave_config
->> > is a physical address in the form that is understood by the DMA
->> > engine, as a dma_addr_t, phys_addr_t or resource_size_t.
->> >
->> > The sh_flctl driver however passes a virtual __iomem address that
->> > gets cast to dma_addr_t in the slave driver. This happens to work
->> > on shmobile because that platform sets up an identity mapping for
->> > its MMIO regions, but such code is not portable to other platforms,
->> > and prevents us from ever changing the platform mapping or reusing
->> > the driver on other architectures like ARM64 that might not have the
->> > mapping.
+
+On 2015/12/10 16:04, Arnd Bergmann wrote:
+> On Thursday 10 December 2015 14:32:05 xuejiancheng wrote:
+>>>
+>>> This is not what I meant. You have to use "syscon" as the most generic
+>>> "compatible" value here, but should add a machine specific string
+>>> as a more specific one. "hisilicon,sysctrl" is not appropriate because
+>>> it does not identify the IP block uniquely, you can only use that
+>>> in combination with another more specific string.
 >>
->> Note that since the removal of (ARM) sh7367/sh7377/sh7372 support, this
->> driver is used on SH only.
->
-> It's still available as COMPILE_TEST, so it's still worth fixing.
->
-> But really, does anyone use this driver any more?
+>> OK. I will use "hisilicon,hi3519-syscon" and "syscon" as the compatible value
+>> for the sysctrl node in hi3519.dtsi.
+>>
+> 
+> Why hisilicon,hi3519-syscon instead of hisilicon,hi3519-sysctrl?
 
-It's used on the sh7723-based AP-325RXA board.
-No idea if anyone is really using it.
+> Is this not called a sysctrl at all in the datasheet then?
 
-Gr{oetje,eeting}s,
+It is OK to use hisilicon,hi3519-sysctrl.
 
-                        Geert
+I thought syscon was more commonly used as abbr. of system-controller in the kernel code.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> 	Arnd
+> 
+> .
+> 
