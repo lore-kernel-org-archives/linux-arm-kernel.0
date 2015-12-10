@@ -1,35 +1,38 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 10 Dec 2015 15:21:13 -0600
-Subject: [PATCH 3/3] arm64: dts: hikey: add label properties to UARTs
-In-Reply-To: <1449782473-20880-1-git-send-email-robh@kernel.org>
-References: <1449782473-20880-1-git-send-email-robh@kernel.org>
-Message-ID: <1449782473-20880-4-git-send-email-robh@kernel.org>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 10 Dec 2015 14:27:54 -0700
+Subject: [PATCH V6 00/26] Coresight integration with perf
+In-Reply-To: <20151208203414.GN11564@kernel.org>
+References: <1449176702-13213-1-git-send-email-mathieu.poirier@linaro.org>
+ <CANLsYkxaOpMcC8ULcTvC1tOd5yEcjH2ZiNS5Rp6UyodzNsAD1g@mail.gmail.com>
+ <20151208203414.GN11564@kernel.org>
+Message-ID: <CANLsYkzCjKNpNVDJax2nVrAMdgi1RR51fcXEf7gJjbFKVThVwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add label properties to provide a way to identify UARTs based on their
-board or connector name. This follows naming convention in 96boards CE
-spec. Ports without external connections are not labelled.
+On 8 December 2015 at 13:34, Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
+> Em Tue, Dec 08, 2015 at 01:29:00PM -0700, Mathieu Poirier escreveu:
+>> On 3 December 2015 at 14:04, Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
+>>
+>> Arnaldo, Peter and Ingo,
+>>
+>> I would like to queue this work for 4.5 but need your help with
+>> reviewing patches 20 [1], 23 [2], 24 [3], 25 [4] and 26 [5].
+>>
+>> A "reviewed-by" would be greatly appreciated.
+>
+> I looked briefly at it and saw perf_session, IIRc, being passed to more
+> functions, which I think can be done otherwise, as, again IIRC, all you
+> need is available via perf_evlist, will look again.
 
-Signed-off-by: Rob Herring <robh@kernel.org>
----
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 7 +++++++
- 1 file changed, 7 insertions(+)
+I just had a double take here and the only remnant of a "struct
+perf_session" I can see is in 26 [1], but that is following the
+upstream API [2].  I can send a fix for that but it would be outside
+the scope of this patch set.
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-index 8d43a0f..8185251 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-@@ -32,3 +32,10 @@
- 		reg = <0x0 0x0 0x0 0x40000000>;
- 	};
- };
-+
-+&uart2 {
-+	label = "LS-UART0";
-+};
-+&uart3 {
-+	label = "LS-UART1";
-+};
--- 
-2.5.0
+Thanks,
+Mathieu
+
+[1]. https://lkml.org/lkml/2015/12/3/684
+[2]. http://lxr.free-electrons.com/source/tools/perf/util/auxtrace.h#L293
+>
+> - Arnaldo
