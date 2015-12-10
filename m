@@ -1,10 +1,10 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 10 Dec 2015 09:00:29 +0100
-Subject: [PATCH v4 45/58] mtd: nand: vf610: use the mtd instance embedded in
+Date: Thu, 10 Dec 2015 09:00:27 +0100
+Subject: [PATCH v4 43/58] mtd: nand: tmio: use the mtd instance embedded in
  struct nand_chip
 In-Reply-To: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1449734442-18672-46-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1449734442-18672-44-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -54,42 +54,51 @@ __type *__priv;
 )
 --->8---
 ---
- drivers/mtd/nand/vf610_nfc.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ drivers/mtd/nand/tmio_nand.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/mtd/nand/vf610_nfc.c b/drivers/mtd/nand/vf610_nfc.c
-index 1c86c6b..1bbb93a 100644
---- a/drivers/mtd/nand/vf610_nfc.c
-+++ b/drivers/mtd/nand/vf610_nfc.c
-@@ -156,7 +156,6 @@ enum vf610_nfc_variant {
- };
+diff --git a/drivers/mtd/nand/tmio_nand.c b/drivers/mtd/nand/tmio_nand.c
+index 6d0cbe9..e7b82e1 100644
+--- a/drivers/mtd/nand/tmio_nand.c
++++ b/drivers/mtd/nand/tmio_nand.c
+@@ -103,7 +103,6 @@
+ /*--------------------------------------------------------------------------*/
  
- struct vf610_nfc {
+ struct tmio_nand {
 -	struct mtd_info mtd;
  	struct nand_chip chip;
- 	struct device *dev;
- 	void __iomem *regs;
-@@ -171,7 +170,10 @@ struct vf610_nfc {
- 	u32 ecc_mode;
+ 
+ 	struct platform_device *dev;
+@@ -119,7 +118,10 @@ struct tmio_nand {
+ 	unsigned read_good:1;
  };
  
--#define mtd_to_nfc(_mtd) container_of(_mtd, struct vf610_nfc, mtd)
-+static inline struct vf610_nfc *mtd_to_nfc(struct mtd_info *mtd)
+-#define mtd_to_tmio(m)			container_of(m, struct tmio_nand, mtd)
++static inline struct tmio_nand *mtd_to_tmio(struct mtd_info *mtd)
 +{
-+	return container_of(mtd_to_nand(mtd), struct vf610_nfc, chip);
++	return container_of(mtd_to_nand(mtd), struct tmio_nand, chip);
 +}
  
- static struct nand_ecclayout vf610_nfc_ecc45 = {
- 	.eccbytes = 45,
-@@ -674,8 +676,8 @@ static int vf610_nfc_probe(struct platform_device *pdev)
- 		return -ENOMEM;
  
- 	nfc->dev = &pdev->dev;
--	mtd = &nfc->mtd;
- 	chip = &nfc->chip;
-+	mtd = nand_to_mtd(chip);
+ /*--------------------------------------------------------------------------*/
+@@ -378,8 +380,8 @@ static int tmio_probe(struct platform_device *dev)
+ 	tmio->dev = dev;
  
- 	mtd->priv = chip;
- 	mtd->owner = THIS_MODULE;
+ 	platform_set_drvdata(dev, tmio);
+-	mtd = &tmio->mtd;
+ 	nand_chip = &tmio->chip;
++	mtd = nand_to_mtd(nand_chip);
+ 	mtd->priv = nand_chip;
+ 	mtd->name = "tmio-nand";
+ 	mtd->dev.parent = &dev->dev;
+@@ -456,7 +458,7 @@ static int tmio_remove(struct platform_device *dev)
+ {
+ 	struct tmio_nand *tmio = platform_get_drvdata(dev);
+ 
+-	nand_release(&tmio->mtd);
++	nand_release(nand_to_mtd(&tmio->chip));
+ 	tmio_hw_stop(dev, tmio);
+ 	return 0;
+ }
 -- 
 2.1.4
