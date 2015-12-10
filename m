@@ -1,10 +1,10 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 10 Dec 2015 08:59:54 +0100
-Subject: [PATCH v4 10/58] mtd: nand: brcm: use the mtd instance embedded in
+Date: Thu, 10 Dec 2015 08:59:55 +0100
+Subject: [PATCH v4 11/58] mtd: nand: cafe: use the mtd instance embedded in
  struct nand_chip
 In-Reply-To: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1449734442-18672-11-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1449734442-18672-12-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,109 +12,45 @@ struct nand_chip now embeds an mtd device. Make use of this mtd instance.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
-Changes generated with the following coccinelle script
+ drivers/mtd/nand/cafe_nand.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
---->8---
-virtual patch
-
-@fix1@
-identifier __chipfield, __mtdfield;
-type __type;
-@@
-(
-	__type {
-		...
-		struct nand_chip __chipfield;
-		...
--		struct mtd_info __mtdfield;
-		...
-	};
-|
-	__type {
-		...
--		struct mtd_info __mtdfield;
-		...
-		struct nand_chip __chipfield;
-		...
-	};
-)
-
-@fix2 depends on fix1@
-identifier fix1.__chipfield, fix1.__mtdfield;
-identifier __subfield;
-type fix1.__type;
-__type *__priv;
-@@
-(
--	__priv->__mtdfield.__subfield
-+	nand_to_mtd(&__priv->__chipfield)->__subfield
-|
--	&(__priv->__mtdfield)
-+	nand_to_mtd(&__priv->__chipfield)
-)
---->8---
----
- drivers/mtd/nand/brcmnand/brcmnand.c | 13 ++++++-------
- 1 file changed, 6 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/mtd/nand/brcmnand/brcmnand.c b/drivers/mtd/nand/brcmnand/brcmnand.c
-index 190a99a..26b64bc 100644
---- a/drivers/mtd/nand/brcmnand/brcmnand.c
-+++ b/drivers/mtd/nand/brcmnand/brcmnand.c
-@@ -178,7 +178,6 @@ struct brcmnand_host {
- 	struct list_head	node;
+diff --git a/drivers/mtd/nand/cafe_nand.c b/drivers/mtd/nand/cafe_nand.c
+index 77c92f1..7d6a142 100644
+--- a/drivers/mtd/nand/cafe_nand.c
++++ b/drivers/mtd/nand/cafe_nand.c
+@@ -605,11 +605,11 @@ static int cafe_nand_probe(struct pci_dev *pdev,
  
- 	struct nand_chip	chip;
--	struct mtd_info		mtd;
- 	struct platform_device	*pdev;
- 	int			cs;
+ 	pci_set_master(pdev);
  
-@@ -1074,7 +1073,7 @@ static int brcmnand_low_level_op(struct brcmnand_host *host,
- 				 enum brcmnand_llop_type type, u32 data,
- 				 bool last_op)
- {
--	struct mtd_info *mtd = &host->mtd;
-+	struct mtd_info *mtd = nand_to_mtd(&host->chip);
- 	struct nand_chip *chip = &host->chip;
- 	struct brcmnand_controller *ctrl = host->ctrl;
- 	u32 tmp;
-@@ -1802,7 +1801,7 @@ static inline int get_blk_adr_bytes(u64 size, u32 writesize)
+-	mtd = kzalloc(sizeof(*mtd) + sizeof(struct cafe_priv), GFP_KERNEL);
+-	if (!mtd)
++	cafe = kzalloc(sizeof(*cafe), GFP_KERNEL);
++	if (!cafe)
+ 		return  -ENOMEM;
+-	cafe = (void *)(&mtd[1]);
  
- static int brcmnand_setup_dev(struct brcmnand_host *host)
- {
--	struct mtd_info *mtd = &host->mtd;
-+	struct mtd_info *mtd = nand_to_mtd(&host->chip);
- 	struct nand_chip *chip = &host->chip;
- 	struct brcmnand_controller *ctrl = host->ctrl;
- 	struct brcmnand_cfg *cfg = &host->hwcfg;
-@@ -1916,7 +1915,7 @@ static int brcmnand_init_cs(struct brcmnand_host *host, struct device_node *dn)
- 		return -ENXIO;
- 	}
++	mtd = nand_to_mtd(&cafe->nand);
+ 	mtd->dev.parent = &pdev->dev;
+ 	mtd->priv = &cafe->nand;
+ 	cafe->nand.priv = cafe;
+@@ -792,7 +792,7 @@ static int cafe_nand_probe(struct pci_dev *pdev,
+  out_ior:
+ 	pci_iounmap(pdev, cafe->mmio);
+  out_free_mtd:
+-	kfree(mtd);
++	kfree(cafe);
+  out:
+ 	return err;
+ }
+@@ -813,7 +813,7 @@ static void cafe_nand_remove(struct pci_dev *pdev)
+ 			2112 + sizeof(struct nand_buffers) +
+ 			mtd->writesize + mtd->oobsize,
+ 			cafe->dmabuf, cafe->dmaaddr);
+-	kfree(mtd);
++	kfree(cafe);
+ }
  
--	mtd = &host->mtd;
-+	mtd = nand_to_mtd(&host->chip);
- 	chip = &host->chip;
- 
- 	nand_set_flash_node(chip, dn);
-@@ -2060,8 +2059,8 @@ static int brcmnand_resume(struct device *dev)
- 	}
- 
- 	list_for_each_entry(host, &ctrl->host_list, node) {
--		struct mtd_info *mtd = &host->mtd;
--		struct nand_chip *chip = mtd_to_nand(mtd);
-+		struct nand_chip *chip = &host->chip;
-+		struct mtd_info *mtd = nand_to_mtd(chip);
- 
- 		brcmnand_save_restore_cs_config(host, 1);
- 
-@@ -2262,7 +2261,7 @@ int brcmnand_remove(struct platform_device *pdev)
- 	struct brcmnand_host *host;
- 
- 	list_for_each_entry(host, &ctrl->host_list, node)
--		nand_release(&host->mtd);
-+		nand_release(nand_to_mtd(&host->chip));
- 
- 	dev_set_drvdata(&pdev->dev, NULL);
- 
+ static const struct pci_device_id cafe_nand_tbl[] = {
 -- 
 2.1.4
