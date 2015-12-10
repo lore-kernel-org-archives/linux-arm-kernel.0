@@ -1,40 +1,46 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Thu, 10 Dec 2015 18:01:59 +0000
-Subject: [RFC PATCH 8/8] arm64: add sysfs cpu_capacity attribute
-In-Reply-To: <20151210155940.GN5727@sirena.org.uk>
-References: <1448288921-30307-1-git-send-email-juri.lelli@arm.com>
- <1448288921-30307-9-git-send-email-juri.lelli@arm.com>
- <566988E8.3010308@arm.com> <20151210155940.GN5727@sirena.org.uk>
-Message-ID: <20151210180159.GF14571@e106622-lin>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 10 Dec 2015 10:04:00 -0800
+Subject: [PATCH 1/2] clk: ti: Add support for dm814x ADPLL
+In-Reply-To: <20151203160712.GM23396@atomide.com>
+References: <1449106504-7645-1-git-send-email-tony@atomide.com>
+ <1449106504-7645-2-git-send-email-tony@atomide.com>
+ <20151203160712.GM23396@atomide.com>
+Message-ID: <20151210180400.GG23396@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 10/12/15 15:59, Mark Brown wrote:
-> On Thu, Dec 10, 2015 at 02:15:04PM +0000, Dietmar Eggemann wrote:
-> > On 23/11/15 14:28, Juri Lelli wrote:
+* Tony Lindgren <tony@atomide.com> [151203 08:08]:
+> * Tony Lindgren <tony@atomide.com> [151202 17:36]:
+> > On dm814x we have 13 ADPLLs with 3 to 4 outputs on each. The
+> > ADPLLs have several dividers and muxes controlled by a shared
+> > control register for each PLL.
+> > 
+> > Note that for the clocks to work as device drivers for booting on
+> > dm814x, this patch depends on "ARM: OMAP2+: Change core_initcall
+> > levels to postcore_initcall".
+> > 
+> > Also note that this patch does not implement clk_set_rate,
+> > that will be posted later on when available.
 > 
-> > > The new attribute shows up as:
-> 
-> > >  /sys/devices/system/cpu/cpu*/cpu_capacity
-> 
-> > This sysfs interface is not really needed for arm or arm64. People can
-> > build the dt blob if they want to change the values. Less code to carry
-> > ... Let's focus on the core functionality, which is parsing cpu capacity
-> > from dt file to task scheduler for heterogeneous systems.
-> 
-> That does make the tuning process much more cumbersome - users have to
-> rebuild and reboot to tweak the numbers rather than just tweaking the
-> numbers and rerunning the benchmark (which seems like something people
-> would want to automate).
+> Mike & Stephen, after review, can we have this patch alone in an
+> immutable branch against v4.4-rc1 that I can merge in too?
 
-IMHO, this is not a tuning interface. It is an alternative interface,
-w.r.t. DTs, that we could use to provide default capacity values to the
-kernel. I'm proposing both here as they make both sense to me. Then we
-might dedice for which one to go (or if we need some other way) or to
-keep both for flexibility.
+Matthijs wanted to rename adpllj naming to adpll_lj and remove remaining
+fapll references, so I'll do that today and repost this series.
 
-Best,
+Tero, do you have any comments on this one? After repost, do you want
+to take this into your clock branch and send a pull request to
+Mike & Stephen along with other omap clock changes?
 
-- Juri
+> Also, the dts changes I need to queue separately FYI to avoid merge
+> conflicts.
+
+I'd still like to have just this clock driver patch alone in an
+immutable branch that I can merge in too. Otherwise we'll get oopses
+during booting when devices are being added.
+
+Regards,
+
+Tony
