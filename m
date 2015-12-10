@@ -1,45 +1,77 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Dec 2015 15:14:26 +0100
-Subject: [PATCH 2/2] ARM: realview: set up cache correctly on the PB11MPCore
-Message-ID: <1449756866-19520-1-git-send-email-linus.walleij@linaro.org>
+From: dietmar.eggemann@arm.com (Dietmar Eggemann)
+Date: Thu, 10 Dec 2015 14:14:44 +0000
+Subject: [RFC PATCH 2/8] Documentation: arm: define DT cpu capacity
+ bindings
+In-Reply-To: <20151201112044.GV20439@e106622-lin>
+References: <1448288921-30307-1-git-send-email-juri.lelli@arm.com>
+ <1448288921-30307-3-git-send-email-juri.lelli@arm.com>
+ <20151124020631.GA15165@rob-hp-laptop> <20151124105423.GM26372@e106622-lin>
+ <CAKfTPtAww=r6H2Jrgu+8jDsYohPj7HD=_sdAP2utEEH-YLVsaA@mail.gmail.com>
+ <20151201112044.GV20439@e106622-lin>
+Message-ID: <566988D4.50406@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The L2 cache comes up in a "safe mode" on the PB11MPCore, as
-it has several issues. This sets it up properly with the right
-size and associativity, also requiring the outer sync to be
-disabled for the machine to boot properly.
+On 01/12/15 11:20, Juri Lelli wrote:
+> Hi Vincent,
+> 
+> On 30/11/15 10:59, Vincent Guittot wrote:
+>> Hi Juri,
+>>
+>> On 24 November 2015 at 11:54, Juri Lelli <juri.lelli@arm.com> wrote:
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/arm-realview-pb11mp.dts | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+[...]
 
-diff --git a/arch/arm/boot/dts/arm-realview-pb11mp.dts b/arch/arm/boot/dts/arm-realview-pb11mp.dts
-index 28bd5aea285f..3d9b1b0f4ffc 100644
---- a/arch/arm/boot/dts/arm-realview-pb11mp.dts
-+++ b/arch/arm/boot/dts/arm-realview-pb11mp.dts
-@@ -99,6 +99,19 @@
- 			     <0 31 IRQ_TYPE_LEVEL_HIGH>;
- 		cache-unified;
- 		cache-level = <2>;
-+		/*
-+		 * Override default cache size, sets and
-+		 * associativity as these may be erroneously set
-+		 * up by boot loader(s), probably for safety
-+		 * since th outer sync operation can cause the
-+		 * cache to hang unless disabled.
-+		 */
-+		cache-size = <1048576>; // 1MB
-+		cache-sets = <4096>;
-+		cache-line-size = <32>;
-+		arm,shared-override;
-+		arm,parity-enable;
-+		arm,outer-sync-disable;
- 	};
- 
- 	scu at 1f000000 {
--- 
-2.4.3
+>>>>> +==========================================
+>>>>> +3 - capacity-scale
+>>>>> +==========================================
+>>>>> +
+>>>>> +CPUs capacities are defined with respect to capacity-scale property in the cpus
+>>>>> +node [1]. The property is optional; if not defined a 1024 capacity-scale is
+>>>>> +assumed. This property defines both the highest CPU capacity present in the
+>>>>> +system and granularity of CPU capacity values.
+>>>>
+>>>> I don't really see the point of this vs. having an absolute scale.
+>>>>
+>>>
+>>> IMHO, we need this for several reasons, one being to address one of your
+>>> concerns below: vendors are free to choose their scale without being
+>>> forced to publish absolute data. Another reason is that it might make
+>>> life easier in certain cases; for example, someone could implement a
+>>> system with a few clusters of, say, A57s, but some run at half the clock
+>>> of the others (e.g., you have a 1.2GHz cluster and a 600MHz cluster); in
+>>> this case I think it is just easier to define capacity-scale as 1200 and
+>>> capacities as 1200 and 600. Last reason that I can think of right now is
+>>> that we don't probably want to bound ourself to some particular range
+>>> from the beginning, as that range might be enough now, but it could
+>>> change in the future (as in, right now [1-1024] looks fine for
+>>> scheduling purposes, but that might change).
+>>
+>> Like Rob, i don't really see the benefit of this optional
+>> capacity-scale property. Parsing the capacity of all cpu nodes should
+>> give you a range as well.
+>> IMHO, this property looks like an optimization of the code that will
+>> parse the dt more than a HW description
+>>
+> 
+> I agree that we can come up with the same information just looking at
+> the biggest capacity value of all CPUs and treat that value as
+> capacity-scale. I just thought that having that explicit made things
+> clearer, as it could be not easy to immediately see from a DT with many
+> CPUs which is the biggest capacity value. But, yes, we could remove that
+> anyway.
+
++1! This capacity-scale complicates things unnecessarily. It was hard
+for me to understand the meaning of it. Your 2. example sets
+'capacity-scale = <2>' but also 'capacity = <2>' for cpu[01] and
+'capacity = <1>' for cpu[23]. This can be easily replaced by 'capacity =
+<1024>' for cpu[01] and 'capacity = <512>' for cpu[23]. Much more
+readable, as it was mentioned already in this thread.
+
+I understand that we don't want to limit the range of capacity values in
+the dt file to [1..1024] nor enforce that the cpu w/ the highest
+capacity has to have the value of 1024 in the dt file so the scheduler
+has to scale accordingly if we want to limit capacity to its supported
+capacity range (like with EAS [1..1024]).
+
+[...]
