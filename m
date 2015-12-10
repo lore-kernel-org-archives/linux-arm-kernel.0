@@ -1,69 +1,68 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 10 Dec 2015 09:00:35 +0100
-Subject: [PATCH v4 51/58] cris: nand: remove useless mtd->priv = chip
- assignments
+Date: Thu, 10 Dec 2015 09:00:32 +0100
+Subject: [PATCH v4 48/58] cris: nand: use the mtd instance embedded in struct
+ nand_chip
 In-Reply-To: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1449734442-18672-52-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1449734442-18672-49-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mtd_to_nand() now uses the container_of() approach to transform an
-mtd_info pointer into a nand_chip one. Drop useless mtd->priv
-assignments from NAND controller drivers.
+struct nand_chip now embeds an mtd device. Patch all drivers to make use
+of this mtd instance instead of using the instance embedded in their
+private struct or dynamically allocated.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
-Patch generated with the following coccinelle script:
-
----8<----
-virtual patch
-
-@@
-struct mtd_info m;
-struct mtd_info *mp;
-struct nand_chip *c;
-@@
-(
--(m).priv = c;
-|
--(mp)->priv = c;
-|
--(mp)->priv = (void *)c;
-)
----8<----
+Most of those changes were generated with the coccinelle script added
+in commit c671312 "coccinelle: nand: detect and correct drivers embedding
+an mtd_info object"
 ---
- arch/cris/arch-v32/drivers/mach-a3/nandflash.c | 3 ---
- arch/cris/arch-v32/drivers/mach-fs/nandflash.c | 3 ---
- 2 files changed, 6 deletions(-)
+ arch/cris/arch-v32/drivers/mach-a3/nandflash.c | 3 +--
+ arch/cris/arch-v32/drivers/mach-fs/nandflash.c | 3 +--
+ 2 files changed, 2 insertions(+), 4 deletions(-)
 
 diff --git a/arch/cris/arch-v32/drivers/mach-a3/nandflash.c b/arch/cris/arch-v32/drivers/mach-a3/nandflash.c
-index ee74e45..5aa3f51 100644
+index db953cf..ee74e45 100644
 --- a/arch/cris/arch-v32/drivers/mach-a3/nandflash.c
 +++ b/arch/cris/arch-v32/drivers/mach-a3/nandflash.c
-@@ -149,9 +149,6 @@ struct mtd_info *__init crisv32_nand_flash_probe(void)
- 	this = &wrapper->chip;
- 	crisv32_mtd = nand_to_mtd(this);
+@@ -36,7 +36,6 @@
+ #define CE_BIT 12
  
--	/* Link the private data with the MTD structure */
--	crisv32_mtd->priv = this;
--
- 	/* Set address of NAND IO lines */
- 	this->IO_ADDR_R = read_cs;
- 	this->IO_ADDR_W = write_cs;
+ struct mtd_info_wrapper {
+-	struct mtd_info info;
+ 	struct nand_chip chip;
+ };
+ 
+@@ -148,7 +147,7 @@ struct mtd_info *__init crisv32_nand_flash_probe(void)
+ 
+ 	/* Get pointer to private data */
+ 	this = &wrapper->chip;
+-	crisv32_mtd = &wrapper->info;
++	crisv32_mtd = nand_to_mtd(this);
+ 
+ 	/* Link the private data with the MTD structure */
+ 	crisv32_mtd->priv = this;
 diff --git a/arch/cris/arch-v32/drivers/mach-fs/nandflash.c b/arch/cris/arch-v32/drivers/mach-fs/nandflash.c
-index 5626297..a7c17b0 100644
+index 22a6467..5626297 100644
 --- a/arch/cris/arch-v32/drivers/mach-fs/nandflash.c
 +++ b/arch/cris/arch-v32/drivers/mach-fs/nandflash.c
-@@ -140,9 +140,6 @@ struct mtd_info *__init crisv32_nand_flash_probe(void)
- 	bif_cfg.gated_csp1 = regk_bif_core_wr;
- 	REG_WR(bif_core, regi_bif_core, rw_grp3_cfg, bif_cfg);
+@@ -31,7 +31,6 @@
+ #define BY_BIT 7
  
--	/* Link the private data with the MTD structure */
--	crisv32_mtd->priv = this;
--
- 	/* Set address of NAND IO lines */
- 	this->IO_ADDR_R = read_cs;
- 	this->IO_ADDR_W = write_cs;
+ struct mtd_info_wrapper {
+-	struct mtd_info info;
+ 	struct nand_chip chip;
+ };
+ 
+@@ -129,7 +128,7 @@ struct mtd_info *__init crisv32_nand_flash_probe(void)
+ 
+ 	/* Get pointer to private data */
+ 	this = &wrapper->chip;
+-	crisv32_mtd = &wrapper->info;
++	crisv32_mtd = nand_to_mtd(this);
+ 
+ 	pa_oe.oe |= 1 << CE_BIT;
+ 	pa_oe.oe |= 1 << ALE_BIT;
 -- 
 2.1.4
