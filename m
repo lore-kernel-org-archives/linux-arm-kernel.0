@@ -1,62 +1,59 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 10 Dec 2015 13:54:45 +0900
-Subject: [PATCH 2/2] ARM: shmobile: r8a7793: Describe DMA for the serial
- ports
-In-Reply-To: <CAMuHMdVfMp0awRZh6S7YiSPFpUyAvwGXSQb2RYU7DkK_SOwH9Q@mail.gmail.com>
-References: <1448589166-11612-1-git-send-email-horms+renesas@verge.net.au>
- <1448589166-11612-3-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdVfMp0awRZh6S7YiSPFpUyAvwGXSQb2RYU7DkK_SOwH9Q@mail.gmail.com>
-Message-ID: <20151210045444.GC6964@verge.net.au>
+From: vigneshr@ti.com (Vignesh R)
+Date: Thu, 10 Dec 2015 10:34:23 +0530
+Subject: [PATCH v4 4/5] ARM: dts: DRA7: add entry for qspi mmap region
+In-Reply-To: <566017A8.5040106@ti.com>
+References: <1448860515-28336-1-git-send-email-vigneshr@ti.com>
+ <1448860515-28336-5-git-send-email-vigneshr@ti.com>
+ <20151130223408.GJ23396@atomide.com> <565D25E6.4070206@ti.com>
+ <20151201163950.GR23396@atomide.com> <566017A8.5040106@ti.com>
+Message-ID: <566907D7.6040003@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 09, 2015 at 11:47:36AM +0100, Geert Uytterhoeven wrote:
-> Hi Simon,
-> 
-> On Fri, Nov 27, 2015 at 2:52 AM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > Add DMA properties to all SCIF, SCIFA, SCIFB, and HSCIF device nodes.
-> >
-> > Based on similar work for the r8a7791 by Geert Uytterhoeven.
-> >
-> > Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > ---
-> >  arch/arm/boot/dts/r8a7793.dtsi | 36 ++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 36 insertions(+)
-> >
-> > diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
-> > index 3ac2ec0414a0..8d5cbdfc3d5d 100644
-> > --- a/arch/arm/boot/dts/r8a7793.dtsi
-> > +++ b/arch/arm/boot/dts/r8a7793.dtsi
-> 
-> > @@ -394,6 +412,8 @@
-> >                 interrupts = <0 152 IRQ_TYPE_LEVEL_HIGH>;
-> >                 clocks = <&mstp7_clks R8A7793_CLK_SCIF0>;
-> >                 clock-names = "sci_ick";
-> > +               dmas = <&dmac0 0x29>, <&dmac0 0x2a>;
-> > +               dma-names = "tx", "rx";
-> >                 power-domains = <&cpg_clocks>;
-> >                 status = "disabled";
-> >         };
-> > @@ -404,6 +424,8 @@
-> >                 interrupts = <0 153 IRQ_TYPE_LEVEL_HIGH>;
-> >                 clocks = <&mstp7_clks R8A7793_CLK_SCIF1>;
-> >                 clock-names = "sci_ick";
-> > +               dmas = <&dmac0 0x29>, <&dmac0 0x2a>;
-> 
-> This is duplicated from scif0, and should be:
-> 
->         dmas = <&dmac0 0x2d>, <&dmac0 0x2e>;
-> 
-> > +               dma-names = "tx", "rx";
-> 
-> After
-> 
->         sed -i -e 's/7791/779x/g' arch/arm/boot/dts/r8a7791.dtsi
->         sed -i -e 's/7793/779x/g' arch/arm/boot/dts/r8a7793.dtsi
-> 
-> arch/arm/boot/dts/r8a7791.dtsi and arch/arm/boot/dts/r8a7793.dtsi should
-> be identical ;-)
 
-Thanks, I have fixed that in v2.
+
+On 12/03/2015 03:51 PM, Vignesh R wrote:
+> 
+> 
+> On 12/01/2015 10:09 PM, Tony Lindgren wrote:
+>> * Vignesh R <vigneshr@ti.com> [151130 20:46]:
+>>> On 12/01/2015 04:04 AM, Tony Lindgren wrote:
+>>>>
+...
+>>
+>> OK. They are both on L3 main so that won't cause any issues for separate
+>> interconnect driver instances. As they are still separate targets flushing
+>> a posted write to one area will not flush anything to the other.
+>>
+> 
+> I didn't quite understand what you meant by interconnect driver instance.
+> qspi_base and qspi_mmap region are tightly bound to each other and both
+> needs to be accessed by ti-qspi driver (though different targets).
+> Besides qspi_mmap region is only used to read data, there will not be
+> any write accesses to this target. Are you saying this binding is not
+> viable?
+> 
+
+As I stated above qspi_base and qspi_mmap region are tightly bound,
+there is no way to use qspi_mmap region w/o accessing qspi_base. So I am
+planning to keep them as it is. I will move qspi_ctrlmod to use syscon.
+Something like:
+
+qspi: qspi at 4b300000 {
+       compatible = "ti,dra7xxx-qspi";
+       reg = <0x4b300000 0x100>,
+             <0x5c000000 0x4000000>,
+       reg-names = "qspi_base", "qspi_mmap";
+       syscon-chipselects = <&scm_conf 0x558>;
+       #address-cells = <1>;
+       #size-cells = <0>;
+       spi-max-frequency = <48000000>;
+       ti,hwmods = "qspi";
+};
+
+Do you think this is not viable in future?
+
+
+-- 
+Regards
+Vignesh
