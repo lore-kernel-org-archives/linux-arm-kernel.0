@@ -1,46 +1,45 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 10 Dec 2015 09:26:46 +0000
-Subject: [PATCH v6 0/4] gicv2m: acpi: Add ACPI support for GICv2m MSI
-In-Reply-To: <1449689074-30609-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-References: <1449689074-30609-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <56694556.3030809@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 10 Dec 2015 10:27:25 +0100
+Subject: [PATCH] mtd: sh_flctl: pass FIFO as physical address
+In-Reply-To: <CAMuHMdXjquhLKsby1QZ+U9JN7bVrxX4guPgC0EQuLXJcmVKACw@mail.gmail.com>
+References: <3152458.D3kElfhRW2@wuerfel> <20151210022146.GH144338@google.com>
+ <CAMuHMdXjquhLKsby1QZ+U9JN7bVrxX4guPgC0EQuLXJcmVKACw@mail.gmail.com>
+Message-ID: <6087453.7mT0kthNee@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/15 19:24, Suravee Suthikulpanit wrote:
-> This patch series has been forked from the following patch series since
-> it no longer depends on the rest of the patches.
+On Thursday 10 December 2015 10:02:06 Geert Uytterhoeven wrote:
 > 
->   [PATCH v4 00/10] ACPI GIC Self-probing, GICv2m and GICv3 support
->   https://lkml.org/lkml/2015/7/29/234
+> On Thu, Dec 10, 2015 at 3:21 AM, Brian Norris
+> <computersforpeace@gmail.com> wrote:
+> > On Tue, Dec 08, 2015 at 05:30:02PM +0100, Geert Uytterhoeven wrote:
+> >> On Tue, Dec 8, 2015 at 4:38 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> > By convention, the FIFO address we pass using dmaengine_slave_config
+> >> > is a physical address in the form that is understood by the DMA
+> >> > engine, as a dma_addr_t, phys_addr_t or resource_size_t.
+> >> >
+> >> > The sh_flctl driver however passes a virtual __iomem address that
+> >> > gets cast to dma_addr_t in the slave driver. This happens to work
+> >> > on shmobile because that platform sets up an identity mapping for
+> >> > its MMIO regions, but such code is not portable to other platforms,
+> >> > and prevents us from ever changing the platform mapping or reusing
+> >> > the driver on other architectures like ARM64 that might not have the
+> >> > mapping.
+> >>
+> >> Note that since the removal of (ARM) sh7367/sh7377/sh7372 support, this
+> >> driver is used on SH only.
+> >
+> > It's still available as COMPILE_TEST, so it's still worth fixing.
+> >
+> > But really, does anyone use this driver any more?
 > 
-> It has been ported to use the newly introduced device fwnode_handle 
-> for ACPI irqdmain introduced by Marc in the following patch series:
-> 
->   [PATCH v2 00/17] Divorcing irqdomain and device_node
-> 
-> The following git branch contains the submitted patches along with
-> the pre-requsite patches (mainly for ARM64 PCI support for ACPI).
-> 
->   https://github.com/ssuthiku/linux.git	v2m-multiframe-v6
-> 
-> This has been tested on AMD Seattle (Overdrive) RevB system. 
-> 
-> NOTE: I have not tested ACPI GICv2m multiframe support since
-> I don't have access to such system. Any helps are appreciated.
+> It's used on the sh7723-based AP-325RXA board.
+> No idea if anyone is really using it.
 
-Suravee,
+If the question is about removing the driver, I think the answer then is
+that we should either remove the platform and the driver, or neither
+of them. sh7723 seems to be one of the more recent ones (added in 2009,
+only 7 of the 40 CPU subtypes are more recent, the last ones were
+added in 2012).
 
-This is starting to look OK, and you should be able to quickly fix the
-last patch. Now, I'm not sure how you want to get that merged.
-
-The first patch touches both ACPI and PCI, so it would at least requires
-Acks from Rafael and Bjorn (which is not cc-ed, and you may want to fix
-that in your next post, adding linux-pci for a good measure). If they
-are both happy with the change, I can pick up the series as a whole.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+	Arnd
