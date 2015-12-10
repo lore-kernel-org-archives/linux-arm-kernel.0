@@ -1,360 +1,241 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 10 Dec 2015 09:14:07 +0000
-Subject: [PATCH v6.1 08/10] cpufreq: st: Provide runtime initialised driver
- for ST's platforms
-In-Reply-To: <1449676697-25432-9-git-send-email-lee.jones@linaro.org>
-References: <1449676697-25432-1-git-send-email-lee.jones@linaro.org>
- <1449676697-25432-9-git-send-email-lee.jones@linaro.org>
-Message-ID: <20151210091407.GF17876@x1>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 10 Dec 2015 09:14:26 +0000
+Subject: [PATCH v6 4/4] gicv2m: acpi: Introducing GICv2m ACPI support
+In-Reply-To: <1449689074-30609-5-git-send-email-Suravee.Suthikulpanit@amd.com>
+References: <1449689074-30609-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1449689074-30609-5-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <56694272.5050706@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The bootloader is charged with the responsibility to provide platform
-specific Dynamic Voltage and Frequency Scaling (DVFS) information via
-Device Tree.  This driver takes the supplied configuration and
-registers it with the new generic OPP framework, to then be used with
-CPUFreq.
+On 09/12/15 19:24, Suravee Suthikulpanit wrote:
+> This patch introduces gicv2m_acpi_init(), which uses information
+> in MADT GIC MSI frames structure to initialize GICv2m driver.
+> It also exposes gicv2m_init() function, which simplifies callers
+> to a single GICv2m init function.
+> 
+> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  drivers/irqchip/irq-gic-v2m.c   | 114 +++++++++++++++++++++++++++++++++++++++-
+>  drivers/irqchip/irq-gic.c       |   6 ++-
+>  include/linux/irqchip/arm-gic.h |   3 +-
+>  3 files changed, 120 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
+> index 779c390..e01a495 100644
+> --- a/drivers/irqchip/irq-gic-v2m.c
+> +++ b/drivers/irqchip/irq-gic-v2m.c
+> @@ -15,9 +15,11 @@
+>  
+>  #define pr_fmt(fmt) "GICv2m: " fmt
+>  
+> +#include <linux/acpi.h>
+>  #include <linux/irq.h>
+>  #include <linux/irqdomain.h>
+>  #include <linux/kernel.h>
+> +#include <linux/msi.h>
+>  #include <linux/of_address.h>
+>  #include <linux/of_pci.h>
+>  #include <linux/slab.h>
+> @@ -138,6 +140,11 @@ static int gicv2m_irq_gic_domain_alloc(struct irq_domain *domain,
+>  		fwspec.param[0] = 0;
+>  		fwspec.param[1] = hwirq - 32;
+>  		fwspec.param[2] = IRQ_TYPE_EDGE_RISING;
+> +	} else if (is_fwnode_irqchip(domain->parent->fwnode)) {
+> +		fwspec.fwnode = domain->parent->fwnode;
+> +		fwspec.param_count = 2;
+> +		fwspec.param[0] = hwirq;
+> +		fwspec.param[1] = IRQ_TYPE_EDGE_RISING;
+>  	} else {
+>  		return -EINVAL;
+>  	}
+> @@ -255,6 +262,8 @@ static void gicv2m_teardown(void)
+>  		kfree(v2m->bm);
+>  		iounmap(v2m->base);
+>  		of_node_put(to_of_node(v2m->fwnode));
+> +		if (is_fwnode_irqchip(v2m->fwnode))
+> +			irq_domain_free_fwnode(v2m->fwnode);
+>  		kfree(v2m);
+>  	}
+>  }
+> @@ -373,11 +382,16 @@ static struct of_device_id gicv2m_device_id[] = {
+>  	{},
+>  };
+>  
+> -int __init gicv2m_of_init(struct device_node *node, struct irq_domain *parent)
+> +static int __init gicv2m_of_init(struct fwnode_handle *parent_handle,
+> +				 struct irq_domain *parent)
+>  {
+>  	int ret = 0;
+> +	struct device_node *node = to_of_node(parent_handle);
+>  	struct device_node *child;
+>  
+> +	if (!node)
+> +		return -EINVAL;
+> +
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
-Viresh,
-  This incremental submission contains fixes to your last requests.
+I don't think we need this, see below.
 
- drivers/cpufreq/Kconfig.arm   |  10 ++
- drivers/cpufreq/Makefile      |   1 +
- drivers/cpufreq/sti-cpufreq.c | 294 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 305 insertions(+)
+>  	for (child = of_find_matching_node(node, gicv2m_device_id); child;
+>  	     child = of_find_matching_node(child, gicv2m_device_id)) {
+>  		u32 spi_start = 0, nr_spis = 0;
+> @@ -411,3 +425,101 @@ int __init gicv2m_of_init(struct device_node *node, struct irq_domain *parent)
+>  		gicv2m_teardown();
+>  	return ret;
+>  }
+> +
+> +#ifdef CONFIG_ACPI
+> +static int acpi_num_msi;
+> +
+> +static struct fwnode_handle *gicv2m_get_fwnode(struct device *dev)
+> +{
+> +	struct v2m_data *data;
+> +
+> +	if (WARN_ON(acpi_num_msi <= 0))
+> +		return NULL;
+> +
+> +	/* We only return the fwnode of the first MSI frame. */
+> +	data = list_first_entry_or_null(&v2m_nodes, struct v2m_data, entry);
+> +	if (!data)
+> +		return NULL;
+> +
+> +	return data->fwnode;
+> +}
+> +
+> +static int __init
+> +acpi_parse_madt_msi(struct acpi_subtable_header *header,
+> +		    const unsigned long end)
+> +{
+> +	int ret;
+> +	struct resource res;
+> +	u32 spi_start = 0, nr_spis = 0;
+> +	struct acpi_madt_generic_msi_frame *m;
+> +	struct fwnode_handle *fwnode;
+> +
+> +	m = (struct acpi_madt_generic_msi_frame *)header;
+> +	if (BAD_MADT_ENTRY(m, end))
+> +		return -EINVAL;
+> +
+> +	res.start = m->base_address;
+> +	res.end = m->base_address + SZ_4K;
+> +
+> +	if (m->flags & ACPI_MADT_OVERRIDE_SPI_VALUES) {
+> +		spi_start = m->spi_base;
+> +		nr_spis = m->spi_count;
+> +
+> +		pr_info("ACPI overriding V2M MSI_TYPER (base:%u, num:%u)\n",
+> +			spi_start, nr_spis);
+> +	}
+> +
+> +	fwnode = irq_domain_alloc_fwnode((void *)m->base_address);
+> +	if (!fwnode) {
+> +		pr_err("Unable to allocate GICv2m domain token\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	ret = gicv2m_init_one(fwnode, spi_start, nr_spis, &res);
+> +	if (ret)
+> +		irq_domain_free_fwnode(fwnode);
+> +
+> +	return ret;
+> +}
+> +
+> +static int __init gicv2m_acpi_init(struct irq_domain *parent)
+> +{
+> +	int ret;
+> +
+> +	if (acpi_num_msi > 0)
+> +		return 0;
+> +
+> +	acpi_num_msi = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_MSI_FRAME,
+> +				      acpi_parse_madt_msi, 0);
+> +
+> +	if (acpi_num_msi <= 0)
+> +		goto err_out;
+> +
+> +	ret = gicv2m_allocate_domains(parent);
+> +	if (ret)
+> +		goto err_out;
+> +
+> +	pci_msi_register_fwnode_provider(&gicv2m_get_fwnode);
+> +
+> +	return 0;
+> +
+> +err_out:
+> +	gicv2m_teardown();
+> +	return -EINVAL;
+> +}
+> +#else /* CONFIG_ACPI */
+> +static int __init gicv2m_acpi_init(struct irq_domain *parent)
+> +{
+> +	return -EINVAL;
+> +}
+> +#endif /* CONFIG_ACPI */
+> +
+> +int __init gicv2m_init(struct fwnode_handle *parent_handle,
+> +		       struct irq_domain *parent)
+> +{
+> +	int ret = gicv2m_of_init(parent_handle, parent);
+> +
+> +	if (ret)
+> +		ret = gicv2m_acpi_init(parent);
+> +	return ret;
 
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index 1582c1c..2dfc327 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -216,6 +216,16 @@ config ARM_SPEAR_CPUFREQ
- 	help
- 	  This adds the CPUFreq driver support for SPEAr SOCs.
- 
-+config ARM_STI_CPUFREQ
-+	tristate "STi CPUFreq support"
-+	depends on SOC_STIH407
-+	help
-+	  This driver uses the generic OPP framework to match the running
-+	  platform with a predefined set of suitable values.  If not provided
-+	  we will fall-back so safe-values contained in Device Tree.  Enable
-+	  this config option if you wish to add CPUFreq support for STi based
-+	  SoCs.
-+
- config ARM_TEGRA20_CPUFREQ
- 	bool "Tegra20 CPUFreq support"
- 	depends on ARCH_TEGRA
-diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-index c0af1a1..9e63fb1 100644
---- a/drivers/cpufreq/Makefile
-+++ b/drivers/cpufreq/Makefile
-@@ -73,6 +73,7 @@ obj-$(CONFIG_ARM_SA1100_CPUFREQ)	+= sa1100-cpufreq.o
- obj-$(CONFIG_ARM_SA1110_CPUFREQ)	+= sa1110-cpufreq.o
- obj-$(CONFIG_ARM_SCPI_CPUFREQ)		+= scpi-cpufreq.o
- obj-$(CONFIG_ARM_SPEAR_CPUFREQ)		+= spear-cpufreq.o
-+obj-$(CONFIG_ARM_STI_CPUFREQ)		+= sti-cpufreq.o
- obj-$(CONFIG_ARM_TEGRA20_CPUFREQ)	+= tegra20-cpufreq.o
- obj-$(CONFIG_ARM_TEGRA124_CPUFREQ)	+= tegra124-cpufreq.o
- obj-$(CONFIG_ARM_VEXPRESS_SPC_CPUFREQ)	+= vexpress-spc-cpufreq.o
-diff --git a/drivers/cpufreq/sti-cpufreq.c b/drivers/cpufreq/sti-cpufreq.c
-new file mode 100644
-index 0000000..a9c659f
---- /dev/null
-+++ b/drivers/cpufreq/sti-cpufreq.c
-@@ -0,0 +1,294 @@
-+/*
-+ * Match running platform with pre-defined OPP values for CPUFreq
-+ *
-+ * Author: Ajit Pal Singh <ajitpal.singh@st.com>
-+ *         Lee Jones <lee.jones@linaro.org>
-+ *
-+ * Copyright (C) 2015 STMicroelectronics (R&D) Limited
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the version 2 of the GNU General Public License as
-+ * published by the Free Software Foundation
-+ */
-+
-+#include <linux/cpu.h>
-+#include <linux/io.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_platform.h>
-+#include <linux/pm_opp.h>
-+#include <linux/regmap.h>
-+
-+#define VERSION_ELEMENTS	3
-+#define MAX_PCODE_NAME_LEN	7
-+
-+#define VERSION_SHIFT		28
-+#define HW_INFO_INDEX		1
-+#define MAJOR_ID_INDEX		1
-+#define MINOR_ID_INDEX		2
-+
-+/*
-+ * Only match on "suitable for ALL versions" entries
-+ *
-+ * This will be used with the BIT() macro.  It sets the
-+ * top bit of a 32bit value and is equal to 0x80000000.
-+ */
-+#define DEFAULT_VERSION		31
-+
-+enum {
-+	PCODE = 0,
-+	SUBSTRATE,
-+	DVFS_MAX_REGFIELDS,
-+};
-+
-+/**
-+ * ST CPUFreq Driver Data
-+ *
-+ * @cpu_node		CPU's OF node
-+ * @syscfg_eng		Engineering Syscon register map
-+ * @regmap		Syscon register map
-+ */
-+static struct sti_cpufreq_ddata {
-+	struct device *cpu;
-+	struct regmap *syscfg_eng;
-+	struct regmap *syscfg;
-+} ddata;
-+
-+static int sti_cpufreq_fetch_major(void) {
-+	struct device_node *np = ddata.cpu->of_node;
-+	struct device *dev = ddata.cpu;
-+	unsigned int major_offset;
-+	unsigned int socid;
-+	int ret;
-+
-+	ret = of_property_read_u32_index(np, "st,syscfg",
-+					 MAJOR_ID_INDEX, &major_offset);
-+	if (ret) {
-+		dev_err(dev, "No major number offset provided in %s [%d]\n",
-+			np->full_name, ret);
-+		return ret;
-+	}
-+
-+	ret = regmap_read(ddata.syscfg, major_offset, &socid);
-+	if (ret) {
-+		dev_err(dev, "Failed to read major number from syscon [%d]\n",
-+			ret);
-+		return ret;
-+	}
-+
-+	return ((socid >> VERSION_SHIFT) & 0xf) + 1;
-+}
-+
-+static int sti_cpufreq_fetch_minor(void)
-+{
-+	struct device *dev = ddata.cpu;
-+	struct device_node *np = dev->of_node;
-+	unsigned int minor_offset;
-+	unsigned int minid;
-+	int ret;
-+
-+	ret = of_property_read_u32_index(np, "st,syscfg-eng",
-+					 MINOR_ID_INDEX, &minor_offset);
-+	if (ret) {
-+		dev_err(dev,
-+			"No minor number offset provided %s [%d]\n",
-+			np->full_name, ret);
-+		return ret;
-+	}
-+
-+	ret = regmap_read(ddata.syscfg_eng, minor_offset, &minid);
-+	if (ret) {
-+		dev_err(dev,
-+			"Failed to read the minor number from syscon [%d]\n",
-+			ret);
-+		return ret;
-+	}
-+
-+	return minid & 0xf;
-+}
-+
-+static int sti_cpufreq_fetch_regmap_field(const struct reg_field *reg_fields,
-+					  int hw_info_offset, int field)
-+{
-+	struct regmap_field *regmap_field;
-+	struct reg_field reg_field = reg_fields[field];
-+	struct device *dev = ddata.cpu;
-+	unsigned int value;
-+	int ret;
-+
-+	reg_field.reg = hw_info_offset;
-+	regmap_field = devm_regmap_field_alloc(dev,
-+					       ddata.syscfg_eng,
-+					       reg_field);
-+	if (IS_ERR(regmap_field)) {
-+		dev_err(dev, "Failed to allocate reg field\n");
-+		return PTR_ERR(regmap_field);
-+	}
-+
-+	ret = regmap_field_read(regmap_field, &value);
-+	if (ret) {
-+		dev_err(dev, "Failed to read %s code\n",
-+			field ? "SUBSTRATE" : "PCODE");
-+		return ret;
-+	}
-+
-+	return value;
-+}
-+
-+static const struct reg_field sti_stih407_dvfs_regfields[DVFS_MAX_REGFIELDS] = {
-+	[PCODE]		= REG_FIELD(0, 16, 19),
-+	[SUBSTRATE]	= REG_FIELD(0, 0, 2),
-+};
-+
-+static const struct reg_field *sti_cpufreq_match(void)
-+{
-+	if (of_machine_is_compatible("st,stih407") ||
-+	    of_machine_is_compatible("st,stih410"))
-+		return sti_stih407_dvfs_regfields;
-+
-+	return NULL;
-+}
-+
-+static int sti_cpufreq_set_opp_info(void)
-+{
-+	struct device *dev = ddata.cpu;
-+	struct device_node *np = dev->of_node;
-+	const struct reg_field *reg_fields;
-+	unsigned int hw_info_offset;
-+	unsigned int version[VERSION_ELEMENTS];
-+	int pcode, substrate, major, minor;
-+	int ret;
-+	char name[MAX_PCODE_NAME_LEN];
-+
-+	reg_fields = sti_cpufreq_match();
-+	if (!reg_fields) {
-+		dev_err(dev, "This SoC doesn't support voltage scaling");
-+		return -ENODEV;
-+	}
-+
-+	ret = of_property_read_u32_index(np, "st,syscfg-eng",
-+					 HW_INFO_INDEX, &hw_info_offset);
-+	if (ret) {
-+		dev_warn(dev, "Failed to read HW info offset from DT\n");
-+		substrate = DEFAULT_VERSION;
-+		pcode = 0;
-+		goto use_defaults;
-+	}
-+
-+	pcode = sti_cpufreq_fetch_regmap_field(reg_fields,
-+					       hw_info_offset,
-+					       PCODE);
-+	if (pcode < 0) {
-+		dev_warn(dev, "Failed to obtain process code\n");
-+		/* Use default pcode */
-+		pcode = 0;
-+	}
-+
-+	substrate = sti_cpufreq_fetch_regmap_field(reg_fields,
-+						   hw_info_offset,
-+						   SUBSTRATE);
-+	if (substrate) {
-+		dev_warn(dev, "Failed to obtain substrate code\n");
-+		/* Use default substrate */
-+		substrate = DEFAULT_VERSION;
-+	}
-+
-+use_defaults:
-+	major = sti_cpufreq_fetch_major();
-+	if (major < 0) {
-+		dev_err(dev, "Failed to obtain major version\n");
-+		/* Use default major number */
-+		major = DEFAULT_VERSION;
-+	}
-+
-+	minor = sti_cpufreq_fetch_minor();
-+	if (minor < 0) {
-+		dev_err(dev, "Failed to obtain minor version\n");
-+		/* Use default minor number */
-+		minor = DEFAULT_VERSION;
-+	}
-+
-+	snprintf(name, MAX_PCODE_NAME_LEN, "pcode%d", pcode);
-+
-+	ret = dev_pm_opp_set_prop_name(dev, name);
-+	if (ret) {
-+		dev_err(dev, "Failed to set prop name\n");
-+		return ret;
-+	}
-+
-+	version[0] = BIT(major);
-+	version[1] = BIT(minor);
-+	version[2] = BIT(substrate);
-+
-+	ret = dev_pm_opp_set_supported_hw(dev, version, VERSION_ELEMENTS);
-+	if (ret) {
-+		dev_err(dev, "Failed to set supported hardware\n");
-+		return ret;
-+	}
-+
-+	dev_dbg(dev, "pcode: %d major: %d minor: %d substrate: %d\n",
-+		pcode, major, minor, substrate);
-+	dev_dbg(dev, "version[0]: %x version[1]: %x version[2]: %x\n",
-+		version[0], version[1], version[2]);
-+
-+	return 0;
-+}
-+
-+static int sti_cpufreq_fetch_syscon_regsiters(void)
-+{
-+	struct device *dev = ddata.cpu;
-+	struct device_node *np = dev->of_node;
-+
-+	ddata.syscfg = syscon_regmap_lookup_by_phandle(np, "st,syscfg");
-+	if (IS_ERR(ddata.syscfg)) {
-+		dev_err(dev,  "\"st,syscfg\" not supplied\n");
-+		return PTR_ERR(ddata.syscfg);
-+	}
-+
-+	ddata.syscfg_eng = syscon_regmap_lookup_by_phandle(np, "st,syscfg-eng");
-+	if (IS_ERR(ddata.syscfg_eng)) {
-+		dev_err(dev, "\"st,syscfg-eng\" not supplied\n");
-+		return PTR_ERR(ddata.syscfg_eng);
-+	}
-+
-+	return 0;
-+}
-+
-+static int sti_cpufreq_init(void)
-+{
-+	int ret;
-+
-+	ddata.cpu = get_cpu_device(0);
-+	if (!ddata.cpu) {
-+		dev_err(ddata.cpu, "Failed to get device for CPU0\n");
-+		goto skip_voltage_scaling;
-+	}
-+
-+	if (!of_get_property(ddata.cpu->of_node, "operating-points-v2", NULL)) {
-+		dev_err(ddata.cpu, "OPP-v2 not supported\n");
-+		goto skip_voltage_scaling;
-+	}
-+
-+	ret = sti_cpufreq_fetch_syscon_regsiters();
-+	if (ret)
-+		goto skip_voltage_scaling;
-+
-+	ret = sti_cpufreq_set_opp_info();
-+	if (!ret)
-+		goto register_cpufreq_dt;
-+
-+skip_voltage_scaling:
-+	dev_err(ddata.cpu, "Not doing voltage scaling\n");
-+
-+register_cpufreq_dt:
-+	platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
-+
-+	return 0;
-+}
-+module_init(sti_cpufreq_init);
-+
-+MODULE_DESCRIPTION("STMicroelectronics CPUFreq/OPP driver");
-+MODULE_AUTHOR("Ajitpal Singh <ajitpal.singh@st.com>");
-+MODULE_AUTHOR("Lee Jones <lee.jones@linaro.org>");
-+MODULE_LICENSE("GPL v2");
+This should really read:
+
+	if (is_of_node(parent_handle))
+		return gicv2m_of_init(parent_handle, parent);
+	
+	return gicv2m_acpi_init(parent);
+
+and you can loose the test for NULL in gicv2m_of_init().
+
+> +}
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index fcd327f..644e8bb 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -1234,7 +1234,7 @@ gic_of_init(struct device_node *node, struct device_node *parent)
+>  	}
+>  
+>  	if (IS_ENABLED(CONFIG_ARM_GIC_V2M))
+> -		gicv2m_of_init(node, gic_data[gic_cnt].domain);
+> +		gicv2m_init(&node->fwnode, gic_data[gic_cnt].domain);
+>  
+>  	gic_cnt++;
+>  	return 0;
+> @@ -1359,6 +1359,10 @@ static int __init gic_v2_acpi_init(struct acpi_subtable_header *header,
+>  	__gic_init_bases(0, -1, dist_base, cpu_base, 0, domain_handle);
+>  
+>  	acpi_set_irq_model(ACPI_IRQ_MODEL_GIC, domain_handle);
+> +
+> +	if (IS_ENABLED(CONFIG_ARM_GIC_V2M))
+> +		gicv2m_init(NULL, gic_data[0].domain);
+> +
+>  	return 0;
+>  }
+>  IRQCHIP_ACPI_DECLARE(gic_v2, ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR,
+> diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+> index bae69e5..febc6c3 100644
+> --- a/include/linux/irqchip/arm-gic.h
+> +++ b/include/linux/irqchip/arm-gic.h
+> @@ -106,7 +106,8 @@ int gic_cpu_if_down(unsigned int gic_nr);
+>  void gic_init(unsigned int nr, int start,
+>  	      void __iomem *dist , void __iomem *cpu);
+>  
+> -int gicv2m_of_init(struct device_node *node, struct irq_domain *parent);
+> +int gicv2m_init(struct fwnode_handle *parent_handle,
+> +		struct irq_domain *parent);
+>  
+>  void gic_send_sgi(unsigned int cpu_id, unsigned int irq);
+>  int gic_get_cpu_id(unsigned int cpu);
+> 
+
+Apart from the fairly minor issue above:
+
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
