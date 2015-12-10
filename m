@@ -1,32 +1,30 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 9 Dec 2015 18:21:46 -0800
-Subject: [PATCH] mtd: sh_flctl: pass FIFO as physical address
-In-Reply-To: <CAMuHMdVWss6Kz8sVrcUR3a4iJ+Z8D1q1Er6eH_uRMoS5DCN5pw@mail.gmail.com>
-References: <3152458.D3kElfhRW2@wuerfel>
- <CAMuHMdVWss6Kz8sVrcUR3a4iJ+Z8D1q1Er6eH_uRMoS5DCN5pw@mail.gmail.com>
-Message-ID: <20151210022146.GH144338@google.com>
+From: biao.huang@mediatek.com (biao huang)
+Date: Thu, 10 Dec 2015 10:34:52 +0800
+Subject: [PATCH 4/5] pinctrl: mediatek: Add Pinctrl/GPIO/EINT driver for
+ mt2701
+In-Reply-To: <CACRpkda2vgrVEisH=akc5aj6h4LW+mBTqgbAiF3E=3zcu6A28A@mail.gmail.com>
+References: <1448527472-20651-1-git-send-email-biao.huang@mediatek.com>
+ <1448527472-20651-5-git-send-email-biao.huang@mediatek.com>
+ <CACRpkda2vgrVEisH=akc5aj6h4LW+mBTqgbAiF3E=3zcu6A28A@mail.gmail.com>
+Message-ID: <1449714892.17341.3.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 08, 2015 at 05:30:02PM +0100, Geert Uytterhoeven wrote:
-> On Tue, Dec 8, 2015 at 4:38 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > By convention, the FIFO address we pass using dmaengine_slave_config
-> > is a physical address in the form that is understood by the DMA
-> > engine, as a dma_addr_t, phys_addr_t or resource_size_t.
-> >
-> > The sh_flctl driver however passes a virtual __iomem address that
-> > gets cast to dma_addr_t in the slave driver. This happens to work
-> > on shmobile because that platform sets up an identity mapping for
-> > its MMIO regions, but such code is not portable to other platforms,
-> > and prevents us from ever changing the platform mapping or reusing
-> > the driver on other architectures like ARM64 that might not have the
-> > mapping.
+On Wed, 2015-12-09 at 23:52 +0100, Linus Walleij wrote:
+> On Thu, Nov 26, 2015 at 9:44 AM, Biao Huang <biao.huang@mediatek.com> wrote:
 > 
-> Note that since the removal of (ARM) sh7367/sh7377/sh7372 support, this
-> driver is used on SH only.
-
-It's still available as COMPILE_TEST, so it's still worth fixing.
-
-But really, does anyone use this driver any more?
-
-Brian
+> > Add mt2701 support using mediatek common pinctrl driver.
+> > MT2701 have some special pins need an extra setting register
+> > than other ICs, so adding this support to common code.
+> >
+> > Signed-off-by: Biao Huang <biao.huang@mediatek.com>
+> 
+> This looks uncontroversial, but I would like to have some of the
+> other Mediatek driver authors send their Ack/Review tags,
+> so Hongzhou & Yingjoe: can you review this and the other
+> patch to the pin control driver?
+The v2 patch will be sent in next week, and there are some changes in
+mt2701 drivers. And I'll add Hongzhou & Yingjoe to review these patches.
+> 
+> Yours,
+> Linus Walleij
