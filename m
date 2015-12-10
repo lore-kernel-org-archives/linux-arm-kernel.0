@@ -1,72 +1,105 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 10 Dec 2015 14:11:08 +0000
-Subject: [RFC PATCH 06/20] arm64: mm: place empty_zero_page in bss
-In-Reply-To: <1449665095-20774-7-git-send-email-mark.rutland@arm.com>
-References: <1449665095-20774-1-git-send-email-mark.rutland@arm.com>
- <1449665095-20774-7-git-send-email-mark.rutland@arm.com>
-Message-ID: <20151210141107.GF21134@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 10 Dec 2015 15:14:15 +0100
+Subject: [PATCH 1/2] ARM: l2x0: make it possible to disable outer sync from DT
+Message-ID: <1449756855-19473-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 09, 2015 at 12:44:41PM +0000, Mark Rutland wrote:
-> Currently the zero page is set up in paging_init, and thus we cannot use
-> the zero page earlier. We use the zero page as a reserved TTBR value
-> from which no TLB entries may be allocated (e.g. when uninstalling the
-> idmap). To enable such usage earlier (as may be required for invasive
-> changes to the kernel page tables), and to minimise the time that the
-> idmap is active, we need to be able to use the zero page before
-> paging_init.
-> 
-> This patch follows the example set by x86, by allocating the zero page
-> at compile time, in .bss. This means that the zero page itself is
-> available immediately upon entry to start_kernel (as we zero .bss before
-> this), and also means that the zero page takes up no space in the raw
-> Image binary. The associated struct page is allocated in bootmem_init,
-> and remains unavailable until this time.
-> 
-> Outside of arch code, the only users of empty_zero_page assume that the
-> empty_zero_page symbol refers to the zeroed memory itself, and that
-> ZERO_PAGE(x) must be used to acquire the associated struct page,
-> following the example of x86. This patch also brings arm64 inline with
-> these assumptions.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Jeremy Linton <jeremy.linton@arm.com>
-> Cc: Laura Abbott <labbott@fedoraproject.org>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/include/asm/mmu_context.h | 2 +-
->  arch/arm64/include/asm/pgtable.h     | 4 ++--
->  arch/arm64/mm/mmu.c                  | 9 +--------
->  3 files changed, 4 insertions(+), 11 deletions(-)
+Some RealView platforms have broken outer_sync, see:
+http://marc.info/?l=linux-kernel&m=144846940516899&w=2
 
-[...]
+We got rid of the custom barriers from the machine by disabling
+outer sync, but that was just for the boardfile case. We have
+to be able to do the same in the device tree case.
 
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index 304ff23..7559c22 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -48,7 +48,7 @@ u64 idmap_t0sz = TCR_T0SZ(VA_BITS);
->   * Empty_zero_page is a special page that is used for zero-initialized data
->   * and COW.
->   */
-> -struct page *empty_zero_page;
-> +unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)] __page_aligned_bss;
->  EXPORT_SYMBOL(empty_zero_page);
+Since __l2c_init() is cloning and copying the L2C vtable,
+we pass an argument to this function to optionally numb
+the outer sync operation if desired, before initializing
+the cache.
 
-I've been looking at this, and it was making me feel uneasy because it's
-full of junk before the bss is zeroed. Working that through, it's no
-worse than what we currently have but I then realised that (a) we don't
-have a dsb after zeroing the zero page (which we need to make sure the
-zeroes are visible to the page table walker and (b) the zero page is
-never explicitly cleaned to the PoC.
+After this we can set up the cache correctly on the RealView
+PB11MPCore, and it boots rock solid with the cache enabled.
+Before this, spurious crashes would occur if we try to set
+up the cache properly.
 
-There may be cases where the zero-page is used to back read-only,
-non-cacheable mappings (something to do with KVM?), so I'd sleep better
-if we made sure that it was clean.
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: devicetree at vger.kernel.org
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ Documentation/devicetree/bindings/arm/l2cc.txt |  1 +
+ arch/arm/mm/cache-l2x0.c                       | 13 ++++++++++---
+ 2 files changed, 11 insertions(+), 3 deletions(-)
 
-Thoughts?
-
-Will
+diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
+index d181b7c4c522..aae7387acbdb 100644
+--- a/Documentation/devicetree/bindings/arm/l2cc.txt
++++ b/Documentation/devicetree/bindings/arm/l2cc.txt
+@@ -75,6 +75,7 @@ Optional properties:
+   specified to indicate that such transforms are precluded.
+ - arm,parity-enable : enable parity checking on the L2 cache (L220 or PL310).
+ - arm,parity-disable : disable parity checking on the L2 cache (L220 or PL310).
++- arm,outer-sync-disable : disable the outer sync operation on the L2 cache.
+ - prefetch-data : Data prefetch. Value: <0> (forcibly disable), <1>
+   (forcibly enable), property absent (retain settings set by firmware)
+ - prefetch-instr : Instruction prefetch. Value: <0> (forcibly disable),
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 3f3008e5c662..9f9d54271aad 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -790,7 +790,7 @@ static const struct l2c_init_data l2c310_init_fns __initconst = {
+ };
+ 
+ static int __init __l2c_init(const struct l2c_init_data *data,
+-			     u32 aux_val, u32 aux_mask, u32 cache_id)
++			     u32 aux_val, u32 aux_mask, u32 cache_id, bool nosync)
+ {
+ 	struct outer_cache_fns fns;
+ 	unsigned way_size_bits, ways;
+@@ -866,6 +866,10 @@ static int __init __l2c_init(const struct l2c_init_data *data,
+ 	fns.configure = outer_cache.configure;
+ 	if (data->fixup)
+ 		data->fixup(l2x0_base, cache_id, &fns);
++	if (nosync) {
++		pr_info("L2C: disabling outer sync\n");
++		fns.sync = NULL;
++	}
+ 
+ 	/*
+ 	 * Check if l2x0 controller is already enabled.  If we are booting
+@@ -925,7 +929,7 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+ 	if (data->save)
+ 		data->save(l2x0_base);
+ 
+-	__l2c_init(data, aux_val, aux_mask, cache_id);
++	__l2c_init(data, aux_val, aux_mask, cache_id, false);
+ }
+ 
+ #ifdef CONFIG_OF
+@@ -1724,6 +1728,7 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+ 	struct resource res;
+ 	u32 cache_id, old_aux;
+ 	u32 cache_level = 2;
++	bool nosync = false;
+ 
+ 	np = of_find_matching_node(NULL, l2x0_ids);
+ 	if (!np)
+@@ -1762,6 +1767,8 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+ 	if (cache_level != 2)
+ 		pr_err("L2C: device tree specifies invalid cache level\n");
+ 
++	nosync = of_property_read_bool(np, "arm,outer-sync-disable");
++
+ 	/* Read back current (default) hardware configuration */
+ 	if (data->save)
+ 		data->save(l2x0_base);
+@@ -1776,6 +1783,6 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+ 	else
+ 		cache_id = readl_relaxed(l2x0_base + L2X0_CACHE_ID);
+ 
+-	return __l2c_init(data, aux_val, aux_mask, cache_id);
++	return __l2c_init(data, aux_val, aux_mask, cache_id, nosync);
+ }
+ #endif
+-- 
+2.4.3
