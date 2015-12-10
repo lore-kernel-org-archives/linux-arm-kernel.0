@@ -1,29 +1,78 @@
-From: sgruszka@redhat.com (Stanislaw Gruszka)
-Date: Thu, 10 Dec 2015 12:08:02 +0100
-Subject: [PATCH] iwlegacy: mark il_adjust_beacon_interval as noinline
-In-Reply-To: <36263581.L8412YxJjp@wuerfel>
-References: <36263581.L8412YxJjp@wuerfel>
-Message-ID: <20151210110801.GA2010@redhat.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 10 Dec 2015 12:10:12 +0100
+Subject: [PATCH] gpio: zynq: Do PM initialization earlier to support gpio hogs
+Message-ID: <fc67101afc0d10efbaeeb6bc3d881ab49e3f4671.1449745801.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 09, 2015 at 05:42:41PM +0100, Arnd Bergmann wrote:
-> With the new optimized do_div() code, some versions of gcc
-> produce obviously incorrect code that leads to a link error
-> in iwlegacy/common.o:
-> 
-> drivers/built-in.o: In function `il_send_rxon_timing':
-> :(.text+0xa6b4d4): undefined reference to `____ilog2_NaN'
-> :(.text+0xa6b4f0): undefined reference to `__aeabi_uldivmod'
-> 
-> In a few thousand randconfig builds, I have seen this problem
-> a couple of times in this file, but never anywhere else in the
-> kernel, so we can try to work around this in the only file
-> that shows the behavior, by marking the il_adjust_beacon_interval
-> function as noinline, which convinces gcc to use the unoptimized
-> do_div() all the time.
+GPIO hogs registration is call at the end of gpiochip_add() function.
+Calling sequence is:
+gpiochip_add -> of_gpiochip_add -> of_gpiochip_scan_hogs ->
+gpiod_hog -> gpiochip_request_own_desc -> __gpiod_request ->
+chip->request -> zynq_gpio_request which calls pm_runtime_get_sync()
+which returns -13 because PM is not initialized yet.
 
-I don't think this is good way to "fix" the issue, but also have
-nothing against to this particular change.
+Initialize PM before gpiochip_add is called to fix this issue.
 
-Acked-by: Stanislaw Gruszka <sgruszka@redhat.com>
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+---
+
+ drivers/gpio/gpio-zynq.c | 19 +++++++++----------
+ 1 file changed, 9 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/gpio/gpio-zynq.c b/drivers/gpio/gpio-zynq.c
+index 00306e70a420..a0cabd17c9d0 100644
+--- a/drivers/gpio/gpio-zynq.c
++++ b/drivers/gpio/gpio-zynq.c
+@@ -710,23 +710,23 @@ static int zynq_gpio_probe(struct platform_device *pdev)
+ 	chip->base = -1;
+ 	chip->ngpio = gpio->p_data->ngpio;
+ 
+-	/* Enable GPIO clock */
++	/* Retrieve GPIO clock */
+ 	gpio->clk = devm_clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(gpio->clk)) {
+ 		dev_err(&pdev->dev, "input clock not found.\n");
+ 		return PTR_ERR(gpio->clk);
+ 	}
+-	ret = clk_prepare_enable(gpio->clk);
+-	if (ret) {
+-		dev_err(&pdev->dev, "Unable to enable clock.\n");
++
++	pm_runtime_enable(&pdev->dev);
++	ret = pm_runtime_get_sync(&pdev->dev);
++	if (ret < 0)
+ 		return ret;
+-	}
+ 
+ 	/* report a bug if gpio chip registration fails */
+ 	ret = gpiochip_add(chip);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Failed to add gpio chip\n");
+-		goto err_disable_clk;
++		goto err_pm_put;
+ 	}
+ 
+ 	/* disable interrupts for all banks */
+@@ -744,15 +744,14 @@ static int zynq_gpio_probe(struct platform_device *pdev)
+ 	gpiochip_set_chained_irqchip(chip, &zynq_gpio_edge_irqchip, gpio->irq,
+ 				     zynq_gpio_irqhandler);
+ 
+-	pm_runtime_set_active(&pdev->dev);
+-	pm_runtime_enable(&pdev->dev);
++	pm_runtime_put(&pdev->dev);
+ 
+ 	return 0;
+ 
+ err_rm_gpiochip:
+ 	gpiochip_remove(chip);
+-err_disable_clk:
+-	clk_disable_unprepare(gpio->clk);
++err_pm_put:
++	pm_runtime_put(&pdev->dev);
+ 
+ 	return ret;
+ }
+-- 
+1.9.1
