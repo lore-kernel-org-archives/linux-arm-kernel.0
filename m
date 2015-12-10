@@ -1,49 +1,41 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 10 Dec 2015 15:10:48 -0500
-Subject: [PATCH V7 3/3] dma: add Qualcomm Technologies HIDMA channel driver
-In-Reply-To: <20151205080030.GJ1854@localhost>
-References: <1448245707-27499-1-git-send-email-okaya@codeaurora.org>
- <1448245707-27499-4-git-send-email-okaya@codeaurora.org>
- <20151130085948.GC3901@localhost> <565CAC4C.7080909@codeaurora.org>
- <20151201113458.GL3901@localhost> <565E0E1D.1040505@codeaurora.org>
- <565F40A5.2040701@codeaurora.org> <20151205080030.GJ1854@localhost>
-Message-ID: <5669DC48.2040402@codeaurora.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 10 Dec 2015 21:12:57 +0100
+Subject: [GIT PULL] ARM: berlin: Fixes for v4.4-rc1 (round 1)
+Message-ID: <1449778377-8720-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/5/2015 3:00 AM, Vinod Koul wrote:
-> On Wed, Dec 02, 2015 at 02:04:05PM -0500, Sinan Kaya wrote:
->>>>> You are missing the point. Channel can be paused, yes but the descriptor
->>>>> is in queue and is not paused. The descriptor running is paused, yes.
->>>>> There is subtle difference between these
->>> I'll follow your recommendation. PAUSE for the currently active
->>> descriptor and DMA_IN_PROGRESS for the rest.
->>>
->>
->> I'm now confused.
->>
->> I looked at several DMA driver implementations.
->>
->> 1. They call dma_cookie_status function to see if the job is done.
->> 2. If done, they return right ahead.
->> 3. Otherwise, dma_cookie_status returns DMA_IN_PROGRESS.
->> 4. Next the code checks if the channel is paused and return value is
->> DMA_IN_PROGRESS. The code changes return code to DMA_PAUSED.
->>
->> Whereas, I was returning paused first before even checking if the
->> descriptor is done. Are you OK with the sequence 1..4 above?
-> 
-> Yes am okay with this with slight change in 4.
-> 
-> You should set to PAUSED only for current descriptor and not for the ones in
-> queue
-> 
+Arnd, Kevin, Olof,
 
-OK. I'll post a new version with this. Is there any other comment that
-needed to be addressed?
+this is the first round of Marvell Berlin fixes for v4.4-rc1.
+This fixes an issue with BG2Q SDIO clocks that have been changed
+in v4.4-rc1 while the corresponding DT change didn't make it in
+time.
 
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a
-Linux Foundation Collaborative Project
+Please pull.
+
+Sebastian
+
+The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+
+  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+
+are available in the git repository at:
+
+  git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin-fixes-for-4.4-rc1-1
+
+for you to fetch changes up to b5010d2081331e1c95358c4eb500bd30f5d532ce:
+
+  ARM: dts: berlin: add 2nd clock for BG2Q sdhci0 and sdhci1 (2015-12-10 21:00:24 +0100)
+
+----------------------------------------------------------------
+Marvell Berlin fixes for 4.4-rc1 (round 1)
+- fix wrong SDIO DT clocks on BG2Q
+
+----------------------------------------------------------------
+Jisheng Zhang (2):
+      ARM: dts: berlin: correct BG2Q's sdhci2 2nd clock
+      ARM: dts: berlin: add 2nd clock for BG2Q sdhci0 and sdhci1
+
+ arch/arm/boot/dts/berlin2q.dtsi | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
