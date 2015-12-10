@@ -1,26 +1,62 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 10 Dec 2015 13:48:15 +0900
-Subject: [PATCH 1/2] ARM: shmobile: r8a7793: Add missing serial devices
- to DT
-In-Reply-To: <CAMuHMdUXaO6PynwOaEP9e88F10uJSoc7u848RgnDVRdqyYFnTg@mail.gmail.com>
+Date: Thu, 10 Dec 2015 13:54:45 +0900
+Subject: [PATCH 2/2] ARM: shmobile: r8a7793: Describe DMA for the serial
+ ports
+In-Reply-To: <CAMuHMdVfMp0awRZh6S7YiSPFpUyAvwGXSQb2RYU7DkK_SOwH9Q@mail.gmail.com>
 References: <1448589166-11612-1-git-send-email-horms+renesas@verge.net.au>
- <1448589166-11612-2-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdUXaO6PynwOaEP9e88F10uJSoc7u848RgnDVRdqyYFnTg@mail.gmail.com>
-Message-ID: <20151210044815.GB6964@verge.net.au>
+ <1448589166-11612-3-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdVfMp0awRZh6S7YiSPFpUyAvwGXSQb2RYU7DkK_SOwH9Q@mail.gmail.com>
+Message-ID: <20151210045444.GC6964@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 09, 2015 at 11:42:35AM +0100, Geert Uytterhoeven wrote:
+On Wed, Dec 09, 2015 at 11:47:36AM +0100, Geert Uytterhoeven wrote:
+> Hi Simon,
+> 
 > On Fri, Nov 27, 2015 at 2:52 AM, Simon Horman
 > <horms+renesas@verge.net.au> wrote:
-> > Instantiate all serial devices in r8a7793 device tree
-> > and set them as disabled by default.
+> > Add DMA properties to all SCIF, SCIFA, SCIFB, and HSCIF device nodes.
 > >
-> > Based on similar work for the r8a7791 by Laurent Pinchart.
+> > Based on similar work for the r8a7791 by Geert Uytterhoeven.
 > >
-> > Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> > Cc: Geert Uytterhoeven <geert+renesas@glider.be>
 > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > ---
+> >  arch/arm/boot/dts/r8a7793.dtsi | 36 ++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 36 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
+> > index 3ac2ec0414a0..8d5cbdfc3d5d 100644
+> > --- a/arch/arm/boot/dts/r8a7793.dtsi
+> > +++ b/arch/arm/boot/dts/r8a7793.dtsi
 > 
-> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > @@ -394,6 +412,8 @@
+> >                 interrupts = <0 152 IRQ_TYPE_LEVEL_HIGH>;
+> >                 clocks = <&mstp7_clks R8A7793_CLK_SCIF0>;
+> >                 clock-names = "sci_ick";
+> > +               dmas = <&dmac0 0x29>, <&dmac0 0x2a>;
+> > +               dma-names = "tx", "rx";
+> >                 power-domains = <&cpg_clocks>;
+> >                 status = "disabled";
+> >         };
+> > @@ -404,6 +424,8 @@
+> >                 interrupts = <0 153 IRQ_TYPE_LEVEL_HIGH>;
+> >                 clocks = <&mstp7_clks R8A7793_CLK_SCIF1>;
+> >                 clock-names = "sci_ick";
+> > +               dmas = <&dmac0 0x29>, <&dmac0 0x2a>;
+> 
+> This is duplicated from scif0, and should be:
+> 
+>         dmas = <&dmac0 0x2d>, <&dmac0 0x2e>;
+> 
+> > +               dma-names = "tx", "rx";
+> 
+> After
+> 
+>         sed -i -e 's/7791/779x/g' arch/arm/boot/dts/r8a7791.dtsi
+>         sed -i -e 's/7793/779x/g' arch/arm/boot/dts/r8a7793.dtsi
+> 
+> arch/arm/boot/dts/r8a7791.dtsi and arch/arm/boot/dts/r8a7793.dtsi should
+> be identical ;-)
 
-Thanks, I have queued this up.
+Thanks, I have fixed that in v2.
