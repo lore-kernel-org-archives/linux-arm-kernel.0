@@ -1,64 +1,22 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 10 Dec 2015 21:59:05 +0530
-Subject: [PATCH v2 2/2] spi: davinci: use dev_err() for error reporting
-In-Reply-To: <cover.1449764266.git.nsekhar@ti.com>
-References: <cover.1449764266.git.nsekhar@ti.com>
-Message-ID: <83b3c0bb63ff958d10c773ab7bf128393cc7ddad.1449764266.git.nsekhar@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 10 Dec 2015 17:46:19 +0100
+Subject: [GIT PULL] LPC32xx DTS changes for v4.4
+In-Reply-To: <1447863700-15681-1-git-send-email-vz@mleia.com>
+References: <1447863700-15681-1-git-send-email-vz@mleia.com>
+Message-ID: <1672811.WmO81ofU8W@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use dev_err() for reporting errors rather than
-dev_dbg().
+On Wednesday 18 November 2015 18:21:40 Vladimir Zapolskiy wrote:
+> Main changes in the series:
+> - Added description of the second PWM controller device
+> - Added External Memory Controller device tree node (Primecell PL175)
+> - Added device tree nodes for standard timer controllers
+> - USB controllers are grouped
+> - Various minor clean-ups needed for further development of LPC32xx
+> 
+> 
 
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
- drivers/spi/spi-davinci.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+Merged into next/dt, sorry for the long delay.
 
-diff --git a/drivers/spi/spi-davinci.c b/drivers/spi/spi-davinci.c
-index 57d6960a6252..fddb7a3be322 100644
---- a/drivers/spi/spi-davinci.c
-+++ b/drivers/spi/spi-davinci.c
-@@ -477,33 +477,33 @@ static int davinci_spi_check_error(struct davinci_spi *dspi, int int_status)
- 	struct device *sdev = dspi->bitbang.master->dev.parent;
- 
- 	if (int_status & SPIFLG_TIMEOUT_MASK) {
--		dev_dbg(sdev, "SPI Time-out Error\n");
-+		dev_err(sdev, "SPI Time-out Error\n");
- 		return -ETIMEDOUT;
- 	}
- 	if (int_status & SPIFLG_DESYNC_MASK) {
--		dev_dbg(sdev, "SPI Desynchronization Error\n");
-+		dev_err(sdev, "SPI Desynchronization Error\n");
- 		return -EIO;
- 	}
- 	if (int_status & SPIFLG_BITERR_MASK) {
--		dev_dbg(sdev, "SPI Bit error\n");
-+		dev_err(sdev, "SPI Bit error\n");
- 		return -EIO;
- 	}
- 
- 	if (dspi->version == SPI_VERSION_2) {
- 		if (int_status & SPIFLG_DLEN_ERR_MASK) {
--			dev_dbg(sdev, "SPI Data Length Error\n");
-+			dev_err(sdev, "SPI Data Length Error\n");
- 			return -EIO;
- 		}
- 		if (int_status & SPIFLG_PARERR_MASK) {
--			dev_dbg(sdev, "SPI Parity Error\n");
-+			dev_err(sdev, "SPI Parity Error\n");
- 			return -EIO;
- 		}
- 		if (int_status & SPIFLG_OVRRUN_MASK) {
--			dev_dbg(sdev, "SPI Data Overrun error\n");
-+			dev_err(sdev, "SPI Data Overrun error\n");
- 			return -EIO;
- 		}
- 		if (int_status & SPIFLG_BUF_INIT_ACTIVE_MASK) {
--			dev_dbg(sdev, "SPI Buffer Init Active\n");
-+			dev_err(sdev, "SPI Buffer Init Active\n");
- 			return -EBUSY;
- 		}
- 	}
--- 
-2.6.3
+	Arnd
