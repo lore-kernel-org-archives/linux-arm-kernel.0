@@ -1,34 +1,32 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 10 Dec 2015 08:37:56 +0100
-Subject: [PATCH] net/macb: add support for resetting PHY using GPIO
-In-Reply-To: <1449683383-5022-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1449683383-5022-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20151210073756.GA11966@pengutronix.de>
+From: sunil.kovvuri@gmail.com (Sunil Goutham)
+Date: Thu, 10 Dec 2015 13:25:18 +0530
+Subject: [PATCH v2 0/2] net: thunderx: Support for pass-2 hw features
+In-Reply-To: <y>
+References: <y>
+Message-ID: <1449734120-8912-1-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+From: Sunil Goutham <sgoutham@cavium.com>
 
-On Wed, Dec 09, 2015 at 06:49:43PM +0100, Gregory CLEMENT wrote:
-> With device tree it is no more possible to reset the PHY at board
-> level. Furthermore, doing in the driver allow to power down the PHY when
-> the network interface is no more used.
-> 
-> The patch introduces a new optional property "phy-reset-gpio" inspired
-> from the one use for the FEC.
+This patch set adds support for new features added in pass-2 revision
+of hardware like TSO and count based interrupt coalescing.
 
-I don't think it's a good idea to further extend the usage of this
-binding. The driver should use the phy-handle property and
-of_phy_connect() which gives you a proper device node for the phy. Then
-the phy device node should get the reset gpio. I know it's more work,
-but doing it like this gives you additional goodies like proper handling
-of the max-speed property, a fixed-link if necessary and picking the
-correct phy if there are muliple phys on the bus.
+Changes from v1:
+- Addressed comments received regarding boolean bit field changes 
+  by excluding them from this patch. Will submit a seperate
+  patch along with cleanup of unsed field.
+- Got rid of new macro 'VNIC_NAPI_WEIGHT' introduced in 
+  count threshold interrupt patch.
 
-Sascha
+Sunil Goutham (2):
+  net: thunderx: HW TSO support for pass-2 hardware
+  net: thunderx: Enable CQE count threshold interrupt
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+ drivers/net/ethernet/cavium/thunder/nic.h          |    6 ++++
+ drivers/net/ethernet/cavium/thunder/nic_main.c     |   11 ++-----
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c   |   15 ++++++++-
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.c |   22 ++++++++++----
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.h |    2 +-
+ drivers/net/ethernet/cavium/thunder/q_struct.h     |   30 ++++++++++---------
+ 6 files changed, 55 insertions(+), 31 deletions(-)
