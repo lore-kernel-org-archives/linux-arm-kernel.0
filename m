@@ -1,53 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 10 Dec 2015 10:01:44 +0100
-Subject: [PATCH 0/6] drivers/dma: drop modular code from non modular
- drivers
-In-Reply-To: <20151210001741.GT22885@windriver.com>
-References: <1449703322-17762-1-git-send-email-paul.gortmaker@windriver.com>
- <7162994.ydt4N8UgZZ@wuerfel> <20151210001741.GT22885@windriver.com>
-Message-ID: <9314789.uFZ258Jr2D@wuerfel>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 10 Dec 2015 14:52:06 +0530
+Subject: [PATCH v6.1 08/10] cpufreq: st: Provide runtime initialised
+ driver for ST's platforms
+In-Reply-To: <20151210091407.GF17876@x1>
+References: <1449676697-25432-1-git-send-email-lee.jones@linaro.org>
+ <1449676697-25432-9-git-send-email-lee.jones@linaro.org>
+ <20151210091407.GF17876@x1>
+Message-ID: <20151210092206.GC6991@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 December 2015 19:17:42 Paul Gortmaker wrote:
-> [Re: [PATCH 0/6] drivers/dma: drop modular code from non modular drivers] On 10/12/2015 (Thu 00:29) Arnd Bergmann wrote:
+On 10-12-15, 09:14, Lee Jones wrote:
+> The bootloader is charged with the responsibility to provide platform
+> specific Dynamic Voltage and Frequency Scaling (DVFS) information via
+> Device Tree.  This driver takes the supplied configuration and
+> registers it with the new generic OPP framework, to then be used with
+> CPUFreq.
 > 
-> > On Wednesday 09 December 2015 18:21:56 Paul Gortmaker wrote:
-> > > This series of commits is a slice of a larger project to ensure
-> > > people don't have dead code for module removal in non-modular
-> > > drivers.  Overall there is roughly 5k lines of dead code in the
-> > > kernel due to this.
-> > > 
-> > > There is a quasi-separate theme, in that some of the drivers were
-> > > allowing an unbind implicitly since it is enabled by default.  But
-> > > for core DMA infrastructure drivers, this doesn't seem useful -- so
-> > > we also disable that here which allows us to delete any ".remove"
-> > > functions from the drivers that would otherwise be called during the
-> > > (impossible to trigger) module removal.
-> > > 
-> > > Since ARM covers these files the best of all architectures, each
-> > > file was build tested for allmodconfig on ARM, which at the same
-> > > time confirms that the files are not built with "CC [M]" -- hence
-> > > genuinely non-modular.
-> > > 
-> > > My testing and the larger patch series in general has been done
-> > > against the latest linux-next tree.
-> > > 
-> > > 
-> > 
-> > We are in the process of changing the DMA drivers to a new way of
-> > passing the "filter" function around. We can soon build them
-> > all as loadable modules again.
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+> Viresh,
+>   This incremental submission contains fixes to your last requests.
 > 
-> Hi Arnd,
-> 
-> Thanks for the feedback -- just to clarify, you are suggesting I hold
-> on the series until I see what emerges in the next merge window?
-> 
-> 
+>  drivers/cpufreq/Kconfig.arm   |  10 ++
+>  drivers/cpufreq/Makefile      |   1 +
+>  drivers/cpufreq/sti-cpufreq.c | 294 ++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 305 insertions(+)
 
-It may take a few cycles, but I think we'll get there and should not
-remove the unload logic from any of these drivers. When we're done,
-there is no reason for a dmaengine driver to be built-in.
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-	Arnd
+-- 
+viresh
