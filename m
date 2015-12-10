@@ -1,30 +1,52 @@
-From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
-Date: Wed, 9 Dec 2015 21:07:25 -0600
-Subject: [PATCH v6 0/4] gicv2m: acpi: Add ACPI support for GICv2m MSI
-In-Reply-To: <CADaLNDkF_-6Odo6ygyuUVSNdcq93stC-pyGTXEoBDUizPzd99Q@mail.gmail.com>
-References: <1449689074-30609-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <CADaLNDkF_-6Odo6ygyuUVSNdcq93stC-pyGTXEoBDUizPzd99Q@mail.gmail.com>
-Message-ID: <5668EC6D.7020305@amd.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 10 Dec 2015 08:42:02 +0530
+Subject: [PATCH 0/6] drivers/dma: drop modular code from non modular
+ drivers
+In-Reply-To: <20151210001741.GT22885@windriver.com>
+References: <1449703322-17762-1-git-send-email-paul.gortmaker@windriver.com>
+ <7162994.ydt4N8UgZZ@wuerfel> <20151210001741.GT22885@windriver.com>
+Message-ID: <20151210031202.GH1854@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/9/2015 8:20 PM, Duc Dang wrote:
->> This has been tested on AMD Seattle (Overdrive) RevB system.
->> >
->> >NOTE: I have not tested ACPI GICv2m multiframe support since
->> >I don't have access to such system. Any helps are appreciated.
-> Hi Suravee,
->
-> I tested your v2m-multiframe-v6 branch with APM X-Gene 2 that has
-> multiple GICv2m frames and it worked.
->
-> Please feel free to add:
-> Tested-by: Duc Dang<dhdang@apm.com>
->
+On Wed, Dec 09, 2015 at 07:17:42PM -0500, Paul Gortmaker wrote:
+> [Re: [PATCH 0/6] drivers/dma: drop modular code from non modular drivers] On 10/12/2015 (Thu 00:29) Arnd Bergmann wrote:
+> 
+> > On Wednesday 09 December 2015 18:21:56 Paul Gortmaker wrote:
+> > > This series of commits is a slice of a larger project to ensure
+> > > people don't have dead code for module removal in non-modular
+> > > drivers.  Overall there is roughly 5k lines of dead code in the
+> > > kernel due to this.
+> > > 
+> > > There is a quasi-separate theme, in that some of the drivers were
+> > > allowing an unbind implicitly since it is enabled by default.  But
+> > > for core DMA infrastructure drivers, this doesn't seem useful -- so
+> > > we also disable that here which allows us to delete any ".remove"
+> > > functions from the drivers that would otherwise be called during the
+> > > (impossible to trigger) module removal.
+> > > 
+> > > Since ARM covers these files the best of all architectures, each
+> > > file was build tested for allmodconfig on ARM, which at the same
+> > > time confirms that the files are not built with "CC [M]" -- hence
+> > > genuinely non-modular.
+> > > 
+> > > My testing and the larger patch series in general has been done
+> > > against the latest linux-next tree.
+> > > 
+> > > 
+> > 
+> > We are in the process of changing the DMA drivers to a new way of
+> > passing the "filter" function around. We can soon build them
+> > all as loadable modules again.
+> 
+> Hi Arnd,
+> 
+> Thanks for the feedback -- just to clarify, you are suggesting I hold
+> on the series until I see what emerges in the next merge window?
 
-Thanks Duc.
+Yes, with this we should be able to have loadable modules for *most* so we
+may not require this
 
-Marc, if you decide to add take V6 would you please also add the Tested-by?
-
-Thanks,
-Suravee
+Thanks
+-- 
+~Vinod
