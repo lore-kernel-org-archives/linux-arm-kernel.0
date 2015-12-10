@@ -1,93 +1,55 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Dec 2015 14:31:11 +0100
-Subject: [GIT PULL] RealView base patches for cleanup and DT
-Message-ID: <CACRpkdZAD-eh8k5RchnAjWyfRBiD0AN0qg_YHhwM6o001rTSQA@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 10 Dec 2015 14:34:46 +0100
+Subject: [PATCH] i2c: allow building emev2 without slave mode again
+In-Reply-To: <2144222.LfzPx9mJ0p@wuerfel>
+References: <2144222.LfzPx9mJ0p@wuerfel>
+Message-ID: <20151210133446.GC1573@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC maintainers,
+On Thu, Dec 10, 2015 at 02:14:49PM +0100, Arnd Bergmann wrote:
+> The emev2 driver stopped compiling in today's linux-next kernel:
+> 
+> drivers/i2c/busses/i2c-emev2.c: In function 'em_i2c_slave_irq':
+> drivers/i2c/busses/i2c-emev2.c:233:23: error: storage size of 'event' isn't known
+> drivers/i2c/busses/i2c-emev2.c:250:3: error: implicit declaration of function 'i2c_slave_event' [-Werror=implicit-function-declaration]
+> drivers/i2c/busses/i2c-emev2.c:250:32: error: 'I2C_SLAVE_STOP' undeclared (first use in this function)
+> 
+> It works again if we enable CONFIG_I2C_SLAVE, but it seems wrong
+> to add a dependency on that symbol:
+> 
+> * The symbol is user-selectable, but only one or two (including this
+>   one) bus drivers actually implement it, and it makes no sense
+>   if you don't have one of them.
+> 
+> * The other driver (R-Car) uses 'select I2C_SLAVE', which seems
+>   reasonable in principle, but we should not do that on user
+>   visible symbols.
+> 
+> * I2C slave mode could be implemented in a lot of other drivers
+>   as an optional feature, but we shouldn't require enabling it
+>   if we don't use it.
+> 
+> This changes the two drivers that provide I2C slave mode so they
+> can again build if the slave mode being disabled. To do this, I
+> move the definition of i2c_slave_event() and enum i2c_slave_event
+> out of the #ifdef and instead make the assignment of the reg_slave
+> and unreg_slave pointers optional in the bus drivers. The functions
+> implementing the feature are unused in that case, so they get
+> marked as __maybe_unused in order to still give compile-time
+> coverage.
 
-this is the base stack of patches piled up for the RealView platforms.
-It basically adds a set of cleanups from Arnd and device tree support
-for the RealView PB11MPCore. The stack has been tested on hardware.
+Thanks a lot! Making this clear and consistent was on my todo-list,
+unfortunately below some other items.
 
-Both Arnd and I have outstanding patches towards the goals of
-modernizing the RealView machines, but these patches are known to
-be stable and working so let's merge this part now so it gets some
-rotation in linux-next.
+Both drivers have quite orthogonal slave_irq routines. What do you think
+about grouping this and the reg/unreg-calls together and compile them
+conditionally on I2C_SLAVE? I think the code savings are worth it.
 
-I think the clk patches are missing an ACK from Mike Turquette but I don't
-think he would mind. There has been some revisions of them after feedback
-and it looks good to me.
-
-This series requires an orthogonal series for the interrupt controller
-on the PB11MPCore, which will be merged on its own in the irqchips
-tree by Marc Zyngier.
-
-Please pull this in!
-
-Yours,
-Linus Walleij
-
-
-The following changes since commit 527e9316f8ec44bd53d90fb9f611fa7ffff52bb9:
-
-  Linux 4.4-rc4 (2015-12-06 15:43:12 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-tags/realview-base-armsoc
-
-for you to fetch changes up to 1c12923c05c95e5626cef705411fa9a873e71cef:
-
-  ARM: realview: add device tree for PB11MPCore (2015-12-10 14:26:51 +0100)
-
-----------------------------------------------------------------
-Base patches for RealView clean-up and DT support.
-
-----------------------------------------------------------------
-Arnd Bergmann (5):
-      ARM: realview: remove sparsemem hack
-      ARM: realview: don't map undefined PCI registers
-      clk/realview: stop using machine headers
-      ARM: no longer force unbuffered DMA for realview
-      ARM: realview: remove private barrier implementation
-
-Linus Walleij (9):
-      ARM: add DT bindings for the ARM11MPCore CPU cluster
-      clk: versatile-icst: convert to use regmap
-      clk: versatile-icst: refactor to allocate regmap separately
-      clk: add ARM syscon ICST device tree bindings
-      clk: versatile-icst: add device tree support
-      soc: versatile: add support for the PB11MPCore
-      ARM: realview: select SP810 and ICST for the DT variant
-      ARM: realview: add an DT SMP boot method
-      ARM: realview: add device tree for PB11MPCore
-
- Documentation/devicetree/bindings/arm/cpus.txt     |   1 +
- Documentation/devicetree/bindings/arm/scu.txt      |   3 +
- .../devicetree/bindings/clock/arm-syscon-icst.txt  |  40 ++
- arch/arm/Kconfig                                   |   2 -
- arch/arm/boot/dts/Makefile                         |   3 +-
- arch/arm/boot/dts/arm-realview-pb11mp.dts          | 668 +++++++++++++++++++++
- arch/arm/mach-realview/Kconfig                     |  11 +-
- arch/arm/mach-realview/Makefile                    |   2 +-
- arch/arm/mach-realview/include/mach/barriers.h     |   8 -
- arch/arm/mach-realview/include/mach/memory.h       |  64 --
- arch/arm/mach-realview/platsmp-dt.c                |  91 +++
- arch/arm/mach-realview/realview_eb.c               |   7 +
- arch/arm/mach-realview/realview_pb11mp.c           |   6 +
- arch/arm/mach-realview/realview_pba8.c             |   8 -
- arch/arm/mach-realview/realview_pbx.c              |   8 -
- arch/arm/mm/Kconfig                                |   2 -
- drivers/clk/versatile/Kconfig                      |   1 +
- drivers/clk/versatile/clk-icst.c                   | 194 +++++-
- drivers/clk/versatile/clk-realview.c               |  10 +-
- drivers/soc/versatile/soc-realview.c               |   4 +
- 20 files changed, 998 insertions(+), 135 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/arm-syscon-icst.txt
- create mode 100644 arch/arm/boot/dts/arm-realview-pb11mp.dts
- delete mode 100644 arch/arm/mach-realview/include/mach/barriers.h
- delete mode 100644 arch/arm/mach-realview/include/mach/memory.h
- create mode 100644 arch/arm/mach-realview/platsmp-dt.c
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151210/29670801/attachment.sig>
