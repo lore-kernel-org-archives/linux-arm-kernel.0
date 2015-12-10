@@ -1,66 +1,48 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Thu, 10 Dec 2015 14:58:47 -0000
-Subject: [PATCH v4 1/8] thermal: qcom: tsens: Add a skeletal TSENS drivers
-In-Reply-To: <565BF633.7070701@codeaurora.org>
-References: <1444383670-32693-1-git-send-email-rnayak@codeaurora.org>
- <1444383670-32693-2-git-send-email-rnayak@codeaurora.org>
- <20151102203021.GB4469@localhost.localdomain>
- <563AFCE9.8020000@codeaurora.org> <565BF633.7070701@codeaurora.org>
-Message-ID: <5038cad94fdd2a76e33234d814658e7c.squirrel@www.codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 10 Dec 2015 16:06:10 +0100
+Subject: [PATCH] i2c: allow building emev2 without slave mode again
+In-Reply-To: <201512102224.cVm7Hcp0%fengguang.wu@intel.com>
+References: <201512102224.cVm7Hcp0%fengguang.wu@intel.com>
+Message-ID: <2592093.cGKEcKVqLU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thursday 10 December 2015 22:54:25 kbuild test robot wrote:
+> 
+>    In file included from arch/x86/include/asm/realmode.h:5:0,
+>                     from arch/x86/include/asm/acpi.h:33,
+>                     from arch/x86/include/asm/fixmap.h:19,
+>                     from arch/x86/include/asm/apic.h:12,
+>                     from arch/x86/include/asm/smp.h:12,
+>                     from arch/x86/include/asm/mmzone_64.h:10,
+>                     from arch/x86/include/asm/mmzone.h:4,
+>                     from include/linux/mmzone.h:856,
+>                     from include/linux/gfp.h:5,
+>                     from include/linux/device.h:29,
+>                     from drivers/i2c/busses/i2c-emev2.c:15:
+>    drivers/i2c/busses/i2c-emev2.c: In function 'em_i2c_irq_handler':
+> >> arch/x86/include/asm/io.h:53:3: warning: 'value' may be used uninitialized in this function [-Wmaybe-uninitialized]
+>     { asm volatile("mov" size " %0,%1": :reg (val), \
+>       ^
+>    drivers/i2c/busses/i2c-emev2.c:232:13: note: 'value' was declared here
+>      u8 status, value;
+>                 ^
 
-> []..
->
->>>> +Optional properties:
->>>> +- qcom,sensor-id: List of sensor instances used in a given SoC. A
->>>> TSENS IP can
->>>> +		  have a fixed number of sensors (like 11) but a given SoC can
->>>> +		  use only 5 of these and they might not always the first 5. They
->>>> +		  could be sensors 0, 1, 4, 8 and 9. This property is used to
->>>> +		  describe the subset of the sensors used. If this property is
->>>> +		  missing they are assumed to be the first 'n' sensors numbered
->>>> +		  sequentially in which case the number of sensors defaults to
->>>> +		  the number of slope values.
->>>
->>> Can you please elaborate a bit more on why you could not solve this
->>> using the thermal sensor descriptor id?
->>>
->>>> +
->>>> +Example:
->>>> +tsens: thermal-sensor at 900000 {
->>>> +		compatible = "qcom,msm8916-tsens";
->>>> +		nvmem-cells = <&tsens_caldata>, <&tsens_calsel>;
->>>> +		nvmem-cell-names = "caldata", "calsel";
->>>> +		qcom,tsens-slopes = <3200 3200 3200 3200 3200>;
->>>
->
->
->>>> +		qcom,sensor-id = <0 1 2 4 5>;
->>>> +		#thermal-sensor-cells = <1>;
->>>
->>> How about if you simply make the sensor driver expose all sensors, then
->>> in the
->>> thermal zone descriptor, you pick which sensor to use using the thermal
->>> sensor
->>> descriptor (quoting the binding again):
->
-> Hi Eduardo,
->
-> What you suggested would work, except for that the calibration data in
-> eeprom would
-> be available for only the _subset_ of sensors on the SoC. So the driver in
-> some way would
-> need to know which exact sensors the eeprom data corresponds to.
->
-> If this does not seem like something which needs to be described in DT, I
-> can have the
-> data embedded into the driver so it gets picked based on the right
-> compatibles.
+The warning was indeed introduced by my change, but I think there
+was a preexisting issue:
 
-Hey Eduardo, any thoughts on this?
+The slave_cb callback function is supposed to set the 'value'
+here, but it might return an error not assign the pointer, which
+is something that both the rcar and the emev2 drivers do not handle
+correctly.
 
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
+It might be best to change the callback to return 'void' and not
+allow it to fail. At least the eeprom slave cannot fail anyway,
+and it is the only implementation we have at the moment.
+The inline function would then have to be changed to initialize
+the 'value'.
+
+Alternatively, the  inline could return an error, and both bus
+drivers check for the error before using 'value'.
+
+	Arnd
