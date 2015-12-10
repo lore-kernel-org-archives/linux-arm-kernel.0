@@ -1,10 +1,10 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 10 Dec 2015 09:00:14 +0100
-Subject: [PATCH v4 30/58] mtd: nand: ndfc: use the mtd instance embedded in
+Date: Thu, 10 Dec 2015 09:00:18 +0100
+Subject: [PATCH v4 34/58] mtd: nand: pasemi: use the mtd instance embedded in
  struct nand_chip
 In-Reply-To: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1449734442-18672-31-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1449734442-18672-35-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,124 +12,51 @@ struct nand_chip now embeds an mtd device. Make use of this mtd instance.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
-Changes generated with the following coccinelle script
+ drivers/mtd/nand/pasemi_nand.c | 12 +++++-------
+ 1 file changed, 5 insertions(+), 7 deletions(-)
 
---->8---
-virtual patch
-
-@fix1@
-identifier __chipfield, __mtdfield;
-type __type;
-@@
-(
-	__type {
-		...
-		struct nand_chip __chipfield;
-		...
--		struct mtd_info __mtdfield;
-		...
-	};
-|
-	__type {
-		...
--		struct mtd_info __mtdfield;
-		...
-		struct nand_chip __chipfield;
-		...
-	};
-)
-
-@fix2 depends on fix1@
-identifier fix1.__chipfield, fix1.__mtdfield;
-identifier __subfield;
-type fix1.__type;
-__type *__priv;
-@@
-(
--	__priv->__mtdfield.__subfield
-+	nand_to_mtd(&__priv->__chipfield)->__subfield
-|
--	&(__priv->__mtdfield)
-+	nand_to_mtd(&__priv->__chipfield)
-)
---->8---
----
- drivers/mtd/nand/ndfc.c | 24 +++++++++++++-----------
- 1 file changed, 13 insertions(+), 11 deletions(-)
-
-diff --git a/drivers/mtd/nand/ndfc.c b/drivers/mtd/nand/ndfc.c
-index d8a23b0..3a7168e 100644
---- a/drivers/mtd/nand/ndfc.c
-+++ b/drivers/mtd/nand/ndfc.c
-@@ -37,7 +37,6 @@
- struct ndfc_controller {
- 	struct platform_device *ofdev;
- 	void __iomem *ndfcbase;
--	struct mtd_info mtd;
- 	struct nand_chip chip;
- 	int chip_select;
- 	struct nand_hw_control ndfc_control;
-@@ -147,6 +146,7 @@ static int ndfc_chip_init(struct ndfc_controller *ndfc,
- {
- 	struct device_node *flash_np;
- 	struct nand_chip *chip = &ndfc->chip;
-+	struct mtd_info *mtd = nand_to_mtd(chip);
- 	int ret;
+diff --git a/drivers/mtd/nand/pasemi_nand.c b/drivers/mtd/nand/pasemi_nand.c
+index 0ececac..4dd2985 100644
+--- a/drivers/mtd/nand/pasemi_nand.c
++++ b/drivers/mtd/nand/pasemi_nand.c
+@@ -110,17 +110,15 @@ static int pasemi_nand_probe(struct platform_device *ofdev)
+ 	pr_debug("pasemi_nand at %pR\n", &res);
  
- 	chip->IO_ADDR_R = ndfc->ndfcbase + NDFC_DATA;
-@@ -167,31 +167,32 @@ static int ndfc_chip_init(struct ndfc_controller *ndfc,
- 	chip->ecc.strength = 1;
- 	chip->priv = ndfc;
- 
--	ndfc->mtd.priv = chip;
--	ndfc->mtd.dev.parent = &ndfc->ofdev->dev;
-+	mtd->priv = chip;
-+	mtd->dev.parent = &ndfc->ofdev->dev;
- 
- 	flash_np = of_get_next_child(node, NULL);
- 	if (!flash_np)
- 		return -ENODEV;
- 	nand_set_flash_node(chip, flash_np);
- 
--	ndfc->mtd.name = kasprintf(GFP_KERNEL, "%s.%s",
--			dev_name(&ndfc->ofdev->dev), flash_np->name);
--	if (!ndfc->mtd.name) {
-+	ppdata.of_node = flash_np;
-+	mtd->name = kasprintf(GFP_KERNEL, "%s.%s", dev_name(&ndfc->ofdev->dev),
-+			      flash_np->name);
-+	if (!mtd->name) {
- 		ret = -ENOMEM;
- 		goto err;
+ 	/* Allocate memory for MTD device structure and private data */
+-	pasemi_nand_mtd = kzalloc(sizeof(struct mtd_info) +
+-				  sizeof(struct nand_chip), GFP_KERNEL);
+-	if (!pasemi_nand_mtd) {
++	chip = kzalloc(sizeof(struct nand_chip), GFP_KERNEL);
++	if (!chip) {
+ 		printk(KERN_WARNING
+ 		       "Unable to allocate PASEMI NAND MTD device structure\n");
+ 		err = -ENOMEM;
+ 		goto out;
  	}
  
--	ret = nand_scan(&ndfc->mtd, 1);
-+	ret = nand_scan(mtd, 1);
- 	if (ret)
- 		goto err;
+-	/* Get pointer to private data */
+-	chip = (struct nand_chip *)&pasemi_nand_mtd[1];
++	pasemi_nand_mtd = nand_to_mtd(chip);
  
--	ret = mtd_device_register(&ndfc->mtd, NULL, 0);
-+	ret = mtd_device_register(mtd, NULL, 0);
- 
- err:
- 	of_node_put(flash_np);
- 	if (ret)
--		kfree(ndfc->mtd.name);
-+		kfree(mtd->name);
- 	return ret;
+ 	/* Link the private data with the MTD structure */
+ 	pasemi_nand_mtd->priv = chip;
+@@ -180,7 +178,7 @@ static int pasemi_nand_probe(struct platform_device *ofdev)
+  out_ior:
+ 	iounmap(chip->IO_ADDR_R);
+  out_mtd:
+-	kfree(pasemi_nand_mtd);
++	kfree(chip);
+  out:
+ 	return err;
  }
+@@ -202,7 +200,7 @@ static int pasemi_nand_remove(struct platform_device *ofdev)
+ 	iounmap(chip->IO_ADDR_R);
  
-@@ -258,9 +259,10 @@ static int ndfc_probe(struct platform_device *ofdev)
- static int ndfc_remove(struct platform_device *ofdev)
- {
- 	struct ndfc_controller *ndfc = dev_get_drvdata(&ofdev->dev);
-+	struct mtd_info *mtd = nand_to_mtd(&ndfc->chip);
+ 	/* Free the MTD device structure */
+-	kfree(pasemi_nand_mtd);
++	kfree(chip);
  
--	nand_release(&ndfc->mtd);
--	kfree(ndfc->mtd.name);
-+	nand_release(mtd);
-+	kfree(mtd->name);
+ 	pasemi_nand_mtd = NULL;
  
- 	return 0;
- }
 -- 
 2.1.4
