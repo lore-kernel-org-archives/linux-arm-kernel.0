@@ -1,37 +1,38 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 10 Dec 2015 10:22:41 +0000
-Subject: [PATCH v8 8/4] arm64: don't call C code with el0's fp register
-In-Reply-To: <1449742961-11432-1-git-send-email-james.morse@arm.com>
-References: <1449226948-14251-1-git-send-email-james.morse@arm.com>
- <1449742961-11432-1-git-send-email-james.morse@arm.com>
-Message-ID: <1449742961-11432-4-git-send-email-james.morse@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 10 Dec 2015 10:31:27 +0000
+Subject: [PATCH] arm64: annotate irq off before schedule
+In-Reply-To: <CACVXFVOg5Gr9=EKtZq8306Q7G4oKqsNBV8Gdqaoi1C8DCCgucQ@mail.gmail.com>
+References: <1449645829-1070-1-git-send-email-ming.lei@canonical.com>
+ <20151209105501.GC26759@e104818-lin.cambridge.arm.com>
+ <CACVXFVOg5Gr9=EKtZq8306Q7G4oKqsNBV8Gdqaoi1C8DCCgucQ@mail.gmail.com>
+Message-ID: <20151210103126.GB21134@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On entry from el0, we save all the registers on the kernel stack, and
-restore them before returning. x29 remains unchanged when we call out
-to C code, which will store x29 as the frame-pointer on the stack.
+On Thu, Dec 10, 2015 at 02:04:41PM +0800, Ming Lei wrote:
+> On Wed, Dec 9, 2015 at 6:55 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Wed, Dec 09, 2015 at 03:23:49PM +0800, Ming Lei wrote:
+> >> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> >> index 7ed3d75..4769190 100644
+> >> --- a/arch/arm64/kernel/entry.S
+> >> +++ b/arch/arm64/kernel/entry.S
+> >> @@ -634,6 +634,9 @@ work_pending:
+> >>       bl      do_notify_resume
+> >>       b       ret_to_user
+> >>  work_resched:
+> >> +#ifdef CONFIG_TRACE_IRQFLAGS
+> >> +     bl      trace_hardirqs_off
+> >> +#endif
+> >>       bl      schedule
+> >
+> > I think Will already queued a similar patch, though he hasn't pushed it
+> > out yet.
+> 
+> I tested the misc-patches branch of Will's tree on kerne.org, and looks
+> the locpdep warning still can be observed.
 
-Instead, write 0 into x29 after entry from el0, to avoid any risk of
-tracing into user space.
+That's the wrong tree. Try the arm64 for-next queue:
 
-Signed-off-by: James Morse <james.morse@arm.com>
----
- arch/arm64/kernel/entry.S | 2 ++
- 1 file changed, 2 insertions(+)
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 9a0450344335..8dd009b4cab2 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -93,6 +93,8 @@
- 	and	tsk, tsk, #~(THREAD_SIZE - 1)	// Ensure MDSCR_EL1.SS is clear,
- 	ldr	x19, [tsk, #TI_FLAGS]		// since we can unmask debug
- 	disable_step_tsk x19, x20		// exceptions when scheduling.
-+
-+	mov	x29, xzr			// fp pointed to user-space
- 	.else
- 	add	x21, sp, #S_FRAME_SIZE
- 	.endif
--- 
-2.6.2
+Will
