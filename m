@@ -1,10 +1,10 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 10 Dec 2015 09:00:23 +0100
-Subject: [PATCH v4 39/58] mtd: nand: sh_flctl: use the mtd instance embedded
- in struct nand_chip
+Date: Thu, 10 Dec 2015 09:00:19 +0100
+Subject: [PATCH v4 35/58] mtd: nand: plat: use the mtd instance embedded in
+ struct nand_chip
 In-Reply-To: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1449734442-18672-40-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1449734442-18672-36-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -54,69 +54,74 @@ __type *__priv;
 )
 --->8---
 ---
- drivers/mtd/nand/sh_flctl.c  | 8 ++++----
- include/linux/mtd/sh_flctl.h | 3 +--
- 2 files changed, 5 insertions(+), 6 deletions(-)
+ drivers/mtd/nand/plat_nand.c | 15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/mtd/nand/sh_flctl.c b/drivers/mtd/nand/sh_flctl.c
-index 57dc525..0ec4b04 100644
---- a/drivers/mtd/nand/sh_flctl.c
-+++ b/drivers/mtd/nand/sh_flctl.c
-@@ -607,13 +607,13 @@ static void execmd_read_page_sector(struct mtd_info *mtd, int page_addr)
- 		case FL_REPAIRABLE:
- 			dev_info(&flctl->pdev->dev,
- 				"applied ecc on page 0x%x", page_addr);
--			flctl->mtd.ecc_stats.corrected++;
-+			mtd->ecc_stats.corrected++;
- 			break;
- 		case FL_ERROR:
- 			dev_warn(&flctl->pdev->dev,
- 				"page 0x%x contains corrupted data\n",
- 				page_addr);
--			flctl->mtd.ecc_stats.failed++;
-+			mtd->ecc_stats.failed++;
- 			break;
- 		default:
- 			;
-@@ -1120,8 +1120,8 @@ static int flctl_probe(struct platform_device *pdev)
+diff --git a/drivers/mtd/nand/plat_nand.c b/drivers/mtd/nand/plat_nand.c
+index 06ac6c6..796eb7d 100644
+--- a/drivers/mtd/nand/plat_nand.c
++++ b/drivers/mtd/nand/plat_nand.c
+@@ -20,7 +20,6 @@
+ 
+ struct plat_nand_data {
+ 	struct nand_chip	chip;
+-	struct mtd_info		mtd;
+ 	void __iomem		*io_base;
+ };
+ 
+@@ -31,6 +30,7 @@ static int plat_nand_probe(struct platform_device *pdev)
+ {
+ 	struct platform_nand_data *pdata = dev_get_platdata(&pdev->dev);
+ 	struct plat_nand_data *data;
++	struct mtd_info *mtd;
+ 	struct resource *res;
+ 	const char **part_types;
+ 	int err = 0;
+@@ -58,8 +58,9 @@ static int plat_nand_probe(struct platform_device *pdev)
+ 
+ 	data->chip.priv = &data;
+ 	nand_set_flash_node(&data->chip, pdev->dev.of_node);
+-	data->mtd.priv = &data->chip;
+-	data->mtd.dev.parent = &pdev->dev;
++	mtd = nand_to_mtd(&data->chip);
++	mtd->priv = &data->chip;
++	mtd->dev.parent = &pdev->dev;
+ 
+ 	data->chip.IO_ADDR_R = data->io_base;
+ 	data->chip.IO_ADDR_W = data->io_base;
+@@ -87,21 +88,21 @@ static int plat_nand_probe(struct platform_device *pdev)
  	}
  
- 	platform_set_drvdata(pdev, flctl);
--	flctl_mtd = &flctl->mtd;
- 	nand = &flctl->chip;
-+	flctl_mtd = nand_to_mtd(nand);
- 	nand_set_flash_node(nand, pdev->dev.of_node);
- 	flctl_mtd->priv = nand;
- 	flctl_mtd->dev.parent = &pdev->dev;
-@@ -1178,7 +1178,7 @@ static int flctl_remove(struct platform_device *pdev)
- 	struct sh_flctl *flctl = platform_get_drvdata(pdev);
+ 	/* Scan to find existence of the device */
+-	if (nand_scan(&data->mtd, pdata->chip.nr_chips)) {
++	if (nand_scan(mtd, pdata->chip.nr_chips)) {
+ 		err = -ENXIO;
+ 		goto out;
+ 	}
  
- 	flctl_release_dma(flctl);
--	nand_release(&flctl->mtd);
-+	nand_release(nand_to_mtd(&flctl->chip));
- 	pm_runtime_disable(&pdev->dev);
+ 	part_types = pdata->chip.part_probe_types;
  
- 	return 0;
-diff --git a/include/linux/mtd/sh_flctl.h b/include/linux/mtd/sh_flctl.h
-index 1c28f88..76e3e88 100644
---- a/include/linux/mtd/sh_flctl.h
-+++ b/include/linux/mtd/sh_flctl.h
-@@ -143,7 +143,6 @@ enum flctl_ecc_res_t {
- struct dma_chan;
+-	err = mtd_device_parse_register(&data->mtd, part_types, NULL,
++	err = mtd_device_parse_register(mtd, part_types, NULL,
+ 					pdata->chip.partitions,
+ 					pdata->chip.nr_partitions);
  
- struct sh_flctl {
--	struct mtd_info		mtd;
- 	struct nand_chip	chip;
- 	struct platform_device	*pdev;
- 	struct dev_pm_qos_request pm_qos;
-@@ -186,7 +185,7 @@ struct sh_flctl_platform_data {
+ 	if (!err)
+ 		return err;
  
- static inline struct sh_flctl *mtd_to_flctl(struct mtd_info *mtdinfo)
- {
--	return container_of(mtdinfo, struct sh_flctl, mtd);
-+	return container_of(mtd_to_nand(mtdinfo), struct sh_flctl, chip);
- }
+-	nand_release(&data->mtd);
++	nand_release(mtd);
+ out:
+ 	if (pdata->ctrl.remove)
+ 		pdata->ctrl.remove(pdev);
+@@ -116,7 +117,7 @@ static int plat_nand_remove(struct platform_device *pdev)
+ 	struct plat_nand_data *data = platform_get_drvdata(pdev);
+ 	struct platform_nand_data *pdata = dev_get_platdata(&pdev->dev);
  
- #endif	/* __SH_FLCTL_H__ */
+-	nand_release(&data->mtd);
++	nand_release(nand_to_mtd(&data->chip));
+ 	if (pdata->ctrl.remove)
+ 		pdata->ctrl.remove(pdev);
+ 
 -- 
 2.1.4
