@@ -1,209 +1,36 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 10 Dec 2015 14:18:17 -0600
-Subject: [PATCH v11] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
- PCIe Host Controller
-In-Reply-To: <8520D5D51A55D047800579B09414719825869A85@XAP-PVEXMBX01.xlnx.xilinx.com>
-References: <1448798633-12697-1-git-send-email-bharatku@xilinx.com>
- <20151209231921.GI31930@localhost>
- <8520D5D51A55D047800579B09414719825869A85@XAP-PVEXMBX01.xlnx.xilinx.com>
-Message-ID: <20151210201817.GB367@localhost>
+From: merker@debian.org (Karsten Merker)
+Date: Thu, 10 Dec 2015 21:31:58 +0100
+Subject: [PATCH 0/3] ARM: dts: sun7i: Olimex A20-SOM-EVB: LRADC-keys,
+ MMC3 and typo fix in the sunxi LRADC binding
+Message-ID: <1449779521-754-1-git-send-email-merker@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Marc for irq_dispose_mapping() question]
+Hello,
 
-On Thu, Dec 10, 2015 at 02:10:34PM +0000, Bharat Kumar Gogada wrote:
-> > Subject: Re: [PATCH v11] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
-> > > +static bool nwl_pcie_valid_device(struct pci_bus *bus, unsigned int
-> > > +devfn) {
-> > > +	struct nwl_pcie *pcie = bus->sysdata;
-> > > +
-> > > +	/* Check link,before accessing downstream ports */
-> > > +	if (bus->number != pcie->root_busno) {
-> > > +		if (!nwl_pcie_link_up(pcie, PCIE_USER_LINKUP))
-> > > +			return false;
-> > > +	}
-> > > +
-> > > +	/* Only one device down on each root port */
-> > > +	if (bus->number == pcie->root_busno && devfn > 0)
-> > > +		return false;
-> > > +
-> > > +	/*
-> > > +	 * Do not read more than one device on the bus directly attached
-> > > +	 * to root port.
-> > > +	 */
-> > > +	if (bus->primary == pcie->root_busno && devfn > 0)
-> > 
-> > Why is this?  Do you have some restriction on the PCIe topology below the
-> > Root Port?  If there's a spec-compliant link coming from the Root Port, it
-> > seems like any legal PCIe device could be attached, including a multifunction
-> > device.
-> > 
-> Primary refers to root port itself, this check is not for devices downstream on link. 
+the Olimex A20-SOM-EVB is an evaluation board for the Olimex
+A20-SOM system-on-module. This patchset adds/enables some more
+hardware features in the board dts:
 
-I'm trying to figure out what the difference is between these two
-checks and why you have both of them:
+  - Patch 1 adds support for the LRADC-keys on the baseboard.
 
-> +	if (bus->number == pcie->root_busno && devfn > 0)
-> +	if (bus->primary == pcie->root_busno && devfn > 0)
+  - Patch 2 enables the MMC3 controller to allow use of the
+    full-size SD card socket on the baseboard.
 
-If I understand correctly, pcie->root_busno is the bus number of the
-Root Port device (likely 00).  I think the "bus->number ==
-pcie->root_busno && devfn > 0" check means that the Root Port, e.g.,
-00:00.0, is the only device allowed on bus 00.  Often a Root Complex
-contains several Root Ports and other integrated devices that
-typically are on bus 00.  But in your case, I think you're saying
-there is only the single Root Port and no other devices.
+While adding the LRADC-keys support, I have stumbled over
+a typo in the bindings documentation. Patch 3 fixes that.
 
-I think that first check takes care of everything on bus 00, so I'm
-trying to figure out what the second check is for.  Assume your Root
-Port is device 00:00.0 and it is a bridge to [bus 01-ff].  Then we
-have two pci_bus structs with these values:
+Regards,
+Karsten
 
-  bus->number = 00
-  bus->primary = 00
-  bus->busn_res = [bus 00-ff]
+Karsten Merker (3):
+  ARM: dts: sun7i: Olimex A20-SOM-EVB: Add LRADC keys
+  ARM: dts: sun7i: Olimex A20-SOM-EVB: Enable mmc3 (baseboard SD socket)
+  ARM: dts: sunxi: allwinner,sun4i-a10-lradc-keys binding: typo fix
 
-  bus->number = 01
-  bus->primary = 00
-  bus->busn_res = [bus 01-ff]
+ .../devicetree/bindings/input/sun4i-lradc-keys.txt |  2 +-
+ arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts     | 73 ++++++++++++++++++++++
+ 2 files changed, 74 insertions(+), 1 deletion(-)
 
-Because of the first check, 00:00.0 is the only possible device on bus
-00, and because of the second check, 01:00.0 is the only possible
-device on bus 01.  Therefore, you don't support a multifunction device
-connected to the Root Port.  Right?
-
-> > > +		return false;
-> > > +
-> > > +	return true;
-> > > +}
-> > > + * nwl_setup_sspl - Set Slot Power limit
-> > > + *
-> > > + * @pcie: PCIe port information
-> > > + */
-> > > +static int nwl_setup_sspl(struct nwl_pcie *pcie)
-> > 
-> > This function needs a little explanation because it doesn't really make any
-> > sense when compared with the PCIe spec.  The spec says the Slot Power
-> > Limit Value is HwInit, which means it's supposed to be initialized by firmware
-> > or hardware, and it should be read-only by the time we get here.
-> > I think the value there should reflect parameters of the hardware design; we
-> > wouldn't want a user to write an arbitrary limit that would tell a card it can
-> > pull more power than the slot can supply.
-> > 
-> > But I saw another driver recently (pcie-snpsdev.c) that's doing something
-> > similar, so there must be something else going on here.  In any case, a
-> > comment here about exactly *what* is going on would be much appreciated.
-> 
-> The spec says the following:
-[This is all from PCIe spec r3.0, sec 2.2.8.5]
-
-> The Set_Slot_Power_Limit Message includes a one DW data payload. The
-> data payload is copied from the Slot Capabilities register of the
-> Downstream Port and is written into the Device Capabilities register
-> of the Upstream Port on the other side of the Link. Bits 9:8 of the
-> data payload map to the Slot Power Limit Scale field and bits 7:0
-> map to the Slot Power Limit Value field. Bits 31:10 of the data
-> payload must be set to all 0's by the Transmitter and ignored by the
-> Receiver.
-
-> This Message is sent automatically by the Downstream Port (of a Root
-> Complex or a Switch) when one of the following events occurs:
-> -> On a Configuration Write to the Slot Capabilities register (see
-> Section 7.8.9) when the Data Link Layer reports DL_Up status.
-
-I interpret this as meaning "the *hardware* automatically sends a
-Set_Slot_Power_Limit Message."  There's no mention of software doing
-anything other than the configuration write.
-
-If your hardware doesn't do that, I think it's a defect.  It's fine to
-work around it, but we should have a comment to that effect so people
-don't copy the code to new drivers that don't need it.
-
-It's a little strange that 7.8.9 talks about writing to this register
-when all of its fields are HwInit and supposedly read-only.  I had
-assumed devices would use strapping or implementation-specific
-registers to set the Slot Power values, but maybe some devices use
-direct writes to Slot Capabilities instead.
-
-BTW, I noticed a related lspci bug: it didn't decode the Capture Slot
-Power Limit in Device Capabilities of Endpoints.  I posted a fix for
-that separately.
-
-The Slot Power Limit (in Slot Capabilities) indicates how much power
-the slot can supply to a downstream device.  That's a function of the
-platform design, so it seems like this is something you want to set
-via DT or some other mechanism that knows about the platform.
-Intercepting all config writes and updating it with whatever the
-caller supplies doesn't sound wise.  The value might be coming from
-setpci or some other source with no knowledge of the platform.
-
-> > > +			status = nwl_bridge_readl(pcie, TX_PCIE_MSG)
-> > > +						  & MSG_DONE_BIT;
-> > > +			if (status) {
-> > > +				status = nwl_bridge_readl(pcie,
-> > TX_PCIE_MSG)
-> > > +						  & MSG_DONE_STATUS_BIT;
-
-> > It's not clear to me whether you need to re-read TX_PCIE_MSG here.
-> 
-> MSG_DONE_BIT qualifies MSG_DONE_STATUS_BIT; so value of
-> MSG_DONE_STATUS_BIT is valid only when MSG_DONE_BIT = 1
-
-That doesn't answer the question of whether another read is required.
-In fact, I would argue that if MSG_DONE_STATUS_BIT is only valid when
-MSG_DONE_BIT = 1, you *should* only do one read, because you want to
-capture both bits simultaneously so you know they're consistent, e.g.,
-
-  status = nwl_bridge_readl(pcie, TX_PCIE_MSG);
-  if (status & MSG_DONE_BIT) {
-    if (status & MSG_DONE_STATUS_BIT)
-      ...
-  }
-
-If you read the register twice, you always have to worry about what
-changes MSG_DONE_BIT, and how you guarantee that the second read
-happens before MSG_DONE_BIT changes.
-
-> > > +		}
-> > > +	} while (status);
-> > > +
-> > > +	return retval;
-> > > 
-> > > +	for (i = 0; i < 4; i++) {
-> > > +		irq = irq_find_mapping(pcie->legacy_irq_domain, i + 1);
-> > > +		if (irq > 0)
-> > > +			irq_dispose_mapping(irq);
-> > > +	}
-> > > +	if (pcie->legacy_irq_domain)
-> > > +		irq_domain_remove(pcie->legacy_irq_domain);
-> > 
-> > Something seems wrong here.  I don't know when irq_dispose_mapping() is
-> > required, but it's not used consistently in drivers/pci, and it should be.
-> > Currently, only pci-tegra.c, pcie-xilinx.c, and this new driver use it.  Tegra uses
-> > it only for MSIs, and Xilinx seems to use it for both MSIs and INTx.  What's
-> > right?
-> Its not related to MSI or INTx, its related to domain, for freeing irq descriptor associated with irq.
-
-So are you saying that other drivers in drivers/pci/host should be
-using irq_dispose_mapping(), but they aren't?
-
-Marc, can you chime in here?
-
-> > > +	pcie = devm_kzalloc(&pdev->dev, sizeof(*pcie), GFP_KERNEL);
-> > > +	if (!pcie)
-> > > +		return -ENOMEM;
-> > > +
-> > > +	err = nwl_pcie_parse_dt(pcie, pdev);
-> > > +	if (err) {
-> > > +		dev_err(pcie->dev, "Parsing DT failed\n");
-> > > +		return err;
-> > 
-> > This leaks the nwl_pcie struct you just allocated.  And all the subsequent
-> > error paths do too, of course.
-> > 
-> Its resource-managed kzalloc(), kernel will take care of it.
-
-Heh, devm_*() always trips me up, sorry about that.
-
-Bjorn
+-- 
+2.1.4
