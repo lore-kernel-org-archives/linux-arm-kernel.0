@@ -1,76 +1,88 @@
-From: bhupesh.sharma@freescale.com (Sharma Bhupesh)
-Date: Thu, 10 Dec 2015 12:22:55 +0000
-Subject: [PATCH v2 5/5] can: flexcan: Add support for non RX-FIFO mode
-In-Reply-To: <56696DC8.8020708@pengutronix.de>
-References: <1431603215-25546-1-git-send-email-bhupesh.sharma@freescale.com>
- <1431603215-25546-6-git-send-email-bhupesh.sharma@freescale.com>
- <5554C244.80809@pengutronix.de>
- <BY1PR0301MB130358076C3A5969406DE69182D80@BY1PR0301MB1303.namprd03.prod.outlook.com>
- <BY1PR0301MB130384E91308C49A850DEC4782E90@BY1PR0301MB1303.namprd03.prod.outlook.com>
- <56696DC8.8020708@pengutronix.de>
-Message-ID: <BY1PR0301MB1303A87AF2B3FFBB6CDA90EE82E90@BY1PR0301MB1303.namprd03.prod.outlook.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 10 Dec 2015 13:39:44 +0100
+Subject: [PATCH 1/4] ARM: realview: refresh defconfig
+Message-ID: <1449751184-13424-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Marc Kleine-Budde [mailto:mkl at pengutronix.de]
-> Sent: Thursday, December 10, 2015 5:49 PM
-> 
-> On 12/10/2015 12:05 PM, Sharma Bhupesh wrote:
-> >>> -----Original Message-----
-> >>> From: Marc Kleine-Budde [mailto:mkl at pengutronix.de]
-> >>> Sent: Thursday, May 14, 2015 9:12 PM
-> >>> To: Sharma Bhupesh-B45370; arnd at arndb.de; linux-can at vger.kernel.org
-> >>> Cc: bhupesh.linux at gmail.com; Arora Sakar-B45205; linux-arm-
-> >>> kernel at lists.infradead.org
-> >>> Subject: Re: [PATCH v2 5/5] can: flexcan: Add support for non
-> >>> RX-FIFO mode
-> >>>
-> >>> On 05/14/2015 01:33 PM, Bhupesh Sharma wrote:
-> >>>> This patch adds support for non RX-FIFO (legacy) mode in the
-> >>>> flexcan driver.
-> >>>>
-> >>>> On certain SoCs, the RX-FIFO support might be broken, as a result
-> >>>> we need to fall-back on the legacy (non RX-FIFO) mode to receive
-> >>>> CAN frames.
-> >>>>
-> >>>> Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
-> >>>> Signed-off-by: Sakar Arora <Sakar.Arora@freescale.com>
-> >>>
-> >>> The non FIFO mode doesn't guarantee the order of the incoming
-> >>> frames, not does not even try to...this is not acceptable. I'm
-> >>> currently working on a patch by David Jander that brings in non FIFO
-> >>> mode, but tries to keep the order of the frames.
-> >>
-> >> That is already WIP at our end. V3 will contain the same change.
-> >> If you are already working on it, I don't know how to proceed further
-> >> as we had already v1 of this patchset with the non FIFO mode out
-> >> since a month or so.
-> >
-> > I don't remember seeing a patch from you which supports non-FIFO mode
-> for flexcan IP.
-> > Since we now have Freescale LS1021A chip out in the field on which the
-> > FIFO mode broken, we cannot use the upstream flexcan driver for
-> enabling flexcan IP on these chips.
-> >
-> > Do you still have plans to work on this? Or should I submit my v3 with
-> > in-order reception supported for rx frames.
-> 
-> The problem is, that the current code triggers a ordering issue (at least
-> on the imx6) in non FIFO mode. The frames are not received as the
-> documentation states. If you have access, take a look at "SR#
-> 1-4074792564 : CAN Ordering Issues". It seems the freescale support
-> doesn't have much interest in confirming the issue, nor bringing us in
-> touch with the people who have access to the IP core source to see what's
-> going on.
-> 
-> If we have to rely on the timestamps the next logical step is to add
-> sorting by timestamp to the rx-fifo implementation. I'll send a patch
-> series of the current state.
+This updates the RealView defconfig with the latest Kconfig
+structure.
 
-With my current v3, I see no rx-frame ordering issues atleast on LS1021A.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/configs/realview_defconfig | 19 +++----------------
+ 1 file changed, 3 insertions(+), 16 deletions(-)
 
-I can ask internally about more details on the "SR# 1-4074792564 : CAN Ordering Issues".
-
-Regards,
-Bhupesh
+diff --git a/arch/arm/configs/realview_defconfig b/arch/arm/configs/realview_defconfig
+index d02e9d911bb7..923df191c674 100644
+--- a/arch/arm/configs/realview_defconfig
++++ b/arch/arm/configs/realview_defconfig
+@@ -1,8 +1,6 @@
+-CONFIG_EXPERIMENTAL=y
+ # CONFIG_SWAP is not set
+ CONFIG_SYSVIPC=y
+ CONFIG_LOG_BUF_SHIFT=14
+-CONFIG_SYSFS_DEPRECATED_V2=y
+ CONFIG_SLAB=y
+ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+@@ -29,10 +27,7 @@ CONFIG_IP_PNP_BOOTP=y
+ # CONFIG_IPV6 is not set
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_MTD=y
+-CONFIG_MTD_CONCAT=y
+-CONFIG_MTD_PARTITIONS=y
+ CONFIG_MTD_CMDLINE_PARTS=y
+-CONFIG_MTD_CHAR=y
+ CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_CFI=y
+ CONFIG_MTD_CFI_INTELEXT=y
+@@ -40,17 +35,14 @@ CONFIG_MTD_CFI_AMDSTD=y
+ CONFIG_MTD_PHYSMAP=y
+ CONFIG_ARM_CHARLCD=y
+ CONFIG_NETDEVICES=y
+-CONFIG_SMSC_PHY=y
+-CONFIG_NET_ETHERNET=y
+ CONFIG_SMC91X=y
+ CONFIG_SMSC911X=y
+-# CONFIG_NETDEV_1000 is not set
+-# CONFIG_NETDEV_10000 is not set
++CONFIG_SMSC_PHY=y
+ # CONFIG_SERIO_SERPORT is not set
+ CONFIG_SERIO_AMBAKMI=y
++CONFIG_LEGACY_PTY_COUNT=16
+ CONFIG_SERIAL_AMBA_PL011=y
+ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+-CONFIG_LEGACY_PTY_COUNT=16
+ # CONFIG_HW_RANDOM is not set
+ CONFIG_I2C=y
+ CONFIG_I2C_VERSATILE=y
+@@ -69,7 +61,6 @@ CONFIG_SND_MIXER_OSS=y
+ CONFIG_SND_PCM_OSS=y
+ # CONFIG_SND_DRIVERS is not set
+ CONFIG_SND_ARMAACI=y
+-# CONFIG_HID_SUPPORT is not set
+ # CONFIG_USB_SUPPORT is not set
+ CONFIG_MMC=y
+ CONFIG_MMC_ARMMMCI=y
+@@ -86,17 +77,13 @@ CONFIG_VFAT_FS=y
+ CONFIG_TMPFS=y
+ CONFIG_CRAMFS=y
+ CONFIG_NFS_FS=y
+-CONFIG_NFS_V3=y
+ CONFIG_ROOT_NFS=y
+ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_ISO8859_1=y
+-CONFIG_MAGIC_SYSRQ=y
+ CONFIG_DEBUG_FS=y
++CONFIG_MAGIC_SYSRQ=y
+ CONFIG_DEBUG_KERNEL=y
+ # CONFIG_SCHED_DEBUG is not set
+-# CONFIG_RCU_CPU_STALL_DETECTOR is not set
+ # CONFIG_FTRACE is not set
+ CONFIG_DEBUG_USER=y
+-CONFIG_DEBUG_ERRORS=y
+-# CONFIG_CRYPTO_ANSI_CPRNG is not set
+ # CONFIG_CRYPTO_HW is not set
+-- 
+2.4.3
