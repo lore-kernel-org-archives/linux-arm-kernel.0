@@ -1,87 +1,43 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 11 Dec 2015 09:19:09 -0600
-Subject: [PATCH v3 2/7] clk: hisilicon: add dt-binding document for
- Hi3519 CRG
-In-Reply-To: <1449819921-18464-3-git-send-email-xuejiancheng@huawei.com>
-References: <1449819921-18464-1-git-send-email-xuejiancheng@huawei.com>
- <1449819921-18464-3-git-send-email-xuejiancheng@huawei.com>
-Message-ID: <20151211151909.GA21272@rob-hp-laptop>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Fri, 11 Dec 2015 17:18:46 +0200
+Subject: [PATCH V6 21/26] coresight: etm-perf: new PMU driver for ETM
+ tracers
+In-Reply-To: <1449176702-13213-22-git-send-email-mathieu.poirier@linaro.org>
+References: <1449176702-13213-1-git-send-email-mathieu.poirier@linaro.org>
+ <1449176702-13213-22-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <87zixhau95.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 11, 2015 at 03:45:16PM +0800, Jiancheng Xue wrote:
-> add dt-binding document for Hi3519 CRG block
-> 
-> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
-> ---
->  .../devicetree/bindings/clock/hi3519-crg.txt       | 46 ++++++++++++++++++++++
->  1 file changed, 46 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/hi3519-crg.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/hi3519-crg.txt b/Documentation/devicetree/bindings/clock/hi3519-crg.txt
-> new file mode 100644
-> index 0000000..e0d30a4
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/hi3519-crg.txt
-> @@ -0,0 +1,46 @@
-> +* Hisilicon Hi3519 Clock and Reset Generator(CRG)
-> +
-> +The Hi3519 CRG module provides clock and reset signals to various
-> +controllers within the SoC.
-> +
-> +This binding uses the following bindings:
-> +    Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +    Documentation/devicetree/bindings/reset/reset.txt
-> +
-> +Required Properties:
-> +
-> +- compatible: should be one of the following.
-> +  - "hisilicon,hi3519-crg" - controller compatible with Hi3519 SoC.
-> +
-> +- reg: physical base address of the controller and length of memory mapped
-> +  region.
-> +
-> +- #clock-cells: should be 1.
-> +
-> +Each clock is assigned an identifier and client nodes use this identifier
-> +to specify the clock which they consume.
-> +
-> +All these identifier could be found in <dt-bindings/clock/hi3519-clock.h>.
+Mathieu Poirier <mathieu.poirier@linaro.org> writes:
 
-This header should be part of this patch.
-
+> +static void etm_event_start(struct perf_event *event, int flags)
+> +{
+> +	int cpu = smp_processor_id();
+> +	struct etm_cpu_data *cpu_data;
+> +	struct etm_event_data *event_data;
+> +	struct perf_output_handle *handle = this_cpu_ptr(&ctx_handle);
+> +	struct coresight_device *sink, *csdev = per_cpu(csdev_src, cpu);
 > +
-> +- #reset-cells: should be 2.
+> +	if (!csdev)
+> +		goto fail;
 > +
-> +A reset signal can be controlled by writing a bit register in the CRG module.
-> +The reset specifier consists of two cells. The first cell represents the
-> +register offset relative to the base address. The second cell represents the
-> +bit index in the register.
-> +
-> +Example: CRG nodes
-> +CRG: clock-reset-controller {
+> +	/*
+> +	 * Deal with the ring buffer API and get a handle on the
+> +	 * session's information.
+> +	 */
+> +	event_data = perf_aux_output_begin(handle, event);
+> +	if (WARN_ON_ONCE(!event_data))
+> +		goto fail;
 
-clock-reset-controller at 12010000
+Hmm, perf_aux_output_begin() returning NULL is not WARN-worthy and is
+actually a normal situation, for example, if the buffer is not
+configured yet (which like I suggested in the other email should be a
+separate thing from the *event* configuration).
 
-> +	compatible = "hisilicon,hi3519-crg";
-> +        reg = <0x12010000 0x10000>;
-> +        #clock-cells = <1>;
-> +        #reset-cells = <2>;
-> +};
-> +
-> +Example: consumer nodes
-> +i2c0: i2c at 0x12110000 {
+perf_aux_output_begin() will also return NULL if there's no room in the
+buffer.
 
-Drop '0x'
-
-> +	compatible = "hisilicon,hi3519-i2c";
-> +        reg = <0x12110000 0x1000>;
-> +        clocks = <&CRG HI3519_I2C0_RST>;*/
-> +        resets = <&CRG 0xE4 0>;
-
-lowercase hex please
-
-> +};
-> -- 
-> 1.9.1
-> 
+Regards,
+--
+Alex
