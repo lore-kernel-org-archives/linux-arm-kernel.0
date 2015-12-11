@@ -1,492 +1,286 @@
-From: dwoods@ezchip.com (David Woods)
-Date: Fri, 11 Dec 2015 16:02:24 -0500
-Subject: [PATCH v4] arm64: Add support for PTE contiguous bit.
-Message-ID: <1449867744-8130-1-git-send-email-dwoods@ezchip.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 11 Dec 2015 22:04:07 +0100
+Subject: [PATCH v3 05/22] arm64: KVM: Implement vgic-v3 save/restore
+In-Reply-To: <1449485618-9443-6-git-send-email-marc.zyngier@arm.com>
+References: <1449485618-9443-1-git-send-email-marc.zyngier@arm.com>
+ <1449485618-9443-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20151211210407.GF27689@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arm64 MMU supports a Contiguous bit which is a hint that the TTE
-is one of a set of contiguous entries which can be cached in a single
-TLB entry.  Supporting this bit adds new intermediate huge page sizes.
+On Mon, Dec 07, 2015 at 10:53:21AM +0000, Marc Zyngier wrote:
+> Implement the vgic-v3 save restore as a direct translation of
+> the assembly code version.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/kvm/hyp/Makefile     |   1 +
+>  arch/arm64/kvm/hyp/hyp.h        |   3 +
+>  arch/arm64/kvm/hyp/vgic-v3-sr.c | 226 ++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 230 insertions(+)
+>  create mode 100644 arch/arm64/kvm/hyp/vgic-v3-sr.c
+> 
+> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+> index d8d5968..d1e38ce 100644
+> --- a/arch/arm64/kvm/hyp/Makefile
+> +++ b/arch/arm64/kvm/hyp/Makefile
+> @@ -3,3 +3,4 @@
+>  #
+>  
+>  obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
+> +obj-$(CONFIG_KVM_ARM_HOST) += vgic-v3-sr.o
+> diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
+> index ac63553..5759f9f 100644
+> --- a/arch/arm64/kvm/hyp/hyp.h
+> +++ b/arch/arm64/kvm/hyp/hyp.h
+> @@ -32,5 +32,8 @@
+>  void __vgic_v2_save_state(struct kvm_vcpu *vcpu);
+>  void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
+>  
+> +void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
+> +void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
+> +
+>  #endif /* __ARM64_KVM_HYP_H__ */
+>  
+> diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+> new file mode 100644
+> index 0000000..78d05f3
+> --- /dev/null
+> +++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+> @@ -0,0 +1,226 @@
+> +/*
+> + * Copyright (C) 2012-2015 - ARM Ltd
+> + * Author: Marc Zyngier <marc.zyngier@arm.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/compiler.h>
+> +#include <linux/irqchip/arm-gic-v3.h>
+> +#include <linux/kvm_host.h>
+> +
+> +#include <asm/kvm_mmu.h>
+> +
+> +#include "hyp.h"
+> +
+> +#define vtr_to_max_lr_idx(v)		((v) & 0xf)
+> +#define vtr_to_nr_pri_bits(v)		(((u32)(v) >> 29) + 1)
+> +
+> +#define read_gicreg(r)							\
+> +	({								\
+> +		u64 reg;						\
+> +		asm volatile("mrs_s %0, " __stringify(r) : "=r" (reg));	\
+> +		reg;							\
+> +	})
+> +
+> +#define write_gicreg(v,r)						\
+> +	do {								\
+> +		u64 __val = (v);					\
+> +		asm volatile("msr_s " __stringify(r) ", %0" : : "r" (__val));\
+> +	} while (0)
+> +
+> +/* vcpu is already in the HYP VA space */
+> +void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+> +{
+> +	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
+> +	u64 val;
+> +	u32 max_lr_idx, nr_pri_bits;
+> +
+> +	/*
+> +	 * Make sure stores to the GIC via the memory mapped interface
+> +	 * are now visible to the system register interface.
+> +	 */
+> +	dsb(st);
+> +
+> +	cpu_if->vgic_vmcr  = read_gicreg(ICH_VMCR_EL2);
+> +	cpu_if->vgic_misr  = read_gicreg(ICH_MISR_EL2);
+> +	cpu_if->vgic_eisr  = read_gicreg(ICH_EISR_EL2);
+> +	cpu_if->vgic_elrsr = read_gicreg(ICH_ELSR_EL2);
+> +
+> +	write_gicreg(0, ICH_HCR_EL2);
+> +	val = read_gicreg(ICH_VTR_EL2);
+> +	max_lr_idx = vtr_to_max_lr_idx(val);
+> +	nr_pri_bits = vtr_to_nr_pri_bits(val);
+> +
+> +	switch (max_lr_idx) {
+> +	case 15:
+> +		cpu_if->vgic_lr[VGIC_V3_LR_INDEX(15)] = read_gicreg(ICH_LR15_EL2);
+> +	case 14:
+> +		cpu_if->vgic_lr[VGIC_V3_LR_INDEX(14)] = read_gicreg(ICH_LR14_EL2);
+> +	case 13:
+> +		cpu_if->vgic_lr[VGIC_V3_LR_INDEX(13)] = read_gicreg(ICH_LR13_EL2);
+> +	case 12:
+> +		cpu_if->vgic_lr[VGIC_V3_LR_INDEX(12)] = read_gicreg(ICH_LR12_EL2);
+> +	case 11:
+> +		cpu_if->vgic_lr[VGIC_V3_LR_INDEX(11)] = read_gicreg(ICH_LR11_EL2);
+> +	case 10:
+> +		cpu_if->vgic_lr[VGIC_V3_LR_INDEX(10)] = read_gicreg(ICH_LR10_EL2);
+> +	case 9:
+> +		cpu_if->vgic_lr[VGIC_V3_LR_INDEX(9)] = read_gicreg(ICH_LR9_EL2);
+> +	case 8:
+> +		cpu_if->vgic_lr[VGIC_V3_LR_INDEX(8)] = read_gicreg(ICH_LR8_EL2);
+> +	case 7:
+> +		cpu_if->vgic_lr[VGIC_V3_LR_INDEX(7)] = read_gicreg(ICH_LR7_EL2);
+> +	case 6:
+> +		cpu_if->vgic_lr[VGIC_V3_LR_INDEX(6)] = read_gicreg(ICH_LR6_EL2);
+> +	case 5:
+> +		cpu_if->vgic_lr[VGIC_V3_LR_INDEX(5)] = read_gicreg(ICH_LR5_EL2);
+> +	case 4:
+> +		cpu_if->vgic_lr[VGIC_V3_LR_INDEX(4)] = read_gicreg(ICH_LR4_EL2);
+> +	case 3:
+> +		cpu_if->vgic_lr[VGIC_V3_LR_INDEX(3)] = read_gicreg(ICH_LR3_EL2);
+> +	case 2:
+> +		cpu_if->vgic_lr[VGIC_V3_LR_INDEX(2)] = read_gicreg(ICH_LR2_EL2);
+> +	case 1:
+> +		cpu_if->vgic_lr[VGIC_V3_LR_INDEX(1)] = read_gicreg(ICH_LR1_EL2);
+> +	case 0:
+> +		cpu_if->vgic_lr[VGIC_V3_LR_INDEX(0)] = read_gicreg(ICH_LR0_EL2);
+> +	}
+> +
+> +	switch (nr_pri_bits) {
+> +	case 7:
+> +		cpu_if->vgic_ap0r[3] = read_gicreg(ICH_AP0R3_EL2);
+> +		cpu_if->vgic_ap0r[2] = read_gicreg(ICH_AP0R2_EL2);
+> +	case 6:
+> +		cpu_if->vgic_ap0r[1] = read_gicreg(ICH_AP0R1_EL2);
+> +	default:
+> +		cpu_if->vgic_ap0r[0] = read_gicreg(ICH_AP0R0_EL2);
+> +	}
+> +
+> +	switch (nr_pri_bits) {
+> +	case 7:
+> +		cpu_if->vgic_ap1r[3] = read_gicreg(ICH_AP1R3_EL2);
+> +		cpu_if->vgic_ap1r[2] = read_gicreg(ICH_AP1R2_EL2);
+> +	case 6:
+> +		cpu_if->vgic_ap1r[1] = read_gicreg(ICH_AP1R1_EL2);
+> +	default:
+> +		cpu_if->vgic_ap1r[0] = read_gicreg(ICH_AP1R0_EL2);
+> +	}
+> +
+> +	val = read_gicreg(ICC_SRE_EL2);
+> +	write_gicreg(val | ICC_SRE_EL2_ENABLE, ICC_SRE_EL2);
+> +	isb(); /* Make sure ENABLE is set at EL2 before setting SRE at EL1 */
+> +	write_gicreg(1, ICC_SRE_EL1);
+> +}
+> +
+> +void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+> +{
+> +	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
+> +	u64 val;
+> +	u32 max_lr_idx, nr_pri_bits;
+> +
+> +	/*
+> +	 * VFIQEn is RES1 if ICC_SRE_EL1.SRE is 1. This causes a
+> +	 * Group0 interrupt (as generated in GICv2 mode) to be
+> +	 * delivered as a FIQ to the guest, with potentially fatal
+> +	 * consequences. So we must make sure that ICC_SRE_EL1 has
+> +	 * been actually programmed with the value we want before
+> +	 * starting to mess with the rest of the GIC.
+> +	 */
+> +	write_gicreg(cpu_if->vgic_sre, ICC_SRE_EL1);
+> +	isb();
+> +
+> +	write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
+> +	write_gicreg(cpu_if->vgic_vmcr, ICH_VMCR_EL2);
+> +
+> +	val = read_gicreg(ICH_VTR_EL2);
+> +	max_lr_idx = vtr_to_max_lr_idx(val);
+> +	nr_pri_bits = vtr_to_nr_pri_bits(val);
+> +
+> +	switch (nr_pri_bits) {
+> +	case 7:
+> +		 write_gicreg(cpu_if->vgic_ap1r[3], ICH_AP1R3_EL2);
+> +		 write_gicreg(cpu_if->vgic_ap1r[2], ICH_AP1R2_EL2);
+> +	case 6:
+> +		 write_gicreg(cpu_if->vgic_ap1r[1], ICH_AP1R1_EL2);
+> +	default:
+> +		 write_gicreg(cpu_if->vgic_ap1r[0], ICH_AP1R0_EL2);
+> +	}	 	                           
+> +		 	                           
 
-The set of huge page sizes available depends on the base page size.
-Without using contiguous pages the huge page sizes are as follows.
+white space issues
 
- 4KB:   2MB  1GB
-64KB: 512MB
+> +	switch (nr_pri_bits) {
+> +	case 7:
+> +		 write_gicreg(cpu_if->vgic_ap0r[3], ICH_AP0R3_EL2);
+> +		 write_gicreg(cpu_if->vgic_ap0r[2], ICH_AP0R2_EL2);
+> +	case 6:
+> +		 write_gicreg(cpu_if->vgic_ap0r[1], ICH_AP0R1_EL2);
+> +	default:
+> +		 write_gicreg(cpu_if->vgic_ap0r[0], ICH_AP0R0_EL2);
+> +	}
+> +
+> +	switch (max_lr_idx) {
+> +	case 15:
+> +		write_gicreg(cpu_if->vgic_lr[VGIC_V3_LR_INDEX(15)], ICH_LR15_EL2);
+> +	case 14:
+> +		write_gicreg(cpu_if->vgic_lr[VGIC_V3_LR_INDEX(14)], ICH_LR14_EL2);
+> +	case 13:
+> +		write_gicreg(cpu_if->vgic_lr[VGIC_V3_LR_INDEX(13)], ICH_LR13_EL2);
+> +	case 12:
+> +		write_gicreg(cpu_if->vgic_lr[VGIC_V3_LR_INDEX(12)], ICH_LR12_EL2);
+> +	case 11:
+> +		write_gicreg(cpu_if->vgic_lr[VGIC_V3_LR_INDEX(11)], ICH_LR11_EL2);
+> +	case 10:
+> +		write_gicreg(cpu_if->vgic_lr[VGIC_V3_LR_INDEX(10)], ICH_LR10_EL2);
+> +	case 9:
+> +		write_gicreg(cpu_if->vgic_lr[VGIC_V3_LR_INDEX(9)], ICH_LR9_EL2);
+> +	case 8:
+> +		write_gicreg(cpu_if->vgic_lr[VGIC_V3_LR_INDEX(8)], ICH_LR8_EL2);
+> +	case 7:
+> +		write_gicreg(cpu_if->vgic_lr[VGIC_V3_LR_INDEX(7)], ICH_LR7_EL2);
+> +	case 6:
+> +		write_gicreg(cpu_if->vgic_lr[VGIC_V3_LR_INDEX(6)], ICH_LR6_EL2);
+> +	case 5:
+> +		write_gicreg(cpu_if->vgic_lr[VGIC_V3_LR_INDEX(5)], ICH_LR5_EL2);
+> +	case 4:
+> +		write_gicreg(cpu_if->vgic_lr[VGIC_V3_LR_INDEX(4)], ICH_LR4_EL2);
+> +	case 3:
+> +		write_gicreg(cpu_if->vgic_lr[VGIC_V3_LR_INDEX(3)], ICH_LR3_EL2);
+> +	case 2:
+> +		write_gicreg(cpu_if->vgic_lr[VGIC_V3_LR_INDEX(2)], ICH_LR2_EL2);
+> +	case 1:
+> +		write_gicreg(cpu_if->vgic_lr[VGIC_V3_LR_INDEX(1)], ICH_LR1_EL2);
+> +	case 0:
+> +		write_gicreg(cpu_if->vgic_lr[VGIC_V3_LR_INDEX(0)], ICH_LR0_EL2);
+> +	}
+> +
+> +	/*
+> +	 * Ensures that the above will have reached the
+> +	 * (re)distributors. This ensure the guest will read the
 
-With a 4KB granule, the contiguous bit groups together sets of 16 pages
-and with a 64KB granule it groups sets of 32 pages.  This enables two new
-huge page sizes in each case, so that the full set of available sizes
-is as follows.
+You fixed the wrong instance of 'ensure' ;)
 
- 4KB:  64KB   2MB  32MB  1GB
-64KB:   2MB 512MB  16GB
+> +	 * correct values from the memory-mapped interface.
+> +	 */
+> +	isb();
+> +	dsb(sy);
+> +
+> +	/*
+> +	 * Prevent the guest from touching the GIC system registers if
+> +	 * SRE isn't enabled for GICv3 emulation.
+> +	 */
+> +	if (!cpu_if->vgic_sre) {
+> +		write_gicreg(read_gicreg(ICC_SRE_EL2) & ~ICC_SRE_EL2_ENABLE,
+> +			     ICC_SRE_EL2);
+> +	}
+> +}
+> +
+> +u64 __hyp_text __vgic_v3_read_ich_vtr_el2(void)
+> +{
+> +	return read_gicreg(ICH_VTR_EL2);
+> +}
 
-If a 16KB granule is used then the contiguous bit groups 128 pages
-at the PTE level and 32 pages at the PMD level.
+Otherwise:
 
-If the base page size is set to 64KB then 2MB pages are enabled by
-default.  It is possible in the future to make 2MB the default huge
-page size for both 4KB and 64KB granules.
-
-Signed-off-by: David Woods <dwoods@ezchip.com>
-Reviewed-by: Chris Metcalf <cmetcalf@ezchip.com>
----
-
-This version of the patch addresses all the comments I've received 
-to date and is passing the libhugetlbfs tests.  Catalin, assuming 
-there are no further comments, can this be considered for the arm64 
-next tree?
-
- arch/arm64/Kconfig                     |   3 -
- arch/arm64/include/asm/hugetlb.h       |  44 ++----
- arch/arm64/include/asm/pgtable-hwdef.h |  18 ++-
- arch/arm64/include/asm/pgtable.h       |  10 +-
- arch/arm64/mm/hugetlbpage.c            | 267 ++++++++++++++++++++++++++++++++-
- include/linux/hugetlb.h                |   2 -
- 6 files changed, 306 insertions(+), 38 deletions(-)
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 4876459..ffa3c54 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -530,9 +530,6 @@ config HW_PERF_EVENTS
- config SYS_SUPPORTS_HUGETLBFS
- 	def_bool y
- 
--config ARCH_WANT_GENERAL_HUGETLB
--	def_bool y
--
- config ARCH_WANT_HUGE_PMD_SHARE
- 	def_bool y if ARM64_4K_PAGES || (ARM64_16K_PAGES && !ARM64_VA_BITS_36)
- 
-diff --git a/arch/arm64/include/asm/hugetlb.h b/arch/arm64/include/asm/hugetlb.h
-index bb4052e..bbc1e35 100644
---- a/arch/arm64/include/asm/hugetlb.h
-+++ b/arch/arm64/include/asm/hugetlb.h
-@@ -26,36 +26,7 @@ static inline pte_t huge_ptep_get(pte_t *ptep)
- 	return *ptep;
- }
- 
--static inline void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
--				   pte_t *ptep, pte_t pte)
--{
--	set_pte_at(mm, addr, ptep, pte);
--}
--
--static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
--					 unsigned long addr, pte_t *ptep)
--{
--	ptep_clear_flush(vma, addr, ptep);
--}
--
--static inline void huge_ptep_set_wrprotect(struct mm_struct *mm,
--					   unsigned long addr, pte_t *ptep)
--{
--	ptep_set_wrprotect(mm, addr, ptep);
--}
- 
--static inline pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
--					    unsigned long addr, pte_t *ptep)
--{
--	return ptep_get_and_clear(mm, addr, ptep);
--}
--
--static inline int huge_ptep_set_access_flags(struct vm_area_struct *vma,
--					     unsigned long addr, pte_t *ptep,
--					     pte_t pte, int dirty)
--{
--	return ptep_set_access_flags(vma, addr, ptep, pte, dirty);
--}
- 
- static inline void hugetlb_free_pgd_range(struct mmu_gather *tlb,
- 					  unsigned long addr, unsigned long end,
-@@ -97,4 +68,19 @@ static inline void arch_clear_hugepage_flags(struct page *page)
- 	clear_bit(PG_dcache_clean, &page->flags);
- }
- 
-+extern pte_t arch_make_huge_pte(pte_t entry, struct vm_area_struct *vma,
-+				struct page *page, int writable);
-+#define arch_make_huge_pte arch_make_huge_pte
-+extern void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
-+			    pte_t *ptep, pte_t pte);
-+extern int huge_ptep_set_access_flags(struct vm_area_struct *vma,
-+				      unsigned long addr, pte_t *ptep,
-+				      pte_t pte, int dirty);
-+extern pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
-+				     unsigned long addr, pte_t *ptep);
-+extern void huge_ptep_set_wrprotect(struct mm_struct *mm,
-+				    unsigned long addr, pte_t *ptep);
-+extern void huge_ptep_clear_flush(struct vm_area_struct *vma,
-+				  unsigned long addr, pte_t *ptep);
-+
- #endif /* __ASM_HUGETLB_H */
-diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-index d6739e8..5c25b83 100644
---- a/arch/arm64/include/asm/pgtable-hwdef.h
-+++ b/arch/arm64/include/asm/pgtable-hwdef.h
-@@ -90,7 +90,23 @@
- /*
-  * Contiguous page definitions.
-  */
--#define CONT_PTES		(_AC(1, UL) << CONT_SHIFT)
-+#ifdef CONFIG_ARM64_64K_PAGES
-+#define CONT_PTE_SHIFT		5
-+#define CONT_PMD_SHIFT		5
-+#elif defined(CONFIG_ARM64_16K_PAGES)
-+#define CONT_PTE_SHIFT		7
-+#define CONT_PMD_SHIFT		5
-+#else
-+#define CONT_PTE_SHIFT		4
-+#define CONT_PMD_SHIFT		4
-+#endif
-+
-+#define CONT_PTES		(1 << CONT_PTE_SHIFT)
-+#define CONT_PTE_SIZE		(CONT_PTES * PAGE_SIZE)
-+#define CONT_PTE_MASK		(~(CONT_PTE_SIZE - 1))
-+#define CONT_PMDS		(1 << CONT_PMD_SHIFT)
-+#define CONT_PMD_SIZE		(CONT_PMDS * PMD_SIZE)
-+#define CONT_PMD_MASK		(~(CONT_PMD_SIZE - 1))
- /* the the numerical offset of the PTE within a range of CONT_PTES */
- #define CONT_RANGE_OFFSET(addr) (((addr)>>PAGE_SHIFT)&(CONT_PTES-1))
- 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 450b355..35a318c 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -227,7 +227,8 @@ static inline pte_t pte_mkspecial(pte_t pte)
- 
- static inline pte_t pte_mkcont(pte_t pte)
- {
--	return set_pte_bit(pte, __pgprot(PTE_CONT));
-+	pte = set_pte_bit(pte, __pgprot(PTE_CONT));
-+	return set_pte_bit(pte, __pgprot(PTE_TYPE_PAGE));
- }
- 
- static inline pte_t pte_mknoncont(pte_t pte)
-@@ -235,6 +236,11 @@ static inline pte_t pte_mknoncont(pte_t pte)
- 	return clear_pte_bit(pte, __pgprot(PTE_CONT));
- }
- 
-+static inline pmd_t pmd_mkcont(pmd_t pmd)
-+{
-+	return __pmd(pmd_val(pmd) | PMD_SECT_CONT);
-+}
-+
- static inline void set_pte(pte_t *ptep, pte_t pte)
- {
- 	*ptep = pte;
-@@ -304,7 +310,7 @@ static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
- /*
-  * Hugetlb definitions.
-  */
--#define HUGE_MAX_HSTATE		2
-+#define HUGE_MAX_HSTATE		4
- #define HPAGE_SHIFT		PMD_SHIFT
- #define HPAGE_SIZE		(_AC(1, UL) << HPAGE_SHIFT)
- #define HPAGE_MASK		(~(HPAGE_SIZE - 1))
-diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index 383b03f..39a5e67 100644
---- a/arch/arm64/mm/hugetlbpage.c
-+++ b/arch/arm64/mm/hugetlbpage.c
-@@ -41,17 +41,282 @@ int pud_huge(pud_t pud)
- #endif
- }
- 
-+static int find_num_contig(struct mm_struct *mm, unsigned long addr,
-+			   pte_t *ptep, pte_t pte, size_t *pgsize)
-+{
-+	pgd_t *pgd = pgd_offset(mm, addr);
-+	pud_t *pud;
-+	pmd_t *pmd;
-+
-+	if (!pte_cont(pte))
-+		return 1;
-+	if (!pgd_present(*pgd)) {
-+		VM_BUG_ON(!pgd_present(*pgd));
-+		return 1;
-+	}
-+	pud = pud_offset(pgd, addr);
-+	if (!pud_present(*pud)) {
-+		VM_BUG_ON(!pud_present(*pud));
-+		return 1;
-+	}
-+	pmd = pmd_offset(pud, addr);
-+	if (!pmd_present(*pmd)) {
-+		VM_BUG_ON(!pmd_present(*pmd));
-+		return 1;
-+	}
-+	if ((pte_t *)pmd == ptep) {
-+		*pgsize = PMD_SIZE;
-+		return CONT_PMDS;
-+	}
-+	*pgsize = PAGE_SIZE;
-+	return CONT_PTES;
-+}
-+
-+void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
-+			    pte_t *ptep, pte_t pte)
-+{
-+	size_t pgsize;
-+	int i;
-+	int ncontig = find_num_contig(mm, addr, ptep, pte, &pgsize);
-+	unsigned long pfn;
-+	pgprot_t hugeprot;
-+
-+	if (ncontig == 1) {
-+		set_pte_at(mm, addr, ptep, pte);
-+		return;
-+	}
-+
-+	pfn = pte_pfn(pte);
-+	hugeprot = __pgprot(pte_val(pfn_pte(pfn, 0)) ^ pte_val(pte));
-+	for (i = 0; i < ncontig; i++) {
-+		pr_debug("%s: set pte %p to 0x%llx\n", __func__, ptep,
-+			 pfn_pte(pfn, hugeprot));
-+		set_pte_at(mm, addr, ptep, pfn_pte(pfn, hugeprot));
-+		ptep++;
-+		pfn += pgsize >> PAGE_SHIFT;
-+		addr += pgsize;
-+	}
-+}
-+
-+pte_t *huge_pte_alloc(struct mm_struct *mm,
-+		      unsigned long addr, unsigned long sz)
-+{
-+	pgd_t *pgd;
-+	pud_t *pud;
-+	pte_t *pte = NULL;
-+
-+	pr_debug("%s: addr:0x%lx sz:0x%lx\n", __func__, addr, sz);
-+	pgd = pgd_offset(mm, addr);
-+	pud = pud_alloc(mm, pgd, addr);
-+	if (!pud)
-+		return NULL;
-+
-+	if (sz == PUD_SIZE) {
-+		pte = (pte_t *)pud;
-+	} else if (sz == (PAGE_SIZE * CONT_PTES)) {
-+		pmd_t *pmd = pmd_alloc(mm, pud, addr);
-+
-+		WARN_ON(addr & (sz - 1));
-+		pte = pte_alloc_map(mm, NULL, pmd, addr);
-+	} else if (sz == PMD_SIZE) {
-+		if (IS_ENABLED(CONFIG_ARCH_WANT_HUGE_PMD_SHARE) &&
-+		    pud_none(*pud))
-+			pte = huge_pmd_share(mm, addr, pud);
-+		else
-+			pte = (pte_t *)pmd_alloc(mm, pud, addr);
-+	} else if (sz == (PMD_SIZE * CONT_PMDS)) {
-+		pmd_t *pmd;
-+
-+		pmd = pmd_alloc(mm, pud, addr);
-+		WARN_ON(addr & (sz - 1));
-+		return (pte_t *)pmd;
-+	}
-+
-+	pr_debug("%s: addr:0x%lx sz:0x%lx ret pte=%p/0x%llx\n", __func__, addr,
-+	       sz, pte, pte_val(*pte));
-+	return pte;
-+}
-+
-+pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
-+{
-+	pgd_t *pgd;
-+	pud_t *pud;
-+	pmd_t *pmd = NULL;
-+	pte_t *pte = NULL;
-+
-+	pgd = pgd_offset(mm, addr);
-+	pr_debug("%s: addr:0x%lx pgd:%p\n", __func__, addr, pgd);
-+	if (!pgd_present(*pgd))
-+		return NULL;
-+	pud = pud_offset(pgd, addr);
-+	if (!pud_present(*pud))
-+		return NULL;
-+
-+	if (pud_huge(*pud))
-+		return (pte_t *)pud;
-+	pmd = pmd_offset(pud, addr);
-+	if (!pmd_present(*pmd))
-+		return NULL;
-+
-+	if (pte_cont(pmd_pte(*pmd))) {
-+		pmd = pmd_offset(
-+			pud, (addr & CONT_PMD_MASK));
-+		return (pte_t *)pmd;
-+	}
-+	if (pmd_huge(*pmd))
-+		return (pte_t *)pmd;
-+	pte = pte_offset_kernel(pmd, addr);
-+	if (pte_present(*pte) && pte_cont(*pte)) {
-+		pte = pte_offset_kernel(
-+			pmd, (addr & CONT_PTE_MASK));
-+	}
-+	return pte;
-+}
-+
-+pte_t arch_make_huge_pte(pte_t entry, struct vm_area_struct *vma,
-+			 struct page *page, int writable)
-+{
-+	size_t pagesize = huge_page_size(hstate_vma(vma));
-+
-+	if (pagesize == CONT_PTE_SIZE) {
-+		entry = pte_mkcont(entry);
-+	} else if (pagesize == CONT_PMD_SIZE) {
-+		entry = pmd_pte(pmd_mkcont(pte_pmd(entry)));
-+	} else if (pagesize != PUD_SIZE && pagesize != PMD_SIZE) {
-+		pr_warn("%s: unrecognized huge page size 0x%lx\n",
-+			__func__, pagesize);
-+	}
-+	return entry;
-+}
-+
-+pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
-+			      unsigned long addr, pte_t *ptep)
-+{
-+	pte_t pte;
-+
-+	if (pte_cont(*ptep)) {
-+		int ncontig, i;
-+		size_t pgsize;
-+		pte_t *cpte;
-+		bool is_dirty = false;
-+
-+		cpte = huge_pte_offset(mm, addr);
-+		ncontig = find_num_contig(mm, addr, cpte,
-+					  pte_val(*cpte), &pgsize);
-+		/* save the 1st pte to return */
-+		pte = ptep_get_and_clear(mm, addr, cpte);
-+		for (i = 1; i < ncontig; ++i) {
-+			/*
-+			 * If HW_AFDBM is enabled, then the HW could
-+			 * turn on the dirty bit for any of the page
-+			 * in the set, so check them all.
-+			 */
-+			++cpte;
-+			if (pte_dirty(ptep_get_and_clear(mm, addr, cpte)))
-+				is_dirty = true;
-+		}
-+		if (is_dirty)
-+			return pte_mkdirty(pte);
-+		else
-+			return pte;
-+	} else {
-+		return ptep_get_and_clear(mm, addr, ptep);
-+	}
-+}
-+
-+int huge_ptep_set_access_flags(struct vm_area_struct *vma,
-+			       unsigned long addr, pte_t *ptep,
-+			       pte_t pte, int dirty)
-+{
-+	pte_t *cpte;
-+
-+	if (pte_cont(pte)) {
-+		int ncontig, i, changed = 0;
-+		size_t pgsize = 0;
-+		unsigned long pfn = pte_pfn(pte);
-+		/* Select all bits except the pfn */
-+		pgprot_t hugeprot =
-+			__pgprot(pte_val(pfn_pte(pfn, 0) ^ pte_val(pte)));
-+
-+		cpte = huge_pte_offset(vma->vm_mm, addr);
-+		pfn = pte_pfn(*cpte);
-+		ncontig = find_num_contig(vma->vm_mm, addr, cpte,
-+					  pte_val(*cpte), &pgsize);
-+		for (i = 0; i < ncontig; ++i, ++cpte) {
-+			changed = ptep_set_access_flags(vma, addr, cpte,
-+							pfn_pte(pfn,
-+								hugeprot),
-+							dirty);
-+			pfn += pgsize >> PAGE_SHIFT;
-+		}
-+		return changed;
-+	} else {
-+		return ptep_set_access_flags(vma, addr, ptep, pte, dirty);
-+	}
-+}
-+
-+void huge_ptep_set_wrprotect(struct mm_struct *mm,
-+			     unsigned long addr, pte_t *ptep)
-+{
-+	if (pte_cont(*ptep)) {
-+		int ncontig, i;
-+		pte_t *cpte;
-+		size_t pgsize = 0;
-+
-+		cpte = huge_pte_offset(mm, addr);
-+		ncontig = find_num_contig(mm, addr, cpte,
-+					  pte_val(*cpte), &pgsize);
-+		for (i = 0; i < ncontig; ++i, ++cpte)
-+			ptep_set_wrprotect(mm, addr, cpte);
-+	} else {
-+		ptep_set_wrprotect(mm, addr, ptep);
-+	}
-+}
-+
-+void huge_ptep_clear_flush(struct vm_area_struct *vma,
-+			   unsigned long addr, pte_t *ptep)
-+{
-+	if (pte_cont(*ptep)) {
-+		int ncontig, i;
-+		pte_t *cpte;
-+		size_t pgsize = 0;
-+
-+		cpte = huge_pte_offset(vma->vm_mm, addr);
-+		ncontig = find_num_contig(vma->vm_mm, addr, cpte,
-+					  pte_val(*cpte), &pgsize);
-+		for (i = 0; i < ncontig; ++i, ++cpte)
-+			ptep_clear_flush(vma, addr, cpte);
-+	} else {
-+		ptep_clear_flush(vma, addr, ptep);
-+	}
-+}
-+
- static __init int setup_hugepagesz(char *opt)
- {
- 	unsigned long ps = memparse(opt, &opt);
-+
- 	if (ps == PMD_SIZE) {
- 		hugetlb_add_hstate(PMD_SHIFT - PAGE_SHIFT);
- 	} else if (ps == PUD_SIZE) {
- 		hugetlb_add_hstate(PUD_SHIFT - PAGE_SHIFT);
-+	} else if (ps == (PAGE_SIZE * CONT_PTES)) {
-+		hugetlb_add_hstate(CONT_PTE_SHIFT);
-+	} else if (ps == (PMD_SIZE * CONT_PMDS)) {
-+		hugetlb_add_hstate((PMD_SHIFT + CONT_PMD_SHIFT) - PAGE_SHIFT);
- 	} else {
--		pr_err("hugepagesz: Unsupported page size %lu M\n", ps >> 20);
-+		pr_err("hugepagesz: Unsupported page size %lu K\n", ps >> 10);
- 		return 0;
- 	}
- 	return 1;
- }
- __setup("hugepagesz=", setup_hugepagesz);
-+
-+#ifdef CONFIG_ARM64_64K_PAGES
-+static __init int add_default_hugepagesz(void)
-+{
-+	if (size_to_hstate(CONT_PTES * PAGE_SIZE) == NULL)
-+		hugetlb_add_hstate(CONT_PMD_SHIFT);
-+	return 0;
-+}
-+arch_initcall(add_default_hugepagesz);
-+#endif
-diff --git a/include/linux/hugetlb.h b/include/linux/hugetlb.h
-index 685c262..b0eb064 100644
---- a/include/linux/hugetlb.h
-+++ b/include/linux/hugetlb.h
-@@ -96,9 +96,7 @@ u32 hugetlb_fault_mutex_hash(struct hstate *h, struct mm_struct *mm,
- 				struct address_space *mapping,
- 				pgoff_t idx, unsigned long address);
- 
--#ifdef CONFIG_ARCH_WANT_HUGE_PMD_SHARE
- pte_t *huge_pmd_share(struct mm_struct *mm, unsigned long addr, pud_t *pud);
--#endif
- 
- extern int hugepages_treat_as_movable;
- extern int sysctl_hugetlb_shm_group;
--- 
-2.1.2
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
