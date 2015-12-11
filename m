@@ -1,58 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 11 Dec 2015 10:08:00 +0100
-Subject: [PATCH 2/3] Add support for monitoring gpio switches
-In-Reply-To: <1449250275-23435-3-git-send-email-martyn.welch@collabora.co.uk>
-References: <1449250275-23435-1-git-send-email-martyn.welch@collabora.co.uk>
- <1449250275-23435-3-git-send-email-martyn.welch@collabora.co.uk>
-Message-ID: <CACRpkdb=it+U+3-0mvZ9Pf1cnYT_r1KkFiS=C4YDkqrjoRm+kQ@mail.gmail.com>
+From: biao.huang@mediatek.com (Biao Huang)
+Date: Fri, 11 Dec 2015 17:07:47 +0800
+Subject: [PATCH v2 0/5] pinctrl: mediatek: add pinctrl/GPIO/EINT driver for
+ mt2701
+Message-ID: <1449824872-18314-1-git-send-email-biao.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 4, 2015 at 6:31 PM, Martyn Welch
-<martyn.welch@collabora.co.uk> wrote:
+Change in v2:
+1. add special pinmux setting for some pins.
+2. fix mt2701 direction control issue
+3. resort dt-bindings
 
-> Select Chromebooks have gpio attached to switches used to cause the
-> firmware to enter alternative modes of operation and/or control other
-> device characteristics (such as write protection on flash devices). This
-> patch adds a driver that exposes a read-only interface to allow these
-> signals to be read from user space.
->
-> This functionality has been generalised to provide support for any device
-> with device tree support which needs to identify a gpio as being used for a
-> specific task.
->
-> Signed-off-by: Martyn Welch <martyn.welch@collabora.co.uk>
+Biao Huang (4):
+  dt-bindings: mediatek: Modify pinctrl bindings for mt2701
+  pinctrl: dt bindings: Add pinfunc header file for mt2701
+  pinctrl: mediatek: Add Pinctrl/GPIO/EINT driver for mt2701
+  arm: dts: Add pinctrl/GPIO/EINT node for mt2701
 
-If you want to do this thing, also propose a device tree binding document
-for "gpio-switch".
+Erin Lo (1):
+  ARM: mediatek: Add MT2701 config options for mediatek SoCs.
 
-But first (from Documentation/gpio/drivers-on-gpio.txt):
+ .../devicetree/bindings/pinctrl/pinctrl-mt65xx.txt |    9 +-
+ arch/arm/boot/dts/mt2701-pinfunc.h                 |  735 +++++++
+ arch/arm/boot/dts/mt2701.dtsi                      |   19 +
+ arch/arm/mach-mediatek/Kconfig                     |    4 +
+ drivers/pinctrl/mediatek/Kconfig                   |    6 +
+ drivers/pinctrl/mediatek/Makefile                  |    1 +
+ drivers/pinctrl/mediatek/pinctrl-mt2701.c          |  590 +++++
+ drivers/pinctrl/mediatek/pinctrl-mtk-common.c      |   14 +
+ drivers/pinctrl/mediatek/pinctrl-mtk-common.h      |   12 +-
+ drivers/pinctrl/mediatek/pinctrl-mtk-mt2701.h      | 2323 ++++++++++++++++++++
+ 10 files changed, 3708 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm/boot/dts/mt2701-pinfunc.h
+ create mode 100644 drivers/pinctrl/mediatek/pinctrl-mt2701.c
+ create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-mt2701.h
 
-- gpio-keys: drivers/input/keyboard/gpio_keys.c is used when your GPIO line
-  can generate interrupts in response to a key press. Also supports debounce.
-
-- gpio-keys-polled: drivers/input/keyboard/gpio_keys_polled.c is used when your
-  GPIO line cannot generate interrupts, so it needs to be periodically polled
-  by a timer.
-
-- extcon-gpio: drivers/extcon/extcon-gpio.c is used when you need to read an
-  external connector status, such as a headset line for an audio driver or an
-  HDMI connector. It will provide a better userspace sysfs interface than GPIO.
-
-So you mean none of these apply for this case?
-
-Second: what you want to do is export a number of GPIOs with certain names
-to userspace. This is something very generic and should be implemented
-as such, not as something Chromebook-specific.
-
-Patches like that has however already been suggested, and I have NACKed
-them because the GPIO sysfs ABI is insane, and that is why I am refactoring
-the world to create a proper chardev ABI for GPIO instead. See:
-http://marc.info/?l=linux-gpio&m=144550276512673&w=2
-
-So for the moment, NACK on this, please participate in creating the
-*right* ABI for GPIO instead of trying to shoehorn stuff into the dying
-sysfs ABI.
-
-Yours,
-Linus Walleij
+-- 
+1.7.9.5
