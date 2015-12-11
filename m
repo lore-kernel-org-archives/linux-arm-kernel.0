@@ -1,49 +1,37 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Fri, 11 Dec 2015 14:35:40 -0800
-Subject: FW: Commit 81a43adae3b9 (locking/mutex: Use acquire/release
- semantics) causing failures on arm64 (ThunderX)
-In-Reply-To: <20151211134803.GP6356@twins.programming.kicks-ass.net>
-References: <SN1PR07MB21577C72379C8440A208D6BC9EEA0@SN1PR07MB2157.namprd07.prod.outlook.com>
- <CA+=Sn1miWYhH5ddMmLGYWknzcw3d1k4S6QyK9O_ofdJKJDQxmg@mail.gmail.com>
- <CA+=Sn1n6e9pLDRVWT1EzDEn2XWwoK-Ep__-R6VVPzhbMvCEdNg@mail.gmail.com>
- <20151211084133.GE6356@twins.programming.kicks-ass.net>
- <20151211120419.GD18828@arm.com>
- <20151211121319.GK6356@twins.programming.kicks-ass.net>
- <20151211121759.GE18828@arm.com>
- <20151211122647.GM6356@twins.programming.kicks-ass.net>
- <20151211133313.GG18828@arm.com>
- <20151211134803.GP6356@twins.programming.kicks-ass.net>
-Message-ID: <20151211223540.GA22277@linux.vnet.ibm.com>
+From: dv@vollmann.ch (Detlef Vollmann)
+Date: Fri, 11 Dec 2015 23:41:37 +0100
+Subject: [PATCH 0/5] ARM: orion5x/dove/mv78xx0 multiplatform
+In-Reply-To: <20151211145554.GD18249@io.lakedaemon.net>
+References: <1448466557-435335-1-git-send-email-arnd@arndb.de>
+ <14967875.ttNXUbSTvS@wuerfel> <20151211133601.GB18249@io.lakedaemon.net>
+ <3272371.tle8Qz0NMz@wuerfel> <20151211145554.GD18249@io.lakedaemon.net>
+Message-ID: <566B5121.5000204@vollmann.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 11, 2015 at 02:48:03PM +0100, Peter Zijlstra wrote:
-> On Fri, Dec 11, 2015 at 01:33:14PM +0000, Will Deacon wrote:
-> > On Fri, Dec 11, 2015 at 01:26:47PM +0100, Peter Zijlstra wrote:
+On 12/11/15 15:55, Jason Cooper wrote:
+> On Fri, Dec 11, 2015 at 03:46:53PM +0100, Arnd Bergmann wrote:
+>> I think you are right this has come up in the past, but I don't see how
+>> it would work in practice without significant changes to driver subsystems:
+>>
+>> The way we describe devices in DT is often very different from what we
+>> have for the traditional board files, and in some cases we don't even
+>> support platform data any more, so this would still depend on having
+>> properties according to the DT bindings, and require a large chunk of
+>> the same code that is doing DT at the moment.
 > 
-> > > While we're there, the acquire in osq_wait_next() seems somewhat ill
-> > > documented too.
-> > > 
-> > > I _think_ we need ACQUIRE semantics there because we want to strictly
-> > > order the lock-unqueue A,B,C steps and we get that with:
-> > > 
-> > >  A: SC
-> > >  B: ACQ
-> > >  C: Relaxed
-> > > 
-> > > Similarly for unlock we want the WRITE_ONCE to happen after
-> > > osq_wait_next, but in that case we can even rely on the control
-> > > dependency there.
-> > 
-> > Even for the lock-unqueue case, isn't B->C ordered by a control dependency
-> > because C consists only of stores?
-> 
-> Hmm, indeed. So we could go fully relaxed on it I suppose, since the
-> same is true for the unlock site.
+> yes, that's unfortunate.  Perhaps the tinification links are still
+> helpful to Detlef.
+I've heard of the tinyfication project, but not paid too much attentions.
+I believe it's the wrong side around.
+For busybox, patches that produce larger binaries without providing
+new functionality are just rejected.
+Those that provide new functionality and such create bigger binaries
+must have a configuration option for still being able to get the
+old small binary.
 
-I am probably missing quite a bit on this thread, but don't x86 MMIO
-accesses to frame buffers need to interact with something more heavyweight
-than an x86 release store or acquire load in order to remain confined
-to the resulting critical section?
+If you accept patches that make the kernel bigger without a configuration
+option to avoid this, any tinyfication effort that tries to make the
+kernel small again afterwards is IMHO a noble but lost cause.
 
-							Thanx, Paul
+  Detlef
