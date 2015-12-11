@@ -1,136 +1,51 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 11 Dec 2015 16:38:01 +0800
-Subject: [PATCH v5 0/9] mfd: axp20x: Add support for RSB based AXP223
-In-Reply-To: <1448606610-32647-1-git-send-email-wens@csie.org>
-References: <1448606610-32647-1-git-send-email-wens@csie.org>
-Message-ID: <CAGb2v65f9tEpMALcKapGPYw72v-hYmfJA1B8nZyj5EW+g_9Byw@mail.gmail.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 11 Dec 2015 09:41:33 +0100
+Subject: FW: Commit 81a43adae3b9 (locking/mutex: Use acquire/release
+ semantics) causing failures on arm64 (ThunderX)
+In-Reply-To: <CA+=Sn1n6e9pLDRVWT1EzDEn2XWwoK-Ep__-R6VVPzhbMvCEdNg@mail.gmail.com>
+References: <5669D5F2.5050004@caviumnetworks.com>
+ <SN1PR07MB21577C72379C8440A208D6BC9EEA0@SN1PR07MB2157.namprd07.prod.outlook.com>
+ <CA+=Sn1miWYhH5ddMmLGYWknzcw3d1k4S6QyK9O_ofdJKJDQxmg@mail.gmail.com>
+ <CA+=Sn1n6e9pLDRVWT1EzDEn2XWwoK-Ep__-R6VVPzhbMvCEdNg@mail.gmail.com>
+Message-ID: <20151211084133.GE6356@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+On Thu, Dec 10, 2015 at 08:51:34PM -0800, Andrew Pinski wrote:
 
-On Fri, Nov 27, 2015 at 2:43 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-> Hi everyone,
->
-> This is v5 of the AXP223 PMIC series. v5 cleans up the code before and
-> after the axp20x split, as suggested by Andy.
+> So looking further I think I understand what is going wrong and why
+> c55a6ffa6285e29f874ed403979472631ec70bff is incorrect.
 
-Any chance you could merge this series (patches 1~7) for 4.5?
+The osq_wait_next() call in osq_lock() is when we fail the lock. This is
+effectively trylock() semantics and like for cmpxchg a failed trylock
+has no implied barrier semantics.  So from that POV osq_wait_next() does
+not need to provide ACQUIRE semantics.
 
-The DTS patches can't be merged without the driver updates, and we'd
-like to get both parts in.
+In osq_unlock() there's an xchg() in front, which implies full barriers
+and thereby provides RELEASE semantics for that part of osq_unlock(), so
+again, from this POV osq_wait_next() does not need to provide RELEASE
+semantics.
 
-> Changes since v4:
->
->   - Get rid of second parameter of axp20x_match_device() (new patch 2)
->
->   - Match against dev->driver->of_match_table, so the entirety of
->     axp20x_match_device() can be kept in the core. (new patch 3)
->
->   - Move *_device_id tables to bottom of the driver, right above driver
->     declaration. (patch 4 & 6)
->
->   - Remove extra whitespaces while moving i2c specific code (patch 4)
->
->   - Remove leftover whitespace and code style issues in axp20x core
->     (new patch 5)
->
->   - Remove extra whitespaces in rsb specific code (patch 6)
->
-> Changes since v3:
->
->   - Removed settings for axp223 reg_rtc_ldo from board dts files that
->     are already in axp22x.dtsi. The name is kept.
->
->   - Dropped simplefb label and defconfig patches, as they are merged.
->
-> Changes since v2:
->
->   - s/It's/Its/ for the commit messages of patches 5 and 7
->
->   - Add Rob's Acked-by for patch 1
->
-> Changes since v1:
->
->   - Dropped NMI interrupt controller dts patch (Merged)
->
->   - Change MFD_AXP20X to represent the axp20x core, and drop MFD_AXP20X_CORE
->
->   - Keep the axp20x core bits named axp20x.c
->
->   - Add patch 7 to add AXP223 to sun8i-q8-common.dtsi
->
->   - Add patch 8 & 9 to update defconfigs
->
->   - Make axp20x drivers tristate and buildable as modules
->
->   - Drop "_sunxi" substring from identifiers in axp20x-rsb driver
->
->
-> This series adds support for the Reduced Serial Bus based AXP223 PMIC.
-> The AXP223 is functionally identical to the AXP221, which we already
-> support. Only some default values for the regulators are different.
-> The defaults fit their recommended application, paired with different
-> SoCs.
->
+> The compare and swap inside osq_lock needs to be both release and
+> acquire semantics memory barriers because the stores (to node) need to
+> be visible to the other cores before the setting of lock->tail
+> happens.
 
-Updated description:
+I'm a wee bit confused on what exactly you mean. Both stores to @node:
 
-Patch 1 adds AXP223 to the list of supported chips in the DT binding.
+ 1) osq_wait_next(): next = xchg(&node->next, NULL)
+ 2) osq_unlock():    next = xchg(&node->next, NULL)
 
-Patch 2 gets rid of the extra "struct device *" parameter from
-axp20x_match_device().
+are xchg() calls which imply full ordering (sequential consistency).
 
-Patch 3 makes axp20x_match_device() use dev->driver->of_match_table,
-so the function can be library-ized without modification.
+Similarly the store before osq_wait_next() in osq_lock(), namely:
 
-Patch 4 splits the axp20x mfd driver into 2 parts, a core library, and
-an I2C driver.
+  cmpxchg(&prev->node, node, NULL)
 
-Patch 5 cleans up some leftover whitespace issues in axp20x core.
+is fully ordered.
 
-Patch 6 adds an RSB based driver for the AXP223.
+So I cannot see any store being delayed past the
+atomic_cmpxchg_acquire().
 
-Patch 7 adds support for the AXP223 regulators
-
-Patch 8 enables the AXP223 PMIC and its regulators for the Sinlinx
-SinA33.
-
-Patch 9 enables the AXP223 PMIC and its regulators for A23/A33 based
-Q8 tablet devices.
-
-
-Regards
-ChenYu
-
->
-> Chen-Yu Tsai (9):
->   mfd: axp20x: Add AXP223 to list of supported PMICs in DT bindings
->   mfd: axp20x: Remove second struct device * parameter for
->     axp20x_match_device()
->   mfd: axp20x: use dev->driver->of_match_table in axp20x_match_device()
->   mfd: axp20x: Split the driver into core and i2c bits
->   mfd: axp20x: Whitespace, open parenthesis alignment code style fixes
->   mfd: axp20x: Add support for RSB based AXP223 PMIC
->   regulator: axp20x: Support new AXP223 PMIC
->   ARM: dts: sun8i: sinlinx-sina33: Add AXP223 PMIC device and regulator
->     nodes
->   ARM: dts: sun8i: q8-common: Add AXP223 PMIC device and regulator nodes
->
->  Documentation/devicetree/bindings/mfd/axp20x.txt |   7 +-
->  arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts   |  76 ++++++++++++++++-
->  arch/arm/boot/dts/sun8i-q8-common.dtsi           |  83 +++++++++++++++++-
->  drivers/mfd/Kconfig                              |  25 ++++--
->  drivers/mfd/Makefile                             |   2 +
->  drivers/mfd/axp20x-i2c.c                         | 102 +++++++++++++++++++++++
->  drivers/mfd/axp20x-rsb.c                         |  78 +++++++++++++++++
->  drivers/mfd/axp20x.c                             | 101 +++++-----------------
->  drivers/regulator/axp20x-regulator.c             |   3 +
->  include/linux/mfd/axp20x.h                       |  34 +++++++-
->  10 files changed, 418 insertions(+), 93 deletions(-)
->  create mode 100644 drivers/mfd/axp20x-i2c.c
->  create mode 100644 drivers/mfd/axp20x-rsb.c
->
-> --
-> 2.6.2
->
+Now you mention 'compare and swap inside osq_lock' which I take to be
+the latter; and it _is_ fully ordered.
