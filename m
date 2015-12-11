@@ -1,97 +1,131 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 11 Dec 2015 18:08:55 +0100
-Subject: [PATCH v5 01/58] mtd: nand: denali: add missing nand_release()
- call in denali_remove()
-In-Reply-To: <CADhT+wcNFxD6Zv9w8W0sontVWa6zOkHjyK42Tw=Y_1X2XCTZfQ@mail.gmail.com>
-References: <1449734442-18672-2-git-send-email-boris.brezillon@free-electrons.com>
- <1449842554-29898-1-git-send-email-boris.brezillon@free-electrons.com>
- <20151211161008.056a0f47@bbrezillon>
- <CADhT+wcNFxD6Zv9w8W0sontVWa6zOkHjyK42Tw=Y_1X2XCTZfQ@mail.gmail.com>
-Message-ID: <20151211180855.47c95df2@bbrezillon>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 11 Dec 2015 12:10:29 -0500 (EST)
+Subject: [PATCH] ARM: Runtime patch udiv/sdiv instructions into
+ __aeabi_{u}idiv()
+In-Reply-To: <6991913.FSOzozNbSC@wuerfel>
+References: <alpine.LFD.2.20.1512110105450.26920@knanqh.ubzr>
+ <6991913.FSOzozNbSC@wuerfel>
+Message-ID: <alpine.LFD.2.20.1512111125330.26920@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dinh,
+On Fri, 11 Dec 2015, Arnd Bergmann wrote:
 
-On Fri, 11 Dec 2015 10:50:21 -0600
-Dinh Nguyen <dinh.linux@gmail.com> wrote:
-
-> Hi Boris,
+> On Friday 11 December 2015 01:26:25 Nicolas Pitre wrote:
 > 
-> On Fri, Dec 11, 2015 at 9:10 AM, Boris Brezillon
-> <boris.brezillon@free-electrons.com> wrote:
-> > + Dinh (who made commit 2a0a288ec258)
-> >
-> > Also added back the Fixes tag.
-> >
-> > On Fri, 11 Dec 2015 15:02:34 +0100
-> > Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
-> >
-> >> Unregister the NAND device from the NAND subsystem when removing a denali
-> >> NAND controller, otherwise the MTD attached to the NAND device is still
-> >> exposed by the MTD layer, and accesses to this device will likely crash
-> >> the system.
-> >>
-> >> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> >
-> > Fixes: 2a0a288ec258 ("mtd: denali: split the generic driver and PCI layer")
-> >
-> >> ---
-> >> Changes since v4:
-> >> - remove Cc stable and fixes tags
-> >> - calculate the dma buffer size before calling nand_release()
-> >>
-> >>  drivers/mtd/nand/denali.c | 6 ++++--
-> >>  1 file changed, 4 insertions(+), 2 deletions(-)
-> >>
-> >> diff --git a/drivers/mtd/nand/denali.c b/drivers/mtd/nand/denali.c
-> >> index 67eb2be..fdfea05 100644
-> >> --- a/drivers/mtd/nand/denali.c
-> >> +++ b/drivers/mtd/nand/denali.c
-> >> @@ -1622,9 +1622,11 @@ EXPORT_SYMBOL(denali_init);
-> >>  /* driver exit point */
-> >>  void denali_remove(struct denali_nand_info *denali)
-> >>  {
-> >> +     int bufsize = denali->mtd.writesize + denali->mtd.oobsize;
-> >> +
-> >> +     nand_release(&denali->mtd);
-> >>       denali_irq_cleanup(denali->irq, denali);
-> >> -     dma_unmap_single(denali->dev, denali->buf.dma_buf,
-> >> -                      denali->mtd.writesize + denali->mtd.oobsize,
-> >> +     dma_unmap_single(denali->dev, denali->buf.dma_buf, bufsize,
-> >>                        DMA_BIDIRECTIONAL);
+> > This is my counter proposal to Stephen's version. Those patches and the 
+> > discussion that followed are available here:
+> > 
+> >   http://news.gmane.org/group/gmane.linux.kbuild.devel/thread=14007
+> > 
+> > I think what I propose here is much simpler and less intrusive.  Going
+> > to the full call site patching provides between moderate to no 
+> > additional performance benefits depending on the CPU core.  That should 
+> > probably be compared with this solution with benchmark results to 
+> > determine if it is worth it.
 > 
-> Not sure what is the need to add bufsize here, but the commit message
-> doesn't reflect the change.
-
-You were not in Cc of the first version (my fault), but Brian pointed
-that the mtd fields could be in an unknown state after the
-nand_release() call (this is currently not the case, but it change in
-the future). The idea is to pre-compute the DMA buffer size before
-releasing the mtd/nand device to prevent any future issues.
-
-I don't think it is worth mentioning this in the commit message,
-because these are just implementation details, but I can add the
-following comment before the bufsize declaration:
-
-	/*
-	 * Pre-compute DMA buffer size to avoid any problems in case
-	 * nand_release() ever changes in a way that mtd->writesize and
-	 * mtd->oobsize are not reliable after this call.
-	 */
-
-What do you think?
-
-Best Regards,
-
-Boris
-
+> Looks really nice, as it's much simpler than Stephen's approach
 > 
-> Dinh
+> > Of course the ultimate performance will come from having gcc emit those 
+> > div instructions directly, but that would make the kernel binary 
+> > incompatible with some systems in a multi-arch config. Hence it has to 
+> > be a separate config option.
+> 
+> Well, what we found is that we already have the same problem today
+> when enabling LPAE makes the kernel incompatible with platforms that
+> can be enabled. The affected platforms are basically the same, except
+> for the earlier PJ4 and Krait variants that have some idiv support
+> but no LPAE.
+
+Still, making native div support depend on CONFIG_LPAE would be strange. 
+A separate config symbol would mmake it self explanatory.
+
+> > diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+> > index 85e374f873..48c77d422a 100644
+> > --- a/arch/arm/include/asm/cputype.h
+> > +++ b/arch/arm/include/asm/cputype.h
+> > @@ -250,8 +250,14 @@ static inline int cpu_is_pj4(void)
+> >  
+> >  	return 0;
+> >  }
+> > +
+> > +static inline bool __attribute_const__ cpu_is_pj4_nomp(void)
+> > +{
+> > +	return read_cpuid_part() == 0x56005810;
+> > +}
+> >  #else
+> > -#define cpu_is_pj4()	0
+> > +#define cpu_is_pj4()		0
+> > +#define cpu_is_pj4_nomp()	0
+> >  #endif
+> 
+> It would be nice to use a symbolic constant for the above, and maybe define
+> all three known cpuid numbers for PJ4 variants.
+> 
+> I've looked at it some more and I now have doubts about this code:
+> 
+> #ifdef CONFIG_CPU_PJ4B
+>         .type   __v7_pj4b_proc_info, #object
+> __v7_pj4b_proc_info:
+>         .long   0x560f5800
+>         .long   0xff0fff00
+>         __v7_proc __v7_pj4b_proc_info, __v7_pj4b_setup, proc_fns = pj4b_processor_functions
+>         .size   __v7_pj4b_proc_info, . - __v7_pj4b_proc_info
+> #endif
+> 
+> 
+> Can someone have a look and tell me that I'm wrong when I read this
+> as matching both PJ4 and PJ4B (and PJ4B-MP)?
+> 
+> Either I'm misreading this, or we do the wrong thing in configurations
+> that include both PJ4B (berlin, mvebu) and PJ4 (MMP2/dove).
+
+I don't have the relevant documentation to validate it.  And I'd prefer 
+if this was sorted out in a separate patch.  Maybe I should just drop 
+the PJ4 variants from this patch for now.
+
+> > +#ifdef CONFIG_ARM_PATCH_IDIV
+> > +
+> > +/* "sdiv r0, r0, r1" or "mrc p6, 1, r0, CR0, CR1, 4" if we're on pj4 w/o MP */
+> > +static inline u32 __attribute_const__ sdiv_instruction(void)
+> > +{
+> > +	if (IS_ENABLED(CONFIG_THUMB2_KERNEL)) {
+> > +		u32 insn = __opcode_thumb32_compose(0xfb90, 0xf0f1);
+> > +		if (cpu_is_pj4_nomp())
+> > +			insn = __opcode_thumb32_compose(0xee30, 0x0691);
+> > +		return __opcode_to_mem_thumb32(insn);
+> > +	}
+> 
+> Strictly speaking, we can ignore the thumb instruction for pj4, as all
+> variants also support the normal T2 opcode for udiv/sdiv.
+
+OK it is gone.
+
+Now... The code bails out if ARM mode and HWCAP_IDIVA is not set so 
+effectively the ARM mode on PJ4 is currently not used either. So I'm 
+leaning towards having aving another patch to sort PJ4 out.
+
+> > diff --git a/arch/arm/lib/lib1funcs.S b/arch/arm/lib/lib1funcs.S
+> > index af2267f6a5..9397b2e532 100644
+> > --- a/arch/arm/lib/lib1funcs.S
+> > +++ b/arch/arm/lib/lib1funcs.S
+> > @@ -205,6 +205,10 @@ Boston, MA 02111-1307, USA.  */
+> >  .endm
+> >  
+> >  
+> > +#ifdef CONFIG_ARM_PATCH_IDIV
+> > +	.align	3
+> > +#endif
+> > +
+> >  ENTRY(__udivsi3)
+> >  ENTRY(__aeabi_uidiv)
+> >  UNWIND(.fnstart)
+> 
+> I'd probably just leave out the #ifdef and always align this, but it's not
+> important.
+
+This serves as "documentation". The alignment is important when 
+CONFIG_ARM_PATCH_IDIV is selected and not otherwise.
 
 
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Nicolas
