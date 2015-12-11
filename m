@@ -1,88 +1,159 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri, 11 Dec 2015 13:51:44 -0700
-Subject: [PATCH RFC 21/27] drivers: cpu-pd: Parse topology to setup CPU
- PM domains
-In-Reply-To: <CAMuHMdWBCPkSH6sf=xtLgttvdru222nAWOYNMVNqv6d86jprvA@mail.gmail.com>
-References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
- <1447799871-56374-22-git-send-email-lina.iyer@linaro.org>
- <20151207145458.GA20538@red-moon>
- <20151208180536.GB2230@linaro.org>
- <20151210181121.GA26229@red-moon>
- <CAMuHMdWBCPkSH6sf=xtLgttvdru222nAWOYNMVNqv6d86jprvA@mail.gmail.com>
-Message-ID: <20151211205144.GD992@linaro.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 11 Dec 2015 21:55:20 +0100
+Subject: [PATCH v3 03/22] arm64: KVM: Implement vgic-v2 save/restore
+In-Reply-To: <1449485618-9443-4-git-send-email-marc.zyngier@arm.com>
+References: <1449485618-9443-1-git-send-email-marc.zyngier@arm.com>
+ <1449485618-9443-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20151211205520.GD27689@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 11 2015 at 02:04 -0700, Geert Uytterhoeven wrote:
->On Thu, Dec 10, 2015 at 7:11 PM, Lorenzo Pieralisi
-><lorenzo.pieralisi@arm.com> wrote:
->> On Tue, Dec 08, 2015 at 11:05:36AM -0700, Lina Iyer wrote:
->>
->> [...]
->>
->>> On Mon, Dec 07 2015 at 07:53 -0700, Lorenzo Pieralisi wrote:
->>> >>+/**
->>> >>+ * of_setup_cpu_domain_topology() - Setup the CPU domains from the CPU
->>> >>+ * topology node in DT.
->>> >>+ *
->>> >>+ * @ops: The PM domain suspend/resume ops for all the domains in the topology
->>> >>+ */
->>> >>+int of_setup_cpu_domain_topology(const struct cpu_pd_ops *ops)
->>> >>+{
->>> >>+   struct device_node *cn, *map;
->>> >>+   int ret = 0;
->>> >>+
->>> >>+   cn = of_find_node_by_path("/cpus");
->>> >>+   if (!cn) {
->>> >>+           pr_err("No CPU information found in DT\n");
->>> >>+           return 0;
->>> >>+   }
->>> >>+
->>> >>+   map = of_get_child_by_name(cn, "cpu-map");
->>> >>+   if (!map)
->>> >>+           goto out;
->>> >
->>> >I commented on this before, is this reliance on cpu-map necessary ?
->>> >Could not you just rely on the "power-domains" phandle in the cpu
->>> >nodes to build the cpumask for a specific power domain ? I think
->>> >you should try to decouple the concept of power domain from the cpu-map
->>> >cluster and I think this would also simplify your code in the process.
->>> >
->>> Sorry, I missed seeing your comment on this earlier.
->>>
->>> Hmm, it can be done, but I felt out of place to define just power
->>> domains that have no devices in Linux, since they are handled in PSCI,
->>> but also have no relation to PSCI. Hence, I felt cpu-map to be a good
->>> place for the cluster domain. But I am not strongly inclined. I can
->>> remove them from the cpu-map and keep them as separate nodes. However,
->>> it would be nice to have a way to say these nodes are PSCI controlled.
->>
->> I do not agree with the way you described the system.
->>
->> Here is how I see it. DT must model HW, and in HW your cpus will be part
->> of a power domain(s) that of course can be hierarchical. Every cpus has a
->> phandle to the power domain it belongs into, and to group them as "cluster"
->> you should follow the power domains hierarchy (ie if you have a cluster
->> power domain, it will contain the core power domains, through the
->> hierarchy it is easy to detect what cpus are part of the cluster power
->> domain by detecting which cpus are part of its children). It is much
->> simpler than the current solution I think, you get rid of cpu-map
->> dependency (honestly it is a bit weird what you did, with cpu-map
->> containing a cluster phandle to a power domain and cpu phandles to
->> cpu nodes, and the DT bindings you posted does not seem to match your
->> dts).
->>
->> For PSCI, nothing prevents you from defining the same bindings except
->> that the power domain(s) is not explicitly controlled by the OS, still,
->> the DT would always describe the HW and you can use it to detect the
->> power domain topology and which cpus are part of a given power domain.
->>
->> Please let me know what you think, thanks.
->
->+1
->
-I have a version written up that builds up the hierarchy from the CPU
-nodes. It doesnt use cpu-map. Will be part of the next submission.
+On Mon, Dec 07, 2015 at 10:53:19AM +0000, Marc Zyngier wrote:
+> Implement the vgic-v2 save restore (mostly) as a direct translation
+> of the assembly code version.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/kvm/Makefile         |  1 +
+>  arch/arm64/kvm/hyp/Makefile     |  5 +++
+>  arch/arm64/kvm/hyp/hyp.h        |  3 ++
+>  arch/arm64/kvm/hyp/vgic-v2-sr.c | 84 +++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 93 insertions(+)
+>  create mode 100644 arch/arm64/kvm/hyp/Makefile
+>  create mode 100644 arch/arm64/kvm/hyp/vgic-v2-sr.c
+> 
+> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+> index 1949fe5..d31e4e5 100644
+> --- a/arch/arm64/kvm/Makefile
+> +++ b/arch/arm64/kvm/Makefile
+> @@ -10,6 +10,7 @@ KVM=../../../virt/kvm
+>  ARM=../../../arch/arm/kvm
+>  
+>  obj-$(CONFIG_KVM_ARM_HOST) += kvm.o
+> +obj-$(CONFIG_KVM_ARM_HOST) += hyp/
+>  
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o $(KVM)/vfio.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/arm.o $(ARM)/mmu.o $(ARM)/mmio.o
+> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+> new file mode 100644
+> index 0000000..d8d5968
+> --- /dev/null
+> +++ b/arch/arm64/kvm/hyp/Makefile
+> @@ -0,0 +1,5 @@
+> +#
+> +# Makefile for Kernel-based Virtual Machine module, HYP part
+> +#
+> +
+> +obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
+> diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
+> index 057f483..ac63553 100644
+> --- a/arch/arm64/kvm/hyp/hyp.h
+> +++ b/arch/arm64/kvm/hyp/hyp.h
+> @@ -29,5 +29,8 @@
+>  #define hyp_kern_va(v) (typeof(v))((unsigned long)(v) - HYP_PAGE_OFFSET \
+>  						      + PAGE_OFFSET)
+>  
+> +void __vgic_v2_save_state(struct kvm_vcpu *vcpu);
+> +void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
+> +
+>  #endif /* __ARM64_KVM_HYP_H__ */
+>  
+> diff --git a/arch/arm64/kvm/hyp/vgic-v2-sr.c b/arch/arm64/kvm/hyp/vgic-v2-sr.c
+> new file mode 100644
+> index 0000000..e717612
+> --- /dev/null
+> +++ b/arch/arm64/kvm/hyp/vgic-v2-sr.c
+> @@ -0,0 +1,84 @@
+> +/*
+> + * Copyright (C) 2012-2015 - ARM Ltd
+> + * Author: Marc Zyngier <marc.zyngier@arm.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/compiler.h>
+> +#include <linux/irqchip/arm-gic.h>
+> +#include <linux/kvm_host.h>
+> +
+> +#include <asm/kvm_mmu.h>
+> +
+> +#include "hyp.h"
+> +
+> +/* vcpu is already in the HYP VA space */
+> +void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
+> +{
+> +	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
+> +	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+> +	struct vgic_dist *vgic = &kvm->arch.vgic;
+> +	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
+> +	u32 eisr0, eisr1, elrsr0, elrsr1;
+> +	int i, nr_lr;
+> +
+> +	if (!base)
+> +		return;
+> +
+> +	nr_lr = vcpu->arch.vgic_cpu.nr_lr;
+> +	cpu_if->vgic_vmcr = readl_relaxed(base + GICH_VMCR);
+> +	cpu_if->vgic_misr = readl_relaxed(base + GICH_MISR);
+> +	eisr0  = readl_relaxed(base + GICH_EISR0);
+> +	elrsr0 = readl_relaxed(base + GICH_ELRSR0);
+> +	if (unlikely(nr_lr > 32)) {
+> +		eisr1  = readl_relaxed(base + GICH_EISR1);
+> +		elrsr1 = readl_relaxed(base + GICH_ELRSR1);
+> +	} else {
+> +		eisr1 = elrsr1 = 0;
+> +	}
+> +#ifdef CONFIG_CPU_BIG_ENDIAN
+> +	cpu_if->vgic_eisr  = ((u64)eisr0 << 32) | eisr1;
+> +	cpu_if->vgic_elrsr = ((u64)elrsr0 << 32) | elrsr1;
+> +#else
+> +	cpu_if->vgic_eisr  = ((u64)eisr1 << 32) | eisr0;
+> +	cpu_if->vgic_elrsr = ((u64)elrsr1 << 32) | elrsr0;
+> +#endif
+> +	cpu_if->vgic_apr    = readl_relaxed(base + GICH_APR);
+> +
+> +	writel_relaxed(0, base + GICH_HCR);
+> +
+> +	for (i = 0; i < nr_lr; i++)
+> +		cpu_if->vgic_lr[i] = readl_relaxed(base + GICH_LR0 + (i * 4));
+> +}
+> +
+> +/* vcpu is already in the HYP VA space */
+> +void __hyp_text __vgic_v2_restore_state(struct kvm_vcpu *vcpu)
+> +{
+> +	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
+> +	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+> +	struct vgic_dist *vgic = &kvm->arch.vgic;
+> +	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
+> +	int i, nr_lr;
+> +
+> +	if (!base)
+> +		return;
+> +
+> +	writel_relaxed(cpu_if->vgic_hcr, base + GICH_HCR);
+> +	writel_relaxed(cpu_if->vgic_vmcr, base + GICH_VMCR);
+> +	writel_relaxed(cpu_if->vgic_apr, base + GICH_APR);
+> +
+> +	nr_lr = vcpu->arch.vgic_cpu.nr_lr;
+> +	for (i = 0; i < nr_lr; i++)
 
-Thanks,
-Lina
+nit: why do you need the nr_lr variable?  it may make the code easier to
+read I guess.
+
+> +		writel_relaxed(cpu_if->vgic_lr[i], base + GICH_LR0 + (i * 4));
+> +}
+> -- 
+> 2.1.4
+> 
+
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
