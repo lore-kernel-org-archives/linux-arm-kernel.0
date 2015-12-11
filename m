@@ -1,59 +1,87 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 11 Dec 2015 16:15:35 +0100
-Subject: [PATCH v4 01/58] mtd: nand: denali: add missing nand_release()
- call in denali_remove()
-In-Reply-To: <20151211143947.GL5284@mwanda>
-References: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
- <1449734442-18672-2-git-send-email-boris.brezillon@free-electrons.com>
- <20151211004008.GQ144338@google.com>
- <20151211145320.1560fac3@bbrezillon> <20151211143947.GL5284@mwanda>
-Message-ID: <20151211161535.60a96ec2@bbrezillon>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 11 Dec 2015 09:19:09 -0600
+Subject: [PATCH v3 2/7] clk: hisilicon: add dt-binding document for
+ Hi3519 CRG
+In-Reply-To: <1449819921-18464-3-git-send-email-xuejiancheng@huawei.com>
+References: <1449819921-18464-1-git-send-email-xuejiancheng@huawei.com>
+ <1449819921-18464-3-git-send-email-xuejiancheng@huawei.com>
+Message-ID: <20151211151909.GA21272@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dan,
-
-On Fri, 11 Dec 2015 17:39:47 +0300
-Dan Carpenter <dan.carpenter@oracle.com> wrote:
-
-> On Fri, Dec 11, 2015 at 02:53:20PM +0100, Boris Brezillon wrote:
-> > Hi Brian,
-> > 
-> > On Thu, 10 Dec 2015 16:40:08 -0800
-> > Brian Norris <computersforpeace@gmail.com> wrote:
-> > 
-> > > On Thu, Dec 10, 2015 at 08:59:45AM +0100, Boris Brezillon wrote:
-> > > > Unregister the NAND device from the NAND subsystem when removing a denali
-> > > > NAND controller, otherwise the MTD attached to the NAND device is still
-> > > > exposed by the MTD layer, and accesses to this device will likely crash
-> > > > the system.
-> > > > 
-> > > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > > > Cc: <stable@vger.kernel.org> #3.8+
-> > > 
-> > > Does this follow these rules, from
-> > > Documentation/stable_kernel_rules.txt?
-> > > 
-> > >  - It must be obviously correct and tested.
-> > > 
-> > >  - It must fix a real bug that bothers people (not a, "This could be a
-> > >    problem..." type thing).
-> > 
-> > As you wish, I'll remove those Cc and Fixes tags, or just drop the
-> > patch if you think it's useless...
+On Fri, Dec 11, 2015 at 03:45:16PM +0800, Jiancheng Xue wrote:
+> add dt-binding document for Hi3519 CRG block
 > 
-> The fixes tag is a separate thing from CCing stable.  It's useful on by
-> itself.  I always put the person who wrote the original patch in the To:
-> header so they can review and comment if I have made a mistake.
+> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
+> ---
+>  .../devicetree/bindings/clock/hi3519-crg.txt       | 46 ++++++++++++++++++++++
+>  1 file changed, 46 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/hi3519-crg.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/hi3519-crg.txt b/Documentation/devicetree/bindings/clock/hi3519-crg.txt
+> new file mode 100644
+> index 0000000..e0d30a4
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/hi3519-crg.txt
+> @@ -0,0 +1,46 @@
+> +* Hisilicon Hi3519 Clock and Reset Generator(CRG)
+> +
+> +The Hi3519 CRG module provides clock and reset signals to various
+> +controllers within the SoC.
+> +
+> +This binding uses the following bindings:
+> +    Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +    Documentation/devicetree/bindings/reset/reset.txt
+> +
+> +Required Properties:
+> +
+> +- compatible: should be one of the following.
+> +  - "hisilicon,hi3519-crg" - controller compatible with Hi3519 SoC.
+> +
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +
+> +- #clock-cells: should be 1.
+> +
+> +Each clock is assigned an identifier and client nodes use this identifier
+> +to specify the clock which they consume.
+> +
+> +All these identifier could be found in <dt-bindings/clock/hi3519-clock.h>.
 
-Noted. I added back the Fixes tag and added Dinh Nguyen (the commit
-author) in the loop.
+This header should be part of this patch.
 
-Thanks,
+> +
+> +- #reset-cells: should be 2.
+> +
+> +A reset signal can be controlled by writing a bit register in the CRG module.
+> +The reset specifier consists of two cells. The first cell represents the
+> +register offset relative to the base address. The second cell represents the
+> +bit index in the register.
+> +
+> +Example: CRG nodes
+> +CRG: clock-reset-controller {
 
-Boris
+clock-reset-controller at 12010000
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+> +	compatible = "hisilicon,hi3519-crg";
+> +        reg = <0x12010000 0x10000>;
+> +        #clock-cells = <1>;
+> +        #reset-cells = <2>;
+> +};
+> +
+> +Example: consumer nodes
+> +i2c0: i2c at 0x12110000 {
+
+Drop '0x'
+
+> +	compatible = "hisilicon,hi3519-i2c";
+> +        reg = <0x12110000 0x1000>;
+> +        clocks = <&CRG HI3519_I2C0_RST>;*/
+> +        resets = <&CRG 0xE4 0>;
+
+lowercase hex please
+
+> +};
+> -- 
+> 1.9.1
+> 
