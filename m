@@ -1,22 +1,36 @@
-From: wcohen@redhat.com (William Cohen)
-Date: Fri, 11 Dec 2015 11:09:58 -0500
-Subject: [RFC] kprobe'ing conditionally executed instructions
-In-Reply-To: <566A5997.9020908@linaro.org>
-References: <566A5997.9020908@linaro.org>
-Message-ID: <566AF556.6050704@redhat.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 11 Dec 2015 16:14:50 +0000
+Subject: [PATCH v2] clk: ti: Add support for dm814x ADPLL
+In-Reply-To: <20151211154854.GK23396@atomide.com>
+References: <1449800792-5551-1-git-send-email-tony@atomide.com>
+ <20151211135237.GG30871@n2100.arm.linux.org.uk>
+ <20151211154854.GK23396@atomide.com>
+Message-ID: <20151211161450.GH30871@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/11/2015 12:05 AM, David Long wrote:
-> There is a moderate amount of code already in kprobes on ARM and the current ARMv8 patch to deal with conditional execution of instructions. One aspect of how this is handled is that instructions that fail their predicate and are not (technically) executed are also not treated as a hit kprobe. Steve Capper has suggested that the probe handling should still take place because we stepped through the instruction even if it was effectively a nop.  This would be a significant change in how it currently works on 32-bit ARM, and a change in the patch for ARMv8 (although it's not likely to be much of a change in the kernel code).
-> 
-> I need input on this.  Do people have opinions?
-> 
-> -dl
-> 
+On Fri, Dec 11, 2015 at 07:48:54AM -0800, Tony Lindgren wrote:
+> There's a problem with MAX_CON_ID 16 hardcoded allocated name length.
 
-Hi Dave,
+Absolutely right...
 
-Conditionally executing the kprobes would violate the assumptions made for perf and systemtap collecting data. Even if the instruction is predicated and treated as a NOP it should still reliably trigger the kprobe.  However, for efficiency the simulation/emulation/single-step of the instruction could be skipped if the instruction is known to have no change on the machine state other than changing the program counter.
+> In this case I have 13 instances of plls with 3 - 4 outputs each and I'd
+> like to use "481c5040.adpll.clkout" style naming starting with the instance
+> address. Also "adpll5.clkdcoldo" style naming would work,
 
--Will Cohen
+Because it's a connection ID, not a clock _name_.  I see that we're still
+making all the same mistakes with clocks that were made years ago, and
+which lead down the path of amazingly complex drivers having conditional
+clock names and the like.
+
+Is there a reason why you can't split this into separate device and input
+names, and use clk_get_sys() rather than passing NULL as the device to
+clk_get().  This is exactly why we've ended up with clk_get_sys(), to
+cater for the cases where there is no struct device to associate with the
+connection ID: the idea behind clk_get_sys() is that you pass the device
+name explicitly, along with the connection ID.
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
