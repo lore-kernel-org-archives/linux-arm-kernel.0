@@ -1,61 +1,47 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Fri, 11 Dec 2015 08:06:22 -0600
-Subject: [PATCH 1/3] Device tree binding documentation for gpio-switch
-In-Reply-To: <CACRpkdYZ-PK9Fb2uq+EMz5RTrtX-isxYkiNvWm2QqAh5WZhpOw@mail.gmail.com>
-References: <1449250275-23435-1-git-send-email-martyn.welch@collabora.co.uk>
- <1449250275-23435-2-git-send-email-martyn.welch@collabora.co.uk>
- <CACRpkdYZ-PK9Fb2uq+EMz5RTrtX-isxYkiNvWm2QqAh5WZhpOw@mail.gmail.com>
-Message-ID: <CAL_JsqJ-dht=rCu2-Unm0yOdFfRoOSXd9fkO7eDeQmvWGkGfsQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 11 Dec 2015 14:06:49 +0000
+Subject: FW: Commit 81a43adae3b9 (locking/mutex: Use acquire/release
+ semantics) causing failures on arm64 (ThunderX)
+In-Reply-To: <20151211134803.GP6356@twins.programming.kicks-ass.net>
+References: <SN1PR07MB21577C72379C8440A208D6BC9EEA0@SN1PR07MB2157.namprd07.prod.outlook.com>
+ <CA+=Sn1miWYhH5ddMmLGYWknzcw3d1k4S6QyK9O_ofdJKJDQxmg@mail.gmail.com>
+ <CA+=Sn1n6e9pLDRVWT1EzDEn2XWwoK-Ep__-R6VVPzhbMvCEdNg@mail.gmail.com>
+ <20151211084133.GE6356@twins.programming.kicks-ass.net>
+ <20151211120419.GD18828@arm.com>
+ <20151211121319.GK6356@twins.programming.kicks-ass.net>
+ <20151211121759.GE18828@arm.com>
+ <20151211122647.GM6356@twins.programming.kicks-ass.net>
+ <20151211133313.GG18828@arm.com>
+ <20151211134803.GP6356@twins.programming.kicks-ass.net>
+Message-ID: <20151211140649.GI18828@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 11, 2015 at 6:39 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Fri, Dec 4, 2015 at 6:31 PM, Martyn Welch
-> <martyn.welch@collabora.co.uk> wrote:
->
->> This patch adds documentation for the gpio-switch binding. This binding
->> provides a mechanism to bind named links to gpio, with the primary
->> purpose of enabling standardised access to switches that might be standard
->> across a group of devices but implemented differently on each device.
->>
->> Signed-off-by: Martyn Welch <martyn.welch@collabora.co.uk>
->
-> As mentioned in the comment to the second patch, this solves the
-> following generic problem:
->
-> Expose a GPIO line to userspace using a specific name
->
-> That means basically naming GPIO lines and marking them as
-> "not used by the operating system".
->
-> This is something that has been proposed before, and postponed
-> because the kernel lacks the right infrastructure.
+On Fri, Dec 11, 2015 at 02:48:03PM +0100, Peter Zijlstra wrote:
+> On Fri, Dec 11, 2015 at 01:33:14PM +0000, Will Deacon wrote:
+> > On Fri, Dec 11, 2015 at 01:26:47PM +0100, Peter Zijlstra wrote:
+> 
+> > > While we're there, the acquire in osq_wait_next() seems somewhat ill
+> > > documented too.
+> > > 
+> > > I _think_ we need ACQUIRE semantics there because we want to strictly
+> > > order the lock-unqueue A,B,C steps and we get that with:
+> > > 
+> > >  A: SC
+> > >  B: ACQ
+> > >  C: Relaxed
+> > > 
+> > > Similarly for unlock we want the WRITE_ONCE to happen after
+> > > osq_wait_next, but in that case we can even rely on the control
+> > > dependency there.
+> > 
+> > Even for the lock-unqueue case, isn't B->C ordered by a control dependency
+> > because C consists only of stores?
+> 
+> Hmm, indeed. So we could go fully relaxed on it I suppose, since the
+> same is true for the unlock site.
 
-That doesn't necessarily mean we can't define a binding.
+In which case, we should be able to relax the xchg in there (osq_wait_next)
+too, right?
 
-> Markus Pargmann also did a series that add initial values to
-> hogs, which is the inverse usecase of this, where you want to
-> *output* something by default, then maybe also make it available
-> to userspace.
->
-> So what we need to see here is a patch series that does all of these
-> things:
->
-> - Name lines
->
-> - Sets them to initial values
->
-> - Mark them as read-only
->
-> - Mark them as "not used by the operating system" so that they
->   can be default-exported to userspace.
-
-No! This should not be a DT property.
-
-Whether I want to control a GPIO in the kernel or userspace is not
-known and can change over time. It could simply depend on kernel
-config. There is also the case that a GPIO has no connection or kernel
-driver until some time later when a DT overlay for an expansion board
-is applied.
-
-Rob
+Will
