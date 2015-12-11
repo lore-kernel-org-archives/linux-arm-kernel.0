@@ -1,29 +1,33 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Fri, 11 Dec 2015 15:14:12 -0800
-Subject: [PATCH 2/3] arm64: dts: apq8016-sbc: add label properties for
- UART, I2C, and SPI
-In-Reply-To: <1449782473-20880-3-git-send-email-robh@kernel.org> (Rob
- Herring's message of "Thu, 10 Dec 2015 15:21:12 -0600")
-References: <1449782473-20880-1-git-send-email-robh@kernel.org>
- <1449782473-20880-3-git-send-email-robh@kernel.org>
-Message-ID: <7hlh90fuij.fsf@deeprootsystems.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 12 Dec 2015 00:14:23 +0100
+Subject: [PATCH v10 2/2] arm-soc: Add support for tango4 platforms
+In-Reply-To: <56558E41.7050301@sigmadesigns.com>
+References: <56549B3A.8010703@sigmadesigns.com>
+ <5654A0F3.40404@sigmadesigns.com> <56558E41.7050301@sigmadesigns.com>
+Message-ID: <7573032.IeyxZFmjBm@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob Herring <robh@kernel.org> writes:
+On Wednesday 25 November 2015 11:32:33 Marc Gonzalez wrote:
+> On 24/11/2015 18:40, Marc Gonzalez wrote:
+> 
+> > +config ARCH_TANGO
+> > +     bool "Sigma Designs Tango4 (SMP87xx)" if ARCH_MULTI_V7
+> > +     # Cortex-A9 MPCore r3p0, PL310 r3p2
+> > +     select ARCH_HAS_HOLES_MEMORYMODEL
+> > +     select ARM_ERRATA_754322
+> > +     select ARM_ERRATA_764369 if SMP
+> > +     select ARM_ERRATA_775420
+> > +     select ARM_GIC
+> > +     select CLKSRC_TANGO_XTAL
+> > +     select GENERIC_IRQ_CHIP
+> 
+> Instead of GENERIC_IRQ_CHIP, I should select TANGO_IRQCHIP
+> (to be defined in drivers/irqchip/Kconfig)
+> 
+> TANGO_IRQCHIP itself will select IRQ_DOMAIN and GENERIC_IRQ_CHIP.
+> 
 
-> Add label properties to provide a way to identify UART, I2C and SPI
-> ports based on their connector names. This follows naming convention in
-> 96boards CE spec. Ports without external connections are not labelled.
->
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> Cc: Andy Gross <agross@codeaurora.org>
+Are you sending a V11 with this?
 
-Acked-by: Kevin Hilman <khilman@linaro.org>
-Tested-by: Kevin Hilman <khilman@linaro.org>
-
-Tested this on my db410c (along with script from cover letter) and it
-works great.
-
-Kevin
+	Arnd
