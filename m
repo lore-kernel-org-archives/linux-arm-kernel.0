@@ -1,47 +1,48 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Fri, 11 Dec 2015 10:27:13 +0000
-Subject: [RFC] kprobe'ing conditionally executed instructions
-In-Reply-To: <566A5997.9020908@linaro.org>
-References: <566A5997.9020908@linaro.org>
-Message-ID: <1449829633.2815.27.camel@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 11 Dec 2015 10:33:22 +0000
+Subject: [PATCH] net/macb: add support for resetting PHY using GPIO
+In-Reply-To: <20151211102130.GA11966@pengutronix.de>
+References: <1449683383-5022-1-git-send-email-gregory.clement@free-electrons.com>
+ <20151210073756.GA11966@pengutronix.de>
+ <871tau8hpj.fsf@free-electrons.com>
+ <20151211084630.GW11966@pengutronix.de>
+ <87wpsl727t.fsf@free-electrons.com>
+ <20151211102130.GA11966@pengutronix.de>
+Message-ID: <20151211103322.GR8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-12-11 at 00:05 -0500, David Long wrote:
-> There is a moderate amount of code already in kprobes on ARM and the 
-> current ARMv8 patch to deal with conditional execution of instructions. 
-> One aspect of how this is handled is that instructions that fail their 
-> predicate and are not (technically) executed are also not treated as a 
-> hit kprobe. Steve Capper has suggested that the probe handling should 
-> still take place because we stepped through the instruction even if it 
-> was effectively a nop.  This would be a significant change in how it 
-> currently works on 32-bit ARM
+On Fri, Dec 11, 2015 at 11:21:30AM +0100, Sascha Hauer wrote:
+> On Fri, Dec 11, 2015 at 10:40:22AM +0100, Gregory CLEMENT wrote:
+> > So I see 2 options:
+> > 
+> > - leaving the phy-reset-gpios property in the ethernet node. Thanks to
+> >   this we can use the gpiod functions, and it is still possible to use
+> >   manage the power management.
+> > 
+> > - using a reset-gpios property inside the phy node. But then the only
+> >   solution to get a reference on it, will be to use
+> >   of_get_named_gpio. All the gpiod functions need a reference to the
+> >   device that we won't have at this point. Also we will only be able to
+> >   power up the reset, but we won't have any reference to it latter.
+> 
+> Have you seen fwnode_get_named_gpiod()? This seems to be the right
+> function for the job.
 
-32-bit ARM uses undefined instructions for kprobe 'breakpoints' and the
-ARM ARM says it's implementation defined behaviour whether these
-generate exceptions or not, i.e. whether the kprobe handler will be
-called. You could say that we could always use unconditional
-breakpoints, but this doesn't work with thumb where the instruction
-could be in an IT block. So, the only way to have consistent behaviour
-on all platforms is to not call kprobe handlers if condition check
-fails. Which is the reason for the current implementation's design.
+Except:
 
-Also, if we change the current implementation as suggested, then looking
-at things from a source code point of view...
+1. You don't have a dev->fwnode pointer setup.
+2. Using &dev->of_node->fwnode is really going underneath the covers.
 
-if (test)
-	foo()
-else
-	bar();
+I've pointed this problem out several times with the fwnode code, which
+seems to be a half-baked and incomplete design when it comes to DT.
 
-If you put a probe on the call to foo() and the compiler uses a branch
-instruction for the test you're never going to hit the probe
-fortest==false. But if it decides to use conditional instructions it
-will (on some CPU implementations). And the choice between
-branch/conditional instructions probably varies between GCC version and
-kernel configs.
-
-So again, IMO, the current kprobes implementation leads to consistency.
+I'd suggest using of_get_named_gpio_flags() et.al. and converting the
+resulting gpio number to a gpio descriptor - or trying to push DT and
+fwnode people to initialise dev->fwnode so that a proper transition to
+fwnode for DT can be made.
 
 -- 
-Tixy 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
