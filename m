@@ -1,87 +1,31 @@
-From: bhupesh.sharma@freescale.com (Bhupesh Sharma)
-Date: Fri, 11 Dec 2015 17:17:47 +0530
-Subject: [PATCH v2 2/2] dts/ls2080a: Update DTSI to add support of SP805 WDT
-In-Reply-To: <1449834467-30283-1-git-send-email-bhupesh.sharma@freescale.com>
-References: <1449834467-30283-1-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <1449834467-30283-3-git-send-email-bhupesh.sharma@freescale.com>
+From: kvalo@codeaurora.org (Kalle Valo)
+Date: Fri, 11 Dec 2015 11:50:37 +0000 (UTC)
+Subject: iwlegacy: mark il_adjust_beacon_interval as noinline
+In-Reply-To: <36263581.L8412YxJjp@wuerfel>
+Message-ID: <20151211115037.B4125141D60@smtp.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the LS2080a DTSI (DTS Include) file to add
-support for eight SP805 Watchdog units which can be used to
-reset the eight Cortex-A57 cores available on LS2080A.
 
-Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
----
- arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi |   56 ++++++++++++++++++++++++
- 1 file changed, 56 insertions(+)
+> With the new optimized do_div() code, some versions of gcc
+> produce obviously incorrect code that leads to a link error
+> in iwlegacy/common.o:
+> 
+> drivers/built-in.o: In function `il_send_rxon_timing':
+> :(.text+0xa6b4d4): undefined reference to `____ilog2_NaN'
+> :(.text+0xa6b4f0): undefined reference to `__aeabi_uldivmod'
+> 
+> In a few thousand randconfig builds, I have seen this problem
+> a couple of times in this file, but never anywhere else in the
+> kernel, so we can try to work around this in the only file
+> that shows the behavior, by marking the il_adjust_beacon_interval
+> function as noinline, which convinces gcc to use the unoptimized
+> do_div() all the time.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Acked-by: Nicolas Pitre <nico@linaro.org>
+> Acked-by: Stanislaw Gruszka <sgruszka@redhat.com>
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-index e81cd48..7b0f411 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-@@ -193,6 +193,62 @@
- 			interrupts = <0 32 0x4>; /* Level high type */
- 		};
- 
-+		cluster1_core0_watchdog: wdt at c000000 {
-+			compatible = "arm,sp805-wdt", "arm,primecell";
-+			reg = <0x0 0xc000000 0x0 0x1000>;
-+			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
-+			clock-names = "apb_pclk", "wdog_clk";
-+		};
-+
-+		cluster1_core1_watchdog: wdt at c010000 {
-+			compatible = "arm,sp805-wdt", "arm,primecell";
-+			reg = <0x0 0xc010000 0x0 0x1000>;
-+			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
-+			clock-names = "apb_pclk", "wdog_clk";
-+		};
-+
-+		cluster2_core0_watchdog: wdt at c100000 {
-+			compatible = "arm,sp805-wdt", "arm,primecell";
-+			reg = <0x0 0xc100000 0x0 0x1000>;
-+			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
-+			clock-names = "apb_pclk", "wdog_clk";
-+		};
-+
-+		cluster2_core1_watchdog: wdt at c110000 {
-+			compatible = "arm,sp805-wdt", "arm,primecell";
-+			reg = <0x0 0xc110000 0x0 0x1000>;
-+			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
-+			clock-names = "apb_pclk", "wdog_clk";
-+		};
-+
-+		cluster3_core0_watchdog: wdt at c200000 {
-+			compatible = "arm,sp805-wdt", "arm,primecell";
-+			reg = <0x0 0xc200000 0x0 0x1000>;
-+			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
-+			clock-names = "apb_pclk", "wdog_clk";
-+		};
-+
-+		cluster3_core1_watchdog: wdt at c210000 {
-+			compatible = "arm,sp805-wdt", "arm,primecell";
-+			reg = <0x0 0xc210000 0x0 0x1000>;
-+			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
-+			clock-names = "apb_pclk", "wdog_clk";
-+		};
-+
-+		cluster4_core0_watchdog: wdt at c300000 {
-+			compatible = "arm,sp805-wdt", "arm,primecell";
-+			reg = <0x0 0xc300000 0x0 0x1000>;
-+			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
-+			clock-names = "apb_pclk", "wdog_clk";
-+		};
-+
-+		cluster4_core1_watchdog: wdt at c310000 {
-+			compatible = "arm,sp805-wdt", "arm,primecell";
-+			reg = <0x0 0xc310000 0x0 0x1000>;
-+			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
-+			clock-names = "apb_pclk", "wdog_clk";
-+		};
-+
- 		fsl_mc: fsl-mc at 80c000000 {
- 			compatible = "fsl,qoriq-mc";
- 			reg = <0x00000008 0x0c000000 0 0x40>,	 /* MC portal base */
--- 
-1.7.9.5
+Thanks, applied to wireless-drivers-next.git.
+
+Kalle Valo
