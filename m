@@ -1,64 +1,30 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 11 Dec 2015 11:59:38 +0900
-Subject: [PATCH] ARM: shmobile: r8a779x: use SoC-specific usb-dac
- compatibility strings
-Message-ID: <1449802778-11777-1-git-send-email-horms+renesas@verge.net.au>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Fri, 11 Dec 2015 11:00:46 +0800
+Subject: [PATCH 1/2] crypto: sahara: fix 64-bit dma_addr_t compilation
+In-Reply-To: <1707164.bU6CqSGiie@wuerfel>
+References: <1707164.bU6CqSGiie@wuerfel>
+Message-ID: <20151211030046.GB10399@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use recently SoC-specific compatibility strings in r8a779[01] device trees.
+On Tue, Dec 08, 2015 at 04:23:51PM +0100, Arnd Bergmann wrote:
+> The sahara hardware uses DMA descriptors with 32-bit addresses, but
+> dma_addr_t is variable size depending on whether we want to support
+> any devices that use 64-bit DMA addresses in hardware.
+> This means that the definition of the DMA descriptor structure is wrong,
+> and we helpfully get a compiler warning about them too:
+> 
+> drivers/crypto/sahara.c:423:372: warning: format '%x' expects argument of type 'unsigned int', but argument 4 has type 'dma_addr_t {aka long long unsigned int}' [-Wformat=]
+> 
+> This changes the definition of the sahara_hw_desc and sahara_hw_link
+> structures to only contain fixed-length members, which is required
+> to make the driver work on ARM LPAE mode, and avoids most of the
+> gcc warnings we get.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
-Based on renesas-devel-20151211-v4.4-rc4
----
- arch/arm/boot/dts/r8a7790.dtsi | 4 ++--
- arch/arm/boot/dts/r8a7791.dtsi | 4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 9f3036b80c0e..c6f083c9345d 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -386,7 +386,7 @@
- 	};
- 
- 	usb_dmac0: dma-controller at e65a0000 {
--		compatible = "renesas,usb-dmac";
-+		compatible = "renesas,r8a7790-usb-dmac", "renesas,usb-dmac";
- 		reg = <0 0xe65a0000 0 0x100>;
- 		interrupts = <0 109 IRQ_TYPE_LEVEL_HIGH
- 			      0 109 IRQ_TYPE_LEVEL_HIGH>;
-@@ -398,7 +398,7 @@
- 	};
- 
- 	usb_dmac1: dma-controller at e65b0000 {
--		compatible = "renesas,usb-dmac";
-+		compatible = "renesas,r8a7790-usb-dmac", "renesas,usb-dmac";
- 		reg = <0 0xe65b0000 0 0x100>;
- 		interrupts = <0 110 IRQ_TYPE_LEVEL_HIGH
- 			      0 110 IRQ_TYPE_LEVEL_HIGH>;
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 36559cb0eb6b..ae1dda181624 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -375,7 +375,7 @@
- 	};
- 
- 	usb_dmac0: dma-controller at e65a0000 {
--		compatible = "renesas,usb-dmac";
-+		compatible = "renesas,r8a7791-usb-dmac", "renesas,usb-dmac";
- 		reg = <0 0xe65a0000 0 0x100>;
- 		interrupts = <0 109 IRQ_TYPE_LEVEL_HIGH
- 			      0 109 IRQ_TYPE_LEVEL_HIGH>;
-@@ -387,7 +387,7 @@
- 	};
- 
- 	usb_dmac1: dma-controller at e65b0000 {
--		compatible = "renesas,usb-dmac";
-+		compatible = "renesas,r8a7791-usb-dmac", "renesas,usb-dmac";
- 		reg = <0 0xe65b0000 0 0x100>;
- 		interrupts = <0 110 IRQ_TYPE_LEVEL_HIGH
- 			      0 110 IRQ_TYPE_LEVEL_HIGH>;
+Both patches applied.  Thanks.
 -- 
-2.1.4
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
