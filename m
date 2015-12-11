@@ -1,103 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 11 Dec 2015 07:48:54 -0800
-Subject: [PATCH v2] clk: ti: Add support for dm814x ADPLL
-In-Reply-To: <20151211135237.GG30871@n2100.arm.linux.org.uk>
-References: <1449800792-5551-1-git-send-email-tony@atomide.com>
- <20151211135237.GG30871@n2100.arm.linux.org.uk>
-Message-ID: <20151211154854.GK23396@atomide.com>
+From: r.schwebel@pengutronix.de (Robert Schwebel)
+Date: Fri, 11 Dec 2015 17:01:04 +0100
+Subject: [PATCH v2 5/5] can: flexcan: Add support for non RX-FIFO mode
+In-Reply-To: <BY1PR0301MB1303A87AF2B3FFBB6CDA90EE82E90@BY1PR0301MB1303.namprd03.prod.outlook.com>
+References: <1431603215-25546-1-git-send-email-bhupesh.sharma@freescale.com>
+ <1431603215-25546-6-git-send-email-bhupesh.sharma@freescale.com>
+ <5554C244.80809@pengutronix.de>
+ <BY1PR0301MB130358076C3A5969406DE69182D80@BY1PR0301MB1303.namprd03.prod.outlook.com>
+ <BY1PR0301MB130384E91308C49A850DEC4782E90@BY1PR0301MB1303.namprd03.prod.outlook.com>
+ <56696DC8.8020708@pengutronix.de>
+ <BY1PR0301MB1303A87AF2B3FFBB6CDA90EE82E90@BY1PR0301MB1303.namprd03.prod.outlook.com>
+Message-ID: <20151211160104.GU30206@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [151211 05:53]:
-> On Thu, Dec 10, 2015 at 06:26:32PM -0800, Tony Lindgren wrote:
-> > +	/* Released with kfree() by clkdev_drop() */
-> > +	cl = kzalloc(sizeof(*cl), GFP_KERNEL);
-> > +	if (!cl)
-> > +		return -ENOMEM;
-> > +
-> > +	/* Use clkdev_add, clk_register_clkdev limits length to MAX_CON_ID */
-> > +	cl->con_id = name;
-> > +	cl->clk = clock;
-> > +	cl->clk_hw = __clk_get_hw(clock);
-> > +	clkdev_add(cl);
-> > +	d->clocks[index].cl = cl;
+On Thu, Dec 10, 2015 at 12:22:55PM +0000, Sharma Bhupesh wrote:
+> > If we have to rely on the timestamps the next logical step is to add
+> > sorting by timestamp to the rx-fifo implementation. I'll send a
+> > patch series of the current state.
 > 
-> NAK.  I've no idea why you're open-coding the clkdev internals (which
-> seems to have been a historical habbit in OMAP code.)  Please stop
-> doing this.
->
-> You are provided with clkdev_alloc() which will allocate the structure
-> and initialise it for you, and clkdev_add() which will add the allocated
-> and initialised struct to the list of lookups.  Everything you're doing
-> above can be done with clkdev_alloc() + clkdev_add() which have been
-> there for a _very_ long time.  They're even documented (thanks for
-> providing me with more proof that documentation is nothing but a waste
-> of time. :))
+> With my current v3, I see no rx-frame ordering issues atleast on
+> LS1021A.
 
-I tried, but I was seeing mysterious silent failures for some clocks.
+Marc can post our testcases here on the list (maybe with the description
+from the service request); perhaps this can clarify the issues.
 
-> Even better is clkdev_create() which eliminates the two step clkdev_alloc()
-> and clkdev_add() process.
-> 
-> So, the whole of the above can be reduced down to:
-> 
-> 	cl = clkdev_create(clock, name, NULL);
-> 	if (!cl)
-> 		return -ENOMEM;
-> 
+> I can ask internally about more details on the "SR# 1-4074792564 : CAN
+> Ordering Issues".
 
-There's a problem with MAX_CON_ID 16 hardcoded allocated name length.
+That would be quite helpful, thanks! Understanding the root cause of the
+issue is often a good start, maybe there is an option for a software
+workaround.
 
-In this case I have 13 instances of plls with 3 - 4 outputs each and I'd
-like to use "481c5040.adpll.clkout" style naming starting with the instance
-address. Also "adpll5.clkdcoldo" style naming would work,
-
-Below is a patch we should probably apply as a band aid to produce a proper
-warning.
-
-Naturally we don't want to allocate longer names for all the clocks.. And
-we already do have some const names coming from device tree we could use.
-
-What if we optionally allow passing a name to clkdev and add some flag
-that tells clkdev code not to attempt to free it? Or do you have better
-ideas in mind to fix the issue?
-
-Regards,
-
-Tony
-
-8< ----------------
-From: Tony Lindgren <tony@atomide.com>
-Date: Fri, 11 Dec 2015 07:28:36 -0800
-Subject: [PATCH] clkdev: Make silent failures of clk_get() produce a proper
- warning
-
-Otherwise we can see mysterious failures with some clocks where
-the name is longer than MAX_CON_ID 16. This can easily happen with
-clock names coming from device tree for example in the form of
-"481c5040.adpll.clkout" or "adpll1.clkdcoldo".
-
-Let's make things a bit easier to debug by adding a warning for
-the clock name. Note that we don't want to error out here as the
-string matching still probably does the right thing for most
-clocks.
-
-Also note that we should also remove the hardcoded name allocation
-in clkdev by adding functions that allow passing a name to clkdev
-optionally.
-
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- a/drivers/clk/clkdev.c
-+++ b/drivers/clk/clkdev.c
-@@ -256,6 +256,10 @@ vclkdev_alloc(struct clk_hw *hw, const char *con_id, const char *dev_fmt,
- {
- 	struct clk_lookup_alloc *cla;
- 
-+	if (strlen(con_id) > MAX_CON_ID)
-+		pr_warn("%s length of %s > %i, clock lookup can fail\n",
-+			__func__, con_id, MAX_CON_ID);
-+
- 	cla = __clkdev_alloc(sizeof(*cla));
- 	if (!cla)
- 		return NULL;
+rsc
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
