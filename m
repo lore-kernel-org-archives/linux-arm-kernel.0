@@ -1,28 +1,42 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 11 Dec 2015 10:27:39 +0900
-Subject: [PATCH v5 7/7] ARM: Exynos: use generic cpufreq driver for
- Exynos5422/5800
-In-Reply-To: <1449766729-435-8-git-send-email-b.zolnierkie@samsung.com>
-References: <1449766729-435-1-git-send-email-b.zolnierkie@samsung.com>
- <1449766729-435-8-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <566A268B.8080404@samsung.com>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Fri, 11 Dec 2015 09:30:48 +0800
+Subject: [PATCH v2 0/4] Add support for rk3228 Soc platform
+Message-ID: <1449797452-19389-1-git-send-email-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11.12.2015 01:58, Bartlomiej Zolnierkiewicz wrote:
-> The new CPU clock type allows the use of generic cpufreq-dt driver
-> for Exynos5422/5800.
-> 
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-> Cc: Thomas Abraham <thomas.ab@samsung.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> ---
->  arch/arm/mach-exynos/exynos.c | 1 +
->  1 file changed, 1 insertion(+)
+This serial of patches add dts/pinctrl/clock-tree/doc for rk3228
+platform, with these patches, my evb board could boot into initramfs.
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Changes in v2:
+Fix some clock tree errors.
+Fix some coding styles.
 
-Best regards,
-Krzysztof
+Separate board and core properties.
+Remove phy clocks.
+Order nodes by register address.
+Add vgic registers and interrupt.
+
+Move board properties into board dts.
+
+Jeffy Chen (4):
+  pinctrl: rockchip: add support for the rk3228
+  rockchip: add clock controller for rk3228
+  ARM: dts: rockchip: add core rk3228 dtsi
+  ARM: dts: rockchip: add rk3228-evb board
+
+ .../bindings/pinctrl/rockchip,pinctrl.txt          |   3 +-
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/rk3228-evb.dts                   |  66 ++
+ arch/arm/boot/dts/rk3228.dtsi                      | 442 +++++++++++++
+ drivers/clk/rockchip/Makefile                      |   1 +
+ drivers/clk/rockchip/clk-rk3228.c                  | 681 +++++++++++++++++++++
+ drivers/clk/rockchip/clk.h                         |  11 +-
+ drivers/pinctrl/pinctrl-rockchip.c                 |  53 ++
+ 8 files changed, 1256 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/boot/dts/rk3228-evb.dts
+ create mode 100644 arch/arm/boot/dts/rk3228.dtsi
+ create mode 100644 drivers/clk/rockchip/clk-rk3228.c
+
+-- 
+2.1.4
