@@ -1,161 +1,27 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Fri, 11 Dec 2015 14:26:31 +0800
-Subject: [RFC PATCH 3/9] drm/rockchip: Convert to support atomic API
-In-Reply-To: <CAPj87rO9_sXZHidTpNs_ubFaUX8ZtytK=bLpQSQwSy5G2-JGEA@mail.gmail.com>
-References: <1448940391-23333-1-git-send-email-mark.yao@rock-chips.com>	<1448940391-23333-4-git-send-email-mark.yao@rock-chips.com>	<CAPj87rPtWgH2WE7_EEC-Q41c7Ew2z8CwPMMQD+cC08G7qNZTeg@mail.gmail.com>	<565D68F0.3010905@rock-chips.com>
- <CAPj87rO9_sXZHidTpNs_ubFaUX8ZtytK=bLpQSQwSy5G2-JGEA@mail.gmail.com>
-Message-ID: <566A6C97.4020207@rock-chips.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 11 Dec 2015 07:05:32 +0000
+Subject: [PICKME 0/2] cpufreq: New ST driver
+In-Reply-To: <20151211031900.GM3612@ubuntu>
+References: <1449740537-12619-1-git-send-email-lee.jones@linaro.org>
+ <2896628.JCDQCVfIaC@vostro.rjw.lan> <20151211031900.GM3612@ubuntu>
+Message-ID: <20151211070532.GB13538@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?12?02? 22:18, Daniel Stone wrote:
-> Hi Mark,
-> Thanks for getting back to this.
->
-> On 1 December 2015 at 09:31, Mark yao <mark.yao@rock-chips.com> wrote:
->> On 2015?12?01? 16:18, Daniel Stone wrote:
->>> On 1 December 2015 at 03:26, Mark Yao<mark.yao@rock-chips.com>  wrote:
->>>>> +       for_each_crtc_in_state(state, crtc, crtc_state, i) {
->>>>> +               if (!crtc->state->active)
->>>>> +                       continue;
->>>>> +
->>>>> +               rockchip_crtc_wait_for_update(crtc);
->>>>> +       }
->>> I'd be much more comfortable if this passed in an explicit pointer to
->>> state, or an address to wait for, rather than have wait_for_complete
->>> dig out state with no locking. The latter is potentially racy for
->>> async operations.
->>>
->> Hi Daniel
->>     "if this passed in an explicit pointer to state, or an address to wait
->> for", I don't understand, can you point how it work?
-> Ah, OK. I mean that rockchip_crtc_wait_for_update takes a drm_crtc
-> pointer, and establishes the state from that (e.g.
-> crtc->primary->state). This can easily lead to confusion in async
-> contexts, as the states attached to a drm_crtc and a drm_plane can
-> change here while you wait for it.
->
-> It would be better if the call was:
->
-> for_each_plane_in_state(state, plane, plane_state, i) {
->      if (plane->type == DRM_PLANE_TYPE_PRIMARY)
->          rockchip_crtc_wait_for_update(plane_state->crtc, plane_state);
-> }
->
-> This way it is very clear, and there is no confusion as to which
-> request we are waiting to complete.
->
-> In general, using crtc->state or plane->state is a very bad idea,
-> _except_ in the atomic_check function where you are calculating
-> changes (e.g. if (plane_state->fb->pitches[0] !=
-> plane->state->fb->pitches[0]) rockchip_plane_state->pitch_changed =
-> true). After atomic_check, you should always pass around pointers to
-> the plane state explicitly, and avoid using the pointers from drm_crtc
-> and drm_plane.
->
-> Does that help?
+On Fri, 11 Dec 2015, Viresh Kumar wrote:
+> On 10-12-15, 22:38, Rafael J. Wysocki wrote:
+> > Do they depend on anything special?
+> 
+> My opp-binding-parsing patches which you applied to bleeding-edge.
 
-Hi Daniel
+I thought these had already been applied.
 
-Sorry, I don't actually understand why crtc->state or plane->state is no 
-recommended
-except atomic_check, on atomic_update, we need use plane->state, is that 
-a problem?
+> Yes, Lee should have mentioned that explicitly.
 
-I guess that, drm_atomic_helper_swap_state would race with async operations,
-so use crtc->state on async stack is not safe. is it correct?
-
-I think we can make asynchronous commit serialize as tegra drm done to 
-avoid this problem:
-
-
-   86         /* serialize outstanding asynchronous commits */
-   87 mutex_lock(&tegra->commit.lock);
-   88 flush_work(&tegra->commit.work);
-89
-   90 /*
-   91          * This is the point of no return - everything below never 
-fails except
-   92          * when the hw goes bonghits. Which means we can commit 
-the new state on
-   93          * the software side now.
-   94 */
-95
-   96         drm_atomic_helper_swap_state(drm, state);
-97
-   98         if (async)
-   99                 tegra_atomic_schedule(tegra, state);
-  100 else
-  101                 tegra_atomic_complete(tegra, state);
-  102
-  103         mutex_unlock(&tegra->commit.lock);
-
-
->
->>>>           if (is_yuv) {
->>>>                   /*
->>>>                    * Src.x1 can be odd when do clip, but yuv plane start
->>>> point
->>>>                    * need align with 2 pixel.
->>>>                    */
->>>> -               val = (src.x1 >> 16) % 2;
->>>> -               src.x1 += val << 16;
->>>> -               src.x2 += val << 16;
->>>> +               uint32_t temp = (src->x1 >> 16) % 2;
->>>> +
->>>> +               src->x1 += temp << 16;
->>>> +               src->x2 += temp << 16;
->>>>           }
->>> I know this isn't new, but moving the plane around is bad. If the user
->>> gives you a pixel boundary that you can't actually use, please reject
->>> the configuration rather than silently trying to fix it up.
->> the origin src.x1 would align with 2 pixel, but when we move the dest
->> window, and do clip by output, the src.x1 may be clipped to odd.
->> regect this configuration may let user confuse, sometimes good, sometimes
->> bad.
-> For me, it is more confusing when the display shows something
-> different to what I have requested. In some media usecases, doing this
-> is a showstopper and will result in products failing acceptance
-> testing. Userspace can make a policy decision to try different
-> alignments to get _something_ to show (even if it's not what was
-> explicitly requested), but doing this in the kernel is inappropriate:
-> please just reject it, and have userspace fall back to another
-> composition method (e.g. GL) in these cases.
->
->>>> -static void vop_plane_destroy(struct drm_plane *plane)
->>>> +static void vop_atomic_plane_destroy_state(struct drm_plane *plane,
->>>> +                                          struct drm_plane_state *state)
->>>>    {
->>>> -       vop_disable_plane(plane);
->>>> -       drm_plane_cleanup(plane);
->>>> +       struct vop_plane_state *vop_state = to_vop_plane_state(state);
->>>> +
->>>> +       if (state->fb)
->>>> +               drm_framebuffer_unreference(state->fb);
->>>> +
->>>> +       kfree(vop_state);
->>>>    }
->>> You can replace this hook with drm_atomic_helper_plane_destroy_state.
->>
->> Hmm, only can hook with __drm_atomic_helper_plane_destroy_state.
-> Ah yes, you're right. But still, using that would be better than duplicating it.
->
->>      Can you share your Weston environment to me, I'm interesting to test drm
->> rockchip on weston.
-> Of course. You can download Weston from http://wayland.freedesktop.org
-> - the most interesting dependencies are libevdev, libinput, and
-> wayland itself. If you are building newer Weston from git, you'll need
-> the wayland-protocols repository as well, from
-> anongit.freedesktop.org/git/wayland/wayland-protocols/. Please let me
-> know privately if you need some more help with building these, but
-> they should be quite straightforward.
->
-> Cheers,
-> Daniel
->
->
->
-
+Aye, apologies for that.
 
 -- 
-?ark Yao
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
