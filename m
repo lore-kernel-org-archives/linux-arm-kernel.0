@@ -1,49 +1,27 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Fri, 11 Dec 2015 13:10:29 -0500
-Subject: [PATCH] scripts: recordmcount: break hardlinks
-In-Reply-To: <20151211144541.GT8644@n2100.arm.linux.org.uk>
-References: <20151202090517.432556a4@gandalf.local.home>
- <E1a7MVT-0000et-62@rmk-PC.arm.linux.org.uk>
- <20151211093125.50b72639@gandalf.local.home>
- <20151211144541.GT8644@n2100.arm.linux.org.uk>
-Message-ID: <20151211131029.5bb23411@gandalf.local.home>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 11 Dec 2015 19:11:12 +0100
+Subject: [PATCH v2 1/4] pinctrl: rockchip: add support for the rk3228
+In-Reply-To: <1449797452-19389-2-git-send-email-jeffy.chen@rock-chips.com>
+References: <1449797452-19389-1-git-send-email-jeffy.chen@rock-chips.com>
+ <1449797452-19389-2-git-send-email-jeffy.chen@rock-chips.com>
+Message-ID: <CACRpkdY6U2aYZY6Sd_cyMVWNOL_LfU812g+jezGoFLjEi7HYKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Dec 2015 14:45:41 +0000
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+On Fri, Dec 11, 2015 at 2:30 AM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
 
-> On Fri, Dec 11, 2015 at 09:31:25AM -0500, Steven Rostedt wrote:
-> > On Fri, 11 Dec 2015 12:09:03 +0000
-> > Russell King <rmk+kernel@arm.linux.org.uk> wrote:
-> >   
-> > > recordmcount edits the file in-place, which can cause problems when
-> > > using ccache in hardlink mode.  Arrange for recordmcount to break a
-> > > hardlinked object.
-> > > 
-> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > > ---
-> > > Steven, sorry it took a while to get this out...  
-> > 
-> > Should this be for stable, or is it fine to just add this to my 4.5
-> > queue?  
-> 
-> I thought you wanted to test it first - although I've been running with
-> this for a while now, my nightly builds have masked out the mcount
-> warning, and I suspect it'll take a while for ccache to purge itself
-> of the modified objects.
-> 
-> If you're happy to add a stable tag to it, then please do so.
-> 
+> The pinctrl of rk3228 is much the same as rk3288's, but
+> without pmu.
+>
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> Acked-by: Rob Herring <robh@kernel.org>
+>
+> ---
+>
+> Changes in v2: None
 
-I ran it through most my tests (it's still running and is at 20 of 33
-tests). If there was anything wrong with this patch, I'm sure one of my
-tests would have crashed by now.
+Same as I applied then, I also added the same Review/ACKs.
 
-Do you want to take it, or shall I?
-
-If you want to take it, you can add my:
-
-Reviewed-by: Steven Rostedt <rostedt@goodmis.org>
-
--- Steve
+Yours,
+Linus Walleij
