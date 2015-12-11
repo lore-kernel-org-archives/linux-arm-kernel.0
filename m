@@ -1,48 +1,32 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 11 Dec 2015 15:21:42 +0100
-Subject: [GIT PULL] ARM: mvebu: defconfig for v4.5 (#2)
-Message-ID: <87io456p6x.fsf@free-electrons.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 11 Dec 2015 15:21:53 +0100
+Subject: [PATCH 2/2] ARM: mvebu: kirkwood: add PogoPlug series 4 device
+ tree
+In-Reply-To: <CACRpkdYHk4ZtF-UY7tp9YrGocyqKNCCPLfWheeP4wvAVxJzhHg@mail.gmail.com>
+References: <1448578868-6323-1-git-send-email-linus.walleij@linaro.org>
+ <20151127202738.GC32356@lunn.ch>
+ <CACRpkdYHk4ZtF-UY7tp9YrGocyqKNCCPLfWheeP4wvAVxJzhHg@mail.gmail.com>
+Message-ID: <20151211142153.GD12282@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Dec 11, 2015 at 09:28:54AM +0100, Linus Walleij wrote:
+> On Fri, Nov 27, 2015 at 9:27 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+> >> +     chosen {
+> >> +             bootargs = "console=ttyS0,115200n8";
+> >> +             stdout-path = &uart0;
+> >
+> > Hi Linus
+> >
+> > You can append the baud rate etc to uart0, and then don't need
+> > bootargs.
 
-Here is the second pull request for defconfig for mvebu for v4.5.
+> However there is also stdout-path, so I went for this:
+> 
+> stdout-path = "serial0:115200n8";
 
-Gregory
+Hi Linus
 
-The following changes since commit a0638365f6850855728a5ef5caf2aeab82a58035:
+Yes, this is what i meant.
 
-  ARM: mvebu: add Kirkwood cpuidle to defconfig (2015-11-30 15:26:45 +0100)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-defconfig-4.5-2
-
-for you to fetch changes up to ab8d80eb5dfd7f4f57364392d746a7700a891e68:
-
-  ARM: mvebu: update v5 defconfig for Orion5x machines (2015-12-08 10:55:20 +0100)
-
-----------------------------------------------------------------
-mvebu defconfig for 4.5 (part 2)
-
-- Reenable DSA in mvebu_v5_defconfig
-- Update multi_v5_defconfig after adding Orion5x to multiarch
-
-----------------------------------------------------------------
-Andrew Lunn (5):
-      ARM: config: Regenerate multi_v5_defconfig
-      ARM: config: Reenable DSA in multi_v5_defconfig
-      ARM: config: Add orion5x to multi_v5_defconfig
-      ARM: mvebu: Reenable DSA in mvebu_v5_defconfig
-      ARM: mvebu: update v5 defconfig for Orion5x machines
-
- arch/arm/configs/multi_v5_defconfig | 43 +++++++++++++++++++++++++++----------
- arch/arm/configs/mvebu_v5_defconfig | 31 +++++++++++++++++++++++++-
- 2 files changed, 62 insertions(+), 12 deletions(-)
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+     Andrew
