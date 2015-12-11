@@ -1,33 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 10 Dec 2015 15:50:05 -0800
-Subject: [GIT PULL] omap fixes against v4.4-rc4
-In-Reply-To: <1892295.pQZqt1gEpo@wuerfel>
-References: <20151210233907.GI23396@atomide.com> <1892295.pQZqt1gEpo@wuerfel>
-Message-ID: <20151210235004.GJ23396@atomide.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 10 Dec 2015 18:00:00 -0600
+Subject: [PATCH 0/3] DT labels for connector device mapping
+In-Reply-To: <5669F053.4080509@linaro.org>
+References: <1449782473-20880-1-git-send-email-robh@kernel.org>
+ <5669F053.4080509@linaro.org>
+Message-ID: <CAL_JsqL=29TSmrsYZhymOWYceNBon=vi9BaaYWX2whY7iRfDTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [151210 15:46]:
-> On Thursday 10 December 2015 15:39:08 Tony Lindgren wrote:
-> > Few fixes for omaps for v4.4-rc cycle:
-> > 
-> > - Fix clock source for ARM TWD and global timers on am437x
-> > 
-> > - Always select REGULATOR_FIXED_VOLTAGE for omap2+ instead of
-> >   when MACH_OMAP3_PANDORA is selected
-> > 
-> > - Fix SPI DMA handles for dm816x as only some were mapped
-> > 
-> > - Fix up mbox cells for dm816x to make mailbox usable
-> > 
-> 
-> Just when I had finished pulling in all other fixes and was about
-> to go to bed.
+On Thu, Dec 10, 2015 at 3:36 PM, Jorge Ramirez-Ortiz
+<jorge.ramirez-ortiz@linaro.org> wrote:
+> On 12/10/2015 04:21 PM, Rob Herring wrote:
+>> Having a common connector interface across different platforms can be
+>> problematic for determining which SOC device is connected to which
+>> connector pins. The standard DT property "label" is intended to provide
+>> a human readable name for a device and can be used to provide this
+>> information. Then userspace can can read the label to determine the
+>> device mapping. For example:
+>>
+>> for f in $(ls -d /sys/class/tty/tty*); do
+>>   label=$(cat $f/device/of_node/label)
+>>   if [ "$label" = "LS-UART1" ]; then
+>>     # you've found UART1, so do something with it.
+>>     # $f/dev is the major:minor for the /dev node
+>>   fi
+>> done
+>>
+>> This series adds labels on hikey and dragonboard 410c devices for the
+>> low speed and high speed connectors. Not tested at all.
+>
+> should we then use the line-name property on the GPIOs to have a common naming
+> convention across all 96Boards boards?
 
-Oops sorry I should have sent this earlier today!
+I left GPIOs out purpose, but they do need to be handled. I'm not
+certain that gpio-hogs is what we want to use here. The other cases
+have no s/w impact as label is ignored. The same is not true of
+gpio-hogs. Also, if we consider that we may want to describe GPIO
+connections to daughterboards with DT overlays, then we wound not want
+the gpio-hogs in the DT. That gets into a whole other set of issues
+needing a way to remap connector signals to have overlays which work
+across different base boards.
 
-> Pulled into fixes, too.
-
-Thanks & good night,
-
-Tony
+Rob
