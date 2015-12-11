@@ -1,129 +1,134 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Fri, 11 Dec 2015 10:12:32 +0000
-Subject: [RFC PATCH 3/8] arm: parse cpu capacity from DT
-In-Reply-To: <566988DD.9080005@arm.com>
-References: <1448288921-30307-1-git-send-email-juri.lelli@arm.com>
- <1448288921-30307-4-git-send-email-juri.lelli@arm.com>
- <566988DD.9080005@arm.com>
-Message-ID: <20151211101232.GI14571@e106622-lin>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 11 Dec 2015 11:12:10 +0100
+Subject: [PATCH v1 7/8] ARM: dts: rockchip: add core rk3228 dtsi
+In-Reply-To: <566A2CB7.4050801@rock-chips.com>
+References: <1449651853-1667-1-git-send-email-jeffy.chen@rock-chips.com>
+ <24573164.okRNXjvZ1B@phil> <566A2CB7.4050801@rock-chips.com>
+Message-ID: <7783766.YsX4m8bWe1@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Jeffy,
 
-On 10/12/15 14:14, Dietmar Eggemann wrote:
-> On 23/11/15 14:28, Juri Lelli wrote:
-> > With the introduction of cpu capacity bindings, CPU capacities can now be
-> > extracted from DT. Add parsing of such information at boot time. We keep
-> > code that can produce same information, based on different DT properties
-> > and hard-coded values, as fall-back for backward compatibility.
-> 
-> This patch-set should define _one_ way to be able to specify
-> heterogeneous cpu capacity values for all arm and arm64 systems. So I
-> would really like that we can agree on this solution ('capacity'
-> property) and delete the old (cortex-a[15,7] only) solution based on
-> struct cpu_efficiency table_efficiency[] and 'clock-frequency' property
-> in arch/arm/kernel/topology.c. The appropriate code in
-> arch/arm[,64]/kernel/topology.c should be the same. Everything else is
-> highly confusing.
-> 
-
-Yeah, I tend to agree on this. I'd say that we could first agree on the
-way we specify capacities and then we see what cleanups are required to
-make things nicer.
-
-Thanks,
-
-- Juri
-
+Am Freitag, 11. Dezember 2015, 09:53:59 schrieb Jeffy Chen:
+> On 2015-12-10 8:32, Heiko Stuebner wrote:
+> > Am Mittwoch, 9. Dezember 2015, 17:04:12 schrieb Jeffy Chen:
+> >> Initial release for rk3228 shared dtsi.
+> >> 
+> >> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> >> ---
+> >> 
+> >>   arch/arm/boot/dts/rk3228.dtsi | 478
+> >>   ++++++++++++++++++++++++++++++++++++++++++ 1 file changed, 478
+> >>   insertions(+)
+> >>   create mode 100644 arch/arm/boot/dts/rk3228.dtsi
+> >> 
+> >> diff --git a/arch/arm/boot/dts/rk3228.dtsi
+> >> b/arch/arm/boot/dts/rk3228.dtsi
+> >> new file mode 100644
+> >> index 0000000..d6b3e40
+> >> --- /dev/null
+> >> +++ b/arch/arm/boot/dts/rk3228.dtsi
+> >> @@ -0,0 +1,478 @@
+> >> +/*
+> >> + * This file is dual-licensed: you can use it either under the terms
+> >> + * of the GPL or the X11 license, at your option. Note that this dual
+> >> + * licensing only applies to this file, and not this project as a
+> >> + * whole.
+> >> + *
+> >> + *  a) This file is free software; you can redistribute it and/or
+> >> + *     modify it under the terms of the GNU General Public License as
+> >> + *     published by the Free Software Foundation; either version 2 of
+> >> the
+> >> + *     License, or (at your option) any later version.
+> >> + *
+> >> + *     This file is distributed in the hope that it will be useful,
+> >> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> >> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> >> + *     GNU General Public License for more details.
+> >> + *
+> >> + * Or, alternatively,
+> >> + *
+> >> + *  b) Permission is hereby granted, free of charge, to any person
+> >> + *     obtaining a copy of this software and associated documentation
+> >> + *     files (the "Software"), to deal in the Software without
+> >> + *     restriction, including without limitation the rights to use,
+> >> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> >> + *     sell copies of the Software, and to permit persons to whom the
+> >> + *     Software is furnished to do so, subject to the following
+> >> + *     conditions:
+> >> + *
+> >> + *     The above copyright notice and this permission notice shall be
+> >> + *     included in all copies or substantial portions of the Software.
+> >> + *
+> >> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> >> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> >> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> >> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> >> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> >> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> >> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> >> + *     OTHER DEALINGS IN THE SOFTWARE.
+> >> + */
+> >> +
+> >> +#include <dt-bindings/gpio/gpio.h>
+> >> +#include <dt-bindings/interrupt-controller/irq.h>
+> >> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> >> +#include <dt-bindings/pinctrl/rockchip.h>
+> >> +#include <dt-bindings/clock/rk3228-cru.h>
+> >> +#include "skeleton.dtsi"
+> >> +
+> >> +/ {
+> >> +	compatible = "rockchip,rk3228";
+> >> +
+> >> +	interrupt-parent = <&gic>;
+> >> +
+> >> +	aliases {
+> >> +		serial0 = &uart0;
+> >> +		serial1 = &uart1;
+> >> +		serial2 = &uart2;
+> >> +	};
+> >> +
+> >> +	memory {
+> >> +		device_type = "memory";
+> >> +		reg = <0x60000000 0x40000000>;
+> >> +	};
 > > 
-> > Cc: Russell King <linux@arm.linux.org.uk>
-> > Signed-off-by: Juri Lelli <juri.lelli@arm.com>
-> > ---
-> >  arch/arm/kernel/topology.c | 50 +++++++++++++++++++++++++++++++++++++++++++++-
-> >  1 file changed, 49 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-> > index ec279d1..ecbff03 100644
-> > --- a/arch/arm/kernel/topology.c
-> > +++ b/arch/arm/kernel/topology.c
-> > @@ -78,6 +78,35 @@ static unsigned long *__cpu_capacity;
-> >  #define cpu_capacity(cpu)	__cpu_capacity[cpu]
-> >  
-> >  static unsigned long middle_capacity = 1;
-> > +static bool capacity_from_dt = true;
-> > +static u32 capacity_scale = SCHED_CAPACITY_SCALE;
-> > +
-> > +static int __init parse_cpu_capacity(struct device_node *cpu_node, int cpu)
-> > +{
-> > +	int ret = 1;
-> > +	u32 cpu_capacity;
-> > +
-> > +	ret = of_property_read_u32(cpu_node,
-> > +				   "capacity",
-> > +				   &cpu_capacity);
-> > +	if (!ret) {
-> > +		u64 capacity;
-> > +
-> > +		/*
-> > +		 * Enforce capacity <= capacity-scale.
-> > +		 */
-> > +		cpu_capacity = cpu_capacity <= capacity_scale ? cpu_capacity :
-> > +			capacity_scale;
-> > +		capacity = (cpu_capacity << SCHED_CAPACITY_SHIFT) /
-> > +			capacity_scale;
-> > +
-> > +		set_capacity_scale(cpu, capacity);
-> > +		pr_info("CPU%d: DT cpu capacity %lu\n",
-> > +			cpu, arch_scale_cpu_capacity(NULL, cpu));
-> > +	}
-> > +
-> > +	return !ret;
-> > +}
-> >  
-> >  /*
-> >   * Iterate all CPUs' descriptor in DT and compute the efficiency
-> > @@ -99,6 +128,18 @@ static void __init parse_dt_topology(void)
-> >  	__cpu_capacity = kcalloc(nr_cpu_ids, sizeof(*__cpu_capacity),
-> >  				 GFP_NOWAIT);
-> >  
-> > +	cn = of_find_node_by_path("/cpus");
-> > +	if (!cn) {
-> > +		pr_err("No CPU information found in DT\n");
-> > +		return;
-> > +	}
-> > +
-> > +	if (!of_property_read_u32(cn, "capacity-scale", &capacity_scale))
-> > +		pr_info("DT cpus capacity-scale %u\n", capacity_scale);
-> > +	else
-> > +		pr_debug("DT cpus capacity-scale not found: assuming %u\n",
-> > +			capacity_scale);
-> > +
-> >  	for_each_possible_cpu(cpu) {
-> >  		const u32 *rate;
-> >  		int len;
-> > @@ -110,6 +151,13 @@ static void __init parse_dt_topology(void)
-> >  			continue;
-> >  		}
-> >  
-> > +		if (parse_cpu_capacity(cn, cpu)) {
-> > +			of_node_put(cn);
-> > +			continue;
-> > +		}
-> > +
-> > +		capacity_from_dt = false;
-> > +
-> >  		for (cpu_eff = table_efficiency; cpu_eff->compatible; cpu_eff++)
-> >  			if (of_device_is_compatible(cn, cpu_eff->compatible))
-> >  				break;
-> > @@ -160,7 +208,7 @@ static void __init parse_dt_topology(void)
-> >   */
-> >  static void update_cpu_capacity(unsigned int cpu)
-> >  {
-> > -	if (!cpu_capacity(cpu))
-> > +	if (!cpu_capacity(cpu) || capacity_from_dt)
-> >  		return;
-> >  
-> >  	set_capacity_scale(cpu, cpu_capacity(cpu) / middle_capacity);
-> > 
+> > The amount of memory is a property of the board
 > 
+> done.
+> 
+> >> +
+> >> +	cpus {
+> >> +		#address-cells = <1>;
+> >> +		#size-cells = <0>;
+> > 
+> > no enable-method?
+> > 
+> > As the rk3228 also does not have a pmu, does the newly created
+> > "rockchip,rk3036-smp" work for you?
+> 
+> unlucky, that doesn't work...and our 3.10 kernel is using psci for
+> rk3228's smp ops, maybe i should check that too, but i know nothing
+> about psci for now :(
+
+Using PSCI on more rockchip socs will make the ARM people very happy ;-) .
+
+So definitly no argument from me against it. I guess you should only need the 
+enable-method and psci node you should already have in your 3.10 dts, to 
+actually enable it.
+
+cpu at xxx {
+		enable-method = "psci";
+};
+
+psci {
+	compatible = "arm,psci-0.2";
+	...
+};
+
+
+But we can of course add that in a later patch as well.
+
+
+Heiko
