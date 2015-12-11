@@ -1,225 +1,97 @@
-From: damien.riegel@savoirfairelinux.com (Damien Riegel)
-Date: Fri, 11 Dec 2015 12:08:14 -0500
-Subject: [PATCH v9 3/3] ARM: dts: TS-4800: add basic device tree
-In-Reply-To: <1449853694-6980-1-git-send-email-damien.riegel@savoirfairelinux.com>
-References: <1449853694-6980-1-git-send-email-damien.riegel@savoirfairelinux.com>
-Message-ID: <1449853694-6980-4-git-send-email-damien.riegel@savoirfairelinux.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 11 Dec 2015 18:08:55 +0100
+Subject: [PATCH v5 01/58] mtd: nand: denali: add missing nand_release()
+ call in denali_remove()
+In-Reply-To: <CADhT+wcNFxD6Zv9w8W0sontVWa6zOkHjyK42Tw=Y_1X2XCTZfQ@mail.gmail.com>
+References: <1449734442-18672-2-git-send-email-boris.brezillon@free-electrons.com>
+ <1449842554-29898-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20151211161008.056a0f47@bbrezillon>
+ <CADhT+wcNFxD6Zv9w8W0sontVWa6zOkHjyK42Tw=Y_1X2XCTZfQ@mail.gmail.com>
+Message-ID: <20151211180855.47c95df2@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This device tree adds support for TS-4800 by Technologic Systems. This
-board is based on MX51-babbage, but there are some subtle differences in
-the pins used, and there is an additional FPGA that is memory-mapped.
+Hi Dinh,
 
-More details here:
-  http://wiki.embeddedarm.com/wiki/TS-4800
+On Fri, 11 Dec 2015 10:50:21 -0600
+Dinh Nguyen <dinh.linux@gmail.com> wrote:
 
-Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
----
- arch/arm/boot/dts/Makefile         |   3 +-
- arch/arm/boot/dts/imx51-ts4800.dts | 180 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 182 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/imx51-ts4800.dts
+> Hi Boris,
+> 
+> On Fri, Dec 11, 2015 at 9:10 AM, Boris Brezillon
+> <boris.brezillon@free-electrons.com> wrote:
+> > + Dinh (who made commit 2a0a288ec258)
+> >
+> > Also added back the Fixes tag.
+> >
+> > On Fri, 11 Dec 2015 15:02:34 +0100
+> > Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+> >
+> >> Unregister the NAND device from the NAND subsystem when removing a denali
+> >> NAND controller, otherwise the MTD attached to the NAND device is still
+> >> exposed by the MTD layer, and accesses to this device will likely crash
+> >> the system.
+> >>
+> >> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> >
+> > Fixes: 2a0a288ec258 ("mtd: denali: split the generic driver and PCI layer")
+> >
+> >> ---
+> >> Changes since v4:
+> >> - remove Cc stable and fixes tags
+> >> - calculate the dma buffer size before calling nand_release()
+> >>
+> >>  drivers/mtd/nand/denali.c | 6 ++++--
+> >>  1 file changed, 4 insertions(+), 2 deletions(-)
+> >>
+> >> diff --git a/drivers/mtd/nand/denali.c b/drivers/mtd/nand/denali.c
+> >> index 67eb2be..fdfea05 100644
+> >> --- a/drivers/mtd/nand/denali.c
+> >> +++ b/drivers/mtd/nand/denali.c
+> >> @@ -1622,9 +1622,11 @@ EXPORT_SYMBOL(denali_init);
+> >>  /* driver exit point */
+> >>  void denali_remove(struct denali_nand_info *denali)
+> >>  {
+> >> +     int bufsize = denali->mtd.writesize + denali->mtd.oobsize;
+> >> +
+> >> +     nand_release(&denali->mtd);
+> >>       denali_irq_cleanup(denali->irq, denali);
+> >> -     dma_unmap_single(denali->dev, denali->buf.dma_buf,
+> >> -                      denali->mtd.writesize + denali->mtd.oobsize,
+> >> +     dma_unmap_single(denali->dev, denali->buf.dma_buf, bufsize,
+> >>                        DMA_BIDIRECTIONAL);
+> 
+> Not sure what is the need to add bufsize here, but the commit message
+> doesn't reflect the change.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index bb8fa02..41b9985 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -258,7 +258,8 @@ dtb-$(CONFIG_SOC_IMX51) += \
- 	imx51-apf51dev.dtb \
- 	imx51-babbage.dtb \
- 	imx51-digi-connectcore-jsk.dtb \
--	imx51-eukrea-mbimxsd51-baseboard.dtb
-+	imx51-eukrea-mbimxsd51-baseboard.dtb \
-+	imx51-ts4800.dtb
- dtb-$(CONFIG_SOC_IMX53) += \
- 	imx53-ard.dtb \
- 	imx53-m53evk.dtb \
-diff --git a/arch/arm/boot/dts/imx51-ts4800.dts b/arch/arm/boot/dts/imx51-ts4800.dts
-new file mode 100644
-index 0000000..f1317f7
---- /dev/null
-+++ b/arch/arm/boot/dts/imx51-ts4800.dts
-@@ -0,0 +1,180 @@
-+/*
-+ * Copyright 2015 Savoir-faire Linux
-+ *
-+ * This device tree is based on imx51-babbage.dts
-+ *
-+ * Licensed under the X11 license or the GPL v2 (or later)
-+ */
-+
-+/dts-v1/;
-+#include "imx51.dtsi"
-+
-+/ {
-+	model = "Technologic Systems TS-4800";
-+	compatible = "technologic,imx51-ts4800", "fsl,imx51";
-+
-+	chosen {
-+		stdout-path = &uart1;
-+	};
-+
-+	memory {
-+		reg = <0x90000000 0x10000000>;
-+	};
-+
-+	soc {
-+		fpga {
-+			compatible = "simple-bus";
-+			reg = <0xb0000000 0x1d000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+
-+			syscon: syscon at b0010000 {
-+				compatible = "syscon", "simple-mfd";
-+				reg = <0xb0010000 0x3d>;
-+				reg-io-width = <2>;
-+
-+				wdt at e {
-+					compatible = "technologic,ts4800-wdt";
-+					syscon = <&syscon 0xe>;
-+				};
-+			};
-+		};
-+	};
-+
-+	clocks {
-+		ckih1 {
-+			clock-frequency = <22579200>;
-+		};
-+
-+		ckih2 {
-+			clock-frequency = <24576000>;
-+		};
-+	};
-+};
-+
-+&esdhc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_esdhc1>;
-+	cd-gpios = <&gpio1 0 GPIO_ACTIVE_LOW>;
-+	wp-gpios = <&gpio1 1 GPIO_ACTIVE_HIGH>;
-+	status = "okay";
-+};
-+
-+&fec {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_fec>;
-+	phy-mode = "mii";
-+	phy-reset-gpios = <&gpio2 14 GPIO_ACTIVE_LOW>;
-+	phy-reset-duration = <1>;
-+	status = "okay";
-+};
-+
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c2>;
-+	status = "okay";
-+
-+	rtc: m41t00 at 68 {
-+		compatible = "stm,m41t00";
-+		reg = <0x68>;
-+	};
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1>;
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart2>;
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart3>;
-+	status = "okay";
-+};
-+
-+&iomuxc {
-+	pinctrl_ecspi1: ecspi1grp {
-+		fsl,pins = <
-+			MX51_PAD_CSPI1_MISO__ECSPI1_MISO	0x185
-+			MX51_PAD_CSPI1_MOSI__ECSPI1_MOSI	0x185
-+			MX51_PAD_CSPI1_SCLK__ECSPI1_SCLK	0x185
-+			MX51_PAD_CSPI1_SS0__GPIO4_24		0x85 /* CS0 */
-+		>;
-+	};
-+
-+	pinctrl_esdhc1: esdhc1grp {
-+		fsl,pins = <
-+			MX51_PAD_SD1_CMD__SD1_CMD		0x400020d5
-+			MX51_PAD_SD1_CLK__SD1_CLK		0x20d5
-+			MX51_PAD_SD1_DATA0__SD1_DATA0		0x20d5
-+			MX51_PAD_SD1_DATA1__SD1_DATA1		0x20d5
-+			MX51_PAD_SD1_DATA2__SD1_DATA2		0x20d5
-+			MX51_PAD_SD1_DATA3__SD1_DATA3		0x20d5
-+			MX51_PAD_GPIO1_0__GPIO1_0		0x100
-+			MX51_PAD_GPIO1_1__GPIO1_1		0x100
-+		>;
-+	};
-+
-+	pinctrl_fec: fecgrp {
-+		fsl,pins = <
-+			MX51_PAD_EIM_EB2__FEC_MDIO		0x000001f5
-+			MX51_PAD_EIM_EB3__FEC_RDATA1		0x00000085
-+			MX51_PAD_EIM_CS2__FEC_RDATA2		0x00000085
-+			MX51_PAD_EIM_CS3__FEC_RDATA3		0x00000085
-+			MX51_PAD_EIM_CS4__FEC_RX_ER		0x00000180
-+			MX51_PAD_EIM_CS5__FEC_CRS		0x00000180
-+			MX51_PAD_DISP2_DAT10__FEC_COL		0x00000180
-+			MX51_PAD_DISP2_DAT11__FEC_RX_CLK	0x00000180
-+			MX51_PAD_DISP2_DAT14__FEC_RDATA0	0x00002180
-+			MX51_PAD_DISP2_DAT15__FEC_TDATA0	0x00002004
-+			MX51_PAD_NANDF_CS2__FEC_TX_ER		0x00002004
-+			MX51_PAD_DI2_PIN2__FEC_MDC		0x00002004
-+			MX51_PAD_DISP2_DAT6__FEC_TDATA1		0x00002004
-+			MX51_PAD_DISP2_DAT7__FEC_TDATA2		0x00002004
-+			MX51_PAD_DISP2_DAT8__FEC_TDATA3		0x00002004
-+			MX51_PAD_DISP2_DAT9__FEC_TX_EN		0x00002004
-+			MX51_PAD_DISP2_DAT13__FEC_TX_CLK	0x00002180
-+			MX51_PAD_DISP2_DAT12__FEC_RX_DV		0x000020a4
-+			MX51_PAD_EIM_A20__GPIO2_14		0x00000085 /* Phy Reset */
-+		>;
-+	};
-+
-+	pinctrl_i2c2: i2c2grp {
-+		fsl,pins = <
-+			MX51_PAD_KEY_COL4__I2C2_SCL		0x400001ed
-+			MX51_PAD_KEY_COL5__I2C2_SDA		0x400001ed
-+		>;
-+	};
-+
-+	pinctrl_uart1: uart1grp {
-+		fsl,pins = <
-+			MX51_PAD_UART1_RXD__UART1_RXD		0x1c5
-+			MX51_PAD_UART1_TXD__UART1_TXD		0x1c5
-+			MX51_PAD_UART1_RTS__UART1_RTS		0x1c5
-+			MX51_PAD_UART1_CTS__UART1_CTS		0x1c5
-+		>;
-+	};
-+
-+	pinctrl_uart2: uart2grp {
-+		fsl,pins = <
-+			MX51_PAD_UART2_RXD__UART2_RXD		0x1c5
-+			MX51_PAD_UART2_TXD__UART2_TXD		0x1c5
-+		>;
-+	};
-+
-+	pinctrl_uart3: uart3grp {
-+		fsl,pins = <
-+			MX51_PAD_EIM_D25__UART3_RXD		0x1c5
-+			MX51_PAD_EIM_D26__UART3_TXD		0x1c5
-+			MX51_PAD_EIM_D27__UART3_RTS		0x1c5
-+			MX51_PAD_EIM_D24__UART3_CTS		0x1c5
-+		>;
-+	};
-+};
+You were not in Cc of the first version (my fault), but Brian pointed
+that the mtd fields could be in an unknown state after the
+nand_release() call (this is currently not the case, but it change in
+the future). The idea is to pre-compute the DMA buffer size before
+releasing the mtd/nand device to prevent any future issues.
+
+I don't think it is worth mentioning this in the commit message,
+because these are just implementation details, but I can add the
+following comment before the bufsize declaration:
+
+	/*
+	 * Pre-compute DMA buffer size to avoid any problems in case
+	 * nand_release() ever changes in a way that mtd->writesize and
+	 * mtd->oobsize are not reliable after this call.
+	 */
+
+What do you think?
+
+Best Regards,
+
+Boris
+
+> 
+> Dinh
+
+
+
 -- 
-2.5.0
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
