@@ -1,67 +1,45 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 11 Dec 2015 18:46:02 +0000
-Subject: [PATCH 0/5] ARM: orion5x/dove/mv78xx0 multiplatform
-In-Reply-To: <20151211182730.GA15800@cloud>
-References: <1448466557-435335-1-git-send-email-arnd@arndb.de>
- <2992463.fVOGazvIkH@wuerfel> <5669F5F8.5010005@vollmann.ch>
- <14967875.ttNXUbSTvS@wuerfel>
- <20151211133601.GB18249@io.lakedaemon.net>
- <20151211182730.GA15800@cloud>
-Message-ID: <20151211184602.GE18249@io.lakedaemon.net>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Fri, 11 Dec 2015 13:51:15 -0500
+Subject: [PATCH] scripts: recordmcount: break hardlinks
+In-Reply-To: <20151211183326.GV8644@n2100.arm.linux.org.uk>
+References: <20151202090517.432556a4@gandalf.local.home>
+ <E1a7MVT-0000et-62@rmk-PC.arm.linux.org.uk>
+ <20151211093125.50b72639@gandalf.local.home>
+ <20151211144541.GT8644@n2100.arm.linux.org.uk>
+ <20151211131029.5bb23411@gandalf.local.home>
+ <20151211183326.GV8644@n2100.arm.linux.org.uk>
+Message-ID: <20151211135115.428f7416@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 11, 2015 at 10:27:30AM -0800, Josh Triplett wrote:
-> On Fri, Dec 11, 2015 at 01:36:01PM +0000, Jason Cooper wrote:
-> > +Josh
-> > 
-> > Hey Arnd, Detlef,
-> > 
-> > On Fri, Dec 11, 2015 at 12:10:55AM +0100, Arnd Bergmann wrote:
-> > > On Thursday 10 December 2015 23:00:24 Detlef Vollmann wrote:
-> > > > On 12/10/15 22:29, Arnd Bergmann wrote:
-> > > > > On Thursday 10 December 2015 22:14:25 Detlef Vollmann wrote:
-> > > > >> On 12/10/15 21:59, Arnd Bergmann wrote:
-> > > > > It may also be worth investigating what has made CONFIG_OF so costly,
-> > > > Probably because too much is done at runtime and too few things can
-> > > > be fixed at build time.
-> > > > 
-> > > > > maybe we can reduce this a bit again.
-> > > > Probably not without turning the wheel backward :-(
-> > > > 
-> > > > So for the test: yes it works, but I'm unhappy with it.
-> > > 
-> > > I'm not too happy about adding 80kb to the uncompressed kernel 
-> > > image either. I've spent some more time now trying to find where
-> > > we added the bloat. It's mainly in drivers, not in arch specific
-> > > code, a kilobyte here and there eventually adds up, but the largest
-> > > portion with a little over 50% of the total diff is drivers/of.
-> > 
-> > Wasn't there an idea kicked around a while ago to create a
-> > dt2boardfile script/executable*?  Then, during kernel configuration, you
-> > enable it and select which dts file you want.  It would disable
-> > CONFIG_OF, multiplatform, etc.  And generate a board_file.c from the dts
-> > file.
-> > 
-> > If anything, it might be worth asking the kernel tinification [1], [2]
-> > folks if they'd be interested in taking this on...
+On Fri, 11 Dec 2015 18:33:27 +0000
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+
+> On Fri, Dec 11, 2015 at 01:10:29PM -0500, Steven Rostedt wrote:
+> > I ran it through most my tests (it's still running and is at 20 of 33
+> > tests). If there was anything wrong with this patch, I'm sure one of my
+> > tests would have crashed by now.  
 > 
-> No objection if you want to add it to the task list on
-> tiny.wiki.kernel.org (on the more difficult end).
+> Thanks for testing.
+> 
+> > Do you want to take it, or shall I?  
+> 
+> I'm easy - it probably makes more sense if take it.
+> 
 
-Done.
+Heh, you got me hanging in suspense. You missed a word. Is it:
 
-> I don't know if you could generate a board file, but I do wonder if you
-> could effectively compile in a parsed description and ditch the parser.
-> Bonus if you can make the values parsed out of it into compile-time
-> constants for constant folding.
+ "makes more sense if *you* take it"
 
-After a bit of discussion with Arnd on irc, I agree.  Going to  a board
-file doesn't really work since the logic is now mostly in the drivers
-probe functions.
+or
 
-The dts parsing -> compile-time constants is worth looking into.
+ "makes more sense if *I* take it"
 
-thx,
+??
 
-Jason.
+Or you could be replying to my sentence of "take it" or "shall I" in
+which it would be *you* take it.
+
+/me confused
+
+-- Steve
