@@ -1,43 +1,48 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Fri, 11 Dec 2015 17:18:46 +0200
-Subject: [PATCH V6 21/26] coresight: etm-perf: new PMU driver for ETM
- tracers
-In-Reply-To: <1449176702-13213-22-git-send-email-mathieu.poirier@linaro.org>
-References: <1449176702-13213-1-git-send-email-mathieu.poirier@linaro.org>
- <1449176702-13213-22-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <87zixhau95.fsf@ashishki-desk.ger.corp.intel.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 11 Dec 2015 09:21:06 -0600
+Subject: [PATCH v3 3/7] ARM: hisi: add dt_machine definition for Hi3519
+In-Reply-To: <1449819921-18464-4-git-send-email-xuejiancheng@huawei.com>
+References: <1449819921-18464-1-git-send-email-xuejiancheng@huawei.com>
+ <1449819921-18464-4-git-send-email-xuejiancheng@huawei.com>
+Message-ID: <20151211152106.GB21272@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mathieu Poirier <mathieu.poirier@linaro.org> writes:
-
-> +static void etm_event_start(struct perf_event *event, int flags)
-> +{
-> +	int cpu = smp_processor_id();
-> +	struct etm_cpu_data *cpu_data;
-> +	struct etm_event_data *event_data;
-> +	struct perf_output_handle *handle = this_cpu_ptr(&ctx_handle);
-> +	struct coresight_device *sink, *csdev = per_cpu(csdev_src, cpu);
+On Fri, Dec 11, 2015 at 03:45:17PM +0800, Jiancheng Xue wrote:
+> add dt_machine definition for hi3519.
+> 
+> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
+> ---
+>  arch/arm/mach-hisi/hisilicon.c | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm/mach-hisi/hisilicon.c b/arch/arm/mach-hisi/hisilicon.c
+> index 8cc6215..010d8a2 100644
+> --- a/arch/arm/mach-hisi/hisilicon.c
+> +++ b/arch/arm/mach-hisi/hisilicon.c
+> @@ -81,3 +81,12 @@ static const char *const hip01_compat[] __initconst = {
+>  DT_MACHINE_START(HIP01, "Hisilicon HIP01 (Flattened Device Tree)")
+>  	.dt_compat      = hip01_compat,
+>  MACHINE_END
 > +
-> +	if (!csdev)
-> +		goto fail;
+> +static const char *const hi3519_compat[] __initconst = {
+> +	"hisilicon,hi3519",
+> +	NULL,
+> +};
+
+You should just have 1 mach desc with multiple compatible strings to 
+match against, not 1 mach desc per compatible string.
+
+Rob
+
 > +
-> +	/*
-> +	 * Deal with the ring buffer API and get a handle on the
-> +	 * session's information.
-> +	 */
-> +	event_data = perf_aux_output_begin(handle, event);
-> +	if (WARN_ON_ONCE(!event_data))
-> +		goto fail;
-
-Hmm, perf_aux_output_begin() returning NULL is not WARN-worthy and is
-actually a normal situation, for example, if the buffer is not
-configured yet (which like I suggested in the other email should be a
-separate thing from the *event* configuration).
-
-perf_aux_output_begin() will also return NULL if there's no room in the
-buffer.
-
-Regards,
---
-Alex
+> +DT_MACHINE_START(HI3519_DT, "Hisilicon Hi3519")
+> +	.dt_compat	= hi3519_compat,
+> +MACHINE_END
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
