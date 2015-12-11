@@ -1,81 +1,39 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 11 Dec 2015 21:36:29 +0800
-Subject: [PATCH v2] mmc: sdhci: restore behavior when setting VDD via external
- regulator
-Message-ID: <1449840989-563-1-git-send-email-jszhang@marvell.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Fri, 11 Dec 2015 05:42:26 -0800
+Subject: [PATCH] arm64: spinlock: serialise spin_unlock_wait against
+ concurrent lockers
+In-Reply-To: <20151211094651.GA18828@arm.com>
+References: <20151201164035.GE27751@arm.com>
+ <20151203001141.GO28602@linux.vnet.ibm.com>
+ <20151203132839.GA3816@twins.programming.kicks-ass.net>
+ <20151203163243.GI11337@arm.com>
+ <20151203172207.GR28602@linux.vnet.ibm.com>
+ <20151206081617.GB1549@fixme-laptop.cn.ibm.com>
+ <20151206192734.GT28602@linux.vnet.ibm.com>
+ <20151207002601.GB13845@fixme-laptop.cn.ibm.com>
+ <20151211080911.GD1072@fixme-laptop.cn.ibm.com>
+ <20151211094651.GA18828@arm.com>
+Message-ID: <20151211134226.GM28602@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After commit 52221610dd84 ("mmc: sdhci: Improve external VDD regulator
-support"), for the VDD is supplied via external regulators, we ignore
-the code to convert a VDD voltage request into one of the standard
-SDHCI voltage levels, then program it in the SDHCI_POWER_CONTROL. This
-brings two issues:
+On Fri, Dec 11, 2015 at 09:46:52AM +0000, Will Deacon wrote:
+> On Fri, Dec 11, 2015 at 04:09:11PM +0800, Boqun Feng wrote:
+> > In conclusion, we have more than a half of uses working well already,
+> > and each of the fix-needed ones has only one related critical section
+> > and only one related data access in it. So on PPC, I think my proposal
+> > won't have more smp_mb() instances to fix all current use cases than
+> > adding smp_mb__after_unlock_lock() after the lock acquisition in each
+> > related lock critical section.
+> > 
+> > Of course, my proposal needs the buy-ins of both PPC and ARM64v8, so
+> > Paul and Will, what do you think? ;-)
+> 
+> I already queued the change promoting it to LOCK for arm64. It makes the
+> semantics easy to understand and I've failed to measure any difference
+> in performance. It's also robust against any future users of the macro
+> and matches what other architectures do.
 
-1. SDHCI_QUIRK2_CARD_ON_NEEDS_BUS_ON quirk isn't handled properly any
-more.
+What size system did you do your performance testing on?
 
-2. What's more, once SDHCI_POWER_ON bit is set, some controllers such
-as the sdhci-pxav3 used in marvell berlin SoCs require the voltage
-levels programming in the SDHCI_POWER_CONTROL register, even the VDD
-is supplied by external regulator. So the host in marvell berlin SoCs
-still works fine after the commit. However, commit 3cbc6123a93d ("mmc:
-sdhci: Set SDHCI_POWER_ON with external vmmc") sets the SDHCI_POWER_ON
-bit, this would make the host in marvell berlin SoCs won't work any
-more with external vmmc.
-
-This patch restores the behavior when setting VDD through external
-regulator by moving the call of mmc_regulator_set_ocr() to the end
-of sdhci_set_power() function.
-
-After this patch, the sdcard on Marvell Berlin SoC boards work again.
-
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-Fixes: 52221610dd84 ("mmc: sdhci: Improve external VDD ...")
----
-Since v1:
- - add more details about why the sdhci-pxav3 used in marvell berlin
-   SoCs need this patch.
-
- drivers/mmc/host/sdhci.c | 19 ++++++-------------
- 1 file changed, 6 insertions(+), 13 deletions(-)
-
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index b48565e..616aa90 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -1274,19 +1274,6 @@ static void sdhci_set_power(struct sdhci_host *host, unsigned char mode,
- 	struct mmc_host *mmc = host->mmc;
- 	u8 pwr = 0;
- 
--	if (!IS_ERR(mmc->supply.vmmc)) {
--		spin_unlock_irq(&host->lock);
--		mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, vdd);
--		spin_lock_irq(&host->lock);
--
--		if (mode != MMC_POWER_OFF)
--			sdhci_writeb(host, SDHCI_POWER_ON, SDHCI_POWER_CONTROL);
--		else
--			sdhci_writeb(host, 0, SDHCI_POWER_CONTROL);
--
--		return;
--	}
--
- 	if (mode != MMC_POWER_OFF) {
- 		switch (1 << vdd) {
- 		case MMC_VDD_165_195:
-@@ -1345,6 +1332,12 @@ static void sdhci_set_power(struct sdhci_host *host, unsigned char mode,
- 		if (host->quirks & SDHCI_QUIRK_DELAY_AFTER_POWER)
- 			mdelay(10);
- 	}
-+
-+	if (!IS_ERR(mmc->supply.vmmc)) {
-+		spin_unlock_irq(&host->lock);
-+		mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, vdd);
-+		spin_lock_irq(&host->lock);
-+	}
- }
- 
- /*****************************************************************************\
--- 
-2.6.3
+							Thanx, Paul
