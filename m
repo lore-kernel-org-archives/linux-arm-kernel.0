@@ -1,49 +1,47 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 11 Dec 2015 14:17:12 -0700
-Subject: [PATCH V6 18/26] coresight: etb10: implementing AUX space API
-In-Reply-To: <87h9jpccfz.fsf@ashishki-desk.ger.corp.intel.com>
+Date: Fri, 11 Dec 2015 14:18:09 -0700
+Subject: [PATCH V6 21/26] coresight: etm-perf: new PMU driver for ETM
+ tracers
+In-Reply-To: <87zixhau95.fsf@ashishki-desk.ger.corp.intel.com>
 References: <1449176702-13213-1-git-send-email-mathieu.poirier@linaro.org>
- <1449176702-13213-19-git-send-email-mathieu.poirier@linaro.org>
- <87h9jpccfz.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <CANLsYkyNE3f49N_rCMAaHgfo+CTSd46ZiTE8qj=bGVubMqTJ6A@mail.gmail.com>
+ <1449176702-13213-22-git-send-email-mathieu.poirier@linaro.org>
+ <87zixhau95.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <CANLsYkxZfMCUHizYPvWB0gd-X68kQoveCuiXDmd=vAmydtaqMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 December 2015 at 07:00, Alexander Shishkin
+On 11 December 2015 at 08:18, Alexander Shishkin
 <alexander.shishkin@linux.intel.com> wrote:
 > Mathieu Poirier <mathieu.poirier@linaro.org> writes:
 >
->> +static void *etb_get_config(struct coresight_device *csdev, int cpu,
->> +                         void **pages, int nr_pages, bool overwrite)
+>> +static void etm_event_start(struct perf_event *event, int flags)
 >> +{
->> +     int node;
->> +     struct cs_buffers *buf;
+>> +     int cpu = smp_processor_id();
+>> +     struct etm_cpu_data *cpu_data;
+>> +     struct etm_event_data *event_data;
+>> +     struct perf_output_handle *handle = this_cpu_ptr(&ctx_handle);
+>> +     struct coresight_device *sink, *csdev = per_cpu(csdev_src, cpu);
 >> +
->> +     if (cpu == -1)
->> +             cpu = smp_processor_id();
->> +     node = cpu_to_node(cpu);
+>> +     if (!csdev)
+>> +             goto fail;
 >> +
->> +     buf = kzalloc_node(sizeof(struct cs_buffers), GFP_KERNEL, node);
->> +     if (!buf)
->> +             return NULL;
->> +
->> +     buf->snapshot = overwrite;
->> +     buf->nr_pages = nr_pages;
->> +     buf->data_pages = pages;
->> +
->> +     return buf;
->> +}
+>> +     /*
+>> +      * Deal with the ring buffer API and get a handle on the
+>> +      * session's information.
+>> +      */
+>> +     event_data = perf_aux_output_begin(handle, event);
+>> +     if (WARN_ON_ONCE(!event_data))
+>> +             goto fail;
 >
-> Nitpick: why is this called "get_config"? I was just looking for
-> something else and noticed that both sources and sinks have
-> .get_config() callback (I was looking for the source's one), but this
-> guy doesn't seem to be getting any config, but rather allocating a
-> buffer descriptor.
+> Hmm, perf_aux_output_begin() returning NULL is not WARN-worthy and is
+> actually a normal situation, for example, if the buffer is not
+> configured yet (which like I suggested in the other email should be a
+> separate thing from the *event* configuration).
+>
+> perf_aux_output_begin() will also return NULL if there's no room in the
+> buffer.
 
-My goal was to harmonise the naming convention between source and
-sinks as much as possible, and I'm still not quite sure how to call
-that function... Given the end result something like
-"etb_alloc_buffer" would likely be more appropriate.
+You are correct - I'll revise this.
 
 >
 > Regards,
