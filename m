@@ -1,26 +1,21 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Sat, 12 Dec 2015 08:07:38 +0900
-Subject: [PATCH 0/3] ARM: shmobile: defconfig: Misc updates
-In-Reply-To: <1449760562-26795-1-git-send-email-geert+renesas@glider.be>
-References: <1449760562-26795-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20151211230737.GB6496@verge.net.au>
+Date: Sat, 12 Dec 2015 08:07:48 +0900
+Subject: [PATCH 1/3] arm64: dts: r8a7795: Add PSCI node
+In-Reply-To: <1449236333-4410-1-git-send-email-dirk.behme@gmail.com>
+References: <1449236333-4410-1-git-send-email-dirk.behme@gmail.com>
+Message-ID: <20151211230748.GC6496@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 10, 2015 at 04:15:59PM +0100, Geert Uytterhoeven wrote:
-> 	Hi Simon, Magnus,
+On Fri, Dec 04, 2015 at 02:38:51PM +0100, Dirk Behme wrote:
+> From: Gaku Inami <gaku.inami.xw@bp.renesas.com>
 > 
-> Here are a few updates for the shmobile defconfig.
-> If these are accepted, I'll send out equivalent updates for
-> multi_v7_defconfig.
+> Add PSCI node for r8a7795 SoC, and cpu node enable-method property is
+> set to "psci".
 > 
-> Geert Uytterhoeven (3):
->   ARM: shmobile: defconfig: Drop useless CONFIG_USB_RCAR_PHY=y
->   ARM: shmobile: defconfig: Enable missing support based on DTSes
->   ARM: shmobile: defconfig: Enable frame buffer console for
->     armadillo800eva
-> 
->  arch/arm/configs/shmobile_defconfig | 10 +++++++++-
->  1 file changed, 9 insertions(+), 1 deletion(-)
+> Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
+> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> Sigend-off-by: Dirk Behme <dirk.behme@gmail.com>
 
-Thanks, I have queued these up.
+I took the liberty of correcting the spelling of "Sigend" when
+queueing this patch up for v4.5.
