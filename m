@@ -1,225 +1,91 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 11 Dec 2015 09:57:04 +0100
-Subject: [PATCH 2/2 v2] ARM: mvebu: kirkwood: add PogoPlug series 4 device tree
-Message-ID: <1449824224-29765-1-git-send-email-linus.walleij@linaro.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 11 Dec 2015 10:04:23 +0100
+Subject: [PATCH RFC 21/27] drivers: cpu-pd: Parse topology to setup CPU PM
+ domains
+In-Reply-To: <20151210181121.GA26229@red-moon>
+References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
+ <1447799871-56374-22-git-send-email-lina.iyer@linaro.org>
+ <20151207145458.GA20538@red-moon>
+ <20151208180536.GB2230@linaro.org>
+ <20151210181121.GA26229@red-moon>
+Message-ID: <CAMuHMdWBCPkSH6sf=xtLgttvdru222nAWOYNMVNqv6d86jprvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a device tree for the CloudEngines PogoPlug series 4
-NAS device. Inspired by out-of-tree boardfiles from ArchLinux
-by Kevin Mihelich.
+On Thu, Dec 10, 2015 at 7:11 PM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Tue, Dec 08, 2015 at 11:05:36AM -0700, Lina Iyer wrote:
+>
+> [...]
+>
+>> On Mon, Dec 07 2015 at 07:53 -0700, Lorenzo Pieralisi wrote:
+>> >>+/**
+>> >>+ * of_setup_cpu_domain_topology() - Setup the CPU domains from the CPU
+>> >>+ * topology node in DT.
+>> >>+ *
+>> >>+ * @ops: The PM domain suspend/resume ops for all the domains in the topology
+>> >>+ */
+>> >>+int of_setup_cpu_domain_topology(const struct cpu_pd_ops *ops)
+>> >>+{
+>> >>+   struct device_node *cn, *map;
+>> >>+   int ret = 0;
+>> >>+
+>> >>+   cn = of_find_node_by_path("/cpus");
+>> >>+   if (!cn) {
+>> >>+           pr_err("No CPU information found in DT\n");
+>> >>+           return 0;
+>> >>+   }
+>> >>+
+>> >>+   map = of_get_child_by_name(cn, "cpu-map");
+>> >>+   if (!map)
+>> >>+           goto out;
+>> >
+>> >I commented on this before, is this reliance on cpu-map necessary ?
+>> >Could not you just rely on the "power-domains" phandle in the cpu
+>> >nodes to build the cpumask for a specific power domain ? I think
+>> >you should try to decouple the concept of power domain from the cpu-map
+>> >cluster and I think this would also simplify your code in the process.
+>> >
+>> Sorry, I missed seeing your comment on this earlier.
+>>
+>> Hmm, it can be done, but I felt out of place to define just power
+>> domains that have no devices in Linux, since they are handled in PSCI,
+>> but also have no relation to PSCI. Hence, I felt cpu-map to be a good
+>> place for the cluster domain. But I am not strongly inclined. I can
+>> remove them from the cpu-map and keep them as separate nodes. However,
+>> it would be nice to have a way to say these nodes are PSCI controlled.
+>
+> I do not agree with the way you described the system.
+>
+> Here is how I see it. DT must model HW, and in HW your cpus will be part
+> of a power domain(s) that of course can be hierarchical. Every cpus has a
+> phandle to the power domain it belongs into, and to group them as "cluster"
+> you should follow the power domains hierarchy (ie if you have a cluster
+> power domain, it will contain the core power domains, through the
+> hierarchy it is easy to detect what cpus are part of the cluster power
+> domain by detecting which cpus are part of its children). It is much
+> simpler than the current solution I think, you get rid of cpu-map
+> dependency (honestly it is a bit weird what you did, with cpu-map
+> containing a cluster phandle to a power domain and cpu phandles to
+> cpu nodes, and the DT bindings you posted does not seem to match your
+> dts).
+>
+> For PSCI, nothing prevents you from defining the same bindings except
+> that the power domain(s) is not explicitly controlled by the OS, still,
+> the DT would always describe the HW and you can use it to detect the
+> power domain topology and which cpus are part of a given power domain.
+>
+> Please let me know what you think, thanks.
 
-Cc: Moonman <moonman.ca@gmail.com>
-Cc: Kevin Mihelich <kevin@archlinuxarm.org>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v1->v2:
-- Use <dt-bindings/input/linux-event-codes.h>
-- Specify default baud rate etc differently
-- Rename LEDs "pogoplugv4*"
-- Skip registering i2c0 as there is nothing on it
----
- arch/arm/boot/dts/Makefile                       |   1 +
- arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts | 179 +++++++++++++++++++++++
- 2 files changed, 180 insertions(+)
- create mode 100644 arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts
++1
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 30bbc3746130..2d9f475a9ceb 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -206,6 +206,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += \
- 	kirkwood-openrd-client.dtb \
- 	kirkwood-openrd-ultimate.dtb \
- 	kirkwood-pogo_e02.dtb \
-+	kirkwood-pogoplug-series-4.dtb \
- 	kirkwood-rd88f6192.dtb \
- 	kirkwood-rd88f6281-z0.dtb \
- 	kirkwood-rd88f6281-a.dtb \
-diff --git a/arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts b/arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts
-new file mode 100644
-index 000000000000..6143ecf4ad4f
---- /dev/null
-+++ b/arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts
-@@ -0,0 +1,179 @@
-+/*
-+ * kirkwood-pogoplug-series-4.dts - Device tree file for PogoPlug Series 4
-+ * inspired by the board files made by Kevin Mihelich for ArchLinux,
-+ * and their DTS file.
-+ *
-+ * Copyright (C) 2015 Linus Walleij <linus.walleij@linaro.org>
-+ */
-+
-+/dts-v1/;
-+
-+#include "kirkwood.dtsi"
-+#include "kirkwood-6192.dtsi"
-+#include <dt-bindings/input/linux-event-codes.h>
-+
-+/ {
-+	model = "Cloud Engines PogoPlug Series 4";
-+	compatible = "cloudengines,pogoplugv4", "marvell,kirkwood-88f6192",
-+		     "marvell,kirkwood";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x08000000>;
-+	};
-+
-+	chosen {
-+		stdout-path = "uart0:115200n8";
-+	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pinctrl-0 = <&pmx_button_eject>;
-+		pinctrl-names = "default";
-+
-+		button at 1 {
-+			debounce_interval = <50>;
-+			wakeup-source;
-+			linux,code = <KEY_EJECTCD>;
-+			label = "Eject Button";
-+			gpios = <&gpio0 29 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+		pinctrl-0 = <&pmx_led_green &pmx_led_red>;
-+		pinctrl-names = "default";
-+
-+		health {
-+			label = "pogoplugv4:green:health";
-+			gpios = <&gpio0 22 GPIO_ACTIVE_LOW>;
-+			default-state = "on";
-+		};
-+		fault {
-+			label = "pogoplugv4:red:fault";
-+			gpios = <&gpio0 24 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+};
-+
-+&pinctrl {
-+	pmx_sata0: pmx-sata0 {
-+		marvell,pins = "mpp21";
-+		marvell,function = "sata0";
-+	};
-+
-+	pmx_sata1: pmx-sata1 {
-+		marvell,pins = "mpp20";
-+		marvell,function = "sata1";
-+	};
-+
-+	pmx_sdio_cd: pmx-sdio-cd {
-+		marvell,pins = "mpp27";
-+		marvell,function = "gpio";
-+	};
-+
-+	pmx_sdio_wp: pmx-sdio-wp {
-+		marvell,pins = "mpp28";
-+		marvell,function = "gpio";
-+	};
-+
-+	pmx_button_eject: pmx-button-eject {
-+		marvell,pins = "mpp29";
-+		marvell,function = "gpio";
-+	};
-+
-+	pmx_led_green: pmx-led-green {
-+		marvell,pins = "mpp22";
-+		marvell,function = "gpio";
-+	};
-+
-+	pmx_led_red: pmx-led-red {
-+		marvell,pins = "mpp24";
-+		marvell,function = "gpio";
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+	current-speed = <115200>;
-+};
-+
-+/*
-+ * This PCIE controller has a USB 3.0 XHCI controller at 1,0
-+ */
-+&pciec {
-+	status = "okay";
-+};
-+
-+&pcie0 {
-+	status = "okay";
-+};
-+
-+&sata {
-+	status = "okay";
-+	pinctrl-0 = <&pmx_sata0 &pmx_sata1>;
-+	pinctrl-names = "default";
-+	nr-ports = <1>;
-+};
-+
-+&sdio {
-+	status = "okay";
-+	pinctrl-0 = <&pmx_sdio &pmx_sdio_cd &pmx_sdio_wp>;
-+	pinctrl-names = "default";
-+	cd-gpios = <&gpio0 27 GPIO_ACTIVE_LOW>;
-+	wp-gpios = <&gpio0 28 GPIO_ACTIVE_HIGH>;
-+};
-+
-+&nand {
-+	/* 128 MiB of NAND flash */
-+	chip-delay = <40>;
-+	status = "okay";
-+	partitions {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		partition at 0 {
-+			label = "u-boot";
-+			reg = <0x00000000 0x200000>;
-+			read-only;
-+		};
-+
-+		partition at 200000 {
-+			label = "uImage";
-+			reg = <0x00200000 0x300000>;
-+		};
-+
-+		partition at 500000 {
-+			label = "uImage2";
-+			reg = <0x00500000 0x300000>;
-+		};
-+
-+		partition at 800000 {
-+			label = "failsafe";
-+			reg = <0x00800000 0x800000>;
-+		};
-+
-+		partition at 1000000 {
-+			label = "root";
-+			reg = <0x01000000 0x7000000>;
-+		};
-+	};
-+};
-+
-+&mdio {
-+	status = "okay";
-+
-+	ethphy0: ethernet-phy at 0 {
-+		reg = <0>;
-+	};
-+};
-+
-+&eth0 {
-+	status = "okay";
-+	ethernet0-port at 0 {
-+		phy-handle = <&ethphy0>;
-+	};
-+};
--- 
-2.4.3
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
