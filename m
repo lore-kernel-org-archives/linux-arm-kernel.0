@@ -1,73 +1,51 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 11 Dec 2015 13:39:32 +0100
-Subject: [PATCH 1/3] Device tree binding documentation for gpio-switch
-In-Reply-To: <1449250275-23435-2-git-send-email-martyn.welch@collabora.co.uk>
-References: <1449250275-23435-1-git-send-email-martyn.welch@collabora.co.uk>
- <1449250275-23435-2-git-send-email-martyn.welch@collabora.co.uk>
-Message-ID: <CACRpkdYZ-PK9Fb2uq+EMz5RTrtX-isxYkiNvWm2QqAh5WZhpOw@mail.gmail.com>
+From: pmladek@suse.com (Petr Mladek)
+Date: Fri, 11 Dec 2015 13:41:59 +0100
+Subject: [PATCH v3 4/4] printk/nmi: Increase the size of NMI buffer and
+ make it configurable
+In-Reply-To: <CAMuHMdXVgr58YjoePGrRbMyMncQ27f85prL7G5SpeHeNxoYrXQ@mail.gmail.com>
+References: <1449667265-17525-1-git-send-email-pmladek@suse.com>
+ <1449667265-17525-5-git-send-email-pmladek@suse.com>
+ <CAMuHMdXVgr58YjoePGrRbMyMncQ27f85prL7G5SpeHeNxoYrXQ@mail.gmail.com>
+Message-ID: <20151211124159.GB3729@pathway.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 4, 2015 at 6:31 PM, Martyn Welch
-<martyn.welch@collabora.co.uk> wrote:
+On Fri 2015-12-11 12:10:02, Geert Uytterhoeven wrote:
+> On Wed, Dec 9, 2015 at 2:21 PM, Petr Mladek <pmladek@suse.com> wrote:
+> > --- a/init/Kconfig
+> > +++ b/init/Kconfig
+> > @@ -866,6 +866,28 @@ config LOG_CPU_MAX_BUF_SHIFT
+> >                      13 =>   8 KB for each CPU
+> >                      12 =>   4 KB for each CPU
+> >
+> > +config NMI_LOG_BUF_SHIFT
+> > +       int "Temporary per-CPU NMI log buffer size (12 => 4KB, 13 => 8KB)"
+> > +       range 10 21
+> > +       default 13
+> > +       depends on PRINTK && HAVE_NMI
+> 
+> Symbol NMI_LOG_BUF_SHIFT does not exist if its dependencies are not met.
 
-> This patch adds documentation for the gpio-switch binding. This binding
-> provides a mechanism to bind named links to gpio, with the primary
-> purpose of enabling standardised access to switches that might be standard
-> across a group of devices but implemented differently on each device.
->
-> Signed-off-by: Martyn Welch <martyn.welch@collabora.co.uk>
+?h, the NMI buffer is enabled on arm via NEED_PRINTK_NMI.
 
-As mentioned in the comment to the second patch, this solves the
-following generic problem:
+The buffer is compiled when CONFIG_PRINTK_NMI is defined. I am going
+to fix it the following way:
 
-Expose a GPIO line to userspace using a specific name
 
-That means basically naming GPIO lines and marking them as
-"not used by the operating system".
+diff --git a/init/Kconfig b/init/Kconfig
+index efcff25a112d..61cfd96a3c96 100644
+--- a/init/Kconfig
++++ b/init/Kconfig
+@@ -870,7 +870,7 @@ config NMI_LOG_BUF_SHIFT
+ 	int "Temporary per-CPU NMI log buffer size (12 => 4KB, 13 => 8KB)"
+ 	range 10 21
+ 	default 13
+-	depends on PRINTK && HAVE_NMI
++	depends on PRINTK_NMI
+ 	help
+ 	  Select the size of a per-CPU buffer where NMI messages are temporary
+ 	  stored. They are copied to the main log buffer in a safe context
 
-This is something that has been proposed before, and postponed
-because the kernel lacks the right infrastructure.
 
-Markus Pargmann also did a series that add initial values to
-hogs, which is the inverse usecase of this, where you want to
-*output* something by default, then maybe also make it available
-to userspace.
-
-So what we need to see here is a patch series that does all of these
-things:
-
-- Name lines
-
-- Sets them to initial values
-
-- Mark them as read-only
-
-- Mark them as "not used by the operating system" so that they
-  can be default-exported to userspace.
-
-Making *USE* of this naming etc inside the Linux kernel
-
-> +        gpio-switch {
-> +                compatible = "gpio-switch";
-> +
-> +                write-protect {
-> +                        label = "write-protect";
-> +                        gpios = <&gpx3 0 GPIO_ACTIVE_LOW>;
-> +                        read-only;
-> +                };
-
-This should not need new structures and nodes like this. It should
-be part of Documentation/devicetree/bindings/gpio/gpio.txt
-and put directly in the gpiochip node.
-
-Maybe as an extension of the existing hogs, but that has already
-been tried.
-
-While we can agree on a device tree binding, the kernel still needs
-major refactoring to actually expose named GPIOs to userspace,
-and that should be done using the new chardev, not with sysfs
-links.
-
-Yours,
-Linus Walleij
+Thanks a lot for report,
+Petr
