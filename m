@@ -1,54 +1,32 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Fri, 11 Dec 2015 09:45:33 +0100
-Subject: [PATCH] ASoC: rockchip: spdif: Set transmit data level to 16 samples
-Message-ID: <1449823533-6993-1-git-send-email-sjoerd.simons@collabora.co.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 11 Dec 2015 09:46:30 +0100
+Subject: [linux-sunxi] ARM: dts: sun7i: Enable audio codec on MK808C
+In-Reply-To: <1449599486-15716-1-git-send-email-codekipper@gmail.com>
+References: <1449599486-15716-1-git-send-email-codekipper@gmail.com>
+Message-ID: <20151211084630.GL27957@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Explicitly set the transmit data level on the transceiver to 16 samples
-rather then the default 0. This matches both the level set in the vendor
-kernel and the (seemingly very similar) i2s engine. This fixes audio
-glitches when playing back at 192k rate.
+Hi,
 
-At the same time, fix a trivial typo in the TDL mask definition
+On Tue, Dec 08, 2015 at 07:31:26PM +0100, codekipper at gmail.com wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
+> 
+> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 
-Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+Please make a commit log.
 
----
+Thanks,
+Maxime
 
- sound/soc/rockchip/rockchip_spdif.c | 6 ++++--
- sound/soc/rockchip/rockchip_spdif.h | 2 +-
- 2 files changed, 5 insertions(+), 3 deletions(-)
-
-diff --git a/sound/soc/rockchip/rockchip_spdif.c b/sound/soc/rockchip/rockchip_spdif.c
-index ac72ff5..5a806da 100644
---- a/sound/soc/rockchip/rockchip_spdif.c
-+++ b/sound/soc/rockchip/rockchip_spdif.c
-@@ -152,8 +152,10 @@ static int rk_spdif_trigger(struct snd_pcm_substream *substream,
- 	case SNDRV_PCM_TRIGGER_RESUME:
- 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
- 		ret = regmap_update_bits(spdif->regmap, SPDIF_DMACR,
--				   SPDIF_DMACR_TDE_ENABLE,
--				   SPDIF_DMACR_TDE_ENABLE);
-+				   SPDIF_DMACR_TDE_ENABLE |
-+				   SPDIF_DMACR_TDL_MASK,
-+				   SPDIF_DMACR_TDE_ENABLE |
-+				   SPDIF_DMACR_TDL(16));
- 
- 		if (ret != 0)
- 			return ret;
-diff --git a/sound/soc/rockchip/rockchip_spdif.h b/sound/soc/rockchip/rockchip_spdif.h
-index 921b409..3ef1277 100644
---- a/sound/soc/rockchip/rockchip_spdif.h
-+++ b/sound/soc/rockchip/rockchip_spdif.h
-@@ -42,7 +42,7 @@
- 
- #define SPDIF_DMACR_TDL_SHIFT	0
- #define SPDIF_DMACR_TDL(x)	((x) << SPDIF_DMACR_TDL_SHIFT)
--#define SPDIF_DMACR_TDL_MASK	(0x1f << SDPIF_DMACR_TDL_SHIFT)
-+#define SPDIF_DMACR_TDL_MASK	(0x1f << SPDIF_DMACR_TDL_SHIFT)
- 
- /*
-  * XFER
 -- 
-2.6.2
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151211/2526bf12/attachment.sig>
