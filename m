@@ -1,91 +1,58 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 11 Dec 2015 10:04:23 +0100
-Subject: [PATCH RFC 21/27] drivers: cpu-pd: Parse topology to setup CPU PM
- domains
-In-Reply-To: <20151210181121.GA26229@red-moon>
-References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
- <1447799871-56374-22-git-send-email-lina.iyer@linaro.org>
- <20151207145458.GA20538@red-moon>
- <20151208180536.GB2230@linaro.org>
- <20151210181121.GA26229@red-moon>
-Message-ID: <CAMuHMdWBCPkSH6sf=xtLgttvdru222nAWOYNMVNqv6d86jprvA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 11 Dec 2015 10:08:00 +0100
+Subject: [PATCH 2/3] Add support for monitoring gpio switches
+In-Reply-To: <1449250275-23435-3-git-send-email-martyn.welch@collabora.co.uk>
+References: <1449250275-23435-1-git-send-email-martyn.welch@collabora.co.uk>
+ <1449250275-23435-3-git-send-email-martyn.welch@collabora.co.uk>
+Message-ID: <CACRpkdb=it+U+3-0mvZ9Pf1cnYT_r1KkFiS=C4YDkqrjoRm+kQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 10, 2015 at 7:11 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> On Tue, Dec 08, 2015 at 11:05:36AM -0700, Lina Iyer wrote:
->
-> [...]
->
->> On Mon, Dec 07 2015 at 07:53 -0700, Lorenzo Pieralisi wrote:
->> >>+/**
->> >>+ * of_setup_cpu_domain_topology() - Setup the CPU domains from the CPU
->> >>+ * topology node in DT.
->> >>+ *
->> >>+ * @ops: The PM domain suspend/resume ops for all the domains in the topology
->> >>+ */
->> >>+int of_setup_cpu_domain_topology(const struct cpu_pd_ops *ops)
->> >>+{
->> >>+   struct device_node *cn, *map;
->> >>+   int ret = 0;
->> >>+
->> >>+   cn = of_find_node_by_path("/cpus");
->> >>+   if (!cn) {
->> >>+           pr_err("No CPU information found in DT\n");
->> >>+           return 0;
->> >>+   }
->> >>+
->> >>+   map = of_get_child_by_name(cn, "cpu-map");
->> >>+   if (!map)
->> >>+           goto out;
->> >
->> >I commented on this before, is this reliance on cpu-map necessary ?
->> >Could not you just rely on the "power-domains" phandle in the cpu
->> >nodes to build the cpumask for a specific power domain ? I think
->> >you should try to decouple the concept of power domain from the cpu-map
->> >cluster and I think this would also simplify your code in the process.
->> >
->> Sorry, I missed seeing your comment on this earlier.
->>
->> Hmm, it can be done, but I felt out of place to define just power
->> domains that have no devices in Linux, since they are handled in PSCI,
->> but also have no relation to PSCI. Hence, I felt cpu-map to be a good
->> place for the cluster domain. But I am not strongly inclined. I can
->> remove them from the cpu-map and keep them as separate nodes. However,
->> it would be nice to have a way to say these nodes are PSCI controlled.
->
-> I do not agree with the way you described the system.
->
-> Here is how I see it. DT must model HW, and in HW your cpus will be part
-> of a power domain(s) that of course can be hierarchical. Every cpus has a
-> phandle to the power domain it belongs into, and to group them as "cluster"
-> you should follow the power domains hierarchy (ie if you have a cluster
-> power domain, it will contain the core power domains, through the
-> hierarchy it is easy to detect what cpus are part of the cluster power
-> domain by detecting which cpus are part of its children). It is much
-> simpler than the current solution I think, you get rid of cpu-map
-> dependency (honestly it is a bit weird what you did, with cpu-map
-> containing a cluster phandle to a power domain and cpu phandles to
-> cpu nodes, and the DT bindings you posted does not seem to match your
-> dts).
->
-> For PSCI, nothing prevents you from defining the same bindings except
-> that the power domain(s) is not explicitly controlled by the OS, still,
-> the DT would always describe the HW and you can use it to detect the
-> power domain topology and which cpus are part of a given power domain.
->
-> Please let me know what you think, thanks.
+On Fri, Dec 4, 2015 at 6:31 PM, Martyn Welch
+<martyn.welch@collabora.co.uk> wrote:
 
-+1
+> Select Chromebooks have gpio attached to switches used to cause the
+> firmware to enter alternative modes of operation and/or control other
+> device characteristics (such as write protection on flash devices). This
+> patch adds a driver that exposes a read-only interface to allow these
+> signals to be read from user space.
+>
+> This functionality has been generalised to provide support for any device
+> with device tree support which needs to identify a gpio as being used for a
+> specific task.
+>
+> Signed-off-by: Martyn Welch <martyn.welch@collabora.co.uk>
 
-Gr{oetje,eeting}s,
+If you want to do this thing, also propose a device tree binding document
+for "gpio-switch".
 
-                        Geert
+But first (from Documentation/gpio/drivers-on-gpio.txt):
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+- gpio-keys: drivers/input/keyboard/gpio_keys.c is used when your GPIO line
+  can generate interrupts in response to a key press. Also supports debounce.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+- gpio-keys-polled: drivers/input/keyboard/gpio_keys_polled.c is used when your
+  GPIO line cannot generate interrupts, so it needs to be periodically polled
+  by a timer.
+
+- extcon-gpio: drivers/extcon/extcon-gpio.c is used when you need to read an
+  external connector status, such as a headset line for an audio driver or an
+  HDMI connector. It will provide a better userspace sysfs interface than GPIO.
+
+So you mean none of these apply for this case?
+
+Second: what you want to do is export a number of GPIOs with certain names
+to userspace. This is something very generic and should be implemented
+as such, not as something Chromebook-specific.
+
+Patches like that has however already been suggested, and I have NACKed
+them because the GPIO sysfs ABI is insane, and that is why I am refactoring
+the world to create a proper chardev ABI for GPIO instead. See:
+http://marc.info/?l=linux-gpio&m=144550276512673&w=2
+
+So for the moment, NACK on this, please participate in creating the
+*right* ABI for GPIO instead of trying to shoehorn stuff into the dying
+sysfs ABI.
+
+Yours,
+Linus Walleij
