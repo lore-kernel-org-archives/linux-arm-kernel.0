@@ -1,44 +1,74 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 12 Dec 2015 00:21:32 +0100
-Subject: [GIT PULL] Renesas ARM Based SoC Cleanup for v4.5
-In-Reply-To: <cover.1448585673.git.horms+renesas@verge.net.au>
-References: <cover.1448585673.git.horms+renesas@verge.net.au>
-Message-ID: <1650671.Xh9EhEssTx@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 11 Dec 2015 23:21:13 +0000
+Subject: [PATCH v3 4/4] printk/nmi: Increase the size of NMI buffer and
+ make it configurable
+In-Reply-To: <20151211145725.b0e81bb4bb18fcd72ef5f557@linux-foundation.org>
+References: <1449667265-17525-1-git-send-email-pmladek@suse.com>
+ <1449667265-17525-5-git-send-email-pmladek@suse.com>
+ <CAMuHMdXVgr58YjoePGrRbMyMncQ27f85prL7G5SpeHeNxoYrXQ@mail.gmail.com>
+ <20151211124159.GB3729@pathway.suse.cz>
+ <20151211145725.b0e81bb4bb18fcd72ef5f557@linux-foundation.org>
+Message-ID: <20151211232113.GZ8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 27 November 2015 10:55:47 Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Fri, Dec 11, 2015 at 02:57:25PM -0800, Andrew Morton wrote:
+> This is a bit messy.  NEED_PRINTK_NMI is an added-on hack for one
+> particular arm variant.  From the changelog:
 > 
-> Please consider these Renesas ARM based SoC cleanup for v4.5.
+>    "One exception is arm where the deferred printing is used for
+>     printing backtraces even without NMI.  For this purpose, we define
+>     NEED_PRINTK_NMI Kconfig flag.  The alternative printk_func is
+>     explicitly set when IPI_CPU_BACKTRACE is handled."
 > 
-> This pull request includes some minor cleanups and
-> introduces ARCH_RENESAS as a firs step to migrating away
-> from ARCH_SHMOBILE and ARCH_SHMOBILE_MULTI.
 > 
+> - why does arm needs deferred printing for backtraces?
 > 
-> The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+> - why is this specific to CONFIG_CPU_V7M?
 > 
->   Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-cleanup-for-v4.5
-> 
-> for you to fetch changes up to c8cd74a1468ffe20db3ddc6e6f408d5377f9be43:
-> 
->   ARM: shmobile: Remove legacy mach/irqs.h (2015-11-19 16:28:01 -0800)
-> 
-> ----------------------------------------------------------------
-> Renesas ARM Based SoC Cleanup for v4.5
-> 
-> * Remove now unnecessary header
-> * Introduce ARCH_RENESAS
-> * Remove unmaintened URL from MAINTAINERS
-> 
+> - can this Kconfig logic be cleaned up a bit?
 
-Pulled into next/cleanup, one conflict gone from linux-next.
+I think this comes purely from this attempt to apply another round of
+cleanups to the nmi backtrace work I did.
 
-Thanks,
+As I explained when I did that work, the vast majority of ARM platforms
+are unable to trigger anything like a NMI - the FIQ is something that's
+generally a property of the secure monitor, and is not accessible to
+Linux.  However, there are platforms where it is accessible.
 
-	Arnd
+The work to add the FIQ-based variant never happened (I've no idea what
+happened to that part, Daniel seems to have lost interest in working on
+it.)  So, what we have is the IRQ-based variant merged in mainline, which
+would be the fallback for the "FIQ not available" cases, and I carry a
+local hack in my tree which provides the FIQ-based version - but if it
+were to trigger, it takes out all interrupts (hence why I've not merged
+my hack.)
+
+I think the reason that the FIQ-based variant has never really happened
+is that hooking into the interrupt controller code to clear down the FIQ
+creates such a horrid layering violation, and also a locking mess that
+I suspect it's just been given up with.
+
+However, I've found my "hack" useful - it's turned a number of totally
+undebuggable hangs (where one CPU silently hangs leaving the others
+running with no way to find out where the hung CPU is) into something
+that can be debugged.
+
+Now, when we end up triggering the IRQ-based variant, we could already
+be in a situation where IRQs are off for the local CPU, so the IRQ is
+never delivered.  Others decided that it wasn't acceptable to wait 10sec
+for the local CPU to time out, and (iirc) we'd also loose the local CPUs
+backtrace in certain situations.
+
+I'm personally happy with the existing code, and I've been wondering why
+there's this effort to apply further cleanups - to me, the changelogs
+don't seem to make that much sense, unless we want to start using
+printk() extensively in NMI functions - using the generic nmi backtrace
+code surely gets us something that works across all architectures...
+
+I've been assuming that I've missed something, which is why I've not
+said anything on that point until now.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
