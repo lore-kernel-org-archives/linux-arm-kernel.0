@@ -1,118 +1,40 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Fri, 11 Dec 2015 09:30:49 +0800
-Subject: [PATCH v2 1/4] pinctrl: rockchip: add support for the rk3228
-In-Reply-To: <1449797452-19389-1-git-send-email-jeffy.chen@rock-chips.com>
-References: <1449797452-19389-1-git-send-email-jeffy.chen@rock-chips.com>
-Message-ID: <1449797452-19389-2-git-send-email-jeffy.chen@rock-chips.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 11 Dec 2015 10:34:13 +0900
+Subject: [PATCH v5 0/7] cpufreq: add generic cpufreq driver support for
+ Exynos542x/5800 platforms
+In-Reply-To: <1449766729-435-1-git-send-email-b.zolnierkie@samsung.com>
+References: <1449766729-435-1-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <566A2815.2020908@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pinctrl of rk3228 is much the same as rk3288's, but
-without pmu.
+On 11.12.2015 01:58, Bartlomiej Zolnierkiewicz wrote:
+> Hi,
+> 
+> This patch series adds generic cpufreq-dt driver support for
+> Exynos542x/5800 (using the new CPU clock type which allows it).
+> 
+> It has been tested on Exynos5422 based ODROID-XU3 Lite board.
+> 
+> Depends on:
+> - next-20151124 branch of linux-next kernel tree
 
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-Acked-by: Rob Herring <robh@kernel.org>
+Bartlomiej,
+Thanks for update! Nice work. Everything looks good for me. As for
+merging, my last pull requests are waiting on Kukjin, so I am not
+grabbing more stuff till they get in. This (I hope) should happen this
+weekend so:
+1. Either Kukjin will pick it up directly,
+2. I could apply this later and hopefully still send them for v4.5.
 
----
 
-Changes in v2: None
+Sylwester,
+However in case of any delay, how about merging clock changes now
+through clock tree and preparing a tag for samsung-soc? If the series
+won't make till v4.5 then at least dependency would be merged.
 
- .../bindings/pinctrl/rockchip,pinctrl.txt          |  3 +-
- drivers/pinctrl/pinctrl-rockchip.c                 | 53 ++++++++++++++++++++++
- 2 files changed, 55 insertions(+), 1 deletion(-)
+In that case you could also pick the first patch from Marek's GSCL clock.
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
-index 391ef4b..0cd701b 100644
---- a/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
-@@ -21,7 +21,8 @@ defined as gpio sub-nodes of the pinmux controller.
- Required properties for iomux controller:
-   - compatible: one of "rockchip,rk2928-pinctrl", "rockchip,rk3066a-pinctrl"
- 		       "rockchip,rk3066b-pinctrl", "rockchip,rk3188-pinctrl"
--		       "rockchip,rk3288-pinctrl", "rockchip,rk3368-pinctrl"
-+		       "rockchip,rk3228-pinctrl", "rockchip,rk3288-pinctrl"
-+		       "rockchip,rk3368-pinctrl"
-   - rockchip,grf: phandle referencing a syscon providing the
- 	 "general register files"
- 
-diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
-index a065112..faab36e 100644
---- a/drivers/pinctrl/pinctrl-rockchip.c
-+++ b/drivers/pinctrl/pinctrl-rockchip.c
-@@ -614,6 +614,40 @@ static void rk3288_calc_drv_reg_and_bit(struct rockchip_pin_bank *bank,
- 	}
- }
- 
-+#define RK3228_PULL_OFFSET		0x100
-+
-+static void rk3228_calc_pull_reg_and_bit(struct rockchip_pin_bank *bank,
-+				    int pin_num, struct regmap **regmap,
-+				    int *reg, u8 *bit)
-+{
-+	struct rockchip_pinctrl *info = bank->drvdata;
-+
-+	*regmap = info->regmap_base;
-+	*reg = RK3228_PULL_OFFSET;
-+	*reg += bank->bank_num * RK3188_PULL_BANK_STRIDE;
-+	*reg += ((pin_num / RK3188_PULL_PINS_PER_REG) * 4);
-+
-+	*bit = (pin_num % RK3188_PULL_PINS_PER_REG);
-+	*bit *= RK3188_PULL_BITS_PER_PIN;
-+}
-+
-+#define RK3228_DRV_GRF_OFFSET		0x200
-+
-+static void rk3228_calc_drv_reg_and_bit(struct rockchip_pin_bank *bank,
-+				    int pin_num, struct regmap **regmap,
-+				    int *reg, u8 *bit)
-+{
-+	struct rockchip_pinctrl *info = bank->drvdata;
-+
-+	*regmap = info->regmap_base;
-+	*reg = RK3228_DRV_GRF_OFFSET;
-+	*reg += bank->bank_num * RK3288_DRV_BANK_STRIDE;
-+	*reg += ((pin_num / RK3288_DRV_PINS_PER_REG) * 4);
-+
-+	*bit = (pin_num % RK3288_DRV_PINS_PER_REG);
-+	*bit *= RK3288_DRV_BITS_PER_PIN;
-+}
-+
- #define RK3368_PULL_GRF_OFFSET		0x100
- #define RK3368_PULL_PMU_OFFSET		0x10
- 
-@@ -2143,6 +2177,23 @@ static struct rockchip_pin_ctrl rk3188_pin_ctrl = {
- 		.pull_calc_reg		= rk3188_calc_pull_reg_and_bit,
- };
- 
-+static struct rockchip_pin_bank rk3228_pin_banks[] = {
-+	PIN_BANK(0, 32, "gpio0"),
-+	PIN_BANK(1, 32, "gpio1"),
-+	PIN_BANK(2, 32, "gpio2"),
-+	PIN_BANK(3, 32, "gpio3"),
-+};
-+
-+static struct rockchip_pin_ctrl rk3228_pin_ctrl = {
-+		.pin_banks		= rk3228_pin_banks,
-+		.nr_banks		= ARRAY_SIZE(rk3228_pin_banks),
-+		.label			= "RK3228-GPIO",
-+		.type			= RK3288,
-+		.grf_mux_offset		= 0x0,
-+		.pull_calc_reg		= rk3228_calc_pull_reg_and_bit,
-+		.drv_calc_reg		= rk3228_calc_drv_reg_and_bit,
-+};
-+
- static struct rockchip_pin_bank rk3288_pin_banks[] = {
- 	PIN_BANK_IOMUX_FLAGS(0, 24, "gpio0", IOMUX_SOURCE_PMU,
- 					     IOMUX_SOURCE_PMU,
-@@ -2220,6 +2271,8 @@ static const struct of_device_id rockchip_pinctrl_dt_match[] = {
- 		.data = (void *)&rk3066b_pin_ctrl },
- 	{ .compatible = "rockchip,rk3188-pinctrl",
- 		.data = (void *)&rk3188_pin_ctrl },
-+	{ .compatible = "rockchip,rk3228-pinctrl",
-+		.data = (void *)&rk3228_pin_ctrl },
- 	{ .compatible = "rockchip,rk3288-pinctrl",
- 		.data = (void *)&rk3288_pin_ctrl },
- 	{ .compatible = "rockchip,rk3368-pinctrl",
--- 
-2.1.4
+
+Best regards,
+Krzysztof
