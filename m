@@ -1,54 +1,77 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 11 Dec 2015 23:53:25 +0100
-Subject: [RFC] ARM: PJ4: don't use PJ4B code on PJ4
-Message-ID: <1589028.kTAQHTnCye@wuerfel>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Fri, 11 Dec 2015 14:57:25 -0800
+Subject: [PATCH v3 4/4] printk/nmi: Increase the size of NMI buffer and
+ make it configurable
+In-Reply-To: <20151211124159.GB3729@pathway.suse.cz>
+References: <1449667265-17525-1-git-send-email-pmladek@suse.com>
+ <1449667265-17525-5-git-send-email-pmladek@suse.com>
+ <CAMuHMdXVgr58YjoePGrRbMyMncQ27f85prL7G5SpeHeNxoYrXQ@mail.gmail.com>
+ <20151211124159.GB3729@pathway.suse.cz>
+Message-ID: <20151211145725.b0e81bb4bb18fcd72ef5f557@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can have multiplatform kernels with PJ4 (Dove, MMP2) in combination
-with PJ4B (Armada 370) or PJ4B-MP (Berlin, Armada XP), and the processor
-functions that are defined for PJ4B use a mask that covers all three
-core types, rather than using the default ARMv7 type for the original
-PJ4.
+On Fri, 11 Dec 2015 13:41:59 +0100 Petr Mladek <pmladek@suse.com> wrote:
 
-This adds a second entry for PJ4B-MP, so we at least get a consistent
-behavior between single-machine kernels and combined ones.
+> On Fri 2015-12-11 12:10:02, Geert Uytterhoeven wrote:
+> > On Wed, Dec 9, 2015 at 2:21 PM, Petr Mladek <pmladek@suse.com> wrote:
+> > > --- a/init/Kconfig
+> > > +++ b/init/Kconfig
+> > > @@ -866,6 +866,28 @@ config LOG_CPU_MAX_BUF_SHIFT
+> > >                      13 =>   8 KB for each CPU
+> > >                      12 =>   4 KB for each CPU
+> > >
+> > > +config NMI_LOG_BUF_SHIFT
+> > > +       int "Temporary per-CPU NMI log buffer size (12 => 4KB, 13 => 8KB)"
+> > > +       range 10 21
+> > > +       default 13
+> > > +       depends on PRINTK && HAVE_NMI
+> > 
+> > Symbol NMI_LOG_BUF_SHIFT does not exist if its dependencies are not met.
+> 
+> __h, the NMI buffer is enabled on arm via NEED_PRINTK_NMI.
+> 
+> The buffer is compiled when CONFIG_PRINTK_NMI is defined. I am going
+> to fix it the following way:
+> 
+> 
+> diff --git a/init/Kconfig b/init/Kconfig
+> index efcff25a112d..61cfd96a3c96 100644
+> --- a/init/Kconfig
+> +++ b/init/Kconfig
+> @@ -870,7 +870,7 @@ config NMI_LOG_BUF_SHIFT
+>  	int "Temporary per-CPU NMI log buffer size (12 => 4KB, 13 => 8KB)"
+>  	range 10 21
+>  	default 13
+> -	depends on PRINTK && HAVE_NMI
+> +	depends on PRINTK_NMI
+>  	help
+>  	  Select the size of a per-CPU buffer where NMI messages are temporary
+>  	  stored. They are copied to the main log buffer in a safe context
 
-I suspect however that we actually want different contents for each
-of the three cores, as PJ4B and PJ4B-MP appear to be at least as
-different as PJ4 is from PJ4B, in particular the support for
-the standard architecture extensions like IDIV and LPAE, and the
-PJ4B_ERRATA_4742 workaround apparently does not apply to PJ4B-MP
-but might apply to PJ4.
+I'm wondering why we're building kernel/printk/nmi.o if HAVE_NMI is not
+set.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 049be07053eb ("ARM: 7754/1: Fix the CPU ID and the mask associated to the PJ4B")
----
-I haven't even build tested this one, for now, let's use this to
-start the discussion about whether the bug is real and what the
-actual functions should be for each of the three cores.
+	obj-$(CONFIG_PRINTK_NMI)		+= nmi.o
 
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 8e1ea433c3f1..d7b61aa9cda9 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -567,10 +567,17 @@ __v7_ca8_proc_info:
- #ifdef CONFIG_CPU_PJ4B
- 	.type   __v7_pj4b_proc_info, #object
- __v7_pj4b_proc_info:
--	.long	0x560f5800
--	.long	0xff0fff00
-+	.long	0x562f5840
-+	.long	0xfffffff0
- 	__v7_proc __v7_pj4b_proc_info, __v7_pj4b_setup, proc_fns = pj4b_processor_functions
- 	.size	__v7_pj4b_proc_info, . - __v7_pj4b_proc_info
-+
-+	.type   __v7_pj4bmp_proc_info, #object
-+__v7_pj4bmp_proc_info:
-+	.long	0x561f5810
-+	.long	0xfffffff0
-+	__v7_proc __v7_pj4bmp_proc_info, __v7_pj4b_setup, proc_fns = pj4b_processor_functions
-+	.size	__v7_pj4bmp_proc_info, . - __v7_pj4bmp_proc_info
- #endif
- 
- 	/*
+and
+
+	config PRINTK_NMI
+		def_bool y
+		depends on PRINTK
+		depends on HAVE_NMI || NEED_PRINTK_NMI
+
+This is a bit messy.  NEED_PRINTK_NMI is an added-on hack for one
+particular arm variant.  From the changelog:
+
+   "One exception is arm where the deferred printing is used for
+    printing backtraces even without NMI.  For this purpose, we define
+    NEED_PRINTK_NMI Kconfig flag.  The alternative printk_func is
+    explicitly set when IPI_CPU_BACKTRACE is handled."
+
+
+- why does arm needs deferred printing for backtraces?
+
+- why is this specific to CONFIG_CPU_V7M?
+
+- can this Kconfig logic be cleaned up a bit?
