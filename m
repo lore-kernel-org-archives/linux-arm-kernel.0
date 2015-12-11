@@ -1,313 +1,53 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 11 Dec 2015 19:21:24 +0100
-Subject: [PATCH v2 1/3] reset: Add shared reset_control_[de]assert variants
-In-Reply-To: <1449853825.3419.50.camel@pengutronix.de>
-References: <1449848520-27379-1-git-send-email-hdegoede@redhat.com>
- <1449853825.3419.50.camel@pengutronix.de>
-Message-ID: <566B1424.2060700@redhat.com>
+From: josh@joshtriplett.org (Josh Triplett)
+Date: Fri, 11 Dec 2015 10:27:30 -0800
+Subject: [PATCH 0/5] ARM: orion5x/dove/mv78xx0 multiplatform
+In-Reply-To: <20151211133601.GB18249@io.lakedaemon.net>
+References: <1448466557-435335-1-git-send-email-arnd@arndb.de>
+ <2992463.fVOGazvIkH@wuerfel> <5669F5F8.5010005@vollmann.ch>
+ <14967875.ttNXUbSTvS@wuerfel>
+ <20151211133601.GB18249@io.lakedaemon.net>
+Message-ID: <20151211182730.GA15800@cloud>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Dec 11, 2015 at 01:36:01PM +0000, Jason Cooper wrote:
+> +Josh
+> 
+> Hey Arnd, Detlef,
+> 
+> On Fri, Dec 11, 2015 at 12:10:55AM +0100, Arnd Bergmann wrote:
+> > On Thursday 10 December 2015 23:00:24 Detlef Vollmann wrote:
+> > > On 12/10/15 22:29, Arnd Bergmann wrote:
+> > > > On Thursday 10 December 2015 22:14:25 Detlef Vollmann wrote:
+> > > >> On 12/10/15 21:59, Arnd Bergmann wrote:
+> > > > It may also be worth investigating what has made CONFIG_OF so costly,
+> > > Probably because too much is done at runtime and too few things can
+> > > be fixed at build time.
+> > > 
+> > > > maybe we can reduce this a bit again.
+> > > Probably not without turning the wheel backward :-(
+> > > 
+> > > So for the test: yes it works, but I'm unhappy with it.
+> > 
+> > I'm not too happy about adding 80kb to the uncompressed kernel 
+> > image either. I've spent some more time now trying to find where
+> > we added the bloat. It's mainly in drivers, not in arch specific
+> > code, a kilobyte here and there eventually adds up, but the largest
+> > portion with a little over 50% of the total diff is drivers/of.
+> 
+> Wasn't there an idea kicked around a while ago to create a
+> dt2boardfile script/executable*?  Then, during kernel configuration, you
+> enable it and select which dts file you want.  It would disable
+> CONFIG_OF, multiplatform, etc.  And generate a board_file.c from the dts
+> file.
+> 
+> If anything, it might be worth asking the kernel tinification [1], [2]
+> folks if they'd be interested in taking this on...
 
-On 11-12-15 18:10, Philipp Zabel wrote:
-> Hi Hans,
->
-> thanks for moving this forward.
+No objection if you want to add it to the task list on
+tiny.wiki.kernel.org (on the more difficult end).
 
-Thanks for the quick review, I've a couple of (simple) questions
-about your review remarks once those are cleared up I'll post a new version
-(of just this patch).
-
-> Am Freitag, den 11.12.2015, 16:41 +0100 schrieb Hans de Goede:
->> Add reset_control_deassert_shared / reset_control_assert_shared
->> functions which are intended for use by drivers for hw blocks which
->> (may) share a reset line with another driver / hw block.
->>
->> Unlike the regular reset_control_[de]assert functions these functions
->> keep track of how often deassert_shared / assert_shared have been called
->> and keep the line deasserted as long as deassert has been called more
->> times than assert.
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->> Changes in v2:
->> -This is a new patch in v2 of this patch-set
->> ---
->>   drivers/reset/core.c             | 121 ++++++++++++++++++++++++++++++++++++---
->>   include/linux/reset-controller.h |   2 +
->>   include/linux/reset.h            |   2 +
->>   3 files changed, 116 insertions(+), 9 deletions(-)
->>
->> diff --git a/drivers/reset/core.c b/drivers/reset/core.c
->> index 9ab9290..8c3436c 100644
->> --- a/drivers/reset/core.c
->> +++ b/drivers/reset/core.c
->> @@ -22,16 +22,29 @@ static DEFINE_MUTEX(reset_controller_list_mutex);
->>   static LIST_HEAD(reset_controller_list);
->>
->>   /**
->> + * struct reset_line - a reset line
->> + * @list:         list entry for the reset controllers reset line list
->> + * @id:           ID of the reset line in the reset controller device
->> + * @refcnt:       Number of reset_control structs referencing this device
->> + * @deassert_cnt: Number of times this reset line has been deasserted
->> + */
->> +struct reset_line {
->> +	struct list_head list;
->> +	unsigned int id;
->> +	unsigned int refcnt;
->> +	unsigned int deassert_cnt;
->> +};
->
-> I'd move rcdev into reset_line, too. That way the description is
-> complete, and we don't duplicate rcdev when there are multiple
-> reset_controls pointing here.
-
-Ack.
-
->> +/**
->>    * struct reset_control - a reset control
->>    * @rcdev: a pointer to the reset controller device
->>    *         this reset control belongs to
->> - * @id: ID of the reset controller in the reset
->> - *      controller device
->> + * @line:  reset line for this reset control
->>    */
->>   struct reset_control {
->>   	struct reset_controller_dev *rcdev;
->> +	struct reset_line *line;
->>   	struct device *dev;
->> -	unsigned int id;
->>   };
->>
->>   /**
-> [...]
->> @@ -119,13 +134,55 @@ EXPORT_SYMBOL_GPL(reset_control_assert);
->>   int reset_control_deassert(struct reset_control *rstc)
->>   {
->
-> Maybe WARN_ON(rstc->line->refcnt > 1) ?
-
-I assume you mean deasser_cnt ? Seems reasonable with that change.
-
->>   	if (rstc->rcdev->ops->deassert)
->> -		return rstc->rcdev->ops->deassert(rstc->rcdev, rstc->id);
->> +		return rstc->rcdev->ops->deassert(rstc->rcdev, rstc->line->id);
->>
->>   	return -ENOTSUPP;
->>   }
->>   EXPORT_SYMBOL_GPL(reset_control_deassert);
->>
->>   /**
->> + * reset_control_assert_shared - asserts a shared reset line
->> + * @rstc: reset controller
->> + *
->> + * Assert a shared reset line, this functions decreases the deassert count
->> + * of the line by one and asserts it if, and only if, the deassert count
->> + * reaches 0.
->
-> "After calling this function the shared reset line may be asserted, or
->   it may still be deasserted, as long as other users keep it so."
-
-I take it this is to replace the text about "deassert count" ?
-
->> + */
->> +int reset_control_assert_shared(struct reset_control *rstc)
->> +{
->> +	if (!rstc->rcdev->ops->assert)
->> +		return -ENOTSUPP;
->
-> WARN_ON(rstc->line->deassert_cnt == 0)
->
-> Actually, what to do in this case? Assume ops->assert was called, or do
-> it again to be sure? Certainly we don't want to wrap deassert_cnt, or
-> the next deassert_shared will do nothing.
->
->> +	rstc->line->deassert_cnt--;
->> +	if (rstc->line->deassert_cnt)
->
-> deassert_cnt isn't protected by any lock.
-
-Right, good catch. I believe the best way to fix this is to change deassert_cnt
-into an atomic_t and use atomic_dec_return / atomic_int_return,
-
-Downside of using an atomic_t is that doing the WARN_ON you are asking for above
-will not be race free, then, but since it is a should never happen scenario I
-guess we do not care about the check not being 100% race free. Or we can even
-just leave out the check ?
-
-
->
->> +		return 0;
->> +
->> +	return rstc->rcdev->ops->assert(rstc->rcdev, rstc->line->id);
->> +}
->> +EXPORT_SYMBOL_GPL(reset_control_assert_shared);
->> +
->> +/**
->> + * reset_control_deassert_shared - deasserts a shared reset line
->> + * @rstc: reset controller
->> + *
->> + * Assert a shared reset line, this functions increases the deassert count
->
-> Deassert
-
-Ack.
-
->> + * of the line by one and deasserts the reset line (if it was not already
->> + * deasserted).
->
-> "After calling this function, the shared reset line is guaranteed to be
->   deasserted."
-
-Same question as above.
-
->> + */
->> +int reset_control_deassert_shared(struct reset_control *rstc)
->> +{
->> +	if (!rstc->rcdev->ops->deassert)
->> +		return -ENOTSUPP;
->> +
->> +	rstc->line->deassert_cnt++;
->> +	if (rstc->line->deassert_cnt != 1)
->> +		return 0;
->> +
->> +	return rstc->rcdev->ops->deassert(rstc->rcdev, rstc->line->id);
->> +}
->> +EXPORT_SYMBOL_GPL(reset_control_deassert_shared);
->> +
->> +/**
->>    * reset_control_status - returns a negative errno if not supported, a
->>    * positive value if the reset line is asserted, or zero if the reset
->>    * line is not asserted.
->> @@ -134,12 +191,47 @@ EXPORT_SYMBOL_GPL(reset_control_deassert);
->>   int reset_control_status(struct reset_control *rstc)
->>   {
->>   	if (rstc->rcdev->ops->status)
->> -		return rstc->rcdev->ops->status(rstc->rcdev, rstc->id);
->> +		return rstc->rcdev->ops->status(rstc->rcdev, rstc->line->id);
->>
->>   	return -ENOTSUPP;
->>   }
->>   EXPORT_SYMBOL_GPL(reset_control_status);
->>
->> +static struct reset_line *reset_line_get(struct reset_controller_dev *rcdev,
->> +					 unsigned int index)
->> +{
->> +	struct reset_line *line;
->
-> lockdep_assert_held here and in reset_line_put would document that these
-> functions are called under reset_(controller_)list_mutex.
-
-Ok, I will add these.
-
->> +	list_for_each_entry(line, &rcdev->reset_line_head, list) {
->> +		if (line->id == index) {
->> +			line->refcnt++;
->> +			return line;
->> +		}
->> +	}
->> +
->> +	line = kzalloc(sizeof(*line), GFP_KERNEL);
->> +	if (!line)
->> +		return NULL;
->> +
->> +	list_add(&line->list, &rcdev->reset_line_head);
->> +	line->id = index;
->> +	line->refcnt = 1;
->> +
->> +	return line;
->> +}
->> +
->> +static void reset_line_put(struct reset_line *line)
->> +{
->> +	if (!line)
->> +		return;
->> +
->> +	if (--line->refcnt)
->> +		return;
->> +
->> +	list_del(&line->list);
->> +	kfree(line);
->> +}
->> +
->>   /**
->>    * of_reset_control_get_by_index - Lookup and obtain a reference to a reset
->>    * controller by index.
->> @@ -155,6 +247,7 @@ struct reset_control *of_reset_control_get_by_index(struct device_node *node,
->>   {
->>   	struct reset_control *rstc = ERR_PTR(-EPROBE_DEFER);
->>   	struct reset_controller_dev *r, *rcdev;
->> +	struct reset_line *line;
->>   	struct of_phandle_args args;
->>   	int rstc_id;
->>   	int ret;
->> @@ -186,16 +279,22 @@ struct reset_control *of_reset_control_get_by_index(struct device_node *node,
->>   	}
->>
->>   	try_module_get(rcdev->owner);
->> +
->> +	/* reset_controller_list_mutex also protects the reset_line list */
->
-> Let's rename it to reset_list_mutex, then.
-
-Ack.
-
->> +	line = reset_line_get(rcdev, rstc_id);
->> +
->>   	mutex_unlock(&reset_controller_list_mutex);
->>
->>   	rstc = kzalloc(sizeof(*rstc), GFP_KERNEL);
->> -	if (!rstc) {
->> +	if (!line || !rstc) {
->> +		kfree(rstc);
->> +		reset_line_put(line);
->>   		module_put(rcdev->owner);
->>   		return ERR_PTR(-ENOMEM);
->>   	}
->>
->>   	rstc->rcdev = rcdev;
->> -	rstc->id = rstc_id;
->> +	rstc->line = line;
->>
->>   	return rstc;
->>   }
->> @@ -259,6 +358,10 @@ void reset_control_put(struct reset_control *rstc)
->>   	if (IS_ERR(rstc))
->>   		return;
->>
->> +	mutex_lock(&reset_controller_list_mutex);
->> +	reset_line_put(rstc->line);
->> +	mutex_unlock(&reset_controller_list_mutex);
->> +
->>   	module_put(rstc->rcdev->owner);
->>   	kfree(rstc);
->>   }
->> diff --git a/include/linux/reset-controller.h b/include/linux/reset-controller.h
->> index ce6b962..7f2cbd1 100644
->> --- a/include/linux/reset-controller.h
->> +++ b/include/linux/reset-controller.h
->> @@ -31,6 +31,7 @@ struct of_phandle_args;
->>    * @ops: a pointer to device specific struct reset_control_ops
->>    * @owner: kernel module of the reset controller driver
->>    * @list: internal list of reset controller devices
->> + * @reset_line_head: head of internal list of reset lines
->
-> "list of requested reset lines" or "list of reset lines in use" to make
-> clear the list only contains entries for the requested controls?
-
-Ok, will fix.
-
->>    * @of_node: corresponding device tree node as phandle target
->>    * @of_reset_n_cells: number of cells in reset line specifiers
->>    * @of_xlate: translation function to translate from specifier as found in the
-> [...]
->
-> best regards
-> Philipp
->
-
-Regards,
-
-Hans
+I don't know if you could generate a board file, but I do wonder if you
+could effectively compile in a parsed description and ditch the parser.
+Bonus if you can make the values parsed out of it into compile-time
+constants for constant folding.
