@@ -1,48 +1,78 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Fri, 11 Dec 2015 10:08:36 -0500
-Subject: [PATCH] scripts: recordmcount: break hardlinks
-In-Reply-To: <20151211144541.GT8644@n2100.arm.linux.org.uk>
-References: <20151202090517.432556a4@gandalf.local.home>
- <E1a7MVT-0000et-62@rmk-PC.arm.linux.org.uk>
- <20151211093125.50b72639@gandalf.local.home>
- <20151211144541.GT8644@n2100.arm.linux.org.uk>
-Message-ID: <20151211100836.011a04b8@gandalf.local.home>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 11 Dec 2015 09:09:35 -0600
+Subject: [PATCH v5 4/5] ARM: dts: DRA7: add entry for qspi mmap region
+In-Reply-To: <1449807000-6457-5-git-send-email-vigneshr@ti.com>
+References: <1449807000-6457-1-git-send-email-vigneshr@ti.com>
+ <1449807000-6457-5-git-send-email-vigneshr@ti.com>
+Message-ID: <20151211150935.GA15654@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Dec 2015 14:45:41 +0000
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-
-> On Fri, Dec 11, 2015 at 09:31:25AM -0500, Steven Rostedt wrote:
-> > On Fri, 11 Dec 2015 12:09:03 +0000
-> > Russell King <rmk+kernel@arm.linux.org.uk> wrote:
-> >   
-> > > recordmcount edits the file in-place, which can cause problems when
-> > > using ccache in hardlink mode.  Arrange for recordmcount to break a
-> > > hardlinked object.
-> > > 
-> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > > ---
-> > > Steven, sorry it took a while to get this out...  
-> > 
-> > Should this be for stable, or is it fine to just add this to my 4.5
-> > queue?  
+On Fri, Dec 11, 2015 at 09:39:59AM +0530, Vignesh R wrote:
+> Add qspi memory mapped region entries for DRA7xx based SoCs. Also,
+> update the binding documents for the controller to document this change.
 > 
-> I thought you wanted to test it first - although I've been running with
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
 
-You're right. I forgot I said that ;-)
+Acked-by: Rob Herring <robh@kernel.org>
 
-
-> this for a while now, my nightly builds have masked out the mcount
-> warning, and I suspect it'll take a while for ccache to purge itself
-> of the modified objects.
+> ---
 > 
-> If you're happy to add a stable tag to it, then please do so.
+> v5: use syscon to access scm register.
 > 
-
-I'm fine with you taking it too, but let me go ahead and run it through
-my tests now. I'll let you know the results. Takes several hours.
-
-Thanks,
-
--- Steve
+>  Documentation/devicetree/bindings/spi/ti_qspi.txt | 17 +++++++++++++++++
+>  arch/arm/boot/dts/dra7.dtsi                       |  6 ++++--
+>  2 files changed, 21 insertions(+), 2 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/spi/ti_qspi.txt b/Documentation/devicetree/bindings/spi/ti_qspi.txt
+> index 601a360531a5..809c3f334316 100644
+> --- a/Documentation/devicetree/bindings/spi/ti_qspi.txt
+> +++ b/Documentation/devicetree/bindings/spi/ti_qspi.txt
+> @@ -15,6 +15,10 @@ Recommended properties:
+>  - spi-max-frequency: Definition as per
+>                       Documentation/devicetree/bindings/spi/spi-bus.txt
+>  
+> +Optional properties:
+> +- syscon-chipselects: Handle to system control region contains QSPI
+> +		      chipselect register and offset of that register.
+> +
+>  Example:
+>  
+>  qspi: qspi at 4b300000 {
+> @@ -26,3 +30,16 @@ qspi: qspi at 4b300000 {
+>  	spi-max-frequency = <25000000>;
+>  	ti,hwmods = "qspi";
+>  };
+> +
+> +For dra7xx:
+> +qspi: qspi at 4b300000 {
+> +	compatible = "ti,dra7xxx-qspi";
+> +	reg = <0x4b300000 0x100>,
+> +	      <0x5c000000 0x4000000>,
+> +	reg-names = "qspi_base", "qspi_mmap";
+> +	syscon-chipselects = <&scm_conf 0x558>;
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +	spi-max-frequency = <48000000>;
+> +	ti,hwmods = "qspi";
+> +};
+> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> index fe99231cbde5..be91c7781c07 100644
+> --- a/arch/arm/boot/dts/dra7.dtsi
+> +++ b/arch/arm/boot/dts/dra7.dtsi
+> @@ -1153,8 +1153,10 @@
+>  
+>  		qspi: qspi at 4b300000 {
+>  			compatible = "ti,dra7xxx-qspi";
+> -			reg = <0x4b300000 0x100>;
+> -			reg-names = "qspi_base";
+> +			reg = <0x4b300000 0x100>,
+> +			      <0x5c000000 0x4000000>;
+> +			reg-names = "qspi_base", "qspi_mmap";
+> +			syscon-chipselects = <&scm_conf 0x558>;
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+>  			ti,hwmods = "qspi";
+> -- 
+> 2.6.3
+> 
