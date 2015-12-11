@@ -1,86 +1,68 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 11 Dec 2015 21:57:36 +0100
-Subject: [PATCH v3 04/22] KVM: arm/arm64: vgic-v3: Make the LR indexing
- macro public
-In-Reply-To: <1449485618-9443-5-git-send-email-marc.zyngier@arm.com>
-References: <1449485618-9443-1-git-send-email-marc.zyngier@arm.com>
- <1449485618-9443-5-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20151211205736.GE27689@cbox>
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 11 Dec 2015 13:02:04 -0800
+Subject: [PATCH v6 0/4] Allow customizable random offset to mmap_base
+ address.
+In-Reply-To: <1449856338-30984-1-git-send-email-dcashman@android.com>
+References: <1449856338-30984-1-git-send-email-dcashman@android.com>
+Message-ID: <CAGXu5j+KSX4xKzGJ1h89N5-CSx5cMFti-sKUKaGom4o+5X+76Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 07, 2015 at 10:53:20AM +0000, Marc Zyngier wrote:
-> We store GICv3 LRs in reverse order so that the CPU can save/restore
-> them in rever order as well (don't ask why, the design is crazy),
+On Fri, Dec 11, 2015 at 9:52 AM, Daniel Cashman <dcashman@android.com> wrote:
+> Address Space Layout Randomization (ASLR) provides a barrier to exploitation of user-space processes in the presence of security vulnerabilities by making it more difficult to find desired code/data which could help an attack. This is done by adding a random offset to the location of regions in the process address space, with a greater range of potential offset values corresponding to better protection/a larger search-space for brute force, but also to greater potential for fragmentation.
+>
+> The offset added to the mmap_base address, which provides the basis for the majority of the mappings for a process, is set once on process exec in arch_pick_mmap_layout() and is done via hard-coded per-arch values, which reflect, hopefully, the best compromise for all systems. The trade-off between increased entropy in the offset value generation and the corresponding increased variability in address space fragmentation is not absolute, however, and some platforms may tolerate higher amounts of entropy. This patch introduces both new Kconfig values and a sysctl interface which may be used to change the amount of entropy used for offset generation on a system.
+>
+> The direct motivation for this change was in response to the libstagefright vulnerabilities that affected Android, specifically to information provided by Google's project zero at:
+>
+> http://googleprojectzero.blogspot.com/2015/09/stagefrightened.html
+>
+> The attack presented therein, by Google's project zero, specifically targeted the limited randomness used to generate the offset added to the mmap_base address in order to craft a brute-force-based attack. Concretely, the attack was against the mediaserver process, which was limited to respawning every 5 seconds, on an arm device. The hard-coded 8 bits used resulted in an average expected success rate of defeating the mmap ASLR after just over 10 minutes (128 tries at 5 seconds a piece). With this patch, and an accompanying increase in the entropy value to 16 bits, the same attack would take an average expected time of over 45 hours (32768 tries), which makes it both less feasible and more likely to be noticed.
+>
+> The introduced Kconfig and sysctl options are limited by per-arch minimum and maximum values, the minimum of which was chosen to match the current hard-coded value and the maximum of which was chosen so as to give the greatest flexibility without generating an invalid mmap_base address, generally a 3-4 bits less than the number of bits in the user-space accessible virtual address space.
+>
+> When decided whether or not to change the default value, a system developer should consider that mmap_base address could be placed anywhere up to 2^(value) bits away from the non-randomized location, which would introduce variable-sized areas above and below the mmap_base address such that the maximum vm_area_struct size may be reduced, preventing very large allocations.
+>
+> Changes in v6:
+> [1/4]
+> * re-added the (void *) casts in kernel/sysctl.c
+>
+> [3/4]
+> * corrected arm64 #ifdef missing '#' typo
+> * removed arm64 'if MMU' Kconfig qualifiers
+> * corrected ARCH_MMAP_RND_BITS_MIN by subtracting 1 from the previous value
+> * added comment w/formula used for generating ARCH_MMAP_RND_BITS_MAX values
+>
+> dcashman (4):
+>   mm: mmap: Add new /proc tunable for mmap_base ASLR.
+>   arm: mm: support ARCH_MMAP_RND_BITS.
+>   arm64: mm: support ARCH_MMAP_RND_BITS.
+>   x86: mm: support ARCH_MMAP_RND_BITS.
+>
+>  Documentation/sysctl/vm.txt | 29 +++++++++++++++++++
+>  arch/Kconfig                | 68 +++++++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/Kconfig            |  9 ++++++
+>  arch/arm/mm/mmap.c          |  3 +-
+>  arch/arm64/Kconfig          | 33 ++++++++++++++++++++++
+>  arch/arm64/mm/mmap.c        |  8 ++++--
+>  arch/x86/Kconfig            | 16 +++++++++++
+>  arch/x86/mm/mmap.c          | 12 ++++----
+>  include/linux/mm.h          | 11 ++++++++
+>  kernel/sysctl.c             | 22 +++++++++++++++
+>  mm/mmap.c                   | 12 ++++++++
+>  11 files changed, 213 insertions(+), 10 deletions(-)
+>
+> --
+> 2.6.0.rc2.230.g3dd15c0
+>
 
-s/rever/reverse/
+Looks great, thanks! I'm looking forward to playing with this so more. :)
 
-> and yet generate memory traffic that doesn't completely suck.
-> 
-> We need this macro to be available to the C version of save/restore.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  include/kvm/arm_vgic.h |  6 ++++++
->  virt/kvm/arm/vgic-v3.c | 10 ++--------
->  2 files changed, 8 insertions(+), 8 deletions(-)
-> 
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index d2f4147..13a3d53 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -279,6 +279,12 @@ struct vgic_v2_cpu_if {
->  	u32		vgic_lr[VGIC_V2_MAX_LRS];
->  };
->  
-> +/*
-> + * LRs are stored in reverse order in memory. make sure we index them
+Acked-by: Kees Cook <keescook@chromium.org>
 
-s/make/Make/  or s/\./,
+-Kees
 
-> + * correctly.
-> + */
-> +#define VGIC_V3_LR_INDEX(lr)		(VGIC_V3_MAX_LRS - 1 - lr)
-> +
->  struct vgic_v3_cpu_if {
->  #ifdef CONFIG_KVM_ARM_VGIC_V3
->  	u32		vgic_hcr;
-> diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
-> index 487d635..3813d23 100644
-> --- a/virt/kvm/arm/vgic-v3.c
-> +++ b/virt/kvm/arm/vgic-v3.c
-> @@ -36,18 +36,12 @@
->  #define GICH_LR_PHYSID_CPUID		(7UL << GICH_LR_PHYSID_CPUID_SHIFT)
->  #define ICH_LR_VIRTUALID_MASK		(BIT_ULL(32) - 1)
->  
-> -/*
-> - * LRs are stored in reverse order in memory. make sure we index them
-> - * correctly.
-> - */
-> -#define LR_INDEX(lr)			(VGIC_V3_MAX_LRS - 1 - lr)
-> -
->  static u32 ich_vtr_el2;
->  
->  static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
->  {
->  	struct vgic_lr lr_desc;
-> -	u64 val = vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[LR_INDEX(lr)];
-> +	u64 val = vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[VGIC_V3_LR_INDEX(lr)];
->  
->  	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
->  		lr_desc.irq = val & ICH_LR_VIRTUALID_MASK;
-> @@ -111,7 +105,7 @@ static void vgic_v3_set_lr(struct kvm_vcpu *vcpu, int lr,
->  		lr_val |= ((u64)lr_desc.hwirq) << ICH_LR_PHYS_ID_SHIFT;
->  	}
->  
-> -	vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[LR_INDEX(lr)] = lr_val;
-> +	vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[VGIC_V3_LR_INDEX(lr)] = lr_val;
->  
->  	if (!(lr_desc.state & LR_STATE_MASK))
->  		vcpu->arch.vgic_cpu.vgic_v3.vgic_elrsr |= (1U << lr);
-> -- 
-> 2.1.4
-> 
 
-Otherwise:
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+-- 
+Kees Cook
+Chrome OS & Brillo Security
