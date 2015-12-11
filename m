@@ -1,33 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 12 Dec 2015 00:14:23 +0100
-Subject: [PATCH v10 2/2] arm-soc: Add support for tango4 platforms
-In-Reply-To: <56558E41.7050301@sigmadesigns.com>
-References: <56549B3A.8010703@sigmadesigns.com>
- <5654A0F3.40404@sigmadesigns.com> <56558E41.7050301@sigmadesigns.com>
-Message-ID: <7573032.IeyxZFmjBm@wuerfel>
+Date: Sat, 12 Dec 2015 00:16:46 +0100
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Updates for
+ v4.5
+In-Reply-To: <cover.1448586938.git.horms+renesas@verge.net.au>
+References: <cover.1448586938.git.horms+renesas@verge.net.au>
+Message-ID: <1701638.qWSQXvbWuo@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 25 November 2015 11:32:33 Marc Gonzalez wrote:
-> On 24/11/2015 18:40, Marc Gonzalez wrote:
+On Friday 27 November 2015 10:55:56 Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> > +config ARCH_TANGO
-> > +     bool "Sigma Designs Tango4 (SMP87xx)" if ARCH_MULTI_V7
-> > +     # Cortex-A9 MPCore r3p0, PL310 r3p2
-> > +     select ARCH_HAS_HOLES_MEMORYMODEL
-> > +     select ARM_ERRATA_754322
-> > +     select ARM_ERRATA_764369 if SMP
-> > +     select ARM_ERRATA_775420
-> > +     select ARM_GIC
-> > +     select CLKSRC_TANGO_XTAL
-> > +     select GENERIC_IRQ_CHIP
+> Please consider these second round of Renesas ARM based SoC DT updates for v4.5.
 > 
-> Instead of GENERIC_IRQ_CHIP, I should select TANGO_IRQCHIP
-> (to be defined in drivers/irqchip/Kconfig)
-> 
-> TANGO_IRQCHIP itself will select IRQ_DOMAIN and GENERIC_IRQ_CHIP.
+> This pull request extends support for Renesas ARM Based SoCs via DT
+> and includes several minor fixes and cleanups.
 > 
 
-Are you sending a V11 with this?
+Pulled first and second round of this into next/dt, thanks!
 
 	Arnd
