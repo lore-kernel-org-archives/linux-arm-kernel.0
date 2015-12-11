@@ -1,22 +1,40 @@
 From: b51503@freescale.com (Bai Ping)
-Date: Fri, 11 Dec 2015 19:55:56 +0800
+Date: Fri, 11 Dec 2015 19:58:00 +0800
 Subject: [PATCH 1/3] ARM: dts: imx: Add basic dts support for imx6qp
-In-Reply-To: <20151211105143.GB11966@pengutronix.de>
+In-Reply-To: <CAOMZO5C8mTotbpOmKkxKOXmBWc-N_zm7xn-fU5gFUgAFCiyokw@mail.gmail.com>
 References: <1449830722-26607-1-git-send-email-b51503@freescale.com>
- <20151211105143.GB11966@pengutronix.de>
-Message-ID: <566AB9CC.4060103@freescale.com>
+ <CAOMZO5C8mTotbpOmKkxKOXmBWc-N_zm7xn-fU5gFUgAFCiyokw@mail.gmail.com>
+Message-ID: <566ABA48.6060508@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 2015/12/11 18:51, Sascha Hauer wrote:
-> On Fri, Dec 11, 2015 at 06:45:20PM +0800, Bai Ping wrote:
+On 2015/12/11 19:37, Fabio Estevam wrote:
+> On Fri, Dec 11, 2015 at 8:45 AM, Bai Ping <b51503@freescale.com> wrote:
 >> The i.MX6Qual Plus processor is an high performance SOC of i.MX6 family.
-> Qual is German for pain. Is that what you mean?
-sorry for my bad. it is a typo. it should be i.MX6Quad, not Qual?
+>> It has enhanced graphics performance and increased overall memory bandwidth
+>> compared to i.MX6Q. Most of the design are same as i.MX6Qual/Dual, so code
+>> for i.MX6Qual can be resued by this chip. The revision number is identied as
+>> i.MX6Q Rev2.0, but actually it is a new chip, as we did many change to the
+>> overall architecture.
+>>
+>> This patch adds basic dts file for the new i.MX6Qual Plus processor.
+>>
+>> Signed-off-by: Bai Ping <b51503@freescale.com>
+>> ---
+>>   arch/arm/boot/dts/Makefile                |   2 +
+>>   arch/arm/boot/dts/imx6q.dtsi              |   2 +-
+>>   arch/arm/boot/dts/imx6qdl-sabresd.dtsi    |   1 +
+>>   arch/arm/boot/dts/imx6qp-sabreauto.dts    |  67 +++++++++++++
+>>   arch/arm/boot/dts/imx6qp-sabresd.dts      |  59 +++++++++++
+>>   arch/arm/boot/dts/imx6qp.dtsi             | 157 ++++++++++++++++++++++++++++++
+>>   include/dt-bindings/clock/imx6qdl-clock.h |  16 ++-
+> Better split this in three patches:
+>
+> - Add imx6qp SoC support
+> - Add imx6qdl-sabresd support
+> - Add imx6qp-sabreauto support
+ok, I will spit this in Patch V2. thanks for you review.
 
 Jacky Bai
->
-> Sascha
->
