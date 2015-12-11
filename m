@@ -1,77 +1,225 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 11 Dec 2015 09:46:30 +0100
-Subject: [PATCH] net/macb: add support for resetting PHY using GPIO
-In-Reply-To: <871tau8hpj.fsf@free-electrons.com>
-References: <1449683383-5022-1-git-send-email-gregory.clement@free-electrons.com>
- <20151210073756.GA11966@pengutronix.de>
- <871tau8hpj.fsf@free-electrons.com>
-Message-ID: <20151211084630.GW11966@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 11 Dec 2015 09:57:04 +0100
+Subject: [PATCH 2/2 v2] ARM: mvebu: kirkwood: add PogoPlug series 4 device tree
+Message-ID: <1449824224-29765-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 10, 2015 at 04:08:08PM +0100, Gregory CLEMENT wrote:
-> Hi Sascha,
->  
->  On jeu., d?c. 10 2015, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> 
-> > Hi Gregory,
-> >
-> > On Wed, Dec 09, 2015 at 06:49:43PM +0100, Gregory CLEMENT wrote:
-> >> With device tree it is no more possible to reset the PHY at board
-> >> level. Furthermore, doing in the driver allow to power down the PHY when
-> >> the network interface is no more used.
-> >> 
-> >> The patch introduces a new optional property "phy-reset-gpio" inspired
-> >> from the one use for the FEC.
-> >
-> > I don't think it's a good idea to further extend the usage of this
-> > binding. The driver should use the phy-handle property and
-> > of_phy_connect() which gives you a proper device node for the phy. Then
-> > the phy device node should get the reset gpio. I know it's more work,
-> 
-> So you suggest to pass from this binding:
-> macb1: ethernet at fc028000 {
-> 	phy-mode = "rmii";
-> 	status = "okay";
-> 	#address-cells = <1>;
-> 	#size-cells = <0>;
-> 	status = "okay";
-> 	phy-reset-gpio = <&pioE 6 GPIO_ACTIVE_HIGH>;
-> 
-> 	ethernet-phy at 1 {
-> 		reg = <0x1>;
-> 		interrupt-parent = <&pioB>;
-> 		interrupts = <31 IRQ_TYPE_EDGE_FALLING>;
-> 
-> 	};
-> };
-> 
-> to this binding
-> macb1: ethernet at fc028000 {
-> 	phy-mode = "rmii";
-> 	status = "okay";
-> 	#address-cells = <1>;
-> 	#size-cells = <0>;
-> 	status = "okay";
-> 
-> 	ethernet-phy at 1 {
-> 		reg = <0x1>;
-> 		interrupt-parent = <&pioB>;
-> 		interrupts = <31 IRQ_TYPE_EDGE_FALLING>;
->                 phy-reset-gpio = <&pioE 6 GPIO_ACTIVE_HIGH>;
-> 	};
-> };
+This adds a device tree for the CloudEngines PogoPlug series 4
+NAS device. Inspired by out-of-tree boardfiles from ArchLinux
+by Kevin Mihelich.
 
-s/phy-reset-gpio/reset-gpios/, but yes.
+Cc: Moonman <moonman.ca@gmail.com>
+Cc: Kevin Mihelich <kevin@archlinuxarm.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v1->v2:
+- Use <dt-bindings/input/linux-event-codes.h>
+- Specify default baud rate etc differently
+- Rename LEDs "pogoplugv4*"
+- Skip registering i2c0 as there is nothing on it
+---
+ arch/arm/boot/dts/Makefile                       |   1 +
+ arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts | 179 +++++++++++++++++++++++
+ 2 files changed, 180 insertions(+)
+ create mode 100644 arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts
 
-I had assumed you do not use a phy description in the device tree at all
-since the macb driver doesn't use of_phy_connect(). Apparently there are
-other possibilities to connect the phy device nodes with the phys
-
-Sascha
-
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 30bbc3746130..2d9f475a9ceb 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -206,6 +206,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += \
+ 	kirkwood-openrd-client.dtb \
+ 	kirkwood-openrd-ultimate.dtb \
+ 	kirkwood-pogo_e02.dtb \
++	kirkwood-pogoplug-series-4.dtb \
+ 	kirkwood-rd88f6192.dtb \
+ 	kirkwood-rd88f6281-z0.dtb \
+ 	kirkwood-rd88f6281-a.dtb \
+diff --git a/arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts b/arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts
+new file mode 100644
+index 000000000000..6143ecf4ad4f
+--- /dev/null
++++ b/arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts
+@@ -0,0 +1,179 @@
++/*
++ * kirkwood-pogoplug-series-4.dts - Device tree file for PogoPlug Series 4
++ * inspired by the board files made by Kevin Mihelich for ArchLinux,
++ * and their DTS file.
++ *
++ * Copyright (C) 2015 Linus Walleij <linus.walleij@linaro.org>
++ */
++
++/dts-v1/;
++
++#include "kirkwood.dtsi"
++#include "kirkwood-6192.dtsi"
++#include <dt-bindings/input/linux-event-codes.h>
++
++/ {
++	model = "Cloud Engines PogoPlug Series 4";
++	compatible = "cloudengines,pogoplugv4", "marvell,kirkwood-88f6192",
++		     "marvell,kirkwood";
++
++	memory {
++		device_type = "memory";
++		reg = <0x00000000 0x08000000>;
++	};
++
++	chosen {
++		stdout-path = "uart0:115200n8";
++	};
++
++	gpio_keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		pinctrl-0 = <&pmx_button_eject>;
++		pinctrl-names = "default";
++
++		button at 1 {
++			debounce_interval = <50>;
++			wakeup-source;
++			linux,code = <KEY_EJECTCD>;
++			label = "Eject Button";
++			gpios = <&gpio0 29 GPIO_ACTIVE_LOW>;
++		};
++	};
++
++	gpio-leds {
++		compatible = "gpio-leds";
++		pinctrl-0 = <&pmx_led_green &pmx_led_red>;
++		pinctrl-names = "default";
++
++		health {
++			label = "pogoplugv4:green:health";
++			gpios = <&gpio0 22 GPIO_ACTIVE_LOW>;
++			default-state = "on";
++		};
++		fault {
++			label = "pogoplugv4:red:fault";
++			gpios = <&gpio0 24 GPIO_ACTIVE_LOW>;
++		};
++	};
++};
++
++&pinctrl {
++	pmx_sata0: pmx-sata0 {
++		marvell,pins = "mpp21";
++		marvell,function = "sata0";
++	};
++
++	pmx_sata1: pmx-sata1 {
++		marvell,pins = "mpp20";
++		marvell,function = "sata1";
++	};
++
++	pmx_sdio_cd: pmx-sdio-cd {
++		marvell,pins = "mpp27";
++		marvell,function = "gpio";
++	};
++
++	pmx_sdio_wp: pmx-sdio-wp {
++		marvell,pins = "mpp28";
++		marvell,function = "gpio";
++	};
++
++	pmx_button_eject: pmx-button-eject {
++		marvell,pins = "mpp29";
++		marvell,function = "gpio";
++	};
++
++	pmx_led_green: pmx-led-green {
++		marvell,pins = "mpp22";
++		marvell,function = "gpio";
++	};
++
++	pmx_led_red: pmx-led-red {
++		marvell,pins = "mpp24";
++		marvell,function = "gpio";
++	};
++};
++
++&uart0 {
++	status = "okay";
++	current-speed = <115200>;
++};
++
++/*
++ * This PCIE controller has a USB 3.0 XHCI controller at 1,0
++ */
++&pciec {
++	status = "okay";
++};
++
++&pcie0 {
++	status = "okay";
++};
++
++&sata {
++	status = "okay";
++	pinctrl-0 = <&pmx_sata0 &pmx_sata1>;
++	pinctrl-names = "default";
++	nr-ports = <1>;
++};
++
++&sdio {
++	status = "okay";
++	pinctrl-0 = <&pmx_sdio &pmx_sdio_cd &pmx_sdio_wp>;
++	pinctrl-names = "default";
++	cd-gpios = <&gpio0 27 GPIO_ACTIVE_LOW>;
++	wp-gpios = <&gpio0 28 GPIO_ACTIVE_HIGH>;
++};
++
++&nand {
++	/* 128 MiB of NAND flash */
++	chip-delay = <40>;
++	status = "okay";
++	partitions {
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		partition at 0 {
++			label = "u-boot";
++			reg = <0x00000000 0x200000>;
++			read-only;
++		};
++
++		partition at 200000 {
++			label = "uImage";
++			reg = <0x00200000 0x300000>;
++		};
++
++		partition at 500000 {
++			label = "uImage2";
++			reg = <0x00500000 0x300000>;
++		};
++
++		partition at 800000 {
++			label = "failsafe";
++			reg = <0x00800000 0x800000>;
++		};
++
++		partition at 1000000 {
++			label = "root";
++			reg = <0x01000000 0x7000000>;
++		};
++	};
++};
++
++&mdio {
++	status = "okay";
++
++	ethphy0: ethernet-phy at 0 {
++		reg = <0>;
++	};
++};
++
++&eth0 {
++	status = "okay";
++	ethernet0-port at 0 {
++		phy-handle = <&ethphy0>;
++	};
++};
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+2.4.3
