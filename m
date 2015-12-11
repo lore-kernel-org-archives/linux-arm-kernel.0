@@ -1,64 +1,57 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 11 Dec 2015 11:52:37 +0900
-Subject: [PATCH/RFC 00/19] r8a7793,
- gose: Add i2c and audio support to device tree
-Message-ID: <1449802376-11301-1-git-send-email-horms+renesas@verge.net.au>
+Date: Fri, 11 Dec 2015 11:52:43 +0900
+Subject: [PATCH/RFC 06/19] ARM: shmobile: r8a7793: add audio clock to device
+ tree
+In-Reply-To: <1449802376-11301-1-git-send-email-horms+renesas@verge.net.au>
+References: <1449802376-11301-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1449802376-11301-7-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Instantiate audio clock in r8a7793 device tree.
+audio_clk_a/b/c are required for R-Car sound.
 
-this series adds support to r8a7793 and gose device trees for:
-* i2c and iic
-* rcar sound: first in PIO mode then using DMA
+Based on similar work for the r8a7791 by Kuninori Morimoto.
 
-i2c support is a pre-requisite for rcar sound support.
+Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7793.dtsi | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-Unfortunately there appears to be some problem with DMA
-for rcar sound that I have been unable to track down. On booting I see:
-
-rcar_sound ec500000.sound: dma allocate failed
-rcar_sound ec500000.sound: ssi[0] fallback to PIO mode
-rcar_sound ec500000.sound: ssi[1] fallback to PIO mode
-rcar_sound ec500000.sound: probed
-
-I would appreciate any insights regarding the above.
-
-I have been unable to test if audio works (in PIO mode) as I
-do not have physical access to a gose board. I would appreaciate
-some assistance there too.
-
-This work is based heavily on the work of others for the r8a7791 and
-koelsch.  as noted in the changelogs of individual patches.
-
-This series is based on renesas-devel-20151211-v4.4-rc4.
-
-
-Simon Horman (19):
-  ARM: shmobile: r8a7793: add i2c clocks
-  ARM: shmobile: r8a7793: add i2c to device tree
-  ARM: shmobile: gose: add i2c2 bus to device tree
-  ARM: shmobile: r8a7793: add iic(b)  to device tree
-  ARM: shmobile: r8a7793: add MSTP10 clocks to device tree
-  ARM: shmobile: r8a7793: add audio clock to device tree
-  ARM: shmobile: r8a7793: add m2 clock to device tree
-  ARM: shmobile: r8a7793: add R-Car sound support to device tree
-  ARM: shmobile: r8a7793: add DVC support to device tree
-  ARM: shmobile: r8a7793: add audio DMAC clocks to device tree
-  ARM: shmobile: r8a7793: add audio DMAC to device tree
-  ARM: shmobile: gose: Enable sound PIO support in device tree
-  ARM: shmobile: gose: enable sound DMA support in device tree
-  ARM: shmobile: gose: enable sound DMA support via BUSIF in device tree
-  ARM: shmobile: gose: enable sound DMA support via SRC in device tree
-  ARM: shmobile: gose: enable sound DMA support via DVC in device tree
-  ARM: shmobile: r8a7793: enable audio DMAC in device tree
-  ARM: shmobile: r8a7793: Add Audio CTU support to device tree
-  ARM: shmobile: r8a7793: add Audio MIX support to device tree
-
- arch/arm/boot/dts/r8a7793-gose.dts        | 107 ++++++++
- arch/arm/boot/dts/r8a7793.dtsi            | 437 +++++++++++++++++++++++++++++-
- include/dt-bindings/clock/r8a7793-clock.h |   2 +
- 3 files changed, 539 insertions(+), 7 deletions(-)
-
+diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
+index 5f953c594395..7179c3cba20a 100644
+--- a/arch/arm/boot/dts/r8a7793.dtsi
++++ b/arch/arm/boot/dts/r8a7793.dtsi
+@@ -698,6 +698,29 @@
+ 			clock-output-names = "extal";
+ 		};
+ 
++		/*
++		 * The external audio clocks are configured as 0 Hz fixed frequency clocks by
++		 * default. Boards that provide audio clocks should override them.
++		 */
++		audio_clk_a: audio_clk_a {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <0>;
++			clock-output-names = "audio_clk_a";
++		};
++		audio_clk_b: audio_clk_b {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <0>;
++			clock-output-names = "audio_clk_b";
++		};
++		audio_clk_c: audio_clk_c {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <0>;
++			clock-output-names = "audio_clk_c";
++		};
++
+ 		/* Special CPG clocks */
+ 		cpg_clocks: cpg_clocks at e6150000 {
+ 			compatible = "renesas,r8a7793-cpg-clocks",
 -- 
 2.1.4
