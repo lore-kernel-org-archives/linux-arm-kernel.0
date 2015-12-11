@@ -1,140 +1,139 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 11 Dec 2015 16:32:18 +0100
-Subject: [PATCH v4 2/2] phy-sun4i-usb: Add support for the host usb-phys found
- on the H3 SoC
-In-Reply-To: <1449847938-20836-1-git-send-email-hdegoede@redhat.com>
-References: <1449847938-20836-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1449847938-20836-2-git-send-email-hdegoede@redhat.com>
+Date: Fri, 11 Dec 2015 16:41:59 +0100
+Subject: [PATCH v2 2/3] ehci-platform: Add support for controllers with
+ multiple reset lines
+In-Reply-To: <1449848520-27379-1-git-send-email-hdegoede@redhat.com>
+References: <1449848520-27379-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1449848520-27379-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Reinder de Haan <patchesrdh@mveas.com>
 
-Note this commit only adds support for phys 1-3, phy 0, the otg phy, is
-not yet (fully) supported after this commit.
+At least the EHCI/OHCI found on the Allwinnner H3 SoC needs multiple
+reset lines, the controller will not initialize while the reset for
+its companion is still asserted, which means we need to de-assert
+2 resets for the controller to work.
 
 Signed-off-by: Reinder de Haan <patchesrdh@mveas.com>
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
 Changes in v2:
--Change break; after dev_err() to return, as intended, fixing a compiler
- warning (the dev_err case should never be reached)
-Changes in v3:
--Use of_match_node to get model specific config data
-Changes in v4:
--Adjust to v4 of "Use of_match_node to get model specific config data" patch
+-Use the new reset_control_[de]assert_shared reset-controller functions
 ---
- .../devicetree/bindings/phy/sun4i-usb-phy.txt      |  1 +
- drivers/phy/phy-sun4i-usb.c                        | 41 +++++++++++++++++-----
- 2 files changed, 33 insertions(+), 9 deletions(-)
+ Documentation/devicetree/bindings/usb/usb-ehci.txt |  2 +-
+ drivers/usb/host/ehci-platform.c                   | 47 +++++++++++++---------
+ 2 files changed, 30 insertions(+), 19 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-index 0cebf74..95736d7 100644
---- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-+++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-@@ -9,6 +9,7 @@ Required properties:
-   * allwinner,sun7i-a20-usb-phy
-   * allwinner,sun8i-a23-usb-phy
-   * allwinner,sun8i-a33-usb-phy
-+  * allwinner,sun8i-h3-usb-phy
- - reg : a list of offset + length pairs
- - reg-names :
-   * "phy_ctrl"
-diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-index 35b1fa3..bae54f7 100644
---- a/drivers/phy/phy-sun4i-usb.c
-+++ b/drivers/phy/phy-sun4i-usb.c
-@@ -47,6 +47,9 @@
- #define REG_PHYBIST			0x08
- #define REG_PHYTUNE			0x0c
- #define REG_PHYCTL_A33			0x10
-+#define REG_PHY_UNK_H3			0x20
-+
-+#define REG_PMU_UNK_H3			0x10
+diff --git a/Documentation/devicetree/bindings/usb/usb-ehci.txt b/Documentation/devicetree/bindings/usb/usb-ehci.txt
+index a12d601..0701812 100644
+--- a/Documentation/devicetree/bindings/usb/usb-ehci.txt
++++ b/Documentation/devicetree/bindings/usb/usb-ehci.txt
+@@ -18,7 +18,7 @@ Optional properties:
+  - clocks : a list of phandle + clock specifier pairs
+  - phys : phandle + phy specifier pair
+  - phy-names : "usb"
+- - resets : phandle + reset specifier pair
++ - resets : a list of phandle + reset specifier pairs
  
- #define PHYCTL_DATA			BIT(7)
+ Example (Sequoia 440EPx):
+     ehci at e0000300 {
+diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
+index bd7082f2..6fbf32a 100644
+--- a/drivers/usb/host/ehci-platform.c
++++ b/drivers/usb/host/ehci-platform.c
+@@ -39,11 +39,12 @@
  
-@@ -80,7 +83,7 @@
- #define PHY_DISCON_TH_SEL		0x2a
- #define PHY_SQUELCH_DETECT		0x3c
+ #define DRIVER_DESC "EHCI generic platform driver"
+ #define EHCI_MAX_CLKS 3
++#define EHCI_MAX_RESETS 2
+ #define hcd_to_ehci_priv(h) ((struct ehci_platform_priv *)hcd_to_ehci(h)->priv)
  
--#define MAX_PHYS			3
-+#define MAX_PHYS			4
+ struct ehci_platform_priv {
+ 	struct clk *clks[EHCI_MAX_CLKS];
+-	struct reset_control *rst;
++	struct reset_control *resets[EHCI_MAX_RESETS];
+ 	struct phy **phys;
+ 	int num_phys;
+ 	bool reset_on_resume;
+@@ -149,7 +150,7 @@ static int ehci_platform_probe(struct platform_device *dev)
+ 	struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
+ 	struct ehci_platform_priv *priv;
+ 	struct ehci_hcd *ehci;
+-	int err, irq, phy_num, clk = 0;
++	int err, irq, phy_num, clk = 0, rst = 0;
  
- /*
-  * Note do not raise the debounce time, we must report Vusb high within 100ms
-@@ -92,6 +95,7 @@
- enum sun4i_usb_phy_type {
- 	sun4i_a10_phy,
- 	sun8i_a33_phy,
-+	sun8i_h3_phy,
- };
+ 	if (usb_disabled())
+ 		return -ENODEV;
+@@ -232,18 +233,24 @@ static int ehci_platform_probe(struct platform_device *dev)
+ 				break;
+ 			}
+ 		}
+-	}
  
- struct sun4i_usb_phy_cfg {
-@@ -239,6 +243,7 @@ static int sun4i_usb_phy_init(struct phy *_phy)
- 	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
- 	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
- 	int ret;
-+	u32 val;
- 
- 	ret = clk_prepare_enable(phy->clk);
- 	if (ret)
-@@ -250,16 +255,26 @@ static int sun4i_usb_phy_init(struct phy *_phy)
- 		return ret;
+-	priv->rst = devm_reset_control_get_optional(&dev->dev, NULL);
+-	if (IS_ERR(priv->rst)) {
+-		err = PTR_ERR(priv->rst);
+-		if (err == -EPROBE_DEFER)
+-			goto err_put_clks;
+-		priv->rst = NULL;
+-	} else {
+-		err = reset_control_deassert(priv->rst);
+-		if (err)
+-			goto err_put_clks;
++		for (rst = 0; rst < EHCI_MAX_RESETS; rst++) {
++			priv->resets[rst] =
++				of_reset_control_get_by_index(dev->dev.of_node,
++							      rst);
++			if (IS_ERR(priv->resets[rst])) {
++				err = PTR_ERR(priv->resets[rst]);
++				if (err == -EPROBE_DEFER)
++					goto err_reset;
++				priv->resets[rst] = NULL;
++				break;
++			}
++			err = reset_control_deassert_shared(priv->resets[rst]);
++			if (err) {
++				reset_control_put(priv->resets[rst]);
++				goto err_reset;
++			}
++		}
  	}
  
--	/* Enable USB 45 Ohm resistor calibration */
--	if (phy->index == 0)
--		sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN, 0x01, 1);
-+	if (data->cfg->type == sun8i_h3_phy) {
-+		if (phy->index == 0) {
-+			val = readl(data->base + REG_PHY_UNK_H3);
-+			writel(val & ~1, data->base + REG_PHY_UNK_H3);
-+		}
-+
-+		val = readl(phy->pmu + REG_PMU_UNK_H3);
-+		writel(val & ~2, phy->pmu + REG_PMU_UNK_H3);
-+	} else {
-+		/* Enable USB 45 Ohm resistor calibration */
-+		if (phy->index == 0)
-+			sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN, 0x01, 1);
+ 	if (pdata->big_endian_desc)
+@@ -300,8 +307,10 @@ err_power:
+ 	if (pdata->power_off)
+ 		pdata->power_off(dev);
+ err_reset:
+-	if (priv->rst)
+-		reset_control_assert(priv->rst);
++	while (--rst >= 0) {
++		reset_control_assert_shared(priv->resets[rst]);
++		reset_control_put(priv->resets[rst]);
++	}
+ err_put_clks:
+ 	while (--clk >= 0)
+ 		clk_put(priv->clks[clk]);
+@@ -319,15 +328,17 @@ static int ehci_platform_remove(struct platform_device *dev)
+ 	struct usb_hcd *hcd = platform_get_drvdata(dev);
+ 	struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
+ 	struct ehci_platform_priv *priv = hcd_to_ehci_priv(hcd);
+-	int clk;
++	int clk, rst;
  
--	/* Adjust PHY's magnitude and rate */
--	sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE, 0x14, 5);
-+		/* Adjust PHY's magnitude and rate */
-+		sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE, 0x14, 5);
+ 	usb_remove_hcd(hcd);
  
--	/* Disconnect threshold adjustment */
--	sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL,
--			    data->cfg->disc_thresh, 2);
-+		/* Disconnect threshold adjustment */
-+		sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL,
-+				    data->cfg->disc_thresh, 2);
+ 	if (pdata->power_off)
+ 		pdata->power_off(dev);
+ 
+-	if (priv->rst)
+-		reset_control_assert(priv->rst);
++	for (rst = 0; rst < EHCI_MAX_RESETS && priv->resets[rst]; rst++) {
++		reset_control_assert_shared(priv->resets[rst]);
++		reset_control_put(priv->resets[rst]);
 +	}
  
- 	sun4i_usb_phy_passby(phy, 1);
- 
-@@ -726,6 +741,13 @@ static const struct sun4i_usb_phy_cfg sun8i_a33_cfg = {
- 	.dedicated_clocks = true,
- };
- 
-+static const struct sun4i_usb_phy_cfg sun8i_h3_cfg = {
-+	.num_phys = 4,
-+	.type = sun8i_h3_phy,
-+	.disc_thresh = 3,
-+	.dedicated_clocks = true,
-+};
-+
- static const struct of_device_id sun4i_usb_phy_of_match[] = {
- 	{ .compatible = "allwinner,sun4i-a10-usb-phy", .data = &sun4i_a10_cfg },
- 	{ .compatible = "allwinner,sun5i-a13-usb-phy", .data = &sun5i_a13_cfg },
-@@ -733,6 +755,7 @@ static const struct of_device_id sun4i_usb_phy_of_match[] = {
- 	{ .compatible = "allwinner,sun7i-a20-usb-phy", .data = &sun7i_a20_cfg },
- 	{ .compatible = "allwinner,sun8i-a23-usb-phy", .data = &sun8i_a23_cfg },
- 	{ .compatible = "allwinner,sun8i-a33-usb-phy", .data = &sun8i_a33_cfg },
-+	{ .compatible = "allwinner,sun8i-h3-usb-phy", .data = &sun8i_h3_cfg },
- 	{ },
- };
- MODULE_DEVICE_TABLE(of, sun4i_usb_phy_of_match);
+ 	for (clk = 0; clk < EHCI_MAX_CLKS && priv->clks[clk]; clk++)
+ 		clk_put(priv->clks[clk]);
 -- 
 2.5.0
