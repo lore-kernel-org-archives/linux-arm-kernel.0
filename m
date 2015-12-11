@@ -1,20 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 12 Dec 2015 00:28:34 +0100
-Subject: [GIT PULL 3/3] ARM: berlin: DT changes for v4.5 (round 1)
-In-Reply-To: <1449398232-13699-3-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1449398232-13699-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1449398232-13699-3-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <4199915.yDRBiKZ42i@wuerfel>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Fri, 11 Dec 2015 15:30:54 -0800
+Subject: [PATCH v3 4/4] printk/nmi: Increase the size of NMI buffer and
+ make it configurable
+In-Reply-To: <20151211232113.GZ8644@n2100.arm.linux.org.uk>
+References: <1449667265-17525-1-git-send-email-pmladek@suse.com>
+ <1449667265-17525-5-git-send-email-pmladek@suse.com>
+ <CAMuHMdXVgr58YjoePGrRbMyMncQ27f85prL7G5SpeHeNxoYrXQ@mail.gmail.com>
+ <20151211124159.GB3729@pathway.suse.cz>
+ <20151211145725.b0e81bb4bb18fcd72ef5f557@linux-foundation.org>
+ <20151211232113.GZ8644@n2100.arm.linux.org.uk>
+Message-ID: <20151211153054.48da5d4139b93dd4ed438f4c@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 06 December 2015 11:37:12 Sebastian Hesselbarth wrote:
-> Marvell Berlin DT changes (round 1):
-> - BG2Q cleanups (DMP eMMC, duplicated interrupt-parents)
-> - add BG2, BG2CD, BG2Q watchdog nodes
-> - add BG2Q DMP SDHCI1 nodes
+On Fri, 11 Dec 2015 23:21:13 +0000 Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+
+> On Fri, Dec 11, 2015 at 02:57:25PM -0800, Andrew Morton wrote:
+> > This is a bit messy.  NEED_PRINTK_NMI is an added-on hack for one
+> > particular arm variant.  From the changelog:
+> > 
+> >    "One exception is arm where the deferred printing is used for
+> >     printing backtraces even without NMI.  For this purpose, we define
+> >     NEED_PRINTK_NMI Kconfig flag.  The alternative printk_func is
+> >     explicitly set when IPI_CPU_BACKTRACE is handled."
+> > 
+> > 
+> > - why does arm needs deferred printing for backtraces?
+> > 
+> > - why is this specific to CONFIG_CPU_V7M?
+> > 
+> > - can this Kconfig logic be cleaned up a bit?
 > 
+> I think this comes purely from this attempt to apply another round of
+> cleanups to the nmi backtrace work I did.
+> 
+> As I explained when I did that work, the vast majority of ARM platforms
+> are unable to trigger anything like a NMI - the FIQ is something that's
+> generally a property of the secure monitor, and is not accessible to
+> Linux.  However, there are platforms where it is accessible.
 
-Pulled into next/dt, thanks!
+OK, thanks.  So "not needed at present, might be needed in the future,
+useful for out-of-tree debug code"?
 
-	Arnd
+> I'm personally happy with the existing code, and I've been wondering why
+> there's this effort to apply further cleanups - to me, the changelogs
+> don't seem to make that much sense, unless we want to start using
+> printk() extensively in NMI functions - using the generic nmi backtrace
+> code surely gets us something that works across all architectures...
+
+Yes, I was scratching my head over that.  The patchset takes an nmi-safe
+all-cpu-backtrace and generalises that into an nmi-safe printk.  That
+*sounds* like a good thing to do but yes, some additional justification
+would be helpful.  What real-world value does this patchset really
+bring to real-world users?
