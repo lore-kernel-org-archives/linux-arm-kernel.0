@@ -1,40 +1,34 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 11 Dec 2015 11:04:31 +0000
-Subject: [PATCH] arm64: mm: place __cpu_setup in .text
-Message-ID: <1449831871-32370-1-git-send-email-mark.rutland@arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 11 Dec 2015 19:07:00 +0800
+Subject: [PATCH V3 2/2] ARM: dts: imx6q: add Novena board
+In-Reply-To: <201512021641.31222.marex@denx.de>
+References: <1448722024-5717-1-git-send-email-marex@denx.de>
+ <1448722024-5717-2-git-send-email-marex@denx.de>
+ <20151202075305.GN692@tiger> <201512021641.31222.marex@denx.de>
+Message-ID: <20151211110700.GD11252@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We drop __cpu_setup in .text.init, which ends up being part of .text.
-The .text.init section was a legacy section name which has been unused
-elsewhere for a long time.
+On Wed, Dec 02, 2015 at 04:41:31PM +0100, Marek Vasut wrote:
+> On Wednesday, December 02, 2015 at 08:53:05 AM, Shawn Guo wrote:
+> > On Sat, Nov 28, 2015 at 03:47:04PM +0100, Marek Vasut wrote:
+> > > +	reg_usb_otg_vbus: usb_otg_vbus {
+> > > +		compatible = "regulator-fixed";
+> > > +		regulator-name = "usb_otg_vbus";
+> > > +		regulator-min-microvolt = <5000000>;
+> > > +		regulator-max-microvolt = <5000000>;
+> > > +		enable-active-high;
+> > > +	};
+> > 
+> > All these regulator nodes are named so arbitrarily.  Can we name them a
+> > bit consistently, something like regulator-xxx?
+> 
+> All of them are named like this (well, but the otg_vbus, I can fix that)
+> 
+> reg_something: something-regulator {}
+> 
+> What do you want to see here ?
 
-The ".text.init" name is misleading if read as a synonym for
-".init.text". Any CPU may execute __cpu_setup before turning the MMU on,
-so it should simply live in .text.
+reg_something: regulator-something {}
 
-Remove the pointless section assignment. This will leave __cpu_setup in
-the .text section.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/mm/proc.S | 2 --
- 1 file changed, 2 deletions(-)
-
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index cacecc4..b6f9053 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -139,8 +139,6 @@ ENTRY(cpu_do_switch_mm)
- 	ret
- ENDPROC(cpu_do_switch_mm)
- 
--	.section ".text.init", #alloc, #execinstr
--
- /*
-  *	__cpu_setup
-  *
--- 
-1.9.1
+Shawn
