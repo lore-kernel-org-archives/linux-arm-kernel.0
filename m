@@ -1,146 +1,256 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 11 Dec 2015 16:28:46 +0000
-Subject: [PATCH v12 04/16] arm64: kvm: allows kvm cpu hotplug
-In-Reply-To: <566A8404.4020507@linaro.org>
-References: <cover.1448403503.git.geoff@infradead.org>
- <23ca498d5e28017549c6076812d60b18e86fa20e.1448403503.git.geoff@infradead.org>
- <CAJ5Y-eYHqQCf=ZQzXb=D_P7VscM=vNc3YpYLJs+UtZLFswiaeQ@mail.gmail.com>
- <56604A6E.60102@arm.com> <566A8404.4020507@linaro.org>
-Message-ID: <566AF9BE.7090806@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 11 Dec 2015 10:28:47 -0600
+Subject: [PATCH v3 7/7] ARM: dts: add dts files for Hi3519
+In-Reply-To: <1449819921-18464-8-git-send-email-xuejiancheng@huawei.com>
+References: <1449819921-18464-1-git-send-email-xuejiancheng@huawei.com>
+ <1449819921-18464-8-git-send-email-xuejiancheng@huawei.com>
+Message-ID: <20151211162847.GC21272@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12/15 08:06, AKASHI Takahiro wrote:
-> Ashwin, Marc,
+On Fri, Dec 11, 2015 at 03:45:21PM +0800, Jiancheng Xue wrote:
+> add dts files for Hi3519
 > 
-> On 12/03/2015 10:58 PM, Marc Zyngier wrote:
->> On 02/12/15 22:40, Ashwin Chaugule wrote:
->>> Hello,
->>>
->>> On 24 November 2015 at 17:25, Geoff Levand <geoff@infradead.org> wrote:
->>>> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
->>>>
->>>> The current kvm implementation on arm64 does cpu-specific initialization
->>>> at system boot, and has no way to gracefully shutdown a core in terms of
->>>> kvm. This prevents, especially, kexec from rebooting the system on a boot
->>>> core in EL2.
->>>>
->>>> This patch adds a cpu tear-down function and also puts an existing cpu-init
->>>> code into a separate function, kvm_arch_hardware_disable() and
->>>> kvm_arch_hardware_enable() respectively.
->>>> We don't need arm64-specific cpu hotplug hook any more.
->>>>
->>>> Since this patch modifies common part of code between arm and arm64, one
->>>> stub definition, __cpu_reset_hyp_mode(), is added on arm side to avoid
->>>> compiling errors.
->>>>
->>>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
->>>> ---
->>>>   arch/arm/include/asm/kvm_host.h   | 10 ++++-
->>>>   arch/arm/include/asm/kvm_mmu.h    |  1 +
->>>>   arch/arm/kvm/arm.c                | 79 ++++++++++++++++++---------------------
->>>>   arch/arm/kvm/mmu.c                |  5 +++
->>>>   arch/arm64/include/asm/kvm_host.h | 16 +++++++-
->>>>   arch/arm64/include/asm/kvm_mmu.h  |  1 +
->>>>   arch/arm64/include/asm/virt.h     |  9 +++++
->>>>   arch/arm64/kvm/hyp-init.S         | 33 ++++++++++++++++
->>>>   arch/arm64/kvm/hyp.S              | 32 ++++++++++++++--
->>>>   9 files changed, 138 insertions(+), 48 deletions(-)
->>>
->>> [..]
->>>
->>>>
->>>>
->>>>   static struct notifier_block hyp_init_cpu_pm_nb = {
->>>> @@ -1108,11 +1119,6 @@ static int init_hyp_mode(void)
->>>>          }
->>>>
->>>>          /*
->>>> -        * Execute the init code on each CPU.
->>>> -        */
->>>> -       on_each_cpu(cpu_init_hyp_mode, NULL, 1);
->>>> -
->>>> -       /*
->>>>           * Init HYP view of VGIC
->>>>           */
->>>>          err = kvm_vgic_hyp_init();
->>>
->>> With this flow, the cpu_init_hyp_mode() is called only at VM guest
->>> creation, but vgic_hyp_init() is called at bootup. On a system with
->>> GICv3, it looks like we end up with bogus values from the ICH_VTR_EL2
->>> (to get the number of LRs), because we're not reading it from EL2
->>> anymore.
+> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
+> ---
+>  arch/arm/boot/dts/Makefile        |   2 +
+>  arch/arm/boot/dts/hi3519-demb.dts |  42 +++++++++++
+>  arch/arm/boot/dts/hi3519.dtsi     | 142 ++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 186 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/hi3519-demb.dts
+>  create mode 100644 arch/arm/boot/dts/hi3519.dtsi
 > 
-> Thank you for pointing this out.
-> Recently I tested my kdump code on hikey, and as hikey(hi6220) has gic-400,
-> I didn't notice this problem.
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 30bbc37..1ff3ed9 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -135,6 +135,8 @@ dtb-$(CONFIG_ARCH_EXYNOS5) += \
+>  	exynos5800-peach-pi.dtb
+>  dtb-$(CONFIG_ARCH_HI3xxx) += \
+>  	hi3620-hi4511.dtb
+> +dtb-$(CONFIG_ARCH_HISI) += \
+> +	hi3519-demb.dtb
+>  dtb-$(CONFIG_ARCH_HIX5HD2) += \
+>  	hisi-x5hd2-dkb.dtb
+>  dtb-$(CONFIG_ARCH_HIGHBANK) += \
+> diff --git a/arch/arm/boot/dts/hi3519-demb.dts b/arch/arm/boot/dts/hi3519-demb.dts
+> new file mode 100644
+> index 0000000..6991ab6
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/hi3519-demb.dts
+> @@ -0,0 +1,42 @@
+> +/*
+> + * Copyright (c) 2015 HiSilicon Technologies Co., Ltd.
+> + *
+> + * This program is free software; you can redistribute  it and/or modify it
+> + * under  the terms of  the GNU General  Public License as published by the
+> + * Free Software Foundation;  either version 2 of the  License, or (at your
+> + * option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + *
+> + */
+> +
+> +/dts-v1/;
+> +#include "hi3519.dtsi"
+> +
+> +/ {
+> +	model = "HiSilicon HI3519 DEMO Board";
+> +	compatible = "hisilicon,hi3519";
+> +
+> +	aliases {
+> +		serial0 = &uart0;
+> +	};
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x80000000 0x40000000>;
+> +	};
+> +};
+> +
+> +&uart0 {
+> +	status = "okay";
+> +};
+> +
+> +&dual_timer0 {
+> +	status = "okay";
+> +};
+> diff --git a/arch/arm/boot/dts/hi3519.dtsi b/arch/arm/boot/dts/hi3519.dtsi
+> new file mode 100644
+> index 0000000..50b736e
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/hi3519.dtsi
+> @@ -0,0 +1,142 @@
+> +/*
+> + * Copyright (c) 2015 HiSilicon Technologies Co., Ltd.
+> + *
+> + * This program is free software; you can redistribute  it and/or modify it
+> + * under  the terms of  the GNU General  Public License as published by the
+> + * Free Software Foundation;  either version 2 of the  License, or (at your
+> + * option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + *
+> + */
+> +
+> +#include "skeleton.dtsi"
 
-Because GIC-400 is a GICv2 implementation, which is entirely MMIO based.
-GICv3 uses some system registers that are only available at EL2, and KVM
-needs some information contained in these registers before being able to
-get initialized.
+Don't include skeleton.dtsi. We've decided it was a bad idea.
 
->> Indeed, this is completely broken (I just reproduced the issue on a
->> model). I wish this kind of details had been checked earlier, but thanks
->> for pointing it out.
->>
->>> Whats the best way to fix this?
->>> - Call kvm_arch_hardware_enable() before vgic_hyp_init() and disable later?
->>> - Fold the VGIC init stuff back into hardware_enable()?
->>
->> None of that works - kvm_arch_hardware_enable() is called once per CPU,
->> while vgic_hyp_init() can only be called once. Also,
->> kvm_arch_hardware_enable() is called from interrupt context, and I
->> wouldn't feel comfortable starting probing DT and allocating stuff from
->> there.
+> +#include <dt-bindings/clock/hi3519-clock.h>
+> +/ {
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		cpu at 0 {
+
+Single core system? Add the other cpu nodes if not. Adding them doesn't 
+have to be in sync with SMP kernel support.
+
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a7";
+> +			reg = <0>;
+> +		};
+> +	};
+> +
+> +	gic: interrupt-controller at 10300000 {
+> +		compatible = "arm,cortex-a7-gic";
+> +		#interrupt-cells = <3>;
+> +		interrupt-controller;
+> +		reg = <0x10301000 0x1000>, <0x10302000 0x1000>;
+> +	};
+> +
+> +	soc {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		compatible = "simple-bus";
+> +		interrupt-parent = <&gic>;
+> +		ranges;
+
+Looks like everything is in 0x12xxxxxx range, so you should add actual 
+translation here if that's the case.
+
+> +
+> +		amba {
+
+Is this actually a separate bus in the physical design of the chip?
+
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			compatible = "arm,amba-bus";
+
+Just simple-bus. "arm,amba-bus" is not any type of bus, nor is it 
+documented.
+
+> +			ranges;
+> +
+> +			uart0: serial at 12100000 {
+> +				compatible = "arm,pl011", "arm,primecell";
+> +				reg = <0x12100000 0x1000>;
+> +				interrupts = <0 4 4>;
+> +				clocks = <&crg HI3519_UART0_CLK>;
+> +				clock-names = "apb_pclk";
+> +				status = "disable";
+> +			};
+> +
+> +			uart1: serial at 12101000 {
+> +				compatible = "arm,pl011", "arm,primecell";
+> +				reg = <0x12101000 0x1000>;
+> +				interrupts = <0 5 4>;
+> +				clocks = <&crg HI3519_UART1_CLK>;
+> +				clock-names = "apb_pclk";
+> +				status = "disable";
+> +			};
+> +
+> +			uart2: serial at 12102000 {
+> +				compatible = "arm,pl011", "arm,primecell";
+> +				reg = <0x12102000 0x1000>;
+> +				interrupts = <0 6 4>;
+> +				clocks = <&crg HI3519_UART2_CLK>;
+> +				clock-names = "apb_pclk";
+> +				status = "disable";
+> +			};
+> +
+> +			uart3: serial at 12103000 {
+> +				compatible = "arm,pl011", "arm,primecell";
+> +				reg = <0x12103000 0x1000>;
+> +				interrupts = <0 7 4>;
+> +				clocks = <&crg HI3519_UART3_CLK>;
+> +				clock-names = "apb_pclk";
+> +				status = "disable";
+> +			};
+> +
+> +			uart4: serial at 12104000 {
+> +				compatible = "arm,pl011", "arm,primecell";
+> +				reg = <0x12104000 0x1000>;
+> +				interrupts = <0 8 4>;
+> +				clocks = <&crg HI3519_UART4_CLK>;
+> +				clock-names = "apb_pclk";
+> +				status = "disable";
+> +			};
+> +
+> +			dual_timer0: timer at 12000000 {
+> +				compatible = "arm,sp804", "arm,primecell";
+> +				interrupts = <0 64 4>, <0 65 4>;
+> +				reg = <0x12000000 0x1000>;
+> +				clocks = <&crg HI3519_FIXED_3M>;
+> +				status = "disable";
+> +			};
+> +
+> +			dual_timer1: timer at 12001000 {
+> +				compatible = "arm,sp804", "arm,primecell";
+> +				interrupts = <0 66 4>, <0 67 4>;
+> +				reg = <0x12001000 0x1000>;
+> +				clocks = <&crg HI3519_FIXED_3M>;
+> +				status = "disable";
+> +			};
+> +
+> +			dual_timer2: timer at 12002000 {
+> +				compatible = "arm,sp804", "arm,primecell";
+> +				interrupts = <0 68 4>, <0 69 4>;
+> +				reg = <0x12002000 0x1000>;
+> +				clocks = <&crg HI3519_FIXED_3M>;
+> +				status = "disable";
+> +			};
+> +		};
+> +
+> +		sysctrl: system-controller at 12020000 {
+> +			compatible = "hisilicon,hi3519-sysctrl", "syscon";
+> +			reg = <0x12020000 0x1000>;
+> +		};
+> +
+> +		reboot {
+> +			compatible = "syscon-reboot";
+> +			regmap = <&sysctrl>;
+> +			offset = <0x4>;
+> +			mask = <0xdeadbeef>;
+> +		};
+> +
+> +		crg: clock-reset-controller at 12010000 {
+> +			compatible = "hisilicon,hi3519-crg";
+> +			#clock-cells = <1>;
+> +			#reset-cells = <2>;
+> +			reg = <0x12010000 0x10000>;
+> +		};
+> +	};
+> +};
+> -- 
+> 1.9.1
 > 
-> Do you think so?
-> How about the fixup! patch attached below?
-> The point is that, like Ashwin's first idea, we initialize cpus temporarily
-> before kvm_vgic_hyp_init() and then soon reset cpus again. Thus,
-> kvm cpu hotplug will still continue to work as before.
-> Now that cpu_init_hyp_mode() is revived as exactly the same as Marc's
-> original code, the change will not be a big jump.
-
-This seems quite complicated:
-- init EL2 on  all CPUs
-- do some initialization
-- tear all CPUs EL2 down
-- let KVM drive the vectors being set or not
-
-My questions are: why do we need to do this on *all* cpus? Can't that
-work on a single one?
-
-Also, the simple fact that we were able to get some junk value is a sign
-that something is amiss. I'd expect a splat of some sort, because we now
-have a possibility of doing things in the wrong context.
-
-> 
-> If kvm_hyp_call() in vgic_v3_probe()/kvm_vgic_hyp_init() is a *problem*,
-> I hope this should work. Actually I confirmed that, with this fixup! patch,
-> we could run a kvm guest and also successfully executed kexec on model w/gic-v3.
-> 
-> My only concern is the following kernel message I saw when kexec shut down
-> the kernel:
-> (Please note that I was running one kvm quest (pid=961) here.)
-> 
-> ===
-> sh-4.3# ./kexec -d -e
-> kexec version: 15.11.16.11.06-g41e52e2
-> arch_process_options:112: command_line: (null)
-> arch_process_options:114: initrd: (null)
-> arch_process_options:115: dtb: (null)
-> arch_process_options:117: port: 0x0
-> kvm: exiting hardware virtualization
-> kvm [961]: Unsupported exception type: 6248304    <== this message
-
-That makes me feel very uncomfortable. It looks like we've exited a
-guest with some horrible value in X0. How is that even possible?
-
-This deserves to be investigated.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
