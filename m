@@ -1,50 +1,44 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 11 Dec 2015 22:00:29 +0800
-Subject: [PATCH] ARM: dts: vf610: use reset values for L2 cache latencies
-In-Reply-To: <1448935166-2697-1-git-send-email-stefan@agner.ch>
-References: <1448935166-2697-1-git-send-email-stefan@agner.ch>
-Message-ID: <20151211140029.GI11252@tiger>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 11 Dec 2015 15:02:34 +0100
+Subject: [PATCH v5 01/58] mtd: nand: denali: add missing nand_release() call
+ in denali_remove()
+In-Reply-To: <1449734442-18672-2-git-send-email-boris.brezillon@free-electrons.com>
+References: <1449734442-18672-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1449842554-29898-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 30, 2015 at 05:59:26PM -0800, Stefan Agner wrote:
-> Linux on Vybrid used several different L2 latencies so far, none
-> of them seem to be the right ones. According to the application note
-> AN4947 ("Understanding Vybrid Architecture"), the tag portion runs
-> on CPU clock and is inside the L2 cache controller, whereas the data
-> portion is stored in the external SRAM running on platform clock.
-> Hence it is likely that the correct value requires a higher data
-> latency then tag latency.
-> 
-> These are the values which have been used so far:
-> - The mainline values:
->   arm,data-latency = <1 1 1>;
->   arm,tag-latency = <2 2 2>;
->   Those values have lead to problems on higher clocks. They look
->   like a poor translation from the reset values (missing +1 offset
->   and a mix up between tag/latency values).
-> - The Linux 3.0 (SoC vendor BSP) values (converted to DT notation):
->   arm,data-latency = <4 2 3>
->   arm,tag-latency = <4 2 3>
->   The cache initialization function along with the value matches the
->   i.MX6 code from the same kernel, so it seems that those values have
->   just been copied.
-> - The Colibri values:
->   arm,data-latency = <2 1 2>;
->   arm,tag-latency = <3 2 3>;
->   Those were a mix between the values of the Linux 3.0 based BSP and
->   the mainline values above.
-> - The SoC Reset values (converted to DT notation):
->   arm,data-latency = <3 3 3>;
->   arm,tag-latency = <2 2 2>;
-> 
-> So far there is no official statement on what the correct values are.
-> See also the related Freescale community thread:
-> https://community.freescale.com/message/579785#579785
-> 
-> For now, the reset values seem to be the best bet. Remove all other
-> "bogus" values and use the reset value on vf610.dtsi level.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+Unregister the NAND device from the NAND subsystem when removing a denali
+NAND controller, otherwise the MTD attached to the NAND device is still
+exposed by the MTD layer, and accesses to this device will likely crash
+the system.
 
-Applied, thanks.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+Changes since v4:
+- remove Cc stable and fixes tags
+- calculate the dma buffer size before calling nand_release()
+
+ drivers/mtd/nand/denali.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/mtd/nand/denali.c b/drivers/mtd/nand/denali.c
+index 67eb2be..fdfea05 100644
+--- a/drivers/mtd/nand/denali.c
++++ b/drivers/mtd/nand/denali.c
+@@ -1622,9 +1622,11 @@ EXPORT_SYMBOL(denali_init);
+ /* driver exit point */
+ void denali_remove(struct denali_nand_info *denali)
+ {
++	int bufsize = denali->mtd.writesize + denali->mtd.oobsize;
++
++	nand_release(&denali->mtd);
+ 	denali_irq_cleanup(denali->irq, denali);
+-	dma_unmap_single(denali->dev, denali->buf.dma_buf,
+-			 denali->mtd.writesize + denali->mtd.oobsize,
++	dma_unmap_single(denali->dev, denali->buf.dma_buf, bufsize,
+ 			 DMA_BIDIRECTIONAL);
+ }
+ EXPORT_SYMBOL(denali_remove);
+-- 
+2.1.4
