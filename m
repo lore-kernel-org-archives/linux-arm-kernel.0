@@ -1,228 +1,138 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 11 Dec 2015 16:32:17 +0100
-Subject: [PATCH v4 1/2] phy-sun4i-usb: Use of_match_node to get model specific
- config data
-Message-ID: <1449847938-20836-1-git-send-email-hdegoede@redhat.com>
+Date: Fri, 11 Dec 2015 16:32:18 +0100
+Subject: [PATCH v4 2/2] phy-sun4i-usb: Add support for the host usb-phys found
+ on the H3 SoC
+In-Reply-To: <1449847938-20836-1-git-send-email-hdegoede@redhat.com>
+References: <1449847938-20836-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1449847938-20836-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use of_match_node instead of calling of_device_is_compatible a ton of
-times to get model specific config data.
+From: Reinder de Haan <patchesrdh@mveas.com>
 
+Note this commit only adds support for phys 1-3, phy 0, the otg phy, is
+not yet (fully) supported after this commit.
+
+Signed-off-by: Reinder de Haan <patchesrdh@mveas.com>
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
+Changes in v2:
+-Change break; after dev_err() to return, as intended, fixing a compiler
+ warning (the dev_err case should never be reached)
 Changes in v3:
--New patch in v3 of this patch-set
+-Use of_match_node to get model specific config data
 Changes in v4:
--Use of_device_get_match_data()
--Add phyctl_offset to sun4i_usb_phy_cfg, get rid of model specific code
- for phyctl-reg in sun4i_usb_phy_write()
+-Adjust to v4 of "Use of_match_node to get model specific config data" patch
 ---
- drivers/phy/phy-sun4i-usb.c | 121 +++++++++++++++++++++++++++++---------------
- 1 file changed, 79 insertions(+), 42 deletions(-)
+ .../devicetree/bindings/phy/sun4i-usb-phy.txt      |  1 +
+ drivers/phy/phy-sun4i-usb.c                        | 41 +++++++++++++++++-----
+ 2 files changed, 33 insertions(+), 9 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+index 0cebf74..95736d7 100644
+--- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
++++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+@@ -9,6 +9,7 @@ Required properties:
+   * allwinner,sun7i-a20-usb-phy
+   * allwinner,sun8i-a23-usb-phy
+   * allwinner,sun8i-a33-usb-phy
++  * allwinner,sun8i-h3-usb-phy
+ - reg : a list of offset + length pairs
+ - reg-names :
+   * "phy_ctrl"
 diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-index b12964b..35b1fa3 100644
+index 35b1fa3..bae54f7 100644
 --- a/drivers/phy/phy-sun4i-usb.c
 +++ b/drivers/phy/phy-sun4i-usb.c
-@@ -32,6 +32,7 @@
- #include <linux/mutex.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-+#include <linux/of_device.h>
- #include <linux/of_gpio.h>
- #include <linux/phy/phy.h>
- #include <linux/phy/phy-sun4i-usb.h>
-@@ -88,12 +89,23 @@
- #define DEBOUNCE_TIME			msecs_to_jiffies(50)
- #define POLL_TIME			msecs_to_jiffies(250)
- 
-+enum sun4i_usb_phy_type {
-+	sun4i_a10_phy,
-+	sun8i_a33_phy,
-+};
+@@ -47,6 +47,9 @@
+ #define REG_PHYBIST			0x08
+ #define REG_PHYTUNE			0x0c
+ #define REG_PHYCTL_A33			0x10
++#define REG_PHY_UNK_H3			0x20
 +
-+struct sun4i_usb_phy_cfg {
-+	int num_phys;
-+	enum sun4i_usb_phy_type type;
-+	u32 disc_thresh;
-+	u8 phyctl_offset;
-+	bool dedicated_clocks;
-+};
-+
- struct sun4i_usb_phy_data {
- 	void __iomem *base;
-+	const struct sun4i_usb_phy_cfg *cfg;
- 	struct mutex mutex;
--	int num_phys;
--	u32 disc_thresh;
--	bool has_a33_phyctl;
- 	struct sun4i_usb_phy {
- 		struct phy *phy;
- 		void __iomem *pmu;
-@@ -159,17 +171,14 @@ static void sun4i_usb_phy_write(struct sun4i_usb_phy *phy, u32 addr, u32 data,
- {
- 	struct sun4i_usb_phy_data *phy_data = to_sun4i_usb_phy_data(phy);
- 	u32 temp, usbc_bit = BIT(phy->index * 2);
--	void *phyctl;
-+	void *phyctl = phy_data->base + phy_data->cfg->phyctl_offset;
- 	int i;
++#define REG_PMU_UNK_H3			0x10
  
- 	mutex_lock(&phy_data->mutex);
+ #define PHYCTL_DATA			BIT(7)
  
--	if (phy_data->has_a33_phyctl) {
--		phyctl = phy_data->base + REG_PHYCTL_A33;
-+	if (phy_data->cfg->type == sun8i_a33_phy) {
- 		/* A33 needs us to set phyctl to 0 explicitly */
- 		writel(0, phyctl);
--	} else {
--		phyctl = phy_data->base + REG_PHYCTL_A10;
+@@ -80,7 +83,7 @@
+ #define PHY_DISCON_TH_SEL		0x2a
+ #define PHY_SQUELCH_DETECT		0x3c
+ 
+-#define MAX_PHYS			3
++#define MAX_PHYS			4
+ 
+ /*
+  * Note do not raise the debounce time, we must report Vusb high within 100ms
+@@ -92,6 +95,7 @@
+ enum sun4i_usb_phy_type {
+ 	sun4i_a10_phy,
+ 	sun8i_a33_phy,
++	sun8i_h3_phy,
+ };
+ 
+ struct sun4i_usb_phy_cfg {
+@@ -239,6 +243,7 @@ static int sun4i_usb_phy_init(struct phy *_phy)
+ 	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+ 	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
+ 	int ret;
++	u32 val;
+ 
+ 	ret = clk_prepare_enable(phy->clk);
+ 	if (ret)
+@@ -250,16 +255,26 @@ static int sun4i_usb_phy_init(struct phy *_phy)
+ 		return ret;
  	}
  
- 	for (i = 0; i < len; i++) {
-@@ -249,7 +258,8 @@ static int sun4i_usb_phy_init(struct phy *_phy)
- 	sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE, 0x14, 5);
+-	/* Enable USB 45 Ohm resistor calibration */
+-	if (phy->index == 0)
+-		sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN, 0x01, 1);
++	if (data->cfg->type == sun8i_h3_phy) {
++		if (phy->index == 0) {
++			val = readl(data->base + REG_PHY_UNK_H3);
++			writel(val & ~1, data->base + REG_PHY_UNK_H3);
++		}
++
++		val = readl(phy->pmu + REG_PMU_UNK_H3);
++		writel(val & ~2, phy->pmu + REG_PMU_UNK_H3);
++	} else {
++		/* Enable USB 45 Ohm resistor calibration */
++		if (phy->index == 0)
++			sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN, 0x01, 1);
  
- 	/* Disconnect threshold adjustment */
--	sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL, data->disc_thresh, 2);
-+	sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL,
-+			    data->cfg->disc_thresh, 2);
+-	/* Adjust PHY's magnitude and rate */
+-	sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE, 0x14, 5);
++		/* Adjust PHY's magnitude and rate */
++		sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE, 0x14, 5);
+ 
+-	/* Disconnect threshold adjustment */
+-	sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL,
+-			    data->cfg->disc_thresh, 2);
++		/* Disconnect threshold adjustment */
++		sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL,
++				    data->cfg->disc_thresh, 2);
++	}
  
  	sun4i_usb_phy_passby(phy, 1);
  
-@@ -476,7 +486,7 @@ static struct phy *sun4i_usb_phy_xlate(struct device *dev,
- {
- 	struct sun4i_usb_phy_data *data = dev_get_drvdata(dev);
+@@ -726,6 +741,13 @@ static const struct sun4i_usb_phy_cfg sun8i_a33_cfg = {
+ 	.dedicated_clocks = true,
+ };
  
--	if (args->args[0] >= data->num_phys)
-+	if (args->args[0] >= data->cfg->num_phys)
- 		return ERR_PTR(-ENODEV);
- 
- 	return data->phys[args->args[0]].phy;
-@@ -511,7 +521,6 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 	struct device_node *np = dev->of_node;
- 	struct phy_provider *phy_provider;
--	bool dedicated_clocks;
- 	struct resource *res;
- 	int i, ret;
- 
-@@ -522,29 +531,9 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
- 	mutex_init(&data->mutex);
- 	INIT_DELAYED_WORK(&data->detect, sun4i_usb_phy0_id_vbus_det_scan);
- 	dev_set_drvdata(dev, data);
--
--	if (of_device_is_compatible(np, "allwinner,sun5i-a13-usb-phy") ||
--	    of_device_is_compatible(np, "allwinner,sun8i-a23-usb-phy") ||
--	    of_device_is_compatible(np, "allwinner,sun8i-a33-usb-phy"))
--		data->num_phys = 2;
--	else
--		data->num_phys = 3;
--
--	if (of_device_is_compatible(np, "allwinner,sun5i-a13-usb-phy") ||
--	    of_device_is_compatible(np, "allwinner,sun7i-a20-usb-phy"))
--		data->disc_thresh = 2;
--	else
--		data->disc_thresh = 3;
--
--	if (of_device_is_compatible(np, "allwinner,sun6i-a31-usb-phy") ||
--	    of_device_is_compatible(np, "allwinner,sun8i-a23-usb-phy") ||
--	    of_device_is_compatible(np, "allwinner,sun8i-a33-usb-phy"))
--		dedicated_clocks = true;
--	else
--		dedicated_clocks = false;
--
--	if (of_device_is_compatible(np, "allwinner,sun8i-a33-usb-phy"))
--		data->has_a33_phyctl = true;
-+	data->cfg = of_device_get_match_data(dev);
-+	if (!data->cfg)
-+		return -EINVAL;
- 
- 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "phy_ctrl");
- 	data->base = devm_ioremap_resource(dev, res);
-@@ -590,7 +579,7 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
- 		}
- 	}
- 
--	for (i = 0; i < data->num_phys; i++) {
-+	for (i = 0; i < data->cfg->num_phys; i++) {
- 		struct sun4i_usb_phy *phy = data->phys + i;
- 		char name[16];
- 
-@@ -602,7 +591,7 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
- 			phy->vbus = NULL;
- 		}
- 
--		if (dedicated_clocks)
-+		if (data->cfg->dedicated_clocks)
- 			snprintf(name, sizeof(name), "usb%d_phy", i);
- 		else
- 			strlcpy(name, "usb_phy", sizeof(name));
-@@ -689,13 +678,61 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct sun4i_usb_phy_cfg sun4i_a10_cfg = {
-+	.num_phys = 3,
-+	.type = sun4i_a10_phy,
++static const struct sun4i_usb_phy_cfg sun8i_h3_cfg = {
++	.num_phys = 4,
++	.type = sun8i_h3_phy,
 +	.disc_thresh = 3,
-+	.phyctl_offset = REG_PHYCTL_A10,
-+	.dedicated_clocks = false,
-+};
-+
-+static const struct sun4i_usb_phy_cfg sun5i_a13_cfg = {
-+	.num_phys = 2,
-+	.type = sun4i_a10_phy,
-+	.disc_thresh = 2,
-+	.phyctl_offset = REG_PHYCTL_A10,
-+	.dedicated_clocks = false,
-+};
-+
-+static const struct sun4i_usb_phy_cfg sun6i_a31_cfg = {
-+	.num_phys = 3,
-+	.type = sun4i_a10_phy,
-+	.disc_thresh = 3,
-+	.phyctl_offset = REG_PHYCTL_A10,
-+	.dedicated_clocks = true,
-+};
-+
-+static const struct sun4i_usb_phy_cfg sun7i_a20_cfg = {
-+	.num_phys = 3,
-+	.type = sun4i_a10_phy,
-+	.disc_thresh = 2,
-+	.phyctl_offset = REG_PHYCTL_A10,
-+	.dedicated_clocks = false,
-+};
-+
-+static const struct sun4i_usb_phy_cfg sun8i_a23_cfg = {
-+	.num_phys = 2,
-+	.type = sun4i_a10_phy,
-+	.disc_thresh = 3,
-+	.phyctl_offset = REG_PHYCTL_A10,
-+	.dedicated_clocks = true,
-+};
-+
-+static const struct sun4i_usb_phy_cfg sun8i_a33_cfg = {
-+	.num_phys = 2,
-+	.type = sun8i_a33_phy,
-+	.disc_thresh = 3,
-+	.phyctl_offset = REG_PHYCTL_A33,
 +	.dedicated_clocks = true,
 +};
 +
  static const struct of_device_id sun4i_usb_phy_of_match[] = {
--	{ .compatible = "allwinner,sun4i-a10-usb-phy" },
--	{ .compatible = "allwinner,sun5i-a13-usb-phy" },
--	{ .compatible = "allwinner,sun6i-a31-usb-phy" },
--	{ .compatible = "allwinner,sun7i-a20-usb-phy" },
--	{ .compatible = "allwinner,sun8i-a23-usb-phy" },
--	{ .compatible = "allwinner,sun8i-a33-usb-phy" },
-+	{ .compatible = "allwinner,sun4i-a10-usb-phy", .data = &sun4i_a10_cfg },
-+	{ .compatible = "allwinner,sun5i-a13-usb-phy", .data = &sun5i_a13_cfg },
-+	{ .compatible = "allwinner,sun6i-a31-usb-phy", .data = &sun6i_a31_cfg },
-+	{ .compatible = "allwinner,sun7i-a20-usb-phy", .data = &sun7i_a20_cfg },
-+	{ .compatible = "allwinner,sun8i-a23-usb-phy", .data = &sun8i_a23_cfg },
-+	{ .compatible = "allwinner,sun8i-a33-usb-phy", .data = &sun8i_a33_cfg },
+ 	{ .compatible = "allwinner,sun4i-a10-usb-phy", .data = &sun4i_a10_cfg },
+ 	{ .compatible = "allwinner,sun5i-a13-usb-phy", .data = &sun5i_a13_cfg },
+@@ -733,6 +755,7 @@ static const struct of_device_id sun4i_usb_phy_of_match[] = {
+ 	{ .compatible = "allwinner,sun7i-a20-usb-phy", .data = &sun7i_a20_cfg },
+ 	{ .compatible = "allwinner,sun8i-a23-usb-phy", .data = &sun8i_a23_cfg },
+ 	{ .compatible = "allwinner,sun8i-a33-usb-phy", .data = &sun8i_a33_cfg },
++	{ .compatible = "allwinner,sun8i-h3-usb-phy", .data = &sun8i_h3_cfg },
  	{ },
  };
  MODULE_DEVICE_TABLE(of, sun4i_usb_phy_of_match);
