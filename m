@@ -1,50 +1,86 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 11 Dec 2015 08:43:59 -0800
-Subject: [PATCH v2] clk: ti: Add support for dm814x ADPLL
-In-Reply-To: <20151211161450.GH30871@n2100.arm.linux.org.uk>
-References: <1449800792-5551-1-git-send-email-tony@atomide.com>
- <20151211135237.GG30871@n2100.arm.linux.org.uk>
- <20151211154854.GK23396@atomide.com>
- <20151211161450.GH30871@n2100.arm.linux.org.uk>
-Message-ID: <20151211164358.GM23396@atomide.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 11 Dec 2015 10:48:08 -0600
+Subject: [PATCH v3 2/9] Documentation: dt-bindings: Document STM32 pinctrl
+ driver DT bindings
+In-Reply-To: <CALszF6Ct5omDxbysmD=7MHYDT5-EowKH+L+sqSbp29R9tHfkdA@mail.gmail.com>
+References: <1449578711-6141-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1449578711-6141-3-git-send-email-mcoquelin.stm32@gmail.com>
+ <20151209034137.GA15954@rob-hp-laptop>
+ <CALszF6Ct5omDxbysmD=7MHYDT5-EowKH+L+sqSbp29R9tHfkdA@mail.gmail.com>
+Message-ID: <CAL_JsqKPgSrbdyPx4qCRB8ycZ2+xNNgT9Gu0YD_OU-kDGAVRPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [151211 08:16]:
-> On Fri, Dec 11, 2015 at 07:48:54AM -0800, Tony Lindgren wrote:
-> > There's a problem with MAX_CON_ID 16 hardcoded allocated name length.
-> 
-> Absolutely right...
+On Wed, Dec 9, 2015 at 3:37 AM, Maxime Coquelin
+<mcoquelin.stm32@gmail.com> wrote:
+> Hi Rob,
+>
+> 2015-12-09 4:41 GMT+01:00 Rob Herring <robh@kernel.org>:
+>> On Tue, Dec 08, 2015 at 01:45:04PM +0100, Maxime Coquelin wrote:
+>>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>>> ---
+>>>  .../bindings/pinctrl/st,stm32-pinctrl.txt          | 126 +++++++++++++++++++++
+>>>  1 file changed, 126 insertions(+)
+>>>  create mode 100644 Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
+>>> new file mode 100644
+>>> index 0000000..7b4800c
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
+>>> @@ -0,0 +1,126 @@
+>>> +* STM32 GPIO and Pin Mux/Config controller
+>>> +
+>>> +STMicroelectronics's STM32 MCUs intregrate a GPIO and Pin mux/config hardware
+>>> +controller. It controls the input/output settings on the available pins and
+>>> +also provides ability to multiplex and configure the output of various on-chip
+>>> +controllers onto these pads.
+>>> +
+>>> +Pin controller node:
+>>> +Required properies:
+>>> + - compatible: value should be one of the following:
+>>> +   (a) "st,stm32f429-pinctrl"
+>>> + - #address-cells: The value of this property must be 1
+>>> + - #size-cells       : The value of this property must be 1
+>>> + - ranges    : defines mapping between pin controller node (parent) to
+>>> +   gpio-bank node (children).
+>>> + - pins-are-numbered: Specify the subnodes are using numbered pinmux to
+>>> +   specify pins.
+>>> +
+>>> +GPIO controller/bank node:
+>>> +Required properties:
+>>> + - gpio-controller : Indicates this device is a GPIO controller
+>>> + - #gpio-cells         : Should be two.
+>>> +                     The first cell is the pin number
+>>> +                     The second one is the polarity:
+>>> +                             - 0 for active high
+>>> +                             - 1 for active low
+>>> + - reg                 : The gpio address range, relative to the pinctrl range
+>>> + - clocks      : clock that drives this bank
+>>> + - st,bank-name        : Should be a name string for this bank as specified in
+>>> +   the datasheet
+>>
+>> How do you intend to use this? We should come up with something generic
+>> or drop it.
+> Good point.
+> It is used to have a meaningful name set in gpio_chip's label.
 
-Well adding the warning there allows people to at least see what's going
-on.
+Who cares about the gpio_chip name?
 
-> > In this case I have 13 instances of plls with 3 - 4 outputs each and I'd
-> > like to use "481c5040.adpll.clkout" style naming starting with the instance
-> > address. Also "adpll5.clkdcoldo" style naming would work,
-> 
-> Because it's a connection ID, not a clock _name_.  I see that we're still
-> making all the same mistakes with clocks that were made years ago, and
-> which lead down the path of amazingly complex drivers having conditional
-> clock names and the like.
+> I see two alternatives:
+>  1. replace "st,bank-name" with label
+>  2. use aliases, and construct label in driver with something like:
+>      kasprintf(GFP_KERNEL, "GPIO%c", 'A' + of_alias_get_id(np, "gpio"));
+>
+> What do you prefer?
 
-Yeah we certainly want to get out of the conditional name business.
+I prefer to not need it. Of these 2 though, probably using label.
+However, I'm not convinced to say yes, we should use that because it
+will only encourage others to do the same.
 
-> Is there a reason why you can't split this into separate device and input
-> names, and use clk_get_sys() rather than passing NULL as the device to
-> clk_get().  This is exactly why we've ended up with clk_get_sys(), to
-> cater for the cases where there is no struct device to associate with the
-> connection ID: the idea behind clk_get_sys() is that you pass the device
-> name explicitly, along with the connection ID.
+> Do you have other ideas?
 
-For most code yes, there's still a pile of shared legacy code relying on
-the clock connection ID only.
+We do need names on individual lines though. I'd rather not complicate
+things by having labels for both unless we can define the need for it.
 
-So what do you envision people using for the connection ID in cases like
-this? It needs to be unique, should relate to the documentation and fit
-MAX_CON_ID. Something like "pll5.clkdcoldo" will still overflow for pll13
-unless also the dot is left out :)
-
-Regards,
-
-Tony
+Rob
