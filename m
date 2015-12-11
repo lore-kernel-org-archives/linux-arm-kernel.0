@@ -1,55 +1,67 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 11 Dec 2015 19:43:59 +0100
-Subject: [PATCH v2 4/4] ARM: dts: sun4i: Enable onboard codec used on the pov
- protab2-ips9 tablet
-In-Reply-To: <1449859439-30875-1-git-send-email-hdegoede@redhat.com>
-References: <1449859439-30875-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1449859439-30875-4-git-send-email-hdegoede@redhat.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 11 Dec 2015 18:46:02 +0000
+Subject: [PATCH 0/5] ARM: orion5x/dove/mv78xx0 multiplatform
+In-Reply-To: <20151211182730.GA15800@cloud>
+References: <1448466557-435335-1-git-send-email-arnd@arndb.de>
+ <2992463.fVOGazvIkH@wuerfel> <5669F5F8.5010005@vollmann.ch>
+ <14967875.ttNXUbSTvS@wuerfel>
+ <20151211133601.GB18249@io.lakedaemon.net>
+ <20151211182730.GA15800@cloud>
+Message-ID: <20151211184602.GE18249@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pov protab2-ips9 tablet uses the A10's integrated audio codec,
-enable it.
+On Fri, Dec 11, 2015 at 10:27:30AM -0800, Josh Triplett wrote:
+> On Fri, Dec 11, 2015 at 01:36:01PM +0000, Jason Cooper wrote:
+> > +Josh
+> > 
+> > Hey Arnd, Detlef,
+> > 
+> > On Fri, Dec 11, 2015 at 12:10:55AM +0100, Arnd Bergmann wrote:
+> > > On Thursday 10 December 2015 23:00:24 Detlef Vollmann wrote:
+> > > > On 12/10/15 22:29, Arnd Bergmann wrote:
+> > > > > On Thursday 10 December 2015 22:14:25 Detlef Vollmann wrote:
+> > > > >> On 12/10/15 21:59, Arnd Bergmann wrote:
+> > > > > It may also be worth investigating what has made CONFIG_OF so costly,
+> > > > Probably because too much is done at runtime and too few things can
+> > > > be fixed at build time.
+> > > > 
+> > > > > maybe we can reduce this a bit again.
+> > > > Probably not without turning the wheel backward :-(
+> > > > 
+> > > > So for the test: yes it works, but I'm unhappy with it.
+> > > 
+> > > I'm not too happy about adding 80kb to the uncompressed kernel 
+> > > image either. I've spent some more time now trying to find where
+> > > we added the bloat. It's mainly in drivers, not in arch specific
+> > > code, a kilobyte here and there eventually adds up, but the largest
+> > > portion with a little over 50% of the total diff is drivers/of.
+> > 
+> > Wasn't there an idea kicked around a while ago to create a
+> > dt2boardfile script/executable*?  Then, during kernel configuration, you
+> > enable it and select which dts file you want.  It would disable
+> > CONFIG_OF, multiplatform, etc.  And generate a board_file.c from the dts
+> > file.
+> > 
+> > If anything, it might be worth asking the kernel tinification [1], [2]
+> > folks if they'd be interested in taking this on...
+> 
+> No objection if you want to add it to the task list on
+> tiny.wiki.kernel.org (on the more difficult end).
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
-Changes in v2:
--Adjust for gpio rename from pa-gpios to allwinner,pa-gpios
----
- arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+Done.
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts b/arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts
-index a88d5f4..ea90634 100644
---- a/arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts
-@@ -72,6 +72,13 @@
- 	};
- };
- 
-+&codec {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&codec_pa_pin>;
-+	allwinner,pa-gpios = <&pio 7 15 GPIO_ACTIVE_HIGH>; /* PH15 */
-+	status = "okay";
-+};
-+
- &cpu0 {
- 	cpu-supply = <&reg_dcdc2>;
- };
-@@ -170,6 +177,13 @@
- 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 	};
- 
-+	codec_pa_pin: codec_pa_pin at 0 {
-+		allwinner,pins = "PH15";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
- 	touchscreen_pins: touchscreen_pins at 0 {
- 		allwinner,pins = "PA5", "PB13";
- 		allwinner,function = "gpio_out";
--- 
-2.5.0
+> I don't know if you could generate a board file, but I do wonder if you
+> could effectively compile in a parsed description and ditch the parser.
+> Bonus if you can make the values parsed out of it into compile-time
+> constants for constant folding.
+
+After a bit of discussion with Arnd on irc, I agree.  Going to  a board
+file doesn't really work since the logic is now mostly in the drivers
+probe functions.
+
+The dts parsing -> compile-time constants is worth looking into.
+
+thx,
+
+Jason.
