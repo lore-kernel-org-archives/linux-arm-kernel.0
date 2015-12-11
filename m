@@ -1,56 +1,69 @@
-From: plaes@plaes.org (Priit Laes)
-Date: Fri, 11 Dec 2015 23:23:00 +0200
-Subject: [PATCH] ARM: dts: sun4i: gemei-g9: Enable PA GPIO pin configuration
-In-Reply-To: <1449868980-28237-1-git-send-email-plaes@plaes.org>
-References: <1449868980-28237-1-git-send-email-plaes@plaes.org>
-Message-ID: <1449868980-28237-2-git-send-email-plaes@plaes.org>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 11 Dec 2015 22:29:13 +0100
+Subject: [PATCH v3 0/5] Add reboot notifier driver for rockchip platform
+In-Reply-To: <1447840044-19689-1-git-send-email-andy.yan@rock-chips.com>
+References: <1447840044-19689-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <45323116.BWNAaZT5p4@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PA GPIO pin (PH15) controls power to external amplifier (FT2012Q).
+Am Mittwoch, 18. November 2015, 17:47:24 schrieb Andy Yan:
+> rockchip platform have a protocol to pass the kernel reboot
+> mode to bootloader by some special registers when system reboot.
+> By this way the bootloader can take different action according
+> to the different kernel reboot mode, for example, command
+> "reboot loader" will reboot the board to rockusb mode, this is
+> a very convenient way to get the board enter download mode.
+> And Android system also use this protocol to pass "recovery"?
+> ?fastboot? reboot mode to bootloader. In upstream land, We found
+> tegra platform also use this mechanism.
+> 
+> Before this version, I have sent two Series, which can be found
+> at [0] [1]
+> [0] https://patchwork.kernel.org/patch/7140751/
+> [1] https://patchwork.kernel.org/patch/7153531/
 
-Signed-off-by: Priit Laes <plaes@plaes.org>
----
- arch/arm/boot/dts/sun4i-a10-gemei-g9.dts | 14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
+just so it doesn't get lost, this ties into a slightly more generic approach, 
+John Stultz is doing for the android reboot reasons:
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-gemei-g9.dts b/arch/arm/boot/dts/sun4i-a10-gemei-g9.dts
-index 1d73a98..ac64781 100644
---- a/arch/arm/boot/dts/sun4i-a10-gemei-g9.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-gemei-g9.dts
-@@ -65,13 +65,16 @@
- /*
-  * TODO:
-  *   2x cameras via CSI
-- *   audio input
-  *   AXP battery management
-  *   NAND
-  *   OTG
-  *   Touchscreen - gt801_2plus1 @ i2c adapter 2 @ 0x48
-  */
- &codec {
-+	/* PH15 controls power to external amplifier (ft2012q) */
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&codec_pa_pin>;
-+	allwinner,pa-gpios = <&pio 7 15 GPIO_ACTIVE_HIGH>;
- 	status = "okay";
- };
- 
-@@ -151,6 +154,15 @@
- 	status = "okay";
- };
- 
-+&pio {
-+	codec_pa_pin: codec_pa_pin at 0 {
-+		allwinner,pins = "PH15";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+};
-+
- &reg_dcdc2 {
- 	regulator-always-on;
- 	regulator-min-microvolt = <1000000>;
--- 
-2.6.4
+http://thread.gmane.org/gmane.linux.kernel/2103447
+
+The only difference is that we'd need to use the pmu syscon for it.
+
+
+
+> Changes in v3:
+>  - rename a pinctrl node in rk3288-veyron, the original name will be
+>    used in the incoming reboot notifier driver
+>  - add dt binding
+>  - move from mach-rockchip to drivers/soc/rockchip, as the tegra does
+>  - use dts pass the related register
+>  - add DT node
+> 
+> Changes in v2:
+>   - check cpu dt node
+>   - remove a unnecessary of_put_node in function rockchip_get_pmu_regmap
+>   - fix a align issue
+>   - use reboot_notifier instead of restart_handler
+> 
+> Andy Yan (5):
+>   ARM: dts: rockchip: rk3288-veyron: rename pinctrl node reboot to reset
+>   dt-bindings: soc: add document for rockchip reboot notifier driver
+>   soc: rockchip: add reboot notifier driver
+>   ARM: dts: rockchip: add reboot node
+>   ARM64: dts: rockchip: add reboot node
+> 
+>  .../bindings/soc/rockchip/rockchip-reboot.txt      | 18 ++++
+>  arch/arm/boot/dts/rk3288-veyron.dtsi               |  2 +-
+>  arch/arm/boot/dts/rk3288.dtsi                      |  6 ++
+>  arch/arm/boot/dts/rk3xxx.dtsi                      |  6 ++
+>  arch/arm64/boot/dts/rockchip/rk3368.dtsi           |  6 ++
+>  drivers/soc/rockchip/Kconfig                       |  7 ++
+>  drivers/soc/rockchip/Makefile                      |  1 +
+>  drivers/soc/rockchip/loader.h                      | 22 +++++
+>  drivers/soc/rockchip/reboot.c                      | 98
+> ++++++++++++++++++++++ 9 files changed, 165 insertions(+), 1 deletion(-)
+>  create mode 100644
+> Documentation/devicetree/bindings/soc/rockchip/rockchip-reboot.txt create
+> mode 100644 drivers/soc/rockchip/loader.h
+>  create mode 100644 drivers/soc/rockchip/reboot.c
