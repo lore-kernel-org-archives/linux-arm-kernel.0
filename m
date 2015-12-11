@@ -1,19 +1,33 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 12 Dec 2015 00:53:42 +0100
-Subject: [GIT PULL] Second Round of Renesas ARM64 Based SoC DT Updates for
- v4.5
-In-Reply-To: <cover.1448587800.git.horms+renesas@verge.net.au>
-References: <cover.1448587800.git.horms+renesas@verge.net.au>
-Message-ID: <2606049.WPpRG1K994@wuerfel>
+Date: Sat, 12 Dec 2015 00:57 +0100
+Subject: [GIT PULL] arm64: DTS changes for X-Gene platforms queued for v4.5
+In-Reply-To: <CADaLNDnM463bnMq349q_2XEh2AeGs4yrp-y474wQZ-NCSE0Cqw@mail.gmail.com>
+References: <CADaLNDnM463bnMq349q_2XEh2AeGs4yrp-y474wQZ-NCSE0Cqw@mail.gmail.com>
+Message-ID: <4175975.EH46H1lqut@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 27 November 2015 10:55:32 Simon Horman wrote:
-> Second Round of Renesas ARM64 Based SoC DT Updates for v4.5
+On Monday 30 November 2015 10:20:50 Duc Dang wrote:
+> DTS changes for X-Gene platforms queued for v4.5
 > 
-> * Enable GPIO, EthernetAVB, I2C and Sound on r8a7795/salvator-x
+> This patch set adds DTS entries to support various IPs
+> for X-Gene v1 and X-Gene v2 SoC:
+> - X-Gene v1: Enable support for MMC, USB, GPIO controllers,
+>   I2C controller, L2 Cache topology
+> - X-Gene v2: Enable support for MMC, USB, GPIO controller,
+>   I2C controller (with RTC), PCIe controller with GICv2m MSI,
+>   EDAC, L2 Cache topology, TRNG
 > 
 
-Merged this into next/dt64 as well, thanks!
+Merged into next/dt64.
 
-	Arnd 
+I see that most of your node names are wrong, please fix them
+in your next update by using the standard node names:
+
+	dwusb -> usb
+	i2c0 -> i2c
+	cfggpio0 -> gpio
+	dwgpio -> gpio
+	...
+
+	Arnd
