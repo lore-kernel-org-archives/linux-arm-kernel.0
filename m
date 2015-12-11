@@ -1,63 +1,114 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 10 Dec 2015 22:19:16 -0700
-Subject: [PATCH RFC 2/4] ARM: bcm2835: rename sdhci pin group
-In-Reply-To: <705524977.33360.5a38c754-5911-4377-aa1a-501587b3a337.open-xchange@email.1und1.de>
-References: <1447949176-21926-1-git-send-email-stefan.wahren@i2se.com>
- <1447949176-21926-3-git-send-email-stefan.wahren@i2se.com>
- <565E6892.4070600@wwwdotorg.org>
- <705524977.33360.5a38c754-5911-4377-aa1a-501587b3a337.open-xchange@email.1und1.de>
-Message-ID: <566A5CD4.7080704@wwwdotorg.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 11 Dec 2015 14:28:43 +0900
+Subject: [PATCH v5 3/7] ARM: dts: Exynos542x/5800: add CPU OPP properties
+In-Reply-To: <566A56DF.5040001@osg.samsung.com>
+References: <1449766729-435-1-git-send-email-b.zolnierkie@samsung.com>
+ <1449766729-435-4-git-send-email-b.zolnierkie@samsung.com>
+ <20151211031646.GL3612@ubuntu> <566A4231.9050608@osg.samsung.com>
+ <20151211033253.GN3612@ubuntu> <566A4A60.8060402@samsung.com>
+ <20151211041349.GO3612@ubuntu> <566A4E82.3040203@samsung.com>
+ <20151211043802.GP3612@ubuntu> <566A56DF.5040001@osg.samsung.com>
+Message-ID: <566A5F0B.8040609@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/2015 02:43 AM, Stefan Wahren wrote:
+On 11.12.2015 13:53, Javier Martinez Canillas wrote:
+> Hello Viresh,
 > 
->> Stephen Warren <swarren@wwwdotorg.org> hat am 2. Dezember 2015 um 04:42
->> geschrieben:
+> On 12/11/2015 01:38 AM, Viresh Kumar wrote:
+>> On 11-12-15, 13:18, Krzysztof Kozlowski wrote:
+>>> We had such configuration before (before df09df6f9ac3). I don't see any
+>>> benefit in what you described. Where is the "thing" to be fixed? It is
+>>> mixed up. The contiguous ordering is easier to read and more natural.
+>>
+>> This is what you are doing today (keeping on one CPU per cluster to
+>> simplify it):
+>>
+>> 		cpu0: cpu at 0 {
+>> 			device_type = "cpu";
+>> 			compatible = "arm,cortex-a15";
+>> 			reg = <0x0>;
+>> 			clock-frequency = <1800000000>;
+>> 			cci-control-port = <&cci_control1>;
+>> 		};
+>>
+>> 		cpu4: cpu at 100 {
+>> 			device_type = "cpu";
+>> 			compatible = "arm,cortex-a7";
+>> 			reg = <0x100>;
+>> 			clock-frequency = <1000000000>;
+>> 			cci-control-port = <&cci_control0>;
+>> 		};
 >>
 >>
->> On 11/19/2015 09:06 AM, Stefan Wahren wrote:
->>> The node name of the sdhci pin group doesn't explain it's
->>> real function. So rename it.
+>> Then you overwrite it with:
 >>
->> The real function of this node is not to configure SDHCI pins, but to
->> set pins to alt3, as the current name states. Admittedly it's possible
->> that currently the only pins that need to be set to ALT3 are SDHCI
->> related, but that's incidental.
+>>                 &cpu0 {
+>>                 	device_type = "cpu";
+>>                 	compatible = "arm,cortex-a7";
+>>                 	reg = <0x100>;
+>>                 	clock-frequency = <1000000000>;
+>>                 	cci-control-port = <&cci_control0>;
+>>                 };
+>>                 
+>>                 &cpu4 {
+>>                 	device_type = "cpu";
+>>                 	compatible = "arm,cortex-a15";
+>>                 	reg = <0x0>;
+>>                 	clock-frequency = <1800000000>;
+>>                 	cci-control-port = <&cci_control1>;
+>>                 };
+>>
+>>
+>> Don't you think this isn't the right way of solving problems?
+>>
+>> The DT overwrite feature isn't there to do such kind of stuff, though
+>> it doesn't stop you from doing that.
+>>
 > 
-> Yes, i understand the original intension to assign every pin to the available
-> mux functions ( gpio_in, gpio_out, alt* ).
+> I still fail to understand why the override is not a good way to solve
+> the issue.
+>  
+>> Either you should keep separate paths for both the SoCs, or can solve
 > 
-> But 3f37169fb3 ("ARM: bcm2835: dt: Add Raspberry Pi Model B rev2") introduce a
+> There's no point IMHO to duplicate the HW description since is the only
+> difference between the Exynos5422 and Exynos5800 SoCs AFAIK.
 
-FYI I don't have that yet and git fetch is being very slow right now:-(
+Actually I think there is no nice way of making this as separate paths.
+As Javier's mentioned, there aren't many differences. Currently the CPU
+ordering is the only difference in DT.
 
-> better self-describing pin group naming for I2S. So my idea was to adapt it
-> according to sdhci first and go on.
+Making it as separate path would create hierarchy like:
+ - exynos5420-based-board.dts
+   \- include: exynos5420.dtsi
+      \- include: exynos5.dtsi
+   \- include: exynos5420-cpu.dtsi (the cpus are not in exynos5420.dtsi)
 
-OK. I'd suggest explaining that directly in the commit description then.
-The commit description above has a quite different semantic meaning.
+ - exynos5422-based-board.dts
+   \- include: exynos5420.dtsi
+      \- include: exynos5.dtsi
+   \- include: exynos5422-cpu.dtsi (the cpus are not in exynos5420.dtsi)
 
-> So here is a possible vision for bcm2835-rpi.dtsi
-> 
-> &gpio {
-> 	pinctrl-names = "default";
-> 
-> 	act_gpio: gpio {
-> 		brcm,pins = <6>;
-> 		brcm,function = <BCM2835_FSEL_GPIO_OUT>;
-> 	};
-> 
-> 	i2c0_alt0: i2c {
-> 		brcm,pins = <0 1>;
-> 		brcm,function = <BCM2835_FSEL_ALT0>;
-> 	};
-> 
-> 	i2c1_alt0: i2c {
-> 		brcm,pins = <2 3>;
-> 		brcm,function = <BCM2835_FSEL_ALT0>;
-> 	};
-...
+which of course is okay... except we keep the definition of CPUs
+completely outside of main Exynos5420 DTSI. Then we have to include both
+DTSI for each new DTS.
 
-OK, I guess that can work; I imagine it would make DT overlays easier by
-making the pinctrl setup more fine-grained.
+Other idea is to create artificial "exynos5420-common":
+ - exynos5420-based-board.dts
+   \- include: exynos5420.dtsi
+       \- include: exynos5420-common.dtsi
+          \- include: exynos5.dtsi
+       \- include: exynos5420-cpu.dtsi
+
+ - exynos5422-based-board.dts
+   \- include: exynos5422.dtsi
+      \- include: exynos5420-common.dtsi
+         \- include: exynos5.dtsi
+      \- include: exynos5422-cpu.dtsi
+
+This is also confusing...
+
+Any third idea?
+
+Best regards,
+KRzysztof
