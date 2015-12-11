@@ -1,51 +1,36 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 11 Dec 2015 10:45:38 +0100
-Subject: [PATCH/RFC 00/19] r8a7793, gose: Add i2c and audio support to
- device tree
-In-Reply-To: <1449802376-11301-1-git-send-email-horms+renesas@verge.net.au>
-References: <1449802376-11301-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdWh4t+-V=CbGpKWfWJLGrEtBhkEBmy__g9449Ay-St9nA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 11 Dec 2015 09:46:52 +0000
+Subject: [PATCH] arm64: spinlock: serialise spin_unlock_wait against
+ concurrent lockers
+In-Reply-To: <20151211080911.GD1072@fixme-laptop.cn.ibm.com>
+References: <20151130155839.GK17308@twins.programming.kicks-ass.net>
+ <20151201164035.GE27751@arm.com>
+ <20151203001141.GO28602@linux.vnet.ibm.com>
+ <20151203132839.GA3816@twins.programming.kicks-ass.net>
+ <20151203163243.GI11337@arm.com>
+ <20151203172207.GR28602@linux.vnet.ibm.com>
+ <20151206081617.GB1549@fixme-laptop.cn.ibm.com>
+ <20151206192734.GT28602@linux.vnet.ibm.com>
+ <20151207002601.GB13845@fixme-laptop.cn.ibm.com>
+ <20151211080911.GD1072@fixme-laptop.cn.ibm.com>
+Message-ID: <20151211094651.GA18828@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Fri, Dec 11, 2015 at 04:09:11PM +0800, Boqun Feng wrote:
+> In conclusion, we have more than a half of uses working well already,
+> and each of the fix-needed ones has only one related critical section
+> and only one related data access in it. So on PPC, I think my proposal
+> won't have more smp_mb() instances to fix all current use cases than
+> adding smp_mb__after_unlock_lock() after the lock acquisition in each
+> related lock critical section.
+> 
+> Of course, my proposal needs the buy-ins of both PPC and ARM64v8, so
+> Paul and Will, what do you think? ;-)
 
-On Fri, Dec 11, 2015 at 3:52 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> this series adds support to r8a7793 and gose device trees for:
-> * i2c and iic
-> * rcar sound: first in PIO mode then using DMA
->
-> i2c support is a pre-requisite for rcar sound support.
+I already queued the change promoting it to LOCK for arm64. It makes the
+semantics easy to understand and I've failed to measure any difference
+in performance. It's also robust against any future users of the macro
+and matches what other architectures do.
 
-This series looks fine, when comparing the resulting DTS of
-r8a7793 and r8a7791, and taking into account the i2c/iic alias differences.
-
-Except for the missing audmapp.
-
-You can add my
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-to all but 8.
-
-> Unfortunately there appears to be some problem with DMA
-> for rcar sound that I have been unable to track down. On booting I see:
->
-> rcar_sound ec500000.sound: dma allocate failed
-> rcar_sound ec500000.sound: ssi[0] fallback to PIO mode
-> rcar_sound ec500000.sound: ssi[1] fallback to PIO mode
-> rcar_sound ec500000.sound: probed
->
-> I would appreciate any insights regarding the above.
-
-Missing periperi?
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Will
