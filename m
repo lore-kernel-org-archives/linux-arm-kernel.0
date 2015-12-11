@@ -1,112 +1,55 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 11 Dec 2015 19:43:57 +0100
-Subject: [PATCH v2 2/4] ASoC: sun4i-codec: Add support for PA gpio pin
+Date: Fri, 11 Dec 2015 19:43:59 +0100
+Subject: [PATCH v2 4/4] ARM: dts: sun4i: Enable onboard codec used on the pov
+ protab2-ips9 tablet
 In-Reply-To: <1449859439-30875-1-git-send-email-hdegoede@redhat.com>
 References: <1449859439-30875-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1449859439-30875-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <1449859439-30875-4-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for PA gpio pin for controlling an external amplifier as used
-on some Allwinner boards.
+The pov protab2-ips9 tablet uses the A10's integrated audio codec,
+enable it.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
 Changes in v2:
--Use a dapm speaker widget (SND_SOC_DAPM_SPK) to control the gpio
--Rename gpio in devicetree from pa-gpios to allwinner,pa-gpios
+-Adjust for gpio rename from pa-gpios to allwinner,pa-gpios
 ---
- .../devicetree/bindings/sound/sun4i-codec.txt      |  3 ++
- sound/soc/sunxi/sun4i-codec.c                      | 35 ++++++++++++++++++++++
- 2 files changed, 38 insertions(+)
+ arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/sound/sun4i-codec.txt b/Documentation/devicetree/bindings/sound/sun4i-codec.txt
-index c92966b..0dce690 100644
---- a/Documentation/devicetree/bindings/sound/sun4i-codec.txt
-+++ b/Documentation/devicetree/bindings/sound/sun4i-codec.txt
-@@ -14,6 +14,9 @@ Required properties:
-    - "apb": the parent APB clock for this controller
-    - "codec": the parent module clock
- 
-+Optional properties:
-+- allwinner,pa-gpios: gpio to enable external amplifier
-+
- Example:
- codec: codec at 01c22c00 {
- 	#sound-dai-cells = <0>;
-diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-index 519ccb3..e6cc6a1 100644
---- a/sound/soc/sunxi/sun4i-codec.c
-+++ b/sound/soc/sunxi/sun4i-codec.c
-@@ -28,6 +28,7 @@
- #include <linux/of_address.h>
- #include <linux/clk.h>
- #include <linux/regmap.h>
-+#include <linux/gpio/consumer.h>
- 
- #include <sound/core.h>
- #include <sound/pcm.h>
-@@ -103,6 +104,7 @@ struct sun4i_codec {
- 	struct regmap	*regmap;
- 	struct clk	*clk_apb;
- 	struct clk	*clk_module;
-+	struct gpio_desc *gpio_pa;
- 
- 	struct snd_dmaengine_dai_dma_data	capture_dma_data;
- 	struct snd_dmaengine_dai_dma_data	playback_dma_data;
-@@ -709,6 +711,26 @@ static struct snd_soc_dai_link *sun4i_codec_create_link(struct device *dev,
- 	return link;
+diff --git a/arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts b/arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts
+index a88d5f4..ea90634 100644
+--- a/arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts
++++ b/arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts
+@@ -72,6 +72,13 @@
+ 	};
  };
  
-+static int sun4i_codec_spk_event(struct snd_soc_dapm_widget *w,
-+				 struct snd_kcontrol *k, int event)
-+{
-+	struct sun4i_codec *scodec = snd_soc_card_get_drvdata(w->dapm->card);
-+
-+	if (scodec->gpio_pa)
-+		gpiod_set_value_cansleep(scodec->gpio_pa,
-+					 !!SND_SOC_DAPM_EVENT_ON(event));
-+
-+	return 0;
-+}
-+
-+static const struct snd_soc_dapm_widget sun4i_codec_card_dapm_widgets[] = {
-+	SND_SOC_DAPM_SPK("Speaker", sun4i_codec_spk_event),
++&codec {
++	pinctrl-names = "default";
++	pinctrl-0 = <&codec_pa_pin>;
++	allwinner,pa-gpios = <&pio 7 15 GPIO_ACTIVE_HIGH>; /* PH15 */
++	status = "okay";
 +};
 +
-+static const struct snd_soc_dapm_route sun4i_codec_card_dapm_routes[] = {
-+	{ "Speaker", NULL, "Power Amplifier" },
-+};
-+
- static struct snd_soc_card *sun4i_codec_create_card(struct device *dev)
- {
- 	struct snd_soc_card *card;
-@@ -723,6 +745,10 @@ static struct snd_soc_card *sun4i_codec_create_card(struct device *dev)
- 
- 	card->dev		= dev;
- 	card->name		= "sun4i-codec";
-+	card->dapm_widgets	= sun4i_codec_card_dapm_widgets;
-+	card->num_dapm_widgets	= ARRAY_SIZE(sun4i_codec_card_dapm_widgets);
-+	card->dapm_routes	= sun4i_codec_card_dapm_routes;
-+	card->num_dapm_routes	= ARRAY_SIZE(sun4i_codec_card_dapm_routes);
- 
- 	return card;
+ &cpu0 {
+ 	cpu-supply = <&reg_dcdc2>;
  };
-@@ -774,6 +800,15 @@ static int sun4i_codec_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
+@@ -170,6 +177,13 @@
+ 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 	};
  
-+	scodec->gpio_pa = devm_gpiod_get_optional(&pdev->dev, "allwinner,pa",
-+						  GPIOD_OUT_LOW);
-+	if (IS_ERR(scodec->gpio_pa)) {
-+		ret = PTR_ERR(scodec->gpio_pa);
-+		if (ret != -EPROBE_DEFER)
-+			dev_err(&pdev->dev, "Failed to get pa gpio: %d\n", ret);
-+		return ret;
-+	}
++	codec_pa_pin: codec_pa_pin at 0 {
++		allwinner,pins = "PH15";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
 +
- 	/* DMA configuration for TX FIFO */
- 	scodec->playback_dma_data.addr = res->start + SUN4I_CODEC_DAC_TXDATA;
- 	scodec->playback_dma_data.maxburst = 4;
+ 	touchscreen_pins: touchscreen_pins at 0 {
+ 		allwinner,pins = "PA5", "PB13";
+ 		allwinner,function = "gpio_out";
 -- 
 2.5.0
