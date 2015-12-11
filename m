@@ -1,88 +1,34 @@
-From: zhangfei.gao@gmail.com (Zhangfei Gao)
-Date: Fri, 11 Dec 2015 18:35:17 +0800
-Subject: [RFC PATCH 4/4] mfd: syscon: add ACPI support
-In-Reply-To: <2299982.06P4iKpkWk@wuerfel>
-References: <1449047368-5768-1-git-send-email-wangkefeng.wang@huawei.com>
- <1449047368-5768-5-git-send-email-wangkefeng.wang@huawei.com>
- <2299982.06P4iKpkWk@wuerfel>
-Message-ID: <CAMj5BkiAToBCvnOSkW=41po5OHpg5uSzxNTNJ_=gLK__BLa1Sw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 11 Dec 2015 10:34:59 +0000
+Subject: [RFC] kprobe'ing conditionally executed instructions
+In-Reply-To: <1449829633.2815.27.camel@linaro.org>
+References: <566A5997.9020908@linaro.org> <1449829633.2815.27.camel@linaro.org>
+Message-ID: <20151211103459.GS8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Arnd
+On Fri, Dec 11, 2015 at 10:27:13AM +0000, Jon Medhurst (Tixy) wrote:
+> On Fri, 2015-12-11 at 00:05 -0500, David Long wrote:
+> > There is a moderate amount of code already in kprobes on ARM and the 
+> > current ARMv8 patch to deal with conditional execution of instructions. 
+> > One aspect of how this is handled is that instructions that fail their 
+> > predicate and are not (technically) executed are also not treated as a 
+> > hit kprobe. Steve Capper has suggested that the probe handling should 
+> > still take place because we stepped through the instruction even if it 
+> > was effectively a nop.  This would be a significant change in how it 
+> > currently works on 32-bit ARM
+> 
+> 32-bit ARM uses undefined instructions for kprobe 'breakpoints' and the
+> ARM ARM says it's implementation defined behaviour whether these
+> generate exceptions or not, i.e. whether the kprobe handler will be
+> called.
 
-On Wed, Dec 2, 2015 at 6:44 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 02 December 2015 17:09:28 Kefeng Wang wrote:
->> This enables syscon with ACPI support.
->> syscon_regmap_lookup_by_dev_property() function was added. With helper
->> device_get_reference_node() and acpi_dev_find_plat_dev(), it can be used
->> in both DT and ACPI.
->>
->> The device driver can obtain syscon using _DSD method in DSDT, an example
->> is shown below.
->>
->>     Device(CTL0) {
->>           Name(_HID, "HISI0061")
->>           Name(_CRS, ResourceTemplate() {
->>                   Memory32Fixed(ReadWrite, 0x80000000, 0x10000)
->>           })
->>     }
->>
->>     Device(DEV0) {
->>           Name(_HID, "HISI00B1")
->>           Name(_CRS, ResourceTemplate() {
->>                   Memory32Fixed(ReadWrite, 0x8c030000, 0x10000)
->>                   Interrupt(ResourceConsumer, Level, ActiveHigh, Exclusive){ 192 }
->>           })
->>
->>           Name (_DSD, Package () {
->>               ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
->>               Package () {
->>                   Package () {"syscon",Package() {\_SB.CTL0} }
->>               }
->>           })
->>     }
->>
->> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
->
-> This sounds like a bad idea:
->
-> syscon is basically a hack to let us access register that the SoC designer
-> couldn't fit in anywhere sane. We need something like this with devicetree
-> because we decided not to have any interpreted bytecode to do this behind
-> our back.
->
-> With ACPI, the same thing is done with AML, which is actually nicer than
-> syscon (once you have to deal with all the problems introduced by AML).
->
-> Use that instead.
->
+There are two classes of undefined instructions.  There are those which
+fall into the above category, and there are those which are guaranteed
+to raise an exception.  We should always be using the guaranteed ones,
+not the other set.
 
-Would you mind clarifying AML method, still not understand.
-Is is means realize the operation in uefi/bootloader and call some
-interface from kernel?
-
-The issue here is we want to access some common registers,
-which we do not want to ioremap for many times in each driver.
-
-In hisi platforms, we have many common registers shared by many components.
-
-Thanks.
-
-
->> +               pdev = acpi_dev_find_plat_dev(adev);
->> +               if (!pdev)
->> +                       return ERR_PTR(-ENODEV);
->> +               syscon = platform_get_drvdata(pdev);
->
-> This still requires the syscon device to be probed first, which is
-> something we shouldn't really need any more.
->
-> A lot of syscon users depend on the regmap to be available before
-> device drivers are loaded, so we have changed the code to just look up
-> the device_node that is already present and ignore the device.
->
-> Once clps711x has been converted to DT, I think we can rip out the
-> syscon_regmap_lookup_by_pdevname() interface and separate the syscon
-> regmap handling from the device handling that we only really need
-> for debugfs.
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
