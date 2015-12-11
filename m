@@ -1,175 +1,21 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 11 Dec 2015 10:13:10 +0100
-Subject: [PATCH RFC 04/27] PM / Domains: make governor select deepest state
-In-Reply-To: <1447799871-56374-5-git-send-email-lina.iyer@linaro.org>
-References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
- <1447799871-56374-5-git-send-email-lina.iyer@linaro.org>
-Message-ID: <CAPDyKFqz8fpoTRTQv+REjiLWa3HgtYPXZooCMYWbaUY=MCofDQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 11 Dec 2015 10:15:25 +0100
+Subject: [PATCH v5 2/4] pinctrl: sunxi: Add H3 PIO controller support
+In-Reply-To: <1449264283-25360-3-git-send-email-jenskuske@gmail.com>
+References: <1449264283-25360-1-git-send-email-jenskuske@gmail.com>
+ <1449264283-25360-3-git-send-email-jenskuske@gmail.com>
+Message-ID: <CACRpkdZ7CMLEvfQkBteyBvm1r2LhU9NFOTe8toxwDcGV-S-==g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 November 2015 at 23:37, Lina Iyer <lina.iyer@linaro.org> wrote:
-> From: Axel Haslam <ahaslam+renesas@baylibre.com>
+On Fri, Dec 4, 2015 at 10:24 PM, Jens Kuske <jenskuske@gmail.com> wrote:
+
+> The H3 uses the same pin controller as previous SoC's from Allwinner.
+> Add support for the pins controlled by the main PIO controller.
 >
-> Now that the structures of genpd can support multiple state definitions,
-> add the logic in the governor to select the deepest possible state when
-> powering down.
->
-> For this, create the new function power_down_ok_for_state which will test
-> if a particular state will not violate the devices and sub-domains
-> constraints.
->
-> default_power_down_ok is modified to try each state starting from the
-> deepest until a valid state is found or there are no more states to test.
->
-> the resulting state will be valid until there are latency or constraint
-> changes, thus, we can avoid looping every power_down, and use the cached
-> results instead.
->
-> Signed-off-by: Axel Haslam <ahaslam+renesas@baylibre.com>
-> ---
->  drivers/base/power/domain_governor.c | 75 +++++++++++++++++++++---------------
->  1 file changed, 45 insertions(+), 30 deletions(-)
+> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
 
-Browsing the changes here and I think it looks good and quite trivial.
+Patch applied with Rob's & Maxime's ACKs.
 
-I would therefore suggest that you fold this change into patch1 as
-it's where it really belongs. Can you please do that?
-
->
-> diff --git a/drivers/base/power/domain_governor.c b/drivers/base/power/domain_governor.c
-> index b4984f5..ad69dc0 100644
-> --- a/drivers/base/power/domain_governor.c
-> +++ b/drivers/base/power/domain_governor.c
-> @@ -98,7 +98,8 @@ static bool default_stop_ok(struct device *dev)
->   *
->   * This routine must be executed under the PM domain's lock.
->   */
-> -static bool default_power_down_ok(struct dev_pm_domain *pd)
-> +static bool power_down_ok_for_state(struct dev_pm_domain *pd,
-> +                                    unsigned int state)
-
-I suggest you re-name this function "__default_power_down_ok()" instead.
-
->  {
->         struct generic_pm_domain *genpd = pd_to_genpd(pd);
->         struct gpd_link *link;
-> @@ -106,31 +107,9 @@ static bool default_power_down_ok(struct dev_pm_domain *pd)
->         s64 min_off_time_ns;
->         s64 off_on_time_ns;
->
-> -       if (genpd->max_off_time_changed) {
-> -               struct gpd_link *link;
-> +       off_on_time_ns = genpd->states[state].power_off_latency_ns +
-> +               genpd->states[state].power_on_latency_ns;
->
-> -               /*
-> -                * We have to invalidate the cached results for the masters, so
-> -                * use the observation that default_power_down_ok() is not
-> -                * going to be called for any master until this instance
-> -                * returns.
-> -                */
-> -               list_for_each_entry(link, &genpd->slave_links, slave_node)
-> -                       link->master->max_off_time_changed = true;
-> -
-> -               genpd->max_off_time_changed = false;
-> -               genpd->cached_power_down_ok = false;
-> -               genpd->max_off_time_ns = -1;
-> -       } else {
-> -               return genpd->cached_power_down_ok;
-> -       }
-> -
-> -       /*
-> -        * Use the only available state, until multiple state support is added
-> -        * to the governor.
-> -        */
-> -       off_on_time_ns = genpd->states[0].power_off_latency_ns +
-> -                               genpd->states[0].power_on_latency_ns;
->
->         min_off_time_ns = -1;
->         /*
-> @@ -193,8 +172,6 @@ static bool default_power_down_ok(struct dev_pm_domain *pd)
->                         min_off_time_ns = constraint_ns;
->         }
->
-> -       genpd->cached_power_down_ok = true;
-> -
->         /*
->          * If the computed minimum device off time is negative, there are no
->          * latency constraints, so the domain can spend arbitrary time in the
-> @@ -207,14 +184,52 @@ static bool default_power_down_ok(struct dev_pm_domain *pd)
->          * The difference between the computed minimum subdomain or device off
->          * time and the time needed to turn the domain on is the maximum
->          * theoretical time this domain can spend in the "off" state.
-> -        * Use the only available state, until multiple state support is added
-> -        * to the governor.
->          */
->         genpd->max_off_time_ns = min_off_time_ns -
-> -               genpd->states[0].power_on_latency_ns;
-> +                       genpd->states[state].power_on_latency_ns;
->         return true;
->  }
->
-> +static bool default_power_down_ok(struct dev_pm_domain *pd)
-> +{
-> +       struct generic_pm_domain *genpd = pd_to_genpd(pd);
-> +       unsigned int last_state_idx = genpd->state_count - 1;
-> +       struct gpd_link *link;
-> +       bool retval = false;
-> +       unsigned int i;
-> +
-> +       /*
-> +        * if there was no change on max_off_time, we can return the
-> +        * cached value and we dont need to find a new target_state
-> +        */
-
-The related code speaks for itself, I think you can drop the above comment.
-
-> +       if (!genpd->max_off_time_changed)
-> +               return genpd->cached_power_down_ok;
-> +
-> +       /*
-> +        * We have to invalidate the cached results for the masters, so
-> +        * use the observation that default_power_down_ok() is not
-> +        * going to be called for any master until this instance
-> +        * returns.
-> +        */
-> +       list_for_each_entry(link, &genpd->slave_links, slave_node)
-> +               link->master->max_off_time_changed = true;
-> +
-> +       genpd->max_off_time_ns = -1;
-> +       genpd->max_off_time_changed = false;
-> +
-> +       /* find a state to power down to, starting from the deepest */
-
-Please start sentence with an upper case letter and end it with a dot.
-
-> +       for (i = 0; i < genpd->state_count; i++) {
-> +               if (power_down_ok_for_state(pd, last_state_idx - i)) {
-> +                       genpd->state_idx = last_state_idx - i;
-> +                       retval = true;
-
-Instead of assigning a local copy "retval", I think you can assign
-genpd->cached_power_down_ok and later below just return its value.
-
-> +                       break;
-> +               }
-> +       }
-
-I think you should convert this to a while loop instead as I think it
-becomes easier to understand what goes on.
-
-> +
-> +       genpd->cached_power_down_ok = retval;
-> +       return retval;
-> +}
-> +
->  static bool always_on_power_down_ok(struct dev_pm_domain *domain)
->  {
->         return false;
-> --
-> 2.1.4
->
-
-Kind regards
-Uffe
+Yours,
+Linus Walleij
