@@ -1,50 +1,58 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 11 Dec 2015 15:05:02 +0530
-Subject: [PATCH V7 3/3] dma: add Qualcomm Technologies HIDMA channel driver
-In-Reply-To: <5669DC48.2040402@codeaurora.org>
-References: <1448245707-27499-1-git-send-email-okaya@codeaurora.org>
- <1448245707-27499-4-git-send-email-okaya@codeaurora.org>
- <20151130085948.GC3901@localhost> <565CAC4C.7080909@codeaurora.org>
- <20151201113458.GL3901@localhost> <565E0E1D.1040505@codeaurora.org>
- <565F40A5.2040701@codeaurora.org> <20151205080030.GJ1854@localhost>
- <5669DC48.2040402@codeaurora.org>
-Message-ID: <20151211093502.GY1854@localhost>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 11 Dec 2015 09:33:06 +0000
+Subject: [PATCH v11] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
+ PCIe Host Controller
+In-Reply-To: <20151210201817.GB367@localhost>
+References: <1448798633-12697-1-git-send-email-bharatku@xilinx.com>
+ <20151209231921.GI31930@localhost>
+ <8520D5D51A55D047800579B09414719825869A85@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <20151210201817.GB367@localhost>
+Message-ID: <566A9852.7060109@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 10, 2015 at 03:10:48PM -0500, Sinan Kaya wrote:
-> On 12/5/2015 3:00 AM, Vinod Koul wrote:
-> > On Wed, Dec 02, 2015 at 02:04:05PM -0500, Sinan Kaya wrote:
-> >>>>> You are missing the point. Channel can be paused, yes but the descriptor
-> >>>>> is in queue and is not paused. The descriptor running is paused, yes.
-> >>>>> There is subtle difference between these
-> >>> I'll follow your recommendation. PAUSE for the currently active
-> >>> descriptor and DMA_IN_PROGRESS for the rest.
-> >>>
-> >>
-> >> I'm now confused.
-> >>
-> >> I looked at several DMA driver implementations.
-> >>
-> >> 1. They call dma_cookie_status function to see if the job is done.
-> >> 2. If done, they return right ahead.
-> >> 3. Otherwise, dma_cookie_status returns DMA_IN_PROGRESS.
-> >> 4. Next the code checks if the channel is paused and return value is
-> >> DMA_IN_PROGRESS. The code changes return code to DMA_PAUSED.
-> >>
-> >> Whereas, I was returning paused first before even checking if the
-> >> descriptor is done. Are you OK with the sequence 1..4 above?
-> > 
-> > Yes am okay with this with slight change in 4.
-> > 
-> > You should set to PAUSED only for current descriptor and not for the ones in
-> > queue
-> > 
+On 10/12/15 20:18, Bjorn Helgaas wrote:
+> [+cc Marc for irq_dispose_mapping() question]
+
+>>>> +		}
+>>>> +	} while (status);
+>>>> +
+>>>> +	return retval;
+>>>>
+>>>> +	for (i = 0; i < 4; i++) {
+>>>> +		irq = irq_find_mapping(pcie->legacy_irq_domain, i + 1);
+>>>> +		if (irq > 0)
+>>>> +			irq_dispose_mapping(irq);
+>>>> +	}
+>>>> +	if (pcie->legacy_irq_domain)
+>>>> +		irq_domain_remove(pcie->legacy_irq_domain);
+>>>
+>>> Something seems wrong here.  I don't know when irq_dispose_mapping() is
+>>> required, but it's not used consistently in drivers/pci, and it should be.
+>>> Currently, only pci-tegra.c, pcie-xilinx.c, and this new driver use it.  Tegra uses
+>>> it only for MSIs, and Xilinx seems to use it for both MSIs and INTx.  What's
+>>> right?
+>> Its not related to MSI or INTx, its related to domain, for freeing irq descriptor associated with irq.
 > 
-> OK. I'll post a new version with this. Is there any other comment that
-> needed to be addressed?
+> So are you saying that other drivers in drivers/pci/host should be
+> using irq_dispose_mapping(), but they aren't?
+> 
+> Marc, can you chime in here?
 
-Looks okay to me
+This indeed looks like be a bug in most drivers. Having a mapping left
+when freeing the domain has a couple of side effects:
+- We leak virtual interrupt numbers
+- If the domain is backed by a radix tree, we leak the tree as well (but
+irq_domain_remove will shout if that's the case).
 
+So I think using irq_dispose_mapping is the right thing to do, and that
+we should fix the other drivers (and maybe provide a convenient helper
+to that effect).
+
+I'll try to come up with something.
+
+Thanks,
+
+	M.
 -- 
-~Vinod
+Jazz is not dead. It just smells funny...
