@@ -1,183 +1,67 @@
-From: info@lategoodbye.de (Stefan Wahren)
-Date: Fri, 11 Dec 2015 19:13:30 +0100
-Subject: [PATCH v2 3/5] ARM: bcm2835: add rpi power domain driver
-In-Reply-To: <1449251148-19344-4-git-send-email-eric@anholt.net>
-References: <1449251148-19344-1-git-send-email-eric@anholt.net>
- <1449251148-19344-4-git-send-email-eric@anholt.net>
-Message-ID: <566B124A.4010401@lategoodbye.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 11 Dec 2015 18:19:52 +0000
+Subject: [PATCH] arm64: mm: ensure that the zero page is visible to the
+ page table walker
+In-Reply-To: <20151211175849.GM18828@arm.com>
+References: <1449769199-31361-1-git-send-email-will.deacon@arm.com>
+ <20151210181412.GL495@leverpostej> <20151211175849.GM18828@arm.com>
+Message-ID: <20151211181952.GB23638@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+> > > +	/* Ensure the zero page is visible to the page table walker */
+> > > +	dsb(ishst);
+> > 
+> > I think this should live in early_alloc (likewise in late_alloc).
+> > 
+> > In the other cases we call early_alloc or late_allot we assume the
+> > zeroing is visible to the page table walker.
+> > 
+> > For example in in alloc_init_pte we do:
+> > 	
+> > 	if (pmd_none(*pmd) || pmd_sect(*pmd)) {
+> > 		pte = alloc(PTRS_PER_PTE * sizeof(pte_t));
+> > 		if (pmd_sect(*pmd))
+> > 			split_pmd(pmd, pte);
+> > 		__pmd_populate(pmd, __pa(pte), PMD_TYPE_TABLE);
+> > 		flush_tlb_all();
+> > 	}
+> > 
+> > There's a dsb in __pmd_populate, but it's _after_ the write to the pmd
+> > entry, so the walker might start walking the newly-allocated pte table
+> > before the zeroing is visible.
+> 
+> Urgh. The reason this is a problem is because we're modifying the page
+> tables live (which I know that you're fixing) without using
+> break-before-make. Consequently, the usual ordering guarantees that we
+> get from the tlb flush after installing the invalid entry do not apply
+> and we end up with the issue you point out.
 
-Am 04.12.2015 um 18:45 schrieb Eric Anholt:
-> From: Alexander Aring <alex.aring@gmail.com>
->
-> This patch adds support for several power domains on Raspberry Pi,
-> including USB (so it can be enabled even if the bootloader didn't do
-> it), and graphics.
->
-> This patch is the combined work of Eric Anholt (who wrote USB support
-> inside of the Raspberry Pi firmware driver, and wrote the non-USB
-> domain support) and Alexander Aring (who separated the original USB
-> work out from the firmware driver).
->
-> Signed-off-by: Alexander Aring <alex.aring@gmail.com>
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> ---
->
-> v2: Add support for power domains other than USB, using the new
->      firmware interface, reword commit message (changes by Eric)
->
->   arch/arm/mach-bcm/Kconfig                   |  10 ++
->   arch/arm/mach-bcm/Makefile                  |   1 +
->   arch/arm/mach-bcm/raspberrypi-power.c       | 269 ++++++++++++++++++++++++++++
->   include/dt-bindings/arm/raspberrypi-power.h |  41 +++++
->   4 files changed, 321 insertions(+)
->   create mode 100644 arch/arm/mach-bcm/raspberrypi-power.c
->   create mode 100644 include/dt-bindings/arm/raspberrypi-power.h
->
-> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-> index 8c53c55..0f23bad 100644
-> --- a/arch/arm/mach-bcm/Kconfig
-> +++ b/arch/arm/mach-bcm/Kconfig
-> @@ -134,6 +134,16 @@ config ARCH_BCM2835
->   	  This enables support for the Broadcom BCM2835 SoC. This SoC is
->   	  used in the Raspberry Pi and Roku 2 devices.
->
-> +config RASPBERRYPI_POWER
-> +	bool "Raspberry Pi power domain driver"
-> +	depends on ARCH_BCM2835 || COMPILE_TEST
-> +	depends on RASPBERRYPI_FIRMWARE
-> +	select PM_GENERIC_DOMAINS if PM
-> +	select PM_GENERIC_DOMAINS_OF if PM
-> +	help
-> +	  This enables support for the RPi power domains which can be enabled
-> +	  or disabled via the RPi firmware.
-> +
->   config ARCH_BCM_63XX
->   	bool "Broadcom BCM63xx DSL SoC" if ARCH_MULTI_V7
->   	depends on MMU
-> diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
-> index 892261f..fec2d6b 100644
-> --- a/arch/arm/mach-bcm/Makefile
-> +++ b/arch/arm/mach-bcm/Makefile
-> @@ -36,6 +36,7 @@ endif
->
->   # BCM2835
->   obj-$(CONFIG_ARCH_BCM2835)	+= board_bcm2835.o
-> +obj-$(CONFIG_RASPBERRYPI_POWER)	+= raspberrypi-power.o
->
->   # BCM5301X
->   obj-$(CONFIG_ARCH_BCM_5301X)	+= bcm_5301x.o
-> diff --git a/arch/arm/mach-bcm/raspberrypi-power.c b/arch/arm/mach-bcm/raspberrypi-power.c
-> new file mode 100644
-> index 0000000..3444301
-> --- /dev/null
-> +++ b/arch/arm/mach-bcm/raspberrypi-power.c
-> @@ -0,0 +1,269 @@
-> +/*
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * Authors:
-> + * (C) 2015 Pengutronix, Alexander Aring <aar@pengutronix.de>
-> + * Eric Anholt <eric@anholt.net>
+My feeling was that in these paths we usually assume all prior page
+table updates have been made visible to the page table walkers. Given
+that, having the allocator guarantee the zeroing was already visible
+felt like the natural thing to do.
 
-shouldn't be the copyright before license?
+That said, having looked at mm/memory.c, we seem to follow the exact
+same pattern when plumbing tables together dynamically, with only an
+smp_wmb() between the zeroed allocation and plumbing a table entry in.
 
-> + */
-> + [...]
-> +
-> +static int rpi_power_probe(struct platform_device *pdev)
-> +{
-> +	struct device_node *fw_np;
-> +	struct device *dev = &pdev->dev;
-> +	struct rpi_power_domains *rpi_domains;
-> +	int ret, i;
-> +
-> +	rpi_domains = devm_kzalloc(dev, sizeof(*rpi_domains), GFP_KERNEL);
-> +	if (!rpi_domains)
-> +		return -ENOMEM;
-> +
-> +	rpi_domains->xlate.domains =
-> +		devm_kzalloc(dev, sizeof(*rpi_domains->xlate.domains) *
-> +			     RPI_POWER_DOMAIN_COUNT, GFP_KERNEL);
-> +	if (!rpi_domains->xlate.domains)
-> +		return -ENOMEM;
-> +
-> +	rpi_domains->xlate.num_domains = RPI_POWER_DOMAIN_COUNT;
-> +
-> +	fw_np = of_parse_phandle(pdev->dev.of_node, "firmware", 0);
-> +	if (!fw_np) {
-> +		dev_err(&pdev->dev, "no firmware node\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	rpi_domains->fw = rpi_firmware_get(fw_np);
-> +	of_node_put(fw_np);
-> +	if (!rpi_domains->fw)
-> +		return -EPROBE_DEFER;
-> +
-> +	rpi_domains->has_new_interface =
-> +		rpi_has_new_domain_support(rpi_domains);
-> +
-> +	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_I2C0, "I2C0");
-> +	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_I2C1, "I2C1");
-> +	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_I2C2, "I2C2");
-> +	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_VIDEO_SCALER,
-> +			      "VIDEO_SCALER");
-> +	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_VPU1, "VPU1");
-> +	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_HDMI, "HDMI");
-> +
-> +	/*
-> +	 * Use the old firmware interface for USB power, so that we
-> +	 * can turn it on even if the firmware hasn't been updated.
-> +	 */
-> +	rpi_init_old_power_domain(rpi_domains, RPI_POWER_DOMAIN_USB,
-> +				  RPI_OLD_POWER_DOMAIN_USB, "USB");
-> +
-> +	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_VEC, "VEC");
-> +	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_JPEG, "JPEG");
-> +	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_H264, "H264");
-> +	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_V3D, "V3D");
+e.g. in __pte_alloc we have the pattern:
 
-After this line i would expect the following:
+	pgtable_t new = pte_alloc_one(mm, address);
+	smp_wmb();
+	if (pmd_none(*pmd))
+		pmd_populate(mm, pmd, new);
 
-rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_ISP, "ISP");
+> > Either we need a barrier after every alloc, or we fold the barrier into
+> > the two allocation functions.
+> 
+> Could you roll this into your patch that drops the size parameter from
+> the alloc functions please? Then we can name them {early,late}_alloc_pgtable
+> and have them do the dsb in there. Maybe we can drop it again when we're
+> doing proper break-before-make.
 
-> +	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_UNICAM0, "UNICAM0");
-> +	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_UNICAM1, "UNICAM1");
-> +	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_CCP2RX, "CCP2RX");
-> +	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_CSI2, "CSI2");
-> +	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_CPI, "CPI");
-> +	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_DSI0, "DSI0");
-> +	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_DSI1, "DSI1");
-> +	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_TRANSPOSER,
-> +			      "TRANPOSER");
+Sure, will do.
 
-s/TRANPOSER/TRANSPOSER ?
-
-> +	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_CCP2TX, "CCP2TX");
-> +	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_CDP, "CDP");
-> +	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_ARM, "ARM");
-> +
-> +	ret = of_genpd_add_provider_onecell(dev->of_node, &rpi_domains->xlate);
-> +	if (ret < 0)
-> +		goto exit_pm;
-> +
-> +	platform_set_drvdata(pdev, rpi_domains);
-> +
-> +	return 0;
-> +
-> +exit_pm:
-> +	for (i = 0; i < rpi_domains->xlate.num_domains; i++)
-> +		pm_genpd_exit(rpi_domains->xlate.domains[i]);
-> +
-> +	return ret;
-> +}
-> +
-
-Best regards
-Stefan
+Thanks,
+Mark.
