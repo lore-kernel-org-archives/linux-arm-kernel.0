@@ -1,50 +1,26 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 10 Dec 2015 16:40:08 -0800
-Subject: [PATCH v4 01/58] mtd: nand: denali: add missing nand_release()
- call in denali_remove()
-In-Reply-To: <1449734442-18672-2-git-send-email-boris.brezillon@free-electrons.com>
-References: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
- <1449734442-18672-2-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20151211004008.GQ144338@google.com>
+From: santosh.shilimkar@oracle.com (santosh shilimkar)
+Date: Thu, 10 Dec 2015 16:44:38 -0800
+Subject: [PATCH] MAINTAINERS: Add missing platform maintainers for dts
+ files
+In-Reply-To: <1449790703-12054-1-git-send-email-robh@kernel.org>
+References: <1449790703-12054-1-git-send-email-robh@kernel.org>
+Message-ID: <566A1C76.4060808@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 10, 2015 at 08:59:45AM +0100, Boris Brezillon wrote:
-> Unregister the NAND device from the NAND subsystem when removing a denali
-> NAND controller, otherwise the MTD attached to the NAND device is still
-> exposed by the MTD layer, and accesses to this device will likely crash
-> the system.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Cc: <stable@vger.kernel.org> #3.8+
+On 12/10/2015 3:38 PM, Rob Herring wrote:
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 69c8a9c..415b731 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
 
-Does this follow these rules, from
-Documentation/stable_kernel_rules.txt?
+[..]
 
- - It must be obviously correct and tested.
-
- - It must fix a real bug that bothers people (not a, "This could be a
-   problem..." type thing).
-
-> Fixes: 2a0a288ec258 ("mtd: denali: split the generic driver and PCI layer")
-> ---
->  drivers/mtd/nand/denali.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/mtd/nand/denali.c b/drivers/mtd/nand/denali.c
-> index 67eb2be..8feece3 100644
-> --- a/drivers/mtd/nand/denali.c
-> +++ b/drivers/mtd/nand/denali.c
-> @@ -1622,6 +1622,7 @@ EXPORT_SYMBOL(denali_init);
->  /* driver exit point */
->  void denali_remove(struct denali_nand_info *denali)
->  {
-> +	nand_release(&denali->mtd);
->  	denali_irq_cleanup(denali->irq, denali);
->  	dma_unmap_single(denali->dev, denali->buf.dma_buf,
->  			 denali->mtd.writesize + denali->mtd.oobsize,
-
-It feels a bit odd to allow usage of MTD fields after it has been
-unregistered. Maybe precompute this before the nand_release()?
-
-Brian
+> @@ -1202,6 +1209,7 @@ M:	Santosh Shilimkar<ssantosh@kernel.org>
+>   L:	linux-arm-kernel at lists.infradead.org  (moderated for non-subscribers)
+>   S:	Maintained
+>   F:	arch/arm/mach-keystone/
+> +F:	arch/arm/boot/dts/k2*
+>   T:	git git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
+>
+Acked-by: Santosh Shilimkar<ssantosh@kernel.org>
