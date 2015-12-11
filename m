@@ -1,98 +1,75 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Fri, 11 Dec 2015 15:04:46 +0000
-Subject: [PATCH v6 3/4] arm64: Juno: Add HDLCD support to the Juno boards.
-In-Reply-To: <1449846287-21398-1-git-send-email-Liviu.Dudau@arm.com>
-References: <1449846287-21398-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1449846287-21398-4-git-send-email-Liviu.Dudau@arm.com>
+Date: Fri, 11 Dec 2015 15:04:43 +0000
+Subject: [PATCH v6 0/4] drm: Add support for the ARM HDLCD display controller
+Message-ID: <1449846287-21398-1-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM's Juno board has two HDLCD controllers, each linked to an NXP
-TDA19988 HDMI transmitter that provides output encoding. Add them
-to the device tree.
+This series adds support for ARM's HDLCD display controller found in Juno
+and ARM TC2 Coretile. The HDLCD outputs an RGB stream that feeds into a
+single digital encoder (DVI or HDMI).
 
-Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-Acked-by: Sudeep Holla <sudeep.holla@arm.com>
----
- arch/arm64/boot/dts/arm/juno-base.dtsi | 46 +++++++++++++++++++++++++++++++---
- 1 file changed, 42 insertions(+), 4 deletions(-)
+Most of the dependencies for this patch series are now queued for the next
+release or are already in the mainline. The one dependency that I'm not sure
+about its future is Thierry Reding's cleanup of the connector->encoder being
+set in the drivers [1]. It is not blocking the HDLCD functionality but avoids
+having an ugly WARNING splat at boot time.
 
-diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
-index dd5158e..8ee094a 100644
---- a/arch/arm64/boot/dts/arm/juno-base.dtsi
-+++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
-@@ -92,8 +92,8 @@
- 			scpi_clk: scpi_clocks at 3 {
- 				compatible = "arm,scpi-variable-clocks";
- 				#clock-cells = <1>;
--				clock-indices = <3>, <4>;
--				clock-output-names = "pxlclk0", "pxlclk1";
-+				clock-indices = <3>;
-+				clock-output-names = "pxlclk";
- 			};
- 		};
- 
-@@ -123,6 +123,34 @@
- 		clock-names = "apb_pclk";
- 	};
- 
-+	hdlcd at 7ff50000 {
-+		compatible = "arm,hdlcd";
-+		reg = <0 0x7ff50000 0 0x1000>;
-+		interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&scpi_clk 3>;
-+		clock-names = "pxlclk";
-+
-+		port {
-+			hdlcd1_output: endpoint at 0 {
-+				remote-endpoint = <&tda998x_1_input>;
-+			};
-+		};
-+	};
-+
-+	hdlcd at 7ff60000 {
-+		compatible = "arm,hdlcd";
-+		reg = <0 0x7ff60000 0 0x1000>;
-+		interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&scpi_clk 3>;
-+		clock-names = "pxlclk";
-+
-+		port {
-+			hdlcd0_output: endpoint at 0 {
-+				remote-endpoint = <&tda998x_0_input>;
-+			};
-+		};
-+	};
-+
- 	soc_uart0: uart at 7ff80000 {
- 		compatible = "arm,pl011", "arm,primecell";
- 		reg = <0x0 0x7ff80000 0x0 0x1000>;
-@@ -141,14 +169,24 @@
- 		i2c-sda-hold-time-ns = <500>;
- 		clocks = <&soc_smc50mhz>;
- 
--		dvi0: dvi-transmitter at 70 {
-+		hdmi-transmitter at 70 {
- 			compatible = "nxp,tda998x";
- 			reg = <0x70>;
-+			port {
-+				tda998x_0_input: endpoint at 0 {
-+					remote-endpoint = <&hdlcd0_output>;
-+				};
-+			};
- 		};
- 
--		dvi1: dvi-transmitter at 71 {
-+		hdmi-transmitter at 71 {
- 			compatible = "nxp,tda998x";
- 			reg = <0x71>;
-+			port {
-+				tda998x_1_input: endpoint at 0 {
-+					remote-endpoint = <&hdlcd1_output>;
-+				};
-+			};
- 		};
- 	};
- 
+Only the Juno functionality has been tested as the TC2 Coretile require
+a working SiI9022 driver for VExpress that is not subject of this patchset.
+
+I think I have addressed most of the comments and I would like to add the series
+to some queue for v4.5. David Airlie's tree feels the most appropriate, even
+if only 1 patch touches drivers/gpu/drm, but I'm open to suggestions.
+
+Changelog:
+v6: Addressed the style nits pointed by Robin Murphy and fixed the use of
+    default color to highlight underrun errors. Also modified MAINTAINERS file
+    to change the status to Supported for HDLCD.
+v5: Queue the pending vblank events sent by userspace using a list instead of
+    keeping the last event seen. Suggested by Daniel Stone <daniel@fooishbar.org>. [2]
+v4: Remove some debugging code that could return an error on a critical path
+    and updated the check for valid format in hdlcd_set_pxl_fmt() to only
+    WARN() if an invalid format found (unlikely case). Added the ACKs received. [3]
+v3: Changed the driver to use the memory-region phandle for bespoke framebuffers. [4]
+v2: Added support for atomic modeset [5]
+v1: Original DRM submission [6]
+
+[1] http://lists.freedesktop.org/archives/dri-devel/2015-November/094576.html
+[2] http://lists.freedesktop.org/archives/dri-devel/2015-December/096432.html
+[3] http://lists.freedesktop.org/archives/dri-devel/2015-December/095990.html
+[4] http://lists.freedesktop.org/archives/dri-devel/2015-December/095877.html
+[5] http://lists.freedesktop.org/archives/dri-devel/2015-November/094177.html
+[6] http://lists.freedesktop.org/archives/dri-devel/2015-August/087685.html
+
+Best regards,
+Liviu
+
+Liviu Dudau (4):
+  drm: arm: Add DT bindings documentation for HDLCD driver.
+  drm: Add support for ARM's HDLCD controller.
+  arm64: Juno: Add HDLCD support to the Juno boards.
+  MAINTAINERS: Add Liviu Dudau as maintainer for ARM HDLCD driver.
+
+ .../devicetree/bindings/display/arm,hdlcd.txt      |  79 +++
+ MAINTAINERS                                        |   6 +
+ arch/arm64/boot/dts/arm/juno-base.dtsi             |  46 +-
+ drivers/gpu/drm/Kconfig                            |   2 +
+ drivers/gpu/drm/Makefile                           |   1 +
+ drivers/gpu/drm/arm/Kconfig                        |  29 ++
+ drivers/gpu/drm/arm/Makefile                       |   2 +
+ drivers/gpu/drm/arm/hdlcd_crtc.c                   | 327 ++++++++++++
+ drivers/gpu/drm/arm/hdlcd_drv.c                    | 579 +++++++++++++++++++++
+ drivers/gpu/drm/arm/hdlcd_drv.h                    |  42 ++
+ drivers/gpu/drm/arm/hdlcd_regs.h                   |  87 ++++
+ 11 files changed, 1196 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/display/arm,hdlcd.txt
+ create mode 100644 drivers/gpu/drm/arm/Kconfig
+ create mode 100644 drivers/gpu/drm/arm/Makefile
+ create mode 100644 drivers/gpu/drm/arm/hdlcd_crtc.c
+ create mode 100644 drivers/gpu/drm/arm/hdlcd_drv.c
+ create mode 100644 drivers/gpu/drm/arm/hdlcd_drv.h
+ create mode 100644 drivers/gpu/drm/arm/hdlcd_regs.h
+
 -- 
 2.6.4
