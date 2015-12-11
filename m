@@ -1,48 +1,78 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 11 Dec 2015 17:54:45 +0000
-Subject: [RFC PATCH 8/8] arm64: add sysfs cpu_capacity attribute
-In-Reply-To: <20151210180159.GF14571@e106622-lin>
-References: <1448288921-30307-1-git-send-email-juri.lelli@arm.com>
- <1448288921-30307-9-git-send-email-juri.lelli@arm.com>
- <566988E8.3010308@arm.com> <20151210155940.GN5727@sirena.org.uk>
- <20151210180159.GF14571@e106622-lin>
-Message-ID: <20151211175445.GR5727@sirena.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 11 Dec 2015 17:58:49 +0000
+Subject: [PATCH] arm64: mm: ensure that the zero page is visible to the
+ page table walker
+In-Reply-To: <20151210181412.GL495@leverpostej>
+References: <1449769199-31361-1-git-send-email-will.deacon@arm.com>
+ <20151210181412.GL495@leverpostej>
+Message-ID: <20151211175849.GM18828@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 10, 2015 at 06:01:59PM +0000, Juri Lelli wrote:
-> On 10/12/15 15:59, Mark Brown wrote:
-> > On Thu, Dec 10, 2015 at 02:15:04PM +0000, Dietmar Eggemann wrote:
-> > > On 23/11/15 14:28, Juri Lelli wrote:
+On Thu, Dec 10, 2015 at 06:14:12PM +0000, Mark Rutland wrote:
+> Hi Will,
 
-> > > > The new attribute shows up as:
+Hi Mark,
 
-> > > >  /sys/devices/system/cpu/cpu*/cpu_capacity
+> On Thu, Dec 10, 2015 at 05:39:59PM +0000, Will Deacon wrote:
+> > In paging_init, we allocate the zero page, memset it to zero and then
+> > point TTBR0 to it in order to avoid speculative fetches through the
+> > identity mapping.
+> > 
+> > In order to guarantee that the freshly zeroed page is indeed visible to
+> > the page table walker, we need to execute a dsb instruction prior to
+> > writing the TTBR.
+> > 
+> > Cc: <stable@vger.kernel.org> # v3.14+, for older kernels need to drop the 'ishst'
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  arch/arm64/mm/mmu.c | 3 +++
+> >  1 file changed, 3 insertions(+)
+> > 
+> > diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> > index c04def90f3e4..c5bd5bca8e3d 100644
+> > --- a/arch/arm64/mm/mmu.c
+> > +++ b/arch/arm64/mm/mmu.c
+> > @@ -464,6 +464,9 @@ void __init paging_init(void)
+> >  
+> >  	empty_zero_page = virt_to_page(zero_page);
+> >  
+> > +	/* Ensure the zero page is visible to the page table walker */
+> > +	dsb(ishst);
+> 
+> I think this should live in early_alloc (likewise in late_alloc).
+> 
+> In the other cases we call early_alloc or late_allot we assume the
+> zeroing is visible to the page table walker.
+> 
+> For example in in alloc_init_pte we do:
+> 	
+> 	if (pmd_none(*pmd) || pmd_sect(*pmd)) {
+> 		pte = alloc(PTRS_PER_PTE * sizeof(pte_t));
+> 		if (pmd_sect(*pmd))
+> 			split_pmd(pmd, pte);
+> 		__pmd_populate(pmd, __pa(pte), PMD_TYPE_TABLE);
+> 		flush_tlb_all();
+> 	}
+> 
+> There's a dsb in __pmd_populate, but it's _after_ the write to the pmd
+> entry, so the walker might start walking the newly-allocated pte table
+> before the zeroing is visible.
 
-> > > This sysfs interface is not really needed for arm or arm64. People can
-> > > build the dt blob if they want to change the values. Less code to carry
-> > > ... Let's focus on the core functionality, which is parsing cpu capacity
-> > > from dt file to task scheduler for heterogeneous systems.
+Urgh. The reason this is a problem is because we're modifying the page
+tables live (which I know that you're fixing) without using
+break-before-make. Consequently, the usual ordering guarantees that we
+get from the tlb flush after installing the invalid entry do not apply
+and we end up with the issue you point out.
 
-> > That does make the tuning process much more cumbersome - users have to
-> > rebuild and reboot to tweak the numbers rather than just tweaking the
-> > numbers and rerunning the benchmark (which seems like something people
-> > would want to automate).
+> Either we need a barrier after every alloc, or we fold the barrier into
+> the two allocation functions.
 
-> IMHO, this is not a tuning interface. It is an alternative interface,
-> w.r.t. DTs, that we could use to provide default capacity values to the
-> kernel. I'm proposing both here as they make both sense to me. Then we
-> might dedice for which one to go (or if we need some other way) or to
-> keep both for flexibility.
+Could you roll this into your patch that drops the size parameter from
+the alloc functions please? Then we can name them {early,late}_alloc_pgtable
+and have them do the dsb in there. Maybe we can drop it again when we're
+doing proper break-before-make.
 
-Kind of repeating what I said in the other mail but I'd say that any
-interface which provides a mechanism for setting a magic number that
-influences system performance is providing tuning.  It's hard to see how
-else to describe it to be honest.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151211/12f138a3/attachment.sig>
+Cheers,
+
+Will
