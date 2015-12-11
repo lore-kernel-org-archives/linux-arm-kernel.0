@@ -1,55 +1,43 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 11 Dec 2015 11:52:40 +0900
-Subject: [PATCH/RFC 03/19] ARM: shmobile: gose: add i2c2 bus to device tree
-In-Reply-To: <1449802376-11301-1-git-send-email-horms+renesas@verge.net.au>
-References: <1449802376-11301-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1449802376-11301-4-git-send-email-horms+renesas@verge.net.au>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 10 Dec 2015 20:53:18 -0600
+Subject: [PATCH v4 2/2] arm: pxa27x: support for ICP DAS LP-8x4x w/ DT
+In-Reply-To: <1449700088-28076-3-git-send-email-ynvich@gmail.com>
+References: <1387309071-22382-1-git-send-email-ynvich@gmail.com>
+ <1449700088-28076-1-git-send-email-ynvich@gmail.com>
+ <1449700088-28076-3-git-send-email-ynvich@gmail.com>
+Message-ID: <20151211025318.GA1000@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Activate i2c2 bus in r8a7793/gose device tree.
+On Thu, Dec 10, 2015 at 01:28:08AM +0300, Sergei Ianovich wrote:
+> ICP DAS calls LP-8x4x 'programmable automation controller'. It is
+> an industrial computer based on PXA270 SoC. They ship it with a 2.6.19
+> kernel and proprietary kernel module and userspace library to access
+> its industrial IO.
 
-Based on similar work for the r8a7791/koelsch by Wolfram Sang.
+2 comments, otherwise:
 
-Cc: Wolfram Sang <wsa@sang-engineering.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7793-gose.dts | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+Acked-by: Rob Herring <robh@kernel.org>
 
-diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
-index 3e3122490650..9a71ff6d4474 100644
---- a/arch/arm/boot/dts/r8a7793-gose.dts
-+++ b/arch/arm/boot/dts/r8a7793-gose.dts
-@@ -38,6 +38,11 @@
- };
- 
- &pfc {
-+	i2c2_pins: i2c2 {
-+		renesas,groups = "i2c2";
-+		renesas,function = "i2c2";
-+	};
-+
- 	scif0_pins: serial0 {
- 		renesas,groups = "scif0_data_d";
- 		renesas,function = "scif0";
-@@ -135,3 +140,17 @@
- 		};
- 	};
- };
-+
-+&i2c2 {
-+	pinctrl-0 = <&i2c2_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+	clock-frequency = <100000>;
-+
-+	eeprom at 50 {
-+		compatible = "renesas,24c02";
-+		reg = <0x50>;
-+		pagesize = <16>;
-+	};
-+};
--- 
-2.1.4
+> diff --git a/arch/arm/boot/dts/pxa27x-lp8x4x.dts b/arch/arm/boot/dts/pxa27x-lp8x4x.dts
+> new file mode 100644
+> index 0000000..bbb5b75
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/pxa27x-lp8x4x.dts
+> @@ -0,0 +1,260 @@
+> +/* Device tree for ICP DAS LP-8x4x */
+> +/dts-v1/;
+> +
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+
+Pretty sure this does not have a GIC.
+
+> +#include "pxa27x.dtsi"
+> +
+> +/ {
+> +	model = "ICP DAS LP-8x4x programmable automation controller";
+> +	compatible = "marvell,pxa270";
+
+You should have a compatible string for this board.
+
+Rob
