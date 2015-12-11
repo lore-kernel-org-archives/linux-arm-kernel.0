@@ -1,115 +1,91 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 11 Dec 2015 11:52:45 +0900
-Subject: [PATCH/RFC 08/19] ARM: shmobile: r8a7793: add R-Car sound support to
- device tree
+Date: Fri, 11 Dec 2015 11:52:48 +0900
+Subject: [PATCH/RFC 11/19] ARM: shmobile: r8a7793: add audio DMAC to device
+ tree
 In-Reply-To: <1449802376-11301-1-git-send-email-horms+renesas@verge.net.au>
 References: <1449802376-11301-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1449802376-11301-9-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1449802376-11301-12-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instantiate R-Car sound node in r8a7793 device tree.
-This only supports PIO transfers.
+Instantiate the two Audio DMA controllers in the r8a7791 device tree.
 
 Based on similar work for the r8a7791 by Kuninori Morimoto.
 
 Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7793.dtsi | 83 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 83 insertions(+)
+ arch/arm/boot/dts/r8a7793.dtsi | 58 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 58 insertions(+)
 
 diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
-index 99ee88e0e8be..5b02b0b1d7ac 100644
+index 13c0acc44ba7..1d68c0dd84e5 100644
 --- a/arch/arm/boot/dts/r8a7793.dtsi
 +++ b/arch/arm/boot/dts/r8a7793.dtsi
-@@ -1093,4 +1093,87 @@
- 		#iommu-cells = <1>;
- 		status = "disabled";
+@@ -306,6 +306,64 @@
+ 		dma-channels = <15>;
  	};
-+
-+	rcar_sound: sound at ec500000 {
-+		/*
-+		 * #sound-dai-cells is required
-+		 *
-+		 * Single DAI : #sound-dai-cells = <0>;         <&rcar_sound>;
-+		 * Multi  DAI : #sound-dai-cells = <1>;         <&rcar_sound N>;
-+		 */
-+		compatible =  "renesas,rcar_sound-r8a7793", "renesas,rcar_sound-gen2";
-+		reg =	<0 0xec500000 0 0x1000>, /* SCU */
-+			<0 0xec5a0000 0 0x100>,  /* ADG */
-+			<0 0xec540000 0 0x1000>, /* SSIU */
-+			<0 0xec541000 0 0x280>;  /* SSI */
-+		reg-names = "scu", "adg", "ssiu", "ssi";
-+
-+		clocks = <&mstp10_clks R8A7793_CLK_SSI_ALL>,
-+			<&mstp10_clks R8A7793_CLK_SSI9>, <&mstp10_clks R8A7793_CLK_SSI8>,
-+			<&mstp10_clks R8A7793_CLK_SSI7>, <&mstp10_clks R8A7793_CLK_SSI6>,
-+			<&mstp10_clks R8A7793_CLK_SSI5>, <&mstp10_clks R8A7793_CLK_SSI4>,
-+			<&mstp10_clks R8A7793_CLK_SSI3>, <&mstp10_clks R8A7793_CLK_SSI2>,
-+			<&mstp10_clks R8A7793_CLK_SSI1>, <&mstp10_clks R8A7793_CLK_SSI0>,
-+			<&mstp10_clks R8A7793_CLK_SCU_SRC9>, <&mstp10_clks R8A7793_CLK_SCU_SRC8>,
-+			<&mstp10_clks R8A7793_CLK_SCU_SRC7>, <&mstp10_clks R8A7793_CLK_SCU_SRC6>,
-+			<&mstp10_clks R8A7793_CLK_SCU_SRC5>, <&mstp10_clks R8A7793_CLK_SCU_SRC4>,
-+			<&mstp10_clks R8A7793_CLK_SCU_SRC3>, <&mstp10_clks R8A7793_CLK_SCU_SRC2>,
-+			<&mstp10_clks R8A7793_CLK_SCU_SRC1>, <&mstp10_clks R8A7793_CLK_SCU_SRC0>,
-+			<&audio_clk_a>, <&audio_clk_b>, <&audio_clk_c>, <&m2_clk>;
-+		clock-names = "ssi-all",
-+				"ssi.9", "ssi.8", "ssi.7", "ssi.6", "ssi.5",
-+				"ssi.4", "ssi.3", "ssi.2", "ssi.1", "ssi.0",
-+				"src.9", "src.8", "src.7", "src.6", "src.5",
-+				"src.4", "src.3", "src.2", "src.1", "src.0",
-+				"clk_a", "clk_b", "clk_c", "clk_i";
+ 
++	audma0: dma-controller at ec700000 {
++		compatible = "renesas,dmac-r8a7793", "renesas,rcar-dmac";
++		reg = <0 0xec700000 0 0x10000>;
++		interrupts =	<0 346 IRQ_TYPE_LEVEL_HIGH
++				 0 320 IRQ_TYPE_LEVEL_HIGH
++				 0 321 IRQ_TYPE_LEVEL_HIGH
++				 0 322 IRQ_TYPE_LEVEL_HIGH
++				 0 323 IRQ_TYPE_LEVEL_HIGH
++				 0 324 IRQ_TYPE_LEVEL_HIGH
++				 0 325 IRQ_TYPE_LEVEL_HIGH
++				 0 326 IRQ_TYPE_LEVEL_HIGH
++				 0 327 IRQ_TYPE_LEVEL_HIGH
++				 0 328 IRQ_TYPE_LEVEL_HIGH
++				 0 329 IRQ_TYPE_LEVEL_HIGH
++				 0 330 IRQ_TYPE_LEVEL_HIGH
++				 0 331 IRQ_TYPE_LEVEL_HIGH
++				 0 332 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "error",
++				"ch0", "ch1", "ch2", "ch3",
++				"ch4", "ch5", "ch6", "ch7",
++				"ch8", "ch9", "ch10", "ch11",
++				"ch12";
++		clocks = <&mstp5_clks R8A7793_CLK_AUDIO_DMAC0>;
++		clock-names = "fck";
 +		power-domains = <&cpg_clocks>;
-+
-+		status = "disabled";
-+
-+		rcar_sound,src {
-+			src0: src at 0 { };
-+			src1: src at 1 { };
-+			src2: src at 2 { };
-+			src3: src at 3 { };
-+			src4: src at 4 { };
-+			src5: src at 5 { };
-+			src6: src at 6 { };
-+			src7: src at 7 { };
-+			src8: src at 8 { };
-+			src9: src at 9 { };
-+		};
-+
-+		rcar_sound,ssi {
-+			ssi0: ssi at 0 {
-+				interrupts = <0 370 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+			ssi1: ssi at 1 {
-+				 interrupts = <0 371 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+			ssi2: ssi at 2 {
-+				interrupts = <0 372 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+			ssi3: ssi at 3 {
-+				interrupts = <0 373 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+			ssi4: ssi at 4 {
-+				interrupts = <0 374 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+			ssi5: ssi at 5 {
-+				interrupts = <0 375 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+			ssi6: ssi at 6 {
-+				interrupts = <0 376 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+			ssi7: ssi at 7 {
-+				interrupts = <0 377 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+			ssi8: ssi at 8 {
-+				interrupts = <0 378 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+			ssi9: ssi at 9 {
-+				interrupts = <0 379 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+		};
++		#dma-cells = <1>;
++		dma-channels = <13>;
 +	};
- };
++
++	audma1: dma-controller at ec720000 {
++		compatible = "renesas,dmac-r8a7793", "renesas,rcar-dmac";
++		reg = <0 0xec720000 0 0x10000>;
++		interrupts =	<0 347 IRQ_TYPE_LEVEL_HIGH
++				 0 333 IRQ_TYPE_LEVEL_HIGH
++				 0 334 IRQ_TYPE_LEVEL_HIGH
++				 0 335 IRQ_TYPE_LEVEL_HIGH
++				 0 336 IRQ_TYPE_LEVEL_HIGH
++				 0 337 IRQ_TYPE_LEVEL_HIGH
++				 0 338 IRQ_TYPE_LEVEL_HIGH
++				 0 339 IRQ_TYPE_LEVEL_HIGH
++				 0 340 IRQ_TYPE_LEVEL_HIGH
++				 0 341 IRQ_TYPE_LEVEL_HIGH
++				 0 342 IRQ_TYPE_LEVEL_HIGH
++				 0 343 IRQ_TYPE_LEVEL_HIGH
++				 0 344 IRQ_TYPE_LEVEL_HIGH
++				 0 345 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "error",
++				"ch0", "ch1", "ch2", "ch3",
++				"ch4", "ch5", "ch6", "ch7",
++				"ch8", "ch9", "ch10", "ch11",
++				"ch12";
++		clocks = <&mstp5_clks R8A7793_CLK_AUDIO_DMAC1>;
++		clock-names = "fck";
++		power-domains = <&cpg_clocks>;
++		#dma-cells = <1>;
++		dma-channels = <13>;
++	};
++
+ 	i2c0: i2c at e6508000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
 -- 
 2.1.4
