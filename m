@@ -1,142 +1,103 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 11 Dec 2015 15:42:37 +0000
-Subject: [PATCH v9 3/4] irqchip:create irq domain for each mbigen device
-In-Reply-To: <1448248513-39760-4-git-send-email-majun258@huawei.com>
-References: <1448248513-39760-1-git-send-email-majun258@huawei.com>
- <1448248513-39760-4-git-send-email-majun258@huawei.com>
-Message-ID: <20151211154236.GF20666@leverpostej>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 11 Dec 2015 07:48:54 -0800
+Subject: [PATCH v2] clk: ti: Add support for dm814x ADPLL
+In-Reply-To: <20151211135237.GG30871@n2100.arm.linux.org.uk>
+References: <1449800792-5551-1-git-send-email-tony@atomide.com>
+ <20151211135237.GG30871@n2100.arm.linux.org.uk>
+Message-ID: <20151211154854.GK23396@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 23, 2015 at 11:15:12AM +0800, MaJun wrote:
-> From: Ma Jun <majun258@huawei.com>
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [151211 05:53]:
+> On Thu, Dec 10, 2015 at 06:26:32PM -0800, Tony Lindgren wrote:
+> > +	/* Released with kfree() by clkdev_drop() */
+> > +	cl = kzalloc(sizeof(*cl), GFP_KERNEL);
+> > +	if (!cl)
+> > +		return -ENOMEM;
+> > +
+> > +	/* Use clkdev_add, clk_register_clkdev limits length to MAX_CON_ID */
+> > +	cl->con_id = name;
+> > +	cl->clk = clock;
+> > +	cl->clk_hw = __clk_get_hw(clock);
+> > +	clkdev_add(cl);
+> > +	d->clocks[index].cl = cl;
 > 
-> For peripheral devices which connect to mbigen,mbigen is a interrupt
-> controller. So, we create irq domain for each mbigen device and add
-> mbigen irq domain into irq hierarchy structure.
+> NAK.  I've no idea why you're open-coding the clkdev internals (which
+> seems to have been a historical habbit in OMAP code.)  Please stop
+> doing this.
+>
+> You are provided with clkdev_alloc() which will allocate the structure
+> and initialise it for you, and clkdev_add() which will add the allocated
+> and initialised struct to the list of lookups.  Everything you're doing
+> above can be done with clkdev_alloc() + clkdev_add() which have been
+> there for a _very_ long time.  They're even documented (thanks for
+> providing me with more proof that documentation is nothing but a waste
+> of time. :))
+
+I tried, but I was seeing mysterious silent failures for some clocks.
+
+> Even better is clkdev_create() which eliminates the two step clkdev_alloc()
+> and clkdev_add() process.
 > 
-> Signed-off-by: Ma Jun <majun258@huawei.com>
-> ---
->  drivers/irqchip/irq-mbigen.c |  119 ++++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 119 insertions(+), 0 deletions(-)
+> So, the whole of the above can be reduced down to:
 > 
-> diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
-> index 9f036c2..81ae61f 100644
-> --- a/drivers/irqchip/irq-mbigen.c
-> +++ b/drivers/irqchip/irq-mbigen.c
-> @@ -16,13 +16,36 @@
->   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->   */
->  
-> +#include <linux/interrupt.h>
-> +#include <linux/irqchip.h>
->  #include <linux/module.h>
-> +#include <linux/msi.h>
->  #include <linux/of_address.h>
->  #include <linux/of_irq.h>
->  #include <linux/of_platform.h>
->  #include <linux/platform_device.h>
->  #include <linux/slab.h>
->  
-> +/* Interrupt numbers per mbigen node supported */
-> +#define IRQS_PER_MBIGEN_NODE		128
-> +
-> +/* 64 irqs (Pin0-pin63) are reserved for each mbigen chip */
-> +#define RESERVED_IRQ_PER_MBIGEN_CHIP	64
-> +
-> +/**
-> + * In mbigen vector register
-> + * bit[21:12]:	event id value
-> + * bit[11:0]:	device id
-> + */
-> +#define IRQ_EVENT_ID_SHIFT		12
-> +#define IRQ_EVENT_ID_MASK		0x3ff
-> +
-> +/* register range of each mbigen node */
-> +#define MBIGEN_NODE_OFFSET		0x1000
-> +
-> +/* offset of vector register in mbigen node */
-> +#define REG_MBIGEN_VEC_OFFSET		0x200
-> +
->  /**
->   * struct mbigen_device - holds the information of mbigen device.
->   *
-> @@ -34,10 +57,94 @@ struct mbigen_device {
->  	void __iomem		*base;
->  };
->  
-> +static inline unsigned int get_mbigen_vec_reg(irq_hw_number_t hwirq)
-> +{
-> +	unsigned int nid, pin;
-> +
-> +	hwirq -= RESERVED_IRQ_PER_MBIGEN_CHIP;
-> +	nid = hwirq / IRQS_PER_MBIGEN_NODE + 1;
-> +	pin = hwirq % IRQS_PER_MBIGEN_NODE;
-> +
-> +	return pin * 4 + nid * MBIGEN_NODE_OFFSET
-> +			+ REG_MBIGEN_VEC_OFFSET;
-> +}
+> 	cl = clkdev_create(clock, name, NULL);
+> 	if (!cl)
+> 		return -ENOMEM;
+> 
 
-Ok. So your "global" pin id is "global" per mbigen chip.
+There's a problem with MAX_CON_ID 16 hardcoded allocated name length.
 
-I think it may make more sense to have separate nid and pin fields in
-your interrupt-specifier, e.g. interrupt = <1 3 x> for nid 1, pin 3.
+In this case I have 13 instances of plls with 3 - 4 outputs each and I'd
+like to use "481c5040.adpll.clkout" style naming starting with the instance
+address. Also "adpll5.clkdcoldo" style naming would work,
 
-That's easier for someone to check against a datasheet that describes
-the nid and pin rather than the global number space you've come up with,
-and also makes it impossible to describe the reserved IRQs.
+Below is a patch we should probably apply as a band aid to produce a proper
+warning.
 
-> +
-> +static struct irq_chip mbigen_irq_chip = {
-> +	.name =			"mbigen-v2",
-> +};
-> +
-> +static void mbigen_write_msg(struct msi_desc *desc, struct msi_msg *msg)
-> +{
-> +	struct irq_data *d = irq_get_irq_data(desc->irq);
-> +	void __iomem *base = d->chip_data;
-> +	u32 val;
-> +
-> +	base += get_mbigen_vec_reg(d->hwirq);
-> +	val = readl_relaxed(base);
-> +
-> +	val &= ~(IRQ_EVENT_ID_MASK << IRQ_EVENT_ID_SHIFT);
-> +	val |= (msg->data << IRQ_EVENT_ID_SHIFT);
-> +
-> +	writel_relaxed(val, base);
-> +}
-> +
-> +static int mbigen_domain_translate(struct irq_domain *d,
-> +				    struct irq_fwspec *fwspec,
-> +				    unsigned long *hwirq,
-> +				    unsigned int *type)
-> +{
-> +	if (is_of_node(fwspec->fwnode)) {
-> +		if (fwspec->param_count != 2)
-> +			return -EINVAL;
-> +
-> +		*hwirq = fwspec->param[0];
+Naturally we don't want to allocate longer names for all the clocks.. And
+we already do have some const names coming from device tree we could use.
 
-You should validate the hwirq here. For instance, we never expect a
-hwirq < RESERVED_IRQ_PER_MBIGEN_CHIP here.
+What if we optionally allow passing a name to clkdev and add some flag
+that tells clkdev code not to attempt to free it? Or do you have better
+ideas in mind to fix the issue?
 
-> +		*type = fwspec->param[1] & IRQ_TYPE_SENSE_MASK;
+Regards,
 
-Don't mask out bits you don't expect to be set. Validate that they
-aren't set and complain if they are.
+Tony
 
-> @@ -50,6 +157,18 @@ static int mbigen_device_probe(struct platform_device *pdev)
->  	if (IS_ERR(mgn_chip->base))
->  		return PTR_ERR(mgn_chip->base);
->  
-> +	/* If there is no "num-msis" property, assume 64... */
-> +	if (of_property_read_u32(pdev->dev.of_node, "num-msis", &num_msis) < 0)
-> +		num_msis = 64;
+8< ----------------
+From: Tony Lindgren <tony@atomide.com>
+Date: Fri, 11 Dec 2015 07:28:36 -0800
+Subject: [PATCH] clkdev: Make silent failures of clk_get() produce a proper
+ warning
 
-The "num-msis" property was mandatory in the binding. We shouldn't need
-the fallback.
+Otherwise we can see mysterious failures with some clocks where
+the name is longer than MAX_CON_ID 16. This can easily happen with
+clock names coming from device tree for example in the form of
+"481c5040.adpll.clkout" or "adpll1.clkdcoldo".
 
-It it is missing, print an error, and abort probing here.
+Let's make things a bit easier to debug by adding a warning for
+the clock name. Note that we don't want to error out here as the
+string matching still probably does the right thing for most
+clocks.
 
-Thanks,
-Mark.
+Also note that we should also remove the hardcoded name allocation
+in clkdev by adding functions that allow passing a name to clkdev
+optionally.
+
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/drivers/clk/clkdev.c
++++ b/drivers/clk/clkdev.c
+@@ -256,6 +256,10 @@ vclkdev_alloc(struct clk_hw *hw, const char *con_id, const char *dev_fmt,
+ {
+ 	struct clk_lookup_alloc *cla;
+ 
++	if (strlen(con_id) > MAX_CON_ID)
++		pr_warn("%s length of %s > %i, clock lookup can fail\n",
++			__func__, con_id, MAX_CON_ID);
++
+ 	cla = __clkdev_alloc(sizeof(*cla));
+ 	if (!cla)
+ 		return NULL;
