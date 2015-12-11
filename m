@@ -1,206 +1,161 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 11 Dec 2015 01:26:25 -0500 (EST)
-Subject: [PATCH] ARM: Runtime patch udiv/sdiv instructions into
- __aeabi_{u}idiv()
-Message-ID: <alpine.LFD.2.20.1512110105450.26920@knanqh.ubzr>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Fri, 11 Dec 2015 14:26:31 +0800
+Subject: [RFC PATCH 3/9] drm/rockchip: Convert to support atomic API
+In-Reply-To: <CAPj87rO9_sXZHidTpNs_ubFaUX8ZtytK=bLpQSQwSy5G2-JGEA@mail.gmail.com>
+References: <1448940391-23333-1-git-send-email-mark.yao@rock-chips.com>	<1448940391-23333-4-git-send-email-mark.yao@rock-chips.com>	<CAPj87rPtWgH2WE7_EEC-Q41c7Ew2z8CwPMMQD+cC08G7qNZTeg@mail.gmail.com>	<565D68F0.3010905@rock-chips.com>
+ <CAPj87rO9_sXZHidTpNs_ubFaUX8ZtytK=bLpQSQwSy5G2-JGEA@mail.gmail.com>
+Message-ID: <566A6C97.4020207@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 2015?12?02? 22:18, Daniel Stone wrote:
+> Hi Mark,
+> Thanks for getting back to this.
+>
+> On 1 December 2015 at 09:31, Mark yao <mark.yao@rock-chips.com> wrote:
+>> On 2015?12?01? 16:18, Daniel Stone wrote:
+>>> On 1 December 2015 at 03:26, Mark Yao<mark.yao@rock-chips.com>  wrote:
+>>>>> +       for_each_crtc_in_state(state, crtc, crtc_state, i) {
+>>>>> +               if (!crtc->state->active)
+>>>>> +                       continue;
+>>>>> +
+>>>>> +               rockchip_crtc_wait_for_update(crtc);
+>>>>> +       }
+>>> I'd be much more comfortable if this passed in an explicit pointer to
+>>> state, or an address to wait for, rather than have wait_for_complete
+>>> dig out state with no locking. The latter is potentially racy for
+>>> async operations.
+>>>
+>> Hi Daniel
+>>     "if this passed in an explicit pointer to state, or an address to wait
+>> for", I don't understand, can you point how it work?
+> Ah, OK. I mean that rockchip_crtc_wait_for_update takes a drm_crtc
+> pointer, and establishes the state from that (e.g.
+> crtc->primary->state). This can easily lead to confusion in async
+> contexts, as the states attached to a drm_crtc and a drm_plane can
+> change here while you wait for it.
+>
+> It would be better if the call was:
+>
+> for_each_plane_in_state(state, plane, plane_state, i) {
+>      if (plane->type == DRM_PLANE_TYPE_PRIMARY)
+>          rockchip_crtc_wait_for_update(plane_state->crtc, plane_state);
+> }
+>
+> This way it is very clear, and there is no confusion as to which
+> request we are waiting to complete.
+>
+> In general, using crtc->state or plane->state is a very bad idea,
+> _except_ in the atomic_check function where you are calculating
+> changes (e.g. if (plane_state->fb->pitches[0] !=
+> plane->state->fb->pitches[0]) rockchip_plane_state->pitch_changed =
+> true). After atomic_check, you should always pass around pointers to
+> the plane state explicitly, and avoid using the pointers from drm_crtc
+> and drm_plane.
+>
+> Does that help?
 
-The ARM compiler inserts calls to __aeabi_uidiv() and
-__aeabi_idiv() when it needs to perform division on signed and
-unsigned integers. If a processor has support for the udiv and
-sdiv instructions, the kernel may overwrite the beginning of those
-functions with those instructions and a "bx lr" to get better
-performance.
+Hi Daniel
 
-To ensure those functions are aligned to a 32-bit word for easier
-patching (which might not always be the case in Thumb mode) and the
-two patched instructions for each case are contained in the same cache
-line, a 8-byte alignment is enforced when ARM_PATCH_IDIV is configured.
+Sorry, I don't actually understand why crtc->state or plane->state is no 
+recommended
+except atomic_check, on atomic_update, we need use plane->state, is that 
+a problem?
 
-This was heavily inspired by a previous patch by Stephen Boyd.
+I guess that, drm_atomic_helper_swap_state would race with async operations,
+so use crtc->state on async stack is not safe. is it correct?
 
-Signed-off-by: Nicolas Pitre <nico@linaro.org>
-
----
-
-This is my counter proposal to Stephen's version. Those patches and the 
-discussion that followed are available here:
-
-  http://news.gmane.org/group/gmane.linux.kbuild.devel/thread=14007
-
-I think what I propose here is much simpler and less intrusive.  Going
-to the full call site patching provides between moderate to no 
-additional performance benefits depending on the CPU core.  That should 
-probably be compared with this solution with benchmark results to 
-determine if it is worth it.
-
-Of course the ultimate performance will come from having gcc emit those 
-div instructions directly, but that would make the kernel binary 
-incompatible with some systems in a multi-arch config. Hence it has to 
-be a separate config option.
+I think we can make asynchronous commit serialize as tegra drm done to 
+avoid this problem:
 
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 34e1569a11..efea5fa975 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1604,6 +1604,21 @@ config THUMB2_AVOID_R_ARM_THM_JUMP11
- config ARM_ASM_UNIFIED
- 	bool
- 
-+config ARM_PATCH_IDIV
-+	bool "Runtime patch udiv/sdiv instructions into __aeabi_{u}idiv()"
-+	depends on CPU_32v7 && !XIP_KERNEL
-+	default y
-+	help
-+	  Some v7 CPUs have support for the udiv and sdiv instructions
-+	  that can be used to implement the __aeabi_uidiv and __aeabi_idiv
-+	  functions provided by the ARM runtime ABI.
-+
-+	  Enabling this option allows the kernel to modify itself to replace
-+	  the first two instructions of these library functions with the
-+	  udiv or sdiv plus "bx lr" instructions. Typically this will be
-+	  faster and less power intensive than running the original library
-+	  support code to do integer division.
-+
- config AEABI
- 	bool "Use the ARM EABI to compile the kernel"
- 	help
-diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-index 85e374f873..48c77d422a 100644
---- a/arch/arm/include/asm/cputype.h
-+++ b/arch/arm/include/asm/cputype.h
-@@ -250,8 +250,14 @@ static inline int cpu_is_pj4(void)
- 
- 	return 0;
- }
-+
-+static inline bool __attribute_const__ cpu_is_pj4_nomp(void)
-+{
-+	return read_cpuid_part() == 0x56005810;
-+}
- #else
--#define cpu_is_pj4()	0
-+#define cpu_is_pj4()		0
-+#define cpu_is_pj4_nomp()	0
- #endif
- 
- static inline int __attribute_const__ cpuid_feature_extract_field(u32 features,
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 20edd349d3..d8614775a8 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -375,6 +375,77 @@ void __init early_print(const char *str, ...)
- 	printk("%s", buf);
- }
- 
-+#ifdef CONFIG_ARM_PATCH_IDIV
-+
-+/* "sdiv r0, r0, r1" or "mrc p6, 1, r0, CR0, CR1, 4" if we're on pj4 w/o MP */
-+static inline u32 __attribute_const__ sdiv_instruction(void)
-+{
-+	if (IS_ENABLED(CONFIG_THUMB2_KERNEL)) {
-+		u32 insn = __opcode_thumb32_compose(0xfb90, 0xf0f1);
-+		if (cpu_is_pj4_nomp())
-+			insn = __opcode_thumb32_compose(0xee30, 0x0691);
-+		return __opcode_to_mem_thumb32(insn);
-+	}
-+
-+	if (cpu_is_pj4_nomp())
-+		return __opcode_to_mem_arm(0xee300691);
-+	return __opcode_to_mem_arm(0xe710f110);
-+}
-+
-+/* "udiv r0, r0, r1" or "mrc p6, 1, r0, CR0, CR1, 0" if we're on pj4 w/o MP */
-+static inline u32 __attribute_const__ udiv_instruction(void)
-+{
-+	if (IS_ENABLED(CONFIG_THUMB2_KERNEL)) {
-+		u32 insn = __opcode_thumb32_compose(0xfbb0, 0xf0f1);
-+		if (cpu_is_pj4_nomp())
-+			insn = __opcode_thumb32_compose(0xee30, 0x0611);
-+		return __opcode_to_mem_thumb32(insn);
-+	}
-+
-+	if (cpu_is_pj4_nomp())
-+		return __opcode_to_mem_arm(0xee300611);
-+	return __opcode_to_mem_arm(0xe730f110);
-+}
-+
-+/* "bx lr" */
-+static inline u32 __attribute_const__ bx_lr_instruction(void)
-+{
-+	if (IS_ENABLED(CONFIG_THUMB2_KERNEL)) {
-+		u32 insn = __opcode_thumb32_compose(0x4770, 0x46c0);
-+		return __opcode_to_mem_thumb32(insn);
-+	}
-+	
-+	return __opcode_to_mem_arm(0xe12fff1e);
-+}
-+
-+static void __init patch_aeabi_uidiv(void)
-+{
-+	extern void __aeabi_uidiv(void);
-+	extern void __aeabi_idiv(void);
-+	uintptr_t fn_addr;
-+	unsigned int mask;
-+
-+	mask = IS_ENABLED(CONFIG_THUMB2_KERNEL) ? HWCAP_IDIVT : HWCAP_IDIVA;
-+	if (!(elf_hwcap & mask))
-+		return;
-+
-+	pr_info("CPU: div instructions available: patching division code\n");
-+
-+	fn_addr = ((uintptr_t)&__aeabi_uidiv) & ~1;
-+	((u32 *)fn_addr)[0] = udiv_instruction();
-+	((u32 *)fn_addr)[1] = bx_lr_instruction();
-+	flush_icache_range(fn_addr, fn_addr + 8);
-+
-+	fn_addr = ((uintptr_t)&__aeabi_idiv) & ~1;
-+	((u32 *)fn_addr)[0] = sdiv_instruction();
-+	((u32 *)fn_addr)[1] = bx_lr_instruction();
-+	flush_icache_range(fn_addr, fn_addr + 8);
-+}
-+
-+#else
-+static inline void patch_aeabi_uidiv(void) { }
-+#endif
-+
- static void __init cpuid_init_hwcaps(void)
- {
- 	int block;
-@@ -642,6 +713,7 @@ static void __init setup_processor(void)
- 	elf_hwcap = list->elf_hwcap;
- 
- 	cpuid_init_hwcaps();
-+	patch_aeabi_uidiv();
- 
- #ifndef CONFIG_ARM_THUMB
- 	elf_hwcap &= ~(HWCAP_THUMB | HWCAP_IDIVT);
-diff --git a/arch/arm/lib/lib1funcs.S b/arch/arm/lib/lib1funcs.S
-index af2267f6a5..9397b2e532 100644
---- a/arch/arm/lib/lib1funcs.S
-+++ b/arch/arm/lib/lib1funcs.S
-@@ -205,6 +205,10 @@ Boston, MA 02111-1307, USA.  */
- .endm
- 
- 
-+#ifdef CONFIG_ARM_PATCH_IDIV
-+	.align	3
-+#endif
-+
- ENTRY(__udivsi3)
- ENTRY(__aeabi_uidiv)
- UNWIND(.fnstart)
-@@ -253,6 +257,10 @@ UNWIND(.fnstart)
- UNWIND(.fnend)
- ENDPROC(__umodsi3)
- 
-+#ifdef CONFIG_ARM_PATCH_IDIV
-+	.align 3
-+#endif
-+
- ENTRY(__divsi3)
- ENTRY(__aeabi_idiv)
- UNWIND(.fnstart)
+   86         /* serialize outstanding asynchronous commits */
+   87 mutex_lock(&tegra->commit.lock);
+   88 flush_work(&tegra->commit.work);
+89
+   90 /*
+   91          * This is the point of no return - everything below never 
+fails except
+   92          * when the hw goes bonghits. Which means we can commit 
+the new state on
+   93          * the software side now.
+   94 */
+95
+   96         drm_atomic_helper_swap_state(drm, state);
+97
+   98         if (async)
+   99                 tegra_atomic_schedule(tegra, state);
+  100 else
+  101                 tegra_atomic_complete(tegra, state);
+  102
+  103         mutex_unlock(&tegra->commit.lock);
+
+
+>
+>>>>           if (is_yuv) {
+>>>>                   /*
+>>>>                    * Src.x1 can be odd when do clip, but yuv plane start
+>>>> point
+>>>>                    * need align with 2 pixel.
+>>>>                    */
+>>>> -               val = (src.x1 >> 16) % 2;
+>>>> -               src.x1 += val << 16;
+>>>> -               src.x2 += val << 16;
+>>>> +               uint32_t temp = (src->x1 >> 16) % 2;
+>>>> +
+>>>> +               src->x1 += temp << 16;
+>>>> +               src->x2 += temp << 16;
+>>>>           }
+>>> I know this isn't new, but moving the plane around is bad. If the user
+>>> gives you a pixel boundary that you can't actually use, please reject
+>>> the configuration rather than silently trying to fix it up.
+>> the origin src.x1 would align with 2 pixel, but when we move the dest
+>> window, and do clip by output, the src.x1 may be clipped to odd.
+>> regect this configuration may let user confuse, sometimes good, sometimes
+>> bad.
+> For me, it is more confusing when the display shows something
+> different to what I have requested. In some media usecases, doing this
+> is a showstopper and will result in products failing acceptance
+> testing. Userspace can make a policy decision to try different
+> alignments to get _something_ to show (even if it's not what was
+> explicitly requested), but doing this in the kernel is inappropriate:
+> please just reject it, and have userspace fall back to another
+> composition method (e.g. GL) in these cases.
+>
+>>>> -static void vop_plane_destroy(struct drm_plane *plane)
+>>>> +static void vop_atomic_plane_destroy_state(struct drm_plane *plane,
+>>>> +                                          struct drm_plane_state *state)
+>>>>    {
+>>>> -       vop_disable_plane(plane);
+>>>> -       drm_plane_cleanup(plane);
+>>>> +       struct vop_plane_state *vop_state = to_vop_plane_state(state);
+>>>> +
+>>>> +       if (state->fb)
+>>>> +               drm_framebuffer_unreference(state->fb);
+>>>> +
+>>>> +       kfree(vop_state);
+>>>>    }
+>>> You can replace this hook with drm_atomic_helper_plane_destroy_state.
+>>
+>> Hmm, only can hook with __drm_atomic_helper_plane_destroy_state.
+> Ah yes, you're right. But still, using that would be better than duplicating it.
+>
+>>      Can you share your Weston environment to me, I'm interesting to test drm
+>> rockchip on weston.
+> Of course. You can download Weston from http://wayland.freedesktop.org
+> - the most interesting dependencies are libevdev, libinput, and
+> wayland itself. If you are building newer Weston from git, you'll need
+> the wayland-protocols repository as well, from
+> anongit.freedesktop.org/git/wayland/wayland-protocols/. Please let me
+> know privately if you need some more help with building these, but
+> they should be quite straightforward.
+>
+> Cheers,
+> Daniel
+>
+>
+>
+
+
+-- 
+?ark Yao
