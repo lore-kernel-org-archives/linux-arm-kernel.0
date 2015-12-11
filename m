@@ -1,29 +1,50 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 11 Dec 2015 11:55:45 +0800
-Subject: [PATCH 3/3] ARM: dts: sunxi: allwinner,sun4i-a10-lradc-keys
- binding: typo fix
-In-Reply-To: <CAGb2v65T=-iPqcyHDUfKX5LFstjcc7XGYfaqkViMpqc_jYAD5A@mail.gmail.com>
-References: <1449779521-754-1-git-send-email-merker@debian.org>
- <1449779521-754-4-git-send-email-merker@debian.org>
- <20151211034524.GA6166@rob-hp-laptop>
- <CAGb2v65T=-iPqcyHDUfKX5LFstjcc7XGYfaqkViMpqc_jYAD5A@mail.gmail.com>
-Message-ID: <CAGb2v64FkFkJU=ySX8-g6km-K4p7cGquBFNCCC+5Yv24vyBjvw@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 11 Dec 2015 13:00:32 +0900
+Subject: [PATCH v5 3/7] ARM: dts: Exynos542x/5800: add CPU OPP properties
+In-Reply-To: <20151211033253.GN3612@ubuntu>
+References: <1449766729-435-1-git-send-email-b.zolnierkie@samsung.com>
+ <1449766729-435-4-git-send-email-b.zolnierkie@samsung.com>
+ <20151211031646.GL3612@ubuntu> <566A4231.9050608@osg.samsung.com>
+ <20151211033253.GN3612@ubuntu>
+Message-ID: <566A4A60.8060402@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 11, 2015 at 11:54 AM, Chen-Yu Tsai <wens@csie.org> wrote:
-> On Fri, Dec 11, 2015 at 11:45 AM, Rob Herring <robh@kernel.org> wrote:
->> On Thu, Dec 10, 2015 at 09:32:01PM +0100, Karsten Merker wrote:
->>> Trivial typo fix ("mut" -> "must") in the sunxi LRADC-keys binding
->>> documentation.
->>>
->>> Signed-off-by: Karsten Merker <merker@debian.org>
+On 11.12.2015 12:32, Viresh Kumar wrote:
+> On 11-12-15, 00:25, Javier Martinez Canillas wrote:
+>> The problem is that the big and LITTLE cores have different ordering per SoCs:
 >>
->> Acked-by: Rob Herring <robh@kernel.org>
->
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
+>> - Exynos5420 and Exynos5800: cpu0-3 (Cortex-A15) and cpu4-7 (Coretx-A7)
+>> - Exynos5422: cpu0-3 (Cortex-A7) and cpu4-7 (Cortex-A15)
+>>
+>> So the OPP tables are set in this DTSI file, to prevent the OPP tables
+>> in the Exynos5422 to be inverted for the cluster 0 and 1.
+> 
+> Oh dude, that's really *ugly*. :)
+> 
+> Reusing files/definitions is fine to the point where things are
+> readable. But you have screwed it up so very badly.
+> 
+> Over that, why can't you keep cpu0-3 as A7 and 4-7 as a15 for all the
+> cases? The only worrying thing for you should be that CPU0 within the
+> kenrel should be controllable, right? i.e. you want a A15 to boot 5800
+> and A7 to boot 5422.
+> 
+> If yes, than you could have kept the CPUs in 5422 as:
+> 0-3: A7
+> 4-7: A15
+> 
+> and in 5420 as:
+> 4-7: A15
+> 0-3: A7
+> 
+> Wouldnt' that work ?
 
-You should send this patch to the input subsystem maintainer and input
-mailing list (with all the acks gathered in this thread).
+It wasn't working like this. The cpu0 got the index from booting cpu, so
+on 5420 cpu0 was A15 and on 5422 it was A7.
 
-ChenYu
+Maybe I am not aware of some changes recently in the kernel but how do
+you want to assign the booting CPU proper number (not CPU0)?
+
+Best regards,
+Krzysztof
