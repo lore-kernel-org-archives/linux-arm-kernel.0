@@ -1,45 +1,46 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Fri, 11 Dec 2015 13:51:15 -0500
-Subject: [PATCH] scripts: recordmcount: break hardlinks
-In-Reply-To: <20151211183326.GV8644@n2100.arm.linux.org.uk>
-References: <20151202090517.432556a4@gandalf.local.home>
- <E1a7MVT-0000et-62@rmk-PC.arm.linux.org.uk>
- <20151211093125.50b72639@gandalf.local.home>
- <20151211144541.GT8644@n2100.arm.linux.org.uk>
- <20151211131029.5bb23411@gandalf.local.home>
- <20151211183326.GV8644@n2100.arm.linux.org.uk>
-Message-ID: <20151211135115.428f7416@gandalf.local.home>
+From: dirk.behme@gmail.com (Dirk Behme)
+Date: Fri, 11 Dec 2015 19:57:47 +0100
+Subject: [PATCH 2/2] ARM: Documentation: l2x0: Mention separate controllers
+ explicitly
+In-Reply-To: <1449860267-16154-1-git-send-email-dirk.behme@gmail.com>
+References: <1449860267-16154-1-git-send-email-dirk.behme@gmail.com>
+Message-ID: <1449860267-16154-2-git-send-email-dirk.behme@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Dec 2015 18:33:27 +0000
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+The documentation in l2x0.txt is only valid for PL210/PL220/PL310
+(and variants). Mention this explicitly. And add a note why this
+isn't valid for integrated L2 controllers.
 
-> On Fri, Dec 11, 2015 at 01:10:29PM -0500, Steven Rostedt wrote:
-> > I ran it through most my tests (it's still running and is at 20 of 33
-> > tests). If there was anything wrong with this patch, I'm sure one of my
-> > tests would have crashed by now.  
-> 
-> Thanks for testing.
-> 
-> > Do you want to take it, or shall I?  
-> 
-> I'm easy - it probably makes more sense if take it.
-> 
+Signed-off-by: Dirk Behme <dirk.behme@gmail.com>
+---
+ Documentation/devicetree/bindings/arm/l2x0.txt | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
-Heh, you got me hanging in suspense. You missed a word. Is it:
-
- "makes more sense if *you* take it"
-
-or
-
- "makes more sense if *I* take it"
-
-??
-
-Or you could be replying to my sentence of "take it" or "shall I" in
-which it would be *you* take it.
-
-/me confused
-
--- Steve
+diff --git a/Documentation/devicetree/bindings/arm/l2x0.txt b/Documentation/devicetree/bindings/arm/l2x0.txt
+index 06c88a4..aec5d02 100644
+--- a/Documentation/devicetree/bindings/arm/l2x0.txt
++++ b/Documentation/devicetree/bindings/arm/l2x0.txt
+@@ -1,7 +1,8 @@
+ * ARM L2 Cache Controller
+ 
+-ARM cores often have a separate level 2 cache controller. There are various
+-implementations of the L2 cache controller with compatible programming models.
++ARM cores often have a separate PL210/PL220/PL310 (and variants) based level 2
++cache controller. All these various implementations of the L2 cache controller
++have compatible programming models (Note 1).
+ Some of the properties that are just prefixed "cache-*" are taken from section
+ 3.7.3 of the ePAPR v1.1 specification which can be found at:
+ https://www.power.org/wp-content/uploads/2012/06/Power_ePAPR_APPROVED_v1.1.pdf
+@@ -91,3 +92,9 @@ L2: cache-controller {
+         cache-level = <2>;
+ 	interrupts = <45>;
+ };
++
++Note 1: The description in this document doesn't apply to integrated L2
++	cache controllers as found in e.g. Cortex-A15/A7/A57/A53. These
++	integrated L2 controllers are assumed to be all preconfigured by
++	early secure boot code. Thus no need to deal with their configuration
++	in the kernel at all.
+-- 
+2.6.4
