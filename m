@@ -1,16 +1,22 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 11 Dec 2015 19:25:18 +0800
-Subject: [PATCH] ARM: dts: imx6qdl: move GIC to right location in DT
-In-Reply-To: <1449063775-1146-1-git-send-email-l.stach@pengutronix.de>
-References: <1449063775-1146-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <20151211112518.GF11252@tiger>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 11 Dec 2015 12:25:32 +0100
+Subject: [PATCH v2 3/4] ARM: dts: rockchip: add core rk3228 dtsi
+In-Reply-To: <1449797452-19389-4-git-send-email-jeffy.chen@rock-chips.com>
+References: <1449797452-19389-1-git-send-email-jeffy.chen@rock-chips.com>
+ <1449797452-19389-4-git-send-email-jeffy.chen@rock-chips.com>
+Message-ID: <1537775.lkITlqtJgh@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 02, 2015 at 02:42:55PM +0100, Lucas Stach wrote:
-> No functional change, just moving the node to the place where it
-> belongs according to its unit address.
-> 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+Hi Jeffy,
 
-Applied, thanks.
+Am Freitag, 11. Dezember 2015, 09:30:51 schrieb Jeffy Chen:
+> Initial release for rk3228 shared dtsi.
+> 
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+
+Booth dts look good now, just need to wait on Linus Walleij picking up the 
+pinctrl patch first.
+
+
+Heiko
