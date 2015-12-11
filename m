@@ -1,111 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 11 Dec 2015 10:24:21 +0100
-Subject: [PATCH] ARM: Runtime patch udiv/sdiv instructions into
- __aeabi_{u}idiv()
-In-Reply-To: <alpine.LFD.2.20.1512110105450.26920@knanqh.ubzr>
-References: <alpine.LFD.2.20.1512110105450.26920@knanqh.ubzr>
-Message-ID: <6991913.FSOzozNbSC@wuerfel>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 11 Dec 2015 10:26:08 +0100
+Subject: [PATCH linux-next 4/5] Documentation: atmel-quadspi: add binding
+ file for Atmel QSPI driver
+In-Reply-To: <caec561f882521b3896530404ecb2bbad9950435.1449494420.git.cyrille.pitchen@atmel.com>
+References: <cover.1449494420.git.cyrille.pitchen@atmel.com>
+ <caec561f882521b3896530404ecb2bbad9950435.1449494420.git.cyrille.pitchen@atmel.com>
+Message-ID: <566A96B0.2010808@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 11 December 2015 01:26:25 Nicolas Pitre wrote:
-
-> This is my counter proposal to Stephen's version. Those patches and the 
-> discussion that followed are available here:
+Le 07/12/2015 15:09, Cyrille Pitchen a ?crit :
+> This patch documents the DT bindings for the driver of the Atmel QSPI
+> controller embedded inside sama5d2x SoCs.
 > 
->   http://news.gmane.org/group/gmane.linux.kbuild.devel/thread=14007
+> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+
+The change is very small from previous one and moreover accepted by Rob.
+So, for sure:
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+
+> ---
+>  .../devicetree/bindings/mtd/atmel-quadspi.txt      | 32 ++++++++++++++++++++++
+>  1 file changed, 32 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
 > 
-> I think what I propose here is much simpler and less intrusive.  Going
-> to the full call site patching provides between moderate to no 
-> additional performance benefits depending on the CPU core.  That should 
-> probably be compared with this solution with benchmark results to 
-> determine if it is worth it.
-
-Looks really nice, as it's much simpler than Stephen's approach
-
-> Of course the ultimate performance will come from having gcc emit those 
-> div instructions directly, but that would make the kernel binary 
-> incompatible with some systems in a multi-arch config. Hence it has to 
-> be a separate config option.
-
-Well, what we found is that we already have the same problem today
-when enabling LPAE makes the kernel incompatible with platforms that
-can be enabled. The affected platforms are basically the same, except
-for the earlier PJ4 and Krait variants that have some idiv support
-but no LPAE.
-
-> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-> index 85e374f873..48c77d422a 100644
-> --- a/arch/arm/include/asm/cputype.h
-> +++ b/arch/arm/include/asm/cputype.h
-> @@ -250,8 +250,14 @@ static inline int cpu_is_pj4(void)
->  
->  	return 0;
->  }
+> diff --git a/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt b/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
+> new file mode 100644
+> index 000000000000..e81f20f9faf1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
+> @@ -0,0 +1,32 @@
+> +* Atmel Quad Serial Peripheral Interface (QSPI)
 > +
-> +static inline bool __attribute_const__ cpu_is_pj4_nomp(void)
-> +{
-> +	return read_cpuid_part() == 0x56005810;
-> +}
->  #else
-> -#define cpu_is_pj4()	0
-> +#define cpu_is_pj4()		0
-> +#define cpu_is_pj4_nomp()	0
->  #endif
-
-It would be nice to use a symbolic constant for the above, and maybe define
-all three known cpuid numbers for PJ4 variants.
-
-I've looked at it some more and I now have doubts about this code:
-
-#ifdef CONFIG_CPU_PJ4B
-        .type   __v7_pj4b_proc_info, #object
-__v7_pj4b_proc_info:
-        .long   0x560f5800
-        .long   0xff0fff00
-        __v7_proc __v7_pj4b_proc_info, __v7_pj4b_setup, proc_fns = pj4b_processor_functions
-        .size   __v7_pj4b_proc_info, . - __v7_pj4b_proc_info
-#endif
-
-
-Can someone have a look and tell me that I'm wrong when I read this
-as matching both PJ4 and PJ4B (and PJ4B-MP)?
-
-Either I'm misreading this, or we do the wrong thing in configurations
-that include both PJ4B (berlin, mvebu) and PJ4 (MMP2/dove).
-
-> +#ifdef CONFIG_ARM_PATCH_IDIV
+> +Required properties:
+> +- compatible:     Should be "atmel,sama5d2-qspi".
+> +- reg:            Should contain the locations and lengths of the base registers
+> +                  and the mapped memory.
+> +- reg-names:      Should contain the resource reg names:
+> +                  - qspi_base: configuration register address space
+> +                  - qspi_mmap: memory mapped address space
+> +- interrupts:     Should contain the interrupt for the device.
+> +- clocks:         The phandle of the clock needed by the QSPI controller.
+> +- #address-cells: Should be <1>.
+> +- #size-cells:    Should be <0>.
 > +
-> +/* "sdiv r0, r0, r1" or "mrc p6, 1, r0, CR0, CR1, 4" if we're on pj4 w/o MP */
-> +static inline u32 __attribute_const__ sdiv_instruction(void)
-> +{
-> +	if (IS_ENABLED(CONFIG_THUMB2_KERNEL)) {
-> +		u32 insn = __opcode_thumb32_compose(0xfb90, 0xf0f1);
-> +		if (cpu_is_pj4_nomp())
-> +			insn = __opcode_thumb32_compose(0xee30, 0x0691);
-> +		return __opcode_to_mem_thumb32(insn);
-> +	}
-
-Strictly speaking, we can ignore the thumb instruction for pj4, as all
-variants also support the normal T2 opcode for udiv/sdiv.
-
-> diff --git a/arch/arm/lib/lib1funcs.S b/arch/arm/lib/lib1funcs.S
-> index af2267f6a5..9397b2e532 100644
-> --- a/arch/arm/lib/lib1funcs.S
-> +++ b/arch/arm/lib/lib1funcs.S
-> @@ -205,6 +205,10 @@ Boston, MA 02111-1307, USA.  */
->  .endm
->  
->  
-> +#ifdef CONFIG_ARM_PATCH_IDIV
-> +	.align	3
-> +#endif
+> +Example:
 > +
->  ENTRY(__udivsi3)
->  ENTRY(__aeabi_uidiv)
->  UNWIND(.fnstart)
+> +spi at f0020000 {
+> +	compatible = "atmel,sama5d2-qspi";
+> +	reg = <0xf0020000 0x100>, <0xd0000000 0x8000000>;
+> +	reg-names = "qpsi_base", "qspi_mmap";
+> +	interrupts = <52 IRQ_TYPE_LEVEL_HIGH 7>;
+> +	clocks = <&spi0_clk>;
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_spi0_default>;
+> +	status = "okay";
+> +
+> +	m25p80 at 0 {
+> +		...
+> +	};
+> +};
+> 
 
-I'd probably just leave out the #ifdef and always align this, but it's not
-important.
 
-	Arnd
+-- 
+Nicolas Ferre
