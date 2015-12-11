@@ -1,91 +1,73 @@
-From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
-Date: Fri, 11 Dec 2015 14:22:04 +0100
-Subject: [PATCH] I.MX6: Fix Ethernet PHY mode on Ventana boards
-Message-ID: <m3r3itaznn.fsf@t19.piap.pl>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 11 Dec 2015 21:19:59 +0800
+Subject: [PATCH] mmc: sdhci: restore behavior when setting VDD via external
+ regulator
+Message-ID: <1449839999-439-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gateworks Ventana boards seem to need "RGMII-ID" (internal delay)
-PHY mode, instead of simple "RGMII", for their Marvell 88E1510
-transceiver. Otherwise, the Ethernet MAC doesn't work with Marvell PHY
-driver (TX doesn't seem to work correctly).
+After commit 52221610dd84 ("mmc: sdhci: Improve external VDD regulator
+support"), for the VDD is supplied via external regulators, we ignore
+the code to convert a VDD voltage request into one of the standard
+SDHCI voltage levels, then program it in the SDHCI_POWER_CONTROL. This
+brings two issues:
 
-Tested on GW5400 rev. C.
+1. SDHCI_QUIRK2_CARD_ON_NEEDS_BUS_ON quirk isn't handled properly any
+more.
 
-This bug affects ARM Fedora 23.
+2. What's more, some controllers such as the sdhci-pxav3 used in
+marvell berlin SoCs require the voltage levels programming in the
+SDHCI_POWER_CONTROL register, even the VDD is supplied by external
+regulator.
 
-Signed-off-by: Krzysztof Ha?asa <khalasa@piap.pl>
-Acked-by: Tim Harvey <tharvey@gateworks.com>
-Cc: stable at vger.kernel.org
+This patch restores the behavior when setting VDD through external
+regulator by moving the call of mmc_regulator_set_ocr() to the end
+of sdhci_set_power() function.
 
-diff --git a/arch/arm/boot/dts/imx6q-gw5400-a.dts b/arch/arm/boot/dts/imx6q-gw5400-a.dts
-index 822ffb2..6c168dc 100644
---- a/arch/arm/boot/dts/imx6q-gw5400-a.dts
-+++ b/arch/arm/boot/dts/imx6q-gw5400-a.dts
-@@ -154,7 +154,7 @@
- &fec {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_enet>;
--	phy-mode = "rgmii";
-+	phy-mode = "rgmii-id";
- 	phy-reset-gpios = <&gpio1 30 GPIO_ACTIVE_HIGH>;
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi
-index 7b31fdb..dc0cebf 100644
---- a/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi
-@@ -94,7 +94,7 @@
- &fec {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_enet>;
--	phy-mode = "rgmii";
-+	phy-mode = "rgmii-id";
- 	phy-reset-gpios = <&gpio1 30 GPIO_ACTIVE_LOW>;
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-index 1b66328..18cd411 100644
---- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-@@ -154,7 +154,7 @@
- &fec {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_enet>;
--	phy-mode = "rgmii";
-+	phy-mode = "rgmii-id";
- 	phy-reset-gpios = <&gpio1 30 GPIO_ACTIVE_LOW>;
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-index 7c51839..eea90f3 100644
---- a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-@@ -155,7 +155,7 @@
- &fec {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_enet>;
--	phy-mode = "rgmii";
-+	phy-mode = "rgmii-id";
- 	phy-reset-gpios = <&gpio1 30 GPIO_ACTIVE_LOW>;
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-index 929e0b3..6c11a2a 100644
---- a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-@@ -145,7 +145,7 @@
- &fec {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_enet>;
--	phy-mode = "rgmii";
-+	phy-mode = "rgmii-id";
- 	phy-reset-gpios = <&gpio1 30 GPIO_ACTIVE_LOW>;
- 	status = "okay";
- };
+After this patch, the sdcard on Marvell Berlin SoCs work again.
 
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Fixes: 52221610dd84 ("mmc: sdhci: Improve external VDD ...")
+---
+ drivers/mmc/host/sdhci.c | 19 ++++++-------------
+ 1 file changed, 6 insertions(+), 13 deletions(-)
+
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index b48565e..616aa90 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -1274,19 +1274,6 @@ static void sdhci_set_power(struct sdhci_host *host, unsigned char mode,
+ 	struct mmc_host *mmc = host->mmc;
+ 	u8 pwr = 0;
+ 
+-	if (!IS_ERR(mmc->supply.vmmc)) {
+-		spin_unlock_irq(&host->lock);
+-		mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, vdd);
+-		spin_lock_irq(&host->lock);
+-
+-		if (mode != MMC_POWER_OFF)
+-			sdhci_writeb(host, SDHCI_POWER_ON, SDHCI_POWER_CONTROL);
+-		else
+-			sdhci_writeb(host, 0, SDHCI_POWER_CONTROL);
+-
+-		return;
+-	}
+-
+ 	if (mode != MMC_POWER_OFF) {
+ 		switch (1 << vdd) {
+ 		case MMC_VDD_165_195:
+@@ -1345,6 +1332,12 @@ static void sdhci_set_power(struct sdhci_host *host, unsigned char mode,
+ 		if (host->quirks & SDHCI_QUIRK_DELAY_AFTER_POWER)
+ 			mdelay(10);
+ 	}
++
++	if (!IS_ERR(mmc->supply.vmmc)) {
++		spin_unlock_irq(&host->lock);
++		mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, vdd);
++		spin_lock_irq(&host->lock);
++	}
+ }
+ 
+ /*****************************************************************************\
 -- 
-Krzysztof Halasa
-
-Industrial Research Institute for Automation and Measurements PIAP
-Al. Jerozolimskie 202, 02-486 Warsaw, Poland
+2.6.3
