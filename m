@@ -1,41 +1,37 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 11 Dec 2015 14:48:03 +0100
-Subject: FW: Commit 81a43adae3b9 (locking/mutex: Use acquire/release
- semantics) causing failures on arm64 (ThunderX)
-In-Reply-To: <20151211133313.GG18828@arm.com>
-References: <5669D5F2.5050004@caviumnetworks.com>
- <SN1PR07MB21577C72379C8440A208D6BC9EEA0@SN1PR07MB2157.namprd07.prod.outlook.com>
- <CA+=Sn1miWYhH5ddMmLGYWknzcw3d1k4S6QyK9O_ofdJKJDQxmg@mail.gmail.com>
- <CA+=Sn1n6e9pLDRVWT1EzDEn2XWwoK-Ep__-R6VVPzhbMvCEdNg@mail.gmail.com>
- <20151211084133.GE6356@twins.programming.kicks-ass.net>
- <20151211120419.GD18828@arm.com>
- <20151211121319.GK6356@twins.programming.kicks-ass.net>
- <20151211121759.GE18828@arm.com>
- <20151211122647.GM6356@twins.programming.kicks-ass.net>
- <20151211133313.GG18828@arm.com>
-Message-ID: <20151211134803.GP6356@twins.programming.kicks-ass.net>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 11 Dec 2015 21:59:49 +0800
+Subject: [GIT PULL] ARM: imx: fixes for 4.4, 2nd round
+Message-ID: <20151211135948.GH11252@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 11, 2015 at 01:33:14PM +0000, Will Deacon wrote:
-> On Fri, Dec 11, 2015 at 01:26:47PM +0100, Peter Zijlstra wrote:
+The following changes since commit 897ed0ca5979f103b8de3c09bcca2ae4860eb5a5:
 
-> > While we're there, the acquire in osq_wait_next() seems somewhat ill
-> > documented too.
-> > 
-> > I _think_ we need ACQUIRE semantics there because we want to strictly
-> > order the lock-unqueue A,B,C steps and we get that with:
-> > 
-> >  A: SC
-> >  B: ACQ
-> >  C: Relaxed
-> > 
-> > Similarly for unlock we want the WRITE_ONCE to happen after
-> > osq_wait_next, but in that case we can even rely on the control
-> > dependency there.
-> 
-> Even for the lock-unqueue case, isn't B->C ordered by a control dependency
-> because C consists only of stores?
+  ARM: dts: vfxxx: Fix dspi[01] spi-num-chipselects. (2015-11-24 17:38:42 +0800)
 
-Hmm, indeed. So we could go fully relaxed on it I suppose, since the
-same is true for the unlock site.
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.4-2
+
+for you to fetch changes up to 9c17190595840b4ed30e8d5f286636ceb28aae4f:
+
+  ARM: dts: vf610: use reset values for L2 cache latencies (2015-12-11 21:32:47 +0800)
+
+----------------------------------------------------------------
+The i.MX fixes for 4.4, 2nd round:
+- Fix vf610 SAI clock configuration bug which is discovered by the newly
+  added master mode support in SAI audio driver.
+- Fix buggy L2 cache latency values in vf610 device trees, which may
+  cause system hang when cpu runs at a higher frequency.
+
+----------------------------------------------------------------
+Stefan Agner (3):
+      ARM: imx: clk-vf610: fix SAI clock tree
+      ARM: dts: vf610: fix clock definition for SAI2
+      ARM: dts: vf610: use reset values for L2 cache latencies
+
+ arch/arm/boot/dts/vf610-colibri.dtsi | 5 -----
+ arch/arm/boot/dts/vf610.dtsi         | 2 +-
+ arch/arm/boot/dts/vfxxx.dtsi         | 6 ++++--
+ drivers/clk/imx/clk-vf610.c          | 8 ++++----
+ 4 files changed, 9 insertions(+), 12 deletions(-)
