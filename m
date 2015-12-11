@@ -1,70 +1,29 @@
 From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Fri, 11 Dec 2015 09:25:04 +0100
-Subject: [PATCH v3 7/9] ARM: dts: Add USART1 pin config to STM32F429 boards
+Date: Fri, 11 Dec 2015 09:25:06 +0100
+Subject: [PATCH v3 9/9] ARM: config: Enable GPIO Led driver in stm32_defconfig
 In-Reply-To: <1449822306-9035-1-git-send-email-mcoquelin.stm32@gmail.com>
 References: <1449822306-9035-1-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <1449822306-9035-8-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <1449822306-9035-10-git-send-email-mcoquelin.stm32@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-This patch selects USART1 pin configuration on PA9/PA10 pins
-for both Eval and Disco boards.
 
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 ---
- arch/arm/boot/dts/stm32429i-eval.dts  |  2 ++
- arch/arm/boot/dts/stm32f429-disco.dts |  2 ++
- arch/arm/boot/dts/stm32f429.dtsi      | 13 +++++++++++++
- 3 files changed, 17 insertions(+)
+ arch/arm/configs/stm32_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/stm32429i-eval.dts b/arch/arm/boot/dts/stm32429i-eval.dts
-index 6964fc9..71fe17a 100644
---- a/arch/arm/boot/dts/stm32429i-eval.dts
-+++ b/arch/arm/boot/dts/stm32429i-eval.dts
-@@ -71,5 +71,7 @@
- };
- 
- &usart1 {
-+	pinctrl-0 = <&usart1_pins_a>;
-+	pinctrl-names = "default";
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/stm32f429-disco.dts b/arch/arm/boot/dts/stm32f429-disco.dts
-index f0b731d..e3ce796 100644
---- a/arch/arm/boot/dts/stm32f429-disco.dts
-+++ b/arch/arm/boot/dts/stm32f429-disco.dts
-@@ -71,5 +71,7 @@
- };
- 
- &usart1 {
-+	pinctrl-0 = <&usart1_pins_a>;
-+	pinctrl-names = "default";
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-index 62d2b3d..1cf713e 100644
---- a/arch/arm/boot/dts/stm32f429.dtsi
-+++ b/arch/arm/boot/dts/stm32f429.dtsi
-@@ -263,6 +263,19 @@
- 				clocks = <&rcc 0 266>;
- 				st,bank-name = "GPIOK";
- 			};
-+
-+			usart1_pins_a: usart1 at 0 {
-+				pins1 {
-+					pinmux = <STM32F429_PA9_FUNC_USART1_TX>;
-+					bias-disable;
-+					drive-push-pull;
-+					slew-rate = <0>;
-+				};
-+				pins2 {
-+					pinmux = <STM32F429_PA10_FUNC_USART1_RX>;
-+					bias-disable;
-+				};
-+			};
- 		};
- 
- 		rcc: rcc at 40023810 {
+diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
+index 4725fab..92ade2e 100644
+--- a/arch/arm/configs/stm32_defconfig
++++ b/arch/arm/configs/stm32_defconfig
+@@ -52,6 +52,7 @@ CONFIG_SERIAL_STM32_CONSOLE=y
+ # CONFIG_USB_SUPPORT is not set
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_GPIO=y
+ CONFIG_LEDS_TRIGGERS=y
+ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+ # CONFIG_FILE_LOCKING is not set
 -- 
 1.9.1
