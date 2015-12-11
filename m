@@ -1,66 +1,46 @@
 From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 11 Dec 2015 13:10:23 +0100
-Subject: [PATCHv3 5/5] arm-cci: CCI-500: Work around PMU counter writes
-In-Reply-To: <566AB36D.9050209@arm.com>
-References: <1447783407-18027-1-git-send-email-suzuki.poulose@arm.com>
- <1447783407-18027-6-git-send-email-suzuki.poulose@arm.com>
- <20151210154251.GG495@leverpostej> <566AB36D.9050209@arm.com>
-Message-ID: <20151211121023.GJ6356@twins.programming.kicks-ass.net>
+Date: Fri, 11 Dec 2015 13:13:19 +0100
+Subject: FW: Commit 81a43adae3b9 (locking/mutex: Use acquire/release
+ semantics) causing failures on arm64 (ThunderX)
+In-Reply-To: <20151211120419.GD18828@arm.com>
+References: <5669D5F2.5050004@caviumnetworks.com>
+ <SN1PR07MB21577C72379C8440A208D6BC9EEA0@SN1PR07MB2157.namprd07.prod.outlook.com>
+ <CA+=Sn1miWYhH5ddMmLGYWknzcw3d1k4S6QyK9O_ofdJKJDQxmg@mail.gmail.com>
+ <CA+=Sn1n6e9pLDRVWT1EzDEn2XWwoK-Ep__-R6VVPzhbMvCEdNg@mail.gmail.com>
+ <20151211084133.GE6356@twins.programming.kicks-ass.net>
+ <20151211120419.GD18828@arm.com>
+Message-ID: <20151211121319.GK6356@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 11, 2015 at 11:28:45AM +0000, Suzuki K. Poulose wrote:
-> On 10/12/15 15:42, Mark Rutland wrote:
+On Fri, Dec 11, 2015 at 12:04:19PM +0000, Will Deacon wrote:
+> I think Andrew meant the atomic_xchg_acquire at the start of osq_lock,
+> as opposed to "compare and swap". In which case, it does look like
+> there's a bug here because there is nothing to order the initialisation
+> of the node fields with publishing of the node, whether that's
+> indirectly as a result of setting the tail to the current CPU or
+> directly as a result of the WRITE_ONCE.
 
-> >This should work, but it seems very heavyweight given we do it for each
-> >write.
-> >
-> >Can we not amortize this by using the {start,commit,cancel}_txn hooks?
-> >
-> >Either we can handle 1-4 and 6-8 in those, or we can copy everything
-> >into a shadow state and apply it all in one go at commit_txn time.
-> 
-> I took a look at it. The only worrying part is, if pmu->add() will be
-> called outside *_txn().
-> 
-> from linux/perf_event.h:
-> 
->         /*
->          * Adds/Removes a counter to/from the PMU, can be done inside a
->          * transaction, see the ->*_txn() methods.
->          *
-> 
-> As of now it is only called within the transactions, but the comment somehow
-> doesn't look like enforces it.
+Agreed, this does indeed look like a bug. If confirmed please write a
+shiny changelog and I'll queue asap.
 
-Right, txn stuff is intended to be optional. However a txn
-implementation must track if one is in progress, so the ::add() method
-can check against that.
-
-Also note that there exist a callchain into pmu->add() that does not
-start a txn. See:
-
-	__perf_event_enable()
-		if (event != leader)
-			event_sched_in()
-				event->pmu->add()
-
-That said, you can also use pmu->pmu_{en,dis}able() to batch stuff (x86
-does this too), add/del, start/stop are guaranteed to be called with the
-PMU disabled (as per the comments in struct pmu).
-
-
-on x86:
-
-For ::add(), we delay touching the hardware until ::pmu_enable() time.
-
-!txn ::add() will do a schedulability test to see if the pmu had place
-for the new event and then record the details of it.
-
-txn ::add() will just record the details.
-
-::commit_txn will do the schedulability test for the txn, if that fails
-we undo bits.
-
-::pmu_enable rewrites the hardware registers, moves events about if
-needed and configures the new event.
+> diff --git a/kernel/locking/osq_lock.c b/kernel/locking/osq_lock.c
+> index d092a0c9c2d4..05a37857ab55 100644
+> --- a/kernel/locking/osq_lock.c
+> +++ b/kernel/locking/osq_lock.c
+> @@ -93,10 +93,12 @@ bool osq_lock(struct optimistic_spin_queue *lock)
+>  	node->cpu = curr;
+>  
+>  	/*
+> -	 * ACQUIRE semantics, pairs with corresponding RELEASE
+> -	 * in unlock() uncontended, or fastpath.
+> +	 * We need both ACQUIRE (pairs with corresponding RELEASE in
+> +	 * unlock() uncontended, or fastpath) and RELEASE (to publish
+> +	 * the node fields we just initialised) semantics when updating
+> +	 * the lock tail.
+>  	 */
+> -	old = atomic_xchg_acquire(&lock->tail, curr);
+> +	old = atomic_xchg(&lock->tail, curr);
+>  	if (old == OSQ_UNLOCKED_VAL)
+>  		return true;
+>  
