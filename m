@@ -1,86 +1,88 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 11 Dec 2015 11:34:53 +0100
-Subject: [PATCH v2] net/macb: add support for resetting PHY using GPIO
-Message-ID: <1449830093-29433-1-git-send-email-gregory.clement@free-electrons.com>
+From: zhangfei.gao@gmail.com (Zhangfei Gao)
+Date: Fri, 11 Dec 2015 18:35:17 +0800
+Subject: [RFC PATCH 4/4] mfd: syscon: add ACPI support
+In-Reply-To: <2299982.06P4iKpkWk@wuerfel>
+References: <1449047368-5768-1-git-send-email-wangkefeng.wang@huawei.com>
+ <1449047368-5768-5-git-send-email-wangkefeng.wang@huawei.com>
+ <2299982.06P4iKpkWk@wuerfel>
+Message-ID: <CAMj5BkiAToBCvnOSkW=41po5OHpg5uSzxNTNJ_=gLK__BLa1Sw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With device tree it is no more possible to reset the PHY at board
-level. Furthermore, doing in the driver allow to power down the PHY when
-the network interface is no more used.
+Hi, Arnd
 
-This reset can't be done at the PHY driver level. The PHY must be able to
-answer the to the mii bus scan to let the kernel creating a PHY device.
+On Wed, Dec 2, 2015 at 6:44 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 02 December 2015 17:09:28 Kefeng Wang wrote:
+>> This enables syscon with ACPI support.
+>> syscon_regmap_lookup_by_dev_property() function was added. With helper
+>> device_get_reference_node() and acpi_dev_find_plat_dev(), it can be used
+>> in both DT and ACPI.
+>>
+>> The device driver can obtain syscon using _DSD method in DSDT, an example
+>> is shown below.
+>>
+>>     Device(CTL0) {
+>>           Name(_HID, "HISI0061")
+>>           Name(_CRS, ResourceTemplate() {
+>>                   Memory32Fixed(ReadWrite, 0x80000000, 0x10000)
+>>           })
+>>     }
+>>
+>>     Device(DEV0) {
+>>           Name(_HID, "HISI00B1")
+>>           Name(_CRS, ResourceTemplate() {
+>>                   Memory32Fixed(ReadWrite, 0x8c030000, 0x10000)
+>>                   Interrupt(ResourceConsumer, Level, ActiveHigh, Exclusive){ 192 }
+>>           })
+>>
+>>           Name (_DSD, Package () {
+>>               ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
+>>               Package () {
+>>                   Package () {"syscon",Package() {\_SB.CTL0} }
+>>               }
+>>           })
+>>     }
+>>
+>> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+>
+> This sounds like a bad idea:
+>
+> syscon is basically a hack to let us access register that the SoC designer
+> couldn't fit in anywhere sane. We need something like this with devicetree
+> because we decided not to have any interpreted bytecode to do this behind
+> our back.
+>
+> With ACPI, the same thing is done with AML, which is actually nicer than
+> syscon (once you have to deal with all the problems introduced by AML).
+>
+> Use that instead.
+>
 
-The patch introduces a new optional property "phy-reset-gpios" inspired
-from the one use for the FEC.
+Would you mind clarifying AML method, still not understand.
+Is is means realize the operation in uefi/bootloader and call some
+interface from kernel?
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
+The issue here is we want to access some common registers,
+which we do not want to ioremap for many times in each driver.
 
-Since the v1, I used the gpiod functions. It allows to simplify the
-code and to not introduce any #ifdef.
+In hisi platforms, we have many common registers shared by many components.
 
-I also rename the property in phy-reset-gpios, even if actually the
-gpiod will match both phy-reset-gpios and phy-reset-gpio.
+Thanks.
 
 
- Documentation/devicetree/bindings/net/macb.txt | 3 +++
- drivers/net/ethernet/cadence/macb.c            | 8 ++++++++
- drivers/net/ethernet/cadence/macb.h            | 1 +
- 3 files changed, 12 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/net/macb.txt b/Documentation/devicetree/bindings/net/macb.txt
-index b5d7976..4a7fb6c 100644
---- a/Documentation/devicetree/bindings/net/macb.txt
-+++ b/Documentation/devicetree/bindings/net/macb.txt
-@@ -19,6 +19,9 @@ Required properties:
- 	Optional elements: 'tx_clk'
- - clocks: Phandles to input clocks.
- 
-+Optional properties:
-+- phy-reset-gpios : Should specify the gpio for phy reset
-+
- Examples:
- 
- 	macb0: ethernet at fffc4000 {
-diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index 88c1e1a..71fbda3 100644
---- a/drivers/net/ethernet/cadence/macb.c
-+++ b/drivers/net/ethernet/cadence/macb.c
-@@ -2900,6 +2900,10 @@ static int macb_probe(struct platform_device *pdev)
- 	else
- 		macb_get_hwaddr(bp);
- 
-+	/* Power up the PHY if there is a GPIO reset */
-+	bp->reset_gpio = devm_gpiod_get_optional(&bp->pdev->dev, "phy-reset",
-+						 GPIOD_OUT_HIGH);
-+
- 	err = of_get_phy_mode(np);
- 	if (err < 0) {
- 		pdata = dev_get_platdata(&pdev->dev);
-@@ -2966,6 +2970,10 @@ static int macb_remove(struct platform_device *pdev)
- 		mdiobus_unregister(bp->mii_bus);
- 		kfree(bp->mii_bus->irq);
- 		mdiobus_free(bp->mii_bus);
-+
-+		/* Shutdown the PHY if there is a GPIO reset */
-+		gpiod_set_value(bp->reset_gpio, 0);
-+
- 		unregister_netdev(dev);
- 		clk_disable_unprepare(bp->tx_clk);
- 		clk_disable_unprepare(bp->hclk);
-diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
-index 6e1faea..b6ec421 100644
---- a/drivers/net/ethernet/cadence/macb.h
-+++ b/drivers/net/ethernet/cadence/macb.h
-@@ -824,6 +824,7 @@ struct macb {
- 	unsigned int		dma_burst_length;
- 
- 	phy_interface_t		phy_interface;
-+	struct gpio_desc	*reset_gpio;
- 
- 	/* AT91RM9200 transmit */
- 	struct sk_buff *skb;			/* holds skb until xmit interrupt completes */
--- 
-2.5.0
+>> +               pdev = acpi_dev_find_plat_dev(adev);
+>> +               if (!pdev)
+>> +                       return ERR_PTR(-ENODEV);
+>> +               syscon = platform_get_drvdata(pdev);
+>
+> This still requires the syscon device to be probed first, which is
+> something we shouldn't really need any more.
+>
+> A lot of syscon users depend on the regmap to be available before
+> device drivers are loaded, so we have changed the code to just look up
+> the device_node that is already present and ignore the device.
+>
+> Once clps711x has been converted to DT, I think we can rip out the
+> syscon_regmap_lookup_by_pdevname() interface and separate the syscon
+> regmap handling from the device handling that we only really need
+> for debugfs.
