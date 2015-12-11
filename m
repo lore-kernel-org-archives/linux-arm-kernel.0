@@ -1,71 +1,100 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 11 Dec 2015 17:24:59 +0000
-Subject: FW: Commit 81a43adae3b9 (locking/mutex: Use acquire/release
- semantics) causing failures on arm64 (ThunderX)
-In-Reply-To: <20151211171128.GC6356@twins.programming.kicks-ass.net>
-References: <CA+=Sn1n6e9pLDRVWT1EzDEn2XWwoK-Ep__-R6VVPzhbMvCEdNg@mail.gmail.com>
- <20151211084133.GE6356@twins.programming.kicks-ass.net>
- <20151211120419.GD18828@arm.com>
- <20151211121319.GK6356@twins.programming.kicks-ass.net>
- <20151211121759.GE18828@arm.com>
- <20151211122647.GM6356@twins.programming.kicks-ass.net>
- <20151211133313.GG18828@arm.com>
- <20151211134803.GP6356@twins.programming.kicks-ass.net>
- <20151211140649.GI18828@arm.com>
- <20151211171128.GC6356@twins.programming.kicks-ass.net>
-Message-ID: <20151211172458.GL18828@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 11 Dec 2015 11:29:19 -0600
+Subject: [PATCH v2 4/8] dt-bindings: Add a binding for Mediatek Video
+ Encoder
+In-Reply-To: <1449827743-22895-5-git-send-email-tiffany.lin@mediatek.com>
+References: <1449827743-22895-1-git-send-email-tiffany.lin@mediatek.com>
+ <1449827743-22895-5-git-send-email-tiffany.lin@mediatek.com>
+Message-ID: <20151211172919.GA2896@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 11, 2015 at 06:11:28PM +0100, Peter Zijlstra wrote:
-> On Fri, Dec 11, 2015 at 02:06:49PM +0000, Will Deacon wrote:
-> > On Fri, Dec 11, 2015 at 02:48:03PM +0100, Peter Zijlstra wrote:
-> > > On Fri, Dec 11, 2015 at 01:33:14PM +0000, Will Deacon wrote:
-> > > > On Fri, Dec 11, 2015 at 01:26:47PM +0100, Peter Zijlstra wrote:
-> > > 
-> > > > > While we're there, the acquire in osq_wait_next() seems somewhat ill
-> > > > > documented too.
-> > > > > 
-> > > > > I _think_ we need ACQUIRE semantics there because we want to strictly
-> > > > > order the lock-unqueue A,B,C steps and we get that with:
-> > > > > 
-> > > > >  A: SC
-> > > > >  B: ACQ
-> > > > >  C: Relaxed
-> > > > > 
-> > > > > Similarly for unlock we want the WRITE_ONCE to happen after
-> > > > > osq_wait_next, but in that case we can even rely on the control
-> > > > > dependency there.
-> > > > 
-> > > > Even for the lock-unqueue case, isn't B->C ordered by a control dependency
-> > > > because C consists only of stores?
-> > > 
-> > > Hmm, indeed. So we could go fully relaxed on it I suppose, since the
-> > > same is true for the unlock site.
-> > 
-> > In which case, we should be able to relax the xchg in there (osq_wait_next)
-> > too, right?
+On Fri, Dec 11, 2015 at 05:55:39PM +0800, Tiffany Lin wrote:
+> Add a DT binding documentation of Video Encoder for the
+> MT8173 SoC from Mediatek.
 > 
-> Can I have second thoughts an confuse matters again? ;-)
-> 
-> A RmW-acq is a load-acquire+store. That means the store is _after_ the
-> load and thus not required for the completion of the control dependency.
-> 
-> Therefore the store in question can reorder inside the conditional
-> control block's stores.
-> 
-> Hmm?
+> Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
 
-Ah yeah, it's the same thing we were discussing the other day! Whilst
-there is a form of control dependency from the SC part of the LL/SC
-sequence, it doesn't guarantee ordering in the same way that a
-load->store control dependency does. That is, it orders subsequent
-writes to be afterwards in the coherence order but it doesn't ensure
-multi-copy atomicity for readers.
+A question and minor issue below, otherwise:
 
-Now, in this case, &lock->tail is only ever accessed by other cmpxchg
-operations, so I think it does actually work using just the control
-dependency. Worst case, a concurrent osq_wait_next gets a stale value
-in the atomic_read, but that's not a correctness problem.
+Acked-by: Rob Herring <robh@kernel.org>
 
-Will
+> ---
+>  .../devicetree/bindings/media/mediatek-vcodec.txt  |   58 ++++++++++++++++++++
+>  1 file changed, 58 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/mediatek-vcodec.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/media/mediatek-vcodec.txt b/Documentation/devicetree/bindings/media/mediatek-vcodec.txt
+> new file mode 100644
+> index 0000000..510cd81
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/mediatek-vcodec.txt
+> @@ -0,0 +1,58 @@
+> +Mediatek Video Codec
+> +
+> +Mediatek Video Codec is the video codec hw present in Mediatek SoCs which
+> +supports high resolution encoding functionalities.
+> +
+> +Required properties:
+> +- compatible : "mediatek,mt8173-vcodec-enc" for encoder
+> +- reg : Physical base address of the video codec registers and length of
+> +  memory mapped region.
+> +- interrupts : interrupt number to the cpu.
+> +- mediatek,larb : must contain the local arbiters in the current Socs.
+> +- clocks : list of clock specifiers, corresponding to entries in
+> +  the clock-names property;
+> +- clock-names: must contain "vencpll", "venc_lt_sel", "vcodecpll_370p5_ck"
+> +- iommus : list of iommus specifiers should be enabled for hw encode.
+> +  There are 2 cells needed to enable/disable iommu.
+> +  The first one is local arbiter index(larbid), and the other is port
+> +  index(portid) within local arbiter. Specifies the larbid and portid
+> +  as defined in dt-binding/memory/mt8173-larb-port.h.
+> +- mediatek,vpu : the node of video processor unit
+> +
+> +Example:
+> +vcodec_enc: vcodec at 0x18002000 {
+> +    compatible = "mediatek,mt8173-vcodec-enc";
+> +    reg = <0 0x18002000 0 0x1000>,    /*VENC_SYS*/
+> +          <0 0x19002000 0 0x1000>;    /*VENC_LT_SYS*/
+> +    interrupts = <GIC_SPI 198 IRQ_TYPE_LEVEL_LOW>,
+> +           <GIC_SPI 202 IRQ_TYPE_LEVEL_LOW>;
+> +    larb = <&larb3>,
+> +           <&larb5>;
+> +    iommus = <&iommu M4U_LARB3_ID M4U_PORT_VENC_RCPU>,
+
+Is this the same iommu as the VPU? If so, you can't have a mixed number 
+of cells.
+
+> +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_REC>,
+> +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_BSDMA>,
+> +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_SV_COMV>,
+> +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_RD_COMV>,
+> +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_CUR_LUMA>,
+> +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_CUR_CHROMA>,
+> +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_REF_LUMA>,
+> +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_REF_CHROMA>,
+> +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_NBM_RDMA>,
+> +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_NBM_WDMA>,
+> +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_RCPU_SET2>,
+> +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_REC_FRM_SET2>,
+> +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_BSDMA_SET2>,
+> +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_SV_COMA_SET2>,
+> +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_RD_COMA_SET2>,
+> +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_CUR_LUMA_SET2>,
+> +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_CUR_CHROMA_SET2>,
+> +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_REF_LUMA_SET2>,
+> +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_REC_CHROMA_SET2>;
+> +    vpu = <&vpu>;
+
+Need to update the example.
+
+> +    clocks = <&apmixedsys CLK_APMIXED_VENCPLL>,
+> +             <&topckgen CLK_TOP_VENC_LT_SEL>,
+> +             <&topckgen CLK_TOP_VCODECPLL_370P5>;
+> +    clock-names = "vencpll",
+> +                  "venc_lt_sel",
+> +                  "vcodecpll_370p5_ck";
+> +  };
+> -- 
+> 1.7.9.5
+> 
