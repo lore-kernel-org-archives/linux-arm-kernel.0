@@ -1,139 +1,275 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 11 Dec 2015 16:41:59 +0100
-Subject: [PATCH v2 2/3] ehci-platform: Add support for controllers with
- multiple reset lines
-In-Reply-To: <1449848520-27379-1-git-send-email-hdegoede@redhat.com>
-References: <1449848520-27379-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1449848520-27379-2-git-send-email-hdegoede@redhat.com>
+Date: Fri, 11 Dec 2015 16:41:58 +0100
+Subject: [PATCH v2 1/3] reset: Add shared reset_control_[de]assert variants
+Message-ID: <1449848520-27379-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Reinder de Haan <patchesrdh@mveas.com>
+Add reset_control_deassert_shared / reset_control_assert_shared
+functions which are intended for use by drivers for hw blocks which
+(may) share a reset line with another driver / hw block.
 
-At least the EHCI/OHCI found on the Allwinnner H3 SoC needs multiple
-reset lines, the controller will not initialize while the reset for
-its companion is still asserted, which means we need to de-assert
-2 resets for the controller to work.
+Unlike the regular reset_control_[de]assert functions these functions
+keep track of how often deassert_shared / assert_shared have been called
+and keep the line deasserted as long as deassert has been called more
+times than assert.
 
-Signed-off-by: Reinder de Haan <patchesrdh@mveas.com>
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
 Changes in v2:
--Use the new reset_control_[de]assert_shared reset-controller functions
+-This is a new patch in v2 of this patch-set
 ---
- Documentation/devicetree/bindings/usb/usb-ehci.txt |  2 +-
- drivers/usb/host/ehci-platform.c                   | 47 +++++++++++++---------
- 2 files changed, 30 insertions(+), 19 deletions(-)
+ drivers/reset/core.c             | 121 ++++++++++++++++++++++++++++++++++++---
+ include/linux/reset-controller.h |   2 +
+ include/linux/reset.h            |   2 +
+ 3 files changed, 116 insertions(+), 9 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/usb/usb-ehci.txt b/Documentation/devicetree/bindings/usb/usb-ehci.txt
-index a12d601..0701812 100644
---- a/Documentation/devicetree/bindings/usb/usb-ehci.txt
-+++ b/Documentation/devicetree/bindings/usb/usb-ehci.txt
-@@ -18,7 +18,7 @@ Optional properties:
-  - clocks : a list of phandle + clock specifier pairs
-  - phys : phandle + phy specifier pair
-  - phy-names : "usb"
-- - resets : phandle + reset specifier pair
-+ - resets : a list of phandle + reset specifier pairs
+diff --git a/drivers/reset/core.c b/drivers/reset/core.c
+index 9ab9290..8c3436c 100644
+--- a/drivers/reset/core.c
++++ b/drivers/reset/core.c
+@@ -22,16 +22,29 @@ static DEFINE_MUTEX(reset_controller_list_mutex);
+ static LIST_HEAD(reset_controller_list);
  
- Example (Sequoia 440EPx):
-     ehci at e0000300 {
-diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
-index bd7082f2..6fbf32a 100644
---- a/drivers/usb/host/ehci-platform.c
-+++ b/drivers/usb/host/ehci-platform.c
-@@ -39,11 +39,12 @@
+ /**
++ * struct reset_line - a reset line
++ * @list:         list entry for the reset controllers reset line list
++ * @id:           ID of the reset line in the reset controller device
++ * @refcnt:       Number of reset_control structs referencing this device
++ * @deassert_cnt: Number of times this reset line has been deasserted
++ */
++struct reset_line {
++	struct list_head list;
++	unsigned int id;
++	unsigned int refcnt;
++	unsigned int deassert_cnt;
++};
++
++/**
+  * struct reset_control - a reset control
+  * @rcdev: a pointer to the reset controller device
+  *         this reset control belongs to
+- * @id: ID of the reset controller in the reset
+- *      controller device
++ * @line:  reset line for this reset control
+  */
+ struct reset_control {
+ 	struct reset_controller_dev *rcdev;
++	struct reset_line *line;
+ 	struct device *dev;
+-	unsigned int id;
+ };
  
- #define DRIVER_DESC "EHCI generic platform driver"
- #define EHCI_MAX_CLKS 3
-+#define EHCI_MAX_RESETS 2
- #define hcd_to_ehci_priv(h) ((struct ehci_platform_priv *)hcd_to_ehci(h)->priv)
- 
- struct ehci_platform_priv {
- 	struct clk *clks[EHCI_MAX_CLKS];
--	struct reset_control *rst;
-+	struct reset_control *resets[EHCI_MAX_RESETS];
- 	struct phy **phys;
- 	int num_phys;
- 	bool reset_on_resume;
-@@ -149,7 +150,7 @@ static int ehci_platform_probe(struct platform_device *dev)
- 	struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
- 	struct ehci_platform_priv *priv;
- 	struct ehci_hcd *ehci;
--	int err, irq, phy_num, clk = 0;
-+	int err, irq, phy_num, clk = 0, rst = 0;
- 
- 	if (usb_disabled())
- 		return -ENODEV;
-@@ -232,18 +233,24 @@ static int ehci_platform_probe(struct platform_device *dev)
- 				break;
- 			}
- 		}
--	}
- 
--	priv->rst = devm_reset_control_get_optional(&dev->dev, NULL);
--	if (IS_ERR(priv->rst)) {
--		err = PTR_ERR(priv->rst);
--		if (err == -EPROBE_DEFER)
--			goto err_put_clks;
--		priv->rst = NULL;
--	} else {
--		err = reset_control_deassert(priv->rst);
--		if (err)
--			goto err_put_clks;
-+		for (rst = 0; rst < EHCI_MAX_RESETS; rst++) {
-+			priv->resets[rst] =
-+				of_reset_control_get_by_index(dev->dev.of_node,
-+							      rst);
-+			if (IS_ERR(priv->resets[rst])) {
-+				err = PTR_ERR(priv->resets[rst]);
-+				if (err == -EPROBE_DEFER)
-+					goto err_reset;
-+				priv->resets[rst] = NULL;
-+				break;
-+			}
-+			err = reset_control_deassert_shared(priv->resets[rst]);
-+			if (err) {
-+				reset_control_put(priv->resets[rst]);
-+				goto err_reset;
-+			}
-+		}
+ /**
+@@ -66,6 +79,8 @@ int reset_controller_register(struct reset_controller_dev *rcdev)
+ 		rcdev->of_xlate = of_reset_simple_xlate;
  	}
  
- 	if (pdata->big_endian_desc)
-@@ -300,8 +307,10 @@ err_power:
- 	if (pdata->power_off)
- 		pdata->power_off(dev);
- err_reset:
--	if (priv->rst)
--		reset_control_assert(priv->rst);
-+	while (--rst >= 0) {
-+		reset_control_assert_shared(priv->resets[rst]);
-+		reset_control_put(priv->resets[rst]);
++	INIT_LIST_HEAD(&rcdev->reset_line_head);
++
+ 	mutex_lock(&reset_controller_list_mutex);
+ 	list_add(&rcdev->list, &reset_controller_list);
+ 	mutex_unlock(&reset_controller_list_mutex);
+@@ -93,7 +108,7 @@ EXPORT_SYMBOL_GPL(reset_controller_unregister);
+ int reset_control_reset(struct reset_control *rstc)
+ {
+ 	if (rstc->rcdev->ops->reset)
+-		return rstc->rcdev->ops->reset(rstc->rcdev, rstc->id);
++		return rstc->rcdev->ops->reset(rstc->rcdev, rstc->line->id);
+ 
+ 	return -ENOTSUPP;
+ }
+@@ -106,7 +121,7 @@ EXPORT_SYMBOL_GPL(reset_control_reset);
+ int reset_control_assert(struct reset_control *rstc)
+ {
+ 	if (rstc->rcdev->ops->assert)
+-		return rstc->rcdev->ops->assert(rstc->rcdev, rstc->id);
++		return rstc->rcdev->ops->assert(rstc->rcdev, rstc->line->id);
+ 
+ 	return -ENOTSUPP;
+ }
+@@ -119,13 +134,55 @@ EXPORT_SYMBOL_GPL(reset_control_assert);
+ int reset_control_deassert(struct reset_control *rstc)
+ {
+ 	if (rstc->rcdev->ops->deassert)
+-		return rstc->rcdev->ops->deassert(rstc->rcdev, rstc->id);
++		return rstc->rcdev->ops->deassert(rstc->rcdev, rstc->line->id);
+ 
+ 	return -ENOTSUPP;
+ }
+ EXPORT_SYMBOL_GPL(reset_control_deassert);
+ 
+ /**
++ * reset_control_assert_shared - asserts a shared reset line
++ * @rstc: reset controller
++ *
++ * Assert a shared reset line, this functions decreases the deassert count
++ * of the line by one and asserts it if, and only if, the deassert count
++ * reaches 0.
++ */
++int reset_control_assert_shared(struct reset_control *rstc)
++{
++	if (!rstc->rcdev->ops->assert)
++		return -ENOTSUPP;
++
++	rstc->line->deassert_cnt--;
++	if (rstc->line->deassert_cnt)
++		return 0;
++
++	return rstc->rcdev->ops->assert(rstc->rcdev, rstc->line->id);
++}
++EXPORT_SYMBOL_GPL(reset_control_assert_shared);
++
++/**
++ * reset_control_deassert_shared - deasserts a shared reset line
++ * @rstc: reset controller
++ *
++ * Assert a shared reset line, this functions increases the deassert count
++ * of the line by one and deasserts the reset line (if it was not already
++ * deasserted).
++ */
++int reset_control_deassert_shared(struct reset_control *rstc)
++{
++	if (!rstc->rcdev->ops->deassert)
++		return -ENOTSUPP;
++
++	rstc->line->deassert_cnt++;
++	if (rstc->line->deassert_cnt != 1)
++		return 0;
++
++	return rstc->rcdev->ops->deassert(rstc->rcdev, rstc->line->id);
++}
++EXPORT_SYMBOL_GPL(reset_control_deassert_shared);
++
++/**
+  * reset_control_status - returns a negative errno if not supported, a
+  * positive value if the reset line is asserted, or zero if the reset
+  * line is not asserted.
+@@ -134,12 +191,47 @@ EXPORT_SYMBOL_GPL(reset_control_deassert);
+ int reset_control_status(struct reset_control *rstc)
+ {
+ 	if (rstc->rcdev->ops->status)
+-		return rstc->rcdev->ops->status(rstc->rcdev, rstc->id);
++		return rstc->rcdev->ops->status(rstc->rcdev, rstc->line->id);
+ 
+ 	return -ENOTSUPP;
+ }
+ EXPORT_SYMBOL_GPL(reset_control_status);
+ 
++static struct reset_line *reset_line_get(struct reset_controller_dev *rcdev,
++					 unsigned int index)
++{
++	struct reset_line *line;
++
++	list_for_each_entry(line, &rcdev->reset_line_head, list) {
++		if (line->id == index) {
++			line->refcnt++;
++			return line;
++		}
 +	}
- err_put_clks:
- 	while (--clk >= 0)
- 		clk_put(priv->clks[clk]);
-@@ -319,15 +328,17 @@ static int ehci_platform_remove(struct platform_device *dev)
- 	struct usb_hcd *hcd = platform_get_drvdata(dev);
- 	struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
- 	struct ehci_platform_priv *priv = hcd_to_ehci_priv(hcd);
--	int clk;
-+	int clk, rst;
++
++	line = kzalloc(sizeof(*line), GFP_KERNEL);
++	if (!line)
++		return NULL;
++
++	list_add(&line->list, &rcdev->reset_line_head);
++	line->id = index;
++	line->refcnt = 1;
++
++	return line;
++}
++
++static void reset_line_put(struct reset_line *line)
++{
++	if (!line)
++		return;
++
++	if (--line->refcnt)
++		return;
++
++	list_del(&line->list);
++	kfree(line);
++}
++
+ /**
+  * of_reset_control_get_by_index - Lookup and obtain a reference to a reset
+  * controller by index.
+@@ -155,6 +247,7 @@ struct reset_control *of_reset_control_get_by_index(struct device_node *node,
+ {
+ 	struct reset_control *rstc = ERR_PTR(-EPROBE_DEFER);
+ 	struct reset_controller_dev *r, *rcdev;
++	struct reset_line *line;
+ 	struct of_phandle_args args;
+ 	int rstc_id;
+ 	int ret;
+@@ -186,16 +279,22 @@ struct reset_control *of_reset_control_get_by_index(struct device_node *node,
+ 	}
  
- 	usb_remove_hcd(hcd);
+ 	try_module_get(rcdev->owner);
++
++	/* reset_controller_list_mutex also protects the reset_line list */
++	line = reset_line_get(rcdev, rstc_id);
++
+ 	mutex_unlock(&reset_controller_list_mutex);
  
- 	if (pdata->power_off)
- 		pdata->power_off(dev);
+ 	rstc = kzalloc(sizeof(*rstc), GFP_KERNEL);
+-	if (!rstc) {
++	if (!line || !rstc) {
++		kfree(rstc);
++		reset_line_put(line);
+ 		module_put(rcdev->owner);
+ 		return ERR_PTR(-ENOMEM);
+ 	}
  
--	if (priv->rst)
--		reset_control_assert(priv->rst);
-+	for (rst = 0; rst < EHCI_MAX_RESETS && priv->resets[rst]; rst++) {
-+		reset_control_assert_shared(priv->resets[rst]);
-+		reset_control_put(priv->resets[rst]);
-+	}
+ 	rstc->rcdev = rcdev;
+-	rstc->id = rstc_id;
++	rstc->line = line;
  
- 	for (clk = 0; clk < EHCI_MAX_CLKS && priv->clks[clk]; clk++)
- 		clk_put(priv->clks[clk]);
+ 	return rstc;
+ }
+@@ -259,6 +358,10 @@ void reset_control_put(struct reset_control *rstc)
+ 	if (IS_ERR(rstc))
+ 		return;
+ 
++	mutex_lock(&reset_controller_list_mutex);
++	reset_line_put(rstc->line);
++	mutex_unlock(&reset_controller_list_mutex);
++
+ 	module_put(rstc->rcdev->owner);
+ 	kfree(rstc);
+ }
+diff --git a/include/linux/reset-controller.h b/include/linux/reset-controller.h
+index ce6b962..7f2cbd1 100644
+--- a/include/linux/reset-controller.h
++++ b/include/linux/reset-controller.h
+@@ -31,6 +31,7 @@ struct of_phandle_args;
+  * @ops: a pointer to device specific struct reset_control_ops
+  * @owner: kernel module of the reset controller driver
+  * @list: internal list of reset controller devices
++ * @reset_line_head: head of internal list of reset lines
+  * @of_node: corresponding device tree node as phandle target
+  * @of_reset_n_cells: number of cells in reset line specifiers
+  * @of_xlate: translation function to translate from specifier as found in the
+@@ -41,6 +42,7 @@ struct reset_controller_dev {
+ 	struct reset_control_ops *ops;
+ 	struct module *owner;
+ 	struct list_head list;
++	struct list_head reset_line_head;
+ 	struct device_node *of_node;
+ 	int of_reset_n_cells;
+ 	int (*of_xlate)(struct reset_controller_dev *rcdev,
+diff --git a/include/linux/reset.h b/include/linux/reset.h
+index c4c097d..1cca8ce 100644
+--- a/include/linux/reset.h
++++ b/include/linux/reset.h
+@@ -11,6 +11,8 @@ int reset_control_reset(struct reset_control *rstc);
+ int reset_control_assert(struct reset_control *rstc);
+ int reset_control_deassert(struct reset_control *rstc);
+ int reset_control_status(struct reset_control *rstc);
++int reset_control_assert_shared(struct reset_control *rstc);
++int reset_control_deassert_shared(struct reset_control *rstc);
+ 
+ struct reset_control *reset_control_get(struct device *dev, const char *id);
+ void reset_control_put(struct reset_control *rstc);
 -- 
 2.5.0
