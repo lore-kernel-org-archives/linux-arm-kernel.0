@@ -1,72 +1,56 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Fri, 11 Dec 2015 09:39:59 +0530
-Subject: [PATCH v5 4/5] ARM: dts: DRA7: add entry for qspi mmap region
-In-Reply-To: <1449807000-6457-1-git-send-email-vigneshr@ti.com>
-References: <1449807000-6457-1-git-send-email-vigneshr@ti.com>
-Message-ID: <1449807000-6457-5-git-send-email-vigneshr@ti.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 11 Dec 2015 09:43:49 +0530
+Subject: [PATCH v5 3/7] ARM: dts: Exynos542x/5800: add CPU OPP properties
+In-Reply-To: <566A4A60.8060402@samsung.com>
+References: <1449766729-435-1-git-send-email-b.zolnierkie@samsung.com>
+ <1449766729-435-4-git-send-email-b.zolnierkie@samsung.com>
+ <20151211031646.GL3612@ubuntu> <566A4231.9050608@osg.samsung.com>
+ <20151211033253.GN3612@ubuntu> <566A4A60.8060402@samsung.com>
+Message-ID: <20151211041349.GO3612@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add qspi memory mapped region entries for DRA7xx based SoCs. Also,
-update the binding documents for the controller to document this change.
+On 11-12-15, 13:00, Krzysztof Kozlowski wrote:
+> It wasn't working like this. The cpu0 got the index from booting cpu, so
+> on 5420 cpu0 was A15 and on 5422 it was A7.
+> 
+> Maybe I am not aware of some changes recently in the kernel but how do
+> you want to assign the booting CPU proper number (not CPU0)?
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
----
+Okay, this is how it works and I don't think you need to change the
+order of CPUs based on machines.
 
-v5: use syscon to access scm register.
+The boot CPU isn't controlled by the DT file but your bootloader, so
+it will be A15 on 5420 and A7 on 5422.
 
- Documentation/devicetree/bindings/spi/ti_qspi.txt | 17 +++++++++++++++++
- arch/arm/boot/dts/dra7.dtsi                       |  6 ++++--
- 2 files changed, 21 insertions(+), 2 deletions(-)
+Now if you keep the order in DT as: 0-3 A7 and 4-7 A15 irrespective of
+the SoCs, then this is how they will be assigned.
 
-diff --git a/Documentation/devicetree/bindings/spi/ti_qspi.txt b/Documentation/devicetree/bindings/spi/ti_qspi.txt
-index 601a360531a5..809c3f334316 100644
---- a/Documentation/devicetree/bindings/spi/ti_qspi.txt
-+++ b/Documentation/devicetree/bindings/spi/ti_qspi.txt
-@@ -15,6 +15,10 @@ Recommended properties:
- - spi-max-frequency: Definition as per
-                      Documentation/devicetree/bindings/spi/spi-bus.txt
- 
-+Optional properties:
-+- syscon-chipselects: Handle to system control region contains QSPI
-+		      chipselect register and offset of that register.
-+
- Example:
- 
- qspi: qspi at 4b300000 {
-@@ -26,3 +30,16 @@ qspi: qspi at 4b300000 {
- 	spi-max-frequency = <25000000>;
- 	ti,hwmods = "qspi";
- };
-+
-+For dra7xx:
-+qspi: qspi at 4b300000 {
-+	compatible = "ti,dra7xxx-qspi";
-+	reg = <0x4b300000 0x100>,
-+	      <0x5c000000 0x4000000>,
-+	reg-names = "qspi_base", "qspi_mmap";
-+	syscon-chipselects = <&scm_conf 0x558>;
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	spi-max-frequency = <48000000>;
-+	ti,hwmods = "qspi";
-+};
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index fe99231cbde5..be91c7781c07 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -1153,8 +1153,10 @@
- 
- 		qspi: qspi at 4b300000 {
- 			compatible = "ti,dra7xxx-qspi";
--			reg = <0x4b300000 0x100>;
--			reg-names = "qspi_base";
-+			reg = <0x4b300000 0x100>,
-+			      <0x5c000000 0x4000000>;
-+			reg-names = "qspi_base", "qspi_mmap";
-+			syscon-chipselects = <&scm_conf 0x558>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			ti,hwmods = "qspi";
+Linux CPU numbers               Actual CPU assigned to them
+                                5420            5422
+
+CPU0                            A15-0 (boot)    A7-0 (boot)
+CPU1                            A7-0            A7-1
+CPU2                            A7-1            A7-2
+CPU3                            A7-2            A7-3
+CPU4                            A7-3            A15-0
+CPU5                            A15-1           A15-1
+CPU6                            A15-2           A15-2
+CPU7                            A15-3           A15-3
+
+This happens because all non-boot CPUs will be added in the order they
+are present in DT.
+
+Now, there should be no *real* reason for you to want your CPUs to be
+always contiguous, isn't it?
+
+In the case of 5420, cpufreq will show related CPUs as:
+Policy0: CPU0,5-7, Policy1: CPU1-4
+
+and in the case of 5422, cpufreq will show related CPUs as:
+Policy0: CPU0-3, Policy1: CPU4-7
+
+And I think you should really fix this now..
+
 -- 
-2.6.3
+viresh
