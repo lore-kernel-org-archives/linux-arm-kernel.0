@@ -1,89 +1,53 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 11 Dec 2015 21:27:15 +0800
-Subject: [PATCH] mmc: sdhci: restore behavior when setting VDD via
- external regulator
-In-Reply-To: <1449839999-439-1-git-send-email-jszhang@marvell.com>
-References: <1449839999-439-1-git-send-email-jszhang@marvell.com>
-Message-ID: <20151211212715.6c6534eb@xhacker>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 11 Dec 2015 13:33:14 +0000
+Subject: FW: Commit 81a43adae3b9 (locking/mutex: Use acquire/release
+ semantics) causing failures on arm64 (ThunderX)
+In-Reply-To: <20151211122647.GM6356@twins.programming.kicks-ass.net>
+References: <5669D5F2.5050004@caviumnetworks.com>
+ <SN1PR07MB21577C72379C8440A208D6BC9EEA0@SN1PR07MB2157.namprd07.prod.outlook.com>
+ <CA+=Sn1miWYhH5ddMmLGYWknzcw3d1k4S6QyK9O_ofdJKJDQxmg@mail.gmail.com>
+ <CA+=Sn1n6e9pLDRVWT1EzDEn2XWwoK-Ep__-R6VVPzhbMvCEdNg@mail.gmail.com>
+ <20151211084133.GE6356@twins.programming.kicks-ass.net>
+ <20151211120419.GD18828@arm.com>
+ <20151211121319.GK6356@twins.programming.kicks-ass.net>
+ <20151211121759.GE18828@arm.com>
+ <20151211122647.GM6356@twins.programming.kicks-ass.net>
+Message-ID: <20151211133313.GG18828@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Dec 2015 21:19:59 +0800 Jisheng Zhang wrote:
-
-> After commit 52221610dd84 ("mmc: sdhci: Improve external VDD regulator
-> support"), for the VDD is supplied via external regulators, we ignore
-> the code to convert a VDD voltage request into one of the standard
-> SDHCI voltage levels, then program it in the SDHCI_POWER_CONTROL. This
-> brings two issues:
+On Fri, Dec 11, 2015 at 01:26:47PM +0100, Peter Zijlstra wrote:
+> On Fri, Dec 11, 2015 at 12:18:00PM +0000, Will Deacon wrote:
+> > On Fri, Dec 11, 2015 at 01:13:19PM +0100, Peter Zijlstra wrote:
+> > > On Fri, Dec 11, 2015 at 12:04:19PM +0000, Will Deacon wrote:
+> > > > I think Andrew meant the atomic_xchg_acquire at the start of osq_lock,
+> > > > as opposed to "compare and swap". In which case, it does look like
+> > > > there's a bug here because there is nothing to order the initialisation
+> > > > of the node fields with publishing of the node, whether that's
+> > > > indirectly as a result of setting the tail to the current CPU or
+> > > > directly as a result of the WRITE_ONCE.
+> > > 
+> > > Agreed, this does indeed look like a bug. If confirmed please write a
+> > > shiny changelog and I'll queue asap.
+> > 
+> > Yup. I've failed to reproduce the issue locally, so we'll need to wait
+> > for Andrew and/or David to get back to us first.
 > 
-> 1. SDHCI_QUIRK2_CARD_ON_NEEDS_BUS_ON quirk isn't handled properly any
-> more.
+> While we're there, the acquire in osq_wait_next() seems somewhat ill
+> documented too.
 > 
-> 2. What's more, some controllers such as the sdhci-pxav3 used in
-> marvell berlin SoCs require the voltage levels programming in the
-> SDHCI_POWER_CONTROL register, even the VDD is supplied by external
-> regulator.
-
-Actually, for this controller, once SDHCI_POWER_ON bit is set, the voltage
-levels also must be correctly set even the VDD is supplied by external regulator.
-
-so commit 52221610dd84 doesn't really introduce the regression, but commit
-52221610dd84 and 3cbc6123a93d ("mmc: sdhci: Set SDHCI_POWER_ON with external
-vmmc") would make the sdcard broken. 
-
-Seems I also need to put these information into the commit msg. will submit
-v2 soon.
-
-Thank you,
-Jisheng
-
+> I _think_ we need ACQUIRE semantics there because we want to strictly
+> order the lock-unqueue A,B,C steps and we get that with:
 > 
-> This patch restores the behavior when setting VDD through external
-> regulator by moving the call of mmc_regulator_set_ocr() to the end
-> of sdhci_set_power() function.
+>  A: SC
+>  B: ACQ
+>  C: Relaxed
 > 
-> After this patch, the sdcard on Marvell Berlin SoCs work again.
-> 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> Fixes: 52221610dd84 ("mmc: sdhci: Improve external VDD ...")
-> ---
->  drivers/mmc/host/sdhci.c | 19 ++++++-------------
->  1 file changed, 6 insertions(+), 13 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-> index b48565e..616aa90 100644
-> --- a/drivers/mmc/host/sdhci.c
-> +++ b/drivers/mmc/host/sdhci.c
-> @@ -1274,19 +1274,6 @@ static void sdhci_set_power(struct sdhci_host *host, unsigned char mode,
->  	struct mmc_host *mmc = host->mmc;
->  	u8 pwr = 0;
->  
-> -	if (!IS_ERR(mmc->supply.vmmc)) {
-> -		spin_unlock_irq(&host->lock);
-> -		mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, vdd);
-> -		spin_lock_irq(&host->lock);
-> -
-> -		if (mode != MMC_POWER_OFF)
-> -			sdhci_writeb(host, SDHCI_POWER_ON, SDHCI_POWER_CONTROL);
-> -		else
-> -			sdhci_writeb(host, 0, SDHCI_POWER_CONTROL);
-> -
-> -		return;
-> -	}
-> -
->  	if (mode != MMC_POWER_OFF) {
->  		switch (1 << vdd) {
->  		case MMC_VDD_165_195:
-> @@ -1345,6 +1332,12 @@ static void sdhci_set_power(struct sdhci_host *host, unsigned char mode,
->  		if (host->quirks & SDHCI_QUIRK_DELAY_AFTER_POWER)
->  			mdelay(10);
->  	}
-> +
-> +	if (!IS_ERR(mmc->supply.vmmc)) {
-> +		spin_unlock_irq(&host->lock);
-> +		mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, vdd);
-> +		spin_lock_irq(&host->lock);
-> +	}
->  }
->  
->  /*****************************************************************************\
+> Similarly for unlock we want the WRITE_ONCE to happen after
+> osq_wait_next, but in that case we can even rely on the control
+> dependency there.
+
+Even for the lock-unqueue case, isn't B->C ordered by a control dependency
+because C consists only of stores?
+
+Will
