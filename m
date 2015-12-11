@@ -1,26 +1,91 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 11 Dec 2015 14:04:29 +0100
-Subject: [PATCH 1/2] arm64: dts: rockchip: change the correct voltage
- range for rk3368 evb board
-In-Reply-To: <1449054741-25354-1-git-send-email-wxt@rock-chips.com>
-References: <1449054741-25354-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1606584.VJKYfIuzKa@diego>
+From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
+Date: Fri, 11 Dec 2015 14:22:04 +0100
+Subject: [PATCH] I.MX6: Fix Ethernet PHY mode on Ventana boards
+Message-ID: <m3r3itaznn.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Caesar,
+Gateworks Ventana boards seem to need "RGMII-ID" (internal delay)
+PHY mode, instead of simple "RGMII", for their Marvell 88E1510
+transceiver. Otherwise, the Ethernet MAC doesn't work with Marvell PHY
+driver (TX doesn't seem to work correctly).
 
-Am Mittwoch, 2. Dezember 2015, 19:12:20 schrieb Caesar Wang:
-> In general, the logic voltage is affected by ddr frequency factors.
-> We should fix the correct voltage range since assuemd that we have the
-> ddr frequency driver in mainline.
-> 
-> AFAIK, the 1.8v voltage is used by the SD3.0 card.
-> 
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+Tested on GW5400 rev. C.
 
-applied both patches to the 32 and 64 bit dts branches for 4.5
+This bug affects ARM Fedora 23.
 
+Signed-off-by: Krzysztof Ha?asa <khalasa@piap.pl>
+Acked-by: Tim Harvey <tharvey@gateworks.com>
+Cc: stable at vger.kernel.org
 
-Thanks
-Heiko
+diff --git a/arch/arm/boot/dts/imx6q-gw5400-a.dts b/arch/arm/boot/dts/imx6q-gw5400-a.dts
+index 822ffb2..6c168dc 100644
+--- a/arch/arm/boot/dts/imx6q-gw5400-a.dts
++++ b/arch/arm/boot/dts/imx6q-gw5400-a.dts
+@@ -154,7 +154,7 @@
+ &fec {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_enet>;
+-	phy-mode = "rgmii";
++	phy-mode = "rgmii-id";
+ 	phy-reset-gpios = <&gpio1 30 GPIO_ACTIVE_HIGH>;
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi
+index 7b31fdb..dc0cebf 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi
+@@ -94,7 +94,7 @@
+ &fec {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_enet>;
+-	phy-mode = "rgmii";
++	phy-mode = "rgmii-id";
+ 	phy-reset-gpios = <&gpio1 30 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
+index 1b66328..18cd411 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
+@@ -154,7 +154,7 @@
+ &fec {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_enet>;
+-	phy-mode = "rgmii";
++	phy-mode = "rgmii-id";
+ 	phy-reset-gpios = <&gpio1 30 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
+index 7c51839..eea90f3 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
+@@ -155,7 +155,7 @@
+ &fec {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_enet>;
+-	phy-mode = "rgmii";
++	phy-mode = "rgmii-id";
+ 	phy-reset-gpios = <&gpio1 30 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+index 929e0b3..6c11a2a 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+@@ -145,7 +145,7 @@
+ &fec {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_enet>;
+-	phy-mode = "rgmii";
++	phy-mode = "rgmii-id";
+ 	phy-reset-gpios = <&gpio1 30 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
+
+-- 
+Krzysztof Halasa
+
+Industrial Research Institute for Automation and Measurements PIAP
+Al. Jerozolimskie 202, 02-486 Warsaw, Poland
