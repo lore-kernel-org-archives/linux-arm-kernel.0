@@ -1,23 +1,29 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sat, 12 Dec 2015 00:08:17 +0100
-Subject: [PATCH] arm: dts: rockchip: Fix typo in rk32288 sdmmc card detect
- pin name
-In-Reply-To: <1449845158-8284-1-git-send-email-mbrugger@suse.com>
-References: <1449845158-8284-1-git-send-email-mbrugger@suse.com>
-Message-ID: <1649282.ILIgoNi0K6@diego>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Fri, 11 Dec 2015 15:14:12 -0800
+Subject: [PATCH 2/3] arm64: dts: apq8016-sbc: add label properties for
+ UART, I2C, and SPI
+In-Reply-To: <1449782473-20880-3-git-send-email-robh@kernel.org> (Rob
+ Herring's message of "Thu, 10 Dec 2015 15:21:12 -0600")
+References: <1449782473-20880-1-git-send-email-robh@kernel.org>
+ <1449782473-20880-3-git-send-email-robh@kernel.org>
+Message-ID: <7hlh90fuij.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthias,
+Rob Herring <robh@kernel.org> writes:
 
-Am Freitag, 11. Dezember 2015, 15:45:58 schrieb Matthias Brugger:
-> The card detect pin is currently called sdmcc-cd.
-> This patch fixes the typo and renames the pin to sdmmc-cd.
-> 
-> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+> Add label properties to provide a way to identify UART, I2C and SPI
+> ports based on their connector names. This follows naming convention in
+> 96boards CE spec. Ports without external connections are not labelled.
+>
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> Cc: Andy Gross <agross@codeaurora.org>
 
-applied to my dts32 branch for 4.5, after fixing the rk32288 in the subject
+Acked-by: Kevin Hilman <khilman@linaro.org>
+Tested-by: Kevin Hilman <khilman@linaro.org>
 
+Tested this on my db410c (along with script from cover letter) and it
+works great.
 
-Thanks
-Heiko
+Kevin
