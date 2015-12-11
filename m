@@ -1,45 +1,33 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 11 Dec 2015 18:13:04 +0100
-Subject: [PATCH v2 2/3] ehci-platform: Add support for controllers with
- multiple reset lines
-In-Reply-To: <1449848520-27379-2-git-send-email-hdegoede@redhat.com>
-References: <1449848520-27379-1-git-send-email-hdegoede@redhat.com>
- <1449848520-27379-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <1449853984.3419.52.camel@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 11 Dec 2015 17:21:40 +0000
+Subject: [PATCH 0/4] arm: Privileged no-access for LPAE
+In-Reply-To: <CAGXu5jJYoCxATf8tWAhdosNH9jKovpcYQ=PqD85gHnT+oBF3CQ@mail.gmail.com>
+References: <1443018250-22893-1-git-send-email-catalin.marinas@arm.com>
+ <CAGXu5jJYoCxATf8tWAhdosNH9jKovpcYQ=PqD85gHnT+oBF3CQ@mail.gmail.com>
+Message-ID: <20151211172140.GQ26759@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 11.12.2015, 16:41 +0100 schrieb Hans de Goede:
-> From: Reinder de Haan <patchesrdh@mveas.com>
+On Thu, Dec 10, 2015 at 11:40:44AM -0800, Kees Cook wrote:
+> [thread necromancy]
 > 
-> At least the EHCI/OHCI found on the Allwinnner H3 SoC needs multiple
-> reset lines, the controller will not initialize while the reset for
-> its companion is still asserted, which means we need to de-assert
-> 2 resets for the controller to work.
+> This series looks good to me. I'd love to see it accepted. At the very
+> least the cleanups look like no-brainers. :)
 > 
-> Signed-off-by: Reinder de Haan <patchesrdh@mveas.com>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
-> Changes in v2:
-> -Use the new reset_control_[de]assert_shared reset-controller functions
-> ---
->  Documentation/devicetree/bindings/usb/usb-ehci.txt |  2 +-
->  drivers/usb/host/ehci-platform.c                   | 47 +++++++++++++---------
->  2 files changed, 30 insertions(+), 19 deletions(-)
+> Please consider the series:
 > 
-> diff --git a/Documentation/devicetree/bindings/usb/usb-ehci.txt b/Documentation/devicetree/bindings/usb/usb-ehci.txt
-> index a12d601..0701812 100644
-> --- a/Documentation/devicetree/bindings/usb/usb-ehci.txt
-> +++ b/Documentation/devicetree/bindings/usb/usb-ehci.txt
-> @@ -18,7 +18,7 @@ Optional properties:
->   - clocks : a list of phandle + clock specifier pairs
->   - phys : phandle + phy specifier pair
->   - phy-names : "usb"
-> - - resets : phandle + reset specifier pair
-> + - resets : a list of phandle + reset specifier pairs
+> Reviewed-by: Kees Cook <keescook@chromium.org>
+> 
+> Thanks for working on it!
 
-Are there documented names for these resets? Is the companion you
-mention the Port Control?
+Thanks for the review. After some more (internal) discussions around
+these patches, I need to get clarification on the architecture whether
+changing the TTBCR.A1 bit is enough to guarantee an ASID change (I do
+this trick to change to the reserved ASID and avoid TLB invalidation as
+normally required by changes to translation control registers). If
+that's not allowed by the architecture, I would have to change the
+patches to switch to a reserved TTBR0 rather than disabling TTBR0 walks
+at the TTBCR level.
 
-regards
-Philipp
+-- 
+Catalin
