@@ -1,67 +1,54 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 11 Dec 2015 20:23:37 +0800
-Subject: [RFC PATCH 4/4] mfd: syscon: add ACPI support
-In-Reply-To: <21660867.NhUszMiexN@wuerfel>
-References: <1449047368-5768-1-git-send-email-wangkefeng.wang@huawei.com>
- <2299982.06P4iKpkWk@wuerfel>
- <CAMj5BkiAToBCvnOSkW=41po5OHpg5uSzxNTNJ_=gLK__BLa1Sw@mail.gmail.com>
- <21660867.NhUszMiexN@wuerfel>
-Message-ID: <566AC049.9080300@linaro.org>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 11 Dec 2015 13:26:47 +0100
+Subject: FW: Commit 81a43adae3b9 (locking/mutex: Use acquire/release
+ semantics) causing failures on arm64 (ThunderX)
+In-Reply-To: <20151211121759.GE18828@arm.com>
+References: <5669D5F2.5050004@caviumnetworks.com>
+ <SN1PR07MB21577C72379C8440A208D6BC9EEA0@SN1PR07MB2157.namprd07.prod.outlook.com>
+ <CA+=Sn1miWYhH5ddMmLGYWknzcw3d1k4S6QyK9O_ofdJKJDQxmg@mail.gmail.com>
+ <CA+=Sn1n6e9pLDRVWT1EzDEn2XWwoK-Ep__-R6VVPzhbMvCEdNg@mail.gmail.com>
+ <20151211084133.GE6356@twins.programming.kicks-ass.net>
+ <20151211120419.GD18828@arm.com>
+ <20151211121319.GK6356@twins.programming.kicks-ass.net>
+ <20151211121759.GE18828@arm.com>
+Message-ID: <20151211122647.GM6356@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/11/2015 06:51 PM, Arnd Bergmann wrote:
-> On Friday 11 December 2015 18:35:17 Zhangfei Gao wrote:
->> On Wed, Dec 2, 2015 at 6:44 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->>> On Wednesday 02 December 2015 17:09:28 Kefeng Wang wrote:
->>>
->>> This sounds like a bad idea:
->>>
->>> syscon is basically a hack to let us access register that the SoC designer
->>> couldn't fit in anywhere sane. We need something like this with devicetree
->>> because we decided not to have any interpreted bytecode to do this behind
->>> our back.
->>>
->>> With ACPI, the same thing is done with AML, which is actually nicer than
->>> syscon (once you have to deal with all the problems introduced by AML).
->>>
->>> Use that instead.
->>>
->>
->> Would you mind clarifying AML method, still not understand.
->> Is is means realize the operation in uefi/bootloader and call some
->> interface from kernel?
->>
->> The issue here is we want to access some common registers,
->> which we do not want to ioremap for many times in each driver.
->>
->> In hisi platforms, we have many common registers shared by many components.
->
-> Sorry, you'd have to ask someone who is more familiar with ACPI.
->
-> Basically, the idea of ACPI as I understand it is that you have a
-> interpreted bytecode language that is provided by the BIOS as tables
-> and executed in the context of the kernel. This byte code has access
-> to stuff like GPIO, PCI config space, MMIO registers, IPMI or the
-> embedded controller on a PC. This way, you can hide all the platform
-> specific details behind a function call from a generic device driver,
-> and the BIOS writer can provide the specific implementation for any
-> registers that are shared across components.
->
-> That's about all I know, but the ACPI specifications are available
-> publicly, please have a look there for more details.
+On Fri, Dec 11, 2015 at 12:18:00PM +0000, Will Deacon wrote:
+> On Fri, Dec 11, 2015 at 01:13:19PM +0100, Peter Zijlstra wrote:
+> > On Fri, Dec 11, 2015 at 12:04:19PM +0000, Will Deacon wrote:
+> > > I think Andrew meant the atomic_xchg_acquire at the start of osq_lock,
+> > > as opposed to "compare and swap". In which case, it does look like
+> > > there's a bug here because there is nothing to order the initialisation
+> > > of the node fields with publishing of the node, whether that's
+> > > indirectly as a result of setting the tail to the current CPU or
+> > > directly as a result of the WRITE_ONCE.
+> > 
+> > Agreed, this does indeed look like a bug. If confirmed please write a
+> > shiny changelog and I'll queue asap.
+> 
+> Yup. I've failed to reproduce the issue locally, so we'll need to wait
+> for Andrew and/or David to get back to us first.
 
-Thanks Arnd rise this up, I agree we need to abstract the syscon
-inside UEFI.
+While we're there, the acquire in osq_wait_next() seems somewhat ill
+documented too.
 
-For ACPI 6.0, there are method such as _ON, _OFF and _RST (reset)
-to the device's power resources, I think it can be extended to
-syscon to reset the device with access syscon in ACPI method,
-those method will be implemented in UEFI which the kernel driver
-don't need to care about the detail.
+I _think_ we need ACQUIRE semantics there because we want to strictly
+order the lock-unqueue A,B,C steps and we get that with:
 
-We are going to for that implementation for D02, and if problem
-we meet, we will go back for this discussion.
+ A: SC
+ B: ACQ
+ C: Relaxed
 
-Thanks
-Hanjun
+Similarly for unlock we want the WRITE_ONCE to happen after
+osq_wait_next, but in that case we can even rely on the control
+dependency there.
+
+
+As noted in a previous email, the ACQUIRE for osq_wait_next() does not
+come from its use in lock since its on the fail path, and trylock
+failure doesn't imply any barriers.
+
+Not should it have RELEASE semantics for its use in unlock, since we
+already have that covered by the xchg() done prior.
