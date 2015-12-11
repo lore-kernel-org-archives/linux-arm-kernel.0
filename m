@@ -1,76 +1,143 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 11 Dec 2015 14:53:20 +0100
-Subject: [PATCH v4 01/58] mtd: nand: denali: add missing nand_release()
- call in denali_remove()
-In-Reply-To: <20151211004008.GQ144338@google.com>
-References: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
- <1449734442-18672-2-git-send-email-boris.brezillon@free-electrons.com>
- <20151211004008.GQ144338@google.com>
-Message-ID: <20151211145320.1560fac3@bbrezillon>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 11 Dec 2015 13:53:08 +0000
+Subject: [PATCH v7 2/4] Documentation, dt, arm64/arm: dt bindings for numa.
+In-Reply-To: <1447780843-9223-3-git-send-email-gkulkarni@caviumnetworks.com>
+References: <1447780843-9223-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <1447780843-9223-3-git-send-email-gkulkarni@caviumnetworks.com>
+Message-ID: <20151211135307.GB20666@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian,
+Hi,
 
-On Thu, 10 Dec 2015 16:40:08 -0800
-Brian Norris <computersforpeace@gmail.com> wrote:
-
-> On Thu, Dec 10, 2015 at 08:59:45AM +0100, Boris Brezillon wrote:
-> > Unregister the NAND device from the NAND subsystem when removing a denali
-> > NAND controller, otherwise the MTD attached to the NAND device is still
-> > exposed by the MTD layer, and accesses to this device will likely crash
-> > the system.
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > Cc: <stable@vger.kernel.org> #3.8+
+On Tue, Nov 17, 2015 at 10:50:41PM +0530, Ganapatrao Kulkarni wrote:
+> DT bindings for numa mapping of memory, cores and IOs.
 > 
-> Does this follow these rules, from
-> Documentation/stable_kernel_rules.txt?
+> Reviewed-by: Robert Richter <rrichter@cavium.com>
+> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+
+Overall this looks good to me. However, I have a couple of concerns.
+
+> ---
+>  Documentation/devicetree/bindings/arm/numa.txt | 272 +++++++++++++++++++++++++
+>  1 file changed, 272 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/numa.txt
 > 
->  - It must be obviously correct and tested.
-> 
->  - It must fix a real bug that bothers people (not a, "This could be a
->    problem..." type thing).
+> diff --git a/Documentation/devicetree/bindings/arm/numa.txt b/Documentation/devicetree/bindings/arm/numa.txt
+> new file mode 100644
+> index 0000000..b87bf4f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/numa.txt
+> @@ -0,0 +1,272 @@
+> +==============================================================================
+> +NUMA binding description.
+> +==============================================================================
+> +
+> +==============================================================================
+> +1 - Introduction
+> +==============================================================================
+> +
+> +Systems employing a Non Uniform Memory Access (NUMA) architecture contain
+> +collections of hardware resources including processors, memory, and I/O buses,
+> +that comprise what is commonly known as a NUMA node.
+> +Processor accesses to memory within the local NUMA node is generally faster
+> +than processor accesses to memory outside of the local NUMA node.
+> +DT defines interfaces that allow the platform to convey NUMA node
+> +topology information to OS.
+> +
+> +==============================================================================
+> +2 - numa-node-id
+> +==============================================================================
+> +The device node property numa-node-id describes numa domains within a
+> +machine. This property can be used in device nodes like cpu, memory, bus and
+> +devices to map to respective numa nodes.
+> +
+> +numa-node-id property is a 32-bit integer which defines numa node id to which
+> +this device node has numa domain association.
 
-As you wish, I'll remove those Cc and Fixes tags, or just drop the
-patch if you think it's useless...
-I just noticed the bug while reworking this series, and thought it
-would be useful to fix it, but I honestly don't care if it's applied
-or not (I don't use this platform).
+I'd prefer if the above two paragraphs were replaced with:
 
-> 
-> > Fixes: 2a0a288ec258 ("mtd: denali: split the generic driver and PCI layer")
-> > ---
-> >  drivers/mtd/nand/denali.c | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/drivers/mtd/nand/denali.c b/drivers/mtd/nand/denali.c
-> > index 67eb2be..8feece3 100644
-> > --- a/drivers/mtd/nand/denali.c
-> > +++ b/drivers/mtd/nand/denali.c
-> > @@ -1622,6 +1622,7 @@ EXPORT_SYMBOL(denali_init);
-> >  /* driver exit point */
-> >  void denali_remove(struct denali_nand_info *denali)
-> >  {
-> > +	nand_release(&denali->mtd);
-> >  	denali_irq_cleanup(denali->irq, denali);
-> >  	dma_unmap_single(denali->dev, denali->buf.dma_buf,
-> >  			 denali->mtd.writesize + denali->mtd.oobsize,
-> 
-> It feels a bit odd to allow usage of MTD fields after it has been
-> unregistered. Maybe precompute this before the nand_release()?
+	For the purpose of identification, each NUMA node is associated
+	with a unique token known as a node id. For the purpose of this
+	binding a node id is a 32-bit integer.
 
-nand_realease() is not releasing the mtd instance or re-initialazing
-its field, so it should be safe, but I agree that pre-computing the DMA
-buffer size is more future-proof.
+	A device node is associated with a NUMA node by the presence of
+	a numa-node-id property which contains the node id of the
+	device.
 
-I'll fix that, send a v5 and let you decide whether it's needed or not.
+> +
+> +Example:
+> +	/* numa node 0 */
+> +	numa-node-id = <0>;
+> +
+> +	/* numa node 1 */
+> +	numa-node-id = <1>;
+> +
+> +==============================================================================
+> +3 - distance-map
+> +==============================================================================
+> +
+> +The device tree node distance-map describes the relative
+> +distance (memory latency) between all numa nodes.
 
-Best Regards,
+Is this not a combined approximation for latency and bandwidth?
 
-Boris
+> +- compatible : Should at least contain "numa,distance-map-v1".
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Please use "numa-distance-map-v1", as "numa" is not a vendor.
+
+> +- distance-matrix
+> +  This property defines a matrix to describe the relative distances
+> +  between all numa nodes.
+> +  It is represented as a list of node pairs and their relative distance.
+> +
+> +  Note:
+> +	1. Each entry represents distance from first node to second node.
+> +	2. If both directions between 2 nodes have the same distance, only
+> +	       one entry is required.
+
+I still don't understand what direction means in this context. Are there
+systems (of any architecture) which don't have symmetric distances?
+Which accesses does this apply differently to?
+
+Given that, I think that it might be best to explicitly call out
+distances as being equal, and leave any directionality for a later
+revision of the binding when we have some semantics for directionality.
+
+> +	2. distance-matrix shold have entries in lexicographical ascending order of nodes.
+> +	3. There must be only one Device node distance-map and must reside in the root node.
+> +
+> +Example:
+> +	4 nodes connected in mesh/ring topology as below,
+> +
+> +		0_______20______1
+> +		|               |
+> +		|               |
+> +	      20|               |20
+> +		|               |
+> +		|               |
+> +		|_______________|
+> +		3       20      2
+> +
+> +	if relative distance for each hop is 20,
+> +	then inter node distance would be for this topology will be,
+> +	      0 -> 1 = 20
+> +	      1 -> 2 = 20
+> +	      2 -> 3 = 20
+> +	      3 -> 0 = 20
+> +	      0 -> 2 = 40
+> +	      1 -> 3 = 40
+
+How is this scaled relative to a local access?
+
+Do we assume that a local access has value 1, e.g. each hop takes 20x a
+local access in this example?
+
+Do we need a finer-grained scale (e.g. to allow us to represent a
+distance of 2.5)? The ACPI SLIT spec seems to give local accesses a
+value 10 implicitly to this end.
+
+Other than those points, I'm happy with this binding.
+
+Thanks,
+Mark.
