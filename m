@@ -1,26 +1,36 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 11 Dec 2015 18:11:44 +0000
-Subject: [PATCH 0/2] arm64: dts: qcom: few i2c fixes
-Message-ID: <1449857504-11365-1-git-send-email-srinivas.kandagatla@linaro.org>
+Date: Fri, 11 Dec 2015 18:12:50 +0000
+Subject: [PATCH 1/2] arm64: dts: fix the i2c aliasing to match to schematics.
+In-Reply-To: <1449857504-11365-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1449857504-11365-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1449857570-11488-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy, 
+This patch fixes the i2c bus number aliasing so that it matches with the
+schematics bus naming.
 
-Here are two i2c dt fixes which I have been using for long time on Landing team tree.
+Without this patch the user might would get bus numbers depending on
+the order the devices are probed.
 
-Can you please consider fixes for v4.5.
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+ arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Thanks,
-srini
-
-Srinivas Kandagatla (2):
-  arm64: dts: fix the i2c aliasing to match to schematics.
-  arm64: dts: set the default i2c pin drive strength to 16mA
-
- arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi  | 3 +++
- arch/arm64/boot/dts/qcom/msm8916-pins.dtsi | 6 +++---
- 2 files changed, 6 insertions(+), 3 deletions(-)
-
+diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+index 6b8abbe..6f19956 100644
+--- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
++++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+@@ -20,6 +20,9 @@
+ 	aliases {
+ 		serial0 = &blsp1_uart2;
+ 		serial1 = &blsp1_uart1;
++		i2c0	= &blsp_i2c2;
++		i2c1	= &blsp_i2c6;
++		i2c3	= &blsp_i2c4;
+ 	};
+ 
+ 	chosen {
 -- 
 1.9.1
