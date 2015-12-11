@@ -1,134 +1,105 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 11 Dec 2015 11:12:10 +0100
-Subject: [PATCH v1 7/8] ARM: dts: rockchip: add core rk3228 dtsi
-In-Reply-To: <566A2CB7.4050801@rock-chips.com>
-References: <1449651853-1667-1-git-send-email-jeffy.chen@rock-chips.com>
- <24573164.okRNXjvZ1B@phil> <566A2CB7.4050801@rock-chips.com>
-Message-ID: <7783766.YsX4m8bWe1@diego>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 11 Dec 2015 11:21:30 +0100
+Subject: [PATCH] net/macb: add support for resetting PHY using GPIO
+In-Reply-To: <87wpsl727t.fsf@free-electrons.com>
+References: <1449683383-5022-1-git-send-email-gregory.clement@free-electrons.com>
+ <20151210073756.GA11966@pengutronix.de>
+ <871tau8hpj.fsf@free-electrons.com>
+ <20151211084630.GW11966@pengutronix.de>
+ <87wpsl727t.fsf@free-electrons.com>
+Message-ID: <20151211102130.GA11966@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeffy,
-
-Am Freitag, 11. Dezember 2015, 09:53:59 schrieb Jeffy Chen:
-> On 2015-12-10 8:32, Heiko Stuebner wrote:
-> > Am Mittwoch, 9. Dezember 2015, 17:04:12 schrieb Jeffy Chen:
-> >> Initial release for rk3228 shared dtsi.
-> >> 
-> >> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> >> ---
-> >> 
-> >>   arch/arm/boot/dts/rk3228.dtsi | 478
-> >>   ++++++++++++++++++++++++++++++++++++++++++ 1 file changed, 478
-> >>   insertions(+)
-> >>   create mode 100644 arch/arm/boot/dts/rk3228.dtsi
-> >> 
-> >> diff --git a/arch/arm/boot/dts/rk3228.dtsi
-> >> b/arch/arm/boot/dts/rk3228.dtsi
-> >> new file mode 100644
-> >> index 0000000..d6b3e40
-> >> --- /dev/null
-> >> +++ b/arch/arm/boot/dts/rk3228.dtsi
-> >> @@ -0,0 +1,478 @@
-> >> +/*
-> >> + * This file is dual-licensed: you can use it either under the terms
-> >> + * of the GPL or the X11 license, at your option. Note that this dual
-> >> + * licensing only applies to this file, and not this project as a
-> >> + * whole.
-> >> + *
-> >> + *  a) This file is free software; you can redistribute it and/or
-> >> + *     modify it under the terms of the GNU General Public License as
-> >> + *     published by the Free Software Foundation; either version 2 of
-> >> the
-> >> + *     License, or (at your option) any later version.
-> >> + *
-> >> + *     This file is distributed in the hope that it will be useful,
-> >> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> >> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> >> + *     GNU General Public License for more details.
-> >> + *
-> >> + * Or, alternatively,
-> >> + *
-> >> + *  b) Permission is hereby granted, free of charge, to any person
-> >> + *     obtaining a copy of this software and associated documentation
-> >> + *     files (the "Software"), to deal in the Software without
-> >> + *     restriction, including without limitation the rights to use,
-> >> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> >> + *     sell copies of the Software, and to permit persons to whom the
-> >> + *     Software is furnished to do so, subject to the following
-> >> + *     conditions:
-> >> + *
-> >> + *     The above copyright notice and this permission notice shall be
-> >> + *     included in all copies or substantial portions of the Software.
-> >> + *
-> >> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> >> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> >> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> >> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> >> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> >> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> >> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> >> + *     OTHER DEALINGS IN THE SOFTWARE.
-> >> + */
-> >> +
-> >> +#include <dt-bindings/gpio/gpio.h>
-> >> +#include <dt-bindings/interrupt-controller/irq.h>
-> >> +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> >> +#include <dt-bindings/pinctrl/rockchip.h>
-> >> +#include <dt-bindings/clock/rk3228-cru.h>
-> >> +#include "skeleton.dtsi"
-> >> +
-> >> +/ {
-> >> +	compatible = "rockchip,rk3228";
-> >> +
-> >> +	interrupt-parent = <&gic>;
-> >> +
-> >> +	aliases {
-> >> +		serial0 = &uart0;
-> >> +		serial1 = &uart1;
-> >> +		serial2 = &uart2;
-> >> +	};
-> >> +
-> >> +	memory {
-> >> +		device_type = "memory";
-> >> +		reg = <0x60000000 0x40000000>;
-> >> +	};
-> > 
-> > The amount of memory is a property of the board
+On Fri, Dec 11, 2015 at 10:40:22AM +0100, Gregory CLEMENT wrote:
+> Hi Sascha,
+>  
+>  On ven., d?c. 11 2015, Sascha Hauer <s.hauer@pengutronix.de> wrote:
 > 
-> done.
+> > On Thu, Dec 10, 2015 at 04:08:08PM +0100, Gregory CLEMENT wrote:
+> >> Hi Sascha,
+> >>  
+> >>  On jeu., d?c. 10 2015, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> >> 
+> >> > Hi Gregory,
+> >> >
+> >> > On Wed, Dec 09, 2015 at 06:49:43PM +0100, Gregory CLEMENT wrote:
+> >> >> With device tree it is no more possible to reset the PHY at board
+> >> >> level. Furthermore, doing in the driver allow to power down the PHY when
+> >> >> the network interface is no more used.
+> >> >> 
+> >> >> The patch introduces a new optional property "phy-reset-gpio" inspired
+> >> >> from the one use for the FEC.
+> >> >
+> >> > I don't think it's a good idea to further extend the usage of this
+> >> > binding. The driver should use the phy-handle property and
+> >> > of_phy_connect() which gives you a proper device node for the phy. Then
+> >> > the phy device node should get the reset gpio. I know it's more work,
+> >> 
+> >> So you suggest to pass from this binding:
+> >> macb1: ethernet at fc028000 {
+> >> 	phy-mode = "rmii";
+> >> 	status = "okay";
+> >> 	#address-cells = <1>;
+> >> 	#size-cells = <0>;
+> >> 	status = "okay";
+> >> 	phy-reset-gpio = <&pioE 6 GPIO_ACTIVE_HIGH>;
+> >> 
+> >> 	ethernet-phy at 1 {
+> >> 		reg = <0x1>;
+> >> 		interrupt-parent = <&pioB>;
+> >> 		interrupts = <31 IRQ_TYPE_EDGE_FALLING>;
+> >> 
+> >> 	};
+> >> };
+> >> 
+> >> to this binding
+> >> macb1: ethernet at fc028000 {
+> >> 	phy-mode = "rmii";
+> >> 	status = "okay";
+> >> 	#address-cells = <1>;
+> >> 	#size-cells = <0>;
+> >> 	status = "okay";
+> >> 
+> >> 	ethernet-phy at 1 {
+> >> 		reg = <0x1>;
+> >> 		interrupt-parent = <&pioB>;
+> >> 		interrupts = <31 IRQ_TYPE_EDGE_FALLING>;
+> >>                 phy-reset-gpio = <&pioE 6 GPIO_ACTIVE_HIGH>;
+> >> 	};
+> >> };
+> >
+> > s/phy-reset-gpio/reset-gpios/, but yes.
 > 
-> >> +
-> >> +	cpus {
-> >> +		#address-cells = <1>;
-> >> +		#size-cells = <0>;
-> > 
-> > no enable-method?
-> > 
-> > As the rk3228 also does not have a pmu, does the newly created
-> > "rockchip,rk3036-smp" work for you?
+> So I took this way. But I had several issues. The first one was that to
+> be able to create a phy device it must first be detected by
+> get_phy_device from of_mdiobus_register_phy.  But in order to be
+> detected it must answer during the scan of the mii bus. That means we
+> can't bind the gpio to the device in order to use it because when we
+> need to manage the reset gpio the device is not yet created.
 > 
-> unlucky, that doesn't work...and our 3.10 kernel is using psci for
-> rk3228's smp ops, maybe i should check that too, but i know nothing
-> about psci for now :(
+> So I see 2 options:
+> 
+> - leaving the phy-reset-gpios property in the ethernet node. Thanks to
+>   this we can use the gpiod functions, and it is still possible to use
+>   manage the power management.
+> 
+> - using a reset-gpios property inside the phy node. But then the only
+>   solution to get a reference on it, will be to use
+>   of_get_named_gpio. All the gpiod functions need a reference to the
+>   device that we won't have at this point. Also we will only be able to
+>   power up the reset, but we won't have any reference to it latter.
 
-Using PSCI on more rockchip socs will make the ARM people very happy ;-) .
+Have you seen fwnode_get_named_gpiod()? This seems to be the right
+function for the job.
 
-So definitly no argument from me against it. I guess you should only need the 
-enable-method and psci node you should already have in your 3.10 dts, to 
-actually enable it.
+I think we should get the binding right. The code can be changed easier
+than the binding later.
 
-cpu at xxx {
-		enable-method = "psci";
-};
+Sascha
 
-psci {
-	compatible = "arm,psci-0.2";
-	...
-};
-
-
-But we can of course add that in a later patch as well.
-
-
-Heiko
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
