@@ -1,56 +1,39 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Fri, 11 Dec 2015 09:20:50 +0100
-Subject: [PATCH v2 4/9] pinctrl: Add support STM32 MCUs
-In-Reply-To: <CACRpkda4eSHu57Tw6F-kmxY_EOSEhpRiowQN9o4LbPVgE_Xvkw@mail.gmail.com>
-References: <1445102604-11502-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1445102604-11502-5-git-send-email-mcoquelin.stm32@gmail.com>
- <CALszF6Cd=yei0m2Zs=+k=KT5RUzdesGWPK7PAQPdj_-Ouan=2A@mail.gmail.com>
- <CACRpkda4eSHu57Tw6F-kmxY_EOSEhpRiowQN9o4LbPVgE_Xvkw@mail.gmail.com>
-Message-ID: <566A8762.4040108@st.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 11 Dec 2015 09:22:07 +0100
+Subject: [PATCH 1/3] ARM: dts: sun7i: Olimex A20-SOM-EVB: Add LRADC keys
+In-Reply-To: <1449779521-754-2-git-send-email-merker@debian.org>
+References: <1449779521-754-1-git-send-email-merker@debian.org>
+ <1449779521-754-2-git-send-email-merker@debian.org>
+Message-ID: <20151211082207.GK27957@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus
+Hi,
 
-I will try to review it before end of next week
+On Thu, Dec 10, 2015 at 09:31:59PM +0100, Karsten Merker wrote:
+> The Olimex A20-SOM-EVB is an evaluation board for the Olimex
+> A20-SOM system-on-module.  It provides a set of android-style
+> buttons (labeled "VOL+", "VOL-", "MENU", "SEARCH", "HOME", "ESC"
+> and "ENTER") which are connected to a low-resolution ADC via a
+> resistor network.
+> 
+> This patch adds appropriate button definitions to the board
+> dts. The voltages assigned to the keys are specified in the
+> board schematics published by the manufacturer.
+> 
+> Signed-off-by: Karsten Merker <merker@debian.org>
 
-Patrice
+Applied 1 and 2, thanks!
+Maxime
 
-
-
-On 12/10/2015 06:08 PM, Linus Walleij wrote:
-> On Tue, Dec 1, 2015 at 10:53 AM, Maxime Coquelin
-> <mcoquelin.stm32@gmail.com> wrote:
->> 2015-10-17 19:23 GMT+02:00 Maxime Coquelin <mcoquelin.stm32@gmail.com>:
->>> This patch adds pinctrl and GPIO support to STMicroelectronic's STM32
->>> family of MCUs.
->>>
->>> While it only supports STM32F429 for now, it has been designed to enable
->>> support of other MCUs of the family (e.g. STM32F746).
->>>
->>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->>> ---
->>>   drivers/pinctrl/Kconfig                   |    1 +
->>>   drivers/pinctrl/Makefile                  |    1 +
->>>   drivers/pinctrl/stm32/Kconfig             |   16 +
->>>   drivers/pinctrl/stm32/Makefile            |    5 +
->>>   drivers/pinctrl/stm32/pinctrl-stm32.c     |  856 +++++++++++++++
->>>   drivers/pinctrl/stm32/pinctrl-stm32.h     |   43 +
->>>   drivers/pinctrl/stm32/pinctrl-stm32f429.c | 1598 +++++++++++++++++++++++++++++
->>>   7 files changed, 2520 insertions(+)
->>>   create mode 100644 drivers/pinctrl/stm32/Kconfig
->>>   create mode 100644 drivers/pinctrl/stm32/Makefile
->>>   create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32.c
->>>   create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32.h
->>>   create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32f429.c
->>>
->> Gentle reminder, do you know when you will be able to review this driver?
-> I'm a bit overloaded so reviewing of large chunks of code takes time.
->
-> It would be great if I could have some Reviewed-by tags from someone
-> else who's familiar with pin control.
->
-> Patrice: do you have a chance to review this driver and help us?
->
-> Yours,
-> Linus Walleij
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151211/2ed9bb8c/attachment-0001.sig>
