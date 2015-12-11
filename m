@@ -1,34 +1,109 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Fri, 11 Dec 2015 08:51:38 -0600
-Subject: [PATCH] MAINTAINERS: Add missing platform maintainers for dts
- files
-In-Reply-To: <1449790703-12054-1-git-send-email-robh@kernel.org>
-References: <1449790703-12054-1-git-send-email-robh@kernel.org>
-Message-ID: <alpine.DEB.2.02.1512110849540.27904@linux-builds1>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Fri, 11 Dec 2015 15:04:44 +0000
+Subject: [PATCH v6 1/4] drm: arm: Add DT bindings documentation for HDLCD
+ driver.
+In-Reply-To: <1449846287-21398-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1449846287-21398-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1449846287-21398-2-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 10 Dec 2015, Rob Herring wrote:
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: Kumar Gala <galak@codeaurora.org>
 
-> Platform dts files need to be reviewed primarily by the platform
-> maintainers as dts files typically go in thru their trees. Add the missing
-> paths where there are existing maintainers listed.
-> 
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> ---
->  MAINTAINERS | 20 +++++++++++++++++++-
->  1 file changed, 19 insertions(+), 1 deletion(-)
->
-[...] 
-> @@ -1536,6 +1549,7 @@ S:	Maintained
->  F:	arch/arm/mach-socfpga/
->  F:	arch/arm/boot/dts/socfpga*
->  F:	arch/arm/configs/socfpga_defconfig
-> +F:	arch/arm64/boot/dts/altera/
->  W:	http://www.rocketboards.org
->  T:	git git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git
+Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ .../devicetree/bindings/display/arm,hdlcd.txt      | 79 ++++++++++++++++++++++
+ 1 file changed, 79 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/arm,hdlcd.txt
 
-Acked-by: Dinh Nguyen <dinguyen@opensource.altera.com>
-
-Thanks,
-Dinh
+diff --git a/Documentation/devicetree/bindings/display/arm,hdlcd.txt b/Documentation/devicetree/bindings/display/arm,hdlcd.txt
+new file mode 100644
+index 0000000..78bc242
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/arm,hdlcd.txt
+@@ -0,0 +1,79 @@
++ARM HDLCD
++
++This is a display controller found on several development platforms produced
++by ARM Ltd and in more modern of its' Fast Models. The HDLCD is an RGB
++streamer that reads the data from a framebuffer and sends it to a single
++digital encoder (DVI or HDMI).
++
++Required properties:
++  - compatible: "arm,hdlcd"
++  - reg: Physical base address and length of the controller's registers.
++  - interrupts: One interrupt used by the display controller to notify the
++    interrupt controller when any of the interrupt sources programmed in
++    the interrupt mask register have activated.
++  - clocks: A list of phandle + clock-specifier pairs, one for each
++    entry in 'clock-names'.
++  - clock-names: A list of clock names. For HDLCD it should contain:
++      - "pxlclk" for the clock feeding the output PLL of the controller.
++
++Required sub-nodes:
++  - port: The HDLCD connection to an encoder chip. The connection is modeled
++    using the OF graph bindings specified in
++    Documentation/devicetree/bindings/graph.txt.
++
++Optional properties:
++  - memory-region: phandle to a node describing memory (see
++    Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt) to be
++    used for the framebuffer; if not present, the framebuffer may be located
++    anywhere in memory.
++
++
++Example:
++
++/ {
++	...
++
++	hdlcd at 2b000000 {
++		compatible = "arm,hdlcd";
++		reg = <0 0x2b000000 0 0x1000>;
++		interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&oscclk5>;
++		clock-names = "pxlclk";
++		port {
++			hdlcd_output: endpoint at 0 {
++				remote-endpoint = <&hdmi_enc_input>;
++			};
++		};
++	};
++
++	/* HDMI encoder on I2C bus */
++	i2c at 7ffa0000 {
++		....
++		hdmi-transmitter at 70 {
++			compatible = ".....";
++			reg = <0x70>;
++			port at 0 {
++				hdmi_enc_input: endpoint {
++					remote-endpoint = <&hdlcd_output>;
++				};
++
++				hdmi_enc_output: endpoint {
++					remote-endpoint = <&hdmi_1_port>;
++				};
++			};
++		};
++
++	};
++
++	hdmi1: connector at 1 {
++		compatible = "hdmi-connector";
++		type = "a";
++		port {
++			hdmi_1_port: endpoint {
++				remote-endpoint = <&hdmi_enc_output>;
++			};
++		};
++	};
++
++	...
++};
+-- 
+2.6.4
