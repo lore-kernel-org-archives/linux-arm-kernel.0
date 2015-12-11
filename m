@@ -1,33 +1,75 @@
 From: damien.riegel@savoirfairelinux.com (Damien Riegel)
-Date: Fri, 11 Dec 2015 12:08:13 -0500
-Subject: [PATCH v9 2/3] of: documentation: add bindings documentation for
- TS-4800
-In-Reply-To: <1449853694-6980-1-git-send-email-damien.riegel@savoirfairelinux.com>
-References: <1449853694-6980-1-git-send-email-damien.riegel@savoirfairelinux.com>
-Message-ID: <1449853694-6980-3-git-send-email-damien.riegel@savoirfairelinux.com>
+Date: Fri, 11 Dec 2015 12:08:11 -0500
+Subject: [PATCH v9 0/3] Add board support for TS-4800
+Message-ID: <1449853694-6980-1-git-send-email-damien.riegel@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the documentation for the TS-4800 by Technologic Systems.
+This patch serie adds support for TS-4800 board. This board,                                                                              
+manufactured by Technologic Systems, is based on an IMX515.
 
-Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
- Documentation/devicetree/bindings/arm/technologic.txt | 6 ++++++
- 1 file changed, 6 insertions(+)
+The first stage bootloader, called TS-BOOTROM, enables the watchdog,
+so a watchdog driver is required to prevent board from rebooting. It is
+handled in a separate patchset.
+
+The current device tree is minimal but it allows to get a shell on the
+board.
+
+Changes in v9:
+ - Changed dts file license to X11/GPL
+ - Reordered i2c2 node to be alphabetically sorted
+ - Dropped container node in iomuxc
+
+Changes in v8:
+ - Split the serie into two parts, watchdog and dts, because there are
+   no build dependencies between the two, and the syscon patch has been
+   separately applied in Lee Jones' tree.
+ - As a consequence, I dropped the patch which enabled the watchdog in
+   imx_v6_v7_defconfig to ease the integration.
+
+Changes in v7:
+ - syscon: change bus-width DT property to reg-io-width
+ - watchdog: add dependency on HAS_IOMEM (spotted by a 0-day build) 
+
+Changes in v6:
+ - vendor prefix: reorder to sort alphabetically (wrong order since v3)
+ - split commit adding device tree into two patches: one for the doc, one for
+   the bindings
+
+Changes in v5:
+ - watchdog: changed iteration stop condition in set_timeout to be less
+   error prone
+
+Changes in v4:
+ - syscon: rewrite DT property reading to be clearer
+ - watchdog: made fixes suggested by Guenter (now uses
+   watchdog_init_timeout, u32 instead of u16, fixed error checking in
+   probe, cleaned set_timeout)
+
+Changes in v3:
+ - Rebased on v4.3
+ - Changed vendor prefix from "ts" to "technologic"
+ - Added a DT option to generic syscon driver to allow regmap configuration
+ - Dropped custom mfd driver, use generic syscon driver instead.
+
+Changes in v2:
+ - Added a mfd driver to handle syscon registers
+ - The watchdog driver now uses the regmap (created by the mfd driver)
+   to access the feed register
+ - Remove watchdog's dependency on SOC_IMX51
+
+Damien Riegel (3):
+  of: add vendor prefix for Technologic Systems
+  of: documentation: add bindings documentation for TS-4800
+  ARM: dts: TS-4800: add basic device tree
+
+ .../devicetree/bindings/arm/technologic.txt        |   6 +
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/boot/dts/Makefile                         |   3 +-
+ arch/arm/boot/dts/imx51-ts4800.dts                 | 180 +++++++++++++++++++++
+ 4 files changed, 189 insertions(+), 1 deletion(-)
  create mode 100644 Documentation/devicetree/bindings/arm/technologic.txt
+ create mode 100644 arch/arm/boot/dts/imx51-ts4800.dts
 
-diff --git a/Documentation/devicetree/bindings/arm/technologic.txt b/Documentation/devicetree/bindings/arm/technologic.txt
-new file mode 100644
-index 0000000..8422988
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/technologic.txt
-@@ -0,0 +1,6 @@
-+Technologic Systems Platforms Device Tree Bindings
-+--------------------------------------------------
-+
-+TS-4800 board
-+Required root node properties:
-+	- compatible = "technologic,imx51-ts4800", "fsl,imx51";
 -- 
 2.5.0
