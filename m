@@ -1,47 +1,31 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 11 Dec 2015 14:06:49 +0000
-Subject: FW: Commit 81a43adae3b9 (locking/mutex: Use acquire/release
- semantics) causing failures on arm64 (ThunderX)
-In-Reply-To: <20151211134803.GP6356@twins.programming.kicks-ass.net>
-References: <SN1PR07MB21577C72379C8440A208D6BC9EEA0@SN1PR07MB2157.namprd07.prod.outlook.com>
- <CA+=Sn1miWYhH5ddMmLGYWknzcw3d1k4S6QyK9O_ofdJKJDQxmg@mail.gmail.com>
- <CA+=Sn1n6e9pLDRVWT1EzDEn2XWwoK-Ep__-R6VVPzhbMvCEdNg@mail.gmail.com>
- <20151211084133.GE6356@twins.programming.kicks-ass.net>
- <20151211120419.GD18828@arm.com>
- <20151211121319.GK6356@twins.programming.kicks-ass.net>
- <20151211121759.GE18828@arm.com>
- <20151211122647.GM6356@twins.programming.kicks-ass.net>
- <20151211133313.GG18828@arm.com>
- <20151211134803.GP6356@twins.programming.kicks-ass.net>
-Message-ID: <20151211140649.GI18828@arm.com>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Fri, 11 Dec 2015 16:12:39 +0200
+Subject: [PATCH V6 20/26] perf: changing pmu::setup_aux() parameter to
+ include event
+In-Reply-To: <1449176702-13213-21-git-send-email-mathieu.poirier@linaro.org>
+References: <1449176702-13213-1-git-send-email-mathieu.poirier@linaro.org>
+ <1449176702-13213-21-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <87egetcbvs.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 11, 2015 at 02:48:03PM +0100, Peter Zijlstra wrote:
-> On Fri, Dec 11, 2015 at 01:33:14PM +0000, Will Deacon wrote:
-> > On Fri, Dec 11, 2015 at 01:26:47PM +0100, Peter Zijlstra wrote:
-> 
-> > > While we're there, the acquire in osq_wait_next() seems somewhat ill
-> > > documented too.
-> > > 
-> > > I _think_ we need ACQUIRE semantics there because we want to strictly
-> > > order the lock-unqueue A,B,C steps and we get that with:
-> > > 
-> > >  A: SC
-> > >  B: ACQ
-> > >  C: Relaxed
-> > > 
-> > > Similarly for unlock we want the WRITE_ONCE to happen after
-> > > osq_wait_next, but in that case we can even rely on the control
-> > > dependency there.
-> > 
-> > Even for the lock-unqueue case, isn't B->C ordered by a control dependency
-> > because C consists only of stores?
-> 
-> Hmm, indeed. So we could go fully relaxed on it I suppose, since the
-> same is true for the unlock site.
+Mathieu Poirier <mathieu.poirier@linaro.org> writes:
 
-In which case, we should be able to relax the xchg in there (osq_wait_next)
-too, right?
+> For Coresight ETMv3/4 tracers the event carries information
+> about trace modes such as user or kernel space tracing and
+> whether tracing is allowed when operating in secure mode.
 
-Will
+Ok, so it looks to me that what you're doing in your setup_aux with the
+event, you should rather be doing in pmu::event_init(), which takes
+event as a parameter and it even makes more sense semantically, because
+that bit is really configuring the parameters of tracing and not
+capturing, which setup_aux() is more about. And the above paragraph also
+sounds very much like it. Since in Coresight there is a very clear
+distinction between trace generation (sources) and capturing (sinks) it
+should also be possible to structure the code in such a way that the
+former are not as closely tied to the latter. Please correct me if I'm
+missing something.
+
+Regards,
+--
+Alex
