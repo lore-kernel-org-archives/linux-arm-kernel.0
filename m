@@ -1,46 +1,46 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 11 Dec 2015 13:13:19 +0100
-Subject: FW: Commit 81a43adae3b9 (locking/mutex: Use acquire/release
- semantics) causing failures on arm64 (ThunderX)
-In-Reply-To: <20151211120419.GD18828@arm.com>
-References: <5669D5F2.5050004@caviumnetworks.com>
- <SN1PR07MB21577C72379C8440A208D6BC9EEA0@SN1PR07MB2157.namprd07.prod.outlook.com>
- <CA+=Sn1miWYhH5ddMmLGYWknzcw3d1k4S6QyK9O_ofdJKJDQxmg@mail.gmail.com>
- <CA+=Sn1n6e9pLDRVWT1EzDEn2XWwoK-Ep__-R6VVPzhbMvCEdNg@mail.gmail.com>
- <20151211084133.GE6356@twins.programming.kicks-ass.net>
- <20151211120419.GD18828@arm.com>
-Message-ID: <20151211121319.GK6356@twins.programming.kicks-ass.net>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Fri, 11 Dec 2015 12:13:52 +0000
+Subject: [RFC] kprobe'ing conditionally executed instructions
+In-Reply-To: <20151211103459.GS8644@n2100.arm.linux.org.uk>
+References: <566A5997.9020908@linaro.org> <1449829633.2815.27.camel@linaro.org>
+ <20151211103459.GS8644@n2100.arm.linux.org.uk>
+Message-ID: <1449836032.2815.39.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 11, 2015 at 12:04:19PM +0000, Will Deacon wrote:
-> I think Andrew meant the atomic_xchg_acquire at the start of osq_lock,
-> as opposed to "compare and swap". In which case, it does look like
-> there's a bug here because there is nothing to order the initialisation
-> of the node fields with publishing of the node, whether that's
-> indirectly as a result of setting the tail to the current CPU or
-> directly as a result of the WRITE_ONCE.
+On Fri, 2015-12-11 at 10:34 +0000, Russell King - ARM Linux wrote:
+> On Fri, Dec 11, 2015 at 10:27:13AM +0000, Jon Medhurst (Tixy) wrote:
+> > On Fri, 2015-12-11 at 00:05 -0500, David Long wrote:
+> > > There is a moderate amount of code already in kprobes on ARM and the 
+> > > current ARMv8 patch to deal with conditional execution of instructions. 
+> > > One aspect of how this is handled is that instructions that fail their 
+> > > predicate and are not (technically) executed are also not treated as a 
+> > > hit kprobe. Steve Capper has suggested that the probe handling should 
+> > > still take place because we stepped through the instruction even if it 
+> > > was effectively a nop.  This would be a significant change in how it 
+> > > currently works on 32-bit ARM
+> > 
+> > 32-bit ARM uses undefined instructions for kprobe 'breakpoints' and the
+> > ARM ARM says it's implementation defined behaviour whether these
+> > generate exceptions or not, i.e. whether the kprobe handler will be
+> > called.
+> 
+> There are two classes of undefined instructions.  There are those which
+> fall into the above category, and there are those which are guaranteed
+> to raise an exception.  We should always be using the guaranteed ones,
+> not the other set.
 
-Agreed, this does indeed look like a bug. If confirmed please write a
-shiny changelog and I'll queue asap.
+I wonder if I'm going senile or have been subject to having the ARM ARM
+evolve under me. I could swear we used instructions that were defined as
+undefined (so to speak) and that conditional versions of undefined
+instructions were UNPREDICTABLE. However, checking the ARM ARM again I
+see those instruction encodings are for the BKPT instruction which says:
 
-> diff --git a/kernel/locking/osq_lock.c b/kernel/locking/osq_lock.c
-> index d092a0c9c2d4..05a37857ab55 100644
-> --- a/kernel/locking/osq_lock.c
-> +++ b/kernel/locking/osq_lock.c
-> @@ -93,10 +93,12 @@ bool osq_lock(struct optimistic_spin_queue *lock)
->  	node->cpu = curr;
->  
->  	/*
-> -	 * ACQUIRE semantics, pairs with corresponding RELEASE
-> -	 * in unlock() uncontended, or fastpath.
-> +	 * We need both ACQUIRE (pairs with corresponding RELEASE in
-> +	 * unlock() uncontended, or fastpath) and RELEASE (to publish
-> +	 * the node fields we just initialised) semantics when updating
-> +	 * the lock tail.
->  	 */
-> -	old = atomic_xchg_acquire(&lock->tail, curr);
-> +	old = atomic_xchg(&lock->tail, curr);
->  	if (old == OSQ_UNLOCKED_VAL)
->  		return true;
->  
+  Breakpoint causes a software breakpoint to occur.
+  Breakpoint is always unconditional, even when inside an IT block.
+
+So, my previous statements about not being able to implement the
+proposed kprobe changes consistently aren't true.
+
+-- 
+Tixy
