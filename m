@@ -1,54 +1,69 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 11 Dec 2015 13:26:47 +0100
-Subject: FW: Commit 81a43adae3b9 (locking/mutex: Use acquire/release
- semantics) causing failures on arm64 (ThunderX)
-In-Reply-To: <20151211121759.GE18828@arm.com>
-References: <5669D5F2.5050004@caviumnetworks.com>
- <SN1PR07MB21577C72379C8440A208D6BC9EEA0@SN1PR07MB2157.namprd07.prod.outlook.com>
- <CA+=Sn1miWYhH5ddMmLGYWknzcw3d1k4S6QyK9O_ofdJKJDQxmg@mail.gmail.com>
- <CA+=Sn1n6e9pLDRVWT1EzDEn2XWwoK-Ep__-R6VVPzhbMvCEdNg@mail.gmail.com>
- <20151211084133.GE6356@twins.programming.kicks-ass.net>
- <20151211120419.GD18828@arm.com>
- <20151211121319.GK6356@twins.programming.kicks-ass.net>
- <20151211121759.GE18828@arm.com>
-Message-ID: <20151211122647.GM6356@twins.programming.kicks-ass.net>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 11 Dec 2015 12:35:06 +0000
+Subject: [RFC PATCH 2/4] device property: Introduce helper
+ device_get_reference_node()
+In-Reply-To: <20151203152842.GO8644@n2100.arm.linux.org.uk>
+References: <1449047368-5768-1-git-send-email-wangkefeng.wang@huawei.com>
+ <1449047368-5768-3-git-send-email-wangkefeng.wang@huawei.com>
+ <20151203152842.GO8644@n2100.arm.linux.org.uk>
+Message-ID: <20151211123506.GA30463@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 11, 2015 at 12:18:00PM +0000, Will Deacon wrote:
-> On Fri, Dec 11, 2015 at 01:13:19PM +0100, Peter Zijlstra wrote:
-> > On Fri, Dec 11, 2015 at 12:04:19PM +0000, Will Deacon wrote:
-> > > I think Andrew meant the atomic_xchg_acquire at the start of osq_lock,
-> > > as opposed to "compare and swap". In which case, it does look like
-> > > there's a bug here because there is nothing to order the initialisation
-> > > of the node fields with publishing of the node, whether that's
-> > > indirectly as a result of setting the tail to the current CPU or
-> > > directly as a result of the WRITE_ONCE.
-> > 
-> > Agreed, this does indeed look like a bug. If confirmed please write a
-> > shiny changelog and I'll queue asap.
+Hi Russell,
+
+On Thu, Dec 03, 2015 at 03:28:42PM +0000, Russell King - ARM Linux wrote:
+> On Wed, Dec 02, 2015 at 05:09:26PM +0800, Kefeng Wang wrote:
+> > With of_parse_phandle() and acpi_dev_get_reference_device(), we can introduce
+> > a universal helper device_get_reference_node() to read and parse a device
+> > property and return a pointer to the resulting firmware node.
 > 
-> Yup. I've failed to reproduce the issue locally, so we'll need to wait
-> for Andrew and/or David to get back to us first.
+> What's happening to make this fwnode stuff actually usable?  Whenever
+> I've looked at it from the DT perspective, it looks very much like a
+> half-baked train wreck - although the struct device_node contains a
+> fwnode, of_node_init() initialises it partially, and we have a way to
+> convert _from_ a fwnode to a device_node (to_of_node), nothing sets
+> the struct device fwnode pointer.
 
-While we're there, the acquire in osq_wait_next() seems somewhat ill
-documented too.
+I might have missed why that pointer is left to NULL in DT, it is
+not that complicated to set it up and may actually simplify things
+in the process.
 
-I _think_ we need ACQUIRE semantics there because we want to strictly
-order the lock-unqueue A,B,C steps and we get that with:
+Rafael certainly knows better than I do, it could have been done in
+commit:
 
- A: SC
- B: ACQ
- C: Relaxed
+9017f25254e4 ("driver core: Implement device property accessors through
+fwnode ones")
 
-Similarly for unlock we want the WRITE_ONCE to happen after
-osq_wait_next, but in that case we can even rely on the control
-dependency there.
+except that as you noticed the dev_fwnode has to be special cased since
+the OF core does not set the fwnode pointer (there must be a reason
+why, if there is not a patch to implement that is simple).
 
+On DT the fwnode_handle is allocated in the struct device_node that
+contains it but I still do not see why the fwnode pointer in struct
+device can't be made to point at it.
 
-As noted in a previous email, the ACQUIRE for osq_wait_next() does not
-come from its use in lock since its on the fail path, and trylock
-failure doesn't imply any barriers.
+> Whenever I've looked at this, it's always led me to the conclusion
+> that the way that fwnode stuff has currently been written, I'm
+> supposed to get the device_node, and then use the embedded fwnode
+> directly, which I'm pretty sure misses the point of fwnode (as it
+> means any driver code making use of this is tied to DT.)
+> 
+> This patch seems to confirm my suspicions that it's just wrong -
+> trying to use device_get_reference_node() here will fail in a DT
+> based setup, because (I assume) dev_fwnode(dev) returns dev->fwnode
+> which is NULL there.
 
-Not should it have RELEASE semantics for its use in unlock, since we
-already have that covered by the xchg() done prior.
+No, dev_fwnode is special cased for OF (have a look at it in
+/drivers/base/property.c), I share your question on why it has to
+be so, actually this would make dev_fwnode() even simpler.
+
+> I don't know, maybe there is an intention that fwnode should not be
+> used for DT?
+
+That's the question we need to get answered :), it might well be that
+we can simply update the OF populate code to initialize the pointer
+in the struct device.
+
+Thanks,
+Lorenzo
