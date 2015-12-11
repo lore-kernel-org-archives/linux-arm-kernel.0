@@ -1,23 +1,34 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 11 Dec 2015 19:21:03 +0000
-Subject: [PATCH 1/2] ARM: Documentation: l2c: Rename l2cc to l2x0
-In-Reply-To: <20151211190711.GX8644@n2100.arm.linux.org.uk>
-References: <1449860267-16154-1-git-send-email-dirk.behme@gmail.com>
- <20151211190711.GX8644@n2100.arm.linux.org.uk>
-Message-ID: <20151211192103.GP18828@arm.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Fri, 11 Dec 2015 13:23:44 -0600
+Subject: [PATCH 4/4] arm: dts: apq8064: add shared memory node
+In-Reply-To: <1449858789-13605-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1449858409-13296-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1449858789-13605-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20151211192344.GA4022@Agamemnon.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 11, 2015 at 07:07:11PM +0000, Russell King - ARM Linux wrote:
-> On Fri, Dec 11, 2015 at 07:57:46PM +0100, Dirk Behme wrote:
-> > The documentation in the l2cc.txt is specific to the L2 cache
-> > controllers PL210/PL220/PL310 (and variants) and not generic
-> > as the file name implies. It's not valid for integrated L2
-> > controllers as found in e.g. Cortex-A15/A7/A57/A53.
+On Fri, Dec 11, 2015 at 06:33:09PM +0000, Srinivas Kandagatla wrote:
+> This patch adds support to qcom,smem device.
 > 
-> Please change it to l2c2x0.txt - and please change the PL prefix above
-> to L2C.  ARMs documentation uses the L2C prefix rather than PL for these.
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> ---
+>  arch/arm/boot/dts/qcom-apq8064.dtsi | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+> index 829028a..40dd6b4 100644
+> --- a/arch/arm/boot/dts/qcom-apq8064.dtsi
+> +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+> @@ -682,5 +682,11 @@
+>  			#hwlock-cells = <1>;
+>  		};
+>  
+> +		smem {
+> +			compatible = "qcom,smem";
+> +			memory-region = <&smem>;
+> +			hwlocks = <&sfpb_mutex 3>;
+> +		};
+> +
 
-Sounds like something out of star wars ;)
-
-Will
+smem needs to be outside the soc as there is no reg entry.
