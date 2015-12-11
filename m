@@ -1,53 +1,38 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 11 Dec 2015 13:36:01 +0000
-Subject: [PATCH 0/5] ARM: orion5x/dove/mv78xx0 multiplatform
-In-Reply-To: <14967875.ttNXUbSTvS@wuerfel>
-References: <1448466557-435335-1-git-send-email-arnd@arndb.de>
- <2992463.fVOGazvIkH@wuerfel> <5669F5F8.5010005@vollmann.ch>
- <14967875.ttNXUbSTvS@wuerfel>
-Message-ID: <20151211133601.GB18249@io.lakedaemon.net>
+From: mans@mansr.com (Mans Rullgard)
+Date: Fri, 11 Dec 2015 13:36:26 +0000
+Subject: [PATCH] ARM: dts: imx28: add alternate auart4 pinmux
+Message-ID: <1449840986-23489-1-git-send-email-mans@mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Josh
+Add auart4 2-pin configuration on auart0 rts/cts pads.
 
-Hey Arnd, Detlef,
+Signed-off-by: Mans Rullgard <mans@mansr.com>
+---
+ arch/arm/boot/dts/imx28.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-On Fri, Dec 11, 2015 at 12:10:55AM +0100, Arnd Bergmann wrote:
-> On Thursday 10 December 2015 23:00:24 Detlef Vollmann wrote:
-> > On 12/10/15 22:29, Arnd Bergmann wrote:
-> > > On Thursday 10 December 2015 22:14:25 Detlef Vollmann wrote:
-> > >> On 12/10/15 21:59, Arnd Bergmann wrote:
-> > > It may also be worth investigating what has made CONFIG_OF so costly,
-> > Probably because too much is done at runtime and too few things can
-> > be fixed at build time.
-> > 
-> > > maybe we can reduce this a bit again.
-> > Probably not without turning the wheel backward :-(
-> > 
-> > So for the test: yes it works, but I'm unhappy with it.
-> 
-> I'm not too happy about adding 80kb to the uncompressed kernel 
-> image either. I've spent some more time now trying to find where
-> we added the bloat. It's mainly in drivers, not in arch specific
-> code, a kilobyte here and there eventually adds up, but the largest
-> portion with a little over 50% of the total diff is drivers/of.
-
-Wasn't there an idea kicked around a while ago to create a
-dt2boardfile script/executable*?  Then, during kernel configuration, you
-enable it and select which dts file you want.  It would disable
-CONFIG_OF, multiplatform, etc.  And generate a board_file.c from the dts
-file.
-
-If anything, it might be worth asking the kernel tinification [1], [2]
-folks if they'd be interested in taking this on...
-
-
-thx,
-
-Jason.
-
-* This may have been completely in my head...
-
-[1] http://events.linuxfoundation.org/sites/events/files/slides/tiny.pdf
-[2] https://tiny.wiki.kernel.org/
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index c5b57d4..fae7b90 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -405,6 +405,17 @@
+ 					fsl,pull-up = <MXS_PULL_DISABLE>;
+ 				};
+ 
++				auart4_2pins_b: auart4 at 1 {
++					reg = <1>;
++					fsl,pinmux-ids = <
++						MX28_PAD_AUART0_CTS__AUART4_RX
++						MX28_PAD_AUART0_RTS__AUART4_TX
++					>;
++					fsl,drive-strength = <MXS_DRIVE_4mA>;
++					fsl,voltage = <MXS_VOLTAGE_HIGH>;
++					fsl,pull-up = <MXS_PULL_DISABLE>;
++				};
++
+ 				mac0_pins_a: mac0 at 0 {
+ 					reg = <0>;
+ 					fsl,pinmux-ids = <
+-- 
+2.6.3
