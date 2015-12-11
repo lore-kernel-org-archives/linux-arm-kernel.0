@@ -1,42 +1,40 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 11 Dec 2015 18:31:47 +0000
-Subject: [PATCH 2/4] arm: dts: apq8064: add shared memory into dt
- reserved-memory
+Date: Fri, 11 Dec 2015 18:32:11 +0000
+Subject: [PATCH 3/4] arm: dts: apq8064: add hwspinlock nodes
 In-Reply-To: <1449858409-13296-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1449858409-13296-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1449858707-13517-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1449858731-13561-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the shared memory in the Device tree reserved memory
-list so that kernel would not map it as normal memory.
+This patch adds support hwspinlock devicetree node.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- arch/arm/boot/dts/qcom-apq8064.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/boot/dts/qcom-apq8064.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
 diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index a4c1762..09f0e27 100644
+index 09f0e27..829028a 100644
 --- a/arch/arm/boot/dts/qcom-apq8064.dtsi
 +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -11,6 +11,17 @@
- 	compatible = "qcom,apq8064";
- 	interrupt-parent = <&intc>;
- 
-+	reserved-memory {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
+@@ -670,5 +670,17 @@
+ 			compatible = "qcom,tcsr-apq8064", "syscon";
+ 			reg = <0x1a400000 0x100>;
+ 		};
 +
-+		smem:smem at 80000000 {
-+			reg = <0x80000000 0x200000>;
-+			no-map;
++		sfpb_syscon:syscon at 01200600 {
++			compatible = "syscon";
++			reg = <0x01200600 0x100>;
 +		};
-+	};
 +
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
++		sfpb_mutex: hwlock {
++			compatible = "qcom,sfpb-mutex";
++			syscon = <&sfpb_syscon 0x4 0x4>;
++			#hwlock-cells = <1>;
++		};
++
+ 	};
+ };
 -- 
 1.9.1
