@@ -1,36 +1,21 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 11 Dec 2015 11:47:04 +0100
-Subject: [PATCH] MAINTAINERS: Add missing platform maintainers for dts
- files
-In-Reply-To: <1449790703-12054-1-git-send-email-robh@kernel.org>
-References: <1449790703-12054-1-git-send-email-robh@kernel.org>
-Message-ID: <566AA9A8.3010707@gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 11 Dec 2015 11:51:43 +0100
+Subject: [PATCH 1/3] ARM: dts: imx: Add basic dts support for imx6qp
+In-Reply-To: <1449830722-26607-1-git-send-email-b51503@freescale.com>
+References: <1449830722-26607-1-git-send-email-b51503@freescale.com>
+Message-ID: <20151211105143.GB11966@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11.12.2015 00:38, Rob Herring wrote:
-> Platform dts files need to be reviewed primarily by the platform
-> maintainers as dts files typically go in thru their trees. Add the missing
-> paths where there are existing maintainers listed.
->
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> ---
->   MAINTAINERS | 20 +++++++++++++++++++-
->   1 file changed, 19 insertions(+), 1 deletion(-)
->
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 69c8a9c..415b731 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-[...]
-> @@ -1270,6 +1278,7 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->   S:	Maintained
->   F:	arch/arm/mach-berlin/
->   F:	arch/arm/boot/dts/berlin*
-> +F:	arch/arm64/boot/dts/marvell/berlin*
+On Fri, Dec 11, 2015 at 06:45:20PM +0800, Bai Ping wrote:
+> The i.MX6Qual Plus processor is an high performance SOC of i.MX6 family.
 
-For Berlin,
+Qual is German for pain. Is that what you mean?
 
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Sascha
 
-Thanks!
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
