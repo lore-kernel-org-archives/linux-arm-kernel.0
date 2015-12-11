@@ -1,37 +1,97 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 11 Dec 2015 14:45:41 +0000
-Subject: [PATCH] scripts: recordmcount: break hardlinks
-In-Reply-To: <20151211093125.50b72639@gandalf.local.home>
-References: <20151202090517.432556a4@gandalf.local.home>
- <E1a7MVT-0000et-62@rmk-PC.arm.linux.org.uk>
- <20151211093125.50b72639@gandalf.local.home>
-Message-ID: <20151211144541.GT8644@n2100.arm.linux.org.uk>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 11 Dec 2015 15:48:04 +0100
+Subject: [PATCH v2] mmc: sdhci: restore behavior when setting VDD via
+ external regulator
+In-Reply-To: <1449840989-563-1-git-send-email-jszhang@marvell.com>
+References: <1449840989-563-1-git-send-email-jszhang@marvell.com>
+Message-ID: <CAPDyKFpVqQREdiKm42cM7OxXHDpJffp3OMN6GqLAkn-gep6xOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 11, 2015 at 09:31:25AM -0500, Steven Rostedt wrote:
-> On Fri, 11 Dec 2015 12:09:03 +0000
-> Russell King <rmk+kernel@arm.linux.org.uk> wrote:
-> 
-> > recordmcount edits the file in-place, which can cause problems when
-> > using ccache in hardlink mode.  Arrange for recordmcount to break a
-> > hardlinked object.
-> > 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > ---
-> > Steven, sorry it took a while to get this out...
-> 
-> Should this be for stable, or is it fine to just add this to my 4.5
-> queue?
++ Ludovic (We had some discussions around this code recently as well)
 
-I thought you wanted to test it first - although I've been running with
-this for a while now, my nightly builds have masked out the mcount
-warning, and I suspect it'll take a while for ccache to purge itself
-of the modified objects.
+On 11 December 2015 at 14:36, Jisheng Zhang <jszhang@marvell.com> wrote:
+> After commit 52221610dd84 ("mmc: sdhci: Improve external VDD regulator
+> support"), for the VDD is supplied via external regulators, we ignore
+> the code to convert a VDD voltage request into one of the standard
+> SDHCI voltage levels, then program it in the SDHCI_POWER_CONTROL. This
+> brings two issues:
+>
+> 1. SDHCI_QUIRK2_CARD_ON_NEEDS_BUS_ON quirk isn't handled properly any
+> more.
+>
+> 2. What's more, once SDHCI_POWER_ON bit is set, some controllers such
+> as the sdhci-pxav3 used in marvell berlin SoCs require the voltage
+> levels programming in the SDHCI_POWER_CONTROL register, even the VDD
+> is supplied by external regulator. So the host in marvell berlin SoCs
+> still works fine after the commit. However, commit 3cbc6123a93d ("mmc:
+> sdhci: Set SDHCI_POWER_ON with external vmmc") sets the SDHCI_POWER_ON
+> bit, this would make the host in marvell berlin SoCs won't work any
+> more with external vmmc.
+>
+> This patch restores the behavior when setting VDD through external
+> regulator by moving the call of mmc_regulator_set_ocr() to the end
+> of sdhci_set_power() function.
+>
+> After this patch, the sdcard on Marvell Berlin SoC boards work again.
+>
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> Fixes: 52221610dd84 ("mmc: sdhci: Improve external VDD ...")
+> ---
+> Since v1:
+>  - add more details about why the sdhci-pxav3 used in marvell berlin
+>    SoCs need this patch.
+>
+>  drivers/mmc/host/sdhci.c | 19 ++++++-------------
+>  1 file changed, 6 insertions(+), 13 deletions(-)
+>
+> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> index b48565e..616aa90 100644
+> --- a/drivers/mmc/host/sdhci.c
+> +++ b/drivers/mmc/host/sdhci.c
+> @@ -1274,19 +1274,6 @@ static void sdhci_set_power(struct sdhci_host *host, unsigned char mode,
+>         struct mmc_host *mmc = host->mmc;
+>         u8 pwr = 0;
+>
+> -       if (!IS_ERR(mmc->supply.vmmc)) {
+> -               spin_unlock_irq(&host->lock);
+> -               mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, vdd);
+> -               spin_lock_irq(&host->lock);
+> -
+> -               if (mode != MMC_POWER_OFF)
+> -                       sdhci_writeb(host, SDHCI_POWER_ON, SDHCI_POWER_CONTROL);
+> -               else
+> -                       sdhci_writeb(host, 0, SDHCI_POWER_CONTROL);
+> -
+> -               return;
+> -       }
+> -
+>         if (mode != MMC_POWER_OFF) {
+>                 switch (1 << vdd) {
+>                 case MMC_VDD_165_195:
+> @@ -1345,6 +1332,12 @@ static void sdhci_set_power(struct sdhci_host *host, unsigned char mode,
+>                 if (host->quirks & SDHCI_QUIRK_DELAY_AFTER_POWER)
+>                         mdelay(10);
+>         }
+> +
+> +       if (!IS_ERR(mmc->supply.vmmc)) {
+> +               spin_unlock_irq(&host->lock);
+> +               mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, vdd);
+> +               spin_lock_irq(&host->lock);
+> +       }
+>  }
+>
+>  /*****************************************************************************\
+> --
+> 2.6.3
+>
 
-If you're happy to add a stable tag to it, then please do so.
+My concern with this patch is that it might fix the problem for your
+SDHCI variant, but will break it for others.
+I guess we can give it try, unless or until someone reports a problem.
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Although, I would like to get Ludovic's input on this change, before I
+decide to do anything.
+
+Kind regards
+Uffe
