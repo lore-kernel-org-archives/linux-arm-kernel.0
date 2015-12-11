@@ -1,58 +1,33 @@
-From: songjun.wu@atmel.com (Songjun Wu)
-Date: Fri, 11 Dec 2015 11:07:37 +0800
-Subject: [PATCH] ASoC: Atmel: ClassD: unregister codec when error occurs
-Message-ID: <1449803257-27255-1-git-send-email-songjun.wu@atmel.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 11 Dec 2015 08:46:46 +0530
+Subject: [PATCH v5 3/7] ARM: dts: Exynos542x/5800: add CPU OPP properties
+In-Reply-To: <1449766729-435-4-git-send-email-b.zolnierkie@samsung.com>
+References: <1449766729-435-1-git-send-email-b.zolnierkie@samsung.com>
+ <1449766729-435-4-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <20151211031646.GL3612@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add code to unregister codec in probe function,
-when the error occurs after the codec is registered.
+On 10-12-15, 17:58, Bartlomiej Zolnierkiewicz wrote:
+> diff --git a/arch/arm/boot/dts/exynos5422-cpus.dtsi b/arch/arm/boot/dts/exynos5422-cpus.dtsi
+> index b7f60c8..9a5131d 100644
+> --- a/arch/arm/boot/dts/exynos5422-cpus.dtsi
+> +++ b/arch/arm/boot/dts/exynos5422-cpus.dtsi
+> @@ -20,8 +20,10 @@
+>  	device_type = "cpu";
+>  	compatible = "arm,cortex-a7";
+>  	reg = <0x100>;
+> +	clocks = <&clock CLK_KFC_CLK>;
+>  	clock-frequency = <1000000000>;
+>  	cci-control-port = <&cci_control0>;
+> +	operating-points-v2 = <&cpu1_opp_table>;
+>  };
 
-Signed-off-by: Songjun Wu <songjun.wu@atmel.com>
----
+Why do you need to update this file? This file is included by
+exynos5422-odroidxu3-common.dtsi, which already inherits cpus nodes
+from exynos5800.dtsi (which inherits exynos5420.dtsi).
 
- sound/soc/atmel/atmel-classd.c |   14 ++++++++++----
- 1 file changed, 10 insertions(+), 4 deletions(-)
+i.e. operating-points-v2 should already be set.
 
-diff --git a/sound/soc/atmel/atmel-classd.c b/sound/soc/atmel/atmel-classd.c
-index dca6141..6107de9 100644
---- a/sound/soc/atmel/atmel-classd.c
-+++ b/sound/soc/atmel/atmel-classd.c
-@@ -640,8 +640,10 @@ static int atmel_classd_probe(struct platform_device *pdev)
- 
- 	/* register sound card */
- 	card = devm_kzalloc(dev, sizeof(*card), GFP_KERNEL);
--	if (!card)
--		return -ENOMEM;
-+	if (!card) {
-+		ret = -ENOMEM;
-+		goto unregister_codec;
-+	}
- 
- 	snd_soc_card_set_drvdata(card, dd);
- 	platform_set_drvdata(pdev, card);
-@@ -649,16 +651,20 @@ static int atmel_classd_probe(struct platform_device *pdev)
- 	ret = atmel_classd_asoc_card_init(dev, card);
- 	if (ret) {
- 		dev_err(dev, "failed to init sound card\n");
--		return ret;
-+		goto unregister_codec;
- 	}
- 
- 	ret = devm_snd_soc_register_card(dev, card);
- 	if (ret) {
- 		dev_err(dev, "failed to register sound card: %d\n", ret);
--		return ret;
-+		goto unregister_codec;
- 	}
- 
- 	return 0;
-+
-+unregister_codec:
-+	snd_soc_unregister_codec(dev);
-+	return ret;
- }
- 
- static int atmel_classd_remove(struct platform_device *pdev)
 -- 
-1.7.9.5
+viresh
