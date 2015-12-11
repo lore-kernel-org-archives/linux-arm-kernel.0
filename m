@@ -1,71 +1,50 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 11 Dec 2015 10:26:08 +0100
-Subject: [PATCH linux-next 4/5] Documentation: atmel-quadspi: add binding
- file for Atmel QSPI driver
-In-Reply-To: <caec561f882521b3896530404ecb2bbad9950435.1449494420.git.cyrille.pitchen@atmel.com>
-References: <cover.1449494420.git.cyrille.pitchen@atmel.com>
- <caec561f882521b3896530404ecb2bbad9950435.1449494420.git.cyrille.pitchen@atmel.com>
-Message-ID: <566A96B0.2010808@atmel.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 11 Dec 2015 15:05:02 +0530
+Subject: [PATCH V7 3/3] dma: add Qualcomm Technologies HIDMA channel driver
+In-Reply-To: <5669DC48.2040402@codeaurora.org>
+References: <1448245707-27499-1-git-send-email-okaya@codeaurora.org>
+ <1448245707-27499-4-git-send-email-okaya@codeaurora.org>
+ <20151130085948.GC3901@localhost> <565CAC4C.7080909@codeaurora.org>
+ <20151201113458.GL3901@localhost> <565E0E1D.1040505@codeaurora.org>
+ <565F40A5.2040701@codeaurora.org> <20151205080030.GJ1854@localhost>
+ <5669DC48.2040402@codeaurora.org>
+Message-ID: <20151211093502.GY1854@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 07/12/2015 15:09, Cyrille Pitchen a ?crit :
-> This patch documents the DT bindings for the driver of the Atmel QSPI
-> controller embedded inside sama5d2x SoCs.
+On Thu, Dec 10, 2015 at 03:10:48PM -0500, Sinan Kaya wrote:
+> On 12/5/2015 3:00 AM, Vinod Koul wrote:
+> > On Wed, Dec 02, 2015 at 02:04:05PM -0500, Sinan Kaya wrote:
+> >>>>> You are missing the point. Channel can be paused, yes but the descriptor
+> >>>>> is in queue and is not paused. The descriptor running is paused, yes.
+> >>>>> There is subtle difference between these
+> >>> I'll follow your recommendation. PAUSE for the currently active
+> >>> descriptor and DMA_IN_PROGRESS for the rest.
+> >>>
+> >>
+> >> I'm now confused.
+> >>
+> >> I looked at several DMA driver implementations.
+> >>
+> >> 1. They call dma_cookie_status function to see if the job is done.
+> >> 2. If done, they return right ahead.
+> >> 3. Otherwise, dma_cookie_status returns DMA_IN_PROGRESS.
+> >> 4. Next the code checks if the channel is paused and return value is
+> >> DMA_IN_PROGRESS. The code changes return code to DMA_PAUSED.
+> >>
+> >> Whereas, I was returning paused first before even checking if the
+> >> descriptor is done. Are you OK with the sequence 1..4 above?
+> > 
+> > Yes am okay with this with slight change in 4.
+> > 
+> > You should set to PAUSED only for current descriptor and not for the ones in
+> > queue
+> > 
 > 
-> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> OK. I'll post a new version with this. Is there any other comment that
+> needed to be addressed?
 
-The change is very small from previous one and moreover accepted by Rob.
-So, for sure:
-
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-
-> ---
->  .../devicetree/bindings/mtd/atmel-quadspi.txt      | 32 ++++++++++++++++++++++
->  1 file changed, 32 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt b/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
-> new file mode 100644
-> index 000000000000..e81f20f9faf1
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
-> @@ -0,0 +1,32 @@
-> +* Atmel Quad Serial Peripheral Interface (QSPI)
-> +
-> +Required properties:
-> +- compatible:     Should be "atmel,sama5d2-qspi".
-> +- reg:            Should contain the locations and lengths of the base registers
-> +                  and the mapped memory.
-> +- reg-names:      Should contain the resource reg names:
-> +                  - qspi_base: configuration register address space
-> +                  - qspi_mmap: memory mapped address space
-> +- interrupts:     Should contain the interrupt for the device.
-> +- clocks:         The phandle of the clock needed by the QSPI controller.
-> +- #address-cells: Should be <1>.
-> +- #size-cells:    Should be <0>.
-> +
-> +Example:
-> +
-> +spi at f0020000 {
-> +	compatible = "atmel,sama5d2-qspi";
-> +	reg = <0xf0020000 0x100>, <0xd0000000 0x8000000>;
-> +	reg-names = "qpsi_base", "qspi_mmap";
-> +	interrupts = <52 IRQ_TYPE_LEVEL_HIGH 7>;
-> +	clocks = <&spi0_clk>;
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_spi0_default>;
-> +	status = "okay";
-> +
-> +	m25p80 at 0 {
-> +		...
-> +	};
-> +};
-> 
-
+Looks okay to me
 
 -- 
-Nicolas Ferre
+~Vinod
