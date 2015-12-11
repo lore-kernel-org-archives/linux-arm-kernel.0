@@ -1,25 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 11 Dec 2015 15:42:39 +0100
-Subject: [PATCH 0/3] ARM: multi_v7_defconfig: Misc shmobile updates
-In-Reply-To: <1449830727-325-1-git-send-email-geert+renesas@glider.be>
-References: <1449830727-325-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <3377719.UMBHRLUcv2@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 11 Dec 2015 14:45:41 +0000
+Subject: [PATCH] scripts: recordmcount: break hardlinks
+In-Reply-To: <20151211093125.50b72639@gandalf.local.home>
+References: <20151202090517.432556a4@gandalf.local.home>
+ <E1a7MVT-0000et-62@rmk-PC.arm.linux.org.uk>
+ <20151211093125.50b72639@gandalf.local.home>
+Message-ID: <20151211144541.GT8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 11 December 2015 11:45:24 Geert Uytterhoeven wrote:
->         Hi Simon, Magnus, arm-soc,
+On Fri, Dec 11, 2015 at 09:31:25AM -0500, Steven Rostedt wrote:
+> On Fri, 11 Dec 2015 12:09:03 +0000
+> Russell King <rmk+kernel@arm.linux.org.uk> wrote:
 > 
-> Here are a few updates for the ARM multi_v7 defconfig.
-> They are equivalent to the updates for shmobile_defconfig that have just
-> been accepted by Simon.
+> > recordmcount edits the file in-place, which can cause problems when
+> > using ccache in hardlink mode.  Arrange for recordmcount to break a
+> > hardlinked object.
+> > 
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > ---
+> > Steven, sorry it took a while to get this out...
 > 
-> This is against renesas-devel-20151211v2-v4.4-rc4.
-> There's a small conflict when applying to arm-soc/for-next, so Simon's
-> tree looks like the best way forward.
+> Should this be for stable, or is it fine to just add this to my 4.5
+> queue?
 
-Sounds good.
+I thought you wanted to test it first - although I've been running with
+this for a while now, my nightly builds have masked out the mcount
+warning, and I suspect it'll take a while for ccache to purge itself
+of the modified objects.
 
-The changes all look good to me,
+If you're happy to add a stable tag to it, then please do so.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
