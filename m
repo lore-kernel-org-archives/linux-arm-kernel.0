@@ -1,27 +1,44 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 11 Dec 2015 07:05:32 +0000
-Subject: [PICKME 0/2] cpufreq: New ST driver
-In-Reply-To: <20151211031900.GM3612@ubuntu>
-References: <1449740537-12619-1-git-send-email-lee.jones@linaro.org>
- <2896628.JCDQCVfIaC@vostro.rjw.lan> <20151211031900.GM3612@ubuntu>
-Message-ID: <20151211070532.GB13538@x1>
+From: vbabka@suse.cz (Vlastimil Babka)
+Date: Fri, 11 Dec 2015 08:12:38 +0100
+Subject: next-20151210 build: 4 failures 43 warnings (next-20151210)
+In-Reply-To: <20151210144708.65b7111eb795ddabbfad1ed3@linux-foundation.org>
+References: <E1a6wEp-0000hU-7o@optimist> <20151210165513.GO5727@sirena.org.uk>
+ <20151210144708.65b7111eb795ddabbfad1ed3@linux-foundation.org>
+Message-ID: <566A7766.7060704@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Dec 2015, Viresh Kumar wrote:
-> On 10-12-15, 22:38, Rafael J. Wysocki wrote:
-> > Do they depend on anything special?
+On 10.12.2015 23:47, Andrew Morton wrote:
+> On Thu, 10 Dec 2015 16:55:13 +0000 Mark Brown <broonie@kernel.org> wrote:
 > 
-> My opp-binding-parsing patches which you applied to bleeding-edge.
+>> Today's -next fails to build most arm64 configs with some rather
+>> spectacular errors below introduced by 02598e94ed5a78 (mm, printk:
+>> introduce new format string for flags) from Andrew's tree.  These in
+>> turn stem from the fact that we introduce an inclusion of
+>> linux/tracepoint.h into linux/mmdebug.h which through a chain of nested
+>> inclusions means that we end up attempting to use definitions from
+>> headers before they have finished including.
+> 
+> Thanks.
+> 
+> Further complexicating the include tree is something we don't need. 
+> I'll try moving the offending declarations into mm/internal.h, see how
+> that goes.
 
-I thought these had already been applied.
+Yeah that works too, thanks.
 
-> Yes, Lee should have mentioned that explicitly.
+> Including ../mm/internal.h into lib/vsprintf.c is a bit grubby, but I
+> guess it makes sense - vsprintf is poking about in mm internals, so it
+> gets to include mm's internal.h.
 
-Aye, apologies for that.
+OK.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> Vlastimil, the patch is rather bloaty - it adds 1.2k for something
+> which few people will use.  I wonder if it should be conditioned by
+> CONFIG_DEBUG_VM.
+
+Hmm, but one of the benefits is that we get e.g. the gfp flags translated
+in oom and alloc failure reports that users submit, and CONFIG_DEBUG_VM
+is not enabled by default. So the conditioning should be based on some
+option that people explicitly enable to make their kernels smaller knowing
+it's a tradeoff for functionality/convenience.
