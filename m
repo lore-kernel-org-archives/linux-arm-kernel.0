@@ -1,50 +1,73 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 11 Dec 2015 13:00:32 +0900
-Subject: [PATCH v5 3/7] ARM: dts: Exynos542x/5800: add CPU OPP properties
-In-Reply-To: <20151211033253.GN3612@ubuntu>
-References: <1449766729-435-1-git-send-email-b.zolnierkie@samsung.com>
- <1449766729-435-4-git-send-email-b.zolnierkie@samsung.com>
- <20151211031646.GL3612@ubuntu> <566A4231.9050608@osg.samsung.com>
- <20151211033253.GN3612@ubuntu>
-Message-ID: <566A4A60.8060402@samsung.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 11 Dec 2015 13:04:06 +0900
+Subject: [PATCH] ARM: shmobile: r8a779x: use SoC-specific usb-dac
+ compatibility strings
+In-Reply-To: <1449802778-11777-1-git-send-email-horms+renesas@verge.net.au>
+References: <1449802778-11777-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20151211040406.GB13336@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11.12.2015 12:32, Viresh Kumar wrote:
-> On 11-12-15, 00:25, Javier Martinez Canillas wrote:
->> The problem is that the big and LITTLE cores have different ordering per SoCs:
->>
->> - Exynos5420 and Exynos5800: cpu0-3 (Cortex-A15) and cpu4-7 (Coretx-A7)
->> - Exynos5422: cpu0-3 (Cortex-A7) and cpu4-7 (Cortex-A15)
->>
->> So the OPP tables are set in this DTSI file, to prevent the OPP tables
->> in the Exynos5422 to be inverted for the cluster 0 and 1.
+On Fri, Dec 11, 2015 at 11:59:38AM +0900, Simon Horman wrote:
+> Use recently SoC-specific compatibility strings in r8a779[01] device trees.
 > 
-> Oh dude, that's really *ugly*. :)
-> 
-> Reusing files/definitions is fine to the point where things are
-> readable. But you have screwed it up so very badly.
-> 
-> Over that, why can't you keep cpu0-3 as A7 and 4-7 as a15 for all the
-> cases? The only worrying thing for you should be that CPU0 within the
-> kenrel should be controllable, right? i.e. you want a A15 to boot 5800
-> and A7 to boot 5422.
-> 
-> If yes, than you could have kept the CPUs in 5422 as:
-> 0-3: A7
-> 4-7: A15
-> 
-> and in 5420 as:
-> 4-7: A15
-> 0-3: A7
-> 
-> Wouldnt' that work ?
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+> Based on renesas-devel-20151211-v4.4-rc4
 
-It wasn't working like this. The cpu0 got the index from booting cpu, so
-on 5420 cpu0 was A15 and on 5422 it was A7.
+Bother, there is a typo in the subject.
+I plan to fix that either when merging or reposting the patch
+depending on what other feedback I get.
 
-Maybe I am not aware of some changes recently in the kernel but how do
-you want to assign the booting CPU proper number (not CPU0)?
-
-Best regards,
-Krzysztof
+> ---
+>  arch/arm/boot/dts/r8a7790.dtsi | 4 ++--
+>  arch/arm/boot/dts/r8a7791.dtsi | 4 ++--
+>  2 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+> index 9f3036b80c0e..c6f083c9345d 100644
+> --- a/arch/arm/boot/dts/r8a7790.dtsi
+> +++ b/arch/arm/boot/dts/r8a7790.dtsi
+> @@ -386,7 +386,7 @@
+>  	};
+>  
+>  	usb_dmac0: dma-controller at e65a0000 {
+> -		compatible = "renesas,usb-dmac";
+> +		compatible = "renesas,r8a7790-usb-dmac", "renesas,usb-dmac";
+>  		reg = <0 0xe65a0000 0 0x100>;
+>  		interrupts = <0 109 IRQ_TYPE_LEVEL_HIGH
+>  			      0 109 IRQ_TYPE_LEVEL_HIGH>;
+> @@ -398,7 +398,7 @@
+>  	};
+>  
+>  	usb_dmac1: dma-controller at e65b0000 {
+> -		compatible = "renesas,usb-dmac";
+> +		compatible = "renesas,r8a7790-usb-dmac", "renesas,usb-dmac";
+>  		reg = <0 0xe65b0000 0 0x100>;
+>  		interrupts = <0 110 IRQ_TYPE_LEVEL_HIGH
+>  			      0 110 IRQ_TYPE_LEVEL_HIGH>;
+> diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+> index 36559cb0eb6b..ae1dda181624 100644
+> --- a/arch/arm/boot/dts/r8a7791.dtsi
+> +++ b/arch/arm/boot/dts/r8a7791.dtsi
+> @@ -375,7 +375,7 @@
+>  	};
+>  
+>  	usb_dmac0: dma-controller at e65a0000 {
+> -		compatible = "renesas,usb-dmac";
+> +		compatible = "renesas,r8a7791-usb-dmac", "renesas,usb-dmac";
+>  		reg = <0 0xe65a0000 0 0x100>;
+>  		interrupts = <0 109 IRQ_TYPE_LEVEL_HIGH
+>  			      0 109 IRQ_TYPE_LEVEL_HIGH>;
+> @@ -387,7 +387,7 @@
+>  	};
+>  
+>  	usb_dmac1: dma-controller at e65b0000 {
+> -		compatible = "renesas,usb-dmac";
+> +		compatible = "renesas,r8a7791-usb-dmac", "renesas,usb-dmac";
+>  		reg = <0 0xe65b0000 0 0x100>;
+>  		interrupts = <0 110 IRQ_TYPE_LEVEL_HIGH
+>  			      0 110 IRQ_TYPE_LEVEL_HIGH>;
+> -- 
+> 2.1.4
+> 
