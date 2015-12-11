@@ -1,71 +1,131 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 11 Dec 2015 19:28:07 +0100
-Subject: [PATCH v2 2/3] ehci-platform: Add support for controllers with
- multiple reset lines
-In-Reply-To: <1449853984.3419.52.camel@pengutronix.de>
-References: <1449848520-27379-1-git-send-email-hdegoede@redhat.com>
- <1449848520-27379-2-git-send-email-hdegoede@redhat.com>
- <1449853984.3419.52.camel@pengutronix.de>
-Message-ID: <566B15B7.40703@redhat.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 11 Dec 2015 18:29:01 +0000
+Subject: [PATCH v3 07/22] arm64: KVM: Implement system register
+ save/restore
+In-Reply-To: <566A420B.2080406@samsung.com>
+References: <1449485618-9443-1-git-send-email-marc.zyngier@arm.com>
+ <1449485618-9443-8-git-send-email-marc.zyngier@arm.com>
+ <566A420B.2080406@samsung.com>
+Message-ID: <566B15ED.5030906@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Mario,
 
-On 11-12-15 18:13, Philipp Zabel wrote:
-> Am Freitag, den 11.12.2015, 16:41 +0100 schrieb Hans de Goede:
->> From: Reinder de Haan <patchesrdh@mveas.com>
+On 11/12/15 03:24, Mario Smarduch wrote:
+> Hi Marc,
+> 
+> On 12/7/2015 2:53 AM, Marc Zyngier wrote:
+>> Implement the system register save/restore as a direct translation of
+>> the assembly code version.
 >>
->> At least the EHCI/OHCI found on the Allwinnner H3 SoC needs multiple
->> reset lines, the controller will not initialize while the reset for
->> its companion is still asserted, which means we need to de-assert
->> 2 resets for the controller to work.
->>
->> Signed-off-by: Reinder de Haan <patchesrdh@mveas.com>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 >> ---
->> Changes in v2:
->> -Use the new reset_control_[de]assert_shared reset-controller functions
->> ---
->>   Documentation/devicetree/bindings/usb/usb-ehci.txt |  2 +-
->>   drivers/usb/host/ehci-platform.c                   | 47 +++++++++++++---------
->>   2 files changed, 30 insertions(+), 19 deletions(-)
+>>  arch/arm64/kvm/hyp/Makefile    |  1 +
+>>  arch/arm64/kvm/hyp/hyp.h       |  3 ++
+>>  arch/arm64/kvm/hyp/sysreg-sr.c | 90 ++++++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 94 insertions(+)
+>>  create mode 100644 arch/arm64/kvm/hyp/sysreg-sr.c
 >>
->> diff --git a/Documentation/devicetree/bindings/usb/usb-ehci.txt b/Documentation/devicetree/bindings/usb/usb-ehci.txt
->> index a12d601..0701812 100644
->> --- a/Documentation/devicetree/bindings/usb/usb-ehci.txt
->> +++ b/Documentation/devicetree/bindings/usb/usb-ehci.txt
->> @@ -18,7 +18,7 @@ Optional properties:
->>    - clocks : a list of phandle + clock specifier pairs
->>    - phys : phandle + phy specifier pair
->>    - phy-names : "usb"
->> - - resets : phandle + reset specifier pair
->> + - resets : a list of phandle + reset specifier pairs
->
-> Are there documented names for these resets?
+>> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+>> index 455dc0a..ec94200 100644
+>> --- a/arch/arm64/kvm/hyp/Makefile
+>> +++ b/arch/arm64/kvm/hyp/Makefile
+>> @@ -5,3 +5,4 @@
+>>  obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
+>>  obj-$(CONFIG_KVM_ARM_HOST) += vgic-v3-sr.o
+>>  obj-$(CONFIG_KVM_ARM_HOST) += timer-sr.o
+>> +obj-$(CONFIG_KVM_ARM_HOST) += sysreg-sr.o
+>> diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
+>> index f213e46..778d56d 100644
+>> --- a/arch/arm64/kvm/hyp/hyp.h
+>> +++ b/arch/arm64/kvm/hyp/hyp.h
+>> @@ -38,5 +38,8 @@ void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
+>>  void __timer_save_state(struct kvm_vcpu *vcpu);
+>>  void __timer_restore_state(struct kvm_vcpu *vcpu);
+>>  
+>> +void __sysreg_save_state(struct kvm_cpu_context *ctxt);
+>> +void __sysreg_restore_state(struct kvm_cpu_context *ctxt);
+>> +
+>>  #endif /* __ARM64_KVM_HYP_H__ */
+>>  
+>> diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+>> new file mode 100644
+>> index 0000000..add8fcb
+>> --- /dev/null
+>> +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+>> @@ -0,0 +1,90 @@
+>> +/*
+>> + * Copyright (C) 2012-2015 - ARM Ltd
+>> + * Author: Marc Zyngier <marc.zyngier@arm.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +
+>> +#include <linux/compiler.h>
+>> +#include <linux/kvm_host.h>
+>> +
+>> +#include <asm/kvm_mmu.h>
+>> +
+>> +#include "hyp.h"
+>> +
+> 
+> I looked closer on some other ways to get better performance out of
+> the compiler. This code sequence performs about 35% faster for 
+> __sysreg_save_state(..) for 5000 exits you save about 500mS or 100nS
+> per exit. This is on Juno.
 
-This binding is a generic ehci controller binding, so even if
-the names are documented for the allwinner SoC we should
-not use names, just like the binding is deliberately not
-using names for the clocks either to keep it generic, so
-that we can reuse the binding + driver with many different SoCs.
+35% faster? Really? That's pretty crazy. Was that on the A57 or the A53?
 
-> Is the companion you
-> mention the Port Control?
+> 
+> register int volatile count asm("r2") = 0;
 
-Sort of, with USB-2, USB-1 compatibility is handled via a mux on the
-datalines (controlled by the EHCI controller Port Control) which muxes
-the lines to an USB-1 controller (typically either UHCI or OHCI) when the
-device does not connect after USB-2 highspeed handshaking.
+Does this even work on arm64? We don't have an "r2" register...
 
-This USB-1 controller (or controller_S_ in some case since the
-USB-1 companions may have less root-ports per controller then the EHCI
-has root-ports) is called the companion controller.
+> 
+> do {
+> ....
+> } while(count);
+> 
+> I didn't test the restore function (ran out of time) but I suspect it should be
+> the same. The assembler pretty much uses all the GPRs, (a little too many, using
+> stp to push 4 pairs on the stack and restore) looking at the assembler it all
+> should execute out of order.
 
-The 2 controllers are supposed to be 100% independent but on the H3
-Allwinner has done something (not documented) which requires one to
-deassert reset on both before you can talk to either one.
+Are you talking about the original implementation here? or the generated
+code out of the compiler? The original implementation didn't push
+anything on the stack (apart from the prologue, but we have the same
+thing in the C implementation).
 
-Regards,
+Looking at the compiler output, we have a bunch of mrs/str, one after
+the other - pretty basic. Maybe that gives the CPU some "breathing"
+time, but I have no idea if that's more or less efficient.
 
-Hans
+But the main thing is that we can now rely on the compiler to generate
+something that is more or less optimized for a given platform if there
+is such a requirement. We go from something that was cast in stone to
+something that has some degree of flexibility.
+
+> 
+> FWIW I gave this a try since compilers like to optimize loops. I used
+> 'cntpct_el0' counter register to measure the intervals.
+
+It'd be nice to have a measure in terms of cycle, but that's a good
+first approximation.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
