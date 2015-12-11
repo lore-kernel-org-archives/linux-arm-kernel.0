@@ -1,52 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 11 Dec 2015 11:51:52 +0100
-Subject: [RFC PATCH 4/4] mfd: syscon: add ACPI support
-In-Reply-To: <CAMj5BkiAToBCvnOSkW=41po5OHpg5uSzxNTNJ_=gLK__BLa1Sw@mail.gmail.com>
-References: <1449047368-5768-1-git-send-email-wangkefeng.wang@huawei.com>
- <2299982.06P4iKpkWk@wuerfel>
- <CAMj5BkiAToBCvnOSkW=41po5OHpg5uSzxNTNJ_=gLK__BLa1Sw@mail.gmail.com>
-Message-ID: <21660867.NhUszMiexN@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 11 Dec 2015 11:59:30 +0100
+Subject: [linux-sunxi][PATCH 1/2] ARM: dts: sun7i: Add Itead Ibox support
+In-Reply-To: <1449599344-15544-1-git-send-email-codekipper@gmail.com>
+References: <1449599344-15544-1-git-send-email-codekipper@gmail.com>
+Message-ID: <20151211105930.GM27957@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 11 December 2015 18:35:17 Zhangfei Gao wrote:
-> On Wed, Dec 2, 2015 at 6:44 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Wednesday 02 December 2015 17:09:28 Kefeng Wang wrote:
-> >
-> > This sounds like a bad idea:
-> >
-> > syscon is basically a hack to let us access register that the SoC designer
-> > couldn't fit in anywhere sane. We need something like this with devicetree
-> > because we decided not to have any interpreted bytecode to do this behind
-> > our back.
-> >
-> > With ACPI, the same thing is done with AML, which is actually nicer than
-> > syscon (once you have to deal with all the problems introduced by AML).
-> >
-> > Use that instead.
-> >
+Hi,
+
+On Tue, Dec 08, 2015 at 07:29:03PM +0100, codekipper at gmail.com wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
 > 
-> Would you mind clarifying AML method, still not understand.
-> Is is means realize the operation in uefi/bootloader and call some
-> interface from kernel?
->
-> The issue here is we want to access some common registers,
-> which we do not want to ioremap for many times in each driver.
+> The Itead Ibox is a multi board device based on the Allwinner A20 SoC.
+> It contains the A20 Itead Core module and a base board for the external
+> interfaces.
 > 
-> In hisi platforms, we have many common registers shared by many components.
+> The core module comes with 4GB NAND and 1GB DDR RAM.
+> 
+> The base board to which the core board is connected provides 3 USB 2.0 Host
+> ports, 1 USB 2.0 OTG, 1 uSD slot, 10/100 Ethernet port, HDMI, IR receiver,
+> SPDIF and a 32-pin GPIO header. This header expands the features of core
+> board by exposing the VGA pins, audio In/Out pins, SATA, SPI, I2C, UARTS,
+> USB-OTG and power.
+> 
+> As there is an A10 version of the Itead Core Module and at least one other
+> base board to support then this patch partitions the device tree files with
+> some consideration that these variants may be added later.
+> 
+> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+> ---
+>  arch/arm/boot/dts/Makefile                     |   1 +
+>  arch/arm/boot/dts/sun7i-a20-itead-core.dtsi    |  83 ++++++++++++++++++
+>  arch/arm/boot/dts/sun7i-a20-itead-ibox.dts     |  98 ++++++++++++++++++++++
+>  arch/arm/boot/dts/sunxi-itead-core-common.dtsi | 111 +++++++++++++++++++++++++
+>  4 files changed, 293 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/sun7i-a20-itead-core.dtsi
+>  create mode 100644 arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
+>  create mode 100644 arch/arm/boot/dts/sunxi-itead-core-common.dtsi
 
-Sorry, you'd have to ask someone who is more familiar with ACPI.
+So, it looks like you're doing several things in this patch:
 
-Basically, the idea of ACPI as I understand it is that you have a
-interpreted bytecode language that is provided by the BIOS as tables
-and executed in the context of the kernel. This byte code has access
-to stuff like GPIO, PCI config space, MMIO registers, IPMI or the
-embedded controller on a PC. This way, you can hide all the platform
-specific details behind a function call from a generic device driver,
-and the BIOS writer can provide the specific implementation for any
-registers that are shared across components.
+1) Create a common DTSI for all itead core variants
+   (sunxi-itead-core-common.dtsi)
 
-That's about all I know, but the ACPI specifications are available
-publicly, please have a look there for more details.
+2) Create an A20 variant of the itead core
+3) Add support for a board using the A20 itead core.
 
-	Arnd
+Please make three different patches for this, and converting the A10
+itead board would be a good idea too.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151211/36d132a4/attachment.sig>
