@@ -1,46 +1,46 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Fri, 11 Dec 2015 12:13:52 +0000
-Subject: [RFC] kprobe'ing conditionally executed instructions
-In-Reply-To: <20151211103459.GS8644@n2100.arm.linux.org.uk>
-References: <566A5997.9020908@linaro.org> <1449829633.2815.27.camel@linaro.org>
- <20151211103459.GS8644@n2100.arm.linux.org.uk>
-Message-ID: <1449836032.2815.39.camel@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 11 Dec 2015 12:14:27 +0000
+Subject: [PATCHv3 5/5] arm-cci: CCI-500: Work around PMU counter writes
+In-Reply-To: <566AB36D.9050209@arm.com>
+References: <1447783407-18027-1-git-send-email-suzuki.poulose@arm.com>
+ <1447783407-18027-6-git-send-email-suzuki.poulose@arm.com>
+ <20151210154251.GG495@leverpostej> <566AB36D.9050209@arm.com>
+Message-ID: <20151211121427.GA20666@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-12-11 at 10:34 +0000, Russell King - ARM Linux wrote:
-> On Fri, Dec 11, 2015 at 10:27:13AM +0000, Jon Medhurst (Tixy) wrote:
-> > On Fri, 2015-12-11 at 00:05 -0500, David Long wrote:
-> > > There is a moderate amount of code already in kprobes on ARM and the 
-> > > current ARMv8 patch to deal with conditional execution of instructions. 
-> > > One aspect of how this is handled is that instructions that fail their 
-> > > predicate and are not (technically) executed are also not treated as a 
-> > > hit kprobe. Steve Capper has suggested that the probe handling should 
-> > > still take place because we stepped through the instruction even if it 
-> > > was effectively a nop.  This would be a significant change in how it 
-> > > currently works on 32-bit ARM
-> > 
-> > 32-bit ARM uses undefined instructions for kprobe 'breakpoints' and the
-> > ARM ARM says it's implementation defined behaviour whether these
-> > generate exceptions or not, i.e. whether the kprobe handler will be
-> > called.
+On Fri, Dec 11, 2015 at 11:28:45AM +0000, Suzuki K. Poulose wrote:
+> On 10/12/15 15:42, Mark Rutland wrote:
+> >On Tue, Nov 17, 2015 at 06:03:27PM +0000, Suzuki K. Poulose wrote:
+> >>The CCI PMU driver sets the event counter to the half of the maximum
+> >>value(2^31) it can count before we start the counters via
+> >>pmu_event_set_period(). This is done to give us the best chance to
+> >>handle the overflow interrupt, taking care of extreme interrupt latencies.
 > 
-> There are two classes of undefined instructions.  There are those which
-> fall into the above category, and there are those which are guaranteed
-> to raise an exception.  We should always be using the guaranteed ones,
-> not the other set.
+> 
+> >
+> >This should work, but it seems very heavyweight given we do it for each
+> >write.
+> >
+> >Can we not amortize this by using the {start,commit,cancel}_txn hooks?
+> >
+> >Either we can handle 1-4 and 6-8 in those, or we can copy everything
+> >into a shadow state and apply it all in one go at commit_txn time.
+> 
+> I took a look at it. The only worrying part is, if pmu->add() will be
+> called outside *_txn().
 
-I wonder if I'm going senile or have been subject to having the ARM ARM
-evolve under me. I could swear we used instructions that were defined as
-undefined (so to speak) and that conditional versions of undefined
-instructions were UNPREDICTABLE. However, checking the ARM ARM again I
-see those instruction encodings are for the BKPT instruction which says:
+It looks like that happns.
 
-  Breakpoint causes a software breakpoint to occur.
-  Breakpoint is always unconditional, even when inside an IT block.
+If we __perf_event_enable an events which is not a leader, we may call
+event_sched_in (which will call pmu->add) outside of a transaction. The
+__perf_event_disable path is similar w.r.t. pmu->del.
 
-So, my previous statements about not being able to implement the
-proposed kprobe changes consistently aren't true.
+So it does look like we can't rely on being in a transaction there.
 
--- 
-Tixy
+Assuming that's deliberate, we could follow the example of other PMU
+drivers and keep track of whether or not we're in a transaction. If not,
+we do all the heavyweight work inline.
+
+Thanks,
+Mark.
