@@ -1,46 +1,54 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 11 Dec 2015 12:14:27 +0000
-Subject: [PATCHv3 5/5] arm-cci: CCI-500: Work around PMU counter writes
-In-Reply-To: <566AB36D.9050209@arm.com>
-References: <1447783407-18027-1-git-send-email-suzuki.poulose@arm.com>
- <1447783407-18027-6-git-send-email-suzuki.poulose@arm.com>
- <20151210154251.GG495@leverpostej> <566AB36D.9050209@arm.com>
-Message-ID: <20151211121427.GA20666@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 11 Dec 2015 12:18:00 +0000
+Subject: FW: Commit 81a43adae3b9 (locking/mutex: Use acquire/release
+ semantics) causing failures on arm64 (ThunderX)
+In-Reply-To: <20151211121319.GK6356@twins.programming.kicks-ass.net>
+References: <5669D5F2.5050004@caviumnetworks.com>
+ <SN1PR07MB21577C72379C8440A208D6BC9EEA0@SN1PR07MB2157.namprd07.prod.outlook.com>
+ <CA+=Sn1miWYhH5ddMmLGYWknzcw3d1k4S6QyK9O_ofdJKJDQxmg@mail.gmail.com>
+ <CA+=Sn1n6e9pLDRVWT1EzDEn2XWwoK-Ep__-R6VVPzhbMvCEdNg@mail.gmail.com>
+ <20151211084133.GE6356@twins.programming.kicks-ass.net>
+ <20151211120419.GD18828@arm.com>
+ <20151211121319.GK6356@twins.programming.kicks-ass.net>
+Message-ID: <20151211121759.GE18828@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 11, 2015 at 11:28:45AM +0000, Suzuki K. Poulose wrote:
-> On 10/12/15 15:42, Mark Rutland wrote:
-> >On Tue, Nov 17, 2015 at 06:03:27PM +0000, Suzuki K. Poulose wrote:
-> >>The CCI PMU driver sets the event counter to the half of the maximum
-> >>value(2^31) it can count before we start the counters via
-> >>pmu_event_set_period(). This is done to give us the best chance to
-> >>handle the overflow interrupt, taking care of extreme interrupt latencies.
+On Fri, Dec 11, 2015 at 01:13:19PM +0100, Peter Zijlstra wrote:
+> On Fri, Dec 11, 2015 at 12:04:19PM +0000, Will Deacon wrote:
+> > I think Andrew meant the atomic_xchg_acquire at the start of osq_lock,
+> > as opposed to "compare and swap". In which case, it does look like
+> > there's a bug here because there is nothing to order the initialisation
+> > of the node fields with publishing of the node, whether that's
+> > indirectly as a result of setting the tail to the current CPU or
+> > directly as a result of the WRITE_ONCE.
 > 
+> Agreed, this does indeed look like a bug. If confirmed please write a
+> shiny changelog and I'll queue asap.
+
+Yup. I've failed to reproduce the issue locally, so we'll need to wait
+for Andrew and/or David to get back to us first.
+
+Will
+
+> > diff --git a/kernel/locking/osq_lock.c b/kernel/locking/osq_lock.c
+> > index d092a0c9c2d4..05a37857ab55 100644
+> > --- a/kernel/locking/osq_lock.c
+> > +++ b/kernel/locking/osq_lock.c
+> > @@ -93,10 +93,12 @@ bool osq_lock(struct optimistic_spin_queue *lock)
+> >  	node->cpu = curr;
+> >  
+> >  	/*
+> > -	 * ACQUIRE semantics, pairs with corresponding RELEASE
+> > -	 * in unlock() uncontended, or fastpath.
+> > +	 * We need both ACQUIRE (pairs with corresponding RELEASE in
+> > +	 * unlock() uncontended, or fastpath) and RELEASE (to publish
+> > +	 * the node fields we just initialised) semantics when updating
+> > +	 * the lock tail.
+> >  	 */
+> > -	old = atomic_xchg_acquire(&lock->tail, curr);
+> > +	old = atomic_xchg(&lock->tail, curr);
+> >  	if (old == OSQ_UNLOCKED_VAL)
+> >  		return true;
+> >  
 > 
-> >
-> >This should work, but it seems very heavyweight given we do it for each
-> >write.
-> >
-> >Can we not amortize this by using the {start,commit,cancel}_txn hooks?
-> >
-> >Either we can handle 1-4 and 6-8 in those, or we can copy everything
-> >into a shadow state and apply it all in one go at commit_txn time.
-> 
-> I took a look at it. The only worrying part is, if pmu->add() will be
-> called outside *_txn().
-
-It looks like that happns.
-
-If we __perf_event_enable an events which is not a leader, we may call
-event_sched_in (which will call pmu->add) outside of a transaction. The
-__perf_event_disable path is similar w.r.t. pmu->del.
-
-So it does look like we can't rely on being in a transaction there.
-
-Assuming that's deliberate, we could follow the example of other PMU
-drivers and keep track of whether or not we're in a transaction. If not,
-we do all the heavyweight work inline.
-
-Thanks,
-Mark.
