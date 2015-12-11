@@ -1,33 +1,21 @@
-From: jikos@kernel.org (Jiri Kosina)
-Date: Sat, 12 Dec 2015 00:26:11 +0100 (CET)
-Subject: [PATCH v3 4/4] printk/nmi: Increase the size of NMI buffer and
- make it configurable
-In-Reply-To: <20151211232113.GZ8644@n2100.arm.linux.org.uk>
-References: <1449667265-17525-1-git-send-email-pmladek@suse.com>
- <1449667265-17525-5-git-send-email-pmladek@suse.com>
- <CAMuHMdXVgr58YjoePGrRbMyMncQ27f85prL7G5SpeHeNxoYrXQ@mail.gmail.com>
- <20151211124159.GB3729@pathway.suse.cz>
- <20151211145725.b0e81bb4bb18fcd72ef5f557@linux-foundation.org>
- <20151211232113.GZ8644@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LNX.2.00.1512120024370.9922@cbobk.fhfr.pm>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 12 Dec 2015 00:27:14 +0100
+Subject: [GIT PULL 2/3] rockchip dts32 changes for 4.5
+In-Reply-To: <18120528.xr1opvZF1r@diego>
+References: <1936935.FVZdWRYuBf@diego> <18120528.xr1opvZF1r@diego>
+Message-ID: <1804962.ITAAA3Svms@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Dec 2015, Russell King - ARM Linux wrote:
+On Saturday 05 December 2015 01:56:23 Heiko St?bner wrote:
+> First round of arm devicetree changes.
+> Among the bigger changes are two new Veyron boards, support for
+> the dual-core cortex-a7 rk3036 soc and addition of support for
+> the crypto engine of the rk3288. Smaller changes include some
+> IR receivers, updates of thermal settings more reflecting real-
+> life and testing-results.
+> 
 
-> I'm personally happy with the existing code, and I've been wondering why
-> there's this effort to apply further cleanups - to me, the changelogs
-> don't seem to make that much sense, unless we want to start using
-> printk() extensively in NMI functions - using the generic nmi backtrace
-> code surely gets us something that works across all architectures...
+Pulled into next/dt, thanks!
 
-It is already being used extensively, and not only for all-CPU backtraces. 
-For starters, please consider
-
-- WARN_ON(in_nmi())
-- BUG_ON(in_nmi())
-- anything being printed out from MCE handlers
-
--- 
-Jiri Kosina
-SUSE Labs
+	Arnd
