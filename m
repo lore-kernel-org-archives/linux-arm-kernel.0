@@ -1,45 +1,88 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Fri, 11 Dec 2015 17:39:47 +0300
-Subject: [PATCH v4 01/58] mtd: nand: denali: add missing nand_release()
- call in denali_remove()
-In-Reply-To: <20151211145320.1560fac3@bbrezillon>
-References: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
- <1449734442-18672-2-git-send-email-boris.brezillon@free-electrons.com>
- <20151211004008.GQ144338@google.com>
- <20151211145320.1560fac3@bbrezillon>
-Message-ID: <20151211143947.GL5284@mwanda>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 11 Dec 2015 22:41:19 +0800
+Subject: [PATCH v3] ARM: dts: ls1021a: add sata node to dts
+In-Reply-To: <1449040591-13618-1-git-send-email-Yuantian.Tang@freescale.com>
+References: <1449040591-13618-1-git-send-email-Yuantian.Tang@freescale.com>
+Message-ID: <20151211144119.GM11252@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 11, 2015 at 02:53:20PM +0100, Boris Brezillon wrote:
-> Hi Brian,
+On Wed, Dec 02, 2015 at 03:16:31PM +0800, Yuantian.Tang at freescale.com wrote:
+> From: Tang Yuantian <Yuantian.Tang@freescale.com>
 > 
-> On Thu, 10 Dec 2015 16:40:08 -0800
-> Brian Norris <computersforpeace@gmail.com> wrote:
+> Added sata node to ls1021aqds and ls1021atwr board to support
+> sata function.
 > 
-> > On Thu, Dec 10, 2015 at 08:59:45AM +0100, Boris Brezillon wrote:
-> > > Unregister the NAND device from the NAND subsystem when removing a denali
-> > > NAND controller, otherwise the MTD attached to the NAND device is still
-> > > exposed by the MTD layer, and accesses to this device will likely crash
-> > > the system.
-> > > 
-> > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > > Cc: <stable@vger.kernel.org> #3.8+
-> > 
-> > Does this follow these rules, from
-> > Documentation/stable_kernel_rules.txt?
-> > 
-> >  - It must be obviously correct and tested.
-> > 
-> >  - It must fix a real bug that bothers people (not a, "This could be a
-> >    problem..." type thing).
+> Signed-off-by: Tang Yuantian <Yuantian.Tang@freescale.com>
+> ---
+> v3:
+> 	- refine the title and commit message
+> 	- added a status property so that sata can be controlled
+> 	by board specific dts.
+> v2:
+> 	- put reg-names right after reg property
 > 
-> As you wish, I'll remove those Cc and Fixes tags, or just drop the
-> patch if you think it's useless...
+>  arch/arm/boot/dts/ls1021a-qds.dts |  4 ++++
+>  arch/arm/boot/dts/ls1021a-twr.dts |  4 ++++
+>  arch/arm/boot/dts/ls1021a.dtsi    | 11 +++++++++++
+>  3 files changed, 19 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/ls1021a-qds.dts b/arch/arm/boot/dts/ls1021a-qds.dts
+> index 0521e68..803cc54 100644
+> --- a/arch/arm/boot/dts/ls1021a-qds.dts
+> +++ b/arch/arm/boot/dts/ls1021a-qds.dts
+> @@ -327,3 +327,7 @@
+>  &uart1 {
+>  	status = "okay";
+>  };
+> +
+> +&sata {
+> +	status = "okay";
+> +};
 
-The fixes tag is a separate thing from CCing stable.  It's useful on by
-itself.  I always put the person who wrote the original patch in the To:
-header so they can review and comment if I have made a mistake.
+The labelled nodes are sorted alphabetically.  Please keep the new
+addition sorted too.
 
-regards,
-dan carpenter
+> diff --git a/arch/arm/boot/dts/ls1021a-twr.dts b/arch/arm/boot/dts/ls1021a-twr.dts
+> index fbb89d1..62dec7c 100644
+> --- a/arch/arm/boot/dts/ls1021a-twr.dts
+> +++ b/arch/arm/boot/dts/ls1021a-twr.dts
+> @@ -219,3 +219,7 @@
+>  &uart1 {
+>  	status = "okay";
+>  };
+> +
+> +&sata {
+> +	status = "okay";
+> +};
+
+Ditto
+
+Shawn
+
+> diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+> index 9430a99..da9bd7e 100644
+> --- a/arch/arm/boot/dts/ls1021a.dtsi
+> +++ b/arch/arm/boot/dts/ls1021a.dtsi
+> @@ -143,6 +143,17 @@
+>  			status = "disabled";
+>  		};
+>  
+> +		sata: sata at 3200000 {
+> +			compatible = "fsl,ls1021a-ahci";
+> +			reg = <0x0 0x3200000 0x0 0x10000>,
+> +			      <0x0 0x20220520 0x0 0x4>;
+> +			reg-names = "ahci", "sata-ecc";
+> +			interrupts = <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&platform_clk 1>;
+> +			dma-coherent;
+> +			status = "disabled";
+> +		};
+> +
+>  		scfg: scfg at 1570000 {
+>  			compatible = "fsl,ls1021a-scfg", "syscon";
+>  			reg = <0x0 0x1570000 0x0 0x10000>;
+> -- 
+> 2.1.0.27.g96db324
+> 
+> 
