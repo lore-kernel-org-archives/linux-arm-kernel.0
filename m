@@ -1,44 +1,96 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 11 Dec 2015 15:02:34 +0100
-Subject: [PATCH v5 01/58] mtd: nand: denali: add missing nand_release() call
- in denali_remove()
-In-Reply-To: <1449734442-18672-2-git-send-email-boris.brezillon@free-electrons.com>
-References: <1449734442-18672-2-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1449842554-29898-1-git-send-email-boris.brezillon@free-electrons.com>
+Date: Fri, 11 Dec 2015 15:04:06 +0100
+Subject: [PATCH v5 41/58] mtd: nand: socrates: use the mtd instance embedded
+ in struct nand_chip
+In-Reply-To: <1449734442-18672-42-git-send-email-boris.brezillon@free-electrons.com>
+References: <1449734442-18672-42-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1449842646-30105-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Unregister the NAND device from the NAND subsystem when removing a denali
-NAND controller, otherwise the MTD attached to the NAND device is still
-exposed by the MTD layer, and accesses to this device will likely crash
-the system.
+struct nand_chip now embeds an mtd device. Make use of this mtd instance.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
 Changes since v4:
-- remove Cc stable and fixes tags
-- calculate the dma buffer size before calling nand_release()
+- fix build error
 
- drivers/mtd/nand/denali.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+---
+Changes generated with the following coccinelle script
 
-diff --git a/drivers/mtd/nand/denali.c b/drivers/mtd/nand/denali.c
-index 67eb2be..fdfea05 100644
---- a/drivers/mtd/nand/denali.c
-+++ b/drivers/mtd/nand/denali.c
-@@ -1622,9 +1622,11 @@ EXPORT_SYMBOL(denali_init);
- /* driver exit point */
- void denali_remove(struct denali_nand_info *denali)
+--->8---
+virtual patch
+
+@fix1@
+identifier __chipfield, __mtdfield;
+type __type;
+@@
+(
+	__type {
+		...
+		struct nand_chip __chipfield;
+		...
+-		struct mtd_info __mtdfield;
+		...
+	};
+|
+	__type {
+		...
+-		struct mtd_info __mtdfield;
+		...
+		struct nand_chip __chipfield;
+		...
+	};
+)
+
+@fix2 depends on fix1@
+identifier fix1.__chipfield, fix1.__mtdfield;
+identifier __subfield;
+type fix1.__type;
+__type *__priv;
+@@
+(
+-	__priv->__mtdfield.__subfield
++	nand_to_mtd(&__priv->__chipfield)->__subfield
+|
+-	&(__priv->__mtdfield)
++	nand_to_mtd(&__priv->__chipfield)
+)
+--->8---
+---
+ drivers/mtd/nand/socrates_nand.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/mtd/nand/socrates_nand.c b/drivers/mtd/nand/socrates_nand.c
+index 2dfb1e0..925761c 100644
+--- a/drivers/mtd/nand/socrates_nand.c
++++ b/drivers/mtd/nand/socrates_nand.c
+@@ -30,7 +30,6 @@
+ 
+ struct socrates_nand_host {
+ 	struct nand_chip	nand_chip;
+-	struct mtd_info		mtd;
+ 	void __iomem		*io_base;
+ 	struct device		*dev;
+ };
+@@ -159,8 +158,8 @@ static int socrates_nand_probe(struct platform_device *ofdev)
+ 		return -EIO;
+ 	}
+ 
+-	mtd = &host->mtd;
+ 	nand_chip = &host->nand_chip;
++	mtd = nand_to_mtd(nand_chip);
+ 	host->dev = &ofdev->dev;
+ 
+ 	nand_chip->priv = host;		/* link the private data structures */
+@@ -216,7 +215,7 @@ out:
+ static int socrates_nand_remove(struct platform_device *ofdev)
  {
-+	int bufsize = denali->mtd.writesize + denali->mtd.oobsize;
-+
-+	nand_release(&denali->mtd);
- 	denali_irq_cleanup(denali->irq, denali);
--	dma_unmap_single(denali->dev, denali->buf.dma_buf,
--			 denali->mtd.writesize + denali->mtd.oobsize,
-+	dma_unmap_single(denali->dev, denali->buf.dma_buf, bufsize,
- 			 DMA_BIDIRECTIONAL);
- }
- EXPORT_SYMBOL(denali_remove);
+ 	struct socrates_nand_host *host = dev_get_drvdata(&ofdev->dev);
+-	struct mtd_info *mtd = &host->mtd;
++	struct mtd_info *mtd = nand_to_mtd(&host->nand_chip);
+ 
+ 	nand_release(mtd);
+ 
 -- 
 2.1.4
