@@ -1,57 +1,45 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 11 Dec 2015 15:20:58 +0100
-Subject: [GIT PULL] ARM: mvebu: dt for v4.5 (#2)
-Message-ID: <87mvth6p85.fsf@free-electrons.com>
+Date: Fri, 11 Dec 2015 15:21:42 +0100
+Subject: [GIT PULL] ARM: mvebu: defconfig for v4.5 (#2)
+Message-ID: <87io456p6x.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Here is the second pull request for dt for mvebu for v4.5.
+Here is the second pull request for defconfig for mvebu for v4.5.
 
 Gregory
 
-The following changes since commit 4627629bbb675665e902ad76ab96ac1ee5d17fd8:
+The following changes since commit a0638365f6850855728a5ef5caf2aeab82a58035:
 
-  ARM: dt: mvebu: ix4-300d: Cleanup NAND partition ranges (2015-11-30 15:18:31 +0100)
+  ARM: mvebu: add Kirkwood cpuidle to defconfig (2015-11-30 15:26:45 +0100)
 
 are available in the git repository at:
 
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.5-2
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-defconfig-4.5-2
 
-for you to fetch changes up to 4c945e8556ec7ea5b19d4f8721b212f468656e0d:
+for you to fetch changes up to ab8d80eb5dfd7f4f57364392d746a7700a891e68:
 
-  ARM: dts: Add SolidRun Armada 388 Clearfog A1 DT file (2015-12-08 17:58:01 +0100)
-
-----------------------------------------------------------------
-mvebu dt for 4.5 (part 2)
-
-- Fix Armada 388 GP dts
-- Add clock related to PMU for Dove
-- Add SolidRun Armada 388 Clearfog A1 dts
+  ARM: mvebu: update v5 defconfig for Orion5x machines (2015-12-08 10:55:20 +0100)
 
 ----------------------------------------------------------------
-Russell King (4):
-      dt-bindings: add Marvell core PLL and clock divider PMU documentation
-      ARM: dts: dove: add Dove divider clocks
-      dt-bindings: add Marvell PMU documentation
-      ARM: dts: Add SolidRun Armada 388 Clearfog A1 DT file
+mvebu defconfig for 4.5 (part 2)
 
-Thomas Petazzoni (1):
-      ARM: mvebu: remove duplicated regulator definition in Armada 388 GP
+- Reenable DSA in mvebu_v5_defconfig
+- Update multi_v5_defconfig after adding Orion5x to multiarch
 
- .../bindings/clock/dove-divider-clock.txt          |  28 ++
- Documentation/devicetree/bindings/soc/dove/pmu.txt |  56 +++
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/armada-388-clearfog.dts          | 456 +++++++++++++++++++++
- arch/arm/boot/dts/armada-388-gp.dts                |  10 -
- .../arm/boot/dts/armada-38x-solidrun-microsom.dtsi | 115 ++++++
- arch/arm/boot/dts/dove.dtsi                        |   6 +
- 7 files changed, 662 insertions(+), 10 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/dove-divider-clock.txt
- create mode 100644 Documentation/devicetree/bindings/soc/dove/pmu.txt
- create mode 100644 arch/arm/boot/dts/armada-388-clearfog.dts
- create mode 100644 arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi
+----------------------------------------------------------------
+Andrew Lunn (5):
+      ARM: config: Regenerate multi_v5_defconfig
+      ARM: config: Reenable DSA in multi_v5_defconfig
+      ARM: config: Add orion5x to multi_v5_defconfig
+      ARM: mvebu: Reenable DSA in mvebu_v5_defconfig
+      ARM: mvebu: update v5 defconfig for Orion5x machines
+
+ arch/arm/configs/multi_v5_defconfig | 43 +++++++++++++++++++++++++++----------
+ arch/arm/configs/mvebu_v5_defconfig | 31 +++++++++++++++++++++++++-
+ 2 files changed, 62 insertions(+), 12 deletions(-)
 
 -- 
 Gregory Clement, Free Electrons
