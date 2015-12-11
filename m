@@ -1,60 +1,68 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 11 Dec 2015 11:52:55 +0900
-Subject: [PATCH/RFC 18/19] ARM: shmobile: r8a7793: Add Audio CTU support to
- device tree
+Date: Fri, 11 Dec 2015 11:52:53 +0900
+Subject: [PATCH/RFC 16/19] ARM: shmobile: gose: enable sound DMA support via
+ DVC in device tree
 In-Reply-To: <1449802376-11301-1-git-send-email-horms+renesas@verge.net.au>
 References: <1449802376-11301-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1449802376-11301-19-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1449802376-11301-17-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instantiate audio CTU support in r8a7793 device tee.
+Enable DMA transfer using DVC in r8a7793/gose device tree.
 
-Based on similar work for the r8a7791 by Kuninori Morimoto.
+     DMA               DMApp
+[MEM] -> [SRC] -> [DVC] -> [SSIU] -> [SSI]
+
+     DMA               DMApp
+[MEM] <- [DVC] <- [SRC] <- [SSIU] <- [SSI]
+
+Based on similar work for the r8a7791/koelsch by Kuninori Morimoto.
 
 Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7793.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/boot/dts/r8a7793-gose.dts | 21 +++++++++++++++++++--
+ 1 file changed, 19 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
-index ed2acd9967b1..d9ba1c97cefc 100644
---- a/arch/arm/boot/dts/r8a7793.dtsi
-+++ b/arch/arm/boot/dts/r8a7793.dtsi
-@@ -1178,6 +1178,7 @@
- 			<&mstp10_clks R8A7793_CLK_SCU_SRC5>, <&mstp10_clks R8A7793_CLK_SCU_SRC4>,
- 			<&mstp10_clks R8A7793_CLK_SCU_SRC3>, <&mstp10_clks R8A7793_CLK_SCU_SRC2>,
- 			<&mstp10_clks R8A7793_CLK_SCU_SRC1>, <&mstp10_clks R8A7793_CLK_SCU_SRC0>,
-+			<&mstp10_clks R8A7793_CLK_SCU_CTU0_MIX0>, <&mstp10_clks R8A7793_CLK_SCU_CTU1_MIX1>,
- 			<&mstp10_clks R8A7793_CLK_SCU_DVC0>, <&mstp10_clks R8A7793_CLK_SCU_DVC1>,
- 			<&audio_clk_a>, <&audio_clk_b>, <&audio_clk_c>, <&m2_clk>;
- 		clock-names = "ssi-all",
-@@ -1185,6 +1186,7 @@
- 				"ssi.4", "ssi.3", "ssi.2", "ssi.1", "ssi.0",
- 				"src.9", "src.8", "src.7", "src.6", "src.5",
- 				"src.4", "src.3", "src.2", "src.1", "src.0",
-+				"ctu.0", "ctu.1",
- 				"dvc.0", "dvc.1",
- 				"clk_a", "clk_b", "clk_c", "clk_i";
- 		power-domains = <&cpg_clocks>;
-@@ -1202,6 +1204,17 @@
- 			};
- 		};
- 
-+		rcar_sound,ctu {
-+			ctu00: ctu at 0 { };
-+			ctu01: ctu at 1 { };
-+			ctu02: ctu at 2 { };
-+			ctu03: ctu at 3 { };
-+			ctu10: ctu at 4 { };
-+			ctu11: ctu at 5 { };
-+			ctu12: ctu at 6 { };
-+			ctu13: ctu at 7 { };
-+		};
+diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
+index 30edd5fef626..def5490761fc 100644
+--- a/arch/arm/boot/dts/r8a7793-gose.dts
++++ b/arch/arm/boot/dts/r8a7793-gose.dts
+@@ -18,7 +18,24 @@
+  * This command is required when Playback/Capture
+  *
+  *	amixer set "LINEOUT Mixer DACL" on
++ *	amixer set "DVC Out" 100%
++ *	amixer set "DVC In" 100%
++ *
++ * You can use Mute
++ *
++ *	amixer set "DVC Out Mute" on
++ *	amixer set "DVC In Mute" on
++ *
++ * You can use Volume Ramp
++ *
++ *	amixer set "DVC Out Ramp Up Rate"   "0.125 dB/64 steps"
++ *	amixer set "DVC Out Ramp Down Rate" "0.125 dB/512 steps"
++ *	amixer set "DVC Out Ramp" on
++ *	aplay xxx.wav &
++ *	amixer set "DVC Out"  80%  // Volume Down
++ *	amixer set "DVC Out" 100%  // Volume Up
+  */
 +
- 		rcar_sound,src {
- 			src0: src at 0 {
- 				interrupts = <0 352 IRQ_TYPE_LEVEL_HIGH>;
+ /dts-v1/;
+ #include "r8a7793.dtsi"
+ #include <dt-bindings/gpio/gpio.h>
+@@ -216,8 +233,8 @@
+ 
+ 	rcar_sound,dai {
+ 		dai0 {
+-			playback = <&ssi0 &src2>;
+-			capture  = <&ssi1 &src3>;
++			playback = <&ssi0 &src2 &dvc0>;
++			capture  = <&ssi1 &src3 &dvc1>;
+ 		};
+ 	};
+ };
 -- 
 2.1.4
