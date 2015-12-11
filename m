@@ -1,53 +1,71 @@
 From: xuejiancheng@huawei.com (Jiancheng Xue)
-Date: Fri, 11 Dec 2015 15:45:19 +0800
-Subject: [PATCH v3 5/7] ARM: debug: add hi3519 debug uart
+Date: Fri, 11 Dec 2015 15:45:16 +0800
+Subject: [PATCH v3 2/7] clk: hisilicon: add dt-binding document for Hi3519 CRG
 In-Reply-To: <1449819921-18464-1-git-send-email-xuejiancheng@huawei.com>
 References: <1449819921-18464-1-git-send-email-xuejiancheng@huawei.com>
-Message-ID: <1449819921-18464-6-git-send-email-xuejiancheng@huawei.com>
+Message-ID: <1449819921-18464-3-git-send-email-xuejiancheng@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add hi3519 debug uart.
+add dt-binding document for Hi3519 CRG block
 
 Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
 ---
- arch/arm/Kconfig.debug | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ .../devicetree/bindings/clock/hi3519-crg.txt       | 46 ++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/hi3519-crg.txt
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 259c0ca..29af057 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -270,6 +270,14 @@ choice
- 		  Say Y here if you want the debug print routines to direct
- 		  their output to the 8250 at PCI COM1.
- 
-+	config DEBUG_HI3519_UART
-+		bool "Hisilicon Hi3519 Debug UART"
-+		depends on ARCH_HISI
-+		select DEBUG_UART_PL01X
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on HI3519 UART.
+diff --git a/Documentation/devicetree/bindings/clock/hi3519-crg.txt b/Documentation/devicetree/bindings/clock/hi3519-crg.txt
+new file mode 100644
+index 0000000..e0d30a4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/hi3519-crg.txt
+@@ -0,0 +1,46 @@
++* Hisilicon Hi3519 Clock and Reset Generator(CRG)
 +
- 	config DEBUG_HI3620_UART
- 		bool "Hisilicon HI3620 Debug UART"
- 		depends on ARCH_HI3xxx
-@@ -1449,6 +1457,7 @@ config DEBUG_UART_PHYS
- 	default 0xf7fc9000 if DEBUG_BERLIN_UART
- 	default 0xf8b00000 if DEBUG_HIX5HD2_UART
- 	default 0xf991e000 if DEBUG_QCOM_UARTDM
-+	default 0x12100000 if DEBUG_HI3519_UART
- 	default 0xfcb00000 if DEBUG_HI3620_UART
- 	default 0xfd883000 if DEBUG_ALPINE_UART0
- 	default 0xfe800000 if ARCH_IOP32X
-@@ -1529,6 +1538,7 @@ config DEBUG_UART_VIRT
- 	default 0xfe230000 if DEBUG_PICOXCELL_UART
- 	default 0xfe300000 if DEBUG_BCM_KONA_UART
- 	default 0xfe800000 if ARCH_IOP32X
-+	default 0xfef00000 if DEBUG_HI3519_UART
- 	default 0xfeb00000 if DEBUG_HI3620_UART || DEBUG_HIX5HD2_UART
- 	default 0xfeb24000 if DEBUG_RK3X_UART0
- 	default 0xfeb26000 if DEBUG_RK3X_UART1
++The Hi3519 CRG module provides clock and reset signals to various
++controllers within the SoC.
++
++This binding uses the following bindings:
++    Documentation/devicetree/bindings/clock/clock-bindings.txt
++    Documentation/devicetree/bindings/reset/reset.txt
++
++Required Properties:
++
++- compatible: should be one of the following.
++  - "hisilicon,hi3519-crg" - controller compatible with Hi3519 SoC.
++
++- reg: physical base address of the controller and length of memory mapped
++  region.
++
++- #clock-cells: should be 1.
++
++Each clock is assigned an identifier and client nodes use this identifier
++to specify the clock which they consume.
++
++All these identifier could be found in <dt-bindings/clock/hi3519-clock.h>.
++
++- #reset-cells: should be 2.
++
++A reset signal can be controlled by writing a bit register in the CRG module.
++The reset specifier consists of two cells. The first cell represents the
++register offset relative to the base address. The second cell represents the
++bit index in the register.
++
++Example: CRG nodes
++CRG: clock-reset-controller {
++	compatible = "hisilicon,hi3519-crg";
++        reg = <0x12010000 0x10000>;
++        #clock-cells = <1>;
++        #reset-cells = <2>;
++};
++
++Example: consumer nodes
++i2c0: i2c at 0x12110000 {
++	compatible = "hisilicon,hi3519-i2c";
++        reg = <0x12110000 0x1000>;
++        clocks = <&CRG HI3519_I2C0_RST>;*/
++        resets = <&CRG 0xE4 0>;
++};
 -- 
 1.9.1
