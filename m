@@ -1,33 +1,63 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 11 Dec 2015 17:21:40 +0000
-Subject: [PATCH 0/4] arm: Privileged no-access for LPAE
-In-Reply-To: <CAGXu5jJYoCxATf8tWAhdosNH9jKovpcYQ=PqD85gHnT+oBF3CQ@mail.gmail.com>
-References: <1443018250-22893-1-git-send-email-catalin.marinas@arm.com>
- <CAGXu5jJYoCxATf8tWAhdosNH9jKovpcYQ=PqD85gHnT+oBF3CQ@mail.gmail.com>
-Message-ID: <20151211172140.GQ26759@e104818-lin.cambridge.arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 11 Dec 2015 11:21:43 -0600
+Subject: [PATCH v2 1/8] dt-bindings: Add a binding for Mediatek Video
+ Processor
+In-Reply-To: <1449827743-22895-2-git-send-email-tiffany.lin@mediatek.com>
+References: <1449827743-22895-1-git-send-email-tiffany.lin@mediatek.com>
+ <1449827743-22895-2-git-send-email-tiffany.lin@mediatek.com>
+Message-ID: <20151211172143.GA14623@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 10, 2015 at 11:40:44AM -0800, Kees Cook wrote:
-> [thread necromancy]
+On Fri, Dec 11, 2015 at 05:55:36PM +0800, Tiffany Lin wrote:
+> From: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
 > 
-> This series looks good to me. I'd love to see it accepted. At the very
-> least the cleanups look like no-brainers. :)
+> Add a DT binding documentation of Video Processor Unit for the
+> MT8173 SoC from Mediatek.
 > 
-> Please consider the series:
-> 
-> Reviewed-by: Kees Cook <keescook@chromium.org>
-> 
-> Thanks for working on it!
+> Signed-off-by: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
+> Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
 
-Thanks for the review. After some more (internal) discussions around
-these patches, I need to get clarification on the architecture whether
-changing the TTBCR.A1 bit is enough to guarantee an ASID change (I do
-this trick to change to the reserved ASID and avoid TLB invalidation as
-normally required by changes to translation control registers). If
-that's not allowed by the architecture, I would have to change the
-patches to switch to a reserved TTBR0 rather than disabling TTBR0 walks
-at the TTBCR level.
+Acked-by: Rob Herring <robh@kernel.org>
 
--- 
-Catalin
+> ---
+>  .../devicetree/bindings/media/mediatek-vpu.txt     |   27 ++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/mediatek-vpu.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/media/mediatek-vpu.txt b/Documentation/devicetree/bindings/media/mediatek-vpu.txt
+> new file mode 100644
+> index 0000000..3c3a424
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/mediatek-vpu.txt
+> @@ -0,0 +1,27 @@
+> +* Mediatek Video Processor Unit
+> +
+> +Video Processor Unit is a HW video controller. It controls HW Codec including
+> +H.264/VP8/VP9 Decode, H.264/VP8 Encode and Image Processor (scale/rotate/color convert).
+> +
+> +Required properties:
+> +  - compatible: "mediatek,mt8173-vpu"
+> +  - reg: Must contain an entry for each entry in reg-names.
+> +  - reg-names: Must include the following entries:
+> +    "tcm": tcm base
+> +    "cfg_reg": Main configuration registers base
+> +  - interrupts: interrupt number to the cpu.
+> +  - clocks : clock name from clock manager
+> +  - clock-names: must be main. It is the main clock of VPU
+> +  - iommus : phandle and IOMMU spcifier for the IOMMU that serves the VPU.
+> +
+> +Example:
+> +	vpu: vpu at 10020000 {
+> +		compatible = "mediatek,mt8173-vpu";
+> +		reg = <0 0x10020000 0 0x30000>,
+> +		      <0 0x10050000 0 0x100>;
+> +		reg-names = "tcm", "cfg_reg";
+> +		interrupts = <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&topckgen TOP_SCP_SEL>;
+> +		clock-names = "main";
+> +		iommus = <&iommu M4U_PORT_VENC_RCPU>;
+> +	};
+> -- 
+> 1.7.9.5
+> 
