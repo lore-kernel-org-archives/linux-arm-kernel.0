@@ -1,21 +1,52 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 11 Dec 2015 11:51:43 +0100
-Subject: [PATCH 1/3] ARM: dts: imx: Add basic dts support for imx6qp
-In-Reply-To: <1449830722-26607-1-git-send-email-b51503@freescale.com>
-References: <1449830722-26607-1-git-send-email-b51503@freescale.com>
-Message-ID: <20151211105143.GB11966@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 11 Dec 2015 11:51:52 +0100
+Subject: [RFC PATCH 4/4] mfd: syscon: add ACPI support
+In-Reply-To: <CAMj5BkiAToBCvnOSkW=41po5OHpg5uSzxNTNJ_=gLK__BLa1Sw@mail.gmail.com>
+References: <1449047368-5768-1-git-send-email-wangkefeng.wang@huawei.com>
+ <2299982.06P4iKpkWk@wuerfel>
+ <CAMj5BkiAToBCvnOSkW=41po5OHpg5uSzxNTNJ_=gLK__BLa1Sw@mail.gmail.com>
+Message-ID: <21660867.NhUszMiexN@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 11, 2015 at 06:45:20PM +0800, Bai Ping wrote:
-> The i.MX6Qual Plus processor is an high performance SOC of i.MX6 family.
+On Friday 11 December 2015 18:35:17 Zhangfei Gao wrote:
+> On Wed, Dec 2, 2015 at 6:44 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Wednesday 02 December 2015 17:09:28 Kefeng Wang wrote:
+> >
+> > This sounds like a bad idea:
+> >
+> > syscon is basically a hack to let us access register that the SoC designer
+> > couldn't fit in anywhere sane. We need something like this with devicetree
+> > because we decided not to have any interpreted bytecode to do this behind
+> > our back.
+> >
+> > With ACPI, the same thing is done with AML, which is actually nicer than
+> > syscon (once you have to deal with all the problems introduced by AML).
+> >
+> > Use that instead.
+> >
+> 
+> Would you mind clarifying AML method, still not understand.
+> Is is means realize the operation in uefi/bootloader and call some
+> interface from kernel?
+>
+> The issue here is we want to access some common registers,
+> which we do not want to ioremap for many times in each driver.
+> 
+> In hisi platforms, we have many common registers shared by many components.
 
-Qual is German for pain. Is that what you mean?
+Sorry, you'd have to ask someone who is more familiar with ACPI.
 
-Sascha
+Basically, the idea of ACPI as I understand it is that you have a
+interpreted bytecode language that is provided by the BIOS as tables
+and executed in the context of the kernel. This byte code has access
+to stuff like GPIO, PCI config space, MMIO registers, IPMI or the
+embedded controller on a PC. This way, you can hide all the platform
+specific details behind a function call from a generic device driver,
+and the BIOS writer can provide the specific implementation for any
+registers that are shared across components.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+That's about all I know, but the ACPI specifications are available
+publicly, please have a look there for more details.
+
+	Arnd
