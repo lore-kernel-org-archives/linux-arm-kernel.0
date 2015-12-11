@@ -1,55 +1,135 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Fri, 11 Dec 2015 15:17:18 +0100
-Subject: [RFC PATCH 1/2] PCI/ACPI: Add ACPI support for non ECAM Host
- Bridge Controllers
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1EBE4494@lhreml503-mbs>
-References: <1449155999-220955-1-git-send-email-gabriele.paoloni@huawei.com>
- <5018756.5lEEeJVMod@wuerfel> <20151204120404.GA3999@red-moon>
- <724640317.IRruPaehsN@wuerfel>
- <EE11001F9E5DDD47B7634E2F8A612F2E1EBE4494@lhreml503-mbs>
-Message-ID: <566ADAEE.8020408@semihalf.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 11 Dec 2015 15:20:11 +0100
+Subject: [GIT PULL] ARM: mvebu: soc for v4.5 (#1)
+Message-ID: <87r3it6p9g.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04.12.2015 17:22, Gabriele Paoloni wrote:
-> Hi Lorenzo, Arnd (thanks to you both for looking at this)
->
->> -----Original Message-----
->> From: Arnd Bergmann [mailto:arnd at arndb.de]
->> Sent: 04 December 2015 13:57
->> To: Lorenzo Pieralisi
->> Cc: linux-arm-kernel at lists.infradead.org; Gabriele Paoloni; linux-
->> acpi at vger.kernel.org; linux-pci at vger.kernel.org;
->> catalin.marinas at arm.com; linaro-acpi at lists.linaro.org;
->> Liviu.Dudau at arm.com; linux-kernel at vger.kernel.org; will.deacon at arm.com;
->> Wangyijing; Wangzhou (B); hanjun.guo at linaro.org; liudongdong (C);
->> tn at semihalf.com; bhelgaas at google.com; tglx at linutronix.de; xuwei (O);
->> Liguozhu (Kenneth); jiang.liu at linux.intel.com
->> Subject: Re: [RFC PATCH 1/2] PCI/ACPI: Add ACPI support for non ECAM
->> Host Bridge Controllers
->>
->> On Friday 04 December 2015 12:04:04 Lorenzo Pieralisi wrote:
->>> On Thu, Dec 03, 2015 at 09:58:14PM +0100, Arnd Bergmann wrote:
->>
->>>> pci-host-generic.c is just for standard PCI implementations, and it
->>>> has zero code that would be shared with ACPI: Most of the
->>>> implementation deals with parsing DT properties, and all that code
->>>> is entirely differnet for ACPI and already exists in drivers/acpi.
->>>> The one thing that could be shared is the ECAM config space access,
->>>> but ACPI already needs something else here because it requires
->>>> access to the config space at early boot time, way before we even
->> load that driver, see raw_pci_read/raw_pci_write.
->>>
->>> Yes, I agree, basically ACPI has already a concept of "host generic"
->>> layer, there is not much point in "merging" it with the
->>> pci-host-generic.c driver. One thing is for certain: nothing in this
->>> and Tomasz patchsets is
->>> arm64 specific, and should not live in arch/arm64.
->
-> Ok so now I guess Tomasz is aware of this and probably he is reworking
-> his patchset to move his code into "drivers/acpi/pci_*",
-> Tomasz can you confirm this?
+Hi,
 
-Yes, working on it now and sorry for late response.
+Here is the first pull request for soc for mvebu for v4.5.
 
-Tomasz
+The annoying part is that with this pull request then the kernel built
+for Orion5x will be bigger as noticed by Detlef.
+
+Gregory
+
+The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+
+  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-4.5-1
+
+for you to fetch changes up to c5d431e8c511788556651b91debd7d77d4508f4b:
+
+  ARM: dove: convert legacy dove to PMU support (2015-12-08 13:23:14 +0100)
+
+----------------------------------------------------------------
+mvebu soc for 4.5 (part 1)
+
+- orion5x/mv78xx0 multiplatform conversion
+- legacy dove PMU support conversion
+
+----------------------------------------------------------------
+Arnd Bergmann (7):
+      ARM: orion: move watchdog setup to mach-orion5x
+      ARM: orion: always use MULTI_IRQ_HANDLER
+      ARM: orion: use SPARSE_IRQ everywhere
+      ARM: mv78xx0: clean up mach/*.h headers
+      ARM: mv78xx0: multiplatform support
+      ARM: orion5x: clean up mach/*.h headers
+      ARM: orion5x: multiplatform support
+
+Russell King (2):
+      soc: dove: add legacy support to PMU driver
+      ARM: dove: convert legacy dove to PMU support
+
+ arch/arm/Kconfig                                   |  30 +------
+ arch/arm/configs/mv78xx0_defconfig                 |   3 +
+ arch/arm/configs/orion5x_defconfig                 |   3 +
+ arch/arm/mach-dove/cm-a510.c                       |   1 +
+ arch/arm/mach-dove/common.c                        |  43 +++++++++
+ arch/arm/mach-dove/dove-db-setup.c                 |   1 +
+ arch/arm/mach-dove/include/mach/dove.h             |   2 +
+ arch/arm/mach-dove/include/mach/entry-macro.S      |  33 -------
+ arch/arm/mach-dove/include/mach/irqs.h             |   2 +-
+ arch/arm/mach-dove/include/mach/pm.h               |  20 ++---
+ arch/arm/mach-dove/irq.c                           | 100 +--------------------
+ arch/arm/mach-mv78xx0/Kconfig                      |  15 +++-
+ arch/arm/mach-mv78xx0/Makefile                     |   2 +
+ .../mach-mv78xx0/{include/mach => }/bridge-regs.h  |   4 +-
+ arch/arm/mach-mv78xx0/buffalo-wxl-setup.c          |   3 +-
+ arch/arm/mach-mv78xx0/common.c                     |   4 +-
+ arch/arm/mach-mv78xx0/db78x00-bp-setup.c           |   3 +-
+ arch/arm/mach-mv78xx0/include/mach/entry-macro.S   |  41 ---------
+ arch/arm/mach-mv78xx0/include/mach/hardware.h      |  14 ---
+ arch/arm/mach-mv78xx0/include/mach/uncompress.h    |  46 ----------
+ arch/arm/mach-mv78xx0/irq.c                        |  35 +++++++-
+ arch/arm/mach-mv78xx0/{include/mach => }/irqs.h    |   4 +-
+ arch/arm/mach-mv78xx0/mpp.c                        |   2 +-
+ arch/arm/mach-mv78xx0/{include/mach => }/mv78xx0.h |   4 +-
+ arch/arm/mach-mv78xx0/pcie.c                       |   2 +-
+ arch/arm/mach-mv78xx0/rd78x00-masa-setup.c         |   3 +-
+ arch/arm/mach-orion5x/Kconfig                      |  18 +++-
+ arch/arm/mach-orion5x/Makefile                     |   2 +
+ arch/arm/mach-orion5x/board-d2net.c                |   2 +-
+ arch/arm/mach-orion5x/board-dt.c                   |   4 +-
+ arch/arm/mach-orion5x/board-mss2.c                 |   4 +-
+ arch/arm/mach-orion5x/board-rd88f5182.c            |   2 +-
+ .../mach-orion5x/{include/mach => }/bridge-regs.h  |   4 +-
+ arch/arm/mach-orion5x/common.c                     |  20 ++++-
+ arch/arm/mach-orion5x/db88f5281-setup.c            |   3 +-
+ arch/arm/mach-orion5x/dns323-setup.c               |   3 +-
+ arch/arm/mach-orion5x/include/mach/entry-macro.S   |  25 ------
+ arch/arm/mach-orion5x/include/mach/hardware.h      |  14 ---
+ arch/arm/mach-orion5x/include/mach/uncompress.h    |  48 ----------
+ arch/arm/mach-orion5x/irq.c                        |  13 +--
+ arch/arm/mach-orion5x/{include/mach => }/irqs.h    |   4 +-
+ arch/arm/mach-orion5x/kurobox_pro-setup.c          |   4 +-
+ arch/arm/mach-orion5x/ls-chl-setup.c               |   3 +-
+ arch/arm/mach-orion5x/ls_hgl-setup.c               |   3 +-
+ arch/arm/mach-orion5x/mpp.c                        |   2 +-
+ arch/arm/mach-orion5x/mv2120-setup.c               |   3 +-
+ arch/arm/mach-orion5x/net2big-setup.c              |   3 +-
+ arch/arm/mach-orion5x/{include/mach => }/orion5x.h |   4 +-
+ arch/arm/mach-orion5x/pci.c                        |   2 +-
+ arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c       |   3 +-
+ arch/arm/mach-orion5x/rd88f5181l-ge-setup.c        |   3 +-
+ arch/arm/mach-orion5x/rd88f5182-setup.c            |   3 +-
+ arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c       |   3 +-
+ arch/arm/mach-orion5x/terastation_pro2-setup.c     |   3 +-
+ arch/arm/mach-orion5x/ts209-setup.c                |   3 +-
+ arch/arm/mach-orion5x/ts409-setup.c                |   3 +-
+ arch/arm/mach-orion5x/ts78xx-setup.c               |   3 +-
+ arch/arm/mach-orion5x/tsx09-common.c               |   2 +-
+ arch/arm/mach-orion5x/wnr854t-setup.c              |   3 +-
+ arch/arm/mach-orion5x/wrt350n-v2-setup.c           |   3 +-
+ arch/arm/plat-orion/common.c                       |  21 -----
+ arch/arm/plat-orion/include/plat/common.h          |   2 -
+ arch/arm/plat-orion/irq.c                          |   1 -
+ arch/arm/plat-orion/mpp.c                          |   1 -
+ drivers/soc/Makefile                               |   1 +
+ drivers/soc/dove/pmu.c                             |  43 +++++++++
+ include/linux/soc/dove/pmu.h                       |  19 ++++
+ 67 files changed, 269 insertions(+), 461 deletions(-)
+ delete mode 100644 arch/arm/mach-dove/include/mach/entry-macro.S
+ rename arch/arm/mach-mv78xx0/{include/mach => }/bridge-regs.h (92%)
+ delete mode 100644 arch/arm/mach-mv78xx0/include/mach/entry-macro.S
+ delete mode 100644 arch/arm/mach-mv78xx0/include/mach/hardware.h
+ delete mode 100644 arch/arm/mach-mv78xx0/include/mach/uncompress.h
+ rename arch/arm/mach-mv78xx0/{include/mach => }/irqs.h (95%)
+ rename arch/arm/mach-mv78xx0/{include/mach => }/mv78xx0.h (98%)
+ rename arch/arm/mach-orion5x/{include/mach => }/bridge-regs.h (92%)
+ delete mode 100644 arch/arm/mach-orion5x/include/mach/entry-macro.S
+ delete mode 100644 arch/arm/mach-orion5x/include/mach/hardware.h
+ delete mode 100644 arch/arm/mach-orion5x/include/mach/uncompress.h
+ rename arch/arm/mach-orion5x/{include/mach => }/irqs.h (94%)
+ rename arch/arm/mach-orion5x/{include/mach => }/orion5x.h (99%)
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
