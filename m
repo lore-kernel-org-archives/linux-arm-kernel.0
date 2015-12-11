@@ -1,34 +1,37 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 11 Dec 2015 09:37:37 -0200
-Subject: [PATCH 1/3] ARM: dts: imx: Add basic dts support for imx6qp
-In-Reply-To: <1449830722-26607-1-git-send-email-b51503@freescale.com>
-References: <1449830722-26607-1-git-send-email-b51503@freescale.com>
-Message-ID: <CAOMZO5C8mTotbpOmKkxKOXmBWc-N_zm7xn-fU5gFUgAFCiyokw@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 11 Dec 2015 19:42:33 +0800
+Subject: [PATCH v2] ARM: multi_v7_defconfig: Enable some drivers for
+ LS1021A
+In-Reply-To: <5410635.RmBCMMyZr3@wuerfel>
+References: <1449650499-28660-1-git-send-email-b18965@freescale.com>
+ <5410635.RmBCMMyZr3@wuerfel>
+Message-ID: <20151211114233.GG11252@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 11, 2015 at 8:45 AM, Bai Ping <b51503@freescale.com> wrote:
-> The i.MX6Qual Plus processor is an high performance SOC of i.MX6 family.
-> It has enhanced graphics performance and increased overall memory bandwidth
-> compared to i.MX6Q. Most of the design are same as i.MX6Qual/Dual, so code
-> for i.MX6Qual can be resued by this chip. The revision number is identied as
-> i.MX6Q Rev2.0, but actually it is a new chip, as we did many change to the
-> overall architecture.
->
-> This patch adds basic dts file for the new i.MX6Qual Plus processor.
->
-> Signed-off-by: Bai Ping <b51503@freescale.com>
-> ---
->  arch/arm/boot/dts/Makefile                |   2 +
->  arch/arm/boot/dts/imx6q.dtsi              |   2 +-
->  arch/arm/boot/dts/imx6qdl-sabresd.dtsi    |   1 +
->  arch/arm/boot/dts/imx6qp-sabreauto.dts    |  67 +++++++++++++
->  arch/arm/boot/dts/imx6qp-sabresd.dts      |  59 +++++++++++
->  arch/arm/boot/dts/imx6qp.dtsi             | 157 ++++++++++++++++++++++++++++++
->  include/dt-bindings/clock/imx6qdl-clock.h |  16 ++-
+On Wed, Dec 09, 2015 at 09:57:26AM +0100, Arnd Bergmann wrote:
+> On Wednesday 09 December 2015 16:41:39 Alison Wang wrote:
+> > This patch enables some drivers for LS1021A, such as
+> > GIANFAR, WATCHDOG, AUDIO, QSPI, I2C, ESDHC, EDMA, FTM.
+> > QorIQ Clock Framework and Ramdisk support is also enabled.
+> > 
+> > Signed-off-by: Alison Wang <alison.wang@freescale.com>
+> > ---
+> > Changes since v1:
+> > - Make some drivers as loadable modules.
+> > 
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> Shawn, do you want to pick this up and send it back through the
+> imx tree?
+> 
+> If you have no other defconfig changes for 4.5, we can also just
+> add it to arm-soc.
 
-Better split this in three patches:
+Arnd,
 
-- Add imx6qp SoC support
-- Add imx6qdl-sabresd support
-- Add imx6qp-sabreauto support
+I was told by Olof to stay away from multi_v7_defconfig as it's not i.MX
+specific.  So please apply it directly to arm-soc.
+
+Shawn
