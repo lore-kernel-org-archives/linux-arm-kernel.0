@@ -1,39 +1,54 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 11 Dec 2015 19:34:10 +0100
-Subject: [PATCH 1/2] ARM: mvebu: add kirkwood compatibles for cloudengine
- boards
-In-Reply-To: <87a8pj8ww7.fsf@free-electrons.com>
-References: <1448578854-6256-1-git-send-email-linus.walleij@linaro.org>
- <CACRpkdaJW6KLdnF4D2kyXuFeEyeNrM_epRodVmT2fQTUcBKbbQ@mail.gmail.com>
- <87a8pj8ww7.fsf@free-electrons.com>
-Message-ID: <CACRpkdYaj3fkmSXoURaJXOP_5srUOtObZzxHoZzkPrqKRP+trg@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 11 Dec 2015 19:43:58 +0100
+Subject: [PATCH v2 3/4] ARM: dts: sun5i: Enable onboard codec used on the UTOO
+ P66 tablet
+In-Reply-To: <1449859439-30875-1-git-send-email-hdegoede@redhat.com>
+References: <1449859439-30875-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1449859439-30875-3-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 9, 2015 at 4:27 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> Hi Linus,
->
->  On mer., d?c. 09 2015, Linus Walleij <linus.walleij@linaro.org> wrote:
->
->> On Fri, Nov 27, 2015 at 12:00 AM, Linus Walleij
->> <linus.walleij@linaro.org> wrote:
->>
->>> This adds the compatible strings for Cloudengine PogoPlug E02 and
->>> series 4. The former already has a devicetree in the kernel.
->>>
->>> Cc: devicetree at vger.kernel.org
->>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->>
->> Kirkwood maintainers: are you queueing this patch with Rob's
->> ACK?
->
-> Actually I was waiting for a new version of the series with Adrew's
-> comment addressed in the 2nd patch before applying the whole series.
+The UTOO P66 tablet uses the A13's integrated audio codec, enable it.
 
-OK I sent a new one of that earlier today, but I did not resend this one.
-I think it stand on its own though? The compatible string for the machine
-was never target of review comments.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+Changes in v2:
+-Adjust for gpio rename from pa-gpios to allwinner,pa-gpios
+---
+ arch/arm/boot/dts/sun5i-a13-utoo-p66.dts | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-Yours,
-Linus Walleij
+diff --git a/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts b/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts
+index 5236c1e..fa9ddfd 100644
+--- a/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts
++++ b/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts
+@@ -73,6 +73,13 @@
+ 	};
+ };
+ 
++&codec {
++	pinctrl-names = "default";
++	pinctrl-0 = <&codec_pa_pin>;
++	allwinner,pa-gpios = <&pio 6 3 GPIO_ACTIVE_HIGH>; /* PG3 */
++	status = "okay";
++};
++
+ &cpu0 {
+ 	cpu-supply = <&reg_dcdc2>;
+ };
+@@ -168,6 +175,13 @@
+ };
+ 
+ &pio {
++	codec_pa_pin: codec_pa_pin at 0 {
++		allwinner,pins = "PG3";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
+ 	mmc0_cd_pin_p66: mmc0_cd_pin at 0 {
+ 		allwinner,pins = "PG0";
+ 		allwinner,function = "gpio_in";
+-- 
+2.5.0
