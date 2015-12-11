@@ -1,41 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 11 Dec 2015 14:02:05 +0100
-Subject: [PATCH v2] ARM: multi_v7_defconfig: Enable some drivers for
- LS1021A
-In-Reply-To: <20151211114233.GG11252@tiger>
-References: <1449650499-28660-1-git-send-email-b18965@freescale.com>
- <5410635.RmBCMMyZr3@wuerfel> <20151211114233.GG11252@tiger>
-Message-ID: <4388581.keeCbMLadq@wuerfel>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 11 Dec 2015 14:04:29 +0100
+Subject: [PATCH 1/2] arm64: dts: rockchip: change the correct voltage
+ range for rk3368 evb board
+In-Reply-To: <1449054741-25354-1-git-send-email-wxt@rock-chips.com>
+References: <1449054741-25354-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <1606584.VJKYfIuzKa@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 11 December 2015 19:42:33 Shawn Guo wrote:
-> On Wed, Dec 09, 2015 at 09:57:26AM +0100, Arnd Bergmann wrote:
-> > On Wednesday 09 December 2015 16:41:39 Alison Wang wrote:
-> > > This patch enables some drivers for LS1021A, such as
-> > > GIANFAR, WATCHDOG, AUDIO, QSPI, I2C, ESDHC, EDMA, FTM.
-> > > QorIQ Clock Framework and Ramdisk support is also enabled.
-> > > 
-> > > Signed-off-by: Alison Wang <alison.wang@freescale.com>
-> > > ---
-> > > Changes since v1:
-> > > - Make some drivers as loadable modules.
-> > > 
-> > 
-> > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > 
-> > Shawn, do you want to pick this up and send it back through the
-> > imx tree?
-> > 
-> > If you have no other defconfig changes for 4.5, we can also just
-> > add it to arm-soc.
-> 
-> Arnd,
-> 
-> I was told by Olof to stay away from multi_v7_defconfig as it's not i.MX
-> specific.  So please apply it directly to arm-soc.
+Hi Caesar,
 
-Ok, I should discuss this with Olof, as I've been giving the opposite
-advice in the past. ;-)
+Am Mittwoch, 2. Dezember 2015, 19:12:20 schrieb Caesar Wang:
+> In general, the logic voltage is affected by ddr frequency factors.
+> We should fix the correct voltage range since assuemd that we have the
+> ddr frequency driver in mainline.
+> 
+> AFAIK, the 1.8v voltage is used by the SD3.0 card.
+> 
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 
-	Arnd
+applied both patches to the 32 and 64 bit dts branches for 4.5
+
+
+Thanks
+Heiko
