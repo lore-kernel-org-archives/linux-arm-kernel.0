@@ -1,107 +1,230 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 11 Dec 2015 15:26:29 +0000
-Subject: [PATCH v9 1/4] dt-binding:Documents of the mbigen bindings
-In-Reply-To: <1448248513-39760-2-git-send-email-majun258@huawei.com>
-References: <1448248513-39760-1-git-send-email-majun258@huawei.com>
- <1448248513-39760-2-git-send-email-majun258@huawei.com>
-Message-ID: <20151211152629.GE20666@leverpostej>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 11 Dec 2015 16:32:17 +0100
+Subject: [PATCH v4 1/2] phy-sun4i-usb: Use of_match_node to get model specific
+ config data
+Message-ID: <1449847938-20836-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Use of_match_node instead of calling of_device_is_compatible a ton of
+times to get model specific config data.
 
-On Mon, Nov 23, 2015 at 11:15:10AM +0800, MaJun wrote:
-> From: Ma Jun <majun258@huawei.com>
-> 
-> Add the mbigen msi interrupt controller bindings document.
-> 
-> This patch based on Mark Rutland's patch
-> https://lkml.org/lkml/2015/7/23/558
-> 
-> Signed-off-by: Ma Jun <majun258@huawei.com>
-> ---
->  Documentation/devicetree/bindings/arm/mbigen.txt |   69 ++++++++++++++++++++++
->  1 files changed, 69 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/mbigen.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/mbigen.txt b/Documentation/devicetree/bindings/arm/mbigen.txt
-> new file mode 100644
-> index 0000000..8ae59a9
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/mbigen.txt
-> @@ -0,0 +1,69 @@
-> +Hisilicon mbigen device tree bindings.
-> +=======================================
-> +
-> +Mbigen means: message based interrupt generator.
-> +
-> +MBI is kind of msi interrupt only used on Non-PCI devices.
-> +
-> +To reduce the wired interrupt number connected to GIC,
-> +Hisilicon designed mbigen to collect and generate interrupt.
-> +
-> +
-> +Non-pci devices can connect to mbigen and generate the
-> +interrupt by writing ITS register.
-> +
-> +The mbigen chip and devices connect to mbigen have the following properties:
-> +
-> +Mbigen main node required properties:
-> +-------------------------------------------
-> +- compatible: Should be "hisilicon,mbigen-v2"
-> +- reg: Specifies the base physical address and size of the Mbigen
-> +  registers.
-> +- interrupt controller: Identifies the node as an interrupt controller
-> +- msi-parent: This property has two cells.
-> +	The 1st cell specifies the ITS this device connected.
-> +	The 2nd cell specifies the device id.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+Changes in v3:
+-New patch in v3 of this patch-set
+Changes in v4:
+-Use of_device_get_match_data()
+-Add phyctl_offset to sun4i_usb_phy_cfg, get rid of model specific code
+ for phyctl-reg in sun4i_usb_phy_write()
+---
+ drivers/phy/phy-sun4i-usb.c | 121 +++++++++++++++++++++++++++++---------------
+ 1 file changed, 79 insertions(+), 42 deletions(-)
 
-This should just refer to the generic msi-parent binding in
-Documentation/devicetree/bindings/interrupt-controller/msi.txt.
-
-I assume that the driver does not try to parse this itself (i.e. it uses
-generic accessors and doesn't assume anything about the meaning of these
-cells).
-
-> +- num-msis:Specifies the total number of interrupt this device has.
-> +- #interrupt-cells : Specifies the number of cells needed to encode an
-> +  interrupt source. The value must be 2.
-> +
-> +  The 1st cell is global hardware pin number of the interrupt.
-> +	This value depends on the Soc design.
-
-I think a little more information is required here. Presumably the
-"global hardware pin number" is actually a pin number within the
-particular mbigen instance? i.e. it is local to this instance?
-
-> +  The 2nd cell is the interrupt trigger type.
-> +	The value of this cell should be:
-> +	1: rising edge triggered
-> +	or
-> +	4: high level triggered	
-> +
-> +Examples:
-> +
-> + 	mbigen_device_gmac:intc {
-> +			compatible = "hisilicon,mbigen-v2";
-> +			reg = <0x0 0xc0080000 0x0 0x10000>;
-> +			interrupt-controller;
-> +			msi-parent = <&its_dsa 0x40b1c>;
-> +			num-msis = <9>;
-> +			#interrupt-cells = <2>;
-> + 	};
-> +
-> +Devices connect to mbigen required properties:
-> +----------------------------------------------------
-> +-interrupt-parent: Specifies the mbigen device node which device connected.
-> +-interrupts:specifies the interrupt source.
-> +  The 1st cell is global hardware pin number of the interrupt.
-> +		This value depends on the Soc design.
-> +  The 2nd cell is the interrupt trigger type(rising edge triggered or high
-> +		level triggered)
-
-You should be able to refer to the usual interrupt bindings given you
-defined the format previously when describing #interrupt-cells.
-
-Thanks,
-Mark.
+diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+index b12964b..35b1fa3 100644
+--- a/drivers/phy/phy-sun4i-usb.c
++++ b/drivers/phy/phy-sun4i-usb.c
+@@ -32,6 +32,7 @@
+ #include <linux/mutex.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
++#include <linux/of_device.h>
+ #include <linux/of_gpio.h>
+ #include <linux/phy/phy.h>
+ #include <linux/phy/phy-sun4i-usb.h>
+@@ -88,12 +89,23 @@
+ #define DEBOUNCE_TIME			msecs_to_jiffies(50)
+ #define POLL_TIME			msecs_to_jiffies(250)
+ 
++enum sun4i_usb_phy_type {
++	sun4i_a10_phy,
++	sun8i_a33_phy,
++};
++
++struct sun4i_usb_phy_cfg {
++	int num_phys;
++	enum sun4i_usb_phy_type type;
++	u32 disc_thresh;
++	u8 phyctl_offset;
++	bool dedicated_clocks;
++};
++
+ struct sun4i_usb_phy_data {
+ 	void __iomem *base;
++	const struct sun4i_usb_phy_cfg *cfg;
+ 	struct mutex mutex;
+-	int num_phys;
+-	u32 disc_thresh;
+-	bool has_a33_phyctl;
+ 	struct sun4i_usb_phy {
+ 		struct phy *phy;
+ 		void __iomem *pmu;
+@@ -159,17 +171,14 @@ static void sun4i_usb_phy_write(struct sun4i_usb_phy *phy, u32 addr, u32 data,
+ {
+ 	struct sun4i_usb_phy_data *phy_data = to_sun4i_usb_phy_data(phy);
+ 	u32 temp, usbc_bit = BIT(phy->index * 2);
+-	void *phyctl;
++	void *phyctl = phy_data->base + phy_data->cfg->phyctl_offset;
+ 	int i;
+ 
+ 	mutex_lock(&phy_data->mutex);
+ 
+-	if (phy_data->has_a33_phyctl) {
+-		phyctl = phy_data->base + REG_PHYCTL_A33;
++	if (phy_data->cfg->type == sun8i_a33_phy) {
+ 		/* A33 needs us to set phyctl to 0 explicitly */
+ 		writel(0, phyctl);
+-	} else {
+-		phyctl = phy_data->base + REG_PHYCTL_A10;
+ 	}
+ 
+ 	for (i = 0; i < len; i++) {
+@@ -249,7 +258,8 @@ static int sun4i_usb_phy_init(struct phy *_phy)
+ 	sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE, 0x14, 5);
+ 
+ 	/* Disconnect threshold adjustment */
+-	sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL, data->disc_thresh, 2);
++	sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL,
++			    data->cfg->disc_thresh, 2);
+ 
+ 	sun4i_usb_phy_passby(phy, 1);
+ 
+@@ -476,7 +486,7 @@ static struct phy *sun4i_usb_phy_xlate(struct device *dev,
+ {
+ 	struct sun4i_usb_phy_data *data = dev_get_drvdata(dev);
+ 
+-	if (args->args[0] >= data->num_phys)
++	if (args->args[0] >= data->cfg->num_phys)
+ 		return ERR_PTR(-ENODEV);
+ 
+ 	return data->phys[args->args[0]].phy;
+@@ -511,7 +521,6 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 	struct device *dev = &pdev->dev;
+ 	struct device_node *np = dev->of_node;
+ 	struct phy_provider *phy_provider;
+-	bool dedicated_clocks;
+ 	struct resource *res;
+ 	int i, ret;
+ 
+@@ -522,29 +531,9 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 	mutex_init(&data->mutex);
+ 	INIT_DELAYED_WORK(&data->detect, sun4i_usb_phy0_id_vbus_det_scan);
+ 	dev_set_drvdata(dev, data);
+-
+-	if (of_device_is_compatible(np, "allwinner,sun5i-a13-usb-phy") ||
+-	    of_device_is_compatible(np, "allwinner,sun8i-a23-usb-phy") ||
+-	    of_device_is_compatible(np, "allwinner,sun8i-a33-usb-phy"))
+-		data->num_phys = 2;
+-	else
+-		data->num_phys = 3;
+-
+-	if (of_device_is_compatible(np, "allwinner,sun5i-a13-usb-phy") ||
+-	    of_device_is_compatible(np, "allwinner,sun7i-a20-usb-phy"))
+-		data->disc_thresh = 2;
+-	else
+-		data->disc_thresh = 3;
+-
+-	if (of_device_is_compatible(np, "allwinner,sun6i-a31-usb-phy") ||
+-	    of_device_is_compatible(np, "allwinner,sun8i-a23-usb-phy") ||
+-	    of_device_is_compatible(np, "allwinner,sun8i-a33-usb-phy"))
+-		dedicated_clocks = true;
+-	else
+-		dedicated_clocks = false;
+-
+-	if (of_device_is_compatible(np, "allwinner,sun8i-a33-usb-phy"))
+-		data->has_a33_phyctl = true;
++	data->cfg = of_device_get_match_data(dev);
++	if (!data->cfg)
++		return -EINVAL;
+ 
+ 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "phy_ctrl");
+ 	data->base = devm_ioremap_resource(dev, res);
+@@ -590,7 +579,7 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
+-	for (i = 0; i < data->num_phys; i++) {
++	for (i = 0; i < data->cfg->num_phys; i++) {
+ 		struct sun4i_usb_phy *phy = data->phys + i;
+ 		char name[16];
+ 
+@@ -602,7 +591,7 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 			phy->vbus = NULL;
+ 		}
+ 
+-		if (dedicated_clocks)
++		if (data->cfg->dedicated_clocks)
+ 			snprintf(name, sizeof(name), "usb%d_phy", i);
+ 		else
+ 			strlcpy(name, "usb_phy", sizeof(name));
+@@ -689,13 +678,61 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct sun4i_usb_phy_cfg sun4i_a10_cfg = {
++	.num_phys = 3,
++	.type = sun4i_a10_phy,
++	.disc_thresh = 3,
++	.phyctl_offset = REG_PHYCTL_A10,
++	.dedicated_clocks = false,
++};
++
++static const struct sun4i_usb_phy_cfg sun5i_a13_cfg = {
++	.num_phys = 2,
++	.type = sun4i_a10_phy,
++	.disc_thresh = 2,
++	.phyctl_offset = REG_PHYCTL_A10,
++	.dedicated_clocks = false,
++};
++
++static const struct sun4i_usb_phy_cfg sun6i_a31_cfg = {
++	.num_phys = 3,
++	.type = sun4i_a10_phy,
++	.disc_thresh = 3,
++	.phyctl_offset = REG_PHYCTL_A10,
++	.dedicated_clocks = true,
++};
++
++static const struct sun4i_usb_phy_cfg sun7i_a20_cfg = {
++	.num_phys = 3,
++	.type = sun4i_a10_phy,
++	.disc_thresh = 2,
++	.phyctl_offset = REG_PHYCTL_A10,
++	.dedicated_clocks = false,
++};
++
++static const struct sun4i_usb_phy_cfg sun8i_a23_cfg = {
++	.num_phys = 2,
++	.type = sun4i_a10_phy,
++	.disc_thresh = 3,
++	.phyctl_offset = REG_PHYCTL_A10,
++	.dedicated_clocks = true,
++};
++
++static const struct sun4i_usb_phy_cfg sun8i_a33_cfg = {
++	.num_phys = 2,
++	.type = sun8i_a33_phy,
++	.disc_thresh = 3,
++	.phyctl_offset = REG_PHYCTL_A33,
++	.dedicated_clocks = true,
++};
++
+ static const struct of_device_id sun4i_usb_phy_of_match[] = {
+-	{ .compatible = "allwinner,sun4i-a10-usb-phy" },
+-	{ .compatible = "allwinner,sun5i-a13-usb-phy" },
+-	{ .compatible = "allwinner,sun6i-a31-usb-phy" },
+-	{ .compatible = "allwinner,sun7i-a20-usb-phy" },
+-	{ .compatible = "allwinner,sun8i-a23-usb-phy" },
+-	{ .compatible = "allwinner,sun8i-a33-usb-phy" },
++	{ .compatible = "allwinner,sun4i-a10-usb-phy", .data = &sun4i_a10_cfg },
++	{ .compatible = "allwinner,sun5i-a13-usb-phy", .data = &sun5i_a13_cfg },
++	{ .compatible = "allwinner,sun6i-a31-usb-phy", .data = &sun6i_a31_cfg },
++	{ .compatible = "allwinner,sun7i-a20-usb-phy", .data = &sun7i_a20_cfg },
++	{ .compatible = "allwinner,sun8i-a23-usb-phy", .data = &sun8i_a23_cfg },
++	{ .compatible = "allwinner,sun8i-a33-usb-phy", .data = &sun8i_a33_cfg },
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(of, sun4i_usb_phy_of_match);
+-- 
+2.5.0
