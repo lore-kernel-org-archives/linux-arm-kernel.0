@@ -1,39 +1,39 @@
 From: biao.huang@mediatek.com (Biao Huang)
-Date: Fri, 11 Dec 2015 17:07:47 +0800
-Subject: [PATCH v2 0/5] pinctrl: mediatek: add pinctrl/GPIO/EINT driver for
- mt2701
-Message-ID: <1449824872-18314-1-git-send-email-biao.huang@mediatek.com>
+Date: Fri, 11 Dec 2015 17:07:48 +0800
+Subject: [PATCH v2 1/5] ARM: mediatek: Add MT2701 config options for mediatek
+ SoCs.
+In-Reply-To: <1449824872-18314-1-git-send-email-biao.huang@mediatek.com>
+References: <1449824872-18314-1-git-send-email-biao.huang@mediatek.com>
+Message-ID: <1449824872-18314-2-git-send-email-biao.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change in v2:
-1. add special pinmux setting for some pins.
-2. fix mt2701 direction control issue
-3. resort dt-bindings
+From: Erin Lo <erin.lo@mediatek.com>
 
-Biao Huang (4):
-  dt-bindings: mediatek: Modify pinctrl bindings for mt2701
-  pinctrl: dt bindings: Add pinfunc header file for mt2701
-  pinctrl: mediatek: Add Pinctrl/GPIO/EINT driver for mt2701
-  arm: dts: Add pinctrl/GPIO/EINT node for mt2701
+The upcoming MTK pinctrl driver have a big pin table for each SoC
+and we don't want to bloat the kernel binary if we don't need it.
+Add config options so we can build for one SoC only. Add MT2701.
 
-Erin Lo (1):
-  ARM: mediatek: Add MT2701 config options for mediatek SoCs.
+Signed-off-by: Erin Lo <erin.lo@mediatek.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-mediatek/Kconfig |    4 ++++
+ 1 file changed, 4 insertions(+)
 
- .../devicetree/bindings/pinctrl/pinctrl-mt65xx.txt |    9 +-
- arch/arm/boot/dts/mt2701-pinfunc.h                 |  735 +++++++
- arch/arm/boot/dts/mt2701.dtsi                      |   19 +
- arch/arm/mach-mediatek/Kconfig                     |    4 +
- drivers/pinctrl/mediatek/Kconfig                   |    6 +
- drivers/pinctrl/mediatek/Makefile                  |    1 +
- drivers/pinctrl/mediatek/pinctrl-mt2701.c          |  590 +++++
- drivers/pinctrl/mediatek/pinctrl-mtk-common.c      |   14 +
- drivers/pinctrl/mediatek/pinctrl-mtk-common.h      |   12 +-
- drivers/pinctrl/mediatek/pinctrl-mtk-mt2701.h      | 2323 ++++++++++++++++++++
- 10 files changed, 3708 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm/boot/dts/mt2701-pinfunc.h
- create mode 100644 drivers/pinctrl/mediatek/pinctrl-mt2701.c
- create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-mt2701.h
-
+diff --git a/arch/arm/mach-mediatek/Kconfig b/arch/arm/mach-mediatek/Kconfig
+index aeece17..37dd438 100644
+--- a/arch/arm/mach-mediatek/Kconfig
++++ b/arch/arm/mach-mediatek/Kconfig
+@@ -9,6 +9,10 @@ menuconfig ARCH_MEDIATEK
+ 
+ if ARCH_MEDIATEK
+ 
++config MACH_MT2701
++	bool "MediaTek MT2701 SoCs support"
++	default ARCH_MEDIATEK
++
+ config MACH_MT6589
+ 	bool "MediaTek MT6589 SoCs support"
+ 	default ARCH_MEDIATEK
 -- 
 1.7.9.5
