@@ -1,42 +1,109 @@
 From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Fri, 11 Dec 2015 09:30:48 +0800
-Subject: [PATCH v2 0/4] Add support for rk3228 Soc platform
-Message-ID: <1449797452-19389-1-git-send-email-jeffy.chen@rock-chips.com>
+Date: Fri, 11 Dec 2015 09:30:52 +0800
+Subject: [PATCH v2 4/4] ARM: dts: rockchip: add rk3228-evb board
+In-Reply-To: <1449797452-19389-1-git-send-email-jeffy.chen@rock-chips.com>
+References: <1449797452-19389-1-git-send-email-jeffy.chen@rock-chips.com>
+Message-ID: <1449797452-19389-5-git-send-email-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This serial of patches add dts/pinctrl/clock-tree/doc for rk3228
-platform, with these patches, my evb board could boot into initramfs.
+Initial release for rk3228 sdk board.
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+
+---
 
 Changes in v2:
-Fix some clock tree errors.
-Fix some coding styles.
+Move board properties here.
 
-Separate board and core properties.
-Remove phy clocks.
-Order nodes by register address.
-Add vgic registers and interrupt.
-
-Move board properties into board dts.
-
-Jeffy Chen (4):
-  pinctrl: rockchip: add support for the rk3228
-  rockchip: add clock controller for rk3228
-  ARM: dts: rockchip: add core rk3228 dtsi
-  ARM: dts: rockchip: add rk3228-evb board
-
- .../bindings/pinctrl/rockchip,pinctrl.txt          |   3 +-
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/rk3228-evb.dts                   |  66 ++
- arch/arm/boot/dts/rk3228.dtsi                      | 442 +++++++++++++
- drivers/clk/rockchip/Makefile                      |   1 +
- drivers/clk/rockchip/clk-rk3228.c                  | 681 +++++++++++++++++++++
- drivers/clk/rockchip/clk.h                         |  11 +-
- drivers/pinctrl/pinctrl-rockchip.c                 |  53 ++
- 8 files changed, 1256 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/Makefile       |  1 +
+ arch/arm/boot/dts/rk3228-evb.dts | 66 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 67 insertions(+)
  create mode 100644 arch/arm/boot/dts/rk3228-evb.dts
- create mode 100644 arch/arm/boot/dts/rk3228.dtsi
- create mode 100644 drivers/clk/rockchip/clk-rk3228.c
 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 2d8b9e0..0223846 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -521,6 +521,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
+ 	rk3066a-marsboard.dtb \
+ 	rk3066a-rayeager.dtb \
+ 	rk3188-radxarock.dtb \
++	rk3228-evb.dtb \
+ 	rk3288-evb-act8846.dtb \
+ 	rk3288-evb-rk808.dtb \
+ 	rk3288-firefly-beta.dtb \
+diff --git a/arch/arm/boot/dts/rk3228-evb.dts b/arch/arm/boot/dts/rk3228-evb.dts
+new file mode 100644
+index 0000000..e3898b8
+--- /dev/null
++++ b/arch/arm/boot/dts/rk3228-evb.dts
+@@ -0,0 +1,66 @@
++/*
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *  Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++#include "rk3228.dtsi"
++
++/ {
++	model = "Rockchip RK3228 Evaluation board";
++	compatible = "rockchip,rk3228-evb", "rockchip,rk3228";
++
++	memory {
++		device_type = "memory";
++		reg = <0x60000000 0x40000000>;
++	};
++};
++
++&emmc {
++	broken-cd;
++	cap-mmc-highspeed;
++	mmc-ddr-1_8v;
++	disable-wp;
++	non-removable;
++	status = "okay";
++};
++
++&uart2 {
++	status = "okay";
++};
 -- 
 2.1.4
