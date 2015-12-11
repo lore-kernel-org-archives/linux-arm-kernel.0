@@ -1,50 +1,111 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 11 Dec 2015 09:16:47 +0000
-Subject: [PATCH] KVM: arm/arm64: vgic: Fix kvm_vgic_map_is_active's dist
- check
-In-Reply-To: <1449784010-21761-1-git-send-email-christoffer.dall@linaro.org>
-References: <1449784010-21761-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <566A947F.8090804@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 11 Dec 2015 10:24:21 +0100
+Subject: [PATCH] ARM: Runtime patch udiv/sdiv instructions into
+ __aeabi_{u}idiv()
+In-Reply-To: <alpine.LFD.2.20.1512110105450.26920@knanqh.ubzr>
+References: <alpine.LFD.2.20.1512110105450.26920@knanqh.ubzr>
+Message-ID: <6991913.FSOzozNbSC@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/12/15 21:46, Christoffer Dall wrote:
-> External inputs to the vgic from time to time need to poke into the
-> state of a virtual interrupt, the prime example is the architected timer
-> code.
+On Friday 11 December 2015 01:26:25 Nicolas Pitre wrote:
+
+> This is my counter proposal to Stephen's version. Those patches and the 
+> discussion that followed are available here:
 > 
-> Since the IRQ's active state can be represented in two places; the LR or
-> the distributor, we first loop over the LRs but if not active in the LRs
-> we just return if *any* IRQ is active on the VCPU in question.
+>   http://news.gmane.org/group/gmane.linux.kbuild.devel/thread=14007
 > 
-> This is of course bogus, as we should check if the specific IRQ in
-> quesiton is active on the distributor instead.
-> 
-> Reported-by: Eric Auger <eric.auger@linaro.org>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  virt/kvm/arm/vgic.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 65461f8..7a2f449 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -1114,7 +1114,7 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, struct irq_phys_map *map)
->  			return true;
->  	}
+> I think what I propose here is much simpler and less intrusive.  Going
+> to the full call site patching provides between moderate to no 
+> additional performance benefits depending on the CPU core.  That should 
+> probably be compared with this solution with benchmark results to 
+> determine if it is worth it.
+
+Looks really nice, as it's much simpler than Stephen's approach
+
+> Of course the ultimate performance will come from having gcc emit those 
+> div instructions directly, but that would make the kernel binary 
+> incompatible with some systems in a multi-arch config. Hence it has to 
+> be a separate config option.
+
+Well, what we found is that we already have the same problem today
+when enabling LPAE makes the kernel incompatible with platforms that
+can be enabled. The affected platforms are basically the same, except
+for the earlier PJ4 and Krait variants that have some idiv support
+but no LPAE.
+
+> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+> index 85e374f873..48c77d422a 100644
+> --- a/arch/arm/include/asm/cputype.h
+> +++ b/arch/arm/include/asm/cputype.h
+> @@ -250,8 +250,14 @@ static inline int cpu_is_pj4(void)
 >  
-> -	return dist_active_irq(vcpu);
-> +	return vgic_irq_is_active(vcpu, map->virt_irq);
+>  	return 0;
 >  }
+> +
+> +static inline bool __attribute_const__ cpu_is_pj4_nomp(void)
+> +{
+> +	return read_cpuid_part() == 0x56005810;
+> +}
+>  #else
+> -#define cpu_is_pj4()	0
+> +#define cpu_is_pj4()		0
+> +#define cpu_is_pj4_nomp()	0
+>  #endif
+
+It would be nice to use a symbolic constant for the above, and maybe define
+all three known cpuid numbers for PJ4 variants.
+
+I've looked at it some more and I now have doubts about this code:
+
+#ifdef CONFIG_CPU_PJ4B
+        .type   __v7_pj4b_proc_info, #object
+__v7_pj4b_proc_info:
+        .long   0x560f5800
+        .long   0xff0fff00
+        __v7_proc __v7_pj4b_proc_info, __v7_pj4b_setup, proc_fns = pj4b_processor_functions
+        .size   __v7_pj4b_proc_info, . - __v7_pj4b_proc_info
+#endif
+
+
+Can someone have a look and tell me that I'm wrong when I read this
+as matching both PJ4 and PJ4B (and PJ4B-MP)?
+
+Either I'm misreading this, or we do the wrong thing in configurations
+that include both PJ4B (berlin, mvebu) and PJ4 (MMP2/dove).
+
+> +#ifdef CONFIG_ARM_PATCH_IDIV
+> +
+> +/* "sdiv r0, r0, r1" or "mrc p6, 1, r0, CR0, CR1, 4" if we're on pj4 w/o MP */
+> +static inline u32 __attribute_const__ sdiv_instruction(void)
+> +{
+> +	if (IS_ENABLED(CONFIG_THUMB2_KERNEL)) {
+> +		u32 insn = __opcode_thumb32_compose(0xfb90, 0xf0f1);
+> +		if (cpu_is_pj4_nomp())
+> +			insn = __opcode_thumb32_compose(0xee30, 0x0691);
+> +		return __opcode_to_mem_thumb32(insn);
+> +	}
+
+Strictly speaking, we can ignore the thumb instruction for pj4, as all
+variants also support the normal T2 opcode for udiv/sdiv.
+
+> diff --git a/arch/arm/lib/lib1funcs.S b/arch/arm/lib/lib1funcs.S
+> index af2267f6a5..9397b2e532 100644
+> --- a/arch/arm/lib/lib1funcs.S
+> +++ b/arch/arm/lib/lib1funcs.S
+> @@ -205,6 +205,10 @@ Boston, MA 02111-1307, USA.  */
+>  .endm
 >  
->  /*
-> 
+>  
+> +#ifdef CONFIG_ARM_PATCH_IDIV
+> +	.align	3
+> +#endif
+> +
+>  ENTRY(__udivsi3)
+>  ENTRY(__aeabi_uidiv)
+>  UNWIND(.fnstart)
 
-Damn!
+I'd probably just leave out the #ifdef and always align this, but it's not
+important.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+	Arnd
