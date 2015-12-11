@@ -1,58 +1,57 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 11 Dec 2015 16:10:08 +0100
-Subject: [PATCH v5 01/58] mtd: nand: denali: add missing nand_release()
+Date: Fri, 11 Dec 2015 16:15:35 +0100
+Subject: [PATCH v4 01/58] mtd: nand: denali: add missing nand_release()
  call in denali_remove()
-In-Reply-To: <1449842554-29898-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1449734442-18672-2-git-send-email-boris.brezillon@free-electrons.com>
- <1449842554-29898-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20151211161008.056a0f47@bbrezillon>
+In-Reply-To: <20151211143947.GL5284@mwanda>
+References: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1449734442-18672-2-git-send-email-boris.brezillon@free-electrons.com>
+ <20151211004008.GQ144338@google.com>
+ <20151211145320.1560fac3@bbrezillon> <20151211143947.GL5284@mwanda>
+Message-ID: <20151211161535.60a96ec2@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Dinh (who made commit 2a0a288ec258)
+Hi Dan,
 
-Also added back the Fixes tag.
+On Fri, 11 Dec 2015 17:39:47 +0300
+Dan Carpenter <dan.carpenter@oracle.com> wrote:
 
-On Fri, 11 Dec 2015 15:02:34 +0100
-Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
-
-> Unregister the NAND device from the NAND subsystem when removing a denali
-> NAND controller, otherwise the MTD attached to the NAND device is still
-> exposed by the MTD layer, and accesses to this device will likely crash
-> the system.
+> On Fri, Dec 11, 2015 at 02:53:20PM +0100, Boris Brezillon wrote:
+> > Hi Brian,
+> > 
+> > On Thu, 10 Dec 2015 16:40:08 -0800
+> > Brian Norris <computersforpeace@gmail.com> wrote:
+> > 
+> > > On Thu, Dec 10, 2015 at 08:59:45AM +0100, Boris Brezillon wrote:
+> > > > Unregister the NAND device from the NAND subsystem when removing a denali
+> > > > NAND controller, otherwise the MTD attached to the NAND device is still
+> > > > exposed by the MTD layer, and accesses to this device will likely crash
+> > > > the system.
+> > > > 
+> > > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > > > Cc: <stable@vger.kernel.org> #3.8+
+> > > 
+> > > Does this follow these rules, from
+> > > Documentation/stable_kernel_rules.txt?
+> > > 
+> > >  - It must be obviously correct and tested.
+> > > 
+> > >  - It must fix a real bug that bothers people (not a, "This could be a
+> > >    problem..." type thing).
+> > 
+> > As you wish, I'll remove those Cc and Fixes tags, or just drop the
+> > patch if you think it's useless...
 > 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> The fixes tag is a separate thing from CCing stable.  It's useful on by
+> itself.  I always put the person who wrote the original patch in the To:
+> header so they can review and comment if I have made a mistake.
 
-Fixes: 2a0a288ec258 ("mtd: denali: split the generic driver and PCI layer")
+Noted. I added back the Fixes tag and added Dinh Nguyen (the commit
+author) in the loop.
 
-> ---
-> Changes since v4:
-> - remove Cc stable and fixes tags
-> - calculate the dma buffer size before calling nand_release()
-> 
->  drivers/mtd/nand/denali.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/denali.c b/drivers/mtd/nand/denali.c
-> index 67eb2be..fdfea05 100644
-> --- a/drivers/mtd/nand/denali.c
-> +++ b/drivers/mtd/nand/denali.c
-> @@ -1622,9 +1622,11 @@ EXPORT_SYMBOL(denali_init);
->  /* driver exit point */
->  void denali_remove(struct denali_nand_info *denali)
->  {
-> +	int bufsize = denali->mtd.writesize + denali->mtd.oobsize;
-> +
-> +	nand_release(&denali->mtd);
->  	denali_irq_cleanup(denali->irq, denali);
-> -	dma_unmap_single(denali->dev, denali->buf.dma_buf,
-> -			 denali->mtd.writesize + denali->mtd.oobsize,
-> +	dma_unmap_single(denali->dev, denali->buf.dma_buf, bufsize,
->  			 DMA_BIDIRECTIONAL);
->  }
->  EXPORT_SYMBOL(denali_remove);
+Thanks,
 
-
+Boris
 
 -- 
 Boris Brezillon, Free Electrons
