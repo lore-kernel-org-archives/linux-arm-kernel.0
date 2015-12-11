@@ -1,51 +1,67 @@
-From: boqun.feng@gmail.com (Boqun Feng)
-Date: Fri, 11 Dec 2015 20:20:32 +0800
-Subject: [PATCH] arm64: spinlock: serialise spin_unlock_wait against
- concurrent lockers
-In-Reply-To: <20151211094651.GA18828@arm.com>
-References: <20151201164035.GE27751@arm.com>
- <20151203001141.GO28602@linux.vnet.ibm.com>
- <20151203132839.GA3816@twins.programming.kicks-ass.net>
- <20151203163243.GI11337@arm.com>
- <20151203172207.GR28602@linux.vnet.ibm.com>
- <20151206081617.GB1549@fixme-laptop.cn.ibm.com>
- <20151206192734.GT28602@linux.vnet.ibm.com>
- <20151207002601.GB13845@fixme-laptop.cn.ibm.com>
- <20151211080911.GD1072@fixme-laptop.cn.ibm.com>
- <20151211094651.GA18828@arm.com>
-Message-ID: <20151211122032.GA29169@fixme-laptop.cn.ibm.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 11 Dec 2015 20:23:37 +0800
+Subject: [RFC PATCH 4/4] mfd: syscon: add ACPI support
+In-Reply-To: <21660867.NhUszMiexN@wuerfel>
+References: <1449047368-5768-1-git-send-email-wangkefeng.wang@huawei.com>
+ <2299982.06P4iKpkWk@wuerfel>
+ <CAMj5BkiAToBCvnOSkW=41po5OHpg5uSzxNTNJ_=gLK__BLa1Sw@mail.gmail.com>
+ <21660867.NhUszMiexN@wuerfel>
+Message-ID: <566AC049.9080300@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On 12/11/2015 06:51 PM, Arnd Bergmann wrote:
+> On Friday 11 December 2015 18:35:17 Zhangfei Gao wrote:
+>> On Wed, Dec 2, 2015 at 6:44 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>> On Wednesday 02 December 2015 17:09:28 Kefeng Wang wrote:
+>>>
+>>> This sounds like a bad idea:
+>>>
+>>> syscon is basically a hack to let us access register that the SoC designer
+>>> couldn't fit in anywhere sane. We need something like this with devicetree
+>>> because we decided not to have any interpreted bytecode to do this behind
+>>> our back.
+>>>
+>>> With ACPI, the same thing is done with AML, which is actually nicer than
+>>> syscon (once you have to deal with all the problems introduced by AML).
+>>>
+>>> Use that instead.
+>>>
+>>
+>> Would you mind clarifying AML method, still not understand.
+>> Is is means realize the operation in uefi/bootloader and call some
+>> interface from kernel?
+>>
+>> The issue here is we want to access some common registers,
+>> which we do not want to ioremap for many times in each driver.
+>>
+>> In hisi platforms, we have many common registers shared by many components.
+>
+> Sorry, you'd have to ask someone who is more familiar with ACPI.
+>
+> Basically, the idea of ACPI as I understand it is that you have a
+> interpreted bytecode language that is provided by the BIOS as tables
+> and executed in the context of the kernel. This byte code has access
+> to stuff like GPIO, PCI config space, MMIO registers, IPMI or the
+> embedded controller on a PC. This way, you can hide all the platform
+> specific details behind a function call from a generic device driver,
+> and the BIOS writer can provide the specific implementation for any
+> registers that are shared across components.
+>
+> That's about all I know, but the ACPI specifications are available
+> publicly, please have a look there for more details.
 
-On Fri, Dec 11, 2015 at 09:46:52AM +0000, Will Deacon wrote:
-> On Fri, Dec 11, 2015 at 04:09:11PM +0800, Boqun Feng wrote:
-> > In conclusion, we have more than a half of uses working well already,
-> > and each of the fix-needed ones has only one related critical section
-> > and only one related data access in it. So on PPC, I think my proposal
-> > won't have more smp_mb() instances to fix all current use cases than
-> > adding smp_mb__after_unlock_lock() after the lock acquisition in each
-> > related lock critical section.
-> > 
-> > Of course, my proposal needs the buy-ins of both PPC and ARM64v8, so
-> > Paul and Will, what do you think? ;-)
-> 
-> I already queued the change promoting it to LOCK for arm64. It makes the
-> semantics easy to understand and I've failed to measure any difference
-> in performance. It's also robust against any future users of the macro
-> and matches what other architectures do.
-> 
+Thanks Arnd rise this up, I agree we need to abstract the syscon
+inside UEFI.
 
-Alright! I simply provided a candidate I came up with and relied on your
-insight to pick a good one ;-)
+For ACPI 6.0, there are method such as _ON, _OFF and _RST (reset)
+to the device's power resources, I think it can be extended to
+syscon to reset the device with access syscon in ACPI method,
+those method will be implemented in UEFI which the kernel driver
+don't need to care about the detail.
 
-Regards,
-Boqun
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151211/683daa7b/attachment.sig>
+We are going to for that implementation for D02, and if problem
+we meet, we will go back for this discussion.
+
+Thanks
+Hanjun
