@@ -1,551 +1,136 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 11 Dec 2015 16:36:17 +0800
-Subject: [PATCH V3] ARM: dts: imx6q-icore-rqs: Add Engicam IMX6 Q7
- initial support
-In-Reply-To: <20151118151030.GA11558@panicking>
-References: <1447584853-12560-1-git-send-email-michael@amarulasolutions.com>
- <1447665552.3144.6.camel@pengutronix.de>
- <20151116112931.GA10464@panicking>
- <1447673895.3144.16.camel@pengutronix.de>
- <20151116114127.GB10464@panicking>
- <1447674695.3144.21.camel@pengutronix.de>
- <20151116115421.GC10464@panicking> <20151116172318.GA513@panicking>
- <1447752697.3144.47.camel@pengutronix.de>
- <20151118151030.GA11558@panicking>
-Message-ID: <20151211083512.GB11252@tiger>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 11 Dec 2015 16:38:01 +0800
+Subject: [PATCH v5 0/9] mfd: axp20x: Add support for RSB based AXP223
+In-Reply-To: <1448606610-32647-1-git-send-email-wens@csie.org>
+References: <1448606610-32647-1-git-send-email-wens@csie.org>
+Message-ID: <CAGb2v65f9tEpMALcKapGPYw72v-hYmfJA1B8nZyj5EW+g_9Byw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 18, 2015 at 04:10:34PM +0100, Michael Trimarchi wrote:
-> www.engicam.com/en/products/embedded/som/standard/i-core-rqs-m6s-dl-d-q
-> 
-> Signed-off-by: Michael Trimarchi <michael@amarulasolutions.com>
-> ---
-> I'm not quite sure how ethernet tuning parameter
-> are working in other setup and this seems the
-> correct way to use it
-> 
-> Changes in v3:
-> 	- add sgtl audio support
-> 	- add ethernet gigabit tuning
-> 	- use hub reset only in usbhub and not
-> 	  in otg vbus
-> 
-> Changes in v2:
-> 	- add the board in alphabetic order
-> 	- remove cpu operating point
-> 	- remove simple-bus and adjust regulaotor
-> 	- add gpios to correct pinctrl
-> 	- remove no mainline binding of gpc
-> 
->  arch/arm/boot/dts/Makefile               |   1 +
->  arch/arm/boot/dts/imx6q-icore-rqs.dts    |  45 ++++
->  arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi | 382 +++++++++++++++++++++++++++++++
->  3 files changed, 428 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx6q-icore-rqs.dts
->  create mode 100644 arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index bb8fa02..7e8f29c 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -312,6 +312,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
->  	imx6q-gw551x.dtb \
->  	imx6q-gw552x.dtb \
->  	imx6q-hummingboard.dtb \
-> +	imx6q-icore-rqs.dtb \
->  	imx6q-nitrogen6x.dtb \
->  	imx6q-phytec-pbab01.dtb \
->  	imx6q-rex-pro.dtb \
-> diff --git a/arch/arm/boot/dts/imx6q-icore-rqs.dts b/arch/arm/boot/dts/imx6q-icore-rqs.dts
-> new file mode 100644
-> index 0000000..8f14edf
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6q-icore-rqs.dts
-> @@ -0,0 +1,45 @@
-> +/*
-> + * Copyright (C) 2015 Amarula Solutions B.V.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
+Hi Lee,
 
-Suggest to use GPL/X11 dual licences, so that non-Linux can use it too.
-You can find a lot of examples in arch/arm/boot/dts.
+On Fri, Nov 27, 2015 at 2:43 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+> Hi everyone,
+>
+> This is v5 of the AXP223 PMIC series. v5 cleans up the code before and
+> after the axp20x split, as suggested by Andy.
 
-> +
-> +/dts-v1/;
-> +
-> +#include "imx6q.dtsi"
-> +#include "imx6qdl-icore-rqs.dtsi"
-> +
-> +/ {
-> +	model = "Engicam i.CoreM6 Quad SOM";
-> +	compatible = "fsl,imx6-icore-rqs", "fsl,imx6q";
+Any chance you could merge this series (patches 1~7) for 4.5?
 
-This is not a board from Freescale, so 'fsl,' is not a appropriate for
-the board compatible imx6q-icore-rqs.
+The DTS patches can't be merged without the driver updates, and we'd
+like to get both parts in.
 
-> +
-> +	sound {
-> +		compatible = "fsl,imx-audio-sgtl5000";
-> +		model = "imx-audio-sgtl5000";
-> +		ssi-controller = <&ssi1>;
-> +		audio-codec = <&codec>;
-> +		audio-routing =
-> +			"MIC_IN", "Mic Jack",
-> +			"Mic Jack", "Mic Bias",
-> +			"Headphone Jack", "HP_OUT";
-> +		mux-int-port = <1>;
-> +		mux-ext-port = <4>;
-> +	};
-> +};
-> +
-> +&sata {
-> +	status = "okay";
-> +};
+> Changes since v4:
+>
+>   - Get rid of second parameter of axp20x_match_device() (new patch 2)
+>
+>   - Match against dev->driver->of_match_table, so the entirety of
+>     axp20x_match_device() can be kept in the core. (new patch 3)
+>
+>   - Move *_device_id tables to bottom of the driver, right above driver
+>     declaration. (patch 4 & 6)
+>
+>   - Remove extra whitespaces while moving i2c specific code (patch 4)
+>
+>   - Remove leftover whitespace and code style issues in axp20x core
+>     (new patch 5)
+>
+>   - Remove extra whitespaces in rsb specific code (patch 6)
+>
+> Changes since v3:
+>
+>   - Removed settings for axp223 reg_rtc_ldo from board dts files that
+>     are already in axp22x.dtsi. The name is kept.
+>
+>   - Dropped simplefb label and defconfig patches, as they are merged.
+>
+> Changes since v2:
+>
+>   - s/It's/Its/ for the commit messages of patches 5 and 7
+>
+>   - Add Rob's Acked-by for patch 1
+>
+> Changes since v1:
+>
+>   - Dropped NMI interrupt controller dts patch (Merged)
+>
+>   - Change MFD_AXP20X to represent the axp20x core, and drop MFD_AXP20X_CORE
+>
+>   - Keep the axp20x core bits named axp20x.c
+>
+>   - Add patch 7 to add AXP223 to sun8i-q8-common.dtsi
+>
+>   - Add patch 8 & 9 to update defconfigs
+>
+>   - Make axp20x drivers tristate and buildable as modules
+>
+>   - Drop "_sunxi" substring from identifiers in axp20x-rsb driver
+>
+>
+> This series adds support for the Reduced Serial Bus based AXP223 PMIC.
+> The AXP223 is functionally identical to the AXP221, which we already
+> support. Only some default values for the regulators are different.
+> The defaults fit their recommended application, paired with different
+> SoCs.
+>
 
-Please sort them labelled nodes alphabetically.
+Updated description:
 
-> +
-> +&i2c3 {
-> +	codec: sgtl5000 at 0a {
-> +		compatible = "fsl,sgtl5000";
-> +		reg = <0x0a>;
-> +		clocks = <&clks IMX6QDL_CLK_CKO>;
-> +		VDDA-supply = <&reg_2p5v>;
-> +		VDDIO-supply = <&reg_3p3v>;
-> +		VDDD-supply = <&reg_1p8v>;
-> +	};
-> +};
-> diff --git a/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi b/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
-> new file mode 100644
-> index 0000000..c57a830
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
-> @@ -0,0 +1,382 @@
-> +/*
-> + * Copyright 2015 Amarula Solutions B.V.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/clock/imx6qdl-clock.h>
-> +
-> +/ {
-> +	memory {
-> +		reg = <0x10000000 0x80000000>;
-> +	};
-> +
-> +	reg_1p8v: 1p8v {
+Patch 1 adds AXP223 to the list of supported chips in the DT binding.
 
-Can we name these regulator nodes a bit better, something like
-'regulator-1pv8'?
+Patch 2 gets rid of the extra "struct device *" parameter from
+axp20x_match_device().
 
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "1P8V";
-> +		regulator-min-microvolt = <1800000>;
-> +		regulator-max-microvolt = <1800000>;
-> +		regulator-boot-on;
-> +		regulator-always-on;
-> +	};
-> +
-> +	reg_2p5v: 2p5v {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "2P5V";
-> +		regulator-min-microvolt = <2500000>;
-> +		regulator-max-microvolt = <2500000>;
-> +		regulator-boot-on;
-> +		regulator-always-on;
-> +	};
-> +
-> +	reg_3p3v: 3p3v {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "3P3V";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		regulator-boot-on;
-> +		regulator-always-on;
-> +	};
-> +
-> +	reg_sd3_vmmc: sd3_vmmc {
+Patch 3 makes axp20x_match_device() use dev->driver->of_match_table,
+so the function can be library-ized without modification.
 
-It's more idiomatic to use minus than underscore in node name.
+Patch 4 splits the axp20x mfd driver into 2 parts, a core library, and
+an I2C driver.
 
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "P3V3_SD3_SWITCHED";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		gpio = <&gpio1 4 GPIO_ACTIVE_LOW>;
-> +		enable-active-high;
-> +	};
-> +
-> +	reg_sd4_vmmc: sd4_vmmc {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "P3V3_SD4_SWITCHED";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		regulator-boot-on;
-> +		regulator-always-on;
-> +	};
-> +
-> +	reg_usb_h1_vbus: usb_h1_vbus {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "usb_h1_vbus";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		regulator-boot-on;
-> +		regulator-always-on;
-> +	};
-> +
-> +	reg_usb_otg_vbus: usb_otg_vbus {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "usb_otg_vbus";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		regulator-boot-on;
-> +		regulator-always-on;
-> +	};
-> +
-> +	usb_hub: usb-hub {
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_usbhub>;
-> +		compatible = "smsc,usb3503a";
+Patch 5 cleans up some leftover whitespace issues in axp20x core.
 
-Let 'compatible' be the top of the property list.
+Patch 6 adds an RSB based driver for the AXP223.
 
-> +		reset-gpios = <&gpio1 6 GPIO_ACTIVE_LOW>;
-> +		clocks = <&clks IMX6QDL_CLK_LVDS2_GATE>;
-> +		clock-names = "refclk";
-> +	};
+Patch 7 adds support for the AXP223 regulators
 
-How is this device get connected?  The most common case is via I2C bus.
-In that case, the node shouldn't be here but under I2C node.
+Patch 8 enables the AXP223 PMIC and its regulators for the Sinlinx
+SinA33.
 
-> +};
-> +
-> +&iomuxc {
+Patch 9 enables the AXP223 PMIC and its regulators for A23/A33 based
+Q8 tablet devices.
 
-Suggest move iomuxc node to the bottom to make the file a bit easier to
-read.
 
-> +	imx6qdl-icore-rqs {
-> +
+Regards
+ChenYu
 
-With commit 5fcdf6a7ed95 (pinctrl: imx: Allow parsing DT without function
-nodes) in place, we can now save this container.
-
-> +		pinctrl_audmux_4: audmux-4 {
-
-The suffix numbering makes no sense in this case.  The following example
-should be good enough.
-
-		pinctrl_audmux: audmux {
-
-> +			fsl,pins = <
-> +				MX6QDL_PAD_DISP0_DAT20__AUD4_TXC  0x130b0
-> +				MX6QDL_PAD_DISP0_DAT21__AUD4_TXD  0x110b0
-> +				MX6QDL_PAD_DISP0_DAT22__AUD4_TXFS 0x130b0
-> +				MX6QDL_PAD_DISP0_DAT23__AUD4_RXD  0x130b0
-> +			>;
-> +		};
-> +
-> +		pinctrl_enet_3: enetgrp-3 {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_ENET_MDIO__ENET_MDIO       0x1b0b0
-> +				MX6QDL_PAD_ENET_MDC__ENET_MDC         0x1b0b0
-> +				MX6QDL_PAD_RGMII_TXC__RGMII_TXC       0x1b0b0
-> +				MX6QDL_PAD_RGMII_TD0__RGMII_TD0       0x1b0b0
-> +				MX6QDL_PAD_RGMII_TD1__RGMII_TD1       0x1b0b0
-> +				MX6QDL_PAD_RGMII_TD2__RGMII_TD2       0x1b0b0
-> +				MX6QDL_PAD_RGMII_TD3__RGMII_TD3       0x1b0b0
-> +				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL 0x1b0b0
-> +				MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK  0x1b0b0
-> +				MX6QDL_PAD_RGMII_RXC__RGMII_RXC       0x1b0b0
-> +				MX6QDL_PAD_RGMII_RD0__RGMII_RD0       0x1b0b0
-> +				MX6QDL_PAD_RGMII_RD1__RGMII_RD1       0x1b0b0
-> +				MX6QDL_PAD_RGMII_RD2__RGMII_RD2       0x1b0b0
-> +				MX6QDL_PAD_RGMII_RD3__RGMII_RD3       0x1b0b0
-> +				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL 0x1b0b0
-> +				MX6QDL_PAD_ENET_TX_EN__ENET_TX_EN     0x1b0b0
-> +			>;
-> +		};
-> +
-> +		pinctrl_i2c1_1: i2c1grp-1 {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_EIM_D21__I2C1_SCL 0x4001b8b1
-> +				MX6QDL_PAD_EIM_D28__I2C1_SDA 0x4001b8b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_i2c2_2: i2c2grp-2 {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_KEY_COL3__I2C2_SCL 0x4001b8b1
-> +				MX6QDL_PAD_KEY_ROW3__I2C2_SDA 0x4001b8b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_i2c3_4: i2c3grp-4 {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_GPIO_5__I2C3_SCL  0x4001b8b1
-> +				MX6QDL_PAD_EIM_D18__I2C3_SDA 0x4001b8b1
-> +				MX6QDL_PAD_GPIO_0__CCM_CLKO1    0x130b0
-> +			>;
-> +		};
-> +
-> +		pinctrl_pcie: pciegrp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_EIM_D29__GPIO3_IO29 0x1f059	/* PCIe Reset */
-> +			>;
-> +		};
-> +
-> +		pinctrl_uart4_1: uart4grp-1 {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_KEY_COL0__UART4_TX_DATA 0x1b0b1
-> +				MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA 0x1b0b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_usbhub: usbhubgrp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_GPIO_6__GPIO1_IO06  0x1f059	/* HUB USB Reset */
-> +			>;
-> +		};
-> +
-> +		pinctrl_usbotg_2: usbotggrp-2 {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID 0x17059
-> +			>;
-> +		};
-> +
-> +		pinctrl_usdhc1_1: usdhc1grp-1 {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_SD1_CMD__SD1_CMD    0x17071
-> +				MX6QDL_PAD_SD1_CLK__SD1_CLK    0x10071
-> +				MX6QDL_PAD_SD1_DAT0__SD1_DATA0 0x17071
-> +				MX6QDL_PAD_SD1_DAT1__SD1_DATA1 0x17071
-> +				MX6QDL_PAD_SD1_DAT2__SD1_DATA2 0x17071
-> +				MX6QDL_PAD_SD1_DAT3__SD1_DATA3 0x17071
-> +			>;
-> +		};
-> +
-> +		pinctrl_usdhc3_2: usdhc3grp-2 {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_SD3_CMD__SD3_CMD    0x17070
-> +				MX6QDL_PAD_SD3_CLK__SD3_CLK    0x10070
-> +				MX6QDL_PAD_SD3_DAT0__SD3_DATA0 0x17070
-> +				MX6QDL_PAD_SD3_DAT1__SD3_DATA1 0x17070
-> +				MX6QDL_PAD_SD3_DAT2__SD3_DATA2 0x17070
-> +				MX6QDL_PAD_SD3_DAT3__SD3_DATA3 0x17070
-> +				MX6QDL_PAD_GPIO_1__GPIO1_IO01  0x1f059	/* CD */
-> +				MX6QDL_PAD_GPIO_4__GPIO1_IO04  0x1f059	/* PWR */
-> +			>;
-> +		};
-> +
-> +		pinctrl_usdhc3_2_100mhz: usdhc3grp-2_100mhz {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_SD3_CMD__SD3_CMD    0x170B1
-> +				MX6QDL_PAD_SD3_CLK__SD3_CLK    0x100B1
-> +				MX6QDL_PAD_SD3_DAT0__SD3_DATA0 0x170B1
-> +				MX6QDL_PAD_SD3_DAT1__SD3_DATA1 0x170B1
-> +				MX6QDL_PAD_SD3_DAT2__SD3_DATA2 0x170B1
-> +				MX6QDL_PAD_SD3_DAT3__SD3_DATA3 0x170B1
-> +			>;
-> +		};
-> +
-> +		pinctrl_usdhc3_2_200mhz: usdhc3grp-2_200mhz {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_SD3_CMD__SD3_CMD    0x170F9
-> +				MX6QDL_PAD_SD3_CLK__SD3_CLK    0x100F9
-> +				MX6QDL_PAD_SD3_DAT0__SD3_DATA0 0x170F9
-> +				MX6QDL_PAD_SD3_DAT1__SD3_DATA1 0x170F9
-> +				MX6QDL_PAD_SD3_DAT2__SD3_DATA2 0x170F9
-> +				MX6QDL_PAD_SD3_DAT3__SD3_DATA3 0x170F9
-> +			>;
-> +		};
-> +
-> +		pinctrl_usdhc4_1: usdhc4grp-1 {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_SD4_CMD__SD4_CMD    0x17070
-> +				MX6QDL_PAD_SD4_CLK__SD4_CLK    0x10070
-> +				MX6QDL_PAD_SD4_DAT0__SD4_DATA0 0x17070
-> +				MX6QDL_PAD_SD4_DAT1__SD4_DATA1 0x17070
-> +				MX6QDL_PAD_SD4_DAT2__SD4_DATA2 0x17070
-> +				MX6QDL_PAD_SD4_DAT3__SD4_DATA3 0x17070
-> +				MX6QDL_PAD_SD4_DAT4__SD4_DATA4 0x17070
-> +				MX6QDL_PAD_SD4_DAT5__SD4_DATA5 0x17070
-> +				MX6QDL_PAD_SD4_DAT6__SD4_DATA6 0x17070
-> +				MX6QDL_PAD_SD4_DAT7__SD4_DATA7 0x17070
-> +			>;
-> +		};
-> +
-> +		pinctrl_usdhc4_1_100mhz: usdhc4grp-1_100mhz {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_SD4_CMD__SD4_CMD    0x170B1
-> +				MX6QDL_PAD_SD4_CLK__SD4_CLK    0x100B1
-> +				MX6QDL_PAD_SD4_DAT0__SD4_DATA0 0x170B1
-> +				MX6QDL_PAD_SD4_DAT1__SD4_DATA1 0x170B1
-> +				MX6QDL_PAD_SD4_DAT2__SD4_DATA2 0x170B1
-> +				MX6QDL_PAD_SD4_DAT3__SD4_DATA3 0x170B1
-> +				MX6QDL_PAD_SD4_DAT4__SD4_DATA4 0x170B1
-> +				MX6QDL_PAD_SD4_DAT5__SD4_DATA5 0x170B1
-> +				MX6QDL_PAD_SD4_DAT6__SD4_DATA6 0x170B1
-> +				MX6QDL_PAD_SD4_DAT7__SD4_DATA7 0x170B1
-> +			>;
-> +		};
-> +
-> +		pinctrl_usdhc4_1_200mhz: usdhc4grp-2_200mhz {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_SD4_CMD__SD4_CMD    0x170F9
-> +				MX6QDL_PAD_SD4_CLK__SD4_CLK    0x100F9
-> +				MX6QDL_PAD_SD4_DAT0__SD4_DATA0 0x170F9
-> +				MX6QDL_PAD_SD4_DAT1__SD4_DATA1 0x170F9
-> +				MX6QDL_PAD_SD4_DAT2__SD4_DATA2 0x170F9
-> +				MX6QDL_PAD_SD4_DAT3__SD4_DATA3 0x170F9
-> +				MX6QDL_PAD_SD4_DAT4__SD4_DATA4 0x170F9
-> +				MX6QDL_PAD_SD4_DAT5__SD4_DATA5 0x170F9
-> +				MX6QDL_PAD_SD4_DAT6__SD4_DATA6 0x170F9
-> +				MX6QDL_PAD_SD4_DAT7__SD4_DATA7 0x170F9
-> +			>;
-> +		};
-> +	};
-> +};
-> +
-> +&clks {
-> +	assigned-clocks = <&clks IMX6QDL_CLK_LVDS2_SEL>;
-> +	assigned-clock-parents = <&clks IMX6QDL_CLK_OSC>;
-> +};
-> +
-> +&audmux {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_audmux_4>;
-> +	status = "okay";
-> +};
-> +
-> +&fec {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_enet_3>;
-> +	phy-handle = <&eth_phy>;
-> +	phy-mode = "rgmii";
-> +	status = "okay";
-> +	mdio {
-> +		eth_phy: ethernet-phy {
-> +			rxc-skew-ps = <1140>;
-> +			txc-skew-ps = <1140>;
-> +			txen-skew-ps = <600>;
-> +			rxdv-skew-ps = <240>;
-> +			rxd0-skew-ps = <420>;
-> +			rxd1-skew-ps = <600>;
-> +			rxd2-skew-ps = <420>;
-> +			rxd3-skew-ps = <240>;
-> +			txd0-skew-ps = <60>;
-> +			txd1-skew-ps = <60>;
-> +			txd2-skew-ps = <60>;
-> +			txd3-skew-ps = <240>;
-> +		};
-> +	};
-> +};
-> +
-> +&i2c1 {
-> +	status = "okay";
-
-Let 'status' be the last property.
-
-Shawn
-
-> +	clock-frequency = <100000>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c1_1>;
-> +};
-> +
-> +&i2c2 {
-> +	clock-frequency = <100000>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c2_2>;
-> +	status = "okay";
-> +};
-> +
-> +&i2c3 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c3_4>;
-> +	status = "okay";
-> +};
-> +
-> +&pcie {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_pcie>;
-> +	reset-gpio = <&gpio3 29 GPIO_ACTIVE_LOW>;
-> +	status = "okay";
-> +};
-> +
-> +&ssi1 {
-> +	fsl,mode = "i2s-slave";
-> +	status = "okay";
-> +};
-> +
-> +&uart4 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart4_1>;
-> +	status = "okay";
-> +};
-> +
-> +&usbh1 {
-> +	vbus-supply = <&reg_usb_h1_vbus>;
-> +	disable-over-current;
-> +	clocks = <&clks IMX6QDL_CLK_USBOH3>;
-> +	status = "okay";
-> +};
-> +
-> +&usbotg {
-> +	vbus-supply = <&reg_usb_otg_vbus>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_usbotg_2>;
-> +	disable-over-current;
-> +	status = "okay";
-> +};
-> +
-> +&usdhc1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_usdhc1_1>;
-> +	no-1-8-v;
-> +	status = "okay";
-> +};
-> +
-> +&usdhc3 {
-> +	pinctrl-names = "default", "state_100mhz", "state_200mhz";
-> +	pinctrl-0 = <&pinctrl_usdhc3_2>;
-> +	pinctrl-1 = <&pinctrl_usdhc3_2_100mhz>;
-> +	pinctrl-2 = <&pinctrl_usdhc3_2_200mhz>;
-> +	vmcc-supply = <&reg_sd3_vmmc>;
-> +	cd-gpios = <&gpio1 1 GPIO_ACTIVE_LOW>;
-> +	bus-witdh=<4>;
-> +	no-1-8-v;
-> +	status = "okay";
-> +};
-> +
-> +&usdhc4 {
-> +	pinctrl-names = "default", "state_100mhz", "state_200mhz";
-> +	pinctrl-0 = <&pinctrl_usdhc4_1>;
-> +	pinctrl-1 = <&pinctrl_usdhc4_1_100mhz>;
-> +	pinctrl-2 = <&pinctrl_usdhc4_1_200mhz>;
-> +	vmcc-supply = <&reg_sd4_vmmc>;
-> +	bus-witdh=<8>;
-> +	no-1-8-v;
-> +	non-removable;
-> +	status = "okay";
-> +};
-> -- 
-> 2.6.3
-> 
-> -- 
-> | Michael Nazzareno Trimarchi                     Amarula Solutions BV |
-> | COO  -  Founder                                      Cruquiuskade 47 |
-> | +31(0)851119172                                 Amsterdam 1018 AM NL |
-> |                  [`as] http://www.amarulasolutions.com               |
-> 
+>
+> Chen-Yu Tsai (9):
+>   mfd: axp20x: Add AXP223 to list of supported PMICs in DT bindings
+>   mfd: axp20x: Remove second struct device * parameter for
+>     axp20x_match_device()
+>   mfd: axp20x: use dev->driver->of_match_table in axp20x_match_device()
+>   mfd: axp20x: Split the driver into core and i2c bits
+>   mfd: axp20x: Whitespace, open parenthesis alignment code style fixes
+>   mfd: axp20x: Add support for RSB based AXP223 PMIC
+>   regulator: axp20x: Support new AXP223 PMIC
+>   ARM: dts: sun8i: sinlinx-sina33: Add AXP223 PMIC device and regulator
+>     nodes
+>   ARM: dts: sun8i: q8-common: Add AXP223 PMIC device and regulator nodes
+>
+>  Documentation/devicetree/bindings/mfd/axp20x.txt |   7 +-
+>  arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts   |  76 ++++++++++++++++-
+>  arch/arm/boot/dts/sun8i-q8-common.dtsi           |  83 +++++++++++++++++-
+>  drivers/mfd/Kconfig                              |  25 ++++--
+>  drivers/mfd/Makefile                             |   2 +
+>  drivers/mfd/axp20x-i2c.c                         | 102 +++++++++++++++++++++++
+>  drivers/mfd/axp20x-rsb.c                         |  78 +++++++++++++++++
+>  drivers/mfd/axp20x.c                             | 101 +++++-----------------
+>  drivers/regulator/axp20x-regulator.c             |   3 +
+>  include/linux/mfd/axp20x.h                       |  34 +++++++-
+>  10 files changed, 418 insertions(+), 93 deletions(-)
+>  create mode 100644 drivers/mfd/axp20x-i2c.c
+>  create mode 100644 drivers/mfd/axp20x-rsb.c
+>
+> --
+> 2.6.2
+>
