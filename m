@@ -1,64 +1,64 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 11 Dec 2015 13:50:16 +0100
-Subject: [PATCH v3 4/4] printk/nmi: Increase the size of NMI buffer and
- make it configurable
-In-Reply-To: <20151211124159.GB3729@pathway.suse.cz>
-References: <1449667265-17525-1-git-send-email-pmladek@suse.com>
- <1449667265-17525-5-git-send-email-pmladek@suse.com>
- <CAMuHMdXVgr58YjoePGrRbMyMncQ27f85prL7G5SpeHeNxoYrXQ@mail.gmail.com>
- <20151211124159.GB3729@pathway.suse.cz>
-Message-ID: <CAMuHMdW0CQYgs2Cz3REf6FHM5dj9LGN6AnmDZnFfaw0084ekSg@mail.gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 11 Dec 2015 14:50:20 +0200
+Subject: [PATCH 2/2] ARM: OMAP2+: Remove device creation for omap-pcm-audio
+In-Reply-To: <1449838220-24309-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1449838220-24309-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1449838220-24309-3-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 11, 2015 at 1:41 PM, Petr Mladek <pmladek@suse.com> wrote:
-> On Fri 2015-12-11 12:10:02, Geert Uytterhoeven wrote:
->> On Wed, Dec 9, 2015 at 2:21 PM, Petr Mladek <pmladek@suse.com> wrote:
->> > --- a/init/Kconfig
->> > +++ b/init/Kconfig
->> > @@ -866,6 +866,28 @@ config LOG_CPU_MAX_BUF_SHIFT
->> >                      13 =>   8 KB for each CPU
->> >                      12 =>   4 KB for each CPU
->> >
->> > +config NMI_LOG_BUF_SHIFT
->> > +       int "Temporary per-CPU NMI log buffer size (12 => 4KB, 13 => 8KB)"
->> > +       range 10 21
->> > +       default 13
->> > +       depends on PRINTK && HAVE_NMI
->>
->> Symbol NMI_LOG_BUF_SHIFT does not exist if its dependencies are not met.
->
-> ?h, the NMI buffer is enabled on arm via NEED_PRINTK_NMI.
->
-> The buffer is compiled when CONFIG_PRINTK_NMI is defined. I am going
-> to fix it the following way:
->
->
-> diff --git a/init/Kconfig b/init/Kconfig
-> index efcff25a112d..61cfd96a3c96 100644
-> --- a/init/Kconfig
-> +++ b/init/Kconfig
-> @@ -870,7 +870,7 @@ config NMI_LOG_BUF_SHIFT
->         int "Temporary per-CPU NMI log buffer size (12 => 4KB, 13 => 8KB)"
->         range 10 21
->         default 13
-> -       depends on PRINTK && HAVE_NMI
-> +       depends on PRINTK_NMI
->         help
->           Select the size of a per-CPU buffer where NMI messages are temporary
->           stored. They are copied to the main log buffer in a safe context
+The omap-pcm in ASoC is no longer a platform device. No need to create this
+device anymore.
 
-Makes sense, as kernel/printk/nmi.c is compiled if PRINTK_NMI is set.
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+ arch/arm/mach-omap2/devices.c | 25 ++++---------------------
+ 1 file changed, 4 insertions(+), 21 deletions(-)
 
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index 9374da313e8e..9cda974a3009 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -94,22 +94,6 @@ static inline void omap_init_mbox(void) { }
+ 
+ static inline void omap_init_sti(void) {}
+ 
+-#if defined(CONFIG_SND_SOC) || defined(CONFIG_SND_SOC_MODULE)
+-
+-static struct platform_device omap_pcm = {
+-	.name	= "omap-pcm-audio",
+-	.id	= -1,
+-};
+-
+-static void omap_init_audio(void)
+-{
+-	platform_device_register(&omap_pcm);
+-}
+-
+-#else
+-static inline void omap_init_audio(void) {}
+-#endif
+-
+ #if defined(CONFIG_SPI_OMAP24XX) || defined(CONFIG_SPI_OMAP24XX_MODULE)
+ 
+ #include <linux/platform_data/spi-omap2-mcspi.h>
+@@ -239,13 +223,12 @@ static int __init omap2_init_devices(void)
+ 	if (!of_have_populated_dt())
+ 		pinctrl_provide_dummies();
+ 
+-	/*
+-	 * please keep these calls, and their implementations above,
+-	 * in alphabetical order so they're easier to sort through.
+-	 */
+-	omap_init_audio();
+ 	/* If dtb is there, the devices will be created dynamically */
+ 	if (!of_have_populated_dt()) {
++		/*
++		 * please keep these calls, and their implementations above,
++		 * in alphabetical order so they're easier to sort through.
++		 */
+ 		omap_init_mbox();
+ 		omap_init_mcspi();
+ 		omap_init_sham();
+-- 
+2.6.4
