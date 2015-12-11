@@ -1,67 +1,53 @@
-From: gg@slimlogic.co.uk (Graeme Gregory)
-Date: Fri, 11 Dec 2015 10:59:44 +0000
-Subject: [RFC PATCH 4/4] mfd: syscon: add ACPI support
-In-Reply-To: <21660867.NhUszMiexN@wuerfel>
-References: <1449047368-5768-1-git-send-email-wangkefeng.wang@huawei.com>
- <2299982.06P4iKpkWk@wuerfel>
- <CAMj5BkiAToBCvnOSkW=41po5OHpg5uSzxNTNJ_=gLK__BLa1Sw@mail.gmail.com>
- <21660867.NhUszMiexN@wuerfel>
-Message-ID: <1449831584.680722.464515769.71BFC229@webmail.messagingengine.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 11 Dec 2015 12:00:04 +0100
+Subject: [linux-sunxi][PATCH 2/2] ARM: dts: sun7i: Add audio codec to
+ Itead Ibox
+In-Reply-To: <1449599344-15544-2-git-send-email-codekipper@gmail.com>
+References: <1449599344-15544-1-git-send-email-codekipper@gmail.com>
+ <1449599344-15544-2-git-send-email-codekipper@gmail.com>
+Message-ID: <20151211110004.GN27957@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-
-On Fri, 11 Dec 2015, at 10:51 AM, Arnd Bergmann wrote:
-> On Friday 11 December 2015 18:35:17 Zhangfei Gao wrote:
-> > On Wed, Dec 2, 2015 at 6:44 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > > On Wednesday 02 December 2015 17:09:28 Kefeng Wang wrote:
-> > >
-> > > This sounds like a bad idea:
-> > >
-> > > syscon is basically a hack to let us access register that the SoC designer
-> > > couldn't fit in anywhere sane. We need something like this with devicetree
-> > > because we decided not to have any interpreted bytecode to do this behind
-> > > our back.
-> > >
-> > > With ACPI, the same thing is done with AML, which is actually nicer than
-> > > syscon (once you have to deal with all the problems introduced by AML).
-> > >
-> > > Use that instead.
-> > >
-> > 
-> > Would you mind clarifying AML method, still not understand.
-> > Is is means realize the operation in uefi/bootloader and call some
-> > interface from kernel?
-> >
-> > The issue here is we want to access some common registers,
-> > which we do not want to ioremap for many times in each driver.
-> > 
-> > In hisi platforms, we have many common registers shared by many components.
+On Tue, Dec 08, 2015 at 07:29:04PM +0100, codekipper at gmail.com wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
 > 
-> Sorry, you'd have to ask someone who is more familiar with ACPI.
+> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+
+A commit log would be nice :)
+
+> ---
+>  arch/arm/boot/dts/sun7i-a20-itead-ibox.dts | 4 ++++
+>  1 file changed, 4 insertions(+)
 > 
-> Basically, the idea of ACPI as I understand it is that you have a
-> interpreted bytecode language that is provided by the BIOS as tables
-> and executed in the context of the kernel. This byte code has access
-> to stuff like GPIO, PCI config space, MMIO registers, IPMI or the
-> embedded controller on a PC. This way, you can hide all the platform
-> specific details behind a function call from a generic device driver,
-> and the BIOS writer can provide the specific implementation for any
-> registers that are shared across components.
-> 
-> That's about all I know, but the ACPI specifications are available
-> publicly, please have a look there for more details.
-> 
+> diff --git a/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts b/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
+> index 90ff677..0950b59 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
+> @@ -70,6 +70,10 @@
+>  	status = "okay";
+>  };
+>  
+> +&codec {
+> +	status = "okay";
+> +};
+> +
 
-Basically in the DSDT you would create a common accessor method for the
-register/registers in question. This function takes care of the register
-in the multiple user cases.
+This can be squashed in the previous patch.
 
-each _RST() method would then call this function to set the bits they
-required.
+Thanks!
+Maxime
 
-So in effect it is no different to what you would do in Linux, just done
-in AML instead.
-
-Graeme
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151211/e516a837/attachment.sig>
