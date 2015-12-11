@@ -1,81 +1,137 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 11 Dec 2015 13:48:57 +0800
-Subject: [PATCH v4 1/5] PCI: designware: add memory barrier after
- enabling region
-In-Reply-To: <CAHM4w1m-NiwyCLz9tikbOcNtCmVu0Vd9FhmKKSuMi5ChzfDafA@mail.gmail.com>
-References: <1449149725-27607-1-git-send-email-stanimir.varbanov@linaro.org>
- <1449149725-27607-2-git-send-email-stanimir.varbanov@linaro.org>
- <56669C50.9060700@linaro.org>
- <CAHM4w1k_EAt+xBBYyG3B7W9Fegc4j+uRq5t_biUsxOGt+k+xUA@mail.gmail.com>
- <20151209102359.GF8644@n2100.arm.linux.org.uk>
- <CAHM4w1m-NiwyCLz9tikbOcNtCmVu0Vd9FhmKKSuMi5ChzfDafA@mail.gmail.com>
-Message-ID: <20151211134857.03601d0e@xhacker>
+From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
+Date: Fri, 11 Dec 2015 05:58:40 +0000
+Subject: [PATCH v11] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
+ PCIe Host Controller
+In-Reply-To: <20151210201817.GB367@localhost>
+References: <1448798633-12697-1-git-send-email-bharatku@xilinx.com>
+ <20151209231921.GI31930@localhost>
+ <8520D5D51A55D047800579B09414719825869A85@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <20151210201817.GB367@localhost>
+Message-ID: <8520D5D51A55D047800579B09414719825869EDC@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Dec 2015 09:35:10 +0530 Pratyush Anand wrote:
+> Subject: Re: [PATCH v11] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
+> PCIe Host Controller
+> 
+> [+cc Marc for irq_dispose_mapping() question]
+> 
+> On Thu, Dec 10, 2015 at 02:10:34PM +0000, Bharat Kumar Gogada wrote:
+> I'm trying to figure out what the difference is between these two checks and
+> why you have both of them:
+> 
+> > +	if (bus->number == pcie->root_busno && devfn > 0)
+> > +	if (bus->primary == pcie->root_busno && devfn > 0)
+> 
+> If I understand correctly, pcie->root_busno is the bus number of the Root
+> Port device (likely 00).  I think the "bus->number ==
+> pcie->root_busno && devfn > 0" check means that the Root Port, e.g.,
+> 00:00.0, is the only device allowed on bus 00.  Often a Root Complex contains
+> several Root Ports and other integrated devices that typically are on bus 00.
+> But in your case, I think you're saying there is only the single Root Port and no
+> other devices.
+> 
+> I think that first check takes care of everything on bus 00, so I'm trying to
+> figure out what the second check is for.  Assume your Root Port is device
+> 00:00.0 and it is a bridge to [bus 01-ff].  Then we have two pci_bus structs
+> with these values:
+> 
+>   bus->number = 00
+>   bus->primary = 00
+>   bus->busn_res = [bus 00-ff]
+> 
+>   bus->number = 01
+>   bus->primary = 00
+>   bus->busn_res = [bus 01-ff]
+> 
+> Because of the first check, 00:00.0 is the only possible device on bus 00, and
+> because of the second check, 01:00.0 is the only possible device on bus 01.
+> Therefore, you don't support a multifunction device connected to the Root
+> Port.  Right?
+> 
+We support multifunction devices also, so this check should not be there, will remove this check in next patch.
 
-> On Wed, Dec 9, 2015 at 3:53 PM, Russell King - ARM Linux wrote:
+> > > > +		return false;
+> > > > +
+> > > > +	return true;
+> > > > +}
+> > > > + * nwl_setup_sspl - Set Slot Power limit
+> > > > + *
+> > > > + * @pcie: PCIe port information
+> > > > + */
+> > > > +static int nwl_setup_sspl(struct nwl_pcie *pcie)
+> > > 
+> > The Set_Slot_Power_Limit Message includes a one DW data payload. The
+> > data payload is copied from the Slot Capabilities register of the
+> > Downstream Port and is written into the Device Capabilities register
+> > of the Upstream Port on the other side of the Link. Bits 9:8 of the
+> > data payload map to the Slot Power Limit Scale field and bits 7:0 map
+> > to the Slot Power Limit Value field. Bits 31:10 of the data payload
+> > must be set to all 0's by the Transmitter and ignored by the Receiver.
 > 
-> [...]
+> > This Message is sent automatically by the Downstream Port (of a Root
+> > Complex or a Switch) when one of the following events occurs:
+> > -> On a Configuration Write to the Slot Capabilities register (see
+> > Section 7.8.9) when the Data Link Layer reports DL_Up status.
 > 
-> >> > >       dw_pcie_writel_rc(pp, PCIE_ATU_ENABLE, PCIE_ATU_CR2);
-> >> > > +     /*
-> >> > > +      * ensure that the ATU enable has been happaned before accessing
-> >> > > +      * pci configuration/io spaces through dw_pcie_cfg_[read|write].
-> >> > > +      */
-> >> > > +     wmb();
-> >> > >  }
-> >> > >  
-> >>
-> >>
-> >> My understnading is that since writel() of dw_pcie_writel_rc() in
-> >> above code and readl(), writel() of dw_pcie_cfg_[read|write]() (which
-> >> will follow) goes through same device (ie PCIe host here). So, it is
-> >> guaranteed that 1st writel() will be executed before later
-> >> readl()/writel(). If that is true then we do not need any explicit
-> >> barrier here.
-> >>
-> >> Arnd, Russel: whats your opinion here.  
-> >               ^l  
+> I interpret this as meaning "the *hardware* automatically sends a
+> Set_Slot_Power_Limit Message."  There's no mention of software doing
+> anything other than the configuration write.
 > 
-> Sorry :(
-> 
-> >
-> > writel() has a barrier _before_ the access but not after.
-> >
-> > The fact is that there's nothing which guarantees that the write will hit
-> > the hardware in a timely manner (forget any rules about PCI config space,
-> > the PCI ordering rules apply to the PCI bus, not to the ARM buses.)
-> >
-> > If you need this write to have hit the hardware before continuing, you
-> > need to read back from the same register.  
-> 
-> OK, so better to replace wmb() with read back of control register.
-> 
-> >
-> > I'm just looking at this driver, trying to decipher what it's doing.  It
-> > _looks_ to me like it's reprogramming one of the outbound windows (IO?)
-> > so that configuration space can be accessed.  Doesn't this have the
-> > effect of disabling access to the IO segment of the PCI bus from the
-> > host CPU?
-> >
-> > What protections are there against other CPUs in the system issuing a
-> > PCI I/O read/write while this outbound window is programmed as
-> > configuration space?  
-> 
-> 
-> Yes, that is an issue with this driver. Most of the host controller
-> has 4 or more viewpoints, and it is very easy to handle for them. But
-> there are few which has only two viewpoints. Do not know how to solve
-> it, so that it works for all.
-> 
+> If your hardware doesn't do that, I think it's a defect.  It's fine to work around
+> it, but we should have a comment to that effect so people don't copy the
+> code to new drivers that don't need it.
 
-The default outbound iATU number is two, this may be the reason why the driver
-is written in current style. And two outbound iATUs may be common for pcie dw
-users because ASIC people just follow the default configuration ;).
+Our hardware is not capable of doing it, so we are doing it software. Yes I will add some comments.
 
-In our case, Marvell Berlin SoCs have two outbound iATUs.
+> 
+> It's a little strange that 7.8.9 talks about writing to this register when all of its
+> fields are HwInit and supposedly read-only.  I had assumed devices would
+> use strapping or implementation-specific registers to set the Slot Power
+> values, but maybe some devices use direct writes to Slot Capabilities instead.
+> 
+> BTW, I noticed a related lspci bug: it didn't decode the Capture Slot Power
+> Limit in Device Capabilities of Endpoints.  I posted a fix for that separately.
+> 
+> The Slot Power Limit (in Slot Capabilities) indicates how much power the slot
+> can supply to a downstream device.  That's a function of the platform design,
+> so it seems like this is something you want to set via DT or some other
+> mechanism that knows about the platform.
+> Intercepting all config writes and updating it with whatever the caller supplies
+> doesn't sound wise.  The value might be coming from setpci or some other
+> source with no knowledge of the platform.
 
-Thanks,
-Jisheng
+Agreed, but this is what can be done, it is difficult to determine who does what. 
+> 
+> > > > +			status = nwl_bridge_readl(pcie, TX_PCIE_MSG)
+> > > > +						  & MSG_DONE_BIT;
+> > > > +			if (status) {
+> > > > +				status = nwl_bridge_readl(pcie,
+> > > TX_PCIE_MSG)
+> > > > +						  & MSG_DONE_STATUS_BIT;
+> 
+> > > It's not clear to me whether you need to re-read TX_PCIE_MSG here.
+> >
+> > MSG_DONE_BIT qualifies MSG_DONE_STATUS_BIT; so value of
+> > MSG_DONE_STATUS_BIT is valid only when MSG_DONE_BIT = 1
+> 
+> That doesn't answer the question of whether another read is required.
+> In fact, I would argue that if MSG_DONE_STATUS_BIT is only valid when
+> MSG_DONE_BIT = 1, you *should* only do one read, because you want to
+> capture both bits simultaneously so you know they're consistent, e.g.,
+> 
+>   status = nwl_bridge_readl(pcie, TX_PCIE_MSG);
+>   if (status & MSG_DONE_BIT) {
+>     if (status & MSG_DONE_STATUS_BIT)
+>       ...
+>   }
+> 
+> If you read the register twice, you always have to worry about what changes
+> MSG_DONE_BIT, and how you guarantee that the second read happens
+> before MSG_DONE_BIT changes.
+>
+Agreed, will do it in this way, once will also confirm with IP owner regarding both bits being updated parallel.
+ 
+> > > > +		}
+> > > > +	} while (status);
+Bharat
