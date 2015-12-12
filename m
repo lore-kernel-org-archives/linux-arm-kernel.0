@@ -1,64 +1,45 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sat, 12 Dec 2015 01:57:21 +0100
-Subject: [GIT PULL 1/3] rockchip soc changes for 4.5
-In-Reply-To: <1650675.1PTvAK3nr8@wuerfel>
-References: <1936935.FVZdWRYuBf@diego> <1650675.1PTvAK3nr8@wuerfel>
-Message-ID: <2125152.VIQO6FufKf@diego>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Fri, 11 Dec 2015 17:10:56 -0800
+Subject: [PATCH] mtd: omap_elm: print interrupt resource using %pr
+In-Reply-To: <2101351.RbJOfbsbGX@wuerfel>
+References: <2101351.RbJOfbsbGX@wuerfel>
+Message-ID: <20151212011056.GA144873@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd,
 
-Am Samstag, 12. Dezember 2015, 01:30:17 schrieb Arnd Bergmann:
-> On Saturday 05 December 2015 01:53:38 Heiko St?bner wrote:
-> > SMP special case for the rk3036 and making sure the arch-timer
-> > supply is enabled, similar to the rk3288.
+On Tue, Dec 08, 2015 at 04:39:45PM +0100, Arnd Bergmann wrote:
+> When CONFIG_LPAE is set on ARM, resource_size_t is 64-bit wide
+> and we get a warning about an incorrect format string for printing
+> the interrupt number in elm_probe:
 > 
-> That is a rather ugly hack, I'd prefer if this could be done cleaner
-> rather than duplicated into another place.
+> drivers/mtd/nand/omap_elm.c: In function 'elm_probe':
+> drivers/mtd/nand/omap_elm.c:417:23: warning: format '%i' expects argument of type 'int', but argument 3 has type 'resource_size_t {aka long long unsigned int}' [-Wformat=]
+> 
+> This patch avoids the type mismatch by printing the interrupt as
+> a resource using the %pr format string.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/mtd/nand/omap_elm.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mtd/nand/omap_elm.c b/drivers/mtd/nand/omap_elm.c
+> index 235ec7992b4c..11f174b07217 100644
+> --- a/drivers/mtd/nand/omap_elm.c
+> +++ b/drivers/mtd/nand/omap_elm.c
+> @@ -414,7 +414,7 @@ static int elm_probe(struct platform_device *pdev)
+>  	ret = devm_request_irq(&pdev->dev, irq->start, elm_isr, 0,
+>  			pdev->name, info);
+>  	if (ret) {
+> -		dev_err(&pdev->dev, "failure requesting irq %i\n", irq->start);
+> +		dev_err(&pdev->dev, "failure requesting %pr\n", &irq);
 
-I do agree that it is rather ugly :-) .
+drivers/mtd/nand/omap_elm.c:417 elm_probe() error: '%pr' expects argument of type struct resource *, but argument 3 has type 'struct resource**' [smatch]
 
-The general opinion seems to be, that firmware is supposed to make sure this 
-timer is enabled and at the time when it got introduced the consensus was to 
-not hack up the arch-timer to facilitate this and "just" put it into the soc 
-code for the affected cpu.
+>  		return ret;
+>  	}
+>  
 
-It seems like the really new rk3228 (quad-core A7 and using psci now) actually 
-gets this right now, in having its firmware taking care of this. So it looks 
-like this hopefully won't be needed even for future arm32 socs.
-
-I guess I should look at what the new and shiny mainline uboot support does 
-for this, but I do think it might actually do it right as well.
-
-So this is really only a hack for flaky vendor-bootloaders.
-
-
-Which brings me to ...
-
-> Sorry for not seeing this earlier. Can you replace the hardcoded
-> RK3036_TIMER_PHYS and RK3288_TIMER6_7_PHYS constants with a DT
-> lookup, to make it somewhat less hacky?
-
-I'm not really sure how that is supposed to look like. Technically nothing 
-should ever touch that timer, as it will only make the system hang if it gets 
-disabled.
-
-We do have a binding for the timer ip block (rockchip,rk3288-timer) but of 
-course cannot use that, to make sure the regular timer driver doesn't bind to 
-it. So I guess we could do something like:
-
-
-timer at 200440a0 {
-	compatible = "rockchip,arch-timer-supply";
-	reg = <0x200440a0 0x20>;
-};
-
-try to find this and enable it, but duplicating the hack and spreading it into 
-the dts as well somehow doesn't feel like an improvement ;-) .
-
-But I maybe you have a nicer idea on how to do this, than me.
-
-
-Thanks
-Heiko
+Brian
