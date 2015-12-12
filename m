@@ -1,23 +1,26 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 12 Dec 2015 01:06:24 +0100
-Subject: [GIT PULL 4/4] Broadcom devicetree-arm64 changes for v4.5
-In-Reply-To: <1449532649-6471-1-git-send-email-f.fainelli@gmail.com>
-References: <1449532649-6471-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <21989457.I9NKs4Welx@wuerfel>
+Date: Sat, 12 Dec 2015 01:08:25 +0100
+Subject: [GIT PULL] Second Round of Renesas ARM64 Based SoC Defconfig
+ Updates for v4.5
+In-Reply-To: <cover.1448588763.git.horms+renesas@verge.net.au>
+References: <cover.1448588763.git.horms+renesas@verge.net.au>
+Message-ID: <2322992.eP63TchiCV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 07 December 2015 15:57:26 Florian Fainelli wrote:
-> This pull request contains Broadcom ARM64-based Device Tree changes:
+On Friday 27 November 2015 10:54:57 Simon Horman wrote:
+> Please consider these second round of Renesas ARM64 based SoC defconfig
+> updates for v4.5.
 > 
-> - Anup Patel adds L2 cache, SMMU, syscon-based reboot, PMU v3, iProc RNG200 (HWRNG) and
->   NAND flash controller support to the Northstar 2 SoCs
+> This pull request Enable Renesas sound, DMAC, I2C, EthernetAVB and GPIO for
+> R-Car Gen3 r8a7795/salvator-x.
 > 
-> - Ray Jui adds the I2C Device Tree nodes to the Norsthar 2 SoCs
+> This pull request is based on the previous round of
+> such requests, tagged as renesas-arm64-defconfig-for-v4.5,
+> which I have already sent a pull-request for.
 > 
-> - Jon Mason enables the clock providers on the Norsthar 2 SoCs
 > 
 
-Merged into next/dt64, thanks!
+Pulled into next/dt64, thanks!
 
 	Arnd
