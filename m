@@ -1,50 +1,81 @@
-From: dave.long@linaro.org (David Long)
-Date: Sat, 12 Dec 2015 15:13:21 -0500
-Subject: [RFC] kprobe'ing conditionally executed instructions
-In-Reply-To: <566C6C11.1030600@redhat.com>
-References: <566A5997.9020908@linaro.org> <566AF556.6050704@redhat.com>
- <566BB6FE.2050005@linaro.org> <566C6C11.1030600@redhat.com>
-Message-ID: <566C7FE1.9050407@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 12 Dec 2015 21:41:04 +0100
+Subject: [PATCH] ARM: Runtime patch udiv/sdiv instructions into
+ __aeabi_{u}idiv()
+In-Reply-To: <alpine.LFD.2.20.1512111955380.26920@knanqh.ubzr>
+References: <alpine.LFD.2.20.1512110105450.26920@knanqh.ubzr>
+ <1952194.3mFBoOuPa0@wuerfel>
+ <alpine.LFD.2.20.1512111955380.26920@knanqh.ubzr>
+Message-ID: <31542311.prPJauWKRa@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/2015 01:48 PM, William Cohen wrote:
-> On 12/12/2015 12:56 AM, David Long wrote:
->> On 12/11/2015 11:09 AM, William Cohen wrote:
->>> On 12/11/2015 12:05 AM, David Long wrote:
->>>> There is a moderate amount of code already in kprobes on ARM and the current ARMv8 patch to deal with conditional execution of instructions. One aspect of how this is handled is that instructions that fail their predicate and are not (technically) executed are also not treated as a hit kprobe. Steve Capper has suggested that the probe handling should still take place because we stepped through the instruction even if it was effectively a nop.  This would be a significant change in how it currently works on 32-bit ARM, and a change in the patch for ARMv8 (although it's not likely to be much of a change in the kernel code).
->>>>
->>>> I need input on this.  Do people have opinions?
->>>>
->>>> -dl
->>>>
->>>
->>> Hi Dave,
->>>
->>> Conditionally executing the kprobes would violate the assumptions made for perf and systemtap collecting data. Even if the instruction is predicated and treated as a NOP it should still reliably trigger the kprobe.  However, for efficiency the simulation/emulation/single-step of the instruction could be skipped if the instruction is known to have no change on the machine state other than changing the program counter.
->>>
->>> -Will Cohen
->>>
->>
->> I wonder if this might explain some systemtap failures.
->>
->> -dl
->>
->
-> Hi Dave,
->
-> It is possible that some of the kprobes not triggering would cause testsuite failures, but I don't have a specific test to point to this is happening.
->
-> How much of change would it be to fix the kprobes to get the correct behavior.  It might be easiest to fix it and compare the test results to find possible candidates where this problem occurs.
->
-> -Will
->
+On Friday 11 December 2015 20:17:44 Nicolas Pitre wrote:
+> ----- >8
+> 
+> family                  out of order                    in order
+> ==============================================================================
+> no mmu          |                               |                            |
+> no cache        |       Falcon                  |       Falcon D             |
+> "966"           |                               |       a.k.a. Dragonite     |
+> ==============================================================================
+> no mmu          |                               |                            |
+> cache           |       Osprey                  |       Osprey D             |
+> "946"           |                               |                            |
+> ==============================================================================
+>                 |       single issue: Mohawk    |                            |
+> mmu             |       a.k.a. Feroceon 1850    |                            |
+> cache           |       a.k.a. Feroceon FR-331  |       single issue:        |
+> "926"           |                               |       Mohawk D             |
+>                 |       dual issue: Jolteon     |                            |
+>                 |       a.k.a. Feroceon 2850    |                            |
+> ==============================================================================
+> 
+> Variants:
+> - Falcon DMC - Multi-Core version of the Falcon D
+> - Falcon DMT - Multi-Thread version of the Falcon D
+> - Osprey DMT - Multi-Thread version of Osprey D
+> 
+> There is also the Flareon, which is what will be used in Dove:
+> - Based on the Jolteon
+> - v6/v7 support
+> - packaged with L2, VFP, AXI
+> 
+> All of these cores can be mixed-and-matched with L2, VFP, AXI, wMMXt,
+> etc.
+> 
+> ----- >8
 
-I think it's a very simple change.  I will come up with something for 
-you to test shortly. It sounds like we may need the change permanently 
-anyway, although clearly there is not a solid consensus yet.
+Ok, so it seems that Mohawk is not just the name for 88sv331 in IXP3xx but
+also for 88fr331 in Orion, I should add that. The table also confirms that
+Feroceon is used as a family name for multiple cores rather than just
+one of the models. It doesn't explain how the Feroceon and Sheeva names
+relate though, I'll just leave that part of my table as it is, it's
+still my best guess.
 
-I would think this would impact 32-bit behavior much more than 64-bit. 
-I can see about producing something for testing that too.
+My table is now:
 
--dl
+  Feroceon-1850 88fr331 "Mohawk"
+        CPUID 0x5615331x or 0x41xx926x
+        ARMv5TE, single issue
+  Feroceon-2850 88fr531-vd "Jolteon"
+        CPUID 0x5605531x or 0x41xx926x
+        ARMv5TE, VFP, dual-issue
+  Feroceon 88fr571-vd "Jolteon"
+        CPUID 0x5615571x
+        ARMv5TE, VFP, dual-issue
+  Feroceon 88fr131 "Mohawk-D"
+        CPUID 0x5625131x
+        ARMv5TE, single-issue, in-order
+  Sheeva PJ1 88sv331 "Mohawk"
+        CPUID 0x561584xx
+        ARMv5, single-issue, iWMMXt v2
+
+Connecting the 88fr131 product code with the "Mohawk-D" name is a wild
+guess, based on the fact that this is a later version of 88fr331 and
+runs at a higher clock frequency but has a lower number.
+
+88fr131 is the core used in Kirkwood. Is there any way to find out if
+Kirkwood is indeed an in-order core unlike Orion5x?
+
+	Arnd
