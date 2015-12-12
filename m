@@ -1,56 +1,51 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Sat, 12 Dec 2015 17:20:57 +0100
-Subject: [PATCH] i2c: allow building emev2 without slave mode again
-In-Reply-To: <2592093.cGKEcKVqLU@wuerfel>
-References: <201512102224.cVm7Hcp0%fengguang.wu@intel.com>
- <2592093.cGKEcKVqLU@wuerfel>
-Message-ID: <20151212162057.GA1530@katana>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 12 Dec 2015 16:26:04 +0000
+Subject: [PATCH v5 2/4] Documentation: add the binding file for Freescale
+ imx7d ADC driver
+In-Reply-To: <1449570383-25716-3-git-send-email-haibo.chen@freescale.com>
+References: <1449570383-25716-1-git-send-email-haibo.chen@freescale.com>
+ <1449570383-25716-3-git-send-email-haibo.chen@freescale.com>
+Message-ID: <566C4A9C.3060903@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-thanks for looking into this, but I don't get your point yet.
-
-> The slave_cb callback function is supposed to set the 'value'
-> here,
-
-Only if a master wants to READ from us.
-
-> but it might return an error not assign the pointer,
-
-An error is only returned if a WRITE from a master was not accepted by
-the slave backend.
-
-> It might be best to change the callback to return 'void' and not
-> allow it to fail.
-
-We need that because in case of an errno, the slave should send NACK to
-the master instead of ACK.
-
-> At least the eeprom slave cannot fail anyway, and it is the only
-> implementation we have at the moment.
-
-True. But giving a slave the possibility to NACK a write should be
-present IMO.
-
-> Alternatively, the  inline could return an error, and both bus
-> drivers check for the error before using 'value'.
-
-Hum, it does return an error?
-
-	return client->slave_cb(client, event, val);
-
-You probably mean something else?
-
-Regards,
-
-   Wolfram
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151212/232493e2/attachment.sig>
+On 08/12/15 10:26, Haibo Chen wrote:
+> The patch adds the binding file for Freescale imx7d ADC driver.
+> 
+> Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+Applied 
+> ---
+>  .../devicetree/bindings/iio/adc/imx7d-adc.txt      | 22 ++++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/iio/adc/imx7d-adc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/iio/adc/imx7d-adc.txt b/Documentation/devicetree/bindings/iio/adc/imx7d-adc.txt
+> new file mode 100644
+> index 0000000..5c184b9
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/iio/adc/imx7d-adc.txt
+> @@ -0,0 +1,22 @@
+> +Freescale imx7d ADC bindings
+> +
+> +The devicetree bindings are for the ADC driver written for
+> +imx7d SoC.
+> +
+> +Required properties:
+> +- compatible: Should be "fsl,imx7d-adc"
+> +- reg: Offset and length of the register set for the ADC device
+> +- interrupts: The interrupt number for the ADC device
+> +- clocks: The root clock of the ADC controller
+> +- clock-names: Must contain "adc", matching entry in the clocks property
+> +- vref-supply: The regulator supply ADC reference voltage
+> +
+> +Example:
+> +adc1: adc at 30610000 {
+> +	compatible = "fsl,imx7d-adc";
+> +	reg = <0x30610000 0x10000>;
+> +	interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
+> +	clocks = <&clks IMX7D_ADC_ROOT_CLK>;
+> +	clock-names = "adc";
+> +	vref-supply = <&reg_vcc_3v3_mcu>;
+> +};
+> 
