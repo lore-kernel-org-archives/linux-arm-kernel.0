@@ -1,23 +1,21 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 12 Dec 2015 01:23:08 +0100
-Subject: [GIT PULL v2] Reset controller changes for v4.5
-In-Reply-To: <1449154761.3339.40.camel@pengutronix.de>
-References: <1449154761.3339.40.camel@pengutronix.de>
-Message-ID: <1511709.Ume7y8iodG@wuerfel>
+Date: Sat, 12 Dec 2015 01:30:17 +0100
+Subject: [GIT PULL 1/3] rockchip soc changes for 4.5
+In-Reply-To: <1936935.FVZdWRYuBf@diego>
+References: <1936935.FVZdWRYuBf@diego>
+Message-ID: <1650675.1PTvAK3nr8@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 03 December 2015 15:59:21 Philipp Zabel wrote:
-> Reset controller changes for v4.5 v2
-> 
-> - oftree support for getting reset devices by index
-> - fixed return value consistency of of_reset_control_get
-> - added support for STi co-processor resets
-> - added STi status callback
-> - added HiSilicon Hi6220 reset driver
-> - added ath79 system restart support
-> - various fixes
+On Saturday 05 December 2015 01:53:38 Heiko St?bner wrote:
+> SMP special case for the rk3036 and making sure the arch-timer
+> supply is enabled, similar to the rk3288.
 
-Merged into next/drivers, thanks!
+That is a rather ugly hack, I'd prefer if this could be done cleaner
+rather than duplicated into another place.
+
+Sorry for not seeing this earlier. Can you replace the hardcoded 
+RK3036_TIMER_PHYS and RK3288_TIMER6_7_PHYS constants with a DT
+lookup, to make it somewhat less hacky?
 
 	Arnd
