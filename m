@@ -1,26 +1,44 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sat, 12 Dec 2015 14:29:02 +0100
-Subject: [PATCH v2 0/2] Improve drm_of_component_probe() and move rockchip
- to use it
-In-Reply-To: <1448029325-14602-1-git-send-email-Liviu.Dudau@arm.com>
-References: <1448029325-14602-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <2302646.WIa4ZQmOnV@diego>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 12 Dec 2015 15:41:31 +0100
+Subject: [PATCH] mtd: omap_elm: print interrupt resource using %pr
+In-Reply-To: <20151212011056.GA144873@google.com>
+References: <2101351.RbJOfbsbGX@wuerfel> <20151212011056.GA144873@google.com>
+Message-ID: <1472979.NmboBT3Vms@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+On Friday 11 December 2015 17:10:56 Brian Norris wrote:
+> Hi Arnd,
+> 
+> On Tue, Dec 08, 2015 at 04:39:45PM +0100, Arnd Bergmann wrote:
+> > When CONFIG_LPAE is set on ARM, resource_size_t is 64-bit wide
+> > and we get a warning about an incorrect format string for printing
+> > the interrupt number in elm_probe:
+> > 
+> > drivers/mtd/nand/omap_elm.c: In function 'elm_probe':
+> > drivers/mtd/nand/omap_elm.c:417:23: warning: format '%i' expects argument of type 'int', but argument 3 has type 'resource_size_t {aka long long unsigned int}' [-Wformat=]
+> > 
+> > This patch avoids the type mismatch by printing the interrupt as
+> > a resource using the %pr format string.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > ---
+> >  drivers/mtd/nand/omap_elm.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/mtd/nand/omap_elm.c b/drivers/mtd/nand/omap_elm.c
+> > index 235ec7992b4c..11f174b07217 100644
+> > --- a/drivers/mtd/nand/omap_elm.c
+> > +++ b/drivers/mtd/nand/omap_elm.c
+> > @@ -414,7 +414,7 @@ static int elm_probe(struct platform_device *pdev)
+> >       ret = devm_request_irq(&pdev->dev, irq->start, elm_isr, 0,
+> >                       pdev->name, info);
+> >       if (ret) {
+> > -             dev_err(&pdev->dev, "failure requesting irq %i\n", irq->start);
+> > +             dev_err(&pdev->dev, "failure requesting %pr\n", &irq);
+> 
+> drivers/mtd/nand/omap_elm.c:417 elm_probe() error: '%pr' expects argument of type struct resource *, but argument 3 has type 'struct resource**' [smatch]
 
-Am Freitag, 20. November 2015, 14:22:03 schrieb Liviu Dudau:
-> This is v2 of the patchset trying to make drm_of_component_probe() cope with
-> finding both local crtc ports and remote encoder ones. Heiko St?bner was
-> nice enough to test an earlier version that was patched following Russell's
-> suggestions on rk3288, but I haven't seen any reports from iMX or Armada
-> users.
+Ah, good catch. Do you want to fix it up yourself, or should I send a new version?
 
-these 2 patches seem to work nicely now and can probably get applied. Do you 
-want to pick them up, or do you expect Mark to do this and then include them 
-in a pull request?
-
-
-Thanks
-Heiko
+	Arnd
