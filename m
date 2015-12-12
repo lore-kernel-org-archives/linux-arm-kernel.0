@@ -1,28 +1,57 @@
-From: dave.long@linaro.org (David Long)
-Date: Sat, 12 Dec 2015 00:56:14 -0500
-Subject: [RFC] kprobe'ing conditionally executed instructions
-In-Reply-To: <566AF556.6050704@redhat.com>
-References: <566A5997.9020908@linaro.org> <566AF556.6050704@redhat.com>
-Message-ID: <566BB6FE.2050005@linaro.org>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sat, 12 Dec 2015 15:57:47 +0900
+Subject: [PATCH 0/4] arm, arm64: uniphier: add a new driver,
+ device tree updates
+In-Reply-To: <10682472.c84OiaBWfX@wuerfel>
+References: <1448357962-12259-1-git-send-email-yamada.masahiro@socionext.com>
+ <10682472.c84OiaBWfX@wuerfel>
+Message-ID: <CAK7LNATcvAFr3joQ0xjZ+M+HEmPubXxj_v09r1VPfTnGtnRKpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/11/2015 11:09 AM, William Cohen wrote:
-> On 12/11/2015 12:05 AM, David Long wrote:
->> There is a moderate amount of code already in kprobes on ARM and the current ARMv8 patch to deal with conditional execution of instructions. One aspect of how this is handled is that instructions that fail their predicate and are not (technically) executed are also not treated as a hit kprobe. Steve Capper has suggested that the probe handling should still take place because we stepped through the instruction even if it was effectively a nop.  This would be a significant change in how it currently works on 32-bit ARM, and a change in the patch for ARMv8 (although it's not likely to be much of a change in the kernel code).
->>
->> I need input on this.  Do people have opinions?
->>
->> -dl
->>
->
-> Hi Dave,
->
-> Conditionally executing the kprobes would violate the assumptions made for perf and systemtap collecting data. Even if the instruction is predicated and treated as a NOP it should still reliably trigger the kprobe.  However, for efficiency the simulation/emulation/single-step of the instruction could be skipped if the instruction is known to have no change on the machine state other than changing the program counter.
->
-> -Will Cohen
->
+Hi Arnd,
 
-I wonder if this might explain some systemtap failures.
 
--dl
+Sorry for confusing you.
+
+2015-12-12 9:12 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> On Tuesday 24 November 2015 18:39:18 Masahiro Yamada wrote:
+>>
+>> Here is another series for UniPhier SoC family:
+>>
+>>  - 1/4: add a new driver.  The UniPhier System Bus is an external bus
+>>         where on-board devices are connected to the SoC.
+>>         (please check if the binding specification is OK.)
+>>
+>>  - 2/4: device tree updates to use the driver added by 1/4
+>>
+>>  - 3/4: trivial rename of device node names
+>>
+>>  - 4/4: initial commit for ARMv8 SoC/Board device trees
+>>
+>> Please apply 2/4, 3/4/, 4/4 into the same branch because 4/4 depends on 2/4 and 3/4.
+>> (4/4 creates symbolic links to ARM device trees.)
+>
+> I'm a bit confused how this relates to the newer version ("[PATCH v5] bus:
+> uniphier-system-bus: add UniPhier System Bus driver"). The new version
+> only has one patch instead of four, so I'm not sure if the patches 2, 3
+> and 4 of this series still apply.
+>
+> Can you clarify, or send the entire series again?
+>
+>         Arnd
+
+
+I'd like to retract this series.
+Please just disregard it.
+
+
+Instead, please review this one:
+https://patchwork.kernel.org/patch/7714151/
+
+
+Thanks!
+
+-- 
+Best Regards
+Masahiro Yamada
