@@ -1,23 +1,23 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Fri, 11 Dec 2015 16:22:00 -0800
-Subject: [PATCH 0/4] arm: dts: qcom-apq8064: add smem and hwspinlock
- support
-In-Reply-To: <1449858409-13296-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1449858409-13296-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <20151212002200.GO4000@usrtlx11787.corpusers.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 12 Dec 2015 01:23:08 +0100
+Subject: [GIT PULL v2] Reset controller changes for v4.5
+In-Reply-To: <1449154761.3339.40.camel@pengutronix.de>
+References: <1449154761.3339.40.camel@pengutronix.de>
+Message-ID: <1511709.Ume7y8iodG@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 11 Dec 10:26 PST 2015, Srinivas Kandagatla wrote:
-
-> Hi Andy, 
+On Thursday 03 December 2015 15:59:21 Philipp Zabel wrote:
+> Reset controller changes for v4.5 v2
 > 
-> Here are 3 patches for smem/hwspinlock which I have tested with QDSP on IFC6410.
-> Also a fix from Ivan which I think can be taken aswell.
-> 
+> - oftree support for getting reset devices by index
+> - fixed return value consistency of of_reset_control_get
+> - added support for STi co-processor resets
+> - added STi status callback
+> - added HiSilicon Hi6220 reset driver
+> - added ath79 system restart support
+> - various fixes
 
-As far as I can tell my patch for adding smem and hwmutex are already in
-linux-next, via Andy's tree. Am I missing something?
+Merged into next/drivers, thanks!
 
-Regards,
-Bjorn
+	Arnd
