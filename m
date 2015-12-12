@@ -1,95 +1,16 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 11 Dec 2015 20:17:44 -0500 (EST)
-Subject: [PATCH] ARM: Runtime patch udiv/sdiv instructions into
- __aeabi_{u}idiv()
-In-Reply-To: <1952194.3mFBoOuPa0@wuerfel>
-References: <alpine.LFD.2.20.1512110105450.26920@knanqh.ubzr>
- <1492057.yA5yAYfdog@wuerfel>
- <alpine.LFD.2.20.1512111858190.26920@knanqh.ubzr>
- <1952194.3mFBoOuPa0@wuerfel>
-Message-ID: <alpine.LFD.2.20.1512111955380.26920@knanqh.ubzr>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 11 Dec 2015 20:28:56 -0500 (EST)
+Subject: [PATCH net-next v3 0/4] mvneta: Introduce RSS support and XPS
+ configuration
+In-Reply-To: <1449681831-2798-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1449681831-2798-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20151211.202856.919803358989781714.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 12 Dec 2015, Arnd Bergmann wrote:
+From: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Date: Wed,  9 Dec 2015 18:23:47 +0100
 
-> On Friday 11 December 2015 19:01:00 Nicolas Pitre wrote:
-> > On Fri, 11 Dec 2015, Arnd Bergmann wrote:
-> > 
-> > > On Friday 11 December 2015 22:34:16 Russell King - ARM Linux wrote:
-> > > > 
-> > > >  __v7_pj4b_proc_info:
-> > > > -       .long   0x562f5840
-> > > > -       .long   0xfffffff0
-> > > > +       .long   0x560f5800
-> > > > +       .long   0xff0fff00
-> > > > 
-> > > > So it was to include Armada 370.  So this now brings up the question...
-> > > > what is the MIDR value used in Armada 370?
-> > > 
-> > > I've listed them in an earlier thread, here is the list again:
-> > > 
-> > >                 variant part    revision        name            features
-> > > mmp2:           0       0x581   5               PJ4             idivt
-> > > dove:           0       0x581   5               PJ4             idivt
-> > > Armada 370      1       0x581   1               PJ4B            idivt
-> > > mmp3:           2       0x584   2               PJ4-MP          idiva idivt lpae
-> > > Armada XP       2       0x584   2               PJ4-MP          idiva idivt lpae
-> > > Berlin          2       0x584   2               PJ4-MP          idiva idivt lpae
-> > > 
-> > > So the original table was wrong because it failed to include PJ4B (Armada 370),
-> > > but the current version is wrong, because it also includes PJ4 (Dove and MMP2).
-> > 
-> > I'd suggest you add the above table and conclusion to the commit log for 
-> > your proposed fix.  Next time the question comes up the info will be 
-> > right there.
-> 
-> I actually procrastinated the better part of my work day today documenting
-> the Marvell core types in the existing kernel documentation directory
-> and ended up with the patch below. ;-)
-> 
-> If you still remember some of the details of the ancient cores that were
-> not entirely clear to me, please have a look.
+> this series is the first step add RSS support on mvneta.
 
-Well... FWIW, digging in my ancient mail folders, I found the following 
-table sent to me in October of 2007. That doesn't add much to what you 
-already have gathered. I have vague memories of a more exhaustive list 
-but I can't find it anymore.
-
------ >8
-
-family			out of order			in order
-==============================================================================
-no mmu		|				|			     |
-no cache	|	Falcon			|	Falcon D	     |
-"966"		|				|	a.k.a. Dragonite     |
-==============================================================================
-no mmu		|				|			     |
-cache		|	Osprey			|	Osprey D	     |
-"946"		|				|			     |
-==============================================================================
-		|	single issue: Mohawk	|			     |
-mmu		|	a.k.a. Feroceon 1850	|			     |
-cache		|	a.k.a. Feroceon FR-331	|	single issue:	     |
-"926"		|				|	Mohawk D	     |
-		|	dual issue: Jolteon	|			     |
-		|	a.k.a. Feroceon 2850	|			     |
-==============================================================================
-
-Variants:
-- Falcon DMC - Multi-Core version of the Falcon D
-- Falcon DMT - Multi-Thread version of the Falcon D
-- Osprey DMT - Multi-Thread version of Osprey D
-
-There is also the Flareon, which is what will be used in Dove:
-- Based on the Jolteon
-- v6/v7 support
-- packaged with L2, VFP, AXI
-
-All of these cores can be mixed-and-matched with L2, VFP, AXI, wMMXt,
-etc.
-
------ >8
-
-
-Nicolas
+Series applied.
