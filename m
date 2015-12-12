@@ -1,26 +1,38 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 11 Dec 2015 23:38:32 -0500 (EST)
-Subject: [PATCH v2 0/2] net: thunderx: Support for pass-2 hw features
-In-Reply-To: <1449734120-8912-1-git-send-email-sunil.kovvuri@gmail.com>
-References: <y>
-	<1449734120-8912-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <20151211.233832.338534313937495741.davem@davemloft.net>
+From: prem.mallappa@broadcom.com (Prem (Premachandra) Mallappa)
+Date: Sat, 12 Dec 2015 05:31:12 +0000
+Subject: [PATCH] IOMMU: arm-smmu-v3: Use STE.S1STALLD only when supported
+In-Reply-To: <20151211195301.GA11096@arm.com>
+References: <1447663700-13309-1-git-send-email-pmallapp@broadcom.com>
+ <20151117174636.GO30101@arm.com>
+ <CC0BC9CB4553B146B290EC1D4DC5C359010924D5@SJEXCHMB15.corp.ad.broadcom.com>
+ <20151211195301.GA11096@arm.com>
+Message-ID: <CC0BC9CB4553B146B290EC1D4DC5C359010946B3@SJEXCHMB15.corp.ad.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sunil Goutham <sunil.kovvuri@gmail.com>
-Date: Thu, 10 Dec 2015 13:25:18 +0530
+Hi Will,
+It is ready, in internal review, will be sending it in a day.
 
-> From: Sunil Goutham <sgoutham@cavium.com>
-> 
-> This patch set adds support for new features added in pass-2 revision
-> of hardware like TSO and count based interrupt coalescing.
-> 
-> Changes from v1:
-> - Addressed comments received regarding boolean bit field changes 
->   by excluding them from this patch. Will submit a seperate
->   patch along with cleanup of unsed field.
-> - Got rid of new macro 'VNIC_NAPI_WEIGHT' introduced in 
->   count threshold interrupt patch.
+/Prem
 
-Series applied to net-next, thanks.
+> -----Original Message-----
+> From: Will Deacon [mailto:will.deacon at arm.com]
+> Sent: 12 December 2015 01:23 AM
+> To: Prem (Premachandra) Mallappa
+> Cc: iommu at lists.linux-foundation.org; linux-arm-kernel at lists.infradead.org;
+> Jayachandran Chandrashekaran Nair
+> Subject: Re: [PATCH] IOMMU: arm-smmu-v3: Use STE.S1STALLD only when
+> supported
+> 
+> Hi Prem,
+> 
+> On Tue, Nov 24, 2015 at 05:30:37AM +0000, Prem (Premachandra) Mallappa
+> wrote:
+> > Thanks for comments, I was on holiday, I'll send updated patch along with
+> > 2 more soon.
+> 
+> Any update on this patch?
+> 
+> Cheers,
+> 
+> Will
