@@ -1,30 +1,26 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Sat, 12 Dec 2015 12:08:47 +0000
-Subject: [PATCH 0/4] arm: dts: qcom-apq8064: add smem and hwspinlock
- support
-In-Reply-To: <20151212002200.GO4000@usrtlx11787.corpusers.net>
-References: <1449858409-13296-1-git-send-email-srinivas.kandagatla@linaro.org>
- <20151212002200.GO4000@usrtlx11787.corpusers.net>
-Message-ID: <566C0E4F.2030100@linaro.org>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Sat, 12 Dec 2015 14:29:02 +0100
+Subject: [PATCH v2 0/2] Improve drm_of_component_probe() and move rockchip
+ to use it
+In-Reply-To: <1448029325-14602-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1448029325-14602-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <2302646.WIa4ZQmOnV@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Dave,
+
+Am Freitag, 20. November 2015, 14:22:03 schrieb Liviu Dudau:
+> This is v2 of the patchset trying to make drm_of_component_probe() cope with
+> finding both local crtc ports and remote encoder ones. Heiko St?bner was
+> nice enough to test an earlier version that was patched following Russell's
+> suggestions on rk3288, but I haven't seen any reports from iMX or Armada
+> users.
+
+these 2 patches seem to work nicely now and can probably get applied. Do you 
+want to pick them up, or do you expect Mark to do this and then include them 
+in a pull request?
 
 
-On 12/12/15 00:22, Bjorn Andersson wrote:
-> On Fri 11 Dec 10:26 PST 2015, Srinivas Kandagatla wrote:
->
->> Hi Andy,
->>
->> Here are 3 patches for smem/hwspinlock which I have tested with QDSP on IFC6410.
->> Also a fix from Ivan which I think can be taken aswell.
->>
->
-> As far as I can tell my patch for adding smem and hwmutex are already in
-> linux-next, via Andy's tree. Am I missing something?
-My bad, I should have checked linux-next before sending..
---srini
->
-> Regards,
-> Bjorn
->
+Thanks
+Heiko
