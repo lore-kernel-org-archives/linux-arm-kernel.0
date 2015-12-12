@@ -1,81 +1,75 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 12 Dec 2015 21:41:04 +0100
-Subject: [PATCH] ARM: Runtime patch udiv/sdiv instructions into
- __aeabi_{u}idiv()
-In-Reply-To: <alpine.LFD.2.20.1512111955380.26920@knanqh.ubzr>
-References: <alpine.LFD.2.20.1512110105450.26920@knanqh.ubzr>
- <1952194.3mFBoOuPa0@wuerfel>
- <alpine.LFD.2.20.1512111955380.26920@knanqh.ubzr>
-Message-ID: <31542311.prPJauWKRa@wuerfel>
+Date: Sat, 12 Dec 2015 22:05:29 +0100
+Subject: [PATCH] i2c: allow building emev2 without slave mode again
+In-Reply-To: <20151212162057.GA1530@katana>
+References: <201512102224.cVm7Hcp0%fengguang.wu@intel.com>
+ <2592093.cGKEcKVqLU@wuerfel> <20151212162057.GA1530@katana>
+Message-ID: <2157023.1Ftpc9ZciN@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 11 December 2015 20:17:44 Nicolas Pitre wrote:
-> ----- >8
+On Saturday 12 December 2015 17:20:57 Wolfram Sang wrote:
+> Hi Arnd,
 > 
-> family                  out of order                    in order
-> ==============================================================================
-> no mmu          |                               |                            |
-> no cache        |       Falcon                  |       Falcon D             |
-> "966"           |                               |       a.k.a. Dragonite     |
-> ==============================================================================
-> no mmu          |                               |                            |
-> cache           |       Osprey                  |       Osprey D             |
-> "946"           |                               |                            |
-> ==============================================================================
->                 |       single issue: Mohawk    |                            |
-> mmu             |       a.k.a. Feroceon 1850    |                            |
-> cache           |       a.k.a. Feroceon FR-331  |       single issue:        |
-> "926"           |                               |       Mohawk D             |
->                 |       dual issue: Jolteon     |                            |
->                 |       a.k.a. Feroceon 2850    |                            |
-> ==============================================================================
+> thanks for looking into this, but I don't get your point yet.
 > 
-> Variants:
-> - Falcon DMC - Multi-Core version of the Falcon D
-> - Falcon DMT - Multi-Thread version of the Falcon D
-> - Osprey DMT - Multi-Thread version of Osprey D
+> > The slave_cb callback function is supposed to set the 'value'
+> > here,
 > 
-> There is also the Flareon, which is what will be used in Dove:
-> - Based on the Jolteon
-> - v6/v7 support
-> - packaged with L2, VFP, AXI
+> Only if a master wants to READ from us.
+
+Right, and can this never fail?
+
+> > but it might return an error not assign the pointer,
 > 
-> All of these cores can be mixed-and-matched with L2, VFP, AXI, wMMXt,
-> etc.
+> An error is only returned if a WRITE from a master was not accepted by
+> the slave backend.
+>
+> > It might be best to change the callback to return 'void' and not
+> > allow it to fail.
 > 
-> ----- >8
+> We need that because in case of an errno, the slave should send NACK to
+> the master instead of ACK.
+> 
+> > At least the eeprom slave cannot fail anyway, and it is the only
+> > implementation we have at the moment.
+> 
+> True. But giving a slave the possibility to NACK a write should be
+> present IMO.
 
-Ok, so it seems that Mohawk is not just the name for 88sv331 in IXP3xx but
-also for 88fr331 in Orion, I should add that. The table also confirms that
-Feroceon is used as a family name for multiple cores rather than just
-one of the models. It doesn't explain how the Feroceon and Sheeva names
-relate though, I'll just leave that part of my table as it is, it's
-still my best guess.
+Ok, fair enough.
+ 
+> > Alternatively, the  inline could return an error, and both bus
+> > drivers check for the error before using 'value'.
+> 
+> Hum, it does return an error?
+> 
+> 	return client->slave_cb(client, event, val);
+> 
+> You probably mean something else?
 
-My table is now:
+I mean specifically this code in em_i2c_slave_irq():
 
-  Feroceon-1850 88fr331 "Mohawk"
-        CPUID 0x5615331x or 0x41xx926x
-        ARMv5TE, single issue
-  Feroceon-2850 88fr531-vd "Jolteon"
-        CPUID 0x5605531x or 0x41xx926x
-        ARMv5TE, VFP, dual-issue
-  Feroceon 88fr571-vd "Jolteon"
-        CPUID 0x5615571x
-        ARMv5TE, VFP, dual-issue
-  Feroceon 88fr131 "Mohawk-D"
-        CPUID 0x5625131x
-        ARMv5TE, single-issue, in-order
-  Sheeva PJ1 88sv331 "Mohawk"
-        CPUID 0x561584xx
-        ARMv5, single-issue, iWMMXt v2
+                        /* Send data */
+                        event = status & I2C_BIT_STD0 ?
+                                I2C_SLAVE_READ_REQUESTED :
+                                I2C_SLAVE_READ_PROCESSED;
+                        i2c_slave_event(priv->slave, event, &value);
+                        writeb(value, priv->base + I2C_OFS_IIC0);
 
-Connecting the 88fr131 product code with the "Mohawk-D" name is a wild
-guess, based on the fact that this is a later version of 88fr331 and
-runs at a higher clock frequency but has a lower number.
+With my current code to turn i2c_slave_event() into an empty inline function
+in case of !CONFIG_I2C_SLAVE, the compiler knows that "value" is uninitialized
+at the point where we write it to the register, and warns about it.
 
-88fr131 is the core used in Kirkwood. Is there any way to find out if
-Kirkwood is indeed an in-order core unlike Orion5x?
+The code will of course never run if slave mode is not allowed, but we should
+still shut up the warning, either by making the inline i2c_slave_event
+set 'value' to zero or 0xff, or by adding an error check:
+
+			ret = i2c_slave_event(priv->slave, event, &value);
+			if (!ret)
+				 writeb(value, priv->base + I2C_OFS_IIC0);
+
+and making the empty i2c_slave_event() function return -ENOSYS or -ENOTSUPP.
+
 
 	Arnd
