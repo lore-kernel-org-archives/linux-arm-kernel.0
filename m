@@ -1,21 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 12 Dec 2015 01:30:17 +0100
-Subject: [GIT PULL 1/3] rockchip soc changes for 4.5
-In-Reply-To: <1936935.FVZdWRYuBf@diego>
-References: <1936935.FVZdWRYuBf@diego>
-Message-ID: <1650675.1PTvAK3nr8@wuerfel>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 11 Dec 2015 19:35:03 -0500 (EST)
+Subject: [PATCH 2/2] netcp: add more __le32 annotations
+In-Reply-To: <6435706.peaM34LhnV@wuerfel>
+References: <1578620.t1ANcREMZ8@wuerfel>
+	<6435706.peaM34LhnV@wuerfel>
+Message-ID: <20151211.193503.312733505035879098.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 05 December 2015 01:53:38 Heiko St?bner wrote:
-> SMP special case for the rk3036 and making sure the arch-timer
-> supply is enabled, similar to the rk3288.
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Tue, 08 Dec 2015 16:32:59 +0100
 
-That is a rather ugly hack, I'd prefer if this could be done cleaner
-rather than duplicated into another place.
+> The handling of epib and psdata remains a bit unclear in the driver,
+> as we access the same fields both as CPU-endian and through DMA
+> from the device.
+> 
+> Sparse warns about this:
+> ti/netcp_core.c:1147:21: warning: incorrect type in assignment (different base types)
+> ti/netcp_core.c:1147:21:    expected unsigned int [usertype] *[assigned] epib
+> ti/netcp_core.c:1147:21:    got restricted __le32 *<noident>
+> 
+> This uses __le32 types in a few places and uses __force where the code
+> looks fishy. The previous patch should really have produced the correct
+> behavior, but this second patch is needed to shut up the warnings about
+> it. Ideally it would be slightly rewritten to not need those casts,
+> but I don't dare do that without access to the hardware for proper
+> testing.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Sorry for not seeing this earlier. Can you replace the hardcoded 
-RK3036_TIMER_PHYS and RK3288_TIMER6_7_PHYS constants with a DT
-lookup, to make it somewhat less hacky?
-
-	Arnd
+Applied to net-next.
