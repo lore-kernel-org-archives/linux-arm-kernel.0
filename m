@@ -1,31 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 12 Dec 2015 01:16:33 +0100
-Subject: [GIT PULL] Second Round of Renesas ARM64 Based SoC Defconfig
- Updates for v4.5
-In-Reply-To: <2322992.eP63TchiCV@wuerfel>
-References: <cover.1448588763.git.horms+renesas@verge.net.au>
- <2322992.eP63TchiCV@wuerfel>
-Message-ID: <1498052.osrM2UgoNc@wuerfel>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Fri, 11 Dec 2015 16:17:39 -0800
+Subject: [GIT PULL] ARM: imx: fixes for 4.4, 2nd round
+In-Reply-To: <20151211135948.GH11252@tiger> (Shawn Guo's message of "Fri, 11
+ Dec 2015 21:59:49 +0800")
+References: <20151211135948.GH11252@tiger>
+Message-ID: <7h8u50frks.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 12 December 2015 01:08:25 Arnd Bergmann wrote:
-> On Friday 27 November 2015 10:54:57 Simon Horman wrote:
-> > Please consider these second round of Renesas ARM64 based SoC defconfig
-> > updates for v4.5.
-> > 
-> > This pull request Enable Renesas sound, DMAC, I2C, EthernetAVB and GPIO for
-> > R-Car Gen3 r8a7795/salvator-x.
-> > 
-> > This pull request is based on the previous round of
-> > such requests, tagged as renesas-arm64-defconfig-for-v4.5,
-> > which I have already sent a pull-request for.
-> > 
-> > 
-> 
-> Pulled into next/dt64, thanks!
-> 
+Shawn Guo <shawnguo@kernel.org> writes:
 
-Sorry, my mistake. This is in next/config64 now.
+> The following changes since commit 897ed0ca5979f103b8de3c09bcca2ae4860eb5a5:
+>
+>   ARM: dts: vfxxx: Fix dspi[01] spi-num-chipselects. (2015-11-24 17:38:42 +0800)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.4-2
+>
+> for you to fetch changes up to 9c17190595840b4ed30e8d5f286636ceb28aae4f:
+>
+>   ARM: dts: vf610: use reset values for L2 cache latencies (2015-12-11 21:32:47 +0800)
+>
+> ----------------------------------------------------------------
+> The i.MX fixes for 4.4, 2nd round:
+> - Fix vf610 SAI clock configuration bug which is discovered by the newly
+>   added master mode support in SAI audio driver.
+> - Fix buggy L2 cache latency values in vf610 device trees, which may
+>   cause system hang when cpu runs at a higher frequency.
+>
+> ----------------------------------------------------------------
 
-	Arnd
+Applied to arm-soc/fixes.
+
+Thanks,
+
+Kevin
