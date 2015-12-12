@@ -1,26 +1,35 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 12 Dec 2015 01:08:25 +0100
-Subject: [GIT PULL] Second Round of Renesas ARM64 Based SoC Defconfig
- Updates for v4.5
-In-Reply-To: <cover.1448588763.git.horms+renesas@verge.net.au>
-References: <cover.1448588763.git.horms+renesas@verge.net.au>
-Message-ID: <2322992.eP63TchiCV@wuerfel>
+Date: Sat, 12 Dec 2015 01:12:05 +0100
+Subject: [PATCH 0/4] arm, arm64: uniphier: add a new driver,
+ device tree updates
+In-Reply-To: <1448357962-12259-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1448357962-12259-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <10682472.c84OiaBWfX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 27 November 2015 10:54:57 Simon Horman wrote:
-> Please consider these second round of Renesas ARM64 based SoC defconfig
-> updates for v4.5.
+On Tuesday 24 November 2015 18:39:18 Masahiro Yamada wrote:
 > 
-> This pull request Enable Renesas sound, DMAC, I2C, EthernetAVB and GPIO for
-> R-Car Gen3 r8a7795/salvator-x.
+> Here is another series for UniPhier SoC family:
 > 
-> This pull request is based on the previous round of
-> such requests, tagged as renesas-arm64-defconfig-for-v4.5,
-> which I have already sent a pull-request for.
+>  - 1/4: add a new driver.  The UniPhier System Bus is an external bus
+>         where on-board devices are connected to the SoC.
+>         (please check if the binding specification is OK.)
 > 
+>  - 2/4: device tree updates to use the driver added by 1/4
 > 
+>  - 3/4: trivial rename of device node names
+> 
+>  - 4/4: initial commit for ARMv8 SoC/Board device trees
+> 
+> Please apply 2/4, 3/4/, 4/4 into the same branch because 4/4 depends on 2/4 and 3/4.
+> (4/4 creates symbolic links to ARM device trees.)
 
-Pulled into next/dt64, thanks!
+I'm a bit confused how this relates to the newer version ("[PATCH v5] bus:
+uniphier-system-bus: add UniPhier System Bus driver"). The new version
+only has one patch instead of four, so I'm not sure if the patches 2, 3
+and 4 of this series still apply.
+
+Can you clarify, or send the entire series again?
 
 	Arnd
