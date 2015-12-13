@@ -1,126 +1,65 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Sat, 12 Dec 2015 20:41:55 -0500
-Subject: [PATCH 08/10] drivers/pci: make host/pcie-xilinx.c explicitly
- non-modular
-In-Reply-To: <1449970917-12633-1-git-send-email-paul.gortmaker@windriver.com>
-References: <1449970917-12633-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <1449970917-12633-9-git-send-email-paul.gortmaker@windriver.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Sun, 13 Dec 2015 03:46:07 +0200
+Subject: [PATCH v5 1/9] mfd: axp20x: Add AXP223 to list of supported PMICs
+ in DT bindings
+In-Reply-To: <1448606610-32647-2-git-send-email-wens@csie.org>
+References: <1448606610-32647-1-git-send-email-wens@csie.org>
+ <1448606610-32647-2-git-send-email-wens@csie.org>
+Message-ID: <CAHp75VcdqOen1iTf5p8uQF=6hrNiQ62Ris5ysU-Z9kySbTySeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Kconfig currently controlling compilation of this code is:
+On Fri, Nov 27, 2015 at 8:43 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+> The AXP223 is a new PMIC commonly paired with Allwinner A23/A33 SoCs.
+> It is functionally identical to AXP221; only the regulator default
+> voltage/status and the external host interface are different.
+>
 
-drivers/pci/host/Kconfig:config PCIE_XILINX
-drivers/pci/host/Kconfig:       bool "Xilinx AXI PCIe host bridge support"
+I missed cover letter, but anyway, for now the entire series looks fine for me!
+FWIW, Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
 
-...meaning that it currently is not being built as a module by anyone.
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/mfd/axp20x.txt | 7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+> index a474359dd206..fd39fa54571b 100644
+> --- a/Documentation/devicetree/bindings/mfd/axp20x.txt
+> +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+> @@ -5,11 +5,12 @@ axp152 (X-Powers)
+>  axp202 (X-Powers)
+>  axp209 (X-Powers)
+>  axp221 (X-Powers)
+> +axp223 (X-Powers)
+>
+>  Required properties:
+>  - compatible: "x-powers,axp152", "x-powers,axp202", "x-powers,axp209",
+> -             "x-powers,axp221"
+> -- reg: The I2C slave address for the AXP chip
+> +             "x-powers,axp221", "x-powers,axp223"
+> +- reg: The I2C slave address or RSB hardware address for the AXP chip
+>  - interrupt-parent: The parent interrupt controller
+>  - interrupts: SoC NMI / GPIO interrupt connected to the PMIC's IRQ pin
+>  - interrupt-controller: The PMIC has its own internal IRQs
+> @@ -51,7 +52,7 @@ LDO3          : LDO           : ldo3in-supply
+>  LDO4           : LDO           : ldo24in-supply        : shared supply
+>  LDO5           : LDO           : ldo5in-supply
+>
+> -AXP221 regulators, type, and corresponding input supply names:
+> +AXP221/AXP223 regulators, type, and corresponding input supply names:
+>
+>  Regulator        Type            Supply Name             Notes
+>  ---------        ----            -----------             -----
+> --
+> 2.6.2
+>
 
-Lets remove the modular code that is essentially orphaned, so that
-when reading the driver there is no doubt it is builtin-only.  This
-makes xilinx_pcie_free_irq_domain orphaned so we remove it too.
 
-We don't have to worry about disallowing a driver unbind, since this
-driver already does that.
 
-Since module_platform_driver() uses the same init level priority as
-builtin_platform_driver() the init ordering remains unchanged with
-this commit.
-
-We also delete the MODULE_LICENSE tag etc. since all that information
-is already contained at the top of the file in the comments.
-
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Michal Simek <michal.simek@xilinx.com>
-Cc: "S?ren Brinkmann" <soren.brinkmann@xilinx.com>
-Cc: linux-pci at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
----
- drivers/pci/host/pcie-xilinx.c | 53 ++----------------------------------------
- 1 file changed, 2 insertions(+), 51 deletions(-)
-
-diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
-index 3c7a0d580b1e..73b5e856f9c2 100644
---- a/drivers/pci/host/pcie-xilinx.c
-+++ b/drivers/pci/host/pcie-xilinx.c
-@@ -18,7 +18,7 @@
- #include <linux/irq.h>
- #include <linux/irqdomain.h>
- #include <linux/kernel.h>
--#include <linux/module.h>
-+#include <linux/init.h>
- #include <linux/msi.h>
- #include <linux/of_address.h>
- #include <linux/of_pci.h>
-@@ -516,35 +516,6 @@ static irqreturn_t xilinx_pcie_intr_handler(int irq, void *data)
- }
- 
- /**
-- * xilinx_pcie_free_irq_domain - Free IRQ domain
-- * @port: PCIe port information
-- */
--static void xilinx_pcie_free_irq_domain(struct xilinx_pcie_port *port)
--{
--	int i;
--	u32 irq, num_irqs;
--
--	/* Free IRQ Domain */
--	if (IS_ENABLED(CONFIG_PCI_MSI)) {
--
--		free_pages(port->msi_pages, 0);
--
--		num_irqs = XILINX_NUM_MSI_IRQS;
--	} else {
--		/* INTx */
--		num_irqs = 4;
--	}
--
--	for (i = 0; i < num_irqs; i++) {
--		irq = irq_find_mapping(port->irq_domain, i);
--		if (irq > 0)
--			irq_dispose_mapping(irq);
--	}
--
--	irq_domain_remove(port->irq_domain);
--}
--
--/**
-  * xilinx_pcie_init_irq_domain - Initialize IRQ domain
-  * @port: PCIe port information
-  *
-@@ -858,21 +829,6 @@ static int xilinx_pcie_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
--/**
-- * xilinx_pcie_remove - Remove function
-- * @pdev: Platform device pointer
-- *
-- * Return: '0' always
-- */
--static int xilinx_pcie_remove(struct platform_device *pdev)
--{
--	struct xilinx_pcie_port *port = platform_get_drvdata(pdev);
--
--	xilinx_pcie_free_irq_domain(port);
--
--	return 0;
--}
--
- static struct of_device_id xilinx_pcie_of_match[] = {
- 	{ .compatible = "xlnx,axi-pcie-host-1.00.a", },
- 	{}
-@@ -885,10 +841,5 @@ static struct platform_driver xilinx_pcie_driver = {
- 		.suppress_bind_attrs = true,
- 	},
- 	.probe = xilinx_pcie_probe,
--	.remove = xilinx_pcie_remove,
- };
--module_platform_driver(xilinx_pcie_driver);
--
--MODULE_AUTHOR("Xilinx Inc");
--MODULE_DESCRIPTION("Xilinx AXI PCIe driver");
--MODULE_LICENSE("GPL v2");
-+builtin_platform_driver(xilinx_pcie_driver);
 -- 
-2.6.1
+With Best Regards,
+Andy Shevchenko
