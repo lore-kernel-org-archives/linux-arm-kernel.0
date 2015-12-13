@@ -1,57 +1,42 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 13 Dec 2015 22:07:19 +0100
-Subject: [PATCH v2] spi: dts: sun4i: Add support for inter-word wait
- cycles using the SPI Wait Clock Register
-In-Reply-To: <1449873940-10167-1-git-send-email-mweseloh42@gmail.com>
-References: <1449873940-10167-1-git-send-email-mweseloh42@gmail.com>
-Message-ID: <20151213210719.GC19456@lukather>
+From: jcm@redhat.com (Jon Masters)
+Date: Sun, 13 Dec 2015 16:36:30 -0500 (EST)
+Subject: [Linaro-acpi] Touching the initrd before paging_init
+In-Reply-To: <20151213165942.GN25034@bivouac.eciton.net>
+References: <566D3090.9090509@redhat.com>
+ <20151213165942.GN25034@bivouac.eciton.net>
+Message-ID: <23071B8C-D1F9-47A6-9DB4-B26842150B76@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Just thinking from a parity point of view - if you can do it on x86, it should be doable on ARM. But that GRUB module approach I quite like! Let's get it documented prominently in the kernel doc as the alternative to updating an initrd then :)
 
-On Fri, Dec 11, 2015 at 11:45:39PM +0100, Marcus Weseloh wrote:
-> Adds support and binding documentation for a new slave device property
-> "sun4i,spi-word-wait-ns" that allows to set a hardware based delay
-> between the transmission of words using the SPI Wait Clock Register.
-> The SPI hardware needs 3 clock cycles to set up the delay, which makes
-> the minimum non-zero wait time 4 clock cycles.
-> 
-> Signed-off-by: Marcus Weseloh <mweseloh42@gmail.com>
-> ---
-> Changes from v1:
->  * renamed the property for more clarity
->  * wait time is set in nanoseconds instead of number of clock cycles
->  * transparently handle the 3 setup clock cycles
-> 
-> There is one review comment that I didn't address: Rob Herring suggested
-> that this should be in the core-binding rather than in sun4i. I checked
-> many of the hardware manuals of other SPI drivers and it looks to me like
-> this hardware based inter-word delay is a feature that not many SPI
-> controllers offer. And the SPI core currently has no way to control an
-> inter-word delay, only inter-message. So I would like to propose this again
-> as a sun4i binding, as it targets a sun4i (or sunxi?) specific hardware
-> feature.
+(In our case we would only turn this on in -debug RHEL kernels so as to keep it very clear this is never for production systems, can't trust folks not to hack things if you give them half a chance)
 
-Only a few of them justify to have this in the framework. There's a
-bunch of controllers that support such a feature, and it definitely
-belongs in the core.
-
-The point of the framework is not to be the least common denominator,
-it's about having as much code in common as possible, and it
-definitely falls into that category.
-
-Thanks,
-Maxime
+Jon.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151213/124a2070/attachment.sig>
+Computer Architect | Sent from my 64-bit #ARM Powered phone
+
+> On Dec 13, 2015, at 11:59, Leif Lindholm <leif.lindholm@linaro.org> wrote:
+> 
+>> On Sun, Dec 13, 2015 at 03:47:12AM -0500, Jon Masters wrote:
+>> I mentioned before that we'll want to see ACPI_INITRD_TABLE_OVERRIDE
+>> support on arm64 in due course for use during bringup of new systems. It
+>> is commonly used on x86 to provide handy updated ACPI tables via a
+>> prepended initrd cpio that is attached to the regular initrd image,
+>> which is infinitely better than respinning firmware each time you want
+>> to provide updated tables (yes yes, we all know the "devicetree"
+>> directive in GRUB does this with DT and that's great and wonderful). I
+>> know that someone is working on it, but I had a need for an interim
+>> solution over the weekend for some hardware I am bringing up here.
+> 
+> Why would we do this through an initrd?
+> That sounds an awful lot like the per-kernel-image dtbs that are the whole
+> thing we're trying to avoid.
+> 
+> Implementing this as a grub command (or kernel command line) for debug
+> purposes would be trivial - and I'm pretty sure Graeme/Al already did
+> this in the past.
+> 
+> /
+>    Leif
