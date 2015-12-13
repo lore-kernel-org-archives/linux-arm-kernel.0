@@ -1,55 +1,64 @@
 From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Sun, 13 Dec 2015 18:57:09 -0500
-Subject: [PATCH 0/3] cpuidle: avoid module usage in non-modular code
-Message-ID: <1450051032-32329-1-git-send-email-paul.gortmaker@windriver.com>
+Date: Sun, 13 Dec 2015 18:57:10 -0500
+Subject: [PATCH 1/3] drivers/cpuidle: make cpuidle-clps711x.c explicitly
+ non-modular
+In-Reply-To: <1450051032-32329-1-git-send-email-paul.gortmaker@windriver.com>
+References: <1450051032-32329-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <1450051032-32329-2-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series of commits is a part of a larger project to ensure
-people don't reference modular support functions in non-modular
-code.  Overall there was roughly 5k lines of dead code in the
-kernel due to this.  So far we've fixed several areas, like tty,
-x86, net, ... and we continue to work on other areas.
+The Kconfig currently controlling compilation of this code is:
 
-There are several reasons to not use module support for code that
-can never be built as a module, but the big ones are:
+drivers/cpuidle/Kconfig.arm:config ARM_CLPS711X_CPUIDLE
+drivers/cpuidle/Kconfig.arm:    bool "CPU Idle Driver for CLPS711X processors"
 
- (1) it is easy to accidentally code up unused module_exit and remove code
- (2) it can be misleading when reading the source, thinking it can be
-      modular when the Makefile and/or Kconfig prohibit it
- (3) it requires the include of the module.h header file which in turn
-     includes nearly everything else.
+...meaning that it currently is not being built as a module by anyone.
 
-Fortunately for cpuidle, the changes are largely trivial and change
-zero runtime.  All the changes here just remap the modular functions
-onto the non-modular ones that they would be remapped onto anyway.
+Lets remove the modular code that is essentially orphaned, so that
+when reading the driver there is no doubt it is builtin-only.
 
-Changes are against linux-next and compile tested on ARM allmodconfig.
-I've Cc'd ARM list because all of these are used on ARM, but I'm
-thinking these probably can go in via the PM tree.
+Since module_platform_driver() uses the same init level priority as
+builtin_platform_driver() the init ordering remains unchanged with
+this commit.
 
-Paul.
----
+Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
 
-Cc: Alexander Shiyan <shc_work@mail.ru>
-Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Cc: Kukjin Kim <kgene@kernel.org>
+We also delete the MODULE_LICENSE tag etc. since all that information
+is already contained at the top of the file in the comments.
+
 Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Cc: linux-arm-kernel at lists.infradead.org
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Alexander Shiyan <shc_work@mail.ru>
 Cc: linux-pm at vger.kernel.org
-Cc: linux-samsung-soc at vger.kernel.org
-
-Paul Gortmaker (3):
-  drivers/cpuidle: make cpuidle-clps711x.c explicitly non-modular
-  drivers/cpuidle: make cpuidle-ux500.c explicitly non-modular
-  drivers/cpuidle: make cpuidle-exynos.c explicitly non-modular
-
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+---
  drivers/cpuidle/cpuidle-clps711x.c | 8 ++------
- drivers/cpuidle/cpuidle-exynos.c   | 5 ++---
- drivers/cpuidle/cpuidle-ux500.c    | 5 ++---
- 3 files changed, 6 insertions(+), 12 deletions(-)
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
+diff --git a/drivers/cpuidle/cpuidle-clps711x.c b/drivers/cpuidle/cpuidle-clps711x.c
+index 18a7f7380508..66a9f231ec41 100644
+--- a/drivers/cpuidle/cpuidle-clps711x.c
++++ b/drivers/cpuidle/cpuidle-clps711x.c
+@@ -12,7 +12,7 @@
+ #include <linux/cpuidle.h>
+ #include <linux/err.h>
+ #include <linux/io.h>
+-#include <linux/module.h>
++#include <linux/init.h>
+ #include <linux/platform_device.h>
+ 
+ #define CLPS711X_CPUIDLE_NAME	"clps711x-cpuidle"
+@@ -56,8 +56,4 @@ static struct platform_driver clps711x_cpuidle_driver = {
+ 		.name	= CLPS711X_CPUIDLE_NAME,
+ 	},
+ };
+-module_platform_driver_probe(clps711x_cpuidle_driver, clps711x_cpuidle_probe);
+-
+-MODULE_AUTHOR("Alexander Shiyan <shc_work@mail.ru>");
+-MODULE_DESCRIPTION("CLPS711X CPU idle driver");
+-MODULE_LICENSE("GPL");
++builtin_platform_driver_probe(clps711x_cpuidle_driver, clps711x_cpuidle_probe);
 -- 
 2.6.1
