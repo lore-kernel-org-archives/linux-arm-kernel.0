@@ -1,25 +1,85 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sun, 13 Dec 2015 01:47 +0100
-Subject: [PATCH v2 4/4] arm64: dts: rockchip: Add the needed timer for
- RK3368 SoC
-In-Reply-To: <1443147298-12603-5-git-send-email-wxt@rock-chips.com>
-References: <1443147298-12603-1-git-send-email-wxt@rock-chips.com>
- <1443147298-12603-5-git-send-email-wxt@rock-chips.com>
-Message-ID: <1937886.TSnbmHXrLV@diego>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Sat, 12 Dec 2015 20:41:48 -0500
+Subject: [PATCH 01/10] drivers/pci: make host/pci-imx6.c driver explicitly
+ non-modular
+In-Reply-To: <1449970917-12633-1-git-send-email-paul.gortmaker@windriver.com>
+References: <1449970917-12633-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <1449970917-12633-2-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 25. September 2015, 10:14:58 schrieb Caesar Wang:
-> There is a need of a broadcast timer in this case to ensure proper
-> wakeup when the cpus are in sleep mode and a timer expires.
-> 
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+The Kconfig for this option is currently:
 
-applied this patch to my dts64 branch for 4.5 .
+config PCI_IMX6
+        bool "Freescale i.MX6 PCIe controller"
 
-The Kconfig option will probably need to wait for 4.6 though, due to the 
-clocksource change going through Daniel's tree. Or I'll try to submit that 
-post 4.5-rc1 as "fix" ... we'll see.
+...meaning that it currently is not being built as a module by anyone.
+Lets remove the couple traces of modularity, so that when reading the
+driver there is no doubt it is builtin-only.
 
+Since module_init translates to device_initcall in the non-modular
+case, the init ordering remains unchanged with this commit.  An
+alternate init level might be worth considering at a later date.
 
-Heiko
+We explicitly disallow a driver unbind, since that doesn't have a
+sensible use case anyway, and there wasn't a supplied ".remove"
+function to be called either.
+
+We also delete the MODULE_LICENSE tag etc. since all that information
+is already contained at the top of the file in the comments.
+
+Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
+
+Cc: Richard Zhu <Richard.Zhu@freescale.com>
+Cc: Lucas Stach <l.stach@pengutronix.de>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: linux-pci at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+---
+ drivers/pci/host/pci-imx6.c | 12 ++++--------
+ 1 file changed, 4 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+index 22e8224126fd..ddd6a752b554 100644
+--- a/drivers/pci/host/pci-imx6.c
++++ b/drivers/pci/host/pci-imx6.c
+@@ -17,7 +17,7 @@
+ #include <linux/kernel.h>
+ #include <linux/mfd/syscon.h>
+ #include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
+-#include <linux/module.h>
++#include <linux/init.h>
+ #include <linux/of_gpio.h>
+ #include <linux/pci.h>
+ #include <linux/platform_device.h>
+@@ -641,24 +641,20 @@ static const struct of_device_id imx6_pcie_of_match[] = {
+ 	{ .compatible = "fsl,imx6q-pcie", },
+ 	{},
+ };
+-MODULE_DEVICE_TABLE(of, imx6_pcie_of_match);
+ 
+ static struct platform_driver imx6_pcie_driver = {
+ 	.driver = {
+ 		.name	= "imx6q-pcie",
+ 		.of_match_table = imx6_pcie_of_match,
++		.suppress_bind_attrs = true,
+ 	},
+ 	.shutdown = imx6_pcie_shutdown,
+ };
+ 
+-/* Freescale PCIe driver does not allow module unload */
++/* Freescale PCIe driver does not support module configuration */
+ 
+ static int __init imx6_pcie_init(void)
+ {
+ 	return platform_driver_probe(&imx6_pcie_driver, imx6_pcie_probe);
+ }
+-module_init(imx6_pcie_init);
+-
+-MODULE_AUTHOR("Sean Cross <xobs@kosagi.com>");
+-MODULE_DESCRIPTION("Freescale i.MX6 PCIe host controller driver");
+-MODULE_LICENSE("GPL v2");
++device_initcall(imx6_pcie_init);
+-- 
+2.6.1
