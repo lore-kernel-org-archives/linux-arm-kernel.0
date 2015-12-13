@@ -1,108 +1,55 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Sat, 12 Dec 2015 23:00:31 -0800
-Subject: [PATCH v1 04/10] serial: mps2-uart: add MPS2 UART driver
-In-Reply-To: <CAHp75Vd98TEQ7TiD==t=RgYOqSinWgnyRjg7V=oPXmEx0nedLQ@mail.gmail.com>
-References: <1449048790-25859-1-git-send-email-vladimir.murzin@arm.com>
- <1449048790-25859-5-git-send-email-vladimir.murzin@arm.com>
- <CAHp75Vd98TEQ7TiD==t=RgYOqSinWgnyRjg7V=oPXmEx0nedLQ@mail.gmail.com>
-Message-ID: <20151213070031.GA12373@kroah.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Sun, 13 Dec 2015 03:47:12 -0500
+Subject: Touching the initrd before paging_init
+Message-ID: <566D3090.9090509@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 13, 2015 at 01:39:26AM +0200, Andy Shevchenko wrote:
-> On Wed, Dec 2, 2015 at 11:33 AM, Vladimir Murzin
-> <vladimir.murzin@arm.com> wrote:
-> > This driver adds support to the UART controller found on ARM MPS2
-> > platform.
-> 
-> Just few comments (have neither time not big desire to do full review).
-> 
-> >
-> > Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> > ---
-> >  drivers/tty/serial/Kconfig       |   12 +
-> >  drivers/tty/serial/Makefile      |    1 +
-> >  drivers/tty/serial/mps2-uart.c   |  596 ++++++++++++++++++++++++++++++++++++++
-> >  include/uapi/linux/serial_core.h |    3 +
-> >  4 files changed, 612 insertions(+)
-> >  create mode 100644 drivers/tty/serial/mps2-uart.c
-> >
-> > diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-> > index f38beb2..e98bfea 100644
-> > --- a/drivers/tty/serial/Kconfig
-> > +++ b/drivers/tty/serial/Kconfig
-> > @@ -1473,6 +1473,18 @@ config SERIAL_EFM32_UART
-> >           This driver support the USART and UART ports on
-> >           Energy Micro's efm32 SoCs.
-> >
-> > +config SERIAL_MPS2_UART_CONSOLE
-> > +       bool "MPS2 UART console support"
-> > +       depends on SERIAL_MPS2_UART
-> > +       select SERIAL_CORE_CONSOLE
-> > +
-> > +config SERIAL_MPS2_UART
-> > +       bool "MPS2 UART port"
-> > +       depends on ARM || COMPILE_TEST
-> > +       select SERIAL_CORE
-> > +       help
-> > +         This driver support the UART ports on ARM MPS2.
-> > +
-> >  config SERIAL_EFM32_UART_CONSOLE
-> >         bool "EFM32 UART/USART console support"
-> >         depends on SERIAL_EFM32_UART=y
-> > diff --git a/drivers/tty/serial/Makefile b/drivers/tty/serial/Makefile
-> > index 5ab4111..7f589f5 100644
-> > --- a/drivers/tty/serial/Makefile
-> > +++ b/drivers/tty/serial/Makefile
-> > @@ -93,6 +93,7 @@ obj-$(CONFIG_SERIAL_CONEXANT_DIGICOLOR)       += digicolor-usart.o
-> >  obj-$(CONFIG_SERIAL_MEN_Z135)  += men_z135_uart.o
-> >  obj-$(CONFIG_SERIAL_SPRD) += sprd_serial.o
-> >  obj-$(CONFIG_SERIAL_STM32)     += stm32-usart.o
-> > +obj-$(CONFIG_SERIAL_MPS2_UART) += mps2-uart.o
-> >
-> >  # GPIOLIB helpers for modem control lines
-> >  obj-$(CONFIG_SERIAL_MCTRL_GPIO)        += serial_mctrl_gpio.o
-> > diff --git a/drivers/tty/serial/mps2-uart.c b/drivers/tty/serial/mps2-uart.c
-> > new file mode 100644
-> > index 0000000..09bac16
-> > --- /dev/null
-> > +++ b/drivers/tty/serial/mps2-uart.c
-> > @@ -0,0 +1,596 @@
-> > +/*
-> > + * Copyright (C) 2015 ARM Limited
-> > + *
-> > + * Author: Vladimir Murzin <vladimir.murzin@arm.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + * TODO: support for SysRq
-> > + */
-> > +
-> > +#define pr_fmt(fmt)    KBUILD_MODNAME ": " fmt
-> > +
-> > +#include <linux/bitops.h>
-> > +#include <linux/clk.h>
-> > +#include <linux/console.h>
-> > +#include <linux/io.h>
-> > +#include <linux/kernel.h>
-> > +#include <linux/module.h>
-> > +#include <linux/of_device.h>
-> > +#include <linux/of.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/serial_core.h>
-> > +#include <linux/tty_flip.h>
-> > +#include <linux/types.h>
-> > +
-> > +#define SERIAL_NAME "ttyMPS"
-> 
-> Can it be ttyS?
+Hi Folks,
 
-It must be ttyS, please fix this.  Don't go creating new tty device
-names, it never will work out and will eventually come back to cause
-problems if you do not.
+Just a few notes that might be useful to someone else.
 
-thanks,
+I mentioned before that we'll want to see ACPI_INITRD_TABLE_OVERRIDE
+support on arm64 in due course for use during bringup of new systems. It
+is commonly used on x86 to provide handy updated ACPI tables via a
+prepended initrd cpio that is attached to the regular initrd image,
+which is infinitely better than respinning firmware each time you want
+to provide updated tables (yes yes, we all know the "devicetree"
+directive in GRUB does this with DT and that's great and wonderful). I
+know that someone is working on it, but I had a need for an interim
+solution over the weekend for some hardware I am bringing up here.
 
-greg k-h
+The problem is that there's no mapping for the pages containing the
+ramdisk data prior to paging_init. x86 does a bit of hoop jumping (and I
+think they have certain assumptions about linear mapping too) and splits
+the initrd setup into a couple of different phases, which we may well
+need to do also if we want to be able to call something like:
+
+#if defined(CONFIG_ACPI) && defined(CONFIG_BLK_DEV_INITRD)
+        acpi_initrd_override((void *)initrd_start, initrd_end -
+initrd_start);
+#endif
+
+prior to acpi_boot_table_init in arch/arm64/kernel/setup.c. That routine
+will correctly map memory for data it copies out of the cpio, but it
+assumes that the initrd is already mapped. For the very nasty hack I
+want over the weekend, I added some extra fixmaps and then do an
+early_memremap on the physical address of first page of the initrd (the
+cpio is tiny, and is always prepended and this is very nasty). Viz:
+
+[    0.000000] JCM: using fixmap for first page of ramdisk...
+[    0.000000] JCM: first physical page of ramdisk: [mem REDACTED]
+[    0.000000] JCM: first virtual page of ramdisk: [mem REDACTED]
+[    0.000000] XXXX ACPI table found in initrd
+[kernel/firmware/acpi/xxxx.aml][0xxxx]
+[    0.000000] XXXX ACPI table found in initrd
+[kernel/firmware/acpi/xxxx.aml][0xxx]
+[    0.000000] XXXX ACPI table found in initrd
+[kernel/firmware/acpi/xxxx.aml][0xxxx]
+
+So maybe I'll get what I want working, but a head's up to whoever from
+Linaro ends up looking into the broader implementation that I think
+you'll need to rework initrd mapping as part of that. Unless of course
+I'm missing something. Which is more than possible.
+
+Jon.
