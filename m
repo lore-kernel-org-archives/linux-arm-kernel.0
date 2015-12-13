@@ -1,44 +1,96 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Sun, 13 Dec 2015 17:19:02 -0500
-Subject: [Linaro-acpi] Touching the initrd before paging_init
-In-Reply-To: <CAGCh1+nb-H-B28crGuTPUKXZrBN_XDn7fNHf4q8LZZOgyhtDmQ@mail.gmail.com>
-References: <566D3090.9090509@redhat.com>	<20151213165942.GN25034@bivouac.eciton.net>	<23071B8C-D1F9-47A6-9DB4-B26842150B76@redhat.com>	<566DEB04.2030806@redhat.com>
- <CAGCh1+nb-H-B28crGuTPUKXZrBN_XDn7fNHf4q8LZZOgyhtDmQ@mail.gmail.com>
-Message-ID: <566DEED6.3010704@redhat.com>
+From: mweseloh42@gmail.com (Marcus Weseloh)
+Date: Mon, 14 Dec 2015 00:04:11 +0100
+Subject: [PATCH v3] spi: dts: sun4i: Add support for hardware-based wait time
+ between words
+In-Reply-To: <1449873940-10167-1-git-send-email-mweseloh42@gmail.com>
+References: <1449873940-10167-1-git-send-email-mweseloh42@gmail.com>
+Message-ID: <1450047853-9005-1-git-send-email-mweseloh42@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/13/2015 05:15 PM, G Gregory wrote:
-> On 13 December 2015 at 22:02, Jon Masters <jcm@redhat.com> wrote:
->> On 12/13/2015 04:36 PM, Jon Masters wrote:
->>
->>> Just thinking from a parity point of view - if you can do it on x86, it should be
->>> doable on ARM. But that GRUB module approach I quite like!
->>
->> Sorry for top post earlier. Was on my phone. In any case, it looks like
->> the "acpi" command in GRUB currently does an all-or-nothing replace of
->> all of the tables, not just a named table. We need to be able to
->> override e.g. just an DSDT or SSDT with a replacement test one.
->>
-> I think thats just clumsily worded documentation. The code certainly
-> looks like you can replace them individually.
+Adds a new property "spi-word-wait-ns" to the spi-bus binding that allows
+SPI slave devices to set a hardware based wait time between the
+transmission of words. Also modifies the sun4i SPI master driver to make
+use of the new property. This specific SPI controller needs 3 clock
+cycles to set up the delay, which makes the minimum non-zero wait time
+on this hardware 4 clock cycles.
 
-Yea, it does. It's unfortunate that the code is more "obvious" than the
-docs, but hardly the first time ;)
+Signed-off-by: Marcus Weseloh <mweseloh42@gmail.com>
+---
+Changes from v1:
+ * renamed the property for more clarity
+ * wait time is set in nanoseconds instead of number of clock cycles
+ * transparently handle the 3 setup clock cycles
 
-> I think its trying to say in the case RSDP,XSDT,RSDT are in ROM it
-> will create new ones to point to the new tables you've just imported.
+Changes from v2:
+ * fixed typo in comment
+ * moved parameter to spi-bus binding, dropping the vendor prefix
+ * changed commit summary and description to reflect the changes
+---
+ Documentation/devicetree/bindings/spi/spi-bus.txt |  2 ++
+ drivers/spi/spi-sun4i.c                           | 23 +++++++++++++++++++++++
+ 2 files changed, 25 insertions(+)
 
-Yea. I think it actually ends up creating new tables in any case, then
-copies over the bits that change. It'll actually need to do that anyway
-because it'll want to update the pointers to new tables. I'll try it.
-But I also want to see the initrd approach working in the not too
-distant future - everything someone can do on an x86 system should
-translate 1:1 in terms of experience. It'll help with bringup of newer
-platforms such as the one I have that needs some NUMA related tweaks.
-
-> I had planned to try it this week anyway.
-
-Great :)
-
-Jon.
+diff --git a/Documentation/devicetree/bindings/spi/spi-bus.txt b/Documentation/devicetree/bindings/spi/spi-bus.txt
+index bbaa857..2d6034f 100644
+--- a/Documentation/devicetree/bindings/spi/spi-bus.txt
++++ b/Documentation/devicetree/bindings/spi/spi-bus.txt
+@@ -61,6 +61,8 @@ contain the following properties.
+                       used for MOSI. Defaults to 1 if not present.
+ - spi-rx-bus-width - (optional) The bus width(number of data wires) that
+                       used for MISO. Defaults to 1 if not present.
++- spi-word-wait-ns - (optional) Hardware based delay between transmission of
++                      words in nanoseconds
+ 
+ Some SPI controllers and devices support Dual and Quad SPI transfer mode.
+ It allows data in the SPI system to be transferred in 2 wires(DUAL) or 4 wires(QUAD).
+diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
+index f60a6d6..73995a1 100644
+--- a/drivers/spi/spi-sun4i.c
++++ b/drivers/spi/spi-sun4i.c
+@@ -19,6 +19,7 @@
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
++#include <linux/of.h>
+ 
+ #include <linux/spi/spi.h>
+ 
+@@ -173,6 +174,9 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
+ 	unsigned int tx_len = 0;
+ 	int ret = 0;
+ 	u32 reg;
++	u32 wait_ns = 0;
++	int wait_clk = 0;
++	int clk_ns = 0;
+ 
+ 	/* We don't support transfer larger than the FIFO */
+ 	if (tfr->len > SUN4I_FIFO_DEPTH)
+@@ -261,6 +265,25 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
+ 
+ 	sun4i_spi_write(sspi, SUN4I_CLK_CTL_REG, reg);
+ 
++	/* Setup wait time between words */
++	of_property_read_u32(spi->dev.of_node, "spi-word-wait-ns",
++			     &wait_ns);
++	if (wait_ns) {
++		/* The wait time is set in SPI_CLK cycles. The SPI hardware
++		 * needs 3 additional cycles to setup the wait counter, so
++		 * the minimum delay time is 4 cycles.
++		 */
++		clk_ns = DIV_ROUND_UP(1000000000, tfr->speed_hz);
++		wait_clk = DIV_ROUND_UP(wait_ns, clk_ns) - 3;
++		if (wait_clk < 1) {
++			wait_clk = 1;
++			dev_info(&spi->dev,
++				 "using minimum of 4 word wait cycles (%uns)",
++				 4 * clk_ns);
++		}
++	}
++	sun4i_spi_write(sspi, SUN4I_WAIT_REG, (u16)wait_clk);
++
+ 	/* Setup the transfer now... */
+ 	if (sspi->tx_buf)
+ 		tx_len = tfr->len;
+-- 
+1.9.1
