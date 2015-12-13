@@ -1,85 +1,84 @@
 From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Sat, 12 Dec 2015 20:41:48 -0500
-Subject: [PATCH 01/10] drivers/pci: make host/pci-imx6.c driver explicitly
+Date: Sat, 12 Dec 2015 20:41:50 -0500
+Subject: [PATCH 03/10] drivers/pci: make host/pci-mvebu.c explicitly
  non-modular
 In-Reply-To: <1449970917-12633-1-git-send-email-paul.gortmaker@windriver.com>
 References: <1449970917-12633-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <1449970917-12633-2-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <1449970917-12633-4-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Kconfig for this option is currently:
+The Kconfig currently controlling compilation of this code is:
 
-config PCI_IMX6
-        bool "Freescale i.MX6 PCIe controller"
+drivers/pci/host/Kconfig:config PCI_MVEBU
+drivers/pci/host/Kconfig:       bool "Marvell EBU PCIe controller"
 
 ...meaning that it currently is not being built as a module by anyone.
-Lets remove the couple traces of modularity, so that when reading the
-driver there is no doubt it is builtin-only.
 
-Since module_init translates to device_initcall in the non-modular
-case, the init ordering remains unchanged with this commit.  An
-alternate init level might be worth considering at a later date.
+Lets remove the modular code that is essentially orphaned, so that
+when reading the driver there is no doubt it is builtin-only.
 
-We explicitly disallow a driver unbind, since that doesn't have a
-sensible use case anyway, and there wasn't a supplied ".remove"
-function to be called either.
+Since module_platform_driver() uses the same init level priority as
+builtin_platform_driver() the init ordering remains unchanged with
+this commit.
 
-We also delete the MODULE_LICENSE tag etc. since all that information
-is already contained at the top of the file in the comments.
+We don't have to disallow a driver unbind, since that is already
+done for us in this driver.
 
 Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
 
-Cc: Richard Zhu <Richard.Zhu@freescale.com>
-Cc: Lucas Stach <l.stach@pengutronix.de>
+We also delete the MODULE_LICENSE tag etc. since all that information
+was (or is now ) contained at the top of the file in the comments.
+
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
 Cc: linux-pci at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 ---
- drivers/pci/host/pci-imx6.c | 12 ++++--------
- 1 file changed, 4 insertions(+), 8 deletions(-)
+ drivers/pci/host/pci-mvebu.c | 11 ++++-------
+ 1 file changed, 4 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-index 22e8224126fd..ddd6a752b554 100644
---- a/drivers/pci/host/pci-imx6.c
-+++ b/drivers/pci/host/pci-imx6.c
-@@ -17,7 +17,7 @@
- #include <linux/kernel.h>
- #include <linux/mfd/syscon.h>
- #include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index 53b79c5f0559..17222f1a3ef3 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -1,6 +1,8 @@
+ /*
+  * PCIe driver for Marvell Armada 370 and Armada XP SoCs
+  *
++ * Module Author: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
++ *
+  * This file is licensed under the terms of the GNU General Public
+  * License version 2.  This program is licensed "as is" without any
+  * warranty of any kind, whether express or implied.
+@@ -11,7 +13,7 @@
+ #include <linux/clk.h>
+ #include <linux/delay.h>
+ #include <linux/gpio.h>
 -#include <linux/module.h>
 +#include <linux/init.h>
- #include <linux/of_gpio.h>
- #include <linux/pci.h>
- #include <linux/platform_device.h>
-@@ -641,24 +641,20 @@ static const struct of_device_id imx6_pcie_of_match[] = {
- 	{ .compatible = "fsl,imx6q-pcie", },
+ #include <linux/mbus.h>
+ #include <linux/msi.h>
+ #include <linux/slab.h>
+@@ -1296,7 +1298,6 @@ static const struct of_device_id mvebu_pcie_of_match_table[] = {
+ 	{ .compatible = "marvell,kirkwood-pcie", },
  	{},
  };
--MODULE_DEVICE_TABLE(of, imx6_pcie_of_match);
+-MODULE_DEVICE_TABLE(of, mvebu_pcie_of_match_table);
  
- static struct platform_driver imx6_pcie_driver = {
- 	.driver = {
- 		.name	= "imx6q-pcie",
- 		.of_match_table = imx6_pcie_of_match,
-+		.suppress_bind_attrs = true,
+ static struct dev_pm_ops mvebu_pcie_pm_ops = {
+ 	.suspend_noirq = mvebu_pcie_suspend,
+@@ -1313,8 +1314,4 @@ static struct platform_driver mvebu_pcie_driver = {
  	},
- 	.shutdown = imx6_pcie_shutdown,
+ 	.probe = mvebu_pcie_probe,
  };
- 
--/* Freescale PCIe driver does not allow module unload */
-+/* Freescale PCIe driver does not support module configuration */
- 
- static int __init imx6_pcie_init(void)
- {
- 	return platform_driver_probe(&imx6_pcie_driver, imx6_pcie_probe);
- }
--module_init(imx6_pcie_init);
+-module_platform_driver(mvebu_pcie_driver);
 -
--MODULE_AUTHOR("Sean Cross <xobs@kosagi.com>");
--MODULE_DESCRIPTION("Freescale i.MX6 PCIe host controller driver");
+-MODULE_AUTHOR("Thomas Petazzoni <thomas.petazzoni@free-electrons.com>");
+-MODULE_DESCRIPTION("Marvell EBU PCIe driver");
 -MODULE_LICENSE("GPL v2");
-+device_initcall(imx6_pcie_init);
++builtin_platform_driver(mvebu_pcie_driver);
 -- 
 2.6.1
