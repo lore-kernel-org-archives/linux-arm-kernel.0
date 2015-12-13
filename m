@@ -1,60 +1,30 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 13 Dec 2015 11:33:29 +0100
-Subject: [PATCH 03/10] drivers/pci: make host/pci-mvebu.c explicitly
- non-modular
-In-Reply-To: <1449970917-12633-4-git-send-email-paul.gortmaker@windriver.com>
-References: <1449970917-12633-1-git-send-email-paul.gortmaker@windriver.com>
- <1449970917-12633-4-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <20151213113329.3b1a303f@free-electrons.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Sun, 13 Dec 2015 09:34:20 -0600
+Subject: [PATCH] tty: amba-pl011: add support for 32-bit register access
+ for earlycon
+In-Reply-To: <20151213060643.GA30667@kroah.com>
+References: <1446855503-25881-1-git-send-email-timur@codeaurora.org>
+ <20151213060643.GA30667@kroah.com>
+Message-ID: <566D8FFC.7080704@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul,
+Greg Kroah-Hartman wrote:
+>> >
+>> >Example:
+>> >
+>> >	earlycon=pl011,mmio32,0x3ced1000
+>> >
+>> >Signed-off-by: Timur Tabi<timur@codeaurora.org>
+>> >---
+>> >
+>> >This patch applies on top of Russell's 12-part amba-pl011.c patchset.
+> Which I didn't apply, so can you resend this after he resends his?
 
-On Sat, 12 Dec 2015 20:41:50 -0500, Paul Gortmaker wrote:
-> The Kconfig currently controlling compilation of this code is:
-> 
-> drivers/pci/host/Kconfig:config PCI_MVEBU
-> drivers/pci/host/Kconfig:       bool "Marvell EBU PCIe controller"
-> 
-> ...meaning that it currently is not being built as a module by anyone.
-> 
-> Lets remove the modular code that is essentially orphaned, so that
-> when reading the driver there is no doubt it is builtin-only.
-> 
-> Since module_platform_driver() uses the same init level priority as
-> builtin_platform_driver() the init ordering remains unchanged with
-> this commit.
-> 
-> We don't have to disallow a driver unbind, since that is already
-> done for us in this driver.
-> 
-> Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
-> 
-> We also delete the MODULE_LICENSE tag etc. since all that information
-> was (or is now ) contained at the top of the file in the comments.
-> 
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: linux-pci at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-> ---
->  drivers/pci/host/pci-mvebu.c | 11 ++++-------
->  1 file changed, 4 insertions(+), 7 deletions(-)
+Yes, I will resend all of my pl011-releated patches after Russell's 
+patches are reworked and accepted.
 
-I think the general direction should rather be to change the PCI
-subsystem to make it possible for those drivers to be built as modules.
-However, since this is quite certainly a much larger effort, there is
-no reason to not clean things up as they are today, so:
-
-Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-
-Thanks,
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, hosted by The Linux Foundation.
