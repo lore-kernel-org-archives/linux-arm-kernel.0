@@ -1,26 +1,61 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 14 Dec 2015 09:30:31 +0800
-Subject: [PATCH 4/5] cpufreq: imx6q: Use id_table to distinguish between
- SoCs
-In-Reply-To: <1446019154-16384-5-git-send-email-s.hauer@pengutronix.de>
-References: <1446019154-16384-1-git-send-email-s.hauer@pengutronix.de>
- <1446019154-16384-5-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20151214013031.GN11252@tiger>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sun, 13 Dec 2015 23:52:25 +0200
+Subject: [PATCH 4/5] iommu/io-pgtable: Make io_pgtable_ops_to_pgtable()
+ macro common
+In-Reply-To: <ef5954ba727840a020b62b0135a1ce9f4a10fb2c.1449246988.git.robin.murphy@arm.com>
+References: <cover.1449246988.git.robin.murphy@arm.com>
+ <ef5954ba727840a020b62b0135a1ce9f4a10fb2c.1449246988.git.robin.murphy@arm.com>
+Message-ID: <2226267.jznMrI8GVh@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 28, 2015 at 08:59:13AM +0100, Sascha Hauer wrote:
-> The i.MX6 cpufreq driver is instantiated from a static device in
-> architecture code and not from the device tree. These devices offer the
-> id_table mechanism to distinguish between different types of devices.
-> Use this mechanism rather than of_machine_is_compatible() as it scales
-> better with increasing number of SoCs to check against.
+Hi Robin,
+
+Thank you for the patch.
+
+On Friday 04 December 2015 17:53:01 Robin Murphy wrote:
+> There is no need to keep a useful accessor for a public structure hidden
+> away in a private implementation. Move it out alongside the structure
+> definition so that other implementations may reuse it.
 > 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
-Acked-by: Shawn Guo <shawnguo@kernel.org>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-Sorry for my oversight on that Sascha was asking my ACK on this patch in
-the cover letter.  Only noticed that with Lucas' ping.
+> ---
+>  drivers/iommu/io-pgtable-arm.c | 3 ---
+>  drivers/iommu/io-pgtable.h     | 2 ++
+>  2 files changed, 2 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+> index 9088d27..1619681 100644
+> --- a/drivers/iommu/io-pgtable-arm.c
+> +++ b/drivers/iommu/io-pgtable-arm.c
+> @@ -38,9 +38,6 @@
+>  #define io_pgtable_to_data(x)						\
+>  	container_of((x), struct arm_lpae_io_pgtable, iop)
+> 
+> -#define io_pgtable_ops_to_pgtable(x)					\
+> -	container_of((x), struct io_pgtable, ops)
+> -
+>  #define io_pgtable_ops_to_data(x)					\
+>  	io_pgtable_to_data(io_pgtable_ops_to_pgtable(x))
+> 
+> diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
+> index 2e18469..36673c8 100644
+> --- a/drivers/iommu/io-pgtable.h
+> +++ b/drivers/iommu/io-pgtable.h
+> @@ -131,6 +131,8 @@ struct io_pgtable {
+>  	struct io_pgtable_ops	ops;
+>  };
+> 
+> +#define io_pgtable_ops_to_pgtable(x) container_of((x), struct io_pgtable,
+> ops) +
+>  /**
+>   * struct io_pgtable_init_fns - Alloc/free a set of page tables for a
+>   *                              particular format.
 
-Shawn
+-- 
+Regards,
+
+Laurent Pinchart
