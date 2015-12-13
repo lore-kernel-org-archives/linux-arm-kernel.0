@@ -1,84 +1,100 @@
 From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Sat, 12 Dec 2015 20:41:50 -0500
-Subject: [PATCH 03/10] drivers/pci: make host/pci-mvebu.c explicitly
- non-modular
-In-Reply-To: <1449970917-12633-1-git-send-email-paul.gortmaker@windriver.com>
-References: <1449970917-12633-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <1449970917-12633-4-git-send-email-paul.gortmaker@windriver.com>
+Date: Sat, 12 Dec 2015 20:41:47 -0500
+Subject: [PATCH 00/10] drivers/pci: avoid module_init in non-modular host/pci*
+Message-ID: <1449970917-12633-1-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Kconfig currently controlling compilation of this code is:
+This series of commits is a slice of a larger project to ensure
+people don't have dead code for module removal in non-modular
+drivers.  Overall there was roughly 5k lines of dead code in the
+kernel due to this.  So far we've fixed several areas, like tty,
+x86, net, etc. and we continue to work on other areas.
 
-drivers/pci/host/Kconfig:config PCI_MVEBU
-drivers/pci/host/Kconfig:       bool "Marvell EBU PCIe controller"
+There are several reasons to not use module_init for code that can
+never be built as a module, but the big ones are:
 
-...meaning that it currently is not being built as a module by anyone.
+ (1) it is easy to accidentally code up unused module_exit and remove code
+ (2) it can be misleading when reading the source, thinking it can be
+      modular when the Makefile and/or Kconfig prohibit it
+ (3) it requires the include of the module.h header file which in turn
+     includes nearly everything else.
 
-Lets remove the modular code that is essentially orphaned, so that
-when reading the driver there is no doubt it is builtin-only.
+Here we convert some module_init() calls into device_initcall() and delete
+any module_exit and remove code that gets orphaned in the process, for
+an overall net code reduction, which is always welcome.
 
-Since module_platform_driver() uses the same init level priority as
-builtin_platform_driver() the init ordering remains unchanged with
-this commit.
+The use of device_initcall ensures that the init function ordering
+remains unchanged, but one could argue that PCI host code might be more
+appropriate to be handled under subsys_initcall.  Fortunately we can
+revisit making this extra change at a later date if desired; it does
+not need to happen now, and we reduce the risk of introducing
+regressions at this point in time by separating the two changes.
 
-We don't have to disallow a driver unbind, since that is already
-done for us in this driver.
+Over half of the drivers changed here already explicitly disallowed any
+unbind operations.  For the rest we make them the same, since there is
+not really any sensible use case to unbind any built-in bus support that
+I can think of.
 
-Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
+I have more "avoid module usage in non-modular code" cleanups for the
+PCI subsystem, but these all have a common theme and it makes for a
+more maintainer friendly series size to just ask to digest these 1st.
 
-We also delete the MODULE_LICENSE tag etc. since all that information
-was (or is now ) contained at the top of the file in the comments.
+Testing was done on linux-next, using an ARCH=arm allmodconfig and then
+explicitly building the files changed in this series.  If desired, I
+can provide a v4.4-rc4 based branch for merging vs e-mail processing,
+since I don't think the underlying baseline is overly important for
+this (largely trivial) series of patches.
 
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: linux-pci at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+Paul.
 ---
- drivers/pci/host/pci-mvebu.c | 11 ++++-------
- 1 file changed, 4 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 53b79c5f0559..17222f1a3ef3 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -1,6 +1,8 @@
- /*
-  * PCIe driver for Marvell Armada 370 and Armada XP SoCs
-  *
-+ * Module Author: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+ *
-  * This file is licensed under the terms of the GNU General Public
-  * License version 2.  This program is licensed "as is" without any
-  * warranty of any kind, whether express or implied.
-@@ -11,7 +13,7 @@
- #include <linux/clk.h>
- #include <linux/delay.h>
- #include <linux/gpio.h>
--#include <linux/module.h>
-+#include <linux/init.h>
- #include <linux/mbus.h>
- #include <linux/msi.h>
- #include <linux/slab.h>
-@@ -1296,7 +1298,6 @@ static const struct of_device_id mvebu_pcie_of_match_table[] = {
- 	{ .compatible = "marvell,kirkwood-pcie", },
- 	{},
- };
--MODULE_DEVICE_TABLE(of, mvebu_pcie_of_match_table);
- 
- static struct dev_pm_ops mvebu_pcie_pm_ops = {
- 	.suspend_noirq = mvebu_pcie_suspend,
-@@ -1313,8 +1314,4 @@ static struct platform_driver mvebu_pcie_driver = {
- 	},
- 	.probe = mvebu_pcie_probe,
- };
--module_platform_driver(mvebu_pcie_driver);
--
--MODULE_AUTHOR("Thomas Petazzoni <thomas.petazzoni@free-electrons.com>");
--MODULE_DESCRIPTION("Marvell EBU PCIe driver");
--MODULE_LICENSE("GPL v2");
-+builtin_platform_driver(mvebu_pcie_driver);
+Cc: Alexandre Courbot <gnurou@gmail.com>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Kishon Vijay Abraham I <kishon@ti.com>
+Cc: Ley Foon Tan <lftan@altera.com>
+Cc: Lucas Stach <l.stach@pengutronix.de>
+Cc: Michal Simek <michal.simek@xilinx.com>
+Cc: Murali Karicheri <m-karicheri2@ti.com>
+Cc: Pratyush Anand <pratyush.anand@gmail.com>
+Cc: Richard Zhu <Richard.Zhu@freescale.com>
+Cc: Simon Horman <horms@verge.net.au>
+Cc: "S?ren Brinkmann" <soren.brinkmann@xilinx.com>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Thierry Reding <thierry.reding@gmail.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-omap at vger.kernel.org
+Cc: linux-pci at vger.kernel.org
+Cc: linux-sh at vger.kernel.org
+Cc: linux-tegra at vger.kernel.org
+Cc: rfi at lists.rocketboards.org
+
+Paul Gortmaker (10):
+  drivers/pci: make host/pci-imx6.c driver explicitly non-modular
+  drivers/pci: make host/pcie-spear13xx.c driver explicitly non-modular
+  drivers/pci: make host/pci-mvebu.c explicitly non-modular
+  drivers/pci: make host/pci-dra7xx.c explicitly non-modular
+  drivers/pci: make host/pci-rcar-gen2.c explicitly non-modular
+  drivers/pci: make host/pci-tegra.c explicitly non-modular
+  drivers/pci: make host/pcie-rcar.c explicitly non-modular
+  drivers/pci: make host/pcie-xilinx.c explicitly non-modular
+  drivers/pci: make host/pci-keystone.c explicitly non-modular
+  drivers/pci: make host/pcie-altera.c explicitly non-modular
+
+ drivers/pci/host/pci-dra7xx.c     | 31 +++--------------------
+ drivers/pci/host/pci-imx6.c       | 12 +++------
+ drivers/pci/host/pci-keystone.c   | 21 +++-------------
+ drivers/pci/host/pci-mvebu.c      | 11 +++-----
+ drivers/pci/host/pci-rcar-gen2.c  | 12 +++------
+ drivers/pci/host/pci-tegra.c      | 11 +++-----
+ drivers/pci/host/pcie-altera.c    | 12 ++++-----
+ drivers/pci/host/pcie-rcar.c      | 11 +++-----
+ drivers/pci/host/pcie-spear13xx.c | 10 +++-----
+ drivers/pci/host/pcie-xilinx.c    | 53 ++-------------------------------------
+ 10 files changed, 35 insertions(+), 149 deletions(-)
+
 -- 
 2.6.1
