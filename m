@@ -1,49 +1,53 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 14 Dec 2015 09:36:28 +0800
-Subject: [PATCH V2 1/2] devicetree: bindings: Add vendor prefix for Kosagi
-In-Reply-To: <1448722024-5717-1-git-send-email-marex@denx.de>
-References: <1448722024-5717-1-git-send-email-marex@denx.de>
-Message-ID: <20151214013628.GO11252@tiger>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sun, 13 Dec 2015 20:56:01 +0200
+Subject: [PATCH/RFC 07/19] ARM: shmobile: r8a7793: add m2 clock to device
+ tree
+In-Reply-To: <1449802376-11301-8-git-send-email-horms+renesas@verge.net.au>
+References: <1449802376-11301-1-git-send-email-horms+renesas@verge.net.au>
+ <1449802376-11301-8-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <2156854.cD7k6gAu9Y@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 28, 2015 at 03:47:03PM +0100, Marek Vasut wrote:
-> From: Sean Cross <xobs@kosagi.com>
+Hi Simon,
+
+Thank you for the patch.
+
+On Friday 11 December 2015 11:52:44 Simon Horman wrote:
+> Declare m2 clock in r8a7793 device tree.
 > 
-> Add a vendor prefix for Sutajio Ko-Usagi PTE Ltd., which goes by the
-> more common name of Kosagi.
+> Based on similar work for the r8a7791 by Laurent Pinchart.
 > 
-> Signed-off-by: Sean Cross <xobs@kosagi.com>
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Rob Herring <robh@kernel.org>
+> Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Hi Rob,
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-Are you okay with this patch?
-
-Shawn
-
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Fabio Estevam <fabio.estevam@freescale.com>
 > ---
->  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->  1 file changed, 1 insertion(+)
+>  arch/arm/boot/dts/r8a7793.dtsi | 8 ++++++++
+>  1 file changed, 8 insertions(+)
 > 
-> V2: Add my SoB line.
-> 
-> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index 62ff22f..d3ee06e 100644
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -124,6 +124,7 @@ jedec	JEDEC Solid State Technology Association
->  karo	Ka-Ro electronics GmbH
->  keymile	Keymile GmbH
->  kinetic Kinetic Technologies
-> +kosagi	Sutajio Ko-Usagi PTE Ltd.
->  lacie	LaCie
->  lantiq	Lantiq Semiconductor
->  lenovo	Lenovo Group Ltd.
-> -- 
-> 2.1.4
-> 
-> 
+> diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
+> index 7179c3cba20a..99ee88e0e8be 100644
+> --- a/arch/arm/boot/dts/r8a7793.dtsi
+> +++ b/arch/arm/boot/dts/r8a7793.dtsi
+> @@ -809,6 +809,14 @@
+>  			clock-mult = <1>;
+>  			clock-output-names = "p";
+>  		};
+> +		m2_clk: m2_clk {
+> +			compatible = "fixed-factor-clock";
+> +			clocks = <&cpg_clocks R8A7793_CLK_PLL1>;
+> +			#clock-cells = <0>;
+> +			clock-div = <8>;
+> +			clock-mult = <1>;
+> +			clock-output-names = "m2";
+> +		};
+>  		rclk_clk: rclk_clk {
+>  			compatible = "fixed-factor-clock";
+>  			clocks = <&cpg_clocks R8A7793_CLK_PLL1>;
+
+-- 
+Regards,
+
+Laurent Pinchart
