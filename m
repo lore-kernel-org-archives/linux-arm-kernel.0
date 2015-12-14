@@ -1,68 +1,54 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 14 Dec 2015 22:47:41 +0200
-Subject: [PATCH V03 4/5] dmaengine: edma: Add support for DMA filter mapping
- to slave devices
-In-Reply-To: <1450126062-8063-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1450126062-8063-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1450126062-8063-5-git-send-email-peter.ujfalusi@ti.com>
+From: dcashman@android.com (Daniel Cashman)
+Date: Mon, 14 Dec 2015 12:51:51 -0800
+Subject: [PATCH v6 4/4] x86: mm: support ARCH_MMAP_RND_BITS.
+In-Reply-To: <566F1154.7030703@zytor.com>
+References: <1449856338-30984-1-git-send-email-dcashman@android.com>
+ <1449856338-30984-2-git-send-email-dcashman@android.com>
+ <1449856338-30984-3-git-send-email-dcashman@android.com>
+ <1449856338-30984-4-git-send-email-dcashman@android.com>
+ <1449856338-30984-5-git-send-email-dcashman@android.com>
+ <566F1154.7030703@zytor.com>
+Message-ID: <566F2BE7.4090904@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for providing device to filter_fn mapping so client drivers
-can switch to use the dma_request_chan() API.
+On 12/14/2015 10:58 AM, H. Peter Anvin wrote:
+> On 12/11/15 09:52, Daniel Cashman wrote:
+>> diff --git a/arch/x86/mm/mmap.c b/arch/x86/mm/mmap.c
+>> index 844b06d..647fecf 100644
+>> --- a/arch/x86/mm/mmap.c
+>> +++ b/arch/x86/mm/mmap.c
+>> @@ -69,14 +69,14 @@ unsigned long arch_mmap_rnd(void)
+>>  {
+>>  	unsigned long rnd;
+>>  
+>> -	/*
+>> -	 *  8 bits of randomness in 32bit mmaps, 20 address space bits
+>> -	 * 28 bits of randomness in 64bit mmaps, 40 address space bits
+>> -	 */
+>>  	if (mmap_is_ia32())
+>> -		rnd = (unsigned long)get_random_int() % (1<<8);
+>> +#ifdef CONFIG_COMPAT
+>> +		rnd = (unsigned long)get_random_int() % (1 << mmap_rnd_compat_bits);
+>> +#else
+>> +		rnd = (unsigned long)get_random_int() % (1 << mmap_rnd_bits);
+>> +#endif
+>>  	else
+>> -		rnd = (unsigned long)get_random_int() % (1<<28);
+>> +		rnd = (unsigned long)get_random_int() % (1 << mmap_rnd_bits);
+>>  
+>>  	return rnd << PAGE_SHIFT;
+>>  }
+>>
+> 
+> Now, you and I know that both variants can be implemented with a simple
+> AND, but I have a strong suspicion that once this is turned into a
+> variable, this will in fact be changed from an AND to a divide.
+> 
+> So I'd prefer to use the
+> "get_random_int() & ((1UL << mmap_rnd_bits) - 1)" construct instead.
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/dma/edma.c                 | 4 ++++
- include/linux/platform_data/edma.h | 7 +++++++
- 2 files changed, 11 insertions(+)
+Good point.  Will change in v7 across patch-set.
 
-diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index 16fe773fb846..2e8acde6b134 100644
---- a/drivers/dma/edma.c
-+++ b/drivers/dma/edma.c
-@@ -2314,6 +2314,10 @@ static int edma_probe(struct platform_device *pdev)
- 		edma_set_chmap(&ecc->slave_chans[i], ecc->dummy_slot);
- 	}
- 
-+	ecc->dma_slave.filter.map = info->slave_map;
-+	ecc->dma_slave.filter.mapcnt = info->slavecnt;
-+	ecc->dma_slave.filter.fn = edma_filter_fn;
-+
- 	ret = dma_async_device_register(&ecc->dma_slave);
- 	if (ret) {
- 		dev_err(dev, "slave ddev registration failed (%d)\n", ret);
-diff --git a/include/linux/platform_data/edma.h b/include/linux/platform_data/edma.h
-index 4299f4ba03bd..0a533f94438f 100644
---- a/include/linux/platform_data/edma.h
-+++ b/include/linux/platform_data/edma.h
-@@ -53,12 +53,16 @@ enum dma_event_q {
- #define EDMA_CTLR(i)			((i) >> 16)
- #define EDMA_CHAN_SLOT(i)		((i) & 0xffff)
- 
-+#define EDMA_FILTER_PARAM(ctlr, chan)	((int[]) { EDMA_CTLR_CHAN(ctlr, chan) })
-+
- struct edma_rsv_info {
- 
- 	const s16	(*rsv_chans)[2];
- 	const s16	(*rsv_slots)[2];
- };
- 
-+struct dma_slave_map;
-+
- /* platform_data for EDMA driver */
- struct edma_soc_info {
- 	/*
-@@ -76,6 +80,9 @@ struct edma_soc_info {
- 
- 	s8	(*queue_priority_mapping)[2];
- 	const s16	(*xbar_chans)[2];
-+
-+	const struct dma_slave_map *slave_map;
-+	int slavecnt;
- };
- 
- #endif
--- 
-2.6.4
+Thank You,
+Dan
