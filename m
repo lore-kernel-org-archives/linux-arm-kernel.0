@@ -1,29 +1,42 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 14 Dec 2015 16:12:18 -0500 (EST)
-Subject: [PATCH net] stmmac: dwmac-sunxi: Call exit cleanup function in
- probe error path
-In-Reply-To: <1449828229-10720-1-git-send-email-wens@csie.org>
-References: <1449828229-10720-1-git-send-email-wens@csie.org>
-Message-ID: <20151214.161218.2057176608170714361.davem@davemloft.net>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 14 Dec 2015 22:17:55 +0100
+Subject: [PATCH 0/3] cpuidle: avoid module usage in non-modular code
+In-Reply-To: <1450051032-32329-1-git-send-email-paul.gortmaker@windriver.com>
+References: <1450051032-32329-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <566F3203.5010009@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chen-Yu Tsai <wens@csie.org>
-Date: Fri, 11 Dec 2015 18:03:49 +0800
+On 12/14/2015 12:57 AM, Paul Gortmaker wrote:
+> This series of commits is a part of a larger project to ensure
+> people don't reference modular support functions in non-modular
+> code.  Overall there was roughly 5k lines of dead code in the
+> kernel due to this.  So far we've fixed several areas, like tty,
+> x86, net, ... and we continue to work on other areas.
+>
+> There are several reasons to not use module support for code that
+> can never be built as a module, but the big ones are:
+>
+>   (1) it is easy to accidentally code up unused module_exit and remove code
+>   (2) it can be misleading when reading the source, thinking it can be
+>        modular when the Makefile and/or Kconfig prohibit it
+>   (3) it requires the include of the module.h header file which in turn
+>       includes nearly everything else.
+>
+> Fortunately for cpuidle, the changes are largely trivial and change
+> zero runtime.  All the changes here just remap the modular functions
+> onto the non-modular ones that they would be remapped onto anyway.
+>
+> Changes are against linux-next and compile tested on ARM allmodconfig.
+> I've Cc'd ARM list because all of these are used on ARM, but I'm
+> thinking these probably can go in via the PM tree.
 
-> dwmac-sunxi has 2 callbacks that were called from stmmac_platform as
-> part of the probe and remove sequences.
-> 
-> Ater the conversion of dwmac-sunxi into a standalone platform driver,
-> the .init function is called before calling into the stmmac driver
-> core, but .exit is not called to clean up if stmmac returns an error.
-> 
-> This patch fixes the probe error path. This properly cleans up and
-> releases resources when the driver core fails to probe.
-> 
-> Cc: Joachim Eastwood <manabian@gmail.com>
-> Fixes: 9a9e9a1edee8 ("stmmac: dwmac-sunxi: turn setup callback into a
-> 		      probe function")
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Applied, thanks.
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
