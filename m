@@ -1,64 +1,77 @@
 From: ranjit.waghmode@xilinx.com (Ranjit Waghmode)
-Date: Mon, 14 Dec 2015 18:39:41 +0530
-Subject: [LINUX RFC v3 0/4] spi: add dual parallel mode support in Zynq MPSoC
- GQSPI controller
-Message-ID: <1450098585-3129-1-git-send-email-ranjit.waghmode@xilinx.com>
+Date: Mon, 14 Dec 2015 18:39:42 +0530
+Subject: [LINUX RFC v3 1/4] spi: addng support for data stripe feature in core
+In-Reply-To: <1450098585-3129-1-git-send-email-ranjit.waghmode@xilinx.com>
+References: <1450098585-3129-1-git-send-email-ranjit.waghmode@xilinx.com>
+Message-ID: <1450098585-3129-2-git-send-email-ranjit.waghmode@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds dual parallel mode support for Zynq Ultrascale+
-MPSoC GQSPI controller driver.
+This patch enables data stripe feature in spi core. This feature is
+required to support dual parallel mode of ZynqMP GQSPI controller.
 
-What is dual parallel mode?
----------------------------
-ZynqMP GQSPI controller supports Dual Parallel mode with following functionalities:
-1) Supporting two SPI flash memories operating in parallel. 8 I/O lines.
-2) Chip selects and clock are shared to both the flash devices
-3) This mode is targeted for faster read/write speed and also doubles the size
-4) Commands/data can be transmitted/received from both the devices(mirror),
-   or only upper or only lower flash memory devices.
-5) Data arrangement:
-   With stripe enabled,
-	Even bytes i.e. 0, 2, 4,... are transmitted on Lower Data Bus
-	Odd bytes i.e. 1, 3, 5,.. are transmitted on Upper Data Bus.
+To achieve the same an API SPI_MASTER_DATA_STRIPE is added.
+With data stripe enabled,
+  - even bytes i.e. 0, 2, 4,... are transmitted on lower data bus
+  - odd bytes i.e. 1, 3, 5,.. are transmitted on upper data bus.
 
-This series also updated MTD layer files for adding parallel mode support.
+To support data stripe; need to  assert both chip selects once.
+This is achieved throught API SPI_MASTER_BOTH_CS.
 
-1) Added Support for two flashes
-2) Support to enable/disable data stripe as and when required.
-3) Added required parameters to spi_nor structure. Initialized all
-   added parameters in spi_nor_scan()
-4) Added support for dual parallel in spi_nor_read/write/erase functions by:
-   a) Increasing page_size, sector_size, erase_size and toatal flash size
-      as and when required.
-   b) Dividing address by 2
-   c) Updating spi->master->flags for qspi driver to change CS
-5) Updated read_sr() to get status of both flashes
-6) Also updated read_fsr() to get status of both flashes
-These all are very high level changes and expected to make an idea clear.
+Signed-off-by: Ranjit Waghmode <ranjit.waghmode@xilinx.com>
 
 ---
 V3 Changes:
-   - Changed couple of comments to remove ambiguity in understanding
-
+	- Updated comments for newly added APIs.
+	- Changed patch description for ease of understanding
 V2 Changes:
-a) Splitted patches based on logical changes
-b) Added error handling for newly added APIs in SPI core
+	- Added error handling condition for newly added features
 ---
 
-Ranjit Waghmode (4):
-  spi: addng support for data stripe feature in core
-  mtd: add spi_device instance to spi_nor struct
-  mtd: spi-nor: add dual parallel mode support
-  spi: zynqmp: gqspi: add support for dual parallel mode configuration
+ drivers/spi/spi.c       |  8 ++++++++
+ include/linux/spi/spi.h | 11 +++++++++++
+ 2 files changed, 19 insertions(+)
 
- drivers/mtd/devices/m25p80.c   |  1 +
- drivers/mtd/spi-nor/spi-nor.c  | 89 ++++++++++++++++++++++++++++++++++--------
- drivers/spi/spi-zynqmp-gqspi.c | 24 +++++++++++-
- drivers/spi/spi.c              |  8 ++++
- include/linux/mtd/spi-nor.h    |  3 ++
- include/linux/spi/spi.h        | 11 ++++++
- 6 files changed, 119 insertions(+), 17 deletions(-)
+diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
+index 2b0a8ec..930dac3 100644
+--- a/drivers/spi/spi.c
++++ b/drivers/spi/spi.c
+@@ -2106,6 +2106,14 @@ static int __spi_validate(struct spi_device *spi, struct spi_message *message)
+ 	if (list_empty(&message->transfers))
+ 		return -EINVAL;
 
++	/*
++	 * Data stripe option is selected if and only if when
++	 * two chips are enabled
++	 */
++	if ((master->flags & SPI_MASTER_DATA_STRIPE)
++		&& !(master->flags & SPI_MASTER_BOTH_CS))
++			return -EINVAL;
++
+ 	/* Half-duplex links include original MicroWire, and ones with
+ 	 * only one data pin like SPI_3WIRE (switches direction) or where
+ 	 * either MOSI or MISO is missing.  They can also be caused by
+diff --git a/include/linux/spi/spi.h b/include/linux/spi/spi.h
+index cce80e6..e83b667 100644
+--- a/include/linux/spi/spi.h
++++ b/include/linux/spi/spi.h
+@@ -424,6 +424,17 @@ struct spi_master {
+ #define SPI_MASTER_NO_TX	BIT(2)		/* can't do buffer write */
+ #define SPI_MASTER_MUST_RX      BIT(3)		/* requires rx */
+ #define SPI_MASTER_MUST_TX      BIT(4)		/* requires tx */
++	/* Controller may support data stripe feature when more than one
++	 * chips are present.
++	 * Setting data stripe will send data in following manner:
++	 * -> even bytes i.e. 0, 2, 4,... are transmitted on lower data bus
++	 * -> odd bytes i.e. 1, 3, 5,.. are transmitted on upper data bus
++	 */
++#define SPI_MASTER_DATA_STRIPE	BIT(7)		/* support data stripe */
++	/* Controller may support asserting more than one chip select at once.
++	 * This flag will enable that feature.
++	 */
++#define SPI_MASTER_BOTH_CS	BIT(8)		/* assert both chip selects */
+
+ 	/* lock and mutex for SPI bus locking */
+ 	spinlock_t		bus_lock_spinlock;
 --
 2.1.2
