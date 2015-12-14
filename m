@@ -1,140 +1,90 @@
-From: yang.shi@linaro.org (Shi, Yang)
-Date: Mon, 14 Dec 2015 10:00:39 -0800
-Subject: [PATCH v12 04/16] arm64: kvm: allows kvm cpu hotplug
-In-Reply-To: <566A84AF.202@linaro.org>
-References: <cover.1448403503.git.geoff@infradead.org>
- <23ca498d5e28017549c6076812d60b18e86fa20e.1448403503.git.geoff@infradead.org>
- <CAJ5Y-eYHqQCf=ZQzXb=D_P7VscM=vNc3YpYLJs+UtZLFswiaeQ@mail.gmail.com>
- <56604A6E.60102@arm.com> <5669C802.7030103@linaro.org>
- <566A84AF.202@linaro.org>
-Message-ID: <566F03C7.6070600@linaro.org>
+From: drivshin.allworx@gmail.com (David Rivshin (Allworx))
+Date: Mon, 14 Dec 2015 13:04:46 -0500
+Subject: [PATCH] drivers: net: cpsw: fix RMII/RGMII mode when used with
+ fixed-link PHY
+In-Reply-To: <6416396.ZOturxhSar@localhost>
+References: <20151209223115.6c5a400f.drivshin.allworx@gmail.com>
+ <6416396.ZOturxhSar@localhost>
+Message-ID: <20151214130446.1e14fbb8.drivshin.allworx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/11/2015 12:09 AM, AKASHI Takahiro wrote:
-> Yang,
->
-> On 12/11/2015 03:44 AM, Shi, Yang wrote:
->> On 12/3/2015 5:58 AM, Marc Zyngier wrote:
->>> On 02/12/15 22:40, Ashwin Chaugule wrote:
->>>> Hello,
->>>>
->>>> On 24 November 2015 at 17:25, Geoff Levand <geoff@infradead.org> wrote:
->>>>> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
->>>>>
->>>>> The current kvm implementation on arm64 does cpu-specific
->>>>> initialization
->>>>> at system boot, and has no way to gracefully shutdown a core in
->>>>> terms of
->>>>> kvm. This prevents, especially, kexec from rebooting the system on
->>>>> a boot
->>>>> core in EL2.
->>>>>
->>>>> This patch adds a cpu tear-down function and also puts an existing
->>>>> cpu-init
->>>>> code into a separate function, kvm_arch_hardware_disable() and
->>>>> kvm_arch_hardware_enable() respectively.
->>>>> We don't need arm64-specific cpu hotplug hook any more.
->>>>>
->>>>> Since this patch modifies common part of code between arm and
->>>>> arm64, one
->>>>> stub definition, __cpu_reset_hyp_mode(), is added on arm side to avoid
->>>>> compiling errors.
->>>>>
->>>>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
->>>>> ---
->>>>>   arch/arm/include/asm/kvm_host.h   | 10 ++++-
->>>>>   arch/arm/include/asm/kvm_mmu.h    |  1 +
->>>>>   arch/arm/kvm/arm.c                | 79
->>>>> ++++++++++++++++++---------------------
->>>>>   arch/arm/kvm/mmu.c                |  5 +++
->>>>>   arch/arm64/include/asm/kvm_host.h | 16 +++++++-
->>>>>   arch/arm64/include/asm/kvm_mmu.h  |  1 +
->>>>>   arch/arm64/include/asm/virt.h     |  9 +++++
->>>>>   arch/arm64/kvm/hyp-init.S         | 33 ++++++++++++++++
->>>>>   arch/arm64/kvm/hyp.S              | 32 ++++++++++++++--
->>>>>   9 files changed, 138 insertions(+), 48 deletions(-)
->>>>
->>>> [..]
->>>>
->>>>>
->>>>>
->>>>>   static struct notifier_block hyp_init_cpu_pm_nb = {
->>>>> @@ -1108,11 +1119,6 @@ static int init_hyp_mode(void)
->>>>>          }
->>>>>
->>>>>          /*
->>>>> -        * Execute the init code on each CPU.
->>>>> -        */
->>>>> -       on_each_cpu(cpu_init_hyp_mode, NULL, 1);
->>>>> -
->>>>> -       /*
->>>>>           * Init HYP view of VGIC
->>>>>           */
->>>>>          err = kvm_vgic_hyp_init();
->>>>
->>>> With this flow, the cpu_init_hyp_mode() is called only at VM guest
->>>> creation, but vgic_hyp_init() is called at bootup. On a system with
->>>> GICv3, it looks like we end up with bogus values from the ICH_VTR_EL2
->>>> (to get the number of LRs), because we're not reading it from EL2
->>>> anymore.
->>>
->>> Indeed, this is completely broken (I just reproduced the issue on a
->>> model). I wish this kind of details had been checked earlier, but thanks
->>> for pointing it out.
->>
->> Sorry for chiming in late. I did run into something similar when I
->> tested some earlier version patches with Akashi San.
->>
->> The guest bootup just hangs with 4.1 kernel on my LS2085 board which
->> has GICv3. Not sure if this is the same issue. But,
->> my bisect did point to this patch.
->
-> Can you please try my fixup! patch to determine whether it is the same
-> issue or not?
+On Sat, 12 Dec 2015 16:44:19 +0100
+Markus Brunner <systemprogrammierung.brunner@gmail.com> wrote:
 
-I wish I could help this time, however, unfortunately, my LS2085 board 
-had some hardware failure so I lost the access to it. Once I get a 
-replacement or have it fixed, I will have a try.
+> On Wednesday 09 December 2015 22:31:15 David Rivshin wrote:
+> ...
+> > This patch was originally developed in parallel with 1f71e8c96fc6 to
+> > accomplish the same goal. When I replaced this patch with
+> > 1f71e8c96fc6, I found that it did not work on my hardware (which
+> > uses RGMII), so I am submitting this patch now as a bugfix. 
+> 
+> Your patch works fine on my board, which uses MII and dual_emac with
+> a fixed_phy and a real one. 
 
-Regards,
-Yang
+Thanks for checking. The only dual_emac board I have available is the 
+EVMSK, which has two real PHYs. I'm not sure of the usual etiquette 
+(and Google was  unhelpful), should I add a Tested-by on the next 
+version?
 
->
-> Thanks
-> -Takahiro AKASHI
->
->
->> I used to think it is my kernel's problem (4.1 sounds a little bit
->> old) since Akashi San can't reproduce this on his
->> Hikey board.
->>
->> Thanks,
->> Yang
->>
->>>
->>>> Whats the best way to fix this?
->>>> - Call kvm_arch_hardware_enable() before vgic_hyp_init() and disable
->>>> later?
->>>> - Fold the VGIC init stuff back into hardware_enable()?
->>>
->>> None of that works - kvm_arch_hardware_enable() is called once per CPU,
->>> while vgic_hyp_init() can only be called once. Also,
->>> kvm_arch_hardware_enable() is called from interrupt context, and I
->>> wouldn't feel comfortable starting probing DT and allocating stuff from
->>> there.
->>>
->>>> - Read the VGIC number of LRs from the hyp stub?
->>>
->>> That's may UNDEF if called in the wrong context. Also, this defeats the
->>> point of stubs, which is just to install the vectors for the hypervisor.
->>>
->>>> - ..
->>>
->>> Yeah, quite.
->>>
->>> Geoff, Takahiro?
->>>
->>>     M.
->>>
->>
+> > Besides fixing the bug mentioned in the commit log, there are a few
+> > other differences to note:
+> >  * If both "phy_id" and a "fixed-link" subnode are present this
+> > patch will use the "phy_id" property. This should preserve current
+> > behavior with existing devicetrees that might incorrectly have
+> > both. This motivates the biggest difference in code organization
+> > from 1f71e8c96fc6.
+> >  * Some error messages have been tweaked to reflect the slightly
+> > changed meanings of the checks.
+> 
+> I wanted to keep changes small and didn't spend too much thinking
+> about already broken devicetrees. Since my patch is quite new, I
+
+I'm honestly not sure it's an important consideration myself. Most
+patches I've seen in this area for this or other drivers do not take 
+such behavior into account (e.g. the phy-handle parsing that went in 
+to cpsw in 4.3).
+I would generally feel more comfortable with such a behavior tweak
+(minor as it is) before 4.4 is released, to avoid ping-ponging the
+behavior. But given how far along the cycle is, I'm not sure about 
+the chances of that.
+
+> don't see any problems with subtle changes like that. However you
+> should update the documentation as well. 
+
+Your patch already updated .../bindings/net/cpsw.txt, which this
+patch left alone. Are you referring to some other documentation, 
+or do you think I should update the binding documentation to state
+that phy_id takes precedence over fixed-link? I figured that such
+devicetrees were still officially malformed, so I thought the 
+existing text was appropriate.
+
+> >  * of_node_get() is called on slave_node before passing the result
+> > to of_phy_find_device(). This increments the reference count, which
+> > I believe is correct for this situation, but I'm not certain of
+> > that.
+> I think you are right. At least most other drivers calling
+> of_phy_register_fixed_link(), call of_node_get afterwards. I can't
+> remember where I got my "inspiration" for the patch. I made it almost
+> a year ago and now 3 other guys tinker with the same feature? What a
+> coincidence ;-)
+
+Perhaps not a complete coincidence. I first wrote this patch a few 
+months ago against 4.1. While I had always intended on submitting when 
+time allowed, testing your patch gave me an extra push.
+
+[...]
+
+> > --- a/drivers/net/ethernet/ti/cpsw.c
+> > +++ b/drivers/net/ethernet/ti/cpsw.c
+> > @@ -26,6 +26,7 @@
+> >  #include <linux/netdevice.h>
+> >  #include <linux/net_tstamp.h>
+> >  #include <linux/phy.h>
+> > +#include <linux/phy_fixed.h>
+> 
+> The prototypes for of_*_fixed_link are in linux/of_mdio.h, which is
+> already included.
+
+You are correct; I forget why I had originally included that. I will 
+remove it for v2.
