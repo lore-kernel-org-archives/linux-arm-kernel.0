@@ -1,81 +1,68 @@
-From: songjun.wu@atmel.com (Songjun Wu)
-Date: Mon, 14 Dec 2015 16:15:40 +0800
-Subject: [PATCH 2/2] ASoC: atmel-pdmic: DT binding for PDMIC driver
-In-Reply-To: <1450080940-4123-1-git-send-email-songjun.wu@atmel.com>
-References: <1450080940-4123-1-git-send-email-songjun.wu@atmel.com>
-Message-ID: <1450080940-4123-3-git-send-email-songjun.wu@atmel.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 14 Dec 2015 09:24:25 +0100
+Subject: [PATCH 00/10] drivers/pci: avoid module_init in non-modular
+ host/pci*
+In-Reply-To: <CAMuHMdXr=ErCO3R2LB+wBJh3JSiFkH5q3-FLSTOwdGT87fXz3A@mail.gmail.com>
+References: <1449970917-12633-1-git-send-email-paul.gortmaker@windriver.com>
+ <CAMuHMdXr=ErCO3R2LB+wBJh3JSiFkH5q3-FLSTOwdGT87fXz3A@mail.gmail.com>
+Message-ID: <20151214082425.GA3766@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DT binding documentation for this new ASoC driver.
+On Mon, Dec 14, 2015 at 09:19:30AM +0100, Geert Uytterhoeven wrote:
+> Hi Paul,
+> 
+> On Sun, Dec 13, 2015 at 2:41 AM, Paul Gortmaker
+> <paul.gortmaker@windriver.com> wrote:
+> > This series of commits is a slice of a larger project to ensure
+> > people don't have dead code for module removal in non-modular
+> > drivers.  Overall there was roughly 5k lines of dead code in the
+> > kernel due to this.  So far we've fixed several areas, like tty,
+> > x86, net, etc. and we continue to work on other areas.
+> >
+> > There are several reasons to not use module_init for code that can
+> > never be built as a module, but the big ones are:
+> >
+> >  (1) it is easy to accidentally code up unused module_exit and remove code
+> >  (2) it can be misleading when reading the source, thinking it can be
+> >       modular when the Makefile and/or Kconfig prohibit it
+> >  (3) it requires the include of the module.h header file which in turn
+> >      includes nearly everything else.
+> >
+> > Here we convert some module_init() calls into device_initcall() and delete
+> > any module_exit and remove code that gets orphaned in the process, for
+> > an overall net code reduction, which is always welcome.
+> >
+> > The use of device_initcall ensures that the init function ordering
+> > remains unchanged, but one could argue that PCI host code might be more
+> > appropriate to be handled under subsys_initcall.  Fortunately we can
+> > revisit making this extra change at a later date if desired; it does
+> > not need to happen now, and we reduce the risk of introducing
+> > regressions at this point in time by separating the two changes.
+> >
+> > Over half of the drivers changed here already explicitly disallowed any
+> > unbind operations.  For the rest we make them the same, since there is
+> > not really any sensible use case to unbind any built-in bus support that
+> > I can think of.
+> 
+> Personally, I think all of these should become tristate, so distro kernels
+> don't have to build in PCI(e) support for all SoCs. multi_v7_defconfig kernels
+> are becoming too big.
+> 
+> That does not preclude making these modules un-unloadable, though.
 
-Signed-off-by: Songjun Wu <songjun.wu@atmel.com>
----
+Most of these can't be made tristate as-is, because they use symbols
+that aren't exported. Many of those symbols can easily be exported, so
+its just a matter of getting the respective patches merged. I disagree
+with making the modules non-unloadable, though. I have a local branch
+with changes necessary to unload the host controller driver and it
+works just fine.
 
- .../devicetree/bindings/sound/atmel-pdmic.txt      |   55 ++++++++++++++++++++
- 1 file changed, 55 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/atmel-pdmic.txt
-
-diff --git a/Documentation/devicetree/bindings/sound/atmel-pdmic.txt b/Documentation/devicetree/bindings/sound/atmel-pdmic.txt
-new file mode 100644
-index 0000000..e0875f1
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/atmel-pdmic.txt
-@@ -0,0 +1,55 @@
-+* Atmel PDMIC driver under ALSA SoC architecture
-+
-+Required properties:
-+- compatible
-+	Should be "atmel,sama5d2-pdmic".
-+- reg
-+	Should contain PDMIC registers location and length.
-+- interrupts
-+	Should contain the IRQ line for the PDMIC.
-+- dmas
-+	One DMA specifiers as described in atmel-dma.txt and dma.txt files.
-+- dma-names
-+	Must be "rx".
-+- clock-names
-+	Required elements:
-+	- "pclk"	peripheral clock
-+	- "gclk"	generated clock
-+- clocks
-+	Must contain an entry for each required entry in clock-names.
-+	Please refer to clock-bindings.txt.
-+- atmel,mic-min-freq
-+	The minimal frequency that the micphone supports.
-+- atmel,mic-max-freq
-+	The maximal frequency that the micphone supports.
-+
-+Optional properties:
-+- pinctrl-names, pinctrl-0
-+	Please refer to pinctrl-bindings.txt.
-+- atmel,model
-+	The user-visible name of this sound card.
-+	The default value is "PDMIC".
-+- atmel,mic-offset
-+	The offset that should be added.
-+	The range is from -32768 to 32767.
-+	The default value is 0.
-+
-+Example:
-+	pdmic at f8018000 {
-+				compatible = "atmel,sama5d2-pdmic";
-+				reg = <0xf8018000 0x124>;
-+				interrupts = <48 IRQ_TYPE_LEVEL_HIGH 7>;
-+				dmas = <&dma0
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
-+					| AT91_XDMAC_DT_PERID(50))>;
-+				dma-names = "rx";
-+				clocks = <&pdmic_clk>, <&pdmic_gclk>;
-+				clock-names = "pclk", "gclk";
-+
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_pdmic_default>;
-+				atmel,model = "PDMIC @ sama5d2_xplained";
-+				atmel,mic-min-freq = <1000000>;
-+				atmel,mic-max-freq = <3246000>;
-+				atmel,mic-offset = <0x0>;
-+	};
--- 
-1.7.9.5
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151214/21036b5d/attachment.sig>
