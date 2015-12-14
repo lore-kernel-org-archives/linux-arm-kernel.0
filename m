@@ -1,29 +1,33 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 14 Dec 2015 14:13:40 +0900
-Subject: [PATCH 0/3] ARM: multi_v7_defconfig: Misc shmobile updates
-In-Reply-To: <3377719.UMBHRLUcv2@wuerfel>
-References: <1449830727-325-1-git-send-email-geert+renesas@glider.be>
- <3377719.UMBHRLUcv2@wuerfel>
-Message-ID: <20151214051340.GE18143@verge.net.au>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Sun, 13 Dec 2015 21:16:47 -0800
+Subject: [PATCH 6/6] staging: board: armadillo800eva: Use "arm,pl390"
+In-Reply-To: <20151214050526.GC18143@verge.net.au>
+References: <1448023017-21816-1-git-send-email-geert+renesas@glider.be>
+ <1448023017-21816-7-git-send-email-geert+renesas@glider.be>
+ <20151211162830.GA9306@kroah.com>
+ <20151214050526.GC18143@verge.net.au>
+Message-ID: <20151214051647.GA3140@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 11, 2015 at 03:42:39PM +0100, Arnd Bergmann wrote:
-> On Friday 11 December 2015 11:45:24 Geert Uytterhoeven wrote:
-> >         Hi Simon, Magnus, arm-soc,
+On Mon, Dec 14, 2015 at 02:05:26PM +0900, Simon Horman wrote:
+> On Fri, Dec 11, 2015 at 11:28:30AM -0500, Greg Kroah-Hartman wrote:
+> > On Fri, Nov 20, 2015 at 01:36:57PM +0100, Geert Uytterhoeven wrote:
+> > > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > > ---
+> > > Must be applied together with "ARM: shmobile: r8a7740 dtsi: Use
+> > > "arm,pl390" for GIC"!
+> > > 
+> > > Greg: Can you please provide your ack? Thanks!
 > > 
-> > Here are a few updates for the ARM multi_v7 defconfig.
-> > They are equivalent to the updates for shmobile_defconfig that have just
-> > been accepted by Simon.
-> > 
-> > This is against renesas-devel-20151211v2-v4.4-rc4.
-> > There's a small conflict when applying to arm-soc/for-next, so Simon's
-> > tree looks like the best way forward.
+> > Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 > 
-> Sounds good.
+> Thanks Greg,
 > 
-> The changes all look good to me,
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> I have taken the liberty of assuming that ack also applies to
+> patch 5/6 of this series, the other staging/board patch in
+> this series.
 
-Thanks, I have queued these up.
+Oops, yes, good call, thanks for doing this.
+
+greg k-h
