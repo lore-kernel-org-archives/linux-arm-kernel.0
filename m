@@ -1,42 +1,68 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 14 Dec 2015 08:49:18 +0100
-Subject: [PATCH] serial: sh-sci: Add device tree support for r8a779[23]
-In-Reply-To: <20151214062722.GH18143@verge.net.au>
-References: <1448587224-8633-1-git-send-email-horms+renesas@verge.net.au>
- <20151213065250.GA2230@kroah.com>
- <20151214062722.GH18143@verge.net.au>
-Message-ID: <CAMuHMdXjQ+N5zfJnQa97N_ob4WUtLTUgePL99e40SjT=tDGfuA@mail.gmail.com>
+From: codekipper@gmail.com (Code Kipper)
+Date: Mon, 14 Dec 2015 08:51:23 +0100
+Subject: [linux-sunxi][PATCH 1/2] ARM: dts: sun7i: Add Itead Ibox support
+In-Reply-To: <20151211105930.GM27957@lukather>
+References: <1449599344-15544-1-git-send-email-codekipper@gmail.com>
+ <20151211105930.GM27957@lukather>
+Message-ID: <CAEKpxBmopZ7+SONFSkVE72RGx=ncQHCZvv_bMJsfkWEHJBpnjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 14, 2015 at 7:27 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Sat, Dec 12, 2015 at 10:52:50PM -0800, Greg Kroah-Hartman wrote:
->> On Fri, Nov 27, 2015 at 10:20:24AM +0900, Simon Horman wrote:
->> > Simply document new compat strings.
->> > There appears to be no need for a driver updates.
->> >
->> > Also update the name of the r8a7791 to M2-W: the name changed a while back.
->> >
->> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+On 11 December 2015 at 11:59, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Tue, Dec 08, 2015 at 07:29:03PM +0100, codekipper at gmail.com wrote:
+>> From: Marcus Cooper <codekipper@gmail.com>
 >>
->> Doesn't apply to my tree :(
+>> The Itead Ibox is a multi board device based on the Allwinner A20 SoC.
+>> It contains the A20 Itead Core module and a base board for the external
+>> interfaces.
+>>
+>> The core module comes with 4GB NAND and 1GB DDR RAM.
+>>
+>> The base board to which the core board is connected provides 3 USB 2.0 Host
+>> ports, 1 USB 2.0 OTG, 1 uSD slot, 10/100 Ethernet port, HDMI, IR receiver,
+>> SPDIF and a 32-pin GPIO header. This header expands the features of core
+>> board by exposing the VGA pins, audio In/Out pins, SATA, SPI, I2C, UARTS,
+>> USB-OTG and power.
+>>
+>> As there is an A10 version of the Itead Core Module and at least one other
+>> base board to support then this patch partitions the device tree files with
+>> some consideration that these variants may be added later.
+>>
+>> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+>> ---
+>>  arch/arm/boot/dts/Makefile                     |   1 +
+>>  arch/arm/boot/dts/sun7i-a20-itead-core.dtsi    |  83 ++++++++++++++++++
+>>  arch/arm/boot/dts/sun7i-a20-itead-ibox.dts     |  98 ++++++++++++++++++++++
+>>  arch/arm/boot/dts/sunxi-itead-core-common.dtsi | 111 +++++++++++++++++++++++++
+>>  4 files changed, 293 insertions(+)
+>>  create mode 100644 arch/arm/boot/dts/sun7i-a20-itead-core.dtsi
+>>  create mode 100644 arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
+>>  create mode 100644 arch/arm/boot/dts/sunxi-itead-core-common.dtsi
 >
-> I'm a little confused.
+> So, it looks like you're doing several things in this patch:
 >
-> The tty-next branch of the tty tree seems to be v4.4-rc5.
-> And the patch seems to apply there. Please let me know what
-> I should be using as a base.
+> 1) Create a common DTSI for all itead core variants
+>    (sunxi-itead-core-common.dtsi)
+>
+> 2) Create an A20 variant of the itead core
+> 3) Add support for a board using the A20 itead core.
+>
+> Please make three different patches for this, and converting the A10
+> itead board would be a good idea too.
 
-Greg has applied the patch from Ulrich, which added support for r8a7793.
-Hence your patch adding support for r8a7792 and r8a7793 no longer applies.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Sure, I will split this into four(or five) patches and include the A10
+variant. I haven't got a A10 Itead board but I've seen that someone
+has just popped on irc asking questions about it. I will ping them to
+see if they can verify it for me.
+CK
+>
+> Thanks!
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
