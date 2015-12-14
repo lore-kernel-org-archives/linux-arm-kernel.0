@@ -1,60 +1,28 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Mon, 14 Dec 2015 21:28:55 +0100
-Subject: FW: Commit 81a43adae3b9 (locking/mutex: Use acquire/release
- semantics) causing failures on arm64 (ThunderX)
-In-Reply-To: <20151211223540.GA22277@linux.vnet.ibm.com>
-References: <CA+=Sn1miWYhH5ddMmLGYWknzcw3d1k4S6QyK9O_ofdJKJDQxmg@mail.gmail.com>
- <CA+=Sn1n6e9pLDRVWT1EzDEn2XWwoK-Ep__-R6VVPzhbMvCEdNg@mail.gmail.com>
- <20151211084133.GE6356@twins.programming.kicks-ass.net>
- <20151211120419.GD18828@arm.com>
- <20151211121319.GK6356@twins.programming.kicks-ass.net>
- <20151211121759.GE18828@arm.com>
- <20151211122647.GM6356@twins.programming.kicks-ass.net>
- <20151211133313.GG18828@arm.com>
- <20151211134803.GP6356@twins.programming.kicks-ass.net>
- <20151211223540.GA22277@linux.vnet.ibm.com>
-Message-ID: <20151214202855.GX6357@twins.programming.kicks-ass.net>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Mon, 14 Dec 2015 22:34:04 +0200
+Subject: [PATCH 0/2] arm: omap2: AM43xx: enable ARM TWD timer
+Message-ID: <1450125246-17249-1-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 11, 2015 at 02:35:40PM -0800, Paul E. McKenney wrote:
-> On Fri, Dec 11, 2015 at 02:48:03PM +0100, Peter Zijlstra wrote:
-> > On Fri, Dec 11, 2015 at 01:33:14PM +0000, Will Deacon wrote:
-> > > On Fri, Dec 11, 2015 at 01:26:47PM +0100, Peter Zijlstra wrote:
-> > 
-> > > > While we're there, the acquire in osq_wait_next() seems somewhat ill
-> > > > documented too.
-> > > > 
-> > > > I _think_ we need ACQUIRE semantics there because we want to strictly
-> > > > order the lock-unqueue A,B,C steps and we get that with:
-> > > > 
-> > > >  A: SC
-> > > >  B: ACQ
-> > > >  C: Relaxed
-> > > > 
-> > > > Similarly for unlock we want the WRITE_ONCE to happen after
-> > > > osq_wait_next, but in that case we can even rely on the control
-> > > > dependency there.
-> > > 
-> > > Even for the lock-unqueue case, isn't B->C ordered by a control dependency
-> > > because C consists only of stores?
-> > 
-> > Hmm, indeed. So we could go fully relaxed on it I suppose, since the
-> > same is true for the unlock site.
-> 
-> I am probably missing quite a bit on this thread, but don't x86 MMIO
-> accesses to frame buffers need to interact with something more heavyweight
-> than an x86 release store or acquire load in order to remain confined
-> to the resulting critical section?
+Now ARM TWD timer can be enabled for AM437x devices since all prerequisite
+patches have been merged already [1] [2].
 
-So on x86 there really isn't a problem because every atomic op (and
-there's plenty here) will be a full barrier.
+But before finally enable ARM TWD timer for UP AM437x devices - 
+the Broadcast event source and infrustructure need to be enabled properly.
+Otherwise CPUIdle will be broken.
 
-That is, even if you were to replace everything with _relaxed() ops, it
-would still work as 'expected' on x86.
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-August/363989.html
+[2] http://www.spinics.net/lists/linux-omap/msg123940.html
+Felipe Balbi (1):
+  arm: omap2: AM43xx: select ARM TWD timer
 
-ppc/arm64 will crash and burn, but that's another story.
+Grygorii Strashko (1):
+  ARM: OMAP: am43xx: enable GENERIC_CLOCKEVENTS_BROADCAST
 
-But the important point here was that osq_wait_next() is never relied
-upon to provide either the ACQUIRE semantics for osq_lock() not the
-RELEASE semantics for osq_unlock(). Those are provided by other ops.
+ arch/arm/mach-omap2/Kconfig | 2 ++
+ arch/arm/mach-omap2/timer.c | 6 ++++++
+ 2 files changed, 8 insertions(+)
+
+-- 
+2.6.4
