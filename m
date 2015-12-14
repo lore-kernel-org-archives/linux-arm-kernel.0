@@ -1,51 +1,192 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 14 Dec 2015 09:42:57 +0000
-Subject: [PATCH 2/4] nvmem: qfprom: Specify LE device endianness
+Date: Mon, 14 Dec 2015 09:43:39 +0000
+Subject: [PATCH 4/4] nvmem: rockchip: trivial: Make the driver more readability
 In-Reply-To: <1450086024-18297-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1450086024-18297-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1450086177-18799-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1450086219-18886-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Boyd <sboyd@codeaurora.org>
+From: Caesar Wang <wxt@rock-chips.com>
 
-The qfprom is a little endian device, but so far we've been
-relying on the regmap mmio bus handling this for us without
-explicitly stating that fact. After commit 4a98da2164cf
-(regmap-mmio: Use native endianness for read/write, 2015-10-29),
-the regmap mmio bus will read/write with the __raw_*() IO
-accessors, instead of using the readl/writel() APIs that do
-proper byte swapping for little endian devices.
+1) Make the include file to sort from order
+2) clean up the driver to make more readability
 
-So if we're running on a big endian processor and haven't
-specified the endianness explicitly in the regmap config or in
-DT, we're going to switch from doing little endian byte swapping
-to big endian accesses without byte swapping, leading to some
-confusing results. Specify the endianness explicitly so that the
-regmap core properly byte swaps the accesses for us.
+Let's clean up such trivial details.
 
-Cc: Rajendra Nayak <rnayak@codeaurora.org>
-Cc: Kevin Hilman <khilman@linaro.org>
-Cc: Tyler Baker <tyler.baker@linaro.org>
-Cc: Simon Arlott <simon@fire.lp0.eu>
-Cc: Mark Brown <broonie@kernel.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- drivers/nvmem/qfprom.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/nvmem/rockchip-efuse.c | 90 ++++++++++++++++++++----------------------
+ 1 file changed, 42 insertions(+), 48 deletions(-)
 
-diff --git a/drivers/nvmem/qfprom.c b/drivers/nvmem/qfprom.c
-index afb67e7..3829e5f 100644
---- a/drivers/nvmem/qfprom.c
-+++ b/drivers/nvmem/qfprom.c
-@@ -21,6 +21,7 @@ static struct regmap_config qfprom_regmap_config = {
- 	.reg_bits = 32,
- 	.val_bits = 8,
- 	.reg_stride = 1,
-+	.val_format_endian = REGMAP_ENDIAN_LITTLE,
+diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
+index f552134..a009795 100644
+--- a/drivers/nvmem/rockchip-efuse.c
++++ b/drivers/nvmem/rockchip-efuse.c
+@@ -14,16 +14,16 @@
+  * more details.
+  */
+ 
+-#include <linux/platform_device.h>
+-#include <linux/nvmem-provider.h>
+-#include <linux/slab.h>
+-#include <linux/regmap.h>
++#include <linux/clk.h>
++#include <linux/delay.h>
+ #include <linux/device.h>
+ #include <linux/io.h>
+ #include <linux/module.h>
+-#include <linux/delay.h>
++#include <linux/nvmem-provider.h>
++#include <linux/slab.h>
+ #include <linux/of.h>
+-#include <linux/clk.h>
++#include <linux/platform_device.h>
++#include <linux/regmap.h>
+ 
+ #define EFUSE_A_SHIFT			6
+ #define EFUSE_A_MASK			0x3ff
+@@ -35,10 +35,10 @@
+ #define REG_EFUSE_CTRL			0x0000
+ #define REG_EFUSE_DOUT			0x0004
+ 
+-struct rockchip_efuse_context {
++struct rockchip_efuse_chip {
+ 	struct device *dev;
+ 	void __iomem *base;
+-	struct clk *efuse_clk;
++	struct clk *clk;
  };
  
- static struct nvmem_config econfig = {
+ static int rockchip_efuse_write(void *context, const void *data, size_t count)
+@@ -52,34 +52,32 @@ static int rockchip_efuse_read(void *context,
+ 			       void *val, size_t val_size)
+ {
+ 	unsigned int offset = *(u32 *)reg;
+-	struct rockchip_efuse_context *_context = context;
+-	void __iomem *base = _context->base;
+-	struct clk *clk = _context->efuse_clk;
++	struct rockchip_efuse_chip *efuse = context;
+ 	u8 *buf = val;
+ 	int ret;
+ 
+-	ret = clk_prepare_enable(clk);
++	ret = clk_prepare_enable(efuse->clk);
+ 	if (ret < 0) {
+-		dev_err(_context->dev, "failed to prepare/enable efuse clk\n");
++		dev_err(efuse->dev, "failed to prepare/enable efuse clk\n");
+ 		return ret;
+ 	}
+ 
+-	writel(EFUSE_LOAD | EFUSE_PGENB, base + REG_EFUSE_CTRL);
++	writel(EFUSE_LOAD | EFUSE_PGENB, efuse->base + REG_EFUSE_CTRL);
+ 	udelay(1);
+ 	while (val_size) {
+-		writel(readl(base + REG_EFUSE_CTRL) &
++		writel(readl(efuse->base + REG_EFUSE_CTRL) &
+ 			     (~(EFUSE_A_MASK << EFUSE_A_SHIFT)),
+-			     base + REG_EFUSE_CTRL);
+-		writel(readl(base + REG_EFUSE_CTRL) |
++			     efuse->base + REG_EFUSE_CTRL);
++		writel(readl(efuse->base + REG_EFUSE_CTRL) |
+ 			     ((offset & EFUSE_A_MASK) << EFUSE_A_SHIFT),
+-			     base + REG_EFUSE_CTRL);
++			     efuse->base + REG_EFUSE_CTRL);
+ 		udelay(1);
+-		writel(readl(base + REG_EFUSE_CTRL) |
+-			     EFUSE_STROBE, base + REG_EFUSE_CTRL);
++		writel(readl(efuse->base + REG_EFUSE_CTRL) |
++			     EFUSE_STROBE, efuse->base + REG_EFUSE_CTRL);
+ 		udelay(1);
+-		*buf++ = readb(base + REG_EFUSE_DOUT);
+-		writel(readl(base + REG_EFUSE_CTRL) &
+-		     (~EFUSE_STROBE), base + REG_EFUSE_CTRL);
++		*buf++ = readb(efuse->base + REG_EFUSE_DOUT);
++		writel(readl(efuse->base + REG_EFUSE_CTRL) &
++		     (~EFUSE_STROBE), efuse->base + REG_EFUSE_CTRL);
+ 		udelay(1);
+ 
+ 		val_size -= 1;
+@@ -87,9 +85,9 @@ static int rockchip_efuse_read(void *context,
+ 	}
+ 
+ 	/* Switch to standby mode */
+-	writel(EFUSE_PGENB | EFUSE_CSB, base + REG_EFUSE_CTRL);
++	writel(EFUSE_PGENB | EFUSE_CSB, efuse->base + REG_EFUSE_CTRL);
+ 
+-	clk_disable_unprepare(clk);
++	clk_disable_unprepare(efuse->clk);
+ 
+ 	return 0;
+ }
+@@ -114,48 +112,44 @@ static struct nvmem_config econfig = {
+ };
+ 
+ static const struct of_device_id rockchip_efuse_match[] = {
+-	{ .compatible = "rockchip,rockchip-efuse",},
++	{ .compatible = "rockchip,rockchip-efuse", },
+ 	{ /* sentinel */},
+ };
+ MODULE_DEVICE_TABLE(of, rockchip_efuse_match);
+ 
+ static int rockchip_efuse_probe(struct platform_device *pdev)
+ {
+-	struct device *dev = &pdev->dev;
+ 	struct resource *res;
+ 	struct nvmem_device *nvmem;
+ 	struct regmap *regmap;
+-	void __iomem *base;
+-	struct clk *clk;
+-	struct rockchip_efuse_context *context;
++	struct rockchip_efuse_chip *efuse;
+ 
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	base = devm_ioremap_resource(dev, res);
+-	if (IS_ERR(base))
+-		return PTR_ERR(base);
++	efuse = devm_kzalloc(&pdev->dev, sizeof(struct rockchip_efuse_chip),
++			     GFP_KERNEL);
++	if (!efuse)
++		return -ENOMEM;
+ 
+-	context = devm_kzalloc(dev, sizeof(struct rockchip_efuse_context),
+-			       GFP_KERNEL);
+-	if (IS_ERR(context))
+-		return PTR_ERR(context);
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	efuse->base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(efuse->base))
++		return PTR_ERR(efuse->base);
+ 
+-	clk = devm_clk_get(dev, "pclk_efuse");
+-	if (IS_ERR(clk))
+-		return PTR_ERR(clk);
++	efuse->clk = devm_clk_get(&pdev->dev, "pclk_efuse");
++	if (IS_ERR(efuse->clk))
++		return PTR_ERR(efuse->clk);
+ 
+-	context->dev = dev;
+-	context->base = base;
+-	context->efuse_clk = clk;
++	efuse->dev = &pdev->dev;
+ 
+ 	rockchip_efuse_regmap_config.max_register = resource_size(res) - 1;
+ 
+-	regmap = devm_regmap_init(dev, &rockchip_efuse_bus,
+-				  context, &rockchip_efuse_regmap_config);
++	regmap = devm_regmap_init(efuse->dev, &rockchip_efuse_bus,
++				  efuse, &rockchip_efuse_regmap_config);
+ 	if (IS_ERR(regmap)) {
+-		dev_err(dev, "regmap init failed\n");
++		dev_err(efuse->dev, "regmap init failed\n");
+ 		return PTR_ERR(regmap);
+ 	}
+-	econfig.dev = dev;
++
++	econfig.dev = efuse->dev;
+ 	nvmem = nvmem_register(&econfig);
+ 	if (IS_ERR(nvmem))
+ 		return PTR_ERR(nvmem);
 -- 
 1.9.1
