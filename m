@@ -1,50 +1,38 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 14 Dec 2015 21:04:09 +0800
-Subject: [PATCH V02 3/5] dmaengine: core: Introduce new, universal API to
- request a channel
-In-Reply-To: <1450092140-31602-4-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <201512142130.g8eZzCT6%fengguang.wu@intel.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 14 Dec 2015 14:05:06 +0100
+Subject: [PATCH] clk: sunxi: fix handling return value of
+ of_property_match_string
+In-Reply-To: <1450087564-28441-3-git-send-email-a.hajda@samsung.com>
+References: <1450087564-28441-1-git-send-email-a.hajda@samsung.com>
+ <1450087564-28441-3-git-send-email-a.hajda@samsung.com>
+Message-ID: <20151214130506.GI19456@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+Hi,
 
-[auto build test WARNING on slave-dma/next]
-[also build test WARNING on v4.4-rc5 next-20151214]
+On Mon, Dec 14, 2015 at 11:06:00AM +0100, Andrzej Hajda wrote:
+> The function can return negative values, so its result should
+> be assigned to signed variable.
+> 
+> The problem has been detected using proposed semantic patch
+> scripts/coccinelle/tests/assign_signed_to_unsigned.cocci [1].
+> 
+> [1]: http://permalink.gmane.org/gmane.linux.kernel/2046107
+> 
+> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
 
-url:    https://github.com/0day-ci/linux/commits/Peter-Ujfalusi/dmaengine-core-Skip-mask-matching-when-it-is-not-provided-to-private_candidate/20151214-192521
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/vkoul/slave-dma.git next
+Applied, thanks!
+Maxime
 
-
-coccinelle warnings: (new ones prefixed by >>)
-
->> drivers/dma/dmaengine.c:715:23-30: ERROR: PTR_ERR applied after initialization to constant on line 703
-
-vim +715 drivers/dma/dmaengine.c
-
-   697	 *
-   698	 * Returns pointer to appropriate DMA channel on success or an error pointer.
-   699	 */
-   700	struct dma_chan *dma_request_chan(struct device *dev, const char *name)
-   701	{
-   702		struct dma_device *d, *_d;
- > 703		struct dma_chan *chan = NULL;
-   704	
-   705		/* If device-tree is present get slave info from here */
-   706		if (dev->of_node)
-   707			chan = of_dma_request_slave_channel(dev->of_node, name);
-   708	
-   709		/* If device was enumerated by ACPI get slave info from here */
-   710		if (has_acpi_companion(dev) && !chan)
-   711			chan = acpi_dma_request_slave_chan_by_name(dev, name);
-   712	
-   713		if (chan) {
-   714			/* Valid channel found or requester need to be deferred */
- > 715			if (!IS_ERR(chan) || PTR_ERR(chan) == -EPROBE_DEFER)
-   716				return chan;
-   717		}
-   718	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151214/439a066f/attachment.sig>
