@@ -1,213 +1,112 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 14 Dec 2015 12:39:44 +0100
-Subject: [PATCH v3 3/5] soc: rockchip: add reboot notifier driver
-In-Reply-To: <1447840582-19850-1-git-send-email-andy.yan@rock-chips.com>
-References: <1447840044-19689-1-git-send-email-andy.yan@rock-chips.com>
- <1447840582-19850-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <10162108.nOThMrrbdf@wuerfel>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 14 Dec 2015 11:40:23 +0000
+Subject: [PATCH 2/2] arm64: mm: ensure visbility of page table zeroing
+In-Reply-To: <1450093223-5117-1-git-send-email-mark.rutland@arm.com>
+References: <20151211191031.GN18828@arm.com>
+ <1450093223-5117-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1450093223-5117-2-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 November 2015 17:56:22 Andy Yan wrote:
-> rockchip platform have a protocol to pass the kernel reboot
-> mode to bootloader by some special registers when system reboot.
-> By this way the bootloader can take different action according
-> to the different kernel reboot mode, for example, command
-> "reboot loader" will reboot the board to rockusb mode, this is
-> a very convenient way to get the board enter download mode.
-> 
-> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+We allocate pages with PGALLOC_GFP, which implictly ensures that the
+newly allocated tables are zeroed. However, we plumb the newly allocated
+tables into (potentially live) tables without an intervening barrier,
+and thus a concurrent page table walk may see stale data rather than the
+zeroes written by the allocator.
 
-Adding John Stultz to Cc
+Insert a dsb(ishst) in our run time page table allocators to ensure that
+such zeroing is visible.
 
-I just saw this thread pop up again, and had to think of John's recent
-patch to unify this across platforms.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/pgalloc.h | 14 +++++++++++---
+ arch/arm64/mm/pgd.c              | 10 ++++++++--
+ 2 files changed, 19 insertions(+), 5 deletions(-)
 
-John, can you have a look at this driver too, and see how it fits in?
-I think this is yet another variant, using an MMIO register rather than
-RAM (as HTC / NVIDIA does) or SRAM (as Qualcomm does), but otherwise
-it conceptually fits in with what you had.
-
-The driver goes through an existing syscon regmap as far as I can
-tell, rather than a memory area or its own device.
-
-	Arnd
-
-> ---
-> 
-> Changes in v3:
->  - move from mach-rockchip to drivers/soc/rockchip, as the tegra does
->  - use dts pass the related register
-> 
-> Changes in v2:
->   - check cpu dt node
->   - remove a unnecessary of_put_node in function rockchip_get_pmu_regmap
->   - fix a align issue
->   - use reboot_notifier instead of restart_handler
-> 
->  drivers/soc/rockchip/Kconfig  |  7 ++++
->  drivers/soc/rockchip/Makefile |  1 +
->  drivers/soc/rockchip/loader.h | 22 ++++++++++
->  drivers/soc/rockchip/reboot.c | 98 +++++++++++++++++++++++++++++++++++++++++++
->  4 files changed, 128 insertions(+)
->  create mode 100644 drivers/soc/rockchip/loader.h
->  create mode 100644 drivers/soc/rockchip/reboot.c
-> 
-> diff --git a/drivers/soc/rockchip/Kconfig b/drivers/soc/rockchip/Kconfig
-> index 7140ff8..4edbc44 100644
-> --- a/drivers/soc/rockchip/Kconfig
-> +++ b/drivers/soc/rockchip/Kconfig
-> @@ -15,4 +15,11 @@ config ROCKCHIP_PM_DOMAINS
->  
->            If unsure, say N.
->  
-> +config ROCKCHIP_REBOOT
-> +	bool "Rockchip reboot notifier driver"
-> +	help
-> +	  Say y here will enable reboot notifier support.
-> +	  This will get reboot mode arguments from userspace and
-> +	  store it in special register.
-> +
->  endif
-> diff --git a/drivers/soc/rockchip/Makefile b/drivers/soc/rockchip/Makefile
-> index 3d73d06..9817496 100644
-> --- a/drivers/soc/rockchip/Makefile
-> +++ b/drivers/soc/rockchip/Makefile
-> @@ -2,3 +2,4 @@
->  # Rockchip Soc drivers
->  #
->  obj-$(CONFIG_ROCKCHIP_PM_DOMAINS) += pm_domains.o
-> +obj-$(CONFIG_ROCKCHIP_REBOOT) += reboot.o
-> diff --git a/drivers/soc/rockchip/loader.h b/drivers/soc/rockchip/loader.h
-> new file mode 100644
-> index 0000000..bf51baa
-> --- /dev/null
-> +++ b/drivers/soc/rockchip/loader.h
-> @@ -0,0 +1,22 @@
-> +#ifndef __MACH_ROCKCHIP_LOADER_H
-> +#define __MACH_ROCKCHIP_LOADER_H
-> +
-> +/*high 24 bits is tag, low 8 bits is type*/
-> +#define SYS_LOADER_REBOOT_FLAG   0x5242C300
-> +
-> +enum {
-> +	BOOT_NORMAL = 0, /* normal boot */
-> +	BOOT_LOADER,     /* enter loader rockusb mode */
-> +	BOOT_MASKROM,    /* enter maskrom rockusb mode (not support now) */
-> +	BOOT_RECOVER,    /* enter recover */
-> +	BOOT_NORECOVER,  /* do not enter recover */
-> +	BOOT_SECONDOS,   /* boot second OS (not support now)*/
-> +	BOOT_WIPEDATA,   /* enter recover and wipe data. */
-> +	BOOT_WIPEALL,    /* enter recover and wipe all data. */
-> +	BOOT_CHECKIMG,   /* check firmware img with backup part*/
-> +	BOOT_FASTBOOT,   /* enter fast boot mode */
-> +	BOOT_SECUREBOOT_DISABLE,
-> +	BOOT_CHARGING,   /* enter charge mode */
-> +	BOOT_MAX         /* MAX VALID BOOT TYPE.*/
-> +};
-> +#endif
-> diff --git a/drivers/soc/rockchip/reboot.c b/drivers/soc/rockchip/reboot.c
-> new file mode 100644
-> index 0000000..048aeb0b
-> --- /dev/null
-> +++ b/drivers/soc/rockchip/reboot.c
-> @@ -0,0 +1,98 @@
-> +/*
-> + * Copyright (c) 2014, Fuzhou Rockchip Electronics Co., Ltd
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + */
-> +#include <linux/init.h>
-> +#include <linux/module.h>
-> +#include <linux/kernel.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/reboot.h>
-> +#include <linux/regmap.h>
-> +#include <linux/mfd/syscon.h>
-> +#include "loader.h"
-> +
-> +struct rockchip_reboot {
-> +	struct device *dev;
-> +	struct regmap *map;
-> +	u32 offset;
-> +	struct notifier_block reboot_notifier;
-> +};
-> +
-> +static void rockchip_get_reboot_flag(const char *cmd, u32 *flag)
-> +{
-> +	*flag = SYS_LOADER_REBOOT_FLAG + BOOT_NORMAL;
-> +
-> +	if (cmd) {
-> +		if (!strcmp(cmd, "loader") || !strcmp(cmd, "bootloader"))
-> +			*flag = SYS_LOADER_REBOOT_FLAG + BOOT_LOADER;
-> +		else if (!strcmp(cmd, "recovery"))
-> +			*flag = SYS_LOADER_REBOOT_FLAG + BOOT_RECOVER;
-> +		else if (!strcmp(cmd, "charge"))
-> +			*flag = SYS_LOADER_REBOOT_FLAG + BOOT_CHARGING;
-> +		else if (!strcmp(cmd, "fastboot"))
-> +			*flag = SYS_LOADER_REBOOT_FLAG + BOOT_FASTBOOT;
-> +	}
-> +}
-> +
-> +static int rockchip_reboot_notify(struct notifier_block *this,
-> +				  unsigned long mode, void *cmd)
-> +{
-> +	struct rockchip_reboot *reboot;
-> +	u32 flag;
-> +
-> +	reboot = container_of(this, struct rockchip_reboot, reboot_notifier);
-> +	rockchip_get_reboot_flag(cmd, &flag);
-> +	regmap_write(reboot->map, reboot->offset, flag);
-> +
-> +	return NOTIFY_DONE;
-> +}
-> +
-> +static int __init rockchip_reboot_probe(struct platform_device *pdev)
-> +{
-> +	struct rockchip_reboot *reboot;
-> +	int ret;
-> +
-> +	reboot = devm_kzalloc(&pdev->dev, sizeof(*reboot), GFP_KERNEL);
-> +	if (!reboot)
-> +		return -ENOMEM;
-> +
-> +	reboot->dev = &pdev->dev;
-> +	reboot->map = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
-> +						      "rockchip,regmap");
-> +	if (IS_ERR(reboot->map))
-> +		return PTR_ERR(reboot->map);
-> +
-> +	if (of_property_read_u32(pdev->dev.of_node, "offset", &reboot->offset))
-> +		return -EINVAL;
-> +
-> +	reboot->reboot_notifier.notifier_call = rockchip_reboot_notify;
-> +	ret = register_reboot_notifier(&reboot->reboot_notifier);
-> +	if (ret)
-> +		dev_err(reboot->dev, "can't register reboot notifier\n");
-> +
-> +	return ret;
-> +}
-> +
-> +static const struct of_device_id rockchip_reboot_of_match[] = {
-> +	{ .compatible = "rockchip,reboot" },
-> +	{}
-> +};
-> +
-> +static struct platform_driver rockchip_reboot_driver = {
-> +	.probe = rockchip_reboot_probe,
-> +	.driver = {
-> +		.name = "rockchip-reboot",
-> +		.of_match_table = rockchip_reboot_of_match,
-> +	},
-> +};
-> +module_platform_driver(rockchip_reboot_driver);
-> +
-> +MODULE_AUTHOR("Andy Yan <andy.yan@rock-chips.com");
-> +MODULE_DESCRIPTION("Rockchip platform reboot notifier driver");
-> +MODULE_LICENSE("GPL");
-> 
+diff --git a/arch/arm64/include/asm/pgalloc.h b/arch/arm64/include/asm/pgalloc.h
+index c150539..b91f6dd 100644
+--- a/arch/arm64/include/asm/pgalloc.h
++++ b/arch/arm64/include/asm/pgalloc.h
+@@ -21,6 +21,7 @@
+ 
+ #include <asm/pgtable-hwdef.h>
+ #include <asm/processor.h>
++#include <asm/barrier.h>
+ #include <asm/cacheflush.h>
+ #include <asm/tlbflush.h>
+ 
+@@ -33,7 +34,9 @@
+ 
+ static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long addr)
+ {
+-	return (pmd_t *)__get_free_page(PGALLOC_GFP);
++	pmd_t *pmd = (pmd_t *)__get_free_page(PGALLOC_GFP);
++	dsb(ishst);
++	return pmd;
+ }
+ 
+ static inline void pmd_free(struct mm_struct *mm, pmd_t *pmd)
+@@ -53,7 +56,9 @@ static inline void pud_populate(struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
+ 
+ static inline pud_t *pud_alloc_one(struct mm_struct *mm, unsigned long addr)
+ {
+-	return (pud_t *)__get_free_page(PGALLOC_GFP);
++	pud_t *pud = (pud_t *)__get_free_page(PGALLOC_GFP);
++	dsb(ishst);
++	return pud;
+ }
+ 
+ static inline void pud_free(struct mm_struct *mm, pud_t *pud)
+@@ -75,7 +80,9 @@ extern void pgd_free(struct mm_struct *mm, pgd_t *pgd);
+ static inline pte_t *
+ pte_alloc_one_kernel(struct mm_struct *mm, unsigned long addr)
+ {
+-	return (pte_t *)__get_free_page(PGALLOC_GFP);
++	pte_t *pte = (pte_t *)__get_free_page(PGALLOC_GFP);
++	dsb(ishst);
++	return pte;
+ }
+ 
+ static inline pgtable_t
+@@ -90,6 +97,7 @@ pte_alloc_one(struct mm_struct *mm, unsigned long addr)
+ 		__free_page(pte);
+ 		return NULL;
+ 	}
++	dsb(ishst);
+ 	return pte;
+ }
+ 
+diff --git a/arch/arm64/mm/pgd.c b/arch/arm64/mm/pgd.c
+index cb3ba1b..5420cf3 100644
+--- a/arch/arm64/mm/pgd.c
++++ b/arch/arm64/mm/pgd.c
+@@ -22,6 +22,7 @@
+ #include <linux/highmem.h>
+ #include <linux/slab.h>
+ 
++#include <asm/barrier.h>
+ #include <asm/pgalloc.h>
+ #include <asm/page.h>
+ #include <asm/tlbflush.h>
+@@ -32,10 +33,15 @@ static struct kmem_cache *pgd_cache;
+ 
+ pgd_t *pgd_alloc(struct mm_struct *mm)
+ {
++	pgd_t *pgd;
++
+ 	if (PGD_SIZE == PAGE_SIZE)
+-		return (pgd_t *)__get_free_page(PGALLOC_GFP);
++		pgd = (pgd_t *)__get_free_page(PGALLOC_GFP);
+ 	else
+-		return kmem_cache_alloc(pgd_cache, PGALLOC_GFP);
++		pgd = kmem_cache_alloc(pgd_cache, PGALLOC_GFP);
++
++	dsb(ishst);
++	return pgd;
+ }
+ 
+ void pgd_free(struct mm_struct *mm, pgd_t *pgd)
+-- 
+1.9.1
