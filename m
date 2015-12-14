@@ -1,68 +1,50 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 14 Dec 2015 09:26:54 +0100
-Subject: [PATCH 00/10] drivers/pci: avoid module_init in non-modular
- host/pci*
-In-Reply-To: <20151214082425.GA3766@ulmo.nvidia.com>
-References: <1449970917-12633-1-git-send-email-paul.gortmaker@windriver.com>
- <CAMuHMdXr=ErCO3R2LB+wBJh3JSiFkH5q3-FLSTOwdGT87fXz3A@mail.gmail.com>
- <20151214082425.GA3766@ulmo.nvidia.com>
-Message-ID: <566E7D4E.8010406@xilinx.com>
+From: mark.yao@rock-chips.com (Mark Yao)
+Date: Mon, 14 Dec 2015 16:32:03 +0800
+Subject: [PATCH v2 0/8] drm/rockchip: covert to support atomic API
+Message-ID: <1450081931-9709-1-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14.12.2015 09:24, Thierry Reding wrote:
-> On Mon, Dec 14, 2015 at 09:19:30AM +0100, Geert Uytterhoeven wrote:
->> Hi Paul,
->>
->> On Sun, Dec 13, 2015 at 2:41 AM, Paul Gortmaker
->> <paul.gortmaker@windriver.com> wrote:
->>> This series of commits is a slice of a larger project to ensure
->>> people don't have dead code for module removal in non-modular
->>> drivers.  Overall there was roughly 5k lines of dead code in the
->>> kernel due to this.  So far we've fixed several areas, like tty,
->>> x86, net, etc. and we continue to work on other areas.
->>>
->>> There are several reasons to not use module_init for code that can
->>> never be built as a module, but the big ones are:
->>>
->>>  (1) it is easy to accidentally code up unused module_exit and remove code
->>>  (2) it can be misleading when reading the source, thinking it can be
->>>       modular when the Makefile and/or Kconfig prohibit it
->>>  (3) it requires the include of the module.h header file which in turn
->>>      includes nearly everything else.
->>>
->>> Here we convert some module_init() calls into device_initcall() and delete
->>> any module_exit and remove code that gets orphaned in the process, for
->>> an overall net code reduction, which is always welcome.
->>>
->>> The use of device_initcall ensures that the init function ordering
->>> remains unchanged, but one could argue that PCI host code might be more
->>> appropriate to be handled under subsys_initcall.  Fortunately we can
->>> revisit making this extra change at a later date if desired; it does
->>> not need to happen now, and we reduce the risk of introducing
->>> regressions at this point in time by separating the two changes.
->>>
->>> Over half of the drivers changed here already explicitly disallowed any
->>> unbind operations.  For the rest we make them the same, since there is
->>> not really any sensible use case to unbind any built-in bus support that
->>> I can think of.
->>
->> Personally, I think all of these should become tristate, so distro kernels
->> don't have to build in PCI(e) support for all SoCs. multi_v7_defconfig kernels
->> are becoming too big.
->>
->> That does not preclude making these modules un-unloadable, though.
-> 
-> Most of these can't be made tristate as-is, because they use symbols
-> that aren't exported. Many of those symbols can easily be exported, so
-> its just a matter of getting the respective patches merged. I disagree
-> with making the modules non-unloadable, though. I have a local branch
-> with changes necessary to unload the host controller driver and it
-> works just fine.
+The series of patches coverting drm rockchip to atomic API, do some
+cleanup and some fixes on atomic side.
 
-Great.
+TODO: fence is not support on current version.
 
-Send them out.
+Tested on rk3288 popmetal board.
 
-Thanks,
-Michal
+All guys can test it with following url:
+ test case: https://github.com/markyzq/libdrm.git atomictest
+ kernel:
+  https://github.com/markyzq/kernel-drm-rockchip.git drm-rockchip-next-12-11
+
+Changes in v2:
+- Optimization commit planes sequence.
+- Get vblank count on atomic_begin to protect vblank event.
+Advised by Daniel Stone
+- Direct return -EINVAL when yuv address is not support, instead of adjust it.
+- code formating and cleanup.
+Advised by Thierry Reding & Daniel Vetter
+- Hook mode_set into crtc enable instead of hack crtc enable on mode set.
+
+v1: http://lists.freedesktop.org/archives/dri-devel/2015-November/095745.html
+
+Mark Yao (8):
+  drm/rockchip: Use new vblank api drm_crtc_vblank_*
+  drm/rockchip: vop: replace dpms with enable/disable
+  drm/rockchip: Convert to support atomic API
+  drm/rockchip: Optimization vop mode set
+  drm/rockchip: support atomic asynchronous commit
+  drm/rockchip: direct config connecter gate and out_mode
+  drm: bridge/dw_hdmi: add atomic API support
+  drm/rockchip: dw_hdmi: use encoder enable function
+
+ drivers/gpu/drm/bridge/dw_hdmi.c            |   23 +-
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c |   14 +-
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c |   21 +-
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.h |   19 +-
+ drivers/gpu/drm/rockchip/rockchip_drm_fb.c  |  112 ++++
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c |  775 +++++++++++----------------
+ 6 files changed, 480 insertions(+), 484 deletions(-)
+
+-- 
+1.7.9.5
