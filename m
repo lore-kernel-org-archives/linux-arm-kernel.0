@@ -1,60 +1,76 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 14 Dec 2015 15:12:24 +0100
-Subject: [PATCH V4 2/2] ARM: dts: imx6q: add Novena board
-In-Reply-To: <566EC9E6.6060402@cogentembedded.com>
-References: <20151211110700.GD11252@tiger> <201512140456.08114.marex@denx.de>
- <566EC9E6.6060402@cogentembedded.com>
-Message-ID: <201512141512.24281.marex@denx.de>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Mon, 14 Dec 2015 15:16:57 +0100
+Subject: [PATCH v6 4/5] iommu/mediatek: Add mt8173 IOMMU driver
+In-Reply-To: <1449568153-15643-5-git-send-email-yong.wu@mediatek.com>
+References: <1449568153-15643-1-git-send-email-yong.wu@mediatek.com>
+ <1449568153-15643-5-git-send-email-yong.wu@mediatek.com>
+Message-ID: <20151214141656.GG18805@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, December 14, 2015 at 02:53:42 PM, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 12/14/2015 6:56 AM, Marek Vasut wrote:
-> >>> From: Sean Cross <xobs@kosagi.com>
-> >>> 
-> >>> Novena is an open-hardware laptop/desktop/bare board.
-> >>> 
-> >>> See http://www.kosagi.com/w/index.php?title=Novena_Main_Page
-> >>> 
-> >>> Signed-off-by: Sean Cross <xobs@kosagi.com>
-> >>> Signed-off-by: Marek Vasut <marex@denx.de>
-> >>> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> >>> Cc: Lucas Stach <l.stach@pengutronix.de>
-> >>> Cc: Sean Cross <xobs@kosagi.com>
-> >>> Cc: Shawn Guo <shawnguo@kernel.org>
-> >> 
-> >> It looks pretty good to me now, except a small question below.
-> > 
-> > Thanks
-> > 
-> >>> ---
-> >>> 
-> >>>   arch/arm/boot/dts/Makefile         |   1 +
-> >>>   arch/arm/boot/dts/imx6q-novena.dts | 789
-> >>>   +++++++++++++++++++++++++++++++++++++ 2 files changed, 790
-> >>>   insertions(+)
-> >>>   create mode 100644 arch/arm/boot/dts/imx6q-novena.dts
-> >> 
-> >> <snip>
-> >> 
-> >>> +/ {
-> >>> +	model = "Kosagi Novena Dual/Quad";
-> >>> +	compatible = "kosagi,imx6q-novena", "fsl,imx6q";
-> >>> +
-> >>> +	memory {
-> >>> +		reg = <0x10000000 0xefffffff>;
-> >> 
-> >> What's the trick of having memory size being 0xefffffff?
-> > 
-> > That is a typo, should obviously be 0xffffffff ,
-> 
->     You didn't get it. :-) It' the _size_, not limit.
+On Tue, Dec 08, 2015 at 05:49:12PM +0800, Yong Wu wrote:
+> +static int mtk_iommu_attach_device(struct iommu_domain *domain,
+> +				   struct device *dev)
+> +{
+> +	struct mtk_iommu_domain *dom = to_mtk_domain(domain);
+> +	struct mtk_iommu_client_priv *priv = dev->archdata.iommu;
+> +	struct mtk_iommu_data *data;
+> +	int ret;
+> +
+> +	if (!priv)
+> +		return -ENODEV;
+> +
+> +	data = dev_get_drvdata(priv->m4udev);
+> +	if (!data) {
+> +		/*
+> +		 * The DMA core will run earlier than this probe, and it will
+> +		 * create a default iommu domain for each a iommu device.
+> +		 * But here there is only one domain called the m4u domain
+> +		 * which all the multimedia HW share.
+> +		 * The default domain isn't needed here.
+> +		 */
 
-So it was correct from the get-go ? Uh ...
+The iommu core creates one domain per iommu-group. In your case this
+means one default domain per iommu in the system.
 
-Thanks for clarification, I will remember this :)
+> +		iommu_domain_free(domain);
 
-Best regards,
-Marek Vasut
+This function is not supposed to free the domain passed to it.
+
+> +static int mtk_iommu_add_device(struct device *dev)
+> +{
+> +	struct iommu_group *group;
+> +
+> +	if (!dev->archdata.iommu) /* Not a iommu client device */
+> +		return -ENODEV;
+> +
+> +	group = iommu_group_get_for_dev(dev);
+> +	if (IS_ERR(group))
+> +		return PTR_ERR(group);
+> +
+> +	iommu_group_put(group);
+> +	return 0;
+> +}
+
+[...]
+
+> +static struct iommu_group *mtk_iommu_device_group(struct device *dev)
+> +{
+> +	struct mtk_iommu_data *data;
+> +	struct mtk_iommu_client_priv *priv;
+> +
+> +	priv = dev->archdata.iommu;
+> +	if (!priv)
+> +		return ERR_PTR(-ENODEV);
+> +
+> +	/* All the client devices are in the same m4u iommu-group */
+> +	data = dev_get_drvdata(priv->m4udev);
+> +	if (!data->m4u_group) {
+> +		data->m4u_group = iommu_group_alloc();
+> +		if (IS_ERR(data->m4u_group))
+> +			dev_err(dev, "Failed to allocate M4U IOMMU group\n");
+> +	}
+> +	return data->m4u_group;
+> +}
+
+This looks much better than before, thanks.
