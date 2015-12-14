@@ -1,72 +1,79 @@
-From: xuejiancheng@huawei.com (xuejiancheng)
-Date: Mon, 14 Dec 2015 10:07:43 +0800
-Subject: [PATCH v3 3/7] ARM: hisi: add dt_machine definition for Hi3519
-In-Reply-To: <20151211152106.GB21272@rob-hp-laptop>
-References: <1449819921-18464-1-git-send-email-xuejiancheng@huawei.com>
- <1449819921-18464-4-git-send-email-xuejiancheng@huawei.com>
- <20151211152106.GB21272@rob-hp-laptop>
-Message-ID: <566E246F.2050304@huawei.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 14 Dec 2015 10:18:01 +0800
+Subject: [PATCH 1/2] ARM: dts: vf-colibri: split PWM pinctrl
+In-Reply-To: <1449094307-6011-1-git-send-email-stefan@agner.ch>
+References: <1449094307-6011-1-git-send-email-stefan@agner.ch>
+Message-ID: <20151214021801.GA25756@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2015/12/11 23:21, Rob Herring wrote:
-> On Fri, Dec 11, 2015 at 03:45:17PM +0800, Jiancheng Xue wrote:
->> add dt_machine definition for hi3519.
->>
->> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
->> ---
->>  arch/arm/mach-hisi/hisilicon.c | 9 +++++++++
->>  1 file changed, 9 insertions(+)
->>
->> diff --git a/arch/arm/mach-hisi/hisilicon.c b/arch/arm/mach-hisi/hisilicon.c
->> index 8cc6215..010d8a2 100644
->> --- a/arch/arm/mach-hisi/hisilicon.c
->> +++ b/arch/arm/mach-hisi/hisilicon.c
->> @@ -81,3 +81,12 @@ static const char *const hip01_compat[] __initconst = {
->>  DT_MACHINE_START(HIP01, "Hisilicon HIP01 (Flattened Device Tree)")
->>  	.dt_compat      = hip01_compat,
->>  MACHINE_END
->> +
->> +static const char *const hi3519_compat[] __initconst = {
->> +	"hisilicon,hi3519",
->> +	NULL,
->> +};
+On Wed, Dec 02, 2015 at 02:11:46PM -0800, Stefan Agner wrote:
+> Split PWM pins into separate pinctrl nodes to allow overrides which
+> select pins individually. This is useful for carrier boards which use
+> only one pin for PWM and would like to use the other pin for a
+> different purpose.
 > 
-> You should just have 1 mach desc with multiple compatible strings to 
-> match against, not 1 mach desc per compatible string.
-
-Yes, you're right. But Hi3519 is a soc in a new family. It doesn't belong to
-any other existing mach descs. And more hi3519 compatible boards will be added
-in this mach desc afterwards.
-Can I do it like this now, and combine them at a proper time?
-
-Or just add a more generic mach desc, then other socs like hix5hd2/hip01/hip04 can use this?
-static const char *const hisilicon_compat[] __initconst = {
-        "hisilicon,hi3519",
-        NULL,
-};
-
-DT_MACHINE_START(HISILICON_DT, "Hisilicon")
-        .dt_compat      = hisilicon_compat,
-MACHINE_END
-
-
-
-> Rob
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+>  arch/arm/boot/dts/vf-colibri.dtsi | 18 ++++++++++++++----
+>  1 file changed, 14 insertions(+), 4 deletions(-)
 > 
->> +
->> +DT_MACHINE_START(HI3519_DT, "Hisilicon Hi3519")
->> +	.dt_compat	= hi3519_compat,
->> +MACHINE_END
->> -- 
->> 1.9.1
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe devicetree" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> diff --git a/arch/arm/boot/dts/vf-colibri.dtsi b/arch/arm/boot/dts/vf-colibri.dtsi
+> index e5949b9..924b660 100644
+> --- a/arch/arm/boot/dts/vf-colibri.dtsi
+> +++ b/arch/arm/boot/dts/vf-colibri.dtsi
+> @@ -74,12 +74,12 @@
+>  
+>  &pwm0 {
+>  	pinctrl-names = "default";
+> -	pinctrl-0 = <&pinctrl_pwm0>;
+> +	pinctrl-0 = <&pinctrl_pwm0_a &pinctrl_pwm0_c>;
+>  };
+>  
+>  &pwm1 {
+>  	pinctrl-names = "default";
+> -	pinctrl-0 = <&pinctrl_pwm1>;
+> +	pinctrl-0 = <&pinctrl_pwm1_b &pinctrl_pwm1_d>;
+>  };
+
+It may make more sense to define these pwm nodes in the final board
+level dts with only defining the pins that are actually used on the
+board.
+
+Shawn
+
+>  
+>  &uart0 {
+> @@ -195,16 +195,26 @@
+>  			>;
+>  		};
+>  
+> -		pinctrl_pwm0: pwm0grp {
+> +		pinctrl_pwm0_a: pwm0agrp {
+>  			fsl,pins = <
+>  				VF610_PAD_PTB0__FTM0_CH0		0x1182
+> +			>;
+> +		};
+> +
+> +		pinctrl_pwm0_c: pwm0cgrp {
+> +			fsl,pins = <
+>  				VF610_PAD_PTB1__FTM0_CH1		0x1182
+>  			>;
+>  		};
+>  
+> -		pinctrl_pwm1: pwm1grp {
+> +		pinctrl_pwm1_b: pwm1bgrp {
+>  			fsl,pins = <
+>  				VF610_PAD_PTB8__FTM1_CH0		0x1182
+> +			>;
+> +		};
+> +
+> +		pinctrl_pwm1_d: pwm1dgrp {
+> +			fsl,pins = <
+>  				VF610_PAD_PTB9__FTM1_CH1		0x1182
+>  			>;
+>  		};
+> -- 
+> 2.6.2
 > 
-> .
 > 
