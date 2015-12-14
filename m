@@ -1,53 +1,57 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 14 Dec 2015 17:01:00 +0000
-Subject: [PATCH] ARM64: ZynqMP: DT: Fix GIC's 'reg' property
-In-Reply-To: <20151214164613.GH21356@leverpostej>
-References: <1450110700-14152-1-git-send-email-soren.brinkmann@xilinx.com>
- <20151214164613.GH21356@leverpostej>
-Message-ID: <566EF5CC.4070000@arm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 14 Dec 2015 20:03:21 +0300
+Subject: [PATCH/RFC 03/19] ARM: shmobile: gose: add i2c2 bus to device tree
+In-Reply-To: <20151214021110.GD13945@verge.net.au>
+References: <1449802376-11301-1-git-send-email-horms+renesas@verge.net.au>
+ <1449802376-11301-4-git-send-email-horms+renesas@verge.net.au>
+ <566AB2A5.4090105@cogentembedded.com> <20151214021110.GD13945@verge.net.au>
+Message-ID: <566EF659.2010105@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark,
+On 12/14/2015 05:11 AM, Simon Horman wrote:
 
-On 14/12/15 16:46, Mark Rutland wrote:
-> On Mon, Dec 14, 2015 at 08:31:40AM -0800, Soren Brinkmann wrote:
->> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
->> ---
->>  arch/arm64/boot/dts/xilinx/zynqmp.dtsi | 6 +++---
->>  1 file changed, 3 insertions(+), 3 deletions(-)
+>>> Activate i2c2 bus in r8a7793/gose device tree.
+>>>
+>>> Based on similar work for the r8a7791/koelsch by Wolfram Sang.
+>>>
+>>> Cc: Wolfram Sang <wsa@sang-engineering.com>
+>>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>>> ---
+>>>   arch/arm/boot/dts/r8a7793-gose.dts | 19 +++++++++++++++++++
+>>>   1 file changed, 19 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
+>>> index 3e3122490650..9a71ff6d4474 100644
+>>> --- a/arch/arm/boot/dts/r8a7793-gose.dts
+>>> +++ b/arch/arm/boot/dts/r8a7793-gose.dts
+>> [...]
+>>> @@ -135,3 +140,17 @@
+>>>   		};
+>>>   	};
+>>>   };
+>>> +
+>>> +&i2c2 {
+>>> +	pinctrl-0 = <&i2c2_pins>;
+>>> +	pinctrl-names = "default";
+>>> +
+>>> +	status = "okay";
+>>> +	clock-frequency = <100000>;
+>>> +
+>>> +	eeprom at 50 {
+>>> +		compatible = "renesas,24c02";
 >>
->> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
->> index 857eda5c7217..b5d1facadf16 100644
->> --- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
->> +++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
->> @@ -80,10 +80,10 @@
->>  		gic: interrupt-controller at f9010000 {
->>  			compatible = "arm,gic-400", "arm,cortex-a15-gic";
->>  			#interrupt-cells = <3>;
->> -			reg = <0x0 0xf9010000 0x10000>,
->> -			      <0x0 0xf902f000 0x2000>,
->> +			reg = <0x0 0xf9010000 0x1000>,
->> +			      <0x0 0xf9020000 0x20000>,
->>  			      <0x0 0xf9040000 0x20000>,
->> -			      <0x0 0xf906f000 0x2000>;
->> +			      <0x0 0xf9060000 0x20000>;
-> 
-> I'm confused. These sizes don't look right for GIC-400. Is this a custom
-> GIC?
+>>     This is not a valid value -- the Renesas chip model is different from 24c02.
+>
+> I copied this value from r8a7791.dtsi.
 
-Probably an implementation that obey the SBSA requirement of aliasing
-the first 4kB of the CPU interface on a 64kB page, and the second one on
-the following 64kB page. See the APM system for an example of such a
-thing. I'm more concerned about the GICH region (3rd one), which has no
-reason to be bigger than 4kB.
+    r8a7791-koelsch.dts, you mean? I remember there has been a discussion on 
+this topic, and I then refrained from adding MAC address EEPROMs as a result. :-)
 
-> Did this ever work wit hteh old offsets and sizes?
+> Looking at the schematic for gose (v100), koelsch (rev024) and porter (v300)
+> I see the following "R1EX24002ATAS0G#U0". Shall we update r8a7791 and
+> this patch to "renesas,24002" or leave things as is?
 
-It probably dies when trying to use EOImode==1.
+    What Geert has suggested seems the right thing to me.
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+MBR, Sergei
