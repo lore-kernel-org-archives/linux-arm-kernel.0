@@ -1,33 +1,52 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 14 Dec 2015 09:40:24 +0000
-Subject: [PATCH 0/4] nvmem: fixes for v4.5
-Message-ID: <1450086024-18297-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 14 Dec 2015 10:41:29 +0100
+Subject: [PATCH/RFC 05/19] ARM: shmobile: r8a7793: add MSTP10 clocks to
+ device tree
+In-Reply-To: <20151214014735.GA13945@verge.net.au>
+References: <1449802376-11301-1-git-send-email-horms+renesas@verge.net.au>
+ <1449802376-11301-6-git-send-email-horms+renesas@verge.net.au>
+ <87oadtkfrw.wl%kuninori.morimoto.gx@renesas.com>
+ <20151214014735.GA13945@verge.net.au>
+Message-ID: <CAMuHMdWXrWKvO29r4KapOAzmOiO+F09B8k5rP6tQaQy73DMEig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+On Mon, Dec 14, 2015 at 2:47 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Mon, Dec 14, 2015 at 01:00:59AM +0000, Kuninori Morimoto wrote:
+>>
+>> Hi Simon
+>>
+>> > Instantiate MSTP10 clocks in r8a7793 device tree.
+>> >
+>> > Based on similar work for the r8a7791 by Kuninori Morimoto.
+>> >
+>> > Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+>> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>> > ---
+>> (snip)
+>> > +           mstp10_clks: mstp10_clks at e6150998 {
+>> > +                   compatible = "renesas,r8a7793-mstp-clocks", "renesas,cpg-mstp-clocks";
+>> > +                   reg = <0 0xe6150998 0 4>, <0 0xe61509a8 0 4>;
+>>
+>> I wonder does r8a7793 use mstp driver ? not mssr ?
+>> Because RFC ?
+>
+> My main motivation is that it follow the pattern already used
+> for other clocks in the same file. I believe all the Renesas ARM32
+> DTS/DTSI files are currently using mssr. Perhaps we should
+> come up with a plan to migrate some or all of them to mstp.
 
-Here are couple of nvmem fixes on the mailing list which are good to go in
-v4.5. Could you please take them thru the char-misc tree.
+(it's the other way around ;-)
 
-Thanks,
-srini
+... plan to migrate some or all of from MSTP to MSSR.
 
-Caesar Wang (2):
-  nvmem: sunxi: trivial: fix code style
-  nvmem: rockchip: trivial: Make the driver more readability
+Gr{oetje,eeting}s,
 
-Srinivas Kandagatla (1):
-  nvmem: core: return error for non word aligned access
+                        Geert
 
-Stephen Boyd (1):
-  nvmem: qfprom: Specify LE device endianness
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
- drivers/nvmem/core.c           |  6 +++
- drivers/nvmem/qfprom.c         |  1 +
- drivers/nvmem/rockchip-efuse.c | 90 ++++++++++++++++++++----------------------
- drivers/nvmem/sunxi_sid.c      |  9 ++---
- 4 files changed, 52 insertions(+), 54 deletions(-)
-
--- 
-1.9.1
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
