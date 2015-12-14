@@ -1,72 +1,71 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 14 Dec 2015 11:19:49 +0000
-Subject: [PATCH v6 3/4] arm64: mm: support ARCH_MMAP_RND_BITS.
-In-Reply-To: <1449856338-30984-4-git-send-email-dcashman@android.com>
-References: <1449856338-30984-1-git-send-email-dcashman@android.com>
- <1449856338-30984-2-git-send-email-dcashman@android.com>
- <1449856338-30984-3-git-send-email-dcashman@android.com>
- <1449856338-30984-4-git-send-email-dcashman@android.com>
-Message-ID: <20151214111949.GD6992@arm.com>
+From: bp@suse.de (Borislav Petkov)
+Date: Mon, 14 Dec 2015 12:20:04 +0100
+Subject: [PATCH v4] acpi, apei, arm64: APEI initial support for aarch64.
+In-Reply-To: <20151210110135.GC21134@arm.com>
+References: <1449558183-12259-1-git-send-email-fu.wei@linaro.org>
+ <20151208123433.GB404@red-moon> <5666D28C.4090305@linaro.org>
+ <CADyBb7tByoke4PGZqcx_jHvgCK0xNTneod8WoVv7VmoSYii+hg@mail.gmail.com>
+ <20151208140720.GA2395@red-moon>
+ <CADyBb7sLAJdiC=2UzKFsHQ=+Tfuwd6FGi80O9H+1sj70qtCiPg@mail.gmail.com>
+ <CADyBb7vVaPsNZeKp=XQ0zwd-qH1mwuECCtCfkpqm0jDyFTzDcg@mail.gmail.com>
+ <20151210110135.GC21134@arm.com>
+Message-ID: <20151214112004.GB11630@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On Thu, Dec 10, 2015 at 11:01:35AM +0000, Will Deacon wrote:
+> [adding Boris, as he might know how this works]
 
-On Fri, Dec 11, 2015 at 09:52:17AM -0800, Daniel Cashman wrote:
-> From: dcashman <dcashman@google.com>
-> 
-> arm64: arch_mmap_rnd() uses STACK_RND_MASK to generate the
-> random offset for the mmap base address.  This value represents a
-> compromise between increased ASLR effectiveness and avoiding
-> address-space fragmentation. Replace it with a Kconfig option, which
-> is sensibly bounded, so that platform developers may choose where to
-> place this compromise. Keep default values as new minimums.
-> 
-> Signed-off-by: Daniel Cashman <dcashman@android.com>
-> ---
->  arch/arm64/Kconfig   | 33 +++++++++++++++++++++++++++++++++
->  arch/arm64/mm/mmap.c |  8 ++++++--
->  2 files changed, 39 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 871f217..0cc9c24 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -51,6 +51,8 @@ config ARM64
->  	select HAVE_ARCH_JUMP_LABEL
->  	select HAVE_ARCH_KASAN if SPARSEMEM_VMEMMAP && !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
->  	select HAVE_ARCH_KGDB
-> +	select HAVE_ARCH_MMAP_RND_BITS
-> +	select HAVE_ARCH_MMAP_RND_COMPAT_BITS if COMPAT
->  	select HAVE_ARCH_SECCOMP_FILTER
->  	select HAVE_ARCH_TRACEHOOK
->  	select HAVE_BPF_JIT
-> @@ -104,6 +106,37 @@ config ARCH_PHYS_ADDR_T_64BIT
->  config MMU
->  	def_bool y
->  
-> +config ARCH_MMAP_RND_BITS_MIN
-> +       default 14 if ARM64_64K_PAGES
-> +       default 16 if ARM64_16K_PAGES
-> +       default 18
-> +
-> +# max bits determined by the following formula:
-> +#  VA_BITS - PAGE_SHIFT - 3
+Gee, thanks Will, now you're making me look at this too :-)
 
-Now that we have this comment, I think we can drop the unsupported
-combinations from the list below. That means we just end up with:
+> It's not about flushing one page, flush_tlb_kernel_range (which is called
+> by unmap_kernel_range) already takes care of that. The problem is that
+> the unmap is called from irq/nmi context, so the IPIs required for
+> broadcasting the TLB maintenance on x86 cannot be safely executed.
 
-> +config ARCH_MMAP_RND_BITS_MAX
-> +       default 19 if ARM64_VA_BITS=36
-> +       default 24 if ARM64_VA_BITS=39
-> +       default 27 if ARM64_VA_BITS=42
-> +       default 30 if ARM64_VA_BITS=47
-> +       default 29 if ARM64_VA_BITS=48 && ARM64_64K_PAGES
-> +       default 31 if ARM64_VA_BITS=48 && ARM64_16K_PAGES
-> +       default 33 if ARM64_VA_BITS=48
+Hmm, if you're talking about ghes_iounmap_nmi() and ghes_iounmap_irq()
+which are the two callers of unmap_kernel_range_noflush(), that last one
+is calling vunmap_page_range() which is fiddling with the page table.
+And I don't see TLB flushing IPIs there.
 
-With that:
+If you mean arch_apei_flush_tlb_one(), that's INVLPG on x86 so also no
+IPI.
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+What am I missing?
 
-Will
+> Ideally, I think the ghes code would just use unmap_kernel_range unless
+> the architecture specifically says that doesn't work in irq context. In
+> that case, we don't need to implement the arch_apei_flush_tlb_one callback
+> on arm64.
+
+Well, what bothers me with using
+unmap_kernel_range()/vunmap_page_range() is that if a GHES IRQ/NMI
+happens while something is executing those, the NMI will interrupt
+whatever's happening and it will possibly corrupt the pagetable, IMHO.
+
+Michal, Vlasta, can you please take a look?
+
+More specifically, those ghes_iounmap_nmi/ghes_iounmap_irq calls to
+unmap_kernel_range_noflush() happening in NMI/IRQ context.
+
+> One thing I don't fully grok about the code: since the page is mapped
+> using ioremap_page_range, doesn't that allow other CPUs to speculatively
+> fill their TLB with entries corresponding to the page mapped by the IRQ
+> handler on another core? If the core with the speculative entries then
+> takes an APEI exception, what guarantees do we have that it's looking at
+> the right page? I think, for x86, we need a local invalidation on map,
+> too.
+
+You're looking at ghes_copy_tofrom_phys(), right? That's grabbing
+spinlocks in IRQ/NMI context and doing the iounmap a bit later, below
+on the same core. I mean, I don't see us landing on another core in
+between, we're non-preemptible...
+
+Or do you mean something else?
+
+-- 
+Regards/Gruss,
+    Boris.
+
+SUSE Linux GmbH, GF: Felix Imend?rffer, Jane Smithard, Graham Norton, HRB 21284 (AG N?rnberg)
+-- 
