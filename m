@@ -1,88 +1,82 @@
 From: mark.yao@rock-chips.com (Mark Yao)
-Date: Mon, 14 Dec 2015 16:36:55 +0800
-Subject: [PATCH v2 6/8] drm/rockchip: direct config connecter gate and out_mode
+Date: Mon, 14 Dec 2015 16:39:01 +0800
+Subject: [PATCH v2 7/8] drm: bridge/dw_hdmi: add atomic API support
 In-Reply-To: <1450081931-9709-1-git-send-email-mark.yao@rock-chips.com>
 References: <1450081931-9709-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <1450082215-10377-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <1450082341-10415-1-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both connecter gate and out_mode are not conflict with mode set
-configure. Direct setting connecter gate and out_mode, that allow
-connector do rockchip_drm_crtc_mode_config after mode set.
+Fill atomic needed funcs with default atomic helper library.
+
+Rockchip use dw_hdmi, and drm/rockchip will covert to atomic api,
+we need dw_hdmi support atomic funcs.
+
+Now another drm driver use dw_hdmi is imx, not yet atomic, so
+check DRIVER_ATOMIC at runtime to spilt atomic and not atomic.
+
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Philipp Zabel <p.zabel@pengutronix.de>
+Cc: Andy Yan <andy.yan@rock-chips.com>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Thierry Reding <treding@nvidia.com>
 
 Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
 ---
+Changes in v2:
+Adviced by Daniel Vetter
+- check DRIVER_ATOMIC at runtime to spilt atomic and not atomic.
 
-Changes in v2: None
+ drivers/gpu/drm/bridge/dw_hdmi.c |   23 +++++++++++++++++++++--
+ 1 file changed, 21 insertions(+), 2 deletions(-)
 
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c |   40 ++++++++++++---------------
- 1 file changed, 18 insertions(+), 22 deletions(-)
-
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index 40cc8ed..43573be 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -89,9 +89,6 @@ struct vop {
- 	struct drm_device *drm_dev;
- 	bool is_enabled;
+diff --git a/drivers/gpu/drm/bridge/dw_hdmi.c b/drivers/gpu/drm/bridge/dw_hdmi.c
+index 56de9f1..dc0bdd4 100644
+--- a/drivers/gpu/drm/bridge/dw_hdmi.c
++++ b/drivers/gpu/drm/bridge/dw_hdmi.c
+@@ -22,6 +22,7 @@
  
--	int connector_type;
--	int connector_out_mode;
--
- 	/* mutex vsync_ work */
- 	struct mutex vsync_mutex;
- 	bool vsync_work_pending;
-@@ -1026,8 +1023,24 @@ int rockchip_drm_crtc_mode_config(struct drm_crtc *crtc,
- {
- 	struct vop *vop = to_vop(crtc);
+ #include <drm/drm_of.h>
+ #include <drm/drmP.h>
++#include <drm/drm_atomic_helper.h>
+ #include <drm/drm_crtc_helper.h>
+ #include <drm/drm_edid.h>
+ #include <drm/drm_encoder_slave.h>
+@@ -1522,6 +1523,17 @@ static struct drm_connector_funcs dw_hdmi_connector_funcs = {
+ 	.force = dw_hdmi_connector_force,
+ };
  
--	vop->connector_type = connector_type;
--	vop->connector_out_mode = out_mode;
-+	if (WARN_ON(!vop->is_enabled))
-+		return -EINVAL;
++static struct drm_connector_funcs dw_hdmi_atomic_connector_funcs = {
++	.dpms = drm_atomic_helper_connector_dpms,
++	.fill_modes = drm_helper_probe_single_connector_modes,
++	.detect = dw_hdmi_connector_detect,
++	.destroy = dw_hdmi_connector_destroy,
++	.force = dw_hdmi_connector_force,
++	.reset = drm_atomic_helper_connector_reset,
++	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
++	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
++};
 +
-+	switch (connector_type) {
-+	case DRM_MODE_CONNECTOR_LVDS:
-+		VOP_CTRL_SET(vop, rgb_en, 1);
-+		break;
-+	case DRM_MODE_CONNECTOR_eDP:
-+		VOP_CTRL_SET(vop, edp_en, 1);
-+		break;
-+	case DRM_MODE_CONNECTOR_HDMIA:
-+		VOP_CTRL_SET(vop, hdmi_en, 1);
-+		break;
-+	default:
-+		DRM_ERROR("unsupport connector_type[%d]\n", connector_type);
-+		return -EINVAL;
-+	};
-+	VOP_CTRL_SET(vop, out_mode, out_mode);
+ static struct drm_connector_helper_funcs dw_hdmi_connector_helper_funcs = {
+ 	.get_modes = dw_hdmi_connector_get_modes,
+ 	.mode_valid = dw_hdmi_connector_mode_valid,
+@@ -1645,8 +1657,15 @@ static int dw_hdmi_register(struct drm_device *drm, struct dw_hdmi *hdmi)
  
- 	return 0;
- }
-@@ -1131,23 +1144,6 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
- 		vop_dsp_hold_valid_irq_disable(vop);
- 	}
+ 	drm_connector_helper_add(&hdmi->connector,
+ 				 &dw_hdmi_connector_helper_funcs);
+-	drm_connector_init(drm, &hdmi->connector, &dw_hdmi_connector_funcs,
+-			   DRM_MODE_CONNECTOR_HDMIA);
++
++	if (drm_core_check_feature(drm, DRIVER_ATOMIC))
++		drm_connector_init(drm, &hdmi->connector,
++				   &dw_hdmi_atomic_connector_funcs,
++				   DRM_MODE_CONNECTOR_HDMIA);
++	else
++		drm_connector_init(drm, &hdmi->connector,
++				   &dw_hdmi_connector_funcs,
++				   DRM_MODE_CONNECTOR_HDMIA);
  
--	switch (vop->connector_type) {
--	case DRM_MODE_CONNECTOR_LVDS:
--		VOP_CTRL_SET(vop, rgb_en, 1);
--		break;
--	case DRM_MODE_CONNECTOR_eDP:
--		VOP_CTRL_SET(vop, edp_en, 1);
--		break;
--	case DRM_MODE_CONNECTOR_HDMIA:
--		VOP_CTRL_SET(vop, hdmi_en, 1);
--		break;
--	default:
--		DRM_ERROR("unsupport connector_type[%d]\n",
--			  vop->connector_type);
--		goto out;
--	};
--	VOP_CTRL_SET(vop, out_mode, vop->connector_out_mode);
--
- 	val = 0x8;
- 	val |= (adjusted_mode->flags & DRM_MODE_FLAG_NHSYNC) ? 0 : 1;
- 	val |= (adjusted_mode->flags & DRM_MODE_FLAG_NVSYNC) ? 0 : (1 << 1);
+ 	hdmi->connector.encoder = encoder;
+ 
 -- 
 1.7.9.5
