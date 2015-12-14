@@ -1,68 +1,28 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 14 Dec 2015 14:06:06 +0100
-Subject: [PATCH 3/4] ARM: dts: rockchip: add eFuse node for rk3066a SoCs
-In-Reply-To: <566E926E.7090903@linaro.org>
-References: <1447227272-1728-1-git-send-email-wxt@rock-chips.com>
- <1447227272-1728-4-git-send-email-wxt@rock-chips.com>
- <566E926E.7090903@linaro.org>
-Message-ID: <3368238.OTPIyEf9PI@diego>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 14 Dec 2015 14:10:31 +0100
+Subject: [PATCH] gpio: zynq: Do PM initialization earlier to support gpio
+ hogs
+In-Reply-To: <fc67101afc0d10efbaeeb6bc3d881ab49e3f4671.1449745801.git.michal.simek@xilinx.com>
+References: <fc67101afc0d10efbaeeb6bc3d881ab49e3f4671.1449745801.git.michal.simek@xilinx.com>
+Message-ID: <CACRpkdYsOtzc_TnRA=CuvQMFNpgrMHhUvLu1kRQFynk5wLNz0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi srini,
+On Thu, Dec 10, 2015 at 12:10 PM, Michal Simek <michal.simek@xilinx.com> wrote:
 
-Am Montag, 14. Dezember 2015, 09:57:02 schrieb Srinivas Kandagatla:
-> Heiko,
-> 
-> Can you take the DT patches in this series via your tree.
-> 
-> I picked up nvmem patches from this series.
+> GPIO hogs registration is call at the end of gpiochip_add() function.
+> Calling sequence is:
+> gpiochip_add -> of_gpiochip_add -> of_gpiochip_scan_hogs ->
+> gpiod_hog -> gpiochip_request_own_desc -> __gpiod_request ->
+> chip->request -> zynq_gpio_request which calls pm_runtime_get_sync()
+> which returns -13 because PM is not initialized yet.
+>
+> Initialize PM before gpiochip_add is called to fix this issue.
+>
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 
-yep that was my plan ... just needed to wait for the nvmem parts to be picked.
+Patch applied!
 
-
-Thanks for the notifying me :-)
-Heiko
-
-
-> 
-> thanks,
-> srini
-> 
-> On 11/11/15 07:34, Caesar Wang wrote:
-> > This patch add the eFuse dt node for rk3066a SoCs.
-> > 
-> > Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> > ---
-> > 
-> >   arch/arm/boot/dts/rk3066a.dtsi | 13 +++++++++++++
-> >   1 file changed, 13 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/rk3066a.dtsi
-> > b/arch/arm/boot/dts/rk3066a.dtsi index 946f187..f61bb8a 100644
-> > --- a/arch/arm/boot/dts/rk3066a.dtsi
-> > +++ b/arch/arm/boot/dts/rk3066a.dtsi
-> > @@ -153,6 +153,19 @@
-> > 
-> >   		clock-names = "timer", "pclk";
-> >   	
-> >   	};
-> > 
-> > +	efuse: efuse at 20010000 {
-> > +		compatible = "rockchip,rockchip-efuse";
-> > +		reg = <0x20010000 0x4000>;
-> > +		#address-cells = <1>;
-> > +		#size-cells = <1>;
-> > +		clocks = <&cru PCLK_EFUSE>;
-> > +		clock-names = "pclk_efuse";
-> > +
-> > +		cpu_leakage: cpu_leakage {
-> > +			reg = <0x17 0x1>;
-> > +		};
-> > +	};
-> > +
-> > 
-> >   	timer at 20038000 {
-> >   	
-> >   		compatible = "snps,dw-apb-timer-osc";
-> >   		reg = <0x20038000 0x100>;
+Yours,
+Linus Walleij
