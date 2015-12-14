@@ -1,17 +1,40 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 14 Dec 2015 10:31:12 -0800
-Subject: [PATCH] mtd: omap_elm: print interrupt resource using %pr
-In-Reply-To: <1472979.NmboBT3Vms@wuerfel>
-References: <2101351.RbJOfbsbGX@wuerfel> <20151212011056.GA144873@google.com>
- <1472979.NmboBT3Vms@wuerfel>
-Message-ID: <20151214183112.GB10460@google.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 14 Dec 2015 12:42:59 -0600
+Subject: [PATCH V2 2/3] ARM: multi_v7_defconfig: Enable AM437x PMIC TPS65218
+In-Reply-To: <1450118580-24754-1-git-send-email-nm@ti.com>
+References: <1450118580-24754-1-git-send-email-nm@ti.com>
+Message-ID: <1450118580-24754-3-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 12, 2015 at 03:41:31PM +0100, Arnd Bergmann wrote:
-> On Friday 11 December 2015 17:10:56 Brian Norris wrote:
-> > drivers/mtd/nand/omap_elm.c:417 elm_probe() error: '%pr' expects argument of type struct resource *, but argument 3 has type 'struct resource**' [smatch]
-> 
-> Ah, good catch. Do you want to fix it up yourself, or should I send a new version?
+Enable PMIC for AM437x platforms such as AM437x-sk similar to commit
+a186cf10da84 ("ARM: omap2plus_defconfig: enable TPS65218 configs").
+This allows multi_v7_defconfig to boot up on AM437x-sk platform.
 
-Can you send a new one?
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ arch/arm/configs/multi_v7_defconfig |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index a8b6de1d6d9a..f8b61b7abc41 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -412,6 +412,7 @@ CONFIG_MFD_STMPE=y
+ CONFIG_MFD_PALMAS=y
+ CONFIG_MFD_TPS65090=y
+ CONFIG_MFD_TPS65217=y
++CONFIG_MFD_TPS65218=y
+ CONFIG_MFD_TPS6586X=y
+ CONFIG_MFD_TPS65910=y
+ CONFIG_REGULATOR_AB8500=y
+@@ -443,6 +444,7 @@ CONFIG_REGULATOR_TPS51632=y
+ CONFIG_REGULATOR_TPS62360=y
+ CONFIG_REGULATOR_TPS65090=y
+ CONFIG_REGULATOR_TPS65217=y
++CONFIG_REGULATOR_TPS65218=y
+ CONFIG_REGULATOR_TPS6586X=y
+ CONFIG_REGULATOR_TPS65910=y
+ CONFIG_REGULATOR_TWL4030=y
+-- 
+1.7.9.5
