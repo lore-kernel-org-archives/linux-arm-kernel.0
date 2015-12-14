@@ -1,36 +1,47 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Mon, 14 Dec 2015 17:14:09 +0900
-Subject: [PATCH] serial: sh-sci: Add device tree support for r8a779[23]
-In-Reply-To: <CAMuHMdXjQ+N5zfJnQa97N_ob4WUtLTUgePL99e40SjT=tDGfuA@mail.gmail.com>
-References: <1448587224-8633-1-git-send-email-horms+renesas@verge.net.au>
- <20151213065250.GA2230@kroah.com>
- <20151214062722.GH18143@verge.net.au>
- <CAMuHMdXjQ+N5zfJnQa97N_ob4WUtLTUgePL99e40SjT=tDGfuA@mail.gmail.com>
-Message-ID: <20151214081408.GA9929@verge.net.au>
+Date: Mon, 14 Dec 2015 17:15:27 +0900
+Subject: [PATCH 6/6] staging: board: armadillo800eva: Use "arm,pl390"
+In-Reply-To: <CAMuHMdXZdJ3WFNm=rRHwd=XtCF3mmbGCH1kA7HoPYdzcXhE8_Q@mail.gmail.com>
+References: <CAMuHMdXZdJ3WFNm=rRHwd=XtCF3mmbGCH1kA7HoPYdzcXhE8_Q@mail.gmail.com>
+Message-ID: <20151214081526.GB9929@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 14, 2015 at 08:49:18AM +0100, Geert Uytterhoeven wrote:
-> On Mon, Dec 14, 2015 at 7:27 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Sat, Dec 12, 2015 at 10:52:50PM -0800, Greg Kroah-Hartman wrote:
-> >> On Fri, Nov 27, 2015 at 10:20:24AM +0900, Simon Horman wrote:
-> >> > Simply document new compat strings.
-> >> > There appears to be no need for a driver updates.
-> >> >
-> >> > Also update the name of the r8a7791 to M2-W: the name changed a while back.
-> >> >
-> >> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >>
-> >> Doesn't apply to my tree :(
-> >
-> > I'm a little confused.
-> >
-> > The tty-next branch of the tty tree seems to be v4.4-rc5.
-> > And the patch seems to apply there. Please let me know what
-> > I should be using as a base.
+On Mon, Dec 14, 2015 at 08:51:24AM +0100, Geert Uytterhoeven wrote:
+> Hi Simon,
 > 
-> Greg has applied the patch from Ulrich, which added support for r8a7793.
-> Hence your patch adding support for r8a7792 and r8a7793 no longer applies.
+> On Mon, Dec 14, 2015 at 7:29 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Sun, Dec 13, 2015 at 09:16:47PM -0800, Greg Kroah-Hartman wrote:
+> >> On Mon, Dec 14, 2015 at 02:05:26PM +0900, Simon Horman wrote:
+> >> > On Fri, Dec 11, 2015 at 11:28:30AM -0500, Greg Kroah-Hartman wrote:
+> >> > > On Fri, Nov 20, 2015 at 01:36:57PM +0100, Geert Uytterhoeven wrote:
+> >> > > > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >> > > > ---
+> >> > > > Must be applied together with "ARM: shmobile: r8a7740 dtsi: Use
+> >> > > > "arm,pl390" for GIC"!
+> >> > > >
+> >> > > > Greg: Can you please provide your ack? Thanks!
+> >> > >
+> >> > > Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> >> >
+> >> > Thanks Greg,
+> >> >
+> >> > I have taken the liberty of assuming that ack also applies to
+> >> > patch 5/6 of this series, the other staging/board patch in
+> >> > this series.
+> >>
+> >> Oops, yes, good call, thanks for doing this.
+> >
+> > No problem.
+> >
+> > For the record I have queued up these patches for v4.6 as I
+> > believe that the ARM SoC maintainers prefer not to have
+> > driver changes depending on DT changes and the first four patches
+> > of this series are DT changes.
+> 
+> Do you mean you have queued up the DT changes for v4.5, and the
+> staging changes for v4.6.? That would break staging/board in v4.5, as both
+> changes should be together as close as possible.
 
-Thanks. I'll come back to the r8a7792 later. Perhaps much later.
-Its not a high priority.
+That is what I meant. Thanks for letting me know that it wont fly.
+I'll see about bundling all the changes in a single branch for v4.5.
