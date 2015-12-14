@@ -1,49 +1,30 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 14 Dec 2015 14:36:05 +0000
-Subject: [PATCH 3/3] arm64: dts: r8a7795: Add pmu device nodes
-In-Reply-To: <1449236333-4410-3-git-send-email-dirk.behme@gmail.com>
-References: <1449236333-4410-1-git-send-email-dirk.behme@gmail.com>
- <1449236333-4410-3-git-send-email-dirk.behme@gmail.com>
-Message-ID: <566ED3D5.1080301@arm.com>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 14 Dec 2015 15:41:13 +0100
+Subject: [PATCH V4 2/2] ARM: dts: imx6q: add Novena board
+In-Reply-To: <CAOMZO5DXnMfrdsUfptbErNdULAYCRg0KuPELYWYVxx5HtezHMw@mail.gmail.com>
+References: <20151211110700.GD11252@tiger> <201512141512.24281.marex@denx.de>
+ <CAOMZO5DXnMfrdsUfptbErNdULAYCRg0KuPELYWYVxx5HtezHMw@mail.gmail.com>
+Message-ID: <201512141541.14107.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Monday, December 14, 2015 at 03:17:04 PM, Fabio Estevam wrote:
+> Hi Marek,
 
+Hi!
 
-On 04/12/15 13:38, Dirk Behme wrote:
-> From: Yoshifumi Hosoya <yoshifumi.hosoya.wj@renesas.com>
->
-> Enabling the performance monitor unit on r8a7795.
->
-> Signed-off-by: Masaru Nagai <masaru.nagai.vx@renesas.com>
-> Signed-off-by: Yoshifumi Hosoya <yoshifumi.hosoya.wj@renesas.com>
-> Sigend-off-by: Dirk Behme <dirk.behme@gmail.com>
-> ---
-> Note: This patch picked from
->
-> https://git.kernel.org/cgit/linux/kernel/git/horms/renesas-bsp.git/log/?h=v4.2/rcar-3.0.x
->
-> and rebased against
->
-> https://git.kernel.org/cgit/linux/kernel/git/geert/renesas-drivers.git/log/?h=topic/gen3-latest renesas-drivers-2015-12-01-v4.4-rc3
->
->   arch/arm64/boot/dts/renesas/r8a7795.dtsi | 12 ++++++++++++
->   1 file changed, 12 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> index 946a5bb..8113b71 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> @@ -247,6 +247,18 @@
->   			power-domains = <&cpg>;
->   		};
->
-> +		pmu {
-> +			compatible = "arm,armv8-pmuv3";
+> On Mon, Dec 14, 2015 at 12:12 PM, Marek Vasut <marex@denx.de> wrote:
+> > So it was correct from the get-go ? Uh ...
+> > 
+> > Thanks for clarification, I will remember this :)
+> 
+> If you prefer, you can even remove this memory node entry from the dts
+> and let the bootloader pass the correct amount of RAM to the kernel.
+> 
+> This is useful when a board has variants in RAM size.
 
-You can add more specific compatible "arm,cortex-a57-pmu" if it's Cortex
-A57.
+Well that's a good idea, but some sort of sane default should be present
+anyway, right ?
 
--- 
-Regards,
-Sudeep
+Best regards,
+Marek Vasut
