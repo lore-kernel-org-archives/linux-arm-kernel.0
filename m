@@ -1,29 +1,26 @@
-From: orders@kingagrocenter.com (America Airlines)
-Date: Mon, 14 Dec 2015 05:18:24 +0000
-Subject: America Airlines E-Ticket #0000454927
-Message-ID: <98695073570f049191516411b8b0ec4b@kingagrocenter.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 14 Dec 2015 15:27:22 +0900
+Subject: [PATCH] serial: sh-sci: Add device tree support for r8a779[23]
+In-Reply-To: <20151213065250.GA2230@kroah.com>
+References: <1448587224-8633-1-git-send-email-horms+renesas@verge.net.au>
+ <20151213065250.GA2230@kroah.com>
+Message-ID: <20151214062722.GH18143@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear customer,
+On Sat, Dec 12, 2015 at 10:52:50PM -0800, Greg Kroah-Hartman wrote:
+> On Fri, Nov 27, 2015 at 10:20:24AM +0900, Simon Horman wrote:
+> > Simply document new compat strings.
+> > There appears to be no need for a driver updates.
+> > 
+> > Also update the name of the r8a7791 to M2-W: the name changed a while back.
+> > 
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> Doesn't apply to my tree :(
 
-Your payment has been successfully processed and charged from your credit card.
+I'm a little confused.
 
-E-Ticket is attached to this email.
-
-Below you can find the order details and e-ticket information:
-
-FLIGHT NUMBER : OQ633571
-DATE & TIME : Dec 18 2015, 19:50
-DEPARTING : El Paso
-TOTAL PRICE : $ 470.00
-
-Thank you for choosing America Airlines.
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: E-Ticket_0000454927.zip
-Type: application/zip
-Size: 2080 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151214/f6a73f52/attachment-0001.zip>
+The tty-next branch of the tty tree seems to be v4.4-rc5.
+And the patch seems to apply there. Please let me know what
+I should be using as a base.
