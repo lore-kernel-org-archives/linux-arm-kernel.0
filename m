@@ -1,27 +1,46 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 15 Dec 2015 01:01:55 +0100
-Subject: [PICKME 0/2] cpufreq: New ST driver
-In-Reply-To: <20151211070532.GB13538@x1>
-References: <1449740537-12619-1-git-send-email-lee.jones@linaro.org>
- <20151211031900.GM3612@ubuntu> <20151211070532.GB13538@x1>
-Message-ID: <1572907.kzmv8s8d6Y@vostro.rjw.lan>
+From: scottwood@freescale.com (Scott Wood)
+Date: Mon, 14 Dec 2015 17:32:59 -0600
+Subject: [PATCH V3 5/6] clk: qoriq: Add ls1043a support.
+In-Reply-To: <20151015195456.GT4558@codeaurora.org>
+References: <1444822498-16477-1-git-send-email-B48286@freescale.com>
+ <1444822498-16477-6-git-send-email-B48286@freescale.com>
+ <20151014183113.GE26883@codeaurora.org>
+ <1444870621.5185.223.camel@freescale.com>
+ <20151015195456.GT4558@codeaurora.org>
+Message-ID: <1450135979.15946.406.camel@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, December 11, 2015 07:05:32 AM Lee Jones wrote:
-> On Fri, 11 Dec 2015, Viresh Kumar wrote:
-> > On 10-12-15, 22:38, Rafael J. Wysocki wrote:
-> > > Do they depend on anything special?
+On Thu, 2015-10-15 at 12:54 -0700, Stephen Boyd wrote:
+> On 10/14, Scott Wood wrote:
+> > On Wed, 2015-10-14 at 11:31 -0700, Stephen Boyd wrote:
+> > > On 10/14, Zhiqiang Hou wrote:
+> > > > From: Hou Zhiqiang <B48286@freescale.com>
+> > > > 
+> > > > Signed-off-by: Hou Zhiqiang <B48286@freescale.com>
+> > > > ---
+> > > 
+> > > Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+> > > 
 > > 
-> > My opp-binding-parsing patches which you applied to bleeding-edge.
+> > Could you ack my clock patchset that this depends on (if there are no 
+> > 
+> > objections)?  Mike Turquette acked the RFC version a while back, but it's 
+> > 
+> > changed a bit since then (including the new clk_get_num_parents() and 
+> > 
+> > clk_get_parent_by_index() -- I CCed Russell King on that but got no 
+> > 
+> > response), and got no response when I asked whether the ack was still good
+> > 
+> > for v3.
+> > 
+> > 
 > 
-> I thought these had already been applied.
-> 
-> > Yes, Lee should have mentioned that explicitly.
-> 
-> Aye, apologies for that.
+> Done. The consumer APIs look ok too, but I'd like to see if
+> Russell has any comments.
 
-No prob, applied now.
+I've pinged Russell several times and gotten no response -- how should we
+proceed?
 
-Thanks,
-Rafael
+-Scott
