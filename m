@@ -1,38 +1,38 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 14 Dec 2015 15:13:48 +0000
-Subject: [PATCH v7 1/4] acpi: pci: Setup MSI domain for ACPI based pci
- devices
-In-Reply-To: <1449766530-16935-2-git-send-email-Suravee.Suthikulpanit@amd.com>
-References: <1449766530-16935-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1449766530-16935-2-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <566EDCAC.1080401@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 14 Dec 2015 15:18:13 +0000
+Subject: [RFC PATCH 1/2] arm64: Defer dcache flush in __cpu_copy_user_page
+In-Reply-To: <1450099664-38554-2-git-send-email-ashoks@broadcom.com>
+References: <1450099664-38554-1-git-send-email-ashoks@broadcom.com>
+ <1450099664-38554-2-git-send-email-ashoks@broadcom.com>
+Message-ID: <20151214151813.GE22038@mbp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/12/15 16:55, Suravee Suthikulpanit wrote:
-> This patch introduces pci_msi_register_fwnode_provider() for irqchip
-> to register a callback, to provide a way to determine appropriate MSI
-> domain for a pci device.
+On Mon, Dec 14, 2015 at 05:27:43AM -0800, Ashok Kumar wrote:
+> Defer dcache flushing to __sync_icache_dcache by calling
+> flush_dcache_page which clears PG_dcache_clean flag.
 > 
-> It also introduces pci_host_bridge_acpi_msi_domain(), which returns
-> the MSI domain of the specified PCI host bridge with DOMAIN_BUS_PCI_MSI
-> bus token. Then, it is assigned to pci device.
+> Signed-off-by: Ashok Kumar <ashoks@broadcom.com>
+> ---
+>  arch/arm64/mm/copypage.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> diff --git a/arch/arm64/mm/copypage.c b/arch/arm64/mm/copypage.c
+> index 13bbc3be..22e4cb4 100644
+> --- a/arch/arm64/mm/copypage.c
+> +++ b/arch/arm64/mm/copypage.c
+> @@ -24,8 +24,9 @@
+>  
+>  void __cpu_copy_user_page(void *kto, const void *kfrom, unsigned long vaddr)
+>  {
+> +	struct page *page = virt_to_page(kto);
+>  	copy_page(kto, kfrom);
+> -	__flush_dcache_area(kto, PAGE_SIZE);
+> +	flush_dcache_page(page);
+>  }
+>  EXPORT_SYMBOL_GPL(__cpu_copy_user_page);
 
-Bjorn, Rafael,
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
-Do you have any comment on this?
-
-I was hoping to queue this work (and the 3 patches that depend on it)
-for 4.5, but if you don't have the bandwidth to review it, I'll postpone
-it to the following merge window.
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Catalin
