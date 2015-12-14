@@ -1,538 +1,213 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 14 Dec 2015 12:26:02 +0100
-Subject: [PATCH v9 5/8] iio: adc: fsl,imx25-gcq driver
-In-Reply-To: <566C55F0.6080901@kernel.org>
-References: <1449431542-1892-1-git-send-email-mpa@pengutronix.de>
- <1449431542-1892-6-git-send-email-mpa@pengutronix.de>
- <566C55F0.6080901@kernel.org>
-Message-ID: <1783157.2jnGQGOp7m@adelgunde>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 14 Dec 2015 12:39:44 +0100
+Subject: [PATCH v3 3/5] soc: rockchip: add reboot notifier driver
+In-Reply-To: <1447840582-19850-1-git-send-email-andy.yan@rock-chips.com>
+References: <1447840044-19689-1-git-send-email-andy.yan@rock-chips.com>
+ <1447840582-19850-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <10162108.nOThMrrbdf@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Saturday 12 December 2015 17:14:24 Jonathan Cameron wrote:
-> On 06/12/15 19:52, Markus Pargmann wrote:
-> > This is a conversion queue driver for the mx25 SoC. It uses the central
-> > ADC which is used by two seperate independent queues. This driver
-> > prepares different conversion configurations for each possible input.
-> > For a conversion it creates a conversionqueue of one item with the
-> conversion queue
-> > correct configuration for the chosen channel. It then executes the queue
-> > once and disables the conversion queue afterwards.
-> > 
-> > The reference voltages are configurable through devicetree subnodes,
-> > depending on the connections of the ADC inputs.
-> > 
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > Signed-off-by: Denis Carikli <denis@eukrea.com>
-> A couple of little bits inline.  Fix the return of 0 on fail in probe
-> and you can add
-
-Thanks, I fixed all your comments for the next version.
-
-Best Regards,
-
-Markus
-
+On Wednesday 18 November 2015 17:56:22 Andy Yan wrote:
+> rockchip platform have a protocol to pass the kernel reboot
+> mode to bootloader by some special registers when system reboot.
+> By this way the bootloader can take different action according
+> to the different kernel reboot mode, for example, command
+> "reboot loader" will reboot the board to rockusb mode, this is
+> a very convenient way to get the board enter download mode.
 > 
-> Acked-by: Jonathan Cameron <jic23@kernel.org>
-> > ---
-> > 
-> > Notes:
-> >     Changes in v7:
-> >      - Remove separate functions mx25_gcq_disable/enable_eoq() as they were used at
-> >        only one position
-> >      - Enforce an external reference regulator if one of the conversions uses it as
-> >        reference. The devm_regulator_get() call was moved into
-> >        mx25_gcq_setup_cfgs() to be able to acquire the reference regulator when
-> >        necessary.
-> >      - Store indio_dev as platform driver data instead of the private data. This
-> >        was changed in probe() and remove().
-> >     
-> >     Changes in v6:
-> >      - Added defines for a complete list of references in the dt binding macros
-> > 
-> >  drivers/iio/adc/Kconfig         |   7 +
-> >  drivers/iio/adc/Makefile        |   1 +
-> >  drivers/iio/adc/fsl-imx25-gcq.c | 415 ++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 423 insertions(+)
-> >  create mode 100644 drivers/iio/adc/fsl-imx25-gcq.c
-> > 
-> > diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
-> > index 7868c744fd4b..73145c53ec2c 100644
-> > --- a/drivers/iio/adc/Kconfig
-> > +++ b/drivers/iio/adc/Kconfig
-> > @@ -183,6 +183,13 @@ config EXYNOS_ADC
-> >  	  To compile this driver as a module, choose M here: the module will be
-> >  	  called exynos_adc.
-> >  
-> > +config FSL_MX25_ADC
-> > +	tristate "Freescale MX25 ADC driver"
-> > +	depends on MFD_MX25_TSADC
-> > +	help
-> > +	  Generic Conversion Queue driver used for general purpose ADC in the
-> > +	  MX25. This driver supports single measurements using the MX25 ADC.
-> > +
-> >  config HI8435
-> >  	tristate "Holt Integrated Circuits HI-8435 threshold detector"
-> >  	select IIO_TRIGGERED_EVENT
-> > diff --git a/drivers/iio/adc/Makefile b/drivers/iio/adc/Makefile
-> > index 99b37a963a1e..2fe9b78e4b02 100644
-> > --- a/drivers/iio/adc/Makefile
-> > +++ b/drivers/iio/adc/Makefile
-> > @@ -19,6 +19,7 @@ obj-$(CONFIG_BERLIN2_ADC) += berlin2-adc.o
-> >  obj-$(CONFIG_CC10001_ADC) += cc10001_adc.o
-> >  obj-$(CONFIG_DA9150_GPADC) += da9150-gpadc.o
-> >  obj-$(CONFIG_EXYNOS_ADC) += exynos_adc.o
-> > +obj-$(CONFIG_FSL_MX25_ADC) += fsl-imx25-gcq.o
-> >  obj-$(CONFIG_HI8435) += hi8435.o
-> >  obj-$(CONFIG_LP8788_ADC) += lp8788_adc.o
-> >  obj-$(CONFIG_MAX1027) += max1027.o
-> > diff --git a/drivers/iio/adc/fsl-imx25-gcq.c b/drivers/iio/adc/fsl-imx25-gcq.c
-> > new file mode 100644
-> > index 000000000000..eb9570876291
-> > --- /dev/null
-> > +++ b/drivers/iio/adc/fsl-imx25-gcq.c
-> > @@ -0,0 +1,415 @@
-> > +/*
-> > + * Copyright (C) 2014-2015 Pengutronix, Markus Pargmann <mpa@pengutronix.de>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify it under
-> > + * the terms of the GNU General Public License version 2 as published by the
-> > + * Free Software Foundation.
-> > + *
-> > + * This is the driver for the imx25 GCQ (Generic Conversion Queue)
-> > + * connected to the imx25 ADC.
-> > + */
-> > +
-> > +#include <dt-bindings/iio/adc/fsl-imx25-gcq.h>
-> > +#include <linux/clk.h>
-> > +#include <linux/iio/iio.h>
-> > +#include <linux/interrupt.h>
-> > +#include <linux/mfd/imx25-tsadc.h>
-> > +#include <linux/module.h>
-> > +#include <linux/of.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/regmap.h>
-> > +#include <linux/regulator/consumer.h>
-> > +
-> > +#define MX25_GCQ_TIMEOUT (msecs_to_jiffies(2000))
-> > +
-> > +static const char * const driver_name = "mx25-gcq";
-> > +
-> > +enum mx25_gcq_cfgs {
-> > +	MX25_CFG_XP = 0,
-> > +	MX25_CFG_YP,
-> > +	MX25_CFG_XN,
-> > +	MX25_CFG_YN,
-> > +	MX25_CFG_WIPER,
-> > +	MX25_CFG_INAUX0,
-> > +	MX25_CFG_INAUX1,
-> > +	MX25_CFG_INAUX2,
-> > +	MX25_NUM_CFGS,
-> > +};
-> > +
-> > +struct mx25_gcq_priv {
-> > +	struct regmap *regs;
-> > +	struct completion completed;
-> > +	struct clk *clk;
-> > +	int irq;
-> > +	struct regulator *vref[4];
-> > +	u32 channel_vref_mv[MX25_NUM_CFGS];
-> > +};
-> > +
-> > +#define MX25_CQG_CHAN(chan, id) {\
-> > +	.type = IIO_VOLTAGE,\
-> > +	.indexed = 1,\
-> > +	.channel = chan,\
-> > +	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) | \
-> > +			      BIT(IIO_CHAN_INFO_SCALE),\
-> > +	.datasheet_name = id,\
-> > +}
-> > +
-> > +static const struct iio_chan_spec mx25_gcq_channels[MX25_NUM_CFGS] = {
-> > +	MX25_CQG_CHAN(MX25_CFG_XP, "xp"),
-> > +	MX25_CQG_CHAN(MX25_CFG_YP, "yp"),
-> > +	MX25_CQG_CHAN(MX25_CFG_XN, "xn"),
-> > +	MX25_CQG_CHAN(MX25_CFG_YN, "yn"),
-> > +	MX25_CQG_CHAN(MX25_CFG_WIPER, "wiper"),
-> > +	MX25_CQG_CHAN(MX25_CFG_INAUX0, "inaux0"),
-> > +	MX25_CQG_CHAN(MX25_CFG_INAUX1, "inaux1"),
-> > +	MX25_CQG_CHAN(MX25_CFG_INAUX2, "inaux2"),
-> > +};
-> > +
-> > +static const char * const mx25_gcq_refp_names[] = {
-> > +	[MX25_ADC_REFP_YP] = "yp",
-> > +	[MX25_ADC_REFP_XP] = "xp",
-> > +	[MX25_ADC_REFP_INT] = "int",
-> > +	[MX25_ADC_REFP_EXT] = "ext",
-> > +};
-> > +
-> > +static irqreturn_t mx25_gcq_irq(int irq, void *data)
-> > +{
-> > +	struct mx25_gcq_priv *priv = data;
-> > +	u32 stats;
-> > +
-> > +	regmap_read(priv->regs, MX25_ADCQ_SR, &stats);
-> > +
-> > +	if (stats & MX25_ADCQ_SR_EOQ) {
-> > +		regmap_update_bits(priv->regs, MX25_ADCQ_MR,
-> > +				   MX25_ADCQ_MR_EOQ_IRQ, MX25_ADCQ_MR_EOQ_IRQ);
-> > +		complete(&priv->completed);
-> > +	}
-> > +
-> > +	/* Disable conversion queue run */
-> > +	regmap_update_bits(priv->regs, MX25_ADCQ_CR, MX25_ADCQ_CR_FQS, 0);
-> > +
-> > +	/* Acknowledge all possible irqs */
-> > +	regmap_write(priv->regs, MX25_ADCQ_SR, MX25_ADCQ_SR_FRR |
-> > +		     MX25_ADCQ_SR_FUR | MX25_ADCQ_SR_FOR |
-> > +		     MX25_ADCQ_SR_EOQ | MX25_ADCQ_SR_PD);
-> > +
-> > +	return IRQ_HANDLED;
-> > +}
-> > +
-> > +static int mx25_gcq_get_raw_value(struct device *dev,
-> > +				  struct iio_chan_spec const *chan,
-> > +				  struct mx25_gcq_priv *priv,
-> > +				  int *val)
-> > +{
-> > +	long timeout;
-> > +	u32 data;
-> > +
-> > +	/* Setup the configuration we want to use */
-> > +	regmap_write(priv->regs, MX25_ADCQ_ITEM_7_0,
-> > +		     MX25_ADCQ_ITEM(0, chan->channel));
-> > +
-> > +	regmap_update_bits(priv->regs, MX25_ADCQ_MR, MX25_ADCQ_MR_EOQ_IRQ, 0);
-> > +
-> > +	/* Trigger queue for one run */
-> > +	regmap_update_bits(priv->regs, MX25_ADCQ_CR, MX25_ADCQ_CR_FQS,
-> > +			   MX25_ADCQ_CR_FQS);
-> > +
-> > +	timeout = wait_for_completion_interruptible_timeout(
-> > +		&priv->completed, MX25_GCQ_TIMEOUT);
-> > +	if (timeout < 0) {
-> > +		dev_err(dev, "ADC wait for measurement failed\n");
-> > +		return timeout;
-> > +	} else if (timeout == 0) {
-> > +		dev_err(dev, "ADC timed out\n");
-> > +		return -ETIMEDOUT;
-> > +	}
-> > +
-> > +	regmap_read(priv->regs, MX25_ADCQ_FIFO, &data);
-> > +
-> > +	*val = MX25_ADCQ_FIFO_DATA(data);
-> > +
-> > +	return IIO_VAL_INT;
-> > +}
-> > +
-> > +static int mx25_gcq_read_raw(struct iio_dev *indio_dev,
-> > +			     struct iio_chan_spec const *chan, int *val,
-> > +			     int *val2, long mask)
-> > +{
-> > +	struct mx25_gcq_priv *priv = iio_priv(indio_dev);
-> > +	int ret;
-> > +
-> > +	switch (mask) {
-> > +	case IIO_CHAN_INFO_RAW:
-> > +		mutex_lock(&indio_dev->mlock);
-> > +		ret = mx25_gcq_get_raw_value(&indio_dev->dev, chan, priv, val);
-> > +		mutex_unlock(&indio_dev->mlock);
-> > +		return ret;
-> > +
-> > +	case IIO_CHAN_INFO_SCALE:
-> > +		*val = priv->channel_vref_mv[chan->channel];
-> > +		*val2 = 12;
-> > +		return IIO_VAL_FRACTIONAL_LOG2;
-> > +
-> > +	default:
-> > +		return -EINVAL;
-> > +	}
-> > +}
-> > +
-> > +static const struct iio_info mx25_gcq_iio_info = {
-> > +	.read_raw = mx25_gcq_read_raw,
-> > +};
-> > +
-> > +static const struct regmap_config mx25_gcq_regconfig = {
-> > +	.max_register = 0x5c,
-> > +	.reg_bits = 32,
-> > +	.val_bits = 32,
-> > +	.reg_stride = 4,
-> > +};
-> > +
-> > +static int mx25_gcq_setup_cfgs(struct platform_device *pdev,
-> > +			       struct mx25_gcq_priv *priv)
-> > +{
-> > +	struct device_node *np = pdev->dev.of_node;
-> > +	struct device_node *child;
-> > +	struct device *dev = &pdev->dev;
-> > +	unsigned int refp_used[4] = {};
-> > +	int ret, i;
-> > +
-> > +	/*
-> > +	 * Setup all configurations registers with a default conversion
-> > +	 * configuration for each input
-> > +	 */
-> > +	for (i = 0; i < MX25_NUM_CFGS; ++i)
-> > +		regmap_write(priv->regs, MX25_ADCQ_CFG(i),
-> > +			     MX25_ADCQ_CFG_YPLL_OFF |
-> > +			     MX25_ADCQ_CFG_XNUR_OFF |
-> > +			     MX25_ADCQ_CFG_XPUL_OFF |
-> > +			     MX25_ADCQ_CFG_REFP_INT |
-> > +			     MX25_ADCQ_CFG_IN(i) |
-> > +			     MX25_ADCQ_CFG_REFN_NGND2);
-> > +
-> > +	/*
-> > +	 * First get all regulators to store them in channel_vref_mv if
-> > +	 * necessary. Later we use that information for proper IIO scale
-> > +	 * information.
-> > +	 */
-> > +	priv->vref[MX25_ADC_REFP_INT] = NULL;
-> > +	priv->vref[MX25_ADC_REFP_EXT] =
-> > +		devm_regulator_get_optional(&pdev->dev, "vref-ext");
-> > +	priv->vref[MX25_ADC_REFP_XP] =
-> > +		devm_regulator_get_optional(&pdev->dev, "vref-xp");
-> > +	priv->vref[MX25_ADC_REFP_YP] =
-> > +		devm_regulator_get_optional(&pdev->dev, "vref-yp");
-> > +
-> > +	for_each_child_of_node(np, child) {
-> > +		u32 reg;
-> > +		u32 refp = MX25_ADCQ_CFG_REFP_INT;
-> > +		u32 refn = MX25_ADCQ_CFG_REFN_NGND2;
-> > +
-> > +		ret = of_property_read_u32(child, "reg", &reg);
-> > +		if (ret) {
-> > +			dev_err(dev, "Failed to get reg property\n");
-> > +			return ret;
-> > +		}
-> > +
-> > +		if (reg >= MX25_NUM_CFGS) {
-> > +			dev_err(dev,
-> > +				"reg value is greater than the number of available configuration registers\n");
-> > +			return -EINVAL;
-> > +		}
-> > +
-> > +		of_property_read_u32(child, "fsl,adc-refp", &refp);
-> > +		of_property_read_u32(child, "fsl,adc-refn", &refn);
-> > +
-> > +		switch (refp) {
-> > +		case MX25_ADC_REFP_EXT:
-> > +		case MX25_ADC_REFP_XP:
-> > +		case MX25_ADC_REFP_YP:
-> > +			if (IS_ERR(priv->vref[refp])) {
-> > +				dev_err(dev, "Error, trying to use external voltage reference without a vref-%s regulator.",
-> > +					mx25_gcq_refp_names[refp]);
-> > +				return PTR_ERR(priv->vref[refp]);
-> > +			}
-> > +			priv->channel_vref_mv[reg] =
-> > +				regulator_get_voltage(priv->vref[refp]);
-> > +			/* Conversion from uV to mV */
-> > +			do_div(priv->channel_vref_mv[reg], 1000);
-> > +			break;
-> > +		case MX25_ADC_REFP_INT:
-> > +			priv->channel_vref_mv[reg] = 2500;
-> > +			break;
-> > +		default:
-> > +			dev_err(dev, "Invalid positive reference %d\n", refp);
-> > +			return -EINVAL;
-> > +		}
-> > +
-> > +		++refp_used[refp];
-> > +
-> > +		/*
-> > +		 * Shift the read values to the correct positions within the
-> > +		 * register.
-> > +		 */
-> > +		refp = MX25_ADCQ_CFG_REFP(refp);
-> > +		refn = MX25_ADCQ_CFG_REFN(refn);
-> > +
-> > +		if ((refp & MX25_ADCQ_CFG_REFP_MASK) != refp) {
-> > +			dev_err(dev, "Invalid fsl,adc-refp property value\n");
-> > +			return -EINVAL;
-> > +		}
-> > +		if ((refn & MX25_ADCQ_CFG_REFN_MASK) != refn) {
-> > +			dev_err(dev, "Invalid fsl,adc-refn property value\n");
-> > +			return -EINVAL;
-> > +		}
-> > +
-> > +		regmap_update_bits(priv->regs, MX25_ADCQ_CFG(reg),
-> > +				   MX25_ADCQ_CFG_REFP_MASK |
-> > +				   MX25_ADCQ_CFG_REFN_MASK,
-> > +				   refp | refn);
-> > +	}
-> > +	regmap_update_bits(priv->regs, MX25_ADCQ_CR,
-> > +			   MX25_ADCQ_CR_FRST | MX25_ADCQ_CR_QRST,
-> > +			   MX25_ADCQ_CR_FRST | MX25_ADCQ_CR_QRST);
-> > +
-> > +	regmap_write(priv->regs, MX25_ADCQ_CR,
-> > +		     MX25_ADCQ_CR_PDMSK | MX25_ADCQ_CR_QSM_FQS);
-> > +
-> > +	/* Remove unused regulators */
-> > +	for (i = 0; i != 4; ++i) {
-> > +		if (!refp_used[i]) {
-> > +			if (!IS_ERR_OR_NULL(priv->vref[i]))
-> > +				devm_regulator_put(priv->vref[i]);
-> > +			priv->vref[i] = NULL;
-> > +		}
-> > +	}
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static int mx25_gcq_probe(struct platform_device *pdev)
-> > +{
-> > +	struct iio_dev *indio_dev;
-> > +	struct mx25_gcq_priv *priv;
-> > +	struct mx25_tsadc *tsadc = dev_get_drvdata(pdev->dev.parent);
-> > +	struct device *dev = &pdev->dev;
-> > +	struct resource *res;
-> > +	void __iomem *mem;
-> > +	int ret;
-> > +	int i;
-> > +
-> > +	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*priv));
-> > +	if (!indio_dev)
-> > +		return -ENOMEM;
-> > +
-> > +	priv = iio_priv(indio_dev);
-> > +
-> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +	mem = devm_ioremap_resource(dev, res);
-> > +	if (IS_ERR(mem))
-> > +		return PTR_ERR(mem);
-> > +
-> > +	priv->regs = devm_regmap_init_mmio(dev, mem, &mx25_gcq_regconfig);
-> > +	if (IS_ERR(priv->regs)) {
-> > +		dev_err(dev, "Failed to initialize regmap\n");
-> > +		return PTR_ERR(priv->regs);
-> > +	}
-> > +
-> > +	init_completion(&priv->completed);
-> > +
-> > +	ret = mx25_gcq_setup_cfgs(pdev, priv);
-> > +	if (ret)
-> > +		return ret;
-> > +
-> > +	for (i = 0; i != 4; ++i) {
-> > +		if (!priv->vref[i])
-> > +			continue;
-> > +
-> > +		ret = regulator_enable(priv->vref[i]);
-> > +		if (ret)
-> > +			goto err_regulator_disable;
-> > +	}
-> > +
-> > +	priv->clk = tsadc->clk;
-> > +	ret = clk_prepare_enable(priv->clk);
-> > +	if (ret) {
-> > +		dev_err(dev, "Failed to enable clock\n");
-> > +		goto err_vref_disable;
-> > +	}
-> > +
-> > +	priv->irq = platform_get_irq(pdev, 0);
-> > +	if (priv->irq <= 0) {
-> > +		dev_err(dev, "Failed to get IRQ\n");
-> > +		ret = priv->irq;
-> If it is zero you'll return 0 from probe (success)
-> whilst actually failing.  
-> > +		goto err_clk_unprepare;
-> > +	}
-> > +
-> > +	ret = request_irq(priv->irq, mx25_gcq_irq, 0, pdev->name, priv);
-> > +	if (ret) {
-> > +		dev_err(dev, "Failed requesting IRQ\n");
-> > +		goto err_clk_unprepare;
-> > +	}
-> > +
-> > +	indio_dev->dev.parent = &pdev->dev;
-> > +	indio_dev->channels = mx25_gcq_channels;
-> > +	indio_dev->num_channels = ARRAY_SIZE(mx25_gcq_channels);
-> > +	indio_dev->info = &mx25_gcq_iio_info;
-> > +	indio_dev->name = driver_name;
-> > +
-> > +	ret = iio_device_register(indio_dev);
-> > +	if (ret) {
-> > +		dev_err(dev, "Failed to register iio device\n");
-> > +		goto err_irq_free;
-> > +	}
-> > +
-> > +	platform_set_drvdata(pdev, indio_dev);
-> > +
-> > +	return 0;
-> > +
-> > +err_irq_free:
-> > +	free_irq(priv->irq, (void *)priv);
-> Cast to void * not needed. Any pointer can be implicitly be
-> cast to void *
-> 
-> > +err_clk_unprepare:
-> > +	clk_disable_unprepare(priv->clk);
-> > +err_vref_disable:
-> > +	i = 4;
-> > +err_regulator_disable:
-> > +	for (; i-- > 0;) {
-> > +		if (priv->vref[i])
-> > +			regulator_disable(priv->vref[i]);
-> > +	}
-> > +	return ret;
-> > +}
-> > +
-> > +static int mx25_gcq_remove(struct platform_device *pdev)
-> > +{
-> > +	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
-> > +	struct mx25_gcq_priv *priv = iio_priv(indio_dev);
-> > +	int i;
-> > +
-> > +	iio_device_unregister(indio_dev);
-> > +	free_irq(priv->irq, priv);
-> > +	clk_disable_unprepare(priv->clk);
-> > +	for (i = 4; i-- > 0;) {
-> > +		if (priv->vref[i])
-> > +			regulator_disable(priv->vref[i]);
-> > +	}
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static const struct of_device_id mx25_gcq_ids[] = {
-> > +	{ .compatible = "fsl,imx25-gcq", },
-> > +	{ /* Sentinel */ }
-> > +};
-> > +
-> > +static struct platform_driver mx25_gcq_driver = {
-> > +	.driver		= {
-> > +		.name	= "mx25-gcq",
-> > +		.of_match_table = mx25_gcq_ids,
-> > +	},
-> > +	.probe		= mx25_gcq_probe,
-> > +	.remove		= mx25_gcq_remove,
-> > +};
-> > +module_platform_driver(mx25_gcq_driver);
-> > +
-> > +MODULE_DESCRIPTION("ADC driver for Freescale mx25");
-> > +MODULE_AUTHOR("Markus Pargmann <mpa@pengutronix.de>");
-> > +MODULE_LICENSE("GPL v2");
-> > 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151214/59db2c3a/attachment-0001.sig>
+Adding John Stultz to Cc
+
+I just saw this thread pop up again, and had to think of John's recent
+patch to unify this across platforms.
+
+John, can you have a look at this driver too, and see how it fits in?
+I think this is yet another variant, using an MMIO register rather than
+RAM (as HTC / NVIDIA does) or SRAM (as Qualcomm does), but otherwise
+it conceptually fits in with what you had.
+
+The driver goes through an existing syscon regmap as far as I can
+tell, rather than a memory area or its own device.
+
+	Arnd
+
+> ---
+> 
+> Changes in v3:
+>  - move from mach-rockchip to drivers/soc/rockchip, as the tegra does
+>  - use dts pass the related register
+> 
+> Changes in v2:
+>   - check cpu dt node
+>   - remove a unnecessary of_put_node in function rockchip_get_pmu_regmap
+>   - fix a align issue
+>   - use reboot_notifier instead of restart_handler
+> 
+>  drivers/soc/rockchip/Kconfig  |  7 ++++
+>  drivers/soc/rockchip/Makefile |  1 +
+>  drivers/soc/rockchip/loader.h | 22 ++++++++++
+>  drivers/soc/rockchip/reboot.c | 98 +++++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 128 insertions(+)
+>  create mode 100644 drivers/soc/rockchip/loader.h
+>  create mode 100644 drivers/soc/rockchip/reboot.c
+> 
+> diff --git a/drivers/soc/rockchip/Kconfig b/drivers/soc/rockchip/Kconfig
+> index 7140ff8..4edbc44 100644
+> --- a/drivers/soc/rockchip/Kconfig
+> +++ b/drivers/soc/rockchip/Kconfig
+> @@ -15,4 +15,11 @@ config ROCKCHIP_PM_DOMAINS
+>  
+>            If unsure, say N.
+>  
+> +config ROCKCHIP_REBOOT
+> +	bool "Rockchip reboot notifier driver"
+> +	help
+> +	  Say y here will enable reboot notifier support.
+> +	  This will get reboot mode arguments from userspace and
+> +	  store it in special register.
+> +
+>  endif
+> diff --git a/drivers/soc/rockchip/Makefile b/drivers/soc/rockchip/Makefile
+> index 3d73d06..9817496 100644
+> --- a/drivers/soc/rockchip/Makefile
+> +++ b/drivers/soc/rockchip/Makefile
+> @@ -2,3 +2,4 @@
+>  # Rockchip Soc drivers
+>  #
+>  obj-$(CONFIG_ROCKCHIP_PM_DOMAINS) += pm_domains.o
+> +obj-$(CONFIG_ROCKCHIP_REBOOT) += reboot.o
+> diff --git a/drivers/soc/rockchip/loader.h b/drivers/soc/rockchip/loader.h
+> new file mode 100644
+> index 0000000..bf51baa
+> --- /dev/null
+> +++ b/drivers/soc/rockchip/loader.h
+> @@ -0,0 +1,22 @@
+> +#ifndef __MACH_ROCKCHIP_LOADER_H
+> +#define __MACH_ROCKCHIP_LOADER_H
+> +
+> +/*high 24 bits is tag, low 8 bits is type*/
+> +#define SYS_LOADER_REBOOT_FLAG   0x5242C300
+> +
+> +enum {
+> +	BOOT_NORMAL = 0, /* normal boot */
+> +	BOOT_LOADER,     /* enter loader rockusb mode */
+> +	BOOT_MASKROM,    /* enter maskrom rockusb mode (not support now) */
+> +	BOOT_RECOVER,    /* enter recover */
+> +	BOOT_NORECOVER,  /* do not enter recover */
+> +	BOOT_SECONDOS,   /* boot second OS (not support now)*/
+> +	BOOT_WIPEDATA,   /* enter recover and wipe data. */
+> +	BOOT_WIPEALL,    /* enter recover and wipe all data. */
+> +	BOOT_CHECKIMG,   /* check firmware img with backup part*/
+> +	BOOT_FASTBOOT,   /* enter fast boot mode */
+> +	BOOT_SECUREBOOT_DISABLE,
+> +	BOOT_CHARGING,   /* enter charge mode */
+> +	BOOT_MAX         /* MAX VALID BOOT TYPE.*/
+> +};
+> +#endif
+> diff --git a/drivers/soc/rockchip/reboot.c b/drivers/soc/rockchip/reboot.c
+> new file mode 100644
+> index 0000000..048aeb0b
+> --- /dev/null
+> +++ b/drivers/soc/rockchip/reboot.c
+> @@ -0,0 +1,98 @@
+> +/*
+> + * Copyright (c) 2014, Fuzhou Rockchip Electronics Co., Ltd
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
+> +#include <linux/init.h>
+> +#include <linux/module.h>
+> +#include <linux/kernel.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/reboot.h>
+> +#include <linux/regmap.h>
+> +#include <linux/mfd/syscon.h>
+> +#include "loader.h"
+> +
+> +struct rockchip_reboot {
+> +	struct device *dev;
+> +	struct regmap *map;
+> +	u32 offset;
+> +	struct notifier_block reboot_notifier;
+> +};
+> +
+> +static void rockchip_get_reboot_flag(const char *cmd, u32 *flag)
+> +{
+> +	*flag = SYS_LOADER_REBOOT_FLAG + BOOT_NORMAL;
+> +
+> +	if (cmd) {
+> +		if (!strcmp(cmd, "loader") || !strcmp(cmd, "bootloader"))
+> +			*flag = SYS_LOADER_REBOOT_FLAG + BOOT_LOADER;
+> +		else if (!strcmp(cmd, "recovery"))
+> +			*flag = SYS_LOADER_REBOOT_FLAG + BOOT_RECOVER;
+> +		else if (!strcmp(cmd, "charge"))
+> +			*flag = SYS_LOADER_REBOOT_FLAG + BOOT_CHARGING;
+> +		else if (!strcmp(cmd, "fastboot"))
+> +			*flag = SYS_LOADER_REBOOT_FLAG + BOOT_FASTBOOT;
+> +	}
+> +}
+> +
+> +static int rockchip_reboot_notify(struct notifier_block *this,
+> +				  unsigned long mode, void *cmd)
+> +{
+> +	struct rockchip_reboot *reboot;
+> +	u32 flag;
+> +
+> +	reboot = container_of(this, struct rockchip_reboot, reboot_notifier);
+> +	rockchip_get_reboot_flag(cmd, &flag);
+> +	regmap_write(reboot->map, reboot->offset, flag);
+> +
+> +	return NOTIFY_DONE;
+> +}
+> +
+> +static int __init rockchip_reboot_probe(struct platform_device *pdev)
+> +{
+> +	struct rockchip_reboot *reboot;
+> +	int ret;
+> +
+> +	reboot = devm_kzalloc(&pdev->dev, sizeof(*reboot), GFP_KERNEL);
+> +	if (!reboot)
+> +		return -ENOMEM;
+> +
+> +	reboot->dev = &pdev->dev;
+> +	reboot->map = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
+> +						      "rockchip,regmap");
+> +	if (IS_ERR(reboot->map))
+> +		return PTR_ERR(reboot->map);
+> +
+> +	if (of_property_read_u32(pdev->dev.of_node, "offset", &reboot->offset))
+> +		return -EINVAL;
+> +
+> +	reboot->reboot_notifier.notifier_call = rockchip_reboot_notify;
+> +	ret = register_reboot_notifier(&reboot->reboot_notifier);
+> +	if (ret)
+> +		dev_err(reboot->dev, "can't register reboot notifier\n");
+> +
+> +	return ret;
+> +}
+> +
+> +static const struct of_device_id rockchip_reboot_of_match[] = {
+> +	{ .compatible = "rockchip,reboot" },
+> +	{}
+> +};
+> +
+> +static struct platform_driver rockchip_reboot_driver = {
+> +	.probe = rockchip_reboot_probe,
+> +	.driver = {
+> +		.name = "rockchip-reboot",
+> +		.of_match_table = rockchip_reboot_of_match,
+> +	},
+> +};
+> +module_platform_driver(rockchip_reboot_driver);
+> +
+> +MODULE_AUTHOR("Andy Yan <andy.yan@rock-chips.com");
+> +MODULE_DESCRIPTION("Rockchip platform reboot notifier driver");
+> +MODULE_LICENSE("GPL");
+> 
