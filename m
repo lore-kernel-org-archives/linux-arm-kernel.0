@@ -1,83 +1,29 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Mon, 14 Dec 2015 14:10:41 +0900
-Subject: [PATCH] ARM: shmobile: r8a779x: use SoC-specific usb-dac
- compatibility strings
-In-Reply-To: <20151211040406.GB13336@verge.net.au>
-References: <1449802778-11777-1-git-send-email-horms+renesas@verge.net.au>
- <20151211040406.GB13336@verge.net.au>
-Message-ID: <20151214051041.GD18143@verge.net.au>
+Date: Mon, 14 Dec 2015 14:13:40 +0900
+Subject: [PATCH 0/3] ARM: multi_v7_defconfig: Misc shmobile updates
+In-Reply-To: <3377719.UMBHRLUcv2@wuerfel>
+References: <1449830727-325-1-git-send-email-geert+renesas@glider.be>
+ <3377719.UMBHRLUcv2@wuerfel>
+Message-ID: <20151214051340.GE18143@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 11, 2015 at 01:04:06PM +0900, Simon Horman wrote:
-> On Fri, Dec 11, 2015 at 11:59:38AM +0900, Simon Horman wrote:
-> > Use recently SoC-specific compatibility strings in r8a779[01] device trees.
+On Fri, Dec 11, 2015 at 03:42:39PM +0100, Arnd Bergmann wrote:
+> On Friday 11 December 2015 11:45:24 Geert Uytterhoeven wrote:
+> >         Hi Simon, Magnus, arm-soc,
 > > 
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > ---
-> > Based on renesas-devel-20151211-v4.4-rc4
+> > Here are a few updates for the ARM multi_v7 defconfig.
+> > They are equivalent to the updates for shmobile_defconfig that have just
+> > been accepted by Simon.
+> > 
+> > This is against renesas-devel-20151211v2-v4.4-rc4.
+> > There's a small conflict when applying to arm-soc/for-next, so Simon's
+> > tree looks like the best way forward.
 > 
-> Bother, there is a typo in the subject.
-> I plan to fix that either when merging or reposting the patch
-> depending on what other feedback I get.
+> Sounds good.
+> 
+> The changes all look good to me,
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-I have queued up the following:
-
-From: Simon Horman <horms+renesas@verge.net.au>
-Subject: [PATCH] ARM: shmobile: r8a779x: use SoC-specific usb-dmac
- compatibility strings
-
-Use recently SoC-specific compatibility strings in r8a779[01] device trees.
-
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7790.dtsi | 4 ++--
- arch/arm/boot/dts/r8a7791.dtsi | 4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 9f3036b80c0e..c6f083c9345d 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -386,7 +386,7 @@
- 	};
- 
- 	usb_dmac0: dma-controller at e65a0000 {
--		compatible = "renesas,usb-dmac";
-+		compatible = "renesas,r8a7790-usb-dmac", "renesas,usb-dmac";
- 		reg = <0 0xe65a0000 0 0x100>;
- 		interrupts = <0 109 IRQ_TYPE_LEVEL_HIGH
- 			      0 109 IRQ_TYPE_LEVEL_HIGH>;
-@@ -398,7 +398,7 @@
- 	};
- 
- 	usb_dmac1: dma-controller at e65b0000 {
--		compatible = "renesas,usb-dmac";
-+		compatible = "renesas,r8a7790-usb-dmac", "renesas,usb-dmac";
- 		reg = <0 0xe65b0000 0 0x100>;
- 		interrupts = <0 110 IRQ_TYPE_LEVEL_HIGH
- 			      0 110 IRQ_TYPE_LEVEL_HIGH>;
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 36559cb0eb6b..ae1dda181624 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -375,7 +375,7 @@
- 	};
- 
- 	usb_dmac0: dma-controller at e65a0000 {
--		compatible = "renesas,usb-dmac";
-+		compatible = "renesas,r8a7791-usb-dmac", "renesas,usb-dmac";
- 		reg = <0 0xe65a0000 0 0x100>;
- 		interrupts = <0 109 IRQ_TYPE_LEVEL_HIGH
- 			      0 109 IRQ_TYPE_LEVEL_HIGH>;
-@@ -387,7 +387,7 @@
- 	};
- 
- 	usb_dmac1: dma-controller at e65b0000 {
--		compatible = "renesas,usb-dmac";
-+		compatible = "renesas,r8a7791-usb-dmac", "renesas,usb-dmac";
- 		reg = <0 0xe65b0000 0 0x100>;
- 		interrupts = <0 110 IRQ_TYPE_LEVEL_HIGH
- 			      0 110 IRQ_TYPE_LEVEL_HIGH>;
--- 
-2.1.4
+Thanks, I have queued these up.
