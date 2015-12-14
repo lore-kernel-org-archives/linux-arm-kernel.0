@@ -1,40 +1,29 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 14 Dec 2015 08:11:03 +0100
-Subject: [PATCH/RFC 03/19] ARM: shmobile: gose: add i2c2 bus to device tree
-In-Reply-To: <20151214021110.GD13945@verge.net.au>
-References: <1449802376-11301-1-git-send-email-horms+renesas@verge.net.au>
- <1449802376-11301-4-git-send-email-horms+renesas@verge.net.au>
- <566AB2A5.4090105@cogentembedded.com>
- <20151214021110.GD13945@verge.net.au>
-Message-ID: <20151214071103.GC1516@katana>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 14 Dec 2015 08:25:29 +0100
+Subject: [PATCH 08/10] drivers/pci: make host/pcie-xilinx.c explicitly
+ non-modular
+In-Reply-To: <1449970917-12633-9-git-send-email-paul.gortmaker@windriver.com>
+References: <1449970917-12633-1-git-send-email-paul.gortmaker@windriver.com>
+ <1449970917-12633-9-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <566E6EE9.6000101@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> > >+	eeprom at 50 {
-> > >+		compatible = "renesas,24c02";
-> > 
-> >    This is not a valid value -- the Renesas chip model is different from 24c02.
+On 13.12.2015 02:41, Paul Gortmaker wrote:
+> The Kconfig currently controlling compilation of this code is:
 > 
-> I copied this value from r8a7791.dtsi.
+> drivers/pci/host/Kconfig:config PCIE_XILINX
+> drivers/pci/host/Kconfig:       bool "Xilinx AXI PCIe host bridge support"
 > 
-> Looking at the schematic for gose (v100), koelsch (rev024) and porter (v300)
-> I see the following "R1EX24002ATAS0G#U0". Shall we update r8a7791 and
-> this patch to "renesas,24002" or leave things as is?
+> ...meaning that it currently is not being built as a module by anyone.
+> 
+> Lets remove the modular code that is essentially orphaned, so that
+> when reading the driver there is no doubt it is builtin-only.  This
+> makes xilinx_pcie_free_irq_domain orphaned so we remove it too.
 
-I wouldn't like to update the at24 driver with all namings from all
-vendors for chips which in large cases are simple 24c02 devices.
+Right.
 
-So, if Sergei insists on the change, I'd propose
+Acked-by: Michal Simek <michal.simek@xilinx.com>
 
-	compatible = "renesas,24002", "24c02";
-
-to keep things sane.
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151214/1203594e/attachment.sig>
+Thanks,
+Michal
