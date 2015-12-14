@@ -1,33 +1,29 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Sun, 13 Dec 2015 21:16:47 -0800
-Subject: [PATCH 6/6] staging: board: armadillo800eva: Use "arm,pl390"
-In-Reply-To: <20151214050526.GC18143@verge.net.au>
-References: <1448023017-21816-1-git-send-email-geert+renesas@glider.be>
- <1448023017-21816-7-git-send-email-geert+renesas@glider.be>
- <20151211162830.GA9306@kroah.com>
- <20151214050526.GC18143@verge.net.au>
-Message-ID: <20151214051647.GA3140@kroah.com>
+From: orders@kingagrocenter.com (America Airlines)
+Date: Mon, 14 Dec 2015 05:18:24 +0000
+Subject: America Airlines E-Ticket #0000454927
+Message-ID: <98695073570f049191516411b8b0ec4b@kingagrocenter.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 14, 2015 at 02:05:26PM +0900, Simon Horman wrote:
-> On Fri, Dec 11, 2015 at 11:28:30AM -0500, Greg Kroah-Hartman wrote:
-> > On Fri, Nov 20, 2015 at 01:36:57PM +0100, Geert Uytterhoeven wrote:
-> > > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > > ---
-> > > Must be applied together with "ARM: shmobile: r8a7740 dtsi: Use
-> > > "arm,pl390" for GIC"!
-> > > 
-> > > Greg: Can you please provide your ack? Thanks!
-> > 
-> > Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> 
-> Thanks Greg,
-> 
-> I have taken the liberty of assuming that ack also applies to
-> patch 5/6 of this series, the other staging/board patch in
-> this series.
+Dear customer,
 
-Oops, yes, good call, thanks for doing this.
+Your payment has been successfully processed and charged from your credit card.
 
-greg k-h
+E-Ticket is attached to this email.
+
+Below you can find the order details and e-ticket information:
+
+FLIGHT NUMBER : OQ633571
+DATE & TIME : Dec 18 2015, 19:50
+DEPARTING : El Paso
+TOTAL PRICE : $ 470.00
+
+Thank you for choosing America Airlines.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: E-Ticket_0000454927.zip
+Type: application/zip
+Size: 2080 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151214/f6a73f52/attachment-0001.zip>
