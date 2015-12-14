@@ -1,13 +1,13 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 14 Dec 2015 13:06:07 +0100
-Subject: [GIT PULL] Allwinner fixes for 4.4
-Message-ID: <20151214120607.GA21693@lukather>
+Date: Mon, 14 Dec 2015 13:08:48 +0100
+Subject: [GIT PULL] Allwinner defconfig changes for 4.5
+Message-ID: <20151214120848.GA23059@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Here a couple of fixes for the 4.4 merge window.
+Please pull this bunch of defconfig changes for the 4.5 merge window.
 
 Thanks!
 Maxime
@@ -18,29 +18,31 @@ The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
 
 are available in the git repository at:
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-fixes-for-4.4
+  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-defconfig-for-4.5
 
-for you to fetch changes up to 43675ffafd3c3373f82691f539df3dc7403877fe:
+for you to fetch changes up to 263350adb2235dbe7d38763812a9b05ab56795bc:
 
-  bus: sunxi-rsb: unlock on error in sunxi_rsb_read() (2015-11-17 09:40:49 +0100)
-
-----------------------------------------------------------------
-Allwinner fixes for 4.4
-
-Two patches, one to fix the touchscreen axis on one Allwinner board, and
-the other one fixing a mutex unlocking issue on one error path in the RSB
-driver.
+  ARM: sunxi: Clean up sunxi_defconfig (2015-11-20 12:48:13 +0100)
 
 ----------------------------------------------------------------
-Dan Carpenter (1):
-      bus: sunxi-rsb: unlock on error in sunxi_rsb_read()
+Allwinner defconfig changes for 4.5
 
-Karsten Merker (1):
-      ARM: dts: sunxi: sun6i-a31s-primo81.dts: add touchscreen axis swapping property
+A bunch of patches to enable new drivers related to Allwinner SoCs.
 
- arch/arm/boot/dts/sun6i-a31s-primo81.dts | 1 +
- drivers/bus/sunxi-rsb.c                  | 4 ++--
- 2 files changed, 3 insertions(+), 2 deletions(-)
+----------------------------------------------------------------
+Chen-Yu Tsai (2):
+      ARM: sunxi_defconfig: Update MFD_AXP20X symbol and enable MFD_AXP20X_RSB
+      ARM: multi_v7_defconfig: Enable RSB and AXP20X related drivers as modules
+
+Timo Sigurdsson (4):
+      ARM: sunxi: Re-enable SID driver in multi_v7_defconfig
+      ARM: sunxi: Re-enable SID driver in sunxi_defconfig
+      ARM: sunxi: Really enable LRADC keys in sunxi_defconfig
+      ARM: sunxi: Clean up sunxi_defconfig
+
+ arch/arm/configs/multi_v7_defconfig | 11 ++++++++---
+ arch/arm/configs/sunxi_defconfig    | 14 +++++++-------
+ 2 files changed, 15 insertions(+), 10 deletions(-)
 
 -- 
 Maxime Ripard, Free Electrons
@@ -52,4 +54,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151214/0dcc9a15/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151214/2ce5bd93/attachment.sig>
