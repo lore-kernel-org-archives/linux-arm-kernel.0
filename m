@@ -1,71 +1,49 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 14 Dec 2015 15:26:14 +0800
-Subject: [PATCH v2 3/3] ARM: dts: imx6qdl-udoo.dtsi: fix onboard USB HUB
- property
-In-Reply-To: <1450077974-22762-1-git-send-email-peter.chen@freescale.com>
-References: <1450077974-22762-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1450077974-22762-4-git-send-email-peter.chen@freescale.com>
+From: mweseloh42@gmail.com (Marcus Weseloh)
+Date: Mon, 14 Dec 2015 08:31:55 +0100
+Subject: [PATCH v3] spi: dts: sun4i: Add support for hardware-based wait
+ time between words
+In-Reply-To: <20151214012937.GA12209@rob-hp-laptop>
+References: <1449873940-10167-1-git-send-email-mweseloh42@gmail.com>
+ <1450047853-9005-1-git-send-email-mweseloh42@gmail.com>
+ <20151214012937.GA12209@rob-hp-laptop>
+Message-ID: <CAGNoLaOckrgv5NP6eTOt8shj5f069DKFrxx+8afydqcAZH5HMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current dts describes USB HUB's property at USB controller's
-entry, it is improper. Fix it by using a generic USB HUB entry.
+Hi,
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
----
- arch/arm/boot/dts/imx6qdl-udoo.dtsi | 26 +++++++-------------------
- 1 file changed, 7 insertions(+), 19 deletions(-)
+2015-12-14 2:29 GMT+01:00 Rob Herring <robh@kernel.org>:
+> On Mon, Dec 14, 2015 at 12:04:11AM +0100, Marcus Weseloh wrote:
+>> Adds a new property "spi-word-wait-ns" to the spi-bus binding that allows
+[...]
+>> diff --git a/Documentation/devicetree/bindings/spi/spi-bus.txt b/Documentation/devicetree/bindings/spi/spi-bus.txt
+>> index bbaa857..2d6034f 100644
+>> --- a/Documentation/devicetree/bindings/spi/spi-bus.txt
+>> +++ b/Documentation/devicetree/bindings/spi/spi-bus.txt
+>> @@ -61,6 +61,8 @@ contain the following properties.
+>>                        used for MOSI. Defaults to 1 if not present.
+>>  - spi-rx-bus-width - (optional) The bus width(number of data wires) that
+>>                        used for MISO. Defaults to 1 if not present.
+>> +- spi-word-wait-ns - (optional) Hardware based delay between transmission of
+>> +                      words in nanoseconds
+>
+> Could be a software delay if the h/w doesn't support delays.
 
-diff --git a/arch/arm/boot/dts/imx6qdl-udoo.dtsi b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-index 1211da8..64eabe2 100644
---- a/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-@@ -9,6 +9,8 @@
-  *
-  */
- 
-+#include <dt-bindings/gpio/gpio.h>
-+
- / {
- 	chosen {
- 		stdout-path = &uart2;
-@@ -18,21 +20,11 @@
- 		reg = <0x10000000 0x40000000>;
- 	};
- 
--	regulators {
--		compatible = "simple-bus";
--		#address-cells = <1>;
--		#size-cells = <0>;
--
--		reg_usb_h1_vbus: regulator at 0 {
--			compatible = "regulator-fixed";
--			reg = <0>;
--			regulator-name = "usb_h1_vbus";
--			regulator-min-microvolt = <5000000>;
--			regulator-max-microvolt = <5000000>;
--			enable-active-high;
--			startup-delay-us = <2>; /* USB2415 requires a POR of 1 us minimum */
--			gpio = <&gpio7 12 0>;
--		};
-+	usb_hub1 {
-+		compatible = "generic-onboard-hub";
-+		clocks = <&clks IMX6QDL_CLK_CKO>;
-+		reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
-+		reset-duration-us = <2>;
- 	};
- };
- 
-@@ -119,10 +111,6 @@
- };
- 
- &usbh1 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_usbh>;
--	vbus-supply = <&reg_usb_h1_vbus>;
--	clocks = <&clks 201>;
- 	status = "okay";
- };
- 
--- 
-1.9.1
+Of course, I was still trapped in my sun4i specific thinking. Will
+remove the hardware reference.
+
+[...]
+>> +     /* Setup wait time between words */
+>> +     of_property_read_u32(spi->dev.of_node, "spi-word-wait-ns",
+>> +                          &wait_ns);
+>
+> Read this in probe and save the value rather than fetching every
+> transfer.
+
+But this is a slave property I'm using here. If I read and store it in
+probe in the spi-sun4i driver, I won't have access to the slave node
+property, will I?
+
+Cheers,
+
+    Marcus
