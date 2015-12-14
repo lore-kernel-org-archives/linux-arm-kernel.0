@@ -1,62 +1,95 @@
-From: robh@kernel.org (Rob Herring)
-Date: Sun, 13 Dec 2015 19:06:19 -0600
-Subject: [PATCH v2 1/2] Documentation: DT: Add entry for ARM SP805-WDT
-In-Reply-To: <1449834467-30283-2-git-send-email-bhupesh.sharma@freescale.com>
-References: <1449834467-30283-1-git-send-email-bhupesh.sharma@freescale.com>
- <1449834467-30283-2-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <20151214010619.GA848@rob-hp-laptop>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Sun, 13 Dec 2015 20:07:14 -0500
+Subject: [PATCH] drivers/misc: make arm-charlcd.c explicitly non-modular
+Message-ID: <1450055234-418-1-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 11, 2015 at 05:17:46PM +0530, Bhupesh Sharma wrote:
-> This patch adds a devicetree binding documentation for ARM's
-> SP805 WatchDog Timer.
-> 
-> Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
-> ---
->  .../devicetree/bindings/watchdog/sp805-wdt.txt     |   29 ++++++++++++++++++++
->  1 file changed, 29 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt b/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
-> new file mode 100644
-> index 0000000..45b5afc
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
-> @@ -0,0 +1,29 @@
-> +* ARM SP805 Watchdog Timer (WDT) Controller
-> +
-> +SP805 WDT is a ARM Primecell Peripheral and has a standard-id register that
-> +can be used to identify the peripheral type, vendor, and revision.
-> +This value can be used for driver matching.
-> +
-> +As SP805 WDT is a primecell IP, it follows the base bindings specified in
-> +'arm/primecell.txt'
-> +
-> +Required properties:
-> +- compatible : Should be "arm,sp805-wdt", "arm,primecell"
-> +- reg : Base address and size of the watchdog timer registers.
-> +- clocks : From common clock binding.
-> +           First clock is PCLK and the second is WDOGCLK.
-> +           WDOGCLK can be equal to or be a sub-multiple of the PCLK frequency.
-> +- clock-names : From common clock binding. Shall be "apb_pclk" for first clock.
+The Kconfig currently controlling compilation of this code is:
 
-And for the 2nd clock?
+drivers/misc/Kconfig:config ARM_CHARLCD
+drivers/misc/Kconfig:   bool "ARM Ltd. Character LCD Driver"
 
-> +
-> +Optional properties:
-> +- interrupts : Should specify WDT interrupt number.
-> +
-> +Examples:
-> +
-> +		cluster1_core0_watchdog: wdt at c000000 {
-> +			compatible = "arm,sp805-wdt", "arm,primecell";
-> +			reg = <0x0 0xc000000 0x0 0x1000>;
-> +			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
-> +			clock-names = "apb_pclk", "wdog_clk";
-> +		};
-> +
-> -- 
-> 1.7.9.5
-> 
-> 
+...meaning that it currently is not being built as a module by anyone.
+
+Lets remove the modular code that is essentially orphaned, so that
+when reading the driver there is no doubt it is builtin-only.
+
+We explicitly disallow a driver unbind, since that doesn't have a
+sensible use case anyway, and this driver did not have a ".remove"
+function coded for non-modular drivers either.
+
+Since module_platform_driver() uses the same init level priority as
+builtin_platform_driver() the init ordering remains unchanged with
+this commit.
+
+We don't replace module.h with init.h since the file already has that.
+
+We also delete the MODULE_LICENSE tag etc. since all that information
+is already contained at the top of the file in the comments.
+
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+---
+
+[ No 0/N lead in this time as drivers/misc only has one cleanup
+  patch, but everyone on the Cc: knows what the 0/N boilerplate
+  would say if it existed by now anyway... ]
+
+ drivers/misc/arm-charlcd.c | 24 ++----------------------
+ 1 file changed, 2 insertions(+), 22 deletions(-)
+
+diff --git a/drivers/misc/arm-charlcd.c b/drivers/misc/arm-charlcd.c
+index c65b5ea5d5ef..b3176ee92b90 100644
+--- a/drivers/misc/arm-charlcd.c
++++ b/drivers/misc/arm-charlcd.c
+@@ -8,7 +8,6 @@
+  * Author: Linus Walleij <triad@df.lth.se>
+  */
+ #include <linux/init.h>
+-#include <linux/module.h>
+ #include <linux/interrupt.h>
+ #include <linux/platform_device.h>
+ #include <linux/of.h>
+@@ -328,20 +327,6 @@ out_no_resource:
+ 	return ret;
+ }
+ 
+-static int __exit charlcd_remove(struct platform_device *pdev)
+-{
+-	struct charlcd *lcd = platform_get_drvdata(pdev);
+-
+-	if (lcd) {
+-		free_irq(lcd->irq, lcd);
+-		iounmap(lcd->virtbase);
+-		release_mem_region(lcd->phybase, lcd->physize);
+-		kfree(lcd);
+-	}
+-
+-	return 0;
+-}
+-
+ static int charlcd_suspend(struct device *dev)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+@@ -376,13 +361,8 @@ static struct platform_driver charlcd_driver = {
+ 	.driver = {
+ 		.name = DRIVERNAME,
+ 		.pm = &charlcd_pm_ops,
++		.suppress_bind_attrs = true,
+ 		.of_match_table = of_match_ptr(charlcd_match),
+ 	},
+-	.remove = __exit_p(charlcd_remove),
+ };
+-
+-module_platform_driver_probe(charlcd_driver, charlcd_probe);
+-
+-MODULE_AUTHOR("Linus Walleij <triad@df.lth.se>");
+-MODULE_DESCRIPTION("ARM Character LCD Driver");
+-MODULE_LICENSE("GPL v2");
++builtin_platform_driver_probe(charlcd_driver, charlcd_probe);
+-- 
+2.6.1
