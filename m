@@ -1,63 +1,92 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 14 Dec 2015 14:53:53 +0100
-Subject: [PATCH v10 7/8] ARM: dts: imx25: Add TSC and ADC support
-In-Reply-To: <1450101234-2191-1-git-send-email-mpa@pengutronix.de>
-References: <1450101234-2191-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1450101234-2191-8-git-send-email-mpa@pengutronix.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 14 Dec 2015 14:56:41 +0100
+Subject: [PATCH v2 13/14] ARM: dts: dove: add DT GPU support
+In-Reply-To: <1450099862.3163.38.camel@pengutronix.de> (Lucas Stach's message
+ of "Mon, 14 Dec 2015 14:31:02 +0100")
+References: <1449661707-30532-1-git-send-email-l.stach@pengutronix.de>
+ <1449661707-30532-13-git-send-email-l.stach@pengutronix.de>
+ <1450099862.3163.38.camel@pengutronix.de>
+Message-ID: <87twnlw2ue.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Denis Carikli <denis@eukrea.com>
-
-Signed-off-by: Denis Carikli <denis@eukrea.com>
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- arch/arm/boot/dts/imx25.dtsi | 29 ++++++++++++++++++++++++++---
- 1 file changed, 26 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-index 677f81d9dcd5..6ac5e71d312b 100644
---- a/arch/arm/boot/dts/imx25.dtsi
-+++ b/arch/arm/boot/dts/imx25.dtsi
-@@ -265,13 +265,36 @@
- 				status = "disabled";
- 			};
+Hi Lucas,
  
--			tsc: tsc at 50030000 {
--				compatible = "fsl,imx25-adc", "fsl,imx21-tsc";
--				reg = <0x50030000 0x4000>;
-+			tscadc: tscadc at 50030000 {
-+				compatible = "fsl,imx25-tsadc";
-+				reg = <0x50030000 0xc>;
- 				interrupts = <46>;
- 				clocks = <&clks 119>;
- 				clock-names = "ipg";
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+				#address-cells = <1>;
-+				#size-cells = <1>;
- 				status = "disabled";
-+
-+				adc: adc at 50030800 {
-+					compatible = "fsl,imx25-gcq";
-+					reg = <0x50030800 0x60>;
-+					interrupt-parent = <&tscadc>;
-+					interrupts = <1>;
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					status = "disabled";
-+				};
-+
-+				tsc: tcq at 50030400 {
-+					compatible = "fsl,imx25-tcq";
-+					reg = <0x50030400 0x60>;
-+					interrupt-parent = <&tscadc>;
-+					interrupts = <0>;
-+					fsl,wires = <4>;
-+					status = "disabled";
-+				};
- 			};
- 
- 			ssi1: ssi at 50034000 {
+ On lun., d?c. 14 2015, Lucas Stach <l.stach@pengutronix.de> wrote:
+
+> Dove maintainers,
+>
+> can you please tell me if you prefer the DT changes to go along with the
+> rest of the etnaviv series through the DRM tree, or plan on picking this
+> separate?
+
+I prefer to take the DT change in the mvebu tree. I was waiting for
+acknowledgment on this series from the DRM maintainers to be sure that
+the binding was OK. However, the fact that Rob Herring already acked the
+binding is a good point for me.
+
+Gregory
+
+
+>
+> Regards,
+> Lucas
+>
+> Am Mittwoch, den 09.12.2015, 12:48 +0100 schrieb Lucas Stach:
+>> From: Russell King <rmk+kernel@arm.linux.org.uk>
+>> 
+>> Add DT support for the Vivante GC600 GPU on Marvell Dove platforms.
+>> These nodes default to being disabled unless a platform decides they
+>> should be enabled.
+>> 
+>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+>> ---
+>>  arch/arm/boot/dts/dove.dtsi | 16 ++++++++++++++++
+>>  1 file changed, 16 insertions(+)
+>> 
+>> diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+>> index cd58c2e62757..ea1d999ca7a7 100644
+>> --- a/arch/arm/boot/dts/dove.dtsi
+>> +++ b/arch/arm/boot/dts/dove.dtsi
+>> @@ -33,6 +33,12 @@
+>>  		marvell,tauros2-cache-features = <0>;
+>>  	};
+>>  
+>> +	gpu-subsystem {
+>> +		compatible = "marvell,dove-gpu-subsystem";
+>> +		cores = <&gpu>;
+>> +		status = "disabled";
+>> +	};
+>> +
+>>  	i2c-mux {
+>>  		compatible = "i2c-mux-pinctrl";
+>>  		#address-cells = <1>;
+>> @@ -776,6 +782,16 @@
+>>  				#address-cells = <1>;
+>>  				#size-cells = <1>;
+>>  			};
+>> +
+>> +			gpu: gpu at 840000 {
+>> +				clocks = <&divider_clk 1>;
+>> +				clock-names = "core";
+>> +				compatible = "vivante,gc";
+>> +				interrupts = <48>;
+>> +				power-domains = <&gpu_domain>;
+>> +				reg = <0x840000 0x4000>;
+>> +				status = "disabled";
+>> +			};
+>>  		};
+>>  	};
+>>  };
+>
+> -- 
+> Pengutronix e.K.             | Lucas Stach                 |
+> Industrial Linux Solutions   | http://www.pengutronix.de/  |
+>
+
 -- 
-2.6.2
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
