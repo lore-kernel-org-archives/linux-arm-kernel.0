@@ -1,49 +1,51 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 14 Dec 2015 09:42:38 +0000
-Subject: [PATCH 1/4] nvmem: core: return error for non word aligned access
+Date: Mon, 14 Dec 2015 09:42:57 +0000
+Subject: [PATCH 2/4] nvmem: qfprom: Specify LE device endianness
 In-Reply-To: <1450086024-18297-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1450086024-18297-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1450086158-18756-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1450086177-18799-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-nvmem providers have restrictions on register strides, so return error
-when users attempt to read/write buffers with sizes which are less
-than word size.
+From: Stephen Boyd <sboyd@codeaurora.org>
 
-Without this patch the userspace would continue to try as it does not
-get any error from the nvmem core, resulting in a hang or endless loop
-in userspace.
+The qfprom is a little endian device, but so far we've been
+relying on the regmap mmio bus handling this for us without
+explicitly stating that fact. After commit 4a98da2164cf
+(regmap-mmio: Use native endianness for read/write, 2015-10-29),
+the regmap mmio bus will read/write with the __raw_*() IO
+accessors, instead of using the readl/writel() APIs that do
+proper byte swapping for little endian devices.
 
-Reported-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
+So if we're running on a big endian processor and haven't
+specified the endianness explicitly in the regmap config or in
+DT, we're going to switch from doing little endian byte swapping
+to big endian accesses without byte swapping, leading to some
+confusing results. Specify the endianness explicitly so that the
+regmap core properly byte swaps the accesses for us.
+
+Cc: Rajendra Nayak <rnayak@codeaurora.org>
+Cc: Kevin Hilman <khilman@linaro.org>
+Cc: Tyler Baker <tyler.baker@linaro.org>
+Cc: Simon Arlott <simon@fire.lp0.eu>
+Cc: Mark Brown <broonie@kernel.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- drivers/nvmem/core.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/nvmem/qfprom.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-index 6fd4e5a..9d11d98 100644
---- a/drivers/nvmem/core.c
-+++ b/drivers/nvmem/core.c
-@@ -70,6 +70,9 @@ static ssize_t bin_attr_nvmem_read(struct file *filp, struct kobject *kobj,
- 	if (pos >= nvmem->size)
- 		return 0;
+diff --git a/drivers/nvmem/qfprom.c b/drivers/nvmem/qfprom.c
+index afb67e7..3829e5f 100644
+--- a/drivers/nvmem/qfprom.c
++++ b/drivers/nvmem/qfprom.c
+@@ -21,6 +21,7 @@ static struct regmap_config qfprom_regmap_config = {
+ 	.reg_bits = 32,
+ 	.val_bits = 8,
+ 	.reg_stride = 1,
++	.val_format_endian = REGMAP_ENDIAN_LITTLE,
+ };
  
-+	if (count < nvmem->word_size)
-+		return -EINVAL;
-+
- 	if (pos + count > nvmem->size)
- 		count = nvmem->size - pos;
- 
-@@ -95,6 +98,9 @@ static ssize_t bin_attr_nvmem_write(struct file *filp, struct kobject *kobj,
- 	if (pos >= nvmem->size)
- 		return 0;
- 
-+	if (count < nvmem->word_size)
-+		return -EINVAL;
-+
- 	if (pos + count > nvmem->size)
- 		count = nvmem->size - pos;
- 
+ static struct nvmem_config econfig = {
 -- 
 1.9.1
