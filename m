@@ -1,90 +1,119 @@
-From: drivshin.allworx@gmail.com (David Rivshin (Allworx))
-Date: Mon, 14 Dec 2015 13:04:46 -0500
-Subject: [PATCH] drivers: net: cpsw: fix RMII/RGMII mode when used with
- fixed-link PHY
-In-Reply-To: <6416396.ZOturxhSar@localhost>
-References: <20151209223115.6c5a400f.drivshin.allworx@gmail.com>
- <6416396.ZOturxhSar@localhost>
-Message-ID: <20151214130446.1e14fbb8.drivshin.allworx@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 14 Dec 2015 18:06:36 +0000
+Subject: [PATCH] ARM: KVM: Cleanup exception injection
+Message-ID: <1450116396-11718-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 12 Dec 2015 16:44:19 +0100
-Markus Brunner <systemprogrammierung.brunner@gmail.com> wrote:
+David Binderman reported that the exception injection code had a
+couple of unused variables lingering around.
 
-> On Wednesday 09 December 2015 22:31:15 David Rivshin wrote:
-> ...
-> > This patch was originally developed in parallel with 1f71e8c96fc6 to
-> > accomplish the same goal. When I replaced this patch with
-> > 1f71e8c96fc6, I found that it did not work on my hardware (which
-> > uses RGMII), so I am submitting this patch now as a bugfix. 
-> 
-> Your patch works fine on my board, which uses MII and dual_emac with
-> a fixed_phy and a real one. 
+Upon examination, it looked like this code could do with an
+anticipated spring cleaning, which amounts to deduplicating
+the CPSR/SPSR update.
 
-Thanks for checking. The only dual_emac board I have available is the 
-EVMSK, which has two real PHYs. I'm not sure of the usual etiquette 
-(and Google was  unhelpful), should I add a Tested-by on the next 
-version?
+The spurious variables are removed in the process.
 
-> > Besides fixing the bug mentioned in the commit log, there are a few
-> > other differences to note:
-> >  * If both "phy_id" and a "fixed-link" subnode are present this
-> > patch will use the "phy_id" property. This should preserve current
-> > behavior with existing devicetrees that might incorrectly have
-> > both. This motivates the biggest difference in code organization
-> > from 1f71e8c96fc6.
-> >  * Some error messages have been tweaked to reflect the slightly
-> > changed meanings of the checks.
-> 
-> I wanted to keep changes small and didn't spend too much thinking
-> about already broken devicetrees. Since my patch is quite new, I
+Reported-by: David Binderman <dcb314@hotmail.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/kvm/emulate.c | 59 ++++++++++++++++++++------------------------------
+ 1 file changed, 23 insertions(+), 36 deletions(-)
 
-I'm honestly not sure it's an important consideration myself. Most
-patches I've seen in this area for this or other drivers do not take 
-such behavior into account (e.g. the phy-handle parsing that went in 
-to cpsw in 4.3).
-I would generally feel more comfortable with such a behavior tweak
-(minor as it is) before 4.4 is released, to avoid ping-ponging the
-behavior. But given how far along the cycle is, I'm not sure about 
-the chances of that.
-
-> don't see any problems with subtle changes like that. However you
-> should update the documentation as well. 
-
-Your patch already updated .../bindings/net/cpsw.txt, which this
-patch left alone. Are you referring to some other documentation, 
-or do you think I should update the binding documentation to state
-that phy_id takes precedence over fixed-link? I figured that such
-devicetrees were still officially malformed, so I thought the 
-existing text was appropriate.
-
-> >  * of_node_get() is called on slave_node before passing the result
-> > to of_phy_find_device(). This increments the reference count, which
-> > I believe is correct for this situation, but I'm not certain of
-> > that.
-> I think you are right. At least most other drivers calling
-> of_phy_register_fixed_link(), call of_node_get afterwards. I can't
-> remember where I got my "inspiration" for the patch. I made it almost
-> a year ago and now 3 other guys tinker with the same feature? What a
-> coincidence ;-)
-
-Perhaps not a complete coincidence. I first wrote this patch a few 
-months ago against 4.1. While I had always intended on submitting when 
-time allowed, testing your patch gave me an extra push.
-
-[...]
-
-> > --- a/drivers/net/ethernet/ti/cpsw.c
-> > +++ b/drivers/net/ethernet/ti/cpsw.c
-> > @@ -26,6 +26,7 @@
-> >  #include <linux/netdevice.h>
-> >  #include <linux/net_tstamp.h>
-> >  #include <linux/phy.h>
-> > +#include <linux/phy_fixed.h>
-> 
-> The prototypes for of_*_fixed_link are in linux/of_mdio.h, which is
-> already included.
-
-You are correct; I forget why I had originally included that. I will 
-remove it for v2.
+diff --git a/arch/arm/kvm/emulate.c b/arch/arm/kvm/emulate.c
+index d6c0052..245106e 100644
+--- a/arch/arm/kvm/emulate.c
++++ b/arch/arm/kvm/emulate.c
+@@ -275,6 +275,25 @@ static u32 exc_vector_base(struct kvm_vcpu *vcpu)
+ 		return vbar;
+ }
+ 
++/* Switch to an exception mode, updating both CPSR and SPSR */
++static void kvm_update_psr(struct kvm_vcpu *vcpu, unsigned long mode)
++{
++	unsigned long cpsr = *vcpu_cpsr(vcpu);
++	u32 sctlr = vcpu->arch.cp15[c1_SCTLR];
++
++	*vcpu_cpsr(vcpu) = (cpsr & ~MODE_MASK) | mode;
++	*vcpu_cpsr(vcpu) |= PSR_I_BIT;
++	*vcpu_cpsr(vcpu) &= ~(PSR_IT_MASK | PSR_J_BIT | PSR_E_BIT | PSR_T_BIT);
++
++	if (sctlr & SCTLR_TE)
++		*vcpu_cpsr(vcpu) |= PSR_T_BIT;
++	if (sctlr & SCTLR_EE)
++		*vcpu_cpsr(vcpu) |= PSR_E_BIT;
++
++	/* Note: These now point to the mode banked copies */
++	*vcpu_spsr(vcpu) = cpsr;
++}
++
+ /**
+  * kvm_inject_undefined - inject an undefined exception into the guest
+  * @vcpu: The VCPU to receive the undefined exception
+@@ -286,29 +305,13 @@ static u32 exc_vector_base(struct kvm_vcpu *vcpu)
+  */
+ void kvm_inject_undefined(struct kvm_vcpu *vcpu)
+ {
+-	unsigned long new_lr_value;
+-	unsigned long new_spsr_value;
+ 	unsigned long cpsr = *vcpu_cpsr(vcpu);
+-	u32 sctlr = vcpu->arch.cp15[c1_SCTLR];
+ 	bool is_thumb = (cpsr & PSR_T_BIT);
+ 	u32 vect_offset = 4;
+ 	u32 return_offset = (is_thumb) ? 2 : 4;
+ 
+-	new_spsr_value = cpsr;
+-	new_lr_value = *vcpu_pc(vcpu) - return_offset;
+-
+-	*vcpu_cpsr(vcpu) = (cpsr & ~MODE_MASK) | UND_MODE;
+-	*vcpu_cpsr(vcpu) |= PSR_I_BIT;
+-	*vcpu_cpsr(vcpu) &= ~(PSR_IT_MASK | PSR_J_BIT | PSR_E_BIT | PSR_T_BIT);
+-
+-	if (sctlr & SCTLR_TE)
+-		*vcpu_cpsr(vcpu) |= PSR_T_BIT;
+-	if (sctlr & SCTLR_EE)
+-		*vcpu_cpsr(vcpu) |= PSR_E_BIT;
+-
+-	/* Note: These now point to UND banked copies */
+-	*vcpu_spsr(vcpu) = cpsr;
+-	*vcpu_reg(vcpu, 14) = new_lr_value;
++	kvm_update_psr(vcpu, UND_MODE);
++	*vcpu_reg(vcpu, 14) = *vcpu_pc(vcpu) - return_offset;
+ 
+ 	/* Branch to exception vector */
+ 	*vcpu_pc(vcpu) = exc_vector_base(vcpu) + vect_offset;
+@@ -320,30 +323,14 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu)
+  */
+ static void inject_abt(struct kvm_vcpu *vcpu, bool is_pabt, unsigned long addr)
+ {
+-	unsigned long new_lr_value;
+-	unsigned long new_spsr_value;
+ 	unsigned long cpsr = *vcpu_cpsr(vcpu);
+-	u32 sctlr = vcpu->arch.cp15[c1_SCTLR];
+ 	bool is_thumb = (cpsr & PSR_T_BIT);
+ 	u32 vect_offset;
+ 	u32 return_offset = (is_thumb) ? 4 : 0;
+ 	bool is_lpae;
+ 
+-	new_spsr_value = cpsr;
+-	new_lr_value = *vcpu_pc(vcpu) + return_offset;
+-
+-	*vcpu_cpsr(vcpu) = (cpsr & ~MODE_MASK) | ABT_MODE;
+-	*vcpu_cpsr(vcpu) |= PSR_I_BIT | PSR_A_BIT;
+-	*vcpu_cpsr(vcpu) &= ~(PSR_IT_MASK | PSR_J_BIT | PSR_E_BIT | PSR_T_BIT);
+-
+-	if (sctlr & SCTLR_TE)
+-		*vcpu_cpsr(vcpu) |= PSR_T_BIT;
+-	if (sctlr & SCTLR_EE)
+-		*vcpu_cpsr(vcpu) |= PSR_E_BIT;
+-
+-	/* Note: These now point to ABT banked copies */
+-	*vcpu_spsr(vcpu) = cpsr;
+-	*vcpu_reg(vcpu, 14) = new_lr_value;
++	kvm_update_psr(vcpu, ABT_MODE);
++	*vcpu_reg(vcpu, 14) = *vcpu_pc(vcpu) + return_offset;
+ 
+ 	if (is_pabt)
+ 		vect_offset = 12;
+-- 
+2.1.4
