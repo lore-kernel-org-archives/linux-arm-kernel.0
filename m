@@ -1,47 +1,35 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 14 Dec 2015 09:38:45 +0800
-Subject: [PATCH V4 2/2] ARM: dts: imx6q: add Novena board
-In-Reply-To: <1449890833-7195-1-git-send-email-marex@denx.de>
-References: <20151211110700.GD11252@tiger>
- <1449890833-7195-1-git-send-email-marex@denx.de>
-Message-ID: <20151214013845.GP11252@tiger>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 14 Dec 2015 10:47:41 +0900
+Subject: [PATCH/RFC 05/19] ARM: shmobile: r8a7793: add MSTP10 clocks to
+ device tree
+In-Reply-To: <87oadtkfrw.wl%kuninori.morimoto.gx@renesas.com>
+References: <1449802376-11301-1-git-send-email-horms+renesas@verge.net.au>
+ <1449802376-11301-6-git-send-email-horms+renesas@verge.net.au>
+ <87oadtkfrw.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20151214014735.GA13945@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 12, 2015 at 04:27:13AM +0100, Marek Vasut wrote:
-> From: Sean Cross <xobs@kosagi.com>
+On Mon, Dec 14, 2015 at 01:00:59AM +0000, Kuninori Morimoto wrote:
 > 
-> Novena is an open-hardware laptop/desktop/bare board.
+> Hi Simon
 > 
-> See http://www.kosagi.com/w/index.php?title=Novena_Main_Page
+> > Instantiate MSTP10 clocks in r8a7793 device tree.
+> > 
+> > Based on similar work for the r8a7791 by Kuninori Morimoto.
+> > 
+> > Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > ---
+> (snip)
+> > +		mstp10_clks: mstp10_clks at e6150998 {
+> > +			compatible = "renesas,r8a7793-mstp-clocks", "renesas,cpg-mstp-clocks";
+> > +			reg = <0 0xe6150998 0 4>, <0 0xe61509a8 0 4>;
 > 
-> Signed-off-by: Sean Cross <xobs@kosagi.com>
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: Lucas Stach <l.stach@pengutronix.de>
-> Cc: Sean Cross <xobs@kosagi.com>
-> Cc: Shawn Guo <shawnguo@kernel.org>
+> I wonder does r8a7793 use mstp driver ? not mssr ?
+> Because RFC ?
 
-It looks pretty good to me now, except a small question below.
-
-> ---
->  arch/arm/boot/dts/Makefile         |   1 +
->  arch/arm/boot/dts/imx6q-novena.dts | 789 +++++++++++++++++++++++++++++++++++++
->  2 files changed, 790 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx6q-novena.dts
-
-<snip>
-
-> +/ {
-> +	model = "Kosagi Novena Dual/Quad";
-> +	compatible = "kosagi,imx6q-novena", "fsl,imx6q";
-> +
-> +	memory {
-> +		reg = <0x10000000 0xefffffff>;
-
-What's the trick of having memory size being 0xefffffff?
-
-Shawn
-
-> +	};
->  
+My main motivation is that it follow the pattern already used
+for other clocks in the same file. I believe all the Renesas ARM32
+DTS/DTSI files are currently using mssr. Perhaps we should
+come up with a plan to migrate some or all of them to mstp.
