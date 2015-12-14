@@ -1,51 +1,83 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon, 14 Dec 2015 10:28:47 +0000
-Subject: [PATCH v3 4/4] printk/nmi: Increase the size of NMI buffer and
- make it configurable
-In-Reply-To: <20151211232113.GZ8644@n2100.arm.linux.org.uk>
-References: <1449667265-17525-1-git-send-email-pmladek@suse.com>
- <1449667265-17525-5-git-send-email-pmladek@suse.com>
- <CAMuHMdXVgr58YjoePGrRbMyMncQ27f85prL7G5SpeHeNxoYrXQ@mail.gmail.com>
- <20151211124159.GB3729@pathway.suse.cz>
- <20151211145725.b0e81bb4bb18fcd72ef5f557@linux-foundation.org>
- <20151211232113.GZ8644@n2100.arm.linux.org.uk>
-Message-ID: <566E99DF.6050008@linaro.org>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Mon, 14 Dec 2015 18:30:31 +0800
+Subject: [PATCH v3 0/5] Add reboot notifier driver for rockchip platform
+In-Reply-To: <45323116.BWNAaZT5p4@diego>
+References: <1447840044-19689-1-git-send-email-andy.yan@rock-chips.com>
+ <45323116.BWNAaZT5p4@diego>
+Message-ID: <566E9A47.8010004@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12/15 23:21, Russell King - ARM Linux wrote:
-> As I explained when I did that work, the vast majority of ARM platforms
-> are unable to trigger anything like a NMI - the FIQ is something that's
-> generally a property of the secure monitor, and is not accessible to
-> Linux.  However, there are platforms where it is accessible.
+Hi John:
+
+On 2015?12?12? 05:29, Heiko St?bner wrote:
+> Am Mittwoch, 18. November 2015, 17:47:24 schrieb Andy Yan:
+>> rockchip platform have a protocol to pass the kernel reboot
+>> mode to bootloader by some special registers when system reboot.
+>> By this way the bootloader can take different action according
+>> to the different kernel reboot mode, for example, command
+>> "reboot loader" will reboot the board to rockusb mode, this is
+>> a very convenient way to get the board enter download mode.
+>> And Android system also use this protocol to pass "recovery"?
+>> ?fastboot? reboot mode to bootloader. In upstream land, We found
+>> tegra platform also use this mechanism.
+>>
+>> Before this version, I have sent two Series, which can be found
+>> at [0] [1]
+>> [0] https://patchwork.kernel.org/patch/7140751/
+>> [1] https://patchwork.kernel.org/patch/7153531/
+> just so it doesn't get lost, this ties into a slightly more generic approach,
+> John Stultz is doing for the android reboot reasons:
 >
-> The work to add the FIQ-based variant never happened (I've no idea what
-> happened to that part, Daniel seems to have lost interest in working on
-> it.)  So, what we have is the IRQ-based variant merged in mainline, which
-> would be the fallback for the "FIQ not available" cases, and I carry a
-> local hack in my tree which provides the FIQ-based version - but if it
-> were to trigger, it takes out all interrupts (hence why I've not merged
-> my hack.)
+> http://thread.gmane.org/gmane.linux.kernel/2103447
 >
-> I think the reason that the FIQ-based variant has never really happened
-> is that hooking into the interrupt controller code to clear down the FIQ
-> creates such a horrid layering violation, and also a locking mess that
-> I suspect it's just been given up with.
-
-I haven't quite given up; I'm still looking into this stuff. However 
-you're certainly right that connecting the FIQ handler to the GIC code 
-in an elegant way is tough.
-
-I've been working in parallel on an arm64 implementation with the result 
-that I'm now two lumps of code that are almost, but not quite, ready.
-
-Right now I hope to share latest arm code fairly late in the this 
-devcycle (for review rather than merge) followed up with a new version 
-very early in v4.6. Even now I think the code needs a long soak in -next 
-just in case there are any lurking regressions on particular platforms.
-
-I don't expect anyone to base decisions on my aspirations above but 
-would like to reassure Russell that I haven't given up on it.
-
-
-Daniel.
+> The only difference is that we'd need to use the pmu syscon for it.
+>
+>
+     Very glad to see your work on this. And your work is more generic 
+than my.
+      So hope we can share the code. As you can see, the rockchip 
+platform use
+      a GRF or PMU register to store the reboot reason. So maybe we need 
+a phandle
+      in the DT node to describe it.
+>> Changes in v3:
+>>   - rename a pinctrl node in rk3288-veyron, the original name will be
+>>     used in the incoming reboot notifier driver
+>>   - add dt binding
+>>   - move from mach-rockchip to drivers/soc/rockchip, as the tegra does
+>>   - use dts pass the related register
+>>   - add DT node
+>>
+>> Changes in v2:
+>>    - check cpu dt node
+>>    - remove a unnecessary of_put_node in function rockchip_get_pmu_regmap
+>>    - fix a align issue
+>>    - use reboot_notifier instead of restart_handler
+>>
+>> Andy Yan (5):
+>>    ARM: dts: rockchip: rk3288-veyron: rename pinctrl node reboot to reset
+>>    dt-bindings: soc: add document for rockchip reboot notifier driver
+>>    soc: rockchip: add reboot notifier driver
+>>    ARM: dts: rockchip: add reboot node
+>>    ARM64: dts: rockchip: add reboot node
+>>
+>>   .../bindings/soc/rockchip/rockchip-reboot.txt      | 18 ++++
+>>   arch/arm/boot/dts/rk3288-veyron.dtsi               |  2 +-
+>>   arch/arm/boot/dts/rk3288.dtsi                      |  6 ++
+>>   arch/arm/boot/dts/rk3xxx.dtsi                      |  6 ++
+>>   arch/arm64/boot/dts/rockchip/rk3368.dtsi           |  6 ++
+>>   drivers/soc/rockchip/Kconfig                       |  7 ++
+>>   drivers/soc/rockchip/Makefile                      |  1 +
+>>   drivers/soc/rockchip/loader.h                      | 22 +++++
+>>   drivers/soc/rockchip/reboot.c                      | 98
+>> ++++++++++++++++++++++ 9 files changed, 165 insertions(+), 1 deletion(-)
+>>   create mode 100644
+>> Documentation/devicetree/bindings/soc/rockchip/rockchip-reboot.txt create
+>> mode 100644 drivers/soc/rockchip/loader.h
+>>   create mode 100644 drivers/soc/rockchip/reboot.c
+>
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
