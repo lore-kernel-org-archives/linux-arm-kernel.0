@@ -1,156 +1,73 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 14 Dec 2015 11:43:36 -0800
-Subject: [PATCH v2] clk: ti: Add support for dm814x ADPLL
-In-Reply-To: <20151214091526.GA16315@squirrel.local>
-References: <1449800792-5551-1-git-send-email-tony@atomide.com>
- <20151214091526.GA16315@squirrel.local>
-Message-ID: <20151214194335.GP23396@atomide.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 14 Dec 2015 11:46:13 -0800
+Subject: [PATCH/RFC 0/7] ARM: dts: Add compatible property to
+ "partitions" node
+In-Reply-To: <1450120304-2760-1-git-send-email-geert+renesas@glider.be>
+References: <1450120304-2760-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20151214194613.GA126731@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Matthijs van Duin <matthijsvanduin@gmail.com> [151214 01:16]:
-> On Thu, Dec 10, 2015 at 06:26:32PM -0800, Tony Lindgren wrote:
-> > +- compatible : shall be one of "ti,dm814-adpll-s-clock" or
-> > +  "ti,dm814-adpll-j-clock" depending on the type of the ADPLL
+On Mon, Dec 14, 2015 at 08:11:37PM +0100, Geert Uytterhoeven wrote:
+> 	Hi,
 > 
-> There's still a j -> lj you missed.
+> As of commit e488ca9f8d4f62c2 ("doc: dt: mtd: partitions: add compatible
+> property to "partitions" node"), the "partitions" subnode of an SPI
+> FLASH device node must have a compatible property. The partitions are no
+> longer detected if it is not present.
 
-Oops thanks will fix.
+For all patches:
 
-> Also, since the device series almost always referred to as dm814x, any 
-> reason the x is omitted here?  Based on a quick google, dm814 mostly seems 
-> to be a moose hunting area in alaska ;-)
+Acked-by: Brian Norris <computersforpeace@gmail.com>
 
-Well we don't want any any wild cards in the dts compatible names.
-Typically the first piece of hardware is selected, but that causes
-confusion too. So we're using comaptible names like dra7 and dm814.
+> I marked this series as "RFC", as the abovementioned commit is not yet
+> upstream. Ideally, the users should be fixed first, to avoid breakage.
 
-> > +- clocks : link phandles of parent clocks (clk-ref and clk-bypass)
+I'd differ on the last sentence. It's more important to straighten out
+the release features for 4.4 than to make sure that linux-next has
+perfect DTS files. So I'll submit whenever ready :)
+
+FWIW, I plan to submit my pullreq this week, hopefully by
+end-of-Wednesday. (There are other potential MTD fixes that haven't
+stabilized. I may just send them separately.)
+
+Regards,
+Brian
+
+> Tested on r8a7791/koelsch.
 > 
-> The documentation and your later example calls these clkinp and clkinpulow. 
-> In theory adpll-s has a third input (clkinphif).
+> Thanks!
 > 
-> Calling the input clock "clk-ref" is potentially misleading since the 
-> documentation uses the name "refclk" for clkinp/(N+1). Also, while I'll 
-> admit "clkinpulow" is an awful name, "clk-bypass" is also misleading since 
-> it is merely an optional alternative bypass clock, the default being 
-> clkinp/(N2+1).
+> Geert Uytterhoeven (7):
+>   ARM: dt: mvebu: ix4-300d: Add compatible property to "partitions" node
+>   ARM: shmobile: bockw dts: Add compatible property to "partitions" node
+>   ARM: shmobile: lager dts: Add compatible property to "partitions" node
+>   ARM: shmobile: koelsch dts: Add compatible property to "partitions"
+>     node
+>   ARM: shmobile: porter dts: Add compatible property to "partitions"
+>     node
+>   ARM: shmobile: gose dts: Add compatible property to "partitions" node
+>   ARM: shmobile: silk dts: Add compatible property to "partitions" node
 > 
-> Are you aware of any dm814x-sibling that actually uses clkinpulow, or are 
-> you just including it for completeness or consistency with DPLL instances 
-> in other devices like the omap4 or am335x?
-
-I don't know of any instances using it.. I'll take a look but seems like we
-could just leave it out.
-
-> > +		clock-output-names = "481c5040.adpll.dcoclkldo",
-> > ...
-> > +		clock-output-names = "481c5080.adpll.clkdcoldo",
+>  arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts | 1 +
+>  arch/arm/boot/dts/r8a7778-bockw.dts             | 1 +
+>  arch/arm/boot/dts/r8a7790-lager.dts             | 1 +
+>  arch/arm/boot/dts/r8a7791-koelsch.dts           | 1 +
+>  arch/arm/boot/dts/r8a7791-porter.dts            | 1 +
+>  arch/arm/boot/dts/r8a7793-gose.dts              | 1 +
+>  arch/arm/boot/dts/r8a7794-silk.dts              | 1 +
+>  7 files changed, 7 insertions(+)
 > 
-> I know this inconsistency comes straight out of the TRM, but may I vote for 
-> picking one of them and sticking to it? :-)
-
-I vote for dcoclkldo then :) The "cold" name embedded in the other one just
-causes me confusion reading it every time..
-
-> > +#define ADPLL_CLKINPHIFSEL_ADPLL_S	19	/* REVISIT: which bit? */
+> -- 
+> 1.9.1
 > 
-> Impossible to say unless a dm814x sibling shows up that actually uses it; 
-> pll_mpu lacks the HIF clocks entirely.  Note that it's quite possible bit 19 
-> is indeed officially assigned to it, CLKINPHIFSEL and CLKOUTLDOEN do not 
-> conflict since they apply to different PLL types.
-
-Yup.
-
-> > +static void ti_adpll_set_bypass(struct ti_adpll_data *d)
-> > +static void ti_adpll_clear_bypass(struct ti_adpll_data *d)
+> Gr{oetje,eeting}s,
 > 
-> These functions relate to a specific "Idle Bypass" mode of the PLL,
-> which gates the refclk and sort of freezes the PLL state.  Various other
-> control/status bits become unresponsive in this mode as a result.
+> 						Geert
 > 
-> I would suggest reflecting this in the name, or at least a comment,
-> since "bypass" refers to a much more general state.  Clearing the IDLE
-> bit is necessary to take the PLL out of bypass, but other conditions
-> need to be satisfied as well.  Hence, "clear_bypass" does not not
-> literally do what its name would seem to suggest.
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 > 
-> > +static int ti_adpll_wait_lock(struct ti_adpll_data *d)
-> > ...
-> > +	while (ti_adpll_clock_is_bypass(d)) {
-
-Yeah I have to take a closer look at this whole bypass thing..
-
-> Locked and bypass are not actually mutually exclusive:  if you only care
-> about the DCO clock and not CLKOUT you can clear M2PWDNZ before enabling
-> the PLL, resulting in status (FREQLOCK | PHASELOCK | BYPASS) after lock.
-> 
-> I don't know if there's any reason to take this obscure configuration
-> into consideration, but I just wanted to make you aware of it.
-
-OK good to know thanks.
-
-> > +static int ti_adpll_is_prepared(struct clk_hw *hw)
-> > ...
-> > +	return (v & ADPLL_STATUS_PREPARED_MASK) == ADPLL_STATUS_PREPARED_MASK;
-> 
-> Yet here you do actually test whether the PLL is locked... why the use a
-> different condition here than in ti_adpll_wait_lock?
-> 
-> 
-> > +static unsigned long ti_adpll_recalc_rate(struct clk_hw *hw,
-> > ...
-> > +	if (ti_adpll_clock_is_bypass(d))
-> > +		return clk_get_rate(d->clocks[TI_ADPLL_N2].clk);
-> 
-> Bypass refers to clkout. This function calculates the DCO clock, which
-> is never subject to bypass: if the PLL is off, dcoclk is low.
-
-Thanks will check.
-
-> <rant>
-> Although I understand the reasoning behind using abstractions like
-> readl_relaxed() for I/O access to allow portability to platforms where
-> I/O is not simply memory-mapped, this concern does not exist for
-> platform-specific devices like this.  There's really no reason in my
-> humble opinion this code could not simply do
-> 
-> 	/* read predivider and multiplier, shifted left 18 bits to
-> 	 * accomodate the fractional multiplier */
-> 	spin_lock_irqsave(&d->lock, flags);
-> 	divider = (pll->n + 1) << 18;
-> 	rate = (pll->m << 18) + pll->frac_m;
-> 	spin_unlock_irqrestore(&d->lock, flags);
-> 
-> 	do_div(rate, divider);
-> 
-> instead of spending a whole paragraph of code on reading each individual
-> field, which I think just hurts readability.
-> </rant>
->
-> Note btw that PLLSS is entirely memory-like and is perfectly okay with
-> 16-bit reads/writes.  Grouping the  u16 n, m2, m, n2;  into two 32-bit
-> registers in the documentation is just TI being silly.
-
-Yeah using 16-bit read/write there seems like a good idea.
-
-For the Linux standard read/write.. That has been discussed to death
-with the immediate offset many years ago.. Let's not go there :)
-
-> > +	frac_m += 1;
-> 
-> que?
-
-Hmm need to check.
-
-> > +	/* Internal mux, sources from divider N2 or clkinpulow */
-> > +	err = ti_adpll_init_mux(d, TI_ADPLL_ULOW, "ulow",
-> 
-> Shouldn't this just be called "bypass", since it is the bypass clock
-> after all.  I would associate the name "ulow" only with clkinpulow.
-
-OK sounds like a good idea to me.
-
-Thanks for all the comments!
-
-Tony
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+> 							    -- Linus Torvalds
