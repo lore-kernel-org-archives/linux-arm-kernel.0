@@ -1,42 +1,46 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 14 Dec 2015 22:17:55 +0100
-Subject: [PATCH 0/3] cpuidle: avoid module usage in non-modular code
-In-Reply-To: <1450051032-32329-1-git-send-email-paul.gortmaker@windriver.com>
-References: <1450051032-32329-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <566F3203.5010009@linaro.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 14 Dec 2015 22:20:19 +0100
+Subject: [PATCH/RFC 0/7] ARM: dts: Add compatible property to "partitions"
+ node
+In-Reply-To: <20151214194613.GA126731@google.com>
+References: <1450120304-2760-1-git-send-email-geert+renesas@glider.be>
+ <20151214194613.GA126731@google.com>
+Message-ID: <CAMuHMdW=wJEoi-+EWAKBjRwb+QFvk=iFur1yFqR=q0f4zwzb2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/14/2015 12:57 AM, Paul Gortmaker wrote:
-> This series of commits is a part of a larger project to ensure
-> people don't reference modular support functions in non-modular
-> code.  Overall there was roughly 5k lines of dead code in the
-> kernel due to this.  So far we've fixed several areas, like tty,
-> x86, net, ... and we continue to work on other areas.
->
-> There are several reasons to not use module support for code that
-> can never be built as a module, but the big ones are:
->
->   (1) it is easy to accidentally code up unused module_exit and remove code
->   (2) it can be misleading when reading the source, thinking it can be
->        modular when the Makefile and/or Kconfig prohibit it
->   (3) it requires the include of the module.h header file which in turn
->       includes nearly everything else.
->
-> Fortunately for cpuidle, the changes are largely trivial and change
-> zero runtime.  All the changes here just remap the modular functions
-> onto the non-modular ones that they would be remapped onto anyway.
->
-> Changes are against linux-next and compile tested on ARM allmodconfig.
-> I've Cc'd ARM list because all of these are used on ARM, but I'm
-> thinking these probably can go in via the PM tree.
+Hi Brian,
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+On Mon, Dec 14, 2015 at 8:46 PM, Brian Norris
+<computersforpeace@gmail.com> wrote:
+> On Mon, Dec 14, 2015 at 08:11:37PM +0100, Geert Uytterhoeven wrote:
+>> As of commit e488ca9f8d4f62c2 ("doc: dt: mtd: partitions: add compatible
+>> property to "partitions" node"), the "partitions" subnode of an SPI
+>> FLASH device node must have a compatible property. The partitions are no
+>> longer detected if it is not present.
+>
+> For all patches:
+>
+> Acked-by: Brian Norris <computersforpeace@gmail.com>
+>
+>> I marked this series as "RFC", as the abovementioned commit is not yet
+>> upstream. Ideally, the users should be fixed first, to avoid breakage.
 
+It breaks bisectability in mainline.
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+> I'd differ on the last sentence. It's more important to straighten out
+> the release features for 4.4 than to make sure that linux-next has
+> perfect DTS files. So I'll submit whenever ready :)
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+If the DTS changes go in first, bisectability is preserved.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
