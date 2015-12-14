@@ -1,37 +1,35 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 14 Dec 2015 16:46:14 +0000
-Subject: [PATCH] ARM64: ZynqMP: DT: Fix GIC's 'reg' property
-In-Reply-To: <1450110700-14152-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1450110700-14152-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <20151214164613.GH21356@leverpostej>
+From: ashoks@broadcom.com (Ashok Kumar)
+Date: Mon, 14 Dec 2015 08:46:03 -0800
+Subject: [RFC PATCH 0/2] arm64: change PoC D-cache flush to PoU
+In-Reply-To: <20151214151117.GD22038@mbp>
+References: <1450099664-38554-1-git-send-email-ashoks@broadcom.com>
+ <20151214151117.GD22038@mbp>
+Message-ID: <20151214164603.GA25971@ashoks@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 14, 2015 at 08:31:40AM -0800, Soren Brinkmann wrote:
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> ---
->  arch/arm64/boot/dts/xilinx/zynqmp.dtsi | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+Hi,
+
+Thanks for the review.
+
+On Mon, Dec 14, 2015 at 03:11:18PM +0000, Catalin Marinas wrote:
+> On Mon, Dec 14, 2015 at 05:27:42AM -0800, Ashok Kumar wrote:
+> > Also deferred dcache flush in __cpu_copy_user_page to __sync_icache_dcache.
+> > May I know why I/D sync is needed in __cpu_copy_user_page? My understanding 
+> > is that any self modifying code in userspace is supposed to take care of the 
+> > coherency using the respective cache flush system call. 
 > 
-> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-> index 857eda5c7217..b5d1facadf16 100644
-> --- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-> +++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-> @@ -80,10 +80,10 @@
->  		gic: interrupt-controller at f9010000 {
->  			compatible = "arm,gic-400", "arm,cortex-a15-gic";
->  			#interrupt-cells = <3>;
-> -			reg = <0x0 0xf9010000 0x10000>,
-> -			      <0x0 0xf902f000 0x2000>,
-> +			reg = <0x0 0xf9010000 0x1000>,
-> +			      <0x0 0xf9020000 0x20000>,
->  			      <0x0 0xf9040000 0x20000>,
-> -			      <0x0 0xf906f000 0x2000>;
-> +			      <0x0 0xf9060000 0x20000>;
+> I think it may have been there for historical reasons on arch/arm
+> (115b22474eb1 - "ARM: 5794/1: Flush the D-cache during
+> copy_user_highpage()") and imported in arch/arm64. But looking back at
+> this, I don't think we need it for two reasons: dynamic linker no longer
+> relocating symbols in a text page (and cause CoW) and set_pte_at()
+> already calling __sync_icache_dcache().
 
-I'm confused. These sizes don't look right for GIC-400. Is this a custom
-GIC?
+In that case, shall we get rid of the flush in __sync_icache_dcache also
+by not calling flush_dcache_page in __cpu_copy_user_page?
 
-Did this ever work wit hteh old offsets and sizes?
-
-Mark.
+> 
+> -- 
+> Catalin
+> 
