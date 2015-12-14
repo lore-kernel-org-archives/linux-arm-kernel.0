@@ -1,39 +1,36 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Mon, 14 Dec 2015 09:13:26 +0100
-Subject: [PATCH v10 2/2] arm-soc: Add support for tango4 platforms
-In-Reply-To: <7573032.IeyxZFmjBm@wuerfel>
-References: <56549B3A.8010703@sigmadesigns.com>
- <5654A0F3.40404@sigmadesigns.com> <56558E41.7050301@sigmadesigns.com>
- <7573032.IeyxZFmjBm@wuerfel>
-Message-ID: <566E7A26.50004@sigmadesigns.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 14 Dec 2015 17:14:09 +0900
+Subject: [PATCH] serial: sh-sci: Add device tree support for r8a779[23]
+In-Reply-To: <CAMuHMdXjQ+N5zfJnQa97N_ob4WUtLTUgePL99e40SjT=tDGfuA@mail.gmail.com>
+References: <1448587224-8633-1-git-send-email-horms+renesas@verge.net.au>
+ <20151213065250.GA2230@kroah.com>
+ <20151214062722.GH18143@verge.net.au>
+ <CAMuHMdXjQ+N5zfJnQa97N_ob4WUtLTUgePL99e40SjT=tDGfuA@mail.gmail.com>
+Message-ID: <20151214081408.GA9929@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/2015 00:14, Arnd Bergmann wrote:
-> On Wednesday 25 November 2015 11:32:33 Marc Gonzalez wrote:
->> On 24/11/2015 18:40, Marc Gonzalez wrote:
->>
->>> +config ARCH_TANGO
->>> +     bool "Sigma Designs Tango4 (SMP87xx)" if ARCH_MULTI_V7
->>> +     # Cortex-A9 MPCore r3p0, PL310 r3p2
->>> +     select ARCH_HAS_HOLES_MEMORYMODEL
->>> +     select ARM_ERRATA_754322
->>> +     select ARM_ERRATA_764369 if SMP
->>> +     select ARM_ERRATA_775420
->>> +     select ARM_GIC
->>> +     select CLKSRC_TANGO_XTAL
->>> +     select GENERIC_IRQ_CHIP
->>
->> Instead of GENERIC_IRQ_CHIP, I should select TANGO_IRQCHIP
->> (to be defined in drivers/irqchip/Kconfig)
->>
->> TANGO_IRQCHIP itself will select IRQ_DOMAIN and GENERIC_IRQ_CHIP.
->>
+On Mon, Dec 14, 2015 at 08:49:18AM +0100, Geert Uytterhoeven wrote:
+> On Mon, Dec 14, 2015 at 7:27 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Sat, Dec 12, 2015 at 10:52:50PM -0800, Greg Kroah-Hartman wrote:
+> >> On Fri, Nov 27, 2015 at 10:20:24AM +0900, Simon Horman wrote:
+> >> > Simply document new compat strings.
+> >> > There appears to be no need for a driver updates.
+> >> >
+> >> > Also update the name of the r8a7791 to M2-W: the name changed a while back.
+> >> >
+> >> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >>
+> >> Doesn't apply to my tree :(
+> >
+> > I'm a little confused.
+> >
+> > The tty-next branch of the tty tree seems to be v4.4-rc5.
+> > And the patch seems to apply there. Please let me know what
+> > I should be using as a base.
 > 
-> Are you sending a V11 with this?
+> Greg has applied the patch from Ulrich, which added support for r8a7793.
+> Hence your patch adding support for r8a7792 and r8a7793 no longer applies.
 
-Yep, v11 coming up later today.
-
-Thanks for reminding me.
-
-Regards.
+Thanks. I'll come back to the r8a7792 later. Perhaps much later.
+Its not a high priority.
