@@ -1,54 +1,50 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 14 Dec 2015 04:56:07 +0100
-Subject: [PATCH V4 2/2] ARM: dts: imx6q: add Novena board
-In-Reply-To: <20151214013845.GP11252@tiger>
-References: <20151211110700.GD11252@tiger>
- <1449890833-7195-1-git-send-email-marex@denx.de>
- <20151214013845.GP11252@tiger>
-Message-ID: <201512140456.08114.marex@denx.de>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Mon, 14 Dec 2015 12:27:16 +0800
+Subject: [PATCH v2 0/3] Mediatek EFUSE Support
+In-Reply-To: <1447930014-19579-1-git-send-email-andrew-ct.chen@mediatek.com>
+References: <1447930014-19579-1-git-send-email-andrew-ct.chen@mediatek.com>
+Message-ID: <CAGS+omA8XK6ksd7Ma8yAUbkSsHR6yQxjFrV+HGbd83UiH6T51g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, December 14, 2015 at 02:38:45 AM, Shawn Guo wrote:
-> On Sat, Dec 12, 2015 at 04:27:13AM +0100, Marek Vasut wrote:
-> > From: Sean Cross <xobs@kosagi.com>
-> > 
-> > Novena is an open-hardware laptop/desktop/bare board.
-> > 
-> > See http://www.kosagi.com/w/index.php?title=Novena_Main_Page
-> > 
-> > Signed-off-by: Sean Cross <xobs@kosagi.com>
-> > Signed-off-by: Marek Vasut <marex@denx.de>
-> > Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> > Cc: Lucas Stach <l.stach@pengutronix.de>
-> > Cc: Sean Cross <xobs@kosagi.com>
-> > Cc: Shawn Guo <shawnguo@kernel.org>
-> 
-> It looks pretty good to me now, except a small question below.
+Hi Srinivas,
 
-Thanks
+On Thu, Nov 19, 2015 at 6:46 PM, Andrew-CT Chen
+<andrew-ct.chen@mediatek.com> wrote:
+> This patch adds EFUSE support driver which is used by other drivers
+> like thermal sensor and HDMI impedance.
+>
+> There are some efuses these fuses store things like calibration data,
+> speed bins.. etc. Drivers like thermal sensor, HDMI impedance would
+> read out this data for configuring the driver.
+>
+> Change in v2:
+> 1. Rebase to 4.4-rc1
+> 2. Modify the driver Makefile for more consistent with other drivers
+> 3. Modify the compatible string to "mediatek,mt8173-efuse" and "mediatek,efuse"
 
-> > ---
-> > 
-> >  arch/arm/boot/dts/Makefile         |   1 +
-> >  arch/arm/boot/dts/imx6q-novena.dts | 789
-> >  +++++++++++++++++++++++++++++++++++++ 2 files changed, 790
-> >  insertions(+)
-> >  create mode 100644 arch/arm/boot/dts/imx6q-novena.dts
-> 
-> <snip>
-> 
-> > +/ {
-> > +	model = "Kosagi Novena Dual/Quad";
-> > +	compatible = "kosagi,imx6q-novena", "fsl,imx6q";
-> > +
-> > +	memory {
-> > +		reg = <0x10000000 0xefffffff>;
-> 
-> What's the trick of having memory size being 0xefffffff?
+Do you still plan to queue this for v4.5?
 
-That is a typo, should obviously be 0xffffffff , I just tested it on the board.
-Thanks for spotting it, do you want me to repost a V5 or can you fix it ?
-
-Best regards,
-Marek Vasut
+>
+> Andrew-CT Chen (3):
+>   dt-bindings: add document of mediatek efuse driver
+>   nvmem: mediatek: Add Mediatek EFUSE driver
+>   dts: arm64: Add EFUSE device node
+>
+>  .../devicetree/bindings/nvmem/mtk-efuse.txt        | 36 +++++++++
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  5 ++
+>  drivers/nvmem/Kconfig                              | 11 +++
+>  drivers/nvmem/Makefile                             |  2 +
+>  drivers/nvmem/mtk-efuse.c                          | 89 ++++++++++++++++++++++
+>  5 files changed, 143 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/nvmem/mtk-efuse.txt
+>  create mode 100644 drivers/nvmem/mtk-efuse.c
+>
+> --
+> 1.9.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
