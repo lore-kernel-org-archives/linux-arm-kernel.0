@@ -1,122 +1,81 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sun, 13 Dec 2015 19:11:28 -0600
-Subject: [PATCH v2 2/4] ASoC: sun4i-codec: Add support for PA gpio pin
-In-Reply-To: <1449859439-30875-2-git-send-email-hdegoede@redhat.com>
-References: <1449859439-30875-1-git-send-email-hdegoede@redhat.com>
- <1449859439-30875-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20151214011128.GA4011@rob-hp-laptop>
+Date: Sun, 13 Dec 2015 19:25:06 -0600
+Subject: [PATCH 2/5] ARM: dts: cm-t335: add support for SBC-T335
+In-Reply-To: <1449996939-13901-3-git-send-email-uri.mashiach@compulab.co.il>
+References: <1445948100-16446-1-git-send-email-uri.mashiach@compulab.co.il>
+ <1449996939-13901-1-git-send-email-uri.mashiach@compulab.co.il>
+ <1449996939-13901-3-git-send-email-uri.mashiach@compulab.co.il>
+Message-ID: <20151214012506.GA11251@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 11, 2015 at 07:43:57PM +0100, Hans de Goede wrote:
-> Add support for PA gpio pin for controlling an external amplifier as used
-> on some Allwinner boards.
+On Sun, Dec 13, 2015 at 10:55:36AM +0200, Uri Mashiach wrote:
+> Add basic support for the SBC-T335.
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> CompuLab SBC-T335 is a single baseboard computer.
+> The SBC-T335 is based on the Texas Instruments Cortex-A8 Sitara AM3354
+> SoC.
+> 
+> Signed-off-by: Uri Mashiach <uri.mashiach@compulab.co.il>
+> Acked-by: Igor Grinberg <grinberg@compulab.co.il>
 
 Acked-by: Rob Herring <robh@kernel.org>
 
 > ---
-> Changes in v2:
-> -Use a dapm speaker widget (SND_SOC_DAPM_SPK) to control the gpio
-> -Rename gpio in devicetree from pa-gpios to allwinner,pa-gpios
-> ---
->  .../devicetree/bindings/sound/sun4i-codec.txt      |  3 ++
->  sound/soc/sunxi/sun4i-codec.c                      | 35 ++++++++++++++++++++++
->  2 files changed, 38 insertions(+)
+>  Documentation/devicetree/bindings/arm/omap/omap.txt |  3 +++
+>  arch/arm/boot/dts/Makefile                          |  1 +
+>  arch/arm/boot/dts/am335x-sbc-t335.dts               | 16 ++++++++++++++++
+>  3 files changed, 20 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/am335x-sbc-t335.dts
 > 
-> diff --git a/Documentation/devicetree/bindings/sound/sun4i-codec.txt b/Documentation/devicetree/bindings/sound/sun4i-codec.txt
-> index c92966b..0dce690 100644
-> --- a/Documentation/devicetree/bindings/sound/sun4i-codec.txt
-> +++ b/Documentation/devicetree/bindings/sound/sun4i-codec.txt
-> @@ -14,6 +14,9 @@ Required properties:
->     - "apb": the parent APB clock for this controller
->     - "codec": the parent module clock
+> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
+> index 2154f97..358e87e 100644
+> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
+> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
+> @@ -141,6 +141,9 @@ Boards:
+>  - AM335X CM-T335 : System On Module, built around the Sitara AM3352/4
+>    compatible = "compulab,cm-t335", "ti,am33xx"
 >  
-> +Optional properties:
-> +- allwinner,pa-gpios: gpio to enable external amplifier
+> +- AM335X SBC-T335 : single board computer, built around the Sitara AM3352/4
+> +  compatible = "compulab,sbc-t335", "compulab,cm-t335", "ti,am33xx"
 > +
->  Example:
->  codec: codec at 01c22c00 {
->  	#sound-dai-cells = <0>;
-> diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-> index 519ccb3..e6cc6a1 100644
-> --- a/sound/soc/sunxi/sun4i-codec.c
-> +++ b/sound/soc/sunxi/sun4i-codec.c
-> @@ -28,6 +28,7 @@
->  #include <linux/of_address.h>
->  #include <linux/clk.h>
->  #include <linux/regmap.h>
-> +#include <linux/gpio/consumer.h>
+>  - OMAP5 EVM : Evaluation Module
+>    compatible = "ti,omap5-evm", "ti,omap5"
 >  
->  #include <sound/core.h>
->  #include <sound/pcm.h>
-> @@ -103,6 +104,7 @@ struct sun4i_codec {
->  	struct regmap	*regmap;
->  	struct clk	*clk_apb;
->  	struct clk	*clk_module;
-> +	struct gpio_desc *gpio_pa;
->  
->  	struct snd_dmaengine_dai_dma_data	capture_dma_data;
->  	struct snd_dmaengine_dai_dma_data	playback_dma_data;
-> @@ -709,6 +711,26 @@ static struct snd_soc_dai_link *sun4i_codec_create_link(struct device *dev,
->  	return link;
->  };
->  
-> +static int sun4i_codec_spk_event(struct snd_soc_dapm_widget *w,
-> +				 struct snd_kcontrol *k, int event)
-> +{
-> +	struct sun4i_codec *scodec = snd_soc_card_get_drvdata(w->dapm->card);
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 15411bc..d82ea97 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -466,6 +466,7 @@ dtb-$(CONFIG_SOC_AM33XX) += \
+>  	am335x-lxm.dtb \
+>  	am335x-nano.dtb \
+>  	am335x-pepper.dtb \
+> +	am335x-sbc-t335.dtb \
+>  	am335x-sl50.dtb \
+>  	am335x-wega-rdk.dtb
+>  dtb-$(CONFIG_ARCH_OMAP4) += \
+> diff --git a/arch/arm/boot/dts/am335x-sbc-t335.dts b/arch/arm/boot/dts/am335x-sbc-t335.dts
+> new file mode 100644
+> index 0000000..9e98445
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/am335x-sbc-t335.dts
+> @@ -0,0 +1,16 @@
+> +/*
+> + * am335x-sbc-t335.dts - Device Tree file for Compulab SBC-T335
+> + *
+> + * Copyright (C) 2014 - 2015 CompuLab Ltd. - http://www.compulab.co.il/
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
 > +
-> +	if (scodec->gpio_pa)
-> +		gpiod_set_value_cansleep(scodec->gpio_pa,
-> +					 !!SND_SOC_DAPM_EVENT_ON(event));
+> +#include "am335x-cm-t335.dts"
 > +
-> +	return 0;
-> +}
-> +
-> +static const struct snd_soc_dapm_widget sun4i_codec_card_dapm_widgets[] = {
-> +	SND_SOC_DAPM_SPK("Speaker", sun4i_codec_spk_event),
+> +/ {
+> +	model = "CompuLab CM-T335 on SB-T335";
+> +	compatible = "compulab,sbc-t335", "compulab,cm-t335", "ti,am33xx";
 > +};
-> +
-> +static const struct snd_soc_dapm_route sun4i_codec_card_dapm_routes[] = {
-> +	{ "Speaker", NULL, "Power Amplifier" },
-> +};
-> +
->  static struct snd_soc_card *sun4i_codec_create_card(struct device *dev)
->  {
->  	struct snd_soc_card *card;
-> @@ -723,6 +745,10 @@ static struct snd_soc_card *sun4i_codec_create_card(struct device *dev)
->  
->  	card->dev		= dev;
->  	card->name		= "sun4i-codec";
-> +	card->dapm_widgets	= sun4i_codec_card_dapm_widgets;
-> +	card->num_dapm_widgets	= ARRAY_SIZE(sun4i_codec_card_dapm_widgets);
-> +	card->dapm_routes	= sun4i_codec_card_dapm_routes;
-> +	card->num_dapm_routes	= ARRAY_SIZE(sun4i_codec_card_dapm_routes);
->  
->  	return card;
->  };
-> @@ -774,6 +800,15 @@ static int sun4i_codec_probe(struct platform_device *pdev)
->  		return -EINVAL;
->  	}
->  
-> +	scodec->gpio_pa = devm_gpiod_get_optional(&pdev->dev, "allwinner,pa",
-> +						  GPIOD_OUT_LOW);
-> +	if (IS_ERR(scodec->gpio_pa)) {
-> +		ret = PTR_ERR(scodec->gpio_pa);
-> +		if (ret != -EPROBE_DEFER)
-> +			dev_err(&pdev->dev, "Failed to get pa gpio: %d\n", ret);
-> +		return ret;
-> +	}
-> +
->  	/* DMA configuration for TX FIFO */
->  	scodec->playback_dma_data.addr = res->start + SUN4I_CODEC_DAC_TXDATA;
->  	scodec->playback_dma_data.maxburst = 4;
 > -- 
 > 2.5.0
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
