@@ -1,81 +1,105 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sun, 13 Dec 2015 19:25:06 -0600
-Subject: [PATCH 2/5] ARM: dts: cm-t335: add support for SBC-T335
-In-Reply-To: <1449996939-13901-3-git-send-email-uri.mashiach@compulab.co.il>
-References: <1445948100-16446-1-git-send-email-uri.mashiach@compulab.co.il>
- <1449996939-13901-1-git-send-email-uri.mashiach@compulab.co.il>
- <1449996939-13901-3-git-send-email-uri.mashiach@compulab.co.il>
-Message-ID: <20151214012506.GA11251@rob-hp-laptop>
+Date: Sun, 13 Dec 2015 19:29:37 -0600
+Subject: [PATCH v3] spi: dts: sun4i: Add support for hardware-based wait
+ time between words
+In-Reply-To: <1450047853-9005-1-git-send-email-mweseloh42@gmail.com>
+References: <1449873940-10167-1-git-send-email-mweseloh42@gmail.com>
+ <1450047853-9005-1-git-send-email-mweseloh42@gmail.com>
+Message-ID: <20151214012937.GA12209@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 13, 2015 at 10:55:36AM +0200, Uri Mashiach wrote:
-> Add basic support for the SBC-T335.
+On Mon, Dec 14, 2015 at 12:04:11AM +0100, Marcus Weseloh wrote:
+> Adds a new property "spi-word-wait-ns" to the spi-bus binding that allows
+> SPI slave devices to set a hardware based wait time between the
+> transmission of words. Also modifies the sun4i SPI master driver to make
+> use of the new property. This specific SPI controller needs 3 clock
+> cycles to set up the delay, which makes the minimum non-zero wait time
+> on this hardware 4 clock cycles.
 > 
-> CompuLab SBC-T335 is a single baseboard computer.
-> The SBC-T335 is based on the Texas Instruments Cortex-A8 Sitara AM3354
-> SoC.
-> 
-> Signed-off-by: Uri Mashiach <uri.mashiach@compulab.co.il>
-> Acked-by: Igor Grinberg <grinberg@compulab.co.il>
-
-Acked-by: Rob Herring <robh@kernel.org>
-
+> Signed-off-by: Marcus Weseloh <mweseloh42@gmail.com>
 > ---
->  Documentation/devicetree/bindings/arm/omap/omap.txt |  3 +++
->  arch/arm/boot/dts/Makefile                          |  1 +
->  arch/arm/boot/dts/am335x-sbc-t335.dts               | 16 ++++++++++++++++
->  3 files changed, 20 insertions(+)
->  create mode 100644 arch/arm/boot/dts/am335x-sbc-t335.dts
+> Changes from v1:
+>  * renamed the property for more clarity
+>  * wait time is set in nanoseconds instead of number of clock cycles
+>  * transparently handle the 3 setup clock cycles
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
-> index 2154f97..358e87e 100644
-> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
-> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
-> @@ -141,6 +141,9 @@ Boards:
->  - AM335X CM-T335 : System On Module, built around the Sitara AM3352/4
->    compatible = "compulab,cm-t335", "ti,am33xx"
+> Changes from v2:
+>  * fixed typo in comment
+>  * moved parameter to spi-bus binding, dropping the vendor prefix
+>  * changed commit summary and description to reflect the changes
+> ---
+>  Documentation/devicetree/bindings/spi/spi-bus.txt |  2 ++
+>  drivers/spi/spi-sun4i.c                           | 23 +++++++++++++++++++++++
+>  2 files changed, 25 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/spi/spi-bus.txt b/Documentation/devicetree/bindings/spi/spi-bus.txt
+> index bbaa857..2d6034f 100644
+> --- a/Documentation/devicetree/bindings/spi/spi-bus.txt
+> +++ b/Documentation/devicetree/bindings/spi/spi-bus.txt
+> @@ -61,6 +61,8 @@ contain the following properties.
+>                        used for MOSI. Defaults to 1 if not present.
+>  - spi-rx-bus-width - (optional) The bus width(number of data wires) that
+>                        used for MISO. Defaults to 1 if not present.
+> +- spi-word-wait-ns - (optional) Hardware based delay between transmission of
+> +                      words in nanoseconds
+
+Could be a software delay if the h/w doesn't support delays.
+
+>  Some SPI controllers and devices support Dual and Quad SPI transfer mode.
+>  It allows data in the SPI system to be transferred in 2 wires(DUAL) or 4 wires(QUAD).
+> diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
+> index f60a6d6..73995a1 100644
+> --- a/drivers/spi/spi-sun4i.c
+> +++ b/drivers/spi/spi-sun4i.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/module.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/pm_runtime.h>
+> +#include <linux/of.h>
 >  
-> +- AM335X SBC-T335 : single board computer, built around the Sitara AM3352/4
-> +  compatible = "compulab,sbc-t335", "compulab,cm-t335", "ti,am33xx"
-> +
->  - OMAP5 EVM : Evaluation Module
->    compatible = "ti,omap5-evm", "ti,omap5"
+>  #include <linux/spi/spi.h>
 >  
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 15411bc..d82ea97 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -466,6 +466,7 @@ dtb-$(CONFIG_SOC_AM33XX) += \
->  	am335x-lxm.dtb \
->  	am335x-nano.dtb \
->  	am335x-pepper.dtb \
-> +	am335x-sbc-t335.dtb \
->  	am335x-sl50.dtb \
->  	am335x-wega-rdk.dtb
->  dtb-$(CONFIG_ARCH_OMAP4) += \
-> diff --git a/arch/arm/boot/dts/am335x-sbc-t335.dts b/arch/arm/boot/dts/am335x-sbc-t335.dts
-> new file mode 100644
-> index 0000000..9e98445
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/am335x-sbc-t335.dts
-> @@ -0,0 +1,16 @@
-> +/*
-> + * am335x-sbc-t335.dts - Device Tree file for Compulab SBC-T335
-> + *
-> + * Copyright (C) 2014 - 2015 CompuLab Ltd. - http://www.compulab.co.il/
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
+> @@ -173,6 +174,9 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
+>  	unsigned int tx_len = 0;
+>  	int ret = 0;
+>  	u32 reg;
+> +	u32 wait_ns = 0;
+> +	int wait_clk = 0;
+> +	int clk_ns = 0;
+>  
+>  	/* We don't support transfer larger than the FIFO */
+>  	if (tfr->len > SUN4I_FIFO_DEPTH)
+> @@ -261,6 +265,25 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
+>  
+>  	sun4i_spi_write(sspi, SUN4I_CLK_CTL_REG, reg);
+>  
+> +	/* Setup wait time between words */
+> +	of_property_read_u32(spi->dev.of_node, "spi-word-wait-ns",
+> +			     &wait_ns);
+
+Read this in probe and save the value rather than fetching every 
+transfer.
+
+> +	if (wait_ns) {
+> +		/* The wait time is set in SPI_CLK cycles. The SPI hardware
+> +		 * needs 3 additional cycles to setup the wait counter, so
+> +		 * the minimum delay time is 4 cycles.
+> +		 */
+> +		clk_ns = DIV_ROUND_UP(1000000000, tfr->speed_hz);
+> +		wait_clk = DIV_ROUND_UP(wait_ns, clk_ns) - 3;
+> +		if (wait_clk < 1) {
+> +			wait_clk = 1;
+> +			dev_info(&spi->dev,
+> +				 "using minimum of 4 word wait cycles (%uns)",
+> +				 4 * clk_ns);
+> +		}
+> +	}
+> +	sun4i_spi_write(sspi, SUN4I_WAIT_REG, (u16)wait_clk);
 > +
-> +#include "am335x-cm-t335.dts"
-> +
-> +/ {
-> +	model = "CompuLab CM-T335 on SB-T335";
-> +	compatible = "compulab,sbc-t335", "compulab,cm-t335", "ti,am33xx";
-> +};
+>  	/* Setup the transfer now... */
+>  	if (sspi->tx_buf)
+>  		tx_len = tfr->len;
 > -- 
-> 2.5.0
+> 1.9.1
 > 
