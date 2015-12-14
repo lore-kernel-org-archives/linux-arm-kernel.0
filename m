@@ -1,239 +1,25 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 14 Dec 2015 10:43:15 +0800
-Subject: [PATCH v2] ARM: dts: imx7d: cl-som-imx7: add basic module support
-In-Reply-To: <1449756097-2921-1-git-send-email-grinberg@compulab.co.il>
-References: <20151208151401.GA20042@rob-hp-laptop>
- <1449756097-2921-1-git-send-email-grinberg@compulab.co.il>
-Message-ID: <20151214024315.GC25756@tiger>
+Date: Mon, 14 Dec 2015 10:47:15 +0800
+Subject: [PATCH 0/8] Add support for CL-SOM-iMX7 and SBC-iMX7
+In-Reply-To: <1449472479-2521-1-git-send-email-ilya@compulab.co.il>
+References: <1449472479-2521-1-git-send-email-ilya@compulab.co.il>
+Message-ID: <20151214024715.GD25756@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 10, 2015 at 04:01:37PM +0200, Igor Grinberg wrote:
-> From: Ilya Ledvich <ilya@compulab.co.il>
-> 
-> CL-SOM-iMX7 is a miniature System-on-Module (SoM) based on
-> Freescale i.MX7 System-on-Chip family.
-> 
-> http://www.compulab.co.il/products/computer-on-modules/cl-som-imx7-freescale-i-mx-7-system-on-module/
-> 
-> Add basic DT support for standalone module (without a carrier board):
-> 
-> * Memory configuration
-> * I2C2 bus
-> * PMIC
-> * UART1
-> 
-> Signed-off-by: Ilya Ledvich <ilya@compulab.co.il>
-> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
-> Acked-by: Rob Herring <robh@kernel.org>
-> ---
-> 
-> v2: use generic node name for pmic (Thanks Rob).
-> 
->  arch/arm/boot/dts/Makefile                    |   1 +
->  arch/arm/boot/dts/imx7d-cl-som-imx7.dts       | 150 ++++++++++++++++++++++++++
->  3 files changed, 155 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx7d-cl-som-imx7.dts
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-> index 34c88b0..30b0ba1 100644
-> --- a/Documentation/devicetree/bindings/arm/fsl.txt
-> +++ b/Documentation/devicetree/bindings/arm/fsl.txt
-> @@ -53,6 +53,10 @@ i.MX6 Quad SABRE Automotive Board
->  Required root node properties:
->      - compatible = "fsl,imx6q-sabreauto", "fsl,imx6q";
->  
-> +i.MX7D CL-SOM-iMX7 Board
-> +Required root node properties:
-> +    - compatible = "compulab,cl-som-imx7", "fsl,imx7d";
-> +
+On Mon, Dec 07, 2015 at 09:14:31AM +0200, Ilya Ledvich wrote:
+> Ilya Ledvich (8):
+>   ARM: dts: imx7d: cl-som-imx7: add basic module support
+>   ARM: dts: imx7d: cl-som-imx7: add usb otg support
+>   ARM: dts: imx7d: cl-som-imx7: add eMMC support
+>   ARM: dts: imx7d: cl-som-imx7: add fec1 support
+>   ARM: dts: imx7d: cl-som-imx7: add eeprom support
+>   ARM: dts: imx7d: cl-som-imx7: add gpio extender support
+>   ARM: dts: imx7d: cl-som-imx7: add fec2 support
 
-This is not a board produced by FSL, so it should be documented in
-fsl.txt.
-
->  Generic i.MX boards
->  -------------------
->  
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 30bbc37..83ed521 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -350,6 +350,7 @@ dtb-$(CONFIG_SOC_IMX6SX) += \
->  dtb-$(CONFIG_SOC_IMX6UL) += \
->  	imx6ul-14x14-evk.dtb
->  dtb-$(CONFIG_SOC_IMX7D) += \
-> +	imx7d-cl-som-imx7.dtb \
->  	imx7d-sdb.dtb
->  dtb-$(CONFIG_SOC_LS1021A) += \
->  	ls1021a-qds.dtb \
-> diff --git a/arch/arm/boot/dts/imx7d-cl-som-imx7.dts b/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
-> new file mode 100644
-> index 0000000..ba05198
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
-> @@ -0,0 +1,150 @@
-> +/*
-> + * Support for CompuLab CL-SOM-iMX7 System-on-Module
-> + *
-> + * Copyright (C) 2015 CompuLab Ltd. - http://www.compulab.co.il/
-> + * Author: Ilya Ledvich <ilya@compulab.co.il>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms of the GNU General Public License version 2 as published by
-> + * the Free Software Foundation.
-> + */
-
-GPL/X11 dual licence is generally suggested for newly added dts files,
-as it will let non-Linux OS use them.
-
-> +
-> +/dts-v1/;
-> +
-> +#include <dt-bindings/input/input.h>
-> +#include "imx7d.dtsi"
-> +
-> +/ {
-> +	model = "CompuLab CL-SOM-iMX7";
-> +	compatible = "compulab,cl-som-imx7", "fsl,imx7d";
-> +
-> +	memory {
-> +		reg = <0x80000000 0x10000000>; /* 256 MB - minimal configuration */
-> +	};
-> +};
-> +
-> +&cpu0 {
-> +	arm-supply = <&sw1a_reg>;
-> +};
-> +
-> +&i2c2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c2>;
-> +	status = "okay";
-> +
-> +	pmic: pmic at 8 {
-> +		compatible = "fsl,pfuze3000";
-> +		reg = <0x08>;
-> +
-> +		regulators {
-> +			sw1a_reg: sw1a {
-> +				regulator-min-microvolt = <700000>;
-> +				regulator-max-microvolt = <1475000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +				regulator-ramp-delay = <6250>;
-> +			};
-> +
-> +			/* use sw1c_reg to align with pfuze100/pfuze200 */
-> +			sw1c_reg: sw1b {
-> +				regulator-min-microvolt = <700000>;
-> +				regulator-max-microvolt = <1475000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +				regulator-ramp-delay = <6250>;
-> +			};
-> +
-> +			sw2_reg: sw2 {
-> +				regulator-min-microvolt = <1500000>;
-> +				regulator-max-microvolt = <1850000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			sw3a_reg: sw3 {
-> +				regulator-min-microvolt = <900000>;
-> +				regulator-max-microvolt = <1650000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			swbst_reg: swbst {
-> +				regulator-min-microvolt = <5000000>;
-> +				regulator-max-microvolt = <5150000>;
-> +			};
-> +
-> +			snvs_reg: vsnvs {
-> +				regulator-min-microvolt = <1000000>;
-> +				regulator-max-microvolt = <3000000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			vref_reg: vrefddr {
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			vgen1_reg: vldo1 {
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-always-on;
-> +			};
-> +
-> +			vgen2_reg: vldo2 {
-> +				regulator-min-microvolt = <800000>;
-> +				regulator-max-microvolt = <1550000>;
-> +			};
-> +
-> +			vgen3_reg: vccsd {
-> +				regulator-min-microvolt = <2850000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-always-on;
-> +			};
-> +
-> +			vgen4_reg: v33 {
-> +				regulator-min-microvolt = <2850000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-always-on;
-> +			};
-> +
-> +			vgen5_reg: vldo3 {
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-always-on;
-> +			};
-> +
-> +			vgen6_reg: vldo4 {
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-always-on;
-> +			};
-> +		};
-> +	};
-> +};
-> +
-> +&uart1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart1>;
-> +	assigned-clocks = <&clks IMX7D_UART1_ROOT_SRC>;
-> +	assigned-clock-parents = <&clks IMX7D_PLL_SYS_MAIN_240M_CLK>;
-> +	status = "okay";
-> +};
-> +
-> +&iomuxc {
-> +	cl-som-imx7 {
-
-Since commit (5fcdf6a7ed95 pinctrl: imx: Allow parsing DT without
-function nodes), this level of container node is not really needed any
-more.
+For the initial board support submission, it doesn't really need such
+splitting.  Please merge above patches into one.
 
 Shawn
 
-> +		pinctrl_i2c2: i2c2grp {
-> +			fsl,pins = <
-> +				MX7D_PAD_I2C2_SDA__I2C2_SDA		0x4000007f
-> +				MX7D_PAD_I2C2_SCL__I2C2_SCL		0x4000007f
-> +			>;
-> +		};
-> +
-> +		pinctrl_uart1: uart1grp {
-> +			fsl,pins = <
-> +				MX7D_PAD_UART1_TX_DATA__UART1_DCE_TX	0x79
-> +				MX7D_PAD_UART1_RX_DATA__UART1_DCE_RX	0x79
-> +			>;
-> +		};
-> +	};
-> +};
-> -- 
-> 2.4.10
-> 
-> 
+>   ARM: dts: imx7d: sbc-imx7: add basic board support
