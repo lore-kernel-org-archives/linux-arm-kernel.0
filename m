@@ -1,36 +1,39 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 14 Dec 2015 09:13:05 +0100
-Subject: [PATCH/RFC 04/19] ARM: shmobile: r8a7793: add iic(b) to device
- tree
-In-Reply-To: <20151214022145.GE13945@verge.net.au>
-References: <1449802376-11301-1-git-send-email-horms+renesas@verge.net.au>
- <1449802376-11301-5-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdWyHHV-QOXc-7g0XjWvWbhb8RcKkX+NTvA1HMngpM1sPQ@mail.gmail.com>
- <20151214022145.GE13945@verge.net.au>
-Message-ID: <CAMuHMdU3+JwHJbK8rZeJQYmsmPY1nvgz72xyx19J908viTKB+Q@mail.gmail.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Mon, 14 Dec 2015 09:13:26 +0100
+Subject: [PATCH v10 2/2] arm-soc: Add support for tango4 platforms
+In-Reply-To: <7573032.IeyxZFmjBm@wuerfel>
+References: <56549B3A.8010703@sigmadesigns.com>
+ <5654A0F3.40404@sigmadesigns.com> <56558E41.7050301@sigmadesigns.com>
+ <7573032.IeyxZFmjBm@wuerfel>
+Message-ID: <566E7A26.50004@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 14, 2015 at 3:21 AM, Simon Horman <horms@verge.net.au> wrote:
->> >   - Documentation makes note of (v1.02, table 12.2.1).
+On 12/12/2015 00:14, Arnd Bergmann wrote:
+> On Wednesday 25 November 2015 11:32:33 Marc Gonzalez wrote:
+>> On 24/11/2015 18:40, Marc Gonzalez wrote:
 >>
->> Which document is this exactly?
->
-> I am looking at:
->
-> R-Car Series, 2nd Generation
-> User's Manual: Hardware
-> Rev.1.02 Oct 2014
+>>> +config ARCH_TANGO
+>>> +     bool "Sigma Designs Tango4 (SMP87xx)" if ARCH_MULTI_V7
+>>> +     # Cortex-A9 MPCore r3p0, PL310 r3p2
+>>> +     select ARCH_HAS_HOLES_MEMORYMODEL
+>>> +     select ARM_ERRATA_754322
+>>> +     select ARM_ERRATA_764369 if SMP
+>>> +     select ARM_ERRATA_775420
+>>> +     select ARM_GIC
+>>> +     select CLKSRC_TANGO_XTAL
+>>> +     select GENERIC_IRQ_CHIP
+>>
+>> Instead of GENERIC_IRQ_CHIP, I should select TANGO_IRQCHIP
+>> (to be defined in drivers/irqchip/Kconfig)
+>>
+>> TANGO_IRQCHIP itself will select IRQ_DOMAIN and GENERIC_IRQ_CHIP.
+>>
+> 
+> Are you sending a V11 with this?
 
-Ah, the latest I have is v1.01, which lacks that table.
+Yep, v11 coming up later today.
 
-Gr{oetje,eeting}s,
+Thanks for reminding me.
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Regards.
