@@ -1,28 +1,38 @@
 From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 14 Dec 2015 22:34:04 +0200
-Subject: [PATCH 0/2] arm: omap2: AM43xx: enable ARM TWD timer
-Message-ID: <1450125246-17249-1-git-send-email-grygorii.strashko@ti.com>
+Date: Mon, 14 Dec 2015 22:34:06 +0200
+Subject: [PATCH v2 2/2] arm: omap2: AM43xx: select ARM TWD timer
+In-Reply-To: <1450125246-17249-1-git-send-email-grygorii.strashko@ti.com>
+References: <1450125246-17249-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <1450125246-17249-3-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now ARM TWD timer can be enabled for AM437x devices since all prerequisite
-patches have been merged already [1] [2].
+From: Felipe Balbi <balbi@ti.com>
 
-But before finally enable ARM TWD timer for UP AM437x devices - 
-the Broadcast event source and infrustructure need to be enabled properly.
-Otherwise CPUIdle will be broken.
+Make sure to tell the kernel that AM437x devices have ARM TWD timer.
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-August/363989.html
-[2] http://www.spinics.net/lists/linux-omap/msg123940.html
-Felipe Balbi (1):
-  arm: omap2: AM43xx: select ARM TWD timer
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+[grygorii.strashko at ti.com: drop ARM Global timer selection, because
+ it's incompatible with PM (cpuidle/cpufreq). So, it's unsafe to enable
+ it unconditionally]
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+---
+v1: http://www.spinics.net/lists/arm-kernel/msg459649.html
 
-Grygorii Strashko (1):
-  ARM: OMAP: am43xx: enable GENERIC_CLOCKEVENTS_BROADCAST
+ arch/arm/mach-omap2/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
- arch/arm/mach-omap2/Kconfig | 2 ++
- arch/arm/mach-omap2/timer.c | 6 ++++++
- 2 files changed, 8 insertions(+)
-
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index 32a0086..0517f0c 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -66,6 +66,7 @@ config SOC_AM43XX
+ 	select MIGHT_HAVE_CACHE_L2X0
+ 	select HAVE_ARM_SCU
+ 	select GENERIC_CLOCKEVENTS_BROADCAST
++	select HAVE_ARM_TWD
+ 
+ config SOC_DRA7XX
+ 	bool "TI DRA7XX"
 -- 
 2.6.4
