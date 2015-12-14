@@ -1,73 +1,150 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 14 Dec 2015 09:19:30 +0100
-Subject: [PATCH 00/10] drivers/pci: avoid module_init in non-modular
- host/pci*
-In-Reply-To: <1449970917-12633-1-git-send-email-paul.gortmaker@windriver.com>
-References: <1449970917-12633-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <CAMuHMdXr=ErCO3R2LB+wBJh3JSiFkH5q3-FLSTOwdGT87fXz3A@mail.gmail.com>
+From: huawei.libin@huawei.com (Li Bin)
+Date: Mon, 14 Dec 2015 16:22:13 +0800
+Subject: [RFC] arm64: ftrace with regs for livepatch support
+In-Reply-To: <564F0846.5000001@linaro.org>
+References: <564F0846.5000001@linaro.org>
+Message-ID: <566E7C35.3060705@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
 
-On Sun, Dec 13, 2015 at 2:41 AM, Paul Gortmaker
-<paul.gortmaker@windriver.com> wrote:
-> This series of commits is a slice of a larger project to ensure
-> people don't have dead code for module removal in non-modular
-> drivers.  Overall there was roughly 5k lines of dead code in the
-> kernel due to this.  So far we've fixed several areas, like tty,
-> x86, net, etc. and we continue to work on other areas.
+
+on 2015/11/20 19:47, AKASHI Takahiro wrote:
+> In this RFC, I'd like to describe and discuss some issues on adding ftrace/
+> livepatch support on arm64 before actually submitting patches. In fact,
+> porting livepatch is not a complicated task, but adding "ftrace with
+> regs(CONFIG_DYNAMIC_FTRACE_WITH_REGS)" which livepatch heavily relies on
+> is a matter.
+> (There is another discussion about "arch-independent livepatch" in LKML.)
 >
-> There are several reasons to not use module_init for code that can
-> never be built as a module, but the big ones are:
+> Under "ftrace with regs", a ftrace helper function (ftrace_regs_caller)
+> will be called with cpu registers (struct pt_regs_t) at the beginning of
+> a function if tracing is enabled on the function. Livepatch utilizes this
+> argument to replace PC and jump back into a new (patched) function.
+> (Please note that this feature will also be used for ftrace-based kprobes.)
 >
->  (1) it is easy to accidentally code up unused module_exit and remove code
->  (2) it can be misleading when reading the source, thinking it can be
->       modular when the Makefile and/or Kconfig prohibit it
->  (3) it requires the include of the module.h header file which in turn
->      includes nearly everything else.
+> On arm64, there is no template for a function prologue, and "instruction
+> scheduling" may mix it with a function body. So a helper function, which
+> is inserted by gcc's "-pg" option, cannot (at least potentially) recognize
+> correct values of registers because some may have already been overwritten
+> at that point.
 >
-> Here we convert some module_init() calls into device_initcall() and delete
-> any module_exit and remove code that gets orphaned in the process, for
-> an overall net code reduction, which is always welcome.
+> Instead, X86 uses gcc's "-mfentry" option, which inserts "call _mcount" as
+> the first instruction of a function, to implement "ftrace with regs".
+> As this option is arch-specific, after discussions with toolchain folks,
+> we are proposing a new arch-neutral option, "-fprolog-pad=N"[1].
+> This option inserts N nop instructions before a function prologue so that
+> any architecture can utilize it to replace nops with whatever instruction
+> sequence they want later on when required.
+> (I assume that nop is very cheap in terms of performance impact.)
 >
-> The use of device_initcall ensures that the init function ordering
-> remains unchanged, but one could argue that PCI host code might be more
-> appropriate to be handled under subsys_initcall.  Fortunately we can
-> revisit making this extra change at a later date if desired; it does
-> not need to happen now, and we reduce the risk of introducing
-> regressions at this point in time by separating the two changes.
+> First, let me explain how we can implement "ftrace with regs", or more
+> specifically, ftrace_make_call() and ftrace_make_nop() as well as how
+> inserted instruction sequences look like. Implementing ftrace_regs_caller
+> is quite straightforward, we don't have to care (at least, in this RFC).
 >
-> Over half of the drivers changed here already explicitly disallowed any
-> unbind operations.  For the rest we make them the same, since there is
-> not really any sensible use case to unbind any built-in bus support that
-> I can think of.
+> 1) instruction sequence
+> Unlike x86, we have to preserve link register(x30) explicitly on arm64 since
+> a ftrace help function will be invoked before a function prologue. so we
+> need a few, not one, instructions here. Two possible ways:
+>
+>  (a) stp x29, x30, [sp, #-16]!
+>      mov x29, sp
+>      bl <mcount>
+>      ldp x29, x30, [sp], #16
+>      <function prologue>
+>      ...
+>
+>  (b) mov x9, x30
+>      bl <mcount>
+>      mov x30, x9
+>      <function prologue>
+>      ...
+>
+> (a) complies with a normal calling convention.
+> (b) is Li Bin's idea in his old patch. While (b) can save some memory
+> accesses by using a scratch register(x9 in this example), we have no way
+> to recover an actual value for this register.
+>
+>       Q#1. Which approach should we take here?
+>
 
-Personally, I think all of these should become tristate, so distro kernels
-don't have to build in PCI(e) support for all SoCs. multi_v7_defconfig kernels
-are becoming too big.
+I think the more appropriate way to implement the livepatch on arm64 is to
+directly modify the instruction with the help of the gcc "-fprolog-pad=N"option
+and the N only needs 1, rather than basing on ftrace.
 
-That does not preclude making these modules un-unloadable, though.
+func:
+    nop    <--->  b <(new_func1 - func)>  <--->   b <(new_func2 - func)>       
+    [prologue]
 
-> Paul Gortmaker (10):
->   drivers/pci: make host/pci-imx6.c driver explicitly non-modular
->   drivers/pci: make host/pcie-spear13xx.c driver explicitly non-modular
->   drivers/pci: make host/pci-mvebu.c explicitly non-modular
->   drivers/pci: make host/pci-dra7xx.c explicitly non-modular
->   drivers/pci: make host/pci-rcar-gen2.c explicitly non-modular
->   drivers/pci: make host/pci-tegra.c explicitly non-modular
->   drivers/pci: make host/pcie-rcar.c explicitly non-modular
->   drivers/pci: make host/pcie-xilinx.c explicitly non-modular
->   drivers/pci: make host/pci-keystone.c explicitly non-modular
->   drivers/pci: make host/pcie-altera.c explicitly non-modular
+And that NOP and B are both safe instructions which called "concurrent modification
+and execution of instructions", that can be executed by one thread of execution as
+they are being modified by another thread of execution without requiring explicit
+synchronization.
 
-Gr{oetje,eeting}s,
+On arm64, this method will improve performance significantly compared with the method
+based on ftrace, especially for the critical function being frequently called.
 
-                        Geert
+Can we modify the livepatch to allow the arch specific implementation? Such as that
+making the klp_enable_func/klp_disable_func as the weak function and allow their
+implementations be architecture sepcific that not use ftrace. I already have a prototype
+patchset and have test it and will post them soon.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Thanks,
+Li Bin
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+>
+> 2) replacing an instruction sequence
+>    (This issue is orthogonal to Q#1.)
+>
+> Replacing can happen anytime, so we have to do it (without any locking) in
+> such a safe way that any task either calls a helper or doesn't call it, but
+> never runs in any intermediate state.
+>
+> Again here, two possible ways:
+>
+>   (a) initialize the code in the shape of (A') at boot time,
+>             (B) -> (B') -> (A')
+>       then switching to (A) or (A')
+>   (b) take a few steps each time. For example,
+>       to enable tracing,
+>             (B) -> (B') -> (A') -> (A)
+>       to disable tracing,
+>             (A) -> (A') -> (B') -> (A)
+>       Obviously, we need cache flushing/invalidation and barriers between.
+>
+>     (A)                                (A')
+>         stp x29, x30, [sp, #-16]!           b 1f
+>         mov x29, sp                         mov x29, sp
+>         bl <_mcount>                        bl <_mcount>
+>         ldp x29, x30, [sp], #16             ld x29, x30, [sp], #16
+>                                          1:
+>         <function prologue>
+>         <function body>
+>         ...
+>
+>     (B)                                (B')
+>         nop                                 b 1f
+>         nop                                 nop
+>         nop                                 nop
+>         nop                                 nop
+>                                          1:
+>         <function prologue>
+>         <function body>
+>         ...
+>
+> (a) is much simpler, but (b) has less performance penalty(?) when tracing
+> is disabled. I'm afraid that I might simplify the issue too much.
+>
+>        Q#2. Which one is more preferable?
+>
+>
+> [1] https://gcc.gnu.org/ml/gcc/2015-05/msg00267.html, and
+>     https://gcc.gnu.org/ml/gcc/2015-10/msg00090.html
+>
+>
+> Thanks,
+> -Takahiro AKASHI
+>
+> .
+>
