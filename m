@@ -1,37 +1,32 @@
-From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
-Date: Mon, 14 Dec 2015 13:23:39 +0530
-Subject: touchscreen: edt-ft5x06: Prevent DMA driver from mapping an area
- on stack
-In-Reply-To: <20151213044237.GA22780@dtor-ws>
-References: <e0311a5e79a315814e8678c9ef4a32563c01d1e0.1449913392.git.maitysanchayan@gmail.com>
- <20151212171355.GA7362@katana> <20151213044237.GA22780@dtor-ws>
-Message-ID: <20151214075339.GA28733@Sanchayan-Arch.toradex.int>
+From: mweseloh42@gmail.com (Marcus Weseloh)
+Date: Mon, 14 Dec 2015 09:08:09 +0100
+Subject: [PATCH v3] spi: dts: sun4i: Add support for hardware-based wait
+ time between words
+In-Reply-To: <CAGNoLaOckrgv5NP6eTOt8shj5f069DKFrxx+8afydqcAZH5HMw@mail.gmail.com>
+References: <1449873940-10167-1-git-send-email-mweseloh42@gmail.com>
+ <1450047853-9005-1-git-send-email-mweseloh42@gmail.com>
+ <20151214012937.GA12209@rob-hp-laptop>
+ <CAGNoLaOckrgv5NP6eTOt8shj5f069DKFrxx+8afydqcAZH5HMw@mail.gmail.com>
+Message-ID: <CAGNoLaMR48FP6LA6OCUiwBFpja_inx47f-7hzLC3+=6td6oeaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+2015-12-14 8:31 GMT+01:00 Marcus Weseloh <mweseloh42@gmail.com>:
+> [...]
+>>> +     /* Setup wait time between words */
+>>> +     of_property_read_u32(spi->dev.of_node, "spi-word-wait-ns",
+>>> +                          &wait_ns);
+>>
+>> Read this in probe and save the value rather than fetching every
+>> transfer.
+>
+> But this is a slave property I'm using here. If I read and store it in
+> probe in the spi-sun4i driver, I won't have access to the slave node
+> property, will I?
 
-On 15-12-12 20:42:37, Dmitry Torokhov wrote:
-> On Sat, Dec 12, 2015 at 06:13:55PM +0100, Wolfram Sang wrote:
-> > 
-> > > Frankly speaking I do not know where the fix should actually be. I2C IMX
-> > > driver somehow taking care of this or the users of I2C, touchscreen drivers
-> > > in this case. In my opinion, the fix should be with the touchscreen driver
-> > > however I did like to have feedback or hear opinions on what is the accepted
-> > > solution to this.
-> > 
-> > There is no accepted solution to this yet :( DMA is/was still too rare for
-> > a serious discussion about this. There is also [1] and probably more...
-> > 
-> > [1]  http://patchwork.ozlabs.org/patch/220137/
-> 
-> I believe vast majority of i2c client drivers do not expect that the
-> transfer buffer they supply in i2c messages are supposed to be DMAable
-> (unlike USB and SPI buses that had that requirement from the beginning).
-> 
-> I won't be applying this patch unless we decide that I2C changes the
-> rules.
+Sorry, I think I get it now. I would need to read the value in SPI
+core, when the slave device gets probed. I will send an updated patch.
 
-Understood. Thanks for the clarifications Dmitry and Wolfram.
+Thanks,
 
-- Sanchayan.
+    Marcus
