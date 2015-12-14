@@ -1,35 +1,38 @@
-From: ashoks@broadcom.com (Ashok Kumar)
-Date: Mon, 14 Dec 2015 08:46:03 -0800
-Subject: [RFC PATCH 0/2] arm64: change PoC D-cache flush to PoU
-In-Reply-To: <20151214151117.GD22038@mbp>
-References: <1450099664-38554-1-git-send-email-ashoks@broadcom.com>
- <20151214151117.GD22038@mbp>
-Message-ID: <20151214164603.GA25971@ashoks@broadcom.com>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 14 Dec 2015 16:47:07 +0000
+Subject: [PATCH] arm64: Add missing linux/bug.h include in asm/pgtable.h
+In-Reply-To: <20151214163840.GB27918@e104818-lin.cambridge.arm.com>
+References: <1450109244-20122-1-git-send-email-julien.grall@citrix.com>
+ <20151214162242.GA27918@e104818-lin.cambridge.arm.com>
+ <566EEDC8.1050501@citrix.com>
+ <20151214163840.GB27918@e104818-lin.cambridge.arm.com>
+Message-ID: <566EF28B.7060909@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 14/12/15 16:38, Catalin Marinas wrote:
+> On Mon, Dec 14, 2015 at 04:26:48PM +0000, Julien Grall wrote:
+>> On 14/12/15 16:22, Catalin Marinas wrote:
+>>> On Mon, Dec 14, 2015 at 04:07:24PM +0000, Julien Grall wrote:
+>>>> Linux 4.4-rc5 doesn't build for arm64 with CONFIG_XEN=y enabled:
+>>>>
+>>>> In file included from linux/arch/arm64/include/asm/pgtable.h:60:0,
+>>>>                  from linux/arch/arm64/include/../../arm/include/asm/xen/page.h:5,
+>>>>                  from linux/arch/arm64/include/asm/xen/page.h:1,
+>>>>                  from linux/include/xen/page.h:28,
+>>>>                  from linux/arch/arm64/xen/../../arm/xen/grant-table.c:33:
+>>>> linux/arch/arm64/include/asm/pgtable.h: In function 'set_pte_at':
+>>>> linux/include/linux/mmdebug.h:49:39: error: implicit declaration of function 'BUILD_BUG_ON_INVALID' [-Werror=implicit-function-declaration]
+>>>>  #define VM_WARN_ONCE(cond, format...) BUILD_BUG_ON_INVALID(cond)
+>>>>                                        ^
+>>>> linux/arch/arm64/include/asm/pgtable.h:281:3: note: in expansion of macro 'VM_WARN_ONCE'
+>>>>    VM_WARN_ONCE(!pte_young(pte),
 
-Thanks for the review.
+I got bitten by this this morning, and had a patch to mmdebug.h I just
+sent to the linux-mm list... sorry I should have copied everyone on this
+thread (you don't get enough email already!).
 
-On Mon, Dec 14, 2015 at 03:11:18PM +0000, Catalin Marinas wrote:
-> On Mon, Dec 14, 2015 at 05:27:42AM -0800, Ashok Kumar wrote:
-> > Also deferred dcache flush in __cpu_copy_user_page to __sync_icache_dcache.
-> > May I know why I/D sync is needed in __cpu_copy_user_page? My understanding 
-> > is that any self modifying code in userspace is supposed to take care of the 
-> > coherency using the respective cache flush system call. 
-> 
-> I think it may have been there for historical reasons on arch/arm
-> (115b22474eb1 - "ARM: 5794/1: Flush the D-cache during
-> copy_user_highpage()") and imported in arch/arm64. But looking back at
-> this, I don't think we need it for two reasons: dynamic linker no longer
-> relocating symbols in a text page (and cause CoW) and set_pte_at()
-> already calling __sync_icache_dcache().
 
-In that case, shall we get rid of the flush in __sync_icache_dcache also
-by not calling flush_dcache_page in __cpu_copy_user_page?
+Thanks,
 
-> 
-> -- 
-> Catalin
-> 
+James
