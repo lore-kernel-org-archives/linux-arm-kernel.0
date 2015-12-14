@@ -1,28 +1,49 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 14 Dec 2015 14:10:31 +0100
-Subject: [PATCH] gpio: zynq: Do PM initialization earlier to support gpio
- hogs
-In-Reply-To: <fc67101afc0d10efbaeeb6bc3d881ab49e3f4671.1449745801.git.michal.simek@xilinx.com>
-References: <fc67101afc0d10efbaeeb6bc3d881ab49e3f4671.1449745801.git.michal.simek@xilinx.com>
-Message-ID: <CACRpkdYsOtzc_TnRA=CuvQMFNpgrMHhUvLu1kRQFynk5wLNz0w@mail.gmail.com>
+From: ranjit.waghmode@xilinx.com (Ranjit Waghmode)
+Date: Mon, 14 Dec 2015 18:39:43 +0530
+Subject: [LINUX RFC v3 2/4] mtd: add spi_device instance to spi_nor struct
+In-Reply-To: <1450098585-3129-1-git-send-email-ranjit.waghmode@xilinx.com>
+References: <1450098585-3129-1-git-send-email-ranjit.waghmode@xilinx.com>
+Message-ID: <1450098585-3129-3-git-send-email-ranjit.waghmode@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 10, 2015 at 12:10 PM, Michal Simek <michal.simek@xilinx.com> wrote:
+This patch adds struct spi_device instacne to the spi_nor structure.
 
-> GPIO hogs registration is call at the end of gpiochip_add() function.
-> Calling sequence is:
-> gpiochip_add -> of_gpiochip_add -> of_gpiochip_scan_hogs ->
-> gpiod_hog -> gpiochip_request_own_desc -> __gpiod_request ->
-> chip->request -> zynq_gpio_request which calls pm_runtime_get_sync()
-> which returns -13 because PM is not initialized yet.
->
-> Initialize PM before gpiochip_add is called to fix this issue.
->
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+Signed-off-by: Ranjit Waghmode <ranjit.waghmode@xilinx.com>
+---
+V3 Changes:
+	- No change in this patch
+V2 Changes:
+	- This is new patch, basically splitted on request of Mark Brown
+---
 
-Patch applied!
+ drivers/mtd/devices/m25p80.c | 1 +
+ include/linux/mtd/spi-nor.h  | 1 +
+ 2 files changed, 2 insertions(+)
 
-Yours,
-Linus Walleij
+diff --git a/drivers/mtd/devices/m25p80.c b/drivers/mtd/devices/m25p80.c
+index fe9ceb7..bab4939 100644
+--- a/drivers/mtd/devices/m25p80.c
++++ b/drivers/mtd/devices/m25p80.c
+@@ -204,6 +204,7 @@ static int m25p_probe(struct spi_device *spi)
+
+ 	spi_set_drvdata(spi, flash);
+ 	flash->spi = spi;
++	nor->spi = spi;
+
+ 	if (spi->mode & SPI_RX_QUAD)
+ 		mode = SPI_NOR_QUAD;
+diff --git a/include/linux/mtd/spi-nor.h b/include/linux/mtd/spi-nor.h
+index c8723b6..872b2b4 100644
+--- a/include/linux/mtd/spi-nor.h
++++ b/include/linux/mtd/spi-nor.h
+@@ -155,6 +155,7 @@ struct spi_nor {
+ 	struct mtd_info		mtd;
+ 	struct mutex		lock;
+ 	struct device		*dev;
++	struct spi_device       *spi;
+ 	struct device_node	*flash_node;
+ 	u32			page_size;
+ 	u8			addr_width;
+--
+2.1.2
