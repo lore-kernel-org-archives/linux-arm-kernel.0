@@ -1,192 +1,64 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 14 Dec 2015 09:43:39 +0000
-Subject: [PATCH 4/4] nvmem: rockchip: trivial: Make the driver more readability
+Date: Mon, 14 Dec 2015 09:43:21 +0000
+Subject: [PATCH 3/4] nvmem: sunxi: trivial: fix code style
 In-Reply-To: <1450086024-18297-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1450086024-18297-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1450086219-18886-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1450086201-18843-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Caesar Wang <wxt@rock-chips.com>
 
-1) Make the include file to sort from order
-2) clean up the driver to make more readability
-
-Let's clean up such trivial details.
+this pacthset try to fix the code style for sunxi.
 
 Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- drivers/nvmem/rockchip-efuse.c | 90 ++++++++++++++++++++----------------------
- 1 file changed, 42 insertions(+), 48 deletions(-)
+ drivers/nvmem/sunxi_sid.c | 9 +++------
+ 1 file changed, 3 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
-index f552134..a009795 100644
---- a/drivers/nvmem/rockchip-efuse.c
-+++ b/drivers/nvmem/rockchip-efuse.c
-@@ -14,16 +14,16 @@
-  * more details.
+diff --git a/drivers/nvmem/sunxi_sid.c b/drivers/nvmem/sunxi_sid.c
+index cfa3b85..bc88b40 100644
+--- a/drivers/nvmem/sunxi_sid.c
++++ b/drivers/nvmem/sunxi_sid.c
+@@ -13,10 +13,8 @@
+  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+- *
   */
  
--#include <linux/platform_device.h>
--#include <linux/nvmem-provider.h>
--#include <linux/slab.h>
--#include <linux/regmap.h>
-+#include <linux/clk.h>
-+#include <linux/delay.h>
+-
  #include <linux/device.h>
  #include <linux/io.h>
  #include <linux/module.h>
--#include <linux/delay.h>
-+#include <linux/nvmem-provider.h>
-+#include <linux/slab.h>
- #include <linux/of.h>
--#include <linux/clk.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
+@@ -27,7 +25,6 @@
+ #include <linux/slab.h>
+ #include <linux/random.h>
  
- #define EFUSE_A_SHIFT			6
- #define EFUSE_A_MASK			0x3ff
-@@ -35,10 +35,10 @@
- #define REG_EFUSE_CTRL			0x0000
- #define REG_EFUSE_DOUT			0x0004
- 
--struct rockchip_efuse_context {
-+struct rockchip_efuse_chip {
- 	struct device *dev;
- 	void __iomem *base;
--	struct clk *efuse_clk;
-+	struct clk *clk;
- };
- 
- static int rockchip_efuse_write(void *context, const void *data, size_t count)
-@@ -52,34 +52,32 @@ static int rockchip_efuse_read(void *context,
- 			       void *val, size_t val_size)
- {
- 	unsigned int offset = *(u32 *)reg;
--	struct rockchip_efuse_context *_context = context;
--	void __iomem *base = _context->base;
--	struct clk *clk = _context->efuse_clk;
-+	struct rockchip_efuse_chip *efuse = context;
- 	u8 *buf = val;
- 	int ret;
- 
--	ret = clk_prepare_enable(clk);
-+	ret = clk_prepare_enable(efuse->clk);
- 	if (ret < 0) {
--		dev_err(_context->dev, "failed to prepare/enable efuse clk\n");
-+		dev_err(efuse->dev, "failed to prepare/enable efuse clk\n");
- 		return ret;
- 	}
- 
--	writel(EFUSE_LOAD | EFUSE_PGENB, base + REG_EFUSE_CTRL);
-+	writel(EFUSE_LOAD | EFUSE_PGENB, efuse->base + REG_EFUSE_CTRL);
- 	udelay(1);
- 	while (val_size) {
--		writel(readl(base + REG_EFUSE_CTRL) &
-+		writel(readl(efuse->base + REG_EFUSE_CTRL) &
- 			     (~(EFUSE_A_MASK << EFUSE_A_SHIFT)),
--			     base + REG_EFUSE_CTRL);
--		writel(readl(base + REG_EFUSE_CTRL) |
-+			     efuse->base + REG_EFUSE_CTRL);
-+		writel(readl(efuse->base + REG_EFUSE_CTRL) |
- 			     ((offset & EFUSE_A_MASK) << EFUSE_A_SHIFT),
--			     base + REG_EFUSE_CTRL);
-+			     efuse->base + REG_EFUSE_CTRL);
- 		udelay(1);
--		writel(readl(base + REG_EFUSE_CTRL) |
--			     EFUSE_STROBE, base + REG_EFUSE_CTRL);
-+		writel(readl(efuse->base + REG_EFUSE_CTRL) |
-+			     EFUSE_STROBE, efuse->base + REG_EFUSE_CTRL);
- 		udelay(1);
--		*buf++ = readb(base + REG_EFUSE_DOUT);
--		writel(readl(base + REG_EFUSE_CTRL) &
--		     (~EFUSE_STROBE), base + REG_EFUSE_CTRL);
-+		*buf++ = readb(efuse->base + REG_EFUSE_DOUT);
-+		writel(readl(efuse->base + REG_EFUSE_CTRL) &
-+		     (~EFUSE_STROBE), efuse->base + REG_EFUSE_CTRL);
- 		udelay(1);
- 
- 		val_size -= 1;
-@@ -87,9 +85,9 @@ static int rockchip_efuse_read(void *context,
- 	}
- 
- 	/* Switch to standby mode */
--	writel(EFUSE_PGENB | EFUSE_CSB, base + REG_EFUSE_CTRL);
-+	writel(EFUSE_PGENB | EFUSE_CSB, efuse->base + REG_EFUSE_CTRL);
- 
--	clk_disable_unprepare(clk);
-+	clk_disable_unprepare(efuse->clk);
- 
- 	return 0;
+-
+ static struct nvmem_config econfig = {
+ 	.name = "sunxi-sid",
+ 	.read_only = true,
+@@ -55,8 +52,8 @@ static u8 sunxi_sid_read_byte(const struct sunxi_sid *sid,
  }
-@@ -114,48 +112,44 @@ static struct nvmem_config econfig = {
- };
  
- static const struct of_device_id rockchip_efuse_match[] = {
--	{ .compatible = "rockchip,rockchip-efuse",},
-+	{ .compatible = "rockchip,rockchip-efuse", },
- 	{ /* sentinel */},
- };
- MODULE_DEVICE_TABLE(of, rockchip_efuse_match);
- 
- static int rockchip_efuse_probe(struct platform_device *pdev)
+ static int sunxi_sid_read(void *context,
+-			    const void *reg, size_t reg_size,
+-			    void *val, size_t val_size)
++			  const void *reg, size_t reg_size,
++			  void *val, size_t val_size)
  {
--	struct device *dev = &pdev->dev;
- 	struct resource *res;
- 	struct nvmem_device *nvmem;
- 	struct regmap *regmap;
--	void __iomem *base;
--	struct clk *clk;
--	struct rockchip_efuse_context *context;
-+	struct rockchip_efuse_chip *efuse;
- 
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	base = devm_ioremap_resource(dev, res);
--	if (IS_ERR(base))
--		return PTR_ERR(base);
-+	efuse = devm_kzalloc(&pdev->dev, sizeof(struct rockchip_efuse_chip),
-+			     GFP_KERNEL);
-+	if (!efuse)
-+		return -ENOMEM;
- 
--	context = devm_kzalloc(dev, sizeof(struct rockchip_efuse_context),
--			       GFP_KERNEL);
--	if (IS_ERR(context))
--		return PTR_ERR(context);
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	efuse->base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(efuse->base))
-+		return PTR_ERR(efuse->base);
- 
--	clk = devm_clk_get(dev, "pclk_efuse");
--	if (IS_ERR(clk))
--		return PTR_ERR(clk);
-+	efuse->clk = devm_clk_get(&pdev->dev, "pclk_efuse");
-+	if (IS_ERR(efuse->clk))
-+		return PTR_ERR(efuse->clk);
- 
--	context->dev = dev;
--	context->base = base;
--	context->efuse_clk = clk;
-+	efuse->dev = &pdev->dev;
- 
- 	rockchip_efuse_regmap_config.max_register = resource_size(res) - 1;
- 
--	regmap = devm_regmap_init(dev, &rockchip_efuse_bus,
--				  context, &rockchip_efuse_regmap_config);
-+	regmap = devm_regmap_init(efuse->dev, &rockchip_efuse_bus,
-+				  efuse, &rockchip_efuse_regmap_config);
- 	if (IS_ERR(regmap)) {
--		dev_err(dev, "regmap init failed\n");
-+		dev_err(efuse->dev, "regmap init failed\n");
- 		return PTR_ERR(regmap);
- 	}
--	econfig.dev = dev;
-+
-+	econfig.dev = efuse->dev;
- 	nvmem = nvmem_register(&econfig);
+ 	struct sunxi_sid *sid = context;
+ 	unsigned int offset = *(u32 *)reg;
+@@ -130,7 +127,7 @@ static int sunxi_sid_probe(struct platform_device *pdev)
  	if (IS_ERR(nvmem))
  		return PTR_ERR(nvmem);
+ 
+-	randomness = kzalloc(sizeof(u8) * size, GFP_KERNEL);
++	randomness = kzalloc(sizeof(u8) * (size), GFP_KERNEL);
+ 	if (!randomness) {
+ 		ret = -EINVAL;
+ 		goto err_unreg_nvmem;
 -- 
 1.9.1
