@@ -1,69 +1,187 @@
-From: lftan@altera.com (Ley Foon Tan)
-Date: Mon, 14 Dec 2015 16:33:51 +0800
-Subject: [PATCH 00/10] drivers/pci: avoid module_init in non-modular
- host/pci*
-In-Reply-To: <20151214082425.GA3766@ulmo.nvidia.com>
-References: <1449970917-12633-1-git-send-email-paul.gortmaker@windriver.com>
- <CAMuHMdXr=ErCO3R2LB+wBJh3JSiFkH5q3-FLSTOwdGT87fXz3A@mail.gmail.com>
- <20151214082425.GA3766@ulmo.nvidia.com>
-Message-ID: <CAFiDJ5-Y8afg5kDRQLK1pain-k1kPQAn3vhWrVkB1ADPRHvx+A@mail.gmail.com>
+From: mark.yao@rock-chips.com (Mark Yao)
+Date: Mon, 14 Dec 2015 16:35:20 +0800
+Subject: [PATCH v2 5/8] drm/rockchip: support atomic asynchronous commit
+In-Reply-To: <1450081931-9709-1-git-send-email-mark.yao@rock-chips.com>
+References: <1450081931-9709-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <1450082120-10026-1-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 14, 2015 at 4:24 PM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> On Mon, Dec 14, 2015 at 09:19:30AM +0100, Geert Uytterhoeven wrote:
->> Hi Paul,
->>
->> On Sun, Dec 13, 2015 at 2:41 AM, Paul Gortmaker
->> <paul.gortmaker@windriver.com> wrote:
->> > This series of commits is a slice of a larger project to ensure
->> > people don't have dead code for module removal in non-modular
->> > drivers.  Overall there was roughly 5k lines of dead code in the
->> > kernel due to this.  So far we've fixed several areas, like tty,
->> > x86, net, etc. and we continue to work on other areas.
->> >
->> > There are several reasons to not use module_init for code that can
->> > never be built as a module, but the big ones are:
->> >
->> >  (1) it is easy to accidentally code up unused module_exit and remove code
->> >  (2) it can be misleading when reading the source, thinking it can be
->> >       modular when the Makefile and/or Kconfig prohibit it
->> >  (3) it requires the include of the module.h header file which in turn
->> >      includes nearly everything else.
->> >
->> > Here we convert some module_init() calls into device_initcall() and delete
->> > any module_exit and remove code that gets orphaned in the process, for
->> > an overall net code reduction, which is always welcome.
->> >
->> > The use of device_initcall ensures that the init function ordering
->> > remains unchanged, but one could argue that PCI host code might be more
->> > appropriate to be handled under subsys_initcall.  Fortunately we can
->> > revisit making this extra change at a later date if desired; it does
->> > not need to happen now, and we reduce the risk of introducing
->> > regressions at this point in time by separating the two changes.
->> >
->> > Over half of the drivers changed here already explicitly disallowed any
->> > unbind operations.  For the rest we make them the same, since there is
->> > not really any sensible use case to unbind any built-in bus support that
->> > I can think of.
->>
->> Personally, I think all of these should become tristate, so distro kernels
->> don't have to build in PCI(e) support for all SoCs. multi_v7_defconfig kernels
->> are becoming too big.
->>
->> That does not preclude making these modules un-unloadable, though.
->
-> Most of these can't be made tristate as-is, because they use symbols
-> that aren't exported. Many of those symbols can easily be exported, so
-> its just a matter of getting the respective patches merged. I disagree
-> with making the modules non-unloadable, though. I have a local branch
-> with changes necessary to unload the host controller driver and it
-> works just fine.
->
-PCIe host driver that use fixup (DECLARE_PCI_FIXUP_*) can't use tristate.
-Fixup region is in kernel region and this region if not updated when
-loading a module.
+If drm core requests a async commit, rockchip_drm_atomic_commit
+will schedule a work task to update later.
 
-Regards
-Ley Foon
+Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+---
+
+Changes in v2:
+- serialize outstanding asynchronous commits
+
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c |    3 +
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.h |   10 ++++
+ drivers/gpu/drm/rockchip/rockchip_drm_fb.c  |   83 +++++++++++++++++++--------
+ 3 files changed, 71 insertions(+), 25 deletions(-)
+
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+index ab3e0f6..5edd5ccb 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+@@ -140,6 +140,9 @@ static int rockchip_drm_load(struct drm_device *drm_dev, unsigned long flags)
+ 	if (!private)
+ 		return -ENOMEM;
+ 
++	mutex_init(&private->commit.lock);
++	INIT_WORK(&private->commit.work, rockchip_drm_atomic_work);
++
+ 	drm_dev->dev_private = private;
+ 
+ 	drm_mode_config_init(drm_dev);
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+index 513ff98..a2f7aca 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+@@ -41,6 +41,13 @@ struct rockchip_crtc_funcs {
+ 	void (*disable_vblank)(struct drm_crtc *crtc);
+ };
+ 
++struct rockchip_atomic_commit {
++	struct work_struct	work;
++	struct drm_atomic_state *state;
++	struct drm_device *dev;
++	struct mutex lock;
++};
++
+ /*
+  * Rockchip drm private structure.
+  *
+@@ -51,8 +58,11 @@ struct rockchip_drm_private {
+ 	struct drm_fb_helper fbdev_helper;
+ 	struct drm_gem_object *fbdev_bo;
+ 	const struct rockchip_crtc_funcs *crtc_funcs[ROCKCHIP_MAX_CRTC];
++
++	struct rockchip_atomic_commit commit;
+ };
+ 
++void rockchip_drm_atomic_work(struct work_struct *work);
+ int rockchip_register_crtc_funcs(struct drm_crtc *crtc,
+ 				 const struct rockchip_crtc_funcs *crtc_funcs);
+ void rockchip_unregister_crtc_funcs(struct drm_crtc *crtc);
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+index 9aca778..1753bee 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+@@ -167,48 +167,44 @@ static void rockchip_drm_output_poll_changed(struct drm_device *dev)
+ 		drm_fb_helper_hotplug_event(fb_helper);
+ }
+ 
+-static void rockchip_atomic_wait_for_complete(struct drm_atomic_state *state)
++static void
++rockchip_atomic_wait_for_complete(struct drm_atomic_state *old_state)
+ {
+-	struct drm_crtc_state *crtc_state;
++	struct drm_crtc_state *old_crtc_state;
+ 	struct drm_crtc *crtc;
+-	int i;
++	int i, ret;
++
++	for_each_crtc_in_state(old_state, crtc, old_crtc_state, i) {
++		/* No one cares about the old state, so abuse it for tracking
++		 * and store whether we hold a vblank reference (and should do a
++		 * vblank wait) in the ->enable boolean.
++		 */
++		old_crtc_state->enable = false;
+ 
+-	for_each_crtc_in_state(state, crtc, crtc_state, i) {
+ 		if (!crtc->state->active)
+ 			continue;
+ 
+-		WARN_ON(drm_crtc_vblank_get(crtc));
+-	}
+-
+-	for_each_crtc_in_state(state, crtc, crtc_state, i) {
+-		if (!crtc->state->active)
++		ret = drm_crtc_vblank_get(crtc);
++		if (ret != 0)
+ 			continue;
+ 
+-		rockchip_crtc_wait_for_update(crtc);
++		old_crtc_state->enable = true;
+ 	}
+ 
+-	for_each_crtc_in_state(state, crtc, crtc_state, i) {
+-		if (!crtc->state->active)
++	for_each_crtc_in_state(old_state, crtc, old_crtc_state, i) {
++		if (!old_crtc_state->enable)
+ 			continue;
+ 
++		rockchip_crtc_wait_for_update(crtc);
+ 		drm_crtc_vblank_put(crtc);
+ 	}
+ }
+ 
+-int rockchip_drm_atomic_commit(struct drm_device *dev,
+-			       struct drm_atomic_state *state,
+-			       bool async)
++static void
++rockchip_atomic_commit_complete(struct rockchip_atomic_commit *commit)
+ {
+-	int ret;
+-
+-	if (async)
+-		return -EBUSY;
+-
+-	ret = drm_atomic_helper_prepare_planes(dev, state);
+-	if (ret)
+-		return ret;
+-
+-	drm_atomic_helper_swap_state(dev, state);
++	struct drm_atomic_state *state = commit->state;
++	struct drm_device *dev = commit->dev;
+ 
+ 	/*
+ 	 * TODO: do fence wait here.
+@@ -240,6 +236,43 @@ int rockchip_drm_atomic_commit(struct drm_device *dev,
+ 	drm_atomic_helper_cleanup_planes(dev, state);
+ 
+ 	drm_atomic_state_free(state);
++}
++
++void rockchip_drm_atomic_work(struct work_struct *work)
++{
++	struct rockchip_atomic_commit *commit = container_of(work,
++					struct rockchip_atomic_commit, work);
++
++	rockchip_atomic_commit_complete(commit);
++}
++
++int rockchip_drm_atomic_commit(struct drm_device *dev,
++			       struct drm_atomic_state *state,
++			       bool async)
++{
++	struct rockchip_drm_private *private = dev->dev_private;
++	struct rockchip_atomic_commit *commit = &private->commit;
++	int ret;
++
++	ret = drm_atomic_helper_prepare_planes(dev, state);
++	if (ret)
++		return ret;
++
++	/* serialize outstanding asynchronous commits */
++	mutex_lock(&commit->lock);
++	flush_work(&commit->work);
++
++	drm_atomic_helper_swap_state(dev, state);
++
++	commit->dev = dev;
++	commit->state = state;
++
++	if (async)
++		schedule_work(&commit->work);
++	else
++		rockchip_atomic_commit_complete(commit);
++
++	mutex_unlock(&commit->lock);
+ 
+ 	return 0;
+ }
+-- 
+1.7.9.5
