@@ -1,86 +1,73 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 14 Dec 2015 14:53:47 +0100
-Subject: [PATCH v10 1/8] ARM: dt: Binding documentation for imx25 ADC/TSC
+Date: Mon, 14 Dec 2015 14:53:49 +0100
+Subject: [PATCH v10 3/8] ARM: dt: Binding documentation for imx25 touchscreen
+ controller
 In-Reply-To: <1450101234-2191-1-git-send-email-mpa@pengutronix.de>
 References: <1450101234-2191-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1450101234-2191-2-git-send-email-mpa@pengutronix.de>
+Message-ID: <1450101234-2191-4-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This documentation describes the devicetree bindings for the
-ADC/Touchscreen unit of the i.MX25 SoC.
+This is the touchscreen conversion queue binding documentation. It uses
+the shared imx25 ADC.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-Acked-by: Jonathan Cameron <jic23@kernel.org>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
 
 Notes:
     Changes in v9:
-     - Fixed some style things.
+     - Updated binding descriptions
     
-    Changes in v6:
-     - Removed adc-ref property and replaced it with refp and refn for positive and
-       negative references. The properties are optional now as the default
-       behaviour is a positive internal reference voltage and ADC GND as negative
-       reference.
+    Changes in v5:
+     - Fix signed/unsigned comparison
+     - Fix unused variable settling_time by putting it in the correct argument list
+     - Use continous conversion queue with the repeat feature and a proper
+       repeat-wait. Previously the touchscreen caused massive number of interrupts.
 
- .../devicetree/bindings/mfd/fsl-imx25-tsadc.txt    | 47 ++++++++++++++++++++++
- 1 file changed, 47 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
+ .../bindings/input/touchscreen/fsl-mx25-tcq.txt    | 35 ++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/input/touchscreen/fsl-mx25-tcq.txt
 
-diff --git a/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt b/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
+diff --git a/Documentation/devicetree/bindings/input/touchscreen/fsl-mx25-tcq.txt b/Documentation/devicetree/bindings/input/touchscreen/fsl-mx25-tcq.txt
 new file mode 100644
-index 000000000000..b03505286997
+index 000000000000..cdf05f9b2329
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
-@@ -0,0 +1,47 @@
-+Freescale MX25 ADC/TSC MultiFunction Device (MFD)
++++ b/Documentation/devicetree/bindings/input/touchscreen/fsl-mx25-tcq.txt
+@@ -0,0 +1,35 @@
++Freescale mx25 TS conversion queue module
 +
-+This device combines two general purpose conversion queues one used for general
-+ADC and the other used for touchscreens.
++mx25 touchscreen conversion queue module which controls the ADC unit of the
++mx25 for attached touchscreens.
 +
 +Required properties:
-+ - compatible:			Should be "fsl,imx25-tsadc".
-+ - reg:				Start address and size of the memory area of
-+ 					the device
-+ - interrupts:			Interrupt for this device
-+					(See: ../interrupt-controller/interrupts.txt)
-+ - clocks:			An 'ipg' clock (See: ../clock/clock-bindings.txt)
-+ - interrupt-controller:	This device is an interrupt controller. It
-+   					controls the interrupts of both
-+					conversion queues.
-+ - #interrupt-cells:		Should be '<1>'.
-+ - #address-cells:		Should be '<1>'.
-+ - #size-cells:			Should be '<1>'.
++ - compatible: Should be "fsl,imx25-tcq".
++ - reg: Memory range of the device.
++ - interrupts: Should be the interrupt number associated with this module within
++   the tscadc unit (<0>).
++ - interrupt-parent: Should be a phandle to the tscadc unit.
++ - fsl,wires: Should be '<4>' or '<5>'
++
++Optional properties:
++ - fsl,pen-debounce-ns: Pen debounce time in nanoseconds.
++ - fsl,pen-threshold: Pen-down threshold for the touchscreen. This is a value
++   between 1 and 4096. It is the ratio between the internal reference voltage
++   and the measured voltage after the plate was precharged. Resistence between
++   plates and therefore the voltage decreases with pressure so that a smaller
++   value is equivalent to a higher pressure.
++ - fsl,settling-time-ns: Settling time in nanoseconds. The settling time is before
++   the actual touch detection to wait for an even charge distribution in the
++   plate.
 +
 +This device includes two conversion queues which can be added as subnodes.
 +The first queue is for the touchscreen, the second for general purpose ADC.
 +
 +Example:
-+	tscadc: tscadc at 50030000 {
-+		compatible = "fsl,imx25-tsadc";
-+		reg = <0x50030000 0xc>;
-+		interrupts = <46>;
-+		clocks = <&clks 119>;
-+		clock-names = "ipg";
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		tsc: tcq at 50030400 {
-+			compatible = "fsl,imx25-tcq";
-+			reg = <0x50030400 0x60>;
-+			...
-+		};
-+
-+		adc: gcq at 50030800 {
-+			compatible = "fsl,imx25-gcq";
-+			reg = <0x50030800 0x60>;
-+			...
-+		};
++	tsc: tcq at 50030400 {
++		compatible = "fsl,imx25-tcq";
++		reg = <0x50030400 0x60>;
++		interrupt-parent = <&tscadc>;
++		interrupts = <0>;
++		fsl,wires = <4>;
 +	};
 -- 
 2.6.2
