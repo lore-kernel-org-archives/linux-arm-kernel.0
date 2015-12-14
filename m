@@ -1,68 +1,108 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 14 Dec 2015 09:24:25 +0100
-Subject: [PATCH 00/10] drivers/pci: avoid module_init in non-modular
- host/pci*
-In-Reply-To: <CAMuHMdXr=ErCO3R2LB+wBJh3JSiFkH5q3-FLSTOwdGT87fXz3A@mail.gmail.com>
-References: <1449970917-12633-1-git-send-email-paul.gortmaker@windriver.com>
- <CAMuHMdXr=ErCO3R2LB+wBJh3JSiFkH5q3-FLSTOwdGT87fXz3A@mail.gmail.com>
-Message-ID: <20151214082425.GA3766@ulmo.nvidia.com>
+From: tiffany.lin@mediatek.com (tiffany lin)
+Date: Mon, 14 Dec 2015 16:26:58 +0800
+Subject: [PATCH v2 4/8] dt-bindings: Add a binding for Mediatek Video
+ Encoder
+In-Reply-To: <20151211172919.GA2896@rob-hp-laptop>
+References: <1449827743-22895-1-git-send-email-tiffany.lin@mediatek.com>
+ <1449827743-22895-5-git-send-email-tiffany.lin@mediatek.com>
+ <20151211172919.GA2896@rob-hp-laptop>
+Message-ID: <1450081618.5745.3.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 14, 2015 at 09:19:30AM +0100, Geert Uytterhoeven wrote:
-> Hi Paul,
+On Fri, 2015-12-11 at 11:29 -0600, Rob Herring wrote:
+> On Fri, Dec 11, 2015 at 05:55:39PM +0800, Tiffany Lin wrote:
+> > Add a DT binding documentation of Video Encoder for the
+> > MT8173 SoC from Mediatek.
+> > 
+> > Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
 > 
-> On Sun, Dec 13, 2015 at 2:41 AM, Paul Gortmaker
-> <paul.gortmaker@windriver.com> wrote:
-> > This series of commits is a slice of a larger project to ensure
-> > people don't have dead code for module removal in non-modular
-> > drivers.  Overall there was roughly 5k lines of dead code in the
-> > kernel due to this.  So far we've fixed several areas, like tty,
-> > x86, net, etc. and we continue to work on other areas.
-> >
-> > There are several reasons to not use module_init for code that can
-> > never be built as a module, but the big ones are:
-> >
-> >  (1) it is easy to accidentally code up unused module_exit and remove code
-> >  (2) it can be misleading when reading the source, thinking it can be
-> >       modular when the Makefile and/or Kconfig prohibit it
-> >  (3) it requires the include of the module.h header file which in turn
-> >      includes nearly everything else.
-> >
-> > Here we convert some module_init() calls into device_initcall() and delete
-> > any module_exit and remove code that gets orphaned in the process, for
-> > an overall net code reduction, which is always welcome.
-> >
-> > The use of device_initcall ensures that the init function ordering
-> > remains unchanged, but one could argue that PCI host code might be more
-> > appropriate to be handled under subsys_initcall.  Fortunately we can
-> > revisit making this extra change at a later date if desired; it does
-> > not need to happen now, and we reduce the risk of introducing
-> > regressions at this point in time by separating the two changes.
-> >
-> > Over half of the drivers changed here already explicitly disallowed any
-> > unbind operations.  For the rest we make them the same, since there is
-> > not really any sensible use case to unbind any built-in bus support that
-> > I can think of.
+> A question and minor issue below, otherwise:
 > 
-> Personally, I think all of these should become tristate, so distro kernels
-> don't have to build in PCI(e) support for all SoCs. multi_v7_defconfig kernels
-> are becoming too big.
+> Acked-by: Rob Herring <robh@kernel.org>
 > 
-> That does not preclude making these modules un-unloadable, though.
+> > ---
+> >  .../devicetree/bindings/media/mediatek-vcodec.txt  |   58 ++++++++++++++++++++
+> >  1 file changed, 58 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/media/mediatek-vcodec.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/media/mediatek-vcodec.txt b/Documentation/devicetree/bindings/media/mediatek-vcodec.txt
+> > new file mode 100644
+> > index 0000000..510cd81
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/media/mediatek-vcodec.txt
+> > @@ -0,0 +1,58 @@
+> > +Mediatek Video Codec
+> > +
+> > +Mediatek Video Codec is the video codec hw present in Mediatek SoCs which
+> > +supports high resolution encoding functionalities.
+> > +
+> > +Required properties:
+> > +- compatible : "mediatek,mt8173-vcodec-enc" for encoder
+> > +- reg : Physical base address of the video codec registers and length of
+> > +  memory mapped region.
+> > +- interrupts : interrupt number to the cpu.
+> > +- mediatek,larb : must contain the local arbiters in the current Socs.
+> > +- clocks : list of clock specifiers, corresponding to entries in
+> > +  the clock-names property;
+> > +- clock-names: must contain "vencpll", "venc_lt_sel", "vcodecpll_370p5_ck"
+> > +- iommus : list of iommus specifiers should be enabled for hw encode.
+> > +  There are 2 cells needed to enable/disable iommu.
+> > +  The first one is local arbiter index(larbid), and the other is port
+> > +  index(portid) within local arbiter. Specifies the larbid and portid
+> > +  as defined in dt-binding/memory/mt8173-larb-port.h.
+> > +- mediatek,vpu : the node of video processor unit
+> > +
+> > +Example:
+> > +vcodec_enc: vcodec at 0x18002000 {
+> > +    compatible = "mediatek,mt8173-vcodec-enc";
+> > +    reg = <0 0x18002000 0 0x1000>,    /*VENC_SYS*/
+> > +          <0 0x19002000 0 0x1000>;    /*VENC_LT_SYS*/
+> > +    interrupts = <GIC_SPI 198 IRQ_TYPE_LEVEL_LOW>,
+> > +           <GIC_SPI 202 IRQ_TYPE_LEVEL_LOW>;
+> > +    larb = <&larb3>,
+> > +           <&larb5>;
+> > +    iommus = <&iommu M4U_LARB3_ID M4U_PORT_VENC_RCPU>,
+> 
+> Is this the same iommu as the VPU? If so, you can't have a mixed number 
+> of cells.
+Yes, its same iommus as the VPU.
+Now we use two parameters for iommus.
+We will fix this in next version.
 
-Most of these can't be made tristate as-is, because they use symbols
-that aren't exported. Many of those symbols can easily be exported, so
-its just a matter of getting the respective patches merged. I disagree
-with making the modules non-unloadable, though. I have a local branch
-with changes necessary to unload the host controller driver and it
-works just fine.
+> > +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_REC>,
+> > +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_BSDMA>,
+> > +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_SV_COMV>,
+> > +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_RD_COMV>,
+> > +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_CUR_LUMA>,
+> > +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_CUR_CHROMA>,
+> > +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_REF_LUMA>,
+> > +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_REF_CHROMA>,
+> > +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_NBM_RDMA>,
+> > +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_NBM_WDMA>,
+> > +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_RCPU_SET2>,
+> > +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_REC_FRM_SET2>,
+> > +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_BSDMA_SET2>,
+> > +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_SV_COMA_SET2>,
+> > +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_RD_COMA_SET2>,
+> > +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_CUR_LUMA_SET2>,
+> > +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_CUR_CHROMA_SET2>,
+> > +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_REF_LUMA_SET2>,
+> > +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_REC_CHROMA_SET2>;
+> > +    vpu = <&vpu>;
+> 
+> Need to update the example.
+Sorry, I didn't get it.
+Do you means update VPU binding document "media/mediatek-vpu.txt"?
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151214/21036b5d/attachment.sig>
+> 
+> > +    clocks = <&apmixedsys CLK_APMIXED_VENCPLL>,
+> > +             <&topckgen CLK_TOP_VENC_LT_SEL>,
+> > +             <&topckgen CLK_TOP_VCODECPLL_370P5>;
+> > +    clock-names = "vencpll",
+> > +                  "venc_lt_sel",
+> > +                  "vcodecpll_370p5_ck";
+> > +  };
+> > -- 
+> > 1.7.9.5
+> > 
