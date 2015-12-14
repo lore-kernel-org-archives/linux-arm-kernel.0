@@ -1,47 +1,73 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 14 Dec 2015 17:15:27 +0900
-Subject: [PATCH 6/6] staging: board: armadillo800eva: Use "arm,pl390"
-In-Reply-To: <CAMuHMdXZdJ3WFNm=rRHwd=XtCF3mmbGCH1kA7HoPYdzcXhE8_Q@mail.gmail.com>
-References: <CAMuHMdXZdJ3WFNm=rRHwd=XtCF3mmbGCH1kA7HoPYdzcXhE8_Q@mail.gmail.com>
-Message-ID: <20151214081526.GB9929@verge.net.au>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 14 Dec 2015 09:19:30 +0100
+Subject: [PATCH 00/10] drivers/pci: avoid module_init in non-modular
+ host/pci*
+In-Reply-To: <1449970917-12633-1-git-send-email-paul.gortmaker@windriver.com>
+References: <1449970917-12633-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <CAMuHMdXr=ErCO3R2LB+wBJh3JSiFkH5q3-FLSTOwdGT87fXz3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 14, 2015 at 08:51:24AM +0100, Geert Uytterhoeven wrote:
-> Hi Simon,
-> 
-> On Mon, Dec 14, 2015 at 7:29 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Sun, Dec 13, 2015 at 09:16:47PM -0800, Greg Kroah-Hartman wrote:
-> >> On Mon, Dec 14, 2015 at 02:05:26PM +0900, Simon Horman wrote:
-> >> > On Fri, Dec 11, 2015 at 11:28:30AM -0500, Greg Kroah-Hartman wrote:
-> >> > > On Fri, Nov 20, 2015 at 01:36:57PM +0100, Geert Uytterhoeven wrote:
-> >> > > > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> >> > > > ---
-> >> > > > Must be applied together with "ARM: shmobile: r8a7740 dtsi: Use
-> >> > > > "arm,pl390" for GIC"!
-> >> > > >
-> >> > > > Greg: Can you please provide your ack? Thanks!
-> >> > >
-> >> > > Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> >> >
-> >> > Thanks Greg,
-> >> >
-> >> > I have taken the liberty of assuming that ack also applies to
-> >> > patch 5/6 of this series, the other staging/board patch in
-> >> > this series.
-> >>
-> >> Oops, yes, good call, thanks for doing this.
-> >
-> > No problem.
-> >
-> > For the record I have queued up these patches for v4.6 as I
-> > believe that the ARM SoC maintainers prefer not to have
-> > driver changes depending on DT changes and the first four patches
-> > of this series are DT changes.
-> 
-> Do you mean you have queued up the DT changes for v4.5, and the
-> staging changes for v4.6.? That would break staging/board in v4.5, as both
-> changes should be together as close as possible.
+Hi Paul,
 
-That is what I meant. Thanks for letting me know that it wont fly.
-I'll see about bundling all the changes in a single branch for v4.5.
+On Sun, Dec 13, 2015 at 2:41 AM, Paul Gortmaker
+<paul.gortmaker@windriver.com> wrote:
+> This series of commits is a slice of a larger project to ensure
+> people don't have dead code for module removal in non-modular
+> drivers.  Overall there was roughly 5k lines of dead code in the
+> kernel due to this.  So far we've fixed several areas, like tty,
+> x86, net, etc. and we continue to work on other areas.
+>
+> There are several reasons to not use module_init for code that can
+> never be built as a module, but the big ones are:
+>
+>  (1) it is easy to accidentally code up unused module_exit and remove code
+>  (2) it can be misleading when reading the source, thinking it can be
+>       modular when the Makefile and/or Kconfig prohibit it
+>  (3) it requires the include of the module.h header file which in turn
+>      includes nearly everything else.
+>
+> Here we convert some module_init() calls into device_initcall() and delete
+> any module_exit and remove code that gets orphaned in the process, for
+> an overall net code reduction, which is always welcome.
+>
+> The use of device_initcall ensures that the init function ordering
+> remains unchanged, but one could argue that PCI host code might be more
+> appropriate to be handled under subsys_initcall.  Fortunately we can
+> revisit making this extra change at a later date if desired; it does
+> not need to happen now, and we reduce the risk of introducing
+> regressions at this point in time by separating the two changes.
+>
+> Over half of the drivers changed here already explicitly disallowed any
+> unbind operations.  For the rest we make them the same, since there is
+> not really any sensible use case to unbind any built-in bus support that
+> I can think of.
+
+Personally, I think all of these should become tristate, so distro kernels
+don't have to build in PCI(e) support for all SoCs. multi_v7_defconfig kernels
+are becoming too big.
+
+That does not preclude making these modules un-unloadable, though.
+
+> Paul Gortmaker (10):
+>   drivers/pci: make host/pci-imx6.c driver explicitly non-modular
+>   drivers/pci: make host/pcie-spear13xx.c driver explicitly non-modular
+>   drivers/pci: make host/pci-mvebu.c explicitly non-modular
+>   drivers/pci: make host/pci-dra7xx.c explicitly non-modular
+>   drivers/pci: make host/pci-rcar-gen2.c explicitly non-modular
+>   drivers/pci: make host/pci-tegra.c explicitly non-modular
+>   drivers/pci: make host/pcie-rcar.c explicitly non-modular
+>   drivers/pci: make host/pcie-xilinx.c explicitly non-modular
+>   drivers/pci: make host/pci-keystone.c explicitly non-modular
+>   drivers/pci: make host/pcie-altera.c explicitly non-modular
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
