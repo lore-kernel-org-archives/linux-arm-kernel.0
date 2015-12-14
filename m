@@ -1,38 +1,38 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 14 Dec 2015 15:18:13 +0000
-Subject: [RFC PATCH 1/2] arm64: Defer dcache flush in __cpu_copy_user_page
-In-Reply-To: <1450099664-38554-2-git-send-email-ashoks@broadcom.com>
-References: <1450099664-38554-1-git-send-email-ashoks@broadcom.com>
- <1450099664-38554-2-git-send-email-ashoks@broadcom.com>
-Message-ID: <20151214151813.GE22038@mbp>
+From: jpoimboe@redhat.com (Josh Poimboeuf)
+Date: Mon, 14 Dec 2015 09:27:18 -0600
+Subject: [RFC PATCH 0/3] livepatch: arm64: add support for livepatch on
+ arm64
+In-Reply-To: <1450097378-3780-1-git-send-email-huawei.libin@huawei.com>
+References: <1450097378-3780-1-git-send-email-huawei.libin@huawei.com>
+Message-ID: <20151214152718.GA11552@treble.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 14, 2015 at 05:27:43AM -0800, Ashok Kumar wrote:
-> Defer dcache flushing to __sync_icache_dcache by calling
-> flush_dcache_page which clears PG_dcache_clean flag.
+On Mon, Dec 14, 2015 at 08:49:35PM +0800, Li Bin wrote:
+> This patchset depends on the on-going gcc feature "-fprolog-pad=N",
+> which will generate a pad of N nops at the beginning of each function.
 > 
-> Signed-off-by: Ashok Kumar <ashoks@broadcom.com>
-> ---
->  arch/arm64/mm/copypage.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+> Livepatch on arm64 can using the feature (that always placing one nop
+> at the beginning of the function). And when enable/disable func patching,
+> just modify the pad code to nop or branch. And that NOP and B instruction
+> are both safe instructions on arm64 which called "concurrent modification
+> and execution of instructions", that can be executed by one thread of
+> execution as they are being modified by another thread of execution without
+> requiring explicit synchronization.
 > 
-> diff --git a/arch/arm64/mm/copypage.c b/arch/arm64/mm/copypage.c
-> index 13bbc3be..22e4cb4 100644
-> --- a/arch/arm64/mm/copypage.c
-> +++ b/arch/arm64/mm/copypage.c
-> @@ -24,8 +24,9 @@
->  
->  void __cpu_copy_user_page(void *kto, const void *kfrom, unsigned long vaddr)
->  {
-> +	struct page *page = virt_to_page(kto);
->  	copy_page(kto, kfrom);
-> -	__flush_dcache_area(kto, PAGE_SIZE);
-> +	flush_dcache_page(page);
->  }
->  EXPORT_SYMBOL_GPL(__cpu_copy_user_page);
+> And this method will improve performance significantly compared with the
+> method based on ftrace, especially for the critical function being frequently
+> called.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+I think the arch-specific code in this patch set would be greatly
+affected by the consistency model when it finally arrives (but that's
+currently gated by getting stacktool merged, which should be soon).
+
+So I think it would be a good idea to wait until then before doing
+something like this.
+
+Is it possible to use ftrace instead?  That would be a much better short
+term solution.
 
 -- 
-Catalin
+Josh
