@@ -1,33 +1,28 @@
 From: ulrich.hecht+renesas@gmail.com (Ulrich Hecht)
-Date: Mon, 14 Dec 2015 16:42:38 +0100
-Subject: [PATCH 6/6] arm64: defconfig: Add Renesas R-Car SATA driver for R-Car
- Gen3 SoCs
+Date: Mon, 14 Dec 2015 16:42:33 +0100
+Subject: [PATCH 1/6] clk: shmobile: r8a7795: Add SATA0 clock
 In-Reply-To: <1450107758-2544-1-git-send-email-ulrich.hecht+renesas@gmail.com>
 References: <1450107758-2544-1-git-send-email-ulrich.hecht+renesas@gmail.com>
-Message-ID: <1450107758-2544-7-git-send-email-ulrich.hecht+renesas@gmail.com>
+Message-ID: <1450107758-2544-2-git-send-email-ulrich.hecht+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kouei Abe <kouei.abe.cp@renesas.com>
-
-This adds Renesas sata_rcar driver to defconfig.
-
-Signed-off-by: Kouei Abe <kouei.abe.cp@renesas.com>
+Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 ---
- arch/arm64/configs/defconfig | 1 +
+ drivers/clk/shmobile/r8a7795-cpg-mssr.c | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index f239a2e..bdbe783 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -93,6 +93,7 @@ CONFIG_SATA_AHCI=y
- CONFIG_SATA_AHCI_PLATFORM=y
- CONFIG_AHCI_CEVA=y
- CONFIG_AHCI_XGENE=y
-+CONFIG_SATA_RCAR=y
- CONFIG_PATA_PLATFORM=y
- CONFIG_PATA_OF_PLATFORM=y
- CONFIG_NETDEVICES=y
+diff --git a/drivers/clk/shmobile/r8a7795-cpg-mssr.c b/drivers/clk/shmobile/r8a7795-cpg-mssr.c
+index 05479e6..ad4d9fd 100644
+--- a/drivers/clk/shmobile/r8a7795-cpg-mssr.c
++++ b/drivers/clk/shmobile/r8a7795-cpg-mssr.c
+@@ -159,6 +159,7 @@ static const struct mssr_mod_clk r8a7795_mod_clks[] __initconst = {
+ 	DEF_MOD("gpio2",		 910,	R8A7795_CLK_CP),
+ 	DEF_MOD("gpio1",		 911,	R8A7795_CLK_CP),
+ 	DEF_MOD("gpio0",		 912,	R8A7795_CLK_CP),
++	DEF_MOD("sata0",		 915,	R8A7795_CLK_S3D2),
+ 	DEF_MOD("i2c6",			 918,	R8A7795_CLK_S3D2),
+ 	DEF_MOD("i2c5",			 919,	R8A7795_CLK_S3D2),
+ 	DEF_MOD("i2c4",			 927,	R8A7795_CLK_S3D2),
 -- 
 2.6.3
