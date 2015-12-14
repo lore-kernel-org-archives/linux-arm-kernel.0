@@ -1,19 +1,16 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sun, 13 Dec 2015 19:10:03 -0600
-Subject: [PATCH v2 3/3] ohci-platform: Add support for controllers with
- multiple reset lines
-In-Reply-To: <1449848520-27379-3-git-send-email-hdegoede@redhat.com>
-References: <1449848520-27379-1-git-send-email-hdegoede@redhat.com>
- <1449848520-27379-3-git-send-email-hdegoede@redhat.com>
-Message-ID: <20151214011003.GA3658@rob-hp-laptop>
+Date: Sun, 13 Dec 2015 19:11:28 -0600
+Subject: [PATCH v2 2/4] ASoC: sun4i-codec: Add support for PA gpio pin
+In-Reply-To: <1449859439-30875-2-git-send-email-hdegoede@redhat.com>
+References: <1449859439-30875-1-git-send-email-hdegoede@redhat.com>
+ <1449859439-30875-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <20151214011128.GA4011@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 11, 2015 at 04:42:00PM +0100, Hans de Goede wrote:
-> At least the EHCI/OHCI found on the Allwinnner H3 SoC needs multiple
-> reset lines, the controller will not initialize while the reset for
-> its companion is still asserted, which means we need to de-assert
-> 2 resets for the controller to work.
+On Fri, Dec 11, 2015 at 07:43:57PM +0100, Hans de Goede wrote:
+> Add support for PA gpio pin for controlling an external amplifier as used
+> on some Allwinner boards.
 > 
 > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
@@ -21,124 +18,101 @@ Acked-by: Rob Herring <robh@kernel.org>
 
 > ---
 > Changes in v2:
-> -New patch in v2 of this patch-set, to complement the identical patch for
->  the ehci-platform code
+> -Use a dapm speaker widget (SND_SOC_DAPM_SPK) to control the gpio
+> -Rename gpio in devicetree from pa-gpios to allwinner,pa-gpios
 > ---
->  Documentation/devicetree/bindings/usb/usb-ohci.txt |  2 +-
->  drivers/usb/host/ohci-platform.c                   | 49 +++++++++++++---------
->  2 files changed, 30 insertions(+), 21 deletions(-)
+>  .../devicetree/bindings/sound/sun4i-codec.txt      |  3 ++
+>  sound/soc/sunxi/sun4i-codec.c                      | 35 ++++++++++++++++++++++
+>  2 files changed, 38 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/usb/usb-ohci.txt b/Documentation/devicetree/bindings/usb/usb-ohci.txt
-> index 19233b7..9df4569 100644
-> --- a/Documentation/devicetree/bindings/usb/usb-ohci.txt
-> +++ b/Documentation/devicetree/bindings/usb/usb-ohci.txt
-> @@ -14,7 +14,7 @@ Optional properties:
->  - clocks : a list of phandle + clock specifier pairs
->  - phys : phandle + phy specifier pair
->  - phy-names : "usb"
-> -- resets : phandle + reset specifier pair
-> +- resets : a list of phandle + reset specifier pairs
+> diff --git a/Documentation/devicetree/bindings/sound/sun4i-codec.txt b/Documentation/devicetree/bindings/sound/sun4i-codec.txt
+> index c92966b..0dce690 100644
+> --- a/Documentation/devicetree/bindings/sound/sun4i-codec.txt
+> +++ b/Documentation/devicetree/bindings/sound/sun4i-codec.txt
+> @@ -14,6 +14,9 @@ Required properties:
+>     - "apb": the parent APB clock for this controller
+>     - "codec": the parent module clock
 >  
+> +Optional properties:
+> +- allwinner,pa-gpios: gpio to enable external amplifier
+> +
 >  Example:
+>  codec: codec at 01c22c00 {
+>  	#sound-dai-cells = <0>;
+> diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
+> index 519ccb3..e6cc6a1 100644
+> --- a/sound/soc/sunxi/sun4i-codec.c
+> +++ b/sound/soc/sunxi/sun4i-codec.c
+> @@ -28,6 +28,7 @@
+>  #include <linux/of_address.h>
+>  #include <linux/clk.h>
+>  #include <linux/regmap.h>
+> +#include <linux/gpio/consumer.h>
 >  
-> diff --git a/drivers/usb/host/ohci-platform.c b/drivers/usb/host/ohci-platform.c
-> index c2669f18..7d8bbc4 100644
-> --- a/drivers/usb/host/ohci-platform.c
-> +++ b/drivers/usb/host/ohci-platform.c
-> @@ -33,11 +33,12 @@
+>  #include <sound/core.h>
+>  #include <sound/pcm.h>
+> @@ -103,6 +104,7 @@ struct sun4i_codec {
+>  	struct regmap	*regmap;
+>  	struct clk	*clk_apb;
+>  	struct clk	*clk_module;
+> +	struct gpio_desc *gpio_pa;
 >  
->  #define DRIVER_DESC "OHCI generic platform driver"
->  #define OHCI_MAX_CLKS 3
-> +#define OHCI_MAX_RESETS 2
->  #define hcd_to_ohci_priv(h) ((struct ohci_platform_priv *)hcd_to_ohci(h)->priv)
->  
->  struct ohci_platform_priv {
->  	struct clk *clks[OHCI_MAX_CLKS];
-> -	struct reset_control *rst;
-> +	struct reset_control *resets[OHCI_MAX_RESETS];
->  	struct phy **phys;
->  	int num_phys;
+>  	struct snd_dmaengine_dai_dma_data	capture_dma_data;
+>  	struct snd_dmaengine_dai_dma_data	playback_dma_data;
+> @@ -709,6 +711,26 @@ static struct snd_soc_dai_link *sun4i_codec_create_link(struct device *dev,
+>  	return link;
 >  };
-> @@ -117,7 +118,7 @@ static int ohci_platform_probe(struct platform_device *dev)
->  	struct usb_ohci_pdata *pdata = dev_get_platdata(&dev->dev);
->  	struct ohci_platform_priv *priv;
->  	struct ohci_hcd *ohci;
-> -	int err, irq, phy_num, clk = 0;
-> +	int err, irq, phy_num, clk = 0, rst = 0;
 >  
->  	if (usb_disabled())
->  		return -ENODEV;
-> @@ -195,19 +196,23 @@ static int ohci_platform_probe(struct platform_device *dev)
->  				break;
->  			}
->  		}
-> -
-> -	}
-> -
-> -	priv->rst = devm_reset_control_get_optional(&dev->dev, NULL);
-> -	if (IS_ERR(priv->rst)) {
-> -		err = PTR_ERR(priv->rst);
-> -		if (err == -EPROBE_DEFER)
-> -			goto err_put_clks;
-> -		priv->rst = NULL;
-> -	} else {
-> -		err = reset_control_deassert(priv->rst);
-> -		if (err)
-> -			goto err_put_clks;
-> +		for (rst = 0; rst < OHCI_MAX_RESETS; rst++) {
-> +			priv->resets[rst] =
-> +				of_reset_control_get_by_index(dev->dev.of_node,
-> +							      rst);
-> +			if (IS_ERR(priv->resets[rst])) {
-> +				err = PTR_ERR(priv->resets[rst]);
-> +				if (err == -EPROBE_DEFER)
-> +					goto err_reset;
-> +				priv->resets[rst] = NULL;
-> +				break;
-> +			}
-> +			err = reset_control_deassert_shared(priv->resets[rst]);
-> +			if (err) {
-> +				reset_control_put(priv->resets[rst]);
-> +				goto err_reset;
-> +			}
-> +		}
+> +static int sun4i_codec_spk_event(struct snd_soc_dapm_widget *w,
+> +				 struct snd_kcontrol *k, int event)
+> +{
+> +	struct sun4i_codec *scodec = snd_soc_card_get_drvdata(w->dapm->card);
+> +
+> +	if (scodec->gpio_pa)
+> +		gpiod_set_value_cansleep(scodec->gpio_pa,
+> +					 !!SND_SOC_DAPM_EVENT_ON(event));
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct snd_soc_dapm_widget sun4i_codec_card_dapm_widgets[] = {
+> +	SND_SOC_DAPM_SPK("Speaker", sun4i_codec_spk_event),
+> +};
+> +
+> +static const struct snd_soc_dapm_route sun4i_codec_card_dapm_routes[] = {
+> +	{ "Speaker", NULL, "Power Amplifier" },
+> +};
+> +
+>  static struct snd_soc_card *sun4i_codec_create_card(struct device *dev)
+>  {
+>  	struct snd_soc_card *card;
+> @@ -723,6 +745,10 @@ static struct snd_soc_card *sun4i_codec_create_card(struct device *dev)
+>  
+>  	card->dev		= dev;
+>  	card->name		= "sun4i-codec";
+> +	card->dapm_widgets	= sun4i_codec_card_dapm_widgets;
+> +	card->num_dapm_widgets	= ARRAY_SIZE(sun4i_codec_card_dapm_widgets);
+> +	card->dapm_routes	= sun4i_codec_card_dapm_routes;
+> +	card->num_dapm_routes	= ARRAY_SIZE(sun4i_codec_card_dapm_routes);
+>  
+>  	return card;
+>  };
+> @@ -774,6 +800,15 @@ static int sun4i_codec_probe(struct platform_device *pdev)
+>  		return -EINVAL;
 >  	}
 >  
->  	if (pdata->big_endian_desc)
-> @@ -265,8 +270,10 @@ err_power:
->  	if (pdata->power_off)
->  		pdata->power_off(dev);
->  err_reset:
-> -	if (priv->rst)
-> -		reset_control_assert(priv->rst);
-> +	while (--rst >= 0) {
-> +		reset_control_assert_shared(priv->resets[rst]);
-> +		reset_control_put(priv->resets[rst]);
+> +	scodec->gpio_pa = devm_gpiod_get_optional(&pdev->dev, "allwinner,pa",
+> +						  GPIOD_OUT_LOW);
+> +	if (IS_ERR(scodec->gpio_pa)) {
+> +		ret = PTR_ERR(scodec->gpio_pa);
+> +		if (ret != -EPROBE_DEFER)
+> +			dev_err(&pdev->dev, "Failed to get pa gpio: %d\n", ret);
+> +		return ret;
 > +	}
->  err_put_clks:
->  	while (--clk >= 0)
->  		clk_put(priv->clks[clk]);
-> @@ -284,15 +291,17 @@ static int ohci_platform_remove(struct platform_device *dev)
->  	struct usb_hcd *hcd = platform_get_drvdata(dev);
->  	struct usb_ohci_pdata *pdata = dev_get_platdata(&dev->dev);
->  	struct ohci_platform_priv *priv = hcd_to_ohci_priv(hcd);
-> -	int clk;
-> +	int clk, rst;
->  
->  	usb_remove_hcd(hcd);
->  
->  	if (pdata->power_off)
->  		pdata->power_off(dev);
->  
-> -	if (priv->rst)
-> -		reset_control_assert(priv->rst);
-> +	for (rst = 0; rst < OHCI_MAX_RESETS && priv->resets[rst]; rst++) {
-> +		reset_control_assert_shared(priv->resets[rst]);
-> +		reset_control_put(priv->resets[rst]);
-> +	}
->  
->  	for (clk = 0; clk < OHCI_MAX_CLKS && priv->clks[clk]; clk++)
->  		clk_put(priv->clks[clk]);
+> +
+>  	/* DMA configuration for TX FIFO */
+>  	scodec->playback_dma_data.addr = res->start + SUN4I_CODEC_DAC_TXDATA;
+>  	scodec->playback_dma_data.maxburst = 4;
 > -- 
 > 2.5.0
 > 
