@@ -1,39 +1,140 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 14 Dec 2015 17:52:40 +0000
-Subject: [RFC PATCH 0/2] arm64: change PoC D-cache flush to PoU
-In-Reply-To: <20151214164603.GA25971@ashoks@broadcom.com>
-References: <1450099664-38554-1-git-send-email-ashoks@broadcom.com>
- <20151214151117.GD22038@mbp>
- <20151214164603.GA25971@ashoks@broadcom.com>
-Message-ID: <20151214175240.GD27918@e104818-lin.cambridge.arm.com>
+From: yang.shi@linaro.org (Shi, Yang)
+Date: Mon, 14 Dec 2015 10:00:39 -0800
+Subject: [PATCH v12 04/16] arm64: kvm: allows kvm cpu hotplug
+In-Reply-To: <566A84AF.202@linaro.org>
+References: <cover.1448403503.git.geoff@infradead.org>
+ <23ca498d5e28017549c6076812d60b18e86fa20e.1448403503.git.geoff@infradead.org>
+ <CAJ5Y-eYHqQCf=ZQzXb=D_P7VscM=vNc3YpYLJs+UtZLFswiaeQ@mail.gmail.com>
+ <56604A6E.60102@arm.com> <5669C802.7030103@linaro.org>
+ <566A84AF.202@linaro.org>
+Message-ID: <566F03C7.6070600@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 14, 2015 at 08:46:03AM -0800, Ashok Kumar wrote:
-> On Mon, Dec 14, 2015 at 03:11:18PM +0000, Catalin Marinas wrote:
-> > On Mon, Dec 14, 2015 at 05:27:42AM -0800, Ashok Kumar wrote:
-> > > Also deferred dcache flush in __cpu_copy_user_page to __sync_icache_dcache.
-> > > May I know why I/D sync is needed in __cpu_copy_user_page? My understanding 
-> > > is that any self modifying code in userspace is supposed to take care of the 
-> > > coherency using the respective cache flush system call. 
-> > 
-> > I think it may have been there for historical reasons on arch/arm
-> > (115b22474eb1 - "ARM: 5794/1: Flush the D-cache during
-> > copy_user_highpage()") and imported in arch/arm64. But looking back at
-> > this, I don't think we need it for two reasons: dynamic linker no longer
-> > relocating symbols in a text page (and cause CoW) and set_pte_at()
-> > already calling __sync_icache_dcache().
-> 
-> In that case, shall we get rid of the flush in __sync_icache_dcache also
-> by not calling flush_dcache_page in __cpu_copy_user_page?
+On 12/11/2015 12:09 AM, AKASHI Takahiro wrote:
+> Yang,
+>
+> On 12/11/2015 03:44 AM, Shi, Yang wrote:
+>> On 12/3/2015 5:58 AM, Marc Zyngier wrote:
+>>> On 02/12/15 22:40, Ashwin Chaugule wrote:
+>>>> Hello,
+>>>>
+>>>> On 24 November 2015 at 17:25, Geoff Levand <geoff@infradead.org> wrote:
+>>>>> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>>>>>
+>>>>> The current kvm implementation on arm64 does cpu-specific
+>>>>> initialization
+>>>>> at system boot, and has no way to gracefully shutdown a core in
+>>>>> terms of
+>>>>> kvm. This prevents, especially, kexec from rebooting the system on
+>>>>> a boot
+>>>>> core in EL2.
+>>>>>
+>>>>> This patch adds a cpu tear-down function and also puts an existing
+>>>>> cpu-init
+>>>>> code into a separate function, kvm_arch_hardware_disable() and
+>>>>> kvm_arch_hardware_enable() respectively.
+>>>>> We don't need arm64-specific cpu hotplug hook any more.
+>>>>>
+>>>>> Since this patch modifies common part of code between arm and
+>>>>> arm64, one
+>>>>> stub definition, __cpu_reset_hyp_mode(), is added on arm side to avoid
+>>>>> compiling errors.
+>>>>>
+>>>>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>>>>> ---
+>>>>>   arch/arm/include/asm/kvm_host.h   | 10 ++++-
+>>>>>   arch/arm/include/asm/kvm_mmu.h    |  1 +
+>>>>>   arch/arm/kvm/arm.c                | 79
+>>>>> ++++++++++++++++++---------------------
+>>>>>   arch/arm/kvm/mmu.c                |  5 +++
+>>>>>   arch/arm64/include/asm/kvm_host.h | 16 +++++++-
+>>>>>   arch/arm64/include/asm/kvm_mmu.h  |  1 +
+>>>>>   arch/arm64/include/asm/virt.h     |  9 +++++
+>>>>>   arch/arm64/kvm/hyp-init.S         | 33 ++++++++++++++++
+>>>>>   arch/arm64/kvm/hyp.S              | 32 ++++++++++++++--
+>>>>>   9 files changed, 138 insertions(+), 48 deletions(-)
+>>>>
+>>>> [..]
+>>>>
+>>>>>
+>>>>>
+>>>>>   static struct notifier_block hyp_init_cpu_pm_nb = {
+>>>>> @@ -1108,11 +1119,6 @@ static int init_hyp_mode(void)
+>>>>>          }
+>>>>>
+>>>>>          /*
+>>>>> -        * Execute the init code on each CPU.
+>>>>> -        */
+>>>>> -       on_each_cpu(cpu_init_hyp_mode, NULL, 1);
+>>>>> -
+>>>>> -       /*
+>>>>>           * Init HYP view of VGIC
+>>>>>           */
+>>>>>          err = kvm_vgic_hyp_init();
+>>>>
+>>>> With this flow, the cpu_init_hyp_mode() is called only at VM guest
+>>>> creation, but vgic_hyp_init() is called at bootup. On a system with
+>>>> GICv3, it looks like we end up with bogus values from the ICH_VTR_EL2
+>>>> (to get the number of LRs), because we're not reading it from EL2
+>>>> anymore.
+>>>
+>>> Indeed, this is completely broken (I just reproduced the issue on a
+>>> model). I wish this kind of details had been checked earlier, but thanks
+>>> for pointing it out.
+>>
+>> Sorry for chiming in late. I did run into something similar when I
+>> tested some earlier version patches with Akashi San.
+>>
+>> The guest bootup just hangs with 4.1 kernel on my LS2085 board which
+>> has GICv3. Not sure if this is the same issue. But,
+>> my bisect did point to this patch.
+>
+> Can you please try my fixup! patch to determine whether it is the same
+> issue or not?
 
-We should still keep it. Assuming that we get CoW mostly on no-exec
-pages, the penalty should be minimal since set_pte_at() only cares about
-executable mappings. But I can't guarantee that user space doesn't do
-any CoW on executable mappings. We could for example have some JIT'ed
-code that forked and the child changes some literal pool data (not
-instructions) causing a CoW. It would not expect the I/D caches to
-become incoherent.
+I wish I could help this time, however, unfortunately, my LS2085 board 
+had some hardware failure so I lost the access to it. Once I get a 
+replacement or have it fixed, I will have a try.
 
--- 
-Catalin
+Regards,
+Yang
+
+>
+> Thanks
+> -Takahiro AKASHI
+>
+>
+>> I used to think it is my kernel's problem (4.1 sounds a little bit
+>> old) since Akashi San can't reproduce this on his
+>> Hikey board.
+>>
+>> Thanks,
+>> Yang
+>>
+>>>
+>>>> Whats the best way to fix this?
+>>>> - Call kvm_arch_hardware_enable() before vgic_hyp_init() and disable
+>>>> later?
+>>>> - Fold the VGIC init stuff back into hardware_enable()?
+>>>
+>>> None of that works - kvm_arch_hardware_enable() is called once per CPU,
+>>> while vgic_hyp_init() can only be called once. Also,
+>>> kvm_arch_hardware_enable() is called from interrupt context, and I
+>>> wouldn't feel comfortable starting probing DT and allocating stuff from
+>>> there.
+>>>
+>>>> - Read the VGIC number of LRs from the hyp stub?
+>>>
+>>> That's may UNDEF if called in the wrong context. Also, this defeats the
+>>> point of stubs, which is just to install the vectors for the hypervisor.
+>>>
+>>>> - ..
+>>>
+>>> Yeah, quite.
+>>>
+>>> Geoff, Takahiro?
+>>>
+>>>     M.
+>>>
+>>
