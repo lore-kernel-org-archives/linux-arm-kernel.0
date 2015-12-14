@@ -1,58 +1,48 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 14 Dec 2015 10:36:07 +0100
-Subject: [PATCH v2 1/3] reset: Add shared reset_control_[de]assert variants
-In-Reply-To: <1449848520-27379-1-git-send-email-hdegoede@redhat.com>
-References: <1449848520-27379-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20151214093607.GF19456@lukather>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 14 Dec 2015 10:39:47 +0100
+Subject: [PATCH/RFC 03/19] ARM: shmobile: gose: add i2c2 bus to device tree
+In-Reply-To: <20151214071103.GC1516@katana>
+References: <1449802376-11301-1-git-send-email-horms+renesas@verge.net.au>
+ <1449802376-11301-4-git-send-email-horms+renesas@verge.net.au>
+ <566AB2A5.4090105@cogentembedded.com>
+ <20151214021110.GD13945@verge.net.au>
+ <20151214071103.GC1516@katana>
+Message-ID: <CAMuHMdXWcyEmoVRZuCTM4yqfxXYjgZF1yP8uqCEU8Bj=pmkNYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Dec 14, 2015 at 8:11 AM, Wolfram Sang <wsa@the-dreams.de> wrote:
+>> > >+  eeprom at 50 {
+>> > >+          compatible = "renesas,24c02";
+>> >
+>> >    This is not a valid value -- the Renesas chip model is different from 24c02.
+>>
+>> I copied this value from r8a7791.dtsi.
+>>
+>> Looking at the schematic for gose (v100), koelsch (rev024) and porter (v300)
+>> I see the following "R1EX24002ATAS0G#U0". Shall we update r8a7791 and
+>> this patch to "renesas,24002" or leave things as is?
+>
+> I wouldn't like to update the at24 driver with all namings from all
+> vendors for chips which in large cases are simple 24c02 devices.
+>
+> So, if Sergei insists on the change, I'd propose
+>
+>         compatible = "renesas,24002", "24c02";
 
-On Fri, Dec 11, 2015 at 04:41:58PM +0100, Hans de Goede wrote:
-> diff --git a/include/linux/reset.h b/include/linux/reset.h
-> index c4c097d..1cca8ce 100644
-> --- a/include/linux/reset.h
-> +++ b/include/linux/reset.h
-> @@ -11,6 +11,8 @@ int reset_control_reset(struct reset_control *rstc);
->  int reset_control_assert(struct reset_control *rstc);
->  int reset_control_deassert(struct reset_control *rstc);
->  int reset_control_status(struct reset_control *rstc);
-> +int reset_control_assert_shared(struct reset_control *rstc);
-> +int reset_control_deassert_shared(struct reset_control *rstc);
+"renesas,r1ex24002"?
 
-Shouldn't that be handled in reset_control_get directly?
+I don't think the "A" is relevant (<= 64 is A, >= 128 is B).
 
-That would allow to share more code between the implementations, since
-it would just be a flag to test in the get and not duplicate the
-function definitions, and we could simply rely on the refcount to know
-if we have to actually assert / deassert the device, in all the cases
-(shared or not).
+http://www.renesas.com/products/memory/eeprom/product_selector.jsp
 
-That would also allow us to catch easily if we're going to be able a
-shared reset line or not, with the regular reset_control_get being
-exclusive, and reset_control_get_shared or reset_control_get(..,
-RESET_SHARED) being shared.
+Gr{oetje,eeting}s,
 
-It would also avoid ending up with the shared variant used in every
-generic driver eventually. We could just use the variant to see if we
-have to use the shared get or not, and the rest of the driver is left
-untouched, which is way less intrusive.
+                        Geert
 
-Moreover, it's also pretty much the pattern used everywhere else
-(irqs, regulator, clocks, etc.), so it's going to be easier to review
-as well.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151214/28af2838/attachment.sig>
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
