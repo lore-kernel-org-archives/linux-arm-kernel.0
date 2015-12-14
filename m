@@ -1,13 +1,13 @@
 From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 14 Dec 2015 13:19:24 +0100
-Subject: [GIT PULL] ARM64: Xilinx ZynqMP DT changes for v4.5
-Message-ID: <566EB3CC.6070701@monstr.eu>
+Date: Mon, 14 Dec 2015 13:28:13 +0100
+Subject: [GIT PULL] ARM32: Xilinx Zynq SoC changes for v4.5
+Message-ID: <566EB5DD.8070308@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-please pull this one patch to your tree. Move patches will come for 4.6.
+please pull this one patch to your tree.
 
 Thanks,
 Michal
@@ -18,24 +18,24 @@ The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
 
 are available in the git repository at:
 
-  https://github.com/Xilinx/linux-xlnx.git tags/zynqmp-dt-for-4.5
+  https://github.com/Xilinx/linux-xlnx.git tags/zynq-soc-for-4.5
 
-for you to fetch changes up to bdd5739008617c594ac231b1427d23f2c9000fcd:
+for you to fetch changes up to 8f039f9a692ab7014e2818a4e372231e134553f9:
 
-  ARM64: zynqmp: DT: Add interrupt-controller property to GPIO
-(2015-12-14 09:48:20 +0100)
-
-----------------------------------------------------------------
-arm: Xilinx ZynqMP dt patches for v4.5
-
-- Label GPIO controller as interrupt controller
+  ARM: zynq: Select ARCH_HAS_RESET_CONTROLLER (2015-12-14 09:33:08 +0100)
 
 ----------------------------------------------------------------
-Soren Brinkmann (1):
-      ARM64: zynqmp: DT: Add interrupt-controller property to GPIO
+arm: Xilinx Zynq patches for v4.5
 
- arch/arm64/boot/dts/xilinx/zynqmp.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+- Select reset controller by default for Zynq
+
+----------------------------------------------------------------
+Moritz Fischer (1):
+      ARM: zynq: Select ARCH_HAS_RESET_CONTROLLER
+
+ arch/arm/mach-zynq/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
+	
 
 -- 
 Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
@@ -51,4 +51,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 181 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151214/e9b95f9b/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151214/df8249a7/attachment.sig>
