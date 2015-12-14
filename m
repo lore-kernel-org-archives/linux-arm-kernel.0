@@ -1,50 +1,29 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Mon, 14 Dec 2015 12:27:16 +0800
-Subject: [PATCH v2 0/3] Mediatek EFUSE Support
-In-Reply-To: <1447930014-19579-1-git-send-email-andrew-ct.chen@mediatek.com>
-References: <1447930014-19579-1-git-send-email-andrew-ct.chen@mediatek.com>
-Message-ID: <CAGS+omA8XK6ksd7Ma8yAUbkSsHR6yQxjFrV+HGbd83UiH6T51g@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 14 Dec 2015 14:05:26 +0900
+Subject: [PATCH 6/6] staging: board: armadillo800eva: Use "arm,pl390"
+In-Reply-To: <20151211162830.GA9306@kroah.com>
+References: <1448023017-21816-1-git-send-email-geert+renesas@glider.be>
+ <1448023017-21816-7-git-send-email-geert+renesas@glider.be>
+ <20151211162830.GA9306@kroah.com>
+Message-ID: <20151214050526.GC18143@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srinivas,
+On Fri, Dec 11, 2015 at 11:28:30AM -0500, Greg Kroah-Hartman wrote:
+> On Fri, Nov 20, 2015 at 01:36:57PM +0100, Geert Uytterhoeven wrote:
+> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > ---
+> > Must be applied together with "ARM: shmobile: r8a7740 dtsi: Use
+> > "arm,pl390" for GIC"!
+> > 
+> > Greg: Can you please provide your ack? Thanks!
+> 
+> Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
-On Thu, Nov 19, 2015 at 6:46 PM, Andrew-CT Chen
-<andrew-ct.chen@mediatek.com> wrote:
-> This patch adds EFUSE support driver which is used by other drivers
-> like thermal sensor and HDMI impedance.
->
-> There are some efuses these fuses store things like calibration data,
-> speed bins.. etc. Drivers like thermal sensor, HDMI impedance would
-> read out this data for configuring the driver.
->
-> Change in v2:
-> 1. Rebase to 4.4-rc1
-> 2. Modify the driver Makefile for more consistent with other drivers
-> 3. Modify the compatible string to "mediatek,mt8173-efuse" and "mediatek,efuse"
+Thanks Greg,
 
-Do you still plan to queue this for v4.5?
+I have taken the liberty of assuming that ack also applies to
+patch 5/6 of this series, the other staging/board patch in
+this series.
 
->
-> Andrew-CT Chen (3):
->   dt-bindings: add document of mediatek efuse driver
->   nvmem: mediatek: Add Mediatek EFUSE driver
->   dts: arm64: Add EFUSE device node
->
->  .../devicetree/bindings/nvmem/mtk-efuse.txt        | 36 +++++++++
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  5 ++
->  drivers/nvmem/Kconfig                              | 11 +++
->  drivers/nvmem/Makefile                             |  2 +
->  drivers/nvmem/mtk-efuse.c                          | 89 ++++++++++++++++++++++
->  5 files changed, 143 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/nvmem/mtk-efuse.txt
->  create mode 100644 drivers/nvmem/mtk-efuse.c
->
-> --
-> 1.9.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+I have queued up this series accordingly.
