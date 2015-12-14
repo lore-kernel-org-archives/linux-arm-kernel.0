@@ -1,86 +1,54 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 14 Dec 2015 13:18:34 +0100
-Subject: [PATCH tip/core/rcu 8/9] arm: Use common outgoing-CPU-notification
- code
-In-Reply-To: <1431467407-1223-8-git-send-email-paulmck@linux.vnet.ibm.com>
-References: <20150512214945.GA813@linux.vnet.ibm.com>
- <1431467407-1223-1-git-send-email-paulmck@linux.vnet.ibm.com>
- <1431467407-1223-8-git-send-email-paulmck@linux.vnet.ibm.com>
-Message-ID: <CAMuHMdXuAQnmGo=a0fa1qJNG6szF4-UGpcmCJOfwqyKhHaNN6g@mail.gmail.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 14 Dec 2015 13:19:24 +0100
+Subject: [GIT PULL] ARM64: Xilinx ZynqMP DT changes for v4.5
+Message-ID: <566EB3CC.6070701@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hi,
 
-On Tue, May 12, 2015 at 11:50 PM, Paul E. McKenney
-<paulmck@linux.vnet.ibm.com> wrote:
-> From: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
->
-> This commit removes the open-coded CPU-offline notification with new
-> common code.  In particular, this change avoids calling scheduler code
-> using RCU from an offline CPU that RCU is ignoring.  This is a minimal
-> change.  A more intrusive change might invoke the cpu_check_up_prepare()
-> and cpu_set_state_online() functions at CPU-online time, which would
-> allow onlining throw an error if the CPU did not go offline properly.
->
-> Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Russell King <linux@arm.linux.org.uk>
+please pull this one patch to your tree. Move patches will come for 4.6.
 
-Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Thanks,
+Michal
 
-Thanks, this seems to fix the intermittent "suspicious RCU usage" warnings I've
-been seeing during suspend to RAM on r8a7791/koelsch, which has a dual-core
-Cortex A15:
+The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
 
-    Disabling non-boot CPUs ...
+  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
 
-    ===============================
-    [ INFO: suspicious RCU usage. ]
-    4.4.0-rc4-koelsch #2123 Tainted: G        W
-    -------------------------------
-    kernel/sched/fair.c:4938 suspicious rcu_dereference_check() usage!
+are available in the git repository at:
 
-    other info that might help us debug this:
+  https://github.com/Xilinx/linux-xlnx.git tags/zynqmp-dt-for-4.5
 
-    RCU used illegally from offline CPU!
-    rcu_scheduler_active = 1, debug_locks = 0
-    3 locks held by swapper/1/0:
-     #0:  ((cpu_died).wait.lock){......}, at: [<c006077c>] complete+0x14/0x44
-     #1:  (&p->pi_lock){-.-.-.}, at: [<c004b8a8>] try_to_wake_up+0x24/0x340
-     #2:  (rcu_read_lock){......}, at: [<c0052740>]
-select_task_rq_fair+0xb4/0x820
+for you to fetch changes up to bdd5739008617c594ac231b1427d23f2c9000fcd:
 
-    stack backtrace:
-    CPU: 1 PID: 0 Comm: swapper/1 Tainted: G        W
-4.4.0-rc4-koelsch #2123
-    Hardware name: Generic R8A7791 (Flattened Device Tree)
-    [<c0017390>] (unwind_backtrace) from [<c0013094>] (show_stack+0x10/0x14)
-    [<c0013094>] (show_stack) from [<c01ee718>] (dump_stack+0x70/0x8c)
-    [<c01ee718>] (dump_stack) from [<c0052810>]
-(select_task_rq_fair+0x184/0x820)
-    [<c0052810>] (select_task_rq_fair) from [<c004ba54>]
-(try_to_wake_up+0x1d0/0x340)
-    [<c004ba54>] (try_to_wake_up) from [<c0060070>] (__wake_up_common+0x4c/0x78)
-    [<c0060070>] (__wake_up_common) from [<c00600ac>]
-(__wake_up_locked+0x10/0x18)
-    [<c00600ac>] (__wake_up_locked) from [<c006079c>] (complete+0x34/0x44)
-    [<c006079c>] (complete) from [<c00159f8>] (arch_cpu_idle_dead+0x2c/0x8c)
-    [<c00159f8>] (arch_cpu_idle_dead) from [<c0060a24>]
-(cpu_startup_entry+0x84/0x228)
-    [<c0060a24>] (cpu_startup_entry) from [<4000a4ac>] (0x4000a4ac)
-    CPU1: shutdown
+  ARM64: zynqmp: DT: Add interrupt-controller property to GPIO
+(2015-12-14 09:48:20 +0100)
 
-But I understand from the various other threads about this issue that this
-patch is not going upstream, as it papers over the real issue?
+----------------------------------------------------------------
+arm: Xilinx ZynqMP dt patches for v4.5
 
-Gr{oetje,eeting}s,
+- Label GPIO controller as interrupt controller
 
-                        Geert
+----------------------------------------------------------------
+Soren Brinkmann (1):
+      ARM64: zynqmp: DT: Add interrupt-controller property to GPIO
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+ arch/arm64/boot/dts/xilinx/zynqmp.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151214/e9b95f9b/attachment.sig>
