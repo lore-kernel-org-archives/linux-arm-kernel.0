@@ -1,63 +1,32 @@
-From: pmallapp@broadcom.com (Prem Mallappa)
-Date: Mon, 14 Dec 2015 22:01:27 +0530
-Subject: [PATCH] IOMMU: arm-smmu-v3: fix broken S2PS and AARCH64 in Broadcom
- Vulcan
-Message-ID: <1450110687-32207-1-git-send-email-pmallapp@broadcom.com>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Mon, 14 Dec 2015 08:31:40 -0800
+Subject: [PATCH] ARM64: ZynqMP: DT: Fix GIC's 'reg' property
+Message-ID: <1450110700-14152-1-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vulcan SMMUv3 looks for AARCH64 and S2PS inroder to validate the STE entry,
-which is a overkill, but when proper encoding not found; the SMMU stops
-processing PCIe read/write requests. Giving the h/w what it wants.
-
-Signed-off-by: Prem Mallappa <pmallapp@broadcom.com>
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 ---
- drivers/iommu/arm-smmu-v3.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm64/boot/dts/xilinx/zynqmp.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index d4af50d..dfda564 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -260,6 +260,7 @@
- #define STRTAB_STE_2_S2VMID_MASK	0xffffUL
- #define STRTAB_STE_2_VTCR_SHIFT		32
- #define STRTAB_STE_2_VTCR_MASK		0x7ffffUL
-+#define STRTAB_STE_2_S2PS_SHIFT        48
- #define STRTAB_STE_2_S2AA64		(1UL << 51)
- #define STRTAB_STE_2_S2ENDI		(1UL << 52)
- #define STRTAB_STE_2_S2PTW		(1UL << 54)
-@@ -577,6 +578,7 @@ struct arm_smmu_device {
- 	u32				features;
- 
- #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
-+#define ARM_SMMU_OPT_BROKEN_STE_VALID	(1 << 1)
- 	u32				options;
- 
- 	struct arm_smmu_cmdq		cmdq;
-@@ -641,6 +643,7 @@ struct arm_smmu_option_prop {
- 
- static struct arm_smmu_option_prop arm_smmu_options[] = {
- 	{ ARM_SMMU_OPT_SKIP_PREFETCH, "hisilicon,broken-prefetch-cmd" },
-+	{ ARM_SMMU_OPT_BROKEN_STE_VALID, "broadcom,broken-ste-valid-check" },
- 	{ 0, NULL},
- };
- 
-@@ -1046,6 +1049,15 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
- 				      : STRTAB_STE_0_CFG_BYPASS;
- 		dst[0] = cpu_to_le64(val);
- 		dst[2] = 0; /* Nuke the VMID */
-+
-+		if (smmu && (smmu->options & ARM_SMMU_OPT_BROKEN_STE_VALID)) {
-+#define SMMU_STE_OAS_44_BITS 0x4UL
-+			WARN_ON(smmu->oas != 44);
-+			dst[1] = STRTAB_STE_1_EATS_TRANS << STRTAB_STE_1_EATS_SHIFT;
-+			dst[2] |= cpu_to_le64((SMMU_STE_OAS_44_BITS << STRTAB_STE_2_S2PS_SHIFT) |
-+					STRTAB_STE_2_S2AA64);
-+		}
-+
- 		if (ste_live)
- 			arm_smmu_sync_ste_for_sid(smmu, sid);
- 		return;
+diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+index 857eda5c7217..b5d1facadf16 100644
+--- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
++++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+@@ -80,10 +80,10 @@
+ 		gic: interrupt-controller at f9010000 {
+ 			compatible = "arm,gic-400", "arm,cortex-a15-gic";
+ 			#interrupt-cells = <3>;
+-			reg = <0x0 0xf9010000 0x10000>,
+-			      <0x0 0xf902f000 0x2000>,
++			reg = <0x0 0xf9010000 0x1000>,
++			      <0x0 0xf9020000 0x20000>,
+ 			      <0x0 0xf9040000 0x20000>,
+-			      <0x0 0xf906f000 0x2000>;
++			      <0x0 0xf9060000 0x20000>;
+ 			interrupt-controller;
+ 			interrupt-parent = <&gic>;
+ 			interrupts = <1 9 0xf04>;
 -- 
-2.6.0
+2.6.3.3.g9bb996a
