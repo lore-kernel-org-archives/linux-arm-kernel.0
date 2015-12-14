@@ -1,35 +1,61 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 14 Dec 2015 14:52:06 +0100
-Subject: [PATCH] i2c: allow building emev2 without slave mode again
-In-Reply-To: <15285750.UWXWiNJ6YU@wuerfel>
-References: <201512102224.cVm7Hcp0%fengguang.wu@intel.com>
- <2157023.1Ftpc9ZciN@wuerfel> <20151213090959.GB1570@katana>
- <15285750.UWXWiNJ6YU@wuerfel>
-Message-ID: <20151214135206.GA1520@katana>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 14 Dec 2015 16:53:42 +0300
+Subject: [PATCH V4 2/2] ARM: dts: imx6q: add Novena board
+In-Reply-To: <201512140456.08114.marex@denx.de>
+References: <20151211110700.GD11252@tiger>
+ <1449890833-7195-1-git-send-email-marex@denx.de>
+ <20151214013845.GP11252@tiger> <201512140456.08114.marex@denx.de>
+Message-ID: <566EC9E6.6060402@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello.
 
-> > What about not ifdeffing the inline function and keep the build error
-> > whenever someone uses it without I2C_SLAVE being selected?
-> 
-> The inline function is only added there for the case that I2C_SLAVE is
-> disabled, so that would be pointless.
-> 
-> However, what we could do is move the extern declaration outside of
-> the #ifdef to make it always visible. The if(IS_ENABLED(CONFIG_I2C_SLAVE))
-> check should then ensure that it never actually gets called, and we
-> get a link error if some driver gets it wrong.
+On 12/14/2015 6:56 AM, Marek Vasut wrote:
 
-Yes, that's what I meant: move the whole function (as it was before your
-patch) out of the CONFIG_I2C_SLAVE block. We should get a compiler error
-even, because for !I2C_SLAVE, the client struct will not have the
-slave_cb member.
+>>> From: Sean Cross <xobs@kosagi.com>
+>>>
+>>> Novena is an open-hardware laptop/desktop/bare board.
+>>>
+>>> See http://www.kosagi.com/w/index.php?title=Novena_Main_Page
+>>>
+>>> Signed-off-by: Sean Cross <xobs@kosagi.com>
+>>> Signed-off-by: Marek Vasut <marex@denx.de>
+>>> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+>>> Cc: Lucas Stach <l.stach@pengutronix.de>
+>>> Cc: Sean Cross <xobs@kosagi.com>
+>>> Cc: Shawn Guo <shawnguo@kernel.org>
+>>
+>> It looks pretty good to me now, except a small question below.
+>
+> Thanks
+>
+>>> ---
+>>>
+>>>   arch/arm/boot/dts/Makefile         |   1 +
+>>>   arch/arm/boot/dts/imx6q-novena.dts | 789
+>>>   +++++++++++++++++++++++++++++++++++++ 2 files changed, 790
+>>>   insertions(+)
+>>>   create mode 100644 arch/arm/boot/dts/imx6q-novena.dts
+>>
+>> <snip>
+>>
+>>> +/ {
+>>> +	model = "Kosagi Novena Dual/Quad";
+>>> +	compatible = "kosagi,imx6q-novena", "fsl,imx6q";
+>>> +
+>>> +	memory {
+>>> +		reg = <0x10000000 0xefffffff>;
+>>
+>> What's the trick of having memory size being 0xefffffff?
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151214/f70353ff/attachment-0001.sig>
+> That is a typo, should obviously be 0xffffffff ,
+
+    You didn't get it. :-) It' the _size_, not limit.
+
+[...]
+
+> Best regards,
+> Marek Vasut
+
+MBR, Sergei
