@@ -1,154 +1,114 @@
-From: ashoks@broadcom.com (Ashok Kumar)
-Date: Mon, 14 Dec 2015 08:48:33 -0800
-Subject: [RFC PATCH 2/2] arm64: Use PoU cache instr for I/D coherency
-In-Reply-To: <20151214140445.GC21356@leverpostej>
-References: <1450099664-38554-1-git-send-email-ashoks@broadcom.com>
- <1450099664-38554-3-git-send-email-ashoks@broadcom.com>
- <20151214140445.GC21356@leverpostej>
-Message-ID: <20151214164812.GB25971@ashoks@broadcom.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 14 Dec 2015 16:59:28 +0000
+Subject: [RFC PATCH 2/8] Documentation: arm: define DT cpu capacity
+ bindings
+In-Reply-To: <20151214123616.GC3308@e106622-lin>
+References: <1448288921-30307-1-git-send-email-juri.lelli@arm.com>
+ <1448288921-30307-3-git-send-email-juri.lelli@arm.com>
+ <20151124020631.GA15165@rob-hp-laptop>
+ <20151210153004.GA26758@sirena.org.uk>
+ <20151210175820.GE14571@e106622-lin>
+ <20151211174940.GQ5727@sirena.org.uk>
+ <20151214123616.GC3308@e106622-lin>
+Message-ID: <20151214165928.GV5727@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
- 
-Thanks for the review. I will incorporate all the comments and post v2
-soon.
+On Mon, Dec 14, 2015 at 12:36:16PM +0000, Juri Lelli wrote:
+> On 11/12/15 17:49, Mark Brown wrote:
 
+> > The purpose of the capacity values is to influence the scheduler
+> > behaviour and hence performance.  Without a concrete definition they're
+> > just magic numbers which have meaining only in terms of their effect on
+> > the performance of the system.  That is a sufficiently complex outcome
+> > to ensure that there will be an element of taste in what the desired
+> > outcomes are.  Sounds like tuneables to me.
 
-On Mon, Dec 14, 2015 at 02:04:46PM +0000, Mark Rutland wrote:
-> Hi,
-> 
-> On Mon, Dec 14, 2015 at 05:27:44AM -0800, Ashok Kumar wrote:
-> > In systems with three levels of cache(PoU at L1 and PoC at L3),
-> > PoC cache flush instructions flushes L2 and L3 caches which could affect
-> > performance.
-> > For cache flushes for I and D coherency, PoU should suffice.
-> > So changing all I and D coherency related cache flushes to PoU.
-> > 
-> > Introduced a new __flush_dcache_area_pou API for dcache flush till PoU
-> >
-> > Signed-off-by: Ashok Kumar <ashoks@broadcom.com>
-> > ---
-> >  arch/arm64/include/asm/cacheflush.h |  1 +
-> >  arch/arm64/mm/cache.S               | 22 ++++++++++++++++++++++
-> >  arch/arm64/mm/flush.c               | 13 +++++++++----
-> >  3 files changed, 32 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
-> > index c75b8d0..e4b13f7 100644
-> > --- a/arch/arm64/include/asm/cacheflush.h
-> > +++ b/arch/arm64/include/asm/cacheflush.h
-> > @@ -68,6 +68,7 @@
-> >  extern void flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned long end);
-> >  extern void flush_icache_range(unsigned long start, unsigned long end);
-> >  extern void __flush_dcache_area(void *addr, size_t len);
-> > +extern void __flush_dcache_area_pou(void *addr, size_t len);
-> >  extern long __flush_cache_user_range(unsigned long start, unsigned long end);
-> >  
-> >  static inline void flush_cache_mm(struct mm_struct *mm)
-> > diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-> > index eb48d5d..037293c 100644
-> > --- a/arch/arm64/mm/cache.S
-> > +++ b/arch/arm64/mm/cache.S
-> > @@ -101,6 +101,28 @@ ENTRY(__flush_dcache_area)
-> >  ENDPROC(__flush_dcache_area)
-> >  
-> >  /*
-> > + *	__flush_dcache_area_pou(kaddr, size)
-> > + *
-> > + *	Ensure that the data held in the page kaddr is written back to the
-> > + *	page in question till Point of Unification.
-> > + *
-> > + *	- kaddr   - kernel address
-> > + *	- size    - size in question
-> > + */
-> 
-> I think it would be better to call this __clean_dcache_area_pou, to make
-> it clean that there's no invalidate (i.e. it can only be used to push
-> data out to the PoU).
-> 
-> > +ENTRY(__flush_dcache_area_pou)
-> > +	dcache_line_size x2, x3
-> > +	add	x1, x0, x1
-> > +	sub	x3, x2, #1
-> > +	bic	x0, x0, x3
-> > +1:	dc	cvau, x0			// clean D line till PoU
-> > +	add	x0, x0, x2
-> > +	cmp	x0, x1
-> > +	b.lo	1b
-> > +	dsb	sy
-> > +	ret
-> > +ENDPROC(__flush_dcache_area_pou)
-> 
-> At the same time we can reduce the domin of that dsb to ish, given all
-> CPUs will be in the same Inner-Shareable domain.
-> 
-> We could also factor the common logic into a macro, e.g.
-> 
-> 	/*
-> 	 * x0 - kaddr
-> 	 * x1 - size
-> 	 */
-> 	.macro dcache_by_line_op op, domain
-> 	dcache_line_size x2, x3
-> 	add	x1, x0, x1
-> 	sub	x3, x2, #1
-> 	bic	x0, x0, x3
-> 1:	dc	\op, x0
-> 	add	x0, x0, x2
-> 	cmp	x0, x1
-> 	b.lo	1b
-> 	dsb	\domain
-> 	.endm
-> 
-> ENTRY(__flush_dcache_area)
-> 	dcache_by_line_op civac, sy
-> 	ret
-> ENDPIPROC(__flush_dcache_area)
-> 
-> ENTRY(__clean_dcache_area_pou)
-> 	dcache_by_line_op cvau, ish
-> 	ret
-> ENDPIPROC(__clean_dcache_area)
-> 
-> > +
-> > +/*
-> >   *	__inval_cache_range(start, end)
-> >   *	- start   - start address of region
-> >   *	- end     - end address of region
-> > diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
-> > index c26b804..6235af6 100644
-> > --- a/arch/arm64/mm/flush.c
-> > +++ b/arch/arm64/mm/flush.c
-> > @@ -41,7 +41,7 @@ static void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
-> >  	if (vma->vm_flags & VM_EXEC) {
-> >  		unsigned long addr = (unsigned long)kaddr;
-> >  		if (icache_is_aliasing()) {
-> > -			__flush_dcache_area(kaddr, len);
-> > +			__flush_dcache_area_pou(kaddr, len);
-> >  			__flush_icache_all();
-> >  		} else {
-> >  			flush_icache_range(addr, addr + len);
-> > @@ -75,9 +75,14 @@ void __sync_icache_dcache(pte_t pte, unsigned long addr)
-> >  		return;
-> >  
-> >  	if (!test_and_set_bit(PG_dcache_clean, &page->flags)) {
-> > -		__flush_dcache_area(page_address(page),
-> > -				PAGE_SIZE << compound_order(page));
-> > -		__flush_icache_all();
-> > +		if (icache_is_aliasing()) {
-> > +			__flush_dcache_area_pou(page_address(page),
-> > +					    PAGE_SIZE << compound_order(page));
-> > +			__flush_icache_all();
-> > +		} else
-> > +			flush_icache_range(page_address(page),
-> > +					   page_address(page) +
-> > +					   (PAGE_SIZE << compound_order(page)));
-> 
-> Nit: If one side of an if/else has braces, the other side should too.
-> 
-> Other than those points, this looks good to me.
-> 
-> Thanks,
-> Mark.
-> 
+> Capacity values are meant to describe asymmetry (if any) of the system
+> CPUs to the scheduler. The scheduler can then use this additional bit of
+> information to try to do better scheduling decisions. Yes, having these
+> values available will end up giving you better performance, but I guess
+> this apply to any information we provide to the kernel (and scheduler);
+> the less dumb a subsystem is, the better we can make it work.
+
+This information is a magic number, there's never going to be a right
+answer.  If it needs changing it's not like the kernel is modeling a
+concrete thing like the relative performance of the A53 and A57 poorly
+or whatever, it's just that the relative values of number A and number B
+are not what the system integrator desires.
+
+> > If you are saying people should use other, more sensible, ways of
+> > specifying the final values that actually get used in production then
+> > why take the defaults from direct numbers DT in the first place?  If you
+> > are saying that people should tune and then put the values in here then
+> > that's problematic for the reasons I outlined.
+
+> IMHO, people should come up with default values that describe
+> heterogeneity in their system. Then use other ways to tune the system at
+> run time (depending on the workload maybe).
+
+My argument is that they should be describing the hetrogeneity of their
+system by describing concrete properties of their system rather than by
+providing magic numbers.
+
+> As said, I understand your concerns; but, what I don't still get is
+> where CPU capacity values are so different from, say, idle states
+> min-residency-us. AFAIK there is a per-SoC benchmarking phase required
+> to come up with that values as well; you have to pick some benchmark
+> that stresses worst case entry/exit while measuring energy, then make
+> calculations that tells you when it is wise to enter a particular idle
+> state. Ideally we should derive min residency from specs, but I'm not
+> sure is how it works in practice.
+
+Those at least have a concrete physical value that it is possible to
+measure in a describable way that is unlikely to change based on the
+internals of the kernel.  It would be kind of nice to have the broken
+down numbers for entry time, exit time and power burn in suspend but
+it's not clear it's worth the bother.  It's also one of these things
+where we don't have any real proxies that get us anywhere in the
+ballpark of where we want to be.
+
+> > It also seems a bit strange to expect people to do some tuning in one
+> > place initially and then additional tuning somewhere else later, from
+> > a user point of view I'd expect to always do my tuning in the same
+> > place.
+
+> I think that runtime tuning needs are much more complex and have finer
+> grained needs than what you can achieve by playing with CPU capacities.
+> And I agree with you, users should only play with these other methods
+> I'm referring to; they should not mess around with platform description
+> bits. They should provide information about runtime needs, then the
+> scheduler (in this case) will do its best to give them acceptable
+> performance using improved knowledge about the platform.
+
+So then why isn't it adequate to just have things like the core types in
+there and work from there?  Are we really expecting the tuning to be so
+much better than it's possible to come up with something that's so much
+better on the scale that we're expecting this to be accurate that it's
+worth just jumping straight to magic numbers?
+
+> > Doing that and then switching to some other interface for real tuning
+> > seems especially odd and I'm not sure that's something that users are
+> > going to expect or understand.
+
+> As I'm saying above, users should not care about this first step of
+> platform description; not more than how much they care about other bits
+> in DTs that describe their platform.
+
+That may be your intention but I don't see how it is realistic to expect
+that this is what people will actually understand.  It's a number, it
+has an effect and it's hard to see that people won't tune it, it's not
+like people don't have to edit DTs during system integration.  People
+won't reliably read documentation or look in mailing list threads and
+other that that it has all the properties of a tuning interface.
+
+There's a tension here between what you're saying about people not being
+supposed to care much about the numbers for tuning and the very fact
+that there's a need for the DT to carry explicit numbers.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151214/7910f143/attachment.sig>
