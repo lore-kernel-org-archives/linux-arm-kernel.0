@@ -1,61 +1,58 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 14 Dec 2015 16:53:42 +0300
-Subject: [PATCH V4 2/2] ARM: dts: imx6q: add Novena board
-In-Reply-To: <201512140456.08114.marex@denx.de>
-References: <20151211110700.GD11252@tiger>
- <1449890833-7195-1-git-send-email-marex@denx.de>
- <20151214013845.GP11252@tiger> <201512140456.08114.marex@denx.de>
-Message-ID: <566EC9E6.6060402@cogentembedded.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Mon, 14 Dec 2015 14:53:46 +0100
+Subject: [PATCH v10 0/8] imx25 adc and touchscreen driver
+Message-ID: <1450101234-2191-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi,
 
-On 12/14/2015 6:56 AM, Marek Vasut wrote:
+v10 includes minor fixes in the gcq driver code and the renamed two DT
+properties for the touchscreen which now include the units in the name.
 
->>> From: Sean Cross <xobs@kosagi.com>
->>>
->>> Novena is an open-hardware laptop/desktop/bare board.
->>>
->>> See http://www.kosagi.com/w/index.php?title=Novena_Main_Page
->>>
->>> Signed-off-by: Sean Cross <xobs@kosagi.com>
->>> Signed-off-by: Marek Vasut <marex@denx.de>
->>> Cc: Fabio Estevam <fabio.estevam@freescale.com>
->>> Cc: Lucas Stach <l.stach@pengutronix.de>
->>> Cc: Sean Cross <xobs@kosagi.com>
->>> Cc: Shawn Guo <shawnguo@kernel.org>
->>
->> It looks pretty good to me now, except a small question below.
->
-> Thanks
->
->>> ---
->>>
->>>   arch/arm/boot/dts/Makefile         |   1 +
->>>   arch/arm/boot/dts/imx6q-novena.dts | 789
->>>   +++++++++++++++++++++++++++++++++++++ 2 files changed, 790
->>>   insertions(+)
->>>   create mode 100644 arch/arm/boot/dts/imx6q-novena.dts
->>
->> <snip>
->>
->>> +/ {
->>> +	model = "Kosagi Novena Dual/Quad";
->>> +	compatible = "kosagi,imx6q-novena", "fsl,imx6q";
->>> +
->>> +	memory {
->>> +		reg = <0x10000000 0xefffffff>;
->>
->> What's the trick of having memory size being 0xefffffff?
+Best Regards,
 
-> That is a typo, should obviously be 0xffffffff ,
+Markus
 
-    You didn't get it. :-) It' the _size_, not limit.
 
-[...]
+Denis Carikli (2):
+  ARM: dts: imx25: Add TSC and ADC support
+  ARM: imx_v4_v5_defconfig: Add I.MX25 Touchscreen controller and ADC
+    support.
 
-> Best regards,
-> Marek Vasut
+Markus Pargmann (6):
+  ARM: dt: Binding documentation for imx25 ADC/TSC
+  ARM: dt: Binding documentation for imx25 GCQ
+  ARM: dt: Binding documentation for imx25 touchscreen controller
+  mfd: fsl imx25 Touchscreen ADC driver
+  iio: adc: fsl,imx25-gcq driver
+  input: touchscreen: imx25 tcq driver
 
-MBR, Sergei
+ .../devicetree/bindings/iio/adc/fsl,imx25-gcq.txt  |  58 ++
+ .../bindings/input/touchscreen/fsl-mx25-tcq.txt    |  35 ++
+ .../devicetree/bindings/mfd/fsl-imx25-tsadc.txt    |  47 ++
+ arch/arm/boot/dts/imx25.dtsi                       |  29 +-
+ arch/arm/configs/imx_v4_v5_defconfig               |   4 +
+ drivers/iio/adc/Kconfig                            |   7 +
+ drivers/iio/adc/Makefile                           |   1 +
+ drivers/iio/adc/fsl-imx25-gcq.c                    | 417 ++++++++++++++
+ drivers/input/touchscreen/Kconfig                  |   9 +
+ drivers/input/touchscreen/Makefile                 |   1 +
+ drivers/input/touchscreen/fsl-imx25-tcq.c          | 596 +++++++++++++++++++++
+ drivers/mfd/Kconfig                                |   9 +
+ drivers/mfd/Makefile                               |   2 +
+ drivers/mfd/fsl-imx25-tsadc.c                      | 203 +++++++
+ include/dt-bindings/iio/adc/fsl-imx25-gcq.h        |  18 +
+ include/linux/mfd/imx25-tsadc.h                    | 140 +++++
+ 16 files changed, 1573 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/iio/adc/fsl,imx25-gcq.txt
+ create mode 100644 Documentation/devicetree/bindings/input/touchscreen/fsl-mx25-tcq.txt
+ create mode 100644 Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
+ create mode 100644 drivers/iio/adc/fsl-imx25-gcq.c
+ create mode 100644 drivers/input/touchscreen/fsl-imx25-tcq.c
+ create mode 100644 drivers/mfd/fsl-imx25-tsadc.c
+ create mode 100644 include/dt-bindings/iio/adc/fsl-imx25-gcq.h
+ create mode 100644 include/linux/mfd/imx25-tsadc.h
+
+-- 
+2.6.2
