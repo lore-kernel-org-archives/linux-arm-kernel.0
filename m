@@ -1,30 +1,42 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Mon, 14 Dec 2015 10:39:39 +0300
-Subject: [RESEND PATCH v5 0/8] Add support for Exynos SROM Controller
- driver
-In-Reply-To: <1449906242-20843-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1449906242-20843-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <00d301d13642$978c70c0$c6a55240$@samsung.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 14 Dec 2015 08:49:18 +0100
+Subject: [PATCH] serial: sh-sci: Add device tree support for r8a779[23]
+In-Reply-To: <20151214062722.GH18143@verge.net.au>
+References: <1448587224-8633-1-git-send-email-horms+renesas@verge.net.au>
+ <20151213065250.GA2230@kroah.com>
+ <20151214062722.GH18143@verge.net.au>
+Message-ID: <CAMuHMdXjQ+N5zfJnQa97N_ob4WUtLTUgePL99e40SjT=tDGfuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello!
+On Mon, Dec 14, 2015 at 7:27 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Sat, Dec 12, 2015 at 10:52:50PM -0800, Greg Kroah-Hartman wrote:
+>> On Fri, Nov 27, 2015 at 10:20:24AM +0900, Simon Horman wrote:
+>> > Simply document new compat strings.
+>> > There appears to be no need for a driver updates.
+>> >
+>> > Also update the name of the r8a7791 to M2-W: the name changed a while back.
+>> >
+>> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>>
+>> Doesn't apply to my tree :(
+>
+> I'm a little confused.
+>
+> The tty-next branch of the tty tree seems to be v4.4-rc5.
+> And the patch seems to apply there. Please let me know what
+> I should be using as a base.
 
-> THIS IS A RESEND OF ONCE MERGED INTO kgene/for-next AND LOST PATCHES
-> 
-> Series v5 got merged in kgene/for-next but due to last moment change before pull
-> these patches were not accepted during 4.3 merge window.After that kgene/for-next
-> got rebased over 4.4-rc1 these patches got dropped into another branch and till
-> date not included to for-next.
+Greg has applied the patch from Ulrich, which added support for r8a7793.
+Hence your patch adding support for r8a7792 and r8a7793 no longer applies.
 
- I will not strictly require it because i'd like to move on with this somehow, and if this gets merged, i'm fine with it, but if you
-happen to send v6, may be you should include this small bit:
+Gr{oetje,eeting}s,
 
-http://www.spinics.net/lists/linux-samsung-soc/msg49008.html
+                        Geert
 
- ?
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
