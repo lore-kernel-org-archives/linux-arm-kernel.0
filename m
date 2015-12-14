@@ -1,217 +1,106 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 14 Dec 2015 11:40:22 +0000
-Subject: [PATCH 1/2] arm64: mm: specialise pagetable allocators
-In-Reply-To: <20151211191031.GN18828@arm.com>
-References: <20151211191031.GN18828@arm.com>
-Message-ID: <1450093223-5117-1-git-send-email-mark.rutland@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 14 Dec 2015 11:46:59 +0000
+Subject: [PATCH v4] acpi, apei, arm64: APEI initial support for aarch64.
+In-Reply-To: <20151214112004.GB11630@pd.tnic>
+References: <1449558183-12259-1-git-send-email-fu.wei@linaro.org>
+ <20151208123433.GB404@red-moon> <5666D28C.4090305@linaro.org>
+ <CADyBb7tByoke4PGZqcx_jHvgCK0xNTneod8WoVv7VmoSYii+hg@mail.gmail.com>
+ <20151208140720.GA2395@red-moon>
+ <CADyBb7sLAJdiC=2UzKFsHQ=+Tfuwd6FGi80O9H+1sj70qtCiPg@mail.gmail.com>
+ <CADyBb7vVaPsNZeKp=XQ0zwd-qH1mwuECCtCfkpqm0jDyFTzDcg@mail.gmail.com>
+ <20151210110135.GC21134@arm.com> <20151214112004.GB11630@pd.tnic>
+Message-ID: <20151214114658.GE6992@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We pass a size parameter to early_alloc and late_alloc, but these are
-only ever used to allocate single pages. In late_alloc we always
-allocate a single page.
+On Mon, Dec 14, 2015 at 12:20:04PM +0100, Borislav Petkov wrote:
+> On Thu, Dec 10, 2015 at 11:01:35AM +0000, Will Deacon wrote:
+> > [adding Boris, as he might know how this works]
+> 
+> Gee, thanks Will, now you're making me look at this too :-)
 
-Both allocators provide us with zeroed pages (such that all entries are
-invalid), but we have no barriers between allocating a page and adding
-that page to existing (live) tables. A concurrent page table walk may
-see stale data, leading to a number of issues.
+Hey, I was having way too much fun by myself, so figured you'd like to
+be involved as well!
 
-This patch specialises the two allocators for page tables. The size
-parameter is removed and the necessary dsb(ishst) is folded into each.
-To make it clear that the functions are intended for use for page table
-allocation, they are renamed to {early_,late_}pgtable_alloc, with the
-related function pointed renamed to pgtable_alloc.
+> > It's not about flushing one page, flush_tlb_kernel_range (which is called
+> > by unmap_kernel_range) already takes care of that. The problem is that
+> > the unmap is called from irq/nmi context, so the IPIs required for
+> > broadcasting the TLB maintenance on x86 cannot be safely executed.
+> 
+> Hmm, if you're talking about ghes_iounmap_nmi() and ghes_iounmap_irq()
+> which are the two callers of unmap_kernel_range_noflush(), that last one
+> is calling vunmap_page_range() which is fiddling with the page table.
+> And I don't see TLB flushing IPIs there.
+> 
+> If you mean arch_apei_flush_tlb_one(), that's INVLPG on x86 so also no
+> IPI.
+> 
+> What am I missing?
 
-As the dsb(ishst) is now in the allocator, the existing barrier for the
-zero page is redundant and thus is removed. The previously missing
-include of barrier.h is added.
+We're in violent agreement. I'm just saying that's *why*
+arch_apei_flush_tlb_one exists, as opposed to calling unmap_kernel_range
+in the driver (which will attempt IPIs). On arm64, unmap_kernel_range
+will actually work correctly, since we don't need IPIs to broadcast TLB
+maintenance.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/mm/mmu.c | 52 +++++++++++++++++++++++++++-------------------------
- 1 file changed, 27 insertions(+), 25 deletions(-)
+The (incorrect) premise earlier in the thread was that
+arch_apei_flush_tlb_one exists because there's no portable API for
+flushing a single page, but that's simply not true.
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index c5bd5bc..3ed128c 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -30,6 +30,7 @@
- #include <linux/slab.h>
- #include <linux/stop_machine.h>
- 
-+#include <asm/barrier.h>
- #include <asm/cputype.h>
- #include <asm/fixmap.h>
- #include <asm/kernel-pgtable.h>
-@@ -62,15 +63,18 @@ pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
- }
- EXPORT_SYMBOL(phys_mem_access_prot);
- 
--static void __init *early_alloc(unsigned long sz)
-+static void __init *early_pgtable_alloc(void)
- {
- 	phys_addr_t phys;
- 	void *ptr;
- 
--	phys = memblock_alloc(sz, sz);
-+	phys = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
- 	BUG_ON(!phys);
- 	ptr = __va(phys);
--	memset(ptr, 0, sz);
-+	memset(ptr, 0, PAGE_SIZE);
-+
-+	/* Ensure the zeroed page is visible to the page table walker */
-+	dsb(ishst);
- 	return ptr;
- }
- 
-@@ -95,12 +99,12 @@ static void split_pmd(pmd_t *pmd, pte_t *pte)
- static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
- 				  unsigned long end, unsigned long pfn,
- 				  pgprot_t prot,
--				  void *(*alloc)(unsigned long size))
-+				  void *(*pgtable_alloc)(void))
- {
- 	pte_t *pte;
- 
- 	if (pmd_none(*pmd) || pmd_sect(*pmd)) {
--		pte = alloc(PTRS_PER_PTE * sizeof(pte_t));
-+		pte = pgtable_alloc();
- 		if (pmd_sect(*pmd))
- 			split_pmd(pmd, pte);
- 		__pmd_populate(pmd, __pa(pte), PMD_TYPE_TABLE);
-@@ -130,7 +134,7 @@ static void split_pud(pud_t *old_pud, pmd_t *pmd)
- static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
- 				  unsigned long addr, unsigned long end,
- 				  phys_addr_t phys, pgprot_t prot,
--				  void *(*alloc)(unsigned long size))
-+				  void *(*pgtable_alloc)(void))
- {
- 	pmd_t *pmd;
- 	unsigned long next;
-@@ -139,7 +143,7 @@ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
- 	 * Check for initial section mappings in the pgd/pud and remove them.
- 	 */
- 	if (pud_none(*pud) || pud_sect(*pud)) {
--		pmd = alloc(PTRS_PER_PMD * sizeof(pmd_t));
-+		pmd = pgtable_alloc();
- 		if (pud_sect(*pud)) {
- 			/*
- 			 * need to have the 1G of mappings continue to be
-@@ -174,7 +178,7 @@ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
- 			}
- 		} else {
- 			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
--				       prot, alloc);
-+				       prot, pgtable_alloc);
- 		}
- 		phys += next - addr;
- 	} while (pmd++, addr = next, addr != end);
-@@ -195,13 +199,13 @@ static inline bool use_1G_block(unsigned long addr, unsigned long next,
- static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
- 				  unsigned long addr, unsigned long end,
- 				  phys_addr_t phys, pgprot_t prot,
--				  void *(*alloc)(unsigned long size))
-+				  void *(*pgtable_alloc)(void))
- {
- 	pud_t *pud;
- 	unsigned long next;
- 
- 	if (pgd_none(*pgd)) {
--		pud = alloc(PTRS_PER_PUD * sizeof(pud_t));
-+		pud = pgtable_alloc();
- 		pgd_populate(mm, pgd, pud);
- 	}
- 	BUG_ON(pgd_bad(*pgd));
-@@ -234,7 +238,8 @@ static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
- 				}
- 			}
- 		} else {
--			alloc_init_pmd(mm, pud, addr, next, phys, prot, alloc);
-+			alloc_init_pmd(mm, pud, addr, next, phys, prot,
-+				       pgtable_alloc);
- 		}
- 		phys += next - addr;
- 	} while (pud++, addr = next, addr != end);
-@@ -247,7 +252,7 @@ static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
- static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
- 				    phys_addr_t phys, unsigned long virt,
- 				    phys_addr_t size, pgprot_t prot,
--				    void *(*alloc)(unsigned long size))
-+				    void *(*pgtable_alloc)(void))
- {
- 	unsigned long addr, length, end, next;
- 
-@@ -265,18 +270,18 @@ static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
- 	end = addr + length;
- 	do {
- 		next = pgd_addr_end(addr, end);
--		alloc_init_pud(mm, pgd, addr, next, phys, prot, alloc);
-+		alloc_init_pud(mm, pgd, addr, next, phys, prot, pgtable_alloc);
- 		phys += next - addr;
- 	} while (pgd++, addr = next, addr != end);
- }
- 
--static void *late_alloc(unsigned long size)
-+static void *late_pgtable_alloc(void)
- {
--	void *ptr;
--
--	BUG_ON(size > PAGE_SIZE);
--	ptr = (void *)__get_free_page(PGALLOC_GFP);
-+	void *ptr = (void *)__get_free_page(PGALLOC_GFP);
- 	BUG_ON(!ptr);
-+
-+	/* Ensure the zeroed page is visible to the page table walker */
-+	dsb(ishst);
- 	return ptr;
- }
- 
-@@ -289,7 +294,7 @@ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
- 		return;
- 	}
- 	__create_mapping(&init_mm, pgd_offset_k(virt), phys, virt,
--			 size, prot, early_alloc);
-+			 size, prot, early_pgtable_alloc);
- }
- 
- void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
-@@ -297,7 +302,7 @@ void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
- 			       pgprot_t prot)
- {
- 	__create_mapping(mm, pgd_offset(mm, virt), phys, virt, size, prot,
--				late_alloc);
-+				late_pgtable_alloc);
- }
- 
- static void create_mapping_late(phys_addr_t phys, unsigned long virt,
-@@ -310,7 +315,7 @@ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
- 	}
- 
- 	return __create_mapping(&init_mm, pgd_offset_k(virt),
--				phys, virt, size, prot, late_alloc);
-+				phys, virt, size, prot, late_pgtable_alloc);
- }
- 
- #ifdef CONFIG_DEBUG_RODATA
-@@ -458,15 +463,12 @@ void __init paging_init(void)
- 	fixup_executable();
- 
- 	/* allocate the zero page. */
--	zero_page = early_alloc(PAGE_SIZE);
-+	zero_page = early_pgtable_alloc();
- 
- 	bootmem_init();
- 
- 	empty_zero_page = virt_to_page(zero_page);
- 
--	/* Ensure the zero page is visible to the page table walker */
--	dsb(ishst);
--
- 	/*
- 	 * TTBR0 is only used for the identity mapping at this stage. Make it
- 	 * point to zero page to avoid speculatively fetching new entries.
--- 
-1.9.1
+> > Ideally, I think the ghes code would just use unmap_kernel_range unless
+> > the architecture specifically says that doesn't work in irq context. In
+> > that case, we don't need to implement the arch_apei_flush_tlb_one callback
+> > on arm64.
+> 
+> Well, what bothers me with using
+> unmap_kernel_range()/vunmap_page_range() is that if a GHES IRQ/NMI
+> happens while something is executing those, the NMI will interrupt
+> whatever's happening and it will possibly corrupt the pagetable, IMHO.
+> 
+> Michal, Vlasta, can you please take a look?
+> 
+> More specifically, those ghes_iounmap_nmi/ghes_iounmap_irq calls to
+> unmap_kernel_range_noflush() happening in NMI/IRQ context.
+
+Yikes, I'd not even thought about that. Perhaps its all serialised
+somehow, but I have no idea.
+
+> > One thing I don't fully grok about the code: since the page is mapped
+> > using ioremap_page_range, doesn't that allow other CPUs to speculatively
+> > fill their TLB with entries corresponding to the page mapped by the IRQ
+> > handler on another core? If the core with the speculative entries then
+> > takes an APEI exception, what guarantees do we have that it's looking at
+> > the right page? I think, for x86, we need a local invalidation on map,
+> > too.
+> 
+> You're looking at ghes_copy_tofrom_phys(), right? That's grabbing
+> spinlocks in IRQ/NMI context and doing the iounmap a bit later, below
+> on the same core. I mean, I don't see us landing on another core in
+> between, we're non-preemptible...
+> 
+> Or do you mean something else?
+
+Right, imagine the following sequence of events:
+
+ 1. CPU x takes a GHES IRQ
+ 2. CPU x then maps the buffer a page at a time in ghes_copy_tofrom_phys.
+    After each unmap, it performs a local TLBI. Let's say that it has
+    the final page of the buffer mapped when...
+ 3. ... CPU y is meanwhile happily executing some other kernel code.
+ 4. CPU y's page table walker speculatively fills the TLB with a translation
+    for the last buffer page that CPU x has mapped (because its just been
+    mapped with ioremap_page_range and is in the kernel page table).
+ 5. CPU x unmaps the last page, performs a *local* TLBI, handles the
+    event and returns from the exception
+ 6. CPU y takes a GHES IRQ
+ 7. CPU y then maps the first buffer page at the same virtual address
+    that CPU x used to map the last buffer page
+ 8. CPU y accesses the page, hits the stale TLB entry and gets junk
+
+which I think means you need to perform local TLB invalidation on map
+as well as unmap.
+
+Is there some reason this can't happen on x86? It sounds plausible on
+arm64 if we were to use local invalidation.
+
+Will
