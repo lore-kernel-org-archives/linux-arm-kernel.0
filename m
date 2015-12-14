@@ -1,38 +1,68 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 14 Dec 2015 14:05:06 +0100
-Subject: [PATCH] clk: sunxi: fix handling return value of
- of_property_match_string
-In-Reply-To: <1450087564-28441-3-git-send-email-a.hajda@samsung.com>
-References: <1450087564-28441-1-git-send-email-a.hajda@samsung.com>
- <1450087564-28441-3-git-send-email-a.hajda@samsung.com>
-Message-ID: <20151214130506.GI19456@lukather>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 14 Dec 2015 14:06:06 +0100
+Subject: [PATCH 3/4] ARM: dts: rockchip: add eFuse node for rk3066a SoCs
+In-Reply-To: <566E926E.7090903@linaro.org>
+References: <1447227272-1728-1-git-send-email-wxt@rock-chips.com>
+ <1447227272-1728-4-git-send-email-wxt@rock-chips.com>
+ <566E926E.7090903@linaro.org>
+Message-ID: <3368238.OTPIyEf9PI@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi srini,
 
-On Mon, Dec 14, 2015 at 11:06:00AM +0100, Andrzej Hajda wrote:
-> The function can return negative values, so its result should
-> be assigned to signed variable.
+Am Montag, 14. Dezember 2015, 09:57:02 schrieb Srinivas Kandagatla:
+> Heiko,
 > 
-> The problem has been detected using proposed semantic patch
-> scripts/coccinelle/tests/assign_signed_to_unsigned.cocci [1].
+> Can you take the DT patches in this series via your tree.
 > 
-> [1]: http://permalink.gmane.org/gmane.linux.kernel/2046107
-> 
-> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+> I picked up nvmem patches from this series.
 
-Applied, thanks!
-Maxime
+yep that was my plan ... just needed to wait for the nvmem parts to be picked.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151214/439a066f/attachment.sig>
+
+Thanks for the notifying me :-)
+Heiko
+
+
+> 
+> thanks,
+> srini
+> 
+> On 11/11/15 07:34, Caesar Wang wrote:
+> > This patch add the eFuse dt node for rk3066a SoCs.
+> > 
+> > Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> > ---
+> > 
+> >   arch/arm/boot/dts/rk3066a.dtsi | 13 +++++++++++++
+> >   1 file changed, 13 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/rk3066a.dtsi
+> > b/arch/arm/boot/dts/rk3066a.dtsi index 946f187..f61bb8a 100644
+> > --- a/arch/arm/boot/dts/rk3066a.dtsi
+> > +++ b/arch/arm/boot/dts/rk3066a.dtsi
+> > @@ -153,6 +153,19 @@
+> > 
+> >   		clock-names = "timer", "pclk";
+> >   	
+> >   	};
+> > 
+> > +	efuse: efuse at 20010000 {
+> > +		compatible = "rockchip,rockchip-efuse";
+> > +		reg = <0x20010000 0x4000>;
+> > +		#address-cells = <1>;
+> > +		#size-cells = <1>;
+> > +		clocks = <&cru PCLK_EFUSE>;
+> > +		clock-names = "pclk_efuse";
+> > +
+> > +		cpu_leakage: cpu_leakage {
+> > +			reg = <0x17 0x1>;
+> > +		};
+> > +	};
+> > +
+> > 
+> >   	timer at 20038000 {
+> >   	
+> >   		compatible = "snps,dw-apb-timer-osc";
+> >   		reg = <0x20038000 0x100>;
