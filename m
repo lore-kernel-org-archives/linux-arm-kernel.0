@@ -1,48 +1,57 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 14 Dec 2015 13:45:07 -0800
-Subject: [PATCH/RFC 0/7] ARM: dts: Add compatible property to "partitions"
- node
-In-Reply-To: <20151214214312.GA86857@google.com>
-References: <1450120304-2760-1-git-send-email-geert+renesas@glider.be>
- <20151214194613.GA126731@google.com>
- <CAMuHMdW=wJEoi-+EWAKBjRwb+QFvk=iFur1yFqR=q0f4zwzb2Q@mail.gmail.com>
- <20151214214312.GA86857@google.com>
-Message-ID: <CAN8TOE9O_egvFevRj3WaUcJd8GMFAAQcWLHMtKe1gwCR14zDPg@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 14 Dec 2015 22:46:02 +0100
+Subject: [PATCH] ARM: multi_v7_defconfig: Enable Rockchip generic power
+ domain.
+In-Reply-To: <CAFqH_53DQ8GH+sq7PYeyDMT3qXJDBq+9P_4bCctMt_Sa_aXQBQ@mail.gmail.com>
+References: <1450113435-32443-1-git-send-email-enric.balletbo@collabora.com>
+ <CAFqH_53DQ8GH+sq7PYeyDMT3qXJDBq+9P_4bCctMt_Sa_aXQBQ@mail.gmail.com>
+Message-ID: <2469375.zETa3aloK0@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ real linux-mtd mailing list
+Hi Enric,
 
-On Mon, Dec 14, 2015 at 1:43 PM, Brian Norris
-<computersforpeace@gmail.com> wrote:
-> On Mon, Dec 14, 2015 at 10:20:19PM +0100, Geert Uytterhoeven wrote:
->> On Mon, Dec 14, 2015 at 8:46 PM, Brian Norris
->> <computersforpeace@gmail.com> wrote:
->> > On Mon, Dec 14, 2015 at 08:11:37PM +0100, Geert Uytterhoeven wrote:
->> >> As of commit e488ca9f8d4f62c2 ("doc: dt: mtd: partitions: add compatible
->> >> property to "partitions" node"), the "partitions" subnode of an SPI
->> >> FLASH device node must have a compatible property. The partitions are no
->> >> longer detected if it is not present.
->> >
->> > For all patches:
->> >
->> > Acked-by: Brian Norris <computersforpeace@gmail.com>
->> >
->> >> I marked this series as "RFC", as the abovementioned commit is not yet
->> >> upstream. Ideally, the users should be fixed first, to avoid breakage.
->>
->> It breaks bisectability in mainline.
->
-> The files you are fixing are not converted in mainline yet, are they?
->
->> > I'd differ on the last sentence. It's more important to straighten out
->> > the release features for 4.4 than to make sure that linux-next has
->> > perfect DTS files. So I'll submit whenever ready :)
->>
->> If the DTS changes go in first, bisectability is preserved.
->
-> Are you asking me to delay fixing the DT binding until 4.5, just because
-> your for-next branches can't be fixed? IOW, you want me to release the
-> bad DT binding for a whole cycle?
->
-> Brian
+defconfig changes are supposed to be applied by the armsoc maintainers, so you 
+should probably also include arm at kernel.org as real "To"
+
+
+Am Montag, 14. Dezember 2015, 18:22:15 schrieben Sie:
+> cc'ing: Heiko Stuebner (rockchip maintainer)
+> 
+> 2015-12-14 18:17 GMT+01:00 Enric Balletbo i Serra <eballetbo@gmail.com>:
+> > In order to meet high performance an low power requirement for Rockchip
+> > enable the power domain support.
+> > 
+
+I guess this should also mention the drm/kms issue (driver deferring until 
+power-domains are available) as further justification.
+
+
+Otherwise, as I had experienced this myself while testing after we talked 
+about it:
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+
+> > Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> > ---
+> > 
+> >  arch/arm/configs/multi_v7_defconfig | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/arch/arm/configs/multi_v7_defconfig
+> > b/arch/arm/configs/multi_v7_defconfig index 69a22fd..81314ec 100644
+> > --- a/arch/arm/configs/multi_v7_defconfig
+> > +++ b/arch/arm/configs/multi_v7_defconfig
+> > @@ -655,6 +655,7 @@ CONFIG_QCOM_PM=y
+> > 
+> >  CONFIG_QCOM_SMD=y
+> >  CONFIG_QCOM_SMD_RPM=y
+> >  CONFIG_QCOM_SMEM=y
+> > 
+> > +CONFIG_ROCKCHIP_PM_DOMAINS=y
+> > 
+> >  CONFIG_COMMON_CLK_QCOM=y
+> >  CONFIG_CHROME_PLATFORMS=y
+> >  CONFIG_CROS_EC_CHARDEV=m
+> > 
+> > --
+> > 2.1.0
