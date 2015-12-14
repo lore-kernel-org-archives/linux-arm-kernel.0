@@ -1,29 +1,83 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Mon, 14 Dec 2015 14:05:26 +0900
-Subject: [PATCH 6/6] staging: board: armadillo800eva: Use "arm,pl390"
-In-Reply-To: <20151211162830.GA9306@kroah.com>
-References: <1448023017-21816-1-git-send-email-geert+renesas@glider.be>
- <1448023017-21816-7-git-send-email-geert+renesas@glider.be>
- <20151211162830.GA9306@kroah.com>
-Message-ID: <20151214050526.GC18143@verge.net.au>
+Date: Mon, 14 Dec 2015 14:10:41 +0900
+Subject: [PATCH] ARM: shmobile: r8a779x: use SoC-specific usb-dac
+ compatibility strings
+In-Reply-To: <20151211040406.GB13336@verge.net.au>
+References: <1449802778-11777-1-git-send-email-horms+renesas@verge.net.au>
+ <20151211040406.GB13336@verge.net.au>
+Message-ID: <20151214051041.GD18143@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 11, 2015 at 11:28:30AM -0500, Greg Kroah-Hartman wrote:
-> On Fri, Nov 20, 2015 at 01:36:57PM +0100, Geert Uytterhoeven wrote:
-> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > ---
-> > Must be applied together with "ARM: shmobile: r8a7740 dtsi: Use
-> > "arm,pl390" for GIC"!
+On Fri, Dec 11, 2015 at 01:04:06PM +0900, Simon Horman wrote:
+> On Fri, Dec 11, 2015 at 11:59:38AM +0900, Simon Horman wrote:
+> > Use recently SoC-specific compatibility strings in r8a779[01] device trees.
 > > 
-> > Greg: Can you please provide your ack? Thanks!
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > ---
+> > Based on renesas-devel-20151211-v4.4-rc4
 > 
-> Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Bother, there is a typo in the subject.
+> I plan to fix that either when merging or reposting the patch
+> depending on what other feedback I get.
 
-Thanks Greg,
+I have queued up the following:
 
-I have taken the liberty of assuming that ack also applies to
-patch 5/6 of this series, the other staging/board patch in
-this series.
+From: Simon Horman <horms+renesas@verge.net.au>
+Subject: [PATCH] ARM: shmobile: r8a779x: use SoC-specific usb-dmac
+ compatibility strings
 
-I have queued up this series accordingly.
+Use recently SoC-specific compatibility strings in r8a779[01] device trees.
+
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7790.dtsi | 4 ++--
+ arch/arm/boot/dts/r8a7791.dtsi | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 9f3036b80c0e..c6f083c9345d 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -386,7 +386,7 @@
+ 	};
+ 
+ 	usb_dmac0: dma-controller at e65a0000 {
+-		compatible = "renesas,usb-dmac";
++		compatible = "renesas,r8a7790-usb-dmac", "renesas,usb-dmac";
+ 		reg = <0 0xe65a0000 0 0x100>;
+ 		interrupts = <0 109 IRQ_TYPE_LEVEL_HIGH
+ 			      0 109 IRQ_TYPE_LEVEL_HIGH>;
+@@ -398,7 +398,7 @@
+ 	};
+ 
+ 	usb_dmac1: dma-controller at e65b0000 {
+-		compatible = "renesas,usb-dmac";
++		compatible = "renesas,r8a7790-usb-dmac", "renesas,usb-dmac";
+ 		reg = <0 0xe65b0000 0 0x100>;
+ 		interrupts = <0 110 IRQ_TYPE_LEVEL_HIGH
+ 			      0 110 IRQ_TYPE_LEVEL_HIGH>;
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index 36559cb0eb6b..ae1dda181624 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -375,7 +375,7 @@
+ 	};
+ 
+ 	usb_dmac0: dma-controller at e65a0000 {
+-		compatible = "renesas,usb-dmac";
++		compatible = "renesas,r8a7791-usb-dmac", "renesas,usb-dmac";
+ 		reg = <0 0xe65a0000 0 0x100>;
+ 		interrupts = <0 109 IRQ_TYPE_LEVEL_HIGH
+ 			      0 109 IRQ_TYPE_LEVEL_HIGH>;
+@@ -387,7 +387,7 @@
+ 	};
+ 
+ 	usb_dmac1: dma-controller at e65b0000 {
+-		compatible = "renesas,usb-dmac";
++		compatible = "renesas,r8a7791-usb-dmac", "renesas,usb-dmac";
+ 		reg = <0 0xe65b0000 0 0x100>;
+ 		interrupts = <0 110 IRQ_TYPE_LEVEL_HIGH
+ 			      0 110 IRQ_TYPE_LEVEL_HIGH>;
+-- 
+2.1.4
