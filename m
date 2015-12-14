@@ -1,64 +1,34 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 14 Dec 2015 09:43:21 +0000
-Subject: [PATCH 3/4] nvmem: sunxi: trivial: fix code style
-In-Reply-To: <1450086024-18297-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1450086024-18297-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1450086201-18843-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 14 Dec 2015 10:44:41 +0100
+Subject: [PATCH v2 1/4] ASoC: sun4i-codec: Rename codec dapm widgets and
+ routes
+In-Reply-To: <1449859439-30875-1-git-send-email-hdegoede@redhat.com>
+References: <1449859439-30875-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20151214094441.GG19456@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Caesar Wang <wxt@rock-chips.com>
+Hi,
 
-this pacthset try to fix the code style for sunxi.
+On Fri, Dec 11, 2015 at 07:43:56PM +0100, Hans de Goede wrote:
+> Rename the codec dapm widgets and routes with a _codec prefix. This is
+> a preparation patch for adding card dapm widgets and routes.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- drivers/nvmem/sunxi_sid.c | 9 +++------
- 1 file changed, 3 insertions(+), 6 deletions(-)
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-diff --git a/drivers/nvmem/sunxi_sid.c b/drivers/nvmem/sunxi_sid.c
-index cfa3b85..bc88b40 100644
---- a/drivers/nvmem/sunxi_sid.c
-+++ b/drivers/nvmem/sunxi_sid.c
-@@ -13,10 +13,8 @@
-  * but WITHOUT ANY WARRANTY; without even the implied warranty of
-  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  * GNU General Public License for more details.
-- *
-  */
- 
--
- #include <linux/device.h>
- #include <linux/io.h>
- #include <linux/module.h>
-@@ -27,7 +25,6 @@
- #include <linux/slab.h>
- #include <linux/random.h>
- 
--
- static struct nvmem_config econfig = {
- 	.name = "sunxi-sid",
- 	.read_only = true,
-@@ -55,8 +52,8 @@ static u8 sunxi_sid_read_byte(const struct sunxi_sid *sid,
- }
- 
- static int sunxi_sid_read(void *context,
--			    const void *reg, size_t reg_size,
--			    void *val, size_t val_size)
-+			  const void *reg, size_t reg_size,
-+			  void *val, size_t val_size)
- {
- 	struct sunxi_sid *sid = context;
- 	unsigned int offset = *(u32 *)reg;
-@@ -130,7 +127,7 @@ static int sunxi_sid_probe(struct platform_device *pdev)
- 	if (IS_ERR(nvmem))
- 		return PTR_ERR(nvmem);
- 
--	randomness = kzalloc(sizeof(u8) * size, GFP_KERNEL);
-+	randomness = kzalloc(sizeof(u8) * (size), GFP_KERNEL);
- 	if (!randomness) {
- 		ret = -EINVAL;
- 		goto err_unreg_nvmem;
+Thanks!
+Maxime
+
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151214/b86b9f6c/attachment-0001.sig>
