@@ -1,10 +1,10 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 14 Dec 2015 20:11:44 +0100
-Subject: [PATCH/RFC 7/7] ARM: shmobile: silk dts: Add compatible property to
+Date: Mon, 14 Dec 2015 20:11:42 +0100
+Subject: [PATCH/RFC 5/7] ARM: shmobile: porter dts: Add compatible property to
  "partitions" node
 In-Reply-To: <1450120304-2760-1-git-send-email-geert+renesas@glider.be>
 References: <1450120304-2760-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1450120304-2760-8-git-send-email-geert+renesas@glider.be>
+Message-ID: <1450120304-2760-6-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,14 +17,14 @@ Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
 The abovementioned commit is destined for v4.4.
 ---
- arch/arm/boot/dts/r8a7794-silk.dts | 1 +
+ arch/arm/boot/dts/r8a7791-porter.dts | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/r8a7794-silk.dts b/arch/arm/boot/dts/r8a7794-silk.dts
-index eb608283a24c070c..c0ae94979a71b04c 100644
---- a/arch/arm/boot/dts/r8a7794-silk.dts
-+++ b/arch/arm/boot/dts/r8a7794-silk.dts
-@@ -217,6 +217,7 @@
+diff --git a/arch/arm/boot/dts/r8a7791-porter.dts b/arch/arm/boot/dts/r8a7791-porter.dts
+index b93016896378c350..f8d8e2e2169a9c40 100644
+--- a/arch/arm/boot/dts/r8a7791-porter.dts
++++ b/arch/arm/boot/dts/r8a7791-porter.dts
+@@ -213,6 +213,7 @@
  		m25p,fast-read;
  
  		partitions {
