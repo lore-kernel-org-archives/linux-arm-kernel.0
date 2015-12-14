@@ -1,119 +1,83 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 14 Dec 2015 18:06:36 +0000
-Subject: [PATCH] ARM: KVM: Cleanup exception injection
-Message-ID: <1450116396-11718-1-git-send-email-marc.zyngier@arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 14 Dec 2015 19:18:17 +0100
+Subject: [PATCH v2 5/8] arm64: dts: mediatek: Add Video Encoder for MT8173
+In-Reply-To: <1449827743-22895-6-git-send-email-tiffany.lin@mediatek.com>
+References: <1449827743-22895-1-git-send-email-tiffany.lin@mediatek.com>
+ <1449827743-22895-6-git-send-email-tiffany.lin@mediatek.com>
+Message-ID: <1598527.2ooU1eBZYB@linux-gy6r.site>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David Binderman reported that the exception injection code had a
-couple of unused variables lingering around.
+On Friday 11 Dec 2015 17:55:40 Tiffany Lin wrote:
+> Add video encoder node for MT8173
+> 
+> Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
+> ---
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi |   47
+> ++++++++++++++++++++++++++++++ 1 file changed, 47 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> b/arch/arm64/boot/dts/mediatek/mt8173.dtsi index b8c8ff0..a6b0fcf 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> @@ -545,6 +545,53 @@
+>  			#clock-cells = <1>;
+>  		};
+> 
+> +		larb3: larb at 18001000 {
+> +			compatible = "mediatek,mt8173-smi-larb";
+> +			reg = <0 0x18001000 0 0x1000>;
+> +			mediatek,smi = <&smi_common>;
+> +			power-domains = <&scpsys MT8173_POWER_DOMAIN_VENC>;
+> +			clocks = <&vencsys CLK_VENC_CKE1>,
+> +				 <&vencsys CLK_VENC_CKE0>;
+> +			clock-names = "apb", "smi";
+> +		};
+> +
+> +		vcodec_enc: vcodec at 18002000 {
+> +			compatible = "mediatek,mt8173-vcodec-enc";
+> +			reg = <0 0x18002000 0 0x1000>,	/* VENC_SYS */
+> +			      <0 0x19002000 0 0x1000>;	/* VENC_LT_SYS */
+> +			interrupts = <GIC_SPI 198 IRQ_TYPE_LEVEL_LOW>,
+> +				     <GIC_SPI 202 IRQ_TYPE_LEVEL_LOW>;
+> +			larb = <&larb3>,
+> +			       <&larb5>;
 
-Upon examination, it looked like this code could do with an
-anticipated spring cleaning, which amounts to deduplicating
-the CPSR/SPSR update.
+should be mediatek,larb or just larb for all instances of the larb's.
+See my other email about the bindings.
 
-The spurious variables are removed in the process.
+Regards,
+Matthias
 
-Reported-by: David Binderman <dcb314@hotmail.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/kvm/emulate.c | 59 ++++++++++++++++++++------------------------------
- 1 file changed, 23 insertions(+), 36 deletions(-)
-
-diff --git a/arch/arm/kvm/emulate.c b/arch/arm/kvm/emulate.c
-index d6c0052..245106e 100644
---- a/arch/arm/kvm/emulate.c
-+++ b/arch/arm/kvm/emulate.c
-@@ -275,6 +275,25 @@ static u32 exc_vector_base(struct kvm_vcpu *vcpu)
- 		return vbar;
- }
- 
-+/* Switch to an exception mode, updating both CPSR and SPSR */
-+static void kvm_update_psr(struct kvm_vcpu *vcpu, unsigned long mode)
-+{
-+	unsigned long cpsr = *vcpu_cpsr(vcpu);
-+	u32 sctlr = vcpu->arch.cp15[c1_SCTLR];
-+
-+	*vcpu_cpsr(vcpu) = (cpsr & ~MODE_MASK) | mode;
-+	*vcpu_cpsr(vcpu) |= PSR_I_BIT;
-+	*vcpu_cpsr(vcpu) &= ~(PSR_IT_MASK | PSR_J_BIT | PSR_E_BIT | PSR_T_BIT);
-+
-+	if (sctlr & SCTLR_TE)
-+		*vcpu_cpsr(vcpu) |= PSR_T_BIT;
-+	if (sctlr & SCTLR_EE)
-+		*vcpu_cpsr(vcpu) |= PSR_E_BIT;
-+
-+	/* Note: These now point to the mode banked copies */
-+	*vcpu_spsr(vcpu) = cpsr;
-+}
-+
- /**
-  * kvm_inject_undefined - inject an undefined exception into the guest
-  * @vcpu: The VCPU to receive the undefined exception
-@@ -286,29 +305,13 @@ static u32 exc_vector_base(struct kvm_vcpu *vcpu)
-  */
- void kvm_inject_undefined(struct kvm_vcpu *vcpu)
- {
--	unsigned long new_lr_value;
--	unsigned long new_spsr_value;
- 	unsigned long cpsr = *vcpu_cpsr(vcpu);
--	u32 sctlr = vcpu->arch.cp15[c1_SCTLR];
- 	bool is_thumb = (cpsr & PSR_T_BIT);
- 	u32 vect_offset = 4;
- 	u32 return_offset = (is_thumb) ? 2 : 4;
- 
--	new_spsr_value = cpsr;
--	new_lr_value = *vcpu_pc(vcpu) - return_offset;
--
--	*vcpu_cpsr(vcpu) = (cpsr & ~MODE_MASK) | UND_MODE;
--	*vcpu_cpsr(vcpu) |= PSR_I_BIT;
--	*vcpu_cpsr(vcpu) &= ~(PSR_IT_MASK | PSR_J_BIT | PSR_E_BIT | PSR_T_BIT);
--
--	if (sctlr & SCTLR_TE)
--		*vcpu_cpsr(vcpu) |= PSR_T_BIT;
--	if (sctlr & SCTLR_EE)
--		*vcpu_cpsr(vcpu) |= PSR_E_BIT;
--
--	/* Note: These now point to UND banked copies */
--	*vcpu_spsr(vcpu) = cpsr;
--	*vcpu_reg(vcpu, 14) = new_lr_value;
-+	kvm_update_psr(vcpu, UND_MODE);
-+	*vcpu_reg(vcpu, 14) = *vcpu_pc(vcpu) - return_offset;
- 
- 	/* Branch to exception vector */
- 	*vcpu_pc(vcpu) = exc_vector_base(vcpu) + vect_offset;
-@@ -320,30 +323,14 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu)
-  */
- static void inject_abt(struct kvm_vcpu *vcpu, bool is_pabt, unsigned long addr)
- {
--	unsigned long new_lr_value;
--	unsigned long new_spsr_value;
- 	unsigned long cpsr = *vcpu_cpsr(vcpu);
--	u32 sctlr = vcpu->arch.cp15[c1_SCTLR];
- 	bool is_thumb = (cpsr & PSR_T_BIT);
- 	u32 vect_offset;
- 	u32 return_offset = (is_thumb) ? 4 : 0;
- 	bool is_lpae;
- 
--	new_spsr_value = cpsr;
--	new_lr_value = *vcpu_pc(vcpu) + return_offset;
--
--	*vcpu_cpsr(vcpu) = (cpsr & ~MODE_MASK) | ABT_MODE;
--	*vcpu_cpsr(vcpu) |= PSR_I_BIT | PSR_A_BIT;
--	*vcpu_cpsr(vcpu) &= ~(PSR_IT_MASK | PSR_J_BIT | PSR_E_BIT | PSR_T_BIT);
--
--	if (sctlr & SCTLR_TE)
--		*vcpu_cpsr(vcpu) |= PSR_T_BIT;
--	if (sctlr & SCTLR_EE)
--		*vcpu_cpsr(vcpu) |= PSR_E_BIT;
--
--	/* Note: These now point to ABT banked copies */
--	*vcpu_spsr(vcpu) = cpsr;
--	*vcpu_reg(vcpu, 14) = new_lr_value;
-+	kvm_update_psr(vcpu, ABT_MODE);
-+	*vcpu_reg(vcpu, 14) = *vcpu_pc(vcpu) + return_offset;
- 
- 	if (is_pabt)
- 		vect_offset = 12;
--- 
-2.1.4
+> +			iommus = <&iommu M4U_LARB3_ID M4U_PORT_VENC_RCPU>,
+> +				 <&iommu M4U_LARB3_ID M4U_PORT_VENC_REC>,
+> +				 <&iommu M4U_LARB3_ID M4U_PORT_VENC_BSDMA>,
+> +				 <&iommu M4U_LARB3_ID M4U_PORT_VENC_SV_COMV>,
+> +				 <&iommu M4U_LARB3_ID M4U_PORT_VENC_RD_COMV>,
+> +				 <&iommu M4U_LARB3_ID M4U_PORT_VENC_CUR_LUMA>,
+> +				 <&iommu M4U_LARB3_ID M4U_PORT_VENC_CUR_CHROMA>,
+> +				 <&iommu M4U_LARB3_ID M4U_PORT_VENC_REF_LUMA>,
+> +				 <&iommu M4U_LARB3_ID M4U_PORT_VENC_REF_CHROMA>,
+> +				 <&iommu M4U_LARB3_ID M4U_PORT_VENC_NBM_RDMA>,
+> +				 <&iommu M4U_LARB3_ID M4U_PORT_VENC_NBM_WDMA>,
+> +				 <&iommu M4U_LARB5_ID M4U_PORT_VENC_RCPU_SET2>,
+> +				 <&iommu M4U_LARB5_ID M4U_PORT_VENC_REC_FRM_SET2>,
+> +				 <&iommu M4U_LARB5_ID M4U_PORT_VENC_BSDMA_SET2>,
+> +				 <&iommu M4U_LARB5_ID M4U_PORT_VENC_SV_COMA_SET2>,
+> +				 <&iommu M4U_LARB5_ID M4U_PORT_VENC_RD_COMA_SET2>,
+> +				 <&iommu M4U_LARB5_ID M4U_PORT_VENC_CUR_LUMA_SET2>,
+> +				 <&iommu M4U_LARB5_ID M4U_PORT_VENC_CUR_CHROMA_SET2>,
+> +				 <&iommu M4U_LARB5_ID M4U_PORT_VENC_REF_LUMA_SET2>,
+> +				 <&iommu M4U_LARB5_ID M4U_PORT_VENC_REC_CHROMA_SET2>;
+> +			vpu = <&vpu>;
+> +			clocks = <&apmixedsys CLK_APMIXED_VENCPLL>,
+> +				 <&topckgen CLK_TOP_VENC_LT_SEL>,
+> +				 <&topckgen CLK_TOP_VCODECPLL_370P5>;
+> +			clock-names = "vencpll",
+> +				      "venc_lt_sel",
+> +				      "vcodecpll_370p5_ck";
+> +		};
+> +
+>  		vencltsys: clock-controller at 19000000 {
+>  			compatible = "mediatek,mt8173-vencltsys", "syscon";
+>  			reg = <0 0x19000000 0 0x1000>;
