@@ -1,26 +1,29 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Mon, 14 Dec 2015 18:13:15 +0100
-Subject: [PATCH v4 3/4] ARM: dts: lpc18xx: add EEPROM memory node
-In-Reply-To: <566E947F.2030805@linaro.org>
-References: <1447790576-29410-1-git-send-email-ariel@vanguardiasur.com.ar>
- <1447790576-29410-4-git-send-email-ariel@vanguardiasur.com.ar>
- <566E947F.2030805@linaro.org>
-Message-ID: <CAGhQ9VxpoVZOc5-dbs6=G5bsh_5AdByXYL8NvDWaUFWRY2qpjA@mail.gmail.com>
+From: eballetbo@gmail.com (Enric Balletbo i Serra)
+Date: Mon, 14 Dec 2015 18:17:15 +0100
+Subject: [PATCH] ARM: multi_v7_defconfig: Enable Rockchip generic power domain.
+Message-ID: <1450113435-32443-1-git-send-email-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srinivas.
+In order to meet high performance an low power requirement for Rockchip
+enable the power domain support.
 
-On 14 December 2015 at 11:05, Srinivas Kandagatla
-<srinivas.kandagatla@linaro.org> wrote:
-> Hi Joachim,
->
-> Could you take this DT patches via your tree, I picked up the nvmem patches.
+Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+---
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Cool.
-
-Yes, I will take the DT and defconfig patch.
-
-
-regards,
-Joachim Eastwood
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 69a22fd..81314ec 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -655,6 +655,7 @@ CONFIG_QCOM_PM=y
+ CONFIG_QCOM_SMD=y
+ CONFIG_QCOM_SMD_RPM=y
+ CONFIG_QCOM_SMEM=y
++CONFIG_ROCKCHIP_PM_DOMAINS=y
+ CONFIG_COMMON_CLK_QCOM=y
+ CONFIG_CHROME_PLATFORMS=y
+ CONFIG_CROS_EC_CHARDEV=m
+-- 
+2.1.0
