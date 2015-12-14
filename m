@@ -1,73 +1,52 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 14 Dec 2015 11:46:13 -0800
-Subject: [PATCH/RFC 0/7] ARM: dts: Add compatible property to
- "partitions" node
-In-Reply-To: <1450120304-2760-1-git-send-email-geert+renesas@glider.be>
-References: <1450120304-2760-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20151214194613.GA126731@google.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 14 Dec 2015 11:55:55 -0800
+Subject: [PATCH 02/10] brcmstb_gisb: Replace "hweight_long(mask) != 1"
+ with "!is_power_of_2(mask)"
+In-Reply-To: <1449396705-14235-1-git-send-email-zhaoxiu.zeng@gmail.com>
+References: <1449396705-14235-1-git-send-email-zhaoxiu.zeng@gmail.com>
+Message-ID: <566F1ECB.8080809@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 14, 2015 at 08:11:37PM +0100, Geert Uytterhoeven wrote:
-> 	Hi,
-> 
-> As of commit e488ca9f8d4f62c2 ("doc: dt: mtd: partitions: add compatible
-> property to "partitions" node"), the "partitions" subnode of an SPI
-> FLASH device node must have a compatible property. The partitions are no
-> longer detected if it is not present.
+On 06/12/15 02:11, Zhaoxiu Zeng wrote:
+> From: Zeng Zhaoxiu <zhaoxiu.zeng@gmail.com>
 
-For all patches:
+is_power_of_2, AFAICT does not handle the case where the mask to be
+tested for is zero, which is why I went with hweight_long() in the first
+place.
 
-Acked-by: Brian Norris <computersforpeace@gmail.com>
+Without further explanation as to whether we should prefer
+is_power_of_2(), NAK.
 
-> I marked this series as "RFC", as the abovementioned commit is not yet
-> upstream. Ideally, the users should be fixed first, to avoid breakage.
+> 
+> Signed-off-by: Zeng Zhaoxiu <zhaoxiu.zeng@gmail.com>
+> ---
+>  drivers/bus/brcmstb_gisb.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/bus/brcmstb_gisb.c b/drivers/bus/brcmstb_gisb.c
+> index f364fa4..2816a04 100644
+> --- a/drivers/bus/brcmstb_gisb.c
+> +++ b/drivers/bus/brcmstb_gisb.c
+> @@ -24,6 +24,7 @@
+>  #include <linux/of.h>
+>  #include <linux/bitops.h>
+>  #include <linux/pm.h>
+> +#include <linux/log2.h>
+>  
+>  #ifdef CONFIG_ARM
+>  #include <asm/bug.h>
+> @@ -171,7 +172,7 @@ brcmstb_gisb_master_to_str(struct brcmstb_gisb_arb_device *gdev,
+>  {
+>  	u32 mask = gdev->valid_mask & masters;
+>  
+> -	if (hweight_long(mask) != 1)
+> +	if (!is_power_of_2(mask))
+>  		return NULL;
+>  
+>  	return gdev->master_names[ffs(mask) - 1];
+> 
 
-I'd differ on the last sentence. It's more important to straighten out
-the release features for 4.4 than to make sure that linux-next has
-perfect DTS files. So I'll submit whenever ready :)
 
-FWIW, I plan to submit my pullreq this week, hopefully by
-end-of-Wednesday. (There are other potential MTD fixes that haven't
-stabilized. I may just send them separately.)
-
-Regards,
-Brian
-
-> Tested on r8a7791/koelsch.
-> 
-> Thanks!
-> 
-> Geert Uytterhoeven (7):
->   ARM: dt: mvebu: ix4-300d: Add compatible property to "partitions" node
->   ARM: shmobile: bockw dts: Add compatible property to "partitions" node
->   ARM: shmobile: lager dts: Add compatible property to "partitions" node
->   ARM: shmobile: koelsch dts: Add compatible property to "partitions"
->     node
->   ARM: shmobile: porter dts: Add compatible property to "partitions"
->     node
->   ARM: shmobile: gose dts: Add compatible property to "partitions" node
->   ARM: shmobile: silk dts: Add compatible property to "partitions" node
-> 
->  arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts | 1 +
->  arch/arm/boot/dts/r8a7778-bockw.dts             | 1 +
->  arch/arm/boot/dts/r8a7790-lager.dts             | 1 +
->  arch/arm/boot/dts/r8a7791-koelsch.dts           | 1 +
->  arch/arm/boot/dts/r8a7791-porter.dts            | 1 +
->  arch/arm/boot/dts/r8a7793-gose.dts              | 1 +
->  arch/arm/boot/dts/r8a7794-silk.dts              | 1 +
->  7 files changed, 7 insertions(+)
-> 
-> -- 
-> 1.9.1
-> 
-> Gr{oetje,eeting}s,
-> 
-> 						Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
-> 							    -- Linus Torvalds
+-- 
+Florian
