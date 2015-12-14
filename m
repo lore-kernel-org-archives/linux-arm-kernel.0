@@ -1,99 +1,69 @@
-From: mark.yao@rock-chips.com (Mark Yao)
-Date: Mon, 14 Dec 2015 16:32:07 +0800
-Subject: [PATCH v2 4/8] drm/rockchip: Optimization vop mode set
-In-Reply-To: <1450081931-9709-1-git-send-email-mark.yao@rock-chips.com>
-References: <1450081931-9709-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <1450081931-9709-5-git-send-email-mark.yao@rock-chips.com>
+From: lftan@altera.com (Ley Foon Tan)
+Date: Mon, 14 Dec 2015 16:33:51 +0800
+Subject: [PATCH 00/10] drivers/pci: avoid module_init in non-modular
+ host/pci*
+In-Reply-To: <20151214082425.GA3766@ulmo.nvidia.com>
+References: <1449970917-12633-1-git-send-email-paul.gortmaker@windriver.com>
+ <CAMuHMdXr=ErCO3R2LB+wBJh3JSiFkH5q3-FLSTOwdGT87fXz3A@mail.gmail.com>
+ <20151214082425.GA3766@ulmo.nvidia.com>
+Message-ID: <CAFiDJ5-Y8afg5kDRQLK1pain-k1kPQAn3vhWrVkB1ADPRHvx+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rk3288 vop timing registers is immediately register, when configure
-timing on display active time, will cause tearing. use dclk reset is
-not a good idea to avoid this tearing. we can avoid tearing by using
-standby register.
+On Mon, Dec 14, 2015 at 4:24 PM, Thierry Reding
+<thierry.reding@gmail.com> wrote:
+> On Mon, Dec 14, 2015 at 09:19:30AM +0100, Geert Uytterhoeven wrote:
+>> Hi Paul,
+>>
+>> On Sun, Dec 13, 2015 at 2:41 AM, Paul Gortmaker
+>> <paul.gortmaker@windriver.com> wrote:
+>> > This series of commits is a slice of a larger project to ensure
+>> > people don't have dead code for module removal in non-modular
+>> > drivers.  Overall there was roughly 5k lines of dead code in the
+>> > kernel due to this.  So far we've fixed several areas, like tty,
+>> > x86, net, etc. and we continue to work on other areas.
+>> >
+>> > There are several reasons to not use module_init for code that can
+>> > never be built as a module, but the big ones are:
+>> >
+>> >  (1) it is easy to accidentally code up unused module_exit and remove code
+>> >  (2) it can be misleading when reading the source, thinking it can be
+>> >       modular when the Makefile and/or Kconfig prohibit it
+>> >  (3) it requires the include of the module.h header file which in turn
+>> >      includes nearly everything else.
+>> >
+>> > Here we convert some module_init() calls into device_initcall() and delete
+>> > any module_exit and remove code that gets orphaned in the process, for
+>> > an overall net code reduction, which is always welcome.
+>> >
+>> > The use of device_initcall ensures that the init function ordering
+>> > remains unchanged, but one could argue that PCI host code might be more
+>> > appropriate to be handled under subsys_initcall.  Fortunately we can
+>> > revisit making this extra change at a later date if desired; it does
+>> > not need to happen now, and we reduce the risk of introducing
+>> > regressions at this point in time by separating the two changes.
+>> >
+>> > Over half of the drivers changed here already explicitly disallowed any
+>> > unbind operations.  For the rest we make them the same, since there is
+>> > not really any sensible use case to unbind any built-in bus support that
+>> > I can think of.
+>>
+>> Personally, I think all of these should become tristate, so distro kernels
+>> don't have to build in PCI(e) support for all SoCs. multi_v7_defconfig kernels
+>> are becoming too big.
+>>
+>> That does not preclude making these modules un-unloadable, though.
+>
+> Most of these can't be made tristate as-is, because they use symbols
+> that aren't exported. Many of those symbols can easily be exported, so
+> its just a matter of getting the respective patches merged. I disagree
+> with making the modules non-unloadable, though. I have a local branch
+> with changes necessary to unload the host controller driver and it
+> works just fine.
+>
+PCIe host driver that use fixup (DECLARE_PCI_FIXUP_*) can't use tristate.
+Fixup region is in kernel region and this region if not updated when
+loading a module.
 
-Vop standby register will take effect at end of current frame, and
-go back to work immediately when exit standby.
-
-So we can use standby register to protect this context.
-
-Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
----
-
-Changes in v2: None
-
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c |   49 +++++++++++++++++++--------
- 1 file changed, 34 insertions(+), 15 deletions(-)
-
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index 58d7cc4..40cc8ed 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -1096,10 +1096,40 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
- 
- 	vop_enable(crtc);
- 	/*
--	 * disable dclk to stop frame scan, so that we can safe config mode and
--	 * enable iommu.
-+	 * If dclk rate is zero, mean that scanout is stop,
-+	 * we don't need wait any more.
- 	 */
--	clk_disable(vop->dclk);
-+	if (clk_get_rate(vop->dclk)) {
-+		/*
-+		 * Rk3288 vop timing register is immediately, when configure
-+		 * display timing on display time, may cause tearing.
-+		 *
-+		 * Vop standby will take effect at end of current frame,
-+		 * if dsp hold valid irq happen, it means standby complete.
-+		 *
-+		 * mode set:
-+		 *    standby and wait complete --> |----
-+		 *                                  | display time
-+		 *                                  |----
-+		 *                                  |---> dsp hold irq
-+		 *     configure display timing --> |
-+		 *         standby exit             |
-+		 *                                  | new frame start.
-+		 */
-+
-+		reinit_completion(&vop->dsp_hold_completion);
-+		vop_dsp_hold_valid_irq_enable(vop);
-+
-+		spin_lock(&vop->reg_lock);
-+
-+		VOP_CTRL_SET(vop, standby, 1);
-+
-+		spin_unlock(&vop->reg_lock);
-+
-+		wait_for_completion(&vop->dsp_hold_completion);
-+
-+		vop_dsp_hold_valid_irq_disable(vop);
-+	}
- 
- 	switch (vop->connector_type) {
- 	case DRM_MODE_CONNECTOR_LVDS:
-@@ -1135,20 +1165,9 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
- 	VOP_CTRL_SET(vop, vact_st_end, val);
- 	VOP_CTRL_SET(vop, vpost_st_end, val);
- 
--
--	/*
--	 * reset dclk, take all mode config affect, so the clk would run in
--	 * correct frame.
--	 */
--	reset_control_assert(vop->dclk_rst);
--	usleep_range(10, 20);
--	reset_control_deassert(vop->dclk_rst);
--
- 	clk_set_rate(vop->dclk, adjusted_mode->clock * 1000);
--out:
--	if (clk_enable(vop->dclk) < 0)
--		dev_err(vop->dev, "failed to enable dclk - %d\n", ret_clk);
- 
-+	VOP_CTRL_SET(vop, standby, 0);
- }
- 
- static void vop_crtc_atomic_flush(struct drm_crtc *crtc,
--- 
-1.7.9.5
+Regards
+Ley Foon
