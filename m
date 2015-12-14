@@ -1,32 +1,61 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Mon, 14 Dec 2015 08:31:40 -0800
-Subject: [PATCH] ARM64: ZynqMP: DT: Fix GIC's 'reg' property
-Message-ID: <1450110700-14152-1-git-send-email-soren.brinkmann@xilinx.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 14 Dec 2015 16:38:41 +0000
+Subject: [PATCH] arm64: Add missing linux/bug.h include in asm/pgtable.h
+In-Reply-To: <566EEDC8.1050501@citrix.com>
+References: <1450109244-20122-1-git-send-email-julien.grall@citrix.com>
+ <20151214162242.GA27918@e104818-lin.cambridge.arm.com>
+ <566EEDC8.1050501@citrix.com>
+Message-ID: <20151214163840.GB27918@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
- arch/arm64/boot/dts/xilinx/zynqmp.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+On Mon, Dec 14, 2015 at 04:26:48PM +0000, Julien Grall wrote:
+> On 14/12/15 16:22, Catalin Marinas wrote:
+> > On Mon, Dec 14, 2015 at 04:07:24PM +0000, Julien Grall wrote:
+> >> Linux 4.4-rc5 doesn't build for arm64 with CONFIG_XEN=y enabled:
+> >>
+> >> In file included from linux/arch/arm64/include/asm/pgtable.h:60:0,
+> >>                  from linux/arch/arm64/include/../../arm/include/asm/xen/page.h:5,
+> >>                  from linux/arch/arm64/include/asm/xen/page.h:1,
+> >>                  from linux/include/xen/page.h:28,
+> >>                  from linux/arch/arm64/xen/../../arm/xen/grant-table.c:33:
+> >> linux/arch/arm64/include/asm/pgtable.h: In function 'set_pte_at':
+> >> linux/include/linux/mmdebug.h:49:39: error: implicit declaration of function 'BUILD_BUG_ON_INVALID' [-Werror=implicit-function-declaration]
+> >>  #define VM_WARN_ONCE(cond, format...) BUILD_BUG_ON_INVALID(cond)
+> >>                                        ^
+> >> linux/arch/arm64/include/asm/pgtable.h:281:3: note: in expansion of macro 'VM_WARN_ONCE'
+> >>    VM_WARN_ONCE(!pte_young(pte),
+> >>    ^
+> >>
+> >> This has been introduced by commit 82d340081b6f71237373d1452e3573a5a122794c
+> >> "arm64: Improve error reporting on set_pte_at() checks". This is because
+> >> mmdebug.h relies on the includer to properly include the dependencies.
+> >>
+> >> Signed-off-by: Julien Grall <julien.grall@citrix.com>
+> >>
+> >> ---
+> >> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> >> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> >> Cc: Will Deacon <will.deacon@arm.com>
+> >>
+> >>     I was tempted to add the missing include in linux/mmdebug.h but I'm
+> >>     not sure about the policy for headers inclusion in Linux.
+> > 
+> > Normally, I would say that mmdebug.h should include whichever headers it
+> > needs but for a quicker fix, I'm fine with including linux/bug.h (and
+> > probably removing the asm/bug.h include in asm/pgtable.h).
+> 
+> The linux/bug.h will only be included when __ASSEMBLY__ is not defined
+> which asm/bug.h is included even for assembly file.
+> 
+> Note that it's not possible to include linux/bug.h for assembly file
+> because the headers is not correctly protected.
+> 
+> As I don't know if asm/bug.h is useful in pgtable.h, I've decided to
+> keep it.
 
-diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-index 857eda5c7217..b5d1facadf16 100644
---- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-+++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-@@ -80,10 +80,10 @@
- 		gic: interrupt-controller at f9010000 {
- 			compatible = "arm,gic-400", "arm,cortex-a15-gic";
- 			#interrupt-cells = <3>;
--			reg = <0x0 0xf9010000 0x10000>,
--			      <0x0 0xf902f000 0x2000>,
-+			reg = <0x0 0xf9010000 0x1000>,
-+			      <0x0 0xf9020000 0x20000>,
- 			      <0x0 0xf9040000 0x20000>,
--			      <0x0 0xf906f000 0x2000>;
-+			      <0x0 0xf9060000 0x20000>;
- 			interrupt-controller;
- 			interrupt-parent = <&gic>;
- 			interrupts = <1 9 0xf04>;
+I don't know why it's there either. Anyway, I'll apply your patch and
+try to remove asm/bug.h as well. If the build fails, I'll add it back.
+
 -- 
-2.6.3.3.g9bb996a
+Catalin
