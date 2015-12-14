@@ -1,20 +1,29 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Mon, 14 Dec 2015 13:08:54 -0800
-Subject: [PATCH v12] Add Mediatek thermal support
-In-Reply-To: <20151214103739.GA14356@pengutronix.de>
-References: <1448883753-19068-1-git-send-email-s.hauer@pengutronix.de>
- <20151214103739.GA14356@pengutronix.de>
-Message-ID: <20151214210852.GA10924@localhost.localdomain>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 14 Dec 2015 16:12:18 -0500 (EST)
+Subject: [PATCH net] stmmac: dwmac-sunxi: Call exit cleanup function in
+ probe error path
+In-Reply-To: <1449828229-10720-1-git-send-email-wens@csie.org>
+References: <1449828229-10720-1-git-send-email-wens@csie.org>
+Message-ID: <20151214.161218.2057176608170714361.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 14, 2015 at 11:37:39AM +0100, Sascha Hauer wrote:
-> Eduardo,
+From: Chen-Yu Tsai <wens@csie.org>
+Date: Fri, 11 Dec 2015 18:03:49 +0800
+
+> dwmac-sunxi has 2 callbacks that were called from stmmac_platform as
+> part of the probe and remove sequences.
 > 
-> Ok, to apply this? There seem to be no further comments.
+> Ater the conversion of dwmac-sunxi into a standalone platform driver,
+> the .init function is called before calling into the stmmac driver
+> core, but .exit is not called to clean up if stmmac returns an error.
+> 
+> This patch fixes the probe error path. This properly cleans up and
+> releases resources when the driver core fails to probe.
+> 
+> Cc: Joachim Eastwood <manabian@gmail.com>
+> Fixes: 9a9e9a1edee8 ("stmmac: dwmac-sunxi: turn setup callback into a
+> 		      probe function")
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Yeah, sorry for the delay. I will do one more review round, but I dont
-see much. So, hopefully should be applied in the coming days.
-
-
-BR
+Applied, thanks.
