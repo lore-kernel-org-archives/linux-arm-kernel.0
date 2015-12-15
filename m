@@ -1,43 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 15 Dec 2015 15:32:02 +0000
-Subject: memcpy alignment
-In-Reply-To: <5670309D.1040309@redhat.com>
-References: <566F92D6.8060103@redhat.com>
- <20151215093406.GC19244@e104818-lin.cambridge.arm.com>
- <5670309D.1040309@redhat.com>
-Message-ID: <20151215153202.GC8644@n2100.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 15 Dec 2015 15:32:19 +0000
+Subject: [RFC PATCH 2/8] Documentation: arm: define DT cpu capacity
+ bindings
+In-Reply-To: <20151215150813.GZ5727@sirena.org.uk>
+References: <20151124020631.GA15165@rob-hp-laptop>
+ <20151210153004.GA26758@sirena.org.uk>
+ <20151210175820.GE14571@e106622-lin>
+ <20151211174940.GQ5727@sirena.org.uk>
+ <20151214123616.GC3308@e106622-lin>
+ <20151214165928.GV5727@sirena.org.uk>
+ <20151215122238.GG16007@e106622-lin>
+ <20151215133951.GY5727@sirena.org.uk>
+ <20151215140135.GI31299@leverpostej>
+ <20151215150813.GZ5727@sirena.org.uk>
+Message-ID: <20151215153218.GA7228@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 15, 2015 at 10:24:13AM -0500, Jon Masters wrote:
-> On 12/15/2015 04:34 AM, Catalin Marinas wrote:
-> > On Mon, Dec 14, 2015 at 11:11:02PM -0500, Jon Masters wrote:
-> >> What's supposed to happen if the natural alignment of the pointers dst
-> >> and src is not the same? We don't seem to handle that case today, and
-> >> instead will base our access data type on the source alignment only.
-> > 
-> > The hardware takes care of the other one. The memcpy behaviour in the
-> > kernel is the same as the glibc one (the Cortex Strings library).
+On Tue, Dec 15, 2015 at 03:08:13PM +0000, Mark Brown wrote:
+> On Tue, Dec 15, 2015 at 02:01:36PM +0000, Mark Rutland wrote:
 > 
-> Not if you're dealing with Device memory. I accept that one could always
-> ensure that there's a non-Device mapping (I got the other replies) but I
-> don't think it's unreasonable to expect a memcpy to work in the presence
-> of misaligned addresses either.
+> > I really don't want to see a table of magic numbers in the kernel.
+> 
+> Right, there's pitfalls there too although not being part of an ABI
+> does make them more manageable.  
 
-Using memcpy() on memory returned from functions which setup IO/MMIO
-mappings has always been outlawed.  It's the whole reason we have
-things like memcpy_toio(), memcpy_fromio() and memset_io(), which
-date back a few decades now, and they exist for exactly these kinds
-of reasons.
+I think that people are very likely to treat them exactly like an ABI,
+w.r.t. any regressions in performance that result from their addition,
+modification, or removal. That becomes really horrible when new CPUs
+appear.
 
-If you get an __iomem pointer, then you must respect that it
-essentially can not be non-dereferenced, and you must use one of the
-standard kernel accessors (read[bwl]/ioread*/write[bwl]/iowrite*/
-memcpy_fromio/memcpy_toio/memset_io) to access it.  That's the API
-contract you implicitly signed up to by using something like ioremap()
-or other mapping which gives you an iomem mapping.
+> One thing it's probably helpful to establish here is how much the
+> specific numbers are going to matter in the grand scheme of things.  If
+> the specific numbers *are* super important then nobody is going to want
+> to touch them as they'll be prone to getting tweaked.  If instead the
+> numbers just need to be ballpark accurate so the scheduler starts off in
+> roughly the right place and the specific numbers don't matter it's a lot
+> easier and having a table in the kernel until we think of something
+> better (if that ever happens) gets a lot easier.
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+I agree that we first need to figure out the importance of these
+numbers. I disagree that our first step should be to add a table.
+
+> My expectation is that we just need good enough, not perfect, and that
+> seems to match what Juri is saying about the expectation that most of
+> the fine tuning is done via other knobs.
+
+My expectation is that if a ballpark figure is good enough, it should be
+possible to implement something trivial like bogomips / loop_per_jiffy
+calculation.
+
+Thanks,
+Mark.
