@@ -1,25 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 Dec 2015 17:49:34 +0100
-Subject: [GIT PULL] RealView defconfig updates
-In-Reply-To: <CACRpkdbpOs24tx6pmPGaetDqu-VeD+pkUDb7BCw7n+KKUJP_oQ@mail.gmail.com>
-References: <CACRpkdbpOs24tx6pmPGaetDqu-VeD+pkUDb7BCw7n+KKUJP_oQ@mail.gmail.com>
-Message-ID: <1800981.2DlpbeHf85@wuerfel>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 15 Dec 2015 17:48:05 +0100
+Subject: [PATCH 0/2] Dove GPU support
+In-Reply-To: <1450197483-31441-1-git-send-email-l.stach@pengutronix.de> (Lucas
+ Stach's message of "Tue, 15 Dec 2015 17:38:01 +0100")
+References: <1450197483-31441-1-git-send-email-l.stach@pengutronix.de>
+Message-ID: <87a8pbvet6.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 10 December 2015 14:19:48 Linus Walleij wrote:
-> Here are some updates to the RealView defconfigs, that make the
-> system modern and testable. Mostly stuff that should have been
-> enabled ages ago.
-> 
-> Whether it should go directly to the -rc:s or next merge window
-> is up to the ARM SoC maintainers.
-> 
-> Please pull it it!
+Hi Lucas,
+ 
+ On mar., d?c. 15 2015, Lucas Stach <l.stach@pengutronix.de> wrote:
 
-I've cherry-picked the patches into the next/defconfig branch for 4.5
-now, to avoid backmerging -rc4 into the -rc3 based branch.
+> Hi Dove maintainers,
+>
+> those 2 patches add support for the Vivante GPU. The binding has already been
+> acked by the DT maintainers and is included in the pull request for the DRM
+> driver. I hope you can pick those patches up for inclusion in 4.5.
+
+Good timing! I was about to ask news about these pacthes.
+
+They are both applied on mvebu/dt
 
 Thanks,
 
-	Arnd
+Gregory
+
+
+>
+> Regards,
+> Lucas
+>
+> Russell King (2):
+>   ARM: dts: dove: add DT GPU support
+>   ARM: dts: enable GPU for SolidRun's Cubox
+>
+>  arch/arm/boot/dts/dove-cubox.dts |  8 ++++++++
+>  arch/arm/boot/dts/dove.dtsi      | 16 ++++++++++++++++
+>  2 files changed, 24 insertions(+)
+>
+> -- 
+> 2.6.2
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
