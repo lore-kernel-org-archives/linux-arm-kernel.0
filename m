@@ -1,47 +1,34 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 15 Dec 2015 17:38:03 +0100
-Subject: [PATCH 2/2] ARM: dts: enable GPU for SolidRun's Cubox
-In-Reply-To: <1450197483-31441-1-git-send-email-l.stach@pengutronix.de>
-References: <1450197483-31441-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1450197483-31441-3-git-send-email-l.stach@pengutronix.de>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 15 Dec 2015 16:39:09 +0000
+Subject: [PATCH 17/19] ARM: dts: armada: replace
+ isil,irq2-can-wakeup-machine with wakeup-source property
+In-Reply-To: <1445422216-29375-18-git-send-email-sudeep.holla@arm.com>
+References: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
+ <1445422216-29375-18-git-send-email-sudeep.holla@arm.com>
+Message-ID: <5670422D.7020404@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Enable the GPU for SolidRun's Cubox.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
- arch/arm/boot/dts/dove-cubox.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+On 21/10/15 11:10, Sudeep Holla wrote:
+> Though the driver will continue to check for and support the legacy
+> "isil,irq2-can-wakeup-machine" boolean property to wakeup source,
+> "wakeup-source" is the new standard binding.
+>
+> This patch replaces the legacy "isil,irq2-can-wakeup-machine" with the
+> unified "wakeup-source" property in order to avoid any futher copy-paste
+> duplication.
+>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>
 
-diff --git a/arch/arm/boot/dts/dove-cubox.dts b/arch/arm/boot/dts/dove-cubox.dts
-index e6fa251e17b9..af3cb633135f 100644
---- a/arch/arm/boot/dts/dove-cubox.dts
-+++ b/arch/arm/boot/dts/dove-cubox.dts
-@@ -62,6 +62,10 @@
- 		pinctrl-0 = <&pmx_gpio_19>;
- 		pinctrl-names = "default";
- 	};
-+
-+	gpu-subsystem {
-+		status = "okay";
-+	};
- };
- 
- &uart0 { status = "okay"; };
-@@ -74,6 +78,10 @@
- 	reg = <1>;
- };
- 
-+&gpu {
-+	status = "okay";
-+};
-+
- &i2c0 {
- 	status = "okay";
- 	clock-frequency = <100000>;
+Ping, do you prefer taking via your tree or should I send to armsoc
+directly ?
+
 -- 
-2.6.2
+Regards,
+Sudeep
