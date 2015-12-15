@@ -1,21 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 Dec 2015 17:41:46 +0100
-Subject: [GIT PULL] MTD/NAND cleanups for v4.5
-In-Reply-To: <20151208031306.GP120110@google.com>
-References: <20151208031306.GP120110@google.com>
-Message-ID: <5642518.pVxm48RVvl@wuerfel>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 15 Dec 2015 16:41:45 +0000
+Subject: [RFC PATCH 2/8] Documentation: arm: define DT cpu capacity
+ bindings
+In-Reply-To: <20151215162317.GB24286@e104818-lin.cambridge.arm.com>
+References: <20151214123616.GC3308@e106622-lin>
+ <20151214165928.GV5727@sirena.org.uk>
+ <20151215122238.GG16007@e106622-lin>
+ <20151215133951.GY5727@sirena.org.uk>
+ <20151215140135.GI31299@leverpostej>
+ <20151215150813.GZ5727@sirena.org.uk>
+ <20151215153218.GA7228@leverpostej>
+ <20151215154651.GK16007@e106622-lin>
+ <20151215155737.GB7619@leverpostej>
+ <20151215162317.GB24286@e104818-lin.cambridge.arm.com>
+Message-ID: <20151215164145.GA8012@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 07 December 2015 19:13:06 Brian Norris wrote:
-> Two changes for NAND/MTD refactoring. The mtd_to_nand() helper will allow us to
-> stop using mtd->priv for NAND drivers.
+On Tue, Dec 15, 2015 at 04:23:18PM +0000, Catalin Marinas wrote:
+> On Tue, Dec 15, 2015 at 03:57:37PM +0000, Mark Rutland wrote:
+> > On Tue, Dec 15, 2015 at 03:46:51PM +0000, Juri Lelli wrote:
+> > > On 15/12/15 15:32, Mark Rutland wrote:
+> > > > On Tue, Dec 15, 2015 at 03:08:13PM +0000, Mark Brown wrote:
+> > > > > My expectation is that we just need good enough, not perfect, and that
+> > > > > seems to match what Juri is saying about the expectation that most of
+> > > > > the fine tuning is done via other knobs.
+> > > > 
+> > > > My expectation is that if a ballpark figure is good enough, it should be
+> > > > possible to implement something trivial like bogomips / loop_per_jiffy
+> > > > calculation.
+> > > 
+> > > I didn't really followed that, so I might be wrong here, but isn't
+> > > already happened a discussion about how we want/like to stop exposing
+> > > bogomips info or rely on it for anything but in kernel delay loops?
+> > 
+> > I meant that we could have a benchmark of that level of complexity,
+> > rather than those specific values.
 > 
-> 
+> Or we could simply let user space use whatever benchmarks or hard-coded
+> values it wants and set the capacity via sysfs (during boot). By
+> default, the kernel would assume all CPUs equal.
 
-I've put this into the next/cleanup branch in arm-soc as well now,
-so we can see when we get conflicts, and work around them locally.
+I assume that a userspace override would be available regardless of
+whatever mechanism the kernel uses to determine relative
+performance/effinciency.
 
-Thanks,
+I am not opposed to that mechanism being "assume equal".
 
-	Arnd
+Mark.
