@@ -1,133 +1,30 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 15 Dec 2015 19:18:55 +0530
-Subject: [PATCH 2/6] ARM: DTS: da850: Use the new DT bindings for the eDMA3
-In-Reply-To: <566FFD1C.4080000@ti.com>
-References: <1449237210-16381-1-git-send-email-peter.ujfalusi@ti.com>
- <1449237210-16381-3-git-send-email-peter.ujfalusi@ti.com>
- <566FDF93.7050005@ti.com> <566FFD1C.4080000@ti.com>
-Message-ID: <56701A47.9090105@ti.com>
+From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
+Date: Tue, 15 Dec 2015 19:21:01 +0530
+Subject: [PATCH V2 1/3] ARM: multi_v7_defconfig: Enable beaglebone PMIC
+ TPS65217
+In-Reply-To: <1450118580-24754-2-git-send-email-nm@ti.com>
+References: <1450118580-24754-1-git-send-email-nm@ti.com>
+ <1450118580-24754-2-git-send-email-nm@ti.com>
+Message-ID: <20151215135100.GA8288@afzalpc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 December 2015 05:14 PM, Peter Ujfalusi wrote:
-> On 12/15/2015 11:38 AM, Sekhar Nori wrote:
->> Hi Peter,
->>
->> On Friday 04 December 2015 07:23 PM, Peter Ujfalusi wrote:
->>> Switch to use the ti,edma3-tpcc and ti,edma3-tptc binding for the eDMA3.
->>> With the new bindings boards can customize and tweak the DMA channel
->>> priority to match their needs. With the new binding the memcpy is safe
->>> to be used since with the old binding it was not possible for a driver
->>> to know which channel is allowed to be used as non HW triggered channel.
->>> Using the new binding will allow us to reserve PaRAM slots to be used by
->>> the DSP which was not possible before and prevented the da850 boards to be
->>> moved to DT only.
->>>
->>> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
->>> ---
->>>  arch/arm/boot/dts/da850-enbw-cmc.dts |  5 +++++
->>>  arch/arm/boot/dts/da850-evm.dts      |  5 +++++
->>>  arch/arm/boot/dts/da850.dtsi         | 27 ++++++++++++++++++++++-----
->>>  3 files changed, 32 insertions(+), 5 deletions(-)
->>>
->>> diff --git a/arch/arm/boot/dts/da850-enbw-cmc.dts b/arch/arm/boot/dts/da850-enbw-cmc.dts
->>> index e750ab9086d5..ca9117624cf9 100644
->>> --- a/arch/arm/boot/dts/da850-enbw-cmc.dts
->>> +++ b/arch/arm/boot/dts/da850-enbw-cmc.dts
->>> @@ -28,3 +28,8 @@
->>>  		};
->>>  	};
->>>  };
->>> +
->>> +&edma0 {
->>> +	ti,edma-reserved-slot-ranges = /bits/ 16 <32 50>;
->>> +	ti,edma-memcpy-channels = /bits/ 16 <20 21>;
->>> +};
->>> diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
->>> index d807285a61cd..33467feb272a 100644
->>> --- a/arch/arm/boot/dts/da850-evm.dts
->>> +++ b/arch/arm/boot/dts/da850-evm.dts
->>> @@ -243,3 +243,8 @@
->>>  	tx-num-evt = <32>;
->>>  	rx-num-evt = <32>;
->>>  };
->>> +
->>> +&edma0 {
->>> +	ti,edma-reserved-slot-ranges = /bits/ 16 <32 50>;
->>> +	ti,edma-memcpy-channels = /bits/ 16 <20 21>;
->>
->> These correspond to PRU events. It is true that most likely they will
->> never be used for peripheral DMA and can be dedicated as memcpy
->> channels. However, since this is being encoded in DT, we need to be sure
->> that they will never be used for peripheral DMA on this board.
->>
->> So, I would prefer if you do not reserve any channels for memcpy until
->> there is a real need/usecase for them. I know the board file has these
->> reserved but board file could be updated as you liked. With DT we need
->> to maintain backward compatibility. So I would rather do it when there
->> is an actual need for it.
-> 
-> If we do not reserve channels for memcpy then you will have no support for
-> memcpy on these boards. Not sure if we use memcpy in any of our drivers in
-> daVinci, so it might be just fine to not have DMA memcpy support at all.
+Hi,
 
-Not that I know of. No driver uses DMA memcpy
+On Mon, Dec 14, 2015 at 12:42:58PM -0600, Nishanth Menon wrote:
 
-> But how about using edma1's reserved channels as memcpy (19-23, 30-31)? I
+> Enable PMIC for beaglebone similar to commit 7a5c6065669c ("ARM:
+> OMAP2+: omap2plus_defconfig: Add tps65217 support") - this allows
+> multi_v7_defconfig to boot up on older beaglebone platforms.
 
-I think this is much more reasonable.
+A similar one -
 
-> don't know which channels the DSP would use on these boards, so it is never
-> going to be safe from that point.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/384289.html
 
-Yeah, and thats why I think its better to add it as and when there is a
-real need for it. At least at that point we are sure of the usecase.
+your v1 was earlier than the above, so mine should > /dev/null.
 
-> 
->> In future, if/when we gain QDMA support, the QDMA channels could be used
->> for memcopy.
-> 
-> Well, in short there is no way to get the qDMA working in a different way
-> either. qDMA channel is in essence using 'normal' eDMA channel. This means
-> that we still need to reserve the eDMA channel to be used for memcpy, but
-> instead of SW triggering it (as we do it right now), we would need to use the
-> channel as qDMA and set things up accordingly. I don't really see the benefit
-> for qDMA mode to be honest.
+Seems Arnd wants multi_v7_defconfig changes thr' submaintainers rather
+than directly (which I initially thought was supposed to be done)
 
-I guess the only advantage is that they will not clash with peripheral
-mode usage. But even then, some sort of reservation is needed. So I
-guess QDMA is no better than the EDMA reserved channels?
-
->>
->>> +};
->>> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
->>> index e73f5efb3aa3..9e46eb51a8da 100644
->>> --- a/arch/arm/boot/dts/da850.dtsi
->>> +++ b/arch/arm/boot/dts/da850.dtsi
->>> @@ -151,11 +151,28 @@
->>>  
->>>  		};
->>>  		edma0: edma at 01c00000 {
->>> -			compatible = "ti,edma3";
->>> +			compatible = "ti,edma3-tpcc";
->>>  			/* eDMA3 CC0: 0x01c0 0000 - 0x01c0 7fff */
->>>  			reg =	<0x0 0x8000>;
->>> -			interrupts = <11 13 12>;
->>> -			#dma-cells = <1>;
->>> +			reg-names = "edma3_cc";
->>> +			interrupts = <11 12>;
->>> +			interrupt-names = "edma3_ccint", "edma3_ccerrint";
->>> +			#dma-cells = <2>;
->>> +
->>> +			ti,tptcs = <&edma0_tptc0 7>, <&edma0_tptc1 0>;
->>> +			ti,edma-memcpy-channels = /bits/ 16 <20 21>;
->>
->> Same here. I would drop this.
-> 
-> OK, I'll drop this part.
-
-For now, I think its better to not add any reservation. It can be added
-when its really needed.
-
-Thanks,
-Sekhar
+Regards
+afzal
