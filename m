@@ -1,75 +1,39 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 15 Dec 2015 10:39:14 +0000
-Subject: [PATCH v2] ARM: psci: Fix indentation in DT bindings
-In-Reply-To: <1450173359-2261-1-git-send-email-geert+renesas@glider.be>
-References: <1450173359-2261-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20151215103914.GC31299@leverpostej>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 15 Dec 2015 11:41:32 +0100
+Subject: [PATCH 1/6] clk: shmobile: r8a7795: Add SATA0 clock
+In-Reply-To: <1450107758-2544-2-git-send-email-ulrich.hecht+renesas@gmail.com>
+References: <1450107758-2544-1-git-send-email-ulrich.hecht+renesas@gmail.com>
+ <1450107758-2544-2-git-send-email-ulrich.hecht+renesas@gmail.com>
+Message-ID: <CAMuHMdV7EqSkQUr1MfCWr+y7q9Bura86r92r6wMQZfYb+YiXug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 15, 2015 at 10:55:59AM +0100, Geert Uytterhoeven wrote:
-> Fix bogus indentation of the PSCI compatible values, reformat.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-
-That looks much nicer!
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
-
+On Mon, Dec 14, 2015 at 4:42 PM, Ulrich Hecht
+<ulrich.hecht+renesas@gmail.com> wrote:
+> Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 > ---
-> v2:
->   - Add Acked-by,
->   - Align second line with first word after colon,
->   - Capitalize "For" after colon,
->   - Insert linebreak after first sentence.
-> ---
->  Documentation/devicetree/bindings/arm/psci.txt | 25 ++++++++++++++-----------
->  1 file changed, 14 insertions(+), 11 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
-> index a9adab84e2feb785..a2c4f1d524929bb7 100644
-> --- a/Documentation/devicetree/bindings/arm/psci.txt
-> +++ b/Documentation/devicetree/bindings/arm/psci.txt
-> @@ -23,17 +23,20 @@ Main node required properties:
->  
->   - compatible    : should contain at least one of:
->  
-> -				 * "arm,psci" : for implementations complying to PSCI versions prior to
-> -					0.2. For these cases function IDs must be provided.
-> -
-> -				 * "arm,psci-0.2" : for implementations complying to PSCI 0.2. Function
-> -					IDs are not required and should be ignored by an OS with PSCI 0.2
-> -					support, but are permitted to be present for compatibility with
-> -					existing software when "arm,psci" is later in the compatible list.
-> -
-> -				* "arm,psci-1.0" : for implementations complying to PSCI 1.0. PSCI 1.0 is
-> -					backward compatible with PSCI 0.2 with minor specification updates,
-> -					as defined in the PSCI specification[2].
-> +     * "arm,psci"     : For implementations complying to PSCI versions prior
-> +			to 0.2.
-> +			For these cases function IDs must be provided.
-> +
-> +     * "arm,psci-0.2" : For implementations complying to PSCI 0.2.
-> +			Function IDs are not required and should be ignored by
-> +			an OS with PSCI 0.2 support, but are permitted to be
-> +			present for compatibility with existing software when
-> +			"arm,psci" is later in the compatible list.
-> +
-> +     * "arm,psci-1.0" : For implementations complying to PSCI 1.0.
-> +			PSCI 1.0 is backward compatible with PSCI 0.2 with
-> +			minor specification updates, as defined in the PSCI
-> +			specification[2].
->  
->   - method        : The method of calling the PSCI firmware. Permitted
->                     values are:
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+>  drivers/clk/shmobile/r8a7795-cpg-mssr.c | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/clk/shmobile/r8a7795-cpg-mssr.c b/drivers/clk/shmobile/r8a7795-cpg-mssr.c
+> index 05479e6..ad4d9fd 100644
+> --- a/drivers/clk/shmobile/r8a7795-cpg-mssr.c
+> +++ b/drivers/clk/shmobile/r8a7795-cpg-mssr.c
+> @@ -159,6 +159,7 @@ static const struct mssr_mod_clk r8a7795_mod_clks[] __initconst = {
+>         DEF_MOD("gpio2",                 910,   R8A7795_CLK_CP),
+>         DEF_MOD("gpio1",                 911,   R8A7795_CLK_CP),
+>         DEF_MOD("gpio0",                 912,   R8A7795_CLK_CP),
+> +       DEF_MOD("sata0",                 915,   R8A7795_CLK_S3D2),
+
+My datasheet says 815?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
