@@ -1,36 +1,21 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 Dec 2015 00:08:42 +0100
-Subject: [GIT PULL] SoCFPGA DTS updates for v4.5
-In-Reply-To: <1449613982-25888-1-git-send-email-dinh.linux@gmail.com>
-References: <1449613982-25888-1-git-send-email-dinh.linux@gmail.com>
-Message-ID: <9029180.vHhHUlzDEF@wuerfel>
+Date: Wed, 16 Dec 2015 00:12:50 +0100
+Subject: [GIT PULL] ARM: mvebu: soc for v4.5 (#1)
+In-Reply-To: <87r3it6p9g.fsf@free-electrons.com>
+References: <87r3it6p9g.fsf@free-electrons.com>
+Message-ID: <1939878.4hiFEtf319@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 08 December 2015 16:33:01 Dinh Nguyen wrote:
-> Hi Arnd, Kevin, and Olof:
+On Friday 11 December 2015 15:20:11 Gregory CLEMENT wrote:
+> mvebu soc for 4.5 (part 1)
 > 
-> Please consider pulling this patch for v4.5.
-> 
-> Thanks,
-> Dinh
-> 
-> The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
-> 
->   Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git socfpga_dts_for_v4.5
-> 
-> for you to fetch changes up to 34a315883f60344f2116dcd445388531d09dc066:
-> 
->   ARM: socfpga: Add support for DENX MCV SoM and MCVEVK baseboard (2015-11-19 10:15:05 -0600)
-> 
-> ----------------------------------------------------------------
-> SoCFPGA DTS update for v4.5
-> - Add DT board file for Denx MCVEVK board
+> - orion5x/mv78xx0 multiplatform conversion
+> - legacy dove PMU support conversion
 
-Pulled into next/dt, thanks!
+I've merged all of it into next/multiplatform along with the other
+multiplatform branches.
+
+Thanks,
 
 	Arnd
