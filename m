@@ -1,134 +1,112 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 15 Dec 2015 17:29:54 +0000
-Subject: [PATCH v12 11/16] arm64: kdump: reserve memory for crash dump
- kernel
-In-Reply-To: <bc962621bd537244b54fc35627a456ab40bc6d26.1448403503.git.geoff@infradead.org>
-References: <cover.1448403503.git.geoff@infradead.org>
- <bc962621bd537244b54fc35627a456ab40bc6d26.1448403503.git.geoff@infradead.org>
-Message-ID: <20151215172953.GD353@arm.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 15 Dec 2015 18:33:14 +0100
+Subject: [PATCH v6 0/7] cpufreq: add generic cpufreq driver support for
+ Exynos542x/5800 platforms
+Message-ID: <1450200801-24539-1-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 24, 2015 at 10:25:34PM +0000, Geoff Levand wrote:
-> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> 
-> On primary kernel, the memory region used by crash dump kernel must be
-> specified by "crashkernel=" boot parameter. reserve_crashkernel()
-> will allocate and reserve the region for later use.
-> 
-> User space tools will be able to find the region marked as "Crash kernel"
-> in /proc/iomem.
-> 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
->  arch/arm64/kernel/setup.c |  7 +++++-
->  arch/arm64/mm/init.c      | 54 +++++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 60 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> index 8119479..f9fffc9 100644
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-> @@ -31,7 +31,6 @@
->  #include <linux/screen_info.h>
->  #include <linux/init.h>
->  #include <linux/kexec.h>
-> -#include <linux/crash_dump.h>
->  #include <linux/root_dev.h>
->  #include <linux/cpu.h>
->  #include <linux/interrupt.h>
-> @@ -221,6 +220,12 @@ static void __init request_standard_resources(void)
->  		    kernel_data.end <= res->end)
->  			request_resource(res, &kernel_data);
->  	}
-> +
-> +#ifdef CONFIG_KEXEC
-> +	/* User space tools will find "Crash kernel" region in /proc/iomem. */
-> +	if (crashk_res.end)
-> +		insert_resource(&iomem_resource, &crashk_res);
-> +#endif
+Hi,
 
-Why can't this bit be moved into reserved_crashkernel, at the end?
+This patch series adds generic cpufreq-dt driver support for
+Exynos542x/5800 (using the new CPU clock type which allows it).
 
->  }
->  
->  #ifdef CONFIG_BLK_DEV_INITRD
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index 17bf39a..24f0a1c 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -34,6 +34,7 @@
->  #include <linux/dma-contiguous.h>
->  #include <linux/efi.h>
->  #include <linux/swiotlb.h>
-> +#include <linux/kexec.h>
->  
->  #include <asm/fixmap.h>
->  #include <asm/memory.h>
-> @@ -66,6 +67,55 @@ static int __init early_initrd(char *p)
->  early_param("initrd", early_initrd);
->  #endif
->  
-> +#ifdef CONFIG_KEXEC
-> +/*
-> + * reserve_crashkernel() - reserves memory for crash kernel
-> + *
-> + * This function reserves memory area given in "crashkernel=" kernel command
-> + * line parameter. The memory reserved is used by dump capture kernel when
-> + * primary kernel is crashing.
-> + */
-> +static void __init reserve_crashkernel(void)
-> +{
-> +	unsigned long long crash_size = 0, crash_base = 0;
-> +	int ret;
-> +
-> +	ret = parse_crashkernel(boot_command_line, memblock_phys_mem_size(),
-> +				&crash_size, &crash_base);
-> +	if (ret)
-> +		return;
+It has been tested on Exynos5422 based ODROID-XU3 Lite board.
 
-What's the point in ret?
+Depends on:
+- next-20151211 branch of linux-next kernel tree
+- "[PATCH] ARM: dts: Make CPU configuration more readable for
+  exynos542x/5800" patch (https://lkml.org/lkml/2015/12/11/107)
 
-> +
-> +	if (crash_base == 0) {
-> +		crash_base = memblock_alloc(crash_size, 1 << 21);
+Changes since v5:
+- rebased over next-20151211 branch (something is broken in
+  newer branches, namely next-2015121[45])
+- rebased on top of "ARM: dts: Make CPU configuration more
+  readable for exynos542x/5800" patch
+- renamed cpu0_opp_table to cluster_a15_opp_table and
+  cpu1_opp_table to cluster_a7_opp_table
+- added Reviewed-by from Krzysztof
 
-What is this magic number? How about SZ_2M and a comment mentioning the
-arm64 boot protocol?
+Changes since v4:
+- renamed oppXX at hz to opp at hz
+- put Odroid changes in exynos5422-odroidxu3-common.dtsi
+- override CPU OPP properties for Exynos5422/5800 instead of
+  duplicating them
+- merged "ARM: dts: Exynos5422: fix OPP tables" patch with
+  "ARM: dts: Exynos5420: add CPU OPP properties" one
+- added missing Thomas' SoB line to "ARM: dts: Exynos5420:
+  add CPU OPP properties" patch
+- updated authorship of "ARM: Exynos: use generic cpufreq
+  driver for Exynos5420" and "ARM: Exynos: use generic
+  cpufreq driver for Exynos5422/5800" patches
+- updated Javier's and Mike's e-mail adresses
+- removed non-working e-mail address of Sachin Kamat
 
-> +		if (crash_base == 0) {
-> +			pr_warn("Unable to allocate crashkernel (size:%llx)\n",
-> +				crash_size);
-> +			return;
-> +		}
-> +	} else {
-> +		/* User specifies base address explicitly. */
-> +		if (!memblock_is_region_memory(crash_base, crash_size) ||
-> +			memblock_is_region_reserved(crash_base, crash_size)) {
-> +			pr_warn("crashkernel has wrong address or size\n");
-> +			return;
-> +		}
-> +
-> +		if (crash_base & ((1 << 21) - 1)) {
+Changes since v3:
+- switched to using cpufreq-dt driver
+- updated patch descriptions to cover Exynos5422 support
+- added Acked-by from Sylwester to clock driver patches
 
-IS_ALIGNED
+Changes since v2:
+- ported over next-20151124 branch
+- integrated missing CLK_RECALC_NEW_RATES flags fix to patch #3
+  (from Anand Moon)
+- added regulator supply properties for ODROID-XU3 Lite and
+  ODROID-XU4 in patch #2
+- ported CPU OPPs to operating-points-v2 (from Ben Gamari)
+- added "ARM: dts: Exynos5422: fix OPP tables" patch (from Ben
+  Gamari)
+- added "cpufreq: arm-big-little: accept operating-points-v2
+  nodes" patch (from Ben Gamari)
+- renamed OPP nodes as opp@<opp-hz>
 
-> +			pr_warn("crashkernel base address is not 2MB aligned\n");
-> +			return;
-> +		}
-> +
-> +		memblock_reserve(crash_base, crash_size);
-> +	}
-> +
-> +	pr_info("Reserving %lldMB of memory at %lldMB for crashkernel\n",
-> +		crash_size >> 20, crash_base >> 20);
-> +
-> +	crashk_res.start = crash_base;
-> +	crashk_res.end = crash_base + crash_size - 1;
-> +}
+Changes since v1:
+- added CPU cluster regulator supply properties to
+  exynos5420-arndale-octa.dts, exynos5420-peach-pit.dts,
+  exynos5420-smdk5420.dts and exynos5800-peach-pi.dts
 
-#else
+Changes over Thomas' original v12 code:
+- split Exynos5420 and Exynos5800 support
+- moved E5420_[EGL,KFC]_DIV0() macros to clk-exynos5420.c
+- disabled cpufreq if big.LITTLE switcher support is enabled
+- enhanced arm_big_little[_dt] driver with CPU cluster regulator
+  support
+- fixed CPU clock configuration data for Exynos5800
+- fixed CPU operating points setup for Exynos5800
+- added CPU cluster regulator supplies for ODROID-XU3 board
 
-static void __init reserve_crashkernel(void) {};
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
 
-Will
+
+Bartlomiej Zolnierkiewicz (5):
+  ARM: dts: Exynos542x/5800: add cluster regulator supply properties
+  ARM: Exynos: use generic cpufreq driver for Exynos5420
+  clk: samsung: exynos5422/5800: fix cpu clock configuration data
+  ARM: dts: Exynos5800: fix CPU OPP
+  ARM: Exynos: use generic cpufreq driver for Exynos5422/5800
+
+Thomas Abraham (2):
+  clk: samsung: exynos5420: add cpu clock configuration data and
+    instantiate cpu clock
+  ARM: dts: Exynos542x/5800: add CPU OPP properties
+
+ arch/arm/boot/dts/exynos5420-arndale-octa.dts      |   8 ++
+ arch/arm/boot/dts/exynos5420-cpus.dtsi             |  10 ++
+ arch/arm/boot/dts/exynos5420-peach-pit.dts         |   8 ++
+ arch/arm/boot/dts/exynos5420-smdk5420.dts          |   8 ++
+ arch/arm/boot/dts/exynos5420.dtsi                  | 110 +++++++++++++++++++++
+ arch/arm/boot/dts/exynos5422-cpus.dtsi             |  10 ++
+ arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |   8 ++
+ arch/arm/boot/dts/exynos5800-peach-pi.dts          |   8 ++
+ arch/arm/boot/dts/exynos5800.dtsi                  | 108 ++++++++++++++++++++
+ arch/arm/mach-exynos/exynos.c                      |   4 +
+ drivers/clk/samsung/clk-exynos5420.c               |  88 ++++++++++++++++-
+ include/dt-bindings/clock/exynos5420.h             |   2 +
+ 12 files changed, 370 insertions(+), 2 deletions(-)
+
+-- 
+1.9.1
