@@ -1,59 +1,163 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Tue, 15 Dec 2015 10:16:24 -0500
-Subject: [PATCH 00/10] drivers/pci: avoid module_init in non-modular
- host/pci*
-In-Reply-To: <3302340.SIljl1qYTl@wuerfel>
-References: <1449970917-12633-1-git-send-email-paul.gortmaker@windriver.com>
- <CAFiDJ5-Y8afg5kDRQLK1pain-k1kPQAn3vhWrVkB1ADPRHvx+A@mail.gmail.com>
- <20151214091940.GA15126@ulmo.nvidia.com>
- <3302340.SIljl1qYTl@wuerfel>
-Message-ID: <20151215151624.GB2772@windriver.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 15 Dec 2015 15:19:53 +0000
+Subject: [PATCH v7 16/19] KVM: ARM64: Add PMU overflow interrupt routing
+In-Reply-To: <1450169379-12336-17-git-send-email-zhaoshenglong@huawei.com>
+References: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
+ <1450169379-12336-17-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <56702F99.8000905@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Re: [PATCH 00/10] drivers/pci: avoid module_init in non-modular host/pci*] On 14/12/2015 (Mon 11:27) Arnd Bergmann wrote:
-
-> On Monday 14 December 2015 10:19:40 Thierry Reding wrote:
-> > > PCIe host driver that use fixup (DECLARE_PCI_FIXUP_*) can't use tristate.
-> > > Fixup region is in kernel region and this region if not updated when
-> > > loading a module.
-> > 
-> > Interesting, I hadn't thought about that. I suppose this means that the
-> > module will end up containing an unused section with the fixup code. It
-> > might be useful to add a way for that to trigger a warning at build
-> > time.
-> > 
-> > Perhaps to fix this a mechanism could be introduced to add a table of
-> > fixups to a host controller driver and that will get applied to all
-> > children of the bridge. It could be problematic to cover all of the
-> > different fixup stages, though.
-> > 
+On 15/12/15 08:49, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
+> When calling perf_event_create_kernel_counter to create perf_event,
+> assign a overflow handler. Then when the perf event overflows, set the
+> corresponding bit of guest PMOVSSET register. If this counter is enabled
+> and its interrupt is enabled as well, kick the vcpu to sync the
+> interrupt.
 > 
-> I think a lot of the fixups shouldn't really be there in the first place,
-> they are about stuff that we can fix up in the probe function, or that should
-> be fixed up in the probe function with some appropriate core support added.
-
-So, the feedback on this is a bit all over the map, leaving me unsure
-what to do next.  And is the choice we make on a per board/bsp basis or
-ideally across all platforms?  I see the choices as:
-
-1) do nothing; which IMHO is least desirable as it leaves the code
-misrepresenting itself as modular; one of the key issues I wanted to fix
-
-2) use the patches I've sent ; then as they are genuinely made modular,
-the person doing so essentially "patch -R" or reverts the change as
-step one.  This has the advantage of solving the "we'll get to it
-someday" issue if someday never comes.
-
-3) make them all tristate;  beat it with a stick until it compiles [M]
-and modposts -- leaving the fixups and functional testing to people with
-the boards and low level knowledge to make it _work_ as a module.  The
-downside here is the code is still kind of misrepresenting itself as
-modularly functional -- a ban of unloading might mitigate that some.
-
-Paul.
---
-
+> On VM entry, if there is counter overflowed, inject the interrupt with
+> the level set to 1. Otherwise, inject the interrupt with the level set
+> to 0.
 > 
-> 	Arnd
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  arch/arm/kvm/arm.c    |  2 ++
+>  include/kvm/arm_pmu.h |  2 ++
+>  virt/kvm/arm/pmu.c    | 54 ++++++++++++++++++++++++++++++++++++++++++++++++++-
+>  3 files changed, 57 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index e06fd29..cd696ef 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -28,6 +28,7 @@
+>  #include <linux/sched.h>
+>  #include <linux/kvm.h>
+>  #include <trace/events/kvm.h>
+> +#include <kvm/arm_pmu.h>
+>  
+>  #define CREATE_TRACE_POINTS
+>  #include "trace.h"
+> @@ -569,6 +570,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  		 * non-preemptible context.
+>  		 */
+>  		preempt_disable();
+> +		kvm_pmu_flush_hwstate(vcpu);
+>  		kvm_timer_flush_hwstate(vcpu);
+>  		kvm_vgic_flush_hwstate(vcpu);
+>  
+> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+> index 25b5f98..732ccaf 100644
+> --- a/include/kvm/arm_pmu.h
+> +++ b/include/kvm/arm_pmu.h
+> @@ -35,6 +35,7 @@ struct kvm_pmu {
+>  	struct kvm_pmc pmc[ARMV8_MAX_COUNTERS];
+>  };
+>  
+> +void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu);
+>  u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx);
+>  void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val);
+>  void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val);
+> @@ -47,6 +48,7 @@ void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val);
+>  struct kvm_pmu {
+>  };
+>  
+> +void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu) {}
+>  u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx)
+>  {
+>  	return 0;
+> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+> index e664721..eff5b19 100644
+> --- a/virt/kvm/arm/pmu.c
+> +++ b/virt/kvm/arm/pmu.c
+> @@ -21,6 +21,7 @@
+>  #include <linux/perf_event.h>
+>  #include <asm/kvm_emulate.h>
+>  #include <kvm/arm_pmu.h>
+> +#include <kvm/arm_vgic.h>
+>  
+>  /**
+>   * kvm_pmu_get_counter_value - get PMU counter value
+> @@ -75,6 +76,56 @@ static void kvm_pmu_stop_counter(struct kvm_vcpu *vcpu, struct kvm_pmc *pmc)
+>  }
+>  
+>  /**
+> + * kvm_pmu_flush_hwstate - flush pmu state to cpu
+> + * @vcpu: The vcpu pointer
+> + *
+> + * Inject virtual PMU IRQ if IRQ is pending for this cpu.
+> + */
+> +void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu)
+> +{
+> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+> +	u64 overflow;
+> +
+> +	if (pmu->irq_num == -1)
+> +		return;
+> +
+> +	if (!(vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMCR_E))
+> +		return;
+> +
+> +	overflow = vcpu_sys_reg(vcpu, PMCNTENSET_EL0)
+> +		   & vcpu_sys_reg(vcpu, PMINTENSET_EL1)
+> +		   & vcpu_sys_reg(vcpu, PMOVSSET_EL0);
+
+You already have something similar to deal with enabling the overflow
+interrupt. You may want to have a common helper.
+
+> +
+> +	kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id, pmu->irq_num,
+> +			    overflow ? 1 : 0);
+
+nit: can also be written as !!overflow.
+
+> +}
+> +
+> +static inline struct kvm_vcpu *kvm_pmc_to_vcpu(struct kvm_pmc *pmc)
+> +{
+> +	struct kvm_pmu *pmu;
+> +	struct kvm_vcpu_arch *vcpu_arch;
+> +
+> +	pmc -= pmc->idx;
+> +	pmu = container_of(pmc, struct kvm_pmu, pmc[0]);
+> +	vcpu_arch = container_of(pmu, struct kvm_vcpu_arch, pmu);
+> +	return container_of(vcpu_arch, struct kvm_vcpu, arch);
+> +}
+> +
+> +/**
+> + * When perf event overflows, call kvm_pmu_overflow_set to set overflow status.
+> + */
+> +static void kvm_pmu_perf_overflow(struct perf_event *perf_event,
+> +				  struct perf_sample_data *data,
+> +				  struct pt_regs *regs)
+> +{
+> +	struct kvm_pmc *pmc = perf_event->overflow_handler_context;
+> +	struct kvm_vcpu *vcpu = kvm_pmc_to_vcpu(pmc);
+> +	int idx = pmc->idx;
+> +
+> +	kvm_pmu_overflow_set(vcpu, BIT(idx));
+> +}
+> +
+> +/**
+>   * kvm_pmu_enable_counter - enable selected PMU counter
+>   * @vcpu: The vcpu pointer
+>   * @val: the value guest writes to PMCNTENSET register
+> @@ -258,7 +309,8 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
+>  	/* The initial sample period (overflow count) of an event. */
+>  	attr.sample_period = (-counter) & pmc->bitmask;
+>  
+> -	event = perf_event_create_kernel_counter(&attr, -1, current, NULL, pmc);
+> +	event = perf_event_create_kernel_counter(&attr, -1, current,
+> +						 kvm_pmu_perf_overflow, pmc);
+>  	if (IS_ERR(event)) {
+>  		printk_once("kvm: pmu event creation failed %ld\n",
+>  			    PTR_ERR(event));
+> 
+
+Thanks,
+	
+	M.
+-- 
+Jazz is not dead. It just smells funny...
