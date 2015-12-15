@@ -1,49 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 Dec 2015 18:02:19 +0100
-Subject: [PATCH v5 2/2] arm: pxa27x: support for ICP DAS LP-8x4x w/ DT
-In-Reply-To: <1450197727.21989.9.camel@gmail.com>
-References: <1449700088-28076-3-git-send-email-ynvich@gmail.com>
- <7496839.vMjVcqPe8Q@wuerfel> <1450197727.21989.9.camel@gmail.com>
-Message-ID: <1843454.zCnLJtF7B6@wuerfel>
+Date: Tue, 15 Dec 2015 18:04:15 +0100
+Subject: [GIT PULL 3/4] Broadcom maintainers changes for v4.5
+In-Reply-To: <1449532649-6471-3-git-send-email-f.fainelli@gmail.com>
+References: <1449532649-6471-1-git-send-email-f.fainelli@gmail.com>
+ <1449532649-6471-3-git-send-email-f.fainelli@gmail.com>
+Message-ID: <8705423.83PkMWBzWS@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 December 2015 19:42:07 Sergei Ianovich wrote:
-> On Tue, 2015-12-15 at 17:32 +0100, Arnd Bergmann wrote:
-> > On Tuesday 15 December 2015 19:27:50 Sergei Ianovich wrote:
-> > >  .../devicetree/bindings/vendor-prefixes.txt        |   1 +
-> > >  arch/arm/boot/dts/Makefile                         |   3 +
-> > >  arch/arm/boot/dts/pxa27x-lp8x4x-i105.dts           |  50 ++++
-> > >  arch/arm/boot/dts/pxa27x-lp8x4x.dts                | 259
-> > > +++++++++++++++++++++
-> > >  arch/arm/configs/lp8x4x_defconfig                  | 176
-> > > ++++++++++++++
-> > > 
-> > 
-> > I had not noticed earlier that you are adding a new defconfig file.
-> > PXA is
-> > already the platform with the most defconfig files, and I'd rather
-> > like
-> > to see that reduced than increased.
-> > 
-> > Is there a chance you could merge this one with some of the existing
-> > files
-> > into one configuration that handles them all?
+On Monday 07 December 2015 15:57:28 Florian Fainelli wrote:
+> This pull request contains MAINTAINERS updates for Broadcom SoCs:
 > 
-> There are several board-specific devices on LP8x4x: custom FPGA, custom
-> UART, custom IRQ on FPGA, custom parallel bus for industrial IO. The
-> defconfig file could alert potential users to this fact. If this is not
-> a sufficient reason to have a defconfig file, it can be dropped.
+> - Florian Fainelli adds bcm-kernel-feedback-list for all Broadcom Set-Top Box
+>   SoCs submissions and removes a stray '>' for the gpio-brcmstb section
 > 
-> I use the full .config anyway 
 
-I would like those drivers to be enabled in some defconfig, so we get
-compile-time coverage, but we generally stopped having one-config-per-board
-files.
+Merged into next/fixes-non-critical,
 
-Maybe we can have a pxa_defconfig file that enables lots of boards
-and then we remove the individual configs? We don't have to remove
-them all at once, but it would make me very happy if we could at
-least kill off some of the ones that are not used regularly.
+thanks!
 
 	Arnd
