@@ -1,36 +1,47 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 15 Dec 2015 15:16:06 +0100
-Subject: [PATCH] soc: mediatek: SCPSYS: use module_platform_driver
-Message-ID: <1450188966-2921-1-git-send-email-s.hauer@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 15 Dec 2015 14:20:14 +0000
+Subject: [PATCH v7 06/19] KVM: ARM64: Add access handler for PMCEID0 and
+ PMCEID1 register
+In-Reply-To: <1450169379-12336-7-git-send-email-zhaoshenglong@huawei.com>
+References: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
+ <1450169379-12336-7-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <5670219E.1050207@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With regulator support to the scpsys driver needs to be able to defer
-probe. Probe deferral is incompatible with module_platform_driver_probe,
-so use -module_platform_driver.
+On 15/12/15 08:49, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> Add access handler which gets host value of PMCEID0 or PMCEID1 when
+> guest access these registers. Writing action to PMCEID0 or PMCEID1 is
+> ignored.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  arch/arm64/kvm/sys_regs.c | 26 ++++++++++++++++++++++----
+>  1 file changed, 22 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index c21f91b..e043224 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -486,6 +486,24 @@ static bool access_pmselr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>  	return true;
+>  }
+>  
+> +static bool access_pmceid(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+> +			  const struct sys_reg_desc *r)
+> +{
+> +	u64 pmceid;
+> +
+> +	if (p->is_write)
+> +		return write_to_read_only(vcpu, p);
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- drivers/soc/mediatek/mtk-scpsys.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+This register in UNDEFINED in that case. You should call
+kvm_inject_undefined() for that vcpu and return.
 
-diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-index e425619..e6752749 100644
---- a/drivers/soc/mediatek/mtk-scpsys.c
-+++ b/drivers/soc/mediatek/mtk-scpsys.c
-@@ -542,6 +542,7 @@ static const struct of_device_id of_scpsys_match_tbl[] = {
- };
- 
- static struct platform_driver scpsys_drv = {
-+	.probe = scpsys_probe,
- 	.driver = {
- 		.name = "mtk-scpsys",
- 		.owner = THIS_MODULE,
-@@ -549,4 +550,4 @@ static struct platform_driver scpsys_drv = {
- 	},
- };
- 
--module_platform_driver_probe(scpsys_drv, scpsys_probe);
-+module_platform_driver(scpsys_drv);
+Thanks,
+
+	M.
 -- 
-2.6.2
+Jazz is not dead. It just smells funny...
