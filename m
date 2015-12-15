@@ -1,62 +1,38 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 15 Dec 2015 13:16:11 +0000
-Subject: [PATCH v1 02/10] clockevents/drivers: add MPS2 Timer driver
-In-Reply-To: <CAL_Jsq+MhvV5BFw+x3TWTDheSpgWHjHjO02+D4V4swr493HXrg@mail.gmail.com>
-References: <1449048790-25859-1-git-send-email-vladimir.murzin@arm.com>
- <1449048790-25859-3-git-send-email-vladimir.murzin@arm.com>
- <CAL_Jsq+MhvV5BFw+x3TWTDheSpgWHjHjO02+D4V4swr493HXrg@mail.gmail.com>
-Message-ID: <5670129B.700@arm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 15 Dec 2015 16:22:20 +0300
+Subject: [PATCH v3 1/4] ARM: dts: dra7: Add dt node for the sycon pcie
+In-Reply-To: <1450172346-11890-2-git-send-email-kishon@ti.com>
+References: <1450172346-11890-1-git-send-email-kishon@ti.com>
+ <1450172346-11890-2-git-send-email-kishon@ti.com>
+Message-ID: <5670140C.7010906@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/12/15 13:56, Rob Herring wrote:
-> On Wed, Dec 2, 2015 at 3:33 AM, Vladimir Murzin <vladimir.murzin@arm.com> wrote:
->> MPS2 platform has simple 32 bits general purpose countdown timers.
->>
->> The driver uses the first detected timer as a clocksource and the rest
->> of the timers as a clockevent
->>
->> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
->> ---
->>  drivers/clocksource/Kconfig      |    5 +
->>  drivers/clocksource/Makefile     |    1 +
->>  drivers/clocksource/mps2-timer.c |  277 ++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 283 insertions(+)
->>  create mode 100644 drivers/clocksource/mps2-timer.c
->>
->> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
->> index 2eb5f0e..8bca09c 100644
->> --- a/drivers/clocksource/Kconfig
->> +++ b/drivers/clocksource/Kconfig
->> @@ -137,6 +137,11 @@ config CLKSRC_STM32
->>         depends on OF && ARM && (ARCH_STM32 || COMPILE_TEST)
->>         select CLKSRC_MMIO
->>
->> +config CLKSRC_MPS2
->> +       bool "Clocksource for MPS2 SoCs" if COMPILE_TEST
->> +       depends on OF && ARM
-> 
-> Does this really depend on both of these for COMPILE_TEST?
+Hello.
 
-Not really...
+On 12/15/2015 12:39 PM, Kishon Vijay Abraham I wrote:
 
-> 
-> You need to select CLKSRC_OF rather than CLKSRC_MMIO as well.
-> 
+> Add new device tree node for the control module register space where
+> PCIe registers are present.
+>
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>   arch/arm/boot/dts/dra7.dtsi |    5 +++++
+>   1 file changed, 5 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> index fe99231..e38f63f 100644
+> --- a/arch/arm/boot/dts/dra7.dtsi
+> +++ b/arch/arm/boot/dts/dra7.dtsi
+> @@ -155,6 +155,11 @@
+>   					compatible = "syscon";
+>   					reg = <0x1c04 0x0020>;
+>   				};
+> +
+> +				scm_conf_pcie: tisyscon at 1c24 {
 
-Does it looks better?
+    Please use the generic node names as the ePAPR standard says.
 
-config CLKSRC_MPS2
-	bool "Clocksource for MPS2 SoCs" if COMPILE_TEST
-	depends on GENERIC_SCHED_CLOCK
-	select CLKSRC_MMIO
-	select CLKSRC_OF
+[...]
 
-
-Cheers
-Vladimir
-
-> Rob
-> 
-> 
-> 
+MBR, Sergei
