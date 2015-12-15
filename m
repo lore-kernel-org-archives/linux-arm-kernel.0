@@ -1,31 +1,52 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 15 Dec 2015 17:38:24 +0900
-Subject: [PATCH 2/3] arm64: dts: r8a7795: Add Cortex-A57 CPU cores
-In-Reply-To: <20151211230751.GD6496@verge.net.au>
-References: <1449236333-4410-1-git-send-email-dirk.behme@gmail.com>
- <1449236333-4410-2-git-send-email-dirk.behme@gmail.com>
- <20151211230751.GD6496@verge.net.au>
-Message-ID: <CANqRtoSeibffbaoVGV7Y_gyuXxCOu+1PmRf3imQ8OKhV6VoAMQ@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 15 Dec 2015 09:45:06 +0100
+Subject: [PATCH v2 6/6] arm64: renesas: r8a7795: Add L2 cache-controller
+ nodes
+In-Reply-To: <CAMuHMdWrXiYkcFwSkgbEfQRXvT2FsSTbqD72vtiedmeEZZKxLg@mail.gmail.com>
+References: <1449512659-16688-1-git-send-email-geert+renesas@glider.be>
+ <1449512659-16688-7-git-send-email-geert+renesas@glider.be>
+ <5665D4C7.1050705@arm.com> <20151207190355.GE28024@leverpostej>
+ <CAMuHMdWrXiYkcFwSkgbEfQRXvT2FsSTbqD72vtiedmeEZZKxLg@mail.gmail.com>
+Message-ID: <CAMuHMdWELqMQ+CCENsGtdBx7n_YV=D6pJpo02jeQRe67jEehyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi Mark,
 
-On Sat, Dec 12, 2015 at 8:07 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Fri, Dec 04, 2015 at 02:38:52PM +0100, Dirk Behme wrote:
->> From: Gaku Inami <gaku.inami.xw@bp.renesas.com>
+On Mon, Dec 7, 2015 at 9:18 PM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> On Mon, Dec 7, 2015 at 8:03 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> On Mon, Dec 07, 2015 at 06:49:43PM +0000, Sudeep Holla wrote:
+>>> On 07/12/15 18:24, Geert Uytterhoeven wrote:
+>>> >+    L2_CA57: cache-controller at 0 {
+>>> >+            compatible = "cache";
+>>> >+            arm,data-latency = <4 4 1>;
+>>> >+            arm,tag-latency = <3 3 3>;
+>>>
+>>> Interesting, only PL2xx/3xx cache controller driver reads this from the
+>>> DT and configures the controller. The integrated L2 found in
+>>> A15/A7/A57/A53 needs doesn't make use of these values from the DT.
 >>
->> Add Cortex-A57 CPU cores to r8a7795 SoC for a total of 4 x Cortex-A57.
+>> These properties seem to be from l2cc.txt, which really only corresponds
+>> to PL210/PL220/PL310 (and variants) and isn't as generic as it sounds.
 >>
->> Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
->> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
->> Sigend-off-by: Dirk Behme <dirk.behme@gmail.com>
+>> I don't see that these are necessary at all.
 >
-> Thanks, I have queued this up for v4.5.
+> The datasheet does mention the data/tag RAM latencies/setup values, so
+> I put them in DT using the properties I could fine.
 
-Thanks. May I ask if CPU hotplug is known to work? Also, which version
-of the boot loader stack is required?
+Furthermore these values are different for different SoCs in the same family
+(e.g. r8a7790 vs. other R-Car Gen2 members), even though they seem to
+have the same Cortex-A15 cores.
 
-Best,
+So to me these look like properties we want to document in the DTS...
 
-/ magnus
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
