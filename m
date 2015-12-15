@@ -1,194 +1,504 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Tue, 15 Dec 2015 12:22:38 +0000
-Subject: [RFC PATCH 2/8] Documentation: arm: define DT cpu capacity
- bindings
-In-Reply-To: <20151214165928.GV5727@sirena.org.uk>
-References: <1448288921-30307-1-git-send-email-juri.lelli@arm.com>
- <1448288921-30307-3-git-send-email-juri.lelli@arm.com>
- <20151124020631.GA15165@rob-hp-laptop>
- <20151210153004.GA26758@sirena.org.uk>
- <20151210175820.GE14571@e106622-lin>
- <20151211174940.GQ5727@sirena.org.uk>
- <20151214123616.GC3308@e106622-lin>
- <20151214165928.GV5727@sirena.org.uk>
-Message-ID: <20151215122238.GG16007@e106622-lin>
+From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
+Date: Tue, 15 Dec 2015 10:22:46 -0200
+Subject: [PATCH v2] [media] media-device: handle errors at media_device_init()
+Message-ID: <e4902f65ceabce2f315e63ba75d4482a4985b351.1450182151.git.mchehab@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/12/15 16:59, Mark Brown wrote:
-> On Mon, Dec 14, 2015 at 12:36:16PM +0000, Juri Lelli wrote:
-> > On 11/12/15 17:49, Mark Brown wrote:
-> 
-> > > The purpose of the capacity values is to influence the scheduler
-> > > behaviour and hence performance.  Without a concrete definition they're
-> > > just magic numbers which have meaining only in terms of their effect on
-> > > the performance of the system.  That is a sufficiently complex outcome
-> > > to ensure that there will be an element of taste in what the desired
-> > > outcomes are.  Sounds like tuneables to me.
-> 
-> > Capacity values are meant to describe asymmetry (if any) of the system
-> > CPUs to the scheduler. The scheduler can then use this additional bit of
-> > information to try to do better scheduling decisions. Yes, having these
-> > values available will end up giving you better performance, but I guess
-> > this apply to any information we provide to the kernel (and scheduler);
-> > the less dumb a subsystem is, the better we can make it work.
-> 
-> This information is a magic number, there's never going to be a right
-> answer.  If it needs changing it's not like the kernel is modeling a
-> concrete thing like the relative performance of the A53 and A57 poorly
-> or whatever, it's just that the relative values of number A and number B
-> are not what the system integrator desires.
-> 
-> > > If you are saying people should use other, more sensible, ways of
-> > > specifying the final values that actually get used in production then
-> > > why take the defaults from direct numbers DT in the first place?  If you
-> > > are saying that people should tune and then put the values in here then
-> > > that's problematic for the reasons I outlined.
-> 
-> > IMHO, people should come up with default values that describe
-> > heterogeneity in their system. Then use other ways to tune the system at
-> > run time (depending on the workload maybe).
-> 
-> My argument is that they should be describing the hetrogeneity of their
-> system by describing concrete properties of their system rather than by
-> providing magic numbers.
-> 
-> > As said, I understand your concerns; but, what I don't still get is
-> > where CPU capacity values are so different from, say, idle states
-> > min-residency-us. AFAIK there is a per-SoC benchmarking phase required
-> > to come up with that values as well; you have to pick some benchmark
-> > that stresses worst case entry/exit while measuring energy, then make
-> > calculations that tells you when it is wise to enter a particular idle
-> > state. Ideally we should derive min residency from specs, but I'm not
-> > sure is how it works in practice.
-> 
-> Those at least have a concrete physical value that it is possible to
-> measure in a describable way that is unlikely to change based on the
-> internals of the kernel.  It would be kind of nice to have the broken
-> down numbers for entry time, exit time and power burn in suspend but
-> it's not clear it's worth the bother.  It's also one of these things
-> where we don't have any real proxies that get us anywhere in the
-> ballpark of where we want to be.
-> 
+Changeset 43ac4401dca9 ("[media] media-device: split media
+initialization and registration") broke media device register
+into two separate functions, but introduced a BUG_ON() and
+made media_device_init() void. It also introduced several
+warnings.
 
-I'm proposing to add a new value because I couldn't find any proxies in
-the current bindings that bring us any close to what we need. If I
-failed in looking for them, and they actually exists, I'll personally be
-more then happy to just rely on them instead of adding more stuff :-).
+Instead of adding BUG_ON(), let's revert to WARN_ON() and fix
+the init code in a way that, if something goes wrong during
+device init, driver probe will fail without causing the Kernel
+to BUG.
 
-Interestingly, to me it sounds like we could actually use your first
-paragraph above almost as it is to describe how to come up with capacity
-values. In the documentation I put the following:
+Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+---
+ drivers/media/media-device.c                  |  8 ++++---
+ drivers/media/platform/exynos4-is/media-dev.c |  7 +++++-
+ drivers/media/platform/omap3isp/isp.c         |  9 ++++++--
+ drivers/media/platform/s3c-camif/camif-core.c |  4 +++-
+ drivers/media/platform/vsp1/vsp1_drv.c        |  7 +++++-
+ drivers/media/platform/xilinx/xilinx-vipp.c   |  7 +++++-
+ drivers/media/usb/au0828/au0828-core.c        | 26 +++++++++++++++++----
+ drivers/media/usb/cx231xx/cx231xx-cards.c     | 23 +++++++++++++++----
+ drivers/media/usb/dvb-usb-v2/dvb_usb_core.c   | 33 +++++++++++++++++++--------
+ drivers/media/usb/dvb-usb/dvb-usb-dvb.c       | 32 +++++++++++++++++++-------
+ drivers/media/usb/siano/smsusb.c              |  6 ++++-
+ drivers/media/usb/uvc/uvc_driver.c            |  3 ++-
+ include/media/media-device.h                  |  2 +-
+ 13 files changed, 128 insertions(+), 39 deletions(-)
 
-"One simple way to estimate CPU capacities is to iteratively run a
-well-known CPU user space benchmark (e.g, sysbench, dhrystone, etc.) on
-each CPU at maximum frequency and then normalize values w.r.t.  the best
-performing CPU."
-
-I don't see why this should change if we decide that the scheduler has
-to change in the future.
-
-Also, looking again at section 2 of idle-states bindings docs, we have a
-nice and accurate description of what min-residency is, but not much
-info about how we can actually measure that. Maybe, expanding the docs
-section regarding CPU capacity could help?
-
-> > > It also seems a bit strange to expect people to do some tuning in one
-> > > place initially and then additional tuning somewhere else later, from
-> > > a user point of view I'd expect to always do my tuning in the same
-> > > place.
-> 
-> > I think that runtime tuning needs are much more complex and have finer
-> > grained needs than what you can achieve by playing with CPU capacities.
-> > And I agree with you, users should only play with these other methods
-> > I'm referring to; they should not mess around with platform description
-> > bits. They should provide information about runtime needs, then the
-> > scheduler (in this case) will do its best to give them acceptable
-> > performance using improved knowledge about the platform.
-> 
-> So then why isn't it adequate to just have things like the core types in
-> there and work from there?  Are we really expecting the tuning to be so
-> much better than it's possible to come up with something that's so much
-> better on the scale that we're expecting this to be accurate that it's
-> worth just jumping straight to magic numbers?
-> 
-
-I take your point here that having fine grained values might not really
-give us appreciable differences (that is also why I proposed the
-capacity-scale in the first instance), but I'm not sure I'm getting what
-you are proposing here.
-
-Today, and for arm only, we have a static table representing CPUs
-"efficiency":
-
- /*
-  * Table of relative efficiency of each processors
-  * The efficiency value must fit in 20bit and the final
-  * cpu_scale value must be in the range
-  *   0 < cpu_scale < 3*SCHED_CAPACITY_SCALE/2
-  * in order to return@most 1 when DIV_ROUND_CLOSEST
-  * is used to compute the capacity of a CPU.
-  * Processors that are not defined in the table,
-  * use the default SCHED_CAPACITY_SCALE value for cpu_scale.
+diff --git a/drivers/media/media-device.c b/drivers/media/media-device.c
+index 76e2b2f3a15f..34621605eed7 100644
+--- a/drivers/media/media-device.c
++++ b/drivers/media/media-device.c
+@@ -625,10 +625,10 @@ EXPORT_SYMBOL_GPL(media_device_unregister_entity);
+  * - dev must point to the parent device
+  * - model must be filled with the device model name
   */
- static const struct cpu_efficiency table_efficiency[] = {
- 	{"arm,cortex-a15", 3891},
- 	{"arm,cortex-a7",  2048},
- 	{NULL, },
- };
-
-When clock-frequency property is defined in DT, we try to find a match
-for the compatibility string in the table above and then use the
-associate number to compute the capacity. Are you proposing to have
-something like this for arm64 as well?
-
-BTW, the only info I could find about those numbers is from this thread
-
- http://lists.infradead.org/pipermail/linux-arm-kernel/2012-June/104072.html
-
-Vincent, do we have more precise information about these numbers
-somewhere else?
-
-If I understand how that table was created, how do we think we will
-extend it in the future to allow newer core types (say we replicate this
-solution for arm64)?  It seems that we have to change it, rescaling
-values, each time we have a new core on the market. How can we come up
-with relative numbers, in the future, comparing newer cores to old ones
-(that might be already out of the market by that time)?
-
-> > > Doing that and then switching to some other interface for real tuning
-> > > seems especially odd and I'm not sure that's something that users are
-> > > going to expect or understand.
-> 
-> > As I'm saying above, users should not care about this first step of
-> > platform description; not more than how much they care about other bits
-> > in DTs that describe their platform.
-> 
-> That may be your intention but I don't see how it is realistic to expect
-> that this is what people will actually understand.  It's a number, it
-> has an effect and it's hard to see that people won't tune it, it's not
-> like people don't have to edit DTs during system integration.  People
-> won't reliably read documentation or look in mailing list threads and
-> other that that it has all the properties of a tuning interface.
-> 
-
-Eh, sad but true. I guess we can, as we usually do, put more effort in
-documenting how things are supposed to be used. Then, if people think
-that they can make their system perform better without looking at
-documentation or asking around, I'm not sure there is much we could do
-to prevent them to do things wrong. There are already lot of things
-people shouldn't touch if they don't know what they are doing. :-/
-
-> There's a tension here between what you're saying about people not being
-> supposed to care much about the numbers for tuning and the very fact
-> that there's a need for the DT to carry explicit numbers.
-
-My point is that people with tuning needs shouldn't even look at DTs,
-but put all their efforts in describing (using appropriate APIs) their
-needs and how they apply to the workload they care about. Our job is to
-put together information coming from users and knowledge of system
-configuration to provide people the desired outcomes.
-
-Best,
-
-- Juri
+-void media_device_init(struct media_device *mdev)
++int __must_check media_device_init(struct media_device *mdev)
+ {
+-
+-	BUG_ON(mdev->dev == NULL);
++	if (WARN_ON(mdev->dev == NULL))
++		return -EINVAL;
+ 
+ 	INIT_LIST_HEAD(&mdev->entities);
+ 	INIT_LIST_HEAD(&mdev->interfaces);
+@@ -638,6 +638,8 @@ void media_device_init(struct media_device *mdev)
+ 	mutex_init(&mdev->graph_mutex);
+ 
+ 	dev_dbg(mdev->dev, "Media device initialized\n");
++
++	return 0;
+ }
+ EXPORT_SYMBOL_GPL(media_device_init);
+ 
+diff --git a/drivers/media/platform/exynos4-is/media-dev.c b/drivers/media/platform/exynos4-is/media-dev.c
+index 27663dd45294..4fea0037dade 100644
+--- a/drivers/media/platform/exynos4-is/media-dev.c
++++ b/drivers/media/platform/exynos4-is/media-dev.c
+@@ -1353,7 +1353,11 @@ static int fimc_md_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
+-	media_device_init(&fmd->media_dev);
++	ret = media_device_init(&fmd->media_dev);
++	if (ret < 0) {
++		v4l2_err(v4l2_dev, "Failed to register media device: %d\n", ret);
++		goto err_v4l2_dev;
++	}
+ 
+ 	ret = fimc_md_get_clocks(fmd);
+ 	if (ret)
+@@ -1424,6 +1428,7 @@ err_m_ent:
+ 	fimc_md_unregister_entities(fmd);
+ err_md:
+ 	media_device_cleanup(&fmd->media_dev);
++err_v4l2_dev:
+ 	v4l2_device_unregister(&fmd->v4l2_dev);
+ 	return ret;
+ }
+diff --git a/drivers/media/platform/omap3isp/isp.c b/drivers/media/platform/omap3isp/isp.c
+index 942b189c0eca..347bfdd8ce65 100644
+--- a/drivers/media/platform/omap3isp/isp.c
++++ b/drivers/media/platform/omap3isp/isp.c
+@@ -1876,7 +1876,12 @@ static int isp_register_entities(struct isp_device *isp)
+ 		sizeof(isp->media_dev.model));
+ 	isp->media_dev.hw_revision = isp->revision;
+ 	isp->media_dev.link_notify = isp_pipeline_link_notify;
+-	media_device_init(&isp->media_dev);
++	ret = media_device_init(&isp->media_dev);
++	if (ret < 0) {
++		dev_err(isp->dev, "%s: Media device registration failed (%d)\n",
++			__func__, ret);
++		return ret;
++	}
+ 
+ 	isp->v4l2_dev.mdev = &isp->media_dev;
+ 	ret = v4l2_device_register(isp->dev, &isp->v4l2_dev);
+@@ -2361,7 +2366,7 @@ static int isp_subdev_notifier_complete(struct v4l2_async_notifier *async)
+ 		}
+ 	}
+ 
+-	ret = v4l2_device_register_subdev_nodes(&isp->v4l2_dev);
++	ret = v4l2_device_register_subdev_nodes(v4l2_dev);
+ 	if (ret < 0)
+ 		return ret;
+ 
+diff --git a/drivers/media/platform/s3c-camif/camif-core.c b/drivers/media/platform/s3c-camif/camif-core.c
+index ea02b7ef2119..6e6ad152adbc 100644
+--- a/drivers/media/platform/s3c-camif/camif-core.c
++++ b/drivers/media/platform/s3c-camif/camif-core.c
+@@ -328,7 +328,9 @@ static int camif_media_dev_init(struct camif_dev *camif)
+ 	if (ret < 0)
+ 		return ret;
+ 
+-	media_device_init(md);
++	ret = media_device_init(md);
++	if (ret < 0)
++		v4l2_device_unregister(v4l2_dev);
+ 
+ 	return ret;
+ }
+diff --git a/drivers/media/platform/vsp1/vsp1_drv.c b/drivers/media/platform/vsp1/vsp1_drv.c
+index 42dff9d020af..1e319eaeb8fe 100644
+--- a/drivers/media/platform/vsp1/vsp1_drv.c
++++ b/drivers/media/platform/vsp1/vsp1_drv.c
+@@ -142,7 +142,12 @@ static int vsp1_create_entities(struct vsp1_device *vsp1)
+ 	strlcpy(mdev->model, "VSP1", sizeof(mdev->model));
+ 	snprintf(mdev->bus_info, sizeof(mdev->bus_info), "platform:%s",
+ 		 dev_name(mdev->dev));
+-	media_device_init(mdev);
++	ret = media_device_init(mdev);
++	if (ret < 0) {
++		dev_err(vsp1->dev, "media device registration failed (%d)\n",
++			ret);
++		return ret;
++	}
+ 
+ 	vdev->mdev = mdev;
+ 	ret = v4l2_device_register(vsp1->dev, vdev);
+diff --git a/drivers/media/platform/xilinx/xilinx-vipp.c b/drivers/media/platform/xilinx/xilinx-vipp.c
+index e795a4501e8b..7c5d23010d6f 100644
+--- a/drivers/media/platform/xilinx/xilinx-vipp.c
++++ b/drivers/media/platform/xilinx/xilinx-vipp.c
+@@ -585,7 +585,12 @@ static int xvip_composite_v4l2_init(struct xvip_composite_device *xdev)
+ 		sizeof(xdev->media_dev.model));
+ 	xdev->media_dev.hw_revision = 0;
+ 
+-	media_device_init(&xdev->media_dev);
++	ret = media_device_init(&xdev->media_dev);
++	if (ret < 0) {
++		dev_err(xdev->dev, "media device registration failed (%d)\n",
++			ret);
++		return ret;
++	}
+ 
+ 	xdev->v4l2_dev.mdev = &xdev->media_dev;
+ 	ret = v4l2_device_register(xdev->dev, &xdev->v4l2_dev);
+diff --git a/drivers/media/usb/au0828/au0828-core.c b/drivers/media/usb/au0828/au0828-core.c
+index e7aab47ae4f5..2f91bbc633b4 100644
+--- a/drivers/media/usb/au0828/au0828-core.c
++++ b/drivers/media/usb/au0828/au0828-core.c
+@@ -217,15 +217,16 @@ static void au0828_usb_disconnect(struct usb_interface *interface)
+ 	au0828_usb_release(dev);
+ }
+ 
+-static void au0828_media_device_init(struct au0828_dev *dev,
+-				     struct usb_device *udev)
++static int au0828_media_device_init(struct au0828_dev *dev,
++				    struct usb_device *udev)
+ {
+ #ifdef CONFIG_MEDIA_CONTROLLER
+ 	struct media_device *mdev;
++	int ret;
+ 
+ 	mdev = kzalloc(sizeof(*mdev), GFP_KERNEL);
+ 	if (!mdev)
+-		return;
++		return -ENOMEM;
+ 
+ 	mdev->dev = &udev->dev;
+ 
+@@ -239,10 +240,18 @@ static void au0828_media_device_init(struct au0828_dev *dev,
+ 	mdev->hw_revision = le16_to_cpu(udev->descriptor.bcdDevice);
+ 	mdev->driver_version = LINUX_VERSION_CODE;
+ 
+-	media_device_init(mdev);
++	ret = media_device_init(mdev);
++	if (ret) {
++		pr_err(
++			"Couldn't create a media device. Error: %d\n",
++			ret);
++		kfree(mdev);
++		return ret;
++	}
+ 
+ 	dev->media_dev = mdev;
+ #endif
++	return 0;
+ }
+ 
+ 
+@@ -368,7 +377,14 @@ static int au0828_usb_probe(struct usb_interface *interface,
+ 	dev->board = au0828_boards[dev->boardnr];
+ 
+ 	/* Initialize the media controller */
+-	au0828_media_device_init(dev, usbdev);
++	retval = au0828_media_device_init(dev, usbdev);
++	if (retval) {
++		pr_err("%s() au0828_media_device_init failed\n",
++		       __func__);
++		mutex_unlock(&dev->lock);
++		kfree(dev);
++		return retval;
++	}
+ 
+ #ifdef CONFIG_VIDEO_AU0828_V4L2
+ 	dev->v4l2_dev.release = au0828_usb_v4l2_release;
+diff --git a/drivers/media/usb/cx231xx/cx231xx-cards.c b/drivers/media/usb/cx231xx/cx231xx-cards.c
+index 2e997f09a4cd..35692d19b652 100644
+--- a/drivers/media/usb/cx231xx/cx231xx-cards.c
++++ b/drivers/media/usb/cx231xx/cx231xx-cards.c
+@@ -1206,15 +1206,16 @@ void cx231xx_release_resources(struct cx231xx *dev)
+ 	clear_bit(dev->devno, &cx231xx_devused);
+ }
+ 
+-static void cx231xx_media_device_init(struct cx231xx *dev,
+-				      struct usb_device *udev)
++static int cx231xx_media_device_init(struct cx231xx *dev,
++				     struct usb_device *udev)
+ {
+ #ifdef CONFIG_MEDIA_CONTROLLER
+ 	struct media_device *mdev;
++	int ret;
+ 
+ 	mdev = kzalloc(sizeof(*mdev), GFP_KERNEL);
+ 	if (!mdev)
+-		return;
++		return -ENOMEM;
+ 
+ 	mdev->dev = dev->dev;
+ 	strlcpy(mdev->model, dev->board.name, sizeof(mdev->model));
+@@ -1224,10 +1225,18 @@ static void cx231xx_media_device_init(struct cx231xx *dev,
+ 	mdev->hw_revision = le16_to_cpu(udev->descriptor.bcdDevice);
+ 	mdev->driver_version = LINUX_VERSION_CODE;
+ 
+-	media_device_init(mdev);
++	ret = media_device_init(mdev);
++	if (ret) {
++		dev_err(dev->dev,
++			"Couldn't create a media device. Error: %d\n",
++			ret);
++		kfree(mdev);
++		return ret;
++	}
+ 
+ 	dev->media_dev = mdev;
+ #endif
++	return 0;
+ }
+ 
+ static int cx231xx_create_media_graph(struct cx231xx *dev)
+@@ -1663,7 +1672,11 @@ static int cx231xx_usb_probe(struct usb_interface *interface,
+ 	usb_set_intfdata(interface, dev);
+ 
+ 	/* Initialize the media controller */
+-	cx231xx_media_device_init(dev, udev);
++	retval = cx231xx_media_device_init(dev, udev);
++	if (retval) {
++		dev_err(d, "cx231xx_media_device_init failed\n");
++		goto err_v4l2;
++	}
+ 
+ 	/* Create v4l2 device */
+ #ifdef CONFIG_MEDIA_CONTROLLER
+diff --git a/drivers/media/usb/dvb-usb-v2/dvb_usb_core.c b/drivers/media/usb/dvb-usb-v2/dvb_usb_core.c
+index a0413dcc3361..9992ac6e63cc 100644
+--- a/drivers/media/usb/dvb-usb-v2/dvb_usb_core.c
++++ b/drivers/media/usb/dvb-usb-v2/dvb_usb_core.c
+@@ -400,7 +400,7 @@ skip_feed_stop:
+ 	return ret;
+ }
+ 
+-static void dvb_usbv2_media_device_init(struct dvb_usb_adapter *adap)
++static int dvb_usbv2_media_device_init(struct dvb_usb_adapter *adap)
+ {
+ #ifdef CONFIG_MEDIA_CONTROLLER_DVB
+ 	struct media_device *mdev;
+@@ -410,7 +410,7 @@ static void dvb_usbv2_media_device_init(struct dvb_usb_adapter *adap)
+ 
+ 	mdev = kzalloc(sizeof(*mdev), GFP_KERNEL);
+ 	if (!mdev)
+-		return;
++		return -ENOMEM;
+ 
+ 	mdev->dev = &udev->dev;
+ 	strlcpy(mdev->model, d->name, sizeof(mdev->model));
+@@ -420,19 +420,28 @@ static void dvb_usbv2_media_device_init(struct dvb_usb_adapter *adap)
+ 	mdev->hw_revision = le16_to_cpu(udev->descriptor.bcdDevice);
+ 	mdev->driver_version = LINUX_VERSION_CODE;
+ 
+-	media_device_init(mdev);
++	ret = media_device_init(mdev);
++	if (ret) {
++		dev_err(&d->udev->dev,
++			"Couldn't create a media device. Error: %d\n",
++			ret);
++		kfree(mdev);
++		return ret;
++	}
+ 
+ 	dvb_register_media_controller(&adap->dvb_adap, mdev);
+ 
+ 	dev_info(&d->udev->dev, "media controller created\n");
+-
+ #endif
++	return 0;
+ }
+ 
+-static void dvb_usbv2_media_device_register(struct dvb_usb_adapter *adap)
++static int dvb_usbv2_media_device_register(struct dvb_usb_adapter *adap)
+ {
+ #ifdef CONFIG_MEDIA_CONTROLLER_DVB
+-	media_device_register(adap->dvb_adap.mdev);
++	return media_device_register(adap->dvb_adap.mdev);
++#else
++	return 0;
+ #endif
+ }
+ 
+@@ -468,7 +477,12 @@ static int dvb_usbv2_adapter_dvb_init(struct dvb_usb_adapter *adap)
+ 
+ 	adap->dvb_adap.priv = adap;
+ 
+-	dvb_usbv2_media_device_init(adap);
++	ret = dvb_usbv2_media_device_init(adap);
++	if (ret < 0) {
++		dev_dbg(&d->udev->dev, "%s: dvb_usbv2_media_device_init() failed=%d\n",
++				__func__, ret);
++		goto err_dvb_register_mc;
++	}
+ 
+ 	if (d->props->read_mac_address) {
+ 		ret = d->props->read_mac_address(adap,
+@@ -519,6 +533,7 @@ err_dvb_dmxdev_init:
+ 	dvb_dmx_release(&adap->demux);
+ err_dvb_dmx_init:
+ 	dvb_usbv2_media_device_unregister(adap);
++err_dvb_register_mc:
+ 	dvb_unregister_adapter(&adap->dvb_adap);
+ err_dvb_register_adapter:
+ 	adap->dvb_adap.priv = NULL;
+@@ -703,9 +718,9 @@ static int dvb_usbv2_adapter_frontend_init(struct dvb_usb_adapter *adap)
+ 	if (ret < 0)
+ 		goto err_dvb_unregister_frontend;
+ 
+-	dvb_usbv2_media_device_register(&adap->dvb_adap);
++	ret = dvb_usbv2_media_device_register(adap);
+ 
+-	return 0;
++	return ret;
+ 
+ err_dvb_unregister_frontend:
+ 	for (i = count_registered - 1; i >= 0; i--)
+diff --git a/drivers/media/usb/dvb-usb/dvb-usb-dvb.c b/drivers/media/usb/dvb-usb/dvb-usb-dvb.c
+index 4086d9626664..920396f935ab 100644
+--- a/drivers/media/usb/dvb-usb/dvb-usb-dvb.c
++++ b/drivers/media/usb/dvb-usb/dvb-usb-dvb.c
+@@ -95,7 +95,7 @@ static int dvb_usb_stop_feed(struct dvb_demux_feed *dvbdmxfeed)
+ 	return dvb_usb_ctrl_feed(dvbdmxfeed, 0);
+ }
+ 
+-static void dvb_usb_media_device_init(struct dvb_usb_adapter *adap)
++static int dvb_usb_media_device_init(struct dvb_usb_adapter *adap)
+ {
+ #ifdef CONFIG_MEDIA_CONTROLLER_DVB
+ 	struct media_device *mdev;
+@@ -105,7 +105,7 @@ static void dvb_usb_media_device_init(struct dvb_usb_adapter *adap)
+ 
+ 	mdev = kzalloc(sizeof(*mdev), GFP_KERNEL);
+ 	if (!mdev)
+-		return;
++		return -EINVAL;
+ 
+ 	mdev->dev = &udev->dev;
+ 	strlcpy(mdev->model, d->desc->name, sizeof(mdev->model));
+@@ -115,18 +115,27 @@ static void dvb_usb_media_device_init(struct dvb_usb_adapter *adap)
+ 	mdev->hw_revision = le16_to_cpu(udev->descriptor.bcdDevice);
+ 	mdev->driver_version = LINUX_VERSION_CODE;
+ 
+-	media_device_init(mdev);
+-
++	ret = media_device_init(mdev);
++	if (ret) {
++		dev_err(&d->udev->dev,
++			"Couldn't create a media device. Error: %d\n",
++			ret);
++		kfree(mdev);
++		return ret;
++	}
+ 	dvb_register_media_controller(&adap->dvb_adap, mdev);
+ 
+ 	dev_info(&d->udev->dev, "media controller created\n");
+ #endif
++	return 0;
+ }
+ 
+-static void dvb_usb_media_device_register(struct dvb_usb_adapter *adap)
++static int dvb_usb_media_device_register(struct dvb_usb_adapter *adap)
+ {
+ #ifdef CONFIG_MEDIA_CONTROLLER_DVB
+-	media_device_register(adap->dvb_adap.mdev);
++	return media_device_register(adap->dvb_adap.mdev);
++#else
++	return 0;
+ #endif
+ }
+ 
+@@ -156,7 +165,11 @@ int dvb_usb_adapter_dvb_init(struct dvb_usb_adapter *adap, short *adapter_nums)
+ 	}
+ 	adap->dvb_adap.priv = adap;
+ 
+-	dvb_usb_media_device_init(adap);
++	ret = dvb_usb_media_device_init(adap);
++	if (ret < 0) {
++		deb_info("dvb_usb_media_device_init failed: error %d", ret);
++		goto err_mc;
++	}
+ 
+ 	if (adap->dev->props.read_mac_address) {
+ 		if (adap->dev->props.read_mac_address(adap->dev, adap->dvb_adap.proposed_mac) == 0)
+@@ -206,6 +219,7 @@ err_dmx_dev:
+ 	dvb_dmx_release(&adap->demux);
+ err_dmx:
+ 	dvb_usb_media_device_unregister(adap);
++err_mc:
+ 	dvb_unregister_adapter(&adap->dvb_adap);
+ err:
+ 	return ret;
+@@ -324,8 +338,10 @@ int dvb_usb_adapter_frontend_init(struct dvb_usb_adapter *adap)
+ 		return ret;
+ 
+ 	ret = dvb_create_media_graph(&adap->dvb_adap);
++	if (ret)
++		return ret;
+ 
+-	dvb_usb_media_device_register(adap);
++	ret = dvb_usb_media_device_register(adap);
+ 
+ 	return ret;
+ }
+diff --git a/drivers/media/usb/siano/smsusb.c b/drivers/media/usb/siano/smsusb.c
+index 8abbd3cc8eba..327180efa264 100644
+--- a/drivers/media/usb/siano/smsusb.c
++++ b/drivers/media/usb/siano/smsusb.c
+@@ -361,7 +361,11 @@ static void *siano_media_device_register(struct smsusb_device_t *dev,
+ 	mdev->hw_revision = le16_to_cpu(udev->descriptor.bcdDevice);
+ 	mdev->driver_version = LINUX_VERSION_CODE;
+ 
+-	media_device_init(mdev);
++	ret = media_device_init(mdev);
++	if (ret) {
++		kfree(mdev);
++		return NULL;
++	}
+ 
+ 	ret = media_device_register(mdev);
+ 	if (ret) {
+diff --git a/drivers/media/usb/uvc/uvc_driver.c b/drivers/media/usb/uvc/uvc_driver.c
+index 96fc2c2efa7b..4dfd3eb814e7 100644
+--- a/drivers/media/usb/uvc/uvc_driver.c
++++ b/drivers/media/usb/uvc/uvc_driver.c
+@@ -1917,7 +1917,8 @@ static int uvc_probe(struct usb_interface *intf,
+ 	strcpy(dev->mdev.bus_info, udev->devpath);
+ 	dev->mdev.hw_revision = le16_to_cpu(udev->descriptor.bcdDevice);
+ 	dev->mdev.driver_version = LINUX_VERSION_CODE;
+-	media_device_init(&dev->mdev);
++	if (media_device_init(&dev->mdev) < 0)
++		goto error;
+ 
+ 	dev->vdev.mdev = &dev->mdev;
+ #endif
+diff --git a/include/media/media-device.h b/include/media/media-device.h
+index 572190860cbb..f09be5d47a7d 100644
+--- a/include/media/media-device.h
++++ b/include/media/media-device.h
+@@ -351,7 +351,7 @@ struct media_device {
+  * within the media device, create pad to pad links and then finally register
+  * the media device by calling media_device_register() as a final step.
+  */
+-void media_device_init(struct media_device *mdev);
++int __must_check media_device_init(struct media_device *mdev);
+ 
+ /**
+  * media_device_cleanup() - Cleanups a media device element
+-- 
+2.5.0
