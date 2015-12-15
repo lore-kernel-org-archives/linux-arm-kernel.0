@@ -1,204 +1,224 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 15 Dec 2015 00:43:51 -0500
-Subject: [PATCH V9 2/5] dma: add Qualcomm Technologies HIDMA management
- driver
-In-Reply-To: <20151214120339.GA21356@leverpostej>
-References: <1449850623-32214-1-git-send-email-okaya@codeaurora.org>
- <1449850623-32214-3-git-send-email-okaya@codeaurora.org>
- <20151211164137.GA23638@leverpostej> <566B1F64.9010500@codeaurora.org>
- <20151211193742.GD23638@leverpostej> <566B4ACC.3070005@codeaurora.org>
- <20151214120339.GA21356@leverpostej>
-Message-ID: <566FA897.4060407@codeaurora.org>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Tue, 15 Dec 2015 13:45:26 +0800
+Subject: [PATCH v6 3/5] memory: mediatek: Add SMI driver
+In-Reply-To: <1450147103.22854.23.camel@mhfsdcap03>
+References: <1449568153-15643-1-git-send-email-yong.wu@mediatek.com>
+ <1449568153-15643-4-git-send-email-yong.wu@mediatek.com>
+ <24171857.0SPpBlzoZl@linux-gy6r.site>
+ <1450147103.22854.23.camel@mhfsdcap03>
+Message-ID: <CAGS+omDTt646fH3p7kA+EHkR93xGX0APu1sOEjY7MCzQfpO8DA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Yong,
 
-On 12/14/2015 7:05 AM, Mark Rutland wrote:
->>>>>> +Required properties:
->>>>>> +- compatible: "qcom,hidma-mgmt-1.0";
->>>>>> +- reg: Address range for DMA device
->>>>>
->>>>> Does this cover just the management registers, or those for channels as
->>>>> well?
->>>>
->>>> just management.
->>>>
->>>>>
->>>>>> +- dma-channels: Number of channels supported by this DMA controller.
->>>>>
->>>>> Surely this is discoverable, or can be derived from the set of channels
->>>>> described in the DT?
->>>>
->>>> No, this is a HW configuration. Each hardware instance supports certain
->>>> number of channels based on the HW build. The number of active channels
->>>> on the running operating system does not necessarily represent the
->>>> maximum possible.
->>>
->>> I don't follow.
->>>
->>> If you aren't using some channels, why do you need to know about them?
->>>
+On Tue, Dec 15, 2015 at 10:38 AM, Yong Wu <yong.wu@mediatek.com> wrote:
+> On Mon, 2015-12-14 at 19:18 +0100, Matthias Brugger wrote:
+>> On Tuesday 08 Dec 2015 17:49:11 Yong Wu wrote:
+>> > This patch add SMI(Smart Multimedia Interface) driver. This driver
+>> > is responsible to enable/disable iommu and control the power domain
+>> > and clocks of each local arbiter.
+>> >
+>> > Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+>> > ---
+>> >   Currently SMI offer mtk_smi_larb_get/put to enable the power-domain
+>> > ,clocks and initialize the iommu configuration register for each a local
+>> > arbiter, The reason is:
+>> >   a) If a device would like to disable iommu, it also need call
+>> > mtk_smi_larb_get/put to enable its power and clocks.
+>> >   b) The iommu core don't support attach/detach a device within a
+>> > iommu-group. So we cann't use iommu_attach_device(iommu_detach_device)
+>> > instead
+>> > of mtk_smi_larb_get/put.
+>> >
+> [..]
+>> > +static int
+>> > +mtk_smi_enable(struct device *dev, struct clk *apb, struct clk *smi)
+>> > +{
+>> > +   int ret;
+>> > +
+>> > +   ret = pm_runtime_get_sync(dev);
+>> > +   if (ret < 0)
+>> > +           return ret;
+>> > +
+>> > +   ret = clk_prepare_enable(apb);
+>> > +   if (ret)
+>> > +           goto err_put_pm;
+>> > +
+>> > +   ret = clk_prepare_enable(smi);
+>> > +   if (ret)
+>> > +           goto err_disable_apb;
+>> > +
+>> > +   return 0;
+>> > +
+>> > +err_disable_apb:
+>> > +   clk_disable_unprepare(apb);
+>> > +err_put_pm:
+>> > +   pm_runtime_put_sync(dev);
+>> > +   return ret;
+>> > +}
+>> > +
+>> > +static void
+>> > +mtk_smi_disable(struct device *dev, struct clk *apb, struct clk *smi)
+>> > +{
+>> > +   clk_disable_unprepare(smi);
+>> > +   clk_disable_unprepare(apb);
+>> > +   pm_runtime_put_sync(dev);
+>> > +}
+>> > +
+>> > +static int mtk_smi_common_enable(struct mtk_smi_common *common)
+>> > +{
+>> > +   return mtk_smi_enable(common->dev, common->clk_apb, common->clk_smi);
+>> > +}
+>> > +
+>> > +static void mtk_smi_common_disable(struct mtk_smi_common *common)
+>> > +{
+>> > +   mtk_smi_disable(common->dev, common->clk_apb, common->clk_smi);
+>> > +}
+>> > +
+>> > +static int mtk_smi_larb_enable(struct mtk_smi_larb *larb)
+>> > +{
+>> > +   return mtk_smi_enable(larb->dev, larb->clk_apb, larb->clk_smi);
+>> > +}
+>> > +
+>> > +static void mtk_smi_larb_disable(struct mtk_smi_larb *larb)
+>> > +{
+>> > +   mtk_smi_disable(larb->dev, larb->clk_apb, larb->clk_smi);
+>> > +}
+>> > +
 >>
->> I mean the hypervisor OS may not be using the channels. It could be the
->> guest machines that are using it. I need the number of the channels not
->> the memory addresses where each channel is.
-> 
-> I still don't follow. Knowing the number of channels alone is clearly
-> insufficient.
+>> This is somehow over-engineered. Just use mtk_smi_enable and mtk_smi_disable
+>> instead of adding an extra indirection.
 >
-> The hypervisor is in charge of handing these out to guests. So it needs
-> to know the set of of channels (i.e. the address of each channel, and
-> which index the channel has in the control interface). Otherwise it
-> cannot possibly allocate them to guests, and cannot possibly control
-> those channels at runtime.
+> I added this only for readable...then the code in mtk_smi_larb_get below
+> may looks simple and readable.
+>
+> If I use mtk_smi_enable/disable directly, the code will be like our
+> v5[1], is it OK?
+> Maybe I don't need these help function here, and only add more comment
+> based on v5.
+>
+> [1]
+> http://lists.linuxfoundation.org/pipermail/iommu/2015-October/014590.html
 
-For clarification, let me reiterate.
+bike-shedding...
 
-Hypervisor operating system certainly knows which channels and
-management interfaces there are in the system. However, the information
-feeds into the OS from two different drivers.
+I like the fact that Yong is trying to make his helpers more type-safe.
+But, perhaps we can rename "struct mtk_smi_common" as "struct
+mtk_smi", and then make "struct mtk_smi_larb" contain a "struct
+mtk_smi":
 
-The HW ownership has been partitioned among two drivers as management
-driver and channel driver. Both of them serve the hypervisor but the
-management driver doesn't need to know about the channel addresses where
-the transfer descriptors are set up. Similarly, the channel driver
-doesn't need to know anything about the management interface where the
-priority and weight assignment is done.
+struct mtk_smi {
+  struct device *dev;
+  struct clk *clk_apb, *clk_smi;
+}
 
-> 
-> Given the hypervisor is in chage of allocating channels to guests, it
-> knows which channels are in use, and can decide whether or not to use
-> channels for its own purposes.
+struct mtk_smi_larb {
+  struct mtk_smi;
+  ...
+}
 
-Agreed
 
-> 
->>> The driver seems to assume it can access registers for all (linearly
->>> indexed) channels up to the value it read from dt for dma-channels. That
->>> doesn't seem right if the driver is not dealing with all of those
->>> channels.
->>
->> I assume you are talking about this. Feel free to be specific if not
->> this one.
->>
->> 	for (i = 0; i < mgmtdev->dma_channels; i++) {
->> 		u32 weight = mgmtdev->weight[i];
->> 		u32 priority = mgmtdev->priority[i];
->>
->> 		val = readl(mgmtdev->virtaddr + HIDMA_QOS_N_OFFSET + (4 * i));
->> 		val &= ~(1 << HIDMA_PRIORITY_BIT_POS);
->> 		val |= (priority & 0x1) << HIDMA_PRIORITY_BIT_POS;
->> 		val &= ~(HIDMA_WEIGHT_MASK << HIDMA_WRR_BIT_POS);
->> 		val |= (weight & HIDMA_WEIGHT_MASK) << HIDMA_WRR_BIT_POS;
->> 		writel(val, mgmtdev->virtaddr + HIDMA_QOS_N_OFFSET + (4 * i));
->> 	}
->>
->> The management driver is configuring the priority and weight registers
->> inside the management address space. It is not accessing the channel
->> address space where data transfer descriptors are set up. There is one
->> register for priority & weight of the each channel inside the management
->> address space.
-> 
-> My point was that this implies that the driver has no idea as to the
-> relationship between these configuration registers and the actual
-> channel address spaces. It has no idea which channel address spaces are
-> being configured here. That does not seem right.
+Then, have:
 
-My intention was to use the ACPI _UID to associate the channel index.
-The _UID would tell me the index of the channel. I was encoding UID as
-follows in the ACPI table.
-
-<deviceid><channelid>
-
-this would tell me which HIDMA this channel belongs to as well as which
-channel it is.
-
-Since this solution is very much ACPI specific and doesn't scale to
-device-tree, I'm thinking of adding a sysfs "index" file into each
-channel so that I don't need to search through the firmware_node in ACPI
-and of_node directory in device-tree mode.
-
-I'm also thinking of creating symbolic links from the channel object
-into the management object.
-
->>>>> hidma {
->>>>> 	compatible - "qcom,hidma-1.0";
->>>>>
->>>>> 	/* OPTIONAL management interface registers */
->>>>> 	reg = < ... ... >;
->>>>>
->>>>> 	...
->>>>>
->>>>> 	channel0 {
->>>>> 		compatible = "qcom,
->>>>> 		reg = < ... ... >;
->>>>>
->>>>> 		...
->>>>> 	};
->>>>>
->>>>> 	...
->>>>> };
->>
->> This seems to have worked without requiring any work from me.
->>
-
-Here is something I don't understand why and I could get some help from
-DT experts.
-
-When I have ACPI as follows
-
-device(mgmt)
+int mtk_smi_enable(struct mtk_smi *smi)
 {
-	device(channel0)
-	{
-	}
+  clk_enable(smi->clk_apb);
+  ...
 }
 
-The channel0 driver gets automatically probed by the OS.
-
-When I have device tree based structure as follows, hidma_00 doesn't get
-probed.
-
-hidmam_00: hidma-mgmt at 0x58000000 {
-		compatible = "qcom,hidma_mgmt-1.0";
-		hidma_00: hidma at 0x58010000 {
-			compatible = "qcom,hidma-1.0";
-
-		}
+int mtk_smi_disable(struct mtk_smi *smi)
+{
 }
 
-If I put them seperately, it works
+int mtk_smi_larb_get(struct device *larbdev)
+{
+  struct mtk_smi_larb *larb = dev_get_drvdata(larbdev);
+  struct mtk_smi *common = dev_get_drvdata(larb->smi_common_dev);
 
-hidma_00: hidma at 0x58010000 {
-	compatible = "qcom,hidma-1.0";
+  mtk_smi_enable(common);
+  mtk_smi_enable(&larb->smi);
+  ...
 }
 
-hidmam_00: hidma-mgmt at 0x58000000 {
-	compatible = "qcom,hidma_mgmt-1.0";
-}
+>>
+>> > +int mtk_smi_larb_get(struct device *larbdev)
+>> > +{
+>> > +   struct mtk_smi_larb *larb = dev_get_drvdata(larbdev);
+>> > +   struct mtk_smi_common *common = dev_get_drvdata(larb->smi_common_dev);
+>> > +   int ret;
+>> > +
+>> > +   ret = mtk_smi_common_enable(common);
+>> > +   if (ret)
+>> > +           return ret;
+>> > +
+>> > +   ret = mtk_smi_larb_enable(larb);
+>> > +   if (ret)
+>> > +           goto err_put_smi;
+>> > +
+>> > +   /* Configure the iommu info */
+>> > +   writel_relaxed(larb->mmu, larb->base + SMI_LARB_MMU_EN);
 
-Wondering If there is any mechanism in DT, I could have the same probing
-behavior as ACPI? I hate calling the of_find_matching_node functions and
-locate the child object. Then, create a platform device. This seems a
-lot of hand-crafting to me. I don't have any OF/ACPI specific code in my
-driver. I want to avoid it if there is a way.
+I think this should probably be writel() not writel_relaxed, since you
+really do want the barrier to ensure all other register accesses have
+completed before enabling the MMU.
+
+>> > +
+>> > +   return 0;
+>> > +
+>> > +err_put_smi:
+>> > +   mtk_smi_common_disable(common);
+>> > +   return ret;
+>> > +}
+>> > +
+>> > +void mtk_smi_larb_put(struct device *larbdev)
+>> > +{
+>> > +   struct mtk_smi_larb *larb = dev_get_drvdata(larbdev);
+>> > +   struct mtk_smi_common *common = dev_get_drvdata(larb->smi_common_dev);
+>> > +
+>> > +   writel_relaxed(0, larb->base + SMI_LARB_MMU_EN);
+>> > +   mtk_smi_larb_disable(larb);
+>> > +   mtk_smi_common_disable(common);
+>> > +}
+>> > +
+>>
+>> Looks strange that you just disable all MMUs while you only enable some of
+>> them at runtime. Unfortunately the datasheet I have lacks the SMI part, so I
+>> can just guess how the HW is working.
+>> From the DTS it looks like as if a larb can be used by two different
+>> components (e.g. larb0 from ovl0 and rdma0). Wouldn't that produce a conflict?
+>
+> Thanks. It's really a problem.
+>
+> There are OVL0 and MDP in larb0, Both will call mtk_smi_larb_get/put, we
+> cann't disable all the MMUs in whole the larb0 here.  This register
+> should be reset to zero while the larb power domain turning off(rely on
+> the power-domain ref count).
+> I will delete this(keep this in our V5.)
+
+Hmm, mtk_smi_config_port(.., false) clears the bit in larb->mmu, but
+does not actually "disable" an enabled mmu.
+The MMU will be disabled only on the next mtk_smi_larb_get() (for a
+different port on the same larb).
+I guess this is ok.  The only weird thing is this situation, where an
+MMU can be left enabled when its user is done with it:
+
+ /* configure port 0 as 'enabled' */
+ mtk_smi_config_port(0, true);
+ /* configure port 1 as 'enabled' */
+ mtk_smi_config_port(1, true);
+
+/* user of port 0 wants to do work */
+mtk_smi_larb_get() /* turns on all clks, power & enables both MMUs */
+
+/* user of port 1 wants to do work */
+mtk_smi_larb_get()
+
+/* user of port 1 done doing work */
+mtk_smi_larb_put()
+
+/* MMU 1 is still enabled */
 
 
->> I need to associate sysfs next.
-> 
-> Ok. I look forward to seeing those patches.
-> 
-
-OK. I'll post it as soon as I figure out DT/ACPI behavior differences.
-
-> Thanks,
-> Mark.
-> 
-
-
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a
-Linux Foundation Collaborative Project
+Thanks!
+-Dan
