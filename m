@@ -1,43 +1,70 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 Dec 2015 16:45:04 +0100
-Subject: [PATCH] soc: mediatek: SCPSYS: use module_platform_driver
-In-Reply-To: <20151215154203.GP11966@pengutronix.de>
-References: <1450188966-2921-1-git-send-email-s.hauer@pengutronix.de>
- <3837885.qE6MXzvvpu@wuerfel> <20151215154203.GP11966@pengutronix.de>
-Message-ID: <3919968.fveBmeY89b@wuerfel>
+From: juri.lelli@arm.com (Juri Lelli)
+Date: Tue, 15 Dec 2015 15:46:51 +0000
+Subject: [RFC PATCH 2/8] Documentation: arm: define DT cpu capacity
+ bindings
+In-Reply-To: <20151215153218.GA7228@leverpostej>
+References: <20151210153004.GA26758@sirena.org.uk>
+ <20151210175820.GE14571@e106622-lin>
+ <20151211174940.GQ5727@sirena.org.uk>
+ <20151214123616.GC3308@e106622-lin>
+ <20151214165928.GV5727@sirena.org.uk>
+ <20151215122238.GG16007@e106622-lin>
+ <20151215133951.GY5727@sirena.org.uk>
+ <20151215140135.GI31299@leverpostej>
+ <20151215150813.GZ5727@sirena.org.uk>
+ <20151215153218.GA7228@leverpostej>
+Message-ID: <20151215154651.GK16007@e106622-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 December 2015 16:42:03 Sascha Hauer wrote:
-> On Tue, Dec 15, 2015 at 03:30:01PM +0100, Arnd Bergmann wrote:
-> > On Tuesday 15 December 2015 15:16:06 Sascha Hauer wrote:
-> > > @@ -542,6 +542,7 @@ static const struct of_device_id of_scpsys_match_tbl[] = {
-> > >  };
-> > >  
-> > >  static struct platform_driver scpsys_drv = {
-> > > +       .probe = scpsys_probe,
-> > >         .driver = {
-> > >                 .name = "mtk-scpsys",
-> > >                 .owner = THIS_MODULE,
-> > > @@ -549,4 +550,4 @@ static struct platform_driver scpsys_drv = {
-> > >         },
-> > >  };
-> > >  
-> > > -module_platform_driver_probe(scpsys_drv, scpsys_probe);
-> > > +module_platform_driver(scpsys_drv);
-> > > 
+On 15/12/15 15:32, Mark Rutland wrote:
+> On Tue, Dec 15, 2015 at 03:08:13PM +0000, Mark Brown wrote:
+> > On Tue, Dec 15, 2015 at 02:01:36PM +0000, Mark Rutland wrote:
 > > 
-> > Good idea, but I wonder why there is no remove function in the
-> > driver. Do we also need to make the module non-removable and
-> > set .suppress_bind_attrs, or is all of the probe function
-> > reversible through devm_* helpers?
+> > > I really don't want to see a table of magic numbers in the kernel.
+> > 
+> > Right, there's pitfalls there too although not being part of an ABI
+> > does make them more manageable.  
 > 
-> pm domains currently can't be unregistered, removal of this driver is
-> not supported. The driver can't be compiled as a module.
+> I think that people are very likely to treat them exactly like an ABI,
+> w.r.t. any regressions in performance that result from their addition,
+> modification, or removal. That becomes really horrible when new CPUs
+> appear.
+> 
 
-Ok, then you need the suppress_bind_attrs flag to ensure that users
-cannot unbind and rebind the device through sysfs. The module_exit()
-function will be dropped implicitly for built-in drivers, so the
-module_platform_driver() is ok.
+Yeah, and I guess the path towards out of three patches changing this
+values for a specifica platform (without exposing the same changes
+upstream) is not too far away.
 
-	Arnd
+> > One thing it's probably helpful to establish here is how much the
+> > specific numbers are going to matter in the grand scheme of things.  If
+> > the specific numbers *are* super important then nobody is going to want
+> > to touch them as they'll be prone to getting tweaked.  If instead the
+> > numbers just need to be ballpark accurate so the scheduler starts off in
+> > roughly the right place and the specific numbers don't matter it's a lot
+> > easier and having a table in the kernel until we think of something
+> > better (if that ever happens) gets a lot easier.
+> 
+> I agree that we first need to figure out the importance of these
+> numbers. I disagree that our first step should be to add a table.
+> 
+
+My take is that ballpark is fine, but it's a per platform/configuration
+ballpark that we need. Not a per core-type one.
+
+> > My expectation is that we just need good enough, not perfect, and that
+> > seems to match what Juri is saying about the expectation that most of
+> > the fine tuning is done via other knobs.
+> 
+> My expectation is that if a ballpark figure is good enough, it should be
+> possible to implement something trivial like bogomips / loop_per_jiffy
+> calculation.
+> 
+
+I didn't really followed that, so I might be wrong here, but isn't
+already happened a discussion about how we want/like to stop exposing
+bogomips info or rely on it for anything but in kernel delay loops?
+
+Thanks,
+
+- Juri
