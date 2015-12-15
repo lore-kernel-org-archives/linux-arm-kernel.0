@@ -1,48 +1,100 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Tue, 15 Dec 2015 11:28:56 -0500
-Subject: memcpy alignment
-In-Reply-To: <20151215160911.GH25034@bivouac.eciton.net>
-References: <566F92D6.8060103@redhat.com>
- <20151215093406.GC19244@e104818-lin.cambridge.arm.com>
- <5670309D.1040309@redhat.com> <20151215153202.GC8644@n2100.arm.linux.org.uk>
- <56703507.2020004@redhat.com> <20151215160911.GH25034@bivouac.eciton.net>
-Message-ID: <56703FC8.5050506@redhat.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 15 Dec 2015 17:30:09 +0100
+Subject: [PATCH v2] ARM: dts: imx6: add Vivante GPU nodes
+Message-ID: <1450197009-24601-1-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/15/2015 11:09 AM, Leif Lindholm wrote:
-> On Tue, Dec 15, 2015 at 10:43:03AM -0500, Jon Masters wrote:
->>> If you get an __iomem pointer, then you must respect that it
->>> essentially can not be non-dereferenced, and you must use one of the
->>> standard kernel accessors (read[bwl]/ioread*/write[bwl]/iowrite*/
->>> memcpy_fromio/memcpy_toio/memset_io) to access it.  That's the API
->>> contract you implicitly signed up to by using something like ioremap()
->>> or other mapping which gives you an iomem mapping.
->>
->> Thanks Russell. If it's definitely never allowed then the existing x86
->> code needs to be fixed to use an IO access function in that case. I get
->> that those accessors are there for this reason, but I wanted to make
->> sure that we don't ever expect to touch Device memory any other way (for
->> example, conflicting mappings between a VM and hypervisor). I am certain
->> there's other non-ACPI code that is going to have this happen :)
-> 
-> A lot of code that has never run on anything other than x86 will have
-> such issues.
-> 
-> Tracking the use of page_is_ram() around the kernel, looking at what
-> it does for different architectures, and looking at how its (not
-> formalised) semantics are interpreted can also be quite unsettling.
+This adds the device nodes for 2D, 3D and VG GPU cores.
 
-Yeah. That was the reason I didn't just change the existing initrd code
-in the first place (wanted to leave it as is). I *did not know* memcpy
-to/from Device memory was explicitly banned (and I get why, and I do
-know one is supposed to map Device memory as such, etc. etc.) for this
-reason. However it's actually very reasonable to demand correctness
-going in. If it were hacked/kludged to paper over the situation I
-describe it would stand even less chance of being fixed.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+ arch/arm/boot/dts/imx6dl.dtsi  |  5 +++++
+ arch/arm/boot/dts/imx6q.dtsi   | 15 +++++++++++++++
+ arch/arm/boot/dts/imx6qdl.dtsi | 21 +++++++++++++++++++++
+ 3 files changed, 41 insertions(+)
 
-I would /separately/ note that there's an inefficiency in that the
-existing code relies upon assumed equal alignment between src/dst so the
-hardware is probably doing a lot of silent unaligned writes.
-
-Jon.
+diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+index 4b0ec0703825..51c517a5cafd 100644
+--- a/arch/arm/boot/dts/imx6dl.dtsi
++++ b/arch/arm/boot/dts/imx6dl.dtsi
+@@ -104,6 +104,11 @@
+ 		compatible = "fsl,imx-display-subsystem";
+ 		ports = <&ipu1_di0>, <&ipu1_di1>;
+ 	};
++
++	gpu-subsystem {
++		compatible = "fsl,imx-gpu-subsystem";
++		cores = <&gpu_2d>, <&gpu_3d>;
++	};
+ };
+ 
+ &gpt {
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index 399103b8e2c9..77d618b2870c 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -153,6 +153,16 @@
+ 			status = "disabled";
+ 		};
+ 
++		gpu_vg: gpu at 02204000 {
++			compatible = "vivante,gc";
++			reg = <0x02204000 0x4000>;
++			interrupts = <0 11 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&clks IMX6QDL_CLK_OPENVG_AXI>,
++				 <&clks IMX6QDL_CLK_GPU2D_CORE>;
++			clock-names = "bus", "core";
++			power-domains = <&gpc 1>;
++		};
++
+ 		ipu2: ipu at 02800000 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -225,6 +235,11 @@
+ 		compatible = "fsl,imx-display-subsystem";
+ 		ports = <&ipu1_di0>, <&ipu1_di1>, <&ipu2_di0>, <&ipu2_di1>;
+ 	};
++
++	gpu-subsystem {
++		compatible = "fsl,imx-gpu-subsystem";
++		cores = <&gpu_2d>, <&gpu_3d>, <&gpu_vg>;
++	};
+ };
+ 
+ &hdmi {
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 2b6cc8bf3c5c..d44e97bbfd1e 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -147,6 +147,27 @@
+ 			};
+ 		};
+ 
++		gpu_3d: gpu at 00130000 {
++			compatible = "vivante,gc";
++			reg = <0x00130000 0x4000>;
++			interrupts = <0 9 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&clks IMX6QDL_CLK_GPU3D_AXI>,
++				 <&clks IMX6QDL_CLK_GPU3D_CORE>,
++				 <&clks IMX6QDL_CLK_GPU3D_SHADER>;
++			clock-names = "bus", "core", "shader";
++			power-domains = <&gpc 1>;
++		};
++
++		gpu_2d: gpu at 00134000 {
++			compatible = "vivante,gc";
++			reg = <0x00134000 0x4000>;
++			interrupts = <0 10 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&clks IMX6QDL_CLK_GPU2D_AXI>,
++				 <&clks IMX6QDL_CLK_GPU2D_CORE>;
++			clock-names = "bus", "core";
++			power-domains = <&gpc 1>;
++		};
++
+ 		timer at 00a00600 {
+ 			compatible = "arm,cortex-a9-twd-timer";
+ 			reg = <0x00a00600 0x20>;
+-- 
+2.6.2
