@@ -1,89 +1,91 @@
-From: pmladek@suse.com (Petr Mladek)
-Date: Tue, 15 Dec 2015 15:26:21 +0100
-Subject: [PATCH v3 4/4] printk/nmi: Increase the size of NMI buffer and
- make it configurable
-In-Reply-To: <20151211153054.48da5d4139b93dd4ed438f4c@linux-foundation.org>
-References: <1449667265-17525-1-git-send-email-pmladek@suse.com>
- <1449667265-17525-5-git-send-email-pmladek@suse.com>
- <CAMuHMdXVgr58YjoePGrRbMyMncQ27f85prL7G5SpeHeNxoYrXQ@mail.gmail.com>
- <20151211124159.GB3729@pathway.suse.cz>
- <20151211145725.b0e81bb4bb18fcd72ef5f557@linux-foundation.org>
- <20151211232113.GZ8644@n2100.arm.linux.org.uk>
- <20151211153054.48da5d4139b93dd4ed438f4c@linux-foundation.org>
-Message-ID: <20151215142621.GE3729@pathway.suse.cz>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 15 Dec 2015 14:26:40 +0000
+Subject: [PATCH v7 08/19] KVM: ARM64: Add access handler for event typer
+ register
+In-Reply-To: <1450169379-12336-9-git-send-email-zhaoshenglong@huawei.com>
+References: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
+ <1450169379-12336-9-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <56702320.1030802@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2015-12-11 15:30:54, Andrew Morton wrote:
-> On Fri, 11 Dec 2015 23:21:13 +0000 Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+On 15/12/15 08:49, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> > On Fri, Dec 11, 2015 at 02:57:25PM -0800, Andrew Morton wrote:
-> > > This is a bit messy.  NEED_PRINTK_NMI is an added-on hack for one
-> > > particular arm variant.  From the changelog:
-> > > 
-> > >    "One exception is arm where the deferred printing is used for
-> > >     printing backtraces even without NMI.  For this purpose, we define
-> > >     NEED_PRINTK_NMI Kconfig flag.  The alternative printk_func is
-> > >     explicitly set when IPI_CPU_BACKTRACE is handled."
-> > > 
-> > > 
-> > > - why does arm needs deferred printing for backtraces?
-> > > 
-> > > - why is this specific to CONFIG_CPU_V7M?
-
-
-
-> > > - can this Kconfig logic be cleaned up a bit?
-> > 
-> > I think this comes purely from this attempt to apply another round of
-> > cleanups to the nmi backtrace work I did.
-> > 
-> > As I explained when I did that work, the vast majority of ARM platforms
-> > are unable to trigger anything like a NMI - the FIQ is something that's
-> > generally a property of the secure monitor, and is not accessible to
-> > Linux.  However, there are platforms where it is accessible.
+> These kind of registers include PMEVTYPERn, PMCCFILTR and PMXEVTYPER
+> which is mapped to PMEVTYPERn or PMCCFILTR.
 > 
-> OK, thanks.  So "not needed at present, might be needed in the future,
-> useful for out-of-tree debug code"?
-
-It is possible that I got it a wrong way on arm. The NMI buffer is
-usable there on two locations.
-
-First, the temporary is currently used to handle IPI_CPU_BACKTRACE.
-It seems that it is not a real NMI. But it seems to be available
-(compiled) on all arm system. This is why I introduced NEED_PRINTK_NMI
-Kconfig flag to avoid confusion with a real NMI.
-
-Second, there is the FIQ "NMI" handler that is called from
-/arch/arm/kernel/entry-armv.S. It is compiled only if _not_
-defined $(CONFIG_CPU_V7M). It calls nmi_enter() and nmi_stop().
-It looks like a real NMI handler. This is why I defined HAVE_NMI
-if (!CPU_V7M).
-
-A solution would be to define HAVE_NMI on all Arm systems and get rid
-of NEED_PRINTK_NMI. If you think that it would cause less confusion...
-
-
-> > there's this effort to apply further cleanups - to me, the changelogs
-> > don't seem to make that much sense, unless we want to start using
-> > printk() extensively in NMI functions - using the generic nmi backtrace
-> > code surely gets us something that works across all architectures...
+> The access handler translates all aarch32 register offsets to aarch64
+> ones and uses vcpu_sys_reg() to access their values to avoid taking care
+> of big endian.
 > 
-> Yes, I was scratching my head over that.  The patchset takes an nmi-safe
-> all-cpu-backtrace and generalises that into an nmi-safe printk.  That
-> *sounds* like a good thing to do but yes, some additional justification
-> would be helpful.  What real-world value does this patchset really
-> bring to real-world users?
+> When writing to these registers, create a perf_event for the selected
+> event type.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  arch/arm64/kvm/sys_regs.c | 154 +++++++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 152 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index e043224..c52ff15 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -504,6 +504,68 @@ static bool access_pmceid(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>  	return true;
+>  }
+>  
+> +static inline bool pmu_counter_idx_valid(struct kvm_vcpu *vcpu, u64 idx)
+> +{
+> +	u64 pmcr, val;
+> +
+> +	pmcr = vcpu_sys_reg(vcpu, PMCR_EL0);
+> +	val = (pmcr >> ARMV8_PMCR_N_SHIFT) & ARMV8_PMCR_N_MASK;
+> +	if (idx >= val && idx != ARMV8_CYCLE_IDX)
+> +		return false;
+> +
+> +	return true;
+> +}
+> +
+> +static bool access_pmu_evtyper(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+> +			       const struct sys_reg_desc *r)
+> +{
+> +	u64 idx, reg;
+> +
+> +	if (r->CRn == 9) {
+> +		/* PMXEVTYPER_EL0 */
+> +		reg = 0;
+> +	} else {
+> +		if (!p->is_aarch32) {
+> +			/* PMEVTYPERn_EL0 or PMCCFILTR_EL0 */
+> +			reg = r->reg;
+> +		} else {
+> +			if (r->CRn == 14 && r->CRm == 15 && r->Op2 == 7) {
+> +				reg = PMCCFILTR_EL0;
+> +			} else {
+> +				reg = ((r->CRm & 3) << 3) & (r->Op2 & 7);
+> +				reg += PMEVTYPER0_EL0;
+> +			}
+> +		}
+> +	}
+> +
+> +	switch (reg) {
+> +	case PMEVTYPER0_EL0 ... PMEVTYPER30_EL0:
+> +		idx = reg - PMEVTYPER0_EL0;
+> +		break;
+> +	case PMCCFILTR_EL0:
+> +		idx = ARMV8_CYCLE_IDX;
+> +		break;
+> +	default:
+> +		/* PMXEVTYPER_EL0 */
+> +		idx = vcpu_sys_reg(vcpu, PMSELR_EL0) & ARMV8_COUNTER_MASK;
+> +		if (!pmu_counter_idx_valid(vcpu, idx))
+> +			return true;
 
-The patchset brings two big advantages. First, it makes the NMI
-backtraces safe on all architectures for free. Second, it makes
-all NMI messages almost[*] safe on all architectures.
+Shouldn't you check the validity of the index in the first case as well?
 
-Note that there already are several messages printed in NMI context.
-See the mail from Jiri Kosina. They are not easy to avoid.
+Thanks,
 
-[*] The temporary buffer is limited. We still should keep
-the number of messages in NMI context at minimum.
-
-Best Regards,
-Petr
+	M.
+-- 
+Jazz is not dead. It just smells funny...
