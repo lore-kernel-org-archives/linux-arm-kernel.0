@@ -1,53 +1,49 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 15 Dec 2015 17:56:05 +0100
-Subject: [PATCH 17/19] ARM: dts: armada: replace isil,
- irq2-can-wakeup-machine with wakeup-source property
-In-Reply-To: <5670422D.7020404@arm.com> (Sudeep Holla's message of "Tue, 15
- Dec 2015 16:39:09 +0000")
-References: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
- <1445422216-29375-18-git-send-email-sudeep.holla@arm.com>
- <5670422D.7020404@arm.com>
-Message-ID: <8760zzvefu.fsf@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 Dec 2015 18:02:19 +0100
+Subject: [PATCH v5 2/2] arm: pxa27x: support for ICP DAS LP-8x4x w/ DT
+In-Reply-To: <1450197727.21989.9.camel@gmail.com>
+References: <1449700088-28076-3-git-send-email-ynvich@gmail.com>
+ <7496839.vMjVcqPe8Q@wuerfel> <1450197727.21989.9.camel@gmail.com>
+Message-ID: <1843454.zCnLJtF7B6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudeep,
- 
- On mar., d?c. 15 2015, Sudeep Holla <sudeep.holla@arm.com> wrote:
+On Tuesday 15 December 2015 19:42:07 Sergei Ianovich wrote:
+> On Tue, 2015-12-15 at 17:32 +0100, Arnd Bergmann wrote:
+> > On Tuesday 15 December 2015 19:27:50 Sergei Ianovich wrote:
+> > >  .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+> > >  arch/arm/boot/dts/Makefile                         |   3 +
+> > >  arch/arm/boot/dts/pxa27x-lp8x4x-i105.dts           |  50 ++++
+> > >  arch/arm/boot/dts/pxa27x-lp8x4x.dts                | 259
+> > > +++++++++++++++++++++
+> > >  arch/arm/configs/lp8x4x_defconfig                  | 176
+> > > ++++++++++++++
+> > > 
+> > 
+> > I had not noticed earlier that you are adding a new defconfig file.
+> > PXA is
+> > already the platform with the most defconfig files, and I'd rather
+> > like
+> > to see that reduced than increased.
+> > 
+> > Is there a chance you could merge this one with some of the existing
+> > files
+> > into one configuration that handles them all?
+> 
+> There are several board-specific devices on LP8x4x: custom FPGA, custom
+> UART, custom IRQ on FPGA, custom parallel bus for industrial IO. The
+> defconfig file could alert potential users to this fact. If this is not
+> a sufficient reason to have a defconfig file, it can be dropped.
+> 
+> I use the full .config anyway 
 
-> On 21/10/15 11:10, Sudeep Holla wrote:
->> Though the driver will continue to check for and support the legacy
->> "isil,irq2-can-wakeup-machine" boolean property to wakeup source,
->> "wakeup-source" is the new standard binding.
->>
->> This patch replaces the legacy "isil,irq2-can-wakeup-machine" with the
->> unified "wakeup-source" property in order to avoid any futher copy-paste
->> duplication.
->>
->> Cc: Jason Cooper <jason@lakedaemon.net>
->> Cc: Andrew Lunn <andrew@lunn.ch>
->> Cc: Gregory Clement <gregory.clement@free-electrons.com>
->> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->>
->
-> Ping, do you prefer taking via your tree or should I send to armsoc
-> directly ?
+I would like those drivers to be enabled in some defconfig, so we get
+compile-time coverage, but we generally stopped having one-config-per-board
+files.
 
-Sorry for the delay it was in my inbox since too many time. I didn't get
-the time to check it. This looks ok for me, so I've just applied it on
-mvebu/dt,
+Maybe we can have a pxa_defconfig file that enables lots of boards
+and then we remove the individual configs? We don't have to remove
+them all at once, but it would make me very happy if we could at
+least kill off some of the ones that are not used regularly.
 
-Thanks,
-
-Gregory
-
->
-> -- 
-> Regards,
-> Sudeep
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+	Arnd
