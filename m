@@ -1,175 +1,123 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 15 Dec 2015 12:37:34 +0000
-Subject: [PATCH v6 4/5] iommu/mediatek: Add mt8173 IOMMU driver
-In-Reply-To: <1450150132.22854.57.camel@mhfsdcap03>
-References: <1449568153-15643-1-git-send-email-yong.wu@mediatek.com>
- <1449568153-15643-5-git-send-email-yong.wu@mediatek.com>
- <20151214141656.GG18805@8bytes.org> <1450150132.22854.57.camel@mhfsdcap03>
-Message-ID: <5670098E.40601@arm.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 15 Dec 2015 12:40:37 +0000
+Subject: [PATCH v1 04/10] serial: mps2-uart: add MPS2 UART driver
+In-Reply-To: <CAHp75Vd98TEQ7TiD==t=RgYOqSinWgnyRjg7V=oPXmEx0nedLQ@mail.gmail.com>
+References: <1449048790-25859-1-git-send-email-vladimir.murzin@arm.com>	<1449048790-25859-5-git-send-email-vladimir.murzin@arm.com>
+ <CAHp75Vd98TEQ7TiD==t=RgYOqSinWgnyRjg7V=oPXmEx0nedLQ@mail.gmail.com>
+Message-ID: <56700A45.3070109@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/12/15 03:28, Yong Wu wrote:
-> On Mon, 2015-12-14 at 15:16 +0100, Joerg Roedel wrote:
->> On Tue, Dec 08, 2015 at 05:49:12PM +0800, Yong Wu wrote:
->>> +static int mtk_iommu_attach_device(struct iommu_domain *domain,
->>> +				   struct device *dev)
->>> +{
->>> +	struct mtk_iommu_domain *dom = to_mtk_domain(domain);
->>> +	struct mtk_iommu_client_priv *priv = dev->archdata.iommu;
->>> +	struct mtk_iommu_data *data;
->>> +	int ret;
->>> +
->>> +	if (!priv)
->>> +		return -ENODEV;
->>> +
->>> +	data = dev_get_drvdata(priv->m4udev);
->>> +	if (!data) {
->>> +		/*
->>> +		 * The DMA core will run earlier than this probe, and it will
->>> +		 * create a default iommu domain for each a iommu device.
->>> +		 * But here there is only one domain called the m4u domain
->>> +		 * which all the multimedia HW share.
->>> +		 * The default domain isn't needed here.
->>> +		 */
->>
->> The iommu core creates one domain per iommu-group. In your case this
->> means one default domain per iommu in the system.
->
-> Yes. The iommu core will create one domain per iommu-group.
-> see the next "if" here.
->
-> But the domain here is created by the current DMA64. It's from this
-> function do_iommu_attach which will be called too early and will help
-> create a default domain for each a iommu device.(my codebase is
-> v4.4-rc1).
+On 12/12/15 23:39, Andy Shevchenko wrote:
+> On Wed, Dec 2, 2015 at 11:33 AM, Vladimir Murzin
+> <vladimir.murzin@arm.com> wrote:
+>> This driver adds support to the UART controller found on ARM MPS2
+>> platform.
+> 
+> Just few comments (have neither time not big desire to do full review).
+> 
 
-I still don't really understand the problem here. The M4U device is 
-created early in mtk_iommu_init_fn, so it should be probed and ready to 
-go long before anything else. Indeed, for your mtk_iommu_device_group() 
-callback to work then everything must already be happening in the right 
-order - add_device will only call iommu_group_get_for_dev() if of_xlate 
-has populated dev->archdata.iommu, and of_xlate will only do that if the 
-M4U was up and running before the client device started probing. 
-Furthermore, if mtk_iommu_device_group() *does* work, then the IOMMU 
-core will go ahead and allocate the default domain there and then, which 
-the arch code should find and use later.
+Still better than nothing ;) I'm mostly agree on points you had, so I've
+just left some I'm doubt about...
 
-The potential issue I *do* see, looking more closely, is that 
-iommu_group_get_for_dev() is setting group->domain but not calling the 
-attach_dev callback, which looks wrong...
+>> +
+>> +static void mps2_uart_enable_ms(struct uart_port *port)
+>> +{
+>> +}
+>> +
+>> +static void mps2_uart_break_ctl(struct uart_port *port, int ctl)
+>> +{
+>> +}
+> 
+> Are those required to be present? If not, remove them until you have
+> alive code there.
 
->
-> //=====the next "if"===========
-> } else if (!data->m4u_dom) {
-> 	/*
-> 	 * While a device is added into a iommu group, the iommu core
-> 	 * will create a default domain for each a iommu group.
-> 	 * This default domain is reserved as the m4u domain and is
-> 	 * initiated here.
-> 	 */
-> 	data->m4u_dom = dom;
-> 	if (domain->type == IOMMU_DOMAIN_DMA) {
-> 		ret = iommu_dma_init_domain(domain, 0,
-> 					    DMA_BIT_MASK(32));
-> 		if (ret)
-> 			goto err_uninit_dom;
-> 	}
->
-> 	ret = mtk_iommu_domain_finalise(data);
-> 	if (ret)
-> 		goto err_uninit_dom;
-> }
-> //======================
->
->>
->>> +		iommu_domain_free(domain);
->>
->> This function is not supposed to free the domain passed to it.
->
-> As above this domain is created in the do_iommu_attach which will help
-> create a default domain for each a iommu device.
-> We don't need this default domain!
->
-> If we don't free it here, there will be a memory leak.
->
->  From Robin's comment, He will improve the sequence of the
-> __iommu_setup_dma_ops in the future.
+A quick grep shows that core calls mps2_uart_break_ctl()
+unconditionally, but, yes, it checks for presence of
+mps2_uart_enable_ms() before jumping there, so it is safe to remove latter.
 
-That already happened. The final version of the arm64 code which was 
-merged makes sure that the IOMMU driver always sees the callbacks in the 
-desired of_xlate -> add_device -> attach_dev order. The whole point of 
-the comment below is that the driver itself *doesn't* have to care about 
-the awkward way in which that is currently achieved.
+>> +static irqreturn_t mps2_uart_oerrirq(int irq, void *data)
+>> +{
+>> +       irqreturn_t handled = IRQ_NONE;
+>> +       struct uart_port *port = data;
+>> +       u8 irqflag = mps2_uart_read8(port, UARTn_INT);
+>> +
+>> +       spin_lock(&port->lock);
+>> +
+>> +       if (irqflag & UARTn_INT_RX_OVERRUN) {
+>> +               struct tty_port *tport = &port->state->port;
+>> +
+>> +               mps2_uart_write8(port, UARTn_INT_RX_OVERRUN, UARTn_INT);
+>> +               tty_insert_flip_char(tport, 0, TTY_OVERRUN);
+>> +               port->icount.overrun++;
+>> +               handled = IRQ_HANDLED;
+>> +       }
+>> +
+>> +       /* XXX: this shouldn't happen? */
+> 
+> If shouldn't why it's there? Otherwise better to explain which
+> conditions may lead to this.
+> 
 
-> /*
->   * TODO: Right now __iommu_setup_dma_ops() gets called too early to do
->   * everything it needs to - the device is only partially created and the
->   * IOMMU driver hasn't seen it yet, so it can't have a group. Thus we
->   * need this delayed attachment dance. Once IOMMU probe ordering is
-> sorted
->   * to move the arch_setup_dma_ops() call later, all the notifier bits
-> below
->   * become unnecessary, and will go away.
->   */
->
-> /*
->   * Best case: The device is either part of a group which was
->   * already attached to a domain in a previous call, or it's
->   * been put in a default DMA domain by the IOMMU core.
->   */
+In practice I've never seen that happened and I think it never *should*
+happen since we check if there is room in TX buffer. However, I could be
+wrong here, so it is why that statement has question mark.
 
-That was before Joerg made the device_group changes which enabled proper 
-default domains for platform devices - with those, we should be now be 
-hitting the "best case" behaviour every time. In fact I think the "fake 
-default domain" workaround shouldn't be needed at all any more, so I 
-will add removing it to my giant list of things to do.
+>> +       if (irqflag & UARTn_INT_TX_OVERRUN) {
+>> +               mps2_uart_write8(port, UARTn_INT_TX_OVERRUN, UARTn_INT);
+>> +               handled = IRQ_HANDLED;
+>> +       }
+>> +
+>> +       spin_unlock(&port->lock);
+>> +
+>> +       return handled;
+>> +}
+>> +
+...
+>> +static void mps2_uart_release_port(struct uart_port *port)
+>> +{
+>> +}
+>> +
+>> +static int mps2_uart_request_port(struct uart_port *port)
+>> +{
+>> +       return 0;
+>> +}
+>> +
+> 
+> Same question about empty stubs.
 
->     But there is no this patch currently, so I add iommu_domain_free
-> here.
->
->     "free the domain" here looks really not good. Then I delete the
-> iommu_domain_free here(allow this memory leak right now), is it ok?
-> (It will also works after Robin's change in the future.)
->
->>
->>> +static int mtk_iommu_add_device(struct device *dev)
->>> +{
->>> +	struct iommu_group *group;
->>> +
->>> +	if (!dev->archdata.iommu) /* Not a iommu client device */
->>> +		return -ENODEV;
->>> +
->>> +	group = iommu_group_get_for_dev(dev);
->>> +	if (IS_ERR(group))
->>> +		return PTR_ERR(group);
->>> +
->>> +	iommu_group_put(group);
->>> +	return 0;
->>> +}
->>
->> [...]
->>
->>> +static struct iommu_group *mtk_iommu_device_group(struct device *dev)
->>> +{
->>> +	struct mtk_iommu_data *data;
->>> +	struct mtk_iommu_client_priv *priv;
->>> +
->>> +	priv = dev->archdata.iommu;
->>> +	if (!priv)
->>> +		return ERR_PTR(-ENODEV);
->>> +
->>> +	/* All the client devices are in the same m4u iommu-group */
->>> +	data = dev_get_drvdata(priv->m4udev);
->>> +	if (!data->m4u_group) {
->>> +		data->m4u_group = iommu_group_alloc();
->>> +		if (IS_ERR(data->m4u_group))
->>> +			dev_err(dev, "Failed to allocate M4U IOMMU group\n");
->>> +	}
->>> +	return data->m4u_group;
->>> +}
+Looks like they called unconditionally by the core.
 
-As long as this works as expected, then AFAICS you shouldn't have to 
-have *any* special-case behaviour or tracking of domains at all.
+>> +static int __init mps2_uart_init(void)
+>> +{
+>> +       int ret;
+>> +
+>> +       ret = uart_register_driver(&mps2_uart_driver);
+>> +       if (ret)
+>> +               return ret;
+>> +
+>> +       ret = platform_driver_register(&mps2_serial_driver);
+>> +       if (ret)
+>> +               uart_unregister_driver(&mps2_uart_driver);
+>> +
+>> +       pr_info("MPS2 UART driver initialized\n");
+>> +
+>> +       return ret;
+>> +}
+>> +module_init(mps2_uart_init);
+>> +
+>> +static void __exit mps2_uart_exit(void)
+>> +{
+>> +       platform_driver_unregister(&mps2_serial_driver);
+>> +       uart_unregister_driver(&mps2_uart_driver);
+>> +}
+>> +module_exit(mps2_uart_exit);
+> 
+> module_platform_driver();
+> And move uart_*register calls to probe/remove.
+> 
 
-Robin.
+With this move we'll get uart_*register for every device probed, no?
+
+Thanks
+Vladimir
