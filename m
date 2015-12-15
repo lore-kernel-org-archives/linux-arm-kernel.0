@@ -1,39 +1,35 @@
 From: ashoks@broadcom.com (Ashok Kumar)
-Date: Tue, 15 Dec 2015 04:56:16 -0800
-Subject: [PATCH v2 0/2] arm64: change PoC D-cache flush to PoU
-Message-ID: <1450184178-28257-1-git-send-email-ashoks@broadcom.com>
+Date: Tue, 15 Dec 2015 04:56:17 -0800
+Subject: [PATCH v2 1/2] arm64: Defer dcache flush in __cpu_copy_user_page
+In-Reply-To: <1450184178-28257-1-git-send-email-ashoks@broadcom.com>
+References: <1450184178-28257-1-git-send-email-ashoks@broadcom.com>
+Message-ID: <1450184178-28257-2-git-send-email-ashoks@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For keeping I and D coherent, dcache flush till PoU(Point of Unification)
-should be sufficient instead of doing till PoC(Point of coherence).
-In SoC with more levels of cache, there could be a performance hit in doing
-flush till PoC as __flush_dcache_area does both flush and invalidate.
-Introduced new API __clean_dcache_area_pou which does only clean till PoU.
+Defer dcache flushing to __sync_icache_dcache by calling
+flush_dcache_page which clears PG_dcache_clean flag.
 
-Also deferred dcache flush in __cpu_copy_user_page to __sync_icache_dcache.
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Ashok Kumar <ashoks@broadcom.com>
+---
+ arch/arm64/mm/copypage.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-changes since v1 [1]:
- Incorporated Mark Rutland's review comments of
-  * renaming __flush_dcache_area_pou to __clean_dcache_area_pou
-  * using inner shareable domain for dsb in __clean_dcache_area_pou
-  * having a common macro for __flush_dcache_area and
-    __clean_dcache_area_pou.
-
-Thanks,
-Ashok
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/393527.html
-
-Ashok Kumar (2):
-  arm64: Defer dcache flush in __cpu_copy_user_page
-  arm64: Use PoU cache instr for I/D coherency
-
- arch/arm64/include/asm/cacheflush.h |  1 +
- arch/arm64/mm/cache.S               | 47 ++++++++++++++++++++++++++++++-------
- arch/arm64/mm/copypage.c            |  3 ++-
- arch/arm64/mm/flush.c               | 14 +++++++----
- 4 files changed, 51 insertions(+), 14 deletions(-)
-
+diff --git a/arch/arm64/mm/copypage.c b/arch/arm64/mm/copypage.c
+index 13bbc3be..22e4cb4 100644
+--- a/arch/arm64/mm/copypage.c
++++ b/arch/arm64/mm/copypage.c
+@@ -24,8 +24,9 @@
+ 
+ void __cpu_copy_user_page(void *kto, const void *kfrom, unsigned long vaddr)
+ {
++	struct page *page = virt_to_page(kto);
+ 	copy_page(kto, kfrom);
+-	__flush_dcache_area(kto, PAGE_SIZE);
++	flush_dcache_page(page);
+ }
+ EXPORT_SYMBOL_GPL(__cpu_copy_user_page);
+ 
 -- 
 2.1.0
