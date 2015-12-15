@@ -1,95 +1,66 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 15 Dec 2015 14:02:40 +0000
-Subject: [PATCH v7 11/19] KVM: ARM64: Add access handler for PMINTENSET
- and PMINTENCLR register
-In-Reply-To: <1450169379-12336-12-git-send-email-zhaoshenglong@huawei.com>
-References: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
- <1450169379-12336-12-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <56701D80.9010302@arm.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 15 Dec 2015 16:05:32 +0200
+Subject: [PATCH 2/6] ARM: DTS: da850: Use the new DT bindings for the eDMA3
+In-Reply-To: <56701A47.9090105@ti.com>
+References: <1449237210-16381-1-git-send-email-peter.ujfalusi@ti.com>
+ <1449237210-16381-3-git-send-email-peter.ujfalusi@ti.com>
+ <566FDF93.7050005@ti.com> <566FFD1C.4080000@ti.com> <56701A47.9090105@ti.com>
+Message-ID: <56701E2C.7060308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/12/15 08:49, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
+On 12/15/2015 03:48 PM, Sekhar Nori wrote:
+>>> These correspond to PRU events. It is true that most likely they will
+>>> never be used for peripheral DMA and can be dedicated as memcpy
+>>> channels. However, since this is being encoded in DT, we need to be sure
+>>> that they will never be used for peripheral DMA on this board.
+>>>
+>>> So, I would prefer if you do not reserve any channels for memcpy until
+>>> there is a real need/usecase for them. I know the board file has these
+>>> reserved but board file could be updated as you liked. With DT we need
+>>> to maintain backward compatibility. So I would rather do it when there
+>>> is an actual need for it.
+>>
+>> If we do not reserve channels for memcpy then you will have no support for
+>> memcpy on these boards. Not sure if we use memcpy in any of our drivers in
+>> daVinci, so it might be just fine to not have DMA memcpy support at all.
 > 
-> Since the reset value of PMINTENSET and PMINTENCLR is UNKNOWN, use
-> reset_unknown for its reset handler. Add a handler to emulate writing
-> PMINTENSET or PMINTENCLR register.
+> Not that I know of. No driver uses DMA memcpy
 > 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  arch/arm64/kvm/sys_regs.c | 29 +++++++++++++++++++++++++----
->  1 file changed, 25 insertions(+), 4 deletions(-)
+>> But how about using edma1's reserved channels as memcpy (19-23, 30-31)? I
 > 
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index f216da7..594e53f 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -648,6 +648,27 @@ static bool access_pmcntenset(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
->  	return true;
->  }
->  
-> +static bool access_pmintenset(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
-> +			      const struct sys_reg_desc *r)
-> +{
-> +	u64 mask = kvm_pmu_valid_counter_mask(vcpu);
-> +
-> +	if (p->is_write) {
-> +		if (r->Op2 & 0x1) {
-> +			/* accessing PMINTENSET_EL1 */
-> +			vcpu_sys_reg(vcpu, r->reg) |= (p->regval & mask);
-> +		} else {
-> +			/* accessing PMINTENCLR_EL1 */
-> +			vcpu_sys_reg(vcpu, r->reg) &= mask;
-> +			vcpu_sys_reg(vcpu, r->reg) &= ~p->regval;
-
-This looks wrong. The first line doesn't have any effect (you shouldn't
-be able to set bits that are not in the mask the first place). I'd
-prefer something like:
-
-		vcpu_sys_reg(vcpu, r->reg) &= ~(p->regval & mask);
-
-which is symmetrical to the SET operator.
-
-> +		}
-> +	} else {
-> +		p->regval = vcpu_sys_reg(vcpu, r->reg) & mask;
-> +	}
-> +
-> +	return true;
-> +}
-> +
->  /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
->  #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
->  	/* DBGBVRn_EL1 */						\
-> @@ -806,10 +827,10 @@ static const struct sys_reg_desc sys_reg_descs[] = {
->  
->  	/* PMINTENSET_EL1 */
->  	{ Op0(0b11), Op1(0b000), CRn(0b1001), CRm(0b1110), Op2(0b001),
-> -	  trap_raz_wi },
-> +	  access_pmintenset, reset_unknown, PMINTENSET_EL1 },
->  	/* PMINTENCLR_EL1 */
->  	{ Op0(0b11), Op1(0b000), CRn(0b1001), CRm(0b1110), Op2(0b010),
-> -	  trap_raz_wi },
-> +	  access_pmintenset, NULL, PMINTENSET_EL1 },
->  
->  	/* MAIR_EL1 */
->  	{ Op0(0b11), Op1(0b000), CRn(0b1010), CRm(0b0010), Op2(0b000),
-> @@ -1204,8 +1225,8 @@ static const struct sys_reg_desc cp15_regs[] = {
->  	{ Op1( 0), CRn( 9), CRm(13), Op2( 1), access_pmu_evtyper },
->  	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), access_pmu_evcntr },
->  	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), trap_raz_wi },
-> -	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), trap_raz_wi },
-> -	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), trap_raz_wi },
-> +	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), access_pmintenset },
-> +	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), access_pmintenset },
->  
->  	{ Op1( 0), CRn(10), CRm( 2), Op2( 0), access_vm_reg, NULL, c10_PRRR },
->  	{ Op1( 0), CRn(10), CRm( 2), Op2( 1), access_vm_reg, NULL, c10_NMRR },
+> I think this is much more reasonable.
 > 
+>> don't know which channels the DSP would use on these boards, so it is never
+>> going to be safe from that point.
+> 
+> Yeah, and thats why I think its better to add it as and when there is a
+> real need for it. At least at that point we are sure of the usecase.
 
-Thanks,
+OK, I'll disable the memcpy for now.
 
-	M.
+>>> In future, if/when we gain QDMA support, the QDMA channels could be used
+>>> for memcopy.
+>>
+>> Well, in short there is no way to get the qDMA working in a different way
+>> either. qDMA channel is in essence using 'normal' eDMA channel. This means
+>> that we still need to reserve the eDMA channel to be used for memcpy, but
+>> instead of SW triggering it (as we do it right now), we would need to use the
+>> channel as qDMA and set things up accordingly. I don't really see the benefit
+>> for qDMA mode to be honest.
+> 
+> I guess the only advantage is that they will not clash with peripheral
+> mode usage. But even then, some sort of reservation is needed. So I
+> guess QDMA is no better than the EDMA reserved channels?
+
+It will clash with the peripheral mode use since it needs to take one of the
+eDMA channels. qDMA mode is basically differs from the mode we are using by
+how the channel is triggered. Currently we start the memcpy with SW trigger.
+In qDMA mode we can select a paRAM parameter which if it is updated will do
+the triggering. It is useful if you have mostly constant memcpy parameters and
+you only need to change one thing in there (reusing the paRAM slot), like you
+change the dst address. In this case you just update the dst and the qDMA will
+be triggered. I don't think we can take advantage of this feature via dmaengine.
+
 -- 
-Jazz is not dead. It just smells funny...
+P?ter
