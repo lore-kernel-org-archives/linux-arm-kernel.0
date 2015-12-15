@@ -1,47 +1,90 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 15 Dec 2015 10:18:15 +0000
-Subject: [PATCH] arm64: Add missing linux/bug.h include in asm/pgtable.h
-In-Reply-To: <20151214170725.GC27918@e104818-lin.cambridge.arm.com>
-References: <1450109244-20122-1-git-send-email-julien.grall@citrix.com>
- <20151214162242.GA27918@e104818-lin.cambridge.arm.com>
- <566EEDC8.1050501@citrix.com>
- <20151214163840.GB27918@e104818-lin.cambridge.arm.com>
- <566EF28B.7060909@arm.com>
- <20151214170725.GC27918@e104818-lin.cambridge.arm.com>
-Message-ID: <566FE8E7.4000401@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 15 Dec 2015 10:19:48 +0000
+Subject: ARM64/KVM: Bad page state in process iperf
+In-Reply-To: <DM2PR03MB55707E80EDA77A6991FDA2190EE0@DM2PR03MB557.namprd03.prod.outlook.com>
+References: <DM2PR03MB557D3079ABFE7AF114A58A690EE0@DM2PR03MB557.namprd03.prod.outlook.com>
+ <566FDEAD.6000707@arm.com>
+ <DM2PR03MB55707E80EDA77A6991FDA2190EE0@DM2PR03MB557.namprd03.prod.outlook.com>
+Message-ID: <566FE944.3090506@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/12/15 17:07, Catalin Marinas wrote:
-> If they take the mmdebug.h patch, it's even better. Please let us know
-> how that goes.
-
-
-Andrew Morton's Robot wrote:
-> The patch titled
->      Subject: include/linux/mmdebug.h: should include linux/bug.h
-> has been added to the -mm tree.  Its filename is
->      include-linux-mmdebugh-should-include-linux-bugh.patch
+On 15/12/15 09:53, Bhushan Bharat wrote:
+> Hi Mark,
 > 
-> This patch should soon appear at
->     http://ozlabs.org/~akpm/mmots/broken-out/include-linux-mmdebugh-should-include-linux-bugh.patch
-> and later at
->     http://ozlabs.org/~akpm/mmotm/broken-out/include-linux-mmdebugh-should-include-linux-bugh.patch
+>> -----Original Message-----
+>> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
+>> Sent: Tuesday, December 15, 2015 3:05 PM
+>> To: Bhushan Bharat-R65777 <Bharat.Bhushan@freescale.com>;
+>> kvmarm at lists.cs.columbia.edu; kvm at vger.kernel.org; linux-arm-
+>> kernel at lists.infradead.org; linux-kernel at vger.kernel.org
+>> Subject: Re: ARM64/KVM: Bad page state in process iperf
+>>
+>> On 15/12/15 03:46, Bhushan Bharat wrote:
+>>>
+>>> Hi All,
+>>>
+>>> I am running "iperf" in KVM guest on ARM64 machine and observing below
+>> crash.
+>>>
+>>> =============================
+>>> $iperf -c 3.3.3.3 -P 4 -t 0 -i 5 -w 90k
+>>> ------------------------------------------------------------
+>>> Client connecting to 3.3.3.3, TCP port 5001 TCP window size:  180
+>>> KByte (WARNING: requested 90.0 KByte)
+>>> ------------------------------------------------------------
+>>> [  3] local 3.3.3.1 port 51131 connected with 3.3.3.3 port 5001 [  6]
+>>> local 3.3.3.1 port 51134 connected with 3.3.3.3 port 5001 [  5] local
+>>> 3.3.3.1 port 51133 connected with 3.3.3.3 port 5001 [  4] local
+>>> 3.3.3.1 port 51132 connected with 3.3.3.3 port 5001
+>>> [   53.088567] random: nonblocking pool is initialized
+>>> [ ID] Interval       Transfer     Bandwidth
+>>> [  3]  0.0- 5.0 sec   638 MBytes  1.07 Gbits/sec
+>>> [  4] 35.0-40.0 sec  1.66 GBytes  2.85 Gbits/sec [  5] 40.0-45.0 sec
+>>> 1.11 GBytes  1.90 Gbits/sec [  4] 40.0-45.0 sec  1.16 GBytes  1.99
+>>> Gbits/sec
+>>> [   98.895207] BUG: Bad page state in process iperf  pfn:0a584
+>>> [   98.896164] page:ffff780000296100 count:-1 mapcount:0 mapping:
+>> (null) index:0x0
+>>> [   98.897436] flags: 0x0()
+>>> [   98.897885] page dumped because: nonzero _count
+>>> [   98.898640] Modules linked in:
+>>> [   98.899178] CPU: 0 PID: 1639 Comm: iperf Not tainted 4.1.8-00461-
+>> ge5431ad #141
+>>> [   98.900302] Hardware name: linux,dummy-virt (DT)
+>>> [   98.901014] Call trace:
+>>> [   98.901406] [<ffff800000096cac>] dump_backtrace+0x0/0x12c
+>>> [   98.902522] [<ffff800000096de8>] show_stack+0x10/0x1c
+>>> [   98.903441] [<ffff800000678dc8>] dump_stack+0x8c/0xdc
+>>> [   98.904202] [<ffff800000145480>] bad_page+0xc4/0x114
+>>> [   98.904945] [<ffff8000001487a4>] get_page_from_freelist+0x590/0x63c
+>>> [   98.905871] [<ffff80000014893c>] __alloc_pages_nodemask+0xec/0x794
+>>> [   98.906791] [<ffff80000059fc80>] skb_page_frag_refill+0x70/0xa8
+>>> [   98.907678] [<ffff80000059fcd8>] sk_page_frag_refill+0x20/0xd0
+>>> [   98.908550] [<ffff8000005edc04>] tcp_sendmsg+0x1f8/0x9a8
+>>> [   98.909368] [<ffff80000061419c>] inet_sendmsg+0x5c/0xd0
+>>> [   98.910178] [<ffff80000059bb44>] sock_sendmsg+0x14/0x58
+>>> [   98.911027] [<ffff80000059bbec>] sock_write_iter+0x64/0xbc
+>>> [   98.912119] [<ffff80000019b5b8>] __vfs_write+0xac/0x10c
+>>> [   98.913126] [<ffff80000019bcb8>] vfs_write+0x90/0x1a0
+>>> [   98.913963] [<ffff80000019c53c>] SyS_write+0x40/0xa0
+>>
+>> This looks quite bad, but I don't see anything here that links it to KVM (apart
+>> from being a guest). Do you have any indication that this is due to KVM
+>> misbehaving? 
 > 
-> Before you just go and hit "reply", please:
->    a) Consider who else should be cc'ed
->    b) Prefer to cc a suitable mailing list as well
->    c) Ideally: find the original patch on the mailing list and do a
->       reply-to-all to that, adding suitable additional cc's
+> I never observed this issue in host Linux but observed this issue always in guest Linux. This issue does not comes immediately after I run "iperf" but after some time.
 > 
-> *** Remember to use Documentation/SubmitChecklist when testing your code ***
+>> I'd appreciate a few more details.
 > 
-> The -mm tree is included into linux-next and is updated
-> there every 3-4 working days
+> We have a networking hardware and we are directly assigning the h/w to guest. When using the same networking hardware in host it always works as expected (tried 100s of times).
+> Also this issue is not observed when we have only one vCPU in guest but seen when we have SMP guest. 
 
-
-
+Can you reproduce the same issue without VFIO (using virtio, for
+example)? Is that platform VFIO? or PCI?
 
 Thanks,
 
-James
+	M.
+-- 
+Jazz is not dead. It just smells funny...
