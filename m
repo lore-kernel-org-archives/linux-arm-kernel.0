@@ -1,256 +1,44 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 15 Dec 2015 17:21:28 +0100
-Subject: [PATCH 0/2 v3] ARM: mvebu: kirkwood: add PogoPlug series 4 device
- tree
-In-Reply-To: <20151214150523.GK5767@lunn.ch> (Andrew Lunn's message of "Mon,
- 14 Dec 2015 16:05:23 +0100")
-References: <1450103575-10066-1-git-send-email-linus.walleij@linaro.org>
- <20151214150523.GK5767@lunn.ch>
-Message-ID: <87io3zvg1j.fsf@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 15 Dec 2015 16:23:18 +0000
+Subject: [RFC PATCH 2/8] Documentation: arm: define DT cpu capacity
+ bindings
+In-Reply-To: <20151215155737.GB7619@leverpostej>
+References: <20151211174940.GQ5727@sirena.org.uk>
+ <20151214123616.GC3308@e106622-lin>
+ <20151214165928.GV5727@sirena.org.uk>
+ <20151215122238.GG16007@e106622-lin>
+ <20151215133951.GY5727@sirena.org.uk>
+ <20151215140135.GI31299@leverpostej>
+ <20151215150813.GZ5727@sirena.org.uk>
+ <20151215153218.GA7228@leverpostej>
+ <20151215154651.GK16007@e106622-lin>
+ <20151215155737.GB7619@leverpostej>
+Message-ID: <20151215162317.GB24286@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
- 
- On lun., d?c. 14 2015, Andrew Lunn <andrew@lunn.ch> wrote:
+On Tue, Dec 15, 2015 at 03:57:37PM +0000, Mark Rutland wrote:
+> On Tue, Dec 15, 2015 at 03:46:51PM +0000, Juri Lelli wrote:
+> > On 15/12/15 15:32, Mark Rutland wrote:
+> > > On Tue, Dec 15, 2015 at 03:08:13PM +0000, Mark Brown wrote:
+> > > > My expectation is that we just need good enough, not perfect, and that
+> > > > seems to match what Juri is saying about the expectation that most of
+> > > > the fine tuning is done via other knobs.
+> > > 
+> > > My expectation is that if a ballpark figure is good enough, it should be
+> > > possible to implement something trivial like bogomips / loop_per_jiffy
+> > > calculation.
+> > 
+> > I didn't really followed that, so I might be wrong here, but isn't
+> > already happened a discussion about how we want/like to stop exposing
+> > bogomips info or rely on it for anything but in kernel delay loops?
+> 
+> I meant that we could have a benchmark of that level of complexity,
+> rather than those specific values.
 
-> On Mon, Dec 14, 2015 at 03:32:55PM +0100, Linus Walleij wrote:
->> This adds a device tree for the CloudEngines PogoPlug series 4
->> NAS device. Inspired by out-of-tree boardfiles from ArchLinux
->> by Kevin Mihelich.
->> 
->> Cc: Moonman <moonman.ca@gmail.com>
->> Cc: Kevin Mihelich <kevin@archlinuxarm.org>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->
-> Acked-by: Andrew Lunn <andrew@lunn.ch>
-
-Applied on mvebu/dt
-
-Thanks,
-
-Gregory
-
->
-> Thanks
-> 	Andrew
->
->> ---
->> ChangeLog v2->v3:
->> - Drop current-speed = <115200> from the uart
->> ChangeLog v1->v2:
->> - Use <dt-bindings/input/linux-event-codes.h>
->> - Specify default baud rate etc differently
->> - Rename LEDs "pogoplugv4*"
->> - Skip registering i2c0 as there is nothing on it
->> ---
->>  arch/arm/boot/dts/Makefile                       |   1 +
->>  arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts | 178 +++++++++++++++++++++++
->>  2 files changed, 179 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts
->> 
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index 30bbc3746130..2d9f475a9ceb 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -206,6 +206,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += \
->>  	kirkwood-openrd-client.dtb \
->>  	kirkwood-openrd-ultimate.dtb \
->>  	kirkwood-pogo_e02.dtb \
->> +	kirkwood-pogoplug-series-4.dtb \
->>  	kirkwood-rd88f6192.dtb \
->>  	kirkwood-rd88f6281-z0.dtb \
->>  	kirkwood-rd88f6281-a.dtb \
->> diff --git a/arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts b/arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts
->> new file mode 100644
->> index 000000000000..1db6f2c506cc
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts
->> @@ -0,0 +1,178 @@
->> +/*
->> + * kirkwood-pogoplug-series-4.dts - Device tree file for PogoPlug Series 4
->> + * inspired by the board files made by Kevin Mihelich for ArchLinux,
->> + * and their DTS file.
->> + *
->> + * Copyright (C) 2015 Linus Walleij <linus.walleij@linaro.org>
->> + */
->> +
->> +/dts-v1/;
->> +
->> +#include "kirkwood.dtsi"
->> +#include "kirkwood-6192.dtsi"
->> +#include <dt-bindings/input/linux-event-codes.h>
->> +
->> +/ {
->> +	model = "Cloud Engines PogoPlug Series 4";
->> +	compatible = "cloudengines,pogoplugv4", "marvell,kirkwood-88f6192",
->> +		     "marvell,kirkwood";
->> +
->> +	memory {
->> +		device_type = "memory";
->> +		reg = <0x00000000 0x08000000>;
->> +	};
->> +
->> +	chosen {
->> +		stdout-path = "uart0:115200n8";
->> +	};
->> +
->> +	gpio_keys {
->> +		compatible = "gpio-keys";
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +		pinctrl-0 = <&pmx_button_eject>;
->> +		pinctrl-names = "default";
->> +
->> +		button at 1 {
->> +			debounce_interval = <50>;
->> +			wakeup-source;
->> +			linux,code = <KEY_EJECTCD>;
->> +			label = "Eject Button";
->> +			gpios = <&gpio0 29 GPIO_ACTIVE_LOW>;
->> +		};
->> +	};
->> +
->> +	gpio-leds {
->> +		compatible = "gpio-leds";
->> +		pinctrl-0 = <&pmx_led_green &pmx_led_red>;
->> +		pinctrl-names = "default";
->> +
->> +		health {
->> +			label = "pogoplugv4:green:health";
->> +			gpios = <&gpio0 22 GPIO_ACTIVE_LOW>;
->> +			default-state = "on";
->> +		};
->> +		fault {
->> +			label = "pogoplugv4:red:fault";
->> +			gpios = <&gpio0 24 GPIO_ACTIVE_LOW>;
->> +		};
->> +	};
->> +};
->> +
->> +&pinctrl {
->> +	pmx_sata0: pmx-sata0 {
->> +		marvell,pins = "mpp21";
->> +		marvell,function = "sata0";
->> +	};
->> +
->> +	pmx_sata1: pmx-sata1 {
->> +		marvell,pins = "mpp20";
->> +		marvell,function = "sata1";
->> +	};
->> +
->> +	pmx_sdio_cd: pmx-sdio-cd {
->> +		marvell,pins = "mpp27";
->> +		marvell,function = "gpio";
->> +	};
->> +
->> +	pmx_sdio_wp: pmx-sdio-wp {
->> +		marvell,pins = "mpp28";
->> +		marvell,function = "gpio";
->> +	};
->> +
->> +	pmx_button_eject: pmx-button-eject {
->> +		marvell,pins = "mpp29";
->> +		marvell,function = "gpio";
->> +	};
->> +
->> +	pmx_led_green: pmx-led-green {
->> +		marvell,pins = "mpp22";
->> +		marvell,function = "gpio";
->> +	};
->> +
->> +	pmx_led_red: pmx-led-red {
->> +		marvell,pins = "mpp24";
->> +		marvell,function = "gpio";
->> +	};
->> +};
->> +
->> +&uart0 {
->> +	status = "okay";
->> +};
->> +
->> +/*
->> + * This PCIE controller has a USB 3.0 XHCI controller at 1,0
->> + */
->> +&pciec {
->> +	status = "okay";
->> +};
->> +
->> +&pcie0 {
->> +	status = "okay";
->> +};
->> +
->> +&sata {
->> +	status = "okay";
->> +	pinctrl-0 = <&pmx_sata0 &pmx_sata1>;
->> +	pinctrl-names = "default";
->> +	nr-ports = <1>;
->> +};
->> +
->> +&sdio {
->> +	status = "okay";
->> +	pinctrl-0 = <&pmx_sdio &pmx_sdio_cd &pmx_sdio_wp>;
->> +	pinctrl-names = "default";
->> +	cd-gpios = <&gpio0 27 GPIO_ACTIVE_LOW>;
->> +	wp-gpios = <&gpio0 28 GPIO_ACTIVE_HIGH>;
->> +};
->> +
->> +&nand {
->> +	/* 128 MiB of NAND flash */
->> +	chip-delay = <40>;
->> +	status = "okay";
->> +	partitions {
->> +		#address-cells = <1>;
->> +		#size-cells = <1>;
->> +
->> +		partition at 0 {
->> +			label = "u-boot";
->> +			reg = <0x00000000 0x200000>;
->> +			read-only;
->> +		};
->> +
->> +		partition at 200000 {
->> +			label = "uImage";
->> +			reg = <0x00200000 0x300000>;
->> +		};
->> +
->> +		partition at 500000 {
->> +			label = "uImage2";
->> +			reg = <0x00500000 0x300000>;
->> +		};
->> +
->> +		partition at 800000 {
->> +			label = "failsafe";
->> +			reg = <0x00800000 0x800000>;
->> +		};
->> +
->> +		partition at 1000000 {
->> +			label = "root";
->> +			reg = <0x01000000 0x7000000>;
->> +		};
->> +	};
->> +};
->> +
->> +&mdio {
->> +	status = "okay";
->> +
->> +	ethphy0: ethernet-phy at 0 {
->> +		reg = <0>;
->> +	};
->> +};
->> +
->> +&eth0 {
->> +	status = "okay";
->> +	ethernet0-port at 0 {
->> +		phy-handle = <&ethphy0>;
->> +	};
->> +};
->> -- 
->> 2.4.3
->> 
+Or we could simply let user space use whatever benchmarks or hard-coded
+values it wants and set the capacity via sysfs (during boot). By
+default, the kernel would assume all CPUs equal.
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Catalin
