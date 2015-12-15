@@ -1,106 +1,82 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Tue, 15 Dec 2015 21:39:22 +0800
-Subject: block layer bug with 4.4-rc3+
-In-Reply-To: <5670062B.7020103@arm.com>
-References: <566FF3ED.1000503@arm.com>
- <CACVXFVNLY97FAJ_tUF1UW4t=3cf6c5mfHXOpbfq1iSSiKciCNw@mail.gmail.com>
- <5670062B.7020103@arm.com>
-Message-ID: <CACVXFVN3w0Y_8k3TiKoGytbayXiB+mRhgDn-OueV2+e93i=4AQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 15 Dec 2015 13:40:10 +0000
+Subject: [PATCH] IOMMU: arm-smmu-v3: fix broken S2PS and AARCH64 in
+ Broadcom Vulcan
+In-Reply-To: <1450110687-32207-1-git-send-email-pmallapp@broadcom.com>
+References: <1450110687-32207-1-git-send-email-pmallapp@broadcom.com>
+Message-ID: <20151215134010.GH9452@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 15, 2015 at 8:23 PM, Andre Przywara <andre.przywara@arm.com> wrote:
-> Hi Ming,
->
-> thanks for the answer!
->
-> On 15/12/15 11:54, Ming Lei wrote:
->> On Tue, Dec 15, 2015 at 7:05 PM, Andre Przywara <andre.przywara@arm.com> wrote:
->>> Hi,
->>>
->>> I've been experiencing issues with at least 4.4-rc3 (including current
->>
->> I'd suggest you to test the latest linus tree first, and at least two
->> fix patches
->> have been merged for blk-merge issue.  If there is still the issue
->> with linus tree,
->> I am happy to take a look.
->
-> Mmh, as said ("including current HEAD") this happens still with the
-> latest HEAD from Linus (which is "9f9499ae8e64: Linux 4.4-rc5" for me).
-> Just tested yesterday.
-> Is there another branch/tree with block fixes I should test? Is it worth
-> to try any of the upcoming branches in linux-block.git (for-4.5/core,
-> maybe?)
+Hi Prem,
 
-Both the fixes have been in linus tree already, and reverting the commit
-basically makes merge not possible, so there must be issues somewhere.
+On Mon, Dec 14, 2015 at 10:01:27PM +0530, Prem Mallappa wrote:
+> Vulcan SMMUv3 looks for AARCH64 and S2PS inroder to validate the STE entry,
 
-And can you see the issue on other 32bit ARM platform?  I don't see the
-issue on x86 and arm64, and the commit itself is correct, IMO.
+'inroder' ?
 
->
-> Thanks,
-> Andre.
->
->> Thanks,
->>
->>> HEAD) on a Calxeda Midway (4*ARM Cortex-A15 (32-bit), 8GB RAM, SATA
->>> spinning disk or SSD).
->>> After some disk I/O load (kernel compile with -j6) I see the kernel
->>> screaming:
->>>
->>> [  103.736982] ata1.00: exception Emask 0x0 SAct 0x3ffff0 SErr 0x0
->>> action 0x6 frozen
->>> [  103.744476] ata1.00: failed command: WRITE FPDMA QUEUED
->>> [  103.749707] ata1.00: cmd 61/00:20:48:6b:41/08:00:0a:00:00/40 tag 4
->>> ncq 1048576 out
->>> [  103.749707]          res 40/00:00:00:00:00/00:00:00:00:00/00 Emask
->>> 0x4 (timeout)
->>> [  103.764659] ata1.00: status: { DRDY }
->>> [  103.768321] ata1.00: failed command: WRITE FPDMA QUEUED
->>> [  103.773547] ata1.00: cmd 61/98:28:48:73:41/42:00:0a:00:00/40 tag 5
->>> ncq 8728576 out
->>> [  103.773547]          res 40/00:00:00:00:00/00:00:00:00:00/00 Emask
->>> 0x4 (timeout)
->>> < repeated with increasing tag numbers>
->>>
->>> This repeats for a while, but then seems to recover later, though I
->>> haven't checked if there are more issues and rebooted instead to avoid
->>> filesystem damage.
->>>
->>> While I agree that this looks like a disk error on the first glance, I
->>> never saw this before 4.4-rc2, had the very same error on different
->>> nodes (with another spinning disk and even an SSD) and I can make it
->>> vanish by reverting the commit I identified after bisection:
->>>
->>> commit 578270bfbd2803dc7b0b03fbc2ac119efbc73195
->>> Author: Ming Lei <ming.lei@canonical.com>
->>> Date:   Tue Nov 24 10:35:29 2015 +0800
->>>
->>>     block: fix segment split
->>> ...
->>> I understand that this fix seems sane, but actually reverting it fixes
->>> the issue for me: 4.4-rc5 crashed within some minutes with the above
->>> log, 4.4-rc5 with 578270bfbd reverted survived 19 hours of continuous
->>> kernel compiles without issues.
->>> Looking at the git history of that file I see quite some recent changes
->>> there, but it's beyond my understanding of the code to spot the real
->>> culprit.
->>>
->>> Can anyone point me to a change in blk-merge.c I could try to revert to
->>> identify the real root cause? I can run tests quickly, though a real
->>> positive case would need some hours of runtime to be sure it's fine.
->>>
->>> Many thanks!
->>> Cheers,
->>> Andre.
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe linux-block" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-block" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> which is a overkill, but when proper encoding not found; the SMMU stops
+> processing PCIe read/write requests. Giving the h/w what it wants.
+> 
+> Signed-off-by: Prem Mallappa <pmallapp@broadcom.com>
+> ---
+>  drivers/iommu/arm-smmu-v3.c | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+> 
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index d4af50d..dfda564 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -260,6 +260,7 @@
+>  #define STRTAB_STE_2_S2VMID_MASK	0xffffUL
+>  #define STRTAB_STE_2_VTCR_SHIFT		32
+>  #define STRTAB_STE_2_VTCR_MASK		0x7ffffUL
+> +#define STRTAB_STE_2_S2PS_SHIFT        48
+>  #define STRTAB_STE_2_S2AA64		(1UL << 51)
+>  #define STRTAB_STE_2_S2ENDI		(1UL << 52)
+>  #define STRTAB_STE_2_S2PTW		(1UL << 54)
+> @@ -577,6 +578,7 @@ struct arm_smmu_device {
+>  	u32				features;
+>  
+>  #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
+> +#define ARM_SMMU_OPT_BROKEN_STE_VALID	(1 << 1)
+>  	u32				options;
+>  
+>  	struct arm_smmu_cmdq		cmdq;
+> @@ -641,6 +643,7 @@ struct arm_smmu_option_prop {
+>  
+>  static struct arm_smmu_option_prop arm_smmu_options[] = {
+>  	{ ARM_SMMU_OPT_SKIP_PREFETCH, "hisilicon,broken-prefetch-cmd" },
+> +	{ ARM_SMMU_OPT_BROKEN_STE_VALID, "broadcom,broken-ste-valid-check" },
+
+This looks like a more specific problem than "broken ste valid check".
+Maybe we could call the prop ARM_SMMU_OPT_BCOM_BROKEN_STE_VALID?
+
+You also need to update the devicetree binding in
+Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt.
+
+>  	{ 0, NULL},
+>  };
+>  
+> @@ -1046,6 +1049,15 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
+>  				      : STRTAB_STE_0_CFG_BYPASS;
+>  		dst[0] = cpu_to_le64(val);
+>  		dst[2] = 0; /* Nuke the VMID */
+> +
+> +		if (smmu && (smmu->options & ARM_SMMU_OPT_BROKEN_STE_VALID)) {
+> +#define SMMU_STE_OAS_44_BITS 0x4UL
+
+Please don't add a #define here. Can we instead use the oas field that
+we've extracted from IDR5? I think we need to be doing that anyway when
+we're using stage-2 translation, looking at the spec...
+
+> +			WARN_ON(smmu->oas != 44);
+> +			dst[1] = STRTAB_STE_1_EATS_TRANS << STRTAB_STE_1_EATS_SHIFT;
+
+Why are you enabling ATS?
+
+> +			dst[2] |= cpu_to_le64((SMMU_STE_OAS_44_BITS << STRTAB_STE_2_S2PS_SHIFT) |
+> +					STRTAB_STE_2_S2AA64);
+> +		}
+
+Will
