@@ -1,100 +1,36 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 15 Dec 2015 17:30:09 +0100
-Subject: [PATCH v2] ARM: dts: imx6: add Vivante GPU nodes
-Message-ID: <1450197009-24601-1-git-send-email-l.stach@pengutronix.de>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Tue, 15 Dec 2015 16:31:06 +0000
+Subject: [Linaro-acpi] Touching the initrd before paging_init
+In-Reply-To: <567031F2.8060102@redhat.com> (Jon Masters's message of "Tue, 15
+ Dec 2015 10:29:54 -0500")
+References: <566D3090.9090509@redhat.com>
+ <20151213165942.GN25034@bivouac.eciton.net>
+ <23071B8C-D1F9-47A6-9DB4-B26842150B76@redhat.com>
+ <566DEB04.2030806@redhat.com> <566DEDFC.909@redhat.com>
+ <566F9C3D.4090306@redhat.com> <yw1xd1u8gcnk.fsf@unicorn.mansr.com>
+ <567031F2.8060102@redhat.com>
+Message-ID: <yw1xa8pbfzcl.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the device nodes for 2D, 3D and VG GPU cores.
+Jon Masters <jcm@redhat.com> writes:
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
- arch/arm/boot/dts/imx6dl.dtsi  |  5 +++++
- arch/arm/boot/dts/imx6q.dtsi   | 15 +++++++++++++++
- arch/arm/boot/dts/imx6qdl.dtsi | 21 +++++++++++++++++++++
- 3 files changed, 41 insertions(+)
+> On 12/15/2015 06:43 AM, M?ns Rullg?rd wrote:
+>> Jon Masters <jcm@redhat.com> writes:
+>
+>>> But the reading of that cpio content into the new table locations is
+>>> done using the kernel memcpy routine to early_ioremap'd memory (Device
+>>> memory), which is architecturally sensitive to missaligned accesses.
+>> 
+>> As others have pointed out, your error is twofold: first using
+>> early_ioremap() when early_memremap() would do, then using regular
+>> memcpy() and not memcpy_fromio() on that.  Seems like your precious ACPI
+>> code is to blame here.
+>
+> So I get that this could be changed. But I still want to understand
+> whether memcpy is behaving correctly.
 
-diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-index 4b0ec0703825..51c517a5cafd 100644
---- a/arch/arm/boot/dts/imx6dl.dtsi
-+++ b/arch/arm/boot/dts/imx6dl.dtsi
-@@ -104,6 +104,11 @@
- 		compatible = "fsl,imx-display-subsystem";
- 		ports = <&ipu1_di0>, <&ipu1_di1>;
- 	};
-+
-+	gpu-subsystem {
-+		compatible = "fsl,imx-gpu-subsystem";
-+		cores = <&gpu_2d>, <&gpu_3d>;
-+	};
- };
- 
- &gpt {
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 399103b8e2c9..77d618b2870c 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -153,6 +153,16 @@
- 			status = "disabled";
- 		};
- 
-+		gpu_vg: gpu at 02204000 {
-+			compatible = "vivante,gc";
-+			reg = <0x02204000 0x4000>;
-+			interrupts = <0 11 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clks IMX6QDL_CLK_OPENVG_AXI>,
-+				 <&clks IMX6QDL_CLK_GPU2D_CORE>;
-+			clock-names = "bus", "core";
-+			power-domains = <&gpc 1>;
-+		};
-+
- 		ipu2: ipu at 02800000 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -225,6 +235,11 @@
- 		compatible = "fsl,imx-display-subsystem";
- 		ports = <&ipu1_di0>, <&ipu1_di1>, <&ipu2_di0>, <&ipu2_di1>;
- 	};
-+
-+	gpu-subsystem {
-+		compatible = "fsl,imx-gpu-subsystem";
-+		cores = <&gpu_2d>, <&gpu_3d>, <&gpu_vg>;
-+	};
- };
- 
- &hdmi {
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 2b6cc8bf3c5c..d44e97bbfd1e 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -147,6 +147,27 @@
- 			};
- 		};
- 
-+		gpu_3d: gpu at 00130000 {
-+			compatible = "vivante,gc";
-+			reg = <0x00130000 0x4000>;
-+			interrupts = <0 9 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clks IMX6QDL_CLK_GPU3D_AXI>,
-+				 <&clks IMX6QDL_CLK_GPU3D_CORE>,
-+				 <&clks IMX6QDL_CLK_GPU3D_SHADER>;
-+			clock-names = "bus", "core", "shader";
-+			power-domains = <&gpc 1>;
-+		};
-+
-+		gpu_2d: gpu at 00134000 {
-+			compatible = "vivante,gc";
-+			reg = <0x00134000 0x4000>;
-+			interrupts = <0 10 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clks IMX6QDL_CLK_GPU2D_AXI>,
-+				 <&clks IMX6QDL_CLK_GPU2D_CORE>;
-+			clock-names = "bus", "core";
-+			power-domains = <&gpc 1>;
-+		};
-+
- 		timer at 00a00600 {
- 			compatible = "arm,cortex-a9-twd-timer";
- 			reg = <0x00a00600 0x20>;
+It is.  I already explained why it's the correct way.
+
 -- 
-2.6.2
+M?ns Rullg?rd
