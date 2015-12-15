@@ -1,188 +1,50 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 15 Dec 2015 13:45:17 +0000
-Subject: [PATCH v2 2/2] arm64: Use PoU cache instr for I/D coherency
-In-Reply-To: <1450184178-28257-3-git-send-email-ashoks@broadcom.com>
-References: <1450184178-28257-1-git-send-email-ashoks@broadcom.com>
- <1450184178-28257-3-git-send-email-ashoks@broadcom.com>
-Message-ID: <20151215134516.GH31299@leverpostej>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 15 Dec 2015 14:45:32 +0100
+Subject: [PATCH] drivers/misc: make arm-charlcd.c explicitly non-modular
+In-Reply-To: <1450055234-418-1-git-send-email-paul.gortmaker@windriver.com>
+References: <1450055234-418-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <CACRpkdYpG-vOjo_A9riUda_HFOYqTroOkJx15MoVUggdVh3Cuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 15, 2015 at 04:56:18AM -0800, Ashok Kumar wrote:
-> In systems with three levels of cache(PoU at L1 and PoC at L3),
-> PoC cache flush instructions flushes L2 and L3 caches which could affect
-> performance.
-> For cache flushes for I and D coherency, PoU should suffice.
-> So changing all I and D coherency related cache flushes to PoU.
-> 
-> Introduced a new __clean_dcache_area_pou API for dcache flush till PoU
-> and provided a common macro for __flush_dcache_area and
-> __clean_dcache_area_pou.
-> 
-> Signed-off-by: Ashok Kumar <ashoks@broadcom.com>
-> ---
->  arch/arm64/include/asm/cacheflush.h |  1 +
->  arch/arm64/mm/cache.S               | 47 ++++++++++++++++++++++++++++++-------
->  arch/arm64/mm/flush.c               | 14 +++++++----
->  3 files changed, 49 insertions(+), 13 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
-> index c75b8d0..6a5ecbd 100644
-> --- a/arch/arm64/include/asm/cacheflush.h
-> +++ b/arch/arm64/include/asm/cacheflush.h
-> @@ -68,6 +68,7 @@
->  extern void flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned long end);
->  extern void flush_icache_range(unsigned long start, unsigned long end);
->  extern void __flush_dcache_area(void *addr, size_t len);
-> +extern void __clean_dcache_area_pou(void *addr, size_t len);
->  extern long __flush_cache_user_range(unsigned long start, unsigned long end);
->  
->  static inline void flush_cache_mm(struct mm_struct *mm)
-> diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-> index eb48d5d..1fdcb38 100644
-> --- a/arch/arm64/mm/cache.S
-> +++ b/arch/arm64/mm/cache.S
-> @@ -79,28 +79,57 @@ ENDPROC(flush_icache_range)
->  ENDPROC(__flush_cache_user_range)
->  
->  /*
-> + * Macro to flush/invalidate cache lines till PoU/PoC
+On Mon, Dec 14, 2015 at 2:07 AM, Paul Gortmaker
+<paul.gortmaker@windriver.com> wrote:
 
-To keep this short and not use the confusing "flush" terminology, I
-think it would be better to just say:
+> The Kconfig currently controlling compilation of this code is:
+>
+> drivers/misc/Kconfig:config ARM_CHARLCD
+> drivers/misc/Kconfig:   bool "ARM Ltd. Character LCD Driver"
+>
+> ...meaning that it currently is not being built as a module by anyone.
+>
+> Lets remove the modular code that is essentially orphaned, so that
+> when reading the driver there is no doubt it is builtin-only.
+>
+> We explicitly disallow a driver unbind, since that doesn't have a
+> sensible use case anyway, and this driver did not have a ".remove"
+> function coded for non-modular drivers either.
+>
+> Since module_platform_driver() uses the same init level priority as
+> builtin_platform_driver() the init ordering remains unchanged with
+> this commit.
+>
+> We don't replace module.h with init.h since the file already has that.
+>
+> We also delete the MODULE_LICENSE tag etc. since all that information
+> is already contained at the top of the file in the comments.
+>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 
-	Macro to perform a data cache maintenance for the interval
-	[kaddr, kkaddr + size).
+I would consider the modular code a copy/paste error. Unfortunately
+not uncommon in the kernel :(
 
-> + *
-> + * 	op:		operation passed to dc instruction
-> + * 	domain:		domain used in dsb instruciton
-> + * 	kaddr:		starting virtual address of the region
-> + * 	size:		size of the region
-> + * 	Corrupts: 	kaddr, size, tmp1, tmp2
-> + */
-> +	.macro dcache_by_line_op op, domain, kaddr, size, tmp1, tmp2
-> +	dcache_line_size \tmp1, \tmp2
-> +	add	\size, \kaddr, \size
-> +	sub	\tmp2, \tmp1, #1
-> +	bic	\kaddr, \kaddr, \tmp2
-> +1:	dc	\op, \kaddr
-> +	add	\kaddr, \kaddr, \tmp1
-> +	cmp	\kaddr, \size
-> +	b.lo	1b
-> +	dsb	\domain
-> +	.endm
-> +
-> +/*
->   *	__flush_dcache_area(kaddr, size)
->   *
->   *	Ensure that the data held in the page kaddr is written back to the
->   *	page in question.
-> + *	Flush and invalidate D-cache lines belonging to
-> + *	address <kaddr, kaddr+size> till PoC.
->   *
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-Similarly we can replace all 4 lines of description here with:
+Thanks for doing this and keeping the kernel clean.
 
-	Ensure that any D-cache lines for the interval [kaddr,
-	kaddr+size) are cleaned and invalidated to the PoC.
-
->   *	- kaddr   - kernel address
->   *	- size    - size in question
->   */
->  ENTRY(__flush_dcache_area)
-> -	dcache_line_size x2, x3
-> -	add	x1, x0, x1
-> -	sub	x3, x2, #1
-> -	bic	x0, x0, x3
-> -1:	dc	civac, x0			// clean & invalidate D line / unified line
-> -	add	x0, x0, x2
-> -	cmp	x0, x1
-> -	b.lo	1b
-> -	dsb	sy
-> +	dcache_by_line_op civac, sy, x0, x1, x2, x3
->  	ret
->  ENDPROC(__flush_dcache_area)
->  
->  /*
-> + *	__clean_dcache_area_pou(kaddr, size)
-> + *
-> + * 	Flush D-cache lines belonging to address
-> + * 	<kaddr, kaddr+size> till PoU.
-
-Similarly here:
-
-	Ensure that any D-cache lines for the interval [kaddr,
-	kaddr+size) are cleaned to the PoU.
-
-> + *
-> + *	- kaddr   - kernel address
-> + *	- size    - size in question
-> + */
-> +ENTRY(__clean_dcache_area_pou)
-> +	dcache_by_line_op cvau, ish, x0, x1, x2, x3
-> +	ret
-> +ENDPROC(__clean_dcache_area_pou)
-> +
-> +/*
->   *	__inval_cache_range(start, end)
->   *	- start   - start address of region
->   *	- end     - end address of region
-> diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
-> index c26b804..4d4d15e 100644
-> --- a/arch/arm64/mm/flush.c
-> +++ b/arch/arm64/mm/flush.c
-> @@ -41,7 +41,7 @@ static void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
->  	if (vma->vm_flags & VM_EXEC) {
->  		unsigned long addr = (unsigned long)kaddr;
->  		if (icache_is_aliasing()) {
-> -			__flush_dcache_area(kaddr, len);
-> +			__clean_dcache_area_pou(kaddr, len);
->  			__flush_icache_all();
->  		} else {
->  			flush_icache_range(addr, addr + len);
-> @@ -75,9 +75,15 @@ void __sync_icache_dcache(pte_t pte, unsigned long addr)
->  		return;
->  
->  	if (!test_and_set_bit(PG_dcache_clean, &page->flags)) {
-> -		__flush_dcache_area(page_address(page),
-> -				PAGE_SIZE << compound_order(page));
-> -		__flush_icache_all();
-> +		if (icache_is_aliasing()) {
-> +			__clean_dcache_area_pou(page_address(page),
-> +					    PAGE_SIZE << compound_order(page));
-> +			__flush_icache_all();
-> +		} else {
-> +			flush_icache_range((unsigned long)page_address(page),
-> +					   (unsigned long)page_address(page) +
-> +					   (PAGE_SIZE << compound_order(page)));
-> +		}
-
-This now looks identical to the guts of flush_ptrace_access.
-
-Let's extract that into a new helper to call in both cases, e.g.
-
-	void sync_icache_aliases(void *kaddr, unsigned long len)
-	{
-		unsigned long addr = (unsigned long)kaddr;
-		if (icache_is_aliasing()) {
-			__flush_dcache_area(kaddr, len);
-			__flush_icache_all();
-		} else {
-			flush_icache_range(addr, addr + len);
-		}
-	}
-
-That would make this call site a lot simpler:
-
-	sync_icache_aliases(page_address(page),
-			    PAGE_SIZE << compound_order(page))
-
-Other than that, this looks good to me.
-
-With the changes suggested above:
-
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
+Yours,
+Linus Walleij
