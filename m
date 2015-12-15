@@ -1,96 +1,47 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue, 15 Dec 2015 15:14:28 -0700
-Subject: [PATCH RFC 02/27] PM / Domains: Allow domain power states to be
- read from DT
-In-Reply-To: <566FE652.1030602@baylibre.com>
-References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
- <1447799871-56374-3-git-send-email-lina.iyer@linaro.org>
- <CAPDyKFrZFMfE9XNRS8CpTPXU6fzfY9wv0cn+DTcg=SUnDyUQ0A@mail.gmail.com>
- <566FE652.1030602@baylibre.com>
-Message-ID: <20151215221428.GF992@linaro.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 15 Dec 2015 14:27:25 -0800
+Subject: [PATCH v3 2/4] ARM: bcm2835: add rpi power domain driver
+In-Reply-To: <1450215622-27394-3-git-send-email-eric@anholt.net>
+References: <1450215622-27394-1-git-send-email-eric@anholt.net>
+ <1450215622-27394-3-git-send-email-eric@anholt.net>
+Message-ID: <567093CD.1020208@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 15 2015 at 03:07 -0700, Marc Titinger wrote:
->On 10/12/2015 17:53, Ulf Hansson wrote:
->>On 17 November 2015 at 23:37, Lina Iyer <lina.iyer@linaro.org> wrote:
+On 15/12/15 13:40, Eric Anholt wrote:
+> From: Alexander Aring <alex.aring@gmail.com>
+> 
+> This patch adds support for several power domains on Raspberry Pi,
+> including USB (so it can be enabled even if the bootloader didn't do
+> it), and graphics.
+> 
+> This patch is the combined work of Eric Anholt (who wrote USB support
+> inside of the Raspberry Pi firmware driver, and wrote the non-USB
+> domain support) and Alexander Aring (who separated the original USB
+> work out from the firmware driver).
+> 
+> Signed-off-by: Alexander Aring <alex.aring@gmail.com>
+> Signed-off-by: Eric Anholt <eric@anholt.net>
+> ---
+> 
+> v2: Add support for power domains other than USB, using the new
+>     firmware interface, reword commit message (changes by Eric)
+> 
+> v3: Restructure as a builtin driver, and drop
+>     of_genpd_add_provider_onecell error handling to avoid
+>     pm_genpd_exit() dependency until that API can be settled.  Clean
+>     up copyright header, add missing ISP initialization, and fix typo
+>     in transposer's name.
+> 
+>  arch/arm/mach-bcm/Kconfig                   |  10 ++
+>  arch/arm/mach-bcm/Makefile                  |   1 +
+>  arch/arm/mach-bcm/raspberrypi-power.c       | 247 ++++++++++++++++++++++++++++
+>  include/dt-bindings/arm/raspberrypi-power.h |  41 +++++
+>  4 files changed, 299 insertions(+)
+>  create mode 100644 arch/arm/mach-bcm/raspberrypi-power.c
 
->>>diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
->>>index 025b5e7..e2f542e 100644
->>>--- a/Documentation/devicetree/bindings/power/power_domain.txt
->>>+++ b/Documentation/devicetree/bindings/power/power_domain.txt
->>>@@ -29,6 +29,44 @@ Optional properties:
->>>     specified by this binding. More details about power domain specifier are
->>>     available in the next section.
->>>
->>>+- power-states : A phandle of an idle-state that shall be soaked into a
->>>+                generic domain power state. The power-state shall be
->>>+               compatible with "linux,domain-state".
->>
->>Why mention the Linux specific "generic power domain" here?
->>
->>Let's instead try to describe this without using specific terminology
->>from Linux.
->
->Hmm, I will need Lina's help to answer this one.
->Following a previous review actually I dropped this power-states 
->compatible, to stick with idle-states.
->
-I didnt want this to be ARM specific. An arm,idle-state is too specific
-to be reused for generic PM domains, hence this compatible. We dont need
-a compatible property, but I thought it would be nice to have the
-property to give structure to the power state node.
-
->>
->>>+
->>>+==Power state==
->>>+
->>>+A PM domain power state describes an idle state of a domain and must be
->>>+have the following properties -
->>>+
->>>+       - compatible
->>>+               Usage: Required
->>>+               Value type: <stringlist>
->>>+               Definition: Must be "linux,domain-state"
->>
->>Why do you need a compatible string?
->>
->>You already have the phandle available, I suppose you can use that
->>instead of parsing for a new compatible string.
->>
-Hmm.. okay.
-
->>>+
->>>+       - entry-latency-us
->>>+               Usage: Not required if wakeup-latency-us is provided.
->>>+               Value type: <prop-encoded-array>
->>>+               Definition: u32 value representing worst case latency in
->>>+               microseconds required to enter the idle state.
->>>+               The exit-latency-us duration may be guaranteed
->>>+               only after entry-latency-us has passed.
->>>+
->>>+       - exit-latency-us
->>>+               Usage: Not required if wakeup-latency-us is provided.
->>>+               Value type: <prop-encoded-array>
->>>+               Definition: u32 value representing worst case latency
->>>+               in microseconds required to exit the idle state.
->>>+
->>>+       - wakeup-latency-us:
->>>+               Usage: Not required if entry-latency-us and exit-latency-us
->>>+               are provided.
->>>+               Value type: <prop-encoded-array>
->>>+               Definition: u32 value representing maximum delay between the
->>>+               signaling the wakeup of the domain and the domain resuming
->>>+               regular operation.
->>>+               If omitted, this is assumed to be equal to:
->>>+                       entry-latency-us + exit-latency-us
->>
->>I think we should decide which of the two alternatives to use, we
->>shouldn't make it more complicated than needed.
->
->Agreed.
->
-I like the entry + exit option.
-
-Thanks,
-Lina
+What motivated the location of this power domain driver in
+arch/arm/mach-bcm? Should not we have this in drivers/power/ or
+somewhere in drivers/ at the very least?
+-- 
+Florian
