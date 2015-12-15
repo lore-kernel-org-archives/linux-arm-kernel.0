@@ -1,66 +1,158 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 15 Dec 2015 16:05:32 +0200
-Subject: [PATCH 2/6] ARM: DTS: da850: Use the new DT bindings for the eDMA3
-In-Reply-To: <56701A47.9090105@ti.com>
-References: <1449237210-16381-1-git-send-email-peter.ujfalusi@ti.com>
- <1449237210-16381-3-git-send-email-peter.ujfalusi@ti.com>
- <566FDF93.7050005@ti.com> <566FFD1C.4080000@ti.com> <56701A47.9090105@ti.com>
-Message-ID: <56701E2C.7060308@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 15 Dec 2015 14:06:05 +0000
+Subject: [PATCH v7 12/19] KVM: ARM64: Add access handler for PMOVSSET
+ and PMOVSCLR register
+In-Reply-To: <1450169379-12336-13-git-send-email-zhaoshenglong@huawei.com>
+References: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
+ <1450169379-12336-13-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <56701E4D.3080501@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/15/2015 03:48 PM, Sekhar Nori wrote:
->>> These correspond to PRU events. It is true that most likely they will
->>> never be used for peripheral DMA and can be dedicated as memcpy
->>> channels. However, since this is being encoded in DT, we need to be sure
->>> that they will never be used for peripheral DMA on this board.
->>>
->>> So, I would prefer if you do not reserve any channels for memcpy until
->>> there is a real need/usecase for them. I know the board file has these
->>> reserved but board file could be updated as you liked. With DT we need
->>> to maintain backward compatibility. So I would rather do it when there
->>> is an actual need for it.
->>
->> If we do not reserve channels for memcpy then you will have no support for
->> memcpy on these boards. Not sure if we use memcpy in any of our drivers in
->> daVinci, so it might be just fine to not have DMA memcpy support at all.
+On 15/12/15 08:49, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> Not that I know of. No driver uses DMA memcpy
+> Since the reset value of PMOVSSET and PMOVSCLR is UNKNOWN, use
+> reset_unknown for its reset handler. Add a handler to emulate writing
+> PMOVSSET or PMOVSCLR register.
 > 
->> But how about using edma1's reserved channels as memcpy (19-23, 30-31)? I
-> 
-> I think this is much more reasonable.
-> 
->> don't know which channels the DSP would use on these boards, so it is never
->> going to be safe from that point.
-> 
-> Yeah, and thats why I think its better to add it as and when there is a
-> real need for it. At least at that point we are sure of the usecase.
+> When writing non-zero value to PMOVSSET, pend PMU interrupt.
 
-OK, I'll disable the memcpy for now.
+This comment doesn't match the code anymore
 
->>> In future, if/when we gain QDMA support, the QDMA channels could be used
->>> for memcopy.
->>
->> Well, in short there is no way to get the qDMA working in a different way
->> either. qDMA channel is in essence using 'normal' eDMA channel. This means
->> that we still need to reserve the eDMA channel to be used for memcpy, but
->> instead of SW triggering it (as we do it right now), we would need to use the
->> channel as qDMA and set things up accordingly. I don't really see the benefit
->> for qDMA mode to be honest.
 > 
-> I guess the only advantage is that they will not clash with peripheral
-> mode usage. But even then, some sort of reservation is needed. So I
-> guess QDMA is no better than the EDMA reserved channels?
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  arch/arm64/kvm/sys_regs.c | 28 +++++++++++++++++++++++++---
+>  include/kvm/arm_pmu.h     |  2 ++
+>  virt/kvm/arm/pmu.c        | 20 ++++++++++++++++++++
+>  3 files changed, 47 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index 594e53f..d1926c4 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -669,6 +669,27 @@ static bool access_pmintenset(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>  	return true;
+>  }
+>  
+> +static bool access_pmovsset(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+> +			    const struct sys_reg_desc *r)
+> +{
+> +	u64 mask = kvm_pmu_valid_counter_mask(vcpu);
+> +
+> +	if (p->is_write) {
+> +		if (r->CRm & 0x2) {
+> +			/* accessing PMOVSSET_EL0 */
+> +			kvm_pmu_overflow_set(vcpu, p->regval & mask);
+> +		} else {
+> +			/* accessing PMOVSCLR_EL0 */
+> +			vcpu_sys_reg(vcpu, r->reg) &= mask;
+> +			vcpu_sys_reg(vcpu, r->reg) &= ~p->regval;
 
-It will clash with the peripheral mode use since it needs to take one of the
-eDMA channels. qDMA mode is basically differs from the mode we are using by
-how the channel is triggered. Currently we start the memcpy with SW trigger.
-In qDMA mode we can select a paRAM parameter which if it is updated will do
-the triggering. It is useful if you have mostly constant memcpy parameters and
-you only need to change one thing in there (reusing the paRAM slot), like you
-change the dst address. In this case you just update the dst and the qDMA will
-be triggered. I don't think we can take advantage of this feature via dmaengine.
+Same as the previous patch.
 
+> +		}
+> +	} else {
+> +		p->regval = vcpu_sys_reg(vcpu, r->reg) & mask;
+> +	}
+> +
+> +	return true;
+> +}
+> +
+>  /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
+>  #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
+>  	/* DBGBVRn_EL1 */						\
+> @@ -876,7 +897,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+>  	  access_pmcntenset, NULL, PMCNTENSET_EL0 },
+>  	/* PMOVSCLR_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b011),
+> -	  trap_raz_wi },
+> +	  access_pmovsset, NULL, PMOVSSET_EL0 },
+>  	/* PMSWINC_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b100),
+>  	  trap_raz_wi },
+> @@ -903,7 +924,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+>  	  trap_raz_wi },
+>  	/* PMOVSSET_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1110), Op2(0b011),
+> -	  trap_raz_wi },
+> +	  access_pmovsset, reset_unknown, PMOVSSET_EL0 },
+>  
+>  	/* TPIDR_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1101), CRm(0b0000), Op2(0b010),
+> @@ -1217,7 +1238,7 @@ static const struct sys_reg_desc cp15_regs[] = {
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), access_pmcr },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), access_pmcntenset },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), access_pmcntenset },
+> -	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), trap_raz_wi },
+> +	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), access_pmovsset },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), access_pmselr },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), access_pmceid },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), access_pmceid },
+> @@ -1227,6 +1248,7 @@ static const struct sys_reg_desc cp15_regs[] = {
+>  	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), trap_raz_wi },
+>  	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), access_pmintenset },
+>  	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), access_pmintenset },
+> +	{ Op1( 0), CRn( 9), CRm(14), Op2( 3), access_pmovsset },
+>  
+>  	{ Op1( 0), CRn(10), CRm( 2), Op2( 0), access_vm_reg, NULL, c10_PRRR },
+>  	{ Op1( 0), CRn(10), CRm( 2), Op2( 1), access_vm_reg, NULL, c10_NMRR },
+> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+> index 43c4117..93aea6a 100644
+> --- a/include/kvm/arm_pmu.h
+> +++ b/include/kvm/arm_pmu.h
+> @@ -38,6 +38,7 @@ struct kvm_pmu {
+>  u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx);
+>  void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val);
+>  void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val);
+> +void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val);
+>  void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
+>  				    u64 select_idx);
+>  #else
+> @@ -50,6 +51,7 @@ u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx)
+>  }
+>  void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val) {}
+>  void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val) {}
+> +void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val) {}
+>  void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
+>  				    u64 select_idx) {}
+>  #endif
+> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+> index 94bff0e..861471d 100644
+> --- a/virt/kvm/arm/pmu.c
+> +++ b/virt/kvm/arm/pmu.c
+> @@ -130,6 +130,26 @@ void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val)
+>  }
+>  
+>  /**
+> + * kvm_pmu_overflow_set - set PMU overflow interrupt
+> + * @vcpu: The vcpu pointer
+> + * @val: the value guest writes to PMOVSSET register
+> + */
+> +void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val)
+> +{
+> +	u64 reg;
+> +
+> +	if (val == 0)
+> +		return;
+> +
+> +	vcpu_sys_reg(vcpu, PMOVSSET_EL0) |= val;
+> +	reg = vcpu_sys_reg(vcpu, PMOVSSET_EL0)
+> +	      & vcpu_sys_reg(vcpu, PMCNTENSET_EL0)
+> +	      & vcpu_sys_reg(vcpu, PMINTENSET_EL1);
+> +	if (reg != 0)
+> +		kvm_vcpu_kick(vcpu);
+> +}
+> +
+> +/**
+>   * kvm_pmu_set_counter_event_type - set selected counter to monitor some event
+>   * @vcpu: The vcpu pointer
+>   * @data: The data guest writes to PMXEVTYPER_EL0
+> 
+
+Thanks,
+
+	M.
 -- 
-P?ter
+Jazz is not dead. It just smells funny...
