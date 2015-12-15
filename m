@@ -1,19 +1,64 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 15 Dec 2015 09:34:07 +0000
-Subject: memcpy alignment
-In-Reply-To: <566F92D6.8060103@redhat.com>
-References: <566F92D6.8060103@redhat.com>
-Message-ID: <20151215093406.GC19244@e104818-lin.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 15 Dec 2015 09:34:37 +0000
+Subject: ARM64/KVM: Bad page state in process iperf
+In-Reply-To: <DM2PR03MB557D3079ABFE7AF114A58A690EE0@DM2PR03MB557.namprd03.prod.outlook.com>
+References: <DM2PR03MB557D3079ABFE7AF114A58A690EE0@DM2PR03MB557.namprd03.prod.outlook.com>
+Message-ID: <566FDEAD.6000707@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 14, 2015 at 11:11:02PM -0500, Jon Masters wrote:
-> What's supposed to happen if the natural alignment of the pointers dst
-> and src is not the same? We don't seem to handle that case today, and
-> instead will base our access data type on the source alignment only.
+On 15/12/15 03:46, Bhushan Bharat wrote:
+> 
+> Hi All,
+> 
+> I am running "iperf" in KVM guest on ARM64 machine and observing below crash.
+> 
+> =============================
+> $iperf -c 3.3.3.3 -P 4 -t 0 -i 5 -w 90k
+> ------------------------------------------------------------
+> Client connecting to 3.3.3.3, TCP port 5001
+> TCP window size:  180 KByte (WARNING: requested 90.0 KByte)
+> ------------------------------------------------------------
+> [  3] local 3.3.3.1 port 51131 connected with 3.3.3.3 port 5001
+> [  6] local 3.3.3.1 port 51134 connected with 3.3.3.3 port 5001
+> [  5] local 3.3.3.1 port 51133 connected with 3.3.3.3 port 5001
+> [  4] local 3.3.3.1 port 51132 connected with 3.3.3.3 port 5001
+> [   53.088567] random: nonblocking pool is initialized
+> [ ID] Interval       Transfer     Bandwidth
+> [  3]  0.0- 5.0 sec   638 MBytes  1.07 Gbits/sec
+> [  4] 35.0-40.0 sec  1.66 GBytes  2.85 Gbits/sec
+> [  5] 40.0-45.0 sec  1.11 GBytes  1.90 Gbits/sec
+> [  4] 40.0-45.0 sec  1.16 GBytes  1.99 Gbits/sec
+> [   98.895207] BUG: Bad page state in process iperf  pfn:0a584
+> [   98.896164] page:ffff780000296100 count:-1 mapcount:0 mapping:          (null) index:0x0
+> [   98.897436] flags: 0x0()
+> [   98.897885] page dumped because: nonzero _count
+> [   98.898640] Modules linked in:
+> [   98.899178] CPU: 0 PID: 1639 Comm: iperf Not tainted 4.1.8-00461-ge5431ad #141
+> [   98.900302] Hardware name: linux,dummy-virt (DT)
+> [   98.901014] Call trace:
+> [   98.901406] [<ffff800000096cac>] dump_backtrace+0x0/0x12c
+> [   98.902522] [<ffff800000096de8>] show_stack+0x10/0x1c
+> [   98.903441] [<ffff800000678dc8>] dump_stack+0x8c/0xdc
+> [   98.904202] [<ffff800000145480>] bad_page+0xc4/0x114
+> [   98.904945] [<ffff8000001487a4>] get_page_from_freelist+0x590/0x63c
+> [   98.905871] [<ffff80000014893c>] __alloc_pages_nodemask+0xec/0x794
+> [   98.906791] [<ffff80000059fc80>] skb_page_frag_refill+0x70/0xa8
+> [   98.907678] [<ffff80000059fcd8>] sk_page_frag_refill+0x20/0xd0
+> [   98.908550] [<ffff8000005edc04>] tcp_sendmsg+0x1f8/0x9a8
+> [   98.909368] [<ffff80000061419c>] inet_sendmsg+0x5c/0xd0
+> [   98.910178] [<ffff80000059bb44>] sock_sendmsg+0x14/0x58
+> [   98.911027] [<ffff80000059bbec>] sock_write_iter+0x64/0xbc
+> [   98.912119] [<ffff80000019b5b8>] __vfs_write+0xac/0x10c
+> [   98.913126] [<ffff80000019bcb8>] vfs_write+0x90/0x1a0
+> [   98.913963] [<ffff80000019c53c>] SyS_write+0x40/0xa0
 
-The hardware takes care of the other one. The memcpy behaviour in the
-kernel is the same as the glibc one (the Cortex Strings library).
+This looks quite bad, but I don't see anything here that links it to KVM
+(apart from being a guest). Do you have any indication that this is due
+to KVM misbehaving? I'd appreciate a few more details.
 
+Thanks,
+
+	M.
 -- 
-Catalin
+Jazz is not dead. It just smells funny...
