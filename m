@@ -1,41 +1,76 @@
-From: sasukewxt@163.com (Caesar Wang)
-Date: Tue, 15 Dec 2015 08:48:08 +0800
-Subject: [PATCH 1/2] ARM: dts: modify rk3288 jaq backlight-level
-In-Reply-To: <1868289.Tn7cSBTFBY@diego>
-References: <1449493869-32151-1-git-send-email-wxt@rock-chips.com>
- <1868289.Tn7cSBTFBY@diego>
-Message-ID: <566F6348.2070405@163.com>
+From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
+Date: Mon, 14 Dec 2015 18:53:25 -0600
+Subject: [PATCH v2 0/2] i2c:dw: Add APM X-Gene ACPI I2C device support
+In-Reply-To: <1449782357-22982-1-git-send-email-lho@apm.com>
+References: <1449782357-22982-1-git-send-email-lho@apm.com>
+Message-ID: <566F6485.2000508@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko,
+Hi,
+
+I'm not sure if this has been discussed earlier. But after looking at 
+the the acpi_apd driver, all we need is just the platform-specific input 
+clock frequency value used by the 
+drivers/i2c/busses/i2c-designware-core.c: i2c_dw_init() to calculate the 
+values to program into the DW_IC_SS_SCL_HCNT and DW_IC_SS_SCL_LCNT 
+registers.
+
+So, instead of hard-coding this value into the driver/acpi/acpi_apd.c 
+(which really has nothing to do with the I2C driver), what if we 
+introduce a new ACPI key-value pair in the ACPI DSDT such as:
+
+     Device(I2C0)    // I2C controller
+     {
+       Name(_HID, "AMDI0510")
+       Name(_UID, 0)
+       Name(_CRS, ResourceTemplate() {
+         Memory32Fixed (ReadWrite, 0xE1000000, 0x1000)
+         Interrupt (ResourceConsumer, Level, ActiveHigh, Exclusive,,,) { 
+389 } // GSIV
+       })
+       Name (_DSD, Package () {
+         ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
+         Package () {
+           Package (2) {"clock-source-frequency", 100000000 }
+         }
+       }) // _DSD()
+     }
 
 
-? 2015?12?15? 05:46, Heiko St?bner ??:
-> Hi Caesar,
->
-> Am Montag, 7. Dezember 2015, 21:11:08 schrieb Caesar Wang:
->> the panel which jaq use require the pwm duty cycle larger than 3%,
->> when the backlight status from power off to power on, otherwise the
->> backlight will flush, so we modify the second brightness-level to 8,
->> and when the backlight from power off to power on the pwm duty cycle
->> will larger than 3%.
->>
->> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> I've merged the two patches and included them in my series for the veyron edp
-> devicetree changes [0].
->
->
-> Heiko
->
-> [0] https://github.com/mmind/linux-rockchip/commit/45e3abed0a86c7ee5cea0b35492b65890b928175
+Then, in the drivers/i2c/busses/i2c-designware-platdrv.c, we can add the 
+code to parse this information. This way, the I2C driver can just 
+retrieve this value from the ACPI table of each platform, which should 
+make it easier to manage. Eventually, we can free I2C driver from the 
+driver/acpi/acpi_apd.c, which is currently only used by AMD x86 platform.
 
-Yep, that's more resonable since we need depend on this edp device node.
+Also, this approach would allow the I2C drivers in other OSes to use 
+this same information in the ACPI table. If this approach is okay, I can 
+provide a patch to implement this.
 
-https://github.com/rockchip-linux/kernel/commit/6d1491faf1e5eee98dfcd9bb1ba1b7f866cd51ab
+Thanks,
+Suravee
 
+On 12/10/2015 3:19 PM, Loc Ho wrote:
+> Add APM X-Gene ACPI I2C device support. These patches follow
+> the same implementation as AMD I2C driver - changes in ACPI APD
+> and Designware I2C drivers.
 >
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+> v2:
+> * Spilt the acpi_apd change with defines for AMD and X-Gene I2C's
+>
+> Signed-off-by: Loc Ho <lho@apm.com>
+> ---
+> Loc Ho (2):
+>    acpi:apd: Add APM X-Gene ACPI I2C device support
+>    i2c:dw: Add APM X-Gene ACPI I2C device support
+>
+>   drivers/acpi/acpi_apd.c                     |   16 +++++++++++++++-
+>   drivers/i2c/busses/i2c-designware-platdrv.c |    1 +
+>   2 files changed, 16 insertions(+), 1 deletions(-)
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
