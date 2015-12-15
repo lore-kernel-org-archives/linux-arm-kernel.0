@@ -1,42 +1,40 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 15 Dec 2015 16:33:26 +0800
-Subject: [PATCH v2 0/3] USB: add generic onboard USB HUB driver
-In-Reply-To: <3023844.AYbAYqvHUZ@wuerfel>
-References: <1450077974-22762-1-git-send-email-peter.chen@freescale.com>
- <3023844.AYbAYqvHUZ@wuerfel>
-Message-ID: <20151215083259.GA13809@shlinux2>
+From: dirk.behme@gmail.com (Dirk Behme)
+Date: Tue, 15 Dec 2015 09:39:17 +0100
+Subject: [PATCH] arm64: perf: Correct Cortex-A53/A57 compatible values
+In-Reply-To: <1450168400-462-1-git-send-email-geert+renesas@glider.be>
+References: <1450168400-462-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <566FD1B5.2070602@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 14, 2015 at 10:35:19AM +0100, Arnd Bergmann wrote:
-> On Monday 14 December 2015 15:26:11 Peter Chen wrote:
-> > Hi all,
-> > 
-> > There is a known issue that the USB code can't handle USB HUB's
-> > external pins well, in that case, it may cause some onboard
-> > USB HUBs can't work since their PHY's clock or reset pin needs to
-> > operate.
-> > 
-> > The user reported this issue at below:
-> > http://www.spinics.net/lists/linux-usb/msg131502.html
-> > 
-> > In this patch set, I add a generic onboard USB HUB driver to
-> > handle this problem, the external signals will be configured
-> > before usb controller's initialization, it much likes we did
-> > it at board code before.
-> > 
-> > The user needs to add this generic hub node at dts to support it.
-> > 
-> > @The udoo users, help to test please.
-> 
-> I still think need to do this properly by representing the hub
-> device as a USB device, using power sequencing code like MMC does.
-> 
-> 	Arnd
+On 15.12.2015 09:33, Geert Uytterhoeven wrote:
+> Use commas instead of periods.
+>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-I will try to have a patch set for general onboard USB device.
+Acked-by: Dirk Behme <dirk.behme@gmail.com>
 
--- 
+Thanks!
 
-Best Regards,
-Peter Chen
+Dirk
+
+> ---
+>   Documentation/devicetree/bindings/arm/pmu.txt | 4 ++--
+>   1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
+> index 97ba45af04fc693f..a6cd14888bed9b29 100644
+> --- a/Documentation/devicetree/bindings/arm/pmu.txt
+> +++ b/Documentation/devicetree/bindings/arm/pmu.txt
+> @@ -9,8 +9,8 @@ Required properties:
+>   - compatible : should be one of
+>   	"apm,potenza-pmu"
+>   	"arm,armv8-pmuv3"
+> -	"arm.cortex-a57-pmu"
+> -	"arm.cortex-a53-pmu"
+> +	"arm,cortex-a57-pmu"
+> +	"arm,cortex-a53-pmu"
+>   	"arm,cortex-a17-pmu"
+>   	"arm,cortex-a15-pmu"
+>   	"arm,cortex-a12-pmu"
+>
