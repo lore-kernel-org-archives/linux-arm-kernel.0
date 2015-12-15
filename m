@@ -1,90 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 15 Dec 2015 10:19:48 +0000
-Subject: ARM64/KVM: Bad page state in process iperf
-In-Reply-To: <DM2PR03MB55707E80EDA77A6991FDA2190EE0@DM2PR03MB557.namprd03.prod.outlook.com>
-References: <DM2PR03MB557D3079ABFE7AF114A58A690EE0@DM2PR03MB557.namprd03.prod.outlook.com>
- <566FDEAD.6000707@arm.com>
- <DM2PR03MB55707E80EDA77A6991FDA2190EE0@DM2PR03MB557.namprd03.prod.outlook.com>
-Message-ID: <566FE944.3090506@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 15 Dec 2015 10:22:21 +0000
+Subject: [Linaro-acpi] Touching the initrd before paging_init
+In-Reply-To: <566F9C3D.4090306@redhat.com>
+References: <566D3090.9090509@redhat.com>
+ <20151213165942.GN25034@bivouac.eciton.net>
+ <23071B8C-D1F9-47A6-9DB4-B26842150B76@redhat.com>
+ <566DEB04.2030806@redhat.com> <566DEDFC.909@redhat.com>
+ <566F9C3D.4090306@redhat.com>
+Message-ID: <20151215102220.GA31299@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/12/15 09:53, Bhushan Bharat wrote:
-> Hi Mark,
+On Mon, Dec 14, 2015 at 11:51:09PM -0500, Jon Masters wrote:
+> Addendum. I was able to get the initrd based ACPI table override
+> working...HOWEVER...
 > 
->> -----Original Message-----
->> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
->> Sent: Tuesday, December 15, 2015 3:05 PM
->> To: Bhushan Bharat-R65777 <Bharat.Bhushan@freescale.com>;
->> kvmarm at lists.cs.columbia.edu; kvm at vger.kernel.org; linux-arm-
->> kernel at lists.infradead.org; linux-kernel at vger.kernel.org
->> Subject: Re: ARM64/KVM: Bad page state in process iperf
->>
->> On 15/12/15 03:46, Bhushan Bharat wrote:
->>>
->>> Hi All,
->>>
->>> I am running "iperf" in KVM guest on ARM64 machine and observing below
->> crash.
->>>
->>> =============================
->>> $iperf -c 3.3.3.3 -P 4 -t 0 -i 5 -w 90k
->>> ------------------------------------------------------------
->>> Client connecting to 3.3.3.3, TCP port 5001 TCP window size:  180
->>> KByte (WARNING: requested 90.0 KByte)
->>> ------------------------------------------------------------
->>> [  3] local 3.3.3.1 port 51131 connected with 3.3.3.3 port 5001 [  6]
->>> local 3.3.3.1 port 51134 connected with 3.3.3.3 port 5001 [  5] local
->>> 3.3.3.1 port 51133 connected with 3.3.3.3 port 5001 [  4] local
->>> 3.3.3.1 port 51132 connected with 3.3.3.3 port 5001
->>> [   53.088567] random: nonblocking pool is initialized
->>> [ ID] Interval       Transfer     Bandwidth
->>> [  3]  0.0- 5.0 sec   638 MBytes  1.07 Gbits/sec
->>> [  4] 35.0-40.0 sec  1.66 GBytes  2.85 Gbits/sec [  5] 40.0-45.0 sec
->>> 1.11 GBytes  1.90 Gbits/sec [  4] 40.0-45.0 sec  1.16 GBytes  1.99
->>> Gbits/sec
->>> [   98.895207] BUG: Bad page state in process iperf  pfn:0a584
->>> [   98.896164] page:ffff780000296100 count:-1 mapcount:0 mapping:
->> (null) index:0x0
->>> [   98.897436] flags: 0x0()
->>> [   98.897885] page dumped because: nonzero _count
->>> [   98.898640] Modules linked in:
->>> [   98.899178] CPU: 0 PID: 1639 Comm: iperf Not tainted 4.1.8-00461-
->> ge5431ad #141
->>> [   98.900302] Hardware name: linux,dummy-virt (DT)
->>> [   98.901014] Call trace:
->>> [   98.901406] [<ffff800000096cac>] dump_backtrace+0x0/0x12c
->>> [   98.902522] [<ffff800000096de8>] show_stack+0x10/0x1c
->>> [   98.903441] [<ffff800000678dc8>] dump_stack+0x8c/0xdc
->>> [   98.904202] [<ffff800000145480>] bad_page+0xc4/0x114
->>> [   98.904945] [<ffff8000001487a4>] get_page_from_freelist+0x590/0x63c
->>> [   98.905871] [<ffff80000014893c>] __alloc_pages_nodemask+0xec/0x794
->>> [   98.906791] [<ffff80000059fc80>] skb_page_frag_refill+0x70/0xa8
->>> [   98.907678] [<ffff80000059fcd8>] sk_page_frag_refill+0x20/0xd0
->>> [   98.908550] [<ffff8000005edc04>] tcp_sendmsg+0x1f8/0x9a8
->>> [   98.909368] [<ffff80000061419c>] inet_sendmsg+0x5c/0xd0
->>> [   98.910178] [<ffff80000059bb44>] sock_sendmsg+0x14/0x58
->>> [   98.911027] [<ffff80000059bbec>] sock_write_iter+0x64/0xbc
->>> [   98.912119] [<ffff80000019b5b8>] __vfs_write+0xac/0x10c
->>> [   98.913126] [<ffff80000019bcb8>] vfs_write+0x90/0x1a0
->>> [   98.913963] [<ffff80000019c53c>] SyS_write+0x40/0xa0
->>
->> This looks quite bad, but I don't see anything here that links it to KVM (apart
->> from being a guest). Do you have any indication that this is due to KVM
->> misbehaving? 
+> *** I had to implement a custom memcpy routine to do so ***
 > 
-> I never observed this issue in host Linux but observed this issue always in guest Linux. This issue does not comes immediately after I run "iperf" but after some time.
+> Per some internal suggestions, I tried moving map_mem earlier (prior to
+> doing boot time ACPI table parsing, in order to avoid needing to abuse
+> fixmaps to touch the initrd contents), which works. For reading the
+> ramdisk cpio content (the kernel code still uses a fixmap in the initrd
+> override driver code to map the newly created tables in memory).
 > 
->> I'd appreciate a few more details.
-> 
-> We have a networking hardware and we are directly assigning the h/w to guest. When using the same networking hardware in host it always works as expected (tried 100s of times).
-> Also this issue is not observed when we have only one vCPU in guest but seen when we have SMP guest. 
+> But the reading of that cpio content into the new table locations is
+> done using the kernel memcpy routine to early_ioremap'd memory (Device
+> memory), which is architecturally sensitive to missaligned accesses. The
+> in-kernel memcpy routine only checks the alignment of the source pointed
+> when it begins copying, and doesn't handle the case that the natural
+> alignment differs between source and destination. Therefore, the kernel
+> rolls over and plays dead unless I provide a hacked up jcm_memcpy that
+> just does byte copies. Then everything "works".
 
-Can you reproduce the same issue without VFIO (using virtio, for
-example)? Is that platform VFIO? or PCI?
+You don't need a custom memcpy. All you need to do is use
+early_memremap, as we do for relocate_initrd, to get a Normal Cacheable
+mapping. See:
 
-Thanks,
+	setup_arch()
+		relocate_initrd()
+			copy_from_early_mem()
+				early_memremap()
+				memcpy()
+				early_memunmap()
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Mark.
