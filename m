@@ -1,65 +1,77 @@
-From: treding@nvidia.com (Thierry Reding)
-Date: Tue, 15 Dec 2015 18:42:36 +0100
-Subject: [PATCH v3 3/5] soc: rockchip: add reboot notifier driver
-In-Reply-To: <3759218.6sItdW65UG@wuerfel>
-References: <1447840044-19689-1-git-send-email-andy.yan@rock-chips.com>
- <10162108.nOThMrrbdf@wuerfel>
- <20151215163120.GA24031@ulmo.nvidia.com>
- <3759218.6sItdW65UG@wuerfel>
-Message-ID: <20151215174234.GB24031@ulmo.nvidia.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 15 Dec 2015 17:45:16 +0000
+Subject: [RFC PATCH 2/8] Documentation: arm: define DT cpu capacity
+ bindings
+In-Reply-To: <20151215172837.GD8012@leverpostej>
+References: <20151211174940.GQ5727@sirena.org.uk>
+ <20151214123616.GC3308@e106622-lin>
+ <20151214165928.GV5727@sirena.org.uk>
+ <20151215122238.GG16007@e106622-lin>
+ <20151215133951.GY5727@sirena.org.uk>
+ <20151215140135.GI31299@leverpostej>
+ <20151215150813.GZ5727@sirena.org.uk>
+ <20151215153218.GA7228@leverpostej>
+ <20151215171713.GA5727@sirena.org.uk>
+ <20151215172837.GD8012@leverpostej>
+Message-ID: <20151215174516.GB5727@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 15, 2015 at 05:34:00PM +0100, Arnd Bergmann wrote:
-> On Tuesday 15 December 2015 17:31:22 Thierry Reding wrote:
-> > On Mon, Dec 14, 2015 at 12:39:44PM +0100, Arnd Bergmann wrote:
-> > > On Wednesday 18 November 2015 17:56:22 Andy Yan wrote:
-> > > > rockchip platform have a protocol to pass the kernel reboot
-> > > > mode to bootloader by some special registers when system reboot.
-> > > > By this way the bootloader can take different action according
-> > > > to the different kernel reboot mode, for example, command
-> > > > "reboot loader" will reboot the board to rockusb mode, this is
-> > > > a very convenient way to get the board enter download mode.
-> > > > 
-> > > > Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
-> > > 
-> > > Adding John Stultz to Cc
-> > > 
-> > > I just saw this thread pop up again, and had to think of John's recent
-> > > patch to unify this across platforms.
-> > > 
-> > > John, can you have a look at this driver too, and see how it fits in?
-> > > I think this is yet another variant, using an MMIO register rather than
-> > > RAM (as HTC / NVIDIA does) or SRAM (as Qualcomm does), but otherwise
-> > > it conceptually fits in with what you had.
-> > 
-> > FWIW, Tegra typically does use an MMIO register as well. See
-> > drivers/soc/tegra/pmc.c:tegra_pmc_restart_notify(). I don't know what
-> > HTC does, but if it's writing somewhere in RAM it isn't using the
-> > standard way of resetting the SoC. There's early boot ROM code which I
-> > think evaluates the PMC_SCRATCH0 register on Tegra to determine which
-> > mode to boot into. That's before even any firmware gets the chance of
-> > doing anything.
-> 
-> HTC apparently uses a separate RAM area to pass the reboot reason,
-> and they have a driver to store that, which is separate from the
-> driver that they use for actually rebooting the machine.
+On Tue, Dec 15, 2015 at 05:28:37PM +0000, Mark Rutland wrote:
+> On Tue, Dec 15, 2015 at 05:17:13PM +0000, Mark Brown wrote:
 
-I wasn't very clear, but the PMC_SCRATCH0 register is used to store the
-reset reason. It supports the recovery mode, which I think is really an
-Android thing, "bootloader" will typically cause the bootloader not to
-boot anything, and "forced-recovery" will go into a recovery mode that
-is used to bootstrap the device (usually by uploading a "miniloader"
-that initializes RAM, downloads a bootloader for booting or flashing an
-operating system, ...).
+> > Obviously people are going to get upset if we introduce performance
+> > regressions - but that's true always, we can also introduce problems
+> > with numbers people have put in DT.  It seems like it'd be harder to
+> > manage regressions due to externally provided magic numbers since
+> > there's inherently less information there.
 
-The write that resets the SoC is to a different register.
+> It's certainly still possible to have regressions in that case. Those
+> regressions would be due to code changes in the kernel, given the DT
+> didn't change.
 
-Thierry
+> I'm not sure I follow w.r.t. "inherently less information", unless you
+> mean trying to debug without access to that DTB?
+
+If what the kernel knows about the system is that it's got a bunch of
+cores with numbers assigned to them then all it's really got is those
+numbers.  If something changes that causes problems for some systems
+(eg, because the numbers have been picked poorly but in a way that
+happened to work well with the old code) that's not a lot to go on, the
+more we know about the system the more likely it is that we'll be able
+to adjust the assumptions in whatever new thing we do that causes
+problems for any particular systems where we run into trouble.
+
+> > My point there is that if we're not that concerned about the specific
+> > number something in kernel is safer.
+
+> I don't entirely disagree there. I think an in-kernel benchmark is
+> likely safer.
+
+Yes, I think that something where we just observe the system performance
+at runtime is likely one of the best solutions if we can get something
+that gives reasonable results.
+
+> > That does have the issue that we need to scale with regard to the
+> > frequency the benchmark gets run at.  That's not an insurmountable
+> > obstacle but it's not completely trivial either.
+
+> If we change clock frequency, then regardless of where the information
+> comes from we need to perform scaling, no?
+
+Yes, it's just a question of making the benchmarking bit talk to the
+scaling bit so we know where we're at when we do the benchmark.  Like I
+say it should be doable.
+
+> One nice thing about doing a benchmark to derive the numbers is that
+> when the kernel is that when the frequency is fixed but the kernel
+> cannot query it, the numbers will be representative.
+
+Definitely.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 819 bytes
+Size: 473 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151215/2ba25cc6/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151215/d7a78108/attachment.sig>
