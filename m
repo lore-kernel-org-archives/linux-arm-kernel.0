@@ -1,48 +1,44 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 15 Dec 2015 17:48:22 +0900
-Subject: [PATCH v12 04/16] arm64: kvm: allows kvm cpu hotplug
-In-Reply-To: <20151211163144.GK18828@arm.com>
-References: <cover.1448403503.git.geoff@infradead.org>
- <23ca498d5e28017549c6076812d60b18e86fa20e.1448403503.git.geoff@infradead.org>
- <CAJ5Y-eYHqQCf=ZQzXb=D_P7VscM=vNc3YpYLJs+UtZLFswiaeQ@mail.gmail.com>
- <56604A6E.60102@arm.com> <1449772308.24127.59.camel@infradead.org>
- <20151211163144.GK18828@arm.com>
-Message-ID: <566FD3D6.2040605@linaro.org>
+From: dirk.behme@gmail.com (Dirk Behme)
+Date: Tue, 15 Dec 2015 09:48:46 +0100
+Subject: [PATCH 2/3] arm64: dts: r8a7795: Add Cortex-A57 CPU cores
+In-Reply-To: <CANqRtoSeibffbaoVGV7Y_gyuXxCOu+1PmRf3imQ8OKhV6VoAMQ@mail.gmail.com>
+References: <1449236333-4410-1-git-send-email-dirk.behme@gmail.com>
+ <1449236333-4410-2-git-send-email-dirk.behme@gmail.com>
+ <20151211230751.GD6496@verge.net.au>
+ <CANqRtoSeibffbaoVGV7Y_gyuXxCOu+1PmRf3imQ8OKhV6VoAMQ@mail.gmail.com>
+Message-ID: <566FD3EE.8040908@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will,
-
-On 12/12/2015 01:31 AM, Will Deacon wrote:
-> On Thu, Dec 10, 2015 at 10:31:48AM -0800, Geoff Levand wrote:
->> On Thu, 2015-12-03 at 13:58 +0000, Marc Zyngier wrote:
->>> Indeed, this is completely broken (I just reproduced the issue on a
->>> model).
+On 15.12.2015 09:38, Magnus Damm wrote:
+> Hi Simon,
+>
+> On Sat, Dec 12, 2015 at 8:07 AM, Simon Horman <horms@verge.net.au> wrote:
+>> On Fri, Dec 04, 2015 at 02:38:52PM +0100, Dirk Behme wrote:
+>>> From: Gaku Inami <gaku.inami.xw@bp.renesas.com>
+>>>
+>>> Add Cortex-A57 CPU cores to r8a7795 SoC for a total of 4 x Cortex-A57.
+>>>
+>>> Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
+>>> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+>>> Sigend-off-by: Dirk Behme <dirk.behme@gmail.com>
 >>
->> There are users out there that want kexec/kdump support.  I think we
->> should remove this patch from the series, replace it with a temporary
->> Kconfig conditional that allows only one of KVM or kexec to be enabled,
->> and merge kexec and kdump support in for 4.5.  This will satisfy users
->> who need kexec but not KVM, like kexec based bootloaders.  Once this
->> KVM hot plug patch is fixed we then merge it, either for 4.5 or 4.6,
->> depending on the timing.
->>
->> I'll prepare and post a v13 series that does the above.
+>> Thanks, I have queued this up for v4.5.
 >
-> I'm not really keen on merging this based on a "temporary" Kconfig change
-> with a promise to have it resolved in the future. Given how long this
-> series has been floating around already, I'm not filled with confidence
-> at the prospect of waiting for a fixup patch after it's been merged.
->
-> Please address the outstanding review comments before reposting.
-
-I'm working hard on addressing Marc's comment on kvm cpu hotplug, and so
-can you please review other *main* part of kexec/kdump patches?
-Or can I think that 'no comments' is a good sign of your acceptance?
-
-Thanks,
--Takahiro AKASHI
+> Thanks. May I ask if CPU hotplug is known to work?
 
 
-> Will
->
+I didn't test that.
+
+
+> Also, which version
+> of the boot loader stack is required?
+
+
+I've the U-Boot / boot loader stack from BSP v3.0.2 on the board. I 
+haven't tested v3.0.3, yet.
+
+
+Best regards
+
+Dirk
