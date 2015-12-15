@@ -1,85 +1,44 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 15 Dec 2015 14:58:35 +0000
-Subject: [PATCH v7 15/19] KVM: ARM64: Add access handler for PMUSERENR
- register
-In-Reply-To: <1450169379-12336-16-git-send-email-zhaoshenglong@huawei.com>
-References: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
- <1450169379-12336-16-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <56702A9B.6000802@arm.com>
+From: mika.westerberg@linux.intel.com (Mika Westerberg)
+Date: Tue, 15 Dec 2015 16:59:53 +0200
+Subject: [PATCH v2 0/2] i2c:dw: Add APM X-Gene ACPI I2C device support
+In-Reply-To: <56702923.9010305@amd.com>
+References: <1449782357-22982-1-git-send-email-lho@apm.com>
+ <566F6485.2000508@amd.com>
+ <20151215132721.GJ1762@lahna.fi.intel.com>
+ <56702923.9010305@amd.com>
+Message-ID: <20151215145953.GK1762@lahna.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/12/15 08:49, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
+On Tue, Dec 15, 2015 at 08:52:19AM -0600, Suravee Suthikulpanit wrote:
 > 
-> The reset value of PMUSERENR_EL0 is UNKNOWN, use reset_unknown.
 > 
-> PMUSERENR_EL0 holds some bits which decide whether PMU registers can be
-> accessed from EL0. Add some check helpers to handle the access from EL0.
+> On 12/15/2015 07:27 AM, Mika Westerberg wrote:
+> >On Mon, Dec 14, 2015 at 06:53:25PM -0600, Suravee Suthikulanit wrote:
+> >>>I'm not sure if this has been discussed earlier. But after looking at the
+> >>>the acpi_apd driver, all we need is just the platform-specific input clock
+> >>>frequency value used by the drivers/i2c/busses/i2c-designware-core.c:
+> >>>i2c_dw_init() to calculate the values to program into the DW_IC_SS_SCL_HCNT
+> >>>and DW_IC_SS_SCL_LCNT registers.
+> >There is a way to pass *CNT values already from ACPI to the driver -- It
+> >looks for method called FMCN (or SSCN) and retrieves the values from
+> >there if found.
 > 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  arch/arm64/kvm/sys_regs.c | 124 ++++++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 119 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index b2ccc25..bad3dfd 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -452,12 +452,44 @@ static void reset_pmcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
->  	vcpu_sys_reg(vcpu, r->reg) = val;
->  }
->  
-> +static inline bool pmu_access_el0_disabled(struct kvm_vcpu *vcpu)
-> +{
-> +	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
-> +
-> +	return !((reg & 0x1) || vcpu_mode_priv(vcpu));
-> +}
-> +
-> +static inline bool pmu_write_swinc_el0_disabled(struct kvm_vcpu *vcpu)
-> +{
-> +	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
-> +
-> +	return !((reg & 0x3) || vcpu_mode_priv(vcpu));
-> +}
-> +
-> +static inline bool pmu_access_cycle_counter_el0_disabled(struct kvm_vcpu *vcpu)
-> +{
-> +	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
-> +
-> +	return !((reg & 0x5) || vcpu_mode_priv(vcpu));
-> +}
-> +
-> +static inline bool pmu_access_event_counter_el0_disabled(struct kvm_vcpu *vcpu)
-> +{
-> +	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
-> +
-> +	return !((reg & 0x9) || vcpu_mode_priv(vcpu));
-> +}
+> Right, I also noticed this afterward. By the way, are FMCN and SSCN
+> documented anywhere in the ACPI spec?  I am trying to figure out how to
+> update the ACPI table to add this information for the AMD Seattle (ARM64)
+> platform, and I will also submit a patch to add the new HID for this driver.
 
-Please add #defines for the PMUSERNR_EL0 bits.
+No, they are Intel inventions for the Windows I2C driver.
 
-> +
->  static bool access_pmcr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
->  			const struct sys_reg_desc *r)
->  {
->  	u64 val;
-> +	bool unaccessible = pmu_access_el0_disabled(vcpu);
->  
->  	if (p->is_write) {
-> +		if (unaccessible)
-> +			return ignore_write(vcpu, p);
-> +
+Here is what I know about it:
+  SSCN - Standard Mode CNTs
+  FMCN - Fast Mode CNTs
 
-This is not how this is supposed to work. If EL0 is denied access to the
-PMU, you must inject an exception into EL1 for it to handle the fault.
-The code should reflect the flow described at D5.11.2 in the ARM ARM.
+They both return a package:
 
-This whole patch needs to be revisited, I'm afraid.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+  Package() {
+    HCNT,
+    LCNT,
+    SDA_hold_time,
+  }
