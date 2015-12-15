@@ -1,198 +1,198 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Tue, 15 Dec 2015 14:55:12 +0100
-Subject: [RFC PATCH 2/8] Documentation: arm: define DT cpu capacity
- bindings
-In-Reply-To: <20151215122238.GG16007@e106622-lin>
-References: <1448288921-30307-1-git-send-email-juri.lelli@arm.com>
- <1448288921-30307-3-git-send-email-juri.lelli@arm.com>
- <20151124020631.GA15165@rob-hp-laptop>
- <20151210153004.GA26758@sirena.org.uk> <20151210175820.GE14571@e106622-lin>
- <20151211174940.GQ5727@sirena.org.uk> <20151214123616.GC3308@e106622-lin>
- <20151214165928.GV5727@sirena.org.uk> <20151215122238.GG16007@e106622-lin>
-Message-ID: <CAKfTPtBJVFOiS7Ci8rgEP_tWWb+nW=DnvJeQ6+HywK5+Ncq+Ng@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 15 Dec 2015 13:56:04 +0000
+Subject: [PATCH v7 10/19] KVM: ARM64: Add access handler for PMCNTENSET
+ and PMCNTENCLR register
+In-Reply-To: <1450169379-12336-11-git-send-email-zhaoshenglong@huawei.com>
+References: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
+ <1450169379-12336-11-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <56701BF4.2060204@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 December 2015 at 13:22, Juri Lelli <juri.lelli@arm.com> wrote:
-> On 14/12/15 16:59, Mark Brown wrote:
->> On Mon, Dec 14, 2015 at 12:36:16PM +0000, Juri Lelli wrote:
->> > On 11/12/15 17:49, Mark Brown wrote:
->>
->> > > The purpose of the capacity values is to influence the scheduler
->> > > behaviour and hence performance.  Without a concrete definition they're
->> > > just magic numbers which have meaining only in terms of their effect on
->> > > the performance of the system.  That is a sufficiently complex outcome
->> > > to ensure that there will be an element of taste in what the desired
->> > > outcomes are.  Sounds like tuneables to me.
->>
->> > Capacity values are meant to describe asymmetry (if any) of the system
->> > CPUs to the scheduler. The scheduler can then use this additional bit of
->> > information to try to do better scheduling decisions. Yes, having these
->> > values available will end up giving you better performance, but I guess
->> > this apply to any information we provide to the kernel (and scheduler);
->> > the less dumb a subsystem is, the better we can make it work.
->>
->> This information is a magic number, there's never going to be a right
->> answer.  If it needs changing it's not like the kernel is modeling a
->> concrete thing like the relative performance of the A53 and A57 poorly
->> or whatever, it's just that the relative values of number A and number B
->> are not what the system integrator desires.
->>
->> > > If you are saying people should use other, more sensible, ways of
->> > > specifying the final values that actually get used in production then
->> > > why take the defaults from direct numbers DT in the first place?  If you
->> > > are saying that people should tune and then put the values in here then
->> > > that's problematic for the reasons I outlined.
->>
->> > IMHO, people should come up with default values that describe
->> > heterogeneity in their system. Then use other ways to tune the system at
->> > run time (depending on the workload maybe).
->>
->> My argument is that they should be describing the hetrogeneity of their
->> system by describing concrete properties of their system rather than by
->> providing magic numbers.
->>
->> > As said, I understand your concerns; but, what I don't still get is
->> > where CPU capacity values are so different from, say, idle states
->> > min-residency-us. AFAIK there is a per-SoC benchmarking phase required
->> > to come up with that values as well; you have to pick some benchmark
->> > that stresses worst case entry/exit while measuring energy, then make
->> > calculations that tells you when it is wise to enter a particular idle
->> > state. Ideally we should derive min residency from specs, but I'm not
->> > sure is how it works in practice.
->>
->> Those at least have a concrete physical value that it is possible to
->> measure in a describable way that is unlikely to change based on the
->> internals of the kernel.  It would be kind of nice to have the broken
->> down numbers for entry time, exit time and power burn in suspend but
->> it's not clear it's worth the bother.  It's also one of these things
->> where we don't have any real proxies that get us anywhere in the
->> ballpark of where we want to be.
->>
->
-> I'm proposing to add a new value because I couldn't find any proxies in
-> the current bindings that bring us any close to what we need. If I
-> failed in looking for them, and they actually exists, I'll personally be
-> more then happy to just rely on them instead of adding more stuff :-).
->
-> Interestingly, to me it sounds like we could actually use your first
-> paragraph above almost as it is to describe how to come up with capacity
-> values. In the documentation I put the following:
->
-> "One simple way to estimate CPU capacities is to iteratively run a
-> well-known CPU user space benchmark (e.g, sysbench, dhrystone, etc.) on
-> each CPU at maximum frequency and then normalize values w.r.t.  the best
-> performing CPU."
->
-> I don't see why this should change if we decide that the scheduler has
-> to change in the future.
->
-> Also, looking again at section 2 of idle-states bindings docs, we have a
-> nice and accurate description of what min-residency is, but not much
-> info about how we can actually measure that. Maybe, expanding the docs
-> section regarding CPU capacity could help?
->
->> > > It also seems a bit strange to expect people to do some tuning in one
->> > > place initially and then additional tuning somewhere else later, from
->> > > a user point of view I'd expect to always do my tuning in the same
->> > > place.
->>
->> > I think that runtime tuning needs are much more complex and have finer
->> > grained needs than what you can achieve by playing with CPU capacities.
->> > And I agree with you, users should only play with these other methods
->> > I'm referring to; they should not mess around with platform description
->> > bits. They should provide information about runtime needs, then the
->> > scheduler (in this case) will do its best to give them acceptable
->> > performance using improved knowledge about the platform.
->>
->> So then why isn't it adequate to just have things like the core types in
->> there and work from there?  Are we really expecting the tuning to be so
->> much better than it's possible to come up with something that's so much
->> better on the scale that we're expecting this to be accurate that it's
->> worth just jumping straight to magic numbers?
->>
->
-> I take your point here that having fine grained values might not really
-> give us appreciable differences (that is also why I proposed the
-> capacity-scale in the first instance), but I'm not sure I'm getting what
-> you are proposing here.
->
-> Today, and for arm only, we have a static table representing CPUs
-> "efficiency":
->
->  /*
->   * Table of relative efficiency of each processors
->   * The efficiency value must fit in 20bit and the final
->   * cpu_scale value must be in the range
->   *   0 < cpu_scale < 3*SCHED_CAPACITY_SCALE/2
->   * in order to return at most 1 when DIV_ROUND_CLOSEST
->   * is used to compute the capacity of a CPU.
->   * Processors that are not defined in the table,
->   * use the default SCHED_CAPACITY_SCALE value for cpu_scale.
->   */
->  static const struct cpu_efficiency table_efficiency[] = {
->         {"arm,cortex-a15", 3891},
->         {"arm,cortex-a7",  2048},
->         {NULL, },
+On 15/12/15 08:49, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> Since the reset value of PMCNTENSET and PMCNTENCLR is UNKNOWN, use
+> reset_unknown for its reset handler. Add a handler to emulate writing
+> PMCNTENSET or PMCNTENCLR register.
+> 
+> When writing to PMCNTENSET, call perf_event_enable to enable the perf
+> event. When writing to PMCNTENCLR, call perf_event_disable to disable
+> the perf event.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  arch/arm64/kvm/sys_regs.c | 41 +++++++++++++++++++++++++++++++----
+>  include/kvm/arm_pmu.h     |  4 ++++
+>  virt/kvm/arm/pmu.c        | 55 +++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 96 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index dc6bb26..f216da7 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -615,6 +615,39 @@ static bool access_pmu_evcntr(struct kvm_vcpu *vcpu,
+>  	return true;
+>  }
+>  
+> +static inline u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu)
+> +{
+> +	u64 val = vcpu_sys_reg(vcpu, PMCR_EL0) >> ARMV8_PMCR_N_SHIFT;
+> +
+> +	val &= ARMV8_PMCR_N_MASK;
+> +	return GENMASK(val - 1, 0) | BIT(ARMV8_CYCLE_IDX);
+> +}
+> +
+> +static bool access_pmcntenset(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+> +			      const struct sys_reg_desc *r)
+> +{
+> +	u64 val, mask;
+> +
+> +	mask = kvm_pmu_valid_counter_mask(vcpu);
+> +	if (p->is_write) {
+> +		val = p->regval & mask;
+> +		if (r->Op2 & 0x1) {
+> +			/* accessing PMCNTENSET_EL0 */
+> +			vcpu_sys_reg(vcpu, r->reg) |= val;
+> +			kvm_pmu_enable_counter(vcpu, val);
+> +		} else {
+> +			/* accessing PMCNTENCLR_EL0 */
+> +			vcpu_sys_reg(vcpu, r->reg) &= mask;
+> +			vcpu_sys_reg(vcpu, r->reg) &= ~val;
+> +			kvm_pmu_disable_counter(vcpu, val);
+> +		}
+> +	} else {
+> +		p->regval = vcpu_sys_reg(vcpu, r->reg) & mask;
+> +	}
+> +
+> +	return true;
+> +}
+> +
+>  /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
+>  #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
+>  	/* DBGBVRn_EL1 */						\
+> @@ -816,10 +849,10 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+>  	  access_pmcr, reset_pmcr, PMCR_EL0, },
+>  	/* PMCNTENSET_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b001),
+> -	  trap_raz_wi },
+> +	  access_pmcntenset, reset_unknown, PMCNTENSET_EL0 },
+>  	/* PMCNTENCLR_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b010),
+> -	  trap_raz_wi },
+> +	  access_pmcntenset, NULL, PMCNTENSET_EL0 },
+>  	/* PMOVSCLR_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b011),
+>  	  trap_raz_wi },
+> @@ -1161,8 +1194,8 @@ static const struct sys_reg_desc cp15_regs[] = {
+>  
+>  	/* PMU */
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), access_pmcr },
+> -	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), trap_raz_wi },
+> -	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), trap_raz_wi },
+> +	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), access_pmcntenset },
+> +	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), access_pmcntenset },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), trap_raz_wi },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), access_pmselr },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), access_pmceid },
+> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+> index 14bedb0..43c4117 100644
+> --- a/include/kvm/arm_pmu.h
+> +++ b/include/kvm/arm_pmu.h
+> @@ -36,6 +36,8 @@ struct kvm_pmu {
 >  };
->
-> When clock-frequency property is defined in DT, we try to find a match
-> for the compatibility string in the table above and then use the
-> associate number to compute the capacity. Are you proposing to have
-> something like this for arm64 as well?
->
-> BTW, the only info I could find about those numbers is from this thread
->
->  http://lists.infradead.org/pipermail/linux-arm-kernel/2012-June/104072.html
->
-> Vincent, do we have more precise information about these numbers
-> somewhere else?
+>  
+>  u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx);
+> +void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val);
+> +void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val);
+>  void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
+>  				    u64 select_idx);
+>  #else
+> @@ -46,6 +48,8 @@ u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx)
+>  {
+>  	return 0;
+>  }
+> +void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val) {}
+> +void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val) {}
+>  void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
+>  				    u64 select_idx) {}
+>  #endif
+> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+> index b107fb8..94bff0e 100644
+> --- a/virt/kvm/arm/pmu.c
+> +++ b/virt/kvm/arm/pmu.c
+> @@ -75,6 +75,61 @@ static void kvm_pmu_stop_counter(struct kvm_vcpu *vcpu, struct kvm_pmc *pmc)
+>  }
+>  
+>  /**
+> + * kvm_pmu_enable_counter - enable selected PMU counter
+> + * @vcpu: The vcpu pointer
+> + * @val: the value guest writes to PMCNTENSET register
+> + *
+> + * Call perf_event_enable to start counting the perf event
+> + */
+> +void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val)
+> +{
+> +	int i;
+> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+> +	struct kvm_pmc *pmc;
+> +
+> +	if (!(vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMCR_E) || !val)
+> +		return;
+> +
+> +	for (i = 0; i < ARMV8_MAX_COUNTERS; i++) {
+> +		if (!((val >> i) & 0x1))
+> +			continue;
 
-These numbers come from a document from ARM in which they compared A15
-and A7 . I just used the number provided by this white paper and scale
-it in a more appropriate range than DMIPS/Mhz
+nit: it is slightly more readable to have "if (!(val & (1 << i)))
 
->
-> If I understand how that table was created, how do we think we will
-> extend it in the future to allow newer core types (say we replicate this
-> solution for arm64)?  It seems that we have to change it, rescaling
-> values, each time we have a new core on the market. How can we come up
-> with relative numbers, in the future, comparing newer cores to old ones
-> (that might be already out of the market by that time)?
->
->> > > Doing that and then switching to some other interface for real tuning
->> > > seems especially odd and I'm not sure that's something that users are
->> > > going to expect or understand.
->>
->> > As I'm saying above, users should not care about this first step of
->> > platform description; not more than how much they care about other bits
->> > in DTs that describe their platform.
->>
->> That may be your intention but I don't see how it is realistic to expect
->> that this is what people will actually understand.  It's a number, it
->> has an effect and it's hard to see that people won't tune it, it's not
->> like people don't have to edit DTs during system integration.  People
->> won't reliably read documentation or look in mailing list threads and
->> other that that it has all the properties of a tuning interface.
->>
->
-> Eh, sad but true. I guess we can, as we usually do, put more effort in
-> documenting how things are supposed to be used. Then, if people think
-> that they can make their system perform better without looking at
-> documentation or asking around, I'm not sure there is much we could do
-> to prevent them to do things wrong. There are already lot of things
-> people shouldn't touch if they don't know what they are doing. :-/
->
->> There's a tension here between what you're saying about people not being
->> supposed to care much about the numbers for tuning and the very fact
->> that there's a need for the DT to carry explicit numbers.
->
-> My point is that people with tuning needs shouldn't even look at DTs,
-> but put all their efforts in describing (using appropriate APIs) their
-> needs and how they apply to the workload they care about. Our job is to
-> put together information coming from users and knowledge of system
-> configuration to provide people the desired outcomes.
->
-> Best,
->
-> - Juri
+> +
+> +		pmc = &pmu->pmc[i];
+> +		if (pmc->perf_event) {
+> +			perf_event_enable(pmc->perf_event);
+> +			if (pmc->perf_event->state != PERF_EVENT_STATE_ACTIVE)
+> +				kvm_debug("fail to enable perf event\n");
+> +		}
+> +	}
+> +}
+> +
+> +/**
+> + * kvm_pmu_disable_counter - disable selected PMU counter
+> + * @vcpu: The vcpu pointer
+> + * @val: the value guest writes to PMCNTENCLR register
+> + *
+> + * Call perf_event_disable to stop counting the perf event
+> + */
+> +void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val)
+> +{
+> +	int i;
+> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+> +	struct kvm_pmc *pmc;
+> +
+> +	if (!val)
+> +		return;
+> +
+> +	for (i = 0; i < ARMV8_MAX_COUNTERS; i++) {
+> +		if (!((val >> i) & 0x1))
+
+Same here.
+
+> +			continue;
+> +
+> +		pmc = &pmu->pmc[i];
+> +		if (pmc->perf_event)
+> +			perf_event_disable(pmc->perf_event);
+> +	}
+> +}
+> +
+> +/**
+>   * kvm_pmu_set_counter_event_type - set selected counter to monitor some event
+>   * @vcpu: The vcpu pointer
+>   * @data: The data guest writes to PMXEVTYPER_EL0
+> 
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
