@@ -1,91 +1,152 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Tue, 15 Dec 2015 18:47:20 +0100
-Subject: [RFC PATCH 2/8] Documentation: arm: define DT cpu capacity
- bindings
-In-Reply-To: <20151215171518.GC8012@leverpostej>
-References: <20151215122238.GG16007@e106622-lin>
- <20151215133951.GY5727@sirena.org.uk>
- <20151215140135.GI31299@leverpostej> <20151215150813.GZ5727@sirena.org.uk>
- <20151215153218.GA7228@leverpostej> <20151215154651.GK16007@e106622-lin>
- <20151215155737.GB7619@leverpostej>
- <20151215162317.GB24286@e104818-lin.cambridge.arm.com>
- <20151215164145.GA8012@leverpostej>
- <CAKfTPtAuosPcL8bbQ27Y-vUE1h4QRY8hGESnm4YrxqRAQ3K=5g@mail.gmail.com>
- <20151215171518.GC8012@leverpostej>
-Message-ID: <CAKfTPtBzWcNHx+Fi7hUabNpPsd1thFAkPnLcpsnqbQp6Qq24cQ@mail.gmail.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Tue, 15 Dec 2015 11:50:32 -0600
+Subject: [PATCH v7 19/19] KVM: ARM64: Add a new kvm ARM PMU device
+In-Reply-To: <567038E3.3010102@arm.com>
+References: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
+ <1450169379-12336-20-git-send-email-zhaoshenglong@huawei.com>
+ <567032AD.8000206@arm.com> <567036DE.80605@linaro.org>
+ <567038E3.3010102@arm.com>
+Message-ID: <20151215175032.GI5373@hawk.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 December 2015 at 18:15, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Tue, Dec 15, 2015 at 05:59:34PM +0100, Vincent Guittot wrote:
->> On 15 December 2015 at 17:41, Mark Rutland <mark.rutland@arm.com> wrote:
->> > On Tue, Dec 15, 2015 at 04:23:18PM +0000, Catalin Marinas wrote:
->> >> On Tue, Dec 15, 2015 at 03:57:37PM +0000, Mark Rutland wrote:
->> >> > On Tue, Dec 15, 2015 at 03:46:51PM +0000, Juri Lelli wrote:
->> >> > > On 15/12/15 15:32, Mark Rutland wrote:
->> >> > > > On Tue, Dec 15, 2015 at 03:08:13PM +0000, Mark Brown wrote:
->> >> > > > > My expectation is that we just need good enough, not perfect, and that
->> >> > > > > seems to match what Juri is saying about the expectation that most of
->> >> > > > > the fine tuning is done via other knobs.
->> >> > > >
->> >> > > > My expectation is that if a ballpark figure is good enough, it should be
->> >> > > > possible to implement something trivial like bogomips / loop_per_jiffy
->> >> > > > calculation.
->> >> > >
->> >> > > I didn't really followed that, so I might be wrong here, but isn't
->> >> > > already happened a discussion about how we want/like to stop exposing
->> >> > > bogomips info or rely on it for anything but in kernel delay loops?
->> >> >
->> >> > I meant that we could have a benchmark of that level of complexity,
->> >> > rather than those specific values.
->> >>
->> >> Or we could simply let user space use whatever benchmarks or hard-coded
->> >> values it wants and set the capacity via sysfs (during boot). By
->> >> default, the kernel would assume all CPUs equal.
->> >
->> > I assume that a userspace override would be available regardless of
->> > whatever mechanism the kernel uses to determine relative
->> > performance/effinciency.
->>
->> Don't you think that if we let a complete latitude to the userspace
->> to set whatever it wants, it will be used to abuse the kernel (and the
->> scheduler in particular ) and that this will finish in a real mess to
->> understand what is wrong when a task is not placed where it should be.
->
-> I'm not sure I follow what you mean by "abuse" here. Userspace currently
-> can force the scheduler to make sub-optimal decisions in a number of
-> ways, e.g.
->
-> * Hot-unplugging the preferred CPUs
-> * Changing a task's affinity mask
-> * Setting the nice value of a task
-> * Using rlimits and/or cgroups
-> * Using a cpufreq governor
-> * Fork-bombing
+On Tue, Dec 15, 2015 at 03:59:31PM +0000, Marc Zyngier wrote:
+> On 15/12/15 15:50, Shannon Zhao wrote:
+> > 
+> > 
+> > On 2015/12/15 23:33, Marc Zyngier wrote:
+> >> On 15/12/15 08:49, Shannon Zhao wrote:
+> >>>> From: Shannon Zhao<shannon.zhao@linaro.org>
+> >>>>
+> >>>> Add a new kvm device type KVM_DEV_TYPE_ARM_PMU_V3 for ARM PMU. Implement
+> >>>> the kvm_device_ops for it.
+> >>>>
+> >>>> Signed-off-by: Shannon Zhao<shannon.zhao@linaro.org>
+> >>>> ---
+> >>>>  Documentation/virtual/kvm/devices/arm-pmu.txt |  16 ++++
+> >>>>  arch/arm64/include/uapi/asm/kvm.h             |   3 +
+> >>>>  include/linux/kvm_host.h                      |   1 +
+> >>>>  include/uapi/linux/kvm.h                      |   2 +
+> >>>>  virt/kvm/arm/pmu.c                            | 115 ++++++++++++++++++++++++++
+> >>>>  virt/kvm/kvm_main.c                           |   4 +
+> >>>>  6 files changed, 141 insertions(+)
+> >>>>  create mode 100644 Documentation/virtual/kvm/devices/arm-pmu.txt
+> >>>>
+> >>>> diff --git a/Documentation/virtual/kvm/devices/arm-pmu.txt b/Documentation/virtual/kvm/devices/arm-pmu.txt
+> >>>> new file mode 100644
+> >>>> index 0000000..5121f1f
+> >>>> --- /dev/null
+> >>>> +++ b/Documentation/virtual/kvm/devices/arm-pmu.txt
+> >>>> @@ -0,0 +1,16 @@
+> >>>> +ARM Virtual Performance Monitor Unit (vPMU)
+> >>>> +===========================================
+> >>>> +
+> >>>> +Device types supported:
+> >>>> +  KVM_DEV_TYPE_ARM_PMU_V3         ARM Performance Monitor Unit v3
+> >>>> +
+> >>>> +Instantiate one PMU instance for per VCPU through this API.
+> >>>> +
+> >>>> +Groups:
+> >>>> +  KVM_DEV_ARM_PMU_GRP_IRQ
+> >>>> +  Attributes:
+> >>>> +    A value describing the interrupt number of PMU overflow interrupt. This
+> >>>> +    interrupt should be a PPI.
+> >>>> +
+> >>>> +  Errors:
+> >>>> +    -EINVAL: Value set is out of the expected range (from 16 to 31)
+> >>>> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+> >>>> index 2d4ca4b..568afa2 100644
+> >>>> --- a/arch/arm64/include/uapi/asm/kvm.h
+> >>>> +++ b/arch/arm64/include/uapi/asm/kvm.h
+> >>>> @@ -204,6 +204,9 @@ struct kvm_arch_memory_slot {
+> >>>>  #define KVM_DEV_ARM_VGIC_GRP_CTRL	4
+> >>>>  #define   KVM_DEV_ARM_VGIC_CTRL_INIT	0
+> >>>>
+> >>>> +/* Device Control API: ARM PMU */
+> >>>> +#define KVM_DEV_ARM_PMU_GRP_IRQ		0
+> >>>> +
+> >>>>  /* KVM_IRQ_LINE irq field index values */
+> >>>>  #define KVM_ARM_IRQ_TYPE_SHIFT		24
+> >>>>  #define KVM_ARM_IRQ_TYPE_MASK		0xff
+> >>>> diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
+> >>>> index c923350..608dea6 100644
+> >>>> --- a/include/linux/kvm_host.h
+> >>>> +++ b/include/linux/kvm_host.h
+> >>>> @@ -1161,6 +1161,7 @@ extern struct kvm_device_ops kvm_mpic_ops;
+> >>>>  extern struct kvm_device_ops kvm_xics_ops;
+> >>>>  extern struct kvm_device_ops kvm_arm_vgic_v2_ops;
+> >>>>  extern struct kvm_device_ops kvm_arm_vgic_v3_ops;
+> >>>> +extern struct kvm_device_ops kvm_arm_pmu_ops;
+> >>>>
+> >>>>  #ifdef CONFIG_HAVE_KVM_CPU_RELAX_INTERCEPT
+> >>>>
+> >>>> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+> >>>> index 03f3618..4ba6fdd 100644
+> >>>> --- a/include/uapi/linux/kvm.h
+> >>>> +++ b/include/uapi/linux/kvm.h
+> >>>> @@ -1032,6 +1032,8 @@ enum kvm_device_type {
+> >>>>  #define KVM_DEV_TYPE_FLIC		KVM_DEV_TYPE_FLIC
+> >>>>  	KVM_DEV_TYPE_ARM_VGIC_V3,
+> >>>>  #define KVM_DEV_TYPE_ARM_VGIC_V3	KVM_DEV_TYPE_ARM_VGIC_V3
+> >>>> +	KVM_DEV_TYPE_ARM_PMU_V3,
+> >>>> +#define	KVM_DEV_TYPE_ARM_PMU_V3		KVM_DEV_TYPE_ARM_PMU_V3
+> >>>>  	KVM_DEV_TYPE_MAX,
+> >>>>  };
+> >>>>
+> >>>> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+> >>>> index d113ee4..1965d0d 100644
+> >>>> --- a/virt/kvm/arm/pmu.c
+> >>>> +++ b/virt/kvm/arm/pmu.c
+> >>>> @@ -19,6 +19,7 @@
+> >>>>  #include <linux/kvm.h>
+> >>>>  #include <linux/kvm_host.h>
+> >>>>  #include <linux/perf_event.h>
+> >>>> +#include <linux/uaccess.h>
+> >>>>  #include <asm/kvm_emulate.h>
+> >>>>  #include <kvm/arm_pmu.h>
+> >>>>  #include <kvm/arm_vgic.h>
+> >>>> @@ -357,3 +358,117 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
+> >>>>
+> >>>>  	pmc->perf_event = event;
+> >>>>  }
+> >>>> +
+> >>>> +static inline bool kvm_arm_pmu_initialized(struct kvm_vcpu *vcpu)
+> >>>> +{
+> >>>> +	return vcpu->arch.pmu.irq_num != -1;
+> >>>> +}
+> >>>> +
+> >>>> +static int kvm_arm_pmu_irq_access(struct kvm *kvm, int *irq, bool is_set)
+> >>>> +{
+> >>>> +	int j;
+> >>>> +	struct kvm_vcpu *vcpu;
+> >>>> +
+> >>>> +	kvm_for_each_vcpu(j, vcpu, kvm) {
+> >>>> +		struct kvm_pmu *pmu = &vcpu->arch.pmu;
+> >>>> +
+> >>>> +		if (!is_set) {
+> >>>> +			if (!kvm_arm_pmu_initialized(vcpu))
+> >>>> +				return -EBUSY;
+> >> Returning -EBUSY is a bit odd. Maybe -EINVAL? But this seems weird
+> >> anyway. Actually, why would you return an error in this case?
+> >>
+> > While this is a unexpected operation from user space and it's already 
+> > initialized and working, so I think it should return an error to user 
+> > and tell user that it's already initialized and working (this should 
+> > mean "busy" ?).
+> 
+> But in this case, you're returning an error if it is *not* initialized.
+> I understand that in that case you cannot return an interrupt number (-1
+> would be weird), but returning -EBUSY feels even more weird.
+> 
+> I'd settle for -ENOXIO, or something similar. Anyone having a better idea?
 
-All these are parameters have a meaning (except the last one). By
-abusing i mean setting the capacity of the most powerful cpu to 1 for
-no good reason except to abuse the scheduler so the latter will not
-put that much tasks on it just  because the current running use case
-is more efficient if the big core is not used.
+Added qemu-devel (Peter). I think for the most part QEMU just stringifies
+errnos and outputs them. So, in the absence of a kernel message, having
+more unique errnos does help zero-in on a problem. However EINVAL plus a
+kernel message is probably even better, and it doesn't start with people
+trying to understand why a particular errno (which makes about as much
+sense as EINVAL, but seems to be attempting to provide something more...)
+was used.
 
-
->
-> Practically all of these are prvileged operations. I would envisage the
-> userspace interface for "capacity" management to be similar.
->
->> We can probably provide a debug mode to help soc manufacturer to
->> define their capacity value but IMHO we should not let complete
->> latitude in normal operation
->
-> In normal operation userspace wouldn't mess with this, as with most of
-> the cases above. Userspace can already shooti tself in the foot.
->
->> In normal operation we need to give some methods to tweak the value to
->> reflect a memory bounded or integer calculation work  or other kind of
->> work that currently runs on the cpu but not more
->
-> You can already do that with the mechanisms above, to some extent. I'm
-> not sure I follow.
->
-> Mark.
+Thanks,
+drew
