@@ -1,64 +1,96 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 15 Dec 2015 09:36:17 +0000
-Subject: [PATCH] ARM: psci: Fix indentation in DT bindings
-In-Reply-To: <1450169255-669-1-git-send-email-geert+renesas@glider.be>
-References: <1450169255-669-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20151215093617.GA11725@red-moon>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 15 Dec 2015 15:08:27 +0530
+Subject: [PATCH 2/6] ARM: DTS: da850: Use the new DT bindings for the eDMA3
+In-Reply-To: <1449237210-16381-3-git-send-email-peter.ujfalusi@ti.com>
+References: <1449237210-16381-1-git-send-email-peter.ujfalusi@ti.com>
+ <1449237210-16381-3-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <566FDF93.7050005@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 15, 2015 at 09:47:35AM +0100, Geert Uytterhoeven wrote:
-> Fix bogus indentation of the PSCI compatible values (each space was
-> replaced by a TAB?).
+Hi Peter,
 
-Probably, I would remove question from the log.
-
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+On Friday 04 December 2015 07:23 PM, Peter Ujfalusi wrote:
+> Switch to use the ti,edma3-tpcc and ti,edma3-tptc binding for the eDMA3.
+> With the new bindings boards can customize and tweak the DMA channel
+> priority to match their needs. With the new binding the memcpy is safe
+> to be used since with the old binding it was not possible for a driver
+> to know which channel is allowed to be used as non HW triggered channel.
+> Using the new binding will allow us to reserve PaRAM slots to be used by
+> the DSP which was not possible before and prevented the da850 boards to be
+> moved to DT only.
+> 
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 > ---
->  Documentation/devicetree/bindings/arm/psci.txt | 18 +++++++++---------
->  1 file changed, 9 insertions(+), 9 deletions(-)
+>  arch/arm/boot/dts/da850-enbw-cmc.dts |  5 +++++
+>  arch/arm/boot/dts/da850-evm.dts      |  5 +++++
+>  arch/arm/boot/dts/da850.dtsi         | 27 ++++++++++++++++++++++-----
+>  3 files changed, 32 insertions(+), 5 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
-> index a9adab84e2feb785..fb3a1dd2a9880bda 100644
-> --- a/Documentation/devicetree/bindings/arm/psci.txt
-> +++ b/Documentation/devicetree/bindings/arm/psci.txt
-> @@ -23,17 +23,17 @@ Main node required properties:
->  
->   - compatible    : should contain at least one of:
->  
-> -				 * "arm,psci" : for implementations complying to PSCI versions prior to
-> -					0.2. For these cases function IDs must be provided.
-> +     * "arm,psci" : for implementations complying to PSCI versions prior to
-> +	0.2. For these cases function IDs must be provided.
+> diff --git a/arch/arm/boot/dts/da850-enbw-cmc.dts b/arch/arm/boot/dts/da850-enbw-cmc.dts
+> index e750ab9086d5..ca9117624cf9 100644
+> --- a/arch/arm/boot/dts/da850-enbw-cmc.dts
+> +++ b/arch/arm/boot/dts/da850-enbw-cmc.dts
+> @@ -28,3 +28,8 @@
+>  		};
+>  	};
+>  };
+> +
+> +&edma0 {
+> +	ti,edma-reserved-slot-ranges = /bits/ 16 <32 50>;
+> +	ti,edma-memcpy-channels = /bits/ 16 <20 21>;
+> +};
+> diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+> index d807285a61cd..33467feb272a 100644
+> --- a/arch/arm/boot/dts/da850-evm.dts
+> +++ b/arch/arm/boot/dts/da850-evm.dts
+> @@ -243,3 +243,8 @@
+>  	tx-num-evt = <32>;
+>  	rx-num-evt = <32>;
+>  };
+> +
+> +&edma0 {
+> +	ti,edma-reserved-slot-ranges = /bits/ 16 <32 50>;
+> +	ti,edma-memcpy-channels = /bits/ 16 <20 21>;
 
-	* "arm,psci" : for implementations complying to PSCI versions prior to
-		       0.2. For these cases function IDs must be provided.
+These correspond to PRU events. It is true that most likely they will
+never be used for peripheral DMA and can be dedicated as memcpy
+channels. However, since this is being encoded in DT, we need to be sure
+that they will never be used for peripheral DMA on this board.
 
-Can you indent like above please (all of them) ?
+So, I would prefer if you do not reserve any channels for memcpy until
+there is a real need/usecase for them. I know the board file has these
+reserved but board file could be updated as you liked. With DT we need
+to maintain backward compatibility. So I would rather do it when there
+is an actual need for it.
 
-Other than that:
+In future, if/when we gain QDMA support, the QDMA channels could be used
+for memcopy.
 
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-
+> +};
+> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+> index e73f5efb3aa3..9e46eb51a8da 100644
+> --- a/arch/arm/boot/dts/da850.dtsi
+> +++ b/arch/arm/boot/dts/da850.dtsi
+> @@ -151,11 +151,28 @@
 >  
-> -				 * "arm,psci-0.2" : for implementations complying to PSCI 0.2. Function
-> -					IDs are not required and should be ignored by an OS with PSCI 0.2
-> -					support, but are permitted to be present for compatibility with
-> -					existing software when "arm,psci" is later in the compatible list.
-> +     * "arm,psci-0.2" : for implementations complying to PSCI 0.2. Function
-> +	IDs are not required and should be ignored by an OS with PSCI 0.2
-> +	support, but are permitted to be present for compatibility with
-> +	existing software when "arm,psci" is later in the compatible list.
->  
-> -				* "arm,psci-1.0" : for implementations complying to PSCI 1.0. PSCI 1.0 is
-> -					backward compatible with PSCI 0.2 with minor specification updates,
-> -					as defined in the PSCI specification[2].
-> +    * "arm,psci-1.0" : for implementations complying to PSCI 1.0. PSCI 1.0 is
-> +	backward compatible with PSCI 0.2 with minor specification updates,
-> +	as defined in the PSCI specification[2].
->  
->   - method        : The method of calling the PSCI firmware. Permitted
->                     values are:
-> -- 
-> 1.9.1
-> 
+>  		};
+>  		edma0: edma at 01c00000 {
+> -			compatible = "ti,edma3";
+> +			compatible = "ti,edma3-tpcc";
+>  			/* eDMA3 CC0: 0x01c0 0000 - 0x01c0 7fff */
+>  			reg =	<0x0 0x8000>;
+> -			interrupts = <11 13 12>;
+> -			#dma-cells = <1>;
+> +			reg-names = "edma3_cc";
+> +			interrupts = <11 12>;
+> +			interrupt-names = "edma3_ccint", "edma3_ccerrint";
+> +			#dma-cells = <2>;
+> +
+> +			ti,tptcs = <&edma0_tptc0 7>, <&edma0_tptc1 0>;
+> +			ti,edma-memcpy-channels = /bits/ 16 <20 21>;
+
+Same here. I would drop this.
+
+Thanks,
+Sekhar
