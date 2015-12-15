@@ -1,304 +1,137 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 15 Dec 2015 18:33:17 +0100
-Subject: [PATCH v6 3/7] ARM: dts: Exynos542x/5800: add CPU OPP properties
+Date: Tue, 15 Dec 2015 18:33:16 +0100
+Subject: [PATCH v6 2/7] clk: samsung: exynos5420: add cpu clock configuration
+ data and instantiate cpu clock
 In-Reply-To: <1450200801-24539-1-git-send-email-b.zolnierkie@samsung.com>
 References: <1450200801-24539-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1450200801-24539-4-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <1450200801-24539-3-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thomas Abraham <thomas.ab@samsung.com>
 
-For Exynos542x/5800 platforms, add CPU operating points
-for migrating from Exynos specific cpufreq driver to using
-generic cpufreq driver.
+With the addition of the new Samsung specific cpu-clock type, the
+arm clock can be represented as a cpu-clock type. Add the CPU clock
+configuration data and instantiate the CPU clock type for Exynos5420.
 
 Changes by Bartlomiej:
-- split Exynos5420 support from the original patch
-- merged Exynos5422 fixes from Ben
+- split Exynos5420 support from the original patches
+- moved E5420_[EGL,KFC]_DIV0() macros to clk-exynos5420.c
 
-Changes by Ben Gamari:
-- Port to operating-points-v2
-
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Doug Anderson <dianders@chromium.org>
+Cc: Tomasz Figa <tomasz.figa@gmail.com>
+Cc: Mike Turquette <mturquette@baylibre.com>
 Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-Cc: Andreas Faerber <afaerber@suse.de>
+Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-Signed-off-by: Ben Gamari <ben@smart-cactus.org>
 Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 ---
- arch/arm/boot/dts/exynos5420-cpus.dtsi |  10 +++
- arch/arm/boot/dts/exynos5420.dtsi      | 110 +++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/exynos5422-cpus.dtsi |  10 +++
- 3 files changed, 130 insertions(+)
+ drivers/clk/samsung/clk-exynos5420.c   | 58 ++++++++++++++++++++++++++++++++--
+ include/dt-bindings/clock/exynos5420.h |  2 ++
+ 2 files changed, 58 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5420-cpus.dtsi b/arch/arm/boot/dts/exynos5420-cpus.dtsi
-index 7aaf031..261d251 100644
---- a/arch/arm/boot/dts/exynos5420-cpus.dtsi
-+++ b/arch/arm/boot/dts/exynos5420-cpus.dtsi
-@@ -29,8 +29,10 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a15";
- 			reg = <0x0>;
-+			clocks = <&clock CLK_ARM_CLK>;
- 			clock-frequency = <1800000000>;
- 			cci-control-port = <&cci_control1>;
-+			operating-points-v2 = <&cluster_a15_opp_table>;
- 		};
+diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+index 389af3c..2a92546 100644
+--- a/drivers/clk/samsung/clk-exynos5420.c
++++ b/drivers/clk/samsung/clk-exynos5420.c
+@@ -18,6 +18,7 @@
+ #include <linux/syscore_ops.h>
  
- 		cpu1: cpu at 1 {
-@@ -39,6 +41,7 @@
- 			reg = <0x1>;
- 			clock-frequency = <1800000000>;
- 			cci-control-port = <&cci_control1>;
-+			operating-points-v2 = <&cluster_a15_opp_table>;
- 		};
+ #include "clk.h"
++#include "clk-cpu.h"
  
- 		cpu2: cpu at 2 {
-@@ -47,6 +50,7 @@
- 			reg = <0x2>;
- 			clock-frequency = <1800000000>;
- 			cci-control-port = <&cci_control1>;
-+			operating-points-v2 = <&cluster_a15_opp_table>;
- 		};
+ #define APLL_LOCK		0x0
+ #define APLL_CON0		0x100
+@@ -616,9 +617,11 @@ static struct samsung_mux_clock exynos5x_mux_clks[] __initdata = {
+ 	MUX(0, "mout_mspll_kfc", mout_mspll_cpu_p, SRC_TOP7, 8, 2),
+ 	MUX(0, "mout_mspll_cpu", mout_mspll_cpu_p, SRC_TOP7, 12, 2),
  
- 		cpu3: cpu at 3 {
-@@ -55,14 +59,17 @@
- 			reg = <0x3>;
- 			clock-frequency = <1800000000>;
- 			cci-control-port = <&cci_control1>;
-+			operating-points-v2 = <&cluster_a15_opp_table>;
- 		};
+-	MUX(0, "mout_apll", mout_apll_p, SRC_CPU, 0, 1),
++	MUX_F(0, "mout_apll", mout_apll_p, SRC_CPU, 0, 1,
++	      CLK_SET_RATE_PARENT | CLK_RECALC_NEW_RATES, 0),
+ 	MUX(0, "mout_cpu", mout_cpu_p, SRC_CPU, 16, 1),
+-	MUX(0, "mout_kpll", mout_kpll_p, SRC_KFC, 0, 1),
++	MUX_F(0, "mout_kpll", mout_kpll_p, SRC_KFC, 0, 1,
++	      CLK_SET_RATE_PARENT | CLK_RECALC_NEW_RATES, 0),
+ 	MUX(0, "mout_kfc", mout_kfc_p, SRC_KFC, 16, 1),
  
- 		cpu4: cpu at 100 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a7";
- 			reg = <0x100>;
-+			clocks = <&clock CLK_KFC_CLK>;
- 			clock-frequency = <1000000000>;
- 			cci-control-port = <&cci_control0>;
-+			operating-points-v2 = <&cluster_a7_opp_table>;
- 		};
- 
- 		cpu5: cpu at 101 {
-@@ -71,6 +78,7 @@
- 			reg = <0x101>;
- 			clock-frequency = <1000000000>;
- 			cci-control-port = <&cci_control0>;
-+			operating-points-v2 = <&cluster_a7_opp_table>;
- 		};
- 
- 		cpu6: cpu at 102 {
-@@ -79,6 +87,7 @@
- 			reg = <0x102>;
- 			clock-frequency = <1000000000>;
- 			cci-control-port = <&cci_control0>;
-+			operating-points-v2 = <&cluster_a7_opp_table>;
- 		};
- 
- 		cpu7: cpu at 103 {
-@@ -87,6 +96,7 @@
- 			reg = <0x103>;
- 			clock-frequency = <1000000000>;
- 			cci-control-port = <&cci_control0>;
-+			operating-points-v2 = <&cluster_a7_opp_table>;
- 		};
- 	};
+ 	MUX(0, "mout_aclk200", mout_group1_p, SRC_TOP0, 8, 2),
+@@ -1246,6 +1249,50 @@ static struct samsung_pll_clock exynos5x_plls[nr_plls] __initdata = {
+ 		KPLL_CON0, NULL),
  };
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index 29b7cba..2458bdf 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -50,6 +50,116 @@
- 		usbdrdphy1 = &usbdrd_phy1;
- 	};
  
-+	cluster_a15_opp_table: opp_table0 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+		opp at 1800000000 {
-+			opp-hz = /bits/ 64 <1800000000>;
-+			opp-microvolt = <1250000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp at 1700000000 {
-+			opp-hz = /bits/ 64 <1700000000>;
-+			opp-microvolt = <1212500>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp at 1600000000 {
-+			opp-hz = /bits/ 64 <1600000000>;
-+			opp-microvolt = <1175000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp at 1500000000 {
-+			opp-hz = /bits/ 64 <1500000000>;
-+			opp-microvolt = <1137500>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp at 1400000000 {
-+			opp-hz = /bits/ 64 <1400000000>;
-+			opp-microvolt = <1112500>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp at 1300000000 {
-+			opp-hz = /bits/ 64 <1300000000>;
-+			opp-microvolt = <1062500>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp at 1200000000 {
-+			opp-hz = /bits/ 64 <1200000000>;
-+			opp-microvolt = <1037500>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp at 1100000000 {
-+			opp-hz = /bits/ 64 <1100000000>;
-+			opp-microvolt = <1012500>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp at 1000000000 {
-+			opp-hz = /bits/ 64 <1000000000>;
-+			opp-microvolt = < 987500>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp at 900000000 {
-+			opp-hz = /bits/ 64 <900000000>;
-+			opp-microvolt = < 962500>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp at 800000000 {
-+			opp-hz = /bits/ 64 <800000000>;
-+			opp-microvolt = < 937500>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp at 700000000 {
-+			opp-hz = /bits/ 64 <700000000>;
-+			opp-microvolt = < 912500>;
-+			clock-latency-ns = <140000>;
-+		};
-+	};
++#define E5420_EGL_DIV0(apll, pclk_dbg, atb, cpud)			\
++		((((apll) << 24) | ((pclk_dbg) << 20) | ((atb) << 16) |	\
++		 ((cpud) << 4)))
 +
-+	cluster_a7_opp_table: opp_table1 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+		opp at 1300000000 {
-+			opp-hz = /bits/ 64 <1300000000>;
-+			opp-microvolt = <1275000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp at 1200000000 {
-+			opp-hz = /bits/ 64 <1200000000>;
-+			opp-microvolt = <1212500>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp at 1100000000 {
-+			opp-hz = /bits/ 64 <1100000000>;
-+			opp-microvolt = <1162500>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp at 1000000000 {
-+			opp-hz = /bits/ 64 <1000000000>;
-+			opp-microvolt = <1112500>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp at 900000000 {
-+			opp-hz = /bits/ 64 <900000000>;
-+			opp-microvolt = <1062500>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp at 800000000 {
-+			opp-hz = /bits/ 64 <800000000>;
-+			opp-microvolt = <1025000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp at 700000000 {
-+			opp-hz = /bits/ 64 <700000000>;
-+			opp-microvolt = <975000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp at 600000000 {
-+			opp-hz = /bits/ 64 <600000000>;
-+			opp-microvolt = <937500>;
-+			clock-latency-ns = <140000>;
-+		};
-+	};
++static const struct exynos_cpuclk_cfg_data exynos5420_eglclk_d[] __initconst = {
++	{ 1800000, E5420_EGL_DIV0(3, 7, 7, 4), },
++	{ 1700000, E5420_EGL_DIV0(3, 7, 7, 3), },
++	{ 1600000, E5420_EGL_DIV0(3, 7, 7, 3), },
++	{ 1500000, E5420_EGL_DIV0(3, 7, 7, 3), },
++	{ 1400000, E5420_EGL_DIV0(3, 7, 7, 3), },
++	{ 1300000, E5420_EGL_DIV0(3, 7, 7, 2), },
++	{ 1200000, E5420_EGL_DIV0(3, 7, 7, 2), },
++	{ 1100000, E5420_EGL_DIV0(3, 7, 7, 2), },
++	{ 1000000, E5420_EGL_DIV0(3, 6, 6, 2), },
++	{  900000, E5420_EGL_DIV0(3, 6, 6, 2), },
++	{  800000, E5420_EGL_DIV0(3, 5, 5, 2), },
++	{  700000, E5420_EGL_DIV0(3, 5, 5, 2), },
++	{  600000, E5420_EGL_DIV0(3, 4, 4, 2), },
++	{  500000, E5420_EGL_DIV0(3, 3, 3, 2), },
++	{  400000, E5420_EGL_DIV0(3, 3, 3, 2), },
++	{  300000, E5420_EGL_DIV0(3, 3, 3, 2), },
++	{  200000, E5420_EGL_DIV0(3, 3, 3, 2), },
++	{  0 },
++};
 +
- 	/*
- 	 * The 'cpus' node is not present here but instead it is provided
- 	 * by exynos5420-cpus.dtsi or exynos5422-cpus.dtsi.
-diff --git a/arch/arm/boot/dts/exynos5422-cpus.dtsi b/arch/arm/boot/dts/exynos5422-cpus.dtsi
-index 33028ac..9b46b9f 100644
---- a/arch/arm/boot/dts/exynos5422-cpus.dtsi
-+++ b/arch/arm/boot/dts/exynos5422-cpus.dtsi
-@@ -28,8 +28,10 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a7";
- 			reg = <0x100>;
-+			clocks = <&clock CLK_KFC_CLK>;
- 			clock-frequency = <1000000000>;
- 			cci-control-port = <&cci_control0>;
-+			operating-points-v2 = <&cluster_a7_opp_table>;
- 		};
++#define E5420_KFC_DIV(kpll, pclk, aclk)					\
++		((((kpll) << 24) | ((pclk) << 20) | ((aclk) << 4)))
++
++static const struct exynos_cpuclk_cfg_data exynos5420_kfcclk_d[] __initconst = {
++	{ 1300000, E5420_KFC_DIV(3, 5, 2), },
++	{ 1200000, E5420_KFC_DIV(3, 5, 2), },
++	{ 1100000, E5420_KFC_DIV(3, 5, 2), },
++	{ 1000000, E5420_KFC_DIV(3, 5, 2), },
++	{  900000, E5420_KFC_DIV(3, 5, 2), },
++	{  800000, E5420_KFC_DIV(3, 5, 2), },
++	{  700000, E5420_KFC_DIV(3, 4, 2), },
++	{  600000, E5420_KFC_DIV(3, 4, 2), },
++	{  500000, E5420_KFC_DIV(3, 4, 2), },
++	{  400000, E5420_KFC_DIV(3, 3, 2), },
++	{  300000, E5420_KFC_DIV(3, 3, 2), },
++	{  200000, E5420_KFC_DIV(3, 3, 2), },
++	{  0 },
++};
++
+ static const struct of_device_id ext_clk_match[] __initconst = {
+ 	{ .compatible = "samsung,exynos5420-oscclk", .data = (void *)0, },
+ 	{ },
+@@ -1310,6 +1357,13 @@ static void __init exynos5x_clk_init(struct device_node *np,
+ 				ARRAY_SIZE(exynos5800_gate_clks));
+ 	}
  
- 		cpu1: cpu at 101 {
-@@ -38,6 +40,7 @@
- 			reg = <0x101>;
- 			clock-frequency = <1000000000>;
- 			cci-control-port = <&cci_control0>;
-+			operating-points-v2 = <&cluster_a7_opp_table>;
- 		};
++	exynos_register_cpu_clock(ctx, CLK_ARM_CLK, "armclk",
++		mout_cpu_p[0], mout_cpu_p[1], 0x200,
++		exynos5420_eglclk_d, ARRAY_SIZE(exynos5420_eglclk_d), 0);
++	exynos_register_cpu_clock(ctx, CLK_KFC_CLK, "kfcclk",
++		mout_kfc_p[0], mout_kfc_p[1], 0x28200,
++		exynos5420_kfcclk_d, ARRAY_SIZE(exynos5420_kfcclk_d), 0);
++
+ 	exynos5420_clk_sleep_init();
  
- 		cpu2: cpu at 102 {
-@@ -46,6 +49,7 @@
- 			reg = <0x102>;
- 			clock-frequency = <1000000000>;
- 			cci-control-port = <&cci_control0>;
-+			operating-points-v2 = <&cluster_a7_opp_table>;
- 		};
+ 	samsung_clk_of_add_provider(np, ctx);
+diff --git a/include/dt-bindings/clock/exynos5420.h b/include/dt-bindings/clock/exynos5420.h
+index 99da0d1..dde9664 100644
+--- a/include/dt-bindings/clock/exynos5420.h
++++ b/include/dt-bindings/clock/exynos5420.h
+@@ -25,6 +25,8 @@
+ #define CLK_FOUT_MPLL		10
+ #define CLK_FOUT_BPLL		11
+ #define CLK_FOUT_KPLL		12
++#define CLK_ARM_CLK		13
++#define CLK_KFC_CLK		14
  
- 		cpu3: cpu at 103 {
-@@ -54,14 +58,17 @@
- 			reg = <0x103>;
- 			clock-frequency = <1000000000>;
- 			cci-control-port = <&cci_control0>;
-+			operating-points-v2 = <&cluster_a7_opp_table>;
- 		};
- 
- 		cpu4: cpu at 0 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a15";
-+			clocks = <&clock CLK_ARM_CLK>;
- 			reg = <0x0>;
- 			clock-frequency = <1800000000>;
- 			cci-control-port = <&cci_control1>;
-+			operating-points-v2 = <&cluster_a15_opp_table>;
- 		};
- 
- 		cpu5: cpu at 1 {
-@@ -70,6 +77,7 @@
- 			reg = <0x1>;
- 			clock-frequency = <1800000000>;
- 			cci-control-port = <&cci_control1>;
-+			operating-points-v2 = <&cluster_a15_opp_table>;
- 		};
- 
- 		cpu6: cpu at 2 {
-@@ -78,6 +86,7 @@
- 			reg = <0x2>;
- 			clock-frequency = <1800000000>;
- 			cci-control-port = <&cci_control1>;
-+			operating-points-v2 = <&cluster_a15_opp_table>;
- 		};
- 
- 		cpu7: cpu at 3 {
-@@ -86,6 +95,7 @@
- 			reg = <0x3>;
- 			clock-frequency = <1800000000>;
- 			cci-control-port = <&cci_control1>;
-+			operating-points-v2 = <&cluster_a15_opp_table>;
- 		};
- 	};
- };
+ /* gate for special clocks (sclk) */
+ #define CLK_SCLK_UART0		128
 -- 
 1.9.1
