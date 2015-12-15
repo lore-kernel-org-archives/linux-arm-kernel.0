@@ -1,57 +1,21 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 15 Dec 2015 17:38:02 +0100
-Subject: [PATCH 1/2] ARM: dts: dove: add DT GPU support
-In-Reply-To: <1450197483-31441-1-git-send-email-l.stach@pengutronix.de>
-References: <1450197483-31441-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1450197483-31441-2-git-send-email-l.stach@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 Dec 2015 17:41:46 +0100
+Subject: [GIT PULL] MTD/NAND cleanups for v4.5
+In-Reply-To: <20151208031306.GP120110@google.com>
+References: <20151208031306.GP120110@google.com>
+Message-ID: <5642518.pVxm48RVvl@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King <rmk+kernel@arm.linux.org.uk>
+On Monday 07 December 2015 19:13:06 Brian Norris wrote:
+> Two changes for NAND/MTD refactoring. The mtd_to_nand() helper will allow us to
+> stop using mtd->priv for NAND drivers.
+> 
+> 
 
-Add DT support for the Vivante GC600 GPU on Marvell Dove platforms.
-These nodes default to being disabled unless a platform decides they
-should be enabled.
+I've put this into the next/cleanup branch in arm-soc as well now,
+so we can see when we get conflicts, and work around them locally.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
- arch/arm/boot/dts/dove.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+Thanks,
 
-diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index cd58c2e62757..ea1d999ca7a7 100644
---- a/arch/arm/boot/dts/dove.dtsi
-+++ b/arch/arm/boot/dts/dove.dtsi
-@@ -33,6 +33,12 @@
- 		marvell,tauros2-cache-features = <0>;
- 	};
- 
-+	gpu-subsystem {
-+		compatible = "marvell,dove-gpu-subsystem";
-+		cores = <&gpu>;
-+		status = "disabled";
-+	};
-+
- 	i2c-mux {
- 		compatible = "i2c-mux-pinctrl";
- 		#address-cells = <1>;
-@@ -776,6 +782,16 @@
- 				#address-cells = <1>;
- 				#size-cells = <1>;
- 			};
-+
-+			gpu: gpu at 840000 {
-+				clocks = <&divider_clk 1>;
-+				clock-names = "core";
-+				compatible = "vivante,gc";
-+				interrupts = <48>;
-+				power-domains = <&gpu_domain>;
-+				reg = <0x840000 0x4000>;
-+				status = "disabled";
-+			};
- 		};
- 	};
- };
--- 
-2.6.2
+	Arnd
