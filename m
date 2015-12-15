@@ -1,55 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 Dec 2015 12:30:57 +0100
-Subject: MP11 port
-In-Reply-To: <CACRpkdYfQg1tFemWCK-CbWh2LyZpQG9Keh2xvLRwOQvX8SONcg@mail.gmail.com>
-References: <CAMou_+dOdmxfsB9Xx1Kbci_uSoPpy-dBf9Ct7Ku+sJ1gE=r0mA@mail.gmail.com>
- <CACRpkdYfQg1tFemWCK-CbWh2LyZpQG9Keh2xvLRwOQvX8SONcg@mail.gmail.com>
-Message-ID: <15449033.rcuzkgqmSU@wuerfel>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 15 Dec 2015 09:32:18 -0200
+Subject: [PATCH v2 0/3] USB: add generic onboard USB HUB driver
+In-Reply-To: <20151215062821.GA11241@shlinux2>
+References: <1450077974-22762-1-git-send-email-peter.chen@freescale.com>
+ <CAOMZO5CfBKuJ584jwbg98s9tn+0Z7W0nOaZnUkm4cJUSvNGTZw@mail.gmail.com>
+ <20151215062821.GA11241@shlinux2>
+Message-ID: <CAOMZO5DiRzfy5dULh0C7qU2KUM-i8fBh6W5rS9zOTHJJK6fqwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 December 2015 10:19:57 Linus Walleij wrote:
+On Tue, Dec 15, 2015 at 4:28 AM, Peter Chen <peter.chen@freescale.com> wrote:
 
-> On Sun, Nov 24, 2013 at 7:36 PM, Ferrari Dante L?szl?
-> <dante.ferrari@gmail.com> wrote:
-> 
-> > I am quite new to the ARM world, and hope that you will have the
-> > patience to help me out with my question. I would like to start a
-> > basic kernel on an MP11 platform with only 6MB of RAM.
+> Thanks, Fabio.
+>
+> I am afraid I forget to set gpio as output, would you please apply
+> below patch against my original ones:
 
-So what hardware is this really? The original Realview had much more
-RAM than this, so I assume this is a custom design of some sort?
+Same error happens with these changes applied.
 
-> Jesus Christ. Well you may be able to start the kernel, but I'm
-> suspcious about how much userspace you will have with that.
-> But I guess you can get a busybox prompt with a rootfs on
-> flash or SD card or so.
+Here are more details: if I run a pure 4.3.2 then I do see the USB
+stick to get detected if I boot it with the USB stick connected to
+Udoo board:
 
-It really depends: the smallest I've heard of was a rather patched-up
-kernel running on 256KB of RAM using all the tricks known to mankind
-(XIP_KERNEL, XIP fs, no MMU, ...)
+[    2.170178] usb 1-1.1: new high-speed USB device number 3 using ci_hdrc
+[    2.305840] usb-storage 1-1.1:1.0: USB Mass Storage device detected
+[    2.314803] scsi host1: usb-storage 1-1.1:1.0
+[    2.400283] usb 1-1.3: new high-speed USB device number 4 using ci_hdrc
+[    3.327925] scsi 1:0:0:0: Direct-Access     General  USB Flash Disk   1.0  P2
+[    3.347070] sd 1:0:0:0: [sda] 7831552 512-byte logical blocks: (4.01 GB/3.73)
+[    3.356181] sd 1:0:0:0: [sda] Write Protect is off
+[    3.362550] sd 1:0:0:0: [sda] No Caching mode page found
+[    3.367899] sd 1:0:0:0: [sda] Assuming drive cache: write through
+[    3.387401]  sda: sda1
+[    3.400238] sd 1:0:0:0: [sda] Attached SCSI removable disk
+[    4.931847] fec 2188000.ethernet eth0: Link is Up - 100Mbps/Full - flow contx
+[    4.941414] IPv6: ADDRCONF(NETDEV_CHANGE): eth0: link becomes ready
+[    4.961400] Sending DHCP requests ., OK
+[    5.380247] IP-Config: Got DHCP answer from 10.29.244.251, my address is 10.1
+[    5.390461] IP-Config: Complete:
+[    5.393731]      device=eth0, hwaddr=00:c0:08:88:0c:b5, ipaddr=10.29.244.61,4
+[    5.404074]      host=10.29.244.61, domain=am.freescale.net, nis-domain=(non)
+[    5.411362]      bootserver=0.0.0.0, rootserver=10.29.244.24, rootpath=     0
+[    5.423964] ALSA device list:
+[    5.426969]   No soundcards found.
+[    5.469374] VFS: Mounted root (nfs filesystem) readonly on device 0:14.
+[    5.478119] devtmpfs: mounted
+[    5.482376] Freeing unused kernel memory: 456K (c0a7e000 - c0af0000)
+starting pid 160, tty '': '/etc/rc.d/rcS'
+Mounting /proc and /sys
+Starting the hotplug events dispatcher udevd
+Synthesizing initial hotplug even[    6.085842] udevd (173): /proc/173/oom_adj .
 
-Some folks are running NOMMU kernels built from usptream sources on
-machines as small as 2MB, which is probably the limit to what you
-can do without out-of-tree hacks. 6MB is tight, but possible.
+,but the system hangs here.
 
-We recently found that going to DT support requires an additional
-80kb of uncompressed kernel size in flash, but I'm not sure about
-the runtime cost. For a multiplatform kernel, using DT tends to be
-a win, as we can leave out the board files, but for a tiny kernel
-on a single machine, I'm sure there is some overhead.
+If I boot it with the USB stick disconnected, then the system boots
+until the prompt, but the insertion of the USB stick is never detected
+afterwards.
 
-> >I have a problem when the
-> > GIC is switched on, from __log_buf I can get some info about the state
-> > of the booting procedure.
-> >
-> > Booting Linux on physical CPU 0x0
-> > Linux version 3.12.0-01915-g6c86ae2-dirty (dante at dante-Latitude-D620)
-> 
-> The kernel developers use Torvald's HEAD for all development.
-> In this case I'd recommend you to check if maybe you want
-> to use my patch stack as base and boot from DT for the moment.
-
-+1
-
-	Arnd
+With your patch applied, the error message (usb 1-1: device descriptor
+read/64, error -7) is shown with USB stick connected or disconnected
+during boot.
