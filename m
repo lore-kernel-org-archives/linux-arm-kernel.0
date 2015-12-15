@@ -1,72 +1,67 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 15 Dec 2015 10:23:07 +0100
-Subject: [PATCHv2 1/2] ARM: multi_v7_defconfig: Enable Rockchip generic
- power domain.
-In-Reply-To: <CAFqH_51TXmOaf2KQrtTv3uuFvL4vZ5nNRSzfE_NQmbQ75TdAWw@mail.gmail.com>
-References: <1450167651-5703-1-git-send-email-enric.balletbo@collabora.com>
- <CAFqH_51TXmOaf2KQrtTv3uuFvL4vZ5nNRSzfE_NQmbQ75TdAWw@mail.gmail.com>
-Message-ID: <1979197.BQ9gqTIVFm@diego>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 15 Dec 2015 10:29:15 +0100
+Subject: ARM64/KVM: Bad page state in process iperf
+In-Reply-To: <DM2PR03MB557D3079ABFE7AF114A58A690EE0@DM2PR03MB557.namprd03.prod.outlook.com>
+References: <DM2PR03MB557D3079ABFE7AF114A58A690EE0@DM2PR03MB557.namprd03.prod.outlook.com>
+Message-ID: <20151215092915.GF4120@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Enric,
+On Tue, Dec 15, 2015 at 03:46:03AM +0000, Bhushan Bharat wrote:
+> 
+> Hi All,
+> 
+> I am running "iperf" in KVM guest on ARM64 machine and observing below crash.
 
-Am Dienstag, 15. Dezember 2015, 09:25:34 schrieb Enric Balletbo Serra:
-> Arght, I'm asleep, I need a coffee this now, there isn't patch 2/2,
-> this patch is 1/1.
+Which host/guest kernel version is this?
 
-I do think you can limit the recipients to "arm at kernel.org", the mailing lists 
-and me (and include linux-rockchip at lists.infradead.org as well). I don't think 
-your other recipients will care to much about Rockchip-specific defconfig 
-changes ;-) .
+Which hardware?
 
-Also, please keep author mail addresses in line ... The address used in the 
-signed-off-by should also be the one the patch gets sent from. 
-
-Alternatively it is also possible to override the From, when patch author-mail 
-and sending address differ. git send-email does this automatically, but it's 
-also possible to do manually (see patches with "From: ..." + blank line at the 
-top of the content).
-
-
-Heiko
+-Christoffer
 
 > 
+> =============================
+> $iperf -c 3.3.3.3 -P 4 -t 0 -i 5 -w 90k
+> ------------------------------------------------------------
+> Client connecting to 3.3.3.3, TCP port 5001
+> TCP window size:  180 KByte (WARNING: requested 90.0 KByte)
+> ------------------------------------------------------------
+> [  3] local 3.3.3.1 port 51131 connected with 3.3.3.3 port 5001
+> [  6] local 3.3.3.1 port 51134 connected with 3.3.3.3 port 5001
+> [  5] local 3.3.3.1 port 51133 connected with 3.3.3.3 port 5001
+> [  4] local 3.3.3.1 port 51132 connected with 3.3.3.3 port 5001
+> [   53.088567] random: nonblocking pool is initialized
+> [ ID] Interval       Transfer     Bandwidth
+> [  3]  0.0- 5.0 sec   638 MBytes  1.07 Gbits/sec
+> [  4] 35.0-40.0 sec  1.66 GBytes  2.85 Gbits/sec
+> [  5] 40.0-45.0 sec  1.11 GBytes  1.90 Gbits/sec
+> [  4] 40.0-45.0 sec  1.16 GBytes  1.99 Gbits/sec
+> [   98.895207] BUG: Bad page state in process iperf  pfn:0a584
+> [   98.896164] page:ffff780000296100 count:-1 mapcount:0 mapping:          (null) index:0x0
+> [   98.897436] flags: 0x0()
+> [   98.897885] page dumped because: nonzero _count
+> [   98.898640] Modules linked in:
+> [   98.899178] CPU: 0 PID: 1639 Comm: iperf Not tainted 4.1.8-00461-ge5431ad #141
+> [   98.900302] Hardware name: linux,dummy-virt (DT)
+> [   98.901014] Call trace:
+> [   98.901406] [<ffff800000096cac>] dump_backtrace+0x0/0x12c
+> [   98.902522] [<ffff800000096de8>] show_stack+0x10/0x1c
+> [   98.903441] [<ffff800000678dc8>] dump_stack+0x8c/0xdc
+> [   98.904202] [<ffff800000145480>] bad_page+0xc4/0x114
+> [   98.904945] [<ffff8000001487a4>] get_page_from_freelist+0x590/0x63c
+> [   98.905871] [<ffff80000014893c>] __alloc_pages_nodemask+0xec/0x794
+> [   98.906791] [<ffff80000059fc80>] skb_page_frag_refill+0x70/0xa8
+> [   98.907678] [<ffff80000059fcd8>] sk_page_frag_refill+0x20/0xd0
+> [   98.908550] [<ffff8000005edc04>] tcp_sendmsg+0x1f8/0x9a8
+> [   98.909368] [<ffff80000061419c>] inet_sendmsg+0x5c/0xd0
+> [   98.910178] [<ffff80000059bb44>] sock_sendmsg+0x14/0x58
+> [   98.911027] [<ffff80000059bbec>] sock_write_iter+0x64/0xbc
+> [   98.912119] [<ffff80000019b5b8>] __vfs_write+0xac/0x10c
+> [   98.913126] [<ffff80000019bcb8>] vfs_write+0x90/0x1a0
+> [   98.913963] [<ffff80000019c53c>] SyS_write+0x40/0xa0
 > 
-> Sorry for the noise.
-> Enric
-> 
-> 2015-12-15 9:20 GMT+01:00 Enric Balletbo i Serra <eballetbo@gmail.com>:
-> > In order to meet high performance an low power requirement for Rockchip
-> > enable the power domain support. The patch also fixes a drm/kms issue,
-> > driver deferring untils power-domains are available)
-> > 
-> > Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> > Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
-> > 
-> > Changes since last version:
-> >  - Add justification as proposed by Heiko
-> >  - Add to=arm at kernel.org
-> >  
-> >  arch/arm/configs/multi_v7_defconfig | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm/configs/multi_v7_defconfig
-> > b/arch/arm/configs/multi_v7_defconfig index 69a22fd..81314ec 100644
-> > --- a/arch/arm/configs/multi_v7_defconfig
-> > +++ b/arch/arm/configs/multi_v7_defconfig
-> > @@ -655,6 +655,7 @@ CONFIG_QCOM_PM=y
-> > 
-> >  CONFIG_QCOM_SMD=y
-> >  CONFIG_QCOM_SMD_RPM=y
-> >  CONFIG_QCOM_SMEM=y
-> > 
-> > +CONFIG_ROCKCHIP_PM_DOMAINS=y
-> > 
-> >  CONFIG_COMMON_CLK_QCOM=y
-> >  CONFIG_CHROME_PLATFORMS=y
-> >  CONFIG_CROS_EC_CHARDEV=m
-> > 
-> > --
-> > 2.1.0
+> -----------
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
