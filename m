@@ -1,91 +1,112 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Tue, 15 Dec 2015 07:41:36 -0800
-Subject: [PATCH LINUX v4 06/13] tty: xuartps: Move request_irq to after
- setting up the HW
-In-Reply-To: <5669F172.6020503@hurleysoftware.com>
-References: <1449376769-13369-1-git-send-email-soren.brinkmann@xilinx.com>
- <1449376769-13369-7-git-send-email-soren.brinkmann@xilinx.com>
- <5669F172.6020503@hurleysoftware.com>
-Message-ID: <20151215154136.GU3358@xsjsorenbubuntu>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 15 Dec 2015 15:41:54 +0000
+Subject: [PATCH v7 00/19] KVM: ARM64: Add guest PMU support
+In-Reply-To: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
+References: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <567034C2.8090307@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-12-10 at 01:41PM -0800, Peter Hurley wrote:
-> On 12/05/2015 08:39 PM, Soren Brinkmann wrote:
-> > Request_irq() should be _after_ h/w programming, otherwise an
-> > interrupt could be triggered and in-progress before the h/w has been
-> > setup.
+On 15/12/15 08:49, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> Slight misunderstanding. My fault; I should have been more explicit.
+> This patchset adds guest PMU support for KVM on ARM64. It takes
+> trap-and-emulate approach. When guest wants to monitor one event, it
+> will be trapped by KVM and KVM will call perf_event API to create a perf
+> event and call relevant perf_event APIs to get the count value of event.
 > 
-> 1. Any setup necessary for the isr not to be confused and misdirect spurious
->    interrupts (or hang) should be before installing the isr with request_irq()
->    None of this code should trigger an interrupt.
-> 2. Clear pending interrupts
-> 3. Install the isr with request_irq()
-> 4. Enable interrupts
-
-Isn't that what the startup function is doing now - more or less. I
-think 3 and 4 are swapped to release the lock and then do the
-request_irq, but I believe that should be OK.
-The startup function configures the HW. Clears the ISR. Enables the
-intended IRQs and then does the request_irq call.
-
+> Use perf to test this patchset in guest. When using "perf list", it
+> shows the list of the hardware events and hardware cache events perf
+> supports. Then use "perf stat -e EVENT" to monitor some event. For
+> example, use "perf stat -e cycles" to count cpu cycles and
+> "perf stat -e cache-misses" to count cache misses.
 > 
-> For extra safety, first disable interrupts before starting h/w programming.
-
-It's done within spin_lock_irqsave, which gives us at least locally
-disabled IRQs. I guess we could add a disabling all IRQs in the UART
-core, but it should not really be necessary.
-
+> Below are the outputs of "perf stat -r 5 sleep 5" when running in host
+> and guest.
 > 
-> I would do the v5 series in the same order as the v3 series only up to
-> what I reviewed. Then do another series with the remainder plus new changes, ok?
-
-Sure.
-
-	S?ren
-
+> Host:
+>  Performance counter stats for 'sleep 5' (5 runs):
 > 
-> Regards,
-> Peter Hurley
+>           0.549456      task-clock (msec)         #    0.000 CPUs utilized            ( +-  5.68% )
+>                  1      context-switches          #    0.002 M/sec
+>                  0      cpu-migrations            #    0.000 K/sec
+>                 48      page-faults               #    0.088 M/sec                    ( +-  1.40% )
+>            1146243      cycles                    #    2.086 GHz                      ( +-  5.71% )
+>    <not supported>      stalled-cycles-frontend
+>    <not supported>      stalled-cycles-backend
+>             627195      instructions              #    0.55  insns per cycle          ( +- 15.65% )
+>    <not supported>      branches
+>               9826      branch-misses             #   17.883 M/sec                    ( +-  1.10% )
 > 
-> > Reported-by: Peter Hurley <peter@hurleysoftware.com>
-> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> > ---
-> > v4:
-> >  - this patch has been added. Thanks to Peter for pointing it out and providing
-> >    commit message
-> > ---
-> >  drivers/tty/serial/xilinx_uartps.c | 9 ++-------
-> >  1 file changed, 2 insertions(+), 7 deletions(-)
-> > 
-> > diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-> > index 6ffd3bbe3e18..1e9053656610 100644
-> > --- a/drivers/tty/serial/xilinx_uartps.c
-> > +++ b/drivers/tty/serial/xilinx_uartps.c
-> > @@ -759,12 +759,7 @@ static void cdns_uart_set_termios(struct uart_port *port,
-> >  static int cdns_uart_startup(struct uart_port *port)
-> >  {
-> >  	unsigned long flags;
-> > -	unsigned int retval = 0, status = 0;
-> > -
-> > -	retval = request_irq(port->irq, cdns_uart_isr, 0, CDNS_UART_NAME,
-> > -								(void *)port);
-> > -	if (retval)
-> > -		return retval;
-> > +	unsigned int status = 0;
-> >  
-> >  	spin_lock_irqsave(&port->lock, flags);
-> >  
-> > @@ -818,7 +813,7 @@ static int cdns_uart_startup(struct uart_port *port)
-> >  
-> >  	spin_unlock_irqrestore(&port->lock, flags);
-> >  
-> > -	return retval;
-> > +	return request_irq(port->irq, cdns_uart_isr, 0, CDNS_UART_NAME, port);
-> >  }
-> >  
-> >  /**
-> > 
+>        5.000875516 seconds time elapsed                                          ( +-  0.00% )
 > 
+> 
+> Guest:
+>  Performance counter stats for 'sleep 5' (5 runs):
+> 
+>           0.640712      task-clock (msec)         #    0.000 CPUs utilized            ( +-  0.41% )
+>                  1      context-switches          #    0.002 M/sec
+>                  0      cpu-migrations            #    0.000 K/sec
+>                 50      page-faults               #    0.077 M/sec                    ( +-  1.37% )
+>            1320428      cycles                    #    2.061 GHz                      ( +-  0.29% )
+>    <not supported>      stalled-cycles-frontend
+>    <not supported>      stalled-cycles-backend
+>             642373      instructions              #    0.49  insns per cycle          ( +-  0.46% )
+>    <not supported>      branches
+>              10399      branch-misses             #   16.230 M/sec                    ( +-  1.57% )
+> 
+>        5.001181020 seconds time elapsed                                          ( +-  0.00% )
+> 
+> 
+> Have a cycle counter read test like below in guest and host:
+> 
+> static void test(void)
+> {
+> 	unsigned long count, count1, count2;
+> 	count1 = read_cycles();
+> 	count++;
+> 	count2 = read_cycles();
+> }
+> 
+> Host:
+> count1: 3049567104
+> count2: 3049567247
+> delta: 143
+> 
+> Guest:
+> count1: 5281420890
+> count2: 5281421068
+> delta: 178
+> 
+> The gap between guest and host is very small. One reason for this I
+> think is that it doesn't count the cycles in EL2 and host since we add
+> exclude_hv = 1. So the cycles spent to store/restore registers which
+> happens at EL2 are not included.
+> 
+> This patchset can be fetched from [1] and the relevant QEMU version for
+> test can be fetched from [2].
+> 
+> The results of 'perf test' can be found from [3][4].
+> The results of perf_event_tests test suite can be found from [5][6].
+> 
+> Also, I have tested "perf top" in two VMs and host at the same time. It
+> works well.
+
+So while things are steadily improving, there is still more things to do
+(and the more I review the code, the more I find things, which worries me).
+
+The biggest issue at the moment is the handling of accesses at EL0,
+which should be forwarded to EL1 instead of ignoring the access when
+denied. There is also the UNDEFINED accesses (which are pretty easy to
+solve), and a couple of straightforward bugs and other nits that should
+be easy to fix.
+
+If you can fix the above and that the result looks good, I'll try to put
+it into -next. But at the moment, it looks like we're not really on
+track to make it into 4.5.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
