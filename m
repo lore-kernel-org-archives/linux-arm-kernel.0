@@ -1,17 +1,19 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 Dec 2015 17:42:58 +0100
-Subject: [GIT PULL] ARM: mvebu: defconfig for v4.5 (#1)
-In-Reply-To: <87io4acida.fsf@free-electrons.com>
-References: <87io4acida.fsf@free-electrons.com>
-Message-ID: <3490969.fEBAFprhcR@wuerfel>
+Date: Tue, 15 Dec 2015 17:45:38 +0100
+Subject: [GIT PULL] ARM: mvebu: defconfig for v4.5 (#2)
+In-Reply-To: <87io456p6x.fsf@free-electrons.com>
+References: <87io456p6x.fsf@free-electrons.com>
+Message-ID: <7458509.TaJ7fDWOST@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 07 December 2015 17:51:13 Gregory CLEMENT wrote:
-> mvebu defconfig for 4.5 (part 1)
+On Friday 11 December 2015 15:21:42 Gregory CLEMENT wrote:
 > 
-> update of mvebu_v5 defconfig with the addition of cpuidle
+> ----------------------------------------------------------------
+> mvebu defconfig for 4.5 (part 2)
 > 
+> - Reenable DSA in mvebu_v5_defconfig
+> - Update multi_v5_defconfig after adding Orion5x to multiarch
 
 Merged into next/defconfig, thanks!
 
