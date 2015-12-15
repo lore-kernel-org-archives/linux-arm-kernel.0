@@ -1,98 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 15 Dec 2015 11:23:39 +0000
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 15 Dec 2015 11:26:13 +0000
 Subject: [RFC PATCH v3 2/8] arm64: Move cpu_die_early to smp.c
-In-Reply-To: <1449655039-22022-3-git-send-email-suzuki.poulose@arm.com>
+In-Reply-To: <20151215112338.GD9452@arm.com>
 References: <1449655039-22022-1-git-send-email-suzuki.poulose@arm.com>
  <1449655039-22022-3-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20151215112338.GD9452@arm.com>
+ <20151215112338.GD9452@arm.com>
+Message-ID: <20151215112612.GG31299@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 09, 2015 at 09:57:13AM +0000, Suzuki K. Poulose wrote:
-> This patch moves cpu_die_early to smp.c, where it fits better.
-> No functional changes, except for adding the necessary checks
-> for CONFIG_HOTPLUG_CPU.
+On Tue, Dec 15, 2015 at 11:23:39AM +0000, Will Deacon wrote:
+> > +/*
+> > + * Kill the calling secondary CPU, early in bringup before it is turned
+> > + * online.
+> > + */
+> > +void cpu_die_early(void)
+> > +{
+> > +	int cpu = smp_processor_id();
+> > +
+> > +	pr_crit("CPU%d: will not boot\n", cpu);
+> > +
+> > +	/* Mark this CPU absent */
+> > +	set_cpu_present(cpu, 0);
+> > +
+> > +#ifdef CONFIG_HOTPLUG_CPU
+> > +	/* Check if we can park ourselves */
+> > +	if (cpu_ops[cpu] && cpu_ops[cpu]->cpu_die)
 > 
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm64/include/asm/smp.h   |    1 +
->  arch/arm64/kernel/cpufeature.c |   23 -----------------------
->  arch/arm64/kernel/smp.c        |   25 +++++++++++++++++++++++++
->  3 files changed, 26 insertions(+), 23 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
-> index d9c3d6a..13ce01f 100644
-> --- a/arch/arm64/include/asm/smp.h
-> +++ b/arch/arm64/include/asm/smp.h
-> @@ -68,5 +68,6 @@ extern int __cpu_disable(void);
->  
->  extern void __cpu_die(unsigned int cpu);
->  extern void cpu_die(void);
-> +extern void cpu_die_early(void);
->  
->  #endif /* ifndef __ASM_SMP_H */
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 581b779..517a3af 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -826,29 +826,6 @@ static u64 __raw_read_system_reg(u32 sys_id)
->  }
->  
->  /*
-> - * Kill the calling secondary CPU, early in bringup before it is turned
-> - * online.
-> - */
-> -void cpu_die_early(void)
-> -{
-> -	int cpu = smp_processor_id();
-> -
-> -	pr_crit("CPU%d: will not boot\n", cpu);
-> -
-> -	/* Mark this CPU absent */
-> -	set_cpu_present(cpu, 0);
-> -
-> -	/* Check if we can park ourselves */
-> -	if (cpu_ops[cpu] && cpu_ops[cpu]->cpu_die)
-> -		cpu_ops[cpu]->cpu_die(cpu);
-> -
-> -	for (;;) {
-> -		wfe();
-> -		wfi();
-> -	}
-> -}
-> -
-> -/*
->   * Run through the enabled system capabilities and enable() it on this CPU.
->   * The capabilities were decided based on the available CPUs at the boot time.
->   * Any new CPU should match the system wide status of the capability. If the
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index b1adc51..607d876 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -313,6 +313,31 @@ void cpu_die(void)
->  }
->  #endif
->  
-> +/*
-> + * Kill the calling secondary CPU, early in bringup before it is turned
-> + * online.
-> + */
-> +void cpu_die_early(void)
-> +{
-> +	int cpu = smp_processor_id();
-> +
-> +	pr_crit("CPU%d: will not boot\n", cpu);
-> +
-> +	/* Mark this CPU absent */
-> +	set_cpu_present(cpu, 0);
-> +
-> +#ifdef CONFIG_HOTPLUG_CPU
-> +	/* Check if we can park ourselves */
-> +	if (cpu_ops[cpu] && cpu_ops[cpu]->cpu_die)
+> IS_ENABLED?
 
-IS_ENABLED?
+The definition of struct cpu_ops has cpu_die in an #ifdef
+CONFIG_HOTPLUG_CPU.
 
-Will
+Mark.
