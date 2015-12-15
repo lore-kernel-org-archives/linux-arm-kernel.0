@@ -1,59 +1,50 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 15 Dec 2015 15:55:17 -0800
-Subject: [PATCH v3 2/4] ARM: bcm2835: add rpi power domain driver
-In-Reply-To: <567093CD.1020208@gmail.com>
-References: <1450215622-27394-1-git-send-email-eric@anholt.net>
- <1450215622-27394-3-git-send-email-eric@anholt.net>
- <567093CD.1020208@gmail.com>
-Message-ID: <87oadrmfmi.fsf@eliezer.anholt.net>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Wed, 16 Dec 2015 08:56:39 +0900
+Subject: [PATCH 1/2] mmc: core: enable CMD19 tuning for DDR50 mode
+In-Reply-To: <CAOQ7t2Z=4Mc9Ev9OBxXiLDtiXaTr5jQzc-gVwU_xJnHLrumd0g@mail.gmail.com>
+References: <1439282492-6274-1-git-send-email-21cnbao@gmail.com>
+ <CAPDyKFpXZD28NwNAhKQyxmWasVhk_7AeyOW6oXaBPHKuSTmGUA@mail.gmail.com>
+ <CAGsJ_4wvvQdyjFi=JmWfASm-LbJMybrhC=Wxxn7jHZEP5dUfEw@mail.gmail.com>
+ <CAPDyKFpEwWvu3tnbMT9ZvM0TUvEHp0Qa8PADohyJoTaNZ9HS9g@mail.gmail.com>
+ <CAGsJ_4x5Nd3Cts1BHsUyB_mCejxbHPPjznUVWUcFoZhxKy+Tcg@mail.gmail.com>
+ <CAPDyKFpWfY9G4WG_GfCutJ2NkRbcAYZToYJXp3RvX=_25sgnWA@mail.gmail.com>
+ <CAGsJ_4zaWcmGsc82=LSohK0UHxJir2OJOBSgoU3sPRXYvLdOZQ@mail.gmail.com>
+ <CAPDyKFrj7mfxYPotHfpYPVf8M=Mvjcz+HfuB871EZNv9FWpPqw@mail.gmail.com>
+ <CAOQ7t2YuSDwtK0R3R4++3LUPyEqW+ENLju63QisX6tO=-cvt6w@mail.gmail.com>
+ <edf24ca1a9614943b55b8d19745a3c45@aptaiexm02f.ap.qualcomm.com>
+ <CAOQ7t2YOd9TtAHHUBhF4n_POQURhfaqC_9Tg-b8d1Bf2QCyoYA@mail.gmail.com>
+ <a2ffc219b04b483b87696ffc81a60787@aptaiexm02f.ap.qualcomm.com>
+ <CAOQ7t2Z=4Mc9Ev9OBxXiLDtiXaTr5jQzc-gVwU_xJnHLrumd0g@mail.gmail.com>
+Message-ID: <5670A8B7.7080808@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Florian Fainelli <f.fainelli@gmail.com> writes:
+Hi,
 
-> On 15/12/15 13:40, Eric Anholt wrote:
->> From: Alexander Aring <alex.aring@gmail.com>
->> 
->> This patch adds support for several power domains on Raspberry Pi,
->> including USB (so it can be enabled even if the bootloader didn't do
->> it), and graphics.
->> 
->> This patch is the combined work of Eric Anholt (who wrote USB support
->> inside of the Raspberry Pi firmware driver, and wrote the non-USB
->> domain support) and Alexander Aring (who separated the original USB
->> work out from the firmware driver).
->> 
->> Signed-off-by: Alexander Aring <alex.aring@gmail.com>
->> Signed-off-by: Eric Anholt <eric@anholt.net>
->> ---
->> 
->> v2: Add support for power domains other than USB, using the new
->>     firmware interface, reword commit message (changes by Eric)
->> 
->> v3: Restructure as a builtin driver, and drop
->>     of_genpd_add_provider_onecell error handling to avoid
->>     pm_genpd_exit() dependency until that API can be settled.  Clean
->>     up copyright header, add missing ISP initialization, and fix typo
->>     in transposer's name.
->> 
->>  arch/arm/mach-bcm/Kconfig                   |  10 ++
->>  arch/arm/mach-bcm/Makefile                  |   1 +
->>  arch/arm/mach-bcm/raspberrypi-power.c       | 247 ++++++++++++++++++++++++++++
->>  include/dt-bindings/arm/raspberrypi-power.h |  41 +++++
->>  4 files changed, 299 insertions(+)
->>  create mode 100644 arch/arm/mach-bcm/raspberrypi-power.c
->
-> What motivated the location of this power domain driver in
-> arch/arm/mach-bcm? Should not we have this in drivers/power/ or
-> somewhere in drivers/ at the very least?
+On 12/14/2015 07:56 PM, Carlo Caione wrote:
+> On Mon, Dec 14, 2015 at 10:24 AM, Yang, York <weijuny@qti.qualcomm.com> wrote:
+>> Hi, Carlo
+>>
+>>         I don't think so. You may check the 9faac7b95, there are two changes in sd.c and sdhc.c.
+>>         Surely the change in sdhc.c will not affect ASUS X205TA (bcm43341) since it is a SDIO device.
+>>         Actually the calling sequence is this: mmc_sd_init_uhs_card() calls sdhci_execute_tuning(). In 9faac7b95, I enabled tuning for DDR50 in these two functions.
+>>         If your function calling sequence is mmc_sdio_init_uhs_card()->sdhci_execute_tuning(), the tuning will not carried out, since you didn't enable tuning for DDR50 in mmc_sdio_init_uhs_card().
+>>         Unless you call sdhci_execute_tuning directly, the tuning command may go through be sent out.
+> 
+> Hi Yang,
+> 
+> On the unmodified master what I see is:
+> 
+> - mmc_sdio_init_uhs_card() is called
+> - card->sw_caps.sd3_bus_mode is 0x14
+> - card->sw_caps.sd3_bus_mode & SD_MODE_UHS_SDR50 is actually verified
+> (even though the tuning for DDR50 is not enabled)
+> - mmc_execute_tuning() is actually called
 
-ls stronly suggests that power contains drivers for power supplies and
-batteries, not power domains.  There are 6 power domain drivers in
-arch/arm, 3 in drivers/clk, and 3 in drivers/soc.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151215/54ad096c/attachment.sig>
+As i know, When mode is UHS_SDR50, tuning is not mandatory.
+Even though i need to check the spec file, i think that condition check is strange.
+
+Best Regards,
+Jaehoon Chung
+
+> 
