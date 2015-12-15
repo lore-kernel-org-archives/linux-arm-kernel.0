@@ -1,80 +1,200 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 14 Dec 2015 21:31:10 -0800
-Subject: [PATCH v2] net/macb: add support for resetting PHY using GPIO
-In-Reply-To: <20151214225634.GA14163@rob-hp-laptop>
-References: <1449830093-29433-1-git-send-email-gregory.clement@free-electrons.com>
- <20151214225634.GA14163@rob-hp-laptop>
-Message-ID: <23E868E9-3EE2-4365-902A-C1C5BA006DFB@gmail.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Mon, 14 Dec 2015 23:30:45 -0600
+Subject: [Patch v2 3/3] regulator: qcom-smd: Add support for PMA8084
+In-Reply-To: <1450157445-23723-1-git-send-email-andy.gross@linaro.org>
+References: <1450157445-23723-1-git-send-email-andy.gross@linaro.org>
+Message-ID: <1450157445-23723-4-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On December 14, 2015 2:56:34 PM PST, Rob Herring <robh@kernel.org> wrote:
->On Fri, Dec 11, 2015 at 11:34:53AM +0100, Gregory CLEMENT wrote:
->> With device tree it is no more possible to reset the PHY at board
->> level. Furthermore, doing in the driver allow to power down the PHY
->when
->> the network interface is no more used.
->> 
->> This reset can't be done at the PHY driver level. The PHY must be
->able to
->> answer the to the mii bus scan to let the kernel creating a PHY
->device.
->> 
->> The patch introduces a new optional property "phy-reset-gpios"
->inspired
->> from the one use for the FEC.
->> 
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> ---
->> 
->> Since the v1, I used the gpiod functions. It allows to simplify the
->> code and to not introduce any #ifdef.
->> 
->> I also rename the property in phy-reset-gpios, even if actually the
->> gpiod will match both phy-reset-gpios and phy-reset-gpio.
->> 
->> 
->>  Documentation/devicetree/bindings/net/macb.txt | 3 +++
->>  drivers/net/ethernet/cadence/macb.c            | 8 ++++++++
->>  drivers/net/ethernet/cadence/macb.h            | 1 +
->>  3 files changed, 12 insertions(+)
->> 
->> diff --git a/Documentation/devicetree/bindings/net/macb.txt
->b/Documentation/devicetree/bindings/net/macb.txt
->> index b5d7976..4a7fb6c 100644
->> --- a/Documentation/devicetree/bindings/net/macb.txt
->> +++ b/Documentation/devicetree/bindings/net/macb.txt
->> @@ -19,6 +19,9 @@ Required properties:
->>  	Optional elements: 'tx_clk'
->>  - clocks: Phandles to input clocks.
->>  
->> +Optional properties:
->> +- phy-reset-gpios : Should specify the gpio for phy reset
->> +
->
->This alone is simple enough, but I worry that this doesn't really
->scale. 
->What if you need to enable clocks or regulators for the same reason?
->The 
->mmc folks did a pwrseq binding for similar reasons. I don't think I'd 
->recommend that here as I think it is kind of ugly. We really need a 
->pre-probe/scan hook for drivers. This is also needed for USB devices 
->mounted on boards.
+From: Andy Gross <agross@codeaurora.org>
 
-In this particular case, the way Ethernet MAC drivers register their MDIO buses and therefore PHYs, there is always a good way to deassert the PHY GPIO line without requiring major core device driver changes. Worst case, there is the MDIO bus reset callback which could used for that matter.
+This patch adds support and documentation for the PMA8084 regulators
+found on APQ8084 platforms.
 
-In the case of PCI, USB etc. I do agree having a way to twiddle things before scanning/probing would be awesome. I have some boards here which have GPIO controlled regulator and hacking the RC driver to deal with that is suboptimal... 
+Signed-off-by: Andy Gross <agross@codeaurora.org>
+Acked-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+---
+ .../bindings/regulator/qcom,smd-rpm-regulator.txt  | 35 ++++++++
+ drivers/regulator/qcom_smd-regulator.c             | 95 ++++++++++++++++++++++
+ 2 files changed, 130 insertions(+)
 
->
->But I'm not going to hold up something simple to do all that, so:
->
->Acked-by: Rob Herring <robh@kernel.org>
->
->_______________________________________________
->linux-arm-kernel mailing list
->linux-arm-kernel at lists.infradead.org
->http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
+diff --git a/Documentation/devicetree/bindings/regulator/qcom,smd-rpm-regulator.txt b/Documentation/devicetree/bindings/regulator/qcom,smd-rpm-regulator.txt
+index 82557e1..1f8d6f8 100644
+--- a/Documentation/devicetree/bindings/regulator/qcom,smd-rpm-regulator.txt
++++ b/Documentation/devicetree/bindings/regulator/qcom,smd-rpm-regulator.txt
+@@ -22,6 +22,7 @@ Regulator nodes are identified by their compatible:
+ 		    "qcom,rpm-pm8841-regulators"
+ 		    "qcom,rpm-pm8916-regulators"
+ 		    "qcom,rpm-pm8941-regulators"
++		    "qcom,rpm-pma8084-regulators"
+ 
+ - vdd_s1-supply:
+ - vdd_s2-supply:
+@@ -67,6 +68,35 @@ Regulator nodes are identified by their compatible:
+ 	Definition: reference to regulator supplying the input pin, as
+ 		    described in the data sheet
+ 
++- vdd_s1-supply:
++- vdd_s2-supply:
++- vdd_s3-supply:
++- vdd_s4-supply:
++- vdd_s5-supply:
++- vdd_s6-supply:
++- vdd_s7-supply:
++- vdd_s8-supply:
++- vdd_s9-supply:
++- vdd_s10-supply:
++- vdd_s11-supply:
++- vdd_s12-supply:
++- vdd_l1_l11-supply:
++- vdd_l2_l3_l4_l27-supply:
++- vdd_l5_l7-supply:
++- vdd_l6_l12_l14_l15_l26-supply:
++- vdd_l8-supply:
++- vdd_l9_l10_l13_l20_l23_l24-supply:
++- vdd_l16_l25-supply:
++- vdd_l17-supply:
++- vdd_l18-supply:
++- vdd_l19-supply:
++- vdd_l21-supply:
++- vdd_l22-supply:
++	Usage: optional (pma8084 only)
++	Value type: <phandle>
++	Definition: reference to regulator supplying the input pin, as
++		    described in the data sheet
++
+ The regulator node houses sub-nodes for each regulator within the device. Each
+ sub-node is identified using the node's name, with valid values listed for each
+ of the pmics below.
+@@ -83,6 +113,11 @@ pm8941:
+ 	l14, l15, l16, l17, l18, l19, l20, l21, l22, l23, l24, lvs1, lvs2,
+ 	lvs3, 5vs1, 5vs2
+ 
++pma8084:
++	s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, l1, l2, l3, l4, l5,
++	l6, l7, l8, l9, l10, l11, l12, l13, l14, l15, l16, l17, l18, l19, l20,
++	l21, l22, l23, l24, l25, l26, l27, lvs1, lvs2, lvs3, lvs4, 5vs1
++
+ The content of each sub-node is defined by the standard binding for regulators -
+ see regulator.txt.
+ 
+diff --git a/drivers/regulator/qcom_smd-regulator.c b/drivers/regulator/qcom_smd-regulator.c
+index 8464ead..56a17ec 100644
+--- a/drivers/regulator/qcom_smd-regulator.c
++++ b/drivers/regulator/qcom_smd-regulator.c
+@@ -153,6 +153,49 @@ static const struct regulator_ops rpm_switch_ops = {
+ 	.is_enabled = rpm_reg_is_enabled,
+ };
+ 
++static const struct regulator_desc pma8084_hfsmps = {
++	.linear_ranges = (struct regulator_linear_range[]) {
++		REGULATOR_LINEAR_RANGE(375000,  0,  95, 12500),
++		REGULATOR_LINEAR_RANGE(1550000, 96, 158, 25000),
++	},
++	.n_linear_ranges = 2,
++	.n_voltages = 159,
++	.ops = &rpm_smps_ldo_ops,
++};
++
++static const struct regulator_desc pma8084_ftsmps = {
++	.linear_ranges = (struct regulator_linear_range[]) {
++		REGULATOR_LINEAR_RANGE(350000,  0, 184, 5000),
++		REGULATOR_LINEAR_RANGE(700000, 185, 339, 10000),
++	},
++	.n_linear_ranges = 2,
++	.n_voltages = 340,
++	.ops = &rpm_smps_ldo_ops,
++};
++
++static const struct regulator_desc pma8084_pldo = {
++	.linear_ranges = (struct regulator_linear_range[]) {
++		REGULATOR_LINEAR_RANGE(750000,  0,  30, 25000),
++		REGULATOR_LINEAR_RANGE(1500000, 31, 99, 50000),
++	},
++	.n_linear_ranges = 2,
++	.n_voltages = 100,
++	.ops = &rpm_smps_ldo_ops,
++};
++
++static const struct regulator_desc pma8084_nldo = {
++	.linear_ranges = (struct regulator_linear_range[]) {
++		REGULATOR_LINEAR_RANGE(750000, 0, 63, 12500),
++	},
++	.n_linear_ranges = 1,
++	.n_voltages = 64,
++	.ops = &rpm_smps_ldo_ops,
++};
++
++static const struct regulator_desc pma8084_switch = {
++	.ops = &rpm_switch_ops,
++};
++
+ static const struct regulator_desc pm8x41_hfsmps = {
+ 	.linear_ranges = (struct regulator_linear_range[]) {
+ 		REGULATOR_LINEAR_RANGE( 375000,  0,  95, 12500),
+@@ -335,10 +378,62 @@ static const struct rpm_regulator_data rpm_pm8941_regulators[] = {
+ 	{}
+ };
+ 
++static const struct rpm_regulator_data rpm_pma8084_regulators[] = {
++	{ "s1", QCOM_SMD_RPM_SMPA, 1, &pma8084_ftsmps, "vdd_s1" },
++	{ "s2", QCOM_SMD_RPM_SMPA, 2, &pma8084_ftsmps, "vdd_s2" },
++	{ "s3", QCOM_SMD_RPM_SMPA, 3, &pma8084_hfsmps, "vdd_s3" },
++	{ "s4", QCOM_SMD_RPM_SMPA, 4, &pma8084_hfsmps, "vdd_s4" },
++	{ "s5", QCOM_SMD_RPM_SMPA, 5, &pma8084_hfsmps, "vdd_s5" },
++	{ "s6", QCOM_SMD_RPM_SMPA, 6, &pma8084_ftsmps, "vdd_s6" },
++	{ "s7", QCOM_SMD_RPM_SMPA, 7, &pma8084_ftsmps, "vdd_s7" },
++	{ "s8", QCOM_SMD_RPM_SMPA, 8, &pma8084_ftsmps, "vdd_s8" },
++	{ "s9", QCOM_SMD_RPM_SMPA, 9, &pma8084_ftsmps, "vdd_s9" },
++	{ "s10", QCOM_SMD_RPM_SMPA, 10, &pma8084_ftsmps, "vdd_s10" },
++	{ "s11", QCOM_SMD_RPM_SMPA, 11, &pma8084_ftsmps, "vdd_s11" },
++	{ "s12", QCOM_SMD_RPM_SMPA, 12, &pma8084_ftsmps, "vdd_s12" },
++
++	{ "l1", QCOM_SMD_RPM_LDOA, 1, &pma8084_nldo, "vdd_l1_l11" },
++	{ "l2", QCOM_SMD_RPM_LDOA, 2, &pma8084_nldo, "vdd_l2_l3_l4_l27" },
++	{ "l3", QCOM_SMD_RPM_LDOA, 3, &pma8084_nldo, "vdd_l2_l3_l4_l27" },
++	{ "l4", QCOM_SMD_RPM_LDOA, 4, &pma8084_nldo, "vdd_l2_l3_l4_l27" },
++	{ "l5", QCOM_SMD_RPM_LDOA, 5, &pma8084_pldo, "vdd_l5_l7" },
++	{ "l6", QCOM_SMD_RPM_LDOA, 6, &pma8084_pldo, "vdd_l6_l12_l14_l15_l26" },
++	{ "l7", QCOM_SMD_RPM_LDOA, 7, &pma8084_pldo, "vdd_l5_l7" },
++	{ "l8", QCOM_SMD_RPM_LDOA, 8, &pma8084_pldo, "vdd_l8" },
++	{ "l9", QCOM_SMD_RPM_LDOA, 9, &pma8084_pldo, "vdd_l9_l10_l13_l20_l23_l24" },
++	{ "l10", QCOM_SMD_RPM_LDOA, 10, &pma8084_pldo, "vdd_l9_l10_l13_l20_l23_l24" },
++	{ "l11", QCOM_SMD_RPM_LDOA, 11, &pma8084_nldo, "vdd_l1_l11" },
++	{ "l12", QCOM_SMD_RPM_LDOA, 12, &pma8084_pldo, "vdd_l6_l12_l14_l15_l26" },
++	{ "l13", QCOM_SMD_RPM_LDOA, 13, &pma8084_pldo, "vdd_l9_l10_l13_l20_l23_l24" },
++	{ "l14", QCOM_SMD_RPM_LDOA, 14, &pma8084_pldo, "vdd_l6_l12_l14_l15_l26" },
++	{ "l15", QCOM_SMD_RPM_LDOA, 15, &pma8084_pldo, "vdd_l6_l12_l14_l15_l26" },
++	{ "l16", QCOM_SMD_RPM_LDOA, 16, &pma8084_pldo, "vdd_l16_l25" },
++	{ "l17", QCOM_SMD_RPM_LDOA, 17, &pma8084_pldo, "vdd_l17" },
++	{ "l18", QCOM_SMD_RPM_LDOA, 18, &pma8084_pldo, "vdd_l18" },
++	{ "l19", QCOM_SMD_RPM_LDOA, 19, &pma8084_pldo, "vdd_l19" },
++	{ "l20", QCOM_SMD_RPM_LDOA, 20, &pma8084_pldo, "vdd_l9_l10_l13_l20_l23_l24" },
++	{ "l21", QCOM_SMD_RPM_LDOA, 21, &pma8084_pldo, "vdd_l21" },
++	{ "l22", QCOM_SMD_RPM_LDOA, 22, &pma8084_pldo, "vdd_l22" },
++	{ "l23", QCOM_SMD_RPM_LDOA, 23, &pma8084_pldo, "vdd_l9_l10_l13_l20_l23_l24" },
++	{ "l24", QCOM_SMD_RPM_LDOA, 24, &pma8084_pldo, "vdd_l9_l10_l13_l20_l23_l24" },
++	{ "l25", QCOM_SMD_RPM_LDOA, 25, &pma8084_pldo, "vdd_l16_l25" },
++	{ "l26", QCOM_SMD_RPM_LDOA, 26, &pma8084_pldo, "vdd_l6_l12_l14_l15_l26" },
++	{ "l27", QCOM_SMD_RPM_LDOA, 27, &pma8084_nldo, "vdd_l2_l3_l4_l27" },
++
++	{ "lvs1", QCOM_SMD_RPM_VSA, 1, &pma8084_switch },
++	{ "lvs2", QCOM_SMD_RPM_VSA, 2, &pma8084_switch },
++	{ "lvs3", QCOM_SMD_RPM_VSA, 3, &pma8084_switch },
++	{ "lvs4", QCOM_SMD_RPM_VSA, 4, &pma8084_switch },
++	{ "5vs1", QCOM_SMD_RPM_VSA, 5, &pma8084_switch },
++
++	{}
++};
++
+ static const struct of_device_id rpm_of_match[] = {
+ 	{ .compatible = "qcom,rpm-pm8841-regulators", .data = &rpm_pm8841_regulators },
+ 	{ .compatible = "qcom,rpm-pm8916-regulators", .data = &rpm_pm8916_regulators },
+ 	{ .compatible = "qcom,rpm-pm8941-regulators", .data = &rpm_pm8941_regulators },
++	{ .compatible = "qcom,rpm-pma8084-regulators", .data = &rpm_pma8084_regulators },
+ 	{}
+ };
+ MODULE_DEVICE_TABLE(of, rpm_of_match);
 -- 
-Sent from my Android device with K-9 Mail. Please excuse my brevity.
+1.9.1
