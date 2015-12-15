@@ -1,53 +1,25 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 15 Dec 2015 09:52:29 +0000
-Subject: [PATCH v7 1/4] acpi: pci: Setup MSI domain for ACPI based pci
- devices
-In-Reply-To: <2013286.NCRgLU1HGi@vostro.rjw.lan>
-References: <1449766530-16935-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1449766530-16935-2-git-send-email-Suravee.Suthikulpanit@amd.com>
- <566EDCAC.1080401@arm.com> <2013286.NCRgLU1HGi@vostro.rjw.lan>
-Message-ID: <566FE2DD.6080308@arm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 15 Dec 2015 15:22:43 +0530
+Subject: [PATCH] ARM: davinci: only select WT cache if cache is enabled
+In-Reply-To: <2043568.VG8xo4jr1Z@wuerfel>
+References: <2043568.VG8xo4jr1Z@wuerfel>
+Message-ID: <566FE2EB.4090505@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/12/15 21:29, Rafael J. Wysocki wrote:
-> On Monday, December 14, 2015 03:13:48 PM Marc Zyngier wrote:
->> On 10/12/15 16:55, Suravee Suthikulpanit wrote:
->>> This patch introduces pci_msi_register_fwnode_provider() for irqchip
->>> to register a callback, to provide a way to determine appropriate MSI
->>> domain for a pci device.
->>>
->>> It also introduces pci_host_bridge_acpi_msi_domain(), which returns
->>> the MSI domain of the specified PCI host bridge with DOMAIN_BUS_PCI_MSI
->>> bus token. Then, it is assigned to pci device.
->>>
->>> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
->>> Cc: Bjorn Helgaas <bhelgaas@google.com>
->>> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
->>> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->>
->> Bjorn, Rafael,
->>
->> Do you have any comment on this?
->>
->> I was hoping to queue this work (and the 3 patches that depend on it)
->> for 4.5, but if you don't have the bandwidth to review it, I'll postpone
->> it to the following merge window.
+On Thursday 10 December 2015 06:49 PM, Arnd Bergmann wrote:
+> The DA830 chip only works if the dcache is in writethrough mode,
+> but that produces a harmless Kconfig warning if the cache happens
+> to be disabled:
 > 
-> How much time do we have to look at it before it is postponed?
+> warning: (ARCH_DAVINCI_DA830) selects CPU_DCACHE_WRITETHROUGH which has unmet direct dependencies ((CPU_ARM740T || CPU_ARM920T || CPU_ARM922T || CPU_ARM925T || CPU_ARM926T || CPU_ARM940T || CPU_ARM946E || CPU_ARM1020 || CPU_FA526) && !CPU_DCACHE_DISABLE)
+> 
+> This makes the select conditional so we don't have to worry
+> about the warning in randconfig builds any more.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Realistically, I'm going to stop queuing stuff Wednesday next week (I'll
-be travelling, and without access to enough HW to follow up on potential
-regressions), and I'd expect Thomas to stop pulling stuff even earlier
-than that.
-
-So we basically have a week to decide whether or not we want this for
-the next merge window. I appreciate this is a busy time for everyone and
-that this series took a long time to reach that stage, so any way is
-fine by me.
+Applied.
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Sekhar
