@@ -1,27 +1,62 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 15 Dec 2015 14:08:13 +0100
-Subject: [PATCH] fixup! pinctrl: pxa: pxa2xx: add pin control skeleton
-In-Reply-To: <1449956585-17118-1-git-send-email-robert.jarzmik@free.fr>
-References: <1449956585-17118-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <CACRpkdZgHWwGXhSv4D9-oyS1wW_ZGDpyUfM47-EbU9ujNRD3Mg@mail.gmail.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 15 Dec 2015 13:16:11 +0000
+Subject: [PATCH v1 02/10] clockevents/drivers: add MPS2 Timer driver
+In-Reply-To: <CAL_Jsq+MhvV5BFw+x3TWTDheSpgWHjHjO02+D4V4swr493HXrg@mail.gmail.com>
+References: <1449048790-25859-1-git-send-email-vladimir.murzin@arm.com>
+ <1449048790-25859-3-git-send-email-vladimir.murzin@arm.com>
+ <CAL_Jsq+MhvV5BFw+x3TWTDheSpgWHjHjO02+D4V4swr493HXrg@mail.gmail.com>
+Message-ID: <5670129B.700@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 12, 2015 at 10:43 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+On 14/12/15 13:56, Rob Herring wrote:
+> On Wed, Dec 2, 2015 at 3:33 AM, Vladimir Murzin <vladimir.murzin@arm.com> wrote:
+>> MPS2 platform has simple 32 bits general purpose countdown timers.
+>>
+>> The driver uses the first detected timer as a clocksource and the rest
+>> of the timers as a clockevent
+>>
+>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+>> ---
+>>  drivers/clocksource/Kconfig      |    5 +
+>>  drivers/clocksource/Makefile     |    1 +
+>>  drivers/clocksource/mps2-timer.c |  277 ++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 283 insertions(+)
+>>  create mode 100644 drivers/clocksource/mps2-timer.c
+>>
+>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+>> index 2eb5f0e..8bca09c 100644
+>> --- a/drivers/clocksource/Kconfig
+>> +++ b/drivers/clocksource/Kconfig
+>> @@ -137,6 +137,11 @@ config CLKSRC_STM32
+>>         depends on OF && ARM && (ARCH_STM32 || COMPILE_TEST)
+>>         select CLKSRC_MMIO
+>>
+>> +config CLKSRC_MPS2
+>> +       bool "Clocksource for MPS2 SoCs" if COMPILE_TEST
+>> +       depends on OF && ARM
+> 
+> Does this really depend on both of these for COMPILE_TEST?
 
-> The wrong free functions were used to release temporary buffers.
->
-> This didn't show up in the normal driver's life. Yet in suspend to RAM,
-> the managed resource list is walked, and as memory was released, the
-> list is corrupted and make the kernel Oops.
->
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> ---
-> Linus, if it's time, then this can fixup the commit. If not, I'll
-> provide a better commit message.
+Not really...
 
-I just applied it on top of my branch, removing the "fixup!"
-comment. It's enough of a commit message I think.
+> 
+> You need to select CLKSRC_OF rather than CLKSRC_MMIO as well.
+> 
 
-Yours,
-Linus Walleij
+Does it looks better?
+
+config CLKSRC_MPS2
+	bool "Clocksource for MPS2 SoCs" if COMPILE_TEST
+	depends on GENERIC_SCHED_CLOCK
+	select CLKSRC_MMIO
+	select CLKSRC_OF
+
+
+Cheers
+Vladimir
+
+> Rob
+> 
+> 
+> 
