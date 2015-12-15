@@ -1,149 +1,185 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Tue, 15 Dec 2015 16:49:36 +0800
-Subject: [PATCH v7 16/19] KVM: ARM64: Add PMU overflow interrupt routing
+Date: Tue, 15 Dec 2015 16:49:30 +0800
+Subject: [PATCH v7 10/19] KVM: ARM64: Add access handler for PMCNTENSET and
+ PMCNTENCLR register
 In-Reply-To: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1450169379-12336-17-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1450169379-12336-11-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-When calling perf_event_create_kernel_counter to create perf_event,
-assign a overflow handler. Then when the perf event overflows, set the
-corresponding bit of guest PMOVSSET register. If this counter is enabled
-and its interrupt is enabled as well, kick the vcpu to sync the
-interrupt.
+Since the reset value of PMCNTENSET and PMCNTENCLR is UNKNOWN, use
+reset_unknown for its reset handler. Add a handler to emulate writing
+PMCNTENSET or PMCNTENCLR register.
 
-On VM entry, if there is counter overflowed, inject the interrupt with
-the level set to 1. Otherwise, inject the interrupt with the level set
-to 0.
+When writing to PMCNTENSET, call perf_event_enable to enable the perf
+event. When writing to PMCNTENCLR, call perf_event_disable to disable
+the perf event.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- arch/arm/kvm/arm.c    |  2 ++
- include/kvm/arm_pmu.h |  2 ++
- virt/kvm/arm/pmu.c    | 54 ++++++++++++++++++++++++++++++++++++++++++++++++++-
- 3 files changed, 57 insertions(+), 1 deletion(-)
+ arch/arm64/kvm/sys_regs.c | 41 +++++++++++++++++++++++++++++++----
+ include/kvm/arm_pmu.h     |  4 ++++
+ virt/kvm/arm/pmu.c        | 55 +++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 96 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index e06fd29..cd696ef 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -28,6 +28,7 @@
- #include <linux/sched.h>
- #include <linux/kvm.h>
- #include <trace/events/kvm.h>
-+#include <kvm/arm_pmu.h>
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index dc6bb26..f216da7 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -615,6 +615,39 @@ static bool access_pmu_evcntr(struct kvm_vcpu *vcpu,
+ 	return true;
+ }
  
- #define CREATE_TRACE_POINTS
- #include "trace.h"
-@@ -569,6 +570,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		 * non-preemptible context.
- 		 */
- 		preempt_disable();
-+		kvm_pmu_flush_hwstate(vcpu);
- 		kvm_timer_flush_hwstate(vcpu);
- 		kvm_vgic_flush_hwstate(vcpu);
++static inline u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu)
++{
++	u64 val = vcpu_sys_reg(vcpu, PMCR_EL0) >> ARMV8_PMCR_N_SHIFT;
++
++	val &= ARMV8_PMCR_N_MASK;
++	return GENMASK(val - 1, 0) | BIT(ARMV8_CYCLE_IDX);
++}
++
++static bool access_pmcntenset(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
++			      const struct sys_reg_desc *r)
++{
++	u64 val, mask;
++
++	mask = kvm_pmu_valid_counter_mask(vcpu);
++	if (p->is_write) {
++		val = p->regval & mask;
++		if (r->Op2 & 0x1) {
++			/* accessing PMCNTENSET_EL0 */
++			vcpu_sys_reg(vcpu, r->reg) |= val;
++			kvm_pmu_enable_counter(vcpu, val);
++		} else {
++			/* accessing PMCNTENCLR_EL0 */
++			vcpu_sys_reg(vcpu, r->reg) &= mask;
++			vcpu_sys_reg(vcpu, r->reg) &= ~val;
++			kvm_pmu_disable_counter(vcpu, val);
++		}
++	} else {
++		p->regval = vcpu_sys_reg(vcpu, r->reg) & mask;
++	}
++
++	return true;
++}
++
+ /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
+ #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
+ 	/* DBGBVRn_EL1 */						\
+@@ -816,10 +849,10 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	  access_pmcr, reset_pmcr, PMCR_EL0, },
+ 	/* PMCNTENSET_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b001),
+-	  trap_raz_wi },
++	  access_pmcntenset, reset_unknown, PMCNTENSET_EL0 },
+ 	/* PMCNTENCLR_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b010),
+-	  trap_raz_wi },
++	  access_pmcntenset, NULL, PMCNTENSET_EL0 },
+ 	/* PMOVSCLR_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b011),
+ 	  trap_raz_wi },
+@@ -1161,8 +1194,8 @@ static const struct sys_reg_desc cp15_regs[] = {
  
+ 	/* PMU */
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), access_pmcr },
+-	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), trap_raz_wi },
+-	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), trap_raz_wi },
++	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), access_pmcntenset },
++	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), access_pmcntenset },
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), trap_raz_wi },
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), access_pmselr },
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), access_pmceid },
 diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-index 25b5f98..732ccaf 100644
+index 14bedb0..43c4117 100644
 --- a/include/kvm/arm_pmu.h
 +++ b/include/kvm/arm_pmu.h
-@@ -35,6 +35,7 @@ struct kvm_pmu {
- 	struct kvm_pmc pmc[ARMV8_MAX_COUNTERS];
+@@ -36,6 +36,8 @@ struct kvm_pmu {
  };
  
-+void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu);
  u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx);
- void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val);
- void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val);
-@@ -47,6 +48,7 @@ void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val);
- struct kvm_pmu {
- };
- 
-+void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu) {}
- u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx)
++void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val);
++void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val);
+ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
+ 				    u64 select_idx);
+ #else
+@@ -46,6 +48,8 @@ u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx)
  {
  	return 0;
+ }
++void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val) {}
++void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val) {}
+ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
+ 				    u64 select_idx) {}
+ #endif
 diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-index e664721..eff5b19 100644
+index b107fb8..94bff0e 100644
 --- a/virt/kvm/arm/pmu.c
 +++ b/virt/kvm/arm/pmu.c
-@@ -21,6 +21,7 @@
- #include <linux/perf_event.h>
- #include <asm/kvm_emulate.h>
- #include <kvm/arm_pmu.h>
-+#include <kvm/arm_vgic.h>
- 
- /**
-  * kvm_pmu_get_counter_value - get PMU counter value
-@@ -75,6 +76,56 @@ static void kvm_pmu_stop_counter(struct kvm_vcpu *vcpu, struct kvm_pmc *pmc)
+@@ -75,6 +75,61 @@ static void kvm_pmu_stop_counter(struct kvm_vcpu *vcpu, struct kvm_pmc *pmc)
  }
  
  /**
-+ * kvm_pmu_flush_hwstate - flush pmu state to cpu
++ * kvm_pmu_enable_counter - enable selected PMU counter
 + * @vcpu: The vcpu pointer
++ * @val: the value guest writes to PMCNTENSET register
 + *
-+ * Inject virtual PMU IRQ if IRQ is pending for this cpu.
++ * Call perf_event_enable to start counting the perf event
 + */
-+void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu)
++void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val)
 +{
++	int i;
 +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-+	u64 overflow;
++	struct kvm_pmc *pmc;
 +
-+	if (pmu->irq_num == -1)
++	if (!(vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMCR_E) || !val)
 +		return;
 +
-+	if (!(vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMCR_E))
-+		return;
++	for (i = 0; i < ARMV8_MAX_COUNTERS; i++) {
++		if (!((val >> i) & 0x1))
++			continue;
 +
-+	overflow = vcpu_sys_reg(vcpu, PMCNTENSET_EL0)
-+		   & vcpu_sys_reg(vcpu, PMINTENSET_EL1)
-+		   & vcpu_sys_reg(vcpu, PMOVSSET_EL0);
-+
-+	kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id, pmu->irq_num,
-+			    overflow ? 1 : 0);
-+}
-+
-+static inline struct kvm_vcpu *kvm_pmc_to_vcpu(struct kvm_pmc *pmc)
-+{
-+	struct kvm_pmu *pmu;
-+	struct kvm_vcpu_arch *vcpu_arch;
-+
-+	pmc -= pmc->idx;
-+	pmu = container_of(pmc, struct kvm_pmu, pmc[0]);
-+	vcpu_arch = container_of(pmu, struct kvm_vcpu_arch, pmu);
-+	return container_of(vcpu_arch, struct kvm_vcpu, arch);
++		pmc = &pmu->pmc[i];
++		if (pmc->perf_event) {
++			perf_event_enable(pmc->perf_event);
++			if (pmc->perf_event->state != PERF_EVENT_STATE_ACTIVE)
++				kvm_debug("fail to enable perf event\n");
++		}
++	}
 +}
 +
 +/**
-+ * When perf event overflows, call kvm_pmu_overflow_set to set overflow status.
++ * kvm_pmu_disable_counter - disable selected PMU counter
++ * @vcpu: The vcpu pointer
++ * @val: the value guest writes to PMCNTENCLR register
++ *
++ * Call perf_event_disable to stop counting the perf event
 + */
-+static void kvm_pmu_perf_overflow(struct perf_event *perf_event,
-+				  struct perf_sample_data *data,
-+				  struct pt_regs *regs)
++void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val)
 +{
-+	struct kvm_pmc *pmc = perf_event->overflow_handler_context;
-+	struct kvm_vcpu *vcpu = kvm_pmc_to_vcpu(pmc);
-+	int idx = pmc->idx;
++	int i;
++	struct kvm_pmu *pmu = &vcpu->arch.pmu;
++	struct kvm_pmc *pmc;
 +
-+	kvm_pmu_overflow_set(vcpu, BIT(idx));
++	if (!val)
++		return;
++
++	for (i = 0; i < ARMV8_MAX_COUNTERS; i++) {
++		if (!((val >> i) & 0x1))
++			continue;
++
++		pmc = &pmu->pmc[i];
++		if (pmc->perf_event)
++			perf_event_disable(pmc->perf_event);
++	}
 +}
 +
 +/**
-  * kvm_pmu_enable_counter - enable selected PMU counter
+  * kvm_pmu_set_counter_event_type - set selected counter to monitor some event
   * @vcpu: The vcpu pointer
-  * @val: the value guest writes to PMCNTENSET register
-@@ -258,7 +309,8 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
- 	/* The initial sample period (overflow count) of an event. */
- 	attr.sample_period = (-counter) & pmc->bitmask;
- 
--	event = perf_event_create_kernel_counter(&attr, -1, current, NULL, pmc);
-+	event = perf_event_create_kernel_counter(&attr, -1, current,
-+						 kvm_pmu_perf_overflow, pmc);
- 	if (IS_ERR(event)) {
- 		printk_once("kvm: pmu event creation failed %ld\n",
- 			    PTR_ERR(event));
+  * @data: The data guest writes to PMXEVTYPER_EL0
 -- 
 2.0.4
