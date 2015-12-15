@@ -1,130 +1,157 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 15 Dec 2015 11:19:12 +0000
-Subject: ARM64/KVM: Bad page state in process iperf
-In-Reply-To: <DM2PR03MB557D3CD68273D243625013390EE0@DM2PR03MB557.namprd03.prod.outlook.com>
-References: <DM2PR03MB557D3079ABFE7AF114A58A690EE0@DM2PR03MB557.namprd03.prod.outlook.com>
- <566FDEAD.6000707@arm.com>
- <DM2PR03MB55707E80EDA77A6991FDA2190EE0@DM2PR03MB557.namprd03.prod.outlook.com>
- <566FE944.3090506@arm.com>
- <DM2PR03MB557D3CD68273D243625013390EE0@DM2PR03MB557.namprd03.prod.outlook.com>
-Message-ID: <566FF730.8050609@arm.com>
+From: graeme.gregory@linaro.org (G Gregory)
+Date: Tue, 15 Dec 2015 11:19:14 +0000
+Subject: [Linaro-acpi] Touching the initrd before paging_init
+In-Reply-To: <566DEED6.3010704@redhat.com>
+References: <566D3090.9090509@redhat.com>
+ <20151213165942.GN25034@bivouac.eciton.net>
+ <23071B8C-D1F9-47A6-9DB4-B26842150B76@redhat.com>
+ <566DEB04.2030806@redhat.com>
+ <CAGCh1+nb-H-B28crGuTPUKXZrBN_XDn7fNHf4q8LZZOgyhtDmQ@mail.gmail.com>
+ <566DEED6.3010704@redhat.com>
+Message-ID: <CAGCh1+k8jHzMK+pLbtBgg5=VdT=+3W+OjTGJLMDGjLqLvmQXnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/12/15 10:57, Bhushan Bharat wrote:
-> 
-> 
->> -----Original Message-----
->> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
->> Sent: Tuesday, December 15, 2015 3:50 PM
->> To: Bhushan Bharat-R65777 <Bharat.Bhushan@freescale.com>;
->> kvmarm at lists.cs.columbia.edu; kvm at vger.kernel.org; linux-arm-
->> kernel at lists.infradead.org; linux-kernel at vger.kernel.org
->> Subject: Re: ARM64/KVM: Bad page state in process iperf
->>
->> On 15/12/15 09:53, Bhushan Bharat wrote:
->>> Hi Mark,
+On 13 December 2015 at 22:19, Jon Masters <jcm@redhat.com> wrote:
+> On 12/13/2015 05:15 PM, G Gregory wrote:
+>> On 13 December 2015 at 22:02, Jon Masters <jcm@redhat.com> wrote:
+>>> On 12/13/2015 04:36 PM, Jon Masters wrote:
 >>>
->>>> -----Original Message-----
->>>> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
->>>> Sent: Tuesday, December 15, 2015 3:05 PM
->>>> To: Bhushan Bharat-R65777 <Bharat.Bhushan@freescale.com>;
->>>> kvmarm at lists.cs.columbia.edu; kvm at vger.kernel.org; linux-arm-
->>>> kernel at lists.infradead.org; linux-kernel at vger.kernel.org
->>>> Subject: Re: ARM64/KVM: Bad page state in process iperf
->>>>
->>>> On 15/12/15 03:46, Bhushan Bharat wrote:
->>>>>
->>>>> Hi All,
->>>>>
->>>>> I am running "iperf" in KVM guest on ARM64 machine and observing
->>>>> below
->>>> crash.
->>>>>
->>>>> =============================
->>>>> $iperf -c 3.3.3.3 -P 4 -t 0 -i 5 -w 90k
->>>>> ------------------------------------------------------------
->>>>> Client connecting to 3.3.3.3, TCP port 5001 TCP window size:  180
->>>>> KByte (WARNING: requested 90.0 KByte)
->>>>> ------------------------------------------------------------
->>>>> [  3] local 3.3.3.1 port 51131 connected with 3.3.3.3 port 5001 [
->>>>> 6] local 3.3.3.1 port 51134 connected with 3.3.3.3 port 5001 [  5]
->>>>> local
->>>>> 3.3.3.1 port 51133 connected with 3.3.3.3 port 5001 [  4] local
->>>>> 3.3.3.1 port 51132 connected with 3.3.3.3 port 5001
->>>>> [   53.088567] random: nonblocking pool is initialized
->>>>> [ ID] Interval       Transfer     Bandwidth
->>>>> [  3]  0.0- 5.0 sec   638 MBytes  1.07 Gbits/sec
->>>>> [  4] 35.0-40.0 sec  1.66 GBytes  2.85 Gbits/sec [  5] 40.0-45.0 sec
->>>>> 1.11 GBytes  1.90 Gbits/sec [  4] 40.0-45.0 sec  1.16 GBytes  1.99
->>>>> Gbits/sec
->>>>> [   98.895207] BUG: Bad page state in process iperf  pfn:0a584
->>>>> [   98.896164] page:ffff780000296100 count:-1 mapcount:0 mapping:
->>>> (null) index:0x0
->>>>> [   98.897436] flags: 0x0()
->>>>> [   98.897885] page dumped because: nonzero _count
->>>>> [   98.898640] Modules linked in:
->>>>> [   98.899178] CPU: 0 PID: 1639 Comm: iperf Not tainted 4.1.8-00461-
->>>> ge5431ad #141
->>>>> [   98.900302] Hardware name: linux,dummy-virt (DT)
->>>>> [   98.901014] Call trace:
->>>>> [   98.901406] [<ffff800000096cac>] dump_backtrace+0x0/0x12c
->>>>> [   98.902522] [<ffff800000096de8>] show_stack+0x10/0x1c
->>>>> [   98.903441] [<ffff800000678dc8>] dump_stack+0x8c/0xdc
->>>>> [   98.904202] [<ffff800000145480>] bad_page+0xc4/0x114
->>>>> [   98.904945] [<ffff8000001487a4>]
->> get_page_from_freelist+0x590/0x63c
->>>>> [   98.905871] [<ffff80000014893c>]
->> __alloc_pages_nodemask+0xec/0x794
->>>>> [   98.906791] [<ffff80000059fc80>] skb_page_frag_refill+0x70/0xa8
->>>>> [   98.907678] [<ffff80000059fcd8>] sk_page_frag_refill+0x20/0xd0
->>>>> [   98.908550] [<ffff8000005edc04>] tcp_sendmsg+0x1f8/0x9a8
->>>>> [   98.909368] [<ffff80000061419c>] inet_sendmsg+0x5c/0xd0
->>>>> [   98.910178] [<ffff80000059bb44>] sock_sendmsg+0x14/0x58
->>>>> [   98.911027] [<ffff80000059bbec>] sock_write_iter+0x64/0xbc
->>>>> [   98.912119] [<ffff80000019b5b8>] __vfs_write+0xac/0x10c
->>>>> [   98.913126] [<ffff80000019bcb8>] vfs_write+0x90/0x1a0
->>>>> [   98.913963] [<ffff80000019c53c>] SyS_write+0x40/0xa0
->>>>
->>>> This looks quite bad, but I don't see anything here that links it to
->>>> KVM (apart from being a guest). Do you have any indication that this
->>>> is due to KVM misbehaving?
+>>>> Just thinking from a parity point of view - if you can do it on x86, it should be
+>>>> doable on ARM. But that GRUB module approach I quite like!
 >>>
->>> I never observed this issue in host Linux but observed this issue always in
->> guest Linux. This issue does not comes immediately after I run "iperf" but
->> after some time.
+>>> Sorry for top post earlier. Was on my phone. In any case, it looks like
+>>> the "acpi" command in GRUB currently does an all-or-nothing replace of
+>>> all of the tables, not just a named table. We need to be able to
+>>> override e.g. just an DSDT or SSDT with a replacement test one.
 >>>
->>>> I'd appreciate a few more details.
->>>
->>> We have a networking hardware and we are directly assigning the h/w to
->> guest. When using the same networking hardware in host it always works as
->> expected (tried 100s of times).
->>> Also this issue is not observed when we have only one vCPU in guest but
->> seen when we have SMP guest.
->>
->> Can you reproduce the same issue without VFIO (using virtio, for example)?
-> 
-> With virtio I have not observed this issue.
-> 
->> Is that platform VFIO? or PCI?
-> 
-> It is not vfio-pci and vfio-platform. It is vfio-fls-mc (some
-> Freescale new hardware), similar to the lines of vfio-platform uses
-> same set of VFIO APIs used by vfio-pci/platform. Do you think this
-> can be some h/w specific issue.
+>> I think thats just clumsily worded documentation. The code certainly
+>> looks like you can replace them individually.
+>
+> Yea, it does. It's unfortunate that the code is more "obvious" than the
+> docs, but hardly the first time ;)
+>
+>> I think its trying to say in the case RSDP,XSDT,RSDT are in ROM it
+>> will create new ones to point to the new tables you've just imported.
+>
+> Yea. I think it actually ends up creating new tables in any case, then
+> copies over the bits that change. It'll actually need to do that anyway
+> because it'll want to update the pointers to new tables. I'll try it.
+> But I also want to see the initrd approach working in the not too
+> distant future - everything someone can do on an x86 system should
+> translate 1:1 in terms of experience. It'll help with bringup of newer
+> platforms such as the one I have that needs some NUMA related tweaks.
+>
+>> I had planned to try it this week anyway.
+>
+> Great :)
+>
+> Jon.
+>
 
-I have no idea, but by the look of it, something could be doing DMA on
-top of your guest page tables, which is not really expected. I suggest
-you carefully look at:
+Tried it, results were not great :-(
 
-1) the DMA addresses that are passed to your device
-2) the page tables that are programmed into the SMMU
-3) the resulting translation
+set root='hd0,gpt2'
+insmod acpi
+acpi /DSDT.aml
+linux /Image-leg earlycon=pl011,0xe1010000 console=ttyAMA0 acpi=force root
+=/dev/sda2
 
-Hopefully this will give you a clue about what is generating this.
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Initializing cgroup subsys cpuset
+[    0.000000] Initializing cgroup subsys cpu
+[    0.000000] Initializing cgroup subsys cpuacct
+[    0.000000] Linux version 4.4.0-rc1-00058-g5e47260-dirty
+(graeme at linaro-seattle.xora.org.uk) (gcc version 4.8.3 20140911 (Red
+Hat 4.8.3-9) (GCC) ) #172 SMP PREEMPT Tue Dec 1 17:01:23 GMT 2015
+[    0.000000] Boot CPU: AArch64 Processor [411fd072]
+[    0.000000] earlycon: Early serial console at MMIO 0xe1010000 (options '')
+[    0.000000] bootconsole [uart0] enabled
+[    0.000000] Bad mode in Error handler detected, code 0xbf000000 -- SError
+[    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted
+4.4.0-rc1-00058-g5e47260-dirty #172
+[    0.000000] Hardware name: AMD Seattle (RevB) Development Board
+(Overdrive) (DT)
+[    0.000000] task: fffffe0000dc7500 ti: fffffe0000d90000 task.ti:
+fffffe0000d90000
+[    0.000000] PC is at setup_arch+0xfc/0x564
+[    0.000000] LR is at setup_arch+0xf8/0x564
+[    0.000000] pc : [<fffffe0000cb35e8>] lr : [<fffffe0000cb35e4>]
+pstate: 000002c5
+[    0.000000] sp : fffffe0000d93f00
+[    0.000000] x29: fffffe0000d93f00 x28: 00000083f0fa22c0
+[    0.000000] x27: fffffe0000081198 x26: 0000008002040000
+[    0.000000] x25: 0000008002010000 x24: 0000008001000000
+[    0.000000] x23: fffffe0000dc0000 x22: 00000083f0f15228
+[    0.000000] x21: fffffe0000080000 x20: fffffe0000cffc00
+[    0.000000] x19: fffffdfffa800000 x18: fffffe00008d0bf0
+[    0.000000] x17: 000000000000000e x16: 0000000000000007
+[    0.000000] x15: 0000000000000001 x14: 0ffffffffffffffe
+[    0.000000] x13: 0000000000000020 x12: 0000000000000038
+[    0.000000] x11: 0000000000000007 x10: 0101010101010101
+[    0.000000] x9 : fffffffffffffffd x8 : 0000000000000008
+[    0.000000] x7 : 0000000000000005 x6 : 0000000000000080
+[    0.000000] x5 : 000000000000005f x4 : 0000000000000072
+[    0.000000] x3 : 0000000000000063 x2 : 0000000000000072
+[    0.000000] x1 : 0000000000000000 x0 : 0000000000000001
+[    0.000000]
+[    0.000000] Internal error: Oops - bad mode: 0 [#1] PREEMPT SMP
+[    0.000000] Modules linked in:
+[    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted
+4.4.0-rc1-00058-g5e47260-dirty #172
+[    0.000000] Hardware name: AMD Seattle (RevB) Development Board
+(Overdrive) (DT)
+[    0.000000] task: fffffe0000dc7500 ti: fffffe0000d90000 task.ti:
+fffffe0000d90000
+[    0.000000] PC is at setup_arch+0xfc/0x564
+[    0.000000] LR is at setup_arch+0xf8/0x564
+[    0.000000] pc : [<fffffe0000cb35e8>] lr : [<fffffe0000cb35e4>]
+pstate: 000002c5
+[    0.000000] sp : fffffe0000d93f00
+[    0.000000] x29: fffffe0000d93f00 x28: 00000083f0fa22c0
+[    0.000000] x27: fffffe0000081198 x26: 0000008002040000
+[    0.000000] x25: 0000008002010000 x24: 0000008001000000
+[    0.000000] x23: fffffe0000dc0000 x22: 00000083f0f15228
+[    0.000000] x21: fffffe0000080000 x20: fffffe0000cffc00
+[    0.000000] x19: fffffdfffa800000 x18: fffffe00008d0bf0
+[    0.000000] x17: 000000000000000e x16: 0000000000000007
+[    0.000000] x15: 0000000000000001 x14: 0ffffffffffffffe
+[    0.000000] x13: 0000000000000020 x12: 0000000000000038
+[    0.000000] x11: 0000000000000007 x10: 0101010101010101
+[    0.000000] x9 : fffffffffffffffd x8 : 0000000000000008
+[    0.000000] x7 : 0000000000000005 x6 : 0000000000000080
+[    0.000000] x5 : 000000000000005f x4 : 0000000000000072
+[    0.000000] x7 : 0000000000000005 x6 : 0000000000000080
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+                                                         [0/1977]
+[    0.000000] x5 : 000000000000005f x4 : 0000000000000072
+[    0.000000] x3 : 0000000000000063 x2 : 0000000000000072
+[    0.000000] x1 : 0000000000000000 x0 : 0000000000000001
+[    0.000000]
+[    0.000000] Process swapper (pid: 0, stack limit = 0xfffffe0000d90020)
+[    0.000000] Stack: (0xfffffe0000d93f00 to 0xfffffe0000d94000)
+[    0.000000] 3f00: fffffe0000d93fa0 fffffe0000cb06a0
+0000000000000001 fffffe0000cffc00
+[    0.000000] 3f20: 000000801fe00000 00000083f0f15228
+fffffe0000dc0000 0000008001000000
+[    0.000000] 3f40: 0000008002010000 0000008002040000
+fffffe0000081198 00000000ffffffc8
+[    0.000000] 3f60: 00000083f0f155a0 fffffe0000860080
+0000000000000001 000000801fe00000
+[    0.000000] 3f80: ffffffffffffffff 8080808080800000
+0000808080808080 fefefefefeff736d
+[    0.000000] 3fa0: 0000000000000000 000000800184d000
+00000083f0f155a0 0000000000000e12
+[    0.000000] 3fc0: 000000801fe00000 00000083f0f15228
+00000083f0f1523d 0000008001000000
+[    0.000000] 3fe0: 0000000000000000 fffffe0000d00428
+0000000000000000 0000000000000000
+[    0.000000] Call trace:
+[    0.000000] [<fffffe0000cb35e8>] setup_arch+0xfc/0x564
+[    0.000000] [<fffffe0000cb06a0>] start_kernel+0xd4/0x400
+[    0.000000] [<000000800184d000>] 0x800184d000
+[    0.000000] Code: 91318000 94002b79 97fff3e7 d50344ff (94000760)
+[    0.000000] ---[ end trace f24b6c88ae00fa9a ]---
+[    0.000000] Kernel panic - not syncing: Attempted to kill the idle task!
+[    0.000000] ---[ end Kernel panic - not syncing: Attempted to kill
+the idle task!
