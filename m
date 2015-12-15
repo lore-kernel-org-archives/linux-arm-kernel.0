@@ -1,51 +1,62 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 15 Dec 2015 08:15:18 -0800
-Subject: [PATCH] watchdog: dw_wdt: fix signedness bug in
- dw_wdt_top_in_seconds()
-In-Reply-To: <1450189527-1015-1-git-send-email-jszhang@marvell.com>
-References: <1450189527-1015-1-git-send-email-jszhang@marvell.com>
-Message-ID: <56703C96.90105@roeck-us.net>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 15 Dec 2015 17:20:52 +0100
+Subject: [PATCH 1/2] ARM: mvebu: add kirkwood compatibles for cloudengine
+ boards
+In-Reply-To: <20151127201702.GA32398@rob-hp-laptop> (Rob Herring's message of
+ "Fri, 27 Nov 2015 14:17:02 -0600")
+References: <1448578854-6256-1-git-send-email-linus.walleij@linaro.org>
+ <20151127201702.GA32398@rob-hp-laptop>
+Message-ID: <87mvtbvg2j.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/15/2015 06:25 AM, Jisheng Zhang wrote:
-> On 64bit platforms, "(1 << (16 + top)) / clk_get_rate(dw_wdt.clk)" is
-> sign-extended to 64bit then converted to unsigned 64bit, finally divide
-> the clk rate. If the top is the maximum TOP i.e 15, "(1 << (16 +15))"
-> will be sign-extended to 0xffffffff80000000, then converted to unsigned
-> 0xffffffff80000000, which is a huge number, thus the final result is
-> wrong.
->
-> We fix this issue by giving usigned value(1U in this case) at first.
->
-> Let's assume clk rate is 25MHZ,
-> Before the patch:
-> dw_wdt_top_in_seconds(15) = -864612050
->
-> After the patch:
-> dw_wdt_top_in_seconds(15) = 85
->
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Hi Linus,
+ 
+ On ven., nov. 27 2015, Rob Herring <robh@kernel.org> wrote:
 
-Nice catch.
+> On Fri, Nov 27, 2015 at 12:00:54AM +0100, Linus Walleij wrote:
+>> This adds the compatible strings for Cloudengine PogoPlug E02 and
+>> series 4. The former already has a devicetree in the kernel.
+>> 
+>> Cc: devicetree at vger.kernel.org
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> Acked-by: Rob Herring <robh@kernel.org>
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+Applied on mvebu/dt
 
-> ---
->   drivers/watchdog/dw_wdt.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
+Thanks,
+
+Gregory
+
 >
-> diff --git a/drivers/watchdog/dw_wdt.c b/drivers/watchdog/dw_wdt.c
-> index 6ea0634..8fefa4ad 100644
-> --- a/drivers/watchdog/dw_wdt.c
-> +++ b/drivers/watchdog/dw_wdt.c
-> @@ -81,7 +81,7 @@ static inline int dw_wdt_top_in_seconds(unsigned top)
->   	 * There are 16 possible timeout values in 0..15 where the number of
->   	 * cycles is 2 ^ (16 + i) and the watchdog counts down.
->   	 */
-> -	return (1 << (16 + top)) / clk_get_rate(dw_wdt.clk);
-> +	return (1U << (16 + top)) / clk_get_rate(dw_wdt.clk);
->   }
->
->   static int dw_wdt_get_top(void)
->
+>> ---
+>>  Documentation/devicetree/bindings/arm/marvell,kirkwood.txt | 2 ++
+>>  1 file changed, 2 insertions(+)
+>> 
+>> diff --git a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
+>> index 5171ad8f48ff..ab0c9cdf388e 100644
+>> --- a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
+>> +++ b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
+>> @@ -24,6 +24,8 @@ board. Currently known boards are:
+>>  "buffalo,lswxl"
+>>  "buffalo,lsxhl"
+>>  "buffalo,lsxl"
+>> +"cloudengines,pogo02"
+>> +"cloudengines,pogoplugv4"
+>>  "dlink,dns-320"
+>>  "dlink,dns-320-a1"
+>>  "dlink,dns-325"
+>> -- 
+>> 2.4.3
+>> 
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
