@@ -1,313 +1,123 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Tue, 15 Dec 2015 16:49:35 +0800
-Subject: [PATCH v7 15/19] KVM: ARM64: Add access handler for PMUSERENR register
+Date: Tue, 15 Dec 2015 16:49:22 +0800
+Subject: [PATCH v7 02/19] KVM: ARM64: Define PMU data structure for each vcpu
 In-Reply-To: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1450169379-12336-16-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1450169379-12336-3-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-The reset value of PMUSERENR_EL0 is UNKNOWN, use reset_unknown.
+Here we plan to support virtual PMU for guest by full software
+emulation, so define some basic structs and functions preparing for
+futher steps. Define struct kvm_pmc for performance monitor counter and
+struct kvm_pmu for performance monitor unit for each vcpu. According to
+ARMv8 spec, the PMU contains at most 32(ARMV8_MAX_COUNTERS) counters.
 
-PMUSERENR_EL0 holds some bits which decide whether PMU registers can be
-accessed from EL0. Add some check helpers to handle the access from EL0.
+Since this only supports ARM64 (or PMUv3), add a separate config symbol
+for it.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- arch/arm64/kvm/sys_regs.c | 124 ++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 119 insertions(+), 5 deletions(-)
+ arch/arm64/include/asm/kvm_host.h |  2 ++
+ arch/arm64/kvm/Kconfig            |  7 +++++++
+ include/kvm/arm_pmu.h             | 42 +++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 51 insertions(+)
+ create mode 100644 include/kvm/arm_pmu.h
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index b2ccc25..bad3dfd 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -452,12 +452,44 @@ static void reset_pmcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
- 	vcpu_sys_reg(vcpu, r->reg) = val;
- }
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index a35ce72..42e15bb 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -37,6 +37,7 @@
  
-+static inline bool pmu_access_el0_disabled(struct kvm_vcpu *vcpu)
-+{
-+	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
-+
-+	return !((reg & 0x1) || vcpu_mode_priv(vcpu));
-+}
-+
-+static inline bool pmu_write_swinc_el0_disabled(struct kvm_vcpu *vcpu)
-+{
-+	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
-+
-+	return !((reg & 0x3) || vcpu_mode_priv(vcpu));
-+}
-+
-+static inline bool pmu_access_cycle_counter_el0_disabled(struct kvm_vcpu *vcpu)
-+{
-+	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
-+
-+	return !((reg & 0x5) || vcpu_mode_priv(vcpu));
-+}
-+
-+static inline bool pmu_access_event_counter_el0_disabled(struct kvm_vcpu *vcpu)
-+{
-+	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
-+
-+	return !((reg & 0x9) || vcpu_mode_priv(vcpu));
-+}
-+
- static bool access_pmcr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 			const struct sys_reg_desc *r)
- {
- 	u64 val;
-+	bool unaccessible = pmu_access_el0_disabled(vcpu);
+ #include <kvm/arm_vgic.h>
+ #include <kvm/arm_arch_timer.h>
++#include <kvm/arm_pmu.h>
  
- 	if (p->is_write) {
-+		if (unaccessible)
-+			return ignore_write(vcpu, p);
-+
- 		/* Only update writeable bits of PMCR */
- 		val = vcpu_sys_reg(vcpu, r->reg);
- 		val &= ~ARMV8_PMCR_MASK;
-@@ -465,6 +497,9 @@ static bool access_pmcr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 		vcpu_sys_reg(vcpu, r->reg) = val;
- 		kvm_pmu_handle_pmcr(vcpu, val);
- 	} else {
-+		if (unaccessible)
-+			return read_zero(vcpu, p);
-+
- 		/* PMCR.P & PMCR.C are RAZ */
- 		val = vcpu_sys_reg(vcpu, r->reg)
- 		      & ~(ARMV8_PMCR_P | ARMV8_PMCR_C);
-@@ -477,9 +512,17 @@ static bool access_pmcr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- static bool access_pmselr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 			  const struct sys_reg_desc *r)
- {
-+	bool unaccessible = pmu_access_event_counter_el0_disabled(vcpu);
-+
- 	if (p->is_write) {
-+		if (unaccessible)
-+			return ignore_write(vcpu, p);
-+
- 		vcpu_sys_reg(vcpu, r->reg) = p->regval;
- 	} else {
-+		if (unaccessible)
-+			return read_zero(vcpu, p);
-+
- 		/* return PMSELR.SEL field */
- 		p->regval = vcpu_sys_reg(vcpu, r->reg) & ARMV8_COUNTER_MASK;
- 	}
-@@ -494,6 +537,8 @@ static bool access_pmceid(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ #define KVM_MAX_VCPUS VGIC_V3_MAX_CPUS
  
- 	if (p->is_write)
- 		return write_to_read_only(vcpu, p);
-+	else if (pmu_access_el0_disabled(vcpu))
-+		return read_zero(vcpu, p);
+@@ -132,6 +133,7 @@ struct kvm_vcpu_arch {
+ 	/* VGIC state */
+ 	struct vgic_cpu vgic_cpu;
+ 	struct arch_timer_cpu timer_cpu;
++	struct kvm_pmu pmu;
  
- 	if (!(p->Op2 & 1))
- 		asm volatile("mrs %0, pmceid0_el0\n" : "=r" (pmceid));
-@@ -521,6 +566,7 @@ static bool access_pmu_evtyper(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 			       const struct sys_reg_desc *r)
- {
- 	u64 idx, reg;
-+	bool unaccessible = pmu_access_el0_disabled(vcpu);
+ 	/*
+ 	 * Anything that is not used directly from assembly code goes
+diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+index a5272c0..de7450d 100644
+--- a/arch/arm64/kvm/Kconfig
++++ b/arch/arm64/kvm/Kconfig
+@@ -36,6 +36,7 @@ config KVM
+ 	select HAVE_KVM_EVENTFD
+ 	select HAVE_KVM_IRQFD
+ 	select KVM_ARM_VGIC_V3
++	select KVM_ARM_PMU if HW_PERF_EVENTS
+ 	---help---
+ 	  Support hosting virtualized guest machines.
+ 	  We don't support KVM with 16K page tables yet, due to the multiple
+@@ -48,6 +49,12 @@ config KVM_ARM_HOST
+ 	---help---
+ 	  Provides host support for ARM processors.
  
- 	if (r->CRn == 9) {
- 		/* PMXEVTYPER_EL0 */
-@@ -558,9 +604,15 @@ static bool access_pmu_evtyper(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 	}
++config KVM_ARM_PMU
++	bool
++	---help---
++	  Adds support for a virtual Performance Monitoring Unit (PMU) in
++	  virtual machines.
++
+ source drivers/vhost/Kconfig
  
- 	if (p->is_write) {
-+		if (unaccessible)
-+			return ignore_write(vcpu, p);
+ endif # VIRTUALIZATION
+diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+new file mode 100644
+index 0000000..ddcb5b2
+--- /dev/null
++++ b/include/kvm/arm_pmu.h
+@@ -0,0 +1,42 @@
++/*
++ * Copyright (C) 2015 Linaro Ltd.
++ * Author: Shannon Zhao <shannon.zhao@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
 +
- 		kvm_pmu_set_counter_event_type(vcpu, p->regval, idx);
- 		vcpu_sys_reg(vcpu, reg) = p->regval & ARMV8_EVTYPE_MASK;
- 	} else {
-+		if (unaccessible)
-+			return read_zero(vcpu, p);
++#ifndef __ASM_ARM_KVM_PMU_H
++#define __ASM_ARM_KVM_PMU_H
 +
- 		p->regval = vcpu_sys_reg(vcpu, reg) & ARMV8_EVTYPE_MASK;
- 	}
- 
-@@ -572,6 +624,7 @@ static bool access_pmu_evcntr(struct kvm_vcpu *vcpu,
- 			      const struct sys_reg_desc *r)
- {
- 	u64 idx, reg, val;
-+	bool unaccessible = false;
- 
- 	if (!p->is_aarch32) {
- 		if (r->CRn == 9 && r->CRm == 13 && r->Op2 == 2)
-@@ -591,13 +644,22 @@ static bool access_pmu_evcntr(struct kvm_vcpu *vcpu,
- 
- 	switch (reg) {
- 	case PMEVCNTR0_EL0 ... PMEVCNTR30_EL0:
-+		if (pmu_access_event_counter_el0_disabled(vcpu))
-+			unaccessible = true;
++#ifdef CONFIG_KVM_ARM_PMU
 +
- 		idx = reg - PMEVCNTR0_EL0;
- 		break;
- 	case PMCCNTR_EL0:
-+		if (pmu_access_cycle_counter_el0_disabled(vcpu))
-+			unaccessible = true;
++#include <linux/perf_event.h>
++#include <asm/pmu.h>
 +
- 		idx = ARMV8_CYCLE_IDX;
- 		break;
- 	default:
- 		/* PMXEVCNTR_EL0 */
-+		if (pmu_access_event_counter_el0_disabled(vcpu))
-+			unaccessible = true;
++struct kvm_pmc {
++	u8 idx;/* index into the pmu->pmc array */
++	struct perf_event *perf_event;
++	u64 bitmask;
++};
 +
- 		idx = vcpu_sys_reg(vcpu, PMSELR_EL0) & ARMV8_COUNTER_MASK;
- 		if (!pmu_counter_idx_valid(vcpu, idx))
- 			return true;
-@@ -608,10 +670,17 @@ static bool access_pmu_evcntr(struct kvm_vcpu *vcpu,
- 	}
- 
- 	val = kvm_pmu_get_counter_value(vcpu, idx);
--	if (p->is_write)
-+	if (p->is_write) {
-+		if (unaccessible)
-+			return ignore_write(vcpu, p);
++struct kvm_pmu {
++	/* PMU IRQ Number per VCPU */
++	int irq_num;
++	struct kvm_pmc pmc[ARMV8_MAX_COUNTERS];
++};
++#else
++struct kvm_pmu {
++};
++#endif
 +
- 		vcpu_sys_reg(vcpu, reg) += (s64)p->regval - val;
--	else
-+	} else {
-+		if (unaccessible)
-+			return read_zero(vcpu, p);
-+
- 		p->regval = val;
-+	}
- 
- 	return true;
- }
-@@ -628,9 +697,13 @@ static bool access_pmcntenset(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 			      const struct sys_reg_desc *r)
- {
- 	u64 val, mask;
-+	bool unaccessible = pmu_access_el0_disabled(vcpu);
- 
- 	mask = kvm_pmu_valid_counter_mask(vcpu);
- 	if (p->is_write) {
-+		if (unaccessible)
-+			return ignore_write(vcpu, p);
-+
- 		val = p->regval & mask;
- 		if (r->Op2 & 0x1) {
- 			/* accessing PMCNTENSET_EL0 */
-@@ -643,6 +716,9 @@ static bool access_pmcntenset(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 			kvm_pmu_disable_counter(vcpu, val);
- 		}
- 	} else {
-+		if (unaccessible)
-+			return read_zero(vcpu, p);
-+
- 		p->regval = vcpu_sys_reg(vcpu, r->reg) & mask;
- 	}
- 
-@@ -653,8 +729,12 @@ static bool access_pmintenset(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 			      const struct sys_reg_desc *r)
- {
- 	u64 mask = kvm_pmu_valid_counter_mask(vcpu);
-+	bool unaccessible = !vcpu_mode_priv(vcpu);
- 
- 	if (p->is_write) {
-+		if (unaccessible)
-+			return ignore_write(vcpu, p);
-+
- 		if (r->Op2 & 0x1) {
- 			/* accessing PMINTENSET_EL1 */
- 			vcpu_sys_reg(vcpu, r->reg) |= (p->regval & mask);
-@@ -664,6 +744,9 @@ static bool access_pmintenset(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 			vcpu_sys_reg(vcpu, r->reg) &= ~p->regval;
- 		}
- 	} else {
-+		if (unaccessible)
-+			return read_zero(vcpu, p);
-+
- 		p->regval = vcpu_sys_reg(vcpu, r->reg) & mask;
- 	}
- 
-@@ -674,8 +757,12 @@ static bool access_pmovsset(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 			    const struct sys_reg_desc *r)
- {
- 	u64 mask = kvm_pmu_valid_counter_mask(vcpu);
-+	bool unaccessible = pmu_access_el0_disabled(vcpu);
- 
- 	if (p->is_write) {
-+		if (unaccessible)
-+			return ignore_write(vcpu, p);
-+
- 		if (r->CRm & 0x2) {
- 			/* accessing PMOVSSET_EL0 */
- 			kvm_pmu_overflow_set(vcpu, p->regval & mask);
-@@ -685,6 +772,9 @@ static bool access_pmovsset(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 			vcpu_sys_reg(vcpu, r->reg) &= ~p->regval;
- 		}
- 	} else {
-+		if (unaccessible)
-+			return read_zero(vcpu, p);
-+
- 		p->regval = vcpu_sys_reg(vcpu, r->reg) & mask;
- 	}
- 
-@@ -695,6 +785,9 @@ static bool access_pmswinc(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 			   const struct sys_reg_desc *r)
- {
- 	if (p->is_write) {
-+		if (pmu_write_swinc_el0_disabled(vcpu))
-+			return ignore_write(vcpu, p);
-+
- 		kvm_pmu_software_increment(vcpu, p->regval);
- 		return true;
- 	} else {
-@@ -702,6 +795,24 @@ static bool access_pmswinc(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 	}
- }
- 
-+static bool access_pmuserenr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
-+			     const struct sys_reg_desc *r)
-+{
-+	if (p->is_write) {
-+		if (!vcpu_mode_priv(vcpu))
-+			return write_to_read_only(vcpu, p);
-+
-+		vcpu_sys_reg(vcpu, r->reg) = p->regval & 0xf;
-+	} else {
-+		if (pmu_access_el0_disabled(vcpu))
-+			return read_zero(vcpu, p);
-+
-+		p->regval = vcpu_sys_reg(vcpu, r->reg) & 0xf;
-+	}
-+
-+	return true;
-+}
-+
- /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
- #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
- 	/* DBGBVRn_EL1 */						\
-@@ -931,9 +1042,12 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	/* PMXEVCNTR_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b010),
- 	  access_pmu_evcntr },
--	/* PMUSERENR_EL0 */
-+	/* PMUSERENR_EL0
-+	 * This register resets as unknown in 64bit mode while it resets as zero
-+	 * in 32bit mode. Here we choose to reset it as zero for consistency.
-+	 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1110), Op2(0b000),
--	  trap_raz_wi },
-+	  access_pmuserenr, reset_val, PMUSERENR_EL0, 0 },
- 	/* PMOVSSET_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1110), Op2(0b011),
- 	  access_pmovsset, reset_unknown, PMOVSSET_EL0 },
-@@ -1258,7 +1372,7 @@ static const struct sys_reg_desc cp15_regs[] = {
- 	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), access_pmu_evcntr },
- 	{ Op1( 0), CRn( 9), CRm(13), Op2( 1), access_pmu_evtyper },
- 	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), access_pmu_evcntr },
--	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), trap_raz_wi },
-+	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), access_pmuserenr },
- 	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), access_pmintenset },
- 	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), access_pmintenset },
- 	{ Op1( 0), CRn( 9), CRm(14), Op2( 3), access_pmovsset },
++#endif
 -- 
 2.0.4
