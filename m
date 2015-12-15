@@ -1,22 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 Dec 2015 18:04:15 +0100
-Subject: [GIT PULL 3/4] Broadcom maintainers changes for v4.5
-In-Reply-To: <1449532649-6471-3-git-send-email-f.fainelli@gmail.com>
-References: <1449532649-6471-1-git-send-email-f.fainelli@gmail.com>
- <1449532649-6471-3-git-send-email-f.fainelli@gmail.com>
-Message-ID: <8705423.83PkMWBzWS@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 15 Dec 2015 17:05:24 +0000
+Subject: [PATCH v12 16/16] arm64: kdump: relax BUG_ON() if more than one
+ cpus are still active
+In-Reply-To: <83db66df70fc1f7cd4da8b580d264b9320991cf0.1448403503.git.geoff@infradead.org>
+References: <cover.1448403503.git.geoff@infradead.org>
+ <83db66df70fc1f7cd4da8b580d264b9320991cf0.1448403503.git.geoff@infradead.org>
+Message-ID: <20151215170523.GA353@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 07 December 2015 15:57:28 Florian Fainelli wrote:
-> This pull request contains MAINTAINERS updates for Broadcom SoCs:
+On Tue, Nov 24, 2015 at 10:25:34PM +0000, Geoff Levand wrote:
+> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
 > 
-> - Florian Fainelli adds bcm-kernel-feedback-list for all Broadcom Set-Top Box
->   SoCs submissions and removes a stray '>' for the gpio-brcmstb section
+> We should try best in case of kdump.
+> So even if not all secondary cpus have shut down, we do kdump anyway.
+> ---
+>  arch/arm64/kernel/machine_kexec.c | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
 > 
+> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+> index d2d7e90..482aae7 100644
+> --- a/arch/arm64/kernel/machine_kexec.c
+> +++ b/arch/arm64/kernel/machine_kexec.c
+> @@ -148,7 +148,13 @@ void machine_kexec(struct kimage *kimage)
+>  	phys_addr_t reboot_code_buffer_phys;
+>  	void *reboot_code_buffer;
+>  
+> -	BUG_ON(num_online_cpus() > 1);
+> +	if (num_online_cpus() > 1) {
+> +		if (in_crash_kexec)
+> +			pr_warn("kdump might fail because %d cpus are still online\n",
+> +					num_online_cpus());
+> +		else
+> +			BUG();
+> +	}
 
-Merged into next/fixes-non-critical,
+Can you just rewrite the existing BUG_ON as:
 
-thanks!
+  BUG_ON(num_online_cpus() && !WARN_ON(in_crash_kexec));
 
-	Arnd
+?
+
+Will
