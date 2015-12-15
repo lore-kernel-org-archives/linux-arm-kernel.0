@@ -1,25 +1,89 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 15 Dec 2015 15:22:43 +0530
-Subject: [PATCH] ARM: davinci: only select WT cache if cache is enabled
-In-Reply-To: <2043568.VG8xo4jr1Z@wuerfel>
-References: <2043568.VG8xo4jr1Z@wuerfel>
-Message-ID: <566FE2EB.4090505@ti.com>
+From: Bharat.Bhushan@freescale.com (Bhushan Bharat)
+Date: Tue, 15 Dec 2015 09:53:32 +0000
+Subject: ARM64/KVM: Bad page state in process iperf
+In-Reply-To: <566FDEAD.6000707@arm.com>
+References: <DM2PR03MB557D3079ABFE7AF114A58A690EE0@DM2PR03MB557.namprd03.prod.outlook.com>
+ <566FDEAD.6000707@arm.com>
+Message-ID: <DM2PR03MB55707E80EDA77A6991FDA2190EE0@DM2PR03MB557.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 10 December 2015 06:49 PM, Arnd Bergmann wrote:
-> The DA830 chip only works if the dcache is in writethrough mode,
-> but that produces a harmless Kconfig warning if the cache happens
-> to be disabled:
-> 
-> warning: (ARCH_DAVINCI_DA830) selects CPU_DCACHE_WRITETHROUGH which has unmet direct dependencies ((CPU_ARM740T || CPU_ARM920T || CPU_ARM922T || CPU_ARM925T || CPU_ARM926T || CPU_ARM940T || CPU_ARM946E || CPU_ARM1020 || CPU_FA526) && !CPU_DCACHE_DISABLE)
-> 
-> This makes the select conditional so we don't have to worry
-> about the warning in randconfig builds any more.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Hi Mark,
 
-Applied.
+> -----Original Message-----
+> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
+> Sent: Tuesday, December 15, 2015 3:05 PM
+> To: Bhushan Bharat-R65777 <Bharat.Bhushan@freescale.com>;
+> kvmarm at lists.cs.columbia.edu; kvm at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org
+> Subject: Re: ARM64/KVM: Bad page state in process iperf
+> 
+> On 15/12/15 03:46, Bhushan Bharat wrote:
+> >
+> > Hi All,
+> >
+> > I am running "iperf" in KVM guest on ARM64 machine and observing below
+> crash.
+> >
+> > =============================
+> > $iperf -c 3.3.3.3 -P 4 -t 0 -i 5 -w 90k
+> > ------------------------------------------------------------
+> > Client connecting to 3.3.3.3, TCP port 5001 TCP window size:  180
+> > KByte (WARNING: requested 90.0 KByte)
+> > ------------------------------------------------------------
+> > [  3] local 3.3.3.1 port 51131 connected with 3.3.3.3 port 5001 [  6]
+> > local 3.3.3.1 port 51134 connected with 3.3.3.3 port 5001 [  5] local
+> > 3.3.3.1 port 51133 connected with 3.3.3.3 port 5001 [  4] local
+> > 3.3.3.1 port 51132 connected with 3.3.3.3 port 5001
+> > [   53.088567] random: nonblocking pool is initialized
+> > [ ID] Interval       Transfer     Bandwidth
+> > [  3]  0.0- 5.0 sec   638 MBytes  1.07 Gbits/sec
+> > [  4] 35.0-40.0 sec  1.66 GBytes  2.85 Gbits/sec [  5] 40.0-45.0 sec
+> > 1.11 GBytes  1.90 Gbits/sec [  4] 40.0-45.0 sec  1.16 GBytes  1.99
+> > Gbits/sec
+> > [   98.895207] BUG: Bad page state in process iperf  pfn:0a584
+> > [   98.896164] page:ffff780000296100 count:-1 mapcount:0 mapping:
+> (null) index:0x0
+> > [   98.897436] flags: 0x0()
+> > [   98.897885] page dumped because: nonzero _count
+> > [   98.898640] Modules linked in:
+> > [   98.899178] CPU: 0 PID: 1639 Comm: iperf Not tainted 4.1.8-00461-
+> ge5431ad #141
+> > [   98.900302] Hardware name: linux,dummy-virt (DT)
+> > [   98.901014] Call trace:
+> > [   98.901406] [<ffff800000096cac>] dump_backtrace+0x0/0x12c
+> > [   98.902522] [<ffff800000096de8>] show_stack+0x10/0x1c
+> > [   98.903441] [<ffff800000678dc8>] dump_stack+0x8c/0xdc
+> > [   98.904202] [<ffff800000145480>] bad_page+0xc4/0x114
+> > [   98.904945] [<ffff8000001487a4>] get_page_from_freelist+0x590/0x63c
+> > [   98.905871] [<ffff80000014893c>] __alloc_pages_nodemask+0xec/0x794
+> > [   98.906791] [<ffff80000059fc80>] skb_page_frag_refill+0x70/0xa8
+> > [   98.907678] [<ffff80000059fcd8>] sk_page_frag_refill+0x20/0xd0
+> > [   98.908550] [<ffff8000005edc04>] tcp_sendmsg+0x1f8/0x9a8
+> > [   98.909368] [<ffff80000061419c>] inet_sendmsg+0x5c/0xd0
+> > [   98.910178] [<ffff80000059bb44>] sock_sendmsg+0x14/0x58
+> > [   98.911027] [<ffff80000059bbec>] sock_write_iter+0x64/0xbc
+> > [   98.912119] [<ffff80000019b5b8>] __vfs_write+0xac/0x10c
+> > [   98.913126] [<ffff80000019bcb8>] vfs_write+0x90/0x1a0
+> > [   98.913963] [<ffff80000019c53c>] SyS_write+0x40/0xa0
+> 
+> This looks quite bad, but I don't see anything here that links it to KVM (apart
+> from being a guest). Do you have any indication that this is due to KVM
+> misbehaving? 
 
-Thanks,
-Sekhar
+I never observed this issue in host Linux but observed this issue always in guest Linux. This issue does not comes immediately after I run "iperf" but after some time.
+
+> I'd appreciate a few more details.
+
+We have a networking hardware and we are directly assigning the h/w to guest. When using the same networking hardware in host it always works as expected (tried 100s of times).
+Also this issue is not observed when we have only one vCPU in guest but seen when we have SMP guest. 
+
+Thanks
+-Bharat
+
+> 
+> Thanks,
+> 
+> 	M.
+> --
+> Jazz is not dead. It just smells funny...
