@@ -1,47 +1,51 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 15 Dec 2015 14:27:25 -0800
-Subject: [PATCH v3 2/4] ARM: bcm2835: add rpi power domain driver
-In-Reply-To: <1450215622-27394-3-git-send-email-eric@anholt.net>
-References: <1450215622-27394-1-git-send-email-eric@anholt.net>
- <1450215622-27394-3-git-send-email-eric@anholt.net>
-Message-ID: <567093CD.1020208@gmail.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Tue, 15 Dec 2015 17:29:50 -0500
+Subject: [PATCH 0/5] drivers/tty: make more bool drivers explicitly
+ non-modular
+In-Reply-To: <1445206878-12455-1-git-send-email-paul.gortmaker@windriver.com>
+References: <1445206878-12455-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <20151215222950.GH2772@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/12/15 13:40, Eric Anholt wrote:
-> From: Alexander Aring <alex.aring@gmail.com>
-> 
-> This patch adds support for several power domains on Raspberry Pi,
-> including USB (so it can be enabled even if the bootloader didn't do
-> it), and graphics.
-> 
-> This patch is the combined work of Eric Anholt (who wrote USB support
-> inside of the Raspberry Pi firmware driver, and wrote the non-USB
-> domain support) and Alexander Aring (who separated the original USB
-> work out from the firmware driver).
-> 
-> Signed-off-by: Alexander Aring <alex.aring@gmail.com>
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> ---
-> 
-> v2: Add support for power domains other than USB, using the new
->     firmware interface, reword commit message (changes by Eric)
-> 
-> v3: Restructure as a builtin driver, and drop
->     of_genpd_add_provider_onecell error handling to avoid
->     pm_genpd_exit() dependency until that API can be settled.  Clean
->     up copyright header, add missing ISP initialization, and fix typo
->     in transposer's name.
-> 
->  arch/arm/mach-bcm/Kconfig                   |  10 ++
->  arch/arm/mach-bcm/Makefile                  |   1 +
->  arch/arm/mach-bcm/raspberrypi-power.c       | 247 ++++++++++++++++++++++++++++
->  include/dt-bindings/arm/raspberrypi-power.h |  41 +++++
->  4 files changed, 299 insertions(+)
->  create mode 100644 arch/arm/mach-bcm/raspberrypi-power.c
+[[PATCH 0/5] drivers/tty: make more bool drivers explicitly non-modular] On 18/10/2015 (Sun 18:21) Paul Gortmaker wrote:
 
-What motivated the location of this power domain driver in
-arch/arm/mach-bcm? Should not we have this in drivers/power/ or
-somewhere in drivers/ at the very least?
--- 
-Florian
+> This next set of patches to drivers/tty fixes up more drivers that would
+> perhaps appear modular when looking at the code, but are controlled by
+> a bool Kconfig.  We make sure they don't look modular and get rid
+> of module related code in the drivers that would never be used.
+
+[...]
+
+> Paul Gortmaker (5):
+>   drivers/tty: make hvc/hvc_vio.c explicitly non-modular
+>   drivers/tty: make ehv_bytechan.c explicitly non-modular
+>   drivers/tty/serial: make serial/atmel_serial.c explicitly non-modular
+>   drivers/tty/serial: make msm_serial.c explicitly non-modular
+>   drivers/tty/serial: make 8250/8250_mtk.c explicitly non-modular
+
+Hi Greg,
+
+You've merged the #3 atmel patch and #5 the 8250_mtk patch; the msm_serial
+patch (#4) is no longer applicable since the authors changed it to tristate.
+
+That leaves the top two patches; both for PPC hardware.  Did you skip
+those because you wanted them pushed through the powerpc tree?
+
+If so, that is fine, I can do that.  Just let me know.
+
+Thanks,
+Paul.
+--
+
+> 
+>  drivers/tty/ehv_bytechan.c         | 40 +++------------------------------
+>  drivers/tty/hvc/hvc_vio.c          | 29 ++++--------------------
+>  drivers/tty/serial/8250/8250_mtk.c | 35 ++++++-----------------------
+>  drivers/tty/serial/atmel_serial.c  | 45 ++++----------------------------------
+>  drivers/tty/serial/msm_serial.c    | 30 ++++---------------------
+>  5 files changed, 22 insertions(+), 157 deletions(-)
+> 
+> -- 
+> 2.6.1
+> 
