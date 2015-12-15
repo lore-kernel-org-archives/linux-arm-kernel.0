@@ -1,85 +1,134 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 15 Dec 2015 17:28:37 +0000
-Subject: [RFC PATCH 2/8] Documentation: arm: define DT cpu capacity
- bindings
-In-Reply-To: <20151215171713.GA5727@sirena.org.uk>
-References: <20151210175820.GE14571@e106622-lin>
- <20151211174940.GQ5727@sirena.org.uk>
- <20151214123616.GC3308@e106622-lin>
- <20151214165928.GV5727@sirena.org.uk>
- <20151215122238.GG16007@e106622-lin>
- <20151215133951.GY5727@sirena.org.uk>
- <20151215140135.GI31299@leverpostej>
- <20151215150813.GZ5727@sirena.org.uk>
- <20151215153218.GA7228@leverpostej>
- <20151215171713.GA5727@sirena.org.uk>
-Message-ID: <20151215172837.GD8012@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 15 Dec 2015 17:29:54 +0000
+Subject: [PATCH v12 11/16] arm64: kdump: reserve memory for crash dump
+ kernel
+In-Reply-To: <bc962621bd537244b54fc35627a456ab40bc6d26.1448403503.git.geoff@infradead.org>
+References: <cover.1448403503.git.geoff@infradead.org>
+ <bc962621bd537244b54fc35627a456ab40bc6d26.1448403503.git.geoff@infradead.org>
+Message-ID: <20151215172953.GD353@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 15, 2015 at 05:17:13PM +0000, Mark Brown wrote:
-> On Tue, Dec 15, 2015 at 03:32:19PM +0000, Mark Rutland wrote:
-> > On Tue, Dec 15, 2015 at 03:08:13PM +0000, Mark Brown wrote:
-> > > On Tue, Dec 15, 2015 at 02:01:36PM +0000, Mark Rutland wrote:
+On Tue, Nov 24, 2015 at 10:25:34PM +0000, Geoff Levand wrote:
+> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
 > 
-> > > > I really don't want to see a table of magic numbers in the kernel.
+> On primary kernel, the memory region used by crash dump kernel must be
+> specified by "crashkernel=" boot parameter. reserve_crashkernel()
+> will allocate and reserve the region for later use.
 > 
-> > > Right, there's pitfalls there too although not being part of an ABI
-> > > does make them more manageable.  
+> User space tools will be able to find the region marked as "Crash kernel"
+> in /proc/iomem.
 > 
-> > I think that people are very likely to treat them exactly like an ABI,
-> > w.r.t. any regressions in performance that result from their addition,
-> > modification, or removal. That becomes really horrible when new CPUs
-> > appear.
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> ---
+>  arch/arm64/kernel/setup.c |  7 +++++-
+>  arch/arm64/mm/init.c      | 54 +++++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 60 insertions(+), 1 deletion(-)
 > 
-> Obviously people are going to get upset if we introduce performance
-> regressions - but that's true always, we can also introduce problems
-> with numbers people have put in DT.  It seems like it'd be harder to
-> manage regressions due to externally provided magic numbers since
-> there's inherently less information there.
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index 8119479..f9fffc9 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -31,7 +31,6 @@
+>  #include <linux/screen_info.h>
+>  #include <linux/init.h>
+>  #include <linux/kexec.h>
+> -#include <linux/crash_dump.h>
+>  #include <linux/root_dev.h>
+>  #include <linux/cpu.h>
+>  #include <linux/interrupt.h>
+> @@ -221,6 +220,12 @@ static void __init request_standard_resources(void)
+>  		    kernel_data.end <= res->end)
+>  			request_resource(res, &kernel_data);
+>  	}
+> +
+> +#ifdef CONFIG_KEXEC
+> +	/* User space tools will find "Crash kernel" region in /proc/iomem. */
+> +	if (crashk_res.end)
+> +		insert_resource(&iomem_resource, &crashk_res);
+> +#endif
 
-It's certainly still possible to have regressions in that case. Those
-regressions would be due to code changes in the kernel, given the DT
-didn't change.
+Why can't this bit be moved into reserved_crashkernel, at the end?
 
-I'm not sure I follow w.r.t. "inherently less information", unless you
-mean trying to debug without access to that DTB?
+>  }
+>  
+>  #ifdef CONFIG_BLK_DEV_INITRD
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index 17bf39a..24f0a1c 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -34,6 +34,7 @@
+>  #include <linux/dma-contiguous.h>
+>  #include <linux/efi.h>
+>  #include <linux/swiotlb.h>
+> +#include <linux/kexec.h>
+>  
+>  #include <asm/fixmap.h>
+>  #include <asm/memory.h>
+> @@ -66,6 +67,55 @@ static int __init early_initrd(char *p)
+>  early_param("initrd", early_initrd);
+>  #endif
+>  
+> +#ifdef CONFIG_KEXEC
+> +/*
+> + * reserve_crashkernel() - reserves memory for crash kernel
+> + *
+> + * This function reserves memory area given in "crashkernel=" kernel command
+> + * line parameter. The memory reserved is used by dump capture kernel when
+> + * primary kernel is crashing.
+> + */
+> +static void __init reserve_crashkernel(void)
+> +{
+> +	unsigned long long crash_size = 0, crash_base = 0;
+> +	int ret;
+> +
+> +	ret = parse_crashkernel(boot_command_line, memblock_phys_mem_size(),
+> +				&crash_size, &crash_base);
+> +	if (ret)
+> +		return;
 
-> > > One thing it's probably helpful to establish here is how much the
-> > > specific numbers are going to matter in the grand scheme of things.  If
-> > > the specific numbers *are* super important then nobody is going to want
-> > > to touch them as they'll be prone to getting tweaked.  If instead the
-> > > numbers just need to be ballpark accurate so the scheduler starts off in
-> > > roughly the right place and the specific numbers don't matter it's a lot
-> > > easier and having a table in the kernel until we think of something
-> > > better (if that ever happens) gets a lot easier.
-> 
-> > I agree that we first need to figure out the importance of these
-> > numbers. I disagree that our first step should be to add a table.
-> 
-> My point there is that if we're not that concerned about the specific
-> number something in kernel is safer.
+What's the point in ret?
 
-I don't entirely disagree there. I think an in-kernel benchmark is
-likely safer.
+> +
+> +	if (crash_base == 0) {
+> +		crash_base = memblock_alloc(crash_size, 1 << 21);
 
-> > > My expectation is that we just need good enough, not perfect, and that
-> > > seems to match what Juri is saying about the expectation that most of
-> > > the fine tuning is done via other knobs.
-> 
-> > My expectation is that if a ballpark figure is good enough, it should be
-> > possible to implement something trivial like bogomips / loop_per_jiffy
-> > calculation.
-> 
-> That does have the issue that we need to scale with regard to the
-> frequency the benchmark gets run at.  That's not an insurmountable
-> obstacle but it's not completely trivial either.
+What is this magic number? How about SZ_2M and a comment mentioning the
+arm64 boot protocol?
 
-If we change clock frequency, then regardless of where the information
-comes from we need to perform scaling, no?
+> +		if (crash_base == 0) {
+> +			pr_warn("Unable to allocate crashkernel (size:%llx)\n",
+> +				crash_size);
+> +			return;
+> +		}
+> +	} else {
+> +		/* User specifies base address explicitly. */
+> +		if (!memblock_is_region_memory(crash_base, crash_size) ||
+> +			memblock_is_region_reserved(crash_base, crash_size)) {
+> +			pr_warn("crashkernel has wrong address or size\n");
+> +			return;
+> +		}
+> +
+> +		if (crash_base & ((1 << 21) - 1)) {
 
-One nice thing about doing a benchmark to derive the numbers is that
-when the kernel is that when the frequency is fixed but the kernel
-cannot query it, the numbers will be representative.
+IS_ALIGNED
 
-Mark.
+> +			pr_warn("crashkernel base address is not 2MB aligned\n");
+> +			return;
+> +		}
+> +
+> +		memblock_reserve(crash_base, crash_size);
+> +	}
+> +
+> +	pr_info("Reserving %lldMB of memory at %lldMB for crashkernel\n",
+> +		crash_size >> 20, crash_base >> 20);
+> +
+> +	crashk_res.start = crash_base;
+> +	crashk_res.end = crash_base + crash_size - 1;
+> +}
+
+#else
+
+static void __init reserve_crashkernel(void) {};
+
+Will
