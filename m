@@ -1,89 +1,38 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Tue, 15 Dec 2015 15:36:37 +0000
-Subject: [RFC PATCH 2/8] Documentation: arm: define DT cpu capacity
- bindings
-In-Reply-To: <20151215145050.GA7041@leverpostej>
-References: <20151210153004.GA26758@sirena.org.uk>
- <20151210175820.GE14571@e106622-lin>
- <20151211174940.GQ5727@sirena.org.uk>
- <20151214123616.GC3308@e106622-lin>
- <20151214165928.GV5727@sirena.org.uk>
- <20151215122238.GG16007@e106622-lin>
- <20151215133951.GY5727@sirena.org.uk>
- <20151215140135.GI31299@leverpostej>
- <20151215142458.GI16007@e106622-lin>
- <20151215145050.GA7041@leverpostej>
-Message-ID: <20151215153637.GJ16007@e106622-lin>
+From: jcm@redhat.com (Jon Masters)
+Date: Tue, 15 Dec 2015 10:36:58 -0500
+Subject: [Linaro-acpi] Touching the initrd before paging_init
+In-Reply-To: <CAGCh1+k8jHzMK+pLbtBgg5=VdT=+3W+OjTGJLMDGjLqLvmQXnw@mail.gmail.com>
+References: <566D3090.9090509@redhat.com>	<20151213165942.GN25034@bivouac.eciton.net>	<23071B8C-D1F9-47A6-9DB4-B26842150B76@redhat.com>	<566DEB04.2030806@redhat.com>	<CAGCh1+nb-H-B28crGuTPUKXZrBN_XDn7fNHf4q8LZZOgyhtDmQ@mail.gmail.com>	<566DEED6.3010704@redhat.com>
+ <CAGCh1+k8jHzMK+pLbtBgg5=VdT=+3W+OjTGJLMDGjLqLvmQXnw@mail.gmail.com>
+Message-ID: <5670339A.7060307@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/12/15 14:50, Mark Rutland wrote:
-> On Tue, Dec 15, 2015 at 02:24:58PM +0000, Juri Lelli wrote:
-> > Hi Mark,
-> 
-> Hi Juri,
-> 
-> > On 15/12/15 14:01, Mark Rutland wrote:
-> > > I really don't want to see a table of magic numbers in the kernel.
-> > 
-> > Doesn't seem to be a clean and scalable solution to me either. It is not
-> > easy to reconfigure when new core types come around, as I don't think
-> > relative data is always present or easy to derive, and it exposes some
-> > sort of centralized global information where everyone is compared
-> > against everyone.
-> 
-> I'm also concerned that it will be difficult to curate this to avoid
-> deceptive marketing numbers. These may not reflect reality.
-> 
+On 12/15/2015 06:19 AM, G Gregory wrote:
 
-Right.
+<below refers to the GRUB-based approach not the initrd override>
 
-> > Where the DT solution is inherently per platform: no need to expose
-> > absolute values and no problems with knowing data regarding old core
-> > types.
+> Tried it, results were not great :-(
 > 
-> The DT approach certainly avoids tying the kernel to a given idea of
-> particular microarchitectures.
-> 
-> > > If we cannot rely on external information, and want this information to
-> > > be derived by the kernel, then we need to perform some dynamic
-> > > benchmark. That would work for future CPUs the kernel knows nothing
-> > > about yet, and would cater for the pseudo-heterogeneous cases too.
-> > 
-> > I've actually experimented a bit with this approch already, but I wasn't
-> > convinced of its viability. It is true that we remove the burden of
-> > coming up with default values from user/integrator, but I'm pretty sure
-> > we will end up discussing endlessly about which particular benchmark to
-> > pick 
-> 
-> Regardless of which direction we go there will be endless discussion as
-> to the benchmark. As Mark pointed out, that happened in the case of the
-> table, and it's happening now for the DT approach.
-> 
-> I think we agree that if this is something we can change later (i.e. we
-> don't rely on an external oracle like DT) the particular benchmark
-> matters less, as that can be changed given evidence of superiority.
-> 
+> set root='hd0,gpt2'
+> insmod acpi
+> acpi /DSDT.aml
+> linux /Image-leg earlycon=pl011,0xe1010000 console=ttyAMA0 acpi=force root
+> =/dev/sda2
 
-True, and in fact we already only point out suggestions for sensitive
-benchmarks. I don't think we want to tie ourselves to any particular
-one. And I think not having a particular benchmark implementation as
-part of the solution will help changing our minds afterwards.
+<snip>
 
-> > and the fact that it impacts on boot time and such.
-> 
-> I was under the impression that the kernel already did RAID algorithm
-> benchmarking as part of the boot process. Maybe we can find a set of
-> similarly brief benchmarks.
-> 
+> [    0.000000] PC is at setup_arch+0xfc/0x564
+> [    0.000000] LR is at setup_arch+0xf8/0x564
 
-Yeah, it's certainly doable, but I'm not really yet seeing what we gain
-with this additional complexity. Also, AFAIK boot time is one important
-metric for the mobile market (while it is less crucial for systems with
-RAID configurations?) and we are going to add overhead there. Stability
-of default values is probably another factor here, where you could be
-rebooting your phone in many different conditions from time to time.
+<snip>
 
-Best,
+So we unmask SError in setup_arch, which happens now later enough that
+it'll come out of the UART where you can see it. However there are still
+occasions on some of these early platforms where an unhandled SError can
+exist as GRUB exits. I have seen that a number of times on Seattle if
+there's a pending error from one of the IO IP blocks on the SoC You
+might need a firmware update, but can you also confirm that this
+happened reproducibly?
 
-- Juri
+Jon.
