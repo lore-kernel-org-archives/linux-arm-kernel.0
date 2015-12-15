@@ -1,28 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 Dec 2015 23:57:48 +0100
-Subject: [PATCH 0/4] ARM Versatile multi-platform support
-In-Reply-To: <1449607458-16850-1-git-send-email-robh@kernel.org>
-References: <1449607458-16850-1-git-send-email-robh@kernel.org>
-Message-ID: <3265937.pryQQXUTv3@wuerfel>
+Date: Wed, 16 Dec 2015 00:05:28 +0100
+Subject: [GIT PULL] RealView base patches for cleanup and DT
+In-Reply-To: <CACRpkdZg36hgT_YTm6dma=B164xo2BP0vq3gb8-JXw6mVaO2bg@mail.gmail.com>
+References: <CACRpkdZAD-eh8k5RchnAjWyfRBiD0AN0qg_YHhwM6o001rTSQA@mail.gmail.com>
+ <1991538.uU1eR25cvh@wuerfel>
+ <CACRpkdZg36hgT_YTm6dma=B164xo2BP0vq3gb8-JXw6mVaO2bg@mail.gmail.com>
+Message-ID: <8810813.iXMYxGHN5G@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 08 December 2015 14:44:14 Rob Herring wrote:
-> Arnd lit a fire under me to dust this off and get it merged. So here it 
-> is. The main change from prior version is I merged all the code to a 
-> single file. It's a bigger patch than I'd like, but I don't think trying 
-> to do it in multiple steps is worth it.
+On Tuesday 15 December 2015 09:53:36 Linus Walleij wrote:
+> I took all three DT-related patches into a separate branch. It makes
+> more sense.
 > 
-> This is dependent on some solution for the default platform choice on 
-> !MMU builds (allnoconfig) as it can't be Versatile after this series. 
-> Arnd has some ideas on how to address that.
-> 
-> This is tested under QEMU. Linus previously tested this on actual h/w 
-> and had a problem with the display identification which needs 
-> investigation or agreement to worry about it if and when someone 
-> actually cares.
+> Please pull the following TWO pull requests instead:
 
+Pulled into next/multiplatform and next/dt, respectively.
 
-Merged into next/multiplatform, thanks a lot!
+Thanks so much for getting this done!
 
 	Arnd
