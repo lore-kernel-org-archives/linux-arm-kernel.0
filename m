@@ -1,26 +1,47 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 15 Dec 2015 17:38:01 +0100
-Subject: [PATCH 0/2] Dove GPU support
-Message-ID: <1450197483-31441-1-git-send-email-l.stach@pengutronix.de>
+Date: Tue, 15 Dec 2015 17:38:03 +0100
+Subject: [PATCH 2/2] ARM: dts: enable GPU for SolidRun's Cubox
+In-Reply-To: <1450197483-31441-1-git-send-email-l.stach@pengutronix.de>
+References: <1450197483-31441-1-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1450197483-31441-3-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dove maintainers,
+From: Russell King <rmk+kernel@arm.linux.org.uk>
 
-those 2 patches add support for the Vivante GPU. The binding has already been
-acked by the DT maintainers and is included in the pull request for the DRM
-driver. I hope you can pick those patches up for inclusion in 4.5.
+Enable the GPU for SolidRun's Cubox.
 
-Regards,
-Lucas
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+ arch/arm/boot/dts/dove-cubox.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Russell King (2):
-  ARM: dts: dove: add DT GPU support
-  ARM: dts: enable GPU for SolidRun's Cubox
-
- arch/arm/boot/dts/dove-cubox.dts |  8 ++++++++
- arch/arm/boot/dts/dove.dtsi      | 16 ++++++++++++++++
- 2 files changed, 24 insertions(+)
-
+diff --git a/arch/arm/boot/dts/dove-cubox.dts b/arch/arm/boot/dts/dove-cubox.dts
+index e6fa251e17b9..af3cb633135f 100644
+--- a/arch/arm/boot/dts/dove-cubox.dts
++++ b/arch/arm/boot/dts/dove-cubox.dts
+@@ -62,6 +62,10 @@
+ 		pinctrl-0 = <&pmx_gpio_19>;
+ 		pinctrl-names = "default";
+ 	};
++
++	gpu-subsystem {
++		status = "okay";
++	};
+ };
+ 
+ &uart0 { status = "okay"; };
+@@ -74,6 +78,10 @@
+ 	reg = <1>;
+ };
+ 
++&gpu {
++	status = "okay";
++};
++
+ &i2c0 {
+ 	status = "okay";
+ 	clock-frequency = <100000>;
 -- 
 2.6.2
