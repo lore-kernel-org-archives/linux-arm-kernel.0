@@ -1,34 +1,40 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Tue, 15 Dec 2015 11:35:24 +0100
-Subject: [for-4.4-rc6 PATCH] scatterlist: fix sg_phys() masking
-In-Reply-To: <20151214231739.10377.11843.stgit@dwillia2-desk3.jf.intel.com>
-References: <20151214231739.10377.11843.stgit@dwillia2-desk3.jf.intel.com>
-Message-ID: <20151215103524.GH18805@8bytes.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 15 Dec 2015 10:37:00 +0000
+Subject: [PATCH] arm64: perf: Correct Cortex-A53/A57 compatible values
+In-Reply-To: <1450168400-462-1-git-send-email-geert+renesas@glider.be>
+References: <1450168400-462-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20151215103659.GB31299@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 14, 2015 at 03:17:39PM -0800, Dan Williams wrote:
-> commit db0fa0cb0157 "scatterlist: use sg_phys()" did replacements of the
-> form:
+On Tue, Dec 15, 2015 at 09:33:20AM +0100, Geert Uytterhoeven wrote:
+> Use commas instead of periods.
 > 
->     phys_addr_t phys = page_to_phys(sg_page(s));
->     phys_addr_t phys = sg_phys(s) & PAGE_MASK;
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Mark.
+
+> ---
+>  Documentation/devicetree/bindings/arm/pmu.txt | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> However, this breaks platforms where sizeof(phys_addr_t) >
-> sizeof(unsigned long).  Since PAGE_MASK is an unsigned long this
-> inadvertently masks the high bits returned by sg_phys().  Convert to
-> PHYSICAL_PAGE_MASK in these cases which will do the proper sign
-> extension.
+> diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
+> index 97ba45af04fc693f..a6cd14888bed9b29 100644
+> --- a/Documentation/devicetree/bindings/arm/pmu.txt
+> +++ b/Documentation/devicetree/bindings/arm/pmu.txt
+> @@ -9,8 +9,8 @@ Required properties:
+>  - compatible : should be one of
+>  	"apm,potenza-pmu"
+>  	"arm,armv8-pmuv3"
+> -	"arm.cortex-a57-pmu"
+> -	"arm.cortex-a53-pmu"
+> +	"arm,cortex-a57-pmu"
+> +	"arm,cortex-a53-pmu"
+>  	"arm,cortex-a17-pmu"
+>  	"arm,cortex-a15-pmu"
+>  	"arm,cortex-a12-pmu"
+> -- 
+> 1.9.1
 > 
-> As caught by the kbuild robot, a generic fallback definition of
-> PHYSICAL_PAGE_MASK is needed for several archs.
-
-It is getting late in the cycle already, isn't it better to revert
-db0fa0cb0157 for now and queue a fixed version for the next round? Then
-you can also replace all the 'sg_phys() & MASK' parts by a new sg helper
-which just returns the page-aligned physical address.
-This would not only be cleaner than your original patch but also leaves
-just one place where you need to fix things if necessary.
-
-
-	Joerg
