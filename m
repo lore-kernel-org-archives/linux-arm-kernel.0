@@ -1,148 +1,73 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Tue, 15 Dec 2015 11:28:52 +0800
-Subject: [PATCH v6 4/5] iommu/mediatek: Add mt8173 IOMMU driver
-In-Reply-To: <20151214141656.GG18805@8bytes.org>
-References: <1449568153-15643-1-git-send-email-yong.wu@mediatek.com>
- <1449568153-15643-5-git-send-email-yong.wu@mediatek.com>
- <20151214141656.GG18805@8bytes.org>
-Message-ID: <1450150132.22854.57.camel@mhfsdcap03>
+From: jitao.shi@mediatek.com (Jitao Shi)
+Date: Tue, 15 Dec 2015 11:30:09 +0800
+Subject: [PATCH v6 1/2] Documentation: bridge: Add documentation for ps8640 DT
+ properties
+Message-ID: <1450150210-21951-1-git-send-email-jitao.shi@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-12-14 at 15:16 +0100, Joerg Roedel wrote:
-> On Tue, Dec 08, 2015 at 05:49:12PM +0800, Yong Wu wrote:
-> > +static int mtk_iommu_attach_device(struct iommu_domain *domain,
-> > +				   struct device *dev)
-> > +{
-> > +	struct mtk_iommu_domain *dom = to_mtk_domain(domain);
-> > +	struct mtk_iommu_client_priv *priv = dev->archdata.iommu;
-> > +	struct mtk_iommu_data *data;
-> > +	int ret;
-> > +
-> > +	if (!priv)
-> > +		return -ENODEV;
-> > +
-> > +	data = dev_get_drvdata(priv->m4udev);
-> > +	if (!data) {
-> > +		/*
-> > +		 * The DMA core will run earlier than this probe, and it will
-> > +		 * create a default iommu domain for each a iommu device.
-> > +		 * But here there is only one domain called the m4u domain
-> > +		 * which all the multimedia HW share.
-> > +		 * The default domain isn't needed here.
-> > +		 */
-> 
-> The iommu core creates one domain per iommu-group. In your case this
-> means one default domain per iommu in the system.
+Add documentation for DT properties supported by
+ps8640 DSI-eDP converter.
 
-Yes. The iommu core will create one domain per iommu-group.
-see the next "if" here.
+Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+Changes since v5
+-no changes
+---
+ .../devicetree/bindings/display/bridge/ps8640.txt  |   43 ++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/bridge/ps8640.txt
 
-But the domain here is created by the current DMA64. It's from this
-function do_iommu_attach which will be called too early and will help
-create a default domain for each a iommu device.(my codebase is
-v4.4-rc1).
-
-
-//=====the next "if"===========
-} else if (!data->m4u_dom) {
-	/*
-	 * While a device is added into a iommu group, the iommu core
-	 * will create a default domain for each a iommu group.
-	 * This default domain is reserved as the m4u domain and is
-	 * initiated here.
-	 */
-	data->m4u_dom = dom;
-	if (domain->type == IOMMU_DOMAIN_DMA) {
-		ret = iommu_dma_init_domain(domain, 0,
-					    DMA_BIT_MASK(32));
-		if (ret)
-			goto err_uninit_dom;
-	}
-
-	ret = mtk_iommu_domain_finalise(data);
-	if (ret)
-		goto err_uninit_dom;
-} 
-//======================
-
-> 
-> > +		iommu_domain_free(domain);
-> 
-> This function is not supposed to free the domain passed to it.
-
-As above this domain is created in the do_iommu_attach which will help
-create a default domain for each a iommu device.
-We don't need this default domain!
-
-If we don't free it here, there will be a memory leak.
-
->From Robin's comment, He will improve the sequence of the
-__iommu_setup_dma_ops in the future.
-
-/*
- * TODO: Right now __iommu_setup_dma_ops() gets called too early to do
- * everything it needs to - the device is only partially created and the
- * IOMMU driver hasn't seen it yet, so it can't have a group. Thus we
- * need this delayed attachment dance. Once IOMMU probe ordering is
-sorted
- * to move the arch_setup_dma_ops() call later, all the notifier bits
-below
- * become unnecessary, and will go away.
- */
-
-/*
- * Best case: The device is either part of a group which was
- * already attached to a domain in a previous call, or it's
- * been put in a default DMA domain by the IOMMU core.
- */
-
-   But there is no this patch currently, so I add iommu_domain_free
-here.
- 
-   "free the domain" here looks really not good. Then I delete the
-iommu_domain_free here(allow this memory leak right now), is it ok?
-(It will also works after Robin's change in the future.)
-
-> 
-> > +static int mtk_iommu_add_device(struct device *dev)
-> > +{
-> > +	struct iommu_group *group;
-> > +
-> > +	if (!dev->archdata.iommu) /* Not a iommu client device */
-> > +		return -ENODEV;
-> > +
-> > +	group = iommu_group_get_for_dev(dev);
-> > +	if (IS_ERR(group))
-> > +		return PTR_ERR(group);
-> > +
-> > +	iommu_group_put(group);
-> > +	return 0;
-> > +}
-> 
-> [...]
-> 
-> > +static struct iommu_group *mtk_iommu_device_group(struct device *dev)
-> > +{
-> > +	struct mtk_iommu_data *data;
-> > +	struct mtk_iommu_client_priv *priv;
-> > +
-> > +	priv = dev->archdata.iommu;
-> > +	if (!priv)
-> > +		return ERR_PTR(-ENODEV);
-> > +
-> > +	/* All the client devices are in the same m4u iommu-group */
-> > +	data = dev_get_drvdata(priv->m4udev);
-> > +	if (!data->m4u_group) {
-> > +		data->m4u_group = iommu_group_alloc();
-> > +		if (IS_ERR(data->m4u_group))
-> > +			dev_err(dev, "Failed to allocate M4U IOMMU group\n");
-> > +	}
-> > +	return data->m4u_group;
-> > +}
-> 
-> This looks much better than before, thanks.
-
-Thanks.
-
-> 
+diff --git a/Documentation/devicetree/bindings/display/bridge/ps8640.txt b/Documentation/devicetree/bindings/display/bridge/ps8640.txt
+new file mode 100644
+index 0000000..a3e0971
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/bridge/ps8640.txt
+@@ -0,0 +1,43 @@
++ps8640-bridge bindings
++
++Required properties:
++	- compatible: "parade,ps8640"
++	- reg: first page address of the bridge.
++	- sleep-gpios: OF device-tree gpio specification for PD_ pin.
++	- reset-gpios: OF device-tree gpio specification for reset pin.
++	- mode-sel-gpios: OF device-tree gpio specification for mode-sel pin.
++	- vdd12-supply: OF device-tree regulator specification for 1.2V power.
++	- vdd33-supply: OF device-tree regulator specification for 3.3V power.
++	- ports: The device node can contain video interface port nodes per
++		 the video-interfaces bind[1]. For port at 0,set the reg = <0> as
++		 ps8640 dsi in and port at 1,set the reg = <1> as ps8640 eDP out.
++
++[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
++
++Example:
++	edp-bridge at 18 {
++		compatible = "parade,ps8640";
++		reg = <0x18>;
++		sleep-gpios = <&pio 116 GPIO_ACTIVE_HIGH>;
++		reset-gpios = <&pio 115 GPIO_ACTIVE_HIGH>;
++		mode-sel-gpios = <&pio 92 GPIO_ACTIVE_HIGH>;
++		vdd12-supply = <&ps8640_fixed_1v2>;
++		vdd33-supply = <&mt6397_vgp2_reg>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			port at 0 {
++				reg = <0>;
++				ps8640_in: endpoint {
++					remote-endpoint = <&dsi0_out>;
++				};
++			};
++			port at 1 {
++				reg = <1>;
++				ps8640_out: endpoint {
++					remote-endpoint = <&panel_in>;
++				};
++			};
++		};
++	};
+-- 
+1.7.9.5
