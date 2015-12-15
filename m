@@ -1,73 +1,59 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 15 Dec 2015 15:08:13 +0000
-Subject: [RFC PATCH 2/8] Documentation: arm: define DT cpu capacity
- bindings
-In-Reply-To: <20151215140135.GI31299@leverpostej>
-References: <1448288921-30307-3-git-send-email-juri.lelli@arm.com>
- <20151124020631.GA15165@rob-hp-laptop>
- <20151210153004.GA26758@sirena.org.uk>
- <20151210175820.GE14571@e106622-lin>
- <20151211174940.GQ5727@sirena.org.uk>
- <20151214123616.GC3308@e106622-lin>
- <20151214165928.GV5727@sirena.org.uk>
- <20151215122238.GG16007@e106622-lin>
- <20151215133951.GY5727@sirena.org.uk>
- <20151215140135.GI31299@leverpostej>
-Message-ID: <20151215150813.GZ5727@sirena.org.uk>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Tue, 15 Dec 2015 10:16:24 -0500
+Subject: [PATCH 00/10] drivers/pci: avoid module_init in non-modular
+ host/pci*
+In-Reply-To: <3302340.SIljl1qYTl@wuerfel>
+References: <1449970917-12633-1-git-send-email-paul.gortmaker@windriver.com>
+ <CAFiDJ5-Y8afg5kDRQLK1pain-k1kPQAn3vhWrVkB1ADPRHvx+A@mail.gmail.com>
+ <20151214091940.GA15126@ulmo.nvidia.com>
+ <3302340.SIljl1qYTl@wuerfel>
+Message-ID: <20151215151624.GB2772@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 15, 2015 at 02:01:36PM +0000, Mark Rutland wrote:
+[Re: [PATCH 00/10] drivers/pci: avoid module_init in non-modular host/pci*] On 14/12/2015 (Mon 11:27) Arnd Bergmann wrote:
 
-> I really don't want to see a table of magic numbers in the kernel.
+> On Monday 14 December 2015 10:19:40 Thierry Reding wrote:
+> > > PCIe host driver that use fixup (DECLARE_PCI_FIXUP_*) can't use tristate.
+> > > Fixup region is in kernel region and this region if not updated when
+> > > loading a module.
+> > 
+> > Interesting, I hadn't thought about that. I suppose this means that the
+> > module will end up containing an unused section with the fixup code. It
+> > might be useful to add a way for that to trigger a warning at build
+> > time.
+> > 
+> > Perhaps to fix this a mechanism could be introduced to add a table of
+> > fixups to a host controller driver and that will get applied to all
+> > children of the bridge. It could be problematic to cover all of the
+> > different fixup stages, though.
+> > 
+> 
+> 
+> I think a lot of the fixups shouldn't really be there in the first place,
+> they are about stuff that we can fix up in the probe function, or that should
+> be fixed up in the probe function with some appropriate core support added.
 
-Right, there's pitfalls there too although not being part of an ABI
-does make them more manageable.  
+So, the feedback on this is a bit all over the map, leaving me unsure
+what to do next.  And is the choice we make on a per board/bsp basis or
+ideally across all platforms?  I see the choices as:
 
-One thing it's probably helpful to establish here is how much the
-specific numbers are going to matter in the grand scheme of things.  If
-the specific numbers *are* super important then nobody is going to want
-to touch them as they'll be prone to getting tweaked.  If instead the
-numbers just need to be ballpark accurate so the scheduler starts off in
-roughly the right place and the specific numbers don't matter it's a lot
-easier and having a table in the kernel until we think of something
-better (if that ever happens) gets a lot easier.
+1) do nothing; which IMHO is least desirable as it leaves the code
+misrepresenting itself as modular; one of the key issues I wanted to fix
 
-My expectation is that we just need good enough, not perfect, and that
-seems to match what Juri is saying about the expectation that most of
-the fine tuning is done via other knobs.
+2) use the patches I've sent ; then as they are genuinely made modular,
+the person doing so essentially "patch -R" or reverts the change as
+step one.  This has the advantage of solving the "we'll get to it
+someday" issue if someday never comes.
 
-> The relative performance and efficiency of cores will vary depending on
-> uArch-specific configuration (e.g. sizing of L1/L2 caches) in addition
-> to general uArch differences, and integration too (e.g. if the memory
-> system gives priority to one cluster over another for whatever reason).
-> I've heard of pseudo-heterogeneous platforms with different
-> configuration of the same uArch across clusters.
+3) make them all tristate;  beat it with a stick until it compiles [M]
+and modposts -- leaving the fixups and functional testing to people with
+the boards and low level knowledge to make it _work_ as a module.  The
+downside here is the code is still kind of misrepresenting itself as
+modularly functional -- a ban of unloading might mitigate that some.
 
-> We also don't necessarily have the CPU clock frequencies, or the ability
-> to scale them. Maybe we simply give up in that case, though.
+Paul.
+--
 
-These variables all sound like the sort of thing we can get people to
-put in the DT where they matter, and the more we talk about multiple
-subtle variables feeding into a single number the more this starts to
-sound like tuning (with all the problems that brings, especially when
-you're into things like the behaviour with the clusters competing for
-resources).  Who knows, at some point the scheduler may even want to
-directly act on some of these parameters?
-
-> If we cannot rely on external information, and want this information to
-> be derived by the kernel, then we need to perform some dynamic
-> benchmark. That would work for future CPUs the kernel knows nothing
-> about yet, and would cater for the pseudo-heterogeneous cases too.
-
-Runtime benchmarking (or gradual tuning based on observed performance of
-the scheduler) would work as well of course.  I'd expect something like
-that to be part of any end point we get to here, the more the system is
-able to self tune the better.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151215/24a3ffc1/attachment.sig>
+> 
+> 	Arnd
