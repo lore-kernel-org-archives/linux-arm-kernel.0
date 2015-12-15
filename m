@@ -1,198 +1,97 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 15 Dec 2015 13:56:04 +0000
-Subject: [PATCH v7 10/19] KVM: ARM64: Add access handler for PMCNTENSET
- and PMCNTENCLR register
-In-Reply-To: <1450169379-12336-11-git-send-email-zhaoshenglong@huawei.com>
-References: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
- <1450169379-12336-11-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <56701BF4.2060204@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 15 Dec 2015 14:01:36 +0000
+Subject: [RFC PATCH 2/8] Documentation: arm: define DT cpu capacity
+ bindings
+In-Reply-To: <20151215133951.GY5727@sirena.org.uk>
+References: <1448288921-30307-1-git-send-email-juri.lelli@arm.com>
+ <1448288921-30307-3-git-send-email-juri.lelli@arm.com>
+ <20151124020631.GA15165@rob-hp-laptop>
+ <20151210153004.GA26758@sirena.org.uk>
+ <20151210175820.GE14571@e106622-lin>
+ <20151211174940.GQ5727@sirena.org.uk>
+ <20151214123616.GC3308@e106622-lin>
+ <20151214165928.GV5727@sirena.org.uk>
+ <20151215122238.GG16007@e106622-lin>
+ <20151215133951.GY5727@sirena.org.uk>
+Message-ID: <20151215140135.GI31299@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/12/15 08:49, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
+On Tue, Dec 15, 2015 at 01:39:51PM +0000, Mark Brown wrote:
+> On Tue, Dec 15, 2015 at 12:22:38PM +0000, Juri Lelli wrote:
+> > > So then why isn't it adequate to just have things like the core types in
+> > > there and work from there?  Are we really expecting the tuning to be so
+> > > much better than it's possible to come up with something that's so much
+> > > better on the scale that we're expecting this to be accurate that it's
+> > > worth just jumping straight to magic numbers?
 > 
-> Since the reset value of PMCNTENSET and PMCNTENCLR is UNKNOWN, use
-> reset_unknown for its reset handler. Add a handler to emulate writing
-> PMCNTENSET or PMCNTENCLR register.
+> > I take your point here that having fine grained values might not really
+> > give us appreciable differences (that is also why I proposed the
+> > capacity-scale in the first instance), but I'm not sure I'm getting what
+> > you are proposing here.
 > 
-> When writing to PMCNTENSET, call perf_event_enable to enable the perf
-> event. When writing to PMCNTENCLR, call perf_event_disable to disable
-> the perf event.
+> Something like the existing solution for arm32.
 > 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  arch/arm64/kvm/sys_regs.c | 41 +++++++++++++++++++++++++++++++----
->  include/kvm/arm_pmu.h     |  4 ++++
->  virt/kvm/arm/pmu.c        | 55 +++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 96 insertions(+), 4 deletions(-)
+> >  static const struct cpu_efficiency table_efficiency[] = {
+> >  	{"arm,cortex-a15", 3891},
+> >  	{"arm,cortex-a7",  2048},
+> >  	{NULL, },
+> >  };
 > 
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index dc6bb26..f216da7 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -615,6 +615,39 @@ static bool access_pmu_evcntr(struct kvm_vcpu *vcpu,
->  	return true;
->  }
->  
-> +static inline u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu)
-> +{
-> +	u64 val = vcpu_sys_reg(vcpu, PMCR_EL0) >> ARMV8_PMCR_N_SHIFT;
-> +
-> +	val &= ARMV8_PMCR_N_MASK;
-> +	return GENMASK(val - 1, 0) | BIT(ARMV8_CYCLE_IDX);
-> +}
-> +
-> +static bool access_pmcntenset(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
-> +			      const struct sys_reg_desc *r)
-> +{
-> +	u64 val, mask;
-> +
-> +	mask = kvm_pmu_valid_counter_mask(vcpu);
-> +	if (p->is_write) {
-> +		val = p->regval & mask;
-> +		if (r->Op2 & 0x1) {
-> +			/* accessing PMCNTENSET_EL0 */
-> +			vcpu_sys_reg(vcpu, r->reg) |= val;
-> +			kvm_pmu_enable_counter(vcpu, val);
-> +		} else {
-> +			/* accessing PMCNTENCLR_EL0 */
-> +			vcpu_sys_reg(vcpu, r->reg) &= mask;
-> +			vcpu_sys_reg(vcpu, r->reg) &= ~val;
-> +			kvm_pmu_disable_counter(vcpu, val);
-> +		}
-> +	} else {
-> +		p->regval = vcpu_sys_reg(vcpu, r->reg) & mask;
-> +	}
-> +
-> +	return true;
-> +}
-> +
->  /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
->  #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
->  	/* DBGBVRn_EL1 */						\
-> @@ -816,10 +849,10 @@ static const struct sys_reg_desc sys_reg_descs[] = {
->  	  access_pmcr, reset_pmcr, PMCR_EL0, },
->  	/* PMCNTENSET_EL0 */
->  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b001),
-> -	  trap_raz_wi },
-> +	  access_pmcntenset, reset_unknown, PMCNTENSET_EL0 },
->  	/* PMCNTENCLR_EL0 */
->  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b010),
-> -	  trap_raz_wi },
-> +	  access_pmcntenset, NULL, PMCNTENSET_EL0 },
->  	/* PMOVSCLR_EL0 */
->  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b011),
->  	  trap_raz_wi },
-> @@ -1161,8 +1194,8 @@ static const struct sys_reg_desc cp15_regs[] = {
->  
->  	/* PMU */
->  	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), access_pmcr },
-> -	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), trap_raz_wi },
-> -	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), trap_raz_wi },
-> +	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), access_pmcntenset },
-> +	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), access_pmcntenset },
->  	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), trap_raz_wi },
->  	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), access_pmselr },
->  	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), access_pmceid },
-> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-> index 14bedb0..43c4117 100644
-> --- a/include/kvm/arm_pmu.h
-> +++ b/include/kvm/arm_pmu.h
-> @@ -36,6 +36,8 @@ struct kvm_pmu {
->  };
->  
->  u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx);
-> +void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val);
-> +void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val);
->  void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
->  				    u64 select_idx);
->  #else
-> @@ -46,6 +48,8 @@ u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx)
->  {
->  	return 0;
->  }
-> +void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val) {}
-> +void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val) {}
->  void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
->  				    u64 select_idx) {}
->  #endif
-> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-> index b107fb8..94bff0e 100644
-> --- a/virt/kvm/arm/pmu.c
-> +++ b/virt/kvm/arm/pmu.c
-> @@ -75,6 +75,61 @@ static void kvm_pmu_stop_counter(struct kvm_vcpu *vcpu, struct kvm_pmc *pmc)
->  }
->  
->  /**
-> + * kvm_pmu_enable_counter - enable selected PMU counter
-> + * @vcpu: The vcpu pointer
-> + * @val: the value guest writes to PMCNTENSET register
-> + *
-> + * Call perf_event_enable to start counting the perf event
-> + */
-> +void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val)
-> +{
-> +	int i;
-> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-> +	struct kvm_pmc *pmc;
-> +
-> +	if (!(vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMCR_E) || !val)
-> +		return;
-> +
-> +	for (i = 0; i < ARMV8_MAX_COUNTERS; i++) {
-> +		if (!((val >> i) & 0x1))
-> +			continue;
+> > When clock-frequency property is defined in DT, we try to find a match
+> > for the compatibility string in the table above and then use the
+> > associate number to compute the capacity. Are you proposing to have
+> > something like this for arm64 as well?
+> 
+> > BTW, the only info I could find about those numbers is from this thread
+> 
+> It was discussed in some other thread when I was sending the equivalent
+> stuff for arm64 (I never got round to finishing it off due to issues
+> with Catalin and Will being concerned about the specific numbers).
+> Vincent confirmed that the numbers came from the (IIRC) DMIPS/MHz
+> numbers that ARM publish for the cores.  I'd independently done the same
+> thing for arm64.  It would probably help to put comments in there with
+> the base numbers before scaling, or just redo the table in terms of the
+> raw numbers.
+> 
+> This is, of course, an example of my concerns about magic number
+> configuration.
+> 
+> > If I understand how that table was created, how do we think we will
+> > extend it in the future to allow newer core types (say we replicate this
+> > solution for arm64)?  It seems that we have to change it, rescaling
+> > values, each time we have a new core on the market. How can we come up
+> > with relative numbers, in the future, comparing newer cores to old ones
+> > (that might be already out of the market by that time)?
+> 
+> It doesn't seem particularly challenging to add new numbers to the table
+> (and add additional properties to select on) TBH.  We can either rescale
+> by hand in the table when adding entries, script it as part of the
+> kernel build or do it at runtime (as the arm32 code already does to an
+> extent based on the particular set of cores we find).  What difficulties
+> do you see with this?
+> 
+> This is something that seems like an advantage to me - we can just
+> replace everything at any point, we're not tied to trusting the golden
+> benchmark someone did (or tweaked) if we come up with a better
+> methodology later on.
 
-nit: it is slightly more readable to have "if (!(val & (1 << i)))
+I really don't want to see a table of magic numbers in the kernel.
 
-> +
-> +		pmc = &pmu->pmc[i];
-> +		if (pmc->perf_event) {
-> +			perf_event_enable(pmc->perf_event);
-> +			if (pmc->perf_event->state != PERF_EVENT_STATE_ACTIVE)
-> +				kvm_debug("fail to enable perf event\n");
-> +		}
-> +	}
-> +}
-> +
-> +/**
-> + * kvm_pmu_disable_counter - disable selected PMU counter
-> + * @vcpu: The vcpu pointer
-> + * @val: the value guest writes to PMCNTENCLR register
-> + *
-> + * Call perf_event_disable to stop counting the perf event
-> + */
-> +void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val)
-> +{
-> +	int i;
-> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-> +	struct kvm_pmc *pmc;
-> +
-> +	if (!val)
-> +		return;
-> +
-> +	for (i = 0; i < ARMV8_MAX_COUNTERS; i++) {
-> +		if (!((val >> i) & 0x1))
+The relative performance and efficiency of cores will vary depending on
+uArch-specific configuration (e.g. sizing of L1/L2 caches) in addition
+to general uArch differences, and integration too (e.g. if the memory
+system gives priority to one cluster over another for whatever reason).
+I've heard of pseudo-heterogeneous platforms with different
+configuration of the same uArch across clusters.
 
-Same here.
+We also don't necessarily have the CPU clock frequencies, or the ability
+to scale them. Maybe we simply give up in that case, though.
 
-> +			continue;
-> +
-> +		pmc = &pmu->pmc[i];
-> +		if (pmc->perf_event)
-> +			perf_event_disable(pmc->perf_event);
-> +	}
-> +}
-> +
-> +/**
->   * kvm_pmu_set_counter_event_type - set selected counter to monitor some event
->   * @vcpu: The vcpu pointer
->   * @data: The data guest writes to PMXEVTYPER_EL0
-> 
+If we cannot rely on external information, and want this information to
+be derived by the kernel, then we need to perform some dynamic
+benchmark. That would work for future CPUs the kernel knows nothing
+about yet, and would cater for the pseudo-heterogeneous cases too.
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Mark.
