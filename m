@@ -1,38 +1,47 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 16 Dec 2015 00:42:29 +0300
-Subject: [PATCH v6 03/20] arm64: rename COMPAT to AARCH32_EL0 in Kconfig
+Date: Wed, 16 Dec 2015 00:42:31 +0300
+Subject: [PATCH v6 05/20] arm64:uapi: set __BITS_PER_LONG correctly for ILP32
+ and LP64
 In-Reply-To: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
 References: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1450215766-14765-4-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1450215766-14765-6-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andrew Pinski <apinski@cavium.com>
 
+Define __BITS_PER_LONG depending on the ABI used (i.e. check whether
+__ILP32__ or __LP64__ is defined).  This is necessary for glibc to
+determine the appropriate type definitions for the system call interface.
+
 Reviewed-by: David Daney <ddaney@caviumnetworks.com>
 Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
 Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
 Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
+Signed-off-by: Andrew Pinski <apinski@cavium.com>
 ---
- arch/arm64/Kconfig | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm64/include/uapi/asm/bitsperlong.h | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 07d1811..4753d435 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -679,6 +679,11 @@ menu "Userspace binary formats"
- source "fs/Kconfig.binfmt"
+diff --git a/arch/arm64/include/uapi/asm/bitsperlong.h b/arch/arm64/include/uapi/asm/bitsperlong.h
+index fce9c29..4265243 100644
+--- a/arch/arm64/include/uapi/asm/bitsperlong.h
++++ b/arch/arm64/include/uapi/asm/bitsperlong.h
+@@ -16,7 +16,14 @@
+ #ifndef __ASM_BITSPERLONG_H
+ #define __ASM_BITSPERLONG_H
  
- config COMPAT
-+	def_bool y
-+	depends on AARCH32_EL0
-+	select COMPAT_BINFMT_ELF
-+
-+config AARCH32_EL0
- 	bool "Kernel support for 32-bit EL0"
- 	depends on !ARM64_64K_PAGES || EXPERT
- 	select COMPAT_BINFMT_ELF
+-#define __BITS_PER_LONG 64
++#if defined(__LP64__)
++/* Assuming __LP64__ will be defined for native ELF64's and not for ILP32. */
++#  define __BITS_PER_LONG 64
++#elif defined(__ILP32__)
++#  define __BITS_PER_LONG 32
++#else
++#  error "Neither LP64 nor ILP32: unsupported ABI in asm/bitsperlong.h"
++#endif
+ 
+ #include <asm-generic/bitsperlong.h>
+ 
 -- 
 2.5.0
