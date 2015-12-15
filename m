@@ -1,25 +1,29 @@
 From: jcm@redhat.com (Jon Masters)
-Date: Tue, 15 Dec 2015 10:24:13 -0500
-Subject: memcpy alignment
-In-Reply-To: <20151215093406.GC19244@e104818-lin.cambridge.arm.com>
-References: <566F92D6.8060103@redhat.com>
- <20151215093406.GC19244@e104818-lin.cambridge.arm.com>
-Message-ID: <5670309D.1040309@redhat.com>
+Date: Tue, 15 Dec 2015 10:29:54 -0500
+Subject: [Linaro-acpi] Touching the initrd before paging_init
+In-Reply-To: <yw1xd1u8gcnk.fsf@unicorn.mansr.com>
+References: <566D3090.9090509@redhat.com>	<20151213165942.GN25034@bivouac.eciton.net>	<23071B8C-D1F9-47A6-9DB4-B26842150B76@redhat.com>	<566DEB04.2030806@redhat.com>
+ <566DEDFC.909@redhat.com>	<566F9C3D.4090306@redhat.com>
+ <yw1xd1u8gcnk.fsf@unicorn.mansr.com>
+Message-ID: <567031F2.8060102@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/15/2015 04:34 AM, Catalin Marinas wrote:
-> On Mon, Dec 14, 2015 at 11:11:02PM -0500, Jon Masters wrote:
->> What's supposed to happen if the natural alignment of the pointers dst
->> and src is not the same? We don't seem to handle that case today, and
->> instead will base our access data type on the source alignment only.
-> 
-> The hardware takes care of the other one. The memcpy behaviour in the
-> kernel is the same as the glibc one (the Cortex Strings library).
+On 12/15/2015 06:43 AM, M?ns Rullg?rd wrote:
+> Jon Masters <jcm@redhat.com> writes:
 
-Not if you're dealing with Device memory. I accept that one could always
-ensure that there's a non-Device mapping (I got the other replies) but I
-don't think it's unreasonable to expect a memcpy to work in the presence
-of misaligned addresses either.
+>> But the reading of that cpio content into the new table locations is
+>> done using the kernel memcpy routine to early_ioremap'd memory (Device
+>> memory), which is architecturally sensitive to missaligned accesses.
+> 
+> As others have pointed out, your error is twofold: first using
+> early_ioremap() when early_memremap() would do, then using regular
+> memcpy() and not memcpy_fromio() on that.  Seems like your precious ACPI
+> code is to blame here.
+
+So I get that this could be changed. But I still want to understand
+whether memcpy is behaving correctly. Will it guaranteed /never/ occur
+that a copy will involve Device memory? All other such occurrences in
+the kernel will be caught and fixed so this will never be an issue?
 
 Jon.
