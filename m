@@ -1,50 +1,30 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 15 Dec 2015 21:42:05 +0100
-Subject: [PATCH v4 0/2] clocksource/drivers/dw_apb_timer: improve
- performance a bit
-In-Reply-To: <1448467313-5626-1-git-send-email-jszhang@marvell.com>
-References: <1448467313-5626-1-git-send-email-jszhang@marvell.com>
-Message-ID: <56707B1D.10807@linaro.org>
+Date: Tue, 15 Dec 2015 21:42:20 +0100
+Subject: [PATCH] clocksource/drivers/dw_apb_timer: Fix apbt_readl return
+ types
+In-Reply-To: <1448466083-5182-1-git-send-email-jszhang@marvell.com>
+References: <1448466083-5182-1-git-send-email-jszhang@marvell.com>
+Message-ID: <56707B2C.30501@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25/2015 05:01 PM, Jisheng Zhang wrote:
-> These two patches try to improve the dw_apb_timer clocksource/clockevent
-> performance.
+On 11/25/2015 04:41 PM, Jisheng Zhang wrote:
+> On Marvell BG4CT platform, we observed the __apbt_read_clocksource()
+> return wrong value: Let's assume the APBTMR_N_CURRENT_VALUE value is
+> 0xf0000000, we got 0xffffffff0fffffff, but it should be 0xfffffff.
 >
-> These patches depend on the apbt_readl return value fix patch:
+> This issue should be common on all 64bit platforms. We fix the issue
+> by letting aptb_readl() return u32. apbt_writel() is also updated
+> to write u32 val rather than unsigned long.
 >
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/388250.html
->
-> since v3:
->   - fix commit msg: we measured 4096 rounds of function call. So add this
->     information into commit msg to avoid confusion.
->
-> since v2:
->   - only use relaxed version in critical path
->   - inline apbt_readl/apbt_writel
->   - add some performance numbers
->
-> since v1:
->   - correct the wrong sentence in commit msg about writel performance on
->     CA9 with outer L2 cache. Thank Arnd for pointing out this in another
->     thread.
->
->
-> Jisheng Zhang (2):
->    clocksource/drivers/dw_apb_timer: Inline apbt_readl and apbt_writel
->    clocksource/drivers/dw_apb_timer: Use {readl|writel}_relaxed in
->      critical path
->
->   drivers/clocksource/dw_apb_timer.c | 30 +++++++++++++++++++++---------
->   1 file changed, 21 insertions(+), 9 deletions(-)
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> ---
 
 Applied.
 
 Thanks !
 
    -- Daniel
-
 
 -- 
   <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
