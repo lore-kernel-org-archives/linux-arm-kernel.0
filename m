@@ -1,127 +1,117 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 15 Dec 2015 15:20:45 +0100
-Subject: [RESEND RFC PATCH 0/2] Expose the PIO_ISR register on SAMA5D3
-In-Reply-To: <85d1850f20c141b2952d93be72199fdf@EMAIL.axentia.se>
-References: <1449544808-3163-1-git-send-email-peda@lysator.liu.se>
- <CACRpkdYN=n=Q+UpLbWjxJHP-FYi_e4cHFE_d1_fR2r7QYcqgYQ@mail.gmail.com>
- <566C6122.6040406@kernel.org>
- <85d1850f20c141b2952d93be72199fdf@EMAIL.axentia.se>
-Message-ID: <CACRpkdY9Nwg3B1bAJ53Y-tJJywC=ENvFR6S99+wUKzcUHTa5TQ@mail.gmail.com>
+From: juri.lelli@arm.com (Juri Lelli)
+Date: Tue, 15 Dec 2015 14:24:58 +0000
+Subject: [RFC PATCH 2/8] Documentation: arm: define DT cpu capacity
+ bindings
+In-Reply-To: <20151215140135.GI31299@leverpostej>
+References: <1448288921-30307-3-git-send-email-juri.lelli@arm.com>
+ <20151124020631.GA15165@rob-hp-laptop>
+ <20151210153004.GA26758@sirena.org.uk>
+ <20151210175820.GE14571@e106622-lin>
+ <20151211174940.GQ5727@sirena.org.uk>
+ <20151214123616.GC3308@e106622-lin>
+ <20151214165928.GV5727@sirena.org.uk>
+ <20151215122238.GG16007@e106622-lin>
+ <20151215133951.GY5727@sirena.org.uk>
+ <20151215140135.GI31299@leverpostej>
+Message-ID: <20151215142458.GI16007@e106622-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+Hi Mark,
 
-On Mon, Dec 14, 2015 at 11:38 AM, Peter Rosin <peda@axentia.se> wrote:
+On 15/12/15 14:01, Mark Rutland wrote:
+> On Tue, Dec 15, 2015 at 01:39:51PM +0000, Mark Brown wrote:
+> > On Tue, Dec 15, 2015 at 12:22:38PM +0000, Juri Lelli wrote:
+> > > > So then why isn't it adequate to just have things like the core types in
+> > > > there and work from there?  Are we really expecting the tuning to be so
+> > > > much better than it's possible to come up with something that's so much
+> > > > better on the scale that we're expecting this to be accurate that it's
+> > > > worth just jumping straight to magic numbers?
+> > 
+> > > I take your point here that having fine grained values might not really
+> > > give us appreciable differences (that is also why I proposed the
+> > > capacity-scale in the first instance), but I'm not sure I'm getting what
+> > > you are proposing here.
+> > 
+> > Something like the existing solution for arm32.
+> > 
+> > >  static const struct cpu_efficiency table_efficiency[] = {
+> > >  	{"arm,cortex-a15", 3891},
+> > >  	{"arm,cortex-a7",  2048},
+> > >  	{NULL, },
+> > >  };
+> > 
+> > > When clock-frequency property is defined in DT, we try to find a match
+> > > for the compatibility string in the table above and then use the
+> > > associate number to compute the capacity. Are you proposing to have
+> > > something like this for arm64 as well?
+> > 
+> > > BTW, the only info I could find about those numbers is from this thread
+> > 
+> > It was discussed in some other thread when I was sending the equivalent
+> > stuff for arm64 (I never got round to finishing it off due to issues
+> > with Catalin and Will being concerned about the specific numbers).
+> > Vincent confirmed that the numbers came from the (IIRC) DMIPS/MHz
+> > numbers that ARM publish for the cores.  I'd independently done the same
+> > thing for arm64.  It would probably help to put comments in there with
+> > the base numbers before scaling, or just redo the table in terms of the
+> > raw numbers.
+> > 
+> > This is, of course, an example of my concerns about magic number
+> > configuration.
+> > 
+> > > If I understand how that table was created, how do we think we will
+> > > extend it in the future to allow newer core types (say we replicate this
+> > > solution for arm64)?  It seems that we have to change it, rescaling
+> > > values, each time we have a new core on the market. How can we come up
+> > > with relative numbers, in the future, comparing newer cores to old ones
+> > > (that might be already out of the market by that time)?
+> > 
+> > It doesn't seem particularly challenging to add new numbers to the table
+> > (and add additional properties to select on) TBH.  We can either rescale
+> > by hand in the table when adding entries, script it as part of the
+> > kernel build or do it at runtime (as the arm32 code already does to an
+> > extent based on the particular set of cores we find).  What difficulties
+> > do you see with this?
+> > 
+> > This is something that seems like an advantage to me - we can just
+> > replace everything at any point, we're not tied to trusting the golden
+> > benchmark someone did (or tweaked) if we come up with a better
+> > methodology later on.
+> 
+> I really don't want to see a table of magic numbers in the kernel.
+> 
 
-I think I atleast half-understand what you're trying to do.
+Doesn't seem to be a clean and scalable solution to me either. It is not
+easy to reconfigure when new core types come around, as I don't think
+relative data is always present or easy to derive, and it exposes some
+sort of centralized global information where everyone is compared
+against everyone. Where the DT solution is inherently per platform: no
+need to expose absolute values and no problems with knowing data
+regarding old core types.
 
-> Userspace does the following when doing this w/o the isr patches:
->
-> 1. select signal using the MUX
-> 2. set the DAC so high that INPUT is never reaching that level.
->    C (and thus gpio) is now stable
-> 3. start waiting for interrupts on gpio
-> 4. adjust the DAC level to the level of interest
-> 5. abort on interrupt or timeout
-(...)
-> With the isr patches, the above transforms into:
->
-> 1. select signal using the MUX
-> 2. set the DAC so high that INPUT is never reaching that level.
->    C (and thus gpio) is now stable
-> 3. read the isr bit to clear it
-> 4. adjust the DAC level to the level of interest
-> 5. read the isr bit again after 50ms
->
-> The result is available directly in the isr bit, no interrupts needed.
+> The relative performance and efficiency of cores will vary depending on
+> uArch-specific configuration (e.g. sizing of L1/L2 caches) in addition
+> to general uArch differences, and integration too (e.g. if the memory
+> system gives priority to one cluster over another for whatever reason).
+> I've heard of pseudo-heterogeneous platforms with different
+> configuration of the same uArch across clusters.
+> 
+> We also don't necessarily have the CPU clock frequencies, or the ability
+> to scale them. Maybe we simply give up in that case, though.
+> 
+> If we cannot rely on external information, and want this information to
+> be derived by the kernel, then we need to perform some dynamic
+> benchmark. That would work for future CPUs the kernel knows nothing
+> about yet, and would cater for the pseudo-heterogeneous cases too.
+> 
 
-The problem I see here as kernel developer is that there is a fuzzy
-and implicit separation of concerns between userspace and
-kernelspace.
+I've actually experimented a bit with this approch already, but I wasn't
+convinced of its viability. It is true that we remove the burden of
+coming up with default values from user/integrator, but I'm pretty sure
+we will end up discussing endlessly about which particular benchmark to
+pick and the fact that it impacts on boot time and such.
 
-IMO reading hardware registers is the domain of the kernel, and
-then the result thereof is presented to userspace. The kernel
-handles hardware, simply.
+Best,
 
-I think we need to reverse out of this solution and instead ask
-the question what the kernel should provide your userspace.
-Maybe parts of what you have in userspace needs to actually
-go into the kernel?
-
-The goal of IIO seems to be to present raw and calibrated
-(SI unit) data to userspace. So what data is it you want, and
-why can't you just get that directly from the kernel without
-tricksing around with reading registers bits in userspace?
-
-If a kernel module needs to read an interrupt bit directly from the
-GPIO controller is another thing. That is akin to how polling
-network drivers start polling registers for incoming packages
-instead of waiting for them to fire interrupts. Just that these are
-dedicated IRQ lines, not GPIOs.
-
-As struct irq_chip has irq_get_irqchip_state() I think this
-is actually possible to achieve this by implementing that
-and calling irq_get_irqchip_state().
-
-> I have realized that I could work with one-shot-interrupts. Then the
-> urgency to disable interrupts go away, as only one interrupt would
-> be served. That was not my immediate solution though, as I have been
-> using isr type registers in this way several times before.
-
-That sounds like the right solution. With ONESHOT a threaded IRQ
-will have its line masked until you return from the ISR thread. Would this
-work for your usecase?
-
-I suspect this require you to move the logic into the kernel? Into IIO?
-
-> If this is to be done in IIO, I imagine that the sanest thing would
-> be to integrate the whole DAC-loop and present a finished envelope
-> value to user space? This envelope detector would have to be pretty
-> configurable, or it will be next to useless to anybody but me.
-
-Makes sense to me, but must be ACKed by Jonathan. But it
-sounds pretty cool does it not?
-
-> I could imaging that this new IIO driver should be able to work
-> with any DAC type device, which in my case would be the mcp4531
-> dpot. Which is not a DAC, maybe that could be solved with a new
-> dac-dpot driver, applicable to cases where a dpot is wired as a
-> simple voltage divider? The new IIO driver also needs to know how
-> to get a reading from the comparator. I think the driver should
-> support having a latch between the comparator and the gpio, so it
-> need to know how to optionally "reset the comparator". That
-> would have solved the whole problem, you would never have seen
-> any of this if I had such a latch on my board. But the isr
-> register is a latch, so...
->
-> Regardless, I think such a driver still needs support from gpio
-> and/or pinctrl. Either exposing the isr register or supporting
-> one-shot-interrupts that disarm themselves before restoring the
-> processor interrupt flag (maybe that exists?).
-
-All irqchips support one-shot interrupts as long as you request a
-threaded IRQ I think.
-
-Your GPIO driver must support IRQs though but AT91 surely does.
-Maybe you will need to implement irq_get_irqchip_state() on it
-if you insist on polling the interrupt.
-
-> Otherwise the
-> core problem remains unsolved. Also, this imaginary IIO driver
-> probably have to be totally oblivious of the MUX, or the number
-> of possibilities explode.
-
-Usually we try to follow the UNIX philisophy to do one thing
-and do it good.
-
-You haven't said much about how that MUX works, if it's another
-userspace ThingOfABob or what it is. There is no generic
-kernel framework for muxes so I see why people would want to
-drive that using userspace GPIO lines for example.
-
-If it is pinmuxing in a standard chip of some kind, pinctrl
-handles it.
-
-Yours,
-Linus Walleij
+- Juri
