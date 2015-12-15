@@ -1,50 +1,48 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Tue, 15 Dec 2015 11:31:16 -0500
-Subject: [Linaro-acpi] Touching the initrd before paging_init
-In-Reply-To: <CAGCh1+=+SkaunFL1JE-d8jTb6-Xi+sjUEYoF5ZgcwV7GTj7ECQ@mail.gmail.com>
-References: <566D3090.9090509@redhat.com>	<20151213165942.GN25034@bivouac.eciton.net>	<23071B8C-D1F9-47A6-9DB4-B26842150B76@redhat.com>	<566DEB04.2030806@redhat.com>	<CAGCh1+nb-H-B28crGuTPUKXZrBN_XDn7fNHf4q8LZZOgyhtDmQ@mail.gmail.com>	<566DEED6.3010704@redhat.com>	<CAGCh1+k8jHzMK+pLbtBgg5=VdT=+3W+OjTGJLMDGjLqLvmQXnw@mail.gmail.com>	<5670339A.7060307@redhat.com>	<CAGCh1+=eyBstwL7aPTvmRDDEn0GDrf9gTkCKLDBwoNT916vUpg@mail.gmail.com>
- <CAGCh1+=+SkaunFL1JE-d8jTb6-Xi+sjUEYoF5ZgcwV7GTj7ECQ@mail.gmail.com>
-Message-ID: <56704054.7080506@redhat.com>
+From: treding@nvidia.com (Thierry Reding)
+Date: Tue, 15 Dec 2015 17:31:22 +0100
+Subject: [PATCH v3 3/5] soc: rockchip: add reboot notifier driver
+In-Reply-To: <10162108.nOThMrrbdf@wuerfel>
+References: <1447840044-19689-1-git-send-email-andy.yan@rock-chips.com>
+ <1447840582-19850-1-git-send-email-andy.yan@rock-chips.com>
+ <10162108.nOThMrrbdf@wuerfel>
+Message-ID: <20151215163120.GA24031@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/15/2015 11:28 AM, G Gregory wrote:
-> On 15 December 2015 at 16:13, G Gregory <graeme.gregory@linaro.org> wrote:
->> On 15 December 2015 at 15:36, Jon Masters <jcm@redhat.com> wrote:
->>> On 12/15/2015 06:19 AM, G Gregory wrote:
->>>
->>> <below refers to the GRUB-based approach not the initrd override>
->>>
->>>> Tried it, results were not great :-(
->>>>
->>>> set root='hd0,gpt2'
->>>> insmod acpi
->>>> acpi /DSDT.aml
->>>> linux /Image-leg earlycon=pl011,0xe1010000 console=ttyAMA0 acpi=force root
->>>> =/dev/sda2
->>>
->>> <snip>
->>>
->>>> [    0.000000] PC is at setup_arch+0xfc/0x564
->>>> [    0.000000] LR is at setup_arch+0xf8/0x564
->>>
->>> <snip>
->>>
->>> So we unmask SError in setup_arch, which happens now later enough that
->>> it'll come out of the UART where you can see it. However there are still
->>> occasions on some of these early platforms where an unhandled SError can
->>> exist as GRUB exits. I have seen that a number of times on Seattle if
->>> there's a pending error from one of the IO IP blocks on the SoC You
->>> might need a firmware update, but can you also confirm that this
->>> happened reproducibly?
->>>
->> It is Seattle RevB I am using and it is repeatable. I have pre-release
->> firmware on there!
->>
-> Repeatable on ROD0084E as well.
+On Mon, Dec 14, 2015 at 12:39:44PM +0100, Arnd Bergmann wrote:
+> On Wednesday 18 November 2015 17:56:22 Andy Yan wrote:
+> > rockchip platform have a protocol to pass the kernel reboot
+> > mode to bootloader by some special registers when system reboot.
+> > By this way the bootloader can take different action according
+> > to the different kernel reboot mode, for example, command
+> > "reboot loader" will reboot the board to rockusb mode, this is
+> > a very convenient way to get the board enter download mode.
+> > 
+> > Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+> 
+> Adding John Stultz to Cc
+> 
+> I just saw this thread pop up again, and had to think of John's recent
+> patch to unify this across platforms.
+> 
+> John, can you have a look at this driver too, and see how it fits in?
+> I think this is yet another variant, using an MMIO register rather than
+> RAM (as HTC / NVIDIA does) or SRAM (as Qualcomm does), but otherwise
+> it conceptually fits in with what you had.
 
-I'll try it on a couple of other platforms later this week. I've
-pondered before whether GRUB should unmask SError and report this prior
-to entering the kernel, because today Linux always gets the blame ;)
+FWIW, Tegra typically does use an MMIO register as well. See
+drivers/soc/tegra/pmc.c:tegra_pmc_restart_notify(). I don't know what
+HTC does, but if it's writing somewhere in RAM it isn't using the
+standard way of resetting the SoC. There's early boot ROM code which I
+think evaluates the PMC_SCRATCH0 register on Tegra to determine which
+mode to boot into. That's before even any firmware gets the chance of
+doing anything.
 
-Jon.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151215/f4a6bc92/attachment.sig>
