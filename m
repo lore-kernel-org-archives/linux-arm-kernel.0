@@ -1,51 +1,51 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 15 Dec 2015 18:10:03 +0000
-Subject: [RFC PATCH 2/8] Documentation: arm: define DT cpu capacity
- bindings
-In-Reply-To: <20151215174516.GB5727@sirena.org.uk>
-References: <20151214123616.GC3308@e106622-lin>
- <20151214165928.GV5727@sirena.org.uk>
- <20151215122238.GG16007@e106622-lin>
- <20151215133951.GY5727@sirena.org.uk>
- <20151215140135.GI31299@leverpostej>
- <20151215150813.GZ5727@sirena.org.uk>
- <20151215153218.GA7228@leverpostej>
- <20151215171713.GA5727@sirena.org.uk>
- <20151215172837.GD8012@leverpostej>
- <20151215174516.GB5727@sirena.org.uk>
-Message-ID: <20151215181002.GA8568@leverpostej>
+Date: Tue, 15 Dec 2015 18:14:07 +0000
+Subject: [PATCH] clocksource: arm_global_timer: Allow DT to specify
+ already reset timer counter
+In-Reply-To: <1448429044-10395-1-git-send-email-jaswinder.singh@linaro.org>
+References: <1448429044-10395-1-git-send-email-jaswinder.singh@linaro.org>
+Message-ID: <20151215181407.GB8568@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 15, 2015 at 05:45:16PM +0000, Mark Brown wrote:
-> On Tue, Dec 15, 2015 at 05:28:37PM +0000, Mark Rutland wrote:
-> > On Tue, Dec 15, 2015 at 05:17:13PM +0000, Mark Brown wrote:
-> 
-> > > Obviously people are going to get upset if we introduce performance
-> > > regressions - but that's true always, we can also introduce problems
-> > > with numbers people have put in DT.  It seems like it'd be harder to
-> > > manage regressions due to externally provided magic numbers since
-> > > there's inherently less information there.
-> 
-> > It's certainly still possible to have regressions in that case. Those
-> > regressions would be due to code changes in the kernel, given the DT
-> > didn't change.
-> 
-> > I'm not sure I follow w.r.t. "inherently less information", unless you
-> > mean trying to debug without access to that DTB?
-> 
-> If what the kernel knows about the system is that it's got a bunch of
-> cores with numbers assigned to them then all it's really got is those
-> numbers.  If something changes that causes problems for some systems
-> (eg, because the numbers have been picked poorly but in a way that
-> happened to work well with the old code) that's not a lot to go on, the
-> more we know about the system the more likely it is that we'll be able
-> to adjust the assumptions in whatever new thing we do that causes
-> problems for any particular systems where we run into trouble.
+On Wed, Nov 25, 2015 at 10:54:04AM +0530, Jassi Brar wrote:
+> The GT counter is common to every core in a cluster. There is a usecase
+> when Linux is spawned by a 'master' firmware/OS running on some core of
+> the same cluster and the GT is used by the both.
+>  Linux, upon boot, resetting the GT counter is obviously fatal to the
+> other OS. So provide a way for DT to tell Linux if it's running in that
+> 'slave' mode and must not reset the counter.
 
-Regardless of where the numbers live (DT or kernel), all we have are
-numbers. I can see that changing the in-kernel numbers would be possible
-when modifyign the DT is not, but I don't see how that gives you more
-information.
+Is the other OS only using the counter?
+
+Or are there other porions of the global timer that it assumes its in
+sole control of?
+
+> Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/arm/global_timer.txt |  6 ++++++
+>  drivers/clocksource/arm_global_timer.c                 | 12 +++++++++---
+>  2 files changed, 15 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/global_timer.txt b/Documentation/devicetree/bindings/arm/global_timer.txt
+> index bdae3a8..bb897a9 100644
+> --- a/Documentation/devicetree/bindings/arm/global_timer.txt
+> +++ b/Documentation/devicetree/bindings/arm/global_timer.txt
+> @@ -17,6 +17,12 @@
+>  
+>  - clocks : Should be phandle to a clock.
+>  
+> +
+> +** Optional properties:
+> +
+> +- arm,gt_no_reset : Firmware/bootloader already initialized the
+> +	global timer-counter and expects it to be not reset again.
+
+s/_/-/ in property names.
+
+No need for the "gt" prefix, this is on tthe glboal timer node.
+
+It "no-counter-reset" seems like a better description, though that
+really depends on how the other OS is using this.
 
 Mark.
