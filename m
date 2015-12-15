@@ -1,59 +1,39 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 15 Dec 2015 15:52:43 +0000
-Subject: memcpy alignment
-In-Reply-To: <56703507.2020004@redhat.com>
-References: <566F92D6.8060103@redhat.com>
- <20151215093406.GC19244@e104818-lin.cambridge.arm.com>
- <5670309D.1040309@redhat.com>
- <20151215153202.GC8644@n2100.arm.linux.org.uk>
- <56703507.2020004@redhat.com>
-Message-ID: <20151215155242.GA7619@leverpostej>
+Date: Tue, 15 Dec 2015 15:57:37 +0000
+Subject: [RFC PATCH 2/8] Documentation: arm: define DT cpu capacity
+ bindings
+In-Reply-To: <20151215154651.GK16007@e106622-lin>
+References: <20151210175820.GE14571@e106622-lin>
+ <20151211174940.GQ5727@sirena.org.uk>
+ <20151214123616.GC3308@e106622-lin>
+ <20151214165928.GV5727@sirena.org.uk>
+ <20151215122238.GG16007@e106622-lin>
+ <20151215133951.GY5727@sirena.org.uk>
+ <20151215140135.GI31299@leverpostej>
+ <20151215150813.GZ5727@sirena.org.uk>
+ <20151215153218.GA7228@leverpostej>
+ <20151215154651.GK16007@e106622-lin>
+Message-ID: <20151215155737.GB7619@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 15, 2015 at 10:43:03AM -0500, Jon Masters wrote:
-> On 12/15/2015 10:32 AM, Russell King - ARM Linux wrote:
-> > On Tue, Dec 15, 2015 at 10:24:13AM -0500, Jon Masters wrote:
-> >> On 12/15/2015 04:34 AM, Catalin Marinas wrote:
-> >>> On Mon, Dec 14, 2015 at 11:11:02PM -0500, Jon Masters wrote:
-> >>>> What's supposed to happen if the natural alignment of the pointers dst
-> >>>> and src is not the same? We don't seem to handle that case today, and
-> >>>> instead will base our access data type on the source alignment only.
-> >>>
-> >>> The hardware takes care of the other one. The memcpy behaviour in the
-> >>> kernel is the same as the glibc one (the Cortex Strings library).
-> >>
-> >> Not if you're dealing with Device memory. I accept that one could always
-> >> ensure that there's a non-Device mapping (I got the other replies) but I
-> >> don't think it's unreasonable to expect a memcpy to work in the presence
-> >> of misaligned addresses either.
+On Tue, Dec 15, 2015 at 03:46:51PM +0000, Juri Lelli wrote:
+> On 15/12/15 15:32, Mark Rutland wrote:
+> > On Tue, Dec 15, 2015 at 03:08:13PM +0000, Mark Brown wrote:
+> > > My expectation is that we just need good enough, not perfect, and that
+> > > seems to match what Juri is saying about the expectation that most of
+> > > the fine tuning is done via other knobs.
 > > 
-> > Using memcpy() on memory returned from functions which setup IO/MMIO
-> > mappings has always been outlawed.  It's the whole reason we have
-> > things like memcpy_toio(), memcpy_fromio() and memset_io(), which
-> > date back a few decades now, and they exist for exactly these kinds
-> > of reasons.
+> > My expectation is that if a ballpark figure is good enough, it should be
+> > possible to implement something trivial like bogomips / loop_per_jiffy
+> > calculation.
 > > 
-> > If you get an __iomem pointer, then you must respect that it
-> > essentially can not be non-dereferenced, and you must use one of the
-> > standard kernel accessors (read[bwl]/ioread*/write[bwl]/iowrite*/
-> > memcpy_fromio/memcpy_toio/memset_io) to access it.  That's the API
-> > contract you implicitly signed up to by using something like ioremap()
-> > or other mapping which gives you an iomem mapping.
 > 
-> Thanks Russell. If it's definitely never allowed then the existing x86
-> code needs to be fixed to use an IO access function in that case. I get
-> that those accessors are there for this reason, but I wanted to make
-> sure that we don't ever expect to touch Device memory any other way (for
-> example, conflicting mappings between a VM and hypervisor). I am certain
-> there's other non-ACPI code that is going to have this happen :)
+> I didn't really followed that, so I might be wrong here, but isn't
+> already happened a discussion about how we want/like to stop exposing
+> bogomips info or rely on it for anything but in kernel delay loops?
 
-It's important to note that much of the ACPI code was written prior to
-the availability of memremap.
+I meant that we could have a benchmark of that level of complexity,
+rather than those specific values.
 
-Depending on the case, the better solution may be to use memremap. I
-would expect this to be the case for any static tables of information,
-at least.
-
-Thanks,
 Mark.
