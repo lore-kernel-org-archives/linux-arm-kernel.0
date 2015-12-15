@@ -1,51 +1,40 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 15 Dec 2015 18:14:07 +0000
-Subject: [PATCH] clocksource: arm_global_timer: Allow DT to specify
- already reset timer counter
-In-Reply-To: <1448429044-10395-1-git-send-email-jaswinder.singh@linaro.org>
-References: <1448429044-10395-1-git-send-email-jaswinder.singh@linaro.org>
-Message-ID: <20151215181407.GB8568@leverpostej>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 15 Dec 2015 10:24:44 -0800
+Subject: [PATCH 0/3] pwm: bcm2835: improve clock handling
+In-Reply-To: <2004478620.33734.6de503e6-02cb-4cce-af2d-c2614efc234a.open-xchange@email.1und1.de>
+References: <1449010541-3767-1-git-send-email-stefan.wahren@i2se.com>
+ <2004478620.33734.6de503e6-02cb-4cce-af2d-c2614efc234a.open-xchange@email.1und1.de>
+Message-ID: <87k2of4ljn.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 25, 2015 at 10:54:04AM +0530, Jassi Brar wrote:
-> The GT counter is common to every core in a cluster. There is a usecase
-> when Linux is spawned by a 'master' firmware/OS running on some core of
-> the same cluster and the GT is used by the both.
->  Linux, upon boot, resetting the GT counter is obviously fatal to the
-> other OS. So provide a way for DT to tell Linux if it's running in that
-> 'slave' mode and must not reset the counter.
+Stefan Wahren <stefan.wahren@i2se.com> writes:
 
-Is the other OS only using the counter?
+>> Stefan Wahren <stefan.wahren@i2se.com> hat am 1. Dezember 2015 um 23:55
+>> geschrieben:
+>>
+>>
+>> With the upcoming PWM clock support the pwm-bcm2835 should take
+>> more care about the clock handling. But this patch series doesn't
+>> depend on these clock driver changes.
+>>
+>> Stefan Wahren (3):
+>> pwm: bcm2835: calculate scaler in pwm_config
+>> pwm: bcm2835: prevent division by zero
+>> pwm: bcm2835: fix email address specifiction
+>>
+>> drivers/pwm/pwm-bcm2835.c | 18 ++++++++++++------
+>> 1 file changed, 12 insertions(+), 6 deletions(-)
+>>
+>
+> gently ping
 
-Or are there other porions of the global timer that it assumes its in
-sole control of?
-
-> Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
-> ---
->  Documentation/devicetree/bindings/arm/global_timer.txt |  6 ++++++
->  drivers/clocksource/arm_global_timer.c                 | 12 +++++++++---
->  2 files changed, 15 insertions(+), 3 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/global_timer.txt b/Documentation/devicetree/bindings/arm/global_timer.txt
-> index bdae3a8..bb897a9 100644
-> --- a/Documentation/devicetree/bindings/arm/global_timer.txt
-> +++ b/Documentation/devicetree/bindings/arm/global_timer.txt
-> @@ -17,6 +17,12 @@
->  
->  - clocks : Should be phandle to a clock.
->  
-> +
-> +** Optional properties:
-> +
-> +- arm,gt_no_reset : Firmware/bootloader already initialized the
-> +	global timer-counter and expects it to be not reset again.
-
-s/_/-/ in property names.
-
-No need for the "gt" prefix, this is on tthe glboal timer node.
-
-It "no-counter-reset" seems like a better description, though that
-really depends on how the other OS is using this.
-
-Mark.
+Thierry, do you want to fold in my r-bs and apply, or should Stefan
+resend with them?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151215/b74ba940/attachment-0001.sig>
