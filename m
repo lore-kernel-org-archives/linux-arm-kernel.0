@@ -1,90 +1,110 @@
-From: Bharat.Bhushan@freescale.com (Bhushan Bharat)
-Date: Tue, 15 Dec 2015 09:33:15 +0000
-Subject: ARM64/KVM: Bad page state in process iperf
-In-Reply-To: <20151215092915.GF4120@cbox>
-References: <DM2PR03MB557D3079ABFE7AF114A58A690EE0@DM2PR03MB557.namprd03.prod.outlook.com>
- <20151215092915.GF4120@cbox>
-Message-ID: <DM2PR03MB5579C771344B9EE0A9C982990EE0@DM2PR03MB557.namprd03.prod.outlook.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
+Date: Tue, 15 Dec 2015 10:33:25 +0100
+Subject: [PATCH 5/5] arm: boot: store ATAGs structure into DT
+ "/chosen/linux,atags" entry
+In-Reply-To: <alpine.LFD.2.20.1511301041090.22569@knanqh.ubzr>
+References: <20150713131902.GH26485@atomide.com>
+ <20151129180939.GE30871@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.20.1511291902100.22569@knanqh.ubzr>
+ <201511300115.12478@pali> <20151130152352.GY2517@atomide.com>
+ <20151130153933.GD29576@pali>
+ <alpine.LFD.2.20.1511301041090.22569@knanqh.ubzr>
+Message-ID: <20151215093325.GK13531@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Christoffer Dall [mailto:christoffer.dall at linaro.org]
-> Sent: Tuesday, December 15, 2015 2:59 PM
-> To: Bhushan Bharat-R65777 <Bharat.Bhushan@freescale.com>
-> Cc: kvmarm at lists.cs.columbia.edu; kvm at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; linux-kernel at vger.kernel.org
-> Subject: Re: ARM64/KVM: Bad page state in process iperf
+On Monday 30 November 2015 11:09:42 Nicolas Pitre wrote:
+> On Mon, 30 Nov 2015, Pali Roh?r wrote:
 > 
-> On Tue, Dec 15, 2015 at 03:46:03AM +0000, Bhushan Bharat wrote:
-> >
-> > Hi All,
-> >
-> > I am running "iperf" in KVM guest on ARM64 machine and observing below
-> crash.
+> > On Monday 30 November 2015 07:23:53 Tony Lindgren wrote:
+> > > * Pali Roh?r <pali.rohar@gmail.com> [151129 16:16]:
+> > > > On Monday 30 November 2015 01:09:17 Nicolas Pitre wrote:
+> > > > > On Sun, 29 Nov 2015, Russell King - ARM Linux wrote:
+> > > > > > On Sat, Nov 28, 2015 at 12:34:23PM -0500, Nicolas Pitre wrote:
+> > > > > > > Good. And Arnd likes the idea too. So we might be converging at
+> > > > > > > last which is a good thing.
+> > > > > > 
+> > > > > > I disagree with the idea that there is convergence.  There might be
+> > > > > > convergence towards an idea, but... Here's a mail extract, from
+> > > > > > July 7th, from earlier in this very thread:
+> > > > > > 
+> > > > > > Pali:
+> > > > > > > Me:
+> > > > > > > > Are the ATAGs at a fixed address on the N900?
+> > > > > > > 
+> > > > > > > Yes, in board-rx51.c is:
+> > > > > > > 
+> > > > > > > .atag_offset    = 0x100
+> > > > > > > 
+> > > > > > > and Nokia Bootloader (proprietary) store them to that address.
+> > > > > > > 
+> > > > > > > > Can that be handled in
+> > > > > > > > some kind of legacy file for the N900 which calls save_atags()
+> > > > > > > > on it, so we don't end up introducing yet more stuff that we
+> > > > > > > > have to maintain into the distant future?  If not, what about
+> > > > > > > > copying a known working atag structure into a legacy file for
+> > > > > > > > the N900?
+> > > > > > > 
+> > > > > > > I already asked question if it is possible to read ATAGs from DT
+> > > > > > > booted kernel. And somebody (do not remember who) wrote to ML,
+> > > > > > > that it is not possible and it can be done in that uncompress
+> > > > > > > code.
+> > > > > 
+> > > > > Who is that somebody? If ever it happened to be me then objection is
+> > > > > withdrawn. Otherwise that somebody should come forth and speak up
+> > > > > again.
+> > > > > 
+> > > > 
+> > > > ... do not remember ... this discussion were in more email threads and 
+> > > > takes more then one year... sorry but my memory is not excellent
+> > > 
+> > > Yes this certainly seems like the best solution. I think we got into
+> > > the atags-to-dt track as some of the atags are already being translated.
+> > > 
+> > > In this case there's no need to translate them AFAIK. You can just
+> > > parse them and have them available for the user space. So as long as
+> > > nothing trashes the atags at the atag_offset, you should be able to
+> > > call a function to parse them in the n900 specific init_machine.
+> > > 
+> > > Regards,
+> > > 
+> > > Tony
+> > 
+> > In arch/arm/kernel/setup.c is function setup_arch() and it calls:
+> > 
+> >   mdesc = setup_machine_fdt(__atags_pointer);
+> >   if (!mdesc)
+> >       mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
+> > 
+> > So it looks like that on atags address is stored either atags structure
+> > or DT structure... so it is truth kernel uncompress code put DT blob to
+> > same offset where is expected atags structure?
 > 
-> Which host/guest kernel version is this?
-
-We are using Linux-v4.1 for both host (4K page size) and guest (64K page size).
-
+> No.  It doesn't put it anywhere. Those functions read DT/ATAGs from the 
+> passed address.  But you know this address won't be the one you want for 
+> the legacy ATAGs.
 > 
-> Which hardware?
-
-This is observed on Freescale LS2085 hardware based on A57 (8 CPUs).
-
-Thanks
--Bharat
-
+> What you should do is to add a init_early hook to your mdesc structure 
+> and retrieve your ATAGs from there directly at PAGE_OFFSET + 0x100.
 > 
-> -Christoffer
+> Now I suspect paging_init() marks the point where the ATAGs will be 
+> overwritten.  To prevent this, you might have to add an additional tweak 
+> in arm_mm_memblock_reserve() similar to the one already present for 
+> CONFIG_SA1111. Something like:
 > 
-> >
-> > =============================
-> > $iperf -c 3.3.3.3 -P 4 -t 0 -i 5 -w 90k
-> > ------------------------------------------------------------
-> > Client connecting to 3.3.3.3, TCP port 5001 TCP window size:  180
-> > KByte (WARNING: requested 90.0 KByte)
-> > ------------------------------------------------------------
-> > [  3] local 3.3.3.1 port 51131 connected with 3.3.3.3 port 5001 [  6]
-> > local 3.3.3.1 port 51134 connected with 3.3.3.3 port 5001 [  5] local
-> > 3.3.3.1 port 51133 connected with 3.3.3.3 port 5001 [  4] local
-> > 3.3.3.1 port 51132 connected with 3.3.3.3 port 5001
-> > [   53.088567] random: nonblocking pool is initialized
-> > [ ID] Interval       Transfer     Bandwidth
-> > [  3]  0.0- 5.0 sec   638 MBytes  1.07 Gbits/sec
-> > [  4] 35.0-40.0 sec  1.66 GBytes  2.85 Gbits/sec [  5] 40.0-45.0 sec
-> > 1.11 GBytes  1.90 Gbits/sec [  4] 40.0-45.0 sec  1.16 GBytes  1.99
-> > Gbits/sec
-> > [   98.895207] BUG: Bad page state in process iperf  pfn:0a584
-> > [   98.896164] page:ffff780000296100 count:-1 mapcount:0 mapping:
-> (null) index:0x0
-> > [   98.897436] flags: 0x0()
-> > [   98.897885] page dumped because: nonzero _count
-> > [   98.898640] Modules linked in:
-> > [   98.899178] CPU: 0 PID: 1639 Comm: iperf Not tainted 4.1.8-00461-
-> ge5431ad #141
-> > [   98.900302] Hardware name: linux,dummy-virt (DT)
-> > [   98.901014] Call trace:
-> > [   98.901406] [<ffff800000096cac>] dump_backtrace+0x0/0x12c
-> > [   98.902522] [<ffff800000096de8>] show_stack+0x10/0x1c
-> > [   98.903441] [<ffff800000678dc8>] dump_stack+0x8c/0xdc
-> > [   98.904202] [<ffff800000145480>] bad_page+0xc4/0x114
-> > [   98.904945] [<ffff8000001487a4>] get_page_from_freelist+0x590/0x63c
-> > [   98.905871] [<ffff80000014893c>] __alloc_pages_nodemask+0xec/0x794
-> > [   98.906791] [<ffff80000059fc80>] skb_page_frag_refill+0x70/0xa8
-> > [   98.907678] [<ffff80000059fcd8>] sk_page_frag_refill+0x20/0xd0
-> > [   98.908550] [<ffff8000005edc04>] tcp_sendmsg+0x1f8/0x9a8
-> > [   98.909368] [<ffff80000061419c>] inet_sendmsg+0x5c/0xd0
-> > [   98.910178] [<ffff80000059bb44>] sock_sendmsg+0x14/0x58
-> > [   98.911027] [<ffff80000059bbec>] sock_write_iter+0x64/0xbc
-> > [   98.912119] [<ffff80000019b5b8>] __vfs_write+0xac/0x10c
-> > [   98.913126] [<ffff80000019bcb8>] vfs_write+0x90/0x1a0
-> > [   98.913963] [<ffff80000019c53c>] SyS_write+0x40/0xa0
-> >
-> > -----------
-> > _______________________________________________
-> > kvmarm mailing list
-> > kvmarm at lists.cs.columbia.edu
-> > https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+> 	memblock_reserve(PHYS_OFFSET, PAGE_SIZE);
+> 
+> And later on you can return that page back to the system.
+> 
+> 
+> Nicolas
+
+So am I understand correctly that solution would be to hack
+arch/arm/mm/mmu.c to not overwrite page at PHYS_OFFSET?
+
+And should be this just when when we detect Nokia N900 in DT? Or for all
+OMAP2 boards? Or all ARM boards?
+
+-- 
+Pali Roh?r
+pali.rohar at gmail.com
