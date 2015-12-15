@@ -1,46 +1,33 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Mon, 14 Dec 2015 17:32:59 -0600
-Subject: [PATCH V3 5/6] clk: qoriq: Add ls1043a support.
-In-Reply-To: <20151015195456.GT4558@codeaurora.org>
-References: <1444822498-16477-1-git-send-email-B48286@freescale.com>
- <1444822498-16477-6-git-send-email-B48286@freescale.com>
- <20151014183113.GE26883@codeaurora.org>
- <1444870621.5185.223.camel@freescale.com>
- <20151015195456.GT4558@codeaurora.org>
-Message-ID: <1450135979.15946.406.camel@freescale.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 15 Dec 2015 01:06:30 +0100
+Subject: [PATCH v10 0/17] Add Analogix Core Display Port Driver
+In-Reply-To: <1449470239-30667-1-git-send-email-ykk@rock-chips.com>
+References: <1449470239-30667-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <4659407.pYb0RRCQQX@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-10-15 at 12:54 -0700, Stephen Boyd wrote:
-> On 10/14, Scott Wood wrote:
-> > On Wed, 2015-10-14 at 11:31 -0700, Stephen Boyd wrote:
-> > > On 10/14, Zhiqiang Hou wrote:
-> > > > From: Hou Zhiqiang <B48286@freescale.com>
-> > > > 
-> > > > Signed-off-by: Hou Zhiqiang <B48286@freescale.com>
-> > > > ---
-> > > 
-> > > Acked-by: Stephen Boyd <sboyd@codeaurora.org>
-> > > 
-> > 
-> > Could you ack my clock patchset that this depends on (if there are no 
-> > 
-> > objections)?  Mike Turquette acked the RFC version a while back, but it's 
-> > 
-> > changed a bit since then (including the new clk_get_num_parents() and 
-> > 
-> > clk_get_parent_by_index() -- I CCed Russell King on that but got no 
-> > 
-> > response), and got no response when I asked whether the ack was still good
-> > 
-> > for v3.
-> > 
-> > 
-> 
-> Done. The consumer APIs look ok too, but I'd like to see if
-> Russell has any comments.
+Hi Yakir,
 
-I've pinged Russell several times and gotten no response -- how should we
-proceed?
+Am Montag, 7. Dezember 2015, 14:37:19 schrieb Yakir Yang:
+>    The Samsung Exynos eDP controller and Rockchip RK3288 eDP controller
+> share the same IP, so a lot of parts can be re-used. I split the common
+> code into bridge directory, then rk3288 and exynos only need to keep
+> some platform code. Cause I can't find the exact IP name of exynos dp
+> controller, so I decide to name dp core driver with "analogix" which I
+> find in rk3288 eDP TRM
 
--Scott
+so it looks like the hotplug works nicely now. I was able to test it 
+sucessfully on both a Jerry and a Minnie device without needing to force 
+hotplug :-) .
+
+As I needed to adapt some patches when applying the lastest ones, I think it 
+would be good for a full send of the latest version as v11.
+
+When going over the patches before sending, please also fix the indentation 
+issues in analogix_dp_core.h - both newly added elements to analogix_dp_device 
+use spaces between type and name, where the rest uses tabs.
+[This should of course be fixed in the patches adding these lines :-) ]
+
+
+Heiko
