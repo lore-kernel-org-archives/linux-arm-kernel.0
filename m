@@ -1,16 +1,18 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 15 Dec 2015 17:01:25 +0800
-Subject: [PATCH v9 0/3] Add board support for TS-4800
-In-Reply-To: <1449853694-6980-1-git-send-email-damien.riegel@savoirfairelinux.com>
-References: <1449853694-6980-1-git-send-email-damien.riegel@savoirfairelinux.com>
-Message-ID: <20151215090125.GH25756@tiger>
+Date: Tue, 15 Dec 2015 17:04:44 +0800
+Subject: [PATCH v4] ARM: dts: ls1021a: add sata node to dts
+In-Reply-To: <1450163654-15836-1-git-send-email-Yuantian.Tang@freescale.com>
+References: <1450163654-15836-1-git-send-email-Yuantian.Tang@freescale.com>
+Message-ID: <20151215090443.GI25756@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 11, 2015 at 12:08:11PM -0500, Damien Riegel wrote:
-> Damien Riegel (3):
->   of: add vendor prefix for Technologic Systems
->   of: documentation: add bindings documentation for TS-4800
->   ARM: dts: TS-4800: add basic device tree
+On Tue, Dec 15, 2015 at 03:14:14PM +0800, Yuantian.Tang at freescale.com wrote:
+> From: Tang Yuantian <Yuantian.Tang@freescale.com>
+> 
+> Added sata node to ls1021aqds and ls1021atwr board to support
+> sata function.
+> 
+> Signed-off-by: Tang Yuantian <Yuantian.Tang@freescale.com>
 
-Applied all, thanks.
+Applied, thanks.
