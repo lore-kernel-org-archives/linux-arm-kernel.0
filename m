@@ -1,29 +1,79 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 15 Dec 2015 16:52:37 +0800
-Subject: [PATCH] ARM: dts: imx: Fix the assigned-clock mismatch issue on
- imx6q/dl
-In-Reply-To: <20151214030750.GF25756@tiger>
-References: <1449648955-30835-1-git-send-email-b51503@freescale.com>
- <20151214030750.GF25756@tiger>
-Message-ID: <20151215085237.GB388@tiger>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Tue, 15 Dec 2015 16:49:31 +0800
+Subject: [PATCH v7 11/19] KVM: ARM64: Add access handler for PMINTENSET and
+ PMINTENCLR register
+In-Reply-To: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
+References: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1450169379-12336-12-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 14, 2015 at 11:07:50AM +0800, Shawn Guo wrote:
-> On Wed, Dec 09, 2015 at 04:15:55PM +0800, Bai Ping wrote:
-> > The 'assigned-clock-parents' and 'assigned-clock-rates' list
-> > should corresponding to the 'assigned-clocks' property clock list.
-> > 
-> > Signed-off-by: Bai Ping <b51503@freescale.com>
-> 
-> Applied, thanks.
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-As this essentially a fix to ed339363de1b ("ARM: dts: imx6qdl-sabreauto:
-Allow HDMI and LVDS to work simultaneously"), I'm going to send it as a
-fix with copying stable.
+Since the reset value of PMINTENSET and PMINTENCLR is UNKNOWN, use
+reset_unknown for its reset handler. Add a handler to emulate writing
+PMINTENSET or PMINTENCLR register.
 
-@Fabio,
+Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+---
+ arch/arm64/kvm/sys_regs.c | 29 +++++++++++++++++++++++++----
+ 1 file changed, 25 insertions(+), 4 deletions(-)
 
-Do you agree with the fix?
-
-Shawn
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index f216da7..594e53f 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -648,6 +648,27 @@ static bool access_pmcntenset(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ 	return true;
+ }
+ 
++static bool access_pmintenset(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
++			      const struct sys_reg_desc *r)
++{
++	u64 mask = kvm_pmu_valid_counter_mask(vcpu);
++
++	if (p->is_write) {
++		if (r->Op2 & 0x1) {
++			/* accessing PMINTENSET_EL1 */
++			vcpu_sys_reg(vcpu, r->reg) |= (p->regval & mask);
++		} else {
++			/* accessing PMINTENCLR_EL1 */
++			vcpu_sys_reg(vcpu, r->reg) &= mask;
++			vcpu_sys_reg(vcpu, r->reg) &= ~p->regval;
++		}
++	} else {
++		p->regval = vcpu_sys_reg(vcpu, r->reg) & mask;
++	}
++
++	return true;
++}
++
+ /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
+ #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
+ 	/* DBGBVRn_EL1 */						\
+@@ -806,10 +827,10 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 
+ 	/* PMINTENSET_EL1 */
+ 	{ Op0(0b11), Op1(0b000), CRn(0b1001), CRm(0b1110), Op2(0b001),
+-	  trap_raz_wi },
++	  access_pmintenset, reset_unknown, PMINTENSET_EL1 },
+ 	/* PMINTENCLR_EL1 */
+ 	{ Op0(0b11), Op1(0b000), CRn(0b1001), CRm(0b1110), Op2(0b010),
+-	  trap_raz_wi },
++	  access_pmintenset, NULL, PMINTENSET_EL1 },
+ 
+ 	/* MAIR_EL1 */
+ 	{ Op0(0b11), Op1(0b000), CRn(0b1010), CRm(0b0010), Op2(0b000),
+@@ -1204,8 +1225,8 @@ static const struct sys_reg_desc cp15_regs[] = {
+ 	{ Op1( 0), CRn( 9), CRm(13), Op2( 1), access_pmu_evtyper },
+ 	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), access_pmu_evcntr },
+ 	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), trap_raz_wi },
+-	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), trap_raz_wi },
+-	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), trap_raz_wi },
++	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), access_pmintenset },
++	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), access_pmintenset },
+ 
+ 	{ Op1( 0), CRn(10), CRm( 2), Op2( 0), access_vm_reg, NULL, c10_PRRR },
+ 	{ Op1( 0), CRn(10), CRm( 2), Op2( 1), access_vm_reg, NULL, c10_NMRR },
+-- 
+2.0.4
