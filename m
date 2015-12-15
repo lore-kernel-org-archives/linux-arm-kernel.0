@@ -1,194 +1,91 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 15 Dec 2015 17:45:56 +0000
-Subject: [PATCH v12 13/16] arm64: kdump: add kdump support
-In-Reply-To: <8b02b030a4a081816f35e49b210b41d9f6e2d961.1448403503.git.geoff@infradead.org>
-References: <cover.1448403503.git.geoff@infradead.org>
- <8b02b030a4a081816f35e49b210b41d9f6e2d961.1448403503.git.geoff@infradead.org>
-Message-ID: <20151215174555.GE353@arm.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Tue, 15 Dec 2015 18:47:20 +0100
+Subject: [RFC PATCH 2/8] Documentation: arm: define DT cpu capacity
+ bindings
+In-Reply-To: <20151215171518.GC8012@leverpostej>
+References: <20151215122238.GG16007@e106622-lin>
+ <20151215133951.GY5727@sirena.org.uk>
+ <20151215140135.GI31299@leverpostej> <20151215150813.GZ5727@sirena.org.uk>
+ <20151215153218.GA7228@leverpostej> <20151215154651.GK16007@e106622-lin>
+ <20151215155737.GB7619@leverpostej>
+ <20151215162317.GB24286@e104818-lin.cambridge.arm.com>
+ <20151215164145.GA8012@leverpostej>
+ <CAKfTPtAuosPcL8bbQ27Y-vUE1h4QRY8hGESnm4YrxqRAQ3K=5g@mail.gmail.com>
+ <20151215171518.GC8012@leverpostej>
+Message-ID: <CAKfTPtBzWcNHx+Fi7hUabNpPsd1thFAkPnLcpsnqbQp6Qq24cQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 24, 2015 at 10:25:34PM +0000, Geoff Levand wrote:
-> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> 
-> On crash dump kernel, all the information about primary kernel's core
-> image is available in elf core header specified by "elfcorehdr=" boot
-> parameter. reserve_elfcorehdr() will set aside the region to avoid any
-> corruption by crash dump kernel.
-> 
-> Crash dump kernel will access the system memory of primary kernel via
-> copy_oldmem_page(), which reads one page by ioremap'ing it since it does
-> not reside in linear mapping on crash dump kernel.
-> Please note that we should add "mem=X[MG]" boot parameter to limit the
-> memory size and avoid the following assertion at ioremap():
-> 	if (WARN_ON(pfn_valid(__phys_to_pfn(phys_addr))))
-> 		return NULL;
-> when accessing any pages beyond the usable memories of crash dump kernel.
-> 
-> We also need our own elfcorehdr_read() here since the weak definition of
-> elfcorehdr_read() utilizes copy_oldmem_page() and will hit the assertion
-> above on arm64.
-> 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
->  arch/arm64/Kconfig             | 12 +++++++
->  arch/arm64/kernel/Makefile     |  1 +
->  arch/arm64/kernel/crash_dump.c | 71 ++++++++++++++++++++++++++++++++++++++++++
->  arch/arm64/mm/init.c           | 29 +++++++++++++++++
->  4 files changed, 113 insertions(+)
->  create mode 100644 arch/arm64/kernel/crash_dump.c
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index c23fd77..4bac7dc 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -545,6 +545,18 @@ config KEXEC
->  	  but it is independent of the system firmware.   And like a reboot
->  	  you can start any kernel with it, not just Linux.
->  
-> +config CRASH_DUMP
-> +	bool "Build kdump crash kernel"
-> +	help
-> +	  Generate crash dump after being started by kexec. This should
-> +	  be normally only set in special crash dump kernels which are
-> +	  loaded in the main kernel with kexec-tools into a specially
-> +	  reserved region and then later executed after a crash by
-> +	  kdump/kexec. The crash dump kernel must be compiled to a
-> +	  memory address not used by the main kernel.
+On 15 December 2015 at 18:15, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Tue, Dec 15, 2015 at 05:59:34PM +0100, Vincent Guittot wrote:
+>> On 15 December 2015 at 17:41, Mark Rutland <mark.rutland@arm.com> wrote:
+>> > On Tue, Dec 15, 2015 at 04:23:18PM +0000, Catalin Marinas wrote:
+>> >> On Tue, Dec 15, 2015 at 03:57:37PM +0000, Mark Rutland wrote:
+>> >> > On Tue, Dec 15, 2015 at 03:46:51PM +0000, Juri Lelli wrote:
+>> >> > > On 15/12/15 15:32, Mark Rutland wrote:
+>> >> > > > On Tue, Dec 15, 2015 at 03:08:13PM +0000, Mark Brown wrote:
+>> >> > > > > My expectation is that we just need good enough, not perfect, and that
+>> >> > > > > seems to match what Juri is saying about the expectation that most of
+>> >> > > > > the fine tuning is done via other knobs.
+>> >> > > >
+>> >> > > > My expectation is that if a ballpark figure is good enough, it should be
+>> >> > > > possible to implement something trivial like bogomips / loop_per_jiffy
+>> >> > > > calculation.
+>> >> > >
+>> >> > > I didn't really followed that, so I might be wrong here, but isn't
+>> >> > > already happened a discussion about how we want/like to stop exposing
+>> >> > > bogomips info or rely on it for anything but in kernel delay loops?
+>> >> >
+>> >> > I meant that we could have a benchmark of that level of complexity,
+>> >> > rather than those specific values.
+>> >>
+>> >> Or we could simply let user space use whatever benchmarks or hard-coded
+>> >> values it wants and set the capacity via sysfs (during boot). By
+>> >> default, the kernel would assume all CPUs equal.
+>> >
+>> > I assume that a userspace override would be available regardless of
+>> > whatever mechanism the kernel uses to determine relative
+>> > performance/effinciency.
+>>
+>> Don't you think that if we let a complete latitude to the userspace
+>> to set whatever it wants, it will be used to abuse the kernel (and the
+>> scheduler in particular ) and that this will finish in a real mess to
+>> understand what is wrong when a task is not placed where it should be.
+>
+> I'm not sure I follow what you mean by "abuse" here. Userspace currently
+> can force the scheduler to make sub-optimal decisions in a number of
+> ways, e.g.
+>
+> * Hot-unplugging the preferred CPUs
+> * Changing a task's affinity mask
+> * Setting the nice value of a task
+> * Using rlimits and/or cgroups
+> * Using a cpufreq governor
+> * Fork-bombing
 
-What does this even mean? How do I "compile to a memory address not used
-by the main kernel"?
+All these are parameters have a meaning (except the last one). By
+abusing i mean setting the capacity of the most powerful cpu to 1 for
+no good reason except to abuse the scheduler so the latter will not
+put that much tasks on it just  because the current running use case
+is more efficient if the big core is not used.
 
-> diff --git a/arch/arm64/kernel/crash_dump.c b/arch/arm64/kernel/crash_dump.c
-> new file mode 100644
-> index 0000000..3d86c0a
-> --- /dev/null
-> +++ b/arch/arm64/kernel/crash_dump.c
-> @@ -0,0 +1,71 @@
-> +/*
-> + * Routines for doing kexec-based kdump
-> + *
-> + * Copyright (C) 2014 Linaro Limited
-> + * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/crash_dump.h>
-> +#include <linux/errno.h>
-> +#include <linux/io.h>
-> +#include <linux/memblock.h>
-> +#include <linux/uaccess.h>
-> +#include <asm/memory.h>
-> +
-> +/**
-> + * copy_oldmem_page() - copy one page from old kernel memory
-> + * @pfn: page frame number to be copied
-> + * @buf: buffer where the copied page is placed
-> + * @csize: number of bytes to copy
-> + * @offset: offset in bytes into the page
-> + * @userbuf: if set, @buf is in a user address space
-> + *
-> + * This function copies one page from old kernel memory into buffer pointed by
-> + * @buf. If @buf is in userspace, set @userbuf to %1. Returns number of bytes
-> + * copied or negative error in case of failure.
-> + */
-> +ssize_t copy_oldmem_page(unsigned long pfn, char *buf,
-> +			 size_t csize, unsigned long offset,
-> +			 int userbuf)
-> +{
-> +	void *vaddr;
-> +
-> +	if (!csize)
-> +		return 0;
-> +
-> +	vaddr = ioremap_cache(pfn << PAGE_SHIFT, PAGE_SIZE);
 
-pfn_to_page
-
-> +	if (!vaddr)
-> +		return -ENOMEM;
-> +
-> +	if (userbuf) {
-> +		if (copy_to_user(buf, vaddr + offset, csize)) {
-> +			iounmap(vaddr);
-> +			return -EFAULT;
-> +		}
-> +	} else {
-> +		memcpy(buf, vaddr + offset, csize);
-> +	}
-> +
-> +	iounmap(vaddr);
-> +
-> +	return csize;
-> +}
-> +
-> +/**
-> + * elfcorehdr_read - read from ELF core header
-> + * @buf: buffer where the data is placed
-> + * @csize: number of bytes to read
-> + * @ppos: address in the memory
-> + *
-> + * This function reads @count bytes from elf core header which exists
-> + * on crash dump kernel's memory.
-> + */
-> +ssize_t elfcorehdr_read(char *buf, size_t count, u64 *ppos)
-> +{
-> +	memcpy(buf, phys_to_virt((phys_addr_t)*ppos), count);
-> +	return count;
-> +}
-
-I know you say that we have to override this function so that we don't
-hit the pfn_valid warning in ioremap, but what guarantees that the ELF
-header of the crashed kernel is actually mapped in our linear mapping?
-
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index 24f0a1c..52a1469 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -35,6 +35,7 @@
->  #include <linux/efi.h>
->  #include <linux/swiotlb.h>
->  #include <linux/kexec.h>
-> +#include <linux/crash_dump.h>
->  
->  #include <asm/fixmap.h>
->  #include <asm/memory.h>
-> @@ -116,6 +117,31 @@ static void __init reserve_crashkernel(void)
->  }
->  #endif /* CONFIG_KEXEC */
->  
-> +#ifdef CONFIG_CRASH_DUMP
-> +/*
-> + * reserve_elfcorehdr() - reserves memory for elf core header
-> + *
-> + * This function reserves elf core header given in "elfcorehdr=" kernel
-> + * command line parameter. This region contains all the information about
-> + * primary kernel's core image and is used by a dump capture kernel to
-> + * access the system memory on primary kernel.
-> + */
-> +static void __init reserve_elfcorehdr(void)
-> +{
-> +	if (!elfcorehdr_size)
-> +		return;
-> +
-> +	if (memblock_is_region_reserved(elfcorehdr_addr, elfcorehdr_size)) {
-> +		pr_warn("elfcorehdr is overlapped\n");
-> +		return;
-> +	}
-> +
-> +	memblock_reserve(elfcorehdr_addr, elfcorehdr_size);
-> +
-> +	pr_info("Reserving %lldKB of memory at %lldMB for elfcorehdr\n",
-> +		elfcorehdr_size >> 10, elfcorehdr_addr >> 20);
-
-I'd have thought it would be more useful to print the address as an
-address rather than a size.
-
-> +}
-
-Similar #else trick here.
-
-Will
+>
+> Practically all of these are prvileged operations. I would envisage the
+> userspace interface for "capacity" management to be similar.
+>
+>> We can probably provide a debug mode to help soc manufacturer to
+>> define their capacity value but IMHO we should not let complete
+>> latitude in normal operation
+>
+> In normal operation userspace wouldn't mess with this, as with most of
+> the cases above. Userspace can already shooti tself in the foot.
+>
+>> In normal operation we need to give some methods to tweak the value to
+>> reflect a memory bounded or integer calculation work  or other kind of
+>> work that currently runs on the cpu but not more
+>
+> You can already do that with the mechanisms above, to some extent. I'm
+> not sure I follow.
+>
+> Mark.
