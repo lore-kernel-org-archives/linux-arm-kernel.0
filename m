@@ -1,213 +1,117 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 16 Dec 2015 00:42:37 +0300
-Subject: [PATCH v6 11/20] arm64:ilp32: support core dump generation for ILP32
+Date: Wed, 16 Dec 2015 00:42:40 +0300
+Subject: [PATCH v6 14/20] arm64: signal: wrap struct ucontext,
+ fp and lr with struct sigframe
 In-Reply-To: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
 References: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1450215766-14765-12-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1450215766-14765-15-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
+It helps to move common code for lp64 and ilp32 to separated header.
 
-This patch supports core dumping on ILP32.
-We need a few extra macros (COMPAT_PR_REG_SIZE and COMPAT_PRSTATUS_SIZE) due
-to size differences of the register sets.
-
-Reviewed-by: David Daney <ddaney@caviumnetworks.com>
-Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
-Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
 Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
 ---
- arch/arm64/include/asm/elf.h | 104 ++++++++++++++++++++++++++++++++++++++-----
- arch/arm64/kernel/ptrace.c   |  12 ++---
- 2 files changed, 100 insertions(+), 16 deletions(-)
+ arch/arm64/kernel/signal.c | 35 ++++++++++++++++++++---------------
+ 1 file changed, 20 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index 8786ca5..4e2e3c0 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -135,7 +135,11 @@ typedef struct user_fpsimd_state elf_fpregset_t;
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index 65baaef..20dca65 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -35,14 +35,18 @@
+ #include <asm/signal32.h>
+ #include <asm/vdso.h>
+ 
++struct sigframe {
++	struct ucontext uc;
++	u64 fp;
++	u64 lr;
++};
++
+ /*
+  * Do a signal return; undo the signal stack. These are aligned to 128-bit.
   */
- #define ELF_PLAT_INIT(_r, load_addr)	(_r)->regs[0] = 0
+ struct rt_sigframe {
+ 	struct siginfo info;
+-	struct ucontext uc;
+-	u64 fp;
+-	u64 lr;
++	struct sigframe sig;
+ };
  
--#define SET_PERSONALITY(ex)		clear_thread_flag(TIF_32BIT);
-+#define SET_PERSONALITY(ex)			\
-+do {						\
-+	clear_thread_flag(TIF_32BIT_AARCH64);	\
-+	clear_thread_flag(TIF_32BIT);		\
-+} while (0)
+ static int preserve_fpsimd_context(struct fpsimd_context __user *ctx)
+@@ -93,7 +97,7 @@ static int restore_fpsimd_context(struct fpsimd_context __user *ctx)
+ }
  
- #define ARCH_DLINFO							\
- do {									\
-@@ -167,12 +171,15 @@ extern int arch_setup_additional_pages(struct linux_binprm *bprm,
+ static int restore_sigframe(struct pt_regs *regs,
+-			    struct rt_sigframe __user *sf)
++			    struct sigframe __user *sf)
+ {
+ 	sigset_t set;
+ 	int i, err;
+@@ -145,10 +149,10 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
+ 	if (!access_ok(VERIFY_READ, frame, sizeof (*frame)))
+ 		goto badframe;
  
- #define COMPAT_ELF_ET_DYN_BASE		(2 * TASK_SIZE_32 / 3)
+-	if (restore_sigframe(regs, frame))
++	if (restore_sigframe(regs, &frame->sig))
+ 		goto badframe;
  
-+extern int aarch32_setup_vectors_page(struct linux_binprm *bprm,
-+				      int uses_interp);
-+
- #ifdef CONFIG_AARCH32_EL0
+-	if (restore_altstack(&frame->uc.uc_stack))
++	if (restore_altstack(&frame->sig.uc.uc_stack))
+ 		goto badframe;
  
- /* AArch32 registers. */
- #define COMPAT_A32_ELF_NGREG		18
--typedef unsigned int			compat_elf_greg_t;
--typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_A32_ELF_NGREG];
-+typedef unsigned int			compat_a32_elf_greg_t;
-+typedef compat_a32_elf_greg_t		compat_a32_elf_gregset_t[COMPAT_A32_ELF_NGREG];
+ 	return regs->regs[0];
+@@ -162,7 +166,7 @@ badframe:
+ 	return 0;
+ }
  
- /* AArch32 EABI. */
- #define EF_ARM_EABI_MASK		0xff000000
-@@ -180,15 +187,92 @@ typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_A32_ELF_NGREG];
- 					 ((x)->e_flags & EF_ARM_EABI_MASK))
+-static int setup_sigframe(struct rt_sigframe __user *sf,
++static int setup_sigframe(struct sigframe __user *sf,
+ 			  struct pt_regs *regs, sigset_t *set)
+ {
+ 	int i, err = 0;
+@@ -230,13 +234,13 @@ static struct rt_sigframe __user *get_sigframe(struct ksignal *ksig,
+ }
  
- #define compat_start_thread		compat_start_thread
--#define COMPAT_SET_PERSONALITY(ex)	set_thread_flag(TIF_32BIT);
--#define COMPAT_ARCH_DLINFO
--extern int aarch32_setup_vectors_page(struct linux_binprm *bprm,
--				      int uses_interp);
--#define compat_arch_setup_additional_pages \
--					aarch32_setup_vectors_page
-+#define COMPAT_A32_SET_PERSONALITY(ex)		\
-+do {						\
-+	clear_thread_flag(TIF_32BIT_AARCH64);	\
-+	set_thread_flag(TIF_32BIT);		\
-+} while (0)
-+#define COMPAT_A32_ARCH_DLINFO		do {} while (0)
-+
-+#else
-+
-+typedef elf_greg_t			compat_elf_greg_t;
-+typedef elf_gregset_t			compat_elf_gregset_t;
-+#define compat_a32_elf_check_arch(x)	0
-+#define COMPAT_A32_SET_PERSONALITY(ex)	do {} while (0)
-+#define COMPAT_A32_ARCH_DLINFO		do {} while (0)
-+#endif
-+
-+/*
-+ * If ILP32 is turned on, we want to define the compat_elf_greg_t to the non compat
-+ * one and define PR_REG_SIZE/PRSTATUS_SIZE/SET_PR_FPVALID so we pick up the correct
-+ * ones for AARCH32. Note also the definition of the macros have to be correct for
-+ * LP64 as this file is included in the standard binfmt_elf.c.
-+ */
-+#ifdef CONFIG_ARM64_ILP32
-+typedef elf_greg_t			compat_elf_greg_t;
-+typedef elf_gregset_t			compat_elf_gregset_t;
-+#ifdef CONFIG_AARCH32_EL0
-+#define PR_REG_SIZE(S)			(is_a32_compat_task() \
-+						? sizeof(compat_a32_elf_gregset_t) \
-+						: sizeof(elf_gregset_t))
-+#endif
-+
-+/*
-+ * struct elf_prstatus is defined in include/uapi/linux/elfcore.h,
-+ * and has different sise for supported ABIs
-+ */
-+#define PRSTATUS_SIZE(S)		(is_a32_compat_task() ? 124 : (is_ilp32_compat_task() ? 352 : 392))
-+
-+#define SET_PR_FPVALID(S, V)							\
-+do {										\
-+	*(int *) (((void *) &((S)->pr_reg)) + PR_REG_SIZE((S)->pr_reg)) = (V);	\
-+} while (0)
-+#else
-+typedef compat_a32_elf_greg_t compat_elf_greg_t;
-+typedef compat_a32_elf_gregset_t compat_elf_gregset_t;
-+#endif
-+
-+#ifdef CONFIG_ARM64_ILP32
-+#define compat_ilp32_elf_check_arch(x) ((x)->e_machine == EM_AARCH64)
-+#define COMPAT_ILP32_SET_PERSONALITY(ex)	\
-+do {						\
-+	set_thread_flag(TIF_32BIT_AARCH64);	\
-+	clear_thread_flag(TIF_32BIT);		\
-+} while (0)
-+#define COMPAT_ILP32_ARCH_DLINFO					\
-+do {									\
-+	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
-+		    (elf_addr_t)(long)current->mm->context.vdso);	\
-+} while (0)
-+#else
-+#define compat_ilp32_elf_check_arch(x) 0
-+#define COMPAT_ILP32_SET_PERSONALITY(ex)	do {} while (0)
-+#define COMPAT_ILP32_ARCH_DLINFO		do {} while (0)
- #endif
+ static void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
+-			 void __user *frame, int usig)
++			 void __user *frame, off_t sigframe_off, int usig)
+ {
+ 	__sigrestore_t sigtramp;
  
--#define compat_elf_check_arch(x)	compat_a32_elf_check_arch(x)
-+#define compat_elf_check_arch(x)	(compat_a32_elf_check_arch(x) || compat_ilp32_elf_check_arch(x))
-+#define COMPAT_SET_PERSONALITY(ex)			\
-+do {							\
-+	if (compat_a32_elf_check_arch(&ex))		\
-+		COMPAT_A32_SET_PERSONALITY(ex);		\
-+	else						\
-+		COMPAT_ILP32_SET_PERSONALITY(ex);	\
-+} while (0)
-+
-+/* ILP32 uses the "LP64-like" vdso pages */
-+#define compat_arch_setup_additional_pages	\
-+	(is_a32_compat_task()			\
-+	 ? &aarch32_setup_vectors_page		\
-+	 : &(arch_setup_additional_pages))
-+
-+#define COMPAT_ARCH_DLINFO			\
-+do {						\
-+	if (is_a32_compat_task())		\
-+		COMPAT_A32_ARCH_DLINFO;		\
-+	else					\
-+		COMPAT_ILP32_ARCH_DLINFO;	\
-+} while (0)
+ 	regs->regs[0] = usig;
+ 	regs->sp = (unsigned long)frame;
+-	regs->regs[29] = regs->sp + offsetof(struct rt_sigframe, fp);
++	regs->regs[29] = regs->sp + sigframe_off + offsetof(struct sigframe, fp);
+ 	regs->pc = (unsigned long)ka->sa.sa_handler;
  
- #endif /* CONFIG_COMPAT */
+ 	if (ka->sa.sa_flags & SA_RESTORER)
+@@ -257,17 +261,18 @@ static int setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
+ 	if (!frame)
+ 		return 1;
  
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index 816b432..a9d07a9 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -853,8 +853,8 @@ static const struct user_regset aarch32_regsets[] = {
- 	[REGSET_COMPAT_GPR] = {
- 		.core_note_type = NT_PRSTATUS,
- 		.n = COMPAT_A32_ELF_NGREG,
--		.size = sizeof(compat_elf_greg_t),
--		.align = sizeof(compat_elf_greg_t),
-+		.size = sizeof(compat_a32_elf_greg_t),
-+		.align = sizeof(compat_a32_elf_greg_t),
- 		.get = compat_gpr_get,
- 		.set = compat_gpr_set
- 	},
-@@ -945,7 +945,7 @@ static int compat_ptrace_read_user(struct task_struct *tsk, compat_ulong_t off,
- 		tmp = tsk->mm->start_data;
- 	else if (off == COMPAT_PT_TEXT_END_ADDR)
- 		tmp = tsk->mm->end_code;
--	else if (off < sizeof(compat_elf_gregset_t))
-+	else if (off < sizeof(compat_a32_elf_gregset_t))
- 		return copy_regset_to_user(tsk, &user_aarch32_view,
- 					   REGSET_COMPAT_GPR, off,
- 					   sizeof(compat_ulong_t), ret);
-@@ -966,7 +966,7 @@ static int compat_ptrace_write_user(struct task_struct *tsk, compat_ulong_t off,
- 	if (off & 3 || off >= COMPAT_USER_SZ)
- 		return -EIO;
+-	__put_user_error(0, &frame->uc.uc_flags, err);
+-	__put_user_error(NULL, &frame->uc.uc_link, err);
++	__put_user_error(0, &frame->sig.uc.uc_flags, err);
++	__put_user_error(NULL, &frame->sig.uc.uc_link, err);
  
--	if (off >= sizeof(compat_elf_gregset_t))
-+	if (off >= sizeof(compat_a32_elf_gregset_t))
- 		return 0;
- 
- 	set_fs(KERNEL_DS);
-@@ -1129,7 +1129,7 @@ long compat_a32_arch_ptrace(struct task_struct *child, compat_long_t request,
- 			ret = copy_regset_to_user(child,
- 						  &user_aarch32_view,
- 						  REGSET_COMPAT_GPR,
--						  0, sizeof(compat_elf_gregset_t),
-+						  0, sizeof(compat_a32_elf_gregset_t),
- 						  datap);
- 			break;
- 
-@@ -1137,7 +1137,7 @@ long compat_a32_arch_ptrace(struct task_struct *child, compat_long_t request,
- 			ret = copy_regset_from_user(child,
- 						    &user_aarch32_view,
- 						    REGSET_COMPAT_GPR,
--						    0, sizeof(compat_elf_gregset_t),
-+						    0, sizeof(compat_a32_elf_gregset_t),
- 						    datap);
- 			break;
+-	err |= __save_altstack(&frame->uc.uc_stack, regs->sp);
+-	err |= setup_sigframe(frame, regs, set);
++	err |= __save_altstack(&frame->sig.uc.uc_stack, regs->sp);
++	err |= setup_sigframe(&frame->sig, regs, set);
+ 	if (err == 0) {
+-		setup_return(regs, &ksig->ka, frame, usig);
++		setup_return(regs, &ksig->ka, frame,
++			offsetof(struct rt_sigframe, sig), usig);
+ 		if (ksig->ka.sa.sa_flags & SA_SIGINFO) {
+ 			err |= copy_siginfo_to_user(&frame->info, &ksig->info);
+ 			regs->regs[1] = (unsigned long)&frame->info;
+-			regs->regs[2] = (unsigned long)&frame->uc;
++			regs->regs[2] = (unsigned long)&frame->sig.uc;
+ 		}
+ 	}
  
 -- 
 2.5.0
