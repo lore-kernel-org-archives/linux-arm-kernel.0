@@ -1,432 +1,448 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 16 Dec 2015 00:42:44 +0300
-Subject: [PATCH v6 18/20] arm64:ilp32: add vdso-ilp32 and use for signal return
+Date: Wed, 16 Dec 2015 00:42:41 +0300
+Subject: [PATCH v6 15/20] arm64: signal: move ilp32 and lp64 common code to
+ separated file
 In-Reply-To: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
 References: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1450215766-14765-19-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1450215766-14765-16-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+After that, it will be possible to reuse it in ILP32.
 
-ILP32 VDSO exports next symbols:
- __kernel_rt_sigreturn;
- __kernel_gettimeofday;
- __kernel_clock_gettime;
- __kernel_clock_getres;
-
-What shared object to use, kernel selects depending on result of
-is_ilp32_compat_task() in arch/arm64/kernel/vdso.c, so it substitutes
-correct pages and spec.
-
-Adjusted to move the move data page before code pages in sync with
-commit 601255ae3c98fdeeee3a8bb4696425e4f868b4f1
-
-Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
-Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
 Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
 ---
- arch/arm64/include/asm/vdso.h                 |  4 ++
- arch/arm64/kernel/Makefile                    |  5 ++
- arch/arm64/kernel/vdso-ilp32/.gitignore       |  2 +
- arch/arm64/kernel/vdso-ilp32/Makefile         | 72 ++++++++++++++++++++
- arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S     | 33 ++++++++++
- arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S | 95 +++++++++++++++++++++++++++
- arch/arm64/kernel/vdso.c                      | 61 ++++++++++++++---
- 7 files changed, 262 insertions(+), 10 deletions(-)
- create mode 100644 arch/arm64/kernel/vdso-ilp32/.gitignore
- create mode 100644 arch/arm64/kernel/vdso-ilp32/Makefile
- create mode 100644 arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S
- create mode 100644 arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S
+ arch/arm64/include/asm/signal_common.h |  39 ++++++++
+ arch/arm64/kernel/Makefile             |   2 +-
+ arch/arm64/kernel/signal.c             | 154 +----------------------------
+ arch/arm64/kernel/signal_common.c      | 174 +++++++++++++++++++++++++++++++++
+ 4 files changed, 215 insertions(+), 154 deletions(-)
+ create mode 100644 arch/arm64/include/asm/signal_common.h
+ create mode 100644 arch/arm64/kernel/signal_common.c
 
-diff --git a/arch/arm64/include/asm/vdso.h b/arch/arm64/include/asm/vdso.h
-index 839ce00..84050c6 100644
---- a/arch/arm64/include/asm/vdso.h
-+++ b/arch/arm64/include/asm/vdso.h
-@@ -29,6 +29,10 @@
- 
- #include <generated/vdso-offsets.h>
- 
-+#ifdef CONFIG_ARM64_ILP32
-+#include <generated/vdso-ilp32-offsets.h>
-+#endif
+diff --git a/arch/arm64/include/asm/signal_common.h b/arch/arm64/include/asm/signal_common.h
+new file mode 100644
+index 0000000..2fb3997
+--- /dev/null
++++ b/arch/arm64/include/asm/signal_common.h
+@@ -0,0 +1,39 @@
++/*
++ * Copyright (C) 1995-2009 Russell King
++ * Copyright (C) 2012 ARM Ltd.
++ * Copyright (C) 2015 Cavium Networks.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
 +
- #define VDSO_SYMBOL(base, name)						   \
- ({									   \
- 	(void *)(vdso_offset_##name - VDSO_LBASE + (unsigned long)(base)); \
++#ifndef __ASM_SIGNAL_COMMON_H
++#define __ASM_SIGNAL_COMMON_H
++
++#include <linux/uaccess.h>
++#include <asm/ucontext.h>
++#include <asm/fpsimd.h>
++
++struct sigframe {
++	struct ucontext uc;
++	u64 fp;
++	u64 lr;
++};
++
++int preserve_fpsimd_context(struct fpsimd_context __user *ctx);
++int restore_fpsimd_context(struct fpsimd_context __user *ctx);
++int setup_sigframe(struct sigframe __user *sf, struct pt_regs *regs, sigset_t *set);
++int restore_sigframe(struct pt_regs *regs, struct sigframe __user *sf);
++void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
++			void __user *frame, off_t sigframe_off, int usig);
++
++#endif /* __ASM_SIGNAL_COMMON_H */
 diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index f92e707..2ef91c2 100644
+index 837d730..94b8b84 100644
 --- a/arch/arm64/kernel/Makefile
 +++ b/arch/arm64/kernel/Makefile
-@@ -40,6 +40,7 @@ arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
- arm64-obj-$(CONFIG_ACPI)		+= acpi.o
+@@ -18,7 +18,7 @@ arm64-obj-y		:= debug-monitors.o entry.o irq.o fpsimd.o		\
+ 			   hyp-stub.o psci.o psci-call.o cpu_ops.o insn.o	\
+ 			   return_address.o cpuinfo.o cpu_errata.o		\
+ 			   cpufeature.o alternative.o cacheinfo.o		\
+-			   smp.o smp_spin_table.o topology.o
++			   smp.o smp_spin_table.o topology.o signal_common.o
  
- obj-y					+= $(arm64-obj-y) vdso/
-+obj-$(CONFIG_ARM64_ILP32)		+= vdso-ilp32/
- obj-m					+= $(arm64-obj-m)
- head-y					:= head.o
- extra-y					:= $(head-y) vmlinux.lds
-@@ -47,3 +48,7 @@ extra-y					:= $(head-y) vmlinux.lds
- # vDSO - this must be built first to generate the symbol offsets
- $(call objectify,$(arm64-obj-y)): $(obj)/vdso/vdso-offsets.h
- $(obj)/vdso/vdso-offsets.h: $(obj)/vdso
-+
-+# vDSO - this must be built first to generate the symbol offsets
-+$(call objectify,$(arm64-obj-y)): $(obj)/vdso-ilp32/vdso-ilp32-offsets.h
-+$(obj)/vdso-ilp32/vdso-ilp32-offsets.h: $(obj)/vdso-ilp32
-diff --git a/arch/arm64/kernel/vdso-ilp32/.gitignore b/arch/arm64/kernel/vdso-ilp32/.gitignore
-new file mode 100644
-index 0000000..61806c3
---- /dev/null
-+++ b/arch/arm64/kernel/vdso-ilp32/.gitignore
-@@ -0,0 +1,2 @@
-+vdso-ilp32.lds
-+vdso-ilp32-offsets.h
-diff --git a/arch/arm64/kernel/vdso-ilp32/Makefile b/arch/arm64/kernel/vdso-ilp32/Makefile
-new file mode 100644
-index 0000000..c8f5472
---- /dev/null
-+++ b/arch/arm64/kernel/vdso-ilp32/Makefile
-@@ -0,0 +1,72 @@
-+#
-+# Building a vDSO image for AArch64.
-+#
-+# Author: Will Deacon <will.deacon@arm.com>
-+# Heavily based on the vDSO Makefiles for other archs.
-+#
-+
-+obj-ilp32-vdso := gettimeofday-ilp32.o note-ilp32.o sigreturn-ilp32.o
-+
-+# Build rules
-+targets := $(obj-ilp32-vdso) vdso-ilp32.so vdso-ilp32.so.dbg
-+obj-ilp32-vdso := $(addprefix $(obj)/, $(obj-ilp32-vdso))
-+
-+ccflags-y := -shared -fno-common -fno-builtin
-+ccflags-y += -nostdlib -Wl,-soname=linux-ilp32-vdso.so.1 \
-+		$(call cc-ldoption, -Wl$(comma)--hash-style=sysv)
-+
-+obj-y += vdso-ilp32.o
-+extra-y += vdso-ilp32.lds vdso-ilp32-offsets.h
-+CPPFLAGS_vdso-ilp32.lds += -P -C -U$(ARCH) -mabi=ilp32
-+
-+# Force dependency (incbin is bad)
-+$(obj)/vdso-ilp32.o : $(obj)/vdso-ilp32.so
-+
-+# Link rule for the .so file, .lds has to be first
-+$(obj)/vdso-ilp32.so.dbg: $(src)/vdso-ilp32.lds $(obj-ilp32-vdso)
-+	$(call if_changed,vdso-ilp32ld)
-+
-+# Strip rule for the .so file
-+$(obj)/%.so: OBJCOPYFLAGS := -S
-+$(obj)/%.so: $(obj)/%.so.dbg FORCE
-+	$(call if_changed,objcopy)
-+
-+# Generate VDSO offsets using helper script
-+gen-vdsosym := $(srctree)/$(src)/../vdso/gen_vdso_offsets.sh
-+quiet_cmd_vdsosym = VDSOSYM $@
-+define cmd_vdsosym
-+	$(NM) $< | $(gen-vdsosym) | LC_ALL=C sort > $@ && \
-+	cp $@ include/generated/
-+endef
-+
-+$(obj)/vdso-ilp32-offsets.h: $(obj)/vdso-ilp32.so.dbg FORCE
-+	$(call if_changed,vdsosym)
-+
-+# Assembly rules for the .S files
-+#$(obj-ilp32-vdso): %.o: $(src)/../vdso/$(subst -ilp32,,%.S)
-+#	$(call if_changed_dep,vdso-ilp32as)
-+
-+$(obj)/gettimeofday-ilp32.o: $(src)/../vdso/gettimeofday.S
-+	$(call if_changed_dep,vdso-ilp32as)
-+
-+$(obj)/note-ilp32.o: $(src)/../vdso/note.S
-+	$(call if_changed_dep,vdso-ilp32as)
-+
-+$(obj)/sigreturn-ilp32.o: $(src)/../vdso/sigreturn.S
-+	$(call if_changed_dep,vdso-ilp32as)
-+
-+# Actual build commands
-+quiet_cmd_vdso-ilp32ld = VDSOILP32L $@
-+      cmd_vdso-ilp32ld = $(CC) $(c_flags) -mabi=ilp32  -Wl,-n -Wl,-T $^ -o $@
-+quiet_cmd_vdso-ilp32as = VDSOILP32A $@
-+      cmd_vdso-ilp32as = $(CC) $(a_flags) -mabi=ilp32 -c -o $@ $<
-+
-+# Install commands for the unstripped file
-+quiet_cmd_vdso_install = INSTALL $@
-+      cmd_vdso_install = cp $(obj)/$@.dbg $(MODLIB)/vdso/$@
-+
-+vdso-ilp32.so: $(obj)/vdso-ilp32.so.dbg
-+	@mkdir -p $(MODLIB)/vdso
-+	$(call cmd,vdso_install)
-+
-+vdso_install: vdso-ilp32.so
-diff --git a/arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S b/arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S
-new file mode 100644
-index 0000000..46ac072
---- /dev/null
-+++ b/arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S
-@@ -0,0 +1,33 @@
-+/*
-+ * Copyright (C) 2012 ARM Limited
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ * Author: Will Deacon <will.deacon@arm.com>
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/linkage.h>
-+#include <linux/const.h>
-+#include <asm/page.h>
-+
-+	__PAGE_ALIGNED_DATA
-+
-+	.globl vdso_ilp32_start, vdso_ilp32_end
-+	.balign PAGE_SIZE
-+vdso_ilp32_start:
-+	.incbin "arch/arm64/kernel/vdso-ilp32/vdso-ilp32.so"
-+	.balign PAGE_SIZE
-+vdso_ilp32_end:
-+
-+	.previous
-diff --git a/arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S b/arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S
-new file mode 100644
-index 0000000..ddc63fd
---- /dev/null
-+++ b/arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S
-@@ -0,0 +1,95 @@
-+/*
-+ * GNU linker script for the VDSO library.
-+ *
-+ * Copyright (C) 2012 ARM Limited
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ * Author: Will Deacon <will.deacon@arm.com>
-+ * Heavily based on the vDSO linker scripts for other archs.
-+ */
-+
-+#include <linux/const.h>
-+#include <asm/page.h>
-+#include <asm/vdso.h>
-+
-+SECTIONS
-+{
-+	PROVIDE(_vdso_data = . - PAGE_SIZE);
-+	. = VDSO_LBASE + SIZEOF_HEADERS;
-+
-+	.hash		: { *(.hash) }			:text
-+	.gnu.hash	: { *(.gnu.hash) }
-+	.dynsym		: { *(.dynsym) }
-+	.dynstr		: { *(.dynstr) }
-+	.gnu.version	: { *(.gnu.version) }
-+	.gnu.version_d	: { *(.gnu.version_d) }
-+	.gnu.version_r	: { *(.gnu.version_r) }
-+
-+	.note		: { *(.note.*) }		:text	:note
-+
-+	. = ALIGN(16);
-+
-+	.text		: { *(.text*) }			:text	=0xd503201f
-+	PROVIDE (__etext = .);
-+	PROVIDE (_etext = .);
-+	PROVIDE (etext = .);
-+
-+	.eh_frame_hdr	: { *(.eh_frame_hdr) }		:text	:eh_frame_hdr
-+	.eh_frame	: { KEEP (*(.eh_frame)) }	:text
-+
-+	.dynamic	: { *(.dynamic) }		:text	:dynamic
-+
-+	.rodata		: { *(.rodata*) }		:text
-+
-+	_end = .;
-+	PROVIDE(end = .);
-+
-+	/DISCARD/	: {
-+		*(.note.GNU-stack)
-+		*(.data .data.* .gnu.linkonce.d.* .sdata*)
-+		*(.bss .sbss .dynbss .dynsbss)
-+	}
-+}
-+
-+/*
-+ * We must supply the ELF program headers explicitly to get just one
-+ * PT_LOAD segment, and set the flags explicitly to make segments read-only.
-+ */
-+PHDRS
-+{
-+	text		PT_LOAD		FLAGS(5) FILEHDR PHDRS; /* PF_R|PF_X */
-+	dynamic		PT_DYNAMIC	FLAGS(4);		/* PF_R */
-+	note		PT_NOTE		FLAGS(4);		/* PF_R */
-+	eh_frame_hdr	PT_GNU_EH_FRAME;
-+}
-+
-+/*
-+ * This controls what symbols we export from the DSO.
-+ */
-+VERSION
-+{
-+	LINUX_2.6 {
-+	global:
-+		__kernel_rt_sigreturn;
-+		__kernel_gettimeofday;
-+		__kernel_clock_gettime;
-+		__kernel_clock_getres;
-+	local: *;
-+	};
-+}
-+
-+/*
-+ * Make the sigreturn code visible to the kernel.
-+ */
-+VDSO_sigtramp_ilp32		= __kernel_rt_sigreturn;
-diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
-index 26352a6..521a8e4 100644
---- a/arch/arm64/kernel/vdso.c
-+++ b/arch/arm64/kernel/vdso.c
-@@ -40,6 +40,12 @@ extern char vdso_start, vdso_end;
- static unsigned long vdso_pages;
- static struct page **vdso_pagelist;
- 
-+#ifdef CONFIG_ARM64_ILP32
-+extern char vdso_ilp32_start, vdso_ilp32_end;
-+static unsigned long vdso_ilp32_pages;
-+static struct page **vdso_ilp32_pagelist;
-+#endif
-+
- /*
-  * The vDSO data page.
-  */
-@@ -109,24 +115,29 @@ int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
- }
- #endif /* CONFIG_AARCH32_EL0 */
- 
--static struct vm_special_mapping vdso_spec[2];
+ arm64-obj-$(CONFIG_AARCH32_EL0)		+= sys32.o kuser32.o signal32.o 	\
+ 					   sys_compat.o entry32.o		\
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index 20dca65..4b8efe5 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -33,13 +33,7 @@
+ #include <asm/unistd.h>
+ #include <asm/fpsimd.h>
+ #include <asm/signal32.h>
+-#include <asm/vdso.h>
 -
--static int __init vdso_init(void)
-+static int __init vdso_init_common(char *vdso_start, char *vdso_end,
-+					  unsigned long *vdso_pagesp,
-+					  struct page ***vdso_pagelistp,
-+					  struct vm_special_mapping* vdso_spec)
+-struct sigframe {
+-	struct ucontext uc;
+-	u64 fp;
+-	u64 lr;
+-};
++#include <asm/signal_common.h>
+ 
+ /*
+  * Do a signal return; undo the signal stack. These are aligned to 128-bit.
+@@ -49,87 +43,6 @@ struct rt_sigframe {
+ 	struct sigframe sig;
+ };
+ 
+-static int preserve_fpsimd_context(struct fpsimd_context __user *ctx)
+-{
+-	struct fpsimd_state *fpsimd = &current->thread.fpsimd_state;
+-	int err;
+-
+-	/* dump the hardware registers to the fpsimd_state structure */
+-	fpsimd_preserve_current_state();
+-
+-	/* copy the FP and status/control registers */
+-	err = __copy_to_user(ctx->vregs, fpsimd->vregs, sizeof(fpsimd->vregs));
+-	__put_user_error(fpsimd->fpsr, &ctx->fpsr, err);
+-	__put_user_error(fpsimd->fpcr, &ctx->fpcr, err);
+-
+-	/* copy the magic/size information */
+-	__put_user_error(FPSIMD_MAGIC, &ctx->head.magic, err);
+-	__put_user_error(sizeof(struct fpsimd_context), &ctx->head.size, err);
+-
+-	return err ? -EFAULT : 0;
+-}
+-
+-static int restore_fpsimd_context(struct fpsimd_context __user *ctx)
+-{
+-	struct fpsimd_state fpsimd;
+-	__u32 magic, size;
+-	int err = 0;
+-
+-	/* check the magic/size information */
+-	__get_user_error(magic, &ctx->head.magic, err);
+-	__get_user_error(size, &ctx->head.size, err);
+-	if (err)
+-		return -EFAULT;
+-	if (magic != FPSIMD_MAGIC || size != sizeof(struct fpsimd_context))
+-		return -EINVAL;
+-
+-	/* copy the FP and status/control registers */
+-	err = __copy_from_user(fpsimd.vregs, ctx->vregs,
+-			       sizeof(fpsimd.vregs));
+-	__get_user_error(fpsimd.fpsr, &ctx->fpsr, err);
+-	__get_user_error(fpsimd.fpcr, &ctx->fpcr, err);
+-
+-	/* load the hardware registers from the fpsimd_state structure */
+-	if (!err)
+-		fpsimd_update_current_state(&fpsimd);
+-
+-	return err ? -EFAULT : 0;
+-}
+-
+-static int restore_sigframe(struct pt_regs *regs,
+-			    struct sigframe __user *sf)
+-{
+-	sigset_t set;
+-	int i, err;
+-	void *aux = sf->uc.uc_mcontext.__reserved;
+-
+-	err = __copy_from_user(&set, &sf->uc.uc_sigmask, sizeof(set));
+-	if (err == 0)
+-		set_current_blocked(&set);
+-
+-	for (i = 0; i < 31; i++)
+-		__get_user_error(regs->regs[i], &sf->uc.uc_mcontext.regs[i],
+-				 err);
+-	__get_user_error(regs->sp, &sf->uc.uc_mcontext.sp, err);
+-	__get_user_error(regs->pc, &sf->uc.uc_mcontext.pc, err);
+-	__get_user_error(regs->pstate, &sf->uc.uc_mcontext.pstate, err);
+-
+-	/*
+-	 * Avoid sys_rt_sigreturn() restarting.
+-	 */
+-	regs->syscallno = ~0UL;
+-
+-	err |= !valid_user_regs(&regs->user_regs);
+-
+-	if (err == 0) {
+-		struct fpsimd_context *fpsimd_ctx =
+-			container_of(aux, struct fpsimd_context, head);
+-		err |= restore_fpsimd_context(fpsimd_ctx);
+-	}
+-
+-	return err;
+-}
+-
+ asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
  {
- 	int i;
-+	unsigned long vdso_pages;
-+	struct page **vdso_pagelist;
- 
--	if (memcmp(&vdso_start, "\177ELF", 4)) {
-+	if (memcmp(vdso_start, "\177ELF", 4)) {
- 		pr_err("vDSO is not a valid ELF object!\n");
- 		return -EINVAL;
- 	}
- 
--	vdso_pages = (&vdso_end - &vdso_start) >> PAGE_SHIFT;
-+	vdso_pages = (vdso_end - vdso_start) >> PAGE_SHIFT;
-+	*vdso_pagesp = vdso_pages;
- 	pr_info("vdso: %ld pages (%ld code @ %p, %ld data @ %p)\n",
--		vdso_pages + 1, vdso_pages, &vdso_start, 1L, vdso_data);
-+		vdso_pages + 1, vdso_pages, vdso_start, 1L, vdso_data);
- 
- 	/* Allocate the vDSO pagelist, plus a page for the data. */
- 	vdso_pagelist = kcalloc(vdso_pages + 1, sizeof(struct page *),
- 				GFP_KERNEL);
-+	*vdso_pagelistp = vdso_pagelist;
- 	if (vdso_pagelist == NULL)
- 		return -ENOMEM;
- 
-@@ -135,7 +146,7 @@ static int __init vdso_init(void)
- 
- 	/* Grab the vDSO code pages. */
- 	for (i = 0; i < vdso_pages; i++)
--		vdso_pagelist[i + 1] = virt_to_page(&vdso_start + i * PAGE_SIZE);
-+		vdso_pagelist[i + 1] = virt_to_page(vdso_start + i * PAGE_SIZE);
- 
- 	/* Populate the special mapping structures */
- 	vdso_spec[0] = (struct vm_special_mapping) {
-@@ -150,16 +161,46 @@ static int __init vdso_init(void)
- 
+ 	struct rt_sigframe __user *frame;
+@@ -166,53 +79,6 @@ badframe:
  	return 0;
  }
-+
-+static struct vm_special_mapping vdso_spec[2];
-+
-+static int __init vdso_init(void)
-+{
-+	return vdso_init_common(&vdso_start, &vdso_end,
-+				&vdso_pages, &vdso_pagelist,
-+				vdso_spec);
-+}
- arch_initcall(vdso_init);
  
-+#ifdef CONFIG_ARM64_ILP32
-+static struct vm_special_mapping vdso_ilp32_spec[2];
-+
-+static int __init vdso_ilp32_init(void)
-+{
-+	return vdso_init_common(&vdso_ilp32_start, &vdso_ilp32_end,
-+				&vdso_ilp32_pages, &vdso_ilp32_pagelist,
-+				vdso_ilp32_spec);
-+}
-+arch_initcall(vdso_ilp32_init);
-+#endif
-+
- int arch_setup_additional_pages(struct linux_binprm *bprm,
- 				int uses_interp)
+-static int setup_sigframe(struct sigframe __user *sf,
+-			  struct pt_regs *regs, sigset_t *set)
+-{
+-	int i, err = 0;
+-	void *aux = sf->uc.uc_mcontext.__reserved;
+-	struct _aarch64_ctx *end;
+-
+-	/* set up the stack frame for unwinding */
+-	__put_user_error(regs->regs[29], &sf->fp, err);
+-	__put_user_error(regs->regs[30], &sf->lr, err);
+-
+-	for (i = 0; i < 31; i++)
+-		__put_user_error(regs->regs[i], &sf->uc.uc_mcontext.regs[i],
+-				 err);
+-	__put_user_error(regs->sp, &sf->uc.uc_mcontext.sp, err);
+-	__put_user_error(regs->pc, &sf->uc.uc_mcontext.pc, err);
+-	__put_user_error(regs->pstate, &sf->uc.uc_mcontext.pstate, err);
+-
+-	__put_user_error(current->thread.fault_address, &sf->uc.uc_mcontext.fault_address, err);
+-
+-	err |= __copy_to_user(&sf->uc.uc_sigmask, set, sizeof(*set));
+-
+-	if (err == 0) {
+-		struct fpsimd_context *fpsimd_ctx =
+-			container_of(aux, struct fpsimd_context, head);
+-		err |= preserve_fpsimd_context(fpsimd_ctx);
+-		aux += sizeof(*fpsimd_ctx);
+-	}
+-
+-	/* fault information, if valid */
+-	if (current->thread.fault_code) {
+-		struct esr_context *esr_ctx =
+-			container_of(aux, struct esr_context, head);
+-		__put_user_error(ESR_MAGIC, &esr_ctx->head.magic, err);
+-		__put_user_error(sizeof(*esr_ctx), &esr_ctx->head.size, err);
+-		__put_user_error(current->thread.fault_code, &esr_ctx->esr, err);
+-		aux += sizeof(*esr_ctx);
+-	}
+-
+-	/* set the "end" magic */
+-	end = aux;
+-	__put_user_error(0, &end->magic, err);
+-	__put_user_error(0, &end->size, err);
+-
+-	return err;
+-}
+-
+ static struct rt_sigframe __user *get_sigframe(struct ksignal *ksig,
+ 					       struct pt_regs *regs)
  {
- 	struct mm_struct *mm = current->mm;
- 	unsigned long vdso_base, vdso_text_len, vdso_mapping_len;
- 	void *ret;
-+	unsigned long pages = vdso_pages;
-+	struct vm_special_mapping *spec = vdso_spec;
+@@ -233,24 +99,6 @@ static struct rt_sigframe __user *get_sigframe(struct ksignal *ksig,
+ 	return frame;
+ }
+ 
+-static void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
+-			 void __user *frame, off_t sigframe_off, int usig)
+-{
+-	__sigrestore_t sigtramp;
+-
+-	regs->regs[0] = usig;
+-	regs->sp = (unsigned long)frame;
+-	regs->regs[29] = regs->sp + sigframe_off + offsetof(struct sigframe, fp);
+-	regs->pc = (unsigned long)ka->sa.sa_handler;
+-
+-	if (ka->sa.sa_flags & SA_RESTORER)
+-		sigtramp = ka->sa.sa_restorer;
+-	else
+-		sigtramp = VDSO_SYMBOL(current->mm->context.vdso, sigtramp);
+-
+-	regs->regs[30] = (unsigned long)sigtramp;
+-}
+-
+ static int setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
+ 			  struct pt_regs *regs)
+ {
+diff --git a/arch/arm64/kernel/signal_common.c b/arch/arm64/kernel/signal_common.c
+new file mode 100644
+index 0000000..7043e5c
+--- /dev/null
++++ b/arch/arm64/kernel/signal_common.c
+@@ -0,0 +1,174 @@
++/*
++ * Copyright (C) 1995-2009 Russell King
++ * Copyright (C) 2012 ARM Ltd.
++ * Copyright (C) 2015 Cavium Networks.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
 +
-+#ifdef CONFIG_ARM64_ILP32
-+	if (is_ilp32_compat_task()) {
-+	        pages = vdso_ilp32_pages;
-+	        spec = vdso_ilp32_spec;
++#include <linux/uaccess.h>
++#include <asm/ucontext.h>
++#include <asm/fpsimd.h>
++#include <asm/vdso.h>
++#include <asm/signal_common.h>
++
++int preserve_fpsimd_context(struct fpsimd_context __user *ctx)
++{
++	struct fpsimd_state *fpsimd = &current->thread.fpsimd_state;
++	int err;
++
++	/* dump the hardware registers to the fpsimd_state structure */
++	fpsimd_preserve_current_state();
++
++	/* copy the FP and status/control registers */
++	err = __copy_to_user(ctx->vregs, fpsimd->vregs, sizeof(fpsimd->vregs));
++	__put_user_error(fpsimd->fpsr, &ctx->fpsr, err);
++	__put_user_error(fpsimd->fpcr, &ctx->fpcr, err);
++
++	/* copy the magic/size information */
++	__put_user_error(FPSIMD_MAGIC, &ctx->head.magic, err);
++	__put_user_error(sizeof(struct fpsimd_context), &ctx->head.size, err);
++
++	return err ? -EFAULT : 0;
++}
++
++int restore_fpsimd_context(struct fpsimd_context __user *ctx)
++{
++	struct fpsimd_state fpsimd;
++	__u32 magic, size;
++	int err = 0;
++
++	/* check the magic/size information */
++	__get_user_error(magic, &ctx->head.magic, err);
++	__get_user_error(size, &ctx->head.size, err);
++	if (err)
++		return -EFAULT;
++	if (magic != FPSIMD_MAGIC || size != sizeof(struct fpsimd_context))
++		return -EINVAL;
++
++	/* copy the FP and status/control registers */
++	err = __copy_from_user(fpsimd.vregs, ctx->vregs,
++			       sizeof(fpsimd.vregs));
++	__get_user_error(fpsimd.fpsr, &ctx->fpsr, err);
++	__get_user_error(fpsimd.fpcr, &ctx->fpcr, err);
++
++	/* load the hardware registers from the fpsimd_state structure */
++	if (!err)
++		fpsimd_update_current_state(&fpsimd);
++
++	return err ? -EFAULT : 0;
++}
++
++int setup_sigframe(struct sigframe __user *sf,
++			  struct pt_regs *regs, sigset_t *set)
++{
++	int i, err = 0;
++	void *aux = sf->uc.uc_mcontext.__reserved;
++	struct _aarch64_ctx *end;
++
++	/* set up the stack frame for unwinding */
++	__put_user_error(regs->regs[29], &sf->fp, err);
++	__put_user_error(regs->regs[30], &sf->lr, err);
++
++	for (i = 0; i < 31; i++)
++		__put_user_error(regs->regs[i], &sf->uc.uc_mcontext.regs[i],
++				 err);
++	__put_user_error(regs->sp, &sf->uc.uc_mcontext.sp, err);
++	__put_user_error(regs->pc, &sf->uc.uc_mcontext.pc, err);
++	__put_user_error(regs->pstate, &sf->uc.uc_mcontext.pstate, err);
++
++	__put_user_error(current->thread.fault_address, &sf->uc.uc_mcontext.fault_address, err);
++
++	err |= __copy_to_user(&sf->uc.uc_sigmask, set, sizeof(*set));
++
++	if (err == 0) {
++		struct fpsimd_context *fpsimd_ctx =
++			container_of(aux, struct fpsimd_context, head);
++		err |= preserve_fpsimd_context(fpsimd_ctx);
++		aux += sizeof(*fpsimd_ctx);
 +	}
++
++	/* fault information, if valid */
++	if (current->thread.fault_code) {
++		struct esr_context *esr_ctx =
++			container_of(aux, struct esr_context, head);
++		__put_user_error(ESR_MAGIC, &esr_ctx->head.magic, err);
++		__put_user_error(sizeof(*esr_ctx), &esr_ctx->head.size, err);
++		__put_user_error(current->thread.fault_code, &esr_ctx->esr, err);
++		aux += sizeof(*esr_ctx);
++	}
++
++	/* set the "end" magic */
++	end = aux;
++	__put_user_error(0, &end->magic, err);
++	__put_user_error(0, &end->size, err);
++
++	return err;
++}
++
++int restore_sigframe(struct pt_regs *regs,
++			    struct sigframe __user *sf)
++{
++	sigset_t set;
++	int i, err;
++	void *aux = sf->uc.uc_mcontext.__reserved;
++
++	err = __copy_from_user(&set, &sf->uc.uc_sigmask, sizeof(set));
++	if (err == 0)
++		set_current_blocked(&set);
++
++	for (i = 0; i < 31; i++)
++		__get_user_error(regs->regs[i], &sf->uc.uc_mcontext.regs[i],
++				 err);
++	__get_user_error(regs->sp, &sf->uc.uc_mcontext.sp, err);
++	__get_user_error(regs->pc, &sf->uc.uc_mcontext.pc, err);
++	__get_user_error(regs->pstate, &sf->uc.uc_mcontext.pstate, err);
++
++	/*
++	 * Avoid sys_rt_sigreturn() restarting.
++	 */
++	regs->syscallno = ~0UL;
++
++	err |= !valid_user_regs(&regs->user_regs);
++
++	if (err == 0) {
++		struct fpsimd_context *fpsimd_ctx =
++			container_of(aux, struct fpsimd_context, head);
++		err |= restore_fpsimd_context(fpsimd_ctx);
++	}
++
++	return err;
++}
++
++void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
++			 void __user *frame, off_t sigframe_off, int usig)
++{
++	__sigrestore_t sigtramp;
++
++	regs->regs[0] = usig;
++	regs->sp = (unsigned long)frame;
++	regs->regs[29] = regs->sp + sigframe_off + offsetof(struct sigframe, fp);
++	regs->pc = (unsigned long)ka->sa.sa_handler;
++
++	if (ka->sa.sa_flags & SA_RESTORER)
++		sigtramp = ka->sa.sa_restorer;
++#ifdef CONFIG_ARM64_ILP32
++	else if (is_ilp32_compat_task())
++		sigtramp = VDSO_SYMBOL(current->mm->context.vdso, sigtramp_ilp32);
 +#endif
- 
--	vdso_text_len = vdso_pages << PAGE_SHIFT;
-+	vdso_text_len = pages << PAGE_SHIFT;
- 	/* Be sure to map the data page */
- 	vdso_mapping_len = vdso_text_len + PAGE_SIZE;
- 
-@@ -171,7 +212,7 @@ int arch_setup_additional_pages(struct linux_binprm *bprm,
- 	}
- 	ret = _install_special_mapping(mm, vdso_base, PAGE_SIZE,
- 				       VM_READ|VM_MAYREAD,
--				       &vdso_spec[0]);
-+				       &spec[0]);
- 	if (IS_ERR(ret))
- 		goto up_fail;
- 
-@@ -180,7 +221,7 @@ int arch_setup_additional_pages(struct linux_binprm *bprm,
- 	ret = _install_special_mapping(mm, vdso_base, vdso_text_len,
- 				       VM_READ|VM_EXEC|
- 				       VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC,
--				       &vdso_spec[1]);
-+				       &spec[1]);
- 	if (IS_ERR(ret))
- 		goto up_fail;
- 
++	else
++		sigtramp = VDSO_SYMBOL(current->mm->context.vdso, sigtramp);
++
++	regs->regs[30] = (unsigned long)sigtramp;
++}
++
 -- 
 2.5.0
