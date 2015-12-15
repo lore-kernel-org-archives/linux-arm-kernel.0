@@ -1,151 +1,55 @@
-From: Bharat.Bhushan@freescale.com (Bhushan Bharat)
-Date: Tue, 15 Dec 2015 11:26:35 +0000
-Subject: ARM64/KVM: Bad page state in process iperf
-In-Reply-To: <566FF730.8050609@arm.com>
-References: <DM2PR03MB557D3079ABFE7AF114A58A690EE0@DM2PR03MB557.namprd03.prod.outlook.com>
- <566FDEAD.6000707@arm.com>
- <DM2PR03MB55707E80EDA77A6991FDA2190EE0@DM2PR03MB557.namprd03.prod.outlook.com>
- <566FE944.3090506@arm.com>
- <DM2PR03MB557D3CD68273D243625013390EE0@DM2PR03MB557.namprd03.prod.outlook.com>
- <566FF730.8050609@arm.com>
-Message-ID: <DM2PR03MB557518F1D7D4EF28DB146B290EE0@DM2PR03MB557.namprd03.prod.outlook.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 Dec 2015 12:30:57 +0100
+Subject: MP11 port
+In-Reply-To: <CACRpkdYfQg1tFemWCK-CbWh2LyZpQG9Keh2xvLRwOQvX8SONcg@mail.gmail.com>
+References: <CAMou_+dOdmxfsB9Xx1Kbci_uSoPpy-dBf9Ct7Ku+sJ1gE=r0mA@mail.gmail.com>
+ <CACRpkdYfQg1tFemWCK-CbWh2LyZpQG9Keh2xvLRwOQvX8SONcg@mail.gmail.com>
+Message-ID: <15449033.rcuzkgqmSU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tuesday 15 December 2015 10:19:57 Linus Walleij wrote:
 
+> On Sun, Nov 24, 2013 at 7:36 PM, Ferrari Dante L?szl?
+> <dante.ferrari@gmail.com> wrote:
+> 
+> > I am quite new to the ARM world, and hope that you will have the
+> > patience to help me out with my question. I would like to start a
+> > basic kernel on an MP11 platform with only 6MB of RAM.
 
-> -----Original Message-----
-> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
-> Sent: Tuesday, December 15, 2015 4:49 PM
-> To: Bhushan Bharat-R65777 <Bharat.Bhushan@freescale.com>;
-> kvmarm at lists.cs.columbia.edu; kvm at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; linux-kernel at vger.kernel.org
-> Subject: Re: ARM64/KVM: Bad page state in process iperf
-> 
-> On 15/12/15 10:57, Bhushan Bharat wrote:
-> >
-> >
-> >> -----Original Message-----
-> >> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
-> >> Sent: Tuesday, December 15, 2015 3:50 PM
-> >> To: Bhushan Bharat-R65777 <Bharat.Bhushan@freescale.com>;
-> >> kvmarm at lists.cs.columbia.edu; kvm at vger.kernel.org; linux-arm-
-> >> kernel at lists.infradead.org; linux-kernel at vger.kernel.org
-> >> Subject: Re: ARM64/KVM: Bad page state in process iperf
-> >>
-> >> On 15/12/15 09:53, Bhushan Bharat wrote:
-> >>> Hi Mark,
-> >>>
-> >>>> -----Original Message-----
-> >>>> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
-> >>>> Sent: Tuesday, December 15, 2015 3:05 PM
-> >>>> To: Bhushan Bharat-R65777 <Bharat.Bhushan@freescale.com>;
-> >>>> kvmarm at lists.cs.columbia.edu; kvm at vger.kernel.org; linux-arm-
-> >>>> kernel at lists.infradead.org; linux-kernel at vger.kernel.org
-> >>>> Subject: Re: ARM64/KVM: Bad page state in process iperf
-> >>>>
-> >>>> On 15/12/15 03:46, Bhushan Bharat wrote:
-> >>>>>
-> >>>>> Hi All,
-> >>>>>
-> >>>>> I am running "iperf" in KVM guest on ARM64 machine and observing
-> >>>>> below
-> >>>> crash.
-> >>>>>
-> >>>>> =============================
-> >>>>> $iperf -c 3.3.3.3 -P 4 -t 0 -i 5 -w 90k
-> >>>>> ------------------------------------------------------------
-> >>>>> Client connecting to 3.3.3.3, TCP port 5001 TCP window size:  180
-> >>>>> KByte (WARNING: requested 90.0 KByte)
-> >>>>> ------------------------------------------------------------
-> >>>>> [  3] local 3.3.3.1 port 51131 connected with 3.3.3.3 port 5001 [
-> >>>>> 6] local 3.3.3.1 port 51134 connected with 3.3.3.3 port 5001 [  5]
-> >>>>> local
-> >>>>> 3.3.3.1 port 51133 connected with 3.3.3.3 port 5001 [  4] local
-> >>>>> 3.3.3.1 port 51132 connected with 3.3.3.3 port 5001
-> >>>>> [   53.088567] random: nonblocking pool is initialized
-> >>>>> [ ID] Interval       Transfer     Bandwidth
-> >>>>> [  3]  0.0- 5.0 sec   638 MBytes  1.07 Gbits/sec
-> >>>>> [  4] 35.0-40.0 sec  1.66 GBytes  2.85 Gbits/sec [  5] 40.0-45.0
-> >>>>> sec
-> >>>>> 1.11 GBytes  1.90 Gbits/sec [  4] 40.0-45.0 sec  1.16 GBytes  1.99
-> >>>>> Gbits/sec
-> >>>>> [   98.895207] BUG: Bad page state in process iperf  pfn:0a584
-> >>>>> [   98.896164] page:ffff780000296100 count:-1 mapcount:0 mapping:
-> >>>> (null) index:0x0
-> >>>>> [   98.897436] flags: 0x0()
-> >>>>> [   98.897885] page dumped because: nonzero _count
-> >>>>> [   98.898640] Modules linked in:
-> >>>>> [   98.899178] CPU: 0 PID: 1639 Comm: iperf Not tainted 4.1.8-00461-
-> >>>> ge5431ad #141
-> >>>>> [   98.900302] Hardware name: linux,dummy-virt (DT)
-> >>>>> [   98.901014] Call trace:
-> >>>>> [   98.901406] [<ffff800000096cac>] dump_backtrace+0x0/0x12c
-> >>>>> [   98.902522] [<ffff800000096de8>] show_stack+0x10/0x1c
-> >>>>> [   98.903441] [<ffff800000678dc8>] dump_stack+0x8c/0xdc
-> >>>>> [   98.904202] [<ffff800000145480>] bad_page+0xc4/0x114
-> >>>>> [   98.904945] [<ffff8000001487a4>]
-> >> get_page_from_freelist+0x590/0x63c
-> >>>>> [   98.905871] [<ffff80000014893c>]
-> >> __alloc_pages_nodemask+0xec/0x794
-> >>>>> [   98.906791] [<ffff80000059fc80>] skb_page_frag_refill+0x70/0xa8
-> >>>>> [   98.907678] [<ffff80000059fcd8>] sk_page_frag_refill+0x20/0xd0
-> >>>>> [   98.908550] [<ffff8000005edc04>] tcp_sendmsg+0x1f8/0x9a8
-> >>>>> [   98.909368] [<ffff80000061419c>] inet_sendmsg+0x5c/0xd0
-> >>>>> [   98.910178] [<ffff80000059bb44>] sock_sendmsg+0x14/0x58
-> >>>>> [   98.911027] [<ffff80000059bbec>] sock_write_iter+0x64/0xbc
-> >>>>> [   98.912119] [<ffff80000019b5b8>] __vfs_write+0xac/0x10c
-> >>>>> [   98.913126] [<ffff80000019bcb8>] vfs_write+0x90/0x1a0
-> >>>>> [   98.913963] [<ffff80000019c53c>] SyS_write+0x40/0xa0
-> >>>>
-> >>>> This looks quite bad, but I don't see anything here that links it
-> >>>> to KVM (apart from being a guest). Do you have any indication that
-> >>>> this is due to KVM misbehaving?
-> >>>
-> >>> I never observed this issue in host Linux but observed this issue
-> >>> always in
-> >> guest Linux. This issue does not comes immediately after I run
-> >> "iperf" but after some time.
-> >>>
-> >>>> I'd appreciate a few more details.
-> >>>
-> >>> We have a networking hardware and we are directly assigning the h/w
-> >>> to
-> >> guest. When using the same networking hardware in host it always
-> >> works as expected (tried 100s of times).
-> >>> Also this issue is not observed when we have only one vCPU in guest
-> >>> but
-> >> seen when we have SMP guest.
-> >>
-> >> Can you reproduce the same issue without VFIO (using virtio, for
-> example)?
-> >
-> > With virtio I have not observed this issue.
-> >
-> >> Is that platform VFIO? or PCI?
-> >
-> > It is not vfio-pci and vfio-platform. It is vfio-fls-mc (some
-> > Freescale new hardware), similar to the lines of vfio-platform uses
-> > same set of VFIO APIs used by vfio-pci/platform. Do you think this can
-> > be some h/w specific issue.
-> 
-> I have no idea, but by the look of it, something could be doing DMA on top of
-> your guest page tables, which is not really expected. I suggest you carefully
-> look at:
-> 
-> 1) the DMA addresses that are passed to your device
-> 2) the page tables that are programmed into the SMMU
-> 3) the resulting translation
+So what hardware is this really? The original Realview had much more
+RAM than this, so I assume this is a custom design of some sort?
 
-Thanks Mark, this is good info. I will continue debugging keeping these points in my mind.
+> Jesus Christ. Well you may be able to start the kernel, but I'm
+> suspcious about how much userspace you will have with that.
+> But I guess you can get a busybox prompt with a rootfs on
+> flash or SD card or so.
 
--Bharat
+It really depends: the smallest I've heard of was a rather patched-up
+kernel running on 256KB of RAM using all the tricks known to mankind
+(XIP_KERNEL, XIP fs, no MMU, ...)
 
+Some folks are running NOMMU kernels built from usptream sources on
+machines as small as 2MB, which is probably the limit to what you
+can do without out-of-tree hacks. 6MB is tight, but possible.
+
+We recently found that going to DT support requires an additional
+80kb of uncompressed kernel size in flash, but I'm not sure about
+the runtime cost. For a multiplatform kernel, using DT tends to be
+a win, as we can leave out the board files, but for a tiny kernel
+on a single machine, I'm sure there is some overhead.
+
+> >I have a problem when the
+> > GIC is switched on, from __log_buf I can get some info about the state
+> > of the booting procedure.
+> >
+> > Booting Linux on physical CPU 0x0
+> > Linux version 3.12.0-01915-g6c86ae2-dirty (dante at dante-Latitude-D620)
 > 
-> Hopefully this will give you a clue about what is generating this.
-> 
-> Thanks,
-> 
-> 	M.
-> --
-> Jazz is not dead. It just smells funny...
+> The kernel developers use Torvald's HEAD for all development.
+> In this case I'd recommend you to check if maybe you want
+> to use my patch stack as base and boot from DT for the moment.
+
++1
+
+	Arnd
