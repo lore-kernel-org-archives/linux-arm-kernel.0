@@ -1,72 +1,43 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 15 Dec 2015 17:17:13 +0000
-Subject: [RFC PATCH 2/8] Documentation: arm: define DT cpu capacity
- bindings
-In-Reply-To: <20151215153218.GA7228@leverpostej>
-References: <20151210153004.GA26758@sirena.org.uk>
- <20151210175820.GE14571@e106622-lin>
- <20151211174940.GQ5727@sirena.org.uk>
- <20151214123616.GC3308@e106622-lin>
- <20151214165928.GV5727@sirena.org.uk>
- <20151215122238.GG16007@e106622-lin>
- <20151215133951.GY5727@sirena.org.uk>
- <20151215140135.GI31299@leverpostej>
- <20151215150813.GZ5727@sirena.org.uk>
- <20151215153218.GA7228@leverpostej>
-Message-ID: <20151215171713.GA5727@sirena.org.uk>
+From: ynvich@gmail.com (Sergei Ianovich)
+Date: Tue, 15 Dec 2015 20:24:41 +0300
+Subject: [PATCH v5 2/2] arm: pxa27x: support for ICP DAS LP-8x4x w/ DT
+In-Reply-To: <1843454.zCnLJtF7B6@wuerfel>
+References: <1449700088-28076-3-git-send-email-ynvich@gmail.com>
+ <7496839.vMjVcqPe8Q@wuerfel> <1450197727.21989.9.camel@gmail.com>
+ <1843454.zCnLJtF7B6@wuerfel>
+Message-ID: <1450200281.21989.24.camel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 15, 2015 at 03:32:19PM +0000, Mark Rutland wrote:
-> On Tue, Dec 15, 2015 at 03:08:13PM +0000, Mark Brown wrote:
-> > On Tue, Dec 15, 2015 at 02:01:36PM +0000, Mark Rutland wrote:
+On Tue, 2015-12-15 at 18:02 +0100, Arnd Bergmann wrote:
+> On Tuesday 15 December 2015 19:42:07 Sergei Ianovich wrote:
+> > There are several board-specific devices on LP8x4x: custom FPGA,
+> > custom
+> > UART, custom IRQ on FPGA, custom parallel bus for industrial IO. The
+> > defconfig file could alert potential users to this fact. If this is
+> > not
+> > a sufficient reason to have a defconfig file, it can be dropped.
+> > 
+> > I use the full .config anyway 
+> 
+> I would like those drivers to be enabled in some defconfig, so we get
+> compile-time coverage, but we generally stopped having one-config-per-
+> board
+> files.
+> 
+> Maybe we can have a pxa_defconfig file that enables lots of boards
+> and then we remove the individual configs? We don't have to remove
+> them all at once, but it would make me very happy if we could at
+> least kill off some of the ones that are not used regularly.
 
-> > > I really don't want to see a table of magic numbers in the kernel.
+lp8x4x seems to be the first pxa board which requires DT.
 
-> > Right, there's pitfalls there too although not being part of an ABI
-> > does make them more manageable.  
+We can create pxa27x-dt_defconfig which selects:
+1. PXA27X_DT
+2. PXA_FB and 8250_PXA to enable console
+3. MMC, MMC_PXA and EXT4_FS to enable boot from MMC
+4. all optional pxa stuff as modules
+5. all stuff on supported pxa boards as modules
 
-> I think that people are very likely to treat them exactly like an ABI,
-> w.r.t. any regressions in performance that result from their addition,
-> modification, or removal. That becomes really horrible when new CPUs
-> appear.
-
-Obviously people are going to get upset if we introduce performance
-regressions - but that's true always, we can also introduce problems
-with numbers people have put in DT.  It seems like it'd be harder to
-manage regressions due to externally provided magic numbers since
-there's inherently less information there.
-
-> > One thing it's probably helpful to establish here is how much the
-> > specific numbers are going to matter in the grand scheme of things.  If
-> > the specific numbers *are* super important then nobody is going to want
-> > to touch them as they'll be prone to getting tweaked.  If instead the
-> > numbers just need to be ballpark accurate so the scheduler starts off in
-> > roughly the right place and the specific numbers don't matter it's a lot
-> > easier and having a table in the kernel until we think of something
-> > better (if that ever happens) gets a lot easier.
-
-> I agree that we first need to figure out the importance of these
-> numbers. I disagree that our first step should be to add a table.
-
-My point there is that if we're not that concerned about the specific
-number something in kernel is safer.
-
-> > My expectation is that we just need good enough, not perfect, and that
-> > seems to match what Juri is saying about the expectation that most of
-> > the fine tuning is done via other knobs.
-
-> My expectation is that if a ballpark figure is good enough, it should be
-> possible to implement something trivial like bogomips / loop_per_jiffy
-> calculation.
-
-That does have the issue that we need to scale with regard to the
-frequency the benchmark gets run at.  That's not an insurmountable
-obstacle but it's not completely trivial either.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151215/ffac8009/attachment-0001.sig>
+If #5 is extended when support for new boards is added, it should be
+possible to run any supported pxa27x board with pxa27x_defconfig.
