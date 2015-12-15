@@ -1,35 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 Dec 2015 18:14:07 +0100
-Subject: [GIT PULL 1/4] Broadcom soc changes for v4.5
-In-Reply-To: <1449532649-6471-4-git-send-email-f.fainelli@gmail.com>
-References: <1449532649-6471-1-git-send-email-f.fainelli@gmail.com>
- <1449532649-6471-4-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1504418.H3sAEoUMl3@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 15 Dec 2015 17:15:18 +0000
+Subject: [PATCH v12 09/16] arm64/kexec: Add pr_devel output
+In-Reply-To: <0e4d27286ec607b0c1f6e17b3034279c96d6b6a6.1448403503.git.geoff@infradead.org>
+References: <cover.1448403503.git.geoff@infradead.org>
+ <0e4d27286ec607b0c1f6e17b3034279c96d6b6a6.1448403503.git.geoff@infradead.org>
+Message-ID: <20151215171517.GB353@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 07 December 2015 15:57:29 Florian Fainelli wrote:
-> This pull request contains Broadcom SoC changes for 4.5, with the following changes:
-> 
-> - Lucas Stach removes the workaround for an imprecise fault for Broadcom
->   BCM5301x SoCs (Northstar) since this is now handled by the ARM/Linux kernel
->   directly
-> 
-> - Hauke Merthens enables a bunch of erratas for the Cortex-A9 and PL310 L2
->   cache present on early Northstar chips (BCM4708)
-> 
-> - Kapil Hali adds SMP support for the Northstar Plus SoCs by consolidating the
->   existing SMP code for Kona SoCs (mobile platforms), fixng the Device Tree
->   binding for the Kona platforms (wrong placement for 'enable-method' and
->   'secondary-reg') and then finally adds the functional code for the Northstar
->   Plus platforms to boot their secondary CPUs
-> 
-> - Jon Mason enables SMP on BCM4708/BCM5301X (Northstar SoCs) by building the generic
->   Northstar/Northstar Plus SMP code, and adding the relevant SMP Device Tree nodes
-> 
-> 
+On Tue, Nov 24, 2015 at 10:25:34PM +0000, Geoff Levand wrote:
+> To aid in debugging kexec problems or when adding new functionality to kexec add
+> a new routine kexec_image_info() and several inline pr_devel statements.
 
+We don't currently have any pr_devel invocations under arm64. Can you
+either remove these or change them to pr_debug?
 
-Pulled into next/soc, thanks!
+> Signed-off-by: Geoff Levand <geoff@infradead.org>
+> ---
+>  arch/arm64/kernel/machine_kexec.c | 63 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 63 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+> index 8b990b8..da28a26 100644
+> --- a/arch/arm64/kernel/machine_kexec.c
+> +++ b/arch/arm64/kernel/machine_kexec.c
+> @@ -25,6 +25,48 @@ extern const unsigned long arm64_relocate_new_kernel_size;
+>  
+>  static unsigned long kimage_start;
+>  
+> +/**
+> + * kexec_is_dtb - Helper routine to check the device tree header signature.
+> + */
+> +static bool kexec_is_dtb(const void *dtb)
+> +{
+> +	__be32 magic;
+> +
+> +	return get_user(magic, (__be32 *)dtb) ? false :
+> +		(be32_to_cpu(magic) == OF_DT_HEADER);
 
-	Arnd
+Isn't there an fdt32_to_cpu helper for this already? I also can't help
+but thing this would be more readable if you didn't bother with the
+ternary if form.
+
+Will
