@@ -1,71 +1,53 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 15 Dec 2015 13:36:38 +0000
-Subject: [PATCH v2 4/4] arm64: dts: add .dts for GICv3 Foundation model
-In-Reply-To: <1450186598-24504-1-git-send-email-andre.przywara@arm.com>
-References: <1450186598-24504-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1450186598-24504-5-git-send-email-andre.przywara@arm.com>
+Date: Tue, 15 Dec 2015 13:36:34 +0000
+Subject: [PATCH v2 0/4] add support for GICv3 on the Foundation model
+Message-ID: <1450186598-24504-1-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARMv8 Foundation model sports a command line parameter to use
-a GICv3 emulation instead of the default GICv2 interrupt controller.
-Add a new .dts file which reuses most of the definitions of the
-existing model while just adding the required properties for the
-GICv3 node.
-This allows the public Foundation model to run with a GICv3.
+Hi,
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- arch/arm64/boot/dts/arm/Makefile                |  2 +-
- arch/arm64/boot/dts/arm/foundation-v8-gicv3.dts | 30 +++++++++++++++++++++++++
- 2 files changed, 31 insertions(+), 1 deletion(-)
+this is v2 adressing the two comments that Marc had on the previous
+version.
+Changelog:
+- remove bogus affinity field from GICv3 maintenance interrupt
+- replace commit message for patch 2/4
+----------------
+
+The freely available ARM Foundation model [1] supports emulating a
+GICv3 interrupt controller (--gicv3).
+To provide the kernel with the proper information, prepare the
+existing model .dts to be split up and eventually create a new .dts
+file which can be used to boot a kernel using the GICv3 in the model.
+
+Patch 1/4 changes the common device tree to allow sharing most of the
+definitions later, while patch 2/4 is a drive-by-fix to add support
+for the recently enabled EOImode=1.
+Patch 3/4 splits the existing DT up to have a common .dtsi file and a
+stub foundation-v8.dts in preparation for the final patch 4/4, which
+adds a new foundation-v8-gicv3.dts that has the required GICv3 node.
+
+Together with the GICv3 support of the bootwrapper this allows to boot
+Linux and make it use the GICv3 interrupt controller.
+
+Cheers,
+Andre.
+
+[1]: http://www.arm.com/products/tools/models/fast-models/foundation-model.php
+
+Andre Przywara (4):
+  arm64: dts: prepare foundation-v8.dts to cope with GICv3
+  arm64: dts: Foundation model: increase GICC region to allow EOImode=1
+  arm64: dts: split Foundation model dts to put the GIC separately
+  arm64: dts: add .dts for GICv3 Foundation model
+
+ arch/arm64/boot/dts/arm/Makefile                   |   2 +-
+ arch/arm64/boot/dts/arm/foundation-v8-gicv3.dts    |  30 +++
+ arch/arm64/boot/dts/arm/foundation-v8.dts          | 227 +--------------------
+ .../arm/{foundation-v8.dts => foundation-v8.dtsi}  |  98 ++++-----
+ 4 files changed, 78 insertions(+), 279 deletions(-)
  create mode 100644 arch/arm64/boot/dts/arm/foundation-v8-gicv3.dts
+ copy arch/arm64/boot/dts/arm/{foundation-v8.dts => foundation-v8.dtsi} (73%)
 
-diff --git a/arch/arm64/boot/dts/arm/Makefile b/arch/arm64/boot/dts/arm/Makefile
-index bb3c072..46d342d 100644
---- a/arch/arm64/boot/dts/arm/Makefile
-+++ b/arch/arm64/boot/dts/arm/Makefile
-@@ -1,4 +1,4 @@
--dtb-$(CONFIG_ARCH_VEXPRESS) += foundation-v8.dtb
-+dtb-$(CONFIG_ARCH_VEXPRESS) += foundation-v8.dtb foundation-v8-gicv3.dtb
- dtb-$(CONFIG_ARCH_VEXPRESS) += juno.dtb juno-r1.dtb
- dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb
- dtb-$(CONFIG_ARCH_VEXPRESS) += vexpress-v2f-1xv7-ca53x2.dtb
-diff --git a/arch/arm64/boot/dts/arm/foundation-v8-gicv3.dts b/arch/arm64/boot/dts/arm/foundation-v8-gicv3.dts
-new file mode 100644
-index 0000000..35588df
---- /dev/null
-+++ b/arch/arm64/boot/dts/arm/foundation-v8-gicv3.dts
-@@ -0,0 +1,30 @@
-+/*
-+ * ARM Ltd.
-+ *
-+ * ARMv8 Foundation model DTS (GICv3 configuration)
-+ */
-+
-+#include "foundation-v8.dtsi"
-+
-+/ {
-+	gic: interrupt-controller at 2f000000 {
-+		compatible = "arm,gic-v3";
-+		#interrupt-cells = <3>;
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+		interrupt-controller;
-+		reg =	<0x0 0x2f000000 0x0 0x10000>,
-+			<0x0 0x2f100000 0x0 0x200000>,
-+			<0x0 0x2c000000 0x0 0x2000>,
-+			<0x0 0x2c010000 0x0 0x2000>,
-+			<0x0 0x2c02f000 0x0 0x2000>;
-+		interrupts = <1 9 4>;
-+
-+		its: its at 2f020000 {
-+			compatible = "arm,gic-v3-its";
-+			msi-controller;
-+			reg = <0x0 0x2f020000 0x0 0x20000>;
-+		};
-+	};
-+};
 -- 
 2.5.1
