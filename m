@@ -1,37 +1,67 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Tue, 15 Dec 2015 13:40:18 -0800
-Subject: [PATCH v3 0/4] Raspberry Pi power domains
-Message-ID: <1450215622-27394-1-git-send-email-eric@anholt.net>
+Date: Tue, 15 Dec 2015 13:40:22 -0800
+Subject: [PATCH v3 4/4] ARM: bcm2835: Add the Raspberry Pi power domain driver
+ to the DT.
+In-Reply-To: <1450215622-27394-1-git-send-email-eric@anholt.net>
+References: <1450215622-27394-1-git-send-email-eric@anholt.net>
+Message-ID: <1450215622-27394-5-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the pm_genpd_exit() patch is still going through review, and
-other drivers in the tree just ignore the error cases, Ulf offered to
-merge the series as a builtin driver not depending on that interface.
-We still avoid dangling pointer references, by just continuing with
-probing if of_genpd_add_provider_onecell() fails.  We can easily go
-back and update the driver when a pm_genpd_exit() lands.
+From: Alexander Aring <alex.aring@gmail.com>
 
-Alexander Aring (3):
-  ARM: bcm2835: add rpi power domain driver
-  dt-bindings: add rpi power domain driver bindings
-  ARM: bcm2835: Add the Raspberry Pi power domain driver to the DT.
+This connects the USB driver to the USB power domain, so that USB can
+actually be turned on at boot if the bootloader didn't do it for us.
 
-Eric Anholt (1):
-  ARM: bcm2835: Define two new packets from the latest firmware.
+Signed-off-by: Alexander Aring <alex.aring@gmail.com>
+Signed-off-by: Eric Anholt <eric@anholt.net>
+---
+ arch/arm/boot/dts/bcm2835-rpi.dtsi | 11 +++++++++++
+ arch/arm/boot/dts/bcm2835.dtsi     |  2 +-
+ 2 files changed, 12 insertions(+), 1 deletion(-)
 
- .../bindings/arm/bcm/raspberrypi,bcm2835-power.txt |  47 ++++
- arch/arm/boot/dts/bcm2835-rpi.dtsi                 |  11 +
- arch/arm/boot/dts/bcm2835.dtsi                     |   2 +-
- arch/arm/mach-bcm/Kconfig                          |  10 +
- arch/arm/mach-bcm/Makefile                         |   1 +
- arch/arm/mach-bcm/raspberrypi-power.c              | 247 +++++++++++++++++++++
- include/dt-bindings/arm/raspberrypi-power.h        |  41 ++++
- include/soc/bcm2835/raspberrypi-firmware.h         |   2 +
- 8 files changed, 360 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-power.txt
- create mode 100644 arch/arm/mach-bcm/raspberrypi-power.c
- create mode 100644 include/dt-bindings/arm/raspberrypi-power.h
-
+diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+index 3572f03..f828202 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
++++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+@@ -1,3 +1,4 @@
++#include <dt-bindings/arm/raspberrypi-power.h>
+ #include "bcm2835.dtsi"
+ 
+ / {
+@@ -20,6 +21,12 @@
+ 			compatible = "raspberrypi,bcm2835-firmware";
+ 			mboxes = <&mailbox>;
+ 		};
++
++		power: power {
++			compatible = "raspberrypi,bcm2835-power";
++			firmware = <&firmware>;
++			#power-domain-cells = <1>;
++		};
+ 	};
+ };
+ 
+@@ -60,3 +67,7 @@
+ 	status = "okay";
+ 	bus-width = <4>;
+ };
++
++&usb {
++	power-domains = <&power RPI_POWER_DOMAIN_USB>;
++};
+diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+index aef64de..6d62af0 100644
+--- a/arch/arm/boot/dts/bcm2835.dtsi
++++ b/arch/arm/boot/dts/bcm2835.dtsi
+@@ -177,7 +177,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		usb at 7e980000 {
++		usb: usb at 7e980000 {
+ 			compatible = "brcm,bcm2835-usb";
+ 			reg = <0x7e980000 0x10000>;
+ 			interrupts = <1 9>;
 -- 
 2.6.2
