@@ -1,50 +1,18 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 15 Dec 2015 17:48:05 +0100
-Subject: [PATCH 0/2] Dove GPU support
-In-Reply-To: <1450197483-31441-1-git-send-email-l.stach@pengutronix.de> (Lucas
- Stach's message of "Tue, 15 Dec 2015 17:38:01 +0100")
-References: <1450197483-31441-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <87a8pbvet6.fsf@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 Dec 2015 17:55:27 +0100
+Subject: [GIT PULL] SoCFPGA defconfig for v4.5
+In-Reply-To: <1449613982-25888-2-git-send-email-dinh.linux@gmail.com>
+References: <1449613982-25888-1-git-send-email-dinh.linux@gmail.com>
+ <1449613982-25888-2-git-send-email-dinh.linux@gmail.com>
+Message-ID: <5295046.lJo3GhvOY6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lucas,
- 
- On mar., d?c. 15 2015, Lucas Stach <l.stach@pengutronix.de> wrote:
+On Tuesday 08 December 2015 16:33:02 Dinh Nguyen wrote:
+> SoCFPGA defconfig update for v4.5
+> -Enable USB OTG dual-role and some cleanup by make savedefconfig
+> 
 
-> Hi Dove maintainers,
->
-> those 2 patches add support for the Vivante GPU. The binding has already been
-> acked by the DT maintainers and is included in the pull request for the DRM
-> driver. I hope you can pick those patches up for inclusion in 4.5.
+Pulled into next/defconfig, thanks!
 
-Good timing! I was about to ask news about these pacthes.
-
-They are both applied on mvebu/dt
-
-Thanks,
-
-Gregory
-
-
->
-> Regards,
-> Lucas
->
-> Russell King (2):
->   ARM: dts: dove: add DT GPU support
->   ARM: dts: enable GPU for SolidRun's Cubox
->
->  arch/arm/boot/dts/dove-cubox.dts |  8 ++++++++
->  arch/arm/boot/dts/dove.dtsi      | 16 ++++++++++++++++
->  2 files changed, 24 insertions(+)
->
-> -- 
-> 2.6.2
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+	Arnd
