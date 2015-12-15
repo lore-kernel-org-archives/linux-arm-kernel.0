@@ -1,17 +1,15 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 16 Dec 2015 00:42:45 +0300
-Subject: [PATCH v6 19/20] arm64:ilp32: change COMPAT_ELF_PLATFORM to report a
- a subplatform for ILP32
+Date: Wed, 16 Dec 2015 00:42:46 +0300
+Subject: [PATCH v6 20/20] arm64:ilp32: add ARM64_ILP32 to Kconfig
 In-Reply-To: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
 References: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1450215766-14765-20-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1450215766-14765-21-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+From: Andrew Pinski <apinski@cavium.com>
 
-To make life for tools (such as gdb) easier when dealing with ILP32 processes,
-we report a proper subarchitecture for ILP32 in the ELF auxiliary vectors.
+This patch adds the config option for ILP32.
 
 Reviewed-by: David Daney <ddaney@caviumnetworks.com>
 Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
@@ -19,24 +17,35 @@ Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
 Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
 Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
 ---
- arch/arm64/include/asm/elf.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/Kconfig | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index 4e2e3c0..1fc6b48 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -164,9 +164,9 @@ extern int arch_setup_additional_pages(struct linux_binprm *bprm,
- #ifdef CONFIG_COMPAT
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 4753d435..deec37a 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -680,7 +680,7 @@ source "fs/Kconfig.binfmt"
  
- #ifdef __AARCH64EB__
--#define COMPAT_ELF_PLATFORM		("v8b")
-+#define COMPAT_ELF_PLATFORM		(is_ilp32_compat_task() ? "aarch64_be:ilp32" : "v8b")
- #else
--#define COMPAT_ELF_PLATFORM		("v8l")
-+#define COMPAT_ELF_PLATFORM		(is_ilp32_compat_task() ? "aarch64:ilp32" : "v8l")
- #endif
+ config COMPAT
+ 	def_bool y
+-	depends on AARCH32_EL0
++	depends on AARCH32_EL0 || ARM64_ILP32
+ 	select COMPAT_BINFMT_ELF
  
- #define COMPAT_ELF_ET_DYN_BASE		(2 * TASK_SIZE_32 / 3)
+ config AARCH32_EL0
+@@ -702,6 +702,13 @@ config AARCH32_EL0
+ 
+ 	  If you want to execute 32-bit userspace applications, say Y.
+ 
++config ARM64_ILP32
++	bool "Kernel support for ILP32"
++	help
++	  This option enables support for AArch64 ILP32 user space.  ILP32
++	  is an ABI where long and pointers are 32bits but it uses the AARCH64
++	  instruction set.
++
+ config SYSVIPC_COMPAT
+ 	def_bool y
+ 	depends on COMPAT && SYSVIPC
 -- 
 2.5.0
