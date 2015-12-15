@@ -1,44 +1,43 @@
-From: pmladek@suse.com (Petr Mladek)
-Date: Tue, 15 Dec 2015 16:43:56 +0100
-Subject: [RFC PATCH 0/3] livepatch: arm64: add support for livepatch on
- arm64
-In-Reply-To: <1450097378-3780-1-git-send-email-huawei.libin@huawei.com>
-References: <1450097378-3780-1-git-send-email-huawei.libin@huawei.com>
-Message-ID: <20151215154356.GF3729@pathway.suse.cz>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 Dec 2015 16:45:04 +0100
+Subject: [PATCH] soc: mediatek: SCPSYS: use module_platform_driver
+In-Reply-To: <20151215154203.GP11966@pengutronix.de>
+References: <1450188966-2921-1-git-send-email-s.hauer@pengutronix.de>
+ <3837885.qE6MXzvvpu@wuerfel> <20151215154203.GP11966@pengutronix.de>
+Message-ID: <3919968.fveBmeY89b@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2015-12-14 20:49:35, Li Bin wrote:
-> This patchset depends on the on-going gcc feature "-fprolog-pad=N",
-> which will generate a pad of N nops at the beginning of each function.
+On Tuesday 15 December 2015 16:42:03 Sascha Hauer wrote:
+> On Tue, Dec 15, 2015 at 03:30:01PM +0100, Arnd Bergmann wrote:
+> > On Tuesday 15 December 2015 15:16:06 Sascha Hauer wrote:
+> > > @@ -542,6 +542,7 @@ static const struct of_device_id of_scpsys_match_tbl[] = {
+> > >  };
+> > >  
+> > >  static struct platform_driver scpsys_drv = {
+> > > +       .probe = scpsys_probe,
+> > >         .driver = {
+> > >                 .name = "mtk-scpsys",
+> > >                 .owner = THIS_MODULE,
+> > > @@ -549,4 +550,4 @@ static struct platform_driver scpsys_drv = {
+> > >         },
+> > >  };
+> > >  
+> > > -module_platform_driver_probe(scpsys_drv, scpsys_probe);
+> > > +module_platform_driver(scpsys_drv);
+> > > 
+> > 
+> > Good idea, but I wonder why there is no remove function in the
+> > driver. Do we also need to make the module non-removable and
+> > set .suppress_bind_attrs, or is all of the probe function
+> > reversible through devm_* helpers?
 > 
-> Livepatch on arm64 can using the feature (that always placing one nop
-> at the beginning of the function). And when enable/disable func patching,
-> just modify the pad code to nop or branch. And that NOP and B instruction
-> are both safe instructions on arm64 which called "concurrent modification
-> and execution of instructions", that can be executed by one thread of
-> execution as they are being modified by another thread of execution without
-> requiring explicit synchronization.
-> 
-> And this method will improve performance significantly compared with the
-> method based on ftrace, especially for the critical function being frequently
-> called.
+> pm domains currently can't be unregistered, removal of this driver is
+> not supported. The driver can't be compiled as a module.
 
-It sounds like a great feature for ftrace. If the new prologue is usable
-for LivePatching, it should be usable to call the ftrace handler as
-well. If you teach ftrace to use the new prologue, you will not need
-all these crazy arch-specific hacks for LivePatching. Then both ftrace
-and livepatch will benefit from the feature.
+Ok, then you need the suppress_bind_attrs flag to ensure that users
+cannot unbind and rebind the device through sysfs. The module_exit()
+function will be dropped implicitly for built-in drivers, so the
+module_platform_driver() is ok.
 
-I suggest to read the ftrace documentation in Documentation/trace/,
-especially ftrace-design.txt. I have never ported ftrace to a new
-architecture. I guess that you need to teach scripts/recordmcount.c
- to find the new location. Also you might need to update
-arch/arm/kernel/ftrace.c. Also please make sure that ftrace
-supports DYNAMIC_FTRACE_WITH_REGS on Arm.
-
-It is harder but the right way to go. Your current patch set
-looks like a hack.
-
-Best Regards,
-Petr
+	Arnd
