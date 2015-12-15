@@ -1,97 +1,95 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 15 Dec 2015 14:01:36 +0000
-Subject: [RFC PATCH 2/8] Documentation: arm: define DT cpu capacity
- bindings
-In-Reply-To: <20151215133951.GY5727@sirena.org.uk>
-References: <1448288921-30307-1-git-send-email-juri.lelli@arm.com>
- <1448288921-30307-3-git-send-email-juri.lelli@arm.com>
- <20151124020631.GA15165@rob-hp-laptop>
- <20151210153004.GA26758@sirena.org.uk>
- <20151210175820.GE14571@e106622-lin>
- <20151211174940.GQ5727@sirena.org.uk>
- <20151214123616.GC3308@e106622-lin>
- <20151214165928.GV5727@sirena.org.uk>
- <20151215122238.GG16007@e106622-lin>
- <20151215133951.GY5727@sirena.org.uk>
-Message-ID: <20151215140135.GI31299@leverpostej>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 15 Dec 2015 14:02:40 +0000
+Subject: [PATCH v7 11/19] KVM: ARM64: Add access handler for PMINTENSET
+ and PMINTENCLR register
+In-Reply-To: <1450169379-12336-12-git-send-email-zhaoshenglong@huawei.com>
+References: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
+ <1450169379-12336-12-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <56701D80.9010302@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 15, 2015 at 01:39:51PM +0000, Mark Brown wrote:
-> On Tue, Dec 15, 2015 at 12:22:38PM +0000, Juri Lelli wrote:
-> > > So then why isn't it adequate to just have things like the core types in
-> > > there and work from there?  Are we really expecting the tuning to be so
-> > > much better than it's possible to come up with something that's so much
-> > > better on the scale that we're expecting this to be accurate that it's
-> > > worth just jumping straight to magic numbers?
+On 15/12/15 08:49, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> > I take your point here that having fine grained values might not really
-> > give us appreciable differences (that is also why I proposed the
-> > capacity-scale in the first instance), but I'm not sure I'm getting what
-> > you are proposing here.
+> Since the reset value of PMINTENSET and PMINTENCLR is UNKNOWN, use
+> reset_unknown for its reset handler. Add a handler to emulate writing
+> PMINTENSET or PMINTENCLR register.
 > 
-> Something like the existing solution for arm32.
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  arch/arm64/kvm/sys_regs.c | 29 +++++++++++++++++++++++++----
+>  1 file changed, 25 insertions(+), 4 deletions(-)
 > 
-> >  static const struct cpu_efficiency table_efficiency[] = {
-> >  	{"arm,cortex-a15", 3891},
-> >  	{"arm,cortex-a7",  2048},
-> >  	{NULL, },
-> >  };
-> 
-> > When clock-frequency property is defined in DT, we try to find a match
-> > for the compatibility string in the table above and then use the
-> > associate number to compute the capacity. Are you proposing to have
-> > something like this for arm64 as well?
-> 
-> > BTW, the only info I could find about those numbers is from this thread
-> 
-> It was discussed in some other thread when I was sending the equivalent
-> stuff for arm64 (I never got round to finishing it off due to issues
-> with Catalin and Will being concerned about the specific numbers).
-> Vincent confirmed that the numbers came from the (IIRC) DMIPS/MHz
-> numbers that ARM publish for the cores.  I'd independently done the same
-> thing for arm64.  It would probably help to put comments in there with
-> the base numbers before scaling, or just redo the table in terms of the
-> raw numbers.
-> 
-> This is, of course, an example of my concerns about magic number
-> configuration.
-> 
-> > If I understand how that table was created, how do we think we will
-> > extend it in the future to allow newer core types (say we replicate this
-> > solution for arm64)?  It seems that we have to change it, rescaling
-> > values, each time we have a new core on the market. How can we come up
-> > with relative numbers, in the future, comparing newer cores to old ones
-> > (that might be already out of the market by that time)?
-> 
-> It doesn't seem particularly challenging to add new numbers to the table
-> (and add additional properties to select on) TBH.  We can either rescale
-> by hand in the table when adding entries, script it as part of the
-> kernel build or do it at runtime (as the arm32 code already does to an
-> extent based on the particular set of cores we find).  What difficulties
-> do you see with this?
-> 
-> This is something that seems like an advantage to me - we can just
-> replace everything at any point, we're not tied to trusting the golden
-> benchmark someone did (or tweaked) if we come up with a better
-> methodology later on.
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index f216da7..594e53f 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -648,6 +648,27 @@ static bool access_pmcntenset(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>  	return true;
+>  }
+>  
+> +static bool access_pmintenset(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+> +			      const struct sys_reg_desc *r)
+> +{
+> +	u64 mask = kvm_pmu_valid_counter_mask(vcpu);
+> +
+> +	if (p->is_write) {
+> +		if (r->Op2 & 0x1) {
+> +			/* accessing PMINTENSET_EL1 */
+> +			vcpu_sys_reg(vcpu, r->reg) |= (p->regval & mask);
+> +		} else {
+> +			/* accessing PMINTENCLR_EL1 */
+> +			vcpu_sys_reg(vcpu, r->reg) &= mask;
+> +			vcpu_sys_reg(vcpu, r->reg) &= ~p->regval;
 
-I really don't want to see a table of magic numbers in the kernel.
+This looks wrong. The first line doesn't have any effect (you shouldn't
+be able to set bits that are not in the mask the first place). I'd
+prefer something like:
 
-The relative performance and efficiency of cores will vary depending on
-uArch-specific configuration (e.g. sizing of L1/L2 caches) in addition
-to general uArch differences, and integration too (e.g. if the memory
-system gives priority to one cluster over another for whatever reason).
-I've heard of pseudo-heterogeneous platforms with different
-configuration of the same uArch across clusters.
+		vcpu_sys_reg(vcpu, r->reg) &= ~(p->regval & mask);
 
-We also don't necessarily have the CPU clock frequencies, or the ability
-to scale them. Maybe we simply give up in that case, though.
+which is symmetrical to the SET operator.
 
-If we cannot rely on external information, and want this information to
-be derived by the kernel, then we need to perform some dynamic
-benchmark. That would work for future CPUs the kernel knows nothing
-about yet, and would cater for the pseudo-heterogeneous cases too.
+> +		}
+> +	} else {
+> +		p->regval = vcpu_sys_reg(vcpu, r->reg) & mask;
+> +	}
+> +
+> +	return true;
+> +}
+> +
+>  /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
+>  #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
+>  	/* DBGBVRn_EL1 */						\
+> @@ -806,10 +827,10 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+>  
+>  	/* PMINTENSET_EL1 */
+>  	{ Op0(0b11), Op1(0b000), CRn(0b1001), CRm(0b1110), Op2(0b001),
+> -	  trap_raz_wi },
+> +	  access_pmintenset, reset_unknown, PMINTENSET_EL1 },
+>  	/* PMINTENCLR_EL1 */
+>  	{ Op0(0b11), Op1(0b000), CRn(0b1001), CRm(0b1110), Op2(0b010),
+> -	  trap_raz_wi },
+> +	  access_pmintenset, NULL, PMINTENSET_EL1 },
+>  
+>  	/* MAIR_EL1 */
+>  	{ Op0(0b11), Op1(0b000), CRn(0b1010), CRm(0b0010), Op2(0b000),
+> @@ -1204,8 +1225,8 @@ static const struct sys_reg_desc cp15_regs[] = {
+>  	{ Op1( 0), CRn( 9), CRm(13), Op2( 1), access_pmu_evtyper },
+>  	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), access_pmu_evcntr },
+>  	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), trap_raz_wi },
+> -	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), trap_raz_wi },
+> -	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), trap_raz_wi },
+> +	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), access_pmintenset },
+> +	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), access_pmintenset },
+>  
+>  	{ Op1( 0), CRn(10), CRm( 2), Op2( 0), access_vm_reg, NULL, c10_PRRR },
+>  	{ Op1( 0), CRn(10), CRm( 2), Op2( 1), access_vm_reg, NULL, c10_NMRR },
+> 
 
 Thanks,
-Mark.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
