@@ -1,31 +1,53 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 15 Dec 2015 04:33:10 +0100
-Subject: [PATCH V4 2/2] ARM: dts: imx6q: add Novena board
-In-Reply-To: <201512141547.10237.marex@denx.de>
-References: <20151211110700.GD11252@tiger>
- <CAOMZO5ATJEOcp8MqXxUaTYXw-cDHQiYPNJrJPy1XRjNoNsYTKQ@mail.gmail.com>
- <201512141547.10237.marex@denx.de>
-Message-ID: <201512150433.10573.marex@denx.de>
+From: Bharat.Bhushan@freescale.com (Bhushan Bharat)
+Date: Tue, 15 Dec 2015 03:46:03 +0000
+Subject: ARM64/KVM: Bad page state in process iperf  
+Message-ID: <DM2PR03MB557D3079ABFE7AF114A58A690EE0@DM2PR03MB557.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, December 14, 2015 at 03:47:10 PM, Marek Vasut wrote:
-> On Monday, December 14, 2015 at 03:45:16 PM, Fabio Estevam wrote:
-> > On Mon, Dec 14, 2015 at 12:41 PM, Marek Vasut <marex@denx.de> wrote:
-> > > Well that's a good idea, but some sort of sane default should be
-> > > present anyway, right ?
-> > 
-> > No, not needed. The bootloader should pass the correct RAM size.
-> > 
-> > See imx6qdl-hummingboard and imx6qdl-cubox-i.dtsi for a reference,
-> > where 'memory' node is not passed.
-> 
-> So, if bootloader does not do the changes to the DT, then what ?
-> (U-Boot does them, so it would work, but I don't think we should depend on
-> that)
 
-I just tested that removing the whole memory {} node has no impact.
-Would you thus prefer a V5 or can you remove that node yourself when applying?
+Hi All,
 
-Best regards,
-Marek Vasut
+I am running "iperf" in KVM guest on ARM64 machine and observing below crash.
+
+=============================
+$iperf -c 3.3.3.3 -P 4 -t 0 -i 5 -w 90k
+------------------------------------------------------------
+Client connecting to 3.3.3.3, TCP port 5001
+TCP window size:  180 KByte (WARNING: requested 90.0 KByte)
+------------------------------------------------------------
+[  3] local 3.3.3.1 port 51131 connected with 3.3.3.3 port 5001
+[  6] local 3.3.3.1 port 51134 connected with 3.3.3.3 port 5001
+[  5] local 3.3.3.1 port 51133 connected with 3.3.3.3 port 5001
+[  4] local 3.3.3.1 port 51132 connected with 3.3.3.3 port 5001
+[   53.088567] random: nonblocking pool is initialized
+[ ID] Interval       Transfer     Bandwidth
+[  3]  0.0- 5.0 sec   638 MBytes  1.07 Gbits/sec
+[  4] 35.0-40.0 sec  1.66 GBytes  2.85 Gbits/sec
+[  5] 40.0-45.0 sec  1.11 GBytes  1.90 Gbits/sec
+[  4] 40.0-45.0 sec  1.16 GBytes  1.99 Gbits/sec
+[   98.895207] BUG: Bad page state in process iperf  pfn:0a584
+[   98.896164] page:ffff780000296100 count:-1 mapcount:0 mapping:          (null) index:0x0
+[   98.897436] flags: 0x0()
+[   98.897885] page dumped because: nonzero _count
+[   98.898640] Modules linked in:
+[   98.899178] CPU: 0 PID: 1639 Comm: iperf Not tainted 4.1.8-00461-ge5431ad #141
+[   98.900302] Hardware name: linux,dummy-virt (DT)
+[   98.901014] Call trace:
+[   98.901406] [<ffff800000096cac>] dump_backtrace+0x0/0x12c
+[   98.902522] [<ffff800000096de8>] show_stack+0x10/0x1c
+[   98.903441] [<ffff800000678dc8>] dump_stack+0x8c/0xdc
+[   98.904202] [<ffff800000145480>] bad_page+0xc4/0x114
+[   98.904945] [<ffff8000001487a4>] get_page_from_freelist+0x590/0x63c
+[   98.905871] [<ffff80000014893c>] __alloc_pages_nodemask+0xec/0x794
+[   98.906791] [<ffff80000059fc80>] skb_page_frag_refill+0x70/0xa8
+[   98.907678] [<ffff80000059fcd8>] sk_page_frag_refill+0x20/0xd0
+[   98.908550] [<ffff8000005edc04>] tcp_sendmsg+0x1f8/0x9a8
+[   98.909368] [<ffff80000061419c>] inet_sendmsg+0x5c/0xd0
+[   98.910178] [<ffff80000059bb44>] sock_sendmsg+0x14/0x58
+[   98.911027] [<ffff80000059bbec>] sock_write_iter+0x64/0xbc
+[   98.912119] [<ffff80000019b5b8>] __vfs_write+0xac/0x10c
+[   98.913126] [<ffff80000019bcb8>] vfs_write+0x90/0x1a0
+[   98.913963] [<ffff80000019c53c>] SyS_write+0x40/0xa0
+
+-----------
