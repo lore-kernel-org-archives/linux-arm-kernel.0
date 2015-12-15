@@ -1,26 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 Dec 2015 17:32:15 +0100
-Subject: [PATCH v5 2/2] arm: pxa27x: support for ICP DAS LP-8x4x w/ DT
-In-Reply-To: <1450196875-6739-1-git-send-email-ynvich@gmail.com>
-References: <1449700088-28076-3-git-send-email-ynvich@gmail.com>
- <1450196875-6739-1-git-send-email-ynvich@gmail.com>
-Message-ID: <7496839.vMjVcqPe8Q@wuerfel>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 15 Dec 2015 16:33:43 +0000
+Subject: [PATCH 09/19] ARM: dts: am335x: replace gpio-key,wakeup with
+ wakeup-source property
+In-Reply-To: <1445422216-29375-10-git-send-email-sudeep.holla@arm.com>
+References: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
+ <1445422216-29375-10-git-send-email-sudeep.holla@arm.com>
+Message-ID: <567040E7.7060308@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 December 2015 19:27:50 Sergei Ianovich wrote:
->  .../devicetree/bindings/vendor-prefixes.txt        |   1 +
->  arch/arm/boot/dts/Makefile                         |   3 +
->  arch/arm/boot/dts/pxa27x-lp8x4x-i105.dts           |  50 ++++
->  arch/arm/boot/dts/pxa27x-lp8x4x.dts                | 259 +++++++++++++++++++++
->  arch/arm/configs/lp8x4x_defconfig                  | 176 ++++++++++++++
-> 
 
-I had not noticed earlier that you are adding a new defconfig file. PXA is
-already the platform with the most defconfig files, and I'd rather like
-to see that reduced than increased.
 
-Is there a chance you could merge this one with some of the existing files
-into one configuration that handles them all?
+On 21/10/15 11:10, Sudeep Holla wrote:
+> Though the keyboard driver for GPIO buttons(gpio-keys) will continue to
+> check for/support the legacy "gpio-key,wakeup" boolean property to
+> enable gpio buttons as wakeup source, "wakeup-source" is the new
+> standard binding.
+>
+> This patch replaces the legacy "gpio-key,wakeup" with the unified
+> "wakeup-source" property in order to avoid any futher copy-paste
+> duplication.
+>
+> Cc: "Beno?t Cousson" <bcousson@baylibre.com>
+> Cc: Tony Lindgren <tony@atomide.com>
 
-	Arnd
+Ping, do you prefer taking via your tree or should I send to armsoc
+directly ?
+
+-- 
+Regards,
+Sudeep
