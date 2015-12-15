@@ -1,64 +1,64 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 15 Dec 2015 09:34:37 +0000
-Subject: ARM64/KVM: Bad page state in process iperf
-In-Reply-To: <DM2PR03MB557D3079ABFE7AF114A58A690EE0@DM2PR03MB557.namprd03.prod.outlook.com>
-References: <DM2PR03MB557D3079ABFE7AF114A58A690EE0@DM2PR03MB557.namprd03.prod.outlook.com>
-Message-ID: <566FDEAD.6000707@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 15 Dec 2015 09:36:17 +0000
+Subject: [PATCH] ARM: psci: Fix indentation in DT bindings
+In-Reply-To: <1450169255-669-1-git-send-email-geert+renesas@glider.be>
+References: <1450169255-669-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20151215093617.GA11725@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/12/15 03:46, Bhushan Bharat wrote:
-> 
-> Hi All,
-> 
-> I am running "iperf" in KVM guest on ARM64 machine and observing below crash.
-> 
-> =============================
-> $iperf -c 3.3.3.3 -P 4 -t 0 -i 5 -w 90k
-> ------------------------------------------------------------
-> Client connecting to 3.3.3.3, TCP port 5001
-> TCP window size:  180 KByte (WARNING: requested 90.0 KByte)
-> ------------------------------------------------------------
-> [  3] local 3.3.3.1 port 51131 connected with 3.3.3.3 port 5001
-> [  6] local 3.3.3.1 port 51134 connected with 3.3.3.3 port 5001
-> [  5] local 3.3.3.1 port 51133 connected with 3.3.3.3 port 5001
-> [  4] local 3.3.3.1 port 51132 connected with 3.3.3.3 port 5001
-> [   53.088567] random: nonblocking pool is initialized
-> [ ID] Interval       Transfer     Bandwidth
-> [  3]  0.0- 5.0 sec   638 MBytes  1.07 Gbits/sec
-> [  4] 35.0-40.0 sec  1.66 GBytes  2.85 Gbits/sec
-> [  5] 40.0-45.0 sec  1.11 GBytes  1.90 Gbits/sec
-> [  4] 40.0-45.0 sec  1.16 GBytes  1.99 Gbits/sec
-> [   98.895207] BUG: Bad page state in process iperf  pfn:0a584
-> [   98.896164] page:ffff780000296100 count:-1 mapcount:0 mapping:          (null) index:0x0
-> [   98.897436] flags: 0x0()
-> [   98.897885] page dumped because: nonzero _count
-> [   98.898640] Modules linked in:
-> [   98.899178] CPU: 0 PID: 1639 Comm: iperf Not tainted 4.1.8-00461-ge5431ad #141
-> [   98.900302] Hardware name: linux,dummy-virt (DT)
-> [   98.901014] Call trace:
-> [   98.901406] [<ffff800000096cac>] dump_backtrace+0x0/0x12c
-> [   98.902522] [<ffff800000096de8>] show_stack+0x10/0x1c
-> [   98.903441] [<ffff800000678dc8>] dump_stack+0x8c/0xdc
-> [   98.904202] [<ffff800000145480>] bad_page+0xc4/0x114
-> [   98.904945] [<ffff8000001487a4>] get_page_from_freelist+0x590/0x63c
-> [   98.905871] [<ffff80000014893c>] __alloc_pages_nodemask+0xec/0x794
-> [   98.906791] [<ffff80000059fc80>] skb_page_frag_refill+0x70/0xa8
-> [   98.907678] [<ffff80000059fcd8>] sk_page_frag_refill+0x20/0xd0
-> [   98.908550] [<ffff8000005edc04>] tcp_sendmsg+0x1f8/0x9a8
-> [   98.909368] [<ffff80000061419c>] inet_sendmsg+0x5c/0xd0
-> [   98.910178] [<ffff80000059bb44>] sock_sendmsg+0x14/0x58
-> [   98.911027] [<ffff80000059bbec>] sock_write_iter+0x64/0xbc
-> [   98.912119] [<ffff80000019b5b8>] __vfs_write+0xac/0x10c
-> [   98.913126] [<ffff80000019bcb8>] vfs_write+0x90/0x1a0
-> [   98.913963] [<ffff80000019c53c>] SyS_write+0x40/0xa0
+On Tue, Dec 15, 2015 at 09:47:35AM +0100, Geert Uytterhoeven wrote:
+> Fix bogus indentation of the PSCI compatible values (each space was
+> replaced by a TAB?).
 
-This looks quite bad, but I don't see anything here that links it to KVM
-(apart from being a guest). Do you have any indication that this is due
-to KVM misbehaving? I'd appreciate a few more details.
+Probably, I would remove question from the log.
 
-Thanks,
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+>  Documentation/devicetree/bindings/arm/psci.txt | 18 +++++++++---------
+>  1 file changed, 9 insertions(+), 9 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
+> index a9adab84e2feb785..fb3a1dd2a9880bda 100644
+> --- a/Documentation/devicetree/bindings/arm/psci.txt
+> +++ b/Documentation/devicetree/bindings/arm/psci.txt
+> @@ -23,17 +23,17 @@ Main node required properties:
+>  
+>   - compatible    : should contain at least one of:
+>  
+> -				 * "arm,psci" : for implementations complying to PSCI versions prior to
+> -					0.2. For these cases function IDs must be provided.
+> +     * "arm,psci" : for implementations complying to PSCI versions prior to
+> +	0.2. For these cases function IDs must be provided.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+	* "arm,psci" : for implementations complying to PSCI versions prior to
+		       0.2. For these cases function IDs must be provided.
+
+Can you indent like above please (all of them) ?
+
+Other than that:
+
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+
+>  
+> -				 * "arm,psci-0.2" : for implementations complying to PSCI 0.2. Function
+> -					IDs are not required and should be ignored by an OS with PSCI 0.2
+> -					support, but are permitted to be present for compatibility with
+> -					existing software when "arm,psci" is later in the compatible list.
+> +     * "arm,psci-0.2" : for implementations complying to PSCI 0.2. Function
+> +	IDs are not required and should be ignored by an OS with PSCI 0.2
+> +	support, but are permitted to be present for compatibility with
+> +	existing software when "arm,psci" is later in the compatible list.
+>  
+> -				* "arm,psci-1.0" : for implementations complying to PSCI 1.0. PSCI 1.0 is
+> -					backward compatible with PSCI 0.2 with minor specification updates,
+> -					as defined in the PSCI specification[2].
+> +    * "arm,psci-1.0" : for implementations complying to PSCI 1.0. PSCI 1.0 is
+> +	backward compatible with PSCI 0.2 with minor specification updates,
+> +	as defined in the PSCI specification[2].
+>  
+>   - method        : The method of calling the PSCI firmware. Permitted
+>                     values are:
+> -- 
+> 1.9.1
+> 
