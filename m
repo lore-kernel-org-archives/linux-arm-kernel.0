@@ -1,86 +1,87 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Tue, 15 Dec 2015 01:14:50 -0800
-Subject: [PATCH] ARM64: ZynqMP: DT: Fix GIC's 'reg' property
-In-Reply-To: <566EF5CC.4070000@arm.com>
-References: <1450110700-14152-1-git-send-email-soren.brinkmann@xilinx.com>
- <20151214164613.GH21356@leverpostej> <566EF5CC.4070000@arm.com>
-Message-ID: <20151215091450.GI3358@xsjsorenbubuntu>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Tue, 15 Dec 2015 16:49:38 +0800
+Subject: [PATCH v7 18/19] KVM: ARM64: Free perf event of PMU when destroying
+ vcpu
+In-Reply-To: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
+References: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1450169379-12336-19-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-12-14 at 05:01PM +0000, Marc Zyngier wrote:
-> Mark,
-> 
-> On 14/12/15 16:46, Mark Rutland wrote:
-> > On Mon, Dec 14, 2015 at 08:31:40AM -0800, Soren Brinkmann wrote:
-> >> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> >> ---
-> >>  arch/arm64/boot/dts/xilinx/zynqmp.dtsi | 6 +++---
-> >>  1 file changed, 3 insertions(+), 3 deletions(-)
-> >>
-> >> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-> >> index 857eda5c7217..b5d1facadf16 100644
-> >> --- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-> >> +++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-> >> @@ -80,10 +80,10 @@
-> >>  		gic: interrupt-controller at f9010000 {
-> >>  			compatible = "arm,gic-400", "arm,cortex-a15-gic";
-> >>  			#interrupt-cells = <3>;
-> >> -			reg = <0x0 0xf9010000 0x10000>,
-> >> -			      <0x0 0xf902f000 0x2000>,
-> >> +			reg = <0x0 0xf9010000 0x1000>,
-> >> +			      <0x0 0xf9020000 0x20000>,
-> >>  			      <0x0 0xf9040000 0x20000>,
-> >> -			      <0x0 0xf906f000 0x2000>;
-> >> +			      <0x0 0xf9060000 0x20000>;
-> > 
-> > I'm confused. These sizes don't look right for GIC-400. Is this a custom
-> > GIC?
-> 
-> Probably an implementation that obey the SBSA requirement of aliasing
-> the first 4kB of the CPU interface on a 64kB page, and the second one on
-> the following 64kB page. See the APM system for an example of such a
-> thing. I'm more concerned about the GICH region (3rd one), which has no
-> reason to be bigger than 4kB.
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Xilinx didn't publish the memory map yet (at least I didn't see it in the
-public docs), so, let me give some excerpts:
+When KVM frees VCPU, it needs to free the perf_event of PMU.
 
-GICD:
-GICD_CTLR 	0xF9010000 	32 	rw 	0x00000000 	Distributor Control Register
-...
-GICD_CIDR3 	0xF9010FFC 	32 	ro 	0x000000B1 	Component ID3 Register
+Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+---
+ arch/arm/kvm/arm.c    |  1 +
+ include/kvm/arm_pmu.h |  2 ++
+ virt/kvm/arm/pmu.c    | 21 +++++++++++++++++++++
+ 3 files changed, 24 insertions(+)
 
-GICC:
-GICC_CTLR 	0xF9020000 	32 	rw 	0x00000000 	CPU Interface Control Register
-...
-GICC_DIR 	0xF9030000 	32 	wo 	x 	Deactivate Interrupt Register
-
-GICH:
-GICH_HCR 	0xF9040000 	32 	rw 	0x00000000 	Hypervisor Control Register
-...
-GICH_LR3_Alias7 	0xF9050F0C 	32 	rw 	0x00000000 	List Register 3
-
-GICV:
-GICV_CTLR 	0xF9060000 	32 	rw 	0x00000000 	Virtual Machine Control Register
-...
-GICV_DIR 	0xF9070000 	32 	wo 	x 	VM Deactivate Interrupt Register
-
-
-Regarding the GICH area, it looks like it starts at 0xF9040000 and the
-alias blocks to access the other processor interfaces start at
-0xF9050000.
-
-> 
-> > Did this ever work wit hteh old offsets and sizes?
-> 
-> It probably dies when trying to use EOImode==1.
-
-Without knowing what parts we really exercise, yes, the system comes up
-fine so far, but I recently found Linux boot hanging on QEMU and it
-seemed to be related to time not progressing (fast enough).
-I found a different DT using the values proposed here and that fixed the
-hang for me.
-
-	Thanks,
-	S?ren
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index cd696ef..cea2176 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -259,6 +259,7 @@ void kvm_arch_vcpu_free(struct kvm_vcpu *vcpu)
+ 	kvm_mmu_free_memory_caches(vcpu);
+ 	kvm_timer_vcpu_terminate(vcpu);
+ 	kvm_vgic_vcpu_destroy(vcpu);
++	kvm_pmu_vcpu_destroy(vcpu);
+ 	kmem_cache_free(kvm_vcpu_cache, vcpu);
+ }
+ 
+diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+index 59cb53c..b1b63ac 100644
+--- a/include/kvm/arm_pmu.h
++++ b/include/kvm/arm_pmu.h
+@@ -36,6 +36,7 @@ struct kvm_pmu {
+ };
+ 
+ void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu);
++void kvm_pmu_vcpu_destroy(struct kvm_vcpu *vcpu);
+ void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu);
+ u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx);
+ void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val);
+@@ -50,6 +51,7 @@ struct kvm_pmu {
+ };
+ 
+ void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu) {}
++void kvm_pmu_vcpu_destroy(struct kvm_vcpu *vcpu) {}
+ void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu) {}
+ u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx)
+ {
+diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+index c62e7f5..d113ee4 100644
+--- a/virt/kvm/arm/pmu.c
++++ b/virt/kvm/arm/pmu.c
+@@ -93,6 +93,27 @@ void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu)
+ }
+ 
+ /**
++ * kvm_pmu_vcpu_destroy - free perf event of PMU for cpu
++ * @vcpu: The vcpu pointer
++ *
++ */
++void kvm_pmu_vcpu_destroy(struct kvm_vcpu *vcpu)
++{
++	int i;
++	struct kvm_pmu *pmu = &vcpu->arch.pmu;
++
++	for (i = 0; i < ARMV8_MAX_COUNTERS; i++) {
++		struct kvm_pmc *pmc = &pmu->pmc[i];
++
++		if (pmc->perf_event) {
++			perf_event_disable(pmc->perf_event);
++			perf_event_release_kernel(pmc->perf_event);
++			pmc->perf_event = NULL;
++		}
++	}
++}
++
++/**
+  * kvm_pmu_flush_hwstate - flush pmu state to cpu
+  * @vcpu: The vcpu pointer
+  *
+-- 
+2.0.4
