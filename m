@@ -1,40 +1,34 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 15 Dec 2015 10:24:44 -0800
-Subject: [PATCH 0/3] pwm: bcm2835: improve clock handling
-In-Reply-To: <2004478620.33734.6de503e6-02cb-4cce-af2d-c2614efc234a.open-xchange@email.1und1.de>
-References: <1449010541-3767-1-git-send-email-stefan.wahren@i2se.com>
- <2004478620.33734.6de503e6-02cb-4cce-af2d-c2614efc234a.open-xchange@email.1und1.de>
-Message-ID: <87k2of4ljn.fsf@eliezer.anholt.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 15 Dec 2015 18:27:10 +0000
+Subject: [PATCH v6 5/8] spi: imx: allow only WML aligned transfers to use
+ DMA
+In-Reply-To: <1449557030-27525-6-git-send-email-anton.bondarenko.sama@gmail.com>
+References: <1449557030-27525-1-git-send-email-anton.bondarenko.sama@gmail.com>
+ <1449557030-27525-6-git-send-email-anton.bondarenko.sama@gmail.com>
+Message-ID: <20151215182710.GD5727@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren <stefan.wahren@i2se.com> writes:
+On Tue, Dec 08, 2015 at 07:43:47AM +0100, Anton Bondarenko wrote:
 
->> Stefan Wahren <stefan.wahren@i2se.com> hat am 1. Dezember 2015 um 23:55
->> geschrieben:
->>
->>
->> With the upcoming PWM clock support the pwm-bcm2835 should take
->> more care about the clock handling. But this patch series doesn't
->> depend on these clock driver changes.
->>
->> Stefan Wahren (3):
->> pwm: bcm2835: calculate scaler in pwm_config
->> pwm: bcm2835: prevent division by zero
->> pwm: bcm2835: fix email address specifiction
->>
->> drivers/pwm/pwm-bcm2835.c | 18 ++++++++++++------
->> 1 file changed, 12 insertions(+), 6 deletions(-)
->>
->
-> gently ping
+> Also removing change introduced in f6ee9b582d2db652497b73c1f117591dfb6d3a90
+> since this change only fix usecases with transfer size from 33 to 128 bytes
+> and doesn't fix 129 bytes and bigger.
 
-Thierry, do you want to fold in my r-bs and apply, or should Stefan
-resend with them?
+This is a bug fix for stable but it's randomly in the middle of the
+patch series so I can't apply it as such :(  Please send this as a bug
+fix suitable for sending to Linus.
+
+Please also include human readable descriptions of things like commits
+and issues being discussed in e-mail in your mails, this makes them much
+easier for humans to read especially when they have no internet access.
+I do frequently catch up on my mail on flights or while otherwise
+travelling so this is even more pressing for me than just being about
+making things a bit easier to read.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 818 bytes
+Size: 473 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151215/b74ba940/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151215/5b8e4fa0/attachment.sig>
