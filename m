@@ -1,143 +1,27 @@
-From: ashoks@broadcom.com (Ashok Kumar)
-Date: Tue, 15 Dec 2015 04:56:18 -0800
-Subject: [PATCH v2 2/2] arm64: Use PoU cache instr for I/D coherency
-In-Reply-To: <1450184178-28257-1-git-send-email-ashoks@broadcom.com>
-References: <1450184178-28257-1-git-send-email-ashoks@broadcom.com>
-Message-ID: <1450184178-28257-3-git-send-email-ashoks@broadcom.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 15 Dec 2015 14:08:13 +0100
+Subject: [PATCH] fixup! pinctrl: pxa: pxa2xx: add pin control skeleton
+In-Reply-To: <1449956585-17118-1-git-send-email-robert.jarzmik@free.fr>
+References: <1449956585-17118-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <CACRpkdZgHWwGXhSv4D9-oyS1wW_ZGDpyUfM47-EbU9ujNRD3Mg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In systems with three levels of cache(PoU at L1 and PoC at L3),
-PoC cache flush instructions flushes L2 and L3 caches which could affect
-performance.
-For cache flushes for I and D coherency, PoU should suffice.
-So changing all I and D coherency related cache flushes to PoU.
+On Sat, Dec 12, 2015 at 10:43 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
 
-Introduced a new __clean_dcache_area_pou API for dcache flush till PoU
-and provided a common macro for __flush_dcache_area and
-__clean_dcache_area_pou.
+> The wrong free functions were used to release temporary buffers.
+>
+> This didn't show up in the normal driver's life. Yet in suspend to RAM,
+> the managed resource list is walked, and as memory was released, the
+> list is corrupted and make the kernel Oops.
+>
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> ---
+> Linus, if it's time, then this can fixup the commit. If not, I'll
+> provide a better commit message.
 
-Signed-off-by: Ashok Kumar <ashoks@broadcom.com>
----
- arch/arm64/include/asm/cacheflush.h |  1 +
- arch/arm64/mm/cache.S               | 47 ++++++++++++++++++++++++++++++-------
- arch/arm64/mm/flush.c               | 14 +++++++----
- 3 files changed, 49 insertions(+), 13 deletions(-)
+I just applied it on top of my branch, removing the "fixup!"
+comment. It's enough of a commit message I think.
 
-diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
-index c75b8d0..6a5ecbd 100644
---- a/arch/arm64/include/asm/cacheflush.h
-+++ b/arch/arm64/include/asm/cacheflush.h
-@@ -68,6 +68,7 @@
- extern void flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned long end);
- extern void flush_icache_range(unsigned long start, unsigned long end);
- extern void __flush_dcache_area(void *addr, size_t len);
-+extern void __clean_dcache_area_pou(void *addr, size_t len);
- extern long __flush_cache_user_range(unsigned long start, unsigned long end);
- 
- static inline void flush_cache_mm(struct mm_struct *mm)
-diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-index eb48d5d..1fdcb38 100644
---- a/arch/arm64/mm/cache.S
-+++ b/arch/arm64/mm/cache.S
-@@ -79,28 +79,57 @@ ENDPROC(flush_icache_range)
- ENDPROC(__flush_cache_user_range)
- 
- /*
-+ * Macro to flush/invalidate cache lines till PoU/PoC
-+ *
-+ * 	op:		operation passed to dc instruction
-+ * 	domain:		domain used in dsb instruciton
-+ * 	kaddr:		starting virtual address of the region
-+ * 	size:		size of the region
-+ * 	Corrupts: 	kaddr, size, tmp1, tmp2
-+ */
-+	.macro dcache_by_line_op op, domain, kaddr, size, tmp1, tmp2
-+	dcache_line_size \tmp1, \tmp2
-+	add	\size, \kaddr, \size
-+	sub	\tmp2, \tmp1, #1
-+	bic	\kaddr, \kaddr, \tmp2
-+1:	dc	\op, \kaddr
-+	add	\kaddr, \kaddr, \tmp1
-+	cmp	\kaddr, \size
-+	b.lo	1b
-+	dsb	\domain
-+	.endm
-+
-+/*
-  *	__flush_dcache_area(kaddr, size)
-  *
-  *	Ensure that the data held in the page kaddr is written back to the
-  *	page in question.
-+ *	Flush and invalidate D-cache lines belonging to
-+ *	address <kaddr, kaddr+size> till PoC.
-  *
-  *	- kaddr   - kernel address
-  *	- size    - size in question
-  */
- ENTRY(__flush_dcache_area)
--	dcache_line_size x2, x3
--	add	x1, x0, x1
--	sub	x3, x2, #1
--	bic	x0, x0, x3
--1:	dc	civac, x0			// clean & invalidate D line / unified line
--	add	x0, x0, x2
--	cmp	x0, x1
--	b.lo	1b
--	dsb	sy
-+	dcache_by_line_op civac, sy, x0, x1, x2, x3
- 	ret
- ENDPROC(__flush_dcache_area)
- 
- /*
-+ *	__clean_dcache_area_pou(kaddr, size)
-+ *
-+ * 	Flush D-cache lines belonging to address
-+ * 	<kaddr, kaddr+size> till PoU.
-+ *
-+ *	- kaddr   - kernel address
-+ *	- size    - size in question
-+ */
-+ENTRY(__clean_dcache_area_pou)
-+	dcache_by_line_op cvau, ish, x0, x1, x2, x3
-+	ret
-+ENDPROC(__clean_dcache_area_pou)
-+
-+/*
-  *	__inval_cache_range(start, end)
-  *	- start   - start address of region
-  *	- end     - end address of region
-diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
-index c26b804..4d4d15e 100644
---- a/arch/arm64/mm/flush.c
-+++ b/arch/arm64/mm/flush.c
-@@ -41,7 +41,7 @@ static void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
- 	if (vma->vm_flags & VM_EXEC) {
- 		unsigned long addr = (unsigned long)kaddr;
- 		if (icache_is_aliasing()) {
--			__flush_dcache_area(kaddr, len);
-+			__clean_dcache_area_pou(kaddr, len);
- 			__flush_icache_all();
- 		} else {
- 			flush_icache_range(addr, addr + len);
-@@ -75,9 +75,15 @@ void __sync_icache_dcache(pte_t pte, unsigned long addr)
- 		return;
- 
- 	if (!test_and_set_bit(PG_dcache_clean, &page->flags)) {
--		__flush_dcache_area(page_address(page),
--				PAGE_SIZE << compound_order(page));
--		__flush_icache_all();
-+		if (icache_is_aliasing()) {
-+			__clean_dcache_area_pou(page_address(page),
-+					    PAGE_SIZE << compound_order(page));
-+			__flush_icache_all();
-+		} else {
-+			flush_icache_range((unsigned long)page_address(page),
-+					   (unsigned long)page_address(page) +
-+					   (PAGE_SIZE << compound_order(page)));
-+		}
- 	} else if (icache_is_aivivt()) {
- 		__flush_icache_all();
- 	}
--- 
-2.1.0
+Yours,
+Linus Walleij
