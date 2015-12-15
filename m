@@ -1,92 +1,98 @@
-From: dannym@scratchpost.org (Danny Milosavljevic)
-Date: Tue, 15 Dec 2015 02:52:08 +0100
-Subject: [PATCH v6] sun4i-codec: Add FM, Line and Mic inputs
-In-Reply-To: <20151213205839.GA19456@lukather>
-References: <20151209235530.7240df0a@dayas> <20151213205839.GA19456@lukather>
-Message-ID: <20151215025208.7c468673@dayas>
+From: Mingkai.Hu@freescale.com (Hu Vincent)
+Date: Tue, 15 Dec 2015 01:57:21 +0000
+Subject: [PATCH] dts/ls2080a: Update PCIe compatible
+In-Reply-To: <1449805706.15946.283.camel@freescale.com>
+References: <1448345075-6801-1-git-send-email-Mingkai.Hu@freescale.com>
+ <20151124202203.GA32297@rob-hp-laptop>
+ <BN3PR0301MB1249CD4A615CCD7308FB067184050@BN3PR0301MB1249.namprd03.prod.outlook.com>
+ <1449805706.15946.283.camel@freescale.com>
+Message-ID: <BY2PR03MB31680271828FEC0329A7B5C84EE0@BY2PR03MB316.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
 
-On Sun, 13 Dec 2015 21:58:39 +0100
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
-> This is not the branch you should be basing your patch on. This is an
-> ASoC patch, base it on the ASoC tree.
-
-Okay, will do. To the branch "sunxi-next" in 
-<git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git>, right?
-
-[...]
-> > -static const struct regmap_config sun4i_codec_regmap_config = {
-> > -	.reg_bits	= 32,
-> > -	.reg_stride	= 4,
-> > -	.val_bits	= 32,
-> > -	.max_register	= SUN4I_CODEC_AC_MIC_PHONE_CAL,
-> > -};
-> > -
+> -----Original Message-----
+> From: Wood Scott-B07421
+> Sent: Friday, December 11, 2015 11:48 AM
+> To: Hu Mingkai-B21284; Rob Herring
+> Cc: devicetree at vger.kernel.org; arm at kernel.org; Li Yang-Leo-R58472;
+> linux-arm-kernel at lists.infradead.org; Lian Minghuan-B31939
+> Subject: Re: [PATCH] dts/ls2080a: Update PCIe compatible
 > 
-> Why is this moved?
-
-Because SUN4I_CODEC_AC_MIC_PHONE_CAL is sun7i-specific. 
-Note: I also renamed it and moved the #define in the course of grouping 
-together sun7i-specific things:
-
-> +/* sun7i-specific things: */
-> +/* MIC_PHONE_CAL register offsets and bit fields (A20 only) */
-> +#define SUN7I_CODEC_AC_MIC_PHONE_CAL		(0x3c)
-[...]
-> +static const struct regmap_config sun4i_codec_regmap_config = {
-> +	.reg_bits	= 32,
-> +	.reg_stride	= 4,
-> +	.val_bits	= 32,
-> +	.max_register	= SUN7I_CODEC_AC_MIC_PHONE_CAL,
-> +};
-> +/* end sun7i-specific things */
-
-I thought about also renaming sun4i_codec_regmap_config but decided against it 
-since it's fine to use it on A10 and I think it's best if the name reflects 
-the minimum required hardware.
-
-On the other hand, once I moved the define, sun4i-codec won't compile if 
-sun4i_codec_regmap_config is left at the top. So I had to move it, too.
-
-It will be clearer once I post a patch doing just the preparation of the 
-A10/A20 split.
-
-I just checked A10 vs A20 some more:
-There's also SUN4I_CODEC_AC_SYS_VERI 0x38 present in original ASoC and in 4.4-rc2.
-It's unused by us, not mentioned in the A10 User manual V1.5 20130820, and called 
-"AC_DAC_CAL" in the A20 User Manual v1.4 20150510. Ok to delete? 
-Or is it better to rename it to "SUN7I_CODEC_AC_DAC_CAL" rather than delete?
-
-> >  static int sun4i_codec_probe(struct platform_device *pdev)
-> >  {
-> >  	struct snd_soc_card *card;
-> > @@ -593,6 +740,7 @@ static int sun4i_codec_probe(struct platform_device *pdev)
-> >  	struct resource *res;
-> >  	void __iomem *base;
-> >  	int ret;
-> > +	const struct snd_soc_codec_driver* codec_codec;
+> On Wed, 2015-11-25 at 05:01 +0000, Hu Vincent wrote:
+> >
+> > > -----Original Message-----
+> > > From: Rob Herring [mailto:robh at kernel.org]
+> > > Sent: Wednesday, November 25, 2015 4:22 AM
+> > > To: Hu Mingkai-B21284
+> > > Cc: arm at kernel.org; linux-arm-kernel at lists.infradead.org;
+> > > devicetree at vger.kernel.org; Li Yang-Leo-R58472; Lian Minghuan-B31939
+> > > Subject: Re: [PATCH] dts/ls2080a: Update PCIe compatible
+> > >
+> > > On Tue, Nov 24, 2015 at 02:04:35PM +0800, Mingkai Hu wrote:
+> > > > From: Minghuan Lian <Minghuan.Lian@freescale.com>
+> > > >
+> > > > The patch adds LS2085a to PCIe compatible to fix the compatibility
+> > > > issue when using firmware with LS2085a compatible property.
+> > > >
+> > > > Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+> > > > Signed-off-by: Mingkai Hu <Mingkai.Hu@freescale.com>
+> > > > ---
+> > > >  Documentation/devicetree/bindings/pci/layerscape-pci.txt |  1 +
+> > > >  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi           | 12
+> > > ++++++++----
+> > > >  2 files changed, 9 insertions(+), 4 deletions(-)
+> > > >
+> > > > diff --git
+> > > > a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> > > > b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> > > > index e376785..4600007 100644
+> > > > --- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> > > > +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> > > > @@ -15,6 +15,7 @@ Required properties:
+> > > >  - compatible: should contain the platform identifier such as:
+> > > >          "fsl,ls1021a-pcie", "snps,dw-pcie"
+> > > >          "fsl,ls2080a-pcie", "snps,dw-pcie"
+> > > > +        "fsl,ls2085a-pcie", "snps,dw-pcie"
+> > > >  - reg: base addresses and lengths of the PCIe controller
+> > > >  - interrupts: A list of interrupt outputs of the controller. Must
+> > > contain an
+> > > >    entry for each entry in the interrupt-names property.
+> > > > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> > > > b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> > > > index e81cd48..3821bb1 100644
+> > > > --- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> > > > +++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> > > > @@ -383,7 +383,8 @@
+> > > >  		};
+> > > >
+> > > >  		pcie at 3400000 {
+> > > > -			compatible = "fsl,ls2080a-pcie", "snps,dw
+> > > > -pcie";
+> > > > +			compatible = "fsl,ls2080a-pcie", "fsl,ls2085a
+> > > > -pcie",
+> > > > +				     "snps,dw-pcie";
+> > >
+> > > This doesn't match the doc as to what are valid combinations. The
+> > > order here seems backwards too. ls2085a is older?
+> > >
+> >
+> > Yes, ls2085a was released earlier. You mean the older one comes first?
+> Like:
+> >
+> > compatible = "fsl,ls2085a-pcie", "fsl,ls2080a-pcie",
+> > 		 "snps,dw-pcie";
 > 
-> I guess a single codec is enough :)
+> No, the more specific one should come first (regardless of when each chip
+> is older), so the patch is correct as is.
+> 
+> BTW, the changelog doesn't describe the severity of the problem, but
+> without this change I see a hang in the PCIe controller probe because U-
+> Boot is unable to mark disabled controllers as disabled.
+> 
 
-Modeled after the name of the original variable, see below :)
-
-But OK, I'll rename it to "codec".
-
-Note: the newest original ASoC sun4i-codec has a variable
-  "struct sun4i_codec *scodec;"
-as well in the same function (which is a different thing).
-
-> > +	if (of_device_is_compatible(pdev->dev.of_node, 
-> > +				    "allwinner,sun7i-a20-codec"))
-> > +		codec_codec = &sun7i_codec_codec;
-> > +	else
-> > +		codec_codec = &sun4i_codec_codec;
-> > +	ret = snd_soc_register_codec(&pdev->dev, codec_codec,
-> >  				     &sun4i_codec_dai, 1);
+I agree with you. That's also the reason why I put the "fsl,ls2080a-pci" first.
 
 Thanks,
-   Danny
+Mingkai
