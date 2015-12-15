@@ -1,39 +1,86 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 15 Dec 2015 15:57:37 +0000
-Subject: [RFC PATCH 2/8] Documentation: arm: define DT cpu capacity
- bindings
-In-Reply-To: <20151215154651.GK16007@e106622-lin>
-References: <20151210175820.GE14571@e106622-lin>
- <20151211174940.GQ5727@sirena.org.uk>
- <20151214123616.GC3308@e106622-lin>
- <20151214165928.GV5727@sirena.org.uk>
- <20151215122238.GG16007@e106622-lin>
- <20151215133951.GY5727@sirena.org.uk>
- <20151215140135.GI31299@leverpostej>
- <20151215150813.GZ5727@sirena.org.uk>
- <20151215153218.GA7228@leverpostej>
- <20151215154651.GK16007@e106622-lin>
-Message-ID: <20151215155737.GB7619@leverpostej>
+From: shannon.zhao@linaro.org (Shannon Zhao)
+Date: Tue, 15 Dec 2015 23:59:08 +0800
+Subject: [PATCH v7 15/19] KVM: ARM64: Add access handler for PMUSERENR
+ register
+In-Reply-To: <56702A9B.6000802@arm.com>
+References: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
+ <1450169379-12336-16-git-send-email-zhaoshenglong@huawei.com>
+ <56702A9B.6000802@arm.com>
+Message-ID: <567038CC.8030504@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 15, 2015 at 03:46:51PM +0000, Juri Lelli wrote:
-> On 15/12/15 15:32, Mark Rutland wrote:
-> > On Tue, Dec 15, 2015 at 03:08:13PM +0000, Mark Brown wrote:
-> > > My expectation is that we just need good enough, not perfect, and that
-> > > seems to match what Juri is saying about the expectation that most of
-> > > the fine tuning is done via other knobs.
-> > 
-> > My expectation is that if a ballpark figure is good enough, it should be
-> > possible to implement something trivial like bogomips / loop_per_jiffy
-> > calculation.
-> > 
-> 
-> I didn't really followed that, so I might be wrong here, but isn't
-> already happened a discussion about how we want/like to stop exposing
-> bogomips info or rely on it for anything but in kernel delay loops?
 
-I meant that we could have a benchmark of that level of complexity,
-rather than those specific values.
 
-Mark.
+On 2015/12/15 22:58, Marc Zyngier wrote:
+> On 15/12/15 08:49, Shannon Zhao wrote:
+>> >From: Shannon Zhao<shannon.zhao@linaro.org>
+>> >
+>> >The reset value of PMUSERENR_EL0 is UNKNOWN, use reset_unknown.
+>> >
+>> >PMUSERENR_EL0 holds some bits which decide whether PMU registers can be
+>> >accessed from EL0. Add some check helpers to handle the access from EL0.
+>> >
+>> >Signed-off-by: Shannon Zhao<shannon.zhao@linaro.org>
+>> >---
+>> >  arch/arm64/kvm/sys_regs.c | 124 ++++++++++++++++++++++++++++++++++++++++++++--
+>> >  1 file changed, 119 insertions(+), 5 deletions(-)
+>> >
+>> >diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+>> >index b2ccc25..bad3dfd 100644
+>> >--- a/arch/arm64/kvm/sys_regs.c
+>> >+++ b/arch/arm64/kvm/sys_regs.c
+>> >@@ -452,12 +452,44 @@ static void reset_pmcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+>> >  	vcpu_sys_reg(vcpu, r->reg) = val;
+>> >  }
+>> >
+>> >+static inline bool pmu_access_el0_disabled(struct kvm_vcpu *vcpu)
+>> >+{
+>> >+	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
+>> >+
+>> >+	return !((reg & 0x1) || vcpu_mode_priv(vcpu));
+>> >+}
+>> >+
+>> >+static inline bool pmu_write_swinc_el0_disabled(struct kvm_vcpu *vcpu)
+>> >+{
+>> >+	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
+>> >+
+>> >+	return !((reg & 0x3) || vcpu_mode_priv(vcpu));
+>> >+}
+>> >+
+>> >+static inline bool pmu_access_cycle_counter_el0_disabled(struct kvm_vcpu *vcpu)
+>> >+{
+>> >+	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
+>> >+
+>> >+	return !((reg & 0x5) || vcpu_mode_priv(vcpu));
+>> >+}
+>> >+
+>> >+static inline bool pmu_access_event_counter_el0_disabled(struct kvm_vcpu *vcpu)
+>> >+{
+>> >+	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
+>> >+
+>> >+	return !((reg & 0x9) || vcpu_mode_priv(vcpu));
+>> >+}
+> Please add #defines for the PMUSERNR_EL0 bits.
+>
+>> >+
+>> >  static bool access_pmcr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>> >  			const struct sys_reg_desc *r)
+>> >  {
+>> >  	u64 val;
+>> >+	bool unaccessible = pmu_access_el0_disabled(vcpu);
+>> >
+>> >  	if (p->is_write) {
+>> >+		if (unaccessible)
+>> >+			return ignore_write(vcpu, p);
+>> >+
+> This is not how this is supposed to work. If EL0 is denied access to the
+> PMU, you must inject an exception into EL1 for it to handle the fault.
+> The code should reflect the flow described at D5.11.2 in the ARM ARM.
+>
+Does it need to add a helper to inject an exception into EL1 or is there 
+a existing one?
+
+Thanks,
+-- 
+Shannon
