@@ -1,46 +1,69 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Tue, 15 Dec 2015 16:49:26 +0800
-Subject: [PATCH v7 06/19] KVM: ARM64: Add access handler for PMCEID0 and
- PMCEID1 register
+Date: Tue, 15 Dec 2015 16:49:24 +0800
+Subject: [PATCH v7 04/19] KVM: ARM64: Add access handler for PMCR register
 In-Reply-To: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1450169379-12336-7-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1450169379-12336-5-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Add access handler which gets host value of PMCEID0 or PMCEID1 when
-guest access these registers. Writing action to PMCEID0 or PMCEID1 is
-ignored.
+Add reset handler which gets host value of PMCR_EL0 and make writable
+bits architecturally UNKNOWN except PMCR.E which is zero. Add an access
+handler for PMCR.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- arch/arm64/kvm/sys_regs.c | 26 ++++++++++++++++++++++----
- 1 file changed, 22 insertions(+), 4 deletions(-)
+ arch/arm64/kvm/sys_regs.c | 39 +++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 37 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index c21f91b..e043224 100644
+index d2650e8..9a06116 100644
 --- a/arch/arm64/kvm/sys_regs.c
 +++ b/arch/arm64/kvm/sys_regs.c
-@@ -486,6 +486,24 @@ static bool access_pmselr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 	return true;
+@@ -33,6 +33,7 @@
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_host.h>
+ #include <asm/kvm_mmu.h>
++#include <asm/pmu.h>
+ 
+ #include <trace/events/kvm.h>
+ 
+@@ -438,6 +439,40 @@ static void reset_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+ 	vcpu_sys_reg(vcpu, MPIDR_EL1) = (1ULL << 31) | mpidr;
  }
  
-+static bool access_pmceid(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
-+			  const struct sys_reg_desc *r)
++static void reset_pmcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
 +{
-+	u64 pmceid;
++	u64 pmcr, val;
 +
-+	if (p->is_write)
-+		return write_to_read_only(vcpu, p);
++	asm volatile("mrs %0, pmcr_el0\n" : "=r" (pmcr));
++	/* Writable bits of PMCR_EL0 (ARMV8_PMCR_MASK) is reset to UNKNOWN
++	 * except PMCR.E resetting to zero.
++	 */
++	val = ((pmcr & ~ARMV8_PMCR_MASK) | (ARMV8_PMCR_MASK & 0xdecafbad))
++	      & (~ARMV8_PMCR_E);
++	vcpu_sys_reg(vcpu, r->reg) = val;
++}
 +
-+	if (!(p->Op2 & 1))
-+		asm volatile("mrs %0, pmceid0_el0\n" : "=r" (pmceid));
-+	else
-+		asm volatile("mrs %0, pmceid1_el0\n" : "=r" (pmceid));
++static bool access_pmcr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
++			const struct sys_reg_desc *r)
++{
++	u64 val;
 +
-+	p->regval = pmceid;
++	if (p->is_write) {
++		/* Only update writeable bits of PMCR */
++		val = vcpu_sys_reg(vcpu, r->reg);
++		val &= ~ARMV8_PMCR_MASK;
++		val |= p->regval & ARMV8_PMCR_MASK;
++		vcpu_sys_reg(vcpu, r->reg) = val;
++	} else {
++		/* PMCR.P & PMCR.C are RAZ */
++		val = vcpu_sys_reg(vcpu, r->reg)
++		      & ~(ARMV8_PMCR_P | ARMV8_PMCR_C);
++		p->regval = val;
++	}
 +
 +	return true;
 +}
@@ -48,29 +71,23 @@ index c21f91b..e043224 100644
  /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
  #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
  	/* DBGBVRn_EL1 */						\
-@@ -688,10 +706,10 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	  access_pmselr, reset_unknown, PMSELR_EL0 },
- 	/* PMCEID0_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b110),
+@@ -622,7 +657,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 
+ 	/* PMCR_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b000),
 -	  trap_raz_wi },
-+	  access_pmceid },
- 	/* PMCEID1_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b111),
--	  trap_raz_wi },
-+	  access_pmceid },
- 	/* PMCCNTR_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b000),
++	  access_pmcr, reset_pmcr, PMCR_EL0, },
+ 	/* PMCNTENSET_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b001),
  	  trap_raz_wi },
-@@ -937,8 +955,8 @@ static const struct sys_reg_desc cp15_regs[] = {
+@@ -884,7 +919,7 @@ static const struct sys_reg_desc cp15_regs[] = {
+ 	{ Op1( 0), CRn( 7), CRm(14), Op2( 2), access_dcsw },
+ 
+ 	/* PMU */
+-	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), trap_raz_wi },
++	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), access_pmcr },
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), trap_raz_wi },
  	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), trap_raz_wi },
  	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), trap_raz_wi },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), access_pmselr },
--	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), trap_raz_wi },
--	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), trap_raz_wi },
-+	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), access_pmceid },
-+	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), access_pmceid },
- 	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), trap_raz_wi },
- 	{ Op1( 0), CRn( 9), CRm(13), Op2( 1), trap_raz_wi },
- 	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), trap_raz_wi },
 -- 
 2.0.4
