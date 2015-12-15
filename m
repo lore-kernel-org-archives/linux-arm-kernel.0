@@ -1,53 +1,65 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 15 Dec 2015 13:22:45 +0900
-Subject: [PATCH 0/6] SATA for r8a7795, Salvator-X
-In-Reply-To: <1450107758-2544-1-git-send-email-ulrich.hecht+renesas@gmail.com>
-References: <1450107758-2544-1-git-send-email-ulrich.hecht+renesas@gmail.com>
-Message-ID: <20151215042245.GB32397@verge.net.au>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Mon, 14 Dec 2015 20:36:49 -0800
+Subject: FW: Commit 81a43adae3b9 (locking/mutex: Use acquire/release
+ semantics) causing failures on arm64 (ThunderX)
+In-Reply-To: <20151214202855.GX6357@twins.programming.kicks-ass.net>
+References: <CA+=Sn1n6e9pLDRVWT1EzDEn2XWwoK-Ep__-R6VVPzhbMvCEdNg@mail.gmail.com>
+ <20151211084133.GE6356@twins.programming.kicks-ass.net>
+ <20151211120419.GD18828@arm.com>
+ <20151211121319.GK6356@twins.programming.kicks-ass.net>
+ <20151211121759.GE18828@arm.com>
+ <20151211122647.GM6356@twins.programming.kicks-ass.net>
+ <20151211133313.GG18828@arm.com>
+ <20151211134803.GP6356@twins.programming.kicks-ass.net>
+ <20151211223540.GA22277@linux.vnet.ibm.com>
+ <20151214202855.GX6357@twins.programming.kicks-ass.net>
+Message-ID: <20151215043649.GJ4054@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 14, 2015 at 04:42:32PM +0100, Ulrich Hecht wrote:
-> Hi!
+On Mon, Dec 14, 2015 at 09:28:55PM +0100, Peter Zijlstra wrote:
+> On Fri, Dec 11, 2015 at 02:35:40PM -0800, Paul E. McKenney wrote:
+> > On Fri, Dec 11, 2015 at 02:48:03PM +0100, Peter Zijlstra wrote:
+> > > On Fri, Dec 11, 2015 at 01:33:14PM +0000, Will Deacon wrote:
+> > > > On Fri, Dec 11, 2015 at 01:26:47PM +0100, Peter Zijlstra wrote:
+> > > 
+> > > > > While we're there, the acquire in osq_wait_next() seems somewhat ill
+> > > > > documented too.
+> > > > > 
+> > > > > I _think_ we need ACQUIRE semantics there because we want to strictly
+> > > > > order the lock-unqueue A,B,C steps and we get that with:
+> > > > > 
+> > > > >  A: SC
+> > > > >  B: ACQ
+> > > > >  C: Relaxed
+> > > > > 
+> > > > > Similarly for unlock we want the WRITE_ONCE to happen after
+> > > > > osq_wait_next, but in that case we can even rely on the control
+> > > > > dependency there.
+> > > > 
+> > > > Even for the lock-unqueue case, isn't B->C ordered by a control dependency
+> > > > because C consists only of stores?
+> > > 
+> > > Hmm, indeed. So we could go fully relaxed on it I suppose, since the
+> > > same is true for the unlock site.
+> > 
+> > I am probably missing quite a bit on this thread, but don't x86 MMIO
+> > accesses to frame buffers need to interact with something more heavyweight
+> > than an x86 release store or acquire load in order to remain confined
+> > to the resulting critical section?
 > 
-> This is an adaptation of the patch set from the BSP, adjusted to the new PFC
-> and MSTP clock models.  Applied on top of renesas-drivers, this works great
-> for me.
+> So on x86 there really isn't a problem because every atomic op (and
+> there's plenty here) will be a full barrier.
 > 
-> CU
-> Uli
+> That is, even if you were to replace everything with _relaxed() ops, it
+> would still work as 'expected' on x86.
 > 
+> ppc/arm64 will crash and burn, but that's another story.
 > 
-> Kouei Abe (3):
->   arm64: dts: r8a7795: Add SATA controller node
->   arm64: dts: salvator-x: Enable SATA controller
->   arm64: defconfig: Add Renesas R-Car SATA driver for R-Car Gen3 SoCs
+> But the important point here was that osq_wait_next() is never relied
+> upon to provide either the ACQUIRE semantics for osq_lock() not the
+> RELEASE semantics for osq_unlock(). Those are provided by other ops.
 
-Thanks, I have queued up the above three arm64 patches for v4.5.
-Please send incremental updates if changes need to be made.
+OK, good to know!
 
-The remaining patches, below, can probably be guided into next by Geert.
-
-> 
-> Takeshi Kihara (1):
->   pinctrl: sh-pfc: r8a7795: Add SATA support
-> 
-> Ulrich Hecht (2):
->   clk: shmobile: r8a7795: Add SATA0 clock
->   pinctrl: sh-pfc: r8a7795: add SATA0 pin conf to DT
-> 
->  arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 11 ++++++++++
->  arch/arm64/boot/dts/renesas/r8a7795.dtsi           |  8 ++++++++
->  arch/arm64/configs/defconfig                       |  1 +
->  drivers/clk/shmobile/r8a7795-cpg-mssr.c            |  1 +
->  drivers/pinctrl/sh-pfc/pfc-r8a7795.c               | 24 ++++++++++++++++++++++
->  5 files changed, 45 insertions(+)
-> 
-> -- 
-> 2.6.3
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+							Thanx, Paul
