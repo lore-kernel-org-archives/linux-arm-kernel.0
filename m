@@ -1,44 +1,63 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 15 Dec 2015 17:05:24 +0000
-Subject: [PATCH v12 16/16] arm64: kdump: relax BUG_ON() if more than one
- cpus are still active
-In-Reply-To: <83db66df70fc1f7cd4da8b580d264b9320991cf0.1448403503.git.geoff@infradead.org>
-References: <cover.1448403503.git.geoff@infradead.org>
- <83db66df70fc1f7cd4da8b580d264b9320991cf0.1448403503.git.geoff@infradead.org>
-Message-ID: <20151215170523.GA353@arm.com>
+From: graeme.gregory@linaro.org (G Gregory)
+Date: Tue, 15 Dec 2015 17:08:32 +0000
+Subject: [Linaro-acpi] Touching the initrd before paging_init
+In-Reply-To: <56704054.7080506@redhat.com>
+References: <566D3090.9090509@redhat.com>
+ <20151213165942.GN25034@bivouac.eciton.net>
+ <23071B8C-D1F9-47A6-9DB4-B26842150B76@redhat.com>
+ <566DEB04.2030806@redhat.com>
+ <CAGCh1+nb-H-B28crGuTPUKXZrBN_XDn7fNHf4q8LZZOgyhtDmQ@mail.gmail.com>
+ <566DEED6.3010704@redhat.com>
+ <CAGCh1+k8jHzMK+pLbtBgg5=VdT=+3W+OjTGJLMDGjLqLvmQXnw@mail.gmail.com>
+ <5670339A.7060307@redhat.com>
+ <CAGCh1+=eyBstwL7aPTvmRDDEn0GDrf9gTkCKLDBwoNT916vUpg@mail.gmail.com>
+ <CAGCh1+=+SkaunFL1JE-d8jTb6-Xi+sjUEYoF5ZgcwV7GTj7ECQ@mail.gmail.com>
+ <56704054.7080506@redhat.com>
+Message-ID: <CAGCh1+kc1X6Crhes0C+bh_8YjrFs=0c8SxYW3VmxmZRSaA+xvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 24, 2015 at 10:25:34PM +0000, Geoff Levand wrote:
-> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> 
-> We should try best in case of kdump.
-> So even if not all secondary cpus have shut down, we do kdump anyway.
-> ---
->  arch/arm64/kernel/machine_kexec.c | 8 +++++++-
->  1 file changed, 7 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-> index d2d7e90..482aae7 100644
-> --- a/arch/arm64/kernel/machine_kexec.c
-> +++ b/arch/arm64/kernel/machine_kexec.c
-> @@ -148,7 +148,13 @@ void machine_kexec(struct kimage *kimage)
->  	phys_addr_t reboot_code_buffer_phys;
->  	void *reboot_code_buffer;
->  
-> -	BUG_ON(num_online_cpus() > 1);
-> +	if (num_online_cpus() > 1) {
-> +		if (in_crash_kexec)
-> +			pr_warn("kdump might fail because %d cpus are still online\n",
-> +					num_online_cpus());
-> +		else
-> +			BUG();
-> +	}
+On 15 December 2015 at 16:31, Jon Masters <jcm@redhat.com> wrote:
+> On 12/15/2015 11:28 AM, G Gregory wrote:
+>> On 15 December 2015 at 16:13, G Gregory <graeme.gregory@linaro.org> wrote:
+>>> On 15 December 2015 at 15:36, Jon Masters <jcm@redhat.com> wrote:
+>>>> On 12/15/2015 06:19 AM, G Gregory wrote:
+>>>>
+>>>> <below refers to the GRUB-based approach not the initrd override>
+>>>>
+>>>>> Tried it, results were not great :-(
+>>>>>
+>>>>> set root='hd0,gpt2'
+>>>>> insmod acpi
+>>>>> acpi /DSDT.aml
+>>>>> linux /Image-leg earlycon=pl011,0xe1010000 console=ttyAMA0 acpi=force root
+>>>>> =/dev/sda2
+>>>>
+>>>> <snip>
+>>>>
+>>>>> [    0.000000] PC is at setup_arch+0xfc/0x564
+>>>>> [    0.000000] LR is at setup_arch+0xf8/0x564
+>>>>
+>>>> <snip>
+>>>>
+>>>> So we unmask SError in setup_arch, which happens now later enough that
+>>>> it'll come out of the UART where you can see it. However there are still
+>>>> occasions on some of these early platforms where an unhandled SError can
+>>>> exist as GRUB exits. I have seen that a number of times on Seattle if
+>>>> there's a pending error from one of the IO IP blocks on the SoC You
+>>>> might need a firmware update, but can you also confirm that this
+>>>> happened reproducibly?
+>>>>
+>>> It is Seattle RevB I am using and it is repeatable. I have pre-release
+>>> firmware on there!
+>>>
+>> Repeatable on ROD0084E as well.
+>
+> I'll try it on a couple of other platforms later this week. I've
+> pondered before whether GRUB should unmask SError and report this prior
+> to entering the kernel, because today Linux always gets the blame ;)
+>
+Well IMO it almost certainly should not pass control of a "broken"
+machine. But I do not know anything about SError.
 
-Can you just rewrite the existing BUG_ON as:
-
-  BUG_ON(num_online_cpus() && !WARN_ON(in_crash_kexec));
-
-?
-
-Will
+Graeme
