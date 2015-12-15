@@ -1,37 +1,37 @@
-From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Tue, 15 Dec 2015 08:52:19 -0600
-Subject: [PATCH v2 0/2] i2c:dw: Add APM X-Gene ACPI I2C device support
-In-Reply-To: <20151215132721.GJ1762@lahna.fi.intel.com>
-References: <1449782357-22982-1-git-send-email-lho@apm.com>
- <566F6485.2000508@amd.com> <20151215132721.GJ1762@lahna.fi.intel.com>
-Message-ID: <56702923.9010305@amd.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 15 Dec 2015 14:52:43 +0000
+Subject: [PATCH] arm64: dts: berlin4ct: switch to Cortex-A53 specific pmu
+ nodes
+In-Reply-To: <20151215224709.2d71d2ba@xhacker>
+References: <1450190172-1161-1-git-send-email-jszhang@marvell.com>
+ <8261316.NuheDtlQ6N@wuerfel> <20151215224709.2d71d2ba@xhacker>
+Message-ID: <20151215145243.GB7041@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Dec 15, 2015 at 10:47:09PM +0800, Jisheng Zhang wrote:
+> Dear Arnd,
+> 
+> On Tue, 15 Dec 2015 15:43:53 +0100 Arnd Bergmann wrote:
+> 
+> > On Tuesday 15 December 2015 22:36:12 Jisheng Zhang wrote:
+> > > -               compatible = "arm,armv8-pmuv3";
+> > > +               compatible = "arm,cortex-a53-pmu";
+> > >   
+> > 
+> > Should this list both?
+> 
+> IMHO, we don't need to list both. The pmu binding document also says:
+> "compatible : should be one of ...."
+> 
+> Dear Mark,
+> 
+> Could you please give suggestions?
 
+That should probably reads as "should contain at least one of".
 
-On 12/15/2015 07:27 AM, Mika Westerberg wrote:
-> On Mon, Dec 14, 2015 at 06:53:25PM -0600, Suravee Suthikulanit wrote:
->> >I'm not sure if this has been discussed earlier. But after looking at the
->> >the acpi_apd driver, all we need is just the platform-specific input clock
->> >frequency value used by the drivers/i2c/busses/i2c-designware-core.c:
->> >i2c_dw_init() to calculate the values to program into the DW_IC_SS_SCL_HCNT
->> >and DW_IC_SS_SCL_LCNT registers.
-> There is a way to pass *CNT values already from ACPI to the driver -- It
-> looks for method called FMCN (or SSCN) and retrieves the values from
-> there if found.
-
-Right, I also noticed this afterward. By the way, are FMCN and SSCN 
-documented anywhere in the ACPI spec?  I am trying to figure out how to 
-update the ACPI table to add this information for the AMD Seattle 
-(ARM64) platform, and I will also submit a patch to add the new HID for 
-this driver.
-
-> The driver could be modified not to require clock if it already knows
-> *CNT values.
->
-
-Sounds good.
+It's probably best to keep "arm,armv8-pmuv3" as a fallback in the
+compatible list.
 
 Thanks,
-Suravee
+Mark.
