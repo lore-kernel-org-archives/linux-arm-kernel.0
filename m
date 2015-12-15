@@ -1,83 +1,283 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Tue, 15 Dec 2015 16:49:29 +0800
-Subject: [PATCH v7 09/19] KVM: ARM64: Add access handler for event counter
- register
+Date: Tue, 15 Dec 2015 16:49:35 +0800
+Subject: [PATCH v7 15/19] KVM: ARM64: Add access handler for PMUSERENR register
 In-Reply-To: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1450169379-12336-10-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1450169379-12336-16-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-These kind of registers include PMEVCNTRn, PMCCNTR and PMXEVCNTR which
-is mapped to PMEVCNTRn.
+The reset value of PMUSERENR_EL0 is UNKNOWN, use reset_unknown.
 
-The access handler translates all aarch32 register offsets to aarch64
-ones and uses vcpu_sys_reg() to access their values to avoid taking care
-of big endian.
-
-When reading these registers, return the sum of register value and the
-value perf event counts.
+PMUSERENR_EL0 holds some bits which decide whether PMU registers can be
+accessed from EL0. Add some check helpers to handle the access from EL0.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- arch/arm64/kvm/sys_regs.c | 136 ++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 132 insertions(+), 4 deletions(-)
+ arch/arm64/kvm/sys_regs.c | 124 ++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 119 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index c52ff15..dc6bb26 100644
+index b2ccc25..bad3dfd 100644
 --- a/arch/arm64/kvm/sys_regs.c
 +++ b/arch/arm64/kvm/sys_regs.c
-@@ -566,6 +566,55 @@ static bool access_pmu_evtyper(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 	return true;
+@@ -452,12 +452,44 @@ static void reset_pmcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+ 	vcpu_sys_reg(vcpu, r->reg) = val;
  }
  
-+static bool access_pmu_evcntr(struct kvm_vcpu *vcpu,
-+			      struct sys_reg_params *p,
-+			      const struct sys_reg_desc *r)
++static inline bool pmu_access_el0_disabled(struct kvm_vcpu *vcpu)
 +{
-+	u64 idx, reg, val;
++	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
 +
-+	if (!p->is_aarch32) {
-+		if (r->CRn == 9 && r->CRm == 13 && r->Op2 == 2)
-+			/* PMXEVCNTR_EL0 */
-+			reg = 0;
-+		else
-+			/* PMEVCNTRn_EL0 or PMCCNTR_EL0 */
-+			reg = r->reg;
++	return !((reg & 0x1) || vcpu_mode_priv(vcpu));
++}
++
++static inline bool pmu_write_swinc_el0_disabled(struct kvm_vcpu *vcpu)
++{
++	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
++
++	return !((reg & 0x3) || vcpu_mode_priv(vcpu));
++}
++
++static inline bool pmu_access_cycle_counter_el0_disabled(struct kvm_vcpu *vcpu)
++{
++	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
++
++	return !((reg & 0x5) || vcpu_mode_priv(vcpu));
++}
++
++static inline bool pmu_access_event_counter_el0_disabled(struct kvm_vcpu *vcpu)
++{
++	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
++
++	return !((reg & 0x9) || vcpu_mode_priv(vcpu));
++}
++
+ static bool access_pmcr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ 			const struct sys_reg_desc *r)
+ {
+ 	u64 val;
++	bool unaccessible = pmu_access_el0_disabled(vcpu);
+ 
+ 	if (p->is_write) {
++		if (unaccessible)
++			return ignore_write(vcpu, p);
++
+ 		/* Only update writeable bits of PMCR */
+ 		val = vcpu_sys_reg(vcpu, r->reg);
+ 		val &= ~ARMV8_PMCR_MASK;
+@@ -465,6 +497,9 @@ static bool access_pmcr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ 		vcpu_sys_reg(vcpu, r->reg) = val;
+ 		kvm_pmu_handle_pmcr(vcpu, val);
+ 	} else {
++		if (unaccessible)
++			return read_zero(vcpu, p);
++
+ 		/* PMCR.P & PMCR.C are RAZ */
+ 		val = vcpu_sys_reg(vcpu, r->reg)
+ 		      & ~(ARMV8_PMCR_P | ARMV8_PMCR_C);
+@@ -477,9 +512,17 @@ static bool access_pmcr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ static bool access_pmselr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ 			  const struct sys_reg_desc *r)
+ {
++	bool unaccessible = pmu_access_event_counter_el0_disabled(vcpu);
++
+ 	if (p->is_write) {
++		if (unaccessible)
++			return ignore_write(vcpu, p);
++
+ 		vcpu_sys_reg(vcpu, r->reg) = p->regval;
+ 	} else {
++		if (unaccessible)
++			return read_zero(vcpu, p);
++
+ 		/* return PMSELR.SEL field */
+ 		p->regval = vcpu_sys_reg(vcpu, r->reg) & ARMV8_COUNTER_MASK;
+ 	}
+@@ -494,6 +537,8 @@ static bool access_pmceid(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ 
+ 	if (p->is_write)
+ 		return write_to_read_only(vcpu, p);
++	else if (pmu_access_el0_disabled(vcpu))
++		return read_zero(vcpu, p);
+ 
+ 	if (!(p->Op2 & 1))
+ 		asm volatile("mrs %0, pmceid0_el0\n" : "=r" (pmceid));
+@@ -521,6 +566,7 @@ static bool access_pmu_evtyper(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ 			       const struct sys_reg_desc *r)
+ {
+ 	u64 idx, reg;
++	bool unaccessible = pmu_access_el0_disabled(vcpu);
+ 
+ 	if (r->CRn == 9) {
+ 		/* PMXEVTYPER_EL0 */
+@@ -558,9 +604,15 @@ static bool access_pmu_evtyper(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ 	}
+ 
+ 	if (p->is_write) {
++		if (unaccessible)
++			return ignore_write(vcpu, p);
++
+ 		kvm_pmu_set_counter_event_type(vcpu, p->regval, idx);
+ 		vcpu_sys_reg(vcpu, reg) = p->regval & ARMV8_EVTYPE_MASK;
+ 	} else {
++		if (unaccessible)
++			return read_zero(vcpu, p);
++
+ 		p->regval = vcpu_sys_reg(vcpu, reg) & ARMV8_EVTYPE_MASK;
+ 	}
+ 
+@@ -572,6 +624,7 @@ static bool access_pmu_evcntr(struct kvm_vcpu *vcpu,
+ 			      const struct sys_reg_desc *r)
+ {
+ 	u64 idx, reg, val;
++	bool unaccessible = false;
+ 
+ 	if (!p->is_aarch32) {
+ 		if (r->CRn == 9 && r->CRm == 13 && r->Op2 == 2)
+@@ -591,13 +644,22 @@ static bool access_pmu_evcntr(struct kvm_vcpu *vcpu,
+ 
+ 	switch (reg) {
+ 	case PMEVCNTR0_EL0 ... PMEVCNTR30_EL0:
++		if (pmu_access_event_counter_el0_disabled(vcpu))
++			unaccessible = true;
++
+ 		idx = reg - PMEVCNTR0_EL0;
+ 		break;
+ 	case PMCCNTR_EL0:
++		if (pmu_access_cycle_counter_el0_disabled(vcpu))
++			unaccessible = true;
++
+ 		idx = ARMV8_CYCLE_IDX;
+ 		break;
+ 	default:
+ 		/* PMXEVCNTR_EL0 */
++		if (pmu_access_event_counter_el0_disabled(vcpu))
++			unaccessible = true;
++
+ 		idx = vcpu_sys_reg(vcpu, PMSELR_EL0) & ARMV8_COUNTER_MASK;
+ 		if (!pmu_counter_idx_valid(vcpu, idx))
+ 			return true;
+@@ -608,10 +670,17 @@ static bool access_pmu_evcntr(struct kvm_vcpu *vcpu,
+ 	}
+ 
+ 	val = kvm_pmu_get_counter_value(vcpu, idx);
+-	if (p->is_write)
++	if (p->is_write) {
++		if (unaccessible)
++			return ignore_write(vcpu, p);
++
+ 		vcpu_sys_reg(vcpu, reg) += (s64)p->regval - val;
+-	else
 +	} else {
-+		if (r->CRn == 9 && r->CRm == 13) {
-+			reg = (r->Op2 & 2) ? 0 : PMCCNTR_EL0;
-+		} else {
-+			reg = ((r->CRm & 3) << 3) & (r->Op2 & 7);
-+			reg += PMEVCNTR0_EL0;
-+		}
++		if (unaccessible)
++			return read_zero(vcpu, p);
++
+ 		p->regval = val;
 +	}
+ 
+ 	return true;
+ }
+@@ -628,9 +697,13 @@ static bool access_pmcntenset(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ 			      const struct sys_reg_desc *r)
+ {
+ 	u64 val, mask;
++	bool unaccessible = pmu_access_el0_disabled(vcpu);
+ 
+ 	mask = kvm_pmu_valid_counter_mask(vcpu);
+ 	if (p->is_write) {
++		if (unaccessible)
++			return ignore_write(vcpu, p);
 +
-+	switch (reg) {
-+	case PMEVCNTR0_EL0 ... PMEVCNTR30_EL0:
-+		idx = reg - PMEVCNTR0_EL0;
-+		break;
-+	case PMCCNTR_EL0:
-+		idx = ARMV8_CYCLE_IDX;
-+		break;
-+	default:
-+		/* PMXEVCNTR_EL0 */
-+		idx = vcpu_sys_reg(vcpu, PMSELR_EL0) & ARMV8_COUNTER_MASK;
-+		if (!pmu_counter_idx_valid(vcpu, idx))
-+			return true;
+ 		val = p->regval & mask;
+ 		if (r->Op2 & 0x1) {
+ 			/* accessing PMCNTENSET_EL0 */
+@@ -643,6 +716,9 @@ static bool access_pmcntenset(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ 			kvm_pmu_disable_counter(vcpu, val);
+ 		}
+ 	} else {
++		if (unaccessible)
++			return read_zero(vcpu, p);
 +
-+		reg = (idx == ARMV8_CYCLE_IDX) ? PMCCNTR_EL0
-+						 : PMEVCNTR0_EL0 + idx;
-+		break;
+ 		p->regval = vcpu_sys_reg(vcpu, r->reg) & mask;
+ 	}
+ 
+@@ -653,8 +729,12 @@ static bool access_pmintenset(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ 			      const struct sys_reg_desc *r)
+ {
+ 	u64 mask = kvm_pmu_valid_counter_mask(vcpu);
++	bool unaccessible = !vcpu_mode_priv(vcpu);
+ 
+ 	if (p->is_write) {
++		if (unaccessible)
++			return ignore_write(vcpu, p);
++
+ 		if (r->Op2 & 0x1) {
+ 			/* accessing PMINTENSET_EL1 */
+ 			vcpu_sys_reg(vcpu, r->reg) |= (p->regval & mask);
+@@ -664,6 +744,9 @@ static bool access_pmintenset(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ 			vcpu_sys_reg(vcpu, r->reg) &= ~p->regval;
+ 		}
+ 	} else {
++		if (unaccessible)
++			return read_zero(vcpu, p);
++
+ 		p->regval = vcpu_sys_reg(vcpu, r->reg) & mask;
+ 	}
+ 
+@@ -674,8 +757,12 @@ static bool access_pmovsset(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ 			    const struct sys_reg_desc *r)
+ {
+ 	u64 mask = kvm_pmu_valid_counter_mask(vcpu);
++	bool unaccessible = pmu_access_el0_disabled(vcpu);
+ 
+ 	if (p->is_write) {
++		if (unaccessible)
++			return ignore_write(vcpu, p);
++
+ 		if (r->CRm & 0x2) {
+ 			/* accessing PMOVSSET_EL0 */
+ 			kvm_pmu_overflow_set(vcpu, p->regval & mask);
+@@ -685,6 +772,9 @@ static bool access_pmovsset(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ 			vcpu_sys_reg(vcpu, r->reg) &= ~p->regval;
+ 		}
+ 	} else {
++		if (unaccessible)
++			return read_zero(vcpu, p);
++
+ 		p->regval = vcpu_sys_reg(vcpu, r->reg) & mask;
+ 	}
+ 
+@@ -695,6 +785,9 @@ static bool access_pmswinc(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ 			   const struct sys_reg_desc *r)
+ {
+ 	if (p->is_write) {
++		if (pmu_write_swinc_el0_disabled(vcpu))
++			return ignore_write(vcpu, p);
++
+ 		kvm_pmu_software_increment(vcpu, p->regval);
+ 		return true;
+ 	} else {
+@@ -702,6 +795,24 @@ static bool access_pmswinc(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ 	}
+ }
+ 
++static bool access_pmuserenr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
++			     const struct sys_reg_desc *r)
++{
++	if (p->is_write) {
++		if (!vcpu_mode_priv(vcpu))
++			return write_to_read_only(vcpu, p);
++
++		vcpu_sys_reg(vcpu, r->reg) = p->regval & 0xf;
++	} else {
++		if (pmu_access_el0_disabled(vcpu))
++			return read_zero(vcpu, p);
++
++		p->regval = vcpu_sys_reg(vcpu, r->reg) & 0xf;
 +	}
-+
-+	val = kvm_pmu_get_counter_value(vcpu, idx);
-+	if (p->is_write)
-+		vcpu_sys_reg(vcpu, reg) += (s64)p->regval - val;
-+	else
-+		p->regval = val;
 +
 +	return true;
 +}
@@ -85,147 +285,29 @@ index c52ff15..dc6bb26 100644
  /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
  #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
  	/* DBGBVRn_EL1 */						\
-@@ -581,6 +630,13 @@ static bool access_pmu_evtyper(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 	{ Op0(0b10), Op1(0b000), CRn(0b0000), CRm((n)), Op2(0b111),	\
- 	  trap_wcr, reset_wcr, n, 0,  get_wcr, set_wcr }
- 
-+/* Macro to expand the PMEVCNTRn_EL0 register */
-+#define PMU_PMEVCNTR_EL0(n)						\
-+	/* PMEVCNTRn_EL0 */						\
-+	{ Op0(0b11), Op1(0b011), CRn(0b1110),				\
-+	  CRm((0b1000 | (((n) >> 3) & 0x3))), Op2(((n) & 0x7)),		\
-+	  access_pmu_evcntr, reset_unknown, (PMEVCNTR0_EL0 + n), }
-+
- /* Macro to expand the PMEVTYPERn_EL0 register */
- #define PMU_PMEVTYPER_EL0(n)						\
- 	/* PMEVTYPERn_EL0 */						\
-@@ -781,13 +837,13 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	  access_pmceid },
- 	/* PMCCNTR_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b000),
--	  trap_raz_wi },
-+	  access_pmu_evcntr, reset_unknown, PMCCNTR_EL0 },
- 	/* PMXEVTYPER_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b001),
- 	  access_pmu_evtyper },
+@@ -931,9 +1042,12 @@ static const struct sys_reg_desc sys_reg_descs[] = {
  	/* PMXEVCNTR_EL0 */
  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b010),
--	  trap_raz_wi },
-+	  access_pmu_evcntr },
- 	/* PMUSERENR_EL0 */
+ 	  access_pmu_evcntr },
+-	/* PMUSERENR_EL0 */
++	/* PMUSERENR_EL0
++	 * This register resets as unknown in 64bit mode while it resets as zero
++	 * in 32bit mode. Here we choose to reset it as zero for consistency.
++	 */
  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1110), Op2(0b000),
- 	  trap_raz_wi },
-@@ -802,6 +858,38 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	{ Op0(0b11), Op1(0b011), CRn(0b1101), CRm(0b0000), Op2(0b011),
- 	  NULL, reset_unknown, TPIDRRO_EL0 },
- 
-+	/* PMEVCNTRn_EL0 */
-+	PMU_PMEVCNTR_EL0(0),
-+	PMU_PMEVCNTR_EL0(1),
-+	PMU_PMEVCNTR_EL0(2),
-+	PMU_PMEVCNTR_EL0(3),
-+	PMU_PMEVCNTR_EL0(4),
-+	PMU_PMEVCNTR_EL0(5),
-+	PMU_PMEVCNTR_EL0(6),
-+	PMU_PMEVCNTR_EL0(7),
-+	PMU_PMEVCNTR_EL0(8),
-+	PMU_PMEVCNTR_EL0(9),
-+	PMU_PMEVCNTR_EL0(10),
-+	PMU_PMEVCNTR_EL0(11),
-+	PMU_PMEVCNTR_EL0(12),
-+	PMU_PMEVCNTR_EL0(13),
-+	PMU_PMEVCNTR_EL0(14),
-+	PMU_PMEVCNTR_EL0(15),
-+	PMU_PMEVCNTR_EL0(16),
-+	PMU_PMEVCNTR_EL0(17),
-+	PMU_PMEVCNTR_EL0(18),
-+	PMU_PMEVCNTR_EL0(19),
-+	PMU_PMEVCNTR_EL0(20),
-+	PMU_PMEVCNTR_EL0(21),
-+	PMU_PMEVCNTR_EL0(22),
-+	PMU_PMEVCNTR_EL0(23),
-+	PMU_PMEVCNTR_EL0(24),
-+	PMU_PMEVCNTR_EL0(25),
-+	PMU_PMEVCNTR_EL0(26),
-+	PMU_PMEVCNTR_EL0(27),
-+	PMU_PMEVCNTR_EL0(28),
-+	PMU_PMEVCNTR_EL0(29),
-+	PMU_PMEVCNTR_EL0(30),
- 	/* PMEVTYPERn_EL0 */
- 	PMU_PMEVTYPER_EL0(0),
- 	PMU_PMEVTYPER_EL0(1),
-@@ -1030,6 +1118,13 @@ static const struct sys_reg_desc cp14_64_regs[] = {
- 	{ Op1( 0), CRm( 2), .access = trap_raz_wi },
- };
- 
-+/* Macro to expand the PMEVCNTRn register */
-+#define PMU_PMEVCNTR(n)							\
-+	/* PMEVCNTRn */							\
-+	{ Op1(0), CRn(0b1110),						\
-+	  CRm((0b1000 | (((n) >> 3) & 0x3))), Op2(((n) & 0x7)),		\
-+	  access_pmu_evcntr }
-+
- /* Macro to expand the PMEVTYPERn register */
- #define PMU_PMEVTYPER(n)						\
- 	/* PMEVTYPERn */						\
-@@ -1072,9 +1167,9 @@ static const struct sys_reg_desc cp15_regs[] = {
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), access_pmselr },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), access_pmceid },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), access_pmceid },
--	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), trap_raz_wi },
-+	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), access_pmu_evcntr },
+-	  trap_raz_wi },
++	  access_pmuserenr, reset_val, PMUSERENR_EL0, 0 },
+ 	/* PMOVSSET_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1110), Op2(0b011),
+ 	  access_pmovsset, reset_unknown, PMOVSSET_EL0 },
+@@ -1258,7 +1372,7 @@ static const struct sys_reg_desc cp15_regs[] = {
+ 	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), access_pmu_evcntr },
  	{ Op1( 0), CRn( 9), CRm(13), Op2( 1), access_pmu_evtyper },
--	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), trap_raz_wi },
-+	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), access_pmu_evcntr },
- 	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), trap_raz_wi },
- 	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), trap_raz_wi },
- 	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), trap_raz_wi },
-@@ -1089,6 +1184,38 @@ static const struct sys_reg_desc cp15_regs[] = {
- 
- 	{ Op1( 0), CRn(13), CRm( 0), Op2( 1), access_vm_reg, NULL, c13_CID },
- 
-+	/* PMEVCNTRn */
-+	PMU_PMEVCNTR(0),
-+	PMU_PMEVCNTR(1),
-+	PMU_PMEVCNTR(2),
-+	PMU_PMEVCNTR(3),
-+	PMU_PMEVCNTR(4),
-+	PMU_PMEVCNTR(5),
-+	PMU_PMEVCNTR(6),
-+	PMU_PMEVCNTR(7),
-+	PMU_PMEVCNTR(8),
-+	PMU_PMEVCNTR(9),
-+	PMU_PMEVCNTR(10),
-+	PMU_PMEVCNTR(11),
-+	PMU_PMEVCNTR(12),
-+	PMU_PMEVCNTR(13),
-+	PMU_PMEVCNTR(14),
-+	PMU_PMEVCNTR(15),
-+	PMU_PMEVCNTR(16),
-+	PMU_PMEVCNTR(17),
-+	PMU_PMEVCNTR(18),
-+	PMU_PMEVCNTR(19),
-+	PMU_PMEVCNTR(20),
-+	PMU_PMEVCNTR(21),
-+	PMU_PMEVCNTR(22),
-+	PMU_PMEVCNTR(23),
-+	PMU_PMEVCNTR(24),
-+	PMU_PMEVCNTR(25),
-+	PMU_PMEVCNTR(26),
-+	PMU_PMEVCNTR(27),
-+	PMU_PMEVCNTR(28),
-+	PMU_PMEVCNTR(29),
-+	PMU_PMEVCNTR(30),
- 	/* PMEVTYPERn */
- 	PMU_PMEVTYPER(0),
- 	PMU_PMEVTYPER(1),
-@@ -1127,6 +1254,7 @@ static const struct sys_reg_desc cp15_regs[] = {
- 
- static const struct sys_reg_desc cp15_64_regs[] = {
- 	{ Op1( 0), CRn( 0), CRm( 2), Op2( 0), access_vm_reg, NULL, c2_TTBR0 },
-+	{ Op1( 0), CRn( 0), CRm( 9), Op2( 0), access_pmu_evcntr },
- 	{ Op1( 0), CRn( 0), CRm(12), Op2( 0), access_gic_sgi },
- 	{ Op1( 1), CRn( 0), CRm( 2), Op2( 0), access_vm_reg, NULL, c2_TTBR1 },
- };
+ 	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), access_pmu_evcntr },
+-	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), trap_raz_wi },
++	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), access_pmuserenr },
+ 	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), access_pmintenset },
+ 	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), access_pmintenset },
+ 	{ Op1( 0), CRn( 9), CRm(14), Op2( 3), access_pmovsset },
 -- 
 2.0.4
