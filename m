@@ -1,37 +1,85 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 15 Dec 2015 14:52:43 +0000
-Subject: [PATCH] arm64: dts: berlin4ct: switch to Cortex-A53 specific pmu
- nodes
-In-Reply-To: <20151215224709.2d71d2ba@xhacker>
-References: <1450190172-1161-1-git-send-email-jszhang@marvell.com>
- <8261316.NuheDtlQ6N@wuerfel> <20151215224709.2d71d2ba@xhacker>
-Message-ID: <20151215145243.GB7041@leverpostej>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 15 Dec 2015 14:58:35 +0000
+Subject: [PATCH v7 15/19] KVM: ARM64: Add access handler for PMUSERENR
+ register
+In-Reply-To: <1450169379-12336-16-git-send-email-zhaoshenglong@huawei.com>
+References: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
+ <1450169379-12336-16-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <56702A9B.6000802@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 15, 2015 at 10:47:09PM +0800, Jisheng Zhang wrote:
-> Dear Arnd,
+On 15/12/15 08:49, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> On Tue, 15 Dec 2015 15:43:53 +0100 Arnd Bergmann wrote:
+> The reset value of PMUSERENR_EL0 is UNKNOWN, use reset_unknown.
 > 
-> > On Tuesday 15 December 2015 22:36:12 Jisheng Zhang wrote:
-> > > -               compatible = "arm,armv8-pmuv3";
-> > > +               compatible = "arm,cortex-a53-pmu";
-> > >   
-> > 
-> > Should this list both?
+> PMUSERENR_EL0 holds some bits which decide whether PMU registers can be
+> accessed from EL0. Add some check helpers to handle the access from EL0.
 > 
-> IMHO, we don't need to list both. The pmu binding document also says:
-> "compatible : should be one of ...."
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  arch/arm64/kvm/sys_regs.c | 124 ++++++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 119 insertions(+), 5 deletions(-)
 > 
-> Dear Mark,
-> 
-> Could you please give suggestions?
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index b2ccc25..bad3dfd 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -452,12 +452,44 @@ static void reset_pmcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+>  	vcpu_sys_reg(vcpu, r->reg) = val;
+>  }
+>  
+> +static inline bool pmu_access_el0_disabled(struct kvm_vcpu *vcpu)
+> +{
+> +	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
+> +
+> +	return !((reg & 0x1) || vcpu_mode_priv(vcpu));
+> +}
+> +
+> +static inline bool pmu_write_swinc_el0_disabled(struct kvm_vcpu *vcpu)
+> +{
+> +	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
+> +
+> +	return !((reg & 0x3) || vcpu_mode_priv(vcpu));
+> +}
+> +
+> +static inline bool pmu_access_cycle_counter_el0_disabled(struct kvm_vcpu *vcpu)
+> +{
+> +	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
+> +
+> +	return !((reg & 0x5) || vcpu_mode_priv(vcpu));
+> +}
+> +
+> +static inline bool pmu_access_event_counter_el0_disabled(struct kvm_vcpu *vcpu)
+> +{
+> +	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
+> +
+> +	return !((reg & 0x9) || vcpu_mode_priv(vcpu));
+> +}
 
-That should probably reads as "should contain at least one of".
+Please add #defines for the PMUSERNR_EL0 bits.
 
-It's probably best to keep "arm,armv8-pmuv3" as a fallback in the
-compatible list.
+> +
+>  static bool access_pmcr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>  			const struct sys_reg_desc *r)
+>  {
+>  	u64 val;
+> +	bool unaccessible = pmu_access_el0_disabled(vcpu);
+>  
+>  	if (p->is_write) {
+> +		if (unaccessible)
+> +			return ignore_write(vcpu, p);
+> +
+
+This is not how this is supposed to work. If EL0 is denied access to the
+PMU, you must inject an exception into EL1 for it to handle the fault.
+The code should reflect the flow described at D5.11.2 in the ARM ARM.
+
+This whole patch needs to be revisited, I'm afraid.
 
 Thanks,
-Mark.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
