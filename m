@@ -1,85 +1,72 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 15 Dec 2015 17:17:27 +0000
-Subject: [PATCH v12 14/16] arm64: kdump: update a kernel doc
-In-Reply-To: <3c9bfb1df9bba481b753d8d630e4e3d45f986f04.1448403503.git.geoff@infradead.org>
-References: <cover.1448403503.git.geoff@infradead.org>
- <3c9bfb1df9bba481b753d8d630e4e3d45f986f04.1448403503.git.geoff@infradead.org>
-Message-ID: <20151215171727.GC353@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 15 Dec 2015 17:17:13 +0000
+Subject: [RFC PATCH 2/8] Documentation: arm: define DT cpu capacity
+ bindings
+In-Reply-To: <20151215153218.GA7228@leverpostej>
+References: <20151210153004.GA26758@sirena.org.uk>
+ <20151210175820.GE14571@e106622-lin>
+ <20151211174940.GQ5727@sirena.org.uk>
+ <20151214123616.GC3308@e106622-lin>
+ <20151214165928.GV5727@sirena.org.uk>
+ <20151215122238.GG16007@e106622-lin>
+ <20151215133951.GY5727@sirena.org.uk>
+ <20151215140135.GI31299@leverpostej>
+ <20151215150813.GZ5727@sirena.org.uk>
+ <20151215153218.GA7228@leverpostej>
+Message-ID: <20151215171713.GA5727@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 24, 2015 at 10:25:34PM +0000, Geoff Levand wrote:
-> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> 
-> This patch adds arch specific descriptions about kdump usage on arm64
-> to kdump.txt.
-> 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
->  Documentation/kdump/kdump.txt | 32 +++++++++++++++++++++++++++++++-
->  1 file changed, 31 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
-> index bc4bd5a..7d3fad0 100644
-> --- a/Documentation/kdump/kdump.txt
-> +++ b/Documentation/kdump/kdump.txt
-> @@ -18,7 +18,7 @@ memory image to a dump file on the local disk, or across the network to
->  a remote system.
->  
->  Kdump and kexec are currently supported on the x86, x86_64, ppc64, ia64,
-> -s390x and arm architectures.
-> +s390x, arm and arm64 architectures.
->  
->  When the system kernel boots, it reserves a small section of memory for
->  the dump-capture kernel. This ensures that ongoing Direct Memory Access
-> @@ -249,6 +249,29 @@ Dump-capture kernel config options (Arch Dependent, arm)
->  
->      AUTO_ZRELADDR=y
->  
-> +Dump-capture kernel config options (Arch Dependent, arm64)
-> +----------------------------------------------------------
-> +
-> +1) Disable symmetric multi-processing support under "Processor type and
-> +   features":
-> +
-> +   CONFIG_SMP=n
-> +
-> +   (If CONFIG_SMP=y, then specify maxcpus=1 on the kernel command line
-> +   when loading the dump-capture kernel, see section "Load the Dump-capture
-> +   Kernel".)
+On Tue, Dec 15, 2015 at 03:32:19PM +0000, Mark Rutland wrote:
+> On Tue, Dec 15, 2015 at 03:08:13PM +0000, Mark Brown wrote:
+> > On Tue, Dec 15, 2015 at 02:01:36PM +0000, Mark Rutland wrote:
 
-SMP is now forced on, so please update this text.
+> > > I really don't want to see a table of magic numbers in the kernel.
 
-> +2) The maximum memory size on the dump-capture kernel must be limited by
-> +   specifying:
-> +
-> +   mem=X[MG]
-> +
-> +   where X should be less than or equal to the size in "crashkernel="
-> +   boot parameter. Kexec-tools will automatically add this.
-> +
-> +3) Currently, kvm will not be enabled on the dump-capture kernel even
-> +   if it is configured.
-> +
->  Extended crashkernel syntax
->  ===========================
->  
-> @@ -312,6 +335,8 @@ Boot into System Kernel
->     any space below the alignment point may be overwritten by the dump-capture kernel,
->     which means it is possible that the vmcore is not that precise as expected.
->  
-> +   On arm64, use "crashkernel=Y[@X]".  Note that the start address of
-> +   the kernel, X if explicitly specified, must be aligned to 2MiB (0x200000).
->  
->  Load the Dump-capture Kernel
->  ============================
-> @@ -334,6 +359,8 @@ For s390x:
->  	- Use image or bzImage
->  For arm:
->  	- Use zImage
-> +For arm64:
-> +	- Use vmlinux
+> > Right, there's pitfalls there too although not being part of an ABI
+> > does make them more manageable.  
 
-What? Why doesn't Image work?
+> I think that people are very likely to treat them exactly like an ABI,
+> w.r.t. any regressions in performance that result from their addition,
+> modification, or removal. That becomes really horrible when new CPUs
+> appear.
 
-Will
+Obviously people are going to get upset if we introduce performance
+regressions - but that's true always, we can also introduce problems
+with numbers people have put in DT.  It seems like it'd be harder to
+manage regressions due to externally provided magic numbers since
+there's inherently less information there.
+
+> > One thing it's probably helpful to establish here is how much the
+> > specific numbers are going to matter in the grand scheme of things.  If
+> > the specific numbers *are* super important then nobody is going to want
+> > to touch them as they'll be prone to getting tweaked.  If instead the
+> > numbers just need to be ballpark accurate so the scheduler starts off in
+> > roughly the right place and the specific numbers don't matter it's a lot
+> > easier and having a table in the kernel until we think of something
+> > better (if that ever happens) gets a lot easier.
+
+> I agree that we first need to figure out the importance of these
+> numbers. I disagree that our first step should be to add a table.
+
+My point there is that if we're not that concerned about the specific
+number something in kernel is safer.
+
+> > My expectation is that we just need good enough, not perfect, and that
+> > seems to match what Juri is saying about the expectation that most of
+> > the fine tuning is done via other knobs.
+
+> My expectation is that if a ballpark figure is good enough, it should be
+> possible to implement something trivial like bogomips / loop_per_jiffy
+> calculation.
+
+That does have the issue that we need to scale with regard to the
+frequency the benchmark gets run at.  That's not an insurmountable
+obstacle but it's not completely trivial either.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151215/ffac8009/attachment-0001.sig>
