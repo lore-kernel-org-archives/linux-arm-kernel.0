@@ -1,120 +1,52 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 15 Dec 2015 13:44:28 +0200
-Subject: [PATCH 2/6] ARM: DTS: da850: Use the new DT bindings for the eDMA3
-In-Reply-To: <566FDF93.7050005@ti.com>
-References: <1449237210-16381-1-git-send-email-peter.ujfalusi@ti.com>
- <1449237210-16381-3-git-send-email-peter.ujfalusi@ti.com>
- <566FDF93.7050005@ti.com>
-Message-ID: <566FFD1C.4080000@ti.com>
+From: shannon.zhao@linaro.org (Shannon Zhao)
+Date: Tue, 15 Dec 2015 19:44:56 +0800
+Subject: [PATCH v7 01/19] ARM64: Move PMU register related defines to
+ asm/pmu.h
+In-Reply-To: <566FFAB6.8060604@arm.com>
+References: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
+ <1450169379-12336-2-git-send-email-zhaoshenglong@huawei.com>
+ <566FFAB6.8060604@arm.com>
+Message-ID: <566FFD38.7060803@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/15/2015 11:38 AM, Sekhar Nori wrote:
-> Hi Peter,
-> 
-> On Friday 04 December 2015 07:23 PM, Peter Ujfalusi wrote:
->> Switch to use the ti,edma3-tpcc and ti,edma3-tptc binding for the eDMA3.
->> With the new bindings boards can customize and tweak the DMA channel
->> priority to match their needs. With the new binding the memcpy is safe
->> to be used since with the old binding it was not possible for a driver
->> to know which channel is allowed to be used as non HW triggered channel.
->> Using the new binding will allow us to reserve PaRAM slots to be used by
->> the DSP which was not possible before and prevented the da850 boards to be
->> moved to DT only.
+
+
+On 2015/12/15 19:34, Marc Zyngier wrote:
+> On 15/12/15 08:49, Shannon Zhao wrote:
+>> From: Shannon Zhao <shannon.zhao@linaro.org>
 >>
->> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+>> To use the ARMv8 PMU related register defines from the KVM code,
+>> we move the relevant definitions to asm/pmu.h header file.
+>>
+>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 >> ---
->>  arch/arm/boot/dts/da850-enbw-cmc.dts |  5 +++++
->>  arch/arm/boot/dts/da850-evm.dts      |  5 +++++
->>  arch/arm/boot/dts/da850.dtsi         | 27 ++++++++++++++++++++++-----
->>  3 files changed, 32 insertions(+), 5 deletions(-)
+>>   arch/arm64/include/asm/pmu.h   | 64 ++++++++++++++++++++++++++++++++++++++++++
+>>   arch/arm64/kernel/perf_event.c | 36 +-----------------------
+>>   2 files changed, 65 insertions(+), 35 deletions(-)
+>>   create mode 100644 arch/arm64/include/asm/pmu.h
 >>
->> diff --git a/arch/arm/boot/dts/da850-enbw-cmc.dts b/arch/arm/boot/dts/da850-enbw-cmc.dts
->> index e750ab9086d5..ca9117624cf9 100644
->> --- a/arch/arm/boot/dts/da850-enbw-cmc.dts
->> +++ b/arch/arm/boot/dts/da850-enbw-cmc.dts
->> @@ -28,3 +28,8 @@
->>  		};
->>  	};
->>  };
->> +
->> +&edma0 {
->> +	ti,edma-reserved-slot-ranges = /bits/ 16 <32 50>;
->> +	ti,edma-memcpy-channels = /bits/ 16 <20 21>;
->> +};
->> diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
->> index d807285a61cd..33467feb272a 100644
->> --- a/arch/arm/boot/dts/da850-evm.dts
->> +++ b/arch/arm/boot/dts/da850-evm.dts
->> @@ -243,3 +243,8 @@
->>  	tx-num-evt = <32>;
->>  	rx-num-evt = <32>;
->>  };
->> +
->> +&edma0 {
->> +	ti,edma-reserved-slot-ranges = /bits/ 16 <32 50>;
->> +	ti,edma-memcpy-channels = /bits/ 16 <20 21>;
-> 
-> These correspond to PRU events. It is true that most likely they will
-> never be used for peripheral DMA and can be dedicated as memcpy
-> channels. However, since this is being encoded in DT, we need to be sure
-> that they will never be used for peripheral DMA on this board.
-> 
-> So, I would prefer if you do not reserve any channels for memcpy until
-> there is a real need/usecase for them. I know the board file has these
-> reserved but board file could be updated as you liked. With DT we need
-> to maintain backward compatibility. So I would rather do it when there
-> is an actual need for it.
-
-If we do not reserve channels for memcpy then you will have no support for
-memcpy on these boards. Not sure if we use memcpy in any of our drivers in
-daVinci, so it might be just fine to not have DMA memcpy support at all.
-But how about using edma1's reserved channels as memcpy (19-23, 30-31)? I
-don't know which channels the DSP would use on these boards, so it is never
-going to be safe from that point.
-
-> In future, if/when we gain QDMA support, the QDMA channels could be used
-> for memcopy.
-
-Well, in short there is no way to get the qDMA working in a different way
-either. qDMA channel is in essence using 'normal' eDMA channel. This means
-that we still need to reserve the eDMA channel to be used for memcpy, but
-instead of SW triggering it (as we do it right now), we would need to use the
-channel as qDMA and set things up accordingly. I don't really see the benefit
-for qDMA mode to be honest.
-> 
->> +};
->> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
->> index e73f5efb3aa3..9e46eb51a8da 100644
->> --- a/arch/arm/boot/dts/da850.dtsi
->> +++ b/arch/arm/boot/dts/da850.dtsi
->> @@ -151,11 +151,28 @@
->>  
->>  		};
->>  		edma0: edma at 01c00000 {
->> -			compatible = "ti,edma3";
->> +			compatible = "ti,edma3-tpcc";
->>  			/* eDMA3 CC0: 0x01c0 0000 - 0x01c0 7fff */
->>  			reg =	<0x0 0x8000>;
->> -			interrupts = <11 13 12>;
->> -			#dma-cells = <1>;
->> +			reg-names = "edma3_cc";
->> +			interrupts = <11 12>;
->> +			interrupt-names = "edma3_ccint", "edma3_ccerrint";
->> +			#dma-cells = <2>;
->> +
->> +			ti,tptcs = <&edma0_tptc0 7>, <&edma0_tptc1 0>;
->> +			ti,edma-memcpy-channels = /bits/ 16 <20 21>;
-> 
-> Same here. I would drop this.
-
-OK, I'll drop this part.
-
-> 
-> Thanks,
-> Sekhar
-> 
-
+>> diff --git a/arch/arm64/include/asm/pmu.h b/arch/arm64/include/asm/pmu.h
+>> new file mode 100644
+>> index 0000000..4264ea0
+>> --- /dev/null
+>> +++ b/arch/arm64/include/asm/pmu.h
+>> @@ -0,0 +1,64 @@
+>> +/*
+>> + * Copyright (C) 2015 Linaro Ltd, Shannon Zhao
+>
+> Erm, not quite. You're simply moving existing code from one file to
+> another. That doesn't change the copyright of said code, which reads:
+>
+>   * PMU support
+>   *
+>   * Copyright (C) 2012 ARM Limited
+>   * Author: Will Deacon <will.deacon@arm.com>
+>
+> Please keep this mention in place.
+>
+Sure, will fix this. Thanks.
 
 -- 
-P?ter
+Shannon
