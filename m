@@ -1,77 +1,194 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 15 Dec 2015 17:45:16 +0000
-Subject: [RFC PATCH 2/8] Documentation: arm: define DT cpu capacity
- bindings
-In-Reply-To: <20151215172837.GD8012@leverpostej>
-References: <20151211174940.GQ5727@sirena.org.uk>
- <20151214123616.GC3308@e106622-lin>
- <20151214165928.GV5727@sirena.org.uk>
- <20151215122238.GG16007@e106622-lin>
- <20151215133951.GY5727@sirena.org.uk>
- <20151215140135.GI31299@leverpostej>
- <20151215150813.GZ5727@sirena.org.uk>
- <20151215153218.GA7228@leverpostej>
- <20151215171713.GA5727@sirena.org.uk>
- <20151215172837.GD8012@leverpostej>
-Message-ID: <20151215174516.GB5727@sirena.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 15 Dec 2015 17:45:56 +0000
+Subject: [PATCH v12 13/16] arm64: kdump: add kdump support
+In-Reply-To: <8b02b030a4a081816f35e49b210b41d9f6e2d961.1448403503.git.geoff@infradead.org>
+References: <cover.1448403503.git.geoff@infradead.org>
+ <8b02b030a4a081816f35e49b210b41d9f6e2d961.1448403503.git.geoff@infradead.org>
+Message-ID: <20151215174555.GE353@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 15, 2015 at 05:28:37PM +0000, Mark Rutland wrote:
-> On Tue, Dec 15, 2015 at 05:17:13PM +0000, Mark Brown wrote:
+On Tue, Nov 24, 2015 at 10:25:34PM +0000, Geoff Levand wrote:
+> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> 
+> On crash dump kernel, all the information about primary kernel's core
+> image is available in elf core header specified by "elfcorehdr=" boot
+> parameter. reserve_elfcorehdr() will set aside the region to avoid any
+> corruption by crash dump kernel.
+> 
+> Crash dump kernel will access the system memory of primary kernel via
+> copy_oldmem_page(), which reads one page by ioremap'ing it since it does
+> not reside in linear mapping on crash dump kernel.
+> Please note that we should add "mem=X[MG]" boot parameter to limit the
+> memory size and avoid the following assertion at ioremap():
+> 	if (WARN_ON(pfn_valid(__phys_to_pfn(phys_addr))))
+> 		return NULL;
+> when accessing any pages beyond the usable memories of crash dump kernel.
+> 
+> We also need our own elfcorehdr_read() here since the weak definition of
+> elfcorehdr_read() utilizes copy_oldmem_page() and will hit the assertion
+> above on arm64.
+> 
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> ---
+>  arch/arm64/Kconfig             | 12 +++++++
+>  arch/arm64/kernel/Makefile     |  1 +
+>  arch/arm64/kernel/crash_dump.c | 71 ++++++++++++++++++++++++++++++++++++++++++
+>  arch/arm64/mm/init.c           | 29 +++++++++++++++++
+>  4 files changed, 113 insertions(+)
+>  create mode 100644 arch/arm64/kernel/crash_dump.c
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index c23fd77..4bac7dc 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -545,6 +545,18 @@ config KEXEC
+>  	  but it is independent of the system firmware.   And like a reboot
+>  	  you can start any kernel with it, not just Linux.
+>  
+> +config CRASH_DUMP
+> +	bool "Build kdump crash kernel"
+> +	help
+> +	  Generate crash dump after being started by kexec. This should
+> +	  be normally only set in special crash dump kernels which are
+> +	  loaded in the main kernel with kexec-tools into a specially
+> +	  reserved region and then later executed after a crash by
+> +	  kdump/kexec. The crash dump kernel must be compiled to a
+> +	  memory address not used by the main kernel.
 
-> > Obviously people are going to get upset if we introduce performance
-> > regressions - but that's true always, we can also introduce problems
-> > with numbers people have put in DT.  It seems like it'd be harder to
-> > manage regressions due to externally provided magic numbers since
-> > there's inherently less information there.
+What does this even mean? How do I "compile to a memory address not used
+by the main kernel"?
 
-> It's certainly still possible to have regressions in that case. Those
-> regressions would be due to code changes in the kernel, given the DT
-> didn't change.
+> diff --git a/arch/arm64/kernel/crash_dump.c b/arch/arm64/kernel/crash_dump.c
+> new file mode 100644
+> index 0000000..3d86c0a
+> --- /dev/null
+> +++ b/arch/arm64/kernel/crash_dump.c
+> @@ -0,0 +1,71 @@
+> +/*
+> + * Routines for doing kexec-based kdump
+> + *
+> + * Copyright (C) 2014 Linaro Limited
+> + * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/crash_dump.h>
+> +#include <linux/errno.h>
+> +#include <linux/io.h>
+> +#include <linux/memblock.h>
+> +#include <linux/uaccess.h>
+> +#include <asm/memory.h>
+> +
+> +/**
+> + * copy_oldmem_page() - copy one page from old kernel memory
+> + * @pfn: page frame number to be copied
+> + * @buf: buffer where the copied page is placed
+> + * @csize: number of bytes to copy
+> + * @offset: offset in bytes into the page
+> + * @userbuf: if set, @buf is in a user address space
+> + *
+> + * This function copies one page from old kernel memory into buffer pointed by
+> + * @buf. If @buf is in userspace, set @userbuf to %1. Returns number of bytes
+> + * copied or negative error in case of failure.
+> + */
+> +ssize_t copy_oldmem_page(unsigned long pfn, char *buf,
+> +			 size_t csize, unsigned long offset,
+> +			 int userbuf)
+> +{
+> +	void *vaddr;
+> +
+> +	if (!csize)
+> +		return 0;
+> +
+> +	vaddr = ioremap_cache(pfn << PAGE_SHIFT, PAGE_SIZE);
 
-> I'm not sure I follow w.r.t. "inherently less information", unless you
-> mean trying to debug without access to that DTB?
+pfn_to_page
 
-If what the kernel knows about the system is that it's got a bunch of
-cores with numbers assigned to them then all it's really got is those
-numbers.  If something changes that causes problems for some systems
-(eg, because the numbers have been picked poorly but in a way that
-happened to work well with the old code) that's not a lot to go on, the
-more we know about the system the more likely it is that we'll be able
-to adjust the assumptions in whatever new thing we do that causes
-problems for any particular systems where we run into trouble.
+> +	if (!vaddr)
+> +		return -ENOMEM;
+> +
+> +	if (userbuf) {
+> +		if (copy_to_user(buf, vaddr + offset, csize)) {
+> +			iounmap(vaddr);
+> +			return -EFAULT;
+> +		}
+> +	} else {
+> +		memcpy(buf, vaddr + offset, csize);
+> +	}
+> +
+> +	iounmap(vaddr);
+> +
+> +	return csize;
+> +}
+> +
+> +/**
+> + * elfcorehdr_read - read from ELF core header
+> + * @buf: buffer where the data is placed
+> + * @csize: number of bytes to read
+> + * @ppos: address in the memory
+> + *
+> + * This function reads @count bytes from elf core header which exists
+> + * on crash dump kernel's memory.
+> + */
+> +ssize_t elfcorehdr_read(char *buf, size_t count, u64 *ppos)
+> +{
+> +	memcpy(buf, phys_to_virt((phys_addr_t)*ppos), count);
+> +	return count;
+> +}
 
-> > My point there is that if we're not that concerned about the specific
-> > number something in kernel is safer.
+I know you say that we have to override this function so that we don't
+hit the pfn_valid warning in ioremap, but what guarantees that the ELF
+header of the crashed kernel is actually mapped in our linear mapping?
 
-> I don't entirely disagree there. I think an in-kernel benchmark is
-> likely safer.
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index 24f0a1c..52a1469 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -35,6 +35,7 @@
+>  #include <linux/efi.h>
+>  #include <linux/swiotlb.h>
+>  #include <linux/kexec.h>
+> +#include <linux/crash_dump.h>
+>  
+>  #include <asm/fixmap.h>
+>  #include <asm/memory.h>
+> @@ -116,6 +117,31 @@ static void __init reserve_crashkernel(void)
+>  }
+>  #endif /* CONFIG_KEXEC */
+>  
+> +#ifdef CONFIG_CRASH_DUMP
+> +/*
+> + * reserve_elfcorehdr() - reserves memory for elf core header
+> + *
+> + * This function reserves elf core header given in "elfcorehdr=" kernel
+> + * command line parameter. This region contains all the information about
+> + * primary kernel's core image and is used by a dump capture kernel to
+> + * access the system memory on primary kernel.
+> + */
+> +static void __init reserve_elfcorehdr(void)
+> +{
+> +	if (!elfcorehdr_size)
+> +		return;
+> +
+> +	if (memblock_is_region_reserved(elfcorehdr_addr, elfcorehdr_size)) {
+> +		pr_warn("elfcorehdr is overlapped\n");
+> +		return;
+> +	}
+> +
+> +	memblock_reserve(elfcorehdr_addr, elfcorehdr_size);
+> +
+> +	pr_info("Reserving %lldKB of memory at %lldMB for elfcorehdr\n",
+> +		elfcorehdr_size >> 10, elfcorehdr_addr >> 20);
 
-Yes, I think that something where we just observe the system performance
-at runtime is likely one of the best solutions if we can get something
-that gives reasonable results.
+I'd have thought it would be more useful to print the address as an
+address rather than a size.
 
-> > That does have the issue that we need to scale with regard to the
-> > frequency the benchmark gets run at.  That's not an insurmountable
-> > obstacle but it's not completely trivial either.
+> +}
 
-> If we change clock frequency, then regardless of where the information
-> comes from we need to perform scaling, no?
+Similar #else trick here.
 
-Yes, it's just a question of making the benchmarking bit talk to the
-scaling bit so we know where we're at when we do the benchmark.  Like I
-say it should be doable.
-
-> One nice thing about doing a benchmark to derive the numbers is that
-> when the kernel is that when the frequency is fixed but the kernel
-> cannot query it, the numbers will be representative.
-
-Definitely.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151215/d7a78108/attachment.sig>
+Will
