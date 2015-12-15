@@ -1,65 +1,145 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 15 Dec 2015 17:55:40 +0900
-Subject: [PATCH 2/3] arm64: dts: r8a7795: Add Cortex-A57 CPU cores
-In-Reply-To: <566FD3EE.8040908@gmail.com>
-References: <1449236333-4410-1-git-send-email-dirk.behme@gmail.com>
- <1449236333-4410-2-git-send-email-dirk.behme@gmail.com>
- <20151211230751.GD6496@verge.net.au>
- <CANqRtoSeibffbaoVGV7Y_gyuXxCOu+1PmRf3imQ8OKhV6VoAMQ@mail.gmail.com>
- <566FD3EE.8040908@gmail.com>
-Message-ID: <CANqRtoQEX3jka7ivsz7gfRXbvPr=WVxiDtbM_199HwMoSa=tkw@mail.gmail.com>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Tue, 15 Dec 2015 16:49:32 +0800
+Subject: [PATCH v7 12/19] KVM: ARM64: Add access handler for PMOVSSET and
+ PMOVSCLR register
+In-Reply-To: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
+References: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1450169379-12336-13-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dirk,
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-On Tue, Dec 15, 2015 at 5:48 PM, Dirk Behme <dirk.behme@gmail.com> wrote:
-> On 15.12.2015 09:38, Magnus Damm wrote:
->>
->> Hi Simon,
->>
->> On Sat, Dec 12, 2015 at 8:07 AM, Simon Horman <horms@verge.net.au> wrote:
->>>
->>> On Fri, Dec 04, 2015 at 02:38:52PM +0100, Dirk Behme wrote:
->>>>
->>>> From: Gaku Inami <gaku.inami.xw@bp.renesas.com>
->>>>
->>>> Add Cortex-A57 CPU cores to r8a7795 SoC for a total of 4 x Cortex-A57.
->>>>
->>>> Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
->>>> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
->>>> Sigend-off-by: Dirk Behme <dirk.behme@gmail.com>
->>>
->>>
->>> Thanks, I have queued this up for v4.5.
->>
->>
->> Thanks. May I ask if CPU hotplug is known to work?
->
->
->
-> I didn't test that.
+Since the reset value of PMOVSSET and PMOVSCLR is UNKNOWN, use
+reset_unknown for its reset handler. Add a handler to emulate writing
+PMOVSSET or PMOVSCLR register.
 
-Ok, no worries. I feel that there are various CPU related features
-that need a bit of testing to make sure support is stable enough to
-enable without causing issues for other on-going development.
+When writing non-zero value to PMOVSSET, pend PMU interrupt.
 
-CPU Hotplug is one of those, another is kernel command line options
-like maxcpus, and kexec would be good to have working as well. To make
-things a bit more complicated, there is a rather complicated software
-stack with trusted code installed by the boot loader, so there is a
-dependency on that as well. On earlier SoCs from previous generations
-there were issues with shared reset vectors and a watchdog, so SMP
-support may affect watchdog too...
+Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+---
+ arch/arm64/kvm/sys_regs.c | 28 +++++++++++++++++++++++++---
+ include/kvm/arm_pmu.h     |  2 ++
+ virt/kvm/arm/pmu.c        | 20 ++++++++++++++++++++
+ 3 files changed, 47 insertions(+), 3 deletions(-)
 
->> Also, which version
->> of the boot loader stack is required?
->
-> I've the U-Boot / boot loader stack from BSP v3.0.2 on the board. I haven't
-> tested v3.0.3, yet.
-
-Thanks for sharing!
-
-Cheers,
-
-/ magnus
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 594e53f..d1926c4 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -669,6 +669,27 @@ static bool access_pmintenset(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ 	return true;
+ }
+ 
++static bool access_pmovsset(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
++			    const struct sys_reg_desc *r)
++{
++	u64 mask = kvm_pmu_valid_counter_mask(vcpu);
++
++	if (p->is_write) {
++		if (r->CRm & 0x2) {
++			/* accessing PMOVSSET_EL0 */
++			kvm_pmu_overflow_set(vcpu, p->regval & mask);
++		} else {
++			/* accessing PMOVSCLR_EL0 */
++			vcpu_sys_reg(vcpu, r->reg) &= mask;
++			vcpu_sys_reg(vcpu, r->reg) &= ~p->regval;
++		}
++	} else {
++		p->regval = vcpu_sys_reg(vcpu, r->reg) & mask;
++	}
++
++	return true;
++}
++
+ /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
+ #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
+ 	/* DBGBVRn_EL1 */						\
+@@ -876,7 +897,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	  access_pmcntenset, NULL, PMCNTENSET_EL0 },
+ 	/* PMOVSCLR_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b011),
+-	  trap_raz_wi },
++	  access_pmovsset, NULL, PMOVSSET_EL0 },
+ 	/* PMSWINC_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b100),
+ 	  trap_raz_wi },
+@@ -903,7 +924,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	  trap_raz_wi },
+ 	/* PMOVSSET_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1110), Op2(0b011),
+-	  trap_raz_wi },
++	  access_pmovsset, reset_unknown, PMOVSSET_EL0 },
+ 
+ 	/* TPIDR_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1101), CRm(0b0000), Op2(0b010),
+@@ -1217,7 +1238,7 @@ static const struct sys_reg_desc cp15_regs[] = {
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), access_pmcr },
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), access_pmcntenset },
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), access_pmcntenset },
+-	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), trap_raz_wi },
++	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), access_pmovsset },
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), access_pmselr },
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), access_pmceid },
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), access_pmceid },
+@@ -1227,6 +1248,7 @@ static const struct sys_reg_desc cp15_regs[] = {
+ 	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), trap_raz_wi },
+ 	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), access_pmintenset },
+ 	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), access_pmintenset },
++	{ Op1( 0), CRn( 9), CRm(14), Op2( 3), access_pmovsset },
+ 
+ 	{ Op1( 0), CRn(10), CRm( 2), Op2( 0), access_vm_reg, NULL, c10_PRRR },
+ 	{ Op1( 0), CRn(10), CRm( 2), Op2( 1), access_vm_reg, NULL, c10_NMRR },
+diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+index 43c4117..93aea6a 100644
+--- a/include/kvm/arm_pmu.h
++++ b/include/kvm/arm_pmu.h
+@@ -38,6 +38,7 @@ struct kvm_pmu {
+ u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx);
+ void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val);
+ void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val);
++void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val);
+ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
+ 				    u64 select_idx);
+ #else
+@@ -50,6 +51,7 @@ u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx)
+ }
+ void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val) {}
+ void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val) {}
++void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val) {}
+ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
+ 				    u64 select_idx) {}
+ #endif
+diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+index 94bff0e..861471d 100644
+--- a/virt/kvm/arm/pmu.c
++++ b/virt/kvm/arm/pmu.c
+@@ -130,6 +130,26 @@ void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val)
+ }
+ 
+ /**
++ * kvm_pmu_overflow_set - set PMU overflow interrupt
++ * @vcpu: The vcpu pointer
++ * @val: the value guest writes to PMOVSSET register
++ */
++void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val)
++{
++	u64 reg;
++
++	if (val == 0)
++		return;
++
++	vcpu_sys_reg(vcpu, PMOVSSET_EL0) |= val;
++	reg = vcpu_sys_reg(vcpu, PMOVSSET_EL0)
++	      & vcpu_sys_reg(vcpu, PMCNTENSET_EL0)
++	      & vcpu_sys_reg(vcpu, PMINTENSET_EL1);
++	if (reg != 0)
++		kvm_vcpu_kick(vcpu);
++}
++
++/**
+  * kvm_pmu_set_counter_event_type - set selected counter to monitor some event
+  * @vcpu: The vcpu pointer
+  * @data: The data guest writes to PMXEVTYPER_EL0
+-- 
+2.0.4
