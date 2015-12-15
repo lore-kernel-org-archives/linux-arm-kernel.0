@@ -1,22 +1,66 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 15 Dec 2015 09:48:59 +0000
-Subject: [PATCH] arm64: add HAVE_LATENCYTOP_SUPPORT config
-In-Reply-To: <566F3C6A.1070704@linaro.org>
-References: <1446825478-24824-1-git-send-email-yalin.wang2010@gmail.com>
- <20151106160501.GR6087@arm.com>
- <247F438B-3EEA-4550-970E-A649D0E604ED@gmail.com>
- <20151106162109.GT6087@arm.com> <20151110074124.GB6672@osiris>
- <20151110100547.GC31947@arm.com> <20151110110145.GE6672@osiris>
- <20151110111829.GD31947@arm.com> <20151110113408.GF6672@osiris>
- <566F3C6A.1070704@linaro.org>
-Message-ID: <20151215094858.GA9452@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 15 Dec 2015 09:50:32 +0000
+Subject: [PATCH 3/3] arm64: dts: r8a7795: Add pmu device nodes
+In-Reply-To: <CAMuHMdU940q78hpDjJEHkeyqRRPTWLxqR46K69DCTMOJHBbKcA@mail.gmail.com>
+References: <1449236333-4410-1-git-send-email-dirk.behme@gmail.com>
+ <1449236333-4410-3-git-send-email-dirk.behme@gmail.com>
+ <566ED3D5.1080301@arm.com>
+ <CAMuHMdU940q78hpDjJEHkeyqRRPTWLxqR46K69DCTMOJHBbKcA@mail.gmail.com>
+Message-ID: <566FE268.70802@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 14, 2015 at 02:02:18PM -0800, Shi, Yang wrote:
-> I tried to enable latencytop for arm64 and came across this discussion, so
-> any plan about when this will get merged into mainline? 4.5 merge window?
 
-It's queued in linux-next, so I imagine its heading for 4.5.
 
-Will
+On 15/12/15 08:33, Geert Uytterhoeven wrote:
+> On Mon, Dec 14, 2015 at 3:36 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>> On 04/12/15 13:38, Dirk Behme wrote:
+>>>
+>>> From: Yoshifumi Hosoya <yoshifumi.hosoya.wj@renesas.com>
+>>>
+>>> Enabling the performance monitor unit on r8a7795.
+>>>
+>>> Signed-off-by: Masaru Nagai <masaru.nagai.vx@renesas.com>
+>>> Signed-off-by: Yoshifumi Hosoya <yoshifumi.hosoya.wj@renesas.com>
+>>> Sigend-off-by: Dirk Behme <dirk.behme@gmail.com>
+>>> ---
+>>> Note: This patch picked from
+>>>
+>>>
+>>> https://git.kernel.org/cgit/linux/kernel/git/horms/renesas-bsp.git/log/?h=v4.2/rcar-3.0.x
+>>>
+>>> and rebased against
+>>>
+>>>
+>>> https://git.kernel.org/cgit/linux/kernel/git/geert/renesas-drivers.git/log/?h=topic/gen3-latest
+>>> renesas-drivers-2015-12-01-v4.4-rc3
+>>>
+>>>    arch/arm64/boot/dts/renesas/r8a7795.dtsi | 12 ++++++++++++
+>>>    1 file changed, 12 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+>>> b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+>>> index 946a5bb..8113b71 100644
+>>> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+>>> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+>>> @@ -247,6 +247,18 @@
+>>>                          power-domains = <&cpg>;
+>>>                  };
+>>>
+>>> +               pmu {
+>>> +                       compatible = "arm,armv8-pmuv3";
+>>
+>>
+>> You can add more specific compatible "arm,cortex-a57-pmu" if it's Cortex
+>> A57.
+>
+> Except that one is not documented.
+>
+> Oh, it is. Someone mistyped the commas. Patch sent.
+>
+
+Ah right, nice catch. Thanks for the patch.
+
+-- 
+Regards,
+Sudeep
