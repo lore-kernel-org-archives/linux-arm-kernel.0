@@ -1,46 +1,34 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 15 Dec 2015 10:22:21 +0000
-Subject: [Linaro-acpi] Touching the initrd before paging_init
-In-Reply-To: <566F9C3D.4090306@redhat.com>
-References: <566D3090.9090509@redhat.com>
- <20151213165942.GN25034@bivouac.eciton.net>
- <23071B8C-D1F9-47A6-9DB4-B26842150B76@redhat.com>
- <566DEB04.2030806@redhat.com> <566DEDFC.909@redhat.com>
- <566F9C3D.4090306@redhat.com>
-Message-ID: <20151215102220.GA31299@leverpostej>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Tue, 15 Dec 2015 11:35:24 +0100
+Subject: [for-4.4-rc6 PATCH] scatterlist: fix sg_phys() masking
+In-Reply-To: <20151214231739.10377.11843.stgit@dwillia2-desk3.jf.intel.com>
+References: <20151214231739.10377.11843.stgit@dwillia2-desk3.jf.intel.com>
+Message-ID: <20151215103524.GH18805@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 14, 2015 at 11:51:09PM -0500, Jon Masters wrote:
-> Addendum. I was able to get the initrd based ACPI table override
-> working...HOWEVER...
+On Mon, Dec 14, 2015 at 03:17:39PM -0800, Dan Williams wrote:
+> commit db0fa0cb0157 "scatterlist: use sg_phys()" did replacements of the
+> form:
 > 
-> *** I had to implement a custom memcpy routine to do so ***
+>     phys_addr_t phys = page_to_phys(sg_page(s));
+>     phys_addr_t phys = sg_phys(s) & PAGE_MASK;
 > 
-> Per some internal suggestions, I tried moving map_mem earlier (prior to
-> doing boot time ACPI table parsing, in order to avoid needing to abuse
-> fixmaps to touch the initrd contents), which works. For reading the
-> ramdisk cpio content (the kernel code still uses a fixmap in the initrd
-> override driver code to map the newly created tables in memory).
+> However, this breaks platforms where sizeof(phys_addr_t) >
+> sizeof(unsigned long).  Since PAGE_MASK is an unsigned long this
+> inadvertently masks the high bits returned by sg_phys().  Convert to
+> PHYSICAL_PAGE_MASK in these cases which will do the proper sign
+> extension.
 > 
-> But the reading of that cpio content into the new table locations is
-> done using the kernel memcpy routine to early_ioremap'd memory (Device
-> memory), which is architecturally sensitive to missaligned accesses. The
-> in-kernel memcpy routine only checks the alignment of the source pointed
-> when it begins copying, and doesn't handle the case that the natural
-> alignment differs between source and destination. Therefore, the kernel
-> rolls over and plays dead unless I provide a hacked up jcm_memcpy that
-> just does byte copies. Then everything "works".
+> As caught by the kbuild robot, a generic fallback definition of
+> PHYSICAL_PAGE_MASK is needed for several archs.
 
-You don't need a custom memcpy. All you need to do is use
-early_memremap, as we do for relocate_initrd, to get a Normal Cacheable
-mapping. See:
+It is getting late in the cycle already, isn't it better to revert
+db0fa0cb0157 for now and queue a fixed version for the next round? Then
+you can also replace all the 'sg_phys() & MASK' parts by a new sg helper
+which just returns the page-aligned physical address.
+This would not only be cleaner than your original patch but also leaves
+just one place where you need to fix things if necessary.
 
-	setup_arch()
-		relocate_initrd()
-			copy_from_early_mem()
-				early_memremap()
-				memcpy()
-				early_memunmap()
 
-Mark.
+	Joerg
