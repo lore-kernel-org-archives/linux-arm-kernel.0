@@ -1,62 +1,50 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 15 Dec 2015 11:14:18 +0100
-Subject: [PATCH] ARM: at91/dt: sama5d2: add watchdog node
-In-Reply-To: <1446709170-24500-1-git-send-email-wenyou.yang@atmel.com>
-References: <1446709170-24500-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <566FE7FA.6040300@atmel.com>
+Date: Tue, 15 Dec 2015 11:14:46 +0100
+Subject: [PATCH] ARM: at91/sama5_defconfig: enable watchdog driver
+In-Reply-To: <566FE7D2.4080201@atmel.com>
+References: <1446709076-24359-1-git-send-email-wenyou.yang@atmel.com>
+ <566FE7D2.4080201@atmel.com>
+Message-ID: <566FE816.704@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 05/11/2015 08:39, Wenyou Yang a ?crit :
-> Add watchdog node to support SAMA5D4 watchdog.
+Le 15/12/2015 11:13, Nicolas Ferre a ?crit :
+> Le 05/11/2015 08:37, Wenyou Yang a ?crit :
+>> Enabel AT91SAM9X / AT91CAP9 watchdog and SAMA5D4 watchdog.
+>>
+>> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 > 
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-And stacked on top of at91-4.5-dt.
-
-Thanks!
-
-> ---
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 > 
->  arch/arm/boot/dts/at91-sama5d2_xplained.dts |    4 ++++
->  arch/arm/boot/dts/sama5d2.dtsi              |    7 +++++++
->  2 files changed, 11 insertions(+)
+> And stacked on top of at91-4.5-dt.
+
+at91-4.5-defconfig I mean ;-)
+
 > 
-> diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-> index e07c2b2..de3ef02 100644
-> --- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-> +++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-> @@ -181,6 +181,10 @@
->  				};
->  			};
->  
-> +			watchdog at f8048040 {
-> +				status = "okay";
-> +			};
-> +
->  			uart3: serial at fc008000 {
->  				pinctrl-names = "default";
->  				pinctrl-0 = <&pinctrl_uart3_default>;
-> diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-> index c1f0cba..c29ff70 100644
-> --- a/arch/arm/boot/dts/sama5d2.dtsi
-> +++ b/arch/arm/boot/dts/sama5d2.dtsi
-> @@ -929,6 +929,13 @@
->  				clocks = <&h32ck>;
->  			};
->  
-> +			watchdog at f8048040 {
-> +				compatible = "atmel,sama5d4-wdt";
-> +				reg = <0xf8048040 0x10>;
-> +				interrupts = <4 IRQ_TYPE_LEVEL_HIGH 7>;
-> +				status = "disabled";
-> +			};
-> +
->  			sckc at f8048050 {
->  				compatible = "atmel,at91sam9x5-sckc";
->  				reg = <0xf8048050 0x4>;
+> Thanks!
+> 
+> 
+>> ---
+>>
+>>  arch/arm/configs/sama5_defconfig |    3 +++
+>>  1 file changed, 3 insertions(+)
+>>
+>> diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
+>> index a0c57ac..963daae 100644
+>> --- a/arch/arm/configs/sama5_defconfig
+>> +++ b/arch/arm/configs/sama5_defconfig
+>> @@ -130,6 +130,9 @@ CONFIG_POWER_SUPPLY=y
+>>  CONFIG_POWER_RESET=y
+>>  # CONFIG_HWMON is not set
+>>  CONFIG_SSB=m
+>> +CONFIG_WATCHDOG=y
+>> +CONFIG_AT91SAM9X_WATCHDOG=y
+>> +CONFIG_SAMA5D4_WATCHDOG=y
+>>  CONFIG_MFD_ATMEL_FLEXCOM=y
+>>  CONFIG_REGULATOR=y
+>>  CONFIG_REGULATOR_FIXED_VOLTAGE=y
+>>
+> 
 > 
 
 
