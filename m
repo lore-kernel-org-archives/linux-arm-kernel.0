@@ -1,49 +1,80 @@
-From: dcbw@redhat.com (Dan Williams)
-Date: Tue, 15 Dec 2015 15:14:10 -0600
-Subject: [PATCH] net: add Qualcomm IPC router
-In-Reply-To: <1450214005.4464.9.camel@redhat.com>
-References: <1449866519-14551-1-git-send-email-bjorn.andersson@sonymobile.com>
- <20151215.160114.1178824607335349574.davem@davemloft.net>
- <1450214005.4464.9.camel@redhat.com>
-Message-ID: <1450214050.4464.10.camel@redhat.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 15 Dec 2015 13:40:21 -0800
+Subject: [PATCH v3 3/4] dt-bindings: add rpi power domain driver bindings
+In-Reply-To: <1450215622-27394-1-git-send-email-eric@anholt.net>
+References: <1450215622-27394-1-git-send-email-eric@anholt.net>
+Message-ID: <1450215622-27394-4-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-12-15 at 15:13 -0600, Dan Williams wrote:
-> On Tue, 2015-12-15 at 16:01 -0500, David Miller wrote:
-> > From: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> > Date: Fri, 11 Dec 2015 12:41:59 -0800
-> > 
-> > > +static unsigned int qrtr_local_nid = 1;
-> > > +module_param_named(node_id, qrtr_local_nid, uint, S_IRUGO);
-> > > +MODULE_PARM_DESC(idVendor, "Local Node Identifier");
-> 
-> Also s/idVendor/node_id?
+From: Alexander Aring <alex.aring@gmail.com>
 
-Well, not that it matters if the module parameter gets removed...
+This patch adds devicetree tree bindings for the Raspberry Pi power
+domain driver.
 
-Dan
+Signed-off-by: Alexander Aring <alex.aring@gmail.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Eric Anholt <eric@anholt.net>
+---
 
-> 
-> Dan
-> 
-> > Module parameters suck.
-> > 
-> > Allow the user to choose this dynamically.  You have roughtly two
-> > choices.
-> > 
-> > 1) Subvert the 'protocol' field passed to ->create() and use that,
-> > it
-> > is
-> >    being ignored otherwise.
-> > 
-> > 2) Put it into the socket address for bind().
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe netdev"
-> > in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> --
-> To unsubscribe from this list: send the line "unsubscribe netdev" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+v2: Add the new domains present in v2 to the list.
+
+ .../bindings/arm/bcm/raspberrypi,bcm2835-power.txt | 47 ++++++++++++++++++++++
+ 1 file changed, 47 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-power.txt
+
+diff --git a/Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-power.txt b/Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-power.txt
+new file mode 100644
+index 0000000..30942cf
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-power.txt
+@@ -0,0 +1,47 @@
++Raspberry Pi power domain driver
++
++Required properties:
++
++- compatible:		Should be "raspberrypi,bcm2835-power".
++- firmware:		Reference to the RPi firmware device node.
++- #power-domain-cells:	Should be <1>, we providing multiple power domains.
++
++The valid defines for power domain are:
++
++ RPI_POWER_DOMAIN_I2C0
++ RPI_POWER_DOMAIN_I2C1
++ RPI_POWER_DOMAIN_I2C2
++ RPI_POWER_DOMAIN_VIDEO_SCALER
++ RPI_POWER_DOMAIN_VPU1
++ RPI_POWER_DOMAIN_HDMI
++ RPI_POWER_DOMAIN_USB
++ RPI_POWER_DOMAIN_VEC
++ RPI_POWER_DOMAIN_JPEG
++ RPI_POWER_DOMAIN_H264
++ RPI_POWER_DOMAIN_V3D
++ RPI_POWER_DOMAIN_ISP
++ RPI_POWER_DOMAIN_UNICAM0
++ RPI_POWER_DOMAIN_UNICAM1
++ RPI_POWER_DOMAIN_CCP2RX
++ RPI_POWER_DOMAIN_CSI2
++ RPI_POWER_DOMAIN_CPI
++ RPI_POWER_DOMAIN_DSI0
++ RPI_POWER_DOMAIN_DSI1
++ RPI_POWER_DOMAIN_TRANSPOSER
++ RPI_POWER_DOMAIN_CCP2TX
++ RPI_POWER_DOMAIN_CDP
++ RPI_POWER_DOMAIN_ARM
++
++Example:
++
++power: power {
++	compatible = "raspberrypi,bcm2835-power";
++	firmware = <&firmware>;
++	#power-domain-cells = <1>;
++};
++
++Example for using power domain:
++
++&usb {
++       power-domains = <&power RPI_POWER_DOMAIN_USB>;
++};
+-- 
+2.6.2
