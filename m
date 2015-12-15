@@ -1,40 +1,31 @@
-From: dirk.behme@gmail.com (Dirk Behme)
-Date: Tue, 15 Dec 2015 09:39:17 +0100
-Subject: [PATCH] arm64: perf: Correct Cortex-A53/A57 compatible values
-In-Reply-To: <1450168400-462-1-git-send-email-geert+renesas@glider.be>
-References: <1450168400-462-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <566FD1B5.2070602@gmail.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Tue, 15 Dec 2015 17:38:24 +0900
+Subject: [PATCH 2/3] arm64: dts: r8a7795: Add Cortex-A57 CPU cores
+In-Reply-To: <20151211230751.GD6496@verge.net.au>
+References: <1449236333-4410-1-git-send-email-dirk.behme@gmail.com>
+ <1449236333-4410-2-git-send-email-dirk.behme@gmail.com>
+ <20151211230751.GD6496@verge.net.au>
+Message-ID: <CANqRtoSeibffbaoVGV7Y_gyuXxCOu+1PmRf3imQ8OKhV6VoAMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.12.2015 09:33, Geert Uytterhoeven wrote:
-> Use commas instead of periods.
+Hi Simon,
+
+On Sat, Dec 12, 2015 at 8:07 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Fri, Dec 04, 2015 at 02:38:52PM +0100, Dirk Behme wrote:
+>> From: Gaku Inami <gaku.inami.xw@bp.renesas.com>
+>>
+>> Add Cortex-A57 CPU cores to r8a7795 SoC for a total of 4 x Cortex-A57.
+>>
+>> Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
+>> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+>> Sigend-off-by: Dirk Behme <dirk.behme@gmail.com>
 >
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Thanks, I have queued this up for v4.5.
 
-Acked-by: Dirk Behme <dirk.behme@gmail.com>
+Thanks. May I ask if CPU hotplug is known to work? Also, which version
+of the boot loader stack is required?
 
-Thanks!
+Best,
 
-Dirk
-
-> ---
->   Documentation/devicetree/bindings/arm/pmu.txt | 4 ++--
->   1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
-> index 97ba45af04fc693f..a6cd14888bed9b29 100644
-> --- a/Documentation/devicetree/bindings/arm/pmu.txt
-> +++ b/Documentation/devicetree/bindings/arm/pmu.txt
-> @@ -9,8 +9,8 @@ Required properties:
->   - compatible : should be one of
->   	"apm,potenza-pmu"
->   	"arm,armv8-pmuv3"
-> -	"arm.cortex-a57-pmu"
-> -	"arm.cortex-a53-pmu"
-> +	"arm,cortex-a57-pmu"
-> +	"arm,cortex-a53-pmu"
->   	"arm,cortex-a17-pmu"
->   	"arm,cortex-a15-pmu"
->   	"arm,cortex-a12-pmu"
->
+/ magnus
