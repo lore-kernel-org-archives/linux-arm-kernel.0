@@ -1,376 +1,141 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 15 Dec 2015 13:40:20 -0800
-Subject: [PATCH v3 2/4] ARM: bcm2835: add rpi power domain driver
-In-Reply-To: <1450215622-27394-1-git-send-email-eric@anholt.net>
-References: <1450215622-27394-1-git-send-email-eric@anholt.net>
-Message-ID: <1450215622-27394-3-git-send-email-eric@anholt.net>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Wed, 16 Dec 2015 00:42:26 +0300
+Subject: [RFC3 PATCH v6 00/20] ILP32 for ARM64
+Message-ID: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexander Aring <alex.aring@gmail.com>
+This is still RFC because we have no glibc yet, that correspnds new ABI
+introduced here. And so we cannot run tests. LP64 and AARCH32 tests show
+no regression though.
 
-This patch adds support for several power domains on Raspberry Pi,
-including USB (so it can be enabled even if the bootloader didn't do
-it), and graphics.
+  v3: https://lkml.org/lkml/2014/9/3/704
+  v4: https://lkml.org/lkml/2015/4/13/691
+  v5: https://lkml.org/lkml/2015/9/29/911
 
-This patch is the combined work of Eric Anholt (who wrote USB support
-inside of the Raspberry Pi firmware driver, and wrote the non-USB
-domain support) and Alexander Aring (who separated the original USB
-work out from the firmware driver).
+  v6:
+ - time_t, __kenel_off_t and other types turned to be 32-bit
+   for compatibility reasons (after v5 discussion);
+ - related changes applied to ILP32 syscall table and handlers;
+ - ILP32 VDSO code excluded. It's not mandatory, and caused questions
+   during review process. We definitely make sure we will follow up
+   with a VDSO later on because it is needed for performance reasons;
+ - fixed build issues with different combinations of AARCH32 / ILP32
+   enabling in config;
+ - ILP32 TLS bug fixed;
+ - entry32-common.S introduced to hold wrappers needed for both ILP32
+   and AARCH32_EL0;
+ - documentation updated according to latest changes;
+ - rebased to the current head;
+ - coding style re-checked;
+ - ILP32 syscall table turned around.
 
-Signed-off-by: Alexander Aring <alex.aring@gmail.com>
-Signed-off-by: Eric Anholt <eric@anholt.net>
----
+ rfc3:
+ - all structures and system calls are just like AARCH32 ones now. with 2
+   exceptions: syscalls that take 64-bit parameter in 2 32-bit regosters
+   are replaced with LP64 version; struct rt_sigframe is constructed both
+   from LP64 and AARCH32 fields to be consistent with AARCH64 register set;
+ - documentation rewritten accordingly;
+ - common code for all 3 ABIs is moved to separated files for easy use,
+   new headers and objects are introduced, incl: is_compat.h, thread_bits.h,
+   signal_common.h, signal32_common.h.
+ - ILP32 VDSO code restored, Nathans comments are addressed;
+ - patch "arm64: ilp32: force IPC_64 in msgctl, shmctl, semctl" removed, as
+   Arnd suggested general solution for IPC_64 problem.
 
-v2: Add support for power domains other than USB, using the new
-    firmware interface, reword commit message (changes by Eric)
 
-v3: Restructure as a builtin driver, and drop
-    of_genpd_add_provider_onecell error handling to avoid
-    pm_genpd_exit() dependency until that API can be settled.  Clean
-    up copyright header, add missing ISP initialization, and fix typo
-    in transposer's name.
+Andrew Pinski (9):
+  arm64: ensure the kernel is compiled for LP64
+  arm64: rename COMPAT to AARCH32_EL0 in Kconfig
+  arm64: change some CONFIG_COMPAT over to use CONFIG_AARCH32_EL0
+    instead
+  arm64:uapi: set __BITS_PER_LONG correctly for ILP32 and LP64
+  arm64:ilp32: share HWCAP between LP64 and ILP32
+  arm64:ilp32 use the native LP64 'start_thread' for ILP32 threads
+  arm64:ilp32: support core dump generation for ILP32
+  arm64:ilp32: add sys_ilp32.c and a separate table (in entry.S) to use
+    it
+  arm64:ilp32: add ARM64_ILP32 to Kconfig
 
- arch/arm/mach-bcm/Kconfig                   |  10 ++
- arch/arm/mach-bcm/Makefile                  |   1 +
- arch/arm/mach-bcm/raspberrypi-power.c       | 247 ++++++++++++++++++++++++++++
- include/dt-bindings/arm/raspberrypi-power.h |  41 +++++
- 4 files changed, 299 insertions(+)
- create mode 100644 arch/arm/mach-bcm/raspberrypi-power.c
- create mode 100644 include/dt-bindings/arm/raspberrypi-power.h
+Jan Dakinevich (1):
+  arm64: ilp32: share aarch32 syscall wrappers to ilp32
 
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index 8c53c55..0f23bad 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -134,6 +134,16 @@ config ARCH_BCM2835
- 	  This enables support for the Broadcom BCM2835 SoC. This SoC is
- 	  used in the Raspberry Pi and Roku 2 devices.
- 
-+config RASPBERRYPI_POWER
-+	bool "Raspberry Pi power domain driver"
-+	depends on ARCH_BCM2835 || COMPILE_TEST
-+	depends on RASPBERRYPI_FIRMWARE
-+	select PM_GENERIC_DOMAINS if PM
-+	select PM_GENERIC_DOMAINS_OF if PM
-+	help
-+	  This enables support for the RPi power domains which can be enabled
-+	  or disabled via the RPi firmware.
-+
- config ARCH_BCM_63XX
- 	bool "Broadcom BCM63xx DSL SoC" if ARCH_MULTI_V7
- 	depends on MMU
-diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
-index 892261f..fec2d6b 100644
---- a/arch/arm/mach-bcm/Makefile
-+++ b/arch/arm/mach-bcm/Makefile
-@@ -36,6 +36,7 @@ endif
- 
- # BCM2835
- obj-$(CONFIG_ARCH_BCM2835)	+= board_bcm2835.o
-+obj-$(CONFIG_RASPBERRYPI_POWER)	+= raspberrypi-power.o
- 
- # BCM5301X
- obj-$(CONFIG_ARCH_BCM_5301X)	+= bcm_5301x.o
-diff --git a/arch/arm/mach-bcm/raspberrypi-power.c b/arch/arm/mach-bcm/raspberrypi-power.c
-new file mode 100644
-index 0000000..9dc8b43
---- /dev/null
-+++ b/arch/arm/mach-bcm/raspberrypi-power.c
-@@ -0,0 +1,247 @@
-+/* (C) 2015 Pengutronix, Alexander Aring <aar@pengutronix.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * Authors:
-+ * Alexander Aring <aar@pengutronix.de>
-+ * Eric Anholt <eric@anholt.net>
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/of_platform.h>
-+#include <linux/platform_device.h>
-+#include <linux/pm_domain.h>
-+#include <dt-bindings/arm/raspberrypi-power.h>
-+#include <soc/bcm2835/raspberrypi-firmware.h>
-+
-+/*
-+ * Firmware indices for the old power domains interface.  Only a few
-+ * of them were actually implemented.
-+ */
-+#define RPI_OLD_POWER_DOMAIN_USB		3
-+#define RPI_OLD_POWER_DOMAIN_V3D		10
-+
-+struct rpi_power_domain {
-+	u32 domain;
-+	bool enabled;
-+	bool old_interface;
-+	struct generic_pm_domain base;
-+	struct rpi_firmware *fw;
-+};
-+
-+struct rpi_power_domains {
-+	bool has_new_interface;
-+	struct genpd_onecell_data xlate;
-+	struct rpi_firmware *fw;
-+	struct rpi_power_domain domains[RPI_POWER_DOMAIN_COUNT];
-+};
-+
-+/*
-+ * Packet definition used by RPI_FIRMWARE_SET_POWER_STATE and
-+ * RPI_FIRMWARE_SET_DOMAIN_STATE
-+ */
-+struct rpi_power_domain_packet {
-+	u32 domain;
-+	u32 on;
-+} __packet;
-+
-+/*
-+ * Asks the firmware to enable or disable power on a specific power
-+ * domain.
-+ */
-+static int rpi_firmware_set_power(struct rpi_power_domain *rpi_domain, bool on)
-+{
-+	struct rpi_power_domain_packet packet;
-+
-+	packet.domain = rpi_domain->domain;
-+	packet.on = on;
-+	return rpi_firmware_property(rpi_domain->fw,
-+				     rpi_domain->old_interface ?
-+				     RPI_FIRMWARE_SET_POWER_STATE :
-+				     RPI_FIRMWARE_SET_DOMAIN_STATE,
-+				     &packet, sizeof(packet));
-+}
-+
-+static int rpi_domain_off(struct generic_pm_domain *domain)
-+{
-+	struct rpi_power_domain *rpi_domain =
-+		container_of(domain, struct rpi_power_domain, base);
-+
-+	return rpi_firmware_set_power(rpi_domain, false);
-+}
-+
-+static int rpi_domain_on(struct generic_pm_domain *domain)
-+{
-+	struct rpi_power_domain *rpi_domain =
-+		container_of(domain, struct rpi_power_domain, base);
-+
-+	return rpi_firmware_set_power(rpi_domain, true);
-+}
-+
-+static void rpi_common_init_power_domain(struct rpi_power_domains *rpi_domains,
-+					 int xlate_index, const char *name)
-+{
-+	struct rpi_power_domain *dom = &rpi_domains->domains[xlate_index];
-+
-+	dom->fw = rpi_domains->fw;
-+
-+	dom->base.name = name;
-+	dom->base.power_on = rpi_domain_on;
-+	dom->base.power_off = rpi_domain_off;
-+
-+	/*
-+	 * Treat all power domains as off at boot.
-+	 *
-+	 * The firmware itself may be keeping some domains on, but
-+	 * from Linux's perspective all we control is the refcounts
-+	 * that we give to the firmware, and we can't ask the firmware
-+	 * to turn off something that we haven't ourselves turned on.
-+	 */
-+	pm_genpd_init(&dom->base, NULL, true);
-+
-+	rpi_domains->xlate.domains[xlate_index] = &dom->base;
-+}
-+
-+static void rpi_init_power_domain(struct rpi_power_domains *rpi_domains,
-+				  int xlate_index, const char *name)
-+{
-+	struct rpi_power_domain *dom = &rpi_domains->domains[xlate_index];
-+
-+	if (!rpi_domains->has_new_interface)
-+		return;
-+
-+	/* The DT binding index is the firmware's domain index minus one. */
-+	dom->domain = xlate_index + 1;
-+
-+	rpi_common_init_power_domain(rpi_domains, xlate_index, name);
-+}
-+
-+static void rpi_init_old_power_domain(struct rpi_power_domains *rpi_domains,
-+				      int xlate_index, int domain,
-+				      const char *name)
-+{
-+	struct rpi_power_domain *dom = &rpi_domains->domains[xlate_index];
-+
-+	dom->old_interface = true;
-+	dom->domain = domain;
-+
-+	rpi_common_init_power_domain(rpi_domains, xlate_index, name);
-+}
-+
-+/*
-+ * Detects whether the firmware supports the new power domains interface.
-+ *
-+ * The firmware doesn't actually return an error on an unknown tag,
-+ * and just skips over it, so we do the detection by putting an
-+ * unexpected value in the return field and checking if it was
-+ * unchanged.
-+ */
-+static bool
-+rpi_has_new_domain_support(struct rpi_power_domains *rpi_domains)
-+{
-+	struct rpi_power_domain_packet packet;
-+	int ret;
-+
-+	packet.domain = RPI_POWER_DOMAIN_ARM;
-+	packet.on = ~0;
-+
-+	ret = rpi_firmware_property(rpi_domains->fw,
-+				    RPI_FIRMWARE_GET_DOMAIN_STATE,
-+				    &packet, sizeof(packet));
-+
-+	return ret == 0 && packet.on != ~0;
-+}
-+
-+static int rpi_power_probe(struct platform_device *pdev)
-+{
-+	struct device_node *fw_np;
-+	struct device *dev = &pdev->dev;
-+	struct rpi_power_domains *rpi_domains;
-+
-+	rpi_domains = devm_kzalloc(dev, sizeof(*rpi_domains), GFP_KERNEL);
-+	if (!rpi_domains)
-+		return -ENOMEM;
-+
-+	rpi_domains->xlate.domains =
-+		devm_kzalloc(dev, sizeof(*rpi_domains->xlate.domains) *
-+			     RPI_POWER_DOMAIN_COUNT, GFP_KERNEL);
-+	if (!rpi_domains->xlate.domains)
-+		return -ENOMEM;
-+
-+	rpi_domains->xlate.num_domains = RPI_POWER_DOMAIN_COUNT;
-+
-+	fw_np = of_parse_phandle(pdev->dev.of_node, "firmware", 0);
-+	if (!fw_np) {
-+		dev_err(&pdev->dev, "no firmware node\n");
-+		return -ENODEV;
-+	}
-+
-+	rpi_domains->fw = rpi_firmware_get(fw_np);
-+	of_node_put(fw_np);
-+	if (!rpi_domains->fw)
-+		return -EPROBE_DEFER;
-+
-+	rpi_domains->has_new_interface =
-+		rpi_has_new_domain_support(rpi_domains);
-+
-+	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_I2C0, "I2C0");
-+	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_I2C1, "I2C1");
-+	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_I2C2, "I2C2");
-+	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_VIDEO_SCALER,
-+			      "VIDEO_SCALER");
-+	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_VPU1, "VPU1");
-+	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_HDMI, "HDMI");
-+
-+	/*
-+	 * Use the old firmware interface for USB power, so that we
-+	 * can turn it on even if the firmware hasn't been updated.
-+	 */
-+	rpi_init_old_power_domain(rpi_domains, RPI_POWER_DOMAIN_USB,
-+				  RPI_OLD_POWER_DOMAIN_USB, "USB");
-+
-+	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_VEC, "VEC");
-+	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_JPEG, "JPEG");
-+	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_H264, "H264");
-+	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_V3D, "V3D");
-+	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_ISP, "ISP");
-+	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_UNICAM0, "UNICAM0");
-+	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_UNICAM1, "UNICAM1");
-+	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_CCP2RX, "CCP2RX");
-+	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_CSI2, "CSI2");
-+	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_CPI, "CPI");
-+	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_DSI0, "DSI0");
-+	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_DSI1, "DSI1");
-+	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_TRANSPOSER,
-+			      "TRANSPOSER");
-+	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_CCP2TX, "CCP2TX");
-+	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_CDP, "CDP");
-+	rpi_init_power_domain(rpi_domains, RPI_POWER_DOMAIN_ARM, "ARM");
-+
-+	of_genpd_add_provider_onecell(dev->of_node, &rpi_domains->xlate);
-+
-+	platform_set_drvdata(pdev, rpi_domains);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id rpi_power_of_match[] = {
-+	{ .compatible = "raspberrypi,bcm2835-power", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, rpi_power_of_match);
-+
-+static struct platform_driver rpi_power_driver = {
-+	.driver = {
-+		.name = "raspberrypi-power",
-+		.of_match_table = rpi_power_of_match,
-+	},
-+	.probe		= rpi_power_probe,
-+};
-+builtin_platform_driver(rpi_power_driver);
-+
-+MODULE_AUTHOR("Alexander Aring <aar@pengutronix.de>");
-+MODULE_AUTHOR("Eric Anholt <eric@anholt.net>");
-+MODULE_DESCRIPTION("Raspberry Pi power domain driver");
-+MODULE_LICENSE("GPL v2");
-diff --git a/include/dt-bindings/arm/raspberrypi-power.h b/include/dt-bindings/arm/raspberrypi-power.h
-new file mode 100644
-index 0000000..b3ff8e0
---- /dev/null
-+++ b/include/dt-bindings/arm/raspberrypi-power.h
-@@ -0,0 +1,41 @@
-+/*
-+ *  Copyright ? 2015 Broadcom
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef _DT_BINDINGS_ARM_BCM2835_RPI_POWER_H
-+#define _DT_BINDINGS_ARM_BCM2835_RPI_POWER_H
-+
-+/* These power domain indices are the firmware interface's indices
-+ * minus one.
-+ */
-+#define RPI_POWER_DOMAIN_I2C0		0
-+#define RPI_POWER_DOMAIN_I2C1		1
-+#define RPI_POWER_DOMAIN_I2C2		2
-+#define RPI_POWER_DOMAIN_VIDEO_SCALER	3
-+#define RPI_POWER_DOMAIN_VPU1		4
-+#define RPI_POWER_DOMAIN_HDMI		5
-+#define RPI_POWER_DOMAIN_USB		6
-+#define RPI_POWER_DOMAIN_VEC		7
-+#define RPI_POWER_DOMAIN_JPEG		8
-+#define RPI_POWER_DOMAIN_H264		9
-+#define RPI_POWER_DOMAIN_V3D		10
-+#define RPI_POWER_DOMAIN_ISP		11
-+#define RPI_POWER_DOMAIN_UNICAM0	12
-+#define RPI_POWER_DOMAIN_UNICAM1	13
-+#define RPI_POWER_DOMAIN_CCP2RX		14
-+#define RPI_POWER_DOMAIN_CSI2		15
-+#define RPI_POWER_DOMAIN_CPI		16
-+#define RPI_POWER_DOMAIN_DSI0		17
-+#define RPI_POWER_DOMAIN_DSI1		18
-+#define RPI_POWER_DOMAIN_TRANSPOSER	19
-+#define RPI_POWER_DOMAIN_CCP2TX		20
-+#define RPI_POWER_DOMAIN_CDP		21
-+#define RPI_POWER_DOMAIN_ARM		22
-+
-+#define RPI_POWER_DOMAIN_COUNT		23
-+
-+#endif /* _DT_BINDINGS_ARM_BCM2835_RPI_POWER_H */
+Philipp Tomsich (2):
+  arm64:ilp32: add vdso-ilp32 and use for signal return
+  arm64:ilp32: change COMPAT_ELF_PLATFORM to report a a subplatform for
+    ILP32
+
+Yury Norov (8):
+  arm64: ilp32: add documentation on the ILP32 ABI for ARM64
+  thread: move thread bits accessors to separated file
+  arm64: introduce is_a32_task and is_a32_thread (for AArch32 compat)
+  arm64: ilp32: add is_ilp32_compat_{task,thread} and TIF_32BIT_AARCH64
+  arm64: signal: wrap struct ucontext, fp and lr with struct sigframe
+  arm64: signal: move ilp32 and lp64 common code to separated file
+  arm64: signal32: move ilp32 and aarch32 common code to separated file
+  arm64: ilp32: introduce ilp32-specific handlers for sigframe
+
+ Documentation/arm64/ilp32.txt                 |  17 +++
+ arch/arm64/Kconfig                            |  12 ++
+ arch/arm64/Makefile                           |   5 +
+ arch/arm64/include/asm/compat.h               |  19 +--
+ arch/arm64/include/asm/elf.h                  | 118 +++++++++++++++--
+ arch/arm64/include/asm/fpsimd.h               |   2 +-
+ arch/arm64/include/asm/hwcap.h                |  12 +-
+ arch/arm64/include/asm/is_compat.h            |  86 +++++++++++++
+ arch/arm64/include/asm/memory.h               |   3 +-
+ arch/arm64/include/asm/processor.h            |  16 ++-
+ arch/arm64/include/asm/ptrace.h               |   2 +-
+ arch/arm64/include/asm/signal32.h             |   6 +-
+ arch/arm64/include/asm/signal32_common.h      |  30 +++++
+ arch/arm64/include/asm/signal_common.h        |  39 ++++++
+ arch/arm64/include/asm/signal_ilp32.h         |  38 ++++++
+ arch/arm64/include/asm/thread_info.h          |   3 +-
+ arch/arm64/include/asm/unistd.h               |  13 +-
+ arch/arm64/include/asm/vdso.h                 |   4 +
+ arch/arm64/include/uapi/asm/bitsperlong.h     |   9 +-
+ arch/arm64/kernel/Makefile                    |  11 +-
+ arch/arm64/kernel/asm-offsets.c               |   2 +-
+ arch/arm64/kernel/entry.S                     |  18 ++-
+ arch/arm64/kernel/entry32-common.S            |  37 ++++++
+ arch/arm64/kernel/entry32.S                   |  29 -----
+ arch/arm64/kernel/entry_ilp32.S               |  32 +++++
+ arch/arm64/kernel/head.S                      |   2 +-
+ arch/arm64/kernel/hw_breakpoint.c             |   6 +-
+ arch/arm64/kernel/perf_regs.c                 |   2 +-
+ arch/arm64/kernel/process.c                   |   5 +-
+ arch/arm64/kernel/ptrace.c                    |  48 ++++---
+ arch/arm64/kernel/signal.c                    | 176 +++-----------------------
+ arch/arm64/kernel/signal32.c                  |  85 -------------
+ arch/arm64/kernel/signal32_common.c           | 116 +++++++++++++++++
+ arch/arm64/kernel/signal_common.c             | 174 +++++++++++++++++++++++++
+ arch/arm64/kernel/signal_ilp32.c              | 126 ++++++++++++++++++
+ arch/arm64/kernel/sys_ilp32.c                 |  77 +++++++++++
+ arch/arm64/kernel/traps.c                     |   5 +-
+ arch/arm64/kernel/vdso-ilp32/.gitignore       |   2 +
+ arch/arm64/kernel/vdso-ilp32/Makefile         |  72 +++++++++++
+ arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S     |  33 +++++
+ arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S |  95 ++++++++++++++
+ arch/arm64/kernel/vdso.c                      |  65 ++++++++--
+ include/linux/thread_bits.h                   |  57 +++++++++
+ include/linux/thread_info.h                   |  44 +------
+ 44 files changed, 1343 insertions(+), 410 deletions(-)
+ create mode 100644 Documentation/arm64/ilp32.txt
+ create mode 100644 arch/arm64/include/asm/is_compat.h
+ create mode 100644 arch/arm64/include/asm/signal32_common.h
+ create mode 100644 arch/arm64/include/asm/signal_common.h
+ create mode 100644 arch/arm64/include/asm/signal_ilp32.h
+ create mode 100644 arch/arm64/kernel/entry32-common.S
+ create mode 100644 arch/arm64/kernel/entry_ilp32.S
+ create mode 100644 arch/arm64/kernel/signal32_common.c
+ create mode 100644 arch/arm64/kernel/signal_common.c
+ create mode 100644 arch/arm64/kernel/signal_ilp32.c
+ create mode 100644 arch/arm64/kernel/sys_ilp32.c
+ create mode 100644 arch/arm64/kernel/vdso-ilp32/.gitignore
+ create mode 100644 arch/arm64/kernel/vdso-ilp32/Makefile
+ create mode 100644 arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S
+ create mode 100644 arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S
+ create mode 100644 include/linux/thread_bits.h
+
 -- 
-2.6.2
+2.5.0
