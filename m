@@ -1,70 +1,29 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Tue, 15 Dec 2015 15:46:51 +0000
-Subject: [RFC PATCH 2/8] Documentation: arm: define DT cpu capacity
- bindings
-In-Reply-To: <20151215153218.GA7228@leverpostej>
-References: <20151210153004.GA26758@sirena.org.uk>
- <20151210175820.GE14571@e106622-lin>
- <20151211174940.GQ5727@sirena.org.uk>
- <20151214123616.GC3308@e106622-lin>
- <20151214165928.GV5727@sirena.org.uk>
- <20151215122238.GG16007@e106622-lin>
- <20151215133951.GY5727@sirena.org.uk>
- <20151215140135.GI31299@leverpostej>
- <20151215150813.GZ5727@sirena.org.uk>
- <20151215153218.GA7228@leverpostej>
-Message-ID: <20151215154651.GK16007@e106622-lin>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 15 Dec 2015 15:48:35 +0000
+Subject: [PATCH] IOMMU: arm-smmu-v3: fix broken S2PS and AARCH64 in
+ Broadcom Vulcan
+In-Reply-To: <20151215134010.GH9452@arm.com>
+References: <1450110687-32207-1-git-send-email-pmallapp@broadcom.com>
+ <20151215134010.GH9452@arm.com>
+Message-ID: <20151215154834.GA11384@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/12/15 15:32, Mark Rutland wrote:
-> On Tue, Dec 15, 2015 at 03:08:13PM +0000, Mark Brown wrote:
-> > On Tue, Dec 15, 2015 at 02:01:36PM +0000, Mark Rutland wrote:
-> > 
-> > > I really don't want to see a table of magic numbers in the kernel.
-> > 
-> > Right, there's pitfalls there too although not being part of an ABI
-> > does make them more manageable.  
+On Tue, Dec 15, 2015 at 01:40:10PM +0000, Will Deacon wrote:
+> On Mon, Dec 14, 2015 at 10:01:27PM +0530, Prem Mallappa wrote:
+> > @@ -1046,6 +1049,15 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
+> >  				      : STRTAB_STE_0_CFG_BYPASS;
+> >  		dst[0] = cpu_to_le64(val);
+> >  		dst[2] = 0; /* Nuke the VMID */
+> > +
+> > +		if (smmu && (smmu->options & ARM_SMMU_OPT_BROKEN_STE_VALID)) {
+> > +#define SMMU_STE_OAS_44_BITS 0x4UL
 > 
-> I think that people are very likely to treat them exactly like an ABI,
-> w.r.t. any regressions in performance that result from their addition,
-> modification, or removal. That becomes really horrible when new CPUs
-> appear.
-> 
+> Please don't add a #define here. Can we instead use the oas field that
+> we've extracted from IDR5? I think we need to be doing that anyway when
+> we're using stage-2 translation, looking at the spec...
 
-Yeah, and I guess the path towards out of three patches changing this
-values for a specifica platform (without exposing the same changes
-upstream) is not too far away.
+... which we already are doing, thanks to the vtcr initialisation in the
+io-pgtable code, which populates the PS field based on the OAS.
 
-> > One thing it's probably helpful to establish here is how much the
-> > specific numbers are going to matter in the grand scheme of things.  If
-> > the specific numbers *are* super important then nobody is going to want
-> > to touch them as they'll be prone to getting tweaked.  If instead the
-> > numbers just need to be ballpark accurate so the scheduler starts off in
-> > roughly the right place and the specific numbers don't matter it's a lot
-> > easier and having a table in the kernel until we think of something
-> > better (if that ever happens) gets a lot easier.
-> 
-> I agree that we first need to figure out the importance of these
-> numbers. I disagree that our first step should be to add a table.
-> 
-
-My take is that ballpark is fine, but it's a per platform/configuration
-ballpark that we need. Not a per core-type one.
-
-> > My expectation is that we just need good enough, not perfect, and that
-> > seems to match what Juri is saying about the expectation that most of
-> > the fine tuning is done via other knobs.
-> 
-> My expectation is that if a ballpark figure is good enough, it should be
-> possible to implement something trivial like bogomips / loop_per_jiffy
-> calculation.
-> 
-
-I didn't really followed that, so I might be wrong here, but isn't
-already happened a discussion about how we want/like to stop exposing
-bogomips info or rely on it for anything but in kernel delay loops?
-
-Thanks,
-
-- Juri
+Will
