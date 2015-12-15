@@ -1,73 +1,120 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Tue, 15 Dec 2015 11:43:43 +0000
-Subject: [Linaro-acpi] Touching the initrd before paging_init
-In-Reply-To: <566F9C3D.4090306@redhat.com> (Jon Masters's message of "Mon, 14
- Dec 2015 23:51:09 -0500")
-References: <566D3090.9090509@redhat.com>
- <20151213165942.GN25034@bivouac.eciton.net>
- <23071B8C-D1F9-47A6-9DB4-B26842150B76@redhat.com>
- <566DEB04.2030806@redhat.com> <566DEDFC.909@redhat.com>
- <566F9C3D.4090306@redhat.com>
-Message-ID: <yw1xd1u8gcnk.fsf@unicorn.mansr.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 15 Dec 2015 13:44:28 +0200
+Subject: [PATCH 2/6] ARM: DTS: da850: Use the new DT bindings for the eDMA3
+In-Reply-To: <566FDF93.7050005@ti.com>
+References: <1449237210-16381-1-git-send-email-peter.ujfalusi@ti.com>
+ <1449237210-16381-3-git-send-email-peter.ujfalusi@ti.com>
+ <566FDF93.7050005@ti.com>
+Message-ID: <566FFD1C.4080000@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jon Masters <jcm@redhat.com> writes:
+On 12/15/2015 11:38 AM, Sekhar Nori wrote:
+> Hi Peter,
+> 
+> On Friday 04 December 2015 07:23 PM, Peter Ujfalusi wrote:
+>> Switch to use the ti,edma3-tpcc and ti,edma3-tptc binding for the eDMA3.
+>> With the new bindings boards can customize and tweak the DMA channel
+>> priority to match their needs. With the new binding the memcpy is safe
+>> to be used since with the old binding it was not possible for a driver
+>> to know which channel is allowed to be used as non HW triggered channel.
+>> Using the new binding will allow us to reserve PaRAM slots to be used by
+>> the DSP which was not possible before and prevented the da850 boards to be
+>> moved to DT only.
+>>
+>> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+>> ---
+>>  arch/arm/boot/dts/da850-enbw-cmc.dts |  5 +++++
+>>  arch/arm/boot/dts/da850-evm.dts      |  5 +++++
+>>  arch/arm/boot/dts/da850.dtsi         | 27 ++++++++++++++++++++++-----
+>>  3 files changed, 32 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/da850-enbw-cmc.dts b/arch/arm/boot/dts/da850-enbw-cmc.dts
+>> index e750ab9086d5..ca9117624cf9 100644
+>> --- a/arch/arm/boot/dts/da850-enbw-cmc.dts
+>> +++ b/arch/arm/boot/dts/da850-enbw-cmc.dts
+>> @@ -28,3 +28,8 @@
+>>  		};
+>>  	};
+>>  };
+>> +
+>> +&edma0 {
+>> +	ti,edma-reserved-slot-ranges = /bits/ 16 <32 50>;
+>> +	ti,edma-memcpy-channels = /bits/ 16 <20 21>;
+>> +};
+>> diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+>> index d807285a61cd..33467feb272a 100644
+>> --- a/arch/arm/boot/dts/da850-evm.dts
+>> +++ b/arch/arm/boot/dts/da850-evm.dts
+>> @@ -243,3 +243,8 @@
+>>  	tx-num-evt = <32>;
+>>  	rx-num-evt = <32>;
+>>  };
+>> +
+>> +&edma0 {
+>> +	ti,edma-reserved-slot-ranges = /bits/ 16 <32 50>;
+>> +	ti,edma-memcpy-channels = /bits/ 16 <20 21>;
+> 
+> These correspond to PRU events. It is true that most likely they will
+> never be used for peripheral DMA and can be dedicated as memcpy
+> channels. However, since this is being encoded in DT, we need to be sure
+> that they will never be used for peripheral DMA on this board.
+> 
+> So, I would prefer if you do not reserve any channels for memcpy until
+> there is a real need/usecase for them. I know the board file has these
+> reserved but board file could be updated as you liked. With DT we need
+> to maintain backward compatibility. So I would rather do it when there
+> is an actual need for it.
 
-> On 12/13/2015 05:15 PM, Jon Masters wrote:
->> On 12/13/2015 05:02 PM, Jon Masters wrote:
->>> On 12/13/2015 04:36 PM, Jon Masters wrote:
->>>
->>>> Just thinking from a parity point of view - if you can do it on x86, it should be
->>>> doable on ARM. But that GRUB module approach I quite like!
->>>
->>> Sorry for top post earlier. Was on my phone. In any case, it looks like
->>> the "acpi" command in GRUB currently does an all-or-nothing replace of
->>> all of the tables, not just a named table. We need to be able to
->>> override e.g. just an DSDT or SSDT with a replacement test one.
->> 
->> I rescind that. Looking at the GRUB source clarifies things. It will
->> copy all host tables, then update the copied version if there are
->> additional tables with changes and recalculate checksums/pointers in the
->> XSDT etc. I seem to recall having looked at this before a couple years
->> ago or something and it might have grown some of the 64-bit XSDT logic
->> in that time. Either way, it does seem to do what I wanted. I will
->> followup. I'll probably still use the initrd approach for now.
->
-> Addendum. I was able to get the initrd based ACPI table override
-> working...HOWEVER...
+If we do not reserve channels for memcpy then you will have no support for
+memcpy on these boards. Not sure if we use memcpy in any of our drivers in
+daVinci, so it might be just fine to not have DMA memcpy support at all.
+But how about using edma1's reserved channels as memcpy (19-23, 30-31)? I
+don't know which channels the DSP would use on these boards, so it is never
+going to be safe from that point.
 
-Why do you need to override ACPI tables?  Isn't ACPI supposed to be
-perfect?
+> In future, if/when we gain QDMA support, the QDMA channels could be used
+> for memcopy.
 
-> *** I had to implement a custom memcpy routine to do so ***
->
-> Per some internal suggestions, I tried moving map_mem earlier (prior to
-> doing boot time ACPI table parsing, in order to avoid needing to abuse
-> fixmaps to touch the initrd contents), which works. For reading the
-> ramdisk cpio content (the kernel code still uses a fixmap in the initrd
-> override driver code to map the newly created tables in memory).
->
-> But the reading of that cpio content into the new table locations is
-> done using the kernel memcpy routine to early_ioremap'd memory (Device
-> memory), which is architecturally sensitive to missaligned accesses.
+Well, in short there is no way to get the qDMA working in a different way
+either. qDMA channel is in essence using 'normal' eDMA channel. This means
+that we still need to reserve the eDMA channel to be used for memcpy, but
+instead of SW triggering it (as we do it right now), we would need to use the
+channel as qDMA and set things up accordingly. I don't really see the benefit
+for qDMA mode to be honest.
+> 
+>> +};
+>> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+>> index e73f5efb3aa3..9e46eb51a8da 100644
+>> --- a/arch/arm/boot/dts/da850.dtsi
+>> +++ b/arch/arm/boot/dts/da850.dtsi
+>> @@ -151,11 +151,28 @@
+>>  
+>>  		};
+>>  		edma0: edma at 01c00000 {
+>> -			compatible = "ti,edma3";
+>> +			compatible = "ti,edma3-tpcc";
+>>  			/* eDMA3 CC0: 0x01c0 0000 - 0x01c0 7fff */
+>>  			reg =	<0x0 0x8000>;
+>> -			interrupts = <11 13 12>;
+>> -			#dma-cells = <1>;
+>> +			reg-names = "edma3_cc";
+>> +			interrupts = <11 12>;
+>> +			interrupt-names = "edma3_ccint", "edma3_ccerrint";
+>> +			#dma-cells = <2>;
+>> +
+>> +			ti,tptcs = <&edma0_tptc0 7>, <&edma0_tptc1 0>;
+>> +			ti,edma-memcpy-channels = /bits/ 16 <20 21>;
+> 
+> Same here. I would drop this.
 
-As others have pointed out, your error is twofold: first using
-early_ioremap() when early_memremap() would do, then using regular
-memcpy() and not memcpy_fromio() on that.  Seems like your precious ACPI
-code is to blame here.
+OK, I'll drop this part.
 
-> The in-kernel memcpy routine only checks the alignment of the source
-> pointed when it begins copying, and doesn't handle the case that the
-> natural alignment differs between source and destination. Therefore,
-> the kernel rolls over and plays dead unless I provide a hacked up
-> jcm_memcpy that just does byte copies. Then everything "works".
+> 
+> Thanks,
+> Sekhar
+> 
 
-That's the right thing to do for normal memory on ARMv6 and up which
-support unaligned accesses.  Hardware unaligned accesses are slightly
-slower than aligned, so aligning the loads saves a few cycles.  The
-manual shifts required to also align the destination are, however, more
-expensive than simply letting the hardware do it.
 
 -- 
-M?ns Rullg?rd
+P?ter
