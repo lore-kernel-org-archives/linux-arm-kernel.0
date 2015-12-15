@@ -1,117 +1,89 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Tue, 15 Dec 2015 14:24:58 +0000
-Subject: [RFC PATCH 2/8] Documentation: arm: define DT cpu capacity
- bindings
-In-Reply-To: <20151215140135.GI31299@leverpostej>
-References: <1448288921-30307-3-git-send-email-juri.lelli@arm.com>
- <20151124020631.GA15165@rob-hp-laptop>
- <20151210153004.GA26758@sirena.org.uk>
- <20151210175820.GE14571@e106622-lin>
- <20151211174940.GQ5727@sirena.org.uk>
- <20151214123616.GC3308@e106622-lin>
- <20151214165928.GV5727@sirena.org.uk>
- <20151215122238.GG16007@e106622-lin>
- <20151215133951.GY5727@sirena.org.uk>
- <20151215140135.GI31299@leverpostej>
-Message-ID: <20151215142458.GI16007@e106622-lin>
+From: pmladek@suse.com (Petr Mladek)
+Date: Tue, 15 Dec 2015 15:26:21 +0100
+Subject: [PATCH v3 4/4] printk/nmi: Increase the size of NMI buffer and
+ make it configurable
+In-Reply-To: <20151211153054.48da5d4139b93dd4ed438f4c@linux-foundation.org>
+References: <1449667265-17525-1-git-send-email-pmladek@suse.com>
+ <1449667265-17525-5-git-send-email-pmladek@suse.com>
+ <CAMuHMdXVgr58YjoePGrRbMyMncQ27f85prL7G5SpeHeNxoYrXQ@mail.gmail.com>
+ <20151211124159.GB3729@pathway.suse.cz>
+ <20151211145725.b0e81bb4bb18fcd72ef5f557@linux-foundation.org>
+ <20151211232113.GZ8644@n2100.arm.linux.org.uk>
+ <20151211153054.48da5d4139b93dd4ed438f4c@linux-foundation.org>
+Message-ID: <20151215142621.GE3729@pathway.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On 15/12/15 14:01, Mark Rutland wrote:
-> On Tue, Dec 15, 2015 at 01:39:51PM +0000, Mark Brown wrote:
-> > On Tue, Dec 15, 2015 at 12:22:38PM +0000, Juri Lelli wrote:
-> > > > So then why isn't it adequate to just have things like the core types in
-> > > > there and work from there?  Are we really expecting the tuning to be so
-> > > > much better than it's possible to come up with something that's so much
-> > > > better on the scale that we're expecting this to be accurate that it's
-> > > > worth just jumping straight to magic numbers?
-> > 
-> > > I take your point here that having fine grained values might not really
-> > > give us appreciable differences (that is also why I proposed the
-> > > capacity-scale in the first instance), but I'm not sure I'm getting what
-> > > you are proposing here.
-> > 
-> > Something like the existing solution for arm32.
-> > 
-> > >  static const struct cpu_efficiency table_efficiency[] = {
-> > >  	{"arm,cortex-a15", 3891},
-> > >  	{"arm,cortex-a7",  2048},
-> > >  	{NULL, },
-> > >  };
-> > 
-> > > When clock-frequency property is defined in DT, we try to find a match
-> > > for the compatibility string in the table above and then use the
-> > > associate number to compute the capacity. Are you proposing to have
-> > > something like this for arm64 as well?
-> > 
-> > > BTW, the only info I could find about those numbers is from this thread
-> > 
-> > It was discussed in some other thread when I was sending the equivalent
-> > stuff for arm64 (I never got round to finishing it off due to issues
-> > with Catalin and Will being concerned about the specific numbers).
-> > Vincent confirmed that the numbers came from the (IIRC) DMIPS/MHz
-> > numbers that ARM publish for the cores.  I'd independently done the same
-> > thing for arm64.  It would probably help to put comments in there with
-> > the base numbers before scaling, or just redo the table in terms of the
-> > raw numbers.
-> > 
-> > This is, of course, an example of my concerns about magic number
-> > configuration.
-> > 
-> > > If I understand how that table was created, how do we think we will
-> > > extend it in the future to allow newer core types (say we replicate this
-> > > solution for arm64)?  It seems that we have to change it, rescaling
-> > > values, each time we have a new core on the market. How can we come up
-> > > with relative numbers, in the future, comparing newer cores to old ones
-> > > (that might be already out of the market by that time)?
-> > 
-> > It doesn't seem particularly challenging to add new numbers to the table
-> > (and add additional properties to select on) TBH.  We can either rescale
-> > by hand in the table when adding entries, script it as part of the
-> > kernel build or do it at runtime (as the arm32 code already does to an
-> > extent based on the particular set of cores we find).  What difficulties
-> > do you see with this?
-> > 
-> > This is something that seems like an advantage to me - we can just
-> > replace everything at any point, we're not tied to trusting the golden
-> > benchmark someone did (or tweaked) if we come up with a better
-> > methodology later on.
+On Fri 2015-12-11 15:30:54, Andrew Morton wrote:
+> On Fri, 11 Dec 2015 23:21:13 +0000 Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 > 
-> I really don't want to see a table of magic numbers in the kernel.
+> > On Fri, Dec 11, 2015 at 02:57:25PM -0800, Andrew Morton wrote:
+> > > This is a bit messy.  NEED_PRINTK_NMI is an added-on hack for one
+> > > particular arm variant.  From the changelog:
+> > > 
+> > >    "One exception is arm where the deferred printing is used for
+> > >     printing backtraces even without NMI.  For this purpose, we define
+> > >     NEED_PRINTK_NMI Kconfig flag.  The alternative printk_func is
+> > >     explicitly set when IPI_CPU_BACKTRACE is handled."
+> > > 
+> > > 
+> > > - why does arm needs deferred printing for backtraces?
+> > > 
+> > > - why is this specific to CONFIG_CPU_V7M?
+
+
+
+> > > - can this Kconfig logic be cleaned up a bit?
+> > 
+> > I think this comes purely from this attempt to apply another round of
+> > cleanups to the nmi backtrace work I did.
+> > 
+> > As I explained when I did that work, the vast majority of ARM platforms
+> > are unable to trigger anything like a NMI - the FIQ is something that's
+> > generally a property of the secure monitor, and is not accessible to
+> > Linux.  However, there are platforms where it is accessible.
 > 
+> OK, thanks.  So "not needed at present, might be needed in the future,
+> useful for out-of-tree debug code"?
 
-Doesn't seem to be a clean and scalable solution to me either. It is not
-easy to reconfigure when new core types come around, as I don't think
-relative data is always present or easy to derive, and it exposes some
-sort of centralized global information where everyone is compared
-against everyone. Where the DT solution is inherently per platform: no
-need to expose absolute values and no problems with knowing data
-regarding old core types.
+It is possible that I got it a wrong way on arm. The NMI buffer is
+usable there on two locations.
 
-> The relative performance and efficiency of cores will vary depending on
-> uArch-specific configuration (e.g. sizing of L1/L2 caches) in addition
-> to general uArch differences, and integration too (e.g. if the memory
-> system gives priority to one cluster over another for whatever reason).
-> I've heard of pseudo-heterogeneous platforms with different
-> configuration of the same uArch across clusters.
+First, the temporary is currently used to handle IPI_CPU_BACKTRACE.
+It seems that it is not a real NMI. But it seems to be available
+(compiled) on all arm system. This is why I introduced NEED_PRINTK_NMI
+Kconfig flag to avoid confusion with a real NMI.
+
+Second, there is the FIQ "NMI" handler that is called from
+/arch/arm/kernel/entry-armv.S. It is compiled only if _not_
+defined $(CONFIG_CPU_V7M). It calls nmi_enter() and nmi_stop().
+It looks like a real NMI handler. This is why I defined HAVE_NMI
+if (!CPU_V7M).
+
+A solution would be to define HAVE_NMI on all Arm systems and get rid
+of NEED_PRINTK_NMI. If you think that it would cause less confusion...
+
+
+> > there's this effort to apply further cleanups - to me, the changelogs
+> > don't seem to make that much sense, unless we want to start using
+> > printk() extensively in NMI functions - using the generic nmi backtrace
+> > code surely gets us something that works across all architectures...
 > 
-> We also don't necessarily have the CPU clock frequencies, or the ability
-> to scale them. Maybe we simply give up in that case, though.
-> 
-> If we cannot rely on external information, and want this information to
-> be derived by the kernel, then we need to perform some dynamic
-> benchmark. That would work for future CPUs the kernel knows nothing
-> about yet, and would cater for the pseudo-heterogeneous cases too.
-> 
+> Yes, I was scratching my head over that.  The patchset takes an nmi-safe
+> all-cpu-backtrace and generalises that into an nmi-safe printk.  That
+> *sounds* like a good thing to do but yes, some additional justification
+> would be helpful.  What real-world value does this patchset really
+> bring to real-world users?
 
-I've actually experimented a bit with this approch already, but I wasn't
-convinced of its viability. It is true that we remove the burden of
-coming up with default values from user/integrator, but I'm pretty sure
-we will end up discussing endlessly about which particular benchmark to
-pick and the fact that it impacts on boot time and such.
+The patchset brings two big advantages. First, it makes the NMI
+backtraces safe on all architectures for free. Second, it makes
+all NMI messages almost[*] safe on all architectures.
 
-Best,
+Note that there already are several messages printed in NMI context.
+See the mail from Jiri Kosina. They are not easy to avoid.
 
-- Juri
+[*] The temporary buffer is limited. We still should keep
+the number of messages in NMI context at minimum.
+
+Best Regards,
+Petr
