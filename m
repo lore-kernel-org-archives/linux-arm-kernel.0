@@ -1,48 +1,48 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue, 15 Dec 2015 09:47:35 +0100
-Subject: [PATCH] ARM: psci: Fix indentation in DT bindings
-Message-ID: <1450169255-669-1-git-send-email-geert+renesas@glider.be>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 15 Dec 2015 17:48:22 +0900
+Subject: [PATCH v12 04/16] arm64: kvm: allows kvm cpu hotplug
+In-Reply-To: <20151211163144.GK18828@arm.com>
+References: <cover.1448403503.git.geoff@infradead.org>
+ <23ca498d5e28017549c6076812d60b18e86fa20e.1448403503.git.geoff@infradead.org>
+ <CAJ5Y-eYHqQCf=ZQzXb=D_P7VscM=vNc3YpYLJs+UtZLFswiaeQ@mail.gmail.com>
+ <56604A6E.60102@arm.com> <1449772308.24127.59.camel@infradead.org>
+ <20151211163144.GK18828@arm.com>
+Message-ID: <566FD3D6.2040605@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix bogus indentation of the PSCI compatible values (each space was
-replaced by a TAB?).
+Will,
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- Documentation/devicetree/bindings/arm/psci.txt | 18 +++++++++---------
- 1 file changed, 9 insertions(+), 9 deletions(-)
+On 12/12/2015 01:31 AM, Will Deacon wrote:
+> On Thu, Dec 10, 2015 at 10:31:48AM -0800, Geoff Levand wrote:
+>> On Thu, 2015-12-03 at 13:58 +0000, Marc Zyngier wrote:
+>>> Indeed, this is completely broken (I just reproduced the issue on a
+>>> model).
+>>
+>> There are users out there that want kexec/kdump support.  I think we
+>> should remove this patch from the series, replace it with a temporary
+>> Kconfig conditional that allows only one of KVM or kexec to be enabled,
+>> and merge kexec and kdump support in for 4.5.  This will satisfy users
+>> who need kexec but not KVM, like kexec based bootloaders.  Once this
+>> KVM hot plug patch is fixed we then merge it, either for 4.5 or 4.6,
+>> depending on the timing.
+>>
+>> I'll prepare and post a v13 series that does the above.
+>
+> I'm not really keen on merging this based on a "temporary" Kconfig change
+> with a promise to have it resolved in the future. Given how long this
+> series has been floating around already, I'm not filled with confidence
+> at the prospect of waiting for a fixup patch after it's been merged.
+>
+> Please address the outstanding review comments before reposting.
 
-diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
-index a9adab84e2feb785..fb3a1dd2a9880bda 100644
---- a/Documentation/devicetree/bindings/arm/psci.txt
-+++ b/Documentation/devicetree/bindings/arm/psci.txt
-@@ -23,17 +23,17 @@ Main node required properties:
- 
-  - compatible    : should contain at least one of:
- 
--				 * "arm,psci" : for implementations complying to PSCI versions prior to
--					0.2. For these cases function IDs must be provided.
-+     * "arm,psci" : for implementations complying to PSCI versions prior to
-+	0.2. For these cases function IDs must be provided.
- 
--				 * "arm,psci-0.2" : for implementations complying to PSCI 0.2. Function
--					IDs are not required and should be ignored by an OS with PSCI 0.2
--					support, but are permitted to be present for compatibility with
--					existing software when "arm,psci" is later in the compatible list.
-+     * "arm,psci-0.2" : for implementations complying to PSCI 0.2. Function
-+	IDs are not required and should be ignored by an OS with PSCI 0.2
-+	support, but are permitted to be present for compatibility with
-+	existing software when "arm,psci" is later in the compatible list.
- 
--				* "arm,psci-1.0" : for implementations complying to PSCI 1.0. PSCI 1.0 is
--					backward compatible with PSCI 0.2 with minor specification updates,
--					as defined in the PSCI specification[2].
-+    * "arm,psci-1.0" : for implementations complying to PSCI 1.0. PSCI 1.0 is
-+	backward compatible with PSCI 0.2 with minor specification updates,
-+	as defined in the PSCI specification[2].
- 
-  - method        : The method of calling the PSCI firmware. Permitted
-                    values are:
--- 
-1.9.1
+I'm working hard on addressing Marc's comment on kvm cpu hotplug, and so
+can you please review other *main* part of kexec/kdump patches?
+Or can I think that 'no comments' is a good sign of your acceptance?
+
+Thanks,
+-Takahiro AKASHI
+
+
+> Will
+>
