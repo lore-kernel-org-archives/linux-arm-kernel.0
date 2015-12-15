@@ -1,46 +1,254 @@
 From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Tue, 15 Dec 2015 10:37:23 +0100
-Subject: [PATCH v11 0/2] Sigma Designs Tango4 port
-Message-ID: <566FDF53.3030004@sigmadesigns.com>
+Date: Tue, 15 Dec 2015 10:39:19 +0100
+Subject: [PATCH v11 1/2] arm-soc: Import initial tango4 device tree
+In-Reply-To: <566FDF53.3030004@sigmadesigns.com>
+References: <566FDF53.3030004@sigmadesigns.com>
+Message-ID: <566FDFC7.1040406@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"One more time. We're gonna celebrate."
+This device tree was tested on a Sigma Designs SMP8758 Vantage-1172
+Rev E1 development board.
 
-Changes since v10:
-Add aliases and chosen DT nodes
-Use CPU_CLK and SYS_CLK symbolic names
-MPCore private memory region DT node
-select TANGO_IRQ instead of GENERIC_IRQ_CHIP
-
-Changes planned for a future patch series:
-Have clkgen driver export CD2 for USB, and CD6 for SDIO
-
-Marc Gonzalez (2):
-  arm-soc: Import initial tango4 device tree
-  arm-soc: Add support for tango4 platforms
-
- MAINTAINERS                               |   7 ++
- arch/arm/Kconfig                          |   2 +
- arch/arm/Makefile                         |   1 +
+Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+---
  arch/arm/boot/dts/Makefile                |   2 +
  arch/arm/boot/dts/tango4-common.dtsi      | 130 ++++++++++++++++++++++++++++++
  arch/arm/boot/dts/tango4-smp8758.dtsi     |  31 +++++++
  arch/arm/boot/dts/tango4-vantage-1172.dts |  37 +++++++++
- arch/arm/mach-tango/Kconfig               |  12 +++
- arch/arm/mach-tango/Makefile              |   2 +
- arch/arm/mach-tango/setup.c               |  31 +++++++
- arch/arm/mach-tango/smc.S                 |   9 +++
- arch/arm/mach-tango/smc.h                 |   5 ++
- 12 files changed, 269 insertions(+)
+ 4 files changed, 200 insertions(+)
  create mode 100644 arch/arm/boot/dts/tango4-common.dtsi
  create mode 100644 arch/arm/boot/dts/tango4-smp8758.dtsi
  create mode 100644 arch/arm/boot/dts/tango4-vantage-1172.dts
- create mode 100644 arch/arm/mach-tango/Kconfig
- create mode 100644 arch/arm/mach-tango/Makefile
- create mode 100644 arch/arm/mach-tango/setup.c
- create mode 100644 arch/arm/mach-tango/smc.S
- create mode 100644 arch/arm/mach-tango/smc.h
 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 992736b5229b..f91db919d5fe 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -564,6 +564,8 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+ 	sun8i-a23-ippo-q8h-v1.2.dtb
+ dtb-$(CONFIG_MACH_SUN9I) += \
+ 	sun9i-a80-optimus.dtb
++dtb-$(CONFIG_ARCH_TANGO) += \
++	tango4-vantage-1172.dtb
+ dtb-$(CONFIG_ARCH_TEGRA_2x_SOC) += \
+ 	tegra20-harmony.dtb \
+ 	tegra20-iris-512.dtb \
+diff --git a/arch/arm/boot/dts/tango4-common.dtsi b/arch/arm/boot/dts/tango4-common.dtsi
+new file mode 100644
+index 000000000000..ef665d21d317
+--- /dev/null
++++ b/arch/arm/boot/dts/tango4-common.dtsi
+@@ -0,0 +1,130 @@
++/*
++ * Based on Mans Rullgard's Tango3 DT
++ * https://github.com/mansr/linux-tangox
++ */
++
++#define CPU_CLK 0
++#define SYS_CLK 1
++
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++
++/ {
++	interrupt-parent = <&gic>;
++	#address-cells = <1>;
++	#size-cells = <1>;
++
++	periph_clk: periph_clk {
++		compatible = "fixed-factor-clock";
++		clocks = <&clkgen CPU_CLK>;
++		clock-mult = <1>;
++		clock-div  = <2>;
++		#clock-cells = <0>;
++	};
++
++	mpcore {
++		compatible = "simple-bus";
++		ranges = <0x00000000 0x20000000 0x2000>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		scu at 0 {
++			compatible = "arm,cortex-a9-scu";
++			reg = <0x0 0x100>;
++		};
++
++		twd at 600 {
++			compatible = "arm,cortex-a9-twd-timer";
++			reg = <0x600 0x10>;
++			interrupts = <GIC_PPI 13 IRQ_TYPE_EDGE_RISING>;
++			clocks = <&periph_clk>;
++			always-on;
++		};
++
++		gic: interrupt-controller at 1000 {
++			compatible = "arm,cortex-a9-gic";
++			#interrupt-cells = <3>;
++			interrupt-controller;
++			reg = <0x1000 0x1000>, <0x100 0x100>;
++		};
++	};
++
++	l2cc: l2-cache-controller at 20100000 {
++		compatible = "arm,pl310-cache";
++		reg = <0x20100000 0x1000>;
++		cache-level = <2>;
++		cache-unified;
++	};
++
++	soc {
++		compatible = "simple-bus";
++		interrupt-parent = <&irq0>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		xtal: xtal {
++			compatible = "fixed-clock";
++			clock-frequency = <27000000>;
++			#clock-cells = <0>;
++		};
++
++		clkgen: clkgen at 10000 {
++			compatible = "sigma,tango4-clkgen";
++			reg = <0x10000 0x40>;
++			clocks = <&xtal>;
++			#clock-cells = <1>;
++		};
++
++		tick-counter at 10048 {
++			compatible = "sigma,tick-counter";
++			reg = <0x10048 0x4>;
++			clocks = <&xtal>;
++		};
++
++		uart: serial at 10700 {
++			compatible = "ralink,rt2880-uart";
++			reg = <0x10700 0x30>;
++			interrupts = <1 IRQ_TYPE_LEVEL_HIGH>;
++			clock-frequency = <7372800>;
++			reg-shift = <2>;
++		};
++
++		eth0: ethernet at 26000 {
++			compatible = "sigma,smp8734-ethernet";
++			reg = <0x26000 0x800>;
++			interrupts = <38 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&clkgen SYS_CLK>;
++		};
++
++		intc: interrupt-controller at 6e000 {
++			compatible = "sigma,smp8642-intc";
++			reg = <0x6e000 0x400>;
++			ranges = <0 0x6e000 0x400>;
++			interrupt-parent = <&gic>;
++			interrupt-controller;
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			irq0: irq0 at 000 {
++				reg = <0x000 0x100>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
++			};
++
++			irq1: irq1 at 100 {
++				reg = <0x100 0x100>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
++			};
++
++			irq2: irq2 at 300 {
++				reg = <0x300 0x100>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
++			};
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/tango4-smp8758.dtsi b/arch/arm/boot/dts/tango4-smp8758.dtsi
+new file mode 100644
+index 000000000000..7ed88ee629fb
+--- /dev/null
++++ b/arch/arm/boot/dts/tango4-smp8758.dtsi
+@@ -0,0 +1,31 @@
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++
++/ {
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		enable-method = "sigma,tango4-smp";
++
++		cpu0: cpu at 0 {
++			compatible = "arm,cortex-a9";
++			next-level-cache = <&l2cc>;
++			device_type = "cpu";
++			reg = <0>;
++		};
++
++		cpu1: cpu at 1 {
++			compatible = "arm,cortex-a9";
++			next-level-cache = <&l2cc>;
++			device_type = "cpu";
++			reg = <1>;
++		};
++	};
++
++	pmu {
++		compatible = "arm,cortex-a9-pmu";
++		interrupt-affinity = <&cpu0>, <&cpu1>;
++		interrupts =
++			<GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
++			<GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
++	};
++};
+diff --git a/arch/arm/boot/dts/tango4-vantage-1172.dts b/arch/arm/boot/dts/tango4-vantage-1172.dts
+new file mode 100644
+index 000000000000..3e5b9c81a51c
+--- /dev/null
++++ b/arch/arm/boot/dts/tango4-vantage-1172.dts
+@@ -0,0 +1,37 @@
++/dts-v1/;
++
++#include "tango4-smp8758.dtsi"
++#include "tango4-common.dtsi"
++
++/ {
++	model = "Sigma Designs SMP8758 Vantage-1172 Rev E1";
++	compatible = "sigma,vantage-1172", "sigma,smp8758", "sigma,tango4";
++
++	aliases {
++		serial = &uart;
++	};
++
++	memory at 80000000 {
++		device_type = "memory";
++		reg = <0x80000000 0x80000000>; /* 2 GB */
++	};
++
++	chosen {
++		stdout-path = "serial:115200n8";
++	};
++};
++
++&eth0 {
++	phy-connection-type = "rgmii";
++	phy-handle = <&eth0_phy>;
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	/* Atheros AR8035 */
++	eth0_phy: ethernet-phy at 4 {
++		compatible = "ethernet-phy-id004d.d072",
++			     "ethernet-phy-ieee802.3-c22";
++		interrupts = <37 IRQ_TYPE_EDGE_RISING>;
++		reg = <4>;
++	};
++};
 -- 
 2.6.3
