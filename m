@@ -1,29 +1,56 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 16 Dec 2015 09:16:50 -0800
-Subject: [PATCHv2] clk: ti: omap5+: dpll: implement errata i810
-In-Reply-To: <1450256530-10251-1-git-send-email-t-kristo@ti.com>
-References: <1450256530-10251-1-git-send-email-t-kristo@ti.com>
-Message-ID: <20151216171650.GS23396@atomide.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 16 Dec 2015 17:19:05 +0000
+Subject: [PATCH v6 09/20] arm64:ilp32: share HWCAP between LP64 and ILP32
+In-Reply-To: <20151216165819.GD27051@e104818-lin.cambridge.arm.com>
+References: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
+ <1450215766-14765-10-git-send-email-ynorov@caviumnetworks.com>
+ <2049962.OV4jWs7vGi@wuerfel>
+ <20151216165819.GD27051@e104818-lin.cambridge.arm.com>
+Message-ID: <20151216171904.GF27051@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [151216 01:00]:
-> Errata i810 states that DPLL controller can get stuck while transitioning
-> to a power saving state, while its M/N ratio is being re-programmed.
+On Wed, Dec 16, 2015 at 04:58:20PM +0000, Catalin Marinas wrote:
+> On Wed, Dec 16, 2015 at 04:54:34PM +0100, Arnd Bergmann wrote:
+> > On Wednesday 16 December 2015 00:42:35 Yury Norov wrote:
+> > > 
+> > >  #ifdef CONFIG_COMPAT
+> > > -#define COMPAT_ELF_HWCAP       (compat_elf_hwcap)
+> > > -#define COMPAT_ELF_HWCAP2      (compat_elf_hwcap2)
+> > >  extern unsigned int compat_elf_hwcap, compat_elf_hwcap2;
+> > > +#define COMPAT_ELF_HWCAP       \
+> > > +       (is_a32_compat_task()   \
+> > > +         ? compat_elf_hwcap    \
+> > > +         : elf_hwcap)
+> > > +
+> > > +#define COMPAT_ELF_HWCAP2      \
+> > > +       (is_a32_compat_task()   \
+> > > +         ? compat_elf_hwcap2   \
+> > > +         : 0)
+> > > +
+> > >  #endif
+> > 
+> > I'm trying to understand how this is used. Are you compiling
+> > fs/compat_binfmt_elf.c twice to handle both 32-bit ELF types?
 > 
-> As a workaround, before re-programming the M/N ratio, SW has to ensure
-> the DPLL cannot start an idle state transition. SW can disable DPLL
-> idling by setting the DPLL AUTO_DPLL_MODE=0 or keeping a clock request
-> active by setting a dependent clock domain in SW_WKUP.
-> 
-> This errata is known to impact OMAP5 and DRA7 chips, but lets enable it
-> unconditionally to avoid any potential problems with earlier generation
-> SoCs also.
-> 
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> ---
-> v2: made the fix to be applied unconditionally on all OMAP3+ SoCs
+> It's the same compat_binfmt_elf.c which handles all 32-bit ELF types,
+> i.e. AArch32 and A64/ILP32. The above macros are not constants, so they
+> are evaluated every time a new ELF file is loaded. We do a similar trick
+> with COMPAT_SET_PERSONALITY in patch 11.
 
-Thanks looks good to me now:
+IIUC, we may have a problem with this. elf_hwcap is 64-bit long while
+elf_info[n] is 32-bit (Elf32_Addr), so we truncate AT_HWCAP if we ever
+go beyond bit 31. The above may need to look something like:
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+#define COMPAT_ELF_HWCAP	\
+	(is_a32_compat_task()	\
+	 ? compat_elf_hwcap	\
+	 : (u32)elf_hwcap)
+
+#define COMPAT_ELF_HWCAP2	\
+	(is_a32_compat_task()	\
+	 ? compat_elf_hwcap2	\
+	 : (u32)(elf_hwcap >> 32))
+
+-- 
+Catalin
