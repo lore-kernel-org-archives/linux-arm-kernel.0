@@ -1,49 +1,48 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 16 Dec 2015 15:19:05 +0200
-Subject: [PATCH] dmaengine: edma: Add probe callback to edma_tptc_driver
-Message-ID: <1450271945-15263-1-git-send-email-peter.ujfalusi@ti.com>
+From: dawei.chien@mediatek.com (Dawei Chien)
+Date: Wed, 16 Dec 2015 21:29:13 +0800
+Subject: [PATCH v6 0/3] thermal: mediatek: Add cpu dynamic power cooling model.
+Message-ID: <1450272556-29770-1-git-send-email-dawei.chien@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to changes in device and platform code drivers w/o probe will fail to
-load. This means that the devices for eDMA TPTCs are goign to be without
-driver and omap hwmod code will turn them off after the kernel finished
-loading:
-[    3.015900] platform 49800000.tptc: omap_device_late_idle: enabled but no driver.  Idling
-[    3.024671] platform 49a00000.tptc: omap_device_late_idle: enabled but no driver.  Idling
+Use Intelligent Power Allocation (IPA) technical to add dynamic power model
+for binding CPU thermal zone. The power allocator governor allocates power
+budget to control CPU temperature.
 
-This will prevent eDMA to work since the TPTCs are not enabled.
+Power Allocator governor is able to keep SOC temperature within a defined
+temperature range to avoid SOC overheat and keep it's performance.
+mt8173-cpufreq.c need to register its' own power model with power allocator
+thermal governor, so that power allocator governor can allocates suitable
+power budget to control CPU temperature.
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Fixes: 34635b1accb9 ("dmaengine: edma: Add dummy driver skeleton for edma3-tptc")
----
-Hi,
+Binding document is refer to this patchset
+https://lkml.org/lkml/2015/11/30/239
 
-The issue surfaced with next-20151216, next-20151214 was worked fine.
+Change since V5:
+1. Remove thermal sensor ID from phandles
 
-Regards,
-Peter
+Change since V4:
+1. Remove unnecessary error-checking for mt8173-cpufreq.c
+2. Initializing variable capacitance with 0
 
- drivers/dma/edma.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+Change since V3:
+1. Remove static power model
+2. Split V3's device tree in two for thermal zones and dynamic power models respectively
 
-diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index 2e8acde6b134..50584015e046 100644
---- a/drivers/dma/edma.c
-+++ b/drivers/dma/edma.c
-@@ -2425,7 +2425,13 @@ static struct platform_driver edma_driver = {
- 	},
- };
- 
-+static int edma_tptc_probe(struct platform_device *pdev)
-+{
-+	return 0;
-+}
-+
- static struct platform_driver edma_tptc_driver = {
-+	.probe		= edma_tptc_probe,
- 	.driver = {
- 		.name	= "edma3-tptc",
- 		.of_match_table = edma_tptc_of_ids,
--- 
-2.6.4
+Change since V2:
+1. Move dynamic/static power model in device tree
+
+Change since V1:
+1. Include mt8171.h and sort header file for mt8173.dtsi
+
+Dawei Chien (3):
+  thermal: mediatek: Add cpu dynamic power cooling model.
+  arm64: dts: mt8173: Add thermal zone node.
+  arm64: dts: mt8173: Add dynamic power node.
+
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi |   47 ++++++++++++++++++++++++++++++
+ drivers/cpufreq/mt8173-cpufreq.c         |   12 ++++++--
+ 2 files changed, 57 insertions(+), 2 deletions(-)
+
+--
+1.7.9.5
