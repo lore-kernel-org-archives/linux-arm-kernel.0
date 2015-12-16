@@ -1,49 +1,57 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 16 Dec 2015 11:32:17 +0100
-Subject: [PATCH] clocksource/drivers/pistachio: Fix wrong calculated
- clocksource read value
-In-Reply-To: <20151216093340.GD8644@n2100.arm.linux.org.uk>
-References: <1448466169-5230-1-git-send-email-jszhang@marvell.com>
- <56707F32.3030405@linaro.org> <20151216151125.1e91b4f4@xhacker>
- <20151216152807.23491eee@xhacker> <20151216153609.0f09f941@xhacker>
- <56712D33.5080009@linaro.org> <20151216093340.GD8644@n2100.arm.linux.org.uk>
-Message-ID: <56713DB1.9070301@linaro.org>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 16 Dec 2015 10:32:56 +0000
+Subject: [PATCH 12/19] ARM: dts: exynos: replace legacy *, wakeup property
+ with wakeup-source
+In-Reply-To: <5670A2F2.5060009@samsung.com>
+References: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
+ <1445422216-29375-13-git-send-email-sudeep.holla@arm.com>
+ <56704141.8070308@arm.com> <5670A2F2.5060009@samsung.com>
+Message-ID: <56713DD8.1050001@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/16/2015 10:33 AM, Russell King - ARM Linux wrote:
-> On Wed, Dec 16, 2015 at 10:21:55AM +0100, Daniel Lezcano wrote:
->> On 12/16/2015 08:36 AM, Jisheng Zhang wrote:
->>> And in fact, clocksource_mmio_readw_down() also has similar issue, but it masks
->>> with c->mask before return, the c->mask is less than 32 bit (because the
->>> clocksource_mmio_init think number of valid bits > 32 or < 16 is invalid.)
->>> the higher 32 bits are masked off, so we never saw such issue. But we'd better
->>> to fix that, what's your opinion?
+
+
+On 15/12/15 23:32, Krzysztof Kozlowski wrote:
+> On 16.12.2015 01:35, Sudeep Holla wrote:
 >>
->> I think we should have a look to this portion closely.
+>>
+>> On 21/10/15 11:10, Sudeep Holla wrote:
+>>> Though the keyboard and other driver will continue to support the legacy
+>>> "gpio-key,wakeup", "linux-keypad,wakeup" boolean property to enable the
+>>> wakeup source, "wakeup-source" is the new standard binding.
+>>>
+>>> This patch replaces all the legacy wakeup properties with the unified
+>>> "wakeup-source" property in order to avoid any futher copy-paste
+>>> duplication.
+>>>
+>>> Cc: Kukjin Kim <kgene@kernel.org>
+>>> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>
+>> Ping, do you prefer taking via your tree or should I send to armsoc
+>> directly ?
 >
-> There is no need to return more bits than are specified.  If you have
-> a N-bit counter, then the high (64-N)-bits can be any value, because:
->
-> static inline cycle_t clocksource_delta(cycle_t now, cycle_t last, cycle_t mask)
-> {
->          return (now - last) & mask;
-> }
->
-> where 'now' is the current value returned from the clock source read
-> function, 'last' is a previously returned value, and 'mask' is the
-> bit mask.  This has the effect of ignoring the high order bits.
+> Usually it depends on the dependencies... but:
+> 1. I just received this patch - 12/19.
 
-I think this approach is perfectly sane. When I said we should look at 
-this portion closely, I meant we should double check the bitwise-nor 
-order regarding the explicit cast. The clocksource's mask makes sense 
-and must stay untouched.
+Sorry for that. The initial idea was to show all the changes but merge
+the binding and dependencies first, so didn't cc all.
 
+> 2. No cover letter, no other patches, no explanation about any
+> dependencies or other related changes. Nothing. Just one patch.
 
+Yes this was initially posted as part of the series, but only
+dependencies were merged for v4.4
+
+> 3. The patch mentions new standard binding. Was the new binding already
+> merged? Or is it part of these series? What about backward compatibility?
+
+Not a brand new binding, but made existing one a standard so that we
+don't continue to be creative and generate more bindings for the same
+thing. Yes binding and dependent patches are already in mainline. And
+yes backward compatibility is maintained as mentioned in the commit
+message.
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Regards,
+Sudeep
