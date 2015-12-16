@@ -1,61 +1,50 @@
 From: zyw@rock-chips.com (Chris Zhong)
-Date: Wed, 16 Dec 2015 18:10:10 +0800
-Subject: [PATCH v6 0/6] Add mipi dsi support for rk3288
-Message-ID: <1450260616-21160-1-git-send-email-zyw@rock-chips.com>
+Date: Wed, 16 Dec 2015 18:10:11 +0800
+Subject: [PATCH v6 1/6] drm/rockchip: return a true clock rate to adjusted_mode
+In-Reply-To: <1450260616-21160-1-git-send-email-zyw@rock-chips.com>
+References: <1450260616-21160-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <1450260616-21160-2-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Since the mipi dsi driver need to use the clock of vop to make the
+calculation of Blanking. But sometimes the clock driver can not set a
+accurate clock_rate for vop, get it by clk_round_rate before mode_set,
+so we can get the true value.
 
-The rk3288 MIPI DSI is a Synopsys DesignWare MIPI DSI host controller
-IP. This series adds support for a Synopsys DesignWare MIPI DSI host
-controller DRM driver.
+Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+Acked-by: Mark Yao <mark.yao@rock-chips.com>
 
-The MIPI DSI feature is tested on rk3288 evb board, backport them to
-chrome os kernel chrome_v3.14, and it can display normally.
+---
 
-This patchset is base on the patchset from Ying.liu at freescale.com.
-<http://www.spinics.net/lists/dri-devel/msg77181.html>
-
-According to the suggestion from Thierry, I have get rid of the bridge,
-and register the encoder & connecter in drm/rockchip/dw-mipi-dsi.c.
-
-
-Changes in v6:
-- update the document, since the bridge device has been deleted.
-- Do not use bridge driver (Thierry Reding)
-- Optimization the phy init sequence
-
-Changes in v5:
-- modify the clk name to SCLK_MIPIDSI_24M
-- add a blank line befor lcd_en
-
+Changes in v6: None
+Changes in v5: None
 Changes in v4:
 - use clk_round_rate to check the clock rate in vop_crtc_mode_fixup
 
-Changes in v3:
-- move dw_mipi_dsi_rockchip.txt to bindings/display/rockchip/
+Changes in v3: None
 
-Chris Zhong (5):
-  drm/rockchip: return a true clock rate to adjusted_mode
-  Documentation: dt-bindings: Add bindings for rk3288 DW MIPI DSI driver
-  drm: rockchip: Support Synopsys DW MIPI DSI
-  ARM: dts: rockchip: add rk3288 mipi_dsi nodes
-  ARM: dts: rockchip: add support mipi panel tv080wum-nl0
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Liu Ying (1):
-  drm/dsi: Add a helper to get bits per pixel of MIPI DSI pixel format
-
- .../display/rockchip/dw_mipi_dsi_rockchip.txt      |   60 +
- arch/arm/boot/dts/rk3288-evb.dtsi                  |   20 +-
- arch/arm/boot/dts/rk3288.dtsi                      |   39 +
- drivers/gpu/drm/rockchip/Kconfig                   |   10 +
- drivers/gpu/drm/rockchip/Makefile                  |    1 +
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c             | 1200 ++++++++++++++++++++
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c        |    8 +
- include/drm/drm_mipi_dsi.h                         |   14 +
- 8 files changed, 1351 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
- create mode 100644 drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index 696e977..d9ec780 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -1146,9 +1146,14 @@ static bool vop_crtc_mode_fixup(struct drm_crtc *crtc,
+ 				const struct drm_display_mode *mode,
+ 				struct drm_display_mode *adjusted_mode)
+ {
++	struct vop *vop = to_vop(crtc);
++
+ 	if (adjusted_mode->htotal == 0 || adjusted_mode->vtotal == 0)
+ 		return false;
+ 
++	adjusted_mode->clock =
++		clk_round_rate(vop->dclk, mode->clock * 1000) / 1000;
++
+ 	return true;
+ }
+ 
 -- 
 2.6.3
