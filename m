@@ -1,208 +1,49 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 16 Dec 2015 10:33:05 +0000
-Subject: [PATCH v3] arm64: dts: juno: Add idle-states to device tree
-In-Reply-To: <1449654053.2818.6.camel@linaro.org>
-References: <1449654053.2818.6.camel@linaro.org>
-Message-ID: <20151216103305.GA19814@red-moon>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 16 Dec 2015 11:32:17 +0100
+Subject: [PATCH] clocksource/drivers/pistachio: Fix wrong calculated
+ clocksource read value
+In-Reply-To: <20151216093340.GD8644@n2100.arm.linux.org.uk>
+References: <1448466169-5230-1-git-send-email-jszhang@marvell.com>
+ <56707F32.3030405@linaro.org> <20151216151125.1e91b4f4@xhacker>
+ <20151216152807.23491eee@xhacker> <20151216153609.0f09f941@xhacker>
+ <56712D33.5080009@linaro.org> <20151216093340.GD8644@n2100.arm.linux.org.uk>
+Message-ID: <56713DB1.9070301@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof, Kevin,
+On 12/16/2015 10:33 AM, Russell King - ARM Linux wrote:
+> On Wed, Dec 16, 2015 at 10:21:55AM +0100, Daniel Lezcano wrote:
+>> On 12/16/2015 08:36 AM, Jisheng Zhang wrote:
+>>> And in fact, clocksource_mmio_readw_down() also has similar issue, but it masks
+>>> with c->mask before return, the c->mask is less than 32 bit (because the
+>>> clocksource_mmio_init think number of valid bits > 32 or < 16 is invalid.)
+>>> the higher 32 bits are masked off, so we never saw such issue. But we'd better
+>>> to fix that, what's your opinion?
+>>
+>> I think we should have a look to this portion closely.
+>
+> There is no need to return more bits than are specified.  If you have
+> a N-bit counter, then the high (64-N)-bits can be any value, because:
+>
+> static inline cycle_t clocksource_delta(cycle_t now, cycle_t last, cycle_t mask)
+> {
+>          return (now - last) & mask;
+> }
+>
+> where 'now' is the current value returned from the clock source read
+> function, 'last' is a previously returned value, and 'mask' is the
+> bit mask.  This has the effect of ignoring the high order bits.
 
-May you consider pulling this patch please or you prefer us sending
-a pull request ?
+I think this approach is perfectly sane. When I said we should look at 
+this portion closely, I meant we should double check the bitwise-nor 
+order regarding the explicit cast. The clocksource's mask makes sense 
+and must stay untouched.
 
-Thanks a lot,
-Lorenzo
 
-On Wed, Dec 09, 2015 at 09:40:53AM +0000, Jon Medhurst (Tixy) wrote:
-> This patch adds idle-states bindings data collected through a set of
-> benchmarking experiments (latency and energy consumption) on Juno
-> boards. Latencies data represents the worst case scenarios as required
-> by the DT idle-states bindings.
-> 
-> Signed-off-by: Jon Medhurst <tixy@linaro.org>
-> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> ---
-> 
-> I don't know if this needs any other Ack or can finally go in (through
-> arm soc tree?)
-> 
-> Changes since v2:
-> - Updated commit message to Lorenzo's suggested text.
-> 
-> Changes since v1:
-> - Updated latency times to those provided by Lorenzo
-> - Included Juno r1 dt
-> 
->  arch/arm64/boot/dts/arm/juno-r1.dts | 28 ++++++++++++++++++++++++++++
->  arch/arm64/boot/dts/arm/juno.dts    | 28 ++++++++++++++++++++++++++++
->  2 files changed, 56 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
-> index 93bc3d7..8826f83 100644
-> --- a/arch/arm64/boot/dts/arm/juno-r1.dts
-> +++ b/arch/arm64/boot/dts/arm/juno-r1.dts
-> @@ -60,6 +60,28 @@
->  			};
->  		};
->  
-> +		idle-states {
-> +			entry-method = "arm,psci";
-> +
-> +			CPU_SLEEP_0: cpu-sleep-0 {
-> +				compatible = "arm,idle-state";
-> +				arm,psci-suspend-param = <0x0010000>;
-> +				local-timer-stop;
-> +				entry-latency-us = <300>;
-> +				exit-latency-us = <1200>;
-> +				min-residency-us = <2000>;
-> +			};
-> +
-> +			CLUSTER_SLEEP_0: cluster-sleep-0 {
-> +				compatible = "arm,idle-state";
-> +				arm,psci-suspend-param = <0x1010000>;
-> +				local-timer-stop;
-> +				entry-latency-us = <300>;
-> +				exit-latency-us = <1200>;
-> +				min-residency-us = <2500>;
-> +			};
-> +		};
-> +
->  		A57_0: cpu at 0 {
->  			compatible = "arm,cortex-a57","arm,armv8";
->  			reg = <0x0 0x0>;
-> @@ -67,6 +89,7 @@
->  			enable-method = "psci";
->  			next-level-cache = <&A57_L2>;
->  			clocks = <&scpi_dvfs 0>;
-> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
->  		};
->  
->  		A57_1: cpu at 1 {
-> @@ -76,6 +99,7 @@
->  			enable-method = "psci";
->  			next-level-cache = <&A57_L2>;
->  			clocks = <&scpi_dvfs 0>;
-> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
->  		};
->  
->  		A53_0: cpu at 100 {
-> @@ -85,6 +109,7 @@
->  			enable-method = "psci";
->  			next-level-cache = <&A53_L2>;
->  			clocks = <&scpi_dvfs 1>;
-> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
->  		};
->  
->  		A53_1: cpu at 101 {
-> @@ -94,6 +119,7 @@
->  			enable-method = "psci";
->  			next-level-cache = <&A53_L2>;
->  			clocks = <&scpi_dvfs 1>;
-> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
->  		};
->  
->  		A53_2: cpu at 102 {
-> @@ -103,6 +129,7 @@
->  			enable-method = "psci";
->  			next-level-cache = <&A53_L2>;
->  			clocks = <&scpi_dvfs 1>;
-> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
->  		};
->  
->  		A53_3: cpu at 103 {
-> @@ -112,6 +139,7 @@
->  			enable-method = "psci";
->  			next-level-cache = <&A53_L2>;
->  			clocks = <&scpi_dvfs 1>;
-> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
->  		};
->  
->  		A57_L2: l2-cache0 {
-> diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
-> index 53442b5..dcfcf15 100644
-> --- a/arch/arm64/boot/dts/arm/juno.dts
-> +++ b/arch/arm64/boot/dts/arm/juno.dts
-> @@ -60,6 +60,28 @@
->  			};
->  		};
->  
-> +		idle-states {
-> +			entry-method = "arm,psci";
-> +
-> +			CPU_SLEEP_0: cpu-sleep-0 {
-> +				compatible = "arm,idle-state";
-> +				arm,psci-suspend-param = <0x0010000>;
-> +				local-timer-stop;
-> +				entry-latency-us = <300>;
-> +				exit-latency-us = <1200>;
-> +				min-residency-us = <2000>;
-> +			};
-> +
-> +			CLUSTER_SLEEP_0: cluster-sleep-0 {
-> +				compatible = "arm,idle-state";
-> +				arm,psci-suspend-param = <0x1010000>;
-> +				local-timer-stop;
-> +				entry-latency-us = <300>;
-> +				exit-latency-us = <1200>;
-> +				min-residency-us = <2500>;
-> +			};
-> +		};
-> +
->  		A57_0: cpu at 0 {
->  			compatible = "arm,cortex-a57","arm,armv8";
->  			reg = <0x0 0x0>;
-> @@ -67,6 +89,7 @@
->  			enable-method = "psci";
->  			next-level-cache = <&A57_L2>;
->  			clocks = <&scpi_dvfs 0>;
-> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
->  		};
->  
->  		A57_1: cpu at 1 {
-> @@ -76,6 +99,7 @@
->  			enable-method = "psci";
->  			next-level-cache = <&A57_L2>;
->  			clocks = <&scpi_dvfs 0>;
-> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
->  		};
->  
->  		A53_0: cpu at 100 {
-> @@ -85,6 +109,7 @@
->  			enable-method = "psci";
->  			next-level-cache = <&A53_L2>;
->  			clocks = <&scpi_dvfs 1>;
-> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
->  		};
->  
->  		A53_1: cpu at 101 {
-> @@ -94,6 +119,7 @@
->  			enable-method = "psci";
->  			next-level-cache = <&A53_L2>;
->  			clocks = <&scpi_dvfs 1>;
-> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
->  		};
->  
->  		A53_2: cpu at 102 {
-> @@ -103,6 +129,7 @@
->  			enable-method = "psci";
->  			next-level-cache = <&A53_L2>;
->  			clocks = <&scpi_dvfs 1>;
-> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
->  		};
->  
->  		A53_3: cpu at 103 {
-> @@ -112,6 +139,7 @@
->  			enable-method = "psci";
->  			next-level-cache = <&A53_L2>;
->  			clocks = <&scpi_dvfs 1>;
-> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
->  		};
->  
->  		A57_L2: l2-cache0 {
-> -- 
-> 2.1.4
-> 
-> 
-> 
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
