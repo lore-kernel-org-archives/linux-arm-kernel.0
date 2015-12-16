@@ -1,39 +1,28 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 16 Dec 2015 15:17:25 -0600
-Subject: [PATCH v4 3/5] PCI: qcom: Add Qualcomm PCIe controller driver
-In-Reply-To: <566FCE27.2050705@mm-sol.com>
-References: <1449149725-27607-1-git-send-email-stanimir.varbanov@linaro.org>
- <1449149725-27607-4-git-send-email-stanimir.varbanov@linaro.org>
- <566FCE27.2050705@mm-sol.com>
-Message-ID: <20151216211725.GA27791@localhost>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 16 Dec 2015 22:24:50 +0100
+Subject: [PATCH 2/5] clk: rockchip: rk3036: enable the CLK_IGNORE_UNUSED
+ flag for aclk_vio
+In-Reply-To: <1450254441-3243-3-git-send-email-wxt@rock-chips.com>
+References: <1450254441-3243-1-git-send-email-wxt@rock-chips.com>
+ <1450254441-3243-3-git-send-email-wxt@rock-chips.com>
+Message-ID: <1859046.avFUcYTcgb@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stan,
-
-On Tue, Dec 15, 2015 at 10:24:07AM +0200, Stanimir Varbanov wrote:
-> On 12/03/2015 03:35 PM, Stanimir Varbanov wrote:
-> > From: Stanimir Varbanov <svarbanov@mm-sol.com>
-> > 
-> > The PCIe driver reuse the Designware common code for host
-> > and MSI initialization, and also program the Qualcomm
-> > application specific registers.
-> > 
-> > Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
-> > Signed-off-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
-> > ---
-> >  MAINTAINERS                  |    7 +
-> >  drivers/pci/host/Kconfig     |   10 +
-> >  drivers/pci/host/Makefile    |    1 +
-> >  drivers/pci/host/pcie-qcom.c |  624 ++++++++++++++++++++++++++++++++++++++++++
-> >  4 files changed, 642 insertions(+)
-> >  create mode 100644 drivers/pci/host/pcie-qcom.c
+Am Mittwoch, 16. Dezember 2015, 16:27:18 schrieb Caesar Wang:
+> From: Yakir Yang <ykk@rock-chips.com>
 > 
-> Hi Bjorn, any chance to get this merged in 4.5 ?
+> ACLK_VIO is the noc bus clock for display module, display cann't
+> read data from ddr without this clock enabled.
+> 
+> Due to it shouldn't belong to any driver, but we need it enabled,
+> so just mark it as the CLK_IGNORE_UNUSED flag.
+> 
+> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 
-The driver looks good overall, so I think 4.5 is very possible.  It
-doesn't look like there's really a consensus on the memory barrier
-thing yet, and I assume the testing reports include that first patch,
-so it'd be good to get that resolved first.
+applied to my clk-branch for 4.5
 
-Bjorn
+
+Thanks
+Heiko
