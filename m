@@ -1,28 +1,43 @@
-From: jarkko.nikula@linux.intel.com (Jarkko Nikula)
-Date: Wed, 16 Dec 2015 14:53:02 +0200
-Subject: [PATCH v2 0/2] i2c:dw: Add APM X-Gene ACPI I2C device support
-In-Reply-To: <20151216090454.GL1762@lahna.fi.intel.com>
-References: <1449782357-22982-1-git-send-email-lho@apm.com>
- <566F6485.2000508@amd.com> <20151215132721.GJ1762@lahna.fi.intel.com>
- <56702923.9010305@amd.com> <20151215145953.GK1762@lahna.fi.intel.com>
- <CAPw-ZT=TcvneyS69GjWe8sFR2hBTpHUUabu8Y5Feup89MwQWQQ@mail.gmail.com>
- <20151216090454.GL1762@lahna.fi.intel.com>
-Message-ID: <56715EAE.4080006@linux.intel.com>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Wed, 16 Dec 2015 13:55:11 +0100
+Subject: [PATCH v3 4/4] drivers: psci: replace psci firmware calls
+In-Reply-To: <20151216105529.GC19814@red-moon>
+References: <1448449461-5043-1-git-send-email-jens.wiklander@linaro.org>
+ <1448449461-5043-5-git-send-email-jens.wiklander@linaro.org>
+ <20151201184741.GE29045@leverpostej> <20151201194421.GA29068@ermac>
+ <20151216105529.GC19814@red-moon>
+Message-ID: <20151216125509.GA27585@ermac>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/16/2015 11:04 AM, Mika Westerberg wrote:
-> On Tue, Dec 15, 2015 at 11:20:03AM -0800, Loc Ho wrote:
->> Can we not just add an AML method that will return the operation clock
->> frequency that the I2C driver can use? If the method doesn't existed,
->> we will just bail and do nothing or assume what ever default behavior?
->
-> Why would you add yet another method? There already are existing ACPI
-> *CNT methods that you can use, and are used in systems out there.
+On Wed, Dec 16, 2015 at 10:55:29AM +0000, Lorenzo Pieralisi wrote:
+> [CC'ed Daniel]
+> 
+> On Tue, Dec 01, 2015 at 08:44:22PM +0100, Jens Wiklander wrote:
+> 
+> [...]
+> 
+> > > What's the plan for merging this? I assume this'll go via arm-soc?
+> > 
+> > I talked to Arnd about this and he suggested to go via Russel.
+> 
+> Heads-up, this patch will conflict with:
+> 
+> https://patchwork.kernel.org/patch/7418351/
+> 
+> that goes via linux-pm tree, please let me and Daniel know how
+> you want us to sort this out.
 
-One thing to remember that *CNT methods allow more precise machine and 
-per bus specific tunings against different HW characteristics like 
-pull-up resistance, line load, propagation delay, etc.
+I guess this arm-smccc patchset need to go together with that patch in
+some way. I've just uploaded my patches in Russels patch system, but I
+can stop that and try to go via the linux-pm tree instead if you think
+the maintainer would accept that. I'll need to ask Russel if he can ack
+the patches "arm/arm64: add arm-smccc" and
+"arm: add implementation for arm-smccc" first though.
 
--- 
-Jarkko
+Would that work or do you have another idea? I'm of course happy either
+way as long as the patches get through. I'm new to this so any advice is
+appreciated.
+
+Thanks,
+Jens
