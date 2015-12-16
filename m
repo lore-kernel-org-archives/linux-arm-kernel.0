@@ -1,31 +1,45 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Wed, 16 Dec 2015 11:12:31 +0000
-Subject: arm-soc boot: 320 boots: 12 failed, 308 passed
- (v4.4-rc3-483-gb48b5ceb7227)
-In-Reply-To: <1746045.ErmxH37Pke@wuerfel>
-References: <567128b4.46b71c0a.17f65.7531@mx.google.com>
- <1746045.ErmxH37Pke@wuerfel>
-Message-ID: <1450264351.2819.4.camel@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 16 Dec 2015 11:13:17 +0000
+Subject: [PATCH] arm64: reenable interrupt when handling ptrace breakpoint
+In-Reply-To: <1450225088-2456-1-git-send-email-yang.shi@linaro.org>
+References: <1450225088-2456-1-git-send-email-yang.shi@linaro.org>
+Message-ID: <20151216111316.GD4308@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-12-16 at 11:17 +0100, Arnd Bergmann wrote:
-> On Wednesday 16 December 2015 01:02:44 kernelci. org bot wrote:
-> > arm-soc boot: 320 boots: 12 failed, 308 passed (v4.4-rc3-483-gb48b5ceb7227)
-> > 
-> > Full Boot Summary: https://kernelci.org/boot/all/job/arm-soc/kernel/v4.4-rc3-483-gb48b5ceb7227/
-> > Full Build Summary: https://kernelci.org/build/arm-soc/kernel/v4.4-rc3-483-gb48b5ceb7227/
-> > 
-> >
-[...]
-> * Juno seems to be sick and doesn't like LAVA today:
+On Tue, Dec 15, 2015 at 04:18:08PM -0800, Yang Shi wrote:
+> The kernel just send out a SIGTRAP signal when handling ptrace breakpoint in
+> debug exception, so it sounds safe to have interrupt enabled if it is not
+> disabled by the parent process.
 
-Looks like a LAVA hickup, I downloaded the Image and btb and they appear
-to work fine on my board. Just to make sure I was running the right
-kernel...
+Is this actually fixing an issue you're seeing, or did you just spot this?
+Given that force_sig_info disable interrupts, I don't think this is really
+worth doing.
 
-# uname -a
-Linux genericarmv8 4.4.0-rc3+ #1 SMP PREEMPT Wed Dec 16 05:51:25 CET 2015 aarch64 GNU/Linux
+> Signed-off-by: Yang Shi <yang.shi@linaro.org>
+> ---
+>  arch/arm64/kernel/debug-monitors.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+> index 8aee3ae..90d70e4 100644
+> --- a/arch/arm64/kernel/debug-monitors.c
+> +++ b/arch/arm64/kernel/debug-monitors.c
+> @@ -239,6 +239,9 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
+>  		return 0;
+>  
+>  	if (user_mode(regs)) {
+> +		if (interrupts_enabled(regs))
+> +			local_irq_enable();
+> +
 
--- 
-Tixy
+My worry here is that we take an interrupt and, on the return path,
+decide to reschedule due to CONFIG_PREEMPT. If we somehow end up back
+in the debugger, I'm concerned that it could remove the breakpoint and
+then later see an unexpected SIGTRAP from the child.
+
+Having said that, I've failed to construct a non-racy scenario in which
+that can happen, but I'm just really uncomfortable making this change
+unless there's a real problem being solved.
+
+Will
