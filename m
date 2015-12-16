@@ -1,78 +1,43 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Wed, 16 Dec 2015 17:29:59 +0800
-Subject: [PATCH v7 19/19] KVM: ARM64: Add a new kvm ARM PMU device
-In-Reply-To: <56712928.8050409@arm.com>
-References: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
- <1450169379-12336-20-git-send-email-zhaoshenglong@huawei.com>
- <567032AD.8000206@arm.com> <567036DE.80605@linaro.org>
- <567038E3.3010102@arm.com> <20151215204739.GK4120@cbox>
- <56711348.6010406@huawei.com> <56711B99.1000608@huawei.com>
- <56712928.8050409@arm.com>
-Message-ID: <56712F17.8000201@huawei.com>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 16 Dec 2015 09:30:34 +0000
+Subject: [PATCH v12 08/16] arm64/kexec: Add core kexec support
+In-Reply-To: <20151216071804.GI4674@dhcppc13.redhat.com>
+References: <cover.1448403503.git.geoff@infradead.org>
+ <6ac232ad37d6b02cf2d5848b15236f26f5ac61ac.1448403503.git.geoff@infradead.org>
+ <20151215182932.GF353@arm.com> <1450224870.24127.130.camel@infradead.org>
+ <20151216071804.GI4674@dhcppc13.redhat.com>
+Message-ID: <56712F3A.7040805@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 16/12/15 07:18, Pratyush Anand wrote:
+> On 15/12/2015:04:14:30 PM, Geoff Levand wrote:
+>> On Tue, 2015-12-15 at 18:29 +0000, Will Deacon wrote:
+>>>> +> > 	> >  * Copy arm64_relocate_new_kernel to the reboot_code_buffer for use
+>>>> +> > 	> >  * after the kernel is shut down.
+>>>> +> > 	> >  */
+>>>> +> > 	> > memcpy(reboot_code_buffer, arm64_relocate_new_kernel,
+>>>> +> > 	> > 	> > arm64_relocate_new_kernel_size);
+>>>
+>>> At which point does the I-cache get invalidated for this?
+>>
+>> I'll add a call to flush_icache_range() for reboot_code_buffer.  I
+>> think that should do it.
+> 
+> We execute arm64_relocate_new_kernel() code with I-cache disabled. So, do we
+> really need to invalidate I-cache?
+
+I got bitten by this, see Mark's earlier reply[0]:
+
+Mark Rutland wrote:
+> The SCTLR_ELx.I only affects the attributes that the I-cache uses to
+> fetch with, not whether it is enabled (it cannot be disabled
+> architecturally).
 
 
-On 2015/12/16 17:04, Marc Zyngier wrote:
-> On 16/12/15 08:06, Shannon Zhao wrote:
->> > Hi,
->> > 
->> > On 2015/12/16 15:31, Shannon Zhao wrote:
->>>>>>>>> >>>>>>>> But in this case, you're returning an error if it is *not* initialized.
->>>>>>>>> >>>>>>>> I understand that in that case you cannot return an interrupt number (-1
->>>>>>>>> >>>>>>>> would be weird), but returning -EBUSY feels even more weird.
->>>>>>>>> >>>>>>>>
->>>>>>>>> >>>>>>>> I'd settle for -ENOXIO, or something similar. Anyone having a better idea?
->>>>>>>>> >>>>>>>>
->>>>> >>>> ENXIO or ENODEV would be my choice too, and add that to the
->>>>> >>>> Documentation clearly describing when this error code is used.
->>>>> >>>>
->>>>> >>>> By the way, why do you loop over all VCPUS to set the same value when
->>>>> >>>> you can't do anything per VCPU anyway?  It seems to me it's either a
->>>>> >>>> per-VM property (that you can store on the VM data structure) or it's a
->>>>> >>>> true per-VCPU property?
->>> >> This is a per-VCPU property. PMU interrupt could be PPI or SPI. For PPI
->>> >> the interrupt numbers are same for each vcpu, while for SPI they are
->>> >> different, so it needs to set them separately. I planned to support both
->>> >> PPI and SPI. I think I should add support for SPI at this moment and let
->>> >> users (QEMU) to set these interrupts for each one.
->> > 
->> > How about below vPMU Documentation?
->> > 
->> > ARM Virtual Performance Monitor Unit (vPMU)
->> > ===========================================
->> > 
->> > Device types supported:
->> >   KVM_DEV_TYPE_ARM_PMU_V3         ARM Performance Monitor Unit v3
->> > 
->> > Instantiate one PMU instance for per VCPU through this API.
->> > 
->> > Groups:
->> >   KVM_DEV_ARM_PMU_GRP_IRQ
->> >   Attributes:
->> >     The attr field of kvm_device_attr encodes two values:
->> >     bits:     | 63 .... 32 | 31 .... 0 |
->> >     values:   | vcpu_index |  irq_num  |
->> >     The irq_num describes the PMU overflow interrupt number for the
->> > specified
->> >     vcpu_index vcpu. This interrupt could be a PPI or SPI, but for one
->> > VM the
->> >     interrupt type must be same for each vcpu.
->> > 
->> >   Errors:
->> >     -ENXIO: Getting or setting this attribute is not yet supported
->> >     -ENODEV: Getting the PMU overflow interrupt number while it's not set
->> >     -EBUSY: The PMU overflow interrupt is already set
->> >     -EINVAL: Invalid vcpu_index or irq_num supplied
->> > 
->> > 
-> Let's add at least one comment that forbids two vcpus from getting the
-> same SPI. This is too common a mistake that we see in actual SoCs, and I
-> don't want to see it replicated in VMs...
 
-Ok, will add.
+James
 
-Thanks,
--- 
-Shannon
+
+[0]
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/382101.html
