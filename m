@@ -1,97 +1,52 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 16 Dec 2015 14:48:13 +0900
-Subject: [PATCH v12 14/16] arm64: kdump: update a kernel doc
-In-Reply-To: <20151215171727.GC353@arm.com>
+Date: Wed, 16 Dec 2015 14:51:09 +0900
+Subject: [PATCH v12 16/16] arm64: kdump: relax BUG_ON() if more than one
+ cpus are still active
+In-Reply-To: <20151215170523.GA353@arm.com>
 References: <cover.1448403503.git.geoff@infradead.org>
- <3c9bfb1df9bba481b753d8d630e4e3d45f986f04.1448403503.git.geoff@infradead.org>
- <20151215171727.GC353@arm.com>
-Message-ID: <5670FB1D.7060300@linaro.org>
+ <83db66df70fc1f7cd4da8b580d264b9320991cf0.1448403503.git.geoff@infradead.org>
+ <20151215170523.GA353@arm.com>
+Message-ID: <5670FBCD.2030600@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/16/2015 02:17 AM, Will Deacon wrote:
+On 12/16/2015 02:05 AM, Will Deacon wrote:
 > On Tue, Nov 24, 2015 at 10:25:34PM +0000, Geoff Levand wrote:
 >> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
 >>
->> This patch adds arch specific descriptions about kdump usage on arm64
->> to kdump.txt.
->>
->> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>> We should try best in case of kdump.
+>> So even if not all secondary cpus have shut down, we do kdump anyway.
 >> ---
->>   Documentation/kdump/kdump.txt | 32 +++++++++++++++++++++++++++++++-
->>   1 file changed, 31 insertions(+), 1 deletion(-)
+>>   arch/arm64/kernel/machine_kexec.c | 8 +++++++-
+>>   1 file changed, 7 insertions(+), 1 deletion(-)
 >>
->> diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
->> index bc4bd5a..7d3fad0 100644
->> --- a/Documentation/kdump/kdump.txt
->> +++ b/Documentation/kdump/kdump.txt
->> @@ -18,7 +18,7 @@ memory image to a dump file on the local disk, or across the network to
->>   a remote system.
+>> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+>> index d2d7e90..482aae7 100644
+>> --- a/arch/arm64/kernel/machine_kexec.c
+>> +++ b/arch/arm64/kernel/machine_kexec.c
+>> @@ -148,7 +148,13 @@ void machine_kexec(struct kimage *kimage)
+>>   	phys_addr_t reboot_code_buffer_phys;
+>>   	void *reboot_code_buffer;
 >>
->>   Kdump and kexec are currently supported on the x86, x86_64, ppc64, ia64,
->> -s390x and arm architectures.
->> +s390x, arm and arm64 architectures.
->>
->>   When the system kernel boots, it reserves a small section of memory for
->>   the dump-capture kernel. This ensures that ongoing Direct Memory Access
->> @@ -249,6 +249,29 @@ Dump-capture kernel config options (Arch Dependent, arm)
->>
->>       AUTO_ZRELADDR=y
->>
->> +Dump-capture kernel config options (Arch Dependent, arm64)
->> +----------------------------------------------------------
->> +
->> +1) Disable symmetric multi-processing support under "Processor type and
->> +   features":
->> +
->> +   CONFIG_SMP=n
->> +
->> +   (If CONFIG_SMP=y, then specify maxcpus=1 on the kernel command line
->> +   when loading the dump-capture kernel, see section "Load the Dump-capture
->> +   Kernel".)
+>> -	BUG_ON(num_online_cpus() > 1);
+>> +	if (num_online_cpus() > 1) {
+>> +		if (in_crash_kexec)
+>> +			pr_warn("kdump might fail because %d cpus are still online\n",
+>> +					num_online_cpus());
+>> +		else
+>> +			BUG();
+>> +	}
 >
-> SMP is now forced on, so please update this text.
-
-OK, I will fix it.
-
->> +2) The maximum memory size on the dump-capture kernel must be limited by
->> +   specifying:
->> +
->> +   mem=X[MG]
->> +
->> +   where X should be less than or equal to the size in "crashkernel="
->> +   boot parameter. Kexec-tools will automatically add this.
->> +
->> +3) Currently, kvm will not be enabled on the dump-capture kernel even
->> +   if it is configured.
->> +
->>   Extended crashkernel syntax
->>   ===========================
->>
->> @@ -312,6 +335,8 @@ Boot into System Kernel
->>      any space below the alignment point may be overwritten by the dump-capture kernel,
->>      which means it is possible that the vmcore is not that precise as expected.
->>
->> +   On arm64, use "crashkernel=Y[@X]".  Note that the start address of
->> +   the kernel, X if explicitly specified, must be aligned to 2MiB (0x200000).
->>
->>   Load the Dump-capture Kernel
->>   ============================
->> @@ -334,6 +359,8 @@ For s390x:
->>   	- Use image or bzImage
->>   For arm:
->>   	- Use zImage
->> +For arm64:
->> +	- Use vmlinux
+> Can you just rewrite the existing BUG_ON as:
 >
-> What? Why doesn't Image work?
+>    BUG_ON(num_online_cpus() && !WARN_ON(in_crash_kexec));
+>
+> ?
 
-Actually it depends on kexec-tools, not the kernel.
-Initially Geoff implemented vmlinux support only, then
-recently Pratyush (RedHat) gave us a patch for "Image" support.
+Yes, but
+      BUG_ON((num_online_cpus() > 1) && !WARN_ON(in_crash_kexec));
 
-So now Image should work.
-
+Thanks,
 -Takahiro AKASHI
 
 > Will
