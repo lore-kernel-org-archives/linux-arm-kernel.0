@@ -1,169 +1,45 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Wed, 16 Dec 2015 11:55:33 +0800
-Subject: [PATCH v11 16/19] drm: bridge: analogix/dp: add edid modes parse in
- get_modes method
-In-Reply-To: <1450236018-1118-1-git-send-email-ykk@rock-chips.com>
-References: <1450236018-1118-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1450238133-3194-1-git-send-email-ykk@rock-chips.com>
+From: dawei.chien@mediatek.com (Dawei Chien)
+Date: Wed, 16 Dec 2015 11:59:13 +0800
+Subject: [PATCH v5 0/3] thermal: mediatek: Add cpu dynamic power cooling model.
+Message-ID: <1450238356-36319-1-git-send-email-dawei.chien@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Display Port monitor could support kinds of mode which indicate
-in monitor edid, not just one single display resolution which
-defined in panel or devivetree property display timing.
+Use Intelligent Power Allocation (IPA) technical to add dynamic power model
+for binding CPU thermal zone. The power allocator governor allocates power
+budget to control CPU temperature.
 
-Note: Gustavo Padovan try to remove the controller and phy
-power on function in bind time at bellow commit:
-	drm/exynos: do not start enabling DP at bind() phase
+Power Allocator governor is able to keep SOC temperature within a defined
+temperature range to avoid SOC overheat and keep it's performance.
+mt8173-cpufreq.c need to register its' own power model with power allocator
+thermal governor, so that power allocator governor can allocates suitable
+power budget to control CPU temperature.
 
-But for now driver need to read edid message in .get_modes()
-function, so controller must be inited in bind time, so we
-need to add controller init back.
+Binding document is refer to this patchset
+https://lkml.org/lkml/2015/11/30/239
 
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
----
-Changes in v11: None
-Changes in v10: None
-Changes in v9: None
-Changes in v8: None
-Changes in v7: None
-Changes in v6: None
-Changes in v5: None
-Changes in v4:
-- Call drm_panel_prepare() in .get_modes function, ensure panel should
-  power on before driver try to read edid message.
+Change since V4:
+1. Remove unnecessary error-checking for mt8173-cpufreq.c
+2. Initializing variable capacitance with 0
 
-Changes in v3:
-- Add edid modes parse support
+Change since V3:
+1. Remove static power model
+2. Split V3's device tree in two for thermal zones and dynamic power models respectively
 
-Changes in v2: None
+Change since V2:
+1. Move dynamic/static power model in device tree
 
- drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 19 +++++----
- drivers/gpu/drm/bridge/analogix/analogix_dp_core.h | 46 +++++++++++-----------
- 2 files changed, 35 insertions(+), 30 deletions(-)
+Change since V1:
+1. Include mt8171.h and sort header file for mt8173.dtsi
 
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-index 952c2c3..d18054d 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-@@ -107,7 +107,7 @@ static unsigned char analogix_dp_calc_edid_check_sum(unsigned char *edid_data)
- 
- static int analogix_dp_read_edid(struct analogix_dp_device *dp)
- {
--	unsigned char edid[EDID_BLOCK_LENGTH * 2];
-+	unsigned char *edid = dp->edid;
- 	unsigned int extend_block = 0;
- 	unsigned char sum;
- 	unsigned char test_vector;
-@@ -901,12 +901,6 @@ static void analogix_dp_commit(struct analogix_dp_device *dp)
- 			DRM_ERROR("failed to disable the panel\n");
- 	}
- 
--	ret = analogix_dp_handle_edid(dp);
--	if (ret) {
--		dev_err(dp->dev, "unable to handle edid\n");
--		return;
--	}
--
- 	ret = analogix_dp_set_link_train(dp, dp->video_info.max_lane_count,
- 					 dp->video_info.max_link_rate);
- 	if (ret) {
-@@ -947,8 +941,17 @@ EXPORT_SYMBOL_GPL(analogix_dp_detect);
- int analogix_dp_get_modes(struct device *dev)
- {
- 	struct analogix_dp_device *dp = dev_get_drvdata(dev);
-+	struct edid *edid = (struct edid *)dp->edid;
- 	int num_modes = 0;
- 
-+	if (analogix_dp_handle_edid(dp)) {
-+		dev_err(dp->dev, "unable to handle edid\n");
-+		return -EINVAL;
-+	}
-+
-+	drm_mode_connector_update_edid_property(dp->connector, edid);
-+	num_modes += drm_add_edid_modes(dp->connector, edid);
-+
- 	if (dp->plat_data->panel)
- 		num_modes += drm_panel_get_modes(dp->plat_data->panel);
- 
-@@ -1303,6 +1306,8 @@ int analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
- 		}
- 	}
- 
-+	analogix_dp_init_dp(dp);
-+
- 	ret = devm_request_irq(&pdev->dev, dp->irq, analogix_dp_irq_handler,
- 			       irq_flags, "analogix-dp", dp);
- 	if (ret) {
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
-index baa06e2..73b780e 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
-@@ -20,6 +20,28 @@
- #define MAX_CR_LOOP			5
- #define MAX_EQ_LOOP			5
- 
-+/* I2C EDID Chip ID, Slave Address */
-+#define I2C_EDID_DEVICE_ADDR			0x50
-+#define I2C_E_EDID_DEVICE_ADDR			0x30
-+
-+#define EDID_BLOCK_LENGTH			0x80
-+#define EDID_HEADER_PATTERN			0x00
-+#define EDID_EXTENSION_FLAG			0x7e
-+#define EDID_CHECKSUM				0x7f
-+
-+/* DP_MAX_LANE_COUNT */
-+#define DPCD_ENHANCED_FRAME_CAP(x)		(((x) >> 7) & 0x1)
-+#define DPCD_MAX_LANE_COUNT(x)			((x) & 0x1f)
-+
-+/* DP_LANE_COUNT_SET */
-+#define DPCD_LANE_COUNT_SET(x)			((x) & 0x1f)
-+
-+/* DP_TRAINING_LANE0_SET */
-+#define DPCD_PRE_EMPHASIS_SET(x)		(((x) & 0x3) << 3)
-+#define DPCD_PRE_EMPHASIS_GET(x)		(((x) >> 3) & 0x3)
-+#define DPCD_VOLTAGE_SWING_SET(x)		(((x) & 0x3) << 0)
-+#define DPCD_VOLTAGE_SWING_GET(x)		(((x) >> 0) & 0x3)
-+
- enum link_rate_type {
- 	LINK_RATE_1_62GBPS = DP_LINK_BW_1_62,
- 	LINK_RATE_2_70GBPS = DP_LINK_BW_2_7,
-@@ -161,6 +183,7 @@ struct analogix_dp_device {
- 	int			dpms_mode;
- 	int			hpd_gpio;
- 	bool                    force_hpd;
-+	unsigned char           edid[EDID_BLOCK_LENGTH * 2];
- 
- 	struct analogix_dp_plat_data *plat_data;
- };
-@@ -260,27 +283,4 @@ int analogix_dp_is_video_stream_on(struct analogix_dp_device *dp);
- void analogix_dp_config_video_slave_mode(struct analogix_dp_device *dp);
- void analogix_dp_enable_scrambling(struct analogix_dp_device *dp);
- void analogix_dp_disable_scrambling(struct analogix_dp_device *dp);
--
--/* I2C EDID Chip ID, Slave Address */
--#define I2C_EDID_DEVICE_ADDR			0x50
--#define I2C_E_EDID_DEVICE_ADDR			0x30
--
--#define EDID_BLOCK_LENGTH			0x80
--#define EDID_HEADER_PATTERN			0x00
--#define EDID_EXTENSION_FLAG			0x7e
--#define EDID_CHECKSUM				0x7f
--
--/* DP_MAX_LANE_COUNT */
--#define DPCD_ENHANCED_FRAME_CAP(x)		(((x) >> 7) & 0x1)
--#define DPCD_MAX_LANE_COUNT(x)			((x) & 0x1f)
--
--/* DP_LANE_COUNT_SET */
--#define DPCD_LANE_COUNT_SET(x)			((x) & 0x1f)
--
--/* DP_TRAINING_LANE0_SET */
--#define DPCD_PRE_EMPHASIS_SET(x)		(((x) & 0x3) << 3)
--#define DPCD_PRE_EMPHASIS_GET(x)		(((x) >> 3) & 0x3)
--#define DPCD_VOLTAGE_SWING_SET(x)		(((x) & 0x3) << 0)
--#define DPCD_VOLTAGE_SWING_GET(x)		(((x) >> 0) & 0x3)
--
- #endif /* _ANALOGIX_DP_CORE_H */
--- 
-1.9.1
+Dawei Chien (3):
+  thermal: mediatek: Add cpu dynamic power cooling model.
+  arm64: dts: mt8173: Add thermal zone node.
+  arm64: dts: mt8173: Add dynamic power node.
+
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi |   47 ++++++++++++++++++++++++++++++
+ drivers/cpufreq/mt8173-cpufreq.c         |   12 ++++++--
+ 2 files changed, 57 insertions(+), 2 deletions(-)
+
+--
+1.7.9.5
