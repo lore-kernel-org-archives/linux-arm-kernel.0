@@ -1,43 +1,49 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 16 Dec 2015 07:59:34 +0100
-Subject: [PATCH] clocksource: arm_global_timer: Allow DT to specify
- already reset timer counter
-In-Reply-To: <CABb+yY0_JvVV_HG_iU8KJjmwu-nq_Cu5hJ6HBoKZCrZAdJ=rLQ@mail.gmail.com>
-References: <1448429044-10395-1-git-send-email-jaswinder.singh@linaro.org>
- <5670559A.4050404@linaro.org>
- <CABb+yY0_JvVV_HG_iU8KJjmwu-nq_Cu5hJ6HBoKZCrZAdJ=rLQ@mail.gmail.com>
-Message-ID: <56710BD6.2090502@linaro.org>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 16 Dec 2015 15:11:25 +0800
+Subject: [PATCH] clocksource/drivers/pistachio: Fix wrong calculated
+ clocksource read value
+In-Reply-To: <56707F32.3030405@linaro.org>
+References: <1448466169-5230-1-git-send-email-jszhang@marvell.com>
+ <56707F32.3030405@linaro.org>
+Message-ID: <20151216151125.1e91b4f4@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/16/2015 05:11 AM, Jassi Brar wrote:
-> On Tue, Dec 15, 2015 at 11:32 PM, Daniel Lezcano
-> <daniel.lezcano@linaro.org> wrote:
->> On 11/25/2015 06:24 AM, Jassi Brar wrote:
->>>
->>> The GT counter is common to every core in a cluster. There is a usecase
->>> when Linux is spawned by a 'master' firmware/OS running on some core of
->>> the same cluster and the GT is used by the both.
->>>    Linux, upon boot, resetting the GT counter is obviously fatal to the
->>> other OS. So provide a way for DT to tell Linux if it's running in that
->>> 'slave' mode and must not reset the counter.
->>>
->>> Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
->>
->>
->> Hmm, I doubt that is a hardware description.
->>
-> Its a regular 2core-1cluster platform. The master RTOS on cpu0
-> maintains the lifecycle of Linux on cpu1.
->
-> 'No_Counter_Reset' is not a h/w thing, I agree, but I don't know how
-> to better convey that platform specific constraint.
+Dear Daniel,
 
-May be with a kernel parameter ?
+On Tue, 15 Dec 2015 21:59:30 +0100 Daniel Lezcano wrote:
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+> On 11/25/2015 04:42 PM, Jisheng Zhang wrote:
+> > Let's assume the counter value is 0xf000000, the pistachio clocksource
+> > read cycles function would return 0xffffffff0fffffff, but it should
+> > return 0xfffffff.
+> >
+> > We fix this issue by calculating bitwise-not counter, then cast to
+> > cycle_t.
+> >
+> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>  
+> 
+> Hi Jisheng,
+> 
+> I tried to reproduce this behavior on x86_64 but without success.
+> 
+> On which architecture did you produce this result ? Do you have a simple 
+> test program to check with ?
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+I have no HW platforms with pistachio, just read the code and run the
+following test code in x86_64 and x86_32:
+
+#include <stdio.h>
+unsigned long long pistachio_clocksource_read_cycles()
+{
+	unsigned int counter = 0xf000000;
+	return ~(unsigned long long)counter;
+}
+int main()
+{
+	printf("%llx\n", pistachio_clocksource_read_cycles());
+	return 0;
+}
+
+Thanks,
+Jisheng
