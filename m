@@ -1,34 +1,31 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 17 Dec 2015 08:52:56 +0900
-Subject: [PATCH 16/19] ARM: dts: s5pv210: replace legacy *, wakeup property
- with wakeup-source
-In-Reply-To: <1445422216-29375-17-git-send-email-sudeep.holla@arm.com>
-References: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
- <1445422216-29375-17-git-send-email-sudeep.holla@arm.com>
-Message-ID: <CAJKOXPcRVPq+wU7=cPkQyqF2Z7dCc0samcHV9UgCYZbeStuCCg@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 16 Dec 2015 15:55:10 -0800
+Subject: [PATCH v2 3/8] dt-bindings: Add root properties for Raspberry Pi 2
+In-Reply-To: <1450310115-22163-1-git-send-email-eric@anholt.net>
+References: <1450310115-22163-1-git-send-email-eric@anholt.net>
+Message-ID: <1450310115-22163-4-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-10-21 19:10 GMT+09:00 Sudeep Holla <sudeep.holla@arm.com>:
-> Though the keyboard and other driver will continue to support the legacy
-> "gpio-key,wakeup", "linux,input-wakeup" boolean property to enable the
-> wakeup source, "wakeup-source" is the new standard binding.
->
-> This patch replaces all the legacy wakeup properties with the unified
-> "wakeup-source" property in order to avoid any futher copy-paste
-> duplication.
->
-> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: linux-samsung-soc at vger.kernel.org
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->  arch/arm/boot/dts/s5pv210-aquila.dts   | 4 ++--
->  arch/arm/boot/dts/s5pv210-goni.dts     | 4 ++--
->  arch/arm/boot/dts/s5pv210-smdkv210.dts | 2 +-
->  3 files changed, 5 insertions(+), 5 deletions(-)
+Signed-off-by: Eric Anholt <eric@anholt.net>
+---
+ Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
-Best regards,
-Krzysztof
+diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt
+index c78576b..11d3056 100644
+--- a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt
++++ b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt
+@@ -26,6 +26,10 @@ Raspberry Pi Model B+
+ Required root node properties:
+ compatible = "raspberrypi,model-b-plus", "brcm,bcm2835";
+ 
++Raspberry Pi 2 Model B
++Required root node properties:
++compatible = "raspberrypi,2-model-b", "brcm,bcm2836";
++
+ Raspberry Pi Compute Module
+ Required root node properties:
+ compatible = "raspberrypi,compute-module", "brcm,bcm2835";
+-- 
+2.6.2
