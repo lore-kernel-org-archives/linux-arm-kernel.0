@@ -1,43 +1,77 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 16 Dec 2015 21:30:30 +0100
-Subject: [PATCH v2] arm64: dts: berlin4ct: switch to Cortex-A53 specific
- pmu nodes
-In-Reply-To: <1450191475-1371-1-git-send-email-jszhang@marvell.com>
-References: <1450191475-1371-1-git-send-email-jszhang@marvell.com>
-Message-ID: <5671C9E6.9080701@gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 16 Dec 2015 21:33:36 +0100
+Subject: [PATCH v7 19/19] KVM: ARM64: Add a new kvm ARM PMU device
+In-Reply-To: <56711B99.1000608@huawei.com>
+References: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
+ <1450169379-12336-20-git-send-email-zhaoshenglong@huawei.com>
+ <567032AD.8000206@arm.com> <567036DE.80605@linaro.org>
+ <567038E3.3010102@arm.com> <20151215204739.GK4120@cbox>
+ <56711348.6010406@huawei.com> <56711B99.1000608@huawei.com>
+Message-ID: <20151216203336.GE24889@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.12.2015 15:57, Jisheng Zhang wrote:
-> Commit ac82d1277215 ("arm64: perf: add Cortex-A53 support") adds the
-> cortex A53 PMU support, thus instead of using the generic armv8-pmuv3
-> compatibility use the more specific Cortex A53 compatibility.
+On Wed, Dec 16, 2015 at 04:06:49PM +0800, Shannon Zhao wrote:
+> Hi,
 > 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> ---
-> Since v1:
->  - keep "arm,armv8-pmuv3" as a fallback in the compatible list. Thank
->    Arnd and Mark.
-
-Applied to berlin64/dt with an updated commit message that
-reflects v2 changes.
-
-Sebastian
-
->  arch/arm64/boot/dts/marvell/berlin4ct.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> On 2015/12/16 15:31, Shannon Zhao wrote:
+> >>>> >> > But in this case, you're returning an error if it is *not* initialized.
+> >>>> >> > I understand that in that case you cannot return an interrupt number (-1
+> >>>> >> > would be weird), but returning -EBUSY feels even more weird.
+> >>>> >> > 
+> >>>> >> > I'd settle for -ENOXIO, or something similar. Anyone having a better idea?
+> >>>> >> > 
+> >> > ENXIO or ENODEV would be my choice too, and add that to the
+> >> > Documentation clearly describing when this error code is used.
+> >> > 
+> >> > By the way, why do you loop over all VCPUS to set the same value when
+> >> > you can't do anything per VCPU anyway?  It seems to me it's either a
+> >> > per-VM property (that you can store on the VM data structure) or it's a
+> >> > true per-VCPU property?
+> > This is a per-VCPU property. PMU interrupt could be PPI or SPI. For PPI
+> > the interrupt numbers are same for each vcpu, while for SPI they are
+> > different, so it needs to set them separately. I planned to support both
+> > PPI and SPI. I think I should add support for SPI at this moment and let
+> > users (QEMU) to set these interrupts for each one.
 > 
-> diff --git a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-> index 099ad93..f926256 100644
-> --- a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-> @@ -115,7 +115,7 @@
->  	};
->  
->  	pmu {
-> -		compatible = "arm,armv8-pmuv3";
-> +		compatible = "arm,cortex-a53-pmu", "arm,armv8-pmuv3";
->  		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>,
->  			     <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>,
->  			     <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>,
+> How about below vPMU Documentation?
 > 
+> ARM Virtual Performance Monitor Unit (vPMU)
+> ===========================================
+> 
+> Device types supported:
+>   KVM_DEV_TYPE_ARM_PMU_V3         ARM Performance Monitor Unit v3
+> 
+> Instantiate one PMU instance for per VCPU through this API.
+> 
+> Groups:
+>   KVM_DEV_ARM_PMU_GRP_IRQ
+>   Attributes:
+>     The attr field of kvm_device_attr encodes two values:
+>     bits:     | 63 .... 32 | 31 .... 0 |
+>     values:   | vcpu_index |  irq_num  |
+>     The irq_num describes the PMU overflow interrupt number for the
+> specified
+>     vcpu_index vcpu. This interrupt could be a PPI or SPI, but for one
+> VM the
+>     interrupt type must be same for each vcpu.
+
+some formatting snafus that I expect come from pasting the text in an
+e-mail client.
+
+> 
+>   Errors:
+>     -ENXIO: Getting or setting this attribute is not yet supported
+
+'not yet supported' as in something we'll implement later, or as in you
+need to call this other function before you can access this state?
+
+>     -ENODEV: Getting the PMU overflow interrupt number while it's not set
+>     -EBUSY: The PMU overflow interrupt is already set
+>     -EINVAL: Invalid vcpu_index or irq_num supplied
+> 
+> 
+Otherwise looks good.
+
+Thanks,
+-Christoffer
