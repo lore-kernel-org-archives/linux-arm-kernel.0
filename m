@@ -1,35 +1,45 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 16 Dec 2015 10:01:59 +0100
-Subject: [PATCH] clocksource/drivers/pistachio: Fix wrong calculated
- clocksource read value
-In-Reply-To: <20151216152807.23491eee@xhacker>
-References: <1448466169-5230-1-git-send-email-jszhang@marvell.com>
- <56707F32.3030405@linaro.org> <20151216151125.1e91b4f4@xhacker>
- <20151216152807.23491eee@xhacker>
-Message-ID: <56712887.5090506@linaro.org>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Wed, 16 Dec 2015 01:03:39 -0800
+Subject: [PATCH LINUX v4 06/13] tty: xuartps: Move request_irq to after
+ setting up the HW
+In-Reply-To: <5670A1B6.6050708@hurleysoftware.com>
+References: <1449376769-13369-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1449376769-13369-7-git-send-email-soren.brinkmann@xilinx.com>
+ <5669F172.6020503@hurleysoftware.com>
+ <20151215154136.GU3358@xsjsorenbubuntu>
+ <5670A1B6.6050708@hurleysoftware.com>
+Message-ID: <20151216090339.GX3358@xsjsorenbubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/16/2015 08:28 AM, Jisheng Zhang wrote:
-> On Wed, 16 Dec 2015 15:11:25 +0800
-> Jisheng Zhang  wrote:
->
->> Dear Daniel,
->>
->> On Tue, 15 Dec 2015 21:59:30 +0100 Daniel Lezcano wrote:
->>
->>> On 11/25/2015 04:42 PM, Jisheng Zhang wrote:
->>>> Let's assume the counter value is 0xf000000, the pistachio clocksource
->
-> oops, sorry, should be 0xf0000000. Do I need to send a v2 patch?
+On Tue, 2015-12-15 at 03:26PM -0800, Peter Hurley wrote:
+> On 12/15/2015 07:41 AM, S?ren Brinkmann wrote:
+> > On Thu, 2015-12-10 at 01:41PM -0800, Peter Hurley wrote:
+> >> On 12/05/2015 08:39 PM, Soren Brinkmann wrote:
+> >>> Request_irq() should be _after_ h/w programming, otherwise an
+> >>> interrupt could be triggered and in-progress before the h/w has been
+> >>> setup.
+> >>
+> >> Slight misunderstanding. My fault; I should have been more explicit.
+> >>
+> >> 1. Any setup necessary for the isr not to be confused and misdirect spurious
+> >>    interrupts (or hang) should be before installing the isr with request_irq()
+> >>    None of this code should trigger an interrupt.
+> >> 2. Clear pending interrupts
+> >> 3. Install the isr with request_irq()
+> >> 4. Enable interrupts
+> > 
+> > Isn't that what the startup function is doing now - more or less. I
+> > think 3 and 4 are swapped to release the lock and then do the
+> > request_irq, but I believe that should be OK.
+> > The startup function configures the HW. Clears the ISR. Enables the
+> > intended IRQs and then does the request_irq call.
+> 
+> If the driver enables interrupts before installing the isr with request_irq()
+> and an interrupt occurs there will the no handler to catch it and EOI the
+> device.
 
-Nope, I fixed it.
+Really? Shouldn't the IRQ be masked in the interrupt controller until
+everything is in place?
 
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+	S?ren
