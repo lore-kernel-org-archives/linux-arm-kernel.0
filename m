@@ -1,75 +1,53 @@
 From: dawei.chien@mediatek.com (Dawei Chien)
-Date: Wed, 16 Dec 2015 21:29:15 +0800
-Subject: [PATCH v6 2/3] arm64: dts: mt8173: Add thermal zone node.
+Date: Wed, 16 Dec 2015 21:29:14 +0800
+Subject: [PATCH v6 1/3] thermal: mediatek: Add cpu dynamic power cooling model.
 In-Reply-To: <1450272556-29770-1-git-send-email-dawei.chien@mediatek.com>
 References: <1450272556-29770-1-git-send-email-dawei.chien@mediatek.com>
-Message-ID: <1450272556-29770-3-git-send-email-dawei.chien@mediatek.com>
+Message-ID: <1450272556-29770-2-git-send-email-dawei.chien@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds thermal zone node to Mediatek MT8173 dtsi file.
+MT8173 cpufreq driver select of_cpufreq_power_cooling_register registering
+cooling devices with dynamic power coefficient.
 
 Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
 ---
 This patch is base on patchset:
-https://lkml.org/lkml/2015/11/30/239
+https://lkml.org/lkml/2015/11/17/251
 ---
- arch/arm64/boot/dts/mediatek/mt8173.dtsi |   43 ++++++++++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
+ drivers/cpufreq/mt8173-cpufreq.c |   11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index fda805d..c962d94 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -188,6 +188,49 @@
- 		clock-output-names = "cpum_ck";
- 	};
+diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mt8173-cpufreq.c
+index 83001dc..d00bab5 100644
+--- a/drivers/cpufreq/mt8173-cpufreq.c
++++ b/drivers/cpufreq/mt8173-cpufreq.c
+@@ -263,17 +263,24 @@ static int mtk_cpufreq_set_target(struct cpufreq_policy *policy,
+ 	return 0;
+ }
  
-+	thermal-zones {
-+		cpu_thermal: cpu_thermal {
-+			polling-delay-passive = <1000>; /* milliseconds */
-+			polling-delay = <1000>; /* milliseconds */
++#define DYNAMIC_POWER "dynamic-power-coefficient"
 +
-+			thermal-sensors = <&thermal>;
-+			sustainable-power = <1500>; /* milliwatts */
+ static void mtk_cpufreq_ready(struct cpufreq_policy *policy)
+ {
+ 	struct mtk_cpu_dvfs_info *info = policy->driver_data;
+ 	struct device_node *np = of_node_get(info->cpu_dev->of_node);
++	u32 capacitance = 0;
+ 
+ 	if (WARN_ON(!np))
+ 		return;
+ 
+ 	if (of_find_property(np, "#cooling-cells", NULL)) {
+-		info->cdev = of_cpufreq_cooling_register(np,
+-							 policy->related_cpus);
++		of_property_read_u32(np, DYNAMIC_POWER, &capacitance);
 +
-+			trips {
-+				threshold: trip-point at 0 {
-+					temperature = <68000>;
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
-+
-+				target: trip-point at 1 {
-+					temperature = <85000>;
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
-+
-+				cpu_crit: cpu_crit at 0 {
-+					temperature = <115000>;
-+					hysteresis = <2000>;
-+					type = "critical";
-+				};
-+			};
-+
-+			cooling-maps {
-+				map at 0 {
-+					trip = <&target>;
-+					cooling-device = <&cpu0 0 0>;
-+					contribution = <1024>;
-+				};
-+				map at 1 {
-+					trip = <&target>;
-+					cooling-device = <&cpu2 0 0>;
-+					contribution = <2048>;
-+				};
-+			};
-+		};
-+	};
-+
- 	timer {
- 		compatible = "arm,armv8-timer";
- 		interrupt-parent = <&gic>;
++		info->cdev = of_cpufreq_power_cooling_register(np,
++						policy->related_cpus,
++						capacitance,
++						NULL);
+ 
+ 		if (IS_ERR(info->cdev)) {
+ 			dev_err(info->cpu_dev,
 -- 
 1.7.9.5
