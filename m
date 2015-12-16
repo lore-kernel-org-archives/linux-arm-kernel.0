@@ -1,73 +1,78 @@
-From: dawei.chien@mediatek.com (dawei chien)
-Date: Wed, 16 Dec 2015 20:12:31 +0800
-Subject: [PATCH v5 2/3] arm64: dts: mt8173: Add thermal zone node.
-In-Reply-To: <CAGS+omCWJo6Q933tRigMsxPvOmD3-cxe337_spAMKhYSUdTUKw@mail.gmail.com>
-References: <1450238356-36319-1-git-send-email-dawei.chien@mediatek.com>
- <1450238356-36319-3-git-send-email-dawei.chien@mediatek.com>
- <CAGS+omDDfJb9dfWWPaMKs=MkO4Pf3RF9SUD==i7sgHsrDhFDxA@mail.gmail.com>
- <1450260553.7981.14.camel@mtksdaap41>
- <CAGS+omCWJo6Q933tRigMsxPvOmD3-cxe337_spAMKhYSUdTUKw@mail.gmail.com>
-Message-ID: <1450267951.7981.22.camel@mtksdaap41>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 16 Dec 2015 12:18:21 +0000
+Subject: [PATCH v3 2/2] arm64: Use PoU cache instr for I/D coherency
+In-Reply-To: <1450260690-5431-3-git-send-email-ashoks@broadcom.com>
+References: <1450260690-5431-1-git-send-email-ashoks@broadcom.com>
+ <1450260690-5431-3-git-send-email-ashoks@broadcom.com>
+Message-ID: <20151216121821.GG4308@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-12-16 at 19:22 +0800, Daniel Kurtz wrote:
-> On Wed, Dec 16, 2015 at 6:09 PM, dawei chien <dawei.chien@mediatek.com> wrote:
-> > On Wed, 2015-12-16 at 16:34 +0800, Daniel Kurtz wrote:
-> >> On Wed, Dec 16, 2015 at 11:59 AM, Dawei Chien <dawei.chien@mediatek.com> wrote:
-> >> >
-> >> > This adds thermal zone node to Mediatek MT8173 dtsi file.
-> >> >
-> >> > Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
-> >> > ---
-> >> > This patch is base on patchset:
-> >> > https://lkml.org/lkml/2015/11/30/239
-> >> > ---
-> >> >  arch/arm64/boot/dts/mediatek/mt8173.dtsi |   43 ++++++++++++++++++++++++++++++
-> >> >  1 file changed, 43 insertions(+)
-> >> >
-> >> > diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> >> > index fda805d..4114cee 100644
-> >> > --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> >> > +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> >> > @@ -188,6 +188,49 @@
-> >> >                 clock-output-names = "cpum_ck";
-> >> >         };
-> >> >
-> >> > +       thermal-zones {
-> >> > +               cpu_thermal: cpu_thermal {
-> >> > +                       polling-delay-passive = <1000>; /* milliseconds */
-> >> > +                       polling-delay = <1000>; /* milliseconds */
-> >> > +
-> >> > +                       thermal-sensors = <&thermal 0>;
-> >>
-> >> This should be <&thermal> with the MTK temp sensor node in
-> >> https://lkml.org/lkml/2015/11/30/239 patch series.
-> >>
-> >> -Dan
-> >
-> > Hi Dan,
-> > Sascha's thermal driver V12 only register sensor id as 0, so we need to
-> > register sensor id as 0 to device tree as well.
-> >
-> > Either <&thermal 0> or <&thermal>, sensor id should be 0 for two cases.
-> > I try this two case, function all work fine for two cases. May I have
-> > any misunderstand? Please kindly give your comment.
-> > I will re-send this patch again once you tell me the reason, thank you.
+On Wed, Dec 16, 2015 at 02:11:30AM -0800, Ashok Kumar wrote:
+> In systems with three levels of cache(PoU at L1 and PoC at L3),
+> PoC cache flush instructions flushes L2 and L3 caches which could affect
+> performance.
+> For cache flushes for I and D coherency, PoU should suffice.
+> So changing all I and D coherency related cache flushes to PoU.
 > 
-> In the new patchset, Sascha changed it to:
-> #thermal-sensor-cells = <0>;
+> Introduced a new __clean_dcache_area_pou API for dcache flush till PoU
+> and provided a common macro for __flush_dcache_area and
+> __clean_dcache_area_pou.
 > 
-> Which means the <&thermal> phandle no longer has any arguments.
+> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Ashok Kumar <ashoks@broadcom.com>
+> ---
+>  arch/arm64/include/asm/cacheflush.h |  1 +
+>  arch/arm64/mm/cache.S               | 50 +++++++++++++++++++++++++++++--------
+>  arch/arm64/mm/flush.c               | 33 +++++++++++++-----------
+>  3 files changed, 58 insertions(+), 26 deletions(-)
 > 
-> Thanks!
-> -Dan
-Hi Dan,
-Thank you for your comment. Yes, I don't need to add sensor id since new
-driver add thermal-sensor-cell as 0.
-(Even I checked function OK to this patch with new patchset)
+> diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
+> index c75b8d0..6a5ecbd 100644
+> --- a/arch/arm64/include/asm/cacheflush.h
+> +++ b/arch/arm64/include/asm/cacheflush.h
+> @@ -68,6 +68,7 @@
+>  extern void flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned long end);
+>  extern void flush_icache_range(unsigned long start, unsigned long end);
+>  extern void __flush_dcache_area(void *addr, size_t len);
+> +extern void __clean_dcache_area_pou(void *addr, size_t len);
+>  extern long __flush_cache_user_range(unsigned long start, unsigned long end);
+>  
+>  static inline void flush_cache_mm(struct mm_struct *mm)
+> diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+> index eb48d5d..b700a97 100644
+> --- a/arch/arm64/mm/cache.S
+> +++ b/arch/arm64/mm/cache.S
+> @@ -79,28 +79,56 @@ ENDPROC(flush_icache_range)
+>  ENDPROC(__flush_cache_user_range)
+>  
+>  /*
+> + * Macro to perform a data cache maintenance for the interval
+> + * [kaddr, kaddr + size)
+> + *
+> + * 	op:		operation passed to dc instruction
+> + * 	domain:		domain used in dsb instruciton
+> + * 	kaddr:		starting virtual address of the region
+> + * 	size:		size of the region
+> + * 	Corrupts: 	kaddr, size, tmp1, tmp2
+> + */
+> +	.macro dcache_by_line_op op, domain, kaddr, size, tmp1, tmp2
+> +	dcache_line_size \tmp1, \tmp2
+> +	add	\size, \kaddr, \size
+> +	sub	\tmp2, \tmp1, #1
+> +	bic	\kaddr, \kaddr, \tmp2
+> +1:	dc	\op, \kaddr
+> +	add	\kaddr, \kaddr, \tmp1
+> +	cmp	\kaddr, \size
+> +	b.lo	1b
+> +	dsb	\domain
+> +	.endm
 
-I will re-send this patch soon, thank you.
+Minor comment, but can you stick this in proc-macros.S and change that
+label from 1: to something like 9998 please?
 
-BR,
-Dawei
+Other than that, looks good. I can take the next version for 4.5.
+
+Cheers,
+
+Will
