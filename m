@@ -1,105 +1,87 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 16 Dec 2015 10:17:35 +0000
-Subject: [PATCH] IOMMU: arm-smmu-v3: fix broken S2PS and AARCH64 in
- Broadcom Vulcan
-In-Reply-To: <CC0BC9CB4553B146B290EC1D4DC5C35901094BCE@SJEXCHMB15.corp.ad.broadcom.com>
-References: <1450110687-32207-1-git-send-email-pmallapp@broadcom.com>
- <20151215134010.GH9452@arm.com>
- <CC0BC9CB4553B146B290EC1D4DC5C35901094BCE@SJEXCHMB15.corp.ad.broadcom.com>
-Message-ID: <20151216101735.GB4308@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 16 Dec 2015 11:17:30 +0100
+Subject: arm-soc boot: 320 boots: 12 failed,
+ 308 passed (v4.4-rc3-483-gb48b5ceb7227)
+In-Reply-To: <567128b4.46b71c0a.17f65.7531@mx.google.com>
+References: <567128b4.46b71c0a.17f65.7531@mx.google.com>
+Message-ID: <1746045.ErmxH37Pke@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 16, 2015 at 04:37:07AM +0000, Prem (Premachandra) Mallappa wrote:
-> > On Mon, Dec 14, 2015 at 10:01:27PM +0530, Prem Mallappa wrote:
-> > > Vulcan SMMUv3 looks for AARCH64 and S2PS inroder to validate the STE
-> > > entry,
-> > 
-> > 'inroder' ?
-> >
-> In order
-
-Got it!
-
-> > > which is a overkill, but when proper encoding not found; the SMMU
-> > > stops processing PCIe read/write requests. Giving the h/w what it wants.
-> > >
-> > > Signed-off-by: Prem Mallappa <pmallapp@broadcom.com>
-> > > ---
-> > >  drivers/iommu/arm-smmu-v3.c | 12 ++++++++++++
-> > >  1 file changed, 12 insertions(+)
-> > >
-> > > diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-
-> > v3.c
-> > > index d4af50d..dfda564 100644
-> > > --- a/drivers/iommu/arm-smmu-v3.c
-> > > +++ b/drivers/iommu/arm-smmu-v3.c
-> > > @@ -260,6 +260,7 @@
-> > >  #define STRTAB_STE_2_S2VMID_MASK	0xffffUL
-> > >  #define STRTAB_STE_2_VTCR_SHIFT		32
-> > >  #define STRTAB_STE_2_VTCR_MASK		0x7ffffUL
-> > > +#define STRTAB_STE_2_S2PS_SHIFT        48
-> > >  #define STRTAB_STE_2_S2AA64		(1UL << 51)
-> > >  #define STRTAB_STE_2_S2ENDI		(1UL << 52)
-> > >  #define STRTAB_STE_2_S2PTW		(1UL << 54)
-> > > @@ -577,6 +578,7 @@ struct arm_smmu_device {
-> > >  	u32				features;
-> > >
-> > >  #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
-> > > +#define ARM_SMMU_OPT_BROKEN_STE_VALID	(1 << 1)
-> > >  	u32				options;
-> > >
-> > >  	struct arm_smmu_cmdq		cmdq;
-> > > @@ -641,6 +643,7 @@ struct arm_smmu_option_prop {
-> > >
-> > >  static struct arm_smmu_option_prop arm_smmu_options[] = {
-> > >  	{ ARM_SMMU_OPT_SKIP_PREFETCH, "hisilicon,broken-prefetch-
-> > cmd" },
-> > > +	{ ARM_SMMU_OPT_BROKEN_STE_VALID, "broadcom,broken-ste-
-> > valid-check"
-> > > +},
-> > 
-> > This looks like a more specific problem than "broken ste valid check".
-> > Maybe we could call the prop
-> > ARM_SMMU_OPT_BCOM_BROKEN_STE_VALID?
-> > 
-> > You also need to update the devicetree binding in
-> > Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt.
-> > 
-> Sure I'll send out v2.
+On Wednesday 16 December 2015 01:02:44 kernelci. org bot wrote:
+> arm-soc boot: 320 boots: 12 failed, 308 passed (v4.4-rc3-483-gb48b5ceb7227)
 > 
-> > >  	{ 0, NULL},
-> > >  };
-> > >
-> > > @@ -1046,6 +1049,15 @@ static void arm_smmu_write_strtab_ent(struct
-> > arm_smmu_device *smmu, u32 sid,
-> > >  				      : STRTAB_STE_0_CFG_BYPASS;
-> > >  		dst[0] = cpu_to_le64(val);
-> > >  		dst[2] = 0; /* Nuke the VMID */
-> > > +
-> > > +		if (smmu && (smmu->options &
-> > ARM_SMMU_OPT_BROKEN_STE_VALID)) {
-> > > +#define SMMU_STE_OAS_44_BITS 0x4UL
-> > 
-> > Please don't add a #define here. Can we instead use the oas field that we've
-> > extracted from IDR5? I think we need to be doing that anyway when we're
-> > using stage-2 translation, looking at the spec...
-> > 
-> As you mentioned in other email, "OAS" is already taken care by io-pgtable
-> vtcr.
+> Full Boot Summary: https://kernelci.org/boot/all/job/arm-soc/kernel/v4.4-rc3-483-gb48b5ceb7227/
+> Full Build Summary: https://kernelci.org/build/arm-soc/kernel/v4.4-rc3-483-gb48b5ceb7227/
+> 
+> Tree: arm-soc
+> Branch: local/for-next
+> Git Describe: v4.4-rc3-483-gb48b5ceb7227
+> Git Commit: b48b5ceb7227a8e6e548dae7a44c80ad85719808
+> Git URL: git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
+> Tested: 67 unique boards, 18 SoC families, 22 builds out of 135
+> 
+> Boot Failures Detected: https://kernelci.org/boot/?v4.4-rc3-483-gb48b5ceb7227&fail
 
-Ok -- so what is the value reported by your IDR5?
+We got three regressions in the arm-soc for-next branch today, compared to yesterday:
 
-> > > +			WARN_ON(smmu->oas != 44);
-> > > +			dst[1] = STRTAB_STE_1_EATS_TRANS <<
-> > STRTAB_STE_1_EATS_SHIFT;
-> > 
-> > Why are you enabling ATS?
-> > 
-> Again, based on feedback from h/w team which expects these fields
-> populated (hence broken :) ), 
+* I did not merge any rockchip changes, but it looks like multi_v7_defconfig is
+  now broken on rk3288-rock2-square and rk3288-veyron-jerry (not in the list below,
+  but in the web interface). I put a diff of the defconfig file on
+  http://pastebin.com/DHgzz1jr, but I don't anything that may have cause the
+  regression.
 
-Ok, I just didn't see any mention of that in the commit message and
-wanted to make sure it wasn't an accidental unrelated change.
+* bcm4708-smartrg-sr400ac doesn't find its rootfs any more
 
-Will
+[   16.670994] No filesystem could mount root, tried:  ext3 ext2 ext4 squashfs vfat msdos ntfs
+[   16.679388] Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(1,0)
+
+  I merged some patches from Florian yesterday, but it could also be a problem with 
+  the defconfig changes
+
+* Juno seems to be sick and doesn't like LAVA today:
+
+Connected to serial03.lavalab.
+Escape character is '^]'.
+Command sent successfully.
+Command sent successfully.
+ErrorMessage: Failed to boot test image.
+Lava failed at action boot_linaro_image with error:Failed to boot test image.
+Traceback (most recent call last):
+  File "/usr/lib/python2.7/dist-packages/lava_dispatcher/job.py", line 381, in run
+    action.run(**params)
+  File "/usr/lib/python2.7/dist-packages/lava_dispatcher/actions/boot_control.py", line 156, in run
+    raise CriticalError("Failed to boot test image.")
+CriticalError: Failed to boot test image.
+Command sent successfully.
+
+	Arnd
+
+> arm:
+> 
+>     multi_v7_defconfig+CONFIG_THUMB2_KERNEL=y:
+>         bcm4708-smartrg-sr400ac: 1 failed lab
+>         rk3288-rock2-square: 1 failed lab
+> 
+>     multi_v7_defconfig+CONFIG_LKDTM=y:
+>         at91-sama5d3_xplained: 1 failed lab
+>         bcm4708-smartrg-sr400ac: 1 failed lab
+>         exynos5422-odroidxu3: 1 failed lab
+>         rk3288-rock2-square: 1 failed lab
+> 
+>     multi_v7_defconfig+CONFIG_PROVE_LOCKING=y:
+>         rk3288-rock2-square: 1 failed lab
+> 
+>     multi_v7_defconfig+CONFIG_ARM_LPAE=y:
+>         rk3288-rock2-square: 1 failed lab
+> 
+>     multi_v7_defconfig:
+>         bcm4708-smartrg-sr400ac: 1 failed lab
+>         rk3288-rock2-square: 1 failed lab
+>         rk3288-rock2-square_rootfs:nfs: 1 failed lab
+> 
+> arm64:
+> 
+>     defconfig+CONFIG_LKDTM=y:
+>         juno: 1 failed lab
+> 
