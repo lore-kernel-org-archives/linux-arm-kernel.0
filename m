@@ -1,87 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 Dec 2015 11:17:30 +0100
-Subject: arm-soc boot: 320 boots: 12 failed,
- 308 passed (v4.4-rc3-483-gb48b5ceb7227)
-In-Reply-To: <567128b4.46b71c0a.17f65.7531@mx.google.com>
-References: <567128b4.46b71c0a.17f65.7531@mx.google.com>
-Message-ID: <1746045.ErmxH37Pke@wuerfel>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 16 Dec 2015 11:20:26 +0100
+Subject: [GIT PULL] at91: defconfig for 4.5 #1
+Message-ID: <1450261226-2102-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 16 December 2015 01:02:44 kernelci. org bot wrote:
-> arm-soc boot: 320 boots: 12 failed, 308 passed (v4.4-rc3-483-gb48b5ceb7227)
-> 
-> Full Boot Summary: https://kernelci.org/boot/all/job/arm-soc/kernel/v4.4-rc3-483-gb48b5ceb7227/
-> Full Build Summary: https://kernelci.org/build/arm-soc/kernel/v4.4-rc3-483-gb48b5ceb7227/
-> 
-> Tree: arm-soc
-> Branch: local/for-next
-> Git Describe: v4.4-rc3-483-gb48b5ceb7227
-> Git Commit: b48b5ceb7227a8e6e548dae7a44c80ad85719808
-> Git URL: git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
-> Tested: 67 unique boards, 18 SoC families, 22 builds out of 135
-> 
-> Boot Failures Detected: https://kernelci.org/boot/?v4.4-rc3-483-gb48b5ceb7227&fail
+Arnd, Olof, Kevin,
 
-We got three regressions in the arm-soc for-next branch today, compared to yesterday:
+As single patch for this pull-request: tell me if you would like to take it
+independently, as a patch.
 
-* I did not merge any rockchip changes, but it looks like multi_v7_defconfig is
-  now broken on rk3288-rock2-square and rk3288-veyron-jerry (not in the list below,
-  but in the web interface). I put a diff of the defconfig file on
-  http://pastebin.com/DHgzz1jr, but I don't anything that may have cause the
-  regression.
+Thanks, best regards,
 
-* bcm4708-smartrg-sr400ac doesn't find its rootfs any more
+The following changes since commit 31ade3b83e1821da5fbb2f11b5b3d4ab2ec39db8:
 
-[   16.670994] No filesystem could mount root, tried:  ext3 ext2 ext4 squashfs vfat msdos ntfs
-[   16.679388] Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(1,0)
+  Linux 4.4-rc3 (2015-11-29 18:58:26 -0800)
 
-  I merged some patches from Florian yesterday, but it could also be a problem with 
-  the defconfig changes
+are available in the git repository at:
 
-* Juno seems to be sick and doesn't like LAVA today:
+  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-defconfig
 
-Connected to serial03.lavalab.
-Escape character is '^]'.
-Command sent successfully.
-Command sent successfully.
-ErrorMessage: Failed to boot test image.
-Lava failed at action boot_linaro_image with error:Failed to boot test image.
-Traceback (most recent call last):
-  File "/usr/lib/python2.7/dist-packages/lava_dispatcher/job.py", line 381, in run
-    action.run(**params)
-  File "/usr/lib/python2.7/dist-packages/lava_dispatcher/actions/boot_control.py", line 156, in run
-    raise CriticalError("Failed to boot test image.")
-CriticalError: Failed to boot test image.
-Command sent successfully.
+for you to fetch changes up to 94c2317cf46a9c137650bf30f2aba7271886c0b4:
 
-	Arnd
+  ARM: at91/defconfig: enable watchdog drivers in sama5_defconfig (2015-12-15 11:18:39 +0100)
 
-> arm:
-> 
->     multi_v7_defconfig+CONFIG_THUMB2_KERNEL=y:
->         bcm4708-smartrg-sr400ac: 1 failed lab
->         rk3288-rock2-square: 1 failed lab
-> 
->     multi_v7_defconfig+CONFIG_LKDTM=y:
->         at91-sama5d3_xplained: 1 failed lab
->         bcm4708-smartrg-sr400ac: 1 failed lab
->         exynos5422-odroidxu3: 1 failed lab
->         rk3288-rock2-square: 1 failed lab
-> 
->     multi_v7_defconfig+CONFIG_PROVE_LOCKING=y:
->         rk3288-rock2-square: 1 failed lab
-> 
->     multi_v7_defconfig+CONFIG_ARM_LPAE=y:
->         rk3288-rock2-square: 1 failed lab
-> 
->     multi_v7_defconfig:
->         bcm4708-smartrg-sr400ac: 1 failed lab
->         rk3288-rock2-square: 1 failed lab
->         rk3288-rock2-square_rootfs:nfs: 1 failed lab
-> 
-> arm64:
-> 
->     defconfig+CONFIG_LKDTM=y:
->         juno: 1 failed lab
-> 
+----------------------------------------------------------------
+First defconfig pull-request for 4.5:
+- a single patch to add watchdog drivers to sama5_defconfig
+
+----------------------------------------------------------------
+Wenyou Yang (1):
+      ARM: at91/defconfig: enable watchdog drivers in sama5_defconfig
+
+ arch/arm/configs/sama5_defconfig | 3 +++
+ 1 file changed, 3 insertions(+)
+
+-- 
+Nicolas Ferre
