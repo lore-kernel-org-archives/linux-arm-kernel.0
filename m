@@ -1,46 +1,51 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 16 Dec 2015 09:43:57 +0900
-Subject: [PATCH v6 3/7] ARM: dts: Exynos542x/5800: add CPU OPP properties
-In-Reply-To: <1450200801-24539-4-git-send-email-b.zolnierkie@samsung.com>
-References: <1450200801-24539-1-git-send-email-b.zolnierkie@samsung.com>
- <1450200801-24539-4-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <5670B3CD.8010604@samsung.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Tue, 15 Dec 2015 16:45:15 -0800
+Subject: [PATCH v12 09/16] arm64/kexec: Add pr_devel output
+In-Reply-To: <20151215171517.GB353@arm.com>
+References: <cover.1448403503.git.geoff@infradead.org>
+ <0e4d27286ec607b0c1f6e17b3034279c96d6b6a6.1448403503.git.geoff@infradead.org>
+ <20151215171517.GB353@arm.com>
+Message-ID: <1450226715.24127.134.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.12.2015 02:33, Bartlomiej Zolnierkiewicz wrote:
-> From: Thomas Abraham <thomas.ab@samsung.com>
+On Tue, 2015-12-15 at 17:15 +0000, Will Deacon wrote:
+> On Tue, Nov 24, 2015 at 10:25:34PM +0000, Geoff Levand wrote:
+> > To aid in debugging kexec problems or when adding new functionality to kexec add
+> > a new routine kexec_image_info() and several inline pr_devel statements.
 > 
-> For Exynos542x/5800 platforms, add CPU operating points
-> for migrating from Exynos specific cpufreq driver to using
-> generic cpufreq driver.
-> 
-> Changes by Bartlomiej:
-> - split Exynos5420 support from the original patch
-> - merged Exynos5422 fixes from Ben
-> 
-> Changes by Ben Gamari:
-> - Port to operating-points-v2
-> 
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Doug Anderson <dianders@chromium.org>
-> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-> Cc: Andreas Faerber <afaerber@suse.de>
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> Signed-off-by: Ben Gamari <ben@smart-cactus.org>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos5420-cpus.dtsi |  10 +++
->  arch/arm/boot/dts/exynos5420.dtsi      | 110 +++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/exynos5422-cpus.dtsi |  10 +++
->  3 files changed, 130 insertions(+)
-> 
+> We don't currently have any pr_devel invocations under arm64. Can you
+> either remove these or change them to pr_debug?
 
-Thanks for rebasing on "exynos5422-cpus.dtsi" patch, I appreciate this.
+OK.
 
-Looks good:
+> > Signed-off-by: Geoff Levand <geoff@infradead.org>
+> > ---
+> >  arch/arm64/kernel/machine_kexec.c | 63 +++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 63 insertions(+)
+> > 
+> > diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+> > index 8b990b8..da28a26 100644
+> > --- a/arch/arm64/kernel/machine_kexec.c
+> > +++ b/arch/arm64/kernel/machine_kexec.c
+> > @@ -25,6 +25,48 @@ extern const unsigned long arm64_relocate_new_kernel_size;
+> >  
+> >  static unsigned long kimage_start;
+> >  
+> > +/**
+> > + * kexec_is_dtb - Helper routine to check the device tree header signature.
+> > + */
+> > +static bool kexec_is_dtb(const void *dtb)
+> > +{
+> > +> > 	> > __be32 magic;
+> > +
+> > +> > 	> > return get_user(magic, (__be32 *)dtb) ? false :
+> > +> > 	> > 	> > (be32_to_cpu(magic) == OF_DT_HEADER);
+> 
+> Isn't there an fdt32_to_cpu helper for this already? I also can't help
+> but thing this would be more readable if you didn't bother with the
+> ternary if form.
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Sure, I'll clean it up.
 
-Best regards,
-Krzysztof
+-Geoff
