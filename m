@@ -1,49 +1,29 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 16 Dec 2015 15:11:25 +0800
-Subject: [PATCH] clocksource/drivers/pistachio: Fix wrong calculated
- clocksource read value
-In-Reply-To: <56707F32.3030405@linaro.org>
-References: <1448466169-5230-1-git-send-email-jszhang@marvell.com>
- <56707F32.3030405@linaro.org>
-Message-ID: <20151216151125.1e91b4f4@xhacker>
+From: panand@redhat.com (Pratyush Anand)
+Date: Wed, 16 Dec 2015 12:48:04 +0530
+Subject: [PATCH v12 08/16] arm64/kexec: Add core kexec support
+In-Reply-To: <1450224870.24127.130.camel@infradead.org>
+References: <cover.1448403503.git.geoff@infradead.org>
+ <6ac232ad37d6b02cf2d5848b15236f26f5ac61ac.1448403503.git.geoff@infradead.org>
+ <20151215182932.GF353@arm.com>
+ <1450224870.24127.130.camel@infradead.org>
+Message-ID: <20151216071804.GI4674@dhcppc13.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Daniel,
-
-On Tue, 15 Dec 2015 21:59:30 +0100 Daniel Lezcano wrote:
-
-> On 11/25/2015 04:42 PM, Jisheng Zhang wrote:
-> > Let's assume the counter value is 0xf000000, the pistachio clocksource
-> > read cycles function would return 0xffffffff0fffffff, but it should
-> > return 0xfffffff.
-> >
-> > We fix this issue by calculating bitwise-not counter, then cast to
-> > cycle_t.
-> >
-> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>  
+On 15/12/2015:04:14:30 PM, Geoff Levand wrote:
+> On Tue, 2015-12-15 at 18:29 +0000, Will Deacon wrote:
+> > > +> > 	> >  * Copy arm64_relocate_new_kernel to the reboot_code_buffer for use
+> > > +> > 	> >  * after the kernel is shut down.
+> > > +> > 	> >  */
+> > > +> > 	> > memcpy(reboot_code_buffer, arm64_relocate_new_kernel,
+> > > +> > 	> > 	> > arm64_relocate_new_kernel_size);
+> > 
+> > At which point does the I-cache get invalidated for this?
 > 
-> Hi Jisheng,
-> 
-> I tried to reproduce this behavior on x86_64 but without success.
-> 
-> On which architecture did you produce this result ? Do you have a simple 
-> test program to check with ?
+> I'll add a call to flush_icache_range() for reboot_code_buffer.  I
+> think that should do it.
 
-I have no HW platforms with pistachio, just read the code and run the
-following test code in x86_64 and x86_32:
+We execute arm64_relocate_new_kernel() code with I-cache disabled. So, do we
+really need to invalidate I-cache?
 
-#include <stdio.h>
-unsigned long long pistachio_clocksource_read_cycles()
-{
-	unsigned int counter = 0xf000000;
-	return ~(unsigned long long)counter;
-}
-int main()
-{
-	printf("%llx\n", pistachio_clocksource_read_cycles());
-	return 0;
-}
-
-Thanks,
-Jisheng
+~Pratyush
