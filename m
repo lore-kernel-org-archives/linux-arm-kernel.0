@@ -1,81 +1,65 @@
-From: courtney.cavin@sonymobile.com (Courtney Cavin)
-Date: Wed, 16 Dec 2015 15:28:50 -0800
-Subject: [PATCH] net: add Qualcomm IPC router
-In-Reply-To: <1449866519-14551-1-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1449866519-14551-1-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <20151216232849.GF28026@sonymobile.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 17 Dec 2015 08:38:03 +0900
+Subject: [PATCH 12/19] ARM: dts: exynos: replace legacy *, wakeup property
+ with wakeup-source
+In-Reply-To: <56713DD8.1050001@arm.com>
+References: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
+ <1445422216-29375-13-git-send-email-sudeep.holla@arm.com>
+ <56704141.8070308@arm.com> <5670A2F2.5060009@samsung.com>
+ <56713DD8.1050001@arm.com>
+Message-ID: <5671F5DB.305@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 11, 2015 at 09:41:59PM +0100, Bjorn Andersson wrote:
-> From: Courtney Cavin <courtney.cavin@sonymobile.com>
+On 16.12.2015 19:32, Sudeep Holla wrote:
 > 
-> Add an implementation of Qualcomm's IPC router protocol, used to
-> communicate with service providing remote processors.
 > 
-> Signed-off-by: Courtney Cavin <courtney.cavin@sonymobile.com>
-> ---
-[...]
-> +static int qrtr_sendmsg(struct socket *sock, struct msghdr *msg, size_t len)
-> +{
-> +       DECLARE_SOCKADDR(struct sockaddr_qrtr *, addr, msg->msg_name);
-> +       int (*enqueue_fn)(struct qrtr_node *, struct sk_buff *);
-> +       struct qrtr_sock *ipc = qrtr_sk(sock->sk);
-> +       struct sock *sk = sock->sk;
-> +       struct qrtr_node *node;
-> +       struct qrtr_hdr *hdr;
-> +       struct sk_buff *skb;
-> +       size_t plen;
-> +       int rc;
-> +
-> +       if (msg->msg_flags & ~(MSG_DONTWAIT))
-> +               return -EINVAL;
-> +
-> +       if (len > 65535)
-> +               return -EMSGSIZE;
-> +
-> +       lock_sock(sk);
-> +
-> +       if (addr) {
-> +               if (msg->msg_namelen < sizeof(*addr)) {
-> +                       release_sock(sk);
-> +                       return -EINVAL;
-> +               }
-> +
-> +               if (addr->sq_family != AF_QIPCRTR) {
-> +                       release_sock(sk);
-> +                       return -EINVAL;
-> +               }
-> +
-> +               rc = qrtr_autobind(sock);
-> +               if (rc) {
-> +                       release_sock(sk);
-> +                       return rc;
-> +               }
-> +       } else if (sk->sk_state == TCP_ESTABLISHED) {
-> +               addr = &ipc->peer;
-> +       } else {
-> +               release_sock(sk);
-> +               return -ENOTCONN;
-> +       }
-> +
-> +       node = NULL;
-> +       if (addr->sq_node == QRTR_NODE_BCAST) {
-> +               enqueue_fn = qrtr_bcast_enqueue;
-> +       } else if (addr->sq_node == 0 || addr->sq_node == ipc->us.sq_node) {
+> On 15/12/15 23:32, Krzysztof Kozlowski wrote:
+>> On 16.12.2015 01:35, Sudeep Holla wrote:
+>>>
+>>>
+>>> On 21/10/15 11:10, Sudeep Holla wrote:
+>>>> Though the keyboard and other driver will continue to support the
+>>>> legacy
+>>>> "gpio-key,wakeup", "linux-keypad,wakeup" boolean property to enable the
+>>>> wakeup source, "wakeup-source" is the new standard binding.
+>>>>
+>>>> This patch replaces all the legacy wakeup properties with the unified
+>>>> "wakeup-source" property in order to avoid any futher copy-paste
+>>>> duplication.
+>>>>
+>>>> Cc: Kukjin Kim <kgene@kernel.org>
+>>>> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>>
+>>> Ping, do you prefer taking via your tree or should I send to armsoc
+>>> directly ?
+>>
+>> Usually it depends on the dependencies... but:
+>> 1. I just received this patch - 12/19.
+> 
+> Sorry for that. The initial idea was to show all the changes but merge
+> the binding and dependencies first, so didn't cc all.
+> 
+>> 2. No cover letter, no other patches, no explanation about any
+>> dependencies or other related changes. Nothing. Just one patch.
+> 
+> Yes this was initially posted as part of the series, but only
+> dependencies were merged for v4.4
+> 
+>> 3. The patch mentions new standard binding. Was the new binding already
+>> merged? Or is it part of these series? What about backward compatibility?
+> 
+> Not a brand new binding, but made existing one a standard so that we
+> don't continue to be creative and generate more bindings for the same
+> thing. Yes binding and dependent patches are already in mainline. And
+> yes backward compatibility is maintained as mentioned in the commit
+> message.
 
-'addr->sq_node == 0' should be removed from this if-condition.  Zero is
-a valid node id.  Clients needing the local address can use
-getsockname(2).
+That explains everything, thanks. We'll take it through samsung-soc,
+just give me some time for review.
 
-> +               enqueue_fn = qrtr_local_enqueue;
-> +       } else {
-> +               enqueue_fn = qrtr_node_enqueue;
-> +               node = qrtr_node_lookup(addr->sq_node);
-> +               if (!node) {
-> +                       release_sock(sk);
-> +                       return -ECONNRESET;
-> +               }
-> +       }
+As for other patch - the s5pv210 - I did not get it directly but I think
+I can find it on list subscription archives.
 
--Courtney
+Best regards,
+Krzysztof
