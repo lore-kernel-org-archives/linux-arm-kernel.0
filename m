@@ -1,154 +1,85 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 16 Dec 2015 16:15:41 -0600
-Subject: [PATCH v7 1/4] acpi: pci: Setup MSI domain for ACPI based pci
- devices
-In-Reply-To: <1449766530-16935-2-git-send-email-Suravee.Suthikulpanit@amd.com>
-References: <1449766530-16935-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1449766530-16935-2-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <20151216221541.GA31633@localhost>
+From: dannym@scratchpost.org (Danny Milosavljevic)
+Date: Wed, 16 Dec 2015 23:30:51 +0100
+Subject: [linux-sunxi] Re: [PATCH v6] sun4i-codec: Add FM, Line and Mic
+ inputs
+In-Reply-To: <20151216104736.GT19456@lukather>
+References: <20151209235530.7240df0a@dayas> <20151213205839.GA19456@lukather>
+ <20151215025208.7c468673@dayas> <20151216104736.GT19456@lukather>
+Message-ID: <20151216233051.09d34738@dayas>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 10, 2015 at 08:55:27AM -0800, Suravee Suthikulpanit wrote:
-> This patch introduces pci_msi_register_fwnode_provider() for irqchip
-> to register a callback, to provide a way to determine appropriate MSI
-> domain for a pci device.
-> 
-> It also introduces pci_host_bridge_acpi_msi_domain(), which returns
-> the MSI domain of the specified PCI host bridge with DOMAIN_BUS_PCI_MSI
-> bus token. Then, it is assigned to pci device.
-> 
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+Hi Maxime,
 
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+On Wed, 16 Dec 2015 11:47:36 +0100
+Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
-I assume the whole series will be queued via a non-PCI tree.
+> > Because SUN4I_CODEC_AC_MIC_PHONE_CAL is sun7i-specific.
+> 
+> Yet, you're using it in both cases (A10 vs A20).
 
-> ---
->  drivers/pci/pci-acpi.c    | 42 ++++++++++++++++++++++++++++++++++++++++++
->  drivers/pci/probe.c       |  2 ++
->  include/linux/irqdomain.h |  5 +++++
->  include/linux/pci.h       | 10 ++++++++++
->  4 files changed, 59 insertions(+)
+Yes. I'm trying to keep complexity and duplication down.
+I figured it wouldn't be bad to have unused registers in the regmap.
+
+(Technially .max_register = MAX(max_register_a10, max_register_a20) would be 
+ better. Should we do that?)
+
+If it's bad in this case, we have to split it up, but frankly the *codec_probe() 
+function is much too long now and this would make it even longer.
+
+Also, it was that way before, so I'm mostly using it in both cases because 
+previously it was also used in both cases (with the too-large max-register), 
+apparently without problems. 
+
+Should I duplicate and adapt the structure?
+
+> You can also have the defines on top, and everything just works :)
+
+The idea is to make the compiler complain when I try to use a sun7i define in a 
+generic sun4i function (or struct, in this case) - because that would probably 
+be causing problems at runtime, too. Better to catch problems earlier.
+So I kept the sun7i-specific things closely together and as much to the bottom 
+of the file as possible - as a poor-mans modularity. 
+If I kept the sun7i defines at the top I could use them anywhere with impunity - 
+also in the A10 case - and it would not complain.
+
+But it's mostly to make the life of the developer easier, so feel free to choose 
+otherwise. (not sarcasm)
+
+> > Or is it better to rename it to "SUN7I_CODEC_AC_DAC_CAL" rather than delete?
 > 
-> diff --git a/drivers/pci/pci-acpi.c b/drivers/pci/pci-acpi.c
-> index a32ba75..d3f32d6 100644
-> --- a/drivers/pci/pci-acpi.c
-> +++ b/drivers/pci/pci-acpi.c
-> @@ -9,7 +9,9 @@
->  
->  #include <linux/delay.h>
->  #include <linux/init.h>
-> +#include <linux/irqdomain.h>
->  #include <linux/pci.h>
-> +#include <linux/msi.h>
->  #include <linux/pci_hotplug.h>
->  #include <linux/module.h>
->  #include <linux/pci-aspm.h>
-> @@ -689,6 +691,46 @@ static struct acpi_bus_type acpi_pci_bus = {
->  	.cleanup = pci_acpi_cleanup,
->  };
->  
-> +
-> +static struct fwnode_handle *(*pci_msi_get_fwnode_cb)(struct device *dev);
-> +
-> +/**
-> + * pci_msi_register_fwnode_provider - Register callback to retrieve fwnode
-> + * @fn:       Callback matching a device to a fwnode that identifies a PCI
-> + *            MSI domain.
-> + *
-> + * This should be called by irqchip driver, which is the parent of
-> + * the MSI domain to provide callback interface to query fwnode.
-> + */
-> +void
-> +pci_msi_register_fwnode_provider(struct fwnode_handle *(*fn)(struct device *))
-> +{
-> +	pci_msi_get_fwnode_cb = fn;
-> +}
-> +
-> +/**
-> + * pci_host_bridge_acpi_msi_domain - Retrieve MSI domain of a PCI host bridge
-> + * @bus:      The PCI host bridge bus.
-> + *
-> + * This function uses the callback function registered by
-> + * pci_msi_register_fwnode_provider() to retrieve the irq_domain with
-> + * type DOMAIN_BUS_PCI_MSI of the specified host bridge bus.
-> + * This returns NULL on error or when the domain is not found.
-> + */
-> +struct irq_domain *pci_host_bridge_acpi_msi_domain(struct pci_bus *bus)
-> +{
-> +	struct fwnode_handle *fwnode;
-> +
-> +	if (!pci_msi_get_fwnode_cb)
-> +		return NULL;
-> +
-> +	fwnode = pci_msi_get_fwnode_cb(&bus->dev);
-> +	if (!fwnode)
-> +		return NULL;
-> +
-> +	return irq_find_matching_fwnode(fwnode, DOMAIN_BUS_PCI_MSI);
-> +}
-> +
->  static int __init acpi_pci_init(void)
->  {
->  	int ret;
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index edb1984..553a029 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -672,6 +672,8 @@ static struct irq_domain *pci_host_bridge_msi_domain(struct pci_bus *bus)
->  	 * should be called from here.
->  	 */
->  	d = pci_host_bridge_of_msi_domain(bus);
-> +	if (!d)
-> +		d = pci_host_bridge_acpi_msi_domain(bus);
->  
->  	return d;
->  }
-> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-> index d5e5c5b..a06feda 100644
-> --- a/include/linux/irqdomain.h
-> +++ b/include/linux/irqdomain.h
-> @@ -410,6 +410,11 @@ static inline bool irq_domain_is_hierarchy(struct irq_domain *domain)
->  static inline void irq_dispose_mapping(unsigned int virq) { }
->  static inline void irq_domain_activate_irq(struct irq_data *data) { }
->  static inline void irq_domain_deactivate_irq(struct irq_data *data) { }
-> +static inline struct irq_domain *irq_find_matching_fwnode(
-> +	struct fwnode_handle *fwnode, enum irq_domain_bus_token bus_token)
-> +{
-> +	return NULL;
-> +}
->  #endif /* !CONFIG_IRQ_DOMAIN */
->  
->  #endif /* _LINUX_IRQDOMAIN_H */
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index 6ae25aa..d86378c 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> @@ -1946,6 +1946,16 @@ static inline struct irq_domain *
->  pci_host_bridge_of_msi_domain(struct pci_bus *bus) { return NULL; }
->  #endif  /* CONFIG_OF */
->  
-> +#ifdef CONFIG_ACPI
-> +struct irq_domain *pci_host_bridge_acpi_msi_domain(struct pci_bus *bus);
-> +
-> +void
-> +pci_msi_register_fwnode_provider(struct fwnode_handle *(*fn)(struct device *));
-> +#else
-> +static inline struct irq_domain *
-> +pci_host_bridge_acpi_msi_domain(struct pci_bus *bus) { return NULL; }
-> +#endif
-> +
->  #ifdef CONFIG_EEH
->  static inline struct eeh_dev *pci_dev_to_eeh_dev(struct pci_dev *pdev)
->  {
-> -- 
-> 2.1.0
+> You can rename it if you want, but it's not like it's of the highest
+> importance :)
+
+The only somewhat important part of the name is the "7". 
+If you use a "7"-register on an A10, it's not going to work at runtime, or worse: 
+do something else that wasn't intended. Right now it has a "4" although it isn't
+an A10 register. This separation should be visible somewhere in the source code, 
+or problems are going to slip through later.
+
+I agree it's not at all important right now because the register is unused 
+by us :P
+(But it's actually an interesting register, it contains DAC bias calibration 
+data. Cool that that can be modified)
+
+> > Note: the newest original ASoC sun4i-codec has a variable
+> >   "struct sun4i_codec *scodec;"
+> > as well in the same function (which is a different thing).
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> I don't know what you're refering to with "newest" and "original".
+
+Oops, sorry, by "newest" I meant "I checked the tree online right before I wrote 
+the mail".
+By "original" I meant "not of my patch".
+
+> But two different variables with two different names doesn't seem so
+> bad, does it?
+
+For the computer? No.
+
+Two different variables with almost the same name for humans? Welll. 
+
+But it's fine, just wanted to point it out because you can't see it in the patch.
+
+Thanks,
+   Danny
