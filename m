@@ -1,97 +1,40 @@
-From: prem.mallappa@broadcom.com (Prem (Premachandra) Mallappa)
-Date: Wed, 16 Dec 2015 04:37:07 +0000
-Subject: [PATCH] IOMMU: arm-smmu-v3: fix broken S2PS and AARCH64 in
- Broadcom Vulcan
-In-Reply-To: <20151215134010.GH9452@arm.com>
-References: <1450110687-32207-1-git-send-email-pmallapp@broadcom.com>
- <20151215134010.GH9452@arm.com>
-Message-ID: <CC0BC9CB4553B146B290EC1D4DC5C35901094BCE@SJEXCHMB15.corp.ad.broadcom.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 16 Dec 2015 13:39:23 +0900
+Subject: [PATCH 2/6] arm64: dts: r8a7795: Add SATA controller node
+In-Reply-To: <CAO3366xq1cbhXE8oYGDFyQ_RGneZTfy_fpCOc_=CsWTswwD8=A@mail.gmail.com>
+References: <1450107758-2544-1-git-send-email-ulrich.hecht+renesas@gmail.com>
+ <1450107758-2544-3-git-send-email-ulrich.hecht+renesas@gmail.com>
+ <CAMuHMdXq1uT69w6bnqJM49vgoDzax=hte+OM3MDahcBuUfD9Ng@mail.gmail.com>
+ <CAO3366xq1cbhXE8oYGDFyQ_RGneZTfy_fpCOc_=CsWTswwD8=A@mail.gmail.com>
+Message-ID: <20151216043922.GB21904@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will, Thanks for the review.
+On Tue, Dec 15, 2015 at 12:21:16PM +0100, Ulrich Hecht wrote:
+> On Tue, Dec 15, 2015 at 11:44 AM, Geert Uytterhoeven
+> <geert@linux-m68k.org> wrote:
+> > On Mon, Dec 14, 2015 at 4:42 PM, Ulrich Hecht
+> > <ulrich.hecht+renesas@gmail.com> wrote:
+> >> diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> >> index c018423..7d4707e 100644
+> >> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> >> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> >> @@ -972,5 +972,13 @@
+> >>                                 };
+> >>                         };
+> >>                 };
+> >> +
+> >> +               sata: sata at ee300000 {
+> >> +                       compatible = "renesas,sata-r8a7795";
+> >> +                       reg = <0 0xee300000 0 0x1fff>;
+> >> +                       interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
+> >> +                       clocks = <&cpg CPG_MOD 915>;
+> >
+> > My datasheet says 815.
+> 
+> So does the BSP, I must have misread that.
+> 
+> Simon, should I send an incremental patch for this one with v2?
 
-> On Mon, Dec 14, 2015 at 10:01:27PM +0530, Prem Mallappa wrote:
-> > Vulcan SMMUv3 looks for AARCH64 and S2PS inroder to validate the STE
-> > entry,
-> 
-> 'inroder' ?
->
-In order
-
-> > which is a overkill, but when proper encoding not found; the SMMU
-> > stops processing PCIe read/write requests. Giving the h/w what it wants.
-> >
-> > Signed-off-by: Prem Mallappa <pmallapp@broadcom.com>
-> > ---
-> >  drivers/iommu/arm-smmu-v3.c | 12 ++++++++++++
-> >  1 file changed, 12 insertions(+)
-> >
-> > diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-
-> v3.c
-> > index d4af50d..dfda564 100644
-> > --- a/drivers/iommu/arm-smmu-v3.c
-> > +++ b/drivers/iommu/arm-smmu-v3.c
-> > @@ -260,6 +260,7 @@
-> >  #define STRTAB_STE_2_S2VMID_MASK	0xffffUL
-> >  #define STRTAB_STE_2_VTCR_SHIFT		32
-> >  #define STRTAB_STE_2_VTCR_MASK		0x7ffffUL
-> > +#define STRTAB_STE_2_S2PS_SHIFT        48
-> >  #define STRTAB_STE_2_S2AA64		(1UL << 51)
-> >  #define STRTAB_STE_2_S2ENDI		(1UL << 52)
-> >  #define STRTAB_STE_2_S2PTW		(1UL << 54)
-> > @@ -577,6 +578,7 @@ struct arm_smmu_device {
-> >  	u32				features;
-> >
-> >  #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
-> > +#define ARM_SMMU_OPT_BROKEN_STE_VALID	(1 << 1)
-> >  	u32				options;
-> >
-> >  	struct arm_smmu_cmdq		cmdq;
-> > @@ -641,6 +643,7 @@ struct arm_smmu_option_prop {
-> >
-> >  static struct arm_smmu_option_prop arm_smmu_options[] = {
-> >  	{ ARM_SMMU_OPT_SKIP_PREFETCH, "hisilicon,broken-prefetch-
-> cmd" },
-> > +	{ ARM_SMMU_OPT_BROKEN_STE_VALID, "broadcom,broken-ste-
-> valid-check"
-> > +},
-> 
-> This looks like a more specific problem than "broken ste valid check".
-> Maybe we could call the prop
-> ARM_SMMU_OPT_BCOM_BROKEN_STE_VALID?
-> 
-> You also need to update the devicetree binding in
-> Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt.
-> 
-Sure I'll send out v2.
-
-> >  	{ 0, NULL},
-> >  };
-> >
-> > @@ -1046,6 +1049,15 @@ static void arm_smmu_write_strtab_ent(struct
-> arm_smmu_device *smmu, u32 sid,
-> >  				      : STRTAB_STE_0_CFG_BYPASS;
-> >  		dst[0] = cpu_to_le64(val);
-> >  		dst[2] = 0; /* Nuke the VMID */
-> > +
-> > +		if (smmu && (smmu->options &
-> ARM_SMMU_OPT_BROKEN_STE_VALID)) {
-> > +#define SMMU_STE_OAS_44_BITS 0x4UL
-> 
-> Please don't add a #define here. Can we instead use the oas field that we've
-> extracted from IDR5? I think we need to be doing that anyway when we're
-> using stage-2 translation, looking at the spec...
-> 
-As you mentioned in other email, "OAS" is already taken care by io-pgtable vtcr.
-
-> > +			WARN_ON(smmu->oas != 44);
-> > +			dst[1] = STRTAB_STE_1_EATS_TRANS <<
-> STRTAB_STE_1_EATS_SHIFT;
-> 
-> Why are you enabling ATS?
-> 
-Again, based on feedback from h/w team which expects these fields populated (hence broken :) ), 
-I am not aware of the h/w doing anything beyond checking this for STE.VALID() (i.o.w, if STE is illegal). 
-
-/Prem
+Please send an incremental patch, though I may well squash it into
+what I already have queued up depending on when it arrives.
