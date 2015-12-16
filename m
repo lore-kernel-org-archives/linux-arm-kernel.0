@@ -1,32 +1,118 @@
-From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
-Date: Wed, 16 Dec 2015 19:45:14 +0530
-Subject: [PATCH V2 1/3] ARM: multi_v7_defconfig: Enable beaglebone PMIC
- TPS65217
-In-Reply-To: <56716F68.6090701@ti.com>
-References: <1450118580-24754-1-git-send-email-nm@ti.com>
- <1450118580-24754-2-git-send-email-nm@ti.com>
- <20151215135100.GA8288@afzalpc>
- <CAGo_u6pGcKoz_Vw9hWtuDJ8RBr+N4=G0p5RgEAcjheoe4VXhvQ@mail.gmail.com>
- <20151216134541.GA5574@afzalpc> <56716F68.6090701@ti.com>
-Message-ID: <20151216141514.GA6312@afzalpc>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 16 Dec 2015 15:24:12 +0100
+Subject: [RFC PATCH v3 2/5] arm64: pci: Add ACPI support
+In-Reply-To: <1450269755-21420-3-git-send-email-jchandra@broadcom.com>
+References: <1450269755-21420-1-git-send-email-jchandra@broadcom.com>
+ <1450269755-21420-3-git-send-email-jchandra@broadcom.com>
+Message-ID: <3216037.gpgqE0G0oj@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wednesday 16 December 2015 18:12:32 Jayachandran C wrote:
+> @@ -48,9 +49,22 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
+>         if (pci_has_flag(PCI_PROBE_ONLY))
+>                 return 0;
+>  
+> +#ifdef CONFIG_ACPI
+> +       if (acpi_find_root_bridge_handle(dev))
+> +               acpi_pci_irq_enable(dev);
+> +#endif
+> +
+>         return pci_enable_resources(dev, mask);
+>  }
+>  
+> +void pcibios_disable_device(struct pci_dev *dev)
+> +{
+> +#ifdef CONFIG_ACPI
+> +       if (acpi_find_root_bridge_handle(dev))
+> +               acpi_pci_irq_disable(dev);
+> +#endif
+> +}
+> +
 
-On Wed, Dec 16, 2015 at 08:04:24AM -0600, Nishanth Menon wrote:
-> On 12/16/2015 07:45 AM, Afzal Mohammed wrote:
+Can you just move this into the PCI core code? Adding more stuff here
+just makes it harder to kill off the existing functions.
 
-> > Changelog refers to old beagle bone's, does new ones have a different
-> > PMIC ?, i only have white bones ;)
+>  #ifdef CONFIG_ACPI
+> -/* Root bridge scanning */
+> -struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+> +
+> +void pcibios_add_bus(struct pci_bus *bus)
+> +{
+> +       acpi_pci_add_bus(bus);
+> +}
+> +
+> +void pcibios_remove_bus(struct pci_bus *bus)
+> +{
+> +       acpi_pci_remove_bus(bus);
+> +}
+> +
+> +int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+> +{
+> +       /* ACPI root bus is created with NULL parent */
+> +       if (!acpi_disabled && bridge->dev.parent == NULL) {
+> +               struct pci_bus *b = bridge->bus;
+> +               struct acpi_pci_root_info *ci = b->sysdata;
+> +
+> +               ACPI_COMPANION_SET(&bridge->dev, ci->bridge);
+> +               b->domain_nr = ci->root->segment;
+> +       }
+> +       return 0;
+> +}
+> +
 
-> Blacks seem to boot (see cover-letter) - could be because of default
-> configuration of tps65217. From my test log:
-> 11:    beaglebone-black: BOOT: PASS: err=4 warn=13:
-> http://pastebin.ubuntu.com/14008272/
+Same here: these functions are identical for all architectures
+that use ACPI, so just move the code into PCI core and be done with
+it. This means we can even kill off all pcibios_add_bus and
+pcibios_remove_bus completely, and pcibios_root_bridge_prepare
+will only be needed for powerpc/pseries.
 
-But default is same for both right ? and since both uses same PMIC,
-something else - due to Uboot handling it differently ?
+>  /*
+> - * raw_pci_read/write - Platform-specific PCI config space access.
+> + * ACPI uses these - leave it to the generic ACPI PCI driver
+>   */
+> -int raw_pci_read(unsigned int domain, unsigned int bus,
+> +int __weak raw_pci_read(unsigned int domain, unsigned int bus,
+>                   unsigned int devfn, int reg, int len, u32 *val)
+>  {
+>         return -ENXIO;
+>  }
+>  
+> -int raw_pci_write(unsigned int domain, unsigned int bus,
+> +int __weak raw_pci_write(unsigned int domain, unsigned int bus,
+>                 unsigned int devfn, int reg, int len, u32 val)
+>  {
+>         return -ENXIO;
+>  }
+>  
+> +/*
+> + * Provide weak implementations of ACPI PCI hooks needed.
+> + * Leave it to the ACPI PCI driver implementation to do it
+> + */
+> +struct pci_bus *__weak pci_acpi_scan_root(struct acpi_pci_root *root)
+>  {
+> -       /* TODO: Should be revisited when implementing PCI on ACPI */
+>         return NULL;
+>  }
+> +
+> +void __init __weak pci_mmcfg_late_init(void)
+> +{
+> +}
 
-Regards
-afzal
+Please don't add __weak functions in architecture code that you expect
+a driver to override. Just call it directly if it's configured and
+make sure that it doesn't get called if it's not there. If both the
+caller and the callee are in generic code, you can leave the architecture
+out of this.
+
+> +static int __init pcibios_assign_resources(void)
+> +{
+> +       pci_assign_unassigned_resources();
+> +       return 0;
+> +}
+> +
+> +fs_initcall(pcibios_assign_resources);
+
+This doesn't work for PCI host drivers in loadable modules.
+
+	Arnd
