@@ -1,175 +1,258 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 17 Dec 2015 00:32:15 +0800
-Subject: [PATCH v6 6/9] mfd: axp20x: Add support for RSB based AXP223 PMIC
-In-Reply-To: <1450283538-25067-1-git-send-email-wens@csie.org>
-References: <1450283538-25067-1-git-send-email-wens@csie.org>
-Message-ID: <1450283538-25067-7-git-send-email-wens@csie.org>
+Date: Thu, 17 Dec 2015 00:39:42 +0800
+Subject: [PATCH resend] pinctrl: sunxi: Add A80 special pin controller
+Message-ID: <1450283982-25295-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXP223 is a new PMIC commonly paired with Allwinner A23/A33 SoCs.
-It is functionally identical to AXP221; only the regulator default
-voltage/status and the external host interface are different.
+From: Maxime Ripard <maxime.ripard@free-electrons.com>
 
+Like the previous designs, the A80 has a special pin controller for the
+critical pins, like the PMIC bus.
+
+Add a driver for this controller.
+
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+[wens: Add A80 compatible strings to bindings doc; fix pin function
+       names based on v1.3 datasheet; constify of_device_id table]
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- drivers/mfd/Kconfig        | 11 +++++++
- drivers/mfd/Makefile       |  1 +
- drivers/mfd/axp20x-rsb.c   | 78 ++++++++++++++++++++++++++++++++++++++++++++++
- drivers/mfd/axp20x.c       |  2 ++
- include/linux/mfd/axp20x.h |  1 +
- 5 files changed, 93 insertions(+)
- create mode 100644 drivers/mfd/axp20x-rsb.c
 
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index 804cd3dcce32..13c565103e96 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -107,6 +107,17 @@ config MFD_AXP20X_I2C
- 	  components like regulators or the PEK (Power Enable Key) under the
- 	  corresponding menus.
+Linus, can we have this one included for 4.5?
+
+Thanks
+
+---
+ .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   2 +
+ drivers/pinctrl/sunxi/Kconfig                      |   5 +
+ drivers/pinctrl/sunxi/Makefile                     |   1 +
+ drivers/pinctrl/sunxi/pinctrl-sun9i-a80-r.c        | 181 +++++++++++++++++++++
+ 4 files changed, 189 insertions(+)
+ create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun9i-a80-r.c
+
+diff --git a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+index b321b26780dc..b3b6c2f210d7 100644
+--- a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+@@ -18,6 +18,8 @@ Required properties:
+   "allwinner,sun8i-a23-r-pinctrl"
+   "allwinner,sun8i-a33-pinctrl"
+   "allwinner,sun8i-a83t-pinctrl"
++  "allwinner,sun9i-a80-pinctrl"
++  "allwinner,sun9i-a80-r-pinctrl"
  
-+config MFD_AXP20X_RSB
-+	tristate "X-Powers AXP series PMICs with RSB"
-+	select MFD_AXP20X
-+	depends on SUNXI_RSB
-+	help
-+	  If you say Y here you get support for the X-Powers AXP series power
-+	  management ICs (PMICs) controlled with RSB.
-+	  This driver include only the core APIs. You have to select individual
-+	  components like regulators or the PEK (Power Enable Key) under the
-+	  corresponding menus.
+ - reg: Should contain the register physical address and length for the
+   pin controller.
+diff --git a/drivers/pinctrl/sunxi/Kconfig b/drivers/pinctrl/sunxi/Kconfig
+index e68fd951129a..0252b3fa41ce 100644
+--- a/drivers/pinctrl/sunxi/Kconfig
++++ b/drivers/pinctrl/sunxi/Kconfig
+@@ -55,4 +55,9 @@ config PINCTRL_SUN9I_A80
+ 	def_bool MACH_SUN9I
+ 	select PINCTRL_SUNXI_COMMON
+ 
++config PINCTRL_SUN9I_A80_R
++	def_bool MACH_SUN9I
++	depends on RESET_CONTROLLER
++	select PINCTRL_SUNXI_COMMON
 +
- config MFD_CROS_EC
- 	tristate "ChromeOS Embedded Controller"
- 	select MFD_CORE
-diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-index a6913007d667..caea6637d5e8 100644
---- a/drivers/mfd/Makefile
-+++ b/drivers/mfd/Makefile
-@@ -108,6 +108,7 @@ obj-$(CONFIG_MFD_DA9052_SPI)	+= da9052-spi.o
- obj-$(CONFIG_MFD_DA9052_I2C)	+= da9052-i2c.o
- obj-$(CONFIG_MFD_AXP20X)	+= axp20x.o
- obj-$(CONFIG_MFD_AXP20X_I2C)	+= axp20x-i2c.o
-+obj-$(CONFIG_MFD_AXP20X_RSB)	+= axp20x-rsb.o
- 
- obj-$(CONFIG_MFD_LP3943)	+= lp3943.o
- obj-$(CONFIG_MFD_LP8788)	+= lp8788.o lp8788-irq.o
-diff --git a/drivers/mfd/axp20x-rsb.c b/drivers/mfd/axp20x-rsb.c
+ endif
+diff --git a/drivers/pinctrl/sunxi/Makefile b/drivers/pinctrl/sunxi/Makefile
+index e08029034510..0b4b827f314b 100644
+--- a/drivers/pinctrl/sunxi/Makefile
++++ b/drivers/pinctrl/sunxi/Makefile
+@@ -14,3 +14,4 @@ obj-$(CONFIG_PINCTRL_SUN8I_A23_R)	+= pinctrl-sun8i-a23-r.o
+ obj-$(CONFIG_PINCTRL_SUN8I_A33)		+= pinctrl-sun8i-a33.o
+ obj-$(CONFIG_PINCTRL_SUN8I_A83T)	+= pinctrl-sun8i-a83t.o
+ obj-$(CONFIG_PINCTRL_SUN9I_A80)		+= pinctrl-sun9i-a80.o
++obj-$(CONFIG_PINCTRL_SUN9I_A80_R)	+= pinctrl-sun9i-a80-r.o
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun9i-a80-r.c b/drivers/pinctrl/sunxi/pinctrl-sun9i-a80-r.c
 new file mode 100644
-index 000000000000..76ff02b96df0
+index 000000000000..42547ffa20a8
 --- /dev/null
-+++ b/drivers/mfd/axp20x-rsb.c
-@@ -0,0 +1,78 @@
++++ b/drivers/pinctrl/sunxi/pinctrl-sun9i-a80-r.c
+@@ -0,0 +1,181 @@
 +/*
-+ * axp20x-rsb.c - RSB driver for the X-Powers' Power Management ICs
++ * Allwinner A80 SoCs special pins pinctrl driver.
 + *
-+ * AXP20x typically comprises an adaptive USB-Compatible PWM charger, BUCK DC-DC
-+ * converters, LDOs, multiple 12-bit ADCs of voltage, current and temperature
-+ * as well as configurable GPIOs.
++ * Copyright (C) 2014 Maxime Ripard
++ * Maxime Ripard <maxime.ripard@free-electrons.com>
 + *
-+ * This driver supports the RSB variants.
-+ *
-+ * Author: Chen-Yu Tsai <wens@csie.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
 + */
 +
-+#include <linux/acpi.h>
-+#include <linux/err.h>
 +#include <linux/module.h>
-+#include <linux/mfd/axp20x.h>
++#include <linux/platform_device.h>
 +#include <linux/of.h>
-+#include <linux/regmap.h>
-+#include <linux/slab.h>
-+#include <linux/sunxi-rsb.h>
++#include <linux/of_device.h>
++#include <linux/pinctrl/pinctrl.h>
++#include <linux/reset.h>
 +
-+static int axp20x_rsb_probe(struct sunxi_rsb_device *rdev)
-+{
-+	struct axp20x_dev *axp20x;
-+	int ret;
++#include "pinctrl-sunxi.h"
 +
-+	axp20x = devm_kzalloc(&rdev->dev, sizeof(*axp20x), GFP_KERNEL);
-+	if (!axp20x)
-+		return -ENOMEM;
++static const struct sunxi_desc_pin sun9i_a80_r_pins[] = {
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 0),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x3, "s_uart"),	/* TX */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 0)),	/* PL_EINT0 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 1),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x3, "s_uart"),	/* RX */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 1)),	/* PL_EINT1 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 2),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x3, "s_jtag"),	/* TMS */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 2)),	/* PL_EINT2 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 3),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x3, "s_jtag"),	/* TCK */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 3)),	/* PL_EINT3 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 4),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x3, "s_jtag"),	/* TDO */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 4)),	/* PL_EINT4 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 5),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x3, "s_jtag"),	/* TDI */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 5)),	/* PL_EINT5 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 6),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x3, "s_cir_rx"),
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 6)),	/* PL_EINT6 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 7),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x3, "1wire"),
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 7)),	/* PL_EINT7 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 8),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "s_ps2"),		/* SCK1 */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 8)),	/* PL_EINT8 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 9),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "s_ps2"),		/* SDA1 */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 9)),	/* PL_EINT9 */
 +
-+	axp20x->dev = &rdev->dev;
-+	axp20x->irq = rdev->irq;
-+	sunxi_rsb_device_set_drvdata(rdev, axp20x);
++	/* Hole */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(M, 0),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 0)),	/* PM_EINT0 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(M, 1),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 1)),	/* PM_EINT1 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(M, 2),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 2)),	/* PM_EINT2 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(M, 3),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 3)),	/* PM_EINT3 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(M, 4),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x3, "s_i2s1"),	/* LRCKR */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 4)),	/* PM_EINT4 */
 +
-+	ret = axp20x_match_device(axp20x);
-+	if (ret)
-+		return ret;
++	/* Hole */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(M, 8),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x3, "s_i2c1"),	/* SCK */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 8)),	/* PM_EINT8 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(M, 9),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x3, "s_i2c1"),	/* SDA */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 9)),	/* PM_EINT9 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(M, 10),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "s_i2s0"),	/* MCLK */
++		  SUNXI_FUNCTION(0x3, "s_i2s1")),	/* MCLK */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(M, 11),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "s_i2s0"),	/* BCLK */
++		  SUNXI_FUNCTION(0x3, "s_i2s1")),	/* BCLK */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(M, 12),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "s_i2s0"),	/* LRCK */
++		  SUNXI_FUNCTION(0x3, "s_i2s1")),	/* LRCK */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(M, 13),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "s_i2s0"),	/* DIN */
++		  SUNXI_FUNCTION(0x3, "s_i2s1")),	/* DIN */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(M, 14),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "s_i2s0"),	/* DOUT */
++		  SUNXI_FUNCTION(0x3, "s_i2s1")),	/* DOUT */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(M, 15),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 15)),	/* PM_EINT15 */
 +
-+	axp20x->regmap = devm_regmap_init_sunxi_rsb(rdev, axp20x->regmap_cfg);
-+	if (IS_ERR(axp20x->regmap)) {
-+		ret = PTR_ERR(axp20x->regmap);
-+		dev_err(&rdev->dev, "regmap init failed: %d\n", ret);
-+		return ret;
-+	}
-+
-+	return axp20x_device_probe(axp20x);
-+}
-+
-+static int axp20x_rsb_remove(struct sunxi_rsb_device *rdev)
-+{
-+	struct axp20x_dev *axp20x = sunxi_rsb_device_get_drvdata(rdev);
-+
-+	return axp20x_device_remove(axp20x);
-+}
-+
-+static const struct of_device_id axp20x_rsb_of_match[] = {
-+	{ .compatible = "x-powers,axp223", .data = (void *)AXP223_ID },
-+	{ },
++	/* Hole */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(N, 0),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "s_i2c0"),	/* SCK */
++		  SUNXI_FUNCTION(0x3, "s_rsb")),	/* SCK */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(N, 1),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "s_i2c0"),	/* SDA */
++		  SUNXI_FUNCTION(0x3, "s_rsb")),	/* SDA */
 +};
-+MODULE_DEVICE_TABLE(of, axp20x_rsb_of_match);
 +
-+static struct sunxi_rsb_driver axp20x_rsb_driver = {
-+	.driver = {
-+		.name	= "axp20x-rsb",
-+		.of_match_table	= of_match_ptr(axp20x_rsb_of_match),
++static const struct sunxi_pinctrl_desc sun9i_a80_r_pinctrl_data = {
++	.pins = sun9i_a80_r_pins,
++	.npins = ARRAY_SIZE(sun9i_a80_r_pins),
++	.pin_base = PL_BASE,
++	.irq_banks = 2,
++};
++
++static int sun9i_a80_r_pinctrl_probe(struct platform_device *pdev)
++{
++	return sunxi_pinctrl_init(pdev,
++				  &sun9i_a80_r_pinctrl_data);
++}
++
++static const struct of_device_id sun9i_a80_r_pinctrl_match[] = {
++	{ .compatible = "allwinner,sun9i-a80-r-pinctrl", },
++	{}
++};
++MODULE_DEVICE_TABLE(of, sun9i_a80_r_pinctrl_match);
++
++static struct platform_driver sun9i_a80_r_pinctrl_driver = {
++	.probe	= sun9i_a80_r_pinctrl_probe,
++	.driver	= {
++		.name		= "sun9i-a80-r-pinctrl",
++		.owner		= THIS_MODULE,
++		.of_match_table	= sun9i_a80_r_pinctrl_match,
 +	},
-+	.probe	= axp20x_rsb_probe,
-+	.remove	= axp20x_rsb_remove,
 +};
-+module_sunxi_rsb_driver(axp20x_rsb_driver);
++module_platform_driver(sun9i_a80_r_pinctrl_driver);
 +
-+MODULE_DESCRIPTION("PMIC MFD sunXi RSB driver for AXP20X");
-+MODULE_AUTHOR("Chen-Yu Tsai <wens@csie.org>");
-+MODULE_LICENSE("GPL v2");
-diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-index 54a00168da26..968d77fb95d8 100644
---- a/drivers/mfd/axp20x.c
-+++ b/drivers/mfd/axp20x.c
-@@ -33,6 +33,7 @@ static const char * const axp20x_model_names[] = {
- 	"AXP202",
- 	"AXP209",
- 	"AXP221",
-+	"AXP223",
- 	"AXP288",
- };
- 
-@@ -616,6 +617,7 @@ int axp20x_match_device(struct axp20x_dev *axp20x)
- 		axp20x->regmap_irq_chip = &axp20x_regmap_irq_chip;
- 		break;
- 	case AXP221_ID:
-+	case AXP223_ID:
- 		axp20x->nr_cells = ARRAY_SIZE(axp22x_cells);
- 		axp20x->cells = axp22x_cells;
- 		axp20x->regmap_cfg = &axp22x_regmap_config;
-diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
-index 00697c6ad8b0..d82e7d51372b 100644
---- a/include/linux/mfd/axp20x.h
-+++ b/include/linux/mfd/axp20x.h
-@@ -18,6 +18,7 @@ enum {
- 	AXP202_ID,
- 	AXP209_ID,
- 	AXP221_ID,
-+	AXP223_ID,
- 	AXP288_ID,
- 	NR_AXP20X_VARIANTS,
- };
++MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com");
++MODULE_DESCRIPTION("Allwinner A80 R_PIO pinctrl driver");
++MODULE_LICENSE("GPL");
 -- 
 2.6.4
