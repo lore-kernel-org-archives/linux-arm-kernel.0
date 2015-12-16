@@ -1,87 +1,62 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 16 Dec 2015 12:21:48 +0100
-Subject: [PATCH v2 1/3] reset: Add shared reset_control_[de]assert variants
-In-Reply-To: <20151216102934.GR19456@lukather>
-References: <1449848520-27379-1-git-send-email-hdegoede@redhat.com>
- <20151214093607.GF19456@lukather> <1450086655.3407.23.camel@pengutronix.de>
- <20151216102934.GR19456@lukather>
-Message-ID: <1450264908.3421.36.camel@pengutronix.de>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Wed, 16 Dec 2015 19:22:04 +0800
+Subject: [PATCH v5 2/3] arm64: dts: mt8173: Add thermal zone node.
+In-Reply-To: <1450260553.7981.14.camel@mtksdaap41>
+References: <1450238356-36319-1-git-send-email-dawei.chien@mediatek.com>
+ <1450238356-36319-3-git-send-email-dawei.chien@mediatek.com>
+ <CAGS+omDDfJb9dfWWPaMKs=MkO4Pf3RF9SUD==i7sgHsrDhFDxA@mail.gmail.com>
+ <1450260553.7981.14.camel@mtksdaap41>
+Message-ID: <CAGS+omCWJo6Q933tRigMsxPvOmD3-cxe337_spAMKhYSUdTUKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On Wed, Dec 16, 2015 at 6:09 PM, dawei chien <dawei.chien@mediatek.com> wrote:
+> On Wed, 2015-12-16 at 16:34 +0800, Daniel Kurtz wrote:
+>> On Wed, Dec 16, 2015 at 11:59 AM, Dawei Chien <dawei.chien@mediatek.com> wrote:
+>> >
+>> > This adds thermal zone node to Mediatek MT8173 dtsi file.
+>> >
+>> > Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
+>> > ---
+>> > This patch is base on patchset:
+>> > https://lkml.org/lkml/2015/11/30/239
+>> > ---
+>> >  arch/arm64/boot/dts/mediatek/mt8173.dtsi |   43 ++++++++++++++++++++++++++++++
+>> >  1 file changed, 43 insertions(+)
+>> >
+>> > diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> > index fda805d..4114cee 100644
+>> > --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> > +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> > @@ -188,6 +188,49 @@
+>> >                 clock-output-names = "cpum_ck";
+>> >         };
+>> >
+>> > +       thermal-zones {
+>> > +               cpu_thermal: cpu_thermal {
+>> > +                       polling-delay-passive = <1000>; /* milliseconds */
+>> > +                       polling-delay = <1000>; /* milliseconds */
+>> > +
+>> > +                       thermal-sensors = <&thermal 0>;
+>>
+>> This should be <&thermal> with the MTK temp sensor node in
+>> https://lkml.org/lkml/2015/11/30/239 patch series.
+>>
+>> -Dan
+>
+> Hi Dan,
+> Sascha's thermal driver V12 only register sensor id as 0, so we need to
+> register sensor id as 0 to device tree as well.
+>
+> Either <&thermal 0> or <&thermal>, sensor id should be 0 for two cases.
+> I try this two case, function all work fine for two cases. May I have
+> any misunderstand? Please kindly give your comment.
+> I will re-send this patch again once you tell me the reason, thank you.
 
-Am Mittwoch, den 16.12.2015, 11:29 +0100 schrieb Maxime Ripard:
-> On Mon, Dec 14, 2015 at 10:50:55AM +0100, Philipp Zabel wrote:
-> > Am Montag, den 14.12.2015, 10:36 +0100 schrieb Maxime Ripard:
-> > > Hi,
-> > > 
-> > > On Fri, Dec 11, 2015 at 04:41:58PM +0100, Hans de Goede wrote:
-> > > > diff --git a/include/linux/reset.h b/include/linux/reset.h
-> > > > index c4c097d..1cca8ce 100644
-> > > > --- a/include/linux/reset.h
-> > > > +++ b/include/linux/reset.h
-> > > > @@ -11,6 +11,8 @@ int reset_control_reset(struct reset_control *rstc);
-> > > >  int reset_control_assert(struct reset_control *rstc);
-> > > >  int reset_control_deassert(struct reset_control *rstc);
-> > > >  int reset_control_status(struct reset_control *rstc);
-> > > > +int reset_control_assert_shared(struct reset_control *rstc);
-> > > > +int reset_control_deassert_shared(struct reset_control *rstc);
-> > > 
-> > > Shouldn't that be handled in reset_control_get directly?
+In the new patchset, Sascha changed it to:
+#thermal-sensor-cells = <0>;
 
-I think I see your point now. Maybe we should add a flags parameter to
-reset_control_get and/or wrap it in two versions,
-reset_control_get_exclusive and reset_control_get_shared (or just add
-the _shared variant). Then reset_control_get(_exclusive) could return
--EBUSY if a reset line is already in use.
+Which means the <&thermal> phandle no longer has any arguments.
 
-> > This is about different expectations of the caller.
-> > A driver calling reset_control_assert expects the reset line to be
-> > asserted after the call.
-> 
-> Is that behaviour documented explicitly somewhere?
-
-/**                                                                                                                                           
- * reset_control_assert - asserts the reset line
- * @rstc: reset controller
- */
-
-Also, that expected behavior matches the function name, which I like.
-So I still welcome adding new API calls for the shared/refcounting
-variant.
-
-> > A driver calling reset_control_assert_shared
-> > just signals that it doesn't care about the state of the reset line
-> > anymore.
-> > We could just as well call the two new functions
-> > reset_control_deassert_get and reset_control_deassert_put.
-> 
-> What happens if you mix them? What happens if you have several drivers
-> ignoring this API?
-
-The core should give useful error messages and disallow non-shared reset
-calls on shared lines.
-
-> The current default API totally allows to have several drivers getting
-> the same reset line, and happily poking that reset line without any
-> way for the others to A) know they're not the single users B) let them
-> know their device has been reset.
-
-That's why I'd like the WARN_ON and error return in reset_control_* when
-the reset_line reference count is > 1.
-
-> And not being able to tell at the consumer level if and when our
-> device is going to be reset behind our back is a big issue. Because
-> then, we simply have to expect it can be reset at any point in time,
-> good luck writing a driver with that expectation.
-
-Yes, that is unacceptable.
-
-> The reset framework should make sure that the shared case is an
-> exception, and not the default case (and make sure that it cannot
-> happen in the default case). Just like for any other framework with
-> similar resources constraints.
-
-regards
-Philipp
+Thanks!
+-Dan
