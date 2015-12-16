@@ -1,55 +1,61 @@
-From: dawei.chien@mediatek.com (dawei chien)
-Date: Wed, 16 Dec 2015 18:09:13 +0800
-Subject: [PATCH v5 2/3] arm64: dts: mt8173: Add thermal zone node.
-In-Reply-To: <CAGS+omDDfJb9dfWWPaMKs=MkO4Pf3RF9SUD==i7sgHsrDhFDxA@mail.gmail.com>
-References: <1450238356-36319-1-git-send-email-dawei.chien@mediatek.com>
- <1450238356-36319-3-git-send-email-dawei.chien@mediatek.com>
- <CAGS+omDDfJb9dfWWPaMKs=MkO4Pf3RF9SUD==i7sgHsrDhFDxA@mail.gmail.com>
-Message-ID: <1450260553.7981.14.camel@mtksdaap41>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Wed, 16 Dec 2015 18:10:10 +0800
+Subject: [PATCH v6 0/6] Add mipi dsi support for rk3288
+Message-ID: <1450260616-21160-1-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-12-16 at 16:34 +0800, Daniel Kurtz wrote:
-> On Wed, Dec 16, 2015 at 11:59 AM, Dawei Chien <dawei.chien@mediatek.com> wrote:
-> >
-> > This adds thermal zone node to Mediatek MT8173 dtsi file.
-> >
-> > Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
-> > ---
-> > This patch is base on patchset:
-> > https://lkml.org/lkml/2015/11/30/239
-> > ---
-> >  arch/arm64/boot/dts/mediatek/mt8173.dtsi |   43 ++++++++++++++++++++++++++++++
-> >  1 file changed, 43 insertions(+)
-> >
-> > diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > index fda805d..4114cee 100644
-> > --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > @@ -188,6 +188,49 @@
-> >                 clock-output-names = "cpum_ck";
-> >         };
-> >
-> > +       thermal-zones {
-> > +               cpu_thermal: cpu_thermal {
-> > +                       polling-delay-passive = <1000>; /* milliseconds */
-> > +                       polling-delay = <1000>; /* milliseconds */
-> > +
-> > +                       thermal-sensors = <&thermal 0>;
-> 
-> This should be <&thermal> with the MTK temp sensor node in
-> https://lkml.org/lkml/2015/11/30/239 patch series.
-> 
-> -Dan
 
-Hi Dan,
-Sascha's thermal driver V12 only register sensor id as 0, so we need to
-register sensor id as 0 to device tree as well.
+The rk3288 MIPI DSI is a Synopsys DesignWare MIPI DSI host controller
+IP. This series adds support for a Synopsys DesignWare MIPI DSI host
+controller DRM driver.
 
-Either <&thermal 0> or <&thermal>, sensor id should be 0 for two cases.
-I try this two case, function all work fine for two cases. May I have
-any misunderstand? Please kindly give your comment.
-I will re-send this patch again once you tell me the reason, thank you.
+The MIPI DSI feature is tested on rk3288 evb board, backport them to
+chrome os kernel chrome_v3.14, and it can display normally.
 
-BR,
-Dawei
+This patchset is base on the patchset from Ying.liu at freescale.com.
+<http://www.spinics.net/lists/dri-devel/msg77181.html>
+
+According to the suggestion from Thierry, I have get rid of the bridge,
+and register the encoder & connecter in drm/rockchip/dw-mipi-dsi.c.
+
+
+Changes in v6:
+- update the document, since the bridge device has been deleted.
+- Do not use bridge driver (Thierry Reding)
+- Optimization the phy init sequence
+
+Changes in v5:
+- modify the clk name to SCLK_MIPIDSI_24M
+- add a blank line befor lcd_en
+
+Changes in v4:
+- use clk_round_rate to check the clock rate in vop_crtc_mode_fixup
+
+Changes in v3:
+- move dw_mipi_dsi_rockchip.txt to bindings/display/rockchip/
+
+Chris Zhong (5):
+  drm/rockchip: return a true clock rate to adjusted_mode
+  Documentation: dt-bindings: Add bindings for rk3288 DW MIPI DSI driver
+  drm: rockchip: Support Synopsys DW MIPI DSI
+  ARM: dts: rockchip: add rk3288 mipi_dsi nodes
+  ARM: dts: rockchip: add support mipi panel tv080wum-nl0
+
+Liu Ying (1):
+  drm/dsi: Add a helper to get bits per pixel of MIPI DSI pixel format
+
+ .../display/rockchip/dw_mipi_dsi_rockchip.txt      |   60 +
+ arch/arm/boot/dts/rk3288-evb.dtsi                  |   20 +-
+ arch/arm/boot/dts/rk3288.dtsi                      |   39 +
+ drivers/gpu/drm/rockchip/Kconfig                   |   10 +
+ drivers/gpu/drm/rockchip/Makefile                  |    1 +
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c             | 1200 ++++++++++++++++++++
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c        |    8 +
+ include/drm/drm_mipi_dsi.h                         |   14 +
+ 8 files changed, 1351 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
+ create mode 100644 drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+
+-- 
+2.6.3
