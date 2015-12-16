@@ -1,153 +1,63 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 16 Dec 2015 16:16:14 +0100
-Subject: [PATCH V2 04/23] x86, pci: mmconfig_{32,
- 64}.c code refactoring - remove code duplication.
+Date: Wed, 16 Dec 2015 16:16:16 +0100
+Subject: [PATCH V2 06/23] XEN / PCI: Remove the dependence on arch x86 when
+ PCI_MMCONFIG=y
 In-Reply-To: <1450278993-12664-1-git-send-email-tn@semihalf.com>
 References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
-Message-ID: <1450278993-12664-5-git-send-email-tn@semihalf.com>
+Message-ID: <1450278993-12664-7-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mmconfig_64.c version is going to be default implementation for low-level
-operation on mmconfig regions. However, now it initializes raw_pci_ext_ops pointer which is specific for
-x86 only. Moreover, mmconfig_32.c is doing the same thing at the same time.
-So lets move it to mmconfig_shared.c so it becomes common for both and
-mmconfig_64.c turns out to be purely arch agnostic.
+In drivers/xen/pci.c, there are arch x86 dependent codes when
+CONFIG_PCI_MMCONFIG is enabled, since CONFIG_PCI_MMCONFIG
+depends on ACPI, so this will prevent XEN PCI running on other
+architectures using ACPI with PCI_MMCONFIG enabled (such as ARM64).
 
-Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+Fortunatly, it can be sloved in a simple way. In drivers/xen/pci.c,
+the only x86 dependent code is if ((pci_probe & PCI_PROBE_MMCONF) == 0),
+and it's defined in asm/pci_x86.h, the code means that
+if the PCI resource is not probed in PCI_PROBE_MMCONF way, just
+ingnore the xen mcfg init. Actually this is duplicate, because
+if PCI resource is not probed in PCI_PROBE_MMCONF way, the
+pci_mmconfig_list will be empty, and the if (list_empty())
+after it will do the same job.
+
+So just remove the arch related code and the head file, this
+will be no functional change for x86, and also makes xen/pci.c
+usable for other architectures.
+
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+CC: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+Cc: Stefano Stabellini <Stefano.Stabellini@eu.citrix.com>
 Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 ---
- arch/x86/include/asm/pci_x86.h |  5 +++++
- arch/x86/pci/mmconfig-shared.c | 10 ++++++++--
- arch/x86/pci/mmconfig_32.c     | 10 ++--------
- arch/x86/pci/mmconfig_64.c     | 11 ++---------
- 4 files changed, 17 insertions(+), 19 deletions(-)
+ drivers/xen/pci.c | 6 ------
+ 1 file changed, 6 deletions(-)
 
-diff --git a/arch/x86/include/asm/pci_x86.h b/arch/x86/include/asm/pci_x86.h
-index c1c0f37..0482807 100644
---- a/arch/x86/include/asm/pci_x86.h
-+++ b/arch/x86/include/asm/pci_x86.h
-@@ -130,6 +130,11 @@ extern void pci_mmcfg_arch_unmap(struct pci_mmcfg_region *cfg);
- extern int pci_mmconfig_insert(struct device *dev, u16 seg, u8 start, u8 end,
- 			       phys_addr_t addr);
+diff --git a/drivers/xen/pci.c b/drivers/xen/pci.c
+index 6785ebb..9a8dbe3 100644
+--- a/drivers/xen/pci.c
++++ b/drivers/xen/pci.c
+@@ -28,9 +28,6 @@
+ #include <asm/xen/hypervisor.h>
+ #include <asm/xen/hypercall.h>
+ #include "../pci/pci.h"
+-#ifdef CONFIG_PCI_MMCONFIG
+-#include <asm/pci_x86.h>
+-#endif
  
-+int pci_mmcfg_read(unsigned int seg, unsigned int bus, unsigned int devfn,
-+		   int reg, int len, u32 *value);
-+int pci_mmcfg_write(unsigned int seg, unsigned int bus, unsigned int devfn,
-+		    int reg, int len, u32 value);
-+
- /*
-  * AMD Fam10h CPUs are buggy, and cannot access MMIO config space
-  * on their northbrige except through the * %eax register. As such, you MUST
-diff --git a/arch/x86/pci/mmconfig-shared.c b/arch/x86/pci/mmconfig-shared.c
-index ce2c2e4..980f304 100644
---- a/arch/x86/pci/mmconfig-shared.c
-+++ b/arch/x86/pci/mmconfig-shared.c
-@@ -29,6 +29,11 @@
- static bool pci_mmcfg_running_state;
- static bool pci_mmcfg_arch_init_failed;
+ static bool __read_mostly pci_seg_supported = true;
  
-+const struct pci_raw_ops pci_mmcfg = {
-+	.read =		pci_mmcfg_read,
-+	.write =	pci_mmcfg_write,
-+};
-+
- static const char *__init pci_mmcfg_e7520(void)
- {
- 	u32 win;
-@@ -512,9 +517,10 @@ static void __init __pci_mmcfg_init(int early)
- 		}
- 	}
+@@ -222,9 +219,6 @@ static int __init xen_mcfg_late(void)
+ 	if (!xen_initial_domain())
+ 		return 0;
  
--	if (pci_mmcfg_arch_init())
-+	if (pci_mmcfg_arch_init()) {
-+		raw_pci_ext_ops = &pci_mmcfg;
- 		pci_probe = (pci_probe & ~PCI_PROBE_MASK) | PCI_PROBE_MMCONF;
--	else {
-+	} else {
- 		free_all_mmcfg();
- 		pci_mmcfg_arch_init_failed = true;
- 	}
-diff --git a/arch/x86/pci/mmconfig_32.c b/arch/x86/pci/mmconfig_32.c
-index 246f135..2ded56f 100644
---- a/arch/x86/pci/mmconfig_32.c
-+++ b/arch/x86/pci/mmconfig_32.c
-@@ -50,7 +50,7 @@ static void pci_exp_set_dev_base(unsigned int base, int bus, int devfn)
- 	}
- }
- 
--static int pci_mmcfg_read(unsigned int seg, unsigned int bus,
-+int pci_mmcfg_read(unsigned int seg, unsigned int bus,
- 			  unsigned int devfn, int reg, int len, u32 *value)
- {
- 	unsigned long flags;
-@@ -89,7 +89,7 @@ err:		*value = -1;
- 	return 0;
- }
- 
--static int pci_mmcfg_write(unsigned int seg, unsigned int bus,
-+int pci_mmcfg_write(unsigned int seg, unsigned int bus,
- 			   unsigned int devfn, int reg, int len, u32 value)
- {
- 	unsigned long flags;
-@@ -126,15 +126,9 @@ static int pci_mmcfg_write(unsigned int seg, unsigned int bus,
- 	return 0;
- }
- 
--const struct pci_raw_ops pci_mmcfg = {
--	.read =		pci_mmcfg_read,
--	.write =	pci_mmcfg_write,
--};
+-	if ((pci_probe & PCI_PROBE_MMCONF) == 0)
+-		return 0;
 -
- int __init pci_mmcfg_arch_init(void)
- {
- 	printk(KERN_INFO "PCI: Using MMCONFIG for extended config space\n");
--	raw_pci_ext_ops = &pci_mmcfg;
- 	return 1;
- }
- 
-diff --git a/arch/x86/pci/mmconfig_64.c b/arch/x86/pci/mmconfig_64.c
-index b14fcd3..d0c48eb 100644
---- a/arch/x86/pci/mmconfig_64.c
-+++ b/arch/x86/pci/mmconfig_64.c
-@@ -25,7 +25,7 @@ static char __iomem *pci_dev_base(unsigned int seg, unsigned int bus, unsigned i
- 	return NULL;
- }
- 
--static int pci_mmcfg_read(unsigned int seg, unsigned int bus,
-+int pci_mmcfg_read(unsigned int seg, unsigned int bus,
- 			  unsigned int devfn, int reg, int len, u32 *value)
- {
- 	char __iomem *addr;
-@@ -59,7 +59,7 @@ err:		*value = -1;
- 	return 0;
- }
- 
--static int pci_mmcfg_write(unsigned int seg, unsigned int bus,
-+int pci_mmcfg_write(unsigned int seg, unsigned int bus,
- 			   unsigned int devfn, int reg, int len, u32 value)
- {
- 	char __iomem *addr;
-@@ -91,11 +91,6 @@ static int pci_mmcfg_write(unsigned int seg, unsigned int bus,
- 	return 0;
- }
- 
--const struct pci_raw_ops pci_mmcfg = {
--	.read =		pci_mmcfg_read,
--	.write =	pci_mmcfg_write,
--};
--
- static void __iomem *mcfg_ioremap(struct pci_mmcfg_region *cfg)
- {
- 	void __iomem *addr;
-@@ -121,8 +116,6 @@ int __init pci_mmcfg_arch_init(void)
- 			return 0;
- 		}
- 
--	raw_pci_ext_ops = &pci_mmcfg;
--
- 	return 1;
- }
+ 	if (list_empty(&pci_mmcfg_list))
+ 		return 0;
  
 -- 
 1.9.1
