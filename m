@@ -1,97 +1,48 @@
-From: majun258@huawei.com (majun)
-Date: Wed, 16 Dec 2015 09:23:19 -0500
-Subject: [PATCH v9 1/4] dt-binding:Documents of the mbigen bindings
-In-Reply-To: <20151211152629.GE20666@leverpostej>
-References: <1448248513-39760-1-git-send-email-majun258@huawei.com>
- <1448248513-39760-2-git-send-email-majun258@huawei.com>
- <20151211152629.GE20666@leverpostej>
-Message-ID: <567173D7.6060303@huawei.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Wed, 16 Dec 2015 06:37:57 -0800
+Subject: [PATCH LINUX v4 06/13] tty: xuartps: Move request_irq to after
+ setting up the HW
+In-Reply-To: <20151216090339.GX3358@xsjsorenbubuntu>
+References: <1449376769-13369-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1449376769-13369-7-git-send-email-soren.brinkmann@xilinx.com>
+ <5669F172.6020503@hurleysoftware.com> <20151215154136.GU3358@xsjsorenbubuntu>
+ <5670A1B6.6050708@hurleysoftware.com> <20151216090339.GX3358@xsjsorenbubuntu>
+Message-ID: <56717745.3060306@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark:
-
-On 2015/12/11 10:26, Mark Rutland wrote:
-> Hi,
-> 
-> On Mon, Nov 23, 2015 at 11:15:10AM +0800, MaJun wrote:
->> From: Ma Jun <majun258@huawei.com>
+On 12/16/2015 01:03 AM, S?ren Brinkmann wrote:
+> On Tue, 2015-12-15 at 03:26PM -0800, Peter Hurley wrote:
+>> On 12/15/2015 07:41 AM, S?ren Brinkmann wrote:
+>>> On Thu, 2015-12-10 at 01:41PM -0800, Peter Hurley wrote:
+>>>> On 12/05/2015 08:39 PM, Soren Brinkmann wrote:
+>>>>> Request_irq() should be _after_ h/w programming, otherwise an
+>>>>> interrupt could be triggered and in-progress before the h/w has been
+>>>>> setup.
+>>>>
+>>>> Slight misunderstanding. My fault; I should have been more explicit.
+>>>>
+>>>> 1. Any setup necessary for the isr not to be confused and misdirect spurious
+>>>>    interrupts (or hang) should be before installing the isr with request_irq()
+>>>>    None of this code should trigger an interrupt.
+>>>> 2. Clear pending interrupts
+>>>> 3. Install the isr with request_irq()
+>>>> 4. Enable interrupts
+>>>
+>>> Isn't that what the startup function is doing now - more or less. I
+>>> think 3 and 4 are swapped to release the lock and then do the
+>>> request_irq, but I believe that should be OK.
+>>> The startup function configures the HW. Clears the ISR. Enables the
+>>> intended IRQs and then does the request_irq call.
 >>
->> Add the mbigen msi interrupt controller bindings document.
->>
->> This patch based on Mark Rutland's patch
->> https://lkml.org/lkml/2015/7/23/558
->>
->> Signed-off-by: Ma Jun <majun258@huawei.com>
->> ---
->>  Documentation/devicetree/bindings/arm/mbigen.txt |   69 ++++++++++++++++++++++
->>  1 files changed, 69 insertions(+), 0 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/arm/mbigen.txt
->>
->> diff --git a/Documentation/devicetree/bindings/arm/mbigen.txt b/Documentation/devicetree/bindings/arm/mbigen.txt
->> new file mode 100644
->> index 0000000..8ae59a9
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/mbigen.txt
->> @@ -0,0 +1,69 @@
->> +Hisilicon mbigen device tree bindings.
->> +=======================================
->> +
-[...]
->> +- #interrupt-cells : Specifies the number of cells needed to encode an
->> +  interrupt source. The value must be 2.
->> +
->> +  The 1st cell is global hardware pin number of the interrupt.
->> +	This value depends on the Soc design.
+>> If the driver enables interrupts before installing the isr with request_irq()
+>> and an interrupt occurs there will the no handler to catch it and EOI the
+>> device.
 > 
-> I think a little more information is required here. Presumably the
-> "global hardware pin number" is actually a pin number within the
-> particular mbigen instance? i.e. it is local to this instance?
-> 
+> Really? Shouldn't the IRQ be masked in the interrupt controller until
+> everything is in place?
 
-Maybe "global hardware pin number" is  not an accurate definition of pin number and
-makes people confused.
+Sorry, I'm used to shared interrupts, where that isn't the case.
 
-I will change it to "hardware pin number" to present the real pin number of
-wired interrupt(from 0 to maximum interrupt number).
-
-So, there is no global pin number or local pin number.
-
-Thanks!
-Majun
-
-
->> +  The 2nd cell is the interrupt trigger type.
->> +	The value of this cell should be:
->> +	1: rising edge triggered
->> +	or
->> +	4: high level triggered	
->> +
->> +Examples:
->> +
->> + 	mbigen_device_gmac:intc {
->> +			compatible = "hisilicon,mbigen-v2";
->> +			reg = <0x0 0xc0080000 0x0 0x10000>;
->> +			interrupt-controller;
->> +			msi-parent = <&its_dsa 0x40b1c>;
->> +			num-msis = <9>;
->> +			#interrupt-cells = <2>;
->> + 	};
->> +
->> +Devices connect to mbigen required properties:
->> +----------------------------------------------------
->> +-interrupt-parent: Specifies the mbigen device node which device connected.
->> +-interrupts:specifies the interrupt source.
->> +  The 1st cell is global hardware pin number of the interrupt.
->> +		This value depends on the Soc design.
->> +  The 2nd cell is the interrupt trigger type(rising edge triggered or high
->> +		level triggered)
-> 
-> You should be able to refer to the usual interrupt bindings given you
-> defined the format previously when describing #interrupt-cells.
-> 
-> Thanks,
-> Mark.
-> 
-> .
-> 
+Regards,
+Peter Hurley
