@@ -1,43 +1,53 @@
-From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Wed, 16 Dec 2015 13:55:11 +0100
-Subject: [PATCH v3 4/4] drivers: psci: replace psci firmware calls
-In-Reply-To: <20151216105529.GC19814@red-moon>
-References: <1448449461-5043-1-git-send-email-jens.wiklander@linaro.org>
- <1448449461-5043-5-git-send-email-jens.wiklander@linaro.org>
- <20151201184741.GE29045@leverpostej> <20151201194421.GA29068@ermac>
- <20151216105529.GC19814@red-moon>
-Message-ID: <20151216125509.GA27585@ermac>
+From: ariel@vanguardiasur.com.ar (Ariel D'Alessandro)
+Date: Wed, 16 Dec 2015 09:55:39 -0300
+Subject: [PATCH 2/3] ARM: dts: lpc4337-ciaa: enable SCT-PWM
+In-Reply-To: <CAGhQ9Vxqpe4QQn1+d6bOCQH9q6evignVR_+U4NK7HqSNhBg4qA@mail.gmail.com>
+References: <1448282225-2635-1-git-send-email-ariel@vanguardiasur.com.ar>
+ <1448282225-2635-3-git-send-email-ariel@vanguardiasur.com.ar>
+ <5655A977.1040408@vanguardiasur.com.ar>
+ <CAGhQ9Vxqpe4QQn1+d6bOCQH9q6evignVR_+U4NK7HqSNhBg4qA@mail.gmail.com>
+Message-ID: <56715F4B.7050109@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 16, 2015 at 10:55:29AM +0000, Lorenzo Pieralisi wrote:
-> [CC'ed Daniel]
-> 
-> On Tue, Dec 01, 2015 at 08:44:22PM +0100, Jens Wiklander wrote:
-> 
-> [...]
-> 
-> > > What's the plan for merging this? I assume this'll go via arm-soc?
-> > 
-> > I talked to Arnd about this and he suggested to go via Russel.
-> 
-> Heads-up, this patch will conflict with:
-> 
-> https://patchwork.kernel.org/patch/7418351/
-> 
-> that goes via linux-pm tree, please let me and Daniel know how
-> you want us to sort this out.
+Joachim,
 
-I guess this arm-smccc patchset need to go together with that patch in
-some way. I've just uploaded my patches in Russels patch system, but I
-can stop that and try to go via the linux-pm tree instead if you think
-the maintainer would accept that. I'll need to ask Russel if he can ack
-the patches "arm/arm64: add arm-smccc" and
-"arm: add implementation for arm-smccc" first though.
+El 14/12/15 a las 19:48, Joachim Eastwood escribi?:
+> Hi Ariel,
+> 
+> Sorry for the late reply. I have just started to put together my DT
+> for 4.5 branch now.
+> 
+> On 25 November 2015 at 13:28, Ariel D'Alessandro
+> <ariel@vanguardiasur.com.ar> wrote:
+>> (+To: Joachim)
+>>
+>> El 23/11/15 a las 09:37, Ariel D'Alessandro escribi?:
+>>> Enable the PWM based on the State Configurable Timer (SCT) included in
+>>> the LPC4337 SoC of the CIAA-NXP board.
+>>>
+>>> Signed-off-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
+>>> ---
+>>>  arch/arm/boot/dts/lpc4337-ciaa.dts | 4 ++++
+>>>  1 file changed, 4 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/lpc4337-ciaa.dts b/arch/arm/boot/dts/lpc4337-ciaa.dts
+>>> index 03bdf77..1a23589 100644
+>>> --- a/arch/arm/boot/dts/lpc4337-ciaa.dts
+>>> +++ b/arch/arm/boot/dts/lpc4337-ciaa.dts
+>>> @@ -170,6 +170,10 @@
+>>>       pinctrl-0 = <&enet_rmii_pins>;
+>>>  };
+>>>
+>>> +&sct_pwm {
+>>> +     status = "okay";
+>>> +};
+>>> +
+> 
+> Isn't this a bit useless without any pinmux setup?
 
-Would that work or do you have another idea? I'm of course happy either
-way as long as the patches get through. I'm new to this so any advice is
-appreciated.
+Yes, it might be kind of useless. Do you think it shouldn't be enabled then?
 
-Thanks,
-Jens
+-- 
+Ariel D'Alessandro, VanguardiaSur
+www.vanguardiasur.com.ar
