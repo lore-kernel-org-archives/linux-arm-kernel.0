@@ -1,41 +1,29 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed, 16 Dec 2015 17:08:05 +0000
-Subject: [PATCH 1/2] arm: Fix "NMI" backtrace for Inforce IFC6410
-In-Reply-To: <1450285686-844-1-git-send-email-daniel.thompson@linaro.org>
-References: <1450285686-844-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1450285686-844-2-git-send-email-daniel.thompson@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 16 Dec 2015 09:16:50 -0800
+Subject: [PATCHv2] clk: ti: omap5+: dpll: implement errata i810
+In-Reply-To: <1450256530-10251-1-git-send-email-t-kristo@ti.com>
+References: <1450256530-10251-1-git-send-email-t-kristo@ti.com>
+Message-ID: <20151216171650.GS23396@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SysRq-L does not generate a backtrace from all CPUs when I test it
-on my Inforce IFC6410 platform (Snapdragon 600). The stack dump code,
-triggered by IPI_CPU_BACKTRACE, never runs on the other CPUs.
-Eventually we hit the 10 second timeout and a subset of the expected
-stack dumps on are shown on the console.
+* Tero Kristo <t-kristo@ti.com> [151216 01:00]:
+> Errata i810 states that DPLL controller can get stuck while transitioning
+> to a power saving state, while its M/N ratio is being re-programmed.
+> 
+> As a workaround, before re-programming the M/N ratio, SW has to ensure
+> the DPLL cannot start an idle state transition. SW can disable DPLL
+> idling by setting the DPLL AUTO_DPLL_MODE=0 or keeping a clock request
+> active by setting a dependent clock domain in SW_WKUP.
+> 
+> This errata is known to impact OMAP5 and DRA7 chips, but lets enable it
+> unconditionally to avoid any potential problems with earlier generation
+> SoCs also.
+> 
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> ---
+> v2: made the fix to be applied unconditionally on all OMAP3+ SoCs
 
-It is likely this is because SGI IDs 14 and 15 have been reserved for
-use by secure world on this platform. For IFC6410 platform the code
-works as expected when IPI_CPU_BACKTRACE is set to any value in the
-interval 9..13.
+Thanks looks good to me now:
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
----
- arch/arm/kernel/smp.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index b26361355dae..78205927fcd4 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -73,7 +73,8 @@ enum ipi_msg_type {
- 	IPI_CPU_STOP,
- 	IPI_IRQ_WORK,
- 	IPI_COMPLETION,
--	IPI_CPU_BACKTRACE = 15,
-+	IPI_CPU_BACKTRACE = 13,
-+	/* 14 and 15 are reserved; they do not work on some Krait CPUs */
- };
- 
- static DECLARE_COMPLETION(cpu_running);
--- 
-2.5.0
+Acked-by: Tony Lindgren <tony@atomide.com>
