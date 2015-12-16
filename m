@@ -1,31 +1,51 @@
-From: ulrich.hecht+renesas@gmail.com (Ulrich Hecht)
-Date: Wed, 16 Dec 2015 11:34:21 +0100
-Subject: [PATCH v2 2/2] arm64: dts: r8a7795: fix SATA clock assignment
-In-Reply-To: <1450262061-1441-1-git-send-email-ulrich.hecht+renesas@gmail.com>
-References: <1450262061-1441-1-git-send-email-ulrich.hecht+renesas@gmail.com>
-Message-ID: <1450262061-1441-3-git-send-email-ulrich.hecht+renesas@gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 16 Dec 2015 11:35:32 +0100
+Subject: [PATCH v2 3/3] ARM: bcm2835: Add the auxiliary clocks to the
+ device tree.
+In-Reply-To: <1450222559-22461-3-git-send-email-eric@anholt.net>
+References: <1450222559-22461-1-git-send-email-eric@anholt.net>
+ <1450222559-22461-3-git-send-email-eric@anholt.net>
+Message-ID: <56713E74.3040907@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SATA clock is 815, not 915.
+Hi Eric,
 
-Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
----
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Am 16.12.2015 um 00:35 schrieb Eric Anholt:
+> These will be used for enabling UART1, SPI1, and SPI2.
+>
+> Signed-off-by: Eric Anholt <eric@anholt.net>
+> ---
+>
+> v2: Make the binding cover both the IRQ and clock enable registers.
+>
+>  arch/arm/boot/dts/bcm2835.dtsi | 7 +++++++
+>  1 file changed, 7 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+> index aef64de..a27d40b 100644
+> --- a/arch/arm/boot/dts/bcm2835.dtsi
+> +++ b/arch/arm/boot/dts/bcm2835.dtsi
+> @@ -73,6 +73,13 @@
+>  			clocks = <&clk_osc>;
+>  		};
+>  
+> +		aux: aux at 0x7e215000 {
+> +			compatible = "brcm,bcm2835-aux";
+> +			#clock-cells = <1>;
+> +			reg = <0x7e215000 0x8>;
+> +			clocks = <&clocks BCM2835_CLOCK_VPU>;
+> +		};
+> +
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index 7d4707e..7b02281 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -977,7 +977,7 @@
- 			compatible = "renesas,sata-r8a7795";
- 			reg = <0 0xee300000 0 0x1fff>;
- 			interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&cpg CPG_MOD 915>;
-+			clocks = <&cpg CPG_MOD 815>;
- 			status = "disabled";
- 		};
- 	};
--- 
-2.6.3
+just a nit. Since the nodes should be ordered by address this should
+better go between|||i2c0 and sdhci.
+
+Thanks
+
+Stefan
+
+|
+>  		rng at 7e104000 {
+>  			compatible = "brcm,bcm2835-rng";
+>  			reg = <0x7e104000 0x10>;
