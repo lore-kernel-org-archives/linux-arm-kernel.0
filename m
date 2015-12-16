@@ -1,40 +1,35 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 16 Dec 2015 11:38:52 +0000
-Subject: regmap-mmio and paged registers
-In-Reply-To: <20151209222613.GI3515@piout.net>
-References: <20151209214150.GH3515@piout.net>
- <20151209221036.GK5727@sirena.org.uk>
- <20151209222613.GI3515@piout.net>
-Message-ID: <20151216113852.GG5727@sirena.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 16 Dec 2015 11:39:21 +0000
+Subject: [PATCH v3 2/2] arm64: Use PoU cache instr for I/D coherency
+In-Reply-To: <1450260690-5431-3-git-send-email-ashoks@broadcom.com>
+References: <1450260690-5431-1-git-send-email-ashoks@broadcom.com>
+ <1450260690-5431-3-git-send-email-ashoks@broadcom.com>
+Message-ID: <20151216113920.GC2765@mbp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 09, 2015 at 11:26:13PM +0100, Alexandre Belloni wrote:
-> On 09/12/2015 at 22:10:36 +0000, Mark Brown wrote :
+On Wed, Dec 16, 2015 at 02:11:30AM -0800, Ashok Kumar wrote:
+> @@ -74,13 +79,11 @@ void __sync_icache_dcache(pte_t pte, unsigned long addr)
+>  	if (!page_mapping(page))
+>  		return;
+>  
+> -	if (!test_and_set_bit(PG_dcache_clean, &page->flags)) {
+> -		__flush_dcache_area(page_address(page),
+> -				PAGE_SIZE << compound_order(page));
+> +	if (!test_and_set_bit(PG_dcache_clean, &page->flags))
+> +		sync_icache_aliases(page_address(page),
+> +				    PAGE_SIZE << compound_order(page));
+> +	else if (icache_is_aivivt())
+>  		__flush_icache_all();
+> -	} else if (icache_is_aivivt()) {
+> -		__flush_icache_all();
+> -	}
+>  }
 
-> > Honestly looking at the register I'm not even convinced it is a paged
-> > regmap, it looks more like a mailbox for communication with a
-> > coprocessor than anything else (the fact that the selector is named PID,
-> > the fact that the bitfields include CMD...).  Are you sure that it's a
-> > good idea to represent this as a regmap at all?
+You changed the original code path slightly here. We had a
+__flush_icache_all() even for non-aliasing VIPT but it now does the
+I-cache invalidation per page. It may be an improvement, I can't tell
+without benchmarks but you should at least mention this in the commit
+log so that we remember in the future. Apart from this:
 
-> Yeah, I was probably not clear enough but the regmap actually covers the
-> whole PMC range and include that particular register. We have to do that
-> because this range is used by multiple drivers.
-
-I don't see how that follows?  You can layer anything you like on top of
-a regmap.
-
-> This register, PMC_PCR is also used by multiple drivers so it is
-> important to properly lock between the page selection and the following
-> read or write.
-
-regmaps aren't the only way of sharing access to something - like I say
-there's the mailbox API too.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151216/cb6cfecd/attachment.sig>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
