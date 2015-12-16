@@ -1,99 +1,126 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 16 Dec 2015 16:16:27 +0100
-Subject: [PATCH V2 17/23] acpi,
- mcfg: Implement two calls that might be used to inject/remove MCFG
- region.
+Date: Wed, 16 Dec 2015 16:16:23 +0100
+Subject: [PATCH V2 13/23] x86, ia64,
+ pci: Remove ACPI companion device from platform specific data.
 In-Reply-To: <1450278993-12664-1-git-send-email-tn@semihalf.com>
 References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
-Message-ID: <1450278993-12664-18-git-send-email-tn@semihalf.com>
+Message-ID: <1450278993-12664-14-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lets abstract two calls which allow to inject and remove MCFG regions
-which may come from DSDT table. These calls will be used for x86 and ARM64
-PCI host bridge driver in the later patches.
+Since PCI core code is setting ACPI companion device for us now,
+platform specific ACPI companion device setting turns out to be dead now.
+Therefore we can get rid of it, including related companion reference
+from PCI sysdata structure.
 
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
 ---
- drivers/acpi/mcfg.c      | 38 ++++++++++++++++++++++++++++++++++++++
- include/linux/pci-acpi.h |  9 +++++++++
- 2 files changed, 47 insertions(+)
+ arch/ia64/include/asm/pci.h |  1 -
+ arch/ia64/pci/pci.c         | 16 ----------------
+ arch/x86/include/asm/pci.h  |  3 ---
+ arch/x86/pci/acpi.c         |  2 --
+ arch/x86/pci/irq.c          | 10 ----------
+ 5 files changed, 32 deletions(-)
 
-diff --git a/drivers/acpi/mcfg.c b/drivers/acpi/mcfg.c
-index 3e1e7be..dca4c4e 100644
---- a/drivers/acpi/mcfg.c
-+++ b/drivers/acpi/mcfg.c
-@@ -10,6 +10,7 @@
- #include <linux/acpi.h>
- #include <linux/ecam.h>
- #include <linux/pci.h>
-+#include <linux/pci-acpi.h>
+diff --git a/arch/ia64/include/asm/pci.h b/arch/ia64/include/asm/pci.h
+index 07039d1..5050748 100644
+--- a/arch/ia64/include/asm/pci.h
++++ b/arch/ia64/include/asm/pci.h
+@@ -65,7 +65,6 @@ extern int pci_mmap_legacy_page_range(struct pci_bus *bus,
+ #define pci_legacy_write platform_pci_legacy_write
  
- #define	PREFIX	"MCFG: "
+ struct pci_controller {
+-	struct acpi_device *companion;
+ 	void *iommu;
+ 	int segment;
+ 	int node;		/* nearest node with memory or NUMA_NO_NODE for global allocation */
+diff --git a/arch/ia64/pci/pci.c b/arch/ia64/pci/pci.c
+index 8f6ac2f..978d6af 100644
+--- a/arch/ia64/pci/pci.c
++++ b/arch/ia64/pci/pci.c
+@@ -301,28 +301,12 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+ 	}
  
-@@ -77,6 +78,43 @@ int __init acpi_parse_mcfg(struct acpi_table_header *header)
- 	return 0;
+ 	info->controller.segment = root->segment;
+-	info->controller.companion = device;
+ 	info->controller.node = acpi_get_node(device->handle);
+ 	INIT_LIST_HEAD(&info->io_resources);
+ 	return acpi_pci_root_create(root, &pci_acpi_root_ops,
+ 				    &info->common, &info->controller);
  }
  
-+int pci_mmcfg_setup_map(struct acpi_pci_root_info *ci)
-+{
-+	struct pci_mmcfg_region *cfg;
-+	struct acpi_pci_root *root;
-+	int seg, start, end, err;
-+
-+	root = ci->root;
-+	seg = root->segment;
-+	start = root->secondary.start;
-+	end = root->secondary.end;
-+
-+	cfg = pci_mmconfig_lookup(seg, start);
-+	if (cfg)
-+		return 0;
-+
-+	cfg = pci_mmconfig_alloc(seg, start, end, root->mcfg_addr);
-+	if (!cfg)
-+		return -ENOMEM;
-+
-+	err = pci_mmconfig_inject(cfg);
-+	return err;
-+}
-+
-+void pci_mmcfg_teardown_map(struct acpi_pci_root_info *ci)
-+{
-+	struct acpi_pci_root *root = ci->root;
-+	struct pci_mmcfg_region *cfg;
-+
-+	cfg = pci_mmconfig_lookup(root->segment, root->secondary.start);
-+	if (!cfg)
-+		return;
-+
-+	if (cfg->hot_added)
-+		pci_mmconfig_delete(root->segment, root->secondary.start,
-+				    root->secondary.end);
-+}
-+
- int __init __weak acpi_mcfg_check_entry(struct acpi_table_mcfg *mcfg,
- 					struct acpi_mcfg_allocation *cfg)
+-int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+-{
+-	/*
+-	 * We pass NULL as parent to pci_create_root_bus(), so if it is not NULL
+-	 * here, pci_create_root_bus() has been called by someone else and
+-	 * sysdata is likely to be different from what we expect.  Let it go in
+-	 * that case.
+-	 */
+-	if (!bridge->dev.parent) {
+-		struct pci_controller *controller = bridge->bus->sysdata;
+-		ACPI_COMPANION_SET(&bridge->dev, controller->companion);
+-	}
+-	return 0;
+-}
+-
+ void pcibios_fixup_device_resources(struct pci_dev *dev)
  {
-diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
-index 89ab057..c277415 100644
---- a/include/linux/pci-acpi.h
-+++ b/include/linux/pci-acpi.h
-@@ -79,6 +79,15 @@ extern struct pci_bus *acpi_pci_root_create(struct acpi_pci_root *root,
- void acpi_pci_add_bus(struct pci_bus *bus);
- void acpi_pci_remove_bus(struct pci_bus *bus);
+ 	int idx;
+diff --git a/arch/x86/include/asm/pci.h b/arch/x86/include/asm/pci.h
+index 4625943..a98c022 100644
+--- a/arch/x86/include/asm/pci.h
++++ b/arch/x86/include/asm/pci.h
+@@ -14,9 +14,6 @@
+ struct pci_sysdata {
+ 	int		domain;		/* PCI domain */
+ 	int		node;		/* NUMA node */
+-#ifdef CONFIG_ACPI
+-	struct acpi_device *companion;	/* ACPI companion device */
+-#endif
+ #ifdef CONFIG_X86_64
+ 	void		*iommu;		/* IOMMU private data */
+ #endif
+diff --git a/arch/x86/pci/acpi.c b/arch/x86/pci/acpi.c
+index 56714a9..286e0f5 100644
+--- a/arch/x86/pci/acpi.c
++++ b/arch/x86/pci/acpi.c
+@@ -333,7 +333,6 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+ 		struct pci_sysdata sd = {
+ 			.domain = domain,
+ 			.node = node,
+-			.companion = root->device
+ 		};
  
-+#ifdef	CONFIG_PCI_MMCONFIG
-+int pci_mmcfg_setup_map(struct acpi_pci_root_info *ci);
-+void pci_mmcfg_teardown_map(struct acpi_pci_root_info *ci);
-+#else
-+static inline int pci_mmcfg_setup_map(struct acpi_pci_root_info *ci)
-+{ return 0; }
-+static inline void pci_mmcfg_teardown_map(struct acpi_pci_root_info *ci) { }
-+#endif
-+
- #ifdef	CONFIG_ACPI_PCI_SLOT
- void acpi_pci_slot_init(void);
- void acpi_pci_slot_enumerate(struct pci_bus *bus);
+ 		memcpy(bus->sysdata, &sd, sizeof(sd));
+@@ -348,7 +347,6 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+ 		else {
+ 			info->sd.domain = domain;
+ 			info->sd.node = node;
+-			info->sd.companion = root->device;
+ 			bus = acpi_pci_root_create(root, &acpi_pci_root_ops,
+ 						   &info->common, &info->sd);
+ 		}
+diff --git a/arch/x86/pci/irq.c b/arch/x86/pci/irq.c
+index 7032798..cc62226 100644
+--- a/arch/x86/pci/irq.c
++++ b/arch/x86/pci/irq.c
+@@ -1153,16 +1153,6 @@ void __init pcibios_irq_init(void)
+ 
+ int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+ {
+-	/*
+-	 * We pass NULL as parent to pci_create_root_bus(), so if it is not NULL
+-	 * here, pci_create_root_bus() has been called by someone else and
+-	 * sysdata is likely to be different from what we expect.  Let it go in
+-	 * that case.
+-	 */
+-	if (!bridge->dev.parent) {
+-		struct pci_sysdata *sd = bridge->bus->sysdata;
+-		ACPI_COMPANION_SET(&bridge->dev, sd->companion);
+-	}
+ 	bridge->map_irq = pci_map_irq;
+ 	return 0;
+ }
 -- 
 1.9.1
