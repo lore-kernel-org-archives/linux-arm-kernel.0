@@ -1,58 +1,98 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 16 Dec 2015 16:16:17 +0100
-Subject: [PATCH V2 07/23] pci, acpi,
- mcfg: Provide default RAW ACPI PCI config space accessors.
+Date: Wed, 16 Dec 2015 16:16:20 +0100
+Subject: [PATCH V2 10/23] x86,
+ pci: Cleanup platform specific MCFG data using previously added ECAM
+ hot_added flag.
 In-Reply-To: <1450278993-12664-1-git-send-email-tn@semihalf.com>
 References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
-Message-ID: <1450278993-12664-8-git-send-email-tn@semihalf.com>
+Message-ID: <1450278993-12664-11-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lets keep RAW ACPI PCI config space accessors empty by default,
-since we are note sure if they are necessary accross all archs.
-Once we sort this out, we can provide generic version or let
-architectures to overwrite, like now x86.
+Now that we have hot_added flag and all information in struct acpi_pci_root
+we need, we can get rid of arch specific mcfg data from struct pci_root_info.
 
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
 Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 ---
- drivers/acpi/mcfg.c | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ arch/x86/pci/acpi.c | 36 ++++++++++++++----------------------
+ 1 file changed, 14 insertions(+), 22 deletions(-)
 
-diff --git a/drivers/acpi/mcfg.c b/drivers/acpi/mcfg.c
-index 745b83e..3e1e7be 100644
---- a/drivers/acpi/mcfg.c
-+++ b/drivers/acpi/mcfg.c
-@@ -9,9 +9,30 @@
+diff --git a/arch/x86/pci/acpi.c b/arch/x86/pci/acpi.c
+index 64caf2b..56714a9 100644
+--- a/arch/x86/pci/acpi.c
++++ b/arch/x86/pci/acpi.c
+@@ -12,11 +12,6 @@
+ struct pci_root_info {
+ 	struct acpi_pci_root_info common;
+ 	struct pci_sysdata sd;
+-#ifdef	CONFIG_PCI_MMCONFIG
+-	bool mcfg_added;
+-	u8 start_bus;
+-	u8 end_bus;
+-#endif
+ };
  
- #include <linux/acpi.h>
- #include <linux/ecam.h>
-+#include <linux/pci.h>
+ static bool pci_use_crs = true;
+@@ -180,16 +175,13 @@ static int check_segment(u16 seg, struct device *dev, char *estr)
  
- #define	PREFIX	"MCFG: "
- 
-+/*
-+ * raw_pci_read/write - raw ACPI PCI config space accessors.
-+ *
-+ * By defauly (__weak) these accessors are empty and should be overwritten
-+ * by architectures which support operations on ACPI PCI_Config regions,
-+ * see osl.c file.
-+ */
-+
-+int __weak raw_pci_read(unsigned int domain, unsigned int bus,
-+			unsigned int devfn, int reg, int len, u32 *val)
-+{
-+	return PCIBIOS_DEVICE_NOT_FOUND;
-+}
-+
-+int __weak raw_pci_write(unsigned int domain, unsigned int bus,
-+			 unsigned int devfn, int reg, int len, u32 val)
-+{
-+	return PCIBIOS_DEVICE_NOT_FOUND;
-+}
-+
- int __init acpi_parse_mcfg(struct acpi_table_header *header)
+ static int setup_mcfg_map(struct acpi_pci_root_info *ci)
  {
- 	struct acpi_table_mcfg *mcfg;
+-	int result, seg;
+-	struct pci_root_info *info;
++	int result, seg, start, end;
+ 	struct acpi_pci_root *root = ci->root;
+ 	struct device *dev = &ci->bridge->dev;
+ 
+-	info = container_of(ci, struct pci_root_info, common);
+-	info->start_bus = (u8)root->secondary.start;
+-	info->end_bus = (u8)root->secondary.end;
+-	info->mcfg_added = false;
+-	seg = info->sd.domain;
++	seg = root->segment;
++	start = root->secondary.start;
++	end = root->secondary.end;
+ 
+ 	/* return success if MMCFG is not in use */
+ 	if (raw_pci_ext_ops && raw_pci_ext_ops != &pci_mmcfg)
+@@ -198,13 +190,11 @@ static int setup_mcfg_map(struct acpi_pci_root_info *ci)
+ 	if (!(pci_probe & PCI_PROBE_MMCONF))
+ 		return check_segment(seg, dev, "MMCONFIG is disabled,");
+ 
+-	result = pci_mmconfig_insert(dev, seg, info->start_bus, info->end_bus,
+-				     root->mcfg_addr);
++	result = pci_mmconfig_insert(dev, seg, start, end, root->mcfg_addr);
+ 	if (result == 0) {
+ 		/* enable MMCFG if it hasn't been enabled yet */
+ 		if (raw_pci_ext_ops == NULL)
+ 			raw_pci_ext_ops = &pci_mmcfg;
+-		info->mcfg_added = true;
+ 	} else if (result != -EEXIST)
+ 		return check_segment(seg, dev,
+ 			 "fail to add MMCONFIG information,");
+@@ -214,14 +204,16 @@ static int setup_mcfg_map(struct acpi_pci_root_info *ci)
+ 
+ static void teardown_mcfg_map(struct acpi_pci_root_info *ci)
+ {
+-	struct pci_root_info *info;
++	struct acpi_pci_root *root = ci->root;
++	struct pci_mmcfg_region *cfg;
+ 
+-	info = container_of(ci, struct pci_root_info, common);
+-	if (info->mcfg_added) {
+-		pci_mmconfig_delete(info->sd.domain,
+-				    info->start_bus, info->end_bus);
+-		info->mcfg_added = false;
+-	}
++	cfg = pci_mmconfig_lookup(root->segment, root->secondary.start);
++	if (!cfg)
++		return;
++
++	if (cfg->hot_added)
++		pci_mmconfig_delete(root->segment, root->secondary.start,
++				    root->secondary.end);
+ }
+ #else
+ static int setup_mcfg_map(struct acpi_pci_root_info *ci)
 -- 
 1.9.1
