@@ -1,60 +1,58 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 16 Dec 2015 16:16:19 +0100
-Subject: [PATCH V2 09/23] pci, acpi,
- ecam: Add flag to indicate whether ECAM region was hot added or not.
+Date: Wed, 16 Dec 2015 16:16:17 +0100
+Subject: [PATCH V2 07/23] pci, acpi,
+ mcfg: Provide default RAW ACPI PCI config space accessors.
 In-Reply-To: <1450278993-12664-1-git-send-email-tn@semihalf.com>
 References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
-Message-ID: <1450278993-12664-10-git-send-email-tn@semihalf.com>
+Message-ID: <1450278993-12664-8-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are two ways we can get ECAM (aka MCFG) regions using ACPI,
-from MCFG static table and from _CBA method. We cannot remove static
-regions, however regions coming from _CBA should be removed while removing
-bridge device.
-
-In the light of above we need flag to mark hot added ECAM entries
-so that user should use pci_mmconfig_inject while adding regions from
-_CBA method.
+Lets keep RAW ACPI PCI config space accessors empty by default,
+since we are note sure if they are necessary accross all archs.
+Once we sort this out, we can provide generic version or let
+architectures to overwrite, like now x86.
 
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
 Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 ---
- drivers/pci/ecam.c   | 2 ++
- include/linux/ecam.h | 1 +
- 2 files changed, 3 insertions(+)
+ drivers/acpi/mcfg.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-diff --git a/drivers/pci/ecam.c b/drivers/pci/ecam.c
-index 8a5eef7..da35b4c 100644
---- a/drivers/pci/ecam.c
-+++ b/drivers/pci/ecam.c
-@@ -131,6 +131,7 @@ struct pci_mmcfg_region *pci_mmconfig_alloc(int segment, int start,
- 	new->segment = segment;
- 	new->start_bus = start;
- 	new->end_bus = end;
-+	new->hot_added = false;
+diff --git a/drivers/acpi/mcfg.c b/drivers/acpi/mcfg.c
+index 745b83e..3e1e7be 100644
+--- a/drivers/acpi/mcfg.c
++++ b/drivers/acpi/mcfg.c
+@@ -9,9 +9,30 @@
  
- 	res = &new->res;
- 	res->start = addr + PCI_MMCFG_BUS_OFFSET(start);
-@@ -221,6 +222,7 @@ int pci_mmconfig_inject(struct pci_mmcfg_region *cfg)
- 		err = -ENOMEM;
- 		goto out;
- 	} else {
-+		cfg->hot_added = true;
- 		list_add_sorted(cfg);
- 		pr_info("MMCONFIG at %pR (base %#lx)\n",
- 			&cfg->res, (unsigned long)cfg->address);
-diff --git a/include/linux/ecam.h b/include/linux/ecam.h
-index 813acd1..e0f322e 100644
---- a/include/linux/ecam.h
-+++ b/include/linux/ecam.h
-@@ -17,6 +17,7 @@ struct pci_mmcfg_region {
- 	u8 start_bus;
- 	u8 end_bus;
- 	char name[PCI_MMCFG_RESOURCE_NAME_LEN];
-+	bool hot_added;
- };
+ #include <linux/acpi.h>
+ #include <linux/ecam.h>
++#include <linux/pci.h>
  
- struct pci_mmcfg_region *pci_mmconfig_lookup(int segment, int bus);
+ #define	PREFIX	"MCFG: "
+ 
++/*
++ * raw_pci_read/write - raw ACPI PCI config space accessors.
++ *
++ * By defauly (__weak) these accessors are empty and should be overwritten
++ * by architectures which support operations on ACPI PCI_Config regions,
++ * see osl.c file.
++ */
++
++int __weak raw_pci_read(unsigned int domain, unsigned int bus,
++			unsigned int devfn, int reg, int len, u32 *val)
++{
++	return PCIBIOS_DEVICE_NOT_FOUND;
++}
++
++int __weak raw_pci_write(unsigned int domain, unsigned int bus,
++			 unsigned int devfn, int reg, int len, u32 val)
++{
++	return PCIBIOS_DEVICE_NOT_FOUND;
++}
++
+ int __init acpi_parse_mcfg(struct acpi_table_header *header)
+ {
+ 	struct acpi_table_mcfg *mcfg;
 -- 
 1.9.1
