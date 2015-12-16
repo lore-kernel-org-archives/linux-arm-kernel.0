@@ -1,34 +1,27 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 16 Dec 2015 14:05:56 +0000
-Subject: [PATCH V1 00/11] MMCONFIG refactoring and ARM64 PCI hostbridge
- init based on ACPI
-In-Reply-To: <20151216125136.GE5890@jayachandranc.netlogicmicro.com>
-References: <1445963922-22711-1-git-send-email-tn@semihalf.com>
- <20151207203117.GB14429@localhost>
- <20151209100125.GA12632@jayachandranc.netlogicmicro.com>
- <20151209155511.GB21048@red-moon>
- <20151216125136.GE5890@jayachandranc.netlogicmicro.com>
-Message-ID: <20151216140556.GC22916@red-moon>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 16 Dec 2015 08:04:24 -0600
+Subject: [PATCH V2 1/3] ARM: multi_v7_defconfig: Enable beaglebone PMIC
+ TPS65217
+In-Reply-To: <20151216134541.GA5574@afzalpc>
+References: <1450118580-24754-1-git-send-email-nm@ti.com>
+ <1450118580-24754-2-git-send-email-nm@ti.com> <20151215135100.GA8288@afzalpc>
+ <CAGo_u6pGcKoz_Vw9hWtuDJ8RBr+N4=G0p5RgEAcjheoe4VXhvQ@mail.gmail.com>
+ <20151216134541.GA5574@afzalpc>
+Message-ID: <56716F68.6090701@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 16, 2015 at 06:21:37PM +0530, Jayachandran C. wrote:
-
+On 12/16/2015 07:45 AM, Afzal Mohammed wrote:
 [...]
+> Changelog refers to old beagle bone's, does new ones have a different
+> PMIC ?, i only have white bones ;)
 
-> > That list is there to manage hotplug bridges, what makes you think
-> > it is not necessary ? Jiang (in CC) can certainly comment on that and
-> > how that list handling can be updated/simplified, if possible.
-> 
-> Looking thru the code, I think moving the MCFG code to common can be
-> done in a simpler way. I have posted a new patchset for this.
-> (And I don't see how the hotplug case needs the list, but that is not
->  relevant now)
 
-You must work with Tomasz and come up with a unified patchset that
-implements ACPI PCIe support for ARM64. We do not need more churn, we
-need a working set, period. Posting separate RFCs just adds to the
-confusion and to maintainers' review backlog, with the end result of
-confusing everyone and achieving nothing.
+Blacks seem to boot (see cover-letter) - could be because of default
+configuration of tps65217. From my test log:
+11:    beaglebone-black: BOOT: PASS: err=4 warn=13:
+http://pastebin.ubuntu.com/14008272/
 
-Lorenzo
+-- 
+Regards,
+Nishanth Menon
