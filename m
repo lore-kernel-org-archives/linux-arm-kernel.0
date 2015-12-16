@@ -1,257 +1,66 @@
-From: jchandra@broadcom.com (Jayachandran C)
-Date: Wed, 16 Dec 2015 18:12:35 +0530
-Subject: [RFC PATCH v3 5/5] PCI: ACPI: Add a generic ACPI based host controller
-In-Reply-To: <1450269755-21420-1-git-send-email-jchandra@broadcom.com>
-References: <1450269755-21420-1-git-send-email-jchandra@broadcom.com>
-Message-ID: <1450269755-21420-6-git-send-email-jchandra@broadcom.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 16 Dec 2015 12:27:27 +0000
+Subject: [PATCH 1/2] ASoC: atmel-pdmic: add the Pulse Density Modulation
+ Interface Controller
+In-Reply-To: <1450080940-4123-2-git-send-email-songjun.wu@atmel.com>
+References: <1450080940-4123-1-git-send-email-songjun.wu@atmel.com>
+ <1450080940-4123-2-git-send-email-songjun.wu@atmel.com>
+Message-ID: <20151216122727.GI5727@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a simple ACPI based PCI host controller. This is done by
-providing a simple implementation for pci_acpi_scan_root().
+On Mon, Dec 14, 2015 at 04:15:39PM +0800, Songjun Wu wrote:
 
-The pci_mmcfg_list handling is done by the ACPI code, we
-keep a reference to the pci_mmcfg_region which is already
-mapped.
+> Add driver for the Pulse Density Modulation Interface
+> Controller. It comes with digitallly controlled gain,
+> a High-Pass and a SINCC filter.
 
-This is enabled only for ARM64 now.
+This looks basically OK but there's a *lot* of weird coding style issues
+in here.  It's really all that, nothing too serious that I noticed -
+I've pointed out some of the patterns below not every individual issue.
 
-Signed-off-by: Jayachandran C <jchandra@broadcom.com>
----
- drivers/pci/host/Kconfig         |   7 ++
- drivers/pci/host/Makefile        |   1 +
- drivers/pci/host/pci-host-acpi.c | 193 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 201 insertions(+)
- create mode 100644 drivers/pci/host/pci-host-acpi.c
+> +	for (i = 0; i < ARRAY_SIZE(mic_gain_table); i++) {
+> +		if ((mic_gain_table[i].dgain == dgain_val)
+> +		&& (mic_gain_table[i].scale == scale_val))
+> +			ucontrol->value.integer.value[0] = i;
+> +	}
 
-diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-index f131ba9..8321efc 100644
---- a/drivers/pci/host/Kconfig
-+++ b/drivers/pci/host/Kconfig
-@@ -53,6 +53,13 @@ config PCI_RCAR_GEN2_PCIE
- 	help
- 	  Say Y here if you want PCIe controller support on R-Car Gen2 SoCs.
- 
-+config PCI_HOST_GENERIC_ACPI
-+	bool "Generic ACPI PCI host controller"
-+	depends on ARM64 && ACPI
-+	help
-+	  Say Y here if you want to support a simple generic ACPI PCI host
-+	  controller.
-+
- config PCI_HOST_GENERIC
- 	bool "Generic PCI host controller"
- 	depends on (ARM || ARM64) && OF
-diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
-index 9d4d3c6..bc31852 100644
---- a/drivers/pci/host/Makefile
-+++ b/drivers/pci/host/Makefile
-@@ -6,6 +6,7 @@ obj-$(CONFIG_PCI_MVEBU) += pci-mvebu.o
- obj-$(CONFIG_PCI_TEGRA) += pci-tegra.o
- obj-$(CONFIG_PCI_RCAR_GEN2) += pci-rcar-gen2.o
- obj-$(CONFIG_PCI_RCAR_GEN2_PCIE) += pcie-rcar.o
-+obj-$(CONFIG_PCI_HOST_GENERIC_ACPI) += pci-host-acpi.o
- obj-$(CONFIG_PCI_HOST_GENERIC) += pci-host-generic.o
- obj-$(CONFIG_PCIE_SPEAR13XX) += pcie-spear13xx.o
- obj-$(CONFIG_PCI_KEYSTONE) += pci-keystone-dw.o pci-keystone.o
-diff --git a/drivers/pci/host/pci-host-acpi.c b/drivers/pci/host/pci-host-acpi.c
-new file mode 100644
-index 00000000..cdc259e
---- /dev/null
-+++ b/drivers/pci/host/pci-host-acpi.c
-@@ -0,0 +1,193 @@
-+/*
-+ * Generic PCI host controller driver for ACPI based systems
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ * Copyright (c) 2015 Broadcom Corporation
-+ *
-+ * Based on drivers/pci/host/pci-host-generic.c
-+ * Copyright (C) 2014 ARM Limited
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/pci.h>
-+#include <linux/acpi.h>
-+#include <linux/pci-acpi.h>
-+#include <linux/sfi_acpi.h>
-+#include <linux/slab.h>
-+
-+#define PREFIX			"pci-host-acpi:"
-+
-+/* sysdata pointer is ->root_info */
-+struct gen_acpi_root_info {
-+	struct acpi_pci_root_info	common;
-+	struct pci_mmcfg_region		*mcfg;
-+	bool				mcfg_added;
-+};
-+
-+/* find mapping of a MCFG area */
-+static void __iomem *gen_acpi_map_cfg_bus(struct pci_bus *bus,
-+			unsigned int devfn, int where)
-+{
-+	struct gen_acpi_root_info *pci = bus->sysdata;
-+	struct pci_mmcfg_region *mcfg = pci->mcfg;
-+
-+	if (bus->number < mcfg->start_bus || bus->number > mcfg->end_bus)
-+		return NULL;
-+
-+	return mcfg->virt +
-+		PCI_MMCFG_OFFSET(bus->number - mcfg->start_bus, devfn) +
-+		where;
-+}
-+
-+static struct pci_ops gen_acpi_pci_ops = {
-+	.map_bus	= gen_acpi_map_cfg_bus,
-+	.read		= pci_generic_config_read,
-+	.write		= pci_generic_config_write,
-+};
-+
-+/* Insert the ECFG area for a root bus */
-+static int pci_acpi_root_init_info(struct acpi_pci_root_info *ci)
-+{
-+	struct gen_acpi_root_info *info;
-+	struct acpi_pci_root *root = ci->root;
-+	struct device *dev = &ci->bridge->dev;
-+	int err;
-+
-+	info = container_of(ci, struct gen_acpi_root_info, common);
-+	err = pci_mmconfig_insert(dev, root->segment, root->secondary.start,
-+			root->secondary.end, root->mcfg_addr);
-+	if (err && err != -EEXIST)
-+		return err;
-+
-+	info->mcfg = pci_mmconfig_lookup(root->segment, root->secondary.start);
-+	WARN_ON(info->mcfg == NULL);
-+	info->mcfg_added = (err == -EEXIST);
-+	return 0;
-+}
-+
-+static void pci_acpi_root_release_info(struct acpi_pci_root_info *ci)
-+{
-+	struct gen_acpi_root_info *info;
-+	struct acpi_pci_root *root = ci->root;
-+
-+	info = container_of(ci, struct gen_acpi_root_info, common);
-+	if (info->mcfg_added)
-+		pci_mmconfig_delete(root->segment, root->secondary.start,
-+					root->secondary.end);
-+	info->mcfg = NULL;
-+}
-+
-+static struct acpi_pci_root_ops pci_acpi_root_ops = {
-+	.pci_ops = &gen_acpi_pci_ops,
-+	.init_info = pci_acpi_root_init_info,
-+	.release_info = pci_acpi_root_release_info,
-+};
-+
-+struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
-+{
-+	struct acpi_device *device = root->device;
-+	struct gen_acpi_root_info *ri;
-+	struct pci_bus *bus, *child;
-+
-+	/* allocate acpi_info/sysdata */
-+	ri = devm_kzalloc(&device->dev, sizeof(*ri), GFP_KERNEL);
-+	if (!ri) {
-+		dev_err(&device->dev,
-+			"pci_bus %04x:%02x: ignored (out of memory)\n",
-+			root->segment, (int)root->secondary.start);
-+		return NULL;
-+	}
-+
-+	bus =  acpi_pci_root_create(root, &pci_acpi_root_ops,
-+					&ri->common, ri);
-+	if (!bus) {
-+		dev_err(&device->dev, "Scanning rootbus failed");
-+		return NULL;
-+	}
-+
-+	list_for_each_entry(child, &bus->children, node)
-+		pcie_bus_configure_settings(child);
-+
-+	return bus;
-+}
-+
-+void __init pci_mmcfg_late_init(void)
-+{
-+	int err;
-+
-+	err = pci_mmconfig_parse_table();
-+	if (err)
-+		pr_err(PREFIX " Failed to parse MCFG (%d)\n", err);
-+}
-+
-+int raw_pci_read(unsigned int seg, unsigned int bus,
-+		  unsigned int devfn, int reg, int len, u32 *val)
-+{
-+	struct pci_mmcfg_region *mcfg;
-+	void __iomem *addr;
-+	int err = -EINVAL;
-+
-+	rcu_read_lock();
-+	mcfg = pci_mmconfig_lookup(seg, bus);
-+	if (!mcfg || !mcfg->virt)
-+		goto err;
-+
-+	addr = mcfg->virt + PCI_MMCFG_OFFSET(bus, devfn);
-+	switch (len) {
-+	case 1:
-+		*val = readb(addr + reg);
-+		break;
-+	case 2:
-+		*val = readw(addr + reg);
-+		break;
-+	case 4:
-+		*val = readl(addr + reg);
-+		break;
-+	}
-+	err = 0;
-+err:
-+	rcu_read_unlock();
-+	return err;
-+}
-+
-+int raw_pci_write(unsigned int seg, unsigned int bus,
-+		unsigned int devfn, int reg, int len, u32 val)
-+{
-+	struct pci_mmcfg_region *mcfg;
-+	void __iomem *addr;
-+	int err = -EINVAL;
-+
-+	rcu_read_lock();
-+	mcfg = pci_mmconfig_lookup(seg, bus);
-+	if (!mcfg || !mcfg->virt)
-+		goto err;
-+
-+	addr = mcfg->virt + PCI_MMCFG_OFFSET(bus, devfn);
-+	switch (len) {
-+	case 1:
-+		writeb(val, addr + reg);
-+		break;
-+	case 2:
-+		writew(val, addr + reg);
-+		break;
-+	case 4:
-+		writel(val, addr + reg);
-+		break;
-+	}
-+	err = 0;
-+err:
-+	rcu_read_unlock();
-+	return err;
-+}
--- 
-1.9.1
+This indentation is really weird, why is the && aligned with the if?
+
+> +	snd_soc_update_bits(codec, PDMIC_DSPR1,
+> +		PDMIC_DSPR1_OFFSET_MASK,
+> +		(u32)(dd->pdata->mic_offset << PDMIC_DSPR1_OFFSET_SHIFT));
+
+These are weird too, I'd expect the second line to be part of the first.
+
+> +static struct regmap *atmel_pdmic_codec_get_remap(struct device *dev)
+> +{
+> +	return dev_get_regmap(dev, NULL);
+> +}
+
+This is (or should be) the default in the core.
+
+> +	if ((fs < rate_min) || (fs > rate_max)) {
+> +		dev_err(codec->dev,
+> +		"sample rate is %dHz, min rate is %dHz, max rate is %dHz\n",
+> +		fs, rate_min, rate_max);
+
+This too, alignment after the (.
+
+> +	if (bits == 16)
+> +		dspr0_val = (PDMIC_DSPR0_SIZE_16_BITS
+> +				<< PDMIC_DSPR0_SIZE_SHIFT);
+> +	else if (bits == 32)
+> +		dspr0_val = (PDMIC_DSPR0_SIZE_32_BITS
+> +				<< PDMIC_DSPR0_SIZE_SHIFT);
+> +	else
+> +		return -EINVAL;
+
+This looks like it should be a switch statement.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151216/93c05879/attachment.sig>
