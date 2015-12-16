@@ -1,43 +1,87 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 16 Dec 2015 11:15:25 +0000
-Subject: [PATCH 1/2] arm64: Improve error reporting on set_pte_at() checks
-In-Reply-To: <CA+=Sn1kQBoLCY_AidPXPU-2dkqGcfDfZtcnk1gzEukttZ+foOQ@mail.gmail.com>
-References: <CA+=Sn1kQBoLCY_AidPXPU-2dkqGcfDfZtcnk1gzEukttZ+foOQ@mail.gmail.com>
-Message-ID: <567147CD.6090404@arm.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 16 Dec 2015 12:21:48 +0100
+Subject: [PATCH v2 1/3] reset: Add shared reset_control_[de]assert variants
+In-Reply-To: <20151216102934.GR19456@lukather>
+References: <1449848520-27379-1-git-send-email-hdegoede@redhat.com>
+ <20151214093607.GF19456@lukather> <1450086655.3407.23.camel@pengutronix.de>
+ <20151216102934.GR19456@lukather>
+Message-ID: <1450264908.3421.36.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Hi Maxime,
 
-On 16/12/15 03:01, Andrew Pinski wrote:
-> On Tue, Dec 9, 2015 at 17:26:56, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
->>
->> Currently the BUG_ON() checks do not give enough information about the PTEs being set. This patch changes BUG_ON to WARN_ONCE and dumps the values of the old and new PTEs.
+Am Mittwoch, den 16.12.2015, 11:29 +0100 schrieb Maxime Ripard:
+> On Mon, Dec 14, 2015 at 10:50:55AM +0100, Philipp Zabel wrote:
+> > Am Montag, den 14.12.2015, 10:36 +0100 schrieb Maxime Ripard:
+> > > Hi,
+> > > 
+> > > On Fri, Dec 11, 2015 at 04:41:58PM +0100, Hans de Goede wrote:
+> > > > diff --git a/include/linux/reset.h b/include/linux/reset.h
+> > > > index c4c097d..1cca8ce 100644
+> > > > --- a/include/linux/reset.h
+> > > > +++ b/include/linux/reset.h
+> > > > @@ -11,6 +11,8 @@ int reset_control_reset(struct reset_control *rstc);
+> > > >  int reset_control_assert(struct reset_control *rstc);
+> > > >  int reset_control_deassert(struct reset_control *rstc);
+> > > >  int reset_control_status(struct reset_control *rstc);
+> > > > +int reset_control_assert_shared(struct reset_control *rstc);
+> > > > +int reset_control_deassert_shared(struct reset_control *rstc);
+> > > 
+> > > Shouldn't that be handled in reset_control_get directly?
+
+I think I see your point now. Maybe we should add a flags parameter to
+reset_control_get and/or wrap it in two versions,
+reset_control_get_exclusive and reset_control_get_shared (or just add
+the _shared variant). Then reset_control_get(_exclusive) could return
+-EBUSY if a reset line is already in use.
+
+> > This is about different expectations of the caller.
+> > A driver calling reset_control_assert expects the reset line to be
+> > asserted after the call.
 > 
+> Is that behaviour documented explicitly somewhere?
+
+/**                                                                                                                                           
+ * reset_control_assert - asserts the reset line
+ * @rstc: reset controller
+ */
+
+Also, that expected behavior matches the function name, which I like.
+So I still welcome adding new API calls for the shared/refcounting
+variant.
+
+> > A driver calling reset_control_assert_shared
+> > just signals that it doesn't care about the state of the reset line
+> > anymore.
+> > We could just as well call the two new functions
+> > reset_control_deassert_get and reset_control_deassert_put.
 > 
-> This change broke building the mantis driver:
-> 
-> In file included from ./arch/arm64/include/asm/io.h:30:0,
->                  from drivers/media/pci/mantis/mantis_i2c.c:21:
-> ./arch/arm64/include/asm/pgtable.h: In function ?set_pte_at?:
-> ./arch/arm64/include/asm/pgtable.h:281:3: error: implicit declaration
-> of function ?BUILD_BUG_ON_INVALID?
-> [-Werror=implicit-function-declaration]
->    VM_WARN_ONCE(!pte_young(pte),
->    ^
+> What happens if you mix them? What happens if you have several drivers
+> ignoring this API?
 
-This is due to a missing include in include/linux/mmdebug.h, which
-Julien Grall saw with CONFIG_XEN & !CONFIG_DEBUG_VM. There was some
-discussion at [0], and a patch at [1].
+The core should give useful error messages and disallow non-shared reset
+calls on shared lines.
 
-The quick-and-dirty workaround is to toggle CONFIG_DEBUG_VM. It should
-be fixed in the next rc.
+> The current default API totally allows to have several drivers getting
+> the same reset line, and happily poking that reset line without any
+> way for the others to A) know they're not the single users B) let them
+> know their device has been reset.
 
+That's why I'd like the WARN_ON and error return in reset_control_* when
+the reset_line reference count is > 1.
 
-Thanks,
+> And not being able to tell at the consumer level if and when our
+> device is going to be reset behind our back is a big issue. Because
+> then, we simply have to expect it can be reset at any point in time,
+> good luck writing a driver with that expectation.
 
-James
+Yes, that is unacceptable.
 
-[0] https://lkml.org/lkml/2015/12/14/489
-[1] http://www.spinics.net/lists/linux-mm/msg98868.html
+> The reset framework should make sure that the shared case is an
+> exception, and not the default case (and make sure that it cannot
+> happen in the default case). Just like for any other framework with
+> similar resources constraints.
+
+regards
+Philipp
