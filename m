@@ -1,66 +1,76 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Wed, 16 Dec 2015 16:06:49 +0800
-Subject: [PATCH v7 19/19] KVM: ARM64: Add a new kvm ARM PMU device
-In-Reply-To: <56711348.6010406@huawei.com>
-References: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
- <1450169379-12336-20-git-send-email-zhaoshenglong@huawei.com>
- <567032AD.8000206@arm.com> <567036DE.80605@linaro.org>
- <567038E3.3010102@arm.com> <20151215204739.GK4120@cbox>
- <56711348.6010406@huawei.com>
-Message-ID: <56711B99.1000608@huawei.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Wed, 16 Dec 2015 16:27:16 +0800
+Subject: [PATCH 0/5] Kylin-board is based on RK3036 SOCs, add the initiation
+Message-ID: <1450254441-3243-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+version for working.
 
-On 2015/12/16 15:31, Shannon Zhao wrote:
->>>> >> > But in this case, you're returning an error if it is *not* initialized.
->>>> >> > I understand that in that case you cannot return an interrupt number (-1
->>>> >> > would be weird), but returning -EBUSY feels even more weird.
->>>> >> > 
->>>> >> > I'd settle for -ENOXIO, or something similar. Anyone having a better idea?
->>>> >> > 
->> > ENXIO or ENODEV would be my choice too, and add that to the
->> > Documentation clearly describing when this error code is used.
->> > 
->> > By the way, why do you loop over all VCPUS to set the same value when
->> > you can't do anything per VCPU anyway?  It seems to me it's either a
->> > per-VM property (that you can store on the VM data structure) or it's a
->> > true per-VCPU property?
-> This is a per-VCPU property. PMU interrupt could be PPI or SPI. For PPI
-> the interrupt numbers are same for each vcpu, while for SPI they are
-> different, so it needs to set them separately. I planned to support both
-> PPI and SPI. I think I should add support for SPI at this moment and let
-> users (QEMU) to set these interrupts for each one.
+This series pacthes have the following decriptions:
 
-How about below vPMU Documentation?
+PATCH[1/5]:
+clk: rockchip: rk3036: include downstream muxes into fractional dividers
 
-ARM Virtual Performance Monitor Unit (vPMU)
-===========================================
+This patch is depend on Heiko's series pacthes.
 
-Device types supported:
-  KVM_DEV_TYPE_ARM_PMU_V3         ARM Performance Monitor Unit v3
+a8a1de6 clk: rockchip: include downstream muxes into fractional dividers
+(https://patchwork.kernel.org/patch/7053071/)
+ab40856 clk: rockchip: handle mux dependency of fractional dividers
+(https://patchwork.kernel.org/patch/7053051/)
+c4c5582 clk: add flag for clocks that need to be enabled on rate changes
+(https://patchwork.kernel.org/patch/7053041/)
+---
 
-Instantiate one PMU instance for per VCPU through this API.
+PATCH[2/5]:
+0a68e13 clk: rockchip: rk3036: enable the CLK_IGNORE_UNUSED flag for aclk_vio
+The aclk_vio is marked as the ignore_unused since it's the noc clock.
+let will fix the display issue.
+---
 
-Groups:
-  KVM_DEV_ARM_PMU_GRP_IRQ
-  Attributes:
-    The attr field of kvm_device_attr encodes two values:
-    bits:     | 63 .... 32 | 31 .... 0 |
-    values:   | vcpu_index |  irq_num  |
-    The irq_num describes the PMU overflow interrupt number for the
-specified
-    vcpu_index vcpu. This interrupt could be a PPI or SPI, but for one
-VM the
-    interrupt type must be same for each vcpu.
+PATCH[3/5]:
+183a5eb ARM: dts: rockchip: update the core dts for rk3036
+Update the rk3036 core dtsi, add the hdmi, lcdc, sdmmc, sdio .... node info
+for rk3036, in general the function is verified by the UARL[0].
 
-  Errors:
-    -ENXIO: Getting or setting this attribute is not yet supported
-    -ENODEV: Getting the PMU overflow interrupt number while it's not set
-    -EBUSY: The PMU overflow interrupt is already set
-    -EINVAL: Invalid vcpu_index or irq_num supplied
+UARL[0]:https://github.com/rockchip-linux/kernel/ -b develop-v4.1
+---
 
+PATCH[4/5]:
+962e1ad ARM: dts: rockchip: add the kylin board for rk3036
+Add the rk3036-kylin dts for Kylin-board.
+---
+
+PATCH[5/5]:
+d96f13a ARM: config: Add the rk3036 configure for kylin board
+Add the defconfig for Kylin-board to better to know about that.
+
+Note: I don't plan to upstream for this patch. :)
+---
+
+The game is just beginning ....
+
+
+
+Caesar Wang (4):
+  clk: rockchip: rk3036: include downstream muxes into fractional
+    dividers
+  ARM: dts: rockchip: update the core dts for rk3036
+  ARM: dts: rockchip: add the kylin board for rk3036
+  ARM: config: Add the rk3036 configure for kylin board
+
+Yakir Yang (1):
+  clk: rockchip: rk3036: enable the CLK_IGNORE_UNUSED flag for aclk_vio
+
+ Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/rk3036-kylin.dts                 | 302 +++++++++++++++++++++
+ arch/arm/boot/dts/rk3036.dtsi                      | 225 ++++++++++++++-
+ arch/arm/configs/rk3036_kylin_defconfig            | 230 ++++++++++++++++
+ drivers/clk/rockchip/clk-rk3036.c                  |  37 +--
+ 6 files changed, 777 insertions(+), 22 deletions(-)
+ create mode 100644 arch/arm/boot/dts/rk3036-kylin.dts
+ create mode 100644 arch/arm/configs/rk3036_kylin_defconfig
 
 -- 
-Shannon
+1.9.1
