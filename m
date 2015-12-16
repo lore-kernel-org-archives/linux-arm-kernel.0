@@ -1,73 +1,35 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 16 Dec 2015 11:02:10 +0200
-Subject: [PATCHv2] clk: ti: omap5+: dpll: implement errata i810
-Message-ID: <1450256530-10251-1-git-send-email-t-kristo@ti.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 16 Dec 2015 10:01:59 +0100
+Subject: [PATCH] clocksource/drivers/pistachio: Fix wrong calculated
+ clocksource read value
+In-Reply-To: <20151216152807.23491eee@xhacker>
+References: <1448466169-5230-1-git-send-email-jszhang@marvell.com>
+ <56707F32.3030405@linaro.org> <20151216151125.1e91b4f4@xhacker>
+ <20151216152807.23491eee@xhacker>
+Message-ID: <56712887.5090506@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Errata i810 states that DPLL controller can get stuck while transitioning
-to a power saving state, while its M/N ratio is being re-programmed.
+On 12/16/2015 08:28 AM, Jisheng Zhang wrote:
+> On Wed, 16 Dec 2015 15:11:25 +0800
+> Jisheng Zhang  wrote:
+>
+>> Dear Daniel,
+>>
+>> On Tue, 15 Dec 2015 21:59:30 +0100 Daniel Lezcano wrote:
+>>
+>>> On 11/25/2015 04:42 PM, Jisheng Zhang wrote:
+>>>> Let's assume the counter value is 0xf000000, the pistachio clocksource
+>
+> oops, sorry, should be 0xf0000000. Do I need to send a v2 patch?
 
-As a workaround, before re-programming the M/N ratio, SW has to ensure
-the DPLL cannot start an idle state transition. SW can disable DPLL
-idling by setting the DPLL AUTO_DPLL_MODE=0 or keeping a clock request
-active by setting a dependent clock domain in SW_WKUP.
+Nope, I fixed it.
 
-This errata is known to impact OMAP5 and DRA7 chips, but lets enable it
-unconditionally to avoid any potential problems with earlier generation
-SoCs also.
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
-v2: made the fix to be applied unconditionally on all OMAP3+ SoCs
 
- drivers/clk/ti/dpll3xxx.c |   20 +++++++++++++++++++-
- 1 file changed, 19 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/clk/ti/dpll3xxx.c b/drivers/clk/ti/dpll3xxx.c
-index f4dec00..cb26eb8 100644
---- a/drivers/clk/ti/dpll3xxx.c
-+++ b/drivers/clk/ti/dpll3xxx.c
-@@ -305,7 +305,7 @@ static void _lookup_sddiv(struct clk_hw_omap *clk, u8 *sd_div, u16 m, u8 n)
- static int omap3_noncore_dpll_program(struct clk_hw_omap *clk, u16 freqsel)
- {
- 	struct dpll_data *dd = clk->dpll_data;
--	u8 dco, sd_div;
-+	u8 dco, sd_div, ai = 0;
- 	u32 v;
- 
- 	/* 3430 ES2 TRM: 4.7.6.9 DPLL Programming Sequence */
-@@ -350,6 +350,21 @@ static int omap3_noncore_dpll_program(struct clk_hw_omap *clk, u16 freqsel)
- 		v |= sd_div << __ffs(dd->sddiv_mask);
- 	}
- 
-+	/*
-+	 * Errata i810 - DPLL controller can get stuck while transitioning
-+	 * to a power saving state. Software must ensure the DPLL can not
-+	 * transition to a low power state while changing M/N values.
-+	 * Easiest way to accomplish this is to prevent DPLL autoidle
-+	 * before doing the M/N re-program.
-+	 */
-+	ai = omap3_dpll_autoidle_read(clk);
-+	if (ai) {
-+		omap3_dpll_deny_idle(clk);
-+
-+		/* OCP barrier */
-+		omap3_dpll_autoidle_read(clk);
-+	}
-+
- 	ti_clk_ll_ops->clk_writel(v, dd->mult_div1_reg);
- 
- 	/* Set 4X multiplier and low-power mode */
-@@ -379,6 +394,9 @@ static int omap3_noncore_dpll_program(struct clk_hw_omap *clk, u16 freqsel)
- 
- 	_omap3_noncore_dpll_lock(clk);
- 
-+	if (ai)
-+		omap3_dpll_allow_idle(clk);
-+
- 	return 0;
- }
- 
 -- 
-1.7.9.5
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
