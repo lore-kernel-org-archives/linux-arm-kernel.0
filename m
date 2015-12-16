@@ -1,39 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 16 Dec 2015 09:33:40 +0000
-Subject: [PATCH] clocksource/drivers/pistachio: Fix wrong calculated
- clocksource read value
-In-Reply-To: <56712D33.5080009@linaro.org>
-References: <1448466169-5230-1-git-send-email-jszhang@marvell.com>
- <56707F32.3030405@linaro.org> <20151216151125.1e91b4f4@xhacker>
- <20151216152807.23491eee@xhacker> <20151216153609.0f09f941@xhacker>
- <56712D33.5080009@linaro.org>
-Message-ID: <20151216093340.GD8644@n2100.arm.linux.org.uk>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 16 Dec 2015 10:55:57 +0100
+Subject: [PATCH 4/6] pinctrl: sh-pfc: r8a7795: Add SATA support
+In-Reply-To: <1450107758-2544-5-git-send-email-ulrich.hecht+renesas@gmail.com>
+References: <1450107758-2544-1-git-send-email-ulrich.hecht+renesas@gmail.com>
+ <1450107758-2544-5-git-send-email-ulrich.hecht+renesas@gmail.com>
+Message-ID: <CAMuHMdWs-mfMH+JHvGX3e26A_hnSScw1kNrLr-xYJxuuX_7eUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 16, 2015 at 10:21:55AM +0100, Daniel Lezcano wrote:
-> On 12/16/2015 08:36 AM, Jisheng Zhang wrote:
-> >And in fact, clocksource_mmio_readw_down() also has similar issue, but it masks
-> >with c->mask before return, the c->mask is less than 32 bit (because the
-> >clocksource_mmio_init think number of valid bits > 32 or < 16 is invalid.)
-> >the higher 32 bits are masked off, so we never saw such issue. But we'd better
-> >to fix that, what's your opinion?
-> 
-> I think we should have a look to this portion closely.
+On Mon, Dec 14, 2015 at 4:42 PM, Ulrich Hecht
+<ulrich.hecht+renesas@gmail.com> wrote:
+> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+>
+> This patch adds SATA0 pinmux support to r8a7795 SoC.
+>
+> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> [uli: adjusted for new PFC driver]
+> Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 
-There is no need to return more bits than are specified.  If you have
-a N-bit counter, then the high (64-N)-bits can be any value, because:
+Thanks, queued for v4.5.
 
-static inline cycle_t clocksource_delta(cycle_t now, cycle_t last, cycle_t mask)
-{
-        return (now - last) & mask;
-}
+Gr{oetje,eeting}s,
 
-where 'now' is the current value returned from the clock source read
-function, 'last' is a previously returned value, and 'mask' is the
-bit mask.  This has the effect of ignoring the high order bits.
+                        Geert
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
