@@ -1,98 +1,43 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 16 Dec 2015 16:16:20 +0100
-Subject: [PATCH V2 10/23] x86,
- pci: Cleanup platform specific MCFG data using previously added ECAM
- hot_added flag.
+Date: Wed, 16 Dec 2015 16:16:21 +0100
+Subject: [PATCH V2 11/23] arm64,
+ pci: Remove useless boot time IRQ assignment when booting with DT.
 In-Reply-To: <1450278993-12664-1-git-send-email-tn@semihalf.com>
 References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
-Message-ID: <1450278993-12664-11-git-send-email-tn@semihalf.com>
+Message-ID: <1450278993-12664-12-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have hot_added flag and all information in struct acpi_pci_root
-we need, we can get rid of arch specific mcfg data from struct pci_root_info.
+In order to probe PCIe host controller when booting with DT,
+ARM64 is using drivers which defer IRQ assignment to device
+enable time. It means that boot time DT specific irq map initialization
+is always overridden, so lets remove that code.
 
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 ---
- arch/x86/pci/acpi.c | 36 ++++++++++++++----------------------
- 1 file changed, 14 insertions(+), 22 deletions(-)
+ arch/arm64/kernel/pci.c | 10 ----------
+ 1 file changed, 10 deletions(-)
 
-diff --git a/arch/x86/pci/acpi.c b/arch/x86/pci/acpi.c
-index 64caf2b..56714a9 100644
---- a/arch/x86/pci/acpi.c
-+++ b/arch/x86/pci/acpi.c
-@@ -12,11 +12,6 @@
- struct pci_root_info {
- 	struct acpi_pci_root_info common;
- 	struct pci_sysdata sd;
--#ifdef	CONFIG_PCI_MMCONFIG
--	bool mcfg_added;
--	u8 start_bus;
--	u8 end_bus;
--#endif
- };
- 
- static bool pci_use_crs = true;
-@@ -180,16 +175,13 @@ static int check_segment(u16 seg, struct device *dev, char *estr)
- 
- static int setup_mcfg_map(struct acpi_pci_root_info *ci)
- {
--	int result, seg;
--	struct pci_root_info *info;
-+	int result, seg, start, end;
- 	struct acpi_pci_root *root = ci->root;
- 	struct device *dev = &ci->bridge->dev;
- 
--	info = container_of(ci, struct pci_root_info, common);
--	info->start_bus = (u8)root->secondary.start;
--	info->end_bus = (u8)root->secondary.end;
--	info->mcfg_added = false;
--	seg = info->sd.domain;
-+	seg = root->segment;
-+	start = root->secondary.start;
-+	end = root->secondary.end;
- 
- 	/* return success if MMCFG is not in use */
- 	if (raw_pci_ext_ops && raw_pci_ext_ops != &pci_mmcfg)
-@@ -198,13 +190,11 @@ static int setup_mcfg_map(struct acpi_pci_root_info *ci)
- 	if (!(pci_probe & PCI_PROBE_MMCONF))
- 		return check_segment(seg, dev, "MMCONFIG is disabled,");
- 
--	result = pci_mmconfig_insert(dev, seg, info->start_bus, info->end_bus,
--				     root->mcfg_addr);
-+	result = pci_mmconfig_insert(dev, seg, start, end, root->mcfg_addr);
- 	if (result == 0) {
- 		/* enable MMCFG if it hasn't been enabled yet */
- 		if (raw_pci_ext_ops == NULL)
- 			raw_pci_ext_ops = &pci_mmcfg;
--		info->mcfg_added = true;
- 	} else if (result != -EEXIST)
- 		return check_segment(seg, dev,
- 			 "fail to add MMCONFIG information,");
-@@ -214,14 +204,16 @@ static int setup_mcfg_map(struct acpi_pci_root_info *ci)
- 
- static void teardown_mcfg_map(struct acpi_pci_root_info *ci)
- {
--	struct pci_root_info *info;
-+	struct acpi_pci_root *root = ci->root;
-+	struct pci_mmcfg_region *cfg;
- 
--	info = container_of(ci, struct pci_root_info, common);
--	if (info->mcfg_added) {
--		pci_mmconfig_delete(info->sd.domain,
--				    info->start_bus, info->end_bus);
--		info->mcfg_added = false;
--	}
-+	cfg = pci_mmconfig_lookup(root->segment, root->secondary.start);
-+	if (!cfg)
-+		return;
-+
-+	if (cfg->hot_added)
-+		pci_mmconfig_delete(root->segment, root->secondary.start,
-+				    root->secondary.end);
+diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+index 023b983..f7948f5 100644
+--- a/arch/arm64/kernel/pci.c
++++ b/arch/arm64/kernel/pci.c
+@@ -51,16 +51,6 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
+ 	return pci_enable_resources(dev, mask);
  }
- #else
- static int setup_mcfg_map(struct acpi_pci_root_info *ci)
+ 
+-/*
+- * Try to assign the IRQ number from DT when adding a new device
+- */
+-int pcibios_add_device(struct pci_dev *dev)
+-{
+-	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+-
+-	return 0;
+-}
+-
+ #ifdef CONFIG_ACPI
+ /* Root bridge scanning */
+ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
 -- 
 1.9.1
