@@ -1,32 +1,29 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 16 Dec 2015 16:38:09 +0100
-Subject: [PATCH 0/3] pwm: bcm2835: improve clock handling
-In-Reply-To: <1449010541-3767-1-git-send-email-stefan.wahren@i2se.com>
-References: <1449010541-3767-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <20151216153809.GC28947@ulmo>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 16 Dec 2015 16:43:52 +0100
+Subject: block layer bug with 4.4-rc3+
+In-Reply-To: <56717B6F.2040008@arm.com>
+References: <566FF3ED.1000503@arm.com>
+ <CACVXFVN3w0Y_8k3TiKoGytbayXiB+mRhgDn-OueV2+e93i=4AQ@mail.gmail.com>
+ <56717B6F.2040008@arm.com>
+Message-ID: <1885710.UNGYhDGGcI@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 01, 2015 at 10:55:38PM +0000, Stefan Wahren wrote:
-> With the upcoming PWM clock support the pwm-bcm2835 should take
-> more care about the clock handling. But this patch series doesn't
-> depend on these clock driver changes.
+On Wednesday 16 December 2015 14:55:43 Andre Przywara wrote:
+> Using the plain multi_v7_defconfig (which doesn't have LPAE and makes me
+> loose half of the RAM on that box) didn't show the bug so far.
+> One of the effects of turning on LPAE is that dma_addr_t and phys_addr_t
+> turn to 64-bit, with long, int and void* still being 32-bit. Can you
+> think of any issues that could be related to that?
 > 
-> Stefan Wahren (3):
->   pwm: bcm2835: calculate scaler in pwm_config
->   pwm: bcm2835: prevent division by zero
->   pwm: bcm2835: fix email address specifiction
-> 
->  drivers/pwm/pwm-bcm2835.c |   18 ++++++++++++------
->  1 file changed, 12 insertions(+), 6 deletions(-)
 
-All three patches applied with Eric's Reviewed-by, thanks.
+Another difference between the platforms is highmem. On Midway,
+almost all of RAM is highmem, which needs a lot of special handling
+that we don't need on platform with less RAM.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151216/973a08fa/attachment-0001.sig>
+To rule out both of highmem and LPAE, it might be interesting to
+test again on Midway with CONFIG_HIGHMEM and CONFIG_LPAE disabled.
+This will limit the RAM to 768MB, but if the bug still shows up,
+you know it's something else.
+
+	Arnd
