@@ -1,69 +1,51 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Wed, 16 Dec 2015 14:36:18 -0700
-Subject: [PATCH RFC 02/27] PM / Domains: Allow domain power states to be
- read from DT
-In-Reply-To: <566FE652.1030602@baylibre.com>
-References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
- <1447799871-56374-3-git-send-email-lina.iyer@linaro.org>
- <CAPDyKFrZFMfE9XNRS8CpTPXU6fzfY9wv0cn+DTcg=SUnDyUQ0A@mail.gmail.com>
- <566FE652.1030602@baylibre.com>
-Message-ID: <20151216213618.GA3342@linaro.org>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Wed, 16 Dec 2015 13:51:10 -0800
+Subject: arm-soc boot: 320 boots: 12 failed,
+ 308 passed (v4.4-rc3-483-gb48b5ceb7227)
+In-Reply-To: <5276296.zVv1bjCjBz@wuerfel>
+References: <567128b4.46b71c0a.17f65.7531@mx.google.com>
+ <1746045.ErmxH37Pke@wuerfel>
+ <CANMBJr6oi5mrUnzTG8J=C69K5ra93MQDjoVP7ef+1oB1RPpGuQ@mail.gmail.com>
+ <5276296.zVv1bjCjBz@wuerfel>
+Message-ID: <CANMBJr4h3JDJk6eufdirvy9fVxBGZUA4zu5e5mtfGdUF13qLwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 15 2015 at 03:07 -0700, Marc Titinger wrote:
->On 10/12/2015 17:53, Ulf Hansson wrote:
->>On 17 November 2015 at 23:37, Lina Iyer <lina.iyer@linaro.org> wrote:
-
->>>Similarly, devices can register power-states into the cluster domain, in
->>>a manner consistent with idle-states.
+On 16 December 2015 at 12:16, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 16 December 2015 11:34:30 Tyler Baker wrote:
+>> > * bcm4708-smartrg-sr400ac doesn't find its rootfs any more
+>> >
+>> > [   16.670994] No filesystem could mount root, tried:  ext3 ext2 ext4 squashfs vfat msdos ntfs
+>> > [   16.679388] Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(1,0)
+>> >
+>> >   I merged some patches from Florian yesterday, but it could also be a problem with
+>> >   the defconfig changes
 >>
->>I don't get this. Can you please elaborate?
->
->
->Alexes addition of "power states" to the power domains was to have a 
->better representation of features of power controllers. For instance 
->QoS may prevent to enter/exit complete power-off, but setting the core 
->voltage to say 0.7v is feasible in terms of timing, and still better 
->than full-power-on etc... Hence the domain has a list of possible 
->states to chose upon, between full power-on and full-power-off, and 
->genpd will call the platform code for this.
->
->Now, this patch maps the idle-states as possible power states for the 
->domain: upon the last CPU runtime_put, the domain can chose the 
->deepest
->state that can be reached given the enter/exit time available, and 
->call the platform code for this. This selected state can be any of:
->* cluster-sleep (power OFF)
->* cluster-retention A (L2RAM retention for instance)
->* cluster-retention B (some device is still on, like PMU or bus 
->analyzer, healthckeck IP etc...)
->...
->* cluster-on, but lower voltage A
->* cluster-on, but lower voltage B
->etc...
->
->Put short: CPUs, like any other devices in the domain may register a 
->power state.
->
+>> The bisection pointed to b02ec7658c98 ("ARM: multi_v7_defconfig:
+>> Enable some drivers for LS1021A")
 >>
->>>
->>>This is a attempt to address device-retention states for devices that
->>>are not hooked to runtime-pm, but feature a retention state handled by
->>>the same firmware that handles idle-states. For instance a L2 caches.
->>
->>I guess whether devices may use runtime PM or not, they still can be
->>attached to a PM domain with multiple power states?
+>> I've rebased my tree with arm-soc for-next, and reverted the commits
+>> listed above. Should know shortly if the reverts fix the boot issues.
 >
->yes.
+> I've looked at the built-in drivers to see if they might do something
+> on unrelated hardware (we've had bugs like that before), but didn't
+> find anything: the watchdog and cpufreq drivers all look sane, everything
+> else is a loadable module.
 >
->From what I understand, it seems like you want to have a constraint on a
-domain state based on the device's idle state. This seems more like a
-job for a governor. You could write a governor that chooses the domain
-state based on these dependencies.
+> One possible explanation would be a buggy bootloader that fails to pass
+> a correct initrd and/or dtb if the kernel image gets too big.
+>
+> Do you know if there is an initrd that is passed on this platform?
 
-I am not sure this can be solved generically without increasing the
-complexity of genpd idle states.
+There is, and if I disable only CONFIG_BLK_DEV_RAM the
+bcm4708-smartrg-sr400ac boots again. This platform runs a CFE
+bootloader, and this is these are the kernel arguments injected into
+the DT - "console=ttyS0,115200 initrd=0x4000000,8M root=/dev/ram0
+ip=dhcp".
 
-Thanks,
-Lina
+I'm still investigating the rk3288 failures, and will report back when
+I find something.
+
+Cheers,
+
+Tyler
