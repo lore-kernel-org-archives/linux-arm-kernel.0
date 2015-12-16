@@ -1,51 +1,69 @@
-From: tyler.baker@linaro.org (Tyler Baker)
-Date: Wed, 16 Dec 2015 13:51:10 -0800
-Subject: arm-soc boot: 320 boots: 12 failed,
- 308 passed (v4.4-rc3-483-gb48b5ceb7227)
-In-Reply-To: <5276296.zVv1bjCjBz@wuerfel>
-References: <567128b4.46b71c0a.17f65.7531@mx.google.com>
- <1746045.ErmxH37Pke@wuerfel>
- <CANMBJr6oi5mrUnzTG8J=C69K5ra93MQDjoVP7ef+1oB1RPpGuQ@mail.gmail.com>
- <5276296.zVv1bjCjBz@wuerfel>
-Message-ID: <CANMBJr4h3JDJk6eufdirvy9fVxBGZUA4zu5e5mtfGdUF13qLwA@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 16 Dec 2015 15:53:04 -0600
+Subject: [PATCH v4 3/5] PCI: qcom: Add Qualcomm PCIe controller driver
+In-Reply-To: <1449149725-27607-4-git-send-email-stanimir.varbanov@linaro.org>
+References: <1449149725-27607-1-git-send-email-stanimir.varbanov@linaro.org>
+ <1449149725-27607-4-git-send-email-stanimir.varbanov@linaro.org>
+Message-ID: <20151216215304.GB27791@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 December 2015 at 12:16, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 16 December 2015 11:34:30 Tyler Baker wrote:
->> > * bcm4708-smartrg-sr400ac doesn't find its rootfs any more
->> >
->> > [   16.670994] No filesystem could mount root, tried:  ext3 ext2 ext4 squashfs vfat msdos ntfs
->> > [   16.679388] Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(1,0)
->> >
->> >   I merged some patches from Florian yesterday, but it could also be a problem with
->> >   the defconfig changes
->>
->> The bisection pointed to b02ec7658c98 ("ARM: multi_v7_defconfig:
->> Enable some drivers for LS1021A")
->>
->> I've rebased my tree with arm-soc for-next, and reverted the commits
->> listed above. Should know shortly if the reverts fix the boot issues.
->
-> I've looked at the built-in drivers to see if they might do something
-> on unrelated hardware (we've had bugs like that before), but didn't
-> find anything: the watchdog and cpufreq drivers all look sane, everything
-> else is a loadable module.
->
-> One possible explanation would be a buggy bootloader that fails to pass
-> a correct initrd and/or dtb if the kernel image gets too big.
->
-> Do you know if there is an initrd that is passed on this platform?
+On Thu, Dec 03, 2015 at 03:35:22PM +0200, Stanimir Varbanov wrote:
+> From: Stanimir Varbanov <svarbanov@mm-sol.com>
+> 
+> The PCIe driver reuse the Designware common code for host
+> and MSI initialization, and also program the Qualcomm
+> application specific registers.
+> 
+> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
+> Signed-off-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
+> ---
+>  MAINTAINERS                  |    7 +
+>  drivers/pci/host/Kconfig     |   10 +
+>  drivers/pci/host/Makefile    |    1 +
+>  drivers/pci/host/pcie-qcom.c |  624 ++++++++++++++++++++++++++++++++++++++++++
 
-There is, and if I disable only CONFIG_BLK_DEV_RAM the
-bcm4708-smartrg-sr400ac boots again. This platform runs a CFE
-bootloader, and this is these are the kernel arguments injected into
-the DT - "console=ttyS0,115200 initrd=0x4000000,8M root=/dev/ram0
-ip=dhcp".
+> +#define PCIE20_CAP				0x70
+> +#define PCIE20_CAP_LINKCTRLSTATUS		(PCIE20_CAP + 0x10)
+> +#define PCIE20_CAP_LINKCTRLSTATUS_LINK_UP	BIT(29)
 
-I'm still investigating the rk3288 failures, and will report back when
-I find something.
+This looks like it could be referring to a standard PCIe Capability;
+could you use the existing PCI_EXP_LNKSTA and PCI_EXP_LNKSTA_DLLLA
+symbols here?  And readw() instead of readl()?
 
-Cheers,
+> +static int qcom_pcie_enable_link_training(struct qcom_pcie *pcie)
+> +{
+> +	struct device *dev = pcie->dev;
+> +	u32 val;
+> +	int ret;
+> +
+> +	/* enable link training */
+> +	val = readl(pcie->elbi + PCIE20_ELBI_SYS_CTRL);
+> +	val |= PCIE20_ELBI_SYS_CTRL_LT_ENABLE;
+> +	writel(val, pcie->elbi + PCIE20_ELBI_SYS_CTRL);
+> +
+> +	/* wait for up to 100ms for the link to come up */
+> +	ret = readl_poll_timeout(pcie->elbi + PCIE20_ELBI_SYS_STTS, val,
+> +				 val & XMLH_LINK_UP, LINKUP_DELAY_US,
+> +				 LINKUP_TIMEOUT_US);
+> +
+> +	if (ret < 0 || !dw_pcie_link_up(&pcie->pp)) {
+> +		dev_err(dev, "link initialization failed\n");
+> +		return -ETIMEDOUT;
+> +	}
+> +
+> +	return 0;
+> +}
 
-Tyler
+This looks a lot like the *_establish_link() functions in other
+DesignWare-based drivers.  Can you make it look even more similar,
+e.g., by renaming it to qcom_pcie_establish_link() and maybe moving
+some of the PHY functionality here?
+
+readl_poll_timeout() is nice and avoids the hand-coded timeout loop
+the other drivers use.  But is there benefit in checking for
+XMLH_LINK_UP, or could you simply poll dw_pcie_link_up() like the
+others do?  If it's sufficient, I'd prefer using dw_pcie_link_up()
+by itself because it's a little more generic.
+
+Bjorn
