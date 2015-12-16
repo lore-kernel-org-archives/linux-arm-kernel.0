@@ -1,53 +1,49 @@
-From: ariel@vanguardiasur.com.ar (Ariel D'Alessandro)
-Date: Wed, 16 Dec 2015 09:55:39 -0300
-Subject: [PATCH 2/3] ARM: dts: lpc4337-ciaa: enable SCT-PWM
-In-Reply-To: <CAGhQ9Vxqpe4QQn1+d6bOCQH9q6evignVR_+U4NK7HqSNhBg4qA@mail.gmail.com>
-References: <1448282225-2635-1-git-send-email-ariel@vanguardiasur.com.ar>
- <1448282225-2635-3-git-send-email-ariel@vanguardiasur.com.ar>
- <5655A977.1040408@vanguardiasur.com.ar>
- <CAGhQ9Vxqpe4QQn1+d6bOCQH9q6evignVR_+U4NK7HqSNhBg4qA@mail.gmail.com>
-Message-ID: <56715F4B.7050109@vanguardiasur.com.ar>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 16 Dec 2015 14:15:54 +0100
+Subject: arm-soc boot: 320 boots: 12 failed,
+ 308 passed (v4.4-rc3-483-gb48b5ceb7227)
+In-Reply-To: <1746045.ErmxH37Pke@wuerfel>
+References: <567128b4.46b71c0a.17f65.7531@mx.google.com>
+ <1746045.ErmxH37Pke@wuerfel>
+Message-ID: <4264525.bKhfcYWiXW@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Joachim,
-
-El 14/12/15 a las 19:48, Joachim Eastwood escribi?:
-> Hi Ariel,
+Am Mittwoch, 16. Dezember 2015, 11:17:30 schrieb Arnd Bergmann:
+> On Wednesday 16 December 2015 01:02:44 kernelci. org bot wrote:
+> > arm-soc boot: 320 boots: 12 failed, 308 passed
+> > (v4.4-rc3-483-gb48b5ceb7227)
+> > 
+> > Full Boot Summary:
+> > https://kernelci.org/boot/all/job/arm-soc/kernel/v4.4-rc3-483-gb48b5ceb72
+> > 27/ Full Build Summary:
+> > https://kernelci.org/build/arm-soc/kernel/v4.4-rc3-483-gb48b5ceb7227/
+> > 
+> > Tree: arm-soc
+> > Branch: local/for-next
+> > Git Describe: v4.4-rc3-483-gb48b5ceb7227
+> > Git Commit: b48b5ceb7227a8e6e548dae7a44c80ad85719808
+> > Git URL: git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
+> > Tested: 67 unique boards, 18 SoC families, 22 builds out of 135
+> > 
+> > Boot Failures Detected:
+> > https://kernelci.org/boot/?v4.4-rc3-483-gb48b5ceb7227&fail
+> We got three regressions in the arm-soc for-next branch today, compared to
+> yesterday:
 > 
-> Sorry for the late reply. I have just started to put together my DT
-> for 4.5 branch now.
-> 
-> On 25 November 2015 at 13:28, Ariel D'Alessandro
-> <ariel@vanguardiasur.com.ar> wrote:
->> (+To: Joachim)
->>
->> El 23/11/15 a las 09:37, Ariel D'Alessandro escribi?:
->>> Enable the PWM based on the State Configurable Timer (SCT) included in
->>> the LPC4337 SoC of the CIAA-NXP board.
->>>
->>> Signed-off-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
->>> ---
->>>  arch/arm/boot/dts/lpc4337-ciaa.dts | 4 ++++
->>>  1 file changed, 4 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/lpc4337-ciaa.dts b/arch/arm/boot/dts/lpc4337-ciaa.dts
->>> index 03bdf77..1a23589 100644
->>> --- a/arch/arm/boot/dts/lpc4337-ciaa.dts
->>> +++ b/arch/arm/boot/dts/lpc4337-ciaa.dts
->>> @@ -170,6 +170,10 @@
->>>       pinctrl-0 = <&enet_rmii_pins>;
->>>  };
->>>
->>> +&sct_pwm {
->>> +     status = "okay";
->>> +};
->>> +
-> 
-> Isn't this a bit useless without any pinmux setup?
+> * I did not merge any rockchip changes, but it looks like multi_v7_defconfig
+> is now broken on rk3288-rock2-square and rk3288-veyron-jerry (not in the
+> list below, but in the web interface). I put a diff of the defconfig file
+> on http://pastebin.com/DHgzz1jr, but I don't anything that may have cause
+> the regression.
 
-Yes, it might be kind of useless. Do you think it shouldn't be enabled then?
+I would also think more of a hickup of the kernelci systems. When looking at 
+veyron-jerry it shows the tftp kernel transfer not completing
+(line "Waiting for the transfer"...) and then the board getting reset and 
+booting the original chromeos after that.
 
--- 
-Ariel D'Alessandro, VanguardiaSur
-www.vanguardiasur.com.ar
+On the rock2 there is also nothing standing out in terms of errors or so.
+So I guess it might be best to simply check if that is still present tomorrow.
+
+
+Heiko
