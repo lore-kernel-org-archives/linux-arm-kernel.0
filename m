@@ -1,53 +1,46 @@
-From: yang.shi@linaro.org (Yang Shi)
-Date: Tue, 15 Dec 2015 16:18:08 -0800
-Subject: [PATCH] arm64: reenable interrupt when handling ptrace breakpoint
-Message-ID: <1450225088-2456-1-git-send-email-yang.shi@linaro.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 16 Dec 2015 09:43:57 +0900
+Subject: [PATCH v6 3/7] ARM: dts: Exynos542x/5800: add CPU OPP properties
+In-Reply-To: <1450200801-24539-4-git-send-email-b.zolnierkie@samsung.com>
+References: <1450200801-24539-1-git-send-email-b.zolnierkie@samsung.com>
+ <1450200801-24539-4-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <5670B3CD.8010604@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kernel just send out a SIGTRAP signal when handling ptrace breakpoint in
-debug exception, so it sounds safe to have interrupt enabled if it is not
-disabled by the parent process.
+On 16.12.2015 02:33, Bartlomiej Zolnierkiewicz wrote:
+> From: Thomas Abraham <thomas.ab@samsung.com>
+> 
+> For Exynos542x/5800 platforms, add CPU operating points
+> for migrating from Exynos specific cpufreq driver to using
+> generic cpufreq driver.
+> 
+> Changes by Bartlomiej:
+> - split Exynos5420 support from the original patch
+> - merged Exynos5422 fixes from Ben
+> 
+> Changes by Ben Gamari:
+> - Port to operating-points-v2
+> 
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Doug Anderson <dianders@chromium.org>
+> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+> Cc: Andreas Faerber <afaerber@suse.de>
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> Signed-off-by: Ben Gamari <ben@smart-cactus.org>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5420-cpus.dtsi |  10 +++
+>  arch/arm/boot/dts/exynos5420.dtsi      | 110 +++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/exynos5422-cpus.dtsi |  10 +++
+>  3 files changed, 130 insertions(+)
+> 
 
-Signed-off-by: Yang Shi <yang.shi@linaro.org>
----
- arch/arm64/kernel/debug-monitors.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+Thanks for rebasing on "exynos5422-cpus.dtsi" patch, I appreciate this.
 
-diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-index 8aee3ae..90d70e4 100644
---- a/arch/arm64/kernel/debug-monitors.c
-+++ b/arch/arm64/kernel/debug-monitors.c
-@@ -239,6 +239,9 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
- 		return 0;
- 
- 	if (user_mode(regs)) {
-+		if (interrupts_enabled(regs))
-+			local_irq_enable();
-+
- 		info.si_signo = SIGTRAP;
- 		info.si_errno = 0;
- 		info.si_code  = TRAP_HWBKPT;
-@@ -310,6 +313,9 @@ static int brk_handler(unsigned long addr, unsigned int esr,
- 	siginfo_t info;
- 
- 	if (user_mode(regs)) {
-+		if (interrupts_enabled(regs))
-+			local_irq_enable();
-+
- 		info = (siginfo_t) {
- 			.si_signo = SIGTRAP,
- 			.si_errno = 0,
-@@ -337,6 +343,10 @@ int aarch32_break_handler(struct pt_regs *regs)
- 	if (!compat_user_mode(regs))
- 		return -EFAULT;
- 
-+	/* COMPAT_PSR_I_BIT has the same bit mask with non-compat one */
-+	if (interrupts_enabled(regs))
-+		local_irq_enable();
-+
- 	if (compat_thumb_mode(regs)) {
- 		/* get 16-bit Thumb instruction */
- 		get_user(thumb_instr, (u16 __user *)pc);
--- 
-2.0.2
+Looks good:
+
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+Best regards,
+Krzysztof
