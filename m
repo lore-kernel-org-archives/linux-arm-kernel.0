@@ -1,129 +1,18 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 16 Dec 2015 17:47:09 +0000
-Subject: [PATCH 2/2] irqchip/gic: Identify and report any reserved SGI IDs
-In-Reply-To: <1450285686-844-3-git-send-email-daniel.thompson@linaro.org>
-References: <1450285686-844-1-git-send-email-daniel.thompson@linaro.org>
- <1450285686-844-3-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <5671A39D.9000500@arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 16 Dec 2015 19:03:35 +0100
+Subject: [PATCH v3] clk: s3c2410: removed unneeded variable in
+ s3c24xx_clkout_set_parent
+In-Reply-To: <20151130100720.GA29096@jci-VirtualBox>
+References: <20151130100720.GA29096@jci-VirtualBox>
+Message-ID: <5671A777.7090308@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
-
-On 16/12/15 17:08, Daniel Thompson wrote:
-> It is possible for the secure world to reserve certain SGI IDs for itself.
-> Currently we have limited visibility of which IDs are safe to use for IPIs.
+On 30/11/15 11:08, Mutharaju, Prasanna (P.) wrote:
+> From: Prasanna Karthik <mkarthi3@visteon.com>
 > 
-> Modify the GIC initialization code to actively search for reserved SGI IDs
-> and report if any are found. Warn even more loudly if the reserved SGIs
-> overlap with the normal IPI range.
+> Remove unneeded variable used to store return value.
 > 
-> When run on an Inforce IFC6410 (Snapdragon 600) this code produces the
-> following messages:
-> ~~~ cut here ~~~
-> CPU0: Detected reserved SGI IDs: 14-15
-> CPU1: Detected reserved SGI IDs: 15
-> CPU2: Detected reserved SGI IDs: 15
-> CPU3: Detected reserved SGI IDs: 15
-> ~~~ cut here ~~~
-> 
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> ---
->  drivers/irqchip/irq-gic.c | 53 +++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 53 insertions(+)
-> 
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index abf2ffaed392..541622da7049 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -490,6 +490,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
->  	void __iomem *base = gic_data_cpu_base(gic);
->  	unsigned int cpu_mask, cpu = smp_processor_id();
->  	int i;
-> +	DECLARE_BITMAP(sgi_mask, 16);
->  
->  	/*
->  	 * Setting up the CPU map is only relevant for the primary GIC
-> @@ -511,6 +512,58 @@ static void gic_cpu_init(struct gic_chip_data *gic)
->  		for (i = 0; i < NR_GIC_CPU_IF; i++)
->  			if (i != cpu)
->  				gic_cpu_map[i] &= ~cpu_mask;
-> +
-> +		/*
-> +		 * Fiddle with the SGI set/clear registers to try identify
-> +		 * any IPIs that are reserved for secure world.
-> +		 */
-> +		bitmap_fill(sgi_mask, 16);
-> +
-> +		for (i = 0; i < 16; i++) {
-> +			void __iomem *set_reg =
-> +			    dist_base + GIC_DIST_SGI_PENDING_SET + (i & ~3);
-> +			void __iomem *clear_reg =
-> +			    dist_base + GIC_DIST_SGI_PENDING_CLEAR + (i & ~3);
-> +			unsigned long mask = cpu_mask << (8*(i%4));
-> +			unsigned long flags, pending, after_clear, after_set;
+> Signed-off-by: Prasanna Karthik <mkarthi3@visteon.com>
 
-Please make these u32, as unsigned long is 64bit on arm64. Another thing
-to note is that GICD_CPEND{S,C}SGIRn are byte accessible, so you can
-save yourself some this hassle shifting things around and just write a
-single byte. You're already writing 16 times anyway...
-
-Another thing to consider is that these locations are only defined on
-GICv2 and not GICv1, so this patch is likely to cause trouble on older HW.
-
-> +
-> +			local_irq_save(flags);
-
-Why do you need to do this? The CPU interface is not enabled yet, so I
-can't see how you could get an interrupt on this CPU.
-
-> +
-> +			/* record original value */
-> +			pending = readl_relaxed(set_reg);
-> +
-> +			/* clear, test, set, and test again */
-> +			writel_relaxed(mask, clear_reg);
-> +			after_clear = readl_relaxed(set_reg);
-> +			writel_relaxed(mask, set_reg);
-> +			after_set = readl_relaxed(set_reg);
-
-It should be enough to write to the SET register, and read back, as the
-bit is RAZ/WI when the interrupt is Group-0.
-
-> +
-> +			/* restore original value */
-> +			writel_relaxed(mask & ~pending, clear_reg);
-> +
-> +			local_irq_restore(flags);
-> +
-> +			if (mask & ~after_clear && mask & after_set)
-> +				clear_bit(i, sgi_mask);
-> +		}
-> +
-> +		/*
-> +		 * Show the SGI mask if it is "interesting". Here interesting
-> +		 * means that the set/clear register is implemented
-> +		 * (mask is not full) and it tells us that the secure world
-> +		 * has reserved some SGIs (mask is not empty).
-> +		 */
-> +		if (!bitmap_full(sgi_mask, 16) && !bitmap_empty(sgi_mask, 16))
-> +			pr_info("CPU%d: Detected reserved SGI IDs: %*pbl\n",
-> +				cpu, 16, sgi_mask);
-> +
-> +		/*
-> +		 * Yell if the reserved IDs make the system unviable.
-> +		 */
-> +		if (!bitmap_full(sgi_mask, 16) &&
-> +		    find_first_bit(sgi_mask, 16) < NR_IPI)
-> +			pr_crit("CPU%d: Not enough SGI IDs; expect failure\n",
-> +				cpu);
->  	}
->  
->  	gic_cpu_config(dist_base, NULL);
-> 
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Patch applied, thanks.
