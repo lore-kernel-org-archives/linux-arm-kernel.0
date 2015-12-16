@@ -1,64 +1,38 @@
-From: mail@maciej.szmigiero.name (Maciej S. Szmigiero)
-Date: Wed, 16 Dec 2015 21:05:35 +0100
-Subject: [PATCH v2 0/3] USB: add generic onboard USB HUB driver
-In-Reply-To: <CAOMZO5An3CK-a3NQtOF3nnPc8vzu2+SKnfJ=iOuAhjCBvZwToQ@mail.gmail.com>
-References: <1450077974-22762-1-git-send-email-peter.chen@freescale.com>	<CAOMZO5CfBKuJ584jwbg98s9tn+0Z7W0nOaZnUkm4cJUSvNGTZw@mail.gmail.com>	<20151215062821.GA11241@shlinux2>	<CAOMZO5DiRzfy5dULh0C7qU2KUM-i8fBh6W5rS9zOTHJJK6fqwg@mail.gmail.com>	<20151216041058.GC23482@shlinux2>
- <CAOMZO5An3CK-a3NQtOF3nnPc8vzu2+SKnfJ=iOuAhjCBvZwToQ@mail.gmail.com>
-Message-ID: <5671C40F.3000000@maciej.szmigiero.name>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 16 Dec 2015 21:16:21 +0100
+Subject: arm-soc boot: 320 boots: 12 failed,
+ 308 passed (v4.4-rc3-483-gb48b5ceb7227)
+In-Reply-To: <CANMBJr6oi5mrUnzTG8J=C69K5ra93MQDjoVP7ef+1oB1RPpGuQ@mail.gmail.com>
+References: <567128b4.46b71c0a.17f65.7531@mx.google.com>
+ <1746045.ErmxH37Pke@wuerfel>
+ <CANMBJr6oi5mrUnzTG8J=C69K5ra93MQDjoVP7ef+1oB1RPpGuQ@mail.gmail.com>
+Message-ID: <5276296.zVv1bjCjBz@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
-Hi Peter,
-
-On 16.12.2015 11:11, Fabio Estevam wrote:
-> Hi Peter,
+On Wednesday 16 December 2015 11:34:30 Tyler Baker wrote:
+> > * bcm4708-smartrg-sr400ac doesn't find its rootfs any more
+> >
+> > [   16.670994] No filesystem could mount root, tried:  ext3 ext2 ext4 squashfs vfat msdos ntfs
+> > [   16.679388] Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(1,0)
+> >
+> >   I merged some patches from Florian yesterday, but it could also be a problem with
+> >   the defconfig changes
 > 
-> On Wed, Dec 16, 2015 at 2:11 AM, Peter Chen <peter.chen@freescale.com> wrote:
+> The bisection pointed to b02ec7658c98 ("ARM: multi_v7_defconfig:
+> Enable some drivers for LS1021A")
 > 
->> Thanks, Fabio, but I am curious how things like that? The USBOH3 clock
->> is not opened, the usb driver will hang when it tries to access
->> registers. If this clock is always on, then, why the system will
->> hang later?
-> 
-> I found the issue with your patch. You missed to add the pinctrl node.
-> 
-> With the change below USB is functional in Udoo:
-> 
-> --- a/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-> @@ -22,6 +22,8 @@
-> 
->         usb_hub1 {
->                 compatible = "generic-onboard-hub";
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&pinctrl_usbh>;
->                 clocks = <&clks IMX6QDL_CLK_CKO>;
->                 reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
->                 reset-duration-us = <2>;
-> 
+> I've rebased my tree with arm-soc for-next, and reverted the commits
+> listed above. Should know shortly if the reverts fix the boot issues.
 
-Thanks for your work, I didn't notice it previously (sorry).
+I've looked at the built-in drivers to see if they might do something
+on unrelated hardware (we've had bugs like that before), but didn't
+find anything: the watchdog and cpufreq drivers all look sane, everything
+else is a loadable module.
 
-I can confirm, too that with Peter's patches and the above change
-the USB support works again on my UDOO DualLite board.
+One possible explanation would be a buggy bootloader that fails to pass
+a correct initrd and/or dtb if the kernel image gets too big.
 
-However, I noticed that when you have host USB support configured to be
-build as modules then (due to its location under "if USB") it is only
-possible to compile generic onboard USB HUB as module, too.
+Do you know if there is an initrd that is passed on this platform?
 
-Then this module would need to be loaded before loading USB support
-(or quickly after it), otherwise USB enumeration would time out after
-few secs and loading it later wouldn't help.
-
-Currently, this driver doesn't really need any USB host support and
-is able to be compiled-in successfully regardless of USB host support
-configuration with just small change to Makefile and Kconfig.
-
-However I don't know if it is a design goal to not use USB host support
-or just a current development status, but if it doesn't really need it
-then it would be great if it could be selected to be build-in into kernel
-regardless of host USB support setting.
-
-Best regards,
-Maciej Szmigiero
+	Arnd
