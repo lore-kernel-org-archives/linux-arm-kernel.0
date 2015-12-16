@@ -1,26 +1,31 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 16 Dec 2015 12:08:35 +0100
-Subject: [PATCH v2 2/2] arm64: dts: r8a7795: fix SATA clock assignment
-In-Reply-To: <1450262061-1441-3-git-send-email-ulrich.hecht+renesas@gmail.com>
-References: <1450262061-1441-1-git-send-email-ulrich.hecht+renesas@gmail.com>
- <1450262061-1441-3-git-send-email-ulrich.hecht+renesas@gmail.com>
-Message-ID: <CAMuHMdVrqQgCHsnJVAETyM=P4mE7is1m6QQ16qA6cQENDoPwhg@mail.gmail.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Wed, 16 Dec 2015 11:12:31 +0000
+Subject: arm-soc boot: 320 boots: 12 failed, 308 passed
+ (v4.4-rc3-483-gb48b5ceb7227)
+In-Reply-To: <1746045.ErmxH37Pke@wuerfel>
+References: <567128b4.46b71c0a.17f65.7531@mx.google.com>
+ <1746045.ErmxH37Pke@wuerfel>
+Message-ID: <1450264351.2819.4.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 16, 2015 at 11:34 AM, Ulrich Hecht
-<ulrich.hecht+renesas@gmail.com> wrote:
-> Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+On Wed, 2015-12-16 at 11:17 +0100, Arnd Bergmann wrote:
+> On Wednesday 16 December 2015 01:02:44 kernelci. org bot wrote:
+> > arm-soc boot: 320 boots: 12 failed, 308 passed (v4.4-rc3-483-gb48b5ceb7227)
+> > 
+> > Full Boot Summary: https://kernelci.org/boot/all/job/arm-soc/kernel/v4.4-rc3-483-gb48b5ceb7227/
+> > Full Build Summary: https://kernelci.org/build/arm-soc/kernel/v4.4-rc3-483-gb48b5ceb7227/
+> > 
+> >
+[...]
+> * Juno seems to be sick and doesn't like LAVA today:
 
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Looks like a LAVA hickup, I downloaded the Image and btb and they appear
+to work fine on my board. Just to make sure I was running the right
+kernel...
 
-Gr{oetje,eeting}s,
+# uname -a
+Linux genericarmv8 4.4.0-rc3+ #1 SMP PREEMPT Wed Dec 16 05:51:25 CET 2015 aarch64 GNU/Linux
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Tixy
