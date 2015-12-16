@@ -1,38 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 Dec 2015 16:54:34 +0100
-Subject: [PATCH v6 09/20] arm64:ilp32: share HWCAP between LP64 and ILP32
-In-Reply-To: <1450215766-14765-10-git-send-email-ynorov@caviumnetworks.com>
-References: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
- <1450215766-14765-10-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <2049962.OV4jWs7vGi@wuerfel>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 16 Dec 2015 17:02:47 +0100
+Subject: [PATCH v2 0/6] pwm: lpc32xx: fixes in the LPC32xx PWM driver
+In-Reply-To: <1449401522-22590-1-git-send-email-vz@mleia.com>
+References: <1449401522-22590-1-git-send-email-vz@mleia.com>
+Message-ID: <20151216160247.GJ28947@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 16 December 2015 00:42:35 Yury Norov wrote:
+On Sun, Dec 06, 2015 at 01:31:56PM +0200, Vladimir Zapolskiy wrote:
+> The changeset fixes a number of issues within current implementation
+> of LPC32xx PWM controller driver, namely
+> - the SoC has two independent PWM controllers with one channel each,
+> - runtime warnings from common clock framework,
+> - overflow in duty cycle calculation may result in disabled PWM,
+> - unsupported period values are not accepted.
 > 
->  #ifdef CONFIG_COMPAT
-> -#define COMPAT_ELF_HWCAP       (compat_elf_hwcap)
-> -#define COMPAT_ELF_HWCAP2      (compat_elf_hwcap2)
->  extern unsigned int compat_elf_hwcap, compat_elf_hwcap2;
-> +#define COMPAT_ELF_HWCAP       \
-> +       (is_a32_compat_task()   \
-> +         ? compat_elf_hwcap    \
-> +         : elf_hwcap)
-> +
-> +#define COMPAT_ELF_HWCAP2      \
-> +       (is_a32_compat_task()   \
-> +         ? compat_elf_hwcap2   \
-> +         : 0)
-> +
->  #endif
->  
+> Correction of PWM channels requires a correspondent change in
+> arch/arm/boot/dts/lpc32xx.dtsi, it has been already sent for review.
 > 
+> Changes from v1 to v2:
+> - corrected style of examples in documentation,
+> - improved commit messages
+> 
+> Version v1 can be found here:
+>   http://comments.gmane.org/gmane.linux.pwm/2828
+>   http://www.spinics.net/lists/devicetree/msg105398.html
+> 
+> Vladimir Zapolskiy (6):
+>   dt: lpc32xx: pwm: correct LPC32xx PWM device node example
+>   dt: lpc32xx: pwm: update documentation of LPC32xx PWM device
+>   pwm: lpc32xx: correct number of PWM channels from 2 to 1
+>   pwm: lpc32xx: fix warnings from common clock framework
+>   pwm: lpc32xx: fix and simplify duty cycle and period calculations
+>   pwm: lpc32xx: return ERANGE, if requested period is not supported
+> 
+>  .../devicetree/bindings/pwm/lpc32xx-pwm.txt        |  9 +++-
+>  drivers/pwm/pwm-lpc32xx.c                          | 59 ++++++++--------------
+>  2 files changed, 29 insertions(+), 39 deletions(-)
 
-I'm trying to understand how this is used. Are you compiling
-fs/compat_binfmt_elf.c twice to handle both 32-bit ELF types?
+All patches applied, thanks.
 
-Would it be easier to use a separate arch/arm64/kernel/binfmt_elf32.c
-as a copy of fs/compat_binfmt_elf.c, with all the right macros defined
-for ilp32 mode in there?
-
-	Arnd
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151216/241bf709/attachment.sig>
