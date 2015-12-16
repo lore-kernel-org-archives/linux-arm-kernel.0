@@ -1,78 +1,70 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 16 Dec 2015 12:18:21 +0000
-Subject: [PATCH v3 2/2] arm64: Use PoU cache instr for I/D coherency
-In-Reply-To: <1450260690-5431-3-git-send-email-ashoks@broadcom.com>
-References: <1450260690-5431-1-git-send-email-ashoks@broadcom.com>
- <1450260690-5431-3-git-send-email-ashoks@broadcom.com>
-Message-ID: <20151216121821.GG4308@arm.com>
+From: jchandra@broadcom.com (Jayachandran C)
+Date: Wed, 16 Dec 2015 18:12:30 +0530
+Subject: [RFC PATCH v3 0/5] Simple ACPI based PCI support for arm64
+Message-ID: <1450269755-21420-1-git-send-email-jchandra@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 16, 2015 at 02:11:30AM -0800, Ashok Kumar wrote:
-> In systems with three levels of cache(PoU at L1 and PoC at L3),
-> PoC cache flush instructions flushes L2 and L3 caches which could affect
-> performance.
-> For cache flushes for I and D coherency, PoU should suffice.
-> So changing all I and D coherency related cache flushes to PoU.
-> 
-> Introduced a new __clean_dcache_area_pou API for dcache flush till PoU
-> and provided a common macro for __flush_dcache_area and
-> __clean_dcache_area_pou.
-> 
-> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Ashok Kumar <ashoks@broadcom.com>
-> ---
->  arch/arm64/include/asm/cacheflush.h |  1 +
->  arch/arm64/mm/cache.S               | 50 +++++++++++++++++++++++++++++--------
->  arch/arm64/mm/flush.c               | 33 +++++++++++++-----------
->  3 files changed, 58 insertions(+), 26 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
-> index c75b8d0..6a5ecbd 100644
-> --- a/arch/arm64/include/asm/cacheflush.h
-> +++ b/arch/arm64/include/asm/cacheflush.h
-> @@ -68,6 +68,7 @@
->  extern void flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned long end);
->  extern void flush_icache_range(unsigned long start, unsigned long end);
->  extern void __flush_dcache_area(void *addr, size_t len);
-> +extern void __clean_dcache_area_pou(void *addr, size_t len);
->  extern long __flush_cache_user_range(unsigned long start, unsigned long end);
->  
->  static inline void flush_cache_mm(struct mm_struct *mm)
-> diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-> index eb48d5d..b700a97 100644
-> --- a/arch/arm64/mm/cache.S
-> +++ b/arch/arm64/mm/cache.S
-> @@ -79,28 +79,56 @@ ENDPROC(flush_icache_range)
->  ENDPROC(__flush_cache_user_range)
->  
->  /*
-> + * Macro to perform a data cache maintenance for the interval
-> + * [kaddr, kaddr + size)
-> + *
-> + * 	op:		operation passed to dc instruction
-> + * 	domain:		domain used in dsb instruciton
-> + * 	kaddr:		starting virtual address of the region
-> + * 	size:		size of the region
-> + * 	Corrupts: 	kaddr, size, tmp1, tmp2
-> + */
-> +	.macro dcache_by_line_op op, domain, kaddr, size, tmp1, tmp2
-> +	dcache_line_size \tmp1, \tmp2
-> +	add	\size, \kaddr, \size
-> +	sub	\tmp2, \tmp1, #1
-> +	bic	\kaddr, \kaddr, \tmp2
-> +1:	dc	\op, \kaddr
-> +	add	\kaddr, \kaddr, \tmp1
-> +	cmp	\kaddr, \size
-> +	b.lo	1b
-> +	dsb	\domain
-> +	.endm
+This patchset provides a generic ACPI based PCI host controller
+implementation and uses it on arm64.
 
-Minor comment, but can you stick this in proc-macros.S and change that
-label from 1: to something like 9998 please?
+The first patch moves the common code to handle MCFG ACPI table from
+arch/x86 to drivers/acpi/pci_mcfg.c. The last patch in the patchset
+provides the generic PCI host controller with a new file
+driver/pci/host/pci-host-acpi.c. The other patches are to fix
+up arm64 and ACPI code to work with these two patches.
 
-Other than that, looks good. I can take the next version for 4.5.
+The pci-host-acpi implementation keeps a reference to pci_mmcfg_region
+entry so that config space access is done with a simple mapping and
+generic PCI config read/write. There is also an implementation of
+raw_pci_read/raw_pci_write provided by walking the pci_mmcfg_list
 
-Cheers,
+This is tested with arm64 QEMU and OVMF and on x86 with qemu.
+Comments are very welcome.
 
-Will
+Thanks,
+JC.
+
+v2->v3:
+ - Move maintainence of the pci_mmcfg_list to drivers/acpi/pci_mcfg.c
+   without changing x86 logic
+ - use the pci_mmcfg_list in ARM64 implementation
+ - provide raw_pci_read/raw_pci_write
+
+v1->v2:
+ - use CONFIG_PCI_MMCONFIG on arm64, provide a weak implementation
+   of pci_mmcfg_late_init for arm64.
+ - The real implementation of pci_mmcfg_late_init is in pci-host-acpi.c
+   and it will save the MCFG table entries to an array. Earlier this
+   was done with an arch_init call
+ - remove unneeded pci_bus_add_devices call and fix MCFG saving code
+ - Added a patch to ACPI pci_root.c to handle arm64 PCI IO resources
+
+Jayachandran C (5):
+  APCI: MCFG: Move mmcfg_list management to drivers/acpi
+  arm64: pci: Add ACPI support
+  PCI: Handle NULL parent in pci_bus_assign_domain_nr
+  ACPI: PCI: Support platforms that need pci_remap_iospace
+  PCI: ACPI: Add a generic ACPI based host controller
+
+ arch/arm64/Kconfig               |   3 +
+ arch/arm64/kernel/pci.c          |  65 ++++++++-
+ arch/x86/include/asm/pci_x86.h   |  24 +---
+ arch/x86/pci/mmconfig-shared.c   | 269 +++++------------------------------
+ arch/x86/pci/mmconfig_32.c       |   1 +
+ arch/x86/pci/mmconfig_64.c       |   1 +
+ drivers/acpi/Makefile            |   1 +
+ drivers/acpi/pci_mcfg.c          | 298 +++++++++++++++++++++++++++++++++++++++
+ drivers/acpi/pci_root.c          |  62 +++++++-
+ drivers/acpi/resource.c          |   2 +
+ drivers/pci/host/Kconfig         |   7 +
+ drivers/pci/host/Makefile        |   1 +
+ drivers/pci/host/pci-host-acpi.c | 193 +++++++++++++++++++++++++
+ drivers/pci/pci.c                |   7 +-
+ include/linux/pci-acpi.h         |  33 +++++
+ 15 files changed, 701 insertions(+), 266 deletions(-)
+ create mode 100644 drivers/acpi/pci_mcfg.c
+ create mode 100644 drivers/pci/host/pci-host-acpi.c
+
+-- 
+1.9.1
