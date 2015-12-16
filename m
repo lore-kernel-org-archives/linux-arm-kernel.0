@@ -1,72 +1,82 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 Dec 2015 20:17:25 +0100
-Subject: [PATCH v6 09/20] arm64:ilp32: share HWCAP between LP64 and ILP32
-In-Reply-To: <20151216171904.GF27051@e104818-lin.cambridge.arm.com>
-References: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
- <20151216165819.GD27051@e104818-lin.cambridge.arm.com>
- <20151216171904.GF27051@e104818-lin.cambridge.arm.com>
-Message-ID: <15616150.rsIFodoBKz@wuerfel>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Wed, 16 Dec 2015 11:34:30 -0800
+Subject: arm-soc boot: 320 boots: 12 failed,
+ 308 passed (v4.4-rc3-483-gb48b5ceb7227)
+In-Reply-To: <1746045.ErmxH37Pke@wuerfel>
+References: <567128b4.46b71c0a.17f65.7531@mx.google.com>
+ <1746045.ErmxH37Pke@wuerfel>
+Message-ID: <CANMBJr6oi5mrUnzTG8J=C69K5ra93MQDjoVP7ef+1oB1RPpGuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 16 December 2015 17:19:05 Catalin Marinas wrote:
-> On Wed, Dec 16, 2015 at 04:58:20PM +0000, Catalin Marinas wrote:
-> > On Wed, Dec 16, 2015 at 04:54:34PM +0100, Arnd Bergmann wrote:
-> > > On Wednesday 16 December 2015 00:42:35 Yury Norov wrote:
-> > > > 
-> > > >  #ifdef CONFIG_COMPAT
-> > > > -#define COMPAT_ELF_HWCAP       (compat_elf_hwcap)
-> > > > -#define COMPAT_ELF_HWCAP2      (compat_elf_hwcap2)
-> > > >  extern unsigned int compat_elf_hwcap, compat_elf_hwcap2;
-> > > > +#define COMPAT_ELF_HWCAP       \
-> > > > +       (is_a32_compat_task()   \
-> > > > +         ? compat_elf_hwcap    \
-> > > > +         : elf_hwcap)
-> > > > +
-> > > > +#define COMPAT_ELF_HWCAP2      \
-> > > > +       (is_a32_compat_task()   \
-> > > > +         ? compat_elf_hwcap2   \
-> > > > +         : 0)
-> > > > +
-> > > >  #endif
-> > > 
-> > > I'm trying to understand how this is used. Are you compiling
-> > > fs/compat_binfmt_elf.c twice to handle both 32-bit ELF types?
-> > 
-> > It's the same compat_binfmt_elf.c which handles all 32-bit ELF types,
-> > i.e. AArch32 and A64/ILP32. The above macros are not constants, so they
-> > are evaluated every time a new ELF file is loaded. We do a similar trick
-> > with COMPAT_SET_PERSONALITY in patch 11.
+On 16 December 2015 at 02:17, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 16 December 2015 01:02:44 kernelci. org bot wrote:
+>> arm-soc boot: 320 boots: 12 failed, 308 passed (v4.4-rc3-483-gb48b5ceb7227)
+>>
+>> Full Boot Summary: https://kernelci.org/boot/all/job/arm-soc/kernel/v4.4-rc3-483-gb48b5ceb7227/
+>> Full Build Summary: https://kernelci.org/build/arm-soc/kernel/v4.4-rc3-483-gb48b5ceb7227/
+>>
+>> Tree: arm-soc
+>> Branch: local/for-next
+>> Git Describe: v4.4-rc3-483-gb48b5ceb7227
+>> Git Commit: b48b5ceb7227a8e6e548dae7a44c80ad85719808
+>> Git URL: git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
+>> Tested: 67 unique boards, 18 SoC families, 22 builds out of 135
+>>
+>> Boot Failures Detected: https://kernelci.org/boot/?v4.4-rc3-483-gb48b5ceb7227&fail
+>
+> We got three regressions in the arm-soc for-next branch today, compared to yesterday:
 
-Ok, I see. I've also looked at other architectures, and found that
-MIPS does it the way I thought it would be
+I had the bot bisect these failures, results below.
 
-git grep -w binfmt_elf.c
-arch/mips/kernel/binfmt_elfn32.c:#include "../../../fs/binfmt_elf.c"
-arch/mips/kernel/binfmt_elfo32.c:#include "../../../fs/binfmt_elf.c"
+>
+> * I did not merge any rockchip changes, but it looks like multi_v7_defconfig is
+>   now broken on rk3288-rock2-square and rk3288-veyron-jerry (not in the list below,
+>   but in the web interface). I put a diff of the defconfig file on
+>   http://pastebin.com/DHgzz1jr, but I don't anything that may have cause the
+>   regression.
 
-I still think doing the same for arm64 would result in more maintainable
-code, because it completely separates the two different formats into
-separate files. We'd obviously leave the existing compat handling as
-it is, and just add one more file, not do both of them separately as
-MIPS does.
+The bisection pointed d2318f340253 ("arm64: dts: berlin4ct: add
+watchdog nodes") which is clearly a red herring. kernelci.org inserts
+the modules from the build into the ramdisk, and eudev will probe
+them. With the modules inserted into the ramdisk, it fails to reach a
+user space prompt. If I remove the modules from the ramdisk it boots
+fine[1]. I may manually bisect if we cannot spot the issue easily.
 
-Do you see any downsides of that approach?
+> * bcm4708-smartrg-sr400ac doesn't find its rootfs any more
+>
+> [   16.670994] No filesystem could mount root, tried:  ext3 ext2 ext4 squashfs vfat msdos ntfs
+> [   16.679388] Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(1,0)
+>
+>   I merged some patches from Florian yesterday, but it could also be a problem with
+>   the defconfig changes
 
-> IIUC, we may have a problem with this. elf_hwcap is 64-bit long while
-> elf_info[n] is 32-bit (Elf32_Addr), so we truncate AT_HWCAP if we ever
-> go beyond bit 31. The above may need to look something like:
-> 
-> #define COMPAT_ELF_HWCAP        \
->         (is_a32_compat_task()   \
->          ? compat_elf_hwcap     \
->          : (u32)elf_hwcap)
-> 
-> #define COMPAT_ELF_HWCAP2       \
->         (is_a32_compat_task()   \
->          ? compat_elf_hwcap2    \
->          : (u32)(elf_hwcap >> 32))
+The bisection pointed to b02ec7658c98 ("ARM: multi_v7_defconfig:
+Enable some drivers for LS1021A")
 
-Yes, interesting find.
+I've rebased my tree with arm-soc for-next, and reverted the commits
+listed above. Should know shortly if the reverts fix the boot issues.
 
-	Arnd
+> * Juno seems to be sick and doesn't like LAVA today:
+>
+> Connected to serial03.lavalab.
+> Escape character is '^]'.
+> Command sent successfully.
+> Command sent successfully.
+> ErrorMessage: Failed to boot test image.
+> Lava failed at action boot_linaro_image with error:Failed to boot test image.
+> Traceback (most recent call last):
+>   File "/usr/lib/python2.7/dist-packages/lava_dispatcher/job.py", line 381, in run
+>     action.run(**params)
+>   File "/usr/lib/python2.7/dist-packages/lava_dispatcher/actions/boot_control.py", line 156, in run
+>     raise CriticalError("Failed to boot test image.")
+> CriticalError: Failed to boot test image.
+> Command sent successfully.
+
+Indeed, I'll look into this. Thanks for reporting.
+
+Cheers,
+
+Tyler
+
+[1] http://nwdrone.com/scheduler/job/13662/log_file
