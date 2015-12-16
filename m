@@ -1,43 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 Dec 2015 20:10:14 +0100
-Subject: [PATCH v3] net/macb: add support for resetting PHY using GPIO
-In-Reply-To: <1450290690-32369-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1450290690-32369-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <6382531.CWmTLTEYMq@wuerfel>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 16 Dec 2015 20:12:24 +0100
+Subject: [PATCH] ARM: at91/dt: Add Support for the L+G VInCo platform
+In-Reply-To: <1450292134-1640-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1450292134-1640-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20151216191224.GG8574@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 16 December 2015 19:31:30 Gregory CLEMENT wrote:
-> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-> index 88c1e1a..35661aa 100644
-> --- a/drivers/net/ethernet/cadence/macb.c
-> +++ b/drivers/net/ethernet/cadence/macb.c
-> @@ -28,6 +28,7 @@
->  #include <linux/phy.h>
->  #include <linux/of.h>
->  #include <linux/of_device.h>
-> +#include <linux/of_gpio.h>
->  #include <linux/of_mdio.h>
->  #include <linux/of_net.h>
+Hi,
 
-Is this the patch that is already in linux-next?
+On 16/12/2015 at 19:55:34 +0100, Gregory CLEMENT wrote :
+> +			i2c2: i2c at f8024000 {
+> +				status = "okay";
+> +
+> +				rtc1: rtc at 64 {
+> +					compatible = "rx8900";
 
-I needed an additional
+This should be epson,rx8900
 
-#include <linux/gpio/consumer.h>
+> +					reg = <0x32>;
+> +				};
+> +			};
+> +
 
-to avoid this build error on randconfig builds without GPIOLIB:
-
-    drivers/net/ethernet/cadence/macb.c: In function 'macb_probe':
-    drivers/net/ethernet/cadence/macb.c:2908:19: error: implicit declaration of function 'devm_gpiod_get_optional' [-Werror=implicit-function-declaration]
-      bp->reset_gpio = devm_gpiod_get_optional(&bp->pdev->dev, "phy-reset",
-                       ^
-    drivers/net/ethernet/cadence/macb.c:2909:8: error: 'GPIOD_OUT_HIGH' undeclared (first use in this function)
-            GPIOD_OUT_HIGH);
-            ^
-    drivers/net/ethernet/cadence/macb.c:2909:8: note: each undeclared identifier is reported only once for each function it appears in
-    drivers/net/ethernet/cadence/macb.c: In function 'macb_remove':
-    drivers/net/ethernet/cadence/macb.c:2979:3: error: implicit declaration of function 'gpiod_set_value' [-Werror=implicit-function-declaration]
-
-
-	Arnd
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
