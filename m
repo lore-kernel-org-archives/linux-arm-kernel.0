@@ -1,42 +1,78 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 16 Dec 2015 10:21:55 +0100
-Subject: [PATCH] clocksource/drivers/pistachio: Fix wrong calculated
- clocksource read value
-In-Reply-To: <20151216153609.0f09f941@xhacker>
-References: <1448466169-5230-1-git-send-email-jszhang@marvell.com>
- <56707F32.3030405@linaro.org> <20151216151125.1e91b4f4@xhacker>
- <20151216152807.23491eee@xhacker> <20151216153609.0f09f941@xhacker>
-Message-ID: <56712D33.5080009@linaro.org>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Wed, 16 Dec 2015 17:29:59 +0800
+Subject: [PATCH v7 19/19] KVM: ARM64: Add a new kvm ARM PMU device
+In-Reply-To: <56712928.8050409@arm.com>
+References: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
+ <1450169379-12336-20-git-send-email-zhaoshenglong@huawei.com>
+ <567032AD.8000206@arm.com> <567036DE.80605@linaro.org>
+ <567038E3.3010102@arm.com> <20151215204739.GK4120@cbox>
+ <56711348.6010406@huawei.com> <56711B99.1000608@huawei.com>
+ <56712928.8050409@arm.com>
+Message-ID: <56712F17.8000201@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/16/2015 08:36 AM, Jisheng Zhang wrote:
-> On Wed, 16 Dec 2015 15:28:07 +0800 wrote:
->
->> On Wed, 16 Dec 2015 15:11:25 +0800
->> Jisheng Zhang  wrote:
->>
->>> Dear Daniel,
->>>
->>> On Tue, 15 Dec 2015 21:59:30 +0100 Daniel Lezcano wrote:
->>>
->>>> On 11/25/2015 04:42 PM, Jisheng Zhang wrote:
->>>>> Let's assume the counter value is 0xf000000, the pistachio clocksource
->>
->> oops, sorry, should be 0xf0000000. Do I need to send a v2 patch?
->
-> And in fact, clocksource_mmio_readw_down() also has similar issue, but it masks
-> with c->mask before return, the c->mask is less than 32 bit (because the
-> clocksource_mmio_init think number of valid bits > 32 or < 16 is invalid.)
-> the higher 32 bits are masked off, so we never saw such issue. But we'd better
-> to fix that, what's your opinion?
-
-I think we should have a look to this portion closely.
 
 
+On 2015/12/16 17:04, Marc Zyngier wrote:
+> On 16/12/15 08:06, Shannon Zhao wrote:
+>> > Hi,
+>> > 
+>> > On 2015/12/16 15:31, Shannon Zhao wrote:
+>>>>>>>>> >>>>>>>> But in this case, you're returning an error if it is *not* initialized.
+>>>>>>>>> >>>>>>>> I understand that in that case you cannot return an interrupt number (-1
+>>>>>>>>> >>>>>>>> would be weird), but returning -EBUSY feels even more weird.
+>>>>>>>>> >>>>>>>>
+>>>>>>>>> >>>>>>>> I'd settle for -ENOXIO, or something similar. Anyone having a better idea?
+>>>>>>>>> >>>>>>>>
+>>>>> >>>> ENXIO or ENODEV would be my choice too, and add that to the
+>>>>> >>>> Documentation clearly describing when this error code is used.
+>>>>> >>>>
+>>>>> >>>> By the way, why do you loop over all VCPUS to set the same value when
+>>>>> >>>> you can't do anything per VCPU anyway?  It seems to me it's either a
+>>>>> >>>> per-VM property (that you can store on the VM data structure) or it's a
+>>>>> >>>> true per-VCPU property?
+>>> >> This is a per-VCPU property. PMU interrupt could be PPI or SPI. For PPI
+>>> >> the interrupt numbers are same for each vcpu, while for SPI they are
+>>> >> different, so it needs to set them separately. I planned to support both
+>>> >> PPI and SPI. I think I should add support for SPI at this moment and let
+>>> >> users (QEMU) to set these interrupts for each one.
+>> > 
+>> > How about below vPMU Documentation?
+>> > 
+>> > ARM Virtual Performance Monitor Unit (vPMU)
+>> > ===========================================
+>> > 
+>> > Device types supported:
+>> >   KVM_DEV_TYPE_ARM_PMU_V3         ARM Performance Monitor Unit v3
+>> > 
+>> > Instantiate one PMU instance for per VCPU through this API.
+>> > 
+>> > Groups:
+>> >   KVM_DEV_ARM_PMU_GRP_IRQ
+>> >   Attributes:
+>> >     The attr field of kvm_device_attr encodes two values:
+>> >     bits:     | 63 .... 32 | 31 .... 0 |
+>> >     values:   | vcpu_index |  irq_num  |
+>> >     The irq_num describes the PMU overflow interrupt number for the
+>> > specified
+>> >     vcpu_index vcpu. This interrupt could be a PPI or SPI, but for one
+>> > VM the
+>> >     interrupt type must be same for each vcpu.
+>> > 
+>> >   Errors:
+>> >     -ENXIO: Getting or setting this attribute is not yet supported
+>> >     -ENODEV: Getting the PMU overflow interrupt number while it's not set
+>> >     -EBUSY: The PMU overflow interrupt is already set
+>> >     -EINVAL: Invalid vcpu_index or irq_num supplied
+>> > 
+>> > 
+> Let's add at least one comment that forbids two vcpus from getting the
+> same SPI. This is too common a mistake that we see in actual SoCs, and I
+> don't want to see it replicated in VMs...
+
+Ok, will add.
+
+Thanks,
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Shannon
