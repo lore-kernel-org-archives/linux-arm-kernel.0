@@ -1,24 +1,30 @@
-From: prem.mallappa@broadcom.com (Prem (Premachandra) Mallappa)
-Date: Wed, 16 Dec 2015 10:49:07 +0000
-Subject: [PATCH] IOMMU: arm-smmu-v3: fix broken S2PS and AARCH64 in
- Broadcom Vulcan
-In-Reply-To: <20151216101735.GB4308@arm.com>
-References: <1450110687-32207-1-git-send-email-pmallapp@broadcom.com>
- <20151215134010.GH9452@arm.com>
- <CC0BC9CB4553B146B290EC1D4DC5C35901094BCE@SJEXCHMB15.corp.ad.broadcom.com>
- <20151216101735.GB4308@arm.com>
-Message-ID: <CC0BC9CB4553B146B290EC1D4DC5C35901094C41@SJEXCHMB15.corp.ad.broadcom.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 16 Dec 2015 10:55:29 +0000
+Subject: [PATCH v3 4/4] drivers: psci: replace psci firmware calls
+In-Reply-To: <20151201194421.GA29068@ermac>
+References: <1448449461-5043-1-git-send-email-jens.wiklander@linaro.org>
+ <1448449461-5043-5-git-send-email-jens.wiklander@linaro.org>
+ <20151201184741.GE29045@leverpostej> <20151201194421.GA29068@ermac>
+Message-ID: <20151216105529.GC19814@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Ok -- so what is the value reported by your IDR5?
+[CC'ed Daniel]
 
-Our  IDR5, OAS=0x4 (44bits) 
+On Tue, Dec 01, 2015 at 08:44:22PM +0100, Jens Wiklander wrote:
 
+[...]
+
+> > What's the plan for merging this? I assume this'll go via arm-soc?
 > 
-> Ok, I just didn't see any mention of that in the commit message and wanted
-> to make sure it wasn't an accidental unrelated change.
-> 
-Got it.
+> I talked to Arnd about this and he suggested to go via Russel.
 
-/Prem
+Heads-up, this patch will conflict with:
+
+https://patchwork.kernel.org/patch/7418351/
+
+that goes via linux-pm tree, please let me and Daniel know how
+you want us to sort this out.
+
+Thanks,
+Lorenzo
