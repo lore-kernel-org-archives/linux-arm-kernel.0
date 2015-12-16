@@ -1,139 +1,185 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 16 Dec 2015 11:39:27 +0100
-Subject: [PATCH v4] spi: dts: sun4i: Add support for wait time between
- word transmissions
-In-Reply-To: <1450080676-6704-1-git-send-email-mweseloh42@gmail.com>
-References: <1450080676-6704-1-git-send-email-mweseloh42@gmail.com>
-Message-ID: <20151216103927.GS19456@lukather>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Wed, 16 Dec 2015 10:39:50 +0000
+Subject: [RFC PATCH v3 4/8] arm64: Handle early CPU boot failures
+In-Reply-To: <20151215115518.GE9452@arm.com>
+References: <1449655039-22022-1-git-send-email-suzuki.poulose@arm.com>
+ <1449655039-22022-5-git-send-email-suzuki.poulose@arm.com>
+ <20151215115518.GE9452@arm.com>
+Message-ID: <56713F76.8080907@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 15/12/15 11:55, Will Deacon wrote:
+> On Wed, Dec 09, 2015 at 09:57:15AM +0000, Suzuki K. Poulose wrote:
 
-On Mon, Dec 14, 2015 at 09:11:14AM +0100, Marcus Weseloh wrote:
-> Adds a new property "spi-word-wait-ns" to the spi-bus binding that allows
-> SPI slave devices to set a wait time between the transmission of words.
-> Modifies the spi_device struct and slave device probing to read and store
-> the new property.
-> 
-> Also modifies the sun4i SPI master driver to make use of the new property.
-> This specific SPI controller needs 3 clock cycles to set up the delay,
-> which makes the minimum non-zero wait time on this hardware 4 clock cycles.
-> 
-> Signed-off-by: Marcus Weseloh <mweseloh42@gmail.com>
+>>   /*
+>>    * Initial data for bringing up a secondary CPU.
+>> + * @stack  - sp for the secondary CPU
+>> + * @status - Result passed back from the secondary CPU to
+>> + *           indicate failure.
+>>    */
+>>   struct secondary_data {
+>>   	void *stack;
+>> -};
+>> +	unsigned long status;
+>> +} ____cacheline_aligned;
+>
+> Why is this necessary?
 
-It looks mostly fine, however, please try to make only one thing in
-one patch.
+That was based on a suggestion from Mark Rutland here:
 
-In this case, it would mean having one patch to add the DT property
-and support in the SPI core in a first one, and then add support for
-it in your driver.
+   https://lkml.org/lkml/2015/12/1/580
 
-I also have a minor comment below....
 
-> ---
-> Changes from v1:
->  * renamed the property for more clarity
->  * wait time is set in nanoseconds instead of number of clock cycles
->  * transparently handle the 3 setup clock cycles
-> 
-> Changes from v2:
->  * fixed typo in comment
->  * moved parameter to spi-bus binding, dropping the vendor prefix
->  * changed commit summary and description to reflect the changes
-> 
-> Changes from v3:
->  * remove reference to "hardware" in comments and description, as the wait
->    time could also be implemented in software
->  * read and set property value in spi core
-> 
-> As I am now changing SPI core, the sun4i driver and the spi-bus binding, I
-> should probably split the patch into smaller parts (spi core + binding,
-> sun4i changes). I will do that as soon as you are satisfied with the actual
-> approach.
-> ---
->  Documentation/devicetree/bindings/spi/spi-bus.txt |  2 ++
->  drivers/spi/spi-sun4i.c                           | 23 +++++++++++++++++++++++
->  drivers/spi/spi.c                                 |  2 ++
->  include/linux/spi/spi.h                           |  2 ++
->  4 files changed, 29 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/spi/spi-bus.txt b/Documentation/devicetree/bindings/spi/spi-bus.txt
-> index bbaa857..434d321 100644
-> --- a/Documentation/devicetree/bindings/spi/spi-bus.txt
-> +++ b/Documentation/devicetree/bindings/spi/spi-bus.txt
-> @@ -61,6 +61,8 @@ contain the following properties.
->                        used for MOSI. Defaults to 1 if not present.
->  - spi-rx-bus-width - (optional) The bus width(number of data wires) that
->                        used for MISO. Defaults to 1 if not present.
-> +- spi-word-wait-ns - (optional) Delay between transmission of words
-> +                      in nanoseconds
->  
->  Some SPI controllers and devices support Dual and Quad SPI transfer mode.
->  It allows data in the SPI system to be transferred in 2 wires(DUAL) or 4 wires(QUAD).
-> diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
-> index f60a6d6..c1a33dc 100644
-> --- a/drivers/spi/spi-sun4i.c
-> +++ b/drivers/spi/spi-sun4i.c
-> @@ -19,6 +19,7 @@
->  #include <linux/module.h>
->  #include <linux/platform_device.h>
->  #include <linux/pm_runtime.h>
-> +#include <linux/of.h>
->  
->  #include <linux/spi/spi.h>
->  
-> @@ -84,6 +85,7 @@ struct sun4i_spi {
->  	const u8		*tx_buf;
->  	u8			*rx_buf;
->  	int			len;
-> +	u32			word_wait_ns;
->  };
->  
->  static inline u32 sun4i_spi_read(struct sun4i_spi *sspi, u32 reg)
-> @@ -173,6 +175,8 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
->  	unsigned int tx_len = 0;
->  	int ret = 0;
->  	u32 reg;
-> +	int wait_clk = 0;
-> +	int clk_ns = 0;
->  
->  	/* We don't support transfer larger than the FIFO */
->  	if (tfr->len > SUN4I_FIFO_DEPTH)
-> @@ -261,6 +265,25 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
->  
->  	sun4i_spi_write(sspi, SUN4I_CLK_CTL_REG, reg);
->  
-> +	/*
-> +	 * Setup wait time between words.
-> +	 *
-> +	 * Wait time is set in SPI_CLK cycles. The SPI hardware needs 3
-> +	 * additional cycles to setup the wait counter, so the minimum delay
-> +	 * time is 4 cycles.
-> +	 */
-> +	if (spi->word_wait_ns) {
-> +		clk_ns = DIV_ROUND_UP(1000000000, tfr->speed_hz);
-> +		wait_clk = DIV_ROUND_UP(spi->word_wait_ns, clk_ns) - 3;
-> +		if (wait_clk < 1) {
-> +			wait_clk = 1;
-> +			dev_info(&spi->dev,
-> +				 "using minimum of 4 word wait cycles (%uns)",
-> +				 4 * clk_ns);
+>> @@ -615,6 +616,7 @@ ENDPROC(__secondary_switched)
+>>    * Enable the MMU.
+>>    *
+>>    *  x0  = SCTLR_EL1 value for turning on the MMU.
+>> + *  x22 = __va(secondary_data)
+>>    *  x27 = *virtual* address to jump to upon completion
 
-Logging it at the info loglevel seems a bit too high. debug seems more
-appropriate.
+...
 
-Thanks!
-Maxime
+>>
+>>   __no_granule_support:
+>> +	/* Indicate that this CPU can't boot and is stuck in the kernel */
+>> +	cmp	x22, 0				// Boot CPU doesn't update status
+>> +	b.eq	1f
+>> +	adrp	x1, secondary_data
+>> +	add	x1, x1, #:lo12:secondary_data	// x1 = __pa(secondary_data)
+>
+> This feels a bit grotty. You end up using the virtual address of
+> secondary_data to figure out if you're the boot CPU or not, and then you
+> end up having to compute the physical address of the same variable anyway.
+>
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151216/6ca25e43/attachment.sig>
+Yes, it looks a bit weird, but we pass down the va(secondary_data) to the secondary
+CPU and that is used only after the MMU is turned on, to fetch the stack ptr.
+We use that information to detect if we are secondary. When we fail before turning
+the MMU on, we need to update our result back, hence the va-to-pa conversion.
+Is there a better way to handle it ? Am I missing something ? Or we could add another
+register which would indicate if it is secondary or not.
+
+>> +	mov	x0, #CPU_STUCK_IN_KERNEL
+>> +	str	x0, [x1, #CPU_BOOT_STATUS]	// update the secondary_data.status
+>> +	/* flush the data to PoC */
+>
+> Can you call __inval_cache_range instead of open-coding this?
+
+Yes, that sounds better, will use that.
+
+>> +	isb
+>
+> Why?
+
+...
+
+>
+>> +	dc	civac, x1
+>> +	dsb	sy
+>> +	isb
+>
+> Why?
+
+I now realize how bad this code is. I wrote this up in a hurry, without proper
+understanding of the dependencies of 'dc'. I was under the assumption that the isb
+needed just like we do after updating the system control registers, which is not
+true for dc.
+
+>
+>> +1:
+>>   	wfe
+>
+> Curious, but do you know why we don't have a wfi here too (like we do in
+> the C code)?
+
+Yes we do, will add it.
+
+>>   	/*
+>>   	 * Now bring the CPU into our world.
+>> @@ -117,7 +135,31 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
+>>   		pr_err("CPU%u: failed to boot: %d\n", cpu, ret);
+>>   	}
+>>
+>> +	mb();
+>
+> Why? (and why not smp_mb(), if the barrier is actually needed?).
+
+Actually, now when I think of it we don't need it as the cache would have been
+invalidated by the secondary. All we need is making secondary_data.status volatile,
+to make sure we don't use a stale copy of secondary_data.status cached in the
+register.
+
+I will rewrite this code.
+
+>> +
+>>   	secondary_data.stack = NULL;
+>> +	if (ret && secondary_data.status) {
+>> +		switch(secondary_data.status) {
+>> +		default:
+>> +			pr_err("CPU%u: failed in unknown state : 0x%lx\n",
+>> +					cpu, secondary_data.status);
+>> +			break;
+>> +		case CPU_KILL_ME:
+>> +			if (op_cpu_kill(cpu)) {
+>> +				pr_crit("CPU%u: may not have shut down cleanly\n",
+>> +							cpu);
+>> +				cpus_stuck_in_kernel++;
+>
+> Maybe restructure this so the failed kill case is a fallthrough to the
+> CPU_STUCK_IN_KERNEL case?
+
+Yes, makes sense.
+
+>
+>> +			} else
+>> +				pr_crit("CPU%u: died during early boot\n", cpu);
+>
+> Missing braces.
+
+Will fix that.
+
+>> +			break;
+>> +		case CPU_STUCK_IN_KERNEL:
+>> +			pr_crit("CPU%u: is stuck in kernel\n", cpu);
+>> +			cpus_stuck_in_kernel++;
+>> +			break;
+>> +		case CPU_PANIC_KERNEL:
+>> +			panic("CPU%u detected unsupported configuration\n", cpu);
+>
+> It would nice to show what the configuration difference was, but maybe
+> that's work for later.
+
+One way would be to assign code for each of the failing cases overload the
+status with the reason (on the top half). But thats only needed for cases where
+we couldn't write something to the console. Anyways, thats something for later.
+
+>
+>> +		}
+>> +	}
+>>
+>>   	return ret;
+>>   }
+>> @@ -185,6 +227,7 @@ asmlinkage void secondary_start_kernel(void)
+>>   	 */
+>>   	pr_info("CPU%u: Booted secondary processor [%08x]\n",
+>>   					 cpu, read_cpuid_id());
+>> +	update_cpu_boot_status(CPU_BOOT_SUCCESS);
+>
+> Why do we need to continue with the cacheflushing at this point?
+
+>> +	update_cpu_boot_status(CPU_STUCK_IN_KERNEL);
+>> +	__flush_dcache_area(&secondary_data, sizeof(secondary_data));
+>
+> Extra flushing, but I don't see why you need it at all when you're
+> running in C on the CPU coming up.
+
+
+You are right, we don't need to do this as we are already using the
+va.
+
+I will rewrite it properly. Thanks for the review and patience :)
+
+Cheers
+Suzuki
+  
