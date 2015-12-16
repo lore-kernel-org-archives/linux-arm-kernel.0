@@ -1,39 +1,22 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 16 Dec 2015 11:20:26 +0100
-Subject: [GIT PULL] at91: defconfig for 4.5 #1
-Message-ID: <1450261226-2102-1-git-send-email-nicolas.ferre@atmel.com>
+From: ulrich.hecht+renesas@gmail.com (Ulrich Hecht)
+Date: Wed, 16 Dec 2015 11:23:53 +0100
+Subject: [PATCH 5/6] pinctrl: sh-pfc: r8a7795: add SATA0 pin conf to DT
+In-Reply-To: <CAMuHMdW3ZtvWkhZW1Locmu3WL1YixGrVAdiy7nKywkTiDB+X1w@mail.gmail.com>
+References: <1450107758-2544-1-git-send-email-ulrich.hecht+renesas@gmail.com>
+ <1450107758-2544-6-git-send-email-ulrich.hecht+renesas@gmail.com>
+ <CAMuHMdW3ZtvWkhZW1Locmu3WL1YixGrVAdiy7nKywkTiDB+X1w@mail.gmail.com>
+Message-ID: <CAO3366xuwvQH1pkFk0DJ01skWqjCki1Ndg5BHrWdauCkkR2HCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+On Wed, Dec 16, 2015 at 11:11 AM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> Hence I expect SATA to work fine without any pinctrl, and this patch should
+> just be dropped?
+>
+> Can you please check? Thanks!
 
-As single patch for this pull-request: tell me if you would like to take it
-independently, as a patch.
+Works just fine without.  I'll drop it.
 
-Thanks, best regards,
-
-The following changes since commit 31ade3b83e1821da5fbb2f11b5b3d4ab2ec39db8:
-
-  Linux 4.4-rc3 (2015-11-29 18:58:26 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-defconfig
-
-for you to fetch changes up to 94c2317cf46a9c137650bf30f2aba7271886c0b4:
-
-  ARM: at91/defconfig: enable watchdog drivers in sama5_defconfig (2015-12-15 11:18:39 +0100)
-
-----------------------------------------------------------------
-First defconfig pull-request for 4.5:
-- a single patch to add watchdog drivers to sama5_defconfig
-
-----------------------------------------------------------------
-Wenyou Yang (1):
-      ARM: at91/defconfig: enable watchdog drivers in sama5_defconfig
-
- arch/arm/configs/sama5_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
-
--- 
-Nicolas Ferre
+CU
+Uli
