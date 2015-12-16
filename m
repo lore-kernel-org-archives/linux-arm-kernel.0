@@ -1,213 +1,159 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 16 Dec 2015 16:16:31 +0100
-Subject: [PATCH V2 21/23] pci, acpi: Support for ACPI based PCI hostbridge init
+Date: Wed, 16 Dec 2015 16:16:32 +0100
+Subject: [PATCH V2 22/23] pci,
+ acpi: Match PCI config space accessors against platfrom specific
+ quirks.
 In-Reply-To: <1450278993-12664-1-git-send-email-tn@semihalf.com>
 References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
-Message-ID: <1450278993-12664-22-git-send-email-tn@semihalf.com>
+Message-ID: <1450278993-12664-23-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because of two patch series:
-1. Jiang Liu's common interface to support PCI host bridge init
-2. MMCONFIG refactoring (part of this patch set)
-now we can think about generic ACPI based PCI host bridge driver
-out of arch/ directory.
+Some platforms may not be fully compliant with generic set of PCI config
+accessors. For these cases we implement the way to overwrite accessors
+set before PCI buses enumeration. Algorithm that overwrite accessors
+matches against platform ID (DMI), domain and bus number, hopefully
+enough for all cases. All quirks can be defined using:
+DECLARE_ACPI_MCFG_FIXUP() and keep self contained.
 
-This driver use information from MCFG table (PCI config space regions)
-and _CRS method (IO/irq resources) to initialize PCI hostbridge.
+example:
 
-TBD: We are still not sure whether we should reassign resources
-after PCI bus enumeration or trust firmware to do all that work for
-us properly.
+static const struct dmi_system_id yyy[] = {
+	{
+		.ident = "<Platform ident string>",
+		.callback = <handler>,
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "<system vendor>"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "<product name>"),
+			DMI_MATCH(DMI_PRODUCT_VERSION, "product version"),
+		},
+	},
+	{ }
+};
+
+static struct pci_ops ecam_pci_ops = {
+	.map_bus = pci_mcfg_dev_base,
+	.read = xxxx_ecam_config_read,
+	.write = xxxx_ecam_config_write,
+};
+DECLARE_ACPI_MCFG_FIXUP(yyy, &ecam_pci_ops, <domain_nr>, <bus_nr>);
+
+Note, that more custom actions can be done via DMI callback hook.
 
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-CC: Arnd Bergmann <arnd@arndb.de>
-CC: Catalin Marinas <catalin.marinas@arm.com>
-CC: Liviu Dudau <Liviu.Dudau@arm.com>
-CC: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
-CC: Will Deacon <will.deacon@arm.com>
-Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 ---
- drivers/pci/host/Kconfig         |   6 ++
- drivers/pci/host/Makefile        |   1 +
- drivers/pci/host/pci-host-acpi.c | 138 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 145 insertions(+)
- create mode 100644 drivers/pci/host/pci-host-acpi.c
+ drivers/acpi/mcfg.c               | 35 +++++++++++++++++++++++++++++++++--
+ include/asm-generic/vmlinux.lds.h |  7 +++++++
+ include/linux/ecam.h              | 17 +++++++++++++++++
+ 3 files changed, 57 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-index f131ba9..0e5e339 100644
---- a/drivers/pci/host/Kconfig
-+++ b/drivers/pci/host/Kconfig
-@@ -60,6 +60,12 @@ config PCI_HOST_GENERIC
- 	  Say Y here if you want to support a simple generic PCI host
- 	  controller, such as the one emulated by kvmtool.
+diff --git a/drivers/acpi/mcfg.c b/drivers/acpi/mcfg.c
+index a9b2231..6d0194d 100644
+--- a/drivers/acpi/mcfg.c
++++ b/drivers/acpi/mcfg.c
+@@ -8,6 +8,7 @@
+  */
  
-+config PCI_HOST_GENERIC_ACPI
-+	bool "Generic ACPI PCI host controller"
-+	depends on ACPI && ARCH_PCI_HOST_GENERIC_ACPI
-+	help
-+	  Say Y here if you want to support generic ACPI PCI host controller.
+ #include <linux/acpi.h>
++#include <linux/dmi.h>
+ #include <linux/ecam.h>
+ #include <linux/pci.h>
+ #include <linux/pci-acpi.h>
+@@ -34,6 +35,31 @@ int __weak raw_pci_write(unsigned int domain, unsigned int bus,
+ 	return PCIBIOS_DEVICE_NOT_FOUND;
+ }
+ 
++extern struct pci_mcfg_fixup __start_acpi_mcfg_fixups[];
++extern struct pci_mcfg_fixup __end_acpi_mcfg_fixups[];
 +
- config PCIE_SPEAR13XX
- 	bool "STMicroelectronics SPEAr PCIe controller"
- 	depends on ARCH_SPEAR13XX
-diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
-index 9d4d3c6..9117894 100644
---- a/drivers/pci/host/Makefile
-+++ b/drivers/pci/host/Makefile
-@@ -7,6 +7,7 @@ obj-$(CONFIG_PCI_TEGRA) += pci-tegra.o
- obj-$(CONFIG_PCI_RCAR_GEN2) += pci-rcar-gen2.o
- obj-$(CONFIG_PCI_RCAR_GEN2_PCIE) += pcie-rcar.o
- obj-$(CONFIG_PCI_HOST_GENERIC) += pci-host-generic.o
-+obj-$(CONFIG_PCI_HOST_GENERIC_ACPI) += pci-host-acpi.o
- obj-$(CONFIG_PCIE_SPEAR13XX) += pcie-spear13xx.o
- obj-$(CONFIG_PCI_KEYSTONE) += pci-keystone-dw.o pci-keystone.o
- obj-$(CONFIG_PCIE_XILINX) += pcie-xilinx.o
-diff --git a/drivers/pci/host/pci-host-acpi.c b/drivers/pci/host/pci-host-acpi.c
-new file mode 100644
-index 0000000..29175f5
---- /dev/null
-+++ b/drivers/pci/host/pci-host-acpi.c
-@@ -0,0 +1,138 @@
-+/*
-+ * ACPI based generic PCI host controller driver
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ * Copyright (C) 2015 Semihalf
-+ * Author: Tomasz Nowicki <tn@semihalf.com>
-+ */
-+
-+#include <linux/acpi.h>
-+#include <linux/ecam.h>
-+#include <linux/of_address.h>
-+#include <linux/pci.h>
-+#include <linux/pci-acpi.h>
-+
-+static int pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
++static struct pci_ops *pci_mcfg_check_quirks(int domain, int bus_number)
 +{
-+	if (pci_dev_msi_enabled(dev))
-+		return 0;
++	struct pci_mcfg_fixup *fixup;
 +
-+	return acpi_pci_irq_enable(dev);
-+}
-+
-+int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
-+{
-+	bridge->map_irq = pcibios_map_irq;
-+	return 0;
-+}
-+
-+static void pci_mcfg_release_info(struct acpi_pci_root_info *ci)
-+{
-+	pci_mmcfg_teardown_map(ci);
-+	kfree(ci);
-+}
-+
-+static int pci_acpi_root_prepare_resources(struct acpi_pci_root_info *ci)
-+{
-+	struct resource_entry *entry, *tmp;
-+	int ret;
-+
-+	ret = acpi_pci_probe_root_resources(ci);
-+	if (ret <= 0)
-+		return ret;
-+
-+	resource_list_for_each_entry_safe(entry, tmp, &ci->resources) {
-+		struct resource *res = entry->res;
-+
-+		/*
-+		 * TODO: need to move pci_register_io_range() function out
-+		 * of drivers/of/address.c for both used by DT and ACPI
-+		 */
-+		if (res->flags & IORESOURCE_IO) {
-+			resource_size_t cpu_addr = res->start + entry->offset;
-+			resource_size_t pci_addr = res->start;
-+			resource_size_t length = res->end - res->start;
-+			unsigned long port;
-+			int err;
-+
-+			err = pci_register_io_range(cpu_addr, length);
-+			if (err) {
-+				resource_list_destroy_entry(entry);
-+				continue;
-+			}
-+
-+			port = pci_address_to_pio(cpu_addr);
-+			if (port == (unsigned long)-1) {
-+				resource_list_destroy_entry(entry);
-+				continue;
-+			}
-+
-+			res->start = port;
-+			res->end = port + length;
-+			entry->offset = port - pci_addr;
-+
-+			if (pci_remap_iospace(res, cpu_addr) < 0)
-+				resource_list_destroy_entry(entry);
++	fixup = __start_acpi_mcfg_fixups;
++	while (fixup < __end_acpi_mcfg_fixups) {
++		if (dmi_check_system(fixup->system) &&
++		    (fixup->domain == domain ||
++		     fixup->domain == PCI_MCFG_DOMAIN_ANY) &&
++		    (fixup->bus_number == bus_number ||
++		     fixup->bus_number == PCI_MCFG_BUS_ANY)) {
++			pr_info(PREFIX "Fixup applied: Platform [%s] domain [%d] bus number [%d]\n",
++				fixup->system->ident, fixup->domain,
++				fixup->bus_number);
++			return fixup->ops;
 +		}
++		++fixup;
 +	}
 +
-+	return ret;
++	return NULL;
 +}
 +
-+static struct acpi_pci_root_ops acpi_pci_root_ops = {
-+	.init_info = pci_mmcfg_setup_map,
-+	.release_info = pci_mcfg_release_info,
-+	.prepare_resources = pci_acpi_root_prepare_resources,
+ void __iomem *
+ pci_mcfg_dev_base(struct pci_bus *bus, unsigned int devfn, int offset)
+ {
+@@ -56,10 +82,15 @@ static struct pci_ops default_pci_mcfg_ops = {
+ 
+ struct pci_ops *pci_mcfg_get_ops(int domain, int bus)
+ {
++	struct pci_ops *pci_mcfg_ops_quirk;
++
+ 	/*
+-	 * TODO: Match against platform specific quirks and return
+-	 * corresponding PCI config space accessor set.
++	 * Match against platform specific quirks and return corresponding
++	 * PCI config space accessor set.
+ 	 */
++	pci_mcfg_ops_quirk = pci_mcfg_check_quirks(domain, bus);
++	if (pci_mcfg_ops_quirk)
++		return pci_mcfg_ops_quirk;
+ 
+ 	return &default_pci_mcfg_ops;
+ }
+diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+index c4bd0e2..c93fc97 100644
+--- a/include/asm-generic/vmlinux.lds.h
++++ b/include/asm-generic/vmlinux.lds.h
+@@ -298,6 +298,13 @@
+ 		VMLINUX_SYMBOL(__end_pci_fixups_suspend_late) = .;	\
+ 	}								\
+ 									\
++	/* ACPI MCFG quirks */						\
++	.acpi_fixup        : AT(ADDR(.acpi_fixup) - LOAD_OFFSET) {	\
++		VMLINUX_SYMBOL(__start_acpi_mcfg_fixups) = .;		\
++		*(.acpi_fixup_mcfg)					\
++		VMLINUX_SYMBOL(__end_acpi_mcfg_fixups) = .;		\
++	}								\
++									\
+ 	/* Built-in firmware blobs */					\
+ 	.builtin_fw        : AT(ADDR(.builtin_fw) - LOAD_OFFSET) {	\
+ 		VMLINUX_SYMBOL(__start_builtin_fw) = .;			\
+diff --git a/include/linux/ecam.h b/include/linux/ecam.h
+index e0f322e..1319fa8 100644
+--- a/include/linux/ecam.h
++++ b/include/linux/ecam.h
+@@ -20,6 +20,23 @@ struct pci_mmcfg_region {
+ 	bool hot_added;
+ };
+ 
++struct pci_mcfg_fixup {
++	const struct dmi_system_id *system;
++	struct pci_ops *ops;
++	int domain;
++	int bus_number;
 +};
 +
-+/* Root bridge scanning */
-+struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
-+{
-+	int node = acpi_get_node(root->device->handle);
-+	int domain = root->segment;
-+	int busnum = root->secondary.start;
-+	struct acpi_pci_root_info *info;
-+	struct pci_bus *bus;
++#define PCI_MCFG_DOMAIN_ANY	-1
++#define PCI_MCFG_BUS_ANY	-1
 +
-+	if (domain && !pci_domains_supported) {
-+		pr_warn("PCI %04x:%02x: multiple domains not supported.\n",
-+			domain, busnum);
-+		return NULL;
-+	}
++/* Designate a routine to fix up buggy MCFG */
++#define DECLARE_ACPI_MCFG_FIXUP(system, ops, dom, bus)			\
++	static const struct pci_mcfg_fixup __mcfg_fixup_##system##dom##bus\
++	 __used	__attribute__((__section__(".acpi_fixup_mcfg"),		\
++				aligned((sizeof(void *))))) =		\
++	{ system, ops, dom, bus };
 +
-+	info = kzalloc_node(sizeof(*info), GFP_KERNEL, node);
-+	if (!info) {
-+		dev_err(&root->device->dev,
-+			"pci_bus %04x:%02x: ignored (out of memory)\n",
-+			domain, busnum);
-+		return NULL;
-+	}
-+
-+	acpi_pci_root_ops.pci_ops = pci_mcfg_get_ops(domain, busnum);
-+	bus = acpi_pci_root_create(root, &acpi_pci_root_ops, info, root);
-+
-+	/* After the PCI-E bus has been walked and all devices discovered,
-+	 * configure any settings of the fabric that might be necessary.
-+	 */
-+	if (bus) {
-+		struct pci_bus *child;
-+		pci_bus_size_bridges(bus);
-+		pci_bus_assign_resources(bus);
-+
-+		list_for_each_entry(child, &bus->children, node)
-+			pcie_bus_configure_settings(child);
-+	}
-+
-+	return bus;
-+}
+ struct pci_mmcfg_region *pci_mmconfig_lookup(int segment, int bus);
+ struct pci_mmcfg_region *pci_mmconfig_alloc(int segment, int start,
+ 						   int end, u64 addr);
 -- 
 1.9.1
