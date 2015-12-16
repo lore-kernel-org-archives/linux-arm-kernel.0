@@ -1,45 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 16 Dec 2015 11:13:17 +0000
-Subject: [PATCH] arm64: reenable interrupt when handling ptrace breakpoint
-In-Reply-To: <1450225088-2456-1-git-send-email-yang.shi@linaro.org>
-References: <1450225088-2456-1-git-send-email-yang.shi@linaro.org>
-Message-ID: <20151216111316.GD4308@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 16 Dec 2015 11:15:25 +0000
+Subject: [PATCH 1/2] arm64: Improve error reporting on set_pte_at() checks
+In-Reply-To: <CA+=Sn1kQBoLCY_AidPXPU-2dkqGcfDfZtcnk1gzEukttZ+foOQ@mail.gmail.com>
+References: <CA+=Sn1kQBoLCY_AidPXPU-2dkqGcfDfZtcnk1gzEukttZ+foOQ@mail.gmail.com>
+Message-ID: <567147CD.6090404@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 15, 2015 at 04:18:08PM -0800, Yang Shi wrote:
-> The kernel just send out a SIGTRAP signal when handling ptrace breakpoint in
-> debug exception, so it sounds safe to have interrupt enabled if it is not
-> disabled by the parent process.
+Hi Andrew,
 
-Is this actually fixing an issue you're seeing, or did you just spot this?
-Given that force_sig_info disable interrupts, I don't think this is really
-worth doing.
-
-> Signed-off-by: Yang Shi <yang.shi@linaro.org>
-> ---
->  arch/arm64/kernel/debug-monitors.c | 10 ++++++++++
->  1 file changed, 10 insertions(+)
+On 16/12/15 03:01, Andrew Pinski wrote:
+> On Tue, Dec 9, 2015 at 17:26:56, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+>>
+>> Currently the BUG_ON() checks do not give enough information about the PTEs being set. This patch changes BUG_ON to WARN_ONCE and dumps the values of the old and new PTEs.
 > 
-> diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-> index 8aee3ae..90d70e4 100644
-> --- a/arch/arm64/kernel/debug-monitors.c
-> +++ b/arch/arm64/kernel/debug-monitors.c
-> @@ -239,6 +239,9 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
->  		return 0;
->  
->  	if (user_mode(regs)) {
-> +		if (interrupts_enabled(regs))
-> +			local_irq_enable();
-> +
+> 
+> This change broke building the mantis driver:
+> 
+> In file included from ./arch/arm64/include/asm/io.h:30:0,
+>                  from drivers/media/pci/mantis/mantis_i2c.c:21:
+> ./arch/arm64/include/asm/pgtable.h: In function ?set_pte_at?:
+> ./arch/arm64/include/asm/pgtable.h:281:3: error: implicit declaration
+> of function ?BUILD_BUG_ON_INVALID?
+> [-Werror=implicit-function-declaration]
+>    VM_WARN_ONCE(!pte_young(pte),
+>    ^
 
-My worry here is that we take an interrupt and, on the return path,
-decide to reschedule due to CONFIG_PREEMPT. If we somehow end up back
-in the debugger, I'm concerned that it could remove the breakpoint and
-then later see an unexpected SIGTRAP from the child.
+This is due to a missing include in include/linux/mmdebug.h, which
+Julien Grall saw with CONFIG_XEN & !CONFIG_DEBUG_VM. There was some
+discussion at [0], and a patch at [1].
 
-Having said that, I've failed to construct a non-racy scenario in which
-that can happen, but I'm just really uncomfortable making this change
-unless there's a real problem being solved.
+The quick-and-dirty workaround is to toggle CONFIG_DEBUG_VM. It should
+be fixed in the next rc.
 
-Will
+
+Thanks,
+
+James
+
+[0] https://lkml.org/lkml/2015/12/14/489
+[1] http://www.spinics.net/lists/linux-mm/msg98868.html
