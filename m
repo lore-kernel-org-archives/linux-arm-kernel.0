@@ -1,60 +1,91 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 16 Dec 2015 16:16:28 +0100
-Subject: [PATCH V2 18/23] x86, acpi,
- pci: Use equivalent function introduced in previous patch.
+Date: Wed, 16 Dec 2015 16:16:29 +0100
+Subject: [PATCH V2 19/23] acpi,
+ mcfg: Add default PCI config accessors implementation and initial
+ support for related quirks.
 In-Reply-To: <1450278993-12664-1-git-send-email-tn@semihalf.com>
 References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
-Message-ID: <1450278993-12664-19-git-send-email-tn@semihalf.com>
+Message-ID: <1450278993-12664-20-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+We use generic accessors from access.c by default. However, we already
+know platforms that need special handling while accessing to PCI config
+space. These platforms will need different accessors set matched against
+platform ID, domain, bus touple. Therefore we are going to add (in future)
+DECLARE_ACPI_MCFG_FIXUP which will register platform specific custom
+accessors. For now we let pci_mcfg_get_ops takes domain and bus arguments
+and left some space for matching algorithm.
+
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
 ---
- arch/x86/pci/acpi.c | 20 +-------------------
- 1 file changed, 1 insertion(+), 19 deletions(-)
+ drivers/acpi/mcfg.c      | 30 ++++++++++++++++++++++++++++++
+ include/linux/pci-acpi.h |  8 ++++++++
+ 2 files changed, 38 insertions(+)
 
-diff --git a/arch/x86/pci/acpi.c b/arch/x86/pci/acpi.c
-index 5f78595..33233a7 100644
---- a/arch/x86/pci/acpi.c
-+++ b/arch/x86/pci/acpi.c
-@@ -201,29 +201,11 @@ static int setup_mcfg_map(struct acpi_pci_root_info *ci)
+diff --git a/drivers/acpi/mcfg.c b/drivers/acpi/mcfg.c
+index dca4c4e..a9b2231 100644
+--- a/drivers/acpi/mcfg.c
++++ b/drivers/acpi/mcfg.c
+@@ -34,6 +34,36 @@ int __weak raw_pci_write(unsigned int domain, unsigned int bus,
+ 	return PCIBIOS_DEVICE_NOT_FOUND;
+ }
  
- 	return 0;
- }
--
--static void teardown_mcfg_map(struct acpi_pci_root_info *ci)
--{
--	struct acpi_pci_root *root = ci->root;
--	struct pci_mmcfg_region *cfg;
--
--	cfg = pci_mmconfig_lookup(root->segment, root->secondary.start);
--	if (!cfg)
--		return;
--
--	if (cfg->hot_added)
--		pci_mmconfig_delete(root->segment, root->secondary.start,
--				    root->secondary.end);
--}
- #else
- static int setup_mcfg_map(struct acpi_pci_root_info *ci)
++void __iomem *
++pci_mcfg_dev_base(struct pci_bus *bus, unsigned int devfn, int offset)
++{
++	struct pci_mmcfg_region *cfg;
++
++	cfg = pci_mmconfig_lookup(pci_domain_nr(bus), bus->number);
++	if (cfg && cfg->virt)
++		return cfg->virt +
++			(PCI_MMCFG_BUS_OFFSET(bus->number) | (devfn << 12)) +
++			offset;
++	return NULL;
++}
++
++/* Default generic PCI config accessors */
++static struct pci_ops default_pci_mcfg_ops = {
++	.map_bus = pci_mcfg_dev_base,
++	.read = pci_generic_config_read,
++	.write = pci_generic_config_write,
++};
++
++struct pci_ops *pci_mcfg_get_ops(int domain, int bus)
++{
++	/*
++	 * TODO: Match against platform specific quirks and return
++	 * corresponding PCI config space accessor set.
++	 */
++
++	return &default_pci_mcfg_ops;
++}
++
+ int __init acpi_parse_mcfg(struct acpi_table_header *header)
  {
- 	return 0;
- }
--
--static void teardown_mcfg_map(struct acpi_pci_root_info *ci)
--{
--}
+ 	struct acpi_table_mcfg *mcfg;
+diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
+index c277415..3790197 100644
+--- a/include/linux/pci-acpi.h
++++ b/include/linux/pci-acpi.h
+@@ -82,10 +82,18 @@ void acpi_pci_remove_bus(struct pci_bus *bus);
+ #ifdef	CONFIG_PCI_MMCONFIG
+ int pci_mmcfg_setup_map(struct acpi_pci_root_info *ci);
+ void pci_mmcfg_teardown_map(struct acpi_pci_root_info *ci);
++struct pci_ops *pci_mcfg_get_ops(int domain, int bus);
++void __iomem *
++pci_mcfg_dev_base(struct pci_bus *bus, unsigned int devfn, int offset);
+ #else
+ static inline int pci_mmcfg_setup_map(struct acpi_pci_root_info *ci)
+ { return 0; }
+ static inline void pci_mmcfg_teardown_map(struct acpi_pci_root_info *ci) { }
++static inline struct pci_ops *pci_mcfg_get_ops(int domain, int bus)
++{ return NULL; }
++void __iomem *
++pci_mcfg_dev_base(struct pci_bus *bus, unsigned int devfn, int offset)
++{ return NULL; }
  #endif
  
- static int pci_acpi_root_get_node(struct acpi_pci_root *root)
-@@ -251,7 +233,7 @@ static int pci_acpi_root_init_info(struct acpi_pci_root_info *ci)
- 
- static void pci_acpi_root_release_info(struct acpi_pci_root_info *ci)
- {
--	teardown_mcfg_map(ci);
-+	pci_mmcfg_teardown_map(ci);
- 	kfree(container_of(ci, struct pci_root_info, common));
- }
- 
+ #ifdef	CONFIG_ACPI_PCI_SLOT
 -- 
 1.9.1
