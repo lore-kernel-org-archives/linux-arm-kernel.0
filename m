@@ -1,55 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 Dec 2015 23:09:36 +0100
-Subject: arm-soc boot: 320 boots: 12 failed,
- 308 passed (v4.4-rc3-483-gb48b5ceb7227)
-In-Reply-To: <CANMBJr4h3JDJk6eufdirvy9fVxBGZUA4zu5e5mtfGdUF13qLwA@mail.gmail.com>
-References: <567128b4.46b71c0a.17f65.7531@mx.google.com>
- <5276296.zVv1bjCjBz@wuerfel>
- <CANMBJr4h3JDJk6eufdirvy9fVxBGZUA4zu5e5mtfGdUF13qLwA@mail.gmail.com>
-Message-ID: <1855103.nkkrE7bpzX@wuerfel>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 16 Dec 2015 16:12:08 -0600
+Subject: [PATCH v7 3/4] gicv2m: Refactor to prepare for ACPI support
+In-Reply-To: <1449766530-16935-4-git-send-email-Suravee.Suthikulpanit@amd.com>
+References: <1449766530-16935-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1449766530-16935-4-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <20151216221208.GC27791@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 16 December 2015 13:51:10 Tyler Baker wrote:
-> On 16 December 2015 at 12:16, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Wednesday 16 December 2015 11:34:30 Tyler Baker wrote:
-> >> > * bcm4708-smartrg-sr400ac doesn't find its rootfs any more
-> >> >
-> >> > [   16.670994] No filesystem could mount root, tried:  ext3 ext2 ext4 squashfs vfat msdos ntfs
-> >> > [   16.679388] Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(1,0)
-> >> >
-> >> >   I merged some patches from Florian yesterday, but it could also be a problem with
-> >> >   the defconfig changes
-> >>
-> >> The bisection pointed to b02ec7658c98 ("ARM: multi_v7_defconfig:
-> >> Enable some drivers for LS1021A")
-> >>
-> >> I've rebased my tree with arm-soc for-next, and reverted the commits
-> >> listed above. Should know shortly if the reverts fix the boot issues.
-> >
-> > I've looked at the built-in drivers to see if they might do something
-> > on unrelated hardware (we've had bugs like that before), but didn't
-> > find anything: the watchdog and cpufreq drivers all look sane, everything
-> > else is a loadable module.
-> >
-> > One possible explanation would be a buggy bootloader that fails to pass
-> > a correct initrd and/or dtb if the kernel image gets too big.
-> >
-> > Do you know if there is an initrd that is passed on this platform?
+On Thu, Dec 10, 2015 at 08:55:29AM -0800, Suravee Suthikulpanit wrote:
+> This patch replaces the struct device_node with struct fwnode_handle
+> since this structure is common between DT and ACPI.
 > 
-> There is, and if I disable only CONFIG_BLK_DEV_RAM the
-> bcm4708-smartrg-sr400ac boots again. This platform runs a CFE
-> bootloader, and this is these are the kernel arguments injected into
-> the DT - "console=ttyS0,115200 initrd=0x4000000,8M root=/dev/ram0
-> ip=dhcp".
+> It also refactors gicv2m_init_one() to prepare for ACPI support.
+> The only functional change is removing the node name from pr_info.
+> 
+> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 
-Ok, so it's probably the initrd= argument that causes the problem: as
-long as CONFIG_BLK_DEV_INITRD was disabled, the code in arm_memblock_init
-would ignore the initrd that gets passed by the bootloader and just
-use the initramfs that is appended to the kernel.
+> @@ -359,10 +355,10 @@ static int __init gicv2m_init_one(struct device_node *node,
+>  	}
+>  
+>  	list_add_tail(&v2m->entry, &v2m_nodes);
+> -	pr_info("Node %s: range[%#lx:%#lx], SPI[%d:%d]\n", node->name,
+> -		(unsigned long)v2m->res.start, (unsigned long)v2m->res.end,
+> -		v2m->spi_start, (v2m->spi_start + v2m->nr_spis));
+>  
+> +	pr_info("range[%#lx:%#lx], SPI[%d:%d]\n",
+> +		(unsigned long)res->start, (unsigned long)res->end,
+> +		v2m->spi_start, (v2m->spi_start + v2m->nr_spis));
 
-There may also be some problem related to how the bootloader uses
-a command line rather than the appropriate ATAG to pass the initrd
-location.
+You didn't change this, but I don't think this message has enough
+context.  It's pretty cryptic all by itself.  It'd be nice if it could
+at least include a device name, e.g., if you could use dev_info().
 
-	Arnd
+If that's possible, I guess a separate patch would be appropriate,
+since there are other similar things in this file.
+
+Bjorn
