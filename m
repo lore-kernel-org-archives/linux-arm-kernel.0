@@ -1,46 +1,55 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 17 Dec 2015 00:32:18 +0800
-Subject: [PATCH v6 9/9] ARM: dts: sun8i: q8-common: Add AXP223 PMIC device and
- regulator nodes
+Date: Thu, 17 Dec 2015 00:32:17 +0800
+Subject: [PATCH v6 8/9] ARM: dts: sun8i: sinlinx-sina33: Add AXP223 PMIC
+ device and regulator nodes
 In-Reply-To: <1450283538-25067-1-git-send-email-wens@csie.org>
 References: <1450283538-25067-1-git-send-email-wens@csie.org>
-Message-ID: <1450283538-25067-10-git-send-email-wens@csie.org>
+Message-ID: <1450283538-25067-9-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A23/A33 Q8 tablets have an X-Powers AXP223 PMIC connected via RSB. Its
-regulators provide power to various parts of the SoC and the board.
+This board has a X-Powers AXP223 PMIC connected via RSB. Its regulators
+provide power to various parts of the SoC and the board.
 
-Also add lcd regulator supply for simplefb and update the existing
-vmmc-supply for mmc0.
+Also update the regulator supply phandles.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun8i-q8-common.dtsi | 83 +++++++++++++++++++++++++++++++++-
- 1 file changed, 81 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts | 76 +++++++++++++++++++++++++-
+ 1 file changed, 73 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-q8-common.dtsi b/arch/arm/boot/dts/sun8i-q8-common.dtsi
-index 1a69231d2da5..9d2b7e2f5975 100644
---- a/arch/arm/boot/dts/sun8i-q8-common.dtsi
-+++ b/arch/arm/boot/dts/sun8i-q8-common.dtsi
-@@ -56,7 +56,6 @@
- 		brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
- 		default-brightness-level = <8>;
- 		enable-gpios = <&pio 7 6 GPIO_ACTIVE_HIGH>; /* PH6 */
--		/* backlight is powered by AXP223 DC1SW */
- 	};
+diff --git a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
+index 13ce68f06dd6..8af38a9719ca 100644
+--- a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
++++ b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
+@@ -68,7 +68,7 @@
+ };
  
- 	chosen {
-@@ -67,7 +66,7 @@
+ &lradc {
+-	vref-supply = <&reg_vcc3v0>;
++	vref-supply = <&reg_dcdc1>;
+ 	status = "okay";
+ 
+ 	button at 200 {
+@@ -96,7 +96,7 @@
  &mmc0 {
  	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_q8>;
+ 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_sina33>;
 -	vmmc-supply = <&reg_vcc3v0>;
 +	vmmc-supply = <&reg_dcdc1>;
  	bus-width = <4>;
  	cd-gpios = <&pio 1 4 GPIO_ACTIVE_HIGH>; /* PB4 */
  	cd-inverted;
-@@ -92,6 +91,82 @@
+@@ -106,7 +106,7 @@
+ &mmc2 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc2_8bit_pins>;
+-	vmmc-supply = <&reg_vcc3v0>;
++	vmmc-supply = <&reg_dcdc1>;
+ 	bus-width = <8>;
+ 	non-removable;
+ 	status = "okay";
+@@ -132,6 +132,76 @@
  
  &r_rsb {
  	status = "okay";
@@ -75,12 +84,6 @@ index 1a69231d2da5..9d2b7e2f5975 100644
 +	regulator-min-microvolt = <2700000>;
 +	regulator-max-microvolt = <3300000>;
 +	regulator-name = "vcc-pll-avcc";
-+};
-+
-+&reg_dc1sw {
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "vcc-lcd";
 +};
 +
 +&reg_dc5ldo {
@@ -122,14 +125,6 @@ index 1a69231d2da5..9d2b7e2f5975 100644
 +	regulator-name = "vcc-rtc";
  };
  
- &r_uart {
-@@ -99,3 +174,7 @@
- 	pinctrl-0 = <&r_uart_pins_a>;
- 	status = "okay";
- };
-+
-+&simplefb_lcd {
-+	vcc-lcd-supply = <&reg_dc1sw>;
-+};
+ &uart0 {
 -- 
 2.6.4
