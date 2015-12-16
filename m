@@ -1,127 +1,257 @@
 From: jchandra@broadcom.com (Jayachandran C)
-Date: Wed, 16 Dec 2015 18:12:34 +0530
-Subject: [RFC PATCH v3 4/5] ACPI: PCI: Support platforms that need
- pci_remap_iospace
+Date: Wed, 16 Dec 2015 18:12:35 +0530
+Subject: [RFC PATCH v3 5/5] PCI: ACPI: Add a generic ACPI based host controller
 In-Reply-To: <1450269755-21420-1-git-send-email-jchandra@broadcom.com>
 References: <1450269755-21420-1-git-send-email-jchandra@broadcom.com>
-Message-ID: <1450269755-21420-5-git-send-email-jchandra@broadcom.com>
+Message-ID: <1450269755-21420-6-git-send-email-jchandra@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some platforms (in this case ARM64), the PCI iospace needs to
-be mapped with pci_remap_iospace and the resources have to be
-adjusted for the iospace physical address.
+Add a simple ACPI based PCI host controller. This is done by
+providing a simple implementation for pci_acpi_scan_root().
 
-This has to be done before acpi_pci_root_validate_resources()
-checks and removes resource windows. Handle this by adding
-a function acpi_pci_root_remap_iospace that is called in
-acpi_pci_probe_root_resources(), before the validate call.
+The pci_mmcfg_list handling is done by the ACPI code, we
+keep a reference to the pci_mmcfg_region which is already
+mapped.
 
-Also fix the address check in acpi_dev_ioresource_flags for
-similar platforms.
+This is enabled only for ARM64 now.
 
 Signed-off-by: Jayachandran C <jchandra@broadcom.com>
 ---
- drivers/acpi/pci_root.c | 62 +++++++++++++++++++++++++++++++++++++++++++++++--
- drivers/acpi/resource.c |  2 ++
- 2 files changed, 62 insertions(+), 2 deletions(-)
+ drivers/pci/host/Kconfig         |   7 ++
+ drivers/pci/host/Makefile        |   1 +
+ drivers/pci/host/pci-host-acpi.c | 193 +++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 201 insertions(+)
+ create mode 100644 drivers/pci/host/pci-host-acpi.c
 
-diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
-index ae3fe4e..fcaa484 100644
---- a/drivers/acpi/pci_root.c
-+++ b/drivers/acpi/pci_root.c
-@@ -720,6 +720,61 @@ next:
- 	}
- }
+diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+index f131ba9..8321efc 100644
+--- a/drivers/pci/host/Kconfig
++++ b/drivers/pci/host/Kconfig
+@@ -53,6 +53,13 @@ config PCI_RCAR_GEN2_PCIE
+ 	help
+ 	  Say Y here if you want PCIe controller support on R-Car Gen2 SoCs.
  
-+#ifdef PCI_IOBASE
++config PCI_HOST_GENERIC_ACPI
++	bool "Generic ACPI PCI host controller"
++	depends on ARM64 && ACPI
++	help
++	  Say Y here if you want to support a simple generic ACPI PCI host
++	  controller.
++
+ config PCI_HOST_GENERIC
+ 	bool "Generic PCI host controller"
+ 	depends on (ARM || ARM64) && OF
+diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
+index 9d4d3c6..bc31852 100644
+--- a/drivers/pci/host/Makefile
++++ b/drivers/pci/host/Makefile
+@@ -6,6 +6,7 @@ obj-$(CONFIG_PCI_MVEBU) += pci-mvebu.o
+ obj-$(CONFIG_PCI_TEGRA) += pci-tegra.o
+ obj-$(CONFIG_PCI_RCAR_GEN2) += pci-rcar-gen2.o
+ obj-$(CONFIG_PCI_RCAR_GEN2_PCIE) += pcie-rcar.o
++obj-$(CONFIG_PCI_HOST_GENERIC_ACPI) += pci-host-acpi.o
+ obj-$(CONFIG_PCI_HOST_GENERIC) += pci-host-generic.o
+ obj-$(CONFIG_PCIE_SPEAR13XX) += pcie-spear13xx.o
+ obj-$(CONFIG_PCI_KEYSTONE) += pci-keystone-dw.o pci-keystone.o
+diff --git a/drivers/pci/host/pci-host-acpi.c b/drivers/pci/host/pci-host-acpi.c
+new file mode 100644
+index 00000000..cdc259e
+--- /dev/null
++++ b/drivers/pci/host/pci-host-acpi.c
+@@ -0,0 +1,193 @@
 +/*
-+ * The IO ports are mapped to a memory range, fixup IO resources to
-+ * handle that
++ * Generic PCI host controller driver for ACPI based systems
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Copyright (c) 2015 Broadcom Corporation
++ *
++ * Based on drivers/pci/host/pci-host-generic.c
++ * Copyright (C) 2014 ARM Limited
 + */
-+static int acpi_pci_root_remap_iospace(struct acpi_pci_root_info *ci)
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/pci.h>
++#include <linux/acpi.h>
++#include <linux/pci-acpi.h>
++#include <linux/sfi_acpi.h>
++#include <linux/slab.h>
++
++#define PREFIX			"pci-host-acpi:"
++
++/* sysdata pointer is ->root_info */
++struct gen_acpi_root_info {
++	struct acpi_pci_root_info	common;
++	struct pci_mmcfg_region		*mcfg;
++	bool				mcfg_added;
++};
++
++/* find mapping of a MCFG area */
++static void __iomem *gen_acpi_map_cfg_bus(struct pci_bus *bus,
++			unsigned int devfn, int where)
 +{
-+	struct resource_entry *entry;
-+	struct resource iores;
-+	resource_size_t iostart;
++	struct gen_acpi_root_info *pci = bus->sysdata;
++	struct pci_mmcfg_region *mcfg = pci->mcfg;
++
++	if (bus->number < mcfg->start_bus || bus->number > mcfg->end_bus)
++		return NULL;
++
++	return mcfg->virt +
++		PCI_MMCFG_OFFSET(bus->number - mcfg->start_bus, devfn) +
++		where;
++}
++
++static struct pci_ops gen_acpi_pci_ops = {
++	.map_bus	= gen_acpi_map_cfg_bus,
++	.read		= pci_generic_config_read,
++	.write		= pci_generic_config_write,
++};
++
++/* Insert the ECFG area for a root bus */
++static int pci_acpi_root_init_info(struct acpi_pci_root_info *ci)
++{
++	struct gen_acpi_root_info *info;
++	struct acpi_pci_root *root = ci->root;
++	struct device *dev = &ci->bridge->dev;
 +	int err;
 +
-+	iores.flags = IORESOURCE_IO;
-+	iores.start = (resource_size_t)-1;
-+	iores.end = 0;
-+	resource_list_for_each_entry(entry, &ci->resources) {
-+		if (entry->res->flags & IORESOURCE_IO) {
-+			iores.start = min(entry->res->start, iores.start);
-+			iores.end = max(entry->res->end, iores.end);
-+		}
-+	}
-+	if (iores.end == 0)
-+		return 0;
-+	iostart = iores.start;
++	info = container_of(ci, struct gen_acpi_root_info, common);
++	err = pci_mmconfig_insert(dev, root->segment, root->secondary.start,
++			root->secondary.end, root->mcfg_addr);
++	if (err && err != -EEXIST)
++		return err;
 +
-+	resource_list_for_each_entry(entry, &ci->resources) {
-+		if (entry->res->flags & IORESOURCE_IO) {
-+			entry->res->start -= iostart;
-+			entry->res->end -= iostart;
-+			entry->offset -= iostart;
-+		}
-+	}
-+	iores.start -= iostart;
-+	iores.end -= iostart;
-+
-+	err = pci_remap_iospace(&iores, iostart);
-+	if (err) {
-+		pr_err("PCI: ACPI: err %d mapping IO %pR\n", err, &iores);
-+		return -ENODEV;
-+	}
-+	pr_info(PREFIX "Mapped %pR at %#lx for IO.\n",
-+			&iores, (unsigned long)iostart);
++	info->mcfg = pci_mmconfig_lookup(root->segment, root->secondary.start);
++	WARN_ON(info->mcfg == NULL);
++	info->mcfg_added = (err == -EEXIST);
 +	return 0;
 +}
-+#else
-+/*
-+ * The IO ports are mapped to a memory range, fixup IO resources to
-+ * handle that
-+ */
-+static int acpi_pci_root_remap_iospace(struct acpi_pci_root_info *ci)
++
++static void pci_acpi_root_release_info(struct acpi_pci_root_info *ci)
 +{
-+	return 0;
-+}
-+#endif /* PCI_IOBASE */
++	struct gen_acpi_root_info *info;
++	struct acpi_pci_root *root = ci->root;
 +
- int acpi_pci_probe_root_resources(struct acpi_pci_root_info *info)
- {
- 	int ret;
-@@ -745,10 +800,13 @@ int acpi_pci_probe_root_resources(struct acpi_pci_root_info *info)
- 			else
- 				entry->res->name = info->name;
- 		}
--		acpi_pci_root_validate_resources(&device->dev, list,
-+		ret = acpi_pci_root_remap_iospace(info);
-+		if (ret >= 0) {
-+			acpi_pci_root_validate_resources(&device->dev, list,
- 						 IORESOURCE_MEM);
--		acpi_pci_root_validate_resources(&device->dev, list,
-+			acpi_pci_root_validate_resources(&device->dev, list,
- 						 IORESOURCE_IO);
-+		}
- 	}
- 
- 	return ret;
-diff --git a/drivers/acpi/resource.c b/drivers/acpi/resource.c
-index cdc5c25..530cad4 100644
---- a/drivers/acpi/resource.c
-+++ b/drivers/acpi/resource.c
-@@ -126,8 +126,10 @@ static void acpi_dev_ioresource_flags(struct resource *res, u64 len,
- 	if (!acpi_dev_resource_len_valid(res->start, res->end, len, true))
- 		res->flags |= IORESOURCE_DISABLED | IORESOURCE_UNSET;
- 
-+#ifndef PCI_IOBASE
- 	if (res->end >= 0x10003)
- 		res->flags |= IORESOURCE_DISABLED | IORESOURCE_UNSET;
-+#endif
- 
- 	if (io_decode == ACPI_DECODE_16)
- 		res->flags |= IORESOURCE_IO_16BIT_ADDR;
++	info = container_of(ci, struct gen_acpi_root_info, common);
++	if (info->mcfg_added)
++		pci_mmconfig_delete(root->segment, root->secondary.start,
++					root->secondary.end);
++	info->mcfg = NULL;
++}
++
++static struct acpi_pci_root_ops pci_acpi_root_ops = {
++	.pci_ops = &gen_acpi_pci_ops,
++	.init_info = pci_acpi_root_init_info,
++	.release_info = pci_acpi_root_release_info,
++};
++
++struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
++{
++	struct acpi_device *device = root->device;
++	struct gen_acpi_root_info *ri;
++	struct pci_bus *bus, *child;
++
++	/* allocate acpi_info/sysdata */
++	ri = devm_kzalloc(&device->dev, sizeof(*ri), GFP_KERNEL);
++	if (!ri) {
++		dev_err(&device->dev,
++			"pci_bus %04x:%02x: ignored (out of memory)\n",
++			root->segment, (int)root->secondary.start);
++		return NULL;
++	}
++
++	bus =  acpi_pci_root_create(root, &pci_acpi_root_ops,
++					&ri->common, ri);
++	if (!bus) {
++		dev_err(&device->dev, "Scanning rootbus failed");
++		return NULL;
++	}
++
++	list_for_each_entry(child, &bus->children, node)
++		pcie_bus_configure_settings(child);
++
++	return bus;
++}
++
++void __init pci_mmcfg_late_init(void)
++{
++	int err;
++
++	err = pci_mmconfig_parse_table();
++	if (err)
++		pr_err(PREFIX " Failed to parse MCFG (%d)\n", err);
++}
++
++int raw_pci_read(unsigned int seg, unsigned int bus,
++		  unsigned int devfn, int reg, int len, u32 *val)
++{
++	struct pci_mmcfg_region *mcfg;
++	void __iomem *addr;
++	int err = -EINVAL;
++
++	rcu_read_lock();
++	mcfg = pci_mmconfig_lookup(seg, bus);
++	if (!mcfg || !mcfg->virt)
++		goto err;
++
++	addr = mcfg->virt + PCI_MMCFG_OFFSET(bus, devfn);
++	switch (len) {
++	case 1:
++		*val = readb(addr + reg);
++		break;
++	case 2:
++		*val = readw(addr + reg);
++		break;
++	case 4:
++		*val = readl(addr + reg);
++		break;
++	}
++	err = 0;
++err:
++	rcu_read_unlock();
++	return err;
++}
++
++int raw_pci_write(unsigned int seg, unsigned int bus,
++		unsigned int devfn, int reg, int len, u32 val)
++{
++	struct pci_mmcfg_region *mcfg;
++	void __iomem *addr;
++	int err = -EINVAL;
++
++	rcu_read_lock();
++	mcfg = pci_mmconfig_lookup(seg, bus);
++	if (!mcfg || !mcfg->virt)
++		goto err;
++
++	addr = mcfg->virt + PCI_MMCFG_OFFSET(bus, devfn);
++	switch (len) {
++	case 1:
++		writeb(val, addr + reg);
++		break;
++	case 2:
++		writew(val, addr + reg);
++		break;
++	case 4:
++		writel(val, addr + reg);
++		break;
++	}
++	err = 0;
++err:
++	rcu_read_unlock();
++	return err;
++}
 -- 
 1.9.1
