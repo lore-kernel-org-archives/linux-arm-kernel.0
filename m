@@ -1,131 +1,20 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 16 Dec 2015 21:40:18 +0100
-Subject: [PATCH] ARM: KVM: Cleanup exception injection
-In-Reply-To: <1450116396-11718-1-git-send-email-marc.zyngier@arm.com>
-References: <1450116396-11718-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20151216204018.GF24889@cbox>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Wed, 16 Dec 2015 14:44:35 -0600
+Subject: [1/2] ARM: dts: qcom: Remove size elements from pmic reg
+ properties
+In-Reply-To: <1448490457-9799-2-git-send-email-sboyd@codeaurora.org>
+References: <1448490457-9799-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20151216204435.GA5951@Agamemnon.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 14, 2015 at 06:06:36PM +0000, Marc Zyngier wrote:
-> David Binderman reported that the exception injection code had a
-> couple of unused variables lingering around.
+On Wed, Nov 25, 2015 at 02:27:36PM -0800, Stephen Boyd wrote:
+> The #size-cells for the pmics are 0, but we specify a size in the
+> reg property so that MPP and GPIO modules can figure out how many
+> pins there are. Now that we've done that by counting irqs, we can
+> remove the size elements in the reg properties and be DT
+> compliant.
 > 
-> Upon examination, it looked like this code could do with an
-> anticipated spring cleaning, which amounts to deduplicating
-> the CPSR/SPSR update.
-> 
-> The spurious variables are removed in the process.
-> 
-> Reported-by: David Binderman <dcb314@hotmail.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/kvm/emulate.c | 59 ++++++++++++++++++++------------------------------
->  1 file changed, 23 insertions(+), 36 deletions(-)
-> 
-> diff --git a/arch/arm/kvm/emulate.c b/arch/arm/kvm/emulate.c
-> index d6c0052..245106e 100644
-> --- a/arch/arm/kvm/emulate.c
-> +++ b/arch/arm/kvm/emulate.c
-> @@ -275,6 +275,25 @@ static u32 exc_vector_base(struct kvm_vcpu *vcpu)
->  		return vbar;
->  }
->  
-> +/* Switch to an exception mode, updating both CPSR and SPSR */
-> +static void kvm_update_psr(struct kvm_vcpu *vcpu, unsigned long mode)
-> +{
-> +	unsigned long cpsr = *vcpu_cpsr(vcpu);
-> +	u32 sctlr = vcpu->arch.cp15[c1_SCTLR];
-> +
-> +	*vcpu_cpsr(vcpu) = (cpsr & ~MODE_MASK) | mode;
-> +	*vcpu_cpsr(vcpu) |= PSR_I_BIT;
-> +	*vcpu_cpsr(vcpu) &= ~(PSR_IT_MASK | PSR_J_BIT | PSR_E_BIT | PSR_T_BIT);
-> +
-> +	if (sctlr & SCTLR_TE)
-> +		*vcpu_cpsr(vcpu) |= PSR_T_BIT;
-> +	if (sctlr & SCTLR_EE)
-> +		*vcpu_cpsr(vcpu) |= PSR_E_BIT;
-> +
-> +	/* Note: These now point to the mode banked copies */
-> +	*vcpu_spsr(vcpu) = cpsr;
-> +}
-> +
->  /**
->   * kvm_inject_undefined - inject an undefined exception into the guest
->   * @vcpu: The VCPU to receive the undefined exception
-> @@ -286,29 +305,13 @@ static u32 exc_vector_base(struct kvm_vcpu *vcpu)
->   */
->  void kvm_inject_undefined(struct kvm_vcpu *vcpu)
->  {
-> -	unsigned long new_lr_value;
-> -	unsigned long new_spsr_value;
->  	unsigned long cpsr = *vcpu_cpsr(vcpu);
-> -	u32 sctlr = vcpu->arch.cp15[c1_SCTLR];
->  	bool is_thumb = (cpsr & PSR_T_BIT);
->  	u32 vect_offset = 4;
->  	u32 return_offset = (is_thumb) ? 2 : 4;
->  
-> -	new_spsr_value = cpsr;
-> -	new_lr_value = *vcpu_pc(vcpu) - return_offset;
-> -
-> -	*vcpu_cpsr(vcpu) = (cpsr & ~MODE_MASK) | UND_MODE;
-> -	*vcpu_cpsr(vcpu) |= PSR_I_BIT;
-> -	*vcpu_cpsr(vcpu) &= ~(PSR_IT_MASK | PSR_J_BIT | PSR_E_BIT | PSR_T_BIT);
-> -
-> -	if (sctlr & SCTLR_TE)
-> -		*vcpu_cpsr(vcpu) |= PSR_T_BIT;
-> -	if (sctlr & SCTLR_EE)
-> -		*vcpu_cpsr(vcpu) |= PSR_E_BIT;
-> -
-> -	/* Note: These now point to UND banked copies */
-> -	*vcpu_spsr(vcpu) = cpsr;
-> -	*vcpu_reg(vcpu, 14) = new_lr_value;
-> +	kvm_update_psr(vcpu, UND_MODE);
-> +	*vcpu_reg(vcpu, 14) = *vcpu_pc(vcpu) - return_offset;
->  
->  	/* Branch to exception vector */
->  	*vcpu_pc(vcpu) = exc_vector_base(vcpu) + vect_offset;
-> @@ -320,30 +323,14 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu)
->   */
->  static void inject_abt(struct kvm_vcpu *vcpu, bool is_pabt, unsigned long addr)
->  {
-> -	unsigned long new_lr_value;
-> -	unsigned long new_spsr_value;
->  	unsigned long cpsr = *vcpu_cpsr(vcpu);
-> -	u32 sctlr = vcpu->arch.cp15[c1_SCTLR];
->  	bool is_thumb = (cpsr & PSR_T_BIT);
->  	u32 vect_offset;
->  	u32 return_offset = (is_thumb) ? 4 : 0;
->  	bool is_lpae;
->  
-> -	new_spsr_value = cpsr;
-> -	new_lr_value = *vcpu_pc(vcpu) + return_offset;
-> -
-> -	*vcpu_cpsr(vcpu) = (cpsr & ~MODE_MASK) | ABT_MODE;
-> -	*vcpu_cpsr(vcpu) |= PSR_I_BIT | PSR_A_BIT;
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-seems like you're losing the PSR_A_BIT in kvm_update_psr() now?
-
-> -	*vcpu_cpsr(vcpu) &= ~(PSR_IT_MASK | PSR_J_BIT | PSR_E_BIT | PSR_T_BIT);
-> -
-> -	if (sctlr & SCTLR_TE)
-> -		*vcpu_cpsr(vcpu) |= PSR_T_BIT;
-> -	if (sctlr & SCTLR_EE)
-> -		*vcpu_cpsr(vcpu) |= PSR_E_BIT;
-> -
-> -	/* Note: These now point to ABT banked copies */
-> -	*vcpu_spsr(vcpu) = cpsr;
-> -	*vcpu_reg(vcpu, 14) = new_lr_value;
-> +	kvm_update_psr(vcpu, ABT_MODE);
-> +	*vcpu_reg(vcpu, 14) = *vcpu_pc(vcpu) + return_offset;
->  
->  	if (is_pabt)
->  		vect_offset = 12;
-> -- 
-> 2.1.4
-> 
-
-Otherwise looks like a welcome cleanup!
-
-Thanks,
--Christoffer
+Acked-by: Andy Gross <andy.gross@linaro.org>
