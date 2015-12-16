@@ -1,77 +1,97 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 16 Dec 2015 16:16:24 +0100
-Subject: [PATCH V2 14/23] pci,
- acpi: Provide generic way to assign bus domain number.
+Date: Wed, 16 Dec 2015 16:16:26 +0100
+Subject: [PATCH V2 16/23] x86,
+ ia64: Include acpi_pci_{add|remove}_bus to the default
+ pcibios_{add|remove}_bus implementation.
 In-Reply-To: <1450278993-12664-1-git-send-email-tn@semihalf.com>
 References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
-Message-ID: <1450278993-12664-15-git-send-email-tn@semihalf.com>
+Message-ID: <1450278993-12664-17-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we now have valid PCI host bridge device reference we can
-introduce code that is going to find its bus domain number using
-ACPI _SEG method.
+Arches in subject are the only one who use pcibios_{add|remove}_bus hooks
+and implement it in the same way. Moreover ARM64 is going to do the same.
+So it seams that acpi_pci_{add|remove}_bus is generic enough to be default
+option for pcibios_{add|remove}_bus hooks. Also, it is always safe to run
+acpi_pci_{add|remove}_bus as they have empty stubs for !ACPI case and
+return if ACPI has been switched off in run time.
 
-Note that _SEG method is optional, therefore _SEG absence means
-that all PCI buses belong to domain 0.
+After all we can remove x86 and ia64 pcibios_{add|remove}_bus
+implementation.
 
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-Reviewed-by: Liviu Dudau <Liviu.Dudau@arm.com>
-Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 ---
- drivers/pci/pci.c | 29 +++++++++++++++++++++++++----
- 1 file changed, 25 insertions(+), 4 deletions(-)
+ arch/ia64/pci/pci.c   | 10 ----------
+ arch/x86/pci/common.c | 10 ----------
+ drivers/pci/probe.c   |  3 +++
+ 3 files changed, 3 insertions(+), 20 deletions(-)
 
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index 7274006..39a985b 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -25,6 +25,7 @@
- #include <linux/device.h>
- #include <linux/pm_runtime.h>
- #include <linux/pci_hotplug.h>
-+#include <linux/acpi.h>
- #include <asm-generic/pci-bridge.h>
- #include <asm/setup.h>
+diff --git a/arch/ia64/pci/pci.c b/arch/ia64/pci/pci.c
+index fe96bc9..c1e8ed5 100644
+--- a/arch/ia64/pci/pci.c
++++ b/arch/ia64/pci/pci.c
+@@ -357,16 +357,6 @@ void pcibios_fixup_bus(struct pci_bus *b)
+ 	platform_pci_fixup_bus(b);
+ }
+ 
+-void pcibios_add_bus(struct pci_bus *bus)
+-{
+-	acpi_pci_add_bus(bus);
+-}
+-
+-void pcibios_remove_bus(struct pci_bus *bus)
+-{
+-	acpi_pci_remove_bus(bus);
+-}
+-
+ void pcibios_set_master (struct pci_dev *dev)
+ {
+ 	/* No special bus mastering setup handling */
+diff --git a/arch/x86/pci/common.c b/arch/x86/pci/common.c
+index eccd4d9..ed3236d 100644
+--- a/arch/x86/pci/common.c
++++ b/arch/x86/pci/common.c
+@@ -171,16 +171,6 @@ void pcibios_fixup_bus(struct pci_bus *b)
+ 		pcibios_fixup_device_resources(dev);
+ }
+ 
+-void pcibios_add_bus(struct pci_bus *bus)
+-{
+-	acpi_pci_add_bus(bus);
+-}
+-
+-void pcibios_remove_bus(struct pci_bus *bus)
+-{
+-	acpi_pci_remove_bus(bus);
+-}
+-
+ /*
+  * Only use DMI information to set this if nothing was passed
+  * on the kernel command line (which was parsed earlier).
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index cad836f..2fbf840 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -12,6 +12,7 @@
+ #include <linux/slab.h>
+ #include <linux/module.h>
+ #include <linux/cpumask.h>
++#include <linux/pci-acpi.h>
+ #include <linux/pci-aspm.h>
  #include <linux/aer.h>
-@@ -4796,14 +4797,34 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
- 	 * API and update the use_dt_domains value to keep track of method we
- 	 * are using to assign domain numbers (use_dt_domains = 0).
- 	 *
-+	 * IF ACPI, we expect non-DT method (use_dt_domains == -1)
-+	 * and call _SEG method for corresponding host bridge device.
-+	 * If _SEG method does not exist, following ACPI spec (6.5.6)
-+	 * all PCI buses belong to domain 0.
-+	 *
- 	 * All other combinations imply we have a platform that is trying
--	 * to mix domain numbers obtained from DT and pci_get_new_domain_nr(),
--	 * which is a recipe for domain mishandling and it is prevented by
--	 * invalidating the domain value (domain = -1) and printing a
--	 * corresponding error.
-+	 * to mix domain numbers obtained from DT, ACPI and
-+	 * pci_get_new_domain_nr(), which is a recipe for domain mishandling and
-+	 * it is prevented by invalidating the domain value (domain = -1) and
-+	 * printing a corresponding error.
- 	 */
-+
- 	if (domain >= 0 && use_dt_domains) {
- 		use_dt_domains = 1;
-+#ifdef CONFIG_ACPI
-+	} else if (!acpi_disabled && use_dt_domains == -1) {
-+		struct acpi_device *acpi_dev = to_acpi_device(parent);
-+		unsigned long long segment = 0;
-+		acpi_status status;
-+
-+		status = acpi_evaluate_integer(acpi_dev->handle,
-+					       METHOD_NAME__SEG, NULL,
-+					       &segment);
-+		if (ACPI_FAILURE(status) && status != AE_NOT_FOUND)
-+			dev_err(&acpi_dev->dev,  "can't evaluate _SEG\n");
-+
-+		domain = segment;
-+#endif
- 	} else if (domain < 0 && use_dt_domains != 1) {
- 		use_dt_domains = 0;
- 		domain = pci_get_new_domain_nr();
+ #include <linux/acpi.h>
+@@ -2067,10 +2068,12 @@ int __weak pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+ 
+ void __weak pcibios_add_bus(struct pci_bus *bus)
+ {
++	acpi_pci_add_bus(bus);
+ }
+ 
+ void __weak pcibios_remove_bus(struct pci_bus *bus)
+ {
++	acpi_pci_remove_bus(bus);
+ }
+ 
+ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
 -- 
 1.9.1
