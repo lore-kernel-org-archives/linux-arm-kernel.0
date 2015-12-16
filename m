@@ -1,131 +1,77 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 16 Dec 2015 16:16:25 +0100
-Subject: [PATCH V2 15/23] x86, ia64,
- pci: Convert arches to use PCI_DOMAINS_GENERIC.
+Date: Wed, 16 Dec 2015 16:16:24 +0100
+Subject: [PATCH V2 14/23] pci,
+ acpi: Provide generic way to assign bus domain number.
 In-Reply-To: <1450278993-12664-1-git-send-email-tn@semihalf.com>
 References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
-Message-ID: <1450278993-12664-16-git-send-email-tn@semihalf.com>
+Message-ID: <1450278993-12664-15-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we have now generic way to retrieve domain number using _SEG method,
-x86 and ia64 can take advantage of it and forget about another
-platform specific data from pci_sysdata.
+As we now have valid PCI host bridge device reference we can
+introduce code that is going to find its bus domain number using
+ACPI _SEG method.
+
+Note that _SEG method is optional, therefore _SEG absence means
+that all PCI buses belong to domain 0.
 
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+Reviewed-by: Liviu Dudau <Liviu.Dudau@arm.com>
+Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 ---
- arch/ia64/Kconfig           | 3 +++
- arch/ia64/include/asm/pci.h | 2 --
- arch/ia64/pci/pci.c         | 1 -
- arch/x86/Kconfig            | 3 +++
- arch/x86/include/asm/pci.h  | 7 -------
- arch/x86/pci/acpi.c         | 2 --
- 6 files changed, 6 insertions(+), 12 deletions(-)
+ drivers/pci/pci.c | 29 +++++++++++++++++++++++++----
+ 1 file changed, 25 insertions(+), 4 deletions(-)
 
-diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
-index eb0249e..6fecd04 100644
---- a/arch/ia64/Kconfig
-+++ b/arch/ia64/Kconfig
-@@ -572,6 +572,9 @@ config PCI
- config PCI_DOMAINS
- 	def_bool PCI
- 
-+config PCI_DOMAINS_GENERIC
-+	def_bool PCI
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index 7274006..39a985b 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -25,6 +25,7 @@
+ #include <linux/device.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/pci_hotplug.h>
++#include <linux/acpi.h>
+ #include <asm-generic/pci-bridge.h>
+ #include <asm/setup.h>
+ #include <linux/aer.h>
+@@ -4796,14 +4797,34 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+ 	 * API and update the use_dt_domains value to keep track of method we
+ 	 * are using to assign domain numbers (use_dt_domains = 0).
+ 	 *
++	 * IF ACPI, we expect non-DT method (use_dt_domains == -1)
++	 * and call _SEG method for corresponding host bridge device.
++	 * If _SEG method does not exist, following ACPI spec (6.5.6)
++	 * all PCI buses belong to domain 0.
++	 *
+ 	 * All other combinations imply we have a platform that is trying
+-	 * to mix domain numbers obtained from DT and pci_get_new_domain_nr(),
+-	 * which is a recipe for domain mishandling and it is prevented by
+-	 * invalidating the domain value (domain = -1) and printing a
+-	 * corresponding error.
++	 * to mix domain numbers obtained from DT, ACPI and
++	 * pci_get_new_domain_nr(), which is a recipe for domain mishandling and
++	 * it is prevented by invalidating the domain value (domain = -1) and
++	 * printing a corresponding error.
+ 	 */
 +
- config PCI_SYSCALL
- 	def_bool PCI
- 
-diff --git a/arch/ia64/include/asm/pci.h b/arch/ia64/include/asm/pci.h
-index 5050748..4214be1 100644
---- a/arch/ia64/include/asm/pci.h
-+++ b/arch/ia64/include/asm/pci.h
-@@ -66,7 +66,6 @@ extern int pci_mmap_legacy_page_range(struct pci_bus *bus,
- 
- struct pci_controller {
- 	void *iommu;
--	int segment;
- 	int node;		/* nearest node with memory or NUMA_NO_NODE for global allocation */
- 
- 	void *platform_data;
-@@ -74,7 +73,6 @@ struct pci_controller {
- 
- 
- #define PCI_CONTROLLER(busdev) ((struct pci_controller *) busdev->sysdata)
--#define pci_domain_nr(busdev)    (PCI_CONTROLLER(busdev)->segment)
- 
- extern struct pci_ops pci_root_ops;
- 
-diff --git a/arch/ia64/pci/pci.c b/arch/ia64/pci/pci.c
-index 978d6af..fe96bc9 100644
---- a/arch/ia64/pci/pci.c
-+++ b/arch/ia64/pci/pci.c
-@@ -300,7 +300,6 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
- 		return NULL;
- 	}
- 
--	info->controller.segment = root->segment;
- 	info->controller.node = acpi_get_node(device->handle);
- 	INIT_LIST_HEAD(&info->io_resources);
- 	return acpi_pci_root_create(root, &pci_acpi_root_ops,
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index 102d7d1..63cc4b7 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -2383,6 +2383,9 @@ config PCI_DOMAINS
- 	def_bool y
- 	depends on PCI
- 
-+config PCI_DOMAINS_GENERIC
-+	def_bool PCI
+ 	if (domain >= 0 && use_dt_domains) {
+ 		use_dt_domains = 1;
++#ifdef CONFIG_ACPI
++	} else if (!acpi_disabled && use_dt_domains == -1) {
++		struct acpi_device *acpi_dev = to_acpi_device(parent);
++		unsigned long long segment = 0;
++		acpi_status status;
 +
- config PCI_MMCONFIG
- 	bool "Support mmconfig PCI config space access"
- 	select PCI_ECAM
-diff --git a/arch/x86/include/asm/pci.h b/arch/x86/include/asm/pci.h
-index a98c022..1dc1ba1 100644
---- a/arch/x86/include/asm/pci.h
-+++ b/arch/x86/include/asm/pci.h
-@@ -12,7 +12,6 @@
- #ifdef __KERNEL__
- 
- struct pci_sysdata {
--	int		domain;		/* PCI domain */
- 	int		node;		/* NUMA node */
- #ifdef CONFIG_X86_64
- 	void		*iommu;		/* IOMMU private data */
-@@ -26,12 +25,6 @@ extern int noioapicreroute;
- #ifdef CONFIG_PCI
- 
- #ifdef CONFIG_PCI_DOMAINS
--static inline int pci_domain_nr(struct pci_bus *bus)
--{
--	struct pci_sysdata *sd = bus->sysdata;
--	return sd->domain;
--}
--
- static inline int pci_proc_domain(struct pci_bus *bus)
- {
- 	return pci_domain_nr(bus);
-diff --git a/arch/x86/pci/acpi.c b/arch/x86/pci/acpi.c
-index 286e0f5..5f78595 100644
---- a/arch/x86/pci/acpi.c
-+++ b/arch/x86/pci/acpi.c
-@@ -331,7 +331,6 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
- 		 * its bus->sysdata.
- 		 */
- 		struct pci_sysdata sd = {
--			.domain = domain,
- 			.node = node,
- 		};
- 
-@@ -345,7 +344,6 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
- 				"pci_bus %04x:%02x: ignored (out of memory)\n",
- 				domain, busnum);
- 		else {
--			info->sd.domain = domain;
- 			info->sd.node = node;
- 			bus = acpi_pci_root_create(root, &acpi_pci_root_ops,
- 						   &info->common, &info->sd);
++		status = acpi_evaluate_integer(acpi_dev->handle,
++					       METHOD_NAME__SEG, NULL,
++					       &segment);
++		if (ACPI_FAILURE(status) && status != AE_NOT_FOUND)
++			dev_err(&acpi_dev->dev,  "can't evaluate _SEG\n");
++
++		domain = segment;
++#endif
+ 	} else if (domain < 0 && use_dt_domains != 1) {
+ 		use_dt_domains = 0;
+ 		domain = pci_get_new_domain_nr();
 -- 
 1.9.1
