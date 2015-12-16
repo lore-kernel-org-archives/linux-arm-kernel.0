@@ -1,59 +1,52 @@
-From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
-Date: Wed, 16 Dec 2015 19:15:41 +0530
-Subject: [PATCH V2 1/3] ARM: multi_v7_defconfig: Enable beaglebone PMIC
- TPS65217
-In-Reply-To: <CAGo_u6pGcKoz_Vw9hWtuDJ8RBr+N4=G0p5RgEAcjheoe4VXhvQ@mail.gmail.com>
-References: <1450118580-24754-1-git-send-email-nm@ti.com>
- <1450118580-24754-2-git-send-email-nm@ti.com>
- <20151215135100.GA8288@afzalpc>
- <CAGo_u6pGcKoz_Vw9hWtuDJ8RBr+N4=G0p5RgEAcjheoe4VXhvQ@mail.gmail.com>
-Message-ID: <20151216134541.GA5574@afzalpc>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 16 Dec 2015 13:47:40 +0000
+Subject: [PATCH v3 4/4] drivers: psci: replace psci firmware calls
+In-Reply-To: <20151216125509.GA27585@ermac>
+References: <1448449461-5043-1-git-send-email-jens.wiklander@linaro.org>
+ <1448449461-5043-5-git-send-email-jens.wiklander@linaro.org>
+ <20151201184741.GE29045@leverpostej> <20151201194421.GA29068@ermac>
+ <20151216105529.GC19814@red-moon> <20151216125509.GA27585@ermac>
+Message-ID: <20151216134740.GB22916@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Dec 15, 2015 at 08:49:07AM -0600, Nishanth Menon wrote:
-> On Tue, Dec 15, 2015 at 7:51 AM, Afzal Mohammed <afzal.mohd.ma@gmail.com> wrote:
-> > On Mon, Dec 14, 2015 at 12:42:58PM -0600, Nishanth Menon wrote:
-
-> >> Enable PMIC for beaglebone similar to commit 7a5c6065669c ("ARM:
-> >> OMAP2+: omap2plus_defconfig: Add tps65217 support") - this allows
-> >> multi_v7_defconfig to boot up on older beaglebone platforms.
-> >
-> > A similar one -
-> >
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/384289.html
-> >
-> > your v1 was earlier than the above, so mine should > /dev/null.
+On Wed, Dec 16, 2015 at 01:55:11PM +0100, Jens Wiklander wrote:
+> On Wed, Dec 16, 2015 at 10:55:29AM +0000, Lorenzo Pieralisi wrote:
+> > [CC'ed Daniel]
+> > 
+> > On Tue, Dec 01, 2015 at 08:44:22PM +0100, Jens Wiklander wrote:
+> > 
+> > [...]
+> > 
+> > > > What's the plan for merging this? I assume this'll go via arm-soc?
+> > > 
+> > > I talked to Arnd about this and he suggested to go via Russel.
+> > 
+> > Heads-up, this patch will conflict with:
+> > 
+> > https://patchwork.kernel.org/patch/7418351/
+> > 
+> > that goes via linux-pm tree, please let me and Daniel know how
+> > you want us to sort this out.
 > 
-> If you'd like to, please reply back on original patch dropping your
-> patch.. or if queued, I can drop mine (I dont see it on linux-next
-> yet).
-
-That patch didn't get a reply at all, hence assuming that it won't be
-picked & don't want to create a noise on that silent thread ;), but if
-it gets applied, i will fight against my patch :)
-
-> > Seems Arnd wants multi_v7_defconfig changes thr' submaintainers rather
-> > than directly (which I initially thought was supposed to be done)
+> I guess this arm-smccc patchset need to go together with that patch in
+> some way. I've just uploaded my patches in Russels patch system, but I
+> can stop that and try to go via the linux-pm tree instead if you think
+> the maintainer would accept that. I'll need to ask Russel if he can ack
+> the patches "arm/arm64: add arm-smccc" and
+> "arm: add implementation for arm-smccc" first though.
 > 
-> Just following what
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/376637.html
-> was told. I am ok as all the submaintainers should be in CC of this
-> patch.
+> Would that work or do you have another idea? I'm of course happy either
+> way as long as the patches get through. I'm new to this so any advice is
+> appreciated.
 
-Hmm..,
+It is really up to Daniel and Russell. If Daniel acks:
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/393016.html
+https://patchwork.kernel.org/patch/7418351/
 
-but looks like Arnd applied it later.
+I can easily rebase it and send it to RMK patch system (as things stand
+it seems the easier option), otherwise the merge conflict (which will show
+up in -next anyway) has to be sorted out, I am open to suggestions.
 
-> If you are ok with these patches, will appreciate to get a acked-by,
-> if you dont mind.
-
-Changelog refers to old beagle bone's, does new ones have a different
-PMIC ?, i only have white bones ;)
-
-Regards
-afzal
+Thanks,
+Lorenzo
