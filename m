@@ -1,61 +1,105 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 16 Dec 2015 11:14:16 +0100
-Subject: [GIT PULL] at91: dt for 4.5 #1
-Message-ID: <1450260856-1375-1-git-send-email-nicolas.ferre@atmel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 16 Dec 2015 10:17:35 +0000
+Subject: [PATCH] IOMMU: arm-smmu-v3: fix broken S2PS and AARCH64 in
+ Broadcom Vulcan
+In-Reply-To: <CC0BC9CB4553B146B290EC1D4DC5C35901094BCE@SJEXCHMB15.corp.ad.broadcom.com>
+References: <1450110687-32207-1-git-send-email-pmallapp@broadcom.com>
+ <20151215134010.GH9452@arm.com>
+ <CC0BC9CB4553B146B290EC1D4DC5C35901094BCE@SJEXCHMB15.corp.ad.broadcom.com>
+Message-ID: <20151216101735.GB4308@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+On Wed, Dec 16, 2015 at 04:37:07AM +0000, Prem (Premachandra) Mallappa wrote:
+> > On Mon, Dec 14, 2015 at 10:01:27PM +0530, Prem Mallappa wrote:
+> > > Vulcan SMMUv3 looks for AARCH64 and S2PS inroder to validate the STE
+> > > entry,
+> > 
+> > 'inroder' ?
+> >
+> In order
 
-This is the first PR for AT91 DT material targeted to 4.5. The main part is the
-addition for the new DENX platform. Other things are simply basic fixes and
-updates.
+Got it!
 
-Thanks, best regards,
+> > > which is a overkill, but when proper encoding not found; the SMMU
+> > > stops processing PCIe read/write requests. Giving the h/w what it wants.
+> > >
+> > > Signed-off-by: Prem Mallappa <pmallapp@broadcom.com>
+> > > ---
+> > >  drivers/iommu/arm-smmu-v3.c | 12 ++++++++++++
+> > >  1 file changed, 12 insertions(+)
+> > >
+> > > diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-
+> > v3.c
+> > > index d4af50d..dfda564 100644
+> > > --- a/drivers/iommu/arm-smmu-v3.c
+> > > +++ b/drivers/iommu/arm-smmu-v3.c
+> > > @@ -260,6 +260,7 @@
+> > >  #define STRTAB_STE_2_S2VMID_MASK	0xffffUL
+> > >  #define STRTAB_STE_2_VTCR_SHIFT		32
+> > >  #define STRTAB_STE_2_VTCR_MASK		0x7ffffUL
+> > > +#define STRTAB_STE_2_S2PS_SHIFT        48
+> > >  #define STRTAB_STE_2_S2AA64		(1UL << 51)
+> > >  #define STRTAB_STE_2_S2ENDI		(1UL << 52)
+> > >  #define STRTAB_STE_2_S2PTW		(1UL << 54)
+> > > @@ -577,6 +578,7 @@ struct arm_smmu_device {
+> > >  	u32				features;
+> > >
+> > >  #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
+> > > +#define ARM_SMMU_OPT_BROKEN_STE_VALID	(1 << 1)
+> > >  	u32				options;
+> > >
+> > >  	struct arm_smmu_cmdq		cmdq;
+> > > @@ -641,6 +643,7 @@ struct arm_smmu_option_prop {
+> > >
+> > >  static struct arm_smmu_option_prop arm_smmu_options[] = {
+> > >  	{ ARM_SMMU_OPT_SKIP_PREFETCH, "hisilicon,broken-prefetch-
+> > cmd" },
+> > > +	{ ARM_SMMU_OPT_BROKEN_STE_VALID, "broadcom,broken-ste-
+> > valid-check"
+> > > +},
+> > 
+> > This looks like a more specific problem than "broken ste valid check".
+> > Maybe we could call the prop
+> > ARM_SMMU_OPT_BCOM_BROKEN_STE_VALID?
+> > 
+> > You also need to update the devicetree binding in
+> > Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt.
+> > 
+> Sure I'll send out v2.
+> 
+> > >  	{ 0, NULL},
+> > >  };
+> > >
+> > > @@ -1046,6 +1049,15 @@ static void arm_smmu_write_strtab_ent(struct
+> > arm_smmu_device *smmu, u32 sid,
+> > >  				      : STRTAB_STE_0_CFG_BYPASS;
+> > >  		dst[0] = cpu_to_le64(val);
+> > >  		dst[2] = 0; /* Nuke the VMID */
+> > > +
+> > > +		if (smmu && (smmu->options &
+> > ARM_SMMU_OPT_BROKEN_STE_VALID)) {
+> > > +#define SMMU_STE_OAS_44_BITS 0x4UL
+> > 
+> > Please don't add a #define here. Can we instead use the oas field that we've
+> > extracted from IDR5? I think we need to be doing that anyway when we're
+> > using stage-2 translation, looking at the spec...
+> > 
+> As you mentioned in other email, "OAS" is already taken care by io-pgtable
+> vtcr.
 
-The following changes since commit 31ade3b83e1821da5fbb2f11b5b3d4ab2ec39db8:
+Ok -- so what is the value reported by your IDR5?
 
-  Linux 4.4-rc3 (2015-11-29 18:58:26 -0800)
+> > > +			WARN_ON(smmu->oas != 44);
+> > > +			dst[1] = STRTAB_STE_1_EATS_TRANS <<
+> > STRTAB_STE_1_EATS_SHIFT;
+> > 
+> > Why are you enabling ATS?
+> > 
+> Again, based on feedback from h/w team which expects these fields
+> populated (hence broken :) ), 
 
-are available in the git repository at:
+Ok, I just didn't see any mention of that in the commit message and
+wanted to make sure it wasn't an accidental unrelated change.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-dt
-
-for you to fetch changes up to 0a804b5729bb0021e63662b772db0f52de653056:
-
-  ARM: at91/dt: sama5d2 Xplained: pmic needs a specific sda hold time (2015-12-15 12:23:32 +0100)
-
-----------------------------------------------------------------
-First batch of DT changes for 4.5:
-- addition of nodes for sama5d2 & sama5d4
-- some fixes for i2c hold time, compatible stings
-- addition of a new patform by DENX: the MA5D4 SoM and EVK
-
-----------------------------------------------------------------
-Ludovic Desroches (2):
-      ARM: at91/dt: sama5d4: update i2c compatible string
-      ARM: at91/dt: sama5d2 Xplained: pmic needs a specific sda hold time
-
-Marek Vasut (3):
-      ARM: at91/dt: sama5d4: Fix mmc0 pinmux comments
-      ARM: at91/dt: sama5d4: Add pinmux for 8-bit MMC0 bus
-      ARM: at91/dt: sama5d4: Add support for DENX MA5D4 SoM and EVK
-
-Nicolas Ferre (1):
-      ARM: at91/dt: sama5d4 master clock can run at 200MHz now
-
-Wenyou Yang (1):
-      ARM: at91/dt: sama5d2: add watchdog node
-
- arch/arm/boot/dts/Makefile                  |   1 +
- arch/arm/boot/dts/at91-sama5d2_xplained.dts |   5 +
- arch/arm/boot/dts/at91-sama5d4_ma5d4.dtsi   | 127 +++++++++++++++++++++
- arch/arm/boot/dts/at91-sama5d4_ma5d4evk.dts | 170 ++++++++++++++++++++++++++++
- arch/arm/boot/dts/sama5d2.dtsi              |   7 ++
- arch/arm/boot/dts/sama5d4.dtsi              |  26 +++--
- 6 files changed, 327 insertions(+), 9 deletions(-)
- create mode 100644 arch/arm/boot/dts/at91-sama5d4_ma5d4.dtsi
- create mode 100644 arch/arm/boot/dts/at91-sama5d4_ma5d4evk.dts
-
--- 
-Nicolas Ferre
+Will
