@@ -1,632 +1,128 @@
-From: michael@amarulasolutions.com (Michael Trimarchi)
-Date: Wed, 16 Dec 2015 19:12:05 +0100
-Subject: [PATCH V3] ARM: dts: imx6q-icore-rqs: Add Engicam IMX6 Q7
- initial support
-In-Reply-To: <20151214084456.GA4305@panicking>
-References: <20151116112931.GA10464@panicking>
- <1447673895.3144.16.camel@pengutronix.de>
- <20151116114127.GB10464@panicking>
- <1447674695.3144.21.camel@pengutronix.de>
- <20151116115421.GC10464@panicking> <20151116172318.GA513@panicking>
- <1447752697.3144.47.camel@pengutronix.de>
- <20151118151030.GA11558@panicking> <20151211083512.GB11252@tiger>
- <20151214084456.GA4305@panicking>
-Message-ID: <20151216181159.GC20121@panicking>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 16 Dec 2015 19:31:30 +0100
+Subject: [PATCH v3] net/macb: add support for resetting PHY using GPIO
+Message-ID: <1450290690-32369-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+With device tree it is no more possible to reset the PHY at board
+level. Furthermore, doing in the driver allow to power down the PHY when
+the network interface is no more used.
 
-I have address most of the changes but I have problem when I remove
-the group of pinctrl as you suggest
+This reset can't be done at the PHY driver level. The PHY must be able to
+answer to the mii bus scan to let the kernel creating a PHY device.
 
-On Mon, Dec 14, 2015 at 09:44:56AM +0100, Michael Trimarchi wrote:
-> Hi
-> 
-> On Fri, Dec 11, 2015 at 04:36:17PM +0800, Shawn Guo wrote:
-> > On Wed, Nov 18, 2015 at 04:10:34PM +0100, Michael Trimarchi wrote:
-> > > www.engicam.com/en/products/embedded/som/standard/i-core-rqs-m6s-dl-d-q
-> > > 
-> > > Signed-off-by: Michael Trimarchi <michael@amarulasolutions.com>
-> > > ---
-> > > I'm not quite sure how ethernet tuning parameter
-> > > are working in other setup and this seems the
-> > > correct way to use it
-> > > 
-> > > Changes in v3:
-> > > 	- add sgtl audio support
-> > > 	- add ethernet gigabit tuning
-> > > 	- use hub reset only in usbhub and not
-> > > 	  in otg vbus
-> > > 
-> > > Changes in v2:
-> > > 	- add the board in alphabetic order
-> > > 	- remove cpu operating point
-> > > 	- remove simple-bus and adjust regulaotor
-> > > 	- add gpios to correct pinctrl
-> > > 	- remove no mainline binding of gpc
-> > > 
-> > >  arch/arm/boot/dts/Makefile               |   1 +
-> > >  arch/arm/boot/dts/imx6q-icore-rqs.dts    |  45 ++++
-> > >  arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi | 382 +++++++++++++++++++++++++++++++
-> > >  3 files changed, 428 insertions(+)
-> > >  create mode 100644 arch/arm/boot/dts/imx6q-icore-rqs.dts
-> > >  create mode 100644 arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
-> > > 
-> > > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> > > index bb8fa02..7e8f29c 100644
-> > > --- a/arch/arm/boot/dts/Makefile
-> > > +++ b/arch/arm/boot/dts/Makefile
-> > > @@ -312,6 +312,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
-> > >  	imx6q-gw551x.dtb \
-> > >  	imx6q-gw552x.dtb \
-> > >  	imx6q-hummingboard.dtb \
-> > > +	imx6q-icore-rqs.dtb \
-> > >  	imx6q-nitrogen6x.dtb \
-> > >  	imx6q-phytec-pbab01.dtb \
-> > >  	imx6q-rex-pro.dtb \
-> > > diff --git a/arch/arm/boot/dts/imx6q-icore-rqs.dts b/arch/arm/boot/dts/imx6q-icore-rqs.dts
-> > > new file mode 100644
-> > > index 0000000..8f14edf
-> > > --- /dev/null
-> > > +++ b/arch/arm/boot/dts/imx6q-icore-rqs.dts
-> > > @@ -0,0 +1,45 @@
-> > > +/*
-> > > + * Copyright (C) 2015 Amarula Solutions B.V.
-> > > + *
-> > > + * This program is free software; you can redistribute it and/or modify
-> > > + * it under the terms of the GNU General Public License version 2 as
-> > > + * published by the Free Software Foundation.
-> > > + */
-> > 
-> > Suggest to use GPL/X11 dual licences, so that non-Linux can use it too.
-> > You can find a lot of examples in arch/arm/boot/dts.
-> > 
-> 
-> Ok
-> 
-> > > +
-> > > +/dts-v1/;
-> > > +
-> > > +#include "imx6q.dtsi"
-> > > +#include "imx6qdl-icore-rqs.dtsi"
-> > > +
-> > > +/ {
-> > > +	model = "Engicam i.CoreM6 Quad SOM";
-> > > +	compatible = "fsl,imx6-icore-rqs", "fsl,imx6q";
-> > 
-> > This is not a board from Freescale, so 'fsl,' is not a appropriate for
-> > the board compatible imx6q-icore-rqs.
-> > 
-> 
-> let use eng,imx6-icore-rqs
-> 
+The patch introduces a new optional property "reset-gpios" at PHY level.
 
-That I have fixed
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+Hi,
 
-> > > +
-> > > +	sound {
-> > > +		compatible = "fsl,imx-audio-sgtl5000";
-> > > +		model = "imx-audio-sgtl5000";
-> > > +		ssi-controller = <&ssi1>;
-> > > +		audio-codec = <&codec>;
-> > > +		audio-routing =
-> > > +			"MIC_IN", "Mic Jack",
-> > > +			"Mic Jack", "Mic Bias",
-> > > +			"Headphone Jack", "HP_OUT";
-> > > +		mux-int-port = <1>;
-> > > +		mux-ext-port = <4>;
-> > > +	};
-> > > +};
-> > > +
-> > > +&sata {
-> > > +	status = "okay";
-> > > +};
-> > 
-> > Please sort them labelled nodes alphabetically.
-> > 
-> 
-> ok
-> 
+I agree with Sasha to start with a good binding and indeed the reset
+is more related to the PHY than to the MAC even if currently we have
+to manipulate it at MAC level.
 
-You mean sata and i2c?
+I also followed Russell advice to not use fwnode functions. However
+the following code seems to work:
 
+        struct fwnode_handle *phy_node =
+		device_get_next_child_node(&pdev->dev, NULL);
+        bp->reset_gpio = fwnode_get_named_gpiod(phy_node, "reset-gpios");
+        if (IS_ERR)
+		bp->reset_gpio = NULL;
+        gpiod_set_value(bp->reset_gpio, GPIOD_OUT_HIGH);
 
-> > > +
-> > > +&i2c3 {
-> > > +	codec: sgtl5000 at 0a {
-> > > +		compatible = "fsl,sgtl5000";
-> > > +		reg = <0x0a>;
-> > > +		clocks = <&clks IMX6QDL_CLK_CKO>;
-> > > +		VDDA-supply = <&reg_2p5v>;
-> > > +		VDDIO-supply = <&reg_3p3v>;
-> > > +		VDDD-supply = <&reg_1p8v>;
-> > > +	};
-> > > +};
-> > > diff --git a/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi b/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
-> > > new file mode 100644
-> > > index 0000000..c57a830
-> > > --- /dev/null
-> > > +++ b/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
-> > > @@ -0,0 +1,382 @@
-> > > +/*
-> > > + * Copyright 2015 Amarula Solutions B.V.
-> > > + *
-> > > + * The code contained herein is licensed under the GNU General Public
-> > > + * License. You may obtain a copy of the GNU General Public License
-> > > + * Version 2 or later at the following locations:
-> > > + *
-> > > + * http://www.opensource.org/licenses/gpl-license.html
-> > > + * http://www.gnu.org/copyleft/gpl.html
-> > > + */
-> > > +#include <dt-bindings/gpio/gpio.h>
-> > > +#include <dt-bindings/clock/imx6qdl-clock.h>
-> > > +
-> > > +/ {
-> > > +	memory {
-> > > +		reg = <0x10000000 0x80000000>;
-> > > +	};
-> > > +
-> > > +	reg_1p8v: 1p8v {
-> > 
-> > Can we name these regulator nodes a bit better, something like
-> > 'regulator-1pv8'?
-> > 
-> 
-> ok
-> 
-> > > +		compatible = "regulator-fixed";
-> > > +		regulator-name = "1P8V";
-> > > +		regulator-min-microvolt = <1800000>;
-> > > +		regulator-max-microvolt = <1800000>;
-> > > +		regulator-boot-on;
-> > > +		regulator-always-on;
-> > > +	};
-> > > +
-> > > +	reg_2p5v: 2p5v {
-> > > +		compatible = "regulator-fixed";
-> > > +		regulator-name = "2P5V";
-> > > +		regulator-min-microvolt = <2500000>;
-> > > +		regulator-max-microvolt = <2500000>;
-> > > +		regulator-boot-on;
-> > > +		regulator-always-on;
-> > > +	};
-> > > +
-> > > +	reg_3p3v: 3p3v {
-> > > +		compatible = "regulator-fixed";
-> > > +		regulator-name = "3P3V";
-> > > +		regulator-min-microvolt = <3300000>;
-> > > +		regulator-max-microvolt = <3300000>;
-> > > +		regulator-boot-on;
-> > > +		regulator-always-on;
-> > > +	};
-> > > +
-> > > +	reg_sd3_vmmc: sd3_vmmc {
-> > 
-> > It's more idiomatic to use minus than underscore in node name.
-> > 
-> 
-> ok
-> 
-> > > +		compatible = "regulator-fixed";
-> > > +		regulator-name = "P3V3_SD3_SWITCHED";
-> > > +		regulator-min-microvolt = <3300000>;
-> > > +		regulator-max-microvolt = <3300000>;
-> > > +		gpio = <&gpio1 4 GPIO_ACTIVE_LOW>;
-> > > +		enable-active-high;
-> > > +	};
-> > > +
-> > > +	reg_sd4_vmmc: sd4_vmmc {
-> > > +		compatible = "regulator-fixed";
-> > > +		regulator-name = "P3V3_SD4_SWITCHED";
-> > > +		regulator-min-microvolt = <3300000>;
-> > > +		regulator-max-microvolt = <3300000>;
-> > > +		regulator-boot-on;
-> > > +		regulator-always-on;
-> > > +	};
-> > > +
-> > > +	reg_usb_h1_vbus: usb_h1_vbus {
-> > > +		compatible = "regulator-fixed";
-> > > +		regulator-name = "usb_h1_vbus";
-> > > +		regulator-min-microvolt = <5000000>;
-> > > +		regulator-max-microvolt = <5000000>;
-> > > +		regulator-boot-on;
-> > > +		regulator-always-on;
-> > > +	};
-> > > +
-> > > +	reg_usb_otg_vbus: usb_otg_vbus {
-> > > +		compatible = "regulator-fixed";
-> > > +		regulator-name = "usb_otg_vbus";
-> > > +		regulator-min-microvolt = <5000000>;
-> > > +		regulator-max-microvolt = <5000000>;
-> > > +		regulator-boot-on;
-> > > +		regulator-always-on;
-> > > +	};
-> > > +
-> > > +	usb_hub: usb-hub {
-> > > +		pinctrl-names = "default";
-> > > +		pinctrl-0 = <&pinctrl_usbhub>;
-> > > +		compatible = "smsc,usb3503a";
-> > 
-> > Let 'compatible' be the top of the property list.
-> >
-> 
-> ok
-> 
-> > > +		reset-gpios = <&gpio1 6 GPIO_ACTIVE_LOW>;
-> > > +		clocks = <&clks IMX6QDL_CLK_LVDS2_GATE>;
-> > > +		clock-names = "refclk";
-> > > +	};
-> > 
-> > How is this device get connected?  The most common case is via I2C bus.
-> > In that case, the node shouldn't be here but under I2C node.
-> > 
-> 
-> It's correct, the connection is completly defined and it's not connected
-> to i2c according from what I know. I will double check
-> 
+Given that it doesn't make the code better I kept the of_get_named_gpio method.
 
-It's fine as it is
+Gregory
 
-> > > +};
-> > > +
-> > > +&iomuxc {
-> > 
-> > Suggest move iomuxc node to the bottom to make the file a bit easier to
-> > read.
-> > 
-> 
-> Ok
-> 
-> 
-> > > +	imx6qdl-icore-rqs {
-> > > +
-> > 
-> > With commit 5fcdf6a7ed95 (pinctrl: imx: Allow parsing DT without function
-> > nodes) in place, we can now save this container.
-> > 
+Documentation/devicetree/bindings/net/macb.txt |  7 +++++++
+ drivers/net/ethernet/cadence/macb.c            | 16 ++++++++++++++++
+ drivers/net/ethernet/cadence/macb.h            |  1 +
+ 3 files changed, 24 insertions(+)
 
-If I save this I can not register usb. Group is not found
-
-[    2.768476] imx6q-pinctrl 20e0000.iomuxc: unable to find group for node usdhc1grp-1
-[    2.768844] imx6q-pinctrl 20e0000.iomuxc: unable to find group for node usdhc1grp-1
-[    2.768932] sdhci-esdhc-imx: probe of 2190000.usdhc failed with error -22
-[    2.768994] imx6q-pinctrl 20e0000.iomuxc: unable to find group for node usdhc3grp-2
-[    2.769240] imx6q-pinctrl 20e0000.iomuxc: unable to find group for node usdhc3grp-2
-[    2.769322] sdhci-esdhc-imx: probe of 2198000.usdhc failed with error -22
-[    2.769381] imx6q-pinctrl 20e0000.iomuxc: unable to find group for node usdhc4grp-1
-[    2.769621] imx6q-pinctrl 20e0000.iomuxc: unable to find group for node usdhc4grp-1
-[    2.769701] sdhci-esdhc-imx: probe of 219c000.usdhc failed with error -22
-
-Michael
-
-> > > +		pinctrl_audmux_4: audmux-4 {
-> > 
-> 
-> I will take a look of that commit
-> 
-> > The suffix numbering makes no sense in this case.  The following example
-> > should be good enough.
-> > 
-> > 		pinctrl_audmux: audmux {
-> > 
-> > > +			fsl,pins = <
-> > > +				MX6QDL_PAD_DISP0_DAT20__AUD4_TXC  0x130b0
-> > > +				MX6QDL_PAD_DISP0_DAT21__AUD4_TXD  0x110b0
-> > > +				MX6QDL_PAD_DISP0_DAT22__AUD4_TXFS 0x130b0
-> > > +				MX6QDL_PAD_DISP0_DAT23__AUD4_RXD  0x130b0
-> > > +			>;
-> > > +		};
-> > > +
-> > > +		pinctrl_enet_3: enetgrp-3 {
-> > > +			fsl,pins = <
-> > > +				MX6QDL_PAD_ENET_MDIO__ENET_MDIO       0x1b0b0
-> > > +				MX6QDL_PAD_ENET_MDC__ENET_MDC         0x1b0b0
-> > > +				MX6QDL_PAD_RGMII_TXC__RGMII_TXC       0x1b0b0
-> > > +				MX6QDL_PAD_RGMII_TD0__RGMII_TD0       0x1b0b0
-> > > +				MX6QDL_PAD_RGMII_TD1__RGMII_TD1       0x1b0b0
-> > > +				MX6QDL_PAD_RGMII_TD2__RGMII_TD2       0x1b0b0
-> > > +				MX6QDL_PAD_RGMII_TD3__RGMII_TD3       0x1b0b0
-> > > +				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL 0x1b0b0
-> > > +				MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK  0x1b0b0
-> > > +				MX6QDL_PAD_RGMII_RXC__RGMII_RXC       0x1b0b0
-> > > +				MX6QDL_PAD_RGMII_RD0__RGMII_RD0       0x1b0b0
-> > > +				MX6QDL_PAD_RGMII_RD1__RGMII_RD1       0x1b0b0
-> > > +				MX6QDL_PAD_RGMII_RD2__RGMII_RD2       0x1b0b0
-> > > +				MX6QDL_PAD_RGMII_RD3__RGMII_RD3       0x1b0b0
-> > > +				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL 0x1b0b0
-> > > +				MX6QDL_PAD_ENET_TX_EN__ENET_TX_EN     0x1b0b0
-> > > +			>;
-> > > +		};
-> > > +
-> > > +		pinctrl_i2c1_1: i2c1grp-1 {
-> > > +			fsl,pins = <
-> > > +				MX6QDL_PAD_EIM_D21__I2C1_SCL 0x4001b8b1
-> > > +				MX6QDL_PAD_EIM_D28__I2C1_SDA 0x4001b8b1
-> > > +			>;
-> > > +		};
-> > > +
-> > > +		pinctrl_i2c2_2: i2c2grp-2 {
-> > > +			fsl,pins = <
-> > > +				MX6QDL_PAD_KEY_COL3__I2C2_SCL 0x4001b8b1
-> > > +				MX6QDL_PAD_KEY_ROW3__I2C2_SDA 0x4001b8b1
-> > > +			>;
-> > > +		};
-> > > +
-> > > +		pinctrl_i2c3_4: i2c3grp-4 {
-> > > +			fsl,pins = <
-> > > +				MX6QDL_PAD_GPIO_5__I2C3_SCL  0x4001b8b1
-> > > +				MX6QDL_PAD_EIM_D18__I2C3_SDA 0x4001b8b1
-> > > +				MX6QDL_PAD_GPIO_0__CCM_CLKO1    0x130b0
-> > > +			>;
-> > > +		};
-> > > +
-> > > +		pinctrl_pcie: pciegrp {
-> > > +			fsl,pins = <
-> > > +				MX6QDL_PAD_EIM_D29__GPIO3_IO29 0x1f059	/* PCIe Reset */
-> > > +			>;
-> > > +		};
-> > > +
-> > > +		pinctrl_uart4_1: uart4grp-1 {
-> > > +			fsl,pins = <
-> > > +				MX6QDL_PAD_KEY_COL0__UART4_TX_DATA 0x1b0b1
-> > > +				MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA 0x1b0b1
-> > > +			>;
-> > > +		};
-> > > +
-> > > +		pinctrl_usbhub: usbhubgrp {
-> > > +			fsl,pins = <
-> > > +				MX6QDL_PAD_GPIO_6__GPIO1_IO06  0x1f059	/* HUB USB Reset */
-> > > +			>;
-> > > +		};
-> > > +
-> > > +		pinctrl_usbotg_2: usbotggrp-2 {
-> > > +			fsl,pins = <
-> > > +				MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID 0x17059
-> > > +			>;
-> > > +		};
-> > > +
-> > > +		pinctrl_usdhc1_1: usdhc1grp-1 {
-> > > +			fsl,pins = <
-> > > +				MX6QDL_PAD_SD1_CMD__SD1_CMD    0x17071
-> > > +				MX6QDL_PAD_SD1_CLK__SD1_CLK    0x10071
-> > > +				MX6QDL_PAD_SD1_DAT0__SD1_DATA0 0x17071
-> > > +				MX6QDL_PAD_SD1_DAT1__SD1_DATA1 0x17071
-> > > +				MX6QDL_PAD_SD1_DAT2__SD1_DATA2 0x17071
-> > > +				MX6QDL_PAD_SD1_DAT3__SD1_DATA3 0x17071
-> > > +			>;
-> > > +		};
-> > > +
-> > > +		pinctrl_usdhc3_2: usdhc3grp-2 {
-> > > +			fsl,pins = <
-> > > +				MX6QDL_PAD_SD3_CMD__SD3_CMD    0x17070
-> > > +				MX6QDL_PAD_SD3_CLK__SD3_CLK    0x10070
-> > > +				MX6QDL_PAD_SD3_DAT0__SD3_DATA0 0x17070
-> > > +				MX6QDL_PAD_SD3_DAT1__SD3_DATA1 0x17070
-> > > +				MX6QDL_PAD_SD3_DAT2__SD3_DATA2 0x17070
-> > > +				MX6QDL_PAD_SD3_DAT3__SD3_DATA3 0x17070
-> > > +				MX6QDL_PAD_GPIO_1__GPIO1_IO01  0x1f059	/* CD */
-> > > +				MX6QDL_PAD_GPIO_4__GPIO1_IO04  0x1f059	/* PWR */
-> > > +			>;
-> > > +		};
-> > > +
-> > > +		pinctrl_usdhc3_2_100mhz: usdhc3grp-2_100mhz {
-> > > +			fsl,pins = <
-> > > +				MX6QDL_PAD_SD3_CMD__SD3_CMD    0x170B1
-> > > +				MX6QDL_PAD_SD3_CLK__SD3_CLK    0x100B1
-> > > +				MX6QDL_PAD_SD3_DAT0__SD3_DATA0 0x170B1
-> > > +				MX6QDL_PAD_SD3_DAT1__SD3_DATA1 0x170B1
-> > > +				MX6QDL_PAD_SD3_DAT2__SD3_DATA2 0x170B1
-> > > +				MX6QDL_PAD_SD3_DAT3__SD3_DATA3 0x170B1
-> > > +			>;
-> > > +		};
-> > > +
-> > > +		pinctrl_usdhc3_2_200mhz: usdhc3grp-2_200mhz {
-> > > +			fsl,pins = <
-> > > +				MX6QDL_PAD_SD3_CMD__SD3_CMD    0x170F9
-> > > +				MX6QDL_PAD_SD3_CLK__SD3_CLK    0x100F9
-> > > +				MX6QDL_PAD_SD3_DAT0__SD3_DATA0 0x170F9
-> > > +				MX6QDL_PAD_SD3_DAT1__SD3_DATA1 0x170F9
-> > > +				MX6QDL_PAD_SD3_DAT2__SD3_DATA2 0x170F9
-> > > +				MX6QDL_PAD_SD3_DAT3__SD3_DATA3 0x170F9
-> > > +			>;
-> > > +		};
-> > > +
-> > > +		pinctrl_usdhc4_1: usdhc4grp-1 {
-> > > +			fsl,pins = <
-> > > +				MX6QDL_PAD_SD4_CMD__SD4_CMD    0x17070
-> > > +				MX6QDL_PAD_SD4_CLK__SD4_CLK    0x10070
-> > > +				MX6QDL_PAD_SD4_DAT0__SD4_DATA0 0x17070
-> > > +				MX6QDL_PAD_SD4_DAT1__SD4_DATA1 0x17070
-> > > +				MX6QDL_PAD_SD4_DAT2__SD4_DATA2 0x17070
-> > > +				MX6QDL_PAD_SD4_DAT3__SD4_DATA3 0x17070
-> > > +				MX6QDL_PAD_SD4_DAT4__SD4_DATA4 0x17070
-> > > +				MX6QDL_PAD_SD4_DAT5__SD4_DATA5 0x17070
-> > > +				MX6QDL_PAD_SD4_DAT6__SD4_DATA6 0x17070
-> > > +				MX6QDL_PAD_SD4_DAT7__SD4_DATA7 0x17070
-> > > +			>;
-> > > +		};
-> > > +
-> > > +		pinctrl_usdhc4_1_100mhz: usdhc4grp-1_100mhz {
-> > > +			fsl,pins = <
-> > > +				MX6QDL_PAD_SD4_CMD__SD4_CMD    0x170B1
-> > > +				MX6QDL_PAD_SD4_CLK__SD4_CLK    0x100B1
-> > > +				MX6QDL_PAD_SD4_DAT0__SD4_DATA0 0x170B1
-> > > +				MX6QDL_PAD_SD4_DAT1__SD4_DATA1 0x170B1
-> > > +				MX6QDL_PAD_SD4_DAT2__SD4_DATA2 0x170B1
-> > > +				MX6QDL_PAD_SD4_DAT3__SD4_DATA3 0x170B1
-> > > +				MX6QDL_PAD_SD4_DAT4__SD4_DATA4 0x170B1
-> > > +				MX6QDL_PAD_SD4_DAT5__SD4_DATA5 0x170B1
-> > > +				MX6QDL_PAD_SD4_DAT6__SD4_DATA6 0x170B1
-> > > +				MX6QDL_PAD_SD4_DAT7__SD4_DATA7 0x170B1
-> > > +			>;
-> > > +		};
-> > > +
-> > > +		pinctrl_usdhc4_1_200mhz: usdhc4grp-2_200mhz {
-> > > +			fsl,pins = <
-> > > +				MX6QDL_PAD_SD4_CMD__SD4_CMD    0x170F9
-> > > +				MX6QDL_PAD_SD4_CLK__SD4_CLK    0x100F9
-> > > +				MX6QDL_PAD_SD4_DAT0__SD4_DATA0 0x170F9
-> > > +				MX6QDL_PAD_SD4_DAT1__SD4_DATA1 0x170F9
-> > > +				MX6QDL_PAD_SD4_DAT2__SD4_DATA2 0x170F9
-> > > +				MX6QDL_PAD_SD4_DAT3__SD4_DATA3 0x170F9
-> > > +				MX6QDL_PAD_SD4_DAT4__SD4_DATA4 0x170F9
-> > > +				MX6QDL_PAD_SD4_DAT5__SD4_DATA5 0x170F9
-> > > +				MX6QDL_PAD_SD4_DAT6__SD4_DATA6 0x170F9
-> > > +				MX6QDL_PAD_SD4_DAT7__SD4_DATA7 0x170F9
-> > > +			>;
-> > > +		};
-> > > +	};
-> > > +};
-> > > +
-> > > +&clks {
-> > > +	assigned-clocks = <&clks IMX6QDL_CLK_LVDS2_SEL>;
-> > > +	assigned-clock-parents = <&clks IMX6QDL_CLK_OSC>;
-> > > +};
-> > > +
-> > > +&audmux {
-> > > +	pinctrl-names = "default";
-> > > +	pinctrl-0 = <&pinctrl_audmux_4>;
-> > > +	status = "okay";
-> > > +};
-> > > +
-> > > +&fec {
-> > > +	pinctrl-names = "default";
-> > > +	pinctrl-0 = <&pinctrl_enet_3>;
-> > > +	phy-handle = <&eth_phy>;
-> > > +	phy-mode = "rgmii";
-> > > +	status = "okay";
-> > > +	mdio {
-> > > +		eth_phy: ethernet-phy {
-> > > +			rxc-skew-ps = <1140>;
-> > > +			txc-skew-ps = <1140>;
-> > > +			txen-skew-ps = <600>;
-> > > +			rxdv-skew-ps = <240>;
-> > > +			rxd0-skew-ps = <420>;
-> > > +			rxd1-skew-ps = <600>;
-> > > +			rxd2-skew-ps = <420>;
-> > > +			rxd3-skew-ps = <240>;
-> > > +			txd0-skew-ps = <60>;
-> > > +			txd1-skew-ps = <60>;
-> > > +			txd2-skew-ps = <60>;
-> > > +			txd3-skew-ps = <240>;
-> > > +		};
-> > > +	};
-> > > +};
-> > > +
-> > > +&i2c1 {
-> > > +	status = "okay";
-> > 
-> > Let 'status' be the last property.
-> > 
-> 
-> Ok
-> 
-> I will repost again
-> 
-> Michael
-> 
-> > Shawn
-> > 
-> > > +	clock-frequency = <100000>;
-> > > +	pinctrl-names = "default";
-> > > +	pinctrl-0 = <&pinctrl_i2c1_1>;
-> > > +};
-> > > +
-> > > +&i2c2 {
-> > > +	clock-frequency = <100000>;
-> > > +	pinctrl-names = "default";
-> > > +	pinctrl-0 = <&pinctrl_i2c2_2>;
-> > > +	status = "okay";
-> > > +};
-> > > +
-> > > +&i2c3 {
-> > > +	pinctrl-names = "default";
-> > > +	pinctrl-0 = <&pinctrl_i2c3_4>;
-> > > +	status = "okay";
-> > > +};
-> > > +
-> > > +&pcie {
-> > > +	pinctrl-names = "default";
-> > > +	pinctrl-0 = <&pinctrl_pcie>;
-> > > +	reset-gpio = <&gpio3 29 GPIO_ACTIVE_LOW>;
-> > > +	status = "okay";
-> > > +};
-> > > +
-> > > +&ssi1 {
-> > > +	fsl,mode = "i2s-slave";
-> > > +	status = "okay";
-> > > +};
-> > > +
-> > > +&uart4 {
-> > > +	pinctrl-names = "default";
-> > > +	pinctrl-0 = <&pinctrl_uart4_1>;
-> > > +	status = "okay";
-> > > +};
-> > > +
-> > > +&usbh1 {
-> > > +	vbus-supply = <&reg_usb_h1_vbus>;
-> > > +	disable-over-current;
-> > > +	clocks = <&clks IMX6QDL_CLK_USBOH3>;
-> > > +	status = "okay";
-> > > +};
-> > > +
-> > > +&usbotg {
-> > > +	vbus-supply = <&reg_usb_otg_vbus>;
-> > > +	pinctrl-names = "default";
-> > > +	pinctrl-0 = <&pinctrl_usbotg_2>;
-> > > +	disable-over-current;
-> > > +	status = "okay";
-> > > +};
-> > > +
-> > > +&usdhc1 {
-> > > +	pinctrl-names = "default";
-> > > +	pinctrl-0 = <&pinctrl_usdhc1_1>;
-> > > +	no-1-8-v;
-> > > +	status = "okay";
-> > > +};
-> > > +
-> > > +&usdhc3 {
-> > > +	pinctrl-names = "default", "state_100mhz", "state_200mhz";
-> > > +	pinctrl-0 = <&pinctrl_usdhc3_2>;
-> > > +	pinctrl-1 = <&pinctrl_usdhc3_2_100mhz>;
-> > > +	pinctrl-2 = <&pinctrl_usdhc3_2_200mhz>;
-> > > +	vmcc-supply = <&reg_sd3_vmmc>;
-> > > +	cd-gpios = <&gpio1 1 GPIO_ACTIVE_LOW>;
-> > > +	bus-witdh=<4>;
-> > > +	no-1-8-v;
-> > > +	status = "okay";
-> > > +};
-> > > +
-> > > +&usdhc4 {
-> > > +	pinctrl-names = "default", "state_100mhz", "state_200mhz";
-> > > +	pinctrl-0 = <&pinctrl_usdhc4_1>;
-> > > +	pinctrl-1 = <&pinctrl_usdhc4_1_100mhz>;
-> > > +	pinctrl-2 = <&pinctrl_usdhc4_1_200mhz>;
-> > > +	vmcc-supply = <&reg_sd4_vmmc>;
-> > > +	bus-witdh=<8>;
-> > > +	no-1-8-v;
-> > > +	non-removable;
-> > > +	status = "okay";
-> > > +};
-> > > -- 
-> > > 2.6.3
-> > > 
-> > > -- 
-> > > | Michael Nazzareno Trimarchi                     Amarula Solutions BV |
-> > > | COO  -  Founder                                      Cruquiuskade 47 |
-> > > | +31(0)851119172                                 Amsterdam 1018 AM NL |
-> > > |                  [`as] http://www.amarulasolutions.com               |
-> > > 
-> 
-> -- 
-> | Michael Nazzareno Trimarchi                     Amarula Solutions BV |
-> | COO  -  Founder                                      Cruquiuskade 47 |
-> | +31(0)851119172                                 Amsterdam 1018 AM NL |
-> |                  [`as] http://www.amarulasolutions.com               |
-
+diff --git a/Documentation/devicetree/bindings/net/macb.txt b/Documentation/devicetree/bindings/net/macb.txt
+index b5d7976..38c8e84 100644
+--- a/Documentation/devicetree/bindings/net/macb.txt
++++ b/Documentation/devicetree/bindings/net/macb.txt
+@@ -19,6 +19,9 @@ Required properties:
+ 	Optional elements: 'tx_clk'
+ - clocks: Phandles to input clocks.
+ 
++Optional properties for PHY child node:
++- reset-gpios : Should specify the gpio for phy reset
++
+ Examples:
+ 
+ 	macb0: ethernet at fffc4000 {
+@@ -29,4 +32,8 @@ Examples:
+ 		local-mac-address = [3a 0e 03 04 05 06];
+ 		clock-names = "pclk", "hclk", "tx_clk";
+ 		clocks = <&clkc 30>, <&clkc 30>, <&clkc 13>;
++		ethernet-phy at 1 {
++			reg = <0x1>;
++			reset-gpios = <&pioE 6 1>;
++		};
+ 	};
+diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+index 88c1e1a..35661aa 100644
+--- a/drivers/net/ethernet/cadence/macb.c
++++ b/drivers/net/ethernet/cadence/macb.c
+@@ -28,6 +28,7 @@
+ #include <linux/phy.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
++#include <linux/of_gpio.h>
+ #include <linux/of_mdio.h>
+ #include <linux/of_net.h>
+ 
+@@ -2813,6 +2814,7 @@ static int macb_probe(struct platform_device *pdev)
+ 					      = macb_clk_init;
+ 	int (*init)(struct platform_device *) = macb_init;
+ 	struct device_node *np = pdev->dev.of_node;
++	struct device_node *phy_node;
+ 	const struct macb_config *macb_config = NULL;
+ 	struct clk *pclk, *hclk, *tx_clk;
+ 	unsigned int queue_mask, num_queues;
+@@ -2900,6 +2902,16 @@ static int macb_probe(struct platform_device *pdev)
+ 	else
+ 		macb_get_hwaddr(bp);
+ 
++	/* Power up the PHY if there is a GPIO reset */
++	phy_node =  of_get_next_available_child(np, NULL);
++	if (phy_node) {
++		int gpio = of_get_named_gpio(phy_node, "reset-gpios", 0);
++		if (gpio_is_valid(gpio))
++			bp->reset_gpio = gpio_to_desc(gpio);
++		gpiod_set_value(bp->reset_gpio, GPIOD_OUT_HIGH);
++	}
++	of_node_put(phy_node);
++
+ 	err = of_get_phy_mode(np);
+ 	if (err < 0) {
+ 		pdata = dev_get_platdata(&pdev->dev);
+@@ -2966,6 +2978,10 @@ static int macb_remove(struct platform_device *pdev)
+ 		mdiobus_unregister(bp->mii_bus);
+ 		kfree(bp->mii_bus->irq);
+ 		mdiobus_free(bp->mii_bus);
++
++		/* Shutdown the PHY if there is a GPIO reset */
++		gpiod_set_value(bp->reset_gpio, GPIOD_OUT_LOW);
++
+ 		unregister_netdev(dev);
+ 		clk_disable_unprepare(bp->tx_clk);
+ 		clk_disable_unprepare(bp->hclk);
+diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
+index 6e1faea..b6ec421 100644
+--- a/drivers/net/ethernet/cadence/macb.h
++++ b/drivers/net/ethernet/cadence/macb.h
+@@ -824,6 +824,7 @@ struct macb {
+ 	unsigned int		dma_burst_length;
+ 
+ 	phy_interface_t		phy_interface;
++	struct gpio_desc	*reset_gpio;
+ 
+ 	/* AT91RM9200 transmit */
+ 	struct sk_buff *skb;			/* holds skb until xmit interrupt completes */
 -- 
-| Michael Nazzareno Trimarchi                     Amarula Solutions BV |
-| COO  -  Founder                                      Cruquiuskade 47 |
-| +31(0)851119172                                 Amsterdam 1018 AM NL |
-|                  [`as] http://www.amarulasolutions.com               |
+2.5.0
