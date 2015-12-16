@@ -1,73 +1,131 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 16 Dec 2015 16:16:33 +0100
-Subject: [PATCH V2 23/23] arm64, pci,
- acpi: Start using ACPI based PCI host bridge driver for ARM64.
+Date: Wed, 16 Dec 2015 16:16:25 +0100
+Subject: [PATCH V2 15/23] x86, ia64,
+ pci: Convert arches to use PCI_DOMAINS_GENERIC.
 In-Reply-To: <1450278993-12664-1-git-send-email-tn@semihalf.com>
 References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
-Message-ID: <1450278993-12664-24-git-send-email-tn@semihalf.com>
+Message-ID: <1450278993-12664-16-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lets get rid of empty PCI init stub, related ACPI header and
-go with full-blown PCI host bridge driver.
+Since we have now generic way to retrieve domain number using _SEG method,
+x86 and ia64 can take advantage of it and forget about another
+platform specific data from pci_sysdata.
 
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-CC: Arnd Bergmann <arnd@arndb.de>
-CC: Catalin Marinas <catalin.marinas@arm.com>
-CC: Liviu Dudau <Liviu.Dudau@arm.com>
-CC: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
-CC: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/Kconfig      |  4 ++++
- arch/arm64/kernel/pci.c | 10 ----------
- 2 files changed, 4 insertions(+), 10 deletions(-)
+ arch/ia64/Kconfig           | 3 +++
+ arch/ia64/include/asm/pci.h | 2 --
+ arch/ia64/pci/pci.c         | 1 -
+ arch/x86/Kconfig            | 3 +++
+ arch/x86/include/asm/pci.h  | 7 -------
+ arch/x86/pci/acpi.c         | 2 --
+ 6 files changed, 6 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index d65d315..71032ed 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -86,6 +86,7 @@ config ARM64
- 	select OF_EARLY_FLATTREE
- 	select OF_RESERVED_MEM
- 	select PERF_USE_VMALLOC
-+	select PCI_HOST_GENERIC_ACPI if ACPI
- 	select POWER_RESET
- 	select POWER_SUPPLY
- 	select RTC_LIB
-@@ -213,6 +214,9 @@ config PCI_MMCONFIG
- 	select PCI_ECAM
- 	depends on ACPI
+diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
+index eb0249e..6fecd04 100644
+--- a/arch/ia64/Kconfig
++++ b/arch/ia64/Kconfig
+@@ -572,6 +572,9 @@ config PCI
+ config PCI_DOMAINS
+ 	def_bool PCI
  
-+config ARCH_PCI_HOST_GENERIC_ACPI
-+	def_bool ACPI
++config PCI_DOMAINS_GENERIC
++	def_bool PCI
 +
- endmenu
+ config PCI_SYSCALL
+ 	def_bool PCI
  
- menu "Kernel Features"
-diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-index f7948f5..e9cf58b 100644
---- a/arch/arm64/kernel/pci.c
-+++ b/arch/arm64/kernel/pci.c
-@@ -10,7 +10,6 @@
-  *
-  */
+diff --git a/arch/ia64/include/asm/pci.h b/arch/ia64/include/asm/pci.h
+index 5050748..4214be1 100644
+--- a/arch/ia64/include/asm/pci.h
++++ b/arch/ia64/include/asm/pci.h
+@@ -66,7 +66,6 @@ extern int pci_mmap_legacy_page_range(struct pci_bus *bus,
  
--#include <linux/acpi.h>
- #include <linux/init.h>
- #include <linux/io.h>
- #include <linux/kernel.h>
-@@ -50,12 +49,3 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
+ struct pci_controller {
+ 	void *iommu;
+-	int segment;
+ 	int node;		/* nearest node with memory or NUMA_NO_NODE for global allocation */
  
- 	return pci_enable_resources(dev, mask);
- }
--
--#ifdef CONFIG_ACPI
--/* Root bridge scanning */
--struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+ 	void *platform_data;
+@@ -74,7 +73,6 @@ struct pci_controller {
+ 
+ 
+ #define PCI_CONTROLLER(busdev) ((struct pci_controller *) busdev->sysdata)
+-#define pci_domain_nr(busdev)    (PCI_CONTROLLER(busdev)->segment)
+ 
+ extern struct pci_ops pci_root_ops;
+ 
+diff --git a/arch/ia64/pci/pci.c b/arch/ia64/pci/pci.c
+index 978d6af..fe96bc9 100644
+--- a/arch/ia64/pci/pci.c
++++ b/arch/ia64/pci/pci.c
+@@ -300,7 +300,6 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+ 		return NULL;
+ 	}
+ 
+-	info->controller.segment = root->segment;
+ 	info->controller.node = acpi_get_node(device->handle);
+ 	INIT_LIST_HEAD(&info->io_resources);
+ 	return acpi_pci_root_create(root, &pci_acpi_root_ops,
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index 102d7d1..63cc4b7 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -2383,6 +2383,9 @@ config PCI_DOMAINS
+ 	def_bool y
+ 	depends on PCI
+ 
++config PCI_DOMAINS_GENERIC
++	def_bool PCI
++
+ config PCI_MMCONFIG
+ 	bool "Support mmconfig PCI config space access"
+ 	select PCI_ECAM
+diff --git a/arch/x86/include/asm/pci.h b/arch/x86/include/asm/pci.h
+index a98c022..1dc1ba1 100644
+--- a/arch/x86/include/asm/pci.h
++++ b/arch/x86/include/asm/pci.h
+@@ -12,7 +12,6 @@
+ #ifdef __KERNEL__
+ 
+ struct pci_sysdata {
+-	int		domain;		/* PCI domain */
+ 	int		node;		/* NUMA node */
+ #ifdef CONFIG_X86_64
+ 	void		*iommu;		/* IOMMU private data */
+@@ -26,12 +25,6 @@ extern int noioapicreroute;
+ #ifdef CONFIG_PCI
+ 
+ #ifdef CONFIG_PCI_DOMAINS
+-static inline int pci_domain_nr(struct pci_bus *bus)
 -{
--	/* TODO: Should be revisited when implementing PCI on ACPI */
--	return NULL;
+-	struct pci_sysdata *sd = bus->sysdata;
+-	return sd->domain;
 -}
--#endif
+-
+ static inline int pci_proc_domain(struct pci_bus *bus)
+ {
+ 	return pci_domain_nr(bus);
+diff --git a/arch/x86/pci/acpi.c b/arch/x86/pci/acpi.c
+index 286e0f5..5f78595 100644
+--- a/arch/x86/pci/acpi.c
++++ b/arch/x86/pci/acpi.c
+@@ -331,7 +331,6 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+ 		 * its bus->sysdata.
+ 		 */
+ 		struct pci_sysdata sd = {
+-			.domain = domain,
+ 			.node = node,
+ 		};
+ 
+@@ -345,7 +344,6 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+ 				"pci_bus %04x:%02x: ignored (out of memory)\n",
+ 				domain, busnum);
+ 		else {
+-			info->sd.domain = domain;
+ 			info->sd.node = node;
+ 			bus = acpi_pci_root_create(root, &acpi_pci_root_ops,
+ 						   &info->common, &info->sd);
 -- 
 1.9.1
