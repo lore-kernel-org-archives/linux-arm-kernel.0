@@ -1,37 +1,101 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Wed, 16 Dec 2015 15:55:14 -0800
-Subject: [PATCH v2 7/8] ARM: bcm2835: Add a compat string for bcm2836 machine
- probe
+Date: Wed, 16 Dec 2015 15:55:15 -0800
+Subject: [PATCH v2 8/8] ARM: bcm2835: Add Kconfig support for bcm2836
 In-Reply-To: <1450310115-22163-1-git-send-email-eric@anholt.net>
 References: <1450310115-22163-1-git-send-email-eric@anholt.net>
-Message-ID: <1450310115-22163-8-git-send-email-eric@anholt.net>
+Message-ID: <1450310115-22163-9-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Supporting the 2836 requires using the new interrupt controller, which
-we have support for.
+This should be a complete port of bcm2835 functionality to bcm2836
+(Raspberry Pi 2).
 
 Signed-off-by: Eric Anholt <eric@anholt.net>
 ---
- arch/arm/mach-bcm/board_bcm2835.c | 5 +++++
- 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/mach-bcm/board_bcm2835.c b/arch/arm/mach-bcm/board_bcm2835.c
-index 0f7b9ea..834d676 100644
---- a/arch/arm/mach-bcm/board_bcm2835.c
-+++ b/arch/arm/mach-bcm/board_bcm2835.c
-@@ -36,7 +36,12 @@ static void __init bcm2835_init(void)
- }
+v2: Implement Arnd's feedback to not split to ARCH_BCM2836, and
+    instead use more conditionals in ARCH_BCM2835.  Also reduce diff
+    between 2835 and 2836.
+
+ arch/arm/Kconfig.debug     | 10 ++++++++--
+ arch/arm/boot/dts/Makefile |  3 ++-
+ arch/arm/mach-bcm/Kconfig  |  8 ++++----
+ 3 files changed, 14 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 259c0ca..957b876 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -143,7 +143,12 @@ choice
  
- static const char * const bcm2835_compat[] = {
-+#ifdef CONFIG_ARCH_MULTI_V6
- 	"brcm,bcm2835",
-+#endif
-+#ifdef CONFIG_ARCH_MULTI_V7
-+	"brcm,bcm2836",
-+#endif
- 	NULL
- };
+ 	config DEBUG_BCM2835
+ 		bool "Kernel low-level debugging on BCM2835 PL011 UART"
+-		depends on ARCH_BCM2835
++		depends on ARCH_BCM2835 && ARCH_MULTI_V6
++		select DEBUG_UART_PL01X
++
++	config DEBUG_BCM2836
++		bool "Kernel low-level debugging on BCM2836 PL011 UART"
++		depends on ARCH_BCM2835 && ARCH_MULTI_V7
+ 		select DEBUG_UART_PL01X
  
+ 	config DEBUG_BCM_5301X
+@@ -1402,6 +1407,7 @@ config DEBUG_UART_PHYS
+ 	default 0x20064000 if DEBUG_RK29_UART1 || DEBUG_RK3X_UART2
+ 	default 0x20068000 if DEBUG_RK29_UART2 || DEBUG_RK3X_UART3
+ 	default 0x20201000 if DEBUG_BCM2835
++	default 0x3f201000 if DEBUG_BCM2836
+ 	default 0x3e000000 if DEBUG_BCM_KONA_UART
+ 	default 0x4000e400 if DEBUG_LL_UART_EFM32
+ 	default 0x40081000 if DEBUG_LPC18XX_UART0
+@@ -1485,7 +1491,7 @@ config DEBUG_UART_VIRT
+ 	default 0xf0000be0 if ARCH_EBSA110
+ 	default 0xf0010000 if DEBUG_ASM9260_UART
+ 	default 0xf01fb000 if DEBUG_NOMADIK_UART
+-	default 0xf0201000 if DEBUG_BCM2835
++	default 0xf0201000 if DEBUG_BCM2835 || DEBUG_BCM2836
+ 	default 0xf1000300 if DEBUG_BCM_5301X
+ 	default 0xf1002000 if DEBUG_MT8127_UART0
+ 	default 0xf1006000 if DEBUG_MT6589_UART0
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 30bbc37..54e8f6b 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -60,7 +60,8 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
+ 	bcm2835-rpi-b.dtb \
+ 	bcm2835-rpi-b-rev2.dtb \
+ 	bcm2835-rpi-b-plus.dtb \
+-	bcm2835-rpi-a-plus.dtb
++	bcm2835-rpi-a-plus.dtb \
++	bcm2836-rpi-2-b.dtb
+ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+ 	bcm4708-asus-rt-ac56u.dtb \
+ 	bcm4708-asus-rt-ac68u.dtb \
+diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+index 8c53c55..d7cada9 100644
+--- a/arch/arm/mach-bcm/Kconfig
++++ b/arch/arm/mach-bcm/Kconfig
+@@ -122,17 +122,17 @@ config ARCH_BCM_MOBILE_SMP
+ comment "Other Architectures"
+ 
+ config ARCH_BCM2835
+-	bool "Broadcom BCM2835 family" if ARCH_MULTI_V6
++	bool "Broadcom BCM2835 family" if ARCH_MULTI_V6 || ARCH_MULTI_V7
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_AMBA
+-	select ARM_ERRATA_411920
++	select ARM_ERRATA_411920 if ARCH_MULTI_V6
+ 	select ARM_TIMER_SP804
+ 	select CLKSRC_OF
+ 	select PINCTRL
+ 	select PINCTRL_BCM2835
+ 	help
+-	  This enables support for the Broadcom BCM2835 SoC. This SoC is
+-	  used in the Raspberry Pi and Roku 2 devices.
++	  This enables support for the Broadcom BCM2835 and BCM2836 SoCs.
++	  This SoC is used in the Raspberry Pi and Roku 2 devices.
+ 
+ config ARCH_BCM_63XX
+ 	bool "Broadcom BCM63xx DSL SoC" if ARCH_MULTI_V7
 -- 
 2.6.2
