@@ -1,89 +1,114 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 16 Dec 2015 15:42:50 -0800
-Subject: [PATCH v2 3/4] ARM: dts: vf610-cosmic: relicense vf610-cosmic.dts
- under GPLv2/X11
-In-Reply-To: <1449525076-23569-4-git-send-email-stefan@agner.ch>
-References: <1449525076-23569-1-git-send-email-stefan@agner.ch>
- <1449525076-23569-4-git-send-email-stefan@agner.ch>
-Message-ID: <22c56b5b292f78aae061b51734005070@agner.ch>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 17 Dec 2015 08:49:35 +0900
+Subject: [PATCH 12/19] ARM: dts: exynos: replace legacy *, wakeup property
+ with wakeup-source
+In-Reply-To: <1445422216-29375-13-git-send-email-sudeep.holla@arm.com>
+References: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
+ <1445422216-29375-13-git-send-email-sudeep.holla@arm.com>
+Message-ID: <5671F88F.7050802@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matt,
-
-Any chance to get an Ack from you for this patch?
-
---
-Stefan
-
-On 2015-12-07 13:51, Stefan Agner wrote:
-> GPLv2-only devicetrees make reuse difficult for software components
-> licensed under a different license.
+On 21.10.2015 19:10, Sudeep Holla wrote:
+> Though the keyboard and other driver will continue to support the legacy
+> "gpio-key,wakeup", "linux-keypad,wakeup" boolean property to enable the
+> wakeup source, "wakeup-source" is the new standard binding.
 > 
-> The consensus is that a GPL/X11 dual-license should allow all necessary
-> uses, so relicense the vf610-twr.dts file to this combination.
+> This patch replaces all the legacy wakeup properties with the unified
+> "wakeup-source" property in order to avoid any futher copy-paste
+> duplication.
 > 
-> CCs were acquired using (updated some email addresses):
-> git shortlog -sne --no-merges arch/arm/boot/dts/vf610-cosmic.dts
-> 
-> CC: Matt Porter <mporter@kernel.crashing.org>
-> Acked-by: Shawn Guo <shawnguo@kernel.org>
-> Acked-by: Cory Tusar <cory.tusar@pid1solutions.com>
-> Acked-by: Olof Johansson <olof@lixom.net>
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Cc: linux-samsung-soc at vger.kernel.org
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 > ---
->  arch/arm/boot/dts/vf610-cosmic.dts | 40 ++++++++++++++++++++++++++++++++++----
->  1 file changed, 36 insertions(+), 4 deletions(-)
+>  arch/arm/boot/dts/exynos3250-monk.dts           |  6 +++---
+>  arch/arm/boot/dts/exynos3250-rinato.dts         |  6 +++---
+>  arch/arm/boot/dts/exynos4210-origen.dts         | 10 +++++-----
+>  arch/arm/boot/dts/exynos4210-smdkv310.dts       |  2 +-
+>  arch/arm/boot/dts/exynos4210-trats.dts          |  2 +-
+>  arch/arm/boot/dts/exynos4210-universal_c210.dts |  4 ++--
+>  arch/arm/boot/dts/exynos4412-odroid-common.dtsi |  2 +-
+>  arch/arm/boot/dts/exynos4412-odroidx.dts        |  2 +-
+>  arch/arm/boot/dts/exynos4412-origen.dts         |  2 +-
+>  arch/arm/boot/dts/exynos4412-smdk4412.dts       |  2 +-
+>  arch/arm/boot/dts/exynos4412-trats2.dts         |  4 ++--
+>  arch/arm/boot/dts/exynos5250-arndale.dts        | 12 ++++++------
+>  arch/arm/boot/dts/exynos5250-snow.dts           |  4 ++--
+>  arch/arm/boot/dts/exynos5250-spring.dts         |  4 ++--
+>  arch/arm/boot/dts/exynos5420-arndale-octa.dts   |  2 +-
+>  arch/arm/boot/dts/exynos5420-peach-pit.dts      |  4 ++--
+>  arch/arm/boot/dts/exynos5800-peach-pi.dts       |  4 ++--
+>  17 files changed, 36 insertions(+), 36 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/vf610-cosmic.dts
-> b/arch/arm/boot/dts/vf610-cosmic.dts
-> index 5447f25..d0559c1 100644
-> --- a/arch/arm/boot/dts/vf610-cosmic.dts
-> +++ b/arch/arm/boot/dts/vf610-cosmic.dts
-> @@ -2,10 +2,42 @@
->   * Copyright 2013 Freescale Semiconductor, Inc.
->   * Copyright 2013 Linaro Limited
->   *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License as published by
-> - * the Free Software Foundation; either version 2 of the License, or
-> - * (at your option) any later version.
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License
-> + *     version 2 as published by the Free Software Foundation.
-> + *
-> + *     This file is distributed in the hope that it will be useful
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
->   */
+> diff --git a/arch/arm/boot/dts/exynos3250-monk.dts b/arch/arm/boot/dts/exynos3250-monk.dts
+> index 540a0adf2be6..b77ea2163a0a 100644
+> --- a/arch/arm/boot/dts/exynos3250-monk.dts
+> +++ b/arch/arm/boot/dts/exynos3250-monk.dts
+> @@ -43,7 +43,7 @@
+>  			linux,code = <KEY_POWER>;
+>  			label = "power key";
+>  			debounce-interval = <10>;
+> -			gpio-key,wakeup;
+> +			wakeup-source;
+>  		};
+>  	};
 >  
->  /dts-v1/;
+> @@ -67,7 +67,7 @@
+>  			interrupt-parent = <&gpx1>;
+>  			interrupts = <5 0>;
+>  			reg = <0x25>;
+> -			wakeup;
+> +			wakeup-source;
+>  
+>  			muic: max77836-muic {
+>  				compatible = "maxim,max77836-muic";
+> @@ -184,7 +184,7 @@
+>  		interrupt-parent = <&gpx0>;
+>  		interrupts = <7 0>;
+>  		reg = <0x66>;
+> -		wakeup;
+> +		wakeup-source;
+>  
+>  		s2mps14_osc: clocks {
+>  			compatible = "samsung,s2mps14-clk";
+> diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
+> index 41a5fafb9aa9..7acd11d2d957 100644
+> --- a/arch/arm/boot/dts/exynos3250-rinato.dts
+> +++ b/arch/arm/boot/dts/exynos3250-rinato.dts
+> @@ -43,7 +43,7 @@
+>  			linux,code = <KEY_POWER>;
+>  			label = "power key";
+>  			debounce-interval = <10>;
+> -			gpio-key,wakeup;
+> +			wakeup-source;
+>  		};
+>  	};
+>  
+> @@ -58,7 +58,7 @@
+>  			interrupt-parent = <&gpx1>;
+>  			interrupts = <5 0>;
+>  			reg = <0x25>;
+> -			wakeup;
+> +			wakeup-source;
+>  
+>  			muic: max77836-muic {
+>  				compatible = "maxim,max77836-muic";
+> @@ -245,7 +245,7 @@
+>  		interrupt-parent = <&gpx0>;
+>  		interrupts = <7 0>;
+>  		reg = <0x66>;
+> -		wakeup;
+> +		wakeup-source;
+
+I think here and in Monk board these four "wakeup" properties are bogus,
+not parsed by driver. Instead wakeup is always initialized to true.
+
+Anyway fixing this is not part of this patch but instead this should be
+fixed in separate commit. Here everything looks good:
+
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+Best regards,
+Krzysztof
