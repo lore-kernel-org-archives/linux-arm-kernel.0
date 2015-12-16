@@ -1,32 +1,81 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 16 Dec 2015 10:55:57 +0100
-Subject: [PATCH 4/6] pinctrl: sh-pfc: r8a7795: Add SATA support
-In-Reply-To: <1450107758-2544-5-git-send-email-ulrich.hecht+renesas@gmail.com>
-References: <1450107758-2544-1-git-send-email-ulrich.hecht+renesas@gmail.com>
- <1450107758-2544-5-git-send-email-ulrich.hecht+renesas@gmail.com>
-Message-ID: <CAMuHMdWs-mfMH+JHvGX3e26A_hnSScw1kNrLr-xYJxuuX_7eUg@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 16 Dec 2015 09:55:41 +0000
+Subject: [PATCH v3 09/10] PM / Hibernate: Publish pages restored in-place
+ to arch code
+In-Reply-To: <20151208081923.GA22680@amd>
+References: <1448559168-8363-1-git-send-email-james.morse@arm.com>
+ <1448559168-8363-10-git-send-email-james.morse@arm.com>
+ <20151205093534.GA7569@amd> <56656D6C.5010004@arm.com>
+ <20151208081923.GA22680@amd>
+Message-ID: <5671351D.3090109@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 14, 2015 at 4:42 PM, Ulrich Hecht
-<ulrich.hecht+renesas@gmail.com> wrote:
-> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
->
-> This patch adds SATA0 pinmux support to r8a7795 SoC.
->
-> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> [uli: adjusted for new PFC driver]
-> Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+Hi Pavel,
 
-Thanks, queued for v4.5.
+On 08/12/15 08:19, Pavel Machek wrote:
+>> I didn't do it here as it would clean every page copied, which was the
+>> worrying part of the previous approach. If there is an architecture
+>> where this cache-clean operation is expensive, it would slow down
+>> restore. I was trying to benchmark the impact of this on 32bit arm when
+>> I spotted it was broken.
+> 
+> You have just loaded the page from slow storage (hard drive,
+> MMC). Cleaning a page should be pretty fast compared to that.
 
-Gr{oetje,eeting}s,
+(One day I hope to own a laptop that hibernates to almost-memory speed
+nvram!)
 
-                        Geert
+Speed is one issue - another is I don't think its correct to assume that
+any architecture with a flush_icache_range() function can/should have
+that called on any page of data.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+There is also the possibility that an architecture needs to do something
+other than flush_icache_range() on the pages that were copied. (I can
+see lots of s390 hooks for 'page keys', Intel's memory protection keys
+may want something similar...)
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+This patch is the general-purpose fix, matching the existing list of
+'these pages need copying' with a 'these pages were already copied'.
+
+
+>> This allocated-same-page code path doesn't happen very often, so we
+>> don't want this to have an impact on the 'normal' code path. On 32bit
+>> arm I saw ~20 of these allocations out of ~60,000 pages.
+>>
+>> This new way allocates a few extra pages during restore, and doesn't
+>> assume that flush_cache_range() needs calling. It should have no impact
+>> on architectures that aren't using the new list.
+> 
+> It is also complex.
+
+Its symmetric with the existing restore_pblist code, I think that this
+is the simplest way of doing it.
+
+
+>>> Alternatively, can you just clean the whole cache before jumping to
+>>> the new kernel?
+>>
+>> On arm64, cleaning the whole cache means cleaning all of memory by
+>> virtual address, which would be a high price to pay when we only need to
+>> clean the pages we copied. The current implementation does clean all
+> 
+> How high price to pay? I mean, hibernation/restore takes
+> _seconds_. Paying miliseconds to have cleaner code is acceptable
+> price.
+
+I agree, but the code to clean all 8GB of memory on Juno takes ~3
+seconds, and this will probably scale linearly. We only need to clean
+the ~250MB that was copied by hibernate, (and of that, only the
+executable pages). The sticking point is the few pages it copies, but
+doesn't tell us about.
+
+I will put together the flush_icache_range()-during-decompression
+version of this patch... it looks like powerpc will suffer the most from
+this, from the comments, its flush_icache_range() code pushes data all
+the way out to memory...
+
+
+Thanks,
+
+James
