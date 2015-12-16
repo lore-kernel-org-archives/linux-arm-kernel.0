@@ -1,59 +1,36 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 16 Dec 2015 10:27:53 +0900
-Subject: [PATCH v3 2/4] ARM: bcm2835: add rpi power domain driver
-In-Reply-To: <20151216011110.GA13147@earth>
-References: <1450215622-27394-1-git-send-email-eric@anholt.net>
- <1450215622-27394-3-git-send-email-eric@anholt.net>
- <567093CD.1020208@gmail.com> <87oadrmfmi.fsf@eliezer.anholt.net>
- <5670AAB2.1080102@gmail.com> <87mvtbkyd0.fsf@eliezer.anholt.net>
- <20151216011110.GA13147@earth>
-Message-ID: <CAJKOXPes85hu6Jnd5p6dqhgdBGF4kmZuJQekM73O83DuZvcyoQ@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 16 Dec 2015 07:44:46 +0530
+Subject: [PATCH v6 0/7] cpufreq: add generic cpufreq driver support for
+ Exynos542x/5800 platforms
+In-Reply-To: <1450200801-24539-1-git-send-email-b.zolnierkie@samsung.com>
+References: <1450200801-24539-1-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <20151216021446.GC3111@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-12-16 10:11 GMT+09:00 Sebastian Reichel <sre@ring0.de>:
+On 15-12-15, 18:33, Bartlomiej Zolnierkiewicz wrote:
 > Hi,
->
-> On Tue, Dec 15, 2015 at 04:53:31PM -0800, Eric Anholt wrote:
->> >>> What motivated the location of this power domain driver in
->> >>> arch/arm/mach-bcm? Should not we have this in drivers/power/ or
->> >>> somewhere in drivers/ at the very least?
->> >>
->> >> ls stronly suggests that power contains drivers for power supplies and
->> >> batteries, not power domains.
->
-> Indeed it's used for fuel gauges and chargers, but also for
-> reboot/powerdown and adaptive voltage scaling, so another
-> subdirectory for power-domains wouldn't be that odd.
->
->> >> There are 6 power domain drivers in
->> >> arch/arm, 3 in drivers/clk, and 3 in drivers/soc.
->> >
->> > If we ever have to support a different architecture which happens to use
->> > a similar power domain, then we want it to be in a location which makes
->> > it easy for sharing it in the first place. As it stands today, it does
->> > not seem useful to me to have this code in arch/arm/mach-bcm/ at all.
->> >
->> > Maybe there is room from a drivers/power/domains/ of some kind?
->
-> I like the idea, but let's include generic power domain maintainers
-> in this discussion, as I suggested here (I got a power domain driver
-> patch for drivers/power just a few days ago):
->
-> https://lkml.org/lkml/2015/12/15/815
->
-> Also somebody would have to step up to maintain that directory.
+> 
+> This patch series adds generic cpufreq-dt driver support for
+> Exynos542x/5800 (using the new CPU clock type which allows it).
+> 
+> It has been tested on Exynos5422 based ODROID-XU3 Lite board.
+> 
+> Depends on:
+> - next-20151211 branch of linux-next kernel tree
+> - "[PATCH] ARM: dts: Make CPU configuration more readable for
+>   exynos542x/5800" patch (https://lkml.org/lkml/2015/12/11/107)
+> 
+> Changes since v5:
+> - rebased over next-20151211 branch (something is broken in
+>   newer branches, namely next-2015121[45])
+> - rebased on top of "ARM: dts: Make CPU configuration more
+>   readable for exynos542x/5800" patch
+> - renamed cpu0_opp_table to cluster_a15_opp_table and
+>   cpu1_opp_table to cluster_a7_opp_table
+> - added Reviewed-by from Krzysztof
 
-This could go into drivers/soc. We put there a lot of mach-specific
-stuff which we want to make a little more generic (like generic enough
-multiplatform, multiarchitecture etc). Rockchip has its own power
-domains there. Dove and Mediatek seem as well but I am not sure. Some
-other architectures keep this still in arm/mach (exynos, ux500, zx,
-imx, s34c64xx, shmobile) but this looks more of like a legacy choice.
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-However, since generic power domains have its own maintainers entry
-and reside under drivers/base/power, maybe making a separate directory
-for power domains drivers makes sense?
-
-Best regards,
-Krzysztof
+-- 
+viresh
