@@ -1,65 +1,89 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 17 Dec 2015 08:38:03 +0900
-Subject: [PATCH 12/19] ARM: dts: exynos: replace legacy *, wakeup property
- with wakeup-source
-In-Reply-To: <56713DD8.1050001@arm.com>
-References: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
- <1445422216-29375-13-git-send-email-sudeep.holla@arm.com>
- <56704141.8070308@arm.com> <5670A2F2.5060009@samsung.com>
- <56713DD8.1050001@arm.com>
-Message-ID: <5671F5DB.305@samsung.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 16 Dec 2015 15:42:50 -0800
+Subject: [PATCH v2 3/4] ARM: dts: vf610-cosmic: relicense vf610-cosmic.dts
+ under GPLv2/X11
+In-Reply-To: <1449525076-23569-4-git-send-email-stefan@agner.ch>
+References: <1449525076-23569-1-git-send-email-stefan@agner.ch>
+ <1449525076-23569-4-git-send-email-stefan@agner.ch>
+Message-ID: <22c56b5b292f78aae061b51734005070@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.12.2015 19:32, Sudeep Holla wrote:
-> 
-> 
-> On 15/12/15 23:32, Krzysztof Kozlowski wrote:
->> On 16.12.2015 01:35, Sudeep Holla wrote:
->>>
->>>
->>> On 21/10/15 11:10, Sudeep Holla wrote:
->>>> Though the keyboard and other driver will continue to support the
->>>> legacy
->>>> "gpio-key,wakeup", "linux-keypad,wakeup" boolean property to enable the
->>>> wakeup source, "wakeup-source" is the new standard binding.
->>>>
->>>> This patch replaces all the legacy wakeup properties with the unified
->>>> "wakeup-source" property in order to avoid any futher copy-paste
->>>> duplication.
->>>>
->>>> Cc: Kukjin Kim <kgene@kernel.org>
->>>> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>>
->>> Ping, do you prefer taking via your tree or should I send to armsoc
->>> directly ?
->>
->> Usually it depends on the dependencies... but:
->> 1. I just received this patch - 12/19.
-> 
-> Sorry for that. The initial idea was to show all the changes but merge
-> the binding and dependencies first, so didn't cc all.
-> 
->> 2. No cover letter, no other patches, no explanation about any
->> dependencies or other related changes. Nothing. Just one patch.
-> 
-> Yes this was initially posted as part of the series, but only
-> dependencies were merged for v4.4
-> 
->> 3. The patch mentions new standard binding. Was the new binding already
->> merged? Or is it part of these series? What about backward compatibility?
-> 
-> Not a brand new binding, but made existing one a standard so that we
-> don't continue to be creative and generate more bindings for the same
-> thing. Yes binding and dependent patches are already in mainline. And
-> yes backward compatibility is maintained as mentioned in the commit
-> message.
+Hi Matt,
 
-That explains everything, thanks. We'll take it through samsung-soc,
-just give me some time for review.
+Any chance to get an Ack from you for this patch?
 
-As for other patch - the s5pv210 - I did not get it directly but I think
-I can find it on list subscription archives.
+--
+Stefan
 
-Best regards,
-Krzysztof
+On 2015-12-07 13:51, Stefan Agner wrote:
+> GPLv2-only devicetrees make reuse difficult for software components
+> licensed under a different license.
+> 
+> The consensus is that a GPL/X11 dual-license should allow all necessary
+> uses, so relicense the vf610-twr.dts file to this combination.
+> 
+> CCs were acquired using (updated some email addresses):
+> git shortlog -sne --no-merges arch/arm/boot/dts/vf610-cosmic.dts
+> 
+> CC: Matt Porter <mporter@kernel.crashing.org>
+> Acked-by: Shawn Guo <shawnguo@kernel.org>
+> Acked-by: Cory Tusar <cory.tusar@pid1solutions.com>
+> Acked-by: Olof Johansson <olof@lixom.net>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+>  arch/arm/boot/dts/vf610-cosmic.dts | 40 ++++++++++++++++++++++++++++++++++----
+>  1 file changed, 36 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/vf610-cosmic.dts
+> b/arch/arm/boot/dts/vf610-cosmic.dts
+> index 5447f25..d0559c1 100644
+> --- a/arch/arm/boot/dts/vf610-cosmic.dts
+> +++ b/arch/arm/boot/dts/vf610-cosmic.dts
+> @@ -2,10 +2,42 @@
+>   * Copyright 2013 Freescale Semiconductor, Inc.
+>   * Copyright 2013 Linaro Limited
+>   *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License as published by
+> - * the Free Software Foundation; either version 2 of the License, or
+> - * (at your option) any later version.
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License
+> + *     version 2 as published by the Free Software Foundation.
+> + *
+> + *     This file is distributed in the hope that it will be useful
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+>   */
+>  
+>  /dts-v1/;
