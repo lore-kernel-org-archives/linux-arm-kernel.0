@@ -1,26 +1,35 @@
 From: ykk@rock-chips.com (Yakir Yang)
-Date: Wed, 16 Dec 2015 11:51:24 +0800
-Subject: [PATCH v11 14/19] drm: bridge: analogix/dp: try force hpd after plug
- in lookup failed
+Date: Wed, 16 Dec 2015 11:53:29 +0800
+Subject: [PATCH v11 15/19] drm: bridge: analogix/dp: move hpd detect to
+ connector detect function
 In-Reply-To: <1450236018-1118-1-git-send-email-ykk@rock-chips.com>
 References: <1450236018-1118-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1450237884-3081-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1450238009-3128-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some edp screen do not have hpd signal, so we can't just return
-failed when hpd plug in detect failed.
+This change just make a little clean to make code more like
+drm core expect, move hdp detect code from bridge->enable(),
+and place them into connector->detect().
 
-This is an hardware property, so we need add a devicetree property
-"analogix,need-force-hpd" to indicate this sutiation.
+Note: Gustavo Padovan try to remove the controller and phy
+power on function in bind time at bellow commit:
+	drm/exynos: do not start enabling DP at bind() phase
+
+But for now the connector status don't hardcode to connected,
+need to operate dp phy in .detect function, so we need to revert
+parts if Gustavo Padovan's changes, add phy poweron
+function in bind time.
 
 Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-Acked-by: Rob Herring <robh@kernel.org>
 Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
 ---
 Changes in v11:
-- Rename the "analogix,need-force-hpd" to common 'force-hpd' (Rob)
-- Add the ack from Rob Herring
+- Revert parts of Gustavo Padovan's changes in commit:
+	drm/exynos: do not start enabling DP at bind() phase
+  Add dp phy poweron function in bind time.
+- Move the panel prepare from get_modes time to bind time, and move
+  the panel unprepare from bridge->disable to unbind time. (Heiko)
 
 Changes in v10: None
 Changes in v9: None
@@ -28,163 +37,100 @@ Changes in v8: None
 Changes in v7: None
 Changes in v6: None
 Changes in v5: None
-Changes in v4: None
+Changes in v4:
+- Take Jingoo suggest, add commit messages.
+
 Changes in v3:
-- Add "analogix,need-force-hpd" to indicate whether driver need foce
-  hpd when hpd detect failed.
+- move dp hpd detect to connector detect function.
 
 Changes in v2: None
 
- .../bindings/display/bridge/analogix_dp.txt        |  4 ++-
- .../bindings/display/exynos/exynos_dp.txt          |  1 +
- .../display/rockchip/analogix_dp-rockchip.txt      |  1 +
- drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 35 ++++++++++++++++++----
- drivers/gpu/drm/bridge/analogix/analogix_dp_core.h |  2 ++
- drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c  |  9 ++++++
- 6 files changed, 46 insertions(+), 6 deletions(-)
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 38 ++++++++++++----------
+ 1 file changed, 20 insertions(+), 18 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt b/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
-index 7659a7a..4f2ba8c 100644
---- a/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
-+++ b/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
-@@ -22,6 +22,9 @@ Required properties for dp-controller:
- 		from general PHY binding: Should be "dp".
- 
- Optional properties for dp-controller:
-+	-force-hpd:
-+		Indicate driver need force hpd when hpd detect failed, this
-+		is used for some eDP screen which don't have hpd signal.
- 	-hpd-gpios:
- 		Hotplug detect GPIO.
- 		Indicates which GPIO should be used for hotplug detection
-@@ -31,7 +34,6 @@ Optional properties for dp-controller:
- 		* Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
- 		* Documentation/devicetree/bindings/video/analogix_dp-rockchip.txt
- 
--
- [1]: Documentation/devicetree/bindings/media/video-interfaces.txt
- -------------------------------------------------------------------------------
- 
-diff --git a/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt b/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
-index 9905081..8800164 100644
---- a/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
-+++ b/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
-@@ -41,6 +41,7 @@ For the below properties, please refer to Analogix DP binding document:
- 	-phys (required)
- 	-phy-names (required)
- 	-hpd-gpios (optional)
-+	-analogix,need-force-hpd (optional)
- 	-video interfaces (optional)
- 
- Deprecated properties for DisplayPort:
-diff --git a/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
-index 04d99e3..e832ff9 100644
---- a/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
-+++ b/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
-@@ -32,6 +32,7 @@ For the below properties, please refer to Analogix DP binding document:
- - phys (required)
- - phy-names (required)
- - hpd-gpios (optional)
-+- force-hpd (optional)
- -------------------------------------------------------------------------------
- 
- Example:
 diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-index f624810..9eb17ce 100644
+index 9eb17ce..952c2c3 100644
 --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
 +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-@@ -59,15 +59,38 @@ static int analogix_dp_detect_hpd(struct analogix_dp_device *dp)
- {
- 	int timeout_loop = 0;
- 
--	while (analogix_dp_get_plug_in_status(dp) != 0) {
-+	while (timeout_loop < DP_TIMEOUT_LOOP_COUNT) {
-+		if (analogix_dp_get_plug_in_status(dp) == 0)
-+			return 0;
-+
- 		timeout_loop++;
--		if (timeout_loop > DP_TIMEOUT_LOOP_COUNT) {
--			dev_err(dp->dev, "failed to get hpd plug status\n");
--			return -ETIMEDOUT;
--		}
- 		usleep_range(10, 11);
+@@ -901,12 +901,6 @@ static void analogix_dp_commit(struct analogix_dp_device *dp)
+ 			DRM_ERROR("failed to disable the panel\n");
  	}
  
-+	/*
-+	 * Some edp screen do not have hpd signal, so we can't just
-+	 * return failed when hpd plug in detect failed, DT property
-+	 * "need-force-hpd" would indicate whether driver need this.
-+	 */
-+	if (!dp->force_hpd)
-+		return -ETIMEDOUT;
+-	ret = analogix_dp_detect_hpd(dp);
+-	if (ret) {
+-		/* Cable has been disconnected, we're done */
+-		return;
+-	}
+-
+ 	ret = analogix_dp_handle_edid(dp);
+ 	if (ret) {
+ 		dev_err(dp->dev, "unable to handle edid\n");
+@@ -941,6 +935,11 @@ static void analogix_dp_commit(struct analogix_dp_device *dp)
+ 
+ enum drm_connector_status analogix_dp_detect(struct device *dev, bool force)
+ {
++	struct analogix_dp_device *dp = dev_get_drvdata(dev);
 +
-+	/*
-+	 * The eDP TRM indicate that if HPD_STATUS(RO) is 0, AUX CH
-+	 * will not work, so we need to give a force hpd action to
-+	 * set HPD_STATUS manually.
-+	 */
-+	dev_dbg(dp->dev, "failed to get hpd plug status, try to force hpd\n");
++	if (analogix_dp_detect_hpd(dp))
++		return connector_status_disconnected;
 +
-+	analogix_dp_force_hpd(dp);
+ 	return connector_status_connected;
+ }
+ EXPORT_SYMBOL_GPL(analogix_dp_detect);
+@@ -1006,13 +1005,6 @@ static void analogix_dp_bridge_enable(struct drm_bridge *bridge)
+ 
+ 	pm_runtime_get_sync(dp->dev);
+ 
+-	if (dp->plat_data->panel) {
+-		if (drm_panel_prepare(dp->plat_data->panel)) {
+-			DRM_ERROR("failed to setup the panel\n");
+-			return;
+-		}
+-	}
+-
+ 	if (dp->plat_data->power_on)
+ 		dp->plat_data->power_on(dp->plat_data);
+ 
+@@ -1045,11 +1037,6 @@ static void analogix_dp_bridge_disable(struct drm_bridge *bridge)
+ 	if (dp->plat_data->power_off)
+ 		dp->plat_data->power_off(dp->plat_data);
+ 
+-	if (dp->plat_data->panel) {
+-		if (drm_panel_unprepare(dp->plat_data->panel))
+-			DRM_ERROR("failed to turnoff the panel\n");
+-	}
+-
+ 	pm_runtime_put_sync(dp->dev);
+ 
+ 	dp->dpms_mode = DRM_MODE_DPMS_OFF;
+@@ -1307,6 +1294,15 @@ int analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
+ 
+ 	pm_runtime_enable(dev);
+ 
++	phy_power_on(dp->phy);
 +
-+	if (analogix_dp_get_plug_in_status(dp) != 0) {
-+		dev_err(dp->dev, "failed to get hpd plug in status\n");
-+		return -EINVAL;
++	if (dp->plat_data->panel) {
++		if (drm_panel_prepare(dp->plat_data->panel)) {
++			DRM_ERROR("failed to setup the panel\n");
++			return -EBUSY;
++		}
 +	}
 +
-+	dev_dbg(dp->dev, "success to get plug in status after force hpd\n");
+ 	ret = devm_request_irq(&pdev->dev, dp->irq, analogix_dp_irq_handler,
+ 			       irq_flags, "analogix-dp", dp);
+ 	if (ret) {
+@@ -1340,6 +1336,12 @@ void analogix_dp_unbind(struct device *dev, struct device *master,
+ 	struct analogix_dp_device *dp = dev_get_drvdata(dev);
+ 
+ 	analogix_dp_bridge_disable(dp->bridge);
 +
- 	return 0;
++	if (dp->plat_data->panel) {
++		if (drm_panel_unprepare(dp->plat_data->panel))
++			DRM_ERROR("failed to turnoff the panel\n");
++	}
++
+ 	pm_runtime_disable(dev);
  }
- 
-@@ -1246,6 +1269,8 @@ int analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
- 	if (IS_ERR(dp->reg_base))
- 		return PTR_ERR(dp->reg_base);
- 
-+	dp->force_hpd = of_property_read_bool(dev->of_node, "force-hpd");
-+
- 	dp->hpd_gpio = of_get_named_gpio(dev->of_node, "hpd-gpios", 0);
- 	if (!gpio_is_valid(dp->hpd_gpio))
- 		dp->hpd_gpio = of_get_named_gpio(dev->of_node,
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
-index 45555ec..baa06e2 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
-@@ -160,6 +160,7 @@ struct analogix_dp_device {
- 	struct phy		*phy;
- 	int			dpms_mode;
- 	int			hpd_gpio;
-+	bool                    force_hpd;
- 
- 	struct analogix_dp_plat_data *plat_data;
- };
-@@ -180,6 +181,7 @@ void analogix_dp_set_analog_power_down(struct analogix_dp_device *dp,
- 				       bool enable);
- void analogix_dp_init_analog_func(struct analogix_dp_device *dp);
- void analogix_dp_init_hpd(struct analogix_dp_device *dp);
-+void analogix_dp_force_hpd(struct analogix_dp_device *dp);
- enum dp_irq_type analogix_dp_get_irq_type(struct analogix_dp_device *dp);
- void analogix_dp_clear_hotplug_interrupts(struct analogix_dp_device *dp);
- void analogix_dp_reset_aux(struct analogix_dp_device *dp);
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-index 21a3287..c7e2959 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-@@ -365,6 +365,15 @@ void analogix_dp_init_hpd(struct analogix_dp_device *dp)
- 	writel(reg, dp->reg_base + ANALOGIX_DP_SYS_CTL_3);
- }
- 
-+void analogix_dp_force_hpd(struct analogix_dp_device *dp)
-+{
-+	u32 reg;
-+
-+	reg = readl(dp->reg_base + ANALOGIX_DP_SYS_CTL_3);
-+	reg = (F_HPD | HPD_CTRL);
-+	writel(reg, dp->reg_base + ANALOGIX_DP_SYS_CTL_3);
-+}
-+
- enum dp_irq_type analogix_dp_get_irq_type(struct analogix_dp_device *dp)
- {
- 	u32 reg;
+ EXPORT_SYMBOL_GPL(analogix_dp_unbind);
 -- 
 1.9.1
