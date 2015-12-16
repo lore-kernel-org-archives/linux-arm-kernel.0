@@ -1,358 +1,257 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Wed, 16 Dec 2015 16:27:20 +0800
-Subject: [PATCH 4/5] ARM: dts: rockchip: add the kylin board for rk3036
+Date: Wed, 16 Dec 2015 16:27:21 +0800
+Subject: [PATCH 5/5] ARM: config: Add the rk3036 configure for kylin board
 In-Reply-To: <1450254441-3243-1-git-send-email-wxt@rock-chips.com>
 References: <1450254441-3243-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1450254441-3243-5-git-send-email-wxt@rock-chips.com>
+Message-ID: <1450254441-3243-6-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset is the initiation version to try work
-for kylin board.
+Add RK3036-specific configuration for Kylin board.
 
 Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+
 ---
 
- Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/rk3036-kylin.dts                 | 302 +++++++++++++++++++++
- 3 files changed, 307 insertions(+)
- create mode 100644 arch/arm/boot/dts/rk3036-kylin.dts
+ arch/arm/configs/rk3036_kylin_defconfig | 230 ++++++++++++++++++++++++++++++++
+ 1 file changed, 230 insertions(+)
+ create mode 100644 arch/arm/configs/rk3036_kylin_defconfig
 
-diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
-index c40c091..56653c4 100644
---- a/Documentation/devicetree/bindings/arm/rockchip.txt
-+++ b/Documentation/devicetree/bindings/arm/rockchip.txt
-@@ -1,6 +1,10 @@
- Rockchip platforms device tree bindings
- ---------------------------------------
- 
-+- Kylin RK3036 board:
-+    Required root node properties:
-+      - compatible = "rockchip,kylin-rk3036", "rockchip,rk3036";
-+
- - MarsBoard RK3066 board:
-     Required root node properties:
-       - compatible = "haoyu,marsboard-rk3066", "rockchip,rk3066a";
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 5e284dd..b911601 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -513,6 +513,7 @@ dtb-$(CONFIG_ARCH_REALVIEW) += \
- 	arm-realview-pb1176.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += \
- 	rk3036-evb.dtb \
-+	rk3036-kylin.dtb \
- 	rk3066a-bqcurie2.dtb \
- 	rk3066a-marsboard.dtb \
- 	rk3066a-rayeager.dtb \
-diff --git a/arch/arm/boot/dts/rk3036-kylin.dts b/arch/arm/boot/dts/rk3036-kylin.dts
+diff --git a/arch/arm/configs/rk3036_kylin_defconfig b/arch/arm/configs/rk3036_kylin_defconfig
 new file mode 100644
-index 0000000..b6a9908
+index 0000000..692c393
 --- /dev/null
-+++ b/arch/arm/boot/dts/rk3036-kylin.dts
-@@ -0,0 +1,302 @@
-+/*
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ *  Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "rk3036.dtsi"
-+
-+/ {
-+	model = "Rockchip RK3036 KylinBoard";
-+	compatible = "rockchip,rk3036-kylin", "rockchip,rk3036";
-+
-+	vcc_sys: vsys-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc_sys";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+	};
-+};
-+
-+&acodec {
-+	status = "okay";
-+};
-+
-+&emmc {
-+	status = "okay";
-+};
-+
-+&hdmi {
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	clock-frequency = <400000>;
-+
-+	status = "okay";
-+
-+	rk808: pmic at 1b {
-+		compatible = "rockchip,rk808";
-+		reg = <0x1b>;
-+		interrupt-parent = <&gpio2>;
-+		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pmic_int &global_pwroff>;
-+		rockchip,system-power-controller;
-+		wakeup-source;
-+		#clock-cells = <1>;
-+		clock-output-names = "xin32k", "rk808-clkout2";
-+
-+		vcc1-supply = <&vcc_sys>;
-+		vcc2-supply = <&vcc_sys>;
-+		vcc3-supply = <&vcc_sys>;
-+		vcc4-supply = <&vcc_sys>;
-+		vcc6-supply = <&vcc_sys>;
-+		vcc7-supply = <&vcc_sys>;
-+		vcc8-supply = <&vcc_18>;
-+		vcc9-supply = <&vcc_io>;
-+		vcc10-supply = <&vcc_io>;
-+		vcc11-supply = <&vcc_sys>;
-+		vcc12-supply = <&vcc_io>;
-+		vddio-supply = <&vccio_pmu>;
-+
-+		regulators {
-+			vdd_cpu: DCDC_REG1 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <750000>;
-+				regulator-max-microvolt = <1350000>;
-+				regulator-name = "vdd_arm";
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
-+			};
-+
-+			vdd_gpu: DCDC_REG2 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <850000>;
-+				regulator-max-microvolt = <1250000>;
-+				regulator-name = "vdd_gpu";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1000000>;
-+				};
-+			};
-+
-+			vcc_ddr: DCDC_REG3 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-name = "vcc_ddr";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
-+			};
-+
-+			vcc_io: DCDC_REG4 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vcc_io";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <3300000>;
-+				};
-+			};
-+
-+			vccio_pmu: LDO_REG1 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vccio_pmu";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <3300000>;
-+				};
-+			};
-+
-+			vcc_tp: LDO_REG2 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vcc_tp";
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
-+			};
-+
-+			vdd_10: LDO_REG3 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-name = "vdd_10";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1000000>;
-+				};
-+			};
-+
-+			vcc18_lcd: LDO_REG4 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-name = "vcc18_lcd";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1800000>;
-+				};
-+			};
-+
-+			vccio_sd: LDO_REG5 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vccio_sd";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <3300000>;
-+				};
-+			};
-+
-+			vout5: LDO_REG6 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <2500000>;
-+				regulator-name = "vout5";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1800000>;
-+				};
-+			};
-+
-+			vcc_18: LDO_REG7 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-name = "vcc_18";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1800000>;
-+				};
-+			};
-+
-+			vcca_codec: LDO_REG8 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-name = "vcca_codec";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1800000>;
-+				};
-+			};
-+
-+			vcc_wl: SWITCH_REG1 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-name = "vcc_wl";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
-+			};
-+
-+			vcc_lcd: SWITCH_REG2 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-name = "vcc_lcd";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
-+			};
-+		};
-+	};
-+};
-+
-+&i2c2 {
-+	status = "okay";
-+};
-+
-+&lcdc {
-+	status = "okay";
-+};
-+
-+&lcdc_mmu {
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	status = "okay";
-+};
-+
-+&usb_host {
-+	status = "okay";
-+};
-+
-+&usb_otg {
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	status = "okay";
-+};
-+
-+&pinctrl {
-+	pmic {
-+		pmic_int: pmic-int {
-+			rockchip,pins = <2 2 RK_FUNC_GPIO &pcfg_pull_up>;
-+		};
-+	};
-+
-+	sleep {
-+		global_pwroff: global-pwroff {
-+			rockchip,pins = <2 7 RK_FUNC_1 &pcfg_pull_none>;
-+		};
-+	};
-+};
++++ b/arch/arm/configs/rk3036_kylin_defconfig
+@@ -0,0 +1,230 @@
++CONFIG_CROSS_COMPILE="arm-linux-gnueabi-"
++# CONFIG_LOCALVERSION_AUTO is not set
++CONFIG_DEFAULT_HOSTNAME="radxarock"
++CONFIG_SYSVIPC=y
++# CONFIG_USELIB is not set
++CONFIG_AUDIT=y
++CONFIG_IRQ_DOMAIN_DEBUG=y
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++CONFIG_PERF_EVENTS=y
++# CONFIG_COMPAT_BRK is not set
++CONFIG_SLAB=y
++CONFIG_JUMP_LABEL=y
++CONFIG_MODULES=y
++CONFIG_MODULE_FORCE_LOAD=y
++CONFIG_MODULE_UNLOAD=y
++CONFIG_PARTITION_ADVANCED=y
++# CONFIG_IOSCHED_CFQ is not set
++CONFIG_ARCH_ROCKCHIP=y
++CONFIG_PL310_ERRATA_588369=y
++CONFIG_PL310_ERRATA_727915=y
++CONFIG_ARM_ERRATA_720789=y
++CONFIG_ARM_ERRATA_754322=y
++CONFIG_SMP=y
++CONFIG_NR_CPUS=2
++CONFIG_PREEMPT_VOLUNTARY=y
++CONFIG_AEABI=y
++CONFIG_HIGHMEM=y
++# CONFIG_COMPACTION is not set
++CONFIG_DEFAULT_MMAP_MIN_ADDR=65536
++CONFIG_CLEANCACHE=y
++CONFIG_FRONTSWAP=y
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ARM_APPENDED_DTB=y
++CONFIG_ARM_ATAG_DTB_COMPAT=y
++CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND=y
++CONFIG_CPU_FREQ=y
++CONFIG_CPU_FREQ_DEFAULT_GOV_CONSERVATIVE=y
++CONFIG_CPU_FREQ_GOV_POWERSAVE=y
++CONFIG_CPUFREQ_DT=y
++CONFIG_CPU_IDLE=y
++CONFIG_VFP=y
++CONFIG_NEON=y
++# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
++CONFIG_PM_WAKELOCKS=y
++CONFIG_PM_DEBUG=y
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
++# CONFIG_INET_XFRM_MODE_TUNNEL is not set
++# CONFIG_INET_XFRM_MODE_BEET is not set
++# CONFIG_INET_LRO is not set
++# CONFIG_INET_DIAG is not set
++# CONFIG_IPV6 is not set
++CONFIG_CFG80211_WEXT=y
++CONFIG_RFKILL=y
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++# CONFIG_FIRMWARE_IN_KERNEL is not set
++CONFIG_BLK_DEV_LOOP=y
++CONFIG_BLK_DEV_RAM=y
++CONFIG_BLK_DEV_RAM_COUNT=1
++CONFIG_BLK_DEV_RAM_SIZE=16384
++CONFIG_SRAM=y
++CONFIG_SCSI=y
++# CONFIG_SCSI_PROC_FS is not set
++CONFIG_BLK_DEV_SD=y
++# CONFIG_SCSI_LOWLEVEL is not set
++CONFIG_NETDEVICES=y
++# CONFIG_NET_CADENCE is not set
++# CONFIG_NET_VENDOR_BROADCOM is not set
++# CONFIG_NET_VENDOR_CIRRUS is not set
++# CONFIG_NET_VENDOR_FARADAY is not set
++# CONFIG_NET_VENDOR_INTEL is not set
++# CONFIG_NET_VENDOR_MARVELL is not set
++# CONFIG_NET_VENDOR_MICREL is not set
++# CONFIG_NET_VENDOR_NATSEMI is not set
++# CONFIG_NET_VENDOR_SAMSUNG is not set
++# CONFIG_NET_VENDOR_SEEQ is not set
++# CONFIG_NET_VENDOR_SMSC is not set
++CONFIG_STMMAC_ETH=y
++# CONFIG_NET_VENDOR_VIA is not set
++# CONFIG_NET_VENDOR_WIZNET is not set
++CONFIG_SMSC_PHY=y
++# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
++CONFIG_INPUT_MOUSEDEV_SCREEN_X=800
++CONFIG_INPUT_MOUSEDEV_SCREEN_Y=600
++CONFIG_INPUT_EVDEV=y
++# CONFIG_KEYBOARD_ATKBD is not set
++CONFIG_KEYBOARD_GPIO=y
++CONFIG_KEYBOARD_GPIO_POLLED=y
++# CONFIG_INPUT_MOUSE is not set
++CONFIG_INPUT_TOUCHSCREEN=y
++CONFIG_INPUT_MISC=y
++# CONFIG_SERIO is not set
++# CONFIG_LEGACY_PTYS is not set
++# CONFIG_DEVKMEM is not set
++CONFIG_SERIAL_8250=y
++CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_8250_DW=y
++# CONFIG_HW_RANDOM is not set
++CONFIG_I2C_CHARDEV=y
++CONFIG_I2C_GPIO=y
++CONFIG_I2C_RK3X=y
++CONFIG_GPIO_DWAPB=y
++CONFIG_POWER_SUPPLY=y
++CONFIG_POWER_RESET=y
++CONFIG_SENSORS_IIO_HWMON=y
++CONFIG_THERMAL=y
++CONFIG_CPU_THERMAL=y
++CONFIG_WATCHDOG=y
++CONFIG_SOFT_WATCHDOG=y
++CONFIG_MFD_RK808=y
++CONFIG_MFD_TPS65910=y
++CONFIG_REGULATOR_DEBUG=y
++CONFIG_REGULATOR_FIXED_VOLTAGE=y
++CONFIG_REGULATOR_ACT8865=y
++CONFIG_REGULATOR_FAN53555=y
++CONFIG_REGULATOR_RK808=y
++CONFIG_DRM=y
++CONFIG_DRM_ROCKCHIP=y
++CONFIG_ROCKCHIP_DW_HDMI=y
++CONFIG_ROCKCHIP_INNO_HDMI=y
++CONFIG_DRM_PANEL_SIMPLE=y
++CONFIG_FB_MODE_HELPERS=y
++CONFIG_BACKLIGHT_LCD_SUPPORT=y
++CONFIG_LCD_CLASS_DEVICE=y
++CONFIG_BACKLIGHT_CLASS_DEVICE=y
++# CONFIG_BACKLIGHT_GENERIC is not set
++CONFIG_BACKLIGHT_PWM=y
++CONFIG_SOUND=y
++CONFIG_SND=y
++CONFIG_SND_SOC=y
++CONFIG_SND_SOC_ROCKCHIP=y
++CONFIG_SND_SOC_ROCKCHIP_I2S=y
++CONFIG_SND_SIMPLE_CARD=y
++CONFIG_USB=y
++CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
++CONFIG_USB_OTG=y
++CONFIG_USB_MON=y
++CONFIG_USB_STORAGE=y
++CONFIG_USB_DWC2=y
++CONFIG_USB_DWC2_PLATFORM=y
++CONFIG_NOP_USB_XCEIV=y
++CONFIG_USB_ULPI=y
++CONFIG_USB_GADGET=y
++CONFIG_USB_G_ANDROID=y
++CONFIG_MMC=y
++CONFIG_MMC_BLOCK_MINORS=32
++CONFIG_MMC_DW=y
++CONFIG_MMC_DW_ROCKCHIP=y
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_GPIO=y
++CONFIG_LEDS_TRIGGERS=y
++CONFIG_LEDS_TRIGGER_TIMER=y
++CONFIG_LEDS_TRIGGER_ONESHOT=y
++CONFIG_LEDS_TRIGGER_HEARTBEAT=y
++CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
++CONFIG_RTC_CLASS=y
++CONFIG_RTC_DRV_HYM8563=y
++CONFIG_RTC_DRV_RK808=y
++CONFIG_DMADEVICES=y
++CONFIG_DMADEVICES_DEBUG=y
++CONFIG_DMADEVICES_VDEBUG=y
++CONFIG_PL330_DMA=y
++CONFIG_ASYNC_TX_DMA=y
++CONFIG_STAGING=y
++CONFIG_R8188EU=y
++CONFIG_R8723AU=y
++CONFIG_ASHMEM=y
++CONFIG_ANDROID_TIMED_GPIO=y
++CONFIG_ANDROID_LOW_MEMORY_KILLER=y
++CONFIG_SYNC=y
++CONFIG_SW_SYNC=y
++CONFIG_SW_SYNC_USER=y
++CONFIG_ION=y
++CONFIG_ION_DUMMY=y
++CONFIG_COMMON_CLK_RK808=y
++CONFIG_ROCKCHIP_IOMMU=y
++CONFIG_IIO=y
++CONFIG_ROCKCHIP_SARADC=y
++CONFIG_INV_MPU6050_IIO=y
++CONFIG_AK8975=y
++CONFIG_PWM=y
++CONFIG_PWM_ROCKCHIP=y
++CONFIG_PHY_ROCKCHIP_USB=y
++CONFIG_ANDROID=y
++CONFIG_ANDROID_BINDER_IPC=y
++CONFIG_EXT2_FS=y
++CONFIG_EXT3_FS=y
++# CONFIG_EXT3_FS_XATTR is not set
++CONFIG_EXT4_FS=y
++CONFIG_EXT4_FS_SECURITY=y
++# CONFIG_DNOTIFY is not set
++CONFIG_MSDOS_FS=y
++CONFIG_VFAT_FS=y
++CONFIG_TMPFS=y
++# CONFIG_NETWORK_FILESYSTEMS is not set
++CONFIG_NLS_CODEPAGE_437=y
++CONFIG_NLS_CODEPAGE_850=y
++CONFIG_NLS_CODEPAGE_852=y
++CONFIG_NLS_ASCII=y
++CONFIG_NLS_ISO8859_1=y
++CONFIG_NLS_ISO8859_15=y
++CONFIG_NLS_UTF8=y
++CONFIG_PRINTK_TIME=y
++CONFIG_DYNAMIC_DEBUG=y
++CONFIG_DEBUG_INFO=y
++# CONFIG_ENABLE_WARN_DEPRECATED is not set
++# CONFIG_ENABLE_MUST_CHECK is not set
++CONFIG_FRAME_WARN=2048
++CONFIG_DEBUG_FS=y
++CONFIG_DEBUG_KERNEL=y
++# CONFIG_SCHED_DEBUG is not set
++CONFIG_TIMER_STATS=y
++CONFIG_KGDB=y
++CONFIG_DEBUG_LL=y
++CONFIG_DEBUG_RK29_UART2=y
++CONFIG_DEBUG_UART_8250_WORD=y
++CONFIG_EARLY_PRINTK=y
++CONFIG_SECURITY=y
++CONFIG_SECURITY_NETWORK=y
++CONFIG_SECURITY_SELINUX=y
++CONFIG_SECURITY_SELINUX_DISABLE=y
++# CONFIG_SECURITY_SELINUX_AVC_STATS is not set
++CONFIG_CRYPTO_ANSI_CPRNG=y
++# CONFIG_CRYPTO_HW is not set
 -- 
 1.9.1
