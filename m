@@ -1,93 +1,73 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Wed, 16 Dec 2015 17:56:07 +0100
-Subject: [PATCH RESEND v3 0/9] Add STM32 pinctrl/GPIO driver
-In-Reply-To: <1449822306-9035-1-git-send-email-mcoquelin.stm32@gmail.com>
-References: <1449822306-9035-1-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <567197A7.5000903@st.com>
+From: brian.starkey@arm.com (Brian Starkey)
+Date: Wed, 16 Dec 2015 16:56:05 +0000
+Subject: [PATCH 2/3] drivers: dma-coherent: use MEMREMAP_WC for DMA_MEMORY_MAP
+In-Reply-To: <1450284966-25369-1-git-send-email-brian.starkey@arm.com>
+References: <1450284966-25369-1-git-send-email-brian.starkey@arm.com>
+Message-ID: <1450284966-25369-3-git-send-email-brian.starkey@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime
+When the DMA_MEMORY_MAP flag is used, memory which can be accessed
+directly should be returned, so use memremap(..., MEMREMAP_WC) to
+provide a writecombine mapping.
 
-You can add my Acked-by after fixing the patch 4/9
+Signed-off-by: Brian Starkey <brian.starkey@arm.com>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ drivers/base/dma-coherent.c |   20 ++++++++++++++++----
+ 1 file changed, 16 insertions(+), 4 deletions(-)
 
-Thanks
-
-Patrice
-
-
-
-On 12/11/2015 09:24 AM, Maxime Coquelin wrote:
-> Hi Linus, Patrice,
->
-> I resend the series for Patrice to review it.
->
-> Thanks,
-> Maxime
->
->
->
-> This is the third round of STM32 pinctrl series, which improves DT
-> bindings declaration and documentation, and also fixes some commit fixup
-> issues. The series also contains two more patches, adding GPIO LEDs
-> support as a user of this driver.
->
-> The STM32 family has 16 pins per GPIO bank, and the number of bank varies
-> depending on the model.
->
-> Pins can be multiplexed either in GPIO mode, alternate function (up to 15
-> functions per pin) or analog (for ADC/DAC).
->
-> Changes since v2:
-> -----------------
->   - Rebase on v4.4-rc1
->   - Declare leds also for Eval board
->   - Set green led as heartbeat
->   - Collect some acks
->
-> Changes since v1:
-> -----------------
->   - Add GPIO LEDs support in DT and defconfig
->   - Changes pinmux DT bindings from macros to raw values (Daniel)
->   - Improve DT bindings documentation (Daniel)
->   - Fix some commit fixup and rebase issues.
->
-> Kind regards,
-> Maxime
->
-> Maxime Coquelin (9):
->    ARM: Kconfig: Introduce MACH_STM32F429 flag
->    Documentation: dt-bindings: Document STM32 pinctrl driver DT bindings
->    includes: dt-bindings: Add STM32F429 pinctrl DT bindings
->    pinctrl: Add STM32 MCUs support
->    ARM: mach-stm32: Select pinctrl
->    ARM: dts: Add pinctrl node to STM32F429
->    ARM: dts: Add USART1 pin config to STM32F429 boards
->    ARM: dts: Add leds support to STM32F429 boards
->    ARM: config: Enable GPIO Led driver in stm32_defconfig
->
->   .../bindings/pinctrl/st,stm32-pinctrl.txt          |  126 ++
->   arch/arm/Kconfig                                   |    6 +
->   arch/arm/boot/dts/stm32429i-eval.dts               |   19 +
->   arch/arm/boot/dts/stm32f429-disco.dts              |   13 +
->   arch/arm/boot/dts/stm32f429.dtsi                   |  110 ++
->   arch/arm/configs/stm32_defconfig                   |    1 +
->   drivers/pinctrl/Kconfig                            |    1 +
->   drivers/pinctrl/Makefile                           |    1 +
->   drivers/pinctrl/stm32/Kconfig                      |   16 +
->   drivers/pinctrl/stm32/Makefile                     |    5 +
->   drivers/pinctrl/stm32/pinctrl-stm32.c              |  856 +++++++++++
->   drivers/pinctrl/stm32/pinctrl-stm32.h              |   43 +
->   drivers/pinctrl/stm32/pinctrl-stm32f429.c          | 1598 ++++++++++++++++++++
->   include/dt-bindings/pinctrl/pinctrl-stm32.h        |   12 +
->   include/dt-bindings/pinctrl/stm32f429-pinfunc.h    | 1241 +++++++++++++++
->   15 files changed, 4048 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
->   create mode 100644 drivers/pinctrl/stm32/Kconfig
->   create mode 100644 drivers/pinctrl/stm32/Makefile
->   create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32.c
->   create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32.h
->   create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32f429.c
->   create mode 100644 include/dt-bindings/pinctrl/pinctrl-stm32.h
->   create mode 100644 include/dt-bindings/pinctrl/stm32f429-pinfunc.h
->
+diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
+index 55b8398..f98359a 100644
+--- a/drivers/base/dma-coherent.c
++++ b/drivers/base/dma-coherent.c
+@@ -2,6 +2,7 @@
+  * Coherent per-device memory handling.
+  * Borrowed from i386
+  */
++#include <linux/io.h>
+ #include <linux/slab.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+@@ -31,7 +32,10 @@ static int dma_init_coherent_memory(phys_addr_t phys_addr, dma_addr_t device_add
+ 	if (!size)
+ 		goto out;
+ 
+-	mem_base = ioremap(phys_addr, size);
++	if (flags & DMA_MEMORY_MAP)
++		mem_base = memremap(phys_addr, size, MEMREMAP_WC);
++	else
++		mem_base = ioremap(phys_addr, size);
+ 	if (!mem_base)
+ 		goto out;
+ 
+@@ -58,8 +62,12 @@ static int dma_init_coherent_memory(phys_addr_t phys_addr, dma_addr_t device_add
+ 
+ out:
+ 	kfree(dma_mem);
+-	if (mem_base)
+-		iounmap(mem_base);
++	if (mem_base) {
++		if (flags & DMA_MEMORY_MAP)
++			memunmap(mem_base);
++		else
++			iounmap(mem_base);
++	}
+ 	return 0;
+ }
+ 
+@@ -67,7 +75,11 @@ static void dma_release_coherent_memory(struct dma_coherent_mem *mem)
+ {
+ 	if (!mem)
+ 		return;
+-	iounmap(mem->virt_base);
++
++	if (mem->flags & DMA_MEMORY_MAP)
++		memunmap(mem->virt_base);
++	else
++		iounmap(mem->virt_base);
+ 	kfree(mem->bitmap);
+ 	kfree(mem);
+ }
+-- 
+1.7.9.5
