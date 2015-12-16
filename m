@@ -1,82 +1,64 @@
-From: tyler.baker@linaro.org (Tyler Baker)
-Date: Wed, 16 Dec 2015 11:34:30 -0800
-Subject: arm-soc boot: 320 boots: 12 failed,
- 308 passed (v4.4-rc3-483-gb48b5ceb7227)
-In-Reply-To: <1746045.ErmxH37Pke@wuerfel>
-References: <567128b4.46b71c0a.17f65.7531@mx.google.com>
- <1746045.ErmxH37Pke@wuerfel>
-Message-ID: <CANMBJr6oi5mrUnzTG8J=C69K5ra93MQDjoVP7ef+1oB1RPpGuQ@mail.gmail.com>
+From: mail@maciej.szmigiero.name (Maciej S. Szmigiero)
+Date: Wed, 16 Dec 2015 21:05:35 +0100
+Subject: [PATCH v2 0/3] USB: add generic onboard USB HUB driver
+In-Reply-To: <CAOMZO5An3CK-a3NQtOF3nnPc8vzu2+SKnfJ=iOuAhjCBvZwToQ@mail.gmail.com>
+References: <1450077974-22762-1-git-send-email-peter.chen@freescale.com>	<CAOMZO5CfBKuJ584jwbg98s9tn+0Z7W0nOaZnUkm4cJUSvNGTZw@mail.gmail.com>	<20151215062821.GA11241@shlinux2>	<CAOMZO5DiRzfy5dULh0C7qU2KUM-i8fBh6W5rS9zOTHJJK6fqwg@mail.gmail.com>	<20151216041058.GC23482@shlinux2>
+ <CAOMZO5An3CK-a3NQtOF3nnPc8vzu2+SKnfJ=iOuAhjCBvZwToQ@mail.gmail.com>
+Message-ID: <5671C40F.3000000@maciej.szmigiero.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 December 2015 at 02:17, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 16 December 2015 01:02:44 kernelci. org bot wrote:
->> arm-soc boot: 320 boots: 12 failed, 308 passed (v4.4-rc3-483-gb48b5ceb7227)
->>
->> Full Boot Summary: https://kernelci.org/boot/all/job/arm-soc/kernel/v4.4-rc3-483-gb48b5ceb7227/
->> Full Build Summary: https://kernelci.org/build/arm-soc/kernel/v4.4-rc3-483-gb48b5ceb7227/
->>
->> Tree: arm-soc
->> Branch: local/for-next
->> Git Describe: v4.4-rc3-483-gb48b5ceb7227
->> Git Commit: b48b5ceb7227a8e6e548dae7a44c80ad85719808
->> Git URL: git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
->> Tested: 67 unique boards, 18 SoC families, 22 builds out of 135
->>
->> Boot Failures Detected: https://kernelci.org/boot/?v4.4-rc3-483-gb48b5ceb7227&fail
->
-> We got three regressions in the arm-soc for-next branch today, compared to yesterday:
+Hi Fabio,
+Hi Peter,
 
-I had the bot bisect these failures, results below.
+On 16.12.2015 11:11, Fabio Estevam wrote:
+> Hi Peter,
+> 
+> On Wed, Dec 16, 2015 at 2:11 AM, Peter Chen <peter.chen@freescale.com> wrote:
+> 
+>> Thanks, Fabio, but I am curious how things like that? The USBOH3 clock
+>> is not opened, the usb driver will hang when it tries to access
+>> registers. If this clock is always on, then, why the system will
+>> hang later?
+> 
+> I found the issue with your patch. You missed to add the pinctrl node.
+> 
+> With the change below USB is functional in Udoo:
+> 
+> --- a/arch/arm/boot/dts/imx6qdl-udoo.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
+> @@ -22,6 +22,8 @@
+> 
+>         usb_hub1 {
+>                 compatible = "generic-onboard-hub";
+> +               pinctrl-names = "default";
+> +               pinctrl-0 = <&pinctrl_usbh>;
+>                 clocks = <&clks IMX6QDL_CLK_CKO>;
+>                 reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
+>                 reset-duration-us = <2>;
+> 
 
->
-> * I did not merge any rockchip changes, but it looks like multi_v7_defconfig is
->   now broken on rk3288-rock2-square and rk3288-veyron-jerry (not in the list below,
->   but in the web interface). I put a diff of the defconfig file on
->   http://pastebin.com/DHgzz1jr, but I don't anything that may have cause the
->   regression.
+Thanks for your work, I didn't notice it previously (sorry).
 
-The bisection pointed d2318f340253 ("arm64: dts: berlin4ct: add
-watchdog nodes") which is clearly a red herring. kernelci.org inserts
-the modules from the build into the ramdisk, and eudev will probe
-them. With the modules inserted into the ramdisk, it fails to reach a
-user space prompt. If I remove the modules from the ramdisk it boots
-fine[1]. I may manually bisect if we cannot spot the issue easily.
+I can confirm, too that with Peter's patches and the above change
+the USB support works again on my UDOO DualLite board.
 
-> * bcm4708-smartrg-sr400ac doesn't find its rootfs any more
->
-> [   16.670994] No filesystem could mount root, tried:  ext3 ext2 ext4 squashfs vfat msdos ntfs
-> [   16.679388] Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(1,0)
->
->   I merged some patches from Florian yesterday, but it could also be a problem with
->   the defconfig changes
+However, I noticed that when you have host USB support configured to be
+build as modules then (due to its location under "if USB") it is only
+possible to compile generic onboard USB HUB as module, too.
 
-The bisection pointed to b02ec7658c98 ("ARM: multi_v7_defconfig:
-Enable some drivers for LS1021A")
+Then this module would need to be loaded before loading USB support
+(or quickly after it), otherwise USB enumeration would time out after
+few secs and loading it later wouldn't help.
 
-I've rebased my tree with arm-soc for-next, and reverted the commits
-listed above. Should know shortly if the reverts fix the boot issues.
+Currently, this driver doesn't really need any USB host support and
+is able to be compiled-in successfully regardless of USB host support
+configuration with just small change to Makefile and Kconfig.
 
-> * Juno seems to be sick and doesn't like LAVA today:
->
-> Connected to serial03.lavalab.
-> Escape character is '^]'.
-> Command sent successfully.
-> Command sent successfully.
-> ErrorMessage: Failed to boot test image.
-> Lava failed at action boot_linaro_image with error:Failed to boot test image.
-> Traceback (most recent call last):
->   File "/usr/lib/python2.7/dist-packages/lava_dispatcher/job.py", line 381, in run
->     action.run(**params)
->   File "/usr/lib/python2.7/dist-packages/lava_dispatcher/actions/boot_control.py", line 156, in run
->     raise CriticalError("Failed to boot test image.")
-> CriticalError: Failed to boot test image.
-> Command sent successfully.
+However I don't know if it is a design goal to not use USB host support
+or just a current development status, but if it doesn't really need it
+then it would be great if it could be selected to be build-in into kernel
+regardless of host USB support setting.
 
-Indeed, I'll look into this. Thanks for reporting.
-
-Cheers,
-
-Tyler
-
-[1] http://nwdrone.com/scheduler/job/13662/log_file
+Best regards,
+Maciej Szmigiero
