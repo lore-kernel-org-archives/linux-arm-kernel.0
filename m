@@ -1,68 +1,45 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 16 Dec 2015 11:11:30 +0100
-Subject: [PATCH 5/6] pinctrl: sh-pfc: r8a7795: add SATA0 pin conf to DT
-In-Reply-To: <1450107758-2544-6-git-send-email-ulrich.hecht+renesas@gmail.com>
-References: <1450107758-2544-1-git-send-email-ulrich.hecht+renesas@gmail.com>
- <1450107758-2544-6-git-send-email-ulrich.hecht+renesas@gmail.com>
-Message-ID: <CAMuHMdW3ZtvWkhZW1Locmu3WL1YixGrVAdiy7nKywkTiDB+X1w@mail.gmail.com>
+From: ashoks@broadcom.com (Ashok Kumar)
+Date: Wed, 16 Dec 2015 02:11:28 -0800
+Subject: [PATCH v3 0/2] arm64: change PoC D-cache flush to PoU
+Message-ID: <1450260690-5431-1-git-send-email-ashoks@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulrich,
+For keeping I and D coherent, dcache flush till PoU(Point of Unification)
+should be sufficient instead of doing till PoC(Point of coherence).
+In SoC with more levels of cache, there could be a performance hit in doing
+flush till PoC as __flush_dcache_area does both flush and invalidate.
+Introduced new API __clean_dcache_area_pou which does only clean till PoU.
 
-On Mon, Dec 14, 2015 at 4:42 PM, Ulrich Hecht
-<ulrich.hecht+renesas@gmail.com> wrote:
-> Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-> ---
->  arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 7 +++++++
->  1 file changed, 7 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-> index 297c9f0..3d6c1e0 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-> +++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-> @@ -140,6 +140,10 @@
->         pinctrl-0 = <&scif_clk_pins>;
->         pinctrl-names = "default";
->
-> +       sata0_pins: sata0 {
-> +               renesas,groups = "sata0_devslp_a";
+Also deferred dcache flush in __cpu_copy_user_page to __sync_icache_dcache.
 
-This pin is GP6_16, which is used for USB-OTG on Salvator-X, according to the
-schematics?
-It looks like the SATA DEVSLP feature is not used at all on Salvator-X.
+changes since v2 [2]:
+ Incorporated Mark Rutland's review comments of
+  * fixing comments
+  * creating a helper function for __sync_icache_dcache.
 
-Upon closer look, using the feature (on a board where the pin is connected)
-would need a driver update, as the SATAEDEVSLPR register is not present on
-R-Car Gen2, and thus not yet handled by the driver.
+changes since v1 [1]:
+ Incorporated Mark Rutland's review comments of
+  * renaming __flush_dcache_area_pou to __clean_dcache_area_pou
+  * using inner shareable domain for dsb in __clean_dcache_area_pou
+  * having a common macro for __flush_dcache_area and
+    __clean_dcache_area_pou.
 
-Hence I expect SATA to work fine without any pinctrl, and this patch should
-just be dropped?
+Thanks,
+Ashok
 
-Can you please check? Thanks!
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/393527.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/393837.html
 
-> +               renesas,function = "sata0";
-> +       };
->         scif1_pins: scif1 {
->                 renesas,groups = "scif1_data_a", "scif1_ctrl";
->                 renesas,function = "scif1";
-> @@ -269,6 +273,9 @@
->  };
->
->  &sata {
-> +       pinctrl-0 = <&sata0_pins>;
-> +       pinctrl-names = "default";
-> +
->         status = "okay";
->  };
+Ashok Kumar (2):
+  arm64: Defer dcache flush in __cpu_copy_user_page
+  arm64: Use PoU cache instr for I/D coherency
 
-Gr{oetje,eeting}s,
+ arch/arm64/include/asm/cacheflush.h |  1 +
+ arch/arm64/mm/cache.S               | 50 +++++++++++++++++++++++++++++--------
+ arch/arm64/mm/copypage.c            |  3 ++-
+ arch/arm64/mm/flush.c               | 33 +++++++++++++-----------
+ 4 files changed, 60 insertions(+), 27 deletions(-)
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+2.1.0
