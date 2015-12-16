@@ -1,73 +1,69 @@
-From: huawei.libin@huawei.com (Li Bin)
-Date: Wed, 16 Dec 2015 14:04:33 +0800
-Subject: [RFC PATCH 0/3] livepatch: arm64: add support for livepatch on
- arm64
-In-Reply-To: <20151215154356.GF3729@pathway.suse.cz>
-References: <1450097378-3780-1-git-send-email-huawei.libin@huawei.com>
- <20151215154356.GF3729@pathway.suse.cz>
-Message-ID: <5670FEF1.1040104@huawei.com>
+From: systemprogrammierung.brunner@gmail.com (Markus Brunner)
+Date: Wed, 16 Dec 2015 07:39:16 +0100
+Subject: [PATCH] drivers: net: cpsw: fix RMII/RGMII mode when used with
+ fixed-link PHY
+In-Reply-To: <20151214130446.1e14fbb8.drivshin.allworx@gmail.com>
+References: <20151209223115.6c5a400f.drivshin.allworx@gmail.com>
+ <6416396.ZOturxhSar@localhost>
+ <20151214130446.1e14fbb8.drivshin.allworx@gmail.com>
+Message-ID: <1741588.Ve76Z1ZI87@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Monday 14 December 2015 13:04:46 David Rivshin wrote:
+> On Sat, 12 Dec 2015 16:44:19 +0100
+...
+> > Your patch works fine on my board, which uses MII and dual_emac with
+> > a fixed_phy and a real one.
+> 
+> Thanks for checking. The only dual_emac board I have available is the
+> EVMSK, which has two real PHYs. I'm not sure of the usual etiquette
+> (and Google was  unhelpful), should I add a Tested-by on the next
+> version?
+> 
+Yes you can. Documentation/SubmittingPatches has some notes about it.
 
+> > > Besides fixing the bug mentioned in the commit log, there are a few
+> > > 
+> > > other differences to note:
+> > >  * If both "phy_id" and a "fixed-link" subnode are present this
+> > > 
+> > > patch will use the "phy_id" property. This should preserve current
+> > > behavior with existing devicetrees that might incorrectly have
+> > > both. This motivates the biggest difference in code organization
+> > > from 1f71e8c96fc6.
+> > > 
+> > >  * Some error messages have been tweaked to reflect the slightly
+> > > 
+> > > changed meanings of the checks.
+> > 
+> > I wanted to keep changes small and didn't spend too much thinking
+> > about already broken devicetrees. Since my patch is quite new, I
+> 
+> I'm honestly not sure it's an important consideration myself. Most
+> patches I've seen in this area for this or other drivers do not take
+> such behavior into account (e.g. the phy-handle parsing that went in
+> to cpsw in 4.3).
+> I would generally feel more comfortable with such a behavior tweak
+> (minor as it is) before 4.4 is released, to avoid ping-ponging the
+> behavior. But given how far along the cycle is, I'm not sure about
+> the chances of that.
+> 
 
-on 2015/12/15 23:43, Petr Mladek wrote:
-> On Mon 2015-12-14 20:49:35, Li Bin wrote:
->> This patchset depends on the on-going gcc feature "-fprolog-pad=N",
->> which will generate a pad of N nops at the beginning of each function.
->>
->> Livepatch on arm64 can using the feature (that always placing one nop
->> at the beginning of the function). And when enable/disable func patching,
->> just modify the pad code to nop or branch. And that NOP and B instruction
->> are both safe instructions on arm64 which called "concurrent modification
->> and execution of instructions", that can be executed by one thread of
->> execution as they are being modified by another thread of execution without
->> requiring explicit synchronization.
->>
->> And this method will improve performance significantly compared with the
->> method based on ftrace, especially for the critical function being frequently
->> called.
-> It sounds like a great feature for ftrace. If the new prologue is usable
-> for LivePatching, it should be usable to call the ftrace handler as
-> well. If you teach ftrace to use the new prologue, you will not need
-> all these crazy arch-specific hacks for LivePatching. Then both ftrace
-> and livepatch will benefit from the feature.
->
-> I suggest to read the ftrace documentation in Documentation/trace/,
-> especially ftrace-design.txt. I have never ported ftrace to a new
-> architecture. I guess that you need to teach scripts/recordmcount.c
->  to find the new location. Also you might need to update
-> arch/arm/kernel/ftrace.c. Also please make sure that ftrace
-> supports DYNAMIC_FTRACE_WITH_REGS on Arm.
+Well I don't think compatibility for flawed DTs is such a high priority, especially if it is that unlikely that there are some affected.
+Keep the focus on the other _real_ problems you have encountered and fix those like you see fit. 
 
-Hi Petr,
-I had posted one method for livepatch implementaion on arm64 based on ftrace with
-DYNAMIC_FTRACE_WITH_REGS.
-https://lwn.net/Articles/646317/
+> > don't see any problems with subtle changes like that. However you
+> > should update the documentation as well.
+> 
+> Your patch already updated .../bindings/net/cpsw.txt, which this
+> patch left alone. Are you referring to some other documentation,
+> or do you think I should update the binding documentation to state
+> that phy_id takes precedence over fixed-link? I figured that such
+> devicetrees were still officially malformed, so I thought the
+> existing text was appropriate.
 
-This requires GCC changes to support it, and I propose a method that implement -mfentry
-feature which following some other arch such as x86/mips/s390 etc. This method is
-architecture-specific, and Maxim Kuvyrkov propose a new method for gcc that implement
-a target-independent option -fprolog-pad=N, which will generate a pad of N nops at the
-beginning of each function.
-https://gcc.gnu.org/ml/gcc/2015-05/msg00267.html
-
-And based on this, DYNAMIC_FTRACE_WITH_REGS feature can be implemented as
-mentioned in:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/386815.html
-
-And in this patchset, I only concern the performance for livepatch on arm64, and I
-hope this also can be resolved by improving ftrace, and thanks to Steve that he pointed
-that he is working on a way to make ftrace a bit better for livepatch.
-
-Thanks,
-Li Bin
-
-> It is harder but the right way to go. Your current patch set
-> looks like a hack.
->
-> Best Regards,
-> Petr
->
-> .
->
+"Either the properties phy_id and phy-mode, or the sub-node fixed-link can be specified"
+One flaw of my patch was to ignore the phy-mode for a fixed link. Do not mention the precedence of the phy_id, because it is an undefined behavior.
+Your patch should change it to:
+"Either the property phy_id, or the sub-node fixed-link can be specified"
