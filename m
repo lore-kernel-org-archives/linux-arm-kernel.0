@@ -1,48 +1,123 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Wed, 16 Dec 2015 06:37:57 -0800
-Subject: [PATCH LINUX v4 06/13] tty: xuartps: Move request_irq to after
- setting up the HW
-In-Reply-To: <20151216090339.GX3358@xsjsorenbubuntu>
-References: <1449376769-13369-1-git-send-email-soren.brinkmann@xilinx.com>
- <1449376769-13369-7-git-send-email-soren.brinkmann@xilinx.com>
- <5669F172.6020503@hurleysoftware.com> <20151215154136.GU3358@xsjsorenbubuntu>
- <5670A1B6.6050708@hurleysoftware.com> <20151216090339.GX3358@xsjsorenbubuntu>
-Message-ID: <56717745.3060306@hurleysoftware.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 16 Dec 2015 14:55:43 +0000
+Subject: block layer bug with 4.4-rc3+
+In-Reply-To: <CACVXFVN3w0Y_8k3TiKoGytbayXiB+mRhgDn-OueV2+e93i=4AQ@mail.gmail.com>
+References: <566FF3ED.1000503@arm.com>
+ <CACVXFVNLY97FAJ_tUF1UW4t=3cf6c5mfHXOpbfq1iSSiKciCNw@mail.gmail.com>
+ <5670062B.7020103@arm.com>
+ <CACVXFVN3w0Y_8k3TiKoGytbayXiB+mRhgDn-OueV2+e93i=4AQ@mail.gmail.com>
+Message-ID: <56717B6F.2040008@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/16/2015 01:03 AM, S?ren Brinkmann wrote:
-> On Tue, 2015-12-15 at 03:26PM -0800, Peter Hurley wrote:
->> On 12/15/2015 07:41 AM, S?ren Brinkmann wrote:
->>> On Thu, 2015-12-10 at 01:41PM -0800, Peter Hurley wrote:
->>>> On 12/05/2015 08:39 PM, Soren Brinkmann wrote:
->>>>> Request_irq() should be _after_ h/w programming, otherwise an
->>>>> interrupt could be triggered and in-progress before the h/w has been
->>>>> setup.
->>>>
->>>> Slight misunderstanding. My fault; I should have been more explicit.
->>>>
->>>> 1. Any setup necessary for the isr not to be confused and misdirect spurious
->>>>    interrupts (or hang) should be before installing the isr with request_irq()
->>>>    None of this code should trigger an interrupt.
->>>> 2. Clear pending interrupts
->>>> 3. Install the isr with request_irq()
->>>> 4. Enable interrupts
->>>
->>> Isn't that what the startup function is doing now - more or less. I
->>> think 3 and 4 are swapped to release the lock and then do the
->>> request_irq, but I believe that should be OK.
->>> The startup function configures the HW. Clears the ISR. Enables the
->>> intended IRQs and then does the request_irq call.
+Hi,
+
+On 15/12/15 13:39, Ming Lei wrote:
+> On Tue, Dec 15, 2015 at 8:23 PM, Andre Przywara <andre.przywara@arm.com> wrote:
+>> Hi Ming,
 >>
->> If the driver enables interrupts before installing the isr with request_irq()
->> and an interrupt occurs there will the no handler to catch it and EOI the
->> device.
+>> thanks for the answer!
+>>
+>> On 15/12/15 11:54, Ming Lei wrote:
+>>> On Tue, Dec 15, 2015 at 7:05 PM, Andre Przywara <andre.przywara@arm.com> wrote:
+>>>> Hi,
+>>>>
+>>>> I've been experiencing issues with at least 4.4-rc3 (including current
+>>>
+>>> I'd suggest you to test the latest linus tree first, and at least two
+>>> fix patches
+>>> have been merged for blk-merge issue.  If there is still the issue
+>>> with linus tree,
+>>> I am happy to take a look.
+>>
+>> Mmh, as said ("including current HEAD") this happens still with the
+>> latest HEAD from Linus (which is "9f9499ae8e64: Linux 4.4-rc5" for me).
+>> Just tested yesterday.
+>> Is there another branch/tree with block fixes I should test? Is it worth
+>> to try any of the upcoming branches in linux-block.git (for-4.5/core,
+>> maybe?)
 > 
-> Really? Shouldn't the IRQ be masked in the interrupt controller until
-> everything is in place?
+> Both the fixes have been in linus tree already, and reverting the commit
+> basically makes merge not possible, so there must be issues somewhere.
+> 
+> And can you see the issue on other 32bit ARM platform?  I don't see the
+> issue on x86 and arm64, and the commit itself is correct, IMO.
 
-Sorry, I'm used to shared interrupts, where that isn't the case.
+Quick tests on a Cubietruck didn't show the issue, but this board is
+nowhere near the Midway (2 in-order cores with 2GB RAM vs. 4
+out-of-order cores with 8 GB RAM), so the load isn't the same.
+I could rule out .config issues by using multi_v7_defconfig - with LPAE
+enabled on top, that is.
+Using the plain multi_v7_defconfig (which doesn't have LPAE and makes me
+loose half of the RAM on that box) didn't show the bug so far.
+One of the effects of turning on LPAE is that dma_addr_t and phys_addr_t
+turn to 64-bit, with long, int and void* still being 32-bit. Can you
+think of any issues that could be related to that?
 
-Regards,
-Peter Hurley
+Also can you briefly sketch what that patch (578270bfbd) eventually
+changes? I see that the fix looks right, I am just wondering what the
+impact is: Do we get more blocks or less or bigger ones or smaller?
+
+I will try to do more experiments and to find the real culprit.
+
+Thanks,
+Andre.
+
+> 
+>>
+>> Thanks,
+>> Andre.
+>>
+>>> Thanks,
+>>>
+>>>> HEAD) on a Calxeda Midway (4*ARM Cortex-A15 (32-bit), 8GB RAM, SATA
+>>>> spinning disk or SSD).
+>>>> After some disk I/O load (kernel compile with -j6) I see the kernel
+>>>> screaming:
+>>>>
+>>>> [  103.736982] ata1.00: exception Emask 0x0 SAct 0x3ffff0 SErr 0x0
+>>>> action 0x6 frozen
+>>>> [  103.744476] ata1.00: failed command: WRITE FPDMA QUEUED
+>>>> [  103.749707] ata1.00: cmd 61/00:20:48:6b:41/08:00:0a:00:00/40 tag 4
+>>>> ncq 1048576 out
+>>>> [  103.749707]          res 40/00:00:00:00:00/00:00:00:00:00/00 Emask
+>>>> 0x4 (timeout)
+>>>> [  103.764659] ata1.00: status: { DRDY }
+>>>> [  103.768321] ata1.00: failed command: WRITE FPDMA QUEUED
+>>>> [  103.773547] ata1.00: cmd 61/98:28:48:73:41/42:00:0a:00:00/40 tag 5
+>>>> ncq 8728576 out
+>>>> [  103.773547]          res 40/00:00:00:00:00/00:00:00:00:00/00 Emask
+>>>> 0x4 (timeout)
+>>>> < repeated with increasing tag numbers>
+>>>>
+>>>> This repeats for a while, but then seems to recover later, though I
+>>>> haven't checked if there are more issues and rebooted instead to avoid
+>>>> filesystem damage.
+>>>>
+>>>> While I agree that this looks like a disk error on the first glance, I
+>>>> never saw this before 4.4-rc2, had the very same error on different
+>>>> nodes (with another spinning disk and even an SSD) and I can make it
+>>>> vanish by reverting the commit I identified after bisection:
+>>>>
+>>>> commit 578270bfbd2803dc7b0b03fbc2ac119efbc73195
+>>>> Author: Ming Lei <ming.lei@canonical.com>
+>>>> Date:   Tue Nov 24 10:35:29 2015 +0800
+>>>>
+>>>>     block: fix segment split
+>>>> ...
+>>>> I understand that this fix seems sane, but actually reverting it fixes
+>>>> the issue for me: 4.4-rc5 crashed within some minutes with the above
+>>>> log, 4.4-rc5 with 578270bfbd reverted survived 19 hours of continuous
+>>>> kernel compiles without issues.
+>>>> Looking at the git history of that file I see quite some recent changes
+>>>> there, but it's beyond my understanding of the code to spot the real
+>>>> culprit.
+>>>>
+>>>> Can anyone point me to a change in blk-merge.c I could try to revert to
+>>>> identify the real root cause? I can run tests quickly, though a real
+>>>> positive case would need some hours of runtime to be sure it's fine.
+>>>>
+>>>> Many thanks!
+>>>> Cheers,
+>>>> Andre.
+>>>> --
