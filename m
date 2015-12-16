@@ -1,50 +1,42 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 16 Dec 2015 17:02:47 +0100
-Subject: [PATCH v2 0/6] pwm: lpc32xx: fixes in the LPC32xx PWM driver
-In-Reply-To: <1449401522-22590-1-git-send-email-vz@mleia.com>
-References: <1449401522-22590-1-git-send-email-vz@mleia.com>
-Message-ID: <20151216160247.GJ28947@ulmo>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 16 Dec 2015 17:07:15 +0100
+Subject: [PATCH v6 12/20] arm64:ilp32: add sys_ilp32.c and a separate
+ table (in entry.S) to use it
+In-Reply-To: <1450215766-14765-13-git-send-email-ynorov@caviumnetworks.com>
+References: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
+ <1450215766-14765-13-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <3828111.AFlzLO4Qgd@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 06, 2015 at 01:31:56PM +0200, Vladimir Zapolskiy wrote:
-> The changeset fixes a number of issues within current implementation
-> of LPC32xx PWM controller driver, namely
-> - the SoC has two independent PWM controllers with one channel each,
-> - runtime warnings from common clock framework,
-> - overflow in duty cycle calculation may result in disabled PWM,
-> - unsupported period values are not accepted.
-> 
-> Correction of PWM channels requires a correspondent change in
-> arch/arm/boot/dts/lpc32xx.dtsi, it has been already sent for review.
-> 
-> Changes from v1 to v2:
-> - corrected style of examples in documentation,
-> - improved commit messages
-> 
-> Version v1 can be found here:
->   http://comments.gmane.org/gmane.linux.pwm/2828
->   http://www.spinics.net/lists/devicetree/msg105398.html
-> 
-> Vladimir Zapolskiy (6):
->   dt: lpc32xx: pwm: correct LPC32xx PWM device node example
->   dt: lpc32xx: pwm: update documentation of LPC32xx PWM device
->   pwm: lpc32xx: correct number of PWM channels from 2 to 1
->   pwm: lpc32xx: fix warnings from common clock framework
->   pwm: lpc32xx: fix and simplify duty cycle and period calculations
->   pwm: lpc32xx: return ERANGE, if requested period is not supported
-> 
->  .../devicetree/bindings/pwm/lpc32xx-pwm.txt        |  9 +++-
->  drivers/pwm/pwm-lpc32xx.c                          | 59 ++++++++--------------
->  2 files changed, 29 insertions(+), 39 deletions(-)
+On Wednesday 16 December 2015 00:42:38 Yury Norov wrote:
+> +/* Using non-compat syscalls where necessary */
+> +#define compat_sys_fadvise64_64        sys_fadvise64_64
+> +#define compat_sys_fallocate           sys_fallocate
+> +#define compat_sys_ftruncate64         sys_ftruncate
+> +#define compat_sys_lookup_dcookie      sys_lookup_dcookie
+> +#define compat_sys_pread64             sys_pread64
+> +#define compat_sys_pwrite64            sys_pwrite64
+> +#define compat_sys_readahead           sys_readahead
+> +#define compat_sys_shmat               sys_shmat
+> +#define compat_sys_sigaltstack         sys_sigaltstack
+> +#define compat_sys_sync_file_range     sys_sync_file_range
+> +#define compat_sys_truncate64          sys_truncate
+> +#define sys_llseek                     sys_lseek
+> +
+> +#define compat_sys_open_by_handle_at   sys_open_by_handle_at
+> +#define compat_sys_openat              sys_openat
 
-All patches applied, thanks.
+Very nice and short list now!
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151216/241bf709/attachment.sig>
+I've double-checked all calls and the only one I'm not sure about is
+sys_sigaltstack. Did we discuss that one earlier?
+My first guess would be that it's easier to use the compat
+version of that.
+
+I would probably also group sys_shmat with sys_openat, because it's
+different from the other ones in the first block as this is not
+about passing 64-bit arguments as registers, but instead it's about
+the behavior of the system call.
+
+	Arnd
