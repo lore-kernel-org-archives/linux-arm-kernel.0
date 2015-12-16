@@ -1,74 +1,147 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Wed, 16 Dec 2015 15:55:12 -0800
-Subject: [PATCH v2 5/8] ARM: bcm2835: Move the CPU/peripheral include out of
- common RPi DT.
+Date: Wed, 16 Dec 2015 15:55:13 -0800
+Subject: [PATCH v2 6/8] ARM: bcm2835: Add devicetree for bcm2836 and Raspberry
+ Pi 2 B
 In-Reply-To: <1450310115-22163-1-git-send-email-eric@anholt.net>
 References: <1450310115-22163-1-git-send-email-eric@anholt.net>
-Message-ID: <1450310115-22163-6-git-send-email-eric@anholt.net>
+Message-ID: <1450310115-22163-7-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For Raspberry Pi 2, we want to use the same general pin assignment
-bits, but need to use bcm2836.dtsi for the CPU instead.
+The Pi 2 B ends up like a Pi 1 B+, with the same peripherals and
+pinout, but the CPU and memory layout changed to use the 2836.
 
 Signed-off-by: Eric Anholt <eric@anholt.net>
 ---
- arch/arm/boot/dts/bcm2835-rpi-a-plus.dts | 1 +
- arch/arm/boot/dts/bcm2835-rpi-b-plus.dts | 1 +
- arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts | 1 +
- arch/arm/boot/dts/bcm2835-rpi-b.dts      | 1 +
- arch/arm/boot/dts/bcm2835-rpi.dtsi       | 2 --
- 5 files changed, 4 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/bcm2836-rpi-2-b.dts | 35 ++++++++++++++++
+ arch/arm/boot/dts/bcm2836.dtsi        | 77 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 112 insertions(+)
+ create mode 100644 arch/arm/boot/dts/bcm2836-rpi-2-b.dts
+ create mode 100644 arch/arm/boot/dts/bcm2836.dtsi
 
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
-index b2bff43..228614f 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
-@@ -1,4 +1,5 @@
- /dts-v1/;
-+#include "bcm2835.dtsi"
- #include "bcm2835-rpi.dtsi"
- 
- / {
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-index 668442b..ef54050 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-@@ -1,4 +1,5 @@
- /dts-v1/;
-+#include "bcm2835.dtsi"
- #include "bcm2835-rpi.dtsi"
- 
- / {
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
-index eab8b591..86f1f2f 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
-@@ -1,4 +1,5 @@
- /dts-v1/;
-+#include "bcm2835.dtsi"
- #include "bcm2835-rpi.dtsi"
- 
- / {
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-b.dts b/arch/arm/boot/dts/bcm2835-rpi-b.dts
-index ff6b2d1..4859e9d 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-b.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-b.dts
-@@ -1,4 +1,5 @@
- /dts-v1/;
-+#include "bcm2835.dtsi"
- #include "bcm2835-rpi.dtsi"
- 
- / {
-diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-index 3572f03..3afb9fe 100644
---- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
-+++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-@@ -1,5 +1,3 @@
--#include "bcm2835.dtsi"
--
- / {
- 	memory {
- 		reg = <0 0x10000000>;
+diff --git a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
+new file mode 100644
+index 0000000..ff94666
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
+@@ -0,0 +1,35 @@
++/dts-v1/;
++#include "bcm2836.dtsi"
++#include "bcm2835-rpi.dtsi"
++
++/ {
++	compatible = "raspberrypi,2-model-b", "brcm,bcm2836";
++	model = "Raspberry Pi 2 Model B";
++
++	memory {
++		reg = <0 0x40000000>;
++	};
++
++	leds {
++		act {
++			gpios = <&gpio 47 0>;
++		};
++
++		pwr {
++			label = "PWR";
++			gpios = <&gpio 35 0>;
++			default-state = "keep";
++			linux,default-trigger = "default-on";
++		};
++	};
++};
++
++&gpio {
++	pinctrl-0 = <&gpioout &alt0 &i2s_alt0 &alt3>;
++
++	/* I2S interface */
++	i2s_alt0: i2s_alt0 {
++		brcm,pins = <18 19 20 21>;
++		brcm,function = <BCM2835_FSEL_ALT0>;
++	};
++};
+diff --git a/arch/arm/boot/dts/bcm2836.dtsi b/arch/arm/boot/dts/bcm2836.dtsi
+new file mode 100644
+index 0000000..6693118
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm2836.dtsi
+@@ -0,0 +1,77 @@
++#include "bcm283x.dtsi"
++
++/ {
++	compatible = "brcm,bcm2836";
++
++	soc {
++		ranges = <0x7e000000 0x3f000000 0x1000000>,
++			 <0x40000000 0x40000000 0x00001000>;
++		dma-ranges = <0xc0000000 0x00000000 0x3f000000>;
++
++		local_intc: local_intc {
++			compatible = "brcm,bcm2836-l1-intc";
++			reg = <0x40000000 0x100>;
++			interrupt-controller;
++			#interrupt-cells = <1>;
++			interrupt-parent = <&local_intc>;
++		};
++
++		arm-pmu {
++			compatible = "arm,cortex-a7-pmu";
++			interrupt-parent = <&local_intc>;
++			interrupts = <9>;
++		};
++	};
++
++	timer {
++		compatible = "arm,armv7-timer";
++		interrupt-parent = <&local_intc>;
++		interrupts = <0>, // PHYS_SECURE_PPI
++			     <1>, // PHYS_NONSECURE_PPI
++			     <3>, // VIRT_PPI
++			     <2>; // HYP_PPI
++		always-on;
++	};
++
++	cpus: cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		v7_cpu0: cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0xf00>;
++			clock-frequency = <800000000>;
++		};
++
++		v7_cpu1: cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0xf01>;
++			clock-frequency = <800000000>;
++		};
++
++		v7_cpu2: cpu at 2 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0xf02>;
++			clock-frequency = <800000000>;
++		};
++
++		v7_cpu3: cpu at 3 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0xf03>;
++			clock-frequency = <800000000>;
++		};
++	};
++};
++
++/* Make the BCM2835-style global interrupt controller be a child of the
++ * CPU-local interrupt controller.
++ */
++&intc {
++	compatible = "brcm,bcm2836-armctrl-ic";
++	interrupt-parent = <&local_intc>;
++	interrupts = <8>;
++};
 -- 
 2.6.2
