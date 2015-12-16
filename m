@@ -1,52 +1,79 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 Dec 2015 17:24:39 +0100
-Subject: [RFC3 PATCH v6 00/20] ILP32 for ARM64
-In-Reply-To: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
-References: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <3878732.mE36CZOJlR@wuerfel>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 16 Dec 2015 17:27:47 +0100
+Subject: [PATCH 2/3] pwm: Add PWM driver for OMAP using dual-mode timers
+In-Reply-To: <5637458D.60106@baylibre.com>
+References: <5637458D.60106@baylibre.com>
+Message-ID: <20151216162747.GL28947@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 16 December 2015 00:42:26 Yury Norov wrote:
-> This is still RFC because we have no glibc yet, that correspnds new ABI
-> introduced here. And so we cannot run tests. LP64 and AARCH32 tests show
-> no regression though.
+On Mon, Nov 02, 2015 at 12:14:21PM +0100, Neil Armstrong wrote:
+> Adds support for using a OMAP dual-mode timer with PWM capability
+> as a Linux PWM device. The driver controls the timer by using the
+> dmtimer API.
 > 
->   v3: https://lkml.org/lkml/2014/9/3/704
->   v4: https://lkml.org/lkml/2015/4/13/691
->   v5: https://lkml.org/lkml/2015/9/29/911
+> Add a platform_data structure for each pwm-omap-dmtimer nodes containing
+> the dmtimers functions in order to get driver not rely on platform
+> specific functions.
 > 
->   v6:
->  - time_t, __kenel_off_t and other types turned to be 32-bit
->    for compatibility reasons (after v5 discussion);
->  - related changes applied to ILP32 syscall table and handlers;
->  - ILP32 VDSO code excluded. It's not mandatory, and caused questions
->    during review process. We definitely make sure we will follow up
->    with a VDSO later on because it is needed for performance reasons;
->  - fixed build issues with different combinations of AARCH32 / ILP32
->    enabling in config;
->  - ILP32 TLS bug fixed;
->  - entry32-common.S introduced to hold wrappers needed for both ILP32
->    and AARCH32_EL0;
->  - documentation updated according to latest changes;
->  - rebased to the current head;
->  - coding style re-checked;
->  - ILP32 syscall table turned around.
+> Cc: Grant Erickson <marathon96@gmail.com>
+> Cc: NeilBrown <neilb@suse.de>
+> Cc: Joachim Eastwood <manabian@gmail.com>
+> Suggested-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>  .../devicetree/bindings/pwm/pwm-omap-dmtimer.txt   |  18 ++
+>  drivers/pwm/Kconfig                                |   9 +
+>  drivers/pwm/Makefile                               |   1 +
+>  drivers/pwm/pwm-omap-dmtimer.c                     | 322 +++++++++++++++++++++
+>  include/linux/platform_data/pwm_omap_dmtimer.h     |  69 +++++
+>  5 files changed, 419 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-omap-dmtimer.txt
+>  create mode 100644 drivers/pwm/pwm-omap-dmtimer.c
+>  create mode 100644 include/linux/platform_data/pwm_omap_dmtimer.h
 
-Hi Yury,
+I've applied this with some coding style bikeshedding applied. Also I
+think there's a timer leak in the probe function:
 
-This version looks very good overall, thanks for addressing all my previous
-comments!
+> diff --git a/drivers/pwm/pwm-omap-dmtimer.c b/drivers/pwm/pwm-omap-dmtimer.c
+[...]
+> +static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+> +{
+[...]
+> +	dm_timer = pdata->request_by_node(timer);
+> +	if (!dm_timer)
+> +		return -EPROBE_DEFER;
 
-I've commented on a few things, but it's mostly about style, and there
-are no show-stoppers. Please reply to my questions about the binfmt_elf.c,
-I must be missing something here as I can't even find which patch adds
-support for the new ELF32 executable format.
+dm_timer holds the requested timer now.
 
-Regarding my sys_sigaltstack comment, I've looked at the compat handling
-in kernel/signal.c and see that it's really ugly. Is that the reason
-you didn't want to use it? I think it's a good idea to clean that up
-so we don't need the get_fs()/set_fs() hack, but that can be done
-independent from your series and would benefit all 32-bit compat handling.
+> +
+> +	omap = devm_kzalloc(&pdev->dev, sizeof(*omap), GFP_KERNEL);
+> +	if (!omap)
+> +		return -ENOMEM;
 
-	Arnd
+But it's not released when this allocation fails...
+
+> +
+> +	omap->pdata = pdata;
+> +	omap->dm_timer = dm_timer;
+> +	omap->dm_timer_pdev = of_find_device_by_node(timer);
+> +	if (!omap->dm_timer_pdev) {
+> +		dev_err(&pdev->dev, "Unable to find timer pdev\n");
+> +		return -EINVAL;
+> +	}
+
+... nor when this lookup fails. I've taken the liberty of adding two
+calls to omap->pdata->free(dm_timer) to these error paths.
+
+Please take a look at what's in the pwm/for-next branch to see if it
+still works correctly.
+
+Thanks,
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151216/3a336f85/attachment.sig>
