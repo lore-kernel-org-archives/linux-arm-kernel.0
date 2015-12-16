@@ -1,263 +1,124 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 16 Dec 2015 12:48:13 +0000
-Subject: [PATCH v6 4/5] iommu/mediatek: Add mt8173 IOMMU driver
-In-Reply-To: <1450245573.22854.108.camel@mhfsdcap03>
-References: <1449568153-15643-1-git-send-email-yong.wu@mediatek.com>
- <1449568153-15643-5-git-send-email-yong.wu@mediatek.com>
- <20151214141656.GG18805@8bytes.org> <1450150132.22854.57.camel@mhfsdcap03>
- <5670098E.40601@arm.com> <1450245573.22854.108.camel@mhfsdcap03>
-Message-ID: <56715D8D.3050102@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 16 Dec 2015 13:48:28 +0100
+Subject: [PATCH RFC 06/27] PM / Domains: add debugfs 'states' and
+ 'timings' seq files
+In-Reply-To: <567145E1.5040804@baylibre.com>
+References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
+ <1447799871-56374-7-git-send-email-lina.iyer@linaro.org>
+ <CAPDyKFrOPKc-WDsHNpndkoZa5g6tnnbE2C5JsqZ6DMCX+6hmFw@mail.gmail.com>
+ <567145E1.5040804@baylibre.com>
+Message-ID: <CAPDyKFqPn5StedOgd-toxKvvcM078NuVvN8yUDByRZSe9HvKbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/12/15 05:59, Yong Wu wrote:
-> On Tue, 2015-12-15 at 12:37 +0000, Robin Murphy wrote:
->> On 15/12/15 03:28, Yong Wu wrote:
->>> On Mon, 2015-12-14 at 15:16 +0100, Joerg Roedel wrote:
->>>> On Tue, Dec 08, 2015 at 05:49:12PM +0800, Yong Wu wrote:
->>>>> +static int mtk_iommu_attach_device(struct iommu_domain *domain,
->>>>> +				   struct device *dev)
->>>>> +{
->>>>> +	struct mtk_iommu_domain *dom = to_mtk_domain(domain);
->>>>> +	struct mtk_iommu_client_priv *priv = dev->archdata.iommu;
->>>>> +	struct mtk_iommu_data *data;
->>>>> +	int ret;
->>>>> +
->>>>> +	if (!priv)
->>>>> +		return -ENODEV;
->>>>> +
->>>>> +	data = dev_get_drvdata(priv->m4udev);
->>>>> +	if (!data) {
->>>>> +		/*
->>>>> +		 * The DMA core will run earlier than this probe, and it will
->>>>> +		 * create a default iommu domain for each a iommu device.
->>>>> +		 * But here there is only one domain called the m4u domain
->>>>> +		 * which all the multimedia HW share.
->>>>> +		 * The default domain isn't needed here.
->>>>> +		 */
->>>>
->>>> The iommu core creates one domain per iommu-group. In your case this
->>>> means one default domain per iommu in the system.
->>>
->>> Yes. The iommu core will create one domain per iommu-group.
->>> see the next "if" here.
->>>
->>> But the domain here is created by the current DMA64. It's from this
->>> function do_iommu_attach which will be called too early and will help
->>> create a default domain for each a iommu device.(my codebase is
->>> v4.4-rc1).
+[...]
+
 >>
->> I still don't really understand the problem here. The M4U device is
->> created early in mtk_iommu_init_fn, so it should be probed and ready to
->> go long before anything else. Indeed, for your mtk_iommu_device_group()
->> callback to work then everything must already be happening in the right
->> order - add_device will only call iommu_group_get_for_dev() if of_xlate
->> has populated dev->archdata.iommu, and of_xlate will only do that if the
->> M4U was up and running before the client device started probing.
->> Furthermore, if mtk_iommu_device_group() *does* work, then the IOMMU
->> core will go ahead and allocate the default domain there and then, which
->> the arch code should find and use later.
+>> A general comment. Static functions in genpd shall start with one of
+>> the following prefix.
+>>
+>> genpd_*
+>> _genpd_*
+>> __genpd_*
+>>
+>> Please change accordingly.
 >
-> Thanks. This is very helpful.
 >
-> I understand your confuse right now and your expectant flow.
->
-> Our IOMMU probe was PROBE_DEFER by our SMI device, so currently it probe
-> was delayed, then have to add the workaround code.
+> Many static routines were already prefixed like the exported functions with
+> "pm_", shall I make a separate patch for this renaming ?
 
-Aha, I hadn't twigged that there was a dependency on another device that 
-could delay the M4U probe, thanks for the clarification. That'll be a 
-good case to bear in mind when I eventually get back to the IOMMU probe 
-deferral stuff.
+My point is that I don't want it to becomes worse.
 
-> Following your comment above, I test as below. Then the flows seems meet
-> the "best case" that the iommu core will help create default DMA domain.
->
-> @@ -664,19 +636,41 @@ static int mtk_iommu_probe(struct platform_device
-> *pdev)
-> for (i = 0; i < larb_nr; i++) {
-> 		struct device_node *larbnode;
-> 		struct platform_device *plarbdev;
->
-> 		larbnode = of_parse_phandle(dev->of_node, "mediatek,larbs", i);
-> 		if (!larbnode)
-> 			return -EINVAL;
->
->                  plarbdev = of_find_device_by_node(larbnode);
->                  of_node_put(larbnode);
-> -               if (!plarbdev)
-> -                       return -EPROBE_DEFER;
-> +               if (!plarbdev) {
-> +                       plarbdev = of_platform_device_create(larbnode,
-> NULL, platform_bus_type.dev_root);
-> +                       if (IS_ERR(pdev))
-> +                               return -EPROBE_DEFER;
-> +               }
-> }
->
-> I only add of_platform_device_create for the SMI local arbiter devices
-> here.
->
-> This is a big improvement for us. If this is ok, I will send a quick
-> next version for this.
+If you follow the above rule for new changes, I am happy.
 
-In my opinion it's reasonable - we need the whole "IOMMU" to be ready, 
-so if we already have to short-cut the creation of the M4U part it only 
-seems fair to do the same for the SMI part. That said, would it work to 
-just unconditionally poke the larbs in mtk_iommu_init_fn() before you 
-poke the M4U itself? It would be nice to keep all that stuff together in 
-the same place.
+Whether you want to send a separate patch fixing the other existing
+name to be consistent with above rule, I would also be happy. :-)
 
->> The potential issue I *do* see, looking more closely, is that
->> iommu_group_get_for_dev() is setting group->domain but not calling the
->> attach_dev callback, which looks wrong...
 >
-> This is the backtrace,
->
-> (151216_09:58:05.207)Call trace:
-> (151216_09:58:05.207)[<ffffffc000400668>] mtk_iommu_attach_device
-> +0xb8/0x178
-> (151216_09:58:05.207)[<ffffffc0003fc55c>] iommu_group_add_device
-> +0x1d8/0x31c
-> (151216_09:58:05.207)[<ffffffc0003fc988>] iommu_group_get_for_dev
-> +0x88/0x108
-> (151216_09:58:05.207)[<ffffffc0003ffcfc>] mtk_iommu_add_device+0x14/0x34
-> (151216_09:58:05.207)[<ffffffc0003fb280>] add_iommu_group+0x20/0x44
-> (151216_09:58:05.207)[<ffffffc000406cec>] bus_for_each_dev+0x58/0x98
-> (151216_09:58:05.207)[<ffffffc0003fbe8c>] bus_set_iommu+0x9c/0xf8
-
-Urgh, now I recall that this isn't even the first time I've been 
-confused by the attach being hidden elsewhere. Oh well, problem averted!
-
-> If I change like above, I will delete the workaround code..
 >
 >>
+>>> ---
+>>>   drivers/base/power/domain.c | 115
+>>> +++++++++++++++++++++++++++++++++++++++++---
+>>>   1 file changed, 107 insertions(+), 8 deletions(-)
 >>>
->>> //=====the next "if"===========
->>> } else if (!data->m4u_dom) {
->>> 	/*
->>> 	 * While a device is added into a iommu group, the iommu core
->>> 	 * will create a default domain for each a iommu group.
->>> 	 * This default domain is reserved as the m4u domain and is
->>> 	 * initiated here.
->>> 	 */
->>> 	data->m4u_dom = dom;
->>> 	if (domain->type == IOMMU_DOMAIN_DMA) {
->>> 		ret = iommu_dma_init_domain(domain, 0,
->>> 					    DMA_BIT_MASK(32));
->>> 		if (ret)
->>> 			goto err_uninit_dom;
->>> 	}
+>>> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+>>> index c300293..9a0df09 100644
+>>> --- a/drivers/base/power/domain.c
+>>> +++ b/drivers/base/power/domain.c
+>>> @@ -2169,21 +2169,120 @@ static const struct file_operations
+>>> pm_genpd_summary_fops = {
+>>>          .release = single_release,
+>>>   };
 >>>
->>> 	ret = mtk_iommu_domain_finalise(data);
->>> 	if (ret)
->>> 		goto err_uninit_dom;
->>> }
->>> //======================
->>>
->>>>
->>>>> +		iommu_domain_free(domain);
->>>>
->>>> This function is not supposed to free the domain passed to it.
->>>
->>> As above this domain is created in the do_iommu_attach which will help
->>> create a default domain for each a iommu device.
->>> We don't need this default domain!
->>>
->>> If we don't free it here, there will be a memory leak.
->>>
->>>   From Robin's comment, He will improve the sequence of the
->>> __iommu_setup_dma_ops in the future.
+>>> +static int pm_genpd_states_show(struct seq_file *s, void *data)
+>>> +{
+>>> +       struct generic_pm_domain *genpd;
+>>> +
+>>> +       seq_puts(s,
+>>> +                "\n  Domain             State name        Enter + Exit =
+>>> Min_off_on (ns)\n");
+>>> +       seq_puts(s,
+>>> +
+>>> "-----------------------------------------------------------------------\n");
+>>> +
 >>
->> That already happened. The final version of the arm64 code which was
->> merged makes sure that the IOMMU driver always sees the callbacks in the
->> desired of_xlate -> add_device -> attach_dev order. The whole point of
->> the comment below is that the driver itself *doesn't* have to care about
->> the awkward way in which that is currently achieved.
 >>
->>> /*
->>>    * TODO: Right now __iommu_setup_dma_ops() gets called too early to do
->>>    * everything it needs to - the device is only partially created and the
->>>    * IOMMU driver hasn't seen it yet, so it can't have a group. Thus we
->>>    * need this delayed attachment dance. Once IOMMU probe ordering is
->>> sorted
->>>    * to move the arch_setup_dma_ops() call later, all the notifier bits
->>> below
->>>    * become unnecessary, and will go away.
->>>    */
->>>
->>> /*
->>>    * Best case: The device is either part of a group which was
->>>    * already attached to a domain in a previous call, or it's
->>>    * been put in a default DMA domain by the IOMMU core.
->>>    */
+>> You must hold the gpd_list_lock while traversing the gpd list.
 >>
->> That was before Joerg made the device_group changes which enabled proper
->> default domains for platform devices - with those, we should be now be
->> hitting the "best case" behaviour every time. In fact I think the "fake
->> default domain" workaround shouldn't be needed at all any more, so I
->> will add removing it to my giant list of things to do.
+>>> +       list_for_each_entry(genpd, &gpd_list, gpd_list_node) {
+>>> +
+>>> +               int i;
+>>> +
+>>> +               for (i = 0; i < genpd->state_count; i++) {
 >>
->>>      But there is no this patch currently, so I add iommu_domain_free
->>> here.
->>>
->>>      "free the domain" here looks really not good. Then I delete the
->>> iommu_domain_free here(allow this memory leak right now), is it ok?
->>> (It will also works after Robin's change in the future.)
->>>
->>>>
->>>>> +static int mtk_iommu_add_device(struct device *dev)
->>>>> +{
->>>>> +	struct iommu_group *group;
->>>>> +
->>>>> +	if (!dev->archdata.iommu) /* Not a iommu client device */
->>>>> +		return -ENODEV;
->>>>> +
->>>>> +	group = iommu_group_get_for_dev(dev);
->>>>> +	if (IS_ERR(group))
->>>>> +		return PTR_ERR(group);
->>>>> +
->>>>> +	iommu_group_put(group);
->>>>> +	return 0;
->>>>> +}
->>>>
->>>> [...]
->>>>
->>>>> +static struct iommu_group *mtk_iommu_device_group(struct device *dev)
->>>>> +{
->>>>> +	struct mtk_iommu_data *data;
->>>>> +	struct mtk_iommu_client_priv *priv;
->>>>> +
->>>>> +	priv = dev->archdata.iommu;
->>>>> +	if (!priv)
->>>>> +		return ERR_PTR(-ENODEV);
->>>>> +
->>>>> +	/* All the client devices are in the same m4u iommu-group */
->>>>> +	data = dev_get_drvdata(priv->m4udev);
->>>>> +	if (!data->m4u_group) {
->>>>> +		data->m4u_group = iommu_group_alloc();
->>>>> +		if (IS_ERR(data->m4u_group))
->>>>> +			dev_err(dev, "Failed to allocate M4U IOMMU group\n");
->>>>> +	}
->>>>> +	return data->m4u_group;
->>>>> +}
 >>
->> As long as this works as expected, then AFAICS you shouldn't have to
->> have *any* special-case behaviour or tracking of domains at all.
+>> To be sure you have valid data, you should hold the genpd lock here.
+>>
 >
-> We only need one iommu-group, one iommu domain here.
+> At some point while testing with calling suspend from the power_off handler,
+> the cpu would go to sleep with the lock held, hence using this seq-file
+> would not work.
+
+That seems like a bad behaviour during suspend. Why does it hold the lock?
+
+On the other it shouldn't matter as userspace can't access the debugfs
+nodes, since its frozen at those times, right!?
+
 >
-> What's the special-case behavior, how can we track of domains.
-> Could you help give me a example?
+> while I agree, I think it is not super likely that a
+> domain/child/devices/states are added or removed at this point (the DT is
+> parsed already), would using list_for_each_entry_safe be safe enough ?
 
-The beauty of it is that you don't need to. If you guarantee all of an 
-IOMMU's client devices are in the same group, you know you've only got 
-one thing which can be attached to that IOMMU's domains. Therefore, you 
-can freely allow as many domains as you like to *exist*, because there 
-can never be more than one *active* at any given time - the core code 
-enforces that the group is detached from one domain before being 
-attached to another, and the driver's attach and detach calls just 
-become responsible for switching the given domain's page table in and 
-out of the actual hardware. I think it's pretty neat.
+No it's not.
 
-Robin.
+The gpd_list is protected with the gdp_list_lock, which is needed
+because new genpds can be added at any point.
+
+You also need the genpd lock here, as otherwise you may print the
+latency-values in the middle of when these are being updated.
+
+>
+>
+>>> +                       seq_printf(s, "%-20s %-20s %lld+%lld=%lld\n",
+>>> +                                  genpd->name,
+>>> +                                  genpd->states[i].name,
+>>> +                                  genpd->states[i].power_on_latency_ns,
+>>> +                                  genpd->states[i].power_off_latency_ns,
+>>> +                                  genpd->states[i].power_off_latency_ns
+>>> +                                  +
+>>> genpd->states[i].power_on_latency_ns);
+>>> +               }
+>>> +
+>>> +       }
+>>> +
+>>> +       seq_puts(s, "\n");
+>>> +
+>>> +       return 0;
+>>> +}
+>>> +
+
+[...]
+
+Kind regards
+Uffe
