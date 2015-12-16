@@ -1,46 +1,40 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 16 Dec 2015 11:36:17 +0000
-Subject: [RFC PATCH v3 4/8] arm64: Handle early CPU boot failures
-In-Reply-To: <20151216112914.GF4308@arm.com>
-References: <1449655039-22022-1-git-send-email-suzuki.poulose@arm.com>
- <1449655039-22022-5-git-send-email-suzuki.poulose@arm.com>
- <20151215115518.GE9452@arm.com> <56713F76.8080907@arm.com>
- <20151216112914.GF4308@arm.com>
-Message-ID: <20151216113617.GC6412@leverpostej>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 16 Dec 2015 11:38:52 +0000
+Subject: regmap-mmio and paged registers
+In-Reply-To: <20151209222613.GI3515@piout.net>
+References: <20151209214150.GH3515@piout.net>
+ <20151209221036.GK5727@sirena.org.uk>
+ <20151209222613.GI3515@piout.net>
+Message-ID: <20151216113852.GG5727@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 16, 2015 at 11:29:15AM +0000, Will Deacon wrote:
-> On Wed, Dec 16, 2015 at 10:39:50AM +0000, Suzuki K. Poulose wrote:
-> > On 15/12/15 11:55, Will Deacon wrote:
-> > >On Wed, Dec 09, 2015 at 09:57:15AM +0000, Suzuki K. Poulose wrote:
-> > 
-> > >>  /*
-> > >>   * Initial data for bringing up a secondary CPU.
-> > >>+ * @stack  - sp for the secondary CPU
-> > >>+ * @status - Result passed back from the secondary CPU to
-> > >>+ *           indicate failure.
-> > >>   */
-> > >>  struct secondary_data {
-> > >>  	void *stack;
-> > >>-};
-> > >>+	unsigned long status;
-> > >>+} ____cacheline_aligned;
-> > >
-> > >Why is this necessary?
-> > 
-> > That was based on a suggestion from Mark Rutland here:
-> > 
-> >   https://lkml.org/lkml/2015/12/1/580
-> 
-> That thread is talking about the CWG, which is not the same thing as
-> ____cacheline_aligned. Given that the architectural maximum for the CWG
-> is 2K, we can probably get away with allocating the status field amongst
-> the head.S text instead (which we know will be clean).
-> 
-> Since SMP boot is serialised, that should be sufficient, right?
+On Wed, Dec 09, 2015 at 11:26:13PM +0100, Alexandre Belloni wrote:
+> On 09/12/2015 at 22:10:36 +0000, Mark Brown wrote :
 
-Assuming you mean in .head.text (rather than .text), that should work
-given that we don't currently free .head.text.
+> > Honestly looking at the register I'm not even convinced it is a paged
+> > regmap, it looks more like a mailbox for communication with a
+> > coprocessor than anything else (the fact that the selector is named PID,
+> > the fact that the bitfields include CMD...).  Are you sure that it's a
+> > good idea to represent this as a regmap at all?
 
-Mark.
+> Yeah, I was probably not clear enough but the regmap actually covers the
+> whole PMC range and include that particular register. We have to do that
+> because this range is used by multiple drivers.
+
+I don't see how that follows?  You can layer anything you like on top of
+a regmap.
+
+> This register, PMC_PCR is also used by multiple drivers so it is
+> important to properly lock between the page selection and the following
+> read or write.
+
+regmaps aren't the only way of sharing access to something - like I say
+there's the mailbox API too.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151216/cb6cfecd/attachment.sig>
