@@ -1,72 +1,83 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Wed, 16 Dec 2015 15:55:08 -0800
-Subject: [PATCH v2 1/8] irq: bcm2836: Fix initialization of the
- LOCAL_IRQ_CNT*IRQ timers
+Date: Wed, 16 Dec 2015 15:55:09 -0800
+Subject: [PATCH v2 2/8] irq: bcm2836: Add SMP support for the 2836
 In-Reply-To: <1450310115-22163-1-git-send-email-eric@anholt.net>
 References: <1450310115-22163-1-git-send-email-eric@anholt.net>
-Message-ID: <1450310115-22163-2-git-send-email-eric@anholt.net>
+Message-ID: <1450310115-22163-3-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The irqchip's register area includes the the setup for the timer's
-scaling factors, and for the platform we want a fixed configuration of
-these registers.
+From: Andrea Merello <andrea.merello@gmail.com>
 
+The firmware sets the secondaries spinning waiting for a non-NULL
+value to show up in the last IPI mailbox.
+
+The original SMP port from the downstream tree was done by Andrea, and
+Eric cleaned it up/rewrote it a few times from there.
+
+Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
 Signed-off-by: Eric Anholt <eric@anholt.net>
 ---
- drivers/irqchip/irq-bcm2836.c | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ drivers/irqchip/irq-bcm2836.c | 27 +++++++++++++++++++++++++--
+ 1 file changed, 25 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/irqchip/irq-bcm2836.c b/drivers/irqchip/irq-bcm2836.c
-index f687082..6ec125e 100644
+index 6ec125e..c5ef4df 100644
 --- a/drivers/irqchip/irq-bcm2836.c
 +++ b/drivers/irqchip/irq-bcm2836.c
-@@ -21,6 +21,9 @@
- #include <linux/irqdomain.h>
- #include <asm/exception.h>
- 
-+#define LOCAL_CONTROL			0x000
-+#define LOCAL_PRESCALER			0x008
-+
+@@ -53,14 +53,16 @@
+ /* Same status bits as above, but for FIQ. */
+ #define LOCAL_FIQ_PENDING0		0x070
  /*
-  * The low 2 bits identify the CPU that the GPU IRQ goes to, and the
-  * next 2 bits identify the CPU that the GPU FIQ goes to.
-@@ -237,6 +240,27 @@ bcm2836_arm_irqchip_smp_init(void)
+- * Mailbox0 write-to-set bits.  There are 16 mailboxes, 4 per CPU, and
++ * Mailbox write-to-set bits.  There are 16 mailboxes, 4 per CPU, and
+  * these bits are organized by mailbox number and then CPU number.  We
+  * use mailbox 0 for IPIs.  The mailbox's interrupt is raised while
+  * any bit is set.
+  */
+ #define LOCAL_MAILBOX0_SET0		0x080
+-/* Mailbox0 write-to-clear bits. */
++#define LOCAL_MAILBOX3_SET0		0x08c
++/* Mailbox write-to-clear bits. */
+ #define LOCAL_MAILBOX0_CLR0		0x0c0
++#define LOCAL_MAILBOX3_CLR0		0x0cc
+ 
+ #define LOCAL_IRQ_CNTPSIRQ	0
+ #define LOCAL_IRQ_CNTPNSIRQ	1
+@@ -226,6 +228,26 @@ static const struct irq_domain_ops bcm2836_arm_irqchip_intc_ops = {
+ 	.xlate = irq_domain_xlate_onecell
+ };
+ 
++#ifdef CONFIG_SMP
++int __init bcm2836_smp_boot_secondary(unsigned int cpu,
++				      struct task_struct *idle)
++{
++	unsigned long secondary_startup_phys =
++		(unsigned long)virt_to_phys((void *)secondary_startup);
++
++	dsb();
++	writel(secondary_startup_phys,
++	       intc.base + LOCAL_MAILBOX3_SET0 + 16 * cpu);
++
++	return 0;
++}
++
++static const struct smp_operations bcm2836_smp_ops __initconst = {
++	.smp_boot_secondary	= bcm2836_smp_boot_secondary,
++};
++
++#endif
++
+ static void
+ bcm2836_arm_irqchip_smp_init(void)
+ {
+@@ -237,6 +259,7 @@ bcm2836_arm_irqchip_smp_init(void)
+ 	register_cpu_notifier(&bcm2836_arm_irqchip_cpu_notifier);
+ 
+ 	set_smp_cross_call(bcm2836_arm_irqchip_send_ipi);
++	smp_set_ops(&bcm2836_smp_ops);
  #endif
  }
  
-+/*
-+ * The LOCAL_IRQ_CNT* timer firings are based off of the external
-+ * oscillator with some scaling.  The firmware sets up CNTFRQ to
-+ * report 19.2Mhz, but doesn't set up the scaling registers.
-+ */
-+static void bcm2835_init_local_timer_frequency(void)
-+{
-+	/*
-+	 * Set the timer to source from the 19.2Mhz crystal clock (bit
-+	 * 8 unset), and only increment by 1 instead of 2 (bit 9
-+	 * unset).
-+	 */
-+	writel(0, intc.base + LOCAL_CONTROL);
-+
-+	/*
-+	 * Set the timer prescaler to 1:1 (timer freq = input freq *
-+	 * 2**31 / prescaler)
-+	 */
-+	writel(0x80000000, intc.base + LOCAL_PRESCALER);
-+}
-+
- static int __init bcm2836_arm_irqchip_l1_intc_of_init(struct device_node *node,
- 						      struct device_node *parent)
- {
-@@ -246,6 +270,8 @@ static int __init bcm2836_arm_irqchip_l1_intc_of_init(struct device_node *node,
- 			node->full_name);
- 	}
- 
-+	bcm2835_init_local_timer_frequency();
-+
- 	intc.domain = irq_domain_add_linear(node, LAST_IRQ + 1,
- 					    &bcm2836_arm_irqchip_intc_ops,
- 					    NULL);
 -- 
 2.6.2
