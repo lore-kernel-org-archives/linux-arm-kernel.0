@@ -1,66 +1,85 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 16 Dec 2015 12:27:27 +0000
-Subject: [PATCH 1/2] ASoC: atmel-pdmic: add the Pulse Density Modulation
- Interface Controller
-In-Reply-To: <1450080940-4123-2-git-send-email-songjun.wu@atmel.com>
-References: <1450080940-4123-1-git-send-email-songjun.wu@atmel.com>
- <1450080940-4123-2-git-send-email-songjun.wu@atmel.com>
-Message-ID: <20151216122727.GI5727@sirena.org.uk>
+From: jchandra@broadcom.com (Jayachandran C.)
+Date: Wed, 16 Dec 2015 18:21:37 +0530
+Subject: [PATCH V1 00/11] MMCONFIG refactoring and ARM64 PCI hostbridge
+ init based on ACPI
+In-Reply-To: <20151209155511.GB21048@red-moon>
+References: <1445963922-22711-1-git-send-email-tn@semihalf.com>
+ <20151207203117.GB14429@localhost>
+ <20151209100125.GA12632@jayachandranc.netlogicmicro.com>
+ <20151209155511.GB21048@red-moon>
+Message-ID: <20151216125136.GE5890@jayachandranc.netlogicmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 14, 2015 at 04:15:39PM +0800, Songjun Wu wrote:
+On Wed, Dec 09, 2015 at 03:55:11PM +0000, Lorenzo Pieralisi wrote:
+> On Wed, Dec 09, 2015 at 03:31:41PM +0530, Jayachandran C. wrote:
+> > [trimmed the cc list a bit]
+> > On Mon, Dec 07, 2015 at 02:31:17PM -0600, Bjorn Helgaas wrote:
+> > > On Tue, Oct 27, 2015 at 05:38:31PM +0100, Tomasz Nowicki wrote:
+> > [...]
+> > > > 
+> > > > Tomasz Nowicki (10):
+> > > >   x86, pci: Reorder logic of pci_mmconfig_insert() function
+> > > >   x86, pci, acpi: Move arch-agnostic MMCONFIG (aka ECAM) and ACPI code
+> > > >     out of arch/x86/ directory
+> > > >   pci, acpi, mcfg: Provide generic implementation of MCFG code
+> > > >     initialization.
+> > > >   x86, pci: mmconfig_{32,64}.c code refactoring - remove code
+> > > >     duplication.
+> > > >   x86, pci, ecam: mmconfig_64.c becomes default implementation for ECAM
+> > > >     driver.
+> > > >   pci, acpi, mcfg: Provide default RAW ACPI PCI config space accessors.
+> > > >   pci, acpi, ecam: Add flag to indicate whether ECAM region was hot
+> > > >     added or not.
+> > > >   x86, pci: Use previously added ECAM hot_added flag to remove ECAM
+> > > >     regions.
+> > [...]
+> > > 
+> > > Waiting for an updated version after all the discussion.
+> > 
+> > Hi Bjorn,
+> > 
+> > After looking thru the code, I don't think moving the mmconfig code out
+> > of x86 and using it in ARM64 is a good idea.
+> > 
+> > The code maintains a list of mapping of ECAM regions which can modified
+> > at run time, and ends doing this sequence for doing a config access:
+> > 
+> >         rcu_read_lock();
+> >         addr = pci_dev_base(seg, bus, devfn);
+> > 	        list_for_each_entry_rcu(cfg, &pci_mmcfg_list, list)
+> > 			...find mapping...
+> > 	do pci operation
+> > 	rcu_read_unlock();
+> > 
+> > A lot of the complexity in mmconfig_*.c is to maintain and validate
+> > the pci_mmcfg_list which seems to be unecessary.
+> 
+> That list is there to manage hotplug bridges, what makes you think
+> it is not necessary ? Jiang (in CC) can certainly comment on that and
+> how that list handling can be updated/simplified, if possible.
 
-> Add driver for the Pulse Density Modulation Interface
-> Controller. It comes with digitallly controlled gain,
-> a High-Pass and a SINCC filter.
+Looking thru the code, I think moving the MCFG code to common can be
+done in a simpler way. I have posted a new patchset for this.
+(And I don't see how the hotplug case needs the list, but that is not
+ relevant now)
 
-This looks basically OK but there's a *lot* of weird coding style issues
-in here.  It's really all that, nothing too serious that I noticed -
-I've pointed out some of the patterns below not every individual issue.
+> > The better way would be to keep the mapping of ECAM region in the PCI
+> > host bridge sysdata like pci-host-generic and directly access using
+> > map_bus/read/write.
+> > 
+> > I see that early raw_pci_read/raw_pci_write may need to be supported.
+> > I am not sure if this is needed in ARM64 - and if it is, we can handle
+> > this by taking an early mapping for ECAM regions until the PCI host
+> > bridges are setup, and dropping the mapping at that point.
+> 
+> I do not think it is needed (and if it is it can be added later, it
+> should not block this series), this was already debated in previous
+> threads (and in the ASWG, where basically nobody could provide a reason
+> why those raw accessors in ACPICA are meant to exist, they are there for
+> AML to access config space, why that has to be happen before PCI busses
+> are enumerated is still a mystery to me).
 
-> +	for (i = 0; i < ARRAY_SIZE(mic_gain_table); i++) {
-> +		if ((mic_gain_table[i].dgain == dgain_val)
-> +		&& (mic_gain_table[i].scale == scale_val))
-> +			ucontrol->value.integer.value[0] = i;
-> +	}
+The posted patchset adds raw_pci_read/raw_pci_write as well.
 
-This indentation is really weird, why is the && aligned with the if?
-
-> +	snd_soc_update_bits(codec, PDMIC_DSPR1,
-> +		PDMIC_DSPR1_OFFSET_MASK,
-> +		(u32)(dd->pdata->mic_offset << PDMIC_DSPR1_OFFSET_SHIFT));
-
-These are weird too, I'd expect the second line to be part of the first.
-
-> +static struct regmap *atmel_pdmic_codec_get_remap(struct device *dev)
-> +{
-> +	return dev_get_regmap(dev, NULL);
-> +}
-
-This is (or should be) the default in the core.
-
-> +	if ((fs < rate_min) || (fs > rate_max)) {
-> +		dev_err(codec->dev,
-> +		"sample rate is %dHz, min rate is %dHz, max rate is %dHz\n",
-> +		fs, rate_min, rate_max);
-
-This too, alignment after the (.
-
-> +	if (bits == 16)
-> +		dspr0_val = (PDMIC_DSPR0_SIZE_16_BITS
-> +				<< PDMIC_DSPR0_SIZE_SHIFT);
-> +	else if (bits == 32)
-> +		dspr0_val = (PDMIC_DSPR0_SIZE_32_BITS
-> +				<< PDMIC_DSPR0_SIZE_SHIFT);
-> +	else
-> +		return -EINVAL;
-
-This looks like it should be a switch statement.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151216/93c05879/attachment.sig>
+JC.
