@@ -1,49 +1,89 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Wed, 16 Dec 2015 09:47:22 +0530
-Subject: [PATCH] clocksource: arm_global_timer: Allow DT to specify
- already reset timer counter
-In-Reply-To: <20151215181407.GB8568@leverpostej>
-References: <1448429044-10395-1-git-send-email-jaswinder.singh@linaro.org>
- <20151215181407.GB8568@leverpostej>
-Message-ID: <CABb+yY1dD3+A9DqLz4uCB2HcX8eRgBcQq95MVrOOeYUt4xR+0g@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 15 Dec 2015 20:34:59 -0800
+Subject: [PATCH -next] of: Move of_io_request_and_map prototype to correct
+ context
+Message-ID: <1450240499-17474-1-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 15, 2015 at 11:44 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Wed, Nov 25, 2015 at 10:54:04AM +0530, Jassi Brar wrote:
->> The GT counter is common to every core in a cluster. There is a usecase
->> when Linux is spawned by a 'master' firmware/OS running on some core of
->> the same cluster and the GT is used by the both.
->>  Linux, upon boot, resetting the GT counter is obviously fatal to the
->> other OS. So provide a way for DT to tell Linux if it's running in that
->> 'slave' mode and must not reset the counter.
->
-> Is the other OS only using the counter?
->
-I understand only the Global Counter and the (unused) PreScalar are
-common to cores in a cluster.
+of_io_request_and_map() is defined in of/address.c, which is compiled
+if CONFIG_OF_ADDRESS is configured. However, it is defined in the context
+of CONFIG_OF. This results in the following build errors for
+sparc:allmodconfig (which defines CONFIG_OF but not CONFIG_OF_ADDRESS).
 
-> Or are there other porions of the global timer that it assumes its in
-> sole control of?
->
-More important than 'control' is the fact that the other OS boots
-first. So it can not survive a reset to the global counter.
+drivers/built-in.o: In function `meson6_timer_init':
+	meson6_timer.c:(.init.text+0x62a8):
+		undefined reference to `of_io_request_and_map'
+drivers/built-in.o: In function `mtk_timer_init':
+	mtk_timer.c:(.init.text+0x6e70):
+		undefined reference to `of_io_request_and_map'
+drivers/built-in.o: In function `asm9260_timer_init':
+	asm9260_timer.c:(.init.text+0x6fcc):
+		undefined reference to `of_io_request_and_map'
 
->> +
->> +** Optional properties:
->> +
->> +- arm,gt_no_reset : Firmware/bootloader already initialized the
->> +     global timer-counter and expects it to be not reset again.
->
-> s/_/-/ in property names.
->
-> No need for the "gt" prefix, this is on tthe glboal timer node.
->
-OK
+Move function prototype and dummy function into the CONFIG_OF_ADDRESS
+conditional to fix the problem.
 
-> It "no-counter-reset" seems like a better description, though that
-> really depends on how the other OS is using this.
->
-OK will change it to "no-counter-reset".
+Exposed by commit bec8c4617611 ("clocksource/drivers/mediatek: Add the
+COMPILE_TEST option").
 
-Thanks.
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+---
+ include/linux/of_address.h | 19 ++++++++++---------
+ 1 file changed, 10 insertions(+), 9 deletions(-)
+
+diff --git a/include/linux/of_address.h b/include/linux/of_address.h
+index 507daad0bc8d..b5324c0553bd 100644
+--- a/include/linux/of_address.h
++++ b/include/linux/of_address.h
+@@ -56,6 +56,8 @@ extern struct of_pci_range *of_pci_range_parser_one(
+ extern int of_dma_get_range(struct device_node *np, u64 *dma_addr,
+ 				u64 *paddr, u64 *size);
+ extern bool of_dma_is_coherent(struct device_node *np);
++void __iomem *of_io_request_and_map(struct device_node *device,
++					int index, const char *name);
+ #else /* CONFIG_OF_ADDRESS */
+ 
+ static inline u64 of_translate_address(struct device_node *np,
+@@ -106,18 +108,22 @@ static inline bool of_dma_is_coherent(struct device_node *np)
+ {
+ 	return false;
+ }
++
++#include <linux/io.h>
++
++static inline void __iomem *of_io_request_and_map(struct device_node *device,
++					int index, const char *name)
++{
++	return IOMEM_ERR_PTR(-EINVAL);
++}
+ #endif /* CONFIG_OF_ADDRESS */
+ 
+ #ifdef CONFIG_OF
+ extern int of_address_to_resource(struct device_node *dev, int index,
+ 				  struct resource *r);
+ void __iomem *of_iomap(struct device_node *node, int index);
+-void __iomem *of_io_request_and_map(struct device_node *device,
+-					int index, const char *name);
+ #else
+ 
+-#include <linux/io.h>
+-
+ static inline int of_address_to_resource(struct device_node *dev, int index,
+ 					 struct resource *r)
+ {
+@@ -129,11 +135,6 @@ static inline void __iomem *of_iomap(struct device_node *device, int index)
+ 	return NULL;
+ }
+ 
+-static inline void __iomem *of_io_request_and_map(struct device_node *device,
+-					int index, const char *name)
+-{
+-	return IOMEM_ERR_PTR(-EINVAL);
+-}
+ #endif
+ 
+ #if defined(CONFIG_OF_ADDRESS) && defined(CONFIG_PCI)
+-- 
+2.1.4
