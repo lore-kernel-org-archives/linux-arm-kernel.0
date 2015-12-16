@@ -1,148 +1,213 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 16 Dec 2015 16:16:30 +0100
-Subject: [PATCH V2 20/23] ACPI,
- PCI: Refine the way to handle translation_offset for ACPI resources
+Date: Wed, 16 Dec 2015 16:16:31 +0100
+Subject: [PATCH V2 21/23] pci, acpi: Support for ACPI based PCI hostbridge init
 In-Reply-To: <1450278993-12664-1-git-send-email-tn@semihalf.com>
 References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
-Message-ID: <1450278993-12664-21-git-send-email-tn@semihalf.com>
+Message-ID: <1450278993-12664-22-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Liu Jiang <jiang.liu@linux.intel.com>
+Because of two patch series:
+1. Jiang Liu's common interface to support PCI host bridge init
+2. MMCONFIG refactoring (part of this patch set)
+now we can think about generic ACPI based PCI host bridge driver
+out of arch/ directory.
 
-Some architectures, such as IA64 and ARM64, have no instructions to
-directly access PCI IO ports, so they map PCI IO ports into PCI MMIO
-address space. Typically PCI host bridges on those architectures take
-the responsibility to map (translate) PCI IO port transactions into
-Memory-Mapped IO transactions. ACPI specification provides support
-of such a usage case by using resource translation_offset.
+This driver use information from MCFG table (PCI config space regions)
+and _CRS method (IO/irq resources) to initialize PCI hostbridge.
 
-But current ACPI resource parsing interface isn't neutral enough,
-it still has some special logic for IA64. So refine the ACPI resource
-parsing interface and IA64 code to neutrally handle translation_offset
-by:
-1) ACPI resource parsing interface doesn't do any translation, it just
-   save the translation_offset to be used by arch code.
-2) Arch code will do the mapping(translation) based on arch specific
-   information. Typically it does:
-2.a) Translate per PCI domain IO port address space into system global
-   IO port address space.
-2.b) Setup MMIO address mapping for IO ports.
-void handle_io_resource(struct resource_entry *io_entry)
-{
-	struct resource *mmio_res;
+TBD: We are still not sure whether we should reassign resources
+after PCI bus enumeration or trust firmware to do all that work for
+us properly.
 
-	mmio_res = kzalloc(sizeof(*mmio_res), GFP_KERNEL);
-	mmio_res->flags = IORESOURCE_MEM;
-	mmio_res->start = io_entry->offset + io_entry->res->start;
-	mmio_res->end = io_entry->offset + io_entry->res->end;
-	insert_resource(&iomem_resource, mmio_res)
-
-	base = map_to_system_ioport_address(entry);
-	io_entry->offset = base;
-	io_entry->res->start += base;
-	io_entry->res->end += base;
-}
-
-Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+CC: Arnd Bergmann <arnd@arndb.de>
+CC: Catalin Marinas <catalin.marinas@arm.com>
+CC: Liviu Dudau <Liviu.Dudau@arm.com>
+CC: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
+CC: Will Deacon <will.deacon@arm.com>
+Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 ---
- arch/ia64/pci/pci.c     | 26 ++++++++++++++++----------
- drivers/acpi/resource.c | 12 +++++-------
- 2 files changed, 21 insertions(+), 17 deletions(-)
+ drivers/pci/host/Kconfig         |   6 ++
+ drivers/pci/host/Makefile        |   1 +
+ drivers/pci/host/pci-host-acpi.c | 138 +++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 145 insertions(+)
+ create mode 100644 drivers/pci/host/pci-host-acpi.c
 
-diff --git a/arch/ia64/pci/pci.c b/arch/ia64/pci/pci.c
-index c1e8ed5..d496976 100644
---- a/arch/ia64/pci/pci.c
-+++ b/arch/ia64/pci/pci.c
-@@ -154,7 +154,7 @@ static int add_io_space(struct device *dev, struct pci_root_info *info,
- 	struct resource_entry *iospace;
- 	struct resource *resource, *res = entry->res;
- 	char *name;
--	unsigned long base, min, max, base_port;
-+	unsigned long base_mmio, base_port;
- 	unsigned int sparse = 0, space_nr, len;
+diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+index f131ba9..0e5e339 100644
+--- a/drivers/pci/host/Kconfig
++++ b/drivers/pci/host/Kconfig
+@@ -60,6 +60,12 @@ config PCI_HOST_GENERIC
+ 	  Say Y here if you want to support a simple generic PCI host
+ 	  controller, such as the one emulated by kvmtool.
  
- 	len = strlen(info->common.name) + 32;
-@@ -172,12 +172,10 @@ static int add_io_space(struct device *dev, struct pci_root_info *info,
- 		goto free_resource;
- 
- 	name = (char *)(iospace + 1);
--	min = res->start - entry->offset;
--	max = res->end - entry->offset;
--	base = __pa(io_space[space_nr].mmio_base);
-+	base_mmio = __pa(io_space[space_nr].mmio_base);
- 	base_port = IO_SPACE_BASE(space_nr);
- 	snprintf(name, len, "%s I/O Ports %08lx-%08lx", info->common.name,
--		 base_port + min, base_port + max);
-+		 base_port + res->start, base_port + res->end);
- 
- 	/*
- 	 * The SDM guarantees the legacy 0-64K space is sparse, but if the
-@@ -190,19 +188,27 @@ static int add_io_space(struct device *dev, struct pci_root_info *info,
- 	resource = iospace->res;
- 	resource->name  = name;
- 	resource->flags = IORESOURCE_MEM;
--	resource->start = base + (sparse ? IO_SPACE_SPARSE_ENCODING(min) : min);
--	resource->end   = base + (sparse ? IO_SPACE_SPARSE_ENCODING(max) : max);
-+	resource->start = base_mmio;
-+	resource->end = base_mmio;
-+	if (sparse) {
-+		resource->start += IO_SPACE_SPARSE_ENCODING(res->start);
-+		resource->end += IO_SPACE_SPARSE_ENCODING(res->end);
-+	} else {
-+		resource->start += res->start;
-+		resource->end += res->end;
++config PCI_HOST_GENERIC_ACPI
++	bool "Generic ACPI PCI host controller"
++	depends on ACPI && ARCH_PCI_HOST_GENERIC_ACPI
++	help
++	  Say Y here if you want to support generic ACPI PCI host controller.
++
+ config PCIE_SPEAR13XX
+ 	bool "STMicroelectronics SPEAr PCIe controller"
+ 	depends on ARCH_SPEAR13XX
+diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
+index 9d4d3c6..9117894 100644
+--- a/drivers/pci/host/Makefile
++++ b/drivers/pci/host/Makefile
+@@ -7,6 +7,7 @@ obj-$(CONFIG_PCI_TEGRA) += pci-tegra.o
+ obj-$(CONFIG_PCI_RCAR_GEN2) += pci-rcar-gen2.o
+ obj-$(CONFIG_PCI_RCAR_GEN2_PCIE) += pcie-rcar.o
+ obj-$(CONFIG_PCI_HOST_GENERIC) += pci-host-generic.o
++obj-$(CONFIG_PCI_HOST_GENERIC_ACPI) += pci-host-acpi.o
+ obj-$(CONFIG_PCIE_SPEAR13XX) += pcie-spear13xx.o
+ obj-$(CONFIG_PCI_KEYSTONE) += pci-keystone-dw.o pci-keystone.o
+ obj-$(CONFIG_PCIE_XILINX) += pcie-xilinx.o
+diff --git a/drivers/pci/host/pci-host-acpi.c b/drivers/pci/host/pci-host-acpi.c
+new file mode 100644
+index 0000000..29175f5
+--- /dev/null
++++ b/drivers/pci/host/pci-host-acpi.c
+@@ -0,0 +1,138 @@
++/*
++ * ACPI based generic PCI host controller driver
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Copyright (C) 2015 Semihalf
++ * Author: Tomasz Nowicki <tn@semihalf.com>
++ */
++
++#include <linux/acpi.h>
++#include <linux/ecam.h>
++#include <linux/of_address.h>
++#include <linux/pci.h>
++#include <linux/pci-acpi.h>
++
++static int pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
++{
++	if (pci_dev_msi_enabled(dev))
++		return 0;
++
++	return acpi_pci_irq_enable(dev);
++}
++
++int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
++{
++	bridge->map_irq = pcibios_map_irq;
++	return 0;
++}
++
++static void pci_mcfg_release_info(struct acpi_pci_root_info *ci)
++{
++	pci_mmcfg_teardown_map(ci);
++	kfree(ci);
++}
++
++static int pci_acpi_root_prepare_resources(struct acpi_pci_root_info *ci)
++{
++	struct resource_entry *entry, *tmp;
++	int ret;
++
++	ret = acpi_pci_probe_root_resources(ci);
++	if (ret <= 0)
++		return ret;
++
++	resource_list_for_each_entry_safe(entry, tmp, &ci->resources) {
++		struct resource *res = entry->res;
++
++		/*
++		 * TODO: need to move pci_register_io_range() function out
++		 * of drivers/of/address.c for both used by DT and ACPI
++		 */
++		if (res->flags & IORESOURCE_IO) {
++			resource_size_t cpu_addr = res->start + entry->offset;
++			resource_size_t pci_addr = res->start;
++			resource_size_t length = res->end - res->start;
++			unsigned long port;
++			int err;
++
++			err = pci_register_io_range(cpu_addr, length);
++			if (err) {
++				resource_list_destroy_entry(entry);
++				continue;
++			}
++
++			port = pci_address_to_pio(cpu_addr);
++			if (port == (unsigned long)-1) {
++				resource_list_destroy_entry(entry);
++				continue;
++			}
++
++			res->start = port;
++			res->end = port + length;
++			entry->offset = port - pci_addr;
++
++			if (pci_remap_iospace(res, cpu_addr) < 0)
++				resource_list_destroy_entry(entry);
++		}
 +	}
- 	if (insert_resource(&iomem_resource, resource)) {
- 		dev_err(dev,
- 			"can't allocate host bridge io space resource  %pR\n",
- 			resource);
- 		goto free_resource;
- 	}
-+	resource_list_add_tail(iospace, &info->io_resources);
- 
-+	/* Adjust base of original IO port resource descriptor */
- 	entry->offset = base_port;
--	res->start = min + base_port;
--	res->end = max + base_port;
--	resource_list_add_tail(iospace, &info->io_resources);
-+	res->start += base_port;
-+	res->end += base_port;
- 
- 	return 0;
- 
-diff --git a/drivers/acpi/resource.c b/drivers/acpi/resource.c
-index cdc5c25..6578f68 100644
---- a/drivers/acpi/resource.c
-+++ b/drivers/acpi/resource.c
-@@ -190,8 +190,7 @@ static bool acpi_decode_space(struct resource_win *win,
- {
- 	u8 iodec = attr->granularity == 0xfff ? ACPI_DECODE_10 : ACPI_DECODE_16;
- 	bool wp = addr->info.mem.write_protect;
--	u64 len = attr->address_length;
--	u64 start, end, offset = 0;
-+	u64 len = attr->address_length, offset = 0;
- 	struct resource *res = &win->res;
- 
- 	/*
-@@ -215,14 +214,13 @@ static bool acpi_decode_space(struct resource_win *win,
- 	else if (attr->translation_offset)
- 		pr_debug("ACPI: translation_offset(%lld) is invalid for non-bridge device.\n",
- 			 attr->translation_offset);
--	start = attr->minimum + offset;
--	end = attr->maximum + offset;
- 
- 	win->offset = offset;
--	res->start = start;
--	res->end = end;
-+	res->start = attr->minimum;
-+	res->end = attr->maximum;
- 	if (sizeof(resource_size_t) < sizeof(u64) &&
--	    (offset != win->offset || start != res->start || end != res->end)) {
-+	    (offset != win->offset || attr->minimum != res->start ||
-+	     attr->maximum != res->end)) {
- 		pr_warn("acpi resource window ([%#llx-%#llx] ignored, not CPU addressable)\n",
- 			attr->minimum, attr->maximum);
- 		return false;
++
++	return ret;
++}
++
++static struct acpi_pci_root_ops acpi_pci_root_ops = {
++	.init_info = pci_mmcfg_setup_map,
++	.release_info = pci_mcfg_release_info,
++	.prepare_resources = pci_acpi_root_prepare_resources,
++};
++
++/* Root bridge scanning */
++struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
++{
++	int node = acpi_get_node(root->device->handle);
++	int domain = root->segment;
++	int busnum = root->secondary.start;
++	struct acpi_pci_root_info *info;
++	struct pci_bus *bus;
++
++	if (domain && !pci_domains_supported) {
++		pr_warn("PCI %04x:%02x: multiple domains not supported.\n",
++			domain, busnum);
++		return NULL;
++	}
++
++	info = kzalloc_node(sizeof(*info), GFP_KERNEL, node);
++	if (!info) {
++		dev_err(&root->device->dev,
++			"pci_bus %04x:%02x: ignored (out of memory)\n",
++			domain, busnum);
++		return NULL;
++	}
++
++	acpi_pci_root_ops.pci_ops = pci_mcfg_get_ops(domain, busnum);
++	bus = acpi_pci_root_create(root, &acpi_pci_root_ops, info, root);
++
++	/* After the PCI-E bus has been walked and all devices discovered,
++	 * configure any settings of the fabric that might be necessary.
++	 */
++	if (bus) {
++		struct pci_bus *child;
++		pci_bus_size_bridges(bus);
++		pci_bus_assign_resources(bus);
++
++		list_for_each_entry(child, &bus->children, node)
++			pcie_bus_configure_settings(child);
++	}
++
++	return bus;
++}
 -- 
 1.9.1
