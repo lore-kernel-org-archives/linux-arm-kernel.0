@@ -1,52 +1,43 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 16 Dec 2015 20:09:39 +0100
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 16 Dec 2015 20:10:14 +0100
 Subject: [PATCH v3] net/macb: add support for resetting PHY using GPIO
-In-Reply-To: <20151216190431.GB28759@localhost.localdomain> (Richard Cochran's
- message of "Wed, 16 Dec 2015 20:04:31 +0100")
+In-Reply-To: <1450290690-32369-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1450290690-32369-1-git-send-email-gregory.clement@free-electrons.com>
- <20151216190431.GB28759@localhost.localdomain>
-Message-ID: <878u4utdl8.fsf@free-electrons.com>
+Message-ID: <6382531.CWmTLTEYMq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
- 
- On mer., d?c. 16 2015, Richard Cochran <richardcochran@gmail.com> wrote:
+On Wednesday 16 December 2015 19:31:30 Gregory CLEMENT wrote:
+> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+> index 88c1e1a..35661aa 100644
+> --- a/drivers/net/ethernet/cadence/macb.c
+> +++ b/drivers/net/ethernet/cadence/macb.c
+> @@ -28,6 +28,7 @@
+>  #include <linux/phy.h>
+>  #include <linux/of.h>
+>  #include <linux/of_device.h>
+> +#include <linux/of_gpio.h>
+>  #include <linux/of_mdio.h>
+>  #include <linux/of_net.h>
 
-> On Wed, Dec 16, 2015 at 07:31:30PM +0100, Gregory CLEMENT wrote:
->> +Optional properties for PHY child node:
->> +- reset-gpios : Should specify the gpio for phy reset
->
-> reset-gpios plural or reset-gpio singular?
+Is this the patch that is already in linux-next?
 
-The bindings name is plural but it handle only one gpio.
+I needed an additional
 
-See:
-https://lkml.org/lkml/2015/12/9/623
+#include <linux/gpio/consumer.h>
 
->
->> +
->>  Examples:
->>  
->>  	macb0: ethernet at fffc4000 {
->> @@ -29,4 +32,8 @@ Examples:
->>  		local-mac-address = [3a 0e 03 04 05 06];
->>  		clock-names = "pclk", "hclk", "tx_clk";
->>  		clocks = <&clkc 30>, <&clkc 30>, <&clkc 13>;
->> +		ethernet-phy at 1 {
->> +			reg = <0x1>;
->> +			reset-gpios = <&pioE 6 1>;
->
-> Did you mean "gpioE" ?
+to avoid this build error on randconfig builds without GPIOLIB:
 
-No, I really mean pioE: it is the name used for the at91 SoCs.
+    drivers/net/ethernet/cadence/macb.c: In function 'macb_probe':
+    drivers/net/ethernet/cadence/macb.c:2908:19: error: implicit declaration of function 'devm_gpiod_get_optional' [-Werror=implicit-function-declaration]
+      bp->reset_gpio = devm_gpiod_get_optional(&bp->pdev->dev, "phy-reset",
+                       ^
+    drivers/net/ethernet/cadence/macb.c:2909:8: error: 'GPIOD_OUT_HIGH' undeclared (first use in this function)
+            GPIOD_OUT_HIGH);
+            ^
+    drivers/net/ethernet/cadence/macb.c:2909:8: note: each undeclared identifier is reported only once for each function it appears in
+    drivers/net/ethernet/cadence/macb.c: In function 'macb_remove':
+    drivers/net/ethernet/cadence/macb.c:2979:3: error: implicit declaration of function 'gpiod_set_value' [-Werror=implicit-function-declaration]
 
-Thanks,
 
-Gregory
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+	Arnd
