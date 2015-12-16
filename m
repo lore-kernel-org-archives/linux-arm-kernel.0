@@ -1,53 +1,56 @@
-From: dawei.chien@mediatek.com (Dawei Chien)
-Date: Wed, 16 Dec 2015 11:59:14 +0800
-Subject: [PATCH v5 1/3] thermal: mediatek: Add cpu dynamic power cooling model.
-In-Reply-To: <1450238356-36319-1-git-send-email-dawei.chien@mediatek.com>
-References: <1450238356-36319-1-git-send-email-dawei.chien@mediatek.com>
-Message-ID: <1450238356-36319-2-git-send-email-dawei.chien@mediatek.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Wed, 16 Dec 2015 11:57:37 +0800
+Subject: [PATCH v11 17/19] drm: bridge: analogix/dp: expand the look time for
+ waiting AUX CH reply
+In-Reply-To: <1450236018-1118-1-git-send-email-ykk@rock-chips.com>
+References: <1450236018-1118-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1450238257-3274-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MT8173 cpufreq driver select of_cpufreq_power_cooling_register registering
-cooling devices with dynamic power coefficient.
+After test on rockchiop platform, i found sometims driver would failed
+at reading EDID message. After debugging more, i found that it's okay
+to read_a byte from i2c, but it would failed at AUX transcation if we
+try to ready multi-bytes from i2c.
 
-Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
----
-This patch is base on patchset:
-https://lkml.org/lkml/2015/11/17/251
----
- drivers/cpufreq/mt8173-cpufreq.c |   11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+Driver just can't received the AUX CH reply command, even no AUX error
+code. I may guess that the AUX wait time is not enough, so I try to
+expand the AUX wait time, and i do see this could fix the EDID read
+failed at rockchip platform.
 
-diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mt8173-cpufreq.c
-index 83001dc..d00bab5 100644
---- a/drivers/cpufreq/mt8173-cpufreq.c
-+++ b/drivers/cpufreq/mt8173-cpufreq.c
-@@ -263,17 +263,24 @@ static int mtk_cpufreq_set_target(struct cpufreq_policy *policy,
- 	return 0;
- }
- 
-+#define DYNAMIC_POWER "dynamic-power-coefficient"
-+
- static void mtk_cpufreq_ready(struct cpufreq_policy *policy)
- {
- 	struct mtk_cpu_dvfs_info *info = policy->driver_data;
- 	struct device_node *np = of_node_get(info->cpu_dev->of_node);
-+	u32 capacitance = 0;
- 
- 	if (WARN_ON(!np))
- 		return;
- 
- 	if (of_find_property(np, "#cooling-cells", NULL)) {
--		info->cdev = of_cpufreq_cooling_register(np,
--							 policy->related_cpus);
-+		of_property_read_u32(np, DYNAMIC_POWER, &capacitance);
-+
-+		info->cdev = of_cpufreq_power_cooling_register(np,
-+						policy->related_cpus,
-+						capacitance,
-+						NULL);
- 
- 		if (IS_ERR(info->cdev)) {
- 			dev_err(info->cpu_dev,
+And I thought that expand the wait time won't hurt Exynos platform too
+much, cause Exynos didn't have this problem, then driver would received
+the reply command very soon, so no more additional wait time would bring
+to Exynos platform.
+
+Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+---
+Changes in v11: None
+Changes in v10: None
+Changes in v9: None
+Changes in v8: None
+Changes in v7: None
+Changes in v6: None
+Changes in v5: None
+Changes in v4: None
+Changes in v3: None
+Changes in v2: None
+
+ drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+index c7e2959..dc376bd 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+@@ -482,7 +482,7 @@ int analogix_dp_start_aux_transaction(struct analogix_dp_device *dp)
+ 	reg = readl(dp->reg_base + ANALOGIX_DP_INT_STA);
+ 	while (!(reg & RPLY_RECEIV)) {
+ 		timeout_loop++;
+-		if (DP_TIMEOUT_LOOP_COUNT < timeout_loop) {
++		if (DP_TIMEOUT_LOOP_COUNT * 10 < timeout_loop) {
+ 			dev_err(dp->dev, "AUX CH command reply failed!\n");
+ 			return -ETIMEDOUT;
+ 		}
 -- 
-1.7.9.5
+1.9.1
