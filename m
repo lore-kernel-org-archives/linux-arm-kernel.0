@@ -1,76 +1,21 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 16 Dec 2015 09:04:40 +0000
-Subject: [PATCH v7 19/19] KVM: ARM64: Add a new kvm ARM PMU device
-In-Reply-To: <56711B99.1000608@huawei.com>
-References: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
- <1450169379-12336-20-git-send-email-zhaoshenglong@huawei.com>
- <567032AD.8000206@arm.com> <567036DE.80605@linaro.org>
- <567038E3.3010102@arm.com> <20151215204739.GK4120@cbox>
- <56711348.6010406@huawei.com> <56711B99.1000608@huawei.com>
-Message-ID: <56712928.8050409@arm.com>
+From: mika.westerberg@linux.intel.com (Mika Westerberg)
+Date: Wed, 16 Dec 2015 11:04:54 +0200
+Subject: [PATCH v2 0/2] i2c:dw: Add APM X-Gene ACPI I2C device support
+In-Reply-To: <CAPw-ZT=TcvneyS69GjWe8sFR2hBTpHUUabu8Y5Feup89MwQWQQ@mail.gmail.com>
+References: <1449782357-22982-1-git-send-email-lho@apm.com>
+ <566F6485.2000508@amd.com>
+ <20151215132721.GJ1762@lahna.fi.intel.com>
+ <56702923.9010305@amd.com>
+ <20151215145953.GK1762@lahna.fi.intel.com>
+ <CAPw-ZT=TcvneyS69GjWe8sFR2hBTpHUUabu8Y5Feup89MwQWQQ@mail.gmail.com>
+Message-ID: <20151216090454.GL1762@lahna.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/12/15 08:06, Shannon Zhao wrote:
-> Hi,
-> 
-> On 2015/12/16 15:31, Shannon Zhao wrote:
->>>>>>>> But in this case, you're returning an error if it is *not* initialized.
->>>>>>>> I understand that in that case you cannot return an interrupt number (-1
->>>>>>>> would be weird), but returning -EBUSY feels even more weird.
->>>>>>>>
->>>>>>>> I'd settle for -ENOXIO, or something similar. Anyone having a better idea?
->>>>>>>>
->>>> ENXIO or ENODEV would be my choice too, and add that to the
->>>> Documentation clearly describing when this error code is used.
->>>>
->>>> By the way, why do you loop over all VCPUS to set the same value when
->>>> you can't do anything per VCPU anyway?  It seems to me it's either a
->>>> per-VM property (that you can store on the VM data structure) or it's a
->>>> true per-VCPU property?
->> This is a per-VCPU property. PMU interrupt could be PPI or SPI. For PPI
->> the interrupt numbers are same for each vcpu, while for SPI they are
->> different, so it needs to set them separately. I planned to support both
->> PPI and SPI. I think I should add support for SPI at this moment and let
->> users (QEMU) to set these interrupts for each one.
-> 
-> How about below vPMU Documentation?
-> 
-> ARM Virtual Performance Monitor Unit (vPMU)
-> ===========================================
-> 
-> Device types supported:
->   KVM_DEV_TYPE_ARM_PMU_V3         ARM Performance Monitor Unit v3
-> 
-> Instantiate one PMU instance for per VCPU through this API.
-> 
-> Groups:
->   KVM_DEV_ARM_PMU_GRP_IRQ
->   Attributes:
->     The attr field of kvm_device_attr encodes two values:
->     bits:     | 63 .... 32 | 31 .... 0 |
->     values:   | vcpu_index |  irq_num  |
->     The irq_num describes the PMU overflow interrupt number for the
-> specified
->     vcpu_index vcpu. This interrupt could be a PPI or SPI, but for one
-> VM the
->     interrupt type must be same for each vcpu.
-> 
->   Errors:
->     -ENXIO: Getting or setting this attribute is not yet supported
->     -ENODEV: Getting the PMU overflow interrupt number while it's not set
->     -EBUSY: The PMU overflow interrupt is already set
->     -EINVAL: Invalid vcpu_index or irq_num supplied
-> 
-> 
+On Tue, Dec 15, 2015 at 11:20:03AM -0800, Loc Ho wrote:
+> Can we not just add an AML method that will return the operation clock
+> frequency that the I2C driver can use? If the method doesn't existed,
+> we will just bail and do nothing or assume what ever default behavior?
 
-Let's add at least one comment that forbids two vcpus from getting the
-same SPI. This is too common a mistake that we see in actual SoCs, and I
-don't want to see it replicated in VMs...
-
-Thanks,
-
-	M.
-
--- 
-Jazz is not dead. It just smells funny...
+Why would you add yet another method? There already are existing ACPI
+*CNT methods that you can use, and are used in systems out there.
