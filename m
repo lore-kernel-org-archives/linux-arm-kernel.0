@@ -1,171 +1,191 @@
 From: mark.yao@rock-chips.com (Mark Yao)
-Date: Thu, 17 Dec 2015 11:37:04 +0800
-Subject: [PATCH 4/6] drm/rockchip: vop: spilt scale regsters
+Date: Thu, 17 Dec 2015 11:37:02 +0800
+Subject: [PATCH 2/6] drm/rockchip: vop: move interrupt registers into vop_data
 In-Reply-To: <1450323426-32109-1-git-send-email-mark.yao@rock-chips.com>
 References: <1450323426-32109-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <1450323426-32109-5-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <1450323426-32109-3-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are two version scale control register found on vop,
-scale full version found on rk3288, support extension registers.
-and scale little version found on rk3036, only support common scale.
+Move interrupt registers into vop_data, so it can use at multi-vop driver
 
 Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
 ---
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c |   46 ++++++++++++++++++---------
- drivers/gpu/drm/rockchip/rockchip_drm_vop.h |   14 ++++++--
- drivers/gpu/drm/rockchip/rockchip_vop_reg.c |    5 ++-
- 3 files changed, 47 insertions(+), 18 deletions(-)
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c |   81 +++++++++++++++++++++++----
+ 1 file changed, 69 insertions(+), 12 deletions(-)
 
 diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index bbb781c..d83bf87 100644
+index dcb1396..7674bdc 100644
 --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
 +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -50,6 +50,8 @@
+@@ -48,6 +48,8 @@
+ 
+ #define REG_SET(x, base, reg, v, mode) \
+ 		__REG_SET_##mode(x, base + reg.offset, reg.mask, reg.shift, v)
++#define REG_SET_MASK(x, base, reg, v, mode) \
++		__REG_SET_##mode(x, base + reg.offset, reg.mask, reg.shift, v)
+ 
+ #define VOP_WIN_SET(x, win, name, v) \
  		REG_SET(x, win->base, win->phy->name, v, RELAXED)
- #define VOP_SCL_SET(x, win, name, v) \
- 		REG_SET(x, win->base, win->phy->scl->name, v, RELAXED)
-+#define VOP_SCL_SET_EXT(x, win, name, v) \
-+		REG_SET(x, win->base, win->phy->scl->ext->name, v, RELAXED)
+@@ -56,6 +58,23 @@
  #define VOP_CTRL_SET(x, name, v) \
  		REG_SET(x, 0, (x)->data->ctrl->name, v, NORMAL)
  
-@@ -313,6 +315,20 @@ static void scl_vop_cal_scl_fac(struct vop *vop, const struct vop_win_data *win,
- 		return;
- 	}
- 
-+	if (!win->phy->scl->ext) {
-+		VOP_SCL_SET(vop, win, scale_yrgb_x,
-+			    scl_cal_scale2(src_w, dst_w));
-+		VOP_SCL_SET(vop, win, scale_yrgb_y,
-+			    scl_cal_scale2(src_h, dst_h));
-+		if (is_yuv) {
-+			VOP_SCL_SET(vop, win, scale_cbcr_x,
-+				    scl_cal_scale2(src_w, dst_w));
-+			VOP_SCL_SET(vop, win, scale_cbcr_y,
-+				    scl_cal_scale2(src_h, dst_h));
-+		}
-+		return;
-+	}
++#define VOP_INTR_GET(vop, name) \
++		vop_read_reg(vop, 0, &vop->data->ctrl->name)
 +
- 	yrgb_hor_scl_mode = scl_get_scl_mode(src_w, dst_w);
- 	yrgb_ver_scl_mode = scl_get_scl_mode(src_h, dst_h);
++#define VOP_INTR_SET(vop, name, v) \
++		REG_SET(vop, 0, vop->data->intr->name, v, NORMAL)
++#define VOP_INTR_SET_TYPE(vop, name, type, v) \
++	do { \
++		int i, reg = 0; \
++		for (i = 0; i < vop->data->intr->nintrs; i++) { \
++			if (vop->data->intr->intrs[i] & type) \
++				reg |= (v) << i; \
++		} \
++		VOP_INTR_SET(vop, name, reg); \
++	} while (0)
++#define VOP_INTR_GET_TYPE(vop, name, type) \
++		vop_get_intr_type(vop, &vop->data->intr->name, type)
++
+ #define VOP_WIN_GET(x, win, name) \
+ 		vop_read_reg(x, win->base, &win->phy->name)
  
-@@ -330,7 +346,7 @@ static void scl_vop_cal_scl_fac(struct vop *vop, const struct vop_win_data *win,
- 			lb_mode = scl_vop_cal_lb_mode(src_w, false);
- 	}
- 
--	VOP_SCL_SET(vop, win, lb_mode, lb_mode);
-+	VOP_SCL_SET_EXT(vop, win, lb_mode, lb_mode);
- 	if (lb_mode == LB_RGB_3840X2) {
- 		if (yrgb_ver_scl_mode != SCALE_NONE) {
- 			DRM_ERROR("ERROR : not allow yrgb ver scale\n");
-@@ -354,14 +370,14 @@ static void scl_vop_cal_scl_fac(struct vop *vop, const struct vop_win_data *win,
- 				false, vsu_mode, &vskiplines);
- 	VOP_SCL_SET(vop, win, scale_yrgb_y, val);
- 
--	VOP_SCL_SET(vop, win, vsd_yrgb_gt4, vskiplines == 4);
--	VOP_SCL_SET(vop, win, vsd_yrgb_gt2, vskiplines == 2);
-+	VOP_SCL_SET_EXT(vop, win, vsd_yrgb_gt4, vskiplines == 4);
-+	VOP_SCL_SET_EXT(vop, win, vsd_yrgb_gt2, vskiplines == 2);
- 
--	VOP_SCL_SET(vop, win, yrgb_hor_scl_mode, yrgb_hor_scl_mode);
--	VOP_SCL_SET(vop, win, yrgb_ver_scl_mode, yrgb_ver_scl_mode);
--	VOP_SCL_SET(vop, win, yrgb_hsd_mode, SCALE_DOWN_BIL);
--	VOP_SCL_SET(vop, win, yrgb_vsd_mode, SCALE_DOWN_BIL);
--	VOP_SCL_SET(vop, win, yrgb_vsu_mode, vsu_mode);
-+	VOP_SCL_SET_EXT(vop, win, yrgb_hor_scl_mode, yrgb_hor_scl_mode);
-+	VOP_SCL_SET_EXT(vop, win, yrgb_ver_scl_mode, yrgb_ver_scl_mode);
-+	VOP_SCL_SET_EXT(vop, win, yrgb_hsd_mode, SCALE_DOWN_BIL);
-+	VOP_SCL_SET_EXT(vop, win, yrgb_vsd_mode, SCALE_DOWN_BIL);
-+	VOP_SCL_SET_EXT(vop, win, yrgb_vsu_mode, vsu_mode);
- 	if (is_yuv) {
- 		val = scl_vop_cal_scale(cbcr_hor_scl_mode, cbcr_src_w,
- 					dst_w, true, 0, NULL);
-@@ -370,13 +386,13 @@ static void scl_vop_cal_scl_fac(struct vop *vop, const struct vop_win_data *win,
- 					dst_h, false, vsu_mode, &vskiplines);
- 		VOP_SCL_SET(vop, win, scale_cbcr_y, val);
- 
--		VOP_SCL_SET(vop, win, vsd_cbcr_gt4, vskiplines == 4);
--		VOP_SCL_SET(vop, win, vsd_cbcr_gt2, vskiplines == 2);
--		VOP_SCL_SET(vop, win, cbcr_hor_scl_mode, cbcr_hor_scl_mode);
--		VOP_SCL_SET(vop, win, cbcr_ver_scl_mode, cbcr_ver_scl_mode);
--		VOP_SCL_SET(vop, win, cbcr_hsd_mode, SCALE_DOWN_BIL);
--		VOP_SCL_SET(vop, win, cbcr_vsd_mode, SCALE_DOWN_BIL);
--		VOP_SCL_SET(vop, win, cbcr_vsu_mode, vsu_mode);
-+		VOP_SCL_SET_EXT(vop, win, vsd_cbcr_gt4, vskiplines == 4);
-+		VOP_SCL_SET_EXT(vop, win, vsd_cbcr_gt2, vskiplines == 2);
-+		VOP_SCL_SET_EXT(vop, win, cbcr_hor_scl_mode, cbcr_hor_scl_mode);
-+		VOP_SCL_SET_EXT(vop, win, cbcr_ver_scl_mode, cbcr_ver_scl_mode);
-+		VOP_SCL_SET_EXT(vop, win, cbcr_hsd_mode, SCALE_DOWN_BIL);
-+		VOP_SCL_SET_EXT(vop, win, cbcr_vsd_mode, SCALE_DOWN_BIL);
-+		VOP_SCL_SET_EXT(vop, win, cbcr_vsu_mode, vsu_mode);
- 	}
- }
- 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-index cbb114a..9a44153 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-@@ -66,7 +66,8 @@ struct vop_intr {
- 	struct vop_reg clear;
- 	struct vop_reg status;
+@@ -168,6 +187,13 @@ struct vop_ctrl {
+ 	struct vop_reg cfg_done;
  };
--struct vop_scl_regs {
-+
-+struct vop_scl_extension {
+ 
++struct vop_intr {
++	const int *intrs;
++	uint32_t nintrs;
++	struct vop_reg enable;
++	struct vop_reg clear;
++	struct vop_reg status;
++};
+ struct vop_scl_regs {
  	struct vop_reg cbcr_vsd_mode;
  	struct vop_reg cbcr_vsu_mode;
- 	struct vop_reg cbcr_hsd_mode;
-@@ -87,8 +88,12 @@ struct vop_scl_regs {
- 	struct vop_reg bic_coe_sel;
- 	struct vop_reg cbcr_axi_gather_en;
- 	struct vop_reg yrgb_axi_gather_en;
--
- 	struct vop_reg lb_mode;
-+};
-+
-+struct vop_scl_regs {
-+	const struct vop_scl_extension *ext;
-+
- 	struct vop_reg scale_yrgb_x;
- 	struct vop_reg scale_yrgb_y;
- 	struct vop_reg scale_cbcr_x;
-@@ -242,6 +247,11 @@ static inline uint16_t scl_cal_scale(int src, int dst, int shift)
- 	return ((src * 2 - 3) << (shift - 1)) / (dst - 1);
- }
- 
-+static inline uint16_t scl_cal_scale2(int src, int dst)
-+{
-+	return (src - 1) << 12 / (dst - 1);
-+}
-+
- #define GET_SCL_FT_BILI_DN(src, dst)	scl_cal_scale(src, dst, 12)
- #define GET_SCL_FT_BILI_UP(src, dst)	scl_cal_scale(src, dst, 16)
- #define GET_SCL_FT_BIC(src, dst)	scl_cal_scale(src, dst, 16)
-diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-index d47bfc3..6495114 100644
---- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-@@ -50,7 +50,7 @@ static const uint32_t formats_234[] = {
- 	DRM_FORMAT_BGR565,
+@@ -227,6 +253,7 @@ struct vop_data {
+ 	const struct vop_reg_data *init_table;
+ 	unsigned int table_size;
+ 	const struct vop_ctrl *ctrl;
++	const struct vop_intr *intr;
+ 	const struct vop_win_data *win;
+ 	unsigned int win_size;
+ };
+@@ -364,8 +391,24 @@ static const struct vop_win_data rk3288_vop_win_data[] = {
+ 	{ .base = 0x50, .phy = &win23_data, .type = DRM_PLANE_TYPE_CURSOR },
  };
  
--static const struct vop_scl_regs win_full_scl = {
-+static const struct vop_scl_extension win_full_ext = {
- 	.cbcr_vsd_mode = VOP_REG(WIN0_CTRL1, 0x1, 31),
- 	.cbcr_vsu_mode = VOP_REG(WIN0_CTRL1, 0x1, 30),
- 	.cbcr_hsd_mode = VOP_REG(WIN0_CTRL1, 0x3, 28),
-@@ -72,6 +72,9 @@ static const struct vop_scl_regs win_full_scl = {
- 	.cbcr_axi_gather_en = VOP_REG(WIN0_CTRL1, 0x1, 1),
- 	.yrgb_axi_gather_en = VOP_REG(WIN0_CTRL1, 0x1, 0),
- 	.lb_mode = VOP_REG(WIN0_CTRL0, 0x7, 5),
++static const int rk3288_vop_intrs[] = {
++	DSP_HOLD_VALID_INTR,
++	FS_INTR,
++	LINE_FLAG_INTR,
++	BUS_ERROR_INTR,
 +};
 +
-+static const struct vop_scl_regs win_full_scl = {
- 	.scale_yrgb_x = VOP_REG(WIN0_SCL_FACTOR_YRGB, 0xffff, 0x0),
- 	.scale_yrgb_y = VOP_REG(WIN0_SCL_FACTOR_YRGB, 0xffff, 16),
- 	.scale_cbcr_x = VOP_REG(WIN0_SCL_FACTOR_CBR, 0xffff, 0x0),
++static const struct vop_intr rk3288_vop_intr = {
++	.intrs = rk3288_vop_intrs,
++	.nintrs = ARRAY_SIZE(rk3288_vop_intrs),
++	.status = VOP_REG(INTR_CTRL0, 0xf, 0),
++	.enable = VOP_REG(INTR_CTRL0, 0xf, 4),
++	.clear = VOP_REG(INTR_CTRL0, 0xf, 8),
++};
++
+ static const struct vop_data rk3288_vop = {
+ 	.init_table = vop_init_reg_table,
++	.intr = &rk3288_vop_intr,
+ 	.table_size = ARRAY_SIZE(vop_init_reg_table),
+ 	.ctrl = &ctrl_data,
+ 	.win = rk3288_vop_win_data,
+@@ -420,6 +463,20 @@ static inline void vop_mask_write_relaxed(struct vop *vop, uint32_t offset,
+ 	}
+ }
+ 
++static inline uint32_t vop_get_intr_type(struct vop *vop,
++					 const struct vop_reg *reg, int type)
++{
++	uint32_t i, ret = 0;
++	uint32_t regs = vop_read_reg(vop, 0, reg);
++
++	for (i = 0; i < vop->data->intr->nintrs; i++) {
++		if ((type & vop->data->intr->intrs[i]) && (regs & 1 << i))
++			ret |= vop->data->intr->intrs[i];
++	}
++
++	return ret;
++}
++
+ static inline void vop_cfg_done(struct vop *vop)
+ {
+ 	VOP_CTRL_SET(vop, cfg_done, 1);
+@@ -616,8 +673,7 @@ static void vop_dsp_hold_valid_irq_enable(struct vop *vop)
+ 
+ 	spin_lock_irqsave(&vop->irq_lock, flags);
+ 
+-	vop_mask_write(vop, INTR_CTRL0, DSP_HOLD_VALID_INTR_MASK,
+-		       DSP_HOLD_VALID_INTR_EN(1));
++	VOP_INTR_SET_TYPE(vop, enable, DSP_HOLD_VALID_INTR, 1);
+ 
+ 	spin_unlock_irqrestore(&vop->irq_lock, flags);
+ }
+@@ -631,8 +687,7 @@ static void vop_dsp_hold_valid_irq_disable(struct vop *vop)
+ 
+ 	spin_lock_irqsave(&vop->irq_lock, flags);
+ 
+-	vop_mask_write(vop, INTR_CTRL0, DSP_HOLD_VALID_INTR_MASK,
+-		       DSP_HOLD_VALID_INTR_EN(0));
++	VOP_INTR_SET_TYPE(vop, enable, DSP_HOLD_VALID_INTR, 0);
+ 
+ 	spin_unlock_irqrestore(&vop->irq_lock, flags);
+ }
+@@ -1051,7 +1106,7 @@ static int vop_crtc_enable_vblank(struct drm_crtc *crtc)
+ 
+ 	spin_lock_irqsave(&vop->irq_lock, flags);
+ 
+-	vop_mask_write(vop, INTR_CTRL0, FS_INTR_MASK, FS_INTR_EN(1));
++	VOP_INTR_SET_TYPE(vop, enable, FS_INTR, 1);
+ 
+ 	spin_unlock_irqrestore(&vop->irq_lock, flags);
+ 
+@@ -1067,7 +1122,9 @@ static void vop_crtc_disable_vblank(struct drm_crtc *crtc)
+ 		return;
+ 
+ 	spin_lock_irqsave(&vop->irq_lock, flags);
+-	vop_mask_write(vop, INTR_CTRL0, FS_INTR_MASK, FS_INTR_EN(0));
++
++	VOP_INTR_SET_TYPE(vop, enable, FS_INTR, 0);
++
+ 	spin_unlock_irqrestore(&vop->irq_lock, flags);
+ }
+ 
+@@ -1263,21 +1320,21 @@ static irqreturn_t vop_isr(int irq, void *data)
+ {
+ 	struct vop *vop = data;
+ 	struct drm_crtc *crtc = &vop->crtc;
+-	uint32_t intr0_reg, active_irqs;
++	uint32_t active_irqs;
+ 	unsigned long flags;
+ 	int ret = IRQ_NONE;
+ 
+ 	/*
+-	 * INTR_CTRL0 register has interrupt status, enable and clear bits, we
++	 * interrupt register has interrupt status, enable and clear bits, we
+ 	 * must hold irq_lock to avoid a race with enable/disable_vblank().
+ 	*/
+ 	spin_lock_irqsave(&vop->irq_lock, flags);
+-	intr0_reg = vop_readl(vop, INTR_CTRL0);
+-	active_irqs = intr0_reg & INTR_MASK;
++
++	active_irqs = VOP_INTR_GET_TYPE(vop, status, INTR_MASK);
+ 	/* Clear all active interrupt sources */
+ 	if (active_irqs)
+-		vop_writel(vop, INTR_CTRL0,
+-			   intr0_reg | (active_irqs << INTR_CLR_SHIFT));
++		VOP_INTR_SET_TYPE(vop, clear, active_irqs, 1);
++
+ 	spin_unlock_irqrestore(&vop->irq_lock, flags);
+ 
+ 	/* This is expected for vop iommu irqs, since the irq is shared */
 -- 
 1.7.9.5
