@@ -1,65 +1,112 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 18 Dec 2015 00:27:12 +0100
-Subject: [PATCH V2] ARM: socfpga: Add support for DENX MCV SoM and MCVEVK
- baseboard
-In-Reply-To: <CADhT+wfuMAdTuGoY1EqDqACkhabVV5Z0qZTLDd3rx_EdqhiKtA@mail.gmail.com>
-References: <1447921918-14486-1-git-send-email-marex@denx.de>
- <CADhT+wfuMAdTuGoY1EqDqACkhabVV5Z0qZTLDd3rx_EdqhiKtA@mail.gmail.com>
-Message-ID: <201512180027.12912.marex@denx.de>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 18 Dec 2015 00:28:27 +0100
+Subject: [PATCH v1 1/6] ARM: dts: fix the correct pinctrl control for
+ rk3036
+In-Reply-To: <1450362112-8075-2-git-send-email-wxt@rock-chips.com>
+References: <1450362112-8075-1-git-send-email-wxt@rock-chips.com>
+ <1450362112-8075-2-git-send-email-wxt@rock-chips.com>
+Message-ID: <1838222.r8GKl7OzB9@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, November 19, 2015 at 05:27:44 PM, Dinh Nguyen wrote:
-> Hi Marek,
+Am Donnerstag, 17. Dezember 2015, 22:21:47 schrieb Caesar Wang:
+> The pinctrl gpio pull up/down is incorrect since the rk3036 SoCs
+> can't set the status in the internal.
 > 
-> On Thu, Nov 19, 2015 at 2:31 AM, Marek Vasut <marex@denx.de> wrote:
-> > Add support for the DENX MCV SoM and MCVEVK baseboard. The SoM contains
-> > eMMC, DRAM, Altera Cyclone V SoC. The baseboard contains CAN ports, UART
-> > ports, STMPE811 touchscreen controller, USB OTG port, ethernet port and
-> > a lot of IO pins.
-> > 
-> > Signed-off-by: Marek Vasut <marex@denx.de>
-> > Cc: Vince Bridgers <vbridgers2013@gmail.com>
-> > Cc: Alan Tull <atull@altera.com>
-> > Cc: Thor Thayer <tthayer@altera.com>
-> > Cc: Dinh Nguyen <dinguyen@altear.com>
-> > Cc: Olof Johansson <olof@lixom.net>
-> > ---
-> > 
-> >  arch/arm/boot/dts/Makefile                    |  1 +
-> >  arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi   | 33 ++++++++++
-> >  arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts | 94
-> >  +++++++++++++++++++++++++++ 3 files changed, 128 insertions(+)
-> >  create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi
-> >  create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts
-> > 
-> > V2: Sort the DT nodes alphabetically.
-> > 
-> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> > index 7d3e495..8f322be 100644
-> > --- a/arch/arm/boot/dts/Makefile
-> > +++ b/arch/arm/boot/dts/Makefile
-> > @@ -555,6 +555,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += \
-> > 
-> >  dtb-$(CONFIG_ARCH_SOCFPGA) += \
-> >  
-> >         socfpga_arria5_socdk.dtb \
-> >         socfpga_arria10_socdk_sdmmc.dtb \
-> > 
-> > +       socfpga_cyclone5_mcvevk.dtb \
-> > 
-> >         socfpga_cyclone5_socdk.dtb \
-> >         socfpga_cyclone5_de0_sockit.dtb \
-> >         socfpga_cyclone5_sockit.dtb \
+> We should keep the default status for enable the gpio status,
+> In fact, the pull_none is the disable the gpio pull up/down.
 > 
-> I've applied this to my tree.
+> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 
-Hi,
+>From the signed-off-by's I guess this change was created by Xing (author), 
+right?
 
-I just found this in linux-next, but all the tabs in the original patch
-submission are replaced with spaces in the DTS files. What happened ?
 
-Thanks
+Heiko
 
-Best regards,
-Marek Vasut
+> ---
+> 
+>  arch/arm/boot/dts/rk3036.dtsi | 34 +++++++++++++++-------------------
+>  1 file changed, 15 insertions(+), 19 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
+> index f8758bf..620e6e0 100644
+> --- a/arch/arm/boot/dts/rk3036.dtsi
+> +++ b/arch/arm/boot/dts/rk3036.dtsi
+> @@ -427,12 +427,8 @@
+>  			#interrupt-cells = <2>;
+>  		};
+> 
+> -		pcfg_pull_up: pcfg-pull-up {
+> -			bias-pull-up;
+> -		};
+> -
+> -		pcfg_pull_down: pcfg-pull-down {
+> -			bias-pull-down;
+> +		pcfg_pull_default: pcfg_pull_default {
+> +			bias-pull-pin-default;
+>  		};
+> 
+>  		pcfg_pull_none: pcfg-pull-none {
+> @@ -473,18 +469,18 @@
+>  			};
+> 
+>  			emmc_cmd: emmc-cmd {
+> -				rockchip,pins = <2 1 RK_FUNC_2 &pcfg_pull_none>;
+> +				rockchip,pins = <2 1 RK_FUNC_2 &pcfg_pull_default>;
+>  			};
+> 
+>  			emmc_bus8: emmc-bus8 {
+> -				rockchip,pins = <1 24 RK_FUNC_2 &pcfg_pull_none>,
+> -						<1 25 RK_FUNC_2 &pcfg_pull_none>,
+> -						<1 26 RK_FUNC_2 &pcfg_pull_none>,
+> -						<1 27 RK_FUNC_2 &pcfg_pull_none>,
+> -						<1 28 RK_FUNC_2 &pcfg_pull_none>,
+> -						<1 29 RK_FUNC_2 &pcfg_pull_none>,
+> -						<1 30 RK_FUNC_2 &pcfg_pull_none>,
+> -						<1 31 RK_FUNC_2 &pcfg_pull_none>;
+> +				rockchip,pins = <1 24 RK_FUNC_2 &pcfg_pull_default>,
+> +						<1 25 RK_FUNC_2 &pcfg_pull_default>,
+> +						<1 26 RK_FUNC_2 &pcfg_pull_default>,
+> +						<1 27 RK_FUNC_2 &pcfg_pull_default>,
+> +						<1 28 RK_FUNC_2 &pcfg_pull_default>,
+> +						<1 29 RK_FUNC_2 &pcfg_pull_default>,
+> +						<1 30 RK_FUNC_2 &pcfg_pull_default>,
+> +						<1 31 RK_FUNC_2 &pcfg_pull_default>;
+>  			};
+>  		};
+> 
+> @@ -522,12 +518,12 @@
+> 
+>  		uart0 {
+>  			uart0_xfer: uart0-xfer {
+> -				rockchip,pins = <0 16 RK_FUNC_1 &pcfg_pull_up>,
+> +				rockchip,pins = <0 16 RK_FUNC_1 &pcfg_pull_default>,
+>  						<0 17 RK_FUNC_1 &pcfg_pull_none>;
+>  			};
+> 
+>  			uart0_cts: uart0-cts {
+> -				rockchip,pins = <0 18 RK_FUNC_1 &pcfg_pull_up>;
+> +				rockchip,pins = <0 18 RK_FUNC_1 &pcfg_pull_default>;
+>  			};
+> 
+>  			uart0_rts: uart0-rts {
+> @@ -537,7 +533,7 @@
+> 
+>  		uart1 {
+>  			uart1_xfer: uart1-xfer {
+> -				rockchip,pins = <2 22 RK_FUNC_1 &pcfg_pull_none>,
+> +				rockchip,pins = <2 22 RK_FUNC_1 &pcfg_pull_default>,
+>  						<2 23 RK_FUNC_1 &pcfg_pull_none>;
+>  			};
+>  			/* no rts / cts for uart1 */
+> @@ -545,7 +541,7 @@
+> 
+>  		uart2 {
+>  			uart2_xfer: uart2-xfer {
+> -				rockchip,pins = <1 18 RK_FUNC_2 &pcfg_pull_none>,
+> +				rockchip,pins = <1 18 RK_FUNC_2 &pcfg_pull_default>,
+>  						<1 19 RK_FUNC_2 &pcfg_pull_none>;
+>  			};
+>  			/* no rts / cts for uart2 */
