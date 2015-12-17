@@ -1,72 +1,111 @@
-From: pinskia@gmail.com (Andrew Pinski)
-Date: Thu, 17 Dec 2015 12:14:20 -0800
-Subject: [PATCH v6 12/20] arm64:ilp32: add sys_ilp32.c and a separate
- table (in entry.S) to use it
-In-Reply-To: <2105480.kqDuemge8n@wuerfel>
-References: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
- <1450215766-14765-13-git-send-email-ynorov@caviumnetworks.com>
- <20151217182753.GF25232@e104818-lin.cambridge.arm.com>
- <2105480.kqDuemge8n@wuerfel>
-Message-ID: <CA+=Sn1ktUCa_8MzMvZtQhE+fUNY5-V9JXTLXKDDe8a0iENgd=w@mail.gmail.com>
+From: dianders@chromium.org (Douglas Anderson)
+Date: Thu, 17 Dec 2015 12:30:53 -0800
+Subject: [PATCH] ARM: dma-mapping: Just allocate one chunk at a time
+Message-ID: <1450384253-1067-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 17, 2015 at 12:10 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 17 December 2015 18:27:53 Catalin Marinas wrote:
->> On Wed, Dec 16, 2015 at 12:42:38AM +0300, Yury Norov wrote:
->
->> > +#define compat_sys_lookup_dcookie      sys_lookup_dcookie
->> > +#define compat_sys_pread64             sys_pread64
->> > +#define compat_sys_pwrite64            sys_pwrite64
->> > +#define compat_sys_readahead           sys_readahead
->> > +#define compat_sys_shmat               sys_shmat
->>
->> I wonder whether we need wrappers (actually, not only for these but
->> sys_read etc.). These functions take either a pointer or a size_t
->> argument which are 32-bit with ILP32 but treated as 64-bit by an LP64
->> kernel. Can we guarantee that user space zeros the top 32-bit of the
->> arguments passed here?
->
-> I'm pretty sure that is safe. I haven't read the calling conventions
-> specification for arm64 ilp32, but usually all function arguments are
-> passed as 64-bit registers with proper sign-extend or zero-extend.
+The __iommu_alloc_buffer() is expected to be called to allocate pretty
+sizeable buffers.  Upon simple tests of video I saw it trying to
+allocate 4,194,304 bytes.  The function tries to be efficient about this
+by starting out allocating large chunks and then moving to smaller and
+smaller chunk sizes until it succeeds.
 
-Well (just like LP64 on AARCH64), when passing a 32bit value to a
-function, the upper 32bits are undefined.  I ran into this when I was
-debugging the GCC go library on ILP32 (though reproduced with pure C
-code) and the assembly functions inside glibc where pointers are
-passed with the upper 32bits as undefined.
-So we have an issue if called with syscall function or using pure
-assembly to create the syscall functions (which glibc does).
+The current function is very, very slow.
 
-Thanks,
-Andrew
+One problem is the way it keeps trying and trying to allocate big
+chunks.  Imagine a very fragmented memory that has 4M free but no
+contiguous pages at all.  Further imagine allocating 4M (1024 pages).
+We'll do the following memory allocations:
+- For page 1:
+  - Try to allocate order 10 (no retry)
+  - Try to allocate order 9 (no retry)
+  - ...
+  - Try to allocate order 0 (with retry, but not needed)
+- For page 2:
+  - Try to allocate order 9 (no retry)
+  - Try to allocate order 8 (no retry)
+  - ...
+  - Try to allocate order 0 (with retry, but not needed)
+- ...
+- ...
 
->
-> Most other syscalls rely on this behavior too, not just the ones that
-> are being modified here.
->
->> With compat/AArch32, this is guaranteed by the kernel since EL0 won't be
->> able to touch the top part but here I'm not entirely sure. As long as
->> user space used Wn registers for 32-bit types, we are probably fine (the
->> architecture guarantees the top 32-bit zeroing following a MOV, LDR etc.
->> instruction into a Wn register). We just need to mention this in the ABI
->> document (ilp32.txt).
->
-> I think the aarch32 case is actually the hard one, because it has to
-> worry about explicitly sign-extending 32-bit arguments (signed int or
-> signed long) that might be negative, e.g. user space passes -1
-> as 0xffffffff, which the kernel entry turns into 0x00000000ffffffff
-> when it should use 0xffffffffffffffff. The COMPAT_SYSCALL_DEFINEx
-> macros take care of this.
->
->> > +
->> > +#define compat_sys_open_by_handle_at   sys_open_by_handle_at
->> > +#define compat_sys_openat              sys_openat
->>
->> So using sys_openat() forces O_LARGEFILE and we don't have a problem
->> with (f)truncate. We may have an issue with AArch32 compat though.
->
-> aarch32 uses the correct compat functions in asm/unistd32.h
->
->         Arnd
+Total number of calls to alloc() calls for this case is:
+  sum(int(math.log(i, 2)) + 1 for i in range(1, 1025))
+  => 9228
+
+The above is obviously worse case, but given how slow alloc can be we
+really want to try to avoid even somewhat bad cases.  I timed the old
+code with a device under memory pressure and it wasn't hard to see it
+take more than 24 seconds to allocate 4 megs of memory (!!).
+
+A second problem (and maybe even more important) is that allocating big
+chunks when we don't need them is just not a good idea anyway.  The
+first thing we do with these big chunks is break them into smaller
+chunks!  If we allocate small chunks:
+- The memory manager doesn't need to work so hard to give us big chunks.
+- We can save the big chunks for those that really need them and this
+  code can make great use of all the small chunks sitting around.
+
+Let's simplify by just allocating one page at a time.  We may make more
+total allocate calls but it works way better.  In real world tests that
+used to sometimes see a 24 second allocation call I can now see at most
+250 ms.
+
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
+---
+ arch/arm/mm/dma-mapping.c | 38 ++++++--------------------------------
+ 1 file changed, 6 insertions(+), 32 deletions(-)
+
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 492bf3efffab..7efeb2d4801b 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -1160,39 +1160,13 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
+ 	gfp |= __GFP_NOWARN | __GFP_HIGHMEM;
+ 
+ 	while (count) {
+-		int j, order;
+-
+-		for (order = __fls(count); order > 0; --order) {
+-			/*
+-			 * We do not want OOM killer to be invoked as long
+-			 * as we can fall back to single pages, so we force
+-			 * __GFP_NORETRY for orders higher than zero.
+-			 */
+-			pages[i] = alloc_pages(gfp | __GFP_NORETRY, order);
+-			if (pages[i])
+-				break;
+-		}
+-
+-		if (!pages[i]) {
+-			/*
+-			 * Fall back to single page allocation.
+-			 * Might invoke OOM killer as last resort.
+-			 */
+-			pages[i] = alloc_pages(gfp, 0);
+-			if (!pages[i])
+-				goto error;
+-		}
+-
+-		if (order) {
+-			split_page(pages[i], order);
+-			j = 1 << order;
+-			while (--j)
+-				pages[i + j] = pages[i] + j;
+-		}
++		pages[i] = alloc_pages(gfp, 0);
++		if (!pages[i])
++			goto error;
+ 
+-		__dma_clear_buffer(pages[i], PAGE_SIZE << order);
+-		i += 1 << order;
+-		count -= 1 << order;
++		__dma_clear_buffer(pages[i], PAGE_SIZE);
++		i += 1;
++		count -= 1;
+ 	}
+ 
+ 	return pages;
+-- 
+2.6.0.rc2.230.g3dd15c0
