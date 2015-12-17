@@ -1,92 +1,76 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 17 Dec 2015 22:37:10 +0000
-Subject: BUG: SDHCI fails to DMA-unmap, and other warnings
-In-Reply-To: <20151217221808.GL8644@n2100.arm.linux.org.uk>
-References: <20151217215140.GK8644@n2100.arm.linux.org.uk>
- <20151217220045.GA27072@n2100.arm.linux.org.uk>
- <20151217221808.GL8644@n2100.arm.linux.org.uk>
-Message-ID: <20151217223709.GM8644@n2100.arm.linux.org.uk>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Thu, 17 Dec 2015 14:38:58 -0800
+Subject: [PATCH v3 4/4] printk/nmi: Increase the size of NMI buffer and
+ make it configurable
+In-Reply-To: <20151215142621.GE3729@pathway.suse.cz>
+References: <1449667265-17525-1-git-send-email-pmladek@suse.com>
+ <1449667265-17525-5-git-send-email-pmladek@suse.com>
+ <CAMuHMdXVgr58YjoePGrRbMyMncQ27f85prL7G5SpeHeNxoYrXQ@mail.gmail.com>
+ <20151211124159.GB3729@pathway.suse.cz>
+ <20151211145725.b0e81bb4bb18fcd72ef5f557@linux-foundation.org>
+ <20151211232113.GZ8644@n2100.arm.linux.org.uk>
+ <20151211153054.48da5d4139b93dd4ed438f4c@linux-foundation.org>
+ <20151215142621.GE3729@pathway.suse.cz>
+Message-ID: <20151217143858.447b5fe79aaa5ed7b2328d67@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 17, 2015 at 10:18:09PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Dec 17, 2015 at 10:00:45PM +0000, Russell King - ARM Linux wrote:
-> > And another one:
+On Tue, 15 Dec 2015 15:26:21 +0100 Petr Mladek <pmladek@suse.com> wrote:
+
+> > OK, thanks.  So "not needed at present, might be needed in the future,
+> > useful for out-of-tree debug code"?
+> 
+> It is possible that I got it a wrong way on arm. The NMI buffer is
+> usable there on two locations.
+> 
+> First, the temporary is currently used to handle IPI_CPU_BACKTRACE.
+> It seems that it is not a real NMI. But it seems to be available
+> (compiled) on all arm system. This is why I introduced NEED_PRINTK_NMI
+> Kconfig flag to avoid confusion with a real NMI.
+> 
+> Second, there is the FIQ "NMI" handler that is called from
+> /arch/arm/kernel/entry-armv.S. It is compiled only if _not_
+> defined $(CONFIG_CPU_V7M). It calls nmi_enter() and nmi_stop().
+> It looks like a real NMI handler. This is why I defined HAVE_NMI
+> if (!CPU_V7M).
+> 
+> A solution would be to define HAVE_NMI on all Arm systems and get rid
+> of NEED_PRINTK_NMI. If you think that it would cause less confusion...
+
+So does this mean that the patch will be updated?
+
+> 
+> > > there's this effort to apply further cleanups - to me, the changelogs
+> > > don't seem to make that much sense, unless we want to start using
+> > > printk() extensively in NMI functions - using the generic nmi backtrace
+> > > code surely gets us something that works across all architectures...
 > > 
-> > "mmcblk0: retrying because a re-tune was needed"
-> > 
-> > static int mmc_blk_err_check(struct mmc_card *card,
-> >                              struct mmc_async_req *areq)
-> > {
-> > ...
-> >         if (brq->data.error) {
-> >                 if (need_retune && !brq->retune_retry_done) {
-> >                         pr_info("%s: retrying because a re-tune was needed\n",
-> >                                 req->rq_disk->disk_name);
-> >                         brq->retune_retry_done = 1;
-> >                         return MMC_BLK_RETRY;
-> > 
-> > This looks like it'll spam the kernel log regularly if MMC/SD is used
-> > heavily with a UHS card, which (iirc) requires regular retunes.  Why is
-> > this message at info level, and not debug level?
+> > Yes, I was scratching my head over that.  The patchset takes an nmi-safe
+> > all-cpu-backtrace and generalises that into an nmi-safe printk.  That
+> > *sounds* like a good thing to do but yes, some additional justification
+> > would be helpful.  What real-world value does this patchset really
+> > bring to real-world users?
 > 
-> And... if three problems aren't enough, have another one... running:
+> The patchset brings two big advantages. First, it makes the NMI
+> backtraces safe on all architectures for free. Second, it makes
+> all NMI messages almost[*] safe on all architectures.
 > 
-> while :; do hdparm -t /dev/mmcblk0; done
+> Note that there already are several messages printed in NMI context.
+> See the mail from Jiri Kosina. They are not easy to avoid.
 > 
-> eventually causes:
-> 
-> [ 3465.671526] mmc0: tuning execution failed
-> [ 3465.675746] mmcblk0: response CRC error sending r/w cmd command, card status 0x900
-> [ 3622.758988] mmc0: tuning execution failed
-> [ 3622.763227] mmcblk0: response CRC error sending r/w cmd command, card status 0x900
-> [ 3858.363555] mmc0: tuning execution failed
-> [ 3858.368857] mmcblk0: response CRC error sending r/w cmd command, card status 0x900
-> [ 3880.388048] mmc0: tuning execution failed
-> [ 3880.392292] mmcblk0: response CRC error sending r/w cmd command, card status 0x900
+> [*] The temporary buffer is limited. We still should keep
+> the number of messages in NMI context at minimum.
 
-And finally, I get the bug that was reported to me by a SolidRun user:
+This is important info - in fact a paragraph which starts with "The
+patchset brings two big advantages" is *the most* important info.  I
+added the below text to the [1/n] changelog:
 
-[ 4507.373536] mmc0: Got data interrupt 0x00000002 even though no data operation was in progress.
-
-So, that's a total of five MMC/SD bugs in 4.4-rc5 which need
-investigation.
-
-Another issue that I've spotted is this cruddy code - which I use
-the term "crud" with a certain amount of distaste, given that there
-was a big effort to "streamline" DMA-API mapping/unmapping events a
-few years back.  So why does sdhci-adma code now do this:
-
-        if (has_unaligned && data->flags & MMC_DATA_READ) {
-                dma_sync_sg_for_cpu(mmc_dev(host->mmc), data->sg,
-                        data->sg_len, direction);
-
-                align = host->align_buffer;
-...
-        if (data->host_cookie == COOKIE_MAPPED) {
-                dma_unmap_sg(mmc_dev(host->mmc), data->sg,
-                        data->sg_len, direction);
-                data->host_cookie = COOKIE_UNMAPPED;
-        }
-
-What this has the effect of doing is invalidating the caches over
-the range in dma_sync_sg_for_cpu(), and then doing it all over again
-in dma_unmap_sg() _or_ later when we come to do the "streamlined"
-unmap.  In either case, this is completely unnecessary to walk the
-entire scatterlist twice.
-
-If you're going to have to do that dma_sync_sg_for_cpu() there
-because you need to write the unaligned data into the buffer, you
-might as well unmap the buffer at that point and be done with it -
-whether or not you're using the "streamlined" DMA-API hack that
-MMC pulls.
-
-Doing otherwise is nothing but a pure unadulterated waste of CPU
-cycles.
-
-So make that six issues now. :)
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+: The patchset brings two big advantages.  First, it makes the NMI
+: backtraces safe on all architectures for free.  Second, it makes all NMI
+: messages almost safe on all architectures (the temporary buffer is
+: limited.  We still should keep the number of messages in NMI context at
+: minimum).
+: 
+: Note that there already are several messages printed in NMI context:
+: WARN_ON(in_nmi()), BUG_ON(in_nmi()), anything being printed out from MCE
+: handlers.  These are not easy to avoid.
