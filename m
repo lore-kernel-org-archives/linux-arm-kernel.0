@@ -1,69 +1,47 @@
-From: mweseloh42@gmail.com (Marcus Weseloh)
-Date: Thu, 17 Dec 2015 12:40:27 +0100
-Subject: [PATCH v5 2/2] spi: sun4i: Add support for wait time between word
- transmissions
-In-Reply-To: <1450352427-25350-1-git-send-email-mweseloh42@gmail.com>
-References: <1450352427-25350-1-git-send-email-mweseloh42@gmail.com>
-Message-ID: <1450352427-25350-3-git-send-email-mweseloh42@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 17 Dec 2015 11:41:53 +0000
+Subject: [PATCH v6 08/20] arm64: ilp32: add is_ilp32_compat_{task,
+ thread} and TIF_32BIT_AARCH64
+In-Reply-To: <1450215766-14765-9-git-send-email-ynorov@caviumnetworks.com>
+References: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
+ <1450215766-14765-9-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <20151217114153.GD25232@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Modifies the sun4i SPI master driver to make use of the
-"spi-word-wait-ns" property. This specific SPI controller needs 3 clock
-cycles to set up the delay, which makes the minimum non-zero wait time
-on this hardware 4 clock cycles.
+On Wed, Dec 16, 2015 at 12:42:34AM +0300, Yury Norov wrote:
+> Reviewed-by: David Daney <ddaney@caviumnetworks.com>
+> Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+> Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
+> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+> Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
 
-Signed-off-by: Marcus Weseloh <mweseloh42@gmail.com>
----
- drivers/spi/spi-sun4i.c | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+Long description missing.
 
-diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
-index f60a6d6..3b4f5f4 100644
---- a/drivers/spi/spi-sun4i.c
-+++ b/drivers/spi/spi-sun4i.c
-@@ -19,6 +19,7 @@
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <linux/pm_runtime.h>
-+#include <linux/of.h>
- 
- #include <linux/spi/spi.h>
- 
-@@ -173,6 +174,8 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
- 	unsigned int tx_len = 0;
- 	int ret = 0;
- 	u32 reg;
-+	int wait_clk = 0;
-+	int clk_ns = 0;
- 
- 	/* We don't support transfer larger than the FIFO */
- 	if (tfr->len > SUN4I_FIFO_DEPTH)
-@@ -261,6 +264,25 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
- 
- 	sun4i_spi_write(sspi, SUN4I_CLK_CTL_REG, reg);
- 
-+	/*
-+	 * Setup wait time between words.
-+	 *
-+	 * Wait time is set in SPI_CLK cycles. The SPI hardware needs 3
-+	 * additional cycles to setup the wait counter, so the minimum delay
-+	 * time is 4 cycles.
-+	 */
-+	if (spi->word_wait_ns) {
-+		clk_ns = DIV_ROUND_UP(1000000000, tfr->speed_hz);
-+		wait_clk = DIV_ROUND_UP(spi->word_wait_ns, clk_ns) - 3;
-+		if (wait_clk < 1) {
-+			wait_clk = 1;
-+			dev_dbg(&spi->dev,
-+				"using minimum of 4 word wait cycles (%uns)",
-+				4 * clk_ns);
-+		}
-+	}
-+	sun4i_spi_write(sspi, SUN4I_WAIT_REG, (u16)wait_clk);
-+
- 	/* Setup the transfer now... */
- 	if (sspi->tx_buf)
- 		tx_len = tfr->len;
+> diff --git a/arch/arm64/include/asm/is_compat.h b/arch/arm64/include/asm/is_compat.h
+> index 476db90..89b1f65 100644
+> --- a/arch/arm64/include/asm/is_compat.h
+> +++ b/arch/arm64/include/asm/is_compat.h
+> @@ -36,7 +36,6 @@ static inline int is_a32_compat_thread(struct thread_info *thread)
+>  #else
+>  
+>  static inline int is_a32_compat_task(void)
+> -
+>  {
+>  	return 0;
+>  }
+
+You should move this to the previous patch.
+
+> @@ -45,14 +44,39 @@ static inline int is_a32_compat_thread(struct thread_info *thread)
+>  {
+>  	return 0;
+>  }
+> -
+>  #endif /* CONFIG_AARCH32_EL0 */
+
+Maybe this one as well, though I like an empty line before the last
+#endif (i.e. drop this hunk).
+
 -- 
-1.9.1
+Catalin
