@@ -1,68 +1,103 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 17 Dec 2015 10:57:14 -0600
-Subject: [PATCH v7 3/4] gicv2m: Refactor to prepare for ACPI support
-In-Reply-To: <56720095.70004@amd.com>
-References: <1449766530-16935-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1449766530-16935-4-git-send-email-Suravee.Suthikulpanit@amd.com>
- <20151216221208.GC27791@localhost> <56720095.70004@amd.com>
-Message-ID: <20151217165713.GA23549@localhost>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 17 Dec 2015 17:55:42 +0100
+Subject: [PATCH 0/4] ARM Versatile multi-platform support
+In-Reply-To: <CAL_JsqLpD8jRZF=mh0rs8Heb3XZftUmbjr7xparFzWYnqC25iQ@mail.gmail.com>
+References: <1449607458-16850-1-git-send-email-robh@kernel.org>
+ <3265937.pryQQXUTv3@wuerfel>
+ <CAL_JsqLpD8jRZF=mh0rs8Heb3XZftUmbjr7xparFzWYnqC25iQ@mail.gmail.com>
+Message-ID: <6928127.mYXKeRL6vI@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 16, 2015 at 06:23:49PM -0600, Suravee Suthikulanit wrote:
-> Hi Bjorn,
-> 
-> Thanks for your review. Please see my comments below.
-> 
-> On 12/16/2015 4:12 PM, Bjorn Helgaas wrote:
-> >On Thu, Dec 10, 2015 at 08:55:29AM -0800, Suravee Suthikulpanit wrote:
-> >>This patch replaces the struct device_node with struct fwnode_handle
-> >>since this structure is common between DT and ACPI.
+On Thursday 17 December 2015 08:53:09 Rob Herring wrote:
+> On Tue, Dec 15, 2015 at 4:57 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Tuesday 08 December 2015 14:44:14 Rob Herring wrote:
+> >> Arnd lit a fire under me to dust this off and get it merged. So here it
+> >> is. The main change from prior version is I merged all the code to a
+> >> single file. It's a bigger patch than I'd like, but I don't think trying
+> >> to do it in multiple steps is worth it.
 > >>
-> >>It also refactors gicv2m_init_one() to prepare for ACPI support.
-> >>The only functional change is removing the node name from pr_info.
+> >> This is dependent on some solution for the default platform choice on
+> >> !MMU builds (allnoconfig) as it can't be Versatile after this series.
+> >> Arnd has some ideas on how to address that.
 > >>
-> >>Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> >>Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> >> This is tested under QEMU. Linus previously tested this on actual h/w
+> >> and had a problem with the display identification which needs
+> >> investigation or agreement to worry about it if and when someone
+> >> actually cares.
 > >
-> >>@@ -359,10 +355,10 @@ static int __init gicv2m_init_one(struct device_node *node,
-> >>  	}
-> >>
-> >>  	list_add_tail(&v2m->entry, &v2m_nodes);
-> >>-	pr_info("Node %s: range[%#lx:%#lx], SPI[%d:%d]\n", node->name,
-> >>-		(unsigned long)v2m->res.start, (unsigned long)v2m->res.end,
-> >>-		v2m->spi_start, (v2m->spi_start + v2m->nr_spis));
-> >>
-> >>+	pr_info("range[%#lx:%#lx], SPI[%d:%d]\n",
-> >>+		(unsigned long)res->start, (unsigned long)res->end,
-> >>+		v2m->spi_start, (v2m->spi_start + v2m->nr_spis));
 > >
-> >You didn't change this, but I don't think this message has enough
-> >context.  It's pretty cryptic all by itself.  It'd be nice if it could
-> >at least include a device name, e.g., if you could use dev_info().
+> > Merged into next/multiplatform, thanks a lot!
 > 
-> Here is the example of the information printed:
-> [    0.000000] GICv2m: range[0xe1180000:0xe1181000], SPI[64:320]
-> 
-> Basically, the v2m is just an extension of the GIC. Here, we are
-> printing the memory range that it is covering, which can be used to
-> identify different V2m frame and the associate interrupt range
-> (SPI). The node name is not really providing any values. So, we are
-> removing it.
+> Are you going to apply something for the default platform? This is
+> breaking allnoconfig without it.
 
-I noticed the pr_fmt definition later; that adds some useful context I
-didn't know about.  I guess there's no struct device for the GIC?  I
-don't see one in struct device_node.  Seems like this piece of
-hardware that apparently responds to a memory range *could* have a
-struct device, but I'm a little fuzzy on how we handle ACPI and OF
-device descriptions in that regard.
+Thanks for the reminder, I have committed this patch on top now,
 
-I hadn't noticed the memory range part; maybe you could use %pR there?
+>From 70722803de91a7670979dcb5748631b4e3c1b219 Mon Sep 17 00:00:00 2001
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Thu, 17 Dec 2015 17:45:47 +0100
+Subject: [PATCH] ARM: make default platform work for NOMMU
 
-Just to double-check, there's no off-by-one error in the SPI range, is
-there?  The pattern I usually expect is "start, start + nr_items - 1".
+Moving ARCH_VERSATILE into ARCH_MULTIPLATFORM means that it no longer
+works as the default target for MMU-less kernels. While we might
+want to get that working again in the future, it's also a rather
+bad default, and it makes sense to make ARM_SINGLE_V7M the default
+because that is what realistically all NOMMU users on ARM are using,
+and it actually is what gets selected by default in the absence of
+versatile in the choice statement.
 
-I'm just kibbitzing here; this isn't PCI code, and you don't need my
-ack, so just consider these as random observations.
+Related to this, 'allnoconfig' kernels fail to link with the new
+default, as they do not include a machine record:
 
-Bjorn
+arm-linux-gnueabi-ld: no machine record defined
+
+For ARCH_MULTIPLATFORM kernels, we avoid this error by using a
+default machine descriptor that works for all trivial platforms,
+like ARCH_VIRT. The same reasoning applies for ARM_SINGLE_V7M,
+as that can also boot with empty machine descriptors both on
+qemu and on real hardware, as long as all the drivers are present.
+
+We could also follow up with a patch to remove the existing
+machine descriptors for the ARMv7M platforms, the only callback
+pointer the four platforms contain today is the armv7m_restart
+handler and we can simply make that the default for v7M with an
+add-on patch.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 72c1df0..a0fda44 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -313,7 +313,7 @@ config MMU
+ #
+ choice
+ 	prompt "ARM system type"
+-	default ARCH_VERSATILE if !MMU
++	default ARM_SINGLE_ARMV7M if !MMU
+ 	default ARCH_MULTIPLATFORM if MMU
+ 
+ config ARCH_MULTIPLATFORM
+diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+index 65addcb..2e26016 100644
+--- a/arch/arm/kernel/devtree.c
++++ b/arch/arm/kernel/devtree.c
+@@ -211,7 +211,7 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
+ {
+ 	const struct machine_desc *mdesc, *mdesc_best = NULL;
+ 
+-#ifdef CONFIG_ARCH_MULTIPLATFORM
++#if defined(CONFIG_ARCH_MULTIPLATFORM) || defined(CONFIG_ARM_SINGLE_ARMV7M)
+ 	DT_MACHINE_START(GENERIC_DT, "Generic DT based system")
+ 	MACHINE_END
+ 
+
+> It looks like versatile_defconfig is also broken, but perhaps due to
+> debug_ll changes?
+
+Yes, a glitch in my test infrastructure caused me not to notice this earlier.
+I've added a fix for that as well, see my reply to Russell "Re: [PATCH 00/10]
+ARM: debug-ll fixes".
+
+	Arnd
