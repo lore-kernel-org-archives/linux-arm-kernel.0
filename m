@@ -1,45 +1,36 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 17 Dec 2015 14:24:51 +0900
-Subject: [PATCH 1/7] ARM: shmobile: defconfig: Enable CONFIG_PRINTK_TIME
+Date: Thu, 17 Dec 2015 14:24:52 +0900
+Subject: [PATCH 2/7] ARM: shmobile: defconfig: Drop useless
+ CONFIG_USB_RCAR_PHY=y
 In-Reply-To: <cover.1450315426.git.horms+renesas@verge.net.au>
 References: <cover.1450315426.git.horms+renesas@verge.net.au>
-Message-ID: <0d8587b49a445d11e497fbe296576e7ab7c54109.1450315426.git.horms+renesas@verge.net.au>
+Message-ID: <59ab5e08b2a60f97e3b59eb8fa4a79c567fc98a5.1450315426.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Enable timestamps for kernel log output to improve debugging.
-You can always use "dmesg -t" to strip the timestamps.
-
-Don't specify CONFIG_LOG_BUF_SHIFT=16 while we're at it.  There's a
-reason the default in Kconfig is higher ;-)
+The Renesas R-Car (Gen1) USB PHY driver (which is being removed) does
+not support DT, and is thus useless in a Renesas ARM multi-platform
+kernel.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/configs/shmobile_defconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/configs/shmobile_defconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
 diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index 3aef019c0de7..e51f7a79c730 100644
+index e51f7a79c730..91233ed27578 100644
 --- a/arch/arm/configs/shmobile_defconfig
 +++ b/arch/arm/configs/shmobile_defconfig
-@@ -2,7 +2,6 @@ CONFIG_SYSVIPC=y
- CONFIG_NO_HZ=y
- CONFIG_IKCONFIG=y
- CONFIG_IKCONFIG_PROC=y
--CONFIG_LOG_BUF_SHIFT=16
- CONFIG_BLK_DEV_INITRD=y
- CONFIG_CC_OPTIMIZE_FOR_SIZE=y
- CONFIG_SYSCTL_SYSCALL=y
-@@ -199,6 +198,7 @@ CONFIG_NFS_V4_1=y
- CONFIG_ROOT_NFS=y
- CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_ISO8859_1=y
-+CONFIG_PRINTK_TIME=y
- # CONFIG_ENABLE_WARN_DEPRECATED is not set
- # CONFIG_ENABLE_MUST_CHECK is not set
- # CONFIG_ARM_UNWIND is not set
+@@ -162,7 +162,6 @@ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_OHCI_HCD=y
+ CONFIG_USB_R8A66597_HCD=y
+ CONFIG_USB_RENESAS_USBHS=y
+-CONFIG_USB_RCAR_PHY=y
+ CONFIG_USB_GADGET=y
+ CONFIG_USB_RENESAS_USBHS_UDC=y
+ CONFIG_USB_ETH=y
 -- 
 2.1.4
