@@ -1,87 +1,56 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 17 Dec 2015 14:57:58 +0800
-Subject: [PATCH v2 0/3] USB: add generic onboard USB HUB driver
-In-Reply-To: <5671C40F.3000000@maciej.szmigiero.name>
-References: <1450077974-22762-1-git-send-email-peter.chen@freescale.com>
- <CAOMZO5CfBKuJ584jwbg98s9tn+0Z7W0nOaZnUkm4cJUSvNGTZw@mail.gmail.com>
- <20151215062821.GA11241@shlinux2>
- <CAOMZO5DiRzfy5dULh0C7qU2KUM-i8fBh6W5rS9zOTHJJK6fqwg@mail.gmail.com>
- <20151216041058.GC23482@shlinux2>
- <CAOMZO5An3CK-a3NQtOF3nnPc8vzu2+SKnfJ=iOuAhjCBvZwToQ@mail.gmail.com>
- <5671C40F.3000000@maciej.szmigiero.name>
-Message-ID: <20151217065756.GB3793@shlinux2>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Thu, 17 Dec 2015 08:07:59 +0100
+Subject: [PATCH v3 4/4] drivers: psci: replace psci firmware calls
+In-Reply-To: <20151216134740.GB22916@red-moon>
+References: <1448449461-5043-1-git-send-email-jens.wiklander@linaro.org>
+ <1448449461-5043-5-git-send-email-jens.wiklander@linaro.org>
+ <20151201184741.GE29045@leverpostej> <20151201194421.GA29068@ermac>
+ <20151216105529.GC19814@red-moon> <20151216125509.GA27585@ermac>
+ <20151216134740.GB22916@red-moon>
+Message-ID: <20151217070758.GA30137@ermac>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 16, 2015 at 09:05:35PM +0100, Maciej S. Szmigiero wrote:
-> Hi Fabio,
-> Hi Peter,
+On Wed, Dec 16, 2015 at 01:47:40PM +0000, Lorenzo Pieralisi wrote:
+> On Wed, Dec 16, 2015 at 01:55:11PM +0100, Jens Wiklander wrote:
+> > On Wed, Dec 16, 2015 at 10:55:29AM +0000, Lorenzo Pieralisi wrote:
+> > > [CC'ed Daniel]
+> > > 
+> > > On Tue, Dec 01, 2015 at 08:44:22PM +0100, Jens Wiklander wrote:
+> > > 
+> > > [...]
+> > > 
+> > > > > What's the plan for merging this? I assume this'll go via arm-soc?
+> > > > 
+> > > > I talked to Arnd about this and he suggested to go via Russel.
+> > > 
+> > > Heads-up, this patch will conflict with:
+> > > 
+> > > https://patchwork.kernel.org/patch/7418351/
+> > > 
+> > > that goes via linux-pm tree, please let me and Daniel know how
+> > > you want us to sort this out.
+> > 
+> > I guess this arm-smccc patchset need to go together with that patch in
+> > some way. I've just uploaded my patches in Russels patch system, but I
+> > can stop that and try to go via the linux-pm tree instead if you think
+> > the maintainer would accept that. I'll need to ask Russel if he can ack
+> > the patches "arm/arm64: add arm-smccc" and
+> > "arm: add implementation for arm-smccc" first though.
+> > 
+> > Would that work or do you have another idea? I'm of course happy either
+> > way as long as the patches get through. I'm new to this so any advice is
+> > appreciated.
 > 
-> On 16.12.2015 11:11, Fabio Estevam wrote:
-> > Hi Peter,
-> > 
-> > On Wed, Dec 16, 2015 at 2:11 AM, Peter Chen <peter.chen@freescale.com> wrote:
-> > 
-> >> Thanks, Fabio, but I am curious how things like that? The USBOH3 clock
-> >> is not opened, the usb driver will hang when it tries to access
-> >> registers. If this clock is always on, then, why the system will
-> >> hang later?
-> > 
-> > I found the issue with your patch. You missed to add the pinctrl node.
-> > 
-> > With the change below USB is functional in Udoo:
-> > 
-> > --- a/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-> > +++ b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-> > @@ -22,6 +22,8 @@
-> > 
-> >         usb_hub1 {
-> >                 compatible = "generic-onboard-hub";
-> > +               pinctrl-names = "default";
-> > +               pinctrl-0 = <&pinctrl_usbh>;
-> >                 clocks = <&clks IMX6QDL_CLK_CKO>;
-> >                 reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
-> >                 reset-duration-us = <2>;
-> > 
+> It is really up to Daniel and Russell. If Daniel acks:
 > 
-> Thanks for your work, I didn't notice it previously (sorry).
+> https://patchwork.kernel.org/patch/7418351/
 > 
-> I can confirm, too that with Peter's patches and the above change
-> the USB support works again on my UDOO DualLite board.
-> 
-> However, I noticed that when you have host USB support configured to be
-> build as modules then (due to its location under "if USB") it is only
-> possible to compile generic onboard USB HUB as module, too.
-> 
-> Then this module would need to be loaded before loading USB support
-> (or quickly after it), otherwise USB enumeration would time out after
-> few secs and loading it later wouldn't help.
+> I can easily rebase it and send it to RMK patch system (as things stand
+> it seems the easier option), otherwise the merge conflict (which will show
+> up in -next anyway) has to be sorted out, I am open to suggestions.
 
-Thanks for testing it, it maybe this hardware limitation.
-The USB device should be back to work whenever do hardware reset,
-otherwise, this reset is not clean.
+What you're suggesting sounds good to me.
 
-> 
-> Currently, this driver doesn't really need any USB host support and
-> is able to be compiled-in successfully regardless of USB host support
-> configuration with just small change to Makefile and Kconfig.
-> 
-> However I don't know if it is a design goal to not use USB host support
-> or just a current development status, but if it doesn't really need it
-> then it would be great if it could be selected to be build-in into kernel
-> regardless of host USB support setting.
-> 
-
-Yes, you are right, this driver is totally unrelated with ANY usb, but
-it intends to handle general USB device which needs to have platform
-control, and USB device is on the USB bus. Currently, if you are
-USB stuff, you must depends of host or gadget support.
-
-For this special hardware, you may have to define module load sequence
-for your loadable support, it the current develop stage, maybe it can
-be changed in future, I don't know when.
-
--- 
-
-Best Regards,
-Peter Chen
+Thanks,
+Jens
