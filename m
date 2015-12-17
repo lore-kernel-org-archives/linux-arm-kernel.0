@@ -1,56 +1,45 @@
 From: drivshin.allworx@gmail.com (David Rivshin (Allworx))
-Date: Wed, 16 Dec 2015 23:02:08 -0500
-Subject: [PATCH v2 0/3] drivers: net: cpsw: Fix bugs in fixed-link PHY DT
- parsing
+Date: Wed, 16 Dec 2015 23:02:09 -0500
+Subject: [PATCH v2 1/3] ethernet:ti:cpsw: fix phy identification with multiple
+ slaves on fixed-phy
+In-Reply-To: <cover.1450309613.git.drivshin@allworx.com>
 References: <20151209223115.6c5a400f.drivshin.allworx@gmail.com>
- <1741588.Ve76Z1ZI87@localhost>
-Message-ID: <cover.1450309613.git.drivshin@allworx.com>
+ <cover.1450309613.git.drivshin@allworx.com> <5661B765.3050504@iktek.de>
+Message-ID: <51520f9b588a4386bed12168d6b4ec3441bd635f.1450309613.git.drivshin@allworx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 1f71e8c96fc654724723ce987e0a8b2aeb81746d ("drivers: net: cpsw:
-Add support for fixed-link PHY") added initial fixed-link PHY support
-for CPSW, but missed a few considerations.
+From: Pascal Speck (Iktek) <kernel@iktek.de>
+Date: Fri, 04 Dec 2015 16:55:17 +0100
 
-This series is based on the tip of the net tree. The first two patches
-fix user-visible errors in different hardware configurations. The third
-patch is for an internal reference counting issue. They are logically
-independent changes, but in the same function, so must be applied in
-order to apply cleanly.
+When using more than one slave with ti cpsw and fixed phy the pd->phy_id
+will be always zero, but slave_data->phy_id must be unique. pd->phy_id
+means a "phy hardware id" whereas slave_data->phy_id means an "unique id",
+so we should use pd->addr which has the same unique meaning.
 
-The first patch was originally submitted by Pascal Speck on December 4,
-but was not picked up by patchwork. I suspect that is because the patch
-was mangled by the mailer. I fixed the mangling and am including it in
-this series, as I believe it is the correct change.
+Fixes: 1f71e8c96fc6 ("drivers: net: cpsw: Add support for fixed-link PHY")
+Signed-off-by: Pascal Speck <kernel@iktek.de>
+---
+This was originally submitted by Pascal Speck on December 4, but was not
+picked up by patchwork. I suspect that is because the patch was mangled by
+the mailer. The only changes I made were to manually fix the patch whitespace
+and wrapping, and add the Fixes: tag.
 
-I have tested on the following hardware configurations:
- - (EVMSK) dual emac with two real MDIO-connected phys using RGMII-TXID
- - single emac with fixed-link using RGMII
-Testing of other CPSW emac configurations that folks may have would
-be appreciated.
+ drivers/net/ethernet/ti/cpsw.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
-Changes from v1 [1]:
- - Split into 3 smaller patches.
- - Maintain 1f71e8c96fc6's preference for fixed-link over phy_id if
-   they are both (incorrectly) specified in the slave node.
- - Update binding documentation to no longer say that phy_mode is also
-   mutually exclusive with fixed-link.
- - Dropped unnecessary include of phy_fixed.h.
-
-[1] https://patchwork.ozlabs.org/patch/554989/
-
-David Rivshin (2):
-  drivers: net: cpsw: fix RMII/RGMII mode when used with fixed-link PHY
-  drivers: net: cpsw: increment reference count on fixed-link PHY node
-
-Pascal Speck (Iktek) (1):
-  ethernet:ti:cpsw: fix phy identification with multiple slaves on
-    fixed-phy
-
- Documentation/devicetree/bindings/net/cpsw.txt |  6 +--
- drivers/net/ethernet/ti/cpsw.c                 | 53 +++++++++++++++-----------
- 2 files changed, 34 insertions(+), 25 deletions(-)
-
+diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
+index 48b92c9..e3b220d 100644
+--- a/drivers/net/ethernet/ti/cpsw.c
++++ b/drivers/net/ethernet/ti/cpsw.c
+@@ -2047,7 +2047,7 @@ static int cpsw_probe_dt(struct cpsw_priv *priv,
+ 			if (!pd)
+ 				return -ENODEV;
+ 			snprintf(slave_data->phy_id, sizeof(slave_data->phy_id),
+-				 PHY_ID_FMT, pd->bus->id, pd->phy_id);
++				 PHY_ID_FMT, pd->bus->id, pd->addr);
+ 			goto no_phy_slave;
+ 		}
+ 		parp = of_get_property(slave_node, "phy_id", &lenp);
 --
 2.5.0
