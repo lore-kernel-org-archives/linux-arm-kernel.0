@@ -1,36 +1,101 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 17 Dec 2015 14:24:57 +0900
-Subject: [PATCH 7/7] ARM: multi_v7_defconfig: Enable frame buffer console for
- armadillo800eva
-In-Reply-To: <cover.1450315426.git.horms+renesas@verge.net.au>
-References: <cover.1450315426.git.horms+renesas@verge.net.au>
-Message-ID: <3bf834e17c8736537a08abfa509ae3a8c8446b08.1450315426.git.horms+renesas@verge.net.au>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 17 Dec 2015 14:31:02 +0900
+Subject: [PATCH v6 0/9] samsung: pmu: split up SoC specific PMU data
+In-Reply-To: <1447740351-14246-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1447740351-14246-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <56724896.1080009@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+On 17.11.2015 15:05, Pankaj Dubey wrote:
+> In this series I am splitting up SoC specific PMU configuration data into
+> mach-exynos folder itself, before moving all of them under
+> drivers/soc/samsung/. Also instead of making all changes in single patch it
+> has been broken into SoC specific patches to avoid large size of patch.
+> With this approach there will not be unwanted big churns just after
+> adding exynos-pmu under drivers/soc/samsung.
+> 
+> All these patches are just refactoring to keep minimal changes while moving
+> exynos-pmu driver under drivers/soc/samsung/. Support for exynos7 PMU can
+> be added on top of it, in such a manner that for ARM64 build, ARM related
+> SoC's PMU will not get compiled and thus unnecessary increasing kernel image size.
+> 
+> These patches have been prepared on top of Kukjin Kim's for-next merged with
+> driver-samsung and on top of
+> cherry-picked change from [1].
+> 
+> 1: ARM: EXYNOS: Constify local exynos_pmu_data structure
+>    https://lkml.org/lkml/2015/10/28/917
+> 
+> For testing entire patchset on Peach-Pi (Exynos5880) based chromebook for boot
+> and S2R functionality.
+> 
+> Tested-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> 
+> For testing entire patchset on on Trats2 (Exynos4412, S2R, reboot, poweroff)
+> and Odroid XU3 (Exynos5422, reboot, poweroff).
+> 
+> Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> 
+> Changes since v5:
+>  - Removed extra blank line from patch 5/9 and 6/9.
+>  - Modified soc/samsung/Kconfig for config EXNOS_PMU. Added depends on ARM.
+> 
+> Changes since v4:
+>  - In v3 I missed to give -M flag to detect rename, which made patches hard
+>    to review, so resubmitting patches with rename detector flag.
+>  - Addressed review comments from Krzysztof.
+> 
+> Changes since v3:
+>  - Keeping intact copyright dates in existing header files.
+>  - Addressed review comments from Krzysztof for v3.
+>  - Removing static inline function from exynos-pmu.h and
+>    keeping them in PMU driver.
+>  - Added new patch (2/9) for fixing potential null pointer reference in
+>    exynos_sys_powerdown_conf.
+>  - Added new patch (8/9) for rearranging static and non-static function for
+>    better readability.
+> 
+> Changes since v2:
+>  - Removed Amit's Samsung id as it's no more valid.
+>  - Rebased on latest kgene tree.
+>  - Removed redundant code from regs-pmu.h
+> 
+> Pankaj Dubey (9):
+>   ARM: EXYNOS: removing redundant code from regs-pmu.h
+>   ARM: EXYNOS: Fix potential NULL pointer access in
+>     exynos_sys_powerdown_conf
+>   ARM: EXYNOS: Move pmu specific headers under "linux/soc/samsung"
+>   ARM: EXYNOS: split up exynos3250 SoC specific PMU data
+>   ARM: EXYNOS: split up exynos4 SoC specific PMU data
+>   ARM: EXYNOS: split up exynos5250 SoC specific PMU data
+>   ARM: EXYNOS: split up exynos5420 SoC specific PMU data
+>   ARM: EXYNOS: rearrange static and non-static functions of PMU driver
+>   drivers: soc: Add support for Exynos PMU driver
+> 
 
-Enabling the frame buffer device on r8a7740/armadillo800eva requires the
-board staging code.
+I tried to apply this to my branch:
+next/stuff-late-not-split-per-branch
+https://git.kernel.org/cgit/linux/kernel/git/krzk/linux.git/log/?h=next/stuff-late-not-split-per-branch
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Unfortunately it fails on:
+error: patch failed: arch/arm/mach-exynos/pmu.c:17
+error: arch/arm/mach-exynos/pmu.c: patch does not apply
+Patch failed at 0001 ARM: EXYNOS: Move pmu specific headers under
+"linux/soc/samsung"
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 32d1573d3cce..31be07178cc6 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -663,6 +663,7 @@ CONFIG_QCOM_SMD_RPM=y
- CONFIG_QCOM_SMEM=y
- CONFIG_COMMON_CLK_QCOM=y
- CONFIG_CHROME_PLATFORMS=y
-+CONFIG_STAGING_BOARD=y
- CONFIG_CROS_EC_CHARDEV=m
- CONFIG_COMMON_CLK_MAX77686=y
- CONFIG_COMMON_CLK_MAX77802=m
--- 
-2.1.4
+because of syscon-reboot handlers (Alim's work).
+
+I think I have all the dependencies already in my
+"next/stuff-late-not-split-per-branch".
+If you want to proceed now, can you rebase on top of it? Otherwise we
+could wait and rebase later (after v4.5-rc1).
+
+
+P.S. Please note that "next/stuff-late-not-split-per-branch" is not
+included in linux-next because I am not sure if I will be able to push
+it out soon.
+
+
+Best regards,
+Krzysztof
