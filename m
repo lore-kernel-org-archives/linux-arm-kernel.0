@@ -1,39 +1,32 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 17 Dec 2015 08:47:02 -0700
-Subject: [PATCH 1/2] coresight: checking for NULL string in
- coresight_name_match()
+Date: Thu, 17 Dec 2015 08:47:03 -0700
+Subject: [PATCH 2/2] coresight: Fix a typo in Kconfig
 In-Reply-To: <1450367223-21068-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1450367223-21068-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1450367223-21068-2-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1450367223-21068-3-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Connection child names associated to ports can sometimes be NULL,
-which is the case when booting a system on QEMU or when the Coresight
-power domain isn't switched on.
+From: "Andrew F. Davis" <afd@ti.com>
 
-This patch is adding a check to make sure a NULL string isn't fed
-to strcmp(), something that avoid crashing the system.
-
-Cc: <stable@vger.kernel.org> # v3.18+
-Reported-by: Tyler Baker <tyler.baker@linaro.org>
+Signed-off-by: Andrew F. Davis <afd@ti.com>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight.c | 2 +-
+ drivers/hwtracing/coresight/Kconfig | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
-index e25492137d8b..93738dfbf631 100644
---- a/drivers/hwtracing/coresight/coresight.c
-+++ b/drivers/hwtracing/coresight/coresight.c
-@@ -548,7 +548,7 @@ static int coresight_name_match(struct device *dev, void *data)
- 	to_match = data;
- 	i_csdev = to_coresight_device(dev);
+diff --git a/drivers/hwtracing/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
+index 6c8921140f02..c85935f3525a 100644
+--- a/drivers/hwtracing/coresight/Kconfig
++++ b/drivers/hwtracing/coresight/Kconfig
+@@ -8,7 +8,7 @@ menuconfig CORESIGHT
+ 	  This framework provides a kernel interface for the CoreSight debug
+ 	  and trace drivers to register themselves with. It's intended to build
+ 	  a topological view of the CoreSight components based on a DT
+-	  specification and configure the right serie of components when a
++	  specification and configure the right series of components when a
+ 	  trace source gets enabled.
  
--	if (!strcmp(to_match, dev_name(&i_csdev->dev)))
-+	if (to_match && !strcmp(to_match, dev_name(&i_csdev->dev)))
- 		return 1;
- 
- 	return 0;
+ if CORESIGHT
 -- 
 2.1.4
