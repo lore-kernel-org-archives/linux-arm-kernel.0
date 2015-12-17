@@ -1,44 +1,110 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 17 Dec 2015 13:50:39 +0100
-Subject: [GIT PULL 5/5] ARM: tegra: Default configuration updates for v4.5-rc1
-In-Reply-To: <1450356639-7758-1-git-send-email-thierry.reding@gmail.com>
-References: <1450356639-7758-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1450356639-7758-5-git-send-email-thierry.reding@gmail.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Thu, 17 Dec 2015 15:15:12 +0200
+Subject: [PATCH v1 04/10] serial: mps2-uart: add MPS2 UART driver
+In-Reply-To: <56700A45.3070109@arm.com>
+References: <1449048790-25859-1-git-send-email-vladimir.murzin@arm.com>
+ <1449048790-25859-5-git-send-email-vladimir.murzin@arm.com>
+ <CAHp75Vd98TEQ7TiD==t=RgYOqSinWgnyRjg7V=oPXmEx0nedLQ@mail.gmail.com>
+ <56700A45.3070109@arm.com>
+Message-ID: <CAHp75Vd3eg5EQhx_36CKNO_N=2yVmsTyCx++6zTvAR2cbp-RYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC maintainers,
+On Tue, Dec 15, 2015 at 2:40 PM, Vladimir Murzin
+<vladimir.murzin@arm.com> wrote:
+> On 12/12/15 23:39, Andy Shevchenko wrote:
+>> On Wed, Dec 2, 2015 at 11:33 AM, Vladimir Murzin
+>> <vladimir.murzin@arm.com> wrote:
+>>> This driver adds support to the UART controller found on ARM MPS2
+>>> platform.
+>>
+>> Just few comments (have neither time not big desire to do full review).
+>>
+>
+> Still better than nothing ;) I'm mostly agree on points you had, so I've
+> just left some I'm doubt about...
+>
+>>> +
+>>> +static void mps2_uart_enable_ms(struct uart_port *port)
+>>> +{
+>>> +}
+>>> +
+>>> +static void mps2_uart_break_ctl(struct uart_port *port, int ctl)
+>>> +{
+>>> +}
+>>
+>> Are those required to be present? If not, remove them until you have
+>> alive code there.
+>
+> A quick grep shows that core calls mps2_uart_break_ctl()
+> unconditionally, but, yes, it checks for presence of
+> mps2_uart_enable_ms() before jumping there, so it is safe to remove latter.
 
-The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+OK.
 
-  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+>>> +static irqreturn_t mps2_uart_oerrirq(int irq, void *data)
+>>> +{
+>>> +       irqreturn_t handled = IRQ_NONE;
+>>> +       struct uart_port *port = data;
+>>> +       u8 irqflag = mps2_uart_read8(port, UARTn_INT);
+>>> +
+>>> +       spin_lock(&port->lock);
+>>> +
+>>> +       if (irqflag & UARTn_INT_RX_OVERRUN) {
+>>> +               struct tty_port *tport = &port->state->port;
+>>> +
+>>> +               mps2_uart_write8(port, UARTn_INT_RX_OVERRUN, UARTn_INT);
+>>> +               tty_insert_flip_char(tport, 0, TTY_OVERRUN);
+>>> +               port->icount.overrun++;
+>>> +               handled = IRQ_HANDLED;
+>>> +       }
+>>> +
+>>> +       /* XXX: this shouldn't happen? */
+>>
+>> If shouldn't why it's there? Otherwise better to explain which
+>> conditions may lead to this.
+>>
+>
+> In practice I've never seen that happened and I think it never *should*
+> happen since we check if there is room in TX buffer. However, I could be
+> wrong here, so it is why that statement has question mark.
 
-are available in the git repository at:
+So, worth to have a proper comment then.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.5-defconfig
+>>> +static int __init mps2_uart_init(void)
+>>> +{
+>>> +       int ret;
+>>> +
+>>> +       ret = uart_register_driver(&mps2_uart_driver);
+>>> +       if (ret)
+>>> +               return ret;
+>>> +
+>>> +       ret = platform_driver_register(&mps2_serial_driver);
+>>> +       if (ret)
+>>> +               uart_unregister_driver(&mps2_uart_driver);
+>>> +
+>>> +       pr_info("MPS2 UART driver initialized\n");
+>>> +
+>>> +       return ret;
+>>> +}
+>>> +module_init(mps2_uart_init);
+>>> +
+>>> +static void __exit mps2_uart_exit(void)
+>>> +{
+>>> +       platform_driver_unregister(&mps2_serial_driver);
+>>> +       uart_unregister_driver(&mps2_uart_driver);
+>>> +}
+>>> +module_exit(mps2_uart_exit);
+>>
+>> module_platform_driver();
+>> And move uart_*register calls to probe/remove.
+>>
+>
+> With this move we'll get uart_*register for every device probed, no?
 
-for you to fetch changes up to 36d6e0872152aab506f952792db7221b9c25ed33:
+Don't see a problem, maybe someone else could share an authoritive opinion.
+Some of the drivers do that, though most do in __init stage. So, see above.
 
-  arm64: defconfig: Enable printk timestamps (2015-11-16 15:48:24 +0100)
-
-Thanks,
-Thierry
-
-----------------------------------------------------------------
-ARM: tegra: Default configuration updates for v4.5-rc1
-
-This set of patches enable various drivers and features required by
-64-bit Tegra SoCs (Tegra132 and Tegra210).
-
-----------------------------------------------------------------
-Thierry Reding (7):
-      arm64: defconfig: Enable Tegra210 support
-      arm64: defconfig: Do not disable Tegra AHB driver
-      arm64: defconfig: Enable tegra-apbdma driver
-      arm64: defconfig: Enable serial-tegra driver
-      arm64: defconfig: Enable sdhci-tegra driver
-      arm64: defconfig: Enable squashfs support
-      arm64: defconfig: Enable printk timestamps
-
- arch/arm64/configs/defconfig | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+-- 
+With Best Regards,
+Andy Shevchenko
