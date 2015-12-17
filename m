@@ -1,46 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 17 Dec 2015 14:24:54 +0900
-Subject: [PATCH 4/7] ARM: shmobile: defconfig: Enable frame buffer console for
- armadillo800eva
+Date: Thu, 17 Dec 2015 14:24:55 +0900
+Subject: [PATCH 5/7] ARM: multi_v7_defconfig: Drop useless
+ CONFIG_USB_RCAR_PHY=y
 In-Reply-To: <cover.1450315426.git.horms+renesas@verge.net.au>
 References: <cover.1450315426.git.horms+renesas@verge.net.au>
-Message-ID: <af48156ff3a1762989627fba7c56e77743fc0fdc.1450315426.git.horms+renesas@verge.net.au>
+Message-ID: <65e5698c27865617813f00706ad3e5fb0f98277d.1450315426.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Enabling the frame buffer device on armadillo800eva requires the board
-staging code.
-Also enable the frame buffer, so you will actually see output during
-boot.
+The Renesas R-Car (Gen1) USB PHY driver (which is being removed) does
+not support DT, and is thus useless in a generic ARM multi-platform
+kernel.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/configs/shmobile_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/configs/multi_v7_defconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index d2259952879d..5bc4f537f9da 100644
---- a/arch/arm/configs/shmobile_defconfig
-+++ b/arch/arm/configs/shmobile_defconfig
-@@ -153,6 +153,7 @@ CONFIG_FB_SH_MOBILE_MERAM=y
- # CONFIG_BACKLIGHT_GENERIC is not set
- CONFIG_BACKLIGHT_PWM=y
- CONFIG_BACKLIGHT_AS3711=y
-+CONFIG_FRAMEBUFFER_CONSOLE=y
- CONFIG_SOUND=y
- CONFIG_SND=y
- CONFIG_SND_SOC=y
-@@ -184,6 +185,8 @@ CONFIG_DMADEVICES=y
- CONFIG_SH_DMAE=y
- CONFIG_RCAR_DMAC=y
- CONFIG_RENESAS_USB_DMAC=y
-+CONFIG_STAGING=y
-+CONFIG_STAGING_BOARD=y
- # CONFIG_IOMMU_SUPPORT is not set
- CONFIG_IIO=y
- CONFIG_AK8975=y
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 69a22fdb52a5..a3d65beacf7c 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -545,7 +545,6 @@ CONFIG_USB_GPIO_VBUS=y
+ CONFIG_USB_ISP1301=y
+ CONFIG_USB_MSM_OTG=m
+ CONFIG_USB_MXS_PHY=y
+-CONFIG_USB_RCAR_PHY=m
+ CONFIG_USB_GADGET=y
+ CONFIG_USB_RENESAS_USBHS_UDC=m
+ CONFIG_USB_ETH=m
 -- 
 2.1.4
