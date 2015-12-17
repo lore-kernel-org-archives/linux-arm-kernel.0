@@ -1,61 +1,99 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 17 Dec 2015 16:25:12 +0100
-Subject: [PATCH] ARM: PJ4: make coprocessor access sequences buildable in
- Thumb2 mode
-Message-ID: <1450365912-3834-1-git-send-email-ard.biesheuvel@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 17 Dec 2015 15:30:46 +0000
+Subject: [PATCH v7 07/19] KVM: ARM64: PMU: Add perf event map and introduce
+ perf event creating function
+In-Reply-To: <20151217152054.GB11796@leverpostej>
+References: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
+ <1450169379-12336-8-git-send-email-zhaoshenglong@huawei.com>
+ <20151217152054.GB11796@leverpostej>
+Message-ID: <5672D526.9070608@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PJ4 inline asm sequence to write to cp15 cannot be built in Thumb-2
-mode, due to the way it performs arithmetic on the program counter, so it
-is built in ARM mode instead. However, building C files in ARM mode under
-CONFIG_THUMB2_KERNEL is problematic, since the instrumentation performed
-by subsystems like ftrace does not expect having to deal with interworking
-branches.
+On 17/12/15 15:22, Mark Rutland wrote:
+> On Tue, Dec 15, 2015 at 04:49:27PM +0800, Shannon Zhao wrote:
+>> From: Shannon Zhao <shannon.zhao@linaro.org>
+>>
+>> When we use tools like perf on host, perf passes the event type and the
+>> id of this event type category to kernel, then kernel will map them to
+>> hardware event number and write this number to PMU PMEVTYPER<n>_EL0
+>> register. When getting the event number in KVM, directly use raw event
+>> type to create a perf_event for it.
+>>
+>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>> ---
+>>  arch/arm64/include/asm/pmu.h |   3 ++
+>>  arch/arm64/kvm/Makefile      |   1 +
+>>  include/kvm/arm_pmu.h        |  11 ++++
+>>  virt/kvm/arm/pmu.c           | 122 +++++++++++++++++++++++++++++++++++++++++++
+>>  4 files changed, 137 insertions(+)
+>>  create mode 100644 virt/kvm/arm/pmu.c
+> 
+> [...]
+> 
+>> +/**
+>> + * kvm_pmu_set_counter_event_type - set selected counter to monitor some event
+>> + * @vcpu: The vcpu pointer
+>> + * @data: The data guest writes to PMXEVTYPER_EL0
+>> + * @select_idx: The number of selected counter
+>> + *
+>> + * When OS accesses PMXEVTYPER_EL0, that means it wants to set a PMC to count an
+>> + * event with given hardware event number. Here we call perf_event API to
+>> + * emulate this action and create a kernel perf event for it.
+>> + */
+>> +void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
+>> +				    u64 select_idx)
+>> +{
+>> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+>> +	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
+>> +	struct perf_event *event;
+>> +	struct perf_event_attr attr;
+>> +	u64 eventsel, counter;
+>> +
+>> +	kvm_pmu_stop_counter(vcpu, pmc);
+>> +	eventsel = data & ARMV8_EVTYPE_EVENT;
+>> +
+>> +	memset(&attr, 0, sizeof(struct perf_event_attr));
+>> +	attr.type = PERF_TYPE_RAW;
+>> +	attr.size = sizeof(attr);
+>> +	attr.pinned = 1;
+>> +	attr.disabled = kvm_pmu_counter_is_enabled(vcpu, select_idx);
+>> +	attr.exclude_user = data & ARMV8_EXCLUDE_EL0 ? 1 : 0;
+>> +	attr.exclude_kernel = data & ARMV8_EXCLUDE_EL1 ? 1 : 0;
+>> +	attr.exclude_hv = 1; /* Don't count EL2 events */
+>> +	attr.exclude_host = 1; /* Don't count host events */
+>> +	attr.config = eventsel;
+>> +
+>> +	counter = kvm_pmu_get_counter_value(vcpu, select_idx);
+>> +	/* The initial sample period (overflow count) of an event. */
+>> +	attr.sample_period = (-counter) & pmc->bitmask;
+>> +
+>> +	event = perf_event_create_kernel_counter(&attr, -1, current, NULL, pmc);
+> 
+> As far as I can see, this is going to result in unreliable counts on a
+> big.LITTLE system, even if the VCPUs are constrained to one class of
+> core.
+> 
+> As this is a task-bound event (cpu == -1, task is current), the perf
+> core will stop as soon as one PMU driver agrees to handle the event. The
+> event will then only count on CPUs handled by that driver.
+> 
+> If you're unlucky, the set of CPUs handled by that driver is not the
+> same as the set of CPUs your VM is constrained to. e.g. your VM might be
+> on little cores, but the big PMU driver accepted the event, and only
+> counts on big cores.
+> 
+> I'm not sure how we can solve that.
 
-Since the sequence in question is simply a poor man's ISB instruction,
-let's use a straight 'isb' instead. Unlike Xscale, where this code
-originated, PJ4 is strictly ARMv7 so this should always be supported.
+Yeah, another level of BL braindeadness. We should have some API to
+match the PMU we want on the CPU we're on at the moment that trap occurs.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/kernel/Makefile  |  1 -
- arch/arm/kernel/pj4-cp0.c | 10 +++-------
- 2 files changed, 3 insertions(+), 8 deletions(-)
+I don't think this should block this series though - this is something
+we can improve on in parallel (a possible solution being to forbid KVM
+on BL platform altogether).
 
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index af9e59bf3831..3c789496297f 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -73,7 +73,6 @@ obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
- obj-$(CONFIG_PERF_EVENTS)	+= perf_regs.o perf_callchain.o
- obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event_xscale.o perf_event_v6.o \
- 				   perf_event_v7.o
--CFLAGS_pj4-cp0.o		:= -marm
- AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
- obj-$(CONFIG_ARM_CPU_TOPOLOGY)  += topology.o
- obj-$(CONFIG_VDSO)		+= vdso.o
-diff --git a/arch/arm/kernel/pj4-cp0.c b/arch/arm/kernel/pj4-cp0.c
-index 8153e36b2491..a311977d795d 100644
---- a/arch/arm/kernel/pj4-cp0.c
-+++ b/arch/arm/kernel/pj4-cp0.c
-@@ -62,14 +62,10 @@ static u32 __init pj4_cp_access_read(void)
- 
- static void __init pj4_cp_access_write(u32 value)
- {
--	u32 temp;
--
- 	__asm__ __volatile__ (
--		"mcr	p15, 0, %1, c1, c0, 2\n\t"
--		"mrc	p15, 0, %0, c1, c0, 2\n\t"
--		"mov	%0, %0\n\t"
--		"sub	pc, pc, #4\n\t"
--		: "=r" (temp) : "r" (value));
-+		"mcr	p15, 0, %0, c1, c0, 2\n\t"
-+		"isb\n\t"
-+		: : "r" (value));
- }
- 
- static int __init pj4_get_iwmmxt_version(void)
+Thanks,
+
+	M.
 -- 
-2.5.0
+Jazz is not dead. It just smells funny...
