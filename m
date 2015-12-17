@@ -1,5 +1,5 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 17 Dec 2015 12:32:57 +0000
+Date: Thu, 17 Dec 2015 12:33:32 +0000
 Subject: block layer bug with 4.4-rc3+
 In-Reply-To: <CACVXFVMXjSFkj0Wb2qDFqDjWUA1fY41MZdN6SDKVH=H8grLZdg@mail.gmail.com>
 References: <566FF3ED.1000503@arm.com>
@@ -8,7 +8,7 @@ References: <566FF3ED.1000503@arm.com>
  <CACVXFVN3w0Y_8k3TiKoGytbayXiB+mRhgDn-OueV2+e93i=4AQ@mail.gmail.com>
  <56717B6F.2040008@arm.com>
  <CACVXFVMXjSFkj0Wb2qDFqDjWUA1fY41MZdN6SDKVH=H8grLZdg@mail.gmail.com>
-Message-ID: <5672AB79.3030004@arm.com>
+Message-ID: <5672AB9C.6040805@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -70,21 +70,39 @@ On 17/12/15 03:52, Ming Lei wrote:
 > transfer size for each bio becomes much smaller, and size of each
 > segment becomes much smaller, but segment number may become
 > bigger.
-
-Thanks a lot, exactly the explanation I was looking for.
-Tracing this function didn't show any significant difference between the
-two version on the first glance, though.
-
-I will try to catch the actual differences and take it from there.
-
-Cheers,
-Andre.
-
+> 
 >>
 >> I will try to do more experiments and to find the real culprit.
 > 
 > It may be helpful to enable 'block:*' trace events, and get/analyze the
 > traces close to the kernel warning.
+
+Good hint.
+I just enabled all block events, so it's a lot of data and I guess I
+didn't catch the actual "bug moment" before the buffer was overwritten.
+Do you know of any specific event that would be useful?
+
+Anyway I see a _lot_ of these in there, even before the bug triggers:
+
+block_dirty_buffer: 8,7 sector=18446744073709486080 size=4096
+block_dirty_buffer: 8,8 sector=18446744073709486080 size=4096
+
+So that long number is 0xffffffffffff0000. Is that is some special value
+for struct buffer_head.b_blocknr?
+I see this in all versions, though, so with and without LPAE and on both
+4.4-rc5 and with the patch in question reverted.
+
+The type of this variable is sector_t, which is u64 with LBDAF defined
+(which is enabled for me), but "unsigned long" without it.
+
+Does that ring a bell?
+
+Thanks,
+Andre.
+
+
+
+
 > 
 >>
 >> Thanks,
