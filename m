@@ -1,26 +1,24 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 17 Dec 2015 11:21:58 +0100
-Subject: [PATCH v3] ARM: at91/dt: Add Support for the L+G VInCo platform
-In-Reply-To: <1450347559-16150-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1450347559-16150-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20151217102158.GC13078@piout.net>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Thu, 17 Dec 2015 15:54:55 +0530
+Subject: [PATCH] clocksource: arm_global_timer: Allow DT to specify
+ already reset timer counter
+In-Reply-To: <56728B87.8030409@linaro.org>
+References: <1448429044-10395-1-git-send-email-jaswinder.singh@linaro.org>
+ <5670559A.4050404@linaro.org>
+ <CABb+yY0_JvVV_HG_iU8KJjmwu-nq_Cu5hJ6HBoKZCrZAdJ=rLQ@mail.gmail.com>
+ <56710BD6.2090502@linaro.org>
+ <CAJe_Zher2N-jFOBiA-25u0fQv_mdps+_Y4FoFdjiw9E++87TLg@mail.gmail.com>
+ <56728B87.8030409@linaro.org>
+Message-ID: <CAJe_ZhfEX-G_EinjLG7_-k4cE7=z_bkoiQAumzLU=hzMmz7a0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/12/2015 at 11:19:19 +0100, Gregory CLEMENT wrote :
-> The Versatile Industrial Communication platform is a community oriented
-> board from Landis + Gyr. It comes with:
->       - an RS-485 port
->       - 2 Ethernet ports
->       - a wireless M-BUS
->       - a 4G modem
->       - a 4MB SPI flash
->       - a 4GB eMMC
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+On 17 December 2015 at 15:46, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> I don't know if there is a better way than a kernel parameter but IMO it
+> makes sense to pass this kind of options via the kernel command line as we
+> can extend it easily for more options in the future.
+>
+I agree, for such 'soft' properties, cmdline is a better option.
+
+Thanks.
