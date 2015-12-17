@@ -1,76 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 17 Dec 2015 11:42:17 +0000
-Subject: [PATCH v2 1/2] IOMMU: arm-smmu-v3: Fix broken STE.VALID check in
- Broadcom Vulcan
-In-Reply-To: <1450346376-30920-1-git-send-email-pmallapp@broadcom.com>
-References: <1450346376-30920-1-git-send-email-pmallapp@broadcom.com>
-Message-ID: <20151217114216.GB11456@arm.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 17 Dec 2015 20:50:24 +0900
+Subject: [PATCH] ARM: multi_v7_defconfig: Enable fan, sensors and audio
+ for Odroid XU3
+In-Reply-To: <1670608.3mJKnXpbtb@wuerfel>
+References: <1449449994-10110-1-git-send-email-k.kozlowski@samsung.com>
+ <3286190.bAhobgE2la@wuerfel> <566553A4.6080106@samsung.com>
+ <1670608.3mJKnXpbtb@wuerfel>
+Message-ID: <CAJKOXPdLG7bcaMOtuc-XwG7f7mrhMS1W0psXOtb+Uhm1YW-M_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Prem,
+2015-12-07 18:43 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> On Monday 07 December 2015 18:38:44 Krzysztof Kozlowski wrote:
+>> On 07.12.2015 18:14, Arnd Bergmann wrote:
+>> > On Monday 07 December 2015 09:59:54 Krzysztof Kozlowski wrote:
+>> >> For Odroid XU3-family enable the:
+>> >>  - PWM fan (to control the CPU fan using thermal subsystem),
+>> >>  - TI INA231 sensors (provide power measurements of big.LITTLE cores,
+>> >>    DRAM and GPU),
+>> >>  - Samsung sound (for Odroid XU3 and Snow as well).
+>> >>
+>> >> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> >>
+>> >
+>> > Looks good. Do you have a samsung/defconfig branch already that you
+>> > can put this into, or should be pick it up into arm-soc directly?
+>> >
+>> > My preference is the former, but it would be a bit silly if that
+>> > is the only samsung defconfig change we need.
+>>
+>> I had a couple of defconfig patches in my queue but I sent them last
+>> week to Kukjin in pull request. He didn't pull it yet. Maybe he could
+>> apply this patch after pulling?
+>>
+>> Anyway we can wait for a few days to sort it out. If I don't have
+>> another defconfig patches then I will remind myself with applying it to
+>> arm-soc.
+>>
+>
+> Ok, sounds good.
 
-Thanks for the update. I still have a few questions though.
++Cc arm at kernel.org,
 
-On Thu, Dec 17, 2015 at 03:29:35PM +0530, Prem Mallappa wrote:
-> Vulcan SMMUv3 looks into more bits than necessary to validate the STE
-> entry (including EATS, S2PS, AARCH64), which is a overkill, but without
-> the proper encoding; the SMMU stops processing PCIe read/write requests.
-> Giving the h/w what it wants.
-> 
-> Signed-off-by: Prem Mallappa <pmallapp@broadcom.com>
-> ---
->  drivers/iommu/arm-smmu-v3.c | 10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index 359190b..9886d2d 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -260,6 +260,7 @@
->  #define STRTAB_STE_2_S2VMID_MASK	0xffffUL
->  #define STRTAB_STE_2_VTCR_SHIFT		32
->  #define STRTAB_STE_2_VTCR_MASK		0x7ffffUL
-> +#define STRTAB_STE_2_S2PS_SHIFT        48
->  #define STRTAB_STE_2_S2AA64		(1UL << 51)
->  #define STRTAB_STE_2_S2ENDI		(1UL << 52)
->  #define STRTAB_STE_2_S2PTW		(1UL << 54)
-> @@ -579,6 +580,7 @@ struct arm_smmu_device {
->  	u32				features;
->  
->  #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
-> +#define ARM_SMMU_OPT_BRCM_BROKEN_STE_VALID	(1 << 1)
->  	u32				options;
->  
->  	struct arm_smmu_cmdq		cmdq;
-> @@ -643,6 +645,7 @@ struct arm_smmu_option_prop {
->  
->  static struct arm_smmu_option_prop arm_smmu_options[] = {
->  	{ ARM_SMMU_OPT_SKIP_PREFETCH, "hisilicon,broken-prefetch-cmd" },
-> +	{ ARM_SMMU_OPT_BRCM_BROKEN_STE_VALID, "broadcom,broken-ste-valid-check" },
->  	{ 0, NULL},
->  };
->  
-> @@ -1053,6 +1056,13 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
->  				      : STRTAB_STE_0_CFG_BYPASS;
->  		dst[0] = cpu_to_le64(val);
->  		dst[2] = 0; /* Nuke the VMID */
-> +
-> +		if (smmu && (smmu->options & ARM_SMMU_OPT_BRCM_BROKEN_STE_VALID)) {
-> +			WARN_ON(smmu->oas != 44);
+I don't have any other defconfig changes in my queue, except of course
+stuff which I sent in pull request. I mean the request sent initially
+to Kukjin but now redirected with his ack to you guys.
 
-Do we really need this WARN_ON?
+If you don't mind, please apply this patch directly (with Javier's reviewed-by).
 
-> +			dst[1] = STRTAB_STE_1_EATS_TRANS << STRTAB_STE_1_EATS_SHIFT;
-
-cpu_to_le64 here too.
-
-> +			dst[2] |= cpu_to_le64(STRTAB_STE_2_S2AA64);
-> +		}
-> +
-
-Is this workaround only needed for bypass STEs? If not, we have a problem
-when we install a stage-1 entry, because we'll clear the EATS bits as
-it stands.
-
-Will
+Best regards,
+Krzysztof
