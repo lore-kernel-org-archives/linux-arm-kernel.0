@@ -1,38 +1,43 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 17 Dec 2015 15:27:51 +0200
-Subject: [PATCH v02 5/6] ARM: DTS: da850: Add node for mmc1
-In-Reply-To: <1450358872-2951-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1450358872-2951-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1450358872-2951-6-git-send-email-peter.ujfalusi@ti.com>
+Date: Thu, 17 Dec 2015 15:33:35 +0200
+Subject: [PATCH v02 0/2] ARM: DTS: am33xx/am437x: Use the new eDMA bindings
+Message-ID: <1450359217-3038-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-da850 has two MMC controller, MMCSD1 is served by eDMA1
+Hi,
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Tested-by: Sushaanth Srirangapathi <sushaanth.s@ti.com>
+Changes since v1:
+- Updated to use the non 16bit arrays [1]
+- send the two patch as a series
+
+[1]
+As it has been discussed earlier:
+https://www.mail-archive.com/linux-omap at vger.kernel.org/msg122117.html
+
+the DT bindings has been changes compared to what we had in 4.4-rc1: the arrays
+now don't have the 16bit type.
+The changes are now merged to mainline and Vinod provided us a branch:
+
+git://git.infradead.org/users/vkoul/slave-dma.git fix/edma
+
+Which is based on 4.4-rc1 and only contains the two patch for changing the eDMA
+bindings.
+
+Regards,
+Peter
 ---
- arch/arm/boot/dts/da850.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 1538959f2853..31ca5768fccf 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -239,6 +239,14 @@
- 			dma-names = "rx", "tx";
- 			status = "disabled";
- 		};
-+		mmc1: mmc at 1e1b000 {
-+			compatible = "ti,da830-mmc";
-+			reg = <0x21b000 0x1000>;
-+			interrupts = <72>;
-+			dmas = <&edma1 28 0>, <&edma1 29 0>;
-+			dma-names = "rx", "tx";
-+			status = "disabled";
-+		};
- 		ehrpwm0: ehrpwm at 01f00000 {
- 			compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
- 			#pwm-cells = <3>;
+Peter Ujfalusi (2):
+  ARM: DTS: am33xx: Use the new DT bindings for the eDMA3
+  ARM: DTS: am437x: Use the new DT bindings for the eDMA3
+
+ arch/arm/boot/dts/am335x-evm.dts    |  9 +---
+ arch/arm/boot/dts/am335x-pepper.dts | 11 +----
+ arch/arm/boot/dts/am33xx.dtsi       | 94 ++++++++++++++++++++++++++-----------
+ arch/arm/boot/dts/am4372.dtsi       | 80 +++++++++++++++++++++++--------
+ arch/arm/boot/dts/am437x-gp-evm.dts |  9 +---
+ 5 files changed, 133 insertions(+), 70 deletions(-)
+
 -- 
 2.6.4
