@@ -1,87 +1,189 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 17 Dec 2015 13:03:53 +0100
-Subject: [PATCH v3 0/8] drm/rockchip: covert to support atomic API
-In-Reply-To: <56728F3F.6060309@rock-chips.com>
-References: <1450321275-31154-1-git-send-email-mark.yao@rock-chips.com>
- <4029109.1DucZWNrFm@diego> <56728F3F.6060309@rock-chips.com>
-Message-ID: <1817698.JgNG3flpWP@diego>
+From: majun258@huawei.com (MaJun)
+Date: Thu, 17 Dec 2015 19:56:35 +0800
+Subject: [PATCH v10 2/4] irqchip: add platform device driver for mbigen device
+In-Reply-To: <1450353397-47668-1-git-send-email-majun258@huawei.com>
+References: <1450353397-47668-1-git-send-email-majun258@huawei.com>
+Message-ID: <1450353397-47668-3-git-send-email-majun258@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+From: Ma Jun <majun258@huawei.com>
 
-Am Donnerstag, 17. Dezember 2015, 18:32:31 schrieb Mark yao:
-> On 2015?12?17? 18:00, Heiko St?bner wrote:
-> > Am Donnerstag, 17. Dezember 2015, 11:01:07 schrieb Mark Yao:
-> >> The series of patches coverting drm rockchip to atomic API, do some
-> >> cleanup and some fixes on atomic side.
+Mbigen means Message Based Interrupt Generator(MBIGEN).
 
-[...]
+Its a kind of interrupt controller that collects
+the interrupts from external devices and generate msi interrupt.
+Mbigen is applied to reduce the number of wire connected interrupts.
 
-> > Plugging in HDMI after boot:
-> > 
-> > [   20.559534] ------------[ cut here ]------------
-> > [   20.564412] WARNING: CPU: 3 PID: 74 at
-> > drivers/gpu/drm/drm_atomic_helper.c:682
-> > drm_atomic_helper_update_legacy_modeset_state+0x6c/0x200() [   20.576991]
-> > Modules linked in:
-> > [   20.580175] CPU: 3 PID: 74 Comm: irq/51-ff980000 Not tainted 4.4.0-rc5+
-> > #2787 [   20.587502] Hardware name: Rockchip (Device Tree)
-> > [   20.592347] [<c0019914>] (unwind_backtrace) from [<c0014bcc>]
-> > (show_stack+0x20/0x24) [   20.600319] [<c0014bcc>] (show_stack) from
-> > [<c02c4344>] (dump_stack+0x84/0xb8) [   20.607776] [<c02c4344>]
-> > (dump_stack) from [<c0029a20>] (warn_slowpath_common+0x98/0xc4) [  
-> > 20.616087] [<c0029a20>] (warn_slowpath_common) from [<c0029b08>]
-> > (warn_slowpath_null+0x2c/0x34) [   20.625106] [<c0029b08>]
-> > (warn_slowpath_null) from [<c0361144>]
-> > (drm_atomic_helper_update_legacy_modeset_state+0x6c/0x200) [   20.636382]
-> > [<c0361144>] (drm_atomic_helper_update_legacy_modeset_state) from
-> > [<c0361684>] (drm_atomic_helper_commit_modeset_disables+0x1e4/0x35c) [  
-> > 20.649732] [<c0361684>] (drm_atomic_helper_commit_modeset_disables) from
-> > [<c038782c>] (rockchip_atomic_commit_complete+0x34/0x108) [   20.661789]
-> > [<c038782c>] (rockchip_atomic_commit_complete) from [<c0387984>]
-> > (rockchip_drm_atomic_commit+0x84/0xa0) [   20.672442] [<c0387984>]
-> > (rockchip_drm_atomic_commit) from [<c0384c58>]
-> > (drm_atomic_commit+0x60/0x70) [   20.681711] [<c0384c58>]
-> > (drm_atomic_commit) from [<c0363ab0>] (restore_fbdev_mode+0x128/0x258) [ 
-> >  20.690418] [<c0363ab0>] (restore_fbdev_mode) from [<c0365208>]
-> > (drm_fb_helper_restore_fbdev_mode_unlocked+0x3c/0x80) [   20.701033]
-> > [<c0365208>] (drm_fb_helper_restore_fbdev_mode_unlocked) from
-> > [<c036529c>] (drm_fb_helper_set_par+0x50/0x60) [   20.711907]
-> > [<c036529c>] (drm_fb_helper_set_par) from [<c03651b4>]
-> > (drm_fb_helper_hotplug_event+0xc8/0xe0) [   20.721569] [<c03651b4>]
-> > (drm_fb_helper_hotplug_event) from [<c0387bd0>]
-> > (rockchip_drm_output_poll_changed+0x24/0x28) [   20.732185] [<c0387bd0>]
-> > (rockchip_drm_output_poll_changed) from [<c035aaf8>]
-> > (drm_kms_helper_hotplug_event+0x34/0x38) [   20.742891] [<c035aaf8>]
-> > (drm_kms_helper_hotplug_event) from [<c035b434>]
-> > (drm_helper_hpd_irq_event+0x120/0x150) [   20.753078] [<c035b434>]
-> > (drm_helper_hpd_irq_event) from [<c038dd1c>] (dw_hdmi_irq+0x14c/0x18c) [ 
-> >  20.761772] [<c038dd1c>] (dw_hdmi_irq) from [<c008d030>]
-> > (irq_thread_fn+0x2c/0x44) [   20.769350] [<c008d030>] (irq_thread_fn)
-> > from [<c008d33c>] (irq_thread+0x118/0x21c) [   20.777019] [<c008d33c>]
-> > (irq_thread) from [<c004bbb8>] (kthread+0xf4/0x10c) [   20.784083]
-> > [<c004bbb8>] (kthread) from [<c0010010>] (ret_from_fork+0x14/0x24) [  
-> > 20.791300] ---[ end trace 3deaa51d288067a0 ]---
-> 
-> Hi Heiko
->      This issue can be explained from following thread:
->         https://lkml.org/lkml/2015/11/16/498
-> 
->      You can fix it by following changes:
-> 
-> @@ -1667,8 +1667,6 @@ static int dw_hdmi_register(struct drm_device
-> *drm, struct dw_hdmi *hdmi)
->                                     &dw_hdmi_connector_funcs,
->                                     DRM_MODE_CONNECTOR_HDMIA);
-> 
->      -       hdmi->connector.encoder = encoder;
+As the peripherals increasing, the interrupts lines needed is
+increasing much, especially on the Arm64 server SOC.
 
-yep that fixes the warning. From the thread you mention, it looks like that 
-assignment should also be removed in the non-atomic case (i.MX)?
+Therefore, the interrupt pin in GIC is not enough to cover so
+many peripherals.
 
-Or if it is really necessary there could also wrap it in a conditional to only 
-be set for the non-atomic case.
+Mbigen is designed to fix this problem.
 
+Mbigen chip locates in ITS or outside of ITS.
 
-Heiko
+Mbigen chip hardware structure shows as below:
+
+		mbigen chip
+|---------------------|-------------------|
+mgn_node0	  mgn_node1		mgn_node2
+ |		 |-------|		|-------|------|
+dev1		dev1    dev2		dev1   dev3   dev4
+
+Each mbigen chip contains several mbigen nodes.
+
+External devices can connect to mbigen node through wire connecting way.
+
+Because a mbigen node only can support 128 interrupt maximum, depends
+on the interrupt lines number of devices, a device can connects to one
+more mbigen nodes.
+
+Also, several different devices can connect to a same mbigen node.
+
+When devices triggered interrupt,mbigen chip detects and collects
+the interrupts and generates the MBI interrupts by writing the ITS
+Translator register.
+
+To simplify mbigen driver,I used a new conception--mbigen device.
+Each mbigen device is initialized as a platform device.
+
+Mbigen device presents the parts(register, pin definition etc.) in
+mbigen chip corresponding to a peripheral device.
+
+So from software view, the structure likes below
+
+	            mbigen chip
+     |---------------------|-----------------|
+mbigen device1       mbigen device2  mbigen device3
+      |                   |                |
+     dev1                dev2             dev3
+
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Ma Jun <majun258@huawei.com>
+---
+ drivers/irqchip/Kconfig      |    8 ++++
+ drivers/irqchip/Makefile     |    1 +
+ drivers/irqchip/irq-mbigen.c |   78 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 87 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/irqchip/irq-mbigen.c
+
+diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+index 4d7294e..b205e15 100644
+--- a/drivers/irqchip/Kconfig
++++ b/drivers/irqchip/Kconfig
+@@ -27,6 +27,14 @@ config ARM_GIC_V3_ITS
+ 	bool
+ 	select PCI_MSI_IRQ_DOMAIN
+ 
++config HISILICON_IRQ_MBIGEN
++	bool "Support mbigen interrupt controller"
++	default n
++	depends on ARM_GIC_V3 && ARM_GIC_V3_ITS && GENERIC_MSI_IRQ_DOMAIN
++	help
++	 Enable the mbigen interrupt controller used on
++	 Hisilicon platform.
++
+ config ARM_NVIC
+ 	bool
+ 	select IRQ_DOMAIN
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index 177f78f..cd76b11 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -24,6 +24,7 @@ obj-$(CONFIG_ARM_GIC)			+= irq-gic.o irq-gic-common.o
+ obj-$(CONFIG_ARM_GIC_V2M)		+= irq-gic-v2m.o
+ obj-$(CONFIG_ARM_GIC_V3)		+= irq-gic-v3.o irq-gic-common.o
+ obj-$(CONFIG_ARM_GIC_V3_ITS)		+= irq-gic-v3-its.o irq-gic-v3-its-pci-msi.o irq-gic-v3-its-platform-msi.o
++obj-$(CONFIG_HISILICON_IRQ_MBIGEN)	+= irq-mbigen.o
+ obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
+ obj-$(CONFIG_ARM_VIC)			+= irq-vic.o
+ obj-$(CONFIG_ATMEL_AIC_IRQ)		+= irq-atmel-aic-common.o irq-atmel-aic.o
+diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
+new file mode 100644
+index 0000000..9f036c2
+--- /dev/null
++++ b/drivers/irqchip/irq-mbigen.c
+@@ -0,0 +1,78 @@
++/*
++ * Copyright (C) 2015 Hisilicon Limited, All Rights Reserved.
++ * Author: Jun Ma <majun258@huawei.com>
++ * Author: Yun Wu <wuyun.wu@huawei.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/module.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++#include <linux/of_platform.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++
++/**
++ * struct mbigen_device - holds the information of mbigen device.
++ *
++ * @pdev:		pointer to the platform device structure of mbigen chip.
++ * @base:		mapped address of this mbigen chip.
++ */
++struct mbigen_device {
++	struct platform_device	*pdev;
++	void __iomem		*base;
++};
++
++static int mbigen_device_probe(struct platform_device *pdev)
++{
++	struct mbigen_device *mgn_chip;
++	struct resource *res;
++
++	mgn_chip = devm_kzalloc(&pdev->dev, sizeof(*mgn_chip), GFP_KERNEL);
++	if (!mgn_chip)
++		return -ENOMEM;
++
++	mgn_chip->pdev = pdev;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	mgn_chip->base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(mgn_chip->base))
++		return PTR_ERR(mgn_chip->base);
++
++	platform_set_drvdata(pdev, mgn_chip);
++
++	return 0;
++}
++
++static const struct of_device_id mbigen_of_match[] = {
++	{ .compatible = "hisilicon,mbigen-v2" },
++	{ /* END */ }
++};
++MODULE_DEVICE_TABLE(of, mbigen_of_match);
++
++static struct platform_driver mbigen_platform_driver = {
++	.driver = {
++		.name		= "Hisilicon MBIGEN-V2",
++		.owner		= THIS_MODULE,
++		.of_match_table	= mbigen_of_match,
++	},
++	.probe			= mbigen_device_probe,
++};
++
++module_platform_driver(mbigen_platform_driver);
++
++MODULE_AUTHOR("Jun Ma <majun258@huawei.com>");
++MODULE_AUTHOR("Yun Wu <wuyun.wu@huawei.com>");
++MODULE_LICENSE("GPL");
++MODULE_DESCRIPTION("Hisilicon MBI Generator driver");
+-- 
+1.7.1
