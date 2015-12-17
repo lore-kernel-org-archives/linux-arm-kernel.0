@@ -1,64 +1,57 @@
-From: pratyush.anand@gmail.com (Pratyush Anand)
-Date: Thu, 17 Dec 2015 21:21:12 +0530
-Subject: [PATCH v4 1/5] PCI: designware: add memory barrier after enabling
- region
-In-Reply-To: <5672D8A1.2080407@linaro.org>
-References: <1449149725-27607-1-git-send-email-stanimir.varbanov@linaro.org>
- <1449149725-27607-2-git-send-email-stanimir.varbanov@linaro.org>
- <56669C50.9060700@linaro.org>
- <CAHM4w1k_EAt+xBBYyG3B7W9Fegc4j+uRq5t_biUsxOGt+k+xUA@mail.gmail.com>
- <20151209102359.GF8644@n2100.arm.linux.org.uk>
- <CAHM4w1m-NiwyCLz9tikbOcNtCmVu0Vd9FhmKKSuMi5ChzfDafA@mail.gmail.com>
- <5672D8A1.2080407@linaro.org>
-Message-ID: <CAHM4w1mjTqrXC_XFTXoAB_3w3L8R=Xg-cXrTUfTuMO9sgctoFw@mail.gmail.com>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Thu, 17 Dec 2015 07:51:14 -0800
+Subject: -next regression: "driver cohandle -EPROBE_DEFER from
+ bus_type.match()"
+Message-ID: <CAPcyv4hOJuT=i2A_0vDQHsL7MXNgVN_p17q3UW6EcTkxsCMmeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 17, 2015 at 9:15 PM, Stanimir Varbanov
-<stanimir.varbanov@linaro.org> wrote:
->
-> On 12/11/2015 06:05 AM, Pratyush Anand wrote:
-> > On Wed, Dec 9, 2015 at 3:53 PM, Russell King - ARM Linux
-> > <linux@arm.linux.org.uk> wrote:
-> >
-> > [...]
-> >
-> >>>>>       dw_pcie_writel_rc(pp, PCIE_ATU_ENABLE, PCIE_ATU_CR2);
-> >>>>> +     /*
-> >>>>> +      * ensure that the ATU enable has been happaned before accessing
-> >>>>> +      * pci configuration/io spaces through dw_pcie_cfg_[read|write].
-> >>>>> +      */
-> >>>>> +     wmb();
-> >>>>>  }
-> >>>>>
-> >>>
-> >>>
-> >>> My understnading is that since writel() of dw_pcie_writel_rc() in
-> >>> above code and readl(), writel() of dw_pcie_cfg_[read|write]() (which
-> >>> will follow) goes through same device (ie PCIe host here). So, it is
-> >>> guaranteed that 1st writel() will be executed before later
-> >>> readl()/writel(). If that is true then we do not need any explicit
-> >>> barrier here.
-> >>>
-> >>> Arnd, Russel: whats your opinion here.
-> >>               ^l
-> >
-> > Sorry :(
-> >
-> >>
-> >> writel() has a barrier _before_ the access but not after.
-> >>
-> >> The fact is that there's nothing which guarantees that the write will hit
-> >> the hardware in a timely manner (forget any rules about PCI config space,
-> >> the PCI ordering rules apply to the PCI bus, not to the ARM buses.)
-> >>
-> >> If you need this write to have hit the hardware before continuing, you
-> >> need to read back from the same register.
-> >
-> > OK, so better to replace wmb() with read back of control register.
->
-> Would the patch be acceptable if I replace wmb with read?
+The commit below causes the libnvdimm sub-system to stop loading.
+This is due to the fact that nvdimm_bus_match() returns the result of
+test_bit() which may be negative.  If there are any other bus match
+functions using test_bit they may be similarly impacted.
 
-For me it would be fine.
+Can we queue a fixup like the following to libnvdimm, and maybe
+others, ahead of this driver core change?
 
-~Pratyush
+diff --git a/drivers/nvdimm/bus.c b/drivers/nvdimm/bus.c
+index 7e2c43f701bc..2b2181cdeb63 100644
+--- a/drivers/nvdimm/bus.c
++++ b/drivers/nvdimm/bus.c
+@@ -62,7 +62,7 @@ static int nvdimm_bus_match(struct device *dev,
+struct device_driver *drv)
+{
+       struct nd_device_driver *nd_drv = to_nd_device_driver(drv);
+
+-       return test_bit(to_nd_device_type(dev), &nd_drv->type);
++       return !!test_bit(to_nd_device_type(dev), &nd_drv->type);
+}
+
+static struct module *to_bus_provider(struct device *dev)
+
+
+
+
+Other ideas?
+
+commit 09a14906a26e454cad7ff0ad96af40fc4cd90eb0
+Author: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+Date:   Tue Dec 8 10:00:45 2015 +0100
+
+   ARM: 8472/1: driver cohandle -EPROBE_DEFER from bus_type.match()
+
+   Allow implementations of the match() callback in struct bus_type to
+   return errors and if it's -EPROBE_DEFER then queue the device for
+   deferred probing.
+
+   This is useful to buses such as AMBA in which devices are registered
+   before their matching information can be retrieved from the HW
+   (typically because a clock driver hasn't probed yet).
+
+   [changed if-else code structure, adjusted documentation to match the code,
+   extended comments]
+
+   Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+   Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+   Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+   Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
