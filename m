@@ -1,67 +1,28 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 17 Dec 2015 15:00:35 +0100
-Subject: [PATCH 2/3] pwm: Add PWM driver for OMAP using dual-mode timers
-In-Reply-To: <20151216162747.GL28947@ulmo>
-References: <5637458D.60106@baylibre.com> <20151216162747.GL28947@ulmo>
-Message-ID: <5672C003.3010105@baylibre.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 17 Dec 2015 14:05:24 +0000
+Subject: [PATCH v6 11/20] arm64:ilp32: support core dump generation for
+ ILP32
+In-Reply-To: <1450215766-14765-12-git-send-email-ynorov@caviumnetworks.com>
+References: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
+ <1450215766-14765-12-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <20151217140524.GE25232@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
-On 12/16/2015 05:27 PM, Thierry Reding wrote:
-> I've applied this with some coding style bikeshedding applied. Also I
-> think there's a timer leak in the probe function:
-Indeed, the coding style had some root for ameliorations ! Thanks !
-I also missed this timer leak, thanks for the fix.
->
->> diff --git a/drivers/pwm/pwm-omap-dmtimer.c b/drivers/pwm/pwm-omap-dmtimer.c
-> [...]
->> +static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
->> +{
-> [...]
->> +	dm_timer = pdata->request_by_node(timer);
->> +	if (!dm_timer)
->> +		return -EPROBE_DEFER;
->
-> dm_timer holds the requested timer now.
->
->> +
->> +	omap = devm_kzalloc(&pdev->dev, sizeof(*omap), GFP_KERNEL);
->> +	if (!omap)
->> +		return -ENOMEM;
->
-> But it's not released when this allocation fails...
->
->> +
->> +	omap->pdata = pdata;
->> +	omap->dm_timer = dm_timer;
->> +	omap->dm_timer_pdev = of_find_device_by_node(timer);
->> +	if (!omap->dm_timer_pdev) {
->> +		dev_err(&pdev->dev, "Unable to find timer pdev\n");
->> +		return -EINVAL;
->> +	}
->
-> ... nor when this lookup fails. I've taken the liberty of adding two
-> calls to omap->pdata->free(dm_timer) to these error paths.
-Perfect !
+On Wed, Dec 16, 2015 at 12:42:37AM +0300, Yury Norov wrote:
+> diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+> index 8786ca5..4e2e3c0 100644
+> --- a/arch/arm64/include/asm/elf.h
+> +++ b/arch/arm64/include/asm/elf.h
+[...]
+> +/*
+> + * struct elf_prstatus is defined in include/uapi/linux/elfcore.h,
+> + * and has different sise for supported ABIs
+> + */
+> +#define PRSTATUS_SIZE(S)		(is_a32_compat_task() ? 124 : (is_ilp32_compat_task() ? 352 : 392))
 
-> Please take a look at what's in the pwm/for-next branch to see if it
-> still works correctly.
-I had a look against my original patch and it should be ok, I will still hook it up back
-on the real HW in case we forgot something.
+It's the *third* time I ask this: can you not use some sizeof instead of
+the magic numbers?
 
-> Thanks,
-> Thierry
->
-
-Thanks !
-Neil
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151217/ee7ebea6/attachment.sig>
+-- 
+Catalin
