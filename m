@@ -1,44 +1,61 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Thu, 17 Dec 2015 15:52:13 -0600
-Subject: FW: Commit 81a43adae3b9 (locking/mutex: Use acquire/release
- semantics) causing failures on arm64 (ThunderX)
-In-Reply-To: <20151211120419.GD18828@arm.com>
-References: <5669D5F2.5050004@caviumnetworks.com>
- <SN1PR07MB21577C72379C8440A208D6BC9EEA0@SN1PR07MB2157.namprd07.prod.outlook.com>
- <CA+=Sn1miWYhH5ddMmLGYWknzcw3d1k4S6QyK9O_ofdJKJDQxmg@mail.gmail.com>
- <CA+=Sn1n6e9pLDRVWT1EzDEn2XWwoK-Ep__-R6VVPzhbMvCEdNg@mail.gmail.com>
- <20151211084133.GE6356@twins.programming.kicks-ass.net>
- <20151211120419.GD18828@arm.com>
-Message-ID: <56732E8D.8050706@arm.com>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Thu, 17 Dec 2015 13:55:53 -0800
+Subject: [PATCH v4 5/5] ARM: dts: ifc6410: enable pcie dt node for this
+ board
+In-Reply-To: <1449149725-27607-6-git-send-email-stanimir.varbanov@linaro.org>
+References: <1449149725-27607-1-git-send-email-stanimir.varbanov@linaro.org>
+ <1449149725-27607-6-git-send-email-stanimir.varbanov@linaro.org>
+Message-ID: <20151217215553.GA4000@usrtlx11787.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/11/2015 06:04 AM, Will Deacon wrote:
-> I think Andrew meant the atomic_xchg_acquire at the start of osq_lock,
-> as opposed to "compare and swap". In which case, it does look like
-> there's a bug here because there is nothing to order the initialisation
-> of the node fields with publishing of the node, whether that's
-> indirectly as a result of setting the tail to the current CPU or
-> directly as a result of the WRITE_ONCE.
->
-> Andrew, David: does making that atomic_xchg_acquire and atomic_xchg
-> fix things for you?
->
-> I don't fully grok what 81a43adae3b9 has to do with any of this, so
-> maybe there's another bug too.
+On Thu 03 Dec 05:35 PST 2015, Stanimir Varbanov wrote:
 
-Will,
+> Enable pcie dt node and fill pcie dt node with regulator, pinctrl
+> and reset gpio, to use the pcie on the ifc6410 board.
+> 
+> Signed-off-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
+> ---
+>  arch/arm/boot/dts/qcom-apq8064-ifc6410.dts |   26 ++++++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+> index 11ac608b6d50..f203b94ee460 100644
+> --- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+> +++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+> @@ -47,6 +47,18 @@
+>  					bias-disable;
+>  				};
+>  			};
+> +
+> +			pcie_pins: pcie_pinmux {
+> +				mux {
+> +					pins = "gpio27";
+> +					function = "gpio";
+> +				};
+> +				conf {
+> +					pins = "gpio27";
+> +					drive-strength = <12>;
+> +					bias-disable;
+> +				};
+> +			};
+>  		};
+>  
+>  		rpm at 108000 {
+> @@ -123,6 +135,10 @@
+>  				pm8921_lvs1: lvs1 {
+>  					bias-pull-down;
+>  				};
+> +
+> +				pm8921_lvs6: lvs6 {
+> +					bias-pull-down;
+> +				};
 
-I ran into this problem while getting a machine to boot with ACPI
-yesterday. Your suggested fix works on that machine.
+Please don't duplicate the labels in the dts files.
 
-Thanks, so for that patch.
+>  			};
+>  		};
+>  
 
-Tested-by: Jeremy Linton <jeremy.linton@arm.com>
-
-
-
-
-
-
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+Regards,
+Bjorn
