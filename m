@@ -1,75 +1,48 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 17 Dec 2015 10:29:53 +0100
-Subject: [PATCH v6 0/6] Add mipi dsi support for rk3288
-In-Reply-To: <1450260616-21160-1-git-send-email-zyw@rock-chips.com>
-References: <1450260616-21160-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <3523259.ZRgH1Shd9Y@diego>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Thu, 17 Dec 2015 15:07:47 +0530
+Subject: [PATCH] clocksource: arm_global_timer: Allow DT to specify
+ already reset timer counter
+In-Reply-To: <56710BD6.2090502@linaro.org>
+References: <1448429044-10395-1-git-send-email-jaswinder.singh@linaro.org>
+ <5670559A.4050404@linaro.org>
+ <CABb+yY0_JvVV_HG_iU8KJjmwu-nq_Cu5hJ6HBoKZCrZAdJ=rLQ@mail.gmail.com>
+ <56710BD6.2090502@linaro.org>
+Message-ID: <CAJe_Zher2N-jFOBiA-25u0fQv_mdps+_Y4FoFdjiw9E++87TLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
+On 16 December 2015 at 12:29, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+> On 12/16/2015 05:11 AM, Jassi Brar wrote:
+>>
+>> On Tue, Dec 15, 2015 at 11:32 PM, Daniel Lezcano
+>> <daniel.lezcano@linaro.org> wrote:
+>>>
+>>> On 11/25/2015 06:24 AM, Jassi Brar wrote:
+>>>>
+>>>>
+>>>> The GT counter is common to every core in a cluster. There is a usecase
+>>>> when Linux is spawned by a 'master' firmware/OS running on some core of
+>>>> the same cluster and the GT is used by the both.
+>>>>    Linux, upon boot, resetting the GT counter is obviously fatal to the
+>>>> other OS. So provide a way for DT to tell Linux if it's running in that
+>>>> 'slave' mode and must not reset the counter.
+>>>>
+>>>> Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+>>>
+>>>
+>>>
+>>> Hmm, I doubt that is a hardware description.
+>>>
+>> Its a regular 2core-1cluster platform. The master RTOS on cpu0
+>> maintains the lifecycle of Linux on cpu1.
+>>
+>> 'No_Counter_Reset' is not a h/w thing, I agree, but I don't know how
+>> to better convey that platform specific constraint.
+>
+>
+> May be with a kernel parameter ?
+>
+The fact, that arch-timer driver does it via DT (see commit
+65b5732d241b8), changes anything? :)
 
-Am Mittwoch, 16. Dezember 2015, 18:10:10 schrieb Chris Zhong:
-> The rk3288 MIPI DSI is a Synopsys DesignWare MIPI DSI host controller
-> IP. This series adds support for a Synopsys DesignWare MIPI DSI host
-> controller DRM driver.
-> 
-> The MIPI DSI feature is tested on rk3288 evb board, backport them to
-> chrome os kernel chrome_v3.14, and it can display normally.
-> 
-> This patchset is base on the patchset from Ying.liu at freescale.com.
-> <http://www.spinics.net/lists/dri-devel/msg77181.html>
-> 
-> According to the suggestion from Thierry, I have get rid of the bridge,
-> and register the encoder & connecter in drm/rockchip/dw-mipi-dsi.c.
-
-from my point it looks good (although I cannot really speak on the drm-related 
-internals).
-
-But I do think we'll be doing atomic modesetting conversion first (last 
-version posted from Mark today), so you should probably make sure your dsi 
-driver still works after that conversion and make changes if needed.
-
-
-Heiko
-
-> 
-> 
-> Changes in v6:
-> - update the document, since the bridge device has been deleted.
-> - Do not use bridge driver (Thierry Reding)
-> - Optimization the phy init sequence
-> 
-> Changes in v5:
-> - modify the clk name to SCLK_MIPIDSI_24M
-> - add a blank line befor lcd_en
-> 
-> Changes in v4:
-> - use clk_round_rate to check the clock rate in vop_crtc_mode_fixup
-> 
-> Changes in v3:
-> - move dw_mipi_dsi_rockchip.txt to bindings/display/rockchip/
-> 
-> Chris Zhong (5):
->   drm/rockchip: return a true clock rate to adjusted_mode
->   Documentation: dt-bindings: Add bindings for rk3288 DW MIPI DSI driver
->   drm: rockchip: Support Synopsys DW MIPI DSI
->   ARM: dts: rockchip: add rk3288 mipi_dsi nodes
->   ARM: dts: rockchip: add support mipi panel tv080wum-nl0
-> 
-> Liu Ying (1):
->   drm/dsi: Add a helper to get bits per pixel of MIPI DSI pixel format
-> 
->  .../display/rockchip/dw_mipi_dsi_rockchip.txt      |   60 +
->  arch/arm/boot/dts/rk3288-evb.dtsi                  |   20 +-
->  arch/arm/boot/dts/rk3288.dtsi                      |   39 +
->  drivers/gpu/drm/rockchip/Kconfig                   |   10 +
->  drivers/gpu/drm/rockchip/Makefile                  |    1 +
->  drivers/gpu/drm/rockchip/dw-mipi-dsi.c             | 1200
-> ++++++++++++++++++++ drivers/gpu/drm/rockchip/rockchip_drm_vop.c        |  
->  8 +
->  include/drm/drm_mipi_dsi.h                         |   14 +
->  8 files changed, 1351 insertions(+), 1 deletion(-)
->  create mode 100644
-> Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
-> create mode 100644 drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+Thanks.
