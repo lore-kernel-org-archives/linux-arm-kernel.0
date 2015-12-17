@@ -1,90 +1,82 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Thu, 17 Dec 2015 10:37:30 -0800 (PST)
-Subject: [PATCH 2/3] Add 'unsafe' user access functions for batched
- accesses
-Message-ID: <alpine.LFD.2.20.1512171036570.27310@i7>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Thu, 17 Dec 2015 01:06:28 -0800
+Subject: [PATCH v6] clk: mediatek: Export CPU mux clocks for CPU
+ frequency control
+In-Reply-To: <CALx668XVnhhLJWs7RBxvaX=SU=S9=wFVT9HMDP2edqiH4Jio4A@mail.gmail.com>
+References: <1442230072-31593-1-git-send-email-pi-cheng.chen@linaro.org>
+ <CAGS+omCkYTPyjMk6QaoxGAL4QVU8VcpWyFqWhST+iP2EFRcRYg@mail.gmail.com>
+ <CALx668XVnhhLJWs7RBxvaX=SU=S9=wFVT9HMDP2edqiH4Jio4A@mail.gmail.com>
+Message-ID: <20151217090628.GA317@quark.deferred.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 12/01, Pi-Cheng Chen wrote:
+> On Mon, Nov 30, 2015 at 11:48 AM, Daniel Kurtz <djkurtz@chromium.org> wrote:
+> > Hi Pi-Cheng and Michael,
+> >
+> > On Mon, Sep 14, 2015 at 7:27 PM, Pi-Cheng Chen <pi-cheng.chen@linaro.org> wrote:
+> >> From: "pi-cheng.chen" <pi-cheng.chen@linaro.org>
+> >>
+> >> This patch adds CPU mux clocks which are used by Mediatek cpufreq driver
+> >> for intermediate clock source switching.
+> >
+> > It looks like this patch was never picked up.
+> > It is required for MT8173 cpufreq.
+> >
+> > What is the plan to get this one merged?
+> 
+> Hi Dan,
+> Mike is working on a new CCF feature called "coordinated clock rate changes"
+> which would help to migrate mt8173-cpufreq driver to generic cpufreq-dt
+> driver, and I am working with him to port MT8173 clock driver on the new
+> feature. So I think that's why this patch was not picked since it will
+> be migrated to new implementation once the new feature's ready.
+> 
+> @Mike:
+> Are you plannig to post those patches on the mailing list ?
+> Or is it fine for you to take this first and then I will refine it for
+> the new feature later?
 
-From: Linus Torvalds <torvalds@linux-foundation.org>
-Date: Thu, 17 Dec 2015 09:57:27 -0800
-Subject: [PATCH 2/3] Add 'unsafe' user access functions for batched accesses
+I plan to post those patches next week.
 
-The naming is meant to discourage random use: the helper functions are
-not really any more "unsafe" than the traditional double-underscore
-functions (which need the address range checking), but they do need even
-more infrastructure around them, and should not be used willy-nilly.
+Thanks,
+Mike
 
-In addition to checking the access range, these user access functions
-require that you wrap the user access with a "user_acess_{begin,end}()"
-around it.
-
-That allows architectures that implement kernel user access control
-(x86: SMAP, arm64: PAN) to do the user access control in the wrapping
-user_access_begin/end part, and then batch up the actual user space
-accesses using the new interfaces.
-
-The main (and hopefully only) use for these are for core generic access
-helpers, initially just the generic user string functions
-(strnlen_user() and strncpy_from_user()).
-
-Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
----
- arch/x86/include/asm/uaccess.h | 25 +++++++++++++++++++++++++
- include/linux/uaccess.h        |  7 +++++++
- 2 files changed, 32 insertions(+)
-
-diff --git a/arch/x86/include/asm/uaccess.h b/arch/x86/include/asm/uaccess.h
-index cc228f4713da..ca59e4f9254e 100644
---- a/arch/x86/include/asm/uaccess.h
-+++ b/arch/x86/include/asm/uaccess.h
-@@ -762,5 +762,30 @@ copy_to_user(void __user *to, const void *from, unsigned long n)
- #undef __copy_from_user_overflow
- #undef __copy_to_user_overflow
- 
-+/*
-+ * The "unsafe" user accesses aren't really "unsafe", but the naming
-+ * is a big fat warning: you have to not only do the access_ok()
-+ * checking before using them, but you have to surround them with the
-+ * user_access_begin/end() pair.
-+ */
-+#define user_access_begin()	__uaccess_begin()
-+#define user_access_end()	__uaccess_end()
-+
-+#define unsafe_put_user(x, ptr)						\
-+({										\
-+	int __pu_err;								\
-+	__put_user_size((x), (ptr), sizeof(*(ptr)), __pu_err, -EFAULT);		\
-+	__builtin_expect(__pu_err, 0);						\
-+})
-+
-+#define unsafe_get_user(x, ptr)						\
-+({										\
-+	int __gu_err;								\
-+	unsigned long __gu_val;							\
-+	__get_user_size(__gu_val, (ptr), sizeof(*(ptr)), __gu_err, -EFAULT);	\
-+	(x) = (__force __typeof__(*(ptr)))__gu_val;				\
-+	__builtin_expect(__gu_err, 0);						\
-+})
-+
- #endif /* _ASM_X86_UACCESS_H */
- 
-diff --git a/include/linux/uaccess.h b/include/linux/uaccess.h
-index 558129af828a..349557825428 100644
---- a/include/linux/uaccess.h
-+++ b/include/linux/uaccess.h
-@@ -111,4 +111,11 @@ extern long strncpy_from_unsafe(char *dst, const void *unsafe_addr, long count);
- #define probe_kernel_address(addr, retval)		\
- 	probe_kernel_read(&retval, addr, sizeof(retval))
- 
-+#ifndef user_access_begin
-+#define user_access_begin() do { } while (0)
-+#define user_access_end() do { } while (0)
-+#define unsafe_get_user(x, ptr) __get_user(x, ptr)
-+#define unsafe_put_user(x, ptr) __put_user(x, ptr)
-+#endif
-+
- #endif		/* __LINUX_UACCESS_H__ */
--- 
-2.7.0.rc1
+> 
+> Best Regards,
+> Pi-Cheng
+> 
+> >
+> > -Dan
+> >
+> >>
+> >> Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
+> >> ---
+> >> Changes in v6:
+> >> - Relace __clk_get_num_parents with clk_hw_get_num_parents to reflect
+> >>   API change
+> >>
+> >> Changes in v5:
+> >> - Replace __initdata with __initconst to fix compiling error
+> >>
+> >> Changes in v4:
+> >> - Fix some minor issues for v3
+> >> - Rebase to the patch that adds 13mhz clock for MT8173[1]
+> >>
+> >> Changes in v3:
+> >> - Rebase to 4.2-rc1
+> >> - Fix some issues of v2
+> >>
+> >> Changes in v2:
+> >> - Remove use of .determine_rate callback
+> >> ---
+> >>  drivers/clk/mediatek/Makefile          |   2 +-
+> >>  drivers/clk/mediatek/clk-cpumux.c      | 127 +++++++++++++++++++++++++++++++++
+> >>  drivers/clk/mediatek/clk-cpumux.h      |  22 ++++++
+> >>  drivers/clk/mediatek/clk-mt8173.c      |  23 ++++++
+> >>  include/dt-bindings/clock/mt8173-clk.h |   4 +-
+> >>  5 files changed, 176 insertions(+), 2 deletions(-)
+> >>  create mode 100644 drivers/clk/mediatek/clk-cpumux.c
+> >>  create mode 100644 drivers/clk/mediatek/clk-cpumux.h
+> >
+> > [snip]
