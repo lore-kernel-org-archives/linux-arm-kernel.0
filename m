@@ -1,27 +1,21 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 17 Dec 2015 01:03:59 +0100
-Subject: [PATCH v2 0/8] Raspberry Pi 2 support.
-In-Reply-To: <1450310115-22163-1-git-send-email-eric@anholt.net>
-References: <1450310115-22163-1-git-send-email-eric@anholt.net>
-Message-ID: <21040591.KakM5Gl6ZZ@wuerfel>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 16 Dec 2015 19:16:47 -0500 (EST)
+Subject: [PATCH] net: add Qualcomm IPC router
+In-Reply-To: <20151217000141.GG28026@sonymobile.com>
+References: <1449866519-14551-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <20151215.160114.1178824607335349574.davem@davemloft.net>
+ <20151217000141.GG28026@sonymobile.com>
+Message-ID: <20151216.191647.857597925395214968.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 16 December 2015 15:55:07 Eric Anholt wrote:
-> This is a major rewrite of the previous Raspberry Pi 2 submission.
-> SMP support is now included, and the DT includes are cleaned up to
-> avoid massive duplication.
+From: Courtney Cavin <courtney.cavin@sonymobile.com>
+Date: Wed, 16 Dec 2015 16:01:41 -0800
+
+> We could hardcode the value in kconfig, but that seems like a worse
+> solution than a module parameter.
 > 
-> The branch (based on 4.4-rc5, to get the USB regression fixes) can be
-> found at:
-> 
-> https://github.com/anholt/linux/tree/bcm2836-4.4
+> I'm open to further suggestions.
 
-Looks all good to me, but when we get the pull request, I'd strongly
-prefer to have that based on -rc3 or earlier.
-
-What commit is the USB regression fix you refer to above? Is that in a
-branch that is -rc3 based? Maybe you can rebase the changes on top
-of that branch, to minimize the amount of backmerges?
-
-	Arnd
+No module parameters, configure it via netlink or similar at run
+time.
