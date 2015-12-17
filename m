@@ -1,63 +1,33 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 17 Dec 2015 10:43:02 +0900
-Subject: [GIT PULL 0/9] ARM: EXYNOS: Pull request for v4.5
-In-Reply-To: <1449020386-20250-1-git-send-email-k.kozlowski@samsung.com>
-References: <1449020386-20250-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <56721326.30004@samsung.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 17 Dec 2015 07:22:31 +0530
+Subject: [PATCH v6 0/3] thermal: mediatek: Add cpu dynamic power cooling
+ model.
+In-Reply-To: <1450272556-29770-1-git-send-email-dawei.chien@mediatek.com>
+References: <1450272556-29770-1-git-send-email-dawei.chien@mediatek.com>
+Message-ID: <20151217015231.GC3496@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02.12.2015 10:39, Krzysztof Kozlowski wrote:
-> Hi Kukjin,
+On 16-12-15, 21:29, Dawei Chien wrote:
+> Use Intelligent Power Allocation (IPA) technical to add dynamic power model
+> for binding CPU thermal zone. The power allocator governor allocates power
+> budget to control CPU temperature.
 > 
-> A lot of stuff for v4.5 with 3 dependencies split into
-> separate tags. The need for dependency is explained both
-> in merge-commit and in description of a tag which is using
-> the dependency.
-
-Hi everyone,
-
-It's been like two weeks... we are after v4.4-rc5 and Christmas season
-is coming... there are some dependencies here and even more stuff waits
-out of queue for this pull request (moving SROM and PMU to drivers/soc,
-cpufreq for Exynos542x).
-
-What I want to say is that I am really not sure whether further waiting
-is beneficial...
-All these patches have been boiling in linux-next for some time (through
-my tree).
-
-
-Are there any comments about this pull request? Ordering of branches?
-Weird looking tags? Bugs? etc.? Anything waits in your tree Kukjin?
-
-
-Maybe this could be pulled directly by arm-soc folks?
-
-
-Best regards,
-Krzysztof
-
+> Power Allocator governor is able to keep SOC temperature within a defined
+> temperature range to avoid SOC overheat and keep it's performance.
+> mt8173-cpufreq.c need to register its' own power model with power allocator
+> thermal governor, so that power allocator governor can allocates suitable
+> power budget to control CPU temperature.
 > 
-> The order goes like (but of course dependencies
-> could be pulled all at once at beginning):
-> 1. tags/samsung-dt-syscon-restart-4.5
-> 2. tags/samsung-soc-4.5
-> 3. tags/samsung-clk-arm64-symbols-4.5
-> 4. tags/samsung-soc64-4.5
-> 5. tags/samsung-drivers-4.5
-> 6. tags/samsung-clk-exynos4-4.5
-> 7. tags/samsung-dt-4.5
-> 8. tags/samsung-dt64-4.5
-> 9. tags/samsung-defconfig-4.5
+> Binding document is refer to this patchset
+> https://lkml.org/lkml/2015/11/30/239
 > 
-> I split dependencies to three tags so clock or other folks could
-> easily grab them if needed.
-> 
-> Please share your comments or pull as early as possible as we have here
-> some more dependencies than usual.
-> 
-> 
-> Kind regards,
-> Krzysztof
-> 
+> Change since V5:
+> 1. Remove thermal sensor ID from phandles
+
+Though you should have included this in the new version, but still
+
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+
+-- 
+viresh
