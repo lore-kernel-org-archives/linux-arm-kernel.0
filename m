@@ -1,26 +1,131 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 17 Dec 2015 10:45:58 -0800
-Subject: [PATCH v5 4/5] ARM: dts: DRA7: add entry for qspi mmap region
-In-Reply-To: <20151211150935.GA15654@rob-hp-laptop>
-References: <1449807000-6457-1-git-send-email-vigneshr@ti.com>
- <1449807000-6457-5-git-send-email-vigneshr@ti.com>
- <20151211150935.GA15654@rob-hp-laptop>
-Message-ID: <20151217184557.GC23396@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 17 Dec 2015 18:46:41 +0000
+Subject: -next regression: "driver cohandle -EPROBE_DEFER from
+ bus_type.match()"
+In-Reply-To: <CAPcyv4hOJuT=i2A_0vDQHsL7MXNgVN_p17q3UW6EcTkxsCMmeg@mail.gmail.com>
+References: <CAPcyv4hOJuT=i2A_0vDQHsL7MXNgVN_p17q3UW6EcTkxsCMmeg@mail.gmail.com>
+Message-ID: <20151217184641.GI8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rob Herring <robh@kernel.org> [151211 07:10]:
-> On Fri, Dec 11, 2015 at 09:39:59AM +0530, Vignesh R wrote:
-> > Add qspi memory mapped region entries for DRA7xx based SoCs. Also,
-> > update the binding documents for the controller to document this change.
-> > 
-> > Signed-off-by: Vignesh R <vigneshr@ti.com>
+On Thu, Dec 17, 2015 at 07:51:14AM -0800, Dan Williams wrote:
+> The commit below causes the libnvdimm sub-system to stop loading.
+> This is due to the fact that nvdimm_bus_match() returns the result of
+> test_bit() which may be negative.  If there are any other bus match
+> functions using test_bit they may be similarly impacted.
 > 
-> Acked-by: Rob Herring <robh@kernel.org>
+> Can we queue a fixup like the following to libnvdimm, and maybe
+> others, ahead of this driver core change?
 
-Vignes, are patches 4 and 5 safe to apply separately already or
-do things break if we do that?
+This is rather annoying.  Have we uncovered a latent bug in other
+architectures?  Well, looking through the test_bit() implementations,
+it looks like it.
 
-Regards,
+I'll drop the patch set for the time being, we can't go around breaking
+stuff like this.  However, I think the test_bit() result should be
+regularised across different architectures - it _looks_ to me like most
+implementations return 0/1 values, but there may be some that don't
+(maybe the assembly versions?)
 
-Tony
+Here's the list I've pulled out so far from the "easy" cases, which all
+look like they're returning 0/1 values.
+
+asm-generic: 0/1
+
+/**
+ * test_bit - Determine whether a bit is set
+ * @nr: bit number to test
+ * @addr: Address to start counting from
+ */
+static inline int test_bit(int nr, const volatile unsigned long *addr)
+{
+        return 1UL & (addr[BIT_WORD(nr)] >> (nr & (BITS_PER_LONG-1)));
+}
+
+alpha: 0/1
+
+static inline int
+test_bit(int nr, const volatile void * addr)
+{
+        return (1UL & (((const int *) addr)[nr >> 5] >> (nr & 31))) != 0UL;
+}
+
+arm: 0/1
+
+test_bit(unsigned int nr, const volatile unsigned long *addr)
+{
+        unsigned long mask;
+
+        addr += nr >> 5;
+
+        mask = 1UL << (nr & 0x1f);
+
+        return ((mask & *addr) != 0);
+}
+
+blackfin: 0/1
+
+static inline int test_bit(int nr, const volatile unsigned long *addr)
+{
+        volatile const unsigned long *a = addr + (nr >> 5);
+        return __raw_bit_test_asm(a, nr & 0x1f) != 0;
+}
+
+frv: 0/1
+
+static inline int
+__constant_test_bit(unsigned long nr, const volatile void *addr)
+{
+        return ((1UL << (nr & 31)) & (((const volatile unsigned int *) addr)[nr >> 5])) != 0;
+}
+(and similar for __test_bit)
+
+h8300 uses assembly... no idea
+
+hexagon uses assembly as well... no idea
+
+ia64: 0/1
+
+static __inline__ int
+test_bit (int nr, const volatile void *addr)
+{
+        return 1 & (((const volatile __u32 *) addr)[nr >> 5] >> (nr & 31));
+}
+
+m68k: 0/1
+
+static inline int test_bit(int nr, const unsigned long *vaddr)
+{
+        return (vaddr[nr >> 5] & (1UL << (nr & 31))) != 0;
+}
+
+mn10300: 0/1
+
+static inline int test_bit(unsigned long nr, const volatile void *addr)
+{
+        return 1UL & (((const volatile unsigned int *) addr)[nr >> 5] >> (nr & 31));
+}
+
+s390: 0/1
+
+static inline int test_bit(unsigned long nr, const volatile unsigned long *ptr)
+{
+        const volatile unsigned char *addr;
+
+        addr = ((const volatile unsigned char *)ptr);
+        addr += (nr ^ (BITS_PER_LONG - 8)) >> 3;
+        return (*addr >> (nr & 7)) & 1;
+}
+
+x86: 0/1 for constant, ? for variable
+
+static __always_inline int constant_test_bit(long nr, const volatile unsigned long *addr)
+{
+        return ((1UL << (nr & (BITS_PER_LONG-1))) &
+                (addr[nr >> _BITOPS_LONG_SHIFT])) != 0;
+}
+(presumably variable_test_bit is the same, but I don't know)
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
