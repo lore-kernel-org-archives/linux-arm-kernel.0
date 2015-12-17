@@ -1,93 +1,89 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 17 Dec 2015 10:54:47 +0000
-Subject: [PATCH v6 09/20] arm64:ilp32: share HWCAP between LP64 and ILP32
-In-Reply-To: <15616150.rsIFodoBKz@wuerfel>
-References: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
- <20151216165819.GD27051@e104818-lin.cambridge.arm.com>
- <20151216171904.GF27051@e104818-lin.cambridge.arm.com>
- <15616150.rsIFodoBKz@wuerfel>
-Message-ID: <20151217105445.GA25232@e104818-lin.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 17 Dec 2015 11:02:47 +0000
+Subject: [PATCH] clocksource: arm_global_timer: Allow DT to specify
+ already reset timer counter
+In-Reply-To: <56728B87.8030409@linaro.org>
+References: <1448429044-10395-1-git-send-email-jaswinder.singh@linaro.org>
+ <5670559A.4050404@linaro.org>
+ <CABb+yY0_JvVV_HG_iU8KJjmwu-nq_Cu5hJ6HBoKZCrZAdJ=rLQ@mail.gmail.com>
+ <56710BD6.2090502@linaro.org>
+ <CAJe_Zher2N-jFOBiA-25u0fQv_mdps+_Y4FoFdjiw9E++87TLg@mail.gmail.com>
+ <56728B87.8030409@linaro.org>
+Message-ID: <20151217110247.GB13389@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 16, 2015 at 08:17:25PM +0100, Arnd Bergmann wrote:
-> On Wednesday 16 December 2015 17:19:05 Catalin Marinas wrote:
-> > On Wed, Dec 16, 2015 at 04:58:20PM +0000, Catalin Marinas wrote:
-> > > On Wed, Dec 16, 2015 at 04:54:34PM +0100, Arnd Bergmann wrote:
-> > > > On Wednesday 16 December 2015 00:42:35 Yury Norov wrote:
-> > > > > 
-> > > > >  #ifdef CONFIG_COMPAT
-> > > > > -#define COMPAT_ELF_HWCAP       (compat_elf_hwcap)
-> > > > > -#define COMPAT_ELF_HWCAP2      (compat_elf_hwcap2)
-> > > > >  extern unsigned int compat_elf_hwcap, compat_elf_hwcap2;
-> > > > > +#define COMPAT_ELF_HWCAP       \
-> > > > > +       (is_a32_compat_task()   \
-> > > > > +         ? compat_elf_hwcap    \
-> > > > > +         : elf_hwcap)
-> > > > > +
-> > > > > +#define COMPAT_ELF_HWCAP2      \
-> > > > > +       (is_a32_compat_task()   \
-> > > > > +         ? compat_elf_hwcap2   \
-> > > > > +         : 0)
-> > > > > +
-> > > > >  #endif
-> > > > 
-> > > > I'm trying to understand how this is used. Are you compiling
-> > > > fs/compat_binfmt_elf.c twice to handle both 32-bit ELF types?
-> > > 
-> > > It's the same compat_binfmt_elf.c which handles all 32-bit ELF types,
-> > > i.e. AArch32 and A64/ILP32. The above macros are not constants, so they
-> > > are evaluated every time a new ELF file is loaded. We do a similar trick
-> > > with COMPAT_SET_PERSONALITY in patch 11.
+On Thu, Dec 17, 2015 at 11:16:39AM +0100, Daniel Lezcano wrote:
+> On 12/17/2015 10:37 AM, Jassi Brar wrote:
+> >On 16 December 2015 at 12:29, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+> >>On 12/16/2015 05:11 AM, Jassi Brar wrote:
+> >>>
+> >>>On Tue, Dec 15, 2015 at 11:32 PM, Daniel Lezcano
+> >>><daniel.lezcano@linaro.org> wrote:
+> >>>>
+> >>>>On 11/25/2015 06:24 AM, Jassi Brar wrote:
+> >>>>>
+> >>>>>
+> >>>>>The GT counter is common to every core in a cluster. There is a usecase
+> >>>>>when Linux is spawned by a 'master' firmware/OS running on some core of
+> >>>>>the same cluster and the GT is used by the both.
+> >>>>>    Linux, upon boot, resetting the GT counter is obviously fatal to the
+> >>>>>other OS. So provide a way for DT to tell Linux if it's running in that
+> >>>>>'slave' mode and must not reset the counter.
+> >>>>>
+> >>>>>Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+> >>>>
+> >>>>
+> >>>>
+> >>>>Hmm, I doubt that is a hardware description.
+> >>>>
+> >>>Its a regular 2core-1cluster platform. The master RTOS on cpu0
+> >>>maintains the lifecycle of Linux on cpu1.
+> >>>
+> >>>'No_Counter_Reset' is not a h/w thing, I agree, but I don't know how
+> >>>to better convey that platform specific constraint.
+> >>
+> >>
+> >>May be with a kernel parameter ?
+> >>
+> >The fact, that arch-timer driver does it via DT (see commit
+> >65b5732d241b8), changes anything? :)
 > 
-> Ok, I see. I've also looked at other architectures, and found that
-> MIPS does it the way I thought it would be
+> It is debatable (cc'ed Rob).
 > 
-> git grep -w binfmt_elf.c
-> arch/mips/kernel/binfmt_elfn32.c:#include "../../../fs/binfmt_elf.c"
-> arch/mips/kernel/binfmt_elfo32.c:#include "../../../fs/binfmt_elf.c"
+> I acked it because the patch was on the edge between soft/hw in the
+> description. But now it sounds like that created a precedence and we
+> consider these DT options exceptions as acceptable.
+
+While not strictly a HW property, it is a property of the system,
+outside of the control of Linux. It's fine to place such things in the
+DT when required.
+
+I don't think it makes sense to have to use kernel commadn line
+parameters for this.
+
+> I don't know if there is a better way than a kernel parameter but
+> IMO it makes sense to pass this kind of options via the kernel
+> command line as we can extend it easily for more options in the
+> future.
 > 
-> I still think doing the same for arm64 would result in more maintainable
-> code, because it completely separates the two different formats into
-> separate files. We'd obviously leave the existing compat handling as
-> it is, and just add one more file, not do both of them separately as
-> MIPS does.
-
-It will probably simplify some of the code like setting personality,
-COMPAT_ELF_HWCAP, elf_check_arch.
-
-> Do you see any downsides of that approach?
-
-Not really. execve may take just a little bit longer to search the right
-binfmt but that's lost in the noise anyway, the execve operation itself
-is expensive.
-
-AFAICT, the main decision on choosing the ELF binfmt comes from
-elf_check_arch() and sizeof(struct elf_phdr). The ILP32 would use the
-EM_AARCH64 class but a smaller struct elf_phdr (with 32-bit members). So
-there won't be any confusion with the AArch32 (compat) and AArch64
-(native) binfmt elf loaders.
-
-> > IIUC, we may have a problem with this. elf_hwcap is 64-bit long while
-> > elf_info[n] is 32-bit (Elf32_Addr), so we truncate AT_HWCAP if we ever
-> > go beyond bit 31. The above may need to look something like:
-> > 
-> > #define COMPAT_ELF_HWCAP        \
-> >         (is_a32_compat_task()   \
-> >          ? compat_elf_hwcap     \
-> >          : (u32)elf_hwcap)
-> > 
-> > #define COMPAT_ELF_HWCAP2       \
-> >         (is_a32_compat_task()   \
-> >          ? compat_elf_hwcap2    \
-> >          : (u32)(elf_hwcap >> 32))
+> Furthermore, I suspect this feature may be needed for other
+> arch/plat. So having a generic option could be useful for future
+> changes.
 > 
-> Yes, interesting find.
+> Thomas, do you have an opinion ?
+> 
+> Can we consider adding a set of kernel parameters instead of adding
+> DT exceptions time to time ?
+> 
+> eg.
+> 
+> clocksource.reset = <0/1>
+> clocksource.virtual = <0/1>
 
-BTW, we need to make sure this series (primarily the ABI) is big-endian
-safe. I know it is not targeted at this initially but given that the
-reason for doing it is legacy networking code, I wouldn't be surprised
-if someone asks for BE at some point in the future.
+I don't think you can have generic optins for this. What exactly you
+need will depend on the specific clocksource and set of other agents
+using it. Generic options won't adequately capture those details.
 
--- 
-Catalin
+Thanks,
+Mark.
