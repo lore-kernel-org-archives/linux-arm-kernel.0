@@ -1,89 +1,104 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 17 Dec 2015 11:02:47 +0000
-Subject: [PATCH] clocksource: arm_global_timer: Allow DT to specify
- already reset timer counter
-In-Reply-To: <56728B87.8030409@linaro.org>
-References: <1448429044-10395-1-git-send-email-jaswinder.singh@linaro.org>
- <5670559A.4050404@linaro.org>
- <CABb+yY0_JvVV_HG_iU8KJjmwu-nq_Cu5hJ6HBoKZCrZAdJ=rLQ@mail.gmail.com>
- <56710BD6.2090502@linaro.org>
- <CAJe_Zher2N-jFOBiA-25u0fQv_mdps+_Y4FoFdjiw9E++87TLg@mail.gmail.com>
- <56728B87.8030409@linaro.org>
-Message-ID: <20151217110247.GB13389@leverpostej>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 17 Dec 2015 12:03:10 +0100
+Subject: SDHCI long sleep with interrupts off
+In-Reply-To: <20151217112814.6250a3b9@archvile>
+References: <20151217112814.6250a3b9@archvile>
+Message-ID: <1450350190.3163.93.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 17, 2015 at 11:16:39AM +0100, Daniel Lezcano wrote:
-> On 12/17/2015 10:37 AM, Jassi Brar wrote:
-> >On 16 December 2015 at 12:29, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
-> >>On 12/16/2015 05:11 AM, Jassi Brar wrote:
-> >>>
-> >>>On Tue, Dec 15, 2015 at 11:32 PM, Daniel Lezcano
-> >>><daniel.lezcano@linaro.org> wrote:
-> >>>>
-> >>>>On 11/25/2015 06:24 AM, Jassi Brar wrote:
-> >>>>>
-> >>>>>
-> >>>>>The GT counter is common to every core in a cluster. There is a usecase
-> >>>>>when Linux is spawned by a 'master' firmware/OS running on some core of
-> >>>>>the same cluster and the GT is used by the both.
-> >>>>>    Linux, upon boot, resetting the GT counter is obviously fatal to the
-> >>>>>other OS. So provide a way for DT to tell Linux if it's running in that
-> >>>>>'slave' mode and must not reset the counter.
-> >>>>>
-> >>>>>Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
-> >>>>
-> >>>>
-> >>>>
-> >>>>Hmm, I doubt that is a hardware description.
-> >>>>
-> >>>Its a regular 2core-1cluster platform. The master RTOS on cpu0
-> >>>maintains the lifecycle of Linux on cpu1.
-> >>>
-> >>>'No_Counter_Reset' is not a h/w thing, I agree, but I don't know how
-> >>>to better convey that platform specific constraint.
-> >>
-> >>
-> >>May be with a kernel parameter ?
-> >>
-> >The fact, that arch-timer driver does it via DT (see commit
-> >65b5732d241b8), changes anything? :)
+Am Donnerstag, den 17.12.2015, 11:28 +0100 schrieb David Jander:
+> Hi all, 
 > 
-> It is debatable (cc'ed Rob).
+> I was investigating the source of abnormal irq-latency spikes on an i.MX6
+> (ARM) board, and discovered this:
 > 
-> I acked it because the patch was on the edge between soft/hw in the
-> description. But now it sounds like that created a precedence and we
-> consider these DT options exceptions as acceptable.
+> # tracer: preemptirqsoff
+> #
+> # preemptirqsoff latency trace v1.1.5 on 4.4.0-rc4+
+> # --------------------------------------------------------------------
+> # latency: 2068 us, #4/4, CPU#0 | (M:preempt VP:0, KP:0, SP:0 HP:0 #P:1)
+> #    -----------------
+> #    | task: mmcqd/0-92 (uid:0 nice:0 policy:0 rt_prio:0)
+> #    -----------------
+> #  => started at: _raw_spin_lock_irqsave
+> #  => ended at:   _raw_spin_unlock_irqrestore
+> #
+> #
+> #                  _------=> CPU#            
+> #                 / _-----=> irqs-off        
+> #                | / _----=> need-resched    
+> #                || / _---=> hardirq/softirq 
+> #                ||| / _--=> preempt-depth   
+> #                |||| /     delay            
+> #  cmd     pid   ||||| time  |   caller      
+> #     \   /      |||||  \    |   /         
+>  mmcqd/0-92      0d...    1us#: _raw_spin_lock_irqsave
+>  mmcqd/0-92      0.n.1 2066us : _raw_spin_unlock_irqrestore
+>  mmcqd/0-92      0.n.1 2070us+: trace_preempt_on <-_raw_spin_unlock_irqrestore
+>  mmcqd/0-92      0.n.1 2107us : <stack trace>
+>  => sdhci_runtime_resume_host
+>  => __rpm_callback
+>  => rpm_callback
+>  => rpm_resume
+>  => __pm_runtime_resume
+>  => __mmc_claim_host
+>  => mmc_blk_issue_rq
+>  => mmc_queue_thread
+>  => kthread
+>  => ret_from_fork
+> 
+> 2 ms with interrupts disabled!!! To much dismay, I later discovered that this
+> isn't even the worst case scenario. I also discovered that this has been in
+> the kernel for a long time without a fix (I have tested from 3.17 to 4.4-rc4).
+> There has been an attempt by someone to address this back in 2010, but
+> apparently it never hit mainline.
+> Going through the code in sdhci.c, I found this troublesome code-path:
+> 
+> sdhci_do_set_ios() {
+> 	spin_lock_irqsave(&host->lock, flags);
+> 	...
+> 	sdhci_reinit() --> sdhci_init() --> sdhci_do_reset() -->
+> 		host->ops->reset() --> sdhci_reset()	
+> 	...
+> 	spin_unlock_irqrestore(&host->lock, flags);
+> }
+> 
+> And in sdhci_reset(), which may be called with held spinlock:
+> 
+> 	...
+> 	/* Wait max 100 ms */
+> 	timeout = 100;
+> 
+> 	/* hw clears the bit when it's done */
+> 	while (sdhci_readb(host, SDHCI_SOFTWARE_RESET) & mask) {
+> 		if (timeout == 0) {
+> 			pr_err("%s: Reset 0x%x never completed.\n",
+> 				mmc_hostname(host->mmc), (int)mask);
+> 			sdhci_dumpregs(host);
+> 			return;
+> 		}
+> 		timeout--;
+> 		mdelay(1);
+> 	}
+> 
+> I am wondering: There either must be a reason this hasn't been fixed in such a
+> long time, or I am not understanding this correctly, so please enlighten me.
+> Before trying a cowboy attempt at "fixing" this, I'd really like to know why am
+> I seeing this?
+> I mean... how can such a problem get unnoticed and unfixed for so long?
+> Will an attempt at fixing this issue even be accepted?
+> 
+I would like to see the sdhci spinlock killed and replaced by a mutex
+for exactly this reason.
 
-While not strictly a HW property, it is a property of the system,
-outside of the control of Linux. It's fine to place such things in the
-DT when required.
+That said, your problem is card polling, when no card is present in the
+slot. This is most probably caused by CD gpios having the wrong
+polarity.
 
-I don't think it makes sense to have to use kernel commadn line
-parameters for this.
+Regards,
+Lucas
 
-> I don't know if there is a better way than a kernel parameter but
-> IMO it makes sense to pass this kind of options via the kernel
-> command line as we can extend it easily for more options in the
-> future.
-> 
-> Furthermore, I suspect this feature may be needed for other
-> arch/plat. So having a generic option could be useful for future
-> changes.
-> 
-> Thomas, do you have an opinion ?
-> 
-> Can we consider adding a set of kernel parameters instead of adding
-> DT exceptions time to time ?
-> 
-> eg.
-> 
-> clocksource.reset = <0/1>
-> clocksource.virtual = <0/1>
-
-I don't think you can have generic optins for this. What exactly you
-need will depend on the specific clocksource and set of other agents
-using it. Generic options won't adequately capture those details.
-
-Thanks,
-Mark.
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
