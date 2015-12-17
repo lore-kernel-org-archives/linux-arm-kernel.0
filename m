@@ -1,72 +1,73 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 17 Dec 2015 09:39:32 +0100
-Subject: [PATCH v3] net/macb: add support for resetting PHY using GPIO
-In-Reply-To: <6382531.CWmTLTEYMq@wuerfel> (Arnd Bergmann's message of "Wed, 16
- Dec 2015 20:10:14 +0100")
-References: <1450290690-32369-1-git-send-email-gregory.clement@free-electrons.com>
- <6382531.CWmTLTEYMq@wuerfel>
-Message-ID: <874mfhtqnv.fsf@free-electrons.com>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Thu, 17 Dec 2015 16:41:30 +0800
+Subject: [PATCH v7 19/19] KVM: ARM64: Add a new kvm ARM PMU device
+In-Reply-To: <20151217083314.2ed36f9f@why.wild-wind.fr.eu.org>
+References: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>	<1450169379-12336-20-git-send-email-zhaoshenglong@huawei.com>	<567032AD.8000206@arm.com>	<567036DE.80605@linaro.org>	<567038E3.3010102@arm.com>	<20151215204739.GK4120@cbox>	<56711348.6010406@huawei.com>	<56711B99.1000608@huawei.com>	<20151216203336.GE24889@cbox>	<567262CA.6050905@huawei.com>
+ <20151217083314.2ed36f9f@why.wild-wind.fr.eu.org>
+Message-ID: <5672753A.8050006@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
- 
- On mer., d?c. 16 2015, Arnd Bergmann <arnd@arndb.de> wrote:
 
-> On Wednesday 16 December 2015 19:31:30 Gregory CLEMENT wrote:
->> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
->> index 88c1e1a..35661aa 100644
->> --- a/drivers/net/ethernet/cadence/macb.c
->> +++ b/drivers/net/ethernet/cadence/macb.c
->> @@ -28,6 +28,7 @@
->>  #include <linux/phy.h>
->>  #include <linux/of.h>
->>  #include <linux/of_device.h>
->> +#include <linux/of_gpio.h>
->>  #include <linux/of_mdio.h>
->>  #include <linux/of_net.h>
->
-> Is this the patch that is already in linux-next?
 
-I've just checked and it is the v2 which is in linux-next. David applied
-it on Monday in his next branche but I was not aware of it.
+On 2015/12/17 16:33, Marc Zyngier wrote:
+> On Thu, 17 Dec 2015 15:22:50 +0800
+> Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+> 
+>> > 
+>> > 
+>> > On 2015/12/17 4:33, Christoffer Dall wrote:
+>>> > > On Wed, Dec 16, 2015 at 04:06:49PM +0800, Shannon Zhao wrote:
+>>>> > >> Hi,
+>>>> > >>
+>>>> > >> On 2015/12/16 15:31, Shannon Zhao wrote:
+>>>>>>>>>>> > >>>>>>>>> But in this case, you're returning an error if it is *not* initialized.
+>>>>>>>>>>> > >>>>>>>>> I understand that in that case you cannot return an interrupt number (-1
+>>>>>>>>>>> > >>>>>>>>> would be weird), but returning -EBUSY feels even more weird.
+>>>>>>>>>>> > >>>>>>>>>
+>>>>>>>>>>> > >>>>>>>>> I'd settle for -ENOXIO, or something similar. Anyone having a better idea?
+>>>>>>>>>>> > >>>>>>>>>
+>>>>>>> > >>>>> ENXIO or ENODEV would be my choice too, and add that to the
+>>>>>>> > >>>>> Documentation clearly describing when this error code is used.
+>>>>>>> > >>>>>
+>>>>>>> > >>>>> By the way, why do you loop over all VCPUS to set the same value when
+>>>>>>> > >>>>> you can't do anything per VCPU anyway?  It seems to me it's either a
+>>>>>>> > >>>>> per-VM property (that you can store on the VM data structure) or it's a
+>>>>>>> > >>>>> true per-VCPU property?
+>>>>> > >>> This is a per-VCPU property. PMU interrupt could be PPI or SPI. For PPI
+>>>>> > >>> the interrupt numbers are same for each vcpu, while for SPI they are
+>>>>> > >>> different, so it needs to set them separately. I planned to support both
+>>>>> > >>> PPI and SPI. I think I should add support for SPI at this moment and let
+>>>>> > >>> users (QEMU) to set these interrupts for each one.
+>>>> > >>
+>>>> > >> How about below vPMU Documentation?
+>>>> > >>
+>>>> > >> ARM Virtual Performance Monitor Unit (vPMU)
+>>>> > >> ===========================================
+>>>> > >>
+>>>> > >> Device types supported:
+>>>> > >>   KVM_DEV_TYPE_ARM_PMU_V3         ARM Performance Monitor Unit v3
+>>>> > >>
+>>>> > >> Instantiate one PMU instance for per VCPU through this API.
+>>>> > >>
+>>>> > >> Groups:
+>>>> > >>   KVM_DEV_ARM_PMU_GRP_IRQ
+>>>> > >>   Attributes:
+>>>> > >>     The attr field of kvm_device_attr encodes two values:
+>>>> > >>     bits:     | 63 .... 32 | 31 .... 0 |
+>>>> > >>     values:   | vcpu_index |  irq_num  |
+>> > BTW, I change this Attribute to below format and pass vcpu_index through
+>> > this Attribute while pass irq_num through kvm_device_attr.addr.
+>> > Is it fine?
+>> > 
+>> >     bits:     | 63 .... 32 | 31 ....  0 |
+>> >     values:   |  reserved  | vcpu_index |
+> Using the .addr field for something that is clearly not an address is
+> rather odd. Is there any prior usage of that field for something that
+> is not an address?
 
-David,
-
-if I remebered well you do not remove patch from yout branch.  So would
-you agree to take a follow-up patch on top of 5833e0526820 "net/macb:
-add support for resetting PHY using GPIO" ?
-
-I will fix the error found by Arnd and also use a better device tree
-binding (more future proof).
-
-Thanks,
-
-Gregory
-
->
-> I needed an additional
->
-> #include <linux/gpio/consumer.h>
->
-> to avoid this build error on randconfig builds without GPIOLIB:
->
->     drivers/net/ethernet/cadence/macb.c: In function 'macb_probe':
->     drivers/net/ethernet/cadence/macb.c:2908:19: error: implicit declaration of function 'devm_gpiod_get_optional' [-Werror=implicit-function-declaration]
->       bp->reset_gpio = devm_gpiod_get_optional(&bp->pdev->dev, "phy-reset",
->                        ^
->     drivers/net/ethernet/cadence/macb.c:2909:8: error: 'GPIOD_OUT_HIGH' undeclared (first use in this function)
->             GPIOD_OUT_HIGH);
->             ^
->     drivers/net/ethernet/cadence/macb.c:2909:8: note: each undeclared identifier is reported only once for each function it appears in
->     drivers/net/ethernet/cadence/macb.c: In function 'macb_remove':
->     drivers/net/ethernet/cadence/macb.c:2979:3: error: implicit declaration of function 'gpiod_set_value' [-Werror=implicit-function-declaration]
->
->
-> 	Arnd
+I see this usage in vgic_attr_regs_access(). But if you prefer previous
+one, I'll use that.
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Shannon
