@@ -1,57 +1,33 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Thu, 17 Dec 2015 07:51:14 -0800
-Subject: -next regression: "driver cohandle -EPROBE_DEFER from
- bus_type.match()"
-Message-ID: <CAPcyv4hOJuT=i2A_0vDQHsL7MXNgVN_p17q3UW6EcTkxsCMmeg@mail.gmail.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Thu, 17 Dec 2015 09:55:30 -0600
+Subject: [PATCH] tty: amba-pl011: add support for 32-bit register access
+ for earlycon
+In-Reply-To: <20151213060643.GA30667@kroah.com>
+References: <1446855503-25881-1-git-send-email-timur@codeaurora.org>
+ <20151213060643.GA30667@kroah.com>
+Message-ID: <CAOZdJXVz5Bm2-XBNjoU6uh=i2E0Mq915entU+rz-MqD8F4C=xQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit below causes the libnvdimm sub-system to stop loading.
-This is due to the fact that nvdimm_bus_match() returns the result of
-test_bit() which may be negative.  If there are any other bus match
-functions using test_bit they may be similarly impacted.
+On Sun, Dec 13, 2015 at 12:06 AM, Greg Kroah-Hartman <greg@kroah.com> wrote:
 
-Can we queue a fixup like the following to libnvdimm, and maybe
-others, ahead of this driver core change?
+>> Example:
+>>
+>>       earlycon=pl011,mmio32,0x3ced1000
+>>
+>> Signed-off-by: Timur Tabi <timur@codeaurora.org>
+>> ---
+>>
+>> This patch applies on top of Russell's 12-part amba-pl011.c patchset.
+>
+> Which I didn't apply, so can you resend this after he resends his?
 
-diff --git a/drivers/nvdimm/bus.c b/drivers/nvdimm/bus.c
-index 7e2c43f701bc..2b2181cdeb63 100644
---- a/drivers/nvdimm/bus.c
-+++ b/drivers/nvdimm/bus.c
-@@ -62,7 +62,7 @@ static int nvdimm_bus_match(struct device *dev,
-struct device_driver *drv)
-{
-       struct nd_device_driver *nd_drv = to_nd_device_driver(drv);
+I see that some of Russell's patches are now in tty-next.  Does that
+make them official?  There was some disagreement about the usage of
+access_32b vs uap->port.iotype for determining whether we need 32-bit
+accessors or not.
 
--       return test_bit(to_nd_device_type(dev), &nd_drv->type);
-+       return !!test_bit(to_nd_device_type(dev), &nd_drv->type);
-}
-
-static struct module *to_bus_provider(struct device *dev)
-
-
-
-
-Other ideas?
-
-commit 09a14906a26e454cad7ff0ad96af40fc4cd90eb0
-Author: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-Date:   Tue Dec 8 10:00:45 2015 +0100
-
-   ARM: 8472/1: driver cohandle -EPROBE_DEFER from bus_type.match()
-
-   Allow implementations of the match() callback in struct bus_type to
-   return errors and if it's -EPROBE_DEFER then queue the device for
-   deferred probing.
-
-   This is useful to buses such as AMBA in which devices are registered
-   before their matching information can be retrieved from the HW
-   (typically because a clock driver hasn't probed yet).
-
-   [changed if-else code structure, adjusted documentation to match the code,
-   extended comments]
-
-   Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-   Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-   Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
-   Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
