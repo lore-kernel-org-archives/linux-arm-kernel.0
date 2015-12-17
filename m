@@ -1,46 +1,92 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 17 Dec 2015 14:32:48 -0800
-Subject: [PATCH v4 0/4] Raspberry Pi power domains
-In-Reply-To: <1450312009-1791-1-git-send-email-eric@anholt.net> (Eric Anholt's
- message of "Wed, 16 Dec 2015 16:26:45 -0800")
-References: <1450312009-1791-1-git-send-email-eric@anholt.net>
-Message-ID: <7hh9jg7lkf.fsf@deeprootsystems.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 17 Dec 2015 22:37:10 +0000
+Subject: BUG: SDHCI fails to DMA-unmap, and other warnings
+In-Reply-To: <20151217221808.GL8644@n2100.arm.linux.org.uk>
+References: <20151217215140.GK8644@n2100.arm.linux.org.uk>
+ <20151217220045.GA27072@n2100.arm.linux.org.uk>
+ <20151217221808.GL8644@n2100.arm.linux.org.uk>
+Message-ID: <20151217223709.GM8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eric Anholt <eric@anholt.net> writes:
+On Thu, Dec 17, 2015 at 10:18:09PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Dec 17, 2015 at 10:00:45PM +0000, Russell King - ARM Linux wrote:
+> > And another one:
+> > 
+> > "mmcblk0: retrying because a re-tune was needed"
+> > 
+> > static int mmc_blk_err_check(struct mmc_card *card,
+> >                              struct mmc_async_req *areq)
+> > {
+> > ...
+> >         if (brq->data.error) {
+> >                 if (need_retune && !brq->retune_retry_done) {
+> >                         pr_info("%s: retrying because a re-tune was needed\n",
+> >                                 req->rq_disk->disk_name);
+> >                         brq->retune_retry_done = 1;
+> >                         return MMC_BLK_RETRY;
+> > 
+> > This looks like it'll spam the kernel log regularly if MMC/SD is used
+> > heavily with a UHS card, which (iirc) requires regular retunes.  Why is
+> > this message at info level, and not debug level?
+> 
+> And... if three problems aren't enough, have another one... running:
+> 
+> while :; do hdparm -t /dev/mmcblk0; done
+> 
+> eventually causes:
+> 
+> [ 3465.671526] mmc0: tuning execution failed
+> [ 3465.675746] mmcblk0: response CRC error sending r/w cmd command, card status 0x900
+> [ 3622.758988] mmc0: tuning execution failed
+> [ 3622.763227] mmcblk0: response CRC error sending r/w cmd command, card status 0x900
+> [ 3858.363555] mmc0: tuning execution failed
+> [ 3858.368857] mmcblk0: response CRC error sending r/w cmd command, card status 0x900
+> [ 3880.388048] mmc0: tuning execution failed
+> [ 3880.392292] mmcblk0: response CRC error sending r/w cmd command, card status 0x900
 
-> Update from v3 to move the driver under drivers/soc.  I've placed it
-> under drivers/soc/bcm since that's how the other drivers under
-> drivers/soc are structured.
+And finally, I get the bug that was reported to me by a SolidRun user:
 
-Thanks, I like it better under drivers/soc too.
+[ 4507.373536] mmc0: Got data interrupt 0x00000002 even though no data operation was in progress.
 
-Reviewed-by: Kevin Hilman <khilman@linaro.org>
+So, that's a total of five MMC/SD bugs in 4.4-rc5 which need
+investigation.
 
-Kevin
+Another issue that I've spotted is this cruddy code - which I use
+the term "crud" with a certain amount of distaste, given that there
+was a big effort to "streamline" DMA-API mapping/unmapping events a
+few years back.  So why does sdhci-adma code now do this:
 
-> Alexander Aring (3):
->   ARM: bcm2835: add rpi power domain driver
->   dt-bindings: add rpi power domain driver bindings
->   ARM: bcm2835: Add the Raspberry Pi power domain driver to the DT.
->
-> Eric Anholt (1):
->   ARM: bcm2835: Define two new packets from the latest firmware.
->
->  .../bindings/soc/bcm/raspberrypi,bcm2835-power.txt |  47 ++++
->  arch/arm/boot/dts/bcm2835-rpi.dtsi                 |  11 +
->  arch/arm/boot/dts/bcm2835.dtsi                     |   2 +-
->  drivers/soc/Kconfig                                |   1 +
->  drivers/soc/Makefile                               |   1 +
->  drivers/soc/bcm/Kconfig                            |   9 +
->  drivers/soc/bcm/Makefile                           |   1 +
->  drivers/soc/bcm/raspberrypi-power.c                | 247 +++++++++++++++++++++
->  include/dt-bindings/soc/raspberrypi-power.h        |  41 ++++
->  include/soc/bcm2835/raspberrypi-firmware.h         |   2 +
->  10 files changed, 361 insertions(+), 1 deletion(-)
->  create mode 100644 Documentation/devicetree/bindings/soc/bcm/raspberrypi,bcm2835-power.txt
->  create mode 100644 drivers/soc/bcm/Kconfig
->  create mode 100644 drivers/soc/bcm/Makefile
->  create mode 100644 drivers/soc/bcm/raspberrypi-power.c
->  create mode 100644 include/dt-bindings/soc/raspberrypi-power.h
+        if (has_unaligned && data->flags & MMC_DATA_READ) {
+                dma_sync_sg_for_cpu(mmc_dev(host->mmc), data->sg,
+                        data->sg_len, direction);
+
+                align = host->align_buffer;
+...
+        if (data->host_cookie == COOKIE_MAPPED) {
+                dma_unmap_sg(mmc_dev(host->mmc), data->sg,
+                        data->sg_len, direction);
+                data->host_cookie = COOKIE_UNMAPPED;
+        }
+
+What this has the effect of doing is invalidating the caches over
+the range in dma_sync_sg_for_cpu(), and then doing it all over again
+in dma_unmap_sg() _or_ later when we come to do the "streamlined"
+unmap.  In either case, this is completely unnecessary to walk the
+entire scatterlist twice.
+
+If you're going to have to do that dma_sync_sg_for_cpu() there
+because you need to write the unaligned data into the buffer, you
+might as well unmap the buffer at that point and be done with it -
+whether or not you're using the "streamlined" DMA-API hack that
+MMC pulls.
+
+Doing otherwise is nothing but a pure unadulterated waste of CPU
+cycles.
+
+So make that six issues now. :)
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
