@@ -1,103 +1,83 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 17 Dec 2015 16:24:46 -0500
-Subject: [PATCH V2 00/23] MMCONFIG refactoring and support for ARM64 PCI
- hostbridge init based on ACPI
-In-Reply-To: <1450278993-12664-1-git-send-email-tn@semihalf.com>
-References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
-Message-ID: <5673281E.7020204@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 17 Dec 2015 21:51:40 +0000
+Subject: BUG: SDHCI fails to DMA-unmap, and other warnings
+Message-ID: <20151217215140.GK8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+Firstly, with a UHS-1 card on iMX6 (so sdhci-esdhc-imx):
 
-On 12/16/2015 10:16 AM, Tomasz Nowicki wrote:
-> From the functionality point of view this series might be split into the
-> following logic parts:
-> 1. Make MMCONFIG code arch-agnostic which allows all architectures to collect
->    PCI config regions and used when necessary.
-> 2. Move non-arch specific bits to the core code.
-> 3. Use MMCONFIG code and implement generic ACPI based PCI host
->    controller driver.
-> 4. Enable above driver on ARM64
-> 
-> Patches has been built on top of 4.4-rc4 and can be found here:
-> git at github.com:semihalf-nowicki-tomasz/linux.git (pci-acpi-v2)
-> 
-> NOTE, this patch set depends on Matthew's patches:
-> http://www.spinics.net/lists/linux-pci/msg45950.html
-> https://github.com/Vality/linux/tree/pci-fixes
-> 
-> This has been tested on Cavium ThunderX 1 socket server and QEMU.
-> Any help in reviewing and testing is very appreciated.
-> 
-> v1 -> v2
-> - moved non-arch specific piece of code to dirver/acpi/ directory
-> - fixed IO resource handling
-> - introduced PCI config accessors quirks matching
-> - moved ACPI_COMPANION_SET to generic code
-> 
+WARNING: CPU: 1 PID: 93 at lib/dma-debug.c:509 add_dma_entry+0xfc/0x13c()
+DMA-API: exceeded 7 overlapping mappings of cacheline 0x00f99290
+Modules linked in: snd_soc_imx_sgtl5000 snd_soc_fsl_asoc_card hid_cypress snd_soc_imx_spdif snd_soc_sgtl5000 snd_soc_imx_audmux cec_dev imx_sdma rc_cec caam imx2_wdt snd_soc_fsl_spdif(+) snd_soc_fsl_ssi coda v4l2_mem2mem imx_pcm_dma videobuf2_dma_contig videobuf2_vmalloc dw_hdmi_cec videobuf2_memops imx_thermal dw_hdmi_ahb_audio cec etnaviv(C) fuse rc_pinnacle_pctv_hd
+CPU: 1 PID: 93 Comm: mmcqd/0 Tainted: G         C      4.4.0-rc5+ #1934
+Hardware name: Freescale i.MX6 Quad/DualLite (Device Tree)
+Backtrace:
+[<c00138a4>] (dump_backtrace) from [<c0013a40>] (show_stack+0x18/0x1c)
+ r6:c033cb44 r5:000001fd r4:00000000 r3:00000000
+[<c0013a28>] (show_stack) from [<c0313220>] (dump_stack+0x7c/0x98)
+[<c03131a4>] (dump_stack) from [<c002d8f4>] (warn_slowpath_common+0x80/0xbc)
+ r4:ee715a48 r3:ee718b80
+[<c002d874>] (warn_slowpath_common) from [<c002d9d4>] (warn_slowpath_fmt+0x38/0x40)
+ r8:efdc3940 r7:3e64a400 r6:20010093 r5:00f99290 r4:c09fce77
+[<c002d9a0>] (warn_slowpath_fmt) from [<c033cb44>] (add_dma_entry+0xfc/0x13c)
+ r3:00000007 r2:c086cc50
+[<c033ca48>] (add_dma_entry) from [<c033ce94>] (debug_dma_map_page+0x128/0x164)
+ r6:00000000 r5:ef1e1c10 r4:ef236800
+[<c033cd6c>] (debug_dma_map_page) from [<c052ae90>] (sdhci_send_command+0x300/0xe44)
+ r10:c13bc880 r9:ee715bf8 r8:ef1e1c10 r7:ee715bc4 r6:3e64a400 r5:00000400
+ r4:ee6a0440 r3:00000200
+[<c052ab90>] (sdhci_send_command) from [<c052c10c>] (sdhci_request+0x90/0x104)
+ r10:00000001 r9:ee715e7c r8:00010013 r7:ee6a0440 r6:ee715c2c r5:ee6a05b8
+ r4:ee6a0000
+[<c052c07c>] (sdhci_request) from [<c05142e0>] (__mmc_start_request+0x48/0xd8)
+ r10:ee991e40 r8:c07217dc r7:ee715c2c r6:ee715c2c r5:ee6a0000 r4:ee715c2c
+[<c0514298>] (__mmc_start_request) from [<c0514470>] (mmc_start_request+0x100/0x130)
+ r7:ee715c3c r6:ee715c2c r5:ee6a0000 r4:ee715c2c
+[<c0514370>] (mmc_start_request) from [<c05144e4>] (mmc_wait_for_req+0x44/0x15c)
+ r5:ee6a0000 r4:ee6a0000
+[<c05144a0>] (mmc_wait_for_req) from [<c051acc0>] (mmc_send_tuning+0x130/0x1a4)
+ r8:c07217dc r7:00000200 r6:00000000 r5:00000040 r4:ee6a0000 r3:00000001
+[<c051ab90>] (mmc_send_tuning) from [<c052ee64>] (esdhc_executing_tuning+0x44/0xf8)
+ r10:00000001 r8:ee6a0440 r7:00000013 r6:ee6a05b8 r5:ee6a0440 r4:0000000c
+[<c052ee20>] (esdhc_executing_tuning) from [<c052ba98>] (sdhci_execute_tuning+0xc4/0x6a8)
+ r7:00000013 r6:ee6a05b8 r5:20000013 r4:ee6a0000
+[<c052b9d4>] (sdhci_execute_tuning) from [<c0515a30>] (mmc_execute_tuning+0x38/0x78)
+ r10:00000001 r9:ee715e7c r8:ee710ad0 r7:ee7109a8 r6:00000000 r5:ee6a0000
+ r4:ee6a0000
+[<c05159f8>] (mmc_execute_tuning) from [<c0517e5c>] (mmc_retune+0x74/0xd0)
+ r5:ee6a0000 r4:ee6a0000
+[<c0517de8>] (mmc_retune) from [<c05142b0>] (__mmc_start_request+0x18/0xd8)
+ r4:ee7109a8 r3:c0527808
+[<c0514298>] (__mmc_start_request) from [<c0514470>] (mmc_start_request+0x100/0x130)
+ r7:ee7109a8 r6:00000000 r5:ee6a0000 r4:ee7109a8
+[<c0514370>] (mmc_start_request) from [<c0514ddc>] (mmc_start_req+0x298/0x3a8)
+ r5:00000000 r4:ee6a0000
+[<c0514b44>] (mmc_start_req) from [<c0523e74>] (mmc_blk_issue_rw_rq+0xd0/0xb30)
+ r10:ee6a1000 r9:ee7109a8 r8:ee710824 r7:ee710800 r6:ee6a1000 r5:ee6a1000
+ r4:00000000
+[<c0523da4>] (mmc_blk_issue_rw_rq) from [<c05249d8>] (mmc_blk_issue_rq+0x104/0x49c)
+ r10:00000001 r9:24590000 r8:ee710800 r7:ee710800 r6:ee737b60 r5:ee6a1000
+ r4:ee710824
+[<c05248d4>] (mmc_blk_issue_rq) from [<c05265dc>] (mmc_queue_thread+0xbc/0x160)
+ r10:00000001 r9:ee71082c r8:24590000 r7:00000000 r6:ee5aec60 r5:ee737b60
+ r4:ee710824
+[<c0526520>] (mmc_queue_thread) from [<c004da9c>] (kthread+0xe0/0xfc)
+ r10:00000000 r9:00000000 r8:00000000 r7:c0526520 r6:ee710824 r5:00000000
+ r4:ee67ed80 r3:00000000
+[<c004d9bc>] (kthread) from [<c000fcf0>] (ret_from_fork+0x14/0x24)
+ r7:00000000 r6:00000000 r5:c004d9bc r4:ee67ed80
+---[ end trace 41e5fc6596fc8196 ]---
 
-Just tested your series. I'm seeing a resource assignment problem below. 
-The bus addresses show as memory addresses and memory addresses show as 
-bus addresses and IO resource did not show up.
+Secondly, my logs are spammed with this at _info_ level:
 
+/soc/aips-bus at 02100000/usdhc at 02190000: voltage-ranges unspecified
 
-Tomasz V2
-
-[    2.520852] ACPI: PCI Interrupt Link [LN1C] (IRQs *238)
-[    2.535472] ACPI: PCI Interrupt Link [LN1D] (IRQs *239)
-[    2.550562] ACPI: PCI Root Bridge [PCI2] (domain 0002 [bus 00-1f])
-[    2.567813] acpi PNP0A08:02: _OSC: OS supports [ExtendedConfig ASPM ClockPM Segments MSI]
-[    2.591270] acpi PNP0A08:02: _OSC: platform does not support [PCIeHotplug]
-[    2.611144] acpi PNP0A08:02: _OSC: OS now controls [PME AER PCIeCapability]
-[    2.630299] ACPI: IORT: can't find node related to (null) device
-[    2.647184]_acpi_PNP0A08:02:_PCI_host_bridge_to_bus_0002:00
-[    2.662663] pci_bus 0002:00: root bus resource [mem 0x00100000-0x3fffffff window] (bus address [0xfffff5ff00100000-0xfffff5ff3fffffff])
-[    2.703561] pci_bus 0002:00: root bus resource [mem 0x40000000-0x7fffffff window] (bus address [0xfffff5fe80000000-0xfffff5febfffffff])
-[    2.737737] pci_bus 0002:00: root bus resource [mem 0x80000000-0xffffffff window] (bus address [0xfffff5fe00000000-0xfffff5fe7fffffff])
-[    2.794961] pci_bus 0002:00: root bus resource [bus 00-1f]
-
-Mark Salter's patches
-
-[    2.730011] ACPI: PCI Interrupt Link [LN1C] (IRQs *238)
-[    2.744648] ACPI: PCI Interrupt Link [LN1D] (IRQs *239)
-[    2.759330] ACPI: PCI Root Bridge [PCI2] (domain 0002 [bus 00-1f])
-[    2.783295] acpi PNP0A08:02: _OSC: OS supports [ExtendedConfig ASPM ClockPM Segments MSI]
-[    2.806726] acpi PNP0A08:02: _OSC: platform does not support [PCIeHotplug]
-[    2.826005] acpi PNP0A08:02: _OSC: OS now controls [PME AER PCIeCapability]
-[    2.845361] PCI host bridge to bus 0002:00
-[    2.856719]_pci_bus_0002:00:_root_bus_resource_[bus_00-1f]
-[    2.872056] pci_bus 0002:00: root bus resource [mem 0xa0100100000-0xa013fffffff] (bus address [0x00100000-0x3fffffff])
-[    2.902008] pci_bus 0002:00: root bus resource [mem 0xa0200000000-0xa023fffffff] (bus address [0x40000000-0x7fffffff])
-[    2.932396] pci_bus 0002:00: root bus resource [mem 0xa0300000000-0xa037fffffff] (bus address [0x80000000-0xffffffff])
-[    2.983827] pci_bus 0002:00: root bus resource [io  0x0000-0xffff]
-
-Here is how the ACPI table looks like:
-
-		QWORDMemory(			// Consumed-And-prodced resource(all of memory space)
-			ResourceProducer,	// bit 0 of general flags is 0
-			PosDecode,		// positive Decode:  		_DEC
-			MinFixed,		// Range is fixed:   		_MIF
-			MaxFixed,		// Range is fixed:   		_MAF
-			NonCacheable,		// 				_MEM
-			ReadWrite,		// 				_RW
-			0x00000000,		// Granularity: 	   	_GRA
-			0x00100000,		// Min - PCI Memory start: 	_MIN
-			0x3FFFFFFF,		// Max - PCI Memory end:   	_MAX
-			0xA0100000000,		// Translation: 		_TRA
-			0x3FF00000,		// Range Length: 		_LEN
-			,			// Optional field left blank
-			,			// Optional field left blank
-			MEM0,			// Name declaration for this descriptor
-			AddressRangeMemory,
-			TypeStatic
-			) 
-
-
-Any thoughts?
-
+which is really interesting, because the binding document says that
+"voltage-ranges" is optional.  If it's optional, then we shouldn't
+be spamming the kernel log 24+ times during boot with this.
 
 -- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
