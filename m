@@ -1,47 +1,76 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 17 Dec 2015 11:41:53 +0000
-Subject: [PATCH v6 08/20] arm64: ilp32: add is_ilp32_compat_{task,
- thread} and TIF_32BIT_AARCH64
-In-Reply-To: <1450215766-14765-9-git-send-email-ynorov@caviumnetworks.com>
-References: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
- <1450215766-14765-9-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <20151217114153.GD25232@e104818-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 17 Dec 2015 11:42:17 +0000
+Subject: [PATCH v2 1/2] IOMMU: arm-smmu-v3: Fix broken STE.VALID check in
+ Broadcom Vulcan
+In-Reply-To: <1450346376-30920-1-git-send-email-pmallapp@broadcom.com>
+References: <1450346376-30920-1-git-send-email-pmallapp@broadcom.com>
+Message-ID: <20151217114216.GB11456@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 16, 2015 at 12:42:34AM +0300, Yury Norov wrote:
-> Reviewed-by: David Daney <ddaney@caviumnetworks.com>
-> Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
-> Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
-> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-> Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
+Hi Prem,
 
-Long description missing.
+Thanks for the update. I still have a few questions though.
 
-> diff --git a/arch/arm64/include/asm/is_compat.h b/arch/arm64/include/asm/is_compat.h
-> index 476db90..89b1f65 100644
-> --- a/arch/arm64/include/asm/is_compat.h
-> +++ b/arch/arm64/include/asm/is_compat.h
-> @@ -36,7 +36,6 @@ static inline int is_a32_compat_thread(struct thread_info *thread)
->  #else
+On Thu, Dec 17, 2015 at 03:29:35PM +0530, Prem Mallappa wrote:
+> Vulcan SMMUv3 looks into more bits than necessary to validate the STE
+> entry (including EATS, S2PS, AARCH64), which is a overkill, but without
+> the proper encoding; the SMMU stops processing PCIe read/write requests.
+> Giving the h/w what it wants.
+> 
+> Signed-off-by: Prem Mallappa <pmallapp@broadcom.com>
+> ---
+>  drivers/iommu/arm-smmu-v3.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index 359190b..9886d2d 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -260,6 +260,7 @@
+>  #define STRTAB_STE_2_S2VMID_MASK	0xffffUL
+>  #define STRTAB_STE_2_VTCR_SHIFT		32
+>  #define STRTAB_STE_2_VTCR_MASK		0x7ffffUL
+> +#define STRTAB_STE_2_S2PS_SHIFT        48
+>  #define STRTAB_STE_2_S2AA64		(1UL << 51)
+>  #define STRTAB_STE_2_S2ENDI		(1UL << 52)
+>  #define STRTAB_STE_2_S2PTW		(1UL << 54)
+> @@ -579,6 +580,7 @@ struct arm_smmu_device {
+>  	u32				features;
 >  
->  static inline int is_a32_compat_task(void)
-> -
->  {
->  	return 0;
->  }
+>  #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
+> +#define ARM_SMMU_OPT_BRCM_BROKEN_STE_VALID	(1 << 1)
+>  	u32				options;
+>  
+>  	struct arm_smmu_cmdq		cmdq;
+> @@ -643,6 +645,7 @@ struct arm_smmu_option_prop {
+>  
+>  static struct arm_smmu_option_prop arm_smmu_options[] = {
+>  	{ ARM_SMMU_OPT_SKIP_PREFETCH, "hisilicon,broken-prefetch-cmd" },
+> +	{ ARM_SMMU_OPT_BRCM_BROKEN_STE_VALID, "broadcom,broken-ste-valid-check" },
+>  	{ 0, NULL},
+>  };
+>  
+> @@ -1053,6 +1056,13 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
+>  				      : STRTAB_STE_0_CFG_BYPASS;
+>  		dst[0] = cpu_to_le64(val);
+>  		dst[2] = 0; /* Nuke the VMID */
+> +
+> +		if (smmu && (smmu->options & ARM_SMMU_OPT_BRCM_BROKEN_STE_VALID)) {
+> +			WARN_ON(smmu->oas != 44);
 
-You should move this to the previous patch.
+Do we really need this WARN_ON?
 
-> @@ -45,14 +44,39 @@ static inline int is_a32_compat_thread(struct thread_info *thread)
->  {
->  	return 0;
->  }
-> -
->  #endif /* CONFIG_AARCH32_EL0 */
+> +			dst[1] = STRTAB_STE_1_EATS_TRANS << STRTAB_STE_1_EATS_SHIFT;
 
-Maybe this one as well, though I like an empty line before the last
-#endif (i.e. drop this hunk).
+cpu_to_le64 here too.
 
--- 
-Catalin
+> +			dst[2] |= cpu_to_le64(STRTAB_STE_2_S2AA64);
+> +		}
+> +
+
+Is this workaround only needed for bypass STEs? If not, we have a problem
+when we install a stage-1 entry, because we'll clear the EATS bits as
+it stands.
+
+Will
