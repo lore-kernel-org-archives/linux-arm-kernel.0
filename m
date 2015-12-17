@@ -1,64 +1,76 @@
-From: tom_usenet@optusnet.com.au (Tom Evans)
-Date: Thu, 17 Dec 2015 15:22:01 +1100
-Subject: can: flexcan: Ancient Freescale Reference FlexCAN Driver and bug
- fixes so it works.
-In-Reply-To: <566A0267.2080809@optusnet.com.au>
-References: <1431603215-25546-1-git-send-email-bhupesh.sharma@freescale.com>
- <1431603215-25546-6-git-send-email-bhupesh.sharma@freescale.com>
- <5554C244.80809@pengutronix.de>
- <BY1PR0301MB130358076C3A5969406DE69182D80@BY1PR0301MB1303.namprd03.prod.outlook.com>
- <BY1PR0301MB130384E91308C49A850DEC4782E90@BY1PR0301MB1303.namprd03.prod.outlook.com>
- <56696582.7020503@optusnet.com.au> <566973A4.5000703@pengutronix.de>
- <566A0267.2080809@optusnet.com.au>
-Message-ID: <56723869.5060900@optusnet.com.au>
+From: drivshin.allworx@gmail.com (David Rivshin (Allworx))
+Date: Thu, 17 Dec 2015 00:04:09 -0500
+Subject: [PATCH] drivers: net: cpsw: fix RMII/RGMII mode when used with
+ fixed-link PHY
+In-Reply-To: <1741588.Ve76Z1ZI87@localhost>
+References: <20151209223115.6c5a400f.drivshin.allworx@gmail.com>
+ <6416396.ZOturxhSar@localhost>
+ <20151214130446.1e14fbb8.drivshin.allworx@gmail.com>
+ <1741588.Ve76Z1ZI87@localhost>
+Message-ID: <20151217000409.27615e57.drivshin.allworx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12/15 09:53, Tom Evans wrote:
-> On 10/12/2015 11:44 PM, Marc Kleine-Budde wrote:
->> On 12/10/2015 12:44 PM, Tom Evans wrote:
->>> I've just had to delve back into the deep murky past and try to get
->>> Freescale's Kernel 2.6.35 FlexCAN driver working...
->
-> On an i.MX53. That's the last supported kernel Freescale ever released for
-> that series of parts.
+On Wed, 16 Dec 2015 07:39:16 +0100
+Markus Brunner <systemprogrammierung.brunner@gmail.com> wrote:
 
-> The simplest path was to fix the
-> simple and stupidly obvious bugs in the existing driver rather
- > than add new complicated bugs.
+> On Monday 14 December 2015 13:04:46 David Rivshin wrote:
+> > On Sat, 12 Dec 2015 16:44:19 +0100
+> ...
+> > > Your patch works fine on my board, which uses MII and dual_emac
+> > > with a fixed_phy and a real one.
+> > 
+> > Thanks for checking. The only dual_emac board I have available is
+> > the EVMSK, which has two real PHYs. I'm not sure of the usual
+> > etiquette (and Google was  unhelpful), should I add a Tested-by on
+> > the next version?
+> > 
+> Yes you can. Documentation/SubmittingPatches has some notes about it.
 
-There seems to be no end of bugs in this driver. It is a lesson in something.
+Thanks, I didn't want to throw it on without permission. Although due 
+to the non-trivial change I mention below, I figured that the previous 
+testing wasn't totally valid anymore anyways, so I left it off the v2 
+emails.
 
-What's the dumbest driver bug ever? Interrupt hazard. Yes, this one has that too.
+> > > I wanted to keep changes small and didn't spend too much thinking
+> > > about already broken devicetrees. Since my patch is quite new, I
+> > 
+> > I'm honestly not sure it's an important consideration myself. Most
+> > patches I've seen in this area for this or other drivers do not take
+> > such behavior into account (e.g. the phy-handle parsing that went in
+> > to cpsw in 4.3).
+> > I would generally feel more comfortable with such a behavior tweak
+> > (minor as it is) before 4.4 is released, to avoid ping-ponging the
+> > behavior. But given how far along the cycle is, I'm not sure about
+> > the chances of that.
+> 
+> Well I don't think compatibility for flawed DTs is such a high
+> priority, especially if it is that unlikely that there are some
+> affected. Keep the focus on the other _real_ problems you have
+> encountered and fix those like you see fit. 
 
-The mainline sends a Message Buffer (or tries to) and DISABLES the netif queue 
-if it can't send [1]. The transmit interrupt service routine ENABLES the netif 
-queue. And when the interrupt routine happens in the middle of the mainline 
-transmit routine? It locks forever. You have to power-cycle to get it back. 
-Normally taking the interface "down" and "up" should fix it, as the "start" 
-and "stop" functions normally stop and start the netif queue. Not these ones. 
-They do now.
+Since there's been no indication from anyone that being nice to such
+broken DTs is desired, I decided to drop that aspect of the patch and 
+leave the current 4.4-rc1..5 behavior. This also made it much more 
+reasonable to chop up the patch into smaller pieces, which I think will 
+be easier to review.
 
-Note 1: This is in the case where the transmit queues and MBs are full. The 
-transmit function is always called twice. The first time it is called it sends 
-the MB, leaves the queue running and return "OK". The second time it finds out 
-it is full, stops the queue and returns "BUSY". Even better, with the default 
-32 transmit MBs it has to scan through all 32 MBs to find out it is full, and 
-it may have also had to scan the same 32 to find an empty one. The FlexCAN 
-registers are on a slow bus and take 180ns to read or write. So it can take 
-the driver up to 12us to send one buffer. Or proportionally longer if you have 
-more Transmit MBs (you might have 56).
+> > > don't see any problems with subtle changes like that. However you
+> > > should update the documentation as well.
+> > 
+> > Your patch already updated .../bindings/net/cpsw.txt, which this
+> > patch left alone. Are you referring to some other documentation,
+> > or do you think I should update the binding documentation to state
+> > that phy_id takes precedence over fixed-link? I figured that such
+> > devicetrees were still officially malformed, so I thought the
+> > existing text was appropriate.
+> 
+> "Either the properties phy_id and phy-mode, or the sub-node
+> fixed-link can be specified" One flaw of my patch was to ignore the
+> phy-mode for a fixed link. Do not mention the precedence of the
+> phy_id, because it is an undefined behavior. Your patch should change
+> it to: "Either the property phy_id, or the sub-node fixed-link can be
+> specified"
 
-If you never send enough data to flow-control the driver this won't happen. If 
-you have more than one Transmit MB (and can handle out of order transmissions) 
-then the subsequent transmit interrupts will repair the damage and you won't 
-see it either. That's probably why it passed whatever testing it had.
-
-Bug detailed here:
-
-https://community.freescale.com/message/597952
-
-Patch to fix here:
-
-https://community.freescale.com/message/597951#597951
-Tom
+Thanks for pointing that out. For some reason my brain skipped over the 
+"and phy-mode" part. Fixed in v2.
