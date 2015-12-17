@@ -1,43 +1,58 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Thu, 17 Dec 2015 12:52:07 +0100
-Subject: [PATCH V2 04/10] irqchip / GICv3: remove gic root node in ITS
+Date: Thu, 17 Dec 2015 12:52:08 +0100
+Subject: [PATCH V2 05/10] irqchip, gicv3,
+ its: Mark its_init() and its children as __init
 In-Reply-To: <1450353133-15992-1-git-send-email-tn@semihalf.com>
 References: <1450353133-15992-1-git-send-email-tn@semihalf.com>
-Message-ID: <1450353133-15992-5-git-send-email-tn@semihalf.com>
+Message-ID: <1450353133-15992-6-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hanjun Guo <hanjun.guo@linaro.org>
+gicv3_init_bases() is the only caller for its_init(),
+also it is a __init function, so mark its_init() as __init too,
+then recursively mark the functions called as __init.
 
-The gic_root_node defined in ITS driver is not actually
-used, and the ITS driver seems will not use it in the
-future, so just remove it.
+This will help to introduce ITS initialization using ACPI tables as
+we will use acpi_table_parse_entries family functions there which
+belong to __init section as well.
 
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 3 ---
- 1 file changed, 3 deletions(-)
+ drivers/irqchip/irq-gic-v3-its.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index e23d1d1..7ca7f9a 100644
+index 7ca7f9a..2bbed18 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -97,7 +97,6 @@ struct its_device {
+@@ -669,7 +669,7 @@ static int its_chunk_to_lpi(int chunk)
+ 	return (chunk << IRQS_PER_CHUNK_SHIFT) + 8192;
+ }
  
- static LIST_HEAD(its_nodes);
- static DEFINE_SPINLOCK(its_lock);
--static struct device_node *gic_root_node;
- static struct rdists *gic_rdists;
+-static int its_lpi_init(u32 id_bits)
++static int __init its_lpi_init(u32 id_bits)
+ {
+ 	lpi_chunks = its_lpi_to_chunk(1UL << id_bits);
  
- #define gic_data_rdist()		(raw_cpu_ptr(gic_rdists->rdist))
-@@ -1602,8 +1601,6 @@ int its_init(struct device_node *node, struct rdists *rdists,
- 	}
+@@ -1424,7 +1424,8 @@ static void its_enable_quirks(struct its_node *its)
+ 	gic_enable_quirks(iidr, its_quirks, its);
+ }
  
- 	gic_rdists = rdists;
--	gic_root_node = node;
--
- 	its_alloc_lpi_tables();
- 	its_lpi_init(rdists->id_bits);
+-static int its_probe(struct device_node *node, struct irq_domain *parent)
++static int __init its_probe(struct device_node *node,
++			    struct irq_domain *parent)
+ {
+ 	struct resource res;
+ 	struct its_node *its;
+@@ -1585,7 +1586,7 @@ static struct of_device_id its_device_id[] = {
+ 	{},
+ };
  
+-int its_init(struct device_node *node, struct rdists *rdists,
++int __init its_init(struct device_node *node, struct rdists *rdists,
+ 	     struct irq_domain *parent_domain)
+ {
+ 	struct device_node *np;
 -- 
 1.9.1
