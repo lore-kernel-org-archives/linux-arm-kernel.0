@@ -1,181 +1,83 @@
-From: ashoks@broadcom.com (Ashok Kumar)
-Date: Thu, 17 Dec 2015 01:38:32 -0800
-Subject: [PATCH v4 2/2] arm64: Use PoU cache instr for I/D coherency
-In-Reply-To: <1450345112-3657-1-git-send-email-ashoks@broadcom.com>
-References: <1450345112-3657-1-git-send-email-ashoks@broadcom.com>
-Message-ID: <1450345112-3657-3-git-send-email-ashoks@broadcom.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 17 Dec 2015 09:38:57 +0000
+Subject: [PATCH v7 19/19] KVM: ARM64: Add a new kvm ARM PMU device
+In-Reply-To: <5672753A.8050006@huawei.com>
+References: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>	<1450169379-12336-20-git-send-email-zhaoshenglong@huawei.com>	<567032AD.8000206@arm.com>	<567036DE.80605@linaro.org>	<567038E3.3010102@arm.com>	<20151215204739.GK4120@cbox>	<56711348.6010406@huawei.com>	<56711B99.1000608@huawei.com>	<20151216203336.GE24889@cbox>	<567262CA.6050905@huawei.com>
+ <20151217083314.2ed36f9f@why.wild-wind.fr.eu.org>
+ <5672753A.8050006@huawei.com>
+Message-ID: <567282B1.7070105@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In systems with three levels of cache(PoU at L1 and PoC at L3),
-PoC cache flush instructions flushes L2 and L3 caches which could affect
-performance.
-For cache flushes for I and D coherency, PoU should suffice.
-So changing all I and D coherency related cache flushes to PoU.
+On 17/12/15 08:41, Shannon Zhao wrote:
+> 
+> 
+> On 2015/12/17 16:33, Marc Zyngier wrote:
+>> On Thu, 17 Dec 2015 15:22:50 +0800
+>> Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+>>
+>>>>
+>>>>
+>>>> On 2015/12/17 4:33, Christoffer Dall wrote:
+>>>>>> On Wed, Dec 16, 2015 at 04:06:49PM +0800, Shannon Zhao wrote:
+>>>>>>>> Hi,
+>>>>>>>>
+>>>>>>>> On 2015/12/16 15:31, Shannon Zhao wrote:
+>>>>>>>>>>>>>>>>>>>>>> But in this case, you're returning an error if it is *not* initialized.
+>>>>>>>>>>>>>>>>>>>>>> I understand that in that case you cannot return an interrupt number (-1
+>>>>>>>>>>>>>>>>>>>>>> would be weird), but returning -EBUSY feels even more weird.
+>>>>>>>>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>>>>>>>>> I'd settle for -ENOXIO, or something similar. Anyone having a better idea?
+>>>>>>>>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>> ENXIO or ENODEV would be my choice too, and add that to the
+>>>>>>>>>>>>>> Documentation clearly describing when this error code is used.
+>>>>>>>>>>>>>>
+>>>>>>>>>>>>>> By the way, why do you loop over all VCPUS to set the same value when
+>>>>>>>>>>>>>> you can't do anything per VCPU anyway?  It seems to me it's either a
+>>>>>>>>>>>>>> per-VM property (that you can store on the VM data structure) or it's a
+>>>>>>>>>>>>>> true per-VCPU property?
+>>>>>>>>>> This is a per-VCPU property. PMU interrupt could be PPI or SPI. For PPI
+>>>>>>>>>> the interrupt numbers are same for each vcpu, while for SPI they are
+>>>>>>>>>> different, so it needs to set them separately. I planned to support both
+>>>>>>>>>> PPI and SPI. I think I should add support for SPI at this moment and let
+>>>>>>>>>> users (QEMU) to set these interrupts for each one.
+>>>>>>>>
+>>>>>>>> How about below vPMU Documentation?
+>>>>>>>>
+>>>>>>>> ARM Virtual Performance Monitor Unit (vPMU)
+>>>>>>>> ===========================================
+>>>>>>>>
+>>>>>>>> Device types supported:
+>>>>>>>>   KVM_DEV_TYPE_ARM_PMU_V3         ARM Performance Monitor Unit v3
+>>>>>>>>
+>>>>>>>> Instantiate one PMU instance for per VCPU through this API.
+>>>>>>>>
+>>>>>>>> Groups:
+>>>>>>>>   KVM_DEV_ARM_PMU_GRP_IRQ
+>>>>>>>>   Attributes:
+>>>>>>>>     The attr field of kvm_device_attr encodes two values:
+>>>>>>>>     bits:     | 63 .... 32 | 31 .... 0 |
+>>>>>>>>     values:   | vcpu_index |  irq_num  |
+>>>> BTW, I change this Attribute to below format and pass vcpu_index through
+>>>> this Attribute while pass irq_num through kvm_device_attr.addr.
+>>>> Is it fine?
+>>>>
+>>>>     bits:     | 63 .... 32 | 31 ....  0 |
+>>>>     values:   |  reserved  | vcpu_index |
+>> Using the .addr field for something that is clearly not an address is
+>> rather odd. Is there any prior usage of that field for something that
+>> is not an address?
+> 
+> I see this usage in vgic_attr_regs_access(). But if you prefer previous
+> one, I'll use that.
 
-Introduced a new __clean_dcache_area_pou API for dcache flush till PoU
-and provided a common macro for __flush_dcache_area and
-__clean_dcache_area_pou.
+Ah, you're using the .addr field to point to a userspace value, not to
+carry the value itself! That'd be fine by me (even if I still prefer the
+original one), but I'd like others to chime in (I'm quite bad at
+defining userspace stuff...).
 
-Also, now in __sync_icache_dcache, icache invalidation for non-aliasing
-VIPT icache is done only for that particular page instead of the earlier
-__flush_icache_all.
+Thanks,
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Ashok Kumar <ashoks@broadcom.com>
----
- arch/arm64/include/asm/cacheflush.h |  1 +
- arch/arm64/mm/cache.S               | 28 +++++++++++++++++-----------
- arch/arm64/mm/flush.c               | 33 ++++++++++++++++++---------------
- arch/arm64/mm/proc-macros.S         | 22 ++++++++++++++++++++++
- 4 files changed, 58 insertions(+), 26 deletions(-)
-
-diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
-index c75b8d0..6a5ecbd 100644
---- a/arch/arm64/include/asm/cacheflush.h
-+++ b/arch/arm64/include/asm/cacheflush.h
-@@ -68,6 +68,7 @@
- extern void flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned long end);
- extern void flush_icache_range(unsigned long start, unsigned long end);
- extern void __flush_dcache_area(void *addr, size_t len);
-+extern void __clean_dcache_area_pou(void *addr, size_t len);
- extern long __flush_cache_user_range(unsigned long start, unsigned long end);
- 
- static inline void flush_cache_mm(struct mm_struct *mm)
-diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-index eb48d5d..605739d 100644
---- a/arch/arm64/mm/cache.S
-+++ b/arch/arm64/mm/cache.S
-@@ -81,26 +81,32 @@ ENDPROC(__flush_cache_user_range)
- /*
-  *	__flush_dcache_area(kaddr, size)
-  *
-- *	Ensure that the data held in the page kaddr is written back to the
-- *	page in question.
-+ *	Ensure that any D-cache lines for the interval [kaddr, kaddr+size)
-+ *	are cleaned and invalidated to the PoC.
-  *
-  *	- kaddr   - kernel address
-  *	- size    - size in question
-  */
- ENTRY(__flush_dcache_area)
--	dcache_line_size x2, x3
--	add	x1, x0, x1
--	sub	x3, x2, #1
--	bic	x0, x0, x3
--1:	dc	civac, x0			// clean & invalidate D line / unified line
--	add	x0, x0, x2
--	cmp	x0, x1
--	b.lo	1b
--	dsb	sy
-+	dcache_by_line_op civac, sy, x0, x1, x2, x3
- 	ret
- ENDPROC(__flush_dcache_area)
- 
- /*
-+ *	__clean_dcache_area_pou(kaddr, size)
-+ *
-+ * 	Ensure that any D-cache lines for the interval [kaddr, kaddr+size)
-+ * 	are cleaned to the PoU.
-+ *
-+ *	- kaddr   - kernel address
-+ *	- size    - size in question
-+ */
-+ENTRY(__clean_dcache_area_pou)
-+	dcache_by_line_op cvau, ish, x0, x1, x2, x3
-+	ret
-+ENDPROC(__clean_dcache_area_pou)
-+
-+/*
-  *	__inval_cache_range(start, end)
-  *	- start   - start address of region
-  *	- end     - end address of region
-diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
-index c26b804..46649d6 100644
---- a/arch/arm64/mm/flush.c
-+++ b/arch/arm64/mm/flush.c
-@@ -34,19 +34,24 @@ void flush_cache_range(struct vm_area_struct *vma, unsigned long start,
- 		__flush_icache_all();
- }
- 
-+static void sync_icache_aliases(void *kaddr, unsigned long len)
-+{
-+	unsigned long addr = (unsigned long)kaddr;
-+
-+	if (icache_is_aliasing()) {
-+		__clean_dcache_area_pou(kaddr, len);
-+		__flush_icache_all();
-+	} else {
-+		flush_icache_range(addr, addr + len);
-+	}
-+}
-+
- static void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
- 				unsigned long uaddr, void *kaddr,
- 				unsigned long len)
- {
--	if (vma->vm_flags & VM_EXEC) {
--		unsigned long addr = (unsigned long)kaddr;
--		if (icache_is_aliasing()) {
--			__flush_dcache_area(kaddr, len);
--			__flush_icache_all();
--		} else {
--			flush_icache_range(addr, addr + len);
--		}
--	}
-+	if (vma->vm_flags & VM_EXEC)
-+		sync_icache_aliases(kaddr, len);
- }
- 
- /*
-@@ -74,13 +79,11 @@ void __sync_icache_dcache(pte_t pte, unsigned long addr)
- 	if (!page_mapping(page))
- 		return;
- 
--	if (!test_and_set_bit(PG_dcache_clean, &page->flags)) {
--		__flush_dcache_area(page_address(page),
--				PAGE_SIZE << compound_order(page));
-+	if (!test_and_set_bit(PG_dcache_clean, &page->flags))
-+		sync_icache_aliases(page_address(page),
-+				    PAGE_SIZE << compound_order(page));
-+	else if (icache_is_aivivt())
- 		__flush_icache_all();
--	} else if (icache_is_aivivt()) {
--		__flush_icache_all();
--	}
- }
- 
- /*
-diff --git a/arch/arm64/mm/proc-macros.S b/arch/arm64/mm/proc-macros.S
-index 4c4d93c..146bd99 100644
---- a/arch/arm64/mm/proc-macros.S
-+++ b/arch/arm64/mm/proc-macros.S
-@@ -62,3 +62,25 @@
- 	bfi	\valreg, \tmpreg, #TCR_T0SZ_OFFSET, #TCR_TxSZ_WIDTH
- #endif
- 	.endm
-+
-+/*
-+ * Macro to perform a data cache maintenance for the interval
-+ * [kaddr, kaddr + size)
-+ *
-+ * 	op:		operation passed to dc instruction
-+ * 	domain:		domain used in dsb instruciton
-+ * 	kaddr:		starting virtual address of the region
-+ * 	size:		size of the region
-+ * 	Corrupts: 	kaddr, size, tmp1, tmp2
-+ */
-+	.macro dcache_by_line_op op, domain, kaddr, size, tmp1, tmp2
-+	dcache_line_size \tmp1, \tmp2
-+	add	\size, \kaddr, \size
-+	sub	\tmp2, \tmp1, #1
-+	bic	\kaddr, \kaddr, \tmp2
-+9998:	dc	\op, \kaddr
-+	add	\kaddr, \kaddr, \tmp1
-+	cmp	\kaddr, \size
-+	b.lo	9998b
-+	dsb	\domain
-+	.endm
+	M.
 -- 
-2.1.0
+Jazz is not dead. It just smells funny...
