@@ -1,80 +1,50 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 17 Dec 2015 22:02:20 +0100
-Subject: [GIT PULL] Allwinner clocks changes for 4.5
-Message-ID: <20151217210220.GA25086@lukather>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 17 Dec 2015 22:08:33 +0100
+Subject: [PATCH v3 0/4] Raspberry Pi power domains
+In-Reply-To: <2899341.Os5E8ounKE@wuerfel>
+References: <1450215622-27394-1-git-send-email-eric@anholt.net>
+ <CAPDyKFp=ykY4dFTxeq+et6z5ek-UYGnBOFG7Po0pSUL7jSYc8g@mail.gmail.com>
+ <878u4sx5gs.fsf@eliezer.anholt.net> <2899341.Os5E8ounKE@wuerfel>
+Message-ID: <CAPDyKFokMdtcwG=0cDP3zKnnLrAxKDGWffWouvyVK0r53nxktg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike, Stephen,
+On 17 December 2015 at 21:11, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 17 December 2015 11:03:47 Eric Anholt wrote:
+>> >>
+>> >>  .../bindings/arm/bcm/raspberrypi,bcm2835-power.txt |  47 ++++
+>> >>  arch/arm/boot/dts/bcm2835-rpi.dtsi                 |  11 +
+>> >>  arch/arm/boot/dts/bcm2835.dtsi                     |   2 +-
+>> >>  arch/arm/mach-bcm/Kconfig                          |  10 +
+>> >>  arch/arm/mach-bcm/Makefile                         |   1 +
+>> >>  arch/arm/mach-bcm/raspberrypi-power.c              | 247 +++++++++++++++++++++
+>> >>  include/dt-bindings/arm/raspberrypi-power.h        |  41 ++++
+>> >>  include/soc/bcm2835/raspberrypi-firmware.h         |   2 +
+>> >>  8 files changed, 360 insertions(+), 1 deletion(-)
+>> >>  create mode 100644 Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-power.txt
+>> >>  create mode 100644 arch/arm/mach-bcm/raspberrypi-power.c
+>> >>  create mode 100644 include/dt-bindings/arm/raspberrypi-power.h
+>> >>
+>> >> --
+>> >> 2.6.2
+>> >>
+>> >
+>> > Besides a nitpick for patch2, I would also reverse the order of patch3
+>> > and patch2. DT docs should go in before the actual parsing of the new
+>> > bindings/compatibles.
+>> >
+>> > Anyway, for the hole series, you may add my:
+>> >
+>> > Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+>>
+>> Would your tree be pulling the series (since it's power domains), or
+>> should I (since it's SOC stuff)?
+>>
+>
+> All of the above files go through the arm-soc tree by default.
 
-Please pull the following changes for the 4.5 merge window.
+That should work as I don't see any other dependency, unless
+Eric/Alexander think there is.
 
-Thanks!
-Maxime
-
-The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
-
-  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-clocks-for-4.5
-
-for you to fetch changes up to fee3103ac3c0aeab52b337903f5af3cd3b3c02d8:
-
-  clk: sunxi: fix handling return value of of_property_match_string (2015-12-14 13:54:11 +0100)
-
-----------------------------------------------------------------
-Allwinner clocks changes for 4.5
-
-Clock patches for the Allwinner SoCs:
-  - H3 clocks
-  - A10/A20 Video Engine clocks
-  - DRAM gates
-  - A80 special CPU clock
-
-----------------------------------------------------------------
-Andrzej Hajda (1):
-      clk: sunxi: fix handling return value of of_property_match_string
-
-Chen-Yu Tsai (5):
-      clk: sunxi: Add sun9i A80 apbs gates support
-      clk: sunxi: Add sun9i A80 cpus (cpu special) clock support
-      clk: sunxi: Add DRAM gates support for sun4i-a10
-      clk: sunxi: Add VE (Video Engine) module clock driver for sun[457]i
-      clk: sunxi: Add CLK_OF_DECLARE support for sun8i-a23-apb0-clk driver
-
-Dan Carpenter (1):
-      clk: sunxi: signedness bug in sun8i_h3_bus_gates_init()
-
-Jens Kuske (1):
-      clk: sunxi: Add H3 clocks support
-
-Reinder de Haan (1):
-      clk: sunxi: Add support for the H3 usb phy clocks
-
- Documentation/devicetree/bindings/clock/sunxi.txt |  10 +
- drivers/clk/sunxi/Makefile                        |   5 +
- drivers/clk/sunxi/clk-a10-ve.c                    | 171 +++++++++++++++
- drivers/clk/sunxi/clk-simple-gates.c              |  14 ++
- drivers/clk/sunxi/clk-sun8i-apb0.c                |  80 ++++++--
- drivers/clk/sunxi/clk-sun8i-bus-gates.c           | 112 ++++++++++
- drivers/clk/sunxi/clk-sun9i-cpus.c                | 240 ++++++++++++++++++++++
- drivers/clk/sunxi/clk-sunxi.c                     |   6 +
- drivers/clk/sunxi/clk-usb.c                       |  12 ++
- 9 files changed, 638 insertions(+), 12 deletions(-)
- create mode 100644 drivers/clk/sunxi/clk-a10-ve.c
- create mode 100644 drivers/clk/sunxi/clk-sun8i-bus-gates.c
- create mode 100644 drivers/clk/sunxi/clk-sun9i-cpus.c
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151217/e742d446/attachment.sig>
+Kind regards
+Uffe
