@@ -1,74 +1,46 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 17 Dec 2015 14:31:40 -0800
-Subject: [PATCH] ARM: dma-mapping: Just allocate one chunk at a time
-In-Reply-To: <1450384253-1067-1-git-send-email-dianders@chromium.org>
-References: <1450384253-1067-1-git-send-email-dianders@chromium.org>
-Message-ID: <CAD=FV=XP9zx2XEmo7vS0MdsROJ0JoRYFidnRaBLxR43GXnuqag@mail.gmail.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Thu, 17 Dec 2015 14:32:48 -0800
+Subject: [PATCH v4 0/4] Raspberry Pi power domains
+In-Reply-To: <1450312009-1791-1-git-send-email-eric@anholt.net> (Eric Anholt's
+ message of "Wed, 16 Dec 2015 16:26:45 -0800")
+References: <1450312009-1791-1-git-send-email-eric@anholt.net>
+Message-ID: <7hh9jg7lkf.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Eric Anholt <eric@anholt.net> writes:
 
-On Thu, Dec 17, 2015 at 12:30 PM, Douglas Anderson
-<dianders@chromium.org> wrote:
-> The __iommu_alloc_buffer() is expected to be called to allocate pretty
-> sizeable buffers.  Upon simple tests of video I saw it trying to
-> allocate 4,194,304 bytes.  The function tries to be efficient about this
-> by starting out allocating large chunks and then moving to smaller and
-> smaller chunk sizes until it succeeds.
->
-> The current function is very, very slow.
->
-> One problem is the way it keeps trying and trying to allocate big
-> chunks.  Imagine a very fragmented memory that has 4M free but no
-> contiguous pages at all.  Further imagine allocating 4M (1024 pages).
-> We'll do the following memory allocations:
-> - For page 1:
->   - Try to allocate order 10 (no retry)
->   - Try to allocate order 9 (no retry)
->   - ...
->   - Try to allocate order 0 (with retry, but not needed)
-> - For page 2:
->   - Try to allocate order 9 (no retry)
->   - Try to allocate order 8 (no retry)
->   - ...
->   - Try to allocate order 0 (with retry, but not needed)
-> - ...
-> - ...
->
-> Total number of calls to alloc() calls for this case is:
->   sum(int(math.log(i, 2)) + 1 for i in range(1, 1025))
->   => 9228
->
-> The above is obviously worse case, but given how slow alloc can be we
-> really want to try to avoid even somewhat bad cases.  I timed the old
-> code with a device under memory pressure and it wasn't hard to see it
-> take more than 24 seconds to allocate 4 megs of memory (!!).
->
-> A second problem (and maybe even more important) is that allocating big
-> chunks when we don't need them is just not a good idea anyway.  The
-> first thing we do with these big chunks is break them into smaller
-> chunks!  If we allocate small chunks:
-> - The memory manager doesn't need to work so hard to give us big chunks.
-> - We can save the big chunks for those that really need them and this
->   code can make great use of all the small chunks sitting around.
->
-> Let's simplify by just allocating one page at a time.  We may make more
-> total allocate calls but it works way better.  In real world tests that
-> used to sometimes see a 24 second allocation call I can now see at most
-> 250 ms.
+> Update from v3 to move the driver under drivers/soc.  I've placed it
+> under drivers/soc/bcm since that's how the other drivers under
+> drivers/soc are structured.
 
-Off-list I talked to Dmitry about this a little bit and he pointed out
-that contiguous chunks actually give a benefit to the IOMMU.  I don't
-think the benefit outweighs the cost in this case, but I'm happy to
-hear what others have to say.  I did some quick printouts and it turns
-out that even when requesting page at a time the memory manager
-(unsurprisingly) can in many cases still give us pages that are
-contiguous.
+Thanks, I like it better under drivers/soc too.
 
-Also I'm happy to post up
-<https://chromium-review.googlesource.com/#/c/319210/> which sorts the
-array and could possibly give us larger chunks of contiguous memory.
+Reviewed-by: Kevin Hilman <khilman@linaro.org>
 
+Kevin
 
--Doug
+> Alexander Aring (3):
+>   ARM: bcm2835: add rpi power domain driver
+>   dt-bindings: add rpi power domain driver bindings
+>   ARM: bcm2835: Add the Raspberry Pi power domain driver to the DT.
+>
+> Eric Anholt (1):
+>   ARM: bcm2835: Define two new packets from the latest firmware.
+>
+>  .../bindings/soc/bcm/raspberrypi,bcm2835-power.txt |  47 ++++
+>  arch/arm/boot/dts/bcm2835-rpi.dtsi                 |  11 +
+>  arch/arm/boot/dts/bcm2835.dtsi                     |   2 +-
+>  drivers/soc/Kconfig                                |   1 +
+>  drivers/soc/Makefile                               |   1 +
+>  drivers/soc/bcm/Kconfig                            |   9 +
+>  drivers/soc/bcm/Makefile                           |   1 +
+>  drivers/soc/bcm/raspberrypi-power.c                | 247 +++++++++++++++++++++
+>  include/dt-bindings/soc/raspberrypi-power.h        |  41 ++++
+>  include/soc/bcm2835/raspberrypi-firmware.h         |   2 +
+>  10 files changed, 361 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/soc/bcm/raspberrypi,bcm2835-power.txt
+>  create mode 100644 drivers/soc/bcm/Kconfig
+>  create mode 100644 drivers/soc/bcm/Makefile
+>  create mode 100644 drivers/soc/bcm/raspberrypi-power.c
+>  create mode 100644 include/dt-bindings/soc/raspberrypi-power.h
