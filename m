@@ -1,42 +1,145 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 17 Dec 2015 16:50:49 +0800
-Subject: [GIT PULL] ARM: imx: fixes for 4.4, 3rd round
-Message-ID: <20151217085049.GA9161@tiger>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 17 Dec 2015 08:59:38 +0000
+Subject: [PATCH] ARM: KVM: Cleanup exception injection
+In-Reply-To: <20151216204018.GF24889@cbox>
+References: <1450116396-11718-1-git-send-email-marc.zyngier@arm.com>
+ <20151216204018.GF24889@cbox>
+Message-ID: <5672797A.3050305@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 9c17190595840b4ed30e8d5f286636ceb28aae4f:
+On 16/12/15 20:40, Christoffer Dall wrote:
+> On Mon, Dec 14, 2015 at 06:06:36PM +0000, Marc Zyngier wrote:
+>> David Binderman reported that the exception injection code had a
+>> couple of unused variables lingering around.
+>>
+>> Upon examination, it looked like this code could do with an
+>> anticipated spring cleaning, which amounts to deduplicating
+>> the CPSR/SPSR update.
+>>
+>> The spurious variables are removed in the process.
+>>
+>> Reported-by: David Binderman <dcb314@hotmail.com>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm/kvm/emulate.c | 59 ++++++++++++++++++++------------------------------
+>>  1 file changed, 23 insertions(+), 36 deletions(-)
+>>
+>> diff --git a/arch/arm/kvm/emulate.c b/arch/arm/kvm/emulate.c
+>> index d6c0052..245106e 100644
+>> --- a/arch/arm/kvm/emulate.c
+>> +++ b/arch/arm/kvm/emulate.c
+>> @@ -275,6 +275,25 @@ static u32 exc_vector_base(struct kvm_vcpu *vcpu)
+>>  		return vbar;
+>>  }
+>>  
+>> +/* Switch to an exception mode, updating both CPSR and SPSR */
+>> +static void kvm_update_psr(struct kvm_vcpu *vcpu, unsigned long mode)
+>> +{
+>> +	unsigned long cpsr = *vcpu_cpsr(vcpu);
+>> +	u32 sctlr = vcpu->arch.cp15[c1_SCTLR];
+>> +
+>> +	*vcpu_cpsr(vcpu) = (cpsr & ~MODE_MASK) | mode;
+>> +	*vcpu_cpsr(vcpu) |= PSR_I_BIT;
+>> +	*vcpu_cpsr(vcpu) &= ~(PSR_IT_MASK | PSR_J_BIT | PSR_E_BIT | PSR_T_BIT);
+>> +
+>> +	if (sctlr & SCTLR_TE)
+>> +		*vcpu_cpsr(vcpu) |= PSR_T_BIT;
+>> +	if (sctlr & SCTLR_EE)
+>> +		*vcpu_cpsr(vcpu) |= PSR_E_BIT;
+>> +
+>> +	/* Note: These now point to the mode banked copies */
+>> +	*vcpu_spsr(vcpu) = cpsr;
+>> +}
+>> +
+>>  /**
+>>   * kvm_inject_undefined - inject an undefined exception into the guest
+>>   * @vcpu: The VCPU to receive the undefined exception
+>> @@ -286,29 +305,13 @@ static u32 exc_vector_base(struct kvm_vcpu *vcpu)
+>>   */
+>>  void kvm_inject_undefined(struct kvm_vcpu *vcpu)
+>>  {
+>> -	unsigned long new_lr_value;
+>> -	unsigned long new_spsr_value;
+>>  	unsigned long cpsr = *vcpu_cpsr(vcpu);
+>> -	u32 sctlr = vcpu->arch.cp15[c1_SCTLR];
+>>  	bool is_thumb = (cpsr & PSR_T_BIT);
+>>  	u32 vect_offset = 4;
+>>  	u32 return_offset = (is_thumb) ? 2 : 4;
+>>  
+>> -	new_spsr_value = cpsr;
+>> -	new_lr_value = *vcpu_pc(vcpu) - return_offset;
+>> -
+>> -	*vcpu_cpsr(vcpu) = (cpsr & ~MODE_MASK) | UND_MODE;
+>> -	*vcpu_cpsr(vcpu) |= PSR_I_BIT;
+>> -	*vcpu_cpsr(vcpu) &= ~(PSR_IT_MASK | PSR_J_BIT | PSR_E_BIT | PSR_T_BIT);
+>> -
+>> -	if (sctlr & SCTLR_TE)
+>> -		*vcpu_cpsr(vcpu) |= PSR_T_BIT;
+>> -	if (sctlr & SCTLR_EE)
+>> -		*vcpu_cpsr(vcpu) |= PSR_E_BIT;
+>> -
+>> -	/* Note: These now point to UND banked copies */
+>> -	*vcpu_spsr(vcpu) = cpsr;
+>> -	*vcpu_reg(vcpu, 14) = new_lr_value;
+>> +	kvm_update_psr(vcpu, UND_MODE);
+>> +	*vcpu_reg(vcpu, 14) = *vcpu_pc(vcpu) - return_offset;
+>>  
+>>  	/* Branch to exception vector */
+>>  	*vcpu_pc(vcpu) = exc_vector_base(vcpu) + vect_offset;
+>> @@ -320,30 +323,14 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu)
+>>   */
+>>  static void inject_abt(struct kvm_vcpu *vcpu, bool is_pabt, unsigned long addr)
+>>  {
+>> -	unsigned long new_lr_value;
+>> -	unsigned long new_spsr_value;
+>>  	unsigned long cpsr = *vcpu_cpsr(vcpu);
+>> -	u32 sctlr = vcpu->arch.cp15[c1_SCTLR];
+>>  	bool is_thumb = (cpsr & PSR_T_BIT);
+>>  	u32 vect_offset;
+>>  	u32 return_offset = (is_thumb) ? 4 : 0;
+>>  	bool is_lpae;
+>>  
+>> -	new_spsr_value = cpsr;
+>> -	new_lr_value = *vcpu_pc(vcpu) + return_offset;
+>> -
+>> -	*vcpu_cpsr(vcpu) = (cpsr & ~MODE_MASK) | ABT_MODE;
+>> -	*vcpu_cpsr(vcpu) |= PSR_I_BIT | PSR_A_BIT;
+> 
+> seems like you're losing the PSR_A_BIT in kvm_update_psr() now?
 
-  ARM: dts: vf610: use reset values for L2 cache latencies (2015-12-11 21:32:47 +0800)
+Ah, nice catch. Indeed, CPSR.A gets set on abort entry, but not on
+undef. I'll add a check in kvm_update_psr, with a reference to the
+AArch32.EnterMode() pseudocode from the ARMv8 ARM.
 
-are available in the git repository at:
+> 
+>> -	*vcpu_cpsr(vcpu) &= ~(PSR_IT_MASK | PSR_J_BIT | PSR_E_BIT | PSR_T_BIT);
+>> -
+>> -	if (sctlr & SCTLR_TE)
+>> -		*vcpu_cpsr(vcpu) |= PSR_T_BIT;
+>> -	if (sctlr & SCTLR_EE)
+>> -		*vcpu_cpsr(vcpu) |= PSR_E_BIT;
+>> -
+>> -	/* Note: These now point to ABT banked copies */
+>> -	*vcpu_spsr(vcpu) = cpsr;
+>> -	*vcpu_reg(vcpu, 14) = new_lr_value;
+>> +	kvm_update_psr(vcpu, ABT_MODE);
+>> +	*vcpu_reg(vcpu, 14) = *vcpu_pc(vcpu) + return_offset;
+>>  
+>>  	if (is_pabt)
+>>  		vect_offset = 12;
+>> -- 
+>> 2.1.4
+>>
+> 
+> Otherwise looks like a welcome cleanup!
+> 
+> Thanks,
+> -Christoffer
+> 
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.4-3
+Thanks,
 
-for you to fetch changes up to 3a35e470bc6bc4ce34c19c410ebbe4e3bbf0bafe:
-
-  ARM: dts: imx6: Fix Ethernet PHY mode on Ventana boards (2015-12-15 16:53:15 +0800)
-
-----------------------------------------------------------------
-The i.MX fixes for 4.4, 3rd round:
-- Fix Ethernet PHY mode on i.MX6 Ventana boards, which can result in
-  a non-functional Ethernet when Marvell phy driver rather than generic
-  phy driver is selected.
-- Fix an assigned-clock configuration bug on imx6qdl-sabreauto board
-  which was introduced by commit ed339363de1b ("ARM: dts:
-  imx6qdl-sabreauto: Allow HDMI and LVDS to work simultaneously").
-
-----------------------------------------------------------------
-Bai Ping (1):
-      ARM: dts: imx: Fix the assigned-clock mismatch issue on imx6q/dl
-
-Krzysztof Ha?asa (1):
-      ARM: dts: imx6: Fix Ethernet PHY mode on Ventana boards
-
- arch/arm/boot/dts/imx6q-gw5400-a.dts     | 2 +-
- arch/arm/boot/dts/imx6qdl-gw51xx.dtsi    | 2 +-
- arch/arm/boot/dts/imx6qdl-gw52xx.dtsi    | 2 +-
- arch/arm/boot/dts/imx6qdl-gw53xx.dtsi    | 2 +-
- arch/arm/boot/dts/imx6qdl-gw54xx.dtsi    | 2 +-
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 6 +++---
- 6 files changed, 8 insertions(+), 8 deletions(-)
+	M.
+-- 
+Jazz is not dead. It just smells funny...
