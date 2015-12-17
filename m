@@ -1,79 +1,181 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 18 Dec 2015 00:33:47 +0100
-Subject: [PATCH v1 5/6] ARM: dts: add the sound codec for kylin board
-In-Reply-To: <1450362112-8075-6-git-send-email-wxt@rock-chips.com>
-References: <1450362112-8075-1-git-send-email-wxt@rock-chips.com>
- <1450362112-8075-6-git-send-email-wxt@rock-chips.com>
-Message-ID: <12098155.IWsPK2pU5b@diego>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 18 Dec 2015 00:38:18 +0100
+Subject: [PATCH] ARM: socfpga: Repair incorrectly applied MCV patch
+Message-ID: <1450395498-9827-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 17. Dezember 2015, 22:21:51 schrieb Caesar Wang:
-> Support the rt5616 codec for kylin board, but we need
-> enable the i2s firstly.
-> 
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> ---
-> 
->  arch/arm/boot/dts/rk3036-kylin.dts | 33 +++++++++++++++++++++++++++++++++
->  1 file changed, 33 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/rk3036-kylin.dts
-> b/arch/arm/boot/dts/rk3036-kylin.dts index 69b1e1e..296139b 100644
-> --- a/arch/arm/boot/dts/rk3036-kylin.dts
-> +++ b/arch/arm/boot/dts/rk3036-kylin.dts
-> @@ -46,6 +46,28 @@
->  	model = "Rockchip RK3036 KylinBoard";
->  	compatible = "rockchip,rk3036-kylin", "rockchip,rk3036";
-> 
-> +	sound {
-> +		compatible = "simple-audio-card";
-> +		simple-audio-card,format = "i2s";
-> +		simple-audio-card,name = "rockchip,rt5616-codec";
-> +		simple-audio-card,mclk-fs = <64>;
-> +		simple-audio-card,widgets =
-> +			"Microphone", "Microphone Jack",
-> +			"Headphone", "Headphone Jack";
-> +		simple-audio-card,routing =
-> +			"MIC1", "Microphone Jack",
-> +			"MIC2", "Microphone Jack",
-> +			"Microphone Jack", "micbias1",
-> +			"Headphone Jack", "HPOL",
-> +			"Headphone Jack", "HPOR";
-> +		simple-audio-card,cpu {
-> +			sound-dai = <&i2s>;
-> +		};
-> +		simple-audio-card,codec {
-> +			sound-dai = <&rt5616>;
-> +		};
-> +	};
-> +
->  	vcc_sys: vsys-regulator {
->  		compatible = "regulator-fixed";
->  		regulator-name = "vcc_sys";
-> @@ -261,6 +283,17 @@
-> 
->  &i2c2 {
->  	status = "okay";
-> +
-> +	rt5616: rt5616 at 1b {
-> +		#sound-dai-cells = <0>;
-> +		compatible = "rt5616";
-> +		reg = <0x1b>;
-> +	};
+For whatever reason, this patch was not applied verbatim and had all
+tabs replaced with spaces. Replace them back by a quick sed.
 
-I don't see that codec in the asoc-tree [0]. And the compatible
-would of course also need to be "realtek,rt5616".
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Alan Tull <atull@altera.com>
+Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+Cc: Thor Thayer <tthayer@altera.com>
+Cc: Vince Bridgers <vbridgers2013@gmail.com>
+---
+ arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi   | 18 +++---
+ arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts | 90 +++++++++++++--------------
+ 2 files changed, 54 insertions(+), 54 deletions(-)
 
-
-[0] https://git.kernel.org/cgit/linux/kernel/git/broonie/sound.git/tree/sound/soc/codecs?h=for-next
-
-
-> +};
-> +
-> +&i2s {
-> +	#sound-dai-cells = <0>;
-> +	status = "okay";
->  };
-> 
->  &lcdc {
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi b/arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi
+index f0e03a2..baecd98 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi
++++ b/arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi
+@@ -18,16 +18,16 @@
+ #include "socfpga_cyclone5.dtsi"
+ 
+ / {
+-       model = "DENX MCV";
+-       compatible = "altr,socfpga-cyclone5", "altr,socfpga";
++	model = "DENX MCV";
++	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
+ 
+-       memory {
+-               name = "memory";
+-               device_type = "memory";
+-               reg = <0x0 0x40000000>; /* 1 GiB */
+-       };
++	memory {
++		name = "memory";
++		device_type = "memory";
++		reg = <0x0 0x40000000>; /* 1 GiB */
++	};
+ };
+ 
+-&mmc0 {        /* On-SoM eMMC */
+-       bus-width = <8>;
++&mmc0 {	/* On-SoM eMMC */
++	bus-width = <8>;
+ };
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts b/arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts
+index 09d0ded..7186a29 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts
+@@ -18,77 +18,77 @@
+ #include "socfpga_cyclone5_mcv.dtsi"
+ 
+ / {
+-       model = "DENX MCV EVK";
+-       compatible = "altr,socfpga-cyclone5", "altr,socfpga";
++	model = "DENX MCV EVK";
++	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
+ 
+-       aliases {
+-               ethernet0 = &gmac0;
+-               stmpe-i2c0 = &stmpe1;
+-       };
++	aliases {
++		ethernet0 = &gmac0;
++		stmpe-i2c0 = &stmpe1;
++	};
+ 
+-       chosen {
+-               stdout-path = "serial0:115200n8";
+-       };
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
+ };
+ 
+ &can0 {
+-       status = "okay";
++	status = "okay";
+ };
+ 
+ &can1 {
+-       status = "okay";
++	status = "okay";
+ };
+ 
+ &gmac0 {
+-       phy-mode = "rgmii";
+-       status = "okay";
++	phy-mode = "rgmii";
++	status = "okay";
+ };
+ 
+-&gpio0 {       /* GPIO  0 ... 28 */
+-       status = "okay";
++&gpio0 {	/* GPIO  0 ... 28 */
++	status = "okay";
+ };
+ 
+-&gpio1 {       /* GPIO 29 ... 57 */
+-       status = "okay";
++&gpio1 {	/* GPIO 29 ... 57 */
++	status = "okay";
+ };
+ 
+-&gpio2 {       /* GPIO 58..66 (HLGPI 0..13 at offset 13) */
+-       status = "okay";
++&gpio2 {	/* GPIO 58..66 (HLGPI 0..13 at offset 13) */
++	status = "okay";
+ };
+ 
+ &i2c0 {
+-       status = "okay";
+-       speed-mode = <0>;
++	status = "okay";
++	speed-mode = <0>;
+ 
+-       stmpe1: stmpe811 at 41 {
+-               compatible = "st,stmpe811";
+-               #address-cells = <1>;
+-               #size-cells = <0>;
+-               reg = <0x41>;
+-               id = <0>;
+-               blocks = <0x5>;
+-               irq-gpio = <&portb 28 0x4>;     /* GPIO 57, trig. level HI */
++	stmpe1: stmpe811 at 41 {
++		compatible = "st,stmpe811";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0x41>;
++		id = <0>;
++		blocks = <0x5>;
++		irq-gpio = <&portb 28 0x4>;     /* GPIO 57, trig. level HI */
+ 
+-               stmpe_touchscreen {
+-                       compatible = "st,stmpe-ts";
+-                       reg = <0>;
+-                       ts,sample-time = <4>;
+-                       ts,mod-12b = <1>;
+-                       ts,ref-sel = <0>;
+-                       ts,adc-freq = <1>;
+-                       ts,ave-ctrl = <1>;
+-                       ts,touch-det-delay = <3>;
+-                       ts,settling = <4>;
+-                       ts,fraction-z = <7>;
+-                       ts,i-drive = <1>;
+-               };
+-       };
++		stmpe_touchscreen {
++			compatible = "st,stmpe-ts";
++			reg = <0>;
++			ts,sample-time = <4>;
++			ts,mod-12b = <1>;
++			ts,ref-sel = <0>;
++			ts,adc-freq = <1>;
++			ts,ave-ctrl = <1>;
++			ts,touch-det-delay = <3>;
++			ts,settling = <4>;
++			ts,fraction-z = <7>;
++			ts,i-drive = <1>;
++		};
++	};
+ };
+ 
+ &uart0 {
+-       status = "okay";
++	status = "okay";
+ };
+ 
+ &usb1 {
+-       status = "okay";
++	status = "okay";
+ };
+-- 
+2.6.4
