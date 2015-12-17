@@ -1,121 +1,42 @@
-From: david@protonic.nl (David Jander)
-Date: Thu, 17 Dec 2015 12:20:53 +0100
-Subject: SDHCI long sleep with interrupts off
-In-Reply-To: <1450350190.3163.93.camel@pengutronix.de>
-References: <20151217112814.6250a3b9@archvile>
- <1450350190.3163.93.camel@pengutronix.de>
-Message-ID: <20151217122053.036daf37@archvile>
+From: mweseloh42@gmail.com (Marcus Weseloh)
+Date: Thu, 17 Dec 2015 12:22:49 +0100
+Subject: [PATCH v4] spi: dts: sun4i: Add support for wait time between
+ word transmissions
+In-Reply-To: <20151216103927.GS19456@lukather>
+References: <1450080676-6704-1-git-send-email-mweseloh42@gmail.com>
+ <20151216103927.GS19456@lukather>
+Message-ID: <CAGNoLaN=HJ-OR6oFiGWC58DG+w1A9qeEVyGBRb1vdf9BRNW=Rg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Maxime,
 
-Hi Lucas,
+2015-12-16 11:39 GMT+01:00 Maxime Ripard <maxime.ripard@free-electrons.com>:
+> It looks mostly fine, however, please try to make only one thing in
+> one patch.
+>
+> In this case, it would mean having one patch to add the DT property
+> and support in the SPI core in a first one, and then add support for
+> it in your driver.
 
-Thanks for reacting.
+Will do.
 
-On Thu, 17 Dec 2015 12:03:10 +0100
-Lucas Stach <l.stach@pengutronix.de> wrote:
+> I also have a minor comment below....
+[...]
+>> +     if (spi->word_wait_ns) {
+>> +             clk_ns = DIV_ROUND_UP(1000000000, tfr->speed_hz);
+>> +             wait_clk = DIV_ROUND_UP(spi->word_wait_ns, clk_ns) - 3;
+>> +             if (wait_clk < 1) {
+>> +                     wait_clk = 1;
+>> +                     dev_info(&spi->dev,
+>> +                              "using minimum of 4 word wait cycles (%uns)",
+>> +                              4 * clk_ns);
+>
+> Logging it at the info loglevel seems a bit too high. debug seems more
+> appropriate.
 
-> Am Donnerstag, den 17.12.2015, 11:28 +0100 schrieb David Jander:
-> > Hi all, 
-> > 
-> > I was investigating the source of abnormal irq-latency spikes on an i.MX6
-> > (ARM) board, and discovered this:
-> > 
-> > # tracer: preemptirqsoff
-> > #
-> > # preemptirqsoff latency trace v1.1.5 on 4.4.0-rc4+
-> > # --------------------------------------------------------------------
-> > # latency: 2068 us, #4/4, CPU#0 | (M:preempt VP:0, KP:0, SP:0 HP:0 #P:1)
-> > #    -----------------
-> > #    | task: mmcqd/0-92 (uid:0 nice:0 policy:0 rt_prio:0)
-> > #    -----------------
-> > #  => started at: _raw_spin_lock_irqsave
-> > #  => ended at:   _raw_spin_unlock_irqrestore
-> > #
-> > #
-> > #                  _------=> CPU#            
-> > #                 / _-----=> irqs-off        
-> > #                | / _----=> need-resched    
-> > #                || / _---=> hardirq/softirq 
-> > #                ||| / _--=> preempt-depth   
-> > #                |||| /     delay            
-> > #  cmd     pid   ||||| time  |   caller      
-> > #     \   /      |||||  \    |   /         
-> >  mmcqd/0-92      0d...    1us#: _raw_spin_lock_irqsave
-> >  mmcqd/0-92      0.n.1 2066us : _raw_spin_unlock_irqrestore
-> >  mmcqd/0-92      0.n.1 2070us+: trace_preempt_on
-> > <-_raw_spin_unlock_irqrestore mmcqd/0-92      0.n.1 2107us : <stack trace>
-> >  => sdhci_runtime_resume_host
-> >  => __rpm_callback
-> >  => rpm_callback
-> >  => rpm_resume
-> >  => __pm_runtime_resume
-> >  => __mmc_claim_host
-> >  => mmc_blk_issue_rq
-> >  => mmc_queue_thread
-> >  => kthread
-> >  => ret_from_fork
-> > 
-> > 2 ms with interrupts disabled!!! To much dismay, I later discovered that
-> > this isn't even the worst case scenario. I also discovered that this has
-> > been in the kernel for a long time without a fix (I have tested from 3.17
-> > to 4.4-rc4). There has been an attempt by someone to address this back in
-> > 2010, but apparently it never hit mainline.
-> > Going through the code in sdhci.c, I found this troublesome code-path:
-> > 
-> > sdhci_do_set_ios() {
-> > 	spin_lock_irqsave(&host->lock, flags);
-> > 	...
-> > 	sdhci_reinit() --> sdhci_init() --> sdhci_do_reset() -->
-> > 		host->ops->reset() --> sdhci_reset()	
-> > 	...
-> > 	spin_unlock_irqrestore(&host->lock, flags);
-> > }
-> > 
-> > And in sdhci_reset(), which may be called with held spinlock:
-> > 
-> > 	...
-> > 	/* Wait max 100 ms */
-> > 	timeout = 100;
-> > 
-> > 	/* hw clears the bit when it's done */
-> > 	while (sdhci_readb(host, SDHCI_SOFTWARE_RESET) & mask) {
-> > 		if (timeout == 0) {
-> > 			pr_err("%s: Reset 0x%x never completed.\n",
-> > 				mmc_hostname(host->mmc), (int)mask);
-> > 			sdhci_dumpregs(host);
-> > 			return;
-> > 		}
-> > 		timeout--;
-> > 		mdelay(1);
-> > 	}
-> > 
-> > I am wondering: There either must be a reason this hasn't been fixed in
-> > such a long time, or I am not understanding this correctly, so please
-> > enlighten me. Before trying a cowboy attempt at "fixing" this, I'd really
-> > like to know why am I seeing this?
-> > I mean... how can such a problem get unnoticed and unfixed for so long?
-> > Will an attempt at fixing this issue even be accepted?
-> > 
-> I would like to see the sdhci spinlock killed and replaced by a mutex
-> for exactly this reason.
-> 
-> That said, your problem is card polling, when no card is present in the
-> slot. This is most probably caused by CD gpios having the wrong
-> polarity.
+I will change it to debug and send a new version.
 
-... or not having a CD pin at all.
-I am using an embedded eMMC chip and a uSD card inserted into a slot. The card
-is present and also detected as such. If I never access the card, I see no
-spikes (filesystem is mounted but not accessed). If I try to read a file or
-directory I get the above trace.
-OTOH, if I disable PM functionality in the kernel, the spike is gone, and
-worst-case latency is in the 300us range, so I don't think this is related to
-card polling.
+Thanks for the review!
 
-Best regards,
-
--- 
-David Jander
-Protonic Holland.
+Marcus
