@@ -1,39 +1,32 @@
 From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Thu, 17 Dec 2015 17:48:35 +0100
-Subject: [PATCH 04/24] crypto: atmel-aes: fix unregistration order of crypto
- algorithms
+Date: Thu, 17 Dec 2015 17:48:33 +0100
+Subject: [PATCH 02/24] crypto: atmel-aes: constify value argument of
+ atmel_aes_write_n()
 In-Reply-To: <cover.1450366831.git.cyrille.pitchen@atmel.com>
 References: <cover.1450366831.git.cyrille.pitchen@atmel.com>
-Message-ID: <afc8327fae3aef588513b3432611df144418091c.1450366831.git.cyrille.pitchen@atmel.com>
+Message-ID: <f5c31bdb23fc62c1230bf0ca131a86f10a05c679.1450366831.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This dummy patch fixes atmel_aes_unregister_algs() so crypto algorithms
-are unregistered in the reverse order they were registered by
-atmel_aes_register_algs().
+atmel_aes_write_n() should not modify its value argument.
 
 Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 ---
- drivers/crypto/atmel-aes.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ drivers/crypto/atmel-aes.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/crypto/atmel-aes.c b/drivers/crypto/atmel-aes.c
-index e545636a7ddc..e948bf2b8a8e 100644
+index 854e2813b2bb..1d3997a45610 100644
 --- a/drivers/crypto/atmel-aes.c
 +++ b/drivers/crypto/atmel-aes.c
-@@ -1219,10 +1219,11 @@ static void atmel_aes_unregister_algs(struct atmel_aes_dev *dd)
- {
- 	int i;
- 
--	for (i = 0; i < ARRAY_SIZE(aes_algs); i++)
--		crypto_unregister_alg(&aes_algs[i]);
- 	if (dd->caps.has_cfb64)
- 		crypto_unregister_alg(&aes_cfb64_alg);
-+
-+	for (i = 0; i < ARRAY_SIZE(aes_algs); i++)
-+		crypto_unregister_alg(&aes_algs[i]);
+@@ -231,7 +231,7 @@ static void atmel_aes_read_n(struct atmel_aes_dev *dd, u32 offset,
  }
  
- static int atmel_aes_register_algs(struct atmel_aes_dev *dd)
+ static void atmel_aes_write_n(struct atmel_aes_dev *dd, u32 offset,
+-					u32 *value, int count)
++			      const u32 *value, int count)
+ {
+ 	for (; count--; value++, offset += 4)
+ 		atmel_aes_write(dd, offset, *value);
 -- 
 1.8.2.2
