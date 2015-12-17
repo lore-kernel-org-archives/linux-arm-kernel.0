@@ -1,40 +1,72 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Thu, 17 Dec 2015 08:48:09 -0800
-Subject: -next regression: "driver cohandle -EPROBE_DEFER from
- bus_type.match()"
-In-Reply-To: <CAPcyv4hOJuT=i2A_0vDQHsL7MXNgVN_p17q3UW6EcTkxsCMmeg@mail.gmail.com>
-References: <CAPcyv4hOJuT=i2A_0vDQHsL7MXNgVN_p17q3UW6EcTkxsCMmeg@mail.gmail.com>
-Message-ID: <CAPcyv4h1yhyqxdyLka2X56Q5QhCoXY3vALFBdm0gdQdYR6Vr8w@mail.gmail.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Thu, 17 Dec 2015 17:48:31 +0100
+Subject: [PATCH 00/24] crypto: atmel-aes: global rework of the driver
+Message-ID: <cover.1450366831.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 17, 2015 at 7:51 AM, Dan Williams <dan.j.williams@intel.com> wrote:
-> The commit below causes the libnvdimm sub-system to stop loading.
-> This is due to the fact that nvdimm_bus_match() returns the result of
-> test_bit() which may be negative.  If there are any other bus match
-> functions using test_bit they may be similarly impacted.
->
-> Can we queue a fixup like the following to libnvdimm, and maybe
-> others, ahead of this driver core change?
->
-> diff --git a/drivers/nvdimm/bus.c b/drivers/nvdimm/bus.c
-> index 7e2c43f701bc..2b2181cdeb63 100644
-> --- a/drivers/nvdimm/bus.c
-> +++ b/drivers/nvdimm/bus.c
-> @@ -62,7 +62,7 @@ static int nvdimm_bus_match(struct device *dev,
-> struct device_driver *drv)
-> {
->        struct nd_device_driver *nd_drv = to_nd_device_driver(drv);
->
-> -       return test_bit(to_nd_device_type(dev), &nd_drv->type);
-> +       return !!test_bit(to_nd_device_type(dev), &nd_drv->type);
-> }
->
-> static struct module *to_bus_provider(struct device *dev)
->
->
->
->
-> Other ideas?
+Hi all,
 
-How about just checking for EPROBE_DEFER, every other non-zero value is success.
+this series of patches is a global rework of the Atmel driver. Some
+patches improve the performances whereas others fix some bugs like
+the counter overflow in CTR mode.
+
+It also updates some part of the code to make them more generic. For
+instance the crypto request queue management supports both async block
+cipher and AEAD requests, which allows us to add support the the GCM
+mode. The support of the GCM mode is only available on sama5d4 and later.
+
+This series is based on linux-next and was tested on sama5d2, sama5d3 and
+sama5d4 boards. The driver implementation was validated using the tcrypt
+module running modes:
+- 10: ecb(aes), cbc(aes), ctr(aes), rfc3686(ctr(aes))
+- 35: gcm(aes)
+
+tcrypt speed test was run with modes:
+- 211: rfc4106(gcm(aes)), gcm(aes)
+- 500: ecb(aes), cbc(aes), ctr(aes), cfb(aes), ofc(aes), rfc3686(ctr(aes))
+
+Finally iperf was run for at least 5 mins over an IPSEC/L2TP tunnel using
+the rfc4106(gcm(aes)) cipher suite.
+
+
+Changelog:
+
+v1: initial version
+
+
+Cyrille Pitchen (23):
+  crypto: atmel-aes: constify value argument of atmel_aes_write_n()
+  crypto: atmel-aes: change algorithm priorities
+  crypto: atmel-aes: fix unregistration order of crypto algorithms
+  crypto: atmel-aes: remove unused header includes
+  crypto: atmel-aes: propagate error from atmel_aes_hw_version_init()
+  crypto: atmel-aes: change atmel_aes_write_ctrl() signature
+  crypto: atmel-aes: make crypto request queue management more generic
+  crypto: atmel-aes: remove useless write in the Control Register
+  crypto: atmel-aes: simplify the configuration of the AES IP
+  crypto: atmel-aes: rework crypto request completion
+  crypto: atmel-aes: remove unused 'err' member of struct atmel_aes_dev
+  crypto: atmel-aes: reduce latency of DMA completion
+  crypto: atmel-aes: remove useless AES_FLAGS_DMA flag
+  crypto: atmel-aes: fix atmel_aes_remove()
+  crypto: atmel-aes: improve performances of data transfer
+  crypto: atmel-aes: use SIZE_IN_WORDS() helper macro
+  crypto: atmel-aes: fix typo and indentation
+  crypto: atmel-aes: create sections to regroup functions by usage
+  crypto: atmel-aes: fix atmel-ctr-aes driver for RFC 3686
+  crypto: atmel-aes: fix the counter overflow in CTR mode
+  crypto: atmel-aes: change the DMA threshold
+  crypto: atmel-aes: add support to GCM mode
+  crypto: atmel-aes: add debug facilities to monitor register accesses.
+
+Leilei Zhao (1):
+  crypto: atmel-aes: add new version
+
+ drivers/crypto/Kconfig          |    1 +
+ drivers/crypto/atmel-aes-regs.h |   10 +
+ drivers/crypto/atmel-aes.c      | 1843 +++++++++++++++++++++++++++------------
+ 3 files changed, 1278 insertions(+), 576 deletions(-)
+
+-- 
+1.8.2.2
