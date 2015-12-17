@@ -1,22 +1,25 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 17 Dec 2015 16:03:28 +0000
-Subject: [PATCH v10 4/4] irqchip:implement the mbigen irq chip operation
- functions
-In-Reply-To: <1450353397-47668-5-git-send-email-majun258@huawei.com>
+Date: Thu, 17 Dec 2015 16:06:03 +0000
+Subject: [PATCH v10 0/4] irqchip:support mbigen interrupt controller
+In-Reply-To: <1450353397-47668-1-git-send-email-majun258@huawei.com>
 References: <1450353397-47668-1-git-send-email-majun258@huawei.com>
- <1450353397-47668-5-git-send-email-majun258@huawei.com>
-Message-ID: <5672DCD0.1070009@arm.com>
+Message-ID: <5672DD6B.4080304@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 17/12/15 11:56, MaJun wrote:
 > From: Ma Jun <majun258@huawei.com>
 > 
-> Add the interrupt controller chip operation functions of mbigen chip.
-> 
-> Signed-off-by: Ma Jun <majun258@huawei.com>
+> This patch set adds the driver of mbigen and binding document for Hisilicon
+> Mbigen chips.
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+[...[
+
+Right, we're almost there. Assuming you quickly deal with the couple of
+remarks Mark had, I'll apply this on top of my irq/wire-msi-bridge
+branch for Thomas to merge it into 4.5.
+
+Thanks,
 
 	M.
 -- 
