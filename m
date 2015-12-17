@@ -1,32 +1,35 @@
 From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Thu, 17 Dec 2015 17:48:33 +0100
-Subject: [PATCH 02/24] crypto: atmel-aes: constify value argument of
- atmel_aes_write_n()
+Date: Thu, 17 Dec 2015 17:48:36 +0100
+Subject: [PATCH 05/24] crypto: atmel-aes: remove unused header includes
 In-Reply-To: <cover.1450366831.git.cyrille.pitchen@atmel.com>
 References: <cover.1450366831.git.cyrille.pitchen@atmel.com>
-Message-ID: <f5c31bdb23fc62c1230bf0ca131a86f10a05c679.1450366831.git.cyrille.pitchen@atmel.com>
+Message-ID: <c33f39fa103fa81c834d87c2eed899b88268726d.1450366831.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-atmel_aes_write_n() should not modify its value argument.
+Hash headers have nothing to do with AES block ciphers.
 
 Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 ---
- drivers/crypto/atmel-aes.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/crypto/atmel-aes.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
 diff --git a/drivers/crypto/atmel-aes.c b/drivers/crypto/atmel-aes.c
-index 854e2813b2bb..1d3997a45610 100644
+index e948bf2b8a8e..7d1b055811c4 100644
 --- a/drivers/crypto/atmel-aes.c
 +++ b/drivers/crypto/atmel-aes.c
-@@ -231,7 +231,7 @@ static void atmel_aes_read_n(struct atmel_aes_dev *dd, u32 offset,
- }
- 
- static void atmel_aes_write_n(struct atmel_aes_dev *dd, u32 offset,
--					u32 *value, int count)
-+			      const u32 *value, int count)
- {
- 	for (; count--; value++, offset += 4)
- 		atmel_aes_write(dd, offset, *value);
+@@ -33,12 +33,9 @@
+ #include <linux/of_device.h>
+ #include <linux/delay.h>
+ #include <linux/crypto.h>
+-#include <linux/cryptohash.h>
+ #include <crypto/scatterwalk.h>
+ #include <crypto/algapi.h>
+ #include <crypto/aes.h>
+-#include <crypto/hash.h>
+-#include <crypto/internal/hash.h>
+ #include <linux/platform_data/crypto-atmel.h>
+ #include <dt-bindings/dma/at91.h>
+ #include "atmel-aes-regs.h"
 -- 
 1.8.2.2
