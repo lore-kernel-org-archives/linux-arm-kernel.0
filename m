@@ -1,30 +1,41 @@
 From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Thu, 17 Dec 2015 17:48:46 +0100
-Subject: [PATCH 15/24] crypto: atmel-aes: fix atmel_aes_remove()
+Date: Thu, 17 Dec 2015 17:48:40 +0100
+Subject: [PATCH 09/24] crypto: atmel-aes: remove useless write in the Control
+ Register
 In-Reply-To: <cover.1450366831.git.cyrille.pitchen@atmel.com>
 References: <cover.1450366831.git.cyrille.pitchen@atmel.com>
-Message-ID: <c0dc652dd6f5014d350398a35a041266daf2dfdf.1450366831.git.cyrille.pitchen@atmel.com>
+Message-ID: <1ace62ded06cbf4992e92aa3c3453b01054f56f4.1450366831.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing call to atmel_aes_buff_cleanup().
+As claimed by the datasheet, writing 0 into the Control Register has no
+effet. So we remove this useless register access.
 
 Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 ---
- drivers/crypto/atmel-aes.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/crypto/atmel-aes.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
 diff --git a/drivers/crypto/atmel-aes.c b/drivers/crypto/atmel-aes.c
-index 68e4177ad61b..343199cfed23 100644
+index 48407a7f6f61..f1ea9c893561 100644
 --- a/drivers/crypto/atmel-aes.c
 +++ b/drivers/crypto/atmel-aes.c
-@@ -1469,6 +1469,7 @@ static int atmel_aes_remove(struct platform_device *pdev)
- 	tasklet_kill(&aes_dd->queue_task);
+@@ -511,7 +511,7 @@ static int atmel_aes_crypt_dma_start(struct atmel_aes_dev *dd)
+ static void atmel_aes_write_ctrl(struct atmel_aes_dev *dd, bool use_dma,
+ 				 const u32 *iv)
+ {
+-	u32 valcr = 0, valmr = 0;
++	u32 valmr = 0;
  
- 	atmel_aes_dma_cleanup(aes_dd);
-+	atmel_aes_buff_cleanup(aes_dd);
+ 	/* MR register must be set before IV registers */
+ 	if (dd->ctx->keylen == AES_KEYSIZE_128)
+@@ -554,7 +554,6 @@ static void atmel_aes_write_ctrl(struct atmel_aes_dev *dd, bool use_dma,
+ 		valmr |= AES_MR_SMOD_AUTO;
+ 	}
  
- 	return 0;
- }
+-	atmel_aes_write(dd, AES_CR, valcr);
+ 	atmel_aes_write(dd, AES_MR, valmr);
+ 
+ 	atmel_aes_write_n(dd, AES_KEYWR(0), dd->ctx->key,
 -- 
 1.8.2.2
