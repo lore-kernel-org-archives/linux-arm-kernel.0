@@ -1,44 +1,75 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 17 Dec 2015 09:28:36 +0000
-Subject: block layer bug with 4.4-rc3+
-In-Reply-To: <1885710.UNGYhDGGcI@wuerfel>
-References: <566FF3ED.1000503@arm.com>
- <CACVXFVN3w0Y_8k3TiKoGytbayXiB+mRhgDn-OueV2+e93i=4AQ@mail.gmail.com>
- <56717B6F.2040008@arm.com> <1885710.UNGYhDGGcI@wuerfel>
-Message-ID: <56728044.7090906@arm.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 17 Dec 2015 10:29:53 +0100
+Subject: [PATCH v6 0/6] Add mipi dsi support for rk3288
+In-Reply-To: <1450260616-21160-1-git-send-email-zyw@rock-chips.com>
+References: <1450260616-21160-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <3523259.ZRgH1Shd9Y@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tach Arnd,
+Hi Chris,
 
-On 16/12/15 15:43, Arnd Bergmann wrote:
-> On Wednesday 16 December 2015 14:55:43 Andre Przywara wrote:
->> Using the plain multi_v7_defconfig (which doesn't have LPAE and makes me
->> loose half of the RAM on that box) didn't show the bug so far.
->> One of the effects of turning on LPAE is that dma_addr_t and phys_addr_t
->> turn to 64-bit, with long, int and void* still being 32-bit. Can you
->> think of any issues that could be related to that?
->>
+Am Mittwoch, 16. Dezember 2015, 18:10:10 schrieb Chris Zhong:
+> The rk3288 MIPI DSI is a Synopsys DesignWare MIPI DSI host controller
+> IP. This series adds support for a Synopsys DesignWare MIPI DSI host
+> controller DRM driver.
 > 
-> Another difference between the platforms is highmem. On Midway,
-> almost all of RAM is highmem, which needs a lot of special handling
-> that we don't need on platform with less RAM.
+> The MIPI DSI feature is tested on rk3288 evb board, backport them to
+> chrome os kernel chrome_v3.14, and it can display normally.
+> 
+> This patchset is base on the patchset from Ying.liu at freescale.com.
+> <http://www.spinics.net/lists/dri-devel/msg77181.html>
+> 
+> According to the suggestion from Thierry, I have get rid of the bridge,
+> and register the encoder & connecter in drm/rockchip/dw-mipi-dsi.c.
 
-Good point, but ...
+from my point it looks good (although I cannot really speak on the drm-related 
+internals).
 
-> To rule out both of highmem and LPAE, it might be interesting to
-> test again on Midway with CONFIG_HIGHMEM and CONFIG_LPAE disabled.
-> This will limit the RAM to 768MB, but if the bug still shows up,
-> you know it's something else.
+But I do think we'll be doing atomic modesetting conversion first (last 
+version posted from Mark today), so you should probably make sure your dsi 
+driver still works after that conversion and make changes if needed.
 
-So it was running for almost a day without LPAE now, but with highmem,
-and the bug didn't show up. So for the time being I'd avoid another test
-run without highmem, as LPAE alone is sufficient to trigger it.
-Also it seems that CONFIG_HIGHMEM is selected by MULTI_V7, so I can't
-configure it out for this box, but would have to restrict memory to
-768M, I guess.
 
-Next I will try some tracing as Ming suggested.
+Heiko
 
-Cheers,
-Andre.
+> 
+> 
+> Changes in v6:
+> - update the document, since the bridge device has been deleted.
+> - Do not use bridge driver (Thierry Reding)
+> - Optimization the phy init sequence
+> 
+> Changes in v5:
+> - modify the clk name to SCLK_MIPIDSI_24M
+> - add a blank line befor lcd_en
+> 
+> Changes in v4:
+> - use clk_round_rate to check the clock rate in vop_crtc_mode_fixup
+> 
+> Changes in v3:
+> - move dw_mipi_dsi_rockchip.txt to bindings/display/rockchip/
+> 
+> Chris Zhong (5):
+>   drm/rockchip: return a true clock rate to adjusted_mode
+>   Documentation: dt-bindings: Add bindings for rk3288 DW MIPI DSI driver
+>   drm: rockchip: Support Synopsys DW MIPI DSI
+>   ARM: dts: rockchip: add rk3288 mipi_dsi nodes
+>   ARM: dts: rockchip: add support mipi panel tv080wum-nl0
+> 
+> Liu Ying (1):
+>   drm/dsi: Add a helper to get bits per pixel of MIPI DSI pixel format
+> 
+>  .../display/rockchip/dw_mipi_dsi_rockchip.txt      |   60 +
+>  arch/arm/boot/dts/rk3288-evb.dtsi                  |   20 +-
+>  arch/arm/boot/dts/rk3288.dtsi                      |   39 +
+>  drivers/gpu/drm/rockchip/Kconfig                   |   10 +
+>  drivers/gpu/drm/rockchip/Makefile                  |    1 +
+>  drivers/gpu/drm/rockchip/dw-mipi-dsi.c             | 1200
+> ++++++++++++++++++++ drivers/gpu/drm/rockchip/rockchip_drm_vop.c        |  
+>  8 +
+>  include/drm/drm_mipi_dsi.h                         |   14 +
+>  8 files changed, 1351 insertions(+), 1 deletion(-)
+>  create mode 100644
+> Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
+> create mode 100644 drivers/gpu/drm/rockchip/dw-mipi-dsi.c
