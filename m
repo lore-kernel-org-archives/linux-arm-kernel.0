@@ -1,147 +1,47 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed, 16 Dec 2015 15:55:13 -0800
-Subject: [PATCH v2 6/8] ARM: bcm2835: Add devicetree for bcm2836 and Raspberry
- Pi 2 B
-In-Reply-To: <1450310115-22163-1-git-send-email-eric@anholt.net>
-References: <1450310115-22163-1-git-send-email-eric@anholt.net>
-Message-ID: <1450310115-22163-7-git-send-email-eric@anholt.net>
+From: courtney.cavin@sonymobile.com (Courtney Cavin)
+Date: Wed, 16 Dec 2015 16:01:41 -0800
+Subject: [PATCH] net: add Qualcomm IPC router
+In-Reply-To: <20151215.160114.1178824607335349574.davem@davemloft.net>
+References: <1449866519-14551-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <20151215.160114.1178824607335349574.davem@davemloft.net>
+Message-ID: <20151217000141.GG28026@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Pi 2 B ends up like a Pi 1 B+, with the same peripherals and
-pinout, but the CPU and memory layout changed to use the 2836.
+On Tue, Dec 15, 2015 at 10:01:14PM +0100, David Miller wrote:
+> From: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> Date: Fri, 11 Dec 2015 12:41:59 -0800
+> 
+> > +static unsigned int qrtr_local_nid = 1;
+> > +module_param_named(node_id, qrtr_local_nid, uint, S_IRUGO);
+> > +MODULE_PARM_DESC(idVendor, "Local Node Identifier");
+> 
+> Module parameters suck.
+> 
+> Allow the user to choose this dynamically.  You have roughtly two choices.
+> 
+> 1) Subvert the 'protocol' field passed to ->create() and use that, it is
+>    being ignored otherwise.
+> 
+> 2) Put it into the socket address for bind().
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
----
- arch/arm/boot/dts/bcm2836-rpi-2-b.dts | 35 ++++++++++++++++
- arch/arm/boot/dts/bcm2836.dtsi        | 77 +++++++++++++++++++++++++++++++++++
- 2 files changed, 112 insertions(+)
- create mode 100644 arch/arm/boot/dts/bcm2836-rpi-2-b.dts
- create mode 100644 arch/arm/boot/dts/bcm2836.dtsi
+So each socket can have its own node id?  That doesn't seem right.
 
-diff --git a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
-new file mode 100644
-index 0000000..ff94666
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
-@@ -0,0 +1,35 @@
-+/dts-v1/;
-+#include "bcm2836.dtsi"
-+#include "bcm2835-rpi.dtsi"
-+
-+/ {
-+	compatible = "raspberrypi,2-model-b", "brcm,bcm2836";
-+	model = "Raspberry Pi 2 Model B";
-+
-+	memory {
-+		reg = <0 0x40000000>;
-+	};
-+
-+	leds {
-+		act {
-+			gpios = <&gpio 47 0>;
-+		};
-+
-+		pwr {
-+			label = "PWR";
-+			gpios = <&gpio 35 0>;
-+			default-state = "keep";
-+			linux,default-trigger = "default-on";
-+		};
-+	};
-+};
-+
-+&gpio {
-+	pinctrl-0 = <&gpioout &alt0 &i2s_alt0 &alt3>;
-+
-+	/* I2S interface */
-+	i2s_alt0: i2s_alt0 {
-+		brcm,pins = <18 19 20 21>;
-+		brcm,function = <BCM2835_FSEL_ALT0>;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/bcm2836.dtsi b/arch/arm/boot/dts/bcm2836.dtsi
-new file mode 100644
-index 0000000..6693118
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm2836.dtsi
-@@ -0,0 +1,77 @@
-+#include "bcm283x.dtsi"
-+
-+/ {
-+	compatible = "brcm,bcm2836";
-+
-+	soc {
-+		ranges = <0x7e000000 0x3f000000 0x1000000>,
-+			 <0x40000000 0x40000000 0x00001000>;
-+		dma-ranges = <0xc0000000 0x00000000 0x3f000000>;
-+
-+		local_intc: local_intc {
-+			compatible = "brcm,bcm2836-l1-intc";
-+			reg = <0x40000000 0x100>;
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+			interrupt-parent = <&local_intc>;
-+		};
-+
-+		arm-pmu {
-+			compatible = "arm,cortex-a7-pmu";
-+			interrupt-parent = <&local_intc>;
-+			interrupts = <9>;
-+		};
-+	};
-+
-+	timer {
-+		compatible = "arm,armv7-timer";
-+		interrupt-parent = <&local_intc>;
-+		interrupts = <0>, // PHYS_SECURE_PPI
-+			     <1>, // PHYS_NONSECURE_PPI
-+			     <3>, // VIRT_PPI
-+			     <2>; // HYP_PPI
-+		always-on;
-+	};
-+
-+	cpus: cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		v7_cpu0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0xf00>;
-+			clock-frequency = <800000000>;
-+		};
-+
-+		v7_cpu1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0xf01>;
-+			clock-frequency = <800000000>;
-+		};
-+
-+		v7_cpu2: cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0xf02>;
-+			clock-frequency = <800000000>;
-+		};
-+
-+		v7_cpu3: cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0xf03>;
-+			clock-frequency = <800000000>;
-+		};
-+	};
-+};
-+
-+/* Make the BCM2835-style global interrupt controller be a child of the
-+ * CPU-local interrupt controller.
-+ */
-+&intc {
-+	compatible = "brcm,bcm2836-armctrl-ic";
-+	interrupt-parent = <&local_intc>;
-+	interrupts = <8>;
-+};
--- 
-2.6.2
+The way these node ids are assigned is by a system designer (in this
+case Qualcomm).  The ARM, Linux CPU is always node 1, the audio DSP is
+always node 5, etc.  Anyone with the knowhow could reassign these
+numbers, but there's no reason to have them be dynamic during runtime.
+Additionally, allowing dynamic assignment would require code to prevent
+id duplication for known remote nodes, as well as to deal with cases in
+which remote node discovery happens after local sockets have acquired
+that node's id.
+
+Maybe the first socket created needs CAP_NET_ADMIN, and uses the
+'protocol' field to set the node id?  Ugh. Gross.
+
+We could hardcode the value in kconfig, but that seems like a worse
+solution than a module parameter.
+
+I'm open to further suggestions.
+
+-Courtney
