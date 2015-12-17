@@ -1,46 +1,58 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Wed, 16 Dec 2015 16:37:37 -0800
-Subject: [PATCH v2 0/8] Raspberry Pi 2 support.
-In-Reply-To: <21040591.KakM5Gl6ZZ@wuerfel>
-References: <1450310115-22163-1-git-send-email-eric@anholt.net>
- <21040591.KakM5Gl6ZZ@wuerfel>
-Message-ID: <874mfhsyem.fsf@eliezer.anholt.net>
+Date: Wed, 16 Dec 2015 16:39:26 -0800
+Subject: [PATCH v3 2/4] ARM: bcm2835: add rpi power domain driver
+In-Reply-To: <CAPDyKFqPk5XPPYMYe6HZc=b8-b-Y2VB6mQfZP8_TS8KOFZjsUw@mail.gmail.com>
+References: <1450215622-27394-1-git-send-email-eric@anholt.net>
+ <1450215622-27394-3-git-send-email-eric@anholt.net>
+ <567093CD.1020208@gmail.com> <87oadrmfmi.fsf@eliezer.anholt.net>
+ <5670AAB2.1080102@gmail.com> <87mvtbkyd0.fsf@eliezer.anholt.net>
+ <20151216011110.GA13147@earth>
+ <CAJKOXPes85hu6Jnd5p6dqhgdBGF4kmZuJQekM73O83DuZvcyoQ@mail.gmail.com>
+ <CAPDyKFqPk5XPPYMYe6HZc=b8-b-Y2VB6mQfZP8_TS8KOFZjsUw@mail.gmail.com>
+Message-ID: <87zix9rjr5.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+Ulf Hansson <ulf.hansson@linaro.org> writes:
 
-> On Wednesday 16 December 2015 15:55:07 Eric Anholt wrote:
->> This is a major rewrite of the previous Raspberry Pi 2 submission.
->> SMP support is now included, and the DT includes are cleaned up to
->> avoid massive duplication.
->> 
->> The branch (based on 4.4-rc5, to get the USB regression fixes) can be
->> found at:
->> 
->> https://github.com/anholt/linux/tree/bcm2836-4.4
+> On 16 December 2015 at 02:27, Krzysztof Kozlowski
+> <k.kozlowski@samsung.com> wrote:
+>> 2015-12-16 10:11 GMT+09:00 Sebastian Reichel <sre@ring0.de>:
+>>> Hi,
+>>>
+>>> On Tue, Dec 15, 2015 at 04:53:31PM -0800, Eric Anholt wrote:
+>>>> >> There are 6 power domain drivers in
+>>>> >> arch/arm, 3 in drivers/clk, and 3 in drivers/soc.
+>>>> >
+>>>> > If we ever have to support a different architecture which happens to use
+>>>> > a similar power domain, then we want it to be in a location which makes
+>>>> > it easy for sharing it in the first place. As it stands today, it does
+>>>> > not seem useful to me to have this code in arch/arm/mach-bcm/ at all.
+>>>> >
+>>>> > Maybe there is room from a drivers/power/domains/ of some kind?
+>>>
+>>> I like the idea, but let's include generic power domain maintainers
+>>> in this discussion, as I suggested here (I got a power domain driver
+>>> patch for drivers/power just a few days ago):
+>>>
+>>> https://lkml.org/lkml/2015/12/15/815
+>>>
+>>> Also somebody would have to step up to maintain that directory.
+>>
+>> This could go into drivers/soc. We put there a lot of mach-specific
+>> stuff which we want to make a little more generic (like generic enough
+>> multiplatform, multiarchitecture etc). Rockchip has its own power
+>> domains there. Dove and Mediatek seem as well but I am not sure. Some
+>> other architectures keep this still in arm/mach (exynos, ux500, zx,
+>> imx, s34c64xx, shmobile) but this looks more of like a legacy choice.
 >
-> Looks all good to me, but when we get the pull request, I'd strongly
-> prefer to have that based on -rc3 or earlier.
->
-> What commit is the USB regression fix you refer to above? Is that in a
-> branch that is -rc3 based? Maybe you can rebase the changes on top
-> of that branch, to minimize the amount of backmerges?
+> Agree, drivers/soc is good.
 
-Top 4 commits of drivers/usb/dwc2 for 4.4-rc5 (possibly not all of them
-are required, but it's what I've been using).  I've been using
-cherry-picks of them on top of my various branches for testing, but pi2
-was going to be rebased so many times in the process of cleanup that I
-put it underneath my development branch instead.
-
-I've been doing pull requests for my stuff on -rc1 tags.  It sucks for
-bisecting any breakage I produce when I can't boot that directly, but I
-don't see a good way to avoid this kind of pain other than getting some
-Pis into kernel-ci.org so we can catch regressions earlier.
+OK, I've resent with a move to drivers/soc/bcm/.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 818 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151216/2bb7e82a/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151216/5f8e7d40/attachment.sig>
