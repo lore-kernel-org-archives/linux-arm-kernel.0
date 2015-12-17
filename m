@@ -1,162 +1,155 @@
-From: david@protonic.nl (David Jander)
-Date: Thu, 17 Dec 2015 13:22:29 +0100
-Subject: SDHCI long sleep with interrupts off
-In-Reply-To: <CAPDyKFosBeyP3YYXz-1uyiqoaLuMQj3+ojzpt1-QY7JU9epggw@mail.gmail.com>
-References: <20151217112814.6250a3b9@archvile>
- <1450350190.3163.93.camel@pengutronix.de>
- <20151217122053.036daf37@archvile>
- <1450351655.3163.97.camel@pengutronix.de>
- <CAPDyKFosBeyP3YYXz-1uyiqoaLuMQj3+ojzpt1-QY7JU9epggw@mail.gmail.com>
-Message-ID: <20151217132229.1c699f69@archvile>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 17 Dec 2015 12:32:57 +0000
+Subject: block layer bug with 4.4-rc3+
+In-Reply-To: <CACVXFVMXjSFkj0Wb2qDFqDjWUA1fY41MZdN6SDKVH=H8grLZdg@mail.gmail.com>
+References: <566FF3ED.1000503@arm.com>
+ <CACVXFVNLY97FAJ_tUF1UW4t=3cf6c5mfHXOpbfq1iSSiKciCNw@mail.gmail.com>
+ <5670062B.7020103@arm.com>
+ <CACVXFVN3w0Y_8k3TiKoGytbayXiB+mRhgDn-OueV2+e93i=4AQ@mail.gmail.com>
+ <56717B6F.2040008@arm.com>
+ <CACVXFVMXjSFkj0Wb2qDFqDjWUA1fY41MZdN6SDKVH=H8grLZdg@mail.gmail.com>
+Message-ID: <5672AB79.3030004@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 Dec 2015 12:39:20 +0100
-Ulf Hansson <ulf.hansson@linaro.org> wrote:
+Hi Ming,
 
-> On 17 December 2015 at 12:27, Lucas Stach <l.stach@pengutronix.de> wrote:
-> > Am Donnerstag, den 17.12.2015, 12:20 +0100 schrieb David Jander:
-> >> Hi Lucas,
-> >>
-> >> Thanks for reacting.
-> >>
-> >> On Thu, 17 Dec 2015 12:03:10 +0100
-> >> Lucas Stach <l.stach@pengutronix.de> wrote:
-> >>
-> >> > Am Donnerstag, den 17.12.2015, 11:28 +0100 schrieb David Jander:
-> >> > > Hi all,
-> >> > >
-> >> > > I was investigating the source of abnormal irq-latency spikes on an
-> >> > > i.MX6 (ARM) board, and discovered this:
-> >> > >
-> >> > > # tracer: preemptirqsoff
-> >> > > #
-> >> > > # preemptirqsoff latency trace v1.1.5 on 4.4.0-rc4+
-> >> > > # --------------------------------------------------------------------
-> >> > > # latency: 2068 us, #4/4, CPU#0 | (M:preempt VP:0, KP:0, SP:0 HP:0
-> >> > > #P:1) #    -----------------
-> >> > > #    | task: mmcqd/0-92 (uid:0 nice:0 policy:0 rt_prio:0)
-> >> > > #    -----------------
-> >> > > #  => started at: _raw_spin_lock_irqsave
-> >> > > #  => ended at:   _raw_spin_unlock_irqrestore
-> >> > > #
-> >> > > #
-> >> > > #                  _------=> CPU#
-> >> > > #                 / _-----=> irqs-off
-> >> > > #                | / _----=> need-resched
-> >> > > #                || / _---=> hardirq/softirq
-> >> > > #                ||| / _--=> preempt-depth
-> >> > > #                |||| /     delay
-> >> > > #  cmd     pid   ||||| time  |   caller
-> >> > > #     \   /      |||||  \    |   /
-> >> > >  mmcqd/0-92      0d...    1us#: _raw_spin_lock_irqsave
-> >> > >  mmcqd/0-92      0.n.1 2066us : _raw_spin_unlock_irqrestore
-> >> > >  mmcqd/0-92      0.n.1 2070us+: trace_preempt_on
-> >> > > <-_raw_spin_unlock_irqrestore mmcqd/0-92      0.n.1 2107us : <stack
-> >> > > trace> => sdhci_runtime_resume_host
-> >> > >  => __rpm_callback
-> >> > >  => rpm_callback
-> >> > >  => rpm_resume
-> >> > >  => __pm_runtime_resume
-> >> > >  => __mmc_claim_host
-> >> > >  => mmc_blk_issue_rq
-> >> > >  => mmc_queue_thread
-> >> > >  => kthread
-> >> > >  => ret_from_fork
-> >> > >
-> >> > > 2 ms with interrupts disabled!!! To much dismay, I later discovered
-> >> > > that this isn't even the worst case scenario. I also discovered that
-> >> > > this has been in the kernel for a long time without a fix (I have
-> >> > > tested from 3.17 to 4.4-rc4). There has been an attempt by someone to
-> >> > > address this back in 2010, but apparently it never hit mainline.
-> >> > > Going through the code in sdhci.c, I found this troublesome code-path:
-> >> > >
-> >> > > sdhci_do_set_ios() {
-> >> > >   spin_lock_irqsave(&host->lock, flags);
-> >> > >   ...
-> >> > >   sdhci_reinit() --> sdhci_init() --> sdhci_do_reset() -->
-> >> > >           host->ops->reset() --> sdhci_reset()
-> >> > >   ...
-> >> > >   spin_unlock_irqrestore(&host->lock, flags);
-> >> > > }
-> >> > >
-> >> > > And in sdhci_reset(), which may be called with held spinlock:
-> >> > >
-> >> > >   ...
-> >> > >   /* Wait max 100 ms */
-> >> > >   timeout = 100;
-> >> > >
-> >> > >   /* hw clears the bit when it's done */
-> >> > >   while (sdhci_readb(host, SDHCI_SOFTWARE_RESET) & mask) {
-> >> > >           if (timeout == 0) {
-> >> > >                   pr_err("%s: Reset 0x%x never completed.\n",
-> >> > >                           mmc_hostname(host->mmc), (int)mask);
-> >> > >                   sdhci_dumpregs(host);
-> >> > >                   return;
-> >> > >           }
-> >> > >           timeout--;
-> >> > >           mdelay(1);
-> >> > >   }
-> >> > >
-> >> > > I am wondering: There either must be a reason this hasn't been fixed
-> >> > > in such a long time, or I am not understanding this correctly, so
-> >> > > please enlighten me. Before trying a cowboy attempt at "fixing" this,
-> >> > > I'd really like to know why am I seeing this?
-> >> > > I mean... how can such a problem get unnoticed and unfixed for so
-> >> > > long? Will an attempt at fixing this issue even be accepted?
-> >> > >
-> >> > I would like to see the sdhci spinlock killed and replaced by a mutex
-> >> > for exactly this reason.
-> >> >
-> >> > That said, your problem is card polling, when no card is present in the
-> >> > slot. This is most probably caused by CD gpios having the wrong
-> >> > polarity.
-> >>
-> >> ... or not having a CD pin at all.
-> >> I am using an embedded eMMC chip and a uSD card inserted into a slot. The
-> >> card is present and also detected as such. If I never access the card, I
-> >> see no spikes (filesystem is mounted but not accessed). If I try to read
-> >> a file or directory I get the above trace.
-> >> OTOH, if I disable PM functionality in the kernel, the spike is gone, and
-> >> worst-case latency is in the 300us range, so I don't think this is
-> >> related to card polling.
-> >>
-> > You may be right. If the SDHCI host gets runtime suspended it needs a
-> > reset after waking up, causing this latency.
-> >
-> > Killing the sdhci spinlock may not be straight forward, as a lot of code
-> > paths need to be audited for irq safety, but it's the only thing to fix
-> > this properly.
-> >
-> > Regards,
-> > Lucas
-> >
+On 17/12/15 03:52, Ming Lei wrote:
+> On Wed, Dec 16, 2015 at 10:55 PM, Andre Przywara <andre.przywara@arm.com> wrote:
+>> Hi,
+>>
+>> On 15/12/15 13:39, Ming Lei wrote:
+>>> On Tue, Dec 15, 2015 at 8:23 PM, Andre Przywara <andre.przywara@arm.com> wrote:
+>>>> Hi Ming,
+>>>>
+>>>> thanks for the answer!
+>>>>
+>>>> On 15/12/15 11:54, Ming Lei wrote:
+>>>>> On Tue, Dec 15, 2015 at 7:05 PM, Andre Przywara <andre.przywara@arm.com> wrote:
+>>>>>> Hi,
+>>>>>>
+>>>>>> I've been experiencing issues with at least 4.4-rc3 (including current
+>>>>>
+>>>>> I'd suggest you to test the latest linus tree first, and at least two
+>>>>> fix patches
+>>>>> have been merged for blk-merge issue.  If there is still the issue
+>>>>> with linus tree,
+>>>>> I am happy to take a look.
+>>>>
+>>>> Mmh, as said ("including current HEAD") this happens still with the
+>>>> latest HEAD from Linus (which is "9f9499ae8e64: Linux 4.4-rc5" for me).
+>>>> Just tested yesterday.
+>>>> Is there another branch/tree with block fixes I should test? Is it worth
+>>>> to try any of the upcoming branches in linux-block.git (for-4.5/core,
+>>>> maybe?)
+>>>
+>>> Both the fixes have been in linus tree already, and reverting the commit
+>>> basically makes merge not possible, so there must be issues somewhere.
+>>>
+>>> And can you see the issue on other 32bit ARM platform?  I don't see the
+>>> issue on x86 and arm64, and the commit itself is correct, IMO.
+>>
+>> Quick tests on a Cubietruck didn't show the issue, but this board is
+>> nowhere near the Midway (2 in-order cores with 2GB RAM vs. 4
+>> out-of-order cores with 8 GB RAM), so the load isn't the same.
+>> I could rule out .config issues by using multi_v7_defconfig - with LPAE
+>> enabled on top, that is.
+>> Using the plain multi_v7_defconfig (which doesn't have LPAE and makes me
+>> loose half of the RAM on that box) didn't show the bug so far.
+>> One of the effects of turning on LPAE is that dma_addr_t and phys_addr_t
+>> turn to 64-bit, with long, int and void* still being 32-bit. Can you
+>> think of any issues that could be related to that?
+>>
+>> Also can you briefly sketch what that patch (578270bfbd) eventually
+>> changes? I see that the fix looks right, I am just wondering what the
+>> impact is: Do we get more blocks or less or bigger ones or smaller?
 > 
-> If/when you decide to fix this issue. Please keep in mind the following
-> things.
+> Without the change, 'bvprvp' always points to 'bv', then each bio vector
+> can't be merged to other bio vector, so each bvec becomes one single
+> physical segment(convert to one single sg element in driver), finally the
+> transfer size for each bio becomes much smaller, and size of each
+> segment becomes much smaller, but segment number may become
+> bigger.
+
+Thanks a lot, exactly the explanation I was looking for.
+Tracing this function didn't show any significant difference between the
+two version on the first glance, though.
+
+I will try to catch the actual differences and take it from there.
+
+Cheers,
+Andre.
+
+>>
+>> I will try to do more experiments and to find the real culprit.
 > 
-> - Try to convert the SDHCI into a pure library. No more quirks or callbacks.
-> - I assume we can simplify lots of code if we convert SDHCI into using
-> a threaded IRQ in favour of the tasklet.
+> It may be helpful to enable 'block:*' trace events, and get/analyze the
+> traces close to the kernel warning.
 > 
-> Any patches that moves SDHCI into this direction will be greatly appreciated!
-
-Ok, this sounds like a good way to go. Unfortunately it also sounds like a
-major endeavor, for which good knowledge of the SDHCI standard is necessary.
-This knowledge is based on documentation that is not openly available without
-cost AFAIK. This probably also explains why there hasn't been a real fix ever.
-On top of that, the whole sdhci code is unmaintained currently as it seems.
-I was studying the code a bit more, and I now understand that I am not even
-close to having the experience and standards-knowledge it takes to pull this
-off reliably. I guess the one who takes on this task may as well become
-official maintainer afterwards...
-OTOH, we pretty much depend on this driver now, since all of our new i.MX6/7
-boards have eMMC flash. We also use the flexcan peripheral on all designs,
-which is specially sensible to these latency spikes, so we will have to do
-something on the long run.... we cannot live forever with disabled PM ;-)
-
-Best regards,
-
--- 
-David Jander
-Protonic Holland.
+>>
+>> Thanks,
+>> Andre.
+>>
+>>>
+>>>>
+>>>> Thanks,
+>>>> Andre.
+>>>>
+>>>>> Thanks,
+>>>>>
+>>>>>> HEAD) on a Calxeda Midway (4*ARM Cortex-A15 (32-bit), 8GB RAM, SATA
+>>>>>> spinning disk or SSD).
+>>>>>> After some disk I/O load (kernel compile with -j6) I see the kernel
+>>>>>> screaming:
+>>>>>>
+>>>>>> [  103.736982] ata1.00: exception Emask 0x0 SAct 0x3ffff0 SErr 0x0
+>>>>>> action 0x6 frozen
+>>>>>> [  103.744476] ata1.00: failed command: WRITE FPDMA QUEUED
+>>>>>> [  103.749707] ata1.00: cmd 61/00:20:48:6b:41/08:00:0a:00:00/40 tag 4
+>>>>>> ncq 1048576 out
+>>>>>> [  103.749707]          res 40/00:00:00:00:00/00:00:00:00:00/00 Emask
+>>>>>> 0x4 (timeout)
+>>>>>> [  103.764659] ata1.00: status: { DRDY }
+>>>>>> [  103.768321] ata1.00: failed command: WRITE FPDMA QUEUED
+>>>>>> [  103.773547] ata1.00: cmd 61/98:28:48:73:41/42:00:0a:00:00/40 tag 5
+>>>>>> ncq 8728576 out
+>>>>>> [  103.773547]          res 40/00:00:00:00:00/00:00:00:00:00/00 Emask
+>>>>>> 0x4 (timeout)
+>>>>>> < repeated with increasing tag numbers>
+>>>>>>
+>>>>>> This repeats for a while, but then seems to recover later, though I
+>>>>>> haven't checked if there are more issues and rebooted instead to avoid
+>>>>>> filesystem damage.
+>>>>>>
+>>>>>> While I agree that this looks like a disk error on the first glance, I
+>>>>>> never saw this before 4.4-rc2, had the very same error on different
+>>>>>> nodes (with another spinning disk and even an SSD) and I can make it
+>>>>>> vanish by reverting the commit I identified after bisection:
+>>>>>>
+>>>>>> commit 578270bfbd2803dc7b0b03fbc2ac119efbc73195
+>>>>>> Author: Ming Lei <ming.lei@canonical.com>
+>>>>>> Date:   Tue Nov 24 10:35:29 2015 +0800
+>>>>>>
+>>>>>>     block: fix segment split
+>>>>>> ...
+>>>>>> I understand that this fix seems sane, but actually reverting it fixes
+>>>>>> the issue for me: 4.4-rc5 crashed within some minutes with the above
+>>>>>> log, 4.4-rc5 with 578270bfbd reverted survived 19 hours of continuous
+>>>>>> kernel compiles without issues.
+>>>>>> Looking at the git history of that file I see quite some recent changes
+>>>>>> there, but it's beyond my understanding of the code to spot the real
+>>>>>> culprit.
+>>>>>>
+>>>>>> Can anyone point me to a change in blk-merge.c I could try to revert to
+>>>>>> identify the real root cause? I can run tests quickly, though a real
+>>>>>> positive case would need some hours of runtime to be sure it's fine.
+>>>>>>
+>>>>>> Many thanks!
+>>>>>> Cheers,
+>>>>>> Andre.
+>>>>>> --
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-block" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
