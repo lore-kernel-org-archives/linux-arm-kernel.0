@@ -1,57 +1,73 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Thu, 17 Dec 2015 11:25:52 +0100
-Subject: [PATCH V2 06/23] XEN / PCI: Remove the dependence on arch x86
- when PCI_MMCONFIG=y
-In-Reply-To: <1450278993-12664-7-git-send-email-tn@semihalf.com>
-References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
- <1450278993-12664-7-git-send-email-tn@semihalf.com>
-Message-ID: <56728DB0.2080800@semihalf.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 17 Dec 2015 10:27:57 +0000
+Subject: [PATCH] ARM: PJ4: move coprocessor register access sequences to
+ iwmmxt.S
+In-Reply-To: <CAKv+Gu9tjeMska_1EUwcCgPoX=uXZkv0q+goew3q59T1UwEsyg@mail.gmail.com>
+References: <1447397933-13379-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20151113184807.GA21047@codeaurora.org>
+ <CAKv+Gu9tjeMska_1EUwcCgPoX=uXZkv0q+goew3q59T1UwEsyg@mail.gmail.com>
+Message-ID: <20151217102757.GF8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.12.2015 16:16, Tomasz Nowicki wrote:
-> In drivers/xen/pci.c, there are arch x86 dependent codes when
-> CONFIG_PCI_MMCONFIG is enabled, since CONFIG_PCI_MMCONFIG
-> depends on ACPI, so this will prevent XEN PCI running on other
-> architectures using ACPI with PCI_MMCONFIG enabled (such as ARM64).
->
-> Fortunatly, it can be sloved in a simple way. In drivers/xen/pci.c,
-> the only x86 dependent code is if ((pci_probe & PCI_PROBE_MMCONF) == 0),
-> and it's defined in asm/pci_x86.h, the code means that
-> if the PCI resource is not probed in PCI_PROBE_MMCONF way, just
-> ingnore the xen mcfg init. Actually this is duplicate, because
-> if PCI resource is not probed in PCI_PROBE_MMCONF way, the
-> pci_mmconfig_list will be empty, and the if (list_empty())
-> after it will do the same job.
->
-> So just remove the arch related code and the head file, this
-> will be no functional change for x86, and also makes xen/pci.c
-> usable for other architectures.
->
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> CC: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-> Cc: Stefano Stabellini <Stefano.Stabellini@eu.citrix.com>
-> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> ---
->   drivers/xen/pci.c | 6 ------
->   1 file changed, 6 deletions(-)
->
-> diff --git a/drivers/xen/pci.c b/drivers/xen/pci.c
-> index 6785ebb..9a8dbe3 100644
-> --- a/drivers/xen/pci.c
-> +++ b/drivers/xen/pci.c
-> @@ -28,9 +28,6 @@
->   #include <asm/xen/hypervisor.h>
->   #include <asm/xen/hypercall.h>
->   #include "../pci/pci.h"
-> -#ifdef CONFIG_PCI_MMCONFIG
-> -#include <asm/pci_x86.h>
-> -#endif
+On Fri, Nov 13, 2015 at 08:23:34PM +0100, Ard Biesheuvel wrote:
+> On 13 November 2015 at 19:48, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> > On 11/13, Ard Biesheuvel wrote:
+> >> The PJ4 inline asm sequences in pj4-cp0.c cannot be built in Thumb-2 mode,
+> >> due to the way it performs arithmetic on the program counter, so it is
+> >> built in ARM mode instead. However, building C files in ARM mode under
+> >> CONFIG_THUMB2_KERNEL is problematic, since the instrumentation performed
+> >> by subsystems like ftrace does not expect having to deal with interworking
+> >> branches.
+> >>
+> >> So instead, revert to building pj4-cp0.c in Thumb-2 mode, and move the
+> >> offending sequence to iwmmxt.S, which is not instrumented anyway, and is
+> >> already built in ARM mode unconditionally.
+> >>
+> >> Reported-by: Stephen Boyd <sboyd@codeaurora.org>
+> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> ---
+> >
+> > Tested-by: Stephen Boyd <sboyd@codeaurora.org>
+> >
+> 
+> Thanks.
+> 
+> I've put this into the patch system (8452/1)
 
-I noticed that I forgot about:
-+#include <linux/ecam.h>
+And I've dropped it from my tree because it's broken.
 
-Sorry.
+Come on guys, you can do better than this:
 
-Tomasz
+arch/arm/kernel/built-in.o: In function `pj4_cp0_init':
+arch/arm/kernel/psci-call.o:(.init.text+0x22d0): undefined reference to `pj4_cp_access_write'
+arch/arm/kernel/psci-call.o:(.init.text+0x22e0): undefined reference to `pj4_cp_access_write'
+arch/arm/kernel/psci-call.o:(.init.text+0x2304): undefined reference to `pj4_cp_access_read'
+arch/arm/kernel/psci-call.o:(.init.text+0x2310): undefined reference to `pj4_cp_access_write'
+arch/arm/kernel/psci-call.o:(.init.text+0x2314): undefined reference to `pj4_cp_access_read'
+
+Let's look at the makefile:
+
+obj-$(CONFIG_CPU_PJ4)           += pj4-cp0.o
+obj-$(CONFIG_CPU_PJ4B)          += pj4-cp0.o
+obj-$(CONFIG_IWMMXT)            += iwmmxt.o
+
+Now, you're moving code from pj4-cp0.c to iwmmxt.S, and of course, you
+checked that IWMMXT would always be enabled if either PJ4 or PJ4B are
+enabled.
+
+config IWMMXT
+        bool "Enable iWMMXt support"
+        depends on CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK || CPU_PJ4 || CPU_PJ4B
+        default y if PXA27x || PXA3xx || ARCH_MMP || CPU_PJ4 || CPU_PJ4B
+
+Err, no, IWMMXT can be disabled.  Hence the build errors.
+
+Please, take more time when moving code around to ensure that this kind
+of build breakage doesn't creep in.  It's *really* easy to check, it
+only takes a couple of additional minutes.
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
