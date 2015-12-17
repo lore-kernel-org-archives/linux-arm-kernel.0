@@ -1,61 +1,86 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Wed, 16 Dec 2015 17:16:01 -0800
-Subject: [PATCH v3 0/5] Add reboot notifier driver for rockchip platform
-In-Reply-To: <566E9A47.8010004@rock-chips.com>
-References: <1447840044-19689-1-git-send-email-andy.yan@rock-chips.com>
- <45323116.BWNAaZT5p4@diego> <566E9A47.8010004@rock-chips.com>
-Message-ID: <CALAqxLW2HD35kfy2RypvVEYPCuRit8YU=-tqgCev41jksRc7gQ@mail.gmail.com>
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Wed, 16 Dec 2015 17:18:48 -0800
+Subject: [PATCH] locking/osq: fix ordering of node initialisation in
+ osq_lock
+In-Reply-To: <1449856001-21177-1-git-send-email-will.deacon@arm.com>
+References: <1449856001-21177-1-git-send-email-will.deacon@arm.com>
+Message-ID: <56720D78.9080706@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 14, 2015 at 2:30 AM, Andy Yan <andy.yan@rock-chips.com> wrote:
-> On 2015?12?12? 05:29, Heiko St?bner wrote:
->> Am Mittwoch, 18. November 2015, 17:47:24 schrieb Andy Yan:
->>>
->>> rockchip platform have a protocol to pass the kernel reboot
->>> mode to bootloader by some special registers when system reboot.
->>> By this way the bootloader can take different action according
->>> to the different kernel reboot mode, for example, command
->>> "reboot loader" will reboot the board to rockusb mode, this is
->>> a very convenient way to get the board enter download mode.
->>> And Android system also use this protocol to pass "recovery"?
->>> ?fastboot? reboot mode to bootloader. In upstream land, We found
->>> tegra platform also use this mechanism.
->>>
->>> Before this version, I have sent two Series, which can be found
->>> at [0] [1]
->>> [0] https://patchwork.kernel.org/patch/7140751/
->>> [1] https://patchwork.kernel.org/patch/7153531/
->>
->> just so it doesn't get lost, this ties into a slightly more generic
->> approach,
->> John Stultz is doing for the android reboot reasons:
->>
->> http://thread.gmane.org/gmane.linux.kernel/2103447
->>
->> The only difference is that we'd need to use the pmu syscon for it.
->>
->>
->     Very glad to see your work on this. And your work is more generic than
-> my.
->      So hope we can share the code. As you can see, the rockchip platform
-> use
->      a GRF or PMU register to store the reboot reason. So maybe we need a
-> phandle
->      in the DT node to describe it.
+What is the status of this patch?  It there a good likelihood that it 
+will make it into v4.4?
 
-Yea. I need to figure out the best way to represent these various methods in DT.
+If not, we should request that c55a6ffa6285 ("locking/osq: Relax atomic 
+semantics") be reverted for v4.4
 
-Apologies for not being super responsive here. Been a bit heads down
-trying to finish up some items before holiday break.
+David Daney
 
->From some of Arnd's comments, it sounds like we may need a larger
-generic subsystem for kernel to firmware communications here.  So more
-then likely I'll not have a chance to take another swing at this after
-the new year.
 
-So if in the meantime you want to try to take my code and rework it,
-or extend your code in a similar way, I'll not take any offence. :)
 
-thanks
--john
+On 12/11/2015 09:46 AM, Will Deacon wrote:
+> The Cavium guys reported a soft lockup on their arm64 machine, caused
+> by c55a6ffa6285 ("locking/osq: Relax atomic semantics"):
+>
+> [   68.909948] [<fffffe00000da03c>] mutex_optimistic_spin+0x9c/0x1d0
+> [   68.909951] [<fffffe00006fe4b8>] __mutex_lock_slowpath+0x44/0x158
+> [   68.909953] [<fffffe00006fe620>] mutex_lock+0x54/0x58
+> [   68.909956] [<fffffe0000265efc>] kernfs_iop_permission+0x38/0x70
+> [   68.909959] [<fffffe00001fbf50>] __inode_permission+0x88/0xd8
+> [   68.909961] [<fffffe00001fbfd0>] inode_permission+0x30/0x6c
+> [   68.909964] [<fffffe00001fe26c>] link_path_walk+0x68/0x4d4
+> [   68.909966] [<fffffe00001ffa14>] path_openat+0xb4/0x2bc
+> [   68.909968] [<fffffe000020123c>] do_filp_open+0x74/0xd0
+> [   68.909971] [<fffffe00001f13e4>] do_sys_open+0x14c/0x228
+> [   68.909973] [<fffffe00001f1544>] SyS_openat+0x3c/0x48
+> [   68.909976] [<fffffe00000851f0>] el0_svc_naked+0x24/0x28
+>
+> This is because in osq_lock we initialise the node for the current CPU:
+>
+> 	node->locked = 0;
+> 	node->next = NULL;
+> 	node->cpu = curr;
+>
+> and then publish the current CPU in the lock tail:
+>
+> 	old = atomic_xchg_acquire(&lock->tail, curr);
+>
+> Once the update to lock->tail is visible to another CPU, the node is
+> then live and can be both read and updated by concurrent lockers.
+>
+> Unfortunately, the ACQUIRE semantics of the xchg operation mean that
+> there is no guarantee the contents of the node will be visible before
+> lock tail is updated. This can lead to lock corruption when, for example,
+> a concurrent locker races to set the next field.
+>
+> Fixes: c55a6ffa6285 ("locking/osq: Relax atomic semantics"):
+> Reported-by: David Daney <ddaney@caviumnetworks.com>
+> Reported-by: Andrew Pinski <andrew.pinski@caviumnetworks.com>
+> Tested-by: Andrew Pinski <andrew.pinski@caviumnetworks.com>
+> Acked-by: Davidlohr Bueso <dave@stgolabs.net>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>   kernel/locking/osq_lock.c | 8 +++++---
+>   1 file changed, 5 insertions(+), 3 deletions(-)
+>
+> diff --git a/kernel/locking/osq_lock.c b/kernel/locking/osq_lock.c
+> index d092a0c9c2d4..05a37857ab55 100644
+> --- a/kernel/locking/osq_lock.c
+> +++ b/kernel/locking/osq_lock.c
+> @@ -93,10 +93,12 @@ bool osq_lock(struct optimistic_spin_queue *lock)
+>   	node->cpu = curr;
+>
+>   	/*
+> -	 * ACQUIRE semantics, pairs with corresponding RELEASE
+> -	 * in unlock() uncontended, or fastpath.
+> +	 * We need both ACQUIRE (pairs with corresponding RELEASE in
+> +	 * unlock() uncontended, or fastpath) and RELEASE (to publish
+> +	 * the node fields we just initialised) semantics when updating
+> +	 * the lock tail.
+>   	 */
+> -	old = atomic_xchg_acquire(&lock->tail, curr);
+> +	old = atomic_xchg(&lock->tail, curr);
+>   	if (old == OSQ_UNLOCKED_VAL)
+>   		return true;
+>
+>
