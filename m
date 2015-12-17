@@ -1,104 +1,85 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 18 Dec 2015 00:39:04 +0100
-Subject: [PATCH] ARM: socfpga: dts: Enable MMC support at correct place in the
- DT
-Message-ID: <1450395544-9890-1-git-send-email-marex@denx.de>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 18 Dec 2015 00:48:36 +0100
+Subject: [PATCH v1 0/6] Support the rk3036 Kylin board
+In-Reply-To: <CAGXu5jKEykL1+F=m2kk8E4qOKeUmc-jHnZ-fYpz1OS8oQ1Pgxg@mail.gmail.com>
+References: <1450362112-8075-1-git-send-email-wxt@rock-chips.com>
+ <CAGXu5jKEykL1+F=m2kk8E4qOKeUmc-jHnZ-fYpz1OS8oQ1Pgxg@mail.gmail.com>
+Message-ID: <2077620.agNLOx8o2g@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The socfpga.dtsi explicitly enabled MMC support, but not all boards are
-equiped with an MMC card. There are setups which only have QSPI NOR.
-Therefore, disable the MMC support on socfpga.dtsi level and enable it
-on per-board basis.
+Hi Caesar, Kees,
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Alan Tull <atull@altera.com>
-Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
-Cc: Marek Vasut <marex@denx.de>
-Cc: Olof Johansson <olof@lixom.net>
-Cc: Thor Thayer <tthayer@altera.com>
-Cc: Vince Bridgers <vbridgers2013@gmail.com>
----
- arch/arm/boot/dts/socfpga.dtsi                    | 1 +
- arch/arm/boot/dts/socfpga_arria5_socdk.dts        | 1 +
- arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts | 1 +
- arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi       | 1 +
- arch/arm/boot/dts/socfpga_cyclone5_socdk.dts      | 1 +
- arch/arm/boot/dts/socfpga_cyclone5_sockit.dts     | 1 +
- 6 files changed, 6 insertions(+)
+Am Donnerstag, 17. Dezember 2015, 11:45:06 schrieb Kees Cook:
+> On Thu, Dec 17, 2015 at 6:21 AM, Caesar Wang <wxt@rock-chips.com> wrote:
+> > Kylin-board is based on RK3036 SOCs, add the initiation
+> > version for working.
+> > 
+> > This series patches have the following decriptions:
+> > 
+> > PATCH[1/6]:
+> > ARM: dts: fix the correct pinctrl control for rk3036
+> > 
+> > The pinctrl gpio pull up/down is incorrect since the rk3036 SoCs
+> > can't set the status in the internal.
+> > ---
+> > 
+> > PATCH[2/6]:
+> > ARM: dts: add the lcdc and hdmi node for rk3036
+> > 
+> > Add the devices is related to display.
+> > Based on the series patches of Mark Yao's
+> > ---
+> > 
+> > PATCH[3/6]:
+> > ARM: dts: add the sdio/sdmmc node for rk3036
+> > 
+> > Add the wifi/sd card work for kylin board.
+> > ---
+> > 
+> > PATCH[4/6]:
+> > ARM: dts: rockchip: add the kylin board for rk3036
+> > 
+> > Add the dts for kylin board.
+> > ---
+> > 
+> > PATCH[5/6]:
+> > ARM: dts: add the sound codec for kylin board
+> > 
+> > Make the codec rt5616 working on kylin board.
+> > The realteak have been upstream for Mark Brown,
+> > I guess need some days to review.
+> > 
+> > ---
+> > 
+> > PATCH[6/6]:
+> > ARM: dts: add the sdio node for kylin board
+> > 
+> > Enable the sdio for kylin board.
+> > ---
+> 
+> Thanks for sending this!
+> 
+> Reviewed-by: Kees Cook <keescook@chromium.org>
+> 
+> Some thoughts: maybe collapse 4, 5, and 6 together, since it's a new file?
 
-NOTE: This should not cause any trouble, since I checked all the boards
-      for the presence of the HPS SD card slot / eMMC.
+@Caesar, no need to resend, I can do that merging myself.
+After we clarified the authorship of patch1 ;-) .
 
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index cffea91..ebcd081 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -677,6 +677,7 @@
- 			#size-cells = <0>;
- 			clocks = <&l4_mp_clk>, <&sdmmc_clk_divided>;
- 			clock-names = "biu", "ciu";
-+			status = "disabled";
- 		};
- 
- 		ocram: sram at ffff0000 {
-diff --git a/arch/arm/boot/dts/socfpga_arria5_socdk.dts b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
-index a75a666..3c88678 100644
---- a/arch/arm/boot/dts/socfpga_arria5_socdk.dts
-+++ b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
-@@ -79,6 +79,7 @@
- &mmc0 {
- 	vmmc-supply = <&regulator_3_3v>;
- 	vqmmc-supply = <&regulator_3_3v>;
-+	status = "okay";
- };
- 
- &usb1 {
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-index 555e9ca..afea364 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-@@ -100,6 +100,7 @@
- &mmc0 {
- 	vmmc-supply = <&regulator_3_3v>;
- 	vqmmc-supply = <&regulator_3_3v>;
-+	status = "okay";
- };
- 
- &uart0 {
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi b/arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi
-index baecd98..f86f9c0 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi
-@@ -30,4 +30,5 @@
- 
- &mmc0 {	/* On-SoM eMMC */
- 	bus-width = <8>;
-+	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-index d4d0a28..15e43f4 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-@@ -84,6 +84,7 @@
- 	cd-gpios = <&portb 18 0>;
- 	vmmc-supply = <&regulator_3_3v>;
- 	vqmmc-supply = <&regulator_3_3v>;
-+	status = "okay";
- };
- 
- &usb1 {
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-index 54ed3f9..1a0c726 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-@@ -172,6 +172,7 @@
- &mmc0 {
- 	vmmc-supply = <&regulator_3_3v>;
- 	vqmmc-supply = <&regulator_3_3v>;
-+	status = "okay";
- };
- 
- &qspi {
--- 
-2.6.4
+Except the audio patch, as we're missing the realtek codec driver.
+I'll also drop the lcdc+hdmi parts for now, as the relevant parts aren't in
+any maintainer-tree yet. The ordering is for this:
+
+- atomic conversion
+- rk3036 vop
+- inno-hdmi driver
+- dts changes last
+
+The driver for the Innosilicon hdmi driver is from November, had one comment 
+from me and Caesar+ Yakir should make sure it works with the atomic 
+modesetting variant of the drm/kms driver please. (And probably resend the 
+series fixing that one tiny comment).
+
+
+Heiko
