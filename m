@@ -1,37 +1,56 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Thu, 17 Dec 2015 11:55:15 +0800
-Subject: block layer bug with 4.4-rc3+
-In-Reply-To: <1885710.UNGYhDGGcI@wuerfel>
-References: <566FF3ED.1000503@arm.com>
- <CACVXFVN3w0Y_8k3TiKoGytbayXiB+mRhgDn-OueV2+e93i=4AQ@mail.gmail.com>
- <56717B6F.2040008@arm.com> <1885710.UNGYhDGGcI@wuerfel>
-Message-ID: <CACVXFVPmZmWt7wApP+dwE7MiJj4hM_eJthREN2Vd5uun2hxK7A@mail.gmail.com>
+From: drivshin.allworx@gmail.com (David Rivshin (Allworx))
+Date: Wed, 16 Dec 2015 23:02:08 -0500
+Subject: [PATCH v2 0/3] drivers: net: cpsw: Fix bugs in fixed-link PHY DT
+ parsing
+References: <20151209223115.6c5a400f.drivshin.allworx@gmail.com>
+ <1741588.Ve76Z1ZI87@localhost>
+Message-ID: <cover.1450309613.git.drivshin@allworx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 16, 2015 at 11:43 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 16 December 2015 14:55:43 Andre Przywara wrote:
->> Using the plain multi_v7_defconfig (which doesn't have LPAE and makes me
->> loose half of the RAM on that box) didn't show the bug so far.
->> One of the effects of turning on LPAE is that dma_addr_t and phys_addr_t
->> turn to 64-bit, with long, int and void* still being 32-bit. Can you
->> think of any issues that could be related to that?
->>
->
-> Another difference between the platforms is highmem. On Midway,
-> almost all of RAM is highmem, which needs a lot of special handling
-> that we don't need on platform with less RAM.
+Commit 1f71e8c96fc654724723ce987e0a8b2aeb81746d ("drivers: net: cpsw:
+Add support for fixed-link PHY") added initial fixed-link PHY support
+for CPSW, but missed a few considerations.
 
-Yeah, block bounce can be triggered for highmem generally.
+This series is based on the tip of the net tree. The first two patches
+fix user-visible errors in different hardware configurations. The third
+patch is for an internal reference counting issue. They are logically
+independent changes, but in the same function, so must be applied in
+order to apply cleanly.
 
->
-> To rule out both of highmem and LPAE, it might be interesting to
-> test again on Midway with CONFIG_HIGHMEM and CONFIG_LPAE disabled.
-> This will limit the RAM to 768MB, but if the bug still shows up,
-> you know it's something else.
->
->         Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-block" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+The first patch was originally submitted by Pascal Speck on December 4,
+but was not picked up by patchwork. I suspect that is because the patch
+was mangled by the mailer. I fixed the mangling and am including it in
+this series, as I believe it is the correct change.
+
+I have tested on the following hardware configurations:
+ - (EVMSK) dual emac with two real MDIO-connected phys using RGMII-TXID
+ - single emac with fixed-link using RGMII
+Testing of other CPSW emac configurations that folks may have would
+be appreciated.
+
+
+Changes from v1 [1]:
+ - Split into 3 smaller patches.
+ - Maintain 1f71e8c96fc6's preference for fixed-link over phy_id if
+   they are both (incorrectly) specified in the slave node.
+ - Update binding documentation to no longer say that phy_mode is also
+   mutually exclusive with fixed-link.
+ - Dropped unnecessary include of phy_fixed.h.
+
+[1] https://patchwork.ozlabs.org/patch/554989/
+
+David Rivshin (2):
+  drivers: net: cpsw: fix RMII/RGMII mode when used with fixed-link PHY
+  drivers: net: cpsw: increment reference count on fixed-link PHY node
+
+Pascal Speck (Iktek) (1):
+  ethernet:ti:cpsw: fix phy identification with multiple slaves on
+    fixed-phy
+
+ Documentation/devicetree/bindings/net/cpsw.txt |  6 +--
+ drivers/net/ethernet/ti/cpsw.c                 | 53 +++++++++++++++-----------
+ 2 files changed, 34 insertions(+), 25 deletions(-)
+
+--
+2.5.0
