@@ -1,52 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 17 Dec 2015 11:26:35 +0100
-Subject: [PATCH v2 0/8] Raspberry Pi 2 support.
-In-Reply-To: <567276F9.5070903@i2se.com>
-References: <1450310115-22163-1-git-send-email-eric@anholt.net>
- <874mfhsyem.fsf@eliezer.anholt.net> <567276F9.5070903@i2se.com>
-Message-ID: <3363412.hB2NWDcUxf@wuerfel>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Thu, 17 Dec 2015 11:25:52 +0100
+Subject: [PATCH V2 06/23] XEN / PCI: Remove the dependence on arch x86
+ when PCI_MMCONFIG=y
+In-Reply-To: <1450278993-12664-7-git-send-email-tn@semihalf.com>
+References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
+ <1450278993-12664-7-git-send-email-tn@semihalf.com>
+Message-ID: <56728DB0.2080800@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 17 December 2015 09:48:57 Stefan Wahren wrote:
-> Am 17.12.2015 um 01:37 schrieb Eric Anholt:
-> > Arnd Bergmann <arnd@arndb.de> writes:
-> >
-> >> On Wednesday 16 December 2015 15:55:07 Eric Anholt wrote:
-> >>> This is a major rewrite of the previous Raspberry Pi 2 submission.
-> >>> SMP support is now included, and the DT includes are cleaned up to
-> >>> avoid massive duplication.
-> >>>
-> >>> The branch (based on 4.4-rc5, to get the USB regression fixes) can be
-> >>> found at:
-> >>>
-> >>> https://github.com/anholt/linux/tree/bcm2836-4.4
-> >> Looks all good to me, but when we get the pull request, I'd strongly
-> >> prefer to have that based on -rc3 or earlier.
-> >>
-> >> What commit is the USB regression fix you refer to above? Is that in a
-> >> branch that is -rc3 based? Maybe you can rebase the changes on top
-> >> of that branch, to minimize the amount of backmerges?
-> > Top 4 commits of drivers/usb/dwc2 for 4.4-rc5 (possibly not all of them
-> > are required, but it's what I've been using).  
-> >
-> 
-> Unfortunately all 4 of them are required:
-> 
-> d0464bcf12af ("usb: dwc2: Make PHY optional")
-> 
-> 6c2dad69163f ("usb: dwc2: Return errors from PHY")
-> 
-> 8aa90cf2a286 ("usb: dwc2: make otg clk optional")
-> 
-> f74875dc3613 ("usb: dwc2: fix kernel oops during driver probe")
+On 16.12.2015 16:16, Tomasz Nowicki wrote:
+> In drivers/xen/pci.c, there are arch x86 dependent codes when
+> CONFIG_PCI_MMCONFIG is enabled, since CONFIG_PCI_MMCONFIG
+> depends on ACPI, so this will prevent XEN PCI running on other
+> architectures using ACPI with PCI_MMCONFIG enabled (such as ARM64).
+>
+> Fortunatly, it can be sloved in a simple way. In drivers/xen/pci.c,
+> the only x86 dependent code is if ((pci_probe & PCI_PROBE_MMCONF) == 0),
+> and it's defined in asm/pci_x86.h, the code means that
+> if the PCI resource is not probed in PCI_PROBE_MMCONF way, just
+> ingnore the xen mcfg init. Actually this is duplicate, because
+> if PCI resource is not probed in PCI_PROBE_MMCONF way, the
+> pci_mmconfig_list will be empty, and the if (list_empty())
+> after it will do the same job.
+>
+> So just remove the arch related code and the head file, this
+> will be no functional change for x86, and also makes xen/pci.c
+> usable for other architectures.
+>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> CC: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+> Cc: Stefano Stabellini <Stefano.Stabellini@eu.citrix.com>
+> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> ---
+>   drivers/xen/pci.c | 6 ------
+>   1 file changed, 6 deletions(-)
+>
+> diff --git a/drivers/xen/pci.c b/drivers/xen/pci.c
+> index 6785ebb..9a8dbe3 100644
+> --- a/drivers/xen/pci.c
+> +++ b/drivers/xen/pci.c
+> @@ -28,9 +28,6 @@
+>   #include <asm/xen/hypervisor.h>
+>   #include <asm/xen/hypercall.h>
+>   #include "../pci/pci.h"
+> -#ifdef CONFIG_PCI_MMCONFIG
+> -#include <asm/pci_x86.h>
+> -#endif
 
-Ok, that's good. They are all based on -rc1, so you you can just rebase
-on top of f74875dc3613, which was pulled by GregKH.
+I noticed that I forgot about:
++#include <linux/ecam.h>
 
-> But they should apply to -rc3 too.
+Sorry.
 
-Please don't rebase them, use the commits that got merged, otherwise we'd
-get duplicate commits and that would be worse than the backmerge.
-
-	Arnd
+Tomasz
