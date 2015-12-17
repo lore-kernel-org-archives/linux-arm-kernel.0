@@ -1,87 +1,145 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Thu, 17 Dec 2015 18:10:16 +0800
-Subject: [PATCH v7 19/19] KVM: ARM64: Add a new kvm ARM PMU device
-In-Reply-To: <567282B1.7070105@arm.com>
-References: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>	<1450169379-12336-20-git-send-email-zhaoshenglong@huawei.com>	<567032AD.8000206@arm.com>	<567036DE.80605@linaro.org>	<567038E3.3010102@arm.com>	<20151215204739.GK4120@cbox>	<56711348.6010406@huawei.com>	<56711B99.1000608@huawei.com>	<20151216203336.GE24889@cbox>	<567262CA.6050905@huawei.com>
- <20151217083314.2ed36f9f@why.wild-wind.fr.eu.org>
- <5672753A.8050006@huawei.com> <567282B1.7070105@arm.com>
-Message-ID: <56728A08.6040304@huawei.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 17 Dec 2015 11:11:41 +0100
+Subject: [PATCH v2] ARM: at91/dt: Add Support for the L+G VInCo platform
+In-Reply-To: <1450346406-11606-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1450346406-11606-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20151217101141.GB13078@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 17/12/2015 at 11:00:06 +0100, Gregory CLEMENT wrote :
+> The Versatile Industrial Communication platform is a community oriented
+> board from Landis + Gyr. It comes with:
+>       - an RS-485 port
+>       - 2 Ethernet ports
+>       - a wireless M-BUS
+>       - a 4G modem
+>       - a 4MB SPI flash
+>       - a 4GB eMMC
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+> 
+> Changelog
+> 
+> v1 -> v2:
+> - Fixed rtc compatible name from "rx8900" to "epson,rx8900" as pointed
+> by Alexandre Belloni
+> 
+> arch/arm/boot/dts/Makefile       |   3 +-
+>  arch/arm/boot/dts/at91-vinco.dts | 266 +++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 268 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/boot/dts/at91-vinco.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 30bbc37..75562ab 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -49,7 +49,8 @@ dtb-$(CONFIG_SOC_SAM_V7) += \
+>  	sama5d35ek.dtb \
+>  	sama5d36ek.dtb \
+>  	at91-sama5d4_xplained.dtb \
+> -	at91-sama5d4ek.dtb
+> +	at91-sama5d4ek.dtb \
+> +	at91-vinco.dtb
+>  dtb-$(CONFIG_ARCH_ATLAS6) += \
+>  	atlas6-evb.dtb
+>  dtb-$(CONFIG_ARCH_ATLAS7) += \
+> diff --git a/arch/arm/boot/dts/at91-vinco.dts b/arch/arm/boot/dts/at91-vinco.dts
+> new file mode 100644
+> index 0000000..951807c
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/at91-vinco.dts
+> @@ -0,0 +1,266 @@
+> +/*
+> + * Device Tree file for VInCo platform
+> + *
+> + *  Copyright (C) 2014 Atmel,
+> + *                2014 Nicolas Ferre <nicolas.ferre@atmel.com>
+> + *   2015 Gregory CLEMENT <gregory.clement@free-electrons.com>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +/dts-v1/;
+> +#include "sama5d4.dtsi"
+> +
+> +/ {
+> +	model = "L+G VInCo platform";
+> +	compatible = "l+g,vinco", "atmel,sama5d4", "atmel,sama5";
+> +
+> +	chosen {
+> +		bootargs = "ignore_loglevel earlyprintk";
 
+Are you sure about that? :)
+See 1392f7c905e80361f57977e4c0f37f0a5d44e597
 
-On 2015/12/17 17:38, Marc Zyngier wrote:
-> On 17/12/15 08:41, Shannon Zhao wrote:
->> > 
->> > 
->> > On 2015/12/17 16:33, Marc Zyngier wrote:
->>> >> On Thu, 17 Dec 2015 15:22:50 +0800
->>> >> Shannon Zhao <zhaoshenglong@huawei.com> wrote:
->>> >>
->>>>> >>>>
->>>>> >>>>
->>>>> >>>> On 2015/12/17 4:33, Christoffer Dall wrote:
->>>>>>> >>>>>> On Wed, Dec 16, 2015 at 04:06:49PM +0800, Shannon Zhao wrote:
->>>>>>>>> >>>>>>>> Hi,
->>>>>>>>> >>>>>>>>
->>>>>>>>> >>>>>>>> On 2015/12/16 15:31, Shannon Zhao wrote:
->>>>>>>>>>>>>>>>>>>>>>> >>>>>>>>>>>>>>>>>>>>>> But in this case, you're returning an error if it is *not* initialized.
->>>>>>>>>>>>>>>>>>>>>>> >>>>>>>>>>>>>>>>>>>>>> I understand that in that case you cannot return an interrupt number (-1
->>>>>>>>>>>>>>>>>>>>>>> >>>>>>>>>>>>>>>>>>>>>> would be weird), but returning -EBUSY feels even more weird.
->>>>>>>>>>>>>>>>>>>>>>> >>>>>>>>>>>>>>>>>>>>>>
->>>>>>>>>>>>>>>>>>>>>>> >>>>>>>>>>>>>>>>>>>>>> I'd settle for -ENOXIO, or something similar. Anyone having a better idea?
->>>>>>>>>>>>>>>>>>>>>>> >>>>>>>>>>>>>>>>>>>>>>
->>>>>>>>>>>>>>> >>>>>>>>>>>>>> ENXIO or ENODEV would be my choice too, and add that to the
->>>>>>>>>>>>>>> >>>>>>>>>>>>>> Documentation clearly describing when this error code is used.
->>>>>>>>>>>>>>> >>>>>>>>>>>>>>
->>>>>>>>>>>>>>> >>>>>>>>>>>>>> By the way, why do you loop over all VCPUS to set the same value when
->>>>>>>>>>>>>>> >>>>>>>>>>>>>> you can't do anything per VCPU anyway?  It seems to me it's either a
->>>>>>>>>>>>>>> >>>>>>>>>>>>>> per-VM property (that you can store on the VM data structure) or it's a
->>>>>>>>>>>>>>> >>>>>>>>>>>>>> true per-VCPU property?
->>>>>>>>>>> >>>>>>>>>> This is a per-VCPU property. PMU interrupt could be PPI or SPI. For PPI
->>>>>>>>>>> >>>>>>>>>> the interrupt numbers are same for each vcpu, while for SPI they are
->>>>>>>>>>> >>>>>>>>>> different, so it needs to set them separately. I planned to support both
->>>>>>>>>>> >>>>>>>>>> PPI and SPI. I think I should add support for SPI at this moment and let
->>>>>>>>>>> >>>>>>>>>> users (QEMU) to set these interrupts for each one.
->>>>>>>>> >>>>>>>>
->>>>>>>>> >>>>>>>> How about below vPMU Documentation?
->>>>>>>>> >>>>>>>>
->>>>>>>>> >>>>>>>> ARM Virtual Performance Monitor Unit (vPMU)
->>>>>>>>> >>>>>>>> ===========================================
->>>>>>>>> >>>>>>>>
->>>>>>>>> >>>>>>>> Device types supported:
->>>>>>>>> >>>>>>>>   KVM_DEV_TYPE_ARM_PMU_V3         ARM Performance Monitor Unit v3
->>>>>>>>> >>>>>>>>
->>>>>>>>> >>>>>>>> Instantiate one PMU instance for per VCPU through this API.
->>>>>>>>> >>>>>>>>
->>>>>>>>> >>>>>>>> Groups:
->>>>>>>>> >>>>>>>>   KVM_DEV_ARM_PMU_GRP_IRQ
->>>>>>>>> >>>>>>>>   Attributes:
->>>>>>>>> >>>>>>>>     The attr field of kvm_device_attr encodes two values:
->>>>>>>>> >>>>>>>>     bits:     | 63 .... 32 | 31 .... 0 |
->>>>>>>>> >>>>>>>>     values:   | vcpu_index |  irq_num  |
->>>>> >>>> BTW, I change this Attribute to below format and pass vcpu_index through
->>>>> >>>> this Attribute while pass irq_num through kvm_device_attr.addr.
->>>>> >>>> Is it fine?
->>>>> >>>>
->>>>> >>>>     bits:     | 63 .... 32 | 31 ....  0 |
->>>>> >>>>     values:   |  reserved  | vcpu_index |
->>> >> Using the .addr field for something that is clearly not an address is
->>> >> rather odd. Is there any prior usage of that field for something that
->>> >> is not an address?
->> > 
->> > I see this usage in vgic_attr_regs_access(). But if you prefer previous
->> > one, I'll use that.
-> Ah, you're using the .addr field to point to a userspace value, not to
-> carry the value itself! That'd be fine by me (even if I still prefer the
-> original one), but I'd like others to chime in (I'm quite bad at
-> defining userspace stuff...).
+> +		stdout-path = "serial0:115200n8";
+> +	};
+> +
+> +	memory {
+> +		reg = <0x20000000 0x4000000>;
+> +	};
+> +
+> +	clocks {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		main_clock: clock at 0 {
+> +			compatible = "atmel,osc", "fixed-clock";
+> +			clock-frequency = <12000000>;
+> +		};
+> +
 
-Another reason I think is that it needs to pass the irq_num to user
-space when calling get_attr. It could be passed via kvm_device_attr.addr
-while can't be passed via kvm_device_attr.attr within current framework.
+This clock at 0 node is unnecessary, see
+15f7e2537a164a9a19861b67aa4368297f8b00bb
 
-Thanks,
+> +		slow_xtal {
+> +			clock-frequency = <32768>;
+> +		};
+> +
+> +		main_xtal {
+> +			clock-frequency = <12000000>;
+> +		};
+> +	};
+> +
 -- 
-Shannon
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
