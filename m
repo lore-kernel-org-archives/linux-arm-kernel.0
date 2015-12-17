@@ -1,63 +1,121 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 17 Dec 2015 07:49:55 -0600
-Subject: [PATCH v2 0/3] USB: add generic onboard USB HUB driver
-In-Reply-To: <20151217023118.GA3793@shlinux2>
-References: <1450077974-22762-1-git-send-email-peter.chen@freescale.com>
- <3023844.AYbAYqvHUZ@wuerfel>
- <CAL_Jsq+KAF6FGyOyC0JzODsSVoK4+V6umpj=cANywgui_wOKMg@mail.gmail.com>
- <1827708.e1pfN6rEID@wuerfel> <20151217023118.GA3793@shlinux2>
-Message-ID: <CAL_Jsq+t6NBh-zzwPH14MYBp6PGFaVv3540Urdn8q6D+erQkLA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 17 Dec 2015 13:52:47 +0000
+Subject: [PATCH v10 1/4] dt-binding:Documents of the mbigen bindings
+In-Reply-To: <1450353397-47668-2-git-send-email-majun258@huawei.com>
+References: <1450353397-47668-1-git-send-email-majun258@huawei.com>
+ <1450353397-47668-2-git-send-email-majun258@huawei.com>
+Message-ID: <20151217135247.GD13389@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 16, 2015 at 8:31 PM, Peter Chen <peter.chen@freescale.com> wrote:
-> On Thu, Dec 17, 2015 at 12:13:07AM +0100, Arnd Bergmann wrote:
->> On Wednesday 16 December 2015 16:59:39 Rob Herring wrote:
->> > On Mon, Dec 14, 2015 at 3:35 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > > On Monday 14 December 2015 15:26:11 Peter Chen wrote:
->> >
->> > I agree on doing it properly, but am not sure that pwrseq binding for
->> > MMC is proper. The pwrseq binding is fairly limited and working around
->> > the driver model IMO. Hubs may also need I2C setup which I don't think
->> > could be done generically other than some defined sequence of i2c
->> > transactions. The current project I'm working on needs to use I2C to
->> > configure the hub to use HSIC mode for example. I really think we need
->> > a pre-probe driver hook to handle this. That would allow device
->> > specific setup to live in the driver.
->> >
->> > Perhaps a more simple approach would be just forcing driver probe if a
->> > DT node is present. I'm not all that familiar with USB drivers, but
->> > presumably there is some setup before probe like setting the USB
->> > device address. We'd have to allow doing that later during probe.
->>
->> Yes, good idea. I was also advocating that approach for MMC at some
->> point, but the power sequencing made it in the end.
->>
->
-> Currently, my design is much like Rob proposal's. I will populate all
-> children device under HUB's node (controller = 1st level hub), and
-> each special onboard USB device needs a platform driver, it can be
-> probed according to compatible string, and at its probe, it can register
-> itself as usb device if needed, and handle properties described at
-> its node. Sample code like below:
-
-It is not like my proposal because I don't think the design should be
-using a platform driver.
-
-> diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> index 8263fc1..7451f7d 100644
-> --- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> @@ -590,6 +590,16 @@
->  &usbh1 {
->         vbus-supply = <&reg_usb_h1_vbus>;
->         status = "okay";
+On Thu, Dec 17, 2015 at 07:56:34PM +0800, MaJun wrote:
+> From: Ma Jun <majun258@huawei.com>
+> 
+> Add the mbigen msi interrupt controller bindings document.
+> 
+> This patch based on Mark Rutland's patch
+> https://lkml.org/lkml/2015/7/23/558
+> 
+> Signed-off-by: Ma Jun <majun258@huawei.com>
+> ---
+>  Documentation/devicetree/bindings/arm/mbigen.txt |   74 ++++++++++++++++++++++
+>  1 files changed, 74 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/mbigen.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/mbigen.txt b/Documentation/devicetree/bindings/arm/mbigen.txt
+> new file mode 100644
+> index 0000000..3eaa678
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/mbigen.txt
+> @@ -0,0 +1,74 @@
+> +Hisilicon mbigen device tree bindings.
+> +=======================================
 > +
-> +       #address-cells = <1>;
-> +       #size-cells = <0>;
-> +       hub: usb2415 at 01 {
-> +               compatible = "generic-onboard-hub";
+> +Mbigen means: message based interrupt generator.
+> +
+> +MBI is kind of msi interrupt only used on Non-PCI devices.
+> +
+> +To reduce the wired interrupt number connected to GIC,
+> +Hisilicon designed mbigen to collect and generate interrupt.
+> +
+> +
+> +Non-pci devices can connect to mbigen and generate the
+> +interrupt by writing ITS register.
+> +
+> +The mbigen chip and devices connect to mbigen have the following properties:
+> +
+> +Mbigen main node required properties:
+> +-------------------------------------------
+> +- compatible: Should be "hisilicon,mbigen-v2"
+> +
+> +- reg: Specifies the base physical address and size of the Mbigen
+> +  registers.
+> +
+> +- interrupt controller: Identifies the node as an interrupt controller
+> +
+> +- msi-parent: Specifies the MSI controller this mbigen use.
+> +  For more detail information,please refer to the generic msi-parent binding in
+> +  Documentation/devicetree/bindings/interrupt-controller/msi.txt.
+> +
+> +- num-msis:Specifies the total number of interrupt this device has.
 
-Please follow the already defined naming scheme for USB devices.
+Is this the number of pins implemented? Or the number of pins that are
+in use?
 
-Rob
+The latter feels like something we can derive.
+
+> +- #interrupt-cells : Specifies the number of cells needed to encode an
+> +  interrupt source. The value must be 2.
+> +
+> +  The 1st cell is hardware pin number of the interrupt.This number is local to
+> +  each mbigen chip and in the range from 0 to the maximum interrupts number
+> +  of the mbigen.
+
+Just to check: 0 - 63 represent the "reserved" pins, yes?
+
+Other than those questions, this looks good to me.
+
+Thanks,
+Mark.
+
+> +
+> +  The 2nd cell is the interrupt trigger type.
+> +	The value of this cell should be:
+> +	1: rising edge triggered
+> +	or
+> +	4: high level triggered
+> +
+> +Examples:
+> +
+> + 	mbigen_device_gmac:intc {
+> +			compatible = "hisilicon,mbigen-v2";
+> +			reg = <0x0 0xc0080000 0x0 0x10000>;
+> +			interrupt-controller;
+> +			msi-parent = <&its_dsa 0x40b1c>;
+> +			num-msis = <9>;
+> +			#interrupt-cells = <2>;
+> + 	};
+> +
+> +Devices connect to mbigen required properties:
+> +----------------------------------------------------
+> +-interrupt-parent: Specifies the mbigen device node which device connected.
+> +
+> +-interrupts:Specifies the interrupt source.
+> + For the specific information of each cell in this property,please refer to
+> + the "interrupt-cells" description mentioned above.
+> +
+> +Examples:
+> +	gmac0: ethernet at c2080000 {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		reg = <0 0xc2080000 0 0x20000>,
+> +		      <0 0xc0000000 0 0x1000>;
+> +		interrupt-parent  = <&mbigen_device_gmac>;
+> +		interrupts =	<656 1>,
+> +				<657 1>;
+> +	};
+> +
+> -- 
+> 1.7.1
+> 
+> 
