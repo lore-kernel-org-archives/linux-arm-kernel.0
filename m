@@ -1,125 +1,73 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Thu, 17 Dec 2015 12:52:13 +0100
-Subject: [PATCH V2 10/10] acpi, gicv3,
- its: Use MADT ITS subtable to do PCI/MSI domain initialization.
-In-Reply-To: <1450353133-15992-1-git-send-email-tn@semihalf.com>
-References: <1450353133-15992-1-git-send-email-tn@semihalf.com>
-Message-ID: <1450353133-15992-11-git-send-email-tn@semihalf.com>
+From: majun258@huawei.com (MaJun)
+Date: Thu, 17 Dec 2015 19:56:33 +0800
+Subject: [PATCH v10 0/4] irqchip:support mbigen interrupt controller
+Message-ID: <1450353397-47668-1-git-send-email-majun258@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After refactoring DT code, we let ACPI to build ITS PCI MSI domain
-and do requester ID to device ID translation using IORT table.
+From: Ma Jun <majun258@huawei.com>
 
-We have now full PCI MSI domain stack, thus we can enable ITS initialization
-from GICv3 core driver for ACPI scenario.
+This patch set adds the driver of mbigen and binding document for Hisilicon
+Mbigen chips.
 
-Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
----
- drivers/irqchip/irq-gic-v3-its-pci-msi.c | 44 +++++++++++++++++++++++++++++++-
- drivers/irqchip/irq-gic-v3.c             |  3 +--
- drivers/pci/msi.c                        |  3 +++
- 3 files changed, 47 insertions(+), 3 deletions(-)
+Compared with previous version, this version changed much.
 
-diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-index 06165cb..7f0a958 100644
---- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-+++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-@@ -15,6 +15,8 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/acpi.h>
-+#include <linux/iort.h>
- #include <linux/msi.h>
- #include <linux/of.h>
- #include <linux/of_irq.h>
-@@ -143,10 +145,50 @@ static int __init its_pci_of_msi_init(void)
- 	return 0;
- }
- 
-+#ifdef CONFIG_ACPI
-+
-+static int __init
-+its_pci_msi_parse_madt(struct acpi_subtable_header *header,
-+		    const unsigned long end)
-+{
-+	struct acpi_madt_generic_translator *its_entry;
-+	struct fwnode_handle *domain_handle;
-+
-+	its_entry = (struct acpi_madt_generic_translator *)header;
-+	domain_handle = iort_find_its_domain_token(its_entry->translation_id);
-+	if (!domain_handle) {
-+		pr_err("ITS at 0x%lx: Unable to locate ITS domain handle\n",
-+		       (long)its_entry->base_address);
-+		return 0;
-+	}
-+
-+	if (its_pci_msi_init_one(domain_handle))
-+		return 0;
-+
-+	pci_msi_register_fwnode_provider(&iort_find_pci_domain_token);
-+	pr_info("PCI/MSI: ITS at 0x%lx domain created\n",
-+		(long)its_entry->base_address);
-+	return 0;
-+}
-+
-+static int __init its_pci_acpi_msi_init(void)
-+{
-+	acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_TRANSLATOR,
-+			      its_pci_msi_parse_madt, 0);
-+	return 0;
-+}
-+#else
-+inline static int __init its_pci_acpi_msi_init(void)
-+{
-+	return 0;
-+}
-+#endif
-+
- static int __init its_pci_msi_init(void)
- {
- 	its_pci_of_msi_init();
-+	its_pci_acpi_msi_init();
-+
- 	return 0;
- }
--
- early_initcall(its_pci_msi_init);
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index 1f3d761..1c9cd5c 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -870,8 +870,7 @@ static int __init gic_init_bases(void __iomem *dist_base,
- 
- 	set_handle_irq(gic_handle_irq);
- 
--	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis() &&
--	    to_of_node(handle)) /* Temp hack to prevent ITS init for ACPI */
-+	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis())
- 		its_init(handle, &gic_data.rdists, gic_data.domain);
- 
- 	gic_smp_init();
-diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-index 53e4632..0393114 100644
---- a/drivers/pci/msi.c
-+++ b/drivers/pci/msi.c
-@@ -18,6 +18,7 @@
- #include <linux/smp.h>
- #include <linux/errno.h>
- #include <linux/io.h>
-+#include <linux/iort.h>
- #include <linux/slab.h>
- #include <linux/irqdomain.h>
- #include <linux/of_irq.h>
-@@ -1366,6 +1367,8 @@ u32 pci_msi_domain_get_msi_rid(struct irq_domain *domain, struct pci_dev *pdev)
- 	of_node = irq_domain_get_of_node(domain);
- 	if (of_node)
- 		rid = of_msi_map_rid(&pdev->dev, of_node, rid);
-+	else
-+		iort_find_pci_id(pdev, rid, &rid);
- 
- 	return rid;
- }
--- 
-1.9.1
+Because during the time between V3 and V4 of my patch, there are two
+related patches were committed by Mr.Marc Zyngier and Mr. Mark Rutland.
+
+First, Mr. Marc Zyngier changed MSI frame and added supporting for
+platform MSI.
+
+https://lkml.org/lkml/2015/7/28/552
+
+Second, Mr.Mark Rutland changed Generic PCI MSI + IOMMU topology bindings
+
+https://lkml.org/lkml/2015/7/23/558 
+
+After V5 patch posted, Mr.Marc Zyngier posted a new patch set
+"Adding core support for wire-MSI bridges"
+
+https://lkml.org/lkml/2015/10/15/545
+
+So, mbigen patch since v6 is based on this new patch.
+
+Changes in v10:
+--- Changed some dts file accroidng to Mark's comment.
+--- Fixed some wrong variable type problem.
+--- Validate the input value in translate function.
+Changes in v9:
+--- Fixed typo problem (dts)
+--- Removed superfluous data structures
+--- Changed clear register offset
+Changes in v8:
+--- Fixed some tiny bugs.
+Changes in v7:
+--- Fixed the build test error when applied patch v6 3/4
+Changes in v6:
+--- Re-based mbigen driver on kernel 4.3.0-rc5 and Marc's new patch
+--- Change the mbigen chip node definition(dts).
+--- Change the interrupt cells definition(dts).
+Changes in v5:
+--- Split mbigen driver patch into 2 smaller patches.
+--- Change mbigen chip and mbigen device initialzing sequence.
+--- Initializing mbigen device instead of mbigen chip as interrupt controller
+--- Remove mbigen node from driver to make this driver more easily read.
+--- Change the mbigen chip node definition(dts).
+--- Change the interrupt cells definition(dts).
+Changes in v4:
+--- Re-based mbigen driver on kernel 4.2.0-rc2 and Marc's patch
+--- Changed the binding document based on Mark's patch.
+
+Ma Jun (4):
+  dt-binding:Documents of the mbigen bindings
+  irqchip: add platform device driver for mbigen device
+  irqchip:create irq domain for each mbigen device
+  irqchip:implement the mbigen irq chip operation functions
+
+ Documentation/devicetree/bindings/arm/mbigen.txt |   74 ++++++
+ drivers/irqchip/Kconfig                          |    8 +
+ drivers/irqchip/Makefile                         |    1 +
+ drivers/irqchip/irq-mbigen.c                     |  297 ++++++++++++++++++++++
+ 4 files changed, 380 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/mbigen.txt
+ create mode 100644 drivers/irqchip/irq-mbigen.c
