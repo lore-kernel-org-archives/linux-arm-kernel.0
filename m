@@ -1,64 +1,110 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 17 Dec 2015 11:13:28 -0500 (EST)
-Subject: [PATCH v2 0/3] USB: add generic onboard USB HUB driver
-In-Reply-To: <CAL_Jsq+KAF6FGyOyC0JzODsSVoK4+V6umpj=cANywgui_wOKMg@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1512171103080.1675-100000@iolanthe.rowland.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 17 Dec 2015 17:14:57 +0100
+Subject: [PATCH 09/10] ARM: debug-ll: reorder Kconfig alphanumerically
+In-Reply-To: <20151217104508.GG8644@n2100.arm.linux.org.uk>
+References: <1449268242-808553-1-git-send-email-arnd@arndb.de>
+ <1449268242-808553-10-git-send-email-arnd@arndb.de>
+ <20151217104508.GG8644@n2100.arm.linux.org.uk>
+Message-ID: <2266750.YuAszZRgmA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 16 Dec 2015, Rob Herring wrote:
-
-> On Mon, Dec 14, 2015 at 3:35 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Monday 14 December 2015 15:26:11 Peter Chen wrote:
-> >> Hi all,
-> >>
-> >> There is a known issue that the USB code can't handle USB HUB's
-> >> external pins well, in that case, it may cause some onboard
-> >> USB HUBs can't work since their PHY's clock or reset pin needs to
-> >> operate.
-> >>
-> >> The user reported this issue at below:
-> >> http://www.spinics.net/lists/linux-usb/msg131502.html
-> >>
-> >> In this patch set, I add a generic onboard USB HUB driver to
-> >> handle this problem, the external signals will be configured
-> >> before usb controller's initialization, it much likes we did
-> >> it at board code before.
-> >>
-> >> The user needs to add this generic hub node at dts to support it.
-> >>
-> >> @The udoo users, help to test please.
-> >
-> > I still think need to do this properly by representing the hub
-> > device as a USB device, using power sequencing code like MMC does.
+On Thursday 17 December 2015 10:45:08 Russell King - ARM Linux wrote:
+> On Fri, Dec 04, 2015 at 11:30:41PM +0100, Arnd Bergmann wrote:
+> > +     config DEBUG_LL_UART_EFM32
+> > +             bool "Kernel low-level debugging via efm32 UART"
+> > +             depends on ARCH_EFM32
+> > +             help
+> > +               Say Y here if you want the debug print routines to direct
+> > +               their output to an UART or USART port on efm32 based
+> > +               machines. Use the following addresses for DEBUG_UART_PHYS:
+> > +
+> > +                 0x4000c000 | USART0
+> > +                 0x4000c400 | USART1
+> > +                 0x4000c800 | USART2
+> > +                 0x4000e000 | UART0
+> > +                 0x4000e400 | UART1
+> > +
 > 
-> I agree on doing it properly, but am not sure that pwrseq binding for
-> MMC is proper. The pwrseq binding is fairly limited and working around
-> the driver model IMO. Hubs may also need I2C setup which I don't think
-> could be done generically other than some defined sequence of i2c
-> transactions. The current project I'm working on needs to use I2C to
-> configure the hub to use HSIC mode for example. I really think we need
-> a pre-probe driver hook to handle this. That would allow device
-> specific setup to live in the driver.
-> 
-> Perhaps a more simple approach would be just forcing driver probe if a
-> DT node is present. I'm not all that familiar with USB drivers, but
-> presumably there is some setup before probe like setting the USB
-> device address. We'd have to allow doing that later during probe.
+> NAK.  The DEBUG_LL options are _supposed_ to be at the end - this option
+> was correctly positioned:
 
-It's not clear (to me, anyway) how this is meant to work.  USB is a
-completely discoverable bus: There is no way to represent devices
-statically; they have to be discovered.  But a device can't be
-discovered unless it is functional, so if an onboard hub (or any other
-sort of USB device) requires power, clocks, or something similar in
-order to function, it won't be discovered.  There won't be any device
-structure to probe, and "forcing driver probe" won't accomplish
-anything.
+Ok, got it. I thought about this briefly when I did the reorganization but
+assumed it was not intentional and just oddly named. DEBUG_LL_UART_EFM32
+it a bit different from all the other options, so either location seemed
+reasonable:
 
-It seems to me that the only way something like this could be made to
-work is if the necessary actions are keyed off the host controller (and
-in particular, _not_ the hub driver), presumably at the time the
-controller is probed.  With anything else, you run the risk that the
-necessary resources won't get enabled before they are needed.
+* like DEBUG_LL_UART_8250 and DEBUG_LL_UART_PL01X, we don't configure
+  a particular address based on the platform, and the naming is consistent
+  with those options.
 
-Alan Stern
+* like all other options, it specific to one particular platform, and
+  simply turning on DEBUG_LL from a defconfig file without selecting
+  a particular target ends up picking the first one, and that is
+  intentionally a platform specific option, so we don't have to pick
+  one explicitly.
+
+I've queued up the patch below to avoid having to rebuild the entire
+next/multiplatform branch, let me know if you'd rather see that branch
+rebuilt.
+
+	Arnd
+
+>From 06920d4eeabcd824436ace6fbd6cf49739a5812a Mon Sep 17 00:00:00 2001
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Thu, 17 Dec 2015 16:59:55 +0100
+Subject: [PATCH] ARM: debug-ll: move DEBUG_LL_UART_EFM32 to correct Kconfig location
+
+I accidentally move the DEBUG_LL_UART_EFM32 option when sorting all
+other options alphanumerically, but it belongs into the same group
+as DEBUG_LL_UART_8250 and DEBUG_LL_UART_PL01X.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 1dc9341 ("ARM: debug-ll: reorder Kconfig alphanumerically")
+
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 3626b8b..776fc7c 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -246,20 +246,6 @@ choice
+ 		  Say Y here if you want the debug print routines to direct
+ 		  their output to the UA0 serial port in the CX92755.
+ 
+-	config DEBUG_LL_UART_EFM32
+-		bool "Kernel low-level debugging via efm32 UART"
+-		depends on ARCH_EFM32
+-		help
+-		  Say Y here if you want the debug print routines to direct
+-		  their output to an UART or USART port on efm32 based
+-		  machines. Use the following addresses for DEBUG_UART_PHYS:
+-
+-		    0x4000c000 | USART0
+-		    0x4000c400 | USART1
+-		    0x4000c800 | USART2
+-		    0x4000e000 | UART0
+-		    0x4000e400 | UART1
+-
+ 	config DEBUG_EP93XX
+ 		bool "Kernel low-level debugging messages via ep93xx UART"
+ 		depends on ARCH_EP93XX
+@@ -1299,6 +1285,20 @@ choice
+ 		  options; the platform specific options are deprecated
+ 		  and will be soon removed.
+ 
++	config DEBUG_LL_UART_EFM32
++		bool "Kernel low-level debugging via efm32 UART"
++		depends on ARCH_EFM32
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to an UART or USART port on efm32 based
++		  machines. Use the following addresses for DEBUG_UART_PHYS:
++
++		    0x4000c000 | USART0
++		    0x4000c400 | USART1
++		    0x4000c800 | USART2
++		    0x4000e000 | UART0
++		    0x4000e400 | UART1
++
+ 	config DEBUG_LL_UART_PL01X
+ 		bool "Kernel low-level debugging via ARM Ltd PL01x Primecell UART"
+ 		help
