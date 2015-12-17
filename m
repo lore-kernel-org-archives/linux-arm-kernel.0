@@ -1,181 +1,104 @@
 From: marex@denx.de (Marek Vasut)
-Date: Fri, 18 Dec 2015 00:38:18 +0100
-Subject: [PATCH] ARM: socfpga: Repair incorrectly applied MCV patch
-Message-ID: <1450395498-9827-1-git-send-email-marex@denx.de>
+Date: Fri, 18 Dec 2015 00:39:04 +0100
+Subject: [PATCH] ARM: socfpga: dts: Enable MMC support at correct place in the
+ DT
+Message-ID: <1450395544-9890-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For whatever reason, this patch was not applied verbatim and had all
-tabs replaced with spaces. Replace them back by a quick sed.
+The socfpga.dtsi explicitly enabled MMC support, but not all boards are
+equiped with an MMC card. There are setups which only have QSPI NOR.
+Therefore, disable the MMC support on socfpga.dtsi level and enable it
+on per-board basis.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Alan Tull <atull@altera.com>
 Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
+Cc: Marek Vasut <marex@denx.de>
 Cc: Olof Johansson <olof@lixom.net>
-Cc: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 Cc: Thor Thayer <tthayer@altera.com>
 Cc: Vince Bridgers <vbridgers2013@gmail.com>
 ---
- arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi   | 18 +++---
- arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts | 90 +++++++++++++--------------
- 2 files changed, 54 insertions(+), 54 deletions(-)
+ arch/arm/boot/dts/socfpga.dtsi                    | 1 +
+ arch/arm/boot/dts/socfpga_arria5_socdk.dts        | 1 +
+ arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts | 1 +
+ arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi       | 1 +
+ arch/arm/boot/dts/socfpga_cyclone5_socdk.dts      | 1 +
+ arch/arm/boot/dts/socfpga_cyclone5_sockit.dts     | 1 +
+ 6 files changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi b/arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi
-index f0e03a2..baecd98 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi
-@@ -18,16 +18,16 @@
- #include "socfpga_cyclone5.dtsi"
+NOTE: This should not cause any trouble, since I checked all the boards
+      for the presence of the HPS SD card slot / eMMC.
+
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index cffea91..ebcd081 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -677,6 +677,7 @@
+ 			#size-cells = <0>;
+ 			clocks = <&l4_mp_clk>, <&sdmmc_clk_divided>;
+ 			clock-names = "biu", "ciu";
++			status = "disabled";
+ 		};
  
- / {
--       model = "DENX MCV";
--       compatible = "altr,socfpga-cyclone5", "altr,socfpga";
-+	model = "DENX MCV";
-+	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
- 
--       memory {
--               name = "memory";
--               device_type = "memory";
--               reg = <0x0 0x40000000>; /* 1 GiB */
--       };
-+	memory {
-+		name = "memory";
-+		device_type = "memory";
-+		reg = <0x0 0x40000000>; /* 1 GiB */
-+	};
- };
- 
--&mmc0 {        /* On-SoM eMMC */
--       bus-width = <8>;
-+&mmc0 {	/* On-SoM eMMC */
-+	bus-width = <8>;
- };
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts b/arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts
-index 09d0ded..7186a29 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts
-@@ -18,77 +18,77 @@
- #include "socfpga_cyclone5_mcv.dtsi"
- 
- / {
--       model = "DENX MCV EVK";
--       compatible = "altr,socfpga-cyclone5", "altr,socfpga";
-+	model = "DENX MCV EVK";
-+	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
- 
--       aliases {
--               ethernet0 = &gmac0;
--               stmpe-i2c0 = &stmpe1;
--       };
-+	aliases {
-+		ethernet0 = &gmac0;
-+		stmpe-i2c0 = &stmpe1;
-+	};
- 
--       chosen {
--               stdout-path = "serial0:115200n8";
--       };
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
- };
- 
- &can0 {
--       status = "okay";
-+	status = "okay";
- };
- 
- &can1 {
--       status = "okay";
-+	status = "okay";
- };
- 
- &gmac0 {
--       phy-mode = "rgmii";
--       status = "okay";
-+	phy-mode = "rgmii";
-+	status = "okay";
- };
- 
--&gpio0 {       /* GPIO  0 ... 28 */
--       status = "okay";
-+&gpio0 {	/* GPIO  0 ... 28 */
-+	status = "okay";
- };
- 
--&gpio1 {       /* GPIO 29 ... 57 */
--       status = "okay";
-+&gpio1 {	/* GPIO 29 ... 57 */
-+	status = "okay";
- };
- 
--&gpio2 {       /* GPIO 58..66 (HLGPI 0..13 at offset 13) */
--       status = "okay";
-+&gpio2 {	/* GPIO 58..66 (HLGPI 0..13 at offset 13) */
-+	status = "okay";
- };
- 
- &i2c0 {
--       status = "okay";
--       speed-mode = <0>;
-+	status = "okay";
-+	speed-mode = <0>;
- 
--       stmpe1: stmpe811 at 41 {
--               compatible = "st,stmpe811";
--               #address-cells = <1>;
--               #size-cells = <0>;
--               reg = <0x41>;
--               id = <0>;
--               blocks = <0x5>;
--               irq-gpio = <&portb 28 0x4>;     /* GPIO 57, trig. level HI */
-+	stmpe1: stmpe811 at 41 {
-+		compatible = "st,stmpe811";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0x41>;
-+		id = <0>;
-+		blocks = <0x5>;
-+		irq-gpio = <&portb 28 0x4>;     /* GPIO 57, trig. level HI */
- 
--               stmpe_touchscreen {
--                       compatible = "st,stmpe-ts";
--                       reg = <0>;
--                       ts,sample-time = <4>;
--                       ts,mod-12b = <1>;
--                       ts,ref-sel = <0>;
--                       ts,adc-freq = <1>;
--                       ts,ave-ctrl = <1>;
--                       ts,touch-det-delay = <3>;
--                       ts,settling = <4>;
--                       ts,fraction-z = <7>;
--                       ts,i-drive = <1>;
--               };
--       };
-+		stmpe_touchscreen {
-+			compatible = "st,stmpe-ts";
-+			reg = <0>;
-+			ts,sample-time = <4>;
-+			ts,mod-12b = <1>;
-+			ts,ref-sel = <0>;
-+			ts,adc-freq = <1>;
-+			ts,ave-ctrl = <1>;
-+			ts,touch-det-delay = <3>;
-+			ts,settling = <4>;
-+			ts,fraction-z = <7>;
-+			ts,i-drive = <1>;
-+		};
-+	};
- };
- 
- &uart0 {
--       status = "okay";
+ 		ocram: sram at ffff0000 {
+diff --git a/arch/arm/boot/dts/socfpga_arria5_socdk.dts b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
+index a75a666..3c88678 100644
+--- a/arch/arm/boot/dts/socfpga_arria5_socdk.dts
++++ b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
+@@ -79,6 +79,7 @@
+ &mmc0 {
+ 	vmmc-supply = <&regulator_3_3v>;
+ 	vqmmc-supply = <&regulator_3_3v>;
 +	status = "okay";
  };
  
  &usb1 {
--       status = "okay";
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
+index 555e9ca..afea364 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
+@@ -100,6 +100,7 @@
+ &mmc0 {
+ 	vmmc-supply = <&regulator_3_3v>;
+ 	vqmmc-supply = <&regulator_3_3v>;
 +	status = "okay";
  };
+ 
+ &uart0 {
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi b/arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi
+index baecd98..f86f9c0 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi
++++ b/arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi
+@@ -30,4 +30,5 @@
+ 
+ &mmc0 {	/* On-SoM eMMC */
+ 	bus-width = <8>;
++	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
+index d4d0a28..15e43f4 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
+@@ -84,6 +84,7 @@
+ 	cd-gpios = <&portb 18 0>;
+ 	vmmc-supply = <&regulator_3_3v>;
+ 	vqmmc-supply = <&regulator_3_3v>;
++	status = "okay";
+ };
+ 
+ &usb1 {
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+index 54ed3f9..1a0c726 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+@@ -172,6 +172,7 @@
+ &mmc0 {
+ 	vmmc-supply = <&regulator_3_3v>;
+ 	vqmmc-supply = <&regulator_3_3v>;
++	status = "okay";
+ };
+ 
+ &qspi {
 -- 
 2.6.4
