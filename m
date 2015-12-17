@@ -1,38 +1,81 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Wed, 16 Dec 2015 16:26:45 -0800
-Subject: [PATCH v4 0/4] Raspberry Pi power domains
-Message-ID: <1450312009-1791-1-git-send-email-eric@anholt.net>
+Date: Wed, 16 Dec 2015 16:26:48 -0800
+Subject: [PATCH v4 3/4] dt-bindings: add rpi power domain driver bindings
+In-Reply-To: <1450312009-1791-1-git-send-email-eric@anholt.net>
+References: <1450312009-1791-1-git-send-email-eric@anholt.net>
+Message-ID: <1450312009-1791-4-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update from v3 to move the driver under drivers/soc.  I've placed it
-under drivers/soc/bcm since that's how the other drivers under
-drivers/soc are structured.
+From: Alexander Aring <alex.aring@gmail.com>
 
-Alexander Aring (3):
-  ARM: bcm2835: add rpi power domain driver
-  dt-bindings: add rpi power domain driver bindings
-  ARM: bcm2835: Add the Raspberry Pi power domain driver to the DT.
+This patch adds devicetree tree bindings for the Raspberry Pi power
+domain driver.
 
-Eric Anholt (1):
-  ARM: bcm2835: Define two new packets from the latest firmware.
+Signed-off-by: Alexander Aring <alex.aring@gmail.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Eric Anholt <eric@anholt.net>
+---
 
- .../bindings/soc/bcm/raspberrypi,bcm2835-power.txt |  47 ++++
- arch/arm/boot/dts/bcm2835-rpi.dtsi                 |  11 +
- arch/arm/boot/dts/bcm2835.dtsi                     |   2 +-
- drivers/soc/Kconfig                                |   1 +
- drivers/soc/Makefile                               |   1 +
- drivers/soc/bcm/Kconfig                            |   9 +
- drivers/soc/bcm/Makefile                           |   1 +
- drivers/soc/bcm/raspberrypi-power.c                | 247 +++++++++++++++++++++
- include/dt-bindings/soc/raspberrypi-power.h        |  41 ++++
- include/soc/bcm2835/raspberrypi-firmware.h         |   2 +
- 10 files changed, 361 insertions(+), 1 deletion(-)
+v2: Add the new domains present in v2 to the list.
+v4: Move to soc/ instead of arm/, to follow the driver's move.
+
+ .../bindings/soc/bcm/raspberrypi,bcm2835-power.txt | 47 ++++++++++++++++++++++
+ 1 file changed, 47 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/soc/bcm/raspberrypi,bcm2835-power.txt
- create mode 100644 drivers/soc/bcm/Kconfig
- create mode 100644 drivers/soc/bcm/Makefile
- create mode 100644 drivers/soc/bcm/raspberrypi-power.c
- create mode 100644 include/dt-bindings/soc/raspberrypi-power.h
 
+diff --git a/Documentation/devicetree/bindings/soc/bcm/raspberrypi,bcm2835-power.txt b/Documentation/devicetree/bindings/soc/bcm/raspberrypi,bcm2835-power.txt
+new file mode 100644
+index 0000000..30942cf
+--- /dev/null
++++ b/Documentation/devicetree/bindings/soc/bcm/raspberrypi,bcm2835-power.txt
+@@ -0,0 +1,47 @@
++Raspberry Pi power domain driver
++
++Required properties:
++
++- compatible:		Should be "raspberrypi,bcm2835-power".
++- firmware:		Reference to the RPi firmware device node.
++- #power-domain-cells:	Should be <1>, we providing multiple power domains.
++
++The valid defines for power domain are:
++
++ RPI_POWER_DOMAIN_I2C0
++ RPI_POWER_DOMAIN_I2C1
++ RPI_POWER_DOMAIN_I2C2
++ RPI_POWER_DOMAIN_VIDEO_SCALER
++ RPI_POWER_DOMAIN_VPU1
++ RPI_POWER_DOMAIN_HDMI
++ RPI_POWER_DOMAIN_USB
++ RPI_POWER_DOMAIN_VEC
++ RPI_POWER_DOMAIN_JPEG
++ RPI_POWER_DOMAIN_H264
++ RPI_POWER_DOMAIN_V3D
++ RPI_POWER_DOMAIN_ISP
++ RPI_POWER_DOMAIN_UNICAM0
++ RPI_POWER_DOMAIN_UNICAM1
++ RPI_POWER_DOMAIN_CCP2RX
++ RPI_POWER_DOMAIN_CSI2
++ RPI_POWER_DOMAIN_CPI
++ RPI_POWER_DOMAIN_DSI0
++ RPI_POWER_DOMAIN_DSI1
++ RPI_POWER_DOMAIN_TRANSPOSER
++ RPI_POWER_DOMAIN_CCP2TX
++ RPI_POWER_DOMAIN_CDP
++ RPI_POWER_DOMAIN_ARM
++
++Example:
++
++power: power {
++	compatible = "raspberrypi,bcm2835-power";
++	firmware = <&firmware>;
++	#power-domain-cells = <1>;
++};
++
++Example for using power domain:
++
++&usb {
++       power-domains = <&power RPI_POWER_DOMAIN_USB>;
++};
 -- 
 2.6.2
