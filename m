@@ -1,41 +1,35 @@
 From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Thu, 17 Dec 2015 17:48:40 +0100
-Subject: [PATCH 09/24] crypto: atmel-aes: remove useless write in the Control
- Register
+Date: Thu, 17 Dec 2015 17:48:44 +0100
+Subject: [PATCH 13/24] crypto: atmel-aes: reduce latency of DMA completion
 In-Reply-To: <cover.1450366831.git.cyrille.pitchen@atmel.com>
 References: <cover.1450366831.git.cyrille.pitchen@atmel.com>
-Message-ID: <1ace62ded06cbf4992e92aa3c3453b01054f56f4.1450366831.git.cyrille.pitchen@atmel.com>
+Message-ID: <a8f43f97c34da143330a883cac79ac5f83f5b859.1450366831.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As claimed by the datasheet, writing 0 into the Control Register has no
-effet. So we remove this useless register access.
+atmel_aes_dma_callback() now directly calls the 'resume' callback instead
+of scheduling the done task, which in turn only calls the very same
+'resume' callback.
 
 Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 ---
- drivers/crypto/atmel-aes.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/crypto/atmel-aes.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/crypto/atmel-aes.c b/drivers/crypto/atmel-aes.c
-index 48407a7f6f61..f1ea9c893561 100644
+index 25dc7bd73532..8a2b3e81c087 100644
 --- a/drivers/crypto/atmel-aes.c
 +++ b/drivers/crypto/atmel-aes.c
-@@ -511,7 +511,7 @@ static int atmel_aes_crypt_dma_start(struct atmel_aes_dev *dd)
- static void atmel_aes_write_ctrl(struct atmel_aes_dev *dd, bool use_dma,
- 				 const u32 *iv)
+@@ -337,8 +337,8 @@ static void atmel_aes_dma_callback(void *data)
  {
--	u32 valcr = 0, valmr = 0;
-+	u32 valmr = 0;
+ 	struct atmel_aes_dev *dd = data;
  
- 	/* MR register must be set before IV registers */
- 	if (dd->ctx->keylen == AES_KEYSIZE_128)
-@@ -554,7 +554,6 @@ static void atmel_aes_write_ctrl(struct atmel_aes_dev *dd, bool use_dma,
- 		valmr |= AES_MR_SMOD_AUTO;
- 	}
+-	/* dma_lch_out - completed */
+-	tasklet_schedule(&dd->done_task);
++	dd->is_async = true;
++	(void)dd->resume(dd);
+ }
  
--	atmel_aes_write(dd, AES_CR, valcr);
- 	atmel_aes_write(dd, AES_MR, valmr);
- 
- 	atmel_aes_write_n(dd, AES_KEYWR(0), dd->ctx->key,
+ static int atmel_aes_crypt_dma(struct atmel_aes_dev *dd,
 -- 
 1.8.2.2
