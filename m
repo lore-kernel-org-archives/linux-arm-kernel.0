@@ -1,104 +1,57 @@
-From: majun258@huawei.com (MaJun)
-Date: Thu, 17 Dec 2015 19:56:34 +0800
-Subject: [PATCH v10 1/4] dt-binding:Documents of the mbigen bindings
-In-Reply-To: <1450353397-47668-1-git-send-email-majun258@huawei.com>
-References: <1450353397-47668-1-git-send-email-majun258@huawei.com>
-Message-ID: <1450353397-47668-2-git-send-email-majun258@huawei.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 17 Dec 2015 13:01:57 +0100
+Subject: [PATCH] i2c: allow building emev2 without slave mode again
+In-Reply-To: <13702087.6o87OAVdIx@wuerfel>
+References: <201512102224.cVm7Hcp0%fengguang.wu@intel.com>
+ <15285750.UWXWiNJ6YU@wuerfel> <20151214135206.GA1520@katana>
+ <13702087.6o87OAVdIx@wuerfel>
+Message-ID: <20151217120157.GC3958@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ma Jun <majun258@huawei.com>
+On Mon, Dec 14, 2015 at 11:27:22PM +0100, Arnd Bergmann wrote:
+> On Monday 14 December 2015 14:52:06 Wolfram Sang wrote:
+> > > > What about not ifdeffing the inline function and keep the build error
+> > > > whenever someone uses it without I2C_SLAVE being selected?
+> > > 
+> > > The inline function is only added there for the case that I2C_SLAVE is
+> > > disabled, so that would be pointless.
+> > > 
+> > > However, what we could do is move the extern declaration outside of
+> > > the #ifdef to make it always visible. The if(IS_ENABLED(CONFIG_I2C_SLAVE))
+> > > check should then ensure that it never actually gets called, and we
+> > > get a link error if some driver gets it wrong.
+> > 
+> > Yes, that's what I meant: move the whole function (as it was before your
+> > patch) out of the CONFIG_I2C_SLAVE block. We should get a compiler error
+> > even, because for !I2C_SLAVE, the client struct will not have the
+> > slave_cb member.
+> > 
+> 
+> But we don't want a compile-error for randconfig builds, and we don't
+> want unnecessary #ifdef in the driver. 
 
-Add the mbigen msi interrupt controller bindings document.
+My conclusion for now is:
 
-This patch based on Mark Rutland's patch
-https://lkml.org/lkml/2015/7/23/558
+There needs something to be done surely, but currently I don't have the
+bandwidth to do it or even play around with it. I am not fully happy
+with your patches as well because __maybe_unused has some kind of "last
+resort" feeling to me.
 
-Signed-off-by: Ma Jun <majun258@huawei.com>
----
- Documentation/devicetree/bindings/arm/mbigen.txt |   74 ++++++++++++++++++++++
- 1 files changed, 74 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/mbigen.txt
+So, to get the build failures away immediately I'd simply submit a patch
+for the emev driver to select I2C_SLAVE and postpone the proper fix to
+later.
 
-diff --git a/Documentation/devicetree/bindings/arm/mbigen.txt b/Documentation/devicetree/bindings/arm/mbigen.txt
-new file mode 100644
-index 0000000..3eaa678
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/mbigen.txt
-@@ -0,0 +1,74 @@
-+Hisilicon mbigen device tree bindings.
-+=======================================
-+
-+Mbigen means: message based interrupt generator.
-+
-+MBI is kind of msi interrupt only used on Non-PCI devices.
-+
-+To reduce the wired interrupt number connected to GIC,
-+Hisilicon designed mbigen to collect and generate interrupt.
-+
-+
-+Non-pci devices can connect to mbigen and generate the
-+interrupt by writing ITS register.
-+
-+The mbigen chip and devices connect to mbigen have the following properties:
-+
-+Mbigen main node required properties:
-+-------------------------------------------
-+- compatible: Should be "hisilicon,mbigen-v2"
-+
-+- reg: Specifies the base physical address and size of the Mbigen
-+  registers.
-+
-+- interrupt controller: Identifies the node as an interrupt controller
-+
-+- msi-parent: Specifies the MSI controller this mbigen use.
-+  For more detail information,please refer to the generic msi-parent binding in
-+  Documentation/devicetree/bindings/interrupt-controller/msi.txt.
-+
-+- num-msis:Specifies the total number of interrupt this device has.
-+
-+- #interrupt-cells : Specifies the number of cells needed to encode an
-+  interrupt source. The value must be 2.
-+
-+  The 1st cell is hardware pin number of the interrupt.This number is local to
-+  each mbigen chip and in the range from 0 to the maximum interrupts number
-+  of the mbigen.
-+
-+  The 2nd cell is the interrupt trigger type.
-+	The value of this cell should be:
-+	1: rising edge triggered
-+	or
-+	4: high level triggered
-+
-+Examples:
-+
-+ 	mbigen_device_gmac:intc {
-+			compatible = "hisilicon,mbigen-v2";
-+			reg = <0x0 0xc0080000 0x0 0x10000>;
-+			interrupt-controller;
-+			msi-parent = <&its_dsa 0x40b1c>;
-+			num-msis = <9>;
-+			#interrupt-cells = <2>;
-+ 	};
-+
-+Devices connect to mbigen required properties:
-+----------------------------------------------------
-+-interrupt-parent: Specifies the mbigen device node which device connected.
-+
-+-interrupts:Specifies the interrupt source.
-+ For the specific information of each cell in this property,please refer to
-+ the "interrupt-cells" description mentioned above.
-+
-+Examples:
-+	gmac0: ethernet at c2080000 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0 0xc2080000 0 0x20000>,
-+		      <0 0xc0000000 0 0x1000>;
-+		interrupt-parent  = <&mbigen_device_gmac>;
-+		interrupts =	<656 1>,
-+				<657 1>;
-+	};
-+
--- 
-1.7.1
+That being said, thanks a lot for your input. I will surely come back to it.
+
+All the best,
+
+   Wolfram
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151217/3aedb5c3/attachment.sig>
