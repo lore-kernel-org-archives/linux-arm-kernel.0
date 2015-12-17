@@ -1,187 +1,106 @@
 From: mark.yao@rock-chips.com (Mark Yao)
-Date: Thu, 17 Dec 2015 11:01:08 +0800
-Subject: [PATCH v3 1/8] drm/rockchip: Use new vblank api drm_crtc_vblank_*
+Date: Thu, 17 Dec 2015 11:01:11 +0800
+Subject: [PATCH v3 4/8] drm/rockchip: Optimization vop mode set
 In-Reply-To: <1450321275-31154-1-git-send-email-mark.yao@rock-chips.com>
 References: <1450321275-31154-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <1450321275-31154-2-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <1450321275-31154-5-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No functional update, drm_vblank_* is the legacy version of
-drm_crtc_vblank_*. and use new api make driver more clean.
+Rk3288 vop timing registers is immediately register, when configure
+timing on display active time, will cause tearing. use dclk reset is
+not a good idea to avoid this tearing. we can avoid tearing by using
+standby register.
+
+Vop standby register will take effect at end of current frame, and
+go back to work immediately when exit standby.
+
+So we can use standby register to protect this context.
 
 Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
 ---
 Changes in v3: None
 Changes in v2: None
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c |   51 ++++++++++++++++++---------
+ 1 file changed, 35 insertions(+), 16 deletions(-)
 
- drivers/gpu/drm/rockchip/rockchip_drm_drv.c |   13 +++++++------
- drivers/gpu/drm/rockchip/rockchip_drm_drv.h |    7 +++----
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c |   24 +++++++++++-------------
- 3 files changed, 21 insertions(+), 23 deletions(-)
-
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-index f22e1e1..cfd9b83 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-@@ -64,11 +64,11 @@ void rockchip_drm_dma_detach_device(struct drm_device *drm_dev,
- }
- EXPORT_SYMBOL_GPL(rockchip_drm_dma_detach_device);
- 
--int rockchip_register_crtc_funcs(struct drm_device *dev,
--				 const struct rockchip_crtc_funcs *crtc_funcs,
--				 int pipe)
-+int rockchip_register_crtc_funcs(struct drm_crtc *crtc,
-+				 const struct rockchip_crtc_funcs *crtc_funcs)
- {
--	struct rockchip_drm_private *priv = dev->dev_private;
-+	int pipe = drm_crtc_index(crtc);
-+	struct rockchip_drm_private *priv = crtc->dev->dev_private;
- 
- 	if (pipe > ROCKCHIP_MAX_CRTC)
- 		return -EINVAL;
-@@ -79,9 +79,10 @@ int rockchip_register_crtc_funcs(struct drm_device *dev,
- }
- EXPORT_SYMBOL_GPL(rockchip_register_crtc_funcs);
- 
--void rockchip_unregister_crtc_funcs(struct drm_device *dev, int pipe)
-+void rockchip_unregister_crtc_funcs(struct drm_crtc *crtc)
- {
--	struct rockchip_drm_private *priv = dev->dev_private;
-+	int pipe = drm_crtc_index(crtc);
-+	struct rockchip_drm_private *priv = crtc->dev->dev_private;
- 
- 	if (pipe > ROCKCHIP_MAX_CRTC)
- 		return;
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-index dc4e5f0..069d6d4 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-@@ -52,10 +52,9 @@ struct rockchip_drm_private {
- 	const struct rockchip_crtc_funcs *crtc_funcs[ROCKCHIP_MAX_CRTC];
- };
- 
--int rockchip_register_crtc_funcs(struct drm_device *dev,
--				 const struct rockchip_crtc_funcs *crtc_funcs,
--				 int pipe);
--void rockchip_unregister_crtc_funcs(struct drm_device *dev, int pipe);
-+int rockchip_register_crtc_funcs(struct drm_crtc *crtc,
-+				 const struct rockchip_crtc_funcs *crtc_funcs);
-+void rockchip_unregister_crtc_funcs(struct drm_crtc *crtc);
- int rockchip_drm_encoder_get_mux_id(struct device_node *node,
- 				    struct drm_encoder *encoder);
- int rockchip_drm_crtc_mode_config(struct drm_crtc *crtc, int connector_type,
 diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index dd8e086..f82c7ba 100644
+index 44f6154..9ace3ae 100644
 --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
 +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -119,8 +119,6 @@ struct vop {
- 	/* vop dclk reset */
- 	struct reset_control *dclk_rst;
+@@ -1097,10 +1097,40 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
  
--	int pipe;
--
- 	struct vop_win win[];
- };
- 
-@@ -692,7 +690,7 @@ static void vop_enable(struct drm_crtc *crtc)
- 
- 	enable_irq(vop->irq);
- 
--	drm_vblank_on(vop->drm_dev, vop->pipe);
-+	drm_crtc_vblank_on(crtc);
- 
- 	return;
- 
-@@ -711,7 +709,7 @@ static void vop_disable(struct drm_crtc *crtc)
- 	if (!vop->is_enabled)
- 		return;
- 
--	drm_vblank_off(crtc->dev, vop->pipe);
-+	drm_crtc_vblank_off(crtc);
- 
+ 	vop_enable(crtc);
  	/*
- 	 * Vop standby will take effect at end of current frame,
-@@ -918,7 +916,7 @@ static int vop_update_plane_event(struct drm_plane *plane,
+-	 * disable dclk to stop frame scan, so that we can safe config mode and
+-	 * enable iommu.
++	 * If dclk rate is zero, mean that scanout is stop,
++	 * we don't need wait any more.
  	 */
- 	mutex_lock(&vop->vsync_mutex);
- 	if (fb != vop_win_last_pending_fb(vop_win)) {
--		ret = drm_vblank_get(plane->dev, vop->pipe);
-+		ret = drm_crtc_vblank_get(crtc);
- 		if (ret) {
- 			DRM_ERROR("failed to get vblank, %d\n", ret);
- 			mutex_unlock(&vop->vsync_mutex);
-@@ -929,7 +927,7 @@ static int vop_update_plane_event(struct drm_plane *plane,
+-	clk_disable(vop->dclk);
++	if (clk_get_rate(vop->dclk)) {
++		/*
++		 * Rk3288 vop timing register is immediately, when configure
++		 * display timing on display time, may cause tearing.
++		 *
++		 * Vop standby will take effect at end of current frame,
++		 * if dsp hold valid irq happen, it means standby complete.
++		 *
++		 * mode set:
++		 *    standby and wait complete --> |----
++		 *                                  | display time
++		 *                                  |----
++		 *                                  |---> dsp hold irq
++		 *     configure display timing --> |
++		 *         standby exit             |
++		 *                                  | new frame start.
++		 */
++
++		reinit_completion(&vop->dsp_hold_completion);
++		vop_dsp_hold_valid_irq_enable(vop);
++
++		spin_lock(&vop->reg_lock);
++
++		VOP_CTRL_SET(vop, standby, 1);
++
++		spin_unlock(&vop->reg_lock);
++
++		wait_for_completion(&vop->dsp_hold_completion);
++
++		vop_dsp_hold_valid_irq_disable(vop);
++	}
  
- 		ret = vop_win_queue_fb(vop_win, fb, yrgb_mst, event);
- 		if (ret) {
--			drm_vblank_put(plane->dev, vop->pipe);
-+			drm_crtc_vblank_put(crtc);
- 			mutex_unlock(&vop->vsync_mutex);
- 			return ret;
- 		}
-@@ -1023,7 +1021,7 @@ static int vop_disable_plane(struct drm_plane *plane)
+ 	switch (vop->connector_type) {
+ 	case DRM_MODE_CONNECTOR_LVDS:
+@@ -1115,7 +1145,6 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
+ 	default:
+ 		DRM_ERROR("unsupport connector_type[%d]\n",
+ 			  vop->connector_type);
+-		goto out;
+ 	};
+ 	VOP_CTRL_SET(vop, out_mode, vop->connector_out_mode);
  
- 	vop = to_vop(plane->crtc);
+@@ -1136,19 +1165,9 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
+ 	VOP_CTRL_SET(vop, vact_st_end, val);
+ 	VOP_CTRL_SET(vop, vpost_st_end, val);
  
--	ret = drm_vblank_get(plane->dev, vop->pipe);
-+	ret = drm_crtc_vblank_get(plane->crtc);
- 	if (ret) {
- 		DRM_ERROR("failed to get vblank, %d\n", ret);
- 		return ret;
-@@ -1033,7 +1031,7 @@ static int vop_disable_plane(struct drm_plane *plane)
- 
- 	ret = vop_win_queue_fb(vop_win, NULL, 0, NULL);
- 	if (ret) {
--		drm_vblank_put(plane->dev, vop->pipe);
-+		drm_crtc_vblank_put(plane->crtc);
- 		mutex_unlock(&vop->vsync_mutex);
- 		return ret;
- 	}
-@@ -1295,7 +1293,7 @@ static void vop_win_state_complete(struct vop_win *vop_win,
- 	}
- 
- 	list_del(&state->head);
--	drm_vblank_put(crtc->dev, vop->pipe);
-+	drm_crtc_vblank_put(crtc);
+-
+-	/*
+-	 * reset dclk, take all mode config affect, so the clk would run in
+-	 * correct frame.
+-	 */
+-	reset_control_assert(vop->dclk_rst);
+-	usleep_range(10, 20);
+-	reset_control_deassert(vop->dclk_rst);
+-
+ 	clk_set_rate(vop->dclk, adjusted_mode->clock * 1000);
+-out:
+-	if (clk_enable(vop->dclk) < 0)
+-		dev_err(vop->dev, "failed to enable dclk\n");
++
++	VOP_CTRL_SET(vop, standby, 0);
  }
  
- static void vop_crtc_destroy(struct drm_crtc *crtc)
-@@ -1410,6 +1408,7 @@ done:
- static irqreturn_t vop_isr(int irq, void *data)
- {
- 	struct vop *vop = data;
-+	struct drm_crtc *crtc = &vop->crtc;
- 	uint32_t intr0_reg, active_irqs;
- 	unsigned long flags;
- 	int ret = IRQ_NONE;
-@@ -1438,7 +1437,7 @@ static irqreturn_t vop_isr(int irq, void *data)
- 	}
- 
- 	if (active_irqs & FS_INTR) {
--		drm_handle_vblank(vop->drm_dev, vop->pipe);
-+		drm_crtc_handle_vblank(crtc);
- 		active_irqs &= ~FS_INTR;
- 		ret = (vop->vsync_work_pending) ? IRQ_WAKE_THREAD : IRQ_HANDLED;
- 	}
-@@ -1531,8 +1530,7 @@ static int vop_create_crtc(struct vop *vop)
- 
- 	init_completion(&vop->dsp_hold_completion);
- 	crtc->port = port;
--	vop->pipe = drm_crtc_index(crtc);
--	rockchip_register_crtc_funcs(drm_dev, &private_crtc_funcs, vop->pipe);
-+	rockchip_register_crtc_funcs(crtc, &private_crtc_funcs);
- 
- 	return 0;
- 
-@@ -1548,7 +1546,7 @@ static void vop_destroy_crtc(struct vop *vop)
- {
- 	struct drm_crtc *crtc = &vop->crtc;
- 
--	rockchip_unregister_crtc_funcs(vop->drm_dev, vop->pipe);
-+	rockchip_unregister_crtc_funcs(crtc);
- 	of_node_put(crtc->port);
- 	drm_crtc_cleanup(crtc);
- }
+ static void vop_crtc_atomic_flush(struct drm_crtc *crtc,
 -- 
 1.7.9.5
