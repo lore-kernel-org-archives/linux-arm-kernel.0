@@ -1,36 +1,53 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 17 Dec 2015 08:53:09 -0600
-Subject: [PATCH 0/4] ARM Versatile multi-platform support
-In-Reply-To: <3265937.pryQQXUTv3@wuerfel>
-References: <1449607458-16850-1-git-send-email-robh@kernel.org>
- <3265937.pryQQXUTv3@wuerfel>
-Message-ID: <CAL_JsqLpD8jRZF=mh0rs8Heb3XZftUmbjr7xparFzWYnqC25iQ@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 17 Dec 2015 15:54:54 +0100
+Subject: SDHCI long sleep with interrupts off
+In-Reply-To: <20151217132229.1c699f69@archvile>
+References: <20151217112814.6250a3b9@archvile>
+ <1450350190.3163.93.camel@pengutronix.de>
+ <20151217122053.036daf37@archvile>
+ <1450351655.3163.97.camel@pengutronix.de>
+ <CAPDyKFosBeyP3YYXz-1uyiqoaLuMQj3+ojzpt1-QY7JU9epggw@mail.gmail.com>
+ <20151217132229.1c699f69@archvile>
+Message-ID: <CAPDyKFpxx5oXM=MAYcdg1fBiodOo2HjoEvHmZk9nHBCW=qqBQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 15, 2015 at 4:57 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 08 December 2015 14:44:14 Rob Herring wrote:
->> Arnd lit a fire under me to dust this off and get it merged. So here it
->> is. The main change from prior version is I merged all the code to a
->> single file. It's a bigger patch than I'd like, but I don't think trying
->> to do it in multiple steps is worth it.
+[...]
+
+>> If/when you decide to fix this issue. Please keep in mind the following
+>> things.
 >>
->> This is dependent on some solution for the default platform choice on
->> !MMU builds (allnoconfig) as it can't be Versatile after this series.
->> Arnd has some ideas on how to address that.
+>> - Try to convert the SDHCI into a pure library. No more quirks or callbacks.
+>> - I assume we can simplify lots of code if we convert SDHCI into using
+>> a threaded IRQ in favour of the tasklet.
 >>
->> This is tested under QEMU. Linus previously tested this on actual h/w
->> and had a problem with the display identification which needs
->> investigation or agreement to worry about it if and when someone
->> actually cares.
+>> Any patches that moves SDHCI into this direction will be greatly appreciated!
 >
+> Ok, this sounds like a good way to go. Unfortunately it also sounds like a
+> major endeavor, for which good knowledge of the SDHCI standard is necessary.
+> This knowledge is based on documentation that is not openly available without
+> cost AFAIK. This probably also explains why there hasn't been a real fix ever.
+> On top of that, the whole sdhci code is unmaintained currently as it seems.
+> I was studying the code a bit more, and I now understand that I am not even
+> close to having the experience and standards-knowledge it takes to pull this
+> off reliably. I guess the one who takes on this task may as well become
+> official maintainer afterwards...
+
+You are right, a maintainer is needed for sdhci.
+
+Also, I am a bit surprised that none have stepped up, especially since
+it's indeed being *very* widely used.
+
+> OTOH, we pretty much depend on this driver now, since all of our new i.MX6/7
+> boards have eMMC flash. We also use the flexcan peripheral on all designs,
+> which is specially sensible to these latency spikes, so we will have to do
+> something on the long run.... we cannot live forever with disabled PM ;-)
 >
-> Merged into next/multiplatform, thanks a lot!
 
-Are you going to apply something for the default platform? This is
-breaking allnoconfig without it.
+Unfortunate, PM is only one of the problems.
 
-It looks like versatile_defconfig is also broken, but perhaps due to
-debug_ll changes?
+The code is in general fragile. We have have kind of reached the
+point, when I apply changes that fixes one issue it may cause another.
 
-Rob
+Kind regards
+Uffe
