@@ -1,110 +1,82 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Thu, 17 Dec 2015 15:15:12 +0200
-Subject: [PATCH v1 04/10] serial: mps2-uart: add MPS2 UART driver
-In-Reply-To: <56700A45.3070109@arm.com>
-References: <1449048790-25859-1-git-send-email-vladimir.murzin@arm.com>
- <1449048790-25859-5-git-send-email-vladimir.murzin@arm.com>
- <CAHp75Vd98TEQ7TiD==t=RgYOqSinWgnyRjg7V=oPXmEx0nedLQ@mail.gmail.com>
- <56700A45.3070109@arm.com>
-Message-ID: <CAHp75Vd3eg5EQhx_36CKNO_N=2yVmsTyCx++6zTvAR2cbp-RYQ@mail.gmail.com>
+From: stanimir.varbanov@linaro.org (Stanimir Varbanov)
+Date: Thu, 17 Dec 2015 15:18:43 +0200
+Subject: [PATCH v4 3/5] PCI: qcom: Add Qualcomm PCIe controller driver
+In-Reply-To: <20151216215304.GB27791@localhost>
+References: <1449149725-27607-1-git-send-email-stanimir.varbanov@linaro.org>
+ <1449149725-27607-4-git-send-email-stanimir.varbanov@linaro.org>
+ <20151216215304.GB27791@localhost>
+Message-ID: <5672B633.6030503@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 15, 2015 at 2:40 PM, Vladimir Murzin
-<vladimir.murzin@arm.com> wrote:
-> On 12/12/15 23:39, Andy Shevchenko wrote:
->> On Wed, Dec 2, 2015 at 11:33 AM, Vladimir Murzin
->> <vladimir.murzin@arm.com> wrote:
->>> This driver adds support to the UART controller found on ARM MPS2
->>> platform.
->>
->> Just few comments (have neither time not big desire to do full review).
->>
->
-> Still better than nothing ;) I'm mostly agree on points you had, so I've
-> just left some I'm doubt about...
->
->>> +
->>> +static void mps2_uart_enable_ms(struct uart_port *port)
->>> +{
->>> +}
->>> +
->>> +static void mps2_uart_break_ctl(struct uart_port *port, int ctl)
->>> +{
->>> +}
->>
->> Are those required to be present? If not, remove them until you have
->> alive code there.
->
-> A quick grep shows that core calls mps2_uart_break_ctl()
-> unconditionally, but, yes, it checks for presence of
-> mps2_uart_enable_ms() before jumping there, so it is safe to remove latter.
+Bjorn, thanks for the comments!
 
-OK.
-
->>> +static irqreturn_t mps2_uart_oerrirq(int irq, void *data)
->>> +{
->>> +       irqreturn_t handled = IRQ_NONE;
->>> +       struct uart_port *port = data;
->>> +       u8 irqflag = mps2_uart_read8(port, UARTn_INT);
->>> +
->>> +       spin_lock(&port->lock);
->>> +
->>> +       if (irqflag & UARTn_INT_RX_OVERRUN) {
->>> +               struct tty_port *tport = &port->state->port;
->>> +
->>> +               mps2_uart_write8(port, UARTn_INT_RX_OVERRUN, UARTn_INT);
->>> +               tty_insert_flip_char(tport, 0, TTY_OVERRUN);
->>> +               port->icount.overrun++;
->>> +               handled = IRQ_HANDLED;
->>> +       }
->>> +
->>> +       /* XXX: this shouldn't happen? */
+On 12/16/2015 11:53 PM, Bjorn Helgaas wrote:
+> On Thu, Dec 03, 2015 at 03:35:22PM +0200, Stanimir Varbanov wrote:
+>> From: Stanimir Varbanov <svarbanov@mm-sol.com>
 >>
->> If shouldn't why it's there? Otherwise better to explain which
->> conditions may lead to this.
+>> The PCIe driver reuse the Designware common code for host
+>> and MSI initialization, and also program the Qualcomm
+>> application specific registers.
 >>
->
-> In practice I've never seen that happened and I think it never *should*
-> happen since we check if there is room in TX buffer. However, I could be
-> wrong here, so it is why that statement has question mark.
+>> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
+>> Signed-off-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
+>> ---
+>>  MAINTAINERS                  |    7 +
+>>  drivers/pci/host/Kconfig     |   10 +
+>>  drivers/pci/host/Makefile    |    1 +
+>>  drivers/pci/host/pcie-qcom.c |  624 ++++++++++++++++++++++++++++++++++++++++++
+> 
+>> +#define PCIE20_CAP				0x70
+>> +#define PCIE20_CAP_LINKCTRLSTATUS		(PCIE20_CAP + 0x10)
+>> +#define PCIE20_CAP_LINKCTRLSTATUS_LINK_UP	BIT(29)
+> 
+> This looks like it could be referring to a standard PCIe Capability;
+> could you use the existing PCI_EXP_LNKSTA and PCI_EXP_LNKSTA_DLLLA
+> symbols here?  And readw() instead of readl()?
 
-So, worth to have a proper comment then.
+Yes, that is possible but I still need to keep PCIE20_CAP capabilities
+offset.
 
->>> +static int __init mps2_uart_init(void)
->>> +{
->>> +       int ret;
->>> +
->>> +       ret = uart_register_driver(&mps2_uart_driver);
->>> +       if (ret)
->>> +               return ret;
->>> +
->>> +       ret = platform_driver_register(&mps2_serial_driver);
->>> +       if (ret)
->>> +               uart_unregister_driver(&mps2_uart_driver);
->>> +
->>> +       pr_info("MPS2 UART driver initialized\n");
->>> +
->>> +       return ret;
->>> +}
->>> +module_init(mps2_uart_init);
->>> +
->>> +static void __exit mps2_uart_exit(void)
->>> +{
->>> +       platform_driver_unregister(&mps2_serial_driver);
->>> +       uart_unregister_driver(&mps2_uart_driver);
->>> +}
->>> +module_exit(mps2_uart_exit);
->>
->> module_platform_driver();
->> And move uart_*register calls to probe/remove.
->>
->
-> With this move we'll get uart_*register for every device probed, no?
+> 
+>> +static int qcom_pcie_enable_link_training(struct qcom_pcie *pcie)
+>> +{
+>> +	struct device *dev = pcie->dev;
+>> +	u32 val;
+>> +	int ret;
+>> +
+>> +	/* enable link training */
+>> +	val = readl(pcie->elbi + PCIE20_ELBI_SYS_CTRL);
+>> +	val |= PCIE20_ELBI_SYS_CTRL_LT_ENABLE;
+>> +	writel(val, pcie->elbi + PCIE20_ELBI_SYS_CTRL);
+>> +
+>> +	/* wait for up to 100ms for the link to come up */
+>> +	ret = readl_poll_timeout(pcie->elbi + PCIE20_ELBI_SYS_STTS, val,
+>> +				 val & XMLH_LINK_UP, LINKUP_DELAY_US,
+>> +				 LINKUP_TIMEOUT_US);
+>> +
+>> +	if (ret < 0 || !dw_pcie_link_up(&pcie->pp)) {
+>> +		dev_err(dev, "link initialization failed\n");
+>> +		return -ETIMEDOUT;
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+> 
+> This looks a lot like the *_establish_link() functions in other
+> DesignWare-based drivers.  Can you make it look even more similar,
+> e.g., by renaming it to qcom_pcie_establish_link() and maybe moving
+> some of the PHY functionality here?
+> 
+> readl_poll_timeout() is nice and avoids the hand-coded timeout loop
+> the other drivers use.  But is there benefit in checking for
+> XMLH_LINK_UP, or could you simply poll dw_pcie_link_up() like the
+> others do?  If it's sufficient, I'd prefer using dw_pcie_link_up()
+> by itself because it's a little more generic.
 
-Don't see a problem, maybe someone else could share an authoritive opinion.
-Some of the drivers do that, though most do in __init stage. So, see above.
+OK I will modify the code to use dw_pcie_link_up() and ensure that this
+check is sufficient.
 
 -- 
-With Best Regards,
-Andy Shevchenko
+regards,
+Stan
