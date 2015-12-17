@@ -1,40 +1,40 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Thu, 17 Dec 2015 10:47:56 -0600
-Subject: [PATCH] tty: amba-pl011: add support for 32-bit register access
- for earlycon
-In-Reply-To: <20151217162736.GA5897@kroah.com>
-References: <1446855503-25881-1-git-send-email-timur@codeaurora.org>
- <20151213060643.GA30667@kroah.com>
- <CAOZdJXVz5Bm2-XBNjoU6uh=i2E0Mq915entU+rz-MqD8F4C=xQ@mail.gmail.com>
- <20151217162736.GA5897@kroah.com>
-Message-ID: <5672E73C.20601@codeaurora.org>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Thu, 17 Dec 2015 08:48:09 -0800
+Subject: -next regression: "driver cohandle -EPROBE_DEFER from
+ bus_type.match()"
+In-Reply-To: <CAPcyv4hOJuT=i2A_0vDQHsL7MXNgVN_p17q3UW6EcTkxsCMmeg@mail.gmail.com>
+References: <CAPcyv4hOJuT=i2A_0vDQHsL7MXNgVN_p17q3UW6EcTkxsCMmeg@mail.gmail.com>
+Message-ID: <CAPcyv4h1yhyqxdyLka2X56Q5QhCoXY3vALFBdm0gdQdYR6Vr8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg Kroah-Hartman wrote:
->> >There was some disagreement about the usage of
->> >access_32b vs uap->port.iotype for determining whether we need 32-bit
->> >accessors or not.
-> There was?  I missed that, please send follow-on patches to resolve the
-> issue if there is one.
+On Thu, Dec 17, 2015 at 7:51 AM, Dan Williams <dan.j.williams@intel.com> wrote:
+> The commit below causes the libnvdimm sub-system to stop loading.
+> This is due to the fact that nvdimm_bus_match() returns the result of
+> test_bit() which may be negative.  If there are any other bus match
+> functions using test_bit they may be similarly impacted.
+>
+> Can we queue a fixup like the following to libnvdimm, and maybe
+> others, ahead of this driver core change?
+>
+> diff --git a/drivers/nvdimm/bus.c b/drivers/nvdimm/bus.c
+> index 7e2c43f701bc..2b2181cdeb63 100644
+> --- a/drivers/nvdimm/bus.c
+> +++ b/drivers/nvdimm/bus.c
+> @@ -62,7 +62,7 @@ static int nvdimm_bus_match(struct device *dev,
+> struct device_driver *drv)
+> {
+>        struct nd_device_driver *nd_drv = to_nd_device_driver(drv);
+>
+> -       return test_bit(to_nd_device_type(dev), &nd_drv->type);
+> +       return !!test_bit(to_nd_device_type(dev), &nd_drv->type);
+> }
+>
+> static struct module *to_bus_provider(struct device *dev)
+>
+>
+>
+>
+> Other ideas?
 
-I can submit a patch that provides an alternative implementation, but 
-I'm pretty sure Russell won't like it.
-
-For reference:
-
-http://www.spinics.net/lists/linux-serial/msg19710.html
-
-Russell said that UPIO_MEM is supposed to be literally only 8-bit 
-access, but then Peter Hurley posted this:
-
-http://www.spinics.net/lists/linux-serial/msg19930.html
-
-which you applied.  So my patch would remove access_32b and use 
-UPIO_MEM32/UPIO_MEM instead.  It would be a little weird having both 
-patches in your tree, I guess.
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, hosted by The Linux Foundation.
+How about just checking for EPROBE_DEFER, every other non-zero value is success.
