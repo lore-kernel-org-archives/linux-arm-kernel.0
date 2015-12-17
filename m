@@ -1,82 +1,86 @@
-From: stanimir.varbanov@linaro.org (Stanimir Varbanov)
-Date: Thu, 17 Dec 2015 15:18:43 +0200
-Subject: [PATCH v4 3/5] PCI: qcom: Add Qualcomm PCIe controller driver
-In-Reply-To: <20151216215304.GB27791@localhost>
-References: <1449149725-27607-1-git-send-email-stanimir.varbanov@linaro.org>
- <1449149725-27607-4-git-send-email-stanimir.varbanov@linaro.org>
- <20151216215304.GB27791@localhost>
-Message-ID: <5672B633.6030503@linaro.org>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Thu, 17 Dec 2015 14:24:03 +0100
+Subject: [PATCH V2 07/10] ARM64, ACPI, PCI: I/O Remapping Table (IORT)
+ initial support.
+In-Reply-To: <1450353133-15992-8-git-send-email-tn@semihalf.com>
+References: <1450353133-15992-1-git-send-email-tn@semihalf.com>
+ <1450353133-15992-8-git-send-email-tn@semihalf.com>
+Message-ID: <5672B773.7060409@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bjorn, thanks for the comments!
+On 17.12.2015 12:52, Tomasz Nowicki wrote:
+> IORT shows representation of IO topology for ARM based systems.
+> It describes how various components are connected together on
+> parent-child basis e.g. PCI RC -> SMMU -> ITS.
+>
+> Initial support allows to:
+> - register ITS MSI chip along with ITS translation ID and domain token
+> - find registered domain token based on ITS translation ID
+> - find registered domain token corresponding to given PCI device
+> - find PCI device DeviceID based on its RequesterID
+>
+> Additional features like:
+> - devices to SMMU binding
+> - finding platform device DeviceID based on its RequesterID
+> will be added in next series.
+>
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>
+> Conflicts:
+> 	drivers/acpi/Kconfig
 
-On 12/16/2015 11:53 PM, Bjorn Helgaas wrote:
-> On Thu, Dec 03, 2015 at 03:35:22PM +0200, Stanimir Varbanov wrote:
->> From: Stanimir Varbanov <svarbanov@mm-sol.com>
->>
->> The PCIe driver reuse the Designware common code for host
->> and MSI initialization, and also program the Qualcomm
->> application specific registers.
->>
->> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
->> Signed-off-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
->> ---
->>  MAINTAINERS                  |    7 +
->>  drivers/pci/host/Kconfig     |   10 +
->>  drivers/pci/host/Makefile    |    1 +
->>  drivers/pci/host/pcie-qcom.c |  624 ++++++++++++++++++++++++++++++++++++++++++
-> 
->> +#define PCIE20_CAP				0x70
->> +#define PCIE20_CAP_LINKCTRLSTATUS		(PCIE20_CAP + 0x10)
->> +#define PCIE20_CAP_LINKCTRLSTATUS_LINK_UP	BIT(29)
-> 
-> This looks like it could be referring to a standard PCIe Capability;
-> could you use the existing PCI_EXP_LNKSTA and PCI_EXP_LNKSTA_DLLLA
-> symbols here?  And readw() instead of readl()?
+Sorry for ^^^^ git rebase leftover.
 
-Yes, that is possible but I still need to keep PCIE20_CAP capabilities
-offset.
+> ---
+>   drivers/acpi/Kconfig    |   3 +
+>   drivers/acpi/Makefile   |   1 +
+>   drivers/acpi/iort.c     | 326 ++++++++++++++++++++++++++++++++++++++++++++++++
+>   drivers/irqchip/Kconfig |   1 +
+>   include/linux/iort.h    |  38 ++++++
+>   5 files changed, 369 insertions(+)
+>   create mode 100644 drivers/acpi/iort.c
+>   create mode 100644 include/linux/iort.h
+>
 
-> 
->> +static int qcom_pcie_enable_link_training(struct qcom_pcie *pcie)
->> +{
->> +	struct device *dev = pcie->dev;
->> +	u32 val;
->> +	int ret;
->> +
->> +	/* enable link training */
->> +	val = readl(pcie->elbi + PCIE20_ELBI_SYS_CTRL);
->> +	val |= PCIE20_ELBI_SYS_CTRL_LT_ENABLE;
->> +	writel(val, pcie->elbi + PCIE20_ELBI_SYS_CTRL);
->> +
->> +	/* wait for up to 100ms for the link to come up */
->> +	ret = readl_poll_timeout(pcie->elbi + PCIE20_ELBI_SYS_STTS, val,
->> +				 val & XMLH_LINK_UP, LINKUP_DELAY_US,
->> +				 LINKUP_TIMEOUT_US);
->> +
->> +	if (ret < 0 || !dw_pcie_link_up(&pcie->pp)) {
->> +		dev_err(dev, "link initialization failed\n");
->> +		return -ETIMEDOUT;
->> +	}
->> +
->> +	return 0;
->> +}
-> 
-> This looks a lot like the *_establish_link() functions in other
-> DesignWare-based drivers.  Can you make it look even more similar,
-> e.g., by renaming it to qcom_pcie_establish_link() and maybe moving
-> some of the PHY functionality here?
-> 
-> readl_poll_timeout() is nice and avoids the hand-coded timeout loop
-> the other drivers use.  But is there benefit in checking for
-> XMLH_LINK_UP, or could you simply poll dw_pcie_link_up() like the
-> others do?  If it's sufficient, I'd prefer using dw_pcie_link_up()
-> by itself because it's a little more generic.
+[...]
 
-OK I will modify the code to use dw_pcie_link_up() and ensure that this
-check is sufficient.
+> diff --git a/include/linux/iort.h b/include/linux/iort.h
+> new file mode 100644
+> index 0000000..783e8d6
+> --- /dev/null
+> +++ b/include/linux/iort.h
+> @@ -0,0 +1,38 @@
+> +/*
+> + * Copyright (C) 2015, Linaro Ltd.
+> + *	Author: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along with
+> + * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+> + * Place - Suite 330, Boston, MA 02111-1307 USA.
+> + */
+> +
+> +#ifndef __IORT_H__
+> +#define __IORT_H__
+> +
+> +#include <linux/acpi.h>
+> +
+> +#ifdef CONFIG_ACPI
+> +
 
--- 
-regards,
-Stan
+As per kbuild test report, this has to be:
+#ifdef CONFIG_IORT_TABLE
+
+Will be fixed in the next version.
+
+Regards,
+Tomasz
