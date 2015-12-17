@@ -1,140 +1,71 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 17 Dec 2015 19:07:08 +0000
-Subject: [PATCH v7 2/4] Documentation, dt, arm64/arm: dt bindings for numa.
-In-Reply-To: <CAFpQJXXopH4_GjE=dX0+NPcfwzRgErEFVMkGd57K+4=YZPDVsw@mail.gmail.com>
-References: <1447780843-9223-1-git-send-email-gkulkarni@caviumnetworks.com>
- <1447780843-9223-3-git-send-email-gkulkarni@caviumnetworks.com>
- <20151211135307.GB20666@leverpostej>
- <CAFpQJXXopH4_GjE=dX0+NPcfwzRgErEFVMkGd57K+4=YZPDVsw@mail.gmail.com>
-Message-ID: <20151217190708.GA14030@leverpostej>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Thu, 17 Dec 2015 11:23:31 -0800
+Subject: [PATCH 1/3] dt-bindings: thermal: Add binding document for
+ Mediatek thermal controller
+In-Reply-To: <CAGS+omCPonvXBTjOqpKrJX0Ebw0KF6TDKH+zRas-3FaAhUWL2w@mail.gmail.com>
+References: <1448883753-19068-1-git-send-email-s.hauer@pengutronix.de>
+ <1448883753-19068-2-git-send-email-s.hauer@pengutronix.de>
+ <CAGS+omCPonvXBTjOqpKrJX0Ebw0KF6TDKH+zRas-3FaAhUWL2w@mail.gmail.com>
+Message-ID: <20151217192329.GA7999@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Dec 11, 2015 at 08:11:07PM +0530, Ganapatrao Kulkarni wrote:
-> On Fri, Dec 11, 2015 at 7:23 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > Hi,
+On Wed, Dec 16, 2015 at 07:23:22PM +0800, Daniel Kurtz wrote:
+> On Mon, Nov 30, 2015 at 7:42 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > This adds the device tree binding documentation for the mediatek thermal
+> > controller found on Mediatek MT8173 and other SoCs.
 > >
-> > On Tue, Nov 17, 2015 at 10:50:41PM +0530, Ganapatrao Kulkarni wrote:
-> >> DT bindings for numa mapping of memory, cores and IOs.
-> >>
-> >> Reviewed-by: Robert Richter <rrichter@cavium.com>
-> >> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+> > Acked-by: Rob Herring <robh@kernel.org>
+> > ---
+> >  .../bindings/thermal/mediatek-thermal.txt          | 43 ++++++++++++++++++++++
+> >  1 file changed, 43 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
 > >
-> > Overall this looks good to me. However, I have a couple of concerns.
-> thanks.
-
-[...]
-
-> >> +==============================================================================
-> >> +2 - numa-node-id
-> >> +==============================================================================
-> >> +The device node property numa-node-id describes numa domains within a
-> >> +machine. This property can be used in device nodes like cpu, memory, bus and
-> >> +devices to map to respective numa nodes.
-> >> +
-> >> +numa-node-id property is a 32-bit integer which defines numa node id to which
-> >> +this device node has numa domain association.
-> >
-> > I'd prefer if the above two paragraphs were replaced with:
-> >
-> >         For the purpose of identification, each NUMA node is associated
-> >         with a unique token known as a node id. For the purpose of this
-> >         binding a node id is a 32-bit integer.
-> >
-> >         A device node is associated with a NUMA node by the presence of
-> >         a numa-node-id property which contains the node id of the
-> >         device.
-> ok, will do.
-
-[...]
-
-> >> +==============================================================================
-> >> +3 - distance-map
-> >> +==============================================================================
-> >> +
-> >> +The device tree node distance-map describes the relative
-> >> +distance (memory latency) between all numa nodes.
-> >
-> > Is this not a combined approximation for latency and bandwidth?
-> AFAIK, it is to represent inter-node memory access latency.
-> >
-> >> +- compatible : Should at least contain "numa,distance-map-v1".
-> >
-> > Please use "numa-distance-map-v1", as "numa" is not a vendor.
-> ok
-> >
-> >> +- distance-matrix
-> >> +  This property defines a matrix to describe the relative distances
-> >> +  between all numa nodes.
-> >> +  It is represented as a list of node pairs and their relative distance.
-> >> +
-> >> +  Note:
-> >> +     1. Each entry represents distance from first node to second node.
-> >> +     2. If both directions between 2 nodes have the same distance, only
-> >> +            one entry is required.
-> >
-> > I still don't understand what direction means in this context. Are there
-> > systems (of any architecture) which don't have symmetric distances?
-> > Which accesses does this apply differently to?
-> >
-> > Given that, I think that it might be best to explicitly call out
-> > distances as being equal, and leave any directionality for a later
-> > revision of the binding when we have some semantics for directionality.
-> agreed, given that there is no know system to substantiate dual direction,
-> let us not explicit about direction.
-
-Regarding your comment in [1], I was expecting a respin of this series
-with the above comments addressed. I will not provide an ack until I've
-seen that.
-
-Additional concerns below also apply.
-
-> >> +     2. distance-matrix shold have entries in lexicographical ascending order of nodes.
-> >> +     3. There must be only one Device node distance-map and must reside in the root node.
-> >> +
-> >> +Example:
-> >> +     4 nodes connected in mesh/ring topology as below,
-> >> +
-> >> +             0_______20______1
-> >> +             |               |
-> >> +             |               |
-> >> +           20|               |20
-> >> +             |               |
-> >> +             |               |
-> >> +             |_______________|
-> >> +             3       20      2
-> >> +
-> >> +     if relative distance for each hop is 20,
-> >> +     then inter node distance would be for this topology will be,
-> >> +           0 -> 1 = 20
-> >> +           1 -> 2 = 20
-> >> +           2 -> 3 = 20
-> >> +           3 -> 0 = 20
-> >> +           0 -> 2 = 40
-> >> +           1 -> 3 = 40
-> >
-> > How is this scaled relative to a local access?
-> this is based on representing local distance with 10 and
-> all inter-node latency being represented as multiple of 10.
+> > diff --git a/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
+> > new file mode 100644
+> > index 0000000..81f9a51
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
+> > @@ -0,0 +1,43 @@
+> > +* Mediatek Thermal
+> > +
+> > +This describes the device tree binding for the Mediatek thermal controller
+> > +which measures the on-SoC temperatures. This device does not have its own ADC,
+> > +instead it directly controls the AUXADC via AHB bus accesses. For this reason
+> > +this device needs phandles to the AUXADC. Also it controls a mux in the
+> > +apmixedsys register space via AHB bus accesses, so a phandle to the APMIXEDSYS
+> > +is also needed.
+> > +
+> > +Required properties:
+> > +- compatible: "mediatek,mt8173-thermal"
+> > +- reg: Address range of the thermal controller
+> > +- interrupts: IRQ for the thermal controller
+> > +- clocks, clock-names: Clocks needed for the thermal controller. required
+> > +                       clocks are:
+> > +                      "therm":  Main clock needed for register access
+> > +                      "auxadc": The AUXADC clock
+> > +- resets: Reference to the reset controller controlling the thermal controller.
+> > +- mediatek,auxadc: A phandle to the AUXADC which the thermal controller uses
+> > +- mediatek,apmixedsys: A phandle to the APMIXEDSYS controller.
+> > +- #thermal-sensor-cells : Should be 0. See ./thermal.txt for a description.
+> > +
+> > +Optional properties:
+> > +- nvmem-cells: A phandle to the calibration data provided by a nvmem device. If
+> > +               unspecified default values shall be used.
+> > +- nvmem-cell-names: Should be "calibration-data"
+> > +
+> > +Example:
+> > +
+> > +       thermal: thermal at 1100b000 {
+> > +               #thermal-sensor-cells = <1>;
 > 
-> >
-> > Do we assume that a local access has value 1, e.g. each hop takes 20x a
-> > local access in this example?
-> The local distance is represented as 10, this is fixed and same as in ACPI.
-> Inter-node distance can be any number greater than 10.
-> this information can be added here to make it clear.
+> Tiny nit: this should now be:
+> 
+> #thermal-sensor-cells = <0>;
 
-This seems rather arbitrary.
 
-Why can we not define the local distance in the DT? I appreciate that
-the value is hard-coded for ACPI, but we don't have to copy that
-limitation.
-
-I'm not sure if asymmetric local distances matter.
-
-Thanks,
-Mark.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/394634.html
+This is actually not so tiny'shy. Why does this driver masks out all
+sensors available? Why don't we expose all of them and use id property
+to expose and identify each of them?
