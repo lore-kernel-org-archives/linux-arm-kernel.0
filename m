@@ -1,69 +1,42 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Thu, 17 Dec 2015 20:54:24 +0100
-Subject: [PATCH 1/2] mmc: core: enable CMD19 tuning for DDR50 mode
-In-Reply-To: <7a1072e99c8149a5b08d1bf260808ce7@aptaiexm02f.ap.qualcomm.com>
-References: <1439282492-6274-1-git-send-email-21cnbao@gmail.com>
- <CAPDyKFpXZD28NwNAhKQyxmWasVhk_7AeyOW6oXaBPHKuSTmGUA@mail.gmail.com>
- <CAGsJ_4wvvQdyjFi=JmWfASm-LbJMybrhC=Wxxn7jHZEP5dUfEw@mail.gmail.com>
- <CAPDyKFpEwWvu3tnbMT9ZvM0TUvEHp0Qa8PADohyJoTaNZ9HS9g@mail.gmail.com>
- <CAGsJ_4x5Nd3Cts1BHsUyB_mCejxbHPPjznUVWUcFoZhxKy+Tcg@mail.gmail.com>
- <CAPDyKFpWfY9G4WG_GfCutJ2NkRbcAYZToYJXp3RvX=_25sgnWA@mail.gmail.com>
- <CAGsJ_4zaWcmGsc82=LSohK0UHxJir2OJOBSgoU3sPRXYvLdOZQ@mail.gmail.com>
- <CAPDyKFrj7mfxYPotHfpYPVf8M=Mvjcz+HfuB871EZNv9FWpPqw@mail.gmail.com>
- <CAOQ7t2YuSDwtK0R3R4++3LUPyEqW+ENLju63QisX6tO=-cvt6w@mail.gmail.com>
- <edf24ca1a9614943b55b8d19745a3c45@aptaiexm02f.ap.qualcomm.com>
- <CAOQ7t2YOd9TtAHHUBhF4n_POQURhfaqC_9Tg-b8d1Bf2QCyoYA@mail.gmail.com>
- <a2ffc219b04b483b87696ffc81a60787@aptaiexm02f.ap.qualcomm.com>
- <CAOQ7t2Z=4Mc9Ev9OBxXiLDtiXaTr5jQzc-gVwU_xJnHLrumd0g@mail.gmail.com>
- <7a1072e99c8149a5b08d1bf260808ce7@aptaiexm02f.ap.qualcomm.com>
-Message-ID: <CAOQ7t2YB8VHw4+v=_5tMU5tAn4oE8KfCOPPAMbZx+2QyY7N5Zg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 17 Dec 2015 20:57:04 +0100
+Subject: [PATCH] i2c: allow building emev2 without slave mode again
+In-Reply-To: <20151217194016.GD1530@katana>
+References: <201512102224.cVm7Hcp0%fengguang.wu@intel.com>
+ <7947081.psvz6dklxq@wuerfel> <20151217194016.GD1530@katana>
+Message-ID: <7990730.tNeXHUrIig@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On gio, dic 17, 2015 at 02:00:17 +0000, Yang, York wrote:
-> Hi, Carlo
+On Thursday 17 December 2015 20:40:17 Wolfram Sang wrote:
+> > > My conclusion for now is:
+> > > 
+> > > There needs something to be done surely, but currently I don't have the
+> > > bandwidth to do it or even play around with it. I am not fully happy
+> > > with your patches as well because __maybe_unused has some kind of "last
+> > > resort" feeling to me.
+> > 
+> > I generally like __maybe_unused, but it's a matter of personal preference.
+> > We could avoid the __maybe_unused if the reg_slave/unreg_slave callback
+> > pointers are always available in struct i2c_algorithm.
+> 
+> Yes, I was thinking in this direction, looking at how PM does it. Needs
+> some playing around, though.
 
-Hi Yang,
+I think PM gets it slightly wrong, the way you have to use #ifdef leads
+to subtle bugs all the time, and I actually have a patch that converts
+a few dozen drivers to use __maybe_unused to shut up build warnings and
+errors.
 
-> I don't understand. We can see that 9faac7b95 is all about
-> DDR50. It should not affect the behavior of SDR50.
+What you can do though is to use a reference like
 
-What I'm saying is that this commit is negatively affecting some DDR50
-SDIO card as in my case.
+#define __i2c_slave_ptr(x) (IS_ENABLED(CONFIG_I2C_SLAVE) ? (x) : NULL)
 
-Ok, let's try to go through the code with and without 9faac7b95.
+	...
+	.reg_slave = __i2c_slave_ptr(em_i2c_reg_slave),
+	.unreg_slave = __i2c_slave_ptr(em_i2c_unreg_slave),
+	...
 
-Without 9faac7b95:
-- mmc_sdio_init_uhs_card() is called
-- sw_caps.sd3_bus_mode is 0x14 (SD_MODE_UHS_SDR50 | SD_MODE_UHS_DDR50)
-- card->sw_caps.sd3_bus_mode & SD_MODE_UHS_SDR50 is verified and
-mmc_execute_tuning() is called
-- sdhci_execute_tuning() is called
-- host->timing is MMC_TIMING_UHS_DDR50
-- since there is no case for that we end up in 'default', goto
-out_unlock and CMD19 is never issued
+This has the same effect as the __maybe_unused annotation.
 
-With 9faac7b95:
-- mmc_sdio_init_uhs_card() is called
-- sw_caps.sd3_bus_mode is 0x14 (SD_MODE_UHS_SDR50 | SD_MODE_UHS_DDR50)
-- card->sw_caps.sd3_bus_mode & SD_MODE_UHS_SDR50 is verified and
-  mmc_execute_tuning() is called
-- sdhci_execute_tuning() is called
-- host->timing is MMC_TIMING_UHS_DDR50
-- this time we have the the 'case MMC_TIMING_UHS_DDR50' and we break on that
-- CMD19 is issued and the card stops working
-
-> Since the commit is very simple, you may remove the change one by one
-> by yourself. And see if any difference occurs.
-
-As stated above the problem is in the new 'case MMC_TIMING_UHS_DDR50'
-we have in sdhci_execute_tuning()
-
-> Besides, please check
-> if the card->sw_caps.sd3_bus_mode changes with or without DDR50 tuning
-> enabled.
-
-It doesn't.
-
--- 
-Carlo Caione
+	Arnd
