@@ -1,106 +1,55 @@
 From: mark.yao@rock-chips.com (Mark Yao)
-Date: Thu, 17 Dec 2015 11:01:11 +0800
-Subject: [PATCH v3 4/8] drm/rockchip: Optimization vop mode set
-In-Reply-To: <1450321275-31154-1-git-send-email-mark.yao@rock-chips.com>
-References: <1450321275-31154-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <1450321275-31154-5-git-send-email-mark.yao@rock-chips.com>
+Date: Thu, 17 Dec 2015 11:01:07 +0800
+Subject: [PATCH v3 0/8] drm/rockchip: covert to support atomic API
+Message-ID: <1450321275-31154-1-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rk3288 vop timing registers is immediately register, when configure
-timing on display active time, will cause tearing. use dclk reset is
-not a good idea to avoid this tearing. we can avoid tearing by using
-standby register.
+The series of patches coverting drm rockchip to atomic API, do some
+cleanup and some fixes on atomic side.
 
-Vop standby register will take effect at end of current frame, and
-go back to work immediately when exit standby.
+TODO: fence is not support on current version.
 
-So we can use standby register to protect this context.
+Tested on rk3288 popmetal board.
 
-Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
----
-Changes in v3: None
-Changes in v2: None
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c |   51 ++++++++++++++++++---------
- 1 file changed, 35 insertions(+), 16 deletions(-)
+All guys can test it with following url:
+ test case: https://github.com/markyzq/libdrm.git atomictest
+ kernel:
+  https://github.com/markyzq/kernel-drm-rockchip.git drm-rockchip-next-12-17
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index 44f6154..9ace3ae 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -1097,10 +1097,40 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
- 
- 	vop_enable(crtc);
- 	/*
--	 * disable dclk to stop frame scan, so that we can safe config mode and
--	 * enable iommu.
-+	 * If dclk rate is zero, mean that scanout is stop,
-+	 * we don't need wait any more.
- 	 */
--	clk_disable(vop->dclk);
-+	if (clk_get_rate(vop->dclk)) {
-+		/*
-+		 * Rk3288 vop timing register is immediately, when configure
-+		 * display timing on display time, may cause tearing.
-+		 *
-+		 * Vop standby will take effect at end of current frame,
-+		 * if dsp hold valid irq happen, it means standby complete.
-+		 *
-+		 * mode set:
-+		 *    standby and wait complete --> |----
-+		 *                                  | display time
-+		 *                                  |----
-+		 *                                  |---> dsp hold irq
-+		 *     configure display timing --> |
-+		 *         standby exit             |
-+		 *                                  | new frame start.
-+		 */
-+
-+		reinit_completion(&vop->dsp_hold_completion);
-+		vop_dsp_hold_valid_irq_enable(vop);
-+
-+		spin_lock(&vop->reg_lock);
-+
-+		VOP_CTRL_SET(vop, standby, 1);
-+
-+		spin_unlock(&vop->reg_lock);
-+
-+		wait_for_completion(&vop->dsp_hold_completion);
-+
-+		vop_dsp_hold_valid_irq_disable(vop);
-+	}
- 
- 	switch (vop->connector_type) {
- 	case DRM_MODE_CONNECTOR_LVDS:
-@@ -1115,7 +1145,6 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
- 	default:
- 		DRM_ERROR("unsupport connector_type[%d]\n",
- 			  vop->connector_type);
--		goto out;
- 	};
- 	VOP_CTRL_SET(vop, out_mode, vop->connector_out_mode);
- 
-@@ -1136,19 +1165,9 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
- 	VOP_CTRL_SET(vop, vact_st_end, val);
- 	VOP_CTRL_SET(vop, vpost_st_end, val);
- 
--
--	/*
--	 * reset dclk, take all mode config affect, so the clk would run in
--	 * correct frame.
--	 */
--	reset_control_assert(vop->dclk_rst);
--	usleep_range(10, 20);
--	reset_control_deassert(vop->dclk_rst);
--
- 	clk_set_rate(vop->dclk, adjusted_mode->clock * 1000);
--out:
--	if (clk_enable(vop->dclk) < 0)
--		dev_err(vop->dev, "failed to enable dclk\n");
-+
-+	VOP_CTRL_SET(vop, standby, 0);
- }
- 
- static void vop_crtc_atomic_flush(struct drm_crtc *crtc,
+Changes in v3:
+Reported by kbuild test robot
+- fix rockchip_crtc_wait_for_update undefined when build drm rockchip as modules.
+
+Changes in v2:
+- Optimization commit planes sequence.
+- Get vblank count on atomic_begin to protect vblank event.
+Advised by Daniel Stone
+- Direct return -EINVAL when yuv address is not support, instead of adjust it.
+- code formating and cleanup.
+Advised by Thierry Reding & Daniel Vetter
+- Hook mode_set into crtc enable instead of hack crtc enable on mode set.
+
+v2: http://www.spinics.net/lists/arm-kernel/msg468423.html
+v1: http://lists.freedesktop.org/archives/dri-devel/2015-November/095745.html
+
+Mark Yao (8):
+  drm/rockchip: Use new vblank api drm_crtc_vblank_*
+  drm/rockchip: vop: replace dpms with enable/disable
+  drm/rockchip: Convert to support atomic API
+  drm/rockchip: Optimization vop mode set
+  drm/rockchip: support atomic asynchronous commit
+  drm/rockchip: direct config connecter gate and out_mode
+  drm: bridge/dw_hdmi: add atomic API support
+  drm/rockchip: dw_hdmi: use encoder enable function
+
+ drivers/gpu/drm/bridge/dw_hdmi.c            |   23 +-
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c |   14 +-
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c |   21 +-
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.h |   20 +-
+ drivers/gpu/drm/rockchip/rockchip_drm_fb.c  |  123 +++++
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c |  782 +++++++++++----------------
+ 6 files changed, 495 insertions(+), 488 deletions(-)
+
 -- 
 1.7.9.5
