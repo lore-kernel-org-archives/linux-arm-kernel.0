@@ -1,45 +1,87 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 17 Dec 2015 17:40:14 +1100
-Subject: linux-next: build failure after merge of the arm-soc tree
-Message-ID: <20151217174014.711d87f1@canb.auug.org.au>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Thu, 17 Dec 2015 14:57:58 +0800
+Subject: [PATCH v2 0/3] USB: add generic onboard USB HUB driver
+In-Reply-To: <5671C40F.3000000@maciej.szmigiero.name>
+References: <1450077974-22762-1-git-send-email-peter.chen@freescale.com>
+ <CAOMZO5CfBKuJ584jwbg98s9tn+0Z7W0nOaZnUkm4cJUSvNGTZw@mail.gmail.com>
+ <20151215062821.GA11241@shlinux2>
+ <CAOMZO5DiRzfy5dULh0C7qU2KUM-i8fBh6W5rS9zOTHJJK6fqwg@mail.gmail.com>
+ <20151216041058.GC23482@shlinux2>
+ <CAOMZO5An3CK-a3NQtOF3nnPc8vzu2+SKnfJ=iOuAhjCBvZwToQ@mail.gmail.com>
+ <5671C40F.3000000@maciej.szmigiero.name>
+Message-ID: <20151217065756.GB3793@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Wed, Dec 16, 2015 at 09:05:35PM +0100, Maciej S. Szmigiero wrote:
+> Hi Fabio,
+> Hi Peter,
+> 
+> On 16.12.2015 11:11, Fabio Estevam wrote:
+> > Hi Peter,
+> > 
+> > On Wed, Dec 16, 2015 at 2:11 AM, Peter Chen <peter.chen@freescale.com> wrote:
+> > 
+> >> Thanks, Fabio, but I am curious how things like that? The USBOH3 clock
+> >> is not opened, the usb driver will hang when it tries to access
+> >> registers. If this clock is always on, then, why the system will
+> >> hang later?
+> > 
+> > I found the issue with your patch. You missed to add the pinctrl node.
+> > 
+> > With the change below USB is functional in Udoo:
+> > 
+> > --- a/arch/arm/boot/dts/imx6qdl-udoo.dtsi
+> > +++ b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
+> > @@ -22,6 +22,8 @@
+> > 
+> >         usb_hub1 {
+> >                 compatible = "generic-onboard-hub";
+> > +               pinctrl-names = "default";
+> > +               pinctrl-0 = <&pinctrl_usbh>;
+> >                 clocks = <&clks IMX6QDL_CLK_CKO>;
+> >                 reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
+> >                 reset-duration-us = <2>;
+> > 
+> 
+> Thanks for your work, I didn't notice it previously (sorry).
+> 
+> I can confirm, too that with Peter's patches and the above change
+> the USB support works again on my UDOO DualLite board.
+> 
+> However, I noticed that when you have host USB support configured to be
+> build as modules then (due to its location under "if USB") it is only
+> possible to compile generic onboard USB HUB as module, too.
+> 
+> Then this module would need to be loaded before loading USB support
+> (or quickly after it), otherwise USB enumeration would time out after
+> few secs and loading it later wouldn't help.
 
-After merging the arm-soc tree, today's linux-next build (arm defconfig)
-failed like this:
+Thanks for testing it, it maybe this hardware limitation.
+The USB device should be back to work whenever do hardware reset,
+otherwise, this reset is not clean.
 
-*** Default configuration is based on 'versatile_defconfig'
-#
-# configuration written to .config
-#
-make[1]: Leaving directory '/home/sfr/next/arm_defconfig'
-.config:2033:warning: symbol value '' invalid for DEBUG_UART_PHYS
-.config:2034:warning: symbol value '' invalid for DEBUG_UART_VIRT
-*
-* Restart config...
-*
-	.
-	.
-	.
-Kernel low-level debugging functions (read help!) (DEBUG_LL) [Y/n/?] y
-  Kernel low-level debugging port
-    1. Kernel low-level debugging messages via ARM Versatile UART (DEBUG_VERSATILE)
-    2. Kernel low-level debugging via EmbeddedICE DCC channel (DEBUG_ICEDCC)
-    3. Kernel low-level debug output via semihosting I/O (DEBUG_SEMIHOSTING)
-    4. Kernel low-level debugging via 8250 UART (DEBUG_LL_UART_8250)
-  > 5. Kernel low-level debugging via ARM Ltd PL01x Primecell UART (DEBUG_LL_UART_PL01X)
-  choice[1-5]: 5
-Physical base address of debug UART (DEBUG_UART_PHYS) [] (NEW) aborted!
+> 
+> Currently, this driver doesn't really need any USB host support and
+> is able to be compiled-in successfully regardless of USB host support
+> configuration with just small change to Makefile and Kconfig.
+> 
+> However I don't know if it is a design goal to not use USB host support
+> or just a current development status, but if it doesn't really need it
+> then it would be great if it could be selected to be build-in into kernel
+> regardless of host USB support setting.
+> 
 
-Console input/output is redirected. Run 'make oldconfig' to update configuration.
+Yes, you are right, this driver is totally unrelated with ANY usb, but
+it intends to handle general USB device which needs to have platform
+control, and USB device is on the USB bus. Currently, if you are
+USB stuff, you must depends of host or gadget support.
 
-Presumably caused by the changes to arch/arm/Kconfig.debug in today's
-arm-soc tree.
-
-I left it broken for today.
+For this special hardware, you may have to define module load sequence
+for your loadable support, it the current develop stage, maybe it can
+be changed in future, I don't know when.
 
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+
+Best Regards,
+Peter Chen
