@@ -1,73 +1,187 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Thu, 17 Dec 2015 10:52:48 +0800
-Subject: [PATCH v2] soc: mediatek: SCPSYS: use module_platform_driver
-In-Reply-To: <56715136.3060908@gmail.com>
-References: <1450263656-12513-1-git-send-email-s.hauer@pengutronix.de>
- <1562792.sV6cmsyeOM@wuerfel> <56715136.3060908@gmail.com>
-Message-ID: <CAGS+omA1mgmFH_JXffUTC-aq3rOy7dRYsdveiJ8LcnB5gg0ELw@mail.gmail.com>
+From: mark.yao@rock-chips.com (Mark Yao)
+Date: Thu, 17 Dec 2015 11:01:08 +0800
+Subject: [PATCH v3 1/8] drm/rockchip: Use new vblank api drm_crtc_vblank_*
+In-Reply-To: <1450321275-31154-1-git-send-email-mark.yao@rock-chips.com>
+References: <1450321275-31154-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <1450321275-31154-2-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sasha, Matthias,
+No functional update, drm_vblank_* is the legacy version of
+drm_crtc_vblank_*. and use new api make driver more clean.
 
-On Wed, Dec 16, 2015 at 7:55 PM, Matthias Brugger
-<matthias.bgg@gmail.com> wrote:
->
->
-> On 16/12/15 12:22, Arnd Bergmann wrote:
->>
->> On Wednesday 16 December 2015 12:00:56 Sascha Hauer wrote:
->>>
->>> With regulator support to the scpsys driver needs to be able to defer
->>> probe. Probe deferral is incompatible with module_platform_driver_probe,
->>> so use module_platform_driver. module_platform_driver_probe sets the
->>> suppress_bind_attrs. To prevent unbinding the device with
->>> module_platform_driver we have to set the flag explicitly in the driver
->>> now.
->>>
->>> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
->>> ---
->>>
->>
->> Looks good now,
->>
->> Acked-by: Arnd Bergmann <arnd@arndb.de>
->>
->
-> Applied to v4.4-next/soc
+Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+---
+Changes in v3: None
+Changes in v2: None
 
-This patch does not compile on my system.
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c |   13 +++++++------
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.h |    7 +++----
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c |   24 +++++++++++-------------
+ 3 files changed, 21 insertions(+), 23 deletions(-)
 
-With "CONFIG_DEBUG_SECTION_MISMATCH=y" I see:
-
-WARNING: vmlinux.o(.data+0x387c8): Section mismatch in reference from
-the variable scpsys_drv to the function .init.text:scpsys_probe()
-The variable scpsys_drv references
-the function __init scpsys_probe()
-If the reference is valid then annotate the
-variable with __init* or __refdata (see linux/init.h) or name the variable:
-*_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
-
-FATAL: modpost: Section mismatches detected.
-Set CONFIG_SECTION_MISMATCH_WARN_ONLY=y to allow them.
-
-
-The problem is that scpsys_probe() is still __init, but it references
-scp_domain_data[] which is __initconst.
-However, scpsys_drv is not __initdata, so it cannot contain a pointer
-to an __init function.
-
-The only way I know to fix this is by dropping the __init & __initconst.
-This is rather unfortunate.
-Is there another way where we can use -EPROBE_DEFER and still preserve
-__init / __initconst ?
-
-Also, since scpsys' Kconfig is "bool" not "tristate" it isn't a real
-module so I think we should use:
-builtin_platform_driver not module_platform_driver
-
-CC'ing Paul Gortmaker who seems to be on a mass
-builtin_platform_driver conversion at the moment, see:
-https://lkml.org/lkml/2015/12/9/952
-
--Dan
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+index f22e1e1..cfd9b83 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+@@ -64,11 +64,11 @@ void rockchip_drm_dma_detach_device(struct drm_device *drm_dev,
+ }
+ EXPORT_SYMBOL_GPL(rockchip_drm_dma_detach_device);
+ 
+-int rockchip_register_crtc_funcs(struct drm_device *dev,
+-				 const struct rockchip_crtc_funcs *crtc_funcs,
+-				 int pipe)
++int rockchip_register_crtc_funcs(struct drm_crtc *crtc,
++				 const struct rockchip_crtc_funcs *crtc_funcs)
+ {
+-	struct rockchip_drm_private *priv = dev->dev_private;
++	int pipe = drm_crtc_index(crtc);
++	struct rockchip_drm_private *priv = crtc->dev->dev_private;
+ 
+ 	if (pipe > ROCKCHIP_MAX_CRTC)
+ 		return -EINVAL;
+@@ -79,9 +79,10 @@ int rockchip_register_crtc_funcs(struct drm_device *dev,
+ }
+ EXPORT_SYMBOL_GPL(rockchip_register_crtc_funcs);
+ 
+-void rockchip_unregister_crtc_funcs(struct drm_device *dev, int pipe)
++void rockchip_unregister_crtc_funcs(struct drm_crtc *crtc)
+ {
+-	struct rockchip_drm_private *priv = dev->dev_private;
++	int pipe = drm_crtc_index(crtc);
++	struct rockchip_drm_private *priv = crtc->dev->dev_private;
+ 
+ 	if (pipe > ROCKCHIP_MAX_CRTC)
+ 		return;
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+index dc4e5f0..069d6d4 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+@@ -52,10 +52,9 @@ struct rockchip_drm_private {
+ 	const struct rockchip_crtc_funcs *crtc_funcs[ROCKCHIP_MAX_CRTC];
+ };
+ 
+-int rockchip_register_crtc_funcs(struct drm_device *dev,
+-				 const struct rockchip_crtc_funcs *crtc_funcs,
+-				 int pipe);
+-void rockchip_unregister_crtc_funcs(struct drm_device *dev, int pipe);
++int rockchip_register_crtc_funcs(struct drm_crtc *crtc,
++				 const struct rockchip_crtc_funcs *crtc_funcs);
++void rockchip_unregister_crtc_funcs(struct drm_crtc *crtc);
+ int rockchip_drm_encoder_get_mux_id(struct device_node *node,
+ 				    struct drm_encoder *encoder);
+ int rockchip_drm_crtc_mode_config(struct drm_crtc *crtc, int connector_type,
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index dd8e086..f82c7ba 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -119,8 +119,6 @@ struct vop {
+ 	/* vop dclk reset */
+ 	struct reset_control *dclk_rst;
+ 
+-	int pipe;
+-
+ 	struct vop_win win[];
+ };
+ 
+@@ -692,7 +690,7 @@ static void vop_enable(struct drm_crtc *crtc)
+ 
+ 	enable_irq(vop->irq);
+ 
+-	drm_vblank_on(vop->drm_dev, vop->pipe);
++	drm_crtc_vblank_on(crtc);
+ 
+ 	return;
+ 
+@@ -711,7 +709,7 @@ static void vop_disable(struct drm_crtc *crtc)
+ 	if (!vop->is_enabled)
+ 		return;
+ 
+-	drm_vblank_off(crtc->dev, vop->pipe);
++	drm_crtc_vblank_off(crtc);
+ 
+ 	/*
+ 	 * Vop standby will take effect at end of current frame,
+@@ -918,7 +916,7 @@ static int vop_update_plane_event(struct drm_plane *plane,
+ 	 */
+ 	mutex_lock(&vop->vsync_mutex);
+ 	if (fb != vop_win_last_pending_fb(vop_win)) {
+-		ret = drm_vblank_get(plane->dev, vop->pipe);
++		ret = drm_crtc_vblank_get(crtc);
+ 		if (ret) {
+ 			DRM_ERROR("failed to get vblank, %d\n", ret);
+ 			mutex_unlock(&vop->vsync_mutex);
+@@ -929,7 +927,7 @@ static int vop_update_plane_event(struct drm_plane *plane,
+ 
+ 		ret = vop_win_queue_fb(vop_win, fb, yrgb_mst, event);
+ 		if (ret) {
+-			drm_vblank_put(plane->dev, vop->pipe);
++			drm_crtc_vblank_put(crtc);
+ 			mutex_unlock(&vop->vsync_mutex);
+ 			return ret;
+ 		}
+@@ -1023,7 +1021,7 @@ static int vop_disable_plane(struct drm_plane *plane)
+ 
+ 	vop = to_vop(plane->crtc);
+ 
+-	ret = drm_vblank_get(plane->dev, vop->pipe);
++	ret = drm_crtc_vblank_get(plane->crtc);
+ 	if (ret) {
+ 		DRM_ERROR("failed to get vblank, %d\n", ret);
+ 		return ret;
+@@ -1033,7 +1031,7 @@ static int vop_disable_plane(struct drm_plane *plane)
+ 
+ 	ret = vop_win_queue_fb(vop_win, NULL, 0, NULL);
+ 	if (ret) {
+-		drm_vblank_put(plane->dev, vop->pipe);
++		drm_crtc_vblank_put(plane->crtc);
+ 		mutex_unlock(&vop->vsync_mutex);
+ 		return ret;
+ 	}
+@@ -1295,7 +1293,7 @@ static void vop_win_state_complete(struct vop_win *vop_win,
+ 	}
+ 
+ 	list_del(&state->head);
+-	drm_vblank_put(crtc->dev, vop->pipe);
++	drm_crtc_vblank_put(crtc);
+ }
+ 
+ static void vop_crtc_destroy(struct drm_crtc *crtc)
+@@ -1410,6 +1408,7 @@ done:
+ static irqreturn_t vop_isr(int irq, void *data)
+ {
+ 	struct vop *vop = data;
++	struct drm_crtc *crtc = &vop->crtc;
+ 	uint32_t intr0_reg, active_irqs;
+ 	unsigned long flags;
+ 	int ret = IRQ_NONE;
+@@ -1438,7 +1437,7 @@ static irqreturn_t vop_isr(int irq, void *data)
+ 	}
+ 
+ 	if (active_irqs & FS_INTR) {
+-		drm_handle_vblank(vop->drm_dev, vop->pipe);
++		drm_crtc_handle_vblank(crtc);
+ 		active_irqs &= ~FS_INTR;
+ 		ret = (vop->vsync_work_pending) ? IRQ_WAKE_THREAD : IRQ_HANDLED;
+ 	}
+@@ -1531,8 +1530,7 @@ static int vop_create_crtc(struct vop *vop)
+ 
+ 	init_completion(&vop->dsp_hold_completion);
+ 	crtc->port = port;
+-	vop->pipe = drm_crtc_index(crtc);
+-	rockchip_register_crtc_funcs(drm_dev, &private_crtc_funcs, vop->pipe);
++	rockchip_register_crtc_funcs(crtc, &private_crtc_funcs);
+ 
+ 	return 0;
+ 
+@@ -1548,7 +1546,7 @@ static void vop_destroy_crtc(struct vop *vop)
+ {
+ 	struct drm_crtc *crtc = &vop->crtc;
+ 
+-	rockchip_unregister_crtc_funcs(vop->drm_dev, vop->pipe);
++	rockchip_unregister_crtc_funcs(crtc);
+ 	of_node_put(crtc->port);
+ 	drm_crtc_cleanup(crtc);
+ }
+-- 
+1.7.9.5
