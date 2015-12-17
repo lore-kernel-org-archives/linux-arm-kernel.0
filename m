@@ -1,27 +1,26 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 17 Dec 2015 19:42:55 +0100
-Subject: [PATCH v4 05/12] arm-cci: PMU: Add support for transactions
-In-Reply-To: <1450374559-23315-6-git-send-email-suzuki.poulose@arm.com>
-References: <1450374559-23315-1-git-send-email-suzuki.poulose@arm.com>
- <1450374559-23315-6-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20151217184255.GI6344@twins.programming.kicks-ass.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 17 Dec 2015 10:45:58 -0800
+Subject: [PATCH v5 4/5] ARM: dts: DRA7: add entry for qspi mmap region
+In-Reply-To: <20151211150935.GA15654@rob-hp-laptop>
+References: <1449807000-6457-1-git-send-email-vigneshr@ti.com>
+ <1449807000-6457-5-git-send-email-vigneshr@ti.com>
+ <20151211150935.GA15654@rob-hp-laptop>
+Message-ID: <20151217184557.GC23396@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 17, 2015 at 05:49:12PM +0000, Suzuki K. Poulose wrote:
-> This patch adds the transaction hooks for CCI PMU, which can be
-> later exploited to amortise the cost of writing the counters for
-> CCI-500 PMU.
+* Rob Herring <robh@kernel.org> [151211 07:10]:
+> On Fri, Dec 11, 2015 at 09:39:59AM +0530, Vignesh R wrote:
+> > Add qspi memory mapped region entries for DRA7xx based SoCs. Also,
+> > update the binding documents for the controller to document this change.
+> > 
+> > Signed-off-by: Vignesh R <vigneshr@ti.com>
 > 
-> We keep track of only the 'ADD' transactions. While we are in a
-> transaction, we keep track of the indices allocated for the events
-> and delay the following operations until the transaction is committed.
->  1) Programming the event on the counter
->  2) Enabling the counter
->  3) Setting the period for the event.
+> Acked-by: Rob Herring <robh@kernel.org>
 
-So that's not really what the txn interface is for, its meant to
-amortize event scheduling.
+Vignes, are patches 4 and 5 safe to apply separately already or
+do things break if we do that?
 
-The above doesn't look like it has a failure case, in which case you can
-achieve the same simpler, using pmu::pmu_{dis,en}able().
+Regards,
+
+Tony
