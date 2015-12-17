@@ -1,34 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 17 Dec 2015 10:46:49 +0100
-Subject: block layer bug with 4.4-rc3+
-In-Reply-To: <56728044.7090906@arm.com>
-References: <566FF3ED.1000503@arm.com> <1885710.UNGYhDGGcI@wuerfel>
- <56728044.7090906@arm.com>
-Message-ID: <4730511.HtLlToyPh4@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 17 Dec 2015 09:48:42 +0000
+Subject: [PATCH] locking/osq: fix ordering of node initialisation in
+ osq_lock
+In-Reply-To: <56720D78.9080706@gmail.com>
+References: <1449856001-21177-1-git-send-email-will.deacon@arm.com>
+ <56720D78.9080706@gmail.com>
+Message-ID: <20151217094655.GA11456@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 17 December 2015 09:28:36 Andre Przywara wrote:
+On Wed, Dec 16, 2015 at 05:18:48PM -0800, David Daney wrote:
+> What is the status of this patch?  It there a good likelihood that it will
+> make it into v4.4?
 > 
-> So it was running for almost a day without LPAE now, but with highmem,
-> and the bug didn't show up. So for the time being I'd avoid another test
-> run without highmem, as LPAE alone is sufficient to trigger it.
+> If not, we should request that c55a6ffa6285 ("locking/osq: Relax atomic
+> semantics") be reverted for v4.4
 
-There is clearly no need to try with both LPAE and HIGHMEM disabled, that
-would almost certainly not bring the bug back.
+I think Peter was going to send it to mingo as an urgent fix, but I've
+not seen anything from the tip-bot yet.
 
-A more useful test might be to try Cubieboard with LPAE enabled, possibly
-with LPAE and no highmem, to rule out the possibility that the bug just
-gets less likely when you have less highmem.
-
-> Also it seems that CONFIG_HIGHMEM is selected by MULTI_V7, so I can't
-> configure it out for this box, but would have to restrict memory to
-> 768M, I guess.
-> 
-> Next I will try some tracing as Ming suggested.
-
-It should not be selected by MULTI_V7, the only 'select HIGHMEM' statement
-I see is for ARCH_OMAP2PLUS_TYPICAL, and that is not a mandatory option
-for anything, it just turns on a few things that are generally useful.
-
-	Arnd
+Will
