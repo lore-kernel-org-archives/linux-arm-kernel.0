@@ -1,86 +1,106 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Wed, 16 Dec 2015 17:18:48 -0800
-Subject: [PATCH] locking/osq: fix ordering of node initialisation in
- osq_lock
-In-Reply-To: <1449856001-21177-1-git-send-email-will.deacon@arm.com>
-References: <1449856001-21177-1-git-send-email-will.deacon@arm.com>
-Message-ID: <56720D78.9080706@gmail.com>
+From: lho@apm.com (Loc Ho)
+Date: Wed, 16 Dec 2015 18:37:35 -0700
+Subject: [PATCH] clk: xgene: Add SoC and PMD PLL clocks with v2 hardware
+Message-ID: <1450316255-9372-1-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-What is the status of this patch?  It there a good likelihood that it 
-will make it into v4.4?
+Add X-Gene SoC and PMD PLL clocks support for v2 hardware.
+X-Gene SoC v2 and above use an slightly different SoC
+and PMD PLL hardware logic.
 
-If not, we should request that c55a6ffa6285 ("locking/osq: Relax atomic 
-semantics") be reverted for v4.4
+Signed-off-by: Loc Ho <lho@apm.com>
+---
+ drivers/clk/clk-xgene.c |   57 ++++++++++++++++++++++++++++++++--------------
+ 1 files changed, 39 insertions(+), 18 deletions(-)
 
-David Daney
-
-
-
-On 12/11/2015 09:46 AM, Will Deacon wrote:
-> The Cavium guys reported a soft lockup on their arm64 machine, caused
-> by c55a6ffa6285 ("locking/osq: Relax atomic semantics"):
->
-> [   68.909948] [<fffffe00000da03c>] mutex_optimistic_spin+0x9c/0x1d0
-> [   68.909951] [<fffffe00006fe4b8>] __mutex_lock_slowpath+0x44/0x158
-> [   68.909953] [<fffffe00006fe620>] mutex_lock+0x54/0x58
-> [   68.909956] [<fffffe0000265efc>] kernfs_iop_permission+0x38/0x70
-> [   68.909959] [<fffffe00001fbf50>] __inode_permission+0x88/0xd8
-> [   68.909961] [<fffffe00001fbfd0>] inode_permission+0x30/0x6c
-> [   68.909964] [<fffffe00001fe26c>] link_path_walk+0x68/0x4d4
-> [   68.909966] [<fffffe00001ffa14>] path_openat+0xb4/0x2bc
-> [   68.909968] [<fffffe000020123c>] do_filp_open+0x74/0xd0
-> [   68.909971] [<fffffe00001f13e4>] do_sys_open+0x14c/0x228
-> [   68.909973] [<fffffe00001f1544>] SyS_openat+0x3c/0x48
-> [   68.909976] [<fffffe00000851f0>] el0_svc_naked+0x24/0x28
->
-> This is because in osq_lock we initialise the node for the current CPU:
->
-> 	node->locked = 0;
-> 	node->next = NULL;
-> 	node->cpu = curr;
->
-> and then publish the current CPU in the lock tail:
->
-> 	old = atomic_xchg_acquire(&lock->tail, curr);
->
-> Once the update to lock->tail is visible to another CPU, the node is
-> then live and can be both read and updated by concurrent lockers.
->
-> Unfortunately, the ACQUIRE semantics of the xchg operation mean that
-> there is no guarantee the contents of the node will be visible before
-> lock tail is updated. This can lead to lock corruption when, for example,
-> a concurrent locker races to set the next field.
->
-> Fixes: c55a6ffa6285 ("locking/osq: Relax atomic semantics"):
-> Reported-by: David Daney <ddaney@caviumnetworks.com>
-> Reported-by: Andrew Pinski <andrew.pinski@caviumnetworks.com>
-> Tested-by: Andrew Pinski <andrew.pinski@caviumnetworks.com>
-> Acked-by: Davidlohr Bueso <dave@stgolabs.net>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->   kernel/locking/osq_lock.c | 8 +++++---
->   1 file changed, 5 insertions(+), 3 deletions(-)
->
-> diff --git a/kernel/locking/osq_lock.c b/kernel/locking/osq_lock.c
-> index d092a0c9c2d4..05a37857ab55 100644
-> --- a/kernel/locking/osq_lock.c
-> +++ b/kernel/locking/osq_lock.c
-> @@ -93,10 +93,12 @@ bool osq_lock(struct optimistic_spin_queue *lock)
->   	node->cpu = curr;
->
->   	/*
-> -	 * ACQUIRE semantics, pairs with corresponding RELEASE
-> -	 * in unlock() uncontended, or fastpath.
-> +	 * We need both ACQUIRE (pairs with corresponding RELEASE in
-> +	 * unlock() uncontended, or fastpath) and RELEASE (to publish
-> +	 * the node fields we just initialised) semantics when updating
-> +	 * the lock tail.
->   	 */
-> -	old = atomic_xchg_acquire(&lock->tail, curr);
-> +	old = atomic_xchg(&lock->tail, curr);
->   	if (old == OSQ_UNLOCKED_VAL)
->   		return true;
->
->
+diff --git a/drivers/clk/clk-xgene.c b/drivers/clk/clk-xgene.c
+index 8131ccf..0f446d3 100644
+--- a/drivers/clk/clk-xgene.c
++++ b/drivers/clk/clk-xgene.c
+@@ -27,9 +27,12 @@
+ #include <linux/clkdev.h>
+ #include <linux/clk-provider.h>
+ #include <linux/of_address.h>
++#include <asm/cputype.h>
+ 
+ /* Register SCU_PCPPLL bit fields */
+-#define N_DIV_RD(src)			(((src) & 0x000001ff))
++#define N_DIV_RD(src)			((src) & 0x000001ff)
++#define SC_N_DIV_RD(src)		((src) & 0x0000007f)
++#define SC_OUTDIV2(src)			(((src) & 0x00000100) >> 8)
+ 
+ /* Register SCU_SOCPLL bit fields */
+ #define CLKR_RD(src)			(((src) & 0x07000000)>>24)
+@@ -41,6 +44,14 @@
+ 
+ static DEFINE_SPINLOCK(clk_lock);
+ 
++static int xgene_clk_version(void)
++{
++	#define MIDR_EL1_VARIANT_MASK	0x00f00000
++	u32 val = read_cpuid_id();
++
++	return (val & MIDR_EL1_VARIANT_MASK) == 0 ? 1 : 2;
++}
++
+ static inline u32 xgene_clk_read(void __iomem *csr)
+ {
+ 	return readl_relaxed(csr);
+@@ -92,27 +103,37 @@ static unsigned long xgene_clk_pll_recalc_rate(struct clk_hw *hw,
+ 
+ 	pll = xgene_clk_read(pllclk->reg + pllclk->pll_offset);
+ 
+-	if (pllclk->type == PLL_TYPE_PCP) {
+-		/*
+-		 * PLL VCO = Reference clock * NF
+-		 * PCP PLL = PLL_VCO / 2
+-		 */
+-		nout = 2;
+-		fvco = parent_rate * (N_DIV_RD(pll) + 4);
++	if (xgene_clk_version() <= 1) {
++		if (pllclk->type == PLL_TYPE_PCP) {
++			/*
++			* PLL VCO = Reference clock * NF
++			* PCP PLL = PLL_VCO / 2
++			*/
++			nout = 2;
++			fvco = parent_rate * (N_DIV_RD(pll) + 4);
++		} else {
++			/*
++			* Fref = Reference Clock / NREF;
++			* Fvco = Fref * NFB;
++			* Fout = Fvco / NOUT;
++			*/
++			nref = CLKR_RD(pll) + 1;
++			nout = CLKOD_RD(pll) + 1;
++			nfb = CLKF_RD(pll);
++			fref = parent_rate / nref;
++			fvco = fref * nfb;
++		}
+ 	} else {
+ 		/*
+-		 * Fref = Reference Clock / NREF;
+-		 * Fvco = Fref * NFB;
+-		 * Fout = Fvco / NOUT;
++		 * fvco = Reference clock * FBDIVC
++		 * PLL freq = fvco / NOUT
+ 		 */
+-		nref = CLKR_RD(pll) + 1;
+-		nout = CLKOD_RD(pll) + 1;
+-		nfb = CLKF_RD(pll);
+-		fref = parent_rate / nref;
+-		fvco = fref * nfb;
++		nout = SC_OUTDIV2(pll) ? 2 : 3;
++		fvco = parent_rate * SC_N_DIV_RD(pll);
+ 	}
+-	pr_debug("%s pll recalc rate %ld parent %ld\n", clk_hw_get_name(hw),
+-		fvco / nout, parent_rate);
++	pr_debug("%s pll recalc rate %ld parent %ld version %d\n",
++		 clk_hw_get_name(hw), fvco / nout, parent_rate,
++		 xgene_clk_version());
+ 
+ 	return fvco / nout;
+ }
+-- 
+1.7.1
