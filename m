@@ -1,47 +1,27 @@
-From: courtney.cavin@sonymobile.com (Courtney Cavin)
-Date: Wed, 16 Dec 2015 16:01:41 -0800
-Subject: [PATCH] net: add Qualcomm IPC router
-In-Reply-To: <20151215.160114.1178824607335349574.davem@davemloft.net>
-References: <1449866519-14551-1-git-send-email-bjorn.andersson@sonymobile.com>
- <20151215.160114.1178824607335349574.davem@davemloft.net>
-Message-ID: <20151217000141.GG28026@sonymobile.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 17 Dec 2015 01:03:59 +0100
+Subject: [PATCH v2 0/8] Raspberry Pi 2 support.
+In-Reply-To: <1450310115-22163-1-git-send-email-eric@anholt.net>
+References: <1450310115-22163-1-git-send-email-eric@anholt.net>
+Message-ID: <21040591.KakM5Gl6ZZ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 15, 2015 at 10:01:14PM +0100, David Miller wrote:
-> From: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> Date: Fri, 11 Dec 2015 12:41:59 -0800
+On Wednesday 16 December 2015 15:55:07 Eric Anholt wrote:
+> This is a major rewrite of the previous Raspberry Pi 2 submission.
+> SMP support is now included, and the DT includes are cleaned up to
+> avoid massive duplication.
 > 
-> > +static unsigned int qrtr_local_nid = 1;
-> > +module_param_named(node_id, qrtr_local_nid, uint, S_IRUGO);
-> > +MODULE_PARM_DESC(idVendor, "Local Node Identifier");
+> The branch (based on 4.4-rc5, to get the USB regression fixes) can be
+> found at:
 > 
-> Module parameters suck.
-> 
-> Allow the user to choose this dynamically.  You have roughtly two choices.
-> 
-> 1) Subvert the 'protocol' field passed to ->create() and use that, it is
->    being ignored otherwise.
-> 
-> 2) Put it into the socket address for bind().
+> https://github.com/anholt/linux/tree/bcm2836-4.4
 
-So each socket can have its own node id?  That doesn't seem right.
+Looks all good to me, but when we get the pull request, I'd strongly
+prefer to have that based on -rc3 or earlier.
 
-The way these node ids are assigned is by a system designer (in this
-case Qualcomm).  The ARM, Linux CPU is always node 1, the audio DSP is
-always node 5, etc.  Anyone with the knowhow could reassign these
-numbers, but there's no reason to have them be dynamic during runtime.
-Additionally, allowing dynamic assignment would require code to prevent
-id duplication for known remote nodes, as well as to deal with cases in
-which remote node discovery happens after local sockets have acquired
-that node's id.
+What commit is the USB regression fix you refer to above? Is that in a
+branch that is -rc3 based? Maybe you can rebase the changes on top
+of that branch, to minimize the amount of backmerges?
 
-Maybe the first socket created needs CAP_NET_ADMIN, and uses the
-'protocol' field to set the node id?  Ugh. Gross.
-
-We could hardcode the value in kconfig, but that seems like a worse
-solution than a module parameter.
-
-I'm open to further suggestions.
-
--Courtney
+	Arnd
