@@ -1,83 +1,54 @@
-From: songjun.wu@atmel.com (Songjun Wu)
-Date: Thu, 17 Dec 2015 17:50:00 +0800
-Subject: [RESEND PATCH v2 2/2] ASoC: atmel-classd: DT binding for PDMIC driver
-In-Reply-To: <1450345800-21299-1-git-send-email-songjun.wu@atmel.com>
-References: <1450345800-21299-1-git-send-email-songjun.wu@atmel.com>
-Message-ID: <1450345800-21299-3-git-send-email-songjun.wu@atmel.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Thu, 17 Dec 2015 02:00:00 -0800
+Subject: [PATCH LINUX v4 06/13] tty: xuartps: Move request_irq to after
+ setting up the HW
+In-Reply-To: <56717745.3060306@hurleysoftware.com>
+References: <1449376769-13369-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1449376769-13369-7-git-send-email-soren.brinkmann@xilinx.com>
+ <5669F172.6020503@hurleysoftware.com>
+ <20151215154136.GU3358@xsjsorenbubuntu>
+ <5670A1B6.6050708@hurleysoftware.com>
+ <20151216090339.GX3358@xsjsorenbubuntu>
+ <56717745.3060306@hurleysoftware.com>
+Message-ID: <20151217100000.GO3358@xsjsorenbubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DT binding documentation for this new ASoC driver.
+On Wed, 2015-12-16 at 06:37AM -0800, Peter Hurley wrote:
+> On 12/16/2015 01:03 AM, S?ren Brinkmann wrote:
+> > On Tue, 2015-12-15 at 03:26PM -0800, Peter Hurley wrote:
+> >> On 12/15/2015 07:41 AM, S?ren Brinkmann wrote:
+> >>> On Thu, 2015-12-10 at 01:41PM -0800, Peter Hurley wrote:
+> >>>> On 12/05/2015 08:39 PM, Soren Brinkmann wrote:
+> >>>>> Request_irq() should be _after_ h/w programming, otherwise an
+> >>>>> interrupt could be triggered and in-progress before the h/w has been
+> >>>>> setup.
+> >>>>
+> >>>> Slight misunderstanding. My fault; I should have been more explicit.
+> >>>>
+> >>>> 1. Any setup necessary for the isr not to be confused and misdirect spurious
+> >>>>    interrupts (or hang) should be before installing the isr with request_irq()
+> >>>>    None of this code should trigger an interrupt.
+> >>>> 2. Clear pending interrupts
+> >>>> 3. Install the isr with request_irq()
+> >>>> 4. Enable interrupts
+> >>>
+> >>> Isn't that what the startup function is doing now - more or less. I
+> >>> think 3 and 4 are swapped to release the lock and then do the
+> >>> request_irq, but I believe that should be OK.
+> >>> The startup function configures the HW. Clears the ISR. Enables the
+> >>> intended IRQs and then does the request_irq call.
+> >>
+> >> If the driver enables interrupts before installing the isr with request_irq()
+> >> and an interrupt occurs there will the no handler to catch it and EOI the
+> >> device.
+> > 
+> > Really? Shouldn't the IRQ be masked in the interrupt controller until
+> > everything is in place?
+> 
+> Sorry, I'm used to shared interrupts, where that isn't the case.
 
-Signed-off-by: Songjun Wu <songjun.wu@atmel.com>
----
+Ahh, I didn't have to deal with such cases yet. Makes sense though.
 
-Changes in v2: None
-
- .../devicetree/bindings/sound/atmel-pdmic.txt      |   55 ++++++++++++++++++++
- 1 file changed, 55 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/atmel-pdmic.txt
-
-diff --git a/Documentation/devicetree/bindings/sound/atmel-pdmic.txt b/Documentation/devicetree/bindings/sound/atmel-pdmic.txt
-new file mode 100644
-index 0000000..e0875f1
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/atmel-pdmic.txt
-@@ -0,0 +1,55 @@
-+* Atmel PDMIC driver under ALSA SoC architecture
-+
-+Required properties:
-+- compatible
-+	Should be "atmel,sama5d2-pdmic".
-+- reg
-+	Should contain PDMIC registers location and length.
-+- interrupts
-+	Should contain the IRQ line for the PDMIC.
-+- dmas
-+	One DMA specifiers as described in atmel-dma.txt and dma.txt files.
-+- dma-names
-+	Must be "rx".
-+- clock-names
-+	Required elements:
-+	- "pclk"	peripheral clock
-+	- "gclk"	generated clock
-+- clocks
-+	Must contain an entry for each required entry in clock-names.
-+	Please refer to clock-bindings.txt.
-+- atmel,mic-min-freq
-+	The minimal frequency that the micphone supports.
-+- atmel,mic-max-freq
-+	The maximal frequency that the micphone supports.
-+
-+Optional properties:
-+- pinctrl-names, pinctrl-0
-+	Please refer to pinctrl-bindings.txt.
-+- atmel,model
-+	The user-visible name of this sound card.
-+	The default value is "PDMIC".
-+- atmel,mic-offset
-+	The offset that should be added.
-+	The range is from -32768 to 32767.
-+	The default value is 0.
-+
-+Example:
-+	pdmic at f8018000 {
-+				compatible = "atmel,sama5d2-pdmic";
-+				reg = <0xf8018000 0x124>;
-+				interrupts = <48 IRQ_TYPE_LEVEL_HIGH 7>;
-+				dmas = <&dma0
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
-+					| AT91_XDMAC_DT_PERID(50))>;
-+				dma-names = "rx";
-+				clocks = <&pdmic_clk>, <&pdmic_gclk>;
-+				clock-names = "pclk", "gclk";
-+
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_pdmic_default>;
-+				atmel,model = "PDMIC @ sama5d2_xplained";
-+				atmel,mic-min-freq = <1000000>;
-+				atmel,mic-max-freq = <3246000>;
-+				atmel,mic-offset = <0x0>;
-+	};
--- 
-1.7.9.5
+	Thanks,
+	S?ren
