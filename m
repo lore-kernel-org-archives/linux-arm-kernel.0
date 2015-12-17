@@ -1,100 +1,152 @@
-From: tiffany.lin@mediatek.com (tiffany lin)
-Date: Thu, 17 Dec 2015 13:52:27 +0800
-Subject: [PATCH v2 6/8] [Media] vcodec: mediatek: Add Mediatek V4L2
- Video Encoder Driver
-In-Reply-To: <56716B88.7090301@xs4all.nl>
-References: <1449827743-22895-1-git-send-email-tiffany.lin@mediatek.com>
- <1449827743-22895-7-git-send-email-tiffany.lin@mediatek.com>
- <566EBAFC.3010408@xs4all.nl> <1450187460.21350.35.camel@mtksdaap41>
- <567020F1.1000204@cisco.com> <1450271857.6730.26.camel@mtksdaap41>
- <56716B88.7090301@xs4all.nl>
-Message-ID: <1450331547.7283.4.camel@mtksdaap41>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Wed, 16 Dec 2015 22:26:05 -0800
+Subject: [PATCH v2] drivers: net: xgene: fix Tx flow control
+Message-ID: <1450333565-23670-1-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-12-16 at 14:47 +0100, Hans Verkuil wrote:
-> On 12/16/15 14:17, tiffany lin wrote:
-> > Hi Hans,
-> > 
-> > 
-> > On Tue, 2015-12-15 at 15:17 +0100, Hans Verkuil wrote:
-> >>
-> >> On 12/15/15 14:51, tiffany lin wrote:
-> >>> We are not familiar with v4l2-compliance utility, we will check how to
-> >>> use it.
-> >>
-> >> It's part of v4l-utils.git (http://git.linuxtv.org/v4l-utils.git/). There is a
-> >> fairly decent man page. It does exhaustive compliance tests for V4L2 devices.
-> >>
-> >> That said, the support for memory-to-memory codec devices is not great, so I wouldn't
-> >> trust any failures it reports when using the streaming tests (i.e. the --stream*
-> >> options). By default just run 'v4l2-compliance -d /dev/videoX' to do the compliance
-> >> test.
-> >>
-> >> Note: before I accept this driver I do want to see that compliance test output!
-> >>
-> > Got it. We will provide it in next version.
-> > Now our driver is developed and run base on kernel v3.18.
-> > V4L2 and vb2 have some difference between Linux 4.4-rc1 and 3.18 kernel.
-> > Is it ok we provided test output base on v3.18 or we need to base on
-> > 4.4-rc1?
-> 
-> I'm actually not sure if the latest v4l2-compliance test suite will work with a 3.18
-> kernel. so either you have to go back to an older version of v4l2-compliance that
-> works with 3.18 (go back to commit 4a57509a8334aca6ca8e81cd3beb08d5be397dac, that
-> might do the trick) or (and that's what I recommend) go with the latest kernel.
-> 
-> For the media tree that is http://git.linuxtv.org/media_tree.git/log/.
-> 
-> The final version of the patch has to be against that kernel anyway.
-> 
-Got it. Thanks for your help, we will try it. ^_^
+Currently the Tx flow control is based on reading the hardware state,
+which is not accurate since it may not reflect the descriptors that
+are not yet reached the memory.
 
-> >>>>> +}
-> >>>>> +
-> >>>>> +int m2mctx_venc_queue_init(void *priv, struct vb2_queue *src_vq,
-> >>>>> +			   struct vb2_queue *dst_vq)
-> >>>>> +{
-> >>>>> +	struct mtk_vcodec_ctx *ctx = priv;
-> >>>>> +	int ret;
-> >>>>> +
-> >>>>> +	src_vq->type		= V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
-> >>>>> +	src_vq->io_modes	= VB2_DMABUF | VB2_MMAP | VB2_USERPTR;
-> >>>>
-> >>>> You're using videobuf2-dma-contig, so VB2_USERPTR is generally useless in that
-> >>>> case. I would drop it.
-> >>>>
-> >>> Sorry, I don't get it. 
-> >>> We are using videobuf2-dma-contig, but we also using VB2_USERPTR.
-> >>
-> >> ???? In that case the user pointer you pass in must point to physically contiguous
-> >> memory. Which means you got it through some magic. Typically what should be used
-> >> are dmabuf handles to pass buffers around between different subsystems.
-> >>
-> >> The use of VB2_USERPTR for that purpose is deprecated.
-> >>
-> >> Or am I misunderstanding you as well?
-> >>
-> > Our encoder support all three modes.
-> > In case that A driver + Encode driver flow, OUTPUT buffer will be
-> > VB2_DMABUF from A driver.
-> > In case that read YCbCr frame data from file and encode them to bit
-> > stream flow, we use VB2_USERPTR and VB2_MMAP.
-> > In VB2_USERPTR case, videobuf2-dma-contig will help us get continuous
-> > dma address.
-> > Our chip has IOMMU and M4U that help us get continuous phy address for
-> > encode HW.
-> > 
-> > http://lists.infradead.org/pipermail/linux-mediatek/2015-October/002525.html
-> 
-> Ah, OK. Have you tested this with malloc()ed buffers? Just asking :-)
-> 
-Yes. Actually we tested this with new()ed buffers. I think it default
-call malloc.
+To accurately control the Tx flow, changing it to be software based.
 
-> Regards,
-> 
-> 	Hans
+Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+---
 
-best regards,
-Tiffany
+v2: Address v1 review comments
+	- Removed use of atomic_t
+	- Added tx_level and txc_level counters to pdata
+
+v1: Initial version
+---
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c | 38 ++++++++++++++----------
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.h |  4 +--
+ 2 files changed, 24 insertions(+), 18 deletions(-)
+
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+index 9147a01..d0ae1a6 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+@@ -289,6 +289,7 @@ static int xgene_enet_setup_tx_desc(struct xgene_enet_desc_ring *tx_ring,
+ 				    struct sk_buff *skb)
+ {
+ 	struct device *dev = ndev_to_dev(tx_ring->ndev);
++	struct xgene_enet_pdata *pdata = netdev_priv(tx_ring->ndev);
+ 	struct xgene_enet_raw_desc *raw_desc;
+ 	__le64 *exp_desc = NULL, *exp_bufs = NULL;
+ 	dma_addr_t dma_addr, pbuf_addr, *frag_dma_addr;
+@@ -419,6 +420,7 @@ out:
+ 	raw_desc->m0 = cpu_to_le64(SET_VAL(LL, ll) | SET_VAL(NV, nv) |
+ 				   SET_VAL(USERINFO, tx_ring->tail));
+ 	tx_ring->cp_ring->cp_skb[tx_ring->tail] = skb;
++	pdata->tx_level += count;
+ 	tx_ring->tail = tail;
+ 
+ 	return count;
+@@ -429,14 +431,13 @@ static netdev_tx_t xgene_enet_start_xmit(struct sk_buff *skb,
+ {
+ 	struct xgene_enet_pdata *pdata = netdev_priv(ndev);
+ 	struct xgene_enet_desc_ring *tx_ring = pdata->tx_ring;
+-	struct xgene_enet_desc_ring *cp_ring = tx_ring->cp_ring;
+-	u32 tx_level, cq_level;
++	u32 tx_level = pdata->tx_level;
+ 	int count;
+ 
+-	tx_level = pdata->ring_ops->len(tx_ring);
+-	cq_level = pdata->ring_ops->len(cp_ring);
+-	if (unlikely(tx_level > pdata->tx_qcnt_hi ||
+-		     cq_level > pdata->cp_qcnt_hi)) {
++	if (tx_level < pdata->txc_level)
++		tx_level += ((typeof(pdata->tx_level))~0U);
++
++	if ((tx_level - pdata->txc_level) > pdata->tx_qcnt_hi) {
+ 		netif_stop_queue(ndev);
+ 		return NETDEV_TX_BUSY;
+ 	}
+@@ -539,10 +540,13 @@ static int xgene_enet_process_ring(struct xgene_enet_desc_ring *ring,
+ 	struct xgene_enet_raw_desc *raw_desc, *exp_desc;
+ 	u16 head = ring->head;
+ 	u16 slots = ring->slots - 1;
+-	int ret, count = 0, processed = 0;
++	int ret, desc_count, count = 0, processed = 0;
++	bool is_completion;
+ 
+ 	do {
+ 		raw_desc = &ring->raw_desc[head];
++		desc_count = 0;
++		is_completion = false;
+ 		exp_desc = NULL;
+ 		if (unlikely(xgene_enet_is_desc_slot_empty(raw_desc)))
+ 			break;
+@@ -559,18 +563,24 @@ static int xgene_enet_process_ring(struct xgene_enet_desc_ring *ring,
+ 			}
+ 			dma_rmb();
+ 			count++;
++			desc_count++;
+ 		}
+-		if (is_rx_desc(raw_desc))
++		if (is_rx_desc(raw_desc)) {
+ 			ret = xgene_enet_rx_frame(ring, raw_desc);
+-		else
++		} else {
+ 			ret = xgene_enet_tx_completion(ring, raw_desc);
++			is_completion = true;
++		}
+ 		xgene_enet_mark_desc_slot_empty(raw_desc);
+ 		if (exp_desc)
+ 			xgene_enet_mark_desc_slot_empty(exp_desc);
+ 
+ 		head = (head + 1) & slots;
+ 		count++;
++		desc_count++;
+ 		processed++;
++		if (is_completion)
++			pdata->txc_level += desc_count;
+ 
+ 		if (ret)
+ 			break;
+@@ -580,10 +590,8 @@ static int xgene_enet_process_ring(struct xgene_enet_desc_ring *ring,
+ 		pdata->ring_ops->wr_cmd(ring, -count);
+ 		ring->head = head;
+ 
+-		if (netif_queue_stopped(ring->ndev)) {
+-			if (pdata->ring_ops->len(ring) < pdata->cp_qcnt_low)
+-				netif_wake_queue(ring->ndev);
+-		}
++		if (netif_queue_stopped(ring->ndev))
++			netif_start_queue(ring->ndev);
+ 	}
+ 
+ 	return processed;
+@@ -1033,9 +1041,7 @@ static int xgene_enet_create_desc_rings(struct net_device *ndev)
+ 	pdata->tx_ring->cp_ring = cp_ring;
+ 	pdata->tx_ring->dst_ring_num = xgene_enet_dst_ring_num(cp_ring);
+ 
+-	pdata->tx_qcnt_hi = pdata->tx_ring->slots / 2;
+-	pdata->cp_qcnt_hi = pdata->rx_ring->slots / 2;
+-	pdata->cp_qcnt_low = pdata->cp_qcnt_hi / 2;
++	pdata->tx_qcnt_hi = pdata->tx_ring->slots - 128;
+ 
+ 	return 0;
+ 
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.h b/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
+index a6e56b8..1aa72c7 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
+@@ -155,11 +155,11 @@ struct xgene_enet_pdata {
+ 	enum xgene_enet_id enet_id;
+ 	struct xgene_enet_desc_ring *tx_ring;
+ 	struct xgene_enet_desc_ring *rx_ring;
++	u16 tx_level;
++	u16 txc_level;
+ 	char *dev_name;
+ 	u32 rx_buff_cnt;
+ 	u32 tx_qcnt_hi;
+-	u32 cp_qcnt_hi;
+-	u32 cp_qcnt_low;
+ 	u32 rx_irq;
+ 	u32 txc_irq;
+ 	u8 cq_cnt;
+-- 
+1.9.1
