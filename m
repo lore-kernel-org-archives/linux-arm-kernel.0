@@ -1,73 +1,94 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 17 Dec 2015 10:27:57 +0000
-Subject: [PATCH] ARM: PJ4: move coprocessor register access sequences to
- iwmmxt.S
-In-Reply-To: <CAKv+Gu9tjeMska_1EUwcCgPoX=uXZkv0q+goew3q59T1UwEsyg@mail.gmail.com>
-References: <1447397933-13379-1-git-send-email-ard.biesheuvel@linaro.org>
- <20151113184807.GA21047@codeaurora.org>
- <CAKv+Gu9tjeMska_1EUwcCgPoX=uXZkv0q+goew3q59T1UwEsyg@mail.gmail.com>
-Message-ID: <20151217102757.GF8644@n2100.arm.linux.org.uk>
+From: david@protonic.nl (David Jander)
+Date: Thu, 17 Dec 2015 11:28:14 +0100
+Subject: SDHCI long sleep with interrupts off
+Message-ID: <20151217112814.6250a3b9@archvile>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 13, 2015 at 08:23:34PM +0100, Ard Biesheuvel wrote:
-> On 13 November 2015 at 19:48, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> > On 11/13, Ard Biesheuvel wrote:
-> >> The PJ4 inline asm sequences in pj4-cp0.c cannot be built in Thumb-2 mode,
-> >> due to the way it performs arithmetic on the program counter, so it is
-> >> built in ARM mode instead. However, building C files in ARM mode under
-> >> CONFIG_THUMB2_KERNEL is problematic, since the instrumentation performed
-> >> by subsystems like ftrace does not expect having to deal with interworking
-> >> branches.
-> >>
-> >> So instead, revert to building pj4-cp0.c in Thumb-2 mode, and move the
-> >> offending sequence to iwmmxt.S, which is not instrumented anyway, and is
-> >> already built in ARM mode unconditionally.
-> >>
-> >> Reported-by: Stephen Boyd <sboyd@codeaurora.org>
-> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> ---
-> >
-> > Tested-by: Stephen Boyd <sboyd@codeaurora.org>
-> >
-> 
-> Thanks.
-> 
-> I've put this into the patch system (8452/1)
 
-And I've dropped it from my tree because it's broken.
+Hi all, 
 
-Come on guys, you can do better than this:
+I was investigating the source of abnormal irq-latency spikes on an i.MX6
+(ARM) board, and discovered this:
 
-arch/arm/kernel/built-in.o: In function `pj4_cp0_init':
-arch/arm/kernel/psci-call.o:(.init.text+0x22d0): undefined reference to `pj4_cp_access_write'
-arch/arm/kernel/psci-call.o:(.init.text+0x22e0): undefined reference to `pj4_cp_access_write'
-arch/arm/kernel/psci-call.o:(.init.text+0x2304): undefined reference to `pj4_cp_access_read'
-arch/arm/kernel/psci-call.o:(.init.text+0x2310): undefined reference to `pj4_cp_access_write'
-arch/arm/kernel/psci-call.o:(.init.text+0x2314): undefined reference to `pj4_cp_access_read'
+# tracer: preemptirqsoff
+#
+# preemptirqsoff latency trace v1.1.5 on 4.4.0-rc4+
+# --------------------------------------------------------------------
+# latency: 2068 us, #4/4, CPU#0 | (M:preempt VP:0, KP:0, SP:0 HP:0 #P:1)
+#    -----------------
+#    | task: mmcqd/0-92 (uid:0 nice:0 policy:0 rt_prio:0)
+#    -----------------
+#  => started at: _raw_spin_lock_irqsave
+#  => ended at:   _raw_spin_unlock_irqrestore
+#
+#
+#                  _------=> CPU#            
+#                 / _-----=> irqs-off        
+#                | / _----=> need-resched    
+#                || / _---=> hardirq/softirq 
+#                ||| / _--=> preempt-depth   
+#                |||| /     delay            
+#  cmd     pid   ||||| time  |   caller      
+#     \   /      |||||  \    |   /         
+ mmcqd/0-92      0d...    1us#: _raw_spin_lock_irqsave
+ mmcqd/0-92      0.n.1 2066us : _raw_spin_unlock_irqrestore
+ mmcqd/0-92      0.n.1 2070us+: trace_preempt_on <-_raw_spin_unlock_irqrestore
+ mmcqd/0-92      0.n.1 2107us : <stack trace>
+ => sdhci_runtime_resume_host
+ => __rpm_callback
+ => rpm_callback
+ => rpm_resume
+ => __pm_runtime_resume
+ => __mmc_claim_host
+ => mmc_blk_issue_rq
+ => mmc_queue_thread
+ => kthread
+ => ret_from_fork
 
-Let's look at the makefile:
+2 ms with interrupts disabled!!! To much dismay, I later discovered that this
+isn't even the worst case scenario. I also discovered that this has been in
+the kernel for a long time without a fix (I have tested from 3.17 to 4.4-rc4).
+There has been an attempt by someone to address this back in 2010, but
+apparently it never hit mainline.
+Going through the code in sdhci.c, I found this troublesome code-path:
 
-obj-$(CONFIG_CPU_PJ4)           += pj4-cp0.o
-obj-$(CONFIG_CPU_PJ4B)          += pj4-cp0.o
-obj-$(CONFIG_IWMMXT)            += iwmmxt.o
+sdhci_do_set_ios() {
+	spin_lock_irqsave(&host->lock, flags);
+	...
+	sdhci_reinit() --> sdhci_init() --> sdhci_do_reset() -->
+		host->ops->reset() --> sdhci_reset()	
+	...
+	spin_unlock_irqrestore(&host->lock, flags);
+}
 
-Now, you're moving code from pj4-cp0.c to iwmmxt.S, and of course, you
-checked that IWMMXT would always be enabled if either PJ4 or PJ4B are
-enabled.
+And in sdhci_reset(), which may be called with held spinlock:
 
-config IWMMXT
-        bool "Enable iWMMXt support"
-        depends on CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK || CPU_PJ4 || CPU_PJ4B
-        default y if PXA27x || PXA3xx || ARCH_MMP || CPU_PJ4 || CPU_PJ4B
+	...
+	/* Wait max 100 ms */
+	timeout = 100;
 
-Err, no, IWMMXT can be disabled.  Hence the build errors.
+	/* hw clears the bit when it's done */
+	while (sdhci_readb(host, SDHCI_SOFTWARE_RESET) & mask) {
+		if (timeout == 0) {
+			pr_err("%s: Reset 0x%x never completed.\n",
+				mmc_hostname(host->mmc), (int)mask);
+			sdhci_dumpregs(host);
+			return;
+		}
+		timeout--;
+		mdelay(1);
+	}
 
-Please, take more time when moving code around to ensure that this kind
-of build breakage doesn't creep in.  It's *really* easy to check, it
-only takes a couple of additional minutes.
+I am wondering: There either must be a reason this hasn't been fixed in such a
+long time, or I am not understanding this correctly, so please enlighten me.
+Before trying a cowboy attempt at "fixing" this, I'd really like to know why am
+I seeing this?
+I mean... how can such a problem get unnoticed and unfixed for so long?
+Will an attempt at fixing this issue even be accepted?
+
+Best regards,
 
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+David Jander
+Protonic Holland.
