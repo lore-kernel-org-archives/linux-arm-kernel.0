@@ -1,71 +1,73 @@
-From: songjun.wu@atmel.com (Wu, Songjun)
-Date: Thu, 17 Dec 2015 10:41:17 +0800
-Subject: [PATCH 1/2] ASoC: atmel-pdmic: add the Pulse Density Modulation
- Interface Controller
-In-Reply-To: <20151216122727.GI5727@sirena.org.uk>
-References: <1450080940-4123-1-git-send-email-songjun.wu@atmel.com>
- <1450080940-4123-2-git-send-email-songjun.wu@atmel.com>
- <20151216122727.GI5727@sirena.org.uk>
-Message-ID: <567220CD.2060706@atmel.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Thu, 17 Dec 2015 10:52:48 +0800
+Subject: [PATCH v2] soc: mediatek: SCPSYS: use module_platform_driver
+In-Reply-To: <56715136.3060908@gmail.com>
+References: <1450263656-12513-1-git-send-email-s.hauer@pengutronix.de>
+ <1562792.sV6cmsyeOM@wuerfel> <56715136.3060908@gmail.com>
+Message-ID: <CAGS+omA1mgmFH_JXffUTC-aq3rOy7dRYsdveiJ8LcnB5gg0ELw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Sasha, Matthias,
+
+On Wed, Dec 16, 2015 at 7:55 PM, Matthias Brugger
+<matthias.bgg@gmail.com> wrote:
+>
+>
+> On 16/12/15 12:22, Arnd Bergmann wrote:
+>>
+>> On Wednesday 16 December 2015 12:00:56 Sascha Hauer wrote:
+>>>
+>>> With regulator support to the scpsys driver needs to be able to defer
+>>> probe. Probe deferral is incompatible with module_platform_driver_probe,
+>>> so use module_platform_driver. module_platform_driver_probe sets the
+>>> suppress_bind_attrs. To prevent unbinding the device with
+>>> module_platform_driver we have to set the flag explicitly in the driver
+>>> now.
+>>>
+>>> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+>>> ---
+>>>
+>>
+>> Looks good now,
+>>
+>> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>>
+>
+> Applied to v4.4-next/soc
+
+This patch does not compile on my system.
+
+With "CONFIG_DEBUG_SECTION_MISMATCH=y" I see:
+
+WARNING: vmlinux.o(.data+0x387c8): Section mismatch in reference from
+the variable scpsys_drv to the function .init.text:scpsys_probe()
+The variable scpsys_drv references
+the function __init scpsys_probe()
+If the reference is valid then annotate the
+variable with __init* or __refdata (see linux/init.h) or name the variable:
+*_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
+
+FATAL: modpost: Section mismatches detected.
+Set CONFIG_SECTION_MISMATCH_WARN_ONLY=y to allow them.
 
 
-On 12/16/2015 20:27, Mark Brown wrote:
-> On Mon, Dec 14, 2015 at 04:15:39PM +0800, Songjun Wu wrote:
->
->> Add driver for the Pulse Density Modulation Interface
->> Controller. It comes with digitallly controlled gain,
->> a High-Pass and a SINCC filter.
->
-> This looks basically OK but there's a *lot* of weird coding style issues
-> in here.  It's really all that, nothing too serious that I noticed -
-> I've pointed out some of the patterns below not every individual issue.
->
->> +	for (i = 0; i < ARRAY_SIZE(mic_gain_table); i++) {
->> +		if ((mic_gain_table[i].dgain == dgain_val)
->> +		&& (mic_gain_table[i].scale == scale_val))
->> +			ucontrol->value.integer.value[0] = i;
->> +	}
->
-> This indentation is really weird, why is the && aligned with the if?
->
-Accept.
->> +	snd_soc_update_bits(codec, PDMIC_DSPR1,
->> +		PDMIC_DSPR1_OFFSET_MASK,
->> +		(u32)(dd->pdata->mic_offset << PDMIC_DSPR1_OFFSET_SHIFT));
->
-> These are weird too, I'd expect the second line to be part of the first.
->
->> +static struct regmap *atmel_pdmic_codec_get_remap(struct device *dev)
->> +{
->> +	return dev_get_regmap(dev, NULL);
->> +}
->
-> This is (or should be) the default in the core.
->
-You are right. The core has initialized the regmap in function 
-snd_soc_component_add_unlocked.
-This function can be removed.
-Thank you.
->> +	if ((fs < rate_min) || (fs > rate_max)) {
->> +		dev_err(codec->dev,
->> +		"sample rate is %dHz, min rate is %dHz, max rate is %dHz\n",
->> +		fs, rate_min, rate_max);
->
-> This too, alignment after the (.
->
-Accept.
->> +	if (bits == 16)
->> +		dspr0_val = (PDMIC_DSPR0_SIZE_16_BITS
->> +				<< PDMIC_DSPR0_SIZE_SHIFT);
->> +	else if (bits == 32)
->> +		dspr0_val = (PDMIC_DSPR0_SIZE_32_BITS
->> +				<< PDMIC_DSPR0_SIZE_SHIFT);
->> +	else
->> +		return -EINVAL;
->
-> This looks like it should be a switch statement.
->
-Accept.
+The problem is that scpsys_probe() is still __init, but it references
+scp_domain_data[] which is __initconst.
+However, scpsys_drv is not __initdata, so it cannot contain a pointer
+to an __init function.
+
+The only way I know to fix this is by dropping the __init & __initconst.
+This is rather unfortunate.
+Is there another way where we can use -EPROBE_DEFER and still preserve
+__init / __initconst ?
+
+Also, since scpsys' Kconfig is "bool" not "tristate" it isn't a real
+module so I think we should use:
+builtin_platform_driver not module_platform_driver
+
+CC'ing Paul Gortmaker who seems to be on a mass
+builtin_platform_driver conversion at the moment, see:
+https://lkml.org/lkml/2015/12/9/952
+
+-Dan
