@@ -1,66 +1,118 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Thu, 17 Dec 2015 17:49:16 +0000
-Subject: [PATCH v4 09/12] arm-cci: Provide hook for writing to PMU counters
+Date: Thu, 17 Dec 2015 17:49:17 +0000
+Subject: [PATCH v4 10/12] arm-cci: CCI-500: Work around PMU counter writes
 In-Reply-To: <1450374559-23315-1-git-send-email-suzuki.poulose@arm.com>
 References: <1450374559-23315-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1450374559-23315-10-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1450374559-23315-11-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a hook for writing to CCI PMU counters. This callback
-can be used for CCI models which requires some extra work
-to program the PMU counter values. To accommodate group writes
-and single counter writes, the call back accepts a bitmask
-of the counter indices which need to be programmed with the
-given value.
+The CCI PMU driver sets the event counter to the half of the maximum
+value(2^31) it can count before we start the counters via
+pmu_event_set_period(). This is done to give us the best chance to
+handle the overflow interrupt, taking care of extreme interrupt latencies.
+
+However, CCI-500 comes with advanced power saving schemes, which
+disables the clock to the event counters unless the counters are enabled to
+count (PMCR.CEN). This prevents the driver from writing the period to the
+counters before starting them.  Also, there is no way we can reset the
+individual event counter to 0 (PMCR.RST resets all the counters, losing
+their current readings). However the value of the counter is preserved and
+could be read back, when the counters are not enabled.
+
+So we cannot reliably use the counters and compute the number of events
+generated during the sampling period since we don't have the value of the
+counter at start.
+
+This patch works around this issue by changing writes to the counter
+with the following steps.
+
+ 1) Disable all the counters (remembering any counters which were enabled)
+ 2) Save the current event and program the target counter to count an
+    invalid event, which by spec is guaranteed to not-generate any events.
+ 3) Enable the target counter.
+ 4) Enable the CCI PMU
+ 5) Write to the target counter.
+ 6) Disable the CCI PMU and the target counter
+ 7) Restore the event back on the target counter.
+ 8) Restore the status of the all the counters
 
 Cc: Punit Agrawal <punit.agrawal@arm.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- drivers/bus/arm-cci.c |   16 ++++++++++++++--
- 1 file changed, 14 insertions(+), 2 deletions(-)
+ drivers/bus/arm-cci.c |   52 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 52 insertions(+)
 
 diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-index 7207def..43f2523 100644
+index 43f2523..b0a64cf 100644
 --- a/drivers/bus/arm-cci.c
 +++ b/drivers/bus/arm-cci.c
-@@ -136,6 +136,7 @@ struct cci_pmu_model {
- 	struct event_range event_ranges[CCI_IF_MAX];
- 	int (*validate_hw_event)(struct cci_pmu *, unsigned long);
- 	int (*get_event_idx)(struct cci_pmu *, struct cci_pmu_hw_events *, unsigned long);
-+	void (*write_counters)(struct cci_pmu *, unsigned long *, u32 val);
- };
- 
- static struct cci_pmu_model cci_pmu_models[];
-@@ -855,7 +856,15 @@ static void pmu_write_counter(struct perf_event *event, u32 value)
- 		dev_err(&cci_pmu->plat_device->dev, "Invalid CCI PMU counter %d\n", idx);
- 		return;
- 	}
--	__pmu_write_counter(cci_pmu, value, idx);
-+
-+	if (cci_pmu->model->write_counters) {
-+		unsigned long mask[BITS_TO_LONGS(cci_pmu->num_cntrs)];
-+
-+		memset(mask, 0, BITS_TO_LONGS(cci_pmu->num_cntrs) * sizeof(unsigned long));
-+		set_bit(idx, mask);
-+		cci_pmu->model->write_counters(cci_pmu, mask, value);
-+	} else
-+		__pmu_write_counter(cci_pmu, value, idx);
+@@ -846,6 +846,57 @@ static void __pmu_write_counter(struct cci_pmu *cci_pmu, u32 value, int idx)
+ 	pmu_write_register(cci_pmu, value, idx, CCI_PMU_CNTR);
  }
  
- /* Write a value to a given set of counters */
-@@ -870,7 +879,10 @@ static void __pmu_write_counters(struct cci_pmu *cci_pmu, unsigned long *mask, u
- static void __maybe_unused
- pmu_write_counters(struct cci_pmu *cci_pmu, unsigned long *mask, u32 value)
++#ifdef CONFIG_ARM_CCI500_PMU
++
++/*
++ * CCI-500 has advanced power saving policies, which could gate the
++ * clocks to the PMU counters, which makes the writes to them ineffective.
++ * The only way to write to those counters is when the global counters
++ * are enabled and the particular counter is enabled.
++ *
++ * So we do the following :
++ *
++ * 1) Disable all the PMU counters, saving their current state
++ * 2) Save the programmed event, and write an invalid event code
++ *    to the event control register for the counter, so that the
++ *    counters are not modified.
++ * 3) Enable the counter control for the counter.
++ * 4) Enable the global PMU profiling
++ * 5) Set the counter value
++ * 6) Disable the counter, global PMU.
++ * 7) Restore the event in the target counter
++ * 8) Restore the status of the rest of the counters.
++ *
++ * We choose an event code which has very little chances of getting
++ * assigned a valid code for step(2). We use the highest possible
++ * event code (0x1f) for the master interface 0.
++ */
++#define CCI500_INVALID_EVENT	((CCI500_PORT_M0 << CCI500_PMU_EVENT_SOURCE_SHIFT) | \
++				 (CCI500_PMU_EVENT_CODE_MASK << CCI500_PMU_EVENT_CODE_SHIFT))
++static void cci500_pmu_write_counters(struct cci_pmu *cci_pmu, unsigned long *mask, u32 value)
++{
++	unsigned long saved_mask[BITS_TO_LONGS(cci_pmu->num_cntrs)];
++	u32 event;
++	int i;
++
++	pmu_save_counters(cci_pmu, saved_mask);
++
++	for_each_set_bit(i, mask, cci_pmu->num_cntrs) {
++		event = pmu_get_event(cci_pmu, i);
++		pmu_set_event(cci_pmu, i, CCI500_INVALID_EVENT);
++		pmu_enable_counter(cci_pmu, i);
++		__cci_pmu_enable();
++		__pmu_write_counter(cci_pmu, value, i);
++		__cci_pmu_disable();
++		pmu_disable_counter(cci_pmu, i);
++		pmu_set_event(cci_pmu, i, event);
++	}
++
++	pmu_restore_counters(cci_pmu, saved_mask);
++}
++
++#endif	/* CONFIG_ARM_CCI500_PMU */
++
+ static void pmu_write_counter(struct perf_event *event, u32 value)
  {
--	__pmu_write_counters(cci_pmu, mask, value);
-+	if (cci_pmu->model->write_counters)
-+		cci_pmu->model->write_counters(cci_pmu, mask, value);
-+	else
-+		__pmu_write_counters(cci_pmu, mask, value);
- }
- 
- static u64 pmu_event_update(struct perf_event *event)
+ 	struct cci_pmu *cci_pmu = to_cci_pmu(event->pmu);
+@@ -1550,6 +1601,7 @@ static struct cci_pmu_model cci_pmu_models[] = {
+ 			},
+ 		},
+ 		.validate_hw_event = cci500_validate_hw_event,
++		.write_counters	= cci500_pmu_write_counters,
+ 	},
+ #endif
+ };
 -- 
 1.7.9.5
