@@ -1,145 +1,85 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 17 Dec 2015 08:59:38 +0000
-Subject: [PATCH] ARM: KVM: Cleanup exception injection
-In-Reply-To: <20151216204018.GF24889@cbox>
-References: <1450116396-11718-1-git-send-email-marc.zyngier@arm.com>
- <20151216204018.GF24889@cbox>
-Message-ID: <5672797A.3050305@arm.com>
+From: juri.lelli@arm.com (Juri Lelli)
+Date: Thu, 17 Dec 2015 09:07:36 +0000
+Subject: [RFC PATCH 2/8] Documentation: arm: define DT cpu capacity
+ bindings
+In-Reply-To: <20151215174516.GB5727@sirena.org.uk>
+References: <20151214123616.GC3308@e106622-lin>
+ <20151214165928.GV5727@sirena.org.uk>
+ <20151215122238.GG16007@e106622-lin>
+ <20151215133951.GY5727@sirena.org.uk>
+ <20151215140135.GI31299@leverpostej>
+ <20151215150813.GZ5727@sirena.org.uk>
+ <20151215153218.GA7228@leverpostej>
+ <20151215171713.GA5727@sirena.org.uk>
+ <20151215172837.GD8012@leverpostej>
+ <20151215174516.GB5727@sirena.org.uk>
+Message-ID: <20151217090736.GC3083@pablo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/12/15 20:40, Christoffer Dall wrote:
-> On Mon, Dec 14, 2015 at 06:06:36PM +0000, Marc Zyngier wrote:
->> David Binderman reported that the exception injection code had a
->> couple of unused variables lingering around.
->>
->> Upon examination, it looked like this code could do with an
->> anticipated spring cleaning, which amounts to deduplicating
->> the CPSR/SPSR update.
->>
->> The spurious variables are removed in the process.
->>
->> Reported-by: David Binderman <dcb314@hotmail.com>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm/kvm/emulate.c | 59 ++++++++++++++++++++------------------------------
->>  1 file changed, 23 insertions(+), 36 deletions(-)
->>
->> diff --git a/arch/arm/kvm/emulate.c b/arch/arm/kvm/emulate.c
->> index d6c0052..245106e 100644
->> --- a/arch/arm/kvm/emulate.c
->> +++ b/arch/arm/kvm/emulate.c
->> @@ -275,6 +275,25 @@ static u32 exc_vector_base(struct kvm_vcpu *vcpu)
->>  		return vbar;
->>  }
->>  
->> +/* Switch to an exception mode, updating both CPSR and SPSR */
->> +static void kvm_update_psr(struct kvm_vcpu *vcpu, unsigned long mode)
->> +{
->> +	unsigned long cpsr = *vcpu_cpsr(vcpu);
->> +	u32 sctlr = vcpu->arch.cp15[c1_SCTLR];
->> +
->> +	*vcpu_cpsr(vcpu) = (cpsr & ~MODE_MASK) | mode;
->> +	*vcpu_cpsr(vcpu) |= PSR_I_BIT;
->> +	*vcpu_cpsr(vcpu) &= ~(PSR_IT_MASK | PSR_J_BIT | PSR_E_BIT | PSR_T_BIT);
->> +
->> +	if (sctlr & SCTLR_TE)
->> +		*vcpu_cpsr(vcpu) |= PSR_T_BIT;
->> +	if (sctlr & SCTLR_EE)
->> +		*vcpu_cpsr(vcpu) |= PSR_E_BIT;
->> +
->> +	/* Note: These now point to the mode banked copies */
->> +	*vcpu_spsr(vcpu) = cpsr;
->> +}
->> +
->>  /**
->>   * kvm_inject_undefined - inject an undefined exception into the guest
->>   * @vcpu: The VCPU to receive the undefined exception
->> @@ -286,29 +305,13 @@ static u32 exc_vector_base(struct kvm_vcpu *vcpu)
->>   */
->>  void kvm_inject_undefined(struct kvm_vcpu *vcpu)
->>  {
->> -	unsigned long new_lr_value;
->> -	unsigned long new_spsr_value;
->>  	unsigned long cpsr = *vcpu_cpsr(vcpu);
->> -	u32 sctlr = vcpu->arch.cp15[c1_SCTLR];
->>  	bool is_thumb = (cpsr & PSR_T_BIT);
->>  	u32 vect_offset = 4;
->>  	u32 return_offset = (is_thumb) ? 2 : 4;
->>  
->> -	new_spsr_value = cpsr;
->> -	new_lr_value = *vcpu_pc(vcpu) - return_offset;
->> -
->> -	*vcpu_cpsr(vcpu) = (cpsr & ~MODE_MASK) | UND_MODE;
->> -	*vcpu_cpsr(vcpu) |= PSR_I_BIT;
->> -	*vcpu_cpsr(vcpu) &= ~(PSR_IT_MASK | PSR_J_BIT | PSR_E_BIT | PSR_T_BIT);
->> -
->> -	if (sctlr & SCTLR_TE)
->> -		*vcpu_cpsr(vcpu) |= PSR_T_BIT;
->> -	if (sctlr & SCTLR_EE)
->> -		*vcpu_cpsr(vcpu) |= PSR_E_BIT;
->> -
->> -	/* Note: These now point to UND banked copies */
->> -	*vcpu_spsr(vcpu) = cpsr;
->> -	*vcpu_reg(vcpu, 14) = new_lr_value;
->> +	kvm_update_psr(vcpu, UND_MODE);
->> +	*vcpu_reg(vcpu, 14) = *vcpu_pc(vcpu) - return_offset;
->>  
->>  	/* Branch to exception vector */
->>  	*vcpu_pc(vcpu) = exc_vector_base(vcpu) + vect_offset;
->> @@ -320,30 +323,14 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu)
->>   */
->>  static void inject_abt(struct kvm_vcpu *vcpu, bool is_pabt, unsigned long addr)
->>  {
->> -	unsigned long new_lr_value;
->> -	unsigned long new_spsr_value;
->>  	unsigned long cpsr = *vcpu_cpsr(vcpu);
->> -	u32 sctlr = vcpu->arch.cp15[c1_SCTLR];
->>  	bool is_thumb = (cpsr & PSR_T_BIT);
->>  	u32 vect_offset;
->>  	u32 return_offset = (is_thumb) ? 4 : 0;
->>  	bool is_lpae;
->>  
->> -	new_spsr_value = cpsr;
->> -	new_lr_value = *vcpu_pc(vcpu) + return_offset;
->> -
->> -	*vcpu_cpsr(vcpu) = (cpsr & ~MODE_MASK) | ABT_MODE;
->> -	*vcpu_cpsr(vcpu) |= PSR_I_BIT | PSR_A_BIT;
-> 
-> seems like you're losing the PSR_A_BIT in kvm_update_psr() now?
+Hi,
 
-Ah, nice catch. Indeed, CPSR.A gets set on abort entry, but not on
-undef. I'll add a check in kvm_update_psr, with a reference to the
-AArch32.EnterMode() pseudocode from the ARMv8 ARM.
+On 15/12/15 17:45, Mark Brown wrote:
+> On Tue, Dec 15, 2015 at 05:28:37PM +0000, Mark Rutland wrote:
+> > On Tue, Dec 15, 2015 at 05:17:13PM +0000, Mark Brown wrote:
+> 
+> > > Obviously people are going to get upset if we introduce performance
+> > > regressions - but that's true always, we can also introduce problems
+> > > with numbers people have put in DT.  It seems like it'd be harder to
+> > > manage regressions due to externally provided magic numbers since
+> > > there's inherently less information there.
+> 
+> > It's certainly still possible to have regressions in that case. Those
+> > regressions would be due to code changes in the kernel, given the DT
+> > didn't change.
+> 
+> > I'm not sure I follow w.r.t. "inherently less information", unless you
+> > mean trying to debug without access to that DTB?
+> 
+> If what the kernel knows about the system is that it's got a bunch of
+> cores with numbers assigned to them then all it's really got is those
+> numbers.  If something changes that causes problems for some systems
+> (eg, because the numbers have been picked poorly but in a way that
+> happened to work well with the old code) that's not a lot to go on, the
+> more we know about the system the more likely it is that we'll be able
+> to adjust the assumptions in whatever new thing we do that causes
+> problems for any particular systems where we run into trouble.
+> 
+> > > My point there is that if we're not that concerned about the specific
+> > > number something in kernel is safer.
+> 
+> > I don't entirely disagree there. I think an in-kernel benchmark is
+> > likely safer.
+> 
+> Yes, I think that something where we just observe the system performance
+> at runtime is likely one of the best solutions if we can get something
+> that gives reasonable results.
+> 
+> > > That does have the issue that we need to scale with regard to the
+> > > frequency the benchmark gets run at.  That's not an insurmountable
+> > > obstacle but it's not completely trivial either.
+> 
+> > If we change clock frequency, then regardless of where the information
+> > comes from we need to perform scaling, no?
+> 
+> Yes, it's just a question of making the benchmarking bit talk to the
+> scaling bit so we know where we're at when we do the benchmark.  Like I
+> say it should be doable.
+> 
+> > One nice thing about doing a benchmark to derive the numbers is that
+> > when the kernel is that when the frequency is fixed but the kernel
+> > cannot query it, the numbers will be representative.
+> 
+> Definitely.
 
-> 
->> -	*vcpu_cpsr(vcpu) &= ~(PSR_IT_MASK | PSR_J_BIT | PSR_E_BIT | PSR_T_BIT);
->> -
->> -	if (sctlr & SCTLR_TE)
->> -		*vcpu_cpsr(vcpu) |= PSR_T_BIT;
->> -	if (sctlr & SCTLR_EE)
->> -		*vcpu_cpsr(vcpu) |= PSR_E_BIT;
->> -
->> -	/* Note: These now point to ABT banked copies */
->> -	*vcpu_spsr(vcpu) = cpsr;
->> -	*vcpu_reg(vcpu, 14) = new_lr_value;
->> +	kvm_update_psr(vcpu, ABT_MODE);
->> +	*vcpu_reg(vcpu, 14) = *vcpu_pc(vcpu) + return_offset;
->>  
->>  	if (is_pabt)
->>  		vect_offset = 12;
->> -- 
->> 2.1.4
->>
-> 
-> Otherwise looks like a welcome cleanup!
-> 
-> Thanks,
-> -Christoffer
-> 
+OK, let's see how a dynamic approach could look like. As said, since it
+was actually our first thought too, I already have a possible
+implementation of such a thing. I'll be OOO until early Jan, but I'll
+try to rebase what I have and post it here as soon as I'm back; and then
+we see which solution looks better.
 
-Thanks,
+Thanks a lot for the feedback!
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Best,
+
+- Juri
