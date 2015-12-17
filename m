@@ -1,408 +1,90 @@
 From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Thu, 17 Dec 2015 10:36:51 -0800 (PST)
-Subject: [PATCH 1/3] x86: reorganize SMAP handling in user space accesses
-Message-ID: <alpine.LFD.2.20.1512171033340.27310@i7>
+Date: Thu, 17 Dec 2015 10:37:30 -0800 (PST)
+Subject: [PATCH 2/3] Add 'unsafe' user access functions for batched
+ accesses
+Message-ID: <alpine.LFD.2.20.1512171036570.27310@i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 From: Linus Torvalds <torvalds@linux-foundation.org>
-Date: Thu, 17 Dec 2015 09:45:09 -0800
-Subject: [PATCH 1/3] x86: reorganize SMAP handling in user space accesses
+Date: Thu, 17 Dec 2015 09:57:27 -0800
+Subject: [PATCH 2/3] Add 'unsafe' user access functions for batched accesses
 
-This reorganizes how we do the stac/clac instructions in the user access
-code.  Instead of adding the instructions directly to the same inline
-asm that does the actual user level access and exception handling, add
-them at a higher level.
+The naming is meant to discourage random use: the helper functions are
+not really any more "unsafe" than the traditional double-underscore
+functions (which need the address range checking), but they do need even
+more infrastructure around them, and should not be used willy-nilly.
 
-This is mainly preparation for the next step, where we will expose an
-interface to allow users to mark several accesses together as being user
-space accesses, but it does already clean up some code:
+In addition to checking the access range, these user access functions
+require that you wrap the user access with a "user_acess_{begin,end}()"
+around it.
 
- - the inlined trivial cases of copy_in_user() now do stac/clac just
-   once over the accesses: they used to do one pair around the user
-   space read, and another pair around the write-back.
+That allows architectures that implement kernel user access control
+(x86: SMAP, arm64: PAN) to do the user access control in the wrapping
+user_access_begin/end part, and then batch up the actual user space
+accesses using the new interfaces.
 
- - the {get,put}_user_ex() macros that are used with the catch/try
-   handling don't do any stac/clac at all, because that happens in the
-   try/catch surrounding them.
-
-Other than those two cleanups that happened naturally from the
-re-organization, this should not make any difference. Yet.
+The main (and hopefully only) use for these are for core generic access
+helpers, initially just the generic user string functions
+(strnlen_user() and strncpy_from_user()).
 
 Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
 ---
-
-ARM64 seems to already have the PAN accesses a bit more separated from the 
-inline asm that does the actual access, but may probably need *some* small 
-re-org like this. But the arm64 people don't have the same kind of "do 
-some simple copy_in_user() cases inline", which simplifies things further.
-
- arch/x86/include/asm/uaccess.h    | 53 ++++++++++++++--------
- arch/x86/include/asm/uaccess_64.h | 94 +++++++++++++++++++++++++++------------
- 2 files changed, 101 insertions(+), 46 deletions(-)
+ arch/x86/include/asm/uaccess.h | 25 +++++++++++++++++++++++++
+ include/linux/uaccess.h        |  7 +++++++
+ 2 files changed, 32 insertions(+)
 
 diff --git a/arch/x86/include/asm/uaccess.h b/arch/x86/include/asm/uaccess.h
-index 09b1b0ab94b7..cc228f4713da 100644
+index cc228f4713da..ca59e4f9254e 100644
 --- a/arch/x86/include/asm/uaccess.h
 +++ b/arch/x86/include/asm/uaccess.h
-@@ -134,6 +134,9 @@ extern int __get_user_4(void);
- extern int __get_user_8(void);
- extern int __get_user_bad(void);
+@@ -762,5 +762,30 @@ copy_to_user(void __user *to, const void *from, unsigned long n)
+ #undef __copy_from_user_overflow
+ #undef __copy_to_user_overflow
  
-+#define __uaccess_begin() stac()
-+#define __uaccess_end()   clac()
++/*
++ * The "unsafe" user accesses aren't really "unsafe", but the naming
++ * is a big fat warning: you have to not only do the access_ok()
++ * checking before using them, but you have to surround them with the
++ * user_access_begin/end() pair.
++ */
++#define user_access_begin()	__uaccess_begin()
++#define user_access_end()	__uaccess_end()
 +
- /*
-  * This is a type: either unsigned long, if the argument fits into
-  * that type, or otherwise unsigned long long.
-@@ -193,10 +196,10 @@ __typeof__(__builtin_choose_expr(sizeof(x) > sizeof(0UL), 0ULL, 0UL))
++#define unsafe_put_user(x, ptr)						\
++({										\
++	int __pu_err;								\
++	__put_user_size((x), (ptr), sizeof(*(ptr)), __pu_err, -EFAULT);		\
++	__builtin_expect(__pu_err, 0);						\
++})
++
++#define unsafe_get_user(x, ptr)						\
++({										\
++	int __gu_err;								\
++	unsigned long __gu_val;							\
++	__get_user_size(__gu_val, (ptr), sizeof(*(ptr)), __gu_err, -EFAULT);	\
++	(x) = (__force __typeof__(*(ptr)))__gu_val;				\
++	__builtin_expect(__gu_err, 0);						\
++})
++
+ #endif /* _ASM_X86_UACCESS_H */
  
- #ifdef CONFIG_X86_32
- #define __put_user_asm_u64(x, addr, err, errret)			\
--	asm volatile(ASM_STAC "\n"					\
-+	asm volatile("\n"						\
- 		     "1:	movl %%eax,0(%2)\n"			\
- 		     "2:	movl %%edx,4(%2)\n"			\
--		     "3: " ASM_CLAC "\n"				\
-+		     "3:"						\
- 		     ".section .fixup,\"ax\"\n"				\
- 		     "4:	movl %3,%0\n"				\
- 		     "	jmp 3b\n"					\
-@@ -207,10 +210,10 @@ __typeof__(__builtin_choose_expr(sizeof(x) > sizeof(0UL), 0ULL, 0UL))
- 		     : "A" (x), "r" (addr), "i" (errret), "0" (err))
+diff --git a/include/linux/uaccess.h b/include/linux/uaccess.h
+index 558129af828a..349557825428 100644
+--- a/include/linux/uaccess.h
++++ b/include/linux/uaccess.h
+@@ -111,4 +111,11 @@ extern long strncpy_from_unsafe(char *dst, const void *unsafe_addr, long count);
+ #define probe_kernel_address(addr, retval)		\
+ 	probe_kernel_read(&retval, addr, sizeof(retval))
  
- #define __put_user_asm_ex_u64(x, addr)					\
--	asm volatile(ASM_STAC "\n"					\
-+	asm volatile("\n"						\
- 		     "1:	movl %%eax,0(%1)\n"			\
- 		     "2:	movl %%edx,4(%1)\n"			\
--		     "3: " ASM_CLAC "\n"				\
-+		     "3:"						\
- 		     _ASM_EXTABLE_EX(1b, 2b)				\
- 		     _ASM_EXTABLE_EX(2b, 3b)				\
- 		     : : "A" (x), "r" (addr))
-@@ -304,6 +307,10 @@ do {									\
- 	}								\
- } while (0)
- 
-+/*
-+ * This doesn't do __uaccess_begin/end - the exception handling
-+ * around it must do that.
-+ */
- #define __put_user_size_ex(x, ptr, size)				\
- do {									\
- 	__chk_user_ptr(ptr);						\
-@@ -358,9 +365,9 @@ do {									\
- } while (0)
- 
- #define __get_user_asm(x, addr, err, itype, rtype, ltype, errret)	\
--	asm volatile(ASM_STAC "\n"					\
-+	asm volatile("\n"						\
- 		     "1:	mov"itype" %2,%"rtype"1\n"		\
--		     "2: " ASM_CLAC "\n"				\
-+		     "2:\n"						\
- 		     ".section .fixup,\"ax\"\n"				\
- 		     "3:	mov %3,%0\n"				\
- 		     "	xor"itype" %"rtype"1,%"rtype"1\n"		\
-@@ -370,6 +377,10 @@ do {									\
- 		     : "=r" (err), ltype(x)				\
- 		     : "m" (__m(addr)), "i" (errret), "0" (err))
- 
-+/*
-+ * This doesn't do __uaccess_begin/end - the exception handling
-+ * around it must do that.
-+ */
- #define __get_user_size_ex(x, ptr, size)				\
- do {									\
- 	__chk_user_ptr(ptr);						\
-@@ -400,7 +411,9 @@ do {									\
- #define __put_user_nocheck(x, ptr, size)			\
- ({								\
- 	int __pu_err;						\
-+	__uaccess_begin();					\
- 	__put_user_size((x), (ptr), (size), __pu_err, -EFAULT);	\
-+	__uaccess_end();					\
- 	__builtin_expect(__pu_err, 0);				\
- })
- 
-@@ -408,7 +421,9 @@ do {									\
- ({									\
- 	int __gu_err;							\
- 	unsigned long __gu_val;						\
-+	__uaccess_begin();						\
- 	__get_user_size(__gu_val, (ptr), (size), __gu_err, -EFAULT);	\
-+	__uaccess_end();						\
- 	(x) = (__force __typeof__(*(ptr)))__gu_val;			\
- 	__builtin_expect(__gu_err, 0);					\
- })
-@@ -423,9 +438,9 @@ struct __large_struct { unsigned long buf[100]; };
-  * aliasing issues.
-  */
- #define __put_user_asm(x, addr, err, itype, rtype, ltype, errret)	\
--	asm volatile(ASM_STAC "\n"					\
-+	asm volatile("\n"						\
- 		     "1:	mov"itype" %"rtype"1,%2\n"		\
--		     "2: " ASM_CLAC "\n"				\
-+		     "2:\n"						\
- 		     ".section .fixup,\"ax\"\n"				\
- 		     "3:	mov %3,%0\n"				\
- 		     "	jmp 2b\n"					\
-@@ -445,11 +460,11 @@ struct __large_struct { unsigned long buf[100]; };
-  */
- #define uaccess_try	do {						\
- 	current_thread_info()->uaccess_err = 0;				\
--	stac();								\
-+	__uaccess_begin();						\
- 	barrier();
- 
- #define uaccess_catch(err)						\
--	clac();								\
-+	__uaccess_end();						\
- 	(err) |= (current_thread_info()->uaccess_err ? -EFAULT : 0);	\
- } while (0)
- 
-@@ -547,12 +562,13 @@ extern void __cmpxchg_wrong_size(void)
- 	__typeof__(ptr) __uval = (uval);				\
- 	__typeof__(*(ptr)) __old = (old);				\
- 	__typeof__(*(ptr)) __new = (new);				\
-+	__uaccess_begin();						\
- 	switch (size) {							\
- 	case 1:								\
- 	{								\
--		asm volatile("\t" ASM_STAC "\n"				\
-+		asm volatile("\n"					\
- 			"1:\t" LOCK_PREFIX "cmpxchgb %4, %2\n"		\
--			"2:\t" ASM_CLAC "\n"				\
-+			"2:\n"						\
- 			"\t.section .fixup, \"ax\"\n"			\
- 			"3:\tmov     %3, %0\n"				\
- 			"\tjmp     2b\n"				\
-@@ -566,9 +582,9 @@ extern void __cmpxchg_wrong_size(void)
- 	}								\
- 	case 2:								\
- 	{								\
--		asm volatile("\t" ASM_STAC "\n"				\
-+		asm volatile("\n"					\
- 			"1:\t" LOCK_PREFIX "cmpxchgw %4, %2\n"		\
--			"2:\t" ASM_CLAC "\n"				\
-+			"2:\n"						\
- 			"\t.section .fixup, \"ax\"\n"			\
- 			"3:\tmov     %3, %0\n"				\
- 			"\tjmp     2b\n"				\
-@@ -582,9 +598,9 @@ extern void __cmpxchg_wrong_size(void)
- 	}								\
- 	case 4:								\
- 	{								\
--		asm volatile("\t" ASM_STAC "\n"				\
-+		asm volatile("\n"					\
- 			"1:\t" LOCK_PREFIX "cmpxchgl %4, %2\n"		\
--			"2:\t" ASM_CLAC "\n"				\
-+			"2:\n"						\
- 			"\t.section .fixup, \"ax\"\n"			\
- 			"3:\tmov     %3, %0\n"				\
- 			"\tjmp     2b\n"				\
-@@ -601,9 +617,9 @@ extern void __cmpxchg_wrong_size(void)
- 		if (!IS_ENABLED(CONFIG_X86_64))				\
- 			__cmpxchg_wrong_size();				\
- 									\
--		asm volatile("\t" ASM_STAC "\n"				\
-+		asm volatile("\n"					\
- 			"1:\t" LOCK_PREFIX "cmpxchgq %4, %2\n"		\
--			"2:\t" ASM_CLAC "\n"				\
-+			"2:\n"						\
- 			"\t.section .fixup, \"ax\"\n"			\
- 			"3:\tmov     %3, %0\n"				\
- 			"\tjmp     2b\n"				\
-@@ -618,6 +634,7 @@ extern void __cmpxchg_wrong_size(void)
- 	default:							\
- 		__cmpxchg_wrong_size();					\
- 	}								\
-+	__uaccess_end();						\
- 	*__uval = __old;						\
- 	__ret;								\
- })
-diff --git a/arch/x86/include/asm/uaccess_64.h b/arch/x86/include/asm/uaccess_64.h
-index f2f9b39b274a..b89c34c4019b 100644
---- a/arch/x86/include/asm/uaccess_64.h
-+++ b/arch/x86/include/asm/uaccess_64.h
-@@ -56,35 +56,49 @@ int __copy_from_user_nocheck(void *dst, const void __user *src, unsigned size)
- 	if (!__builtin_constant_p(size))
- 		return copy_user_generic(dst, (__force void *)src, size);
- 	switch (size) {
--	case 1:__get_user_asm(*(u8 *)dst, (u8 __user *)src,
-+	case 1:
-+		__uaccess_begin();
-+		__get_user_asm(*(u8 *)dst, (u8 __user *)src,
- 			      ret, "b", "b", "=q", 1);
-+		__uaccess_end();
- 		return ret;
--	case 2:__get_user_asm(*(u16 *)dst, (u16 __user *)src,
-+	case 2:
-+		__uaccess_begin();
-+		__get_user_asm(*(u16 *)dst, (u16 __user *)src,
- 			      ret, "w", "w", "=r", 2);
-+		__uaccess_end();
- 		return ret;
--	case 4:__get_user_asm(*(u32 *)dst, (u32 __user *)src,
-+	case 4:
-+		__uaccess_begin();
-+		__get_user_asm(*(u32 *)dst, (u32 __user *)src,
- 			      ret, "l", "k", "=r", 4);
-+		__uaccess_end();
- 		return ret;
--	case 8:__get_user_asm(*(u64 *)dst, (u64 __user *)src,
-+	case 8:
-+		__uaccess_begin();
-+		__get_user_asm(*(u64 *)dst, (u64 __user *)src,
- 			      ret, "q", "", "=r", 8);
-+		__uaccess_end();
- 		return ret;
- 	case 10:
-+		__uaccess_begin();
- 		__get_user_asm(*(u64 *)dst, (u64 __user *)src,
- 			       ret, "q", "", "=r", 10);
--		if (unlikely(ret))
--			return ret;
--		__get_user_asm(*(u16 *)(8 + (char *)dst),
--			       (u16 __user *)(8 + (char __user *)src),
--			       ret, "w", "w", "=r", 2);
-+		if (likely(!ret))
-+			__get_user_asm(*(u16 *)(8 + (char *)dst),
-+				       (u16 __user *)(8 + (char __user *)src),
-+				       ret, "w", "w", "=r", 2);
-+		__uaccess_end();
- 		return ret;
- 	case 16:
-+		__uaccess_begin();
- 		__get_user_asm(*(u64 *)dst, (u64 __user *)src,
- 			       ret, "q", "", "=r", 16);
--		if (unlikely(ret))
--			return ret;
--		__get_user_asm(*(u64 *)(8 + (char *)dst),
--			       (u64 __user *)(8 + (char __user *)src),
--			       ret, "q", "", "=r", 8);
-+		if (likely(!ret))
-+			__get_user_asm(*(u64 *)(8 + (char *)dst),
-+				       (u64 __user *)(8 + (char __user *)src),
-+				       ret, "q", "", "=r", 8);
-+		__uaccess_end();
- 		return ret;
- 	default:
- 		return copy_user_generic(dst, (__force void *)src, size);
-@@ -106,35 +120,51 @@ int __copy_to_user_nocheck(void __user *dst, const void *src, unsigned size)
- 	if (!__builtin_constant_p(size))
- 		return copy_user_generic((__force void *)dst, src, size);
- 	switch (size) {
--	case 1:__put_user_asm(*(u8 *)src, (u8 __user *)dst,
-+	case 1:
-+		__uaccess_begin();
-+		__put_user_asm(*(u8 *)src, (u8 __user *)dst,
- 			      ret, "b", "b", "iq", 1);
-+		__uaccess_end();
- 		return ret;
--	case 2:__put_user_asm(*(u16 *)src, (u16 __user *)dst,
-+	case 2:
-+		__uaccess_begin();
-+		__put_user_asm(*(u16 *)src, (u16 __user *)dst,
- 			      ret, "w", "w", "ir", 2);
-+		__uaccess_end();
- 		return ret;
--	case 4:__put_user_asm(*(u32 *)src, (u32 __user *)dst,
-+	case 4:
-+		__uaccess_begin();
-+		__put_user_asm(*(u32 *)src, (u32 __user *)dst,
- 			      ret, "l", "k", "ir", 4);
-+		__uaccess_end();
- 		return ret;
--	case 8:__put_user_asm(*(u64 *)src, (u64 __user *)dst,
-+	case 8:
-+		__uaccess_begin();
-+		__put_user_asm(*(u64 *)src, (u64 __user *)dst,
- 			      ret, "q", "", "er", 8);
-+		__uaccess_end();
- 		return ret;
- 	case 10:
-+		__uaccess_begin();
- 		__put_user_asm(*(u64 *)src, (u64 __user *)dst,
- 			       ret, "q", "", "er", 10);
--		if (unlikely(ret))
--			return ret;
--		asm("":::"memory");
--		__put_user_asm(4[(u16 *)src], 4 + (u16 __user *)dst,
--			       ret, "w", "w", "ir", 2);
-+		if (likely(!ret)) {
-+			asm("":::"memory");
-+			__put_user_asm(4[(u16 *)src], 4 + (u16 __user *)dst,
-+				       ret, "w", "w", "ir", 2);
-+		}
-+		__uaccess_end();
- 		return ret;
- 	case 16:
-+		__uaccess_begin();
- 		__put_user_asm(*(u64 *)src, (u64 __user *)dst,
- 			       ret, "q", "", "er", 16);
--		if (unlikely(ret))
--			return ret;
--		asm("":::"memory");
--		__put_user_asm(1[(u64 *)src], 1 + (u64 __user *)dst,
--			       ret, "q", "", "er", 8);
-+		if (likely(!ret)) {
-+			asm("":::"memory");
-+			__put_user_asm(1[(u64 *)src], 1 + (u64 __user *)dst,
-+				       ret, "q", "", "er", 8);
-+		}
-+		__uaccess_end();
- 		return ret;
- 	default:
- 		return copy_user_generic((__force void *)dst, src, size);
-@@ -160,39 +190,47 @@ int __copy_in_user(void __user *dst, const void __user *src, unsigned size)
- 	switch (size) {
- 	case 1: {
- 		u8 tmp;
-+		__uaccess_begin();
- 		__get_user_asm(tmp, (u8 __user *)src,
- 			       ret, "b", "b", "=q", 1);
- 		if (likely(!ret))
- 			__put_user_asm(tmp, (u8 __user *)dst,
- 				       ret, "b", "b", "iq", 1);
-+		__uaccess_end();
- 		return ret;
- 	}
- 	case 2: {
- 		u16 tmp;
-+		__uaccess_begin();
- 		__get_user_asm(tmp, (u16 __user *)src,
- 			       ret, "w", "w", "=r", 2);
- 		if (likely(!ret))
- 			__put_user_asm(tmp, (u16 __user *)dst,
- 				       ret, "w", "w", "ir", 2);
-+		__uaccess_end();
- 		return ret;
- 	}
- 
- 	case 4: {
- 		u32 tmp;
-+		__uaccess_begin();
- 		__get_user_asm(tmp, (u32 __user *)src,
- 			       ret, "l", "k", "=r", 4);
- 		if (likely(!ret))
- 			__put_user_asm(tmp, (u32 __user *)dst,
- 				       ret, "l", "k", "ir", 4);
-+		__uaccess_end();
- 		return ret;
- 	}
- 	case 8: {
- 		u64 tmp;
-+		__uaccess_begin();
- 		__get_user_asm(tmp, (u64 __user *)src,
- 			       ret, "q", "", "=r", 8);
- 		if (likely(!ret))
- 			__put_user_asm(tmp, (u64 __user *)dst,
- 				       ret, "q", "", "er", 8);
-+		__uaccess_end();
- 		return ret;
- 	}
- 	default:
++#ifndef user_access_begin
++#define user_access_begin() do { } while (0)
++#define user_access_end() do { } while (0)
++#define unsafe_get_user(x, ptr) __get_user(x, ptr)
++#define unsafe_put_user(x, ptr) __put_user(x, ptr)
++#endif
++
+ #endif		/* __LINUX_UACCESS_H__ */
 -- 
 2.7.0.rc1
