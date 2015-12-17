@@ -1,40 +1,67 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 17 Dec 2015 20:50:56 +0000
-Subject: [PATCH v2 0/3] io-pgtable ARM short descriptor format
-Message-ID: <cover.1450383740.git.robin.murphy@arm.com>
+Date: Thu, 17 Dec 2015 20:50:59 +0000
+Subject: [PATCH v2 3/3] iommu/io-pgtable: Avoid redundant TLB syncs
+In-Reply-To: <cover.1450383740.git.robin.murphy@arm.com>
+References: <cover.1450383740.git.robin.murphy@arm.com>
+Message-ID: <eb7458ed51b800f035976e879530ab1e90d02858.1450383740.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+In certain unmapping situations it is quite possible to end up issuing
+back-to-back TLB synchronisations, which at best is a waste of time and
+effort, and at worst causes some hardware to get rather confused. Whilst
+the pagetable implementations, or the IOMMU drivers, or both, could keep
+track of things to avoid this happening, it seems to make the most sense
+to prevent code duplication and add some simple state tracking in the
+common interface between the two.
 
-A few small changes in io-pgtable-arm-v7s.c to address Yong's comments:
-- Add a comment explaining "cont".
-- Keep kmemleak quiet.
-- Make the loop in arm_v7s_iova_to_phys, and correspondingly the
-  level test in the ARM_V7S_PTE_IS_TABLE macro, more sane.
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/iommu/io-pgtable.h | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-I've dropped the fixes which Will has queued already, even if it does
-mean my own semicolons will never get to see the light of day :(
-
-I'm posting patches 2 and 3 as a series with this as they're inspired
-by the sync issue raised on v1 and touch the code in patch 1, but those
-two are really more of an RFC idea than intended 4.5 material.
-
-Robin.
-
-Robin Murphy (3):
-  iommu/io-pgtable: Add ARMv7 short descriptor support
-  iommu/io-pgtable: Add helper functions for TLB ops
-  iommu/io-pgtable: Avoid redundant TLB syncs
-
- drivers/iommu/Kconfig              |  19 +
- drivers/iommu/Makefile             |   1 +
- drivers/iommu/io-pgtable-arm-v7s.c | 840 +++++++++++++++++++++++++++++++++++++
- drivers/iommu/io-pgtable-arm.c     |  21 +-
- drivers/iommu/io-pgtable.c         |   5 +-
- drivers/iommu/io-pgtable.h         |  37 +-
- 6 files changed, 909 insertions(+), 14 deletions(-)
- create mode 100644 drivers/iommu/io-pgtable-arm-v7s.c
-
+diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
+index 95c5565..d06219b 100644
+--- a/drivers/iommu/io-pgtable.h
++++ b/drivers/iommu/io-pgtable.h
+@@ -132,12 +132,14 @@ void free_io_pgtable_ops(struct io_pgtable_ops *ops);
+  * @fmt:    The page table format.
+  * @cookie: An opaque token provided by the IOMMU driver and passed back to
+  *          any callback routines.
++ * @sync_flag: Private flag for optimising out redundant syncs.
+  * @cfg:    A copy of the page table configuration.
+  * @ops:    The page table operations in use for this set of page tables.
+  */
+ struct io_pgtable {
+ 	enum io_pgtable_fmt	fmt;
+ 	void			*cookie;
++	bool			sync_flag;
+ 	struct io_pgtable_cfg	cfg;
+ 	struct io_pgtable_ops	ops;
+ };
+@@ -147,17 +149,22 @@ struct io_pgtable {
+ static inline void io_pgtable_tlb_flush_all(struct io_pgtable *iop)
+ {
+ 	iop->cfg.tlb->tlb_flush_all(iop->cookie);
++	iop->sync_flag = true;
+ }
+ 
+ static inline void io_pgtable_tlb_add_flush(struct io_pgtable *iop,
+ 		unsigned long iova, size_t size, size_t granule, bool leaf)
+ {
+ 	iop->cfg.tlb->tlb_add_flush(iova, size, granule, leaf, iop->cookie);
++	iop->sync_flag = true;
+ }
+ 
+ static inline void io_pgtable_tlb_sync(struct io_pgtable *iop)
+ {
+-	iop->cfg.tlb->tlb_sync(iop->cookie);
++	if (iop->sync_flag) {
++		iop->cfg.tlb->tlb_sync(iop->cookie);
++		iop->sync_flag = false;
++	}
+ }
+ 
+ /**
 -- 
 1.9.1
