@@ -1,101 +1,100 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 17 Dec 2015 14:31:02 +0900
-Subject: [PATCH v6 0/9] samsung: pmu: split up SoC specific PMU data
-In-Reply-To: <1447740351-14246-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1447740351-14246-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <56724896.1080009@samsung.com>
+From: tiffany.lin@mediatek.com (tiffany lin)
+Date: Thu, 17 Dec 2015 13:52:27 +0800
+Subject: [PATCH v2 6/8] [Media] vcodec: mediatek: Add Mediatek V4L2
+ Video Encoder Driver
+In-Reply-To: <56716B88.7090301@xs4all.nl>
+References: <1449827743-22895-1-git-send-email-tiffany.lin@mediatek.com>
+ <1449827743-22895-7-git-send-email-tiffany.lin@mediatek.com>
+ <566EBAFC.3010408@xs4all.nl> <1450187460.21350.35.camel@mtksdaap41>
+ <567020F1.1000204@cisco.com> <1450271857.6730.26.camel@mtksdaap41>
+ <56716B88.7090301@xs4all.nl>
+Message-ID: <1450331547.7283.4.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.11.2015 15:05, Pankaj Dubey wrote:
-> In this series I am splitting up SoC specific PMU configuration data into
-> mach-exynos folder itself, before moving all of them under
-> drivers/soc/samsung/. Also instead of making all changes in single patch it
-> has been broken into SoC specific patches to avoid large size of patch.
-> With this approach there will not be unwanted big churns just after
-> adding exynos-pmu under drivers/soc/samsung.
+On Wed, 2015-12-16 at 14:47 +0100, Hans Verkuil wrote:
+> On 12/16/15 14:17, tiffany lin wrote:
+> > Hi Hans,
+> > 
+> > 
+> > On Tue, 2015-12-15 at 15:17 +0100, Hans Verkuil wrote:
+> >>
+> >> On 12/15/15 14:51, tiffany lin wrote:
+> >>> We are not familiar with v4l2-compliance utility, we will check how to
+> >>> use it.
+> >>
+> >> It's part of v4l-utils.git (http://git.linuxtv.org/v4l-utils.git/). There is a
+> >> fairly decent man page. It does exhaustive compliance tests for V4L2 devices.
+> >>
+> >> That said, the support for memory-to-memory codec devices is not great, so I wouldn't
+> >> trust any failures it reports when using the streaming tests (i.e. the --stream*
+> >> options). By default just run 'v4l2-compliance -d /dev/videoX' to do the compliance
+> >> test.
+> >>
+> >> Note: before I accept this driver I do want to see that compliance test output!
+> >>
+> > Got it. We will provide it in next version.
+> > Now our driver is developed and run base on kernel v3.18.
+> > V4L2 and vb2 have some difference between Linux 4.4-rc1 and 3.18 kernel.
+> > Is it ok we provided test output base on v3.18 or we need to base on
+> > 4.4-rc1?
 > 
-> All these patches are just refactoring to keep minimal changes while moving
-> exynos-pmu driver under drivers/soc/samsung/. Support for exynos7 PMU can
-> be added on top of it, in such a manner that for ARM64 build, ARM related
-> SoC's PMU will not get compiled and thus unnecessary increasing kernel image size.
+> I'm actually not sure if the latest v4l2-compliance test suite will work with a 3.18
+> kernel. so either you have to go back to an older version of v4l2-compliance that
+> works with 3.18 (go back to commit 4a57509a8334aca6ca8e81cd3beb08d5be397dac, that
+> might do the trick) or (and that's what I recommend) go with the latest kernel.
 > 
-> These patches have been prepared on top of Kukjin Kim's for-next merged with
-> driver-samsung and on top of
-> cherry-picked change from [1].
+> For the media tree that is http://git.linuxtv.org/media_tree.git/log/.
 > 
-> 1: ARM: EXYNOS: Constify local exynos_pmu_data structure
->    https://lkml.org/lkml/2015/10/28/917
+> The final version of the patch has to be against that kernel anyway.
 > 
-> For testing entire patchset on Peach-Pi (Exynos5880) based chromebook for boot
-> and S2R functionality.
-> 
-> Tested-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> 
-> For testing entire patchset on on Trats2 (Exynos4412, S2R, reboot, poweroff)
-> and Odroid XU3 (Exynos5422, reboot, poweroff).
-> 
-> Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> 
-> Changes since v5:
->  - Removed extra blank line from patch 5/9 and 6/9.
->  - Modified soc/samsung/Kconfig for config EXNOS_PMU. Added depends on ARM.
-> 
-> Changes since v4:
->  - In v3 I missed to give -M flag to detect rename, which made patches hard
->    to review, so resubmitting patches with rename detector flag.
->  - Addressed review comments from Krzysztof.
-> 
-> Changes since v3:
->  - Keeping intact copyright dates in existing header files.
->  - Addressed review comments from Krzysztof for v3.
->  - Removing static inline function from exynos-pmu.h and
->    keeping them in PMU driver.
->  - Added new patch (2/9) for fixing potential null pointer reference in
->    exynos_sys_powerdown_conf.
->  - Added new patch (8/9) for rearranging static and non-static function for
->    better readability.
-> 
-> Changes since v2:
->  - Removed Amit's Samsung id as it's no more valid.
->  - Rebased on latest kgene tree.
->  - Removed redundant code from regs-pmu.h
-> 
-> Pankaj Dubey (9):
->   ARM: EXYNOS: removing redundant code from regs-pmu.h
->   ARM: EXYNOS: Fix potential NULL pointer access in
->     exynos_sys_powerdown_conf
->   ARM: EXYNOS: Move pmu specific headers under "linux/soc/samsung"
->   ARM: EXYNOS: split up exynos3250 SoC specific PMU data
->   ARM: EXYNOS: split up exynos4 SoC specific PMU data
->   ARM: EXYNOS: split up exynos5250 SoC specific PMU data
->   ARM: EXYNOS: split up exynos5420 SoC specific PMU data
->   ARM: EXYNOS: rearrange static and non-static functions of PMU driver
->   drivers: soc: Add support for Exynos PMU driver
-> 
+Got it. Thanks for your help, we will try it. ^_^
 
-I tried to apply this to my branch:
-next/stuff-late-not-split-per-branch
-https://git.kernel.org/cgit/linux/kernel/git/krzk/linux.git/log/?h=next/stuff-late-not-split-per-branch
+> >>>>> +}
+> >>>>> +
+> >>>>> +int m2mctx_venc_queue_init(void *priv, struct vb2_queue *src_vq,
+> >>>>> +			   struct vb2_queue *dst_vq)
+> >>>>> +{
+> >>>>> +	struct mtk_vcodec_ctx *ctx = priv;
+> >>>>> +	int ret;
+> >>>>> +
+> >>>>> +	src_vq->type		= V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
+> >>>>> +	src_vq->io_modes	= VB2_DMABUF | VB2_MMAP | VB2_USERPTR;
+> >>>>
+> >>>> You're using videobuf2-dma-contig, so VB2_USERPTR is generally useless in that
+> >>>> case. I would drop it.
+> >>>>
+> >>> Sorry, I don't get it. 
+> >>> We are using videobuf2-dma-contig, but we also using VB2_USERPTR.
+> >>
+> >> ???? In that case the user pointer you pass in must point to physically contiguous
+> >> memory. Which means you got it through some magic. Typically what should be used
+> >> are dmabuf handles to pass buffers around between different subsystems.
+> >>
+> >> The use of VB2_USERPTR for that purpose is deprecated.
+> >>
+> >> Or am I misunderstanding you as well?
+> >>
+> > Our encoder support all three modes.
+> > In case that A driver + Encode driver flow, OUTPUT buffer will be
+> > VB2_DMABUF from A driver.
+> > In case that read YCbCr frame data from file and encode them to bit
+> > stream flow, we use VB2_USERPTR and VB2_MMAP.
+> > In VB2_USERPTR case, videobuf2-dma-contig will help us get continuous
+> > dma address.
+> > Our chip has IOMMU and M4U that help us get continuous phy address for
+> > encode HW.
+> > 
+> > http://lists.infradead.org/pipermail/linux-mediatek/2015-October/002525.html
+> 
+> Ah, OK. Have you tested this with malloc()ed buffers? Just asking :-)
+> 
+Yes. Actually we tested this with new()ed buffers. I think it default
+call malloc.
 
-Unfortunately it fails on:
-error: patch failed: arch/arm/mach-exynos/pmu.c:17
-error: arch/arm/mach-exynos/pmu.c: patch does not apply
-Patch failed at 0001 ARM: EXYNOS: Move pmu specific headers under
-"linux/soc/samsung"
+> Regards,
+> 
+> 	Hans
 
-because of syscon-reboot handlers (Alim's work).
-
-I think I have all the dependencies already in my
-"next/stuff-late-not-split-per-branch".
-If you want to proceed now, can you rebase on top of it? Otherwise we
-could wait and rebase later (after v4.5-rc1).
-
-
-P.S. Please note that "next/stuff-late-not-split-per-branch" is not
-included in linux-next because I am not sure if I will be able to push
-it out soon.
-
-
-Best regards,
-Krzysztof
+best regards,
+Tiffany
