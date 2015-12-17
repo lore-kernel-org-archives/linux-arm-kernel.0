@@ -1,225 +1,204 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 17 Dec 2015 15:48:40 +0100
-Subject: [PATCH] i2c: allow building emev2 without slave mode again
-In-Reply-To: <20151217120157.GC3958@katana>
-References: <201512102224.cVm7Hcp0%fengguang.wu@intel.com>
- <13702087.6o87OAVdIx@wuerfel> <20151217120157.GC3958@katana>
-Message-ID: <7947081.psvz6dklxq@wuerfel>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 17 Dec 2015 15:50:06 +0100
+Subject: [GIT PULL] clockevents for 4.5
+Message-ID: <5672CB9E.7090707@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 17 December 2015 13:01:57 Wolfram Sang wrote:
-> On Mon, Dec 14, 2015 at 11:27:22PM +0100, Arnd Bergmann wrote:
-> > On Monday 14 December 2015 14:52:06 Wolfram Sang wrote:
-> > > > > What about not ifdeffing the inline function and keep the build error
-> > > > > whenever someone uses it without I2C_SLAVE being selected?
-> > > > 
-> > > > The inline function is only added there for the case that I2C_SLAVE is
-> > > > disabled, so that would be pointless.
-> > > > 
-> > > > However, what we could do is move the extern declaration outside of
-> > > > the #ifdef to make it always visible. The if(IS_ENABLED(CONFIG_I2C_SLAVE))
-> > > > check should then ensure that it never actually gets called, and we
-> > > > get a link error if some driver gets it wrong.
-> > > 
-> > > Yes, that's what I meant: move the whole function (as it was before your
-> > > patch) out of the CONFIG_I2C_SLAVE block. We should get a compiler error
-> > > even, because for !I2C_SLAVE, the client struct will not have the
-> > > slave_cb member.
-> > > 
-> > 
-> > But we don't want a compile-error for randconfig builds, and we don't
-> > want unnecessary #ifdef in the driver. 
-> 
-> My conclusion for now is:
-> 
-> There needs something to be done surely, but currently I don't have the
-> bandwidth to do it or even play around with it. I am not fully happy
-> with your patches as well because __maybe_unused has some kind of "last
-> resort" feeling to me.
+Hi Thomas,
 
-I generally like __maybe_unused, but it's a matter of personal preference.
-We could avoid the __maybe_unused if the reg_slave/unreg_slave callback
-pointers are always available in struct i2c_algorithm.
+this pull request is bigger than the other ones. It contains a lot of 
+changes and cleanups in order to increase the compilation test coverage.
 
-> So, to get the build failures away immediately I'd simply submit a patch
-> for the emev driver to select I2C_SLAVE and postpone the proper fix to
-> later.
-> 
-> That being said, thanks a lot for your input. I will surely come back to it.
+  - Add cosmetic changes on error and a memory leakage on failure at 
+init time for the mediatek timer (Alexey Klimov)
 
+  - Remove the useless dsb() usage in the rockchip timer, the side 
+effect is it can compile for the ARM and ARM64 (Caesar Wang)
 
-Just for reference, see below for my combined patch, in case you decide
-to use that at a later point.
+  - Huge cleanups and fixes for the timers st_lpc, pxa_timer, tango, 
+pistachio, mediatek, rockchip, armada-370-xp, meson6, orion, digicolor, 
+dw_apb, sun4i, sun5i, tegra2, vt8500, cadence_ttc, asm9260, lpc32xx, 
+nomadik_mtu, prcmu, exynos_mct, samsung-pwm and fsl-ftm in order to add 
+the COMPILE_TEST option (Daniel Lezcano)
 
-	Arnd
+  - Cleanup of the h8300 timers and add the COMPILE_TEST option (Daniel 
+Lezcano)
 
-8<---
-Subject: [PATCH] i2c: emev2 depends on i2c slave mode
+  - Factor out the tango-xtal and the timer_sun5i code by using the 
+clocksource_mmio_init (Daniel Lezcano)
 
-The emev2 driver stopped compiling in today's linux-next kernel:
+  - Fix suspend / resume on the arch_arm_timer (Grygorii Strashko)
 
-drivers/i2c/busses/i2c-emev2.c: In function 'em_i2c_slave_irq':
-drivers/i2c/busses/i2c-emev2.c:233:23: error: storage size of 'event' isn't known
-drivers/i2c/busses/i2c-emev2.c:250:3: error: implicit declaration of function 'i2c_slave_event' [-Werror=implicit-function-declaration]
-drivers/i2c/busses/i2c-emev2.c:250:32: error: 'I2C_SLAVE_STOP' undeclared (first use in this function)
+  - Implement an ARM delay timer, fix return value and use relaxed io to 
+improve performances on the dw_apb_timer (Jisheng Zhang)
 
-It works again if we enable CONFIG_I2C_SLAVE, but it seems  wrong
-to add a dependency on that symbol:
+  - Improve greatly performances by using writel_relaxed in 
+gt_compare_set in the arm_global_timer (Jisheng Zhang)
 
-* The symbol is user-selectable, but only one or two (including this
-  one) bus drivers actually implement it, and it makes no sense
-  if you don't have one of them.
+  - Use the dynamic irq affinity flag on the tegra2 timer (Lucas Stach)
 
-* The other driver (R-Car) uses 'select I2C_SLAVE', which seems
-  reasonable in principle, but we should not do that on user
-  visible symbols.
+  - Correct pr_err() output format on the lpc32 timer (Vladimir Zapolskiy)
 
-* I2C slave mode could be implemented in a lot of other drivers
-  as an optional feature, but we shouldn't require enabling it
-  if we don't use it.
+  - Second round of cleanups on the h8300 timers (Yoshinori Sato)
 
-This changes the two drivers that provide I2C slave mode so they
-can again build if the slave mode being disabled. To do this, I
-move the definition of i2c_slave_event() and enum i2c_slave_event
-out of the #ifdef and instead make the assignment of the reg_slave
-and unreg_slave pointers optional in the bus drivers. The functions
-implementing the feature are unused in that case, so they get
-marked as __maybe_unused in order to still give compile-time
-coverage.
+Tested on kernelci.org:
+https://kernelci.org/build/dlezcano/kernel/v4.4-rc2-71-gd33f250af4e6/
+https://kernelci.org/boot/all/job/dlezcano/kernel/v4.4-rc2-71-gd33f250af4e6/
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: c31d0a00021d ("i2c: emev2: add slave support")
+Thanks !
 
----
-
- drivers/i2c/busses/Kconfig     | 1 -
- drivers/i2c/busses/i2c-emev2.c | 8 +++++---
- drivers/i2c/busses/i2c-rcar.c  | 8 +++++---
- include/linux/i2c.h            | 4 +++-
- 4 files changed, 13 insertions(+), 8 deletions(-)
+   -- Daniel
 
 
-diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-index eaa7b4a0e484..f205b9fa7a74 100644
---- a/drivers/i2c/busses/Kconfig
-+++ b/drivers/i2c/busses/Kconfig
-@@ -985,7 +985,6 @@ config I2C_XLP9XX
- config I2C_RCAR
- 	tristate "Renesas R-Car I2C Controller"
- 	depends on ARCH_SHMOBILE || COMPILE_TEST
--	select I2C_SLAVE
- 	help
- 	  If you say yes to this option, support will be included for the
- 	  R-Car I2C controller.
-diff --git a/drivers/i2c/busses/i2c-emev2.c b/drivers/i2c/busses/i2c-emev2.c
-index 96bb4e749012..b01c9f30c545 100644
---- a/drivers/i2c/busses/i2c-emev2.c
-+++ b/drivers/i2c/busses/i2c-emev2.c
-@@ -303,7 +303,7 @@ static irqreturn_t em_i2c_irq_handler(int this_irq, void *dev_id)
- {
- 	struct em_i2c_device *priv = dev_id;
- 
--	if (em_i2c_slave_irq(priv))
-+	if (IS_ENABLED(CONFIG_I2C_SLAVE) && em_i2c_slave_irq(priv))
- 		return IRQ_HANDLED;
- 
- 	complete(&priv->msg_done);
-@@ -316,7 +316,7 @@ static u32 em_i2c_func(struct i2c_adapter *adap)
- 	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL | I2C_FUNC_SLAVE;
- }
- 
--static int em_i2c_reg_slave(struct i2c_client *slave)
-+static int __maybe_unused em_i2c_reg_slave(struct i2c_client *slave)
- {
- 	struct em_i2c_device *priv = i2c_get_adapdata(slave->adapter);
- 
-@@ -334,7 +334,7 @@ static int em_i2c_reg_slave(struct i2c_client *slave)
- 	return 0;
- }
- 
--static int em_i2c_unreg_slave(struct i2c_client *slave)
-+static int __maybe_unused em_i2c_unreg_slave(struct i2c_client *slave)
- {
- 	struct em_i2c_device *priv = i2c_get_adapdata(slave->adapter);
- 
-@@ -350,8 +350,10 @@ static int em_i2c_unreg_slave(struct i2c_client *slave)
- static struct i2c_algorithm em_i2c_algo = {
- 	.master_xfer = em_i2c_xfer,
- 	.functionality = em_i2c_func,
-+#ifdef CONFIG_I2C_SLAVE
- 	.reg_slave      = em_i2c_reg_slave,
- 	.unreg_slave    = em_i2c_unreg_slave,
-+#endif
- };
- 
- static int em_i2c_probe(struct platform_device *pdev)
-diff --git a/drivers/i2c/busses/i2c-rcar.c b/drivers/i2c/busses/i2c-rcar.c
-index b2389c492579..ab7fa78b8030 100644
---- a/drivers/i2c/busses/i2c-rcar.c
-+++ b/drivers/i2c/busses/i2c-rcar.c
-@@ -430,7 +430,7 @@ static irqreturn_t rcar_i2c_irq(int irq, void *ptr)
- 	/* Only handle interrupts that are currently enabled */
- 	msr &= rcar_i2c_read(priv, ICMIER);
- 	if (!msr) {
--		if (rcar_i2c_slave_irq(priv))
-+		if (IS_ENABLED(CONFIG_I2C_SLAVE) && rcar_i2c_slave_irq(priv))
- 			return IRQ_HANDLED;
- 
- 		return IRQ_NONE;
-@@ -523,7 +523,7 @@ out:
- 	return ret;
- }
- 
--static int rcar_reg_slave(struct i2c_client *slave)
-+static int __maybe_unused rcar_reg_slave(struct i2c_client *slave)
- {
- 	struct rcar_i2c_priv *priv = i2c_get_adapdata(slave->adapter);
- 
-@@ -544,7 +544,7 @@ static int rcar_reg_slave(struct i2c_client *slave)
- 	return 0;
- }
- 
--static int rcar_unreg_slave(struct i2c_client *slave)
-+static int __maybe_unused rcar_unreg_slave(struct i2c_client *slave)
- {
- 	struct rcar_i2c_priv *priv = i2c_get_adapdata(slave->adapter);
- 
-@@ -570,8 +570,10 @@ static u32 rcar_i2c_func(struct i2c_adapter *adap)
- static const struct i2c_algorithm rcar_i2c_algo = {
- 	.master_xfer	= rcar_i2c_master_xfer,
- 	.functionality	= rcar_i2c_func,
-+#ifdef CONFIG_I2C_SLAVE
- 	.reg_slave	= rcar_reg_slave,
- 	.unreg_slave	= rcar_unreg_slave,
-+#endif
- };
- 
- static const struct of_device_id rcar_i2c_dt_ids[] = {
-diff --git a/include/linux/i2c.h b/include/linux/i2c.h
-index bc2b19ad9357..2b0b08b183e0 100644
---- a/include/linux/i2c.h
-+++ b/include/linux/i2c.h
-@@ -254,7 +254,6 @@ static inline void i2c_set_clientdata(struct i2c_client *dev, void *data)
- 
- /* I2C slave support */
- 
--#if IS_ENABLED(CONFIG_I2C_SLAVE)
- enum i2c_slave_event {
- 	I2C_SLAVE_READ_REQUESTED,
- 	I2C_SLAVE_WRITE_REQUESTED,
-@@ -266,11 +265,14 @@ enum i2c_slave_event {
- extern int i2c_slave_register(struct i2c_client *client, i2c_slave_cb_t slave_cb);
- extern int i2c_slave_unregister(struct i2c_client *client);
- 
-+#if IS_ENABLED(CONFIG_I2C_SLAVE)
- static inline int i2c_slave_event(struct i2c_client *client,
- 				  enum i2c_slave_event event, u8 *val)
- {
- 	return client->slave_cb(client, event, val);
- }
-+#else
-+extern int i2c_slave_event(struct i2c_client *client, enum i2c_slave_event event, u8 *val);
- #endif
- 
- /**
+The following changes since commit 82bbe34b3d895fb026b2fc0e7da2e641797bfaed:
+
+   nohz: Clarify magic in tick_nohz_stop_sched_tick() (2015-11-25 
+22:37:27 +0100)
+
+are available in the git repository at:
+
+   http://git.linaro.org/people/daniel.lezcano/linux.git kevin-bot
+
+for you to fetch changes up to d33f250af4e67d449f2c748b861ba99d50955469:
+
+   clocksource/drivers/h8300: Use ioread / iowrite (2015-12-16 17:20:13 
++0100)
+
+----------------------------------------------------------------
+Alexey Klimov (3):
+       clocksource/drivers/mtk_timer: Add pr_fmt define
+       clocksource/drivers/mtk_timer: Fix pr_warn() messages in 
+mtk_timer_init
+       clocksource/drivers/mtk_timer: Fix memleak in mtk_timer_init()
+
+Caesar Wang (2):
+       clocksource/drivers/rockchip: Make the driver more readable
+       clocksource/drivers/rockchip: Remove dsb() usage
+
+Daniel Lezcano (49):
+       time: Define dummy functions for the generic sched clock
+       clocksource/drivers/qcom: Make COMPILE_TEST enabled for ARM 
+architecture
+       clocksource/drivers/st_lpc: Fix Kconfig dependency
+       clocksource/drivers/st_lpc: Add the COMPILE_TEST option
+       clocksource/drivers/pxa_timer: Move the Kconfig rule
+       clocksource/drivers/pxa_timer: Add the COMPILE_TEST option
+       clocksource/drivers/tango: Add COMPILE_TEST option
+       clocksource/drivers/pistachio: Add the COMPILE_TEST option
+       clocksource/drivers/mediatek: Add the COMPILE_TEST option
+       clocksource/drivers/rockchip: Add COMPILE_TEST option
+       clocksource/drivers/armada-370-xp: Add the COMPILE_TEST option
+       clocksource/drivers/meson6: Add the COMPILE_TEST option
+       clocksource/drivers/orion: Add the COMPILE_TEST option
+       clocksource/drivers/digicolor: Add the COMPILE_TEST option
+       clocksource/drivers/dw_apb: Add the COMPILE_TEST option
+       clocksource/drivers/sun4i: Add the COMPILE_TEST option
+       clocksource/drivers/sun5i: Add the COMPILE_TEST option
+       clocksource/drivers/tegra2: Add the COMPILE_TEST option
+       clocksource/drivers/vt8500: Remove unneeded header
+       clocksource/drivers/vt8500: Add the COMPILE_TEST option
+       clocksource/drivers/cadence_ttc: Add the COMPILE_TEST option
+       clocksource/drivers/asm9260: Add the COMPILE_TEST option
+       clocksource/drivers/lpc32xx: Add the COMPILE_TEST option
+       clocksource/drivers/nomadik_mtu: Add the COMPILE_TEST option
+       clocksource/drivers/prcmu: Fix Kconfig and add COMPILE_TEST option
+       clocksource/drivers/exynos_mct: Fix Kconfig and add COMPILE_TEST 
+option
+       clocksource/drivers/samsung-pwm: Add the COMPILE_TEST option
+       clocksource/drivers/fsl-ftm: Add the COMPILE_TEST option
+       clocksource/drivers/Kconfig: Add missing GENERIC_CLOCKEVENTS 
+dependency
+       clocksource/drivers/h8300_timer8: Fix compilation error with dev_warn
+       clocksource/drivers/h8300_tpu: Remove unused macros
+       clocksource/drivers/h8300_tpu: Remove pointless headers for TPU
+       clocksource/drivers/h8300_timer8: Remove unused headers
+       clocksource/drivers/h8300_timer8: Remove unused macros
+       clocksource/drivers/h8300_timer8: Remove PERIODIC and ONESHOT macro
+       clocksource/drivers/h8300_timer8: Fix irq return value check
+       clocksource/drivers/h8300_timer8: Remove pointless irq re-entrant 
+safe code
+       clocksource/drivers/h8300_timer8: Remove irq and lock legacy code
+       clocksource/drivers/h8300_timer8: Retrieve the clock rate at init 
+time
+       clocksource/drivers/h8300_timer16: Remove pointless headers
+       clocksource/drivers/h8300_timer16: Remove unused macros
+       clocksource/drivers/h8300_timer16: Remove unused fields in 
+timer16_priv
+       clocksource/drivers/h8300_timer16: Fix irq return value check
+       clocksource/drivers/h8300_timer16: Remove pointless lock
+       clocksource/drivers/timer_sun5i: Replace code by 
+clocksource_mmio_init
+       clocksource/drivers/h8300_timer8: Separate the Kconfig option 
+from the arch
+       h8300: Rename ctlr_out/in[bwl] to raw_read/write[bwl]
+       clocksource/drivers/h8300: Increase the compilation test coverage
+       clocksource/drivers/tango-xtal: Replace code by clocksource_mmio_init
+
+Grygorii Strashko (1):
+       clocksource/drivers/arm_global_timer: Fix suspend resume
+
+Jisheng Zhang (6):
+       clocksource/drivers/dw_apb_timer_of: Implement ARM delay timer
+       clocksource/drivers/dw_apb_timer: Fix apbt_readl return types
+       clocksource/drivers/dw_apb_timer: Use {readl|writel}_relaxed in 
+critical path
+       clocksource/drivers/dw_apb_timer: Inline apbt_readl and apbt_writel
+       clockevents/drivers/arm_global_timer: Use writel_relaxed in 
+gt_compare_set
+       clocksource/drivers/pistachio: Fix wrong calculated clocksource 
+read value
+
+Lucas Stach (1):
+       clocksource/drivers/tegra: Allow timer irq affinity change
+
+Vladimir Zapolskiy (1):
+       clocksource/drivers/lpc32: Correct pr_err() output format
+
+Yoshinori Sato (6):
+       clocksource/drivers/h8300: Cleanup startup and remove module code.
+       clocksource/drivers/h8300: Change to overflow interrupt
+       clocksource/drivers/h8300: Fix timer not overflow case
+       clocksource/drivers/h8300: Simplify delta handling
+       clocksource/drivers/h8300: Initializer cleanup.
+       clocksource/drivers/h8300: Use ioread / iowrite
+
+  arch/arm/Kconfig                       |   3 +++
+  arch/arm/mach-exynos/Kconfig           |   1 +
+  arch/arm/mach-sti/Kconfig              |   1 +
+  arch/arm/mach-ux500/Kconfig            |   1 +
+  arch/h8300/Kconfig                     |   1 +
+  arch/h8300/include/asm/io.h            |  39 
+++++++++++++++++++++--------------
+  arch/h8300/kernel/setup.c              |   8 +++----
+  drivers/clocksource/Kconfig            | 132 
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++----------------------------
+  drivers/clocksource/Makefile           |   2 +-
+  drivers/clocksource/arm_global_timer.c |  21 +++++++++++++-----
+  drivers/clocksource/dw_apb_timer.c     |  46 
++++++++++++++++++++++++++---------------
+  drivers/clocksource/dw_apb_timer_of.c  |  16 ++++++++++++++
+  drivers/clocksource/h8300_timer16.c    | 222 
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++----------------------------------------------------------------------------------------------------------------------------
+  drivers/clocksource/h8300_timer8.c     | 264 
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-------------------------------------------------------------------------------------------------------------------------------------------------------------
+  drivers/clocksource/h8300_tpu.c        | 159 
+++++++++++++++++++++++++++++++++++++++++++++++++-----------------------------------------------------------------------------------------
+  drivers/clocksource/mtk_timer.c        |  20 ++++++++++--------
+  drivers/clocksource/rockchip_timer.c   |  23 +++++++++-----------
+  drivers/clocksource/tango_xtal.c       |  18 +++-------------
+  drivers/clocksource/tegra20_timer.c    |   3 ++-
+  drivers/clocksource/time-lpc32xx.c     |   4 ++--
+  drivers/clocksource/time-pistachio.c   |   2 +-
+  drivers/clocksource/timer-sun5i.c      |  16 ++------------
+  drivers/clocksource/vt8500_timer.c     |   1 -
+  drivers/irqchip/irq-renesas-h8300h.c   |   8 +++----
+  include/linux/sched_clock.h            |  12 ++++++++---
+  25 files changed, 454 insertions(+), 569 deletions(-)
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
