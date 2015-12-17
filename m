@@ -1,93 +1,105 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Thu, 17 Dec 2015 10:16:17 -0500
-Subject: [PATCH v2] soc: mediatek: SCPSYS: use module_platform_driver
-In-Reply-To: <CAGS+omA1mgmFH_JXffUTC-aq3rOy7dRYsdveiJ8LcnB5gg0ELw@mail.gmail.com>
-References: <1450263656-12513-1-git-send-email-s.hauer@pengutronix.de>
- <1562792.sV6cmsyeOM@wuerfel> <56715136.3060908@gmail.com>
- <CAGS+omA1mgmFH_JXffUTC-aq3rOy7dRYsdveiJ8LcnB5gg0ELw@mail.gmail.com>
-Message-ID: <20151217151617.GY2772@windriver.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 17 Dec 2015 15:22:27 +0000
+Subject: [PATCH v7 07/19] KVM: ARM64: PMU: Add perf event map and
+ introduce perf event creating function
+In-Reply-To: <1450169379-12336-8-git-send-email-zhaoshenglong@huawei.com>
+References: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
+ <1450169379-12336-8-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <20151217152054.GB11796@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Re: [PATCH v2] soc: mediatek: SCPSYS: use module_platform_driver] On 17/12/2015 (Thu 10:52) Daniel Kurtz wrote:
+On Tue, Dec 15, 2015 at 04:49:27PM +0800, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> When we use tools like perf on host, perf passes the event type and the
+> id of this event type category to kernel, then kernel will map them to
+> hardware event number and write this number to PMU PMEVTYPER<n>_EL0
+> register. When getting the event number in KVM, directly use raw event
+> type to create a perf_event for it.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  arch/arm64/include/asm/pmu.h |   3 ++
+>  arch/arm64/kvm/Makefile      |   1 +
+>  include/kvm/arm_pmu.h        |  11 ++++
+>  virt/kvm/arm/pmu.c           | 122 +++++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 137 insertions(+)
+>  create mode 100644 virt/kvm/arm/pmu.c
 
 [...]
 
+> +/**
+> + * kvm_pmu_set_counter_event_type - set selected counter to monitor some event
+> + * @vcpu: The vcpu pointer
+> + * @data: The data guest writes to PMXEVTYPER_EL0
+> + * @select_idx: The number of selected counter
+> + *
+> + * When OS accesses PMXEVTYPER_EL0, that means it wants to set a PMC to count an
+> + * event with given hardware event number. Here we call perf_event API to
+> + * emulate this action and create a kernel perf event for it.
+> + */
+> +void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
+> +				    u64 select_idx)
+> +{
+> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+> +	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
+> +	struct perf_event *event;
+> +	struct perf_event_attr attr;
+> +	u64 eventsel, counter;
+> +
+> +	kvm_pmu_stop_counter(vcpu, pmc);
+> +	eventsel = data & ARMV8_EVTYPE_EVENT;
+> +
+> +	memset(&attr, 0, sizeof(struct perf_event_attr));
+> +	attr.type = PERF_TYPE_RAW;
+> +	attr.size = sizeof(attr);
+> +	attr.pinned = 1;
+> +	attr.disabled = kvm_pmu_counter_is_enabled(vcpu, select_idx);
+> +	attr.exclude_user = data & ARMV8_EXCLUDE_EL0 ? 1 : 0;
+> +	attr.exclude_kernel = data & ARMV8_EXCLUDE_EL1 ? 1 : 0;
+> +	attr.exclude_hv = 1; /* Don't count EL2 events */
+> +	attr.exclude_host = 1; /* Don't count host events */
+> +	attr.config = eventsel;
+> +
+> +	counter = kvm_pmu_get_counter_value(vcpu, select_idx);
+> +	/* The initial sample period (overflow count) of an event. */
+> +	attr.sample_period = (-counter) & pmc->bitmask;
+> +
+> +	event = perf_event_create_kernel_counter(&attr, -1, current, NULL, pmc);
+
+As far as I can see, this is going to result in unreliable counts on a
+big.LITTLE system, even if the VCPUs are constrained to one class of
+core.
+
+As this is a task-bound event (cpu == -1, task is current), the perf
+core will stop as soon as one PMU driver agrees to handle the event. The
+event will then only count on CPUs handled by that driver.
+
+If you're unlucky, the set of CPUs handled by that driver is not the
+same as the set of CPUs your VM is constrained to. e.g. your VM might be
+on little cores, but the big PMU driver accepted the event, and only
+counts on big cores.
+
+I'm not sure how we can solve that.
+
+Thanks,
+Mark.
+
+> +	if (IS_ERR(event)) {
+> +		printk_once("kvm: pmu event creation failed %ld\n",
+> +			    PTR_ERR(event));
+> +		return;
+> +	}
+> +
+> +	pmc->perf_event = event;
+> +}
+> -- 
+> 2.0.4
 > 
-> Also, since scpsys' Kconfig is "bool" not "tristate" it isn't a real
-> module so I think we should use:
-> builtin_platform_driver not module_platform_driver
 > 
-> CC'ing Paul Gortmaker who seems to be on a mass
-> builtin_platform_driver conversion at the moment, see:
-> https://lkml.org/lkml/2015/12/9/952
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
 > 
-
-Good guess.  In my giant queue I have that change.  I just haven't got
-around to the requisite triple check and multi arch rebuild tests and
-put out a series for soc yet.  Here is the short list for soc:
-
-drivers-soc-make-mediatek-mtk-scpsys.c-explicitly-no.patch
-drivers-soc-make-qcom-spm.c-explicitly-non-modular.patch
-drivers-soc-make-samsung-exynos-srom.c.c-explicitly-.patch
-drivers-soc-make-sunxi_sram.c-explicitly-non-modular.patch
-drivers-soc-tegra-make-fuse-tegra.c-explicitly-non-m.patch
-
-...and here is the patch you predicted.  If someone wants to fold
-the change into their work then great; I'll be happy to drop
-mine and be with one less patch to herd along.
-
-Paul.
---
-
- From eb32cc2c1db8192c08dd64af69cb172b3be4c98b Mon Sep 17 00:00:00 2001
-From: Paul Gortmaker <paul.gortmaker@windriver.com>
-Date: Fri, 4 Sep 2015 19:33:54 -0400
-Subject: [PATCH] drivers/soc: make mediatek/mtk-scpsys.c explicitly
- non-modular
-
-The Kconfig currently controlling compilation of this code is:
-
-drivers/soc/mediatek/Kconfig:config MTK_SCPSYS
-drivers/soc/mediatek/Kconfig:   bool "MediaTek SCPSYS Support"
-
-...meaning that it currently is not being built as a module by anyone.
-
-Lets remove the couple traces of modularity so that when reading the
-driver there is no doubt it is builtin-only.
-
-Since module_platform_driver() uses the same init level priority as
-builtin_platform_driver() the init ordering remains unchanged with
-this commit.
-
-Cc: Matthias Brugger <matthias.bgg@gmail.com>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Daniel Kurtz <djkurtz@chromium.org>
-Cc: Paul Gortmaker <paul.gortmaker@windriver.com>
-Cc: Olof Johansson <olof@lixom.net>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-mediatek at lists.infradead.org
-Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-
-diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-index 164a7d8439b1..ae0ca34e64dd 100644
---- a/drivers/soc/mediatek/mtk-scpsys.c
-+++ b/drivers/soc/mediatek/mtk-scpsys.c
-@@ -15,7 +15,7 @@
- #include <linux/io.h>
- #include <linux/kernel.h>
- #include <linux/mfd/syscon.h>
--#include <linux/module.h>
-+#include <linux/init.h>
- #include <linux/of_device.h>
- #include <linux/platform_device.h>
- #include <linux/pm_domain.h>
-@@ -484,5 +484,4 @@ static struct platform_driver scpsys_drv = {
- 		.of_match_table = of_match_ptr(of_scpsys_match_tbl),
- 	},
- };
--
--module_platform_driver_probe(scpsys_drv, scpsys_probe);
-+builtin_platform_driver_probe(scpsys_drv, scpsys_probe);
--- 
-2.5.0
