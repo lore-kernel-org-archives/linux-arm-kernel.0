@@ -1,106 +1,63 @@
-From: lho@apm.com (Loc Ho)
-Date: Wed, 16 Dec 2015 18:37:35 -0700
-Subject: [PATCH] clk: xgene: Add SoC and PMD PLL clocks with v2 hardware
-Message-ID: <1450316255-9372-1-git-send-email-lho@apm.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 17 Dec 2015 10:43:02 +0900
+Subject: [GIT PULL 0/9] ARM: EXYNOS: Pull request for v4.5
+In-Reply-To: <1449020386-20250-1-git-send-email-k.kozlowski@samsung.com>
+References: <1449020386-20250-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <56721326.30004@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add X-Gene SoC and PMD PLL clocks support for v2 hardware.
-X-Gene SoC v2 and above use an slightly different SoC
-and PMD PLL hardware logic.
+On 02.12.2015 10:39, Krzysztof Kozlowski wrote:
+> Hi Kukjin,
+> 
+> A lot of stuff for v4.5 with 3 dependencies split into
+> separate tags. The need for dependency is explained both
+> in merge-commit and in description of a tag which is using
+> the dependency.
 
-Signed-off-by: Loc Ho <lho@apm.com>
----
- drivers/clk/clk-xgene.c |   57 ++++++++++++++++++++++++++++++++--------------
- 1 files changed, 39 insertions(+), 18 deletions(-)
+Hi everyone,
 
-diff --git a/drivers/clk/clk-xgene.c b/drivers/clk/clk-xgene.c
-index 8131ccf..0f446d3 100644
---- a/drivers/clk/clk-xgene.c
-+++ b/drivers/clk/clk-xgene.c
-@@ -27,9 +27,12 @@
- #include <linux/clkdev.h>
- #include <linux/clk-provider.h>
- #include <linux/of_address.h>
-+#include <asm/cputype.h>
- 
- /* Register SCU_PCPPLL bit fields */
--#define N_DIV_RD(src)			(((src) & 0x000001ff))
-+#define N_DIV_RD(src)			((src) & 0x000001ff)
-+#define SC_N_DIV_RD(src)		((src) & 0x0000007f)
-+#define SC_OUTDIV2(src)			(((src) & 0x00000100) >> 8)
- 
- /* Register SCU_SOCPLL bit fields */
- #define CLKR_RD(src)			(((src) & 0x07000000)>>24)
-@@ -41,6 +44,14 @@
- 
- static DEFINE_SPINLOCK(clk_lock);
- 
-+static int xgene_clk_version(void)
-+{
-+	#define MIDR_EL1_VARIANT_MASK	0x00f00000
-+	u32 val = read_cpuid_id();
-+
-+	return (val & MIDR_EL1_VARIANT_MASK) == 0 ? 1 : 2;
-+}
-+
- static inline u32 xgene_clk_read(void __iomem *csr)
- {
- 	return readl_relaxed(csr);
-@@ -92,27 +103,37 @@ static unsigned long xgene_clk_pll_recalc_rate(struct clk_hw *hw,
- 
- 	pll = xgene_clk_read(pllclk->reg + pllclk->pll_offset);
- 
--	if (pllclk->type == PLL_TYPE_PCP) {
--		/*
--		 * PLL VCO = Reference clock * NF
--		 * PCP PLL = PLL_VCO / 2
--		 */
--		nout = 2;
--		fvco = parent_rate * (N_DIV_RD(pll) + 4);
-+	if (xgene_clk_version() <= 1) {
-+		if (pllclk->type == PLL_TYPE_PCP) {
-+			/*
-+			* PLL VCO = Reference clock * NF
-+			* PCP PLL = PLL_VCO / 2
-+			*/
-+			nout = 2;
-+			fvco = parent_rate * (N_DIV_RD(pll) + 4);
-+		} else {
-+			/*
-+			* Fref = Reference Clock / NREF;
-+			* Fvco = Fref * NFB;
-+			* Fout = Fvco / NOUT;
-+			*/
-+			nref = CLKR_RD(pll) + 1;
-+			nout = CLKOD_RD(pll) + 1;
-+			nfb = CLKF_RD(pll);
-+			fref = parent_rate / nref;
-+			fvco = fref * nfb;
-+		}
- 	} else {
- 		/*
--		 * Fref = Reference Clock / NREF;
--		 * Fvco = Fref * NFB;
--		 * Fout = Fvco / NOUT;
-+		 * fvco = Reference clock * FBDIVC
-+		 * PLL freq = fvco / NOUT
- 		 */
--		nref = CLKR_RD(pll) + 1;
--		nout = CLKOD_RD(pll) + 1;
--		nfb = CLKF_RD(pll);
--		fref = parent_rate / nref;
--		fvco = fref * nfb;
-+		nout = SC_OUTDIV2(pll) ? 2 : 3;
-+		fvco = parent_rate * SC_N_DIV_RD(pll);
- 	}
--	pr_debug("%s pll recalc rate %ld parent %ld\n", clk_hw_get_name(hw),
--		fvco / nout, parent_rate);
-+	pr_debug("%s pll recalc rate %ld parent %ld version %d\n",
-+		 clk_hw_get_name(hw), fvco / nout, parent_rate,
-+		 xgene_clk_version());
- 
- 	return fvco / nout;
- }
--- 
-1.7.1
+It's been like two weeks... we are after v4.4-rc5 and Christmas season
+is coming... there are some dependencies here and even more stuff waits
+out of queue for this pull request (moving SROM and PMU to drivers/soc,
+cpufreq for Exynos542x).
+
+What I want to say is that I am really not sure whether further waiting
+is beneficial...
+All these patches have been boiling in linux-next for some time (through
+my tree).
+
+
+Are there any comments about this pull request? Ordering of branches?
+Weird looking tags? Bugs? etc.? Anything waits in your tree Kukjin?
+
+
+Maybe this could be pulled directly by arm-soc folks?
+
+
+Best regards,
+Krzysztof
+
+> 
+> The order goes like (but of course dependencies
+> could be pulled all at once at beginning):
+> 1. tags/samsung-dt-syscon-restart-4.5
+> 2. tags/samsung-soc-4.5
+> 3. tags/samsung-clk-arm64-symbols-4.5
+> 4. tags/samsung-soc64-4.5
+> 5. tags/samsung-drivers-4.5
+> 6. tags/samsung-clk-exynos4-4.5
+> 7. tags/samsung-dt-4.5
+> 8. tags/samsung-dt64-4.5
+> 9. tags/samsung-defconfig-4.5
+> 
+> I split dependencies to three tags so clock or other folks could
+> easily grab them if needed.
+> 
+> Please share your comments or pull as early as possible as we have here
+> some more dependencies than usual.
+> 
+> 
+> Kind regards,
+> Krzysztof
+> 
