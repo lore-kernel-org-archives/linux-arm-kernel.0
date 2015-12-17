@@ -1,82 +1,117 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Thu, 17 Dec 2015 01:06:28 -0800
-Subject: [PATCH v6] clk: mediatek: Export CPU mux clocks for CPU
- frequency control
-In-Reply-To: <CALx668XVnhhLJWs7RBxvaX=SU=S9=wFVT9HMDP2edqiH4Jio4A@mail.gmail.com>
-References: <1442230072-31593-1-git-send-email-pi-cheng.chen@linaro.org>
- <CAGS+omCkYTPyjMk6QaoxGAL4QVU8VcpWyFqWhST+iP2EFRcRYg@mail.gmail.com>
- <CALx668XVnhhLJWs7RBxvaX=SU=S9=wFVT9HMDP2edqiH4Jio4A@mail.gmail.com>
-Message-ID: <20151217090628.GA317@quark.deferred.io>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Thu, 17 Dec 2015 10:39:26 -0800 (PST)
+Subject: [PATCH 3/3] Use the new batched user accesses in generic user string
+ handling
+Message-ID: <alpine.LFD.2.20.1512171037350.27310@i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/01, Pi-Cheng Chen wrote:
-> On Mon, Nov 30, 2015 at 11:48 AM, Daniel Kurtz <djkurtz@chromium.org> wrote:
-> > Hi Pi-Cheng and Michael,
-> >
-> > On Mon, Sep 14, 2015 at 7:27 PM, Pi-Cheng Chen <pi-cheng.chen@linaro.org> wrote:
-> >> From: "pi-cheng.chen" <pi-cheng.chen@linaro.org>
-> >>
-> >> This patch adds CPU mux clocks which are used by Mediatek cpufreq driver
-> >> for intermediate clock source switching.
-> >
-> > It looks like this patch was never picked up.
-> > It is required for MT8173 cpufreq.
-> >
-> > What is the plan to get this one merged?
-> 
-> Hi Dan,
-> Mike is working on a new CCF feature called "coordinated clock rate changes"
-> which would help to migrate mt8173-cpufreq driver to generic cpufreq-dt
-> driver, and I am working with him to port MT8173 clock driver on the new
-> feature. So I think that's why this patch was not picked since it will
-> be migrated to new implementation once the new feature's ready.
-> 
-> @Mike:
-> Are you plannig to post those patches on the mailing list ?
-> Or is it fine for you to take this first and then I will refine it for
-> the new feature later?
 
-I plan to post those patches next week.
+From: Linus Torvalds <torvalds@linux-foundation.org>
+Date: Thu, 17 Dec 2015 10:05:19 -0800
+Subject: [PATCH 3/3] Use the new batched user accesses in generic user string handling
 
-Thanks,
-Mike
+This converts the generic user string functions to use the batched user
+access functions.
 
-> 
-> Best Regards,
-> Pi-Cheng
-> 
-> >
-> > -Dan
-> >
-> >>
-> >> Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
-> >> ---
-> >> Changes in v6:
-> >> - Relace __clk_get_num_parents with clk_hw_get_num_parents to reflect
-> >>   API change
-> >>
-> >> Changes in v5:
-> >> - Replace __initdata with __initconst to fix compiling error
-> >>
-> >> Changes in v4:
-> >> - Fix some minor issues for v3
-> >> - Rebase to the patch that adds 13mhz clock for MT8173[1]
-> >>
-> >> Changes in v3:
-> >> - Rebase to 4.2-rc1
-> >> - Fix some issues of v2
-> >>
-> >> Changes in v2:
-> >> - Remove use of .determine_rate callback
-> >> ---
-> >>  drivers/clk/mediatek/Makefile          |   2 +-
-> >>  drivers/clk/mediatek/clk-cpumux.c      | 127 +++++++++++++++++++++++++++++++++
-> >>  drivers/clk/mediatek/clk-cpumux.h      |  22 ++++++
-> >>  drivers/clk/mediatek/clk-mt8173.c      |  23 ++++++
-> >>  include/dt-bindings/clock/mt8173-clk.h |   4 +-
-> >>  5 files changed, 176 insertions(+), 2 deletions(-)
-> >>  create mode 100644 drivers/clk/mediatek/clk-cpumux.c
-> >>  create mode 100644 drivers/clk/mediatek/clk-cpumux.h
-> >
-> > [snip]
+It makes a big difference on x86 microarchitectures that implement SMAP.  
+The STAC/CLAC instructions are not very fast, and doing them for each 
+access inside the loop that copies strings from user space (which is what 
+the pathname handling does for every pathname the kernel uses, for 
+example) is very inefficient.
+
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+---
+
+ lib/strncpy_from_user.c | 11 ++++++++---
+ lib/strnlen_user.c      | 18 ++++++++++++++----
+ 2 files changed, 22 insertions(+), 7 deletions(-)
+
+diff --git a/lib/strncpy_from_user.c b/lib/strncpy_from_user.c
+index e0af6ff73d14..33840324138c 100644
+--- a/lib/strncpy_from_user.c
++++ b/lib/strncpy_from_user.c
+@@ -39,7 +39,7 @@ static inline long do_strncpy_from_user(char *dst, const char __user *src, long
+ 		unsigned long c, data;
+ 
+ 		/* Fall back to byte-at-a-time if we get a page fault */
+-		if (unlikely(__get_user(c,(unsigned long __user *)(src+res))))
++		if (unlikely(unsafe_get_user(c,(unsigned long __user *)(src+res))))
+ 			break;
+ 		*(unsigned long *)(dst+res) = c;
+ 		if (has_zero(c, &data, &constants)) {
+@@ -55,7 +55,7 @@ byte_at_a_time:
+ 	while (max) {
+ 		char c;
+ 
+-		if (unlikely(__get_user(c,src+res)))
++		if (unlikely(unsafe_get_user(c,src+res)))
+ 			return -EFAULT;
+ 		dst[res] = c;
+ 		if (!c)
+@@ -107,7 +107,12 @@ long strncpy_from_user(char *dst, const char __user *src, long count)
+ 	src_addr = (unsigned long)src;
+ 	if (likely(src_addr < max_addr)) {
+ 		unsigned long max = max_addr - src_addr;
+-		return do_strncpy_from_user(dst, src, count, max);
++		long retval;
++
++		user_access_begin();
++		retval = do_strncpy_from_user(dst, src, count, max);
++		user_access_end();
++		return retval;
+ 	}
+ 	return -EFAULT;
+ }
+diff --git a/lib/strnlen_user.c b/lib/strnlen_user.c
+index 3a5f2b366d84..2625943625d7 100644
+--- a/lib/strnlen_user.c
++++ b/lib/strnlen_user.c
+@@ -45,7 +45,7 @@ static inline long do_strnlen_user(const char __user *src, unsigned long count,
+ 	src -= align;
+ 	max += align;
+ 
+-	if (unlikely(__get_user(c,(unsigned long __user *)src)))
++	if (unlikely(unsafe_get_user(c,(unsigned long __user *)src)))
+ 		return 0;
+ 	c |= aligned_byte_mask(align);
+ 
+@@ -61,7 +61,7 @@ static inline long do_strnlen_user(const char __user *src, unsigned long count,
+ 		if (unlikely(max <= sizeof(unsigned long)))
+ 			break;
+ 		max -= sizeof(unsigned long);
+-		if (unlikely(__get_user(c,(unsigned long __user *)(src+res))))
++		if (unlikely(unsafe_get_user(c,(unsigned long __user *)(src+res))))
+ 			return 0;
+ 	}
+ 	res -= align;
+@@ -112,7 +112,12 @@ long strnlen_user(const char __user *str, long count)
+ 	src_addr = (unsigned long)str;
+ 	if (likely(src_addr < max_addr)) {
+ 		unsigned long max = max_addr - src_addr;
+-		return do_strnlen_user(str, count, max);
++		long retval;
++
++		user_access_begin();
++		retval = do_strnlen_user(str, count, max);
++		user_access_end();
++		return retval;
+ 	}
+ 	return 0;
+ }
+@@ -141,7 +146,12 @@ long strlen_user(const char __user *str)
+ 	src_addr = (unsigned long)str;
+ 	if (likely(src_addr < max_addr)) {
+ 		unsigned long max = max_addr - src_addr;
+-		return do_strnlen_user(str, ~0ul, max);
++		long retval;
++
++		user_access_begin();
++		retval = do_strnlen_user(str, ~0ul, max);
++		user_access_end();
++		return retval;
+ 	}
+ 	return 0;
+ }
+-- 
+2.7.0.rc1
