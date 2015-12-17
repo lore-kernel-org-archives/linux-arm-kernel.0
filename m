@@ -1,76 +1,59 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Thu, 17 Dec 2015 14:38:58 -0800
-Subject: [PATCH v3 4/4] printk/nmi: Increase the size of NMI buffer and
- make it configurable
-In-Reply-To: <20151215142621.GE3729@pathway.suse.cz>
-References: <1449667265-17525-1-git-send-email-pmladek@suse.com>
- <1449667265-17525-5-git-send-email-pmladek@suse.com>
- <CAMuHMdXVgr58YjoePGrRbMyMncQ27f85prL7G5SpeHeNxoYrXQ@mail.gmail.com>
- <20151211124159.GB3729@pathway.suse.cz>
- <20151211145725.b0e81bb4bb18fcd72ef5f557@linux-foundation.org>
- <20151211232113.GZ8644@n2100.arm.linux.org.uk>
- <20151211153054.48da5d4139b93dd4ed438f4c@linux-foundation.org>
- <20151215142621.GE3729@pathway.suse.cz>
-Message-ID: <20151217143858.447b5fe79aaa5ed7b2328d67@linux-foundation.org>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Thu, 17 Dec 2015 23:55:23 +0100
+Subject: [PATCH 2/3] ARM: dts: lpc4337-ciaa: enable SCT-PWM
+In-Reply-To: <56715F4B.7050109@vanguardiasur.com.ar>
+References: <1448282225-2635-1-git-send-email-ariel@vanguardiasur.com.ar>
+ <1448282225-2635-3-git-send-email-ariel@vanguardiasur.com.ar>
+ <5655A977.1040408@vanguardiasur.com.ar>
+ <CAGhQ9Vxqpe4QQn1+d6bOCQH9q6evignVR_+U4NK7HqSNhBg4qA@mail.gmail.com>
+ <56715F4B.7050109@vanguardiasur.com.ar>
+Message-ID: <CAGhQ9Vzt6b3Bgcc6yoroQyDtbsw=QeDWRQCKKNdJ3ObCGWUfnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 15 Dec 2015 15:26:21 +0100 Petr Mladek <pmladek@suse.com> wrote:
+On 16 December 2015 at 13:55, Ariel D'Alessandro
+<ariel@vanguardiasur.com.ar> wrote:
+> Joachim,
+>
+> El 14/12/15 a las 19:48, Joachim Eastwood escribi?:
+>> Hi Ariel,
+>>
+>> Sorry for the late reply. I have just started to put together my DT
+>> for 4.5 branch now.
+>>
+>> On 25 November 2015 at 13:28, Ariel D'Alessandro
+>> <ariel@vanguardiasur.com.ar> wrote:
+>>> (+To: Joachim)
+>>>
+>>> El 23/11/15 a las 09:37, Ariel D'Alessandro escribi?:
+>>>> Enable the PWM based on the State Configurable Timer (SCT) included in
+>>>> the LPC4337 SoC of the CIAA-NXP board.
+>>>>
+>>>> Signed-off-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
+>>>> ---
+>>>>  arch/arm/boot/dts/lpc4337-ciaa.dts | 4 ++++
+>>>>  1 file changed, 4 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/lpc4337-ciaa.dts b/arch/arm/boot/dts/lpc4337-ciaa.dts
+>>>> index 03bdf77..1a23589 100644
+>>>> --- a/arch/arm/boot/dts/lpc4337-ciaa.dts
+>>>> +++ b/arch/arm/boot/dts/lpc4337-ciaa.dts
+>>>> @@ -170,6 +170,10 @@
+>>>>       pinctrl-0 = <&enet_rmii_pins>;
+>>>>  };
+>>>>
+>>>> +&sct_pwm {
+>>>> +     status = "okay";
+>>>> +};
+>>>> +
+>>
+>> Isn't this a bit useless without any pinmux setup?
+>
+> Yes, it might be kind of useless. Do you think it shouldn't be enabled then?
 
-> > OK, thanks.  So "not needed at present, might be needed in the future,
-> > useful for out-of-tree debug code"?
-> 
-> It is possible that I got it a wrong way on arm. The NMI buffer is
-> usable there on two locations.
-> 
-> First, the temporary is currently used to handle IPI_CPU_BACKTRACE.
-> It seems that it is not a real NMI. But it seems to be available
-> (compiled) on all arm system. This is why I introduced NEED_PRINTK_NMI
-> Kconfig flag to avoid confusion with a real NMI.
-> 
-> Second, there is the FIQ "NMI" handler that is called from
-> /arch/arm/kernel/entry-armv.S. It is compiled only if _not_
-> defined $(CONFIG_CPU_V7M). It calls nmi_enter() and nmi_stop().
-> It looks like a real NMI handler. This is why I defined HAVE_NMI
-> if (!CPU_V7M).
-> 
-> A solution would be to define HAVE_NMI on all Arm systems and get rid
-> of NEED_PRINTK_NMI. If you think that it would cause less confusion...
+It would be nice to have a board with sct-pwm enabled. Would it
+possible for you to assign a pin to it?
 
-So does this mean that the patch will be updated?
 
-> 
-> > > there's this effort to apply further cleanups - to me, the changelogs
-> > > don't seem to make that much sense, unless we want to start using
-> > > printk() extensively in NMI functions - using the generic nmi backtrace
-> > > code surely gets us something that works across all architectures...
-> > 
-> > Yes, I was scratching my head over that.  The patchset takes an nmi-safe
-> > all-cpu-backtrace and generalises that into an nmi-safe printk.  That
-> > *sounds* like a good thing to do but yes, some additional justification
-> > would be helpful.  What real-world value does this patchset really
-> > bring to real-world users?
-> 
-> The patchset brings two big advantages. First, it makes the NMI
-> backtraces safe on all architectures for free. Second, it makes
-> all NMI messages almost[*] safe on all architectures.
-> 
-> Note that there already are several messages printed in NMI context.
-> See the mail from Jiri Kosina. They are not easy to avoid.
-> 
-> [*] The temporary buffer is limited. We still should keep
-> the number of messages in NMI context at minimum.
-
-This is important info - in fact a paragraph which starts with "The
-patchset brings two big advantages" is *the most* important info.  I
-added the below text to the [1/n] changelog:
-
-: The patchset brings two big advantages.  First, it makes the NMI
-: backtraces safe on all architectures for free.  Second, it makes all NMI
-: messages almost safe on all architectures (the temporary buffer is
-: limited.  We still should keep the number of messages in NMI context at
-: minimum).
-: 
-: Note that there already are several messages printed in NMI context:
-: WARN_ON(in_nmi()), BUG_ON(in_nmi()), anything being printed out from MCE
-: handlers.  These are not easy to avoid.
+regards,
+Joachim Eastwood
