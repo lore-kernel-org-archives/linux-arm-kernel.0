@@ -1,21 +1,57 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 16 Dec 2015 19:16:47 -0500 (EST)
-Subject: [PATCH] net: add Qualcomm IPC router
-In-Reply-To: <20151217000141.GG28026@sonymobile.com>
-References: <1449866519-14551-1-git-send-email-bjorn.andersson@sonymobile.com>
- <20151215.160114.1178824607335349574.davem@davemloft.net>
- <20151217000141.GG28026@sonymobile.com>
-Message-ID: <20151216.191647.857597925395214968.davem@davemloft.net>
+From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
+Date: Wed, 16 Dec 2015 18:23:49 -0600
+Subject: [PATCH v7 3/4] gicv2m: Refactor to prepare for ACPI support
+In-Reply-To: <20151216221208.GC27791@localhost>
+References: <1449766530-16935-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1449766530-16935-4-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <20151216221208.GC27791@localhost>
+Message-ID: <56720095.70004@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Courtney Cavin <courtney.cavin@sonymobile.com>
-Date: Wed, 16 Dec 2015 16:01:41 -0800
+Hi Bjorn,
 
-> We could hardcode the value in kconfig, but that seems like a worse
-> solution than a module parameter.
-> 
-> I'm open to further suggestions.
+Thanks for your review. Please see my comments below.
 
-No module parameters, configure it via netlink or similar at run
-time.
+On 12/16/2015 4:12 PM, Bjorn Helgaas wrote:
+> On Thu, Dec 10, 2015 at 08:55:29AM -0800, Suravee Suthikulpanit wrote:
+>> This patch replaces the struct device_node with struct fwnode_handle
+>> since this structure is common between DT and ACPI.
+>>
+>> It also refactors gicv2m_init_one() to prepare for ACPI support.
+>> The only functional change is removing the node name from pr_info.
+>>
+>> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+>> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>
+>> @@ -359,10 +355,10 @@ static int __init gicv2m_init_one(struct device_node *node,
+>>   	}
+>>
+>>   	list_add_tail(&v2m->entry, &v2m_nodes);
+>> -	pr_info("Node %s: range[%#lx:%#lx], SPI[%d:%d]\n", node->name,
+>> -		(unsigned long)v2m->res.start, (unsigned long)v2m->res.end,
+>> -		v2m->spi_start, (v2m->spi_start + v2m->nr_spis));
+>>
+>> +	pr_info("range[%#lx:%#lx], SPI[%d:%d]\n",
+>> +		(unsigned long)res->start, (unsigned long)res->end,
+>> +		v2m->spi_start, (v2m->spi_start + v2m->nr_spis));
+>
+> You didn't change this, but I don't think this message has enough
+> context.  It's pretty cryptic all by itself.  It'd be nice if it could
+> at least include a device name, e.g., if you could use dev_info().
+
+Here is the example of the information printed:
+[    0.000000] GICv2m: range[0xe1180000:0xe1181000], SPI[64:320]
+
+Basically, the v2m is just an extension of the GIC. Here, we are 
+printing the memory range that it is covering, which can be used to 
+identify different V2m frame and the associate interrupt range (SPI). 
+The node name is not really providing any values. So, we are removing it.
+
+Thanks,
+Suravee
+
+> If that's possible, I guess a separate patch would be appropriate,
+> since there are other similar things in this file.
+> j
+> Bjorn
