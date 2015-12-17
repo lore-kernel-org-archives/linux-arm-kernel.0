@@ -1,65 +1,59 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 17 Dec 2015 22:19:31 +0100
-Subject: [PATCH RFC 01/27] PM / Domains: core changes for multiple states
-In-Reply-To: <CAKXjFTOMwMBq7Md6BFLuGnq4yQTZOyv4QVA6Cw7MWrkH0PvYDg@mail.gmail.com>
-References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
- <1447799871-56374-2-git-send-email-lina.iyer@linaro.org>
- <CAPDyKFoBkKdBpuA6_EMtQNc-n0HxVAFpULrxgpnU5eXtcuS6og@mail.gmail.com>
- <CAKXjFTOMwMBq7Md6BFLuGnq4yQTZOyv4QVA6Cw7MWrkH0PvYDg@mail.gmail.com>
-Message-ID: <CAPDyKFovwXNnr4RPDww_wp_4+mOjN7ZL1zfc3i=G4EbktzsJOQ@mail.gmail.com>
+From: lznuaa@gmail.com (Zhi Li)
+Date: Thu, 17 Dec 2015 15:23:59 -0600
+Subject: [PATCH 1/3] ARM: dts: imx7d: add arch timer
+In-Reply-To: <024b6540b3ebd5f132d171ba40c6e727@agner.ch>
+References: <1449789132-18976-1-git-send-email-Frank.Li@freescale.com>
+ <024b6540b3ebd5f132d171ba40c6e727@agner.ch>
+Message-ID: <CAHrpEqTQFkme-BmVOPHbFwguQkpbYboaXymrRMc-6TDjwO8dUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
-
->>> +static int genpd_alloc_states_data(struct generic_pm_domain *genpd,
+On Thu, Dec 17, 2015 at 2:45 PM, Stefan Agner <stefan@agner.ch> wrote:
+> On 2015-12-10 15:12, Frank.Li at freescale.com wrote:
+>> From: Frank Li <Frank.Li@freescale.com>
 >>
->> In this patch I would rather just add *one* new "alloc" function and
->> name it like below.
+>> add cortex a7 arch timer.
+>> uboot v2016.01-rc2 supported psci basic support.
+>> smp can be supported by psci
+>
+> This sounds a bit overly simplified log message. I am not very into this
+> PSCI topic, is this a prerequisit for the ARM arch timers? Maybe you
+> could elaborate that a bit more.
+
+No.
+But according to previous discussion. Shawn want us to use psci to enable
+second core.  We need enable arch timer if second core enabled.
+
+>
+> Also, I would prefer full sentences and commonly used spellings such as
+> Cortex-A7, U-Boot etc...
+>
+> --
+> Stefan
+>
 >>
->> static int genpd_alloc_default_state(struct generic_pm_domain *genpd)
+>> Signed-off-by: Frank Li <Frank.Li@freescale.com>
+>> ---
+>>  arch/arm/boot/dts/imx7d.dtsi | 9 +++++++++
+>>  1 file changed, 9 insertions(+)
 >>
->> I assume the name I suggest for it, indicates what it needs to do and
->> *not* needs to do.
->
-> Hi Ulf,
->
-> Thanks for your thorough review!
-> i will implement your suggestions for the next spin,
-
-Great, thanks!
-
->
-> However I have a doubt about this comment, do you mean that i should get rid of
-> genpd_alloc_states_data completly? i had a static number of states before
-
-Yes, in this patch - but we still want to alloc the data on the heap.
-
-Just alloc a state struct with size of one array.
-
-> but that was droped because o wasted memory if no states were needed.
-
-There will always be at least *one* state, so we shouldn't waste any
-memory following my suggestion above.
-
->
-> if you just meant that it should be added in a separate patch, since i
-> will be sqashing
-
-I think you need to go through review comments for each patch
-separately. In the end that might very well mean that you should
-completely drop some patches, rework some and even create some some
-new.
-
-> this patch with "PM / Domains: make governor select deepest state"   can
-> i keep it here? maybe it should  go with the dt parsing patch from Marc?
-
-I don't think so.
-
-Try to keep each logical change in a separate patch. That makes it
-easier to review and thus also to accept patches.
-
-[...]
-
-Kind regards
-Uffe
+>> diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+>> index 489604a..a621af6 100644
+>> --- a/arch/arm/boot/dts/imx7d.dtsi
+>> +++ b/arch/arm/boot/dts/imx7d.dtsi
+>> @@ -119,6 +119,15 @@
+>>               clock-output-names = "osc";
+>>       };
+>>
+>> +     timer {
+>> +             compatible = "arm,armv7-timer";
+>> +             interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+>> +                          <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+>> +                          <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+>> +                          <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
+>> +             interrupt-parent = <&intc>;
+>> +     };
+>> +
+>>       etr at 30086000 {
+>>               compatible = "arm,coresight-tmc", "arm,primecell";
+>>               reg = <0x30086000 0x1000>;
