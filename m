@@ -1,72 +1,42 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 17 Dec 2015 11:27:17 -0500 (EST)
-Subject: [PATCH] ARM: PJ4: make coprocessor access sequences buildable
- in Thumb2 mode
-In-Reply-To: <1450365912-3834-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1450365912-3834-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <alpine.LFD.2.20.1512171126350.3603@knanqh.ubzr>
+From: greg@kroah.com (Greg Kroah-Hartman)
+Date: Thu, 17 Dec 2015 08:27:36 -0800
+Subject: [PATCH] tty: amba-pl011: add support for 32-bit register access
+ for earlycon
+In-Reply-To: <CAOZdJXVz5Bm2-XBNjoU6uh=i2E0Mq915entU+rz-MqD8F4C=xQ@mail.gmail.com>
+References: <1446855503-25881-1-git-send-email-timur@codeaurora.org>
+ <20151213060643.GA30667@kroah.com>
+ <CAOZdJXVz5Bm2-XBNjoU6uh=i2E0Mq915entU+rz-MqD8F4C=xQ@mail.gmail.com>
+Message-ID: <20151217162736.GA5897@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 Dec 2015, Ard Biesheuvel wrote:
-
-> The PJ4 inline asm sequence to write to cp15 cannot be built in Thumb-2
-> mode, due to the way it performs arithmetic on the program counter, so it
-> is built in ARM mode instead. However, building C files in ARM mode under
-> CONFIG_THUMB2_KERNEL is problematic, since the instrumentation performed
-> by subsystems like ftrace does not expect having to deal with interworking
-> branches.
+On Thu, Dec 17, 2015 at 09:55:30AM -0600, Timur Tabi wrote:
+> On Sun, Dec 13, 2015 at 12:06 AM, Greg Kroah-Hartman <greg@kroah.com> wrote:
 > 
-> Since the sequence in question is simply a poor man's ISB instruction,
-> let's use a straight 'isb' instead. Unlike Xscale, where this code
-> originated, PJ4 is strictly ARMv7 so this should always be supported.
+> >> Example:
+> >>
+> >>       earlycon=pl011,mmio32,0x3ced1000
+> >>
+> >> Signed-off-by: Timur Tabi <timur@codeaurora.org>
+> >> ---
+> >>
+> >> This patch applies on top of Russell's 12-part amba-pl011.c patchset.
+> >
+> > Which I didn't apply, so can you resend this after he resends his?
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> I see that some of Russell's patches are now in tty-next.  Does that
+> make them official?
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+Unless Russell asks me to revert them, they will show up in the next
+merge window.
 
+> There was some disagreement about the usage of
+> access_32b vs uap->port.iotype for determining whether we need 32-bit
+> accessors or not.
 
+There was?  I missed that, please send follow-on patches to resolve the
+issue if there is one.
 
-> ---
->  arch/arm/kernel/Makefile  |  1 -
->  arch/arm/kernel/pj4-cp0.c | 10 +++-------
->  2 files changed, 3 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-> index af9e59bf3831..3c789496297f 100644
-> --- a/arch/arm/kernel/Makefile
-> +++ b/arch/arm/kernel/Makefile
-> @@ -73,7 +73,6 @@ obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
->  obj-$(CONFIG_PERF_EVENTS)	+= perf_regs.o perf_callchain.o
->  obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event_xscale.o perf_event_v6.o \
->  				   perf_event_v7.o
-> -CFLAGS_pj4-cp0.o		:= -marm
->  AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
->  obj-$(CONFIG_ARM_CPU_TOPOLOGY)  += topology.o
->  obj-$(CONFIG_VDSO)		+= vdso.o
-> diff --git a/arch/arm/kernel/pj4-cp0.c b/arch/arm/kernel/pj4-cp0.c
-> index 8153e36b2491..a311977d795d 100644
-> --- a/arch/arm/kernel/pj4-cp0.c
-> +++ b/arch/arm/kernel/pj4-cp0.c
-> @@ -62,14 +62,10 @@ static u32 __init pj4_cp_access_read(void)
->  
->  static void __init pj4_cp_access_write(u32 value)
->  {
-> -	u32 temp;
-> -
->  	__asm__ __volatile__ (
-> -		"mcr	p15, 0, %1, c1, c0, 2\n\t"
-> -		"mrc	p15, 0, %0, c1, c0, 2\n\t"
-> -		"mov	%0, %0\n\t"
-> -		"sub	pc, pc, #4\n\t"
-> -		: "=r" (temp) : "r" (value));
-> +		"mcr	p15, 0, %0, c1, c0, 2\n\t"
-> +		"isb\n\t"
-> +		: : "r" (value));
->  }
->  
->  static int __init pj4_get_iwmmxt_version(void)
-> -- 
-> 2.5.0
-> 
-> 
+thanks,
+
+greg k-h
