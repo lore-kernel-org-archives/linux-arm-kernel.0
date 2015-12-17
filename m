@@ -1,111 +1,63 @@
-From: dianders@chromium.org (Douglas Anderson)
-Date: Thu, 17 Dec 2015 12:30:53 -0800
-Subject: [PATCH] ARM: dma-mapping: Just allocate one chunk at a time
-Message-ID: <1450384253-1067-1-git-send-email-dianders@chromium.org>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Thu, 17 Dec 2015 14:33:55 -0600
+Subject: [GIT PULL] Qualcomm SoC Updates for 4.5
+Message-ID: <1450384435-4300-1-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The __iommu_alloc_buffer() is expected to be called to allocate pretty
-sizeable buffers.  Upon simple tests of video I saw it trying to
-allocate 4,194,304 bytes.  The function tries to be efficient about this
-by starting out allocating large chunks and then moving to smaller and
-smaller chunk sizes until it succeeds.
+The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
 
-The current function is very, very slow.
+  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
 
-One problem is the way it keeps trying and trying to allocate big
-chunks.  Imagine a very fragmented memory that has 4M free but no
-contiguous pages at all.  Further imagine allocating 4M (1024 pages).
-We'll do the following memory allocations:
-- For page 1:
-  - Try to allocate order 10 (no retry)
-  - Try to allocate order 9 (no retry)
-  - ...
-  - Try to allocate order 0 (with retry, but not needed)
-- For page 2:
-  - Try to allocate order 9 (no retry)
-  - Try to allocate order 8 (no retry)
-  - ...
-  - Try to allocate order 0 (with retry, but not needed)
-- ...
-- ...
+are available in the git repository at:
 
-Total number of calls to alloc() calls for this case is:
-  sum(int(math.log(i, 2)) + 1 for i in range(1, 1025))
-  => 9228
+  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-soc-for-4.5
 
-The above is obviously worse case, but given how slow alloc can be we
-really want to try to avoid even somewhat bad cases.  I timed the old
-code with a device under memory pressure and it wasn't hard to see it
-take more than 24 seconds to allocate 4 megs of memory (!!).
+for you to fetch changes up to bbeaa59598cae12626c9c42e91821e3abd5b87f0:
 
-A second problem (and maybe even more important) is that allocating big
-chunks when we don't need them is just not a good idea anyway.  The
-first thing we do with these big chunks is break them into smaller
-chunks!  If we allocate small chunks:
-- The memory manager doesn't need to work so hard to give us big chunks.
-- We can save the big chunks for those that really need them and this
-  code can make great use of all the small chunks sitting around.
+  MAINTAINERS: Change QCOM entries (2015-12-17 13:55:38 -0600)
 
-Let's simplify by just allocating one page at a time.  We may make more
-total allocate calls but it works way better.  In real world tests that
-used to sometimes see a 24 second allocation call I can now see at most
-250 ms.
+----------------------------------------------------------------
+Qualcomm ARM Based SoC Updates for 4.5
 
-Signed-off-by: Douglas Anderson <dianders@chromium.org>
----
- arch/arm/mm/dma-mapping.c | 38 ++++++--------------------------------
- 1 file changed, 6 insertions(+), 32 deletions(-)
+* Add WCNSS_CTRL client
+* Various Kconfig changes to fix build issues
+* Update SoC Qualcomm MAINTAINERS entry
+* Add SMP2P, SMSM, and SMEM state machine drivers
+* Add SMD-RPM support for existing platforms
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 492bf3efffab..7efeb2d4801b 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -1160,39 +1160,13 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
- 	gfp |= __GFP_NOWARN | __GFP_HIGHMEM;
- 
- 	while (count) {
--		int j, order;
--
--		for (order = __fls(count); order > 0; --order) {
--			/*
--			 * We do not want OOM killer to be invoked as long
--			 * as we can fall back to single pages, so we force
--			 * __GFP_NORETRY for orders higher than zero.
--			 */
--			pages[i] = alloc_pages(gfp | __GFP_NORETRY, order);
--			if (pages[i])
--				break;
--		}
--
--		if (!pages[i]) {
--			/*
--			 * Fall back to single page allocation.
--			 * Might invoke OOM killer as last resort.
--			 */
--			pages[i] = alloc_pages(gfp, 0);
--			if (!pages[i])
--				goto error;
--		}
--
--		if (order) {
--			split_page(pages[i], order);
--			j = 1 << order;
--			while (--j)
--				pages[i + j] = pages[i] + j;
--		}
-+		pages[i] = alloc_pages(gfp, 0);
-+		if (!pages[i])
-+			goto error;
- 
--		__dma_clear_buffer(pages[i], PAGE_SIZE << order);
--		i += 1 << order;
--		count -= 1 << order;
-+		__dma_clear_buffer(pages[i], PAGE_SIZE);
-+		i += 1;
-+		count -= 1;
- 	}
- 
- 	return pages;
--- 
-2.6.0.rc2.230.g3dd15c0
+----------------------------------------------------------------
+Andy Gross (2):
+      soc: qcom: smd-rpm: Add existing platform support
+      MAINTAINERS: Change QCOM entries
+
+Arnd Bergmann (2):
+      soc: qcom: enable smsm/smp2p modular build
+      ARM: qcom: select ARM_CPU_SUSPEND for power management
+
+Bjorn Andersson (5):
+      soc: qcom: Introduce common SMEM state machine code
+      soc: qcom: smsm: Add driver for Qualcomm SMSM
+      soc: qcom: smp2p: Qualcomm Shared Memory Point to Point
+      MAINTAINERS: Add rules for Qualcomm dts files
+      soc: qcom: Introduce WCNSS_CTRL SMD client
+
+Stephen Boyd (1):
+      serial: msm_serial: Make config tristate
+
+ MAINTAINERS                         |   8 +-
+ drivers/soc/qcom/Kconfig            |  27 ++
+ drivers/soc/qcom/Makefile           |   4 +
+ drivers/soc/qcom/smd-rpm.c          |   2 +
+ drivers/soc/qcom/smem_state.c       | 201 ++++++++++++
+ drivers/soc/qcom/smp2p.c            | 578 +++++++++++++++++++++++++++++++++
+ drivers/soc/qcom/smsm.c             | 625 ++++++++++++++++++++++++++++++++++++
+ drivers/soc/qcom/wcnss_ctrl.c       | 272 ++++++++++++++++
+ drivers/tty/serial/Kconfig          |   2 +-
+ include/linux/soc/qcom/smem_state.h |  18 ++
+ 10 files changed, 1733 insertions(+), 4 deletions(-)
+ create mode 100644 drivers/soc/qcom/smem_state.c
+ create mode 100644 drivers/soc/qcom/smp2p.c
+ create mode 100644 drivers/soc/qcom/smsm.c
+ create mode 100644 drivers/soc/qcom/wcnss_ctrl.c
+ create mode 100644 include/linux/soc/qcom/smem_state.h
