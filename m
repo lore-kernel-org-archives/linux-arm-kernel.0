@@ -1,92 +1,36 @@
-From: pmladek@suse.com (Petr Mladek)
-Date: Thu, 17 Dec 2015 13:36:50 +0100
-Subject: [RFC PATCH 0/3] livepatch: arm64: add support for livepatch on
- arm64
-In-Reply-To: <5670FEF1.1040104@huawei.com>
-References: <1450097378-3780-1-git-send-email-huawei.libin@huawei.com>
- <20151215154356.GF3729@pathway.suse.cz>
- <5670FEF1.1040104@huawei.com>
-Message-ID: <20151217123650.GB31777@pathway.suse.cz>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 17 Dec 2015 20:46:03 +0800
+Subject: [PATCH V2 10/10] acpi, gicv3, its: Use MADT ITS subtable to do
+ PCI/MSI domain initialization.
+In-Reply-To: <1450353133-15992-11-git-send-email-tn@semihalf.com>
+Message-ID: <201512172029.JF6K6l2j%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2015-12-16 14:04:33, Li Bin wrote:
-> 
-> 
-> on 2015/12/15 23:43, Petr Mladek wrote:
-> > On Mon 2015-12-14 20:49:35, Li Bin wrote:
-> >> This patchset depends on the on-going gcc feature "-fprolog-pad=N",
-> >> which will generate a pad of N nops at the beginning of each function.
-> >>
-> >> Livepatch on arm64 can using the feature (that always placing one nop
-> >> at the beginning of the function). And when enable/disable func patching,
-> >> just modify the pad code to nop or branch. And that NOP and B instruction
-> >> are both safe instructions on arm64 which called "concurrent modification
-> >> and execution of instructions", that can be executed by one thread of
-> >> execution as they are being modified by another thread of execution without
-> >> requiring explicit synchronization.
-> >>
-> >> And this method will improve performance significantly compared with the
-> >> method based on ftrace, especially for the critical function being frequently
-> >> called.
-> > It sounds like a great feature for ftrace. If the new prologue is usable
-> > for LivePatching, it should be usable to call the ftrace handler as
-> > well. If you teach ftrace to use the new prologue, you will not need
-> > all these crazy arch-specific hacks for LivePatching. Then both ftrace
-> > and livepatch will benefit from the feature.
-> >
-> > I suggest to read the ftrace documentation in Documentation/trace/,
-> > especially ftrace-design.txt. I have never ported ftrace to a new
-> > architecture. I guess that you need to teach scripts/recordmcount.c
-> >  to find the new location. Also you might need to update
-> > arch/arm/kernel/ftrace.c. Also please make sure that ftrace
-> > supports DYNAMIC_FTRACE_WITH_REGS on Arm.
-> 
-> Hi Petr,
-> I had posted one method for livepatch implementaion on arm64 based on ftrace with
-> DYNAMIC_FTRACE_WITH_REGS.
-> https://lwn.net/Articles/646317/
+Hi Tomasz,
 
-I see. What are the plans with this patchset, please?
+[auto build test ERROR on v4.4-rc4]
+[also build test ERROR on next-20151217]
+[cannot apply to tip/irq/core v4.4-rc5]
 
+url:    https://github.com/0day-ci/linux/commits/Tomasz-Nowicki/Introduce-ACPI-world-to-GICv3-ITS-irqchip/20151217-195910
+config: i386-randconfig-s1-12171706 (attached as .config)
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-> This requires GCC changes to support it, and I propose a method that implement -mfentry
-> feature which following some other arch such as x86/mips/s390 etc. This method is
-> architecture-specific, and Maxim Kuvyrkov propose a new method for gcc that implement
-> a target-independent option -fprolog-pad=N, which will generate a pad of N nops at the
-> beginning of each function.
-> https://gcc.gnu.org/ml/gcc/2015-05/msg00267.html
->
-> And based on this, DYNAMIC_FTRACE_WITH_REGS feature can be implemented as
-> mentioned in:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/386815.html
+All errors (new ones prefixed by >>):
 
-What will happen if DYNAMIC_FTRACE_WITH_REGS is implemented using
--fprolog-pad=N, please? Will ftrace and livepatch try to modify the same
-location? Or do you plan to revert all these changes then?
+   drivers/built-in.o: In function `pci_msi_domain_get_msi_rid':
+>> (.text+0x3175d): undefined reference to `iort_find_pci_id'
 
-
-> And in this patchset, I only concern the performance for livepatch on arm64, and I
-> hope this also can be resolved by improving ftrace, and thanks to Steve that he pointed
-> that he is working on a way to make ftrace a bit better for livepatch.
-
-What is the exact performance optimization? Is it that you call the
-new functiion (from the patch) dirrectly instead of using the generic
-ftrace handler? This will break once ftrace start using this location.
-Also this will get more problematic once we have the consistency
-mode as pointed out by Josh.
-
-Please, note that there are currently three features that need to
-modify the function entry code: Ftrace, Kprobes, and LivePatch.
-They need to be coordinated. This is why also Kprobes are called via
-Ftrace when available.
-
-Your patch set looks like a temporary hack to me. I suggest you to
-concentrace on implemention DYNAMIC_FTRACE_WITH_REGS on Arm. If you
-are not happy with the ftrace performance, you might work on improving
-it. All three features: Ftrace, Kprobes, and LivePatch will benefit
-from it. Modyfying the code directly from LivePatch looks like a way
-to a maintenance hell.
-
-Best Regards,
-Petr
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 24633 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151217/1659c2ca/attachment-0001.obj>
