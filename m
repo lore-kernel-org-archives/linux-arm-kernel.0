@@ -1,53 +1,58 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Thu, 17 Dec 2015 17:49:09 +0000
-Subject: [PATCH v4 02/12] arm-cci: Refactor pmu_write_counter
+Date: Thu, 17 Dec 2015 17:49:08 +0000
+Subject: [PATCH v4 01/12] arm-cci: Define CCI counter period
 In-Reply-To: <1450374559-23315-1-git-send-email-suzuki.poulose@arm.com>
 References: <1450374559-23315-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1450374559-23315-3-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1450374559-23315-2-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Refactor pmu_write_counter to add __pmu_write_counter() which
-will actually write to the counter once the event is validated.
-This can be used by hooks specific to CCI PMU model to program
-the counter, where the event is already validated.
+Instead of hard coding the period we program on the PMU
+counters, define a symbol.
 
 Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Punit Agrawal <punit.agrawal@arm.com>
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- drivers/bus/arm-cci.c |   12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
+ drivers/bus/arm-cci.c |   19 ++++++++++---------
+ 1 file changed, 10 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-index 3786879..ce0d3ef 100644
+index ee47e6b..3786879 100644
 --- a/drivers/bus/arm-cci.c
 +++ b/drivers/bus/arm-cci.c
-@@ -767,16 +767,22 @@ static u32 pmu_read_counter(struct perf_event *event)
- 	return value;
- }
+@@ -85,6 +85,14 @@ static const struct of_device_id arm_cci_matches[] = {
+ #define CCI_PMU_CNTR_MASK		((1ULL << 32) -1)
+ #define CCI_PMU_CNTR_LAST(cci_pmu)	(cci_pmu->num_cntrs - 1)
  
-+static void __pmu_write_counter(struct cci_pmu *cci_pmu, u32 value, int idx)
-+{
-+	pmu_write_register(cci_pmu, value, idx, CCI_PMU_CNTR);
-+}
++/*
++ * The CCI PMU counters have a period of 2^32. To account for the
++ * possiblity of extreme interrupt latency we program for a period of
++ * half that. Hopefully we can handle the interrupt before another 2^31
++ * events occur and the counter overtakes its previous value.
++ */
++#define CCI_CNTR_PERIOD		(1UL << 31)
 +
- static void pmu_write_counter(struct perf_event *event, u32 value)
- {
- 	struct cci_pmu *cci_pmu = to_cci_pmu(event->pmu);
- 	struct hw_perf_event *hw_counter = &event->hw;
- 	int idx = hw_counter->idx;
+ #define CCI_PMU_MAX_HW_CNTRS(model) \
+ 	((model)->num_hw_cntrs + (model)->fixed_hw_cntrs)
  
--	if (unlikely(!pmu_is_valid_counter(cci_pmu, idx)))
-+	if (unlikely(!pmu_is_valid_counter(cci_pmu, idx))) {
- 		dev_err(&cci_pmu->plat_device->dev, "Invalid CCI PMU counter %d\n", idx);
--	else
--		pmu_write_register(cci_pmu, value, idx, CCI_PMU_CNTR);
-+		return;
-+	}
-+	__pmu_write_counter(cci_pmu, value, idx);
+@@ -797,15 +805,8 @@ static void pmu_read(struct perf_event *event)
+ void pmu_event_set_period(struct perf_event *event)
+ {
+ 	struct hw_perf_event *hwc = &event->hw;
+-	/*
+-	 * The CCI PMU counters have a period of 2^32. To account for the
+-	 * possiblity of extreme interrupt latency we program for a period of
+-	 * half that. Hopefully we can handle the interrupt before another 2^31
+-	 * events occur and the counter overtakes its previous value.
+-	 */
+-	u64 val = 1ULL << 31;
+-	local64_set(&hwc->prev_count, val);
+-	pmu_write_counter(event, val);
++	local64_set(&hwc->prev_count, CCI_CNTR_PERIOD);
++	pmu_write_counter(event, CCI_CNTR_PERIOD);
  }
  
- static u64 pmu_event_update(struct perf_event *event)
+ static irqreturn_t pmu_handle_irq(int irq_num, void *dev)
 -- 
 1.7.9.5
