@@ -1,42 +1,54 @@
-From: greg@kroah.com (Greg Kroah-Hartman)
-Date: Thu, 17 Dec 2015 08:27:36 -0800
-Subject: [PATCH] tty: amba-pl011: add support for 32-bit register access
- for earlycon
-In-Reply-To: <CAOZdJXVz5Bm2-XBNjoU6uh=i2E0Mq915entU+rz-MqD8F4C=xQ@mail.gmail.com>
-References: <1446855503-25881-1-git-send-email-timur@codeaurora.org>
- <20151213060643.GA30667@kroah.com>
- <CAOZdJXVz5Bm2-XBNjoU6uh=i2E0Mq915entU+rz-MqD8F4C=xQ@mail.gmail.com>
-Message-ID: <20151217162736.GA5897@kroah.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 17 Dec 2015 17:28:20 +0100
+Subject: [PATCH v4 2/4] ARM: bcm2835: add rpi power domain driver
+In-Reply-To: <1450312009-1791-3-git-send-email-eric@anholt.net>
+References: <1450312009-1791-1-git-send-email-eric@anholt.net>
+ <1450312009-1791-3-git-send-email-eric@anholt.net>
+Message-ID: <CAPDyKFp5JfHmNw+ryoAnu-0XANcxW_pyNL_GUFUw7sBQmU+WDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 17, 2015 at 09:55:30AM -0600, Timur Tabi wrote:
-> On Sun, Dec 13, 2015 at 12:06 AM, Greg Kroah-Hartman <greg@kroah.com> wrote:
-> 
-> >> Example:
-> >>
-> >>       earlycon=pl011,mmio32,0x3ced1000
-> >>
-> >> Signed-off-by: Timur Tabi <timur@codeaurora.org>
-> >> ---
-> >>
-> >> This patch applies on top of Russell's 12-part amba-pl011.c patchset.
-> >
-> > Which I didn't apply, so can you resend this after he resends his?
-> 
-> I see that some of Russell's patches are now in tty-next.  Does that
-> make them official?
+On 17 December 2015 at 01:26, Eric Anholt <eric@anholt.net> wrote:
+> From: Alexander Aring <alex.aring@gmail.com>
+>
+> This patch adds support for several power domains on Raspberry Pi,
+> including USB (so it can be enabled even if the bootloader didn't do
+> it), and graphics.
+>
+> This patch is the combined work of Eric Anholt (who wrote USB support
+> inside of the Raspberry Pi firmware driver, and wrote the non-USB
+> domain support) and Alexander Aring (who separated the original USB
+> work out from the firmware driver).
+>
+> Signed-off-by: Alexander Aring <alex.aring@gmail.com>
+> Signed-off-by: Eric Anholt <eric@anholt.net>
+> ---
+>
+> v2: Add support for power domains other than USB, using the new
+>     firmware interface, reword commit message (changes by Eric)
+>
+> v3: Restructure as a builtin driver, and drop
+>     of_genpd_add_provider_onecell error handling to avoid
+>     pm_genpd_exit() dependency until that API can be settled.  Clean
+>     up copyright header, add missing ISP initialization, and fix typo
+>     in transposer's name.
+>
+> v4: Move to drivers/soc/bcm/, move include to dt-bindings/soc/, set up
+>     Makefile for the drivers/soc/bcm following clk/'s model.
+>
+>  drivers/soc/Kconfig                         |   1 +
+>  drivers/soc/Makefile                        |   1 +
+>  drivers/soc/bcm/Kconfig                     |   9 +
+>  drivers/soc/bcm/Makefile                    |   1 +
+>  drivers/soc/bcm/raspberrypi-power.c         | 247 ++++++++++++++++++++++++++++
+>  include/dt-bindings/soc/raspberrypi-power.h |  41 +++++
 
-Unless Russell asks me to revert them, they will show up in the next
-merge window.
+There is currently a directory which I think may be better.
+include/dt-bindings/power/*
 
-> There was some disagreement about the usage of
-> access_32b vs uap->port.iotype for determining whether we need 32-bit
-> accessors or not.
+Besides this nitpick, I think this looks good. You may add my:
 
-There was?  I missed that, please send follow-on patches to resolve the
-issue if there is one.
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-thanks,
-
-greg k-h
+Kind regards
+Uffe
