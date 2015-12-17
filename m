@@ -1,45 +1,42 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 17 Dec 2015 09:48:57 +0100
-Subject: [PATCH v2 0/8] Raspberry Pi 2 support.
-In-Reply-To: <874mfhsyem.fsf@eliezer.anholt.net>
-References: <1450310115-22163-1-git-send-email-eric@anholt.net>
- <21040591.KakM5Gl6ZZ@wuerfel> <874mfhsyem.fsf@eliezer.anholt.net>
-Message-ID: <567276F9.5070903@i2se.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 17 Dec 2015 16:50:49 +0800
+Subject: [GIT PULL] ARM: imx: fixes for 4.4, 3rd round
+Message-ID: <20151217085049.GA9161@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 17.12.2015 um 01:37 schrieb Eric Anholt:
-> Arnd Bergmann <arnd@arndb.de> writes:
->
->> On Wednesday 16 December 2015 15:55:07 Eric Anholt wrote:
->>> This is a major rewrite of the previous Raspberry Pi 2 submission.
->>> SMP support is now included, and the DT includes are cleaned up to
->>> avoid massive duplication.
->>>
->>> The branch (based on 4.4-rc5, to get the USB regression fixes) can be
->>> found at:
->>>
->>> https://github.com/anholt/linux/tree/bcm2836-4.4
->> Looks all good to me, but when we get the pull request, I'd strongly
->> prefer to have that based on -rc3 or earlier.
->>
->> What commit is the USB regression fix you refer to above? Is that in a
->> branch that is -rc3 based? Maybe you can rebase the changes on top
->> of that branch, to minimize the amount of backmerges?
-> Top 4 commits of drivers/usb/dwc2 for 4.4-rc5 (possibly not all of them
-> are required, but it's what I've been using).  
->
+The following changes since commit 9c17190595840b4ed30e8d5f286636ceb28aae4f:
 
-Unfortunately all 4 of them are required:
+  ARM: dts: vf610: use reset values for L2 cache latencies (2015-12-11 21:32:47 +0800)
 
-d0464bcf12af ("usb: dwc2: Make PHY optional")
+are available in the git repository at:
 
-6c2dad69163f ("usb: dwc2: Return errors from PHY")
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.4-3
 
-8aa90cf2a286 ("usb: dwc2: make otg clk optional")
+for you to fetch changes up to 3a35e470bc6bc4ce34c19c410ebbe4e3bbf0bafe:
 
-f74875dc3613 ("usb: dwc2: fix kernel oops during driver probe")
+  ARM: dts: imx6: Fix Ethernet PHY mode on Ventana boards (2015-12-15 16:53:15 +0800)
 
-But they should apply to -rc3 too.
+----------------------------------------------------------------
+The i.MX fixes for 4.4, 3rd round:
+- Fix Ethernet PHY mode on i.MX6 Ventana boards, which can result in
+  a non-functional Ethernet when Marvell phy driver rather than generic
+  phy driver is selected.
+- Fix an assigned-clock configuration bug on imx6qdl-sabreauto board
+  which was introduced by commit ed339363de1b ("ARM: dts:
+  imx6qdl-sabreauto: Allow HDMI and LVDS to work simultaneously").
 
-Stefan
+----------------------------------------------------------------
+Bai Ping (1):
+      ARM: dts: imx: Fix the assigned-clock mismatch issue on imx6q/dl
+
+Krzysztof Ha?asa (1):
+      ARM: dts: imx6: Fix Ethernet PHY mode on Ventana boards
+
+ arch/arm/boot/dts/imx6q-gw5400-a.dts     | 2 +-
+ arch/arm/boot/dts/imx6qdl-gw51xx.dtsi    | 2 +-
+ arch/arm/boot/dts/imx6qdl-gw52xx.dtsi    | 2 +-
+ arch/arm/boot/dts/imx6qdl-gw53xx.dtsi    | 2 +-
+ arch/arm/boot/dts/imx6qdl-gw54xx.dtsi    | 2 +-
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 6 +++---
+ 6 files changed, 8 insertions(+), 8 deletions(-)
