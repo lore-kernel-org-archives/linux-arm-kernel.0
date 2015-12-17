@@ -1,24 +1,38 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Thu, 17 Dec 2015 13:37:22 -0600
-Subject: [PATCH] MAINTAINERS: Change QCOM entries
-In-Reply-To: <1449870378-13232-1-git-send-email-andy.gross@linaro.org>
-References: <1449870378-13232-1-git-send-email-andy.gross@linaro.org>
-Message-ID: <574A7092-75F9-477E-B074-5E184098F918@codeaurora.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 17 Dec 2015 20:40:17 +0100
+Subject: [PATCH] i2c: allow building emev2 without slave mode again
+In-Reply-To: <7947081.psvz6dklxq@wuerfel>
+References: <201512102224.cVm7Hcp0%fengguang.wu@intel.com>
+ <13702087.6o87OAVdIx@wuerfel> <20151217120157.GC3958@katana>
+ <7947081.psvz6dklxq@wuerfel>
+Message-ID: <20151217194016.GD1530@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-> On Dec 11, 2015, at 3:46 PM, Andy Gross <andy.gross@linaro.org> wrote:
+> > My conclusion for now is:
+> > 
+> > There needs something to be done surely, but currently I don't have the
+> > bandwidth to do it or even play around with it. I am not fully happy
+> > with your patches as well because __maybe_unused has some kind of "last
+> > resort" feeling to me.
 > 
-> From: Andy Gross <agross@codeaurora.org>
-> 
-> This patch changes the email address for Andy Gross and David Brown and drops
-> Kumar Gala.  In addition, it changes the location of the repository.
-> 
-> Signed-off-by: Andy Gross <andy.gross@linaro.org>
-> Signed-off-by: Andy Gross <agross@codeaurora.org>
-> ?
+> I generally like __maybe_unused, but it's a matter of personal preference.
+> We could avoid the __maybe_unused if the reg_slave/unreg_slave callback
+> pointers are always available in struct i2c_algorithm.
 
-Acked-by: Kumar Gala <galak@codeaurora.org>
+Yes, I was thinking in this direction, looking at how PM does it. Needs
+some playing around, though.
 
-- k
+> Just for reference, see below for my combined patch, in case you decide
+> to use that at a later point.
+
+Thanks a lot!
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151217/1d5dfb0a/attachment.sig>
