@@ -1,73 +1,45 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Thu, 17 Dec 2015 16:41:30 +0800
-Subject: [PATCH v7 19/19] KVM: ARM64: Add a new kvm ARM PMU device
-In-Reply-To: <20151217083314.2ed36f9f@why.wild-wind.fr.eu.org>
-References: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>	<1450169379-12336-20-git-send-email-zhaoshenglong@huawei.com>	<567032AD.8000206@arm.com>	<567036DE.80605@linaro.org>	<567038E3.3010102@arm.com>	<20151215204739.GK4120@cbox>	<56711348.6010406@huawei.com>	<56711B99.1000608@huawei.com>	<20151216203336.GE24889@cbox>	<567262CA.6050905@huawei.com>
- <20151217083314.2ed36f9f@why.wild-wind.fr.eu.org>
-Message-ID: <5672753A.8050006@huawei.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 17 Dec 2015 09:48:57 +0100
+Subject: [PATCH v2 0/8] Raspberry Pi 2 support.
+In-Reply-To: <874mfhsyem.fsf@eliezer.anholt.net>
+References: <1450310115-22163-1-git-send-email-eric@anholt.net>
+ <21040591.KakM5Gl6ZZ@wuerfel> <874mfhsyem.fsf@eliezer.anholt.net>
+Message-ID: <567276F9.5070903@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Am 17.12.2015 um 01:37 schrieb Eric Anholt:
+> Arnd Bergmann <arnd@arndb.de> writes:
+>
+>> On Wednesday 16 December 2015 15:55:07 Eric Anholt wrote:
+>>> This is a major rewrite of the previous Raspberry Pi 2 submission.
+>>> SMP support is now included, and the DT includes are cleaned up to
+>>> avoid massive duplication.
+>>>
+>>> The branch (based on 4.4-rc5, to get the USB regression fixes) can be
+>>> found at:
+>>>
+>>> https://github.com/anholt/linux/tree/bcm2836-4.4
+>> Looks all good to me, but when we get the pull request, I'd strongly
+>> prefer to have that based on -rc3 or earlier.
+>>
+>> What commit is the USB regression fix you refer to above? Is that in a
+>> branch that is -rc3 based? Maybe you can rebase the changes on top
+>> of that branch, to minimize the amount of backmerges?
+> Top 4 commits of drivers/usb/dwc2 for 4.4-rc5 (possibly not all of them
+> are required, but it's what I've been using).  
+>
 
+Unfortunately all 4 of them are required:
 
-On 2015/12/17 16:33, Marc Zyngier wrote:
-> On Thu, 17 Dec 2015 15:22:50 +0800
-> Shannon Zhao <zhaoshenglong@huawei.com> wrote:
-> 
->> > 
->> > 
->> > On 2015/12/17 4:33, Christoffer Dall wrote:
->>> > > On Wed, Dec 16, 2015 at 04:06:49PM +0800, Shannon Zhao wrote:
->>>> > >> Hi,
->>>> > >>
->>>> > >> On 2015/12/16 15:31, Shannon Zhao wrote:
->>>>>>>>>>> > >>>>>>>>> But in this case, you're returning an error if it is *not* initialized.
->>>>>>>>>>> > >>>>>>>>> I understand that in that case you cannot return an interrupt number (-1
->>>>>>>>>>> > >>>>>>>>> would be weird), but returning -EBUSY feels even more weird.
->>>>>>>>>>> > >>>>>>>>>
->>>>>>>>>>> > >>>>>>>>> I'd settle for -ENOXIO, or something similar. Anyone having a better idea?
->>>>>>>>>>> > >>>>>>>>>
->>>>>>> > >>>>> ENXIO or ENODEV would be my choice too, and add that to the
->>>>>>> > >>>>> Documentation clearly describing when this error code is used.
->>>>>>> > >>>>>
->>>>>>> > >>>>> By the way, why do you loop over all VCPUS to set the same value when
->>>>>>> > >>>>> you can't do anything per VCPU anyway?  It seems to me it's either a
->>>>>>> > >>>>> per-VM property (that you can store on the VM data structure) or it's a
->>>>>>> > >>>>> true per-VCPU property?
->>>>> > >>> This is a per-VCPU property. PMU interrupt could be PPI or SPI. For PPI
->>>>> > >>> the interrupt numbers are same for each vcpu, while for SPI they are
->>>>> > >>> different, so it needs to set them separately. I planned to support both
->>>>> > >>> PPI and SPI. I think I should add support for SPI at this moment and let
->>>>> > >>> users (QEMU) to set these interrupts for each one.
->>>> > >>
->>>> > >> How about below vPMU Documentation?
->>>> > >>
->>>> > >> ARM Virtual Performance Monitor Unit (vPMU)
->>>> > >> ===========================================
->>>> > >>
->>>> > >> Device types supported:
->>>> > >>   KVM_DEV_TYPE_ARM_PMU_V3         ARM Performance Monitor Unit v3
->>>> > >>
->>>> > >> Instantiate one PMU instance for per VCPU through this API.
->>>> > >>
->>>> > >> Groups:
->>>> > >>   KVM_DEV_ARM_PMU_GRP_IRQ
->>>> > >>   Attributes:
->>>> > >>     The attr field of kvm_device_attr encodes two values:
->>>> > >>     bits:     | 63 .... 32 | 31 .... 0 |
->>>> > >>     values:   | vcpu_index |  irq_num  |
->> > BTW, I change this Attribute to below format and pass vcpu_index through
->> > this Attribute while pass irq_num through kvm_device_attr.addr.
->> > Is it fine?
->> > 
->> >     bits:     | 63 .... 32 | 31 ....  0 |
->> >     values:   |  reserved  | vcpu_index |
-> Using the .addr field for something that is clearly not an address is
-> rather odd. Is there any prior usage of that field for something that
-> is not an address?
+d0464bcf12af ("usb: dwc2: Make PHY optional")
 
-I see this usage in vgic_attr_regs_access(). But if you prefer previous
-one, I'll use that.
+6c2dad69163f ("usb: dwc2: Return errors from PHY")
 
--- 
-Shannon
+8aa90cf2a286 ("usb: dwc2: make otg clk optional")
+
+f74875dc3613 ("usb: dwc2: fix kernel oops during driver probe")
+
+But they should apply to -rc3 too.
+
+Stefan
