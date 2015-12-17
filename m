@@ -1,99 +1,135 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 17 Dec 2015 15:30:46 +0000
-Subject: [PATCH v7 07/19] KVM: ARM64: PMU: Add perf event map and introduce
- perf event creating function
-In-Reply-To: <20151217152054.GB11796@leverpostej>
-References: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
- <1450169379-12336-8-git-send-email-zhaoshenglong@huawei.com>
- <20151217152054.GB11796@leverpostej>
-Message-ID: <5672D526.9070608@arm.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 17 Dec 2015 07:32:02 -0800
+Subject: [PATCH v4 1/2] watchdog: imx2_wdt: add external reset support via
+ 'ext-reset-output' dt prop
+In-Reply-To: <CAJ+vNU2qHQPSJ1KWp_3f3vAdeuOcF0ooZHmHsdafabZLXJv=Bw@mail.gmail.com>
+References: <1446758362-11702-1-git-send-email-akshay.bhat@timesys.com>
+ <1446758362-11702-2-git-send-email-akshay.bhat@timesys.com>
+ <20151105222325.GA26159@roeck-us.net>
+ <CAJ+vNU2fSxRJ7YvxOfNzoEoiKgzv-dHj=+eksKxH48ekHiUw2Q@mail.gmail.com>
+ <20151106220249.GA19791@roeck-us.net> <565F4244.7090502@timesys.com>
+ <CAJ+vNU00Bf97HUqkkW9KqOUzHXh482R9O1gasz6ju3Pn-_5chA@mail.gmail.com>
+ <CAJ+vNU2qHQPSJ1KWp_3f3vAdeuOcF0ooZHmHsdafabZLXJv=Bw@mail.gmail.com>
+Message-ID: <5672D572.9080104@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/12/15 15:22, Mark Rutland wrote:
-> On Tue, Dec 15, 2015 at 04:49:27PM +0800, Shannon Zhao wrote:
->> From: Shannon Zhao <shannon.zhao@linaro.org>
+On 12/17/2015 07:02 AM, Tim Harvey wrote:
+> On Wed, Dec 2, 2015 at 12:54 PM, Tim Harvey <tharvey@gateworks.com> wrote:
 >>
->> When we use tools like perf on host, perf passes the event type and the
->> id of this event type category to kernel, then kernel will map them to
->> hardware event number and write this number to PMU PMEVTYPER<n>_EL0
->> register. When getting the event number in KVM, directly use raw event
->> type to create a perf_event for it.
+>> On Wed, Dec 2, 2015 at 11:11 AM, Akshay Bhat <akshay.bhat@timesys.com> wrote:
+>>>
+>>>
+>>> On 11/06/2015 05:02 PM, Guenter Roeck wrote:
+>>>>
+>>>> On Fri, Nov 06, 2015 at 11:53:42AM -0800, Tim Harvey wrote:
+>>>>>
+>>>>> On Thu, Nov 5, 2015 at 2:23 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+>>>>>>
+>>>>>> On Thu, Nov 05, 2015 at 04:19:21PM -0500, Akshay Bhat wrote:
+>>>>>>>
+>>>>>>> From: Tim Harvey <tharvey@gateworks.com>
+>>>>>>>
+>>>>>>> The IMX6 watchdog supports assertion of a signal (WDOG_B) which
+>>>>>>> can be pinmux'd to an external pin. This is typically used for boards
+>>>>>>> that
+>>>>>>> have PMIC's in control of the IMX6 power rails. In fact, failure to use
+>>>>>>> such an external reset on boards with external PMIC's can result in
+>>>>>>> various
+>>>>>>> hangs due to the IMX6 not being fully reset [1] as well as the board
+>>>>>>> failing
+>>>>>>> to reset because its PMIC has not been reset to provide adequate
+>>>>>>> voltage for
+>>>>>>> the CPU when coming out of reset at 800Mhz.
+>>>>>>>
+>>>>>>> This uses a new device-tree property 'ext-reset-output' to indicate the
+>>>>>>> board has such a reset and to cause the watchdog to be configured to
+>>>>>>> assert
+>>>>>>> WDOG_B instead of an internal reset both on a watchdog timeout and in
+>>>>>>> system_restart.
+>>>>>>>
+>>>>>>> [1]
+>>>>>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/333689.html
+>>>>>>>
+>>>>>>> Cc: Lucas Stach <l.stach@pengutronix.de>
+>>>>>>> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+>>>>>>> ---
+>>>>>>>    .../devicetree/bindings/watchdog/fsl-imx-wdt.txt     |  2 ++
+>>>>>>>    drivers/watchdog/imx2_wdt.c                          | 20
+>>>>>>> ++++++++++++++++++--
+>>>>>>>    2 files changed, 20 insertions(+), 2 deletions(-)
+>>>>>>>
+>>>>>>> diff --git a/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
+>>>>>>> b/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
+>>>>>>> index 8dab6fd..9b89b3a 100644
+>>>>>>> --- a/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
+>>>>>>> +++ b/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
+>>>>>>> @@ -9,6 +9,8 @@ Optional property:
+>>>>>>
+>>>>>>
+>>>>>> properties ?
+>>>>>>
+>>>>>>>    - big-endian: If present the watchdog device's registers are
+>>>>>>> implemented
+>>>>>>>      in big endian mode, otherwise in native mode(same with CPU), for
+>>>>>>> more
+>>>>>>>      detail please see:
+>>>>>>> Documentation/devicetree/bindings/regmap/regmap.txt.
+>>>>>>> +- ext-reset-output: If present the watchdog device is configured to
+>>>>>>> assert its
+>>>>>>
+>>>>>>
+>>>>>> Should that have a vendor prefix ? Also, not sure if "-output"
+>>>>>> has any real value in the property name. "fsl,external-reset", maybe ?
+>>>>>
+>>>>>
+>>>>> Hi Guenter,
+>>>>>
+>>>>> I don't see why a vendor prefix is necessary - its a feature of the
+>>>>> IMX6 watchdog supported by this driver to be able to trigger an
+>>>>> internal chip-level reset and/or an external signal that can be hooked
+>>>>> to additional hardware.
+>>>>>
+>>>> Sounded like vendor specific to me, but then I am not a devicetree
+>>>> maintainer,
+>>>> so I am not an authority on the subject.
+>>>
+>>>
+>>> Devicetree maintainers,
+>>>
+>>> Any thoughts?
+>>>
+>>> Tim,
+>>>
+>>> After looking at all the other watchdog drivers, it does not appear that
+>>> there is any other processor which uses a similar feature. Since imx is the
+>>> only processor that appears to support this feature, it might make sense in
+>>> making this vendor specific. If in the future it is found more processors
+>>> support a similar functionality, it can be revisited and moved out from
+>>> being vendor specific?
+>>>
 >>
->> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->> ---
->>  arch/arm64/include/asm/pmu.h |   3 ++
->>  arch/arm64/kvm/Makefile      |   1 +
->>  include/kvm/arm_pmu.h        |  11 ++++
->>  virt/kvm/arm/pmu.c           | 122 +++++++++++++++++++++++++++++++++++++++++++
->>  4 files changed, 137 insertions(+)
->>  create mode 100644 virt/kvm/arm/pmu.c
-> 
-> [...]
-> 
->> +/**
->> + * kvm_pmu_set_counter_event_type - set selected counter to monitor some event
->> + * @vcpu: The vcpu pointer
->> + * @data: The data guest writes to PMXEVTYPER_EL0
->> + * @select_idx: The number of selected counter
->> + *
->> + * When OS accesses PMXEVTYPER_EL0, that means it wants to set a PMC to count an
->> + * event with given hardware event number. Here we call perf_event API to
->> + * emulate this action and create a kernel perf event for it.
->> + */
->> +void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
->> +				    u64 select_idx)
->> +{
->> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
->> +	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
->> +	struct perf_event *event;
->> +	struct perf_event_attr attr;
->> +	u64 eventsel, counter;
->> +
->> +	kvm_pmu_stop_counter(vcpu, pmc);
->> +	eventsel = data & ARMV8_EVTYPE_EVENT;
->> +
->> +	memset(&attr, 0, sizeof(struct perf_event_attr));
->> +	attr.type = PERF_TYPE_RAW;
->> +	attr.size = sizeof(attr);
->> +	attr.pinned = 1;
->> +	attr.disabled = kvm_pmu_counter_is_enabled(vcpu, select_idx);
->> +	attr.exclude_user = data & ARMV8_EXCLUDE_EL0 ? 1 : 0;
->> +	attr.exclude_kernel = data & ARMV8_EXCLUDE_EL1 ? 1 : 0;
->> +	attr.exclude_hv = 1; /* Don't count EL2 events */
->> +	attr.exclude_host = 1; /* Don't count host events */
->> +	attr.config = eventsel;
->> +
->> +	counter = kvm_pmu_get_counter_value(vcpu, select_idx);
->> +	/* The initial sample period (overflow count) of an event. */
->> +	attr.sample_period = (-counter) & pmc->bitmask;
->> +
->> +	event = perf_event_create_kernel_counter(&attr, -1, current, NULL, pmc);
-> 
-> As far as I can see, this is going to result in unreliable counts on a
-> big.LITTLE system, even if the VCPUs are constrained to one class of
-> core.
-> 
-> As this is a task-bound event (cpu == -1, task is current), the perf
-> core will stop as soon as one PMU driver agrees to handle the event. The
-> event will then only count on CPUs handled by that driver.
-> 
-> If you're unlucky, the set of CPUs handled by that driver is not the
-> same as the set of CPUs your VM is constrained to. e.g. your VM might be
-> on little cores, but the big PMU driver accepted the event, and only
-> counts on big cores.
-> 
-> I'm not sure how we can solve that.
+>> I'm certainly no expert on device-tree policy. I understand your
+>> point, but realize that the driver in question is imx2_wdt.c
+>> (compatible = "fsl,imx21-wdt"). This is an IP block inside the silicon
+>> of only Freescale chips, so its not like a future omap chip would be
+>> using this driver - only fsl devices. So why would it need a 'vendor'
+>> property any more than its other properties?
+>>
+>> Regards,
+>>
+>> Tim
+>
+> Wim,
+>
+> Does the lack of response mean overwhelming approval?
+>
+> I haven't heard any valid complaints - what does it take to get this approved?
+>
 
-Yeah, another level of BL braindeadness. We should have some API to
-match the PMU we want on the CPU we're on at the moment that trap occurs.
+Tim,
 
-I don't think this should block this series though - this is something
-we can improve on in parallel (a possible solution being to forbid KVM
-on BL platform altogether).
+Do you have an Ack from a devicetree maintainer ? I don't recall seeing one.
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Guenter
