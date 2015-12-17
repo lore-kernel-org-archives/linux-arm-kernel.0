@@ -1,56 +1,87 @@
-From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Thu, 17 Dec 2015 08:07:59 +0100
-Subject: [PATCH v3 4/4] drivers: psci: replace psci firmware calls
-In-Reply-To: <20151216134740.GB22916@red-moon>
-References: <1448449461-5043-1-git-send-email-jens.wiklander@linaro.org>
- <1448449461-5043-5-git-send-email-jens.wiklander@linaro.org>
- <20151201184741.GE29045@leverpostej> <20151201194421.GA29068@ermac>
- <20151216105529.GC19814@red-moon> <20151216125509.GA27585@ermac>
- <20151216134740.GB22916@red-moon>
-Message-ID: <20151217070758.GA30137@ermac>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Thu, 17 Dec 2015 15:22:50 +0800
+Subject: [PATCH v7 19/19] KVM: ARM64: Add a new kvm ARM PMU device
+In-Reply-To: <20151216203336.GE24889@cbox>
+References: <1450169379-12336-1-git-send-email-zhaoshenglong@huawei.com>
+ <1450169379-12336-20-git-send-email-zhaoshenglong@huawei.com>
+ <567032AD.8000206@arm.com> <567036DE.80605@linaro.org>
+ <567038E3.3010102@arm.com> <20151215204739.GK4120@cbox>
+ <56711348.6010406@huawei.com> <56711B99.1000608@huawei.com>
+ <20151216203336.GE24889@cbox>
+Message-ID: <567262CA.6050905@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 16, 2015 at 01:47:40PM +0000, Lorenzo Pieralisi wrote:
-> On Wed, Dec 16, 2015 at 01:55:11PM +0100, Jens Wiklander wrote:
-> > On Wed, Dec 16, 2015 at 10:55:29AM +0000, Lorenzo Pieralisi wrote:
-> > > [CC'ed Daniel]
-> > > 
-> > > On Tue, Dec 01, 2015 at 08:44:22PM +0100, Jens Wiklander wrote:
-> > > 
-> > > [...]
-> > > 
-> > > > > What's the plan for merging this? I assume this'll go via arm-soc?
-> > > > 
-> > > > I talked to Arnd about this and he suggested to go via Russel.
-> > > 
-> > > Heads-up, this patch will conflict with:
-> > > 
-> > > https://patchwork.kernel.org/patch/7418351/
-> > > 
-> > > that goes via linux-pm tree, please let me and Daniel know how
-> > > you want us to sort this out.
-> > 
-> > I guess this arm-smccc patchset need to go together with that patch in
-> > some way. I've just uploaded my patches in Russels patch system, but I
-> > can stop that and try to go via the linux-pm tree instead if you think
-> > the maintainer would accept that. I'll need to ask Russel if he can ack
-> > the patches "arm/arm64: add arm-smccc" and
-> > "arm: add implementation for arm-smccc" first though.
-> > 
-> > Would that work or do you have another idea? I'm of course happy either
-> > way as long as the patches get through. I'm new to this so any advice is
-> > appreciated.
-> 
-> It is really up to Daniel and Russell. If Daniel acks:
-> 
-> https://patchwork.kernel.org/patch/7418351/
-> 
-> I can easily rebase it and send it to RMK patch system (as things stand
-> it seems the easier option), otherwise the merge conflict (which will show
-> up in -next anyway) has to be sorted out, I am open to suggestions.
 
-What you're suggesting sounds good to me.
+
+On 2015/12/17 4:33, Christoffer Dall wrote:
+> On Wed, Dec 16, 2015 at 04:06:49PM +0800, Shannon Zhao wrote:
+>> Hi,
+>>
+>> On 2015/12/16 15:31, Shannon Zhao wrote:
+>>>>>>>>> But in this case, you're returning an error if it is *not* initialized.
+>>>>>>>>> I understand that in that case you cannot return an interrupt number (-1
+>>>>>>>>> would be weird), but returning -EBUSY feels even more weird.
+>>>>>>>>>
+>>>>>>>>> I'd settle for -ENOXIO, or something similar. Anyone having a better idea?
+>>>>>>>>>
+>>>>> ENXIO or ENODEV would be my choice too, and add that to the
+>>>>> Documentation clearly describing when this error code is used.
+>>>>>
+>>>>> By the way, why do you loop over all VCPUS to set the same value when
+>>>>> you can't do anything per VCPU anyway?  It seems to me it's either a
+>>>>> per-VM property (that you can store on the VM data structure) or it's a
+>>>>> true per-VCPU property?
+>>> This is a per-VCPU property. PMU interrupt could be PPI or SPI. For PPI
+>>> the interrupt numbers are same for each vcpu, while for SPI they are
+>>> different, so it needs to set them separately. I planned to support both
+>>> PPI and SPI. I think I should add support for SPI at this moment and let
+>>> users (QEMU) to set these interrupts for each one.
+>>
+>> How about below vPMU Documentation?
+>>
+>> ARM Virtual Performance Monitor Unit (vPMU)
+>> ===========================================
+>>
+>> Device types supported:
+>>   KVM_DEV_TYPE_ARM_PMU_V3         ARM Performance Monitor Unit v3
+>>
+>> Instantiate one PMU instance for per VCPU through this API.
+>>
+>> Groups:
+>>   KVM_DEV_ARM_PMU_GRP_IRQ
+>>   Attributes:
+>>     The attr field of kvm_device_attr encodes two values:
+>>     bits:     | 63 .... 32 | 31 .... 0 |
+>>     values:   | vcpu_index |  irq_num  |
+BTW, I change this Attribute to below format and pass vcpu_index through
+this Attribute while pass irq_num through kvm_device_attr.addr.
+Is it fine?
+
+    bits:     | 63 .... 32 | 31 ....  0 |
+    values:   |  reserved  | vcpu_index |
+
+>>     The irq_num describes the PMU overflow interrupt number for the
+>> specified
+>>     vcpu_index vcpu. This interrupt could be a PPI or SPI, but for one
+>> VM the
+>>     interrupt type must be same for each vcpu.
+> 
+> some formatting snafus that I expect come from pasting the text in an
+> e-mail client.
+> 
+>>
+>>   Errors:
+>>     -ENXIO: Getting or setting this attribute is not yet supported
+> 
+> 'not yet supported' as in something we'll implement later, or as in you
+> need to call this other function before you can access this state?
+> 
+Since only when the group is not KVM_DEV_ARM_PMU_GRP_IRQ, it will return
+-ENXIO. So what about this?
+
+"-ENXIO: Unsupported attribute group"
 
 Thanks,
-Jens
+-- 
+Shannon
