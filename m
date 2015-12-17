@@ -1,25 +1,24 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 17 Dec 2015 09:58:13 -0800
-Subject: [PATCH 09/19] ARM: dts: am335x: replace gpio-key,wakeup with
- wakeup-source property
-In-Reply-To: <567040E7.7060308@arm.com>
+Date: Thu, 17 Dec 2015 09:58:36 -0800
+Subject: [PATCH 15/19] ARM: dts: omap: replace legacy *,wakeup property
+ with wakeup-source
+In-Reply-To: <567041AD.1020702@arm.com>
 References: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
- <1445422216-29375-10-git-send-email-sudeep.holla@arm.com>
- <567040E7.7060308@arm.com>
-Message-ID: <20151217175812.GU23396@atomide.com>
+ <1445422216-29375-16-git-send-email-sudeep.holla@arm.com>
+ <567041AD.1020702@arm.com>
+Message-ID: <20151217175835.GV23396@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sudeep Holla <sudeep.holla@arm.com> [151215 08:33]:
+* Sudeep Holla <sudeep.holla@arm.com> [151215 08:37]:
 > 
 > 
 > On 21/10/15 11:10, Sudeep Holla wrote:
-> >Though the keyboard driver for GPIO buttons(gpio-keys) will continue to
-> >check for/support the legacy "gpio-key,wakeup" boolean property to
-> >enable gpio buttons as wakeup source, "wakeup-source" is the new
-> >standard binding.
+> >Though the keyboard and other driver will continue to support the legacy
+> >"gpio-key,wakeup", "linux,wakeup" boolean property to enable the wakeup
+> >source, "wakeup-source" is the new standard binding.
 > >
-> >This patch replaces the legacy "gpio-key,wakeup" with the unified
+> >This patch replaces all the legacy wakeup properties with the unified
 > >"wakeup-source" property in order to avoid any futher copy-paste
 > >duplication.
 > >
@@ -29,7 +28,6 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > Ping, do you prefer taking via your tree or should I send to armsoc
 > directly ?
 
-Sorry I did not realized you're waiting for me to pick this one,
-applying into omap-for-v4.5/dt thanks.
+Applying this one too thanks.
 
 Tony
