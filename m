@@ -1,33 +1,91 @@
-From: pmallapp@broadcom.com (Prem Mallappa)
-Date: Thu, 17 Dec 2015 15:29:36 +0530
-Subject: [PATCH v2 2/2] Documentation: dt-bindings: Add option to workaround
- STE.VALID in Broadcom Vulcan
-In-Reply-To: <1450346376-30920-1-git-send-email-pmallapp@broadcom.com>
-References: <1450346376-30920-1-git-send-email-pmallapp@broadcom.com>
-Message-ID: <1450346376-30920-2-git-send-email-pmallapp@broadcom.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 17 Dec 2015 11:06:05 +0100
+Subject: [PATCH v2 2/2] ASoC: atmel-classd: DT binding for PDMIC driver
+In-Reply-To: <1450345498-20130-2-git-send-email-songjun.wu@atmel.com>
+References: <1450345498-20130-1-git-send-email-songjun.wu@atmel.com>
+ <1450345498-20130-2-git-send-email-songjun.wu@atmel.com>
+Message-ID: <5672890D.7050401@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Prem Mallappa <pmallapp@broadcom.com>
----
- Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt | 5 +++++
- 1 file changed, 5 insertions(+)
+It seems that the $subject is not correct.
 
-diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-index 947863a..9c1218e 100644
---- a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-+++ b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-@@ -43,6 +43,11 @@ the PCIe specification.
- - hisilicon,broken-prefetch-cmd
-                     : Avoid sending CMD_PREFETCH_* commands to the SMMU.
- 
-+- broadcom,broken-ste-valid-check
-+                    : Broadcom specific, h/w peeks into more than just 
-+		      STE.VALID bit in "Bypass" mode. Enabling this, 
-+		      populates needed bits.
-+
- ** Example
- 
-         smmu at 2b400000 {
+
+Le 17/12/2015 10:44, Songjun Wu a ?crit :
+> DT binding documentation for this new ASoC driver.
+> 
+> Signed-off-by: Songjun Wu <songjun.wu@atmel.com>
+> ---
+> 
+> Changes in v2: None
+> 
+>  .../devicetree/bindings/sound/atmel-pdmic.txt      |   55 ++++++++++++++++++++
+>  1 file changed, 55 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/sound/atmel-pdmic.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/sound/atmel-pdmic.txt b/Documentation/devicetree/bindings/sound/atmel-pdmic.txt
+> new file mode 100644
+> index 0000000..e0875f1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/sound/atmel-pdmic.txt
+> @@ -0,0 +1,55 @@
+> +* Atmel PDMIC driver under ALSA SoC architecture
+> +
+> +Required properties:
+> +- compatible
+> +	Should be "atmel,sama5d2-pdmic".
+> +- reg
+> +	Should contain PDMIC registers location and length.
+> +- interrupts
+> +	Should contain the IRQ line for the PDMIC.
+> +- dmas
+> +	One DMA specifiers as described in atmel-dma.txt and dma.txt files.
+> +- dma-names
+> +	Must be "rx".
+> +- clock-names
+> +	Required elements:
+> +	- "pclk"	peripheral clock
+> +	- "gclk"	generated clock
+> +- clocks
+> +	Must contain an entry for each required entry in clock-names.
+> +	Please refer to clock-bindings.txt.
+> +- atmel,mic-min-freq
+> +	The minimal frequency that the micphone supports.
+> +- atmel,mic-max-freq
+> +	The maximal frequency that the micphone supports.
+> +
+> +Optional properties:
+> +- pinctrl-names, pinctrl-0
+> +	Please refer to pinctrl-bindings.txt.
+> +- atmel,model
+> +	The user-visible name of this sound card.
+> +	The default value is "PDMIC".
+> +- atmel,mic-offset
+> +	The offset that should be added.
+> +	The range is from -32768 to 32767.
+> +	The default value is 0.
+> +
+> +Example:
+> +	pdmic at f8018000 {
+> +				compatible = "atmel,sama5d2-pdmic";
+> +				reg = <0xf8018000 0x124>;
+> +				interrupts = <48 IRQ_TYPE_LEVEL_HIGH 7>;
+> +				dmas = <&dma0
+> +					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
+> +					| AT91_XDMAC_DT_PERID(50))>;
+> +				dma-names = "rx";
+> +				clocks = <&pdmic_clk>, <&pdmic_gclk>;
+> +				clock-names = "pclk", "gclk";
+> +
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pinctrl_pdmic_default>;
+> +				atmel,model = "PDMIC @ sama5d2_xplained";
+> +				atmel,mic-min-freq = <1000000>;
+> +				atmel,mic-max-freq = <3246000>;
+> +				atmel,mic-offset = <0x0>;
+> +	};
+> 
+
+
 -- 
-2.6.0
+Nicolas Ferre
