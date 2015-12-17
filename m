@@ -1,90 +1,68 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Thu, 17 Dec 2015 17:48:45 +0100
-Subject: [PATCH 14/24] crypto: atmel-aes: remove useless AES_FLAGS_DMA flag
-In-Reply-To: <cover.1450366831.git.cyrille.pitchen@atmel.com>
-References: <cover.1450366831.git.cyrille.pitchen@atmel.com>
-Message-ID: <bc344cf9484078f5f0bf8a606efb338803633f45.1450366831.git.cyrille.pitchen@atmel.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 17 Dec 2015 10:57:14 -0600
+Subject: [PATCH v7 3/4] gicv2m: Refactor to prepare for ACPI support
+In-Reply-To: <56720095.70004@amd.com>
+References: <1449766530-16935-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1449766530-16935-4-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <20151216221208.GC27791@localhost> <56720095.70004@amd.com>
+Message-ID: <20151217165713.GA23549@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the 'done' task code was split into atmel_aes_cpu_complete() and
-atmel_aes_dma_complete(), the AES_FLAGS_DMA flag has become useless.
+On Wed, Dec 16, 2015 at 06:23:49PM -0600, Suravee Suthikulanit wrote:
+> Hi Bjorn,
+> 
+> Thanks for your review. Please see my comments below.
+> 
+> On 12/16/2015 4:12 PM, Bjorn Helgaas wrote:
+> >On Thu, Dec 10, 2015 at 08:55:29AM -0800, Suravee Suthikulpanit wrote:
+> >>This patch replaces the struct device_node with struct fwnode_handle
+> >>since this structure is common between DT and ACPI.
+> >>
+> >>It also refactors gicv2m_init_one() to prepare for ACPI support.
+> >>The only functional change is removing the node name from pr_info.
+> >>
+> >>Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> >>Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> >
+> >>@@ -359,10 +355,10 @@ static int __init gicv2m_init_one(struct device_node *node,
+> >>  	}
+> >>
+> >>  	list_add_tail(&v2m->entry, &v2m_nodes);
+> >>-	pr_info("Node %s: range[%#lx:%#lx], SPI[%d:%d]\n", node->name,
+> >>-		(unsigned long)v2m->res.start, (unsigned long)v2m->res.end,
+> >>-		v2m->spi_start, (v2m->spi_start + v2m->nr_spis));
+> >>
+> >>+	pr_info("range[%#lx:%#lx], SPI[%d:%d]\n",
+> >>+		(unsigned long)res->start, (unsigned long)res->end,
+> >>+		v2m->spi_start, (v2m->spi_start + v2m->nr_spis));
+> >
+> >You didn't change this, but I don't think this message has enough
+> >context.  It's pretty cryptic all by itself.  It'd be nice if it could
+> >at least include a device name, e.g., if you could use dev_info().
+> 
+> Here is the example of the information printed:
+> [    0.000000] GICv2m: range[0xe1180000:0xe1181000], SPI[64:320]
+> 
+> Basically, the v2m is just an extension of the GIC. Here, we are
+> printing the memory range that it is covering, which can be used to
+> identify different V2m frame and the associate interrupt range
+> (SPI). The node name is not really providing any values. So, we are
+> removing it.
 
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
----
- drivers/crypto/atmel-aes.c | 37 +++++++++++++++----------------------
- 1 file changed, 15 insertions(+), 22 deletions(-)
+I noticed the pr_fmt definition later; that adds some useful context I
+didn't know about.  I guess there's no struct device for the GIC?  I
+don't see one in struct device_node.  Seems like this piece of
+hardware that apparently responds to a memory range *could* have a
+struct device, but I'm a little fuzzy on how we handle ACPI and OF
+device descriptions in that regard.
 
-diff --git a/drivers/crypto/atmel-aes.c b/drivers/crypto/atmel-aes.c
-index 8a2b3e81c087..68e4177ad61b 100644
---- a/drivers/crypto/atmel-aes.c
-+++ b/drivers/crypto/atmel-aes.c
-@@ -66,7 +66,6 @@
- 
- #define AES_FLAGS_INIT		BIT(2)
- #define AES_FLAGS_BUSY		BIT(3)
--#define AES_FLAGS_DMA		BIT(4)
- #define AES_FLAGS_FAST		BIT(5)
- 
- #define AES_FLAGS_PERSISTENT	(AES_FLAGS_INIT | AES_FLAGS_BUSY)
-@@ -393,8 +392,6 @@ static int atmel_aes_crypt_dma(struct atmel_aes_dev *dd,
- 	dmaengine_slave_config(dd->dma_lch_in.chan, &dd->dma_lch_in.dma_conf);
- 	dmaengine_slave_config(dd->dma_lch_out.chan, &dd->dma_lch_out.dma_conf);
- 
--	dd->flags |= AES_FLAGS_DMA;
--
- 	sg_init_table(&sg[0], 1);
- 	sg_dma_address(&sg[0]) = dma_addr_in;
- 	sg_dma_len(&sg[0]) = length;
-@@ -433,8 +430,6 @@ static int atmel_aes_crypt_cpu_start(struct atmel_aes_dev *dd)
- {
- 	struct ablkcipher_request *req = ablkcipher_request_cast(dd->areq);
- 
--	dd->flags &= ~AES_FLAGS_DMA;
--
- 	dma_sync_single_for_cpu(dd->dev, dd->dma_addr_in,
- 				dd->dma_size, DMA_TO_DEVICE);
- 	dma_sync_single_for_cpu(dd->dev, dd->dma_addr_out,
-@@ -642,25 +637,23 @@ static int atmel_aes_start(struct atmel_aes_dev *dd)
- 
- static int atmel_aes_crypt_dma_stop(struct atmel_aes_dev *dd)
- {
--	int err = -EINVAL;
-+	int err = 0;
- 	size_t count;
- 
--	if (dd->flags & AES_FLAGS_DMA) {
--		err = 0;
--		if  (dd->flags & AES_FLAGS_FAST) {
--			dma_unmap_sg(dd->dev, dd->out_sg, 1, DMA_FROM_DEVICE);
--			dma_unmap_sg(dd->dev, dd->in_sg, 1, DMA_TO_DEVICE);
--		} else {
--			dma_sync_single_for_cpu(dd->dev, dd->dma_addr_out,
--				dd->dma_size, DMA_FROM_DEVICE);
--
--			/* copy data */
--			count = atmel_aes_sg_copy(&dd->out_sg, &dd->out_offset,
--				dd->buf_out, dd->buflen, dd->dma_size, 1);
--			if (count != dd->dma_size) {
--				err = -EINVAL;
--				pr_err("not all data converted: %zu\n", count);
--			}
-+	if  (dd->flags & AES_FLAGS_FAST) {
-+		dma_unmap_sg(dd->dev, dd->out_sg, 1, DMA_FROM_DEVICE);
-+		dma_unmap_sg(dd->dev, dd->in_sg, 1, DMA_TO_DEVICE);
-+	} else {
-+		dma_sync_single_for_cpu(dd->dev, dd->dma_addr_out,
-+					dd->dma_size, DMA_FROM_DEVICE);
-+
-+		/* copy data */
-+		count = atmel_aes_sg_copy(&dd->out_sg, &dd->out_offset,
-+					  dd->buf_out, dd->buflen,
-+					  dd->dma_size, 1);
-+		if (count != dd->dma_size) {
-+			err = -EINVAL;
-+			pr_err("not all data converted: %zu\n", count);
- 		}
- 	}
- 
--- 
-1.8.2.2
+I hadn't noticed the memory range part; maybe you could use %pR there?
+
+Just to double-check, there's no off-by-one error in the SPI range, is
+there?  The pattern I usually expect is "start, start + nr_items - 1".
+
+I'm just kibbitzing here; this isn't PCI code, and you don't need my
+ack, so just consider these as random observations.
+
+Bjorn
