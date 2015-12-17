@@ -1,49 +1,74 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 17 Dec 2015 22:18:09 +0000
-Subject: BUG: SDHCI fails to DMA-unmap, and other warnings
-In-Reply-To: <20151217220045.GA27072@n2100.arm.linux.org.uk>
-References: <20151217215140.GK8644@n2100.arm.linux.org.uk>
- <20151217220045.GA27072@n2100.arm.linux.org.uk>
-Message-ID: <20151217221808.GL8644@n2100.arm.linux.org.uk>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 17 Dec 2015 14:31:40 -0800
+Subject: [PATCH] ARM: dma-mapping: Just allocate one chunk at a time
+In-Reply-To: <1450384253-1067-1-git-send-email-dianders@chromium.org>
+References: <1450384253-1067-1-git-send-email-dianders@chromium.org>
+Message-ID: <CAD=FV=XP9zx2XEmo7vS0MdsROJ0JoRYFidnRaBLxR43GXnuqag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 17, 2015 at 10:00:45PM +0000, Russell King - ARM Linux wrote:
-> And another one:
-> 
-> "mmcblk0: retrying because a re-tune was needed"
-> 
-> static int mmc_blk_err_check(struct mmc_card *card,
->                              struct mmc_async_req *areq)
-> {
-> ...
->         if (brq->data.error) {
->                 if (need_retune && !brq->retune_retry_done) {
->                         pr_info("%s: retrying because a re-tune was needed\n",
->                                 req->rq_disk->disk_name);
->                         brq->retune_retry_done = 1;
->                         return MMC_BLK_RETRY;
-> 
-> This looks like it'll spam the kernel log regularly if MMC/SD is used
-> heavily with a UHS card, which (iirc) requires regular retunes.  Why is
-> this message at info level, and not debug level?
+Hi,
 
-And... if three problems aren't enough, have another one... running:
+On Thu, Dec 17, 2015 at 12:30 PM, Douglas Anderson
+<dianders@chromium.org> wrote:
+> The __iommu_alloc_buffer() is expected to be called to allocate pretty
+> sizeable buffers.  Upon simple tests of video I saw it trying to
+> allocate 4,194,304 bytes.  The function tries to be efficient about this
+> by starting out allocating large chunks and then moving to smaller and
+> smaller chunk sizes until it succeeds.
+>
+> The current function is very, very slow.
+>
+> One problem is the way it keeps trying and trying to allocate big
+> chunks.  Imagine a very fragmented memory that has 4M free but no
+> contiguous pages at all.  Further imagine allocating 4M (1024 pages).
+> We'll do the following memory allocations:
+> - For page 1:
+>   - Try to allocate order 10 (no retry)
+>   - Try to allocate order 9 (no retry)
+>   - ...
+>   - Try to allocate order 0 (with retry, but not needed)
+> - For page 2:
+>   - Try to allocate order 9 (no retry)
+>   - Try to allocate order 8 (no retry)
+>   - ...
+>   - Try to allocate order 0 (with retry, but not needed)
+> - ...
+> - ...
+>
+> Total number of calls to alloc() calls for this case is:
+>   sum(int(math.log(i, 2)) + 1 for i in range(1, 1025))
+>   => 9228
+>
+> The above is obviously worse case, but given how slow alloc can be we
+> really want to try to avoid even somewhat bad cases.  I timed the old
+> code with a device under memory pressure and it wasn't hard to see it
+> take more than 24 seconds to allocate 4 megs of memory (!!).
+>
+> A second problem (and maybe even more important) is that allocating big
+> chunks when we don't need them is just not a good idea anyway.  The
+> first thing we do with these big chunks is break them into smaller
+> chunks!  If we allocate small chunks:
+> - The memory manager doesn't need to work so hard to give us big chunks.
+> - We can save the big chunks for those that really need them and this
+>   code can make great use of all the small chunks sitting around.
+>
+> Let's simplify by just allocating one page at a time.  We may make more
+> total allocate calls but it works way better.  In real world tests that
+> used to sometimes see a 24 second allocation call I can now see at most
+> 250 ms.
 
-while :; do hdparm -t /dev/mmcblk0; done
+Off-list I talked to Dmitry about this a little bit and he pointed out
+that contiguous chunks actually give a benefit to the IOMMU.  I don't
+think the benefit outweighs the cost in this case, but I'm happy to
+hear what others have to say.  I did some quick printouts and it turns
+out that even when requesting page at a time the memory manager
+(unsurprisingly) can in many cases still give us pages that are
+contiguous.
 
-eventually causes:
+Also I'm happy to post up
+<https://chromium-review.googlesource.com/#/c/319210/> which sorts the
+array and could possibly give us larger chunks of contiguous memory.
 
-[ 3465.671526] mmc0: tuning execution failed
-[ 3465.675746] mmcblk0: response CRC error sending r/w cmd command, card status 0x900
-[ 3622.758988] mmc0: tuning execution failed
-[ 3622.763227] mmcblk0: response CRC error sending r/w cmd command, card status 0x900
-[ 3858.363555] mmc0: tuning execution failed
-[ 3858.368857] mmcblk0: response CRC error sending r/w cmd command, card status 0x900
-[ 3880.388048] mmc0: tuning execution failed
-[ 3880.392292] mmcblk0: response CRC error sending r/w cmd command, card status 0x900
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+-Doug
