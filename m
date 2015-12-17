@@ -1,44 +1,72 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Thu, 17 Dec 2015 17:49:11 +0000
-Subject: [PATCH v4 04/12] arm-cci: Fix the flags for pmu_start called from
- pmu_add
+Date: Thu, 17 Dec 2015 17:49:15 +0000
+Subject: [PATCH v4 08/12] arm-cci: Add routines to save/restore all counters
 In-Reply-To: <1450374559-23315-1-git-send-email-suzuki.poulose@arm.com>
 References: <1450374559-23315-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1450374559-23315-5-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1450374559-23315-9-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cci PMU always reprograms the counter value in pmu->start()
-irrespective of the mode it is called from, making sure that
-the hwc->state is PERF_HES_UPTODATE.
+Adds helper routines to disable the counter controls for
+all the counters on the CCI PMU and restore it back, by
+preserving the original state in caller provided mask.
 
-When pmu->add() is called with PERF_EF_START, we invoke
-pmu->start() with PERF_EF_RELOAD removing the PERF_EF_START.
-This makes it impossible to detect where the pmu->start()
-is called from, i.e, PERF_EF_START or a real PERF_EF_RELOAD.
-
-This patch fixes the issue by, passing the right flags down
-to the pmu->start() when called from pmu->add().
-
-Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Punit Agrawal <punit.agrawal@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- drivers/bus/arm-cci.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/bus/arm-cci.c |   39 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
 diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-index f6b8717..f00cbce 100644
+index 7f77f65..7207def 100644
 --- a/drivers/bus/arm-cci.c
 +++ b/drivers/bus/arm-cci.c
-@@ -1020,7 +1020,7 @@ static int cci_pmu_add(struct perf_event *event, int flags)
+@@ -679,6 +679,45 @@ pmu_get_event(struct cci_pmu *cci_pmu, int idx)
+ 	return pmu_read_register(cci_pmu, idx, CCI_PMU_EVT_SEL);
+ }
  
- 	hwc->state = PERF_HES_STOPPED | PERF_HES_UPTODATE;
- 	if (flags & PERF_EF_START)
--		cci_pmu_start(event, PERF_EF_RELOAD);
-+		cci_pmu_start(event, flags);
- 
- 	/* Propagate our changes to the userspace mapping. */
- 	perf_event_update_userpage(event);
++
++/*
++ * For all counters on the CCI-PMU, disable any 'enabled' counters,
++ * saving the changed counters in the mask, so that we can restore
++ * it later using pmu_restore_counters. The mask is private to the
++ * caller. We cannot rely on the used_mask maintained by the CCI_PMU
++ * as it only tells us if the counter is assigned to perf_event or not.
++ * The state of the perf_event cannot be locked by the PMU layer, hence
++ * we check the individual counter status (which can be locked by
++ * cci_pm->hw_events->pmu_lock).
++ *
++ * @mask should be initialised by the caller.
++ */
++static void __maybe_unused
++pmu_save_counters(struct cci_pmu *cci_pmu, unsigned long *mask)
++{
++	int i;
++
++	for (i = 0; i < cci_pmu->num_cntrs; i++) {
++		if (pmu_counter_is_enabled(cci_pmu, i)) {
++			set_bit(i, mask);
++			pmu_disable_counter(cci_pmu, i);
++		}
++	}
++}
++
++/*
++ * Restore the status of the counters. Reversal of the pmu_disable_counters().
++ * For each counter set in the mask, enable the counter back.
++ */
++static void __maybe_unused
++pmu_restore_counters(struct cci_pmu *cci_pmu, unsigned long *mask)
++{
++	int i;
++
++	for_each_set_bit(i, mask, cci_pmu->num_cntrs)
++		pmu_enable_counter(cci_pmu, i);
++}
++
+ /*
+  * Returns the number of programmable counters actually implemented
+  * by the cci
 -- 
 1.7.9.5
