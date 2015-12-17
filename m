@@ -1,46 +1,23 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Thu, 17 Dec 2015 12:35:54 -0800
-Subject: -next regression: "driver cohandle -EPROBE_DEFER from
- bus_type.match()"
-In-Reply-To: <20151217184641.GI8644@n2100.arm.linux.org.uk>
-References: <CAPcyv4hOJuT=i2A_0vDQHsL7MXNgVN_p17q3UW6EcTkxsCMmeg@mail.gmail.com>
- <20151217184641.GI8644@n2100.arm.linux.org.uk>
-Message-ID: <CAPcyv4i=gD0D_W8ufjCdjRuekS-mf9fZGmod+zn7dA2zDx7LAw@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 17 Dec 2015 15:45:08 -0500 (EST)
+Subject: [PATCH v2 0/3] drivers: net: cpsw: Fix bugs in fixed-link PHY
+ DT parsing
+In-Reply-To: <cover.1450309613.git.drivshin@allworx.com>
+References: <20151209223115.6c5a400f.drivshin.allworx@gmail.com>
+ <1741588.Ve76Z1ZI87@localhost>
+ <cover.1450309613.git.drivshin@allworx.com>
+Message-ID: <20151217.154508.505711333985621252.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Adding Dave Howells who tried to correct this situation earlier this year]
+From: "David Rivshin (Allworx)" <drivshin.allworx@gmail.com>
+Date: Wed, 16 Dec 2015 23:02:08 -0500
 
-On Thu, Dec 17, 2015 at 10:46 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Dec 17, 2015 at 07:51:14AM -0800, Dan Williams wrote:
->> The commit below causes the libnvdimm sub-system to stop loading.
->> This is due to the fact that nvdimm_bus_match() returns the result of
->> test_bit() which may be negative.  If there are any other bus match
->> functions using test_bit they may be similarly impacted.
->>
->> Can we queue a fixup like the following to libnvdimm, and maybe
->> others, ahead of this driver core change?
->
-> This is rather annoying.  Have we uncovered a latent bug in other
-> architectures?  Well, looking through the test_bit() implementations,
-> it looks like it.
->
-> I'll drop the patch set for the time being, we can't go around breaking
-> stuff like this.
+> I have tested on the following hardware configurations:
+>  - (EVMSK) dual emac with two real MDIO-connected phys using RGMII-TXID
+>  - single emac with fixed-link using RGMII
+> Testing of other CPSW emac configurations that folks may have would
+> be appreciated.
 
-...or make the interpretation from the return value of ->match() be 0,
--EPROBE_DEFER, or other non-zero value for success?  Although that's
-fairly subtle.
-
-> However, I think the test_bit() result should be
-> regularised across different architectures - it _looks_ to me like most
-> implementations return 0/1 values, but there may be some that don't
-> (maybe the assembly versions?)
-
-Correct.  Al the constant versions return 0 or 1, but the assembly
-return 0 or non-zero.
-
-Here's a link to Dave's rework.
-
-https://lwn.net/Articles/642437/
+I'm going to wait until some others give some feedback and testing
+results on this one, thanks.
