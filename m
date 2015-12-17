@@ -1,91 +1,56 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 17 Dec 2015 11:06:05 +0100
-Subject: [PATCH v2 2/2] ASoC: atmel-classd: DT binding for PDMIC driver
-In-Reply-To: <1450345498-20130-2-git-send-email-songjun.wu@atmel.com>
-References: <1450345498-20130-1-git-send-email-songjun.wu@atmel.com>
- <1450345498-20130-2-git-send-email-songjun.wu@atmel.com>
-Message-ID: <5672890D.7050401@atmel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 17 Dec 2015 10:08:45 +0000
+Subject: [PATCH] clocksource: arm_global_timer: Allow DT to specify already
+ reset timer counter
+In-Reply-To: <CAJe_Zher2N-jFOBiA-25u0fQv_mdps+_Y4FoFdjiw9E++87TLg@mail.gmail.com>
+References: <1448429044-10395-1-git-send-email-jaswinder.singh@linaro.org>	<5670559A.4050404@linaro.org>	<CABb+yY0_JvVV_HG_iU8KJjmwu-nq_Cu5hJ6HBoKZCrZAdJ=rLQ@mail.gmail.com>	<56710BD6.2090502@linaro.org>
+ <CAJe_Zher2N-jFOBiA-25u0fQv_mdps+_Y4FoFdjiw9E++87TLg@mail.gmail.com>
+Message-ID: <567289AD.5000209@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It seems that the $subject is not correct.
+On 17/12/15 09:37, Jassi Brar wrote:
+> On 16 December 2015 at 12:29, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+>> On 12/16/2015 05:11 AM, Jassi Brar wrote:
+>>>
+>>> On Tue, Dec 15, 2015 at 11:32 PM, Daniel Lezcano
+>>> <daniel.lezcano@linaro.org> wrote:
+>>>>
+>>>> On 11/25/2015 06:24 AM, Jassi Brar wrote:
+>>>>>
+>>>>>
+>>>>> The GT counter is common to every core in a cluster. There is a usecase
+>>>>> when Linux is spawned by a 'master' firmware/OS running on some core of
+>>>>> the same cluster and the GT is used by the both.
+>>>>>    Linux, upon boot, resetting the GT counter is obviously fatal to the
+>>>>> other OS. So provide a way for DT to tell Linux if it's running in that
+>>>>> 'slave' mode and must not reset the counter.
+>>>>>
+>>>>> Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+>>>>
+>>>>
+>>>>
+>>>> Hmm, I doubt that is a hardware description.
+>>>>
+>>> Its a regular 2core-1cluster platform. The master RTOS on cpu0
+>>> maintains the lifecycle of Linux on cpu1.
+>>>
+>>> 'No_Counter_Reset' is not a h/w thing, I agree, but I don't know how
+>>> to better convey that platform specific constraint.
+>>
+>>
+>> May be with a kernel parameter ?
+>>
+> The fact, that arch-timer driver does it via DT (see commit
+> 65b5732d241b8), changes anything? :)
 
+This is a horrible, platform specific hack. I wish we could have pushed
+back on this by forcing people to fix their firmware. Why can't you
+simply get the firmware to *remove* the node from your device tree
+altogether?
 
-Le 17/12/2015 10:44, Songjun Wu a ?crit :
-> DT binding documentation for this new ASoC driver.
-> 
-> Signed-off-by: Songjun Wu <songjun.wu@atmel.com>
-> ---
-> 
-> Changes in v2: None
-> 
->  .../devicetree/bindings/sound/atmel-pdmic.txt      |   55 ++++++++++++++++++++
->  1 file changed, 55 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/sound/atmel-pdmic.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/sound/atmel-pdmic.txt b/Documentation/devicetree/bindings/sound/atmel-pdmic.txt
-> new file mode 100644
-> index 0000000..e0875f1
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/sound/atmel-pdmic.txt
-> @@ -0,0 +1,55 @@
-> +* Atmel PDMIC driver under ALSA SoC architecture
-> +
-> +Required properties:
-> +- compatible
-> +	Should be "atmel,sama5d2-pdmic".
-> +- reg
-> +	Should contain PDMIC registers location and length.
-> +- interrupts
-> +	Should contain the IRQ line for the PDMIC.
-> +- dmas
-> +	One DMA specifiers as described in atmel-dma.txt and dma.txt files.
-> +- dma-names
-> +	Must be "rx".
-> +- clock-names
-> +	Required elements:
-> +	- "pclk"	peripheral clock
-> +	- "gclk"	generated clock
-> +- clocks
-> +	Must contain an entry for each required entry in clock-names.
-> +	Please refer to clock-bindings.txt.
-> +- atmel,mic-min-freq
-> +	The minimal frequency that the micphone supports.
-> +- atmel,mic-max-freq
-> +	The maximal frequency that the micphone supports.
-> +
-> +Optional properties:
-> +- pinctrl-names, pinctrl-0
-> +	Please refer to pinctrl-bindings.txt.
-> +- atmel,model
-> +	The user-visible name of this sound card.
-> +	The default value is "PDMIC".
-> +- atmel,mic-offset
-> +	The offset that should be added.
-> +	The range is from -32768 to 32767.
-> +	The default value is 0.
-> +
-> +Example:
-> +	pdmic at f8018000 {
-> +				compatible = "atmel,sama5d2-pdmic";
-> +				reg = <0xf8018000 0x124>;
-> +				interrupts = <48 IRQ_TYPE_LEVEL_HIGH 7>;
-> +				dmas = <&dma0
-> +					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
-> +					| AT91_XDMAC_DT_PERID(50))>;
-> +				dma-names = "rx";
-> +				clocks = <&pdmic_clk>, <&pdmic_gclk>;
-> +				clock-names = "pclk", "gclk";
-> +
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_pdmic_default>;
-> +				atmel,model = "PDMIC @ sama5d2_xplained";
-> +				atmel,mic-min-freq = <1000000>;
-> +				atmel,mic-max-freq = <3246000>;
-> +				atmel,mic-offset = <0x0>;
-> +	};
-> 
+Thanks,
 
-
+	M.
 -- 
-Nicolas Ferre
+Jazz is not dead. It just smells funny...
