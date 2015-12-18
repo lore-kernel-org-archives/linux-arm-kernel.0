@@ -1,38 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Dec 2015 15:09:46 +0100
-Subject: [PATCH v6 15/20] arm64: signal: move ilp32 and lp64 common code
- to separated file
-In-Reply-To: <20151218134855.GA31200@yury-N73SV>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Fri, 18 Dec 2015 17:11:12 +0300
+Subject: [PATCH v6 08/20] arm64: ilp32: add is_ilp32_compat_{task,
+ thread} and TIF_32BIT_AARCH64
+In-Reply-To: <20151217114153.GD25232@e104818-lin.cambridge.arm.com>
 References: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
- <6089723.moZBJ98Dq4@wuerfel> <20151218134855.GA31200@yury-N73SV>
-Message-ID: <2916702.unU22JtYur@wuerfel>
+ <1450215766-14765-9-git-send-email-ynorov@caviumnetworks.com>
+ <20151217114153.GD25232@e104818-lin.cambridge.arm.com>
+Message-ID: <20151218141112.GD31200@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 18 December 2015 16:48:55 Yury Norov wrote:
-> On Wed, Dec 16, 2015 at 05:08:35PM +0100, Arnd Bergmann wrote:
-> > On Wednesday 16 December 2015 00:42:41 Yury Norov wrote:
-> > > +               sigtramp = ka->sa.sa_restorer;
-> > > +#ifdef CONFIG_ARM64_ILP32
-> > > +       else if (is_ilp32_compat_task())
-> > > +               sigtramp = VDSO_SYMBOL(current->mm->context.vdso, sigtramp_ilp32);
-> > > +#endif
-> > > +       else
-> > > +               sigtramp = VDSO_SYMBOL(current->mm->context.vdso, sigtramp);
-> > > 
-> > 
-> > This is another case where I think it's more readable to remove the #ifdef,
-> > with no change in behavior.
-> > 
-> >       Arnd
+On Thu, Dec 17, 2015 at 11:41:53AM +0000, Catalin Marinas wrote:
+> On Wed, Dec 16, 2015 at 12:42:34AM +0300, Yury Norov wrote:
+> > Reviewed-by: David Daney <ddaney@caviumnetworks.com>
+> > Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+> > Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
+> > Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+> > Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
 > 
-> No actually. symbol sigtramp_ilp32 is declared in
-> arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S
+> Long description missing.
+
+Hi, Catalin,
+
+I think this patch (and patch #3 too) is trivial, and
+explanation in patch name is clear enougth. So, I just do not
+understand what else to explain here. Could you point me, and then I
+will do it.
+
 > 
-> And so it does not exist if CONFIG_ARM64_ILP32 is not set.
+> > diff --git a/arch/arm64/include/asm/is_compat.h b/arch/arm64/include/asm/is_compat.h
+> > index 476db90..89b1f65 100644
+> > --- a/arch/arm64/include/asm/is_compat.h
+> > +++ b/arch/arm64/include/asm/is_compat.h
+> > @@ -36,7 +36,6 @@ static inline int is_a32_compat_thread(struct thread_info *thread)
+> >  #else
+> >  
+> >  static inline int is_a32_compat_task(void)
+> > -
+> >  {
+> >  	return 0;
+> >  }
+> 
+> You should move this to the previous patch.
+> 
+> > @@ -45,14 +44,39 @@ static inline int is_a32_compat_thread(struct thread_info *thread)
+> >  {
+> >  	return 0;
+> >  }
+> > -
+> >  #endif /* CONFIG_AARCH32_EL0 */
+> 
+> Maybe this one as well, though I like an empty line before the last
+> #endif (i.e. drop this hunk).
 
-You only need the declaration of that symbol, the compiler's dead code
-elimination will ensure that no symbol reference is generated when 
-the condition is always false at compile time.
+It's just dirt, I'll clean it. Thank you.
 
-	Arnd
+Yury.
