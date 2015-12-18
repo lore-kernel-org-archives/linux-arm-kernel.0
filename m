@@ -1,75 +1,57 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 18 Dec 2015 11:26:51 +0000
-Subject: [PATCH v10 1/4] dt-binding:Documents of the mbigen bindings
-In-Reply-To: <20151218105837.GB29219@leverpostej>
+Date: Fri, 18 Dec 2015 11:27:34 +0000
+Subject: [PATCH v10 3/4] irqchip:create irq domain for each mbigen device
+In-Reply-To: <20151218110253.GC29219@leverpostej>
 References: <1450353397-47668-1-git-send-email-majun258@huawei.com>
- <1450353397-47668-2-git-send-email-majun258@huawei.com>
- <20151217135247.GD13389@leverpostej> <5673683C.2080304@huawei.com>
- <20151218105837.GB29219@leverpostej>
-Message-ID: <5673ED7B.1050700@arm.com>
+ <1450353397-47668-4-git-send-email-majun258@huawei.com>
+ <20151218110253.GC29219@leverpostej>
+Message-ID: <5673EDA6.5090902@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/12/15 10:58, Mark Rutland wrote:
-> On Fri, Dec 18, 2015 at 09:58:20AM +0800, majun (F) wrote:
->> Hi Mark:
+On 18/12/15 11:02, Mark Rutland wrote:
+> On Thu, Dec 17, 2015 at 07:56:36PM +0800, MaJun wrote:
+>> From: Ma Jun <majun258@huawei.com>
 >>
->> ? 2015/12/17 21:52, Mark Rutland ??:
->>> On Thu, Dec 17, 2015 at 07:56:34PM +0800, MaJun wrote:
->>>> From: Ma Jun <majun258@huawei.com>
->> [...]
->>>> +- compatible: Should be "hisilicon,mbigen-v2"
->>>> +
->>>> +- reg: Specifies the base physical address and size of the Mbigen
->>>> +  registers.
->>>> +
->>>> +- interrupt controller: Identifies the node as an interrupt controller
->>>> +
->>>> +- msi-parent: Specifies the MSI controller this mbigen use.
->>>> +  For more detail information,please refer to the generic msi-parent binding in
->>>> +  Documentation/devicetree/bindings/interrupt-controller/msi.txt.
->>>> +
->>>> +- num-msis:Specifies the total number of interrupt this device has.
->>>
->>> Is this the number of pins implemented? Or the number of pins that are
->>> in use?
->>>
->>> The latter feels like something we can derive.
+>> For peripheral devices which connect to mbigen,mbigen is a interrupt
+>> controller. So, we create irq domain for each mbigen device and add
+>> mbigen irq domain into irq hierarchy structure.
 >>
->> num-msis means the total number of pins implemented.
+>> Signed-off-by: Ma Jun <majun258@huawei.com>
+>> ---
+>>  drivers/irqchip/irq-mbigen.c |  138 ++++++++++++++++++++++++++++++++++++++++++
+>>  1 files changed, 138 insertions(+), 0 deletions(-)
 > 
-> Ok. In that case I think it should be:
+> [...]
 > 
-> - num-pins: the total number of pins implemented in this Mbigen
->   instance.
+>> +static int mbigen_domain_translate(struct irq_domain *d,
+>> +				    struct irq_fwspec *fwspec,
+>> +				    unsigned long *hwirq,
+>> +				    unsigned int *type)
+>> +{
+>> +	if (is_of_node(fwspec->fwnode)) {
+>> +		if (fwspec->param_count != 2)
+>> +			return -EINVAL;
+>> +
+>> +		if ((fwspec->param[0] > MAXIMUM_IRQ_PIN_NUM) ||
+>> +			(fwspec->param[0] < RESERVED_IRQ_PER_MBIGEN_CHIP))
+>> +			return -EINVAL;
+>> +		else
+>> +			*hwirq = fwspec->param[0];
+>> +
+>> +		/* If there is no valid irq type, just use the default type */
+>> +		if ((fwspec->param[1] == IRQ_TYPE_EDGE_RISING) ||
+>> +			(fwspec->param[1] == IRQ_TYPE_LEVEL_HIGH))
+>> +			*type = fwspec->param[1];
+>> +		else
+>> +			*type = IRQ_TYPE_NONE;
 > 
-> (with the appropriate fixups in the driver).
+> That does not seem like a good idea. The binding requires one of two
+> types, and the DT is clearly wrong in the else case. 
 > 
-> With that:
-> 
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> 
->>>> +- #interrupt-cells : Specifies the number of cells needed to encode an
->>>> +  interrupt source. The value must be 2.
->>>> +
->>>> +  The 1st cell is hardware pin number of the interrupt.This number is local to
->>>> +  each mbigen chip and in the range from 0 to the maximum interrupts number
->>>> +  of the mbigen.
->>>
->>> Just to check: 0 - 63 represent the "reserved" pins, yes?
->>
->> Yes, you are right.
->>
->>>
->>> Other than those questions, this looks good to me.
->>
->> Do i need to post a new patch to update these two questions?
-> 
-> Hopefully not.
-> 
-> Marc, are you happy to fold in the s/num-msis/num-pins/ change?
+> I think for the else case we should return -EINVAL.
 
-Sure, I'll update the whole thing while merging it.
+Ah, nicely spotted. I'll fix that in my tree too.
 
 Thanks,
 
