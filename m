@@ -1,52 +1,56 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 18 Dec 2015 15:18:13 +0100
-Subject: [PATCH 60/69] clocksource/drivers/dw_apb_timer: Inline apbt_readl and
- apbt_writel
+Date: Fri, 18 Dec 2015 15:18:14 +0100
+Subject: [PATCH 61/69] clockevents/drivers/arm_global_timer: Use
+ writel_relaxed in gt_compare_set
 In-Reply-To: <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
 References: <5672CB9E.7090707@linaro.org>
  <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1450448302-27429-60-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1450448302-27429-61-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jisheng Zhang <jszhang@marvell.com>
 
-It seems gcc can automatically inline apbt_writel() for us, but
-apbt_real isn't inlined. This patch makes them inline to get a trivial
-performance improvement: 4096 rounds of __apbt_read_clocksource() call
-spend time on Marvell BG4CT platform:
+Use the relaxed version to improve performance. we measured time of
+4096 rounds of gt_compare_set() spent on Marvell BG2Q:
 
- before the patch 1275240ns on average
- after the patch 1263240ns on average
+before the patch: 3690648ns on average
+after the patch: 1083023ns on average
 
-so we get 1% performance improvement.
+improved by 70%!
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/dw_apb_timer.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/clocksource/arm_global_timer.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/clocksource/dw_apb_timer.c b/drivers/clocksource/dw_apb_timer.c
-index 7f95b53..6334526 100644
---- a/drivers/clocksource/dw_apb_timer.c
-+++ b/drivers/clocksource/dw_apb_timer.c
-@@ -49,13 +49,13 @@ clocksource_to_dw_apb_clocksource(struct clocksource *cs)
- 	return container_of(cs, struct dw_apb_clocksource, cs);
+diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
+index a2cb6fa..f99be6b 100644
+--- a/drivers/clocksource/arm_global_timer.c
++++ b/drivers/clocksource/arm_global_timer.c
+@@ -99,17 +99,17 @@ static void gt_compare_set(unsigned long delta, int periodic)
+ 
+ 	counter += delta;
+ 	ctrl = GT_CONTROL_TIMER_ENABLE;
+-	writel(ctrl, gt_base + GT_CONTROL);
+-	writel(lower_32_bits(counter), gt_base + GT_COMP0);
+-	writel(upper_32_bits(counter), gt_base + GT_COMP1);
++	writel_relaxed(ctrl, gt_base + GT_CONTROL);
++	writel_relaxed(lower_32_bits(counter), gt_base + GT_COMP0);
++	writel_relaxed(upper_32_bits(counter), gt_base + GT_COMP1);
+ 
+ 	if (periodic) {
+-		writel(delta, gt_base + GT_AUTO_INC);
++		writel_relaxed(delta, gt_base + GT_AUTO_INC);
+ 		ctrl |= GT_CONTROL_AUTO_INC;
+ 	}
+ 
+ 	ctrl |= GT_CONTROL_COMP_ENABLE | GT_CONTROL_IRQ_ENABLE;
+-	writel(ctrl, gt_base + GT_CONTROL);
++	writel_relaxed(ctrl, gt_base + GT_CONTROL);
  }
  
--static u32 apbt_readl(struct dw_apb_timer *timer, unsigned long offs)
-+static inline u32 apbt_readl(struct dw_apb_timer *timer, unsigned long offs)
- {
- 	return readl(timer->base + offs);
- }
- 
--static void apbt_writel(struct dw_apb_timer *timer, u32 val,
--		 unsigned long offs)
-+static inline void apbt_writel(struct dw_apb_timer *timer, u32 val,
-+			unsigned long offs)
- {
- 	writel(val, timer->base + offs);
- }
+ static int gt_clockevent_shutdown(struct clock_event_device *evt)
 -- 
 1.9.1
