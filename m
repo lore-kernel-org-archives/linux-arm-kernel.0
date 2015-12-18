@@ -1,28 +1,38 @@
-From: hannes@cmpxchg.org (Johannes Weiner)
-Date: Fri, 18 Dec 2015 11:42:09 -0500
-Subject: [PATCH] memcg: fix SLOB build regression
-In-Reply-To: <13705081.IYJlPWfILN@wuerfel>
-References: <13705081.IYJlPWfILN@wuerfel>
-Message-ID: <20151218164209.GD4201@cmpxchg.org>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Fri, 18 Dec 2015 16:57:32 +0000
+Subject: [PATCH v2] serial: 8250: of: Fix the driver and actually compile
+ the 8250_of
+In-Reply-To: <3295738.CvTDrXdGbt@wuerfel>
+References: <1450443649-31654-1-git-send-email-peter.ujfalusi@ti.com>
+ <3295738.CvTDrXdGbt@wuerfel>
+Message-ID: <56743AFC.7000402@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 03:35:06PM +0100, Arnd Bergmann wrote:
-> A recent cleanup broke the build when CONFIG_SLOB is used:
-> 
-> mm/memcontrol.c: In function 'memcg_update_kmem_limit':
-> mm/memcontrol.c:2974:9: error: implicit declaration of function 'memcg_online_kmem' [-Werror=implicit-function-declaration]
-> mm/memcontrol.c: In function 'mem_cgroup_css_alloc':
-> mm/memcontrol.c:4229:10: error: too many arguments to function 'memcg_propagate_kmem'
-> mm/memcontrol.c:2949:12: note: declared here
-> 
-> This fixes the memcg_propagate_kmem prototype to match the normal
-> implementation and adds the respective memcg_online_kmem helper
-> function that was needed.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: a5ed904c5039 ("mm: memcontrol: clean up alloc, online, offline, free functions")
 
-I am slob.
+On 18/12/15 13:16, Arnd Bergmann wrote:
+> On Friday 18 December 2015 15:00:49 Peter Ujfalusi wrote:
+>> The 8250_of never compiled since in the Kconfig we have SERIAL_OF_PLATFORM
+>> but in the makefile we expect to have SERIAL_8250_OF...
+>>
+>> When the 8250_of.c is actually compiled we will have two errors:
+>> missing linux/nwpserial.h and 8250/8250.h.
+>> Fix those as well at the same time when enable the compilation of the
+>> driver.
+>>
+>> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+>> Fixes: afd7f88f1577 ("serial: 8250: move of_serial code to 8250 directory")
+>> CC: Arnd Bergmann <arnd@arndb.de>
+>>
+> 
+> Thanks for fixing this, and sorry for the mess.
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Acked-by: Johannes Weiner <hannes@cmpxchg.org>
+Thanks, this fixes booting tegra 32-bit devices on -next.
+
+Acked-by: Jon Hunter <jonathanh@nvidia.com>
+Tested-by: Jon Hunter <jonathanh@nvidia.com>
+
+Cheers
+Jon
