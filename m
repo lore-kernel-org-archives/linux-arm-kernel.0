@@ -1,41 +1,91 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Fri, 18 Dec 2015 12:11:39 +0000
-Subject: arm64/efi handling of persistent memory
-In-Reply-To: <20151218115224.GE29219@leverpostej>
-References: <94D0CD8314A33A4D9D801C0FE68B40295BEBD864@G9W0745.americas.hpqcorp.net>
- <20151218110651.GL25034@bivouac.eciton.net>
- <20151218115224.GE29219@leverpostej>
-Message-ID: <20151218121139.GM25034@bivouac.eciton.net>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Fri, 18 Dec 2015 20:11:45 +0800
+Subject: [PATCH V2 07/10] ARM64, ACPI, PCI: I/O Remapping Table (IORT)
+ initial support.
+In-Reply-To: <5672B773.7060409@semihalf.com>
+References: <1450353133-15992-1-git-send-email-tn@semihalf.com>
+ <1450353133-15992-8-git-send-email-tn@semihalf.com>
+ <5672B773.7060409@semihalf.com>
+Message-ID: <5673F801.9030302@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 11:52:24AM +0000, Mark Rutland wrote:
-> On Fri, Dec 18, 2015 at 11:06:51AM +0000, Leif Lindholm wrote:
-> > On Fri, Dec 18, 2015 at 01:33:25AM +0000, Elliott, Robert (Persistent Memory) wrote:
-> > > Similar to the questions about the arm64 efi boot stub
-> > > handing persistent memory, some of the arm64 kernel code 
-> > > looks fishy.
-> 
+On 2015/12/17 21:24, Tomasz Nowicki wrote:
+> On 17.12.2015 12:52, Tomasz Nowicki wrote:
+>> IORT shows representation of IO topology for ARM based systems.
+>> It describes how various components are connected together on
+>> parent-child basis e.g. PCI RC -> SMMU -> ITS.
+>>
+>> Initial support allows to:
+>> - register ITS MSI chip along with ITS translation ID and domain token
+>> - find registered domain token based on ITS translation ID
+>> - find registered domain token corresponding to given PCI device
+>> - find PCI device DeviceID based on its RequesterID
+>>
+>> Additional features like:
+>> - devices to SMMU binding
+>> - finding platform device DeviceID based on its RequesterID
+>> will be added in next series.
+>>
+>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>>
+>> Conflicts:
+>>     drivers/acpi/Kconfig
+>
+> Sorry for ^^^^ git rebase leftover.
+>
+>> ---
+>>   drivers/acpi/Kconfig    |   3 +
+>>   drivers/acpi/Makefile   |   1 +
+>>   drivers/acpi/iort.c     | 326 ++++++++++++++++++++++++++++++++++++++++++++++++
+>>   drivers/irqchip/Kconfig |   1 +
+>>   include/linux/iort.h    |  38 ++++++
+>>   5 files changed, 369 insertions(+)
+>>   create mode 100644 drivers/acpi/iort.c
+>>   create mode 100644 include/linux/iort.h
+>>
+>
 > [...]
-> 
-> > > 2. is_reserve_region() treating EFI_PERSISTENT_MEMORY the same
-> > > as EFI_CONVENTIONAL_MEMORY looks wrong.
-> > 
-> > Yeah... That one was introduced by
-> > ad5fb870c486 ("e820, efi: add ACPI 6.0 persistent memory types")
-> > without any ACKs from ARM people :/
-> 
-> Do we need to do anythign to avoid his kind of thing in future? e.g. a
-> MAINTAINERS patch for the ARM EFI bits?
+>
+>> diff --git a/include/linux/iort.h b/include/linux/iort.h
+>> new file mode 100644
+>> index 0000000..783e8d6
+>> --- /dev/null
+>> +++ b/include/linux/iort.h
+>> @@ -0,0 +1,38 @@
+>> +/*
+>> + * Copyright (C) 2015, Linaro Ltd.
+>> + *    Author: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify it
+>> + * under the terms and conditions of the GNU General Public License,
+>> + * version 2, as published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope it will be useful, but WITHOUT
+>> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+>> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+>> + * more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License along with
+>> + * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+>> + * Place - Suite 330, Boston, MA 02111-1307 USA.
+>> + */
+>> +
+>> +#ifndef __IORT_H__
+>> +#define __IORT_H__
+>> +
+>> +#include <linux/acpi.h>
+>> +
+>> +#ifdef CONFIG_ACPI
+>> +
+>
+> As per kbuild test report, this has to be:
+> #ifdef CONFIG_IORT_TABLE
+>
+> Will be fixed in the next version.
 
-We've not needed that sort of thing in the past.
-And running get_maintainer.pl on ad5fb870c486 does yield Catalin,
-Will, Matt Fleming, you, Ard, me, lakml and linux-efi.
+Sorry, I should notice this email before I comment on this patch
+as you already find the way to fix it.
 
-> Or do we just need to pay attention to linux-efi?
-
-While I am certainly guilty of not watching that closely enough, I
-can't actually find that patch in my linux-efi history. Or lakml.
-
-/
-    Leif
+Thanks
+Hanjun
