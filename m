@@ -1,46 +1,54 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 18 Dec 2015 15:17:16 +0100
-Subject: [PATCH 03/69] clocksource/drivers/mtk_timer: Fix memleak in
- mtk_timer_init()
+Date: Fri, 18 Dec 2015 15:17:19 +0100
+Subject: [PATCH 06/69] time: Define dummy functions for the generic sched clock
 In-Reply-To: <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
 References: <5672CB9E.7090707@linaro.org>
  <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1450448302-27429-3-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1450448302-27429-6-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexey Klimov <alexey.klimov@linaro.org>
+When we try to compile a clocksource driver with the COMPILE_TEST option,
+we can't select the GENERIC_SCHED_CLOCK because the sched_clock() symbol
+will be duplicated with the one defined for the x86.
 
-Add error path to clear evt struct allocated by kzalloc() in the beginning of
-function mtk_timer_init().
+In order to fix that, we don't select the GENERIC_SCHED_CLOCK in the
+driver Kconfig's file but we define some empty functions for the different
+symbols in order to prevent the unresolved ones.
 
-Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
-Signed-off-by: Alexey Klimov <alexey.klimov@linaro.org>
+This patch fixes the COMPILE_TEST option for the compile test coverage for
+the clocksource drivers. Without this patch, we can't add the COMPILE_TEST
+option for the clocksource drivers using the GENERIC_SCHED_CLOCK.
+
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/mtk_timer.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ include/linux/sched_clock.h | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
-index e1e0642..d67bc35 100644
---- a/drivers/clocksource/mtk_timer.c
-+++ b/drivers/clocksource/mtk_timer.c
-@@ -205,7 +205,7 @@ static void __init mtk_timer_init(struct device_node *node)
- 	evt->gpt_base = of_io_request_and_map(node, 0, "mtk-timer");
- 	if (IS_ERR(evt->gpt_base)) {
- 		pr_err("Can't get resource\n");
--		return;
-+		goto err_kzalloc;
- 	}
+diff --git a/include/linux/sched_clock.h b/include/linux/sched_clock.h
+index efa931c..411b52e 100644
+--- a/include/linux/sched_clock.h
++++ b/include/linux/sched_clock.h
+@@ -10,11 +10,17 @@
  
- 	evt->dev.irq = irq_of_parse_and_map(node, 0);
-@@ -260,5 +260,7 @@ err_mem:
- 	iounmap(evt->gpt_base);
- 	of_address_to_resource(node, 0, &res);
- 	release_mem_region(res.start, resource_size(&res));
-+err_kzalloc:
-+	kfree(evt);
- }
- CLOCKSOURCE_OF_DECLARE(mtk_mt6577, "mediatek,mt6577-timer", mtk_timer_init);
+ #ifdef CONFIG_GENERIC_SCHED_CLOCK
+ extern void sched_clock_postinit(void);
+-#else
+-static inline void sched_clock_postinit(void) { }
+-#endif
+ 
+ extern void sched_clock_register(u64 (*read)(void), int bits,
+ 				 unsigned long rate);
++#else
++static inline void sched_clock_postinit(void) { }
++
++static inline void sched_clock_register(u64 (*read)(void), int bits,
++					unsigned long rate)
++{
++	;
++}
++#endif
+ 
+ #endif
 -- 
 1.9.1
