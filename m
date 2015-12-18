@@ -1,130 +1,97 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 18 Dec 2015 11:07:23 +0100
-Subject: [PATCH] ARM: shmobile: alt: Add QSPI device to DT
-In-Reply-To: <20151218025410.GA10973@verge.net.au>
-References: <1448863990-16276-1-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdWnyZbHiLEPn-6dEweBEXHzWr6o2KF2iCpzg2-OhZRVSw@mail.gmail.com>
- <20151201064149.GH16260@verge.net.au>
- <CAMuHMdXgr5FbS0_L8g0xdesFZ-utPH+G8VgXQKqXZd3t4OsXcw@mail.gmail.com>
- <20151218025410.GA10973@verge.net.au>
-Message-ID: <CAMuHMdWtv3Vin9jiwAsqZOmnuSYJeviCA6PuHt6C=-fvOSFsVA@mail.gmail.com>
+From: alex.aring@gmail.com (Alexander Aring)
+Date: Fri, 18 Dec 2015 11:08:31 +0100
+Subject: [PATCH v2 0/8] Raspberry Pi 2 support.
+In-Reply-To: <1450310115-22163-1-git-send-email-eric@anholt.net>
+References: <1450310115-22163-1-git-send-email-eric@anholt.net>
+Message-ID: <20151218100826.GB1145@omega>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi Eric,
 
-On Fri, Dec 18, 2015 at 3:54 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Tue, Dec 01, 2015 at 09:06:17AM +0100, Geert Uytterhoeven wrote:
->> On Tue, Dec 1, 2015 at 7:41 AM, Simon Horman <horms@verge.net.au> wrote:
->> > On Mon, Nov 30, 2015 at 09:34:10AM +0100, Geert Uytterhoeven wrote:
->> >> On Mon, Nov 30, 2015 at 7:13 AM, Simon Horman
->> >> <horms+renesas@verge.net.au> wrote:
->> >> > Enable the QSPI controller in the alt device tree.
->> >> >
->> >> > Based similar work for the silk board by by Vladimir Barinov and
->> >> > Sergei Shtylyov.
->> >> >
->> >> > Cc: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->> >> > Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->> >> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->> >>
->> >> Verified against Alt schematics and r8a7794 datasheet.
->> >>
->> >> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
->> >>
->> >> I can't verify the FLASH layout. Note that p.11 of
->> >> ALT_MiniMonitor_Manual(SPI_Boot)_Rev0.01_e.pdf shows a different
->> >> FLASH layout for the second and third partition.
->> >
->> > Thanks. I see the following in v1.9.6 of the BSP[1]. Is it
->> > the same as the document you referred to above?
->> >
->> >
->> >                 partition at 0 {
->> >                         label = "loader";
->> >                         reg = <0x00000000 0x00080000>;
->> >                         read-only;
->> >                 };
->> >                 partition at 40000 {
->> >                         label = "user";
->> >                         reg = <0x00080000 0x00580000>;
->> >                         read-only;
->> >                 };
->> >                 partition at 440000 {
->> >                         label = "flash";
->> >                         reg = <0x00600000 0x03a00000>;
->> >                 };
->> >
->> >
->> > [1] https://git.kernel.org/cgit/linux/kernel/git/horms/renesas-backport.git/tree/arch/arm/boot/dts/r8a7794-alt.dts?h=rcar-gen2/v1.9.6&id=e1acbe074f36d96e901bf5346c50ee51da2ced42#n379
->>
->> No, the document specifies 3 partitions:
->>   - SA0: loader program area, 16 KiB,
+On Wed, Dec 16, 2015 at 03:55:07PM -0800, Eric Anholt wrote:
+> This is a major rewrite of the previous Raspberry Pi 2 submission.
+> SMP support is now included, and the DT includes are cleaned up to
+> avoid massive duplication.
+> 
+> The branch (based on 4.4-rc5, to get the USB regression fixes) can be
+> found at:
+> 
+> https://github.com/anholt/linux/tree/bcm2836-4.4
+> 
 
-Sorry, I missed a "Not used" part after that, and started miscounting zeroes
-on top of that :-(
+thanks. :-)
 
-So the loader consumes 16 KiB out of the 256 KiB SA0 partition.
+I tried it via booting with the RPi firmware and your branch, but it
+doesn't boot on my side:
 
->>   - SA1: System area, 16 KiB,
+I get:
 
-Should be 256 KiB.
+Uncompressing Linux... done, booting the kernel.
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Initializing cgroup subsys cpuset
+[    0.000000] Initializing cgroup subsys cpu
+[    0.000000] Initializing cgroup subsys cpuacct
+[    0.000000] Linux version 4.4.0-rc5+ (alex at omega) (gcc version 4.9.2 (OSELAS.Toolchain-2014.12.1) ) #989 Fri Dec 18 10:54:40 CET 2015
+[    0.000000] CPU: ARMv7 Processor [410fc075] revision 5 (ARMv7), cr=10c53c7d
+[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
+[    0.000000] Machine model: Raspberry Pi 2 Model B Rev 1.1
+[    0.000000] bootconsole [earlycon0] enabled
+[    0.000000] Truncating RAM at 0x00000000-0x3e000000 to -0x30000000
+[    0.000000] Consider using a HIGHMEM enabled kernel.
+[    0.000000] Memory policy: Data cache writeback
+[    0.000000] BUG: mapping for 0x3f201000 at 0xf0201000 out of vmalloc space
+[    0.000000] ------------[ cut here ]------------
+[    0.000000] WARNING: CPU: 0 PID: 0 at arch/arm/kernel/devtree.c:149 arm_dt_init_cpu_maps+0x100/0x1a4()
+[    0.000000] DT /cpu 2 nodes greater than max cores 1, capping them
+[    0.000000] Modules linked in:
+[    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted 4.4.0-rc5+ #989
+[    0.000000] Hardware name: BCM2835
+[    0.000000] [<c0016c4c>] (unwind_backtrace) from [<c0013e58>] (show_stack+0x20/0x24)
+[    0.000000] [<c0013e58>] (show_stack) from [<c0247620>] (dump_stack+0x20/0x28)
+[    0.000000] [<c0247620>] (dump_stack) from [<c0023a84>] (warn_slowpath_common+0x9c/0xc4)
+[    0.000000] [<c0023a84>] (warn_slowpath_common) from [<c0023aec>] (warn_slowpath_fmt+0x40/0x48)
+[    0.000000] [<c0023aec>] (warn_slowpath_fmt) from [<c074ef94>] (arm_dt_init_cpu_maps+0x100/0x1a4)
+[    0.000000] [<c074ef94>] (arm_dt_init_cpu_maps) from [<c074e60c>] (setup_arch+0x6f4/0x89c)
+[    0.000000] [<c074e60c>] (setup_arch) from [<c074b9cc>] (start_kernel+0x74/0x3a4)
+[    0.000000] [<c074b9cc>] (start_kernel) from [<00008078>] (0x8078)
+[    0.000000] ---[ end trace cb88537fdc8fa200 ]---
+[    0.000000] DT missing boot CPU MPIDR[23:0], fall back to default cpu_logical_map
+[    0.000000] CPU: All CPU(s) started in SVC mode.
+[    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 195072
+[    0.000000] Kernel command line: earlyprintk console=ttyAMA0 dma.dmachans=0x7f35 bcm2708_fb.fbwidth=720 bcm2708_fb.fbheight=576 bcm2709.boardrev=0xa01041 bcm2709.serial=0x3449476 smsc95xx.macaddr=B8:27:EB:44:94:76 bcm2708_fb.fbswap=1 bcm2709.disk_led_gpio=47 bcm2709.disk_led_active_low=0 sdhci-bcm2708.emmc_clock_freq=250000000 vc_mem.mem_base=0x3ea00000 vc_mem.mem_size=0x3f000000  dwc_otg.lpm_enable=0 console=ttyAMA0,115200 kgdboc=ttyAMA0,115200 root=/dev/mmcblk0p2 rootfstype=ext4 rootwait consoleblank=0 rw
+[    0.000000] PID hash table entries: 4096 (order: 2, 16384 bytes)
+[    0.000000] Dentry cache hash table entries: 131072 (order: 7, 524288 bytes)
+[    0.000000] Inode-cache hash table entries: 65536 (order: 6, 262144 bytes)
+[    0.000000] Memory: 770408K/786432K available (5713K kernel code, 426K rwdata, 1720K rodata, 420K init, 687K bss, 16024K reserved, 0K cma-reserved)
+[    0.000000] Virtual kernel memory layout:
+[    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+[    0.000000]     fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
+[    0.000000]     vmalloc : 0xf0800000 - 0xff800000   ( 240 MB)
+[    0.000000]     lowmem  : 0xc0000000 - 0xf0000000   ( 768 MB)
+[    0.000000]     modules : 0xbf000000 - 0xc0000000   (  16 MB)
+[    0.000000]       .text : 0xc0008000 - 0xc074a7cc   (7434 kB)
+[    0.000000]       .init : 0xc074b000 - 0xc07b4000   ( 420 kB)
+[    0.000000]       .data : 0xc07b4000 - 0xc081e910   ( 427 kB)
+[    0.000000]        .bss : 0xc081e910 - 0xc08ca80c   ( 688 kB)
+[    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=1, Nodes=1
+[    0.000000] NR_IRQS:16 nr_irqs:16 16
+[    0.000000] Kernel panic - not syncing: /soc/local_intc: unable to map local interrupt registers
+[    0.000000] 
+[    0.000000] CPU: 0 PID: 0 Comm: swapper Tainted: G        W       4.4.0-rc5+ #989
+[    0.000000] Hardware name: BCM2835
+[    0.000000] [<c0016c4c>] (unwind_backtrace) from [<c0013e58>] (show_stack+0x20/0x24)
+[    0.000000] [<c0013e58>] (show_stack) from [<c0247620>] (dump_stack+0x20/0x28)
+[    0.000000] [<c0247620>] (dump_stack) from [<c00c17c0>] (panic+0x84/0x210)
+[    0.000000] [<c00c17c0>] (panic) from [<c0771d5c>] (bcm2836_arm_irqchip_l1_intc_of_init+0x94/0x110)
+[    0.000000] [<c0771d5c>] (bcm2836_arm_irqchip_l1_intc_of_init) from [<c0779f04>] (of_irq_init+0x1a0/0x2a8)
+[    0.000000] [<c0779f04>] (of_irq_init) from [<c0771af4>] (irqchip_init+0x14/0x1c)
+[    0.000000] [<c0771af4>] (irqchip_init) from [<c074d7a8>] (init_IRQ+0x28/0x88)
+[    0.000000] [<c074d7a8>] (init_IRQ) from [<c074bb64>] (start_kernel+0x20c/0x3a4)
+[    0.000000] [<c074bb64>] (start_kernel) from [<00008078>] (0x8078)
+[    0.000000] ---[ end Kernel panic - not syncing: /soc/local_intc: unable to map local interrupt registers
 
->>   - SA2: User program area, remainder.
->>
->> FWIW, the unit addresses in the device nodes above are not consistent
->> with their reg properties.
->
-> My feeling is that we should follow the documentation.
-> Does this reflect the scheme it describes?
->
->
->                 partitions {
->                         #address-cells = <1>;
->                         #size-cells = <1>;
->
->                         partition at 0 {
->                                 label = "loader";
->                                 reg = <0x00000000 0x00004000>;
 
-reg = <0x00000000 0x00040000>;
+Any ideas why I get this message?
 
->                                 read-only;
->                         };
->                         partition at 4000 {
-
-partition at 40000
-
->                                 label = "system";
->                                 reg = <0x00004000 0x00004000>;
-
-reg = <0x00040000 0x00040000>;
-
->                                 read-only;
->                         };
->                         partition at 8000 {
-
-partition at 80000
-
->                                 label = "user";
->                                 reg = <0x00008000 0x03ff8000>;
-
-reg = <0x00080000 0x03f80000>;
-
->                         };
->                 };
-
-I don't have an ALT. Does this match with the actual FLASH contents?
-
-Sorry for the wreck on my side.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+- Alex
