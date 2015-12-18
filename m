@@ -1,37 +1,23 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 18 Dec 2015 06:29:49 +0100
-Subject: [PATCH V2 1/2] devicetree: bindings: Add vendor prefix for Kosagi
-Message-ID: <1450416590-14908-1-git-send-email-marex@denx.de>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 18 Dec 2015 11:03:41 +0530
+Subject: [PATCH] dmaengine: edma: Add probe callback to edma_tptc_driver
+In-Reply-To: <1450271945-15263-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1450271945-15263-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20151218053341.GT1854@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Cross <xobs@kosagi.com>
+On Wed, Dec 16, 2015 at 03:19:05PM +0200, Peter Ujfalusi wrote:
+> Due to changes in device and platform code drivers w/o probe will fail to
+> load. This means that the devices for eDMA TPTCs are goign to be without
+> driver and omap hwmod code will turn them off after the kernel finished
+> loading:
+> [    3.015900] platform 49800000.tptc: omap_device_late_idle: enabled but no driver.  Idling
+> [    3.024671] platform 49a00000.tptc: omap_device_late_idle: enabled but no driver.  Idling
+> 
+> This will prevent eDMA to work since the TPTCs are not enabled.
 
-Add a vendor prefix for Sutajio Ko-Usagi PTE Ltd., which goes by the
-more common name of Kosagi.
+Applied, thanks
 
-Signed-off-by: Sean Cross <xobs@kosagi.com>
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Rob Herring <robh@kernel.org>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
----
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
- 1 file changed, 1 insertion(+)
-
-V2: Rebase on top of linux-next
-
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 38eeaa2..265ec68 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -125,6 +125,7 @@ karo	Ka-Ro electronics GmbH
- keymile	Keymile GmbH
- kinetic Kinetic Technologies
- kyo	Kyocera Corporation
-+kosagi	Sutajio Ko-Usagi PTE Ltd.
- lacie	LaCie
- lantiq	Lantiq Semiconductor
- lenovo	Lenovo Group Ltd.
 -- 
-2.1.4
+~Vinod
