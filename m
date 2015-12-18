@@ -1,26 +1,43 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 18 Dec 2015 15:58:52 +0200
-Subject: [RFC 0/9] ARM: OMAP4: hwmod clkctrl conversion to DT + clock driver 
-Message-ID: <1450447141-29936-1-git-send-email-t-kristo@ti.com>
+Date: Fri, 18 Dec 2015 15:58:53 +0200
+Subject: [RFC 1/9] ARM: OMAP2+: omap_device: create clock alias purely from DT
+ data
+In-Reply-To: <1450447141-29936-1-git-send-email-t-kristo@ti.com>
+References: <1450447141-29936-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1450447141-29936-2-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This avoids the need to add most of the clock aliases under
+drivers/clk/ti/clk-xyz.c files.
 
-This series adds support for hwmod gate clock type, and changes OMAP4
-as an example to use the new clock type, converting the existing
-hwmod_data clkctrl definitions to clock nodes under device tree.
-Some additional magic is required for handling timer clocks, as the
-clock driver assumes it can do mux operations on the hwmod main clock,
-the mux-mod clock type variants are for this purpose.
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+---
+ arch/arm/mach-omap2/omap_device.c |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-The data files have been automatically converted by scripting, so doing
-the same conversion for any AMxyz / OMAP4+ SoC should be relatively
-easy to do.
-
-Boot tested on OMAP4 panda ES board, also tried that suspend-resume /
-cpuidle works fine. Testing done on top of 4.4-rc3.
-
-This series is one part of the work to get rid of hwmod data from kernel.
-
--Tero
+diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+index 72ebc4c..3389ce7 100644
+--- a/arch/arm/mach-omap2/omap_device.c
++++ b/arch/arm/mach-omap2/omap_device.c
+@@ -62,6 +62,18 @@ static void _add_clkdev(struct omap_device *od, const char *clk_alias,
+ 		return;
+ 	}
+ 
++	r = clk_get_sys(NULL, clk_name);
++
++	if (IS_ERR(r) && of_have_populated_dt()) {
++		struct of_phandle_args clkspec;
++
++		clkspec.np = of_find_node_by_name(NULL, clk_name);
++
++		r = of_clk_get_from_provider(&clkspec);
++
++		clk_register_clkdev(r, clk_name, NULL);
++	}
++
+ 	rc = clk_add_alias(clk_alias, dev_name(&od->pdev->dev), clk_name, NULL);
+ 	if (rc) {
+ 		if (rc == -ENODEV || rc == -ENOMEM)
+-- 
+1.7.9.5
