@@ -1,86 +1,68 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 18 Dec 2015 07:36:06 -0800
-Subject: [RFC 6/9] clk: ti: add support for omap4 module clocks
-In-Reply-To: <1450447141-29936-7-git-send-email-t-kristo@ti.com>
-References: <1450447141-29936-1-git-send-email-t-kristo@ti.com>
- <1450447141-29936-7-git-send-email-t-kristo@ti.com>
-Message-ID: <20151218153606.GJ23396@atomide.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Fri, 18 Dec 2015 10:38:14 -0500 (EST)
+Subject: [PATCH v2 0/3] USB: add generic onboard USB HUB driver
+In-Reply-To: <CAL411-rK6qfkbQsSjvXH5VPAQAm4tMyD6fVTEgFQrpLHNGMXeA@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1512181030590.1682-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [151218 05:57]:
-> Previously, hwmod core has been used for controlling the hwmod level
-> clocks. This has certain drawbacks, like being unable to share the
-> clocks for multiple users, missing usecounting and generally being
-> totally incompatible with common clock framework.
+On Fri, 18 Dec 2015, Peter Chen wrote:
+
+> On Fri, Dec 18, 2015 at 12:13 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
+
+> > It's not clear (to me, anyway) how this is meant to work.  USB is a
+> > completely discoverable bus: There is no way to represent devices
+> > statically; they have to be discovered.  But a device can't be
+> > discovered unless it is functional, so if an onboard hub (or any other
+> > sort of USB device) requires power, clocks, or something similar in
+> > order to function, it won't be discovered.  There won't be any device
+> > structure to probe, and "forcing driver probe" won't accomplish
+> > anything.
+> >
+> > It seems to me that the only way something like this could be made to
+> > work is if the necessary actions are keyed off the host controller (and
+> > in particular, _not_ the hub driver), presumably at the time the
+> > controller is probed.
 > 
-> Add support for new clock type under the TI clock driver, which will
-> be used to convert all the existing hwmod clocks to. This helps to
-> get rid of the clock related hwmod data from kernel and instead
-> parsing this from DT.
+> The reason why I put the code at hub driver is the onboard USB device
+> may be at 2nd level hub, at hub driver, we can know all devices under
+> this level hub.
 
-Good to see this happening, few comments on what I've noticed so
-far that should be considered.
+Maybe.  I'm not convinced.  See below.
 
-We should be able to do a generic "ti,mux-div-gate" clock and use
-it for the clkctrl too I think. See the suggested binding elsewhere
-in this thread. That would also work for the clkout register at least.
-Maybe the "ti,mux-div-gate" clock needs a separate clkctrl type
-compatible to know it needs to sleep to wait for the status bit.
+> > With anything else, you run the risk that the
+> > necessary resources won't get enabled before they are needed.
+> >
+> 
+> Sorry, I can't understand what you mean
 
-Also, we already know these clkctrl register do have multiple clocks,
-like the GPIO debounce and dividers for debugss clock. And we want
-to get rid of the overlapping reg entries.
+Suppose you have a platform driver to manage the device's resources, 
+and the platform driver is in loadable module.  Suppose the device can 
+be detected even before the resources have been initialized, but it 
+can't work correctly.
 
-> +static int _omap4_hwmod_clk_enable(struct clk_hw *hw)
+Then what happens when the platform driver's module doesn't get loaded 
+until _after_ the device has been detected and after the device failed 
+to initialize?
+
+
+> +static int hub_of_children_register(struct usb_device *hdev)
 > +{
-> +	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
-> +	u32 val;
-> +	int timeout = 0;
-> +	int ret;
+> +     struct device *dev;
 > +
-> +	if (!clk->enable_bit)
-> +		return 0;
+> +     if (hdev->parent)
+> +             dev = &hdev->dev;
+> +     else
+> +             dev = bus_to_hcd(hdev->bus)->self.controller;
 > +
-> +	if (clk->clkdm) {
-> +		ret = ti_clk_ll_ops->clkdm_clk_enable(clk->clkdm, hw->clk);
-> +		if (ret) {
-> +			WARN(1,
-> +			     "%s: could not enable %s's clockdomain %s: %d\n",
-> +			     __func__, clk_hw_get_name(hw),
-> +			     clk->clkdm_name, ret);
-> +			return ret;
-> +		}
-> +	}
-> +
-> +	val = ti_clk_ll_ops->clk_readl(clk->enable_reg);
-> +
-> +	val &= ~OMAP4_MODULEMODE_MASK;
-> +	val |= clk->enable_bit;
-> +
-> +	ti_clk_ll_ops->clk_writel(val, clk->enable_reg);
-> +
-> +	/* Wait until module is enabled */
-> +	while (!_omap4_is_ready(val)) {
-> +		udelay(1);
-> +		timeout++;
-> +		if (timeout > OMAP4_MAX_MODULE_READY_TIME) {
-> +			pr_err("%s: failed to enable\n", clk_hw_get_name(hw));
-> +			return -EBUSY;
-> +		}
-> +		val = ti_clk_ll_ops->clk_readl(clk->enable_reg);
-> +	}
-> +
-> +	return 0;
-> +}
+> +     if (!dev->of_node)
+> +             return 0;
 
-Clocks that need to wait to lock need to be set up with clk_prepare
-instead of clk_enable as pointed out by TGLX recently. Also see the
-"[PATCH] clk: ti: Fix FAPLL udelay in clk_enable with clk_prepare".
+Suppose hdev->parent is not NULL (hdev isn't the root hub -- maybe it's
+a 2nd-level hub).  Then how did hdev->dev->of_node get set?
 
-Not sure what all needs to be fixed in the hwmod code for that to
-happen and PM to work, but that probably needs to be done first.
+> +
+> +     return of_platform_populate(dev->of_node, NULL, NULL, dev);
+> +} 
 
-Regards,
-
-Tony
+Alan Stern
