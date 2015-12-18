@@ -1,102 +1,64 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 18 Dec 2015 17:44:49 +0000
-Subject: [PATCH v7 4/5] iommu/mediatek: Add mt8173 IOMMU driver
-In-Reply-To: <1450426183-1571-5-git-send-email-yong.wu@mediatek.com>
-References: <1450426183-1571-1-git-send-email-yong.wu@mediatek.com>
- <1450426183-1571-5-git-send-email-yong.wu@mediatek.com>
-Message-ID: <56744611.3070604@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 18 Dec 2015 17:46:08 +0000
+Subject: [PATCH v4] arm64: run-time detection for aarch32 support
+In-Reply-To: <56743C4F.7060201@arm.com>
+References: <1450454429-22976-1-git-send-email-ynorov@caviumnetworks.com>
+ <56743C4F.7060201@arm.com>
+Message-ID: <20151218174607.GE30229@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/12/15 08:09, Yong Wu wrote:
-> This patch adds support for mediatek m4u (MultiMedia Memory Management
-> Unit).
->
-> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-> ---
->   drivers/iommu/Kconfig     |  14 +
->   drivers/iommu/Makefile    |   1 +
->   drivers/iommu/mtk_iommu.c | 734 ++++++++++++++++++++++++++++++++++++++++++++++
->   3 files changed, 749 insertions(+)
->   create mode 100644 drivers/iommu/mtk_iommu.c
->
+On Fri, Dec 18, 2015 at 05:03:11PM +0000, Suzuki K. Poulose wrote:
+> On 18/12/15 16:00, Yury Norov wrote:
+> >Kernel option COMPAT defines the ability of executing aarch32 binaries.
+> >Some platforms does not support aarch32 mode, and so cannot execute that
+> >binaries. But we cannot just disable COMPAT for them because the same
+> >kernel binary may be used by multiple platforms.
+> 
+> 
+> >diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+> >index 8f271b8..781a2f7 100644
+> >--- a/arch/arm64/include/asm/cpufeature.h
+> >+++ b/arch/arm64/include/asm/cpufeature.h
+> >@@ -184,6 +184,13 @@ static inline bool system_supports_mixed_endian_el0(void)
+> >  	return id_aa64mmfr0_mixed_endian_el0(read_system_reg(SYS_ID_AA64MMFR0_EL1));
+> >  }
+> >
+> >+static inline bool system_supports_aarch32_el0(void)
+> >+{
+> >+	u64 pfr0 = read_system_reg(SYS_ID_AA64PFR0_EL1);
+> >+	return ((pfr0 >> ID_AA64PFR0_EL0_SHIFT) & ID_AA64PFR0_ELx_MASK)
+> >+						!= ID_AA64PFR0_EL0_64BIT_ONLY;
+> 
+> Could you please use
+> 
+> cpuid_feature_extract_field(pfr0, ID_AA64PFR0_EL0_SHIFT) != ID_AA64PFR0_EL0_64BIT_ONLY
+> 
+> instead and
+> 
+> >--- a/arch/arm64/include/asm/sysreg.h
+> >+++ b/arch/arm64/include/asm/sysreg.h
+> >@@ -102,6 +102,7 @@
+> >  #define ID_AA64PFR0_EL2_SHIFT		8
+> >  #define ID_AA64PFR0_EL1_SHIFT		4
+> >  #define ID_AA64PFR0_EL0_SHIFT		0
+> >+#define ID_AA64PFR0_ELx_MASK		0xf
+> 
+> get rid of ^ ?
+> 
+> As per ARM ARM, AArch32 only ID register values are unknown if AArch32 is
+> not implemented. So I think we need to skip accessing the AArch32 ID registers
+> everywhere (feature tracking), if the CPU doesn't supports it, to avoid
+> unnecessary SANITY failures and TAINTing the kernel.
 
-> diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
-> new file mode 100644
-> index 0000000..d000d31
-> --- /dev/null
-> +++ b/drivers/iommu/mtk_iommu.c
+That all sounds good to me.
 
-[...]
-
-> +#define REG_MMU_CTRL_REG			0x110
-> +#define F_MMU_PREFETCH_RT_REPLACE_MOD		BIT(4)
-> +#define F_MMU_TF_PROTECT_SEL(prot)		(((prot) & 0x3) << 5)
-> +#define F_COHERENCE_EN				BIT(8)
-
-[...]
-
-> +static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
-> +{
-> +	u32 regval;
-> +	int ret;
-> +
-> +	ret = clk_prepare_enable(data->bclk);
-> +	if (ret) {
-> +		dev_err(data->dev, "Failed to enable iommu bclk(%d)\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	regval = F_MMU_PREFETCH_RT_REPLACE_MOD |
-> +		F_MMU_TF_PROTECT_SEL(2) |
-> +		F_COHERENCE_EN;
-
-I meant to ask this last time - does setting F_COHERENCE_EN here imply 
-that the M4U is capable of cache-coherent page table walks, or something 
-else? If it's the former, and assuming the MT8173 is actually wired up 
-to support that, then you should add a dma-coherent property to its DT 
-node in patch 5 (which will also save you all the cache flushes on page 
-table updates).
-
-> +	writel_relaxed(regval, data->base + REG_MMU_CTRL_REG);
-> +
-> +	regval = F_L2_MULIT_HIT_EN |
-> +		F_TABLE_WALK_FAULT_INT_EN |
-> +		F_PREETCH_FIFO_OVERFLOW_INT_EN |
-> +		F_MISS_FIFO_OVERFLOW_INT_EN |
-> +		F_PREFETCH_FIFO_ERR_INT_EN |
-> +		F_MISS_FIFO_ERR_INT_EN;
-> +	writel_relaxed(regval, data->base + REG_MMU_INT_CONTROL0);
-> +
-> +	regval = F_INT_TRANSLATION_FAULT |
-> +		F_INT_MAIN_MULTI_HIT_FAULT |
-> +		F_INT_INVALID_PA_FAULT |
-> +		F_INT_ENTRY_REPLACEMENT_FAULT |
-> +		F_INT_TLB_MISS_FAULT |
-> +		F_INT_MISS_TRANSATION_FIFO_FAULT |
-> +		F_INT_PRETETCH_TRANSATION_FIFO_FAULT;
-> +	writel_relaxed(regval, data->base + REG_MMU_INT_MAIN_CONTROL);
-> +
-> +	regval = F_MMU_IVRP_PA_SET(data->protect_base);
-> +	writel_relaxed(regval, data->base + REG_MMU_IVRP_PADDR);
-> +
-> +	writel_relaxed(0, data->base + REG_MMU_DCM_DIS);
-> +	writel_relaxed(0, data->base + REG_MMU_STANDARD_AXI_MODE);
-> +
-> +	if (devm_request_irq(data->dev, data->irq, mtk_iommu_isr, 0,
-> +			     dev_name(data->dev), (void *)data)) {
-> +		writel_relaxed(0, data->base + REG_MMU_PT_BASE_ADDR);
-> +		clk_disable_unprepare(data->bclk);
-> +		dev_err(data->dev, "Failed @ IRQ-%d Request\n", data->irq);
-> +		return -ENODEV;
-> +	}
-> +
-> +	return 0;
-> +}
-
-Otherwise, I've not had the chance to go through this thoroughly but at 
-a glance it seems in pretty good shape now - nothing immediately jumps 
-out as looking wrong or worth making a fuss over.
+After boot-time we should also fail hotplug of a CPU that doesn't
+support AArch32, if we decided at boot-time that AArch32 was supported
+accross the system. That should probably be added to your early cpu
+feature verification [1].
 
 Thanks,
-Robin.
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/392237.html
