@@ -1,144 +1,68 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 18 Dec 2015 13:58:56 -0700
-Subject: [PATCH V7 00/24] Coresight integration with perf
-Message-ID: <1450472361-426-1-git-send-email-mathieu.poirier@linaro.org>
+Date: Fri, 18 Dec 2015 13:58:57 -0700
+Subject: [PATCH V7 01/24] coresight: implementing 'cpu_id()' API
+In-Reply-To: <1450472361-426-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1450472361-426-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1450472361-426-2-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset aims to integrate configuration and control of
-the Coresight tracers with the perf sub-system.
+Other than plainly parsing the device tree there is no way to
+know which CPU a tracer is affined to.  As such adding an
+interface to lookup the CPU field enclosed in the etm_drvdata
+structure that was initialised at boot time.
 
-The goal is to use PMUs to represent tracers and the auxiliary
-buffer enhancement to collect processor traces.  As such a lot
-of work is done to move the current Coresight sysFS oriented
-configuration and control commands to perf's AUX API.
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ drivers/hwtracing/coresight/coresight-etm3x.c | 8 ++++++++
+ include/linux/coresight.h                     | 3 +++
+ 2 files changed, 11 insertions(+)
 
-For the time being the work concentrates on ETMv3 and ETB1.0
-sink buffer.  Work on ETMv4 and other type of sink buffers
-will follow once a foundation has been established.
-
-Best regards,
-Mathieu
-
-Changes since V6:
-* Rebased to 4.4-rc5.
-* Thanks to [1], all tracer configuration now happens
-  when events are scheduled.
-
-[1]. https://lwn.net/Articles/667573/
-
-Changes since V5:
-* Addressed Arnaldo's comment about using a struct perf_evlist rather
-  than a struct perf_session.
-* Addressed kbuild test robot's anomaly report [1].
-* Moved perf_aux_output_{begin|end} to etm_event_{start|stop} in
-  accordance with [2].
-
-[1]. https://lkml.org/lkml/2015/11/30/46
-[2]. http://thread.gmane.org/gmane.linux.kernel/2099328/focus=2099343
-
-Changes since V4:
-* Reworked the way event configuration information is kept, fixing
-  a few corner cases when doing per CPU tracing.
-* Rebased on 4.4-rc1.
-* Added 'Cc' to specific perf related patches in the hope of suscitating
-  interest from reviewers, i.e perf maintainers.
-
-Changes since V3:
-* Rebased to GKH's char-misc-next tree (e2d8680741ed).
-
-Changes since V2:
-* Rebased to v4.3.
-* Used the -M option to "git format-patch".
-* Decoupled tracers and path - both are now completely independent.
-* Moved path enablement/release to Perf's add/del functions.
-* Moved PM runtime operations to the coresight core rather than
-  individual drivers.
-* Enhanced mutual exclusion scheme between perf and sysFS.
-* Removed architecture specific define in perf cmd line tool.
-* Got rid of unused fields in structure 'cs_buffers'.
-* Enhanced changelog for patch 16/26.
-
-Changes since V1:
- * Fixed typos in typographical error in documentation.
- * Moved to a multi session support scheme.
- * Split static and dynamic tracer configuration.
- * Fixed configuration for user and kernel space tracing.
- * Using WARN_ON_ONCE() rather than WARN_ON().
- * Implemented strategy to prevent tracers from being used simultaneously.
- * Changed sink_ops::unset_buffer() to sink_ops::reset_buffer().
- * Moves ETM's sysFS interface from driver core to dedicated file.
- * Removed spinlock in "etm_cpu_id()".
- * Aggregated PMU driver pieces in a single patch.
- * Added user space changes and rebased everything to v4.3-rc5. 
-
-Mathieu Poirier (24):
-  coresight: implementing 'cpu_id()' API
-  coresight: associating path with session rather than tracer
-  coresight: add API to get sink from path
-  coresight: moving PM runtime operations to core framework
-  coresight: etm3x: moving etm_readl/writel to header file
-  coresight: etm3x: moving sysFS entries to dedicated file
-  coresight: etm3x: unlocking tracers in default arch init
-  coresight: etm3x: splitting struct etm_drvdata
-  coresight: etm3x: adding operation mode for etm_enable()
-  coresight: etm3x: set progbit to stop trace collection
-  coresight: etm3x: changing default trace configuration
-  coresight: etm3x: consolidating initial config
-  coresight: etm3x: implementing user/kernel mode tracing
-  coresight: etm3x: implementing perf_enable/disable() API
-  coresight: etb10: moving to local atomic operations
-  coresight: etb10: adding operation mode for sink->enable()
-  coresight: etb10: implementing AUX space API
-  coresight: updating documentation to reflect integration with perf
-  coresight: etm-perf: new PMU driver for ETM tracers
-  coresight: introducing a global trace ID function
-  perf tools: making function set_max_cpu_num() non static
-  perf tools: adding perf_evlist to *info_priv_size()
-  perf tools: making coresight PMU listable
-  perf tools: adding coresight etm PMU record capabilities
-
- Documentation/trace/coresight.txt                  |  138 +-
- MAINTAINERS                                        |    4 +
- drivers/hwtracing/coresight/Kconfig                |    1 +
- drivers/hwtracing/coresight/Makefile               |    4 +-
- drivers/hwtracing/coresight/coresight-etb10.c      |  276 ++-
- drivers/hwtracing/coresight/coresight-etm-perf.c   |  386 +++++
- drivers/hwtracing/coresight/coresight-etm-perf.h   |   32 +
- drivers/hwtracing/coresight/coresight-etm.h        |  142 +-
- .../hwtracing/coresight/coresight-etm3x-sysfs.c    | 1272 ++++++++++++++
- drivers/hwtracing/coresight/coresight-etm3x.c      | 1824 +++++---------------
- drivers/hwtracing/coresight/coresight-etm4x.c      |   10 +-
- drivers/hwtracing/coresight/coresight-funnel.c     |    2 -
- drivers/hwtracing/coresight/coresight-priv.h       |   15 +
- .../coresight/coresight-replicator-qcom.c          |    4 -
- drivers/hwtracing/coresight/coresight-replicator.c |    2 -
- drivers/hwtracing/coresight/coresight-tmc.c        |    7 +-
- drivers/hwtracing/coresight/coresight-tpiu.c       |    4 +-
- drivers/hwtracing/coresight/coresight.c            |  330 ++--
- include/linux/coresight-pmu.h                      |   39 +
- include/linux/coresight.h                          |   34 +-
- tools/perf/arch/arm/util/Build                     |    2 +
- tools/perf/arch/arm/util/auxtrace.c                |   48 +
- tools/perf/arch/arm/util/cs_etm.c                  |  466 +++++
- tools/perf/arch/arm/util/cs_etm.h                  |   44 +
- tools/perf/arch/arm/util/pmu.c                     |   34 +
- tools/perf/arch/x86/util/intel-bts.c               |    4 +-
- tools/perf/arch/x86/util/intel-pt.c                |    4 +-
- tools/perf/config/Makefile                         |   17 +-
- tools/perf/util/auxtrace.c                         |    8 +-
- tools/perf/util/auxtrace.h                         |    7 +-
- tools/perf/util/cpumap.c                           |    2 +-
- tools/perf/util/cpumap.h                           |    1 +
- 32 files changed, 3518 insertions(+), 1645 deletions(-)
- create mode 100644 drivers/hwtracing/coresight/coresight-etm-perf.c
- create mode 100644 drivers/hwtracing/coresight/coresight-etm-perf.h
- create mode 100644 drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
- create mode 100644 include/linux/coresight-pmu.h
- create mode 100644 tools/perf/arch/arm/util/auxtrace.c
- create mode 100644 tools/perf/arch/arm/util/cs_etm.c
- create mode 100644 tools/perf/arch/arm/util/cs_etm.h
- create mode 100644 tools/perf/arch/arm/util/pmu.c
-
+diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
+index d630b7ece735..755f6f4d6d79 100644
+--- a/drivers/hwtracing/coresight/coresight-etm3x.c
++++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+@@ -315,6 +315,13 @@ static void etm_enable_hw(void *info)
+ 	dev_dbg(drvdata->dev, "cpu: %d enable smp call done\n", drvdata->cpu);
+ }
+ 
++static int etm_cpu_id(struct coresight_device *csdev)
++{
++	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
++
++	return drvdata->cpu;
++}
++
+ static int etm_trace_id(struct coresight_device *csdev)
+ {
+ 	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+@@ -421,6 +428,7 @@ static void etm_disable(struct coresight_device *csdev)
+ }
+ 
+ static const struct coresight_ops_source etm_source_ops = {
++	.cpu_id		= etm_cpu_id,
+ 	.trace_id	= etm_trace_id,
+ 	.enable		= etm_enable,
+ 	.disable	= etm_disable,
+diff --git a/include/linux/coresight.h b/include/linux/coresight.h
+index a7cabfa23b55..bf62b265bf52 100644
+--- a/include/linux/coresight.h
++++ b/include/linux/coresight.h
+@@ -205,12 +205,15 @@ struct coresight_ops_link {
+ /**
+  * struct coresight_ops_source - basic operations for a source
+  * Operations available for sources.
++ * @cpu_id:	returns the value of the CPU number this component
++ *		is associated to.
+  * @trace_id:	returns the value of the component's trace ID as known
+ 		to the HW.
+  * @enable:	enables tracing for a source.
+  * @disable:	disables tracing for a source.
+  */
+ struct coresight_ops_source {
++	int (*cpu_id)(struct coresight_device *csdev);
+ 	int (*trace_id)(struct coresight_device *csdev);
+ 	int (*enable)(struct coresight_device *csdev);
+ 	void (*disable)(struct coresight_device *csdev);
 -- 
 2.1.4
