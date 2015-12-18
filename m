@@ -1,28 +1,41 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 18 Dec 2015 13:11:41 +0100
-Subject: [PATCH v3 4/4] printk/nmi: Increase the size of NMI buffer and
- make it configurable
-In-Reply-To: <20151218112902.GO6344@twins.programming.kicks-ass.net>
-References: <1449667265-17525-1-git-send-email-pmladek@suse.com>
- <1449667265-17525-5-git-send-email-pmladek@suse.com>
- <CAMuHMdXVgr58YjoePGrRbMyMncQ27f85prL7G5SpeHeNxoYrXQ@mail.gmail.com>
- <20151211124159.GB3729@pathway.suse.cz>
- <20151211145725.b0e81bb4bb18fcd72ef5f557@linux-foundation.org>
- <20151211232113.GZ8644@n2100.arm.linux.org.uk>
- <alpine.LNX.2.00.1512120024370.9922@cbobk.fhfr.pm>
- <5673DD60.7080302@linaro.org>
- <20151218112902.GO6344@twins.programming.kicks-ass.net>
-Message-ID: <20151218121141.GR6373@twins.programming.kicks-ass.net>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Fri, 18 Dec 2015 12:11:39 +0000
+Subject: arm64/efi handling of persistent memory
+In-Reply-To: <20151218115224.GE29219@leverpostej>
+References: <94D0CD8314A33A4D9D801C0FE68B40295BEBD864@G9W0745.americas.hpqcorp.net>
+ <20151218110651.GL25034@bivouac.eciton.net>
+ <20151218115224.GE29219@leverpostej>
+Message-ID: <20151218121139.GM25034@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 12:29:02PM +0100, Peter Zijlstra wrote:
-> On Fri, Dec 18, 2015 at 10:18:08AM +0000, Daniel Thompson wrote:
-> > I'm not entirely sure that this is an improvement.
+On Fri, Dec 18, 2015 at 11:52:24AM +0000, Mark Rutland wrote:
+> On Fri, Dec 18, 2015 at 11:06:51AM +0000, Leif Lindholm wrote:
+> > On Fri, Dec 18, 2015 at 01:33:25AM +0000, Elliott, Robert (Persistent Memory) wrote:
+> > > Similar to the questions about the arm64 efi boot stub
+> > > handing persistent memory, some of the arm64 kernel code 
+> > > looks fishy.
 > 
-> What I do these days is delete everything in vprintk_emit() and simply
-> call early_printk().
+> [...]
+> 
+> > > 2. is_reserve_region() treating EFI_PERSISTENT_MEMORY the same
+> > > as EFI_CONVENTIONAL_MEMORY looks wrong.
+> > 
+> > Yeah... That one was introduced by
+> > ad5fb870c486 ("e820, efi: add ACPI 6.0 persistent memory types")
+> > without any ACKs from ARM people :/
+> 
+> Do we need to do anythign to avoid his kind of thing in future? e.g. a
+> MAINTAINERS patch for the ARM EFI bits?
 
-On that, whoever made the device model use vprintk_emit() broke the
-debugger (KGDB/KDB) printk intercept, and the whole vprintk_func
-redirection scheme.
+We've not needed that sort of thing in the past.
+And running get_maintainer.pl on ad5fb870c486 does yield Catalin,
+Will, Matt Fleming, you, Ard, me, lakml and linux-efi.
+
+> Or do we just need to pay attention to linux-efi?
+
+While I am certainly guilty of not watching that closely enough, I
+can't actually find that patch in my linux-efi history. Or lakml.
+
+/
+    Leif
