@@ -1,35 +1,53 @@
-From: fw@strlen.de (Florian Westphal)
-Date: Fri, 18 Dec 2015 19:09:31 +0100
-Subject: [PATCH] ila: add NETFILTER dependency
-In-Reply-To: <20151218172606.GB1299@salvia>
-References: <2011239.T7zzuZGeyk@wuerfel>
- <20151218172606.GB1299@salvia>
-Message-ID: <20151218180931.GC29573@breakpoint.cc>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Fri, 18 Dec 2015 19:14:56 +0100
+Subject: [PULL take #2] KVM/ARM fixes for v4.4-rc6
+In-Reply-To: <1450447552-3161-1-git-send-email-marc.zyngier@arm.com>
+References: <1450447552-3161-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <56744D20.1080705@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pablo Neira Ayuso <pablo@netfilter.org> wrote:
-> On Fri, Dec 18, 2015 at 03:37:37PM +0100, Arnd Bergmann wrote:
-> > The recently added generic ILA translation facility fails to
-> > build when CONFIG_NETFILTER is disabled:
-> > 
-> > net/ipv6/ila/ila_xlat.c:229:20: warning: 'struct nf_hook_state' declared inside parameter list
-> > net/ipv6/ila/ila_xlat.c:235:27: error: array type has incomplete element type 'struct nf_hook_ops'
-> >  static struct nf_hook_ops ila_nf_hook_ops[] __read_mostly = {
-> > 
-> > This adds an explicit Kconfig dependency to avoid that case.
+
+
+On 18/12/2015 15:05, Marc Zyngier wrote:
+> Hi Paolo,
 > 
-> I'm afraid this extra Kconfig dependency that Arnd adds to fix this is
-> a symptom that there is something that doesn't belong there.
+> We have a one line fix for the VGIC this time around, fixing a patch
+> that went in -rc2. Oh well. Hopefully this is the last one for v4.4.
+> And yes, the right patch is following the pull-request this time...
 > 
-> I overlook this new hook on priority -1, how does this integrate into
-> our infrastructure?
+> Please pull!
 
-Looks problematic since address changes post ipv6 dnat translations,
-its certainly unexpected for nft since we have magic address mangling
-after -2 and 0 priroized tables...
+Pulled, thanks.
 
-However ... how is ILA supposed to work?
+Paolo
 
-ila_xlat_outgoing has no callers, so it appears we only do this
-stateless nat on ingress...?
+> Thanks,
+> 
+> 	M.
+> 
+> The following changes since commit 0de58f852875a0f0dcfb120bb8433e4e73c7803b:
+> 
+>   ARM/arm64: KVM: correct PTE uncachedness check (2015-12-04 16:30:17 +0000)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-v4.4-rc6
+> 
+> for you to fetch changes up to fdec12c12ed4333afb49c9948c29fbd5fb52da97:
+> 
+>   KVM: arm/arm64: vgic: Fix kvm_vgic_map_is_active's dist check (2015-12-11 16:33:31 +0000)
+> 
+> ----------------------------------------------------------------
+> KVM/ARM fixes for v4.4-rc6
+> 
+> - Fix for the active interrupt detection code, affecting
+>   the timer interrupt injection.
+> 
+> ----------------------------------------------------------------
+> Christoffer Dall (1):
+>       KVM: arm/arm64: vgic: Fix kvm_vgic_map_is_active's dist check
+> 
+>  virt/kvm/arm/vgic.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
