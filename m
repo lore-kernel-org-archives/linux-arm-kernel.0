@@ -1,46 +1,31 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Fri, 18 Dec 2015 10:24:37 -0800
-Subject: [PATCH v2] mtd: omap_elm: print interrupt resource using %pr
-In-Reply-To: <2327550.1yLrRnIh7I@wuerfel>
-References: <2327550.1yLrRnIh7I@wuerfel>
-Message-ID: <20151218182437.GM10460@google.com>
+From: hpa@zytor.com (H. Peter Anvin)
+Date: Fri, 18 Dec 2015 10:33:25 -0800
+Subject: [PATCH 0/3] Batched user access support
+In-Reply-To: <20151218111346.GF30483@arm.com>
+References: <alpine.LFD.2.20.1512171016510.27310@i7>
+ <20151218111346.GF30483@arm.com>
+Message-ID: <56745175.9010006@zytor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 02:15:17PM +0100, Arnd Bergmann wrote:
-> When CONFIG_LPAE is set on ARM, resource_size_t is 64-bit wide
-> and we get a warning about an incorrect format string for printing
-> the interrupt number in elm_probe:
+On 12/18/15 03:13, Will Deacon wrote:
 > 
-> drivers/mtd/nand/omap_elm.c: In function 'elm_probe':
-> drivers/mtd/nand/omap_elm.c:417:23: warning: format '%i' expects argument of type 'int', but argument 3 has type 'resource_size_t {aka long long unsigned int}' [-Wformat=]
+> From an implementation and performance point of view, this can certainly
+> be used by arm64. My only concern is that we increase the region where
+> PAN is disabled (that is, user accesses are permitted). Currently, that's
+> carefully restricted to the single userspace access, but now it could
+> easily include accesses to the kernel stack, perhaps even generated as
+> a result of compiler spills.
 > 
-> This patch avoids the type mismatch by printing the interrupt as
-> a resource using the %pr format string.
+> I'm pretty unimaginative when it comes to security exploits, but that
+> does sound worse than the current implementation from a security
+> perspective.
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> v2: pass correct pointer
-> 
-> diff --git a/drivers/mtd/nand/omap_elm.c b/drivers/mtd/nand/omap_elm.c
-> index 235ec7992b4c..a3f32f939cc1 100644
-> --- a/drivers/mtd/nand/omap_elm.c
-> +++ b/drivers/mtd/nand/omap_elm.c
-> @@ -414,7 +414,7 @@ static int elm_probe(struct platform_device *pdev)
->  	ret = devm_request_irq(&pdev->dev, irq->start, elm_isr, 0,
->  			pdev->name, info);
->  	if (ret) {
-> -		dev_err(&pdev->dev, "failure requesting irq %i\n", irq->start);
-> +		dev_err(&pdev->dev, "failure requesting %pr\n", irq);
 
-FWIW, the printk documentation isn't very specific about the formatting
-for %pr. After drilling down to resource_string() in lib/vsprintf.c, it
-looks like there is special case handling for various resrouce types,
-even though the documentation only shows IORESOURCE_MEM types.
+It is, but it is a tradeoff.  It is way better than opening it up for
+the entire kernel.  In the end the only real way to avoid this is
+compiler support, which I *have* discussed for x86 with the gcc people.
+ gcc could avoid the back-to-back on and off and even batch accesses by
+moving them into registers.
 
-Applied to l2-mtd.git.
-
->  		return ret;
->  	}
->  
-> 
+	-hpa
