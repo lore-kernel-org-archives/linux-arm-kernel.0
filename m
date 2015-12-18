@@ -1,49 +1,33 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 Dec 2015 11:29:37 +0900
-Subject: [PATCH 07/25] ARM: shmobile: r8a7778: tidyup #sound-dai-cells settings
+Date: Fri, 18 Dec 2015 11:29:40 +0900
+Subject: [PATCH 10/25] ARM: shmobile: ape6evm dts: Add serial port config to
+ chosen/stdout-path
 In-Reply-To: <cover.1450402264.git.horms+renesas@verge.net.au>
 References: <cover.1450402264.git.horms+renesas@verge.net.au>
-Message-ID: <2020dddd67c1884ea7cb9891b36aac7ff5e73038.1450402264.git.horms+renesas@verge.net.au>
+Message-ID: <6deac6d0b931825081c5894d186abd1c6ec4c524.1450402264.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Renesas sound driver needs #sound-dai-cells settings, but, this usage
-is a little bit confusable. It came from ALSA SoC historical reasons.
-The sound DAI naming method is different between Single/Multi DAI in
-the ALSA framework, and it is used for sound card matching.
-And this #sound-dai-cells has relationship to it.
-Current SoC dtsi has #sound-dai-cells = <1> as default settings
-(= it is assuming that board/platform has multi DAI), and
-board/platform side needs to overwrite it if board/platform was single
-DAI. This style is more confusable for users.
-This patch removes SoC side default settings, and force to set it by
-board/platform side.
-
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7778.dtsi | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a73a4-ape6evm.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7778.dtsi b/arch/arm/boot/dts/r8a7778.dtsi
-index 4f8e07811746..b140627dd88b 100644
---- a/arch/arm/boot/dts/r8a7778.dtsi
-+++ b/arch/arm/boot/dts/r8a7778.dtsi
-@@ -236,7 +236,12 @@
+diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+index 9b7eabd3eba3..590257095700 100644
+--- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
++++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+@@ -23,7 +23,7 @@
+ 
+ 	chosen {
+ 		bootargs = "ignore_loglevel root=/dev/nfs ip=dhcp rw";
+-		stdout-path = &scifa0;
++		stdout-path = "serial0:115200n8";
  	};
  
- 	rcar_sound: sound at ffd90000 {
--		#sound-dai-cells = <1>;
-+		/*
-+		 * #sound-dai-cells is required
-+		 *
-+		 * Single DAI : #sound-dai-cells = <0>;         <&rcar_sound>;
-+		 * Multi  DAI : #sound-dai-cells = <1>;         <&rcar_sound N>;
-+		 */
- 		compatible = "renesas,rcar_sound-r8a7778", "renesas,rcar_sound-gen1";
- 		reg =	<0xffd90000 0x1000>,	/* SRU */
- 			<0xffd91000 0x240>,	/* SSI */
+ 	memory at 40000000 {
 -- 
 2.1.4
