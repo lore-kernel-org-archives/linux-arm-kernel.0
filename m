@@ -1,31 +1,31 @@
-From: hpa@zytor.com (H. Peter Anvin)
-Date: Fri, 18 Dec 2015 10:33:25 -0800
-Subject: [PATCH 0/3] Batched user access support
-In-Reply-To: <20151218111346.GF30483@arm.com>
-References: <alpine.LFD.2.20.1512171016510.27310@i7>
- <20151218111346.GF30483@arm.com>
-Message-ID: <56745175.9010006@zytor.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 18 Dec 2015 10:35:30 -0800
+Subject: [PATCH] ARM: dts: Fix UART wakeirq for omap4 duovero parlor
+Message-ID: <1450463730-5973-1-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/18/15 03:13, Will Deacon wrote:
-> 
-> From an implementation and performance point of view, this can certainly
-> be used by arm64. My only concern is that we increase the region where
-> PAN is disabled (that is, user accesses are permitted). Currently, that's
-> carefully restricted to the single userspace access, but now it could
-> easily include accesses to the kernel stack, perhaps even generated as
-> a result of compiler spills.
-> 
-> I'm pretty unimaginative when it comes to security exploits, but that
-> does sound worse than the current implementation from a security
-> perspective.
-> 
+Looks like we're missing the wakeirq for the console uart for
+duovero parlor. Let's add that as without it console acess just
+hangs with PM enabled.
 
-It is, but it is a tradeoff.  It is way better than opening it up for
-the entire kernel.  In the end the only real way to avoid this is
-compiler support, which I *have* discussed for x86 with the gcc people.
- gcc could avoid the back-to-back on and off and even batch accesses by
-moving them into registers.
+Cc: Arun Bharadwaj <arun@gumstix.com>
+Cc: Ash Charles <ash@gumstix.com>
+Cc: Florian Vaussard <florian.vaussard@epfl.ch>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/boot/dts/omap4-duovero-parlor.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-	-hpa
+--- a/arch/arm/boot/dts/omap4-duovero-parlor.dts
++++ b/arch/arm/boot/dts/omap4-duovero-parlor.dts
+@@ -189,3 +189,7 @@
+ 	};
+ };
+ 
++&uart3 {
++	interrupts-extended = <&wakeupgen GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH
++			       &omap4_pmx_core OMAP4_UART3_RX>;
++};
+-- 
+2.6.2
