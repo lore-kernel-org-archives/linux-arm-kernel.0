@@ -1,83 +1,106 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 18 Dec 2015 11:35:36 +0000
-Subject: [PATCH v10 1/4] dt-binding:Documents of the mbigen bindings
-In-Reply-To: <20151218105837.GB29219@leverpostej>
-References: <1450353397-47668-1-git-send-email-majun258@huawei.com>
- <1450353397-47668-2-git-send-email-majun258@huawei.com>
- <20151217135247.GD13389@leverpostej> <5673683C.2080304@huawei.com>
- <20151218105837.GB29219@leverpostej>
-Message-ID: <5673EF88.80205@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 18 Dec 2015 11:37:59 +0000
+Subject: [ALT-PATCH v3 9/10] PM / Hibernate: Call flush_icache_range() on
+ pages restored in-place
+In-Reply-To: <1448559168-8363-1-git-send-email-james.morse@arm.com>
+References: <1448559168-8363-1-git-send-email-james.morse@arm.com>
+Message-ID: <1450438679-9389-1-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/12/15 10:58, Mark Rutland wrote:
-> On Fri, Dec 18, 2015 at 09:58:20AM +0800, majun (F) wrote:
->> Hi Mark:
->>
->> ? 2015/12/17 21:52, Mark Rutland ??:
->>> On Thu, Dec 17, 2015 at 07:56:34PM +0800, MaJun wrote:
->>>> From: Ma Jun <majun258@huawei.com>
->> [...]
->>>> +- compatible: Should be "hisilicon,mbigen-v2"
->>>> +
->>>> +- reg: Specifies the base physical address and size of the Mbigen
->>>> +  registers.
->>>> +
->>>> +- interrupt controller: Identifies the node as an interrupt controller
->>>> +
->>>> +- msi-parent: Specifies the MSI controller this mbigen use.
->>>> +  For more detail information,please refer to the generic msi-parent binding in
->>>> +  Documentation/devicetree/bindings/interrupt-controller/msi.txt.
->>>> +
->>>> +- num-msis:Specifies the total number of interrupt this device has.
->>>
->>> Is this the number of pins implemented? Or the number of pins that are
->>> in use?
->>>
->>> The latter feels like something we can derive.
->>
->> num-msis means the total number of pins implemented.
-> 
-> Ok. In that case I think it should be:
-> 
-> - num-pins: the total number of pins implemented in this Mbigen
->   instance.
-> 
-> (with the appropriate fixups in the driver).
-> 
-> With that:
-> 
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> 
->>>> +- #interrupt-cells : Specifies the number of cells needed to encode an
->>>> +  interrupt source. The value must be 2.
->>>> +
->>>> +  The 1st cell is hardware pin number of the interrupt.This number is local to
->>>> +  each mbigen chip and in the range from 0 to the maximum interrupts number
->>>> +  of the mbigen.
->>>
->>> Just to check: 0 - 63 represent the "reserved" pins, yes?
->>
->> Yes, you are right.
->>
->>>
->>> Other than those questions, this looks good to me.
->>
->> Do i need to post a new patch to update these two questions?
-> 
-> Hopefully not.
-> 
-> Marc, are you happy to fold in the s/num-msis/num-pins/ change?
+Some architectures require code written to memory as if it were data to be
+'cleaned' from any data caches before the processor can fetch them as new
+instructions.
 
-FWIW, I'm also moving this to:
+During resume from hibernate, the snapshot code copies some pages directly,
+meaning these architectures do not get a chance to perform their cache
+maintenance. Modify the read and decompress code to call
+flush_icache_range() on all pages that are restored, so that the restored
+in-place pages are guaranteed to be executable on these architectures.
 
-Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt
+Signed-off-by: James Morse <james.morse@arm.com>
+CC: Michael Ellerman <mpe@ellerman.id.au>
 
-in order to match the new documentation conventions.
+---
+Hi,
 
-Thanks,
+This is an alternative version of 9/10 [0] requested by Pavel. It isn't
+possible to know which pages are being restored in place, so this code
+cleans all the pages restored. This is unnecessary 99.95% of the time,
+as the pages will be copied (and cleaned again) by arch code walking
+restore_pblist.
 
-	M.
+I may be being over-cautions, but this looks like it will have the most
+impact on powerpc, where the cache will be cleaned to memory, a page at
+a time.
 
+Patch 10/10 of the series won't build with this 9/10, I will repost the
+series if we chose to use this version.
+
+
+James
+
+[0] http://www.spinics.net/lists/arm-kernel/msg463600.html
+
+ kernel/power/swap.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/kernel/power/swap.c b/kernel/power/swap.c
+index 12cd989dadf6..a30645d2e93f 100644
+--- a/kernel/power/swap.c
++++ b/kernel/power/swap.c
+@@ -37,6 +37,14 @@
+ #define HIBERNATE_SIG	"S1SUSPEND"
+ 
+ /*
++ * When reading an {un,}compressed image, we may restore pages in place,
++ * in which case some architectures need these pages cleaning before they
++ * can be executed. We don't know which pages these may be, so clean the lot.
++ */
++bool clean_pages_on_read = false;
++bool clean_pages_on_decompress = false;
++
++/*
+  *	The swap map is a data structure used for keeping track of each page
+  *	written to a swap partition.  It consists of many swap_map_page
+  *	structures that contain each an array of MAP_PAGE_ENTRIES swap entries.
+@@ -241,6 +249,9 @@ static void hib_end_io(struct bio *bio)
+ 
+ 	if (bio_data_dir(bio) == WRITE)
+ 		put_page(page);
++	else if (clean_pages_on_read)
++		flush_icache_range((unsigned long)page_address(page),
++				   (unsigned long)page_address(page) + PAGE_SIZE);
+ 
+ 	if (bio->bi_error && !hb->error)
+ 		hb->error = bio->bi_error;
+@@ -1049,6 +1060,7 @@ static int load_image(struct swap_map_handle *handle,
+ 
+ 	hib_init_batch(&hb);
+ 
++	clean_pages_on_read = true;
+ 	printk(KERN_INFO "PM: Loading image data pages (%u pages)...\n",
+ 		nr_to_read);
+ 	m = nr_to_read / 10;
+@@ -1124,6 +1136,10 @@ static int lzo_decompress_threadfn(void *data)
+ 		d->unc_len = LZO_UNC_SIZE;
+ 		d->ret = lzo1x_decompress_safe(d->cmp + LZO_HEADER, d->cmp_len,
+ 		                               d->unc, &d->unc_len);
++		if (clean_pages_on_decompress)
++			flush_icache_range((unsigned long)d->unc,
++					   (unsigned long)d->unc + d->unc_len);
++
+ 		atomic_set(&d->stop, 1);
+ 		wake_up(&d->done);
+ 	}
+@@ -1189,6 +1205,8 @@ static int load_image_lzo(struct swap_map_handle *handle,
+ 	}
+ 	memset(crc, 0, offsetof(struct crc_data, go));
+ 
++	clean_pages_on_decompress = true;
++
+ 	/*
+ 	 * Start the decompression threads.
+ 	 */
 -- 
-Jazz is not dead. It just smells funny...
+2.6.2
