@@ -1,51 +1,37 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 18 Dec 2015 12:02:39 +0900
-Subject: [PATCH/RFC 03/19] ARM: shmobile: gose: add i2c2 bus to device tree
-In-Reply-To: <CAMuHMdXWcyEmoVRZuCTM4yqfxXYjgZF1yP8uqCEU8Bj=pmkNYw@mail.gmail.com>
-References: <1449802376-11301-1-git-send-email-horms+renesas@verge.net.au>
- <1449802376-11301-4-git-send-email-horms+renesas@verge.net.au>
- <566AB2A5.4090105@cogentembedded.com>
- <20151214021110.GD13945@verge.net.au>
- <20151214071103.GC1516@katana>
- <CAMuHMdXWcyEmoVRZuCTM4yqfxXYjgZF1yP8uqCEU8Bj=pmkNYw@mail.gmail.com>
-Message-ID: <20151218030239.GB10973@verge.net.au>
+From: bayi.cheng@mediatek.com (Bayi Cheng)
+Date: Fri, 18 Dec 2015 11:02:40 +0800
+Subject: [RESEND PATCH] mtd: mtk-nor: adjust sequence of trigger function and
+ assignment function
+Message-ID: <1450407760-30030-1-git-send-email-bayi.cheng@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 14, 2015 at 10:39:47AM +0100, Geert Uytterhoeven wrote:
-> On Mon, Dec 14, 2015 at 8:11 AM, Wolfram Sang <wsa@the-dreams.de> wrote:
-> >> > >+  eeprom at 50 {
-> >> > >+          compatible = "renesas,24c02";
-> >> >
-> >> >    This is not a valid value -- the Renesas chip model is different from 24c02.
-> >>
-> >> I copied this value from r8a7791.dtsi.
-> >>
-> >> Looking at the schematic for gose (v100), koelsch (rev024) and porter (v300)
-> >> I see the following "R1EX24002ATAS0G#U0". Shall we update r8a7791 and
-> >> this patch to "renesas,24002" or leave things as is?
-> >
-> > I wouldn't like to update the at24 driver with all namings from all
-> > vendors for chips which in large cases are simple 24c02 devices.
-> >
-> > So, if Sergei insists on the change, I'd propose
-> >
-> >         compatible = "renesas,24002", "24c02";
-> 
-> "renesas,r1ex24002"?
-> 
-> I don't think the "A" is relevant (<= 64 is A, >= 128 is B).
-> 
-> http://www.renesas.com/products/memory/eeprom/product_selector.jsp
+Move write data register before excute command to avoid
+missing first byte write to nor flash
 
-Thanks.
+Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
+---
+the previous patch didn't drop the Change-Id
 
-It seems to me that we have some consensus around:
+---
+ drivers/mtd/spi-nor/mtk-quadspi.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-	compatible = "renesas,r1ex24002", "24c02";
-
-Should this be added to Documentation/devicetree/bindings/eeprom/eeprom.txt ?
-Or documented elsewhere?
-
-I believe that as well as any documentation and update of this patch-set
-that r8a7791-koelsch.dts will also need to be updated. I plan to do so.
+diff --git a/drivers/mtd/spi-nor/mtk-quadspi.c b/drivers/mtd/spi-nor/mtk-quadspi.c
+index dd269650..04da971 100644
+--- a/drivers/mtd/spi-nor/mtk-quadspi.c
++++ b/drivers/mtd/spi-nor/mtk-quadspi.c
+@@ -272,10 +272,10 @@ static int mt8173_nor_write_single_byte(struct mt8173_nor *mt8173_nor,
+ 	mt8173_nor_set_addr(mt8173_nor, addr);
+ 
+ 	for (i = 0; i < length; i++) {
++		writeb(*data++, mt8173_nor->base + MTK_NOR_WDATA_REG);
+ 		ret = mt8173_nor_execute_cmd(mt8173_nor, MTK_NOR_PIO_WR_CMD);
+ 		if (ret < 0)
+ 			return ret;
+-		writeb(*data++, mt8173_nor->base + MTK_NOR_WDATA_REG);
+ 	}
+ 	return 0;
+ }
+-- 
+1.8.1.1.dirty
