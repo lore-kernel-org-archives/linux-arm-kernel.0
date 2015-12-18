@@ -1,103 +1,29 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 18 Dec 2015 15:18:12 +0100
-Subject: [PATCH 59/69] clocksource/drivers/dw_apb_timer: Use
- {readl|writel}_relaxed in critical path
-In-Reply-To: <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
-References: <5672CB9E.7090707@linaro.org>
- <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1450448302-27429-59-git-send-email-daniel.lezcano@linaro.org>
+From: majun258@huawei.com (majun)
+Date: Fri, 18 Dec 2015 09:03:17 -0500
+Subject: [PATCH v10 0/4] irqchip:support mbigen interrupt controller
+In-Reply-To: <5673F4D0.9050608@arm.com>
+References: <1450353397-47668-1-git-send-email-majun258@huawei.com>
+ <5673F4D0.9050608@arm.com>
+Message-ID: <56741225.8010605@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jisheng Zhang <jszhang@marvell.com>
+Hi Marc and Mark:
 
-It's safe to use the relaxed version. From another side, the relaxed io
-accessor macros are available on all architectures now, so we can use
-the relaxed versions to get a trivial system performance improvement,
-we measured time the following functions spent on Marvell BG4CT:
+On 2015/12/18 6:58, Marc Zyngier wrote:
+> On 17/12/15 11:56, MaJun wrote:
+>> From: Ma Jun <majun258@huawei.com>
+>>
+>> This patch set adds the driver of mbigen and binding document for Hisilicon
+>> Mbigen chips.
+> 
+> [...]
+> 
+> I've reworked the nits noticed by Mark and stashed this in my
+> irq/wire-msi-bridge branch.
+> 
 
-4096 rounds of __apbt_read_clocksource() call:
+Thanks for your reviewing and great help.
 
-before the patch: 1263240ns on average
-after the patch: 1250080ns on average
-improved by 1%
-
-4096 rounds of apbt_eoi() call:
-
-before the patch: 1290960ns on average
-after the patch: 1248240ns on average
-
-4096 rounds of apbt_next_event() call:
-
-before the patch: 3333660ns on average
-after the patch: 1322040ns on average
-
-improved by 60%!
-
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- drivers/clocksource/dw_apb_timer.c | 24 ++++++++++++++++++------
- 1 file changed, 18 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/clocksource/dw_apb_timer.c b/drivers/clocksource/dw_apb_timer.c
-index 3a6d9db..7f95b53 100644
---- a/drivers/clocksource/dw_apb_timer.c
-+++ b/drivers/clocksource/dw_apb_timer.c
-@@ -60,6 +60,17 @@ static void apbt_writel(struct dw_apb_timer *timer, u32 val,
- 	writel(val, timer->base + offs);
- }
- 
-+static inline u32 apbt_readl_relaxed(struct dw_apb_timer *timer, unsigned long offs)
-+{
-+	return readl_relaxed(timer->base + offs);
-+}
-+
-+static inline void apbt_writel_relaxed(struct dw_apb_timer *timer, u32 val,
-+			unsigned long offs)
-+{
-+	writel_relaxed(val, timer->base + offs);
-+}
-+
- static void apbt_disable_int(struct dw_apb_timer *timer)
- {
- 	u32 ctrl = apbt_readl(timer, APBTMR_N_CONTROL);
-@@ -81,7 +92,7 @@ void dw_apb_clockevent_pause(struct dw_apb_clock_event_device *dw_ced)
- 
- static void apbt_eoi(struct dw_apb_timer *timer)
- {
--	apbt_readl(timer, APBTMR_N_EOI);
-+	apbt_readl_relaxed(timer, APBTMR_N_EOI);
- }
- 
- static irqreturn_t dw_apb_clockevent_irq(int irq, void *data)
-@@ -200,13 +211,13 @@ static int apbt_next_event(unsigned long delta,
- 	struct dw_apb_clock_event_device *dw_ced = ced_to_dw_apb_ced(evt);
- 
- 	/* Disable timer */
--	ctrl = apbt_readl(&dw_ced->timer, APBTMR_N_CONTROL);
-+	ctrl = apbt_readl_relaxed(&dw_ced->timer, APBTMR_N_CONTROL);
- 	ctrl &= ~APBTMR_CONTROL_ENABLE;
--	apbt_writel(&dw_ced->timer, ctrl, APBTMR_N_CONTROL);
-+	apbt_writel_relaxed(&dw_ced->timer, ctrl, APBTMR_N_CONTROL);
- 	/* write new count */
--	apbt_writel(&dw_ced->timer, delta, APBTMR_N_LOAD_COUNT);
-+	apbt_writel_relaxed(&dw_ced->timer, delta, APBTMR_N_LOAD_COUNT);
- 	ctrl |= APBTMR_CONTROL_ENABLE;
--	apbt_writel(&dw_ced->timer, ctrl, APBTMR_N_CONTROL);
-+	apbt_writel_relaxed(&dw_ced->timer, ctrl, APBTMR_N_CONTROL);
- 
- 	return 0;
- }
-@@ -342,7 +353,8 @@ static cycle_t __apbt_read_clocksource(struct clocksource *cs)
- 	struct dw_apb_clocksource *dw_cs =
- 		clocksource_to_dw_apb_clocksource(cs);
- 
--	current_count = apbt_readl(&dw_cs->timer, APBTMR_N_CURRENT_VALUE);
-+	current_count = apbt_readl_relaxed(&dw_cs->timer,
-+					APBTMR_N_CURRENT_VALUE);
- 
- 	return (cycle_t)~current_count;
- }
--- 
-1.9.1
+Thanks again!
+MaJun
