@@ -1,53 +1,48 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 18 Dec 2015 11:02:54 +0000
-Subject: [PATCH v10 3/4] irqchip:create irq domain for each mbigen device
-In-Reply-To: <1450353397-47668-4-git-send-email-majun258@huawei.com>
-References: <1450353397-47668-1-git-send-email-majun258@huawei.com>
- <1450353397-47668-4-git-send-email-majun258@huawei.com>
-Message-ID: <20151218110253.GC29219@leverpostej>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 18 Dec 2015 12:03:41 +0100
+Subject: [PATCH 2/2] arm64: dts: r8a7795: Add L2 cache-controller nodes
+In-Reply-To: <1449904607-4060-2-git-send-email-dirk.behme@gmail.com>
+References: <1449904607-4060-1-git-send-email-dirk.behme@gmail.com>
+ <1449904607-4060-2-git-send-email-dirk.behme@gmail.com>
+Message-ID: <CAMuHMdXpgtPDMBUd_aJsxvh1oFF36i5AnTTSvh+1kmEzcWkGyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 17, 2015 at 07:56:36PM +0800, MaJun wrote:
-> From: Ma Jun <majun258@huawei.com>
-> 
-> For peripheral devices which connect to mbigen,mbigen is a interrupt
-> controller. So, we create irq domain for each mbigen device and add
-> mbigen irq domain into irq hierarchy structure.
-> 
-> Signed-off-by: Ma Jun <majun258@huawei.com>
+Hi Dirk,
+
+On Sat, Dec 12, 2015 at 8:16 AM, Dirk Behme <dirk.behme@gmail.com> wrote:
+> From: Geert Uytterhoeven <geert+renesas@glider.be>
+>
+> Add device nodes for the L2 caches, and link the CPU node to its L2
+> cache node.
+>
+> The L2 cache for the Cortex-A57 CPU cores is 2 MiB large (organized as
+> 128 KiB x 16 ways).
+>
+> The L2 cache for the Cortex-A53 CPU cores is 512 KiB large (organized as
+> 32 KiB x 16 ways).
+>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Signed-off-by: Dirk Behme <dirk.behme@gmail.com>
 > ---
->  drivers/irqchip/irq-mbigen.c |  138 ++++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 138 insertions(+), 0 deletions(-)
+> Note: Geert: I picked your patch from
+>
+> http://www.spinics.net/lists/arm-kernel/msg466628.html
+>
+> incoporated some review comments and rebased it against
+>
+> https://git.kernel.org/cgit/linux/kernel/git/horms/renesas.git/log/?h=next renesas-next-20151211v2-v4.4-rc1
 
-[...]
+This is more or less what I have locally, except that I kept the latency
+properties, pending discussion.
 
-> +static int mbigen_domain_translate(struct irq_domain *d,
-> +				    struct irq_fwspec *fwspec,
-> +				    unsigned long *hwirq,
-> +				    unsigned int *type)
-> +{
-> +	if (is_of_node(fwspec->fwnode)) {
-> +		if (fwspec->param_count != 2)
-> +			return -EINVAL;
-> +
-> +		if ((fwspec->param[0] > MAXIMUM_IRQ_PIN_NUM) ||
-> +			(fwspec->param[0] < RESERVED_IRQ_PER_MBIGEN_CHIP))
-> +			return -EINVAL;
-> +		else
-> +			*hwirq = fwspec->param[0];
-> +
-> +		/* If there is no valid irq type, just use the default type */
-> +		if ((fwspec->param[1] == IRQ_TYPE_EDGE_RISING) ||
-> +			(fwspec->param[1] == IRQ_TYPE_LEVEL_HIGH))
-> +			*type = fwspec->param[1];
-> +		else
-> +			*type = IRQ_TYPE_NONE;
+Gr{oetje,eeting}s,
 
-That does not seem like a good idea. The binding requires one of two
-types, and the DT is clearly wrong in the else case. 
+                        Geert
 
-I think for the else case we should return -EINVAL.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Thanks,
-Mark.
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
