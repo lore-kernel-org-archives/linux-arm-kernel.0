@@ -1,77 +1,65 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 18 Dec 2015 13:00:09 +0000
-Subject: [PATCH] KVM: arm/arm64: vgic-new: Try to insert multi-source SGIs at
- once
-In-Reply-To: <1450443609-2233-1-git-send-email-marc.zyngier@arm.com>
-References: <1450443609-2233-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1450443609-2233-2-git-send-email-marc.zyngier@arm.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 18 Dec 2015 15:00:49 +0200
+Subject: [PATCH v2] serial: 8250: of: Fix the driver and actually compile the
+ 8250_of
+Message-ID: <1450443649-31654-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Improve handling of multi-source SGIs: instead of only inserting
-one source per SGI per run, try to insert them all at once.
+The 8250_of never compiled since in the Kconfig we have SERIAL_OF_PLATFORM
+but in the makefile we expect to have SERIAL_8250_OF...
 
-Hopefully this is a rare case.
+When the 8250_of.c is actually compiled we will have two errors:
+missing linux/nwpserial.h and 8250/8250.h.
+Fix those as well at the same time when enable the compilation of the
+driver.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Fixes: afd7f88f1577 ("serial: 8250: move of_serial code to 8250 directory")
+CC: Arnd Bergmann <arnd@arndb.de>
 ---
- virt/kvm/arm/vgic/vgic.c | 30 ++++++++++++++++++++++++++----
- 1 file changed, 26 insertions(+), 4 deletions(-)
+Hi,
 
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index c6f04a1..052f917 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -371,15 +371,22 @@ static int compute_ap_list_depth(struct kvm_vcpu *vcpu)
- 	struct vgic_irq *irq;
- 	int count = 0;
+Changes since v1:
+- Only update the Makefile
+
+this is fixes linux-next. W/o the patch davinci devices are not booting in DT
+mode for example.
+
+Regards,
+Peter
+
+ drivers/tty/serial/8250/8250_of.c | 3 +--
+ drivers/tty/serial/8250/Makefile  | 2 +-
+ 2 files changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/tty/serial/8250/8250_of.c b/drivers/tty/serial/8250/8250_of.c
+index d66fd24f87cf..33021c1f7d55 100644
+--- a/drivers/tty/serial/8250/8250_of.c
++++ b/drivers/tty/serial/8250/8250_of.c
+@@ -18,10 +18,9 @@
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+-#include <linux/nwpserial.h>
+ #include <linux/clk.h>
  
--	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list)
--		count++;
--
-+	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
-+		spin_lock(&irq->irq_lock);
-+		/* GICv2 SGIs can count for more than one... */
-+		if (irq->intid < VGIC_NR_SGIS && irq->source)
-+			count += hweight8(irq->source);
-+		else
-+			count++;
-+		spin_unlock(&irq->irq_lock);
-+	}
- 	return count;
- }
+-#include "8250/8250.h"
++#include "8250.h"
  
- static void vgic_populate_lrs(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-+	u32 model = vcpu->kvm->arch.vgic.vgic_model;
- 	struct vgic_irq *irq;
- 	int count = 0;
+ struct of_serial_info {
+ 	struct clk *clk;
+diff --git a/drivers/tty/serial/8250/Makefile b/drivers/tty/serial/8250/Makefile
+index 4ecb80d3549a..b9b9bca5b6c3 100644
+--- a/drivers/tty/serial/8250/Makefile
++++ b/drivers/tty/serial/8250/Makefile
+@@ -28,6 +28,6 @@ obj-$(CONFIG_SERIAL_8250_MT6577)	+= 8250_mtk.o
+ obj-$(CONFIG_SERIAL_8250_UNIPHIER)	+= 8250_uniphier.o
+ obj-$(CONFIG_SERIAL_8250_INGENIC)	+= 8250_ingenic.o
+ obj-$(CONFIG_SERIAL_8250_MID)		+= 8250_mid.o
+-obj-$(CONFIG_SERIAL_8250_OF)		+= 8250_of.o
++obj-$(CONFIG_SERIAL_OF_PLATFORM)	+= 8250_of.o
  
-@@ -390,8 +397,23 @@ static void vgic_populate_lrs(struct kvm_vcpu *vcpu)
- 
- 	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
- 		spin_lock(&irq->irq_lock);
--		if (vgic_target_oracle(irq) == vcpu)
-+
-+		if (unlikely(vgic_target_oracle(irq) != vcpu))
-+			goto next;
-+
-+		/*
-+		 * If we get an SGI with multiple sources, try to get
-+		 * them in all at once.
-+		 */
-+		if (model == KVM_DEV_TYPE_ARM_VGIC_V2 &&
-+		    irq->intid < VGIC_NR_SGIS) {
-+			while(irq->source && count < vcpu->arch.vgic_cpu.nr_lr)
-+				vgic_populate_lr(vcpu, irq, count++);
-+		} else {
- 			vgic_populate_lr(vcpu, irq, count++);
-+		}
-+
-+	next:
- 		spin_unlock(&irq->irq_lock);
- 
- 		if (count == vcpu->arch.vgic_cpu.nr_lr)
+ CFLAGS_8250_ingenic.o += -I$(srctree)/scripts/dtc/libfdt
 -- 
-2.1.4
+2.6.4
