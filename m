@@ -1,74 +1,43 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Fri, 18 Dec 2015 14:27:42 -0800
-Subject: [PATCH v5 1/3] KVM/arm: add hooks for armv7 fp/simd lazy switch
- support
-In-Reply-To: <20151218130741.GF32720@cbox>
-References: <1449450434-2929-1-git-send-email-m.smarduch@samsung.com>
- <1449450434-2929-2-git-send-email-m.smarduch@samsung.com>
- <20151218130741.GF32720@cbox>
-Message-ID: <5674885E.4080300@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 18 Dec 2015 14:31:57 -0800
+Subject: [PATCH] mmc: pwrseq_simple: Fix regression with optional GPIOs
+In-Reply-To: <CAPDyKFr8e6wDxkGwnOwijQiOgF7oq6gCoHmqbubv6oSbpYbwqg@mail.gmail.com>
+References: <1449528845-25189-1-git-send-email-tony@atomide.com>
+ <CAPDyKFpxiOJJdh-nLXjxv3DYJnW3RAf_9aqMfds46=-oqPd5ng@mail.gmail.com>
+ <20151218161406.GL23396@atomide.com>
+ <CAPDyKFr8e6wDxkGwnOwijQiOgF7oq6gCoHmqbubv6oSbpYbwqg@mail.gmail.com>
+Message-ID: <20151218223156.GP23396@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+* Ulf Hansson <ulf.hansson@linaro.org> [151218 14:20]:
+> On 18 December 2015 at 17:14, Tony Lindgren <tony@atomide.com> wrote:
+> > * Ulf Hansson <ulf.hansson@linaro.org> [151207 16:20]:
+> >> +Linus
+> >>
+> >> On 7 December 2015 at 23:54, Tony Lindgren <tony@atomide.com> wrote:
+> >> > Commit ce037275861e ("mmc: pwrseq_simple: use GPIO descriptors array API")
+> >> > changed the handling MMC power sequence so GPIOs no longer are optional.
+> >> >
+> >> > This broke SDIO WLAN at least for omap5 that can't yet use the reset GPIOs
+> >> > with pwrseq_simple as a wait is needed after enabling the SDIO device.
+> >>
+> >> Can you elaborate on this. Did it break omap5 or not? :-)
+> >
+> > Ulf, is this patch queued for v4.4 as a regression fix? I don't see it
+> > in Linux next or mainline trees?
+> 
+> Ohh, I guess there where some misunderstanding. I made a bunch of
+> comments on your patch as well, so I have been expecting a new
+> version.
 
+Well this $subject patch was intended as a regression fix for v4.4-rc cycle.
+All the other things discussed are not fixes but new features instead.
 
-On 12/18/2015 5:07 AM, Christoffer Dall wrote:
-> On Sun, Dec 06, 2015 at 05:07:12PM -0800, Mario Smarduch wrote:
->> This patch adds vcpu fields to configure hcptr trap register which is also used 
->> to determine if fp/simd registers are dirty. Adds a field to save host FPEXC, 
->> and offsets associated offsets.
-> 
-> offsets offsets?
-Should be 'with vcpu fields'
-> 
->>
->> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
->> ---
->>  arch/arm/include/asm/kvm_host.h | 6 ++++++
->>  arch/arm/kernel/asm-offsets.c   | 2 ++
->>  2 files changed, 8 insertions(+)
->>
->> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
->> index 3df1e97..09bb1f2 100644
->> --- a/arch/arm/include/asm/kvm_host.h
->> +++ b/arch/arm/include/asm/kvm_host.h
->> @@ -104,6 +104,12 @@ struct kvm_vcpu_arch {
->>  	/* HYP trapping configuration */
->>  	u32 hcr;
->>  
->> +	/* HYP Co-processor fp/simd and trace trapping configuration */
->> +	u32 hcptr;
->> +
->> +	/* Save host FPEXC register to later restore on vcpu put */
->> +	u32 host_fpexc;
->> +
->>  	/* Interrupt related fields */
->>  	u32 irq_lines;		/* IRQ and FIQ levels */
->>  
->> diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
->> index 871b826..28ebd4c 100644
->> --- a/arch/arm/kernel/asm-offsets.c
->> +++ b/arch/arm/kernel/asm-offsets.c
->> @@ -185,6 +185,8 @@ int main(void)
->>    DEFINE(VCPU_PC,		offsetof(struct kvm_vcpu, arch.regs.usr_regs.ARM_pc));
->>    DEFINE(VCPU_CPSR,		offsetof(struct kvm_vcpu, arch.regs.usr_regs.ARM_cpsr));
->>    DEFINE(VCPU_HCR,		offsetof(struct kvm_vcpu, arch.hcr));
->> +  DEFINE(VCPU_HCPTR,		offsetof(struct kvm_vcpu, arch.hcptr));
->> +  DEFINE(VCPU_VFP_HOST_FPEXC,	offsetof(struct kvm_vcpu, arch.host_fpexc));
-> 
-> this makes me think this needs a good rebase on world-switch in C, which
-> is now in kvmarm/next...
-Ok, definitely.
-> 
->>    DEFINE(VCPU_IRQ_LINES,	offsetof(struct kvm_vcpu, arch.irq_lines));
->>    DEFINE(VCPU_HSR,		offsetof(struct kvm_vcpu, arch.fault.hsr));
->>    DEFINE(VCPU_HxFAR,		offsetof(struct kvm_vcpu, arch.fault.hxfar));
-> 
-> this patch is hard to review on its own as I don't see how this is used,
-> but ok...
-Sure, I'll combine it.
-> 
->> -- 
->> 1.9.1
->>
-> 
+> Sorry if that was unclear!
+
+I think this patch should be still fine as is, care to take a look again?
+
+Regards,
+
+Tony
