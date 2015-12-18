@@ -1,37 +1,56 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Fri, 18 Dec 2015 12:16:22 +0300
-Subject: [PATCH v9 0/4] Exynos SROMc configuration and Ethernet support for
- SMDK5410
-In-Reply-To: <56724519.80108@samsung.com>
-References: <cover.1447659546.git.p.fedin@samsung.com>
- <56724519.80108@samsung.com>
-Message-ID: <019e01d13974$c432fb00$4c98f100$@samsung.com>
+From: yoann@printk.fr (Yoann Sculo)
+Date: Fri, 18 Dec 2015 10:32:45 +0100
+Subject: [PATCH 3/4] ARM: dts: kirkwood: add Seagate GoFlex Home
+In-Reply-To: <563CCFE3.7080603@printk.fr>
+References: <1446675888-24495-1-git-send-email-luka.perkov@sartura.hr>
+ <00000150d49a8745-1c2bc8d4-1333-46bb-bf0e-5508ef988c73-000000@email.amazonses.com>
+ <563CCFE3.7080603@printk.fr>
+Message-ID: <5673D2BD.8070805@printk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello!
+Hi Luka,
 
-> 4. This branch is not pushed to linux-next. I will sort it out if my
-> previous pull requests get in. I will be out of office for Christmas so
-> depending on the timing of {arm-soc,Christmas,Kukjin} this may or may
-> not go into v4.5 (yay...).
-> 
-> 5. If it does not get into v4.5, I will rebase it and proceed further
-> for v4.6.
-> 
-> If you have any questions, please let me know.
+Did you have the time to look at those issues ?
 
- Thank you very much. No, i don't have any questions, i'm glad that my work is picked up and not lost, i'm just keeping an eye on it
-until it goes to stable.
+Yoann
 
- P.S. Not related to these sets directly, just to note... When i was writing the doc for SROMc bindings, i noticed that we have two
-directories for Exynos in Documentation/devicetree/bindings/arm:
-1. Documentation/devicetree/bindings/arm/exynos
-2. Documentation/devicetree/bindings/arm/Samsung
-
- In (1) we have only a single old file, shouldn't this be cleaned up and shouldn't this file be moved to (2)?
-
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+Le 06/11/2015 17:05, Yoann Sculo a ?crit :
+> Hi Luka,
+>
+> I tested your patch on the GoFlex Home.
+>
+>> +    gpio-leds {
+>> +        compatible = "gpio-leds";
+>> +
+>> +        health {
+>> +            label = "status:green:health";
+>> +            gpios = <&gpio1 14 1>;
+>> +            linux,default-trigger = "default-on";
+>> +        };
+>> +        fault {
+>> +            label = "status:orange:fault";
+>> +            gpios = <&gpio1 15 1>;
+>> +        };
+>> +        misc {
+>> +            label = "status:white:misc";
+>> +            gpios = <&gpio1 8 1>;
+>> +            linux,default-trigger = "ide-disk";
+>> +        };
+>> +    };
+>
+> I noticed green and orange leds were working fine (0 == off, 1 == on).
+> But white led polarity is inverted (1 == off, 0 == on).
+>
+>> +    partition at 500000 {
+>> +        label = "pogoplug";
+>> +        reg = <0x0500000 0x2000000>;
+>> +    };
+>
+> I don't think pogoplug is the proper label for this partition. It seems
+> duplicated from "kirkwood-goflexnet.dts" I guess you could label it
+> "data" for instance.
+>
+> Tested-by: Yoann Sculo <yoann@printk.fr>
+>
+> Yoann
