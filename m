@@ -1,34 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Dec 2015 14:15:17 +0100
-Subject: [PATCH v2] mtd: omap_elm: print interrupt resource using %pr
-Message-ID: <2327550.1yLrRnIh7I@wuerfel>
+Date: Fri, 18 Dec 2015 14:16:06 +0100
+Subject: [PATCH v2] serial: 8250: of: Fix the driver and actually compile
+ the 8250_of
+In-Reply-To: <1450443649-31654-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1450443649-31654-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <3295738.CvTDrXdGbt@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_LPAE is set on ARM, resource_size_t is 64-bit wide
-and we get a warning about an incorrect format string for printing
-the interrupt number in elm_probe:
+On Friday 18 December 2015 15:00:49 Peter Ujfalusi wrote:
+> The 8250_of never compiled since in the Kconfig we have SERIAL_OF_PLATFORM
+> but in the makefile we expect to have SERIAL_8250_OF...
+> 
+> When the 8250_of.c is actually compiled we will have two errors:
+> missing linux/nwpserial.h and 8250/8250.h.
+> Fix those as well at the same time when enable the compilation of the
+> driver.
+> 
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Fixes: afd7f88f1577 ("serial: 8250: move of_serial code to 8250 directory")
+> CC: Arnd Bergmann <arnd@arndb.de>
+> 
 
-drivers/mtd/nand/omap_elm.c: In function 'elm_probe':
-drivers/mtd/nand/omap_elm.c:417:23: warning: format '%i' expects argument of type 'int', but argument 3 has type 'resource_size_t {aka long long unsigned int}' [-Wformat=]
+Thanks for fixing this, and sorry for the mess.
 
-This patch avoids the type mismatch by printing the interrupt as
-a resource using the %pr format string.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-v2: pass correct pointer
-
-diff --git a/drivers/mtd/nand/omap_elm.c b/drivers/mtd/nand/omap_elm.c
-index 235ec7992b4c..a3f32f939cc1 100644
---- a/drivers/mtd/nand/omap_elm.c
-+++ b/drivers/mtd/nand/omap_elm.c
-@@ -414,7 +414,7 @@ static int elm_probe(struct platform_device *pdev)
- 	ret = devm_request_irq(&pdev->dev, irq->start, elm_isr, 0,
- 			pdev->name, info);
- 	if (ret) {
--		dev_err(&pdev->dev, "failure requesting irq %i\n", irq->start);
-+		dev_err(&pdev->dev, "failure requesting %pr\n", irq);
- 		return ret;
- 	}
- 
+Acked-by: Arnd Bergmann <arnd@arndb.de>
