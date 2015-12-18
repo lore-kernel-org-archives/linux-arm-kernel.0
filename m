@@ -1,29 +1,23 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Fri, 18 Dec 2015 20:27:36 +0800
-Subject: [PATCH v10 0/4] irqchip:support mbigen interrupt controller
-In-Reply-To: <5673F4D0.9050608@arm.com>
-References: <1450353397-47668-1-git-send-email-majun258@huawei.com>
- <5673F4D0.9050608@arm.com>
-Message-ID: <5673FBB8.7000307@huawei.com>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Fri, 18 Dec 2015 06:26:54 -0600
+Subject: [PATCH] ARM: socfpga: Repair incorrectly applied MCV patch
+In-Reply-To: <1450395498-9827-1-git-send-email-marex@denx.de>
+References: <1450395498-9827-1-git-send-email-marex@denx.de>
+Message-ID: <alpine.DEB.2.02.1512180623300.7406@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc, Mark,
+On Thu, 17 Dec 2015, Marek Vasut wrote:
 
-On 2015/12/18 19:58, Marc Zyngier wrote:
-> On 17/12/15 11:56, MaJun wrote:
->> From: Ma Jun <majun258@huawei.com>
->>
->> This patch set adds the driver of mbigen and binding document for Hisilicon
->> Mbigen chips.
-> [...]
->
-> I've reworked the nits noticed by Mark and stashed this in my
-> irq/wire-msi-bridge branch.
+> For whatever reason, this patch was not applied verbatim and had all
+> tabs replaced with spaces. Replace them back by a quick sed.
+> 
 
-I'm also following this patch set and I checked your tree in irq/wire-msi-bridge
-branch, especially with the "num-pins" property/driver update, I think the code
-in your tree is in good shape, thanks a lot for the review!
+Thanks for catching this. I think what happened was that I had to pull this
+patch from the mailing list, and whenever I forward a patch from my gmail
+account, I can't seem to be able to use git am.
 
-Thanks
-Hanjun
+Anyways, patch is applied.
+
+Thanks,
+Dinh
