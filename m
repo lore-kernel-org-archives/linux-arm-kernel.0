@@ -1,73 +1,97 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 18 Dec 2015 08:35:32 +0100
-Subject: I2C eeprom compatibles? (was Re: [PATCH/RFC 03/19] ARM: shmobile:
- gose: add i2c2 bus to device tree)
-In-Reply-To: <20151218030239.GB10973@verge.net.au>
-References: <1449802376-11301-1-git-send-email-horms+renesas@verge.net.au>
- <1449802376-11301-4-git-send-email-horms+renesas@verge.net.au>
- <566AB2A5.4090105@cogentembedded.com>
- <20151214021110.GD13945@verge.net.au>
- <20151214071103.GC1516@katana>
- <CAMuHMdXWcyEmoVRZuCTM4yqfxXYjgZF1yP8uqCEU8Bj=pmkNYw@mail.gmail.com>
- <20151218030239.GB10973@verge.net.au>
-Message-ID: <20151218073531.GA1517@katana>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Fri, 18 Dec 2015 15:38:22 +0800
+Subject: [PATCH v2 0/3] USB: add generic onboard USB HUB driver
+In-Reply-To: <CAL_Jsq+t6NBh-zzwPH14MYBp6PGFaVv3540Urdn8q6D+erQkLA@mail.gmail.com>
+References: <1450077974-22762-1-git-send-email-peter.chen@freescale.com>
+ <3023844.AYbAYqvHUZ@wuerfel>
+ <CAL_Jsq+KAF6FGyOyC0JzODsSVoK4+V6umpj=cANywgui_wOKMg@mail.gmail.com>
+ <1827708.e1pfN6rEID@wuerfel> <20151217023118.GA3793@shlinux2>
+ <CAL_Jsq+t6NBh-zzwPH14MYBp6PGFaVv3540Urdn8q6D+erQkLA@mail.gmail.com>
+Message-ID: <CAL411-qWj4jwPW98gourzg2A+6HtbENyqRZPmam4z2mvdMXT6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 12:02:39PM +0900, Simon Horman wrote:
-> On Mon, Dec 14, 2015 at 10:39:47AM +0100, Geert Uytterhoeven wrote:
-> > On Mon, Dec 14, 2015 at 8:11 AM, Wolfram Sang <wsa@the-dreams.de> wrote:
-> > >> > >+  eeprom at 50 {
-> > >> > >+          compatible = "renesas,24c02";
-> > >> >
-> > >> >    This is not a valid value -- the Renesas chip model is different from 24c02.
-> > >>
-> > >> I copied this value from r8a7791.dtsi.
-> > >>
-> > >> Looking at the schematic for gose (v100), koelsch (rev024) and porter (v300)
-> > >> I see the following "R1EX24002ATAS0G#U0". Shall we update r8a7791 and
-> > >> this patch to "renesas,24002" or leave things as is?
-> > >
-> > > I wouldn't like to update the at24 driver with all namings from all
-> > > vendors for chips which in large cases are simple 24c02 devices.
-> > >
-> > > So, if Sergei insists on the change, I'd propose
-> > >
-> > >         compatible = "renesas,24002", "24c02";
-> > 
-> > "renesas,r1ex24002"?
-> > 
-> > I don't think the "A" is relevant (<= 64 is A, >= 128 is B).
-> > 
-> > http://www.renesas.com/products/memory/eeprom/product_selector.jsp
-> 
-> Thanks.
-> 
-> It seems to me that we have some consensus around:
-> 
-> 	compatible = "renesas,r1ex24002", "24c02";
+On Thu, Dec 17, 2015 at 9:49 PM, Rob Herring <robh+dt@kernel.org> wrote:
+> On Wed, Dec 16, 2015 at 8:31 PM, Peter Chen <peter.chen@freescale.com> wrote:
+>> On Thu, Dec 17, 2015 at 12:13:07AM +0100, Arnd Bergmann wrote:
+>>> On Wednesday 16 December 2015 16:59:39 Rob Herring wrote:
+>>> > On Mon, Dec 14, 2015 at 3:35 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>> > > On Monday 14 December 2015 15:26:11 Peter Chen wrote:
+>>> >
+>>> > I agree on doing it properly, but am not sure that pwrseq binding for
+>>> > MMC is proper. The pwrseq binding is fairly limited and working around
+>>> > the driver model IMO. Hubs may also need I2C setup which I don't think
+>>> > could be done generically other than some defined sequence of i2c
+>>> > transactions. The current project I'm working on needs to use I2C to
+>>> > configure the hub to use HSIC mode for example. I really think we need
+>>> > a pre-probe driver hook to handle this. That would allow device
+>>> > specific setup to live in the driver.
+>>> >
+>>> > Perhaps a more simple approach would be just forcing driver probe if a
+>>> > DT node is present. I'm not all that familiar with USB drivers, but
+>>> > presumably there is some setup before probe like setting the USB
+>>> > device address. We'd have to allow doing that later during probe.
+>>>
+>>> Yes, good idea. I was also advocating that approach for MMC at some
+>>> point, but the power sequencing made it in the end.
+>>>
+>>
+>> Currently, my design is much like Rob proposal's. I will populate all
+>> children device under HUB's node (controller = 1st level hub), and
+>> each special onboard USB device needs a platform driver, it can be
+>> probed according to compatible string, and at its probe, it can register
+>> itself as usb device if needed, and handle properties described at
+>> its node. Sample code like below:
+>
+> It is not like my proposal because I don't think the design should be
+> using a platform driver.
+>
 
-Thinking again, "generic,24c02" or "generic-24c02" could also be an
-option.
+FSL email is migrating with NXP's, it is unavailable now, I use my
+gmail account.
 
-> Should this be added to Documentation/devicetree/bindings/eeprom/eeprom.txt ?
-> Or documented elsewhere?
+If I understand correct, you would like use current USB class driver to handle
+its related device. Yes, it can work only the device can be discovered without
+any pre-setup, like reset, clock setting, etc. The related class driver's probe
+is only called when this kinds of classes (hid, mass storage, ethernet, etc)
+is discovered by USB bus.
 
-Probably we need a DT maintainers advice here? I don't mind vendor
-specific compatibles being documented, but I'm reluctant to add all
-these compatibles for the myriads of I2C eeproms to the at24 driver. 99%
-are covered by the generic case.
+Besides this, we need pre-setup code to let the USB device can be discovered
+if needed. There is no place to put this pre-setup code at related
+class driver,
+->probe will be called after discovered, at its init, we have no
+struct device *,
+even we can create an API for this purpose, and call it at its parent's driver,
+this class driver may be not loaded at all.
 
-Adding DT to CC.
+If not use platform driver, we had to use the way MMC power code does that
+is have this pre-setup code as library, and build together with USB core.
 
-Thanks,
+>> diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+>> index 8263fc1..7451f7d 100644
+>> --- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+>> +++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+>> @@ -590,6 +590,16 @@
+>>  &usbh1 {
+>>         vbus-supply = <&reg_usb_h1_vbus>;
+>>         status = "okay";
+>> +
+>> +       #address-cells = <1>;
+>> +       #size-cells = <0>;
+>> +       hub: usb2415 at 01 {
+>> +               compatible = "generic-onboard-hub";
+>
+> Please follow the already defined naming scheme for USB devices.
+>
+> Rob
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-   Wolfram
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151218/0f224d37/attachment.sig>
+
+-- 
+BR,
+Peter Chen
