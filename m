@@ -1,36 +1,30 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 18 Dec 2015 11:15:34 +0100
-Subject: [PATCH 2/3] ARM: shmobile: r8a7791: use fallback usbhs
+Date: Fri, 18 Dec 2015 11:15:47 +0100
+Subject: [PATCH 1/3] ARM: shmobile: r8a7790: use fallback usbhs
  compatibility string
-In-Reply-To: <1450404705-5449-3-git-send-email-horms+renesas@verge.net.au>
+In-Reply-To: <1450404705-5449-2-git-send-email-horms+renesas@verge.net.au>
 References: <1450404705-5449-1-git-send-email-horms+renesas@verge.net.au>
- <1450404705-5449-3-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdVzcvJvOKp6y2faU-5KevRFfOAmPYSBYL9pm9S-bod-gA@mail.gmail.com>
+ <1450404705-5449-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdWhcCE9G2pPALRek+iB=Jot+a6uiO-WnR-Q8OHtTVWQmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, Dec 18, 2015 at 3:11 AM, Simon Horman
 <horms+renesas@verge.net.au> wrote:
-> Use recently added fallback compatibility string in r8a7791 device tree.
->
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->  arch/arm/boot/dts/r8a7791.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-> index 2a369ddcb6fd..e2ffbfae6c5c 100644
-> --- a/arch/arm/boot/dts/r8a7791.dtsi
-> +++ b/arch/arm/boot/dts/r8a7791.dtsi
-> @@ -822,7 +822,7 @@
+> --- a/arch/arm/boot/dts/r8a7790.dtsi
+> +++ b/arch/arm/boot/dts/r8a7790.dtsi
+> @@ -746,7 +746,7 @@
 >         };
 >
 >         hsusb: usb at e6590000 {
-> -               compatible = "renesas,usbhs-r8a7791";
-> +               compatible = "renesas,usbhs-r8a7791", "renesas,usbhs";
+> -               compatible = "renesas,usbhs-r8a7790";
+> +               compatible = "renesas,usbhs-r8a7790", "renesas,usbhs";
 
 "renesas,rcar-gen2-usbhs", not "renesas,usbhs".
 
+
+
+-- 
 Gr{oetje,eeting}s,
 
                         Geert
