@@ -1,55 +1,89 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 Dec 2015 11:30:41 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC GIC Cleanup for v4.5
-Message-ID: <cover.1450401902.git.horms+renesas@verge.net.au>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 18 Dec 2015 11:54:11 +0900
+Subject: [PATCH] ARM: shmobile: alt: Add QSPI device to DT
+In-Reply-To: <CAMuHMdXgr5FbS0_L8g0xdesFZ-utPH+G8VgXQKqXZd3t4OsXcw@mail.gmail.com>
+References: <1448863990-16276-1-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdWnyZbHiLEPn-6dEweBEXHzWr6o2KF2iCpzg2-OhZRVSw@mail.gmail.com>
+ <20151201064149.GH16260@verge.net.au>
+ <CAMuHMdXgr5FbS0_L8g0xdesFZ-utPH+G8VgXQKqXZd3t4OsXcw@mail.gmail.com>
+Message-ID: <20151218025410.GA10973@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+On Tue, Dec 01, 2015 at 09:06:17AM +0100, Geert Uytterhoeven wrote:
+> Hi Simon,
+> 
+> On Tue, Dec 1, 2015 at 7:41 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Mon, Nov 30, 2015 at 09:34:10AM +0100, Geert Uytterhoeven wrote:
+> >> On Mon, Nov 30, 2015 at 7:13 AM, Simon Horman
+> >> <horms+renesas@verge.net.au> wrote:
+> >> > Enable the QSPI controller in the alt device tree.
+> >> >
+> >> > Based similar work for the silk board by by Vladimir Barinov and
+> >> > Sergei Shtylyov.
+> >> >
+> >> > Cc: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> >> > Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> >> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >>
+> >> Verified against Alt schematics and r8a7794 datasheet.
+> >>
+> >> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >>
+> >> I can't verify the FLASH layout. Note that p.11 of
+> >> ALT_MiniMonitor_Manual(SPI_Boot)_Rev0.01_e.pdf shows a different
+> >> FLASH layout for the second and third partition.
+> >
+> > Thanks. I see the following in v1.9.6 of the BSP[1]. Is it
+> > the same as the document you referred to above?
+> >
+> >
+> >                 partition at 0 {
+> >                         label = "loader";
+> >                         reg = <0x00000000 0x00080000>;
+> >                         read-only;
+> >                 };
+> >                 partition at 40000 {
+> >                         label = "user";
+> >                         reg = <0x00080000 0x00580000>;
+> >                         read-only;
+> >                 };
+> >                 partition at 440000 {
+> >                         label = "flash";
+> >                         reg = <0x00600000 0x03a00000>;
+> >                 };
+> >
+> >
+> > [1] https://git.kernel.org/cgit/linux/kernel/git/horms/renesas-backport.git/tree/arch/arm/boot/dts/r8a7794-alt.dts?h=rcar-gen2/v1.9.6&id=e1acbe074f36d96e901bf5346c50ee51da2ced42#n379
+> 
+> No, the document specifies 3 partitions:
+>   - SA0: loader program area, 16 KiB,
+>   - SA1: System area, 16 KiB,
+>   - SA2: User program area, remainder.
+> 
+> FWIW, the unit addresses in the device nodes above are not consistent
+> with their reg properties.
 
-Please consider these Renesas ARM based SoC GIC cleanup for v4.5.
+My feeling is that we should follow the documentation.
+Does this reflect the scheme it describes?
 
-This pull-request includes staging-board changes which have been
-acked by Greg Kroah-Hartman. They are bundled into this pull-request
-as not-doing so would break the drivers they update.
 
-The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+                partitions {
+                        #address-cells = <1>;
+                        #size-cells = <1>;
 
-  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-gic-cleanup-for-v4.5
-
-for you to fetch changes up to 1474136ce6a457a10a797b3de04adbb035e90901:
-
-  staging: board: armadillo800eva: Use "arm,pl390" (2015-12-18 10:21:10 +0900)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC GIC Cleanup for v4.5
-
-On several Renesas ARM SoCs, the GIC is described in DT as being a
-Cortex A9 GIC, while it's actually a PL390. This is not only stated in
-the documentation, but has been verified by reading the GICD_IIDR
-register.
-
-To correct this:
-  1. Update the DT compatible value to match reality,
-  2. Update the board staging drivers to match the above.
-
-----------------------------------------------------------------
-Geert Uytterhoeven (6):
-      ARM: shmobile: r7s72100 dtsi: Use "arm,pl390" for GIC
-      ARM: shmobile: r8a7740 dtsi: Use "arm,pl390" for GIC
-      ARM: shmobile: emev2 dtsi: Use "arm,pl390" for GIC
-      ARM: shmobile: r8a7778 dtsi: Use "arm,pl390" for GIC
-      staging: board: kzm9d: Use "arm,pl390"
-      staging: board: armadillo800eva: Use "arm,pl390"
-
- arch/arm/boot/dts/emev2.dtsi            | 2 +-
- arch/arm/boot/dts/r7s72100.dtsi         | 2 +-
- arch/arm/boot/dts/r8a7740.dtsi          | 2 +-
- arch/arm/boot/dts/r8a7778.dtsi          | 2 +-
- drivers/staging/board/armadillo800eva.c | 2 +-
- drivers/staging/board/kzm9d.c           | 2 +-
- 6 files changed, 6 insertions(+), 6 deletions(-)
+                        partition at 0 {
+                                label = "loader";
+                                reg = <0x00000000 0x00004000>;
+                                read-only;
+                        };
+                        partition at 4000 {
+                                label = "system";
+                                reg = <0x00004000 0x00004000>;
+                                read-only;
+                        };
+                        partition at 8000 {
+                                label = "user";
+                                reg = <0x00008000 0x03ff8000>;
+                        };
+                };
