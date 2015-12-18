@@ -1,72 +1,102 @@
-From: pankaj.dubey@samsung.com (pankaj.dubey)
-Date: Fri, 18 Dec 2015 13:49:42 +0530
-Subject: [PATCH v7 0/6] samsung: pmu: split up SoC specific PMU data
-In-Reply-To: <56738B39.10201@samsung.com>
-References: <1450409536-30463-1-git-send-email-pankaj.dubey@samsung.com>
- <56738B39.10201@samsung.com>
-Message-ID: <5673C19E.9000907@samsung.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 18 Dec 2015 09:33:36 +0100
+Subject: [PATCH v2] soc: mediatek: SCPSYS: use module_platform_driver
+In-Reply-To: <20151217151617.GY2772@windriver.com>
+References: <1450263656-12513-1-git-send-email-s.hauer@pengutronix.de>
+ <1562792.sV6cmsyeOM@wuerfel> <56715136.3060908@gmail.com>
+ <CAGS+omA1mgmFH_JXffUTC-aq3rOy7dRYsdveiJ8LcnB5gg0ELw@mail.gmail.com>
+ <20151217151617.GY2772@windriver.com>
+Message-ID: <5673C4E0.70607@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+Hi Paul,
 
-On Friday 18 December 2015 09:57 AM, Krzysztof Kozlowski wrote:
-> On 18.12.2015 12:32, Pankaj Dubey wrote:
->> In this series I am splitting up SoC specific PMU configuration data into
->> mach-exynos folder itself, before moving all of them under
->> drivers/soc/samsung/. Also instead of making all changes in single patch it
->> has been broken into SoC specific patches to avoid large size of patch.
->> With this approach there will not be unwanted big churns just after
->> adding exynos-pmu under drivers/soc/samsung.
+On 17/12/15 16:16, Paul Gortmaker wrote:
+> [Re: [PATCH v2] soc: mediatek: SCPSYS: use module_platform_driver] On 17/12/2015 (Thu 10:52) Daniel Kurtz wrote:
+>
+> [...]
+>
 >>
->> All these patches are just refactoring to keep minimal changes while moving
->> exynos-pmu driver under drivers/soc/samsung/. Support for exynos7 PMU can
->> be added on top of it, in such a manner that for ARM64 build, ARM related
->> SoC's PMU will not get compiled and thus unnecessary increasing kernel image size.
+>> Also, since scpsys' Kconfig is "bool" not "tristate" it isn't a real
+>> module so I think we should use:
+>> builtin_platform_driver not module_platform_driver
 >>
->> This series have been prepared on top of Krzysztof Kozlowski's 
->> next/stuff-late-not-split-per-branch branch, and it's just a rebase compared to
->> V6 posted and reviewed here [1]. 
+>> CC'ing Paul Gortmaker who seems to be on a mass
+>> builtin_platform_driver conversion at the moment, see:
+>> https://lkml.org/lkml/2015/12/9/952
 >>
->> [1]: https://lkml.org/lkml/2015/11/17/15
->>
->> For testing entire patchset on Peach-Pi (Exynos5880) based chromebook for boot
->> and S2R functionality.
->>
->> Tested-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->>
->> For testing entire patchset on on Trats2 (Exynos4412, S2R, reboot, poweroff)
->> and Odroid XU3 (Exynos5422, reboot, poweroff).
->>
->> Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>
->> Changes since v6:
->>  - Rebasing on top of branch provided by Krzysztof, after resolving conflicts 
->>    caused due to Alim's patches for adoptation of generic syscon for poweroff, reboot.
->>  - Included Tested-by tags on individual patches as per applicability.
->>  - Dropped patches v6 [1/9], v6 [2/9] as these are already present in above mentioned branch.
->>  - Dropped patch v6 [8/9] as after Alim's patch this patch no more required.
->>
-> 
-> Patchset applied cleanly with:
-> 1. Removal of blank lines at end of two files (they appeared in v7).
-> 2. Removal of your tested-by. The author does not provide such tag
-> because it is assumed that he tested it before sending. However I left
-> the information about testing platform near your signed-off-by.
-> 
+>
+> Good guess.  In my giant queue I have that change.  I just haven't got
+> around to the requisite triple check and multi arch rebuild tests and
+> put out a series for soc yet.  Here is the short list for soc:
+>
+> drivers-soc-make-mediatek-mtk-scpsys.c-explicitly-no.patch
+> drivers-soc-make-qcom-spm.c-explicitly-non-modular.patch
+> drivers-soc-make-samsung-exynos-srom.c.c-explicitly-.patch
+> drivers-soc-make-sunxi_sram.c-explicitly-non-modular.patch
+> drivers-soc-tegra-make-fuse-tegra.c-explicitly-non-m.patch
+>
+> ...and here is the patch you predicted.  If someone wants to fold
+> the change into their work then great; I'll be happy to drop
+> mine and be with one less patch to herd along.
+>
 
-Thanks for taking care of minor nitpicks. I will be more careful, next
-time.
+I take this through my tree.
 
-> You can find the patches on the same branch:
-> https://git.kernel.org/cgit/linux/kernel/git/krzk/linux.git/log/?h=next/stuff-late-not-split-per-branch
-> 
-> I hope I will be able to push it out to arm-soc soon...
-> 
+Thanks a lot.
+Matthias
 
-Thanks,
-Pankaj Dubey
-> Best regards,
-> Krzysztof
-> 
-> 
+> Paul.
+> --
+>
+>   From eb32cc2c1db8192c08dd64af69cb172b3be4c98b Mon Sep 17 00:00:00 2001
+> From: Paul Gortmaker <paul.gortmaker@windriver.com>
+> Date: Fri, 4 Sep 2015 19:33:54 -0400
+> Subject: [PATCH] drivers/soc: make mediatek/mtk-scpsys.c explicitly
+>   non-modular
+>
+> The Kconfig currently controlling compilation of this code is:
+>
+> drivers/soc/mediatek/Kconfig:config MTK_SCPSYS
+> drivers/soc/mediatek/Kconfig:   bool "MediaTek SCPSYS Support"
+>
+> ...meaning that it currently is not being built as a module by anyone.
+>
+> Lets remove the couple traces of modularity so that when reading the
+> driver there is no doubt it is builtin-only.
+>
+> Since module_platform_driver() uses the same init level priority as
+> builtin_platform_driver() the init ordering remains unchanged with
+> this commit.
+>
+> Cc: Matthias Brugger <matthias.bgg@gmail.com>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Daniel Kurtz <djkurtz@chromium.org>
+> Cc: Paul Gortmaker <paul.gortmaker@windriver.com>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-mediatek at lists.infradead.org
+> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+>
+> diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+> index 164a7d8439b1..ae0ca34e64dd 100644
+> --- a/drivers/soc/mediatek/mtk-scpsys.c
+> +++ b/drivers/soc/mediatek/mtk-scpsys.c
+> @@ -15,7 +15,7 @@
+>   #include <linux/io.h>
+>   #include <linux/kernel.h>
+>   #include <linux/mfd/syscon.h>
+> -#include <linux/module.h>
+> +#include <linux/init.h>
+>   #include <linux/of_device.h>
+>   #include <linux/platform_device.h>
+>   #include <linux/pm_domain.h>
+> @@ -484,5 +484,4 @@ static struct platform_driver scpsys_drv = {
+>   		.of_match_table = of_match_ptr(of_scpsys_match_tbl),
+>   	},
+>   };
+> -
+> -module_platform_driver_probe(scpsys_drv, scpsys_probe);
+> +builtin_platform_driver_probe(scpsys_drv, scpsys_probe);
+>
