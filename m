@@ -1,41 +1,32 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 18 Dec 2015 15:17:21 +0100
-Subject: [PATCH 08/69] clocksource/drivers/qcom: Make COMPILE_TEST enabled for
- ARM architecture
+Date: Fri, 18 Dec 2015 15:17:23 +0100
+Subject: [PATCH 10/69] clocksource/drivers/st_lpc: Add the COMPILE_TEST option
 In-Reply-To: <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
 References: <5672CB9E.7090707@linaro.org>
  <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1450448302-27429-8-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1450448302-27429-10-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to be consistent with the rest of the drivers compilation, let's
-introduce the COMPILE_TEST option. Unfortunately, the delay.h code is not
-portable, so the compilation test coverage will be restricted to the ARM
-architecture.
+Increase the compilation test coverage by adding the COMPILE_TEST option.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/Kconfig | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ drivers/clocksource/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 2eb5f0e..b423785 100644
+index 3594a2b..4117386 100644
 --- a/drivers/clocksource/Kconfig
 +++ b/drivers/clocksource/Kconfig
-@@ -279,7 +279,12 @@ config EM_TIMER_STI
- 	  such as EMEV2 from former NEC Electronics.
+@@ -325,7 +325,7 @@ config CLKSRC_IMX_GPT
+ 	select CLKSRC_MMIO
  
- config CLKSRC_QCOM
+ config CLKSRC_ST_LPC
 -	bool
-+	bool "Qualcomm MSM timer" if COMPILE_TEST
-+	depends on ARM
-+	select CLKSRC_OF
-+	help
-+	  This enables the clocksource and the per CPU clockevent driver for the
-+	  Qualcomm SoCs.
- 
- config CLKSRC_VERSATILE
- 	bool "ARM Versatile (Express) reference platforms clock source"
++	bool "Low power clocksource found in the LPC" if COMPILE_TEST
+ 	select CLKSRC_OF if OF
+ 	help
+ 	  Enable this option to use the Low Power controller timer
 -- 
 1.9.1
