@@ -1,24 +1,20 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 18 Dec 2015 22:19:11 +0100
-Subject: [PATCH v2 4/4] ARM: dts: sun4i: Enable onboard codec used on the
- pov protab2-ips9 tablet
-In-Reply-To: <1449859439-30875-4-git-send-email-hdegoede@redhat.com>
-References: <1449859439-30875-1-git-send-email-hdegoede@redhat.com>
- <1449859439-30875-4-git-send-email-hdegoede@redhat.com>
-Message-ID: <20151218211911.GP30359@lukather>
+Date: Fri, 18 Dec 2015 22:19:29 +0100
+Subject: [PATCH] ARM: dts: sun4i: gemei-g9: Enable PA GPIO pin
+ configuration
+In-Reply-To: <1449868980-28237-2-git-send-email-plaes@plaes.org>
+References: <1449868980-28237-1-git-send-email-plaes@plaes.org>
+ <1449868980-28237-2-git-send-email-plaes@plaes.org>
+Message-ID: <20151218211929.GQ30359@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 11, 2015 at 07:43:59PM +0100, Hans de Goede wrote:
-> The pov protab2-ips9 tablet uses the A10's integrated audio codec,
-> enable it.
+On Fri, Dec 11, 2015 at 11:23:00PM +0200, Priit Laes wrote:
+> PA GPIO pin (PH15) controls power to external amplifier (FT2012Q).
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Signed-off-by: Priit Laes <plaes@plaes.org>
 
-Applied 3 and 4. Thanks!
-
-I have a bad network connection for the next two weeks though, so I'm
-not quite sure whether or not it will make it for 4.5.
+Applied, thanks!
 
 Maxime
 
@@ -32,4 +28,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151218/6cf7b095/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151218/334abe22/attachment.sig>
