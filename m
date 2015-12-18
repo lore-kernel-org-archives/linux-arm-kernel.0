@@ -1,42 +1,71 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Fri, 18 Dec 2015 10:58:17 +0000
-Subject: [PATCH v4 05/12] arm-cci: PMU: Add support for transactions
-In-Reply-To: <20151218104234.GN6344@twins.programming.kicks-ass.net>
-References: <1450374559-23315-1-git-send-email-suzuki.poulose@arm.com>
- <1450374559-23315-6-git-send-email-suzuki.poulose@arm.com>
- <20151217184255.GI6344@twins.programming.kicks-ass.net>
- <5673DFC7.6060406@arm.com>
- <20151218104234.GN6344@twins.programming.kicks-ass.net>
-Message-ID: <5673E6C9.7040304@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 18 Dec 2015 10:58:38 +0000
+Subject: [PATCH v10 1/4] dt-binding:Documents of the mbigen bindings
+In-Reply-To: <5673683C.2080304@huawei.com>
+References: <1450353397-47668-1-git-send-email-majun258@huawei.com>
+ <1450353397-47668-2-git-send-email-majun258@huawei.com>
+ <20151217135247.GD13389@leverpostej> <5673683C.2080304@huawei.com>
+Message-ID: <20151218105837.GB29219@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/12/15 10:42, Peter Zijlstra wrote:
-> On Fri, Dec 18, 2015 at 10:28:23AM +0000, Suzuki K. Poulose wrote:
->> On 17/12/15 18:42, Peter Zijlstra wrote:
->> I thought about that, but was not sure if pmu->stop() is guaranteed to be
->> called on all the events scheduled on the PMU when we pmu::pmu_disable().
->> Is it ?
->
-> Not by core code, but you get to implement your pmu::pmu_disable() call,
-> and if that's what you need, you can make it do that.
+On Fri, Dec 18, 2015 at 09:58:20AM +0800, majun (F) wrote:
+> Hi Mark:
+> 
+> ? 2015/12/17 21:52, Mark Rutland ??:
+> > On Thu, Dec 17, 2015 at 07:56:34PM +0800, MaJun wrote:
+> >> From: Ma Jun <majun258@huawei.com>
+> [...]
+> >> +- compatible: Should be "hisilicon,mbigen-v2"
+> >> +
+> >> +- reg: Specifies the base physical address and size of the Mbigen
+> >> +  registers.
+> >> +
+> >> +- interrupt controller: Identifies the node as an interrupt controller
+> >> +
+> >> +- msi-parent: Specifies the MSI controller this mbigen use.
+> >> +  For more detail information,please refer to the generic msi-parent binding in
+> >> +  Documentation/devicetree/bindings/interrupt-controller/msi.txt.
+> >> +
+> >> +- num-msis:Specifies the total number of interrupt this device has.
+> > 
+> > Is this the number of pins implemented? Or the number of pins that are
+> > in use?
+> > 
+> > The latter feels like something we can derive.
+> 
+> num-msis means the total number of pins implemented.
 
-OK.
+Ok. In that case I think it should be:
 
->
-> Examples:
->
-> On some x86 hardware we indeed have to poke at each counter control
-> register and clear the ENable bit, which is the same what
-> pmu::stop(.flags=0) would do.
+- num-pins: the total number of pins implemented in this Mbigen
+  instance.
 
-We have a global Enable/Disable for CCI PMU and thats what we use
-currently. To be able to reprogram the counters with the event period
-(we program the counter with a specific count in pmu::start() and at
-overflow irq handler, not to be confused with the sampling period, which
-is not supported), we need to be sure that the counter value has been updated.
+(with the appropriate fixups in the driver).
 
-May be we could check the event->hw->state to see if we need to reprogram it.
+With that:
 
-Thanks
-Suzuki
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+> >> +- #interrupt-cells : Specifies the number of cells needed to encode an
+> >> +  interrupt source. The value must be 2.
+> >> +
+> >> +  The 1st cell is hardware pin number of the interrupt.This number is local to
+> >> +  each mbigen chip and in the range from 0 to the maximum interrupts number
+> >> +  of the mbigen.
+> > 
+> > Just to check: 0 - 63 represent the "reserved" pins, yes?
+> 
+> Yes, you are right.
+> 
+> > 
+> > Other than those questions, this looks good to me.
+> 
+> Do i need to post a new patch to update these two questions?
+
+Hopefully not.
+
+Marc, are you happy to fold in the s/num-msis/num-pins/ change?
+
+Thanks,
+Mark.
