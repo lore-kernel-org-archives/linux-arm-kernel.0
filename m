@@ -1,37 +1,29 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 18 Dec 2015 09:16:13 +0000
-Subject: [PATCH 2/2] ARM: Make IPI_CPU_BACKTRACE a "non-secure" SGI
-In-Reply-To: <1450430173-26992-1-git-send-email-marc.zyngier@arm.com>
-References: <1450430173-26992-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1450430173-26992-3-git-send-email-marc.zyngier@arm.com>
+Date: Fri, 18 Dec 2015 09:16:11 +0000
+Subject: [PATCH 0/2] IPI numbering cleanup
+Message-ID: <1450430173-26992-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Having IPI_CPU_BACKTRACE as SGI15 may not work if the kernel is
-running in non-secure mode and that the secure firmware has
-decided to follow ARM's recommendations that SGI8-15 should
-be reserved for secure purpose.
+Daniel Thompson reported[1] that IPI_CPU_BACKTRACE failed to fire on
+one of his platforms because SGI15 was already used by the secure
+firmware.
 
-Now that we are "only" using SGI0-6, change IPI_CPU_BACKTRACE
-to use SGI7, which makes it more likely to work.
+In order to move this IPI to the non-secure side, this series drops
+IPI_CALL_FUNC_SINGLE (which has been deprecated for a while). This
+allows the last non-secure SGI to be reallocated to IPI_CPU_BACKTRACE.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/kernel/smp.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+       M.
 
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index d50a77d..fe517f1 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -72,7 +72,7 @@ enum ipi_msg_type {
- 	IPI_CPU_STOP,
- 	IPI_IRQ_WORK,
- 	IPI_COMPLETION,
--	IPI_CPU_BACKTRACE = 15,
-+	IPI_CPU_BACKTRACE,
- };
- 
- static DECLARE_COMPLETION(cpu_running);
+[1]: https://lkml.org/lkml/2015/12/16/375
+
+Marc Zyngier (2):
+  ARM: Remove IPI_CALL_FUNC_SINGLE
+  ARM: Make IPI_CPU_BACKTRACE a "non-secure" SGI
+
+ arch/arm/include/asm/hardirq.h |  2 +-
+ arch/arm/kernel/smp.c          | 12 ++----------
+ 2 files changed, 3 insertions(+), 11 deletions(-)
+
 -- 
 2.1.4
