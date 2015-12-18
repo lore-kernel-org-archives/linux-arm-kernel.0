@@ -1,82 +1,35 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Fri, 18 Dec 2015 23:06:36 +0800
-Subject: [PATCH] pinctrl: mediatek: convert to arch_initcall
-In-Reply-To: <1450412497-25872-1-git-send-email-djkurtz@chromium.org>
-References: <1450412497-25872-1-git-send-email-djkurtz@chromium.org>
-Message-ID: <1450451196.19539.9.camel@mtksdaap41>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 18 Dec 2015 07:11:56 -0800
+Subject: [RFC 8/9] ARM: OMAP4: hwmod_data: use module clocks from DT
+In-Reply-To: <1450447141-29936-9-git-send-email-t-kristo@ti.com>
+References: <1450447141-29936-1-git-send-email-t-kristo@ti.com>
+ <1450447141-29936-9-git-send-email-t-kristo@ti.com>
+Message-ID: <20151218151156.GH23396@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-12-18 at 12:21 +0800, Daniel Kurtz wrote:
-> Move pinctrl initialization earlier in boot so that real devices can find
-> their pctldev without probe deferring.
-> 
-> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
-> ---
->  drivers/pinctrl/mediatek/pinctrl-mt6397.c | 2 +-
->  drivers/pinctrl/mediatek/pinctrl-mt8127.c | 2 +-
->  drivers/pinctrl/mediatek/pinctrl-mt8135.c | 2 +-
->  drivers/pinctrl/mediatek/pinctrl-mt8173.c | 2 +-
->  4 files changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/mediatek/pinctrl-mt6397.c b/drivers/pinctrl/mediatek/pinctrl-mt6397.c
-> index f9751ae..a3780d4 100644
-> --- a/drivers/pinctrl/mediatek/pinctrl-mt6397.c
-> +++ b/drivers/pinctrl/mediatek/pinctrl-mt6397.c
-> @@ -70,7 +70,7 @@ static int __init mtk_pinctrl_init(void)
->  	return platform_driver_register(&mtk_pinctrl_driver);
->  }
->  
-> -module_init(mtk_pinctrl_init);
-> +arch_initcall(mtk_pinctrl_init);
+* Tero Kristo <t-kristo@ti.com> [151218 05:57]:
+> Replace the usage of prcm->clkstctrl with main_clk:s provided via DT.
+> This is done in preparation to get rid of hwmod data from kernel.
+...
+> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> @@ -334,10 +329,9 @@ static struct omap_hwmod omap44xx_counter_32k_hwmod = {
+>  	.class		= &omap44xx_counter_hwmod_class,
+>  	.clkdm_name	= "l4_wkup_clkdm",
+>  	.flags		= HWMOD_SWSUP_SIDLE,
+> -	.main_clk	= "sys_32k_ck",
+> +	.main_clk	= "counter_32k_mod_ck",
+>  	.prcm = {
+>  		.omap4 = {
+> -			.clkctrl_offs = OMAP4_CM_WKUP_SYNCTIMER_CLKCTRL_OFFSET,
+>  			.context_offs = OMAP4_RM_WKUP_SYNCTIMER_CONTEXT_OFFSET,
+>  		},
+>  	},
 
+Care to describe why the main_clk now needs to be modified or
+added? Can that too come from dts now?
 
-MT6397 is PMIC, which depends on pwrap on main AP to work. Since
-pmic-wrap itself is module_platform_driver, I think it make sense to
-keep this one as module_init. Maybe adding a comment to explain why it
-is different from others will help.
+Regards,
 
-Joe.C
-
->  
->  MODULE_LICENSE("GPL v2");
->  MODULE_DESCRIPTION("MediaTek MT6397 Pinctrl Driver");
-> diff --git a/drivers/pinctrl/mediatek/pinctrl-mt8127.c b/drivers/pinctrl/mediatek/pinctrl-mt8127.c
-> index b317b0b..98e0beb 100644
-> --- a/drivers/pinctrl/mediatek/pinctrl-mt8127.c
-> +++ b/drivers/pinctrl/mediatek/pinctrl-mt8127.c
-> @@ -351,7 +351,7 @@ static int __init mtk_pinctrl_init(void)
->  	return platform_driver_register(&mtk_pinctrl_driver);
->  }
->  
-> -module_init(mtk_pinctrl_init);
-> +arch_initcall(mtk_pinctrl_init);
->  
->  MODULE_LICENSE("GPL v2");
->  MODULE_DESCRIPTION("MediaTek MT8127 Pinctrl Driver");
-> diff --git a/drivers/pinctrl/mediatek/pinctrl-mt8135.c b/drivers/pinctrl/mediatek/pinctrl-mt8135.c
-> index 404f117..1c153b8 100644
-> --- a/drivers/pinctrl/mediatek/pinctrl-mt8135.c
-> +++ b/drivers/pinctrl/mediatek/pinctrl-mt8135.c
-> @@ -366,7 +366,7 @@ static int __init mtk_pinctrl_init(void)
->  	return platform_driver_register(&mtk_pinctrl_driver);
->  }
->  
-> -module_init(mtk_pinctrl_init);
-> +arch_initcall(mtk_pinctrl_init);
->  
->  MODULE_LICENSE("GPL");
->  MODULE_DESCRIPTION("MediaTek Pinctrl Driver");
-> diff --git a/drivers/pinctrl/mediatek/pinctrl-mt8173.c b/drivers/pinctrl/mediatek/pinctrl-mt8173.c
-> index ad27184..a62514e 100644
-> --- a/drivers/pinctrl/mediatek/pinctrl-mt8173.c
-> +++ b/drivers/pinctrl/mediatek/pinctrl-mt8173.c
-> @@ -394,7 +394,7 @@ static int __init mtk_pinctrl_init(void)
->  	return platform_driver_register(&mtk_pinctrl_driver);
->  }
->  
-> -module_init(mtk_pinctrl_init);
-> +arch_initcall(mtk_pinctrl_init);
->  
->  MODULE_LICENSE("GPL v2");
->  MODULE_DESCRIPTION("MediaTek Pinctrl Driver");
+Tony
