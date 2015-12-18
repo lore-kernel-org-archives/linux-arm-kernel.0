@@ -1,51 +1,88 @@
-From: bhupesh.linux@gmail.com (Bhupesh SHARMA)
-Date: Fri, 18 Dec 2015 11:52:07 +0530
-Subject: [PATCH v3 0/2] ARM64: Enable SP805 WDT support for FSL LS2080A
-In-Reply-To: <1450189825-29065-1-git-send-email-bhupesh.sharma@freescale.com>
-References: <1450189825-29065-1-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <CAFTCetRhHwgg1w=gYHL0T=8p-KVV1sq_jVK1CmHr3DF1Ng=UDQ@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 18 Dec 2015 08:16:33 +0100
+Subject: [PATCH 1/3] dt-bindings: thermal: Add binding document for
+ Mediatek thermal controller
+In-Reply-To: <20151217192329.GA7999@localhost.localdomain>
+References: <1448883753-19068-1-git-send-email-s.hauer@pengutronix.de>
+ <1448883753-19068-2-git-send-email-s.hauer@pengutronix.de>
+ <CAGS+omCPonvXBTjOqpKrJX0Ebw0KF6TDKH+zRas-3FaAhUWL2w@mail.gmail.com>
+ <20151217192329.GA7999@localhost.localdomain>
+Message-ID: <20151218071633.GG11966@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob, Mark,
+On Thu, Dec 17, 2015 at 11:23:31AM -0800, Eduardo Valentin wrote:
+> On Wed, Dec 16, 2015 at 07:23:22PM +0800, Daniel Kurtz wrote:
+> > On Mon, Nov 30, 2015 at 7:42 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > > This adds the device tree binding documentation for the mediatek thermal
+> > > controller found on Mediatek MT8173 and other SoCs.
+> > >
+> > > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > > Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+> > > Acked-by: Rob Herring <robh@kernel.org>
+> > > ---
+> > >  .../bindings/thermal/mediatek-thermal.txt          | 43 ++++++++++++++++++++++
+> > >  1 file changed, 43 insertions(+)
+> > >  create mode 100644 Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
+> > >
+> > > diff --git a/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
+> > > new file mode 100644
+> > > index 0000000..81f9a51
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
+> > > @@ -0,0 +1,43 @@
+> > > +* Mediatek Thermal
+> > > +
+> > > +This describes the device tree binding for the Mediatek thermal controller
+> > > +which measures the on-SoC temperatures. This device does not have its own ADC,
+> > > +instead it directly controls the AUXADC via AHB bus accesses. For this reason
+> > > +this device needs phandles to the AUXADC. Also it controls a mux in the
+> > > +apmixedsys register space via AHB bus accesses, so a phandle to the APMIXEDSYS
+> > > +is also needed.
+> > > +
+> > > +Required properties:
+> > > +- compatible: "mediatek,mt8173-thermal"
+> > > +- reg: Address range of the thermal controller
+> > > +- interrupts: IRQ for the thermal controller
+> > > +- clocks, clock-names: Clocks needed for the thermal controller. required
+> > > +                       clocks are:
+> > > +                      "therm":  Main clock needed for register access
+> > > +                      "auxadc": The AUXADC clock
+> > > +- resets: Reference to the reset controller controlling the thermal controller.
+> > > +- mediatek,auxadc: A phandle to the AUXADC which the thermal controller uses
+> > > +- mediatek,apmixedsys: A phandle to the APMIXEDSYS controller.
+> > > +- #thermal-sensor-cells : Should be 0. See ./thermal.txt for a description.
+> > > +
+> > > +Optional properties:
+> > > +- nvmem-cells: A phandle to the calibration data provided by a nvmem device. If
+> > > +               unspecified default values shall be used.
+> > > +- nvmem-cell-names: Should be "calibration-data"
+> > > +
+> > > +Example:
+> > > +
+> > > +       thermal: thermal at 1100b000 {
+> > > +               #thermal-sensor-cells = <1>;
+> > 
+> > Tiny nit: this should now be:
+> > 
+> > #thermal-sensor-cells = <0>;
+> 
+> 
+> This is actually not so tiny'shy. Why does this driver masks out all
+> sensors available? Why don't we expose all of them and use id property
+> to expose and identify each of them?
 
-On Tue, Dec 15, 2015 at 8:00 PM, Bhupesh Sharma
-<bhupesh.sharma@freescale.com> wrote:
-> This is the v3 of patchset which adds the support for SP805 WDT on FSL LS2080A
-> and also adds the missing documentation of SP805 WDT device-tree bindings.
+This has been the case until v9 of this series. It was requested by
+Mediatek that the CPU frequency regulation works better when the maximum
+of all sensors is taken instead of only single sensors. We decided to
+expose the maximum of all sensors in the device tree. IN the end it will
+be easier to add additional sensors should we need them later than it is
+to get rid of sensors we don't need.
 
-Any comments on this version, or does it seems fine for integration
-into the arm-soc tree.
+Sascha
 
-Regards,
-Bhupesh
-
->
-> Rebased against arm-soc/next/dt
->
-> Changes since v2:
-> (v2 can be viewed here: http://permalink.gmane.org/gmane.linux.ports.arm.kernel/463141)
-> - Addressed Rob's comments regarding the second mandatory CLK source's
->   (WDOGCLK) name in the bindings.
->
-> Changes since v1:
-> (v1 can be viewed here: http://www.spinics.net/lists/devicetree/msg102487.html)
->
-> - Addressed Rob and Mark's comments regarding the mandatory CLK sources
-> - Removed interrupt property from the bindings for now (as discussed
->   with Mark on IRC) till Will's patch proceeds further and enables
->   handling the WDOG interrupts for each core connected to the same PPI
->   line (http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/391616.html)
->
-> Bhupesh Sharma (2):
->   Documentation: DT: Add entry for ARM SP805-WDT
->   dts/ls2080a: Update DTSI to add support of SP805 WDT
->
->  .../devicetree/bindings/watchdog/sp805-wdt.txt     |   29 ++++++++++
->  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi     |   56 ++++++++++++++++++++
->  2 files changed, 85 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
->
-> --
-> 1.7.9.5
->
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
