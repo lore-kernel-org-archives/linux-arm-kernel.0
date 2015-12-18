@@ -1,95 +1,46 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 Dec 2015 11:29:12 +0900
-Subject: [PATCH 04/10] arm64: dts: r8a7795: Add Cortex-A57 CPU cores
+Date: Fri, 18 Dec 2015 11:29:13 +0900
+Subject: [PATCH 05/10] arm64: dts: r8a7795: Add pmu device nodes
 In-Reply-To: <cover.1450401186.git.horms+renesas@verge.net.au>
 References: <cover.1450401186.git.horms+renesas@verge.net.au>
-Message-ID: <0ed1a79ed0c17631fb41d336a4eddb9bbd299b64.1450401186.git.horms+renesas@verge.net.au>
+Message-ID: <a6b6b478459be0c5614626ba6ac95df05a7fc5e9.1450401186.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gaku Inami <gaku.inami.xw@bp.renesas.com>
+From: Yoshifumi Hosoya <yoshifumi.hosoya.wj@renesas.com>
 
-Add Cortex-A57 CPU cores to r8a7795 SoC for a total of 4 x Cortex-A57.
+Enabling the performance monitor unit on r8a7795.
 
-Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-Sigend-off-by: Dirk Behme <dirk.behme@gmail.com>
+Signed-off-by: Masaru Nagai <masaru.nagai.vx@renesas.com>
+Signed-off-by: Yoshifumi Hosoya <yoshifumi.hosoya.wj@renesas.com>
+Signed-off-by: Dirk Behme <dirk.behme@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 31 +++++++++++++++++++++++++------
- 1 file changed, 25 insertions(+), 6 deletions(-)
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index 051ff143506e..4d43cf31418f 100644
+index 4d43cf31418f..b9229a49dabc 100644
 --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
 +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -35,13 +35,31 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 
--		/* 1 core only at this point */
- 		a57_0: cpu at 0 {
- 			compatible = "arm,cortex-a57", "arm,armv8";
- 			reg = <0x0>;
- 			device_type = "cpu";
- 			enable-method = "psci";
- 		};
-+
-+		a57_1: cpu at 1 {
-+			compatible = "arm,cortex-a57","arm,armv8";
-+			reg = <0x1>;
-+			device_type = "cpu";
-+			enable-method = "psci";
-+		};
-+		a57_2: cpu at 2 {
-+			compatible = "arm,cortex-a57","arm,armv8";
-+			reg = <0x2>;
-+			device_type = "cpu";
-+			enable-method = "psci";
-+		};
-+		a57_3: cpu at 3 {
-+			compatible = "arm,cortex-a57","arm,armv8";
-+			reg = <0x3>;
-+			device_type = "cpu";
-+			enable-method = "psci";
-+		};
- 	};
- 
- 	extal_clk: extal {
-@@ -84,6 +102,7 @@
- 	soc {
- 		compatible = "simple-bus";
- 		interrupt-parent = <&gic>;
-+
- 		#address-cells = <2>;
- 		#size-cells = <2>;
- 		ranges;
-@@ -96,7 +115,7 @@
- 			reg = <0x0 0xf1010000 0 0x1000>,
- 			      <0x0 0xf1020000 0 0x2000>;
- 			interrupts = <GIC_PPI 9
--					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_HIGH)>;
-+					(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+@@ -230,6 +230,18 @@
+ 			power-domains = <&cpg>;
  		};
  
- 		gpio0: gpio at e6050000 {
-@@ -214,13 +233,13 @@
++		pmu {
++			compatible = "arm,armv8-pmuv3";
++			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-affinity = <&a57_0>,
++					     <&a57_1>,
++					     <&a57_2>,
++					     <&a57_3>;
++		};
++
  		timer {
  			compatible = "arm,armv8-timer";
  			interrupts = <GIC_PPI 13
--					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
-+					(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
- 				     <GIC_PPI 14
--					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
-+					(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
- 				     <GIC_PPI 11
--					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
-+					(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
- 				     <GIC_PPI 10
--					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>;
-+					(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
- 		};
- 
- 		cpg: clock-controller at e6150000 {
 -- 
 2.1.4
