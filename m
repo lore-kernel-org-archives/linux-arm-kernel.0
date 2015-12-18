@@ -1,93 +1,35 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Fri, 18 Dec 2015 09:23:51 -0800
-Subject: [PATCH] PCI: iproc: fix msi driver selection
-In-Reply-To: <1541985.1Jq5kHC7MS@wuerfel>
-References: <1541985.1Jq5kHC7MS@wuerfel>
-Message-ID: <56744127.5060106@broadcom.com>
+From: pablo@netfilter.org (Pablo Neira Ayuso)
+Date: Fri, 18 Dec 2015 18:26:06 +0100
+Subject: [PATCH] ila: add NETFILTER dependency
+In-Reply-To: <2011239.T7zzuZGeyk@wuerfel>
+References: <2011239.T7zzuZGeyk@wuerfel>
+Message-ID: <20151218172606.GB1299@salvia>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Fri, Dec 18, 2015 at 03:37:37PM +0100, Arnd Bergmann wrote:
+> The recently added generic ILA translation facility fails to
+> build when CONFIG_NETFILTER is disabled:
+> 
+> net/ipv6/ila/ila_xlat.c:229:20: warning: 'struct nf_hook_state' declared inside parameter list
+> net/ipv6/ila/ila_xlat.c:235:27: error: array type has incomplete element type 'struct nf_hook_ops'
+>  static struct nf_hook_ops ila_nf_hook_ops[] __read_mostly = {
+> 
+> This adds an explicit Kconfig dependency to avoid that case.
 
-On 12/18/2015 6:57 AM, Arnd Bergmann wrote:
-> The newly added MSI support for iproc causes a link error when its
-> Kconfig option is disabled:
->
-> ERROR: "iproc_msi_exit" [drivers/pci/host/pcie-iproc.ko] undefined!
-> ERROR: "iproc_msi_init" [drivers/pci/host/pcie-iproc.ko] undefined!
->
-> This changes the header file so we use stub functions whenever
-> the driver is not built, even when CONFIG_MSI is enabled.
->
-> As the Kconfig logic for the driver is a bit off, I'm rectifying
-> that as well, by making it depend on the specific drivers that
-> call into the driver, and moving the option behind those instead
-> of before them.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 610894347cbf ("PCI: iproc: Add iProc PCIe MSI support")
-> ---
-> Found on ARM randconfig builds a couple of days ago
->
-> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-> index 490476e172fd..d7c05894af70 100644
-> --- a/drivers/pci/host/Kconfig
-> +++ b/drivers/pci/host/Kconfig
-> @@ -124,15 +124,6 @@ config PCIE_IPROC
->   	  iProc family of SoCs. An appropriate bus interface driver needs
->   	  to be enabled to select this.
->
+I'm afraid this extra Kconfig dependency that Arnd adds to fix this is
+a symptom that there is something that doesn't belong there.
 
-I was actually not aware of the change that makes PCIE_IPROC hidden and 
-selected by the bus drivers. But I know, :)
+I overlook this new hook on priority -1, how does this integrate into
+our infrastructure?
 
-> -config PCIE_IPROC_MSI
-> -	bool "Broadcom iProc PCIe MSI support"
-> -	depends on ARCH_BCM_IPROC && PCI_MSI
-> -	select PCI_MSI_IRQ_DOMAIN
-> -	default ARCH_BCM_IPROC
-> -	help
-> -	  Say Y here if you want to enable MSI support for Broadcom's iProc
-> -	  PCIe controller
-> -
->   config PCIE_IPROC_PLATFORM
->   	tristate "Broadcom iProc PCIe platform bus driver"
->   	depends on ARCH_BCM_IPROC || (ARM && COMPILE_TEST)
-> @@ -154,6 +145,16 @@ config PCIE_IPROC_BCMA
->   	  Say Y here if you want to use the Broadcom iProc PCIe controller
->   	  through the BCMA bus interface
->
-> +config PCIE_IPROC_MSI
-> +	bool "Broadcom iProc PCIe MSI support"
-> +	depends on PCIE_IPROC_PLATFORM || PCIE_IPROC_BCMA
-> +	depends on PCI_MSI
-> +	select PCI_MSI_IRQ_DOMAIN
-> +	default ARCH_BCM_IPROC
-> +	help
-> +	  Say Y here if you want to enable MSI support for Broadcom's iProc
-> +	  PCIe controller
-> +
->   config PCIE_ALTERA
->   	bool "Altera PCIe controller"
->   	depends on ARM || NIOS2
-> diff --git a/drivers/pci/host/pcie-iproc.h b/drivers/pci/host/pcie-iproc.h
-> index 6def23a7eb54..e84d93c53c7b 100644
-> --- a/drivers/pci/host/pcie-iproc.h
-> +++ b/drivers/pci/host/pcie-iproc.h
-> @@ -79,7 +79,7 @@ struct iproc_pcie {
->   int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res);
->   int iproc_pcie_remove(struct iproc_pcie *pcie);
->
-> -#ifdef CONFIG_PCI_MSI
-> +#ifdef CONFIG_PCIE_IPROC_MSI
->   int iproc_msi_init(struct iproc_pcie *pcie, struct device_node *node);
->   void iproc_msi_exit(struct iproc_pcie *pcie);
->   #else
->
->
+And mainly, isn't there any better way to integrate this into the
+stack?
 
-This fix looks good to me. Thanks!
+And why didn't you Cc netfilter-devel for code that involves
+Netfilter?
 
-Reviewed-by: Ray Jui <rjui@broadcom.com>
+We have to evaluate how this integrates into what we have, if it
+breaks when it interacts with other components that we have.
 
-Ray
+I'm very sorry to say, but none of this has happened so far.
