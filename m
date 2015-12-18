@@ -1,109 +1,97 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Fri, 18 Dec 2015 11:06:51 +0000
-Subject: arm64/efi handling of persistent memory
-In-Reply-To: <94D0CD8314A33A4D9D801C0FE68B40295BEBD864@G9W0745.americas.hpqcorp.net>
-References: <94D0CD8314A33A4D9D801C0FE68B40295BEBD864@G9W0745.americas.hpqcorp.net>
-Message-ID: <20151218110651.GL25034@bivouac.eciton.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 18 Dec 2015 11:13:47 +0000
+Subject: [PATCH 0/3] Batched user access support
+In-Reply-To: <alpine.LFD.2.20.1512171016510.27310@i7>
+References: <alpine.LFD.2.20.1512171016510.27310@i7>
+Message-ID: <20151218111346.GF30483@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 01:33:25AM +0000, Elliott, Robert (Persistent Memory) wrote:
-> Similar to the questions about the arm64 efi boot stub
-> handing persistent memory, some of the arm64 kernel code 
-> looks fishy.
+Hi Linus,
+
+Thanks for Cc'ing us ARM people.
+
+On Thu, Dec 17, 2015 at 10:33:21AM -0800, Linus Torvalds wrote:
 > 
-> In arch/arm64/kernel/efi.c:
+> So I already sent the end result of these three patches to the x86 people, 
+> but since I *think* it may bve an arm64 issue too, I'm including the arm64 
+> people too for information.
 > 
-> static int __init is_normal_ram(efi_memory_desc_t *md)
-> {
->         if (md->attribute & EFI_MEMORY_WB)
->                 return 1;
->         return 0;
-> }
+> Background for the the arm64 people: I upgraded my main desktop to 
+> Skylake, and did my usual build performance tests, including a perf run to 
+> check that everything looks fine. Yes, the machine is 20% faster than my 
+> old one, but the profile also shows that now that I have a CPU that 
+> supports SMAP, the overhead of that on the user string handling functions 
+> was horrendous.
 > 
-> static __init int is_reserve_region(efi_memory_desc_t *md)
-> {
->         switch (md->type) {
->         case EFI_LOADER_CODE:
->         case EFI_LOADER_DATA:
->         case EFI_BOOT_SERVICES_CODE:
->         case EFI_BOOT_SERVICES_DATA:
->         case EFI_CONVENTIONAL_MEMORY:
->         case EFI_PERSISTENT_MEMORY:
->                 return 0;
->         default:
->                 break;
->         }
->         return is_normal_ram(md);
-> }
+> Normally, that probably isn't really noticeable, but on loads that do a 
+> ton of pathname handling (like a "make -j" on the fully built kernel, or 
+> doing "git diff" etc - both of which spend most of their time just doing 
+> 'lstat()' on all the files they care about), the user space string 
+> accesses really are pretty hot.
 > 
-> static __init void reserve_regions(void)
-> {
-> ...
->                 if (is_normal_ram(md))
->                         early_init_dt_add_memory_arch(paddr, size);
+> On the 'make -j' test on a fully built kernel, strncpy_from_user() was 
+> about 1.5% of all CPU time. And almost two thirds of that was just the 
+> SMAP overhead.
 > 
->                 if (is_reserve_region(md)) {
->                         memblock_reserve(paddr, size);
-> ...
+> So this patch series introduces a model for batching that SMAP overhead on 
+> x86, and the reason the ARM people are involved is that the same _may_ be 
+> true of the PAN overhead. I don't know - for all I know, the pstate "set 
+> pan" instruction may be so cheap on ARM64 that it doesn't really matter.
+
+Changing the PAN state on arm64 is a "self-synchronising" operation (i.e.
+no explicit barriers are required to ensure that the updated PAN state
+is applied to subsequent memory accesses), so there certainly will be
+some overhead involved in that. Unfortunately, we don't currently have
+silicon on which we can benchmark the PAN feature (we developed the code
+using simulation), so it's difficult to provide concrete numbers.
+
+Adding an isb instruction (forcing instruction synchronisation) to the
+PAN-swizzling locations appears to yield sub 1% overhead in some basic
+tests, but that's not to say we shouldn't avoid turning it on and off
+all the time for back-to-back userspace accesses.
+
+> Thew new interface is very simple: new "unsafe_{get,put}_user()" functions 
+> that have exactly the same semantics as the old unsafe ones (that weren't 
+> called "unsafe", but have the two underscores). The only difference is 
+> that you have to use "user_access_{begin,end}()" around them, which allows 
+> the architecture to hoist the user access permission wrapper to outside 
+> the loop, and then batch the raw accesses.
 > 
-> static bool __init efi_virtmap_init(void)
-> {
-> ...
->                 if (!is_normal_ram(md))
->                         prot = __pgprot(PROT_DEVICE_nGnRE);
->                 else if (md->type == EFI_RUNTIME_SERVICES_CODE ||
->                          !PAGE_ALIGNED(md->phys_addr))
->                         prot = PAGE_KERNEL_EXEC;
->                 else
->                         prot = PAGE_KERNEL;
+> The series contains this addition to uaccess.h:
 > 
-> Concerns include:
+>   #ifndef user_access_begin
+>   #define user_access_begin() do { } while (0)
+>   #define user_access_end() do { } while (0)
+>   #define unsafe_get_user(x, ptr) __get_user(x, ptr)
+>   #define unsafe_put_user(x, ptr) __put_user(x, ptr)
+>   #endif
 > 
-> 1. is_normal_ram() will see the WB bit and return 1 regardless
-> of the type.  That seems similar to the arm EFI boot stub issue.
-> The three callers are shown above.
+> so architectures that don't care or haven't implemented it yet, don't need 
+> to worry about it. Architectures that _do_ care just need to implement 
+> their own versions, and make sure that user_access_begin is a macro (it 
+> may obviously be an inline function and just then an additional 
+> self-defining macro).
+> 
+> Any comments? 
 
-So, first and third cases look OK to me, but the bit where we add
-things to memblock just for being WB is bogus.
+>From an implementation and performance point of view, this can certainly
+be used by arm64. My only concern is that we increase the region where
+PAN is disabled (that is, user accesses are permitted). Currently, that's
+carefully restricted to the single userspace access, but now it could
+easily include accesses to the kernel stack, perhaps even generated as
+a result of compiler spills.
 
-> 2. is_reserve_region() treating EFI_PERSISTENT_MEMORY the same
-> as EFI_CONVENTIONAL_MEMORY looks wrong.
+I'm pretty unimaginative when it comes to security exploits, but that
+does sound worse than the current implementation from a security
+perspective.
 
-Yeah... That one was introduced by
-ad5fb870c486 ("e820, efi: add ACPI 6.0 persistent memory types")
-without any ACKs from ARM people :/
+We *could* hide this behind a kconfig option, like we do for things like
+stack protector and kasan, where we have a "strong" mode that has worst
+performance but really isolates the PAN switch to a single access, but
+the default case could do what you suggest above. In both cases the same
+APIs could be used. Expanding the set of kernel configurations is rarely
+popular, but this seems to be the usual performance vs security trade-off
+and we should provide some way to choose.
 
-While it probably wouldn't wreck your system, it is unlikely to do
-what you'd want.
-
-> 3. We're contemplating working around the grub problem by
-> reporting EFI_RESERVED_MEMORY plus the NV attribute rather
-> than EFI_PERSISTENT_MEMORY.
-
-That sounds a bit ... nuclear.
-Would you then be expecting to retreive information about the NV
-device out of hw description, or via PCI, rather than the UEFI memory
-map?
-
-> If this is done, then is_reserve_region() will fall through
-> to is_normal_ram(), which will see the WB bit and return 1.
-> That seems backwards... but seems correct for persistent
-> memory, reporting it as a reserved region.  That might avoid the
-> the EFI_PERSISTENT_MEMORY handling problem (if the preceding
-> call to is_normal_ram() didn't already cause problems).
-
-So ... the code is convoluted and could probably do with a
-refresh. But is_normal_ram() returning 1 means is_reserve_region()
-will return 1, meaning we end up reserving it in memblock and not
-allocating in it.
-
-However, this is for is_reserve_region() - we will still have added it
-to memblock with early_init_dt_add_memory_arch(), which may have
-unwanted side effects.
-
-I thought Ard had some patches in flight to address this, but they
-don't appear to be in yet.
-
-/
-    Leif
+Will
