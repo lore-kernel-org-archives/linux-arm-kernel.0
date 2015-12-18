@@ -1,96 +1,103 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 Dec 2015 11:29:43 +0900
-Subject: [GIT PULL] Third Round of Renesas ARM Based SoC DT Updates for v4.5
-Message-ID: <cover.1450402264.git.horms+renesas@verge.net.au>
+Date: Fri, 18 Dec 2015 11:29:31 +0900
+Subject: [PATCH 01/25] ARM: shmobile: sh73a0: Add MSIOF clocks
+In-Reply-To: <cover.1450402264.git.horms+renesas@verge.net.au>
+References: <cover.1450402264.git.horms+renesas@verge.net.au>
+Message-ID: <23d711ab4dec7552cad8d03d12e253ac66e70a95.1450402264.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these third round of Renesas ARM based SoC DT updates for v4.5.
+The 4 MSIOF clocks are MSTP clocks, and children of the SUB clock.
 
-This pull request is based on the previous round of
-such requests, tagged as renesas-dt2-for-v4.5,
-which you have already pulled.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/sh73a0.dtsi            | 28 ++++++++++++++++------------
+ include/dt-bindings/clock/sh73a0-clock.h |  6 +++++-
+ 2 files changed, 21 insertions(+), 13 deletions(-)
 
-
-The following changes since commit c8d9fdbe2d648caaa510d45dc13eba2e9957140b:
-
-  ARM: shmobile: sh73a0 dtsi: Add L2 cache-controller node (2015-11-25 10:42:38 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt3-for-v4.5
-
-for you to fetch changes up to d01c8bec91414f2110370dfcb9dd33fc0e573cee:
-
-  ARM: shmobile: r8a779x: use SoC-specific usb-dmac compatibility strings (2015-12-17 10:10:54 +0900)
-
-----------------------------------------------------------------
-Third Round of Renesas ARM Based SoC DT Updates for v4.5
-
-* Use SoC-specific usb-dmac and IPMMU compatibility strings
-* Add internal delay for i2c IPs
-* Add missing serial devices to r8a7793
-* Enable DMA for r8a7793 serial devices
-* Add serial port config to chosen/stdout-path
-* Tidyup #sound-dai-cells settings for r8a7798/bockw
-* Remove deprecated #gpio-range-cells from r8a7793
-* Add EtherAVB support to r8a7791
-* Add MSIOF support to sh73a0
-
-----------------------------------------------------------------
-Geert Uytterhoeven (11):
-      ARM: shmobile: sh73a0: Add MSIOF clocks
-      ARM: shmobile: sh73a0: Add MSIOF device nodes
-      ARM: shmobile: bockw dts: Override #sound-dai-cells to zero
-      ARM: shmobile: koelsch dts: Add serial port config to chosen/stdout-path
-      ARM: shmobile: alt dts: Add serial port config to chosen/stdout-path
-      ARM: shmobile: ape6evm dts: Add serial port config to chosen/stdout-path
-      ARM: shmobile: bockw dts: Update console parameters
-      ARM: shmobile: gose dts: Add serial port config to chosen/stdout-path
-      ARM: shmobile: silk dts: Add serial port config to chosen/stdout-path
-      ARM: shmobile: porter dts: Add serial port config to chosen/stdout-path
-      ARM: shmobile: lager dts: Add serial port config to chosen/stdout-path
-
-Kuninori Morimoto (1):
-      ARM: shmobile: r8a7778: tidyup #sound-dai-cells settings
-
-Magnus Damm (4):
-      ARM: shmobile: r8a7790: IPMMU compat string SoC part number update
-      ARM: shmobile: r8a7791: IPMMU compat string SoC part number update
-      ARM: shmobile: r8a7793: IPMMU compat string SoC part number update
-      ARM: shmobile: r8a7794: IPMMU compat string SoC part number update
-
-Sergei Shtylyov (2):
-      ARM: shmobile: r8a7791: add EtherAVB clock
-      ARM: shmobile: r8a7791: add EtherAVB DT support
-
-Simon Horman (4):
-      ARM: shmobile: r8a7793: remove deprecated #gpio-range-cells
-      ARM: shmobile: r8a7793: Add missing serial devices to DT
-      ARM: shmobile: r8a7793: Describe DMA for the serial ports
-      ARM: shmobile: r8a779x: use SoC-specific usb-dmac compatibility strings
-
-Wolfram Sang (3):
-      ARM: shmobile: r8a7790: dtsi: add internal delay for i2c IPs
-      ARM: shmobile: r8a7791: dtsi: add internal delay for i2c IPs
-      ARM: shmobile: r8a7794: dtsi: add internal delay for i2c IPs
-
- arch/arm/boot/dts/r8a73a4-ape6evm.dts     |   2 +-
- arch/arm/boot/dts/r8a7778-bockw.dts       |   9 +-
- arch/arm/boot/dts/r8a7778.dtsi            |   7 +-
- arch/arm/boot/dts/r8a7790-lager.dts       |   2 +-
- arch/arm/boot/dts/r8a7790.dtsi            |  20 +--
- arch/arm/boot/dts/r8a7791-koelsch.dts     |   2 +-
- arch/arm/boot/dts/r8a7791-porter.dts      |   2 +-
- arch/arm/boot/dts/r8a7791.dtsi            |  46 ++++--
- arch/arm/boot/dts/r8a7793-gose.dts        |   2 +-
- arch/arm/boot/dts/r8a7793.dtsi            | 230 ++++++++++++++++++++++++++++--
- arch/arm/boot/dts/r8a7794-alt.dts         |   2 +-
- arch/arm/boot/dts/r8a7794-silk.dts        |   2 +-
- arch/arm/boot/dts/r8a7794.dtsi            |  18 ++-
- arch/arm/boot/dts/sh73a0.dtsi             |  72 ++++++++--
- include/dt-bindings/clock/r8a7791-clock.h |   1 +
- include/dt-bindings/clock/sh73a0-clock.h  |   6 +-
- 16 files changed, 363 insertions(+), 60 deletions(-)
+diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+index 319551f0fcdb..635564ab98ed 100644
+--- a/arch/arm/boot/dts/sh73a0.dtsi
++++ b/arch/arm/boot/dts/sh73a0.dtsi
+@@ -812,13 +812,13 @@
+ 		mstp0_clks: mstp0_clks at e6150130 {
+ 			compatible = "renesas,sh73a0-mstp-clocks", "renesas,cpg-mstp-clocks";
+ 			reg = <0xe6150130 4>, <0xe6150030 4>;
+-			clocks = <&cpg_clocks SH73A0_CLK_HP>;
++			clocks = <&cpg_clocks SH73A0_CLK_HP>, <&sub_clk>;
+ 			#clock-cells = <1>;
+ 			clock-indices = <
+-				SH73A0_CLK_IIC2
++				SH73A0_CLK_IIC2 SH73A0_CLK_MSIOF0
+ 			>;
+ 			clock-output-names =
+-				"iic2";
++				"iic2", "msiof0";
+ 		};
+ 		mstp1_clks: mstp1_clks at e6150134 {
+ 			compatible = "renesas,sh73a0-mstp-clocks", "renesas,cpg-mstp-clocks";
+@@ -848,20 +848,24 @@
+ 			reg = <0xe6150138 4>, <0xe6150040 4>;
+ 			clocks = <&sub_clk>, <&cpg_clocks SH73A0_CLK_HP>,
+ 				 <&cpg_clocks SH73A0_CLK_HP>, <&sub_clk>,
+-				 <&sub_clk>, <&sub_clk>, <&sub_clk>, <&sub_clk>,
+-				 <&sub_clk>, <&sub_clk>;
++				 <&sub_clk>, <&sub_clk>, <&sub_clk>,
++				 <&sub_clk>, <&sub_clk>, <&sub_clk>,
++				 <&sub_clk>, <&sub_clk>, <&sub_clk>;
+ 			#clock-cells = <1>;
+ 			clock-indices = <
+ 				SH73A0_CLK_SCIFA7 SH73A0_CLK_SY_DMAC
+-				SH73A0_CLK_MP_DMAC SH73A0_CLK_SCIFA5
+-				SH73A0_CLK_SCIFB SH73A0_CLK_SCIFA0
+-				SH73A0_CLK_SCIFA1 SH73A0_CLK_SCIFA2
+-				SH73A0_CLK_SCIFA3 SH73A0_CLK_SCIFA4
++				SH73A0_CLK_MP_DMAC SH73A0_CLK_MSIOF3
++				SH73A0_CLK_MSIOF1 SH73A0_CLK_SCIFA5
++				SH73A0_CLK_SCIFB SH73A0_CLK_MSIOF2
++				SH73A0_CLK_SCIFA0 SH73A0_CLK_SCIFA1
++				SH73A0_CLK_SCIFA2 SH73A0_CLK_SCIFA3
++				SH73A0_CLK_SCIFA4
+ 			>;
+ 			clock-output-names =
+-				"scifa7", "sy_dmac", "mp_dmac", "scifa5",
+-				"scifb", "scifa0", "scifa1", "scifa2",
+-				"scifa3", "scifa4";
++				"scifa7", "sy_dmac", "mp_dmac", "msiof3",
++				"msiof1", "scifa5", "scifb", "msiof2",
++				"scifa0", "scifa1", "scifa2", "scifa3",
++				"scifa4";
+ 		};
+ 		mstp3_clks: mstp3_clks at e615013c {
+ 			compatible = "renesas,sh73a0-mstp-clocks", "renesas,cpg-mstp-clocks";
+diff --git a/include/dt-bindings/clock/sh73a0-clock.h b/include/dt-bindings/clock/sh73a0-clock.h
+index 53369568c24c..2eca353a29d7 100644
+--- a/include/dt-bindings/clock/sh73a0-clock.h
++++ b/include/dt-bindings/clock/sh73a0-clock.h
+@@ -28,7 +28,8 @@
+ #define SH73A0_CLK_HP		14
+ 
+ /* MSTP0 */
+-#define SH73A0_CLK_IIC2	1
++#define SH73A0_CLK_IIC2		1
++#define SH73A0_CLK_MSIOF0	0
+ 
+ /* MSTP1 */
+ #define SH73A0_CLK_CEU1		29
+@@ -45,8 +46,11 @@
+ #define SH73A0_CLK_SCIFA7	19
+ #define SH73A0_CLK_SY_DMAC	18
+ #define SH73A0_CLK_MP_DMAC	17
++#define SH73A0_CLK_MSIOF3	15
++#define SH73A0_CLK_MSIOF1	8
+ #define SH73A0_CLK_SCIFA5	7
+ #define SH73A0_CLK_SCIFB	6
++#define SH73A0_CLK_MSIOF2	5
+ #define SH73A0_CLK_SCIFA0	4
+ #define SH73A0_CLK_SCIFA1	3
+ #define SH73A0_CLK_SCIFA2	2
+-- 
+2.1.4
