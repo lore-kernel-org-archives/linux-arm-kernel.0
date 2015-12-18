@@ -1,63 +1,72 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 18 Dec 2015 15:18:07 +0100
-Subject: [PATCH 54/69] clocksource/drivers/h8300_timer8: Separate the Kconfig
- option from the arch
+Date: Fri, 18 Dec 2015 15:18:10 +0100
+Subject: [PATCH 57/69] clocksource/drivers/tango-xtal: Replace code by
+ clocksource_mmio_init
 In-Reply-To: <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
 References: <5672CB9E.7090707@linaro.org>
  <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1450448302-27429-54-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1450448302-27429-57-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current Kconfig option is the H8300 arch option. In order to comply to the
-current rule, let's create a specific option for the timer8 and select it
-from the arch's Kconfig.
+The current code to initialize, register and read the clocksource is
+already factored out in mmio.c via the clocksource_mmio_init function.
+
+Factor out the code with the clocksource_mmio_init function.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- arch/h8300/Kconfig           | 1 +
- drivers/clocksource/Kconfig  | 3 +++
- drivers/clocksource/Makefile | 2 +-
- 3 files changed, 5 insertions(+), 1 deletion(-)
+ drivers/clocksource/Kconfig      |  1 +
+ drivers/clocksource/tango_xtal.c | 18 +++---------------
+ 2 files changed, 4 insertions(+), 15 deletions(-)
 
-diff --git a/arch/h8300/Kconfig b/arch/h8300/Kconfig
-index dd3ac75..2e20333 100644
---- a/arch/h8300/Kconfig
-+++ b/arch/h8300/Kconfig
-@@ -17,6 +17,7 @@ config H8300
- 	select HAVE_MEMBLOCK
- 	select HAVE_DMA_ATTRS
- 	select CLKSRC_OF
-+	select H8300_TMR8
- 
- config RWSEM_GENERIC_SPINLOCK
- 	def_bool y
 diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index de331b8..73477b5 100644
+index db240cb..b251013 100644
 --- a/drivers/clocksource/Kconfig
 +++ b/drivers/clocksource/Kconfig
-@@ -362,6 +362,9 @@ config CLKSRC_PXA
- 	  This enables OST0 support available on PXA and SA-11x0
- 	  platforms.
+@@ -351,6 +351,7 @@ config CLKSRC_TANGO_XTAL
+ 	bool "Clocksource for Tango SoC" if COMPILE_TEST
+ 	depends on ARM
+ 	select CLKSRC_OF
++	select CLKSRC_MMIO
+ 	help
+ 	  This enables the clocksource for Tango SoC
  
-+config H8300_TMR8
-+        bool
-+
- config H8300_TMR16
-         bool
+diff --git a/drivers/clocksource/tango_xtal.c b/drivers/clocksource/tango_xtal.c
+index d297b30..2bcecaf 100644
+--- a/drivers/clocksource/tango_xtal.c
++++ b/drivers/clocksource/tango_xtal.c
+@@ -19,19 +19,6 @@ static u64 notrace read_sched_clock(void)
+ 	return read_xtal_counter();
+ }
  
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 56bd16e..dc2b899 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -60,7 +60,7 @@ obj-$(CONFIG_CLKSRC_MIPS_GIC)		+= mips-gic-timer.o
- obj-$(CONFIG_CLKSRC_TANGO_XTAL)		+= tango_xtal.o
- obj-$(CONFIG_CLKSRC_IMX_GPT)		+= timer-imx-gpt.o
- obj-$(CONFIG_ASM9260_TIMER)		+= asm9260_timer.o
--obj-$(CONFIG_H8300)			+= h8300_timer8.o
-+obj-$(CONFIG_H8300_TMR8)		+= h8300_timer8.o
- obj-$(CONFIG_H8300_TMR16)		+= h8300_timer16.o
- obj-$(CONFIG_H8300_TPU)			+= h8300_tpu.o
- obj-$(CONFIG_CLKSRC_ST_LPC)		+= clksrc_st_lpc.o
+-static cycle_t read_clocksource(struct clocksource *cs)
+-{
+-	return read_xtal_counter();
+-}
+-
+-static struct clocksource tango_xtal = {
+-	.name	= "tango-xtal",
+-	.rating	= 350,
+-	.read	= read_clocksource,
+-	.mask	= CLOCKSOURCE_MASK(32),
+-	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
+-};
+-
+ static void __init tango_clocksource_init(struct device_node *np)
+ {
+ 	struct clk *clk;
+@@ -53,8 +40,9 @@ static void __init tango_clocksource_init(struct device_node *np)
+ 	delay_timer.freq = xtal_freq;
+ 	delay_timer.read_current_timer = read_xtal_counter;
+ 
+-	ret = clocksource_register_hz(&tango_xtal, xtal_freq);
+-	if (ret != 0) {
++	ret = clocksource_mmio_init(xtal_in_cnt, "tango-xtal", xtal_freq, 350,
++				    32, clocksource_mmio_readl_up);
++	if (!ret) {
+ 		pr_err("%s: registration failed\n", np->full_name);
+ 		return;
+ 	}
 -- 
 1.9.1
