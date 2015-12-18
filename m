@@ -1,117 +1,44 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 18 Dec 2015 13:59:19 -0700
-Subject: [PATCH V7 23/24] perf tools: making coresight PMU listable
-In-Reply-To: <1450472361-426-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1450472361-426-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1450472361-426-24-git-send-email-mathieu.poirier@linaro.org>
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 18 Dec 2015 13:04:59 -0800
+Subject: [PATCH] ARM: fix atags_to_fdt with stack-protector-strong
+Message-ID: <20151218210459.GA23293@www.outflux.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding the required mechanic allowing 'perf list pmu' to
-discover coresight ETM/PTM tracers.
+Building with CONFIG_CC_STACKPROTECTOR_STRONG triggers protection code
+generation under CONFIG_ARM_ATAG_DTB_COMPAT but this is too early for
+being able to use any of the stack_chk code. Explicitly disable it for
+only the atags_to_fdt bits.
 
-Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Suggested-by: zhxihu <zhxihu@marvell.com>
+Signed-off-by: Kees Cook <keescook@chromium.org>
 ---
- MAINTAINERS                    |  1 +
- tools/perf/arch/arm/util/Build |  2 ++
- tools/perf/arch/arm/util/pmu.c | 34 ++++++++++++++++++++++++++++++++++
- tools/perf/config/Makefile     | 17 ++++++++++++-----
- 4 files changed, 49 insertions(+), 5 deletions(-)
- create mode 100644 tools/perf/arch/arm/util/pmu.c
+ arch/arm/boot/compressed/Makefile | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 9bff63cf326e..e1a5de0e5733 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1007,6 +1007,7 @@ F:	drivers/hwtracing/coresight/*
- F:	Documentation/trace/coresight.txt
- F:	Documentation/devicetree/bindings/arm/coresight.txt
- F:	Documentation/ABI/testing/sysfs-bus-coresight-devices-*
-+F:	tools/perf/arch/arm/util/pmu.c
- 
- ARM/CORGI MACHINE SUPPORT
- M:	Richard Purdie <rpurdie@rpsys.net>
-diff --git a/tools/perf/arch/arm/util/Build b/tools/perf/arch/arm/util/Build
-index d22e3d07de3d..66ab0b05549c 100644
---- a/tools/perf/arch/arm/util/Build
-+++ b/tools/perf/arch/arm/util/Build
-@@ -2,3 +2,5 @@ libperf-$(CONFIG_DWARF) += dwarf-regs.o
- 
- libperf-$(CONFIG_LIBUNWIND)          += unwind-libunwind.o
- libperf-$(CONFIG_LIBDW_DWARF_UNWIND) += unwind-libdw.o
-+
-+libperf-$(CONFIG_AUXTRACE) += pmu.o
-diff --git a/tools/perf/arch/arm/util/pmu.c b/tools/perf/arch/arm/util/pmu.c
-new file mode 100644
-index 000000000000..af9fb666b44f
---- /dev/null
-+++ b/tools/perf/arch/arm/util/pmu.c
-@@ -0,0 +1,34 @@
-+/*
-+ * Copyright(C) 2015 Linaro Limited. All rights reserved.
-+ * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published by
-+ * the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <string.h>
-+#include <linux/coresight-pmu.h>
-+#include <linux/perf_event.h>
-+
-+#include "../../util/pmu.h"
-+
-+struct perf_event_attr
-+*perf_pmu__get_default_config(struct perf_pmu *pmu __maybe_unused)
-+{
-+#ifdef HAVE_AUXTRACE_SUPPORT
-+	if (!strcmp(pmu->name, CORESIGHT_ETM_PMU_NAME)) {
-+		/* add ETM default config here */
-+		pmu->selectable = true;
-+	}
-+#endif
-+	return NULL;
-+}
-diff --git a/tools/perf/config/Makefile b/tools/perf/config/Makefile
-index de89ec574361..905faabff8b1 100644
---- a/tools/perf/config/Makefile
-+++ b/tools/perf/config/Makefile
-@@ -647,12 +647,19 @@ ifdef LIBBABELTRACE
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index 3f9a9ebc77c3..8cfbc4a2090b 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -106,6 +106,14 @@ ORIG_CFLAGS := $(KBUILD_CFLAGS)
+ KBUILD_CFLAGS = $(subst -pg, , $(ORIG_CFLAGS))
  endif
  
- ifndef NO_AUXTRACE
--  ifeq ($(feature-get_cpuid), 0)
--    msg := $(warning Your gcc lacks the __get_cpuid() builtin, disables support for auxtrace/Intel PT, please install a newer gcc);
--    NO_AUXTRACE := 1
-+  ifeq ($(ARCH),x86)
-+    ifeq ($(feature-get_cpuid), 0)
-+      msg := $(warning Your gcc lacks the __get_cpuid() builtin, disables support for auxtrace/Intel PT, please install a newer gcc);
-+      NO_AUXTRACE := 1
-+    else
-+      $(call detected,CONFIG_AUXTRACE)
-+      CFLAGS += -DHAVE_AUXTRACE_SUPPORT
-+    endif
-   else
--    $(call detected,CONFIG_AUXTRACE)
--    CFLAGS += -DHAVE_AUXTRACE_SUPPORT
-+    ifeq ($(ARCH),$(filter $(ARCH), arm arm64))
-+      $(call detected,CONFIG_AUXTRACE)
-+      CFLAGS += -DHAVE_AUXTRACE_SUPPORT
-+    endif
-   endif
- endif
++ifeq ($(CONFIG_ARM_ATAG_DTB_COMPAT),y)
++CFLAGS_atags_to_fdt.o := -fno-stack-protector
++CFLAGS_fdt.o := -fno-stack-protector
++CFLAGS_fdt_ro.o := -fno-stack-protector
++CFLAGS_fdt_rw.o := -fno-stack-protector
++CFLAGS_fdt_wip.o := -fno-stack-protector
++endif
++
+ ccflags-y := -fpic -mno-single-pic-base -fno-builtin -I$(obj)
+ asflags-y := -DZIMAGE
  
 -- 
-2.1.4
+2.6.3
+
+
+-- 
+Kees Cook
+Chrome OS & Brillo Security
