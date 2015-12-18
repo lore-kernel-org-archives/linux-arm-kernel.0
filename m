@@ -1,106 +1,90 @@
 From: fan.chen@mediatek.com (Fan Chen)
-Date: Fri, 18 Dec 2015 10:42:28 +0800
-Subject: [PATCH 1/4] soc: Mediatek: Create Mediatek SIP call
+Date: Fri, 18 Dec 2015 10:42:31 +0800
+Subject: [PATCH 4/4] arm64: dts: mediatek: Improve cpuidle latency on MT8173
 In-Reply-To: <1450406551-1741-1-git-send-email-fan.chen@mediatek.com>
 References: <1450406551-1741-1-git-send-email-fan.chen@mediatek.com>
-Message-ID: <1450406551-1741-2-git-send-email-fan.chen@mediatek.com>
+Message-ID: <1450406551-1741-5-git-send-email-fan.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create a generic interface for issuing SIP Service calls
-which are specified in ARM SMC CALLING CONVENTION.
+From: Weiyi Lu <weiyi.lu@mediatek.com>
 
-Signed-off-by: Fan Chen <fan.chen@mediatek.com>
+All according to the exact profiling result:
+First, each CPU cluster needs its own nodes due to the latency gap
+between each other.
+Second, tune the parameters to enter the lowest idle state as much time
+as possible without disturbing the system performance for
+power-saving demand.
+
+Signed-off-by: Weiyi Lu <weiyi.lu@mediatek.com>
 ---
- drivers/soc/mediatek/Kconfig         |    8 ++++++++
- drivers/soc/mediatek/Makefile        |    1 +
- drivers/soc/mediatek/mtk-sip.c       |   28 ++++++++++++++++++++++++++++
- include/linux/soc/mediatek/mtk-sip.h |   17 +++++++++++++++++
- 4 files changed, 54 insertions(+)
- create mode 100644 drivers/soc/mediatek/mtk-sip.c
- create mode 100644 include/linux/soc/mediatek/mtk-sip.h
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi |   34 +++++++++++++++++++++++-------
+ 1 file changed, 26 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
-index 9d50682..65c1323 100644
---- a/drivers/soc/mediatek/Kconfig
-+++ b/drivers/soc/mediatek/Kconfig
-@@ -29,3 +29,11 @@ config MTK_SCPSYS
- 	help
- 	  Say yes here to add support for the MediaTek SCPSYS power domain
- 	  driver.
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index 77c1f84..0ae3983 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -69,7 +69,7 @@
+ 			compatible = "arm,cortex-a57";
+ 			reg = <0x100>;
+ 			enable-method = "psci";
+-			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
++			cpu-idle-states = <&CPU_SLEEP_1 &CLUSTER_SLEEP_1>;
+ 		};
+ 
+ 		cpu3: cpu at 101 {
+@@ -77,7 +77,7 @@
+ 			compatible = "arm,cortex-a57";
+ 			reg = <0x101>;
+ 			enable-method = "psci";
+-			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
++			cpu-idle-states = <&CPU_SLEEP_1 &CLUSTER_SLEEP_1>;
+ 		};
+ 
+ 		idle-states {
+@@ -86,18 +86,36 @@
+ 			CPU_SLEEP_0: cpu-sleep-0 {
+ 				compatible = "arm,idle-state";
+ 				local-timer-stop;
+-				entry-latency-us = <639>;
+-				exit-latency-us = <680>;
+-				min-residency-us = <1088>;
++				entry-latency-us = <72>;
++				exit-latency-us = <66>;
++				min-residency-us = <458>;
+ 				arm,psci-suspend-param = <0x0010000>;
+ 			};
+ 
+ 			CLUSTER_SLEEP_0: cluster-sleep-0 {
+ 				compatible = "arm,idle-state";
+ 				local-timer-stop;
+-				entry-latency-us = <800>;
+-				exit-latency-us = <1000>;
+-				min-residency-us = <2000>;
++				entry-latency-us = <145>;
++				exit-latency-us = <60>;
++				min-residency-us = <331>;
++				arm,psci-suspend-param = <0x1010000>;
++			};
 +
-+config MTK_SIP
-+        bool "Mediatek SIP Support"
-+	depends on ARCH_MEDIATEK || COMPILE_TEST
-+	depends on HAVE_SMCCC
-+	help
-+	Say yes here to add support for the MediaTek SIP call.
++			CPU_SLEEP_1: cpu-sleep-1 {
++				compatible = "arm,idle-state";
++				local-timer-stop;
++				entry-latency-us = <72>;
++				exit-latency-us = <66>;
++				min-residency-us = <516>;
++				arm,psci-suspend-param = <0x0010000>;
++			};
 +
-diff --git a/drivers/soc/mediatek/Makefile b/drivers/soc/mediatek/Makefile
-index 12998b0..67077dc 100644
---- a/drivers/soc/mediatek/Makefile
-+++ b/drivers/soc/mediatek/Makefile
-@@ -1,3 +1,4 @@
- obj-$(CONFIG_MTK_INFRACFG) += mtk-infracfg.o
- obj-$(CONFIG_MTK_PMIC_WRAP) += mtk-pmic-wrap.o
- obj-$(CONFIG_MTK_SCPSYS) += mtk-scpsys.o
-+obj-$(CONFIG_MTK_SIP) += mtk-sip.o
-diff --git a/drivers/soc/mediatek/mtk-sip.c b/drivers/soc/mediatek/mtk-sip.c
-new file mode 100644
-index 0000000..882617f
---- /dev/null
-+++ b/drivers/soc/mediatek/mtk-sip.c
-@@ -0,0 +1,28 @@
-+/*
-+ * Copyright (c) 2015 MediaTek Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/arm-smccc.h>
-+#include <linux/soc/mediatek/mtk-sip.h>
-+
-+int mtk_sip_simple_call(unsigned long func_id,
-+			unsigned long a1,
-+			unsigned long a2,
-+			unsigned long a3)
-+{
-+	struct smccc_res res;
-+
-+	smccc_smc(func_id, a1, a2, a3, 0, 0, 0, 0, &res);
-+
-+	return res.a0;
-+}
-+
-diff --git a/include/linux/soc/mediatek/mtk-sip.h b/include/linux/soc/mediatek/mtk-sip.h
-new file mode 100644
-index 0000000..dce1818
---- /dev/null
-+++ b/include/linux/soc/mediatek/mtk-sip.h
-@@ -0,0 +1,17 @@
-+#ifndef __SOC_MEDIATEK_MTKSIP_H
-+#define __SOC_MEDIATEK_MTKSIP_H
-+
-+#ifdef CONFIG_MTK_SIP
-+int mtk_sip_simple_call(unsigned long func_id,
-+			unsigned long a1,
-+			unsigned long a2,
-+			unsigned long a3);
-+#else
-+static inline int mtk_sip_simple_call(unsigned long func_id,
-+				      unsigned long a1,
-+				      unsigned long a2,
-+				      unsigned long a3)
-+{       return -EOPNOTSUPP; }
-+#endif
-+
-+#endif /*__SOC_MEDIATEK_MTKSIP_H*/
++			CLUSTER_SLEEP_1: cluster-sleep-1 {
++				compatible = "arm,idle-state";
++				local-timer-stop;
++				entry-latency-us = <287>;
++				exit-latency-us = <62>;
++				min-residency-us = <1423>;
+ 				arm,psci-suspend-param = <0x1010000>;
+ 			};
+ 		};
 -- 
 1.7.9.5
