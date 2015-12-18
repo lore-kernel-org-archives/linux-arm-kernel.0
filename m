@@ -1,31 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Dec 2015 15:37:37 +0100
-Subject: [PATCH] ila: add NETFILTER dependency
-Message-ID: <2011239.T7zzuZGeyk@wuerfel>
+From: pratyush.anand@gmail.com (Pratyush Anand)
+Date: Fri, 18 Dec 2015 20:11:07 +0530
+Subject: [PATCH v5 1/5] PCI: designware: ensure ATU is enabled before
+ IO/conf space accesses
+In-Reply-To: <1450442339-18765-2-git-send-email-stanimir.varbanov@linaro.org>
+References: <1450442339-18765-1-git-send-email-stanimir.varbanov@linaro.org>
+ <1450442339-18765-2-git-send-email-stanimir.varbanov@linaro.org>
+Message-ID: <CAHM4w1kzGKahVOTdTxMciZBs81U9EVoSYPgCw9=ph3R9vSwCwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The recently added generic ILA translation facility fails to
-build when CONFIG_NETFILTER is disabled:
+On Fri, Dec 18, 2015 at 6:08 PM, Stanimir Varbanov
+<stanimir.varbanov@linaro.org> wrote:
+> There is no guarantees that enabling ATU will hit the hardware
+> immediately, and subsequent accesses to configuration / IO spaces
+> are reliable. So fixing this by read back PCIE_ATU_CR2 register
+> just after writing.
+>
+> Without such a fix the PCI device enumeration during kernel boot
+> is not reliable, and reading configuration space for particular
+> PCI device on the bus returns zero aka no device.
+>
+> Signed-off-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
 
-net/ipv6/ila/ila_xlat.c:229:20: warning: 'struct nf_hook_state' declared inside parameter list
-net/ipv6/ila/ila_xlat.c:235:27: error: array type has incomplete element type 'struct nf_hook_ops'
- static struct nf_hook_ops ila_nf_hook_ops[] __read_mostly = {
-
-This adds an explicit Kconfig dependency to avoid that case.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 7f00feaf1076 ("ila: Add generic ILA translation facility")
-
-diff --git a/net/ipv6/Kconfig b/net/ipv6/Kconfig
-index 983bb999738c..bb7dabe2ebbf 100644
---- a/net/ipv6/Kconfig
-+++ b/net/ipv6/Kconfig
-@@ -94,6 +94,7 @@ config IPV6_MIP6
- 
- config IPV6_ILA
- 	tristate "IPv6: Identifier Locator Addressing (ILA)"
-+	depends on NETFILTER
- 	select LWTUNNEL
- 	---help---
- 	  Support for IPv6 Identifier Locator Addressing (ILA).
+Acked-by: Pratyush Anand <pratyush.anand@gmail.com>
