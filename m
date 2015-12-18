@@ -1,38 +1,33 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 Dec 2015 11:29:41 +0900
-Subject: [PATCH 11/25] ARM: shmobile: bockw dts: Update console parameters
+Date: Fri, 18 Dec 2015 11:29:42 +0900
+Subject: [PATCH 12/25] ARM: shmobile: gose dts: Add serial port config to
+ chosen/stdout-path
 In-Reply-To: <cover.1450402264.git.horms+renesas@verge.net.au>
 References: <cover.1450402264.git.horms+renesas@verge.net.au>
-Message-ID: <f84a9cbb173946754712b366524fc4f5fb744424.1450402264.git.horms+renesas@verge.net.au>
+Message-ID: <16010a3e13f7ede016ae9bdc5dbffa96a0a49d3b.1450402264.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Drop the "console=" parameter from the kernel command line, as it's no
-longer needed for DT-based platforms.
-Add serial port config to chosen/stdout-path.
-
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7778-bockw.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/r8a7793-gose.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7778-bockw.dts b/arch/arm/boot/dts/r8a7778-bockw.dts
-index 158ad94fd4d1..b1aa02599229 100644
---- a/arch/arm/boot/dts/r8a7778-bockw.dts
-+++ b/arch/arm/boot/dts/r8a7778-bockw.dts
-@@ -28,8 +28,8 @@
- 	};
+diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
+index d842ce77b7c8..3e3122490650 100644
+--- a/arch/arm/boot/dts/r8a7793-gose.dts
++++ b/arch/arm/boot/dts/r8a7793-gose.dts
+@@ -24,7 +24,7 @@
  
  	chosen {
--		bootargs = "console=ttySC0,115200 ignore_loglevel ip=dhcp root=/dev/nfs rw";
+ 		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
 -		stdout-path = &scif0;
-+		bootargs = "ignore_loglevel ip=dhcp root=/dev/nfs rw";
 +		stdout-path = "serial0:115200n8";
  	};
  
- 	memory {
+ 	memory at 40000000 {
 -- 
 2.1.4
