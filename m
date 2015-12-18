@@ -1,40 +1,50 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 18 Dec 2015 17:01:47 +0000
-Subject: [PATCH 2/3] iommu/dma: Use correct offset in map_sg
-In-Reply-To: <9a84191ed813c23db7901f8c73f514d081495bdf.1450457730.git.robin.murphy@arm.com>
-References: <9a84191ed813c23db7901f8c73f514d081495bdf.1450457730.git.robin.murphy@arm.com>
-Message-ID: <4812a34857b081e45c36d7e887840f3675da74dc.1450457730.git.robin.murphy@arm.com>
+Date: Fri, 18 Dec 2015 17:01:46 +0000
+Subject: [PATCH 1/3] iommu/dma: Add some missing #includes
+Message-ID: <9a84191ed813c23db7901f8c73f514d081495bdf.1450457730.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When mapping a non-page-aligned scatterlist entry, we copy the original
-offset to the output DMA address before aligning it to hand off to
-iommu_map_sg(), then later adding the IOVA page address portion to get
-the final mapped address. However, when the IOVA page size is smaller
-than the CPU page size, it is the offset within the IOVA page we want,
-not that within the CPU page, which can easily be larger than an IOVA
-page and thus result in an incorrect final address.
+dma-iommu.c was naughtily relying on an implicit transitive #include of
+linux/vmalloc.h, which is apparently not present on some architectures.
+Add that, plus a couple more headers for other functions which are used
+similarly.
 
-Fix the bug by taking only the IOVA-aligned part of the offset as the
-basis of the DMA address, not the whole thing.
-
+Reported-by: kbuild test robot <lkp@intel.com>
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- drivers/iommu/dma-iommu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+
+Hi Joerg,
+
+here are a couple more minor fixes for some obscure subtleties in the
+common DMA code. I see I've just missed the rc5 fixes pull, but I hope
+you can pick these up for rc6 (unless of course you're also just about
+to disappear for 2 weeks like I am).
+
+Thanks,
+Robin.
+
+
+ drivers/iommu/dma-iommu.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
 diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-index 982e716..03811e3 100644
+index 427fdc1..982e716 100644
 --- a/drivers/iommu/dma-iommu.c
 +++ b/drivers/iommu/dma-iommu.c
-@@ -458,7 +458,7 @@ int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
- 		size_t s_length = s->length;
- 		size_t pad_len = (mask - iova_len + 1) & mask;
+@@ -21,10 +21,13 @@
  
--		sg_dma_address(s) = s->offset;
-+		sg_dma_address(s) = s_offset;
- 		sg_dma_len(s) = s_length;
- 		s->offset -= s_offset;
- 		s_length = iova_align(iovad, s_length + s_offset);
+ #include <linux/device.h>
+ #include <linux/dma-iommu.h>
++#include <linux/gfp.h>
+ #include <linux/huge_mm.h>
+ #include <linux/iommu.h>
+ #include <linux/iova.h>
+ #include <linux/mm.h>
++#include <linux/scatterlist.h>
++#include <linux/vmalloc.h>
+ 
+ int iommu_dma_init(void)
+ {
 -- 
 1.9.1
