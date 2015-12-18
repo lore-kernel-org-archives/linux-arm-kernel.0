@@ -1,120 +1,56 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 18 Dec 2015 15:18:11 +0100
-Subject: [PATCH 58/69] clocksource/drivers/dw_apb_timer: Fix apbt_readl return
- types
+Date: Fri, 18 Dec 2015 15:17:44 +0100
+Subject: [PATCH 31/69] clocksource/drivers/prcmu: Fix Kconfig and add
+ COMPILE_TEST option
 In-Reply-To: <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
 References: <5672CB9E.7090707@linaro.org>
  <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1450448302-27429-58-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1450448302-27429-31-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jisheng Zhang <jszhang@marvell.com>
+Let the platform's Kconfig to select the clock instead of having a reverse
+dependency from the driver to the platform options.
 
-On Marvell BG4CT platform, we observed the __apbt_read_clocksource()
-return wrong value: Let's assume the APBTMR_N_CURRENT_VALUE value is
-0xf0000000, we got 0xffffffff0fffffff, but it should be 0xfffffff.
+Add the COMPILE_TEST option for the compilation test coverage.
 
-This issue should be common on all 64bit platforms. We fix the issue
-by letting aptb_readl() return u32. apbt_writel() is also updated
-to write u32 val rather than unsigned long.
+This change is debatable as the option itself in the Kconfig allows to
+select the driver for the platform or not. This change will make the prcmu
+timer always selected.
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/clocksource/dw_apb_timer.c | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+ arch/arm/mach-ux500/Kconfig | 1 +
+ drivers/clocksource/Kconfig | 4 +---
+ 2 files changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/clocksource/dw_apb_timer.c b/drivers/clocksource/dw_apb_timer.c
-index c76c750..3a6d9db 100644
---- a/drivers/clocksource/dw_apb_timer.c
-+++ b/drivers/clocksource/dw_apb_timer.c
-@@ -49,12 +49,12 @@ clocksource_to_dw_apb_clocksource(struct clocksource *cs)
- 	return container_of(cs, struct dw_apb_clocksource, cs);
- }
+diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
+index c9ac19b..5eacdd6 100644
+--- a/arch/arm/mach-ux500/Kconfig
++++ b/arch/arm/mach-ux500/Kconfig
+@@ -32,6 +32,7 @@ config UX500_SOC_DB8500
+ 	select PINCTRL_AB8540
+ 	select REGULATOR
+ 	select REGULATOR_DB8500_PRCMU
++	select CLKSRC_DBX500_PRCMU
+ 	select PM_GENERIC_DOMAINS if PM
  
--static unsigned long apbt_readl(struct dw_apb_timer *timer, unsigned long offs)
-+static u32 apbt_readl(struct dw_apb_timer *timer, unsigned long offs)
- {
- 	return readl(timer->base + offs);
- }
+ config MACH_MOP500
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 847b3b1..e3ba5b4 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -123,9 +123,7 @@ config CLKSRC_NOMADIK_MTU_SCHED_CLOCK
+ 	  Use the Multi Timer Unit as the sched_clock.
  
--static void apbt_writel(struct dw_apb_timer *timer, unsigned long val,
-+static void apbt_writel(struct dw_apb_timer *timer, u32 val,
- 		 unsigned long offs)
- {
- 	writel(val, timer->base + offs);
-@@ -62,7 +62,7 @@ static void apbt_writel(struct dw_apb_timer *timer, unsigned long val,
- 
- static void apbt_disable_int(struct dw_apb_timer *timer)
- {
--	unsigned long ctrl = apbt_readl(timer, APBTMR_N_CONTROL);
-+	u32 ctrl = apbt_readl(timer, APBTMR_N_CONTROL);
- 
- 	ctrl |= APBTMR_CONTROL_INT;
- 	apbt_writel(timer, ctrl, APBTMR_N_CONTROL);
-@@ -103,7 +103,7 @@ static irqreturn_t dw_apb_clockevent_irq(int irq, void *data)
- 
- static void apbt_enable_int(struct dw_apb_timer *timer)
- {
--	unsigned long ctrl = apbt_readl(timer, APBTMR_N_CONTROL);
-+	u32 ctrl = apbt_readl(timer, APBTMR_N_CONTROL);
- 	/* clear pending intr */
- 	apbt_readl(timer, APBTMR_N_EOI);
- 	ctrl &= ~APBTMR_CONTROL_INT;
-@@ -113,7 +113,7 @@ static void apbt_enable_int(struct dw_apb_timer *timer)
- static int apbt_shutdown(struct clock_event_device *evt)
- {
- 	struct dw_apb_clock_event_device *dw_ced = ced_to_dw_apb_ced(evt);
--	unsigned long ctrl;
-+	u32 ctrl;
- 
- 	pr_debug("%s CPU %d state=shutdown\n", __func__,
- 		 cpumask_first(evt->cpumask));
-@@ -127,7 +127,7 @@ static int apbt_shutdown(struct clock_event_device *evt)
- static int apbt_set_oneshot(struct clock_event_device *evt)
- {
- 	struct dw_apb_clock_event_device *dw_ced = ced_to_dw_apb_ced(evt);
--	unsigned long ctrl;
-+	u32 ctrl;
- 
- 	pr_debug("%s CPU %d state=oneshot\n", __func__,
- 		 cpumask_first(evt->cpumask));
-@@ -160,7 +160,7 @@ static int apbt_set_periodic(struct clock_event_device *evt)
- {
- 	struct dw_apb_clock_event_device *dw_ced = ced_to_dw_apb_ced(evt);
- 	unsigned long period = DIV_ROUND_UP(dw_ced->timer.freq, HZ);
--	unsigned long ctrl;
-+	u32 ctrl;
- 
- 	pr_debug("%s CPU %d state=periodic\n", __func__,
- 		 cpumask_first(evt->cpumask));
-@@ -196,7 +196,7 @@ static int apbt_resume(struct clock_event_device *evt)
- static int apbt_next_event(unsigned long delta,
- 			   struct clock_event_device *evt)
- {
--	unsigned long ctrl;
-+	u32 ctrl;
- 	struct dw_apb_clock_event_device *dw_ced = ced_to_dw_apb_ced(evt);
- 
- 	/* Disable timer */
-@@ -323,7 +323,7 @@ void dw_apb_clocksource_start(struct dw_apb_clocksource *dw_cs)
- 	 * start count down from 0xffff_ffff. this is done by toggling the
- 	 * enable bit then load initial load count to ~0.
- 	 */
--	unsigned long ctrl = apbt_readl(&dw_cs->timer, APBTMR_N_CONTROL);
-+	u32 ctrl = apbt_readl(&dw_cs->timer, APBTMR_N_CONTROL);
- 
- 	ctrl &= ~APBTMR_CONTROL_ENABLE;
- 	apbt_writel(&dw_cs->timer, ctrl, APBTMR_N_CONTROL);
-@@ -338,7 +338,7 @@ void dw_apb_clocksource_start(struct dw_apb_clocksource *dw_cs)
- 
- static cycle_t __apbt_read_clocksource(struct clocksource *cs)
- {
--	unsigned long current_count;
-+	u32 current_count;
- 	struct dw_apb_clocksource *dw_cs =
- 		clocksource_to_dw_apb_clocksource(cs);
+ config CLKSRC_DBX500_PRCMU
+-	bool "Clocksource PRCMU Timer"
+-	depends on UX500_SOC_DB8500
+-	default y
++	bool "Clocksource PRCMU Timer" if COMPILE_TEST
+ 	help
+ 	  Use the always on PRCMU Timer as clocksource
  
 -- 
 1.9.1
