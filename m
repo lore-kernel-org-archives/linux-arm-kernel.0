@@ -1,42 +1,54 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 18 Dec 2015 10:16:23 +0000
-Subject: [PATCH 05/10] arm64: dts: r8a7795: Add pmu device nodes
-In-Reply-To: <a6b6b478459be0c5614626ba6ac95df05a7fc5e9.1450401186.git.horms+renesas@verge.net.au>
-References: <cover.1450401186.git.horms+renesas@verge.net.au>
- <a6b6b478459be0c5614626ba6ac95df05a7fc5e9.1450401186.git.horms+renesas@verge.net.au>
-Message-ID: <5673DCF7.1050008@arm.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Fri, 18 Dec 2015 10:18:08 +0000
+Subject: [PATCH v3 4/4] printk/nmi: Increase the size of NMI buffer and
+ make it configurable
+In-Reply-To: <alpine.LNX.2.00.1512120024370.9922@cbobk.fhfr.pm>
+References: <1449667265-17525-1-git-send-email-pmladek@suse.com>
+ <1449667265-17525-5-git-send-email-pmladek@suse.com>
+ <CAMuHMdXVgr58YjoePGrRbMyMncQ27f85prL7G5SpeHeNxoYrXQ@mail.gmail.com>
+ <20151211124159.GB3729@pathway.suse.cz>
+ <20151211145725.b0e81bb4bb18fcd72ef5f557@linux-foundation.org>
+ <20151211232113.GZ8644@n2100.arm.linux.org.uk>
+ <alpine.LNX.2.00.1512120024370.9922@cbobk.fhfr.pm>
+Message-ID: <5673DD60.7080302@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 11/12/15 23:26, Jiri Kosina wrote:
+> On Fri, 11 Dec 2015, Russell King - ARM Linux wrote:
+>
+>> I'm personally happy with the existing code, and I've been wondering why
+>> there's this effort to apply further cleanups - to me, the changelogs
+>> don't seem to make that much sense, unless we want to start using
+>> printk() extensively in NMI functions - using the generic nmi backtrace
+>> code surely gets us something that works across all architectures...
+>
+> It is already being used extensively, and not only for all-CPU backtraces.
+> For starters, please consider
+>
+> - WARN_ON(in_nmi())
+> - BUG_ON(in_nmi())
+
+Sorry to join in so late but...
+
+Today we risk deadlock when we try to issue these diagnostic errors 
+directly from NMI context.
+
+After this change we will still risk deadlock, because that's what the 
+diagnostic code is trying to tell us, *and* we delay actually reporting 
+the error until, and only if, the NMI handler completes.
+
+I'm not entirely sure that this is an improvement.
 
 
-On 18/12/15 02:29, Simon Horman wrote:
-> From: Yoshifumi Hosoya <yoshifumi.hosoya.wj@renesas.com>
->
-> Enabling the performance monitor unit on r8a7795.
->
-> Signed-off-by: Masaru Nagai <masaru.nagai.vx@renesas.com>
-> Signed-off-by: Yoshifumi Hosoya <yoshifumi.hosoya.wj@renesas.com>
-> Signed-off-by: Dirk Behme <dirk.behme@gmail.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->   arch/arm64/boot/dts/renesas/r8a7795.dtsi | 12 ++++++++++++
->   1 file changed, 12 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> index 4d43cf31418f..b9229a49dabc 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> @@ -230,6 +230,18 @@
->   			power-domains = <&cpg>;
->   		};
->
-> +		pmu {
-> +			compatible = "arm,armv8-pmuv3";
+> - anything being printed out from MCE handlers
 
-Please use arm,cortex-a57-pmu to be more specific. IIRC I mentioned this
-for some shmobile platform recently.
+The MCE handlers should only call printk() when they decide to panic and 
+*after* busting the spinlocks. At this point deferring printk() until it 
+is safe is not very helpful.
 
--- 
-Regards,
-Sudeep
+When we bust the spinlocks we should probably restore the normal 
+printk() function to give best chance of the failure messages making it out.
+
+
+Daniel.
