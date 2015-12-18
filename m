@@ -1,68 +1,59 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 18 Dec 2015 13:58:57 -0700
-Subject: [PATCH V7 01/24] coresight: implementing 'cpu_id()' API
+Date: Fri, 18 Dec 2015 13:58:59 -0700
+Subject: [PATCH V7 03/24] coresight: add API to get sink from path
 In-Reply-To: <1450472361-426-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1450472361-426-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1450472361-426-2-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1450472361-426-4-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Other than plainly parsing the device tree there is no way to
-know which CPU a tracer is affined to.  As such adding an
-interface to lookup the CPU field enclosed in the etm_drvdata
-structure that was initialised at boot time.
+Add an API allowing external code to quickly get a handle on the
+sink within a path.  The sink is always last, but adding an API allows
+to keep the path's node structure private and remove redundant checks.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm3x.c | 8 ++++++++
- include/linux/coresight.h                     | 3 +++
- 2 files changed, 11 insertions(+)
+ drivers/hwtracing/coresight/coresight-priv.h |  1 +
+ drivers/hwtracing/coresight/coresight.c      | 15 +++++++++++++++
+ 2 files changed, 16 insertions(+)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index d630b7ece735..755f6f4d6d79 100644
---- a/drivers/hwtracing/coresight/coresight-etm3x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -315,6 +315,13 @@ static void etm_enable_hw(void *info)
- 	dev_dbg(drvdata->dev, "cpu: %d enable smp call done\n", drvdata->cpu);
+diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
+index 7b193a34d709..14f245a2018d 100644
+--- a/drivers/hwtracing/coresight/coresight-priv.h
++++ b/drivers/hwtracing/coresight/coresight-priv.h
+@@ -54,6 +54,7 @@ static inline void CS_UNLOCK(void __iomem *addr)
+ 
+ void coresight_disable_path(struct list_head *path);
+ int coresight_enable_path(struct list_head *path);
++struct coresight_device *coresight_get_sink(struct list_head *path);
+ struct list_head *coresight_build_path(struct coresight_device *csdev);
+ void coresight_release_path(struct list_head *path);
+ 
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index 74beba461aa2..b488af14a143 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -321,6 +321,21 @@ err:
+ 	goto out;
  }
  
-+static int etm_cpu_id(struct coresight_device *csdev)
++struct coresight_device *coresight_get_sink(struct list_head *path)
 +{
-+	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
++	struct coresight_device *csdev;
 +
-+	return drvdata->cpu;
++	if (!path)
++		return NULL;
++
++	csdev = list_last_entry(path, struct coresight_node, link)->csdev;
++	if (csdev->type != CORESIGHT_DEV_TYPE_SINK &&
++	    csdev->type != CORESIGHT_DEV_TYPE_LINKSINK)
++		return NULL;
++
++	return csdev;
 +}
 +
- static int etm_trace_id(struct coresight_device *csdev)
- {
- 	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-@@ -421,6 +428,7 @@ static void etm_disable(struct coresight_device *csdev)
- }
- 
- static const struct coresight_ops_source etm_source_ops = {
-+	.cpu_id		= etm_cpu_id,
- 	.trace_id	= etm_trace_id,
- 	.enable		= etm_enable,
- 	.disable	= etm_disable,
-diff --git a/include/linux/coresight.h b/include/linux/coresight.h
-index a7cabfa23b55..bf62b265bf52 100644
---- a/include/linux/coresight.h
-+++ b/include/linux/coresight.h
-@@ -205,12 +205,15 @@ struct coresight_ops_link {
  /**
-  * struct coresight_ops_source - basic operations for a source
-  * Operations available for sources.
-+ * @cpu_id:	returns the value of the CPU number this component
-+ *		is associated to.
-  * @trace_id:	returns the value of the component's trace ID as known
- 		to the HW.
-  * @enable:	enables tracing for a source.
-  * @disable:	disables tracing for a source.
-  */
- struct coresight_ops_source {
-+	int (*cpu_id)(struct coresight_device *csdev);
- 	int (*trace_id)(struct coresight_device *csdev);
- 	int (*enable)(struct coresight_device *csdev);
- 	void (*disable)(struct coresight_device *csdev);
+  * _coresight_build_path - recursively build a path from a @csdev to a sink.
+  * @csdev:	The device to start from.
 -- 
 2.1.4
