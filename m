@@ -1,33 +1,35 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 Dec 2015 11:29:14 +0900
-Subject: [PATCH 06/10] arm64: renesas: salvator-x: Add board part number to DT
- bindings
+Date: Fri, 18 Dec 2015 11:29:18 +0900
+Subject: [PATCH 10/10] arm64: renesas: r8a7795: fix SATA clock assignment
 In-Reply-To: <cover.1450401186.git.horms+renesas@verge.net.au>
 References: <cover.1450401186.git.horms+renesas@verge.net.au>
-Message-ID: <187623569c4ccb26cd20cb68f56bcea2d00ee947.1450401186.git.horms+renesas@verge.net.au>
+Message-ID: <2eb2b5066197eab00c55dcd1132f17836e4975b2.1450401186.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+SATA clock is 815, not 915.
+
+Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- Documentation/devicetree/bindings/arm/shmobile.txt | 2 +-
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
-index 678a8184da24..9cf67e48f222 100644
---- a/Documentation/devicetree/bindings/arm/shmobile.txt
-+++ b/Documentation/devicetree/bindings/arm/shmobile.txt
-@@ -59,7 +59,7 @@ Boards:
-     compatible = "renesas,marzen", "renesas,r8a7779"
-   - Porter (M2-LCDP)
-     compatible = "renesas,porter", "renesas,r8a7791"
--  - Salvator-X
-+  - Salvator-X (RTP0RC7795SIPB0010S)
-     compatible = "renesas,salvator-x", "renesas,r8a7795";
-   - SILK (RTP0RC7794LCB00011S)
-     compatible = "renesas,silk", "renesas,r8a7794"
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index 9ce6a5ea6629..bb353cde1253 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -772,7 +772,7 @@
+ 			compatible = "renesas,sata-r8a7795";
+ 			reg = <0 0xee300000 0 0x1fff>;
+ 			interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&cpg CPG_MOD 915>;
++			clocks = <&cpg CPG_MOD 815>;
+ 			status = "disabled";
+ 		};
+ 	};
 -- 
 2.1.4
