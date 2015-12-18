@@ -1,27 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Dec 2015 14:16:06 +0100
-Subject: [PATCH v2] serial: 8250: of: Fix the driver and actually compile
- the 8250_of
-In-Reply-To: <1450443649-31654-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1450443649-31654-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <3295738.CvTDrXdGbt@wuerfel>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 18 Dec 2015 14:19:54 +0100
+Subject: [PATCH] ARM: realview: select apropriate targets in defconfig
+Message-ID: <1450444794-18478-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 18 December 2015 15:00:49 Peter Ujfalusi wrote:
-> The 8250_of never compiled since in the Kconfig we have SERIAL_OF_PLATFORM
-> but in the makefile we expect to have SERIAL_8250_OF...
-> 
-> When the 8250_of.c is actually compiled we will have two errors:
-> missing linux/nwpserial.h and 8250/8250.h.
-> Fix those as well at the same time when enable the compilation of the
-> driver.
-> 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> Fixes: afd7f88f1577 ("serial: 8250: move of_serial code to 8250 directory")
-> CC: Arnd Bergmann <arnd@arndb.de>
-> 
+After adding multiplatform support for the RealView, we need
+to add the apropriate targets to the defconfig so we get the
+full range of supported devices. This amends both the defconfig
+files for this.
 
-Thanks for fixing this, and sorry for the mess.
+Cc: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/configs/realview-smp_defconfig | 6 ++++++
+ arch/arm/configs/realview_defconfig     | 5 +++++
+ 2 files changed, 11 insertions(+)
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+diff --git a/arch/arm/configs/realview-smp_defconfig b/arch/arm/configs/realview-smp_defconfig
+index 1da5d9e48224..b10949545e76 100644
+--- a/arch/arm/configs/realview-smp_defconfig
++++ b/arch/arm/configs/realview-smp_defconfig
+@@ -9,9 +9,15 @@ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_BLK_DEV_BSG is not set
+ # CONFIG_IOSCHED_CFQ is not set
+ CONFIG_ARCH_REALVIEW=y
++CONFIG_REALVIEW_DT=y
+ CONFIG_MACH_REALVIEW_EB=y
++CONFIG_REALVIEW_EB_A9MP=y
+ CONFIG_REALVIEW_EB_ARM11MP=y
++CONFIG_REALVIEW_EB_ARM11MP_REVB=y
+ CONFIG_MACH_REALVIEW_PB11MP=y
++CONFIG_MACH_REALVIEW_PB1176=y
++CONFIG_MACH_REALVIEW_PBA8=y
++CONFIG_MACH_REALVIEW_PBX=y
+ CONFIG_SMP=y
+ CONFIG_HOTPLUG_CPU=y
+ CONFIG_AEABI=y
+diff --git a/arch/arm/configs/realview_defconfig b/arch/arm/configs/realview_defconfig
+index d02e9d911bb7..8ba19ea592cf 100644
+--- a/arch/arm/configs/realview_defconfig
++++ b/arch/arm/configs/realview_defconfig
+@@ -9,10 +9,15 @@ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_BLK_DEV_BSG is not set
+ # CONFIG_IOSCHED_CFQ is not set
+ CONFIG_ARCH_REALVIEW=y
++CONFIG_REALVIEW_DT=y
+ CONFIG_MACH_REALVIEW_EB=y
++CONFIG_REALVIEW_EB_A9MP=y
+ CONFIG_REALVIEW_EB_ARM11MP=y
++CONFIG_REALVIEW_EB_ARM11MP_REVB=y
+ CONFIG_MACH_REALVIEW_PB11MP=y
+ CONFIG_MACH_REALVIEW_PB1176=y
++CONFIG_MACH_REALVIEW_PBA8=y
++CONFIG_MACH_REALVIEW_PBX=y
+ CONFIG_AEABI=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+-- 
+2.4.3
