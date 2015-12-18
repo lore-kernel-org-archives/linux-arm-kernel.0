@@ -1,72 +1,59 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Fri, 18 Dec 2015 12:21:11 +0800
-Subject: [PATCH] pinctrl: mediatek: convert to arch_initcall
-Message-ID: <1450412497-25872-1-git-send-email-djkurtz@chromium.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 18 Dec 2015 13:27:37 +0900
+Subject: [PATCH v7 0/6] samsung: pmu: split up SoC specific PMU data
+In-Reply-To: <1450409536-30463-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1450409536-30463-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <56738B39.10201@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move pinctrl initialization earlier in boot so that real devices can find
-their pctldev without probe deferring.
+On 18.12.2015 12:32, Pankaj Dubey wrote:
+> In this series I am splitting up SoC specific PMU configuration data into
+> mach-exynos folder itself, before moving all of them under
+> drivers/soc/samsung/. Also instead of making all changes in single patch it
+> has been broken into SoC specific patches to avoid large size of patch.
+> With this approach there will not be unwanted big churns just after
+> adding exynos-pmu under drivers/soc/samsung.
+> 
+> All these patches are just refactoring to keep minimal changes while moving
+> exynos-pmu driver under drivers/soc/samsung/. Support for exynos7 PMU can
+> be added on top of it, in such a manner that for ARM64 build, ARM related
+> SoC's PMU will not get compiled and thus unnecessary increasing kernel image size.
+> 
+> This series have been prepared on top of Krzysztof Kozlowski's 
+> next/stuff-late-not-split-per-branch branch, and it's just a rebase compared to
+> V6 posted and reviewed here [1]. 
+> 
+> [1]: https://lkml.org/lkml/2015/11/17/15
+> 
+> For testing entire patchset on Peach-Pi (Exynos5880) based chromebook for boot
+> and S2R functionality.
+> 
+> Tested-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> 
+> For testing entire patchset on on Trats2 (Exynos4412, S2R, reboot, poweroff)
+> and Odroid XU3 (Exynos5422, reboot, poweroff).
+> 
+> Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> 
+> Changes since v6:
+>  - Rebasing on top of branch provided by Krzysztof, after resolving conflicts 
+>    caused due to Alim's patches for adoptation of generic syscon for poweroff, reboot.
+>  - Included Tested-by tags on individual patches as per applicability.
+>  - Dropped patches v6 [1/9], v6 [2/9] as these are already present in above mentioned branch.
+>  - Dropped patch v6 [8/9] as after Alim's patch this patch no more required.
+> 
 
-Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
----
- drivers/pinctrl/mediatek/pinctrl-mt6397.c | 2 +-
- drivers/pinctrl/mediatek/pinctrl-mt8127.c | 2 +-
- drivers/pinctrl/mediatek/pinctrl-mt8135.c | 2 +-
- drivers/pinctrl/mediatek/pinctrl-mt8173.c | 2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
+Patchset applied cleanly with:
+1. Removal of blank lines at end of two files (they appeared in v7).
+2. Removal of your tested-by. The author does not provide such tag
+because it is assumed that he tested it before sending. However I left
+the information about testing platform near your signed-off-by.
 
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mt6397.c b/drivers/pinctrl/mediatek/pinctrl-mt6397.c
-index f9751ae..a3780d4 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mt6397.c
-+++ b/drivers/pinctrl/mediatek/pinctrl-mt6397.c
-@@ -70,7 +70,7 @@ static int __init mtk_pinctrl_init(void)
- 	return platform_driver_register(&mtk_pinctrl_driver);
- }
- 
--module_init(mtk_pinctrl_init);
-+arch_initcall(mtk_pinctrl_init);
- 
- MODULE_LICENSE("GPL v2");
- MODULE_DESCRIPTION("MediaTek MT6397 Pinctrl Driver");
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mt8127.c b/drivers/pinctrl/mediatek/pinctrl-mt8127.c
-index b317b0b..98e0beb 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mt8127.c
-+++ b/drivers/pinctrl/mediatek/pinctrl-mt8127.c
-@@ -351,7 +351,7 @@ static int __init mtk_pinctrl_init(void)
- 	return platform_driver_register(&mtk_pinctrl_driver);
- }
- 
--module_init(mtk_pinctrl_init);
-+arch_initcall(mtk_pinctrl_init);
- 
- MODULE_LICENSE("GPL v2");
- MODULE_DESCRIPTION("MediaTek MT8127 Pinctrl Driver");
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mt8135.c b/drivers/pinctrl/mediatek/pinctrl-mt8135.c
-index 404f117..1c153b8 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mt8135.c
-+++ b/drivers/pinctrl/mediatek/pinctrl-mt8135.c
-@@ -366,7 +366,7 @@ static int __init mtk_pinctrl_init(void)
- 	return platform_driver_register(&mtk_pinctrl_driver);
- }
- 
--module_init(mtk_pinctrl_init);
-+arch_initcall(mtk_pinctrl_init);
- 
- MODULE_LICENSE("GPL");
- MODULE_DESCRIPTION("MediaTek Pinctrl Driver");
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mt8173.c b/drivers/pinctrl/mediatek/pinctrl-mt8173.c
-index ad27184..a62514e 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mt8173.c
-+++ b/drivers/pinctrl/mediatek/pinctrl-mt8173.c
-@@ -394,7 +394,7 @@ static int __init mtk_pinctrl_init(void)
- 	return platform_driver_register(&mtk_pinctrl_driver);
- }
- 
--module_init(mtk_pinctrl_init);
-+arch_initcall(mtk_pinctrl_init);
- 
- MODULE_LICENSE("GPL v2");
- MODULE_DESCRIPTION("MediaTek Pinctrl Driver");
--- 
-2.6.0.rc2.230.g3dd15c0
+You can find the patches on the same branch:
+https://git.kernel.org/cgit/linux/kernel/git/krzk/linux.git/log/?h=next/stuff-late-not-split-per-branch
+
+I hope I will be able to push it out to arm-soc soon...
+
+Best regards,
+Krzysztof
