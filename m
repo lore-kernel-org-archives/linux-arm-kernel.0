@@ -1,155 +1,70 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 18 Dec 2015 12:41:20 +0000
-Subject: [PATCH] ARM: dma-mapping: Just allocate one chunk at a time
-In-Reply-To: <CAD=FV=XP9zx2XEmo7vS0MdsROJ0JoRYFidnRaBLxR43GXnuqag@mail.gmail.com>
-References: <1450384253-1067-1-git-send-email-dianders@chromium.org>
- <CAD=FV=XP9zx2XEmo7vS0MdsROJ0JoRYFidnRaBLxR43GXnuqag@mail.gmail.com>
-Message-ID: <5673FEF0.1080504@arm.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 18 Dec 2015 14:43:32 +0200
+Subject: [PATCH] serial: 8250: of: Fix the driver and actually compile the
+ 8250_of
+Message-ID: <1450442612-11372-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
+The 8250_of never compiled since in the Kconfig we have SERIAL_OF_PLATFORM
+but in the makefile we expect to have SERIAL_8250_OF...
 
-On 17/12/15 22:31, Doug Anderson wrote:
-> Hi,
->
-> On Thu, Dec 17, 2015 at 12:30 PM, Douglas Anderson
-> <dianders@chromium.org> wrote:
->> The __iommu_alloc_buffer() is expected to be called to allocate pretty
->> sizeable buffers.  Upon simple tests of video I saw it trying to
->> allocate 4,194,304 bytes.  The function tries to be efficient about this
->> by starting out allocating large chunks and then moving to smaller and
->> smaller chunk sizes until it succeeds.
->>
->> The current function is very, very slow.
->>
->> One problem is the way it keeps trying and trying to allocate big
->> chunks.  Imagine a very fragmented memory that has 4M free but no
->> contiguous pages at all.  Further imagine allocating 4M (1024 pages).
->> We'll do the following memory allocations:
->> - For page 1:
->>    - Try to allocate order 10 (no retry)
->>    - Try to allocate order 9 (no retry)
->>    - ...
->>    - Try to allocate order 0 (with retry, but not needed)
->> - For page 2:
->>    - Try to allocate order 9 (no retry)
->>    - Try to allocate order 8 (no retry)
->>    - ...
->>    - Try to allocate order 0 (with retry, but not needed)
->> - ...
->> - ...
->>
->> Total number of calls to alloc() calls for this case is:
->>    sum(int(math.log(i, 2)) + 1 for i in range(1, 1025))
->>    => 9228
->>
->> The above is obviously worse case, but given how slow alloc can be we
->> really want to try to avoid even somewhat bad cases.  I timed the old
->> code with a device under memory pressure and it wasn't hard to see it
->> take more than 24 seconds to allocate 4 megs of memory (!!).
->>
->> A second problem (and maybe even more important) is that allocating big
->> chunks when we don't need them is just not a good idea anyway.  The
->> first thing we do with these big chunks is break them into smaller
->> chunks!  If we allocate small chunks:
->> - The memory manager doesn't need to work so hard to give us big chunks.
->> - We can save the big chunks for those that really need them and this
->>    code can make great use of all the small chunks sitting around.
->>
->> Let's simplify by just allocating one page at a time.  We may make more
->> total allocate calls but it works way better.  In real world tests that
->> used to sometimes see a 24 second allocation call I can now see at most
->> 250 ms.
->
-> Off-list I talked to Dmitry about this a little bit and he pointed out
-> that contiguous chunks actually give a benefit to the IOMMU.  I don't
-> think the benefit outweighs the cost in this case, but I'm happy to
-> hear what others have to say.  I did some quick printouts and it turns
-> out that even when requesting page at a time the memory manager
-> (unsurprisingly) can in many cases still give us pages that are
-> contiguous.
->
-> Also I'm happy to post up
-> <https://chromium-review.googlesource.com/#/c/319210/> which sorts the
-> array and could possibly give us larger chunks of contiguous memory.
+In the Kconfig keep the SERIAL_OF_PLATFORM for compatibility reasons and
+let it select the SERIAL_8250_OF. Later we can replace the
+SERIAL_OF_PLATFORM use in defconfigs to SERIAL_8250_OF.
 
-I think sorting individually-allocated pages really isn't worth the 
-effort - I'm not aware of anything that's going to be capable of using 
-larger page/section mappings without also having the necessary physical 
-alignment, and if you _can_ cobble together, say, 2MB worth of 
-contiguous pages *at 2MB alignment*, then you would have been far better 
-off just asking the slab allocator for that in the first place.
+When the 8250_of.c is actually compiled we will have two errors:
+missing linux/nwpserial.h and 8250/8250.h.
+Fix those as well at the same time when enable the compilation of the
+driver.
 
-That's the key point of the higher-order allocation - not that you get 
-some contiguous pages, but that the region you get is also naturally 
-aligned to its size physically. That we break up the CPU page tables for 
-that region into individual pages is just an inconsequential 
-implementation detail from the IOMMU side. When you _do_ have plenty of 
-unfragmented free memory it can really be a big win - here's an 
-instrumented example of what happens on my Juno with the ARM HDLCD/SMMU 
-combo setting up a framebuffer at boot time:
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Fixes: afd7f88f1577 ("serial: 8250: move of_serial code to 8250 directory")
+CC: Arnd Bergmann <arnd@arndb.de>
+---
+Hi,
 
+this is fixes linux-next. W/o the patch davinci devices are not booting in DT
+mode for example.
 
-   iommu_dma_alloc: alloc size 0x753000, 1875 pages
-   __iommu_dma_alloc_pages: allocated at order 10
-   __iommu_dma_alloc_pages: allocated at order 9
-   __iommu_dma_alloc_pages: allocated at order 8
-   __iommu_dma_alloc_pages: allocated at order 6
-   __iommu_dma_alloc_pages: allocated at order 4
-   __iommu_dma_alloc_pages: allocated at order 1
-   __iommu_dma_alloc_pages: allocated at order 0
-   iommu: map: iova 0xff800000 pa 0x00000009f5400000 size 0x400000
-   iommu: mapping: iova 0xff800000 pa 0x00000009f5400000 pgsize 0x200000
-   iommu: mapping: iova 0xffa00000 pa 0x00000009f5600000 pgsize 0x200000
-   iommu: map: iova 0xffc00000 pa 0x00000000fa200000 size 0x200000
-   iommu: mapping: iova 0xffc00000 pa 0x00000000fa200000 pgsize 0x200000
-   iommu: map: iova 0xffe00000 pa 0x00000009f5a00000 size 0x100000
-   iommu: mapping: iova 0xffe00000 pa 0x00000009f5a00000 pgsize 0x1000
-   iommu: mapping: iova 0xffe01000 pa 0x00000009f5a01000 pgsize 0x1000
-   iommu: mapping: iova 0xffe02000 pa 0x00000009f5a02000 pgsize 0x1000
-   iommu: mapping: iova 0xffe03000 pa 0x00000009f5a03000 pgsize 0x1000
-   ...
+Regards,
+Peter
 
-Since the IOVA region itself is aligned to 8MB (for the total size) and 
-the physical regions come out in optimal decreasing order, we're able to 
-map over 80% of the whole buffer with just 3 section entries, with a 
-corresponding saving on TLB pressure, page table maintenance (cache 
-flushing), etc.
+ drivers/tty/serial/8250/8250_of.c | 3 +--
+ drivers/tty/serial/8250/Kconfig   | 5 +++++
+ 2 files changed, 6 insertions(+), 2 deletions(-)
 
-That said, unless you're in the middle of some crazy allocator-thrashing 
-race, then it's probably safe to assume that once allocation fails at a 
-given order that's going to remain the case in the near future - would 
-you mind taking the following diff for a spin under your test conditions 
-to see how it compares?
-
-Robin.
-
------>8-----
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index dfb5001..95e75c4 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -1129,6 +1129,7 @@ static struct page **__iommu_alloc_buffer(struct 
-device *dev, size_t size,
-         int count = size >> PAGE_SHIFT;
-         int array_size = count * sizeof(struct page *);
-         int i = 0;
-+       unsigned int order = MAX_ORDER;
-
-         if (array_size <= PAGE_SIZE)
-                 pages = kzalloc(array_size, GFP_KERNEL);
-@@ -1160,9 +1161,10 @@ static struct page **__iommu_alloc_buffer(struct 
-device *dev, size_t size,
-         gfp |= __GFP_NOWARN | __GFP_HIGHMEM;
-
-         while (count) {
--               int j, order;
-+               int j;
-
--               for (order = __fls(count); order > 0; --order) {
-+               for (order = min_t(unsigned int, order, __fls(count));
-+                    order > 0; --order) {
-                         /*
-                          * We do not want OOM killer to be invoked as long
-                          * as we can fall back to single pages, so we force
+diff --git a/drivers/tty/serial/8250/8250_of.c b/drivers/tty/serial/8250/8250_of.c
+index d66fd24f87cf..33021c1f7d55 100644
+--- a/drivers/tty/serial/8250/8250_of.c
++++ b/drivers/tty/serial/8250/8250_of.c
+@@ -18,10 +18,9 @@
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+-#include <linux/nwpserial.h>
+ #include <linux/clk.h>
+ 
+-#include "8250/8250.h"
++#include "8250.h"
+ 
+ struct of_serial_info {
+ 	struct clk *clk;
+diff --git a/drivers/tty/serial/8250/Kconfig b/drivers/tty/serial/8250/Kconfig
+index b03cb5175113..01f24613b0e6 100644
+--- a/drivers/tty/serial/8250/Kconfig
++++ b/drivers/tty/serial/8250/Kconfig
+@@ -379,6 +379,11 @@ config SERIAL_8250_MID
+ 	  Intel platforms.
+ 
+ config SERIAL_OF_PLATFORM
++	tristate
++	depends on SERIAL_8250 && OF
++	select SERIAL_8250_OF
++
++config SERIAL_8250_OF
+ 	tristate "Devicetree based probing for 8250 ports"
+ 	depends on SERIAL_8250 && OF
+ 	help
+-- 
+2.6.4
