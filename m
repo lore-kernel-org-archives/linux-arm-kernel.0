@@ -1,46 +1,36 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 Dec 2015 11:29:13 +0900
-Subject: [PATCH 05/10] arm64: dts: r8a7795: Add pmu device nodes
+Date: Fri, 18 Dec 2015 11:29:17 +0900
+Subject: [PATCH 09/10] arm64: dts: salvator-x: Enable SATA controller
 In-Reply-To: <cover.1450401186.git.horms+renesas@verge.net.au>
 References: <cover.1450401186.git.horms+renesas@verge.net.au>
-Message-ID: <a6b6b478459be0c5614626ba6ac95df05a7fc5e9.1450401186.git.horms+renesas@verge.net.au>
+Message-ID: <52ee9fb34aa4b839b784e2e224a7c525cc51c955.1450401186.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yoshifumi Hosoya <yoshifumi.hosoya.wj@renesas.com>
+From: Kouei Abe <kouei.abe.cp@renesas.com>
 
-Enabling the performance monitor unit on r8a7795.
+This enables SATA device in r8a7795-salvator-x.dts.
 
-Signed-off-by: Masaru Nagai <masaru.nagai.vx@renesas.com>
-Signed-off-by: Yoshifumi Hosoya <yoshifumi.hosoya.wj@renesas.com>
-Signed-off-by: Dirk Behme <dirk.behme@gmail.com>
+Signed-off-by: Kouei Abe <kouei.abe.cp@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index 4d43cf31418f..b9229a49dabc 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -230,6 +230,18 @@
- 			power-domains = <&cpg>;
- 		};
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+index 75af5ec5a4d4..265d12ff6022 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+@@ -212,6 +212,10 @@
+ 	};
+ };
  
-+		pmu {
-+			compatible = "arm,armv8-pmuv3";
-+			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-affinity = <&a57_0>,
-+					     <&a57_1>,
-+					     <&a57_2>,
-+					     <&a57_3>;
-+		};
++&sata {
++	status = "okay";
++};
 +
- 		timer {
- 			compatible = "arm,armv8-timer";
- 			interrupts = <GIC_PPI 13
+ &ssi1 {
+ 	shared-pin;
+ };
 -- 
 2.1.4
