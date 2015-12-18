@@ -1,43 +1,143 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 17 Dec 2015 16:41:29 -0800
-Subject: [PATCH linux-next 0/5] mtd: spi-nor: add driver for Atmel QSPI
- controller
-In-Reply-To: <20151218002901.GE10460@google.com>
-References: <cover.1449494420.git.cyrille.pitchen@atmel.com>
- <20151207193441.GO120110@google.com>
- <A765B125120D1346A63912DDE6D8B6310BF53437@NTXXIAMBX02.xacn.micron.com>
- <20151218002901.GE10460@google.com>
-Message-ID: <20151218004129.GF10460@google.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Fri, 18 Dec 2015 09:29:58 +0800
+Subject: [PATCH v1 1/6] ARM: dts: fix the correct pinctrl control for
+ rk3036
+In-Reply-To: <1838222.r8GKl7OzB9@diego>
+References: <1450362112-8075-1-git-send-email-wxt@rock-chips.com>
+ <1450362112-8075-2-git-send-email-wxt@rock-chips.com>
+ <1838222.r8GKl7OzB9@diego>
+Message-ID: <56736196.8050007@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 17, 2015 at 04:29:01PM -0800, Brian Norris wrote:
-> On Tue, Dec 08, 2015 at 06:21:00AM +0000, Bean Huo ??? wrote:
+Heiko,
 
-> OK, so I think your patch is broken:
-> 
-> > >     commit 548cd3ab54da ("mtd: spi-nor: Add quad I/O support for Micron
-> > >     SPI NOR")
-> 
-> How did you test this? Specifically, this can't possibly have worked
-> with a regular drivers/spi/ controllers, since:
-> 
->  (a) you're enabling 4/4/4 (i.e., "Quad mode") on the flash but
->  (b) m25p80_read() only sets .rx_bits for the data; i.e., it's using
->  1/1/4 (i.e., "Extended mode")
-> 
-> I'm tempted to essentially revert that, as it looks essentially
-> untested. It would be nice to have a cleaner baseline before trying to
-> extend it with Cyrille's work.
-> 
-> Cyrille, what do you think? Is my analysis at all correct here? (Sorry
-> if this is addressed elsewhere; there's a lot of text in this
-> conversation, but I'm getting hung up very early.) And if so, does it
-> hurt to just drop Micron "Quad mode" (4/4/4)?
+? 2015?12?18? 07:28, Heiko St?bner ??:
+> Am Donnerstag, 17. Dezember 2015, 22:21:47 schrieb Caesar Wang:
+>> The pinctrl gpio pull up/down is incorrect since the rk3036 SoCs
+>> can't set the status in the internal.
+>>
+>> We should keep the default status for enable the gpio status,
+>> In fact, the pull_none is the disable the gpio pull up/down.
+>>
+>> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+>  From the signed-off-by's I guess this change was created by Xing (author),
+> right?
 
-It looks like you address some of this in patch 2, where you (as I do)
-claim that Micron support is broken. It seems to me that it could be
-better to kill it than to try to fix it. But maybe that's just the
-frustrated maintainer in me speaking.
+The original patch:
 
-Brian
+-		pcfg_pull_up: pcfg-pull-up {
+-			bias-pull-up;
+-		};
+-
+-		pcfg_pull_down: pcfg-pull-down {
+-			bias-pull-down;
++		pcfg_pull_default: pcfg_pull_default {
++			bias-pull-pin-default;
+
+I'm re-writing the patch to fit the others.
+
+Yep, the seem should change commit author as the
+
+Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+
+
+
+>
+> Heiko
+>
+>> ---
+>>
+>>   arch/arm/boot/dts/rk3036.dtsi | 34 +++++++++++++++-------------------
+>>   1 file changed, 15 insertions(+), 19 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
+>> index f8758bf..620e6e0 100644
+>> --- a/arch/arm/boot/dts/rk3036.dtsi
+>> +++ b/arch/arm/boot/dts/rk3036.dtsi
+>> @@ -427,12 +427,8 @@
+>>   			#interrupt-cells = <2>;
+>>   		};
+>>
+>> -		pcfg_pull_up: pcfg-pull-up {
+>> -			bias-pull-up;
+>> -		};
+>> -
+>> -		pcfg_pull_down: pcfg-pull-down {
+>> -			bias-pull-down;
+>> +		pcfg_pull_default: pcfg_pull_default {
+>> +			bias-pull-pin-default;
+>>   		};
+>>
+>>   		pcfg_pull_none: pcfg-pull-none {
+>> @@ -473,18 +469,18 @@
+>>   			};
+>>
+>>   			emmc_cmd: emmc-cmd {
+>> -				rockchip,pins = <2 1 RK_FUNC_2 &pcfg_pull_none>;
+>> +				rockchip,pins = <2 1 RK_FUNC_2 &pcfg_pull_default>;
+>>   			};
+>>
+>>   			emmc_bus8: emmc-bus8 {
+>> -				rockchip,pins = <1 24 RK_FUNC_2 &pcfg_pull_none>,
+>> -						<1 25 RK_FUNC_2 &pcfg_pull_none>,
+>> -						<1 26 RK_FUNC_2 &pcfg_pull_none>,
+>> -						<1 27 RK_FUNC_2 &pcfg_pull_none>,
+>> -						<1 28 RK_FUNC_2 &pcfg_pull_none>,
+>> -						<1 29 RK_FUNC_2 &pcfg_pull_none>,
+>> -						<1 30 RK_FUNC_2 &pcfg_pull_none>,
+>> -						<1 31 RK_FUNC_2 &pcfg_pull_none>;
+>> +				rockchip,pins = <1 24 RK_FUNC_2 &pcfg_pull_default>,
+>> +						<1 25 RK_FUNC_2 &pcfg_pull_default>,
+>> +						<1 26 RK_FUNC_2 &pcfg_pull_default>,
+>> +						<1 27 RK_FUNC_2 &pcfg_pull_default>,
+>> +						<1 28 RK_FUNC_2 &pcfg_pull_default>,
+>> +						<1 29 RK_FUNC_2 &pcfg_pull_default>,
+>> +						<1 30 RK_FUNC_2 &pcfg_pull_default>,
+>> +						<1 31 RK_FUNC_2 &pcfg_pull_default>;
+>>   			};
+>>   		};
+>>
+>> @@ -522,12 +518,12 @@
+>>
+>>   		uart0 {
+>>   			uart0_xfer: uart0-xfer {
+>> -				rockchip,pins = <0 16 RK_FUNC_1 &pcfg_pull_up>,
+>> +				rockchip,pins = <0 16 RK_FUNC_1 &pcfg_pull_default>,
+>>   						<0 17 RK_FUNC_1 &pcfg_pull_none>;
+>>   			};
+>>
+>>   			uart0_cts: uart0-cts {
+>> -				rockchip,pins = <0 18 RK_FUNC_1 &pcfg_pull_up>;
+>> +				rockchip,pins = <0 18 RK_FUNC_1 &pcfg_pull_default>;
+>>   			};
+>>
+>>   			uart0_rts: uart0-rts {
+>> @@ -537,7 +533,7 @@
+>>
+>>   		uart1 {
+>>   			uart1_xfer: uart1-xfer {
+>> -				rockchip,pins = <2 22 RK_FUNC_1 &pcfg_pull_none>,
+>> +				rockchip,pins = <2 22 RK_FUNC_1 &pcfg_pull_default>,
+>>   						<2 23 RK_FUNC_1 &pcfg_pull_none>;
+>>   			};
+>>   			/* no rts / cts for uart1 */
+>> @@ -545,7 +541,7 @@
+>>
+>>   		uart2 {
+>>   			uart2_xfer: uart2-xfer {
+>> -				rockchip,pins = <1 18 RK_FUNC_2 &pcfg_pull_none>,
+>> +				rockchip,pins = <1 18 RK_FUNC_2 &pcfg_pull_default>,
+>>   						<1 19 RK_FUNC_2 &pcfg_pull_none>;
+>>   			};
+>>   			/* no rts / cts for uart2 */
+>
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+
+
+-- 
+caesar wang | software engineer | wxt at rock-chip.com
