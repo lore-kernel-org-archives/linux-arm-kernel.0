@@ -1,48 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Dec 2015 15:23:40 +0100
-Subject: [PATCH] kernel/stop_machine: remove HOTPLUG_CPU dependency
-Message-ID: <3973773.5dBOxplscZ@wuerfel>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 18 Dec 2015 15:17:40 +0100
+Subject: [PATCH 27/69] clocksource/drivers/cadence_ttc: Add the COMPILE_TEST
+ option
+In-Reply-To: <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
+References: <5672CB9E.7090707@linaro.org>
+ <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1450448302-27429-27-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A number of things rely on stop_machine, not just HOTPLUG_CPU,
-as got apparent, when we stopped building the functions for all
-SMP configurations:
+Increase the compilation test coverage by adding the COMPILE_TEST option.
 
-arch/arm/kernel/built-in.o: In function `patch_text':
-arch/arm/kernel/patch.c:127: undefined reference to `stop_machine'
-arch/arm/probes/built-in.o: In function `kprobes_remove_breakpoint':
-arch/arm/probes/kprobes/core.c:184: undefined reference to `stop_machine'
-arch/arm/probes/kprobes/core.c:184: undefined reference to `stop_machine'
-kernel/built-in.o: In function `timekeeping_notify':
-kernel/time/timekeeping.c:1096: undefined reference to `stop_machine'
-mm/built-in.o: In function `build_all_zonelists':
+The driver depends on the common clock framework, thus the dependency added
+on COMMON_CLK.
 
-This restores the original behavior by always compiling the stop_machine
-function.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 64dab25b058c ("kernel/stop_machine.c: remove CONFIG_SMP dependencies")
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
-Found on ARM randconfig builds with today's linux-next, please apply
-or fold into the original patch.
+ drivers/clocksource/Kconfig | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/kernel/stop_machine.c b/kernel/stop_machine.c
-index b07adef99a82..a467e6c28a3b 100644
---- a/kernel/stop_machine.c
-+++ b/kernel/stop_machine.c
-@@ -529,8 +529,6 @@ static int __init cpu_stop_init(void)
- }
- early_initcall(cpu_stop_init);
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index c2b87b4..badef72 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -95,7 +95,10 @@ config VT8500_TIMER
+ 	  Enables support for the VT8500 driver.
  
--#ifdef CONFIG_HOTPLUG_CPU
--
- static int __stop_machine(cpu_stop_fn_t fn, void *data, const struct cpumask *cpus)
- {
- 	struct multi_stop_data msdata = {
-@@ -628,5 +626,3 @@ int stop_machine_from_inactive_cpu(cpu_stop_fn_t fn, void *data,
- 	mutex_unlock(&stop_cpus_mutex);
- 	return ret ?: done.ret;
- }
--
--#endif	/* CONFIG_HOTPLUG_CPU */
+ config CADENCE_TTC_TIMER
+-	bool
++	bool "Cadence TTC timer driver" if COMPILE_TEST
++	depends on COMMON_CLK
++	help
++	  Enables support for the cadence ttc driver.
+ 
+ config ASM9260_TIMER
+ 	bool
+-- 
+1.9.1
