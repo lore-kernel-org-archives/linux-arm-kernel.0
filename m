@@ -1,82 +1,119 @@
 From: pankaj.dubey@samsung.com (pankaj.dubey)
-Date: Fri, 18 Dec 2015 09:09:35 +0530
-Subject: [RESEND PATCH v5 0/8] Add support for Exynos SROM Controller
- driver
-In-Reply-To: <567244C4.8080708@samsung.com>
-References: <1449906242-20843-1-git-send-email-pankaj.dubey@samsung.com>
- <567244C4.8080708@samsung.com>
-Message-ID: <56737FF7.6060907@samsung.com>
+Date: Fri, 18 Dec 2015 09:14:29 +0530
+Subject: [PATCH v6 0/9] samsung: pmu: split up SoC specific PMU data
+In-Reply-To: <56724896.1080009@samsung.com>
+References: <1447740351-14246-1-git-send-email-pankaj.dubey@samsung.com>
+ <56724896.1080009@samsung.com>
+Message-ID: <5673811D.7040808@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Krzysztof,
 
-On Thursday 17 December 2015 10:44 AM, Krzysztof Kozlowski wrote:
-> On 12.12.2015 16:43, Pankaj Dubey wrote:
->> THIS IS A RESEND OF ONCE MERGED INTO kgene/for-next AND LOST PATCHES
+On Thursday 17 December 2015 11:01 AM, Krzysztof Kozlowski wrote:
+> On 17.11.2015 15:05, Pankaj Dubey wrote:
+>> In this series I am splitting up SoC specific PMU configuration data into
+>> mach-exynos folder itself, before moving all of them under
+>> drivers/soc/samsung/. Also instead of making all changes in single patch it
+>> has been broken into SoC specific patches to avoid large size of patch.
+>> With this approach there will not be unwanted big churns just after
+>> adding exynos-pmu under drivers/soc/samsung.
 >>
->> Series v5 got merged in kgene/for-next but due to last moment change before pull
->> these patches were not accepted during 4.3 merge window.After that kgene/for-next
->> got rebased over 4.4-rc1 these patches got dropped into another branch and till
->> date not included to for-next.
+>> All these patches are just refactoring to keep minimal changes while moving
+>> exynos-pmu driver under drivers/soc/samsung/. Support for exynos7 PMU can
+>> be added on top of it, in such a manner that for ARM64 build, ARM related
+>> SoC's PMU will not get compiled and thus unnecessary increasing kernel image size.
 >>
->> Since then due to minor change in "drivers/soc/", patches are not getting applied
->> cleanly so rebasing on current for-next and resending all these with fix in memory
->> mapping included.
+>> These patches have been prepared on top of Kukjin Kim's for-next merged with
+>> driver-samsung and on top of
+>> cherry-picked change from [1].
 >>
+>> 1: ARM: EXYNOS: Constify local exynos_pmu_data structure
+>>    https://lkml.org/lkml/2015/10/28/917
 >>
->> This patch set adds support for Exynos SROM controller DT based driver.
->> Currently SROM register sets are used only during S2R, so driver
->> basically added for taking care of S2R. It will help us in removing
->> static mapping from exynos.c and other extra code handline during S2R.
->>
->> This patch set also updated exynos4 and exynos5 dtsi files for with device
->> node for srom, and added binding documentation for the same.
->>
->> First two patches are some minor cleanup in mach-exynos.
->>
->> Patchset v1 was posted here[1]
->> [1]: https://lkml.org/lkml/2015/4/29/98
->> Patchset v2 was posted here[2]
->> [2]: https://lkml.org/lkml/2015/8/24/125
->> Patchset v3 was posted here[3]
->> [3]: https://lkml.org/lkml/2015/10/13/392
->> Patchset v3 was posted here[4]
->> [4]: https://lkml.org/lkml/2015/10/19/278
->>
->> This patchset, I have tested on Peach-Pi (Exynos5880) based chromebook for boot
+>> For testing entire patchset on Peach-Pi (Exynos5880) based chromebook for boot
 >> and S2R functionality.
+>>
+>> Tested-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>>
+>> For testing entire patchset on on Trats2 (Exynos4412, S2R, reboot, poweroff)
+>> and Odroid XU3 (Exynos5422, reboot, poweroff).
+>>
+>> Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>
+>> Changes since v5:
+>>  - Removed extra blank line from patch 5/9 and 6/9.
+>>  - Modified soc/samsung/Kconfig for config EXNOS_PMU. Added depends on ARM.
+>>
+>> Changes since v4:
+>>  - In v3 I missed to give -M flag to detect rename, which made patches hard
+>>    to review, so resubmitting patches with rename detector flag.
+>>  - Addressed review comments from Krzysztof.
+>>
+>> Changes since v3:
+>>  - Keeping intact copyright dates in existing header files.
+>>  - Addressed review comments from Krzysztof for v3.
+>>  - Removing static inline function from exynos-pmu.h and
+>>    keeping them in PMU driver.
+>>  - Added new patch (2/9) for fixing potential null pointer reference in
+>>    exynos_sys_powerdown_conf.
+>>  - Added new patch (8/9) for rearranging static and non-static function for
+>>    better readability.
+>>
+>> Changes since v2:
+>>  - Removed Amit's Samsung id as it's no more valid.
+>>  - Rebased on latest kgene tree.
+>>  - Removed redundant code from regs-pmu.h
+>>
+>> Pankaj Dubey (9):
+>>   ARM: EXYNOS: removing redundant code from regs-pmu.h
+>>   ARM: EXYNOS: Fix potential NULL pointer access in
+>>     exynos_sys_powerdown_conf
+>>   ARM: EXYNOS: Move pmu specific headers under "linux/soc/samsung"
+>>   ARM: EXYNOS: split up exynos3250 SoC specific PMU data
+>>   ARM: EXYNOS: split up exynos4 SoC specific PMU data
+>>   ARM: EXYNOS: split up exynos5250 SoC specific PMU data
+>>   ARM: EXYNOS: split up exynos5420 SoC specific PMU data
+>>   ARM: EXYNOS: rearrange static and non-static functions of PMU driver
+>>   drivers: soc: Add support for Exynos PMU driver
+>>
 > 
-> Let me share the plan/status:
-
-Thanks for sharing status on this.
-
-> 1. Currently Kukjin Kim is on out of office (he told me he will be back
-> on Christmas).
-> 2. I asked arm-soc people to pull my requests.
-> 
-> 3. I applied this patchset to my branch:
+> I tried to apply this to my branch:
 > next/stuff-late-not-split-per-branch
 > https://git.kernel.org/cgit/linux/kernel/git/krzk/linux.git/log/?h=next/stuff-late-not-split-per-branch
 > 
-> 4. This branch is not pushed to linux-next. I will sort it out if my
-> previous pull requests get in. I will be out of office for Christmas so
-> depending on the timing of arm-soc/Christmas/Kukjin this may or may not
-> go into v4.5 (yay...).
+> Unfortunately it fails on:
+> error: patch failed: arch/arm/mach-exynos/pmu.c:17
+> error: arch/arm/mach-exynos/pmu.c: patch does not apply
+> Patch failed at 0001 ARM: EXYNOS: Move pmu specific headers under
+> "linux/soc/samsung"
+> 
+> because of syscon-reboot handlers (Alim's work).
+> 
+> I think I have all the dependencies already in my
+> "next/stuff-late-not-split-per-branch".
+> If you want to proceed now, can you rebase on top of it? Otherwise we
+> could wait and rebase later (after v4.5-rc1).
+> 
 > 
 
-I am fine in either way. But prefer if it goes in v4.5, just to save
-time in rebasing.
+Thanks for looking into this.
 
-> 5. If it does not get into v4.5, I will rebase it and proceed further
-> for v4.6.
+I have just posted v7 of this series after rebasing on
+"next/stuff-late-not-split-per-branch". Please have a look and if all
+OK, include v7 in your branch, and lets try to get this in for v4.5. For
+some reason if does not go, I am OK to wait for next cycle.
+
+
+Thanks,
+Pankaj Dubey
+
+> P.S. Please note that "next/stuff-late-not-split-per-branch" is not
+> included in linux-next because I am not sure if I will be able to push
+> it out soon.
 > 
-> If you have any questions, please let me know.
 > 
 > Best regards,
 > Krzysztof
 > 
 > 
-
-Thanks,
-Pankaj Dubey
