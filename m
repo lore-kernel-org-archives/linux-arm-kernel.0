@@ -1,28 +1,43 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 18 Dec 2015 08:14:06 -0800
-Subject: [PATCH] mmc: pwrseq_simple: Fix regression with optional GPIOs
-In-Reply-To: <CAPDyKFpxiOJJdh-nLXjxv3DYJnW3RAf_9aqMfds46=-oqPd5ng@mail.gmail.com>
-References: <1449528845-25189-1-git-send-email-tony@atomide.com>
- <CAPDyKFpxiOJJdh-nLXjxv3DYJnW3RAf_9aqMfds46=-oqPd5ng@mail.gmail.com>
-Message-ID: <20151218161406.GL23396@atomide.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 18 Dec 2015 18:14:19 +0200
+Subject: OMAP display kconfig options changing
+In-Reply-To: <20151218160514.GK23396@atomide.com>
+References: <5673CA0D.4000706@ti.com> <20151218135342.GF23396@atomide.com>
+ <56741FA9.3080607@ti.com> <20151218160514.GK23396@atomide.com>
+Message-ID: <567430DB.4000507@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ulf Hansson <ulf.hansson@linaro.org> [151207 16:20]:
-> +Linus
+On 18/12/15 18:05, Tony Lindgren wrote:
+
+>> Are you referring to Kconfig options? Or userspace?
 > 
-> On 7 December 2015 at 23:54, Tony Lindgren <tony@atomide.com> wrote:
-> > Commit ce037275861e ("mmc: pwrseq_simple: use GPIO descriptors array API")
-> > changed the handling MMC power sequence so GPIOs no longer are optional.
-> >
-> > This broke SDIO WLAN at least for omap5 that can't yet use the reset GPIOs
-> > with pwrseq_simple as a wait is needed after enabling the SDIO device.
+> Well sounds like both need updating :)
+
+Depends... For simple fb apps, omapdrm works fine, and X with the
+standard fbdev driver should work with omapdrm too.
+
+But if the userspace is using any omapfb specific apps, then yes, update
+is necessary.
+
+>> But no, I don't have links to either.
 > 
-> Can you elaborate on this. Did it break omap5 or not? :-)
+> So change the Kconfig options and then deal with the flood
+> of angry emails? :) I think we need instructions..
 
-Ulf, is this patch queued for v4.4 as a regression fix? I don't see it
-in Linux next or mainline trees?
+Ok. I think it's then best that I just update the defconfig to enable
+omapfb as modules, as it is currently.
 
-Regards,
+We can look again at changing the default to omapdrm after we've tested
+it on OMAP2 too, and we have a better idea what the user needs to take
+care of.
 
-Tony
+ Tomi
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151218/1ca25916/attachment-0001.sig>
