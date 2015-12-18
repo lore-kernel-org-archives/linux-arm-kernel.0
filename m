@@ -1,119 +1,146 @@
-From: pankaj.dubey@samsung.com (pankaj.dubey)
-Date: Fri, 18 Dec 2015 09:14:29 +0530
-Subject: [PATCH v6 0/9] samsung: pmu: split up SoC specific PMU data
-In-Reply-To: <56724896.1080009@samsung.com>
-References: <1447740351-14246-1-git-send-email-pankaj.dubey@samsung.com>
- <56724896.1080009@samsung.com>
-Message-ID: <5673811D.7040808@samsung.com>
+From: ysato@users.sourceforge.jp (Yoshinori Sato)
+Date: Fri, 18 Dec 2015 13:18:36 +0900
+Subject: -next regression: "driver cohandle -EPROBE_DEFER from
+ bus_type.match()"
+In-Reply-To: <20151217184641.GI8644@n2100.arm.linux.org.uk>
+References: <CAPcyv4hOJuT=i2A_0vDQHsL7MXNgVN_p17q3UW6EcTkxsCMmeg@mail.gmail.com>
+ <20151217184641.GI8644@n2100.arm.linux.org.uk>
+Message-ID: <87r3ikjso3.wl-ysato@users.sourceforge.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+On Fri, 18 Dec 2015 03:46:41 +0900,
+Russell King - ARM Linux wrote:
+> 
+> On Thu, Dec 17, 2015 at 07:51:14AM -0800, Dan Williams wrote:
+> > The commit below causes the libnvdimm sub-system to stop loading.
+> > This is due to the fact that nvdimm_bus_match() returns the result of
+> > test_bit() which may be negative.  If there are any other bus match
+> > functions using test_bit they may be similarly impacted.
+> > 
+> > Can we queue a fixup like the following to libnvdimm, and maybe
+> > others, ahead of this driver core change?
+> 
+> This is rather annoying.  Have we uncovered a latent bug in other
+> architectures?  Well, looking through the test_bit() implementations,
+> it looks like it.
+> 
+> I'll drop the patch set for the time being, we can't go around breaking
+> stuff like this.  However, I think the test_bit() result should be
+> regularised across different architectures - it _looks_ to me like most
+> implementations return 0/1 values, but there may be some that don't
+> (maybe the assembly versions?)
+> 
+> Here's the list I've pulled out so far from the "easy" cases, which all
+> look like they're returning 0/1 values.
+> 
+> asm-generic: 0/1
+> 
+> /**
+>  * test_bit - Determine whether a bit is set
+>  * @nr: bit number to test
+>  * @addr: Address to start counting from
+>  */
+> static inline int test_bit(int nr, const volatile unsigned long *addr)
+> {
+>         return 1UL & (addr[BIT_WORD(nr)] >> (nr & (BITS_PER_LONG-1)));
+> }
+> 
+> alpha: 0/1
+> 
+> static inline int
+> test_bit(int nr, const volatile void * addr)
+> {
+>         return (1UL & (((const int *) addr)[nr >> 5] >> (nr & 31))) != 0UL;
+> }
+> 
+> arm: 0/1
+> 
+> test_bit(unsigned int nr, const volatile unsigned long *addr)
+> {
+>         unsigned long mask;
+> 
+>         addr += nr >> 5;
+> 
+>         mask = 1UL << (nr & 0x1f);
+> 
+>         return ((mask & *addr) != 0);
+> }
+> 
+> blackfin: 0/1
+> 
+> static inline int test_bit(int nr, const volatile unsigned long *addr)
+> {
+>         volatile const unsigned long *a = addr + (nr >> 5);
+>         return __raw_bit_test_asm(a, nr & 0x1f) != 0;
+> }
+> 
+> frv: 0/1
+> 
+> static inline int
+> __constant_test_bit(unsigned long nr, const volatile void *addr)
+> {
+>         return ((1UL << (nr & 31)) & (((const volatile unsigned int *) addr)[nr >> 5])) != 0;
+> }
+> (and similar for __test_bit)
+> 
+> h8300 uses assembly... no idea
+0/1
+I think same return of other architecture.
 
-On Thursday 17 December 2015 11:01 AM, Krzysztof Kozlowski wrote:
-> On 17.11.2015 15:05, Pankaj Dubey wrote:
->> In this series I am splitting up SoC specific PMU configuration data into
->> mach-exynos folder itself, before moving all of them under
->> drivers/soc/samsung/. Also instead of making all changes in single patch it
->> has been broken into SoC specific patches to avoid large size of patch.
->> With this approach there will not be unwanted big churns just after
->> adding exynos-pmu under drivers/soc/samsung.
->>
->> All these patches are just refactoring to keep minimal changes while moving
->> exynos-pmu driver under drivers/soc/samsung/. Support for exynos7 PMU can
->> be added on top of it, in such a manner that for ARM64 build, ARM related
->> SoC's PMU will not get compiled and thus unnecessary increasing kernel image size.
->>
->> These patches have been prepared on top of Kukjin Kim's for-next merged with
->> driver-samsung and on top of
->> cherry-picked change from [1].
->>
->> 1: ARM: EXYNOS: Constify local exynos_pmu_data structure
->>    https://lkml.org/lkml/2015/10/28/917
->>
->> For testing entire patchset on Peach-Pi (Exynos5880) based chromebook for boot
->> and S2R functionality.
->>
->> Tested-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->>
->> For testing entire patchset on on Trats2 (Exynos4412, S2R, reboot, poweroff)
->> and Odroid XU3 (Exynos5422, reboot, poweroff).
->>
->> Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>
->> Changes since v5:
->>  - Removed extra blank line from patch 5/9 and 6/9.
->>  - Modified soc/samsung/Kconfig for config EXNOS_PMU. Added depends on ARM.
->>
->> Changes since v4:
->>  - In v3 I missed to give -M flag to detect rename, which made patches hard
->>    to review, so resubmitting patches with rename detector flag.
->>  - Addressed review comments from Krzysztof.
->>
->> Changes since v3:
->>  - Keeping intact copyright dates in existing header files.
->>  - Addressed review comments from Krzysztof for v3.
->>  - Removing static inline function from exynos-pmu.h and
->>    keeping them in PMU driver.
->>  - Added new patch (2/9) for fixing potential null pointer reference in
->>    exynos_sys_powerdown_conf.
->>  - Added new patch (8/9) for rearranging static and non-static function for
->>    better readability.
->>
->> Changes since v2:
->>  - Removed Amit's Samsung id as it's no more valid.
->>  - Rebased on latest kgene tree.
->>  - Removed redundant code from regs-pmu.h
->>
->> Pankaj Dubey (9):
->>   ARM: EXYNOS: removing redundant code from regs-pmu.h
->>   ARM: EXYNOS: Fix potential NULL pointer access in
->>     exynos_sys_powerdown_conf
->>   ARM: EXYNOS: Move pmu specific headers under "linux/soc/samsung"
->>   ARM: EXYNOS: split up exynos3250 SoC specific PMU data
->>   ARM: EXYNOS: split up exynos4 SoC specific PMU data
->>   ARM: EXYNOS: split up exynos5250 SoC specific PMU data
->>   ARM: EXYNOS: split up exynos5420 SoC specific PMU data
->>   ARM: EXYNOS: rearrange static and non-static functions of PMU driver
->>   drivers: soc: Add support for Exynos PMU driver
->>
+> hexagon uses assembly as well... no idea
 > 
-> I tried to apply this to my branch:
-> next/stuff-late-not-split-per-branch
-> https://git.kernel.org/cgit/linux/kernel/git/krzk/linux.git/log/?h=next/stuff-late-not-split-per-branch
+> ia64: 0/1
 > 
-> Unfortunately it fails on:
-> error: patch failed: arch/arm/mach-exynos/pmu.c:17
-> error: arch/arm/mach-exynos/pmu.c: patch does not apply
-> Patch failed at 0001 ARM: EXYNOS: Move pmu specific headers under
-> "linux/soc/samsung"
+> static __inline__ int
+> test_bit (int nr, const volatile void *addr)
+> {
+>         return 1 & (((const volatile __u32 *) addr)[nr >> 5] >> (nr & 31));
+> }
 > 
-> because of syscon-reboot handlers (Alim's work).
+> m68k: 0/1
 > 
-> I think I have all the dependencies already in my
-> "next/stuff-late-not-split-per-branch".
-> If you want to proceed now, can you rebase on top of it? Otherwise we
-> could wait and rebase later (after v4.5-rc1).
+> static inline int test_bit(int nr, const unsigned long *vaddr)
+> {
+>         return (vaddr[nr >> 5] & (1UL << (nr & 31))) != 0;
+> }
 > 
+> mn10300: 0/1
 > 
+> static inline int test_bit(unsigned long nr, const volatile void *addr)
+> {
+>         return 1UL & (((const volatile unsigned int *) addr)[nr >> 5] >> (nr & 31));
+> }
+> 
+> s390: 0/1
+> 
+> static inline int test_bit(unsigned long nr, const volatile unsigned long *ptr)
+> {
+>         const volatile unsigned char *addr;
+> 
+>         addr = ((const volatile unsigned char *)ptr);
+>         addr += (nr ^ (BITS_PER_LONG - 8)) >> 3;
+>         return (*addr >> (nr & 7)) & 1;
+> }
+> 
+> x86: 0/1 for constant, ? for variable
+> 
+> static __always_inline int constant_test_bit(long nr, const volatile unsigned long *addr)
+> {
+>         return ((1UL << (nr & (BITS_PER_LONG-1))) &
+>                 (addr[nr >> _BITOPS_LONG_SHIFT])) != 0;
+> }
+> (presumably variable_test_bit is the same, but I don't know)
+> 
+> -- 
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
 
-Thanks for looking into this.
-
-I have just posted v7 of this series after rebasing on
-"next/stuff-late-not-split-per-branch". Please have a look and if all
-OK, include v7 in your branch, and lets try to get this in for v4.5. For
-some reason if does not go, I am OK to wait for next cycle.
-
-
-Thanks,
-Pankaj Dubey
-
-> P.S. Please note that "next/stuff-late-not-split-per-branch" is not
-> included in linux-next because I am not sure if I will be able to push
-> it out soon.
-> 
-> 
-> Best regards,
-> Krzysztof
-> 
-> 
+-- 
+Yoshinori Sato
+<ysato@users.sourceforge.jp>
