@@ -1,54 +1,41 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 18 Dec 2015 11:32:15 +0100
-Subject: I2C eeprom compatibles? (was Re: [PATCH/RFC 03/19] ARM:
- shmobile: gose: add i2c2 bus to device tree)
-In-Reply-To: <1839177.77Qt0RnI3v@wuerfel>
-References: <1449802376-11301-1-git-send-email-horms+renesas@verge.net.au>
- <20151218030239.GB10973@verge.net.au>
- <20151218073531.GA1517@katana> <1839177.77Qt0RnI3v@wuerfel>
-Message-ID: <20151218103214.GA1532@katana>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 18 Dec 2015 11:35:03 +0100
+Subject: [RFC PATCH v3 5/5] PCI: ACPI: Add a generic ACPI based host
+ controller
+In-Reply-To: <1450269755-21420-6-git-send-email-jchandra@broadcom.com>
+References: <1450269755-21420-1-git-send-email-jchandra@broadcom.com>
+ <1450269755-21420-6-git-send-email-jchandra@broadcom.com>
+Message-ID: <2016693.gtbtd8TMEz@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 10:06:48AM +0100, Arnd Bergmann wrote:
-> On Friday 18 December 2015 08:35:32 Wolfram Sang wrote:
-> > > 
-> > > It seems to me that we have some consensus around:
-> > > 
-> > >       compatible = "renesas,r1ex24002", "24c02";
-> > 
-> > Thinking again, "generic,24c02" or "generic-24c02" could also be an
-> > option.
-> > 
-> > > Should this be added to Documentation/devicetree/bindings/eeprom/eeprom.txt ?
-> > > Or documented elsewhere?
-> > 
-> > Probably we need a DT maintainers advice here? I don't mind vendor
-> > specific compatibles being documented, but I'm reluctant to add all
-> > these compatibles for the myriads of I2C eeproms to the at24 driver. 99%
-> > are covered by the generic case.
-> > 
-> > Adding DT to CC.
+On Wednesday 16 December 2015 18:12:35 Jayachandran C wrote:
+> Add a simple ACPI based PCI host controller. This is done by
+> providing a simple implementation for pci_acpi_scan_root().
 > 
-> I'd rather use some vendor string in addition to 24c02. Isn't this originally
-> an Atmel part? In that case, using "atmel,24c02" as the most generic string
-> would be appropriate,
+> The pci_mmcfg_list handling is done by the ACPI code, we
+> keep a reference to the pci_mmcfg_region which is already
+> mapped.
+> 
+> This is enabled only for ARM64 now.
+> 
+> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+> ---
+>  drivers/pci/host/Kconfig         |   7 ++
+>  drivers/pci/host/Makefile        |   1 +
+>  drivers/pci/host/pci-host-acpi.c | 193 +++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 201 insertions(+)
+>  create mode 100644 drivers/pci/host/pci-host-acpi.c
 
-Yeah, the at24 driver is named after Atmel chips AFAIR. Having "atmel,*"
-as the generic fallback sounds like a good solution to me, too.
+(just noticed this got stuck in my outbox, sending it late)
 
-> and IIRC the i2c framework will just match that with
-> the "24c02" entry in the i2c_device_id list.
+I think this would be better put into drivers/acpi/pci_root.c, it directly
+interacts with the code that is already there, and it's by no means
+a standalone driver.
 
-True, although this behaviour is often complained about. There have been
-attempts to make i2c/spi behave like the rest of the DT world and to
-deprecate the current way. It didn't happen because of lots gory details,
-however :/
+Also, there is no need for a Kconfig symbol that way.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151218/8e665e4f/attachment.sig>
+You can put it into #if !(defined(CONFIG_X86) || defined(CONFIG_IA64))
+if the code cannot be shared with the other architectures at the moment.
+
+	Arnd
