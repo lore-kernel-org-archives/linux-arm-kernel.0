@@ -1,38 +1,93 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Fri, 18 Dec 2015 16:57:32 +0000
-Subject: [PATCH v2] serial: 8250: of: Fix the driver and actually compile
- the 8250_of
-In-Reply-To: <3295738.CvTDrXdGbt@wuerfel>
-References: <1450443649-31654-1-git-send-email-peter.ujfalusi@ti.com>
- <3295738.CvTDrXdGbt@wuerfel>
-Message-ID: <56743AFC.7000402@nvidia.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Fri, 18 Dec 2015 17:00:16 +0000
+Subject: [PATCH v3 4/4] printk/nmi: Increase the size of NMI buffer and
+ make it configurable
+In-Reply-To: <20151218145207.GK3729@pathway.suse.cz>
+References: <1449667265-17525-1-git-send-email-pmladek@suse.com>
+ <1449667265-17525-5-git-send-email-pmladek@suse.com>
+ <CAMuHMdXVgr58YjoePGrRbMyMncQ27f85prL7G5SpeHeNxoYrXQ@mail.gmail.com>
+ <20151211124159.GB3729@pathway.suse.cz>
+ <20151211145725.b0e81bb4bb18fcd72ef5f557@linux-foundation.org>
+ <20151211232113.GZ8644@n2100.arm.linux.org.uk>
+ <alpine.LNX.2.00.1512120024370.9922@cbobk.fhfr.pm>
+ <5673DD60.7080302@linaro.org> <20151218145207.GK3729@pathway.suse.cz>
+Message-ID: <56743BA0.1030409@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 18/12/15 13:16, Arnd Bergmann wrote:
-> On Friday 18 December 2015 15:00:49 Peter Ujfalusi wrote:
->> The 8250_of never compiled since in the Kconfig we have SERIAL_OF_PLATFORM
->> but in the makefile we expect to have SERIAL_8250_OF...
+On 18/12/15 14:52, Petr Mladek wrote:
+> On Fri 2015-12-18 10:18:08, Daniel Thompson wrote:
+>> On 11/12/15 23:26, Jiri Kosina wrote:
+>>> On Fri, 11 Dec 2015, Russell King - ARM Linux wrote:
+>>>
+>>>> I'm personally happy with the existing code, and I've been wondering why
+>>>> there's this effort to apply further cleanups - to me, the changelogs
+>>>> don't seem to make that much sense, unless we want to start using
+>>>> printk() extensively in NMI functions - using the generic nmi backtrace
+>>>> code surely gets us something that works across all architectures...
+>>>
+>>> It is already being used extensively, and not only for all-CPU backtraces.
+>>> For starters, please consider
+>>>
+>>> - WARN_ON(in_nmi())
+>>> - BUG_ON(in_nmi())
 >>
->> When the 8250_of.c is actually compiled we will have two errors:
->> missing linux/nwpserial.h and 8250/8250.h.
->> Fix those as well at the same time when enable the compilation of the
->> driver.
+>> Sorry to join in so late but...
 >>
->> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
->> Fixes: afd7f88f1577 ("serial: 8250: move of_serial code to 8250 directory")
->> CC: Arnd Bergmann <arnd@arndb.de>
+>> Today we risk deadlock when we try to issue these diagnostic errors
+>> directly from NMI context.
 >>
-> 
-> Thanks for fixing this, and sorry for the mess.
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>> After this change we will still risk deadlock, because that's what
+>> the diagnostic code is trying to tell us, *and* we delay actually
+>> reporting the error until, and only if, the NMI handler completes.
+>
+> I think that NMI messages about a possible deadlock are the ones
+> from
+>
+>      kernel/locking/rtmutex.c
+>      kernel/irq_work.c
+>      include/linux/hardirq.h
+>
+> You are right that if the deadlock happens, this patch set lowers the
+> chance to see the message.
+>
+> On the other hand, all the other printk's in NMI seems to be non-fatal
+> warnings. In this case, this patch set increases the chance to see
+> them.
 
-Thanks, this fixes booting tegra 32-bit devices on -next.
+Maybe for a WARN_ON() the trade off is worth it but I don't think a 
+BUG_ON() trace would ever make it out.
 
-Acked-by: Jon Hunter <jonathanh@nvidia.com>
-Tested-by: Jon Hunter <jonathanh@nvidia.com>
 
-Cheers
-Jon
+> A compromise might be to explicitly call printk_nmi_flush() in the few
+> fatal cases. Alternatively we could force the messages on the
+> early_console when available.
+>
+>
+>>> - anything being printed out from MCE handlers
+>>
+>> The MCE handlers should only call printk() when they decide to panic
+>> and *after* busting the spinlocks. At this point deferring printk()
+>> until it is safe is not very helpful.
+>>
+>> When we bust the spinlocks we should probably restore the normal
+>> printk() function to give best chance of the failure messages making
+>> it out.
+>
+> The problem is that we do not know what locks need to be busted. There
+> are too many consoles and too many locks involved. Also busting locks
+> open another can of worms.
+
+Yes, I agree that busting the spinlocks doesn't avoid all risk of deadlock.
+
+Probably I've been placing too much weight on the importance of getting 
+messages out when dying. You're right that surviving far enough through 
+a panic to trigger kdump or reset is equally (or more) important in many 
+scenarios than getting a failure message out.
+
+However on a system with nothing but "while(1) {}" hooked up to panic() 
+then its worth risking a lock up. In this case restoring normal printk() 
+behavior and dumping the NMI buffers would be worthwhile.
+
+
+Daniel.
