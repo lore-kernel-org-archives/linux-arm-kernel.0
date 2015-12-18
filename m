@@ -1,54 +1,101 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Fri, 18 Dec 2015 17:03:11 +0000
-Subject: [PATCH v4] arm64: run-time detection for aarch32 support
-In-Reply-To: <1450454429-22976-1-git-send-email-ynorov@caviumnetworks.com>
-References: <1450454429-22976-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <56743C4F.7060201@arm.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Fri, 18 Dec 2015 09:06:29 -0800
+Subject: [PATCH 0/3] Batched user access support
+In-Reply-To: <20151218094452.GA32455@gmail.com>
+References: <alpine.LFD.2.20.1512171016510.27310@i7>
+ <20151218094452.GA32455@gmail.com>
+Message-ID: <CA+55aFx=KibdQAc6_UQkBNbCaYzJPu7VL-gRX7cVin8JmnW6EA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/12/15 16:00, Yury Norov wrote:
-> Kernel option COMPAT defines the ability of executing aarch32 binaries.
-> Some platforms does not support aarch32 mode, and so cannot execute that
-> binaries. But we cannot just disable COMPAT for them because the same
-> kernel binary may be used by multiple platforms.
-
-
-> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> index 8f271b8..781a2f7 100644
-> --- a/arch/arm64/include/asm/cpufeature.h
-> +++ b/arch/arm64/include/asm/cpufeature.h
-> @@ -184,6 +184,13 @@ static inline bool system_supports_mixed_endian_el0(void)
->   	return id_aa64mmfr0_mixed_endian_el0(read_system_reg(SYS_ID_AA64MMFR0_EL1));
->   }
+On Fri, Dec 18, 2015 at 1:44 AM, Ingo Molnar <mingo@kernel.org> wrote:
 >
-> +static inline bool system_supports_aarch32_el0(void)
-> +{
-> +	u64 pfr0 = read_system_reg(SYS_ID_AA64PFR0_EL1);
-> +	return ((pfr0 >> ID_AA64PFR0_EL0_SHIFT) & ID_AA64PFR0_ELx_MASK)
-> +						!= ID_AA64PFR0_EL0_64BIT_ONLY;
+> * Linus Torvalds <torvalds@linux-foundation.org> wrote:
+>>
+>> On the 'make -j' test on a fully built kernel, strncpy_from_user() was
+>> about 1.5% of all CPU time. And almost two thirds of that was just the
+>> SMAP overhead.
+>
+> Just curious: by how much did the overhead shift after your patches?
 
-Could you please use
+So just in case you want to reproduce this, here's what I do:
 
-cpuid_feature_extract_field(pfr0, ID_AA64PFR0_EL0_SHIFT) != ID_AA64PFR0_EL0_64BIT_ONLY
+ (a) configure a maximal kernel build:
 
-instead and
+      make allmodconfig
 
-> --- a/arch/arm64/include/asm/sysreg.h
-> +++ b/arch/arm64/include/asm/sysreg.h
-> @@ -102,6 +102,7 @@
->   #define ID_AA64PFR0_EL2_SHIFT		8
->   #define ID_AA64PFR0_EL1_SHIFT		4
->   #define ID_AA64PFR0_EL0_SHIFT		0
-> +#define ID_AA64PFR0_ELx_MASK		0xf
+ (b) build the kernel fully (not timing this part):
 
-get rid of ^ ?
+      make -j16
 
-As per ARM ARM, AArch32 only ID register values are unknown if AArch32 is
-not implemented. So I think we need to skip accessing the AArch32 ID registers
-everywhere (feature tracking), if the CPU doesn't supports it, to avoid
-unnecessary SANITY failures and TAINTing the kernel.
+ (c) profile the now empty kernel re-build:
 
+      perf record -e cycles:pp make -j
 
-Cheers
-Suzuki
+ (d) look at just the kernel part of the profile, by zooming into the
+kernel DSO when doing
+
+      perf report --sort=symbol
+
+That empty kernel rebuild is one of my ways to check for somewhat real
+VFS path-lookup performance. It's a real load, and fairly relevant:
+most of my kernel builds are reasonably empty (ie when I pull from
+people, I always rebuild, but if it's a small pull, it's not
+necessarily rebuilding very much).
+
+Anyway, on that profile, what you *should* normally see is that the
+path walking is the hottest part by far, because most of the costs
+there is "make" doing a lot of "stat()" calls to get the timestamps of
+all the source and object files. It has a long tail - "make" does
+other things too, but the top kernel entry should basically be
+"__d_lookup_rcu()", with "link_path_walk()" and
+"selinux_inode_permission()" being up there too.
+
+Those are basically the three hottest path lookup functions (and yes,
+it's sad how high selinux_inode_permission() is, but it's largely
+because it's the first place where we start touching the actual inode
+data, so you an see in the instruction profiles how much of it are
+those first accesses).
+
+With SMAP and the stac/clac on every access, in my profiles I see
+strncpy_from_user() being neck-and-neck with link_path_walk() and
+selinux_inode_permission(). And it definitely shouldn't be there.
+Don't get me wrong: it's a function that I expect to see in the
+profiles - copying the pathname from user space really is a noticeable
+part of pathname lookup - but it shouldn't be in the top three.
+
+So for me, without that patch-series, "strncpu_from_user()" was the
+third-hottest function (ok, looked at my numbers again, and it wasn't
+1.5%, it was 1.2% of all time).
+
+And looking at the instruction profile, the overhead of _just_ the
+stac/clac instructions (using "cycles:pp" in the profile) was 60% of
+that 1.2%.
+
+Put another way: just those two instructions used to be 0.7% of the
+whole CPU cost of that empty "make -j".
+
+Now, as I'm sure you have seen many many times, instruction-level
+profiling isn't "real performance". It shifts around, and with
+out-of-order CPU's, even with the nice precise PEBS profiling, the
+fact that 0.7% of all time is *accounted* to the instructions doesn't
+mean that you really spend that much on it. But it's still a pretty
+big sign.
+
+Anyway, *with* the patches, strncpu_from_user() falls from third place
+and 1.2% of the cost down to ninth place, and 0.52% of the total cost.
+And the stac/clac instructions go from 60% of the cost to 33%. So
+overall, those two stac/clac instructions went from 0.7% of the whole
+build cost down to 0.17%.
+
+So the whole strncpy_from_user() function sped up by between a factor
+of two and three, and that's because the cost of just the stac/clac
+was cut by almost a factor of five.
+
+And all the numbers fluctuate, so take all of the above with a pinch
+of salt. But they are repeatable enough for me to be a reasonable
+ballpark, even if they do fluctuate a bit.
+
+I think you have a Skylake machine too, so you can redo the above.
+
+                           Linus
