@@ -1,56 +1,45 @@
-From: aford173@gmail.com (Adam Ford)
-Date: Fri, 18 Dec 2015 08:03:35 -0600
-Subject: OMAP display kconfig options changing
-In-Reply-To: <20151218135342.GF23396@atomide.com>
-References: <5673CA0D.4000706@ti.com>
-	<20151218135342.GF23396@atomide.com>
-Message-ID: <CAHCN7xJnHac+50TFSZ-+4Hqq9Of1HA6fTtnPxKUMCq_j5_UqgQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 18 Dec 2015 14:05:52 +0000
+Subject: [PATCH] KVM: arm/arm64: vgic: Fix kvm_vgic_map_is_active's dist check
+In-Reply-To: <1450447552-3161-1-git-send-email-marc.zyngier@arm.com>
+References: <1450447552-3161-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1450447552-3161-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomi,
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
-I'd like to also test the LogicPD Torpedo which has been using the FB
-drivers until this point. I just pushed some LCD info for inclusion in
-4.5, but if I need to make changes, I'd like to do that sooner than
-later.  Any insturctions would be helpful.  Will this impact people
-who use the SGX drivers?
+External inputs to the vgic from time to time need to poke into the
+state of a virtual interrupt, the prime example is the architected timer
+code.
 
+Since the IRQ's active state can be represented in two places; the LR or
+the distributor, we first loop over the LRs but if not active in the LRs
+we just return if *any* IRQ is active on the VCPU in question.
 
-Thanks
+This is of course bogus, as we should check if the specific IRQ in
+quesiton is active on the distributor instead.
 
-adam
+Reported-by: Eric Auger <eric.auger@linaro.org>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ virt/kvm/arm/vgic.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-On Fri, Dec 18, 2015 at 7:53 AM, Tony Lindgren <tony@atomide.com> wrote:
-> Hi,
->
-> * Tomi Valkeinen <tomi.valkeinen@ti.com> [151218 00:55]:
->> Hi Tony,
->>
->> I've just pushed a patch series to fbdev for-next branch which makes the
->> OMAP DRM and FB drivers independent of each other. This requires
->> changing the related Kconfig options.
->
-> OK
->
->> What should I do with omap2plus_defconfig?
->>
->> At the moment omap2plus_defconfig enables the omapfb driver and panels
->> as modules. Should I change it to do the same with the new code? Or
->> should I change it to use omapdrm, which is the better maintained and
->> developed driver (although no one has probably tried omapdrm on omap2)?
->
-> I'm all for changing omap2plus_defconfnig to use omapdrm.
->
-> Do you have a link to a page we can point people to for instructions
-> for what needs to be changed to get things working with omapdrm?
->
-> For omap2, I can try to peek into my rack for n800.
->
-> Regards,
->
-> Tony
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 65461f8..7a2f449 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1114,7 +1114,7 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, struct irq_phys_map *map)
+ 			return true;
+ 	}
+ 
+-	return dist_active_irq(vcpu);
++	return vgic_irq_is_active(vcpu, map->virt_irq);
+ }
+ 
+ /*
+-- 
+2.1.4
