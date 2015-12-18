@@ -1,33 +1,25 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 Dec 2015 11:30:44 +0900
-Subject: [PATCH 6/6] staging: board: armadillo800eva: Use "arm,pl390"
-In-Reply-To: <cover.1450401902.git.horms+renesas@verge.net.au>
-References: <cover.1450401902.git.horms+renesas@verge.net.au>
-Message-ID: <1474136ce6a457a10a797b3de04adbb035e90901.1450401902.git.horms+renesas@verge.net.au>
+Date: Fri, 18 Dec 2015 11:36:01 +0900
+Subject: [PATCH 0/2] ARM: shmobile: r8a779x: use fallback pcie compatibility
+ string
+Message-ID: <1450406163-23795-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi,
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- drivers/staging/board/armadillo800eva.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+this short series makes use of the recently added fallback pcie
+compatibility string in the r8a779[01] device trees.
 
-diff --git a/drivers/staging/board/armadillo800eva.c b/drivers/staging/board/armadillo800eva.c
-index 9c41652ee908..912c96b0536d 100644
---- a/drivers/staging/board/armadillo800eva.c
-+++ b/drivers/staging/board/armadillo800eva.c
-@@ -97,7 +97,7 @@ static const struct board_staging_dev armadillo800eva_devices[] __initconst = {
- 
- static void __init armadillo800eva_init(void)
- {
--	board_staging_gic_setup_xlate("arm,cortex-a9-gic", 32);
-+	board_staging_gic_setup_xlate("arm,pl390", 32);
- 	board_staging_register_devices(armadillo800eva_devices,
- 				       ARRAY_SIZE(armadillo800eva_devices));
- }
+Based on renesas-devel-20151218-v4.4-rc5.
+
+Simon Horman (2):
+  ARM: shmobile: r8a7790: use fallback pcie compatibility string
+  ARM: shmobile: r8a7791: use fallback pcie compatibility string
+
+ arch/arm/boot/dts/r8a7790.dtsi | 2 +-
+ arch/arm/boot/dts/r8a7791.dtsi | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
 -- 
 2.1.4
