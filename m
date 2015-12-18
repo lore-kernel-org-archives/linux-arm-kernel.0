@@ -1,43 +1,19 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Fri, 18 Dec 2015 15:03:20 -0800
-Subject: [PATCH v3 4/4] printk/nmi: Increase the size of NMI buffer and
- make it configurable
-In-Reply-To: <20151218121141.GR6373@twins.programming.kicks-ass.net>
-References: <1449667265-17525-1-git-send-email-pmladek@suse.com>
- <1449667265-17525-5-git-send-email-pmladek@suse.com>
- <CAMuHMdXVgr58YjoePGrRbMyMncQ27f85prL7G5SpeHeNxoYrXQ@mail.gmail.com>
- <20151211124159.GB3729@pathway.suse.cz>
- <20151211145725.b0e81bb4bb18fcd72ef5f557@linux-foundation.org>
- <20151211232113.GZ8644@n2100.arm.linux.org.uk>
- <alpine.LNX.2.00.1512120024370.9922@cbobk.fhfr.pm>
- <5673DD60.7080302@linaro.org>
- <20151218112902.GO6344@twins.programming.kicks-ass.net>
- <20151218121141.GR6373@twins.programming.kicks-ass.net>
-Message-ID: <20151218150320.5d377789ee6253379b82412d@linux-foundation.org>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Fri, 18 Dec 2015 15:06:06 -0800
+Subject: [RESEND PATCH] mtd: mtk-nor: adjust sequence of trigger function
+ and assignment function
+In-Reply-To: <1450407760-30030-1-git-send-email-bayi.cheng@mediatek.com>
+References: <1450407760-30030-1-git-send-email-bayi.cheng@mediatek.com>
+Message-ID: <20151218230606.GV10460@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 18 Dec 2015 13:11:41 +0100 Peter Zijlstra <peterz@infradead.org> wrote:
-
-> On Fri, Dec 18, 2015 at 12:29:02PM +0100, Peter Zijlstra wrote:
-> > On Fri, Dec 18, 2015 at 10:18:08AM +0000, Daniel Thompson wrote:
-> > > I'm not entirely sure that this is an improvement.
-> > 
-> > What I do these days is delete everything in vprintk_emit() and simply
-> > call early_printk().
+On Fri, Dec 18, 2015 at 11:02:40AM +0800, Bayi Cheng wrote:
+> Move write data register before excute command to avoid
+> missing first byte write to nor flash
 > 
-> On that, whoever made the device model use vprintk_emit() broke the
-> debugger (KGDB/KDB) printk intercept, and the whole vprintk_func
-> redirection scheme.
+> Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
+> ---
+> the previous patch didn't drop the Change-Id
 
-crap, we have a whole set of interfaces which are broken this way. 
-printk_emit(), vprintk(), vprintk_emit().
-
-
-commit 7ff9554bb578ba02166071d2d487b7fc7d860d62
-Author:     Kay Sievers <kay@vrfy.org>
-AuthorDate: Thu May 3 02:29:13 2012 +0200
-Commit:     Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-CommitDate: Mon May 7 16:53:02 2012 -0700
-
-    printk: convert byte-buffer to variable-length record buffer
+Applied to l2-mtd.git
