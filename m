@@ -1,50 +1,36 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 18 Dec 2015 15:18:01 +0100
-Subject: [PATCH 48/69] clocksource/drivers/h8300_timer16: Remove pointless
- headers
+Date: Fri, 18 Dec 2015 15:17:42 +0100
+Subject: [PATCH 29/69] clocksource/drivers/lpc32xx: Add the COMPILE_TEST option
 In-Reply-To: <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
 References: <5672CB9E.7090707@linaro.org>
  <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1450448302-27429-48-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1450448302-27429-29-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The headers are not needed, remove them.
+Increase the compilation test coverage by adding the COMPILE_TEST option.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/h8300_timer16.c | 10 ----------
- 1 file changed, 10 deletions(-)
+ drivers/clocksource/Kconfig | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clocksource/h8300_timer16.c b/drivers/clocksource/h8300_timer16.c
-index cdf0d83..1c9dd02 100644
---- a/drivers/clocksource/h8300_timer16.c
-+++ b/drivers/clocksource/h8300_timer16.c
-@@ -4,25 +4,15 @@
-  *  Copyright 2015 Yoshinori Sato <ysato@users.sourcefoge.jp>
-  */
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index a658190..ed7a824 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -146,9 +146,11 @@ config CLKSRC_EFM32
+ 	  event device.
  
--#include <linux/errno.h>
--#include <linux/kernel.h>
--#include <linux/param.h>
--#include <linux/string.h>
--#include <linux/slab.h>
- #include <linux/interrupt.h>
- #include <linux/init.h>
--#include <linux/platform_device.h>
- #include <linux/clocksource.h>
--#include <linux/module.h>
- #include <linux/clk.h>
- #include <linux/io.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
+ config CLKSRC_LPC32XX
+-	bool
++	bool "Clocksource for LPC32XX" if COMPILE_TEST
+ 	select CLKSRC_MMIO
+ 	select CLKSRC_OF
++	help
++	  Support for the LPC32XX clocksource.
  
--#include <asm/segment.h>
--#include <asm/irq.h>
--
- #define TSTR	0
- #define TSNC	1
- #define TMDR	2
+ config CLKSRC_PISTACHIO
+ 	bool "Clocksource for Pistachio SoC" if COMPILE_TEST
 -- 
 1.9.1
