@@ -1,33 +1,28 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 18 Dec 2015 08:42:00 -0800
-Subject: [PATCH v5 4/5] ARM: dts: DRA7: add entry for qspi mmap region
-In-Reply-To: <56739EB4.6040804@ti.com>
-References: <1449807000-6457-1-git-send-email-vigneshr@ti.com>
- <1449807000-6457-5-git-send-email-vigneshr@ti.com>
- <20151211150935.GA15654@rob-hp-laptop>
- <20151217184557.GC23396@atomide.com> <56739EB4.6040804@ti.com>
-Message-ID: <20151218164200.GM23396@atomide.com>
+From: hannes@cmpxchg.org (Johannes Weiner)
+Date: Fri, 18 Dec 2015 11:42:09 -0500
+Subject: [PATCH] memcg: fix SLOB build regression
+In-Reply-To: <13705081.IYJlPWfILN@wuerfel>
+References: <13705081.IYJlPWfILN@wuerfel>
+Message-ID: <20151218164209.GD4201@cmpxchg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Vignesh R <vigneshr@ti.com> [151217 21:51]:
+On Fri, Dec 18, 2015 at 03:35:06PM +0100, Arnd Bergmann wrote:
+> A recent cleanup broke the build when CONFIG_SLOB is used:
 > 
+> mm/memcontrol.c: In function 'memcg_update_kmem_limit':
+> mm/memcontrol.c:2974:9: error: implicit declaration of function 'memcg_online_kmem' [-Werror=implicit-function-declaration]
+> mm/memcontrol.c: In function 'mem_cgroup_css_alloc':
+> mm/memcontrol.c:4229:10: error: too many arguments to function 'memcg_propagate_kmem'
+> mm/memcontrol.c:2949:12: note: declared here
 > 
-> On 12/18/2015 12:15 AM, Tony Lindgren wrote:
-> > * Rob Herring <robh@kernel.org> [151211 07:10]:
-> >> On Fri, Dec 11, 2015 at 09:39:59AM +0530, Vignesh R wrote:
-> >>> Add qspi memory mapped region entries for DRA7xx based SoCs. Also,
-> >>> update the binding documents for the controller to document this change.
-> >>>
-> >>> Signed-off-by: Vignesh R <vigneshr@ti.com>
-> >>
-> >> Acked-by: Rob Herring <robh@kernel.org>
-> > 
-> > Vignes, are patches 4 and 5 safe to apply separately already or
-> > do things break if we do that?
+> This fixes the memcg_propagate_kmem prototype to match the normal
+> implementation and adds the respective memcg_online_kmem helper
+> function that was needed.
 > 
-> Yes, 4 and 5 can be applied separately w/o driver changes.
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: a5ed904c5039 ("mm: memcontrol: clean up alloc, online, offline, free functions")
 
-OK picking 4 and 5 into omap-for-v4.5/dt thanks.
+I am slob.
 
-Tony
+Acked-by: Johannes Weiner <hannes@cmpxchg.org>
