@@ -1,39 +1,53 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 18 Dec 2015 11:42:34 +0100
-Subject: [PATCH v4 05/12] arm-cci: PMU: Add support for transactions
-In-Reply-To: <5673DFC7.6060406@arm.com>
-References: <1450374559-23315-1-git-send-email-suzuki.poulose@arm.com>
- <1450374559-23315-6-git-send-email-suzuki.poulose@arm.com>
- <20151217184255.GI6344@twins.programming.kicks-ass.net>
- <5673DFC7.6060406@arm.com>
-Message-ID: <20151218104234.GN6344@twins.programming.kicks-ass.net>
+From: dirk.behme@gmail.com (Dirk Behme)
+Date: Fri, 18 Dec 2015 11:44:44 +0100
+Subject: [PATCH 05/10] arm64: dts: r8a7795: Add pmu device nodes
+In-Reply-To: <5673DCF7.1050008@arm.com>
+References: <cover.1450401186.git.horms+renesas@verge.net.au>
+ <a6b6b478459be0c5614626ba6ac95df05a7fc5e9.1450401186.git.horms+renesas@verge.net.au>
+ <5673DCF7.1050008@arm.com>
+Message-ID: <5673E39C.6050206@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 10:28:23AM +0000, Suzuki K. Poulose wrote:
-> On 17/12/15 18:42, Peter Zijlstra wrote:
+On 18.12.2015 11:16, Sudeep Holla wrote:
+>
+>
+> On 18/12/15 02:29, Simon Horman wrote:
+>> From: Yoshifumi Hosoya <yoshifumi.hosoya.wj@renesas.com>
+>>
+>> Enabling the performance monitor unit on r8a7795.
+>>
+>> Signed-off-by: Masaru Nagai <masaru.nagai.vx@renesas.com>
+>> Signed-off-by: Yoshifumi Hosoya <yoshifumi.hosoya.wj@renesas.com>
+>> Signed-off-by: Dirk Behme <dirk.behme@gmail.com>
+>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>> ---
+>>   arch/arm64/boot/dts/renesas/r8a7795.dtsi | 12 ++++++++++++
+>>   1 file changed, 12 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+>> b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+>> index 4d43cf31418f..b9229a49dabc 100644
+>> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+>> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+>> @@ -230,6 +230,18 @@
+>>               power-domains = <&cpg>;
+>>           };
+>>
+>> +        pmu {
+>> +            compatible = "arm,armv8-pmuv3";
+>
+> Please use arm,cortex-a57-pmu to be more specific. IIRC I mentioned this
+> for some shmobile platform recently.
 
-> >The above doesn't look like it has a failure case, in which case you can
-> >achieve the same simpler, using pmu::pmu_{dis,en}able().
-> >
-> 
-> I thought about that, but was not sure if pmu->stop() is guaranteed to be
-> called on all the events scheduled on the PMU when we pmu::pmu_disable().
-> Is it ?
 
-Not by core code, but you get to implement your pmu::pmu_disable() call,
-and if that's what you need, you can make it do that.
+Yes. But as this patch has been applied already to some branches, I 
+incorporated your a57-pmu hint with an additional update patch:
 
-Examples:
+http://marc.info/?l=linux-sh&m=145011467914857
 
-On some x86 hardware we indeed have to poke at each counter control
-register and clear the ENable bit, which is the same what
-pmu::stop(.flags=0) would do.
+Feel free to squash if still possible.
 
-But other x86 hardware has a global disable switch, which is much
-cheaper than poking at the individual counter control registers one by
-one. In this case we only update the counter control register if it
-needs updates (typically in the pmu_enable path).
+Best regards
 
-Yet other x86 hardware can auto disable this global state on interrupt,
-which saves us yet another machine register poke.
+Dirk
