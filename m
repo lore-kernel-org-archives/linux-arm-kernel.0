@@ -1,34 +1,56 @@
 From: mamlinav@gmail.com (Aleksei Mamlin)
-Date: Fri, 18 Dec 2015 11:49:51 +0300
-Subject: [PATCH 0/4] ARM: dts: sun7i: Devicetree improvements for the Wexler
- TAB7200
-Message-ID: <1450428591-5597-1-git-send-email-mamlinav@gmail.com>
+Date: Fri, 18 Dec 2015 11:51:50 +0300
+Subject: [PATCH 1/4] ARM: dts: sun7i: Enable touchscreen on Wexler TAB7200
+ tablet
+In-Reply-To: <1450428591-5597-1-git-send-email-mamlinav@gmail.com>
+References: <1450428591-5597-1-git-send-email-mamlinav@gmail.com>
+Message-ID: <1450428710-5653-1-git-send-email-mamlinav@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
-This is a batch of patches with devicetree improvements for Wexler TAB7200 tablet.
+Add a node for the Goodix GT911 touchscreen found on the Wexler TAB7200 tablet
 
-The first one add Goodix GT911 touchscreen node to dts.
-The second add PWM node, which need for LCD backlight.
-The third add LCD backlight support via PWM.
-The last add PA gpio pin for controlling external amplifiers.
+Signed-off-by: Aleksei Mamlin <mamlinav@gmail.com>
+---
+ arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-The touchscreen patch depends on "Goodix touchscreen enhancements" [1]
-and "Input: goodix - add axis swapping and axis inversion support" [2]
-patchsets. Both merged into Dmitry Torokhov's input tree (goodix branch)
-
-[1] https://lkml.org/lkml/2015/11/19/241
-[2] https://lkml.org/lkml/2015/11/21/44
-
-Aleksei Mamlin (4):
-  ARM: dts: sun7i: Enable touchscreen on Wexler TAB7200 tablet
-  ARM: dts: sun7i: Enable PWM controller on Wexler TAB7200 tablet
-  ARM: dts: sun7i: Add backlight node to Wexler TAB7200 tablet
-  ARM: dts: sun7i: Add PA gpio pin to Wexler TAB7200 tablet
-
- arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts | 53 ++++++++++++++++++++++++++
- 1 file changed, 53 insertions(+)
-
+diff --git a/arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts b/arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts
+index 239b5d2..ec3b837 100644
+--- a/arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts
++++ b/arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts
+@@ -102,6 +102,18 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c2_pins_a>;
+ 	status = "okay";
++
++	gt911: touchscreen at 5d {
++		compatible = "goodix,gt911";
++		reg = <0x5d>;
++		interrupt-parent = <&pio>;
++		interrupts = <7 21 IRQ_TYPE_EDGE_FALLING>; /* EINT21 (PH21) */
++		pinctrl-names = "default";
++		pinctrl-0 = <&ts_reset_pin>;
++		irq-gpios = <&pio 7 21 GPIO_ACTIVE_HIGH>; /* INT (PH21) */
++		reset-gpios = <&pio 1 13 GPIO_ACTIVE_HIGH>; /* RST (PB13) */
++		touchscreen-swapped-x-y;
++	};
+ };
+ 
+ &lradc {
+@@ -146,6 +158,13 @@
+ };
+ 
+ &pio {
++	ts_reset_pin: ts_reset_pin at 0 {
++		allwinner,pins = "PB13";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
+ 	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
+ 		allwinner,pins = "PH4";
+ 		allwinner,function = "gpio_in";
 -- 
 2.4.10
