@@ -1,25 +1,37 @@
 From: davem@davemloft.net (David Miller)
-Date: Fri, 18 Dec 2015 14:19:48 -0500 (EST)
-Subject: [PATCH] ila: add NETFILTER dependency
-In-Reply-To: <2011239.T7zzuZGeyk@wuerfel>
-References: <2011239.T7zzuZGeyk@wuerfel>
-Message-ID: <20151218.141948.2267406136595226362.davem@davemloft.net>
+Date: Fri, 18 Dec 2015 14:46:36 -0500 (EST)
+Subject: [PATCH v2 0/3] drivers: net: cpsw: Fix bugs in fixed-link PHY
+ DT parsing
+In-Reply-To: <cover.1450309613.git.drivshin@allworx.com>
+References: <20151209223115.6c5a400f.drivshin.allworx@gmail.com>
+ <1741588.Ve76Z1ZI87@localhost>
+ <cover.1450309613.git.drivshin@allworx.com>
+Message-ID: <20151218.144636.771957142710802303.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Fri, 18 Dec 2015 15:37:37 +0100
+From: "David Rivshin (Allworx)" <drivshin.allworx@gmail.com>
+Date: Wed, 16 Dec 2015 23:02:08 -0500
 
-> The recently added generic ILA translation facility fails to
-> build when CONFIG_NETFILTER is disabled:
+> Commit 1f71e8c96fc654724723ce987e0a8b2aeb81746d ("drivers: net: cpsw:
+> Add support for fixed-link PHY") added initial fixed-link PHY support
+> for CPSW, but missed a few considerations.
 > 
-> net/ipv6/ila/ila_xlat.c:229:20: warning: 'struct nf_hook_state' declared inside parameter list
-> net/ipv6/ila/ila_xlat.c:235:27: error: array type has incomplete element type 'struct nf_hook_ops'
->  static struct nf_hook_ops ila_nf_hook_ops[] __read_mostly = {
+> This series is based on the tip of the net tree. The first two patches
+> fix user-visible errors in different hardware configurations. The third
+> patch is for an internal reference counting issue. They are logically
+> independent changes, but in the same function, so must be applied in
+> order to apply cleanly.
 > 
-> This adds an explicit Kconfig dependency to avoid that case.
+> The first patch was originally submitted by Pascal Speck on December 4,
+> but was not picked up by patchwork. I suspect that is because the patch
+> was mangled by the mailer. I fixed the mangling and am including it in
+> this series, as I believe it is the correct change.
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 7f00feaf1076 ("ila: Add generic ILA translation facility")
+> I have tested on the following hardware configurations:
+>  - (EVMSK) dual emac with two real MDIO-connected phys using RGMII-TXID
+>  - single emac with fixed-link using RGMII
+> Testing of other CPSW emac configurations that folks may have would
+> be appreciated.
 
-Applied, thanks.
+Series applied, thanks David.
