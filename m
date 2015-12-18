@@ -1,31 +1,25 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 18 Dec 2015 11:52:24 +0000
-Subject: arm64/efi handling of persistent memory
-In-Reply-To: <20151218110651.GL25034@bivouac.eciton.net>
-References: <94D0CD8314A33A4D9D801C0FE68B40295BEBD864@G9W0745.americas.hpqcorp.net>
- <20151218110651.GL25034@bivouac.eciton.net>
-Message-ID: <20151218115224.GE29219@leverpostej>
+Date: Fri, 18 Dec 2015 11:54:44 +0000
+Subject: [PATCH v10 1/4] dt-binding:Documents of the mbigen bindings
+In-Reply-To: <5673EF88.80205@arm.com>
+References: <1450353397-47668-1-git-send-email-majun258@huawei.com>
+ <1450353397-47668-2-git-send-email-majun258@huawei.com>
+ <20151217135247.GD13389@leverpostej> <5673683C.2080304@huawei.com>
+ <20151218105837.GB29219@leverpostej> <5673EF88.80205@arm.com>
+Message-ID: <20151218115443.GF29219@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 11:06:51AM +0000, Leif Lindholm wrote:
-> On Fri, Dec 18, 2015 at 01:33:25AM +0000, Elliott, Robert (Persistent Memory) wrote:
-> > Similar to the questions about the arm64 efi boot stub
-> > handing persistent memory, some of the arm64 kernel code 
-> > looks fishy.
-
-[...]
-
-> > 2. is_reserve_region() treating EFI_PERSISTENT_MEMORY the same
-> > as EFI_CONVENTIONAL_MEMORY looks wrong.
+On Fri, Dec 18, 2015 at 11:35:36AM +0000, Marc Zyngier wrote:
+> On 18/12/15 10:58, Mark Rutland wrote:
+> > Marc, are you happy to fold in the s/num-msis/num-pins/ change?
 > 
-> Yeah... That one was introduced by
-> ad5fb870c486 ("e820, efi: add ACPI 6.0 persistent memory types")
-> without any ACKs from ARM people :/
+> FWIW, I'm also moving this to:
+> 
+> Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt
+> 
+> in order to match the new documentation conventions.
 
-Do we need to do anythign to avoid his kind of thing in future? e.g. a
-MAINTAINERS patch for the ARM EFI bits?
-
-Or do we just need to pay attention to linux-efi?
+Even better! My ack stil stands.
 
 Mark.
