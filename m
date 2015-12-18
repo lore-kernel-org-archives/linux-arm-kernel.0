@@ -1,178 +1,119 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Fri, 18 Dec 2015 14:03:40 -0800
-Subject: [PATCH v4 00/58] mtd: nand: refactor the NAND subsystem (part 1)
-In-Reply-To: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20151218220340.GP10460@google.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 18 Dec 2015 14:05:40 -0800
+Subject: [PATCH] ARM: dma-mapping: Just allocate one chunk at a time
+In-Reply-To: <56746AA8.6010202@arm.com>
+References: <1450384253-1067-1-git-send-email-dianders@chromium.org>
+ <CAD=FV=XP9zx2XEmo7vS0MdsROJ0JoRYFidnRaBLxR43GXnuqag@mail.gmail.com>
+ <5673FEF0.1080504@arm.com>
+ <CAD=FV=XxSBe8=OJHpMqk9mPUnhNZ5pF5otJWr-2RedEkuMp+Kw@mail.gmail.com>
+ <56746AA8.6010202@arm.com>
+Message-ID: <CAD=FV=XYym5B=G762e6NLdMKaqTNwObakNrVDPu3iJAdhy7frA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Thu, Dec 10, 2015 at 08:59:44AM +0100, Boris Brezillon wrote:
-> Hello,
-> 
-> This huge series aims at clarifying the relationship between the mtd and
-> nand_chip structures and hiding NAND framework internals to NAND
-> controller drivers.
-> 
-> The first part of the series (patch 1 to 4) is a set of fixes/simple
-> reworks easing the migration to mtd_to_nand().
-> 
-> The second part of the series embeds the mtd structure into the nand_chip
-> one so that NAND controller drivers don't have to bother allocating the
-> MTD device and linking it with the NAND chip.
-> 
-> The last part of the series hides accesses to the chip->priv field behind
-> two helper functions.
-> 
-> This allows removal of some of the boilerplate code done in all NAND
-> controller drivers, but most importantly, it unifies a bit the way NAND
-> chip structures are instantiated (even though we still have two different
-> kinds of drivers: those embedding the nand_chip struct into their private
-> nand chip representation, and those allocating two different structures
-> and linking them together with the chip->priv field).
-> 
-> As said in the title, this refactoring is only the first step. I plan to
-> rework the NAND controller / NAND chip separation for pretty much the same
-> reasons: clarifying the separation between the two concepts, and getting
-> rid of more boilerplate code in NAND controller drivers.
-> 
-> Stay tuned ;-).
-> 
-> Best Regards,
-> 
-> Boris
+On Fri, Dec 18, 2015 at 12:20 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> Hmm, I'm no mm expert, but from a look at the flags in gfp.h perhaps instead
+> of just __GFP_NORETRY we should go all the way to clearing __GFP_RECLAIM for
+> the opportunistic calls so they really fail fast?
 
-Thanks a lot for all the work here! Nice cleanups. I think I've pushed
-everything correctly to l2-mtd.git. Please verify that things look sane
-to you, if possible. There were a few v5's thrown in after the fact, as
-well as other cleanups that required apply-conflicts.
+Ah, interesting.
 
-I'll summarize below anything I remember that's changed since the cover
-letter, for posterity.
+Hrmm, I thought I mentioned somewhere that I'm testing on 3.14, but
+looking back it looks like I didn't.  :(  It is entirely possible that
+the memory management has improved in newer versions of Linux so that
+things aren't so bad even without my patch.  Since I'm doing a full
+system test it's pretty hard for me to bump up to a new version of
+Linux and test (it looks like the accelerated video hasn't landed
+there).
 
-> Changes since v3:
-> - fix some bugs introduced when migrating to nand_to_mtd()
-> - split the huge commit switching all drivers to nand_to_mtd() into several
->   commits (one per driver) to ease review and integration
-> - add a simple fixes/reworks at the beginning of the series (mainly to
->   ease migration to nand_to_mtd())
-> - drop already applied patches.
-> 
-> Changes since v2:
-> - fix some build warnings/erros
-> 
-> Changes since v1:
-> - dropped already applied patches
-> - fixed some typos
-> - manually fixed some modifications omitted by the coccinelle scripts
-> - manually reworked modifactions done by coccinelle scripts to improve
->   readability and fix coding style issues
-> 
-> *** BLURB HERE ***
+On 3.14 thre's no "__GFP_RECLAIM".
 
-Nice blurb :)
+Since many ARM users are running old versions of Linux and are
+interested in nice backportable patches, it probably makes sense to
+post up and use __GFP_NORETRY and someone in the future can try poking
+it to clearing __GFP_RECLAIM instead?
 
-> 
-> Boris Brezillon (58):
->   mtd: nand: denali: add missing nand_release() call in denali_remove()
 
-You sent v5 of this, and I added in the comment that was
-written/requested afterward. That caused some small conflicts later.
+>> 2. We still have the same problem that we're taking away all the
+>> contiguous memory that other users may want.  I've got a dwc2 USB
+>> controller in my system and it needs to allocate bounce buffers for
+>> its DMA.  While looking at cat videos on Facebook and running a
+>> program to simulate memory pressure (4 userspace programs each walking
+>> through 350 Megs of memory over and over) I start seeing lots of order
+>> 3 allocation failures in dwc2.  It's true that the USB/network stack
+>> is resilient against these allocation failures (other than spamming my
+>> log), but performance will decrease.  When I switch to WiFi I suddenly
+>> start seeing "mwifiex_sdio mmc2:0001:1: single skb allocated fail,
+>> drop pkt port=28 len=33024".  Again, it's robust, but you're affecting
+>> performance.
+>>
+>>
+>>
+>> I also tried using "4" instead of "MAX_ORDER" (as per Marek) so that
+>> we don't try for > 64K chunks.  This is might be a reasonable
+>> compromise.  My cat video test still reproduces "alloc 4194304 bytes:
+>> 674318751 ns", but maybe ~700 ms is an OK?  Of course, this still eats
+>> all the large chunks of memory that everyone else would like to have.
+>>
+>>
+>> Oh, or how about this: we start allocating of order 4.  Upon the first
+>> failure we jump to order 1.  AKA: if there's no memory pressure we're
+>> golden.  The moment we have the first bit of memory pressure we fold.
+>> That's basically just a slight optimization on Marek's suggestion.  I
+>> still see 450 ms for an allocation, but that's not too bad.  It can
+>> still take away large chunks from other users, but maybe that's OK?
+>
+>
+> That makes sense - there's really no benefit to be had from trying orders
+> which don't correspond to our relevant IOMMU page sizes - I'm not sure
+> off-hand how many contortions you'd have to go through to actually get at
+> those from here, although it might be another argument in favour of moving
+> the pgsize_bitmap into the iommu_domain as Will proposed some time ago. In
+> lieu of an actual lookup, my general inclination would be to go
+> 2MB->1MB->64K->4K to cover all the common page sizes, but Marek's probably
+> right that the larger two are less relevant in the context of mobile
+> graphics stuff, which lets face it is the prime concern for IOMMUs on 32-bit
+> ARM.
 
->   mtd: nand: fsmc: create and use mtd_to_fsmc()
->   mtd: nand: nuc900: create and use mtd_to_nuc900()
->   mtd: nand: omap2: create and use mtd_to_omap()
->   mtd: nand: ams-delta: use the mtd instance embedded in struct
->     nand_chip
->   mtd: nand: atmel: use the mtd instance embedded in struct nand_chip
->   mtd: nand: au1550nd: use the mtd instance embedded in struct nand_chip
->   mtd: nand: bcm47xx: use the mtd instance embedded in struct nand_chip
->   mtd: nand: bf5xx: use the mtd instance embedded in struct nand_chip
->   mtd: nand: brcm: use the mtd instance embedded in struct nand_chip
->   mtd: nand: cafe: use the mtd instance embedded in struct nand_chip
->   mtd: nand: cmx270: use the mtd instance embedded in struct nand_chip
+OK, adding 1MB in the mix isn't too hard and doesn't seem to affect
+performance too negatively compared to just trying 64K too.  2MB
+either.
 
-^^ I dropped one comment in this one
+Note that I re-tested trying 64K vs. just always allocation 1 page at
+a time.  In my usage model (Facebook cat videos under memory pressure)
+performance was visually better with page at a time.  That's because:
 
->   mtd: nand: cs553x: use the mtd instance embedded in struct nand_chip
->   mtd: nand: davinci: use the mtd instance embedded in struct nand_chip
->   mtd: nand: denali: use the mtd instance embedded in struct nand_chip
+1. I'm on a system that uses IOMMU for video decoding.  I don't think
+TLB optimization in this case is very critical since video decoding is
+a linear optimization.  Also these IOMMU mappings are allocated once
+per video, so every time I scroll down and a new video starts playing
+it allocates a new buffer.  The time it takes is critical.
 
-You sent v5, but there were still trivial conflicts.
+2. The page at a time definitely affects my other peripherals, so by
+eating up large pages I kill my network connectivity.  :(
 
->   mtd: nand: diskonchip: use the mtd instance embedded in struct
->     nand_chip
->   mtd: nand: docg4: use the mtd instance embedded in struct nand_chip
+It might make sense to choose peripheral by peripheral.
 
-I cleaned some things up after this one, causing more trivial conflicts
-later in the controller_data accessor patches.
 
->   mtd: nand: fsl_elbc: use the mtd instance embedded in struct nand_chip
->   mtd: nand: fsl_ifc: use the mtd instance embedded in struct nand_chip
->   mtd: nand: fsl_upm: use the mtd instance embedded in struct nand_chip
->   mtd: nand: fsmc: use the mtd instance embedded in struct nand_chip
->   mtd: nand: gpio: use the mtd instance embedded in struct nand_chip
->   mtd: nand: gpmi: use the mtd instance embedded in struct nand_chip
->   mtd: nand: hisi504: use the mtd instance embedded in struct nand_chip
->   mtd: nand: jz4740: use the mtd instance embedded in struct nand_chip
->   mtd: nand: lpc32xx: use the mtd instance embedded in struct nand_chip
->   mtd: nand: mpc5121: use the mtd instance embedded in struct nand_chip
->   mtd: nand: mxc: use the mtd instance embedded in struct nand_chip
->   mtd: nand: nandsim: use the mtd instance embedded in struct nand_chip
->   mtd: nand: ndfc: use the mtd instance embedded in struct nand_chip
->   mtd: nand: nuc900: use the mtd instance embedded in struct nand_chip
->   mtd: nand: omap2: use the mtd instance embedded in struct nand_chip
->   mtd: nand: orion: use the mtd instance embedded in struct nand_chip
->   mtd: nand: pasemi: use the mtd instance embedded in struct nand_chip
->   mtd: nand: plat: use the mtd instance embedded in struct nand_chip
->   mtd: nand: pxa3xx: use the mtd instance embedded in struct nand_chip
->   mtd: nand: r852: use the mtd instance embedded in struct nand_chip
->   mtd: nand: s3c2410: use the mtd instance embedded in struct nand_chip
->   mtd: nand: sh_flctl: use the mtd instance embedded in struct nand_chip
->   mtd: nand: sharpsl: use the mtd instance embedded in struct nand_chip
->   mtd: nand: socrates: use the mtd instance embedded in struct nand_chip
->   mtd: nand: sunxi: use the mtd instance embedded in struct nand_chip
->   mtd: nand: tmio: use the mtd instance embedded in struct nand_chip
->   mtd: nand: txx9ndfmc: use the mtd instance embedded in struct
->     nand_chip
->   mtd: nand: vf610: use the mtd instance embedded in struct nand_chip
->   mtd: nand: update the documentation to reflect framework changes
->   staging: mt29f_spinand: use the mtd instance embedded in struct
->     nand_chip
->   cris: nand: use the mtd instance embedded in struct nand_chip
->   mtd: nand: update mtd_to_nand()
->   mtd: nand: remove useless mtd->priv = chip assignments
->   cris: nand: remove useless mtd->priv = chip assignments
->   staging: mt29f_spinand: remove useless mtd->priv = chip assignment
->   mtd: nand: simplify nand_dt_init() usage
->   mtd: nand: kill the chip->flash_node field
->   mtd: nand: add helpers to access ->priv
+>> Anyway, I'll plan to send that patch up.  I'll also do a quick test to
+>> see if my "sort()" actually helps anything.
 
-I have some comments on this one, so I'm not pushing the last 4 patches
-for now.
+The sort actually did help in some cases.  I'll throw it up as a
+separate patch and people can see if they want it.
 
->   ARM: make use of nand_set/get_controller_data() helpers
 
-BTW, I see that plat_nand.c and arch/arm/mach-ixp4xx/ixdp425-setup.c are
-making conflicting use of the ->priv field. You've essentially fixed the
-conflict in:
+> Sounds good. I'm about to disappear off for holidays, but it'll be good to
+> see how much you've improved everything when I get back :D
 
-  [PATCH] mtd: nand: remove unused and buggy get_platform_nandchip() helper function
-  http://lists.infradead.org/pipermail/linux-mtd/2015-December/064409.html
+I'm going to be out for a while too.
 
-But really, that's a pretty big hack still... I don't care to fix it
-myself right now. Just whining :)
 
->   mtd: nand: make use of nand_set/get_controller_data() helpers
->   staging: mt29f_spinand: make use of nand_set/get_controller_data()
->     helpers
+Anyway, I'm about out of time.  I'll send up what I have and people
+can debate about it if they want...  Unless there's something truly
+terribly about it maybe it would be good to land since the newest
+patch shouldn't cause any major regressions but should massively
+improve performance for some cases.
 
-[...]
-
-So, this has passed all my build tests and LGTM. Pushed patches 1 - 54
-to l2-mtd.git!
-
-Much thanks,
-Brian
+-Doug
