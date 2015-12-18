@@ -1,146 +1,72 @@
-From: ysato@users.sourceforge.jp (Yoshinori Sato)
-Date: Fri, 18 Dec 2015 13:18:36 +0900
-Subject: -next regression: "driver cohandle -EPROBE_DEFER from
- bus_type.match()"
-In-Reply-To: <20151217184641.GI8644@n2100.arm.linux.org.uk>
-References: <CAPcyv4hOJuT=i2A_0vDQHsL7MXNgVN_p17q3UW6EcTkxsCMmeg@mail.gmail.com>
- <20151217184641.GI8644@n2100.arm.linux.org.uk>
-Message-ID: <87r3ikjso3.wl-ysato@users.sourceforge.jp>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Fri, 18 Dec 2015 12:21:11 +0800
+Subject: [PATCH] pinctrl: mediatek: convert to arch_initcall
+Message-ID: <1450412497-25872-1-git-send-email-djkurtz@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 18 Dec 2015 03:46:41 +0900,
-Russell King - ARM Linux wrote:
-> 
-> On Thu, Dec 17, 2015 at 07:51:14AM -0800, Dan Williams wrote:
-> > The commit below causes the libnvdimm sub-system to stop loading.
-> > This is due to the fact that nvdimm_bus_match() returns the result of
-> > test_bit() which may be negative.  If there are any other bus match
-> > functions using test_bit they may be similarly impacted.
-> > 
-> > Can we queue a fixup like the following to libnvdimm, and maybe
-> > others, ahead of this driver core change?
-> 
-> This is rather annoying.  Have we uncovered a latent bug in other
-> architectures?  Well, looking through the test_bit() implementations,
-> it looks like it.
-> 
-> I'll drop the patch set for the time being, we can't go around breaking
-> stuff like this.  However, I think the test_bit() result should be
-> regularised across different architectures - it _looks_ to me like most
-> implementations return 0/1 values, but there may be some that don't
-> (maybe the assembly versions?)
-> 
-> Here's the list I've pulled out so far from the "easy" cases, which all
-> look like they're returning 0/1 values.
-> 
-> asm-generic: 0/1
-> 
-> /**
->  * test_bit - Determine whether a bit is set
->  * @nr: bit number to test
->  * @addr: Address to start counting from
->  */
-> static inline int test_bit(int nr, const volatile unsigned long *addr)
-> {
->         return 1UL & (addr[BIT_WORD(nr)] >> (nr & (BITS_PER_LONG-1)));
-> }
-> 
-> alpha: 0/1
-> 
-> static inline int
-> test_bit(int nr, const volatile void * addr)
-> {
->         return (1UL & (((const int *) addr)[nr >> 5] >> (nr & 31))) != 0UL;
-> }
-> 
-> arm: 0/1
-> 
-> test_bit(unsigned int nr, const volatile unsigned long *addr)
-> {
->         unsigned long mask;
-> 
->         addr += nr >> 5;
-> 
->         mask = 1UL << (nr & 0x1f);
-> 
->         return ((mask & *addr) != 0);
-> }
-> 
-> blackfin: 0/1
-> 
-> static inline int test_bit(int nr, const volatile unsigned long *addr)
-> {
->         volatile const unsigned long *a = addr + (nr >> 5);
->         return __raw_bit_test_asm(a, nr & 0x1f) != 0;
-> }
-> 
-> frv: 0/1
-> 
-> static inline int
-> __constant_test_bit(unsigned long nr, const volatile void *addr)
-> {
->         return ((1UL << (nr & 31)) & (((const volatile unsigned int *) addr)[nr >> 5])) != 0;
-> }
-> (and similar for __test_bit)
-> 
-> h8300 uses assembly... no idea
-0/1
-I think same return of other architecture.
+Move pinctrl initialization earlier in boot so that real devices can find
+their pctldev without probe deferring.
 
-> hexagon uses assembly as well... no idea
-> 
-> ia64: 0/1
-> 
-> static __inline__ int
-> test_bit (int nr, const volatile void *addr)
-> {
->         return 1 & (((const volatile __u32 *) addr)[nr >> 5] >> (nr & 31));
-> }
-> 
-> m68k: 0/1
-> 
-> static inline int test_bit(int nr, const unsigned long *vaddr)
-> {
->         return (vaddr[nr >> 5] & (1UL << (nr & 31))) != 0;
-> }
-> 
-> mn10300: 0/1
-> 
-> static inline int test_bit(unsigned long nr, const volatile void *addr)
-> {
->         return 1UL & (((const volatile unsigned int *) addr)[nr >> 5] >> (nr & 31));
-> }
-> 
-> s390: 0/1
-> 
-> static inline int test_bit(unsigned long nr, const volatile unsigned long *ptr)
-> {
->         const volatile unsigned char *addr;
-> 
->         addr = ((const volatile unsigned char *)ptr);
->         addr += (nr ^ (BITS_PER_LONG - 8)) >> 3;
->         return (*addr >> (nr & 7)) & 1;
-> }
-> 
-> x86: 0/1 for constant, ? for variable
-> 
-> static __always_inline int constant_test_bit(long nr, const volatile unsigned long *addr)
-> {
->         return ((1UL << (nr & (BITS_PER_LONG-1))) &
->                 (addr[nr >> _BITOPS_LONG_SHIFT])) != 0;
-> }
-> (presumably variable_test_bit is the same, but I don't know)
-> 
-> -- 
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+---
+ drivers/pinctrl/mediatek/pinctrl-mt6397.c | 2 +-
+ drivers/pinctrl/mediatek/pinctrl-mt8127.c | 2 +-
+ drivers/pinctrl/mediatek/pinctrl-mt8135.c | 2 +-
+ drivers/pinctrl/mediatek/pinctrl-mt8173.c | 2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
 
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mt6397.c b/drivers/pinctrl/mediatek/pinctrl-mt6397.c
+index f9751ae..a3780d4 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mt6397.c
++++ b/drivers/pinctrl/mediatek/pinctrl-mt6397.c
+@@ -70,7 +70,7 @@ static int __init mtk_pinctrl_init(void)
+ 	return platform_driver_register(&mtk_pinctrl_driver);
+ }
+ 
+-module_init(mtk_pinctrl_init);
++arch_initcall(mtk_pinctrl_init);
+ 
+ MODULE_LICENSE("GPL v2");
+ MODULE_DESCRIPTION("MediaTek MT6397 Pinctrl Driver");
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mt8127.c b/drivers/pinctrl/mediatek/pinctrl-mt8127.c
+index b317b0b..98e0beb 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mt8127.c
++++ b/drivers/pinctrl/mediatek/pinctrl-mt8127.c
+@@ -351,7 +351,7 @@ static int __init mtk_pinctrl_init(void)
+ 	return platform_driver_register(&mtk_pinctrl_driver);
+ }
+ 
+-module_init(mtk_pinctrl_init);
++arch_initcall(mtk_pinctrl_init);
+ 
+ MODULE_LICENSE("GPL v2");
+ MODULE_DESCRIPTION("MediaTek MT8127 Pinctrl Driver");
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mt8135.c b/drivers/pinctrl/mediatek/pinctrl-mt8135.c
+index 404f117..1c153b8 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mt8135.c
++++ b/drivers/pinctrl/mediatek/pinctrl-mt8135.c
+@@ -366,7 +366,7 @@ static int __init mtk_pinctrl_init(void)
+ 	return platform_driver_register(&mtk_pinctrl_driver);
+ }
+ 
+-module_init(mtk_pinctrl_init);
++arch_initcall(mtk_pinctrl_init);
+ 
+ MODULE_LICENSE("GPL");
+ MODULE_DESCRIPTION("MediaTek Pinctrl Driver");
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mt8173.c b/drivers/pinctrl/mediatek/pinctrl-mt8173.c
+index ad27184..a62514e 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mt8173.c
++++ b/drivers/pinctrl/mediatek/pinctrl-mt8173.c
+@@ -394,7 +394,7 @@ static int __init mtk_pinctrl_init(void)
+ 	return platform_driver_register(&mtk_pinctrl_driver);
+ }
+ 
+-module_init(mtk_pinctrl_init);
++arch_initcall(mtk_pinctrl_init);
+ 
+ MODULE_LICENSE("GPL v2");
+ MODULE_DESCRIPTION("MediaTek Pinctrl Driver");
 -- 
-Yoshinori Sato
-<ysato@users.sourceforge.jp>
+2.6.0.rc2.230.g3dd15c0
