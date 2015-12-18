@@ -1,43 +1,37 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 18 Dec 2015 15:51:54 +0530
-Subject: [PATCH v3 1/4] ARM: dts: dra7: Add dt node for the sycon pcie
-In-Reply-To: <5670140C.7010906@cogentembedded.com>
-References: <1450172346-11890-1-git-send-email-kishon@ti.com>
- <1450172346-11890-2-git-send-email-kishon@ti.com>
- <5670140C.7010906@cogentembedded.com>
-Message-ID: <5673DE42.9080407@ti.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Fri, 18 Dec 2015 10:28:23 +0000
+Subject: [PATCH v4 05/12] arm-cci: PMU: Add support for transactions
+In-Reply-To: <20151217184255.GI6344@twins.programming.kicks-ass.net>
+References: <1450374559-23315-1-git-send-email-suzuki.poulose@arm.com>
+ <1450374559-23315-6-git-send-email-suzuki.poulose@arm.com>
+ <20151217184255.GI6344@twins.programming.kicks-ass.net>
+Message-ID: <5673DFC7.6060406@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 17/12/15 18:42, Peter Zijlstra wrote:
+> On Thu, Dec 17, 2015 at 05:49:12PM +0000, Suzuki K. Poulose wrote:
+>> We keep track of only the 'ADD' transactions. While we are in a
+>> transaction, we keep track of the indices allocated for the events
+>> and delay the following operations until the transaction is committed.
+>>   1) Programming the event on the counter
+>>   2) Enabling the counter
+>>   3) Setting the period for the event.
+>
+> So that's not really what the txn interface is for, its meant to
+> amortize event scheduling.
 
-On Tuesday 15 December 2015 06:52 PM, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 12/15/2015 12:39 PM, Kishon Vijay Abraham I wrote:
-> 
->> Add new device tree node for the control module register space where
->> PCIe registers are present.
->>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> ---
->>   arch/arm/boot/dts/dra7.dtsi |    5 +++++
->>   1 file changed, 5 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
->> index fe99231..e38f63f 100644
->> --- a/arch/arm/boot/dts/dra7.dtsi
->> +++ b/arch/arm/boot/dts/dra7.dtsi
->> @@ -155,6 +155,11 @@
->>                       compatible = "syscon";
->>                       reg = <0x1c04 0x0020>;
->>                   };
->> +
->> +                scm_conf_pcie: tisyscon at 1c24 {
-> 
->    Please use the generic node names as the ePAPR standard says.
+OK
 
-something like  scm_conf_pcie: syscon at 1c24??
+>
+> The above doesn't look like it has a failure case, in which case you can
+> achieve the same simpler, using pmu::pmu_{dis,en}able().
+>
 
-Thanks
-Kishon
+I thought about that, but was not sure if pmu->stop() is guaranteed to be
+called on all the events scheduled on the PMU when we pmu::pmu_disable().
+Is it ?
+
+Thanks for the quick response.
+
+Suzuki
