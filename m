@@ -1,33 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Dec 2015 23:44:23 +0100
-Subject: [PATCH] ARM: default to multi_v7_defconfig
-Message-ID: <2084866.x9T7k7V9eW@wuerfel>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Fri, 18 Dec 2015 15:03:20 -0800
+Subject: [PATCH v3 4/4] printk/nmi: Increase the size of NMI buffer and
+ make it configurable
+In-Reply-To: <20151218121141.GR6373@twins.programming.kicks-ass.net>
+References: <1449667265-17525-1-git-send-email-pmladek@suse.com>
+ <1449667265-17525-5-git-send-email-pmladek@suse.com>
+ <CAMuHMdXVgr58YjoePGrRbMyMncQ27f85prL7G5SpeHeNxoYrXQ@mail.gmail.com>
+ <20151211124159.GB3729@pathway.suse.cz>
+ <20151211145725.b0e81bb4bb18fcd72ef5f557@linux-foundation.org>
+ <20151211232113.GZ8644@n2100.arm.linux.org.uk>
+ <alpine.LNX.2.00.1512120024370.9922@cbobk.fhfr.pm>
+ <5673DD60.7080302@linaro.org>
+ <20151218112902.GO6344@twins.programming.kicks-ass.net>
+ <20151218121141.GR6373@twins.programming.kicks-ass.net>
+Message-ID: <20151218150320.5d377789ee6253379b82412d@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-versatile_defconfig has not been a reasonable default for a very long
-time, there is very little work happening on this platform and it's
-based on an old ARM926 CPU core.
+On Fri, 18 Dec 2015 13:11:41 +0100 Peter Zijlstra <peterz@infradead.org> wrote:
 
-This changes the default to multi_v7_defconfig, which is much more
-relevant to anyone doing a build test on ARM, as it covers a wide
-range of platforms.
+> On Fri, Dec 18, 2015 at 12:29:02PM +0100, Peter Zijlstra wrote:
+> > On Fri, Dec 18, 2015 at 10:18:08AM +0000, Daniel Thompson wrote:
+> > > I'm not entirely sure that this is an improvement.
+> > 
+> > What I do these days is delete everything in vprintk_emit() and simply
+> > call early_printk().
+> 
+> On that, whoever made the device model use vprintk_emit() broke the
+> debugger (KGDB/KDB) printk intercept, and the whole vprintk_func
+> redirection scheme.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+crap, we have a whole set of interfaces which are broken this way. 
+printk_emit(), vprintk(), vprintk_emit().
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 2c2b28ee4811..e9fb67913e6e 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -30,9 +30,8 @@ GZFLAGS		:=-9
- # Never generate .eh_frame
- KBUILD_CFLAGS	+= $(call cc-option,-fno-dwarf2-cfi-asm)
- 
--# Do not use arch/arm/defconfig - it's always outdated.
--# Select a platform tht is kept up-to-date
--KBUILD_DEFCONFIG := versatile_defconfig
-+# This should work on most of the modern platforms
-+KBUILD_DEFCONFIG := multi_v7_defconfig
- 
- # defines filename extension depending memory management type.
- ifeq ($(CONFIG_MMU),)
+
+commit 7ff9554bb578ba02166071d2d487b7fc7d860d62
+Author:     Kay Sievers <kay@vrfy.org>
+AuthorDate: Thu May 3 02:29:13 2012 +0200
+Commit:     Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+CommitDate: Mon May 7 16:53:02 2012 -0700
+
+    printk: convert byte-buffer to variable-length record buffer
