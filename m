@@ -1,59 +1,46 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 18 Dec 2015 15:17:24 +0100
-Subject: [PATCH 11/69] clocksource/drivers/pxa_timer: Move the Kconfig rule
+Date: Fri, 18 Dec 2015 15:17:22 +0100
+Subject: [PATCH 09/69] clocksource/drivers/st_lpc: Fix Kconfig dependency
 In-Reply-To: <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
 References: <5672CB9E.7090707@linaro.org>
  <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1450448302-27429-11-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1450448302-27429-9-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of having the clocksource's Kconfig depending on the arch, let the
-arch to select the timer it needs.
-
-The CLKSRC_OF dependency is removed because already selected by the
-ARCH_PXA, and it is added for SA1100.
+Change the Kconfig selection rule by letting the STI arch to select
+the timer.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 ---
- arch/arm/Kconfig            | 3 +++
- drivers/clocksource/Kconfig | 3 +--
- 2 files changed, 4 insertions(+), 2 deletions(-)
+ arch/arm/mach-sti/Kconfig   | 1 +
+ drivers/clocksource/Kconfig | 1 -
+ 2 files changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 0365cbb..a5d416e 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -609,6 +609,7 @@ config ARCH_PXA
- 	select AUTO_ZRELADDR
- 	select COMMON_CLK
- 	select CLKDEV_LOOKUP
-+	select CLKSRC_PXA
- 	select CLKSRC_MMIO
- 	select CLKSRC_OF
- 	select GENERIC_CLOCKEVENTS
-@@ -648,6 +649,8 @@ config ARCH_SA1100
- 	select ARCH_SPARSEMEM_ENABLE
- 	select CLKDEV_LOOKUP
- 	select CLKSRC_MMIO
-+	select CLKSRC_PXA
-+	select CLKSRC_OF if OF
- 	select CPU_FREQ
- 	select CPU_SA1100
- 	select GENERIC_CLOCKEVENTS
+diff --git a/arch/arm/mach-sti/Kconfig b/arch/arm/mach-sti/Kconfig
+index 125865d..12dd1dc 100644
+--- a/arch/arm/mach-sti/Kconfig
++++ b/arch/arm/mach-sti/Kconfig
+@@ -3,6 +3,7 @@ menuconfig ARCH_STI
+ 	select ARM_GIC
+ 	select ST_IRQCHIP
+ 	select ARM_GLOBAL_TIMER
++	select CLKSRC_ST_LPC
+ 	select PINCTRL
+ 	select PINCTRL_ST
+ 	select MFD_SYSCON
 diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 4117386..d4221e0 100644
+index b423785..3594a2b 100644
 --- a/drivers/clocksource/Kconfig
 +++ b/drivers/clocksource/Kconfig
-@@ -307,8 +307,7 @@ config CLKSRC_TANGO_XTAL
- 	select CLKSRC_OF
+@@ -326,7 +326,6 @@ config CLKSRC_IMX_GPT
  
- config CLKSRC_PXA
--	def_bool y if ARCH_PXA || ARCH_SA1100
--	select CLKSRC_OF if OF
-+	bool
+ config CLKSRC_ST_LPC
+ 	bool
+-	depends on ARCH_STI
+ 	select CLKSRC_OF if OF
  	help
- 	  This enables OST0 support available on PXA and SA-11x0
- 	  platforms.
+ 	  Enable this option to use the Low Power controller timer
 -- 
 1.9.1
