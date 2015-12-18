@@ -1,39 +1,37 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 18 Dec 2015 10:48:02 +0530
-Subject: [PATCH v02 0/2] ARM: DTS: am33xx/am437x: Use the new eDMA bindings
-In-Reply-To: <20151217174844.GT23396@atomide.com>
-References: <1450359217-3038-1-git-send-email-peter.ujfalusi@ti.com>
- <20151217174844.GT23396@atomide.com>
-Message-ID: <20151218051801.GR1854@localhost>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 18 Dec 2015 06:29:49 +0100
+Subject: [PATCH V2 1/2] devicetree: bindings: Add vendor prefix for Kosagi
+Message-ID: <1450416590-14908-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 17, 2015 at 09:48:44AM -0800, Tony Lindgren wrote:
-> * Peter Ujfalusi <peter.ujfalusi@ti.com> [151217 05:33]:
-> > Hi,
-> > 
-> > Changes since v1:
-> > - Updated to use the non 16bit arrays [1]
-> > - send the two patch as a series
-> > 
-> > [1]
-> > As it has been discussed earlier:
-> > https://www.mail-archive.com/linux-omap at vger.kernel.org/msg122117.html
-> > 
-> > the DT bindings has been changes compared to what we had in 4.4-rc1: the arrays
-> > now don't have the 16bit type.
-> > The changes are now merged to mainline and Vinod provided us a branch:
-> > 
-> > git://git.infradead.org/users/vkoul/slave-dma.git fix/edma
-> > 
-> > Which is based on 4.4-rc1 and only contains the two patch for changing the eDMA
-> > bindings.
-> 
-> Great, I'll merge the fix/edma also into omap-for-v4.5/dt and apply
-> your two patches.
+From: Sean Cross <xobs@kosagi.com>
 
-FWIW, fix/edma is in Linu's tree now and should be in -rc6
+Add a vendor prefix for Sutajio Ko-Usagi PTE Ltd., which goes by the
+more common name of Kosagi.
 
-Thanks
+Signed-off-by: Sean Cross <xobs@kosagi.com>
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Rob Herring <robh@kernel.org>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
+
+V2: Rebase on top of linux-next
+
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 38eeaa2..265ec68 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -125,6 +125,7 @@ karo	Ka-Ro electronics GmbH
+ keymile	Keymile GmbH
+ kinetic Kinetic Technologies
+ kyo	Kyocera Corporation
++kosagi	Sutajio Ko-Usagi PTE Ltd.
+ lacie	LaCie
+ lantiq	Lantiq Semiconductor
+ lenovo	Lenovo Group Ltd.
 -- 
-~Vinod
+2.1.4
