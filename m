@@ -1,100 +1,95 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 Dec 2015 11:29:10 +0900
-Subject: [PATCH 02/10] arm64: renesas: salvator-x: use CS2000 as AUDIO_CLK_B
+Date: Fri, 18 Dec 2015 11:29:12 +0900
+Subject: [PATCH 04/10] arm64: dts: r8a7795: Add Cortex-A57 CPU cores
 In-Reply-To: <cover.1450401186.git.horms+renesas@verge.net.au>
 References: <cover.1450401186.git.horms+renesas@verge.net.au>
-Message-ID: <8a8f181d2cfdbff772ff2cc895f59bb28beafbdf.1450401186.git.horms+renesas@verge.net.au>
+Message-ID: <0ed1a79ed0c17631fb41d336a4eddb9bbd299b64.1450401186.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Gaku Inami <gaku.inami.xw@bp.renesas.com>
 
-CS2000 needs AUDIO_CLKOUT as master clock which is generated
-by Renesas sound, and Renesas sound needs CS2000 as ADUIO_CLK_B.
-Because of this relationship, it will be dead-lock when driver probe.
+Add Cortex-A57 CPU cores to r8a7795 SoC for a total of 4 x Cortex-A57.
 
-cs2000: clk_multiplier at 4f {
-        ...
-        clocks = <&rcar_sound 0>, <&x12_clk>;
-        ...
-};
-
-&rcar_sound {
-        ...
-        assigned-clocks = <&cs2000>;
-        ...
-};
-
-This patch is using dummy audio_clkout to avoid this issue.
-
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Sigend-off-by: Dirk Behme <dirk.behme@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 38 ++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 31 +++++++++++++++++++++++++------
+ 1 file changed, 25 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-index beeacfaf18d0..75af5ec5a4d4 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-@@ -61,6 +61,16 @@
- 		clock-frequency = <24576000>;
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index 051ff143506e..4d43cf31418f 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -35,13 +35,31 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 
+-		/* 1 core only at this point */
+ 		a57_0: cpu at 0 {
+ 			compatible = "arm,cortex-a57", "arm,armv8";
+ 			reg = <0x0>;
+ 			device_type = "cpu";
+ 			enable-method = "psci";
+ 		};
++
++		a57_1: cpu at 1 {
++			compatible = "arm,cortex-a57","arm,armv8";
++			reg = <0x1>;
++			device_type = "cpu";
++			enable-method = "psci";
++		};
++		a57_2: cpu at 2 {
++			compatible = "arm,cortex-a57","arm,armv8";
++			reg = <0x2>;
++			device_type = "cpu";
++			enable-method = "psci";
++		};
++		a57_3: cpu at 3 {
++			compatible = "arm,cortex-a57","arm,armv8";
++			reg = <0x3>;
++			device_type = "cpu";
++			enable-method = "psci";
++		};
  	};
  
-+	audio_clkout: audio_clkout {
-+		/*
-+		 * This is same as <&rcar_sound 0>
-+		 * but needed to avoid cs2000/rcar_sound probe dead-lock
-+		 */
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <11289600>;
-+	};
+ 	extal_clk: extal {
+@@ -84,6 +102,7 @@
+ 	soc {
+ 		compatible = "simple-bus";
+ 		interrupt-parent = <&gic>;
 +
- 	rsnd_ak4613: sound {
- 		compatible = "simple-audio-card";
+ 		#address-cells = <2>;
+ 		#size-cells = <2>;
+ 		ranges;
+@@ -96,7 +115,7 @@
+ 			reg = <0x0 0xf1010000 0 0x1000>,
+ 			      <0x0 0xf1020000 0 0x2000>;
+ 			interrupts = <GIC_PPI 9
+-					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_HIGH)>;
++					(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+ 		};
  
-@@ -151,6 +161,17 @@
- 		asahi-kasei,out5-single-end;
- 		asahi-kasei,out6-single-end;
- 	};
-+
-+	cs2000: clk_multiplier at 4f {
-+		#clock-cells = <0>;
-+		compatible = "cirrus,cs2000-cp";
-+		reg = <0x4f>;
-+		clocks = <&audio_clkout>, <&x12_clk>;
-+		clock-names = "clk_in", "ref_clk";
-+
-+		assigned-clocks = <&cs2000>;
-+		assigned-clock-rates = <24576000>; /* 1/1 divide */
-+	};
- };
+ 		gpio0: gpio at e6050000 {
+@@ -214,13 +233,13 @@
+ 		timer {
+ 			compatible = "arm,armv8-timer";
+ 			interrupts = <GIC_PPI 13
+-					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
++					(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+ 				     <GIC_PPI 14
+-					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
++					(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+ 				     <GIC_PPI 11
+-					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
++					(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+ 				     <GIC_PPI 10
+-					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>;
++					(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
+ 		};
  
- &rcar_sound {
-@@ -166,6 +187,23 @@
- 
- 	status = "okay";
- 
-+	/* update <audio_clk_b> to <cs2000> */
-+	clocks = <&cpg CPG_MOD 1005>,
-+		 <&cpg CPG_MOD 1006>, <&cpg CPG_MOD 1007>,
-+		 <&cpg CPG_MOD 1008>, <&cpg CPG_MOD 1009>,
-+		 <&cpg CPG_MOD 1010>, <&cpg CPG_MOD 1011>,
-+		 <&cpg CPG_MOD 1012>, <&cpg CPG_MOD 1013>,
-+		 <&cpg CPG_MOD 1014>, <&cpg CPG_MOD 1015>,
-+		 <&cpg CPG_MOD 1022>, <&cpg CPG_MOD 1023>,
-+		 <&cpg CPG_MOD 1024>, <&cpg CPG_MOD 1025>,
-+		 <&cpg CPG_MOD 1026>, <&cpg CPG_MOD 1027>,
-+		 <&cpg CPG_MOD 1028>, <&cpg CPG_MOD 1029>,
-+		 <&cpg CPG_MOD 1030>, <&cpg CPG_MOD 1031>,
-+		 <&cpg CPG_MOD 1019>, <&cpg CPG_MOD 1018>,
-+		 <&audio_clk_a>, <&cs2000>,
-+		 <&audio_clk_c>,
-+		 <&cpg CPG_CORE R8A7795_CLK_S0D4>;
-+
- 	rcar_sound,dai {
- 		dai0 {
- 			playback = <&ssi0 &src0 &dvc0>;
+ 		cpg: clock-controller at e6150000 {
 -- 
 2.1.4
