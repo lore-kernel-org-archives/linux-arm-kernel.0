@@ -1,83 +1,155 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 18 Dec 2015 11:42:19 +0000
-Subject: [PATCH v6 12/20] arm64:ilp32: add sys_ilp32.c and a separate
- table (in entry.S) to use it
-In-Reply-To: <CA+=Sn1ktUCa_8MzMvZtQhE+fUNY5-V9JXTLXKDDe8a0iENgd=w@mail.gmail.com>
-References: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
- <1450215766-14765-13-git-send-email-ynorov@caviumnetworks.com>
- <20151217182753.GF25232@e104818-lin.cambridge.arm.com>
- <2105480.kqDuemge8n@wuerfel>
- <CA+=Sn1ktUCa_8MzMvZtQhE+fUNY5-V9JXTLXKDDe8a0iENgd=w@mail.gmail.com>
-Message-ID: <20151218114219.GA2830@mbp>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 18 Dec 2015 11:45:47 +0000
+Subject: arm64/efi handling of persistent memory
+In-Reply-To: <20151218110651.GL25034@bivouac.eciton.net>
+References: <94D0CD8314A33A4D9D801C0FE68B40295BEBD864@G9W0745.americas.hpqcorp.net>
+ <20151218110651.GL25034@bivouac.eciton.net>
+Message-ID: <20151218114546.GD29219@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(cc'ing Marcus for more insight on the tools side)
-
-On Thu, Dec 17, 2015 at 12:14:20PM -0800, Andrew Pinski wrote:
-> On Thu, Dec 17, 2015 at 12:10 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Thursday 17 December 2015 18:27:53 Catalin Marinas wrote:
-> >> On Wed, Dec 16, 2015 at 12:42:38AM +0300, Yury Norov wrote:
-> >
-> >> > +#define compat_sys_lookup_dcookie      sys_lookup_dcookie
-> >> > +#define compat_sys_pread64             sys_pread64
-> >> > +#define compat_sys_pwrite64            sys_pwrite64
-> >> > +#define compat_sys_readahead           sys_readahead
-> >> > +#define compat_sys_shmat               sys_shmat
-> >>
-> >> I wonder whether we need wrappers (actually, not only for these but
-> >> sys_read etc.). These functions take either a pointer or a size_t
-> >> argument which are 32-bit with ILP32 but treated as 64-bit by an LP64
-> >> kernel. Can we guarantee that user space zeros the top 32-bit of the
-> >> arguments passed here?
-> >
-> > I'm pretty sure that is safe. I haven't read the calling conventions
-> > specification for arm64 ilp32, but usually all function arguments are
-> > passed as 64-bit registers with proper sign-extend or zero-extend.
+On Fri, Dec 18, 2015 at 11:06:51AM +0000, Leif Lindholm wrote:
+> On Fri, Dec 18, 2015 at 01:33:25AM +0000, Elliott, Robert (Persistent Memory) wrote:
+> > Similar to the questions about the arm64 efi boot stub
+> > handing persistent memory, some of the arm64 kernel code 
+> > looks fishy.
+> > 
+> > In arch/arm64/kernel/efi.c:
+> > 
+> > static int __init is_normal_ram(efi_memory_desc_t *md)
+> > {
+> >         if (md->attribute & EFI_MEMORY_WB)
+> >                 return 1;
+> >         return 0;
+> > }
+> > 
+> > static __init int is_reserve_region(efi_memory_desc_t *md)
+> > {
+> >         switch (md->type) {
+> >         case EFI_LOADER_CODE:
+> >         case EFI_LOADER_DATA:
+> >         case EFI_BOOT_SERVICES_CODE:
+> >         case EFI_BOOT_SERVICES_DATA:
+> >         case EFI_CONVENTIONAL_MEMORY:
+> >         case EFI_PERSISTENT_MEMORY:
+> >                 return 0;
+> >         default:
+> >                 break;
+> >         }
+> >         return is_normal_ram(md);
+> > }
+> > 
+> > static __init void reserve_regions(void)
+> > {
+> > ...
+> >                 if (is_normal_ram(md))
+> >                         early_init_dt_add_memory_arch(paddr, size);
+> > 
+> >                 if (is_reserve_region(md)) {
+> >                         memblock_reserve(paddr, size);
+> > ...
+> > 
+> > static bool __init efi_virtmap_init(void)
+> > {
+> > ...
+> >                 if (!is_normal_ram(md))
+> >                         prot = __pgprot(PROT_DEVICE_nGnRE);
+> >                 else if (md->type == EFI_RUNTIME_SERVICES_CODE ||
+> >                          !PAGE_ALIGNED(md->phys_addr))
+> >                         prot = PAGE_KERNEL_EXEC;
+> >                 else
+> >                         prot = PAGE_KERNEL;
+> > 
+> > Concerns include:
+> > 
+> > 1. is_normal_ram() will see the WB bit and return 1 regardless
+> > of the type.  That seems similar to the arm EFI boot stub issue.
+> > The three callers are shown above.
 > 
-> Well (just like LP64 on AARCH64), when passing a 32bit value to a
-> function, the upper 32bits are undefined.  I ran into this when I was
-> debugging the GCC go library on ILP32 (though reproduced with pure C
-> code) and the assembly functions inside glibc where pointers are
-> passed with the upper 32bits as undefined.
-> So we have an issue if called with syscall function or using pure
-> assembly to create the syscall functions (which glibc does).
+> So, first and third cases look OK to me, but the bit where we add
+> things to memblock just for being WB is bogus.
 
-I think the ILP32 syscall ABI should follow the PCS convention where the
-top 32-bit of a register is not guaranteed 0 when the size of the
-argument is 32-bit. So take the read(2) syscall:
+We should be able to do this much more simply by only ever adding what
+we know is safe. We can "reserve" portions by nomapping them. e.g.
 
-	ssize_t read(int fd, void *buf, size_t count);
+bool can_add_to_memblock(efi_memory_desc_t *md)
+{
+	if (!(md->attribute & EFI_MEMORY_WB))
+		return false;
 
->From the ILP32 code perspective, void * and size_t are both 32-bit. It
-would call into the kernel leaving the top 32-bit as undefined (if we
-follow the PCS). Normally, calling a function with the same size
-arguments is not a problem since the compiler generates the callee code
-accordingly. However, we route the syscall directly into the native
-sys_read() where void * and size_t are 64-bit with the top 32-bit left
-undefined.
+	switch (md->type) {
+	case EFI_LOADER_CODE:
+	case EFI_LOADER_DATA:
+	case EFI_BOOT_SERVICES_CODE:
+	case EFI_BOOT_SERVICES_DATA:
+	case EFI_CONVENTIONAL_MEMORY:
+		return true;
+	}
 
-We have three options here:
+	return false;
+}
 
-1. Always follow PCS convention across user/kernel call and add wrappers
-   in the kernel (preferred)
+for_each_efi_memory_desc(&memmap, md) {
+	if (can_add_to_memblock(md))
+		early_init_dt_add_memory_arch(...);
+	else
+		memblock_mark_nomap(...);
+}
 
-2. Follow the PCS up to glibc and get glibc to zero the top part (not
-   always safe with hand-written assembly, though we already do this for
-   AArch32 where the PCS only specifies 4 arguments in registers, the
-   rest go on the stack)
+Though I suspect Ard might know some reason that won't work.
 
-3. Follow the PCS up to glibc but always pass syscall arguments in W
-   registers, like AArch32 compat support (the least preferred option,
-   the only advantage is a single wrapper for all syscalls but it would
-   be doing unnecessary zeroing even for syscalls where it isn't needed)
+> > 2. is_reserve_region() treating EFI_PERSISTENT_MEMORY the same
+> > as EFI_CONVENTIONAL_MEMORY looks wrong.
+> 
+> Yeah... That one was introduced by
+> ad5fb870c486 ("e820, efi: add ACPI 6.0 persistent memory types")
+> without any ACKs from ARM people :/
+> 
+> While it probably wouldn't wreck your system, it is unlikely to do
+> what you'd want.
 
-My preference, as stated above, is (1). You can write the wrappers in C
-directly and let the compiler upgrade the types when calling the native
-syscall. But any other option would be fine (take some inspiration from
-other architectures). Unfortunately we don't have COMPAT_SYSCALL_DEFINE
-for all functions that we need to wrap, it would have been easier (so we
-need to add them but probably in the arch/arm64 code).
+It might corrupt that data you wanted to persist, so it's definitely a
+bug. Severity is arguable.
 
--- 
-Catalin
+> > 3. We're contemplating working around the grub problem by
+> > reporting EFI_RESERVED_MEMORY plus the NV attribute rather
+> > than EFI_PERSISTENT_MEMORY.
+
+I'm missing something. Robert, do you mean GRUB has a similar bug?
+
+> That sounds a bit ... nuclear.
+> Would you then be expecting to retreive information about the NV
+> device out of hw description, or via PCI, rather than the UEFI memory
+> map?
+
+That's going to cause much more pain. We should fix this code.
+
+> > If this is done, then is_reserve_region() will fall through
+> > to is_normal_ram(), which will see the WB bit and return 1.
+> > That seems backwards... but seems correct for persistent
+> > memory, reporting it as a reserved region.  That might avoid the
+> > the EFI_PERSISTENT_MEMORY handling problem (if the preceding
+> > call to is_normal_ram() didn't already cause problems).
+> 
+> So ... the code is convoluted and could probably do with a
+> refresh. But is_normal_ram() returning 1 means is_reserve_region()
+> will return 1, meaning we end up reserving it in memblock and not
+> allocating in it.
+> 
+> However, this is for is_reserve_region() - we will still have added it
+> to memblock with early_init_dt_add_memory_arch(), which may have
+> unwanted side effects.
+
+See above for a suggestion on that front.
+
+> I thought Ard had some patches in flight to address this, but they
+> don't appear to be in yet.
+
+The nomap stuff is in the arm64 git repo, in aarch64/efi [1] and
+for-next/core [2]. That alone doesn't seem to address this, though.
+
+Thanks,
+Mark.
+
+[1] https://git.kernel.org/cgit/linux/kernel/git/arm64/linux.git/log/?h=aarch64/efi
+[2] https://git.kernel.org/cgit/linux/kernel/git/arm64/linux.git/log/?h=for-next/core
