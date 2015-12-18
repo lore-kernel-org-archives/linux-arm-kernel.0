@@ -1,58 +1,26 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Fri, 18 Dec 2015 17:11:12 +0300
-Subject: [PATCH v6 08/20] arm64: ilp32: add is_ilp32_compat_{task,
- thread} and TIF_32BIT_AARCH64
-In-Reply-To: <20151217114153.GD25232@e104818-lin.cambridge.arm.com>
-References: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
- <1450215766-14765-9-git-send-email-ynorov@caviumnetworks.com>
- <20151217114153.GD25232@e104818-lin.cambridge.arm.com>
-Message-ID: <20151218141112.GD31200@yury-N73SV>
+From: mfuzzey@parkeon.com (Martin Fuzzey)
+Date: Fri, 18 Dec 2015 15:13:48 +0100
+Subject: [Regression] No display on i.MX53 after update to 4.4-rc4
+Message-ID: <5674149C.90206@parkeon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 17, 2015 at 11:41:53AM +0000, Catalin Marinas wrote:
-> On Wed, Dec 16, 2015 at 12:42:34AM +0300, Yury Norov wrote:
-> > Reviewed-by: David Daney <ddaney@caviumnetworks.com>
-> > Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
-> > Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
-> > Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-> > Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
-> 
-> Long description missing.
+Hi Philipp,
 
-Hi, Catalin,
+after updating my kernel to include:
 
-I think this patch (and patch #3 too) is trivial, and
-explanation in patch name is clear enougth. So, I just do not
-understand what else to explain here. Could you point me, and then I
-will do it.
+     gpu: ipu-v3: Assign of_node of child platform devices to 
+corresponding ports  [304e6be652e2ef2190adf9c23a2a1e5f9f39800d]
 
-> 
-> > diff --git a/arch/arm64/include/asm/is_compat.h b/arch/arm64/include/asm/is_compat.h
-> > index 476db90..89b1f65 100644
-> > --- a/arch/arm64/include/asm/is_compat.h
-> > +++ b/arch/arm64/include/asm/is_compat.h
-> > @@ -36,7 +36,6 @@ static inline int is_a32_compat_thread(struct thread_info *thread)
-> >  #else
-> >  
-> >  static inline int is_a32_compat_task(void)
-> > -
-> >  {
-> >  	return 0;
-> >  }
-> 
-> You should move this to the previous patch.
-> 
-> > @@ -45,14 +44,39 @@ static inline int is_a32_compat_thread(struct thread_info *thread)
-> >  {
-> >  	return 0;
-> >  }
-> > -
-> >  #endif /* CONFIG_AARCH32_EL0 */
-> 
-> Maybe this one as well, though I like an empty line before the last
-> #endif (i.e. drop this hunk).
+the display initialisation fails with:
 
-It's just dirt, I'll clean it. Thank you.
+     "imx-ipuv3 18000000.ipu: missing port at 0 node in /soc/ipu at 18000000"
 
-Yury.
+Indeed the in tree imx53.dtsi file does not contain that node.
+
+Does the node need to be added (even if the camera is not being used) or 
+should ipu_add_client_devices() not bail out if one node is missing?
+
+Regards,
+
+Martin
