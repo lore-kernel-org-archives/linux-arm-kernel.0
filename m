@@ -1,105 +1,111 @@
-From: majun258@huawei.com (majun (F))
-Date: Fri, 18 Dec 2015 09:58:20 +0800
-Subject: [PATCH v10 1/4] dt-binding:Documents of the mbigen bindings
-In-Reply-To: <20151217135247.GD13389@leverpostej>
-References: <1450353397-47668-1-git-send-email-majun258@huawei.com>
- <1450353397-47668-2-git-send-email-majun258@huawei.com>
- <20151217135247.GD13389@leverpostej>
-Message-ID: <5673683C.2080304@huawei.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 17 Dec 2015 18:08:41 -0800
+Subject: [PATCH linux-next 1/5] mtd: spi-nor: properly detect the memory
+ when it boots in Quad or Dual mode
+In-Reply-To: <813edd1addf9a09b9f01031d3cb279c8cdfe97bb.1449494420.git.cyrille.pitchen@atmel.com>
+References: <cover.1449494420.git.cyrille.pitchen@atmel.com>
+ <813edd1addf9a09b9f01031d3cb279c8cdfe97bb.1449494420.git.cyrille.pitchen@atmel.com>
+Message-ID: <20151218020841.GH10460@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark:
+(Hit send too early; a few more comments)
 
-? 2015/12/17 21:52, Mark Rutland ??:
-> On Thu, Dec 17, 2015 at 07:56:34PM +0800, MaJun wrote:
->> From: Ma Jun <majun258@huawei.com>
+On Mon, Dec 07, 2015 at 03:09:10PM +0100, Cyrille Pitchen wrote:
+>  drivers/mtd/spi-nor/spi-nor.c | 52 +++++++++++++++++++++++++++++++++++++++----
+>  include/linux/mtd/spi-nor.h   | 23 +++++++++++++++++--
+>  2 files changed, 69 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
+> index 3b2460efc019..bf17736750c1 100644
+> --- a/drivers/mtd/spi-nor/spi-nor.c
+> +++ b/drivers/mtd/spi-nor/spi-nor.c
+> @@ -73,6 +73,11 @@ struct flash_info {
+>  
+>  #define JEDEC_MFR(info)	((info)->id[0])
+>  
+> +struct read_id_config {
+> +	enum read_mode		mode;
+> +	enum spi_protocol	proto;
+> +};
+> +
+>  static const struct flash_info *spi_nor_match_id(const char *name);
+>  
+>  /*
+> @@ -867,11 +872,16 @@ static const struct flash_info spi_nor_ids[] = {
+>  	{ },
+>  };
+>  
+> -static const struct flash_info *spi_nor_read_id(struct spi_nor *nor)
+> +static const struct flash_info *spi_nor_read_id(struct spi_nor *nor,
+> +						enum read_mode mode)
+>  {
+> -	int			tmp;
+> +	int			i, tmp;
+>  	u8			id[SPI_NOR_MAX_ID_LEN];
+>  	const struct flash_info	*info;
+> +	static const struct read_id_config configs[] = {
+> +		{SPI_NOR_QUAD, SPI_PROTO_4_4_4},
+> +		{SPI_NOR_DUAL, SPI_PROTO_2_2_2}
+> +	};
+>  
+>  	tmp = nor->read_reg(nor, SPINOR_OP_RDID, id, SPI_NOR_MAX_ID_LEN);
+>  	if (tmp < 0) {
+> @@ -879,6 +889,34 @@ static const struct flash_info *spi_nor_read_id(struct spi_nor *nor)
+>  		return ERR_PTR(tmp);
+>  	}
+>  
+> +	/* Special case for Micron/Macronix qspi nor. */
+> +	if ((id[0] == 0xff && id[1] == 0xff && id[2] == 0xff) ||
+> +	    (id[0] == 0x00 && id[1] == 0x00 && id[2] == 0x00))
+
+Is this specified anywhere, or is this just a heuristic, to guess
+whether we're getting valid IDs? Do we know anything about what opcodes
+look like ...
+
+> +		for (i = 0; i < ARRAY_SIZE(configs); ++i) {
+> +			if (configs[i].mode != mode)
+> +				continue;
+> +
+> +			/* Set this protocol for all commands. */
+> +			nor->reg_proto = configs[i].proto;
+> +			nor->read_proto = configs[i].proto;
+> +			nor->write_proto = configs[i].proto;
+> +			nor->erase_proto = configs[i].proto;
+> +
+> +			/*
+> +			 * Multiple I/O Read ID only returns the Manufacturer ID
+> +			 * (1 byte) and the Device ID (2 bytes). So we reset the
+> +			 * remaining bytes.
+> +			 */
+
+Ugh, does that mean we get different IDs returned via the different
+modes? That sounds like a disaster. What about all the flash that we
+need 5+ bytes to differentiate? Just be glad we haven't come across any
+Micron or Macronix like that yet?
+
+> +			memset(id, 0, sizeof(id));
+> +			tmp = nor->read_reg(nor, SPINOR_OP_MIO_RDID, id, 3);
+
+Hmm, so you're passing implicit configuration data via the
+nor->reg_proto field. So, spi-nor drivers now have to read that field
+during every read_reg() invocation? Seems like either this should be:
+ (a) a driver hook/callback, so we can just reconfigure a handful of
+ times or
+ (b) part of a parameter that gets passed as part of the function
+ signature
+
+> +			if (tmp < 0) {
+> +				dev_dbg(nor->dev,
+> +					"error %d reading JEDEC ID Multi I/O\n",
+> +					tmp);
+> +				return ERR_PTR(tmp);
+> +			}
+> +		}
+> +
+>  	for (tmp = 0; tmp < ARRAY_SIZE(spi_nor_ids) - 1; tmp++) {
+>  		info = &spi_nor_ids[tmp];
+>  		if (info->id_len) {
 [...]
->> +- compatible: Should be "hisilicon,mbigen-v2"
->> +
->> +- reg: Specifies the base physical address and size of the Mbigen
->> +  registers.
->> +
->> +- interrupt controller: Identifies the node as an interrupt controller
->> +
->> +- msi-parent: Specifies the MSI controller this mbigen use.
->> +  For more detail information,please refer to the generic msi-parent binding in
->> +  Documentation/devicetree/bindings/interrupt-controller/msi.txt.
->> +
->> +- num-msis:Specifies the total number of interrupt this device has.
-> 
-> Is this the number of pins implemented? Or the number of pins that are
-> in use?
-> 
-> The latter feels like something we can derive.
 
-num-msis means the total number of pins implemented.
-
-> 
->> +- #interrupt-cells : Specifies the number of cells needed to encode an
->> +  interrupt source. The value must be 2.
->> +
->> +  The 1st cell is hardware pin number of the interrupt.This number is local to
->> +  each mbigen chip and in the range from 0 to the maximum interrupts number
->> +  of the mbigen.
-> 
-> Just to check: 0 - 63 represent the "reserved" pins, yes?
-
-Yes, you are right.
-
-> 
-> Other than those questions, this looks good to me.
-
-Do i need to post a new patch to update these two questions?
-
-Thanks!
-MaJun
-
-> 
-> Thanks,
-> Mark.
-> 
->> +
->> +  The 2nd cell is the interrupt trigger type.
->> +	The value of this cell should be:
->> +	1: rising edge triggered
->> +	or
->> +	4: high level triggered
->> +
->> +Examples:
->> +
->> + 	mbigen_device_gmac:intc {
->> +			compatible = "hisilicon,mbigen-v2";
->> +			reg = <0x0 0xc0080000 0x0 0x10000>;
->> +			interrupt-controller;
->> +			msi-parent = <&its_dsa 0x40b1c>;
->> +			num-msis = <9>;
->> +			#interrupt-cells = <2>;
->> + 	};
->> +
->> +Devices connect to mbigen required properties:
->> +----------------------------------------------------
->> +-interrupt-parent: Specifies the mbigen device node which device connected.
->> +
->> +-interrupts:Specifies the interrupt source.
->> + For the specific information of each cell in this property,please refer to
->> + the "interrupt-cells" description mentioned above.
->> +
->> +Examples:
->> +	gmac0: ethernet at c2080000 {
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +		reg = <0 0xc2080000 0 0x20000>,
->> +		      <0 0xc0000000 0 0x1000>;
->> +		interrupt-parent  = <&mbigen_device_gmac>;
->> +		interrupts =	<656 1>,
->> +				<657 1>;
->> +	};
->> +
->> -- 
->> 1.7.1
->>
->>
-> 
-> .
-> 
+Brian
