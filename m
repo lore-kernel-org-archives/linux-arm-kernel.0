@@ -1,54 +1,111 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Fri, 18 Dec 2015 10:43:39 -0800
-Subject: [PATCH 0/3] Batched user access support
-In-Reply-To: <56745175.9010006@zytor.com>
-References: <alpine.LFD.2.20.1512171016510.27310@i7>
- <20151218111346.GF30483@arm.com> <56745175.9010006@zytor.com>
-Message-ID: <CA+55aFyAts-EGzmybdm93WZU_G4rAbpvONNt12s-ozy=SBbzGw@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 18 Dec 2015 18:54:45 +0000
+Subject: [PATCH 1/2] io-64-nonatomic: Add relaxed accessor variants
+Message-ID: <a2664d5691ff1889d80c711577cbd20680191b98.1450464706.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 10:33 AM, H. Peter Anvin <hpa@zytor.com> wrote:
-> On 12/18/15 03:13, Will Deacon wrote:
->>
->> I'm pretty unimaginative when it comes to security exploits, but that
->> does sound worse than the current implementation from a security
->> perspective.
->>
->
-> It is, but it is a tradeoff.  It is way better than opening it up for
-> the entire kernel.
+Whilst commit 9439eb3ab9d1 ("asm-generic: io: implement relaxed
+accessor macros as conditional wrappers") makes the *_relaxed forms of
+I/O accessors universally available to drivers, in cases where writeq()
+is implemented via the io-64-nonatomic helpers, writeq_relaxed() will
+end up falling back to writel() regardless of whether writel_relaxed()
+is available (identically for s/write/read/).
 
-So I wouldn't worry about the security part as long as we *only* do
-this in core library routines, and never really expose it as some kind
-of direct generic interface for random users.
+Add corresponding relaxed forms of the nonatomic helpers to delegate
+to the equivalent 32-bit accessors as appropriate.
 
-It's one of the reasons I named those functions "unsafe". They really
-aren't any more unsafe than the double underscore functions (which I
-really dislike outside of core kernel code too), but it's just a bad
-bad idea to use these in random drivers etc.
+CC: Arnd Bergmann <arnd@arndb.de>
+CC: Christoph Hellwig <hch@lst.de>
+CC: Darren Hart <dvhart@linux.intel.com>
+CC: Hitoshi Mitake <mitake.hitoshi@lab.ntt.co.jp>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ include/linux/io-64-nonatomic-hi-lo.h | 25 +++++++++++++++++++++++++
+ include/linux/io-64-nonatomic-lo-hi.h | 25 +++++++++++++++++++++++++
+ 2 files changed, 50 insertions(+)
 
-In fact, my first version of the patch restricted the code to only
-non-module builds, but I ended up not posting that because the extra
-
-   #ifndef MODULE
-   ...
-   #endif
-
-just made it a bit uglier.
-
-But I suspect we should do that in the long run. In fact, I would want
-to do that for the __{get,put}_user() functions too, because there
-really is no valid reason for drivers to use them.
-
-So I would very strongly advocate that we only ever use these new
-functions only for very core functions. Exactly things like
-"strncpy_from_user()" and friends. I'd also possibly see it for things
-like "cp_new_stat()", which right now copies to a temporary struicture
-on the kernel stack, and then uses a "copy_to_user()" to copy the
-temporary to user space. It's another very hot function on similar
-stat-hot workloads, although in profiles it ends up not showing quite
-as hot because the profile is split between the "set up on the kernel
-stack" and the actual user copy.
-
-                 Linus
+diff --git a/include/linux/io-64-nonatomic-hi-lo.h b/include/linux/io-64-nonatomic-hi-lo.h
+index 11d7e84..1a85566 100644
+--- a/include/linux/io-64-nonatomic-hi-lo.h
++++ b/include/linux/io-64-nonatomic-hi-lo.h
+@@ -21,6 +21,23 @@ static inline void hi_lo_writeq(__u64 val, volatile void __iomem *addr)
+ 	writel(val, addr);
+ }
+ 
++static inline __u64 hi_lo_readq_relaxed(const volatile void __iomem *addr)
++{
++	const volatile u32 __iomem *p = addr;
++	u32 low, high;
++
++	high = readl_relaxed(p + 1);
++	low = readl_relaxed(p);
++
++	return low + ((u64)high << 32);
++}
++
++static inline void hi_lo_writeq_relaxed(__u64 val, volatile void __iomem *addr)
++{
++	writel_relaxed(val >> 32, addr + 4);
++	writel_relaxed(val, addr);
++}
++
+ #ifndef readq
+ #define readq hi_lo_readq
+ #endif
+@@ -29,4 +46,12 @@ static inline void hi_lo_writeq(__u64 val, volatile void __iomem *addr)
+ #define writeq hi_lo_writeq
+ #endif
+ 
++#ifndef readq_relaxed
++#define readq_relaxed hi_lo_readq_relaxed
++#endif
++
++#ifndef writeq_relaxed
++#define writeq hi_lo_writeq_relaxed
++#endif
++
+ #endif	/* _LINUX_IO_64_NONATOMIC_HI_LO_H_ */
+diff --git a/include/linux/io-64-nonatomic-lo-hi.h b/include/linux/io-64-nonatomic-lo-hi.h
+index 1a4315f..1b7411d 100644
+--- a/include/linux/io-64-nonatomic-lo-hi.h
++++ b/include/linux/io-64-nonatomic-lo-hi.h
+@@ -21,6 +21,23 @@ static inline void lo_hi_writeq(__u64 val, volatile void __iomem *addr)
+ 	writel(val >> 32, addr + 4);
+ }
+ 
++static inline __u64 lo_hi_readq_relaxed(const volatile void __iomem *addr)
++{
++	const volatile u32 __iomem *p = addr;
++	u32 low, high;
++
++	low = readl_relaxed(p);
++	high = readl_relaxed(p + 1);
++
++	return low + ((u64)high << 32);
++}
++
++static inline void lo_hi_writeq_relaxed(__u64 val, volatile void __iomem *addr)
++{
++	writel_relaxed(val, addr);
++	writel_relaxed(val >> 32, addr + 4);
++}
++
+ #ifndef readq
+ #define readq lo_hi_readq
+ #endif
+@@ -29,4 +46,12 @@ static inline void lo_hi_writeq(__u64 val, volatile void __iomem *addr)
+ #define writeq lo_hi_writeq
+ #endif
+ 
++#ifndef readq_relaxed
++#define readq_relaxed hi_lo_readq_relaxed
++#endif
++
++#ifndef writeq_relaxed
++#define writeq hi_lo_writeq_relaxed
++#endif
++
+ #endif	/* _LINUX_IO_64_NONATOMIC_LO_HI_H_ */
+-- 
+1.9.1
