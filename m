@@ -1,148 +1,264 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 18 Dec 2015 13:59:09 -0700
-Subject: [PATCH V7 13/24] coresight: etm3x: implementing user/kernel mode
- tracing
+Date: Fri, 18 Dec 2015 13:59:10 -0700
+Subject: [PATCH V7 14/24] coresight: etm3x: implementing perf_enable/disable()
+ API
 In-Reply-To: <1450472361-426-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1450472361-426-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1450472361-426-14-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1450472361-426-15-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding new mode to limit tracing to kernel or user space.
+That way traces can be enabled and disabled automatically
+from the Perf subystem using the PMU abstraction.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm.h        |  6 ++-
- .../hwtracing/coresight/coresight-etm3x-sysfs.c    |  4 ++
- drivers/hwtracing/coresight/coresight-etm3x.c      | 63 ++++++++++++++++++++++
- drivers/hwtracing/coresight/coresight-priv.h       |  3 ++
- 4 files changed, 75 insertions(+), 1 deletion(-)
+ drivers/hwtracing/coresight/Kconfig           |  1 +
+ drivers/hwtracing/coresight/coresight-etm3x.c | 95 +++++++++++++++++++++++++--
+ drivers/hwtracing/coresight/coresight-etm4x.c |  4 +-
+ drivers/hwtracing/coresight/coresight.c       |  2 +-
+ include/linux/coresight.h                     |  6 +-
+ 5 files changed, 99 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm.h b/drivers/hwtracing/coresight/coresight-etm.h
-index 44585d4adb26..51597cb2c08a 100644
---- a/drivers/hwtracing/coresight/coresight-etm.h
-+++ b/drivers/hwtracing/coresight/coresight-etm.h
-@@ -110,7 +110,10 @@
- #define ETM_MODE_STALL		BIT(2)
- #define ETM_MODE_TIMESTAMP	BIT(3)
- #define ETM_MODE_CTXID		BIT(4)
--#define ETM_MODE_ALL		0x1f
-+#define ETM_MODE_ALL		(ETM_MODE_EXCLUDE | ETM_MODE_CYCACC | \
-+				 ETM_MODE_STALL | ETM_MODE_TIMESTAMP | \
-+				 ETM_MODE_CTXID | ETM_MODE_EXCL_KERN | \
-+				 ETM_MODE_EXCL_USER)
- 
- #define ETM_SQR_MASK		0x3
- #define ETM_TRACEID_MASK	0x3f
-@@ -296,5 +299,6 @@ static inline unsigned int etm_readl(struct etm_drvdata *drvdata, u32 off)
- extern const struct attribute_group *coresight_etm_groups[];
- int etm_get_trace_id(struct etm_drvdata *drvdata);
- void etm_set_default(struct etm_config *config);
-+void etm_config_trace_mode(struct etm_config *config);
- struct etm_config *get_etm_config(struct etm_drvdata *drvdata);
- #endif
-diff --git a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-index 387c79fd9d5e..cbb4046c1070 100644
---- a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-@@ -162,6 +162,10 @@ static ssize_t mode_store(struct device *dev,
- 		config->ctrl |= ETMCR_CTXID_SIZE;
- 	else
- 		config->ctrl &= ~ETMCR_CTXID_SIZE;
-+
-+	if (config->mode & (ETM_MODE_EXCL_KERN | ETM_MODE_EXCL_USER))
-+		etm_config_trace_mode(config);
-+
- 	spin_unlock(&drvdata->spinlock);
- 
- 	return size;
+diff --git a/drivers/hwtracing/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
+index 6c8921140f02..e252dd1522e5 100644
+--- a/drivers/hwtracing/coresight/Kconfig
++++ b/drivers/hwtracing/coresight/Kconfig
+@@ -4,6 +4,7 @@
+ menuconfig CORESIGHT
+ 	bool "CoreSight Tracing Support"
+ 	select ARM_AMBA
++	select PERF_EVENTS
+ 	help
+ 	  This framework provides a kernel interface for the CoreSight debug
+ 	  and trace drivers to register themselves with. It's intended to build
 diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index 9293e71a075a..60e06a865628 100644
+index 60e06a865628..6980880458ae 100644
 --- a/drivers/hwtracing/coresight/coresight-etm3x.c
 +++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -234,6 +234,69 @@ void etm_set_default(struct etm_config *config)
- 	config->ctxid_mask = 0x0;
+@@ -31,6 +31,7 @@
+ #include <linux/seq_file.h>
+ #include <linux/uaccess.h>
+ #include <linux/clk.h>
++#include <linux/perf_event.h>
+ #include <asm/sections.h>
+ 
+ #include "coresight-etm.h"
+@@ -297,6 +298,47 @@ void etm_config_trace_mode(struct etm_config *config)
+ 	config->addr_type[1] = ETM_ADDR_TYPE_RANGE;
  }
  
-+void etm_config_trace_mode(struct etm_config *config)
++#define ETM3X_SUPPORTED_OPTIONS (ETMCR_CYC_ACC | ETMCR_TIMESTAMP_EN)
++
++static int etm_parse_event_config(struct etm_drvdata *drvdata,
++				  struct perf_event_attr *attr)
 +{
-+	u32 flags, mode;
++	struct etm_config *config = &drvdata->config;
 +
-+	mode = config->mode;
++	if (!attr)
++		return -EINVAL;
 +
-+	mode &= (ETM_MODE_EXCL_KERN | ETM_MODE_EXCL_USER);
++	/* Clear configuration from previous run */
++	memset(config, 0, sizeof(struct etm_config));
 +
-+	/* excluding kernel AND user space doesn't make sense */
-+	if (mode == (ETM_MODE_EXCL_KERN | ETM_MODE_EXCL_USER))
-+		return;
++	if (attr->exclude_kernel)
++		config->mode = ETM_MODE_EXCL_KERN;
 +
-+	/* nothing to do if neither flags are set */
-+	if (!(mode & ETM_MODE_EXCL_KERN) && !(mode & ETM_MODE_EXCL_USER))
-+		return;
++	if (attr->exclude_user)
++		config->mode = ETM_MODE_EXCL_USER;
 +
-+	flags = (1 << 0 |	/* instruction execute */
-+		 3 << 3 |	/* ARM instruction */
-+		 0 << 5 |	/* No data value comparison */
-+		 0 << 7 |	/* No exact mach */
-+		 0 << 8);	/* Ignore context ID */
-+
-+	/* No need to worry about single address comparators. */
-+	config->enable_ctrl2 = 0x0;
-+
-+	/* Bit 0 is address range comparator 1 */
-+	config->enable_ctrl1 = ETMTECR1_ADDR_COMP_1;
++	/* Always start from the default config */
++	etm_set_default(config);
 +
 +	/*
-+	 * On ETMv3.5:
-+	 * ETMACTRn[13,11] == Non-secure state comparison control
-+	 * ETMACTRn[12,10] == Secure state comparison control
-+	 *
-+	 * b00 == Match in all modes in this state
-+	 * b01 == Do not match in any more in this state
-+	 * b10 == Match in all modes excepts user mode in this state
-+	 * b11 == Match only in user mode in this state
++	 * By default the tracers are configured to trace the whole address
++	 * range.  Narrow the field only if requested by user space.
 +	 */
-+
-+	/* Tracing in secure mode is not supported at this time */
-+	flags |= (0 << 12 | 1 << 10);
-+
-+	if (mode & ETM_MODE_EXCL_USER) {
-+		/* exclude user, match all modes except user mode */
-+		flags |= (1 << 13 | 0 << 11);
-+	} else {
-+		/* exclude kernel, match only in user mode */
-+		flags |= (1 << 13 | 1 << 11);
-+	}
++	if (config->mode)
++		etm_config_trace_mode(config);
 +
 +	/*
-+	 * The ETMEEVR register is already set to "hard wire A".  As such
-+	 * all there is to do is setup an address comparator that spans
-+	 * the entire address range and configure the state and mode bits.
++	 * At this time only cycle accurate and timestamp options are
++	 * available.
 +	 */
-+	config->addr_val[0] = (u32) 0x0;
-+	config->addr_val[1] = (u32) ~0x0;
-+	config->addr_acctype[0] = flags;
-+	config->addr_acctype[1] = flags;
-+	config->addr_type[0] = ETM_ADDR_TYPE_RANGE;
-+	config->addr_type[1] = ETM_ADDR_TYPE_RANGE;
++	if (attr->config & ~ETM3X_SUPPORTED_OPTIONS)
++		return -EINVAL;
++
++	config->ctrl = attr->config;
++
++	return 0;
 +}
 +
  static void etm_enable_hw(void *info)
  {
  	int i;
-diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
-index ed116b303e87..932f34a84d96 100644
---- a/drivers/hwtracing/coresight/coresight-priv.h
-+++ b/drivers/hwtracing/coresight/coresight-priv.h
-@@ -34,6 +34,9 @@
- #define TIMEOUT_US		100
- #define BMVAL(val, lsb, msb)	((val & GENMASK(msb, lsb)) >> lsb)
+@@ -316,8 +358,10 @@ static void etm_enable_hw(void *info)
+ 	etm_set_prog(drvdata);
  
-+#define ETM_MODE_EXCL_KERN	BIT(30)
-+#define ETM_MODE_EXCL_USER	BIT(31)
+ 	etmcr = etm_readl(drvdata, ETMCR);
+-	etmcr &= (ETMCR_PWD_DWN | ETMCR_ETM_PRG);
++	/* Clear setting from a previous run if need be */
++	etmcr &= ~ETM3X_SUPPORTED_OPTIONS;
+ 	etmcr |= drvdata->port_size;
++	etmcr |= ETMCR_ETM_EN;
+ 	etm_writel(drvdata, config->ctrl | etmcr, ETMCR);
+ 	etm_writel(drvdata, config->trigger_event, ETMTRIGGER);
+ 	etm_writel(drvdata, config->startstop_ctrl, ETMTSSCR);
+@@ -357,9 +401,6 @@ static void etm_enable_hw(void *info)
+ 	/* No VMID comparator value selected */
+ 	etm_writel(drvdata, 0x0, ETMVMIDCVR);
+ 
+-	/* Ensures trace output is enabled from this ETM */
+-	etm_writel(drvdata, config->ctrl | ETMCR_ETM_EN | etmcr, ETMCR);
+-
+ 	etm_clr_prog(drvdata);
+ 	CS_LOCK(drvdata->base);
+ 
+@@ -407,6 +448,22 @@ static int etm_trace_id(struct coresight_device *csdev)
+ 	return etm_get_trace_id(drvdata);
+ }
+ 
++static int etm_enable_perf(struct coresight_device *csdev,
++			   struct perf_event_attr *attr)
++{
++	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
 +
- enum cs_mode {
- 	CS_MODE_DISABLED,
- 	CS_MODE_SYSFS,
++	if (WARN_ON_ONCE(drvdata->cpu != smp_processor_id()))
++		return -EINVAL;
++
++	/* Configure the tracer based on the session's specifics */
++	etm_parse_event_config(drvdata, attr);
++	/* And enable it */
++	etm_enable_hw(drvdata);
++
++	return 0;
++}
++
+ static int etm_enable_sysfs(struct coresight_device *csdev)
+ {
+ 	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+@@ -437,7 +494,8 @@ err:
+ 	return ret;
+ }
+ 
+-static int etm_enable(struct coresight_device *csdev, u32 mode)
++static int etm_enable(struct coresight_device *csdev,
++		      struct perf_event_attr *attr, u32 mode)
+ {
+ 	int ret;
+ 	u32 val;
+@@ -453,6 +511,9 @@ static int etm_enable(struct coresight_device *csdev, u32 mode)
+ 	case CS_MODE_SYSFS:
+ 		ret = etm_enable_sysfs(csdev);
+ 		break;
++	case CS_MODE_PERF:
++		ret = etm_enable_perf(csdev, attr);
++		break;
+ 	default:
+ 		ret = -EINVAL;
+ 	}
+@@ -485,6 +546,27 @@ static void etm_disable_hw(void *info)
+ 	dev_dbg(drvdata->dev, "cpu: %d disable smp call done\n", drvdata->cpu);
+ }
+ 
++static void etm_disable_perf(struct coresight_device *csdev)
++{
++	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
++
++	if (WARN_ON_ONCE(drvdata->cpu != smp_processor_id()))
++		return;
++
++	CS_UNLOCK(drvdata->base);
++
++	/* Setting the prog bit disables tracing immediately */
++	etm_set_prog(drvdata);
++
++	/*
++	 * There is no way to know when the tracer will be used again so
++	 * power down the tracer.
++	 */
++	etm_set_pwrdwn(drvdata);
++
++	CS_LOCK(drvdata->base);
++}
++
+ static void etm_disable_sysfs(struct coresight_device *csdev)
+ {
+ 	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+@@ -530,6 +612,9 @@ static void etm_disable(struct coresight_device *csdev)
+ 	case CS_MODE_SYSFS:
+ 		etm_disable_sysfs(csdev);
+ 		break;
++	case CS_MODE_PERF:
++		etm_disable_perf(csdev);
++		break;
+ 	default:
+ 		WARN_ON_ONCE(mode);
+ 		return;
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+index 4ab291b3a6c8..2f7523caf9d6 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -32,6 +32,7 @@
+ #include <linux/seq_file.h>
+ #include <linux/uaccess.h>
+ #include <linux/pm_runtime.h>
++#include <linux/perf_event.h>
+ #include <asm/sections.h>
+ 
+ #include "coresight-etm4x.h"
+@@ -180,7 +181,8 @@ static void etm4_enable_hw(void *info)
+ 	dev_dbg(drvdata->dev, "cpu: %d enable smp call done\n", drvdata->cpu);
+ }
+ 
+-static int etm4_enable(struct coresight_device *csdev, u32 mode)
++static int etm4_enable(struct coresight_device *csdev,
++		       struct perf_event_attr *attr, u32 mode)
+ {
+ 	struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+ 	int ret;
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index c02da2edfd80..3cd0e87d8a16 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -234,7 +234,7 @@ static int coresight_enable_source(struct coresight_device *csdev, u32 mode)
+ 
+ 	if (!csdev->enable) {
+ 		if (source_ops(csdev)->enable) {
+-			ret = source_ops(csdev)->enable(csdev, mode);
++			ret = source_ops(csdev)->enable(csdev, NULL, mode);
+ 			if (ret)
+ 				return ret;
+ 		}
+diff --git a/include/linux/coresight.h b/include/linux/coresight.h
+index 61dfb8d511ea..6801dd64ee5d 100644
+--- a/include/linux/coresight.h
++++ b/include/linux/coresight.h
+@@ -14,6 +14,7 @@
+ #define _LINUX_CORESIGHT_H
+ 
+ #include <linux/device.h>
++#include <linux/perf_event.h>
+ #include <linux/sched.h>
+ 
+ /* Peripheral id registers (0xFD0-0xFEC) */
+@@ -206,14 +207,15 @@ struct coresight_ops_link {
+  * @cpu_id:	returns the value of the CPU number this component
+  *		is associated to.
+  * @trace_id:	returns the value of the component's trace ID as known
+-		to the HW.
++ *		to the HW.
+  * @enable:	enables tracing for a source.
+  * @disable:	disables tracing for a source.
+  */
+ struct coresight_ops_source {
+ 	int (*cpu_id)(struct coresight_device *csdev);
+ 	int (*trace_id)(struct coresight_device *csdev);
+-	int (*enable)(struct coresight_device *csdev, u32 mode);
++	int (*enable)(struct coresight_device *csdev,
++		      struct perf_event_attr *attr,  u32 mode);
+ 	void (*disable)(struct coresight_device *csdev);
+ };
+ 
 -- 
 2.1.4
