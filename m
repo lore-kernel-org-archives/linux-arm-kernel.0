@@ -1,99 +1,56 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 18 Dec 2015 17:33:55 +0800
-Subject: [RFC PATCH 1/5] usb: hub: add device tree support for populating
- onboard usb device
+Date: Fri, 18 Dec 2015 17:33:56 +0800
+Subject: [RFC PATCH 2/5] doc: dt-binding: generic onboard USB device
 In-Reply-To: <1450431239-16439-1-git-send-email-peter.chen@freescale.com>
 References: <1450431239-16439-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1450431239-16439-2-git-send-email-peter.chen@freescale.com>
+Message-ID: <1450431239-16439-3-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Although most of USB device is hot-plug's, there are still some
-USB devices are soldered on the board, and these kinds of devices
-maybe the upstream device at 1st or 2nd level hub's, so in order to
-detect all onboard devices, we put the detect device node code
-at hub's driver, and it will populate platform device under this HUB.
+Add dt-binding documentation for generic onboard USB device.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/core/hub.c | 37 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+ .../bindings/usb/generic-onboard-device.txt        | 31 ++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/usb/generic-onboard-device.txt
 
-diff --git a/drivers/usb/core/hub.c b/drivers/usb/core/hub.c
-index 5e32ce7..889f188 100644
---- a/drivers/usb/core/hub.c
-+++ b/drivers/usb/core/hub.c
-@@ -26,6 +26,7 @@
- #include <linux/mutex.h>
- #include <linux/random.h>
- #include <linux/pm_qos.h>
-+#include <linux/of_platform.h>
- 
- #include <asm/uaccess.h>
- #include <asm/byteorder.h>
-@@ -1334,6 +1335,34 @@ static int hub_post_reset(struct usb_interface *intf)
- 	return 0;
- }
- 
-+static int hub_of_children_register(struct usb_device *hdev)
-+{
-+	struct device *dev;
+diff --git a/Documentation/devicetree/bindings/usb/generic-onboard-device.txt b/Documentation/devicetree/bindings/usb/generic-onboard-device.txt
+new file mode 100644
+index 0000000..cdb3014
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/generic-onboard-device.txt
+@@ -0,0 +1,31 @@
++Generic Onboard USB Device 
 +
-+	if (hdev->parent)
-+		dev = &hdev->dev;
-+	else
-+		dev = bus_to_hcd(hdev->bus)->self.controller;
++The node should be located at USB host controller's node or
++any USB HUB's node.
 +
-+	if (!dev->of_node)
-+		return 0;
++Required properties:
++- compatible: should be "generic-onboard-device"
 +
-+	return of_platform_populate(dev->of_node, NULL, NULL, dev);
-+}
++Optional properties:
++- clocks: the input clock for USB device.
++- clock-frequency: the frequency for device's clock.
++- reset-gpios: Should specify the GPIO for reset.
++- reset-duration-us: the duration for assert reset signal, the time unit
++  is microsecond.
 +
-+static void hub_of_children_unregister(struct usb_device *hdev)
-+{
-+	struct device *dev;
++Example:
 +
-+	if (hdev->parent)
-+		dev = &hdev->dev;
-+	else
-+		dev = bus_to_hcd(hdev->bus)->self.controller;
++&usbh1 {
++	vbus-supply = <&reg_usb_h1_vbus>;
++        status = "okay";
 +
-+	if (dev->of_node)
-+		of_platform_depopulate(dev);
-+}
-+
- static int hub_configure(struct usb_hub *hub,
- 	struct usb_endpoint_descriptor *endpoint)
- {
-@@ -1677,6 +1706,7 @@ static void hub_disconnect(struct usb_interface *intf)
- 	usb_set_intfdata(intf, NULL);
- 	spin_unlock_irq(&device_state_lock);
- 
-+	hub_of_children_unregister(hdev);
- 	for (; port1 > 0; --port1)
- 		usb_hub_remove_port_device(hub, port1);
- 
-@@ -1701,6 +1731,7 @@ static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
- 	struct usb_endpoint_descriptor *endpoint;
- 	struct usb_device *hdev;
- 	struct usb_hub *hub;
-+	int ret;
- 
- 	desc = intf->cur_altsetting;
- 	hdev = interface_to_usbdev(intf);
-@@ -1820,6 +1851,12 @@ descriptor_error:
- 	if (id->driver_info & HUB_QUIRK_CHECK_PORT_AUTOSUSPEND)
- 		hub->quirk_check_port_auto_suspend = 1;
- 
-+	ret = hub_of_children_register(hdev);
-+	if (ret) {
-+		dev_err(&hdev->dev, "Failed to register child device\n");
-+		return ret;
-+	}
-+
- 	if (hub_configure(hub, endpoint) >= 0)
- 		return 0;
- 
++	#address-cells = <1>;
++	#size-cells = <0>;
++	hub: usb2415 at 01 {
++	       compatible = "generic-onboard-device";
++	       reg = <0x01>;
++	       clocks = <&clks IMX6QDL_CLK_CKO>;
++	       reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
++	       reset-duration-us = <10>;
++	};
++};
 -- 
 1.9.1
