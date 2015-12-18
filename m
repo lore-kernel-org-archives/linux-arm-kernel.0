@@ -1,79 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Dec 2015 15:18:08 +0100
-Subject: [PATCH] netcp: fix regression in receive processing
-Message-ID: <1651314.QiL8XMyoqS@wuerfel>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 18 Dec 2015 15:17:17 +0100
+Subject: [PATCH 04/69] clocksource/drivers/tegra: Allow timer irq affinity
+ change
+In-Reply-To: <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
+References: <5672CB9E.7090707@linaro.org>
+ <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1450448302-27429-4-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A cleanup patch I did was unfortunately wrong and introduced
-multiple serious bugs in the netcp rx processing, as indicated
-by these correct gcc warnings:
+From: Lucas Stach <dev@lynxeye.de>
 
-drivers/net/ethernet/ti/netcp_core.c:776:14: warning: 'buf_ptr' may be used uninitialized in this function [-Wuninitialized]
-drivers/net/ethernet/ti/netcp_core.c:687:14: warning: 'ptr' may be used uninitialized in this function [-Wuninitialized]
+Allow the timer core to change the smp affinity of the broadcast timer
+irq by setting CLOCK_EVT_FEAT_DYNIRQ flag.
 
-I have checked the patch once more and found that a call to
-get_pkt_info() accidentally got removed in netcp_free_rx_desc_chain,
-and netcp_process_one_rx_packet no longer retrieved the correct
-buffer length. This patch should fix all the known problems,
-but I did not test on real hardware.
+This reduces interrupt pressure and wakeups on CPU0 as well as vastly
+reducing the number of timer broadcast IPIs.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 899077791403 ("netcp: try to reduce type confusion in descriptors")
+Signed-off-by: Lucas Stach <dev@lynxeye.de>
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ drivers/clocksource/tegra20_timer.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/net/ethernet/ti/netcp_core.c b/drivers/net/ethernet/ti/netcp_core.c
-index 92d08eb262c2..c61d66d38634 100644
---- a/drivers/net/ethernet/ti/netcp_core.c
-+++ b/drivers/net/ethernet/ti/netcp_core.c
-@@ -582,6 +582,7 @@ static void netcp_free_rx_desc_chain(struct netcp_intf *netcp,
- 	unsigned int buf_len, dma_sz = sizeof(*ndesc);
- 	void *buf_ptr;
- 	u32 pad[2];
-+	u32 tmp;
- 
- 	get_words(&dma_desc, 1, &desc->next_desc);
- 
-@@ -591,6 +592,7 @@ static void netcp_free_rx_desc_chain(struct netcp_intf *netcp,
- 			dev_err(netcp->ndev_dev, "failed to unmap Rx desc\n");
- 			break;
- 		}
-+		get_pkt_info(&dma_buf, &tmp, &dma_desc, ndesc);
- 		get_pad_ptr(&buf_ptr, ndesc);
- 		dma_unmap_page(netcp->dev, dma_buf, PAGE_SIZE, DMA_FROM_DEVICE);
- 		__free_page(buf_ptr);
-@@ -637,6 +639,7 @@ static int netcp_process_one_rx_packet(struct netcp_intf *netcp)
- 	dma_addr_t dma_desc, dma_buff;
- 	struct netcp_packet p_info;
- 	struct sk_buff *skb;
-+	u32 pad[2];
- 	void *org_buf_ptr;
- 
- 	dma_desc = knav_queue_pop(netcp->rx_queue, &dma_sz);
-@@ -650,7 +653,8 @@ static int netcp_process_one_rx_packet(struct netcp_intf *netcp)
- 	}
- 
- 	get_pkt_info(&dma_buff, &buf_len, &dma_desc, desc);
--	get_pad_ptr(&org_buf_ptr, desc);
-+	get_pad_info(&pad[0], &pad[1], &org_buf_len, desc);
-+	org_buf_ptr = (void *)(uintptr_t)(pad[0] + ((u64)pad[1] << 32));
- 
- 	if (unlikely(!org_buf_ptr)) {
- 		dev_err(netcp->ndev_dev, "NULL bufptr in desc\n");
-@@ -684,7 +688,7 @@ static int netcp_process_one_rx_packet(struct netcp_intf *netcp)
- 		}
- 
- 		get_pkt_info(&dma_buff, &buf_len, &dma_desc, ndesc);
--		get_pad_ptr(ptr, ndesc);
-+		get_pad_ptr(&ptr, ndesc);
- 		page = ptr;
- 
- 		if (likely(dma_buff && buf_len && page)) {
-@@ -773,7 +777,7 @@ static void netcp_free_rx_buf(struct netcp_intf *netcp, int fdq)
- 		}
- 
- 		get_org_pkt_info(&dma, &buf_len, desc);
--		get_pad_ptr(buf_ptr, desc);
-+		get_pad_ptr(&buf_ptr, desc);
- 
- 		if (unlikely(!dma)) {
- 			dev_err(netcp->ndev_dev, "NULL orig_buff in desc\n");
+diff --git a/drivers/clocksource/tegra20_timer.c b/drivers/clocksource/tegra20_timer.c
+index 6ebda11..38333ab 100644
+--- a/drivers/clocksource/tegra20_timer.c
++++ b/drivers/clocksource/tegra20_timer.c
+@@ -96,7 +96,8 @@ static struct clock_event_device tegra_clockevent = {
+ 	.name			= "timer0",
+ 	.rating			= 300,
+ 	.features		= CLOCK_EVT_FEAT_ONESHOT |
+-				  CLOCK_EVT_FEAT_PERIODIC,
++				  CLOCK_EVT_FEAT_PERIODIC |
++				  CLOCK_EVT_FEAT_DYNIRQ,
+ 	.set_next_event		= tegra_timer_set_next_event,
+ 	.set_state_shutdown	= tegra_timer_shutdown,
+ 	.set_state_periodic	= tegra_timer_set_periodic,
+-- 
+1.9.1
