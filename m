@@ -1,44 +1,86 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 18 Dec 2015 15:03:59 +0900
-Subject: [PATCH] ARM: uniphier: select PINCTRL
-In-Reply-To: <1446706075-7348-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1446706075-7348-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAK7LNATtUC+5TU7eyuoOQ3W1ZbPwkX_1zY9rqC80_j1VZOsWgw@mail.gmail.com>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Fri, 18 Dec 2015 15:05:45 +0900
+Subject: [PATCH] ARM: dma-mapping: Just allocate one chunk at a time
+In-Reply-To: <CAD=FV=XP9zx2XEmo7vS0MdsROJ0JoRYFidnRaBLxR43GXnuqag@mail.gmail.com>
+References: <1450384253-1067-1-git-send-email-dianders@chromium.org>
+ <CAD=FV=XP9zx2XEmo7vS0MdsROJ0JoRYFidnRaBLxR43GXnuqag@mail.gmail.com>
+Message-ID: <CAAFQd5A1jDaqNaOqUqPOYFW+6aA5fAZwUxJB6LWQ44R0b9ZuQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please let me gently ping in case the maintainers might be away from keyboard
-during the Christmas days.
-
-I want this trivial one for the next merge window.
-
-Thanks!
-
-
-2015-11-05 15:47 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> The UniPhier SoCs support pinctrl drivers.
+On Fri, Dec 18, 2015 at 7:31 AM, Doug Anderson <dianders@chromium.org> wrote:
+> Hi,
 >
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
+> On Thu, Dec 17, 2015 at 12:30 PM, Douglas Anderson
+> <dianders@chromium.org> wrote:
+>> The __iommu_alloc_buffer() is expected to be called to allocate pretty
+>> sizeable buffers.  Upon simple tests of video I saw it trying to
+>> allocate 4,194,304 bytes.  The function tries to be efficient about this
+>> by starting out allocating large chunks and then moving to smaller and
+>> smaller chunk sizes until it succeeds.
+>>
+>> The current function is very, very slow.
+>>
+>> One problem is the way it keeps trying and trying to allocate big
+>> chunks.  Imagine a very fragmented memory that has 4M free but no
+>> contiguous pages at all.  Further imagine allocating 4M (1024 pages).
+>> We'll do the following memory allocations:
+>> - For page 1:
+>>   - Try to allocate order 10 (no retry)
+>>   - Try to allocate order 9 (no retry)
+>>   - ...
+>>   - Try to allocate order 0 (with retry, but not needed)
+>> - For page 2:
+>>   - Try to allocate order 9 (no retry)
+>>   - Try to allocate order 8 (no retry)
+>>   - ...
+>>   - Try to allocate order 0 (with retry, but not needed)
+>> - ...
+>> - ...
+>>
+>> Total number of calls to alloc() calls for this case is:
+>>   sum(int(math.log(i, 2)) + 1 for i in range(1, 1025))
+>>   => 9228
+>>
+>> The above is obviously worse case, but given how slow alloc can be we
+>> really want to try to avoid even somewhat bad cases.  I timed the old
+>> code with a device under memory pressure and it wasn't hard to see it
+>> take more than 24 seconds to allocate 4 megs of memory (!!).
+>>
+>> A second problem (and maybe even more important) is that allocating big
+>> chunks when we don't need them is just not a good idea anyway.  The
+>> first thing we do with these big chunks is break them into smaller
+>> chunks!  If we allocate small chunks:
+>> - The memory manager doesn't need to work so hard to give us big chunks.
+>> - We can save the big chunks for those that really need them and this
+>>   code can make great use of all the small chunks sitting around.
+>>
+>> Let's simplify by just allocating one page at a time.  We may make more
+>> total allocate calls but it works way better.  In real world tests that
+>> used to sometimes see a 24 second allocation call I can now see at most
+>> 250 ms.
 >
->  arch/arm/mach-uniphier/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/mach-uniphier/Kconfig b/arch/arm/mach-uniphier/Kconfig
-> index b640458..82dddee 100644
-> --- a/arch/arm/mach-uniphier/Kconfig
-> +++ b/arch/arm/mach-uniphier/Kconfig
-> @@ -6,6 +6,7 @@ config ARCH_UNIPHIER
->         select ARM_GIC
->         select HAVE_ARM_SCU
->         select HAVE_ARM_TWD if SMP
-> +       select PINCTRL
->         help
->           Support for UniPhier SoC family developed by Socionext Inc.
->           (formerly, System LSI Business Division of Panasonic Corporation)
-> --
+> Off-list I talked to Dmitry about this a little bit and he pointed out
+> that contiguous chunks actually give a benefit to the IOMMU.  I don't
+> think the benefit outweighs the cost in this case, but I'm happy to
+> hear what others have to say.
 
+Yeah, I'd like to see some discussion about the effect of allocating
+bigger chunks on IOMMU performance. Dmitry (on CC), could you
+elaborate a bit on what Doug mentioned?
 
--- 
-Best Regards
-Masahiro Yamada
+As for my own understanding, some IOMMUs can map memory using big
+pages, which should improve TLB efficiency and so look-up speed.
+However AFAICT current implementation of allocating function doesn't
+allocate the chunks properly, because there is no guarantee that
+particular chunks are aligned on big page boundary. For example, it
+might happen that we allocate first chunk of order 0, then second
+chunk of order 4 (64KiB - typical big page), then we won't be able to
+map the second chunk using a big page, because the IOVA at that point
+will not be aligned properly.
+
+Is there any other case when bigger physically contiguous chunks can
+help the IOMMU?
+
+Best regards,
+Tomasz
