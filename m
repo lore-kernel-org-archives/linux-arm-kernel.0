@@ -1,43 +1,38 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 18 Dec 2015 14:05:51 +0000
-Subject: [PULL take #2] KVM/ARM fixes for v4.4-rc6
-Message-ID: <1450447552-3161-1-git-send-email-marc.zyngier@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 18 Dec 2015 15:09:46 +0100
+Subject: [PATCH v6 15/20] arm64: signal: move ilp32 and lp64 common code
+ to separated file
+In-Reply-To: <20151218134855.GA31200@yury-N73SV>
+References: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
+ <6089723.moZBJ98Dq4@wuerfel> <20151218134855.GA31200@yury-N73SV>
+Message-ID: <2916702.unU22JtYur@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paolo,
+On Friday 18 December 2015 16:48:55 Yury Norov wrote:
+> On Wed, Dec 16, 2015 at 05:08:35PM +0100, Arnd Bergmann wrote:
+> > On Wednesday 16 December 2015 00:42:41 Yury Norov wrote:
+> > > +               sigtramp = ka->sa.sa_restorer;
+> > > +#ifdef CONFIG_ARM64_ILP32
+> > > +       else if (is_ilp32_compat_task())
+> > > +               sigtramp = VDSO_SYMBOL(current->mm->context.vdso, sigtramp_ilp32);
+> > > +#endif
+> > > +       else
+> > > +               sigtramp = VDSO_SYMBOL(current->mm->context.vdso, sigtramp);
+> > > 
+> > 
+> > This is another case where I think it's more readable to remove the #ifdef,
+> > with no change in behavior.
+> > 
+> >       Arnd
+> 
+> No actually. symbol sigtramp_ilp32 is declared in
+> arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S
+> 
+> And so it does not exist if CONFIG_ARM64_ILP32 is not set.
 
-We have a one line fix for the VGIC this time around, fixing a patch
-that went in -rc2. Oh well. Hopefully this is the last one for v4.4.
-And yes, the right patch is following the pull-request this time...
+You only need the declaration of that symbol, the compiler's dead code
+elimination will ensure that no symbol reference is generated when 
+the condition is always false at compile time.
 
-Please pull!
-
-Thanks,
-
-	M.
-
-The following changes since commit 0de58f852875a0f0dcfb120bb8433e4e73c7803b:
-
-  ARM/arm64: KVM: correct PTE uncachedness check (2015-12-04 16:30:17 +0000)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-v4.4-rc6
-
-for you to fetch changes up to fdec12c12ed4333afb49c9948c29fbd5fb52da97:
-
-  KVM: arm/arm64: vgic: Fix kvm_vgic_map_is_active's dist check (2015-12-11 16:33:31 +0000)
-
-----------------------------------------------------------------
-KVM/ARM fixes for v4.4-rc6
-
-- Fix for the active interrupt detection code, affecting
-  the timer interrupt injection.
-
-----------------------------------------------------------------
-Christoffer Dall (1):
-      KVM: arm/arm64: vgic: Fix kvm_vgic_map_is_active's dist check
-
- virt/kvm/arm/vgic.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+	Arnd
