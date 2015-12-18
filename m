@@ -1,159 +1,40 @@
-From: damien.riegel@savoirfairelinux.com (Damien Riegel)
-Date: Fri, 18 Dec 2015 12:00:32 -0500
-Subject: [PATCH 1/2] ARM: dts: ts-4800: Add LCD support
-Message-ID: <1450458033-30471-1-git-send-email-damien.riegel@savoirfairelinux.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 18 Dec 2015 17:01:47 +0000
+Subject: [PATCH 2/3] iommu/dma: Use correct offset in map_sg
+In-Reply-To: <9a84191ed813c23db7901f8c73f514d081495bdf.1450457730.git.robin.murphy@arm.com>
+References: <9a84191ed813c23db7901f8c73f514d081495bdf.1450457730.git.robin.murphy@arm.com>
+Message-ID: <4812a34857b081e45c36d7e887840f3675da74dc.1450457730.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds LCD support for the TS-4800. The panel is an Okaya
-RS800480T-7X0WQ and the timings have been extracted from Technologic
-Systems' tree.
+When mapping a non-page-aligned scatterlist entry, we copy the original
+offset to the output DMA address before aligning it to hand off to
+iommu_map_sg(), then later adding the IOVA page address portion to get
+the final mapped address. However, when the IOVA page size is smaller
+than the CPU page size, it is the offset within the IOVA page we want,
+not that within the CPU page, which can easily be larger than an IOVA
+page and thus result in an incorrect final address.
 
-Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
+Fix the bug by taking only the IOVA-aligned part of the offset as the
+basis of the DMA address, not the whole thing.
+
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- arch/arm/boot/dts/imx51-ts4800.dts | 109 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 109 insertions(+)
+ drivers/iommu/dma-iommu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx51-ts4800.dts b/arch/arm/boot/dts/imx51-ts4800.dts
-index 83352cb..4951ebd 100644
---- a/arch/arm/boot/dts/imx51-ts4800.dts
-+++ b/arch/arm/boot/dts/imx51-ts4800.dts
-@@ -30,6 +30,60 @@
- 			clock-frequency = <24576000>;
- 		};
- 	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		backlight_reg: regulator at 0 {
-+			compatible = "regulator-fixed";
-+			reg = <0>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_enable_lcd>;
-+			regulator-name = "enable_lcd_reg";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			gpio = <&gpio4 9 GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+		};
-+	};
-+
-+	backlight: backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&pwm1 0 78770>;
-+		brightness-levels = <0 150 200 255>;
-+		default-brightness-level = <1>;
-+		power-supply = <&backlight_reg>;
-+	};
-+
-+	display0: display at di0 {
-+		compatible = "fsl,imx-parallel-display";
-+		interface-pix-fmt = "rgb24";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_lcd>;
-+
-+		display-timings {
-+			800x480p60 {
-+				native-mode;
-+				clock-frequency = <30066000>;
-+				hactive = <800>;
-+				vactive = <480>;
-+				hfront-porch = <50>;
-+				hback-porch = <70>;
-+				hsync-len = <50>;
-+				vback-porch = <0>;
-+				vfront-porch = <0>;
-+				vsync-len = <50>;
-+			};
-+		};
-+
-+		port at 0 {
-+			display0_in: endpoint {
-+				remote-endpoint = <&ipu_di0_disp0>;
-+			};
-+		};
-+	};
- };
+diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+index 982e716..03811e3 100644
+--- a/drivers/iommu/dma-iommu.c
++++ b/drivers/iommu/dma-iommu.c
+@@ -458,7 +458,7 @@ int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
+ 		size_t s_length = s->length;
+ 		size_t pad_len = (mask - iova_len + 1) & mask;
  
- &esdhc1 {
-@@ -60,6 +114,16 @@
- 	};
- };
- 
-+&ipu_di0_disp0 {
-+	remote-endpoint = <&display0_in>;
-+};
-+
-+&pwm1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pwm_backlight>;
-+	status = "okay";
-+};
-+
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart1>;
-@@ -115,6 +179,12 @@
- 		>;
- 	};
- 
-+	pinctrl_enable_lcd: enablelcdgrp {
-+		fsl,pins = <
-+			MX51_PAD_CSI2_D12__GPIO4_9		0x1c5
-+		>;
-+	};
-+
- 	pinctrl_esdhc1: esdhc1grp {
- 		fsl,pins = <
- 			MX51_PAD_SD1_CMD__SD1_CMD		0x400020d5
-@@ -159,6 +229,45 @@
- 		>;
- 	};
- 
-+	pinctrl_lcd: lcdgrp {
-+		fsl,pins = <
-+			MX51_PAD_DISP1_DAT0__DISP1_DAT0		0x5
-+			MX51_PAD_DISP1_DAT1__DISP1_DAT1		0x5
-+			MX51_PAD_DISP1_DAT2__DISP1_DAT2		0x5
-+			MX51_PAD_DISP1_DAT3__DISP1_DAT3		0x5
-+			MX51_PAD_DISP1_DAT4__DISP1_DAT4		0x5
-+			MX51_PAD_DISP1_DAT5__DISP1_DAT5		0x5
-+			MX51_PAD_DISP1_DAT6__DISP1_DAT6		0x5
-+			MX51_PAD_DISP1_DAT7__DISP1_DAT7		0x5
-+			MX51_PAD_DISP1_DAT8__DISP1_DAT8		0x5
-+			MX51_PAD_DISP1_DAT9__DISP1_DAT9		0x5
-+			MX51_PAD_DISP1_DAT10__DISP1_DAT10	0x5
-+			MX51_PAD_DISP1_DAT11__DISP1_DAT11	0x5
-+			MX51_PAD_DISP1_DAT12__DISP1_DAT12	0x5
-+			MX51_PAD_DISP1_DAT13__DISP1_DAT13	0x5
-+			MX51_PAD_DISP1_DAT14__DISP1_DAT14	0x5
-+			MX51_PAD_DISP1_DAT15__DISP1_DAT15	0x5
-+			MX51_PAD_DISP1_DAT16__DISP1_DAT16	0x5
-+			MX51_PAD_DISP1_DAT17__DISP1_DAT17	0x5
-+			MX51_PAD_DISP1_DAT18__DISP1_DAT18	0x5
-+			MX51_PAD_DISP1_DAT19__DISP1_DAT19	0x5
-+			MX51_PAD_DISP1_DAT20__DISP1_DAT20	0x5
-+			MX51_PAD_DISP1_DAT21__DISP1_DAT21	0x5
-+			MX51_PAD_DISP1_DAT22__DISP1_DAT22	0x5
-+			MX51_PAD_DISP1_DAT23__DISP1_DAT23	0x5
-+			MX51_PAD_DI1_PIN2__DI1_PIN2		0x5
-+			MX51_PAD_DI1_PIN3__DI1_PIN3		0x5
-+			MX51_PAD_DI2_DISP_CLK__DI2_DISP_CLK	0x5
-+			MX51_PAD_DI_GP4__DI2_PIN15		0x5
-+		>;
-+	};
-+
-+	pinctrl_pwm_backlight: backlightgrp {
-+		fsl,pins = <
-+			MX51_PAD_GPIO1_2__PWM1_PWMO		0x80000000
-+		>;
-+	};
-+
- 	pinctrl_uart1: uart1grp {
- 		fsl,pins = <
- 			MX51_PAD_UART1_RXD__UART1_RXD		0x1c5
+-		sg_dma_address(s) = s->offset;
++		sg_dma_address(s) = s_offset;
+ 		sg_dma_len(s) = s_length;
+ 		s->offset -= s_offset;
+ 		s_length = iova_align(iovad, s_length + s_offset);
 -- 
-2.5.0
+1.9.1
