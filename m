@@ -1,53 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Dec 2015 17:13:40 +0100
-Subject: [PATCH] null_blk: use sector_div instead of do_div
-In-Reply-To: <56596064.2070306@bjorling.me>
-References: <3768541.ja0r6f0Odi@wuerfel> <4449032.oPBtpzlXyB@wuerfel>
- <56596064.2070306@bjorling.me>
-Message-ID: <5665391.6n2Zq774pT@wuerfel>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 18 Dec 2015 08:14:06 -0800
+Subject: [PATCH] mmc: pwrseq_simple: Fix regression with optional GPIOs
+In-Reply-To: <CAPDyKFpxiOJJdh-nLXjxv3DYJnW3RAf_9aqMfds46=-oqPd5ng@mail.gmail.com>
+References: <1449528845-25189-1-git-send-email-tony@atomide.com>
+ <CAPDyKFpxiOJJdh-nLXjxv3DYJnW3RAf_9aqMfds46=-oqPd5ng@mail.gmail.com>
+Message-ID: <20151218161406.GL23396@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 28 November 2015 09:05:56 Matias Bj?rling wrote:
+* Ulf Hansson <ulf.hansson@linaro.org> [151207 16:20]:
+> +Linus
 > 
-> I had my head around the original code and kept references to the device 
-> layout I had in mind. 256 being number of pages in a block, and the 2^16 
-> being number of blocks in a lun and wanted to communicate that part.. 
-> which led to producing silly code in the mean time.
+> On 7 December 2015 at 23:54, Tony Lindgren <tony@atomide.com> wrote:
+> > Commit ce037275861e ("mmc: pwrseq_simple: use GPIO descriptors array API")
+> > changed the handling MMC power sequence so GPIOs no longer are optional.
+> >
+> > This broke SDIO WLAN at least for omap5 that can't yet use the reset GPIOs
+> > with pwrseq_simple as a wait is needed after enabling the SDIO device.
 > 
-> Similarly, the bs is always fixed to 4k for lightnvm, until other bs 
-> sizes are supported. We could optimize it out, I left it in for the same 
-> reasons.
+> Can you elaborate on this. Did it break omap5 or not? :-)
 
-I still see the build warning in linux-next, can you merge your patch?
+Ulf, is this patch queued for v4.4 as a regression fix? I don't see it
+in Linux next or mainline trees?
 
-	Arnd
+Regards,
 
-> diff --git i/drivers/block/null_blk.c w/drivers/block/null_blk.c
-> index 5c8ba54..97c02fe 100644
-> --- i/drivers/block/null_blk.c
-> +++ w/drivers/block/null_blk.c
-> @@ -510,17 +510,17 @@ static int null_lnvm_id(struct request_queue *q, 
-> struct nvm_id *id)
->         id->ppaf.ch_offset = 56;
->         id->ppaf.ch_len = 8;
-> 
-> -       do_div(size, bs); /* convert size to pages */
-> -       do_div(size, 256); /* concert size to pgs pr blk */
-> +       sector_div(size, bs); /* convert size to pages */
-> +       size >>= 8; /* convert size to pgs pr blk */
->         grp = &id->groups[0];
->         grp->mtype = 0;
->         grp->fmtype = 0;
->         grp->num_ch = 1;
->         grp->num_pg = 256;
->         blksize = size;
-> -       do_div(size, (1 << 16));
-> +       size >>= 16; /* convert size to num luns */
->         grp->num_lun = size + 1;
-> -       do_div(blksize, grp->num_lun);
-> +       sector_div(blksize, grp->num_lun);
->         grp->num_blk = blksize;
->         grp->num_pln = 1;
-> 
-> 
+Tony
