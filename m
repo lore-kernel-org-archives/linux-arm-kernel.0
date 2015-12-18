@@ -1,128 +1,73 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 18 Dec 2015 07:39:56 +0000
-Subject: [PATCH 2/2] irqchip/gic: Identify and report any reserved SGI IDs
-In-Reply-To: <20151217192610.GA16577@wychelm.lan>
-References: <1450285686-844-1-git-send-email-daniel.thompson@linaro.org>
- <1450285686-844-3-git-send-email-daniel.thompson@linaro.org>
- <5671A39D.9000500@arm.com> <20151217192610.GA16577@wychelm.lan>
-Message-ID: <20151218073956.0622f8bf@why.wild-wind.fr.eu.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 18 Dec 2015 08:35:32 +0100
+Subject: I2C eeprom compatibles? (was Re: [PATCH/RFC 03/19] ARM: shmobile:
+ gose: add i2c2 bus to device tree)
+In-Reply-To: <20151218030239.GB10973@verge.net.au>
+References: <1449802376-11301-1-git-send-email-horms+renesas@verge.net.au>
+ <1449802376-11301-4-git-send-email-horms+renesas@verge.net.au>
+ <566AB2A5.4090105@cogentembedded.com>
+ <20151214021110.GD13945@verge.net.au>
+ <20151214071103.GC1516@katana>
+ <CAMuHMdXWcyEmoVRZuCTM4yqfxXYjgZF1yP8uqCEU8Bj=pmkNYw@mail.gmail.com>
+ <20151218030239.GB10973@verge.net.au>
+Message-ID: <20151218073531.GA1517@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 Dec 2015 19:26:10 +0000
-Daniel Thompson <daniel.thompson@linaro.org> wrote:
-
-> On Wed, Dec 16, 2015 at 05:47:09PM +0000, Marc Zyngier wrote:
-> > Hi Daniel,
-> 
-> Hi Marc
-> 
-> Thanks for the review.
-> 
-> 
-> > On 16/12/15 17:08, Daniel Thompson wrote:
-> > > It is possible for the secure world to reserve certain SGI IDs for itself.
-> > > Currently we have limited visibility of which IDs are safe to use for IPIs.
-> > > 
-> > > Modify the GIC initialization code to actively search for reserved SGI IDs
-> > > and report if any are found. Warn even more loudly if the reserved SGIs
-> > > overlap with the normal IPI range.
-> > > 
-> > > When run on an Inforce IFC6410 (Snapdragon 600) this code produces the
-> > > following messages:
-> > > ~~~ cut here ~~~
-> > > CPU0: Detected reserved SGI IDs: 14-15
-> > > CPU1: Detected reserved SGI IDs: 15
-> > > CPU2: Detected reserved SGI IDs: 15
-> > > CPU3: Detected reserved SGI IDs: 15
-> > > ~~~ cut here ~~~
-> > > 
-> > > Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> 
-> BTW you *didn't* say "this code is pointless and I hate it"...
-
-Well, this was obviously used to detect another issue (patch #1), so I
-can't see any harm in trying to sanitize things, as long as it doesn't
-break anything else. I imagine this patch will also trigger on my
-sunxi platforms, which use a SGI to implement PSCI in secure mode.
-
-> Does that mean I should be looking at adding similar code for GICv3+? I 
-> wanted to guage reactions to this sort of diagnostics before getting
-> carried away!
-
-Could be useful as well.
-
-> 
-> 
-> > > +
-> > > +		/*
-> > > +		 * Fiddle with the SGI set/clear registers to try identify
-> > > +		 * any IPIs that are reserved for secure world.
-> > > +		 */
-> > > +		bitmap_fill(sgi_mask, 16);
-> > > +
-> > > +		for (i = 0; i < 16; i++) {
-> > > +			void __iomem *set_reg =
-> > > +			    dist_base + GIC_DIST_SGI_PENDING_SET + (i & ~3);
-> > > +			void __iomem *clear_reg =
-> > > +			    dist_base + GIC_DIST_SGI_PENDING_CLEAR + (i & ~3);
-> > > +			unsigned long mask = cpu_mask << (8*(i%4));
-> > > +			unsigned long flags, pending, after_clear, after_set;
+On Fri, Dec 18, 2015 at 12:02:39PM +0900, Simon Horman wrote:
+> On Mon, Dec 14, 2015 at 10:39:47AM +0100, Geert Uytterhoeven wrote:
+> > On Mon, Dec 14, 2015 at 8:11 AM, Wolfram Sang <wsa@the-dreams.de> wrote:
+> > >> > >+  eeprom at 50 {
+> > >> > >+          compatible = "renesas,24c02";
+> > >> >
+> > >> >    This is not a valid value -- the Renesas chip model is different from 24c02.
+> > >>
+> > >> I copied this value from r8a7791.dtsi.
+> > >>
+> > >> Looking at the schematic for gose (v100), koelsch (rev024) and porter (v300)
+> > >> I see the following "R1EX24002ATAS0G#U0". Shall we update r8a7791 and
+> > >> this patch to "renesas,24002" or leave things as is?
+> > >
+> > > I wouldn't like to update the at24 driver with all namings from all
+> > > vendors for chips which in large cases are simple 24c02 devices.
+> > >
+> > > So, if Sergei insists on the change, I'd propose
+> > >
+> > >         compatible = "renesas,24002", "24c02";
 > > 
-> > Please make these u32, as unsigned long is 64bit on arm64. Another thing
-> > to note is that GICD_CPEND{S,C}SGIRn are byte accessible, so you can
-> > save yourself some this hassle shifting things around and just write a
-> > single byte. You're already writing 16 times anyway...
-> 
-> Will do both.
-> 
-> 
-> > Another thing to consider is that these locations are only defined on
-> > GICv2 and not GICv1, so this patch is likely to cause trouble on older HW.
-> 
-> As presented the code relies on the RAZ/WI property of reserved
-> registers to avoid issues on GICv1; it does not report anything if there
-> appear to be know working SGIs on the assumption we are actually running
-> on a GICv1.
-> 
-> You'd prefer an explicit version check?
-
-I'd rather be cautious and check for the architecture version,
-specially if you settle for the byte access mentioned above (a GICv1
-may not support byte access and explode unexpectedly). ICPIDR2.ArchRev
-should be the right thing to check.
-
-> 
-> 
-> > > +
-> > > +			local_irq_save(flags);
+> > "renesas,r1ex24002"?
 > > 
-> > Why do you need to do this? The CPU interface is not enabled yet, so I
-> > can't see how you could get an interrupt on this CPU.
-> 
-> Agreed. Can get rid of these.
-> 
-> 
-> > > +
-> > > +			/* record original value */
-> > > +			pending = readl_relaxed(set_reg);
-> > > +
-> > > +			/* clear, test, set, and test again */
-> > > +			writel_relaxed(mask, clear_reg);
-> > > +			after_clear = readl_relaxed(set_reg);
-> > > +			writel_relaxed(mask, set_reg);
-> > > +			after_set = readl_relaxed(set_reg);
+> > I don't think the "A" is relevant (<= 64 is A, >= 128 is B).
 > > 
-> > It should be enough to write to the SET register, and read back, as the
-> > bit is RAZ/WI when the interrupt is Group-0.
+> > http://www.renesas.com/products/memory/eeprom/product_selector.jsp
 > 
-> Good point. Will simplify.
+> Thanks.
+> 
+> It seems to me that we have some consensus around:
+> 
+> 	compatible = "renesas,r1ex24002", "24c02";
 
-I'd also suggest moving the whole thing to a separate function that'd
-get called from gic_cpu_init().
+Thinking again, "generic,24c02" or "generic-24c02" could also be an
+option.
+
+> Should this be added to Documentation/devicetree/bindings/eeprom/eeprom.txt ?
+> Or documented elsewhere?
+
+Probably we need a DT maintainers advice here? I don't mind vendor
+specific compatibles being documented, but I'm reluctant to add all
+these compatibles for the myriads of I2C eeproms to the at24 driver. 99%
+are covered by the generic case.
+
+Adding DT to CC.
 
 Thanks,
 
-	M.
--- 
-Without deviation from the norm, progress is not possible.
+   Wolfram
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151218/0f224d37/attachment.sig>
