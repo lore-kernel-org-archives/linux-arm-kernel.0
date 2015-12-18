@@ -1,68 +1,138 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 18 Dec 2015 12:16:27 +0100
-Subject: [PATCH v5 2/2] spi: sun4i: Add support for wait time between
- word transmissions
-In-Reply-To: <1450352427-25350-3-git-send-email-mweseloh42@gmail.com>
-References: <1450352427-25350-1-git-send-email-mweseloh42@gmail.com>
- <1450352427-25350-3-git-send-email-mweseloh42@gmail.com>
-Message-ID: <20151218111627.GM30359@lukather>
+Date: Fri, 18 Dec 2015 12:08:10 +0100
+Subject: [PATCH v2 1/3] reset: Add shared reset_control_[de]assert variants
+In-Reply-To: <1450264908.3421.36.camel@pengutronix.de>
+References: <1449848520-27379-1-git-send-email-hdegoede@redhat.com>
+ <20151214093607.GF19456@lukather>
+ <1450086655.3407.23.camel@pengutronix.de>
+ <20151216102934.GR19456@lukather>
+ <1450264908.3421.36.camel@pengutronix.de>
+Message-ID: <20151218110810.GK30359@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Dec 17, 2015 at 12:40:27PM +0100, Marcus Weseloh wrote:
-> Modifies the sun4i SPI master driver to make use of the
-> "spi-word-wait-ns" property. This specific SPI controller needs 3 clock
-> cycles to set up the delay, which makes the minimum non-zero wait time
-> on this hardware 4 clock cycles.
+On Wed, Dec 16, 2015 at 12:21:48PM +0100, Philipp Zabel wrote:
+> Hi Maxime,
 > 
-> Signed-off-by: Marcus Weseloh <mweseloh42@gmail.com>
-> ---
->  drivers/spi/spi-sun4i.c | 22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
+> Am Mittwoch, den 16.12.2015, 11:29 +0100 schrieb Maxime Ripard:
+> > On Mon, Dec 14, 2015 at 10:50:55AM +0100, Philipp Zabel wrote:
+> > > Am Montag, den 14.12.2015, 10:36 +0100 schrieb Maxime Ripard:
+> > > > Hi,
+> > > > 
+> > > > On Fri, Dec 11, 2015 at 04:41:58PM +0100, Hans de Goede wrote:
+> > > > > diff --git a/include/linux/reset.h b/include/linux/reset.h
+> > > > > index c4c097d..1cca8ce 100644
+> > > > > --- a/include/linux/reset.h
+> > > > > +++ b/include/linux/reset.h
+> > > > > @@ -11,6 +11,8 @@ int reset_control_reset(struct reset_control *rstc);
+> > > > >  int reset_control_assert(struct reset_control *rstc);
+> > > > >  int reset_control_deassert(struct reset_control *rstc);
+> > > > >  int reset_control_status(struct reset_control *rstc);
+> > > > > +int reset_control_assert_shared(struct reset_control *rstc);
+> > > > > +int reset_control_deassert_shared(struct reset_control *rstc);
+> > > > 
+> > > > Shouldn't that be handled in reset_control_get directly?
 > 
-> diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
-> index f60a6d6..3b4f5f4 100644
-> --- a/drivers/spi/spi-sun4i.c
-> +++ b/drivers/spi/spi-sun4i.c
-> @@ -19,6 +19,7 @@
->  #include <linux/module.h>
->  #include <linux/platform_device.h>
->  #include <linux/pm_runtime.h>
-> +#include <linux/of.h>
->  
->  #include <linux/spi/spi.h>
->  
-> @@ -173,6 +174,8 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
->  	unsigned int tx_len = 0;
->  	int ret = 0;
->  	u32 reg;
-> +	int wait_clk = 0;
-> +	int clk_ns = 0;
->  
->  	/* We don't support transfer larger than the FIFO */
->  	if (tfr->len > SUN4I_FIFO_DEPTH)
-> @@ -261,6 +264,25 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
->  
->  	sun4i_spi_write(sspi, SUN4I_CLK_CTL_REG, reg);
->  
-> +	/*
-> +	 * Setup wait time between words.
-> +	 *
-> +	 * Wait time is set in SPI_CLK cycles. The SPI hardware needs 3
-> +	 * additional cycles to setup the wait counter, so the minimum delay
-> +	 * time is 4 cycles.
-> +	 */
-> +	if (spi->word_wait_ns) {
-> +		clk_ns = DIV_ROUND_UP(1000000000, tfr->speed_hz);
+> I think I see your point now. Maybe we should add a flags parameter to
+> reset_control_get and/or wrap it in two versions,
+> reset_control_get_exclusive and reset_control_get_shared (or just add
+> the _shared variant). Then reset_control_get(_exclusive) could return
+> -EBUSY if a reset line is already in use.
 
-You should use the actual rate of the clock returned by clk_get_rate
-(or probably just use mclk_rate).
+I guess the current assumption was that reset_control_get was
+exclusive.
 
-The clock driver might round the frequency to something else than what
-was set in clk_set_rate, which would make your calculation here a bit
-off.
+So we could have something like:
+
+reset_control_get (..) {
+  return __reset_control_get(.., 0);
+}
+
+reset_control_get_shared (..) {
+  return __reset_control_get(.., RESET_SHARED);
+}
+
+And all the logic shared between the two, without exposing any flag
+(that would change the prototype and require to fix every callers).
+
+> 
+> > > This is about different expectations of the caller.
+> > > A driver calling reset_control_assert expects the reset line to be
+> > > asserted after the call.
+> > 
+> > Is that behaviour documented explicitly somewhere?
+> 
+> /**                                                                                                                                           
+>  * reset_control_assert - asserts the reset line
+>  * @rstc: reset controller
+>  */
+
+Yeah, but it's not said when it would happen, or if it happens
+synchronously.
+
+> Also, that expected behavior matches the function name, which I like.
+> So I still welcome adding new API calls for the shared/refcounting
+> variant.
+> 
+> > > A driver calling reset_control_assert_shared
+> > > just signals that it doesn't care about the state of the reset line
+> > > anymore.
+> > > We could just as well call the two new functions
+> > > reset_control_deassert_get and reset_control_deassert_put.
+> > 
+> > What happens if you mix them? What happens if you have several drivers
+> > ignoring this API?
+> 
+> The core should give useful error messages and disallow non-shared reset
+> calls on shared lines.
+
+I guess we could also have something like this:
+
+  * The driver gets the reference to the reset line using
+    reset_control_get or its shared variant.
+
+    - If you call reset_control_get on a free line, it succeeds, and
+      marks the line in exclusive use.
+    - If you call reset_control_get on a busy line, it fails with
+      EBUSY
+
+    - If you call the shared variant on a free line, it succeeds
+    - If you call the shared variant on a busy exclusive line, it
+      fails with EBUSY
+    - If you call the shared variant on a busy !exclusive line, it
+      succeeds.
+
+  * The customer driver can then call reset_control_assert / deassert:
+
+    - If the reset line is in exclusive use, the assertion happens
+      right away, it succeeds and returns 0.
+
+    - If the reset line is in a !exclusive use, but with a single
+      user, the assertion happens right away, it succeeds and returns
+      0.
+
+    - If the reset line is in a !exclusive use with more than 1 user,
+      the refcount is modified and an error is returned to notify that
+      it didn't happen.
+
+What do you think? That would work fine in both the case where you
+care about the fact that the device has really been asserted (to
+recover from an error for example) and the one when you don't really
+care and you just want to give away your reset line (in a remove for
+example).
+
+I'd really like to avoid having shared variants of assert and
+de-assert, since it will only spread out and end up being used in
+drivers where most users don't have a shared reset line.
+
+And if we want to avoid that, we'll end up in something like
+
+if (struct->shared_reset)
+	reset_control_assert_shared
+else
+	reset_control_assert
+
+around *all* the calls in your driver.
 
 Maxime
 
@@ -76,4 +146,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151218/45797bbe/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151218/24183b3b/attachment-0001.sig>
