@@ -1,34 +1,79 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 18 Dec 2015 12:29:02 +0100
-Subject: [PATCH v3 4/4] printk/nmi: Increase the size of NMI buffer and
- make it configurable
-In-Reply-To: <5673DD60.7080302@linaro.org>
-References: <1449667265-17525-1-git-send-email-pmladek@suse.com>
- <1449667265-17525-5-git-send-email-pmladek@suse.com>
- <CAMuHMdXVgr58YjoePGrRbMyMncQ27f85prL7G5SpeHeNxoYrXQ@mail.gmail.com>
- <20151211124159.GB3729@pathway.suse.cz>
- <20151211145725.b0e81bb4bb18fcd72ef5f557@linux-foundation.org>
- <20151211232113.GZ8644@n2100.arm.linux.org.uk>
- <alpine.LNX.2.00.1512120024370.9922@cbobk.fhfr.pm>
- <5673DD60.7080302@linaro.org>
-Message-ID: <20151218112902.GO6344@twins.programming.kicks-ass.net>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Fri, 18 Dec 2015 11:29:18 +0000
+Subject: [PATCH 2/2] irqchip/gic: Identify and report any reserved SGI IDs
+In-Reply-To: <20151218073956.0622f8bf@why.wild-wind.fr.eu.org>
+References: <1450285686-844-1-git-send-email-daniel.thompson@linaro.org>
+ <1450285686-844-3-git-send-email-daniel.thompson@linaro.org>
+ <5671A39D.9000500@arm.com> <20151217192610.GA16577@wychelm.lan>
+ <20151218073956.0622f8bf@why.wild-wind.fr.eu.org>
+Message-ID: <5673EE0E.6090500@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 10:18:08AM +0000, Daniel Thompson wrote:
-> I'm not entirely sure that this is an improvement.
+On 18/12/15 07:39, Marc Zyngier wrote:
+>>> On 16/12/15 17:08, Daniel Thompson wrote:
+>>>> It is possible for the secure world to reserve certain SGI IDs for itself.
+>>>> Currently we have limited visibility of which IDs are safe to use for IPIs.
+>>>>
+>>>> Modify the GIC initialization code to actively search for reserved SGI IDs
+>>>> and report if any are found. Warn even more loudly if the reserved SGIs
+>>>> overlap with the normal IPI range.
+>>>>
+>>>> When run on an Inforce IFC6410 (Snapdragon 600) this code produces the
+>>>> following messages:
+>>>> ~~~ cut here ~~~
+>>>> CPU0: Detected reserved SGI IDs: 14-15
+>>>> CPU1: Detected reserved SGI IDs: 15
+>>>> CPU2: Detected reserved SGI IDs: 15
+>>>> CPU3: Detected reserved SGI IDs: 15
+>>>> ~~~ cut here ~~~
+>>>>
+>>>> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+...
 
-What I do these days is delete everything in vprintk_emit() and simply
-call early_printk().
+>>> Another thing to consider is that these locations are only defined on
+>>> GICv2 and not GICv1, so this patch is likely to cause trouble on older HW.
+>>
+>> As presented the code relies on the RAZ/WI property of reserved
+>> registers to avoid issues on GICv1; it does not report anything if there
+>> appear to be know working SGIs on the assumption we are actually running
+>> on a GICv1.
+>>
+>> You'd prefer an explicit version check?
+>
+> I'd rather be cautious and check for the architecture version,
+> specially if you settle for the byte access mentioned above (a GICv1
+> may not support byte access and explode unexpectedly). ICPIDR2.ArchRev
+> should be the right thing to check.
 
-Kill the useless kmsg buffer crap and locking, just pound bytes to the
-UART registers without anything in between.
+Will do.
 
-The other semi usable solution is redirecting to trace_printk() and
-recovering the trace buffers from your kdump. But I've found that
-typically kdump doesn't work anymore if you properly wedge the machine.
-So this is very much a second rate solution.
 
-But this globally locked buffer, calling out to console drivers that do
-locking and even scheduling, is an unreliable unfixable trainwreck that
-I've given up on.
+>>>> +
+>>>> +			/* record original value */
+>>>> +			pending = readl_relaxed(set_reg);
+>>>> +
+>>>> +			/* clear, test, set, and test again */
+>>>> +			writel_relaxed(mask, clear_reg);
+>>>> +			after_clear = readl_relaxed(set_reg);
+>>>> +			writel_relaxed(mask, set_reg);
+>>>> +			after_set = readl_relaxed(set_reg);
+>>>
+>>> It should be enough to write to the SET register, and read back, as the
+>>> bit is RAZ/WI when the interrupt is Group-0.
+>>
+>> Good point. Will simplify.
+>
+> I'd also suggest moving the whole thing to a separate function that'd
+> get called from gic_cpu_init().
+
+Will do.
+
+I think I will also upgrade the pr_crit() to a WARN_ON() and hard code 
+the check to 8 rather than NR_IPI.
+
+Currently NR_IPI is small on arm64 so it would be good for us to shout 
+loudly about latent firmware/secure-zone misconfiguration.
+
+
+Daniel.
