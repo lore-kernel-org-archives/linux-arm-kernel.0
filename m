@@ -1,30 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Dec 2015 16:40:26 +0100
-Subject: [PATCH] ARM: imx: select SRC for i.MX7
-Message-ID: <3611827.5qPn4xd4c4@wuerfel>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 18 Dec 2015 15:53:00 +0000
+Subject: [PULL] GIC updates for v4.5
+Message-ID: <1450453980-26142-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.MX7 Kconfig option had a couple of missing select lines that
-I fixed already, but I missed HAVE_IMX_SRC:
+Hi Thomas, Jason,
 
-arch/arm/mach-imx/built-in.o: In function `imx7d_init_irq':
-platform-spi_imx.c:(.init.text+0x25a8): undefined reference to `imx_src_init'
+This is the pull request for the GIC updates aimed at v4.5. Not a lot
+this time (what a relief!), but an interesting series from Linus
+Walleij coming out of his work converting the ARM RealView platforms
+to DT, and a couple of mundane fixes.
 
-This adds that one as well.
+Please pull!
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 0be5da9dc249 ("ARM: imx: imx7d requires anatop")
+Thanks,
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 0ac180f7b330..15df34fbdf44 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -563,6 +563,7 @@ config SOC_IMX7D
- 	select ARM_GIC
- 	select HAVE_IMX_ANATOP
- 	select HAVE_IMX_MMDC
-+	select HAVE_IMX_SRC
- 	help
- 		This enables support for Freescale i.MX7 Dual processor.
- 
+	M.
+
+The following changes since commit 9f9499ae8e6415cefc4fe0a96ad0e27864353c89:
+
+  Linux 4.4-rc5 (2015-12-13 17:42:58 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/gic-4.5
+
+for you to fetch changes up to a27d21e03eb14a63dae12467a7655be3334ac80c:
+
+  irqchip/gic: Kconfig the number of instances (2015-12-18 10:37:00 +0000)
+
+----------------------------------------------------------------
+Linus Walleij (4):
+      irqchip/gic: Fix ARM11MPCore GIC bindings
+      irqchip/gic: Support RealView variant setup
+      irqchip/gic: Assign irqchip dynamically
+      irqchip/gic: Kconfig the number of instances
+
+Marc Zyngier (2):
+      irqchip/gic-v2m: Fix of_node refcount on error
+      irqchip/gic: Make interrupt ID 1020 invalid
+
+ .../bindings/interrupt-controller/arm,gic.txt      |  1 +
+ drivers/irqchip/Kconfig                            |  5 ++
+ drivers/irqchip/Makefile                           |  1 +
+ drivers/irqchip/irq-gic-realview.c                 | 43 +++++++++++++++++
+ drivers/irqchip/irq-gic-v2m.c                      |  2 +-
+ drivers/irqchip/irq-gic.c                          | 56 ++++++++++------------
+ include/linux/irqchip/arm-gic.h                    | 10 ++++
+ 7 files changed, 86 insertions(+), 32 deletions(-)
+ create mode 100644 drivers/irqchip/irq-gic-realview.c
