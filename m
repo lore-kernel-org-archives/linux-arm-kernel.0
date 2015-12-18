@@ -1,44 +1,40 @@
 From: jonmason@broadcom.com (Jon Mason)
-Date: Fri, 18 Dec 2015 16:37:56 -0500
-Subject: [PATCH 3/3] arm: dts: bcm5301x: Add syscon based reboot in DT
+Date: Fri, 18 Dec 2015 16:37:55 -0500
+Subject: [PATCH 2/3] ARM: dts: bcm5301x: Add I2C support to the DT
 In-Reply-To: <1450474676-10210-1-git-send-email-jonmason@broadcom.com>
 References: <1450474676-10210-1-git-send-email-jonmason@broadcom.com>
-Message-ID: <1450474676-10210-3-git-send-email-jonmason@broadcom.com>
+Message-ID: <1450474676-10210-2-git-send-email-jonmason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the ability to reboot via a reset of the processor.  This is
-achieved via a write of 0x39 to the CRU Reset Register.  Unfortunately,
-this only resets the core and not the other IP blocks.  So if possible,
-other methods should be used on the individual boards.
+Add I2C support to the bcm5301x Device Tree.  Since no driver changes
+are needed to enable this hardware, only the device tree changes are
+required to make this functional.
 
 Signed-off-by: Jon Mason <jonmason@broadcom.com>
 ---
- arch/arm/boot/dts/bcm5301x.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/boot/dts/bcm5301x.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
 diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
-index 553b2ec..2a482ec 100644
+index c31fafe..553b2ec 100644
 --- a/arch/arm/boot/dts/bcm5301x.dtsi
 +++ b/arch/arm/boot/dts/bcm5301x.dtsi
-@@ -246,6 +246,18 @@
- 				     "sata2";
+@@ -218,6 +218,15 @@
+ 		};
  	};
  
-+	cru: cru at 1800c184 {
-+		compatible = "syscon";
-+		reg = <0x1800c184 0xc>;
++	i2c0: i2c at 18009000 {
++		compatible = "brcm,iproc-i2c";
++		reg = <0x18009000 0x50>;
++		interrupts = <GIC_SPI 121 IRQ_TYPE_NONE>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		clock-frequency = <100000>;
 +	};
 +
-+	reboot at 1800c184 {
-+		compatible ="syscon-reboot";
-+		regmap = <&cru>;
-+		offset = <0>;
-+		mask = <0x39>;
-+	};
-+
- 	nand: nand at 18028000 {
- 		compatible = "brcm,nand-iproc", "brcm,brcmnand-v6.1", "brcm,brcmnand";
- 		reg = <0x18028000 0x600>, <0x1811a408 0x600>, <0x18028f00 0x20>;
+ 	lcpll0: lcpll0 at 1800c100 {
+ 		#clock-cells = <1>;
+ 		compatible = "brcm,nsp-lcpll0";
 -- 
 1.9.1
