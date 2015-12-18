@@ -1,30 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Dec 2015 22:09:12 +0100
-Subject: [PATCH] ARM: fix atags_to_fdt with stack-protector-strong
-In-Reply-To: <20151218210459.GA23293@www.outflux.net>
-References: <20151218210459.GA23293@www.outflux.net>
-Message-ID: <2005828.pC3KGx5clE@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 18 Dec 2015 22:19:11 +0100
+Subject: [PATCH v2 4/4] ARM: dts: sun4i: Enable onboard codec used on the
+ pov protab2-ips9 tablet
+In-Reply-To: <1449859439-30875-4-git-send-email-hdegoede@redhat.com>
+References: <1449859439-30875-1-git-send-email-hdegoede@redhat.com>
+ <1449859439-30875-4-git-send-email-hdegoede@redhat.com>
+Message-ID: <20151218211911.GP30359@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 18 December 2015 13:04:59 Kees Cook wrote:
-> +ifeq ($(CONFIG_ARM_ATAG_DTB_COMPAT),y)
-> +CFLAGS_atags_to_fdt.o := -fno-stack-protector
-> +CFLAGS_fdt.o := -fno-stack-protector
-> +CFLAGS_fdt_ro.o := -fno-stack-protector
-> +CFLAGS_fdt_rw.o := -fno-stack-protector
-> +CFLAGS_fdt_wip.o := -fno-stack-protector
-> +endif
+On Fri, Dec 11, 2015 at 07:43:59PM +0100, Hans de Goede wrote:
+> The pov protab2-ips9 tablet uses the A10's integrated audio codec,
+> enable it.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-I'm pretty sure you don't need the ifeq there, you can simply define those
-flags unconditionally.
+Applied 3 and 4. Thanks!
 
-You can't just add -fno-stack-protector unconditionally, because that
-breaks building the kernel with toolchains that are older than stack-protector,
-so this should be
+I have a bad network connection for the next two weeks though, so I'm
+not quite sure whether or not it will make it for 4.5.
 
-CFLAGS_obj.o += $(call cc-option, -fno-stack-protector)
+Maxime
 
-Other than that, the patch looks ok.
-
-	Arnd
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151218/6cf7b095/attachment.sig>
