@@ -1,53 +1,29 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 18 Dec 2015 15:59:01 +0200
-Subject: [RFC 9/9] clk: ti: omap4: update clock aliases to reflect new module
- clocks
-In-Reply-To: <1450447141-29936-1-git-send-email-t-kristo@ti.com>
-References: <1450447141-29936-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1450447141-29936-10-git-send-email-t-kristo@ti.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Fri, 18 Dec 2015 16:57:17 +0300
+Subject: [PATCH v6 10/20] arm64:ilp32 use the native LP64 'start_thread'
+ for ILP32 threads
+In-Reply-To: <12007390.0rtOQc0npd@wuerfel>
+References: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
+ <1450215766-14765-11-git-send-email-ynorov@caviumnetworks.com>
+ <12007390.0rtOQc0npd@wuerfel>
+Message-ID: <20151218135717.GC31200@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clock data in DT has been updated, and the clock aliases must be
-updated to match.
+On Wed, Dec 16, 2015 at 04:50:18PM +0100, Arnd Bergmann wrote:
+> On Wednesday 16 December 2015 00:42:36 Yury Norov wrote:
+> > +#ifdef CONFIG_ARM64_ILP32
+> > +       /* ILP32 threads are started the same way as LP64 threads. */
+> > +       if (is_ilp32_compat_task()) {
+> > +               start_thread(regs, pc, sp);
+> > +               return;
+> > +       }
+> > +#endif
+> > 
+> 
+> Just a small style comment, but I think you can just leave out the #ifdef,
+> as is_ilp32_compat_task() will already return false if that is disabled.
+> 
+> 	Arnd
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- drivers/clk/ti/clk-44xx.c |   22 +++++++++++-----------
- 1 file changed, 11 insertions(+), 11 deletions(-)
-
-diff --git a/drivers/clk/ti/clk-44xx.c b/drivers/clk/ti/clk-44xx.c
-index 7a8b51b..81cd26e 100644
---- a/drivers/clk/ti/clk-44xx.c
-+++ b/drivers/clk/ti/clk-44xx.c
-@@ -164,17 +164,17 @@ static struct ti_dt_clk omap44xx_clks[] = {
- 	DT_CLK(NULL, "smartreflex_core_fck", "smartreflex_core_fck"),
- 	DT_CLK(NULL, "smartreflex_iva_fck", "smartreflex_iva_fck"),
- 	DT_CLK(NULL, "smartreflex_mpu_fck", "smartreflex_mpu_fck"),
--	DT_CLK(NULL, "dmt1_clk_mux", "dmt1_clk_mux"),
--	DT_CLK(NULL, "cm2_dm10_mux", "cm2_dm10_mux"),
--	DT_CLK(NULL, "cm2_dm11_mux", "cm2_dm11_mux"),
--	DT_CLK(NULL, "cm2_dm2_mux", "cm2_dm2_mux"),
--	DT_CLK(NULL, "cm2_dm3_mux", "cm2_dm3_mux"),
--	DT_CLK(NULL, "cm2_dm4_mux", "cm2_dm4_mux"),
--	DT_CLK(NULL, "timer5_sync_mux", "timer5_sync_mux"),
--	DT_CLK(NULL, "timer6_sync_mux", "timer6_sync_mux"),
--	DT_CLK(NULL, "timer7_sync_mux", "timer7_sync_mux"),
--	DT_CLK(NULL, "timer8_sync_mux", "timer8_sync_mux"),
--	DT_CLK(NULL, "cm2_dm9_mux", "cm2_dm9_mux"),
-+	DT_CLK(NULL, "timer1_mod_ck", "timer1_mod_ck"),
-+	DT_CLK(NULL, "timer10_mod_ck", "timer10_mod_ck"),
-+	DT_CLK(NULL, "timer11_mod_ck", "timer11_mod_ck"),
-+	DT_CLK(NULL, "timer2_mod_ck", "timer2_mod_ck"),
-+	DT_CLK(NULL, "timer3_mod_ck", "timer3_mod_ck"),
-+	DT_CLK(NULL, "timer4_mod_ck", "timer4_mod_ck"),
-+	DT_CLK(NULL, "timer5_mod_ck", "timer5_mod_ck"),
-+	DT_CLK(NULL, "timer6_mod_ck", "timer6_mod_ck"),
-+	DT_CLK(NULL, "timer7_mod_ck", "timer7_mod_ck"),
-+	DT_CLK(NULL, "timer8_mod_ck", "timer8_mod_ck"),
-+	DT_CLK(NULL, "timer9_mod_ck", "timer9_mod_ck"),
- 	DT_CLK(NULL, "usb_host_fs_fck", "usb_host_fs_fck"),
- 	DT_CLK("usbhs_omap", "fs_fck", "usb_host_fs_fck"),
- 	DT_CLK(NULL, "utmi_p1_gfclk", "utmi_p1_gfclk"),
--- 
-1.7.9.5
+Missed it, thank you.
