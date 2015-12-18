@@ -1,28 +1,43 @@
-From: dtrautmann@ibhsoftec.com (Daniel Trautmann)
-Date: Fri, 18 Dec 2015 11:20:21 +0100
-Subject: [PATCH v2 0/3] drivers: net: cpsw: Fix bugs in fixed-link PHY DT
- parsing
-In-Reply-To: <20151217.154508.505711333985621252.davem@davemloft.net>
-References: <20151209223115.6c5a400f.drivshin.allworx@gmail.com>
- <1741588.Ve76Z1ZI87@localhost>
- <cover.1450309613.git.drivshin@allworx.com>
- <20151217.154508.505711333985621252.davem@davemloft.net>
-Message-ID: <20151218102020.GA1703@dt-ub1404lts.ENTWDOM.local>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 18 Dec 2015 15:51:54 +0530
+Subject: [PATCH v3 1/4] ARM: dts: dra7: Add dt node for the sycon pcie
+In-Reply-To: <5670140C.7010906@cogentembedded.com>
+References: <1450172346-11890-1-git-send-email-kishon@ti.com>
+ <1450172346-11890-2-git-send-email-kishon@ti.com>
+ <5670140C.7010906@cogentembedded.com>
+Message-ID: <5673DE42.9080407@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 17, 2015 at 03:45:08PM -0500, David Miller wrote:
-> From: "David Rivshin (Allworx)" <drivshin.allworx@gmail.com>
-> Date: Wed, 16 Dec 2015 23:02:08 -0500
-> 
-> > I have tested on the following hardware configurations:
-> >  - (EVMSK) dual emac with two real MDIO-connected phys using RGMII-TXID
-> >  - single emac with fixed-link using RGMII
-> > Testing of other CPSW emac configurations that folks may have would
-> > be appreciated.
-> 
-> I'm going to wait until some others give some feedback and testing
-> results on this one, thanks.
+Hi,
 
-I can confirm that this patch is working on the following hardware setup:
- - single emac using MII connected with fixed-link to Micrel KSZ8895 Switch
+On Tuesday 15 December 2015 06:52 PM, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 12/15/2015 12:39 PM, Kishon Vijay Abraham I wrote:
+> 
+>> Add new device tree node for the control module register space where
+>> PCIe registers are present.
+>>
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> ---
+>>   arch/arm/boot/dts/dra7.dtsi |    5 +++++
+>>   1 file changed, 5 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+>> index fe99231..e38f63f 100644
+>> --- a/arch/arm/boot/dts/dra7.dtsi
+>> +++ b/arch/arm/boot/dts/dra7.dtsi
+>> @@ -155,6 +155,11 @@
+>>                       compatible = "syscon";
+>>                       reg = <0x1c04 0x0020>;
+>>                   };
+>> +
+>> +                scm_conf_pcie: tisyscon at 1c24 {
+> 
+>    Please use the generic node names as the ePAPR standard says.
+
+something like  scm_conf_pcie: syscon at 1c24??
+
+Thanks
+Kishon
