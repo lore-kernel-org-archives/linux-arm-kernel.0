@@ -1,226 +1,65 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 18 Dec 2015 17:33:57 +0800
-Subject: [RFC PATCH 3/5] usb: misc: generic_onboard_hub: add generic onboard
- USB device driver
+Date: Fri, 18 Dec 2015 17:33:58 +0800
+Subject: [RFC PATCH 4/5] usb: chipidea: host: let the hcd know's parent device
+ node
 In-Reply-To: <1450431239-16439-1-git-send-email-peter.chen@freescale.com>
 References: <1450431239-16439-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1450431239-16439-4-git-send-email-peter.chen@freescale.com>
+Message-ID: <1450431239-16439-5-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current USB device driver lacks of platform interfaces to configure
-external signal on HUB chip, eg, the PHY input clock and gpio reset
-pin for HUB, these kinds of devices are usually soldered at the board,
-and they are not hot-plug USB devices.
-
-With this patch, the user can configure the device's pins at device tree,
-and these configuration will be effective before the USB bus can be used,
-it can avoid unexpected signals at USB bus during this USB device hardware
-reset process, so we use subsys_initcall for this driver.
+Since the hcd (chipidea core device) has no device node, so
+if we want to describe the child node under the hcd, we had
+to put it under its parent's node (glue layer device), and
+in the code, we need to let the hcd knows glue layer's code,
+then the USB core can handle this node.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- MAINTAINERS                               |   7 ++
- drivers/usb/misc/Kconfig                  |  10 +++
- drivers/usb/misc/Makefile                 |   1 +
- drivers/usb/misc/generic_onboard_device.c | 144 ++++++++++++++++++++++++++++++
- 4 files changed, 162 insertions(+)
- create mode 100644 drivers/usb/misc/generic_onboard_device.c
+ drivers/usb/chipidea/host.c | 18 ++++++++++++++----
+ 1 file changed, 14 insertions(+), 4 deletions(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 9bff63c..9ea0955 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -11140,6 +11140,13 @@ S:	Maintained
- F:	Documentation/usb/ohci.txt
- F:	drivers/usb/host/ohci*
+diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
+index 3d24304..63a6aa4 100644
+--- a/drivers/usb/chipidea/host.c
++++ b/drivers/usb/chipidea/host.c
+@@ -109,15 +109,25 @@ static int host_start(struct ci_hdrc *ci)
+ 	struct ehci_hcd *ehci;
+ 	struct ehci_ci_priv *priv;
+ 	int ret;
++	struct device *dev = ci->dev;
  
-+USB Generic Onboard Device Driver
-+M:	Peter Chen <Peter.Chen@freescale.com>
-+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/peter.chen/usb.git
-+L:	linux-usb at vger.kernel.org
-+S:	Maintained
-+F:	drivers/usb/misc/generic_onboard_device.c
-+
- USB OTG FSM (Finite State Machine)
- M:	Peter Chen <Peter.Chen@freescale.com>
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/peter.chen/usb.git
-diff --git a/drivers/usb/misc/Kconfig b/drivers/usb/misc/Kconfig
-index f7a7fc2..089e2c4 100644
---- a/drivers/usb/misc/Kconfig
-+++ b/drivers/usb/misc/Kconfig
-@@ -268,3 +268,13 @@ config USB_CHAOSKEY
+-	if (usb_disabled())
++	if (usb_disabled() || !dev)
+ 		return -ENODEV;
  
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called chaoskey.
+-	hcd = usb_create_hcd(&ci_ehci_hc_driver, ci->dev, dev_name(ci->dev));
++	/*
++	 * USB Core will try to get child node under roothub,
++	 * but chipidea core has no of_node, and the child node
++	 * for controller is located at glue layer's node which
++	 * is chipidea core's parent.
++	 */
++	if (dev->parent && dev->parent->of_node)
++		dev->of_node = dev->parent->of_node;
 +
-+config USB_ONBOARD_DEVICE
-+	tristate "Generic USB Onboard Device"
-+	help
-+	  depends on OF
-+	  Say Y here if your board has an onboard device, and this device
-+	  needs to control its PHY clock and reset pin through external
-+	  signals. If you are not sure, say N.
-+
-+	  To compile this driver as a module, choose M here.
-diff --git a/drivers/usb/misc/Makefile b/drivers/usb/misc/Makefile
-index 45fd4ac..60731bb 100644
---- a/drivers/usb/misc/Makefile
-+++ b/drivers/usb/misc/Makefile
-@@ -29,3 +29,4 @@ obj-$(CONFIG_USB_CHAOSKEY)		+= chaoskey.o
++	hcd = usb_create_hcd(&ci_ehci_hc_driver, dev, dev_name(dev));
+ 	if (!hcd)
+ 		return -ENOMEM;
  
- obj-$(CONFIG_USB_SISUSBVGA)		+= sisusbvga/
- obj-$(CONFIG_USB_LINK_LAYER_TEST)	+= lvstest.o
-+obj-$(CONFIG_USB_ONBOARD_DEVICE)	+= generic_onboard_device.o
-diff --git a/drivers/usb/misc/generic_onboard_device.c b/drivers/usb/misc/generic_onboard_device.c
-new file mode 100644
-index 0000000..0111bd9
---- /dev/null
-+++ b/drivers/usb/misc/generic_onboard_device.c
-@@ -0,0 +1,144 @@
-+/*
-+ * generic_onboard_device.c	The generic onboard USB device driver
-+ *
-+ * Copyright (C) 2015 Freescale Semiconductor, Inc.
-+ * Author: Peter Chen <peter.chen@freescale.com>
-+ *
-+ * This program is free software: you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2  of
-+ * the License as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+/*
-+ * This driver is only for the USB HUB devices which need to control
-+ * their external pins(clock, reset, etc), and these USB HUB devices
-+ * are soldered at the board.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/delay.h>
-+#include <linux/gpio.h>
-+#include <linux/gpio/consumer.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_gpio.h>
-+#include <linux/platform_device.h>
-+#include <linux/regulator/consumer.h>
-+#include <linux/slab.h>
-+
-+struct usb_generic_onboard_data {
-+	struct clk *clk;
-+};
-+
-+static int usb_generic_onboard_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct usb_generic_onboard_data *hub_data;
-+	int ret = -EINVAL;
-+	struct gpio_desc *gpiod_reset = NULL;
-+	struct device_node *node = dev->of_node;
-+	u32 duration_us = 50, clk_rate = 0;
-+
-+	/* Only support device tree now */
-+	if (!node)
-+		return ret;
-+
-+	hub_data = devm_kzalloc(dev, sizeof(*hub_data), GFP_KERNEL);
-+	if (!hub_data)
-+		return -ENOMEM;
-+
-+	hub_data->clk = devm_clk_get(dev, NULL);
-+	if (IS_ERR(hub_data->clk)) {
-+		dev_dbg(dev, "Can't get clock: %ld\n",
-+			PTR_ERR(hub_data->clk));
-+		hub_data->clk = NULL;
-+	} else {
-+		ret = clk_prepare_enable(hub_data->clk);
-+		if (ret) {
-+			dev_err(dev,
-+				"Can't enable external clock: %d\n",
-+				ret);
-+			return ret;
-+		}
-+
-+		of_property_read_u32(node, "clock-frequency", &clk_rate);
-+		if (clk_rate) {
-+			ret = clk_set_rate(hub_data->clk, clk_rate);
-+			if (ret) {
-+				dev_err(dev, "Error setting clock rate\n");
-+				goto disable_clk;
-+			}
-+		}
-+	}
-+
-+	gpiod_reset = devm_gpiod_get_optional(dev, "reset", GPIOD_ASIS);
-+	ret = PTR_ERR_OR_ZERO(gpiod_reset);
-+	if (ret) {
-+		dev_err(dev, "Failed to get reset gpio, err = %d\n", ret);
-+		goto disable_clk;
-+	}
-+
-+	of_property_read_u32(node, "reset-duration-us", &duration_us);
-+
-+	if (gpiod_reset) {
-+		gpiod_direction_output(gpiod_reset, 1);
-+
-+		gpiod_set_value(gpiod_reset, 1);
-+		usleep_range(duration_us, duration_us + 10);
-+		gpiod_set_value(gpiod_reset, 0);
-+	}
-+
-+	dev_set_drvdata(dev, hub_data);
-+	return ret;
-+
-+disable_clk:
-+	clk_disable_unprepare(hub_data->clk);
-+	return ret;
-+}
-+
-+static int usb_generic_onboard_remove(struct platform_device *pdev)
-+{
-+	struct usb_generic_onboard_data *hub_data = platform_get_drvdata(pdev);
-+
-+	clk_disable_unprepare(hub_data->clk);
-+	return 0;
-+}
-+
-+static const struct of_device_id usb_generic_onboard_dt_ids[] = {
-+	{.compatible = "generic-onboard-device"},
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(of, usb_generic_onboard_dt_ids);
-+
-+static struct platform_driver usb_generic_onboard_driver = {
-+	.probe = usb_generic_onboard_probe,
-+	.remove = usb_generic_onboard_remove,
-+	.driver = {
-+		.name = "usb_generic_onboard",
-+		.of_match_table = usb_generic_onboard_dt_ids,
-+	 },
-+};
-+
-+static int __init usb_generic_onboard_init(void)
-+{
-+	return platform_driver_register(&usb_generic_onboard_driver);
-+}
-+subsys_initcall(usb_generic_onboard_init);
-+
-+static void __exit usb_generic_onboard_exit(void)
-+{
-+	platform_driver_unregister(&usb_generic_onboard_driver);
-+}
-+module_exit(usb_generic_onboard_exit);
-+
-+MODULE_AUTHOR("Peter Chen <peter.chen@freescale.com>");
-+MODULE_DESCRIPTION("Generic Onboard USB HUB driver");
-+MODULE_LICENSE("GPL v2");
+-	dev_set_drvdata(ci->dev, ci);
++	dev_set_drvdata(dev, ci);
+ 	hcd->rsrc_start = ci->hw_bank.phys;
+ 	hcd->rsrc_len = ci->hw_bank.size;
+ 	hcd->regs = ci->hw_bank.abs;
+@@ -143,7 +153,7 @@ static int host_start(struct ci_hdrc *ci)
+ 		if (ci->platdata->flags & CI_HDRC_TURN_VBUS_EARLY_ON) {
+ 			ret = regulator_enable(ci->platdata->reg_vbus);
+ 			if (ret) {
+-				dev_err(ci->dev,
++				dev_err(dev,
+ 				"Failed to enable vbus regulator, ret=%d\n",
+ 									ret);
+ 				goto put_hcd;
 -- 
 1.9.1
