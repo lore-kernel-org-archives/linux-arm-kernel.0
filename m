@@ -1,143 +1,79 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Fri, 18 Dec 2015 09:29:58 +0800
-Subject: [PATCH v1 1/6] ARM: dts: fix the correct pinctrl control for
- rk3036
-In-Reply-To: <1838222.r8GKl7OzB9@diego>
-References: <1450362112-8075-1-git-send-email-wxt@rock-chips.com>
- <1450362112-8075-2-git-send-email-wxt@rock-chips.com>
- <1838222.r8GKl7OzB9@diego>
-Message-ID: <56736196.8050007@rock-chips.com>
+From: elliott@hpe.com (Elliott, Robert (Persistent Memory))
+Date: Fri, 18 Dec 2015 01:33:25 +0000
+Subject: arm64/efi handling of persistent memory
+Message-ID: <94D0CD8314A33A4D9D801C0FE68B40295BEBD864@G9W0745.americas.hpqcorp.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko,
+Similar to the questions about the arm64 efi boot stub
+handing persistent memory, some of the arm64 kernel code 
+looks fishy.
 
-? 2015?12?18? 07:28, Heiko St?bner ??:
-> Am Donnerstag, 17. Dezember 2015, 22:21:47 schrieb Caesar Wang:
->> The pinctrl gpio pull up/down is incorrect since the rk3036 SoCs
->> can't set the status in the internal.
->>
->> We should keep the default status for enable the gpio status,
->> In fact, the pull_none is the disable the gpio pull up/down.
->>
->> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
->> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->  From the signed-off-by's I guess this change was created by Xing (author),
-> right?
+In arch/arm64/kernel/efi.c:
 
-The original patch:
+static int __init is_normal_ram(efi_memory_desc_t *md)
+{
+        if (md->attribute & EFI_MEMORY_WB)
+                return 1;
+        return 0;
+}
 
--		pcfg_pull_up: pcfg-pull-up {
--			bias-pull-up;
--		};
--
--		pcfg_pull_down: pcfg-pull-down {
--			bias-pull-down;
-+		pcfg_pull_default: pcfg_pull_default {
-+			bias-pull-pin-default;
+static __init int is_reserve_region(efi_memory_desc_t *md)
+{
+        switch (md->type) {
+        case EFI_LOADER_CODE:
+        case EFI_LOADER_DATA:
+        case EFI_BOOT_SERVICES_CODE:
+        case EFI_BOOT_SERVICES_DATA:
+        case EFI_CONVENTIONAL_MEMORY:
+        case EFI_PERSISTENT_MEMORY:
+                return 0;
+        default:
+                break;
+        }
+        return is_normal_ram(md);
+}
 
-I'm re-writing the patch to fit the others.
+static __init void reserve_regions(void)
+{
+...
+                if (is_normal_ram(md))
+                        early_init_dt_add_memory_arch(paddr, size);
 
-Yep, the seem should change commit author as the
+                if (is_reserve_region(md)) {
+                        memblock_reserve(paddr, size);
+...
 
-Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+static bool __init efi_virtmap_init(void)
+{
+...
+                if (!is_normal_ram(md))
+                        prot = __pgprot(PROT_DEVICE_nGnRE);
+                else if (md->type == EFI_RUNTIME_SERVICES_CODE ||
+                         !PAGE_ALIGNED(md->phys_addr))
+                        prot = PAGE_KERNEL_EXEC;
+                else
+                        prot = PAGE_KERNEL;
 
+Concerns include:
 
+1. is_normal_ram() will see the WB bit and return 1 regardless
+of the type.  That seems similar to the arm EFI boot stub issue.
+The three callers are shown above.
 
->
-> Heiko
->
->> ---
->>
->>   arch/arm/boot/dts/rk3036.dtsi | 34 +++++++++++++++-------------------
->>   1 file changed, 15 insertions(+), 19 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
->> index f8758bf..620e6e0 100644
->> --- a/arch/arm/boot/dts/rk3036.dtsi
->> +++ b/arch/arm/boot/dts/rk3036.dtsi
->> @@ -427,12 +427,8 @@
->>   			#interrupt-cells = <2>;
->>   		};
->>
->> -		pcfg_pull_up: pcfg-pull-up {
->> -			bias-pull-up;
->> -		};
->> -
->> -		pcfg_pull_down: pcfg-pull-down {
->> -			bias-pull-down;
->> +		pcfg_pull_default: pcfg_pull_default {
->> +			bias-pull-pin-default;
->>   		};
->>
->>   		pcfg_pull_none: pcfg-pull-none {
->> @@ -473,18 +469,18 @@
->>   			};
->>
->>   			emmc_cmd: emmc-cmd {
->> -				rockchip,pins = <2 1 RK_FUNC_2 &pcfg_pull_none>;
->> +				rockchip,pins = <2 1 RK_FUNC_2 &pcfg_pull_default>;
->>   			};
->>
->>   			emmc_bus8: emmc-bus8 {
->> -				rockchip,pins = <1 24 RK_FUNC_2 &pcfg_pull_none>,
->> -						<1 25 RK_FUNC_2 &pcfg_pull_none>,
->> -						<1 26 RK_FUNC_2 &pcfg_pull_none>,
->> -						<1 27 RK_FUNC_2 &pcfg_pull_none>,
->> -						<1 28 RK_FUNC_2 &pcfg_pull_none>,
->> -						<1 29 RK_FUNC_2 &pcfg_pull_none>,
->> -						<1 30 RK_FUNC_2 &pcfg_pull_none>,
->> -						<1 31 RK_FUNC_2 &pcfg_pull_none>;
->> +				rockchip,pins = <1 24 RK_FUNC_2 &pcfg_pull_default>,
->> +						<1 25 RK_FUNC_2 &pcfg_pull_default>,
->> +						<1 26 RK_FUNC_2 &pcfg_pull_default>,
->> +						<1 27 RK_FUNC_2 &pcfg_pull_default>,
->> +						<1 28 RK_FUNC_2 &pcfg_pull_default>,
->> +						<1 29 RK_FUNC_2 &pcfg_pull_default>,
->> +						<1 30 RK_FUNC_2 &pcfg_pull_default>,
->> +						<1 31 RK_FUNC_2 &pcfg_pull_default>;
->>   			};
->>   		};
->>
->> @@ -522,12 +518,12 @@
->>
->>   		uart0 {
->>   			uart0_xfer: uart0-xfer {
->> -				rockchip,pins = <0 16 RK_FUNC_1 &pcfg_pull_up>,
->> +				rockchip,pins = <0 16 RK_FUNC_1 &pcfg_pull_default>,
->>   						<0 17 RK_FUNC_1 &pcfg_pull_none>;
->>   			};
->>
->>   			uart0_cts: uart0-cts {
->> -				rockchip,pins = <0 18 RK_FUNC_1 &pcfg_pull_up>;
->> +				rockchip,pins = <0 18 RK_FUNC_1 &pcfg_pull_default>;
->>   			};
->>
->>   			uart0_rts: uart0-rts {
->> @@ -537,7 +533,7 @@
->>
->>   		uart1 {
->>   			uart1_xfer: uart1-xfer {
->> -				rockchip,pins = <2 22 RK_FUNC_1 &pcfg_pull_none>,
->> +				rockchip,pins = <2 22 RK_FUNC_1 &pcfg_pull_default>,
->>   						<2 23 RK_FUNC_1 &pcfg_pull_none>;
->>   			};
->>   			/* no rts / cts for uart1 */
->> @@ -545,7 +541,7 @@
->>
->>   		uart2 {
->>   			uart2_xfer: uart2-xfer {
->> -				rockchip,pins = <1 18 RK_FUNC_2 &pcfg_pull_none>,
->> +				rockchip,pins = <1 18 RK_FUNC_2 &pcfg_pull_default>,
->>   						<1 19 RK_FUNC_2 &pcfg_pull_none>;
->>   			};
->>   			/* no rts / cts for uart2 */
->
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+2. is_reserve_region() treating EFI_PERSISTENT_MEMORY the same
+as EFI_CONVENTIONAL_MEMORY looks wrong.
 
+3. We're contemplating working around the grub problem by
+reporting EFI_RESERVED_MEMORY plus the NV attribute rather
+than EFI_PERSISTENT_MEMORY.
 
--- 
-caesar wang | software engineer | wxt at rock-chip.com
+If this is done, then is_reserve_region() will fall through
+to is_normal_ram(), which will see the WB bit and return 1.
+That seems backwards... but seems correct for persistent
+memory, reporting it as a reserved region.  That might avoid the
+the EFI_PERSISTENT_MEMORY handling problem (if the preceding
+call to is_normal_ram() didn't already cause problems).
+
+---
+Robert Elliott, HPE Persistent Memory
