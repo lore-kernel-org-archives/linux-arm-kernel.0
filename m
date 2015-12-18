@@ -1,12 +1,11 @@
 From: vishnupatekar0510@gmail.com (Vishnu Patekar)
-Date: Fri, 18 Dec 2015 21:30:48 +0800
-Subject: [PATCH v3 0/3] Add basic support for Allwinner A83T SOC
-Message-ID: <1450445451-311-1-git-send-email-vishnupatekar0510@gmail.com>
+Date: Fri, 18 Dec 2015 21:30:49 +0800
+Subject: [PATCH v3 1/3] ARM: sunxi: Introduce Allwinner for A83T support
+In-Reply-To: <1450445451-311-1-git-send-email-vishnupatekar0510@gmail.com>
+References: <1450445451-311-1-git-send-email-vishnupatekar0510@gmail.com>
+Message-ID: <1450445451-311-2-git-send-email-vishnupatekar0510@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-This patch series adds very basic support for Allwinner A83T SOC.
-Clock, peripherals, smp support will be added later.
 
 Allwinner A83T is octa-core cortex-a7 based SoC.
 It's clock control unit and prcm, pinmux are different from previous sun8i
@@ -14,41 +13,64 @@ series.
 Its processor cores are arragned in two clusters 4 cores each,
 similar to A80.
 
-Note: A83T pincontroller patch is already applied by Linus, so not added in this
-patch.
+Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
+---
+ Documentation/arm/sunxi/README                  | 1 -
+ Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
+ arch/arm/mach-sunxi/sunxi.c                     | 1 +
+ drivers/clk/sunxi/clk-sunxi.c                   | 6 ++++++
+ 4 files changed, 8 insertions(+), 1 deletion(-)
 
-changes from v2->v3
-1. removed "Not Supported" for A83T in sunxi/README
-2. removed un-unsed nodes from dtsi.
-3. corrected GIC_SPI number for PH_EINT in dtsi.
-4. removed address at soc node which was un-necessary.
-5. corrected reg<> addresses for cpu nodes.
-6. changed cpu mask to 8 in gic and archtimer node.
-
-
-changes from v1->v2:
-1. used UART0 header with PB9, PB10 pins.
-2. removed unnecessary includes and comments from dtsi.
-3. arranged nodes in alphabatical order.
-4. arrnaged compatible in alphabatical order.
-5. changed cpu nodes to use cpu at 100 -cpu at -103.
-6. changed dts filename.
-
-Vishnu Patekar (3):
-  ARM: sunxi: Introduce Allwinner for A83T support
-  ARM: dts: sun8i: Add Allwinner A83T dtsi
-  ARM: dts: sun8i: Add A83T HomletV2 Board by Allwinner
-
- Documentation/arm/sunxi/README                     |   1 -
- Documentation/devicetree/bindings/arm/sunxi.txt    |   1 +
- arch/arm/boot/dts/Makefile                         |   1 +
- .../boot/dts/sun8i-a83t-allwinner-h8homlet-v2.dts  |  64 +++++++
- arch/arm/boot/dts/sun8i-a83t.dtsi                  | 206 +++++++++++++++++++++
- arch/arm/mach-sunxi/sunxi.c                        |   1 +
- drivers/clk/sunxi/clk-sunxi.c                      |   6 +
- 7 files changed, 279 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/sun8i-a83t-allwinner-h8homlet-v2.dts
- create mode 100644 arch/arm/boot/dts/sun8i-a83t.dtsi
-
+diff --git a/Documentation/arm/sunxi/README b/Documentation/arm/sunxi/README
+index 430d279..e5a115f 100644
+--- a/Documentation/arm/sunxi/README
++++ b/Documentation/arm/sunxi/README
+@@ -72,6 +72,5 @@ SunXi family
+ 
+     * Octa ARM Cortex-A7 based SoCs
+       - Allwinner A83T
+-        + Not Supported
+         + Datasheet
+           http://dl.linux-sunxi.org/A83T/A83T_datasheet_Revision_1.1.pdf
+diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
+index bb9b0faa..7e79fcc 100644
+--- a/Documentation/devicetree/bindings/arm/sunxi.txt
++++ b/Documentation/devicetree/bindings/arm/sunxi.txt
+@@ -11,5 +11,6 @@ using one of the following compatible strings:
+   allwinner,sun7i-a20
+   allwinner,sun8i-a23
+   allwinner,sun8i-a33
++  allwinner,sun8i-a83t
+   allwinner,sun8i-h3
+   allwinner,sun9i-a80
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index c2be98f..3c15619 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -69,6 +69,7 @@ MACHINE_END
+ static const char * const sun8i_board_dt_compat[] = {
+ 	"allwinner,sun8i-a23",
+ 	"allwinner,sun8i-a33",
++	"allwinner,sun8i-a83t",
+ 	"allwinner,sun8i-h3",
+ 	NULL,
+ };
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index 5ba2188..0d45253 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -1219,6 +1219,12 @@ CLK_OF_DECLARE(sun8i_a23_clk_init, "allwinner,sun8i-a23", sun6i_init_clocks);
+ CLK_OF_DECLARE(sun8i_a33_clk_init, "allwinner,sun8i-a33", sun6i_init_clocks);
+ CLK_OF_DECLARE(sun8i_h3_clk_init, "allwinner,sun8i-h3", sun6i_init_clocks);
+ 
++static void __init sun8i_a83t_init_clocks(struct device_node *node)
++{
++	sunxi_init_clocks(NULL, 0);
++}
++CLK_OF_DECLARE(sun8i_a83t_clk_init, "allwinner,sun8i-a83t", sun8i_a83t_init_clocks);
++
+ static void __init sun9i_init_clocks(struct device_node *node)
+ {
+ 	sunxi_init_clocks(NULL, 0);
 -- 
 1.9.1
