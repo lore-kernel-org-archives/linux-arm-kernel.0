@@ -1,66 +1,78 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Fri, 18 Dec 2015 19:18:17 +0800
-Subject: [PATCH V2 07/10] ARM64, ACPI, PCI: I/O Remapping Table (IORT)
- initial support.
-In-Reply-To: <1450353133-15992-8-git-send-email-tn@semihalf.com>
-References: <1450353133-15992-1-git-send-email-tn@semihalf.com>
- <1450353133-15992-8-git-send-email-tn@semihalf.com>
-Message-ID: <5673EB79.9000105@huawei.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 18 Dec 2015 11:26:51 +0000
+Subject: [PATCH v10 1/4] dt-binding:Documents of the mbigen bindings
+In-Reply-To: <20151218105837.GB29219@leverpostej>
+References: <1450353397-47668-1-git-send-email-majun258@huawei.com>
+ <1450353397-47668-2-git-send-email-majun258@huawei.com>
+ <20151217135247.GD13389@leverpostej> <5673683C.2080304@huawei.com>
+ <20151218105837.GB29219@leverpostej>
+Message-ID: <5673ED7B.1050700@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/12/17 19:52, Tomasz Nowicki wrote:
-> +++ b/include/linux/iort.h
-> @@ -0,0 +1,38 @@
-> +/*
-> + * Copyright (C) 2015, Linaro Ltd.
-> + *	Author: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along with
-> + * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
-> + * Place - Suite 330, Boston, MA 02111-1307 USA.
-> + */
-> +
-> +#ifndef __IORT_H__
-> +#define __IORT_H__
-> +
-> +#include <linux/acpi.h>
-> +
-> +#ifdef CONFIG_ACPI
+On 18/12/15 10:58, Mark Rutland wrote:
+> On Fri, Dec 18, 2015 at 09:58:20AM +0800, majun (F) wrote:
+>> Hi Mark:
+>>
+>> ? 2015/12/17 21:52, Mark Rutland ??:
+>>> On Thu, Dec 17, 2015 at 07:56:34PM +0800, MaJun wrote:
+>>>> From: Ma Jun <majun258@huawei.com>
+>> [...]
+>>>> +- compatible: Should be "hisilicon,mbigen-v2"
+>>>> +
+>>>> +- reg: Specifies the base physical address and size of the Mbigen
+>>>> +  registers.
+>>>> +
+>>>> +- interrupt controller: Identifies the node as an interrupt controller
+>>>> +
+>>>> +- msi-parent: Specifies the MSI controller this mbigen use.
+>>>> +  For more detail information,please refer to the generic msi-parent binding in
+>>>> +  Documentation/devicetree/bindings/interrupt-controller/msi.txt.
+>>>> +
+>>>> +- num-msis:Specifies the total number of interrupt this device has.
+>>>
+>>> Is this the number of pins implemented? Or the number of pins that are
+>>> in use?
+>>>
+>>> The latter feels like something we can derive.
+>>
+>> num-msis means the total number of pins implemented.
+> 
+> Ok. In that case I think it should be:
+> 
+> - num-pins: the total number of pins implemented in this Mbigen
+>   instance.
+> 
+> (with the appropriate fixups in the driver).
+> 
+> With that:
+> 
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> 
+>>>> +- #interrupt-cells : Specifies the number of cells needed to encode an
+>>>> +  interrupt source. The value must be 2.
+>>>> +
+>>>> +  The 1st cell is hardware pin number of the interrupt.This number is local to
+>>>> +  each mbigen chip and in the range from 0 to the maximum interrupts number
+>>>> +  of the mbigen.
+>>>
+>>> Just to check: 0 - 63 represent the "reserved" pins, yes?
+>>
+>> Yes, you are right.
+>>
+>>>
+>>> Other than those questions, this looks good to me.
+>>
+>> Do i need to post a new patch to update these two questions?
+> 
+> Hopefully not.
+> 
+> Marc, are you happy to fold in the s/num-msis/num-pins/ change?
 
-I think we need use CONFIG_IORT_TABLE here, or the code will be compiled
-error on no-ARM64 platform, and it will lead to undefined function, just as
-the kbuild test robot pointed out:
+Sure, I'll update the whole thing while merging it.
 
-All errors (new ones prefixed by >>):
+Thanks,
 
-   drivers/built-in.o: In function `pci_msi_domain_get_msi_rid':
-
->> (.text+0x3175d): undefined reference to `iort_find_pci_id'
-
-
-Thanks
-Hanjun
-> +
-> +struct fwnode_handle;
-> +
-> +int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node);
-> +struct fwnode_handle *iort_find_its_domain_token(int trans_id);
-> +struct fwnode_handle *iort_find_pci_domain_token(struct device *dev);
-> +int iort_find_pci_id(struct pci_dev *pdev, u32 req_id, u32 *dev_id);
-> +#else /* CONFIG_ACPI */
-> +static inline int
-> +iort_find_pci_id(struct pci_dev *pdev, u32 req_id, u32 *dev_id)
-> +{ return -ENXIO; }
-> +#endif /* CONFIG_ACPI */
-> +
-> +#endif /* __IORT_H__ */
+	M.
+-- 
+Jazz is not dead. It just smells funny...
