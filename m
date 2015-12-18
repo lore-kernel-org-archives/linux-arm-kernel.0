@@ -1,41 +1,37 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 18 Dec 2015 15:17:17 +0100
-Subject: [PATCH 04/69] clocksource/drivers/tegra: Allow timer irq affinity
- change
-In-Reply-To: <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
+Date: Fri, 18 Dec 2015 15:17:14 +0100
+Subject: [PATCH 01/69] clocksource/drivers/mtk_timer: Add pr_fmt define
+In-Reply-To: <5672CB9E.7090707@linaro.org>
 References: <5672CB9E.7090707@linaro.org>
- <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1450448302-27429-4-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lucas Stach <dev@lynxeye.de>
+From: Alexey Klimov <alexey.klimov@linaro.org>
 
-Allow the timer core to change the smp affinity of the broadcast timer
-irq by setting CLOCK_EVT_FEAT_DYNIRQ flag.
+It's a bit unclear what subsystem/driver emits some messages to dmesg in
+the function mtk_init_timer(). Use pr_fmt to auto-prefix the messages
+appropriately.
 
-This reduces interrupt pressure and wakeups on CPU0 as well as vastly
-reducing the number of timer broadcast IPIs.
-
-Signed-off-by: Lucas Stach <dev@lynxeye.de>
+Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
+Signed-off-by: Alexey Klimov <alexey.klimov@linaro.org>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/tegra20_timer.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/clocksource/mtk_timer.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/clocksource/tegra20_timer.c b/drivers/clocksource/tegra20_timer.c
-index 6ebda11..38333ab 100644
---- a/drivers/clocksource/tegra20_timer.c
-+++ b/drivers/clocksource/tegra20_timer.c
-@@ -96,7 +96,8 @@ static struct clock_event_device tegra_clockevent = {
- 	.name			= "timer0",
- 	.rating			= 300,
- 	.features		= CLOCK_EVT_FEAT_ONESHOT |
--				  CLOCK_EVT_FEAT_PERIODIC,
-+				  CLOCK_EVT_FEAT_PERIODIC |
-+				  CLOCK_EVT_FEAT_DYNIRQ,
- 	.set_next_event		= tegra_timer_set_next_event,
- 	.set_state_shutdown	= tegra_timer_shutdown,
- 	.set_state_periodic	= tegra_timer_set_periodic,
+diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
+index fbfc746..8f99cd7 100644
+--- a/drivers/clocksource/mtk_timer.c
++++ b/drivers/clocksource/mtk_timer.c
+@@ -16,6 +16,8 @@
+  * GNU General Public License for more details.
+  */
+ 
++#define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
++
+ #include <linux/clk.h>
+ #include <linux/clockchips.h>
+ #include <linux/interrupt.h>
 -- 
 1.9.1
