@@ -1,37 +1,80 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 18 Dec 2015 15:17:14 +0100
-Subject: [PATCH 01/69] clocksource/drivers/mtk_timer: Add pr_fmt define
-In-Reply-To: <5672CB9E.7090707@linaro.org>
+Date: Fri, 18 Dec 2015 15:17:15 +0100
+Subject: [PATCH 02/69] clocksource/drivers/mtk_timer: Fix pr_warn() messages
+ in mtk_timer_init
+In-Reply-To: <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
 References: <5672CB9E.7090707@linaro.org>
-Message-ID: <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
+ <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1450448302-27429-2-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Alexey Klimov <alexey.klimov@linaro.org>
 
-It's a bit unclear what subsystem/driver emits some messages to dmesg in
-the function mtk_init_timer(). Use pr_fmt to auto-prefix the messages
-appropriately.
+1) Change pr_warn()s to pr_err()s. These messages are actually errors and not
+   warnings.
+2) Add missing \n.
+3) Error message for kzalloc() failure is removed per suggestion by Joe Perches.
+   There is generic stack_dump() for allocation issues.
 
-Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
 Signed-off-by: Alexey Klimov <alexey.klimov@linaro.org>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/mtk_timer.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/clocksource/mtk_timer.c | 14 ++++++--------
+ 1 file changed, 6 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
-index fbfc746..8f99cd7 100644
+index 8f99cd7..e1e0642 100644
 --- a/drivers/clocksource/mtk_timer.c
 +++ b/drivers/clocksource/mtk_timer.c
-@@ -16,6 +16,8 @@
-  * GNU General Public License for more details.
-  */
+@@ -189,10 +189,8 @@ static void __init mtk_timer_init(struct device_node *node)
+ 	struct clk *clk;
  
-+#define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
-+
- #include <linux/clk.h>
- #include <linux/clockchips.h>
- #include <linux/interrupt.h>
+ 	evt = kzalloc(sizeof(*evt), GFP_KERNEL);
+-	if (!evt) {
+-		pr_warn("Can't allocate mtk clock event driver struct");
++	if (!evt)
+ 		return;
+-	}
+ 
+ 	evt->dev.name = "mtk_tick";
+ 	evt->dev.rating = 300;
+@@ -206,31 +204,31 @@ static void __init mtk_timer_init(struct device_node *node)
+ 
+ 	evt->gpt_base = of_io_request_and_map(node, 0, "mtk-timer");
+ 	if (IS_ERR(evt->gpt_base)) {
+-		pr_warn("Can't get resource\n");
++		pr_err("Can't get resource\n");
+ 		return;
+ 	}
+ 
+ 	evt->dev.irq = irq_of_parse_and_map(node, 0);
+ 	if (evt->dev.irq <= 0) {
+-		pr_warn("Can't parse IRQ");
++		pr_err("Can't parse IRQ\n");
+ 		goto err_mem;
+ 	}
+ 
+ 	clk = of_clk_get(node, 0);
+ 	if (IS_ERR(clk)) {
+-		pr_warn("Can't get timer clock");
++		pr_err("Can't get timer clock\n");
+ 		goto err_irq;
+ 	}
+ 
+ 	if (clk_prepare_enable(clk)) {
+-		pr_warn("Can't prepare clock");
++		pr_err("Can't prepare clock\n");
+ 		goto err_clk_put;
+ 	}
+ 	rate = clk_get_rate(clk);
+ 
+ 	if (request_irq(evt->dev.irq, mtk_timer_interrupt,
+ 			IRQF_TIMER | IRQF_IRQPOLL, "mtk_timer", evt)) {
+-		pr_warn("failed to setup irq %d\n", evt->dev.irq);
++		pr_err("failed to setup irq %d\n", evt->dev.irq);
+ 		goto err_clk_disable;
+ 	}
+ 
 -- 
 1.9.1
