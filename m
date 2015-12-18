@@ -1,80 +1,140 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Fri, 18 Dec 2015 19:00:29 +0300
-Subject: [PATCH v4] arm64: run-time detection for aarch32 support
-Message-ID: <1450454429-22976-1-git-send-email-ynorov@caviumnetworks.com>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 18 Dec 2015 16:01:47 +0000
+Subject: [PATCH v8 9/4] arm64: remove irq_count and do_softirq_own_stack()
+In-Reply-To: <1449226948-14251-1-git-send-email-james.morse@arm.com>
+References: <1449226948-14251-1-git-send-email-james.morse@arm.com>
+Message-ID: <1450454507-8907-1-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kernel option COMPAT defines the ability of executing aarch32 binaries.
-Some platforms does not support aarch32 mode, and so cannot execute that
-binaries. But we cannot just disable COMPAT for them because the same
-kernel binary may be used by multiple platforms.
+sysrq_handle_reboot() re-enables interrupts while on the irq stack. The
+irq_stack implementation wrongly assumed this would only ever happen
+via the softirq path, allowing it to update irq_count late, in
+do_softirq_own_stack().
 
-In this patch, system_supports_aarch32_el0() is introduced to detect
-aarch32 support at run-time.
+This means if an irq occurs in sysrq_handle_reboot(), during
+emergency_restart() the stack will be corrupted, as irq_count wasn't
+updated.
 
-v4: use new CPU Feature API.
+Lose the optimisation, and instead of moving the adding/subtracting of
+irq_count into irq_stack_entry/irq_stack_exit, remove it, and compare
+sp_el0 (struct task_info) with sp & ~(THREAD_SIZE - 1). This tells us if
+we are on a task stack, if so, we can safely switch to the irq stack.
+Finally, remove do_softirq_own_stack(), we don't need it anymore.
 
-Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+Reported-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: James Morse <james.morse@arm.com>
 ---
- arch/arm64/include/asm/cpufeature.h | 7 +++++++
- arch/arm64/include/asm/elf.h        | 6 ++++--
- arch/arm64/include/asm/sysreg.h     | 1 +
- 3 files changed, 12 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/irq.h |  2 --
+ arch/arm64/kernel/entry.S    | 17 +++++++++--------
+ arch/arm64/kernel/irq.c      | 38 +-------------------------------------
+ 3 files changed, 10 insertions(+), 47 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 8f271b8..781a2f7 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -184,6 +184,13 @@ static inline bool system_supports_mixed_endian_el0(void)
- 	return id_aa64mmfr0_mixed_endian_el0(read_system_reg(SYS_ID_AA64MMFR0_EL1));
- }
+diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
+index 3bece4379bd9..b77197d941fc 100644
+--- a/arch/arm64/include/asm/irq.h
++++ b/arch/arm64/include/asm/irq.h
+@@ -11,8 +11,6 @@
+ #include <asm-generic/irq.h>
+ #include <asm/thread_info.h>
  
-+static inline bool system_supports_aarch32_el0(void)
-+{
-+	u64 pfr0 = read_system_reg(SYS_ID_AA64PFR0_EL1);
-+	return ((pfr0 >> ID_AA64PFR0_EL0_SHIFT) & ID_AA64PFR0_ELx_MASK)
-+						!= ID_AA64PFR0_EL0_64BIT_ONLY;
-+}
+-#define __ARCH_HAS_DO_SOFTIRQ
+-
+ struct pt_regs;
+ 
+ DECLARE_PER_CPU(unsigned long [IRQ_STACK_SIZE/sizeof(long)], irq_stack);
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 0667fb7d8bb1..6745a9041f99 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -181,19 +181,20 @@ alternative_endif
+ 	.macro	irq_stack_entry
+ 	mov	x19, sp			// preserve the original sp
+ 
+-	this_cpu_ptr irq_stack, x25, x26
+-
+ 	/*
+-	 * Check the lowest address on irq_stack for the irq_count value,
+-	 * incremented by do_softirq_own_stack if we have re-enabled irqs
+-	 * while on the irq_stack.
++	 * Compare sp and sp_el0, if the top ~(THREAD_SIZE - 1) bits match,
++	 * we are on a task stack, and should switch to the irq stack.
+ 	 */
+-	ldr	x26, [x25]
+-	cbnz	x26, 9998f		// recursive use?
++	mrs	x26, sp_el0		// already masked
++	and	x25, x19, #~(THREAD_SIZE - 1)
++	cmp	x25, x26
++	b.ne	9998f
+ 
+-	/* switch to the irq stack */
++	this_cpu_ptr irq_stack, x25, x26
+ 	mov	x26, #IRQ_STACK_START_SP
+ 	add	x26, x25, x26
 +
- #endif /* __ASSEMBLY__ */
++	/* switch to the irq stack */
+ 	mov	sp, x26
  
- #endif
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index faad6df..1053cd7 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -23,6 +23,7 @@
-  */
- #include <asm/ptrace.h>
- #include <asm/user.h>
-+#include <asm/cpufeature.h>
+ 	/*
+diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
+index ff7ebb710e51..2386b26c0712 100644
+--- a/arch/arm64/kernel/irq.c
++++ b/arch/arm64/kernel/irq.c
+@@ -25,24 +25,14 @@
+ #include <linux/irq.h>
+ #include <linux/smp.h>
+ #include <linux/init.h>
+-#include <linux/interrupt.h>
+ #include <linux/irqchip.h>
+ #include <linux/seq_file.h>
  
- typedef unsigned long elf_greg_t;
+ unsigned long irq_err_count;
  
-@@ -173,8 +174,9 @@ typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_ELF_NGREG];
+-/*
+- * irq stack only needs to be 16 byte aligned - not IRQ_STACK_SIZE aligned.
+- * irq_stack[0] is used as irq_count, a non-zero value indicates the stack
+- * is in use, and el?_irq() shouldn't switch to it. This is used to detect
+- * recursive use of the irq_stack, it is lazily updated by
+- * do_softirq_own_stack(), which is called on the irq_stack, before
+- * re-enabling interrupts to process softirqs.
+- */
++/* irq stack only needs to be 16 byte aligned - not IRQ_STACK_SIZE aligned. */
+ DEFINE_PER_CPU(unsigned long [IRQ_STACK_SIZE/sizeof(long)], irq_stack) __aligned(16);
  
- /* AArch32 EABI. */
- #define EF_ARM_EABI_MASK		0xff000000
--#define compat_elf_check_arch(x)	(((x)->e_machine == EM_ARM) && \
--					 ((x)->e_flags & EF_ARM_EABI_MASK))
-+#define compat_elf_check_arch(x)	(system_supports_aarch32_el0()	\
-+					 && ((x)->e_machine == EM_ARM)	\
-+					 && ((x)->e_flags & EF_ARM_EABI_MASK))
- 
- #define compat_start_thread		compat_start_thread
- #define COMPAT_SET_PERSONALITY(ex)	set_thread_flag(TIF_32BIT);
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index d48ab5b..a67b203 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -102,6 +102,7 @@
- #define ID_AA64PFR0_EL2_SHIFT		8
- #define ID_AA64PFR0_EL1_SHIFT		4
- #define ID_AA64PFR0_EL0_SHIFT		0
-+#define ID_AA64PFR0_ELx_MASK		0xf
- 
- #define ID_AA64PFR0_FP_NI		0xf
- #define ID_AA64PFR0_FP_SUPPORTED	0x0
+-#define IRQ_COUNT()	(*per_cpu(irq_stack, smp_processor_id()))
+-
+ int arch_show_interrupts(struct seq_file *p, int prec)
+ {
+ 	show_ipi_list(p, prec);
+@@ -66,29 +56,3 @@ void __init init_IRQ(void)
+ 	if (!handle_arch_irq)
+ 		panic("No interrupt controller found.");
+ }
+-
+-/*
+- * do_softirq_own_stack() is called from irq_exit() before __do_softirq()
+- * re-enables interrupts, at which point we may re-enter el?_irq(). We
+- * increase irq_count here so that el1_irq() knows that it is already on the
+- * irq stack.
+- *
+- * Called with interrupts disabled, so we don't worry about moving cpu, or
+- * being interrupted while modifying irq_count.
+- *
+- * This function doesn't actually switch stack.
+- */
+-void do_softirq_own_stack(void)
+-{
+-	int cpu = smp_processor_id();
+-
+-	WARN_ON_ONCE(!irqs_disabled());
+-
+-	if (on_irq_stack(current_stack_pointer, cpu)) {
+-		IRQ_COUNT()++;
+-		__do_softirq();
+-		IRQ_COUNT()--;
+-	} else {
+-		__do_softirq();
+-	}
+-}
 -- 
-2.5.0
+2.6.2
