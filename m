@@ -1,40 +1,46 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 18 Dec 2015 15:17:32 +0100
-Subject: [PATCH 19/69] clocksource/drivers/orion: Add the COMPILE_TEST option
+Date: Fri, 18 Dec 2015 15:18:05 +0100
+Subject: [PATCH 52/69] clocksource/drivers/h8300_timer16: Remove pointless lock
 In-Reply-To: <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
 References: <5672CB9E.7090707@linaro.org>
  <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1450448302-27429-19-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1450448302-27429-52-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Increase the compilation test coverage by adding the COMPILE_TEST option.
-
-The driver is using the atomic_io API which is not portable, so the
-compilation is restricted to ARM only.
+The lock in the timer16_clocksource_read is not needed, remove it.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/Kconfig | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ drivers/clocksource/h8300_timer16.c | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index f6e71b7..68a63b2 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -59,9 +59,12 @@ config MESON6_TIMER
- 	  Enables the support for the Meson6 timer driver.
+diff --git a/drivers/clocksource/h8300_timer16.c b/drivers/clocksource/h8300_timer16.c
+index 129dca0..f396605 100644
+--- a/drivers/clocksource/h8300_timer16.c
++++ b/drivers/clocksource/h8300_timer16.c
+@@ -30,7 +30,6 @@ struct timer16_priv {
+ 	unsigned char imfa;
+ 	unsigned char imiea;
+ 	unsigned char ovf;
+-	raw_spinlock_t lock;
+ 	struct clk *clk;
+ };
  
- config ORION_TIMER
-+	bool "Orion timer driver" if COMPILE_TEST
-+	depends on ARM
- 	select CLKSRC_OF
- 	select CLKSRC_MMIO
--	bool
-+	help
-+	  Enables the support for the Orion timer driver
+@@ -75,13 +74,10 @@ static inline struct timer16_priv *cs_to_priv(struct clocksource *cs)
+ static cycle_t timer16_clocksource_read(struct clocksource *cs)
+ {
+ 	struct timer16_priv *p = cs_to_priv(cs);
+-	unsigned long flags, raw;
+-	unsigned long value;
++	unsigned long raw, value;
  
- config SUN4I_TIMER
- 	select CLKSRC_MMIO
+-	raw_spin_lock_irqsave(&p->lock, flags);
+ 	value = p->total_cycles;
+ 	raw = timer16_get_counter(p);
+-	raw_spin_unlock_irqrestore(&p->lock, flags);
+ 
+ 	return value + raw;
+ }
 -- 
 1.9.1
