@@ -1,43 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 18 Dec 2015 14:31:57 -0800
-Subject: [PATCH] mmc: pwrseq_simple: Fix regression with optional GPIOs
-In-Reply-To: <CAPDyKFr8e6wDxkGwnOwijQiOgF7oq6gCoHmqbubv6oSbpYbwqg@mail.gmail.com>
-References: <1449528845-25189-1-git-send-email-tony@atomide.com>
- <CAPDyKFpxiOJJdh-nLXjxv3DYJnW3RAf_9aqMfds46=-oqPd5ng@mail.gmail.com>
- <20151218161406.GL23396@atomide.com>
- <CAPDyKFr8e6wDxkGwnOwijQiOgF7oq6gCoHmqbubv6oSbpYbwqg@mail.gmail.com>
-Message-ID: <20151218223156.GP23396@atomide.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 18 Dec 2015 14:35:40 -0800
+Subject: [PATCH 3/3] iommu/dma: Avoid unlikely high-order allocations
+In-Reply-To: <8014a146e90282b8cbc5868cee0d01776670d9a6.1450457730.git.robin.murphy@arm.com>
+References: <9a84191ed813c23db7901f8c73f514d081495bdf.1450457730.git.robin.murphy@arm.com>
+ <8014a146e90282b8cbc5868cee0d01776670d9a6.1450457730.git.robin.murphy@arm.com>
+Message-ID: <CAD=FV=WqJHjb3zoZn=8OPO2iKH1k1sMvXkVBkyM6pAyvo6PgDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ulf Hansson <ulf.hansson@linaro.org> [151218 14:20]:
-> On 18 December 2015 at 17:14, Tony Lindgren <tony@atomide.com> wrote:
-> > * Ulf Hansson <ulf.hansson@linaro.org> [151207 16:20]:
-> >> +Linus
-> >>
-> >> On 7 December 2015 at 23:54, Tony Lindgren <tony@atomide.com> wrote:
-> >> > Commit ce037275861e ("mmc: pwrseq_simple: use GPIO descriptors array API")
-> >> > changed the handling MMC power sequence so GPIOs no longer are optional.
-> >> >
-> >> > This broke SDIO WLAN at least for omap5 that can't yet use the reset GPIOs
-> >> > with pwrseq_simple as a wait is needed after enabling the SDIO device.
-> >>
-> >> Can you elaborate on this. Did it break omap5 or not? :-)
-> >
-> > Ulf, is this patch queued for v4.4 as a regression fix? I don't see it
-> > in Linux next or mainline trees?
-> 
-> Ohh, I guess there where some misunderstanding. I made a bunch of
-> comments on your patch as well, so I have been expecting a new
-> version.
+Robin,
 
-Well this $subject patch was intended as a regression fix for v4.4-rc cycle.
-All the other things discussed are not fixes but new features instead.
+On Fri, Dec 18, 2015 at 9:01 AM, Robin Murphy <robin.murphy@arm.com> wrote:
+> Doug reports that the equivalent page allocator on 32-bit ARM exhibits
+> particularly pathalogical behaviour under memory pressure when
+> fragmentation is high, where allocating a 4MB buffer takes tens of
+> seconds and the number of calls to alloc_pages() is over 9000![1]
+>
+> We can drastically improve that situation without losing the other
+> benefits of high-order allocations when they would succeed, by assuming
+> memory pressure is relatively constant over the course of an allocation,
+> and not retrying allocations at orders we know to have failed before.
+> This way, the best-case behaviour remains unchanged, and in the worst
+> case we should see at most a dozen or so (MAX_ORDER - 1) failed attempts
+> before falling back to single pages for the remainder of the buffer.
+>
+> [1]:http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/394660.html
+>
+> Reported-by: Douglas Anderson <dianders@chromium.org>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  drivers/iommu/dma-iommu.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
 
-> Sorry if that was unclear!
-
-I think this patch should be still fine as is, care to take a look again?
-
-Regards,
-
-Tony
+Presumably it makes sense to update this based on v2 of my patch to
+the original code?  AKA: <https://patchwork.kernel.org/patch/7888851/>
+?
