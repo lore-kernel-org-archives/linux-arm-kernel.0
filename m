@@ -1,101 +1,93 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Fri, 18 Dec 2015 09:06:29 -0800
-Subject: [PATCH 0/3] Batched user access support
-In-Reply-To: <20151218094452.GA32455@gmail.com>
-References: <alpine.LFD.2.20.1512171016510.27310@i7>
- <20151218094452.GA32455@gmail.com>
-Message-ID: <CA+55aFx=KibdQAc6_UQkBNbCaYzJPu7VL-gRX7cVin8JmnW6EA@mail.gmail.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Fri, 18 Dec 2015 09:23:51 -0800
+Subject: [PATCH] PCI: iproc: fix msi driver selection
+In-Reply-To: <1541985.1Jq5kHC7MS@wuerfel>
+References: <1541985.1Jq5kHC7MS@wuerfel>
+Message-ID: <56744127.5060106@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 1:44 AM, Ingo Molnar <mingo@kernel.org> wrote:
+Hi Arnd,
+
+On 12/18/2015 6:57 AM, Arnd Bergmann wrote:
+> The newly added MSI support for iproc causes a link error when its
+> Kconfig option is disabled:
 >
-> * Linus Torvalds <torvalds@linux-foundation.org> wrote:
->>
->> On the 'make -j' test on a fully built kernel, strncpy_from_user() was
->> about 1.5% of all CPU time. And almost two thirds of that was just the
->> SMAP overhead.
+> ERROR: "iproc_msi_exit" [drivers/pci/host/pcie-iproc.ko] undefined!
+> ERROR: "iproc_msi_init" [drivers/pci/host/pcie-iproc.ko] undefined!
 >
-> Just curious: by how much did the overhead shift after your patches?
+> This changes the header file so we use stub functions whenever
+> the driver is not built, even when CONFIG_MSI is enabled.
+>
+> As the Kconfig logic for the driver is a bit off, I'm rectifying
+> that as well, by making it depend on the specific drivers that
+> call into the driver, and moving the option behind those instead
+> of before them.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 610894347cbf ("PCI: iproc: Add iProc PCIe MSI support")
+> ---
+> Found on ARM randconfig builds a couple of days ago
+>
+> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> index 490476e172fd..d7c05894af70 100644
+> --- a/drivers/pci/host/Kconfig
+> +++ b/drivers/pci/host/Kconfig
+> @@ -124,15 +124,6 @@ config PCIE_IPROC
+>   	  iProc family of SoCs. An appropriate bus interface driver needs
+>   	  to be enabled to select this.
+>
 
-So just in case you want to reproduce this, here's what I do:
+I was actually not aware of the change that makes PCIE_IPROC hidden and 
+selected by the bus drivers. But I know, :)
 
- (a) configure a maximal kernel build:
+> -config PCIE_IPROC_MSI
+> -	bool "Broadcom iProc PCIe MSI support"
+> -	depends on ARCH_BCM_IPROC && PCI_MSI
+> -	select PCI_MSI_IRQ_DOMAIN
+> -	default ARCH_BCM_IPROC
+> -	help
+> -	  Say Y here if you want to enable MSI support for Broadcom's iProc
+> -	  PCIe controller
+> -
+>   config PCIE_IPROC_PLATFORM
+>   	tristate "Broadcom iProc PCIe platform bus driver"
+>   	depends on ARCH_BCM_IPROC || (ARM && COMPILE_TEST)
+> @@ -154,6 +145,16 @@ config PCIE_IPROC_BCMA
+>   	  Say Y here if you want to use the Broadcom iProc PCIe controller
+>   	  through the BCMA bus interface
+>
+> +config PCIE_IPROC_MSI
+> +	bool "Broadcom iProc PCIe MSI support"
+> +	depends on PCIE_IPROC_PLATFORM || PCIE_IPROC_BCMA
+> +	depends on PCI_MSI
+> +	select PCI_MSI_IRQ_DOMAIN
+> +	default ARCH_BCM_IPROC
+> +	help
+> +	  Say Y here if you want to enable MSI support for Broadcom's iProc
+> +	  PCIe controller
+> +
+>   config PCIE_ALTERA
+>   	bool "Altera PCIe controller"
+>   	depends on ARM || NIOS2
+> diff --git a/drivers/pci/host/pcie-iproc.h b/drivers/pci/host/pcie-iproc.h
+> index 6def23a7eb54..e84d93c53c7b 100644
+> --- a/drivers/pci/host/pcie-iproc.h
+> +++ b/drivers/pci/host/pcie-iproc.h
+> @@ -79,7 +79,7 @@ struct iproc_pcie {
+>   int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res);
+>   int iproc_pcie_remove(struct iproc_pcie *pcie);
+>
+> -#ifdef CONFIG_PCI_MSI
+> +#ifdef CONFIG_PCIE_IPROC_MSI
+>   int iproc_msi_init(struct iproc_pcie *pcie, struct device_node *node);
+>   void iproc_msi_exit(struct iproc_pcie *pcie);
+>   #else
+>
+>
 
-      make allmodconfig
+This fix looks good to me. Thanks!
 
- (b) build the kernel fully (not timing this part):
+Reviewed-by: Ray Jui <rjui@broadcom.com>
 
-      make -j16
-
- (c) profile the now empty kernel re-build:
-
-      perf record -e cycles:pp make -j
-
- (d) look at just the kernel part of the profile, by zooming into the
-kernel DSO when doing
-
-      perf report --sort=symbol
-
-That empty kernel rebuild is one of my ways to check for somewhat real
-VFS path-lookup performance. It's a real load, and fairly relevant:
-most of my kernel builds are reasonably empty (ie when I pull from
-people, I always rebuild, but if it's a small pull, it's not
-necessarily rebuilding very much).
-
-Anyway, on that profile, what you *should* normally see is that the
-path walking is the hottest part by far, because most of the costs
-there is "make" doing a lot of "stat()" calls to get the timestamps of
-all the source and object files. It has a long tail - "make" does
-other things too, but the top kernel entry should basically be
-"__d_lookup_rcu()", with "link_path_walk()" and
-"selinux_inode_permission()" being up there too.
-
-Those are basically the three hottest path lookup functions (and yes,
-it's sad how high selinux_inode_permission() is, but it's largely
-because it's the first place where we start touching the actual inode
-data, so you an see in the instruction profiles how much of it are
-those first accesses).
-
-With SMAP and the stac/clac on every access, in my profiles I see
-strncpy_from_user() being neck-and-neck with link_path_walk() and
-selinux_inode_permission(). And it definitely shouldn't be there.
-Don't get me wrong: it's a function that I expect to see in the
-profiles - copying the pathname from user space really is a noticeable
-part of pathname lookup - but it shouldn't be in the top three.
-
-So for me, without that patch-series, "strncpu_from_user()" was the
-third-hottest function (ok, looked at my numbers again, and it wasn't
-1.5%, it was 1.2% of all time).
-
-And looking at the instruction profile, the overhead of _just_ the
-stac/clac instructions (using "cycles:pp" in the profile) was 60% of
-that 1.2%.
-
-Put another way: just those two instructions used to be 0.7% of the
-whole CPU cost of that empty "make -j".
-
-Now, as I'm sure you have seen many many times, instruction-level
-profiling isn't "real performance". It shifts around, and with
-out-of-order CPU's, even with the nice precise PEBS profiling, the
-fact that 0.7% of all time is *accounted* to the instructions doesn't
-mean that you really spend that much on it. But it's still a pretty
-big sign.
-
-Anyway, *with* the patches, strncpu_from_user() falls from third place
-and 1.2% of the cost down to ninth place, and 0.52% of the total cost.
-And the stac/clac instructions go from 60% of the cost to 33%. So
-overall, those two stac/clac instructions went from 0.7% of the whole
-build cost down to 0.17%.
-
-So the whole strncpy_from_user() function sped up by between a factor
-of two and three, and that's because the cost of just the stac/clac
-was cut by almost a factor of five.
-
-And all the numbers fluctuate, so take all of the above with a pinch
-of salt. But they are repeatable enough for me to be a reasonable
-ballpark, even if they do fluctuate a bit.
-
-I think you have a Skylake machine too, so you can redo the above.
-
-                           Linus
+Ray
