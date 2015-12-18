@@ -1,48 +1,99 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 18 Dec 2015 17:33:54 +0800
-Subject: [RFC PATCH 0/5] USB: add generic onboard USB driver
-Message-ID: <1450431239-16439-1-git-send-email-peter.chen@freescale.com>
+Date: Fri, 18 Dec 2015 17:33:55 +0800
+Subject: [RFC PATCH 1/5] usb: hub: add device tree support for populating
+ onboard usb device
+In-Reply-To: <1450431239-16439-1-git-send-email-peter.chen@freescale.com>
+References: <1450431239-16439-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <1450431239-16439-2-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Although most of USB device is hot-plug's, there are still some
+USB devices are soldered on the board, and these kinds of devices
+maybe the upstream device at 1st or 2nd level hub's, so in order to
+detect all onboard devices, we put the detect device node code
+at hub's driver, and it will populate platform device under this HUB.
 
-This is later patch set for generic onboard HUB dirver [1], since
-I find it can apply for all generic onboard USB devices, so I
-changed a little for it, it should be work for the use case found
-at imx6qdl udoo board, but several people have comments for its
-design, I mark RFC for disucssion, and see how to implement it
-properly.
+Signed-off-by: Peter Chen <peter.chen@freescale.com>
+---
+ drivers/usb/core/hub.c | 37 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
-The purpose for this patch set is to let the USB handle platform
-parameters properly, since some usb devices need to pre-setup
-before it can be recognized by controller [2], some usb devices
-has more interfaces for others use, like i2c, gpios, etc.[3]
-
-Thanks.
-
-[1] http://www.spinics.net/lists/linux-usb/msg134082.html
-[2] http://www.spinics.net/lists/linux-usb/msg131502.html
-[3] http://marc.info/?l=linux-usb&m=142772952730243&w=2
-
-Peter Chen (5):
-  usb: hub: add device tree support for populating onboard usb device
-  doc: dt-binding: generic onboard USB device
-  usb: misc: generic_onboard_hub: add generic onboard USB device driver
-  usb: chipidea: host: let the hcd know's parent device node
-  ARM: dts: imx6qdl-udoo.dtsi: fix onboard USB HUB property
-
- .../bindings/usb/generic-onboard-device.txt        |  31 +++++
- MAINTAINERS                                        |   7 +
- arch/arm/boot/dts/imx6qdl-udoo.dtsi                |  35 ++---
- drivers/usb/chipidea/host.c                        |  18 ++-
- drivers/usb/core/hub.c                             |  37 ++++++
- drivers/usb/misc/Kconfig                           |  10 ++
- drivers/usb/misc/Makefile                          |   1 +
- drivers/usb/misc/generic_onboard_device.c          | 144 +++++++++++++++++++++
- 8 files changed, 258 insertions(+), 25 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/usb/generic-onboard-device.txt
- create mode 100644 drivers/usb/misc/generic_onboard_device.c
-
+diff --git a/drivers/usb/core/hub.c b/drivers/usb/core/hub.c
+index 5e32ce7..889f188 100644
+--- a/drivers/usb/core/hub.c
++++ b/drivers/usb/core/hub.c
+@@ -26,6 +26,7 @@
+ #include <linux/mutex.h>
+ #include <linux/random.h>
+ #include <linux/pm_qos.h>
++#include <linux/of_platform.h>
+ 
+ #include <asm/uaccess.h>
+ #include <asm/byteorder.h>
+@@ -1334,6 +1335,34 @@ static int hub_post_reset(struct usb_interface *intf)
+ 	return 0;
+ }
+ 
++static int hub_of_children_register(struct usb_device *hdev)
++{
++	struct device *dev;
++
++	if (hdev->parent)
++		dev = &hdev->dev;
++	else
++		dev = bus_to_hcd(hdev->bus)->self.controller;
++
++	if (!dev->of_node)
++		return 0;
++
++	return of_platform_populate(dev->of_node, NULL, NULL, dev);
++}
++
++static void hub_of_children_unregister(struct usb_device *hdev)
++{
++	struct device *dev;
++
++	if (hdev->parent)
++		dev = &hdev->dev;
++	else
++		dev = bus_to_hcd(hdev->bus)->self.controller;
++
++	if (dev->of_node)
++		of_platform_depopulate(dev);
++}
++
+ static int hub_configure(struct usb_hub *hub,
+ 	struct usb_endpoint_descriptor *endpoint)
+ {
+@@ -1677,6 +1706,7 @@ static void hub_disconnect(struct usb_interface *intf)
+ 	usb_set_intfdata(intf, NULL);
+ 	spin_unlock_irq(&device_state_lock);
+ 
++	hub_of_children_unregister(hdev);
+ 	for (; port1 > 0; --port1)
+ 		usb_hub_remove_port_device(hub, port1);
+ 
+@@ -1701,6 +1731,7 @@ static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
+ 	struct usb_endpoint_descriptor *endpoint;
+ 	struct usb_device *hdev;
+ 	struct usb_hub *hub;
++	int ret;
+ 
+ 	desc = intf->cur_altsetting;
+ 	hdev = interface_to_usbdev(intf);
+@@ -1820,6 +1851,12 @@ descriptor_error:
+ 	if (id->driver_info & HUB_QUIRK_CHECK_PORT_AUTOSUSPEND)
+ 		hub->quirk_check_port_auto_suspend = 1;
+ 
++	ret = hub_of_children_register(hdev);
++	if (ret) {
++		dev_err(&hdev->dev, "Failed to register child device\n");
++		return ret;
++	}
++
+ 	if (hub_configure(hub, endpoint) >= 0)
+ 		return 0;
+ 
 -- 
 1.9.1
