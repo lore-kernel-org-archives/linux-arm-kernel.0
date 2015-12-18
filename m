@@ -1,32 +1,84 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 18 Dec 2015 15:17:47 +0100
-Subject: [PATCH 34/69] clocksource/drivers/fsl-ftm: Add the COMPILE_TEST option
+Date: Fri, 18 Dec 2015 15:17:49 +0100
+Subject: [PATCH 36/69] clocksource/drivers/dw_apb_timer_of: Implement ARM
+ delay timer
 In-Reply-To: <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
 References: <5672CB9E.7090707@linaro.org>
  <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1450448302-27429-34-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1450448302-27429-36-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Increase the compilation test coverage by adding the COMPILE_TEST option.
+From: Jisheng Zhang <jszhang@marvell.com>
 
+Implement an ARM delay timer to be used for udelay(). This allows us to
+skip the delay loop calibration at boot on Marvell BG2, BG2Q, BG2CD
+platforms. And after this patch, udelay() will be unaffected by CPU
+frequency changes.
+
+Note: Although in case there are several possible delay timers, we may
+not select the "best" delay timer. Take one Marvell Berlin platform for
+example: we have arch timer and dw-apb timer. The arch timer freq is
+25MHZ while the dw-apb timer freq is 100MHZ, current selection would
+choose the dw-apb timer. But the dw apb timer is on the APB bus while
+arch timer sits in CPU, the cost of accessing the apb timer is higher
+than the arch timer. We could introduce "rating" concept to delay
+timer, but this approach "brings a lot of complexity and workarounds
+in the code for a small benefit" as pointed out by Daniel.
+
+Later, Arnd pointed out "However, we could argue that this actually
+doesn't matter at all, because the entire point of the ndelay()/
+udelay()/mdelay() functions is to waste CPU cycles doing not much at
+all, so we can just as well waste them reading the timer register
+than spinning on the CPU reading the arch timer more often.", so we
+just simply register the dw apb base delay timer.
+
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clocksource/dw_apb_timer_of.c | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 3457a86..7085eb7 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -245,7 +245,7 @@ config CLKSRC_SAMSUNG_PWM
- 	  needed only on systems that do not have the Exynos MCT available.
+diff --git a/drivers/clocksource/dw_apb_timer_of.c b/drivers/clocksource/dw_apb_timer_of.c
+index a19a3f6..860843c 100644
+--- a/drivers/clocksource/dw_apb_timer_of.c
++++ b/drivers/clocksource/dw_apb_timer_of.c
+@@ -16,6 +16,7 @@
+  * You should have received a copy of the GNU General Public License
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
++#include <linux/delay.h>
+ #include <linux/dw_apb_timer.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+@@ -130,6 +131,17 @@ static void __init init_sched_clock(void)
+ 	sched_clock_register(read_sched_clock, 32, sched_rate);
+ }
  
- config FSL_FTM_TIMER
--	bool
-+	bool "Freescale FlexTimer Module driver" if COMPILE_TEST
- 	help
- 	  Support for Freescale FlexTimer Module (FTM) timer.
- 
++#ifdef CONFIG_ARM
++static unsigned long dw_apb_delay_timer_read(void)
++{
++	return ~readl_relaxed(sched_io_base);
++}
++
++static struct delay_timer dw_apb_delay_timer = {
++	.read_current_timer	= dw_apb_delay_timer_read,
++};
++#endif
++
+ static int num_called;
+ static void __init dw_apb_timer_init(struct device_node *timer)
+ {
+@@ -142,6 +154,10 @@ static void __init dw_apb_timer_init(struct device_node *timer)
+ 		pr_debug("%s: found clocksource timer\n", __func__);
+ 		add_clocksource(timer);
+ 		init_sched_clock();
++#ifdef CONFIG_ARM
++		dw_apb_delay_timer.freq = sched_rate;
++		register_current_timer_delay(&dw_apb_delay_timer);
++#endif
+ 		break;
+ 	default:
+ 		break;
 -- 
 1.9.1
