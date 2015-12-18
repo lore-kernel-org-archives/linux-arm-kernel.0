@@ -1,80 +1,41 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 18 Dec 2015 15:17:15 +0100
-Subject: [PATCH 02/69] clocksource/drivers/mtk_timer: Fix pr_warn() messages
- in mtk_timer_init
+Date: Fri, 18 Dec 2015 15:17:21 +0100
+Subject: [PATCH 08/69] clocksource/drivers/qcom: Make COMPILE_TEST enabled for
+ ARM architecture
 In-Reply-To: <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
 References: <5672CB9E.7090707@linaro.org>
  <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1450448302-27429-2-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1450448302-27429-8-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexey Klimov <alexey.klimov@linaro.org>
+In order to be consistent with the rest of the drivers compilation, let's
+introduce the COMPILE_TEST option. Unfortunately, the delay.h code is not
+portable, so the compilation test coverage will be restricted to the ARM
+architecture.
 
-1) Change pr_warn()s to pr_err()s. These messages are actually errors and not
-   warnings.
-2) Add missing \n.
-3) Error message for kzalloc() failure is removed per suggestion by Joe Perches.
-   There is generic stack_dump() for allocation issues.
-
-Signed-off-by: Alexey Klimov <alexey.klimov@linaro.org>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/mtk_timer.c | 14 ++++++--------
- 1 file changed, 6 insertions(+), 8 deletions(-)
+ drivers/clocksource/Kconfig | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
-index 8f99cd7..e1e0642 100644
---- a/drivers/clocksource/mtk_timer.c
-+++ b/drivers/clocksource/mtk_timer.c
-@@ -189,10 +189,8 @@ static void __init mtk_timer_init(struct device_node *node)
- 	struct clk *clk;
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 2eb5f0e..b423785 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -279,7 +279,12 @@ config EM_TIMER_STI
+ 	  such as EMEV2 from former NEC Electronics.
  
- 	evt = kzalloc(sizeof(*evt), GFP_KERNEL);
--	if (!evt) {
--		pr_warn("Can't allocate mtk clock event driver struct");
-+	if (!evt)
- 		return;
--	}
+ config CLKSRC_QCOM
+-	bool
++	bool "Qualcomm MSM timer" if COMPILE_TEST
++	depends on ARM
++	select CLKSRC_OF
++	help
++	  This enables the clocksource and the per CPU clockevent driver for the
++	  Qualcomm SoCs.
  
- 	evt->dev.name = "mtk_tick";
- 	evt->dev.rating = 300;
-@@ -206,31 +204,31 @@ static void __init mtk_timer_init(struct device_node *node)
- 
- 	evt->gpt_base = of_io_request_and_map(node, 0, "mtk-timer");
- 	if (IS_ERR(evt->gpt_base)) {
--		pr_warn("Can't get resource\n");
-+		pr_err("Can't get resource\n");
- 		return;
- 	}
- 
- 	evt->dev.irq = irq_of_parse_and_map(node, 0);
- 	if (evt->dev.irq <= 0) {
--		pr_warn("Can't parse IRQ");
-+		pr_err("Can't parse IRQ\n");
- 		goto err_mem;
- 	}
- 
- 	clk = of_clk_get(node, 0);
- 	if (IS_ERR(clk)) {
--		pr_warn("Can't get timer clock");
-+		pr_err("Can't get timer clock\n");
- 		goto err_irq;
- 	}
- 
- 	if (clk_prepare_enable(clk)) {
--		pr_warn("Can't prepare clock");
-+		pr_err("Can't prepare clock\n");
- 		goto err_clk_put;
- 	}
- 	rate = clk_get_rate(clk);
- 
- 	if (request_irq(evt->dev.irq, mtk_timer_interrupt,
- 			IRQF_TIMER | IRQF_IRQPOLL, "mtk_timer", evt)) {
--		pr_warn("failed to setup irq %d\n", evt->dev.irq);
-+		pr_err("failed to setup irq %d\n", evt->dev.irq);
- 		goto err_clk_disable;
- 	}
- 
+ config CLKSRC_VERSATILE
+ 	bool "ARM Versatile (Express) reference platforms clock source"
 -- 
 1.9.1
