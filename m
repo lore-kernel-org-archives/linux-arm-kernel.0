@@ -1,39 +1,28 @@
-From: dirk.behme@gmail.com (Dirk Behme)
-Date: Fri, 18 Dec 2015 12:58:33 +0100
-Subject: [PATCH 1/2] arm64: dts: r8a7795: Add Cortex-A53 CPU cores
-In-Reply-To: <CAMuHMdVVL9T6U8npb5kOLdP3PmS6Lhx0b9O3FKgxd2HQcUedFw@mail.gmail.com>
-References: <1449904607-4060-1-git-send-email-dirk.behme@gmail.com>
- <CAMuHMdVVL9T6U8npb5kOLdP3PmS6Lhx0b9O3FKgxd2HQcUedFw@mail.gmail.com>
-Message-ID: <5673F4E9.9070205@gmail.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 18 Dec 2015 13:11:41 +0100
+Subject: [PATCH v3 4/4] printk/nmi: Increase the size of NMI buffer and
+ make it configurable
+In-Reply-To: <20151218112902.GO6344@twins.programming.kicks-ass.net>
+References: <1449667265-17525-1-git-send-email-pmladek@suse.com>
+ <1449667265-17525-5-git-send-email-pmladek@suse.com>
+ <CAMuHMdXVgr58YjoePGrRbMyMncQ27f85prL7G5SpeHeNxoYrXQ@mail.gmail.com>
+ <20151211124159.GB3729@pathway.suse.cz>
+ <20151211145725.b0e81bb4bb18fcd72ef5f557@linux-foundation.org>
+ <20151211232113.GZ8644@n2100.arm.linux.org.uk>
+ <alpine.LNX.2.00.1512120024370.9922@cbobk.fhfr.pm>
+ <5673DD60.7080302@linaro.org>
+ <20151218112902.GO6344@twins.programming.kicks-ass.net>
+Message-ID: <20151218121141.GR6373@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+On Fri, Dec 18, 2015 at 12:29:02PM +0100, Peter Zijlstra wrote:
+> On Fri, Dec 18, 2015 at 10:18:08AM +0000, Daniel Thompson wrote:
+> > I'm not entirely sure that this is an improvement.
+> 
+> What I do these days is delete everything in vprintk_emit() and simply
+> call early_printk().
 
-On 18.12.2015 12:02, Geert Uytterhoeven wrote:
-> Hi Dirk,
->
-> On Sat, Dec 12, 2015 at 8:16 AM, Dirk Behme <dirk.behme@gmail.com> wrote:
->> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
->>
->> This patch adds Cortex-A53 CPU cores to r8a7795 SoC for a total of 8
->> cores (4 x Cortex-A57 + 4 x Cortex-A53).
->>
->> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
->> Signed-off-by: Dirk Behme <dirk.behme@gmail.com>
->
-> Thanks, I can confirm this works.
->
-> However, as the scheduler is not big.LITTLE aware (running processes are not
-> migrated automatically to the faster CA57 cores when these are idle), it makes
-> performance less deterministic.
-
-
-What's the plan, then?
-
-Waiting for big.LITTLE getting merged before enabling the A53? Or not 
-using the A53 at all?
-
-Best regards
-
-Dirk
+On that, whoever made the device model use vprintk_emit() broke the
+debugger (KGDB/KDB) printk intercept, and the whole vprintk_func
+redirection scheme.
