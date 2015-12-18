@@ -1,210 +1,210 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 18 Dec 2015 10:55:08 -0800
-Subject: [PATCH] ARM: dma-mapping: Just allocate one chunk at a time
-In-Reply-To: <5673FEF0.1080504@arm.com>
-References: <1450384253-1067-1-git-send-email-dianders@chromium.org>
- <CAD=FV=XP9zx2XEmo7vS0MdsROJ0JoRYFidnRaBLxR43GXnuqag@mail.gmail.com>
- <5673FEF0.1080504@arm.com>
-Message-ID: <CAD=FV=XxSBe8=OJHpMqk9mPUnhNZ5pF5otJWr-2RedEkuMp+Kw@mail.gmail.com>
+From: okaya@codeaurora.org (okaya at codeaurora.org)
+Date: Fri, 18 Dec 2015 18:56:39 -0000
+Subject: [PATCH V2 00/23] MMCONFIG refactoring and support for ARM64 PCI
+ hostbridge init based on ACPI
+In-Reply-To: <5673FB6C.80008@semihalf.com>
+References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
+ <5673281E.7020204@codeaurora.org> <5673FB6C.80008@semihalf.com>
+Message-ID: <4bccc2de7668dde04436ac9c19aac25d.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Robin,
-
-On Fri, Dec 18, 2015 at 4:41 AM, Robin Murphy <robin.murphy@arm.com> wrote:
-> Hi Doug,
->
->
-> On 17/12/15 22:31, Doug Anderson wrote:
+> On 17.12.2015 22:24, Sinan Kaya wrote:
+>> Hi Tomasz,
 >>
->> Hi,
+>> On 12/16/2015 10:16 AM, Tomasz Nowicki wrote:
+>>>  From the functionality point of view this series might be split into
+>>> the
+>>> following logic parts:
+>>> 1. Make MMCONFIG code arch-agnostic which allows all architectures to
+>>> collect
+>>>     PCI config regions and used when necessary.
+>>> 2. Move non-arch specific bits to the core code.
+>>> 3. Use MMCONFIG code and implement generic ACPI based PCI host
+>>>     controller driver.
+>>> 4. Enable above driver on ARM64
+>>>
+>>> Patches has been built on top of 4.4-rc4 and can be found here:
+>>> git at github.com:semihalf-nowicki-tomasz/linux.git (pci-acpi-v2)
+>>>
+>>> NOTE, this patch set depends on Matthew's patches:
+>>> http://www.spinics.net/lists/linux-pci/msg45950.html
+>>> https://github.com/Vality/linux/tree/pci-fixes
+>>>
+>>> This has been tested on Cavium ThunderX 1 socket server and QEMU.
+>>> Any help in reviewing and testing is very appreciated.
+>>>
+>>> v1 -> v2
+>>> - moved non-arch specific piece of code to dirver/acpi/ directory
+>>> - fixed IO resource handling
+>>> - introduced PCI config accessors quirks matching
+>>> - moved ACPI_COMPANION_SET to generic code
+>>>
 >>
->> On Thu, Dec 17, 2015 at 12:30 PM, Douglas Anderson
->> <dianders@chromium.org> wrote:
->>>
->>> The __iommu_alloc_buffer() is expected to be called to allocate pretty
->>> sizeable buffers.  Upon simple tests of video I saw it trying to
->>> allocate 4,194,304 bytes.  The function tries to be efficient about this
->>> by starting out allocating large chunks and then moving to smaller and
->>> smaller chunk sizes until it succeeds.
->>>
->>> The current function is very, very slow.
->>>
->>> One problem is the way it keeps trying and trying to allocate big
->>> chunks.  Imagine a very fragmented memory that has 4M free but no
->>> contiguous pages at all.  Further imagine allocating 4M (1024 pages).
->>> We'll do the following memory allocations:
->>> - For page 1:
->>>    - Try to allocate order 10 (no retry)
->>>    - Try to allocate order 9 (no retry)
->>>    - ...
->>>    - Try to allocate order 0 (with retry, but not needed)
->>> - For page 2:
->>>    - Try to allocate order 9 (no retry)
->>>    - Try to allocate order 8 (no retry)
->>>    - ...
->>>    - Try to allocate order 0 (with retry, but not needed)
->>> - ...
->>> - ...
->>>
->>> Total number of calls to alloc() calls for this case is:
->>>    sum(int(math.log(i, 2)) + 1 for i in range(1, 1025))
->>>    => 9228
->>>
->>> The above is obviously worse case, but given how slow alloc can be we
->>> really want to try to avoid even somewhat bad cases.  I timed the old
->>> code with a device under memory pressure and it wasn't hard to see it
->>> take more than 24 seconds to allocate 4 megs of memory (!!).
->>>
->>> A second problem (and maybe even more important) is that allocating big
->>> chunks when we don't need them is just not a good idea anyway.  The
->>> first thing we do with these big chunks is break them into smaller
->>> chunks!  If we allocate small chunks:
->>> - The memory manager doesn't need to work so hard to give us big chunks.
->>> - We can save the big chunks for those that really need them and this
->>>    code can make great use of all the small chunks sitting around.
->>>
->>> Let's simplify by just allocating one page at a time.  We may make more
->>> total allocate calls but it works way better.  In real world tests that
->>> used to sometimes see a 24 second allocation call I can now see at most
->>> 250 ms.
-
-One thing to note is that testing yesterday I actually managed to
-reproduce an allocation taking 120 seconds (!) with the old code.
-
-
->> Off-list I talked to Dmitry about this a little bit and he pointed out
->> that contiguous chunks actually give a benefit to the IOMMU.  I don't
->> think the benefit outweighs the cost in this case, but I'm happy to
->> hear what others have to say.  I did some quick printouts and it turns
->> out that even when requesting page at a time the memory manager
->> (unsurprisingly) can in many cases still give us pages that are
->> contiguous.
+>> Just tested your series. I'm seeing a resource assignment problem below.
+>> The bus addresses show as memory addresses and memory addresses show as
+>> bus addresses and IO resource did not show up.
 >>
->> Also I'm happy to post up
->> <https://chromium-review.googlesource.com/#/c/319210/> which sorts the
->> array and could possibly give us larger chunks of contiguous memory.
+>>
+>> Tomasz V2
+>>
+>> [    2.520852] ACPI: PCI Interrupt Link [LN1C] (IRQs *238)
+>> [    2.535472] ACPI: PCI Interrupt Link [LN1D] (IRQs *239)
+>> [    2.550562] ACPI: PCI Root Bridge [PCI2] (domain 0002 [bus 00-1f])
+>> [    2.567813] acpi PNP0A08:02: _OSC: OS supports [ExtendedConfig ASPM
+>> ClockPM Segments MSI]
+>> [    2.591270] acpi PNP0A08:02: _OSC: platform does not support
+>> [PCIeHotplug]
+>> [    2.611144] acpi PNP0A08:02: _OSC: OS now controls [PME AER
+>> PCIeCapability]
+>> [    2.630299] ACPI: IORT: can't find node related to (null) device
+>> [    2.647184]_acpi_PNP0A08:02:_PCI_host_bridge_to_bus_0002:00
+>> [    2.662663] pci_bus 0002:00: root bus resource [mem
+>> 0x00100000-0x3fffffff window] (bus address
+>> [0xfffff5ff00100000-0xfffff5ff3fffffff])
+>> [    2.703561] pci_bus 0002:00: root bus resource [mem
+>> 0x40000000-0x7fffffff window] (bus address
+>> [0xfffff5fe80000000-0xfffff5febfffffff])
+>> [    2.737737] pci_bus 0002:00: root bus resource [mem
+>> 0x80000000-0xffffffff window] (bus address
+>> [0xfffff5fe00000000-0xfffff5fe7fffffff])
+>> [    2.794961] pci_bus 0002:00: root bus resource [bus 00-1f]
+>>
+>> Mark Salter's patches
+>>
+>> [    2.730011] ACPI: PCI Interrupt Link [LN1C] (IRQs *238)
+>> [    2.744648] ACPI: PCI Interrupt Link [LN1D] (IRQs *239)
+>> [    2.759330] ACPI: PCI Root Bridge [PCI2] (domain 0002 [bus 00-1f])
+>> [    2.783295] acpi PNP0A08:02: _OSC: OS supports [ExtendedConfig ASPM
+>> ClockPM Segments MSI]
+>> [    2.806726] acpi PNP0A08:02: _OSC: platform does not support
+>> [PCIeHotplug]
+>> [    2.826005] acpi PNP0A08:02: _OSC: OS now controls [PME AER
+>> PCIeCapability]
+>> [    2.845361] PCI host bridge to bus 0002:00
+>> [    2.856719]_pci_bus_0002:00:_root_bus_resource_[bus_00-1f]
+>> [    2.872056] pci_bus 0002:00: root bus resource [mem
+>> 0xa0100100000-0xa013fffffff] (bus address [0x00100000-0x3fffffff])
+>> [    2.902008] pci_bus 0002:00: root bus resource [mem
+>> 0xa0200000000-0xa023fffffff] (bus address [0x40000000-0x7fffffff])
+>> [    2.932396] pci_bus 0002:00: root bus resource [mem
+>> 0xa0300000000-0xa037fffffff] (bus address [0x80000000-0xffffffff])
+>> [    2.983827] pci_bus 0002:00: root bus resource [io  0x0000-0xffff]
+>>
+>> Here is how the ACPI table looks like:
+>>
+>> 		QWORDMemory(			// Consumed-And-prodced resource(all of memory space)
+>> 			ResourceProducer,	// bit 0 of general flags is 0
+>> 			PosDecode,		// positive Decode:  		_DEC
+>> 			MinFixed,		// Range is fixed:   		_MIF
+>> 			MaxFixed,		// Range is fixed:   		_MAF
+>> 			NonCacheable,		// 				_MEM
+>> 			ReadWrite,		// 				_RW
+>> 			0x00000000,		// Granularity: 	   	_GRA
+>> 			0x00100000,		// Min - PCI Memory start: 	_MIN
+>> 			0x3FFFFFFF,		// Max - PCI Memory end:   	_MAX
+>> 			0xA0100000000,		// Translation: 		_TRA
+>> 			0x3FF00000,		// Range Length: 		_LEN
+>> 			,			// Optional field left blank
+>> 			,			// Optional field left blank
+>> 			MEM0,			// Name declaration for this descriptor
+>> 			AddressRangeMemory,
+>> 			TypeStatic
+>> 			)
+>>
+>>
+>> Any thoughts?
+>>
+>>
 >
+> Yes, this is because of:
+> [PATCH V2 20/23] ACPI, PCI: Refine the way to handle translation_offset
+> for ACPI resources
+> which should have RFC tag. I posted this patch to re-trigger discussion
+> on this.
 >
-> I think sorting individually-allocated pages really isn't worth the effort -
-> I'm not aware of anything that's going to be capable of using larger
-> page/section mappings without also having the necessary physical alignment,
-> and if you _can_ cobble together, say, 2MB worth of contiguous pages *at 2MB
-> alignment*, then you would have been far better off just asking the slab
-> allocator for that in the first place.
+> The patch does not add Translation offset to the MMIO type resource
+> start address and for acpi_pci_probe_root_resources(ci) causes problems
+> like that. Indeed MMIO has to be fixed.
+
+OK. I assume you'll post a patch for this soon similar to what Liu Jiang
+is doing in IA64 directory (arch/ia64/pci/pci.c) as I can't proceed with
+my testing without this bugfix.
 >
-> That's the key point of the higher-order allocation - not that you get some
-> contiguous pages, but that the region you get is also naturally aligned to
-> its size physically. That we break up the CPU page tables for that region
-> into individual pages is just an inconsequential implementation detail from
-> the IOMMU side. When you _do_ have plenty of unfragmented free memory it can
-> really be a big win - here's an instrumented example of what happens on my
-> Juno with the ARM HDLCD/SMMU combo setting up a framebuffer at boot time:
+> But IO resource type is more problematic. Actually, how
+> acpi_decode_space() should parse resources and which ACPI IO descriptor
+> should be used for ARM64: QWORDIO (offset == 0 vs offset != 0), DWordIO
+> (TypeStatic vs TypeTranslation) + backward compatibility with IA64...
 >
+> Please refer to:
+> https://lkml.org/lkml/2015/11/5/581
 >
->   iommu_dma_alloc: alloc size 0x753000, 1875 pages
->   __iommu_dma_alloc_pages: allocated at order 10
->   __iommu_dma_alloc_pages: allocated at order 9
->   __iommu_dma_alloc_pages: allocated at order 8
->   __iommu_dma_alloc_pages: allocated at order 6
->   __iommu_dma_alloc_pages: allocated at order 4
->   __iommu_dma_alloc_pages: allocated at order 1
->   __iommu_dma_alloc_pages: allocated at order 0
->   iommu: map: iova 0xff800000 pa 0x00000009f5400000 size 0x400000
->   iommu: mapping: iova 0xff800000 pa 0x00000009f5400000 pgsize 0x200000
->   iommu: mapping: iova 0xffa00000 pa 0x00000009f5600000 pgsize 0x200000
->   iommu: map: iova 0xffc00000 pa 0x00000000fa200000 size 0x200000
->   iommu: mapping: iova 0xffc00000 pa 0x00000000fa200000 pgsize 0x200000
->   iommu: map: iova 0xffe00000 pa 0x00000009f5a00000 size 0x100000
->   iommu: mapping: iova 0xffe00000 pa 0x00000009f5a00000 pgsize 0x1000
->   iommu: mapping: iova 0xffe01000 pa 0x00000009f5a01000 pgsize 0x1000
->   iommu: mapping: iova 0xffe02000 pa 0x00000009f5a02000 pgsize 0x1000
->   iommu: mapping: iova 0xffe03000 pa 0x00000009f5a03000 pgsize 0x1000
->   ...
+> As Lorenzo pointed out, we *all* need to agree upon the IO resource ACPI
+> descriptor and its parsing method.
+
+Here is what I have as an IO resource.
+
+		QWORDIO(			//Consumed-And-produced resource
+			ResourceProducer,	// bit 0 of general flags is 0
+			MinFixed,		// Range is fixed
+			MaxFixed,		// Range is fixed
+			PosDecode,
+			EntireRange,
+			0x0000,			// Granularity
+			0x1000,		// Min, 0 is not accepted
+			0x10FFF,		// Max
+			0x8FFFFFEF000,	// Translation
+			0x10000,		// Range Length
+			,, PI00
+		 )
+
+I don't have any type specified.
+
+I agree with Lorenzo's assessment. The min and max values represent the
+PCI IO bus addresses. The translation offset is added to these values to
+figure out the CPU view of the PCI IO range.
+
+The endpoints BAR addresses are programmed with IO addresses ranging
+between 0x1000 and 0x10FFF for this example above.
+
+Here is another question. Chris Covington and I asked this question on a
+private email to you but we didn't hear back.
+
+We were referring to a Linaro IO hack patch as we were not sure whether
+this was a limitation of the hack or a general expectation for ARM64 PCI
+in general.
+
+I'll repeat it here.
+
+I have multiple root ports with the same IO port configuration in the
+current ACPI table.
+
+Root port 0 = IO range 0x1000-0x10FFF
+Root port 1 = IO range 0x1000-0x10FFF
+Root port 2 = IO range 0x1000-0x10FFF
+
+Each root port can have the same IO address range configuration, are we
+expecting IO port numbers to be unique across the whole system for ARM64?
+
+Something like
+
+Root port 0 = IO range 0x1000-0x10FFF
+Root port 1 = IO range 0x11000-0x20FFF
+Root port 2 = IO range 0x21000-0x30FFF
+
+since the IO addresses are being remapped into PCI IO range printed during
+boot.
+
+PCI I/O : 0xffff7ffffae00000 - 0xffff7ffffbe00000   (    16 MB)
+
+and each root port would remap to 64k of the 16MB range.
+
 >
-> Since the IOVA region itself is aligned to 8MB (for the total size) and the
-> physical regions come out in optimal decreasing order, we're able to map
-> over 80% of the whole buffer with just 3 section entries, with a
-> corresponding saving on TLB pressure, page table maintenance (cache
-> flushing), etc.
+> Any comments are very appreciated!
 >
-> That said, unless you're in the middle of some crazy allocator-thrashing
-> race, then it's probably safe to assume that once allocation fails at a
-> given order that's going to remain the case in the near future - would you
-> mind taking the following diff for a spin under your test conditions to see
-> how it compares?
+> Tomasz
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 >
-> Robin.
->
-> ----->8-----
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index dfb5001..95e75c4 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -1129,6 +1129,7 @@ static struct page **__iommu_alloc_buffer(struct
-> device *dev, size_t size,
->         int count = size >> PAGE_SHIFT;
->         int array_size = count * sizeof(struct page *);
->         int i = 0;
-> +       unsigned int order = MAX_ORDER;
->
->         if (array_size <= PAGE_SIZE)
->                 pages = kzalloc(array_size, GFP_KERNEL);
-> @@ -1160,9 +1161,10 @@ static struct page **__iommu_alloc_buffer(struct
-> device *dev, size_t size,
->         gfp |= __GFP_NOWARN | __GFP_HIGHMEM;
->
->         while (count) {
-> -               int j, order;
-> +               int j;
->
-> -               for (order = __fls(count); order > 0; --order) {
-> +               for (order = min_t(unsigned int, order, __fls(count));
-> +                    order > 0; --order) {
-
-Yeah, I'd been playing with things like that, though not that exact patch.
-
-I just tried it now.  As should be obvious, it certainly makes a
-DRASTIC improvement in things but it still has some downsides as
-compared to my patch.
-
-1. It's still pretty easy for arm_iommu_alloc_attrs() to take many
-seconds.  I can no longer reproduce the 24 second or 120 second
-allocation call, but I still see things like "alloc 4194304 bytes:
-3208093877 ns" (AKA an allocation taking > 3 seconds).  That's
-compared with 250 ms max with my patch.
-
-2. We still have the same problem that we're taking away all the
-contiguous memory that other users may want.  I've got a dwc2 USB
-controller in my system and it needs to allocate bounce buffers for
-its DMA.  While looking at cat videos on Facebook and running a
-program to simulate memory pressure (4 userspace programs each walking
-through 350 Megs of memory over and over) I start seeing lots of order
-3 allocation failures in dwc2.  It's true that the USB/network stack
-is resilient against these allocation failures (other than spamming my
-log), but performance will decrease.  When I switch to WiFi I suddenly
-start seeing "mwifiex_sdio mmc2:0001:1: single skb allocated fail,
-drop pkt port=28 len=33024".  Again, it's robust, but you're affecting
-performance.
-
-
-
-I also tried using "4" instead of "MAX_ORDER" (as per Marek) so that
-we don't try for > 64K chunks.  This is might be a reasonable
-compromise.  My cat video test still reproduces "alloc 4194304 bytes:
-674318751 ns", but maybe ~700 ms is an OK?  Of course, this still eats
-all the large chunks of memory that everyone else would like to have.
-
-
-Oh, or how about this: we start allocating of order 4.  Upon the first
-failure we jump to order 1.  AKA: if there's no memory pressure we're
-golden.  The moment we have the first bit of memory pressure we fold.
-That's basically just a slight optimization on Marek's suggestion.  I
-still see 450 ms for an allocation, but that's not too bad.  It can
-still take away large chunks from other users, but maybe that's OK?
-
-
-Anyway, I'll plan to send that patch up.  I'll also do a quick test to
-see if my "sort()" actually helps anything.
-
--Doug
