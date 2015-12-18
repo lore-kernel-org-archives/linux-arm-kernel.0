@@ -1,37 +1,34 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 18 Dec 2015 14:46:36 -0500 (EST)
-Subject: [PATCH v2 0/3] drivers: net: cpsw: Fix bugs in fixed-link PHY
- DT parsing
-In-Reply-To: <cover.1450309613.git.drivshin@allworx.com>
-References: <20151209223115.6c5a400f.drivshin.allworx@gmail.com>
- <1741588.Ve76Z1ZI87@localhost>
- <cover.1450309613.git.drivshin@allworx.com>
-Message-ID: <20151218.144636.771957142710802303.davem@davemloft.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 18 Dec 2015 19:56:17 +0000
+Subject: [PATCH 0/3] Batched user access support
+In-Reply-To: <alpine.LFD.2.20.1512171016510.27310@i7>
+References: <alpine.LFD.2.20.1512171016510.27310@i7>
+Message-ID: <20151218195617.GQ8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "David Rivshin (Allworx)" <drivshin.allworx@gmail.com>
-Date: Wed, 16 Dec 2015 23:02:08 -0500
+On Thu, Dec 17, 2015 at 10:33:21AM -0800, Linus Torvalds wrote:
+> So this patch series introduces a model for batching that SMAP overhead on 
+> x86, and the reason the ARM people are involved is that the same _may_ be 
+> true of the PAN overhead. I don't know - for all I know, the pstate "set 
+> pan" instruction may be so cheap on ARM64 that it doesn't really matter.
 
-> Commit 1f71e8c96fc654724723ce987e0a8b2aeb81746d ("drivers: net: cpsw:
-> Add support for fixed-link PHY") added initial fixed-link PHY support
-> for CPSW, but missed a few considerations.
-> 
-> This series is based on the tip of the net tree. The first two patches
-> fix user-visible errors in different hardware configurations. The third
-> patch is for an internal reference counting issue. They are logically
-> independent changes, but in the same function, so must be applied in
-> order to apply cleanly.
-> 
-> The first patch was originally submitted by Pascal Speck on December 4,
-> but was not picked up by patchwork. I suspect that is because the patch
-> was mangled by the mailer. I fixed the mangling and am including it in
-> this series, as I believe it is the correct change.
-> 
-> I have tested on the following hardware configurations:
->  - (EVMSK) dual emac with two real MDIO-connected phys using RGMII-TXID
->  - single emac with fixed-link using RGMII
-> Testing of other CPSW emac configurations that folks may have would
-> be appreciated.
+I think it may be of use on 32-bit ARM, so we don't have to keep switching
+the domain register between allowing and denying userspace access across
+a batch of userspace operations.
 
-Series applied, thanks David.
+The area I'm specifically thinking that it'd be useful is in the ARM
+signal handling code, where we already have our special "__get_user_error"
+which tries to be as efficient as possible, though that may be a false
+optimisation.  Since the SW PAN stuff, I've been debating about converting
+that to use copy_to_user()/copy_from_user() instead, but haven't yet found
+the time to do any analysis.
+
+See restore_sigframe() and setup_sigframe() in arch/arm/kernel/signal.c.
+
+I'm not sure I'll have any time to look into this before the new year
+though.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
