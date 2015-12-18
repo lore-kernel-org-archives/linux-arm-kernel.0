@@ -1,38 +1,36 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 18 Dec 2015 15:17:37 +0100
-Subject: [PATCH 24/69] clocksource/drivers/tegra2: Add the COMPILE_TEST option
+Date: Fri, 18 Dec 2015 15:17:41 +0100
+Subject: [PATCH 28/69] clocksource/drivers/asm9260: Add the COMPILE_TEST option
 In-Reply-To: <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
 References: <5672CB9E.7090707@linaro.org>
  <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1450448302-27429-24-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1450448302-27429-28-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Increase the compilation test coverage by adding the COMPILE_TEST option.
 
-Due to the non portable code for the delay timer, this option is only
-available for the ARM architecture.
-
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/Kconfig | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ drivers/clocksource/Kconfig | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 625d459..e33ed76 100644
+index badef72..a658190 100644
 --- a/drivers/clocksource/Kconfig
 +++ b/drivers/clocksource/Kconfig
-@@ -84,7 +84,10 @@ config SUN5I_HSTIMER
- 	  Enables support the Sun5i timer.
+@@ -101,9 +101,11 @@ config CADENCE_TTC_TIMER
+ 	  Enables support for the cadence ttc driver.
  
- config TEGRA_TIMER
+ config ASM9260_TIMER
 -	bool
-+	bool "Tegra timer driver" if COMPILE_TEST
-+	depends on ARM
++	bool "ASM9260 timer driver" if COMPILE_TEST
+ 	select CLKSRC_MMIO
+ 	select CLKSRC_OF
 +	help
-+	  Enables support for the Tegra driver.
++	  Enables support for the ASM9260 timer.
  
- config VT8500_TIMER
+ config CLKSRC_NOMADIK_MTU
  	bool
 -- 
 1.9.1
