@@ -1,41 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Dec 2015 11:35:03 +0100
-Subject: [RFC PATCH v3 5/5] PCI: ACPI: Add a generic ACPI based host
- controller
-In-Reply-To: <1450269755-21420-6-git-send-email-jchandra@broadcom.com>
-References: <1450269755-21420-1-git-send-email-jchandra@broadcom.com>
- <1450269755-21420-6-git-send-email-jchandra@broadcom.com>
-Message-ID: <2016693.gtbtd8TMEz@wuerfel>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 18 Dec 2015 11:42:34 +0100
+Subject: [PATCH v4 05/12] arm-cci: PMU: Add support for transactions
+In-Reply-To: <5673DFC7.6060406@arm.com>
+References: <1450374559-23315-1-git-send-email-suzuki.poulose@arm.com>
+ <1450374559-23315-6-git-send-email-suzuki.poulose@arm.com>
+ <20151217184255.GI6344@twins.programming.kicks-ass.net>
+ <5673DFC7.6060406@arm.com>
+Message-ID: <20151218104234.GN6344@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 16 December 2015 18:12:35 Jayachandran C wrote:
-> Add a simple ACPI based PCI host controller. This is done by
-> providing a simple implementation for pci_acpi_scan_root().
+On Fri, Dec 18, 2015 at 10:28:23AM +0000, Suzuki K. Poulose wrote:
+> On 17/12/15 18:42, Peter Zijlstra wrote:
+
+> >The above doesn't look like it has a failure case, in which case you can
+> >achieve the same simpler, using pmu::pmu_{dis,en}able().
+> >
 > 
-> The pci_mmcfg_list handling is done by the ACPI code, we
-> keep a reference to the pci_mmcfg_region which is already
-> mapped.
-> 
-> This is enabled only for ARM64 now.
-> 
-> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
-> ---
->  drivers/pci/host/Kconfig         |   7 ++
->  drivers/pci/host/Makefile        |   1 +
->  drivers/pci/host/pci-host-acpi.c | 193 +++++++++++++++++++++++++++++++++++++++
->  3 files changed, 201 insertions(+)
->  create mode 100644 drivers/pci/host/pci-host-acpi.c
+> I thought about that, but was not sure if pmu->stop() is guaranteed to be
+> called on all the events scheduled on the PMU when we pmu::pmu_disable().
+> Is it ?
 
-(just noticed this got stuck in my outbox, sending it late)
+Not by core code, but you get to implement your pmu::pmu_disable() call,
+and if that's what you need, you can make it do that.
 
-I think this would be better put into drivers/acpi/pci_root.c, it directly
-interacts with the code that is already there, and it's by no means
-a standalone driver.
+Examples:
 
-Also, there is no need for a Kconfig symbol that way.
+On some x86 hardware we indeed have to poke at each counter control
+register and clear the ENable bit, which is the same what
+pmu::stop(.flags=0) would do.
 
-You can put it into #if !(defined(CONFIG_X86) || defined(CONFIG_IA64))
-if the code cannot be shared with the other architectures at the moment.
+But other x86 hardware has a global disable switch, which is much
+cheaper than poking at the individual counter control registers one by
+one. In this case we only update the counter control register if it
+needs updates (typically in the pmu_enable path).
 
-	Arnd
+Yet other x86 hardware can auto disable this global state on interrupt,
+which saves us yet another machine register poke.
