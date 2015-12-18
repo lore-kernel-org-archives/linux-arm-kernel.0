@@ -1,56 +1,85 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 18 Dec 2015 15:58:56 +0200
-Subject: [RFC 4/9] clk: ti: mux: export mux clock APIs locally
+Date: Fri, 18 Dec 2015 15:58:57 +0200
+Subject: [RFC 5/9] dt-bindings: clk: ti: Document module clock type
 In-Reply-To: <1450447141-29936-1-git-send-email-t-kristo@ti.com>
 References: <1450447141-29936-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1450447141-29936-5-git-send-email-t-kristo@ti.com>
+Message-ID: <1450447141-29936-6-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-get_parent and set_parent are going to be required by the support of
-module clocks, so export these locally.
+Document the new TI module clock type, which is intended to replace the
+internal clock control handling within omap_hwmod. Module clock is
+effectively a gate clock controlling both interface and functional
+clocks for a single hardware IP block.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/clk/ti/clock.h |    3 +++
- drivers/clk/ti/mux.c   |    4 ++--
- 2 files changed, 5 insertions(+), 2 deletions(-)
+ .../devicetree/bindings/clock/ti/module.txt        |   57 ++++++++++++++++++++
+ 1 file changed, 57 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/ti/module.txt
 
-diff --git a/drivers/clk/ti/clock.h b/drivers/clk/ti/clock.h
-index 90f3f47..7eca8a1 100644
---- a/drivers/clk/ti/clock.h
-+++ b/drivers/clk/ti/clock.h
-@@ -224,6 +224,9 @@ extern const struct clk_hw_omap_ops clkhwops_am35xx_ipss_wait;
- extern const struct clk_ops ti_clk_divider_ops;
- extern const struct clk_ops ti_clk_mux_ops;
- 
-+u8 ti_clk_mux_get_parent(struct clk_hw *hw);
-+int ti_clk_mux_set_parent(struct clk_hw *hw, u8 index);
+diff --git a/Documentation/devicetree/bindings/clock/ti/module.txt b/Documentation/devicetree/bindings/clock/ti/module.txt
+new file mode 100644
+index 0000000..a5f70f2
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/ti/module.txt
+@@ -0,0 +1,57 @@
++Binding for Texas Instruments module clock.
 +
- int omap2_clkops_enable_clkdm(struct clk_hw *hw);
- void omap2_clkops_disable_clkdm(struct clk_hw *hw);
- 
-diff --git a/drivers/clk/ti/mux.c b/drivers/clk/ti/mux.c
-index 69f08a1..d723dad 100644
---- a/drivers/clk/ti/mux.c
-+++ b/drivers/clk/ti/mux.c
-@@ -28,7 +28,7 @@
- 
- #define to_clk_mux(_hw) container_of(_hw, struct clk_mux, hw)
- 
--static u8 ti_clk_mux_get_parent(struct clk_hw *hw)
-+u8 ti_clk_mux_get_parent(struct clk_hw *hw)
- {
- 	struct clk_mux *mux = to_clk_mux(hw);
- 	int num_parents = clk_hw_get_num_parents(hw);
-@@ -65,7 +65,7 @@ static u8 ti_clk_mux_get_parent(struct clk_hw *hw)
- 	return val;
- }
- 
--static int ti_clk_mux_set_parent(struct clk_hw *hw, u8 index)
-+int ti_clk_mux_set_parent(struct clk_hw *hw, u8 index)
- {
- 	struct clk_mux *mux = to_clk_mux(hw);
- 	u32 val;
++Binding status: Unstable - ABI compatibility may be broken in the future
++
++This binding uses the common clock binding[1]. This clock is
++quite much similar to the basic gate-clock [2], however, internally
++it controls an OMAP module clock, which effectively handles
++both interface and functional clocks for a single module. In some
++cases, support for mux clock [3] is composited to the same clock node,
++currently only needed for proper support of timer module clocks.
++
++[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++[2] Documentation/devicetree/bindings/clock/ti/gate.txt
++[3] Documentation/devicetree/bindings/clock/ti/mux.txt
++
++Required properties:
++- compatible : shall be one of:
++  "ti,omap4-mod-clock" - basic module clock, no gating supported
++  "ti,omap4-hw-mod-clock" - module clock with hardware gating support
++  "ti,omap4-sw-mod-clock" - module clock with software forced gating support
++  "ti,omap4-mux-mod-clock" - composite clock with mux and module clocks, no
++			     gating supported
++  "ti,omap4-hw-mux-mod-clock" - composite clock with mux and module clocks,
++				with hardware gating
++  "ti,omap4-sw-mux-mod-clock" - composite clock with mux and module clocks,
++				with software forced gating
++
++- #clock-cells : from common clock binding; shall be set to 0
++- clocks : link to phandle of parent clock(s)
++- reg : offset for register controlling adjustable gate and optional mux
++
++Optional properties:
++- ti,bit-shift : bit shift for programming the clock mux, only needed for
++		 the nodes of the mux variant
++
++Examples:
++	timer6_mod_ck: timer6_mod_ck {
++		#clock-cells = <0>;
++		compatible = "ti,omap4-sw-mux-mod-clock";
++		reg = <0x0570>;
++		clocks = <&syc_clk_div_ck>, <&sys_32k_ck>;
++		ti,bit-shift = <24>;
++	};
++
++	i2c1_mod_ck: i2c1_mod_ck {
++		#clock-cells = <0>;
++		compatible = "ti,omap4-sw-mod-clock";
++		reg = <0x14a0>;
++		clocks = <&func_96m_fclk>;
++	};
++
++	hsi_mod_ck: hsi_mod_ck {
++		#clock-cells = <0>;
++		compatible = "ti,omap4-hw-mod-clock";
++		reg = <0x1338>;
++		clocks = <&hsi_fck>;
++	};
 -- 
 1.7.9.5
