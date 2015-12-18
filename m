@@ -1,59 +1,46 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 18 Dec 2015 15:17:18 +0100
-Subject: [PATCH 05/69] clocksource/drivers/rockchip: Make the driver more
- readable
+Date: Fri, 18 Dec 2015 15:17:16 +0100
+Subject: [PATCH 03/69] clocksource/drivers/mtk_timer: Fix memleak in
+ mtk_timer_init()
 In-Reply-To: <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
 References: <5672CB9E.7090707@linaro.org>
  <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1450448302-27429-5-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1450448302-27429-3-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Caesar Wang <wxt@rock-chips.com>
+From: Alexey Klimov <alexey.klimov@linaro.org>
 
-Let's checkstyle to clean up the macros with such trivial details.
+Add error path to clear evt struct allocated by kzalloc() in the beginning of
+function mtk_timer_init().
 
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
+Signed-off-by: Alexey Klimov <alexey.klimov@linaro.org>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/rockchip_timer.c | 19 ++++++++++---------
- 1 file changed, 10 insertions(+), 9 deletions(-)
+ drivers/clocksource/mtk_timer.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clocksource/rockchip_timer.c b/drivers/clocksource/rockchip_timer.c
-index d3c1742..b14716b6 100644
---- a/drivers/clocksource/rockchip_timer.c
-+++ b/drivers/clocksource/rockchip_timer.c
-@@ -17,16 +17,16 @@
+diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
+index e1e0642..d67bc35 100644
+--- a/drivers/clocksource/mtk_timer.c
++++ b/drivers/clocksource/mtk_timer.c
+@@ -205,7 +205,7 @@ static void __init mtk_timer_init(struct device_node *node)
+ 	evt->gpt_base = of_io_request_and_map(node, 0, "mtk-timer");
+ 	if (IS_ERR(evt->gpt_base)) {
+ 		pr_err("Can't get resource\n");
+-		return;
++		goto err_kzalloc;
+ 	}
  
- #define TIMER_NAME "rk_timer"
- 
--#define TIMER_LOAD_COUNT0 0x00
--#define TIMER_LOAD_COUNT1 0x04
--#define TIMER_CONTROL_REG 0x10
--#define TIMER_INT_STATUS 0x18
-+#define TIMER_LOAD_COUNT0	0x00
-+#define TIMER_LOAD_COUNT1	0x04
-+#define TIMER_CONTROL_REG	0x10
-+#define TIMER_INT_STATUS	0x18
- 
--#define TIMER_DISABLE 0x0
--#define TIMER_ENABLE 0x1
--#define TIMER_MODE_FREE_RUNNING (0 << 1)
--#define TIMER_MODE_USER_DEFINED_COUNT (1 << 1)
--#define TIMER_INT_UNMASK (1 << 2)
-+#define TIMER_DISABLE		0x0
-+#define TIMER_ENABLE		0x1
-+#define TIMER_MODE_FREE_RUNNING			(0 << 1)
-+#define TIMER_MODE_USER_DEFINED_COUNT		(1 << 1)
-+#define TIMER_INT_UNMASK			(1 << 2)
- 
- struct bc_timer {
- 	struct clock_event_device ce;
-@@ -173,4 +173,5 @@ static void __init rk_timer_init(struct device_node *np)
- 
- 	clockevents_config_and_register(ce, bc_timer.freq, 1, UINT_MAX);
+ 	evt->dev.irq = irq_of_parse_and_map(node, 0);
+@@ -260,5 +260,7 @@ err_mem:
+ 	iounmap(evt->gpt_base);
+ 	of_address_to_resource(node, 0, &res);
+ 	release_mem_region(res.start, resource_size(&res));
++err_kzalloc:
++	kfree(evt);
  }
-+
- CLOCKSOURCE_OF_DECLARE(rk_timer, "rockchip,rk3288-timer", rk_timer_init);
+ CLOCKSOURCE_OF_DECLARE(mtk_mt6577, "mediatek,mt6577-timer", mtk_timer_init);
 -- 
 1.9.1
