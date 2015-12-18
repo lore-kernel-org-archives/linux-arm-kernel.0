@@ -1,79 +1,138 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Fri, 18 Dec 2015 15:42:45 +0800
-Subject: [PATCH v2 0/3] USB: add generic onboard USB HUB driver
-In-Reply-To: <Pine.LNX.4.44L0.1512171103080.1675-100000@iolanthe.rowland.org>
-References: <CAL_Jsq+KAF6FGyOyC0JzODsSVoK4+V6umpj=cANywgui_wOKMg@mail.gmail.com>
- <Pine.LNX.4.44L0.1512171103080.1675-100000@iolanthe.rowland.org>
-Message-ID: <CAL411-rK6qfkbQsSjvXH5VPAQAm4tMyD6fVTEgFQrpLHNGMXeA@mail.gmail.com>
+From: yong.wu@mediatek.com (Yong Wu)
+Date: Fri, 18 Dec 2015 16:09:38 +0800
+Subject: [PATCH v7 0/5] MT8173 IOMMU SUPPORT
+Message-ID: <1450426183-1571-1-git-send-email-yong.wu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 12:13 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
-> On Wed, 16 Dec 2015, Rob Herring wrote:
->
->> On Mon, Dec 14, 2015 at 3:35 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Monday 14 December 2015 15:26:11 Peter Chen wrote:
->> >> Hi all,
->> >>
->> >> There is a known issue that the USB code can't handle USB HUB's
->> >> external pins well, in that case, it may cause some onboard
->> >> USB HUBs can't work since their PHY's clock or reset pin needs to
->> >> operate.
->> >>
->> >> The user reported this issue at below:
->> >> http://www.spinics.net/lists/linux-usb/msg131502.html
->> >>
->> >> In this patch set, I add a generic onboard USB HUB driver to
->> >> handle this problem, the external signals will be configured
->> >> before usb controller's initialization, it much likes we did
->> >> it at board code before.
->> >>
->> >> The user needs to add this generic hub node at dts to support it.
->> >>
->> >> @The udoo users, help to test please.
->> >
->> > I still think need to do this properly by representing the hub
->> > device as a USB device, using power sequencing code like MMC does.
->>
->> I agree on doing it properly, but am not sure that pwrseq binding for
->> MMC is proper. The pwrseq binding is fairly limited and working around
->> the driver model IMO. Hubs may also need I2C setup which I don't think
->> could be done generically other than some defined sequence of i2c
->> transactions. The current project I'm working on needs to use I2C to
->> configure the hub to use HSIC mode for example. I really think we need
->> a pre-probe driver hook to handle this. That would allow device
->> specific setup to live in the driver.
->>
->> Perhaps a more simple approach would be just forcing driver probe if a
->> DT node is present. I'm not all that familiar with USB drivers, but
->> presumably there is some setup before probe like setting the USB
->> device address. We'd have to allow doing that later during probe.
->
-> It's not clear (to me, anyway) how this is meant to work.  USB is a
-> completely discoverable bus: There is no way to represent devices
-> statically; they have to be discovered.  But a device can't be
-> discovered unless it is functional, so if an onboard hub (or any other
-> sort of USB device) requires power, clocks, or something similar in
-> order to function, it won't be discovered.  There won't be any device
-> structure to probe, and "forcing driver probe" won't accomplish
-> anything.
->
-> It seems to me that the only way something like this could be made to
-> work is if the necessary actions are keyed off the host controller (and
-> in particular, _not_ the hub driver), presumably at the time the
-> controller is probed.
+  This patch set adds support for m4u(Multimedia Memory Management Unit),
+Currently it only support the m4u with 2 levels of pagetable on mt8173.
 
-The reason why I put the code at hub driver is the onboard USB device
-may be at 2nd level hub, at hub driver, we can know all devices under
-this level hub.
+  It's based on Robin Murphy's reposting Short-descriptor v2[1].
+ 
+  Please check the hardware block diagram of Mediatek IOMMU.
+ 
+              m4u (Multimedia Memory Management Unit)
+               |
+           SMI Common(Smart Multimedia Interface Common)
+               |
+       +----------------+-------
+       |                |
+       |                |
+   SMI larb0        SMI larb1   ... SoCs have several SMI local arbiter(larb).
+   (display)         (vdec)
+       |                |
+       |                |
+ +-----+-----+     +----+----+
+ |     |     |     |    |    |
+ |     |     |...  |    |    |  ... There are different ports in each larb.
+ |     |     |     |    |    |
+OVL0 RDMA0 WDMA0  MC   PP   VLD
 
-> With anything else, you run the risk that the
-> necessary resources won't get enabled before they are needed.
->
+  As above, The Multimedia HW will go through SMI and M4U while it
+access EMI. SMI is a brige between m4u and the Multimedia HW. It contain
+smi local arbiter and smi common. It will control whether the Multimedia
+HW should go though the m4u for translation or bypass it and talk
+directly with EMI. And also SMI help control the power domain and clocks for
+each local arbiter.
+  Normally we specify a local arbiter(larb) for each multimedia HW
+like display, video decode, and camera. And there are different ports
+in each larb. Take a example, There are many ports like MC, PP, VLD in the
+video decode local arbiter, all these ports are according to the video HW.
 
-Sorry, I can't understand what you mean
+[1] http://lists.linuxfoundation.org/pipermail/iommu/2015-December/015210.html
 
+v7:
+- rebase onto Robin's short v2
+- Adjust the iommu probe sequence to meet the expectant flow that the iommu
+  core help create the domain.
+- use component additional data instead of the interface mtk_smi_config_port.
+- reconstruct the SMI help function.
+
+v6: http://lists.linuxfoundation.org/pipermail/iommu/2015-December/015105.html
+-rebase onto v4.4-rc1.
+-Use Robin's reposting Short-decriptor.
+ http://lists.linuxfoundation.org/pipermail/iommu/2015-December/015088.html
+-Add component for m4u and smi since m4u should depend on smi-larb.
+ The master device is the m4u device, and the client one is the smi-larb device. 
+-Change mtk iommu-cells from 2 to 1 since the mapping between larb and port is
+ fixed. Compare this with v2, we redefine MTK_M4U_ID following this register
+ REG_MMU_INT_ID.
+-About SMI: Add some help funcion and rename some function and struction for
+ more readable. 
+ These three above are according to Daniel Kurtz's suggestion.
+
+v5: http://lists.linuxfoundation.org/pipermail/iommu/2015-October/014586.html
+-rebase onto v4.3-rc1.
+-About MTK iommu: don't return the same domain while domain_alloc, change the
+ domain's flow according to the M4U HW.
+-About Short-descriptor: Improve many error-handles, NO_PERMS quirk, and 
+ add TLBI_MAP quirk following Will's Suggestion; Add io-pgtable don't use 
+ dma_to_phys; Add a loop in arm_short_unmap since iommu_unmap don't care the 
+ physical address align.
+-About SMI driver: Add a help funcion for some similar code. Add PROPRE_DEFER
+ for power-domain as MTK SCPSYS is module_init currently.
+
+v4: http://lists.linuxfoundation.org/pipermail/iommu/2015-August/013903.html
+-use only one iommu domain here based on the Robin's DMA-v5:
+ http://lists.linuxfoundation.org/pipermail/iommu/2015-July/013900.html
+-remove flush_pgtable.
+-change writel to writel_relaxed.
+-about Short-descriptor: move dma_map_single into io-pgtable-arm-short.
+ Improve the flow of free pgtable and add NO_XN+NO_PERMS quirk following
+ Will's suggestion.
+-Change two sytle issues in dtsi according to Daniel's suggestion.
+
+v3: http://lists.linuxfoundation.org/pipermail/iommu/2015-July/013632.html
+-rebased onto v4.2-rc1
+-improve iommu flow based on the Robin's DMA v3:
+ http://lists.linuxfoundation.org/pipermail/iommu/2015-July/013597.html
+-change mtk iommu-cells from 1 to 2.
+-about Short-descriptor: add split function; add self-test; add some other bits like nG,
+ XN according to the spec; add SUPERSECTION and MTK quirk; move io_pgtable_ops_to_pgtable
+ out from LPAE to the header file.
+-about SMI: move from driver/soc/mediatek to driver/memory; change the clocks from
+ clk[2] to clk_apb and clk_smi; add pm.
+-add iommu suspend/resume to backup/restore register.
+
+v2: http://lists.linuxfoundation.org/pipermail/iommu/2015-May/013028.html
+-add arm short descriptor support.
+-seperate smi common from smi and change the clock-names according
+ to smi HW.
+-delete the hardcode of the port-names in mt8173.
+ replace this with larb-portes-nr in dtsi.
+-fix some coding style issues.
+
+v1: http://lists.infradead.org/pipermail/linux-mediatek/2015-March/000058.html
+-initial version.
+
+Yong Wu (5):
+  dt-bindings: iommu: Add binding for mediatek IOMMU
+  dt-bindings: mediatek: Add smi dts binding
+  memory: mediatek: Add SMI driver
+  iommu/mediatek: Add mt8173 IOMMU driver
+  dts: mt8173: Add iommu/smi nodes for mt8173
+
+ .../devicetree/bindings/iommu/mediatek,iommu.txt   |  68 ++
+ .../memory-controllers/mediatek,smi-common.txt     |  24 +
+ .../memory-controllers/mediatek,smi-larb.txt       |  25 +
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  81 +++
+ drivers/iommu/Kconfig                              |  14 +
+ drivers/iommu/Makefile                             |   1 +
+ drivers/iommu/mtk_iommu.c                          | 734 +++++++++++++++++++++
+ drivers/memory/Kconfig                             |   8 +
+ drivers/memory/Makefile                            |   1 +
+ drivers/memory/mtk-smi.c                           | 268 ++++++++
+ include/dt-bindings/memory/mt8173-larb-port.h      | 111 ++++
+ include/soc/mediatek/smi.h                         |  58 ++
+ 12 files changed, 1393 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/mediatek,smi-common.txt
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/mediatek,smi-larb.txt
+ create mode 100644 drivers/iommu/mtk_iommu.c
+ create mode 100644 drivers/memory/mtk-smi.c
+ create mode 100644 include/dt-bindings/memory/mt8173-larb-port.h
+ create mode 100644 include/soc/mediatek/smi.h
 
 -- 
-BR,
-Peter Chen
+1.8.1.1.dirty
