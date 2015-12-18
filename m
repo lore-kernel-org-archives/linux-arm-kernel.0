@@ -1,52 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Dec 2015 13:52:33 +0100
-Subject: [PATCH] serial: 8250: of: Fix the driver and actually compile the
- 8250_of
-In-Reply-To: <1450442612-11372-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1450442612-11372-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <6383189.zS3XQNVGho@wuerfel>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Fri, 18 Dec 2015 06:45:50 -0600
+Subject: [PATCH] ARM: socfpga: dts: Enable MMC support at correct place
+ in the DT
+In-Reply-To: <1450395544-9890-1-git-send-email-marex@denx.de>
+References: <1450395544-9890-1-git-send-email-marex@denx.de>
+Message-ID: <alpine.DEB.2.02.1512180638340.7406@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 18 December 2015 14:43:32 Peter Ujfalusi wrote:
-> The 8250_of never compiled since in the Kconfig we have SERIAL_OF_PLATFORM
-> but in the makefile we expect to have SERIAL_8250_OF...
+On Thu, 17 Dec 2015, Marek Vasut wrote:
+
+> The socfpga.dtsi explicitly enabled MMC support, but not all boards are
+> equiped with an MMC card. There are setups which only have QSPI NOR.
+> Therefore, disable the MMC support on socfpga.dtsi level and enable it
+> on per-board basis.
 > 
-> In the Kconfig keep the SERIAL_OF_PLATFORM for compatibility reasons and
-> let it select the SERIAL_8250_OF. Later we can replace the
-> SERIAL_OF_PLATFORM use in defconfigs to SERIAL_8250_OF.
-> 
-> When the 8250_of.c is actually compiled we will have two errors:
-> missing linux/nwpserial.h and 8250/8250.h.
-> Fix those as well at the same time when enable the compilation of the
-> driver.
-> 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> Fixes: afd7f88f1577 ("serial: 8250: move of_serial code to 8250 directory")
-> CC: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Alan Tull <atull@altera.com>
+> Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
+> Cc: Marek Vasut <marex@denx.de>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Thor Thayer <tthayer@altera.com>
+> Cc: Vince Bridgers <vbridgers2013@gmail.com>
 > ---
+>  arch/arm/boot/dts/socfpga.dtsi                    | 1 +
 
-Thanks for the report. Indeed this could not have worked.
+<snip>
 
-> diff --git a/drivers/tty/serial/8250/Kconfig b/drivers/tty/serial/8250/Kconfig
-> index b03cb5175113..01f24613b0e6 100644
-> --- a/drivers/tty/serial/8250/Kconfig
-> +++ b/drivers/tty/serial/8250/Kconfig
-> @@ -379,6 +379,11 @@ config SERIAL_8250_MID
->           Intel platforms.
+> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+> index 54ed3f9..1a0c726 100644
+> --- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+> +++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+> @@ -172,6 +172,7 @@
+>  &mmc0 {
+>  	vmmc-supply = <&regulator_3_3v>;
+>  	vqmmc-supply = <&regulator_3_3v>;
+> +	status = "okay";
+>  };
 >  
->  config SERIAL_OF_PLATFORM
-> +       tristate
-> +       depends on SERIAL_8250 && OF
-> +       select SERIAL_8250_OF
-> +
-> +config SERIAL_8250_OF
->         tristate "Devicetree based probing for 8250 ports"
->         depends on SERIAL_8250 && OF
->         help
+>  &qspi {
 
-This will still require changing all the defconfigs, as SERIAL_OF_PLATFORM
-is a silent option now. I think it's better to change the Makefile and
-leave the slightly odd Kconfig symbol name.
+This part doesn't apply to any of the upstream branches. "&qspi" has not been
+enabled yet, unless I have missed that patch? Can you please rebase this patch
+to my branch:
 
-	Arnd
+git://git.kernel.org:pub/scm/linux/kernel/git/dinguyen/linux.git socfpga_for_next_v4.5_dts
+
+Thanks,,
+Dinh
