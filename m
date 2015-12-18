@@ -1,45 +1,83 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 18 Dec 2015 14:32:54 +0300
-Subject: [PATCH v3 1/4] ARM: dts: dra7: Add dt node for the sycon pcie
-In-Reply-To: <5673DE42.9080407@ti.com>
-References: <1450172346-11890-1-git-send-email-kishon@ti.com>
- <1450172346-11890-2-git-send-email-kishon@ti.com>
- <5670140C.7010906@cogentembedded.com> <5673DE42.9080407@ti.com>
-Message-ID: <5673EEE6.7080706@cogentembedded.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 18 Dec 2015 11:35:36 +0000
+Subject: [PATCH v10 1/4] dt-binding:Documents of the mbigen bindings
+In-Reply-To: <20151218105837.GB29219@leverpostej>
+References: <1450353397-47668-1-git-send-email-majun258@huawei.com>
+ <1450353397-47668-2-git-send-email-majun258@huawei.com>
+ <20151217135247.GD13389@leverpostej> <5673683C.2080304@huawei.com>
+ <20151218105837.GB29219@leverpostej>
+Message-ID: <5673EF88.80205@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On 12/18/2015 1:21 PM, Kishon Vijay Abraham I wrote:
-
->>> Add new device tree node for the control module register space where
->>> PCIe registers are present.
->>>
->>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->>> ---
->>>    arch/arm/boot/dts/dra7.dtsi |    5 +++++
->>>    1 file changed, 5 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
->>> index fe99231..e38f63f 100644
->>> --- a/arch/arm/boot/dts/dra7.dtsi
->>> +++ b/arch/arm/boot/dts/dra7.dtsi
->>> @@ -155,6 +155,11 @@
->>>                        compatible = "syscon";
->>>                        reg = <0x1c04 0x0020>;
->>>                    };
->>> +
->>> +                scm_conf_pcie: tisyscon at 1c24 {
+On 18/12/15 10:58, Mark Rutland wrote:
+> On Fri, Dec 18, 2015 at 09:58:20AM +0800, majun (F) wrote:
+>> Hi Mark:
 >>
->>     Please use the generic node names as the ePAPR standard says.
->
-> something like  scm_conf_pcie: syscon at 1c24??
+>> ? 2015/12/17 21:52, Mark Rutland ??:
+>>> On Thu, Dec 17, 2015 at 07:56:34PM +0800, MaJun wrote:
+>>>> From: Ma Jun <majun258@huawei.com>
+>> [...]
+>>>> +- compatible: Should be "hisilicon,mbigen-v2"
+>>>> +
+>>>> +- reg: Specifies the base physical address and size of the Mbigen
+>>>> +  registers.
+>>>> +
+>>>> +- interrupt controller: Identifies the node as an interrupt controller
+>>>> +
+>>>> +- msi-parent: Specifies the MSI controller this mbigen use.
+>>>> +  For more detail information,please refer to the generic msi-parent binding in
+>>>> +  Documentation/devicetree/bindings/interrupt-controller/msi.txt.
+>>>> +
+>>>> +- num-msis:Specifies the total number of interrupt this device has.
+>>>
+>>> Is this the number of pins implemented? Or the number of pins that are
+>>> in use?
+>>>
+>>> The latter feels like something we can derive.
+>>
+>> num-msis means the total number of pins implemented.
+> 
+> Ok. In that case I think it should be:
+> 
+> - num-pins: the total number of pins implemented in this Mbigen
+>   instance.
+> 
+> (with the appropriate fixups in the driver).
+> 
+> With that:
+> 
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> 
+>>>> +- #interrupt-cells : Specifies the number of cells needed to encode an
+>>>> +  interrupt source. The value must be 2.
+>>>> +
+>>>> +  The 1st cell is hardware pin number of the interrupt.This number is local to
+>>>> +  each mbigen chip and in the range from 0 to the maximum interrupts number
+>>>> +  of the mbigen.
+>>>
+>>> Just to check: 0 - 63 represent the "reserved" pins, yes?
+>>
+>> Yes, you are right.
+>>
+>>>
+>>> Other than those questions, this looks good to me.
+>>
+>> Do i need to post a new patch to update these two questions?
+> 
+> Hopefully not.
+> 
+> Marc, are you happy to fold in the s/num-msis/num-pins/ change?
 
-    Yes, though "system-controller" would be probably more in line with what 
-ePAPR has standardized.
+FWIW, I'm also moving this to:
 
-> Thanks
-> Kishon
+Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt
 
-MBR, Sergei
+in order to match the new documentation conventions.
+
+Thanks,
+
+	M.
+
+-- 
+Jazz is not dead. It just smells funny...
