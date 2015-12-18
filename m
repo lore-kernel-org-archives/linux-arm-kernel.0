@@ -1,71 +1,38 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 18 Dec 2015 10:58:38 +0000
-Subject: [PATCH v10 1/4] dt-binding:Documents of the mbigen bindings
-In-Reply-To: <5673683C.2080304@huawei.com>
-References: <1450353397-47668-1-git-send-email-majun258@huawei.com>
- <1450353397-47668-2-git-send-email-majun258@huawei.com>
- <20151217135247.GD13389@leverpostej> <5673683C.2080304@huawei.com>
-Message-ID: <20151218105837.GB29219@leverpostej>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 18 Dec 2015 12:02:42 +0100
+Subject: [PATCH 1/2] arm64: dts: r8a7795: Add Cortex-A53 CPU cores
+In-Reply-To: <1449904607-4060-1-git-send-email-dirk.behme@gmail.com>
+References: <1449904607-4060-1-git-send-email-dirk.behme@gmail.com>
+Message-ID: <CAMuHMdVVL9T6U8npb5kOLdP3PmS6Lhx0b9O3FKgxd2HQcUedFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 09:58:20AM +0800, majun (F) wrote:
-> Hi Mark:
-> 
-> ? 2015/12/17 21:52, Mark Rutland ??:
-> > On Thu, Dec 17, 2015 at 07:56:34PM +0800, MaJun wrote:
-> >> From: Ma Jun <majun258@huawei.com>
-> [...]
-> >> +- compatible: Should be "hisilicon,mbigen-v2"
-> >> +
-> >> +- reg: Specifies the base physical address and size of the Mbigen
-> >> +  registers.
-> >> +
-> >> +- interrupt controller: Identifies the node as an interrupt controller
-> >> +
-> >> +- msi-parent: Specifies the MSI controller this mbigen use.
-> >> +  For more detail information,please refer to the generic msi-parent binding in
-> >> +  Documentation/devicetree/bindings/interrupt-controller/msi.txt.
-> >> +
-> >> +- num-msis:Specifies the total number of interrupt this device has.
-> > 
-> > Is this the number of pins implemented? Or the number of pins that are
-> > in use?
-> > 
-> > The latter feels like something we can derive.
-> 
-> num-msis means the total number of pins implemented.
+Hi Dirk,
 
-Ok. In that case I think it should be:
+On Sat, Dec 12, 2015 at 8:16 AM, Dirk Behme <dirk.behme@gmail.com> wrote:
+> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+>
+> This patch adds Cortex-A53 CPU cores to r8a7795 SoC for a total of 8
+> cores (4 x Cortex-A57 + 4 x Cortex-A53).
+>
+> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> Signed-off-by: Dirk Behme <dirk.behme@gmail.com>
 
-- num-pins: the total number of pins implemented in this Mbigen
-  instance.
+Thanks, I can confirm this works.
 
-(with the appropriate fixups in the driver).
+However, as the scheduler is not big.LITTLE aware (running processes are not
+migrated automatically to the faster CA57 cores when these are idle), it makes
+performance less deterministic.
 
-With that:
+Hence we would like to postpone this.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+Gr{oetje,eeting}s,
 
-> >> +- #interrupt-cells : Specifies the number of cells needed to encode an
-> >> +  interrupt source. The value must be 2.
-> >> +
-> >> +  The 1st cell is hardware pin number of the interrupt.This number is local to
-> >> +  each mbigen chip and in the range from 0 to the maximum interrupts number
-> >> +  of the mbigen.
-> > 
-> > Just to check: 0 - 63 represent the "reserved" pins, yes?
-> 
-> Yes, you are right.
-> 
-> > 
-> > Other than those questions, this looks good to me.
-> 
-> Do i need to post a new patch to update these two questions?
+                        Geert
 
-Hopefully not.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Marc, are you happy to fold in the s/num-msis/num-pins/ change?
-
-Thanks,
-Mark.
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
