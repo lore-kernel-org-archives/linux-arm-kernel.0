@@ -1,82 +1,23 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 18 Dec 2015 11:19:43 +0100
-Subject: [linux-sunxi] Re: [PATCH v6] sun4i-codec: Add FM, Line and Mic
- inputs
-In-Reply-To: <20151216233051.09d34738@dayas>
-References: <20151209235530.7240df0a@dayas> <20151213205839.GA19456@lukather>
- <20151215025208.7c468673@dayas> <20151216104736.GT19456@lukather>
- <20151216233051.09d34738@dayas>
-Message-ID: <20151218101943.GI30359@lukather>
+Date: Fri, 18 Dec 2015 12:11:01 +0100
+Subject: [PATCH v5 1/2] spi: dts: Add new device property to specifcy a
+ wait time between word transmissions
+In-Reply-To: <1450352427-25350-2-git-send-email-mweseloh42@gmail.com>
+References: <1450352427-25350-1-git-send-email-mweseloh42@gmail.com>
+ <1450352427-25350-2-git-send-email-mweseloh42@gmail.com>
+Message-ID: <20151218111101.GL30359@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 16, 2015 at 11:30:51PM +0100, Danny Milosavljevic wrote:
-> Hi Maxime,
+On Thu, Dec 17, 2015 at 12:40:26PM +0100, Marcus Weseloh wrote:
+> Adds a new property "spi-word-wait-ns" to the spi-bus binding that allows
+> SPI slave devices to set a wait time between the transmission of words.
 > 
-> On Wed, 16 Dec 2015 11:47:36 +0100
-> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> 
-> > > Because SUN4I_CODEC_AC_MIC_PHONE_CAL is sun7i-specific.
-> > 
-> > Yet, you're using it in both cases (A10 vs A20).
-> 
-> Yes. I'm trying to keep complexity and duplication down.
-> I figured it wouldn't be bad to have unused registers in the regmap.
-> 
-> (Technially .max_register = MAX(max_register_a10, max_register_a20) would be 
->  better. Should we do that?)
-> 
-> If it's bad in this case, we have to split it up, but frankly the *codec_probe() 
-> function is much too long now and this would make it even longer.
-> 
-> Also, it was that way before, so I'm mostly using it in both cases because 
-> previously it was also used in both cases (with the too-large max-register), 
-> apparently without problems. 
-> 
-> Should I duplicate and adapt the structure?
+> Signed-off-by: Marcus Weseloh <mweseloh42@gmail.com>
 
-No, my point was that you don't need to move it around at all.
+Reviewed-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-> > You can also have the defines on top, and everything just works :)
-> 
-> The idea is to make the compiler complain when I try to use a sun7i define in a 
-> generic sun4i function (or struct, in this case) - because that would probably 
-> be causing problems at runtime, too. Better to catch problems earlier.
-> So I kept the sun7i-specific things closely together and as much to the bottom 
-> of the file as possible - as a poor-mans modularity. 
-> If I kept the sun7i defines at the top I could use them anywhere with impunity - 
-> also in the A10 case - and it would not complain.
-> 
-> But it's mostly to make the life of the developer easier, so feel free to choose 
-> otherwise. (not sarcasm)
-
-I understand your point to develop it, but now, the development is done :)
-
-Having all the defines packed together is easier to read and maintain
-after the development is done.
-
-
-> > > Or is it better to rename it to "SUN7I_CODEC_AC_DAC_CAL" rather than delete?
-> > 
-> > You can rename it if you want, but it's not like it's of the highest
-> > importance :)
-> 
-> The only somewhat important part of the name is the "7". 
-> If you use a "7"-register on an A10, it's not going to work at runtime, or worse: 
-> do something else that wasn't intended. Right now it has a "4" although it isn't
-> an A10 register. This separation should be visible somewhere in the source code, 
-> or problems are going to slip through later.
-> 
-> I agree it's not at all important right now because the register is unused 
-> by us :P
-
-Exactly my point ;)
-
-Like I said, if you want to rename it, go ahead. It would also be a
-good idea to open a github issue on allwinner's documentation repo to
-make them know that the register name doesn't match between the
-register list and the register documentations.
-
+Thanks!
 Maxime
 
 -- 
@@ -89,4 +30,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151218/e782bb2e/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151218/b3e3cf54/attachment-0001.sig>
