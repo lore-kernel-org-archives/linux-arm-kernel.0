@@ -1,81 +1,43 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 18 Dec 2015 15:05:38 +0100
-Subject: [PATCH 00/13] ARM: shmobile: dts: Update console parameters
-In-Reply-To: <20151210070239.GA17682@verge.net.au>
-References: <1449597258-32623-1-git-send-email-geert+renesas@glider.be>
- <20151210070239.GA17682@verge.net.au>
-Message-ID: <CAMuHMdVzEpcZ11EckVW+5eG55UbLoWzsuGaza-Mp+XKZtRmNDA@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 18 Dec 2015 14:05:51 +0000
+Subject: [PULL take #2] KVM/ARM fixes for v4.4-rc6
+Message-ID: <1450447552-3161-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi Paolo,
 
-On Thu, Dec 10, 2015 at 8:02 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Tue, Dec 08, 2015 at 06:54:05PM +0100, Geert Uytterhoeven wrote:
->> This patch series updates the console parameters in the DTSes for
->> various Renesas ARM boards.
->>
->>   - For all of them, the serial port config is added to
->>     chosen/stdout-path, as per current best practices,
->>   - On some boards (armadillo, bockw, kzm9d, kzm9g), "console="
->>     parameters are removed from the kernel command lines, as they're no
->>     longer needed for DT-only platforms,
->>   - On some boards (genmai, kzm9g), the console alias is changed to
->>     "serial0", for consistency with other boards (the first serial port
->>     is always called "serial0", unless labeled otherwise); this does
->>     mean the device changes its name to /dev/ttySC0 in userspace, which
->>     also happened on R-Car Gen2 before,
->>   - On kzm9d, a console alias is added.
->>
->> Tested on r8a73a4/ape6evm, r8a7740/armadillo, r8a7778/bockw,
->> r8a7779/marzen, r8a7791/koelsch, and sh73a0/kzm9g.
->>
->> Thanks for applying!
->>
->> Geert Uytterhoeven (13):
->>   ARM: shmobile: alt dts: Add serial port config to chosen/stdout-path
->>   ARM: shmobile: ape6evm dts: Add serial port config to
->>     chosen/stdout-path
->
-> alt and ape6evm tested ok.
-> I have queued up the changes for those boards.
->
->>   ARM: shmobile: armadillo800eva dts: Update console parameters
->
-> I would prefer not to take the serial1 -> serial0 portion of this change at
-> this time as it causes a user-space visible change: the console moves from
-> ttySC1 to ttySC0. I noticed this because I no longer made it all the way
-> to user-space which was expecting a console on ttySC1.
->
-> -- start before --
-> [    0.050000] e6c50000.serial: ttySC1 at MMIO 0xe6c50000 (irq = 25, base_baud = 0) is a scifa
-> [    0.780000] console [ttySC1] enabled
-> -- end before --
->
-> -- start after --
-> [    0.050000] e6c50000.serial: ttySC0 at MMIO 0xe6c50000 (irq = 25, base_baud = 0) is a scifa
-> [    0.780000] console [ttySC0] enabled
-> -- end after --
+We have a one line fix for the VGIC this time around, fixing a patch
+that went in -rc2. Oh well. Hopefully this is the last one for v4.4.
+And yes, the right patch is following the pull-request this time...
 
-We made a similar change on koelsch, lager, and marzen (cfr. below) before,
-so I assumed this is OK?
+Please pull!
 
->>   ARM: shmobile: marzen dts: Add serial port config to
->>     chosen/stdout-path
->
-> Changing &scif2 to serial0 creates a user-space visible change:
-> the console moves from ttySC2 to ttySC0.
+Thanks,
 
-Does it? Serial0 was already pointing to scif2 since Magnus' commit
-8025e3ff4ca972a0 ("ARM: shmobile: marzen: Board specific serial port order").
+	M.
 
-Gr{oetje,eeting}s,
+The following changes since commit 0de58f852875a0f0dcfb120bb8433e4e73c7803b:
 
-                        Geert
+  ARM/arm64: KVM: correct PTE uncachedness check (2015-12-04 16:30:17 +0000)
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+are available in the git repository at:
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-v4.4-rc6
+
+for you to fetch changes up to fdec12c12ed4333afb49c9948c29fbd5fb52da97:
+
+  KVM: arm/arm64: vgic: Fix kvm_vgic_map_is_active's dist check (2015-12-11 16:33:31 +0000)
+
+----------------------------------------------------------------
+KVM/ARM fixes for v4.4-rc6
+
+- Fix for the active interrupt detection code, affecting
+  the timer interrupt injection.
+
+----------------------------------------------------------------
+Christoffer Dall (1):
+      KVM: arm/arm64: vgic: Fix kvm_vgic_map_is_active's dist check
+
+ virt/kvm/arm/vgic.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
