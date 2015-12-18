@@ -1,45 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 18 Dec 2015 05:46:57 -0800
-Subject: [PATCH v02 0/2] ARM: DTS: am33xx/am437x: Use the new eDMA bindings
-In-Reply-To: <20151218051801.GR1854@localhost>
-References: <1450359217-3038-1-git-send-email-peter.ujfalusi@ti.com>
- <20151217174844.GT23396@atomide.com>
- <20151218051801.GR1854@localhost>
-Message-ID: <20151218134657.GE23396@atomide.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Fri, 18 Dec 2015 16:48:55 +0300
+Subject: [PATCH v6 15/20] arm64: signal: move ilp32 and lp64 common code
+ to separated file
+In-Reply-To: <6089723.moZBJ98Dq4@wuerfel>
+References: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
+ <1450215766-14765-16-git-send-email-ynorov@caviumnetworks.com>
+ <6089723.moZBJ98Dq4@wuerfel>
+Message-ID: <20151218134855.GA31200@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Vinod Koul <vinod.koul@intel.com> [151217 21:14]:
-> On Thu, Dec 17, 2015 at 09:48:44AM -0800, Tony Lindgren wrote:
-> > * Peter Ujfalusi <peter.ujfalusi@ti.com> [151217 05:33]:
-> > > Hi,
-> > > 
-> > > Changes since v1:
-> > > - Updated to use the non 16bit arrays [1]
-> > > - send the two patch as a series
-> > > 
-> > > [1]
-> > > As it has been discussed earlier:
-> > > https://www.mail-archive.com/linux-omap at vger.kernel.org/msg122117.html
-> > > 
-> > > the DT bindings has been changes compared to what we had in 4.4-rc1: the arrays
-> > > now don't have the 16bit type.
-> > > The changes are now merged to mainline and Vinod provided us a branch:
-> > > 
-> > > git://git.infradead.org/users/vkoul/slave-dma.git fix/edma
-> > > 
-> > > Which is based on 4.4-rc1 and only contains the two patch for changing the eDMA
-> > > bindings.
+On Wed, Dec 16, 2015 at 05:08:35PM +0100, Arnd Bergmann wrote:
+> On Wednesday 16 December 2015 00:42:41 Yury Norov wrote:
+> > +               sigtramp = ka->sa.sa_restorer;
+> > +#ifdef CONFIG_ARM64_ILP32
+> > +       else if (is_ilp32_compat_task())
+> > +               sigtramp = VDSO_SYMBOL(current->mm->context.vdso, sigtramp_ilp32);
+> > +#endif
+> > +       else
+> > +               sigtramp = VDSO_SYMBOL(current->mm->context.vdso, sigtramp);
 > > 
-> > Great, I'll merge the fix/edma also into omap-for-v4.5/dt and apply
-> > your two patches.
 > 
-> FWIW, fix/edma is in Linu's tree now and should be in -rc6
+> This is another case where I think it's more readable to remove the #ifdef,
+> with no change in behavior.
+> 
+> 	Arnd
 
-Yes that's great, but now I can keep my branches at early -rc's
-and that leaves out the need of late -rc backmerges to the
-whole arm soc tree.
+No actually. symbol sigtramp_ilp32 is declared in
+arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S
 
-Regards,
-
-Tony
+And so it does not exist if CONFIG_ARM64_ILP32 is not set.
