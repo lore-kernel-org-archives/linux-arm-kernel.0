@@ -1,88 +1,128 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 18 Dec 2015 08:16:33 +0100
-Subject: [PATCH 1/3] dt-bindings: thermal: Add binding document for
- Mediatek thermal controller
-In-Reply-To: <20151217192329.GA7999@localhost.localdomain>
-References: <1448883753-19068-1-git-send-email-s.hauer@pengutronix.de>
- <1448883753-19068-2-git-send-email-s.hauer@pengutronix.de>
- <CAGS+omCPonvXBTjOqpKrJX0Ebw0KF6TDKH+zRas-3FaAhUWL2w@mail.gmail.com>
- <20151217192329.GA7999@localhost.localdomain>
-Message-ID: <20151218071633.GG11966@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 18 Dec 2015 07:39:56 +0000
+Subject: [PATCH 2/2] irqchip/gic: Identify and report any reserved SGI IDs
+In-Reply-To: <20151217192610.GA16577@wychelm.lan>
+References: <1450285686-844-1-git-send-email-daniel.thompson@linaro.org>
+ <1450285686-844-3-git-send-email-daniel.thompson@linaro.org>
+ <5671A39D.9000500@arm.com> <20151217192610.GA16577@wychelm.lan>
+Message-ID: <20151218073956.0622f8bf@why.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 17, 2015 at 11:23:31AM -0800, Eduardo Valentin wrote:
-> On Wed, Dec 16, 2015 at 07:23:22PM +0800, Daniel Kurtz wrote:
-> > On Mon, Nov 30, 2015 at 7:42 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > > This adds the device tree binding documentation for the mediatek thermal
-> > > controller found on Mediatek MT8173 and other SoCs.
-> > >
-> > > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > > Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
-> > > Acked-by: Rob Herring <robh@kernel.org>
-> > > ---
-> > >  .../bindings/thermal/mediatek-thermal.txt          | 43 ++++++++++++++++++++++
-> > >  1 file changed, 43 insertions(+)
-> > >  create mode 100644 Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
-> > >
-> > > diff --git a/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
-> > > new file mode 100644
-> > > index 0000000..81f9a51
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
-> > > @@ -0,0 +1,43 @@
-> > > +* Mediatek Thermal
-> > > +
-> > > +This describes the device tree binding for the Mediatek thermal controller
-> > > +which measures the on-SoC temperatures. This device does not have its own ADC,
-> > > +instead it directly controls the AUXADC via AHB bus accesses. For this reason
-> > > +this device needs phandles to the AUXADC. Also it controls a mux in the
-> > > +apmixedsys register space via AHB bus accesses, so a phandle to the APMIXEDSYS
-> > > +is also needed.
-> > > +
-> > > +Required properties:
-> > > +- compatible: "mediatek,mt8173-thermal"
-> > > +- reg: Address range of the thermal controller
-> > > +- interrupts: IRQ for the thermal controller
-> > > +- clocks, clock-names: Clocks needed for the thermal controller. required
-> > > +                       clocks are:
-> > > +                      "therm":  Main clock needed for register access
-> > > +                      "auxadc": The AUXADC clock
-> > > +- resets: Reference to the reset controller controlling the thermal controller.
-> > > +- mediatek,auxadc: A phandle to the AUXADC which the thermal controller uses
-> > > +- mediatek,apmixedsys: A phandle to the APMIXEDSYS controller.
-> > > +- #thermal-sensor-cells : Should be 0. See ./thermal.txt for a description.
-> > > +
-> > > +Optional properties:
-> > > +- nvmem-cells: A phandle to the calibration data provided by a nvmem device. If
-> > > +               unspecified default values shall be used.
-> > > +- nvmem-cell-names: Should be "calibration-data"
-> > > +
-> > > +Example:
-> > > +
-> > > +       thermal: thermal at 1100b000 {
-> > > +               #thermal-sensor-cells = <1>;
-> > 
-> > Tiny nit: this should now be:
-> > 
-> > #thermal-sensor-cells = <0>;
+On Thu, 17 Dec 2015 19:26:10 +0000
+Daniel Thompson <daniel.thompson@linaro.org> wrote:
+
+> On Wed, Dec 16, 2015 at 05:47:09PM +0000, Marc Zyngier wrote:
+> > Hi Daniel,
+> 
+> Hi Marc
+> 
+> Thanks for the review.
 > 
 > 
-> This is actually not so tiny'shy. Why does this driver masks out all
-> sensors available? Why don't we expose all of them and use id property
-> to expose and identify each of them?
+> > On 16/12/15 17:08, Daniel Thompson wrote:
+> > > It is possible for the secure world to reserve certain SGI IDs for itself.
+> > > Currently we have limited visibility of which IDs are safe to use for IPIs.
+> > > 
+> > > Modify the GIC initialization code to actively search for reserved SGI IDs
+> > > and report if any are found. Warn even more loudly if the reserved SGIs
+> > > overlap with the normal IPI range.
+> > > 
+> > > When run on an Inforce IFC6410 (Snapdragon 600) this code produces the
+> > > following messages:
+> > > ~~~ cut here ~~~
+> > > CPU0: Detected reserved SGI IDs: 14-15
+> > > CPU1: Detected reserved SGI IDs: 15
+> > > CPU2: Detected reserved SGI IDs: 15
+> > > CPU3: Detected reserved SGI IDs: 15
+> > > ~~~ cut here ~~~
+> > > 
+> > > Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+> 
+> BTW you *didn't* say "this code is pointless and I hate it"...
 
-This has been the case until v9 of this series. It was requested by
-Mediatek that the CPU frequency regulation works better when the maximum
-of all sensors is taken instead of only single sensors. We decided to
-expose the maximum of all sensors in the device tree. IN the end it will
-be easier to add additional sensors should we need them later than it is
-to get rid of sensors we don't need.
+Well, this was obviously used to detect another issue (patch #1), so I
+can't see any harm in trying to sanitize things, as long as it doesn't
+break anything else. I imagine this patch will also trigger on my
+sunxi platforms, which use a SGI to implement PSCI in secure mode.
 
-Sascha
+> Does that mean I should be looking at adding similar code for GICv3+? I 
+> wanted to guage reactions to this sort of diagnostics before getting
+> carried away!
 
+Could be useful as well.
+
+> 
+> 
+> > > +
+> > > +		/*
+> > > +		 * Fiddle with the SGI set/clear registers to try identify
+> > > +		 * any IPIs that are reserved for secure world.
+> > > +		 */
+> > > +		bitmap_fill(sgi_mask, 16);
+> > > +
+> > > +		for (i = 0; i < 16; i++) {
+> > > +			void __iomem *set_reg =
+> > > +			    dist_base + GIC_DIST_SGI_PENDING_SET + (i & ~3);
+> > > +			void __iomem *clear_reg =
+> > > +			    dist_base + GIC_DIST_SGI_PENDING_CLEAR + (i & ~3);
+> > > +			unsigned long mask = cpu_mask << (8*(i%4));
+> > > +			unsigned long flags, pending, after_clear, after_set;
+> > 
+> > Please make these u32, as unsigned long is 64bit on arm64. Another thing
+> > to note is that GICD_CPEND{S,C}SGIRn are byte accessible, so you can
+> > save yourself some this hassle shifting things around and just write a
+> > single byte. You're already writing 16 times anyway...
+> 
+> Will do both.
+> 
+> 
+> > Another thing to consider is that these locations are only defined on
+> > GICv2 and not GICv1, so this patch is likely to cause trouble on older HW.
+> 
+> As presented the code relies on the RAZ/WI property of reserved
+> registers to avoid issues on GICv1; it does not report anything if there
+> appear to be know working SGIs on the assumption we are actually running
+> on a GICv1.
+> 
+> You'd prefer an explicit version check?
+
+I'd rather be cautious and check for the architecture version,
+specially if you settle for the byte access mentioned above (a GICv1
+may not support byte access and explode unexpectedly). ICPIDR2.ArchRev
+should be the right thing to check.
+
+> 
+> 
+> > > +
+> > > +			local_irq_save(flags);
+> > 
+> > Why do you need to do this? The CPU interface is not enabled yet, so I
+> > can't see how you could get an interrupt on this CPU.
+> 
+> Agreed. Can get rid of these.
+> 
+> 
+> > > +
+> > > +			/* record original value */
+> > > +			pending = readl_relaxed(set_reg);
+> > > +
+> > > +			/* clear, test, set, and test again */
+> > > +			writel_relaxed(mask, clear_reg);
+> > > +			after_clear = readl_relaxed(set_reg);
+> > > +			writel_relaxed(mask, set_reg);
+> > > +			after_set = readl_relaxed(set_reg);
+> > 
+> > It should be enough to write to the SET register, and read back, as the
+> > bit is RAZ/WI when the interrupt is Group-0.
+> 
+> Good point. Will simplify.
+
+I'd also suggest moving the whole thing to a separate function that'd
+get called from gic_cpu_init().
+
+Thanks,
+
+	M.
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Without deviation from the norm, progress is not possible.
