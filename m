@@ -1,46 +1,33 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 18 Dec 2015 15:18:05 +0100
-Subject: [PATCH 52/69] clocksource/drivers/h8300_timer16: Remove pointless lock
+Date: Fri, 18 Dec 2015 15:17:46 +0100
+Subject: [PATCH 33/69] clocksource/drivers/samsung-pwm: Add the COMPILE_TEST
+ option
 In-Reply-To: <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
 References: <5672CB9E.7090707@linaro.org>
  <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1450448302-27429-52-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1450448302-27429-33-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The lock in the timer16_clocksource_read is not needed, remove it.
+Increase the compilation test coverage by adding the COMPILE_TEST option.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/h8300_timer16.c | 6 +-----
- 1 file changed, 1 insertion(+), 5 deletions(-)
+ drivers/clocksource/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clocksource/h8300_timer16.c b/drivers/clocksource/h8300_timer16.c
-index 129dca0..f396605 100644
---- a/drivers/clocksource/h8300_timer16.c
-+++ b/drivers/clocksource/h8300_timer16.c
-@@ -30,7 +30,6 @@ struct timer16_priv {
- 	unsigned char imfa;
- 	unsigned char imiea;
- 	unsigned char ovf;
--	raw_spinlock_t lock;
- 	struct clk *clk;
- };
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 2062783..3457a86 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -237,7 +237,7 @@ config CLKSRC_EXYNOS_MCT
+ 	  Support for Multi Core Timer controller on Exynos SoCs.
  
-@@ -75,13 +74,10 @@ static inline struct timer16_priv *cs_to_priv(struct clocksource *cs)
- static cycle_t timer16_clocksource_read(struct clocksource *cs)
- {
- 	struct timer16_priv *p = cs_to_priv(cs);
--	unsigned long flags, raw;
--	unsigned long value;
-+	unsigned long raw, value;
- 
--	raw_spin_lock_irqsave(&p->lock, flags);
- 	value = p->total_cycles;
- 	raw = timer16_get_counter(p);
--	raw_spin_unlock_irqrestore(&p->lock, flags);
- 
- 	return value + raw;
- }
+ config CLKSRC_SAMSUNG_PWM
+-	bool
++	bool "PWM timer drvier for Samsung S3C, S5P" if COMPILE_TEST
+ 	help
+ 	  This is a new clocksource driver for the PWM timer found in
+ 	  Samsung S3C, S5P and Exynos SoCs, replacing an earlier driver
 -- 
 1.9.1
