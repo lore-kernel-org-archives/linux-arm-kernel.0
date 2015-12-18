@@ -1,70 +1,25 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 18 Dec 2015 14:43:32 +0200
-Subject: [PATCH] serial: 8250: of: Fix the driver and actually compile the
- 8250_of
-Message-ID: <1450442612-11372-1-git-send-email-peter.ujfalusi@ti.com>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 18 Dec 2015 13:45:05 +0100
+Subject: [PATCH] ARM: socfpga: Repair incorrectly applied MCV patch
+In-Reply-To: <alpine.DEB.2.02.1512180623300.7406@linux-builds1>
+References: <1450395498-9827-1-git-send-email-marex@denx.de>
+ <alpine.DEB.2.02.1512180623300.7406@linux-builds1>
+Message-ID: <201512181345.05923.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 8250_of never compiled since in the Kconfig we have SERIAL_OF_PLATFORM
-but in the makefile we expect to have SERIAL_8250_OF...
+On Friday, December 18, 2015 at 01:26:54 PM, Dinh Nguyen wrote:
+> On Thu, 17 Dec 2015, Marek Vasut wrote:
+> > For whatever reason, this patch was not applied verbatim and had all
+> > tabs replaced with spaces. Replace them back by a quick sed.
+> 
+> Thanks for catching this. I think what happened was that I had to pull this
+> patch from the mailing list, and whenever I forward a patch from my gmail
+> account, I can't seem to be able to use git am.
+> 
+> Anyways, patch is applied.
 
-In the Kconfig keep the SERIAL_OF_PLATFORM for compatibility reasons and
-let it select the SERIAL_8250_OF. Later we can replace the
-SERIAL_OF_PLATFORM use in defconfigs to SERIAL_8250_OF.
+Thanks :)
 
-When the 8250_of.c is actually compiled we will have two errors:
-missing linux/nwpserial.h and 8250/8250.h.
-Fix those as well at the same time when enable the compilation of the
-driver.
-
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Fixes: afd7f88f1577 ("serial: 8250: move of_serial code to 8250 directory")
-CC: Arnd Bergmann <arnd@arndb.de>
----
-Hi,
-
-this is fixes linux-next. W/o the patch davinci devices are not booting in DT
-mode for example.
-
-Regards,
-Peter
-
- drivers/tty/serial/8250/8250_of.c | 3 +--
- drivers/tty/serial/8250/Kconfig   | 5 +++++
- 2 files changed, 6 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/tty/serial/8250/8250_of.c b/drivers/tty/serial/8250/8250_of.c
-index d66fd24f87cf..33021c1f7d55 100644
---- a/drivers/tty/serial/8250/8250_of.c
-+++ b/drivers/tty/serial/8250/8250_of.c
-@@ -18,10 +18,9 @@
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
--#include <linux/nwpserial.h>
- #include <linux/clk.h>
- 
--#include "8250/8250.h"
-+#include "8250.h"
- 
- struct of_serial_info {
- 	struct clk *clk;
-diff --git a/drivers/tty/serial/8250/Kconfig b/drivers/tty/serial/8250/Kconfig
-index b03cb5175113..01f24613b0e6 100644
---- a/drivers/tty/serial/8250/Kconfig
-+++ b/drivers/tty/serial/8250/Kconfig
-@@ -379,6 +379,11 @@ config SERIAL_8250_MID
- 	  Intel platforms.
- 
- config SERIAL_OF_PLATFORM
-+	tristate
-+	depends on SERIAL_8250 && OF
-+	select SERIAL_8250_OF
-+
-+config SERIAL_8250_OF
- 	tristate "Devicetree based probing for 8250 ports"
- 	depends on SERIAL_8250 && OF
- 	help
--- 
-2.6.4
+Best regards,
+Marek Vasut
