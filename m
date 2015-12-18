@@ -1,35 +1,84 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 18 Dec 2015 09:52:36 +0000
-Subject: [PATCH 2/2] ARM: Make IPI_CPU_BACKTRACE a "non-secure" SGI
-In-Reply-To: <5673D683.8050002@arm.com>
-References: <1450430173-26992-1-git-send-email-marc.zyngier@arm.com>
- <1450430173-26992-3-git-send-email-marc.zyngier@arm.com>
- <20151218093412.GN8644@n2100.arm.linux.org.uk>
- <5673D683.8050002@arm.com>
-Message-ID: <20151218095236.GO8644@n2100.arm.linux.org.uk>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Fri, 18 Dec 2015 17:54:03 +0800
+Subject: [PATCH v6 0/6] Add mipi dsi support for rk3288
+In-Reply-To: <3523259.ZRgH1Shd9Y@diego>
+References: <1450260616-21160-1-git-send-email-zyw@rock-chips.com>
+ <3523259.ZRgH1Shd9Y@diego>
+Message-ID: <5673D7BB.50000@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 09:48:51AM +0000, Marc Zyngier wrote:
-> On 18/12/15 09:34, Russell King - ARM Linux wrote:
-> > On Fri, Dec 18, 2015 at 09:16:13AM +0000, Marc Zyngier wrote:
-> >> Having IPI_CPU_BACKTRACE as SGI15 may not work if the kernel is
-> >> running in non-secure mode and that the secure firmware has
-> >> decided to follow ARM's recommendations that SGI8-15 should
-> >> be reserved for secure purpose.
-> >>
-> >> Now that we are "only" using SGI0-6, change IPI_CPU_BACKTRACE
-> >> to use SGI7, which makes it more likely to work.
-> > 
-> > We should add a comment to the enum explaining this, so it's obvious
-> > for the future - best place is after the IPI_CPU_BACKTRACE entry.
-> > Not everyone checks the git logs for these kinds of details.
-> 
-> Indeed. How about something like this:
+Hi Heiko
 
-Yep.
+Thanks for your reminder.
+I have post the v6.1 mipi patch with the atomic support.
+<https://patchwork.kernel.org/patch/7881781/>
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+On 12/17/2015 05:29 PM, Heiko St?bner wrote:
+> Hi Chris,
+>
+> Am Mittwoch, 16. Dezember 2015, 18:10:10 schrieb Chris Zhong:
+>> The rk3288 MIPI DSI is a Synopsys DesignWare MIPI DSI host controller
+>> IP. This series adds support for a Synopsys DesignWare MIPI DSI host
+>> controller DRM driver.
+>>
+>> The MIPI DSI feature is tested on rk3288 evb board, backport them to
+>> chrome os kernel chrome_v3.14, and it can display normally.
+>>
+>> This patchset is base on the patchset from Ying.liu at freescale.com.
+>> <http://www.spinics.net/lists/dri-devel/msg77181.html>
+>>
+>> According to the suggestion from Thierry, I have get rid of the bridge,
+>> and register the encoder & connecter in drm/rockchip/dw-mipi-dsi.c.
+> from my point it looks good (although I cannot really speak on the drm-related
+> internals).
+>
+> But I do think we'll be doing atomic modesetting conversion first (last
+> version posted from Mark today), so you should probably make sure your dsi
+> driver still works after that conversion and make changes if needed.
+>
+>
+> Heiko
+>
+>>
+>> Changes in v6:
+>> - update the document, since the bridge device has been deleted.
+>> - Do not use bridge driver (Thierry Reding)
+>> - Optimization the phy init sequence
+>>
+>> Changes in v5:
+>> - modify the clk name to SCLK_MIPIDSI_24M
+>> - add a blank line befor lcd_en
+>>
+>> Changes in v4:
+>> - use clk_round_rate to check the clock rate in vop_crtc_mode_fixup
+>>
+>> Changes in v3:
+>> - move dw_mipi_dsi_rockchip.txt to bindings/display/rockchip/
+>>
+>> Chris Zhong (5):
+>>    drm/rockchip: return a true clock rate to adjusted_mode
+>>    Documentation: dt-bindings: Add bindings for rk3288 DW MIPI DSI driver
+>>    drm: rockchip: Support Synopsys DW MIPI DSI
+>>    ARM: dts: rockchip: add rk3288 mipi_dsi nodes
+>>    ARM: dts: rockchip: add support mipi panel tv080wum-nl0
+>>
+>> Liu Ying (1):
+>>    drm/dsi: Add a helper to get bits per pixel of MIPI DSI pixel format
+>>
+>>   .../display/rockchip/dw_mipi_dsi_rockchip.txt      |   60 +
+>>   arch/arm/boot/dts/rk3288-evb.dtsi                  |   20 +-
+>>   arch/arm/boot/dts/rk3288.dtsi                      |   39 +
+>>   drivers/gpu/drm/rockchip/Kconfig                   |   10 +
+>>   drivers/gpu/drm/rockchip/Makefile                  |    1 +
+>>   drivers/gpu/drm/rockchip/dw-mipi-dsi.c             | 1200
+>> ++++++++++++++++++++ drivers/gpu/drm/rockchip/rockchip_drm_vop.c        |
+>>   8 +
+>>   include/drm/drm_mipi_dsi.h                         |   14 +
+>>   8 files changed, 1351 insertions(+), 1 deletion(-)
+>>   create mode 100644
+>> Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
+>> create mode 100644 drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+>
+>
+>
