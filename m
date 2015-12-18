@@ -1,10 +1,10 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 18 Dec 2015 15:18:21 +0100
-Subject: [PATCH 68/69] clocksource/drivers/h8300: Initializer cleanup.
+Date: Fri, 18 Dec 2015 15:18:20 +0100
+Subject: [PATCH 67/69] clocksource/drivers/h8300: Simplify delta handling
 In-Reply-To: <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
 References: <5672CB9E.7090707@linaro.org>
  <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1450448302-27429-68-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1450448302-27429-67-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,56 +13,76 @@ From: Yoshinori Sato <ysato@users.sourceforge.jp>
 Signed-off-by: Yoshinori Sato <ysato@users.sourceforge.jp>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/h8300_timer8.c | 15 ++++++---------
- 1 file changed, 6 insertions(+), 9 deletions(-)
+ drivers/clocksource/h8300_timer8.c | 40 ++++++--------------------------------
+ 1 file changed, 6 insertions(+), 34 deletions(-)
 
 diff --git a/drivers/clocksource/h8300_timer8.c b/drivers/clocksource/h8300_timer8.c
-index 1ba453b..9087dd2 100644
+index aa4b2a98..1ba453b 100644
 --- a/drivers/clocksource/h8300_timer8.c
 +++ b/drivers/clocksource/h8300_timer8.c
-@@ -33,7 +33,6 @@ struct timer8_priv {
- 	void __iomem *mapbase;
- 	unsigned long flags;
- 	unsigned int rate;
--	unsigned int tcora;
+@@ -36,57 +36,29 @@ struct timer8_priv {
+ 	unsigned int tcora;
  };
  
+-static unsigned long timer8_get_counter(struct timer8_priv *p)
+-{
+-	unsigned long v1, v2, v3;
+-	int o1, o2;
+-
+-	o1 = readb(p->mapbase + _8TCSR) & 0x20;
+-
+-	/* Make sure the timer value is stable. Stolen from acpi_pm.c */
+-	do {
+-		o2 = o1;
+-		v1 = readw(p->mapbase + _8TCNT);
+-		v2 = readw(p->mapbase + _8TCNT);
+-		v3 = readw(p->mapbase + _8TCNT);
+-		o1 = readb(p->mapbase + _8TCSR) & 0x20;
+-	} while (unlikely((o1 != o2) || (v1 > v2 && v1 < v3)
+-			  || (v2 > v3 && v2 < v1) || (v3 > v1 && v3 < v2)));
+-
+-	v2 |= o1 << 10;
+-	return v2;
+-}
+-
  static irqreturn_t timer8_interrupt(int irq, void *dev_id)
-@@ -163,8 +162,6 @@ static void __init h8300_8timer_init(struct device_node *node)
  {
- 	void __iomem *base;
- 	int irq;
--	int ret = 0;
--	int rate;
- 	struct clk *clk;
+ 	struct timer8_priv *p = dev_id;
  
- 	clk = of_clk_get(node, 0);
-@@ -187,20 +184,20 @@ static void __init h8300_8timer_init(struct device_node *node)
+-	writeb(readb(p->mapbase + _8TCSR) & ~0x40,
+-		  p->mapbase + _8TCSR);
+-
+-	writew(p->tcora, p->mapbase + TCORA);
+-
+ 	if (clockevent_state_oneshot(&p->ced))
+ 		writew(0x0000, p->mapbase + _8TCR);
  
- 	timer8_priv.mapbase = base;
+ 	p->ced.event_handler(&p->ced);
  
--	rate = clk_get_rate(clk) / SCALE;
--	if (!rate) {
-+	timer8_priv.rate = clk_get_rate(clk) / SCALE;
-+	if (!timer8_priv.rate) {
- 		pr_err("Failed to get rate for the clocksource\n");
- 		goto unmap_reg;
- 	}
++	writeb(readb(p->mapbase + _8TCSR) & ~0x40,
++		  p->mapbase + _8TCSR);
++
+ 	return IRQ_HANDLED;
+ }
  
--	ret = request_irq(irq, timer8_interrupt,
--			  IRQF_TIMER, timer8_priv.ced.name, &timer8_priv);
--	if (ret < 0) {
-+	if (request_irq(irq, timer8_interrupt, IRQF_TIMER,
-+			timer8_priv.ced.name, &timer8_priv) < 0) {
- 		pr_err("failed to request irq %d for clockevent\n", irq);
- 		goto unmap_reg;
- 	}
+ static void timer8_set_next(struct timer8_priv *p, unsigned long delta)
+ {
+-	unsigned long now;
+-
+ 	if (delta >= 0x10000)
+ 		pr_warn("delta out of range\n");
+-	now = timer8_get_counter(p);
+-	p->tcora = delta;
++	writeb(readb(p->mapbase + _8TCR) & ~0x40, p->mapbase + _8TCR);
++	writew(0, p->mapbase + _8TCNT);
++	writew(delta, p->mapbase + TCORA);
+ 	writeb(readb(p->mapbase + _8TCR) | 0x40, p->mapbase + _8TCR);
+-	if (delta > now)
+-		writew(delta, p->mapbase + TCORA);
+-	else
+-		writew(now + 1, p->mapbase + TCORA);
+ }
  
--	clockevents_config_and_register(&timer8_priv.ced, rate, 1, 0x0000ffff);
-+	clockevents_config_and_register(&timer8_priv.ced,
-+					timer8_priv.rate, 1, 0x0000ffff);
- 
- 	return;
- unmap_reg:
+ static int timer8_enable(struct timer8_priv *p)
 -- 
 1.9.1
