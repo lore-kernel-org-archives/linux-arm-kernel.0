@@ -1,53 +1,46 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Fri, 18 Dec 2015 19:14:56 +0100
-Subject: [PULL take #2] KVM/ARM fixes for v4.4-rc6
-In-Reply-To: <1450447552-3161-1-git-send-email-marc.zyngier@arm.com>
-References: <1450447552-3161-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <56744D20.1080705@redhat.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Fri, 18 Dec 2015 10:24:37 -0800
+Subject: [PATCH v2] mtd: omap_elm: print interrupt resource using %pr
+In-Reply-To: <2327550.1yLrRnIh7I@wuerfel>
+References: <2327550.1yLrRnIh7I@wuerfel>
+Message-ID: <20151218182437.GM10460@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Dec 18, 2015 at 02:15:17PM +0100, Arnd Bergmann wrote:
+> When CONFIG_LPAE is set on ARM, resource_size_t is 64-bit wide
+> and we get a warning about an incorrect format string for printing
+> the interrupt number in elm_probe:
+> 
+> drivers/mtd/nand/omap_elm.c: In function 'elm_probe':
+> drivers/mtd/nand/omap_elm.c:417:23: warning: format '%i' expects argument of type 'int', but argument 3 has type 'resource_size_t {aka long long unsigned int}' [-Wformat=]
+> 
+> This patch avoids the type mismatch by printing the interrupt as
+> a resource using the %pr format string.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> v2: pass correct pointer
+> 
+> diff --git a/drivers/mtd/nand/omap_elm.c b/drivers/mtd/nand/omap_elm.c
+> index 235ec7992b4c..a3f32f939cc1 100644
+> --- a/drivers/mtd/nand/omap_elm.c
+> +++ b/drivers/mtd/nand/omap_elm.c
+> @@ -414,7 +414,7 @@ static int elm_probe(struct platform_device *pdev)
+>  	ret = devm_request_irq(&pdev->dev, irq->start, elm_isr, 0,
+>  			pdev->name, info);
+>  	if (ret) {
+> -		dev_err(&pdev->dev, "failure requesting irq %i\n", irq->start);
+> +		dev_err(&pdev->dev, "failure requesting %pr\n", irq);
 
+FWIW, the printk documentation isn't very specific about the formatting
+for %pr. After drilling down to resource_string() in lib/vsprintf.c, it
+looks like there is special case handling for various resrouce types,
+even though the documentation only shows IORESOURCE_MEM types.
 
-On 18/12/2015 15:05, Marc Zyngier wrote:
-> Hi Paolo,
-> 
-> We have a one line fix for the VGIC this time around, fixing a patch
-> that went in -rc2. Oh well. Hopefully this is the last one for v4.4.
-> And yes, the right patch is following the pull-request this time...
-> 
-> Please pull!
+Applied to l2-mtd.git.
 
-Pulled, thanks.
-
-Paolo
-
-> Thanks,
-> 
-> 	M.
-> 
-> The following changes since commit 0de58f852875a0f0dcfb120bb8433e4e73c7803b:
-> 
->   ARM/arm64: KVM: correct PTE uncachedness check (2015-12-04 16:30:17 +0000)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-v4.4-rc6
-> 
-> for you to fetch changes up to fdec12c12ed4333afb49c9948c29fbd5fb52da97:
-> 
->   KVM: arm/arm64: vgic: Fix kvm_vgic_map_is_active's dist check (2015-12-11 16:33:31 +0000)
-> 
-> ----------------------------------------------------------------
-> KVM/ARM fixes for v4.4-rc6
-> 
-> - Fix for the active interrupt detection code, affecting
->   the timer interrupt injection.
-> 
-> ----------------------------------------------------------------
-> Christoffer Dall (1):
->       KVM: arm/arm64: vgic: Fix kvm_vgic_map_is_active's dist check
-> 
->  virt/kvm/arm/vgic.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  		return ret;
+>  	}
+>  
 > 
