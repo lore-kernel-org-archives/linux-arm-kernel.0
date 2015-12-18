@@ -1,37 +1,54 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Fri, 18 Dec 2015 10:28:23 +0000
-Subject: [PATCH v4 05/12] arm-cci: PMU: Add support for transactions
-In-Reply-To: <20151217184255.GI6344@twins.programming.kicks-ass.net>
-References: <1450374559-23315-1-git-send-email-suzuki.poulose@arm.com>
- <1450374559-23315-6-git-send-email-suzuki.poulose@arm.com>
- <20151217184255.GI6344@twins.programming.kicks-ass.net>
-Message-ID: <5673DFC7.6060406@arm.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 18 Dec 2015 11:32:15 +0100
+Subject: I2C eeprom compatibles? (was Re: [PATCH/RFC 03/19] ARM:
+ shmobile: gose: add i2c2 bus to device tree)
+In-Reply-To: <1839177.77Qt0RnI3v@wuerfel>
+References: <1449802376-11301-1-git-send-email-horms+renesas@verge.net.au>
+ <20151218030239.GB10973@verge.net.au>
+ <20151218073531.GA1517@katana> <1839177.77Qt0RnI3v@wuerfel>
+Message-ID: <20151218103214.GA1532@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/12/15 18:42, Peter Zijlstra wrote:
-> On Thu, Dec 17, 2015 at 05:49:12PM +0000, Suzuki K. Poulose wrote:
->> We keep track of only the 'ADD' transactions. While we are in a
->> transaction, we keep track of the indices allocated for the events
->> and delay the following operations until the transaction is committed.
->>   1) Programming the event on the counter
->>   2) Enabling the counter
->>   3) Setting the period for the event.
->
-> So that's not really what the txn interface is for, its meant to
-> amortize event scheduling.
+On Fri, Dec 18, 2015 at 10:06:48AM +0100, Arnd Bergmann wrote:
+> On Friday 18 December 2015 08:35:32 Wolfram Sang wrote:
+> > > 
+> > > It seems to me that we have some consensus around:
+> > > 
+> > >       compatible = "renesas,r1ex24002", "24c02";
+> > 
+> > Thinking again, "generic,24c02" or "generic-24c02" could also be an
+> > option.
+> > 
+> > > Should this be added to Documentation/devicetree/bindings/eeprom/eeprom.txt ?
+> > > Or documented elsewhere?
+> > 
+> > Probably we need a DT maintainers advice here? I don't mind vendor
+> > specific compatibles being documented, but I'm reluctant to add all
+> > these compatibles for the myriads of I2C eeproms to the at24 driver. 99%
+> > are covered by the generic case.
+> > 
+> > Adding DT to CC.
+> 
+> I'd rather use some vendor string in addition to 24c02. Isn't this originally
+> an Atmel part? In that case, using "atmel,24c02" as the most generic string
+> would be appropriate,
 
-OK
+Yeah, the at24 driver is named after Atmel chips AFAIR. Having "atmel,*"
+as the generic fallback sounds like a good solution to me, too.
 
->
-> The above doesn't look like it has a failure case, in which case you can
-> achieve the same simpler, using pmu::pmu_{dis,en}able().
->
+> and IIRC the i2c framework will just match that with
+> the "24c02" entry in the i2c_device_id list.
 
-I thought about that, but was not sure if pmu->stop() is guaranteed to be
-called on all the events scheduled on the PMU when we pmu::pmu_disable().
-Is it ?
+True, although this behaviour is often complained about. There have been
+attempts to make i2c/spi behave like the rest of the DT world and to
+deprecate the current way. It didn't happen because of lots gory details,
+however :/
 
-Thanks for the quick response.
-
-Suzuki
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151218/8e665e4f/attachment.sig>
