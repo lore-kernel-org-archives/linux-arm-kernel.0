@@ -1,51 +1,52 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 18 Dec 2015 15:18:15 +0100
-Subject: [PATCH 62/69] clocksource/drivers/pistachio: Fix wrong calculated
- clocksource read value
+Date: Fri, 18 Dec 2015 15:18:13 +0100
+Subject: [PATCH 60/69] clocksource/drivers/dw_apb_timer: Inline apbt_readl and
+ apbt_writel
 In-Reply-To: <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
 References: <5672CB9E.7090707@linaro.org>
  <1450448302-27429-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1450448302-27429-62-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1450448302-27429-60-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jisheng Zhang <jszhang@marvell.com>
 
-Let's assume the counter value is 0xf0000000, the pistachio clocksource
-read cycles function should return ~0x0fffffff but actually it returns
-0xffffffff0fffffff.
+It seems gcc can automatically inline apbt_writel() for us, but
+apbt_real isn't inlined. This patch makes them inline to get a trivial
+performance improvement: 4096 rounds of __apbt_read_clocksource() call
+spend time on Marvell BG4CT platform:
 
-That occurs because:
+ before the patch 1275240ns on average
+ after the patch 1263240ns on average
 
-	~(cycle_t)value is different from (cycle_t)~value.
-
-unsigned long val = ~(unsigned long)0xf0000000;
-40049a:       48 b8 ff ff ff 0f ff    movabs $0xffffffff0fffffff,%rax
-
-unsigned long val = (unsigned long)~0xf0000000;
-40049a:       48 c7 45 f8 ff ff ff    movq   $0xfffffff,-0x8(%rbp)
-
-We fix this issue by calculating bitwise-not counter, then cast to
-cycle_t.
+so we get 1% performance improvement.
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/time-pistachio.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clocksource/dw_apb_timer.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/clocksource/time-pistachio.c b/drivers/clocksource/time-pistachio.c
-index bba6799..3269d9e 100644
---- a/drivers/clocksource/time-pistachio.c
-+++ b/drivers/clocksource/time-pistachio.c
-@@ -84,7 +84,7 @@ pistachio_clocksource_read_cycles(struct clocksource *cs)
- 	counter = gpt_readl(pcs->base, TIMER_CURRENT_VALUE, 0);
- 	raw_spin_unlock_irqrestore(&pcs->lock, flags);
- 
--	return ~(cycle_t)counter;
-+	return (cycle_t)~counter;
+diff --git a/drivers/clocksource/dw_apb_timer.c b/drivers/clocksource/dw_apb_timer.c
+index 7f95b53..6334526 100644
+--- a/drivers/clocksource/dw_apb_timer.c
++++ b/drivers/clocksource/dw_apb_timer.c
+@@ -49,13 +49,13 @@ clocksource_to_dw_apb_clocksource(struct clocksource *cs)
+ 	return container_of(cs, struct dw_apb_clocksource, cs);
  }
  
- static u64 notrace pistachio_read_sched_clock(void)
+-static u32 apbt_readl(struct dw_apb_timer *timer, unsigned long offs)
++static inline u32 apbt_readl(struct dw_apb_timer *timer, unsigned long offs)
+ {
+ 	return readl(timer->base + offs);
+ }
+ 
+-static void apbt_writel(struct dw_apb_timer *timer, u32 val,
+-		 unsigned long offs)
++static inline void apbt_writel(struct dw_apb_timer *timer, u32 val,
++			unsigned long offs)
+ {
+ 	writel(val, timer->base + offs);
+ }
 -- 
 1.9.1
