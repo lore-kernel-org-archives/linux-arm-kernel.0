@@ -1,42 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Dec 2015 16:02:41 +0100
-Subject: [PATCH] PCI: provide of_pci_get_host_bridge_resources helper
-Message-ID: <8759253.sZisGJ6Km3@wuerfel>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 18 Dec 2015 17:04:13 +0200
+Subject: OMAP display kconfig options changing
+In-Reply-To: <CAHCN7xJnHac+50TFSZ-+4Hqq9Of1HA6fTtnPxKUMCq_j5_UqgQ@mail.gmail.com>
+References: <5673CA0D.4000706@ti.com> <20151218135342.GF23396@atomide.com>
+ <CAHCN7xJnHac+50TFSZ-+4Hqq9Of1HA6fTtnPxKUMCq_j5_UqgQ@mail.gmail.com>
+Message-ID: <5674206D.60207@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pcie-rcar driver can be built for any ARM platform (for COMPILE_TEST)
-including those without CONFIG_OF enabled, and that results in a compile-time
-error:
 
-drivers/pci/host/pcie-rcar.c: In function 'rcar_pcie_parse_request_of_pci_ranges':
-drivers/pci/host/pcie-rcar.c:939:8: error: implicit declaration of function 'of_pci_get_host_bridge_resources' [-Werror=implicit-function-declaration]
-  err = of_pci_get_host_bridge_resources(np, 0, 0xff, &pci->resources, &iobase);
 
-In order to allow compile-testing on all platforms, this adds a
-of_pci_get_host_bridge_resources() helper stub function that gets
-used when CONFIG_OF_ADDRESS is disabled. This mirrors what we do for
-other OF-specific functions.
+On 18/12/15 16:03, Adam Ford wrote:
+> Tomi,
+> 
+> I'd like to also test the LogicPD Torpedo which has been using the FB
+> drivers until this point. I just pushed some LCD info for inclusion in
+> 4.5, but if I need to make changes, I'd like to do that sooner than
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 5d2917d469fa ("PCI: rcar: Convert to DT resource parsing API")
+The DT data is the same for omapfb and omapdrm, so no changes needed.
 
-diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-index 2c51ee78b1c0..874d68f50a40 100644
---- a/include/linux/of_pci.h
-+++ b/include/linux/of_pci.h
-@@ -59,6 +59,14 @@ static inline void of_pci_check_probe_only(void) { }
- int of_pci_get_host_bridge_resources(struct device_node *dev,
- 			unsigned char busno, unsigned char bus_max,
- 			struct list_head *resources, resource_size_t *io_base);
-+#else
-+static inline
-+int of_pci_get_host_bridge_resources(struct device_node *dev,
-+			unsigned char busno, unsigned char bus_max,
-+			struct list_head *resources, resource_size_t *io_base)
-+{
-+	return -EINVAL;
-+}
- #endif
- 
- #if defined(CONFIG_OF) && defined(CONFIG_PCI_MSI)
+> later.  Any insturctions would be helpful.  Will this impact people
+> who use the SGX drivers?
+
+I'm no expert, but... Yes, I think so. If you were using SGX driver with
+some additional omapfb patches, it won't work with omapdrm.
+
+omapdrm + SGX works, but it's a bit tricky setup (need extra kernel
+patches, specific userspace libs...). I hope we'll get the SGX side
+sorted out during the first quarter, which should make omapdrm + SGX
+much easier to get running.
+
+ Tomi
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151218/f2417bea/attachment-0001.sig>
