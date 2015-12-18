@@ -1,203 +1,657 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 18 Dec 2015 13:59:14 -0700
-Subject: [PATCH V7 18/24] coresight: updating documentation to reflect
- integration with perf
+Date: Fri, 18 Dec 2015 13:59:20 -0700
+Subject: [PATCH V7 24/24] perf tools: adding coresight etm PMU record
+ capabilities
 In-Reply-To: <1450472361-426-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1450472361-426-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1450472361-426-19-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1450472361-426-25-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding a new section giving information on how coresight has been
-integrated with the perf subsystem along with a general idea of how
-to control tracing from the perf tool cmd line.
+Coresight ETMs are IP blocks used to perform HW assisted tracing
+on a CPU core.  This patch introduce the required auxiliary API
+functions allowing the perf core to interact with a tracer.
 
+Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- Documentation/trace/coresight.txt | 138 ++++++++++++++++++++++++++++++++++----
- 1 file changed, 124 insertions(+), 14 deletions(-)
+ MAINTAINERS                         |   3 +
+ tools/perf/arch/arm/util/Build      |   2 +-
+ tools/perf/arch/arm/util/auxtrace.c |  48 ++++
+ tools/perf/arch/arm/util/cs_etm.c   | 466 ++++++++++++++++++++++++++++++++++++
+ tools/perf/arch/arm/util/cs_etm.h   |  44 ++++
+ tools/perf/util/auxtrace.c          |   1 +
+ tools/perf/util/auxtrace.h          |   1 +
+ 7 files changed, 564 insertions(+), 1 deletion(-)
+ create mode 100644 tools/perf/arch/arm/util/auxtrace.c
+ create mode 100644 tools/perf/arch/arm/util/cs_etm.c
+ create mode 100644 tools/perf/arch/arm/util/cs_etm.h
 
-diff --git a/Documentation/trace/coresight.txt b/Documentation/trace/coresight.txt
-index 0a5c3290e732..9515206b4b1a 100644
---- a/Documentation/trace/coresight.txt
-+++ b/Documentation/trace/coresight.txt
-@@ -20,13 +20,13 @@ Components are generally categorised as source, link and sinks and are
+diff --git a/MAINTAINERS b/MAINTAINERS
+index e1a5de0e5733..1368a22f61c0 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1008,6 +1008,9 @@ F:	Documentation/trace/coresight.txt
+ F:	Documentation/devicetree/bindings/arm/coresight.txt
+ F:	Documentation/ABI/testing/sysfs-bus-coresight-devices-*
+ F:	tools/perf/arch/arm/util/pmu.c
++F:	tools/perf/arch/arm/util/auxtrace.c
++F:	tools/perf/arch/arm/util/cs_etm.c
++F:	tools/perf/arch/arm/util/cs_etm.h
  
- "Sources" generate a compressed stream representing the processor instruction
- path based on tracing scenarios as configured by users.  From there the stream
--flows through the coresight system (via ATB bus) using links that are connecting
--the emanating source to a sink(s).  Sinks serve as endpoints to the coresight
-+flows through the Coresight system (via ATB bus) using links that are connecting
-+the emanating source to a sink(s).  Sinks serve as endpoints to the Coresight
- implementation, either storing the compressed stream in a memory buffer or
- creating an interface to the outside world where data can be transferred to a
--host without fear of filling up the onboard coresight memory buffer.
-+host without fear of filling up the onboard Coresight memory buffer.
+ ARM/CORGI MACHINE SUPPORT
+ M:	Richard Purdie <rpurdie@rpsys.net>
+diff --git a/tools/perf/arch/arm/util/Build b/tools/perf/arch/arm/util/Build
+index 66ab0b05549c..0a25a1248f42 100644
+--- a/tools/perf/arch/arm/util/Build
++++ b/tools/perf/arch/arm/util/Build
+@@ -3,4 +3,4 @@ libperf-$(CONFIG_DWARF) += dwarf-regs.o
+ libperf-$(CONFIG_LIBUNWIND)          += unwind-libunwind.o
+ libperf-$(CONFIG_LIBDW_DWARF_UNWIND) += unwind-libdw.o
  
--At typical coresight system would look like this:
-+At typical Coresight system would look like this:
+-libperf-$(CONFIG_AUXTRACE) += pmu.o
++libperf-$(CONFIG_AUXTRACE) += pmu.o auxtrace.o cs_etm.o
+diff --git a/tools/perf/arch/arm/util/auxtrace.c b/tools/perf/arch/arm/util/auxtrace.c
+new file mode 100644
+index 000000000000..4988fdf7cb8a
+--- /dev/null
++++ b/tools/perf/arch/arm/util/auxtrace.c
+@@ -0,0 +1,48 @@
++/*
++ * Copyright(C) 2015 Linaro Limited. All rights reserved.
++ * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 as published by
++ * the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <stdbool.h>
++#include <linux/coresight-pmu.h>
++
++#include "../../util/auxtrace.h"
++#include "../../util/evlist.h"
++#include "../../util/pmu.h"
++#include "cs_etm.h"
++
++struct auxtrace_record
++*auxtrace_record__init(struct perf_evlist *evlist, int *err)
++{
++	struct perf_pmu	*cs_etm_pmu;
++	struct perf_evsel *evsel;
++	bool found_etm = false;
++
++	cs_etm_pmu = perf_pmu__find(CORESIGHT_ETM_PMU_NAME);
++
++	 if (evlist) {
++		evlist__for_each(evlist, evsel) {
++			if (cs_etm_pmu &&
++			    evsel->attr.type == cs_etm_pmu->type)
++				found_etm = true;
++		}
++	}
++
++	if (found_etm)
++		return cs_etm_record_init(err);
++
++	*err = -EINVAL;
++	return NULL;
++}
+diff --git a/tools/perf/arch/arm/util/cs_etm.c b/tools/perf/arch/arm/util/cs_etm.c
+new file mode 100644
+index 000000000000..5710b90e23d5
+--- /dev/null
++++ b/tools/perf/arch/arm/util/cs_etm.c
+@@ -0,0 +1,466 @@
++/*
++ * Copyright(C) 2015 Linaro Limited. All rights reserved.
++ * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 as published by
++ * the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <api/fs/fs.h>
++#include <linux/bitops.h>
++#include <linux/coresight-pmu.h>
++#include <linux/kernel.h>
++#include <linux/log2.h>
++#include <linux/types.h>
++
++#include "../../perf.h"
++#include "../../util/auxtrace.h"
++#include "../../util/cpumap.h"
++#include "../../util/evlist.h"
++#include "../../util/pmu.h"
++#include "../../util/thread_map.h"
++#include "cs_etm.h"
++
++#include <stdlib.h>
++
++#define KiB(x) ((x) * 1024)
++#define MiB(x) ((x) * 1024 * 1024)
++
++struct cs_etm_recording {
++	struct auxtrace_record	itr;
++	struct perf_pmu		*cs_etm_pmu;
++	struct perf_evlist	*evlist;
++	bool			snapshot_mode;
++	size_t			snapshot_size;
++};
++
++static int cs_etm_parse_snapshot_options(struct auxtrace_record *itr,
++					 struct record_opts *opts,
++					 const char *str)
++{
++	struct cs_etm_recording *ptr =
++				container_of(itr, struct cs_etm_recording, itr);
++	unsigned long long snapshot_size = 0;
++	char *endptr;
++
++	if (str) {
++		snapshot_size = strtoull(str, &endptr, 0);
++		if (*endptr || snapshot_size > SIZE_MAX)
++			return -1;
++	}
++
++	opts->auxtrace_snapshot_mode = true;
++	opts->auxtrace_snapshot_size = snapshot_size;
++	ptr->snapshot_size = snapshot_size;
++
++	return 0;
++}
++
++static int cs_etm_recording_options(struct auxtrace_record *itr,
++				    struct perf_evlist *evlist,
++				    struct record_opts *opts)
++{
++	struct cs_etm_recording *ptr =
++				container_of(itr, struct cs_etm_recording, itr);
++	struct perf_pmu *cs_etm_pmu = ptr->cs_etm_pmu;
++	struct perf_evsel *evsel, *cs_etm_evsel = NULL;
++	const struct cpu_map *cpus = evlist->cpus;
++	bool privileged = (geteuid() == 0 || perf_event_paranoid() < 0);
++
++	ptr->evlist = evlist;
++	ptr->snapshot_mode = opts->auxtrace_snapshot_mode;
++
++	evlist__for_each(evlist, evsel) {
++		if (evsel->attr.type == cs_etm_pmu->type) {
++			if (cs_etm_evsel) {
++				pr_err("There may be only one %s event\n",
++				       CORESIGHT_ETM_PMU_NAME);
++				return -EINVAL;
++			}
++			evsel->attr.freq = 0;
++			evsel->attr.sample_period = 1;
++			cs_etm_evsel = evsel;
++			opts->full_auxtrace = true;
++		}
++	}
++
++	/* no need to continue if at least one event of interest was found */
++	if (!cs_etm_evsel)
++		return 0;
++
++	if (opts->use_clockid) {
++		pr_err("Cannot use clockid (-k option) with %s\n",
++		       CORESIGHT_ETM_PMU_NAME);
++		return -EINVAL;
++	}
++
++	/* we are in snapshot mode */
++	if (opts->auxtrace_snapshot_mode) {
++		/*
++		 * No size were given to '-S' or '-m,', so go with
++		 * the default
++		 */
++		if (!opts->auxtrace_snapshot_size &&
++		    !opts->auxtrace_mmap_pages) {
++			if (privileged) {
++				opts->auxtrace_mmap_pages = MiB(4) / page_size;
++			} else {
++				opts->auxtrace_mmap_pages =
++							KiB(128) / page_size;
++				if (opts->mmap_pages == UINT_MAX)
++					opts->mmap_pages = KiB(256) / page_size;
++			}
++		} else if (!opts->auxtrace_mmap_pages && !privileged &&
++						opts->mmap_pages == UINT_MAX) {
++			opts->mmap_pages = KiB(256) / page_size;
++		}
++
++		/*
++		 * '-m,xyz' was specified but no snapshot size, so make the
++		 * snapshot size as big as the auxtrace mmap area.
++		 */
++		if (!opts->auxtrace_snapshot_size) {
++			opts->auxtrace_snapshot_size =
++				opts->auxtrace_mmap_pages * (size_t)page_size;
++		}
++
++		/*
++		 * -Sxyz was specified but no auxtrace mmap area, so make the
++		 * auxtrace mmap area big enough to fit the requested snapshot
++		 * size.
++		 */
++		if (!opts->auxtrace_mmap_pages) {
++			size_t sz = opts->auxtrace_snapshot_size;
++
++			sz = round_up(sz, page_size) / page_size;
++			opts->auxtrace_mmap_pages = roundup_pow_of_two(sz);
++		}
++
++		/* Snapshost size can't be bigger than the auxtrace area */
++		if (opts->auxtrace_snapshot_size >
++				opts->auxtrace_mmap_pages * (size_t)page_size) {
++			pr_err("Snapshot size %zu must not be greater than AUX area tracing mmap size %zu\n",
++			       opts->auxtrace_snapshot_size,
++			       opts->auxtrace_mmap_pages * (size_t)page_size);
++			return -EINVAL;
++		}
++
++		/* Something went wrong somewhere - this shouldn't happen */
++		if (!opts->auxtrace_snapshot_size ||
++		    !opts->auxtrace_mmap_pages) {
++			pr_err("Failed to calculate default snapshot size and/or AUX area tracing mmap pages\n");
++			return -EINVAL;
++		}
++	}
++
++	/* We are in full trace mode but '-m,xyz' wasn't specified */
++	 if (opts->full_auxtrace && !opts->auxtrace_mmap_pages) {
++		if (privileged) {
++			opts->auxtrace_mmap_pages = MiB(4) / page_size;
++		} else {
++			opts->auxtrace_mmap_pages = KiB(128) / page_size;
++			if (opts->mmap_pages == UINT_MAX)
++				opts->mmap_pages = KiB(256) / page_size;
++		}
++
++	}
++
++	/* Validate auxtrace_mmap_pages provided by user */
++	if (opts->auxtrace_mmap_pages) {
++		unsigned int max_page = (KiB(128) / page_size);
++		size_t sz = opts->auxtrace_mmap_pages * (size_t)page_size;
++
++		if (!privileged &&
++		    opts->auxtrace_mmap_pages > max_page) {
++			opts->auxtrace_mmap_pages = max_page;
++			pr_err("auxtrace too big, truncating to %d\n",
++			       max_page);
++		}
++
++		if (!is_power_of_2(sz)) {
++			pr_err("Invalid mmap size for %s: must be a power of 2\n",
++			       CORESIGHT_ETM_PMU_NAME);
++			return -EINVAL;
++		}
++	}
++
++	if (opts->auxtrace_snapshot_mode)
++		pr_debug2("%s snapshot size: %zu\n", CORESIGHT_ETM_PMU_NAME,
++			  opts->auxtrace_snapshot_size);
++
++	if (cs_etm_evsel) {
++		/*
++		 * To obtain the auxtrace buffer file descriptor, the auxtrace
++		 * event must come first.
++		 */
++		perf_evlist__to_front(evlist, cs_etm_evsel);
++		/*
++		 * In the case of per-cpu mmaps, we need the CPU on the
++		 * AUX event.
++		 */
++		if (!cpu_map__empty(cpus))
++			perf_evsel__set_sample_bit(cs_etm_evsel, CPU);
++	}
++
++	/* Add dummy event to keep tracking */
++	if (opts->full_auxtrace) {
++		struct perf_evsel *tracking_evsel;
++		int err;
++
++		err = parse_events(evlist, "dummy:u", NULL);
++		if (err)
++			return err;
++
++		tracking_evsel = perf_evlist__last(evlist);
++		perf_evlist__set_tracking_event(evlist, tracking_evsel);
++
++		tracking_evsel->attr.freq = 0;
++		tracking_evsel->attr.sample_period = 1;
++
++		/* In per-cpu case, always need the time of mmap events etc */
++		if (!cpu_map__empty(cpus))
++			perf_evsel__set_sample_bit(tracking_evsel, TIME);
++	}
++
++	return 0;
++}
++
++static u64 cs_etm_get_config(struct auxtrace_record *itr)
++{
++	u64 config = 0;
++	struct cs_etm_recording *ptr =
++			container_of(itr, struct cs_etm_recording, itr);
++	struct perf_pmu *cs_etm_pmu = ptr->cs_etm_pmu;
++	struct perf_evlist *evlist = ptr->evlist;
++	struct perf_evsel *evsel;
++
++	evlist__for_each(evlist, evsel) {
++		if (evsel->attr.type == cs_etm_pmu->type) {
++			/*
++			 * Variable perf_event_attr::config is assigned to
++			 * ETMv3/PTM.  The bit fields have been made to match
++			 * the ETMv3.5 ETRMCR register specification.  See the
++			 * PMU_FORMAT_ATTR() declarations in
++			 * drivers/hwtracing/coresight/coresight-perf.c for
++			 * details.
++			 */
++			config = evsel->attr.config;
++			break;
++		}
++	}
++
++	return config;
++}
++
++static size_t
++cs_etm_info_priv_size(struct auxtrace_record *itr __maybe_unused,
++		      struct perf_evlist *evlist __maybe_unused)
++{
++	int records;
++	const struct cpu_map *cpus = evlist->cpus;
++
++	if (!cpu_map__empty(cpus)) {
++		records = cpu_map__nr(cpus);
++		goto out;
++	}
++
++	set_max_cpu_num();
++	records = cpu__max_cpu();
++out:
++	return records * CS_ETM_PRIV_SIZE;
++}
++
++static const char *metadata_etmv3_ro[CS_ETM_PRIV_MAX] = {
++	[CS_ETM_ETMCCER]	= "mgmt/etmccer",
++	[CS_ETM_ETMIDR]		= "mgmt/etmidr",
++};
++
++static int cs_etm_get_metadata(int cpu, int index,
++			       struct auxtrace_record *itr,
++			       struct auxtrace_info_event *info)
++{
++	char path[PATH_MAX];
++	int offset = 0, ret = 0;
++	int i, scan;
++	unsigned int val;
++	struct cs_etm_recording *ptr =
++			container_of(itr, struct cs_etm_recording, itr);
++	struct perf_pmu *cs_etm_pmu = ptr->cs_etm_pmu;
++
++	offset = index * CS_ETM_PRIV_MAX;
++
++	/* Build generic header portion */
++	info->priv[offset + CS_ETM_MAGIC] = __perf_cs_etm_magic;
++	info->priv[offset + CS_ETM_CPU] = cpu;
++	info->priv[offset + CS_ETM_SNAPSHOT] = ptr->snapshot_mode;
++
++	/* Get user configurables from the session */
++	info->priv[offset + CS_ETM_ETMCR] = cs_etm_get_config(itr);
++	info->priv[offset + CS_ETM_ETMTRACEIDR] = coresight_get_trace_id(cpu);
++
++	/* Get RO metadata from sysfs */
++	for (i = CS_ETM_ETMCCER; i < CS_ETM_PRIV_MAX; i++) {
++		snprintf(path, PATH_MAX, "cpu%d/%s", cpu, metadata_etmv3_ro[i]);
++
++		scan = perf_pmu__scan_file(cs_etm_pmu, path, "%x", &val);
++		if (scan != 1) {
++			ret = -EINVAL;
++			break;
++		}
++
++		info->priv[offset + i] = val;
++	}
++
++	return ret;
++}
++
++static int cs_etm_info_fill(struct auxtrace_record *itr,
++			    struct perf_session *session,
++			    struct auxtrace_info_event *auxtrace_info,
++			    size_t priv_size)
++{
++	int i, nr_cpu, ret = 0;
++	const struct cpu_map *cpus = session->evlist->cpus;
++
++	if (priv_size != cs_etm_info_priv_size(itr, session->evlist))
++		return -EINVAL;
++
++	if (!session->evlist->nr_mmaps)
++		return -EINVAL;
++
++	auxtrace_info->type = PERF_AUXTRACE_CS_ETM;
++
++	/* cpu map is not empty, we have specific CPUs to work with */
++	if (!cpu_map__empty(cpus)) {
++		for (i = 0; i < cpu_map__nr(cpus); i++) {
++			ret = cs_etm_get_metadata(cpus->map[i], i,
++						  itr, auxtrace_info);
++			if (ret)
++				goto out;
++		}
++	} else {
++		/* get configuration for all CPUs in the system */
++		nr_cpu = cpu__max_cpu();
++		for (i = 0; i < nr_cpu; i++) {
++			ret = cs_etm_get_metadata(i, i, itr, auxtrace_info);
++			if (ret)
++				goto out;
++		}
++	}
++
++out:
++	return ret;
++}
++
++static int cs_etm_find_snapshot(struct auxtrace_record *itr __maybe_unused,
++				int idx, struct auxtrace_mmap *mm,
++				unsigned char *data __maybe_unused,
++				u64 *head, u64 *old)
++{
++	pr_debug3("%s: mmap index %d old head %zu new head %zu size %zu\n",
++		  __func__, idx, (size_t)*old, (size_t)*head, mm->len);
++
++	*old = *head;
++	*head += mm->len;
++
++	return 0;
++}
++
++static int cs_etm_snapshot_start(struct auxtrace_record *itr)
++{
++	struct cs_etm_recording *ptr =
++			container_of(itr, struct cs_etm_recording, itr);
++	struct perf_evsel *evsel;
++
++	evlist__for_each(ptr->evlist, evsel) {
++		if (evsel->attr.type == ptr->cs_etm_pmu->type)
++			return perf_evlist__disable_event(ptr->evlist, evsel);
++	}
++	return -EINVAL;
++}
++
++static int cs_etm_snapshot_finish(struct auxtrace_record *itr)
++{
++	struct cs_etm_recording *ptr =
++			container_of(itr, struct cs_etm_recording, itr);
++	struct perf_evsel *evsel;
++
++	evlist__for_each(ptr->evlist, evsel) {
++		if (evsel->attr.type == ptr->cs_etm_pmu->type)
++			return perf_evlist__enable_event(ptr->evlist, evsel);
++	}
++	return -EINVAL;
++}
++
++static u64 cs_etm_reference(struct auxtrace_record *itr __maybe_unused)
++{
++	return (((u64) rand() <<  0) & 0x00000000FFFFFFFFull) |
++		(((u64) rand() << 32) & 0xFFFFFFFF00000000ull);
++}
++
++static void cs_etm_recording_free(struct auxtrace_record *itr)
++{
++	struct cs_etm_recording *ptr =
++			container_of(itr, struct cs_etm_recording, itr);
++	free(ptr);
++}
++
++static int cs_etm_read_finish(struct auxtrace_record *itr, int idx)
++{
++	struct cs_etm_recording *ptr =
++			container_of(itr, struct cs_etm_recording, itr);
++	struct perf_evsel *evsel;
++
++	evlist__for_each(ptr->evlist, evsel) {
++		if (evsel->attr.type == ptr->cs_etm_pmu->type)
++			return perf_evlist__enable_event_idx(ptr->evlist,
++							     evsel, idx);
++	}
++
++	return -EINVAL;
++}
++
++struct auxtrace_record *cs_etm_record_init(int *err)
++{
++	struct perf_pmu *cs_etm_pmu;
++	struct cs_etm_recording *ptr;
++
++	cs_etm_pmu = perf_pmu__find(CORESIGHT_ETM_PMU_NAME);
++
++	if (!cs_etm_pmu) {
++		*err = -EINVAL;
++		goto out;
++	}
++
++	ptr = zalloc(sizeof(struct cs_etm_recording));
++	if (!ptr) {
++		*err = -ENOMEM;
++		goto out;
++	}
++
++	ptr->cs_etm_pmu			= cs_etm_pmu;
++	ptr->itr.parse_snapshot_options	= cs_etm_parse_snapshot_options;
++	ptr->itr.recording_options	= cs_etm_recording_options;
++	ptr->itr.info_priv_size		= cs_etm_info_priv_size;
++	ptr->itr.info_fill		= cs_etm_info_fill;
++	ptr->itr.find_snapshot		= cs_etm_find_snapshot;
++	ptr->itr.snapshot_start		= cs_etm_snapshot_start;
++	ptr->itr.snapshot_finish	= cs_etm_snapshot_finish;
++	ptr->itr.reference		= cs_etm_reference;
++	ptr->itr.free			= cs_etm_recording_free;
++	ptr->itr.read_finish		= cs_etm_read_finish;
++
++	*err = 0;
++	return &ptr->itr;
++out:
++	return NULL;
++}
+diff --git a/tools/perf/arch/arm/util/cs_etm.h b/tools/perf/arch/arm/util/cs_etm.h
+new file mode 100644
+index 000000000000..7e85c1b43598
+--- /dev/null
++++ b/tools/perf/arch/arm/util/cs_etm.h
+@@ -0,0 +1,44 @@
++/*
++ * Copyright(C) 2015 Linaro Limited. All rights reserved.
++ * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 as published by
++ * the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef INCLUDE__PERF_CS_ETM_H__
++#define INCLUDE__PERF_CS_ETM_H__
++
++/* Beginning of header common to both ETMv3 and V4 */
++enum {
++	CS_ETM_MAGIC,
++	CS_ETM_CPU,
++	CS_ETM_SNAPSHOT,
++};
++
++/* ETMv3/PTM metadata */
++enum {
++	/* Dynamic, configurable parameters */
++	CS_ETM_ETMCR = CS_ETM_SNAPSHOT + 1,
++	CS_ETM_ETMTRACEIDR,
++	/* RO, taken from sysFS */
++	CS_ETM_ETMCCER,
++	CS_ETM_ETMIDR,
++	CS_ETM_PRIV_MAX,
++};
++
++static const u64 __perf_cs_etm_magic   = 0x3030303030303030ULL;
++#define CS_ETM_PRIV_SIZE (CS_ETM_PRIV_MAX * sizeof(u64))
++
++struct auxtrace_record *cs_etm_record_init(int *err);
++
++#endif
+diff --git a/tools/perf/util/auxtrace.c b/tools/perf/util/auxtrace.c
+index cc1c9ce5cc56..a6f291dbc4d9 100644
+--- a/tools/perf/util/auxtrace.c
++++ b/tools/perf/util/auxtrace.c
+@@ -892,6 +892,7 @@ int perf_event__process_auxtrace_info(struct perf_tool *tool __maybe_unused,
+ 		return intel_pt_process_auxtrace_info(event, session);
+ 	case PERF_AUXTRACE_INTEL_BTS:
+ 		return intel_bts_process_auxtrace_info(event, session);
++	case PERF_AUXTRACE_CS_ETM:
+ 	case PERF_AUXTRACE_UNKNOWN:
+ 	default:
+ 		return -EINVAL;
+diff --git a/tools/perf/util/auxtrace.h b/tools/perf/util/auxtrace.h
+index e5a8e2d4f2af..adb53e7bcabf 100644
+--- a/tools/perf/util/auxtrace.h
++++ b/tools/perf/util/auxtrace.h
+@@ -41,6 +41,7 @@ enum auxtrace_type {
+ 	PERF_AUXTRACE_UNKNOWN,
+ 	PERF_AUXTRACE_INTEL_PT,
+ 	PERF_AUXTRACE_INTEL_BTS,
++	PERF_AUXTRACE_CS_ETM,
+ };
  
-   *****************************************************************
-  **************************** AMBA AXI  ****************************===||
-@@ -83,8 +83,8 @@ While on target configuration of the components is done via the APB bus,
- all trace data are carried out-of-band on the ATB bus.  The CTM provides
- a way to aggregate and distribute signals between CoreSight components.
- 
--The coresight framework provides a central point to represent, configure and
--manage coresight devices on a platform.  This first implementation centers on
-+The Coresight framework provides a central point to represent, configure and
-+manage Coresight devices on a platform.  This first implementation centers on
- the basic tracing functionality, enabling components such ETM/PTM, funnel,
- replicator, TMC, TPIU and ETB.  Future work will enable more
- intricate IP blocks such as STM and CTI.
-@@ -129,11 +129,11 @@ expected to be added as the solution matures.
- Framework and implementation
- ----------------------------
- 
--The coresight framework provides a central point to represent, configure and
--manage coresight devices on a platform.  Any coresight compliant device can
-+The Coresight framework provides a central point to represent, configure and
-+manage Coresight devices on a platform.  Any Coresight compliant device can
- register with the framework for as long as they use the right APIs:
- 
--struct coresight_device *coresight_register(struct coresight_desc *desc);
-+struct Coresight_device *coresight_register(struct coresight_desc *desc);
- void coresight_unregister(struct coresight_device *csdev);
- 
- The registering function is taking a "struct coresight_device *csdev" and
-@@ -193,10 +193,120 @@ the information carried in "THIS_MODULE".
- How to use
- ----------
- 
--Before trace collection can start, a coresight sink needs to be identify.
--There is no limit on the amount of sinks (nor sources) that can be enabled at
--any given moment.  As a generic operation, all device pertaining to the sink
--class will have an "active" entry in sysfs:
-+There is two ways to use the Coresight framework: 1) using the perf cmd line
-+tool and 2) interacting directly with the Coresight devices using the sysFS
-+interface.  The latter will slowly be faded out as more functionality become
-+available from the perf cmd line tool but for the time being both are still
-+supported.  The following sections provide details on using both methods.
-+
-+1) Using perf framework:
-+
-+Coresight tracers like ETM and PTM are represented using the Perf framework's
-+Performance Monitoring Unit (PMU).  As such the perf framework takes charge of
-+controlling when tracing happens based on when the process(es) of interest are
-+scheduled.  When configure in a system, Coresight PMUs will be listed when
-+queried by the perf command line tool:
-+
-+linaro at linaro-nano:~$ ./perf list pmu
-+
-+List of pre-defined events (to be used in -e):
-+
-+  cs_etm//                                           [Kernel PMU event]
-+
-+linaro at linaro-nano:~$
-+
-+Regardless of the amount ETM/PTM IP block in a system (usually equal to the
-+amount of processor core), the "cs_etm" PMU will be listed only once.
-+
-+Before a trace can be configured and started a Coresight sink needs to be
-+selected using the sysFS method (see below).  This is only temporary until
-+sink selection can be made from the command line tool.
-+
-+linaro at linaro-nano:~$ ls /sys/bus/coresight/devices
-+20010000.etb  20030000.tpiu  20040000.funnel  2201c000.ptm
-+2201d000.ptm  2203c000.etm  2203d000.etm  2203e000.etm  replicator
-+
-+linaro at linaro-nano:~$ echo 1 > /sys/bus/coresight/devices/20010000.etb/enable_sink
-+
-+Once a sink has been selected configuring a Coresight PMU works the same way as
-+any other PMU.  As such tracing can happen for a single CPU, a group of CPU, per
-+thread or a combination of those:
-+
-+linaro at linaro-nano:~$ perf record -e cs_etm// --per-thread <command>
-+
-+linaro at linaro-nano:~$ perf record -C 0,2-3 -e cs_etm// <command>
-+
-+Tracing limited to user and kernel space can also be used to narrow the amount
-+of collected traces:
-+
-+linaro at linaro-nano:~$ perf record -e cs_etm//u --per-thread <command>
-+
-+linaro at linaro-nano:~$ perf record -C 0,2-3 -e cs_etm//k <command>
-+
-+As of this writing two ETM/PTM specific options have are available: cycle
-+accurate and timestamp (please refer to the Embedded Trace Macrocell reference
-+manual for details on these options).  By default both are disabled but using
-+the "cycacc" and "timestamp" mnemonic within the double '/' will see those
-+options configure for the upcoming trace run:
-+
-+linaro at linaro-nano:~$ perf record -e cs_etm/cycacc/ --per-thread <command>
-+
-+linaro at linaro-nano:~$ perf record -C 0,2-3 -e cs_etm/cycacc,timestamp/ <command>
-+
-+The Coresight PMUs can be configured to work in "full trace" or "snapshot" mode.
-+In full trace mode trace acquisition is enabled from beginning to end with trace
-+data being recorded continuously:
-+
-+linaro at linaro-nano:~$ perf record -e cs_etm// dd if=/dev/random of=./test.txt bs=1k count=1000
-+
-+Since this can lead to a significant amount of data and because some devices are
-+limited in disk space snapshot mode can be used instead.  In snapshot mode
-+traces are still collected in the ring buffer but not communicated to user
-+space.  The ring buffer is allowed to wrap around, providing the latest
-+information before an event of interest happens.  Significant events are
-+communicated by sending a USR2 signal to the user space command line tool.
-+From there the tool will stop trace collection and harvest data from the ring
-+buffer before re-enabling traces.  Snapshot mode can be invoked using '-S' when
-+launching a trace collection:
-+
-+linaro at linaro-nano:~$ perf record -S -e cs_etm// dd if=/dev/random of=./test.txt bs=1k count=1000
-+
-+Trace data collected during trace runs ends up in the "perf.data" file.  Trace
-+configuration information necessary for trace decoding is also embedded in the
-+"perf.data" file.  Two new headers, 'PERF_RECORD_AUXTRACE_INFO' and
-+'PERF_RECORD_AUXTRACE' have been added to the list of event types in order to
-+find out where the different sections start.
-+
-+It is worth noting that a set of metadata information exists for each tracer
-+that participated in a trace run.  As such if 5 processors have been engaged,
-+5 sets of metadata will be found in the perf.data file.  This is to ensure that
-+tracer decompression tools have all the information they need in order to
-+process the trace data.
-+
-+Metadata information is collected directly from the ETM/PTM management registers
-+using the sysFS interface.  Since there is no way for the perf command line
-+tool to associate a CPU with a tracer, a symbolic link has been created between
-+the cs_etm sysFS event directory and each Coresight tracer:
-+
-+linaro at linaro-nano:~$ ls /sys/bus/event_source/devices/cs_etm
-+cpu0  cpu1  cpu2  cpu3  cpu4  format  perf_event_mux_interval_ms
-+power  subsystem  type  uevent
-+
-+linaro at linaro-nano:~$ ls /sys/bus/event_source/devices/cs_etm/cpu0/mgmt/
-+etmccer  etmccr  etmcr  etmidr  etmscr  etmtecr1  etmtecr2
-+etmteevr  etmtraceidr  etmtssvr
-+
-+2) Using the sysFS interface:
-+
-+Most, if not all, configuration registers are made available to users via the
-+sysFS interface.  Until all Coresight ETM drivers have been converted to perf,
-+it will also be possible to start and stop traces from sysFS.
-+
-+As with the perf method described above, a Coresight sink needs to be identify
-+before trace collection can commence.  Using the sysFS method _only_, there is
-+no limit on the amount of sinks (nor sources) that can be enabled at
-+any given moment.  As a generic operation, all devices pertaining to the sink
-+class will have an "enable_sink" entry in sysfs:
- 
- root:/sys/bus/coresight/devices# ls
- replicator  20030000.tpiu    2201c000.ptm  2203c000.etm  2203e000.etm
-@@ -246,7 +356,7 @@ The file cstrace.bin can be decompressed using "ptm2human", DS-5 or Trace32.
- 
- Following is a DS-5 output of an experimental loop that increments a variable up
- to a certain value.  The example is simple and yet provides a glimpse of the
--wealth of possibilities that coresight provides.
-+wealth of possibilities that Coresight provides.
- 
- Info                                    Tracing enabled
- Instruction     106378866       0x8026B53C      E52DE004        false   PUSH     {lr}
+ enum itrace_period_type {
 -- 
 2.1.4
