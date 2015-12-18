@@ -1,61 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 18 Dec 2015 14:19:54 +0100
-Subject: [PATCH] ARM: realview: select apropriate targets in defconfig
-Message-ID: <1450444794-18478-1-git-send-email-linus.walleij@linaro.org>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Fri, 18 Dec 2015 13:27:51 +0000
+Subject: arm64/efi handling of persistent memory
+In-Reply-To: <20151218115224.GE29219@leverpostej>
+References: <94D0CD8314A33A4D9D801C0FE68B40295BEBD864@G9W0745.americas.hpqcorp.net>
+ <20151218110651.GL25034@bivouac.eciton.net>
+ <20151218115224.GE29219@leverpostej>
+Message-ID: <20151218132751.GD2638@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After adding multiplatform support for the RealView, we need
-to add the apropriate targets to the defconfig so we get the
-full range of supported devices. This amends both the defconfig
-files for this.
+On Fri, 18 Dec, at 11:52:24AM, Mark Rutland wrote:
+> On Fri, Dec 18, 2015 at 11:06:51AM +0000, Leif Lindholm wrote:
+> > On Fri, Dec 18, 2015 at 01:33:25AM +0000, Elliott, Robert (Persistent Memory) wrote:
+> > > Similar to the questions about the arm64 efi boot stub
+> > > handing persistent memory, some of the arm64 kernel code 
+> > > looks fishy.
+> 
+> [...]
+> 
+> > > 2. is_reserve_region() treating EFI_PERSISTENT_MEMORY the same
+> > > as EFI_CONVENTIONAL_MEMORY looks wrong.
+> > 
+> > Yeah... That one was introduced by
+> > ad5fb870c486 ("e820, efi: add ACPI 6.0 persistent memory types")
+> > without any ACKs from ARM people :/
+> 
+> Do we need to do anythign to avoid his kind of thing in future? e.g. a
+> MAINTAINERS patch for the ARM EFI bits?
+> 
+> Or do we just need to pay attention to linux-efi?
 
-Cc: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/configs/realview-smp_defconfig | 6 ++++++
- arch/arm/configs/realview_defconfig     | 5 +++++
- 2 files changed, 11 insertions(+)
+It never hit linux-efi, and I wasn't Cc'd, which means the entries
+that do exist in MAINTAINERS were ignored anyway.
 
-diff --git a/arch/arm/configs/realview-smp_defconfig b/arch/arm/configs/realview-smp_defconfig
-index 1da5d9e48224..b10949545e76 100644
---- a/arch/arm/configs/realview-smp_defconfig
-+++ b/arch/arm/configs/realview-smp_defconfig
-@@ -9,9 +9,15 @@ CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
- # CONFIG_IOSCHED_CFQ is not set
- CONFIG_ARCH_REALVIEW=y
-+CONFIG_REALVIEW_DT=y
- CONFIG_MACH_REALVIEW_EB=y
-+CONFIG_REALVIEW_EB_A9MP=y
- CONFIG_REALVIEW_EB_ARM11MP=y
-+CONFIG_REALVIEW_EB_ARM11MP_REVB=y
- CONFIG_MACH_REALVIEW_PB11MP=y
-+CONFIG_MACH_REALVIEW_PB1176=y
-+CONFIG_MACH_REALVIEW_PBA8=y
-+CONFIG_MACH_REALVIEW_PBX=y
- CONFIG_SMP=y
- CONFIG_HOTPLUG_CPU=y
- CONFIG_AEABI=y
-diff --git a/arch/arm/configs/realview_defconfig b/arch/arm/configs/realview_defconfig
-index d02e9d911bb7..8ba19ea592cf 100644
---- a/arch/arm/configs/realview_defconfig
-+++ b/arch/arm/configs/realview_defconfig
-@@ -9,10 +9,15 @@ CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
- # CONFIG_IOSCHED_CFQ is not set
- CONFIG_ARCH_REALVIEW=y
-+CONFIG_REALVIEW_DT=y
- CONFIG_MACH_REALVIEW_EB=y
-+CONFIG_REALVIEW_EB_A9MP=y
- CONFIG_REALVIEW_EB_ARM11MP=y
-+CONFIG_REALVIEW_EB_ARM11MP_REVB=y
- CONFIG_MACH_REALVIEW_PB11MP=y
- CONFIG_MACH_REALVIEW_PB1176=y
-+CONFIG_MACH_REALVIEW_PBA8=y
-+CONFIG_MACH_REALVIEW_PBX=y
- CONFIG_AEABI=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
--- 
-2.4.3
+Because what would usually happens in that situation is that I would
+ask ARM people to chime in.
+
+It looks like all the NVDIMM changes came via Dan's nvdimm tree.
