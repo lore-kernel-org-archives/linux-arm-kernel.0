@@ -1,45 +1,44 @@
 From: jonmason@broadcom.com (Jon Mason)
-Date: Fri, 18 Dec 2015 16:37:54 -0500
-Subject: [PATCH 1/3] ARM: dts: bcm5301x: Add TWD WD Support to DT
-Message-ID: <1450474676-10210-1-git-send-email-jonmason@broadcom.com>
+Date: Fri, 18 Dec 2015 16:37:56 -0500
+Subject: [PATCH 3/3] arm: dts: bcm5301x: Add syscon based reboot in DT
+In-Reply-To: <1450474676-10210-1-git-send-email-jonmason@broadcom.com>
+References: <1450474676-10210-1-git-send-email-jonmason@broadcom.com>
+Message-ID: <1450474676-10210-3-git-send-email-jonmason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the ARM TWD Watchdog to the bcm5301x device tree.  The
-ARM TWD timer allocated the register space for the WDT, so this patch
-necessitated shrinking that.  Also, the GIC masks were added for these.
+Add the ability to reboot via a reset of the processor.  This is
+achieved via a write of 0x39 to the CRU Reset Register.  Unfortunately,
+this only resets the core and not the other IP blocks.  So if possible,
+other methods should be used on the individual boards.
 
 Signed-off-by: Jon Mason <jonmason@broadcom.com>
 ---
- arch/arm/boot/dts/bcm5301x.dtsi | 15 ++++++++++++---
- 1 file changed, 12 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/bcm5301x.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
 diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
-index 65a1309..c31fafe 100644
+index 553b2ec..2a482ec 100644
 --- a/arch/arm/boot/dts/bcm5301x.dtsi
 +++ b/arch/arm/boot/dts/bcm5301x.dtsi
-@@ -66,10 +66,19 @@
- 			clocks = <&periph_clk>;
- 		};
+@@ -246,6 +246,18 @@
+ 				     "sata2";
+ 	};
  
--		local-timer at 20600 {
-+		twd-timer at 20600 {
- 			compatible = "arm,cortex-a9-twd-timer";
--			reg = <0x20600 0x100>;
--			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
-+			reg = <0x20600 0x20>;
-+			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
-+						  IRQ_TYPE_LEVEL_HIGH)>;
-+			clocks = <&periph_clk>;
-+		};
++	cru: cru at 1800c184 {
++		compatible = "syscon";
++		reg = <0x1800c184 0xc>;
++	};
 +
-+		twd-watchdog at 20620 {
-+			compatible = "arm,cortex-a9-twd-wdt";
-+			reg = <0x20620 0x20>;
-+			interrupts = <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) |
-+						  IRQ_TYPE_LEVEL_HIGH)>;
- 			clocks = <&periph_clk>;
- 		};
- 
++	reboot at 1800c184 {
++		compatible ="syscon-reboot";
++		regmap = <&cru>;
++		offset = <0>;
++		mask = <0x39>;
++	};
++
+ 	nand: nand at 18028000 {
+ 		compatible = "brcm,nand-iproc", "brcm,brcmnand-v6.1", "brcm,brcmnand";
+ 		reg = <0x18028000 0x600>, <0x1811a408 0x600>, <0x18028f00 0x20>;
 -- 
 1.9.1
