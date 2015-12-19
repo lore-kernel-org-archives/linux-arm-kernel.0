@@ -1,23 +1,95 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 18 Dec 2015 22:17:46 -0600
-Subject: [PATCH v5 1/2] spi: dts: Add new device property to specifcy a
- wait time between word transmissions
-In-Reply-To: <1450352427-25350-2-git-send-email-mweseloh42@gmail.com>
-References: <1450352427-25350-1-git-send-email-mweseloh42@gmail.com>
- <1450352427-25350-2-git-send-email-mweseloh42@gmail.com>
-Message-ID: <20151219041746.GF14936@rob-hp-laptop>
+Date: Fri, 18 Dec 2015 22:17:55 -0600
+Subject: [RESEND PATCH v2 2/2] ASoC: atmel-classd: DT binding for PDMIC
+ driver
+In-Reply-To: <1450345800-21299-3-git-send-email-songjun.wu@atmel.com>
+References: <1450345800-21299-1-git-send-email-songjun.wu@atmel.com>
+ <1450345800-21299-3-git-send-email-songjun.wu@atmel.com>
+Message-ID: <20151219041755.GG14936@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 17, 2015 at 12:40:26PM +0100, Marcus Weseloh wrote:
-> Adds a new property "spi-word-wait-ns" to the spi-bus binding that allows
-> SPI slave devices to set a wait time between the transmission of words.
+On Thu, Dec 17, 2015 at 05:50:00PM +0800, Songjun Wu wrote:
+> DT binding documentation for this new ASoC driver.
 > 
-> Signed-off-by: Marcus Weseloh <mweseloh42@gmail.com>
+> Signed-off-by: Songjun Wu <songjun.wu@atmel.com>
 > ---
->  Documentation/devicetree/bindings/spi/spi-bus.txt | 2 ++
->  drivers/spi/spi.c                                 | 2 ++
->  include/linux/spi/spi.h                           | 2 ++
->  3 files changed, 6 insertions(+)
+> 
+> Changes in v2: None
+> 
+>  .../devicetree/bindings/sound/atmel-pdmic.txt      |   55 ++++++++++++++++++++
+>  1 file changed, 55 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/sound/atmel-pdmic.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/sound/atmel-pdmic.txt b/Documentation/devicetree/bindings/sound/atmel-pdmic.txt
+> new file mode 100644
+> index 0000000..e0875f1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/sound/atmel-pdmic.txt
+> @@ -0,0 +1,55 @@
+> +* Atmel PDMIC driver under ALSA SoC architecture
+> +
+> +Required properties:
+> +- compatible
+> +	Should be "atmel,sama5d2-pdmic".
+> +- reg
+> +	Should contain PDMIC registers location and length.
+> +- interrupts
+> +	Should contain the IRQ line for the PDMIC.
+> +- dmas
+> +	One DMA specifiers as described in atmel-dma.txt and dma.txt files.
+> +- dma-names
+> +	Must be "rx".
+> +- clock-names
+> +	Required elements:
+> +	- "pclk"	peripheral clock
+> +	- "gclk"	generated clock
+> +- clocks
+> +	Must contain an entry for each required entry in clock-names.
+> +	Please refer to clock-bindings.txt.
+> +- atmel,mic-min-freq
+> +	The minimal frequency that the micphone supports.
+> +- atmel,mic-max-freq
+> +	The maximal frequency that the micphone supports.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Please append units to these 2 (-hz).
+
+ 
+> +Optional properties:
+> +- pinctrl-names, pinctrl-0
+> +	Please refer to pinctrl-bindings.txt.
+> +- atmel,model
+> +	The user-visible name of this sound card.
+> +	The default value is "PDMIC".
+
+When and why would this be different than the default?
+
+"label" can be used here if this is really needed.
+
+> +- atmel,mic-offset
+> +	The offset that should be added.
+> +	The range is from -32768 to 32767.
+> +	The default value is 0.
+> +
+> +Example:
+> +	pdmic at f8018000 {
+> +				compatible = "atmel,sama5d2-pdmic";
+> +				reg = <0xf8018000 0x124>;
+> +				interrupts = <48 IRQ_TYPE_LEVEL_HIGH 7>;
+> +				dmas = <&dma0
+> +					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
+> +					| AT91_XDMAC_DT_PERID(50))>;
+> +				dma-names = "rx";
+> +				clocks = <&pdmic_clk>, <&pdmic_gclk>;
+> +				clock-names = "pclk", "gclk";
+> +
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pinctrl_pdmic_default>;
+> +				atmel,model = "PDMIC @ sama5d2_xplained";
+> +				atmel,mic-min-freq = <1000000>;
+> +				atmel,mic-max-freq = <3246000>;
+> +				atmel,mic-offset = <0x0>;
+> +	};
+> -- 
+> 1.7.9.5
+> 
