@@ -1,82 +1,67 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 18 Dec 2015 22:05:10 -0600
-Subject: [PATCH v3 1/3] ARM: sunxi: Introduce Allwinner for A83T support
-In-Reply-To: <1450445451-311-2-git-send-email-vishnupatekar0510@gmail.com>
-References: <1450445451-311-1-git-send-email-vishnupatekar0510@gmail.com>
- <1450445451-311-2-git-send-email-vishnupatekar0510@gmail.com>
-Message-ID: <20151219040252.GA4997@rob-hp-laptop>
+Date: Fri, 18 Dec 2015 22:15:52 -0600
+Subject: [RFC PATCH 2/5] doc: dt-binding: generic onboard USB device
+In-Reply-To: <1450431239-16439-3-git-send-email-peter.chen@freescale.com>
+References: <1450431239-16439-1-git-send-email-peter.chen@freescale.com>
+ <1450431239-16439-3-git-send-email-peter.chen@freescale.com>
+Message-ID: <20151219041552.GA14247@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 09:30:49PM +0800, Vishnu Patekar wrote:
-> Allwinner A83T is octa-core cortex-a7 based SoC.
-> It's clock control unit and prcm, pinmux are different from previous sun8i
-> series.
-> Its processor cores are arragned in two clusters 4 cores each,
-> similar to A80.
+On Fri, Dec 18, 2015 at 05:33:56PM +0800, Peter Chen wrote:
+> Add dt-binding documentation for generic onboard USB device.
+
+As has already been mentioned, please following the existing USB device 
+binding convention. We can debate whether the kernel driver is tied into 
+existing USB drivers or separate platform drivers, but the binding needs 
+to reflect the h/w.
+
+Rob
+
 > 
-> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
-
-Acked-by: Rob Herring <robh@kernel.org>
-
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
 > ---
->  Documentation/arm/sunxi/README                  | 1 -
->  Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
->  arch/arm/mach-sunxi/sunxi.c                     | 1 +
->  drivers/clk/sunxi/clk-sunxi.c                   | 6 ++++++
->  4 files changed, 8 insertions(+), 1 deletion(-)
+>  .../bindings/usb/generic-onboard-device.txt        | 31 ++++++++++++++++++++++
+>  1 file changed, 31 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/usb/generic-onboard-device.txt
 > 
-> diff --git a/Documentation/arm/sunxi/README b/Documentation/arm/sunxi/README
-> index 430d279..e5a115f 100644
-> --- a/Documentation/arm/sunxi/README
-> +++ b/Documentation/arm/sunxi/README
-> @@ -72,6 +72,5 @@ SunXi family
->  
->      * Octa ARM Cortex-A7 based SoCs
->        - Allwinner A83T
-> -        + Not Supported
->          + Datasheet
->            http://dl.linux-sunxi.org/A83T/A83T_datasheet_Revision_1.1.pdf
-> diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
-> index bb9b0faa..7e79fcc 100644
-> --- a/Documentation/devicetree/bindings/arm/sunxi.txt
-> +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
-> @@ -11,5 +11,6 @@ using one of the following compatible strings:
->    allwinner,sun7i-a20
->    allwinner,sun8i-a23
->    allwinner,sun8i-a33
-> +  allwinner,sun8i-a83t
->    allwinner,sun8i-h3
->    allwinner,sun9i-a80
-> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-> index c2be98f..3c15619 100644
-> --- a/arch/arm/mach-sunxi/sunxi.c
-> +++ b/arch/arm/mach-sunxi/sunxi.c
-> @@ -69,6 +69,7 @@ MACHINE_END
->  static const char * const sun8i_board_dt_compat[] = {
->  	"allwinner,sun8i-a23",
->  	"allwinner,sun8i-a33",
-> +	"allwinner,sun8i-a83t",
->  	"allwinner,sun8i-h3",
->  	NULL,
->  };
-> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> index 5ba2188..0d45253 100644
-> --- a/drivers/clk/sunxi/clk-sunxi.c
-> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> @@ -1219,6 +1219,12 @@ CLK_OF_DECLARE(sun8i_a23_clk_init, "allwinner,sun8i-a23", sun6i_init_clocks);
->  CLK_OF_DECLARE(sun8i_a33_clk_init, "allwinner,sun8i-a33", sun6i_init_clocks);
->  CLK_OF_DECLARE(sun8i_h3_clk_init, "allwinner,sun8i-h3", sun6i_init_clocks);
->  
-> +static void __init sun8i_a83t_init_clocks(struct device_node *node)
-> +{
-> +	sunxi_init_clocks(NULL, 0);
-> +}
-> +CLK_OF_DECLARE(sun8i_a83t_clk_init, "allwinner,sun8i-a83t", sun8i_a83t_init_clocks);
+> diff --git a/Documentation/devicetree/bindings/usb/generic-onboard-device.txt b/Documentation/devicetree/bindings/usb/generic-onboard-device.txt
+> new file mode 100644
+> index 0000000..cdb3014
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/usb/generic-onboard-device.txt
+> @@ -0,0 +1,31 @@
+> +Generic Onboard USB Device 
 > +
->  static void __init sun9i_init_clocks(struct device_node *node)
->  {
->  	sunxi_init_clocks(NULL, 0);
+> +The node should be located at USB host controller's node or
+> +any USB HUB's node.
+> +
+> +Required properties:
+> +- compatible: should be "generic-onboard-device"
+> +
+> +Optional properties:
+> +- clocks: the input clock for USB device.
+> +- clock-frequency: the frequency for device's clock.
+> +- reset-gpios: Should specify the GPIO for reset.
+> +- reset-duration-us: the duration for assert reset signal, the time unit
+> +  is microsecond.
+> +
+> +Example:
+> +
+> +&usbh1 {
+> +	vbus-supply = <&reg_usb_h1_vbus>;
+> +        status = "okay";
+> +
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +	hub: usb2415 at 01 {
+> +	       compatible = "generic-onboard-device";
+> +	       reg = <0x01>;
+> +	       clocks = <&clks IMX6QDL_CLK_CKO>;
+> +	       reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
+> +	       reset-duration-us = <10>;
+> +	};
+> +};
 > -- 
 > 1.9.1
 > 
