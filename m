@@ -1,65 +1,89 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Sat, 19 Dec 2015 18:13:42 +0100
-Subject: [PATCH V7 04/24] coresight: moving PM runtime operations to core
- framework
-In-Reply-To: <1450472361-426-5-git-send-email-mathieu.poirier@linaro.org>
-References: <1450472361-426-1-git-send-email-mathieu.poirier@linaro.org>
- <1450472361-426-5-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20151219171342.GA2437@debian>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Sat, 19 Dec 2015 18:16:33 +0100
+Subject: [PATCH v1 0/6] Support the rk3036 Kylin board
+In-Reply-To: <1450362112-8075-1-git-send-email-wxt@rock-chips.com>
+References: <1450362112-8075-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <9746732.gszC1tXaj9@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 01:59:00PM -0700, Mathieu Poirier wrote:
-> @@ -415,9 +418,13 @@ struct list_head *coresight_build_path(struct coresight_device *csdev)
->   */
->  void coresight_release_path(struct list_head *path)
->  {
-> +	struct coresight_device *csdev;
->  	struct coresight_node *nd, *next;
->  
->  	list_for_each_entry_safe(nd, next, path, link) {
-> +		csdev = nd->csdev;
-> +
-> +		pm_runtime_put_sync(csdev->dev.parent);
->  		list_del(&nd->link);
->  		kfree(nd);
->  	}
+Hi Caesar,
 
-This leads to the following splat:
+Am Donnerstag, 17. Dezember 2015, 22:21:46 schrieb Caesar Wang:
+> Kylin-board is based on RK3036 SOCs, add the initiation
+> version for working.
 
- BUG: sleeping function called from invalid context at /home/rabin/dev/linux/drivers/base/power/runtime.c:892
- in_atomic(): 1, irqs_disabled(): 128, pid: 763, name: perf
- 2 locks held by perf/763:
-  #0:  (&mm->mmap_sem){++++++}, at: [<c012e42c>] vm_munmap+0x2c/0x50
-  #1:  (&event->mmap_mutex){+.+.+.}, at: [<c008248c>] atomic_dec_and_mutex_lock+0x58/0x98
- irq event stamp: 63152
- hardirqs last  enabled at (63151): [<c04f7edc>] _raw_spin_unlock_irqrestore+0x30/0x5c
- hardirqs last disabled at (63152): [<c04f88e8>] __irq_svc+0x48/0x78
- softirqs last  enabled at (61242): [<c003a914>] __do_softirq+0x408/0x4fc
- softirqs last disabled at (61223): [<c003ad50>] irq_exit+0xcc/0x130
- CPU: 1 PID: 763 Comm: perf Not tainted 4.4.0-rc5-00224-ge461459-dirty #152
- Hardware name: Generic OMAP4 (Flattened Device Tree)
- [<c00184dc>] (unwind_backtrace) from [<c0014c74>] (show_stack+0x10/0x14)
- [<c0014c74>] (show_stack) from [<c025c834>] (dump_stack+0x90/0xb8)
- [<c025c834>] (dump_stack) from [<c02f026c>] (__pm_runtime_idle+0xa4/0xa8)
- [<c02f026c>] (__pm_runtime_idle) from [<c03e1a08>] (coresight_release_path+0x38/0x7c)
- [<c03e1a08>] (coresight_release_path) from [<c03e210c>] (free_event_data+0x84/0x9c)
- [<c03e210c>] (free_event_data) from [<c00f8be8>] (rb_irq_work+0x4c/0xcc)
- [<c00f8be8>] (rb_irq_work) from [<c00e8860>] (irq_work_run_list+0x7c/0xb4)
- [<c00e8860>] (irq_work_run_list) from [<c00e88b8>] (irq_work_run+0x20/0x34)
- [<c00e88b8>] (irq_work_run) from [<c0016dcc>] (handle_IPI+0x1cc/0x334)
- [<c0016dcc>] (handle_IPI) from [<c0009538>] (gic_handle_irq+0x84/0x88)
- [<c0009538>] (gic_handle_irq) from [<c04f88f8>] (__irq_svc+0x58/0x78)
- Exception stack(0xed865e98 to 0xed865ee0)
- 5e80:                                                       00000001 00000110
- 5ea0: 00000000 ee2f1080 20000113 c0784808 edbe4e1c b6ae5000 edb882f0 ed9b1e04
- 5ec0: edb88298 c075648c 00000002 ed865ee8 c008724c c04f7ee0 20000113 ffffffff
- [<c04f88f8>] (__irq_svc) from [<c04f7ee0>] (_raw_spin_unlock_irqrestore+0x34/0x5c)
- [<c04f7ee0>] (_raw_spin_unlock_irqrestore) from [<c00e8978>] (irq_work_queue+0xac/0xb4)
- [<c00e8978>] (irq_work_queue) from [<c00f5020>] (perf_mmap_close+0x370/0x3c8)
- [<c00f5020>] (perf_mmap_close) from [<c012c560>] (remove_vma+0x40/0x6c)
- [<c012c560>] (remove_vma) from [<c012e2b4>] (do_munmap+0x210/0x35c)
- [<c012e2b4>] (do_munmap) from [<c012e43c>] (vm_munmap+0x3c/0x50)
- [<c012e43c>] (vm_munmap) from [<c0010320>] (ret_fast_syscall+0x0/0x1c)
+I've applied:
+- patch1 (please include the "rockchip:" part in dts subjects)
+- patch3 (dito)
+- patch4 (after merging in patch6 and dropping the hdmi+lcdc parts)
 
-It should presumably be using pm_runtime_put() instead.
+Please resubmit the missing parts (audio + graphics) against my dts-branch [0]
+after the relevant maintainers have added the code-parts to their trees.
+
+
+Thanks
+Heiko
+
+[0] https://git.kernel.org/cgit/linux/kernel/git/mmind/linux-rockchip.git/log/?h=v4.5-armsoc/dts32
+
+> 
+> This series patches have the following decriptions:
+> 
+> PATCH[1/6]:
+> ARM: dts: fix the correct pinctrl control for rk3036
+> 
+> The pinctrl gpio pull up/down is incorrect since the rk3036 SoCs
+> can't set the status in the internal.
+> ---
+> 
+> PATCH[2/6]:
+> ARM: dts: add the lcdc and hdmi node for rk3036
+> 
+> Add the devices is related to display.
+> Based on the series patches of Mark Yao's
+> ---
+> 
+> PATCH[3/6]:
+> ARM: dts: add the sdio/sdmmc node for rk3036
+> 
+> Add the wifi/sd card work for kylin board.
+> ---
+> 
+> PATCH[4/6]:
+> ARM: dts: rockchip: add the kylin board for rk3036
+> 
+> Add the dts for kylin board.
+> ---
+> 
+> PATCH[5/6]:
+> ARM: dts: add the sound codec for kylin board
+> 
+> Make the codec rt5616 working on kylin board.
+> The realteak have been upstream for Mark Brown,
+> I guess need some days to review.
+> 
+> ---
+> 
+> PATCH[6/6]:
+> ARM: dts: add the sdio node for kylin board
+> 
+> Enable the sdio for kylin board.
+> ---
+> 
+> 
+> 
+> Caesar Wang (6):
+>   ARM: dts: fix the correct pinctrl control for rk3036
+>   ARM: dts: add the lcdc and hdmi node for rk3036
+>   ARM: dts: add the sdio/sdmmc node for rk3036
+>   ARM: dts: rockchip: add the kylin board for rk3036
+>   ARM: dts: add the sound codec for kylin board
+>   ARM: dts: add the sdio node for kylin board
+> 
+>  Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
+>  arch/arm/boot/dts/Makefile                         |   1 +
+>  arch/arm/boot/dts/rk3036-kylin.dts                 | 345
+> +++++++++++++++++++++ arch/arm/boot/dts/rk3036.dtsi                      |
+> 167 ++++++++-- 4 files changed, 498 insertions(+), 19 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/rk3036-kylin.dts
