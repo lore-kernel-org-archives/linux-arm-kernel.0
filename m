@@ -1,30 +1,176 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Sat, 19 Dec 2015 18:42:31 +0100
-Subject: [PATCH V7 00/24] Coresight integration with perf
-In-Reply-To: <1450472361-426-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1450472361-426-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20151219174231.GD2437@debian>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Sat, 19 Dec 2015 20:37:00 +0200
+Subject: [PATCH V10 7/7] dma: qcom_hidma: add support for object hierarchy
+In-Reply-To: <1450371684-23415-8-git-send-email-okaya@codeaurora.org>
+References: <1450371684-23415-1-git-send-email-okaya@codeaurora.org>
+ <1450371684-23415-8-git-send-email-okaya@codeaurora.org>
+Message-ID: <CAHp75Vd-ku1E4+BWGwtL06mO7EZHFmwCvwFiAhLUVwrJHNKD7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 01:58:56PM -0700, Mathieu Poirier wrote:
-> This patchset aims to integrate configuration and control of
-> the Coresight tracers with the perf sub-system.
-> 
-> The goal is to use PMUs to represent tracers and the auxiliary
-> buffer enhancement to collect processor traces.  As such a lot
-> of work is done to move the current Coresight sysFS oriented
-> configuration and control commands to perf's AUX API.
+On Thu, Dec 17, 2015 at 7:01 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+> In order to create a relationship model between the channels and the
+> management object, we are adding support for object hierarchy to the
+> drivers. This patch simplifies the userspace application development.
+> We will not have to traverse different firmware paths based on device
+> tree or ACPI baed kernels.
+>
+> No matter what flavor of kernel is used, objects will be represented as
+> platform devices.
+>
+> The new layout is as follows:
+>
+> hidmam_10: hidma-mgmt at 0x5A000000 {
+>         compatible = "qcom,hidma-mgmt-1.0";
+>         ...
+>
+>         hidma_10: hidma at 0x5a010000 {
+>                         compatible = "qcom,hidma-1.0";
+>                         ...
+>         }
+> }
+>
+> The hidma_mgmt_init detects each instance of the hidma-mgmt-1.0 objects
+> in device tree and calls into the channel driver to create platform devices
+> for each child of the management object.
+>
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 
-These patches allow the trace to be recorded with perf, but what do you
-use to actually get something useful out of the resulting perf.data?
-AFAICS it can't be processed by perf script or the other perf tools.
 
-# echo 1 > /sys/bus/coresight/devices/54162000.etb/enable_sink
+> +What:          /sys/devices/platform/hidma-*/chid
+> +               /sys/devices/platform/QCOM8061:*/chid
+> +Date:          Dec 2015
+> +KernelVersion: 4.4
+> +Contact:       "Sinan Kaya <okaya@cudeaurora.org>"
+> +Description:
+> +               Contains the ID of the channel within the HIDMA instance.
+> +               It is used to associate a given HIDMA channel with the
+> +               priority and weight calls in the management interface.
 
-# perf record -e cs_etm// true 
-[ perf record: Woken up 1 times to write data ]
-[ perf record: Captured and wrote 0.032 MB perf.data ]
+> -module_platform_driver(hidma_mgmt_driver);
+> +#ifdef CONFIG_OF
+> +static int object_counter;
+> +
+> +static int __init hidma_mgmt_of_populate_channels(struct device_node *np)
+> +{
+> +       struct platform_device *pdev_parent = of_find_device_by_node(np);
+> +       struct platform_device_info pdevinfo;
+> +       struct of_phandle_args out_irq;
+> +       struct device_node *child;
+> +       struct resource *res;
+> +       const __be32 *cell;
 
-# perf script
-0x188 [0x80]: failed to process type: 70
+Always BE ?
+
+> +       int ret = 0, size, i, num;
+> +       u64 addr, addr_size;
+
+resource_size_t
+
+> +
+> +       for_each_available_child_of_node(np, child) {
+> +               int iter = 0;
+> +
+> +               cell = of_get_property(child, "reg", &size);
+> +               if (!cell) {
+> +                       ret = -EINVAL;
+> +                       goto out;
+> +               }
+> +
+> +               size /= (sizeof(*cell));
+
+Redundant parens. I think it might be good to use common sense for
+operator precedence, here is a radical example of ignoring it. And
+this is not the first case.
+
+> +               num = size /
+> +                       (of_n_addr_cells(child) + of_n_size_cells(child)) + 1;
+> +
+> +               /* allocate a resource array */
+> +               res = kcalloc(num, sizeof(*res), GFP_KERNEL);
+> +               if (!res) {
+> +                       ret = -ENOMEM;
+> +                       goto out;
+> +               }
+> +
+> +               /* read each reg value */
+> +               i = 0;
+> +               while (i < size) {
+> +                       addr = of_read_number(&cell[i],
+> +                                             of_n_addr_cells(child));
+> +                       i += of_n_addr_cells(child);
+> +
+> +                       addr_size = of_read_number(&cell[i],
+> +                                                  of_n_size_cells(child));
+> +                       i += of_n_size_cells(child);
+> +
+> +                       res[iter].start = addr;
+> +                       res[iter].end = res[iter].start + addr_size - 1;
+> +                       res[iter].flags = IORESOURCE_MEM;
+
+res->start = ?
+?
+res++;
+
+> +                       iter++;
+> +               }
+> +
+> +               ret = of_irq_parse_one(child, 0, &out_irq);
+> +               if (ret)
+> +                       goto out;
+> +
+> +               res[iter].start = irq_create_of_mapping(&out_irq);
+> +               res[iter].name = "hidma event irq";
+> +               res[iter].flags = IORESOURCE_IRQ;
+
+Ditto.
+
+> +
+> +               pdevinfo.fwnode = &child->fwnode;
+> +               pdevinfo.parent = pdev_parent ? &pdev_parent->dev : NULL;
+> +               pdevinfo.name = child->name;
+> +               pdevinfo.id = object_counter++;
+> +               pdevinfo.res = res;
+> +               pdevinfo.num_res = num;
+> +               pdevinfo.data = NULL;
+> +               pdevinfo.size_data = 0;
+> +               pdevinfo.dma_mask = DMA_BIT_MASK(64);
+> +               platform_device_register_full(&pdevinfo);
+> +
+> +               kfree(res);
+> +               res = NULL;
+> +       }
+> +out:
+
+> +       kfree(res);
+
+
+> +
+> +       return ret;
+> +}
+> +#endif
+> +
+> +static int __init hidma_mgmt_init(void)
+> +{
+> +#ifdef CONFIG_OF
+> +       struct device_node *child;
+> +
+> +       for (child = of_find_matching_node(NULL, hidma_mgmt_match); child;
+> +            child = of_find_matching_node(child, hidma_mgmt_match)) {
+> +               /* device tree based firmware here */
+> +               hidma_mgmt_of_populate_channels(child);
+> +               of_node_put(child);
+> +       }
+
+And why this is can't be done in probe of parent node driver?
+
+> +#endif
+> +       platform_driver_register(&hidma_mgmt_driver);
+> +
+> +       return 0;
+> +}
+> +module_init(hidma_mgmt_init);
+
+-- 
+With Best Regards,
+Andy Shevchenko
