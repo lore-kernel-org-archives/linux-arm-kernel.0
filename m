@@ -1,24 +1,43 @@
-From: m.silentcreek@gmail.com (m.silentcreek at gmail.com)
-Date: Sat, 19 Dec 2015 13:39:36 -0800 (PST)
-Subject: BUG - Bananapi USB not working on Mainline
-In-Reply-To: <ec8d762c-3e2b-4438-a43e-ae2740f8a5f3@googlegroups.com>
-References: <CAOP4N=_Ux0FPSRep7AfBVovd59LeDTbBjH=LBdfWDb6Mc3e=Fg@mail.gmail.com>
- <ec8d762c-3e2b-4438-a43e-ae2740f8a5f3@googlegroups.com>
-Message-ID: <ed63cc0b-fb90-4947-ab4c-b89655538a1a@googlegroups.com>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Sat, 19 Dec 2015 22:19:33 +0100
+Subject: [PATCH] nvmem: delete unneeded IS_ERR test
+Message-ID: <1450559973-9067-1-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+devm_kzalloc returns NULL rather than an ERR_PTR value.
 
-Am Samstag, 19. Dezember 2015 20:38:08 UTC+1 schrieb Hans de Goede:
-> The sunxi usb-phy driver now requires extcon (due to the added otg support), maybe the defconfig is not enabling extcon and thereby you are not getting the sunxi usb-phy driver build, or not build-in at least ?
-> 
-> Can you edit .config after the make defconfig and see what the value for CONFIG_PHY_SUN4I_USB is ?
+The semantic match that finds this problem is as follows:
+(http://coccinelle.lip6.fr/)
 
-I found the solution! The problem is CONFIG_AXP20X_POWER which was introduced in 4.4-rc1 but defaults to no and not set in sunxi_defconfig. Adding CONFIG_AXP20X_POWER=y to sunxi_defconfig solves that and get's my USB devices working again on linux 4.4-rc5. I actually brought that up on IRC once, but at that time nobody seemed to know so I forgot it again.
+// <smpl>
+@@
+expression x,e;
+@@
 
-Anyway, wouldn't it be a better to just have it automatically be selected when e.g. CONFIG_PHY_SUN4I_USB or something else that depends on it is enabled?
+* x = devm_kzalloc(...)
+... when != x = e
+* IS_ERR(x)
+// </smpl>
 
-Regards,
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-Timo
+---
+ drivers/nvmem/rockchip-efuse.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
+index f552134..811c73c 100644
+--- a/drivers/nvmem/rockchip-efuse.c
++++ b/drivers/nvmem/rockchip-efuse.c
+@@ -136,8 +136,8 @@ static int rockchip_efuse_probe(struct platform_device *pdev)
+ 
+ 	context = devm_kzalloc(dev, sizeof(struct rockchip_efuse_context),
+ 			       GFP_KERNEL);
+-	if (IS_ERR(context))
+-		return PTR_ERR(context);
++	if (!context)
++		return -ENOMEM;
+ 
+ 	clk = devm_clk_get(dev, "pclk_efuse");
+ 	if (IS_ERR(clk))
