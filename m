@@ -1,8 +1,8 @@
 From: xerofoify@gmail.com (Nicholas Krause)
-Date: Sat, 19 Dec 2015 14:42:05 -0500
+Date: Sat, 19 Dec 2015 14:43:07 -0500
 Subject: [PATCH] mpt3sas:Fix missing error checks for calls to
  _transport_phy_reset in mpt3sas_transport.c
-Message-ID: <1450554125-14756-1-git-send-email-xerofoify@gmail.com>
+Message-ID: <1450554187-14812-1-git-send-email-xerofoify@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
