@@ -1,24 +1,29 @@
-From: prem.mallappa@broadcom.com (Prem (Premachandra) Mallappa)
-Date: Sat, 19 Dec 2015 04:47:30 +0000
-Subject: [PATCH v2 1/2] IOMMU: arm-smmu-v3: Fix broken STE.VALID check
- in Broadcom Vulcan
-In-Reply-To: <20151217114216.GB11456@arm.com>
-References: <1450346376-30920-1-git-send-email-pmallapp@broadcom.com>
- <20151217114216.GB11456@arm.com>
-Message-ID: <CC0BC9CB4553B146B290EC1D4DC5C35901096047@SJEXCHMB15.corp.ad.broadcom.com>
+From: davem@davemloft.net (David Miller)
+Date: Sat, 19 Dec 2015 00:10:58 -0500 (EST)
+Subject: [PATCH] netcp: fix regression in receive processing
+In-Reply-To: <1651314.QiL8XMyoqS@wuerfel>
+References: <1651314.QiL8XMyoqS@wuerfel>
+Message-ID: <20151219.001058.862320196789855068.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will, 
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Fri, 18 Dec 2015 15:18:08 +0100
 
+> A cleanup patch I did was unfortunately wrong and introduced
+> multiple serious bugs in the netcp rx processing, as indicated
+> by these correct gcc warnings:
 > 
-> Is this workaround only needed for bypass STEs? If not, we have a problem
-> when we install a stage-1 entry, because we'll clear the EATS bits as it stands.
->
+> drivers/net/ethernet/ti/netcp_core.c:776:14: warning: 'buf_ptr' may be used uninitialized in this function [-Wuninitialized]
+> drivers/net/ethernet/ti/netcp_core.c:687:14: warning: 'ptr' may be used uninitialized in this function [-Wuninitialized]
+> 
+> I have checked the patch once more and found that a call to
+> get_pkt_info() accidentally got removed in netcp_free_rx_desc_chain,
+> and netcp_process_one_rx_packet no longer retrieved the correct
+> buffer length. This patch should fix all the known problems,
+> but I did not test on real hardware.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 899077791403 ("netcp: try to reduce type confusion in descriptors")
 
-Yes, this _was_ needed only in Bypass STEs, AFAIK.
-However, the h/w fixes that were committed recently has this worked out. 
-I have tested and confirmed this patch is no longer necessary. We'll drop this series as STE.VALID is not broken anymore :).
-
-Cheers,
-/Prem
+Applied.
