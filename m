@@ -1,43 +1,64 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Sat, 19 Dec 2015 22:19:33 +0100
-Subject: [PATCH] nvmem: delete unneeded IS_ERR test
-Message-ID: <1450559973-9067-1-git-send-email-Julia.Lawall@lip6.fr>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sun, 20 Dec 2015 00:12:27 +0100
+Subject: [PATCH v4 1/2] serial: rewrite pxa2xx-uart to use 8250_core
+In-Reply-To: <1450555955.15911.14.camel@gmail.com> (Sergei Ianovich's message
+ of "Sat, 19 Dec 2015 23:12:35 +0300")
+References: <1387309071-22382-1-git-send-email-ynvich@gmail.com>
+ <1449700088-28076-1-git-send-email-ynvich@gmail.com>
+ <1449700088-28076-2-git-send-email-ynvich@gmail.com>
+ <8737uyhaji.fsf@belgarion.home> <87y4cqfu2j.fsf@belgarion.home>
+ <1450550792.15911.5.camel@gmail.com> <87twnefd67.fsf@belgarion.home>
+ <1450555955.15911.14.camel@gmail.com>
+Message-ID: <87poy2f2xw.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-devm_kzalloc returns NULL rather than an ERR_PTR value.
+Sergei Ianovich <ynvich@gmail.com> writes:
 
-The semantic match that finds this problem is as follows:
-(http://coccinelle.lip6.fr/)
+> On Sat, 2015-12-19 at 20:31 +0100, Robert Jarzmik wrote:
+>> Sergei Ianovich <ynvich@gmail.com> writes:
+>> Thanks for spotting this. This is caused by a change in the latest
+>> > version of the patch (SERIAL_8250_PXA instead of SERIAL_PXA). This
+>> > change could be reverted.
+>> Actually I'm against the revert.
+>> The name change looks very good to me, please keep it.
+>
+> Is it worth adding an error if CONFIG_SERIAL_PXA is defined?
+I don't think so.
 
-// <smpl>
-@@
-expression x,e;
-@@
+> Or is there any other way of preventing this patch launching Linus' "flag
+> days" as Russel King named it?
+I must think about it, and test a bit more.
+Ah and a small hint : if you include back Russell in the conversation, don't
+forget the double "ll" if you wish him to answer.
 
-* x = devm_kzalloc(...)
-... when != x = e
-* IS_ERR(x)
-// </smpl>
+> I understand that people are afraid of taking this patch. If it starts
+> causing troubles at runtime, it will be difficult to diagnose. There
+> will be no console for most people. So it is probably good idea to fail
+> at boot time.
+Who are "the people" ? If it's about something already written in a mailing
+list, please point me to it so that it can help me think about it.
 
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+>> > > But that can be handled in an subsequent patch to keep your acks
+>> > > and
+>> > > reviews.
+>> > I will respin the patch. Please comment on the acks and reviews.
+>> > They
+>> > were made at an earlier version of the patch. That version no longer
+>> > applies. Can the updated version carry on the flags?
+>> I don't get you. If you mean keeping CONFIG_SERIAL_8250_PXA, then yes,
+>> please
+>> keep it.
+>
+> I mean should the patch be re-revied and re-acked?
+Well it depends on what was since then. If it's a trivial commit message fix or
+a typo, I don't think it's necessary. If it's the algorithm, the code logic, or
+even I think you should ask again.
 
----
- drivers/nvmem/rockchip-efuse.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+For a name change in CONFIG_SERIAL_PXA into CONFIG_SERIAL_8250_PXA (change from
+v3 to v4), I must admit I don't know. Maybe Kevin or Arnd might give a clue.
 
-diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
-index f552134..811c73c 100644
---- a/drivers/nvmem/rockchip-efuse.c
-+++ b/drivers/nvmem/rockchip-efuse.c
-@@ -136,8 +136,8 @@ static int rockchip_efuse_probe(struct platform_device *pdev)
- 
- 	context = devm_kzalloc(dev, sizeof(struct rockchip_efuse_context),
- 			       GFP_KERNEL);
--	if (IS_ERR(context))
--		return PTR_ERR(context);
-+	if (!context)
-+		return -ENOMEM;
- 
- 	clk = devm_clk_get(dev, "pclk_efuse");
- 	if (IS_ERR(clk))
+Cheers.
+
+-- 
+Robert
