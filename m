@@ -1,176 +1,53 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Sat, 19 Dec 2015 20:37:00 +0200
-Subject: [PATCH V10 7/7] dma: qcom_hidma: add support for object hierarchy
-In-Reply-To: <1450371684-23415-8-git-send-email-okaya@codeaurora.org>
-References: <1450371684-23415-1-git-send-email-okaya@codeaurora.org>
- <1450371684-23415-8-git-send-email-okaya@codeaurora.org>
-Message-ID: <CAHp75Vd-ku1E4+BWGwtL06mO7EZHFmwCvwFiAhLUVwrJHNKD7w@mail.gmail.com>
+From: ynvich@gmail.com (Sergei Ianovich)
+Date: Sat, 19 Dec 2015 21:46:32 +0300
+Subject: [PATCH v4 1/2] serial: rewrite pxa2xx-uart to use 8250_core
+In-Reply-To: <87y4cqfu2j.fsf@belgarion.home>
+References: <1387309071-22382-1-git-send-email-ynvich@gmail.com>
+ <1449700088-28076-1-git-send-email-ynvich@gmail.com>
+ <1449700088-28076-2-git-send-email-ynvich@gmail.com>
+ <8737uyhaji.fsf@belgarion.home> <87y4cqfu2j.fsf@belgarion.home>
+Message-ID: <1450550792.15911.5.camel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 17, 2015 at 7:01 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
-> In order to create a relationship model between the channels and the
-> management object, we are adding support for object hierarchy to the
-> drivers. This patch simplifies the userspace application development.
-> We will not have to traverse different firmware paths based on device
-> tree or ACPI baed kernels.
->
-> No matter what flavor of kernel is used, objects will be represented as
-> platform devices.
->
-> The new layout is as follows:
->
-> hidmam_10: hidma-mgmt at 0x5A000000 {
->         compatible = "qcom,hidma-mgmt-1.0";
->         ...
->
->         hidma_10: hidma at 0x5a010000 {
->                         compatible = "qcom,hidma-1.0";
->                         ...
->         }
-> }
->
-> The hidma_mgmt_init detects each instance of the hidma-mgmt-1.0 objects
-> in device tree and calls into the channel driver to create platform devices
-> for each child of the management object.
->
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+On Sat, 2015-12-19 at 14:26 +0100, Robert Jarzmik wrote:
+> Robert Jarzmik <robert.jarzmik@free.fr> writes:
+> 
+> > Sergei Ianovich <ynvich@gmail.com> writes:
+> > 
+> > > pxa2xx-uart was a separate uart platform driver. It was declaring
+> > > the same device names and numbers as 8250 driver. As a result,
+> > > it was impossible to use 8250 driver on PXA SoCs.
+> > > 
+> > > Upon closer examination pxa2xx-uart turned out to be a clone of
+> > > 8250_core driver.
+> > > 
+> > > Workaround for Erratum #19 according to Marvel(R) PXA270M
+> > > Processor
+> > > Specification Update (April 19, 2010) is dropped. 8250_core reads
+> > > from FIFO immediately after checking DR bit in LSR.
+> > > 
+> > > Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
+> > > Reviewed-by: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+> > > Reviewed-by: James Cameron <quozl@laptop.org>
+> > > Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> 
+> Shrunk the list, the following is rather mach-pxa specific.
+> 
+> Actually there is a small glitch ...
+> Have a look at arch/arm/mach-pxa/viper.c, line 490:
+> 	#ifndef CONFIG_SERIAL_PXA
+> 	...
 
+Thanks for spotting this. This is caused by a change in the latest
+version of the patch (SERIAL_8250_PXA instead of SERIAL_PXA). This
+change could be reverted.
 
-> +What:          /sys/devices/platform/hidma-*/chid
-> +               /sys/devices/platform/QCOM8061:*/chid
-> +Date:          Dec 2015
-> +KernelVersion: 4.4
-> +Contact:       "Sinan Kaya <okaya@cudeaurora.org>"
-> +Description:
-> +               Contains the ID of the channel within the HIDMA instance.
-> +               It is used to associate a given HIDMA channel with the
-> +               priority and weight calls in the management interface.
+> But that can be handled in an subsequent patch to keep your acks and
+> reviews.
+> 
 
-> -module_platform_driver(hidma_mgmt_driver);
-> +#ifdef CONFIG_OF
-> +static int object_counter;
-> +
-> +static int __init hidma_mgmt_of_populate_channels(struct device_node *np)
-> +{
-> +       struct platform_device *pdev_parent = of_find_device_by_node(np);
-> +       struct platform_device_info pdevinfo;
-> +       struct of_phandle_args out_irq;
-> +       struct device_node *child;
-> +       struct resource *res;
-> +       const __be32 *cell;
-
-Always BE ?
-
-> +       int ret = 0, size, i, num;
-> +       u64 addr, addr_size;
-
-resource_size_t
-
-> +
-> +       for_each_available_child_of_node(np, child) {
-> +               int iter = 0;
-> +
-> +               cell = of_get_property(child, "reg", &size);
-> +               if (!cell) {
-> +                       ret = -EINVAL;
-> +                       goto out;
-> +               }
-> +
-> +               size /= (sizeof(*cell));
-
-Redundant parens. I think it might be good to use common sense for
-operator precedence, here is a radical example of ignoring it. And
-this is not the first case.
-
-> +               num = size /
-> +                       (of_n_addr_cells(child) + of_n_size_cells(child)) + 1;
-> +
-> +               /* allocate a resource array */
-> +               res = kcalloc(num, sizeof(*res), GFP_KERNEL);
-> +               if (!res) {
-> +                       ret = -ENOMEM;
-> +                       goto out;
-> +               }
-> +
-> +               /* read each reg value */
-> +               i = 0;
-> +               while (i < size) {
-> +                       addr = of_read_number(&cell[i],
-> +                                             of_n_addr_cells(child));
-> +                       i += of_n_addr_cells(child);
-> +
-> +                       addr_size = of_read_number(&cell[i],
-> +                                                  of_n_size_cells(child));
-> +                       i += of_n_size_cells(child);
-> +
-> +                       res[iter].start = addr;
-> +                       res[iter].end = res[iter].start + addr_size - 1;
-> +                       res[iter].flags = IORESOURCE_MEM;
-
-res->start = ?
-?
-res++;
-
-> +                       iter++;
-> +               }
-> +
-> +               ret = of_irq_parse_one(child, 0, &out_irq);
-> +               if (ret)
-> +                       goto out;
-> +
-> +               res[iter].start = irq_create_of_mapping(&out_irq);
-> +               res[iter].name = "hidma event irq";
-> +               res[iter].flags = IORESOURCE_IRQ;
-
-Ditto.
-
-> +
-> +               pdevinfo.fwnode = &child->fwnode;
-> +               pdevinfo.parent = pdev_parent ? &pdev_parent->dev : NULL;
-> +               pdevinfo.name = child->name;
-> +               pdevinfo.id = object_counter++;
-> +               pdevinfo.res = res;
-> +               pdevinfo.num_res = num;
-> +               pdevinfo.data = NULL;
-> +               pdevinfo.size_data = 0;
-> +               pdevinfo.dma_mask = DMA_BIT_MASK(64);
-> +               platform_device_register_full(&pdevinfo);
-> +
-> +               kfree(res);
-> +               res = NULL;
-> +       }
-> +out:
-
-> +       kfree(res);
-
-
-> +
-> +       return ret;
-> +}
-> +#endif
-> +
-> +static int __init hidma_mgmt_init(void)
-> +{
-> +#ifdef CONFIG_OF
-> +       struct device_node *child;
-> +
-> +       for (child = of_find_matching_node(NULL, hidma_mgmt_match); child;
-> +            child = of_find_matching_node(child, hidma_mgmt_match)) {
-> +               /* device tree based firmware here */
-> +               hidma_mgmt_of_populate_channels(child);
-> +               of_node_put(child);
-> +       }
-
-And why this is can't be done in probe of parent node driver?
-
-> +#endif
-> +       platform_driver_register(&hidma_mgmt_driver);
-> +
-> +       return 0;
-> +}
-> +module_init(hidma_mgmt_init);
-
--- 
-With Best Regards,
-Andy Shevchenko
+I will respin the patch. Please comment on the acks and reviews. They
+were made at an earlier version of the patch. That version no longer
+applies. Can the updated version carry on the flags?
