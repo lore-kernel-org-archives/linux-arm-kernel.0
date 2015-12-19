@@ -1,137 +1,269 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 19 Dec 2015 11:55:11 +0100
-Subject: [linux-sunxi] Re: [PATCH v2 1/3] reset: Add shared
- reset_control_[de]assert variants
-In-Reply-To: <20151218110810.GK30359@lukather>
-References: <1449848520-27379-1-git-send-email-hdegoede@redhat.com>
- <20151214093607.GF19456@lukather> <1450086655.3407.23.camel@pengutronix.de>
- <20151216102934.GR19456@lukather> <1450264908.3421.36.camel@pengutronix.de>
- <20151218110810.GK30359@lukather>
-Message-ID: <5675378F.5010904@redhat.com>
+Date: Sat, 19 Dec 2015 11:57:03 +0100
+Subject: [linux-sunxi] Re: [PATCH v3 2/3] ARM: dts: sun8i: Add Allwinner
+ A83T dtsi
+In-Reply-To: <20151218214112.GU30359@lukather>
+References: <1450445451-311-1-git-send-email-vishnupatekar0510@gmail.com>
+ <1450445451-311-3-git-send-email-vishnupatekar0510@gmail.com>
+ <20151218214112.GU30359@lukather>
+Message-ID: <567537FF.9010601@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 18-12-15 12:08, Maxime Ripard wrote:
-> On Wed, Dec 16, 2015 at 12:21:48PM +0100, Philipp Zabel wrote:
->> Hi Maxime,
+On 18-12-15 22:41, Maxime Ripard wrote:
+> Hi,
+>
+> On Fri, Dec 18, 2015 at 09:30:50PM +0800, Vishnu Patekar wrote:
+>> Allwinner A83T is new octa-core cortex-a7 SOC.
+>> This adds the basic dtsi, the clocks differs from
+>> earlier sun8i SOCs.
 >>
->> Am Mittwoch, den 16.12.2015, 11:29 +0100 schrieb Maxime Ripard:
->>> On Mon, Dec 14, 2015 at 10:50:55AM +0100, Philipp Zabel wrote:
->>>> Am Montag, den 14.12.2015, 10:36 +0100 schrieb Maxime Ripard:
->>>>> Hi,
->>>>>
->>>>> On Fri, Dec 11, 2015 at 04:41:58PM +0100, Hans de Goede wrote:
->>>>>> diff --git a/include/linux/reset.h b/include/linux/reset.h
->>>>>> index c4c097d..1cca8ce 100644
->>>>>> --- a/include/linux/reset.h
->>>>>> +++ b/include/linux/reset.h
->>>>>> @@ -11,6 +11,8 @@ int reset_control_reset(struct reset_control *rstc);
->>>>>>   int reset_control_assert(struct reset_control *rstc);
->>>>>>   int reset_control_deassert(struct reset_control *rstc);
->>>>>>   int reset_control_status(struct reset_control *rstc);
->>>>>> +int reset_control_assert_shared(struct reset_control *rstc);
->>>>>> +int reset_control_deassert_shared(struct reset_control *rstc);
->>>>>
->>>>> Shouldn't that be handled in reset_control_get directly?
+>> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
+>> ---
+>>   arch/arm/boot/dts/sun8i-a83t.dtsi | 206 ++++++++++++++++++++++++++++++++++++++
+>>   1 file changed, 206 insertions(+)
+>>   create mode 100644 arch/arm/boot/dts/sun8i-a83t.dtsi
 >>
->> I think I see your point now. Maybe we should add a flags parameter to
->> reset_control_get and/or wrap it in two versions,
->> reset_control_get_exclusive and reset_control_get_shared (or just add
->> the _shared variant). Then reset_control_get(_exclusive) could return
->> -EBUSY if a reset line is already in use.
+>> diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+>> new file mode 100644
+>> index 0000000..e577c64
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+>> @@ -0,0 +1,206 @@
+>> +/*
+>> + * Copyright 2015 Vishnu Patekar
+>> + *
+>> + * Vishnu Patekar <vishnupatekar0510@gmail.com>
+>> + *
+>> + * This file is dual-licensed: you can use it either under the terms
+>> + * of the GPL or the X11 license, at your option. Note that this dual
+>> + * licensing only applies to this file, and not this project as a
+>> + * whole.
+>> + *
+>> + *  a) This file is free software; you can redistribute it and/or
+>> + *     modify it under the terms of the GNU General Public License as
+>> + *     published by the Free Software Foundation; either version 2 of the
+>> + *     License, or (at your option) any later version.
+>> + *
+>> + *     This file is distributed in the hope that it will be useful,
+>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + *     GNU General Public License for more details.
+>> + *
+>> + * Or, alternatively,
+>> + *
+>> + *  b) Permission is hereby granted, free of charge, to any person
+>> + *     obtaining a copy of this software and associated documentation
+>> + *     files (the "Software"), to deal in the Software without
+>> + *     restriction, including without limitation the rights to use,
+>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+>> + *     sell copies of the Software, and to permit persons to whom the
+>> + *     Software is furnished to do so, subject to the following
+>> + *     conditions:
+>> + *
+>> + *     The above copyright notice and this permission notice shall be
+>> + *     included in all copies or substantial portions of the Software.
+>> + *
+>> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>> + *     OTHER DEALINGS IN THE SOFTWARE.
+>> +
+>> + */
+>> +
+>> +#include "skeleton.dtsi"
+>> +
+>> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+>> +
+>> +#include <dt-bindings/pinctrl/sun4i-a10.h>
+>> +
+>> +/ {
+>> +	interrupt-parent = <&gic>;
+>> +
+>> +	chosen {
+>> +		#address-cells = <1>;
+>> +		#size-cells = <1>;
+>> +		ranges;
+>> +	};
+>> +
+>> +	cpus {
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +
+>> +		cpu at 0 {
+>> +			compatible = "arm,cortex-a7";
+>> +			device_type = "cpu";
+>> +			reg = <0>;
+>> +		};
+>> +
+>> +		cpu at 1 {
+>> +			compatible = "arm,cortex-a7";
+>> +			device_type = "cpu";
+>> +			reg = <1>;
+>> +		};
+>> +
+>> +		cpu at 2 {
+>> +			compatible = "arm,cortex-a7";
+>> +			device_type = "cpu";
+>> +			reg = <2>;
+>> +		};
+>> +
+>> +		cpu at 3 {
+>> +			compatible = "arm,cortex-a7";
+>> +			device_type = "cpu";
+>> +			reg = <3>;
+>> +		};
 >
-> I guess the current assumption was that reset_control_get was
-> exclusive.
+> A \n here please
 >
-> So we could have something like:
+>> +		cpu at 100 {
+>> +			compatible = "arm,cortex-a7";
+>> +			device_type = "cpu";
+>> +			reg = <0x100>;
+>> +		};
+>> +
+>> +		cpu at 101 {
+>> +			compatible = "arm,cortex-a7";
+>> +			device_type = "cpu";
+>> +			reg = <0x101>;
+>> +		};
 >
-> reset_control_get (..) {
->    return __reset_control_get(.., 0);
-> }
+> Ditto.
 >
-> reset_control_get_shared (..) {
->    return __reset_control_get(.., RESET_SHARED);
-> }
+>> +		cpu at 102 {
+>> +			compatible = "arm,cortex-a7";
+>> +			device_type = "cpu";
+>> +			reg = <0x102>;
+>> +		};
+>> +
+>> +		cpu at 103 {
+>> +			compatible = "arm,cortex-a7";
+>> +			device_type = "cpu";
+>> +			reg = <0x103>;
+>> +		};
+>> +	};
+>> +
+>> +	memory {
+>> +		reg = <0x40000000 0x80000000>;
+>> +	};
 >
-> And all the logic shared between the two, without exposing any flag
-> (that would change the prototype and require to fix every callers).
->
->>
->>>> This is about different expectations of the caller.
->>>> A driver calling reset_control_assert expects the reset line to be
->>>> asserted after the call.
->>>
->>> Is that behaviour documented explicitly somewhere?
->>
->> /**
->>   * reset_control_assert - asserts the reset line
->>   * @rstc: reset controller
->>   */
->
-> Yeah, but it's not said when it would happen, or if it happens
-> synchronously.
->
->> Also, that expected behavior matches the function name, which I like.
->> So I still welcome adding new API calls for the shared/refcounting
->> variant.
->>
->>>> A driver calling reset_control_assert_shared
->>>> just signals that it doesn't care about the state of the reset line
->>>> anymore.
->>>> We could just as well call the two new functions
->>>> reset_control_deassert_get and reset_control_deassert_put.
->>>
->>> What happens if you mix them? What happens if you have several drivers
->>> ignoring this API?
->>
->> The core should give useful error messages and disallow non-shared reset
->> calls on shared lines.
->
-> I guess we could also have something like this:
->
->    * The driver gets the reference to the reset line using
->      reset_control_get or its shared variant.
->
->      - If you call reset_control_get on a free line, it succeeds, and
->        marks the line in exclusive use.
->      - If you call reset_control_get on a busy line, it fails with
->        EBUSY
->
->      - If you call the shared variant on a free line, it succeeds
->      - If you call the shared variant on a busy exclusive line, it
->        fails with EBUSY
->      - If you call the shared variant on a busy !exclusive line, it
->        succeeds.
->
->    * The customer driver can then call reset_control_assert / deassert:
->
->      - If the reset line is in exclusive use, the assertion happens
->        right away, it succeeds and returns 0.
->
->      - If the reset line is in a !exclusive use, but with a single
->        user, the assertion happens right away, it succeeds and returns
->        0.
+> Is mainline u-boot usable ? If so, you can remove that node entirely.
 
-Ack for all of the above, this is what I had in mind at first, but I started
-with a more lightweight version as I'm lazy :)  If Philipp likes this
-suggestion I can rework my patch-set into this.
-
->      - If the reset line is in a !exclusive use with more than 1 user,
->        the refcount is modified and an error is returned to notify that
->        it didn't happen.
-
-Also ack, except for returning the error, if a driver has used
-reset_control_get_shared, it should simply be aware that doing an assert
-might not necessarily actually assert the line, just like doing a clk-disable
-does not really necessary disable the clock, etc. If a driver is not prepared
-to deal with this, it should simply not use reset_control_get_shared.
-
-I see returning an error if the assert did not happen due to other users /
-deassert_count != 0 as inconsistent compared to how clks, regulators and phys
-handle this, these all simply return success in this case.
+mainline u-boot works for me when cold-booting from a sdcard, so I consider
+it usable :)
 
 Regards,
 
 Hans
+
+
+
+>
+>> +
+>> +	timer {
+>> +		compatible = "arm,armv7-timer";
+>> +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
+>> +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
+>> +			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
+>> +			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>;
+>> +	};
+>> +
+>> +	clocks {
+>> +		#address-cells = <1>;
+>> +		#size-cells = <1>;
+>> +		ranges;
+>> +
+>> +		osc24M: osc24M_clk {
+>> +			#clock-cells = <0>;
+>> +			compatible = "fixed-clock";
+>> +			clock-frequency = <24000000>;
+>> +			clock-output-names = "osc24M";
+>> +		};
+>> +
+>> +		osc32k: osc32k_clk {
+>> +			#clock-cells = <0>;
+>> +			compatible = "fixed-clock";
+>> +			clock-frequency = <32768>;
+>> +			clock-output-names = "osc32k";
+>> +		};
+>
+> Do you need to modify the clocks driver in your first commit then?
+>
+>> +	};
+>> +
+>> +	soc {
+>> +		compatible = "simple-bus";
+>> +		#address-cells = <1>;
+>> +		#size-cells = <1>;
+>> +		ranges;
+>> +
+>> +		gic: interrupt-controller at 01c81000 {
+>> +			compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
+>> +			reg = <0x01c81000 0x1000>,
+>> +			      <0x01c82000 0x1000>,
+>> +			      <0x01c84000 0x2000>,
+>> +			      <0x01c86000 0x2000>;
+>
+> Please order the nodes by ascending physical addresses.
+>
+>> +			interrupt-controller;
+>> +			#interrupt-cells = <3>;
+>> +			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_HIGH)>;
+>> +		};
+>> +
+>> +		pio: pinctrl at 01c20800 {
+>> +			compatible = "allwinner,sun8i-a83t-pinctrl";
+>> +			interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
+>> +				     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>,
+>> +				     <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
+>> +			reg = <0x01c20800 0x400>;
+>> +			clocks = <&osc24M>;
+>> +			gpio-controller;
+>> +			interrupt-controller;
+>> +			#interrupt-cells = <3>;
+>> +			#gpio-cells = <3>;
+>> +
+>> +			mmc0_pins_a: mmc0 at 0 {
+>> +				allwinner,pins = "PF0", "PF1", "PF2",
+>> +						 "PF3", "PF4", "PF5";
+>> +				allwinner,function = "mmc0";
+>> +				allwinner,drive = <SUN4I_PINCTRL_30_MA>;
+>> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>> +			};
+>> +
+>> +			uart0_pins_a: uart0 at 0 {
+>> +				allwinner,pins = "PF2", "PF4";
+>> +				allwinner,function = "uart0";
+>> +				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>> +			};
+>> +
+>> +			uart0_pins_b: uart0 at 1 {
+>> +				allwinner,pins = "PB9", "PB10";
+>> +				allwinner,function = "uart0";
+>> +				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>> +			};
+>> +		};
+>> +
+>> +		uart0: serial at 01c28000 {
+>> +			compatible = "snps,dw-apb-uart";
+>> +			reg = <0x01c28000 0x400>;
+>> +			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
+>> +			reg-shift = <2>;
+>> +			reg-io-width = <4>;
+>> +			clocks = <&osc24M>;
+>> +			status = "disabled";
+>> +		};
+>> +	};
+>> +};
+>
+> Thanks!
+> Maxime
+>
