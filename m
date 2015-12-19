@@ -1,20 +1,24 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 18 Dec 2015 22:17:21 -0600
-Subject: [PATCH V10 2/7] dma: hidma: Add Device Tree support
-In-Reply-To: <1450371684-23415-3-git-send-email-okaya@codeaurora.org>
-References: <1450371684-23415-1-git-send-email-okaya@codeaurora.org>
- <1450371684-23415-3-git-send-email-okaya@codeaurora.org>
-Message-ID: <20151219041721.GC14936@rob-hp-laptop>
+Date: Fri, 18 Dec 2015 22:17:41 -0600
+Subject: [PATCH v1 4/6] ARM: dts: rockchip: add the kylin board for rk3036
+In-Reply-To: <1450362112-8075-5-git-send-email-wxt@rock-chips.com>
+References: <1450362112-8075-1-git-send-email-wxt@rock-chips.com>
+ <1450362112-8075-5-git-send-email-wxt@rock-chips.com>
+Message-ID: <20151219041741.GE14936@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 17, 2015 at 12:01:17PM -0500, Sinan Kaya wrote:
-> Add documentation for the Qualcomm Technologies HIDMA driver.
+On Thu, Dec 17, 2015 at 10:21:50PM +0800, Caesar Wang wrote:
+> This patchset is the initiation version to try work
+> for kylin board.
 > 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 > ---
->  .../devicetree/bindings/dma/qcom_hidma_mgmt.txt    | 79 ++++++++++++++++++++++
->  1 file changed, 79 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
+> 
+>  Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
+>  arch/arm/boot/dts/Makefile                         |   1 +
+>  arch/arm/boot/dts/rk3036-kylin.dts                 | 298 +++++++++++++++++++++
+>  3 files changed, 303 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/rk3036-kylin.dts
 
 Acked-by: Rob Herring <robh@kernel.org>
