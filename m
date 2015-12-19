@@ -1,291 +1,79 @@
-From: dannym@scratchpost.org (Danny Milosavljevic)
-Date: Sat, 19 Dec 2015 03:59:36 +0100
-Subject: [linux-sunxi] [PATCH v7 2/2] sun4i-codec: Add FM, Line and Mic inputs
-In-Reply-To: <20151219034511.372575d3@dayas>
-References: <20151219034511.372575d3@dayas>
-Message-ID: <20151219035936.1880d07f@dayas>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Sat, 19 Dec 2015 04:01:24 +0100
+Subject: [PATCH v4 55/58] mtd: nand: add helpers to access ->priv
+In-Reply-To: <20151218221758.GQ10460@google.com>
+References: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1449734442-18672-56-git-send-email-boris.brezillon@free-electrons.com>
+ <20151218221758.GQ10460@google.com>
+Message-ID: <20151219040124.7ffe4274@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the second part, actually adding FM, Line and Mic inputs.
+Hi Brian,
 
-Signed-off-by: Danny Milosavljevic <dannym+a@scratchpost.org>
----
- b/sound/soc/sunxi/sun4i-codec.c |  182 +++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 178 insertions(+), 4 deletions(-)
+On Fri, 18 Dec 2015 14:17:58 -0800
+Brian Norris <computersforpeace@gmail.com> wrote:
 
-diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-index 6628e6e..9a9ad62 100644
---- a/sound/soc/sunxi/sun4i-codec.c
-+++ b/sound/soc/sunxi/sun4i-codec.c
-@@ -59,9 +59,20 @@
- #define SUN4I_CODEC_DAC_ACTL_DACAENR			(31)
- #define SUN4I_CODEC_DAC_ACTL_DACAENL			(30)
- #define SUN4I_CODEC_DAC_ACTL_MIXEN			(29)
-+#define SUN4I_CODEC_DAC_ACTL_LNG			(26)
-+#define SUN4I_CODEC_DAC_ACTL_FMG			(23)
-+#define SUN4I_CODEC_DAC_ACTL_MICG			(20)
-+#define SUN4I_CODEC_DAC_ACTL_LLNS			(19)
-+#define SUN4I_CODEC_DAC_ACTL_RLNS			(18)
-+#define SUN4I_CODEC_DAC_ACTL_LFMS			(17)
-+#define SUN4I_CODEC_DAC_ACTL_RFMS			(16)
- #define SUN4I_CODEC_DAC_ACTL_LDACLMIXS			(15)
- #define SUN4I_CODEC_DAC_ACTL_RDACRMIXS			(14)
- #define SUN4I_CODEC_DAC_ACTL_LDACRMIXS			(13)
-+#define SUN4I_CODEC_DAC_ACTL_MIC1LS			(12)
-+#define SUN4I_CODEC_DAC_ACTL_MIC1RS			(11)
-+#define SUN4I_CODEC_DAC_ACTL_MIC2LS			(10)
-+#define SUN4I_CODEC_DAC_ACTL_MIC2RS			(9)
- #define SUN4I_CODEC_DAC_ACTL_DACPAS			(8)
- #define SUN4I_CODEC_DAC_ACTL_MIXPAS			(7)
- #define SUN4I_CODEC_DAC_ACTL_PA_MUTE			(6)
-@@ -87,8 +98,11 @@
- #define SUN4I_CODEC_ADC_ACTL_PREG1EN			(29)
- #define SUN4I_CODEC_ADC_ACTL_PREG2EN			(28)
- #define SUN4I_CODEC_ADC_ACTL_VMICEN			(27)
--#define SUN4I_CODEC_ADC_ACTL_VADCG			(20)
-+#define SUN4I_CODEC_ADC_ACTL_PREG1_A10			(25)
-+#define SUN4I_CODEC_ADC_ACTL_PREG2_A10			(23)
-+#define SUN4I_CODEC_ADC_ACTL_ADCG			(20)
- #define SUN4I_CODEC_ADC_ACTL_ADCIS			(17)
-+#define SUN4I_CODEC_ADC_ACTL_LNRDF			(16)
- #define SUN4I_CODEC_ADC_ACTL_PA_EN			(4)
- #define SUN4I_CODEC_ADC_ACTL_DDE			(3)
- #define SUN4I_CODEC_ADC_DEBUG			(0x2c)
-@@ -100,6 +114,16 @@
- #define SUN7I_CODEC_AC_DAC_CAL			(0x38)
- #define SUN7I_CODEC_AC_MIC_PHONE_CAL		(0x3c)
- 
-+#define SUN7I_CODEC_AC_MIC_PHONE_CAL_PREG1      (29)
-+#define SUN7I_CODEC_AC_MIC_PHONE_CAL_PREG2      (26)
-+/* note: no idea where the output pins for the following are. */
-+#define SUN7I_CODEC_AC_MIC_PHONE_CAL_PHONEOUTG  (5)
-+#define SUN7I_CODEC_AC_MIC_PHONE_CAL_PHONEOUTEN (4)
-+#define SUN7I_CODEC_AC_MIC_PHONE_CAL_PHONEOUTS3 (3)
-+#define SUN7I_CODEC_AC_MIC_PHONE_CAL_PHONEOUTS2 (2)
-+#define SUN7I_CODEC_AC_MIC_PHONE_CAL_PHONEOUTS1 (1)
-+#define SUN7I_CODEC_AC_MIC_PHONE_CAL_PHONEOUTS0 (0)
-+
- struct sun4i_codec {
- 	struct device	*dev;
- 	struct regmap	*regmap;
-@@ -509,19 +533,102 @@ static const struct snd_kcontrol_new sun4i_codec_pa_mute =
- 			SUN4I_CODEC_DAC_ACTL_PA_MUTE, 1, 0);
- 
- static DECLARE_TLV_DB_SCALE(sun4i_codec_pa_volume_scale, -6300, 100, 1);
-+static DECLARE_TLV_DB_SCALE(sun4i_codec_linein_loopback_gain_scale,
-+			    -150,
-+			    150,
-+			    0);
-+static DECLARE_TLV_DB_SCALE(sun4i_codec_fmin_loopback_gain_scale,
-+			    -450,
-+			    150,
-+			    0);
-+static DECLARE_TLV_DB_SCALE(sun4i_codec_micin_loopback_gain_scale,
-+			    -450,
-+			    150,
-+			    0);
-+static DECLARE_TLV_DB_RANGE(sun4i_codec_micin_preamp_gain_scale_a10,
-+			    0, 0, TLV_DB_SCALE_ITEM(0, 0, 0),
-+			    1, 7, TLV_DB_SCALE_ITEM(3500, 300, 0));
-+static DECLARE_TLV_DB_SCALE(sun4i_codec_adc_gain_scale, -450, 150, 0);
-+/* Sources:
-+ *   A10 User Manual v1.5 20130820
-+ *   A20 User Manual v1.4 20150510
-+ */
-+static const char * const sun4i_codec_capture_source[] = {
-+	"Line-In",
-+	"FM",
-+	"Mic1",
-+	"Mic2",
-+	"Mic1,Mic2",
-+	"Mic1+Mic2",
-+	"Output Mixer",
-+	"Line-In,Mic1",
-+};
-+static SOC_ENUM_SINGLE_DECL(sun4i_codec_enum_capture_source,
-+			    SUN4I_CODEC_ADC_ACTL,
-+			    SUN4I_CODEC_ADC_ACTL_ADCIS,
-+			    sun4i_codec_capture_source);
-+
-+static const struct snd_kcontrol_new sun4i_codec_capture_source_controls =
-+	SOC_DAPM_ENUM("Route", sun4i_codec_enum_capture_source);
- 
- #define SUN4I_COMMON_CODEC_WIDGETS \
--	SOC_SINGLE_TLV("Power Amplifier Volume", SUN4I_CODEC_DAC_ACTL,\
--		       SUN4I_CODEC_DAC_ACTL_PA_VOL, 0x3F, 0,\
--		       sun4i_codec_pa_volume_scale)
-+	SOC_SINGLE_TLV("Power Amplifier Playback Volume", SUN4I_CODEC_DAC_ACTL,\
-+		       SUN4I_CODEC_DAC_ACTL_PA_VOL, 0x3F, 0, \
-+		       sun4i_codec_pa_volume_scale), \
-+	/* Line-In, FM, Mic1, Mic2 */ \
-+	SOC_SINGLE_TLV("Line-In Playback Volume", \
-+		       SUN4I_CODEC_DAC_ACTL, \
-+		       SUN4I_CODEC_DAC_ACTL_LNG, \
-+		       1, \
-+		       0, \
-+		       sun4i_codec_linein_loopback_gain_scale), \
-+	SOC_SINGLE_TLV("FM Playback Volume", \
-+		       SUN4I_CODEC_DAC_ACTL, \
-+		       SUN4I_CODEC_DAC_ACTL_FMG, \
-+		       3, \
-+		       0, \
-+		       sun4i_codec_fmin_loopback_gain_scale), \
-+	SOC_SINGLE_TLV("Mic Playback Volume", \
-+		       SUN4I_CODEC_DAC_ACTL, \
-+		       SUN4I_CODEC_DAC_ACTL_MICG, \
-+		       7, \
-+		       0, \
-+		       sun4i_codec_micin_loopback_gain_scale), \
-+	/* ADC */ \
-+	SOC_SINGLE_TLV("Capture Volume", \
-+		       SUN4I_CODEC_ADC_ACTL, \
-+		       SUN4I_CODEC_ADC_ACTL_ADCG, \
-+		       4, \
-+		       0, \
-+		       sun4i_codec_adc_gain_scale)
- 
- static const struct snd_kcontrol_new sun4i_codec_widgets_a10[] = {
- 	SUN4I_COMMON_CODEC_WIDGETS,
-+	SOC_SINGLE_TLV("Mic1 Capture Volume",
-+		       SUN4I_CODEC_ADC_ACTL,
-+		       SUN4I_CODEC_ADC_ACTL_PREG1_A10,
-+		       3,
-+		       0,
-+		       sun4i_codec_micin_preamp_gain_scale_a10),
-+	SOC_SINGLE_TLV("Mic2 Capture Volume",
-+		       SUN4I_CODEC_ADC_ACTL,
-+		       SUN4I_CODEC_ADC_ACTL_PREG2_A10,
-+		       3,
-+		       0,
-+		       sun4i_codec_micin_preamp_gain_scale_a10),
- };
- 
- static const struct snd_kcontrol_new sun4i_codec_left_mixer_controls[] = {
- 	SOC_DAPM_SINGLE("Left DAC Playback Switch", SUN4I_CODEC_DAC_ACTL,
- 			SUN4I_CODEC_DAC_ACTL_LDACLMIXS, 1, 0),
-+	SOC_DAPM_SINGLE("Left Line-In Playback Switch", SUN4I_CODEC_DAC_ACTL,
-+			SUN4I_CODEC_DAC_ACTL_LLNS, 1, 0),
-+	SOC_DAPM_SINGLE("Left FM Playback Switch", SUN4I_CODEC_DAC_ACTL,
-+			SUN4I_CODEC_DAC_ACTL_LFMS, 1, 0),
-+	SOC_DAPM_SINGLE("Mic1 Playback Switch", SUN4I_CODEC_DAC_ACTL,
-+			SUN4I_CODEC_DAC_ACTL_MIC1LS, 1, 0),
-+	SOC_DAPM_SINGLE("Mic2 Playback Switch", SUN4I_CODEC_DAC_ACTL,
-+			SUN4I_CODEC_DAC_ACTL_MIC2LS, 1, 0),
- };
- 
- static const struct snd_kcontrol_new sun4i_codec_right_mixer_controls[] = {
-@@ -529,6 +636,14 @@ static const struct snd_kcontrol_new sun4i_codec_right_mixer_controls[] = {
- 			SUN4I_CODEC_DAC_ACTL_RDACRMIXS, 1, 0),
- 	SOC_DAPM_SINGLE("Left DAC Playback Switch", SUN4I_CODEC_DAC_ACTL,
- 			SUN4I_CODEC_DAC_ACTL_LDACRMIXS, 1, 0),
-+	SOC_DAPM_SINGLE("Right Line-In Playback Switch", SUN4I_CODEC_DAC_ACTL,
-+			SUN4I_CODEC_DAC_ACTL_RLNS, 1, 0),
-+	SOC_DAPM_SINGLE("Right FM Playback Switch", SUN4I_CODEC_DAC_ACTL,
-+			SUN4I_CODEC_DAC_ACTL_RFMS, 1, 0),
-+	SOC_DAPM_SINGLE("Mic1 Playback Switch", SUN4I_CODEC_DAC_ACTL,
-+			SUN4I_CODEC_DAC_ACTL_MIC1RS, 1, 0),
-+	SOC_DAPM_SINGLE("Mic2 Playback Switch", SUN4I_CODEC_DAC_ACTL,
-+			SUN4I_CODEC_DAC_ACTL_MIC2RS, 1, 0),
- };
- 
- static const struct snd_kcontrol_new sun4i_codec_pa_mixer_controls[] = {
-@@ -561,6 +676,10 @@ static const struct snd_soc_dapm_widget sun4i_codec_codec_dapm_widgets[] = {
- 	SND_SOC_DAPM_DAC("Right DAC", "Codec Playback", SUN4I_CODEC_DAC_ACTL,
- 			 SUN4I_CODEC_DAC_ACTL_DACAENR, 0),
- 
-+	/* MUX */
-+	SND_SOC_DAPM_MUX("Capture Source", SND_SOC_NOPM, 0, 0,
-+			 &sun4i_codec_capture_source_controls),
-+
- 	/* Mixers */
- 	SND_SOC_DAPM_MIXER("Left Mixer", SND_SOC_NOPM, 0, 0,
- 			   sun4i_codec_left_mixer_controls,
-@@ -580,6 +699,8 @@ static const struct snd_soc_dapm_widget sun4i_codec_codec_dapm_widgets[] = {
- 	/* Mic Pre-Amplifiers */
- 	SND_SOC_DAPM_PGA("MIC1 Pre-Amplifier", SUN4I_CODEC_ADC_ACTL,
- 			 SUN4I_CODEC_ADC_ACTL_PREG1EN, 0, NULL, 0),
-+	SND_SOC_DAPM_PGA("MIC2 Pre-Amplifier", SUN4I_CODEC_ADC_ACTL,
-+			 SUN4I_CODEC_ADC_ACTL_PREG2EN, 0, NULL, 0),
- 
- 	/* Power Amplifier */
- 	SND_SOC_DAPM_MIXER("Power Amplifier", SUN4I_CODEC_ADC_ACTL,
-@@ -590,9 +711,15 @@ static const struct snd_soc_dapm_widget sun4i_codec_codec_dapm_widgets[] = {
- 			    &sun4i_codec_pa_mute),
- 
- 	SND_SOC_DAPM_INPUT("Mic1"),
-+	SND_SOC_DAPM_INPUT("Mic2"),
- 
- 	SND_SOC_DAPM_OUTPUT("HP Right"),
- 	SND_SOC_DAPM_OUTPUT("HP Left"),
-+
-+	SND_SOC_DAPM_INPUT("Line-In Right"),
-+	SND_SOC_DAPM_INPUT("Line-In Left"),
-+	SND_SOC_DAPM_INPUT("FM Right"),
-+	SND_SOC_DAPM_INPUT("FM Left"),
- };
- 
- static const struct snd_soc_dapm_route sun4i_codec_codec_dapm_routes[] = {
-@@ -629,6 +756,36 @@ static const struct snd_soc_dapm_route sun4i_codec_codec_dapm_routes[] = {
- 	{ "Right ADC", NULL, "MIC1 Pre-Amplifier" },
- 	{ "MIC1 Pre-Amplifier", NULL, "Mic1"},
- 	{ "Mic1", NULL, "VMIC" },
-+	{ "Right Mixer", "Mic1 Playback Switch", "MIC1 Pre-Amplifier" },
-+	{ "Left Mixer", "Mic1 Playback Switch", "MIC1 Pre-Amplifier" },
-+
-+	/* Mic2 Routes */
-+	{ "Left ADC", NULL, "MIC2 Pre-Amplifier" },
-+	{ "Right ADC", NULL, "MIC2 Pre-Amplifier" },
-+	{ "MIC2 Pre-Amplifier", NULL, "Mic2"},
-+	{ "Mic2", NULL, "VMIC" },
-+	{ "Right Mixer", "Mic2 Playback Switch", "MIC2 Pre-Amplifier" },
-+	{ "Left Mixer", "Mic2 Playback Switch", "MIC2 Pre-Amplifier" },
-+
-+	/* Line-In, FM Routes */
-+	{ "Right Mixer", "Right Line-In Playback Switch", "Line-In Right" },
-+	{ "Left Mixer", "Left Line-In Playback Switch", "Line-In Left" },
-+	{ "Right Mixer", "Right FM Playback Switch", "FM Right" },
-+	{ "Left Mixer", "Left FM Playback Switch", "FM Left" },
-+
-+	/* ADC Capturing Sources */
-+	{"Capture Source", "Line-In", "Line-In"},
-+	{"Capture Source", "FM", "FM"},
-+	{"Capture Source", "Mic1", "MIC1 Pre-Amplifier"},
-+	{"Capture Source", "Mic2", "MIC2 Pre-Amplifier"},
-+	{"Capture Source", "Mic1,Mic2", "MIC1 Pre-Amplifier"},
-+	{"Capture Source", "Mic1,Mic2", "MIC2 Pre-Amplifier"},
-+	{"Capture Source", "Mic1+Mic2", "MIC1 Pre-Amplifier"},
-+	{"Capture Source", "Mic1+Mic2", "MIC2 Pre-Amplifier"},
-+	{"Capture Source", "Output Mixer", "Left Mixer"},
-+	{"Capture Source", "Output Mixer", "Right Mixer"},
-+	{"Capture Source", "Line-In,Mic1", "Line-In"},
-+	{"Capture Source", "Line-In,Mic1", "MIC1 Pre-Amplifier"},
- };
- 
- static struct snd_soc_codec_driver sun4i_codec_codec_a10 = {
-@@ -757,8 +914,25 @@ static struct snd_soc_card *sun4i_codec_create_card(struct device *dev)
- 	return card;
- };
- 
-+static DECLARE_TLV_DB_RANGE(sun7i_codec_micin_preamp_gain_scale,
-+	0, 0, TLV_DB_SCALE_ITEM(0, 0, 0),
-+	1, 7, TLV_DB_SCALE_ITEM(2400, 300, 0)
-+);
-+
- static const struct snd_kcontrol_new sun7i_codec_widgets[] = {
- 	SUN4I_COMMON_CODEC_WIDGETS,
-+	SOC_SINGLE_TLV("Mic1 Capture Volume",
-+		       SUN7I_CODEC_AC_MIC_PHONE_CAL,
-+		       SUN7I_CODEC_AC_MIC_PHONE_CAL_PREG1,
-+		       7,
-+		       0,
-+		       sun7i_codec_micin_preamp_gain_scale),
-+	SOC_SINGLE_TLV("Mic2 Capture Volume",
-+		       SUN7I_CODEC_AC_MIC_PHONE_CAL,
-+		       SUN7I_CODEC_AC_MIC_PHONE_CAL_PREG2,
-+		       7,
-+		       0,
-+		       sun7i_codec_micin_preamp_gain_scale),
- };
- 
- static struct snd_soc_codec_driver sun7i_codec_codec = {
+> Hi Boris,
+> 
+> On Thu, Dec 10, 2015 at 09:00:39AM +0100, Boris Brezillon wrote:
+> > Add two helpers to access the field reserved for private controller data.
+> > This makes it clearer what this field is reserved for and ease future
+> > refactoring.
+> 
+> I agree with the refactoring part, but I'm not sure about the name. Is
+> it really "controller" data? That sounds like something that has 1
+> instance per controller. But the way this is sometimes used, we get 1
+> instance per NAND chip, and there may be more than one NAND chip per
+> controller.
+> 
+> So at the moment, this is more like opaque "driver data", like
+> dev_{get,set}_drvdata(), which doesn't really have a prescribed use --
+> it's up to the driver.
+> 
+> Notably, we already have a (sort of) 1-per-controler-instance field:
+> struct nand_hw_control (I notice we have both the 'controller' and
+> 'hwcontrol' fields in nand_chip; that's pretty ugly too...).
+
+Will be addressed soon ;-).
+
+> Those don't
+> have private data fields, but we could of course extend that if we
+> really want "controller" data.
+
+Actually the nand_{get,set}_controller_data() helpers are not about
+assigning NAND controller private data (as you pointed those can
+already be retrieved thanks to the ->controller field using the
+container_of() trick), but per-chip private data instantiated by the
+NAND controller and attached to a specific chip. For example, some
+controllers pre-compute some register values or a clk rate to set when
+a specific chip is selected. This is what per-chip controller data is
+meant for.
+
+Now, the reason I explicitly specified the data usage instead of using
+a generic name like nand_{get,set}_data() is because I plan to define
+other helpers to allow NAND manufacturer code to manipulate its own
+private data. This is required if we want to support read-retry on some
+chips who are requiring a read OTP area step to retrieve some register
+values which will later be used to change from one read-retry mode to
+another.
+The plan was to define the nand_{set,get}_manufacturer_data() helpers,
+and create or reuse an existing priv field (mtd->priv?) to store this
+private data.
+
+Also note that the spi framework provides the same kind of helpers [1].
+
+This being said, I'm perfectly fine changing the function names, but
+I'd like to replace it by something explicitly telling the user that
+this field should only be set by NAND controller drivers. 
+
+[1]http://lxr.free-electrons.com/source/include/linux/spi/spi.h#L189
+
+Best Regards,
+
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
