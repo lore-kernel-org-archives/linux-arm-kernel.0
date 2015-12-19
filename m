@@ -1,29 +1,36 @@
-From: davem@davemloft.net (David Miller)
-Date: Sat, 19 Dec 2015 00:10:58 -0500 (EST)
-Subject: [PATCH] netcp: fix regression in receive processing
-In-Reply-To: <1651314.QiL8XMyoqS@wuerfel>
-References: <1651314.QiL8XMyoqS@wuerfel>
-Message-ID: <20151219.001058.862320196789855068.davem@davemloft.net>
+From: lkp@intel.com (kbuild test robot)
+Date: Sat, 19 Dec 2015 15:14:17 +0800
+Subject: [PATCH V10 7/7] dma: qcom_hidma: add support for object hierarchy
+In-Reply-To: <1450371684-23415-8-git-send-email-okaya@codeaurora.org>
+Message-ID: <201512191520.8X85HnZ5%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Fri, 18 Dec 2015 15:18:08 +0100
+Hi Sinan,
 
-> A cleanup patch I did was unfortunately wrong and introduced
-> multiple serious bugs in the netcp rx processing, as indicated
-> by these correct gcc warnings:
-> 
-> drivers/net/ethernet/ti/netcp_core.c:776:14: warning: 'buf_ptr' may be used uninitialized in this function [-Wuninitialized]
-> drivers/net/ethernet/ti/netcp_core.c:687:14: warning: 'ptr' may be used uninitialized in this function [-Wuninitialized]
-> 
-> I have checked the patch once more and found that a call to
-> get_pkt_info() accidentally got removed in netcp_free_rx_desc_chain,
-> and netcp_process_one_rx_packet no longer retrieved the correct
-> buffer length. This patch should fix all the known problems,
-> but I did not test on real hardware.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 899077791403 ("netcp: try to reduce type confusion in descriptors")
+[auto build test ERROR on v4.4-rc5]
+[also build test ERROR on next-20151218]
 
-Applied.
+url:    https://github.com/0day-ci/linux/commits/Sinan-Kaya/dma-add-Qualcomm-Technologies-HIDMA-driver/20151218-010637
+config: sparc-allyesconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=sparc 
+
+All errors (new ones prefixed by >>):
+
+   drivers/built-in.o: In function `hidma_mgmt_of_populate_channels':
+>> hidma_mgmt.c:(.init.text+0x5cc8): undefined reference to `of_irq_parse_one'
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 44406 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151219/cd75a00a/attachment-0001.obj>
