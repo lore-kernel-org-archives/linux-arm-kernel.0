@@ -1,35 +1,40 @@
 From: rabin@rab.in (Rabin Vincent)
-Date: Sat, 19 Dec 2015 18:23:14 +0100
-Subject: [PATCH V7 17/24] coresight: etb10: implementing AUX space API
-In-Reply-To: <1450472361-426-18-git-send-email-mathieu.poirier@linaro.org>
+Date: Sat, 19 Dec 2015 18:27:05 +0100
+Subject: [PATCH V7 24/24] perf tools: adding coresight etm PMU record
+ capabilities
+In-Reply-To: <1450472361-426-25-git-send-email-mathieu.poirier@linaro.org>
 References: <1450472361-426-1-git-send-email-mathieu.poirier@linaro.org>
- <1450472361-426-18-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20151219172314.GB2437@debian>
+ <1450472361-426-25-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <20151219172705.GC2437@debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 01:59:13PM -0700, Mathieu Poirier wrote:
-> +static void etb_update_buffer(struct coresight_device *csdev,
-> +			      struct perf_output_handle *handle,
-> +			      void *sink_config)
+On Fri, Dec 18, 2015 at 01:59:20PM -0700, Mathieu Poirier wrote:
+> +struct auxtrace_record
+> +*auxtrace_record__init(struct perf_evlist *evlist, int *err)
 > +{
-> +	int i, cur;
-> +	u32 *buf_ptr;
-
-...
-
-> +	for (i = 0; i < to_read; i += 4) {
-> +		buf_ptr = buf->data_pages[cur] + offset;
-> +		read_data = readl_relaxed(drvdata->base +
-> +					  ETB_RAM_READ_DATA_REG);
-> +		*buf_ptr++ = read_data >> 0;
-> +		*buf_ptr++ = read_data >> 8;
-> +		*buf_ptr++ = read_data >> 16;
-> +		*buf_ptr++ = read_data >> 24;
-
-buf_ptr should either be changed to a u8* or just the first write should
-be present.  Otherwise this overwrites lots of memory.
-
+> +	struct perf_pmu	*cs_etm_pmu;
+> +	struct perf_evsel *evsel;
+> +	bool found_etm = false;
 > +
-> +		offset += 4;
-> +		if (offset >= PAGE_SIZE) {
+> +	cs_etm_pmu = perf_pmu__find(CORESIGHT_ETM_PMU_NAME);
+> +
+> +	 if (evlist) {
+> +		evlist__for_each(evlist, evsel) {
+> +			if (cs_etm_pmu &&
+> +			    evsel->attr.type == cs_etm_pmu->type)
+> +				found_etm = true;
+> +		}
+> +	}
+> +
+> +	if (found_etm)
+> +		return cs_etm_record_init(err);
+> +
+> +	*err = -EINVAL;
+
+This should not set an error code when found_etm is false.  Otherwise
+any attempt to uses perf record without a cs_etm event enabled errors
+out.
+
+> +	return NULL;
+> +}
