@@ -1,40 +1,30 @@
 From: rabin@rab.in (Rabin Vincent)
-Date: Sat, 19 Dec 2015 18:27:05 +0100
-Subject: [PATCH V7 24/24] perf tools: adding coresight etm PMU record
- capabilities
-In-Reply-To: <1450472361-426-25-git-send-email-mathieu.poirier@linaro.org>
+Date: Sat, 19 Dec 2015 18:42:31 +0100
+Subject: [PATCH V7 00/24] Coresight integration with perf
+In-Reply-To: <1450472361-426-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1450472361-426-1-git-send-email-mathieu.poirier@linaro.org>
- <1450472361-426-25-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20151219172705.GC2437@debian>
+Message-ID: <20151219174231.GD2437@debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 01:59:20PM -0700, Mathieu Poirier wrote:
-> +struct auxtrace_record
-> +*auxtrace_record__init(struct perf_evlist *evlist, int *err)
-> +{
-> +	struct perf_pmu	*cs_etm_pmu;
-> +	struct perf_evsel *evsel;
-> +	bool found_etm = false;
-> +
-> +	cs_etm_pmu = perf_pmu__find(CORESIGHT_ETM_PMU_NAME);
-> +
-> +	 if (evlist) {
-> +		evlist__for_each(evlist, evsel) {
-> +			if (cs_etm_pmu &&
-> +			    evsel->attr.type == cs_etm_pmu->type)
-> +				found_etm = true;
-> +		}
-> +	}
-> +
-> +	if (found_etm)
-> +		return cs_etm_record_init(err);
-> +
-> +	*err = -EINVAL;
+On Fri, Dec 18, 2015 at 01:58:56PM -0700, Mathieu Poirier wrote:
+> This patchset aims to integrate configuration and control of
+> the Coresight tracers with the perf sub-system.
+> 
+> The goal is to use PMUs to represent tracers and the auxiliary
+> buffer enhancement to collect processor traces.  As such a lot
+> of work is done to move the current Coresight sysFS oriented
+> configuration and control commands to perf's AUX API.
 
-This should not set an error code when found_etm is false.  Otherwise
-any attempt to uses perf record without a cs_etm event enabled errors
-out.
+These patches allow the trace to be recorded with perf, but what do you
+use to actually get something useful out of the resulting perf.data?
+AFAICS it can't be processed by perf script or the other perf tools.
 
-> +	return NULL;
-> +}
+# echo 1 > /sys/bus/coresight/devices/54162000.etb/enable_sink
+
+# perf record -e cs_etm// true 
+[ perf record: Woken up 1 times to write data ]
+[ perf record: Captured and wrote 0.032 MB perf.data ]
+
+# perf script
+0x188 [0x80]: failed to process type: 70
