@@ -1,95 +1,42 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 18 Dec 2015 22:17:55 -0600
-Subject: [RESEND PATCH v2 2/2] ASoC: atmel-classd: DT binding for PDMIC
- driver
-In-Reply-To: <1450345800-21299-3-git-send-email-songjun.wu@atmel.com>
-References: <1450345800-21299-1-git-send-email-songjun.wu@atmel.com>
- <1450345800-21299-3-git-send-email-songjun.wu@atmel.com>
-Message-ID: <20151219041755.GG14936@rob-hp-laptop>
+From: apinski@cavium.com (Andrew Pinski)
+Date: Fri, 18 Dec 2015 20:17:35 -0800
+Subject: [PATCH] ARM64: Fix compiling with GCC 6 and Atomics enabled
+Message-ID: <1450498655-3820-1-git-send-email-apinski@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 17, 2015 at 05:50:00PM +0800, Songjun Wu wrote:
-> DT binding documentation for this new ASoC driver.
-> 
-> Signed-off-by: Songjun Wu <songjun.wu@atmel.com>
-> ---
-> 
-> Changes in v2: None
-> 
->  .../devicetree/bindings/sound/atmel-pdmic.txt      |   55 ++++++++++++++++++++
->  1 file changed, 55 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/sound/atmel-pdmic.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/sound/atmel-pdmic.txt b/Documentation/devicetree/bindings/sound/atmel-pdmic.txt
-> new file mode 100644
-> index 0000000..e0875f1
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/sound/atmel-pdmic.txt
-> @@ -0,0 +1,55 @@
-> +* Atmel PDMIC driver under ALSA SoC architecture
-> +
-> +Required properties:
-> +- compatible
-> +	Should be "atmel,sama5d2-pdmic".
-> +- reg
-> +	Should contain PDMIC registers location and length.
-> +- interrupts
-> +	Should contain the IRQ line for the PDMIC.
-> +- dmas
-> +	One DMA specifiers as described in atmel-dma.txt and dma.txt files.
-> +- dma-names
-> +	Must be "rx".
-> +- clock-names
-> +	Required elements:
-> +	- "pclk"	peripheral clock
-> +	- "gclk"	generated clock
-> +- clocks
-> +	Must contain an entry for each required entry in clock-names.
-> +	Please refer to clock-bindings.txt.
-> +- atmel,mic-min-freq
-> +	The minimal frequency that the micphone supports.
-> +- atmel,mic-max-freq
-> +	The maximal frequency that the micphone supports.
+The problem here is that GCC 6 and above emits .arch now
+for each function so now the global .arch_extension has
+no effect.  This fixes the problem by putting
+.arch_extension inside ARM64_LSE_ATOMIC_INSN so
+it is enabled for each place where LSE is used.
 
-Please append units to these 2 (-hz).
+Signed-off-by: Andrew Pinski <apinski@cavium.com>
+---
+ arch/arm64/include/asm/lse.h |    4 +---
+ 1 files changed, 1 insertions(+), 3 deletions(-)
 
+diff --git a/arch/arm64/include/asm/lse.h b/arch/arm64/include/asm/lse.h
+index 3de42d6..625601f 100644
+--- a/arch/arm64/include/asm/lse.h
++++ b/arch/arm64/include/asm/lse.h
+@@ -17,8 +17,6 @@
  
-> +Optional properties:
-> +- pinctrl-names, pinctrl-0
-> +	Please refer to pinctrl-bindings.txt.
-> +- atmel,model
-> +	The user-visible name of this sound card.
-> +	The default value is "PDMIC".
-
-When and why would this be different than the default?
-
-"label" can be used here if this is really needed.
-
-> +- atmel,mic-offset
-> +	The offset that should be added.
-> +	The range is from -32768 to 32767.
-> +	The default value is 0.
-> +
-> +Example:
-> +	pdmic at f8018000 {
-> +				compatible = "atmel,sama5d2-pdmic";
-> +				reg = <0xf8018000 0x124>;
-> +				interrupts = <48 IRQ_TYPE_LEVEL_HIGH 7>;
-> +				dmas = <&dma0
-> +					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
-> +					| AT91_XDMAC_DT_PERID(50))>;
-> +				dma-names = "rx";
-> +				clocks = <&pdmic_clk>, <&pdmic_gclk>;
-> +				clock-names = "pclk", "gclk";
-> +
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_pdmic_default>;
-> +				atmel,model = "PDMIC @ sama5d2_xplained";
-> +				atmel,mic-min-freq = <1000000>;
-> +				atmel,mic-max-freq = <3246000>;
-> +				atmel,mic-offset = <0x0>;
-> +	};
-> -- 
-> 1.7.9.5
-> 
+ #else	/* __ASSEMBLER__ */
+ 
+-__asm__(".arch_extension	lse");
+-
+ /* Move the ll/sc atomics out-of-line */
+ #define __LL_SC_INLINE
+ #define __LL_SC_PREFIX(x)	__ll_sc_##x
+@@ -29,7 +27,7 @@ __asm__(".arch_extension	lse");
+ 
+ /* In-line patching at runtime */
+ #define ARM64_LSE_ATOMIC_INSN(llsc, lse)				\
+-	ALTERNATIVE(llsc, lse, ARM64_HAS_LSE_ATOMICS)
++	ALTERNATIVE(".arch_extension        lse\n" llsc, lse, ARM64_HAS_LSE_ATOMICS)
+ 
+ #endif	/* __ASSEMBLER__ */
+ #else	/* CONFIG_AS_LSE && CONFIG_ARM64_LSE_ATOMICS */
+-- 
+1.7.2.5
