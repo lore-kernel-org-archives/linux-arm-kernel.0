@@ -1,47 +1,56 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 19 Dec 2015 14:26:28 +0100
-Subject: [PATCH v4 1/2] serial: rewrite pxa2xx-uart to use 8250_core
-In-Reply-To: <8737uyhaji.fsf@belgarion.home> (Robert Jarzmik's message of
- "Sat, 19 Dec 2015 13:45:21 +0100")
-References: <1387309071-22382-1-git-send-email-ynvich@gmail.com>
- <1449700088-28076-1-git-send-email-ynvich@gmail.com>
- <1449700088-28076-2-git-send-email-ynvich@gmail.com>
- <8737uyhaji.fsf@belgarion.home>
-Message-ID: <87y4cqfu2j.fsf@belgarion.home>
+From: codekipper@gmail.com (codekipper at gmail.com)
+Date: Sat, 19 Dec 2015 16:05:16 +0100
+Subject: [linux-sunxi][PATCH v2 0/5] ARM: dt: sunxi: Add Itead Ibox support
+Message-ID: <1450537521-6476-1-git-send-email-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Robert Jarzmik <robert.jarzmik@free.fr> writes:
+From: Marcus Cooper <codekipper@gmail.com>
 
-> Sergei Ianovich <ynvich@gmail.com> writes:
->
->> pxa2xx-uart was a separate uart platform driver. It was declaring
->> the same device names and numbers as 8250 driver. As a result,
->> it was impossible to use 8250 driver on PXA SoCs.
->>
->> Upon closer examination pxa2xx-uart turned out to be a clone of
->> 8250_core driver.
->>
->> Workaround for Erratum #19 according to Marvel(R) PXA270M Processor
->> Specification Update (April 19, 2010) is dropped. 8250_core reads
->> from FIFO immediately after checking DR bit in LSR.
->>
->> Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
->> Reviewed-by: Heikki Krogerus <heikki.krogerus@linux.intel.com>
->> Reviewed-by: James Cameron <quozl@laptop.org>
->> Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Hi All,
 
-Shrunk the list, the following is rather mach-pxa specific.
+this patch series is an extension of the initial patch delivery for the
+Itead Ibox as found here
+https://groups.google.com/d/msg/linux-sunxi/GR_co3ObW8s/0BTPQljmAAAJ.
 
-Actually there is a small glitch ...
-Have a look at arch/arm/mach-pxa/viper.c, line 490:
-	#ifndef CONFIG_SERIAL_PXA
-	...
+There seems to be a few Itead variants out there based on their A10/A20
+core module and this patch series attempts to organise the device tree
+files with some consideration that these variants may be added later.
 
-But that can be handled in an subsequent patch to keep your acks and reviews.
+I've also converted the A10 Itead Iteaduino dts to use these common files.
+As I don't have this board to verify the changes I simply compared the
+output of the fdtdump before and after applying these patches. The only
+difference was the addition of codec support and a reduction to the dcdc2
+max voltage.
 
-Cheers.
+BR,
+CK
+
+---
+Changes since v1:
+- Added audio codec.
+- Seperated into individual patches
+- added Itead A10 core dtsi
+- modified sun4i-a10-itead-iteaduino-plus.dts to use itead common core dtsi
+
+Marcus Cooper (5):
+  ARM: dts: sunxi: Add sunxi-itead-core-common.dtsi
+  ARM: dts: sun7i: Add Itead A20 Core support
+  ARM: dts: sun7i: Add Itead Ibox support
+  ARM: dts: sun4i: Add Itead A10 Core support
+  ARM: dts: sun4i: Itead Iteaduino to use common code
+
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/sun4i-a10-itead-core.dtsi        |  86 ++++++++++++++++
+ .../boot/dts/sun4i-a10-itead-iteaduino-plus.dts    | 102 +-----------------
+ arch/arm/boot/dts/sun7i-a20-itead-core.dtsi        |  87 ++++++++++++++++
+ arch/arm/boot/dts/sun7i-a20-itead-ibox.dts         | 111 ++++++++++++++++++++
+ arch/arm/boot/dts/sunxi-itead-core-common.dtsi     | 114 +++++++++++++++++++++
+ 6 files changed, 401 insertions(+), 100 deletions(-)
+ create mode 100644 arch/arm/boot/dts/sun4i-a10-itead-core.dtsi
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-itead-core.dtsi
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
+ create mode 100644 arch/arm/boot/dts/sunxi-itead-core-common.dtsi
 
 -- 
-Robert
+1.9.1
