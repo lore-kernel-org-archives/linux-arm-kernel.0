@@ -1,161 +1,38 @@
-From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Sat, 19 Dec 2015 16:05:21 +0100
-Subject: [linux-sunxi][PATCH v2 5/5] ARM: dts: sun4i: Itead Iteaduino to use
- common code
-In-Reply-To: <1450537521-6476-1-git-send-email-codekipper@gmail.com>
-References: <1450537521-6476-1-git-send-email-codekipper@gmail.com>
-Message-ID: <1450537521-6476-6-git-send-email-codekipper@gmail.com>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Sat, 19 Dec 2015 16:23:11 +0100
+Subject: [PATCH] [media] gsc-m2m: Use an unsigned data type for a variable
+Message-ID: <5675765F.9020002@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcus Cooper <codekipper@gmail.com>
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Sat, 19 Dec 2015 15:28:37 +0100
 
-Convert the Itead Iteaduino A10 to use the new common itead core dtsi.
+The data type "int" was used by the variable "ret" in the
+gsc_m2m_poll() function despite of the aspect that the type "unsigned int"
+will usually be needed for the return value from a call of the
+v4l2_m2m_poll() function.
+Improve this implementation detail by addition of the type modifier then.
 
-Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+This issue was detected by using the Coccinelle software.
+
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
 ---
- .../boot/dts/sun4i-a10-itead-iteaduino-plus.dts    | 102 +--------------------
- 1 file changed, 2 insertions(+), 100 deletions(-)
+ drivers/media/platform/exynos-gsc/gsc-m2m.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-itead-iteaduino-plus.dts b/arch/arm/boot/dts/sun4i-a10-itead-iteaduino-plus.dts
-index 985e155..86d7b7a 100644
---- a/arch/arm/boot/dts/sun4i-a10-itead-iteaduino-plus.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-itead-iteaduino-plus.dts
-@@ -1,5 +1,6 @@
- /*
-  * Copyright 2015 Josef Gajdusek <atx@atx.name>
-+ * Copyright 2015 - Marcus Cooper <codekipper@gmail.com>
-  *
-  * This file is dual-licensed: you can use it either under the terms
-  * of the GPL or the X11 license, at your option. Note that this dual
-@@ -41,40 +42,11 @@
-  */
+diff --git a/drivers/media/platform/exynos-gsc/gsc-m2m.c b/drivers/media/platform/exynos-gsc/gsc-m2m.c
+index d82e717..f2c091c 100644
+--- a/drivers/media/platform/exynos-gsc/gsc-m2m.c
++++ b/drivers/media/platform/exynos-gsc/gsc-m2m.c
+@@ -701,7 +701,7 @@ static unsigned int gsc_m2m_poll(struct file *file,
+ {
+ 	struct gsc_ctx *ctx = fh_to_ctx(file->private_data);
+ 	struct gsc_dev *gsc = ctx->gsc_dev;
+-	int ret;
++	unsigned int ret;
  
- /dts-v1/;
--#include "sun4i-a10.dtsi"
--#include "sunxi-common-regulators.dtsi"
--
--#include <dt-bindings/gpio/gpio.h>
--#include <dt-bindings/pinctrl/sun4i-a10.h>
-+#include "sun4i-a10-itead-core.dtsi"
- 
- / {
- 	model = "Iteaduino Plus A10";
- 	compatible = "itead,iteaduino-plus-a10", "allwinner,sun4i-a10";
--
--	aliases {
--		serial0 = &uart0;
--	};
--
--	chosen {
--		stdout-path = "serial0:115200n8";
--	};
--};
--
--&ahci {
--	target-supply = <&reg_ahci_5v>;
--	status = "okay";
--};
--
--&cpu0 {
--	cpu-supply = <&reg_dcdc2>;
--};
--
--&ehci0 {
--	status = "okay";
--};
--
--&ehci1 {
--	status = "okay";
- };
- 
- &emac {
-@@ -88,17 +60,6 @@
- 	status = "okay";
- };
- 
--&i2c0 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&i2c0_pins_a>;
--	status = "okay";
--
--	axp209: pmic at 34 {
--		reg = <0x34>;
--		interrupts = <0>;
--	};
--};
--
- &i2c1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c1_pins_a>;
-@@ -135,68 +96,9 @@
- 	status = "okay";
- };
- 
--&ohci0 {
--	status = "okay";
--};
--
--&ohci1 {
--	status = "okay";
--};
--
--&reg_ahci_5v {
--	status = "okay";
--};
--
--#include "axp209.dtsi"
--
--&reg_dcdc2 {
--	regulator-always-on;
--	regulator-min-microvolt = <1000000>;
--	regulator-max-microvolt = <1450000>;
--	regulator-name = "vdd-cpu";
--};
--
--&reg_dcdc3 {
--	regulator-always-on;
--	regulator-min-microvolt = <1000000>;
--	regulator-max-microvolt = <1400000>;
--	regulator-name = "vdd-int-dll";
--};
--
--&reg_ldo1 {
--	regulator-name = "vdd-rtc";
--};
--
--&reg_ldo2 {
--	regulator-always-on;
--	regulator-min-microvolt = <3000000>;
--	regulator-max-microvolt = <3000000>;
--	regulator-name = "avcc";
--};
--
--&reg_usb1_vbus {
--	status = "okay";
--};
--
--&reg_usb2_vbus {
--	status = "okay";
--};
--
- &spi0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&spi0_pins_a>,
- 		    <&spi0_cs0_pins_a>;
- 	status = "okay";
- };
--
--&uart0 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&uart0_pins_a>;
--	status = "okay";
--};
--
--&usbphy {
--	usb1_vbus-supply = <&reg_usb1_vbus>;
--	usb2_vbus-supply = <&reg_usb2_vbus>;
--	status = "okay";
--};
+ 	if (mutex_lock_interruptible(&gsc->lock))
+ 		return -ERESTARTSYS;
 -- 
-1.9.1
+2.6.3
