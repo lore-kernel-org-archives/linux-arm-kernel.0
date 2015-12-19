@@ -1,33 +1,41 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sat, 19 Dec 2015 11:30:55 +0000
-Subject: [RESEND PATCH v2 2/2] ASoC: atmel-classd: DT binding for PDMIC
- driver
-In-Reply-To: <20151219040913.D0F442C02FD@rob-hp-laptop>
-References: <1450345800-21299-1-git-send-email-songjun.wu@atmel.com>
- <1450345800-21299-3-git-send-email-songjun.wu@atmel.com>
- <20151219040913.D0F442C02FD@rob-hp-laptop>
-Message-ID: <20151219113055.GF5727@sirena.org.uk>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 19 Dec 2015 13:27:07 +0100
+Subject: [PATCH v5 2/2] arm: pxa27x: support for ICP DAS LP-8x4x w/ DT
+In-Reply-To: <1843454.zCnLJtF7B6@wuerfel> (Arnd Bergmann's message of "Tue, 15
+ Dec 2015 18:02:19 +0100")
+References: <1449700088-28076-3-git-send-email-ynvich@gmail.com>
+ <7496839.vMjVcqPe8Q@wuerfel> <1450197727.21989.9.camel@gmail.com>
+ <1843454.zCnLJtF7B6@wuerfel>
+Message-ID: <87h9jehbdw.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 01:56:21PM -0600, Rob Herring wrote:
-> On Thu, Dec 17, 2015 at 05:50:00PM +0800, Songjun Wu wrote:
+Arnd Bergmann <arnd@arndb.de> writes:
 
-> > +- atmel,model
-> > +	The user-visible name of this sound card.
-> > +	The default value is "PDMIC".
+> I would like those drivers to be enabled in some defconfig, so we get
+> compile-time coverage, but we generally stopped having one-config-per-board
+> files.
+>
+> Maybe we can have a pxa_defconfig file that enables lots of boards
+> and then we remove the individual configs? We don't have to remove
+> them all at once, but it would make me very happy if we could at
+> least kill off some of the ones that are not used regularly.
 
-> When and why would this be different than the default?
+I'll take that part, the pxa_defconfig which covers all pxa boards in
+arch/arm/mach-pxa. I have a prototype, which of course doesn't boot on any of my
+pxa platforms (breaks in the very early bootstrap code I think, DEBUG_LL is the
+next stage).
 
-> "label" can be used here if this is really needed.
+Actually I've not even looked if a single kernel covering pxa2xx and pxa3xx is
+possible (since recently clock handling was a blocker).
 
-The plastics for the system are often very important for audio
-configuration - we need userspace to be able to distinguish between
-systems that are identical even on the electrical level.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151219/0ab432ed/attachment.sig>
+Once I have something that at least shows me a sign of life, I'll submit an RFC
+patch. This work will be orthogonal to Sergei's one, as it is aimed at having
+one defconfig compiling all mach-pxa/*.c files and the drivers referenced by
+them. This won't allow removing defconfig files until I have a good idea why my
+boards are not booting (lubbock, mainstone, mioa701, zylonite, cm-x300).
+
+Cheers.
+
+-- 
+Robert
