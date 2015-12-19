@@ -1,41 +1,35 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 19 Dec 2015 13:27:07 +0100
-Subject: [PATCH v5 2/2] arm: pxa27x: support for ICP DAS LP-8x4x w/ DT
-In-Reply-To: <1843454.zCnLJtF7B6@wuerfel> (Arnd Bergmann's message of "Tue, 15
- Dec 2015 18:02:19 +0100")
-References: <1449700088-28076-3-git-send-email-ynvich@gmail.com>
- <7496839.vMjVcqPe8Q@wuerfel> <1450197727.21989.9.camel@gmail.com>
- <1843454.zCnLJtF7B6@wuerfel>
-Message-ID: <87h9jehbdw.fsf@belgarion.home>
+Date: Sat, 19 Dec 2015 13:45:21 +0100
+Subject: [PATCH v4 1/2] serial: rewrite pxa2xx-uart to use 8250_core
+References: <1387309071-22382-1-git-send-email-ynvich@gmail.com>
+ <1449700088-28076-1-git-send-email-ynvich@gmail.com>
+ <1449700088-28076-2-git-send-email-ynvich@gmail.com>
+Message-ID: <8737uyhaji.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+Sergei Ianovich <ynvich@gmail.com> writes:
 
-> I would like those drivers to be enabled in some defconfig, so we get
-> compile-time coverage, but we generally stopped having one-config-per-board
-> files.
+> pxa2xx-uart was a separate uart platform driver. It was declaring
+> the same device names and numbers as 8250 driver. As a result,
+> it was impossible to use 8250 driver on PXA SoCs.
 >
-> Maybe we can have a pxa_defconfig file that enables lots of boards
-> and then we remove the individual configs? We don't have to remove
-> them all at once, but it would make me very happy if we could at
-> least kill off some of the ones that are not used regularly.
+> Upon closer examination pxa2xx-uart turned out to be a clone of
+> 8250_core driver.
+>
+> Workaround for Erratum #19 according to Marvel(R) PXA270M Processor
+> Specification Update (April 19, 2010) is dropped. 8250_core reads
+> from FIFO immediately after checking DR bit in LSR.
+>
+> Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
+> Reviewed-by: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+> Reviewed-by: James Cameron <quozl@laptop.org>
+> Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
-I'll take that part, the pxa_defconfig which covers all pxa boards in
-arch/arm/mach-pxa. I have a prototype, which of course doesn't boot on any of my
-pxa platforms (breaks in the very early bootstrap code I think, DEBUG_LL is the
-next stage).
-
-Actually I've not even looked if a single kernel covering pxa2xx and pxa3xx is
-possible (since recently clock handling was a blocker).
-
-Once I have something that at least shows me a sign of life, I'll submit an RFC
-patch. This work will be orthogonal to Sergei's one, as it is aimed at having
-one defconfig compiling all mach-pxa/*.c files and the drivers referenced by
-them. This won't allow removing defconfig files until I have a good idea why my
-boards are not booting (lubbock, mainstone, mioa701, zylonite, cm-x300).
+I was wondering if this should go through pxa tree, or through serial tree ?
 
 Cheers.
 
--- 
+--
 Robert
