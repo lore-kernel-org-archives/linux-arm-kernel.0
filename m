@@ -1,42 +1,28 @@
-From: ynvich@gmail.com (Sergei Ianovich)
-Date: Sat, 19 Dec 2015 23:12:35 +0300
-Subject: [PATCH v4 1/2] serial: rewrite pxa2xx-uart to use 8250_core
-In-Reply-To: <87twnefd67.fsf@belgarion.home>
-References: <1387309071-22382-1-git-send-email-ynvich@gmail.com>
- <1449700088-28076-1-git-send-email-ynvich@gmail.com>
- <1449700088-28076-2-git-send-email-ynvich@gmail.com>
- <8737uyhaji.fsf@belgarion.home> <87y4cqfu2j.fsf@belgarion.home>
- <1450550792.15911.5.camel@gmail.com> <87twnefd67.fsf@belgarion.home>
-Message-ID: <1450555955.15911.14.camel@gmail.com>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Sat, 19 Dec 2015 23:42:22 +0300
+Subject: [PATCH] [media] gsc-m2m: Use an unsigned data type for a variable
+In-Reply-To: <5675765F.9020002@users.sourceforge.net>
+References: <5675765F.9020002@users.sourceforge.net>
+Message-ID: <20151219204222.GU5284@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2015-12-19 at 20:31 +0100, Robert Jarzmik wrote:
-> Sergei Ianovich <ynvich@gmail.com> writes:
-> Thanks for spotting this. This is caused by a change in the latest
-> > version of the patch (SERIAL_8250_PXA instead of SERIAL_PXA). This
-> > change could be reverted.
-> Actually I'm against the revert.
-> The name change looks very good to me, please keep it.
+On Sat, Dec 19, 2015 at 04:23:11PM +0100, SF Markus Elfring wrote:
+> diff --git a/drivers/media/platform/exynos-gsc/gsc-m2m.c b/drivers/media/platform/exynos-gsc/gsc-m2m.c
+> index d82e717..f2c091c 100644
+> --- a/drivers/media/platform/exynos-gsc/gsc-m2m.c
+> +++ b/drivers/media/platform/exynos-gsc/gsc-m2m.c
+> @@ -701,7 +701,7 @@ static unsigned int gsc_m2m_poll(struct file *file,
+>  {
+>  	struct gsc_ctx *ctx = fh_to_ctx(file->private_data);
+>  	struct gsc_dev *gsc = ctx->gsc_dev;
+> -	int ret;
+> +	unsigned int ret;
+>  
+>  	if (mutex_lock_interruptible(&gsc->lock))
+>  		return -ERESTARTSYS;
 
-Is it worth adding an error if CONFIG_SERIAL_PXA is defined? Or is there
-any other way of preventing this patch launching Linus' "flag days" as
-Russel King named it?
+I'm suspect returning -ERESTARTSYS is a bug.
 
-I understand that people are afraid of taking this patch. If it starts
-causing troubles at runtime, it will be difficult to diagnose. There
-will be no console for most people. So it is probably good idea to fail
-at boot time.
-
-> > > But that can be handled in an subsequent patch to keep your acks
-> > > and
-> > > reviews.
-> > I will respin the patch. Please comment on the acks and reviews.
-> > They
-> > were made at an earlier version of the patch. That version no longer
-> > applies. Can the updated version carry on the flags?
-> I don't get you. If you mean keeping CONFIG_SERIAL_8250_PXA, then yes,
-> please
-> keep it.
-
-I mean should the patch be re-revied and re-acked?
+regards,
+dan carpenter
