@@ -1,44 +1,42 @@
-From: xerofoify@gmail.com (Nicholas Krause)
-Date: Sat, 19 Dec 2015 14:43:07 -0500
-Subject: [PATCH] mpt3sas:Fix missing error checks for calls to
- _transport_phy_reset in mpt3sas_transport.c
-Message-ID: <1450554187-14812-1-git-send-email-xerofoify@gmail.com>
+From: ynvich@gmail.com (Sergei Ianovich)
+Date: Sat, 19 Dec 2015 23:12:35 +0300
+Subject: [PATCH v4 1/2] serial: rewrite pxa2xx-uart to use 8250_core
+In-Reply-To: <87twnefd67.fsf@belgarion.home>
+References: <1387309071-22382-1-git-send-email-ynvich@gmail.com>
+ <1449700088-28076-1-git-send-email-ynvich@gmail.com>
+ <1449700088-28076-2-git-send-email-ynvich@gmail.com>
+ <8737uyhaji.fsf@belgarion.home> <87y4cqfu2j.fsf@belgarion.home>
+ <1450550792.15911.5.camel@gmail.com> <87twnefd67.fsf@belgarion.home>
+Message-ID: <1450555955.15911.14.camel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the missing error checks and paths for functions that
-call _transport_phy_reset and do not correctly check that the
-call to this particular function has succeeded by returning zero
-in the file, mpt3sas_transport.c.
+On Sat, 2015-12-19 at 20:31 +0100, Robert Jarzmik wrote:
+> Sergei Ianovich <ynvich@gmail.com> writes:
+> Thanks for spotting this. This is caused by a change in the latest
+> > version of the patch (SERIAL_8250_PXA instead of SERIAL_PXA). This
+> > change could be reverted.
+> Actually I'm against the revert.
+> The name change looks very good to me, please keep it.
 
-Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
----
- drivers/scsi/mpt3sas/mpt3sas_transport.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+Is it worth adding an error if CONFIG_SERIAL_PXA is defined? Or is there
+any other way of preventing this patch launching Linus' "flag days" as
+Russel King named it?
 
-diff --git a/drivers/scsi/mpt3sas/mpt3sas_transport.c b/drivers/scsi/mpt3sas/mpt3sas_transport.c
-index ca36d7e..bff5a11 100644
---- a/drivers/scsi/mpt3sas/mpt3sas_transport.c
-+++ b/drivers/scsi/mpt3sas/mpt3sas_transport.c
-@@ -1766,7 +1766,7 @@ _transport_phy_enable(struct sas_phy *phy, int enable)
- 
- 	/* link reset */
- 	if (enable)
--		_transport_phy_reset(phy, 0);
-+		rc = _transport_phy_reset(phy, 0);
- 
-  out:
- 	kfree(sas_iounit_pg1);
-@@ -1870,7 +1870,9 @@ _transport_phy_speed(struct sas_phy *phy, struct sas_phy_linkrates *rates)
- 	}
- 
- 	/* link reset */
--	_transport_phy_reset(phy, 0);
-+	rc = _transport_phy_reset(phy, 0);
-+	if (rc)
-+		goto out;
- 
- 	/* read phy page 0, then update the rates in the sas transport phy */
- 	if (!mpt3sas_config_get_phy_pg0(ioc, &mpi_reply, &phy_pg0,
--- 
-2.5.0
+I understand that people are afraid of taking this patch. If it starts
+causing troubles at runtime, it will be difficult to diagnose. There
+will be no console for most people. So it is probably good idea to fail
+at boot time.
+
+> > > But that can be handled in an subsequent patch to keep your acks
+> > > and
+> > > reviews.
+> > I will respin the patch. Please comment on the acks and reviews.
+> > They
+> > were made at an earlier version of the patch. That version no longer
+> > applies. Can the updated version carry on the flags?
+> I don't get you. If you mean keeping CONFIG_SERIAL_8250_PXA, then yes,
+> please
+> keep it.
+
+I mean should the patch be re-revied and re-acked?
