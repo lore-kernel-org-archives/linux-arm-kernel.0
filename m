@@ -1,525 +1,146 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sat, 19 Dec 2015 08:45:38 +0100
-Subject: [PATCH v5 3/3] KVM/arm/arm64: enable enhanced armv8 fp/simd lazy
- switch
-In-Reply-To: <5674B00C.1050900@samsung.com>
-References: <1449450434-2929-1-git-send-email-m.smarduch@samsung.com>
- <1449450434-2929-4-git-send-email-m.smarduch@samsung.com>
- <20151218135403.GH32720@cbox> <5674B00C.1050900@samsung.com>
-Message-ID: <20151219074538.GA9370@cbox>
+From: ynvich@gmail.com (Sergei Ianovich)
+Date: Sat, 19 Dec 2015 10:53:03 +0300
+Subject: [PATCH] arm: pxa: create a unified defconfig for PXA27X-DT
+In-Reply-To: <1450196875-6739-1-git-send-email-ynvich@gmail.com>
+References: <1450196875-6739-1-git-send-email-ynvich@gmail.com>
+Message-ID: <1450511594-12009-1-git-send-email-ynvich@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 05:17:00PM -0800, Mario Smarduch wrote:
-> On 12/18/2015 5:54 AM, Christoffer Dall wrote:
-> > On Sun, Dec 06, 2015 at 05:07:14PM -0800, Mario Smarduch wrote:
-> >> This patch tracks armv7 and armv8 fp/simd hardware state with cptr_el2 register.
-> >> On vcpu_load for 32 bit guests enable FP access, and enable fp/simd
-> >> trapping for 32 and 64 bit guests. On first fp/simd access trap to handler 
-> >> to save host and restore guest context, and clear trapping bits to enable vcpu 
-> >> lazy mode. On vcpu_put if trap bits are clear save guest and restore host 
-> >> context and also save 32 bit guest fpexc register.
-> >>
-> >> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
-> >> ---
-> >>  arch/arm/include/asm/kvm_emulate.h   |   5 ++
-> >>  arch/arm/include/asm/kvm_host.h      |   2 +
-> >>  arch/arm/kvm/arm.c                   |  20 +++++--
-> >>  arch/arm64/include/asm/kvm_asm.h     |   2 +
-> >>  arch/arm64/include/asm/kvm_emulate.h |  15 +++--
-> >>  arch/arm64/include/asm/kvm_host.h    |  16 +++++-
-> >>  arch/arm64/kernel/asm-offsets.c      |   1 +
-> >>  arch/arm64/kvm/Makefile              |   3 +-
-> >>  arch/arm64/kvm/fpsimd_switch.S       |  38 ++++++++++++
-> >>  arch/arm64/kvm/hyp.S                 | 108 +++++++++++++----------------------
-> >>  arch/arm64/kvm/hyp_head.S            |  48 ++++++++++++++++
-> >>  11 files changed, 181 insertions(+), 77 deletions(-)
-> >>  create mode 100644 arch/arm64/kvm/fpsimd_switch.S
-> >>  create mode 100644 arch/arm64/kvm/hyp_head.S
-> >>
-> >> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-> >> index 3de11a2..13feed5 100644
-> >> --- a/arch/arm/include/asm/kvm_emulate.h
-> >> +++ b/arch/arm/include/asm/kvm_emulate.h
-> >> @@ -243,6 +243,11 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
-> >>  	}
-> >>  }
-> >>  
-> >> +static inline bool kvm_guest_vcpu_is_32bit(struct kvm_vcpu *vcpu)
-> >> +{
-> >> +	return true;
-> >> +}
-> >> +
-> >>  #ifdef CONFIG_VFPv3
-> >>  /* Called from vcpu_load - save fpexc and enable guest access to fp/simd unit */
-> >>  static inline void kvm_enable_vcpu_fpexc(struct kvm_vcpu *vcpu)
-> >> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> >> index ecc883a..720ae51 100644
-> >> --- a/arch/arm/include/asm/kvm_host.h
-> >> +++ b/arch/arm/include/asm/kvm_host.h
-> >> @@ -227,6 +227,8 @@ int kvm_perf_teardown(void);
-> >>  void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
-> >>  
-> >>  struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
-> >> +
-> >> +static inline void kvm_save_guest_vcpu_fpexc(struct kvm_vcpu *vcpu) {}
-> >>  void kvm_restore_host_vfp_state(struct kvm_vcpu *);
-> >>  
-> >>  static inline void kvm_arch_hardware_disable(void) {}
-> >> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> >> index 1de07ab..dd59f8a 100644
-> >> --- a/arch/arm/kvm/arm.c
-> >> +++ b/arch/arm/kvm/arm.c
-> >> @@ -292,8 +292,12 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
-> >>  
-> >>  	kvm_arm_set_running_vcpu(vcpu);
-> >>  
-> >> -	/*  Save and enable FPEXC before we load guest context */
-> >> -	kvm_enable_vcpu_fpexc(vcpu);
-> >> +	/*
-> >> +	 * For 32bit guest executing on arm64, enable fp/simd access in
-> >> +	 * EL2. On arm32 save host fpexc and then enable fp/simd access.
-> >> +	 */
-> >> +	if (kvm_guest_vcpu_is_32bit(vcpu))
-> >> +		kvm_enable_vcpu_fpexc(vcpu);
-> >>  
-> >>  	/* reset hyp cptr register to trap on tracing and vfp/simd access*/
-> >>  	vcpu_reset_cptr(vcpu);
-> >> @@ -302,10 +306,18 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
-> >>  void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
-> >>  {
-> >>  	/* If the fp/simd registers are dirty save guest, restore host. */
-> >> -	if (kvm_vcpu_vfp_isdirty(vcpu))
-> >> +	if (kvm_vcpu_vfp_isdirty(vcpu)) {
-> >>  		kvm_restore_host_vfp_state(vcpu);
-> >>  
-> >> -	/* Restore host FPEXC trashed in vcpu_load */
-> >> +		/*
-> >> +		 * For 32bit guest on arm64 save the guest fpexc register
-> >> +		 * in EL2 mode.
-> >> +		 */
-> >> +		if (kvm_guest_vcpu_is_32bit(vcpu))
-> >> +			kvm_save_guest_vcpu_fpexc(vcpu);
-> >> +	}
-> >> +
-> >> +	/* For arm32 restore host FPEXC trashed in vcpu_load. */
-> >>  	kvm_restore_host_fpexc(vcpu);
-> >>  
-> >>  	/*
-> >> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-> >> index 5e37710..d53d069 100644
-> >> --- a/arch/arm64/include/asm/kvm_asm.h
-> >> +++ b/arch/arm64/include/asm/kvm_asm.h
-> >> @@ -117,6 +117,8 @@ extern char __kvm_hyp_vector[];
-> >>  extern void __kvm_flush_vm_context(void);
-> >>  extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
-> >>  extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
-> >> +extern void __kvm_vcpu_enable_fpexc32(void);
-> >> +extern void __kvm_vcpu_save_fpexc32(struct kvm_vcpu *vcpu);
-> >>  
-> >>  extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
-> >>  
-> >> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-> >> index 8dccbd7..bbbee9d 100644
-> >> --- a/arch/arm64/include/asm/kvm_emulate.h
-> >> +++ b/arch/arm64/include/asm/kvm_emulate.h
-> >> @@ -290,13 +290,20 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
-> >>  	return data;		/* Leave LE untouched */
-> >>  }
-> >>  
-> >> -static inline void kvm_enable_vcpu_fpexc(struct kvm_vcpu *vcpu) {}
-> >> -static inline void kvm_restore_host_fpexc(struct kvm_vcpu *vcpu) {}
-> >> -static inline void vcpu_reset_cptr(struct kvm_vcpu *vcpu) {}
-> >> +static inline bool kvm_guest_vcpu_is_32bit(struct kvm_vcpu *vcpu)
-> >> +{
-> >> +	 return !(vcpu->arch.hcr_el2 & HCR_RW);
-> >> +}
-> >> +
-> >> +static inline void vcpu_reset_cptr(struct kvm_vcpu *vcpu)
-> >> +{
-> >> +	vcpu->arch.cptr_el2 = CPTR_EL2_TTA | CPTR_EL2_TFP;
-> >> +}
-> >> +
-> >>  
-> >>  static inline bool kvm_vcpu_vfp_isdirty(struct kvm_vcpu *vcpu)
-> >>  {
-> >> -	return false;
-> >> +	return !!(~vcpu->arch.cptr_el2 & CPTR_EL2_TFP);
-> >>  }
-> >>  
-> >>  #endif /* __ARM64_KVM_EMULATE_H__ */
-> >> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> >> index e16fd39..0c65393 100644
-> >> --- a/arch/arm64/include/asm/kvm_host.h
-> >> +++ b/arch/arm64/include/asm/kvm_host.h
-> >> @@ -100,6 +100,7 @@ struct kvm_vcpu_arch {
-> >>  	/* HYP configuration */
-> >>  	u64 hcr_el2;
-> >>  	u32 mdcr_el2;
-> >> +	u32 cptr_el2;
-> >>  
-> >>  	/* Exception Information */
-> >>  	struct kvm_vcpu_fault_info fault;
-> >> @@ -248,7 +249,20 @@ static inline void kvm_arch_hardware_unsetup(void) {}
-> >>  static inline void kvm_arch_sync_events(struct kvm *kvm) {}
-> >>  static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
-> >>  static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
-> >> -static inline void kvm_restore_host_vfp_state(struct kvm_vcpu *vcpu) {}
-> >> +
-> >> +static inline void kvm_enable_vcpu_fpexc(struct kvm_vcpu *vcpu)
-> >> +{
-> >> +	/* Enable FP/SIMD access from EL2 mode*/
-> >> +	kvm_call_hyp(__kvm_vcpu_enable_fpexc32);
-> >> +}
-> >> +
-> >> +static inline void kvm_save_guest_vcpu_fpexc(struct kvm_vcpu *vcpu)
-> >> +{
-> >> +	/* Save FPEXEC32_EL2 in EL2 mode */
-> >> +	kvm_call_hyp(__kvm_vcpu_save_fpexc32, vcpu);
-> >> +}
-> >> +static inline void kvm_restore_host_fpexc(struct kvm_vcpu *vcpu) {}
-> >> +void kvm_restore_host_vfp_state(struct kvm_vcpu *vcpu);
-> >>  
-> >>  void kvm_arm_init_debug(void);
-> >>  void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
-> >> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-> >> index 8d89cf8..3c8d836 100644
-> >> --- a/arch/arm64/kernel/asm-offsets.c
-> >> +++ b/arch/arm64/kernel/asm-offsets.c
-> >> @@ -123,6 +123,7 @@ int main(void)
-> >>    DEFINE(DEBUG_WVR, 		offsetof(struct kvm_guest_debug_arch, dbg_wvr));
-> >>    DEFINE(VCPU_HCR_EL2,		offsetof(struct kvm_vcpu, arch.hcr_el2));
-> >>    DEFINE(VCPU_MDCR_EL2,	offsetof(struct kvm_vcpu, arch.mdcr_el2));
-> >> +  DEFINE(VCPU_CPTR_EL2,		offsetof(struct kvm_vcpu, arch.cptr_el2));
-> >>    DEFINE(VCPU_IRQ_LINES,	offsetof(struct kvm_vcpu, arch.irq_lines));
-> >>    DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
-> >>    DEFINE(VCPU_HOST_DEBUG_STATE, offsetof(struct kvm_vcpu, arch.host_debug_state));
-> >> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-> >> index 1949fe5..262b9a5 100644
-> >> --- a/arch/arm64/kvm/Makefile
-> >> +++ b/arch/arm64/kvm/Makefile
-> >> @@ -17,7 +17,8 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/psci.o $(ARM)/perf.o
-> >>  
-> >>  kvm-$(CONFIG_KVM_ARM_HOST) += emulate.o inject_fault.o regmap.o
-> >>  kvm-$(CONFIG_KVM_ARM_HOST) += hyp.o hyp-init.o handle_exit.o
-> >> -kvm-$(CONFIG_KVM_ARM_HOST) += guest.o debug.o reset.o sys_regs.o sys_regs_generic_v8.o
-> >> +kvm-$(CONFIG_KVM_ARM_HOST) += guest.o debug.o reset.o sys_regs.o
-> >> +kvm-$(CONFIG_KVM_ARM_HOST) += sys_regs_generic_v8.o fpsimd_switch.o
-> >>  
-> >>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic.o
-> >>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v2.o
-> >> diff --git a/arch/arm64/kvm/fpsimd_switch.S b/arch/arm64/kvm/fpsimd_switch.S
-> >> new file mode 100644
-> >> index 0000000..5295512
-> >> --- /dev/null
-> >> +++ b/arch/arm64/kvm/fpsimd_switch.S
-> >> @@ -0,0 +1,38 @@
-> >> +/*
-> >> + * Copyright (C) 2012,2013 - ARM Ltd
-> >> + * Author: Marc Zyngier <marc.zyngier@arm.com>
-> >> + *
-> > 
-> > Is this copied code or new code?
-> 
-> It's mostly refactored copied code.
+Instead of one defconfig file per board, pxa27x-dt_defconfig
+is expected to provide a configuration for kernel which can test any
+PXA27X-DT compatible board
 
-Then it's probably fine to keep the original copyright.
+Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
+CC: Robert Jarzmik <robert.jarzmik@free.fr>
+CC: Arnd Bergmann <arnd@arndb.de>
+---
+ Documentation/arm/pxa/pxa27x_defconfig.txt |   7 ++
+ arch/arm/configs/pxa27x-dt_defconfig       | 102 +++++++++++++++++++++++++++++
+ 2 files changed, 109 insertions(+)
+ create mode 100644 Documentation/arm/pxa/pxa27x_defconfig.txt
+ create mode 100644 arch/arm/configs/pxa27x-dt_defconfig
 
-> > 
-> >> + * This program is free software; you can redistribute it and/or modify
-> >> + * it under the terms of the GNU General Public License version 2 as
-> >> + * published by the Free Software Foundation.
-> >> + *
-> >> + * This program is distributed in the hope that it will be useful,
-> >> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> >> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> >> + * GNU General Public License for more details.
-> >> + *
-> >> + * You should have received a copy of the GNU General Public License
-> >> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> >> + */
-> >> +
-> >> +#include <linux/linkage.h>
-> >> +
-> >> +#include "hyp_head.S"
-> >> +
-> >> +	.text
-> >> +/**
-> >> + * void kvm_restore_host_vfp_state(struct vcpu *vcpu) -
-> >> + *     This function saves the guest, restores host, called from host.
-> >> + */
-> >> +ENTRY(kvm_restore_host_vfp_state)
-> >> +	push	xzr, lr
-> >> +
-> >> +	add	x2, x0, #VCPU_CONTEXT
-> >> +	bl __save_fpsimd
-> >> +
-> >> +	ldr	x2, [x0, #VCPU_HOST_CONTEXT]
-> >> +	bl __restore_fpsimd
-> >> +
-> >> +	pop	xzr, lr
-> >> +	ret
-> >> +ENDPROC(kvm_restore_host_vfp_state)
-> >> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-> >> index e583613..b8b1afb 100644
-> >> --- a/arch/arm64/kvm/hyp.S
-> >> +++ b/arch/arm64/kvm/hyp.S
-> >> @@ -17,23 +17,7 @@
-> >>  
-> >>  #include <linux/linkage.h>
-> >>  
-> >> -#include <asm/alternative.h>
-> >> -#include <asm/asm-offsets.h>
-> >> -#include <asm/assembler.h>
-> >> -#include <asm/cpufeature.h>
-> >> -#include <asm/debug-monitors.h>
-> >> -#include <asm/esr.h>
-> >> -#include <asm/fpsimdmacros.h>
-> >> -#include <asm/kvm.h>
-> >> -#include <asm/kvm_arm.h>
-> >> -#include <asm/kvm_asm.h>
-> >> -#include <asm/kvm_mmu.h>
-> >> -#include <asm/memory.h>
-> >> -
-> >> -#define CPU_GP_REG_OFFSET(x)	(CPU_GP_REGS + x)
-> >> -#define CPU_XREG_OFFSET(x)	CPU_GP_REG_OFFSET(CPU_USER_PT_REGS + 8*x)
-> >> -#define CPU_SPSR_OFFSET(x)	CPU_GP_REG_OFFSET(CPU_SPSR + 8*x)
-> >> -#define CPU_SYSREG_OFFSET(x)	(CPU_SYSREGS + 8*x)
-> >> +#include "hyp_head.S"
-> >>  
-> >>  	.text
-> >>  	.pushsection	.hyp.text, "ax"
-> >> @@ -104,20 +88,6 @@
-> >>  	restore_common_regs
-> >>  .endm
-> >>  
-> >> -.macro save_fpsimd
-> >> -	// x2: cpu context address
-> >> -	// x3, x4: tmp regs
-> >> -	add	x3, x2, #CPU_GP_REG_OFFSET(CPU_FP_REGS)
-> >> -	fpsimd_save x3, 4
-> >> -.endm
-> >> -
-> >> -.macro restore_fpsimd
-> >> -	// x2: cpu context address
-> >> -	// x3, x4: tmp regs
-> >> -	add	x3, x2, #CPU_GP_REG_OFFSET(CPU_FP_REGS)
-> >> -	fpsimd_restore x3, 4
-> >> -.endm
-> >> -
-> >>  .macro save_guest_regs
-> >>  	// x0 is the vcpu address
-> >>  	// x1 is the return code, do not corrupt!
-> >> @@ -385,14 +355,6 @@
-> >>  	tbz	\tmp, #KVM_ARM64_DEBUG_DIRTY_SHIFT, \target
-> >>  .endm
-> >>  
-> >> -/*
-> >> - * Branch to target if CPTR_EL2.TFP bit is set (VFP/SIMD trapping enabled)
-> >> - */
-> >> -.macro skip_fpsimd_state tmp, target
-> >> -	mrs	\tmp, cptr_el2
-> >> -	tbnz	\tmp, #CPTR_EL2_TFP_SHIFT, \target
-> >> -.endm
-> >> -
-> >>  .macro compute_debug_state target
-> >>  	// Compute debug state: If any of KDE, MDE or KVM_ARM64_DEBUG_DIRTY
-> >>  	// is set, we do a full save/restore cycle and disable trapping.
-> >> @@ -433,10 +395,6 @@
-> >>  	mrs	x5, ifsr32_el2
-> >>  	stp	x4, x5, [x3]
-> >>  
-> >> -	skip_fpsimd_state x8, 2f
-> >> -	mrs	x6, fpexc32_el2
-> >> -	str	x6, [x3, #16]
-> >> -2:
-> >>  	skip_debug_state x8, 1f
-> >>  	mrs	x7, dbgvcr32_el2
-> >>  	str	x7, [x3, #24]
-> >> @@ -467,22 +425,9 @@
-> >>  
-> >>  .macro activate_traps
-> >>  	ldr     x2, [x0, #VCPU_HCR_EL2]
-> >> -
-> >> -	/*
-> >> -	 * We are about to set CPTR_EL2.TFP to trap all floating point
-> >> -	 * register accesses to EL2, however, the ARM ARM clearly states that
-> >> -	 * traps are only taken to EL2 if the operation would not otherwise
-> >> -	 * trap to EL1.  Therefore, always make sure that for 32-bit guests,
-> >> -	 * we set FPEXC.EN to prevent traps to EL1, when setting the TFP bit.
-> >> -	 */
-> >> -	tbnz	x2, #HCR_RW_SHIFT, 99f // open code skip_32bit_state
-> >> -	mov	x3, #(1 << 30)
-> >> -	msr	fpexc32_el2, x3
-> >> -	isb
-> >> -99:
-> >>  	msr     hcr_el2, x2
-> >> -	mov	x2, #CPTR_EL2_TTA
-> >> -	orr     x2, x2, #CPTR_EL2_TFP
-> >> +
-> >> +	ldr     w2, [x0, VCPU_CPTR_EL2]
-> >>  	msr	cptr_el2, x2
-> >>  
-> >>  	mov	x2, #(1 << 15)	// Trap CP15 Cr=15
-> >> @@ -668,15 +613,15 @@ __restore_debug:
-> >>  
-> >>  	ret
-> >>  
-> >> -__save_fpsimd:
-> >> -	skip_fpsimd_state x3, 1f
-> >> +ENTRY(__save_fpsimd)
-> >>  	save_fpsimd
-> >> -1:	ret
-> >> +	ret
-> >> +ENDPROC(__save_fpsimd)
-> >>  
-> >> -__restore_fpsimd:
-> >> -	skip_fpsimd_state x3, 1f
-> >> +ENTRY(__restore_fpsimd)
-> >>  	restore_fpsimd
-> >> -1:	ret
-> >> +	ret
-> >> +ENDPROC(__restore_fpsimd)
-> >>  
-> >>  switch_to_guest_fpsimd:
-> >>  	push	x4, lr
-> >> @@ -763,7 +708,6 @@ __kvm_vcpu_return:
-> >>  	add	x2, x0, #VCPU_CONTEXT
-> >>  
-> >>  	save_guest_regs
-> >> -	bl __save_fpsimd
-> >>  	bl __save_sysregs
-> >>  
-> >>  	skip_debug_state x3, 1f
-> >> @@ -784,8 +728,10 @@ __kvm_vcpu_return:
-> >>  	kern_hyp_va x2
-> >>  
-> >>  	bl __restore_sysregs
-> >> -	bl __restore_fpsimd
-> >> -	/* Clear FPSIMD and Trace trapping */
-> >> +
-> >> +	/* Save CPTR_EL2 between exits and clear FPSIMD and Trace trapping */
-> >> +	mrs     x3, cptr_el2
-> >> +	str     w3, [x0, VCPU_CPTR_EL2]
-> >>  	msr     cptr_el2, xzr
-> >>  
-> >>  	skip_debug_state x3, 1f
-> >> @@ -863,6 +809,34 @@ ENTRY(__kvm_flush_vm_context)
-> >>  	ret
-> >>  ENDPROC(__kvm_flush_vm_context)
-> >>  
-> >> +/**
-> >> +  * void __kvm_enable_fpexc32(void) -
-> >> +  *	We may be entering the guest and set CPTR_EL2.TFP to trap all floating
-> >> +  *	point register accesses to EL2, however, the ARM manual clearly states
-> >> +  *	that traps are only taken to EL2 if the operation would not otherwise
-> >> +  *	trap to EL1.  Therefore, always make sure that for 32-bit guests,
-> >> +  *	we set FPEXC.EN to prevent traps to EL1, when setting the TFP bit.
-> >> +  */
-> >> +ENTRY(__kvm_vcpu_enable_fpexc32)
-> >> +	mov	x3, #(1 << 30)
-> >> +	msr	fpexc32_el2, x3
-> >> +	isb
-> > 
-> > this is only called via a hypercall so do you really need the ISB?
-> 
-> Same comment as in 2nd patch for the isb.
-> 
-
-Unless you can argue that something needs to take effect before
-something else, where there's no other implicit barrier, you don't need
-the ISB.
-
-> > 
-> >> +	ret
-> >> +ENDPROC(__kvm_vcpu_enable_fpexc32)
-> >> +
-> >> +/**
-> >> + * void __kvm_save_fpexc32(void) -
-> >> + *	This function restores guest FPEXC to its vcpu context, we call this
-> >> + *	function from vcpu_put.
-> >> + */
-> >> +ENTRY(__kvm_vcpu_save_fpexc32)
-> >> +	kern_hyp_va x0
-> >> +	add     x2, x0, #VCPU_CONTEXT
-> >> +	mrs     x1, fpexc32_el2
-> >> +	str     x1, [x2, #CPU_SYSREG_OFFSET(FPEXC32_EL2)]
-> >> +	ret
-> >> +ENDPROC(__kvm_vcpu_save_fpexc32)
-> >> +
-> >>  __kvm_hyp_panic:
-> >>  	// Guess the context by looking at VTTBR:
-> >>  	// If zero, then we're already a host.
-> >> diff --git a/arch/arm64/kvm/hyp_head.S b/arch/arm64/kvm/hyp_head.S
-> >> new file mode 100644
-> >> index 0000000..bb32824
-> >> --- /dev/null
-> >> +++ b/arch/arm64/kvm/hyp_head.S
-> >> @@ -0,0 +1,48 @@
-> >> +/*
-> >> + * Copyright (C) 2012,2013 - ARM Ltd
-> >> + * Author: Marc Zyngier <marc.zyngier@arm.com>
-> >> + *
-> >> + * This program is free software; you can redistribute it and/or modify
-> >> + * it under the terms of the GNU General Public License version 2 as
-> >> + * published by the Free Software Foundation.
-> >> + *
-> >> + * This program is distributed in the hope that it will be useful,
-> >> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> >> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> >> + * GNU General Public License for more details.
-> >> + *
-> >> + * You should have received a copy of the GNU General Public License
-> >> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> >> + */
-> >> +
-> >> +#include <asm/alternative.h>
-> >> +#include <asm/asm-offsets.h>
-> >> +#include <asm/assembler.h>
-> >> +#include <asm/cpufeature.h>
-> >> +#include <asm/debug-monitors.h>
-> >> +#include <asm/esr.h>
-> >> +#include <asm/fpsimdmacros.h>
-> >> +#include <asm/kvm.h>
-> >> +#include <asm/kvm_arm.h>
-> >> +#include <asm/kvm_asm.h>
-> >> +#include <asm/kvm_mmu.h>
-> >> +#include <asm/memory.h>
-> >> +
-> >> +#define CPU_GP_REG_OFFSET(x)    (CPU_GP_REGS + x)
-> >> +#define CPU_XREG_OFFSET(x)      CPU_GP_REG_OFFSET(CPU_USER_PT_REGS + 8*x)
-> >> +#define CPU_SPSR_OFFSET(x)      CPU_GP_REG_OFFSET(CPU_SPSR + 8*x)
-> >> +#define CPU_SYSREG_OFFSET(x)    (CPU_SYSREGS + 8*x)
-> >> +
-> >> +.macro save_fpsimd
-> >> +	// x2: cpu context address
-> >> +	// x3, x4: tmp regs
-> >> +	add x3, x2, #CPU_GP_REG_OFFSET(CPU_FP_REGS)
-> >> +	fpsimd_save x3, 4
-> >> +.endm
-> >> +
-> >> +.macro restore_fpsimd
-> >> +	// x2: cpu context address
-> >> +	// x3, x4: tmp regs
-> >> +	add x3, x2, #CPU_GP_REG_OFFSET(CPU_FP_REGS)
-> >> +	fpsimd_restore x3, 4
-> >> +.endm
-> >> -- 
-> >> 1.9.1
-> >>
-> > 
-> > I'm not going to review the details of this, since we have to rebase it
-> > on the world-switch in C, sorry.
-> That fine.
-> > 
-> > The good news is that it should be much simpler to write in C-code.
-> > 
-> > Let me know if you don't have the bandwidth to rebase this, in that case
-> > I'll be happy to help.
-> 
-> Let me see where I'm at by the end of Monday, if there is a rush to get it into
-> next release by all means.
-> 
-Sounds good - I prefer having you do it ;)
-
--Christoffer
+diff --git a/Documentation/arm/pxa/pxa27x_defconfig.txt b/Documentation/arm/pxa/pxa27x_defconfig.txt
+new file mode 100644
+index 0000000..fc4e164
+--- /dev/null
++++ b/Documentation/arm/pxa/pxa27x_defconfig.txt
+@@ -0,0 +1,7 @@
++If you are reading this, because you are adding support for a new
++PXA27X board, please note that you should not create an additional
++defconfig in arch/arm/configs.
++
++Instead, please update arch/arm/configs/pxa27x-dt_defconfig so that
++a kernel built with this config after `make olddefconfig` boots your
++board.
+diff --git a/arch/arm/configs/pxa27x-dt_defconfig b/arch/arm/configs/pxa27x-dt_defconfig
+new file mode 100644
+index 0000000..003be48
+--- /dev/null
++++ b/arch/arm/configs/pxa27x-dt_defconfig
+@@ -0,0 +1,102 @@
++## Kernel built with this config should boot any supported PXA27X-DT board
++## Please see Documentation/arm/pxa/pxa27x_defconfig.txt for details
++##
++CONFIG_ARM=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++CONFIG_EMBEDDED=y
++CONFIG_MODULES=y
++CONFIG_MODULE_UNLOAD=y
++CONFIG_MODVERSIONS=y
++CONFIG_BLK_CMDLINE_PARSER=y
++CONFIG_PARTITION_ADVANCED=y
++CONFIG_ARCH_PXA=y
++CONFIG_MACH_PXA27X_DT=y
++CONFIG_PXA_SYSTEMS_CPLDS=y
++CONFIG_PXA_SSP=y
++CONFIG_CPU_FREQ=y
++CONFIG_ARM_PXA2xx_CPUFREQ=y
++CONFIG_NET=y
++CONFIG_IRDA=y
++CONFIG_PXA_FICP=y
++CONFIG_MTD=y
++CONFIG_MTD_OF_PARTS=y
++CONFIG_MTD_BLOCK=y
++CONFIG_MTD_CFI=y
++CONFIG_MTD_CFI_ADV_OPTIONS=y
++CONFIG_MTD_CFI_GEOMETRY=y
++CONFIG_MTD_CFI_INTELEXT=y
++CONFIG_MTD_PHYSMAP_OF=y
++CONFIG_MTD_PXA2XX=y
++CONFIG_OF=y
++CONFIG_OF_FLATTREE=y
++CONFIG_SCSI=y
++CONFIG_BLK_DEV_SD=y
++CONFIG_ATA=y
++CONFIG_SATA_PMP=y
++CONFIG_ATA_SFF=y
++CONFIG_ATA_BMDMA=y
++CONFIG_PATA_PXA=y
++CONFIG_NETDEVICES=y
++CONFIG_DM9000=y
++CONFIG_INPUT=y
++CONFIG_INPUT_MOUSEDEV=y
++CONFIG_INPUT_KEYBOARD=y
++CONFIG_KEYBOARD_PXA27x=y
++CONFIG_INPUT_MOUSE=y
++CONFIG_MOUSE_NAVPOINT_PXA27x=y
++CONFIG_TTY=y
++CONFIG_SERIAL_8250=y
++CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_8250_NR_UARTS=40
++CONFIG_SERIAL_8250_RUNTIME_UARTS=40
++CONFIG_SERIAL_8250_EXTENDED=y
++CONFIG_SERIAL_8250_MANY_PORTS=y
++CONFIG_SERIAL_8250_SHARE_IRQ=y
++CONFIG_SERIAL_8250_PXA=y
++CONFIG_I2C=y
++CONFIG_I2C_GPIO=y
++CONFIG_I2C_PXA=y
++CONFIG_SPI=y
++CONFIG_SPI_PXA2XX=y
++CONFIG_WATCHDOG=y
++CONFIG_SA1100_WATCHDOG=y
++CONFIG_REGULATOR=y
++CONFIG_REGULATOR_FIXED_VOLTAGE=y
++CONFIG_MEDIA_SUPPORT=y
++CONFIG_MEDIA_CAMERA_SUPPORT=y
++CONFIG_VIDEO_DEV=y
++CONFIG_V4L_PLATFORM_DRIVERS=y
++CONFIG_SOC_CAMERA=y
++CONFIG_VIDEO_PXA27x=y
++CONFIG_FB=y
++CONFIG_FB_PXA=y
++CONFIG_FB_PXA_OVERLAY=y
++CONFIG_FB_PXA_SMARTPANEL=y
++CONFIG_FB_PXA_PARAMETERS=y
++CONFIG_FRAMEBUFFER_CONSOLE=y
++CONFIG_SOUND=y
++CONFIG_SND=y
++CONFIG_SND_ARM=y
++CONFIG_SND_PXA2XX_AC97=y
++CONFIG_SND_SOC=y
++CONFIG_SND_PXA2XX_SOC=y
++CONFIG_USB_SUPPORT=y
++CONFIG_USB=y
++CONFIG_USB_OHCI_HCD=y
++CONFIG_USB_OHCI_HCD_PXA27X=y
++CONFIG_USB_STORAGE=y
++CONFIG_USB_SERIAL=y
++CONFIG_MMC=y
++CONFIG_MMC_BLOCK=y
++CONFIG_MMC_PXA=y
++CONFIG_RTC_CLASS=y
++CONFIG_RTC_DRV_PXA=y
++CONFIG_DMADEVICES=y
++CONFIG_DMA_OF=y
++CONFIG_PXA_DMA=y
++CONFIG_PWM=y
++CONFIG_PWM_PXA=y
++CONFIG_EXT4_FS=y
++CONFIG_JFFS2_FS=y
++CONFIG_JFFS2_COMPRESSION_OPTIONS=y
+-- 
+2.6.3
