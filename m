@@ -1,36 +1,27 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Fri, 18 Dec 2015 18:27:37 -0800
-Subject: [PATCH] mtd: sh_flctl: pass FIFO as physical address
-In-Reply-To: <3152458.D3kElfhRW2@wuerfel>
-References: <3152458.D3kElfhRW2@wuerfel>
-Message-ID: <20151219022737.GC109450@google.com>
+From: dannym@scratchpost.org (Danny Milosavljevic)
+Date: Sat, 19 Dec 2015 03:45:11 +0100
+Subject: [PATCH v7 0/2] sun4i-codec: Add FM, Line and Mic inputs
+Message-ID: <20151219034511.372575d3@dayas>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 08, 2015 at 04:38:12PM +0100, Arnd Bergmann wrote:
-> By convention, the FIFO address we pass using dmaengine_slave_config
-> is a physical address in the form that is understood by the DMA
-> engine, as a dma_addr_t, phys_addr_t or resource_size_t.
-> 
-> The sh_flctl driver however passes a virtual __iomem address that
-> gets cast to dma_addr_t in the slave driver. This happens to work
-> on shmobile because that platform sets up an identity mapping for
-> its MMIO regions, but such code is not portable to other platforms,
-> and prevents us from ever changing the platform mapping or reusing
-> the driver on other architectures like ARM64 that might not have the
-> mapping.
-> 
-> We also get a warning about a type mismatch for the case that
-> dma_addr_t is wider than a pointer, i.e. when CONFIG_LPAE is set:
-> 
-> drivers/mtd/nand/sh_flctl.c: In function 'flctl_setup_dma':
-> drivers/mtd/nand/sh_flctl.c:163:17: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
->   cfg.dst_addr = (dma_addr_t)FLDTFIFO(flctl);
-> 
-> This changes the driver to instead pass the physical address of
-> the FIFO that is extracted from the MMIO resource, making the
-> code more portable and avoiding the warning.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Hi,
 
-Applied
+this is the seventh version of the patch set that adds inputs to sun4i-codec.
+
+Changes compared to v6 are:
+ - preparation for different A20, A10 controls is now in an extra patch.
+ - all register definitions are now at the top
+ - sun7i-specific things (A20-specific things) are now less grouped-together.
+
+The patches are on top of the branch "sunxi-next" in 
+<git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git>.
+
+Regards,
+   Danny
+---
+Danny Milosavljevic (2):
+  sun4i-codec: Add FM, Line and Mic inputs
+  sun4i-codec: make it possible to use different codec_widgets for A10 and A20.
+
+ sound/soc/sunxi/sun4i-codec.c |  223 +++++++++++++++++++++++++++++++++++++---
