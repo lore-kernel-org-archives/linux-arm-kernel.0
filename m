@@ -1,33 +1,53 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Sun, 20 Dec 2015 12:51:04 +0100
-Subject: [PATCH] mmc: core: Enable tuning according to the actual timing
-In-Reply-To: <1450474474-2666-1-git-send-email-carlo@caione.org>
-References: <1450474474-2666-1-git-send-email-carlo@caione.org>
-Message-ID: <CAOQ7t2ZEQborWOvEbVSbqp227N_kAPfqD=YO8fN5k5hr7ybt5Q@mail.gmail.com>
+From: mweseloh42@gmail.com (Marcus Weseloh)
+Date: Sun, 20 Dec 2015 13:47:43 +0100
+Subject: [PATCH v5 2/2] spi: sun4i: Add support for wait time between word
+ transmissions
+In-Reply-To: <20151218111627.GM30359@lukather>
+References: <1450352427-25350-1-git-send-email-mweseloh42@gmail.com>
+ <1450352427-25350-3-git-send-email-mweseloh42@gmail.com>
+ <20151218111627.GM30359@lukather>
+Message-ID: <CAGNoLaOf6ZDxi+skRKc6gQKzAJot=fvvX91xx+H3c4ni9P-gdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 10:34 PM, Carlo Caione <carlo@caione.org> wrote:
-> From: Carlo Caione <carlo@endlessm.com>
->
-> While in sdhci_execute_tuning() the choice whether or not to enable the
-> tuning is done on the actual timing, in the mmc_sdio_init_uhs_card() the
-> check is done on the capability of the card.
->
-> This difference is causing some issues with some SDIO cards in DDR50
-> mode where the CDM19 is wrongly issued.
->
-> With this patch we modify the check in both
-> mmc_(sd|sdio)_init_uhs_card() functions to take the proper decision
-> only according to the actual timing specification.
->
-> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+Hi,
 
-Uhm, apparently this is causing some issues with the eMMC on another
-laptop I'm testing this patch on.
-Please, disregard this patch. I'll post a v2 once I understand what's going on.
+2015-12-18 12:16 GMT+01:00 Maxime Ripard <maxime.ripard@free-electrons.com>:
 
-Thanks,
+>>       sun4i_spi_write(sspi, SUN4I_CLK_CTL_REG, reg);
+>>
+>> +     /*
+>> +      * Setup wait time between words.
+>> +      *
+>> +      * Wait time is set in SPI_CLK cycles. The SPI hardware needs 3
+>> +      * additional cycles to setup the wait counter, so the minimum delay
+>> +      * time is 4 cycles.
+>> +      */
+>> +     if (spi->word_wait_ns) {
+>> +             clk_ns = DIV_ROUND_UP(1000000000, tfr->speed_hz);
+>
+> You should use the actual rate of the clock returned by clk_get_rate
+> (or probably just use mclk_rate).
+>
+> The clock driver might round the frequency to something else than what
+> was set in clk_set_rate, which would make your calculation here a bit
+> off.
 
--- 
-Carlo Caione
+Yes, good point! And as the wait clock counter is based on the actual
+SPI_CLK and not the mod clock, I need to calculate the exact clock
+myself before handling the wait clock setting. Will amend the patch
+and send a new version.
+
+While looking into this, I also noticed a problem with a previous
+patch of mine, which changed the spi-sun[46]i to use
+transfer->speed_hz instead of the spi->max_speed_hz: I also changed
+the mclk_rate calculation to be based on tfr->speed_hz, which should
+have stayed with spi->max_speed_hz. In the current state, the clock
+calculations only ever increase mclk_rate, wich leads to very
+different clocks being set depending on which clock was used on the
+previous transfer. Will send a fix for that as well in a separate
+patch.
+
+Cheers,
+
+   Marcus
