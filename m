@@ -1,89 +1,42 @@
-From: caesar.upstream@gmail.com (Caesar Wang)
-Date: Sun, 20 Dec 2015 15:50:12 +0800
-Subject: [PATCH v3 2/5] thermal: rockchip: fix a impossible condition
- caused by the warning
-In-Reply-To: <20151203201908.GA34901@dtor-ws>
-References: <1449132523-18817-1-git-send-email-wxt@rock-chips.com>
- <1449132523-18817-3-git-send-email-wxt@rock-chips.com>
- <20151203201908.GA34901@dtor-ws>
-Message-ID: <56765DB4.5070901@gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Sun, 20 Dec 2015 14:39:15 +0530
+Subject: [PATCH v3 7/8] clk: rockchip: fix usbphy-related clocks
+In-Reply-To: <80597401.Y78Rj8FshV@diego>
+References: <1447968149-10979-1-git-send-email-heiko@sntech.de>
+ <1447968149-10979-8-git-send-email-heiko@sntech.de> <566FF0F0.6080803@ti.com>
+ <80597401.Y78Rj8FshV@diego>
+Message-ID: <5676703B.90300@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+On Saturday 19 December 2015 10:51 PM, Heiko St?bner wrote:
+> Hi Kishon,
+> 
+> Am Dienstag, 15. Dezember 2015, 16:22:32 schrieb Kishon Vijay Abraham I:
+>> On Friday 20 November 2015 02:52 AM, Heiko Stuebner wrote:
+>>> The otgphy clocks really only drive the phy blocks. These in turn
+>>> contain plls that then generate the 480m clocks the clock controller
+>>> uses to supply some other clocks like uart0, gpu or the video-codec.
+>>>
+>>> So fix this structure to actually respect that hirarchy and removed
+>>> that usb480m fixed-rate clock working as a placeholder till now, as
+>>> this wouldn't even work if the supplying phy gets turned off while
+>>> its pll-output gets used elsewhere.
+>>>
+>>> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+>>> Reviewed-by: Douglas Anderson <dianders@chromium.org>
+>>
+>> I saw you've given your Acked-by in a previous version of this patch.
+>> Do you want me to take this in linux-phy tree?
+> 
+> from my POV, this series should probably go through your tree in one go, as 
+> this patch depends on the newly exposed clocks from the previous patch. So to 
+> keep bisectability, it should most likely stay together.
 
-? 2015?12?04? 04:19, Dmitry Torokhov ??:
-> On Thu, Dec 03, 2015 at 04:48:40PM +0800, Caesar Wang wrote:
->> As the Dan report the smatch check the thermal driver warning:
->> drivers/thermal/rockchip_thermal.c:551 rockchip_configure_from_dt()
->> warn: impossible condition '(thermal->tshut_temp > ((~0 >> 1))) =>
->> (s32min-s32max > s32max)'
->>
->> Let's we remove the imposssible condition Since the Temperature is
->> currently represented as int not long in the thermal driver.
->>
->> Fixes: commit 437df2172e8d
->> ("thermal: rockchip: consistently use int for temperatures")
->>
->> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
->> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->>
->> ---
->>
->> Changes in v3:
->> - As Brian comments on https://patchwork.kernel.org/patch/7580661/,
->>    let's remove the impossible condition.
->>
->> Changes in v2: None
->> Changes in v1: None
->>
->>   drivers/thermal/rockchip_thermal.c | 6 ------
->>   1 file changed, 6 deletions(-)
->>
->> diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
->> index ae796ec..611de00 100644
->> --- a/drivers/thermal/rockchip_thermal.c
->> +++ b/drivers/thermal/rockchip_thermal.c
->> @@ -549,12 +549,6 @@ static int rockchip_configure_from_dt(struct device *dev,
->>   		thermal->tshut_temp = shut_temp;
->>   	}
->>   
->> -	if (thermal->tshut_temp > INT_MAX) {
->> -		dev_err(dev, "Invalid tshut temperature specified: %d\n",
->> -			thermal->tshut_temp);
->> -		return -ERANGE;
->> -	}
-> Well, that is not entirely correct. The value that we read from DT is
-> u32, but we convert it down to int. I believe you want to move the check
-> up so that you do:
->
-> 	} else if (tshut_temp > INT_MAX) {
-> 		dev_err(dev, "Invalid tshut temperature specified: %d\n",
-> 			thermal->tshut_temp);
-> 		return -ERANGE;
-> 	} else {
-> 		thermal->tshut_temp = shut_temp;
-> 	}
+I agree. But I can't take another subsystem patch without getting a clear nod
+from the maintainer. I'll wait till tomorrow for Turquette to give his Acked-by.
 
-Okay,
-that's seem the following wll be resonable since the checkcode is a warning.
-
-if (of_property_read_u32(np, "rockchip,hw-tshut-temp", &shut_temp)) {
-         dev_warn(dev,
-              "Missing tshut temp property, using default %d\n",
-              thermal->chip->tshut_temp);
-         thermal->tshut_temp = thermal->chip->tshut_temp;
-     } else {
-         if (tshut_temp > INT_MAX) {
-             dev_err(dev, "Invalid tshut temperature specified: %d\n",
-                 tshut_temp);
-             return -ERANGE;
-         }
-         thermal->tshut_temp = shut_temp;
-     }
-
-Thanks,
-
-
-> Thanks.
->
+Thanks
+Kishon
