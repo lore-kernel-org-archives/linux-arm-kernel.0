@@ -1,67 +1,109 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Sun, 20 Dec 2015 20:52:33 +0000
-Subject: [PATCH 4.4-rc5 v22 0/4] irq/arm: Use FIQ for NMI backtrace (when
- possible)
-Message-ID: <1450644757-18734-1-git-send-email-daniel.thompson@linaro.org>
+Date: Sun, 20 Dec 2015 20:52:34 +0000
+Subject: [PATCH 4.4-rc5 v22 1/4] irqchip: gic: Optimize locking in
+ gic_raise_softirq
+In-Reply-To: <1450644757-18734-1-git-send-email-daniel.thompson@linaro.org>
+References: <1450644757-18734-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1450644757-18734-2-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset modifies the GIC driver to allow it, on supported
-platforms, to route IPI interrupts to FIQ. It then uses this
-feature to allow the NMI backtrace code on arm to be implemented
-using FIQ.
+Currently gic_raise_softirq() is locked using irq_controller_lock.
+This lock is primarily used to make register read-modify-write sequences
+atomic but gic_raise_softirq() uses it instead to ensure that the
+big.LITTLE migration logic can figure out when it is safe to migrate
+interrupts between physical cores.
 
-The patches have been runtime tested on the following systems, covering
-both arm and arm64 systems and those with and without FIQ support:
+This is sub-optimal in closely related ways:
 
-* Freescale i.MX6 (arm, gicv1, supports FIQ)
-* Qualcomm Snapdragon 600 (arm, gicv2, does not support FIQ)
-* Hisilicon 6220 (arm64, gicv2, does not support FIQ)
+1. No locking at all is required on systems where the b.L switcher is
+   not configured.
 
+2. Finer grain locking can be used on systems where the b.L switcher is
+   present.
 
-v22:
+This patch resolves both of the above by introducing a separate finer
+grain lock and providing conditionally compiled inlines to lock/unlock
+it.
 
-* Rebase on v4.4-rc5 to adopt the new NMI backtrace code from Russell
-  King.
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+---
+ drivers/irqchip/irq-gic.c | 36 +++++++++++++++++++++++++++++++++---
+ 1 file changed, 33 insertions(+), 3 deletions(-)
 
-* Polished a few comments and reorganised the patches very slightly
-  (shifted a couple of arm changes to patch 4).
-
-* Fixed bug in the way gic_handle_fiq() checks whether it is safe for
-  it to read IAR.
-
-v21:
-
-* Change the way SGIs are raised to try to increase robustness starting
-  secondary cores. This is a theoretic fix for a regression reported
-  by Mark Rutland on vexpress-tc2 but it also allows us to remove
-  igroup0_shadow entirely since it is no longer needed.
-
-* Fix a couple of variable names and add comments to describe the
-  hardware behavior better (Mark Rutland).
-
-* Improved MULTI_IRQ_HANDLER support by clearing FIQs using
-  handle_arch_irq (Marc Zygnier).
-
-* Fix gic_cpu_if_down() to ensure group 1 interrupts are disabled
-  when the interface is brought down.
-
-For changes in v20 and earlier see:
-  http://thread.gmane.org/gmane.linux.kernel/1928465
-
-
-Daniel Thompson (4):
-  irqchip: gic: Optimize locking in gic_raise_softirq
-  irqchip: gic: Make gic_raise_softirq FIQ-safe
-  irqchip: gic: Introduce plumbing for IPI FIQ
-  ARM: Allow IPI_CPU_BACKTRACE to exploit FIQ
-
- arch/arm/include/asm/smp.h      |   9 ++
- arch/arm/kernel/smp.c           |   6 +
- arch/arm/kernel/traps.c         |   9 +-
- drivers/irqchip/irq-gic.c       | 235 ++++++++++++++++++++++++++++++++++++----
- include/linux/irqchip/arm-gic.h |   6 +
- 5 files changed, 245 insertions(+), 20 deletions(-)
-
---
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index abf2ffaed392..0c4635ea308d 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -90,6 +90,27 @@ struct gic_chip_data {
+ static DEFINE_RAW_SPINLOCK(irq_controller_lock);
+ 
+ /*
++ * This lock is used by the big.LITTLE migration code to ensure no IPIs
++ * can be pended on the old core after the map has been updated.
++ */
++#ifdef CONFIG_BL_SWITCHER
++static DEFINE_RAW_SPINLOCK(cpu_map_migration_lock);
++
++static inline void gic_migration_lock(unsigned long *flags)
++{
++	raw_spin_lock_irqsave(&cpu_map_migration_lock, *flags);
++}
++
++static inline void gic_migration_unlock(unsigned long flags)
++{
++	raw_spin_unlock_irqrestore(&cpu_map_migration_lock, flags);
++}
++#else
++static inline void gic_migration_lock(unsigned long *flags) {}
++static inline void gic_migration_unlock(unsigned long flags) {}
++#endif
++
++/*
+  * The GIC mapping of CPU interfaces does not necessarily match
+  * the logical CPU numbering.  Let's use a mapping as returned
+  * by the GIC itself.
+@@ -763,7 +784,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+ 	int cpu;
+ 	unsigned long flags, map = 0;
+ 
+-	raw_spin_lock_irqsave(&irq_controller_lock, flags);
++	gic_migration_lock(&flags);
+ 
+ 	/* Convert our logical CPU mask into a physical one. */
+ 	for_each_cpu(cpu, mask)
+@@ -778,7 +799,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+ 	/* this always happens on GIC0 */
+ 	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
+ 
+-	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
++	gic_migration_unlock(flags);
+ }
+ #endif
+ 
+@@ -849,8 +870,17 @@ void gic_migrate_target(unsigned int new_cpu_id)
+ 
+ 	raw_spin_lock(&irq_controller_lock);
+ 
+-	/* Update the target interface for this logical CPU */
++	/*
++	 * Update the target interface for this logical CPU
++	 *
++	 * From the point we release the cpu_map_migration_lock any new
++	 * SGIs will be pended on the new cpu which makes the set of SGIs
++	 * pending on the old cpu static. That means we can defer the
++	 * migration until after we have released the irq_controller_lock.
++	 */
++	raw_spin_lock(&cpu_map_migration_lock);
+ 	gic_cpu_map[cpu] = 1 << new_cpu_id;
++	raw_spin_unlock(&cpu_map_migration_lock);
+ 
+ 	/*
+ 	 * Find all the peripheral interrupts targetting the current
+-- 
 2.5.0
