@@ -1,13 +1,13 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Sun, 20 Dec 2015 22:21:12 +0100
-Subject: [GIT PULL] ARM: mediatek: kconfig update for v4.4
-Message-ID: <CABuKBe+mw4nWDO8JPciz1FC-x7UrF-MvF7r_LeqWU=JT8jwUCA@mail.gmail.com>
+Date: Sun, 20 Dec 2015 22:22:41 +0100
+Subject: [GIT PULL] ARM: mediatek: soc updates for v4.4
+Message-ID: <CABuKBeK7v2B_X4i-s02uiK-NpmxeGB2qtXokupsfVCJ5TOte9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd and Olof,
 
-Please pull the following patch.
+Please pull the following patches.
 
 Thanks,
 Matthias
@@ -20,19 +20,24 @@ The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
 
 are available in the git repository at:
 
-  https://github.com/mbgg/linux-mediatek.git tags/v4.4-next-kconfig
+  https://github.com/mbgg/linux-mediatek.git tags/v4.4-next-soc
 
-for you to fetch changes up to c050b45d87adf88d60347005cfaac3bdad21e7c5:
+for you to fetch changes up to e50be5cd0caa1d3c59d2fa9064c3932f3f74e047:
 
-  arm64: mediatek: enable MTK_TIMER (2015-12-18 09:41:18 +0100)
-
-----------------------------------------------------------------
-Enable mediatek clocksource driver by default as otherwise the system
-does not boot.
+  drivers/soc: make mediatek/mtk-scpsys.c explicitly non-modular
+(2015-12-18 09:41:43 +0100)
 
 ----------------------------------------------------------------
-Yingjoe Chen (1):
-      arm64: mediatek: enable MTK_TIMER
+Change the scpsys to builtin_platform_driver_probe.
 
- arch/arm64/Kconfig.platforms | 1 +
- 1 file changed, 1 insertion(+)
+Add regulator support for scpsys driver.
+
+----------------------------------------------------------------
+Paul Gortmaker (1):
+      drivers/soc: make mediatek/mtk-scpsys.c explicitly non-modular
+
+Sascha Hauer (1):
+      soc: mediatek: SCPSYS: Add regulator support
+
+ drivers/soc/mediatek/mtk-scpsys.c | 32 +++++++++++++++++++++++++++++---
+ 1 file changed, 29 insertions(+), 3 deletions(-)
