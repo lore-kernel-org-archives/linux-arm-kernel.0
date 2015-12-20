@@ -1,20 +1,20 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 20 Dec 2015 10:43:27 -0800
-Subject: [PATCH] ARM: uniphier: select PINCTRL
-In-Reply-To: <CAK7LNATtUC+5TU7eyuoOQ3W1ZbPwkX_1zY9rqC80_j1VZOsWgw@mail.gmail.com>
-References: <1446706075-7348-1-git-send-email-yamada.masahiro@socionext.com>
- <CAK7LNATtUC+5TU7eyuoOQ3W1ZbPwkX_1zY9rqC80_j1VZOsWgw@mail.gmail.com>
-Message-ID: <20151220184327.GA32594@localhost>
+Date: Sun, 20 Dec 2015 10:44:53 -0800
+Subject: [PATCH] ARM: multi_v7_defconfig: enable TPS65217 regulator
+In-Reply-To: <1447225753-2788-1-git-send-email-afzal.mohd.ma@gmail.com>
+References: <1447225753-2788-1-git-send-email-afzal.mohd.ma@gmail.com>
+Message-ID: <20151220184453.GB32594@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 03:03:59PM +0900, Masahiro Yamada wrote:
-> Please let me gently ping in case the maintainers might be away from keyboard
-> during the Christmas days.
+On Wed, Nov 11, 2015 at 12:39:13PM +0530, Afzal Mohammed wrote:
+> Enable TPS65217 regulator to have rootfs in MMC for Beagle Bone's.
 > 
-> I want this trivial one for the next merge window.
+> Suggested-by: Kishon Vijay Abraham I <kishon@ti.com>
+> Signed-off-by: Afzal Mohammed <afzal.mohd.ma@gmail.com>
+> ---
 
-Applied now. Thanks for the ping.
+Applied, thanks.
 
 
 -Olof
