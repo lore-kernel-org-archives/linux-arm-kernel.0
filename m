@@ -1,49 +1,33 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 20 Dec 2015 12:43:00 +0100
-Subject: [PATCH 3/5] ARM: dts: sun4i: Add touchscreen node to inet97fv2 dts
- file
-In-Reply-To: <1450611782-9494-1-git-send-email-hdegoede@redhat.com>
-References: <1450611782-9494-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1450611782-9494-3-git-send-email-hdegoede@redhat.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Sun, 20 Dec 2015 12:51:04 +0100
+Subject: [PATCH] mmc: core: Enable tuning according to the actual timing
+In-Reply-To: <1450474474-2666-1-git-send-email-carlo@caione.org>
+References: <1450474474-2666-1-git-send-email-carlo@caione.org>
+Message-ID: <CAOQ7t2ZEQborWOvEbVSbqp227N_kAPfqD=YO8fN5k5hr7ybt5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a node describing the focaltech ft5306de4 touchscreen found on
-inet97fv2 tablets.
+On Fri, Dec 18, 2015 at 10:34 PM, Carlo Caione <carlo@caione.org> wrote:
+> From: Carlo Caione <carlo@endlessm.com>
+>
+> While in sdhci_execute_tuning() the choice whether or not to enable the
+> tuning is done on the actual timing, in the mmc_sdio_init_uhs_card() the
+> check is done on the capability of the card.
+>
+> This difference is causing some issues with some SDIO cards in DDR50
+> mode where the CDM19 is wrongly issued.
+>
+> With this patch we modify the check in both
+> mmc_(sd|sdio)_init_uhs_card() functions to take the proper decision
+> only according to the actual timing specification.
+>
+> Signed-off-by: Carlo Caione <carlo@endlessm.com>
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/sun4i-a10-inet97fv2.dts | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+Uhm, apparently this is causing some issues with the eMMC on another
+laptop I'm testing this patch on.
+Please, disregard this patch. I'll post a v2 once I understand what's going on.
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts b/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts
-index 77c31da..74dd458 100644
---- a/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts
-@@ -48,6 +48,7 @@
- 
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/input/input.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
- 
- / {
- 	model = "INet-97F Rev 02";
-@@ -93,6 +94,16 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c2_pins_a>;
- 	status = "okay";
-+
-+	ft5406ee8: touchscreen at 38 {
-+		compatible = "edt,edt-ft5406";
-+		reg = <0x38>;
-+		interrupt-parent = <&pio>;
-+		interrupts = <7 21 IRQ_TYPE_EDGE_FALLING>;
-+		pinctrl-names = "default";
-+		touchscreen-size-x = <800>;
-+		touchscreen-size-y = <480>;
-+	};
- };
- 
- &lradc {
+Thanks,
+
 -- 
-2.5.0
+Carlo Caione
