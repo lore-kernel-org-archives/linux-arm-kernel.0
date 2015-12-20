@@ -1,123 +1,87 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sun, 20 Dec 2015 15:44:17 +0100
-Subject: [PATCH v1 0/6] Support the rk3036 Kylin board
-In-Reply-To: <5676A3CA.6090205@gmail.com>
-References: <1450362112-8075-1-git-send-email-wxt@rock-chips.com>
- <9746732.gszC1tXaj9@diego> <5676A3CA.6090205@gmail.com>
-Message-ID: <2374106.I3IsqKzjVk@diego>
+From: rabin@rab.in (Rabin Vincent)
+Date: Sun, 20 Dec 2015 16:29:39 +0100
+Subject: [PATCH V7 02/24] coresight: associating path with session rather
+ than tracer
+In-Reply-To: <1450472361-426-3-git-send-email-mathieu.poirier@linaro.org>
+References: <1450472361-426-1-git-send-email-mathieu.poirier@linaro.org>
+ <1450472361-426-3-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <20151220152939.GA11552@debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Caesar,
-
-Am Sonntag, 20. Dezember 2015, 20:49:14 schrieb Caesar Wang:
-> Hi Heiko,
+On Fri, Dec 18, 2015 at 01:58:58PM -0700, Mathieu Poirier wrote:
+> When using the Coresight framework from the sysFS interface a
+> tracer is always handling a single session and as such, a path
+> can be associated with a tracer.  But when supporting multiple
+> session per tracer there is no guarantee that sessions will always
+> have the same path from source to sink.
 > 
-> ? 2015?12?20? 01:16, Heiko St?bner ??:
-> > Hi Caesar,
-> > 
-> > Am Donnerstag, 17. Dezember 2015, 22:21:46 schrieb Caesar Wang:
-> >> Kylin-board is based on RK3036 SOCs, add the initiation
-> >> version for working.
-> > 
-> > I've applied:
-> > - patch1 (please include the "rockchip:" part in dts subjects)
-> > - patch3 (dito)
-> > - patch4 (after merging in patch6 and dropping the hdmi+lcdc parts)
-> 
-> Okay, thanks!
-> 
-> Sync to the rockchip github
-> <https://github.com/rockchip-linux/kernel/commits/develop4.4>.
-> 
-> > Please resubmit the missing parts (audio + graphics) against my dts-branch
-> > [0] after the relevant maintainers have added the code-parts to their
-> > trees.
-> For codec:
-> RT5616 is existing  in
-> https://git.kernel.org/cgit/linux/kernel/git/broonie/sound.git/log/?h=for-ne
-> xt now.
+> This patch is removing the automatic association between path and
+> tracers.  The building of a path and enablement of the components
+> in the path are decoupled, allowing for the association of a path
+> with a session rather than a tracer.
 
-that seems to be missing the devicetree-parts. I think you can just send a 
-patch to Mark adding
-- of_device_id match table
-- of_match_table assignment
-- binding-documentation (it seems to have only compatible and reg propeties)
+This patch introduces a use-after-free/double kfree() if the sink is
+disabled after the source.
 
+With this command sequence:
 
-Heiko
+# echo 1 > /sys/bus/coresight/devices/54162000.etb/enable_sink 
+# echo 1 > /sys/bus/coresight/devices/5414c000.ptm/enable_source 
+...
+# echo 0 > /sys/bus/coresight/devices/54162000.etb/enable_sink 
+# echo 0 > /sys/bus/coresight/devices/5414c000.ptm/enable_source 
 
-> For 3036 vop:
-> I would like wait a moment from Mark Yao updating the driver.
-> 
-> > Thanks
-> > Heiko
-> > 
-> > [0]
-> > https://git.kernel.org/cgit/linux/kernel/git/mmind/linux-rockchip.git/log
-> > /?h=v4.5-armsoc/dts32> 
-> >> This series patches have the following decriptions:
-> >> 
-> >> PATCH[1/6]:
-> >> ARM: dts: fix the correct pinctrl control for rk3036
-> >> 
-> >> The pinctrl gpio pull up/down is incorrect since the rk3036 SoCs
-> >> can't set the status in the internal.
-> >> ---
-> >> 
-> >> PATCH[2/6]:
-> >> ARM: dts: add the lcdc and hdmi node for rk3036
-> >> 
-> >> Add the devices is related to display.
-> >> Based on the series patches of Mark Yao's
-> >> ---
-> >> 
-> >> PATCH[3/6]:
-> >> ARM: dts: add the sdio/sdmmc node for rk3036
-> >> 
-> >> Add the wifi/sd card work for kylin board.
-> >> ---
-> >> 
-> >> PATCH[4/6]:
-> >> ARM: dts: rockchip: add the kylin board for rk3036
-> >> 
-> >> Add the dts for kylin board.
-> >> ---
-> >> 
-> >> PATCH[5/6]:
-> >> ARM: dts: add the sound codec for kylin board
-> >> 
-> >> Make the codec rt5616 working on kylin board.
-> >> The realteak have been upstream for Mark Brown,
-> >> I guess need some days to review.
-> >> 
-> >> ---
-> >> 
-> >> PATCH[6/6]:
-> >> ARM: dts: add the sdio node for kylin board
-> >> 
-> >> Enable the sdio for kylin board.
-> >> ---
-> >> 
-> >> Caesar Wang (6):
-> >>    ARM: dts: fix the correct pinctrl control for rk3036
-> >>    ARM: dts: add the lcdc and hdmi node for rk3036
-> >>    ARM: dts: add the sdio/sdmmc node for rk3036
-> >>    ARM: dts: rockchip: add the kylin board for rk3036
-> >>    ARM: dts: add the sound codec for kylin board
-> >>    ARM: dts: add the sdio node for kylin board
-> >>   
-> >>   Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
-> >>   arch/arm/boot/dts/Makefile                         |   1 +
-> >>   arch/arm/boot/dts/rk3036-kylin.dts                 | 345
-> >> 
-> >> +++++++++++++++++++++ arch/arm/boot/dts/rk3036.dtsi                     
-> >> |
-> >> 167 ++++++++-- 4 files changed, 498 insertions(+), 19 deletions(-)
-> >> 
-> >>   create mode 100644 arch/arm/boot/dts/rk3036-kylin.dts
-> > 
-> > _______________________________________________
-> > Linux-rockchip mailing list
-> > Linux-rockchip at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-rockchip
+Before these patches, we get these messages while disabling:
+
+[  165.822326] coresight-etm3x 5414c000.ptm: ETM tracing disabled
+[  165.828491] coresight 5414c000.ptm: releasing path(s) failed
+
+After these patches, we get this (with SLUB debugging enabled):
+
+=============================================================================
+BUG kmalloc-512 (Not tainted): Invalid object pointer 0xed60e164
+-----------------------------------------------------------------------------
+
+Disabling lock debugging due to kernel taint
+INFO: Slab 0xeebac180 objects=23 used=23 fp=0x  (null) flags=0x4081
+CPU: 0 PID: 856 Comm: sh Tainted: G    B           4.4.0-rc5-00224-ge461459-dirty #168
+Hardware name: Generic OMAP4 (Flattened Device Tree)
+Backtrace: 
+[<c00154d4>] (dump_backtrace) from [<c00156d0>] (show_stack+0x18/0x1c)
+ r7:00000001 r6:eebac180 r5:c07ae71c r4:00000000
+[<c00156b8>] (show_stack) from [<c027e69c>] (dump_stack+0x98/0xc0)
+[<c027e604>] (dump_stack) from [<c014f018>] (slab_err+0x78/0x80)
+ r5:ee0013c0 r4:eebac180
+[<c014efa4>] (slab_err) from [<c0153880>] (free_debug_processing+0x234/0x34c)
+ r3:ed60e164 r2:c068d484
+ r5:ee0013c0 r4:ed60e164
+[<c015364c>] (free_debug_processing) from [<c0153c34>] (__slab_free+0x29c/0x428)
+ r10:ee0013c0 r9:00000000 r8:20000013 r7:c041a5f4 r6:ed60e164 r5:00010d00
+ r4:eebac180
+[<c0153998>] (__slab_free) from [<c0154770>] (kfree+0x2dc/0x2f4)
+ r10:eda29f80 r9:00000000 r8:20000013 r7:c041a5f4 r6:ed60e164 r5:eebac180
+ r4:ee0013c0
+[<c0154494>] (kfree) from [<c041a5f4>] (etm_disable+0xf8/0x148)
+ r10:eda29f80 r9:00000000 r8:ed7ba500 r7:00000000 r6:ed60e120 r5:00000001
+ r4:ed60e110
+[<c041a4fc>] (etm_disable) from [<c0415e64>] (coresight_disable+0xbc/0x100)
+ r7:00000000 r6:c0771150 r5:c076c900 r4:ed662600
+[<c0415da8>] (coresight_disable) from [<c0415ef0>] (enable_source_store+0x48/0x68)
+ r9:ed67ec8c r8:ed7d7900 r7:00000000 r6:ed7d7900 r5:00000002 r4:ed662620
+[<c0415ea8>] (enable_source_store) from [<c030b37c>] (dev_attr_store+0x20/0x2c)
+ r5:ed67ec80 r4:c0415ea8
+[<c030b35c>] (dev_attr_store) from [<c01d55d8>] (sysfs_kf_write+0x50/0x54)
+ r5:ed67ec80 r4:c030b35c
+[<c01d5588>] (sysfs_kf_write) from [<c01d4b98>] (kernfs_fop_write+0xc4/0x1c0)
+ r7:00000000 r6:00000000 r5:00000002 r4:ed67ec80
+[<c01d4ad4>] (kernfs_fop_write) from [<c015b60c>] (__vfs_write+0x34/0xe4)
+ r10:00000000 r9:eda28000 r8:c0010964 r7:eda29f80 r6:00000002 r5:c01d4ad4
+ r4:ed811180
+[<c015b5d8>] (__vfs_write) from [<c015bf38>] (vfs_write+0x98/0x174)
+ r9:eda28000 r8:c0010964 r7:eda29f80 r6:000a9e40 r5:00000002 r4:ed811180
+[<c015bea0>] (vfs_write) from [<c015c7a8>] (SyS_write+0x4c/0xa8)
+ r8:c0010964 r7:00000002 r6:000a9e40 r5:ed811180 r4:ed811180
+[<c015c75c>] (SyS_write) from [<c00107c0>] (ret_fast_syscall+0x0/0x1c)
+ r7:00000004 r6:00000001 r5:000a9e40 r4:00000002
+FIX kmalloc-512: Object at 0xed60e164 not freed
