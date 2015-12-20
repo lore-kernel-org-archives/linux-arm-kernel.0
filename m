@@ -1,33 +1,89 @@
-From: robh@kernel.org (Rob Herring)
-Date: Sat, 19 Dec 2015 21:39:43 -0600
-Subject: [PATCH v10 3/8] ARM: dt: Binding documentation for imx25
- touchscreen controller
-In-Reply-To: <1450101234-2191-4-git-send-email-mpa@pengutronix.de>
-References: <1450101234-2191-1-git-send-email-mpa@pengutronix.de>
- <1450101234-2191-4-git-send-email-mpa@pengutronix.de>
-Message-ID: <20151220033943.GO9883@rob-hp-laptop>
+From: caesar.upstream@gmail.com (Caesar Wang)
+Date: Sun, 20 Dec 2015 15:50:12 +0800
+Subject: [PATCH v3 2/5] thermal: rockchip: fix a impossible condition
+ caused by the warning
+In-Reply-To: <20151203201908.GA34901@dtor-ws>
+References: <1449132523-18817-1-git-send-email-wxt@rock-chips.com>
+ <1449132523-18817-3-git-send-email-wxt@rock-chips.com>
+ <20151203201908.GA34901@dtor-ws>
+Message-ID: <56765DB4.5070901@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 14, 2015 at 02:53:49PM +0100, Markus Pargmann wrote:
-> This is the touchscreen conversion queue binding documentation. It uses
-> the shared imx25 ADC.
-> 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> ---
-> 
-> Notes:
->     Changes in v9:
->      - Updated binding descriptions
->     
->     Changes in v5:
->      - Fix signed/unsigned comparison
->      - Fix unused variable settling_time by putting it in the correct argument list
->      - Use continous conversion queue with the repeat feature and a proper
->        repeat-wait. Previously the touchscreen caused massive number of interrupts.
-> 
->  .../bindings/input/touchscreen/fsl-mx25-tcq.txt    | 35 ++++++++++++++++++++++
->  1 file changed, 35 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/input/touchscreen/fsl-mx25-tcq.txt
 
-Acked-by: Rob Herring <robh@kernel.org>
+
+? 2015?12?04? 04:19, Dmitry Torokhov ??:
+> On Thu, Dec 03, 2015 at 04:48:40PM +0800, Caesar Wang wrote:
+>> As the Dan report the smatch check the thermal driver warning:
+>> drivers/thermal/rockchip_thermal.c:551 rockchip_configure_from_dt()
+>> warn: impossible condition '(thermal->tshut_temp > ((~0 >> 1))) =>
+>> (s32min-s32max > s32max)'
+>>
+>> Let's we remove the imposssible condition Since the Temperature is
+>> currently represented as int not long in the thermal driver.
+>>
+>> Fixes: commit 437df2172e8d
+>> ("thermal: rockchip: consistently use int for temperatures")
+>>
+>> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+>>
+>> ---
+>>
+>> Changes in v3:
+>> - As Brian comments on https://patchwork.kernel.org/patch/7580661/,
+>>    let's remove the impossible condition.
+>>
+>> Changes in v2: None
+>> Changes in v1: None
+>>
+>>   drivers/thermal/rockchip_thermal.c | 6 ------
+>>   1 file changed, 6 deletions(-)
+>>
+>> diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
+>> index ae796ec..611de00 100644
+>> --- a/drivers/thermal/rockchip_thermal.c
+>> +++ b/drivers/thermal/rockchip_thermal.c
+>> @@ -549,12 +549,6 @@ static int rockchip_configure_from_dt(struct device *dev,
+>>   		thermal->tshut_temp = shut_temp;
+>>   	}
+>>   
+>> -	if (thermal->tshut_temp > INT_MAX) {
+>> -		dev_err(dev, "Invalid tshut temperature specified: %d\n",
+>> -			thermal->tshut_temp);
+>> -		return -ERANGE;
+>> -	}
+> Well, that is not entirely correct. The value that we read from DT is
+> u32, but we convert it down to int. I believe you want to move the check
+> up so that you do:
+>
+> 	} else if (tshut_temp > INT_MAX) {
+> 		dev_err(dev, "Invalid tshut temperature specified: %d\n",
+> 			thermal->tshut_temp);
+> 		return -ERANGE;
+> 	} else {
+> 		thermal->tshut_temp = shut_temp;
+> 	}
+
+Okay,
+that's seem the following wll be resonable since the checkcode is a warning.
+
+if (of_property_read_u32(np, "rockchip,hw-tshut-temp", &shut_temp)) {
+         dev_warn(dev,
+              "Missing tshut temp property, using default %d\n",
+              thermal->chip->tshut_temp);
+         thermal->tshut_temp = thermal->chip->tshut_temp;
+     } else {
+         if (tshut_temp > INT_MAX) {
+             dev_err(dev, "Invalid tshut temperature specified: %d\n",
+                 tshut_temp);
+             return -ERANGE;
+         }
+         thermal->tshut_temp = shut_temp;
+     }
+
+Thanks,
+
+
+> Thanks.
+>
