@@ -1,133 +1,95 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Sun, 20 Dec 2015 20:52:35 +0000
-Subject: [PATCH 4.4-rc5 v22 2/4] irqchip: gic: Make gic_raise_softirq FIQ-safe
+Date: Sun, 20 Dec 2015 20:52:37 +0000
+Subject: [PATCH 4.4-rc5 v22 4/4] ARM: Allow IPI_CPU_BACKTRACE to exploit FIQ
 In-Reply-To: <1450644757-18734-1-git-send-email-daniel.thompson@linaro.org>
 References: <1450644757-18734-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1450644757-18734-3-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1450644757-18734-5-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is currently possible for FIQ handlers to re-enter gic_raise_softirq()
-and lock up.
+The GIC (v1 & v2) driver allows its implementation of handle_arch_irq()
+to be called from the FIQ handler but currently the ARM code is not
+able to exploit this.
 
-    	gic_raise_softirq()
-	   lock(x);
--~-> FIQ
-        handle_fiq()
-	   gic_raise_softirq()
-	      lock(x);		<-- Lockup
+Extend handle_fiq_as_nmi() to call handle_arch_irq(). This will affect
+all interrupt controllers, including ones that do not support FIQ. This
+is OK because a spurious FIQ is normally fatal. Handling a spurious FIQ
+like a normal interrupt does risk deadlock but does give us a chance
+of surviving long enough to get an error message out.
 
-arch/arm/ uses IPIs to implement arch_irq_work_raise(), thus this issue
-renders it difficult for FIQ handlers to safely defer work to less
-restrictive calling contexts.
-
-This patch fixes the problem by converting the cpu_map_migration_lock
-into a rwlock making it safe to re-enter the function.
-
-Note that having made it safe to re-enter gic_raise_softirq() we no
-longer need to mask interrupts during gic_raise_softirq() because the
-b.L migration is always performed from task context.
+We also extend the SMP code to indicate to irq drivers which IPIs they
+should seek to implement using FIQ.
 
 Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 ---
- drivers/irqchip/irq-gic.c | 38 +++++++++++++++++++++++++-------------
- 1 file changed, 25 insertions(+), 13 deletions(-)
+ arch/arm/include/asm/smp.h | 9 +++++++++
+ arch/arm/kernel/smp.c      | 6 ++++++
+ arch/arm/kernel/traps.c    | 9 ++++++++-
+ 3 files changed, 23 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 0c4635ea308d..b6c1e96b52a1 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -92,22 +92,25 @@ static DEFINE_RAW_SPINLOCK(irq_controller_lock);
- /*
-  * This lock is used by the big.LITTLE migration code to ensure no IPIs
-  * can be pended on the old core after the map has been updated.
-+ *
-+ * This lock may be locked for reading from both IRQ and FIQ handlers
-+ * and therefore must not be locked for writing when these are enabled.
-  */
- #ifdef CONFIG_BL_SWITCHER
--static DEFINE_RAW_SPINLOCK(cpu_map_migration_lock);
-+static DEFINE_RWLOCK(cpu_map_migration_lock);
- 
--static inline void gic_migration_lock(unsigned long *flags)
-+static inline void gic_migration_lock(void)
- {
--	raw_spin_lock_irqsave(&cpu_map_migration_lock, *flags);
-+	read_lock(&cpu_map_migration_lock);
- }
- 
--static inline void gic_migration_unlock(unsigned long flags)
-+static inline void gic_migration_unlock(void)
- {
--	raw_spin_unlock_irqrestore(&cpu_map_migration_lock, flags);
-+	read_unlock(&cpu_map_migration_lock);
- }
- #else
--static inline void gic_migration_lock(unsigned long *flags) {}
--static inline void gic_migration_unlock(unsigned long flags) {}
-+static inline void gic_migration_lock(void) {}
-+static inline void gic_migration_unlock(void) {}
+diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
+index 3d6dc8b460e4..daf869cff02e 100644
+--- a/arch/arm/include/asm/smp.h
++++ b/arch/arm/include/asm/smp.h
+@@ -18,6 +18,15 @@
+ # error "<asm/smp.h> included in non-SMP build"
  #endif
  
- /*
-@@ -779,12 +782,20 @@ static void __init gic_pm_init(struct gic_chip_data *gic)
- #endif
- 
- #ifdef CONFIG_SMP
 +/*
-+ * Raise the specified IPI on all cpus set in mask.
++ * Identify which IPIs are safe for the irqchip to handle using FIQ.
 + *
-+ * This function is safe to call from all calling contexts, including
-+ * FIQ handlers. It relies on gic_migration_lock() being multiply acquirable
-+ * to avoid deadlocks when the function is re-entered at different
-+ * exception levels.
++ * This information is advisory. The interrupt controller may not be capable
++ * of routing these IPIs to FIQ and the kernel will continue to work if they
++ * are routed to IRQ as normal.
 + */
- static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
- {
- 	int cpu;
--	unsigned long flags, map = 0;
-+	unsigned long map = 0;
++#define SMP_IPI_FIQ_MASK 0x80
++
+ #define raw_smp_processor_id() (current_thread_info()->cpu)
  
--	gic_migration_lock(&flags);
-+	gic_migration_lock();
+ struct seq_file;
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index fe517f1e88d8..853089e1aa8a 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -639,6 +639,11 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+ 		break;
  
- 	/* Convert our logical CPU mask into a physical one. */
- 	for_each_cpu(cpu, mask)
-@@ -799,7 +810,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
- 	/* this always happens on GIC0 */
- 	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
+ 	case IPI_CPU_BACKTRACE:
++		if (in_nmi()) {
++			nmi_cpu_backtrace(regs);
++			break;
++		}
++
+ 		irq_enter();
+ 		nmi_cpu_backtrace(regs);
+ 		irq_exit();
+@@ -750,6 +755,7 @@ static void raise_nmi(cpumask_t *mask)
+ 	if (cpumask_test_cpu(smp_processor_id(), mask) && irqs_disabled())
+ 		nmi_cpu_backtrace(NULL);
  
--	gic_migration_unlock(flags);
-+	gic_migration_unlock();
++	BUILD_BUG_ON(SMP_IPI_FIQ_MASK != BIT(IPI_CPU_BACKTRACE));
+ 	smp_cross_call(mask, IPI_CPU_BACKTRACE);
  }
- #endif
  
-@@ -847,7 +858,8 @@ int gic_get_cpu_id(unsigned int cpu)
-  * Migrate all peripheral interrupts with a target matching the current CPU
-  * to the interface corresponding to @new_cpu_id.  The CPU interface mapping
-  * is also updated.  Targets to other CPU interfaces are unchanged.
-- * This must be called with IRQs locally disabled.
-+ * This must be called from a task context and with IRQ and FIQ locally
-+ * disabled.
-  */
- void gic_migrate_target(unsigned int new_cpu_id)
- {
-@@ -878,9 +890,9 @@ void gic_migrate_target(unsigned int new_cpu_id)
- 	 * pending on the old cpu static. That means we can defer the
- 	 * migration until after we have released the irq_controller_lock.
- 	 */
--	raw_spin_lock(&cpu_map_migration_lock);
-+	write_lock(&cpu_map_migration_lock);
- 	gic_cpu_map[cpu] = 1 << new_cpu_id;
--	raw_spin_unlock(&cpu_map_migration_lock);
-+	write_unlock(&cpu_map_migration_lock);
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index bc698383e822..a04426ee7684 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -479,7 +479,14 @@ asmlinkage void __exception_irq_entry handle_fiq_as_nmi(struct pt_regs *regs)
  
- 	/*
- 	 * Find all the peripheral interrupts targetting the current
+ 	nmi_enter();
+ 
+-	/* nop. FIQ handlers for special arch/arm features can be added here. */
++	/*
++	 * Either the interrupt controller supports FIQ, meaning it will
++	 * do the right thing with this call, or we will end up treating a
++	 * spurious FIQ (which is normally fatal) as though it were an IRQ
++	 * which, although it risks deadlock, still gives us a sporting
++	 * chance of surviving long enough to log errors.
++	 */
++	handle_arch_irq(regs);
+ 
+ 	nmi_exit();
+ 
 -- 
 2.5.0
