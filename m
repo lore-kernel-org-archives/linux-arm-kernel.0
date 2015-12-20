@@ -1,53 +1,110 @@
-From: mweseloh42@gmail.com (Marcus Weseloh)
-Date: Sun, 20 Dec 2015 13:47:43 +0100
-Subject: [PATCH v5 2/2] spi: sun4i: Add support for wait time between word
- transmissions
-In-Reply-To: <20151218111627.GM30359@lukather>
-References: <1450352427-25350-1-git-send-email-mweseloh42@gmail.com>
- <1450352427-25350-3-git-send-email-mweseloh42@gmail.com>
- <20151218111627.GM30359@lukather>
-Message-ID: <CAGNoLaOf6ZDxi+skRKc6gQKzAJot=fvvX91xx+H3c4ni9P-gdQ@mail.gmail.com>
+From: caesar.upstream@gmail.com (Caesar Wang)
+Date: Sun, 20 Dec 2015 20:49:14 +0800
+Subject: [PATCH v1 0/6] Support the rk3036 Kylin board
+In-Reply-To: <9746732.gszC1tXaj9@diego>
+References: <1450362112-8075-1-git-send-email-wxt@rock-chips.com>
+ <9746732.gszC1tXaj9@diego>
+Message-ID: <5676A3CA.6090205@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Heiko,
 
-2015-12-18 12:16 GMT+01:00 Maxime Ripard <maxime.ripard@free-electrons.com>:
+? 2015?12?20? 01:16, Heiko St?bner ??:
+> Hi Caesar,
+>
+> Am Donnerstag, 17. Dezember 2015, 22:21:46 schrieb Caesar Wang:
+>> Kylin-board is based on RK3036 SOCs, add the initiation
+>> version for working.
+> I've applied:
+> - patch1 (please include the "rockchip:" part in dts subjects)
+> - patch3 (dito)
+> - patch4 (after merging in patch6 and dropping the hdmi+lcdc parts)
 
->>       sun4i_spi_write(sspi, SUN4I_CLK_CTL_REG, reg);
+Okay, thanks!
+
+Sync to the rockchip github 
+<https://github.com/rockchip-linux/kernel/commits/develop4.4>.
+
+> Please resubmit the missing parts (audio + graphics) against my dts-branch [0]
+> after the relevant maintainers have added the code-parts to their trees.
+
+For codec:
+RT5616 is existing  in
+https://git.kernel.org/cgit/linux/kernel/git/broonie/sound.git/log/?h=for-next 
+now.
+
+For 3036 vop:
+I would like wait a moment from Mark Yao updating the driver.
+
+
+>
+> Thanks
+> Heiko
+>
+> [0] https://git.kernel.org/cgit/linux/kernel/git/mmind/linux-rockchip.git/log/?h=v4.5-armsoc/dts32
+>
+>> This series patches have the following decriptions:
 >>
->> +     /*
->> +      * Setup wait time between words.
->> +      *
->> +      * Wait time is set in SPI_CLK cycles. The SPI hardware needs 3
->> +      * additional cycles to setup the wait counter, so the minimum delay
->> +      * time is 4 cycles.
->> +      */
->> +     if (spi->word_wait_ns) {
->> +             clk_ns = DIV_ROUND_UP(1000000000, tfr->speed_hz);
+>> PATCH[1/6]:
+>> ARM: dts: fix the correct pinctrl control for rk3036
+>>
+>> The pinctrl gpio pull up/down is incorrect since the rk3036 SoCs
+>> can't set the status in the internal.
+>> ---
+>>
+>> PATCH[2/6]:
+>> ARM: dts: add the lcdc and hdmi node for rk3036
+>>
+>> Add the devices is related to display.
+>> Based on the series patches of Mark Yao's
+>> ---
+>>
+>> PATCH[3/6]:
+>> ARM: dts: add the sdio/sdmmc node for rk3036
+>>
+>> Add the wifi/sd card work for kylin board.
+>> ---
+>>
+>> PATCH[4/6]:
+>> ARM: dts: rockchip: add the kylin board for rk3036
+>>
+>> Add the dts for kylin board.
+>> ---
+>>
+>> PATCH[5/6]:
+>> ARM: dts: add the sound codec for kylin board
+>>
+>> Make the codec rt5616 working on kylin board.
+>> The realteak have been upstream for Mark Brown,
+>> I guess need some days to review.
+>>
+>> ---
+>>
+>> PATCH[6/6]:
+>> ARM: dts: add the sdio node for kylin board
+>>
+>> Enable the sdio for kylin board.
+>> ---
+>>
+>>
+>>
+>> Caesar Wang (6):
+>>    ARM: dts: fix the correct pinctrl control for rk3036
+>>    ARM: dts: add the lcdc and hdmi node for rk3036
+>>    ARM: dts: add the sdio/sdmmc node for rk3036
+>>    ARM: dts: rockchip: add the kylin board for rk3036
+>>    ARM: dts: add the sound codec for kylin board
+>>    ARM: dts: add the sdio node for kylin board
+>>
+>>   Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
+>>   arch/arm/boot/dts/Makefile                         |   1 +
+>>   arch/arm/boot/dts/rk3036-kylin.dts                 | 345
+>> +++++++++++++++++++++ arch/arm/boot/dts/rk3036.dtsi                      |
+>> 167 ++++++++-- 4 files changed, 498 insertions(+), 19 deletions(-)
+>>   create mode 100644 arch/arm/boot/dts/rk3036-kylin.dts
 >
-> You should use the actual rate of the clock returned by clk_get_rate
-> (or probably just use mclk_rate).
->
-> The clock driver might round the frequency to something else than what
-> was set in clk_set_rate, which would make your calculation here a bit
-> off.
-
-Yes, good point! And as the wait clock counter is based on the actual
-SPI_CLK and not the mod clock, I need to calculate the exact clock
-myself before handling the wait clock setting. Will amend the patch
-and send a new version.
-
-While looking into this, I also noticed a problem with a previous
-patch of mine, which changed the spi-sun[46]i to use
-transfer->speed_hz instead of the spi->max_speed_hz: I also changed
-the mclk_rate calculation to be based on tfr->speed_hz, which should
-have stayed with spi->max_speed_hz. In the current state, the clock
-calculations only ever increase mclk_rate, wich leads to very
-different clocks being set depending on which clock was used on the
-previous transfer. Will send a fix for that as well in a separate
-patch.
-
-Cheers,
-
-   Marcus
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
