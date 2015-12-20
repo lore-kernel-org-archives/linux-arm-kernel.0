@@ -1,65 +1,50 @@
-From: caesar.upstream@gmail.com (Caesar Wang)
-Date: Sun, 20 Dec 2015 10:21:50 +0800
-Subject: [PATCH] nvmem: delete unneeded IS_ERR test
-In-Reply-To: <1450559973-9067-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1450559973-9067-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <567610BE.8010706@gmail.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Sun, 20 Dec 2015 04:22:39 +0200
+Subject: [PATCH v2 2/3] arm: dts: phy3250: add SD fixed regulator
+In-Reply-To: <1450567932-22994-3-git-send-email-vz@mleia.com>
+References: <1450567932-22994-3-git-send-email-vz@mleia.com>
+Message-ID: <1450578159-29216-1-git-send-email-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julia,
+The change adds fixed voltage regulator for SD controller, ARM MMCI
+controller driver uses it to control card power management.
 
-Thanks to check this, but there was a patch fixing it.:-)
+Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+---
+Changes from v1 to v2:
+* specify SD card power supply instead of signal power, thanks to Russell
 
+ arch/arm/boot/dts/phy3250.dts | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-? 2015?12?20? 05:19, Julia Lawall ??:
-> devm_kzalloc returns NULL rather than an ERR_PTR value.
->
-> The semantic match that finds this problem is as follows:
-> (http://coccinelle.lip6.fr/)
->
-> // <smpl>
-> @@
-> expression x,e;
-> @@
->
-> * x = devm_kzalloc(...)
-> ... when != x = e
-> * IS_ERR(x)
-> // </smpl>
->
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
->
-> ---
->   drivers/nvmem/rockchip-efuse.c |    4 ++--
->   1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
-> index f552134..811c73c 100644
-> --- a/drivers/nvmem/rockchip-efuse.c
-> +++ b/drivers/nvmem/rockchip-efuse.c
-> @@ -136,8 +136,8 @@ static int rockchip_efuse_probe(struct platform_device *pdev)
->   
->   	context = devm_kzalloc(dev, sizeof(struct rockchip_efuse_context),
->   			       GFP_KERNEL);
-> -	if (IS_ERR(context))
-> -		return PTR_ERR(context);
-> +	if (!context)
-> +		return -ENOMEM;
-
-Fixed in this patch[0].
-
-patch[0]:
-https://patchwork.kernel.org/patch/7842821/
-
-Thanks,
-Caesar
->   
->   	clk = devm_clk_get(dev, "pclk_efuse");
->   	if (IS_ERR(clk))
->
->
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+diff --git a/arch/arm/boot/dts/phy3250.dts b/arch/arm/boot/dts/phy3250.dts
+index 34e15fd..bcb87b3 100644
+--- a/arch/arm/boot/dts/phy3250.dts
++++ b/arch/arm/boot/dts/phy3250.dts
+@@ -45,6 +45,15 @@
+ 			enable-active-high;
+ 			regulator-boot-on;
+ 		};
++
++		sd_reg: fixed-regulator at 2 {
++			compatible = "regulator-fixed";
++			regulator-name = "sd_reg";
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <1800000>;
++			gpio = <&gpio 5 5 0>;
++			enable-active-high;
++		};
+ 	};
+ 
+ 	ahb {
+@@ -162,6 +171,7 @@
+ 				cd-gpios = <&gpio 3 1 0>;
+ 				cd-inverted;
+ 				bus-width = <4>;
++				vmmc-supply = <&sd_reg>;
+ 				status = "okay";
+ 			};
+ 		};
+-- 
+2.1.4
