@@ -1,178 +1,82 @@
-From: v1ron@mail.ru (Roman Volkov)
-Date: Mon, 21 Dec 2015 01:28:12 +0300
-Subject: [PATCH 4/4] clocksource/vt8500: Add register R/W functions
-In-Reply-To: <1450650492-18996-1-git-send-email-v1ron@mail.ru>
-References: <1450650492-18996-1-git-send-email-v1ron@mail.ru>
-Message-ID: <1450650492-18996-5-git-send-email-v1ron@mail.ru>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 21 Dec 2015 06:52:19 +0800
+Subject: [PATCH 4.4-rc5 v22 4/4] ARM: Allow IPI_CPU_BACKTRACE to exploit
+ FIQ
+In-Reply-To: <1450644757-18734-5-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <201512210611.VZD43TTL%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Roman Volkov <rvolkov@v1ros.org>
+Hi Daniel,
 
-vt8500 timer requires special synchronization for accessing some of its
-registers. Define special read and write functions to handle this process
-transparently.
+[auto build test ERROR on v4.4-rc5]
+[also build test ERROR on next-20151218]
+[cannot apply to tip/irq/core]
 
-To perform a read from the Timer Count register, user must write a one
-to the Timer Control register and wait for completion flag by polling the
-Timer Read Count Active bit.
+url:    https://github.com/0day-ci/linux/commits/Daniel-Thompson/irq-arm-Use-FIQ-for-NMI-backtrace-when-possible/20151221-045854
+config: arm-socfpga_defconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-To perform a write to the Count or Match registers, user must poll the
-write completion flag for the corresponding register to ensure that the
-previous write completed and then write the actual value.
+All error/warnings (new ones prefixed by >>):
 
-Signed-off-by: Roman Volkov <rvolkov@v1ros.org>
+   In file included from include/uapi/linux/stddef.h:1:0,
+                    from include/linux/stddef.h:4,
+                    from include/uapi/linux/posix_types.h:4,
+                    from include/uapi/linux/types.h:13,
+                    from include/linux/types.h:5,
+                    from include/linux/list.h:4,
+                    from include/linux/module.h:9,
+                    from arch/arm/kernel/smp.c:10:
+   arch/arm/kernel/smp.c: In function 'raise_nmi':
+>> include/linux/compiler.h:484:38: error: call to '__compiletime_assert_766' declared with attribute error: BUILD_BUG_ON failed: SMP_IPI_FIQ_MASK != BIT(IPI_CPU_BACKTRACE)
+     _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
+                                         ^
+   include/linux/compiler.h:467:4: note: in definition of macro '__compiletime_assert'
+       prefix ## suffix();    \
+       ^
+   include/linux/compiler.h:484:2: note: in expansion of macro '_compiletime_assert'
+     _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
+     ^
+   include/linux/bug.h:50:37: note: in expansion of macro 'compiletime_assert'
+    #define BUILD_BUG_ON_MSG(cond, msg) compiletime_assert(!(cond), msg)
+                                        ^
+   include/linux/bug.h:74:2: note: in expansion of macro 'BUILD_BUG_ON_MSG'
+     BUILD_BUG_ON_MSG(condition, "BUILD_BUG_ON failed: " #condition)
+     ^
+>> arch/arm/kernel/smp.c:766:2: note: in expansion of macro 'BUILD_BUG_ON'
+     BUILD_BUG_ON(SMP_IPI_FIQ_MASK != BIT(IPI_CPU_BACKTRACE));
+     ^
+
+vim +/__compiletime_assert_766 +484 include/linux/compiler.h
+
+9a8ab1c3 Daniel Santos  2013-02-21  478   *
+9a8ab1c3 Daniel Santos  2013-02-21  479   * In tradition of POSIX assert, this macro will break the build if the
+9a8ab1c3 Daniel Santos  2013-02-21  480   * supplied condition is *false*, emitting the supplied error message if the
+9a8ab1c3 Daniel Santos  2013-02-21  481   * compiler has support to do so.
+9a8ab1c3 Daniel Santos  2013-02-21  482   */
+9a8ab1c3 Daniel Santos  2013-02-21  483  #define compiletime_assert(condition, msg) \
+9a8ab1c3 Daniel Santos  2013-02-21 @484  	_compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
+9a8ab1c3 Daniel Santos  2013-02-21  485  
+47933ad4 Peter Zijlstra 2013-11-06  486  #define compiletime_assert_atomic_type(t)				\
+47933ad4 Peter Zijlstra 2013-11-06  487  	compiletime_assert(__native_word(t),				\
+
+:::::: The code at line 484 was first introduced by commit
+:::::: 9a8ab1c39970a4938a72d94e6fd13be88a797590 bug.h, compiler.h: introduce compiletime_assert & BUILD_BUG_ON_MSG
+
+:::::: TO: Daniel Santos <daniel.santos@pobox.com>
+:::::: CC: Linus Torvalds <torvalds@linux-foundation.org>
+
 ---
- drivers/clocksource/vt8500_timer.c | 90 +++++++++++++++++++++++++++-----------
- 1 file changed, 65 insertions(+), 25 deletions(-)
-
-diff --git a/drivers/clocksource/vt8500_timer.c b/drivers/clocksource/vt8500_timer.c
-index 7649852..4d7513f 100644
---- a/drivers/clocksource/vt8500_timer.c
-+++ b/drivers/clocksource/vt8500_timer.c
-@@ -38,36 +38,75 @@
- 
- #define VT8500_TIMER_OFFSET	0x0100
- #define VT8500_TIMER_HZ		3000000
--#define TIMER_MATCH_VAL		0x0000
-+#define TIMER_MATCH0_VAL	0
-+#define TIMER_MATCH1_VAL	0x04
-+#define TIMER_MATCH2_VAL	0x08
-+#define TIMER_MATCH3_VAL	0x0c
- #define TIMER_COUNT_VAL		0x0010
- #define TIMER_STATUS_VAL	0x0014
- #define TIMER_IER_VAL		0x001c		/* interrupt enable */
- #define TIMER_CTRL_VAL		0x0020
- #define TIMER_AS_VAL		0x0024		/* access status */
--#define TIMER_COUNT_R_ACTIVE	(1 << 5)	/* not ready for read */
--#define TIMER_COUNT_W_ACTIVE	(1 << 4)	/* not ready for write */
--#define TIMER_MATCH_W_ACTIVE	(1 << 0)	/* not ready for write */
--
--#define timer_readl(addr)	readl_relaxed(regbase + addr)
--#define timer_writel(v, addr)	writel_relaxed(v, regbase + addr)
-+/* R/W status flags */
-+#define TIMER_COUNT_R_ACTIVE	(1 << 5)
-+#define TIMER_COUNT_W_ACTIVE	(1 << 4)
-+#define TIMER_MATCH3_W_ACTIVE	(1 << 3)
-+#define TIMER_MATCH2_W_ACTIVE	(1 << 2)
-+#define TIMER_MATCH1_W_ACTIVE	(1 << 1)
-+#define TIMER_MATCH0_W_ACTIVE	(1 << 0)
-+
-+#define vt8500_timer_sync(bit)	{ while (readl_relaxed \
-+				    (regbase + TIMER_AS_VAL) & bit) \
-+					cpu_relax(); }
- 
- #define MIN_OSCR_DELTA		16
- 
- static void __iomem *regbase;
- 
--static cycle_t vt8500_timer_read(struct clocksource *cs)
-+static void vt8500_timer_write(unsigned long reg, u32 value)
-+{
-+	switch (reg) {
-+	case TIMER_COUNT_VAL:
-+		vt8500_timer_sync(TIMER_COUNT_W_ACTIVE);
-+		break;
-+	case TIMER_MATCH0_VAL:
-+		vt8500_timer_sync(TIMER_MATCH0_W_ACTIVE);
-+		break;
-+	case TIMER_MATCH1_VAL:
-+		vt8500_timer_sync(TIMER_MATCH1_W_ACTIVE);
-+		break;
-+	case TIMER_MATCH2_VAL:
-+		vt8500_timer_sync(TIMER_MATCH2_W_ACTIVE);
-+		break;
-+	case TIMER_MATCH3_VAL:
-+		vt8500_timer_sync(TIMER_MATCH3_W_ACTIVE);
-+		break;
-+	}
-+
-+	writel_relaxed(value, regbase + reg);
-+}
-+
-+static u32 vt8500_timer_read(unsigned long reg)
- {
--	timer_writel(3, TIMER_CTRL_VAL);
--	while (timer_readl(TIMER_AS_VAL) & TIMER_COUNT_R_ACTIVE)
--		cpu_relax();
-+	if (reg == TIMER_COUNT_VAL) {
-+		vt8500_timer_write(TIMER_CTRL_VAL, 3);
-+		vt8500_timer_sync(TIMER_COUNT_R_ACTIVE);
- 
--	return timer_readl(TIMER_COUNT_VAL);
-+		return readl_relaxed(regbase + TIMER_COUNT_VAL);
-+	}
-+
-+	return readl_relaxed(regbase + reg);
-+}
-+
-+static cycle_t vt8500_oscr0_read(struct clocksource *cs)
-+{
-+	return vt8500_timer_read(TIMER_COUNT_VAL);
- }
- 
- static struct clocksource clocksource = {
- 	.name           = "vt8500_timer",
- 	.rating         = 200,
--	.read           = vt8500_timer_read,
-+	.read           = vt8500_oscr0_read,
- 	.mask           = CLOCKSOURCE_MASK(32),
- 	.flags          = CLOCK_SOURCE_IS_CONTINUOUS,
- };
-@@ -75,23 +114,24 @@ static struct clocksource clocksource = {
- static int vt8500_timer_set_next_event(unsigned long cycles,
- 				    struct clock_event_device *evt)
- {
--	cycle_t alarm = clocksource.read(&clocksource) + cycles;
--	while (timer_readl(TIMER_AS_VAL) & TIMER_MATCH_W_ACTIVE)
--		cpu_relax();
--	timer_writel((unsigned long)alarm, TIMER_MATCH_VAL);
-+	unsigned long alarm = vt8500_timer_read(TIMER_COUNT_VAL) + cycles;
- 
--	if ((signed)(alarm - clocksource.read(&clocksource)) <= MIN_OSCR_DELTA)
-+	vt8500_timer_write(TIMER_MATCH0_VAL, alarm);
-+	if ((signed)(alarm - vt8500_timer_read(
-+				TIMER_COUNT_VAL)) <= MIN_OSCR_DELTA) {
- 		return -ETIME;
-+	}
- 
--	timer_writel(1, TIMER_IER_VAL);
-+	vt8500_timer_write(TIMER_IER_VAL, 1);
- 
- 	return 0;
- }
- 
- static int vt8500_shutdown(struct clock_event_device *evt)
- {
--	timer_writel(timer_readl(TIMER_CTRL_VAL) | 1, TIMER_CTRL_VAL);
--	timer_writel(0, TIMER_IER_VAL);
-+	vt8500_timer_write(TIMER_CTRL_VAL,
-+				vt8500_timer_read(TIMER_CTRL_VAL) | 1);
-+	vt8500_timer_write(TIMER_IER_VAL, 0);
- 	return 0;
- }
- 
-@@ -107,7 +147,7 @@ static struct clock_event_device clockevent = {
- static irqreturn_t vt8500_timer_interrupt(int irq, void *dev_id)
- {
- 	struct clock_event_device *evt = dev_id;
--	timer_writel(0xf, TIMER_STATUS_VAL);
-+	vt8500_timer_write(TIMER_STATUS_VAL, 0xf);
- 	evt->event_handler(evt);
- 
- 	return IRQ_HANDLED;
-@@ -137,9 +177,9 @@ static void __init vt8500_timer_init(struct device_node *np)
- 		return;
- 	}
- 
--	timer_writel(1, TIMER_CTRL_VAL);
--	timer_writel(0xf, TIMER_STATUS_VAL);
--	timer_writel(~0, TIMER_MATCH_VAL);
-+	vt8500_timer_write(TIMER_CTRL_VAL, 1);
-+	vt8500_timer_write(TIMER_STATUS_VAL, 0xf);
-+	vt8500_timer_write(TIMER_MATCH0_VAL, ~0);
- 
- 	if (clocksource_register_hz(&clocksource, VT8500_TIMER_HZ))
- 		pr_err("%s: vt8500_timer_init: clocksource_register failed for %s\n",
--- 
-2.6.2
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 15515 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151221/a9e75d33/attachment-0001.obj>
