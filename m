@@ -1,47 +1,71 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Sat, 19 Dec 2015 20:39:37 -0500
-Subject: [PATCH] serial: atmel: remove module device table
-In-Reply-To: <1540393.QjMdSgnH0N@wuerfel>
-References: <1540393.QjMdSgnH0N@wuerfel>
-Message-ID: <20151220013937.GC2772@windriver.com>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Sat, 19 Dec 2015 18:12:16 -0800
+Subject: [PATCH 1/3] dt-bindings: thermal: Add binding document for
+ Mediatek thermal controller
+In-Reply-To: <20151218071633.GG11966@pengutronix.de>
+References: <1448883753-19068-1-git-send-email-s.hauer@pengutronix.de>
+ <1448883753-19068-2-git-send-email-s.hauer@pengutronix.de>
+ <CAGS+omCPonvXBTjOqpKrJX0Ebw0KF6TDKH+zRas-3FaAhUWL2w@mail.gmail.com>
+ <20151217192329.GA7999@localhost.localdomain>
+ <20151218071633.GG11966@pengutronix.de>
+Message-ID: <20151220021214.GA11054@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[[PATCH] serial: atmel: remove module device table] On 18/12/2015 (Fri 15:49) Arnd Bergmann wrote:
+Hello Sascha,
 
-> A recent patch removed most of the module-specific code from the atmel
-> serial driver, but left the MODULE_DEVICE_TABLE in place, so we can't
-> build it any more:
-> 
-> drivers/tty/serial/atmel_serial.c:192:1: error: type defaults to 'int' in declaration of 'MODULE_DEVICE_TABLE' [-Werror=implicit-int]
-> drivers/tty/serial/atmel_serial.c:192:1: warning: parameter names (without types) in function declaration
-> 
-> This removes the table as well to avoid the error.
+On Fri, Dec 18, 2015 at 08:16:33AM +0100, Sascha Hauer wrote:
+> On Thu, Dec 17, 2015 at 11:23:31AM -0800, Eduardo Valentin wrote:
+> > On Wed, Dec 16, 2015 at 07:23:22PM +0800, Daniel Kurtz wrote:
+> > > On Mon, Nov 30, 2015 at 7:42 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > > > +Example:
 
-I sent the same fix on Thursday.  Again, sorry that my testing did
-not uncover this earlier.  I was build testing for ARM on almost a daily
-basis but not so regularly for MIPS.
+<cut>
 
-http://lkml.kernel.org/r/1450364746-815-1-git-send-email-paul.gortmaker at windriver.com
+> > > > +
+> > > > +       thermal: thermal at 1100b000 {
+> > > > +               #thermal-sensor-cells = <1>;
+> > > 
+> > > Tiny nit: this should now be:
+> > > 
+> > > #thermal-sensor-cells = <0>;
+> > 
+> > 
+> > This is actually not so tiny'shy. Why does this driver masks out all
+> > sensors available? Why don't we expose all of them and use id property
+> > to expose and identify each of them?
+> 
+> This has been the case until v9 of this series. It was requested by
+> Mediatek that the CPU frequency regulation works better when the maximum
+> of all sensors is taken instead of only single sensors. We decided to
+> expose the maximum of all sensors in the device tree. IN the end it will
+> be easier to add additional sensors should we need them later than it is
+> to get rid of sensors we don't need.
 
-Paul.
---
+Apologize as I completely missed this transition from v9 to v10. In
+fact, I really cannot understand the benefit of having such constraint
+implemented in the driver. In device tree you can mark a thermal zone as
+status disabled and it won't appear in your system.
+
+One can select which sensors / thermal zones are required. And even
+reuse same dtsi, and change status on dts per board. 
+
+The combination of the above, with the possibility to select the maximum
+from thermal core / sysfs, would be bring much more flexibility for a
+system engineer, than having the maximum coded in the driver, because,
+well, changing that relation would require changing the code. If you
+keep the driver as simple as possible, changing the this setup later
+would be as simple as changing the dts(i).
+
+What do you think?
+
+BR,
 
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: c39dfebc7798 ("drivers/tty/serial: make serial/atmel_serial.c explicitly non-modular")
+> Sascha
 > 
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index 50e785a0ea73..1c0884d8ef32 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -188,8 +188,6 @@ static const struct of_device_id atmel_serial_dt_ids[] = {
->  	{ .compatible = "atmel,at91sam9260-usart" },
->  	{ /* sentinel */ }
->  };
-> -
-> -MODULE_DEVICE_TABLE(of, atmel_serial_dt_ids);
->  #endif
->  
->  static inline struct atmel_uart_port *
-> 
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
