@@ -1,21 +1,32 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sat, 19 Dec 2015 21:38:29 -0600
-Subject: [PATCH v3 1/2] Documentation: DT: Add entry for ARM SP805-WDT
-In-Reply-To: <1450189825-29065-2-git-send-email-bhupesh.sharma@freescale.com>
-References: <1450189825-29065-1-git-send-email-bhupesh.sharma@freescale.com>
- <1450189825-29065-2-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <20151220033829.GF9883@rob-hp-laptop>
+Date: Sat, 19 Dec 2015 21:39:12 -0600
+Subject: [PATCH] arm64: perf: Correct Cortex-A53/A57 compatible values
+In-Reply-To: <20151217121955.GE11456@arm.com>
+References: <1450168400-462-1-git-send-email-geert+renesas@glider.be>
+ <20151215103659.GB31299@leverpostej>
+ <20151215104242.GC9452@arm.com> <20151217121955.GE11456@arm.com>
+Message-ID: <20151220033912.GJ9883@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 15, 2015 at 08:00:24PM +0530, Bhupesh Sharma wrote:
-> This patch adds a devicetree binding documentation for ARM's
-> SP805 WatchDog Timer.
+On Thu, Dec 17, 2015 at 12:19:56PM +0000, Will Deacon wrote:
+> On Tue, Dec 15, 2015 at 10:42:42AM +0000, Will Deacon wrote:
+> > On Tue, Dec 15, 2015 at 10:37:00AM +0000, Mark Rutland wrote:
+> > > On Tue, Dec 15, 2015 at 09:33:20AM +0100, Geert Uytterhoeven wrote:
+> > > > Use commas instead of periods.
+> > > > 
+> > > > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > > 
+> > > Acked-by: Mark Rutland <mark.rutland@arm.com>
+> > 
+> > Cheers, Mark.
+> > 
+> > Rob -- do you want to pick this up, or shall I queue it on my perf
+> > branch?
 > 
-> Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
-> ---
->  .../devicetree/bindings/watchdog/sp805-wdt.txt     |   29 ++++++++++++++++++++
->  1 file changed, 29 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
+> Since it's so trivial and also has Mark's ack, I've queued this in the
+> ARM perf tree.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Okay, no problem.
+
+Rob
