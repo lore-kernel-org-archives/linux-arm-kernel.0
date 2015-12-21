@@ -1,373 +1,151 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Mon, 21 Dec 2015 12:00:35 -0800
-Subject: [PATCH v3 5/8] phy: rockchip-usb: expose the phy-internal PLLs
-In-Reply-To: <566FF124.1030501@ti.com>
-References: <1447968149-10979-1-git-send-email-heiko@sntech.de>
- <1447968149-10979-6-git-send-email-heiko@sntech.de> <566FF124.1030501@ti.com>
-Message-ID: <CAEG3pNA3s+KhVArsoNTqq4VnB5TgFtS3n_D-hjFhPdrC8AL=HA@mail.gmail.com>
+From: v1ron@mail.ru (Roman Volkov)
+Date: Mon, 21 Dec 2015 23:33:59 +0300
+Subject: [PATCH 0/4] clocksource/vt8500: Fix hangs in small delays
+In-Reply-To: <20151221112916.40373d2f@anonymous>
+References: <1450650492-18996-1-git-send-email-v1ron@mail.ru>
+ <20151221112916.40373d2f@anonymous>
+Message-ID: <20151221233359.268fe6da@anonymous>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kishon & Heiko,
+> Roman Volkov <v1ron <at> mail.ru> writes:
+> 
+> > 
+> > From: Roman Volkov <rvolkov <at> v1ros.org>
+> > 
+> > vt8500 timer requires special synchronization for accessing some of
+> > its registers. Define special read and write functions to handle
+> > this process transparently.
+> 
+> Maybe introduce such accessor functions (conditionally) into the PXA
+> driver and kill this one altogether then?
 
-On Tue, Dec 15, 2015 at 2:53 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> Hi Mike,
->
-> On Friday 20 November 2015 02:52 AM, Heiko Stuebner wrote:
->> The USB phys on Rockchip SoCs contain their own internal PLLs to create
->> the 480MHz needed. Additionally this PLL output is also fed back into the
->> core clock-controller as possible source for clocks like the GPU or others.
->>
->> Until now this was modelled incorrectly with a "virtual" factor clock in
->> the clock controller. The one big caveat is that if we turn off the usb phy
->> via the siddq signal, all analog components get turned off, including the
->> PLLs. It is therefore possible that a source clock gets disabled without
->> the clock driver ever knowing, possibly making the system hang.
->>
->> Therefore register the phy-plls as real clocks that the clock driver can
->> then reference again normally, making the clock hirarchy finally reflect
->> the actual hardware.
->>
->> The phy-ops get converted to simply turning that new clock on and off
->> which in turn controls the siddq signal of the phy.
->>
->> Through this the driver gains handling for platform-specific data, to
->> handle the phy->clock name association.
->
-> Are you okay with this patch/ Can you give your Acked-by?
+I don't think maintainers will accept a lot of #ifdefs. I have an idea
+to move the common code from the PXA to something like pxa_common.c
+(can we give the correct name for it?) and include it from the
+vt8500_timer.c and pxa_timer.c.
 
-Acked-by: Michael Turquette <mturquette@baylibre.com>
+> If I understood you right, this extra bus synchronization is the only
+> thing that makes vt8500 different from PXA, so merging the two files
+> right away might be a better long-term option.
 
->
-> Thanks
-> Kishon
->
->>
->> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
->> Reviewed-by: Douglas Anderson <dianders@chromium.org>
->> ---
->>  .../devicetree/bindings/phy/rockchip-usb-phy.txt   |   1 +
->>  drivers/phy/phy-rockchip-usb.c                     | 188 ++++++++++++++++++---
->>  2 files changed, 162 insertions(+), 27 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt b/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt
->> index 9b37242..68498d5 100644
->> --- a/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt
->> +++ b/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt
->> @@ -24,6 +24,7 @@ required properties:
->>  Optional Properties:
->>  - clocks : phandle + clock specifier for the phy clocks
->>  - clock-names: string, clock name, must be "phyclk"
->> +- #clock-cells: for users of the phy-pll, should be 0
->>
->>  Example:
->>
->> diff --git a/drivers/phy/phy-rockchip-usb.c b/drivers/phy/phy-rockchip-usb.c
->> index 16cd533..33a80eb 100644
->> --- a/drivers/phy/phy-rockchip-usb.c
->> +++ b/drivers/phy/phy-rockchip-usb.c
->> @@ -15,12 +15,14 @@
->>   */
->>
->>  #include <linux/clk.h>
->> +#include <linux/clk-provider.h>
->>  #include <linux/io.h>
->>  #include <linux/kernel.h>
->>  #include <linux/module.h>
->>  #include <linux/mutex.h>
->>  #include <linux/of.h>
->>  #include <linux/of_address.h>
->> +#include <linux/of_platform.h>
->>  #include <linux/phy/phy.h>
->>  #include <linux/platform_device.h>
->>  #include <linux/regulator/consumer.h>
->> @@ -36,15 +38,28 @@
->>  #define SIDDQ_ON             BIT(13)
->>  #define SIDDQ_OFF            (0 << 13)
->>
->> +struct rockchip_usb_phys {
->> +     int reg;
->> +     const char *pll_name;
->> +};
->> +
->> +struct rockchip_usb_phy_pdata {
->> +     struct rockchip_usb_phys *phys;
->> +};
->> +
->>  struct rockchip_usb_phy_base {
->>       struct device *dev;
->>       struct regmap *reg_base;
->> +     const struct rockchip_usb_phy_pdata *pdata;
->>  };
->>
->>  struct rockchip_usb_phy {
->>       struct rockchip_usb_phy_base *base;
->> +     struct device_node *np;
->>       unsigned int    reg_offset;
->>       struct clk      *clk;
->> +     struct clk      *clk480m;
->> +     struct clk_hw   clk480m_hw;
->>       struct phy      *phy;
->>  };
->>
->> @@ -55,17 +70,59 @@ static int rockchip_usb_phy_power(struct rockchip_usb_phy *phy,
->>                           SIDDQ_WRITE_ENA | (siddq ? SIDDQ_ON : SIDDQ_OFF));
->>  }
->>
->> -static int rockchip_usb_phy_power_off(struct phy *_phy)
->> +static unsigned long rockchip_usb_phy480m_recalc_rate(struct clk_hw *hw,
->> +                                             unsigned long parent_rate)
->>  {
->> -     struct rockchip_usb_phy *phy = phy_get_drvdata(_phy);
->> -     int ret = 0;
->> +     return 480000000;
->> +}
->> +
->> +static void rockchip_usb_phy480m_disable(struct clk_hw *hw)
->> +{
->> +     struct rockchip_usb_phy *phy = container_of(hw,
->> +                                                 struct rockchip_usb_phy,
->> +                                                 clk480m_hw);
->>
->>       /* Power down usb phy analog blocks by set siddq 1 */
->> -     ret = rockchip_usb_phy_power(phy, 1);
->> -     if (ret)
->> +     rockchip_usb_phy_power(phy, 1);
->> +}
->> +
->> +static int rockchip_usb_phy480m_enable(struct clk_hw *hw)
->> +{
->> +     struct rockchip_usb_phy *phy = container_of(hw,
->> +                                                 struct rockchip_usb_phy,
->> +                                                 clk480m_hw);
->> +
->> +     /* Power up usb phy analog blocks by set siddq 0 */
->> +     return rockchip_usb_phy_power(phy, 0);
->> +}
->> +
->> +static int rockchip_usb_phy480m_is_enabled(struct clk_hw *hw)
->> +{
->> +     struct rockchip_usb_phy *phy = container_of(hw,
->> +                                                 struct rockchip_usb_phy,
->> +                                                 clk480m_hw);
->> +     int ret;
->> +     u32 val;
->> +
->> +     ret = regmap_read(phy->base->reg_base, phy->reg_offset, &val);
->> +     if (ret < 0)
->>               return ret;
->>
->> -     clk_disable_unprepare(phy->clk);
->> +     return (val & SIDDQ_ON) ? 0 : 1;
->> +}
->> +
->> +static const struct clk_ops rockchip_usb_phy480m_ops = {
->> +     .enable = rockchip_usb_phy480m_enable,
->> +     .disable = rockchip_usb_phy480m_disable,
->> +     .is_enabled = rockchip_usb_phy480m_is_enabled,
->> +     .recalc_rate = rockchip_usb_phy480m_recalc_rate,
->> +};
->> +
->> +static int rockchip_usb_phy_power_off(struct phy *_phy)
->> +{
->> +     struct rockchip_usb_phy *phy = phy_get_drvdata(_phy);
->> +
->> +     clk_disable_unprepare(phy->clk480m);
->>
->>       return 0;
->>  }
->> @@ -73,20 +130,8 @@ static int rockchip_usb_phy_power_off(struct phy *_phy)
->>  static int rockchip_usb_phy_power_on(struct phy *_phy)
->>  {
->>       struct rockchip_usb_phy *phy = phy_get_drvdata(_phy);
->> -     int ret = 0;
->>
->> -     ret = clk_prepare_enable(phy->clk);
->> -     if (ret)
->> -             return ret;
->> -
->> -     /* Power up usb phy analog blocks by set siddq 0 */
->> -     ret = rockchip_usb_phy_power(phy, 0);
->> -     if (ret) {
->> -             clk_disable_unprepare(phy->clk);
->> -             return ret;
->> -     }
->> -
->> -     return 0;
->> +     return clk_prepare_enable(phy->clk480m);
->>  }
->>
->>  static const struct phy_ops ops = {
->> @@ -99,6 +144,9 @@ static void rockchip_usb_phy_action(void *data)
->>  {
->>       struct rockchip_usb_phy *rk_phy = data;
->>
->> +     of_clk_del_provider(rk_phy->np);
->> +     clk_unregister(rk_phy->clk480m);
->> +
->>       if (rk_phy->clk)
->>               clk_put(rk_phy->clk);
->>  }
->> @@ -108,13 +156,16 @@ static int rockchip_usb_phy_init(struct rockchip_usb_phy_base *base,
->>  {
->>       struct rockchip_usb_phy *rk_phy;
->>       unsigned int reg_offset;
->> -     int err;
->> +     const char *clk_name;
->> +     struct clk_init_data init;
->> +     int err, i;
->>
->>       rk_phy = devm_kzalloc(base->dev, sizeof(*rk_phy), GFP_KERNEL);
->>       if (!rk_phy)
->>               return -ENOMEM;
->>
->>       rk_phy->base = base;
->> +     rk_phy->np = child;
->>
->>       if (of_property_read_u32(child, "reg", &reg_offset)) {
->>               dev_err(base->dev, "missing reg property in node %s\n",
->> @@ -124,14 +175,54 @@ static int rockchip_usb_phy_init(struct rockchip_usb_phy_base *base,
->>
->>       rk_phy->reg_offset = reg_offset;
->>
->> -     err = devm_add_action(base->dev, rockchip_usb_phy_action, rk_phy);
->> -     if (err)
->> -             return err;
->> -
->>       rk_phy->clk = of_clk_get_by_name(child, "phyclk");
->>       if (IS_ERR(rk_phy->clk))
->>               rk_phy->clk = NULL;
->>
->> +     i = 0;
->> +     init.name = NULL;
->> +     while (base->pdata->phys[i].reg) {
->> +             if (base->pdata->phys[i].reg == reg_offset) {
->> +                     init.name = base->pdata->phys[i].pll_name;
->> +                     break;
->> +             }
->> +             i++;
->> +     }
->> +
->> +     if (!init.name) {
->> +             dev_err(base->dev, "phy data not found\n");
->> +             return -EINVAL;
->> +     }
->> +
->> +     if (rk_phy->clk) {
->> +             clk_name = __clk_get_name(rk_phy->clk);
->> +             init.flags = 0;
->> +             init.parent_names = &clk_name;
->> +             init.num_parents = 1;
->> +     } else {
->> +             init.flags = CLK_IS_ROOT;
->> +             init.parent_names = NULL;
->> +             init.num_parents = 0;
->> +     }
->> +
->> +     init.ops = &rockchip_usb_phy480m_ops;
->> +     rk_phy->clk480m_hw.init = &init;
->> +
->> +     rk_phy->clk480m = clk_register(base->dev, &rk_phy->clk480m_hw);
->> +     if (IS_ERR(rk_phy->clk480m)) {
->> +             err = PTR_ERR(rk_phy->clk480m);
->> +             goto err_clk;
->> +     }
->> +
->> +     err = of_clk_add_provider(child, of_clk_src_simple_get,
->> +                               rk_phy->clk480m);
->> +     if (err < 0)
->> +             goto err_clk_prov;
->> +
->> +     err = devm_add_action(base->dev, rockchip_usb_phy_action, rk_phy);
->> +     if (err)
->> +             goto err_devm_action;
->> +
->>       rk_phy->phy = devm_phy_create(base->dev, child, &ops);
->>       if (IS_ERR(rk_phy->phy)) {
->>               dev_err(base->dev, "failed to create PHY\n");
->> @@ -141,13 +232,48 @@ static int rockchip_usb_phy_init(struct rockchip_usb_phy_base *base,
->>
->>       /* only power up usb phy when it use, so disable it when init*/
->>       return rockchip_usb_phy_power(rk_phy, 1);
->> +
->> +err_devm_action:
->> +     of_clk_del_provider(child);
->> +err_clk_prov:
->> +     clk_unregister(rk_phy->clk480m);
->> +err_clk:
->> +     if (rk_phy->clk)
->> +             clk_put(rk_phy->clk);
->> +     return err;
->>  }
->>
->> +static const struct rockchip_usb_phy_pdata rk3066a_pdata = {
->> +     .phys = (struct rockchip_usb_phys[]){
->> +             { .reg = 0x17c, .pll_name = "sclk_otgphy0_480m" },
->> +             { .reg = 0x188, .pll_name = "sclk_otgphy1_480m" },
->> +             { /* sentinel */ }
->> +     },
->> +};
->> +
->> +static const struct rockchip_usb_phy_pdata rk3188_pdata = {
->> +     .phys = (struct rockchip_usb_phys[]){
->> +             { .reg = 0x10c, .pll_name = "sclk_otgphy0_480m" },
->> +             { .reg = 0x11c, .pll_name = "sclk_otgphy1_480m" },
->> +             { /* sentinel */ }
->> +     },
->> +};
->> +
->> +static const struct rockchip_usb_phy_pdata rk3288_pdata = {
->> +     .phys = (struct rockchip_usb_phys[]){
->> +             { .reg = 0x320, .pll_name = "sclk_otgphy0_480m" },
->> +             { .reg = 0x334, .pll_name = "sclk_otgphy1_480m" },
->> +             { .reg = 0x348, .pll_name = "sclk_otgphy2_480m" },
->> +             { /* sentinel */ }
->> +     },
->> +};
->> +
->>  static int rockchip_usb_phy_probe(struct platform_device *pdev)
->>  {
->>       struct device *dev = &pdev->dev;
->>       struct rockchip_usb_phy_base *phy_base;
->>       struct phy_provider *phy_provider;
->> +     const struct of_device_id *match;
->>       struct device_node *child;
->>       int err;
->>
->> @@ -155,6 +281,14 @@ static int rockchip_usb_phy_probe(struct platform_device *pdev)
->>       if (!phy_base)
->>               return -ENOMEM;
->>
->> +     match = of_match_device(dev->driver->of_match_table, dev);
->> +     if (!match || !match->data) {
->> +             dev_err(dev, "missing phy data\n");
->> +             return -EINVAL;
->> +     }
->> +
->> +     phy_base->pdata = match->data;
->> +
->>       phy_base->dev = dev;
->>       phy_base->reg_base = syscon_regmap_lookup_by_phandle(dev->of_node,
->>                                                            "rockchip,grf");
->> @@ -176,9 +310,9 @@ static int rockchip_usb_phy_probe(struct platform_device *pdev)
->>  }
->>
->>  static const struct of_device_id rockchip_usb_phy_dt_ids[] = {
->> -     { .compatible = "rockchip,rk3066a-usb-phy" },
->> -     { .compatible = "rockchip,rk3188-usb-phy" },
->> -     { .compatible = "rockchip,rk3288-usb-phy" },
->> +     { .compatible = "rockchip,rk3066a-usb-phy", .data = &rk3066a_pdata },
->> +     { .compatible = "rockchip,rk3188-usb-phy", .data = &rk3188_pdata },
->> +     { .compatible = "rockchip,rk3288-usb-phy", .data = &rk3288_pdata },
->>       {}
->>  };
->>
->>
+Sure. But lets make the vt8500 working at this step.
 
+> > To perform a read from the Timer Count register, user must write a
+> > one to the Timer Control register and wait for completion flag by
+> > polling the Timer Read Count Active bit.
+> > 
+> > To perform a write to the Count or Match registers, user must poll
+> > the write completion flag for the corresponding register to ensure
+> > that the previous write completed and then write the actual value.
+> > 
+> > Signed-off-by: Roman Volkov <rvolkov <at> v1ros.org>
+> > ---
+> >  drivers/clocksource/vt8500_timer.c | 90
+> +++++++++++++++++++++++++++-----------
+> >  1 file changed, 65 insertions(+), 25 deletions(-)
+> 
+> > diff --git a/drivers/clocksource/vt8500_timer.c
+> b/drivers/clocksource/vt8500_timer.c
+> > index 7649852..4d7513f 100644
+> > --- a/drivers/clocksource/vt8500_timer.c
+> > +++ b/drivers/clocksource/vt8500_timer.c
+> >  <at>  <at>  -38,36 +38,75  <at>  <at> 
+> > 
+> >  #define VT8500_TIMER_OFFSET	0x0100
+> >  #define VT8500_TIMER_HZ		3000000
+> > -#define TIMER_MATCH_VAL		0x0000
+> > +#define TIMER_MATCH0_VAL	0
+> > +#define TIMER_MATCH1_VAL	0x04
+> > +#define TIMER_MATCH2_VAL	0x08
+> > +#define TIMER_MATCH3_VAL	0x0c
+> >  #define TIMER_COUNT_VAL		0x0010
+> >  #define TIMER_STATUS_VAL	0x0014
+> >  #define TIMER_IER_VAL		0x001c		/*
+> > interrupt enable */ #define TIMER_CTRL_VAL		0x0020
+> >  #define TIMER_AS_VAL		0x0024		/*
+> > access status */ -#define TIMER_COUNT_R_ACTIVE	(1 <<
+> > 5)	/* not ready for read */ -#define
+> > TIMER_COUNT_W_ACTIVE	(1 << 4)	/* not ready for write
+> > */ -#define TIMER_MATCH_W_ACTIVE	(1 << 0)	/* not
+> > ready for write */ - -#define timer_readl(addr)
+> > readl_relaxed(regbase + addr) -#define timer_writel(v, addr)
+> > writel_relaxed(v, regbase + addr) +/* R/W status flags */
+> > +#define TIMER_COUNT_R_ACTIVE	(1 << 5)
+> > +#define TIMER_COUNT_W_ACTIVE	(1 << 4)
+> > +#define TIMER_MATCH3_W_ACTIVE	(1 << 3)
+> > +#define TIMER_MATCH2_W_ACTIVE	(1 << 2)
+> > +#define TIMER_MATCH1_W_ACTIVE	(1 << 1)
+> > +#define TIMER_MATCH0_W_ACTIVE	(1 << 0)
+> > +
+> > +#define vt8500_timer_sync(bit)	{ while (readl_relaxed \
+> > +				    (regbase + TIMER_AS_VAL) &
+> > bit) \
+> > +					cpu_relax(); }
+> 
+> The whole issue around 'loops' counter in these busy waits basically
+> boils down to whether we would like a way to try and recover from a
+> potential hardware misbehavior.
+> 
+> You can of course argue that when the system timer misbehaves you
+> already have bigger issues to worry about, but does a 10 msec limit
+> that was in the original version really hurt?
 
+If we do the merging work with PXA, this code will go away. Have this
+variable already fixed some _real_ problem? Otherwise this is excessive
+coding.
 
--- 
-Michael Turquette
-CEO
-BayLibre - At the Heart of Embedded Linux
-http://baylibre.com/
+> >  #define MIN_OSCR_DELTA		16
+> > 
+> >  static void __iomem *regbase;
+> > 
+> > -static cycle_t vt8500_timer_read(struct clocksource *cs)
+> > +static void vt8500_timer_write(unsigned long reg, u32 value)
+> 
+> Maybe define this with 'value' first, 'reg' second - to be in line
+> with the common prototype of writel and such?
+
+Oh my right-handed habits :)
+
+> Plus if you could take the same name for the macro above
+> (timer_writel) and this accessor (vt8500_timer_write) that would
+> somewhat reduce extra additions/deletions in this patch. Same for the
+> read function.
+
+When we perform our merging work, we have to use the following glue:
+...
+vt8500_timer_read { ... }
+#define timer_read(reg)	vt8500_timer_read(reg)
+...
+#include pxa_common.c
+
+> <skip>
+> 
+> >  <at>  <at>  -75,23 +114,24  <at>  <at>  static struct clocksource
+> clocksource = {
+> >  static int vt8500_timer_set_next_event(unsigned long cycles,
+> >  				    struct clock_event_device *evt)
+> >  {
+> > -	cycle_t alarm = clocksource.read(&clocksource) + cycles;
+> > -	while (timer_readl(TIMER_AS_VAL) & TIMER_MATCH_W_ACTIVE)
+> > -		cpu_relax();
+> > -	timer_writel((unsigned long)alarm, TIMER_MATCH_VAL);
+> > +	unsigned long alarm = vt8500_timer_read(TIMER_COUNT_VAL) +
+> > cycles;
+> 
+> I personally like the form above better (via clocksource.read) - even
+> if just for the fact that it's shorter and reduces the number of
+> places where we use TIMER_COUNT_VAL definition.
+> 
+> Any specific reasons to rewrite it?
+
+To avoid calculation of the 64-bit cycle_t and remove type casts.
+
+> > -	if ((signed)(alarm - clocksource.read(&clocksource)) <=
+> > MIN_OSCR_DELTA)
+> > +	vt8500_timer_write(TIMER_MATCH0_VAL, alarm);
+> > +	if ((signed)(alarm - vt8500_timer_read(
+> > +				TIMER_COUNT_VAL)) <=
+> > MIN_OSCR_DELTA) {
+> 
+> Same here.
