@@ -1,46 +1,62 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 21 Dec 2015 15:19:02 +0100
-Subject: [PATCH 0/4] Use new MSI infrastructure on Marvell EBU
-Message-ID: <1450707546-15060-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Mon, 21 Dec 2015 15:19:03 +0100
+Subject: [PATCH 1/4] irqchip: irq-armada-370-xp: add Kconfig option for the
+ driver
+In-Reply-To: <1450707546-15060-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1450707546-15060-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1450707546-15060-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Instead of building the irq-armada-370-xp driver directly when
+CONFIG_ARCH_MVEBU is enabled, this commit introduces an intermediate
+CONFIG_ARMADA_370_XP_IRQ hidden Kconfig option.
 
-IMPORTANT: do not apply the following set of patches now. They depend
-on two irqdomain fixes from Marc Zyngier, which he hasn't submitted
-yet. So this patch series is currently for review.
+This allows this option to select other interrupt-related Kconfig
+options (which will be needed in follow-up commits) rather than having
+such selects done from arch/arm/mach-<foo>/.
 
-(In fact patches 1 and 4 and be applied now, but patches 2 and 3 will
-have to wait until Marc submits his patches.)
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/irqchip/Kconfig  | 5 +++++
+ drivers/irqchip/Makefile | 2 +-
+ 2 files changed, 6 insertions(+), 1 deletion(-)
 
-For those interested, the two fixes needed are available at
-https://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/log/?h=irq/irqdomain-fixes.
-
-This patch series converts the Armada 370/XP irqchip driver (also used
-on Armada 375, 38x and 39x) to the new MSI infrastructure put in place
-by Marc. It doesn't bring any functional difference other than using
-the right, modern, MSI mechanism, which might ultimately allow Marc to
-remove the old way of implementing MSI support.
-
-It has been tested on Armada 38x and Armada XP with an Intel e1000e
-NIC which uses MSI.
-
-Thanks,
-
-Thomas
-
-Thomas Petazzoni (4):
-  irqchip: irq-armada-370-xp: add Kconfig option for the driver
-  irqchip: irq-armada-370-xp: use the generic MSI infrastructure
-  irqchip: irq-armada-370-xp: use shorter names for irq_chip
-  ARM: mvebu: use the ARMADA_370_XP_IRQ option
-
- arch/arm/mach-mvebu/Kconfig         |   6 +-
- drivers/irqchip/Kconfig             |   6 ++
- drivers/irqchip/Makefile            |   2 +-
- drivers/irqchip/irq-armada-370-xp.c | 153 +++++++++++++++---------------------
- 4 files changed, 77 insertions(+), 90 deletions(-)
-
+diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+index 4d7294e..ab672b0 100644
+--- a/drivers/irqchip/Kconfig
++++ b/drivers/irqchip/Kconfig
+@@ -47,6 +47,11 @@ config ARM_VIC_NR
+ 	  The maximum number of VICs available in the system, for
+ 	  power management.
+ 
++config ARMADA_370_XP_IRQ
++	bool
++	default y if ARCH_MVEBU
++	select GENERIC_IRQ_CHIP
++
+ config ATMEL_AIC_IRQ
+ 	bool
+ 	select GENERIC_IRQ_CHIP
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index 177f78f..4d740d8 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -5,7 +5,6 @@ obj-$(CONFIG_ARCH_BCM2835)		+= irq-bcm2836.o
+ obj-$(CONFIG_ARCH_EXYNOS)		+= exynos-combiner.o
+ obj-$(CONFIG_ARCH_HIP04)		+= irq-hip04.o
+ obj-$(CONFIG_ARCH_MMP)			+= irq-mmp.o
+-obj-$(CONFIG_ARCH_MVEBU)		+= irq-armada-370-xp.o
+ obj-$(CONFIG_IRQ_MXS)			+= irq-mxs.o
+ obj-$(CONFIG_ARCH_TEGRA)		+= irq-tegra.o
+ obj-$(CONFIG_ARCH_S3C24XX)		+= irq-s3c24xx.o
+@@ -26,6 +25,7 @@ obj-$(CONFIG_ARM_GIC_V3)		+= irq-gic-v3.o irq-gic-common.o
+ obj-$(CONFIG_ARM_GIC_V3_ITS)		+= irq-gic-v3-its.o irq-gic-v3-its-pci-msi.o irq-gic-v3-its-platform-msi.o
+ obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
+ obj-$(CONFIG_ARM_VIC)			+= irq-vic.o
++obj-$(CONFIG_ARMADA_370_XP_IRQ)		+= irq-armada-370-xp.o
+ obj-$(CONFIG_ATMEL_AIC_IRQ)		+= irq-atmel-aic-common.o irq-atmel-aic.o
+ obj-$(CONFIG_ATMEL_AIC5_IRQ)	+= irq-atmel-aic-common.o irq-atmel-aic5.o
+ obj-$(CONFIG_I8259)			+= irq-i8259.o
 -- 
 2.6.4
