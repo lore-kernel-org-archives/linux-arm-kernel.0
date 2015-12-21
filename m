@@ -1,68 +1,158 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Mon, 21 Dec 2015 07:44:10 +0300
-Subject: [PATCH v5] arm64: run-time detection for aarch32 support
-Message-ID: <1450673050-12101-1-git-send-email-ynorov@caviumnetworks.com>
+From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
+Date: Mon, 21 Dec 2015 05:23:47 +0000
+Subject: [PATCH v11] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
+ PCIe Host Controller
+In-Reply-To: <8520D5D51A55D047800579B09414719825869EDC@XAP-PVEXMBX01.xlnx.xilinx.com>
+References: <1448798633-12697-1-git-send-email-bharatku@xilinx.com>
+ <20151209231921.GI31930@localhost>
+ <8520D5D51A55D047800579B09414719825869A85@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <20151210201817.GB367@localhost>
+ <8520D5D51A55D047800579B09414719825869EDC@XAP-PVEXMBX01.xlnx.xilinx.com>
+Message-ID: <8520D5D51A55D047800579B0941471982586BC8D@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kernel option COMPAT defines the ability of executing aarch32 binaries.
-Some platforms does not support aarch32 mode, and so cannot execute that
-binaries. But we cannot just disable COMPAT for them because the same
-kernel binary may be used by multiple platforms.
+Hi Bjorn, can you comment on this. Marc has also replied for query on irq_dispose_mapping().
 
-In this patch, system_supports_aarch32_el0() is introduced to detect
-aarch32 support at run-time.
-
-v4: use new CPU Feature API.
-v5: use cpuid_feature_extract_field.
-
-Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
----
- arch/arm64/include/asm/cpufeature.h | 7 +++++++
- arch/arm64/include/asm/elf.h        | 6 ++++--
- 2 files changed, 11 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 8f271b8..bcb0dbe 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -184,6 +184,13 @@ static inline bool system_supports_mixed_endian_el0(void)
- 	return id_aa64mmfr0_mixed_endian_el0(read_system_reg(SYS_ID_AA64MMFR0_EL1));
- }
- 
-+static inline bool system_supports_aarch32_el0(void)
-+{
-+	u64 pfr0 = read_system_reg(SYS_ID_AA64PFR0_EL1);
-+	return cpuid_feature_extract_field(pfr0, ID_AA64PFR0_EL0_SHIFT)
-+						!= ID_AA64PFR0_EL0_64BIT_ONLY;
-+}
-+
- #endif /* __ASSEMBLY__ */
- 
- #endif
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index faad6df..99ec9ac 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -21,6 +21,7 @@
- /*
-  * ELF register definitions..
-  */
-+#include <asm/cpufeature.h>
- #include <asm/ptrace.h>
- #include <asm/user.h>
- 
-@@ -173,8 +174,9 @@ typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_ELF_NGREG];
- 
- /* AArch32 EABI. */
- #define EF_ARM_EABI_MASK		0xff000000
--#define compat_elf_check_arch(x)	(((x)->e_machine == EM_ARM) && \
--					 ((x)->e_flags & EF_ARM_EABI_MASK))
-+#define compat_elf_check_arch(x)	(system_supports_aarch32_el0()	\
-+					 && ((x)->e_machine == EM_ARM)	\
-+					 && ((x)->e_flags & EF_ARM_EABI_MASK))
- 
- #define compat_start_thread		compat_start_thread
- #define COMPAT_SET_PERSONALITY(ex)	set_thread_flag(TIF_32BIT);
--- 
-2.5.0
+> Subject: RE: [PATCH v11] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
+> PCIe Host Controller
+> 
+> > Subject: Re: [PATCH v11] PCI: Xilinx-NWL-PCIe: Added support for
+> > Xilinx NWL PCIe Host Controller
+> >
+> > [+cc Marc for irq_dispose_mapping() question]
+> >
+> > On Thu, Dec 10, 2015 at 02:10:34PM +0000, Bharat Kumar Gogada wrote:
+> > I'm trying to figure out what the difference is between these two
+> > checks and why you have both of them:
+> >
+> > > +	if (bus->number == pcie->root_busno && devfn > 0)
+> > > +	if (bus->primary == pcie->root_busno && devfn > 0)
+> >
+> > If I understand correctly, pcie->root_busno is the bus number of the
+> > Root Port device (likely 00).  I think the "bus->number ==
+> > pcie->root_busno && devfn > 0" check means that the Root Port, e.g.,
+> > 00:00.0, is the only device allowed on bus 00.  Often a Root Complex
+> > contains several Root Ports and other integrated devices that typically are
+> on bus 00.
+> > But in your case, I think you're saying there is only the single Root
+> > Port and no other devices.
+> >
+> > I think that first check takes care of everything on bus 00, so I'm
+> > trying to figure out what the second check is for.  Assume your Root
+> > Port is device
+> > 00:00.0 and it is a bridge to [bus 01-ff].  Then we have two pci_bus
+> > structs with these values:
+> >
+> >   bus->number = 00
+> >   bus->primary = 00
+> >   bus->busn_res = [bus 00-ff]
+> >
+> >   bus->number = 01
+> >   bus->primary = 00
+> >   bus->busn_res = [bus 01-ff]
+> >
+> > Because of the first check, 00:00.0 is the only possible device on bus
+> > 00, and because of the second check, 01:00.0 is the only possible device on
+> bus 01.
+> > Therefore, you don't support a multifunction device connected to the
+> > Root Port.  Right?
+> >
+> We support multifunction devices also, so this check should not be there, will
+> remove this check in next patch.
+> 
+> > > > > +		return false;
+> > > > > +
+> > > > > +	return true;
+> > > > > +}
+> > > > > + * nwl_setup_sspl - Set Slot Power limit
+> > > > > + *
+> > > > > + * @pcie: PCIe port information  */ static int
+> > > > > +nwl_setup_sspl(struct nwl_pcie *pcie)
+> > > >
+> > > The Set_Slot_Power_Limit Message includes a one DW data payload. The
+> > > data payload is copied from the Slot Capabilities register of the
+> > > Downstream Port and is written into the Device Capabilities register
+> > > of the Upstream Port on the other side of the Link. Bits 9:8 of the
+> > > data payload map to the Slot Power Limit Scale field and bits 7:0
+> > > map to the Slot Power Limit Value field. Bits 31:10 of the data
+> > > payload must be set to all 0's by the Transmitter and ignored by the
+> Receiver.
+> >
+> > > This Message is sent automatically by the Downstream Port (of a Root
+> > > Complex or a Switch) when one of the following events occurs:
+> > > -> On a Configuration Write to the Slot Capabilities register (see
+> > > Section 7.8.9) when the Data Link Layer reports DL_Up status.
+> >
+> > I interpret this as meaning "the *hardware* automatically sends a
+> > Set_Slot_Power_Limit Message."  There's no mention of software doing
+> > anything other than the configuration write.
+> >
+> > If your hardware doesn't do that, I think it's a defect.  It's fine to
+> > work around it, but we should have a comment to that effect so people
+> > don't copy the code to new drivers that don't need it.
+> 
+> Our hardware is not capable of doing it, so we are doing it software. Yes I will
+> add some comments.
+> 
+> >
+> > It's a little strange that 7.8.9 talks about writing to this register
+> > when all of its fields are HwInit and supposedly read-only.  I had
+> > assumed devices would use strapping or implementation-specific
+> > registers to set the Slot Power values, but maybe some devices use direct
+> writes to Slot Capabilities instead.
+> >
+> > BTW, I noticed a related lspci bug: it didn't decode the Capture Slot
+> > Power Limit in Device Capabilities of Endpoints.  I posted a fix for that
+> separately.
+> >
+> > The Slot Power Limit (in Slot Capabilities) indicates how much power
+> > the slot can supply to a downstream device.  That's a function of the
+> > platform design, so it seems like this is something you want to set
+> > via DT or some other mechanism that knows about the platform.
+> > Intercepting all config writes and updating it with whatever the
+> > caller supplies doesn't sound wise.  The value might be coming from
+> > setpci or some other source with no knowledge of the platform.
+> 
+> Agreed, but this is what can be done, it is difficult to determine who does
+> what.
+> >
+> > > > > +			status = nwl_bridge_readl(pcie,
+> TX_PCIE_MSG)
+> > > > > +						  & MSG_DONE_BIT;
+> > > > > +			if (status) {
+> > > > > +				status = nwl_bridge_readl(pcie,
+> > > > TX_PCIE_MSG)
+> > > > > +						  &
+> MSG_DONE_STATUS_BIT;
+> >
+> > > > It's not clear to me whether you need to re-read TX_PCIE_MSG here.
+> > >
+> > > MSG_DONE_BIT qualifies MSG_DONE_STATUS_BIT; so value of
+> > > MSG_DONE_STATUS_BIT is valid only when MSG_DONE_BIT = 1
+> >
+> > That doesn't answer the question of whether another read is required.
+> > In fact, I would argue that if MSG_DONE_STATUS_BIT is only valid when
+> > MSG_DONE_BIT = 1, you *should* only do one read, because you want to
+> > capture both bits simultaneously so you know they're consistent, e.g.,
+> >
+> >   status = nwl_bridge_readl(pcie, TX_PCIE_MSG);
+> >   if (status & MSG_DONE_BIT) {
+> >     if (status & MSG_DONE_STATUS_BIT)
+> >       ...
+> >   }
+> >
+> > If you read the register twice, you always have to worry about what
+> > changes MSG_DONE_BIT, and how you guarantee that the second read
+> > happens before MSG_DONE_BIT changes.
+> >
+> Agreed, will do it in this way, once will also confirm with IP owner regarding
+> both bits being updated parallel.
+> 
+> > > > > +		}
+> > > > > +	} while (status);
+> Bharat
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in the
+> body of a message to majordomo at vger.kernel.org More majordomo info at
+> http://vger.kernel.org/majordomo-info.html
