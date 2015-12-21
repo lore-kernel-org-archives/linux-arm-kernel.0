@@ -1,29 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 21 Dec 2015 23:42:18 +0100
-Subject: [PATCH V2 22/23] pci,
- acpi: Match PCI config space accessors against platfrom specific
- quirks.
-In-Reply-To: <5678370B.1030102@caviumnetworks.com>
-References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
- <201512211510.32029.arnd@arndb.de> <5678370B.1030102@caviumnetworks.com>
-Message-ID: <201512212342.18960.arnd@arndb.de>
+From: akshay.bhat@timesys.com (Akshay Bhat)
+Date: Mon, 21 Dec 2015 17:53:18 -0500
+Subject: [PATCH v5 0/7] ARM: dts: Add Advantech board support
+In-Reply-To: <1449177036-13317-1-git-send-email-akshay.bhat@timesys.com>
+References: <1449177036-13317-1-git-send-email-akshay.bhat@timesys.com>
+Message-ID: <CACrMeVC1ZrG2fd_z5KW3y=jgu7NHqnj44+kN+=iJ1z0BJ+vffQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 December 2015, David Daney wrote:
-> On 12/21/2015 06:10 AM, Arnd Bergmann wrote:
-> > On Monday 21 December 2015, Gabriele Paoloni wrote:
-> 
-> > or require the BIOS to work around the hardware
-> > quirks differently (e.g. by trapping config space access through secure
-> > firmware, or going through an AML method to be defined).
-> 
-> Some systems don't seem to have this capability.  For example, in ARMv8 
-> (A.K.A. arm64), I haven't been able to figure out how to trap these 
-> accesses to EL3 for emulation.  The specification is 5700 pages long 
-> though, so perhaps I missed that bit.
+Lucas, Shawn,
 
-How about using AML then? This would be similar to what CHRP used with
-RTAS calls to do PCI config space access.
+Any further review comments on the patches. If not can this be applied?
 
-	Arnd
+Thanks,
+Akshay
+
+On Thu, Dec 3, 2015 at 4:10 PM, Akshay Bhat <akshay.bhat@timesys.com> wrote:
+> This series aims to add Advantech BA-16 module (iMX6 based) and GE board support.
+>
+> This series has been tested against linux-next tag next-20151202.
+>
+> Modifications:
+> v4->v5:
+> - BA16: Move SPI FLASH partitions to a "partitions" subnode
+> - B450v3, B650v3 and B850v3: Fix model names
+>
+> History:
+> --------
+> [v1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/381872.html
+> [v2]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/383276.html
+> [v3]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/384202.html
+> [v4]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/390373.html
+>
+> Akshay Bhat (5):
+>   of: Add vendor prefix for Advantech Corporation
+>   of: Add vendor prefix for General Electric Company
+>   ARM: dts: imx: Add support for Advantech/GE B450v3
+>   ARM: dts: imx: Add support for Advantech/GE B650v3
+>   ARM: dts: imx: Add support for Advantech/GE B850v3
+>
+> Justin Waters (2):
+>   ARM: dts: imx: Add Advantech BA-16 Qseven module
+>   ARM: dts: imx: Add support for Advantech/GE Bx50v3
+>
+>  .../devicetree/bindings/vendor-prefixes.txt        |   2 +
+>  arch/arm/boot/dts/Makefile                         |   3 +
+>  arch/arm/boot/dts/imx6q-b450v3.dts                 |  84 +++
+>  arch/arm/boot/dts/imx6q-b650v3.dts                 |  84 +++
+>  arch/arm/boot/dts/imx6q-b850v3.dts                 | 127 +++++
+>  arch/arm/boot/dts/imx6q-ba16.dtsi                  | 589 +++++++++++++++++++++
+>  arch/arm/boot/dts/imx6q-bx50v3.dtsi                | 207 ++++++++
+>  7 files changed, 1096 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx6q-b450v3.dts
+>  create mode 100644 arch/arm/boot/dts/imx6q-b650v3.dts
+>  create mode 100644 arch/arm/boot/dts/imx6q-b850v3.dts
+>  create mode 100644 arch/arm/boot/dts/imx6q-ba16.dtsi
+>  create mode 100644 arch/arm/boot/dts/imx6q-bx50v3.dtsi
+>
+> --
+> 2.6.3
+>
