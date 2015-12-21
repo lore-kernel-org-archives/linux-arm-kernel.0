@@ -1,42 +1,78 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 21 Dec 2015 14:42:58 +0100
-Subject: [PATCH] ARM64: Improve copy_page for 128 cache line sizes.
-In-Reply-To: <20151221124637.GN23092@arm.com>
-References: <1450570278-19404-1-git-send-email-apinski@cavium.com>
- <20151221124637.GN23092@arm.com>
-Message-ID: <201512211442.58803.arnd@arndb.de>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 21 Dec 2015 21:46:40 +0800
+Subject: [PATCH 1/2] ARM: dts: vf-colibri: split PWM pinctrl
+In-Reply-To: <86e283b5c7ed5f54ef25c9ff7e747834@agner.ch>
+References: <1449094307-6011-1-git-send-email-stefan@agner.ch>
+ <20151214021801.GA25756@tiger>
+ <86e283b5c7ed5f54ef25c9ff7e747834@agner.ch>
+Message-ID: <20151221134541.GD18410@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 December 2015, Will Deacon wrote:
-> On Sat, Dec 19, 2015 at 04:11:18PM -0800, Andrew Pinski wrote:
-> > Adding a check for the cache line size is not much overhead.
-> > Special case 128 byte cache line size.
-> > This improves copy_page by 85% on ThunderX compared to the
-> > original implementation.
+On Sun, Dec 13, 2015 at 06:53:35PM -0800, Stefan Agner wrote:
+> On 2015-12-13 18:18, Shawn Guo wrote:
+> > On Wed, Dec 02, 2015 at 02:11:46PM -0800, Stefan Agner wrote:
+> >> Split PWM pins into separate pinctrl nodes to allow overrides which
+> >> select pins individually. This is useful for carrier boards which use
+> >> only one pin for PWM and would like to use the other pin for a
+> >> different purpose.
+> >>
+> >> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> >> ---
+> >>  arch/arm/boot/dts/vf-colibri.dtsi | 18 ++++++++++++++----
+> >>  1 file changed, 14 insertions(+), 4 deletions(-)
+> >>
+> >> diff --git a/arch/arm/boot/dts/vf-colibri.dtsi b/arch/arm/boot/dts/vf-colibri.dtsi
+> >> index e5949b9..924b660 100644
+> >> --- a/arch/arm/boot/dts/vf-colibri.dtsi
+> >> +++ b/arch/arm/boot/dts/vf-colibri.dtsi
+> >> @@ -74,12 +74,12 @@
+> >>
+> >>  &pwm0 {
+> >>  	pinctrl-names = "default";
+> >> -	pinctrl-0 = <&pinctrl_pwm0>;
+> >> +	pinctrl-0 = <&pinctrl_pwm0_a &pinctrl_pwm0_c>;
+> >>  };
+> >>
+> >>  &pwm1 {
+> >>  	pinctrl-names = "default";
+> >> -	pinctrl-0 = <&pinctrl_pwm1>;
+> >> +	pinctrl-0 = <&pinctrl_pwm1_b &pinctrl_pwm1_d>;
+> >>  };
+> > 
+> > It may make more sense to define these pwm nodes in the final board
+> > level dts with only defining the pins that are actually used on the
+> > board.
 > 
-> So this patch seems to:
+> Well, if we follow that policy, we would have to remove almost anything
+> from the -colibri.dtsi device trees...
 > 
->   - Align the loop
->   - Increase the prefetch size
->   - Unroll the loop once
+> The Colibri standard defines standard functionality, which is kept
+> compatible across modules with different SoC's. However, on almost all
+> pins different functionality is available, and we have some customer
+> which make use that....
 > 
-> Do you know where your 85% boost comes from between these? I'd really
-> like to avoid having multiple versions of copy_page, if possible, but
-> maybe we could end up with something that works well enough regardless
-> of cacheline size. Understanding what your bottleneck is would help to
-> lead us in the right direction.
+> So far we followed the policy that we define the pin/device
+> configuration of the standard functionality in the -colibri.dtsi files
+> (since this is the most used functionality). This allows us to also
+> "bug-fix" standard functionality without having to touch customers
+> (often out-of-tree) device trees.
 > 
-> Also, how are you measuring the improvement? If you can share your
-> test somewhere, I can see how it affects the other systems I have access
-> to.
+> This change is not different from that approach, it merely splits the
+> pin configuration in two individual pinctrl nodes. This makes sense for
+> PWM signals since they can be used individually (compared to, lets say,
+> I2C, where it is more like "all or nothing")...  It turned out that
+> several customers used PWM<A> for the display back light, while using
+> PWM<C> in a different function, therefor that change.
 
-A related question would be how other CPU cores are affected by the change.
-The test for the cache line size is going to take a few cycles, possibly
-a lot on certain implementations, e.g. if we ever get one where 'mrs' is
-microcoded or trapped by a hypervisor.
+Okay, sounds reasonable.  But please be consistent on the naming.  I
+would expect the pin groups named in scheme
+pinctrl_<device><0,1,2...>_<a,b,c...>.  That said, in this case of pwm,
+they should be something like below.
 
-Are there any possible downsides to using the ThunderX version on other
-microarchitectures too and skip the check?
+ - pinctrl_pwm0_a
+ - pinctrl_pwm0_b
+ - pinctrl_pwm1_a
+ - pinctrl_pwm1_b
 
-	Arnd
+Shawn
