@@ -1,43 +1,71 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 21 Dec 2015 11:42:21 -0300
-Subject: [PATCH v2] [media] media-device: handle errors at
- media_device_init()
-In-Reply-To: <e4902f65ceabce2f315e63ba75d4482a4985b351.1450182151.git.mchehab@osg.samsung.com>
-References: <e4902f65ceabce2f315e63ba75d4482a4985b351.1450182151.git.mchehab@osg.samsung.com>
-Message-ID: <56780FCD.9060007@osg.samsung.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 21 Dec 2015 14:50:28 +0000
+Subject: [Qemu-devel] [Xen-devel] new barrier type for paravirt (was Re:
+ [PATCH] virtio_ring: use smp_store_mb)
+In-Reply-To: <5677D8D5.7080700@citrix.com>
+References: <1450347932-16325-1-git-send-email-mst@redhat.com>
+ <20151217105238.GA6375@twins.programming.kicks-ass.net>
+ <20151217131554-mutt-send-email-mst@redhat.com>
+ <20151217135726.GA6344@twins.programming.kicks-ass.net>
+ <20151217161124-mutt-send-email-mst@redhat.com>
+ <20151217143910.GD6344@twins.programming.kicks-ass.net>
+ <20151220105146-mutt-send-email-mst@redhat.com> <5677D8D5.7080700@citrix.com>
+Message-ID: <alpine.DEB.2.02.1512211139150.17516@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mauro,
-
-On 12/15/2015 09:22 AM, Mauro Carvalho Chehab wrote:
-> Changeset 43ac4401dca9 ("[media] media-device: split media
-> initialization and registration") broke media device register
-> into two separate functions, but introduced a BUG_ON() and
-> made media_device_init() void. It also introduced several
-> warnings.
+On Mon, 21 Dec 2015, David Vrabel wrote:
+> On 20/12/15 09:25, Michael S. Tsirkin wrote:
+> > 
+> > I noticed that drivers/xen/xenbus/xenbus_comms.c uses
+> > full memory barriers to communicate with the other side.
+> > For example:
+> > 
+> >                 /* Must write data /after/ reading the consumer index.  * */
+> >                 mb();
+> > 
+> >                 memcpy(dst, data, avail);
+> >                 data += avail;
+> >                 len -= avail;
+> >         
+> >                 /* Other side must not see new producer until data is * there. */
+> >                 wmb();
+> >                 intf->req_prod += avail;
+> >                 
+> >                 /* Implies mb(): other side will see the updated producer. */
+> >                 notify_remote_via_evtchn(xen_store_evtchn);
+> > 
+> > To me, it looks like for guests compiled with CONFIG_SMP, smp_wmb and smp_mb
+> > would be sufficient, so mb() and wmb() here are only needed if
+> > a non-SMP guest runs on an SMP host.
+> > 
+> > Is my analysis correct?
 > 
-> Instead of adding BUG_ON(), let's revert to WARN_ON() and fix
-> the init code in a way that, if something goes wrong during
-> device init, driver probe will fail without causing the Kernel
-> to BUG.
+> For x86, yes.
 > 
-> Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
-> ---
+> For arm/arm64 I think so, but would prefer one of the Xen arm
+> maintainers to confirm.  In particular, whether inner-shareable barriers
+> are sufficient for memory shared with the hypervisor.
 
-I agree with your patch, in fact the first version of the media
-split patch did exactly this and later media_device_init() was
-converted to void and the BUG_ON() introduced to address some
-feedback I got during the patches review.
+inner-shareable barriers are certainly OK. In this case there would be
+also a switch from dsb to dmb barriers, which I also think should be OK.
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+What about all the mb() and wmb() in RING_PUSH_REQUESTS and
+RING_PUSH_RESPONSES in include/xen/interface/io/ring.h ?
 
-On an OMAP3 IGEPv2:
 
-Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+> > So what I'm suggesting is something like the below patch,
+> > except instead of using virtio directly, a new set of barriers
+> > that behaves identically for SMP and non-SMP guests will be introduced.
+> > 
+> > And of course the weak barriers flag is not needed for Xen -
+> > that's a virtio only thing.
+> > 
+> > For example:
+> > 
+> > smp_pv_wmb()
+> > smp_pv_rmb()
+> > smp_pv_mb()
+> 
+> The smp_ prefix doesn't make a lot of sense to me here since these
+> barriers are going to be the same whether the kernel is SMP or not.
