@@ -1,91 +1,160 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 21 Dec 2015 14:12:31 +0800
-Subject: [PATCH V3] ARM: dts: imx6q-icore-rqs: Add Engicam IMX6 Q7
- initial support
-In-Reply-To: <20151216181159.GC20121@panicking>
-References: <1447673895.3144.16.camel@pengutronix.de>
- <20151116114127.GB10464@panicking>
- <1447674695.3144.21.camel@pengutronix.de>
- <20151116115421.GC10464@panicking> <20151116172318.GA513@panicking>
- <1447752697.3144.47.camel@pengutronix.de>
- <20151118151030.GA11558@panicking> <20151211083512.GB11252@tiger>
- <20151214084456.GA4305@panicking>
- <20151216181159.GC20121@panicking>
-Message-ID: <20151221061231.GA4703@tiger>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 21 Dec 2015 14:18:22 +0800
+Subject: [linux-sunxi][PATCH v2 1/5] ARM: dts: sunxi: Add
+ sunxi-itead-core-common.dtsi
+In-Reply-To: <1450537521-6476-2-git-send-email-codekipper@gmail.com>
+References: <1450537521-6476-1-git-send-email-codekipper@gmail.com>
+ <1450537521-6476-2-git-send-email-codekipper@gmail.com>
+Message-ID: <CAGb2v64f0wGdg4fZoQhZaVgBERi63e51U_sJBzxxbgPkY85pHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 16, 2015 at 07:12:05PM +0100, Michael Trimarchi wrote:
-> Hi
-> 
-> I have address most of the changes but I have problem when I remove
-> the group of pinctrl as you suggest
-...
-> > > > +&iomuxc {
-> > > 
-> > > Suggest move iomuxc node to the bottom to make the file a bit easier to
-> > > read.
-> > > 
-> > 
-> > Ok
-> > 
-> > 
-> > > > +	imx6qdl-icore-rqs {
-> > > > +
-> > > 
-> > > With commit 5fcdf6a7ed95 (pinctrl: imx: Allow parsing DT without function
-> > > nodes) in place, we can now save this container.
-> > > 
-> 
-> If I save this I can not register usb. Group is not found
-> 
-> [    2.768476] imx6q-pinctrl 20e0000.iomuxc: unable to find group for node usdhc1grp-1
-> [    2.768844] imx6q-pinctrl 20e0000.iomuxc: unable to find group for node usdhc1grp-1
-> [    2.768932] sdhci-esdhc-imx: probe of 2190000.usdhc failed with error -22
-> [    2.768994] imx6q-pinctrl 20e0000.iomuxc: unable to find group for node usdhc3grp-2
-> [    2.769240] imx6q-pinctrl 20e0000.iomuxc: unable to find group for node usdhc3grp-2
-> [    2.769322] sdhci-esdhc-imx: probe of 2198000.usdhc failed with error -22
-> [    2.769381] imx6q-pinctrl 20e0000.iomuxc: unable to find group for node usdhc4grp-1
-> [    2.769621] imx6q-pinctrl 20e0000.iomuxc: unable to find group for node usdhc4grp-1
-> [    2.769701] sdhci-esdhc-imx: probe of 219c000.usdhc failed with error -22
+Hi,
 
-I'm not sure if you got my comment correct, but what I meant is
-something like below.
+On Sat, Dec 19, 2015 at 11:05 PM,  <codekipper@gmail.com> wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
+>
+> Itead have a core module board that can be populated with either
+> an Allwinner A10 or A20 SoC. This patch creates a common dtsi
+> which these boards can use.
+>
+> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+> ---
+>  arch/arm/boot/dts/sunxi-itead-core-common.dtsi | 114 +++++++++++++++++++++++++
+>  1 file changed, 114 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/sunxi-itead-core-common.dtsi
+>
+> diff --git a/arch/arm/boot/dts/sunxi-itead-core-common.dtsi b/arch/arm/boot/dts/sunxi-itead-core-common.dtsi
+> new file mode 100644
+> index 0000000..41449fa
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sunxi-itead-core-common.dtsi
+> @@ -0,0 +1,114 @@
+> +/*
+> + * Copyright 2015 - Marcus Cooper <codekipper@gmail.com>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +#include "sunxi-common-regulators.dtsi"
+> +
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/interrupt-controller/irq.h>
+> +#include <dt-bindings/pinctrl/sun4i-a10.h>
+> +
+> +/ {
+> +       aliases {
+> +               serial0 = &uart0;
+> +       };
+> +
+> +       chosen {
+> +               stdout-path = "serial0:115200n8";
+> +       };
+> +};
+> +
+> +&ahci {
+> +       target-supply = <&reg_ahci_5v>;
+> +       status = "okay";
+> +};
+> +
+> +&codec {
+> +       status = "okay";
+> +};
+> +
+> +&ehci0 {
+> +       status = "okay";
+> +};
+> +
+> +&ehci1 {
+> +       status = "okay";
+> +};
+> +
+> +&i2c1 {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&i2c1_pins_a>;
+> +       status = "okay";
+> +};
+> +
+> +&ohci0 {
+> +       status = "okay";
+> +};
+> +
+> +&ohci1 {
+> +       status = "okay";
+> +};
+> +
+> +&reg_ahci_5v {
+> +       pinctrl-0 = <&ahci_pwr_pin_a>;
+> +       gpio = <&pio 1 8 GPIO_ACTIVE_HIGH>;
 
-&iomuxc {
-       pinctrl_audmux_4: audmux-4 {
-	       fsl,pins = <
-		       MX6QDL_PAD_DISP0_DAT20__AUD4_TXC  0x130b0
-		       MX6QDL_PAD_DISP0_DAT21__AUD4_TXD  0x110b0
-		       MX6QDL_PAD_DISP0_DAT22__AUD4_TXFS 0x130b0
-		       MX6QDL_PAD_DISP0_DAT23__AUD4_RXD  0x130b0
-	       >;
-       };
+These 2 lines are in sunxi-common-regulators.dtsi. No need to repeat them here.
 
-       pinctrl_enet_3: enetgrp-3 {
-	       fsl,pins = <
-		       MX6QDL_PAD_ENET_MDIO__ENET_MDIO       0x1b0b0
-		       MX6QDL_PAD_ENET_MDC__ENET_MDC         0x1b0b0
-		       MX6QDL_PAD_RGMII_TXC__RGMII_TXC       0x1b0b0
-		       MX6QDL_PAD_RGMII_TD0__RGMII_TD0       0x1b0b0
-		       MX6QDL_PAD_RGMII_TD1__RGMII_TD1       0x1b0b0
-		       MX6QDL_PAD_RGMII_TD2__RGMII_TD2       0x1b0b0
-		       MX6QDL_PAD_RGMII_TD3__RGMII_TD3       0x1b0b0
-		       MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL 0x1b0b0
-		       MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK  0x1b0b0
-		       MX6QDL_PAD_RGMII_RXC__RGMII_RXC       0x1b0b0
-		       MX6QDL_PAD_RGMII_RD0__RGMII_RD0       0x1b0b0
-		       MX6QDL_PAD_RGMII_RD1__RGMII_RD1       0x1b0b0
-		       MX6QDL_PAD_RGMII_RD2__RGMII_RD2       0x1b0b0
-		       MX6QDL_PAD_RGMII_RD3__RGMII_RD3       0x1b0b0
-		       MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL 0x1b0b0
-		       MX6QDL_PAD_ENET_TX_EN__ENET_TX_EN     0x1b0b0
-	       >;
-       };
+Otherwise,
 
-       ......
-};
+Acked-by: Chen-Yu Tsai <wens@csie.org>
 
-Is this what you did?
-
-Shawn
+> +       status = "okay";
+> +};
+> +
+> +&reg_usb1_vbus {
+> +       status = "okay";
+> +};
+> +
+> +&reg_usb2_vbus {
+> +       status = "okay";
+> +};
+> +
+> +&uart0 {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&uart0_pins_a>;
+> +       status = "okay";
+> +};
+> +
+> +&usbphy {
+> +       usb1_vbus-supply = <&reg_usb1_vbus>;
+> +       usb2_vbus-supply = <&reg_usb2_vbus>;
+> +       status = "okay";
+> +};
+> --
+> 1.9.1
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
