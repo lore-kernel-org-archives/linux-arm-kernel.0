@@ -1,50 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 21 Dec 2015 15:15:54 +0100
-Subject: [PATCH V2 00/23] MMCONFIG refactoring and support for ARM64 PCI
- hostbridge init based on ACPI
-In-Reply-To: <5677F3C8.8040200@semihalf.com>
-References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
- <20151221121050.GB11145@red-moon> <5677F3C8.8040200@semihalf.com>
-Message-ID: <201512211515.55447.arnd@arndb.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 21 Dec 2015 15:19:02 +0100
+Subject: [PATCH 0/4] Use new MSI infrastructure on Marvell EBU
+Message-ID: <1450707546-15060-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 December 2015, Tomasz Nowicki wrote:
-> On 21.12.2015 13:10, Lorenzo Pieralisi wrote:
-> > On Fri, Dec 18, 2015 at 06:56:39PM +0000, okaya at codeaurora.org wrote:
+Hello,
 
-> >> I have multiple root ports with the same IO port configuration in the
-> >> current ACPI table.
-> >>
-> >> Root port 0 = IO range 0x1000-0x10FFF
-> >> Root port 1 = IO range 0x1000-0x10FFF
-> >> Root port 2 = IO range 0x1000-0x10FFF
-> >
-> > It is fine. You end up mapping for each of those a 4k window of the
-> > virtual address space allocated to IO and that's what you will have in
-> > the kernel PCI resources (not in the HW BARs though). If that was a problem
-> > it would be even for the current DT host controllers eg:
-> >
-> > arch/arm64/boot/dts/apm/apm-storm.dtsi
-> >
-> > it should not be (again I will let Arnd comment on this since he may be
-> > aware of issues encountered on other arches/platforms).
-> >
-> 
-> Root port 0 = IO range 0x1000-0x10FFF
-> Root port 1 = IO range 0x1000-0x10FFF
-> Root port 2 = IO range 0x1000-0x10FFF
-> 
-> If above ranges are mapped into different CPU windows, then yes, it is fine.
+IMPORTANT: do not apply the following set of patches now. They depend
+on two irqdomain fixes from Marc Zyngier, which he hasn't submitted
+yet. So this patch series is currently for review.
 
-Ideally, they should all be the same CPU address so we only have to map the window
-once, each device gets an address below 64K, and you can have legacy port numbers
-(below 4K) on any bus, which is required to make certain GPUs work.
+(In fact patches 1 and 4 and be applied now, but patches 2 and 3 will
+have to wait until Marc submits his patches.)
 
-I haven't actually seen anyone do that on ARM though, every implementation so
-far has a separate mapping per host bridge, and we can cope with that too,
-and we can live with either overlapping bus addresses or unique bus addresses,
-any of them can be expressed by the PCI core in Linux, we just have to make sure
-that we correctly translate the firmware tables into our internal structures.
+For those interested, the two fixes needed are available at
+https://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/log/?h=irq/irqdomain-fixes.
 
-	Arnd
+This patch series converts the Armada 370/XP irqchip driver (also used
+on Armada 375, 38x and 39x) to the new MSI infrastructure put in place
+by Marc. It doesn't bring any functional difference other than using
+the right, modern, MSI mechanism, which might ultimately allow Marc to
+remove the old way of implementing MSI support.
+
+It has been tested on Armada 38x and Armada XP with an Intel e1000e
+NIC which uses MSI.
+
+Thanks,
+
+Thomas
+
+Thomas Petazzoni (4):
+  irqchip: irq-armada-370-xp: add Kconfig option for the driver
+  irqchip: irq-armada-370-xp: use the generic MSI infrastructure
+  irqchip: irq-armada-370-xp: use shorter names for irq_chip
+  ARM: mvebu: use the ARMADA_370_XP_IRQ option
+
+ arch/arm/mach-mvebu/Kconfig         |   6 +-
+ drivers/irqchip/Kconfig             |   6 ++
+ drivers/irqchip/Makefile            |   2 +-
+ drivers/irqchip/irq-armada-370-xp.c | 153 +++++++++++++++---------------------
+ 4 files changed, 77 insertions(+), 90 deletions(-)
+
+-- 
+2.6.4
