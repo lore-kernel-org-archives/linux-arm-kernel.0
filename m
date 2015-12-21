@@ -1,97 +1,31 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 21 Dec 2015 12:10:50 +0000
-Subject: [PATCH V2 00/23] MMCONFIG refactoring and support for ARM64 PCI
- hostbridge init based on ACPI
-In-Reply-To: <4bccc2de7668dde04436ac9c19aac25d.squirrel@www.codeaurora.org>
-References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
- <5673281E.7020204@codeaurora.org> <5673FB6C.80008@semihalf.com>
- <4bccc2de7668dde04436ac9c19aac25d.squirrel@www.codeaurora.org>
-Message-ID: <20151221121050.GB11145@red-moon>
+From: James.Morse@arm.com (James Morse)
+Date: Mon, 21 Dec 2015 12:19:32 +0000
+Subject: [PATCH v8 9/4] arm64: remove irq_count and do_softirq_own_stack()
+In-Reply-To: <20151221113021.GH23092@arm.com>
+References: <1449226948-14251-1-git-send-email-james.morse@arm.com>
+ <1450454507-8907-1-git-send-email-james.morse@arm.com>
+ <68E0E2C7-A4C2-45C2-95C5-842FA807F918@gmail.com>,
+ <20151221113021.GH23092@arm.com>
+Message-ID: <DB3PR08MB0041F2F26E5FABEE61ACA089F3E40@DB3PR08MB0041.eurprd08.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 06:56:39PM +0000, okaya at codeaurora.org wrote:
+Hi Will,
 
-[...]
+Will Deacon wrote:
+>> > +   mrs     x26, sp_el0             // already masked
+>>
+>> Nit: How about using 'get_thread_info x26'?
+>
+> Something like the following?
 
-> Here is what I have as an IO resource.
-> 
-> 		QWORDIO(			//Consumed-And-produced resource
-> 			ResourceProducer,	// bit 0 of general flags is 0
-> 			MinFixed,		// Range is fixed
-> 			MaxFixed,		// Range is fixed
-> 			PosDecode,
-> 			EntireRange,
-> 			0x0000,			// Granularity
-> 			0x1000,		// Min, 0 is not accepted
-> 			0x10FFF,		// Max
-> 			0x8FFFFFEF000,	// Translation
-> 			0x10000,		// Range Length
-> 			,, PI00
-> 		 )
-> 
-> I don't have any type specified.
-> 
-> I agree with Lorenzo's assessment. The min and max values represent the
-> PCI IO bus addresses. The translation offset is added to these values to
-> figure out the CPU view of the PCI IO range.
-> 
-> The endpoints BAR addresses are programmed with IO addresses ranging
-> between 0x1000 and 0x10FFF for this example above.
-> 
-> Here is another question. Chris Covington and I asked this question on a
-> private email to you but we didn't hear back.
-> 
-> We were referring to a Linaro IO hack patch as we were not sure whether
-> this was a limitation of the hack or a general expectation for ARM64 PCI
-> in general.
-> 
-> I'll repeat it here.
-> 
-> I have multiple root ports with the same IO port configuration in the
-> current ACPI table.
-> 
-> Root port 0 = IO range 0x1000-0x10FFF
-> Root port 1 = IO range 0x1000-0x10FFF
-> Root port 2 = IO range 0x1000-0x10FFF
+Looks fine - I guess you're cleverly leaving the the el0_irq case to be covered by get_thread_info in kernel_entry?
 
-It is fine. You end up mapping for each of those a 4k window of the
-virtual address space allocated to IO and that's what you will have in
-the kernel PCI resources (not in the HW BARs though). If that was a problem
-it would be even for the current DT host controllers eg:
 
-arch/arm64/boot/dts/apm/apm-storm.dtsi
+Thanks,
 
-it should not be (again I will let Arnd comment on this since he may be
-aware of issues encountered on other arches/platforms).
+James
 
-Lorenzo
 
-> 
-> Each root port can have the same IO address range configuration, are we
-> expecting IO port numbers to be unique across the whole system for ARM64?
-> 
-> Something like
-> 
-> Root port 0 = IO range 0x1000-0x10FFF
-> Root port 1 = IO range 0x11000-0x20FFF
-> Root port 2 = IO range 0x21000-0x30FFF
-> 
-> since the IO addresses are being remapped into PCI IO range printed during
-> boot.
-> 
-> PCI I/O : 0xffff7ffffae00000 - 0xffff7ffffbe00000   (    16 MB)
-> 
-> and each root port would remap to 64k of the 16MB range.
-> 
-> >
-> > Any comments are very appreciated!
-> >
-> > Tomasz
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> >
-> 
-> 
+(Sorry if this message formatting is weird - I'm briefly stuck with webmail)
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
