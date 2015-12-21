@@ -1,70 +1,149 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 21 Dec 2015 11:46:18 +0100
-Subject: [linux-sunxi] Re: [PATCH 4/5] ARM: dts: sun5i: Add dts file for
- the Empire Electronix D709 tablet
-In-Reply-To: <CAGb2v65daCCOWf7EXDkNWnxv1idXHXesOp6Et_0h-o+9drdeMA@mail.gmail.com>
-References: <1450611782-9494-1-git-send-email-hdegoede@redhat.com>
- <1450611782-9494-4-git-send-email-hdegoede@redhat.com>
- <CAGb2v65daCCOWf7EXDkNWnxv1idXHXesOp6Et_0h-o+9drdeMA@mail.gmail.com>
-Message-ID: <5677D87A.90805@redhat.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 21 Dec 2015 10:48:18 +0000
+Subject: [PATCH] arm64: reenable interrupt when handling ptrace breakpoint
+In-Reply-To: <5671CD5B.9030907@linaro.org>
+References: <1450225088-2456-1-git-send-email-yang.shi@linaro.org>
+ <20151216111316.GD4308@arm.com> <5671CD5B.9030907@linaro.org>
+Message-ID: <20151221104818.GF23092@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Dec 16, 2015 at 12:45:15PM -0800, Shi, Yang wrote:
+> On 12/16/2015 3:13 AM, Will Deacon wrote:
+> >On Tue, Dec 15, 2015 at 04:18:08PM -0800, Yang Shi wrote:
+> >>The kernel just send out a SIGTRAP signal when handling ptrace breakpoint in
+> >>debug exception, so it sounds safe to have interrupt enabled if it is not
+> >>disabled by the parent process.
+> >
+> >Is this actually fixing an issue you're seeing, or did you just spot this?
+> >Given that force_sig_info disable interrupts, I don't think this is really
+> >worth doing.
+> 
+> I should made more comments at the first place, sorry for the inconvenience.
+> 
+> I did run into some problems on -rt kernel with CRIU restore, please see the
+> below kernel bug log:
 
-On 21-12-15 07:09, Chen-Yu Tsai wrote:
-> Hi,
->
-> On Sun, Dec 20, 2015 at 7:43 PM, Hans de Goede <hdegoede@redhat.com> wrote:
->> The Empire Electronix D709 tablet is a fairly standard 7" A13 tablet,
->> featuring usb-wifi, a micro-sd slot, micro-usb otg and headphone jack.
->>
->> Empire Electronix is written on the back of the tablet, the D709 model
->> info can be found in the about tablet menu in android.
->>
->> The PCB has no markings to speak of.
->>
->> This dts file does not add support for the ft5x touchscreen found at
->> i2c bus 1, addr 0x38, irq PG11, because it does not work out of the box.
->> It seems it has been flashed with the wrong firmware and needs to have
->> alternative firmware uploaded at boot to make the touchscreen work
->> properly, when hot-booting from android into an upstream kernel the
->> touchscreen does work.
->>
->> The Memsic MXC622X accelerometer at i2c bus 1, addr 0x15 also is not
->> enabled as there is no driver for it.
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>   arch/arm/boot/dts/Makefile                         |   1 +
->>   .../boot/dts/sun5i-a13-empire-electronix-d709.dts  | 241 +++++++++++++++++++++
->
-> The contents seem the same as sun5i-q8-common.dtsi and sun5i-a13-q8-tablet.dts.
-> Any chance you could use those instead?
+Thanks.
 
-Given the special needs of the touchscreen I do not think that that is a good idea.
+> >My worry here is that we take an interrupt and, on the return path,
+> >decide to reschedule due to CONFIG_PREEMPT. If we somehow end up back
+> >in the debugger, I'm concerned that it could remove the breakpoint and
+> >then later see an unexpected SIGTRAP from the child.
+> >
+> >Having said that, I've failed to construct a non-racy scenario in which
+> >that can happen, but I'm just really uncomfortable making this change
+> >unless there's a real problem being solved.
+> 
+> The patch is inspired by the similar code in other architectures, e.g. x86
+> and powerpc which have hardware debug exception to handle breakpoint and
+> single step like arm64. And, they have interrupt enabled in both breakpoint
+> and single step. So, I'm supposed arm64 could do the same thing.
+> 
+> For the preempt case, it might be possible, but it sounds like a exception
+> handling problem to me. The preempt should not be allowed in debug exception
+> (current arm64 kernel does it), and in interrupt return path the code should
+> check if debug is on or not. If debug is on, preempt should be just skipped.
+> Or we could disable preempt in debug exception.
 
-> On the side, any thoughts on how to handle the differences between various "Q8"
-> tablets, like different I2C-based sensors and WiFi chips?
+Yeah, disabling preemption during the debug handler and then enabling
+interrupts if it came from userspace sounds like the best option. However,
+that's a fairly invasive change to entry.S at this point, so maybe we're
+better off with something like the patch below in the meantime?
 
-For i2c based sensors the plan is to use devicetree overlays + an in kernel
-overlay manager which probes the i2c bus (checking known touchscreen / accelerometer
-addresses) and then picks the right touchscreen + accelerometer overlays.
+Will
 
-Wifi is somewhat more tricky I must admit, esp. since there seem to be q8 a23 based
-tablet variants with usb wifi and others with sdio wifi. Since both busses are
-discoverable I'm tempted to just enable both in devicetree, and let the kernel probe
-and see what is actually there. This assume that the way the wifichip is powered
-is the same on all boards, or at least that it is safe to enable the necessary
-regulators on all boards ...
+--->8
 
-> I'm asking because with Maxime's couple-regulator we should be able to get the
-> RTL8723BS on the Q8 A23/33 v1.5 working.
-
-So this means enabled the sdio controller (should be safe on all boards?) and
-enabling 2 regulators to power the wifi-chip. I think it will be safe to do this
-even on boards where those regulators are not used, what do you think ?
-
-Regards,
-
-Hans
+diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+index 8aee3aeec3e6..7f4913f2ea3c 100644
+--- a/arch/arm64/kernel/debug-monitors.c
++++ b/arch/arm64/kernel/debug-monitors.c
+@@ -226,11 +226,29 @@ static int call_step_hook(struct pt_regs *regs, unsigned int esr)
+ 	return retval;
+ }
+ 
++static void send_user_sigtrap(int si_code)
++{
++	struct pt_regs *regs = current_pt_regs();
++	siginfo_t info = {
++		.si_signo	= SIGTRAP,
++		.si_errno	= 0,
++		.si_code	= si_code,
++		.si_addr	= (void __user *)instruction_pointer(regs),
++	};
++
++	if (WARN_ON(!user_mode(regs)))
++		return;
++
++	preempt_disable();
++	local_irq_enable();
++	force_sig_info(SIGTRAP, &info, current);
++	local_irq_disable();
++	preempt_enable();
++}
++
+ static int single_step_handler(unsigned long addr, unsigned int esr,
+ 			       struct pt_regs *regs)
+ {
+-	siginfo_t info;
+-
+ 	/*
+ 	 * If we are stepping a pending breakpoint, call the hw_breakpoint
+ 	 * handler first.
+@@ -239,11 +257,7 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
+ 		return 0;
+ 
+ 	if (user_mode(regs)) {
+-		info.si_signo = SIGTRAP;
+-		info.si_errno = 0;
+-		info.si_code  = TRAP_HWBKPT;
+-		info.si_addr  = (void __user *)instruction_pointer(regs);
+-		force_sig_info(SIGTRAP, &info, current);
++		send_user_sigtrap(TRAP_HWBKPT);
+ 
+ 		/*
+ 		 * ptrace will disable single step unless explicitly
+@@ -307,17 +321,8 @@ static int call_break_hook(struct pt_regs *regs, unsigned int esr)
+ static int brk_handler(unsigned long addr, unsigned int esr,
+ 		       struct pt_regs *regs)
+ {
+-	siginfo_t info;
+-
+ 	if (user_mode(regs)) {
+-		info = (siginfo_t) {
+-			.si_signo = SIGTRAP,
+-			.si_errno = 0,
+-			.si_code  = TRAP_BRKPT,
+-			.si_addr  = (void __user *)instruction_pointer(regs),
+-		};
+-
+-		force_sig_info(SIGTRAP, &info, current);
++		send_user_sigtrap(TRAP_BRKPT);
+ 	} else if (call_break_hook(regs, esr) != DBG_HOOK_HANDLED) {
+ 		pr_warning("Unexpected kernel BRK exception at EL1\n");
+ 		return -EFAULT;
+@@ -328,7 +333,6 @@ static int brk_handler(unsigned long addr, unsigned int esr,
+ 
+ int aarch32_break_handler(struct pt_regs *regs)
+ {
+-	siginfo_t info;
+ 	u32 arm_instr;
+ 	u16 thumb_instr;
+ 	bool bp = false;
+@@ -359,14 +363,7 @@ int aarch32_break_handler(struct pt_regs *regs)
+ 	if (!bp)
+ 		return -EFAULT;
+ 
+-	info = (siginfo_t) {
+-		.si_signo = SIGTRAP,
+-		.si_errno = 0,
+-		.si_code  = TRAP_BRKPT,
+-		.si_addr  = pc,
+-	};
+-
+-	force_sig_info(SIGTRAP, &info, current);
++	send_user_sigtrap(TRAP_BRKPT);
+ 	return 0;
+ }
+ 
