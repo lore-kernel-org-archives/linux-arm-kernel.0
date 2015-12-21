@@ -1,10 +1,10 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 21 Dec 2015 11:33:45 +0100
-Subject: [PATCH v2 1/9] ARM: mvebu: ix4-300d: Add compatible property to
+Date: Mon, 21 Dec 2015 11:33:48 +0100
+Subject: [PATCH v2 4/9] ARM: shmobile: lager dts: Add compatible property to
  "partitions" node
 In-Reply-To: <1450694033-27717-1-git-send-email-geert+renesas@glider.be>
 References: <1450694033-27717-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1450694033-27717-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <1450694033-27717-5-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,20 +19,20 @@ Acked-by: Brian Norris <computersforpeace@gmail.com>
 v2:
   - Add Acked-by.
 ---
- arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts | 1 +
+ arch/arm/boot/dts/r8a7790-lager.dts | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
-index 13cf69a8d0fb392b..fb9e1bbf23385b85 100644
---- a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
-+++ b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
-@@ -152,6 +152,7 @@
- 				nand-on-flash-bbt;
+diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+index 7773cb1f10317d85..cdc0414f5f0716dd 100644
+--- a/arch/arm/boot/dts/r8a7790-lager.dts
++++ b/arch/arm/boot/dts/r8a7790-lager.dts
+@@ -457,6 +457,7 @@
+ 		m25p,fast-read;
  
- 				partitions {
-+					compatible = "fixed-partitions";
- 					#address-cells = <1>;
- 					#size-cells = <1>;
+ 		partitions {
++			compatible = "fixed-partitions";
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
  
 -- 
 1.9.1
