@@ -1,148 +1,222 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 21 Dec 2015 04:02:34 +0100
-Subject: [PATCH v7 1/4] acpi: pci: Setup MSI domain for ACPI based pci
- devices
-In-Reply-To: <1449766530-16935-2-git-send-email-Suravee.Suthikulpanit@amd.com>
+Date: Mon, 21 Dec 2015 04:04:13 +0100
+Subject: [PATCH v7 4/4] gicv2m: acpi: Introducing GICv2m ACPI support
+In-Reply-To: <1449766530-16935-5-git-send-email-Suravee.Suthikulpanit@amd.com>
 References: <1449766530-16935-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1449766530-16935-2-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <161215641.FWtaEPFn08@vostro.rjw.lan>
+ <1449766530-16935-5-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <27927867.pbQ7Vf8UQe@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, December 10, 2015 08:55:27 AM Suravee Suthikulpanit wrote:
-> This patch introduces pci_msi_register_fwnode_provider() for irqchip
-> to register a callback, to provide a way to determine appropriate MSI
-> domain for a pci device.
-> 
-> It also introduces pci_host_bridge_acpi_msi_domain(), which returns
-> the MSI domain of the specified PCI host bridge with DOMAIN_BUS_PCI_MSI
-> bus token. Then, it is assigned to pci device.
+On Thursday, December 10, 2015 08:55:30 AM Suravee Suthikulpanit wrote:
+> This patch introduces gicv2m_acpi_init(), which uses information
+> in MADT GIC MSI frames structure to initialize GICv2m driver.
+> It also exposes gicv2m_init() function, which simplifies callers
+> to a single GICv2m init function.
 > 
 > Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+> Tested-by: Duc Dang <dhdang@apm.com>
 > Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+I don't see anything objectionable here, so please feel free to add my ACK
+for the ACPI part to this.
 
 > ---
->  drivers/pci/pci-acpi.c    | 42 ++++++++++++++++++++++++++++++++++++++++++
->  drivers/pci/probe.c       |  2 ++
->  include/linux/irqdomain.h |  5 +++++
->  include/linux/pci.h       | 10 ++++++++++
->  4 files changed, 59 insertions(+)
+>  drivers/irqchip/irq-gic-v2m.c   | 110 +++++++++++++++++++++++++++++++++++++++-
+>  drivers/irqchip/irq-gic.c       |   6 ++-
+>  include/linux/irqchip/arm-gic.h |   3 +-
+>  3 files changed, 116 insertions(+), 3 deletions(-)
 > 
-> diff --git a/drivers/pci/pci-acpi.c b/drivers/pci/pci-acpi.c
-> index a32ba75..d3f32d6 100644
-> --- a/drivers/pci/pci-acpi.c
-> +++ b/drivers/pci/pci-acpi.c
-> @@ -9,7 +9,9 @@
+> diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
+> index 779c390..7e2975d 100644
+> --- a/drivers/irqchip/irq-gic-v2m.c
+> +++ b/drivers/irqchip/irq-gic-v2m.c
+> @@ -15,9 +15,11 @@
 >  
->  #include <linux/delay.h>
->  #include <linux/init.h>
-> +#include <linux/irqdomain.h>
->  #include <linux/pci.h>
+>  #define pr_fmt(fmt) "GICv2m: " fmt
+>  
+> +#include <linux/acpi.h>
+>  #include <linux/irq.h>
+>  #include <linux/irqdomain.h>
+>  #include <linux/kernel.h>
 > +#include <linux/msi.h>
->  #include <linux/pci_hotplug.h>
->  #include <linux/module.h>
->  #include <linux/pci-aspm.h>
-> @@ -689,6 +691,46 @@ static struct acpi_bus_type acpi_pci_bus = {
->  	.cleanup = pci_acpi_cleanup,
+>  #include <linux/of_address.h>
+>  #include <linux/of_pci.h>
+>  #include <linux/slab.h>
+> @@ -138,6 +140,11 @@ static int gicv2m_irq_gic_domain_alloc(struct irq_domain *domain,
+>  		fwspec.param[0] = 0;
+>  		fwspec.param[1] = hwirq - 32;
+>  		fwspec.param[2] = IRQ_TYPE_EDGE_RISING;
+> +	} else if (is_fwnode_irqchip(domain->parent->fwnode)) {
+> +		fwspec.fwnode = domain->parent->fwnode;
+> +		fwspec.param_count = 2;
+> +		fwspec.param[0] = hwirq;
+> +		fwspec.param[1] = IRQ_TYPE_EDGE_RISING;
+>  	} else {
+>  		return -EINVAL;
+>  	}
+> @@ -255,6 +262,8 @@ static void gicv2m_teardown(void)
+>  		kfree(v2m->bm);
+>  		iounmap(v2m->base);
+>  		of_node_put(to_of_node(v2m->fwnode));
+> +		if (is_fwnode_irqchip(v2m->fwnode))
+> +			irq_domain_free_fwnode(v2m->fwnode);
+>  		kfree(v2m);
+>  	}
+>  }
+> @@ -373,9 +382,11 @@ static struct of_device_id gicv2m_device_id[] = {
+>  	{},
 >  };
 >  
+> -int __init gicv2m_of_init(struct device_node *node, struct irq_domain *parent)
+> +static int __init gicv2m_of_init(struct fwnode_handle *parent_handle,
+> +				 struct irq_domain *parent)
+>  {
+>  	int ret = 0;
+> +	struct device_node *node = to_of_node(parent_handle);
+>  	struct device_node *child;
+>  
+>  	for (child = of_find_matching_node(node, gicv2m_device_id); child;
+> @@ -411,3 +422,100 @@ int __init gicv2m_of_init(struct device_node *node, struct irq_domain *parent)
+>  		gicv2m_teardown();
+>  	return ret;
+>  }
 > +
-> +static struct fwnode_handle *(*pci_msi_get_fwnode_cb)(struct device *dev);
+> +#ifdef CONFIG_ACPI
+> +static int acpi_num_msi;
 > +
-> +/**
-> + * pci_msi_register_fwnode_provider - Register callback to retrieve fwnode
-> + * @fn:       Callback matching a device to a fwnode that identifies a PCI
-> + *            MSI domain.
-> + *
-> + * This should be called by irqchip driver, which is the parent of
-> + * the MSI domain to provide callback interface to query fwnode.
-> + */
-> +void
-> +pci_msi_register_fwnode_provider(struct fwnode_handle *(*fn)(struct device *))
+> +static struct fwnode_handle *gicv2m_get_fwnode(struct device *dev)
 > +{
-> +	pci_msi_get_fwnode_cb = fn;
+> +	struct v2m_data *data;
+> +
+> +	if (WARN_ON(acpi_num_msi <= 0))
+> +		return NULL;
+> +
+> +	/* We only return the fwnode of the first MSI frame. */
+> +	data = list_first_entry_or_null(&v2m_nodes, struct v2m_data, entry);
+> +	if (!data)
+> +		return NULL;
+> +
+> +	return data->fwnode;
 > +}
 > +
-> +/**
-> + * pci_host_bridge_acpi_msi_domain - Retrieve MSI domain of a PCI host bridge
-> + * @bus:      The PCI host bridge bus.
-> + *
-> + * This function uses the callback function registered by
-> + * pci_msi_register_fwnode_provider() to retrieve the irq_domain with
-> + * type DOMAIN_BUS_PCI_MSI of the specified host bridge bus.
-> + * This returns NULL on error or when the domain is not found.
-> + */
-> +struct irq_domain *pci_host_bridge_acpi_msi_domain(struct pci_bus *bus)
+> +static int __init
+> +acpi_parse_madt_msi(struct acpi_subtable_header *header,
+> +		    const unsigned long end)
 > +{
+> +	int ret;
+> +	struct resource res;
+> +	u32 spi_start = 0, nr_spis = 0;
+> +	struct acpi_madt_generic_msi_frame *m;
 > +	struct fwnode_handle *fwnode;
 > +
-> +	if (!pci_msi_get_fwnode_cb)
-> +		return NULL;
+> +	m = (struct acpi_madt_generic_msi_frame *)header;
+> +	if (BAD_MADT_ENTRY(m, end))
+> +		return -EINVAL;
 > +
-> +	fwnode = pci_msi_get_fwnode_cb(&bus->dev);
-> +	if (!fwnode)
-> +		return NULL;
+> +	res.start = m->base_address;
+> +	res.end = m->base_address + SZ_4K;
 > +
-> +	return irq_find_matching_fwnode(fwnode, DOMAIN_BUS_PCI_MSI);
+> +	if (m->flags & ACPI_MADT_OVERRIDE_SPI_VALUES) {
+> +		spi_start = m->spi_base;
+> +		nr_spis = m->spi_count;
+> +
+> +		pr_info("ACPI overriding V2M MSI_TYPER (base:%u, num:%u)\n",
+> +			spi_start, nr_spis);
+> +	}
+> +
+> +	fwnode = irq_domain_alloc_fwnode((void *)m->base_address);
+> +	if (!fwnode) {
+> +		pr_err("Unable to allocate GICv2m domain token\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	ret = gicv2m_init_one(fwnode, spi_start, nr_spis, &res);
+> +	if (ret)
+> +		irq_domain_free_fwnode(fwnode);
+> +
+> +	return ret;
 > +}
 > +
->  static int __init acpi_pci_init(void)
->  {
->  	int ret;
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index edb1984..553a029 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -672,6 +672,8 @@ static struct irq_domain *pci_host_bridge_msi_domain(struct pci_bus *bus)
->  	 * should be called from here.
->  	 */
->  	d = pci_host_bridge_of_msi_domain(bus);
-> +	if (!d)
-> +		d = pci_host_bridge_acpi_msi_domain(bus);
->  
->  	return d;
->  }
-> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-> index d5e5c5b..a06feda 100644
-> --- a/include/linux/irqdomain.h
-> +++ b/include/linux/irqdomain.h
-> @@ -410,6 +410,11 @@ static inline bool irq_domain_is_hierarchy(struct irq_domain *domain)
->  static inline void irq_dispose_mapping(unsigned int virq) { }
->  static inline void irq_domain_activate_irq(struct irq_data *data) { }
->  static inline void irq_domain_deactivate_irq(struct irq_data *data) { }
-> +static inline struct irq_domain *irq_find_matching_fwnode(
-> +	struct fwnode_handle *fwnode, enum irq_domain_bus_token bus_token)
+> +static int __init gicv2m_acpi_init(struct irq_domain *parent)
 > +{
-> +	return NULL;
+> +	int ret;
+> +
+> +	if (acpi_num_msi > 0)
+> +		return 0;
+> +
+> +	acpi_num_msi = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_MSI_FRAME,
+> +				      acpi_parse_madt_msi, 0);
+> +
+> +	if (acpi_num_msi <= 0)
+> +		goto err_out;
+> +
+> +	ret = gicv2m_allocate_domains(parent);
+> +	if (ret)
+> +		goto err_out;
+> +
+> +	pci_msi_register_fwnode_provider(&gicv2m_get_fwnode);
+> +
+> +	return 0;
+> +
+> +err_out:
+> +	gicv2m_teardown();
+> +	return -EINVAL;
 > +}
->  #endif /* !CONFIG_IRQ_DOMAIN */
->  
->  #endif /* _LINUX_IRQDOMAIN_H */
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index 6ae25aa..d86378c 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> @@ -1946,6 +1946,16 @@ static inline struct irq_domain *
->  pci_host_bridge_of_msi_domain(struct pci_bus *bus) { return NULL; }
->  #endif  /* CONFIG_OF */
->  
-> +#ifdef CONFIG_ACPI
-> +struct irq_domain *pci_host_bridge_acpi_msi_domain(struct pci_bus *bus);
+> +#else /* CONFIG_ACPI */
+> +static int __init gicv2m_acpi_init(struct irq_domain *parent)
+> +{
+> +	return -EINVAL;
+> +}
+> +#endif /* CONFIG_ACPI */
 > +
-> +void
-> +pci_msi_register_fwnode_provider(struct fwnode_handle *(*fn)(struct device *));
-> +#else
-> +static inline struct irq_domain *
-> +pci_host_bridge_acpi_msi_domain(struct pci_bus *bus) { return NULL; }
-> +#endif
+> +int __init gicv2m_init(struct fwnode_handle *parent_handle,
+> +		       struct irq_domain *parent)
+> +{
+> +	if (is_of_node(parent_handle))
+> +		return gicv2m_of_init(parent_handle, parent);
 > +
->  #ifdef CONFIG_EEH
->  static inline struct eeh_dev *pci_dev_to_eeh_dev(struct pci_dev *pdev)
->  {
+> +	return gicv2m_acpi_init(parent);
+> +}
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index fcd327f..644e8bb 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -1234,7 +1234,7 @@ gic_of_init(struct device_node *node, struct device_node *parent)
+>  	}
+>  
+>  	if (IS_ENABLED(CONFIG_ARM_GIC_V2M))
+> -		gicv2m_of_init(node, gic_data[gic_cnt].domain);
+> +		gicv2m_init(&node->fwnode, gic_data[gic_cnt].domain);
+>  
+>  	gic_cnt++;
+>  	return 0;
+> @@ -1359,6 +1359,10 @@ static int __init gic_v2_acpi_init(struct acpi_subtable_header *header,
+>  	__gic_init_bases(0, -1, dist_base, cpu_base, 0, domain_handle);
+>  
+>  	acpi_set_irq_model(ACPI_IRQ_MODEL_GIC, domain_handle);
+> +
+> +	if (IS_ENABLED(CONFIG_ARM_GIC_V2M))
+> +		gicv2m_init(NULL, gic_data[0].domain);
+> +
+>  	return 0;
+>  }
+>  IRQCHIP_ACPI_DECLARE(gic_v2, ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR,
+> diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+> index bae69e5..febc6c3 100644
+> --- a/include/linux/irqchip/arm-gic.h
+> +++ b/include/linux/irqchip/arm-gic.h
+> @@ -106,7 +106,8 @@ int gic_cpu_if_down(unsigned int gic_nr);
+>  void gic_init(unsigned int nr, int start,
+>  	      void __iomem *dist , void __iomem *cpu);
+>  
+> -int gicv2m_of_init(struct device_node *node, struct irq_domain *parent);
+> +int gicv2m_init(struct fwnode_handle *parent_handle,
+> +		struct irq_domain *parent);
+>  
+>  void gic_send_sgi(unsigned int cpu_id, unsigned int irq);
+>  int gic_get_cpu_id(unsigned int cpu);
 > 
 
 -- 
