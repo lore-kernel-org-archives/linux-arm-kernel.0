@@ -1,33 +1,27 @@
-From: heiko.stuebner@collabora.com (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 21 Dec 2015 22:22:28 +0100
-Subject: [PATCH 3/3] ARM: multi_v7_defconfig: enable rk808 clkout module
-In-Reply-To: <2111669.2aeXLpXsWE@diego>
-References: <2111669.2aeXLpXsWE@diego>
-Message-ID: <6073058.AZlvB89lJp@diego>
+From: Okaya@codeaurora.org (Okaya at codeaurora.org)
+Date: Mon, 21 Dec 2015 22:01:35 -0000
+Subject: [PATCH V10 2/7] dma: hidma: Add Device Tree support
+In-Reply-To: <20151219041721.GC14936@rob-hp-laptop>
+References: <1450371684-23415-1-git-send-email-okaya@codeaurora.org>
+ <1450371684-23415-3-git-send-email-okaya@codeaurora.org>
+ <20151219041721.GC14936@rob-hp-laptop>
+Message-ID: <59ccbbe291408823915df4ba151b3bc8.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rk808 supplies two clock outputs with one going back into the soc as
-32kHz supply, supplying some core soc clocks with it. The system can boot
-without it being present, but it is needed for example as source clock
-for the thermal driver.
+> On Thu, Dec 17, 2015 at 12:01:17PM -0500, Sinan Kaya wrote:
+>> Add documentation for the Qualcomm Technologies HIDMA driver.
+>>
+>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+>> ---
+>>  .../devicetree/bindings/dma/qcom_hidma_mgmt.txt    | 79
+>> ++++++++++++++++++++++
+>>  1 file changed, 79 insertions(+)
+>>  create mode 100644
+>> Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
+>
+> Acked-by: Rob Herring <robh@kernel.org>
+>
+>
 
-Signed-off-by: Heiko Stuebner <heiko.stuebner@collabora.com>
----
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index ff7eb19..2fa39c1 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -662,6 +662,7 @@ CONFIG_CHROME_PLATFORMS=y
- CONFIG_CROS_EC_CHARDEV=m
- CONFIG_COMMON_CLK_MAX77686=y
- CONFIG_COMMON_CLK_MAX77802=m
-+CONFIG_COMMON_CLK_RK808=m
- CONFIG_COMMON_CLK_S2MPS11=m
- CONFIG_APQ_MMCC_8084=y
- CONFIG_MSM_GCC_8660=y
--- 
-2.6.4
+Ty.
