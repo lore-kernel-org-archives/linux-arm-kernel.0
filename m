@@ -1,10 +1,10 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 21 Dec 2015 11:33:47 +0100
-Subject: [PATCH v2 3/9] ARM: shmobile: bockw dts: Add compatible property to
+Date: Mon, 21 Dec 2015 11:33:46 +0100
+Subject: [PATCH v2 2/9] ARM: mvebu: kirkwood: Add compatible property to
  "partitions" node
 In-Reply-To: <1450694033-27717-1-git-send-email-geert+renesas@glider.be>
 References: <1450694033-27717-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1450694033-27717-4-git-send-email-geert+renesas@glider.be>
+Message-ID: <1450694033-27717-3-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,25 +14,24 @@ FLASH device node must have a compatible property. The partitions are no
 longer detected if it is not present.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Brian Norris <computersforpeace@gmail.com>
 ---
 v2:
-  - Add Acked-by.
+  - New.
 ---
- arch/arm/boot/dts/r8a7778-bockw.dts | 1 +
+ arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/r8a7778-bockw.dts b/arch/arm/boot/dts/r8a7778-bockw.dts
-index 482228b8a984656e..06ceefe3cb500dc7 100644
---- a/arch/arm/boot/dts/r8a7778-bockw.dts
-+++ b/arch/arm/boot/dts/r8a7778-bockw.dts
-@@ -212,6 +212,7 @@
- 		m25p,fast-read;
- 
- 		partitions {
-+			compatible = "fixed-partitions";
- 			#address-cells = <1>;
- 			#size-cells = <1>;
+diff --git a/arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts b/arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts
+index 1db6f2c506cce320..8082d64266a37c33 100644
+--- a/arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts
++++ b/arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts
+@@ -131,6 +131,7 @@
+ 	chip-delay = <40>;
+ 	status = "okay";
+ 	partitions {
++		compatible = "fixed-partitions";
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
  
 -- 
 1.9.1
