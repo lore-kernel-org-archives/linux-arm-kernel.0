@@ -1,71 +1,59 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Mon, 21 Dec 2015 19:41:38 +0300
-Subject: [PATCH v3 3/3] serial: amba-pl011: add ACPI support to AMBA probe
-In-Reply-To: <1450716100-13688-1-git-send-email-aleksey.makarov@linaro.org>
-References: <1450716100-13688-1-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <1450716100-13688-4-git-send-email-aleksey.makarov@linaro.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 21 Dec 2015 17:48:48 +0100
+Subject: [PATCH v2 1/9] ARM: mvebu: ix4-300d: Add compatible property to
+ "partitions" node
+In-Reply-To: <1450694033-27717-2-git-send-email-geert+renesas@glider.be>
+ (Geert Uytterhoeven's message of "Mon, 21 Dec 2015 11:33:45 +0100")
+References: <1450694033-27717-1-git-send-email-geert+renesas@glider.be>
+ <1450694033-27717-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <87zix3rbm7.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Graeme Gregory <graeme.gregory@linaro.org>
-
-In ACPI this device is only defined in SBSA mode so
-if we are coming from ACPI use this mode.
-
-Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
----
- drivers/tty/serial/amba-pl011.c | 37 ++++++++++++++++++++++++++-----------
- 1 file changed, 26 insertions(+), 11 deletions(-)
-
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 899a771..766ce4f 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -2368,18 +2368,33 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
- 	if (!uap)
- 		return -ENOMEM;
+Hi Geert,
  
--	uap->clk = devm_clk_get(&dev->dev, NULL);
--	if (IS_ERR(uap->clk))
--		return PTR_ERR(uap->clk);
--
--	uap->vendor = vendor;
--	uap->lcrh_rx = vendor->lcrh_rx;
--	uap->lcrh_tx = vendor->lcrh_tx;
--	uap->fifosize = vendor->get_fifosize(dev);
--	uap->port.irq = dev->irq[0];
--	uap->port.ops = &amba_pl011_pops;
-+	/* ACPI only defines SBSA variant */
-+	if (ACPI_COMPANION(&dev->dev)) {
-+		/*
-+		 * According to ARM ARMH0011 is currently the only mapping
-+		 * of pl011 in ACPI and it's mapped to SBSA UART mode
-+		 */
-+		uap->vendor	= &vendor_sbsa;
-+		uap->fifosize	= 32;
-+		uap->port.ops	= &sbsa_uart_pops;
-+		uap->fixed_baud = 115200;
- 
--	snprintf(uap->type, sizeof(uap->type), "PL011 rev%u", amba_rev(dev));
-+		snprintf(uap->type, sizeof(uap->type), "SBSA");
-+	} else {
-+		uap->clk = devm_clk_get(&dev->dev, NULL);
-+		if (IS_ERR(uap->clk))
-+			return PTR_ERR(uap->clk);
-+
-+		uap->vendor = vendor;
-+		uap->lcrh_rx = vendor->lcrh_rx;
-+		uap->lcrh_tx = vendor->lcrh_tx;
-+		uap->fifosize = vendor->get_fifosize(dev);
-+		uap->port.ops = &amba_pl011_pops;
-+
-+		snprintf(uap->type, sizeof(uap->type), "PL011 rev%u",
-+				amba_rev(dev));
-+	}
-+	uap->port.irq = dev->irq[0];
- 
- 	ret = pl011_setup_port(&dev->dev, uap, &dev->res, portnr);
- 	if (ret)
+ On lun., d?c. 21 2015, Geert Uytterhoeven <geert+renesas@glider.be> wrote:
+
+> As of commit e488ca9f8d4f62c2 ("doc: dt: mtd: partitions: add compatible
+> property to "partitions" node"), the "partitions" subnode of an SPI
+> FLASH device node must have a compatible property. The partitions are no
+> longer detected if it is not present.
+>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Acked-by: Brian Norris <computersforpeace@gmail.com>
+
+Applied on mvebu/dt (with the hope that it is still time to push it to
+arm-soc)
+
+Thanks,
+
+Gregory
+
+> ---
+> v2:
+>   - Add Acked-by.
+> ---
+>  arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
+> index 13cf69a8d0fb392b..fb9e1bbf23385b85 100644
+> --- a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
+> +++ b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
+> @@ -152,6 +152,7 @@
+>  				nand-on-flash-bbt;
+>  
+>  				partitions {
+> +					compatible = "fixed-partitions";
+>  					#address-cells = <1>;
+>  					#size-cells = <1>;
+>  
+> -- 
+> 1.9.1
+>
+
 -- 
-2.6.4
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
