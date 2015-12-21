@@ -1,59 +1,74 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Mon, 21 Dec 2015 20:45:38 +0800
-Subject: [PATCH] pinctrl: mediatek: convert to arch_initcall
-In-Reply-To: <1450701598.6795.11.camel@mtksdaap41>
-References: <1450412497-25872-1-git-send-email-djkurtz@chromium.org>
- <1450451196.19539.9.camel@mtksdaap41>
- <CAGS+omCDxj_wMDiAiywSv4hAtq6E9vm+CxgG8gs1TmrrS499mQ@mail.gmail.com>
- <1450701598.6795.11.camel@mtksdaap41>
-Message-ID: <CAGS+omBX2hXXaLfnHQboMXEcQnzO8TV33DRqWq80DPaNHEW=Ag@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 21 Dec 2015 13:46:22 +0100
+Subject: [PATCH] ARM64: Fix compiling with GCC 6 and Atomics enabled
+In-Reply-To: <20151221123843.GM23092@arm.com>
+References: <1450498655-3820-1-git-send-email-apinski@cavium.com>
+ <20151221123843.GM23092@arm.com>
+Message-ID: <CAKv+Gu_aUvckKpwWw+Xo5VkFEA8-uT9xU0-m5NgAzAc1d53uhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 21, 2015 at 8:39 PM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
+On 21 December 2015 at 13:38, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Dec 18, 2015 at 08:17:35PM -0800, Andrew Pinski wrote:
+>> The problem here is that GCC 6 and above emits .arch now
+>> for each function so now the global .arch_extension has
+>> no effect.  This fixes the problem by putting
+>> .arch_extension inside ARM64_LSE_ATOMIC_INSN so
+>> it is enabled for each place where LSE is used.
 >
-> On Mon, 2015-12-21 at 14:51 +0800, Daniel Kurtz wrote:
-> > On Fri, Dec 18, 2015 at 11:06 PM, Yingjoe Chen
-> > <yingjoe.chen@mediatek.com> wrote:
-> > > On Fri, 2015-12-18 at 12:21 +0800, Daniel Kurtz wrote:
-> > >> Move pinctrl initialization earlier in boot so that real devices can find
-> > >> their pctldev without probe deferring.
-> > >>
-> > >> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
-> > >> ---
-> > >>  drivers/pinctrl/mediatek/pinctrl-mt6397.c | 2 +-
-> > >>  drivers/pinctrl/mediatek/pinctrl-mt8127.c | 2 +-
-> > >>  drivers/pinctrl/mediatek/pinctrl-mt8135.c | 2 +-
-> > >>  drivers/pinctrl/mediatek/pinctrl-mt8173.c | 2 +-
-> > >>  4 files changed, 4 insertions(+), 4 deletions(-)
-> > >>
-> > >> diff --git a/drivers/pinctrl/mediatek/pinctrl-mt6397.c b/drivers/pinctrl/mediatek/pinctrl-mt6397.c
-> > >> index f9751ae..a3780d4 100644
-> > >> --- a/drivers/pinctrl/mediatek/pinctrl-mt6397.c
-> > >> +++ b/drivers/pinctrl/mediatek/pinctrl-mt6397.c
-> > >> @@ -70,7 +70,7 @@ static int __init mtk_pinctrl_init(void)
-> > >>       return platform_driver_register(&mtk_pinctrl_driver);
-> > >>  }
-> > >>
-> > >> -module_init(mtk_pinctrl_init);
-> > >> +arch_initcall(mtk_pinctrl_init);
-> > >
-> > >
-> > > MT6397 is PMIC, which depends on pwrap on main AP to work. Since
-> > > pmic-wrap itself is module_platform_driver, I think it make sense to
-> > > keep this one as module_init. Maybe adding a comment to explain why it
-> > > is different from others will help.
-> >
-> > I interpret this the other way - I think that since the PMIC wrapper
-> > provides a bus required for the system PMIC it should also be a
-> > builtin and use arch_initcall.
+> Hmm, this is going to affect arch/arm/ much more heavily than arch/arm64.
+> .arch_extension is used for virt, mp and sec over there, and it may be
+> tricky to isolate the actual instruction usage (at least, virt looks
+> lost in kvm/arm.c).
 >
-> We'll have to change mt8173 PMIC wrapper and mt6397 MFD core to
-> arch_initcall if we want to do it.
+> Why can't gas have an option to accept all instruction encodings that it
+> knows about, inspite of any .arch directives?
 >
-> I think regulators on PMIC is more important than pinctrl. For all
-> mt8173 systems, few drivers depends on PMIC pinctrl to work but many
-> depends on the regulators. So if we adjust pinctrl to arch_initcall, we
-> should change mt6397 regulator as well.
 
-ACK to changing all of mt6397 to arch_initcall, especially the regulators.
+Modern GAS supports things like -march=armv7-a+mp+sec+virt, so it
+probably makes sense to pass that on the command line when building
+for v7 (or +sec only for v6) if the assembler is found to support it
+at build time.
+
+
+>> Signed-off-by: Andrew Pinski <apinski@cavium.com>
+>> ---
+>>  arch/arm64/include/asm/lse.h |    4 +---
+>>  1 files changed, 1 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/lse.h b/arch/arm64/include/asm/lse.h
+>> index 3de42d6..625601f 100644
+>> --- a/arch/arm64/include/asm/lse.h
+>> +++ b/arch/arm64/include/asm/lse.h
+>> @@ -17,8 +17,6 @@
+>>
+>>  #else        /* __ASSEMBLER__ */
+>>
+>> -__asm__(".arch_extension     lse");
+>> -
+>>  /* Move the ll/sc atomics out-of-line */
+>>  #define __LL_SC_INLINE
+>>  #define __LL_SC_PREFIX(x)    __ll_sc_##x
+>> @@ -29,7 +27,7 @@ __asm__(".arch_extension    lse");
+>>
+>>  /* In-line patching at runtime */
+>>  #define ARM64_LSE_ATOMIC_INSN(llsc, lse)                             \
+>> -     ALTERNATIVE(llsc, lse, ARM64_HAS_LSE_ATOMICS)
+>> +     ALTERNATIVE(".arch_extension        lse\n" llsc, lse, ARM64_HAS_LSE_ATOMICS)
+>>
+>>  #endif       /* __ASSEMBLER__ */
+>>  #else        /* CONFIG_AS_LSE && CONFIG_ARM64_LSE_ATOMICS */
+>> --
+>> 1.7.2.5
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
