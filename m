@@ -1,48 +1,59 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 21 Dec 2015 20:04:03 +0300
-Subject: [PATCH 2/3] arm: dts: phy3250: add SD fixed regulator
-In-Reply-To: <56782FCA.2050504@mleia.com>
-References: <1450567932-22994-1-git-send-email-vz@mleia.com>
- <1450567932-22994-3-git-send-email-vz@mleia.com>
- <5677F3DC.6070402@cogentembedded.com> <56782FCA.2050504@mleia.com>
-Message-ID: <56783103.3070008@cogentembedded.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 21 Dec 2015 17:09:51 +0000
+Subject: [PATCH v5] arm64: run-time detection for aarch32 support
+In-Reply-To: <1450673050-12101-1-git-send-email-ynorov@caviumnetworks.com>
+References: <1450673050-12101-1-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <20151221170951.GA24894@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/21/2015 07:58 PM, Vladimir Zapolskiy wrote:
+On Mon, Dec 21, 2015 at 07:44:10AM +0300, Yury Norov wrote:
+> Kernel option COMPAT defines the ability of executing aarch32 binaries.
+> Some platforms does not support aarch32 mode, and so cannot execute that
+> binaries. But we cannot just disable COMPAT for them because the same
+> kernel binary may be used by multiple platforms.
+> 
+> In this patch, system_supports_aarch32_el0() is introduced to detect
+> aarch32 support at run-time.
+> 
+> v4: use new CPU Feature API.
+> v5: use cpuid_feature_extract_field.
+> 
+> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+> ---
+>  arch/arm64/include/asm/cpufeature.h | 7 +++++++
+>  arch/arm64/include/asm/elf.h        | 6 ++++--
+>  2 files changed, 11 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+> index 8f271b8..bcb0dbe 100644
+> --- a/arch/arm64/include/asm/cpufeature.h
+> +++ b/arch/arm64/include/asm/cpufeature.h
+> @@ -184,6 +184,13 @@ static inline bool system_supports_mixed_endian_el0(void)
+>  	return id_aa64mmfr0_mixed_endian_el0(read_system_reg(SYS_ID_AA64MMFR0_EL1));
+>  }
+>  
+> +static inline bool system_supports_aarch32_el0(void)
+> +{
+> +	u64 pfr0 = read_system_reg(SYS_ID_AA64PFR0_EL1);
+> +	return cpuid_feature_extract_field(pfr0, ID_AA64PFR0_EL0_SHIFT)
+> +						!= ID_AA64PFR0_EL0_64BIT_ONLY;
+> +}
 
->>> The change adds fixed voltage regulator for SD controller, ARM MMCI
->>> controller driver uses it to control card power management.
->>>
->>> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
->>> ---
->>>    arch/arm/boot/dts/phy3250.dts | 10 ++++++++++
->>>    1 file changed, 10 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/phy3250.dts b/arch/arm/boot/dts/phy3250.dts
->>> index 34e15fd..5465b9e 100644
->>> --- a/arch/arm/boot/dts/phy3250.dts
->>> +++ b/arch/arm/boot/dts/phy3250.dts
->>> @@ -45,6 +45,15 @@
->>>    			enable-active-high;
->>>    			regulator-boot-on;
->>>    		};
->>> +
->>> +		sd_reg: fixed-regulator at 2 {
->>
->>      Please just "regulator at 2", to comply with the ePAPR standard.
->
-> thanks for review, just for my information, do I understand correctly
-> that you reference to "Generic Names Recommendation" ?
+Suzuki already suggested to hook this into the existing arm64_features[]
+array:
 
-    Sure, AKA 2.2.2. :-)
+http://lkml.kernel.org/g/56748437.2040905 at arm.com
 
-> I have no objection to generalize device tree node name as you
-> suggested, will do it.
+> +#define compat_elf_check_arch(x)	(system_supports_aarch32_el0()	\
+> +					 && ((x)->e_machine == EM_ARM)	\
+> +					 && ((x)->e_flags & EF_ARM_EABI_MASK))
 
-    TIA.
+And here use something like cpus_have_cap(ARM64_HAS_32BIT_EL0).
 
-> With best wishes,
-> Vladimir
+And a nitpick: please use the same convention for placing the "&&"
+operator like in the rest of the file, i.e. on the previous line
+(similarly for "!=" etc.)
 
-MBR, Sergei
+-- 
+Catalin
