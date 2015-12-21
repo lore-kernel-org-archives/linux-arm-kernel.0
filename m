@@ -1,25 +1,59 @@
 From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Mon, 21 Dec 2015 17:39:48 +0100
-Subject: [PATCH 5/5] pinctrl: mediatek: add missing of_node_put
-In-Reply-To: <1450715988-4770-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1450715988-4770-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1450715988-4770-6-git-send-email-Julia.Lawall@lip6.fr>
+Date: Mon, 21 Dec 2015 17:39:43 +0100
+Subject: [PATCH 0/5] add missing of_node_put
+Message-ID: <1450715988-4770-1-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-for_each_child_of_node performs an of_node_get on each iteration, so a
-return from the loop requires an of_node_put.
+The various for_each device_node iterators performs an of_node_get on each
+iteration, so a break out of the loop requires an of_node_put.
 
-A simplified version of the semantic patch that fixes this problem is as
-follows (http://coccinelle.lip6.fr):
+The complete semantic patch that fixes this problem is
+(http://coccinelle.lip6.fr):
 
 // <smpl>
-@@
+@r@
 local idexpression n;
-expression e,e1;
+expression e1,e2;
+iterator name for_each_node_by_name, for_each_node_by_type,
+for_each_compatible_node, for_each_matching_node,
+for_each_matching_node_and_match, for_each_child_of_node,
+for_each_available_child_of_node, for_each_node_with_property;
+iterator i;
+statement S;
+expression list [n1] es;
 @@
 
- for_each_child_of_node(e1,n) {
+(
+(
+for_each_node_by_name(n,e1) S
+|
+for_each_node_by_type(n,e1) S
+|
+for_each_compatible_node(n,e1,e2) S
+|
+for_each_matching_node(n,e1) S
+|
+for_each_matching_node_and_match(n,e1,e2) S
+|
+for_each_child_of_node(e1,n) S
+|
+for_each_available_child_of_node(e1,n) S
+|
+for_each_node_with_property(n,e1) S
+)
+&
+i(es,n,...) S
+)
+
+@@
+local idexpression r.n;
+iterator r.i;
+expression e;
+expression list [r.n1] es;
+@@
+
+ i(es,n,...) {
    ...
 (
    of_node_put(n);
@@ -33,23 +67,57 @@ expression e,e1;
 )
    ...
  }
-// </smpl>
 
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+@@
+local idexpression r.n;
+iterator r.i;
+expression e;
+expression list [r.n1] es;
+@@
+
+ i(es,n,...) {
+   ...
+(
+   of_node_put(n);
+|
+   e = n
+|
++  of_node_put(n);
+?  break;
+)
+   ...
+ }
+... when != n
+
+@@
+local idexpression r.n;
+iterator r.i;
+expression e;
+identifier l;
+expression list [r.n1] es;
+@@
+
+ i(es,n,...) {
+   ...
+(
+   of_node_put(n);
+|
+   e = n
+|
++  of_node_put(n);
+?  goto l;
+)
+   ...
+ }
+...
+l: ... when != n// </smpl>
 
 ---
- drivers/pinctrl/mediatek/pinctrl-mtk-common.c |    1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-index 45f3562..ee2287b 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-+++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-@@ -598,6 +598,7 @@ static int mtk_pctrl_dt_node_to_map(struct pinctrl_dev *pctldev,
- 				&reserved_maps, num_maps);
- 		if (ret < 0) {
- 			pinctrl_utils_dt_free_map(pctldev, *map, *num_maps);
-+			of_node_put(np);
- 			return ret;
- 		}
- 	}
+ drivers/pinctrl/mediatek/pinctrl-mtk-common.c |    1 +
+ drivers/pinctrl/pinctrl-rockchip.c            |    5 ++++-
+ drivers/pinctrl/pinctrl-tegra-xusb.c          |    4 +++-
+ drivers/pinctrl/pinctrl-tegra.c               |    1 +
+ drivers/pinctrl/sh-pfc/pinctrl.c              |    4 +++-
+ drivers/pinctrl/sirf/pinctrl-sirf.c           |    8 ++++++--
+ 6 files changed, 18 insertions(+), 5 deletions(-)
