@@ -1,20 +1,60 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 21 Dec 2015 22:22:15 +0800
-Subject: [linux-sunxi][PATCH v2 4/5] ARM: dts: sun4i: Add Itead A10 Core
- support
-In-Reply-To: <1450537521-6476-5-git-send-email-codekipper@gmail.com>
-References: <1450537521-6476-1-git-send-email-codekipper@gmail.com>
- <1450537521-6476-5-git-send-email-codekipper@gmail.com>
-Message-ID: <CAGb2v64sy49cSAmNS8Wn9Xd+VQgAcuzjJ3Kj4UWjSabqDiV6eQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 21 Dec 2015 14:27:02 +0000
+Subject: [RESEND PATCH v7 2/4] Documentation, dt, arm64/arm: dt bindings
+ for numa.
+In-Reply-To: <20151218180346.GF30229@leverpostej>
+References: <1450413433-7467-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <20151218141826.GB30229@leverpostej>
+ <CAFpQJXVmXkgD1FuMbU3rWg5MR3AEeneHAiG6XVfOs6m6e6=byQ@mail.gmail.com>
+ <20151218180346.GF30229@leverpostej>
+Message-ID: <20151221142701.GR23092@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 19, 2015 at 11:05 PM,  <codekipper@gmail.com> wrote:
-> From: Marcus Cooper <codekipper@gmail.com>
->
-> The A10 Itead Core module comes with 4GB NAND and 1GB DDR RAM. All of the
-> I/O interfaces are exposed via 4 groups of 2*30 1mm pitched female headers.
->
-> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+Mark,
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+On Fri, Dec 18, 2015 at 06:03:47PM +0000, Mark Rutland wrote:
+> On Fri, Dec 18, 2015 at 09:00:18PM +0530, Ganapatrao Kulkarni wrote:
+> > Hi Mark,
+> > 
+> > On Fri, Dec 18, 2015 at 7:48 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > >> +- distance-matrix
+> > >> +  This property defines a matrix to describe the relative distances
+> > >> +  between all numa nodes.
+> > >> +  It is represented as a list of node pairs and their relative distance.
+> > >> +
+> > >> +  Note:
+> > >> +     1. Each entry represents distance from first node to second node.
+> > >> +     The distance are equal in either direction.
+> > >> +     2. The distance from a node to self(local distance) is represented
+> > >> +     with value 10 and all inter node distance should be represented with
+> > >> +     value greater than 10.
+> > >> +     3. distance-matrix shold have entries in lexicographical ascending
+> > >> +     order of nodes.
+> > >> +     4. There must be only one Device node distance-map and must reside in the root node.
+> > >
+> > > I am still concerned that the local distance of 10 is completely
+> > > arbitrary.
+> > IMHO, i do not see any issue in having defined local distance to
+> > arbitrary number(10).
+> > inter node numa distance is relative number with respect to local distance
+> > we have to fix local distance to some value, having it in dt to make
+> > generic will not add
+> > any additional value as compared to having the fixed local distance to 10.
+> 
+> That's not quite true. The figure chosen for the local distance affects
+> the granularity with which you can describe all distances.
+> 
+> By using a local distance of 10 we can only encode distances in 10%
+> chunks of that. Using a local distance of 100 we could encode in 1%
+> chunks of that.
+
+Whilst I see what you're saying, the local distance of 10 seems to be
+part of the ACPI spec, and is the reason why the core code defines it
+that way.
+
+Now, we can of course do our own thing for device-tree, but I really
+don't think it's worth our while to change this without a compelling
+use-case.
+
+Will
