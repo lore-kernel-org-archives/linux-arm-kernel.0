@@ -1,48 +1,64 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Dec 2015 13:03:38 +0000
-Subject: [PATCH] ARM64: Fix compiling with GCC 6 and Atomics enabled
-In-Reply-To: <CAKv+Gu_aUvckKpwWw+Xo5VkFEA8-uT9xU0-m5NgAzAc1d53uhQ@mail.gmail.com>
-References: <1450498655-3820-1-git-send-email-apinski@cavium.com>
- <20151221123843.GM23092@arm.com>
- <CAKv+Gu_aUvckKpwWw+Xo5VkFEA8-uT9xU0-m5NgAzAc1d53uhQ@mail.gmail.com>
-Message-ID: <20151221130338.GA8644@n2100.arm.linux.org.uk>
+From: wangnan0@huawei.com (Wangnan (F))
+Date: Mon, 21 Dec 2015 20:56:03 +0800
+Subject: [BUG REPORT]: ARM64: perf: System hung in perf test
+Message-ID: <5677F6E3.9050902@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 21, 2015 at 01:46:22PM +0100, Ard Biesheuvel wrote:
-> On 21 December 2015 at 13:38, Will Deacon <will.deacon@arm.com> wrote:
-> > On Fri, Dec 18, 2015 at 08:17:35PM -0800, Andrew Pinski wrote:
-> >> The problem here is that GCC 6 and above emits .arch now
-> >> for each function so now the global .arch_extension has
-> >> no effect.  This fixes the problem by putting
-> >> .arch_extension inside ARM64_LSE_ATOMIC_INSN so
-> >> it is enabled for each place where LSE is used.
-> >
-> > Hmm, this is going to affect arch/arm/ much more heavily than arch/arm64.
-> > .arch_extension is used for virt, mp and sec over there, and it may be
-> > tricky to isolate the actual instruction usage (at least, virt looks
-> > lost in kvm/arm.c).
-> >
-> > Why can't gas have an option to accept all instruction encodings that it
-> > knows about, inspite of any .arch directives?
-> >
-> 
-> Modern GAS supports things like -march=armv7-a+mp+sec+virt, so it
-> probably makes sense to pass that on the command line when building
-> for v7 (or +sec only for v6) if the assembler is found to support it
-> at build time.
+System hung can be reproduced on qemu and real hardware using:
 
-Modern GCCs (GCC 4 at least) add .arch / .cpu pseudo-instructions in
-the assembly output which means using -Wa,-march= and -Wa,-mcpu= to
-GCC are now totally useless.
+  # perf test -v signal
 
-(From the bug reports I've seen, I don't deem GCC 5 to be anything but
-a total failure, and so as far as I'm concerned, GCC 5 is not to be
-used for ARM, and effectively doesn't exist.  I have no experience or
-opinions on GCC 6.  Hence, "GCC 4" still counts as "modern" being the
-only recent compilers that produce sane results.)
+If qemu is started with '-smp 1', system hung. In real hardware and in
+qemu with smp > 1, the result is:
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+  # /perf test -v signal
+  17: Test breakpoint overflow signal handler                  :
+  --- start ---
+  test child forked, pid 792
+  count1 11, count2 11, overflow 11
+  failed: RF EFLAG recursion issue detected
+  failed: wrong overflow hit
+  failed: wrong count for bp2
+  test child finished with -1
+  ---- end ----
+  Test breakpoint overflow signal handler: FAILED!
+
+Looks like something like [1] is required for ARM64.
+
+Some analysis is done with qemu:
+
+This testcase tests the intertaction between breakpoint, perf_event
+and signal handling. It installs a breakpoint at the enter of a
+function and makes the corresponding perf_event generate SIGIO when
+the event raise.
+
+When perf_event on a async perf_event is triggered:
+
+         if (*perf_event_fasync(event) && event->pending_kill) {
+                 event->pending_wakeup = 1;
+                 irq_work_queue(&event->pending);
+         }
+
+it calls irq_work_queue(&event->pending), which is used to fire a
+poll event and SIGIO. Later when perf_event is closed, in _free_event
+irq_work_sync(&event->pending) is called to ensure all irq_work is done.
+On ARM64, if we have only 1 cpu, the system hung at irq_work_sync().
+
+Using gdb attached, I see:
+  1. IRQ is not disabled. Inside irq_work_sync, result of 
+arch_local_save_flags()
+     is 0x140.
+
+  2. hrtimer_interrupt() is still generated. The system is not dead.
+
+  3. In irq_work_tick, we have a chance to process irq_work. However,
+     llist_empty(raised) is false but arch_irq_work_has_interrupt()
+     is true, so kernel only process lazy_list.
+
+  4. handle_IPI() is never called, so I guess the IPI is disabled by 
+breakpoint
+     and not restored in this case.
+
+[1] 
+http://lkml.kernel.org/r/1362940871-24486-1-git-send-email-jolsa at redhat.com
