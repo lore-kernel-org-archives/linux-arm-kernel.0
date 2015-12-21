@@ -1,10 +1,10 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 21 Dec 2015 11:33:46 +0100
-Subject: [PATCH v2 2/9] ARM: mvebu: kirkwood: Add compatible property to
+Date: Mon, 21 Dec 2015 11:33:53 +0100
+Subject: [PATCH v2 9/9] MIPS: dts: jz4780/ci20: Add compatible property to
  "partitions" node
 In-Reply-To: <1450694033-27717-1-git-send-email-geert+renesas@glider.be>
 References: <1450694033-27717-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1450694033-27717-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <1450694033-27717-10-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,20 +18,20 @@ Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 v2:
   - New.
 ---
- arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts | 1 +
+ arch/mips/boot/dts/ingenic/ci20.dts | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts b/arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts
-index 1db6f2c506cce320..8082d64266a37c33 100644
---- a/arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts
-+++ b/arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts
-@@ -131,6 +131,7 @@
- 	chip-delay = <40>;
- 	status = "okay";
- 	partitions {
-+		compatible = "fixed-partitions";
- 		#address-cells = <1>;
- 		#size-cells = <1>;
+diff --git a/arch/mips/boot/dts/ingenic/ci20.dts b/arch/mips/boot/dts/ingenic/ci20.dts
+index 782258c0e4fbba8e..1652d8d60b1e4b86 100644
+--- a/arch/mips/boot/dts/ingenic/ci20.dts
++++ b/arch/mips/boot/dts/ingenic/ci20.dts
+@@ -70,6 +70,7 @@
+ 			nand-on-flash-bbt;
+ 
+ 			partitions {
++				compatible = "fixed-partitions";
+ 				#address-cells = <2>;
+ 				#size-cells = <2>;
  
 -- 
 1.9.1
