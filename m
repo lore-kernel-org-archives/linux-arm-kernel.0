@@ -1,7 +1,7 @@
 From: dannym@scratchpost.org (Danny Milosavljevic)
-Date: Mon, 21 Dec 2015 12:30:47 +0100
+Date: Mon, 21 Dec 2015 12:31:48 +0100
 Subject: [PATCH v8 0/2] ASoc: sun4i-codec: Add FM, Line and Mic inputs
-Message-ID: <20151221123047.215306ce@dayas>
+Message-ID: <20151221123148.1ab6480b@dayas>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
