@@ -1,34 +1,38 @@
-From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
-Date: Mon, 21 Dec 2015 15:54:08 +0530
-Subject: [PATCH] ARM: multi_v7_defconfig: enable TPS65217 regulator
-In-Reply-To: <20151220184453.GB32594@localhost>
-References: <1447225753-2788-1-git-send-email-afzal.mohd.ma@gmail.com>
- <20151220184453.GB32594@localhost>
-Message-ID: <20151221102408.GA4339@afzalpc>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Mon, 21 Dec 2015 11:33:45 +0100
+Subject: [PATCH v2 1/9] ARM: mvebu: ix4-300d: Add compatible property to
+ "partitions" node
+In-Reply-To: <1450694033-27717-1-git-send-email-geert+renesas@glider.be>
+References: <1450694033-27717-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1450694033-27717-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+As of commit e488ca9f8d4f62c2 ("doc: dt: mtd: partitions: add compatible
+property to "partitions" node"), the "partitions" subnode of an SPI
+FLASH device node must have a compatible property. The partitions are no
+longer detected if it is not present.
 
-On Sun, Dec 20, 2015 at 10:44:53AM -0800, Olof Johansson wrote:
-> On Wed, Nov 11, 2015 at 12:39:13PM +0530, Afzal Mohammed wrote:
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Brian Norris <computersforpeace@gmail.com>
+---
+v2:
+  - Add Acked-by.
+---
+ arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-> > Enable TPS65217 regulator to have rootfs in MMC for Beagle Bone's.
-> > 
-> > Suggested-by: Kishon Vijay Abraham I <kishon@ti.com>
-> > Signed-off-by: Afzal Mohammed <afzal.mohd.ma@gmail.com>
-
-> Applied, thanks.
-
-Would it be possible to consider the similar patch [1] from Nishant
-Menon instead of this patch ?, though i am not satisfied with the
-changelog in his, i.e. regarding mention that it is required only for
-older Beagle Bones. He has sent the initial version of it (identical in
-diff) before mine.
-
-Sorry for the trouble and Thanks.
-
-Regards
-afzal
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/393611.html
+diff --git a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
+index 13cf69a8d0fb392b..fb9e1bbf23385b85 100644
+--- a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
++++ b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
+@@ -152,6 +152,7 @@
+ 				nand-on-flash-bbt;
+ 
+ 				partitions {
++					compatible = "fixed-partitions";
+ 					#address-cells = <1>;
+ 					#size-cells = <1>;
+ 
+-- 
+1.9.1
