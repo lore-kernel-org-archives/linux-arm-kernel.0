@@ -1,56 +1,54 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Mon, 21 Dec 2015 12:07:58 +0800
-Subject: [PATCH 2/3] thermal: Add Mediatek thermal controller support
-In-Reply-To: <1448883753-19068-3-git-send-email-s.hauer@pengutronix.de>
-References: <1448883753-19068-1-git-send-email-s.hauer@pengutronix.de>
- <1448883753-19068-3-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <CAGS+omC86=Kfdj0cFNHqs4fXCAT0uU+AxHCj3ORd2HetNZ2gVQ@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 21 Dec 2015 15:33:48 +1100
+Subject: I2C eeprom compatibles? (was Re: [PATCH/RFC 03/19] ARM:
+ shmobile: gose: add i2c2 bus to device tree)
+In-Reply-To: <20151218103214.GA1532@katana>
+References: <1449802376-11301-1-git-send-email-horms+renesas@verge.net.au>
+ <20151218030239.GB10973@verge.net.au>
+ <20151218073531.GA1517@katana> <1839177.77Qt0RnI3v@wuerfel>
+ <20151218103214.GA1532@katana>
+Message-ID: <20151221043346.GE14422@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On Fri, Dec 18, 2015 at 11:32:15AM +0100, Wolfram Sang wrote:
+> On Fri, Dec 18, 2015 at 10:06:48AM +0100, Arnd Bergmann wrote:
+> > On Friday 18 December 2015 08:35:32 Wolfram Sang wrote:
+> > > > 
+> > > > It seems to me that we have some consensus around:
+> > > > 
+> > > >       compatible = "renesas,r1ex24002", "24c02";
+> > > 
+> > > Thinking again, "generic,24c02" or "generic-24c02" could also be an
+> > > option.
+> > > 
+> > > > Should this be added to Documentation/devicetree/bindings/eeprom/eeprom.txt ?
+> > > > Or documented elsewhere?
+> > > 
+> > > Probably we need a DT maintainers advice here? I don't mind vendor
+> > > specific compatibles being documented, but I'm reluctant to add all
+> > > these compatibles for the myriads of I2C eeproms to the at24 driver. 99%
+> > > are covered by the generic case.
+> > > 
+> > > Adding DT to CC.
+> > 
+> > I'd rather use some vendor string in addition to 24c02. Isn't this originally
+> > an Atmel part? In that case, using "atmel,24c02" as the most generic string
+> > would be appropriate,
+> 
+> Yeah, the at24 driver is named after Atmel chips AFAIR. Having "atmel,*"
+> as the generic fallback sounds like a good solution to me, too.
+> 
+> > and IIRC the i2c framework will just match that with
+> > the "24c02" entry in the i2c_device_id list.
+> 
+> True, although this behaviour is often complained about. There have been
+> attempts to make i2c/spi behave like the rest of the DT world and to
+> deprecate the current way. It didn't happen because of lots gory details,
+> however :/
 
-One nit below that can be fixed up later, or now if you don't plan to
-spin this driver to
-address Eduardo's feedback...
+My reading of the above is that we are currently leaning towards:
 
-On Mon, Nov 30, 2015 at 7:42 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> This adds support for the Mediatek thermal controller found on MT8173
-> and likely other SoCs.
-> The controller is a bit special. It does not have its own ADC, instead
-> it controls the on-SoC AUXADC via AHB bus accesses. For this reason
-> we need the physical address of the AUXADC. Also it controls a mux
-> using AHB bus accesses, so we need the APMIXEDSYS physical address aswell.
->
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+	compatible = "renesas,r1ex24002", "atmel,24c02";
 
-[snip]
-
-> +static int mtk_thermal_get_calibration_data(struct device *dev, struct mtk_thermal *mt)
-> +{
-> +       struct nvmem_cell *cell;
-> +       u32 *buf;
-> +       size_t len;
-> +       int i, ret = 0;
-> +
-> +       /* Start with default values */
-> +       mt->adc_ge = 512;
-> +       for (i = 0; i < MT8173_NUM_SENSORS; i++)
-> +               mt->vts[i] = 260;
-> +       mt->degc_cali = 40;
-> +       mt->o_slope = 0;
-> +
-> +       cell = nvmem_cell_get(dev, "calibration-data");
-> +       if (IS_ERR(cell)) {
-> +               if (PTR_ERR(cell) == -EPROBE_DEFER)
-
-It is useful to know why the thermal driver is being probe defered, so
-I suggest here:
-dev_warn(dev, "Waiting for calibration data.\n");
-
-> +                       return PTR_ERR(cell);
-> +               return 0;
-> +       }
-
-Thanks,
--Dan
+And we are unsure what to do about the documentation.
