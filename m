@@ -1,22 +1,32 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 21 Dec 2015 21:20:49 +0800
-Subject: [PATCH V2 1/2] devicetree: bindings: Add vendor prefix for Kosagi
-In-Reply-To: <1450416590-14908-1-git-send-email-marex@denx.de>
-References: <1450416590-14908-1-git-send-email-marex@denx.de>
-Message-ID: <20151221131953.GA18410@tiger>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 21 Dec 2015 13:22:51 +0000
+Subject: [PATCH] ARM64: tegra: Add chosen node for tegra132 norrin
+Message-ID: <1450704171-8345-1-git-send-email-jonathanh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 06:29:49AM +0100, Marek Vasut wrote:
-> From: Sean Cross <xobs@kosagi.com>
-> 
-> Add a vendor prefix for Sutajio Ko-Usagi PTE Ltd., which goes by the
-> more common name of Kosagi.
-> 
-> Signed-off-by: Sean Cross <xobs@kosagi.com>
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Rob Herring <robh@kernel.org>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+The NVIDIA bootloader, nvtboot, expects the "chosen" node to be present
+in the device-tree blob and it is not then it fails to boot the kernel.
+Add the chosen node so we can boot the kernel on tegra132 norrin with
+the nvtboot bootloader.
 
-Applied both, thanks.
+Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+---
+ arch/arm64/boot/dts/nvidia/tegra132-norrin.dts | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/nvidia/tegra132-norrin.dts b/arch/arm64/boot/dts/nvidia/tegra132-norrin.dts
+index 7dfe1c085966..62f33fc84e3e 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra132-norrin.dts
++++ b/arch/arm64/boot/dts/nvidia/tegra132-norrin.dts
+@@ -12,6 +12,8 @@
+ 		rtc1 = "/rtc at 0,7000e000";
+ 	};
+ 
++	chosen { };
++
+ 	memory {
+ 		device_type = "memory";
+ 		reg = <0x0 0x80000000 0x0 0x80000000>;
+-- 
+2.1.4
