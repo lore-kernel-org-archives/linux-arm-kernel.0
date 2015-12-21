@@ -1,234 +1,63 @@
-From: dcashman@android.com (Daniel Cashman)
-Date: Mon, 21 Dec 2015 09:26:54 -0800
-Subject: [PATCH v7 1/4] mm: mmap: Add new /proc tunable for mmap_base ASLR.
-In-Reply-To: <1450718817-7082-1-git-send-email-dcashman@android.com>
-References: <1450718817-7082-1-git-send-email-dcashman@android.com>
-Message-ID: <1450718817-7082-2-git-send-email-dcashman@android.com>
+From: yang.shi@linaro.org (Shi, Yang)
+Date: Mon, 21 Dec 2015 09:27:37 -0800
+Subject: [PATCH] arm64: reenable interrupt when handling ptrace breakpoint
+In-Reply-To: <20151221170028.GT23092@arm.com>
+References: <1450225088-2456-1-git-send-email-yang.shi@linaro.org>
+ <20151216111316.GD4308@arm.com> <5671CD5B.9030907@linaro.org>
+ <20151221104818.GF23092@arm.com> <alpine.DEB.2.11.1512211749180.28591@nanos>
+ <20151221170028.GT23092@arm.com>
+Message-ID: <56783689.5050308@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: dcashman <dcashman@google.com>
+On 12/21/2015 9:00 AM, Will Deacon wrote:
+> On Mon, Dec 21, 2015 at 05:51:22PM +0100, Thomas Gleixner wrote:
+>> On Mon, 21 Dec 2015, Will Deacon wrote:
+>>> +static void send_user_sigtrap(int si_code)
+>>> +{
+>>> +	struct pt_regs *regs = current_pt_regs();
+>>> +	siginfo_t info = {
+>>> +		.si_signo	= SIGTRAP,
+>>> +		.si_errno	= 0,
+>>> +		.si_code	= si_code,
+>>> +		.si_addr	= (void __user *)instruction_pointer(regs),
+>>> +	};
+>>> +
+>>> +	if (WARN_ON(!user_mode(regs)))
+>>> +		return;
+>>> +
+>>> +	preempt_disable();
+>>
+>> That doesn't work on RT either. force_sig_info() takes task->sighand->siglock,
+>> which is a 'sleeping' spinlock on RT.
+>
+> Ah, I missed that :/
+>
+>> Why would we need to disable preemption here at all? What's the problem of
+>> being preempted or even migrated?
+>
+> There *might* not be a problem, I'm just really nervous about changing
+> the behaviour on the debug path and subtly changing how ptrace behaves.
+>
+> My worry was that you could somehow get back into the tracer, and it
+> could remove a software breakpoint in the knowledge that it wouldn't
+> see any future (spurious) SIGTRAPs for that location.
+>
+> Without a concrete example, however, I guess I'll bite the bullet and
+> enable irqs across the call to force_sig_info, since there is clearly a
+> real issue here on RT.
 
-ASLR  only uses as few as 8 bits to generate the random offset for the
-mmap base address on 32 bit architectures. This value was chosen to
-prevent a poorly chosen value from dividing the address space in such
-a way as to prevent large allocations. This may not be an issue on all
-platforms. Allow the specification of a minimum number of bits so that
-platforms desiring greater ASLR protection may determine where to place
-the trade-off.
+Thanks for the review.
 
-Signed-off-by: Daniel Cashman <dcashman@android.com>
----
- Documentation/sysctl/vm.txt | 29 +++++++++++++++++++
- arch/Kconfig                | 68 +++++++++++++++++++++++++++++++++++++++++++++
- include/linux/mm.h          | 11 ++++++++
- kernel/sysctl.c             | 22 +++++++++++++++
- mm/mmap.c                   | 12 ++++++++
- 5 files changed, 142 insertions(+)
+I don't have any concrete usecase for that race condition too since all 
+ptrace tests from ltp passed. However, even though we need preemption 
+disabled at some point in debug exception code path in the future, I 
+think we could just extend the "signal delay send" approach from x86-64 
+to arm64, which is currently used by x86-64 on -rt kernel only.
 
-diff --git a/Documentation/sysctl/vm.txt b/Documentation/sysctl/vm.txt
-index f72370b..ee763f3 100644
---- a/Documentation/sysctl/vm.txt
-+++ b/Documentation/sysctl/vm.txt
-@@ -42,6 +42,8 @@ Currently, these files are in /proc/sys/vm:
- - min_slab_ratio
- - min_unmapped_ratio
- - mmap_min_addr
-+- mmap_rnd_bits
-+- mmap_rnd_compat_bits
- - nr_hugepages
- - nr_overcommit_hugepages
- - nr_trim_pages         (only if CONFIG_MMU=n)
-@@ -485,6 +487,33 @@ against future potential kernel bugs.
- 
- ==============================================================
- 
-+mmap_rnd_bits:
-+
-+This value can be used to select the number of bits to use to
-+determine the random offset to the base address of vma regions
-+resulting from mmap allocations on architectures which support
-+tuning address space randomization.  This value will be bounded
-+by the architecture's minimum and maximum supported values.
-+
-+This value can be changed after boot using the
-+/proc/sys/vm/mmap_rnd_bits tunable
-+
-+==============================================================
-+
-+mmap_rnd_compat_bits:
-+
-+This value can be used to select the number of bits to use to
-+determine the random offset to the base address of vma regions
-+resulting from mmap allocations for applications run in
-+compatibility mode on architectures which support tuning address
-+space randomization.  This value will be bounded by the
-+architecture's minimum and maximum supported values.
-+
-+This value can be changed after boot using the
-+/proc/sys/vm/mmap_rnd_compat_bits tunable
-+
-+==============================================================
-+
- nr_hugepages
- 
- Change the minimum size of the hugepage pool.
-diff --git a/arch/Kconfig b/arch/Kconfig
-index 4e949e5..ba1b626 100644
---- a/arch/Kconfig
-+++ b/arch/Kconfig
-@@ -511,6 +511,74 @@ config ARCH_HAS_ELF_RANDOMIZE
- 	  - arch_mmap_rnd()
- 	  - arch_randomize_brk()
- 
-+config HAVE_ARCH_MMAP_RND_BITS
-+	bool
-+	help
-+	  An arch should select this symbol if it supports setting a variable
-+	  number of bits for use in establishing the base address for mmap
-+	  allocations, has MMU enabled and provides values for both:
-+	  - ARCH_MMAP_RND_BITS_MIN
-+	  - ARCH_MMAP_RND_BITS_MAX
-+
-+config ARCH_MMAP_RND_BITS_MIN
-+	int
-+
-+config ARCH_MMAP_RND_BITS_MAX
-+	int
-+
-+config ARCH_MMAP_RND_BITS_DEFAULT
-+	int
-+
-+config ARCH_MMAP_RND_BITS
-+	int "Number of bits to use for ASLR of mmap base address" if EXPERT
-+	range ARCH_MMAP_RND_BITS_MIN ARCH_MMAP_RND_BITS_MAX
-+	default ARCH_MMAP_RND_BITS_DEFAULT if ARCH_MMAP_RND_BITS_DEFAULT
-+	default ARCH_MMAP_RND_BITS_MIN
-+	depends on HAVE_ARCH_MMAP_RND_BITS
-+	help
-+	  This value can be used to select the number of bits to use to
-+	  determine the random offset to the base address of vma regions
-+	  resulting from mmap allocations. This value will be bounded
-+	  by the architecture's minimum and maximum supported values.
-+
-+	  This value can be changed after boot using the
-+	  /proc/sys/vm/mmap_rnd_bits tunable
-+
-+config HAVE_ARCH_MMAP_RND_COMPAT_BITS
-+	bool
-+	help
-+	  An arch should select this symbol if it supports running applications
-+	  in compatibility mode, supports setting a variable number of bits for
-+	  use in establishing the base address for mmap allocations, has MMU
-+	  enabled and provides values for both:
-+	  - ARCH_MMAP_RND_COMPAT_BITS_MIN
-+	  - ARCH_MMAP_RND_COMPAT_BITS_MAX
-+
-+config ARCH_MMAP_RND_COMPAT_BITS_MIN
-+	int
-+
-+config ARCH_MMAP_RND_COMPAT_BITS_MAX
-+	int
-+
-+config ARCH_MMAP_RND_COMPAT_BITS_DEFAULT
-+	int
-+
-+config ARCH_MMAP_RND_COMPAT_BITS
-+	int "Number of bits to use for ASLR of mmap base address for compatible applications" if EXPERT
-+	range ARCH_MMAP_RND_COMPAT_BITS_MIN ARCH_MMAP_RND_COMPAT_BITS_MAX
-+	default ARCH_MMAP_RND_COMPAT_BITS_DEFAULT if ARCH_MMAP_RND_COMPAT_BITS_DEFAULT
-+	default ARCH_MMAP_RND_COMPAT_BITS_MIN
-+	depends on HAVE_ARCH_MMAP_RND_COMPAT_BITS
-+	help
-+	  This value can be used to select the number of bits to use to
-+	  determine the random offset to the base address of vma regions
-+	  resulting from mmap allocations for compatible applications This
-+	  value will be bounded by the architecture's minimum and maximum
-+	  supported values.
-+
-+	  This value can be changed after boot using the
-+	  /proc/sys/vm/mmap_rnd_compat_bits tunable
-+
- config HAVE_COPY_THREAD_TLS
- 	bool
- 	help
-diff --git a/include/linux/mm.h b/include/linux/mm.h
-index 00bad77..6f6dd6e 100644
---- a/include/linux/mm.h
-+++ b/include/linux/mm.h
-@@ -51,6 +51,17 @@ extern int sysctl_legacy_va_layout;
- #define sysctl_legacy_va_layout 0
- #endif
- 
-+#ifdef CONFIG_HAVE_ARCH_MMAP_RND_BITS
-+extern const int mmap_rnd_bits_min;
-+extern const int mmap_rnd_bits_max;
-+extern int mmap_rnd_bits __read_mostly;
-+#endif
-+#ifdef CONFIG_HAVE_ARCH_MMAP_RND_COMPAT_BITS
-+extern const int mmap_rnd_compat_bits_min;
-+extern const int mmap_rnd_compat_bits_max;
-+extern int mmap_rnd_compat_bits __read_mostly;
-+#endif
-+
- #include <asm/page.h>
- #include <asm/pgtable.h>
- #include <asm/processor.h>
-diff --git a/kernel/sysctl.c b/kernel/sysctl.c
-index dc6858d..d5e7e24 100644
---- a/kernel/sysctl.c
-+++ b/kernel/sysctl.c
-@@ -1568,6 +1568,28 @@ static struct ctl_table vm_table[] = {
- 		.mode		= 0644,
- 		.proc_handler	= proc_doulongvec_minmax,
- 	},
-+#ifdef CONFIG_HAVE_ARCH_MMAP_RND_BITS
-+	{
-+		.procname	= "mmap_rnd_bits",
-+		.data		= &mmap_rnd_bits,
-+		.maxlen		= sizeof(mmap_rnd_bits),
-+		.mode		= 0600,
-+		.proc_handler	= proc_dointvec_minmax,
-+		.extra1		= (void *)&mmap_rnd_bits_min,
-+		.extra2		= (void *)&mmap_rnd_bits_max,
-+	},
-+#endif
-+#ifdef CONFIG_HAVE_ARCH_MMAP_RND_COMPAT_BITS
-+	{
-+		.procname	= "mmap_rnd_compat_bits",
-+		.data		= &mmap_rnd_compat_bits,
-+		.maxlen		= sizeof(mmap_rnd_compat_bits),
-+		.mode		= 0600,
-+		.proc_handler	= proc_dointvec_minmax,
-+		.extra1		= (void *)&mmap_rnd_compat_bits_min,
-+		.extra2		= (void *)&mmap_rnd_compat_bits_max,
-+	},
-+#endif
- 	{ }
- };
- 
-diff --git a/mm/mmap.c b/mm/mmap.c
-index 2ce04a6..fe3816c 100644
---- a/mm/mmap.c
-+++ b/mm/mmap.c
-@@ -58,6 +58,18 @@
- #define arch_rebalance_pgtables(addr, len)		(addr)
- #endif
- 
-+#ifdef CONFIG_HAVE_ARCH_MMAP_RND_BITS
-+const int mmap_rnd_bits_min = CONFIG_ARCH_MMAP_RND_BITS_MIN;
-+const int mmap_rnd_bits_max = CONFIG_ARCH_MMAP_RND_BITS_MAX;
-+int mmap_rnd_bits __read_mostly = CONFIG_ARCH_MMAP_RND_BITS;
-+#endif
-+#ifdef CONFIG_HAVE_ARCH_MMAP_RND_COMPAT_BITS
-+const int mmap_rnd_compat_bits_min = CONFIG_ARCH_MMAP_RND_COMPAT_BITS_MIN;
-+const int mmap_rnd_compat_bits_max = CONFIG_ARCH_MMAP_RND_COMPAT_BITS_MAX;
-+int mmap_rnd_compat_bits __read_mostly = CONFIG_ARCH_MMAP_RND_COMPAT_BITS;
-+#endif
-+
-+
- static void unmap_region(struct mm_struct *mm,
- 		struct vm_area_struct *vma, struct vm_area_struct *prev,
- 		unsigned long start, unsigned long end);
--- 
-2.6.0.rc2.230.g3dd15c0
+Regards,
+Yang
+
+>
+> Will
+>
