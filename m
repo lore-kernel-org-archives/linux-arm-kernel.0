@@ -1,60 +1,75 @@
-From: andy.yan@rock-chips.com (Andy Yan)
-Date: Mon, 21 Dec 2015 19:27:29 +0800
-Subject: [PATCH 0/6] misc: add reboot mode driver
-Message-ID: <1450697249-29994-1-git-send-email-andy.yan@rock-chips.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 21 Dec 2015 11:30:21 +0000
+Subject: [PATCH v8 9/4] arm64: remove irq_count and do_softirq_own_stack()
+In-Reply-To: <68E0E2C7-A4C2-45C2-95C5-842FA807F918@gmail.com>
+References: <1449226948-14251-1-git-send-email-james.morse@arm.com>
+ <1450454507-8907-1-git-send-email-james.morse@arm.com>
+ <68E0E2C7-A4C2-45C2-95C5-842FA807F918@gmail.com>
+Message-ID: <20151221113021.GH23092@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, Dec 20, 2015 at 08:07:46PM +0900, Jungseok Lee wrote:
+> On Dec 19, 2015, at 1:01 AM, James Morse wrote:
+> > diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> > index 0667fb7d8bb1..6745a9041f99 100644
+> > --- a/arch/arm64/kernel/entry.S
+> > +++ b/arch/arm64/kernel/entry.S
+> > @@ -181,19 +181,20 @@ alternative_endif
+> > 	.macro	irq_stack_entry
+> > 	mov	x19, sp			// preserve the original sp
+> > 
+> > -	this_cpu_ptr irq_stack, x25, x26
+> > -
+> > 	/*
+> > -	 * Check the lowest address on irq_stack for the irq_count value,
+> > -	 * incremented by do_softirq_own_stack if we have re-enabled irqs
+> > -	 * while on the irq_stack.
+> > +	 * Compare sp and sp_el0, if the top ~(THREAD_SIZE - 1) bits match,
+> > +	 * we are on a task stack, and should switch to the irq stack.
+> > 	 */
+> > -	ldr	x26, [x25]
+> > -	cbnz	x26, 9998f		// recursive use?
+> > +	mrs	x26, sp_el0		// already masked
+> 
+> Nit: How about using 'get_thread_info x26'?
 
-This driver parse the reboot commands like "reboot loader"
-and "reboot recovery" to get a boot mode described in the
-device tree , then call the vendor specific write interfae
-to store the boot mode in some place like special register
-or sram , which can be read by the bootloader after system
-reboot.
+Something like the following?
 
-This is commonly done on Android based devices, in order to
-reboot the device into fastboot or recovery mode.
+Will
 
-Before this patch , I have try some hack on[0], and then found
-John Stultz also doing the same work[1].
+--->8
 
-As John is busy these days, I go on with this work.
-
-[0]https://patchwork.kernel.org/patch/7647751/
-[1]https://patchwork.kernel.org/patch/7802391/
-
-
-Andy Yan (6):
-  dt-bindings: misc: add document for reboot-mode driver
-  dt-bindings: soc: add document for rockchip reboot-mode driver
-  misc: add reboot mode driver
-  soc: rockchip: add reboot mode driver
-  ARM: dts: rockchip: add reboot mode node
-  ARM64: dts: rockchip: add reboot mode node
-
- .../devicetree/bindings/misc/reboot-mode.txt       | 41 +++++++++
- .../bindings/soc/rockchip/rockchip,reboot-mode.txt | 39 +++++++++
- arch/arm/boot/dts/rk3288.dtsi                      | 25 ++++++
- arch/arm/boot/dts/rk3xxx.dtsi                      | 26 ++++++
- arch/arm64/boot/dts/rockchip/rk3368.dtsi           | 26 ++++++
- drivers/misc/Kconfig                               |  7 ++
- drivers/misc/Makefile                              |  1 +
- drivers/misc/reboot_mode.c                         | 96 ++++++++++++++++++++++
- drivers/power/reset/Kconfig                        |  1 -
- drivers/soc/rockchip/Kconfig                       |  8 ++
- drivers/soc/rockchip/Makefile                      |  1 +
- drivers/soc/rockchip/loader.h                      | 22 +++++
- drivers/soc/rockchip/reboot.c                      | 66 +++++++++++++++
- include/dt-bindings/soc/rockchip_boot-mode.h       | 30 +++++++
- include/linux/reboot.h                             |  4 +-
- 15 files changed, 391 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/misc/reboot-mode.txt
- create mode 100644 Documentation/devicetree/bindings/soc/rockchip/rockchip,reboot-mode.txt
- create mode 100644 drivers/misc/reboot_mode.c
- create mode 100644 drivers/soc/rockchip/loader.h
- create mode 100644 drivers/soc/rockchip/reboot.c
- create mode 100644 include/dt-bindings/soc/rockchip_boot-mode.h
-
--- 
-1.9.1
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 6745a9041f99..c0db321db7e1 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -182,12 +182,12 @@ alternative_endif
+ 	mov	x19, sp			// preserve the original sp
+ 
+ 	/*
+-	 * Compare sp and sp_el0, if the top ~(THREAD_SIZE - 1) bits match,
+-	 * we are on a task stack, and should switch to the irq stack.
++	 * Compare sp with the current thread_info, if the top
++	 * ~(THREAD_SIZE - 1) bits match, we are on a task stack, and
++	 * should switch to the irq stack.
+ 	 */
+-	mrs	x26, sp_el0		// already masked
+ 	and	x25, x19, #~(THREAD_SIZE - 1)
+-	cmp	x25, x26
++	cmp	x25, tsk
+ 	b.ne	9998f
+ 
+ 	this_cpu_ptr irq_stack, x25, x26
+@@ -406,10 +406,10 @@ el1_irq:
+ 	bl	trace_hardirqs_off
+ #endif
+ 
++	get_thread_info tsk
+ 	irq_handler
+ 
+ #ifdef CONFIG_PREEMPT
+-	get_thread_info tsk
+ 	ldr	w24, [tsk, #TI_PREEMPT]		// get preempt count
+ 	cbnz	w24, 1f				// preempt count != 0
+ 	ldr	x0, [tsk, #TI_FLAGS]		// get flags
