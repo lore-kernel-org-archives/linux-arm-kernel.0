@@ -1,12 +1,12 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 21 Dec 2015 17:48:48 +0100
-Subject: [PATCH v2 1/9] ARM: mvebu: ix4-300d: Add compatible property to
+Date: Mon, 21 Dec 2015 17:49:58 +0100
+Subject: [PATCH v2 2/9] ARM: mvebu: kirkwood: Add compatible property to
  "partitions" node
-In-Reply-To: <1450694033-27717-2-git-send-email-geert+renesas@glider.be>
- (Geert Uytterhoeven's message of "Mon, 21 Dec 2015 11:33:45 +0100")
+In-Reply-To: <1450694033-27717-3-git-send-email-geert+renesas@glider.be>
+ (Geert Uytterhoeven's message of "Mon, 21 Dec 2015 11:33:46 +0100")
 References: <1450694033-27717-1-git-send-email-geert+renesas@glider.be>
- <1450694033-27717-2-git-send-email-geert+renesas@glider.be>
-Message-ID: <87zix3rbm7.fsf@free-electrons.com>
+ <1450694033-27717-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <87vb7rrbk9.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,10 +20,8 @@ Hi Geert,
 > longer detected if it is not present.
 >
 > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Acked-by: Brian Norris <computersforpeace@gmail.com>
 
-Applied on mvebu/dt (with the hope that it is still time to push it to
-arm-soc)
+Applied on mvebu/dt
 
 Thanks,
 
@@ -31,22 +29,22 @@ Gregory
 
 > ---
 > v2:
->   - Add Acked-by.
+>   - New.
 > ---
->  arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts | 1 +
+>  arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts | 1 +
 >  1 file changed, 1 insertion(+)
 >
-> diff --git a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
-> index 13cf69a8d0fb392b..fb9e1bbf23385b85 100644
-> --- a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
-> +++ b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
-> @@ -152,6 +152,7 @@
->  				nand-on-flash-bbt;
->  
->  				partitions {
-> +					compatible = "fixed-partitions";
->  					#address-cells = <1>;
->  					#size-cells = <1>;
+> diff --git a/arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts b/arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts
+> index 1db6f2c506cce320..8082d64266a37c33 100644
+> --- a/arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts
+> +++ b/arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts
+> @@ -131,6 +131,7 @@
+>  	chip-delay = <40>;
+>  	status = "okay";
+>  	partitions {
+> +		compatible = "fixed-partitions";
+>  		#address-cells = <1>;
+>  		#size-cells = <1>;
 >  
 > -- 
 > 1.9.1
