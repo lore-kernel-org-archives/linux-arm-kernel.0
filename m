@@ -1,111 +1,237 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 21 Dec 2015 13:06:37 -0800
-Subject: [GIT PULL 4/4] omap device tree changes for v4.5, part 2
-In-Reply-To: <pull-1450731519-787330>
-References: <pull-1450731519-787330>
-Message-ID: <pull-1450731519-787330-4>
+From: graeme.gregory@linaro.org (G Gregory)
+Date: Mon, 21 Dec 2015 21:11:42 +0000
+Subject: [PATCH v3 1/3] ACPI: amba bus probing support
+In-Reply-To: <CAHp75VfOUgkJ1mXPZpHLMr7=bqFDqJSTxy6y+a5PqZZEVcCxYg@mail.gmail.com>
+References: <1450716100-13688-1-git-send-email-aleksey.makarov@linaro.org>
+ <1450716100-13688-2-git-send-email-aleksey.makarov@linaro.org>
+ <CAHp75VfOUgkJ1mXPZpHLMr7=bqFDqJSTxy6y+a5PqZZEVcCxYg@mail.gmail.com>
+Message-ID: <CAGCh1+kA4tiHb3Nxxfa3BSoU2XSYak7vRFLRr5fW9Lag2uhDtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 89c6f2e5ab7a0499c6bcb25d281977ada205765d:
+On 21 December 2015 at 18:19, Andy Shevchenko <andy.shevchenko@gmail.com> wrote:
+> On Mon, Dec 21, 2015 at 6:41 PM, Aleksey Makarov
+> <aleksey.makarov@linaro.org> wrote:
+>> From: Graeme Gregory <graeme.gregory@linaro.org>
+>>
+>> On ARM64 some devices use the AMBA device and not the platform bus for
+>> probing so add support for this. Uses a dummy clock for apb_pclk as ACPI
+>> does not have a suitable clock representation and to keep the core
+>> AMBA bus code unchanged between probing methods.
+>>
+>> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+>> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+>> ---
+>>  drivers/acpi/Makefile    |   1 +
+>>  drivers/acpi/acpi_amba.c | 149 +++++++++++++++++++++++++++++++++++++++++++++++
+>>  drivers/acpi/internal.h  |   5 ++
+>>  3 files changed, 155 insertions(+)
+>>  create mode 100644 drivers/acpi/acpi_amba.c
+>>
+>> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+>> index 675eaf3..3cf732f 100644
+>> --- a/drivers/acpi/Makefile
+>> +++ b/drivers/acpi/Makefile
+>> @@ -43,6 +43,7 @@ acpi-y                                += pci_root.o pci_link.o pci_irq.o
+>>  acpi-y                         += acpi_lpss.o acpi_apd.o
+>>  acpi-y                         += acpi_platform.o
+>>  acpi-y                         += acpi_pnp.o
+>> +acpi-$(CONFIG_ARM_AMBA)        += acpi_amba.o
+>>  acpi-y                         += int340x_thermal.o
+>>  acpi-y                         += power.o
+>>  acpi-y                         += event.o
+>> diff --git a/drivers/acpi/acpi_amba.c b/drivers/acpi/acpi_amba.c
+>> new file mode 100644
+>> index 0000000..ebc8913
+>> --- /dev/null
+>> +++ b/drivers/acpi/acpi_amba.c
+>> @@ -0,0 +1,149 @@
+>> +
+>> +/*
+>> + * ACPI support for platform bus type.
+>> + *
+>> + * Copyright (C) 2015, Linaro Ltd
+>> + * Authors: Graeme Gregory <graeme.gregory@linaro.org>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+>> +#include <linux/acpi.h>
+>> +#include <linux/amba/bus.h>
+>> +#include <linux/clkdev.h>
+>> +#include <linux/clk-provider.h>
+>> +#include <linux/device.h>
+>> +#include <linux/err.h>
+>> +#include <linux/ioport.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/module.h>
+>> +
+>> +#include "internal.h"
+>> +
+>> +static const struct acpi_device_id amba_id_list[] = {
+>> +       {"ARMH0011", 0}, /* PL011 SBSA Uart */
+>> +       {"ARMH0061", 0}, /* PL061 GPIO Device */
+>> +       {"", 0},
+>> +};
+>> +
+>> +static struct clk *amba_dummy_clk;
+>> +
+>> +static void amba_register_dummy_clk(void)
+>> +{
+>> +       struct clk *clk;
+>> +
+>> +       /* If clock already registered */
+>> +       if (amba_dummy_clk)
+>> +               return;
+>> +
+>> +       clk = clk_register_fixed_rate(NULL, "apb_pclk", NULL, CLK_IS_ROOT, 0);
+>> +       clk_register_clkdev(clk, "apb_pclk", NULL);
+>> +
+>> +       amba_dummy_clk = clk;
+>> +}
+>> +
+>> +static int amba_handler_attach(struct acpi_device *adev,
+>> +                               const struct acpi_device_id *id)
+>> +{
+>> +       struct amba_device *dev = NULL;
+>> +       struct acpi_device *acpi_parent;
+>> +       struct resource_entry *rentry;
+>> +       struct list_head resource_list;
+>> +       struct resource *resources = NULL;
+>> +       bool address_found = false;
+>> +       int ret, count, irq_no = 0;
+>> +
+>> +       /* If the ACPI node already has a physical device attached, skip it. */
+>> +       if (adev->physical_node_count)
+>> +               return 0;
+>> +
+>> +       amba_register_dummy_clk();
+>> +
+>> +       dev = amba_device_alloc(NULL, 0, 0);
+>> +       if (!dev) {
+>> +               pr_err("%s(): amba_device_alloc() failed for %s\n",
+>
+> Can it be dev_err(&adev->dev, ?); ?
+> Same for below cases.
+>
+Yes it probably can, I took the code directly from DT version and
+didn't think of using adev->dev directly.
 
-  ARM: dts: omap3-igep0030: Use MMC pwrseq to init SDIO WiFi (2015-12-07 16:11:43 -0800)
+Graeme
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.5/dt-pt2
-
-for you to fetch changes up to 6c95771f8c71cd4dd6ed7ab84a3aea7d509d7704:
-
-  ARM: OMAP2+: LogicPD Torpedo: Add Touchscreen Support (2015-12-21 11:10:40 -0800)
-
-----------------------------------------------------------------
-Second set of omap device tree changes for v4.5 merge window. This series
-updates the EDMA bindings based on the various fixes to split EDMA into
-separate independent devices. It also adds support for more devices on the
-CompuLab cm-t335 and LogicPD Torpedo boards, and enables the new bindings
-for qspi for am437x and dra7. There are also few dra7 regulator fixes, and
-change of gpoi-key,wakeup to wakeup-source.
-
-These depend on commit ae0add740cd0 ("dmaengine: edma: DT: Change reserved
-slot array from 16bit to 32bit type") already merged into mainline.
-
-----------------------------------------------------------------
-Adam Ford (4):
-      ARM: OMAP2+: LogicPD Torpedo: Add LCD Type 15 Support
-      ARM: OMAP2+: LogicPD Torpedo + Wireless: Add Bluetooth
-      ARM: OMAP2+: LogicPD Torpedo: Revert Duplicative Entries
-      ARM: OMAP2+: LogicPD Torpedo: Add Touchscreen Support
-
-Ilya Ledvich (1):
-      ARM: dts: cm-t335: add support for USB0
-
-Keerthy (2):
-      ARM: dts: DRA72-EVM: Add regulator-allow-bypass property for ldo1 and ldo2
-      ARM: dts: DRA7-EVM: Add regulator-allow-bypass property for ldo9
-
-Peter Ujfalusi (4):
-      dmaengine: edma: DT: Change memcpy channel array from 16bit to 32bit type
-      dmaengine: edma: DT: Change reserved slot array from 16bit to 32bit type
-      ARM: DTS: am33xx: Use the new DT bindings for the eDMA3
-      ARM: DTS: am437x: Use the new DT bindings for the eDMA3
-
-Sudeep Holla (2):
-      ARM: dts: am335x: replace gpio-key,wakeup with wakeup-source property
-      ARM: dts: omap: replace legacy *,wakeup property with wakeup-source
-
-Tony Lindgren (1):
-      Merge commit 'ae0add740cd06169cd124f9aaa6eceb11e5b3060' into omap-for-v4.5/dt
-
-Uri Mashiach (4):
-      ARM: dts: cm-t335: add support for SBC-T335
-      ARM: dts: cm-t335: add support for I2C GPIO expander
-      ARM: dts: cm-t335: add support for DVI/LCD
-      ARM: dts: cm-t335: add support for bluetooth
-
-Vignesh R (2):
-      ARM: dts: DRA7: add entry for qspi mmap region
-      ARM: dts: AM4372: add entry for qspi mmap region
-
- .../devicetree/bindings/arm/omap/omap.txt          |   3 +
- Documentation/devicetree/bindings/dma/ti-edma.txt  |  10 +-
- Documentation/devicetree/bindings/spi/ti_qspi.txt  |  22 ++-
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/am335x-cm-t335.dts               |  51 ++++-
- arch/arm/boot/dts/am335x-evm.dts                   |  13 +-
- arch/arm/boot/dts/am335x-evmsk.dts                 |   2 +-
- arch/arm/boot/dts/am335x-pepper.dts                |  17 +-
- arch/arm/boot/dts/am335x-sbc-t335.dts              | 219 +++++++++++++++++++++
- arch/arm/boot/dts/am33xx.dtsi                      |  94 ++++++---
- arch/arm/boot/dts/am4372.dtsi                      |  84 ++++++--
- arch/arm/boot/dts/am437x-gp-evm.dts                |   9 +-
- arch/arm/boot/dts/dra7-evm.dts                     |   1 +
- arch/arm/boot/dts/dra7.dtsi                        |   6 +-
- arch/arm/boot/dts/dra72-evm.dts                    |   2 +
- arch/arm/boot/dts/logicpd-torpedo-37xx-devkit.dts  | 145 ++++++++++++--
- arch/arm/boot/dts/omap3-beagle-xm.dts              |   2 +-
- arch/arm/boot/dts/omap3-beagle.dts                 |   2 +-
- arch/arm/boot/dts/omap3-cm-t3x.dtsi                |   2 +-
- arch/arm/boot/dts/omap3-devkit8000-common.dtsi     |   2 +-
- arch/arm/boot/dts/omap3-devkit8000-lcd-common.dtsi |   2 +-
- arch/arm/boot/dts/omap3-gta04.dtsi                 |   2 +-
- arch/arm/boot/dts/omap3-ldp.dts                    |  18 +-
- arch/arm/boot/dts/omap3-lilly-a83x.dtsi            |   2 +-
- arch/arm/boot/dts/omap3-n900.dts                   |  10 +-
- arch/arm/boot/dts/omap3-overo-alto35-common.dtsi   |   2 +-
- .../boot/dts/omap3-overo-chestnut43-common.dtsi    |   4 +-
- arch/arm/boot/dts/omap3-overo-common-lcd35.dtsi    |   2 +-
- arch/arm/boot/dts/omap3-overo-common-lcd43.dtsi    |   2 +-
- arch/arm/boot/dts/omap3-overo-gallop43-common.dtsi |   4 +-
- arch/arm/boot/dts/omap3-overo-palo35-common.dtsi   |   4 +-
- arch/arm/boot/dts/omap3-overo-palo43-common.dtsi   |   4 +-
- arch/arm/boot/dts/omap3-pandora-common.dtsi        |  34 ++--
- .../boot/dts/omap3-panel-sharp-ls037v7dw01.dtsi    |   2 +-
- arch/arm/boot/dts/omap4-duovero-parlor.dts         |   2 +-
- arch/arm/boot/dts/omap4-var-om44customboard.dtsi   |   2 +-
- arch/arm/boot/dts/omap5-cm-t54.dts                 |   2 +-
- arch/arm/mach-omap2/pdata-quirks.c                 |  24 ++-
- drivers/dma/edma.c                                 |  53 +++--
- include/linux/platform_data/edma.h                 |   2 +-
- 40 files changed, 689 insertions(+), 175 deletions(-)
- create mode 100644 arch/arm/boot/dts/am335x-sbc-t335.dts
+>> +                      __func__, dev_name(&adev->dev));
+>> +               return 0;
+>> +       }
+>> +
+>> +       INIT_LIST_HEAD(&resource_list);
+>
+>> +       count = acpi_dev_get_resources(adev, &resource_list, NULL, NULL);
+>> +       if (count < 0) {
+>> +               return 0;
+>> +       } else if (count > 0) {
+>> +               resources = kmalloc_array(count, sizeof(struct resource),
+>> +                                   GFP_KERNEL);
+>> +               if (!resources) {
+>> +                       acpi_dev_free_resource_list(&resource_list);
+>> +                       return 0;
+>> +               }
+>> +               count = 0;
+>> +               list_for_each_entry(rentry, &resource_list, node) {
+>> +                       switch (resource_type(rentry->res)) {
+>> +                       case IORESOURCE_MEM:
+>> +                               if (!address_found) {
+>> +                                       dev->res = *rentry->res;
+>> +                                       address_found = true;
+>> +                               }
+>> +                               break;
+>> +                       case IORESOURCE_IRQ:
+>> +                               if (irq_no < AMBA_NR_IRQS)
+>> +                                       dev->irq[irq_no++] = rentry->res->start;
+>> +                               break;
+>> +                       default:
+>> +                               dev_warn(&adev->dev, "Invalid resource\n");
+>> +                       }
+>> +               }
+>> +               acpi_dev_free_resource_list(&resource_list);
+>> +       }
+>> +
+>> +       /*
+>> +        * If the ACPI node has a parent and that parent has a physical device
+>> +        * attached to it, that physical device should be the parent of the
+>> +        * platform device we are about to create.
+>> +        */
+>> +       dev->dev.parent = NULL;
+>> +       acpi_parent = adev->parent;
+>> +       if (acpi_parent) {
+>> +               struct acpi_device_physical_node *entry;
+>> +               struct list_head *list;
+>> +
+>> +               mutex_lock(&acpi_parent->physical_node_lock);
+>> +               list = &acpi_parent->physical_node_list;
+>> +               if (!list_empty(list)) {
+>> +                       entry = list_first_entry(list,
+>> +                                       struct acpi_device_physical_node,
+>> +                                       node);
+>> +                       dev->dev.parent = entry->dev;
+>> +               }
+>> +               mutex_unlock(&acpi_parent->physical_node_lock);
+>> +       }
+>> +
+>> +       dev_set_name(&dev->dev, "%s", dev_name(&adev->dev));
+>> +       ACPI_COMPANION_SET(&dev->dev, adev);
+>> +
+>> +       ret = amba_device_add(dev, &iomem_resource);
+>> +       if (ret) {
+>> +               pr_err("%s(): amba_device_add() failed (%d) for %s\n",
+>> +                      __func__, ret, dev_name(&adev->dev));
+>> +               goto err_free;
+>> +       }
+>> +
+>> +       return 1;
+>> +
+>> +err_free:
+>> +       amba_device_put(dev);
+>> +       return 0;
+>> +}
+>> +
+>> +static struct acpi_scan_handler amba_handler = {
+>> +       .ids = amba_id_list,
+>> +       .attach = amba_handler_attach,
+>> +};
+>> +
+>> +void __init acpi_amba_init(void)
+>> +{
+>> +       acpi_scan_add_handler(&amba_handler);
+>> +}
+>> diff --git a/drivers/acpi/internal.h b/drivers/acpi/internal.h
+>> index 11d87bf..9d58f0c 100644
+>> --- a/drivers/acpi/internal.h
+>> +++ b/drivers/acpi/internal.h
+>> @@ -29,6 +29,11 @@ void acpi_processor_init(void);
+>>  void acpi_platform_init(void);
+>>  void acpi_pnp_init(void);
+>>  void acpi_int340x_thermal_init(void);
+>> +#ifdef CONFIG_ARM_AMBA
+>> +void acpi_amba_init(void);
+>> +#else
+>> +static inline void acpi_amba_init(void) {}
+>> +#endif
+>>  int acpi_sysfs_init(void);
+>>  void acpi_container_init(void);
+>>  void acpi_memory_hotplug_init(void);
+>> --
+>> 2.6.4
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> Please read the FAQ at  http://www.tux.org/lkml/
+>
+>
+>
+> --
+> With Best Regards,
+> Andy Shevchenko
