@@ -1,93 +1,69 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Mon, 21 Dec 2015 20:11:32 +0200
-Subject: [PATCH v2 3/3] serial: amba-pl011: add ACPI support to AMBA probe
-In-Reply-To: <1450709399-7246-4-git-send-email-aleksey.makarov@linaro.org>
-References: <1450709399-7246-1-git-send-email-aleksey.makarov@linaro.org>
- <1450709399-7246-4-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <CAHp75VcLGTMemaDyezgtxjtPa+tEUGm8ULJE8feY8FX4FEqU6g@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 21 Dec 2015 18:12:14 +0000
+Subject: [PATCH V2 06/23] XEN / PCI: Remove the dependence on arch x86
+ when PCI_MMCONFIG=y
+In-Reply-To: <1450278993-12664-7-git-send-email-tn@semihalf.com>
+References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
+ <1450278993-12664-7-git-send-email-tn@semihalf.com>
+Message-ID: <alpine.DEB.2.02.1512211811550.3096@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 21, 2015 at 4:49 PM, Aleksey Makarov
-<aleksey.makarov@linaro.org> wrote:
-> From: Graeme Gregory <graeme.gregory@linaro.org>
->
-> In ACPI this device is only defined in SBSA mode so
-> if we are coming from ACPI use this mode.
->
-> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
-> ---
->  drivers/tty/serial/amba-pl011.c | 37 ++++++++++++++++++++++++++-----------
->  1 file changed, 26 insertions(+), 11 deletions(-)
->
-> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-> index 899a771..766ce4f 100644
-> --- a/drivers/tty/serial/amba-pl011.c
-> +++ b/drivers/tty/serial/amba-pl011.c
-> @@ -2368,18 +2368,33 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
->         if (!uap)
->                 return -ENOMEM;
->
-> -       uap->clk = devm_clk_get(&dev->dev, NULL);
-> -       if (IS_ERR(uap->clk))
-> -               return PTR_ERR(uap->clk);
+On Wed, 16 Dec 2015, Tomasz Nowicki wrote:
+> In drivers/xen/pci.c, there are arch x86 dependent codes when
+> CONFIG_PCI_MMCONFIG is enabled, since CONFIG_PCI_MMCONFIG
+> depends on ACPI, so this will prevent XEN PCI running on other
+> architectures using ACPI with PCI_MMCONFIG enabled (such as ARM64).
+> 
+> Fortunatly, it can be sloved in a simple way. In drivers/xen/pci.c,
+> the only x86 dependent code is if ((pci_probe & PCI_PROBE_MMCONF) == 0),
+> and it's defined in asm/pci_x86.h, the code means that
+> if the PCI resource is not probed in PCI_PROBE_MMCONF way, just
+> ingnore the xen mcfg init. Actually this is duplicate, because
+> if PCI resource is not probed in PCI_PROBE_MMCONF way, the
+> pci_mmconfig_list will be empty, and the if (list_empty())
+> after it will do the same job.
+> 
+> So just remove the arch related code and the head file, this
+> will be no functional change for x86, and also makes xen/pci.c
+> usable for other architectures.
+> 
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> CC: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+> Cc: Stefano Stabellini <Stefano.Stabellini@eu.citrix.com>
+> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+
+Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+
+
+>  drivers/xen/pci.c | 6 ------
+>  1 file changed, 6 deletions(-)
+> 
+> diff --git a/drivers/xen/pci.c b/drivers/xen/pci.c
+> index 6785ebb..9a8dbe3 100644
+> --- a/drivers/xen/pci.c
+> +++ b/drivers/xen/pci.c
+> @@ -28,9 +28,6 @@
+>  #include <asm/xen/hypervisor.h>
+>  #include <asm/xen/hypercall.h>
+>  #include "../pci/pci.h"
+> -#ifdef CONFIG_PCI_MMCONFIG
+> -#include <asm/pci_x86.h>
+> -#endif
+>  
+>  static bool __read_mostly pci_seg_supported = true;
+>  
+> @@ -222,9 +219,6 @@ static int __init xen_mcfg_late(void)
+>  	if (!xen_initial_domain())
+>  		return 0;
+>  
+> -	if ((pci_probe & PCI_PROBE_MMCONF) == 0)
+> -		return 0;
 > -
-> -       uap->vendor = vendor;
-> -       uap->lcrh_rx = vendor->lcrh_rx;
-> -       uap->lcrh_tx = vendor->lcrh_tx;
-> -       uap->fifosize = vendor->get_fifosize(dev);
-> -       uap->port.irq = dev->irq[0];
-> -       uap->port.ops = &amba_pl011_pops;
-> +       /* ACPI only defines SBSA variant */
-> +       if (ACPI_COMPANION(&dev->dev)) {
-
-has_acpi_companion()
-
-> +               /*
-> +                * According to ARM ARMH0011 is currently the only mapping
-> +                * of pl011 in ACPI and it's mapped to SBSA UART mode
-> +                */
-> +               uap->vendor     = &vendor_sbsa;
-> +               uap->fifosize   = 32;
-> +               uap->port.ops   = &sbsa_uart_pops;
-> +               uap->fixed_baud = 115200;
-
-Shouldn't you match by ID and provide the custom values if any?
-On the other hand have you checked if it's possible to use _DSD in this case?
-
->
-> -       snprintf(uap->type, sizeof(uap->type), "PL011 rev%u", amba_rev(dev));
-> +               snprintf(uap->type, sizeof(uap->type), "SBSA");
-> +       } else {
-> +               uap->clk = devm_clk_get(&dev->dev, NULL);
-> +               if (IS_ERR(uap->clk))
-> +                       return PTR_ERR(uap->clk);
-> +
-> +               uap->vendor = vendor;
-> +               uap->lcrh_rx = vendor->lcrh_rx;
-> +               uap->lcrh_tx = vendor->lcrh_tx;
-> +               uap->fifosize = vendor->get_fifosize(dev);
-> +               uap->port.ops = &amba_pl011_pops;
-> +
-> +               snprintf(uap->type, sizeof(uap->type), "PL011 rev%u",
-> +                               amba_rev(dev));
-> +       }
-> +       uap->port.irq = dev->irq[0];
->
->         ret = pl011_setup_port(&dev->dev, uap, &dev->res, portnr);
->         if (ret)
-> --
-> 2.6.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-
-
-
--- 
-With Best Regards,
-Andy Shevchenko
+>  	if (list_empty(&pci_mmcfg_list))
+>  		return 0;
+>  
+> -- 
+> 1.9.1
+> 
