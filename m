@@ -1,93 +1,35 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 21 Dec 2015 14:40:42 -0500 (EST)
-Subject: [PATCH v2 0/3] USB: add generic onboard USB HUB driver
-In-Reply-To: <CAL411-qKE=12VZAN9=tUWPqkC5BfSgpQb9aNgCU6rmPLasXNHQ@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1512211436030.1618-100000@netrider.rowland.org>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Mon, 21 Dec 2015 21:54:24 +0200
+Subject: [PATCH v3 0/3] arm: lpc32xx: remove direct control of GPIOs from
+ shared mach file
+Message-ID: <1450727667-16175-1-git-send-email-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 21 Dec 2015, Peter Chen wrote:
+The change moves GPIO controlled voltage regulators from
+mach-lpc32xx/phy3250.c to Phytec PHY3250 DTS board file.
 
-> There are two problems which needs device tree to support, I have
-> below solutions for them, please help to see if it is reasonable.
-> 
-> 1. The USB device can't work without external clock, power, reset operation.
-> At device tree, we have a node to describe external signals like clocks, gpios
-> for all onboard devices under this controller. And this node is as phandle for
-> host controller, see below:
-> 
-> --- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> @@ -108,6 +108,21 @@
->                 default-brightness-level = <7>;
->                 status = "okay";
->         };
-> +
-> +       usbh1_pre_operation: usbh1_pre_operation {
-> +               clocks = <&clks IMX6QDL_CLK_1>,
-> +                        <&clks IMX6QDL_CLK_2>,
-> +                        <&clks IMX6QDL_CLK_3>,
-> +                        <&clks IMX6QDL_CLK_4>,
-> +                        <&clks IMX6QDL_CLK_5>,
-> +                        <&clks IMX6QDL_CLK_6>;
-> +               reset-gpios = <&gpio4 5 GPIO_ACTIVE_LOW>,
-> +                             <&gpio4 7 GPIO_ACTIVE_LOW>,
-> +                             <&gpio3 25 GPIO_ACTIVE_LOW>,
-> +                             <&gpio3 27 GPIO_ACTIVE_LOW>,
-> +                             <&gpio4 4 GPIO_ACTIVE_LOW>,
-> +                             <&gpio4 6 GPIO_ACTIVE_LOW>;
-> +       };
->  };
-> 
->  &clks {
-> @@ -590,6 +605,8 @@
->  &usbh1 {
->         vbus-supply = <&reg_usb_h1_vbus>;
->         status = "okay";
-> +
-> +       devices-pre-operation = <&usbh1_pre_operation>
->  };
-> 
-> At code, we add one API of_usb_pre_operation to get clocks and gpios through
-> host controller's device node, and this API is called at usb_add_hcd,
-> and opposite
-> operation is called at usb_remove_hcd.
-> 
-> This solution is almost the same with MMC power sequence solution.
-> (see drivers/mmc/core/pwrseq.c)
+The change makes previous versions of PHY3250 DTB incompatible with
+the new kernel version, however the change is needed, because regardless
+of its name mach-lpc32xx/phy3250.c file is a common file for all
+NXP LPC32xx boards and PHY3250 specifics are not needed there.
 
-That seems reasonable to me.
+Changes from v2 to v3:
+* use "regulator" as a generic device tree node name of fixed regulators,
+  thanks to Sergei Shtylyov
 
-> 2. There are MFD USB devices, which includes several interfaces under
-> USB device,
-> like i2c, gpios, etc. Due to lack of device tree support, USB
-> class/device driver doesn't know
-> which kinds of interfaces are needed for this board.
-> 
-> This problem is hard to handle, I have a solution, but it can't cover
-> two same devices
-> under the same HUB ports. My solution is let USB know device node, the main idea
-> is similar with PCIi's (see drivers/of/of_pci.c, drivers/pci/of.c),
-> the most difficulty is
-> find correct node for USB device after bus enumeration. Once the
-> device is recognized,
-> the USB core will create a USB device for it, since we know its parent
-> device, and its parent
-> device  (eg, the host controller) has device node, and we can find all
-> children nodes under
-> this node, if the child's {vid, pid} is the same with {vid, pid} the
-> device descriptor we read, we
-> assign this node as usb device's node.
+Changes from v1 to v2:
+* specify SD card power supply instead of signal power supply,
+  thanks to Russell King
 
-I don't really understand this.  However, you can always specify a USB 
-device by giving its port number on the parent hub, and the hub's port 
-number on _its_ parent hub, and so on back to the root hub and host 
-controller.  That works even if you're not using DT or OF or ACPI.
+Vladimir Zapolskiy (3):
+  arm: dts: phy3250: add lcd and backlight fixed regulators
+  arm: dts: phy3250: add SD fixed regulator
+  arm: lpc32xx: remove direct control of GPIOs from shared mach file
 
-Alan Stern
+ arch/arm/boot/dts/phy3250.dts   | 32 +++++++++++++++++++++++++
+ arch/arm/mach-lpc32xx/phy3250.c | 52 -----------------------------------------
+ 2 files changed, 32 insertions(+), 52 deletions(-)
 
-> At USB class/device driver, we can get the properties/phandles under
-> this device node, and register
-> them.
-> 
-> At device tree, we need to describe the bus topology for this USB device.
+-- 
+2.1.4
