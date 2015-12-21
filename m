@@ -1,61 +1,23 @@
-From: akshay.bhat@timesys.com (Akshay Bhat)
-Date: Mon, 21 Dec 2015 17:53:18 -0500
-Subject: [PATCH v5 0/7] ARM: dts: Add Advantech board support
-In-Reply-To: <1449177036-13317-1-git-send-email-akshay.bhat@timesys.com>
-References: <1449177036-13317-1-git-send-email-akshay.bhat@timesys.com>
-Message-ID: <CACrMeVC1ZrG2fd_z5KW3y=jgu7NHqnj44+kN+=iJ1z0BJ+vffQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Dec 2015 00:04:22 +0100
+Subject: [PATCH v5 3/5] PCI: qcom: Add Qualcomm PCIe controller driver
+In-Reply-To: <CAJAp7Ohgr7j7i=73R6Y_+GDa_4QZnhuPgB7AFdJGxNVJ_cVFsA@mail.gmail.com>
+References: <1450442339-18765-4-git-send-email-stanimir.varbanov@linaro.org>
+ <201512182111.1GLn2hxy%fengguang.wu@intel.com>
+ <CAJAp7Ohgr7j7i=73R6Y_+GDa_4QZnhuPgB7AFdJGxNVJ_cVFsA@mail.gmail.com>
+Message-ID: <201512220004.22548.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lucas, Shawn,
+On Monday 21 December 2015, Bjorn Andersson wrote:
+> I disagree with this "recommendation" as it's only outcome will be asymmetry.
+> 
+> I think this script should be changed to only warn if there's a single
+> IS_ERR/PTR_ERR at the end of the function, not if there's a list of
+> them and this would replace the last one.
+> 
 
-Any further review comments on the patches. If not can this be applied?
+Agreed, looks like a false positive, and I think it's best to ignore the
+warning here, but not change the script that seems reasonable in general.
 
-Thanks,
-Akshay
-
-On Thu, Dec 3, 2015 at 4:10 PM, Akshay Bhat <akshay.bhat@timesys.com> wrote:
-> This series aims to add Advantech BA-16 module (iMX6 based) and GE board support.
->
-> This series has been tested against linux-next tag next-20151202.
->
-> Modifications:
-> v4->v5:
-> - BA16: Move SPI FLASH partitions to a "partitions" subnode
-> - B450v3, B650v3 and B850v3: Fix model names
->
-> History:
-> --------
-> [v1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/381872.html
-> [v2]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/383276.html
-> [v3]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/384202.html
-> [v4]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/390373.html
->
-> Akshay Bhat (5):
->   of: Add vendor prefix for Advantech Corporation
->   of: Add vendor prefix for General Electric Company
->   ARM: dts: imx: Add support for Advantech/GE B450v3
->   ARM: dts: imx: Add support for Advantech/GE B650v3
->   ARM: dts: imx: Add support for Advantech/GE B850v3
->
-> Justin Waters (2):
->   ARM: dts: imx: Add Advantech BA-16 Qseven module
->   ARM: dts: imx: Add support for Advantech/GE Bx50v3
->
->  .../devicetree/bindings/vendor-prefixes.txt        |   2 +
->  arch/arm/boot/dts/Makefile                         |   3 +
->  arch/arm/boot/dts/imx6q-b450v3.dts                 |  84 +++
->  arch/arm/boot/dts/imx6q-b650v3.dts                 |  84 +++
->  arch/arm/boot/dts/imx6q-b850v3.dts                 | 127 +++++
->  arch/arm/boot/dts/imx6q-ba16.dtsi                  | 589 +++++++++++++++++++++
->  arch/arm/boot/dts/imx6q-bx50v3.dtsi                | 207 ++++++++
->  7 files changed, 1096 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx6q-b450v3.dts
->  create mode 100644 arch/arm/boot/dts/imx6q-b650v3.dts
->  create mode 100644 arch/arm/boot/dts/imx6q-b850v3.dts
->  create mode 100644 arch/arm/boot/dts/imx6q-ba16.dtsi
->  create mode 100644 arch/arm/boot/dts/imx6q-bx50v3.dtsi
->
-> --
-> 2.6.3
->
+	Arnd
