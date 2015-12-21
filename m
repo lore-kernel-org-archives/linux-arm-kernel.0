@@ -1,32 +1,22 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 21 Dec 2015 13:22:51 +0000
-Subject: [PATCH] ARM64: tegra: Add chosen node for tegra132 norrin
-Message-ID: <1450704171-8345-1-git-send-email-jonathanh@nvidia.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 21 Dec 2015 21:25:40 +0800
+Subject: [PATCH] ARM: imx: select SRC for i.MX7
+In-Reply-To: <3611827.5qPn4xd4c4@wuerfel>
+References: <3611827.5qPn4xd4c4@wuerfel>
+Message-ID: <20151221132540.GB18410@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The NVIDIA bootloader, nvtboot, expects the "chosen" node to be present
-in the device-tree blob and it is not then it fails to boot the kernel.
-Add the chosen node so we can boot the kernel on tegra132 norrin with
-the nvtboot bootloader.
+On Fri, Dec 18, 2015 at 04:40:26PM +0100, Arnd Bergmann wrote:
+> The i.MX7 Kconfig option had a couple of missing select lines that
+> I fixed already, but I missed HAVE_IMX_SRC:
+> 
+> arch/arm/mach-imx/built-in.o: In function `imx7d_init_irq':
+> platform-spi_imx.c:(.init.text+0x25a8): undefined reference to `imx_src_init'
+> 
+> This adds that one as well.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 0be5da9dc249 ("ARM: imx: imx7d requires anatop")
 
-Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
----
- arch/arm64/boot/dts/nvidia/tegra132-norrin.dts | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/nvidia/tegra132-norrin.dts b/arch/arm64/boot/dts/nvidia/tegra132-norrin.dts
-index 7dfe1c085966..62f33fc84e3e 100644
---- a/arch/arm64/boot/dts/nvidia/tegra132-norrin.dts
-+++ b/arch/arm64/boot/dts/nvidia/tegra132-norrin.dts
-@@ -12,6 +12,8 @@
- 		rtc1 = "/rtc at 0,7000e000";
- 	};
- 
-+	chosen { };
-+
- 	memory {
- 		device_type = "memory";
- 		reg = <0x0 0x80000000 0x0 0x80000000>;
--- 
-2.1.4
+Applied as a non-critical fix for 4.5, thanks.
