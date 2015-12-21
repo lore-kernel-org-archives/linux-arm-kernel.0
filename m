@@ -1,53 +1,105 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 21 Dec 2015 17:11:32 +0100
-Subject: [linux-sunxi] Re: [PATCH 4/5] ARM: dts: sun5i: Add dts file for
- the Empire Electronix D709 tablet
-In-Reply-To: <5677D87A.90805@redhat.com>
-References: <1450611782-9494-1-git-send-email-hdegoede@redhat.com>
- <1450611782-9494-4-git-send-email-hdegoede@redhat.com>
- <CAGb2v65daCCOWf7EXDkNWnxv1idXHXesOp6Et_0h-o+9drdeMA@mail.gmail.com>
- <5677D87A.90805@redhat.com>
-Message-ID: <20151221161132.GA30359@lukather>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 22 Dec 2015 00:28:15 +0800
+Subject: [PATCH v2 1/3] ACPI: amba bus probing support
+In-Reply-To: <1450709399-7246-2-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <201512220040.gNdKEc5p%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,x
+Hi Graeme,
 
-On Mon, Dec 21, 2015 at 11:46:18AM +0100, Hans de Goede wrote:
-> >On the side, any thoughts on how to handle the differences between various "Q8"
-> >tablets, like different I2C-based sensors and WiFi chips?
-> 
-> For i2c based sensors the plan is to use devicetree overlays + an in kernel
-> overlay manager which probes the i2c bus (checking known touchscreen / accelerometer
-> addresses) and then picks the right touchscreen + accelerometer overlays.
-> 
-> Wifi is somewhat more tricky I must admit, esp. since there seem to be q8 a23 based
-> tablet variants with usb wifi and others with sdio wifi. Since both busses are
-> discoverable I'm tempted to just enable both in devicetree, and let the kernel probe
-> and see what is actually there. This assume that the way the wifichip is powered
-> is the same on all boards, or at least that it is safe to enable the necessary
-> regulators on all boards ...
-> 
-> >I'm asking because with Maxime's couple-regulator we should be able to get the
-> >RTL8723BS on the Q8 A23/33 v1.5 working.
-> 
-> So this means enabled the sdio controller (should be safe on all boards?) and
-> enabling 2 regulators to power the wifi-chip. I think it will be safe to do this
-> even on boards where those regulators are not used, what do you think ?
+[auto build test ERROR on pm/linux-next]
+[also build test ERROR on v4.4-rc6 next-20151221]
 
-Wouldn't that introduce some useless power drain on those boards?
+url:    https://github.com/0day-ci/linux/commits/Aleksey-Makarov/ACPI-amba-bus-probing-support/20151221-225448
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git linux-next
+config: i386-randconfig-s1-201551 (attached as .config)
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-Thanks!
-Maxime
+All errors (new ones prefixed by >>):
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+   drivers/acpi/utils.o: In function `acpi_amba_init':
+>> utils.c:(.text+0x39): multiple definition of `acpi_amba_init'
+   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
+   drivers/acpi/nvs.o: In function `acpi_amba_init':
+   nvs.c:(.text+0x0): multiple definition of `acpi_amba_init'
+   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
+   drivers/acpi/wakeup.o: In function `acpi_amba_init':
+   wakeup.c:(.text+0x0): multiple definition of `acpi_amba_init'
+   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
+   drivers/acpi/sleep.o: In function `acpi_amba_init':
+   sleep.c:(.text+0x89): multiple definition of `acpi_amba_init'
+   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
+   drivers/acpi/device_sysfs.o: In function `acpi_amba_init':
+   device_sysfs.c:(.text+0x584): multiple definition of `acpi_amba_init'
+   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
+   drivers/acpi/device_pm.o: In function `acpi_amba_init':
+   device_pm.c:(.text+0x1ed): multiple definition of `acpi_amba_init'
+   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
+   drivers/acpi/bus.o: In function `acpi_amba_init':
+   bus.c:(.text+0x514): multiple definition of `acpi_amba_init'
+   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
+   drivers/acpi/glue.o: In function `acpi_amba_init':
+   glue.c:(.text+0xd3): multiple definition of `acpi_amba_init'
+   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
+   drivers/acpi/scan.o: In function `acpi_amba_init':
+   scan.c:(.text+0x1f1): multiple definition of `acpi_amba_init'
+   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
+   drivers/acpi/acpi_processor.o: In function `acpi_amba_init':
+   acpi_processor.c:(.text+0x39a): multiple definition of `acpi_amba_init'
+   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
+   drivers/acpi/processor_pdc.o: In function `acpi_amba_init':
+   processor_pdc.c:(.text+0x0): multiple definition of `acpi_amba_init'
+   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
+   drivers/acpi/ec.o: In function `acpi_amba_init':
+   ec.c:(.text+0x15ad): multiple definition of `acpi_amba_init'
+   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
+   drivers/acpi/pci_root.o: In function `acpi_amba_init':
+   pci_root.c:(.text+0x689): multiple definition of `acpi_amba_init'
+   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
+   drivers/acpi/pci_link.o: In function `acpi_amba_init':
+   pci_link.c:(.text+0x5c4): multiple definition of `acpi_amba_init'
+   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
+   drivers/acpi/acpi_lpss.o: In function `acpi_amba_init':
+   acpi_lpss.c:(.text+0x0): multiple definition of `acpi_amba_init'
+   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
+   drivers/acpi/acpi_apd.o: In function `acpi_amba_init':
+   acpi_apd.c:(.text+0x8d): multiple definition of `acpi_amba_init'
+   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
+   drivers/acpi/acpi_platform.o: In function `acpi_amba_init':
+   acpi_platform.c:(.text+0x0): multiple definition of `acpi_amba_init'
+   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
+   drivers/acpi/int340x_thermal.o: In function `acpi_amba_init':
+   int340x_thermal.c:(.text+0x1b): multiple definition of `acpi_amba_init'
+   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
+   drivers/acpi/power.o: In function `acpi_amba_init':
+   power.c:(.text+0x2c5): multiple definition of `acpi_amba_init'
+   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
+   drivers/acpi/event.o: In function `acpi_amba_init':
+   event.c:(.text+0x0): multiple definition of `acpi_amba_init'
+   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
+   drivers/acpi/sysfs.o: In function `acpi_amba_init':
+   sysfs.c:(.text+0x623): multiple definition of `acpi_amba_init'
+   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
+   drivers/acpi/property.o: In function `acpi_amba_init':
+   property.c:(.text+0x618): multiple definition of `acpi_amba_init'
+   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
+   drivers/acpi/acpi_cmos_rtc.o: In function `acpi_amba_init':
+   acpi_cmos_rtc.c:(.text+0xde): multiple definition of `acpi_amba_init'
+   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
+   drivers/acpi/debugfs.o: In function `acpi_amba_init':
+   debugfs.c:(.text+0x0): multiple definition of `acpi_amba_init'
+   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151221/2ca1c560/attachment.sig>
+Name: .config.gz
+Type: application/octet-stream
+Size: 22084 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151222/9566c633/attachment-0001.obj>
