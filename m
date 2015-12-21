@@ -1,50 +1,34 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Mon, 21 Dec 2015 11:21:02 +0100
-Subject: [PATCH V2 21/23] pci, acpi: Support for ACPI based PCI hostbridge
- init
-In-Reply-To: <2277339.U6fWlSIDzy@wuerfel>
-References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
- <1450278993-12664-22-git-send-email-tn@semihalf.com>
- <2277339.U6fWlSIDzy@wuerfel>
-Message-ID: <5677D28E.6010803@semihalf.com>
+From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
+Date: Mon, 21 Dec 2015 15:54:08 +0530
+Subject: [PATCH] ARM: multi_v7_defconfig: enable TPS65217 regulator
+In-Reply-To: <20151220184453.GB32594@localhost>
+References: <1447225753-2788-1-git-send-email-afzal.mohd.ma@gmail.com>
+ <20151220184453.GB32594@localhost>
+Message-ID: <20151221102408.GA4339@afzalpc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.12.2015 13:40, Arnd Bergmann wrote:
-> On Wednesday 16 December 2015 16:16:31 Tomasz Nowicki wrote:
->> Because of two patch series:
->> 1. Jiang Liu's common interface to support PCI host bridge init
->> 2. MMCONFIG refactoring (part of this patch set)
->> now we can think about generic ACPI based PCI host bridge driver
->> out of arch/ directory.
->>
->> This driver use information from MCFG table (PCI config space regions)
->> and _CRS method (IO/irq resources) to initialize PCI hostbridge.
->>
->> TBD: We are still not sure whether we should reassign resources
->> after PCI bus enumeration or trust firmware to do all that work for
->> us properly.
->>
->> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->> CC: Arnd Bergmann <arnd@arndb.de>
->> CC: Catalin Marinas <catalin.marinas@arm.com>
->> CC: Liviu Dudau <Liviu.Dudau@arm.com>
->> CC: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
->> CC: Will Deacon <will.deacon@arm.com>
->> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->>
->
-> I think this code could better live in drivers/acpi/pci_root.c
-> along with all the related functions. It's not really a driver
-> by itself and cannot be a loadable module or built on other
-> architectures.
->
-> You can put all the code inside an #ifdef ARCH_PCI_HOST_GENERIC_ACPI
-> there.
->
+Hi Olof,
 
-Makes sense to me, thanks.
+On Sun, Dec 20, 2015 at 10:44:53AM -0800, Olof Johansson wrote:
+> On Wed, Nov 11, 2015 at 12:39:13PM +0530, Afzal Mohammed wrote:
 
-Tomasz
+> > Enable TPS65217 regulator to have rootfs in MMC for Beagle Bone's.
+> > 
+> > Suggested-by: Kishon Vijay Abraham I <kishon@ti.com>
+> > Signed-off-by: Afzal Mohammed <afzal.mohd.ma@gmail.com>
+
+> Applied, thanks.
+
+Would it be possible to consider the similar patch [1] from Nishant
+Menon instead of this patch ?, though i am not satisfied with the
+changelog in his, i.e. regarding mention that it is required only for
+older Beagle Bones. He has sent the initial version of it (identical in
+diff) before mine.
+
+Sorry for the trouble and Thanks.
+
+Regards
+afzal
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/393611.html
