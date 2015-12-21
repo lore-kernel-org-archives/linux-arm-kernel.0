@@ -1,30 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 21 Dec 2015 23:39:05 +0100
-Subject: [PATCH V2 00/23] MMCONFIG refactoring and support for ARM64 PCI
- hostbridge init based on ACPI
-In-Reply-To: <b3750d7918712f6035ea875d90c25471.squirrel@www.codeaurora.org>
-References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
- <201512211515.55447.arnd@arndb.de>
- <b3750d7918712f6035ea875d90c25471.squirrel@www.codeaurora.org>
-Message-ID: <201512212339.05923.arnd@arndb.de>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 21 Dec 2015 14:41:41 -0800
+Subject: [PATCH] pinctrl: bcm2835: Fix memory leak in error path
+In-Reply-To: <1450658644-20858-1-git-send-email-stefan.wahren@i2se.com>
+References: <1450658644-20858-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <87fuyvfmqi.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 December 2015, Okaya at codeaurora.org wrote:
-> Thanks, I won't be touching the acpi tables then and I will assume the
-> hack had a problem. It was trying to remap the io range of the second root
-> port  to the first port io address map.
+Stefan Wahren <stefan.wahren@i2se.com> writes:
 
-If all domains share the same I/O space, you should only map it once
-of course.
+> In case of an invalid pin value bcm2835_pctl_dt_node_to_map()
+> would leak the pull configs of already assigned pins.
+> So avoid this by calling the free map function in error case.
+>
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> Fixes: e1b2dc70cd5b ("pinctrl: add bcm2835 driver")
 
-> I was getting a warning from resource.c
-> 
-> Btw, when I tested the io ranges before, kernel didn't accept anything
-> below 1k like 0. That is why my range starts at 1k.
-
-This is PCIBIOS_MIN_IO, it defines what I/O port numbers can be dynamically
-assigned to PCI devices, but you should still map the entire 64K area per
-domain, including the first 4K that can be used for legacy ISA compatibility.
-
-	Arnd
+Reviewed-by: Eric Anholt <eric@anholt.net>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151221/dfe30daf/attachment.sig>
