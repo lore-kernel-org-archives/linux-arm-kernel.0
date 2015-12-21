@@ -1,21 +1,34 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 21 Dec 2015 17:08:51 +0100
-Subject: [PATCH 5/5] ARM: dts: sun7i: Enable gmac on Wits Pro A20 DKT
-In-Reply-To: <CAGb2v67JKRNCTspryGNiRG2zO8usMdfD=cGWzCK+eKMmyb5bvQ@mail.gmail.com>
+Date: Mon, 21 Dec 2015 17:10:30 +0100
+Subject: [PATCH 4/5] ARM: dts: sun5i: Add dts file for the Empire
+ Electronix D709 tablet
+In-Reply-To: <1450611782-9494-4-git-send-email-hdegoede@redhat.com>
 References: <1450611782-9494-1-git-send-email-hdegoede@redhat.com>
- <1450611782-9494-5-git-send-email-hdegoede@redhat.com>
- <CAGb2v67JKRNCTspryGNiRG2zO8usMdfD=cGWzCK+eKMmyb5bvQ@mail.gmail.com>
-Message-ID: <20151221160851.GY30359@lukather>
+ <1450611782-9494-4-git-send-email-hdegoede@redhat.com>
+Message-ID: <20151221161030.GZ30359@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 21, 2015 at 01:55:07PM +0800, Chen-Yu Tsai wrote:
-> On Sun, Dec 20, 2015 at 7:43 PM, Hans de Goede <hdegoede@redhat.com> wrote:
-> > The Wits Pro A20 DKT has a gbit ethernet port, enable it.
-> >
-> > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+On Sun, Dec 20, 2015 at 12:43:01PM +0100, Hans de Goede wrote:
+> The Empire Electronix D709 tablet is a fairly standard 7" A13 tablet,
+> featuring usb-wifi, a micro-sd slot, micro-usb otg and headphone jack.
 > 
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
+> Empire Electronix is written on the back of the tablet, the D709 model
+> info can be found in the about tablet menu in android.
+> 
+> The PCB has no markings to speak of.
+> 
+> This dts file does not add support for the ft5x touchscreen found at
+> i2c bus 1, addr 0x38, irq PG11, because it does not work out of the box.
+> It seems it has been flashed with the wrong firmware and needs to have
+> alternative firmware uploaded at boot to make the touchscreen work
+> properly, when hot-booting from android into an upstream kernel the
+> touchscreen does work.
+> 
+> The Memsic MXC622X accelerometer at i2c bus 1, addr 0x15 also is not
+> enabled as there is no driver for it.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
 Applied, thanks!
 Maxime
@@ -30,4 +43,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151221/05548d80/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151221/6f91f318/attachment.sig>
