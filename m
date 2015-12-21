@@ -1,34 +1,48 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 21 Dec 2015 13:59:59 +0100
-Subject: [linux-sunxi] Re: [PATCH 0/5] ARM: dts: sunxi: Add backlight node
- to q8 tablets
-In-Reply-To: <fc4adcf5-4362-4d4c-b42e-729922c79f65@googlegroups.com>
-References: <1442752251-20744-1-git-send-email-hdegoede@redhat.com>
- <fc4adcf5-4362-4d4c-b42e-729922c79f65@googlegroups.com>
-Message-ID: <5677F7CF.3050308@redhat.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 21 Dec 2015 13:03:38 +0000
+Subject: [PATCH] ARM64: Fix compiling with GCC 6 and Atomics enabled
+In-Reply-To: <CAKv+Gu_aUvckKpwWw+Xo5VkFEA8-uT9xU0-m5NgAzAc1d53uhQ@mail.gmail.com>
+References: <1450498655-3820-1-git-send-email-apinski@cavium.com>
+ <20151221123843.GM23092@arm.com>
+ <CAKv+Gu_aUvckKpwWw+Xo5VkFEA8-uT9xU0-m5NgAzAc1d53uhQ@mail.gmail.com>
+Message-ID: <20151221130338.GA8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Dec 21, 2015 at 01:46:22PM +0100, Ard Biesheuvel wrote:
+> On 21 December 2015 at 13:38, Will Deacon <will.deacon@arm.com> wrote:
+> > On Fri, Dec 18, 2015 at 08:17:35PM -0800, Andrew Pinski wrote:
+> >> The problem here is that GCC 6 and above emits .arch now
+> >> for each function so now the global .arch_extension has
+> >> no effect.  This fixes the problem by putting
+> >> .arch_extension inside ARM64_LSE_ATOMIC_INSN so
+> >> it is enabled for each place where LSE is used.
+> >
+> > Hmm, this is going to affect arch/arm/ much more heavily than arch/arm64.
+> > .arch_extension is used for virt, mp and sec over there, and it may be
+> > tricky to isolate the actual instruction usage (at least, virt looks
+> > lost in kvm/arm.c).
+> >
+> > Why can't gas have an option to accept all instruction encodings that it
+> > knows about, inspite of any .arch directives?
+> >
+> 
+> Modern GAS supports things like -march=armv7-a+mp+sec+virt, so it
+> probably makes sense to pass that on the command line when building
+> for v7 (or +sec only for v6) if the assembler is found to support it
+> at build time.
 
-On 21-12-15 11:56, Silvio Pellicano wrote:
->
->
->> Here is a slightly updated version of Chen-Yu's backlight
->> patches, also adding support for the backlight found on A13
->> based q8 tablets.
->>
->
-> If i compile your dtsi with (obviously) pwm  support enable , backlight
-> switch off after kernel start,
-> if i disable pwm in menuconfig,it stay on, all seem correct (pwm on PB2 in
-> original script.bin),
-> but there is somewhere a bug in pwm or dtsi description of backlight.
+Modern GCCs (GCC 4 at least) add .arch / .cpu pseudo-instructions in
+the assembly output which means using -Wa,-march= and -Wa,-mcpu= to
+GCC are now totally useless.
 
-No there is not, if you enable the pwm driver you must also enable
-the backlight-pwm driver / add CONFIG_BACKLIGHT_PWM=y to your .config
-(and make sure it stays that way after a "make oldconfig").
+(From the bug reports I've seen, I don't deem GCC 5 to be anything but
+a total failure, and so as far as I'm concerned, GCC 5 is not to be
+used for ARM, and effectively doesn't exist.  I have no experience or
+opinions on GCC 6.  Hence, "GCC 4" still counts as "modern" being the
+only recent compilers that produce sane results.)
 
-Regards,
-
-Hans
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
