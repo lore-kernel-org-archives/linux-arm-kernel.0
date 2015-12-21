@@ -1,106 +1,50 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 21 Dec 2015 15:15:51 +0100
-Subject: [PATCH] gpmi-nand: Handle ECC Errors in erased pages
-Message-ID: <1450707351-9029-1-git-send-email-mpa@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 21 Dec 2015 15:15:54 +0100
+Subject: [PATCH V2 00/23] MMCONFIG refactoring and support for ARM64 PCI
+ hostbridge init based on ACPI
+In-Reply-To: <5677F3C8.8040200@semihalf.com>
+References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
+ <20151221121050.GB11145@red-moon> <5677F3C8.8040200@semihalf.com>
+Message-ID: <201512211515.55447.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ECC is only calculated for written pages. As erased pages are not
-actively written the ECC is always invalid. For this purpose the
-Hardware BCH unit is able to check for erased pages and does not raise
-an ECC error in this case. This behaviour can be influenced using the
-BCH_MODE register which sets the number of allowed bitflips in an erased
-page. Unfortunately the unit is not capable of fixing the bitflips in
-memory.
+On Monday 21 December 2015, Tomasz Nowicki wrote:
+> On 21.12.2015 13:10, Lorenzo Pieralisi wrote:
+> > On Fri, Dec 18, 2015 at 06:56:39PM +0000, okaya at codeaurora.org wrote:
 
-To avoid complete software checks for erased pages, we can simply check
-buffers with uncorrectable ECC errors because we know that any erased
-page with errors is uncorrectable by the BCH unit.
+> >> I have multiple root ports with the same IO port configuration in the
+> >> current ACPI table.
+> >>
+> >> Root port 0 = IO range 0x1000-0x10FFF
+> >> Root port 1 = IO range 0x1000-0x10FFF
+> >> Root port 2 = IO range 0x1000-0x10FFF
+> >
+> > It is fine. You end up mapping for each of those a 4k window of the
+> > virtual address space allocated to IO and that's what you will have in
+> > the kernel PCI resources (not in the HW BARs though). If that was a problem
+> > it would be even for the current DT host controllers eg:
+> >
+> > arch/arm64/boot/dts/apm/apm-storm.dtsi
+> >
+> > it should not be (again I will let Arnd comment on this since he may be
+> > aware of issues encountered on other arches/platforms).
+> >
+> 
+> Root port 0 = IO range 0x1000-0x10FFF
+> Root port 1 = IO range 0x1000-0x10FFF
+> Root port 2 = IO range 0x1000-0x10FFF
+> 
+> If above ranges are mapped into different CPU windows, then yes, it is fine.
 
-This patch adds the generic nand_check_erased_ecc_chunk() to gpmi-nand
-to correct erased pages. To have the valid data in the buffer before
-using them, this patch moves the read_page_swap_end() call before the
-ECC status checking for-loop.
+Ideally, they should all be the same CPU address so we only have to map the window
+once, each device gets an address below 64K, and you can have legacy port numbers
+(below 4K) on any bus, which is required to make certain GPUs work.
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 49 ++++++++++++++++++++++++++++++----
- 1 file changed, 44 insertions(+), 5 deletions(-)
+I haven't actually seen anyone do that on ARM though, every implementation so
+far has a separate mapping per host bridge, and we can cope with that too,
+and we can live with either overlapping bus addresses or unique bus addresses,
+any of them can be expressed by the PCI core in Linux, we just have to make sure
+that we correctly translate the firmware tables into our internal structures.
 
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-index 2064adac1d17..51ad1c500e9c 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-@@ -1035,14 +1035,58 @@ static int gpmi_ecc_read_page(struct mtd_info *mtd, struct nand_chip *chip,
- 	/* Loop over status bytes, accumulating ECC status. */
- 	status = auxiliary_virt + nfc_geo->auxiliary_status_offset;
- 
-+	read_page_swap_end(this, buf, nfc_geo->payload_size,
-+			   this->payload_virt, this->payload_phys,
-+			   nfc_geo->payload_size,
-+			   payload_virt, payload_phys);
-+
- 	for (i = 0; i < nfc_geo->ecc_chunk_count; i++, status++) {
- 		if ((*status == STATUS_GOOD) || (*status == STATUS_ERASED))
- 			continue;
- 
- 		if (*status == STATUS_UNCORRECTABLE) {
-+			int flips;
-+
-+			/*
-+			 * The ECC hardware has an uncorrectable ECC status
-+			 * code in case we have bitflips in an erased page. As
-+			 * nothing was written into this subpage the ECC is
-+			 * obviously wrong and we can not trust it. We assume
-+			 * at this point that we are reading an erased page and
-+			 * try to correct the bitflips in buffer up to
-+			 * ecc_strength bitflips. If this is a page with random
-+			 * data, we exceed this number of bitflips and have a
-+			 * ECC failure. Otherwise we use the corrected buffer.
-+			 */
-+			if (i == 0) {
-+				/* The first block includes metadata */
-+				flips = nand_check_erased_ecc_chunk(
-+						buf + i * nfc_geo->ecc_chunk_size,
-+						nfc_geo->ecc_chunk_size,
-+						NULL, 0,
-+						auxiliary_virt,
-+						nfc_geo->metadata_size,
-+						nfc_geo->ecc_strength);
-+			} else {
-+				flips = nand_check_erased_ecc_chunk(
-+						buf + i * nfc_geo->ecc_chunk_size,
-+						nfc_geo->ecc_chunk_size,
-+						NULL, 0,
-+						NULL, 0,
-+						nfc_geo->ecc_strength);
-+			}
-+
-+			if (flips > 0) {
-+				max_bitflips = max_t(unsigned int, max_bitflips,
-+						     flips);
-+				mtd->ecc_stats.corrected += flips;
-+				continue;
-+			}
-+
- 			mtd->ecc_stats.failed++;
- 			continue;
- 		}
-+
- 		mtd->ecc_stats.corrected += *status;
- 		max_bitflips = max_t(unsigned int, max_bitflips, *status);
- 	}
-@@ -1062,11 +1106,6 @@ static int gpmi_ecc_read_page(struct mtd_info *mtd, struct nand_chip *chip,
- 		chip->oob_poi[0] = ((uint8_t *) auxiliary_virt)[0];
- 	}
- 
--	read_page_swap_end(this, buf, nfc_geo->payload_size,
--			this->payload_virt, this->payload_phys,
--			nfc_geo->payload_size,
--			payload_virt, payload_phys);
--
- 	return max_bitflips;
- }
- 
--- 
-2.6.2
+	Arnd
