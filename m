@@ -1,28 +1,93 @@
-From: info@lategoodbye.de (Stefan Wahren)
-Date: Mon, 21 Dec 2015 19:08:56 +0100
-Subject: [PATCH 4/4] ARM: bcm2835: Switch to using the new clock driver
- support.
-In-Reply-To: <03BE10FE-D743-4CD3-8825-112D0F6B2D43@martin.sperl.org>
-References: <1441562263-19888-1-git-send-email-eric@anholt.net>
- <1441562263-19888-5-git-send-email-eric@anholt.net>
- <5677E7BF.3020404@martin.sperl.org> <5677F3C8.5000600@lategoodbye.de>
- <03BE10FE-D743-4CD3-8825-112D0F6B2D43@martin.sperl.org>
-Message-ID: <56784038.402@lategoodbye.de>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Mon, 21 Dec 2015 20:11:32 +0200
+Subject: [PATCH v2 3/3] serial: amba-pl011: add ACPI support to AMBA probe
+In-Reply-To: <1450709399-7246-4-git-send-email-aleksey.makarov@linaro.org>
+References: <1450709399-7246-1-git-send-email-aleksey.makarov@linaro.org>
+ <1450709399-7246-4-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <CAHp75VcLGTMemaDyezgtxjtPa+tEUGm8ULJE8feY8FX4FEqU6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-[fix Michael's address and add Remi]
-
-Am 21.12.2015 um 16:17 schrieb Martin Sperl:
+On Mon, Dec 21, 2015 at 4:49 PM, Aleksey Makarov
+<aleksey.makarov@linaro.org> wrote:
+> From: Graeme Gregory <graeme.gregory@linaro.org>
 >
-> I started looking and found that drivers/clk/bcm/clk-bcm2835.c
-> does not include the PWM clock either.
+> In ACPI this device is only defined in SBSA mode so
+> if we are coming from ACPI use this mode.
+>
+> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+> ---
+>  drivers/tty/serial/amba-pl011.c | 37 ++++++++++++++++++++++++++-----------
+>  1 file changed, 26 insertions(+), 11 deletions(-)
+>
+> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> index 899a771..766ce4f 100644
+> --- a/drivers/tty/serial/amba-pl011.c
+> +++ b/drivers/tty/serial/amba-pl011.c
+> @@ -2368,18 +2368,33 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+>         if (!uap)
+>                 return -ENOMEM;
+>
+> -       uap->clk = devm_clk_get(&dev->dev, NULL);
+> -       if (IS_ERR(uap->clk))
+> -               return PTR_ERR(uap->clk);
+> -
+> -       uap->vendor = vendor;
+> -       uap->lcrh_rx = vendor->lcrh_rx;
+> -       uap->lcrh_tx = vendor->lcrh_tx;
+> -       uap->fifosize = vendor->get_fifosize(dev);
+> -       uap->port.irq = dev->irq[0];
+> -       uap->port.ops = &amba_pl011_pops;
+> +       /* ACPI only defines SBSA variant */
+> +       if (ACPI_COMPANION(&dev->dev)) {
 
-yes but please look at Remi's patch series first:
+has_acpi_companion()
 
-http://lists.infradead.org/pipermail/linux-rpi-kernel/2015-December/002672.html
+> +               /*
+> +                * According to ARM ARMH0011 is currently the only mapping
+> +                * of pl011 in ACPI and it's mapped to SBSA UART mode
+> +                */
+> +               uap->vendor     = &vendor_sbsa;
+> +               uap->fifosize   = 32;
+> +               uap->port.ops   = &sbsa_uart_pops;
+> +               uap->fixed_baud = 115200;
 
-Regards
-Stefan
+Shouldn't you match by ID and provide the custom values if any?
+On the other hand have you checked if it's possible to use _DSD in this case?
+
+>
+> -       snprintf(uap->type, sizeof(uap->type), "PL011 rev%u", amba_rev(dev));
+> +               snprintf(uap->type, sizeof(uap->type), "SBSA");
+> +       } else {
+> +               uap->clk = devm_clk_get(&dev->dev, NULL);
+> +               if (IS_ERR(uap->clk))
+> +                       return PTR_ERR(uap->clk);
+> +
+> +               uap->vendor = vendor;
+> +               uap->lcrh_rx = vendor->lcrh_rx;
+> +               uap->lcrh_tx = vendor->lcrh_tx;
+> +               uap->fifosize = vendor->get_fifosize(dev);
+> +               uap->port.ops = &amba_pl011_pops;
+> +
+> +               snprintf(uap->type, sizeof(uap->type), "PL011 rev%u",
+> +                               amba_rev(dev));
+> +       }
+> +       uap->port.irq = dev->irq[0];
+>
+>         ret = pl011_setup_port(&dev->dev, uap, &dev->res, portnr);
+>         if (ret)
+> --
+> 2.6.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+
+
+
+-- 
+With Best Regards,
+Andy Shevchenko
