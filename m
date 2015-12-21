@@ -1,105 +1,53 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 22 Dec 2015 00:28:15 +0800
-Subject: [PATCH v2 1/3] ACPI: amba bus probing support
-In-Reply-To: <1450709399-7246-2-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <201512220040.gNdKEc5p%fengguang.wu@intel.com>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Mon, 21 Dec 2015 19:41:35 +0300
+Subject: [PATCH v3 0/3] Add AMBA bus probing support to ACPI
+Message-ID: <1450716100-13688-1-git-send-email-aleksey.makarov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Graeme,
+As discussed when Shannon Zhao sent a patch to add platform_device support
+to pl061 driver. Russel and other maintainers prefered that ACPI learned
+how to create AMBA devices rather than converting/adding platform_device
+support to AMBA drivers.
 
-[auto build test ERROR on pm/linux-next]
-[also build test ERROR on v4.4-rc6 next-20151221]
+http://comments.gmane.org/gmane.linux.ports.arm.kernel/431364
 
-url:    https://github.com/0day-ci/linux/commits/Aleksey-Makarov/ACPI-amba-bus-probing-support/20151221-225448
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git linux-next
-config: i386-randconfig-s1-201551 (attached as .config)
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+1) Adds basic AMBA device probing support to ACPI, it uses a whitelist of
+device IDs as the number of AMBA devices is limited. Currently the two ids
+present are those used in QEMU for arm64.
 
-All errors (new ones prefixed by >>):
+2) Adds the plumbing into ACPI probe sequence.
 
-   drivers/acpi/utils.o: In function `acpi_amba_init':
->> utils.c:(.text+0x39): multiple definition of `acpi_amba_init'
-   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
-   drivers/acpi/nvs.o: In function `acpi_amba_init':
-   nvs.c:(.text+0x0): multiple definition of `acpi_amba_init'
-   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
-   drivers/acpi/wakeup.o: In function `acpi_amba_init':
-   wakeup.c:(.text+0x0): multiple definition of `acpi_amba_init'
-   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
-   drivers/acpi/sleep.o: In function `acpi_amba_init':
-   sleep.c:(.text+0x89): multiple definition of `acpi_amba_init'
-   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
-   drivers/acpi/device_sysfs.o: In function `acpi_amba_init':
-   device_sysfs.c:(.text+0x584): multiple definition of `acpi_amba_init'
-   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
-   drivers/acpi/device_pm.o: In function `acpi_amba_init':
-   device_pm.c:(.text+0x1ed): multiple definition of `acpi_amba_init'
-   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
-   drivers/acpi/bus.o: In function `acpi_amba_init':
-   bus.c:(.text+0x514): multiple definition of `acpi_amba_init'
-   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
-   drivers/acpi/glue.o: In function `acpi_amba_init':
-   glue.c:(.text+0xd3): multiple definition of `acpi_amba_init'
-   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
-   drivers/acpi/scan.o: In function `acpi_amba_init':
-   scan.c:(.text+0x1f1): multiple definition of `acpi_amba_init'
-   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
-   drivers/acpi/acpi_processor.o: In function `acpi_amba_init':
-   acpi_processor.c:(.text+0x39a): multiple definition of `acpi_amba_init'
-   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
-   drivers/acpi/processor_pdc.o: In function `acpi_amba_init':
-   processor_pdc.c:(.text+0x0): multiple definition of `acpi_amba_init'
-   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
-   drivers/acpi/ec.o: In function `acpi_amba_init':
-   ec.c:(.text+0x15ad): multiple definition of `acpi_amba_init'
-   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
-   drivers/acpi/pci_root.o: In function `acpi_amba_init':
-   pci_root.c:(.text+0x689): multiple definition of `acpi_amba_init'
-   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
-   drivers/acpi/pci_link.o: In function `acpi_amba_init':
-   pci_link.c:(.text+0x5c4): multiple definition of `acpi_amba_init'
-   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
-   drivers/acpi/acpi_lpss.o: In function `acpi_amba_init':
-   acpi_lpss.c:(.text+0x0): multiple definition of `acpi_amba_init'
-   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
-   drivers/acpi/acpi_apd.o: In function `acpi_amba_init':
-   acpi_apd.c:(.text+0x8d): multiple definition of `acpi_amba_init'
-   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
-   drivers/acpi/acpi_platform.o: In function `acpi_amba_init':
-   acpi_platform.c:(.text+0x0): multiple definition of `acpi_amba_init'
-   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
-   drivers/acpi/int340x_thermal.o: In function `acpi_amba_init':
-   int340x_thermal.c:(.text+0x1b): multiple definition of `acpi_amba_init'
-   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
-   drivers/acpi/power.o: In function `acpi_amba_init':
-   power.c:(.text+0x2c5): multiple definition of `acpi_amba_init'
-   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
-   drivers/acpi/event.o: In function `acpi_amba_init':
-   event.c:(.text+0x0): multiple definition of `acpi_amba_init'
-   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
-   drivers/acpi/sysfs.o: In function `acpi_amba_init':
-   sysfs.c:(.text+0x623): multiple definition of `acpi_amba_init'
-   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
-   drivers/acpi/property.o: In function `acpi_amba_init':
-   property.c:(.text+0x618): multiple definition of `acpi_amba_init'
-   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
-   drivers/acpi/acpi_cmos_rtc.o: In function `acpi_amba_init':
-   acpi_cmos_rtc.c:(.text+0xde): multiple definition of `acpi_amba_init'
-   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
-   drivers/acpi/debugfs.o: In function `acpi_amba_init':
-   debugfs.c:(.text+0x0): multiple definition of `acpi_amba_init'
-   drivers/acpi/osl.o:osl.c:(.text+0x176): first defined here
+3) From ACPI pl011 is only defined (SBSA document) to be in SBSA mode which has
+reduced functionality. There may be a better method to do this that I have
+overlooked.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 22084 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151222/9566c633/attachment-0001.obj>
+v3:
+- Compilation without CONFIG_ARM_AMBA has been fixed
+
+v2:
+https://lkml.kernel.org/g/1450709399-7246-1-git-send-email-aleksey.makarov at linaro.org
+- A new ACPI scan handler for AMBA devices has been implemented
+- The order of `if` branches in amba-pl011.c has been changed
+- A couple of `static`s have been added
+- The compilation of the acpi_amba.c unit has made conditional
+- A comment on SBSA UART has been added
+
+v1:
+https://lkml.kernel.org/g/1443609530-21524-1-git-send-email-graeme.gregory at linaro.org
+
+Graeme Gregory (3):
+  ACPI: amba bus probing support
+  ACPI: scan add in amba probing
+  serial: amba-pl011: add ACPI support to AMBA probe
+
+ drivers/acpi/Makefile           |   1 +
+ drivers/acpi/acpi_amba.c        | 149 ++++++++++++++++++++++++++++++++++++++++
+ drivers/acpi/internal.h         |   5 ++
+ drivers/acpi/scan.c             |   1 +
+ drivers/tty/serial/amba-pl011.c |  37 +++++++---
+ 5 files changed, 182 insertions(+), 11 deletions(-)
+ create mode 100644 drivers/acpi/acpi_amba.c
+
+-- 
+2.6.4
