@@ -1,44 +1,72 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 21 Dec 2015 09:18:42 -0800
-Subject: [PATCH] ARM: multi_v7_defconfig: enable TPS65217 regulator
-In-Reply-To: <20151221102408.GA4339@afzalpc>
-References: <1447225753-2788-1-git-send-email-afzal.mohd.ma@gmail.com>
- <20151220184453.GB32594@localhost> <20151221102408.GA4339@afzalpc>
-Message-ID: <CAOesGMiA2+e2xNzuQyAXUkSHkGbTdGZMKF982=Py35wtxosECw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 21 Dec 2015 17:21:09 +0000
+Subject: Absolute relocs in EFI stub w/ tracing options
+Message-ID: <20151221172109.GU23092@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Ard,
 
-On Mon, Dec 21, 2015 at 2:24 AM, Afzal Mohammed <afzal.mohd.ma@gmail.com> wrote:
-> Hi Olof,
->
-> On Sun, Dec 20, 2015 at 10:44:53AM -0800, Olof Johansson wrote:
->> On Wed, Nov 11, 2015 at 12:39:13PM +0530, Afzal Mohammed wrote:
->
->> > Enable TPS65217 regulator to have rootfs in MMC for Beagle Bone's.
->> >
->> > Suggested-by: Kishon Vijay Abraham I <kishon@ti.com>
->> > Signed-off-by: Afzal Mohammed <afzal.mohd.ma@gmail.com>
->
->> Applied, thanks.
->
-> Would it be possible to consider the similar patch [1] from Nishant
-> Menon instead of this patch ?, though i am not satisfied with the
-> changelog in his, i.e. regarding mention that it is required only for
-> older Beagle Bones. He has sent the initial version of it (identical in
-> diff) before mine.
->
-> Sorry for the trouble and Thanks.
+Just to say that I hit some ABS64 relocs in the stub today when compiling
+with all of the "tracer" options enabled (in particular, you need to
+enable CONFIG_PROFILE_ALL_BRANCHES).
 
-So the diff is the same, his is sent before yours but you're unhappy
-with his commit message? Sounds like we're better off using yours, and
-either way the code is the same.
+Looks like that code #defines if :/
 
-I'll keep it the way it is -- it's not worth the work to rewind the
-branch and break our downstream developers if there are any.
+Log below.
 
+Will
 
-Regards,
+--->8
 
--Olof
+0000000000000000 R_AARCH64_ABS64   .init.rodata+0x0000000000000070
+0000000000000008 R_AARCH64_ABS64   .init.rodata.str1.8+0x0000000000000358
+0000000000000028 R_AARCH64_ABS64   .init.rodata+0x0000000000000070
+0000000000000030 R_AARCH64_ABS64   .init.rodata.str1.8+0x0000000000000358
+0000000000000050 R_AARCH64_ABS64   .init.rodata+0x0000000000000060
+0000000000000058 R_AARCH64_ABS64   .init.rodata.str1.8+0x0000000000000358
+0000000000000078 R_AARCH64_ABS64   .init.rodata+0x0000000000000060
+0000000000000080 R_AARCH64_ABS64   .init.rodata.str1.8+0x0000000000000358
+00000000000000a0 R_AARCH64_ABS64   .init.rodata+0x0000000000000060
+00000000000000a8 R_AARCH64_ABS64   .init.rodata.str1.8+0x0000000000000358
+00000000000000c8 R_AARCH64_ABS64   .init.rodata+0x0000000000000060
+00000000000000d0 R_AARCH64_ABS64   .init.rodata.str1.8+0x0000000000000358
+00000000000000f0 R_AARCH64_ABS64   .init.rodata+0x0000000000000060
+00000000000000f8 R_AARCH64_ABS64   .init.rodata.str1.8+0x0000000000000358
+0000000000000118 R_AARCH64_ABS64   .init.rodata+0x0000000000000050
+0000000000000120 R_AARCH64_ABS64   .init.rodata.str1.8+0x0000000000000358
+0000000000000140 R_AARCH64_ABS64   .init.rodata+0x0000000000000050
+0000000000000148 R_AARCH64_ABS64   .init.rodata.str1.8+0x0000000000000358
+0000000000000168 R_AARCH64_ABS64   .init.rodata+0x0000000000000050
+0000000000000170 R_AARCH64_ABS64   .init.rodata.str1.8+0x0000000000000358
+0000000000000190 R_AARCH64_ABS64   .init.rodata+0x0000000000000050
+0000000000000198 R_AARCH64_ABS64   .init.rodata.str1.8+0x0000000000000358
+00000000000001b8 R_AARCH64_ABS64   .init.rodata+0x0000000000000050
+00000000000001c0 R_AARCH64_ABS64   .init.rodata.str1.8+0x0000000000000358
+00000000000001e0 R_AARCH64_ABS64   .init.rodata+0x0000000000000050
+00000000000001e8 R_AARCH64_ABS64   .init.rodata.str1.8+0x0000000000000358
+0000000000000208 R_AARCH64_ABS64   .init.rodata+0x0000000000000050
+0000000000000210 R_AARCH64_ABS64   .init.rodata.str1.8+0x0000000000000358
+0000000000000230 R_AARCH64_ABS64   .init.rodata+0x0000000000000050
+0000000000000238 R_AARCH64_ABS64   .init.rodata.str1.8+0x0000000000000358
+0000000000000258 R_AARCH64_ABS64   .init.rodata+0x0000000000000050
+0000000000000260 R_AARCH64_ABS64   .init.rodata.str1.8+0x0000000000000358
+0000000000000280 R_AARCH64_ABS64   .init.rodata+0x0000000000000050
+0000000000000288 R_AARCH64_ABS64   .init.rodata.str1.8+0x0000000000000358
+00000000000002a8 R_AARCH64_ABS64   .init.rodata+0x0000000000000050
+00000000000002b0 R_AARCH64_ABS64   .init.rodata.str1.8+0x0000000000000358
+00000000000002d0 R_AARCH64_ABS64   .init.rodata+0x0000000000000050
+00000000000002d8 R_AARCH64_ABS64   .init.rodata.str1.8+0x0000000000000358
+00000000000002f8 R_AARCH64_ABS64   .init.rodata+0x0000000000000050
+0000000000000300 R_AARCH64_ABS64   .init.rodata.str1.8+0x0000000000000358
+0000000000000320 R_AARCH64_ABS64   .init.rodata+0x0000000000000040
+0000000000000328 R_AARCH64_ABS64   .init.rodata.str1.8+0x0000000000000358
+0000000000000348 R_AARCH64_ABS64   .init.rodata+0x0000000000000028
+0000000000000350 R_AARCH64_ABS64   .init.rodata.str1.8+0x0000000000000358
+0000000000000370 R_AARCH64_ABS64   .init.rodata+0x0000000000000040
+0000000000000378 R_AARCH64_ABS64   .init.rodata.str1.8+0x0000000000000358
+0000000000000398 R_AARCH64_ABS64   .init.rodata+0x0000000000000040
+00000000000003a0 R_AARCH64_ABS64   .init.rodata.str1.8+0x0000000000000358
+drivers/firmware/efi/libstub/arm-stub.stub.o: absolute symbol references not allowed in the EFI stub
+drivers/firmware/efi/libstub/Makefile:63: recipe for target 'drivers/firmware/efi/libstub/arm-stub.stub.o' failed
+make[4]: *** [drivers/firmware/efi/libstub/arm-stub.stub.o] Error 1
