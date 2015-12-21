@@ -1,202 +1,32 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Mon, 21 Dec 2015 14:43:27 +0800
-Subject: [PATCH] clk: let clk_disable() return immediately if clk is NULL
- or error
-In-Reply-To: <1449296276-32208-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1449296276-32208-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAKT61h_1+_1Cw1m4Tg1i+1fTD_eGz0=AFTR1+NaN1H==PGCzsQ@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 21 Dec 2015 14:44:14 +0800
+Subject: [PATCH 1/3] ARM: dts: imx7d: add arch timer
+In-Reply-To: <CAHrpEqTQFkme-BmVOPHbFwguQkpbYboaXymrRMc-6TDjwO8dUg@mail.gmail.com>
+References: <1449789132-18976-1-git-send-email-Frank.Li@freescale.com>
+ <024b6540b3ebd5f132d171ba40c6e727@agner.ch>
+ <CAHrpEqTQFkme-BmVOPHbFwguQkpbYboaXymrRMc-6TDjwO8dUg@mail.gmail.com>
+Message-ID: <20151221064414.GD4703@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-12-05 14:17 GMT+08:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> The clk_disable() in the common clock framework (drivers/clk/clk.c)
-> returns immediately if the given clk is NULL or an error pointer.
-> It allows drivers to call clk_disable() (and clk_disable_unprepare())
-> with a clock that might be NULL or an error pointer as long as the
-> drivers are only used along with the common clock framework.
->
-> Unfortunately, NULL/error checking is missing from some of non-common
-> clk_disable() implementations.  This prevents us from completely
-> dropping NULL/error from callers.  Let's add IS_ERR_OR_NULL(clk)
-> checks to all callees.
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
->
->  arch/arm/mach-ep93xx/clock.c     |  2 +-
->  arch/arm/mach-lpc32xx/clock.c    |  3 +++
->  arch/arm/mach-mmp/clock.c        |  3 +++
->  arch/arm/mach-sa1100/clock.c     | 15 ++++++++-------
->  arch/arm/mach-w90x900/clock.c    |  3 +++
->  arch/blackfin/mach-bf609/clock.c |  3 +++
->  arch/m68k/coldfire/clk.c         |  4 ++++
->  arch/mips/bcm63xx/clk.c          |  3 +++
->  arch/mips/lantiq/clk.c           |  3 +++
->  drivers/sh/clk/core.c            |  2 +-
->  10 files changed, 32 insertions(+), 9 deletions(-)
->
-> diff --git a/arch/arm/mach-ep93xx/clock.c b/arch/arm/mach-ep93xx/clock.c
-> index 39ef3b6..4e11f7d 100644
-> --- a/arch/arm/mach-ep93xx/clock.c
-> +++ b/arch/arm/mach-ep93xx/clock.c
-> @@ -293,7 +293,7 @@ void clk_disable(struct clk *clk)
->  {
->         unsigned long flags;
->
-> -       if (!clk)
-> +       if (IS_ERR_OR_NULL(clk))
->                 return;
->
->         spin_lock_irqsave(&clk_lock, flags);
-> diff --git a/arch/arm/mach-lpc32xx/clock.c b/arch/arm/mach-lpc32xx/clock.c
-> index 661c8f4..07faac2 100644
-> --- a/arch/arm/mach-lpc32xx/clock.c
-> +++ b/arch/arm/mach-lpc32xx/clock.c
-> @@ -1125,6 +1125,9 @@ void clk_disable(struct clk *clk)
->  {
->         unsigned long flags;
->
-> +       if (IS_ERR_OR_NULL(clk))
-> +               return;
-> +
->         spin_lock_irqsave(&global_clkregs_lock, flags);
->         local_clk_disable(clk);
->         spin_unlock_irqrestore(&global_clkregs_lock, flags);
-> diff --git a/arch/arm/mach-mmp/clock.c b/arch/arm/mach-mmp/clock.c
-> index 7c6f95f..7b33122 100644
-> --- a/arch/arm/mach-mmp/clock.c
-> +++ b/arch/arm/mach-mmp/clock.c
-> @@ -67,6 +67,9 @@ void clk_disable(struct clk *clk)
->  {
->         unsigned long flags;
->
-> +       if (IS_ERR_OR_NULL(clk))
-> +               return;
-> +
->         WARN_ON(clk->enabled == 0);
->
->         spin_lock_irqsave(&clocks_lock, flags);
-> diff --git a/arch/arm/mach-sa1100/clock.c b/arch/arm/mach-sa1100/clock.c
-> index cbf53bb..ea103fd 100644
-> --- a/arch/arm/mach-sa1100/clock.c
-> +++ b/arch/arm/mach-sa1100/clock.c
-> @@ -85,13 +85,14 @@ void clk_disable(struct clk *clk)
->  {
->         unsigned long flags;
->
-> -       if (clk) {
-> -               WARN_ON(clk->enabled == 0);
-> -               spin_lock_irqsave(&clocks_lock, flags);
-> -               if (--clk->enabled == 0)
-> -                       clk->ops->disable(clk);
-> -               spin_unlock_irqrestore(&clocks_lock, flags);
-> -       }
-> +       if (IS_ERR_OR_NULL(clk))
-> +               return;
-> +
-> +       WARN_ON(clk->enabled == 0);
-> +       spin_lock_irqsave(&clocks_lock, flags);
-> +       if (--clk->enabled == 0)
-> +               clk->ops->disable(clk);
-> +       spin_unlock_irqrestore(&clocks_lock, flags);
->  }
->  EXPORT_SYMBOL(clk_disable);
->
-> diff --git a/arch/arm/mach-w90x900/clock.c b/arch/arm/mach-w90x900/clock.c
-> index 2c371ff..90ec250 100644
-> --- a/arch/arm/mach-w90x900/clock.c
-> +++ b/arch/arm/mach-w90x900/clock.c
-> @@ -46,6 +46,9 @@ void clk_disable(struct clk *clk)
->  {
->         unsigned long flags;
->
-> +       if (IS_ERR_OR_NULL(clk))
-> +               return;
+On Thu, Dec 17, 2015 at 03:23:59PM -0600, Zhi Li wrote:
+> On Thu, Dec 17, 2015 at 2:45 PM, Stefan Agner <stefan@agner.ch> wrote:
+> > On 2015-12-10 15:12, Frank.Li at freescale.com wrote:
+> >> From: Frank Li <Frank.Li@freescale.com>
+> >>
+> >> add cortex a7 arch timer.
+> >> uboot v2016.01-rc2 supported psci basic support.
+> >> smp can be supported by psci
+> >
+> > This sounds a bit overly simplified log message. I am not very into this
+> > PSCI topic, is this a prerequisit for the ARM arch timers? Maybe you
+> > could elaborate that a bit more.
+> 
+> No.
+> But according to previous discussion. Shawn want us to use psci to enable
+> second core.  We need enable arch timer if second core enabled.
 
-Looks good for w90x900 platform.
-Acked-by: Wan Zongshun <mcuos.com@gmail.com>
+I guess you can make the commit log a bit better by commenting
+the relationship between the arch timer and secondary core.
 
-> +
->         WARN_ON(clk->enabled == 0);
->
->         spin_lock_irqsave(&clocks_lock, flags);
-> diff --git a/arch/blackfin/mach-bf609/clock.c b/arch/blackfin/mach-bf609/clock.c
-> index 3783058..fed8015 100644
-> --- a/arch/blackfin/mach-bf609/clock.c
-> +++ b/arch/blackfin/mach-bf609/clock.c
-> @@ -97,6 +97,9 @@ EXPORT_SYMBOL(clk_enable);
->
->  void clk_disable(struct clk *clk)
->  {
-> +       if (IS_ERR_OR_NULL(clk))
-> +               return;
-> +
->         if (clk->ops && clk->ops->disable)
->                 clk->ops->disable(clk);
->  }
-> diff --git a/arch/m68k/coldfire/clk.c b/arch/m68k/coldfire/clk.c
-> index fddfdcc..eb0e8c1 100644
-> --- a/arch/m68k/coldfire/clk.c
-> +++ b/arch/m68k/coldfire/clk.c
-> @@ -101,6 +101,10 @@ EXPORT_SYMBOL(clk_enable);
->  void clk_disable(struct clk *clk)
->  {
->         unsigned long flags;
-> +
-> +       if (IS_ERR_OR_NULL(clk))
-> +               return;
-> +
->         spin_lock_irqsave(&clk_lock, flags);
->         if ((--clk->enabled == 0) && clk->clk_ops)
->                 clk->clk_ops->disable(clk);
-> diff --git a/arch/mips/bcm63xx/clk.c b/arch/mips/bcm63xx/clk.c
-> index 6375652..d6a39bf 100644
-> --- a/arch/mips/bcm63xx/clk.c
-> +++ b/arch/mips/bcm63xx/clk.c
-> @@ -326,6 +326,9 @@ EXPORT_SYMBOL(clk_enable);
->
->  void clk_disable(struct clk *clk)
->  {
-> +       if (IS_ERR_OR_NULL(clk))
-> +               return;
-> +
->         mutex_lock(&clocks_mutex);
->         clk_disable_unlocked(clk);
->         mutex_unlock(&clocks_mutex);
-> diff --git a/arch/mips/lantiq/clk.c b/arch/mips/lantiq/clk.c
-> index a0706fd..c8d87b1 100644
-> --- a/arch/mips/lantiq/clk.c
-> +++ b/arch/mips/lantiq/clk.c
-> @@ -130,6 +130,9 @@ EXPORT_SYMBOL(clk_enable);
->
->  void clk_disable(struct clk *clk)
->  {
-> +       if (IS_ERR_OR_NULL(clk))
-> +               return;
-> +
->         if (unlikely(!clk_good(clk)))
->                 return;
->
-> diff --git a/drivers/sh/clk/core.c b/drivers/sh/clk/core.c
-> index be56b22..3dd20cf 100644
-> --- a/drivers/sh/clk/core.c
-> +++ b/drivers/sh/clk/core.c
-> @@ -252,7 +252,7 @@ void clk_disable(struct clk *clk)
->  {
->         unsigned long flags;
->
-> -       if (!clk)
-> +       if (IS_ERR_OR_NULL(clk))
->                 return;
->
->         spin_lock_irqsave(&clock_lock, flags);
-> --
-> 1.9.1
->
-
-
-
--- 
----
-Vincent Wan(Zongshun)
-www.mcuos.com
+Shawn
