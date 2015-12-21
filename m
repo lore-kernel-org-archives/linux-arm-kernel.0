@@ -1,76 +1,114 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 21 Dec 2015 11:13:41 -0800
-Subject: [PATCH 1/2] ARM: OMAP: am43xx: enable
- GENERIC_CLOCKEVENTS_BROADCAST
-In-Reply-To: <1450125246-17249-2-git-send-email-grygorii.strashko@ti.com>
-References: <1450125246-17249-1-git-send-email-grygorii.strashko@ti.com>
- <1450125246-17249-2-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <20151221191341.GC2793@atomide.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Mon, 21 Dec 2015 21:34:14 +0200
+Subject: [PATCH v2 0/5] clk: lpc32xx: add clock support for NXP LPC32xx
+In-Reply-To: <1449398757-16834-1-git-send-email-vz@mleia.com>
+References: <1449398757-16834-1-git-send-email-vz@mleia.com>
+Message-ID: <56785436.4000505@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grygorii Strashko <grygorii.strashko@ti.com> [151214 12:35]:
-> System will misbehave in the following case:
-> - AM43XX only build (UP);
-> - CONFIG_CPU_IDLE=y
-> - ARM TWD timer enabled and selected as clockevent device.
-> 
-> In the above case, It's expected that broadcast timer will be used as
-> backup timer when CPUIdle will put MPU in low power states where ARM
-> TWD will stop and lose its context. But, the CONFIG_SMP might not be
-> selected when kernel is built for AM43XX SoC only and, as result,
-> GENERIC_CLOCKEVENTS_BROADCAST option will not be selected also. This
-> will break CPUIdle and System will stuck in low power states.
-> 
-> Hence, fix it by selecting GENERIC_CLOCKEVENTS_BROADCAST option for
-> AM43XX SoCs always and add empty tick_broadcast() function
-> implementation - no need to send any IPI on UP. After this change
-> timer1 will be selected as broadcast timer the same way as for SMP,
-> and CPUIdle will work properly.
+Hi Stephen, Michael,
 
-I've applied both of these into omap-for-v4.4/fixes because of the
-description above.
-
-Regards,
-
-Tony
-
+On 06.12.2015 12:45, Vladimir Zapolskiy wrote:
+> This changeset adds common clock framework driver for NXP LPC32xx
+> boards.
 > 
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> ---
->  arch/arm/mach-omap2/Kconfig | 1 +
->  arch/arm/mach-omap2/timer.c | 6 ++++++
->  2 files changed, 7 insertions(+)
+> The change can be applied without any dependencies, LPC32xx device tree
+> and mach changes will be done, when this changeset is accepted.
 > 
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index 4b4371d..32a0086 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -65,6 +65,7 @@ config SOC_AM43XX
->  	select MACH_OMAP_GENERIC
->  	select MIGHT_HAVE_CACHE_L2X0
->  	select HAVE_ARM_SCU
-> +	select GENERIC_CLOCKEVENTS_BROADCAST
->  
->  config SOC_DRA7XX
->  	bool "TI DRA7XX"
-> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> index 3bfde44..f34a809 100644
-> --- a/arch/arm/mach-omap2/timer.c
-> +++ b/arch/arm/mach-omap2/timer.c
-> @@ -320,6 +320,12 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
->  	return r;
->  }
->  
-> +#if !defined(CONFIG_SMP) && defined(CONFIG_GENERIC_CLOCKEVENTS_BROADCAST)
-> +void tick_broadcast(const struct cpumask *mask)
-> +{
-> +}
-> +#endif
-> +
->  static void __init omap2_gp_clockevent_init(int gptimer_id,
->  						const char *fck_source,
->  						const char *property)
-> -- 
-> 2.6.4
+> The v1 version of CCF driver can be found here:
+>   http://www.spinics.net/lists/arm-kernel/msg461632.html
 > 
+> The RFC version of CCF driver 9/11 can be found here:
+>   http://www.spinics.net/lists/devicetree/msg100583.html
+> 
+> Changes from v1 to v2:
+> * removed dependency on the recent LPC32xx device tree changes,
+>   also removed LPC32xx device tree and mach changes, which depend
+>   on this series,
+> * use lowercase hex numbers in a DT binding example,
+> * incremented by 1 all clock values, possibly clock "0" may have a
+>   special meaning in future,
+> * removed explicit COMMON_CLK selection for NXP LPC18xx,
+> * LPC32XX_CLK_DEFINE() does not stringify clock names,
+> * fixed a minor bug in clk_pll_set_rate().
+> 
+> Changes from RFC to v1:
+> * added definitions of a missed IRDA clock,
+> * renamed compatible property from lpc32xx-scb to lpc32xx-clk
+> * switched to regmap interface instead of mmio, this is required to
+>   secure access to registers shared between pinmux, dma and clock
+>   driver, unfortunately this change has to pull some code snippets
+>   from common gate, divider and mux helpers rebased on regmap API,
+> * split clock definitions from the driver to be able to update
+>   dts files separately from CCF driver.
+> 
+> The driver is written from scratch, here are main functional
+> differences with the legacy driver arch/arm/mach-lpc32xx/clock.c:
+> * serialized access to SCB registers,
+> * reworked routines to select PLL parameters,
+> * now the clock driver has detailed description of all clocks,
+>   the original driver misses several clock entries and most of fine
+>   grained clock controls, here every mux and divider are accounted,
+> * now clocks and clock hierarchies can be described in board DT file,
+> * sophisticated management of USB clocks, for example now USB device
+>   controller needs only one clock instead of USB PLL, USB OTG and USB
+>   device clocks,
+> * other benefits from a driver powered by CCF.
+> 
+> Patch 5/5 may produce false positives from checkpatch.pl, the fix
+> to checkpatch is found in Andrew's tree
+> 
+> Vladimir Zapolskiy (5):
+>   dt-bindings: clock: add description of LPC32xx clock controller
+>   dt-bindings: clock: add description of LPC32xx USB clock controller
+>   dt-bindings: clock: add NXP LPC32xx clock list for consumers
+>   clk: lpc18xx: add NXP specific COMMON_CLK_NXP configuration symbol
+>   clk: lpc32xx: add common clock framework driver
+> 
+>  .../devicetree/bindings/clock/nxp,lpc3220-clk.txt  |   30 +
+>  .../bindings/clock/nxp,lpc3220-usb-clk.txt         |   22 +
+>  drivers/clk/Kconfig                                |    6 +
+>  drivers/clk/Makefile                               |    2 +-
+>  drivers/clk/nxp/Makefile                           |    1 +
+>  drivers/clk/nxp/clk-lpc32xx.c                      | 1569 ++++++++++++++++++++
+>  include/dt-bindings/clock/lpc32xx-clock.h          |   56 +
+>  7 files changed, 1685 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/nxp,lpc3220-clk.txt
+>  create mode 100644 Documentation/devicetree/bindings/clock/nxp,lpc3220-usb-clk.txt
+>  create mode 100644 drivers/clk/nxp/clk-lpc32xx.c
+>  create mode 100644 include/dt-bindings/clock/lpc32xx-clock.h
+> 
+
+this is a gentle ping, the first version of the driver was published
+in October, the only functional change is switching from iomap to regmap
+API to access the registers.
+
+A couple of words about the change to mitigate your impression of
+apparently imperfect code.
+
+The NXP LPC32xx platform is unmaintained and broken for about one
+and a half years, so I presume you won't get an ack from Roland, who
+is an official maintainer. Adding a CCF driver will be a huge progress,
+since it allows in +1 kernel release to fix the platform -- there is
+a critical problem in legacy IRQ handling based on hardware IRQs,
+irqchip driver change is ready as well, but CCF should go first,
+because it allows to remove a legacy clocksource/clockevent driver
+arch/arm/mach-lpc32xx/timer.c. That driver depends on legacy broken
+irqchip (hardware IRQs are used, irqchip with virtual IRQs will break
+the driver), it has a proper replacement drivers/clocksource/time-lpc32xx.c,
+but to use the new driver common clock support is needed. The CCF
+driver will let me remove tons of other legacy stuff as well, and this
+should be a step towards inclusion of the platform to multiarch builds.
+
+If you find impossible to include this CCF driver to v4.5, please add
+the first 4 of 5 changes, dt bindings include file is needed to
+update DTS files independently on CCF driver inclusion status.
+
+Thank you in advance.
+
+Merry Christmas, Happy Holidays!
+
+--
+With best wishes,
+Vladimir
