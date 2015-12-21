@@ -1,37 +1,52 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 21 Dec 2015 11:33:53 +0100
-Subject: [PATCH v2 9/9] MIPS: dts: jz4780/ci20: Add compatible property to
- "partitions" node
-In-Reply-To: <1450694033-27717-1-git-send-email-geert+renesas@glider.be>
-References: <1450694033-27717-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1450694033-27717-10-git-send-email-geert+renesas@glider.be>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 21 Dec 2015 10:43:58 +0000
+Subject: [PATCH] IRQ/Platform-MSI:Increase the maximum MSIs the MSI
+ framework can support.
+In-Reply-To: <1450667905-2968-1-git-send-email-majun258@huawei.com>
+References: <1450667905-2968-1-git-send-email-majun258@huawei.com>
+Message-ID: <20151221104358.18734bc3@why.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As of commit e488ca9f8d4f62c2 ("doc: dt: mtd: partitions: add compatible
-property to "partitions" node"), the "partitions" subnode of an SPI
-FLASH device node must have a compatible property. The partitions are no
-longer detected if it is not present.
+On Mon, 21 Dec 2015 11:18:25 +0800
+MaJun <majun258@huawei.com> wrote:
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-v2:
-  - New.
----
- arch/mips/boot/dts/ingenic/ci20.dts | 1 +
- 1 file changed, 1 insertion(+)
+> From: Ma Jun <majun258@huawei.com>
+> 
+> The current MSI framework can only support 256 platform MSIs.
+> 
+> But on Hisilicon platform, some network related devices has about 500
+> wired interrupts.
+> 
+> To support these devices, we need a new maximum value more than 256.
+> 
+> Signed-off-by: Ma Jun <majun258@huawei.com>
+> ---
+>  drivers/base/platform-msi.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/base/platform-msi.c b/drivers/base/platform-msi.c
+> index a203896..9c00d3f 100644
+> --- a/drivers/base/platform-msi.c
+> +++ b/drivers/base/platform-msi.c
+> @@ -24,7 +24,7 @@
+>  #include <linux/msi.h>
+>  #include <linux/slab.h>
+>  
+> -#define DEV_ID_SHIFT	24
+> +#define DEV_ID_SHIFT	22
+>  #define MAX_DEV_MSIS	(1 << (32 - DEV_ID_SHIFT))
+>  
+>  /*
 
-diff --git a/arch/mips/boot/dts/ingenic/ci20.dts b/arch/mips/boot/dts/ingenic/ci20.dts
-index 782258c0e4fbba8e..1652d8d60b1e4b86 100644
---- a/arch/mips/boot/dts/ingenic/ci20.dts
-+++ b/arch/mips/boot/dts/ingenic/ci20.dts
-@@ -70,6 +70,7 @@
- 			nand-on-flash-bbt;
- 
- 			partitions {
-+				compatible = "fixed-partitions";
- 				#address-cells = <2>;
- 				#size-cells = <2>;
- 
+If we bother doing that, why not directly aligning it with MSI-X and
+allow up to 2048 interrupts per device? It is only an extra bit, and
+that still leaves 21 bits worth of device IDs, while still having
+hwirq as an unsigned long (32bit on 32bit architectures).
+
+Thanks,
+
+	M.
+
 -- 
-1.9.1
+Without deviation from the norm, progress is not possible.
