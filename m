@@ -1,55 +1,66 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 21 Dec 2015 17:52:15 +0100
-Subject: [PATCH 1/2] ARM: mvebu: adjust board name and compatible for
- Armada 388 GP
-In-Reply-To: <1450708916-15966-2-git-send-email-thomas.petazzoni@free-electrons.com>
- (Thomas Petazzoni's message of "Mon, 21 Dec 2015 15:41:55 +0100")
-References: <1450708916-15966-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1450708916-15966-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <87r3ifrbgg.fsf@free-electrons.com>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Mon, 21 Dec 2015 17:39:45 +0100
+Subject: [PATCH 2/5] pinctrl: sirf: add missing of_node_put
+In-Reply-To: <1450715988-4770-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1450715988-4770-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1450715988-4770-3-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+for_each_child_of_node performs an of_node_get on each iteration, so a
+return from the loop requires an of_node_put.
+
+A simplified version of the semantic patch that fixes this problem is as
+follows (http://coccinelle.lip6.fr):
+
+// <smpl>
+@@
+local idexpression n;
+expression e,e1;
+@@
+
+ for_each_child_of_node(e1,n) {
+   ...
+(
+   of_node_put(n);
+|
+   e = n
+|
+   return n;
+|
++  of_node_put(n);
+?  return ...;
+)
+   ...
+ }
+// </smpl>
+
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+
+---
+ drivers/pinctrl/sirf/pinctrl-sirf.c |    8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/pinctrl/sirf/pinctrl-sirf.c b/drivers/pinctrl/sirf/pinctrl-sirf.c
+index ae97bdc..18fe46d 100644
+--- a/drivers/pinctrl/sirf/pinctrl-sirf.c
++++ b/drivers/pinctrl/sirf/pinctrl-sirf.c
+@@ -85,12 +85,16 @@ static int sirfsoc_dt_node_to_map(struct pinctrl_dev *pctldev,
+ 	/* calculate number of maps required */
+ 	for_each_child_of_node(np_config, np) {
+ 		ret = of_property_read_string(np, "sirf,function", &function);
+-		if (ret < 0)
++		if (ret < 0) {
++			of_node_put(np);
+ 			return ret;
++		}
  
- On lun., d?c. 21 2015, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
-
-> As the name of the Device Tree file name suggests, the Armada 388 GP
-> really contains an Armada 388 SoC, so this commit updates the board
-> name and compatible string in the Device Tree file.
->
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-
-Applied on mvebu/dt
-
-Thanks,
-
-Gregory
-> ---
->  arch/arm/boot/dts/armada-388-gp.dts | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
-> index a633be3..d8dab0f 100644
-> --- a/arch/arm/boot/dts/armada-388-gp.dts
-> +++ b/arch/arm/boot/dts/armada-388-gp.dts
-> @@ -44,8 +44,8 @@
->  #include <dt-bindings/gpio/gpio.h>
->  
->  / {
-> -	model = "Marvell Armada 385 GP";
-> -	compatible = "marvell,a385-gp", "marvell,armada388", "marvell,armada380";
-> +	model = "Marvell Armada 388 DB-88F6820-GP";
-> +	compatible = "marvell,a388-gp", "marvell,armada388", "marvell,armada380";
->  
->  	chosen {
->  		stdout-path = "serial0:115200n8";
-> -- 
-> 2.6.4
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+ 		ret = of_property_count_strings(np, "sirf,pins");
+-		if (ret < 0)
++		if (ret < 0) {
++			of_node_put(np);
+ 			return ret;
++		}
+ 
+ 		count += ret;
+ 	}
