@@ -1,32 +1,30 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 21 Dec 2015 23:31:57 +0100
-Subject: [PATCH v6 12/20] arm64:ilp32: add sys_ilp32.c and a separate
- table (in entry.S) to use it
-In-Reply-To: <1450215766-14765-13-git-send-email-ynorov@caviumnetworks.com>
-References: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
- <1450215766-14765-13-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <201512212331.58152.arnd@arndb.de>
+Date: Mon, 21 Dec 2015 23:39:05 +0100
+Subject: [PATCH V2 00/23] MMCONFIG refactoring and support for ARM64 PCI
+ hostbridge init based on ACPI
+In-Reply-To: <b3750d7918712f6035ea875d90c25471.squirrel@www.codeaurora.org>
+References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
+ <201512211515.55447.arnd@arndb.de>
+ <b3750d7918712f6035ea875d90c25471.squirrel@www.codeaurora.org>
+Message-ID: <201512212339.05923.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 December 2015, Yury Norov wrote:
-> +
-> +#define compat_sys_open_by_handle_at   sys_open_by_handle_at
-> +#define compat_sys_openat              sys_openat
-> +
+On Monday 21 December 2015, Okaya at codeaurora.org wrote:
+> Thanks, I won't be touching the acpi tables then and I will assume the
+> hack had a problem. It was trying to remap the io range of the second root
+> port  to the first port io address map.
 
-One more thing I just remembered: I think we want this behavior for all new
-32-bit architectures, it was a bug to call compat_sys_openat for the generic
-syscall table, as we don't support 32-bit off_t.
+If all domains share the same I/O space, you should only map it once
+of course.
 
-Could you split this out into a separate patch that does these changes:
+> I was getting a warning from resource.c
+> 
+> Btw, when I tested the io ranges before, kernel didn't accept anything
+> below 1k like 0. That is why my range starts at 1k.
 
-- change the default asm-generic/unistd.h to use sys_openat/sys_open_by_handle_at
-- change tile to override those two to keep the current (suboptimal) behavior
-- change the force_o_largefile() definition so it defaults to true for all future
-  architectures. The easiest way is probably to add a Kconfig symbol for this
-  that gets selected by all 32-bit architectures, so we can use
-
-#define force_o_largefile() ((BITS_PER_LONG != 32) || !IS_ENABLED(CONFIG_ARCH_32BIT_OFF_T))
+This is PCIBIOS_MIN_IO, it defines what I/O port numbers can be dynamically
+assigned to PCI devices, but you should still map the entire 64K area per
+domain, including the first 4K that can be used for legacy ISA compatibility.
 
 	Arnd
