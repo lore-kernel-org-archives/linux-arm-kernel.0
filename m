@@ -1,77 +1,59 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Mon, 21 Dec 2015 13:42:48 +0100
-Subject: [PATCH V2 00/23] MMCONFIG refactoring and support for ARM64 PCI
- hostbridge init based on ACPI
-In-Reply-To: <20151221121050.GB11145@red-moon>
-References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
- <5673281E.7020204@codeaurora.org> <5673FB6C.80008@semihalf.com>
- <4bccc2de7668dde04436ac9c19aac25d.squirrel@www.codeaurora.org>
- <20151221121050.GB11145@red-moon>
-Message-ID: <5677F3C8.8040200@semihalf.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Mon, 21 Dec 2015 20:45:38 +0800
+Subject: [PATCH] pinctrl: mediatek: convert to arch_initcall
+In-Reply-To: <1450701598.6795.11.camel@mtksdaap41>
+References: <1450412497-25872-1-git-send-email-djkurtz@chromium.org>
+ <1450451196.19539.9.camel@mtksdaap41>
+ <CAGS+omCDxj_wMDiAiywSv4hAtq6E9vm+CxgG8gs1TmrrS499mQ@mail.gmail.com>
+ <1450701598.6795.11.camel@mtksdaap41>
+Message-ID: <CAGS+omBX2hXXaLfnHQboMXEcQnzO8TV33DRqWq80DPaNHEW=Ag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21.12.2015 13:10, Lorenzo Pieralisi wrote:
-> On Fri, Dec 18, 2015 at 06:56:39PM +0000, okaya at codeaurora.org wrote:
+On Mon, Dec 21, 2015 at 8:39 PM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
 >
-> [...]
+> On Mon, 2015-12-21 at 14:51 +0800, Daniel Kurtz wrote:
+> > On Fri, Dec 18, 2015 at 11:06 PM, Yingjoe Chen
+> > <yingjoe.chen@mediatek.com> wrote:
+> > > On Fri, 2015-12-18 at 12:21 +0800, Daniel Kurtz wrote:
+> > >> Move pinctrl initialization earlier in boot so that real devices can find
+> > >> their pctldev without probe deferring.
+> > >>
+> > >> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+> > >> ---
+> > >>  drivers/pinctrl/mediatek/pinctrl-mt6397.c | 2 +-
+> > >>  drivers/pinctrl/mediatek/pinctrl-mt8127.c | 2 +-
+> > >>  drivers/pinctrl/mediatek/pinctrl-mt8135.c | 2 +-
+> > >>  drivers/pinctrl/mediatek/pinctrl-mt8173.c | 2 +-
+> > >>  4 files changed, 4 insertions(+), 4 deletions(-)
+> > >>
+> > >> diff --git a/drivers/pinctrl/mediatek/pinctrl-mt6397.c b/drivers/pinctrl/mediatek/pinctrl-mt6397.c
+> > >> index f9751ae..a3780d4 100644
+> > >> --- a/drivers/pinctrl/mediatek/pinctrl-mt6397.c
+> > >> +++ b/drivers/pinctrl/mediatek/pinctrl-mt6397.c
+> > >> @@ -70,7 +70,7 @@ static int __init mtk_pinctrl_init(void)
+> > >>       return platform_driver_register(&mtk_pinctrl_driver);
+> > >>  }
+> > >>
+> > >> -module_init(mtk_pinctrl_init);
+> > >> +arch_initcall(mtk_pinctrl_init);
+> > >
+> > >
+> > > MT6397 is PMIC, which depends on pwrap on main AP to work. Since
+> > > pmic-wrap itself is module_platform_driver, I think it make sense to
+> > > keep this one as module_init. Maybe adding a comment to explain why it
+> > > is different from others will help.
+> >
+> > I interpret this the other way - I think that since the PMIC wrapper
+> > provides a bus required for the system PMIC it should also be a
+> > builtin and use arch_initcall.
 >
->> Here is what I have as an IO resource.
->>
->> 		QWORDIO(			//Consumed-And-produced resource
->> 			ResourceProducer,	// bit 0 of general flags is 0
->> 			MinFixed,		// Range is fixed
->> 			MaxFixed,		// Range is fixed
->> 			PosDecode,
->> 			EntireRange,
->> 			0x0000,			// Granularity
->> 			0x1000,		// Min, 0 is not accepted
->> 			0x10FFF,		// Max
->> 			0x8FFFFFEF000,	// Translation
->> 			0x10000,		// Range Length
->> 			,, PI00
->> 		 )
->>
->> I don't have any type specified.
->>
->> I agree with Lorenzo's assessment. The min and max values represent the
->> PCI IO bus addresses. The translation offset is added to these values to
->> figure out the CPU view of the PCI IO range.
->>
->> The endpoints BAR addresses are programmed with IO addresses ranging
->> between 0x1000 and 0x10FFF for this example above.
->>
->> Here is another question. Chris Covington and I asked this question on a
->> private email to you but we didn't hear back.
->>
->> We were referring to a Linaro IO hack patch as we were not sure whether
->> this was a limitation of the hack or a general expectation for ARM64 PCI
->> in general.
->>
->> I'll repeat it here.
->>
->> I have multiple root ports with the same IO port configuration in the
->> current ACPI table.
->>
->> Root port 0 = IO range 0x1000-0x10FFF
->> Root port 1 = IO range 0x1000-0x10FFF
->> Root port 2 = IO range 0x1000-0x10FFF
+> We'll have to change mt8173 PMIC wrapper and mt6397 MFD core to
+> arch_initcall if we want to do it.
 >
-> It is fine. You end up mapping for each of those a 4k window of the
-> virtual address space allocated to IO and that's what you will have in
-> the kernel PCI resources (not in the HW BARs though). If that was a problem
-> it would be even for the current DT host controllers eg:
->
-> arch/arm64/boot/dts/apm/apm-storm.dtsi
->
-> it should not be (again I will let Arnd comment on this since he may be
-> aware of issues encountered on other arches/platforms).
->
+> I think regulators on PMIC is more important than pinctrl. For all
+> mt8173 systems, few drivers depends on PMIC pinctrl to work but many
+> depends on the regulators. So if we adjust pinctrl to arch_initcall, we
+> should change mt6397 regulator as well.
 
-Root port 0 = IO range 0x1000-0x10FFF
-Root port 1 = IO range 0x1000-0x10FFF
-Root port 2 = IO range 0x1000-0x10FFF
-
-If above ranges are mapped into different CPU windows, then yes, it is fine.
-
-Tomasz
+ACK to changing all of mt6397 to arch_initcall, especially the regulators.
