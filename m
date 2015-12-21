@@ -1,28 +1,36 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 21 Dec 2015 21:59:59 +0800
-Subject: [PATCH v2] ARM: dts: imx7d: cl-som-imx7: add basic module support
-In-Reply-To: <5677B341.6040203@compulab.co.il>
-References: <20151208151401.GA20042@rob-hp-laptop>
- <1449756097-2921-1-git-send-email-grinberg@compulab.co.il>
- <20151214024315.GC25756@tiger> <56716EA4.2080107@compulab.co.il>
- <20151221063608.GB4703@tiger> <5677B341.6040203@compulab.co.il>
-Message-ID: <20151221135959.GA18858@tiger>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 21 Dec 2015 14:01:04 +0000
+Subject: [BUG REPORT]: ARM64: perf: System hung in perf test
+In-Reply-To: <5677F6E3.9050902@huawei.com>
+References: <5677F6E3.9050902@huawei.com>
+Message-ID: <20151221140104.GQ23092@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 21, 2015 at 10:07:29AM +0200, Igor Grinberg wrote:
-> >> Do you think we should document it in:
-> >> Documentation/devicetree/bindings/arm/compulab-boards.txt
-> >> (this file should already exist in arm-soc/next/dt)?
-> > 
-> > Yeah, if the file already exist, it's the best option.  But, as it
-> > doesn't exist on my tree, I can not apply this change.
+On Mon, Dec 21, 2015 at 08:56:03PM +0800, Wangnan (F) wrote:
+> System hung can be reproduced on qemu and real hardware using:
 > 
-> It is already in linux-next.
-> Who do you think should apply the v2 patch then?
-> May be the arm-soc guys? (Cc'ed Olof and Arnd)
+>  # perf test -v signal
+> 
+> If qemu is started with '-smp 1', system hung. In real hardware and in
+> qemu with smp > 1, the result is:
 
-I think you can leave out the change from the patch, so that I can
-apply.  And you send that change separately to arm-soc folks.
+That sounds like a qemu issue...
 
-Shawn
+>  # /perf test -v signal
+>  17: Test breakpoint overflow signal handler                  :
+>  --- start ---
+>  test child forked, pid 792
+>  count1 11, count2 11, overflow 11
+>  failed: RF EFLAG recursion issue detected
+>  failed: wrong overflow hit
+>  failed: wrong count for bp2
+>  test child finished with -1
+>  ---- end ----
+>  Test breakpoint overflow signal handler: FAILED!
+
+... and this sounds like the perf tool expecting to single-step over
+signal handlers, whereas (on arm64) we deliberately single-step into
+them, so you can run into a loop for this case.
+
+Will
