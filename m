@@ -1,48 +1,232 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Mon, 21 Dec 2015 18:24:15 -0500
-Subject: [PATCH V2 22/23] pci, acpi: Match PCI config space accessors
- against platfrom specific quirks.
-In-Reply-To: <201512212342.18960.arnd@arndb.de>
-References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
- <201512211510.32029.arnd@arndb.de> <5678370B.1030102@caviumnetworks.com>
- <201512212342.18960.arnd@arndb.de>
-Message-ID: <56788A1F.6020305@redhat.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Tue, 22 Dec 2015 01:54:47 +0200
+Subject: [PATCH v3 1/3] ACPI: amba bus probing support
+In-Reply-To: <1450716100-13688-2-git-send-email-aleksey.makarov@linaro.org>
+References: <1450716100-13688-1-git-send-email-aleksey.makarov@linaro.org>
+ <1450716100-13688-2-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <56789147.8070602@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/21/2015 05:42 PM, Arnd Bergmann wrote:
-> On Monday 21 December 2015, David Daney wrote:
->> On 12/21/2015 06:10 AM, Arnd Bergmann wrote:
->>> On Monday 21 December 2015, Gabriele Paoloni wrote:
->>
->>> or require the BIOS to work around the hardware
->>> quirks differently (e.g. by trapping config space access through secure
->>> firmware, or going through an AML method to be defined).
->>
->> Some systems don't seem to have this capability.  For example, in ARMv8 
->> (A.K.A. arm64), I haven't been able to figure out how to trap these 
->> accesses to EL3 for emulation.  The specification is 5700 pages long 
->> though, so perhaps I missed that bit.
+Hi,
 
-There isn't a way to directly trap to EL3 for emulation (caveat - there
-might be some nasty hack with an SMMU that wouldn't be supportable). I
-requested the implementation of a generic mechanism for LPC type
-emulation (complete with "SMI" traps to EL3 for fixups) about 4 years
-ago. That wouldn't have helped with this situation, but this was to be
-on the radar afterward. However, on ARM, it is still early days with
-respect to transparently trapping and emulating hardware workarounds.
+On 21.12.2015 18:41, Aleksey Makarov wrote:
+> From: Graeme Gregory <graeme.gregory@linaro.org>
+> 
+> On ARM64 some devices use the AMBA device and not the platform bus for
+> probing so add support for this. Uses a dummy clock for apb_pclk as ACPI
+> does not have a suitable clock representation and to keep the core
+> AMBA bus code unchanged between probing methods.
+> 
+> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+> ---
+>  drivers/acpi/Makefile    |   1 +
+>  drivers/acpi/acpi_amba.c | 149 +++++++++++++++++++++++++++++++++++++++++++++++
+>  drivers/acpi/internal.h  |   5 ++
+>  3 files changed, 155 insertions(+)
+>  create mode 100644 drivers/acpi/acpi_amba.c
+> 
+> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+> index 675eaf3..3cf732f 100644
+> --- a/drivers/acpi/Makefile
+> +++ b/drivers/acpi/Makefile
+> @@ -43,6 +43,7 @@ acpi-y				+= pci_root.o pci_link.o pci_irq.o
+>  acpi-y				+= acpi_lpss.o acpi_apd.o
+>  acpi-y				+= acpi_platform.o
+>  acpi-y				+= acpi_pnp.o
+> +acpi-$(CONFIG_ARM_AMBA)	+= acpi_amba.o
+>  acpi-y				+= int340x_thermal.o
+>  acpi-y				+= power.o
+>  acpi-y				+= event.o
+> diff --git a/drivers/acpi/acpi_amba.c b/drivers/acpi/acpi_amba.c
+> new file mode 100644
+> index 0000000..ebc8913
+> --- /dev/null
+> +++ b/drivers/acpi/acpi_amba.c
+> @@ -0,0 +1,149 @@
+> +
+> +/*
+> + * ACPI support for platform bus type.
+> + *
+> + * Copyright (C) 2015, Linaro Ltd
+> + * Authors: Graeme Gregory <graeme.gregory@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/acpi.h>
+> +#include <linux/amba/bus.h>
+> +#include <linux/clkdev.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/device.h>
+> +#include <linux/err.h>
+> +#include <linux/ioport.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +
+> +#include "internal.h"
+> +
+> +static const struct acpi_device_id amba_id_list[] = {
+> +	{"ARMH0011", 0}, /* PL011 SBSA Uart */
+> +	{"ARMH0061", 0}, /* PL061 GPIO Device */
+> +	{"", 0},
+> +};
+> +
+> +static struct clk *amba_dummy_clk;
+> +
+> +static void amba_register_dummy_clk(void)
+> +{
+> +	struct clk *clk;
+> +
+> +	/* If clock already registered */
+> +	if (amba_dummy_clk)
+> +		return;
+> +
+> +	clk = clk_register_fixed_rate(NULL, "apb_pclk", NULL, CLK_IS_ROOT, 0);
+> +	clk_register_clkdev(clk, "apb_pclk", NULL);
+> +
+> +	amba_dummy_clk = clk;
+> +}
+> +
+> +static int amba_handler_attach(struct acpi_device *adev,
+> +				const struct acpi_device_id *id)
+> +{
+> +	struct amba_device *dev = NULL;
+> +	struct acpi_device *acpi_parent;
+> +	struct resource_entry *rentry;
+> +	struct list_head resource_list;
+> +	struct resource *resources = NULL;
+> +	bool address_found = false;
+> +	int ret, count, irq_no = 0;
+> +
+> +	/* If the ACPI node already has a physical device attached, skip it. */
+> +	if (adev->physical_node_count)
+> +		return 0;
+> +
+> +	amba_register_dummy_clk();
 
-> How about using AML then? This would be similar to what CHRP used with
-> RTAS calls to do PCI config space access.
+Since it is a single time dummy clock registration, may be it is better
+to move it to acpi_amba_init() or somewhere else? I understand that
+"apb_pclk" is wanted, but I'm not sure that this driver should serve as
+a clock provider.
 
-The best way to do it for now (IMO) is via a DMI quirk match and a
-special method for the early SoCs that aren't implementing MMCONFIG
-correctly. An effort is underway to correct that in third party IP, and
-similar directly with the partners for future generations. So this
-should not get "much" more out of hand than it sadly is so far. Once we
-have a good upstream solution (which is vital) then it will be an error
-and a pre-tapeout bug to not be able to boot an upstream kernel with
-stock ACPI hostbridge working sans nasty quirks. Therefore, the sooner
-this is upstream, the better it will be for everyone involved.
+> +	dev = amba_device_alloc(NULL, 0, 0);
+> +	if (!dev) {
+> +		pr_err("%s(): amba_device_alloc() failed for %s\n",
+> +		       __func__, dev_name(&adev->dev));
+> +		return 0;
+> +	}
+> +
+> +	INIT_LIST_HEAD(&resource_list);
+> +	count = acpi_dev_get_resources(adev, &resource_list, NULL, NULL);
+> +	if (count < 0) {
+> +		return 0;
+> +	} else if (count > 0) {
 
-Jon.
+if you return from one of two if-branches, please don't use if-else nesting
+for another one.
+
+> +		resources = kmalloc_array(count, sizeof(struct resource),
+> +				    GFP_KERNEL);
+
+resources is never used and it is never freed, why do you allocate it?
+
+> +		if (!resources) {
+> +			acpi_dev_free_resource_list(&resource_list);
+> +			return 0;
+
+return -ENOMEM; seems to be more appropriate here.
+
+> +		}
+> +		count = 0;
+> +		list_for_each_entry(rentry, &resource_list, node) {
+> +			switch (resource_type(rentry->res)) {
+> +			case IORESOURCE_MEM:
+> +				if (!address_found) {
+> +					dev->res = *rentry->res;
+> +					address_found = true;
+> +				}
+> +				break;
+> +			case IORESOURCE_IRQ:
+> +				if (irq_no < AMBA_NR_IRQS)
+> +					dev->irq[irq_no++] = rentry->res->start;
+> +				break;
+> +			default:
+> +				dev_warn(&adev->dev, "Invalid resource\n");
+> +			}
+> +		}
+> +		acpi_dev_free_resource_list(&resource_list);
+> +	}
+> +
+> +	/*
+> +	 * If the ACPI node has a parent and that parent has a physical device
+> +	 * attached to it, that physical device should be the parent of the
+> +	 * platform device we are about to create.
+> +	 */
+> +	dev->dev.parent = NULL;
+> +	acpi_parent = adev->parent;
+> +	if (acpi_parent) {
+> +		struct acpi_device_physical_node *entry;
+> +		struct list_head *list;
+> +
+> +		mutex_lock(&acpi_parent->physical_node_lock);
+> +		list = &acpi_parent->physical_node_list;
+> +		if (!list_empty(list)) {
+> +			entry = list_first_entry(list,
+> +					struct acpi_device_physical_node,
+> +					node);
+> +			dev->dev.parent = entry->dev;
+> +		}
+> +		mutex_unlock(&acpi_parent->physical_node_lock);
+> +	}
+> +
+> +	dev_set_name(&dev->dev, "%s", dev_name(&adev->dev));
+> +	ACPI_COMPANION_SET(&dev->dev, adev);
+> +
+> +	ret = amba_device_add(dev, &iomem_resource);
+> +	if (ret) {
+> +		pr_err("%s(): amba_device_add() failed (%d) for %s\n",
+> +		       __func__, ret, dev_name(&adev->dev));
+> +		goto err_free;
+> +	}
+> +
+> +	return 1;
+> +
+> +err_free:
+> +	amba_device_put(dev);
+> +	return 0;
+> +}
+> +
+> +static struct acpi_scan_handler amba_handler = {
+> +	.ids = amba_id_list,
+> +	.attach = amba_handler_attach,
+> +};
+> +
+> +void __init acpi_amba_init(void)
+> +{
+> +	acpi_scan_add_handler(&amba_handler);
+> +}
+> diff --git a/drivers/acpi/internal.h b/drivers/acpi/internal.h
+> index 11d87bf..9d58f0c 100644
+> --- a/drivers/acpi/internal.h
+> +++ b/drivers/acpi/internal.h
+> @@ -29,6 +29,11 @@ void acpi_processor_init(void);
+>  void acpi_platform_init(void);
+>  void acpi_pnp_init(void);
+>  void acpi_int340x_thermal_init(void);
+> +#ifdef CONFIG_ARM_AMBA
+> +void acpi_amba_init(void);
+> +#else
+> +static inline void acpi_amba_init(void) {}
+> +#endif
+>  int acpi_sysfs_init(void);
+>  void acpi_container_init(void);
+>  void acpi_memory_hotplug_init(void);
+> 
+
+--
+With best wishes,
+Vladimir
