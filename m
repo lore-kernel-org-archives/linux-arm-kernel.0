@@ -1,74 +1,74 @@
-From: Okaya@codeaurora.org (Okaya at codeaurora.org)
-Date: Mon, 21 Dec 2015 15:26:14 -0000
-Subject: [PATCH V2 00/23] MMCONFIG refactoring and support for ARM64 PCI
- hostbridge init based on ACPI
-In-Reply-To: <201512211515.55447.arnd@arndb.de>
-References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
- <20151221121050.GB11145@red-moon> <5677F3C8.8040200@semihalf.com>
- <201512211515.55447.arnd@arndb.de>
-Message-ID: <b3750d7918712f6035ea875d90c25471.squirrel@www.codeaurora.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 21 Dec 2015 16:43:42 +0100
+Subject: [PATCH 1/4] ARM: dts: sun7i: Enable touchscreen on Wexler
+ TAB7200 tablet
+In-Reply-To: <CAF==cZWcY=FH9Sr8RY4j4Ob8iuiYrBGkajZDWpNQzS-t4d074Q@mail.gmail.com>
+References: <1450428591-5597-1-git-send-email-mamlinav@gmail.com>
+ <1450428710-5653-1-git-send-email-mamlinav@gmail.com>
+ <20151218212525.GR30359@lukather>
+ <CAF==cZWcY=FH9Sr8RY4j4Ob8iuiYrBGkajZDWpNQzS-t4d074Q@mail.gmail.com>
+Message-ID: <20151221154342.GV30359@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Monday 21 December 2015, Tomasz Nowicki wrote:
->> On 21.12.2015 13:10, Lorenzo Pieralisi wrote:
->> > On Fri, Dec 18, 2015 at 06:56:39PM +0000, okaya at codeaurora.org wrote:
->
->> >> I have multiple root ports with the same IO port configuration in the
->> >> current ACPI table.
->> >>
->> >> Root port 0 = IO range 0x1000-0x10FFF
->> >> Root port 1 = IO range 0x1000-0x10FFF
->> >> Root port 2 = IO range 0x1000-0x10FFF
->> >
->> > It is fine. You end up mapping for each of those a 4k window of the
->> > virtual address space allocated to IO and that's what you will have in
->> > the kernel PCI resources (not in the HW BARs though). If that was a
->> problem
->> > it would be even for the current DT host controllers eg:
->> >
->> > arch/arm64/boot/dts/apm/apm-storm.dtsi
->> >
->> > it should not be (again I will let Arnd comment on this since he may
->> be
->> > aware of issues encountered on other arches/platforms).
->> >
->>
->> Root port 0 = IO range 0x1000-0x10FFF
->> Root port 1 = IO range 0x1000-0x10FFF
->> Root port 2 = IO range 0x1000-0x10FFF
->>
->> If above ranges are mapped into different CPU windows, then yes, it is
->> fine.
->
-> Ideally, they should all be the same CPU address so we only have to map
-> the window
-> once, each device gets an address below 64K, and you can have legacy port
-> numbers
-> (below 4K) on any bus, which is required to make certain GPUs work.
->
-> I haven't actually seen anyone do that on ARM though, every implementation
-> so
-> far has a separate mapping per host bridge, and we can cope with that too,
-> and we can live with either overlapping bus addresses or unique bus
-> addresses,
-> any of them can be expressed by the PCI core in Linux, we just have to
-> make sure
-> that we correctly translate the firmware tables into our internal
-> structures.
->
-> 	Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+On Sat, Dec 19, 2015 at 06:11:40PM +0300, Aleksei Mamlin wrote:
+> 2015-12-19 0:25 GMT+03:00 Maxime Ripard <maxime.ripard@free-electrons.com>:
+> 
+> > Hi,
+> >
+> > On Fri, Dec 18, 2015 at 11:51:50AM +0300, Aleksei Mamlin wrote:
+> > > Add a node for the Goodix GT911 touchscreen found on the Wexler TAB7200
+> > tablet
+> > >
+> > > Signed-off-by: Aleksei Mamlin <mamlinav@gmail.com>
+> > > ---
+> > >  arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts | 19 +++++++++++++++++++
+> > >  1 file changed, 19 insertions(+)
+> > >
+> > > diff --git a/arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts
+> > b/arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts
+> > > index 239b5d2..ec3b837 100644
+> > > --- a/arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts
+> > > +++ b/arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts
+> > > @@ -102,6 +102,18 @@
+> > >       pinctrl-names = "default";
+> > >       pinctrl-0 = <&i2c2_pins_a>;
+> > >       status = "okay";
+> > > +
+> > > +     gt911: touchscreen at 5d {
+> > > +             compatible = "goodix,gt911";
+> > > +             reg = <0x5d>;
+> > > +             interrupt-parent = <&pio>;
+> > > +             interrupts = <7 21 IRQ_TYPE_EDGE_FALLING>; /* EINT21
+> > (PH21) */
+> > > +             pinctrl-names = "default";
+> > > +             pinctrl-0 = <&ts_reset_pin>;
+> > > +             irq-gpios = <&pio 7 21 GPIO_ACTIVE_HIGH>; /* INT (PH21) */
+> >
+> > It seems odd that you need both irq-gpios and interrupts. These two
+> > are completely redundant, and you should even actually use only one in
+> > your driver, since the second request_irq will fail.
+> >
+> >
+> We need both interrupts and irq-gpios because the driver uses the interrupt
+> gpio pin as output to reset the device. See bindings documentation [1]
+> 
+> [1]
+> https://git.kernel.org/cgit/linux/kernel/git/dtor/input.git/tree/Documentation/devicetree/bindings/input/touchscreen/goodix.txt?h=goodix
 
-Thanks, I won't be touching the acpi tables then and I will assume the
-hack had a problem. It was trying to remap the io range of the second root
-port  to the first port io address map.
+Hmm, indeed, and even the documentation is confusing.
 
-I was getting a warning from resource.c
+Thanks,
+Maxime
 
-Btw, when I tested the io ranges before, kernel didn't accept anything
-below 1k like 0. That is why my range starts at 1k.
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151221/d7bf2b64/attachment-0001.sig>
