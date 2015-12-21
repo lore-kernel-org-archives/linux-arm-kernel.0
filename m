@@ -1,169 +1,60 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 21 Dec 2015 11:14:55 +0000
-Subject: [PATCH v6] arm/arm64: add arm-smccc
-In-Reply-To: <1449667495-23091-1-git-send-email-jens.wiklander@linaro.org>
-References: <1449667495-23091-1-git-send-email-jens.wiklander@linaro.org>
-Message-ID: <20151221111455.GA11145@red-moon>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Mon, 21 Dec 2015 19:27:29 +0800
+Subject: [PATCH 0/6] misc: add reboot mode driver
+Message-ID: <1450697249-29994-1-git-send-email-andy.yan@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 09, 2015 at 02:24:55PM +0100, Jens Wiklander wrote:
-> Adds helpers to do SMC and HVC based on ARM SMC Calling Convention.
-> CONFIG_HAVE_ARM_SMCCC is enabled for architectures that may support the
-> SMC or HVC instruction. It's the responsibility of the caller to know if
-> the SMC instruction is supported by the platform.
-> 
-> This patch doesn't provide an implementation of the declared functions.
-> Later patches will bring in implementations and set
-> CONFIG_HAVE_ARM_SMCCC for ARM and ARM64 respectively.
-> 
-> Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
-> ---
-> 
-> v6:
-> * Move HAVE_ARM_SMCCC from init/Kconfig
-> 
->  arch/Kconfig              |  3 ++
->  include/linux/arm-smccc.h | 98 +++++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 101 insertions(+)
->  create mode 100644 include/linux/arm-smccc.h
-> 
-> diff --git a/arch/Kconfig b/arch/Kconfig
-> index 4e949e5..ce3c0b0 100644
-> --- a/arch/Kconfig
-> +++ b/arch/Kconfig
-> @@ -564,4 +564,7 @@ config OLD_SIGACTION
->  config COMPAT_OLD_SIGACTION
->  	bool
->  
-> +config HAVE_ARM_SMCCC
-> +	bool
 
-It is ok by me to move it there, probably we do not want it at the end of
-the "ABI hall of shame" list :)
+This driver parse the reboot commands like "reboot loader"
+and "reboot recovery" to get a boot mode described in the
+device tree , then call the vendor specific write interfae
+to store the boot mode in some place like special register
+or sram , which can be read by the bootloader after system
+reboot.
 
-Or drivers/firmware/Kconfig ?
+This is commonly done on Android based devices, in order to
+reboot the device into fastboot or recovery mode.
 
-Strictly speaking, since PSCI uses this by default, you should also
-enforce an ARM_PSCI_FW dependency on HAVE_ARM_SMCCC.
+Before this patch , I have try some hack on[0], and then found
+John Stultz also doing the same work[1].
 
->  source "kernel/gcov/Kconfig"
-> diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
-> new file mode 100644
-> index 0000000..dea68a9
-> --- /dev/null
-> +++ b/include/linux/arm-smccc.h
-> @@ -0,0 +1,98 @@
-> +/*
-> + * Copyright (c) 2015, Linaro Limited
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + */
-> +#ifndef __LINUX_ARM_SMCCC_H
-> +#define __LINUX_ARM_SMCCC_H
-> +
-> +#include <linux/types.h>
-> +#include <linux/linkage.h>
+As John is busy these days, I go on with this work.
 
-Nit: alphabetical order please.
+[0]https://patchwork.kernel.org/patch/7647751/
+[1]https://patchwork.kernel.org/patch/7802391/
 
-> +
-> +/*
-> + * This file provides common defines for ARM SMC Calling Convention as
-> + * specified in
-> + * http://infocenter.arm.com/help/topic/com.arm.doc.den0028a/index.html
-> + */
-> +
-> +#define ARM_SMCCC_SMC_32		(0 << 30)
-> +#define ARM_SMCCC_SMC_64		(1 << 30)
-> +#define ARM_SMCCC_FAST_CALL		(1 << 31)
-> +#define ARM_SMCCC_STD_CALL		(0 << 31)
-> +
-> +#define ARM_SMCCC_OWNER_MASK		0x3F
-> +#define ARM_SMCCC_OWNER_SHIFT		24
-> +
-> +#define ARM_SMCCC_FUNC_MASK		0xFFFF
-> +
-> +#define ARM_SMCCC_IS_FAST_CALL(smc_val)	((smc_val) & ARM_SMCCC_FAST_CALL)
-> +#define ARM_SMCCC_IS_64(smc_val)	((smc_val) & ARM_SMCCC_SMC_64)
-> +#define ARM_SMCCC_FUNC_NUM(smc_val)	((smc_val) & ARM_SMCCC_FUNC_MASK)
-> +#define ARM_SMCCC_OWNER_NUM(smc_val) \
-> +	(((smc_val) >> ARM_SMCCC_OWNER_SHIFT) & ARM_SMCCC_OWNER_MASK)
-> +
-> +#define ARM_SMCCC_CALL_VAL(type, calling_convention, owner, func_num) \
-> +	((type) | (calling_convention) | \
 
-Nit: if you use a shift macro for some fields it would be clearer if you use
-for all of them (I am referring to type/calling_convention here), it can
-be changed later.
+Andy Yan (6):
+  dt-bindings: misc: add document for reboot-mode driver
+  dt-bindings: soc: add document for rockchip reboot-mode driver
+  misc: add reboot mode driver
+  soc: rockchip: add reboot mode driver
+  ARM: dts: rockchip: add reboot mode node
+  ARM64: dts: rockchip: add reboot mode node
 
-Other than that:
+ .../devicetree/bindings/misc/reboot-mode.txt       | 41 +++++++++
+ .../bindings/soc/rockchip/rockchip,reboot-mode.txt | 39 +++++++++
+ arch/arm/boot/dts/rk3288.dtsi                      | 25 ++++++
+ arch/arm/boot/dts/rk3xxx.dtsi                      | 26 ++++++
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi           | 26 ++++++
+ drivers/misc/Kconfig                               |  7 ++
+ drivers/misc/Makefile                              |  1 +
+ drivers/misc/reboot_mode.c                         | 96 ++++++++++++++++++++++
+ drivers/power/reset/Kconfig                        |  1 -
+ drivers/soc/rockchip/Kconfig                       |  8 ++
+ drivers/soc/rockchip/Makefile                      |  1 +
+ drivers/soc/rockchip/loader.h                      | 22 +++++
+ drivers/soc/rockchip/reboot.c                      | 66 +++++++++++++++
+ include/dt-bindings/soc/rockchip_boot-mode.h       | 30 +++++++
+ include/linux/reboot.h                             |  4 +-
+ 15 files changed, 391 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/misc/reboot-mode.txt
+ create mode 100644 Documentation/devicetree/bindings/soc/rockchip/rockchip,reboot-mode.txt
+ create mode 100644 drivers/misc/reboot_mode.c
+ create mode 100644 drivers/soc/rockchip/loader.h
+ create mode 100644 drivers/soc/rockchip/reboot.c
+ create mode 100644 include/dt-bindings/soc/rockchip_boot-mode.h
 
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-
-> +	(((owner) & ARM_SMCCC_OWNER_MASK) << ARM_SMCCC_OWNER_SHIFT) | \
-> +	((func_num) & ARM_SMCCC_FUNC_MASK))
-> +
-> +#define ARM_SMCCC_OWNER_ARCH		0
-> +#define ARM_SMCCC_OWNER_CPU		1
-> +#define ARM_SMCCC_OWNER_SIP		2
-> +#define ARM_SMCCC_OWNER_OEM		3
-> +#define ARM_SMCCC_OWNER_STANDARD	4
-> +#define ARM_SMCCC_OWNER_TRUSTED_APP	48
-> +#define ARM_SMCCC_OWNER_TRUSTED_APP_END	49
-> +#define ARM_SMCCC_OWNER_TRUSTED_OS	50
-> +#define ARM_SMCCC_OWNER_TRUSTED_OS_END	63
-> +
-> +/**
-> + * struct arm_smccc_res - Result from SMC/HVC call
-> + * @a0-a3 result values from registers 0 to 3
-> + */
-> +struct arm_smccc_res {
-> +	unsigned long a0;
-> +	unsigned long a1;
-> +	unsigned long a2;
-> +	unsigned long a3;
-> +};
-> +
-> +/**
-> + * arm_smccc_smc() - make SMC calls
-> + * @a0-a7: arguments passed in registers 0 to 7
-> + * @res: result values from registers 0 to 3
-> + *
-> + * This function is used to make SMC calls following SMC Calling Convention.
-> + * The content of the supplied param are copied to registers 0 to 7 prior
-> + * to the SMC instruction. The return values are updated with the content
-> + * from register 0 to 3 on return from the SMC instruction.
-> + */
-> +asmlinkage void arm_smccc_smc(unsigned long a0, unsigned long a1,
-> +			unsigned long a2, unsigned long a3, unsigned long a4,
-> +			unsigned long a5, unsigned long a6, unsigned long a7,
-> +			struct arm_smccc_res *res);
-> +
-> +/**
-> + * arm_smccc_hvc() - make HVC calls
-> + * @a0-a7: arguments passed in registers 0 to 7
-> + * @res: result values from registers 0 to 3
-> + *
-> + * This function is used to make HVC calls following SMC Calling
-> + * Convention.  The content of the supplied param are copied to registers 0
-> + * to 7 prior to the HVC instruction. The return values are updated with
-> + * the content from register 0 to 3 on return from the HVC instruction.
-> + */
-> +asmlinkage void arm_smccc_hvc(unsigned long a0, unsigned long a1,
-> +			unsigned long a2, unsigned long a3, unsigned long a4,
-> +			unsigned long a5, unsigned long a6, unsigned long a7,
-> +			struct arm_smccc_res *res);
-> +
-> +#endif /*__LINUX_ARM_SMCCC_H*/
-> -- 
-> 1.9.1
-> 
+-- 
+1.9.1
