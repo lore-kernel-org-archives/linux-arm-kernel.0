@@ -1,116 +1,151 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Mon, 21 Dec 2015 10:07:29 +0200
-Subject: [PATCH v2] ARM: dts: imx7d: cl-som-imx7: add basic module support
-In-Reply-To: <20151221063608.GB4703@tiger>
-References: <20151208151401.GA20042@rob-hp-laptop>
- <1449756097-2921-1-git-send-email-grinberg@compulab.co.il>
- <20151214024315.GC25756@tiger> <56716EA4.2080107@compulab.co.il>
- <20151221063608.GB4703@tiger>
-Message-ID: <5677B341.6040203@compulab.co.il>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Mon, 21 Dec 2015 16:33:25 +0800
+Subject: [PATCH v2 0/3] USB: add generic onboard USB HUB driver
+In-Reply-To: <Pine.LNX.4.44L0.1512181030590.1682-100000@iolanthe.rowland.org>
+References: <CAL411-rK6qfkbQsSjvXH5VPAQAm4tMyD6fVTEgFQrpLHNGMXeA@mail.gmail.com>
+ <Pine.LNX.4.44L0.1512181030590.1682-100000@iolanthe.rowland.org>
+Message-ID: <CAL411-qKE=12VZAN9=tUWPqkC5BfSgpQb9aNgCU6rmPLasXNHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
-
-On 12/21/15 08:36, Shawn Guo wrote:
-> On Wed, Dec 16, 2015 at 04:01:08PM +0200, Igor Grinberg wrote:
->> Hi Shawn,
+On Fri, Dec 18, 2015 at 11:38 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
+> On Fri, 18 Dec 2015, Peter Chen wrote:
+>
+>> On Fri, Dec 18, 2015 at 12:13 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
+>
+>> > It's not clear (to me, anyway) how this is meant to work.  USB is a
+>> > completely discoverable bus: There is no way to represent devices
+>> > statically; they have to be discovered.  But a device can't be
+>> > discovered unless it is functional, so if an onboard hub (or any other
+>> > sort of USB device) requires power, clocks, or something similar in
+>> > order to function, it won't be discovered.  There won't be any device
+>> > structure to probe, and "forcing driver probe" won't accomplish
+>> > anything.
+>> >
+>> > It seems to me that the only way something like this could be made to
+>> > work is if the necessary actions are keyed off the host controller (and
+>> > in particular, _not_ the hub driver), presumably at the time the
+>> > controller is probed.
 >>
->> On 12/14/15 04:43, Shawn Guo wrote:
->>> On Thu, Dec 10, 2015 at 04:01:37PM +0200, Igor Grinberg wrote:
->>>> From: Ilya Ledvich <ilya@compulab.co.il>
+>> The reason why I put the code at hub driver is the onboard USB device
+>> may be at 2nd level hub, at hub driver, we can know all devices under
+>> this level hub.
+>
+> Maybe.  I'm not convinced.  See below.
+>
+>> > With anything else, you run the risk that the
+>> > necessary resources won't get enabled before they are needed.
+>> >
 >>
->> [...]
->>
->>>> diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
->>>> index 34c88b0..30b0ba1 100644
->>>> --- a/Documentation/devicetree/bindings/arm/fsl.txt
->>>> +++ b/Documentation/devicetree/bindings/arm/fsl.txt
->>>> @@ -53,6 +53,10 @@ i.MX6 Quad SABRE Automotive Board
->>>>  Required root node properties:
->>>>      - compatible = "fsl,imx6q-sabreauto", "fsl,imx6q";
->>>>  
->>>> +i.MX7D CL-SOM-iMX7 Board
->>>> +Required root node properties:
->>>> +    - compatible = "compulab,cl-som-imx7", "fsl,imx7d";
->>>> +
->>>
->>> This is not a board produced by FSL, so it should be documented in
->>> fsl.txt.
->>
->> You mean _should not_ be documented in fsl.txt, right?
-> 
-> Right.  Sorry.
-> 
->> Ok, I have no problem with that, we've just used the same approach OMAP
->> takes - all the OMAP based boards are documented in the same file:
->> Documentation/devicetree/bindings/arm/omap/omap.txt
-> 
-> omap.txt is probably fine, as it's not ti.txt.
+>> Sorry, I can't understand what you mean
+>
+> Suppose you have a platform driver to manage the device's resources,
+> and the platform driver is in loadable module.  Suppose the device can
+> be detected even before the resources have been initialized, but it
+> can't work correctly.
+>
+> Then what happens when the platform driver's module doesn't get loaded
+> until _after_ the device has been detected and after the device failed
+> to initialize?
+>
+>
 
-Have you considered creating a kind of imx.txt?
+You are right, so the platform driver is not a good choice for doing
+that.
 
-> 
->>
->> Do you think we should document it in:
->> Documentation/devicetree/bindings/arm/compulab-boards.txt
->> (this file should already exist in arm-soc/next/dt)?
-> 
-> Yeah, if the file already exist, it's the best option.  But, as it
-> doesn't exist on my tree, I can not apply this change.
+>> +static int hub_of_children_register(struct usb_device *hdev)
+>> +{
+>> +     struct device *dev;
+>> +
+>> +     if (hdev->parent)
+>> +             dev = &hdev->dev;
+>> +     else
+>> +             dev = bus_to_hcd(hdev->bus)->self.controller;
+>> +
+>> +     if (!dev->of_node)
+>> +             return 0;
+>
+> Suppose hdev->parent is not NULL (hdev isn't the root hub -- maybe it's
+> a 2nd-level hub).  Then how did hdev->dev->of_node get set?
+>
 
-It is already in linux-next.
-Who do you think should apply the v2 patch then?
-May be the arm-soc guys? (Cc'ed Olof and Arnd)
+Yes, the USB device doesn't know device node.
 
-> 
->>
->>>
->>>>  Generic i.MX boards
->>>>  -------------------
->>>>  
->>>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->>>> index 30bbc37..83ed521 100644
->>>> --- a/arch/arm/boot/dts/Makefile
->>>> +++ b/arch/arm/boot/dts/Makefile
->>>> @@ -350,6 +350,7 @@ dtb-$(CONFIG_SOC_IMX6SX) += \
->>>>  dtb-$(CONFIG_SOC_IMX6UL) += \
->>>>  	imx6ul-14x14-evk.dtb
->>>>  dtb-$(CONFIG_SOC_IMX7D) += \
->>>> +	imx7d-cl-som-imx7.dtb \
->>>>  	imx7d-sdb.dtb
->>>>  dtb-$(CONFIG_SOC_LS1021A) += \
->>>>  	ls1021a-qds.dtb \
->>>> diff --git a/arch/arm/boot/dts/imx7d-cl-som-imx7.dts b/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
->>>> new file mode 100644
->>>> index 0000000..ba05198
->>>> --- /dev/null
->>>> +++ b/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
->>>> @@ -0,0 +1,150 @@
->>>> +/*
->>>> + * Support for CompuLab CL-SOM-iMX7 System-on-Module
->>>> + *
->>>> + * Copyright (C) 2015 CompuLab Ltd. - http://www.compulab.co.il/
->>>> + * Author: Ilya Ledvich <ilya@compulab.co.il>
->>>> + *
->>>> + * This program is free software; you can redistribute it and/or modify it
->>>> + * under the terms of the GNU General Public License version 2 as published by
->>>> + * the Free Software Foundation.
->>>> + */
->>>
->>> GPL/X11 dual licence is generally suggested for newly added dts files,
->>> as it will let non-Linux OS use them.
->>
->> I don't remember we've used this one before...
->> Can you please point to an example?
-> 
-> The following command will give you a plenty of examples.
-> 
-> $ git grep X11 arch/arm/boot/dts
+There are two problems which needs device tree to support, I have
+below solutions for them, please help to see if it is reasonable.
 
-10x!
+1. The USB device can't work without external clock, power, reset operation.
+At device tree, we have a node to describe external signals like clocks, gpios
+for all onboard devices under this controller. And this node is as phandle for
+host controller, see below:
 
+--- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+@@ -108,6 +108,21 @@
+                default-brightness-level = <7>;
+                status = "okay";
+        };
++
++       usbh1_pre_operation: usbh1_pre_operation {
++               clocks = <&clks IMX6QDL_CLK_1>,
++                        <&clks IMX6QDL_CLK_2>,
++                        <&clks IMX6QDL_CLK_3>,
++                        <&clks IMX6QDL_CLK_4>,
++                        <&clks IMX6QDL_CLK_5>,
++                        <&clks IMX6QDL_CLK_6>;
++               reset-gpios = <&gpio4 5 GPIO_ACTIVE_LOW>,
++                             <&gpio4 7 GPIO_ACTIVE_LOW>,
++                             <&gpio3 25 GPIO_ACTIVE_LOW>,
++                             <&gpio3 27 GPIO_ACTIVE_LOW>,
++                             <&gpio4 4 GPIO_ACTIVE_LOW>,
++                             <&gpio4 6 GPIO_ACTIVE_LOW>;
++       };
+ };
+
+ &clks {
+@@ -590,6 +605,8 @@
+ &usbh1 {
+        vbus-supply = <&reg_usb_h1_vbus>;
+        status = "okay";
++
++       devices-pre-operation = <&usbh1_pre_operation>
+ };
+
+At code, we add one API of_usb_pre_operation to get clocks and gpios through
+host controller's device node, and this API is called at usb_add_hcd,
+and opposite
+operation is called at usb_remove_hcd.
+
+This solution is almost the same with MMC power sequence solution.
+(see drivers/mmc/core/pwrseq.c)
+
+2. There are MFD USB devices, which includes several interfaces under
+USB device,
+like i2c, gpios, etc. Due to lack of device tree support, USB
+class/device driver doesn't know
+which kinds of interfaces are needed for this board.
+
+This problem is hard to handle, I have a solution, but it can't cover
+two same devices
+under the same HUB ports. My solution is let USB know device node, the main idea
+is similar with PCIi's (see drivers/of/of_pci.c, drivers/pci/of.c),
+the most difficulty is
+find correct node for USB device after bus enumeration. Once the
+device is recognized,
+the USB core will create a USB device for it, since we know its parent
+device, and its parent
+device  (eg, the host controller) has device node, and we can find all
+children nodes under
+this node, if the child's {vid, pid} is the same with {vid, pid} the
+device descriptor we read, we
+assign this node as usb device's node.
+
+At USB class/device driver, we can get the properties/phandles under
+this device node, and register
+them.
+
+At device tree, we need to describe the bus topology for this USB device.
 
 -- 
-Regards,
-Igor.
+BR,
+Peter Chen
