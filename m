@@ -1,49 +1,48 @@
 From: jcm@redhat.com (Jon Masters)
-Date: Mon, 21 Dec 2015 18:10:58 -0500 (EST)
-Subject: [PATCH V2 22/23] pci,
- acpi: Match PCI config space accessors against platfrom specific
- quirks.
-In-Reply-To: <201512211510.32029.arnd@arndb.de>
+Date: Mon, 21 Dec 2015 18:24:15 -0500
+Subject: [PATCH V2 22/23] pci, acpi: Match PCI config space accessors
+ against platfrom specific quirks.
+In-Reply-To: <201512212342.18960.arnd@arndb.de>
 References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
- <1450278993-12664-23-git-send-email-tn@semihalf.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1EC14C0F@lhreml503-mbb>
- <201512211510.32029.arnd@arndb.de>
-Message-ID: <335CDE2E-B588-43A8-8665-6023AFD0EA04@redhat.com>
+ <201512211510.32029.arnd@arndb.de> <5678370B.1030102@caviumnetworks.com>
+ <201512212342.18960.arnd@arndb.de>
+Message-ID: <56788A1F.6020305@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for top-posting. A quick note that SMBIOS3 is required by SBBR so it can be presumed that compliant platforms will provide quirks via DMI.
+On 12/21/2015 05:42 PM, Arnd Bergmann wrote:
+> On Monday 21 December 2015, David Daney wrote:
+>> On 12/21/2015 06:10 AM, Arnd Bergmann wrote:
+>>> On Monday 21 December 2015, Gabriele Paoloni wrote:
+>>
+>>> or require the BIOS to work around the hardware
+>>> quirks differently (e.g. by trapping config space access through secure
+>>> firmware, or going through an AML method to be defined).
+>>
+>> Some systems don't seem to have this capability.  For example, in ARMv8 
+>> (A.K.A. arm64), I haven't been able to figure out how to trap these 
+>> accesses to EL3 for emulation.  The specification is 5700 pages long 
+>> though, so perhaps I missed that bit.
 
--- 
-Computer Architect | Sent from my 64-bit #ARM Powered phone
+There isn't a way to directly trap to EL3 for emulation (caveat - there
+might be some nasty hack with an SMMU that wouldn't be supportable). I
+requested the implementation of a generic mechanism for LPC type
+emulation (complete with "SMI" traps to EL3 for fixups) about 4 years
+ago. That wouldn't have helped with this situation, but this was to be
+on the radar afterward. However, on ARM, it is still early days with
+respect to transparently trapping and emulating hardware workarounds.
 
-> On Dec 21, 2015, at 09:11, Arnd Bergmann <arnd@arndb.de> wrote:
-> 
-> On Monday 21 December 2015, Gabriele Paoloni wrote:
->>> -----Original Message-----
->>> From: linux-kernel-owner at vger.kernel.org [mailto:linux-kernel-
->>> owner at vger.kernel.org] On Behalf Of Tomasz Nowicki
-> 
->>> Some platforms may not be fully compliant with generic set of PCI
->>> config accessors. For these cases we implement the way to overwrite
->>> accessors set before PCI buses enumeration. Algorithm that overwrite
->>> accessors matches against platform ID (DMI), domain and bus number,
->>> hopefully enough for all cases. All quirks can be defined using:
->>> DECLARE_ACPI_MCFG_FIXUP() and keep self contained.
->> 
->> I've got a couple of comments/questions about this patch..
->> 
->> 1) So according to this mechanism quirks would be supported only by 
->>   vendors whose BIOS are SMBIOS compliant. Now personally I am ok
->>   with this but I don't know if this is OK in general as it would 
->>   narrow down the number of platforms that would be able to define
->>   the quirks...
->>   Lorenzo, Arnd what is your opinion here?
-> 
-> I'd rather not see the quirks in mainline at all, and only support
-> SBSA compliant machines, or require the BIOS to work around the hardware
-> quirks differently (e.g. by trapping config space access through secure
-> firmware, or going through an AML method to be defined). I'm certainly
-> ok with making it depend on SMBIOS if we are going to use something like this.
-> 
->    Arnd
+> How about using AML then? This would be similar to what CHRP used with
+> RTAS calls to do PCI config space access.
+
+The best way to do it for now (IMO) is via a DMI quirk match and a
+special method for the early SoCs that aren't implementing MMCONFIG
+correctly. An effort is underway to correct that in third party IP, and
+similar directly with the partners for future generations. So this
+should not get "much" more out of hand than it sadly is so far. Once we
+have a good upstream solution (which is vital) then it will be an error
+and a pre-tapeout bug to not be able to boot an upstream kernel with
+stock ACPI hostbridge working sans nasty quirks. Therefore, the sooner
+this is upstream, the better it will be for everyone involved.
+
+Jon.
