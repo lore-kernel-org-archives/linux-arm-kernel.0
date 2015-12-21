@@ -1,33 +1,54 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Mon, 21 Dec 2015 23:06:21 +0900
-Subject: [PATCH v8 9/4] arm64: remove irq_count and do_softirq_own_stack()
-In-Reply-To: <20151221122148.GK23092@arm.com>
-References: <1449226948-14251-1-git-send-email-james.morse@arm.com>
- <1450454507-8907-1-git-send-email-james.morse@arm.com>
- <68E0E2C7-A4C2-45C2-95C5-842FA807F918@gmail.com>
- <20151221113021.GH23092@arm.com>
- <DB3PR08MB0041F2F26E5FABEE61ACA089F3E40@DB3PR08MB0041.eurprd08.prod.outlook.com>
- <20151221122148.GK23092@arm.com>
-Message-ID: <FE5DE263-AC69-4C88-84DC-329280340148@gmail.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 21 Dec 2015 14:08:22 +0000
+Subject: Tegra baseline test results for v4.4-rc6
+Message-ID: <567807D6.2090208@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Dec 21, 2015, at 9:21 PM, Will Deacon wrote:
-> On Mon, Dec 21, 2015 at 12:19:32PM +0000, James Morse wrote:
->> Will Deacon wrote:
->>>>> +   mrs     x26, sp_el0             // already masked
->>>> 
->>>> Nit: How about using 'get_thread_info x26'?
->>> 
->>> Something like the following?
->> 
->> Looks fine - I guess you're cleverly leaving the the el0_irq case to be
->> covered by get_thread_info in kernel_entry?
-> 
-> Yup. tsk is always valid for exceptions taken from el0, afaict.
+Here are some basic Tegra test results for Linux v4.4-rc6.
+Logs and other details at:
+
+    https://nvtb.github.io//linux/test_v4.4-rc6/20151220163104/
 
 
-Good idea! I like the change.
+Test summary
+------------
 
-Best Regards
-Jungseok Lee
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Build: Image:
+    Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+    Pass: ( 1/ 1): qemu-vexpress64
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.4-rc5 (9f9499ae8e6415cefc4fe0a96ad0e27864353c89)):
+   text     data      bss    total  kernel
+  +4108   +12288        0   +16396  defconfig
+  -5144        0        0    -5144  multi_v7_defconfig
+  +1748        0        0    +1748  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.4-rc5 (9f9499ae8e6415cefc4fe0a96ad0e27864353c89))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+       8k      -8k        .      -4k tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .      -4k tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+       8k      -8k        .      -4k  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .      -4k  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+       8k      -8k        .      -4k    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .      -4k    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+       8k      -8k        .      -4k       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .      -4k       tegra30-beaver      tegra_defconfig       tegra30-beaver
