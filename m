@@ -1,36 +1,33 @@
-From: kernel@martin.sperl.org (Martin Sperl)
-Date: Mon, 21 Dec 2015 19:32:40 +0100
-Subject: [PATCH 4/4] ARM: bcm2835: Switch to using the new clock driver
- support.
-In-Reply-To: <56784038.402@lategoodbye.de>
-References: <1441562263-19888-1-git-send-email-eric@anholt.net>
- <1441562263-19888-5-git-send-email-eric@anholt.net>
- <5677E7BF.3020404@martin.sperl.org> <5677F3C8.5000600@lategoodbye.de>
- <03BE10FE-D743-4CD3-8825-112D0F6B2D43@martin.sperl.org>
- <56784038.402@lategoodbye.de>
-Message-ID: <1C11D489-8708-4937-A1CD-338DDEFF7AAD@martin.sperl.org>
+From: philipp.tomsich@theobroma-systems.com (Dr. Philipp Tomsich)
+Date: Mon, 21 Dec 2015 19:39:35 +0100
+Subject: [PATCH v6 12/20] arm64:ilp32: add sys_ilp32.c and a separate
+ table (in entry.S) to use it
+In-Reply-To: <2334903.IjsQ1BK3JF@wuerfel>
+References: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
+ <CA+=Sn1ktUCa_8MzMvZtQhE+fUNY5-V9JXTLXKDDe8a0iENgd=w@mail.gmail.com>
+ <20151218114219.GA2830@mbp> <2334903.IjsQ1BK3JF@wuerfel>
+Message-ID: <4753CD2F-914D-44D5-BD18-8DF94068315D@theobroma-systems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-> On 21.12.2015, at 19:08, Stefan Wahren <info@lategoodbye.de> wrote:
+> On 18 Dec 2015, at 13:47, Arnd Bergmann <arnd@arndb.de> wrote:
 > 
-> Hi,
+>> 3. Follow the PCS up to glibc but always pass syscall arguments in W
+>>   registers, like AArch32 compat support (the least preferred option,
+>>   the only advantage is a single wrapper for all syscalls but it would
+>>   be doing unnecessary zeroing even for syscalls where it isn't needed)
 > 
-> [fix Michael's address and add Remi]
-> 
-> Am 21.12.2015 um 16:17 schrieb Martin Sperl:
->> 
->> I started looking and found that drivers/clk/bcm/clk-bcm2835.c
->> does not include the PWM clock either.
-> 
-> yes but please look at Remi's patch series first:
-> 
-> http://lists.infradead.org/pipermail/linux-rpi-kernel/2015-December/002672.html
+> This would mean we cannot pass 64-bit arguments in registers, right?
 
-I guess I must have seen it, but have not realized that I could
-apply these. It still leaves the i2s driver itself to get modified -
-I got something working but there are still issues...
+Note that there?s no 32bit registers (the ?w?-form always refers to the lower
+32bits of a 64bit register, with implicit zero-extension)? and load/store
+instructions always use the full base-register (?x?-form) for address calculation.
+I.e. a load/store would inadvertently pickup ?random garbage? in the upper 
+32bits, if no explicit zero-extension is applied.
 
-Thanks,
-	Martin
+In other words: all zero-extensions for 32bit arguments should be explicit
+on the kernel side.
+
+Regards,
+Philipp.
