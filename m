@@ -1,99 +1,51 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 21 Dec 2015 14:36:50 +0800
-Subject: [PATCH v2] ARM: dts: imx7d: cl-som-imx7: add basic module support
-In-Reply-To: <56716EA4.2080107@compulab.co.il>
-References: <20151208151401.GA20042@rob-hp-laptop>
- <1449756097-2921-1-git-send-email-grinberg@compulab.co.il>
- <20151214024315.GC25756@tiger> <56716EA4.2080107@compulab.co.il>
-Message-ID: <20151221063608.GB4703@tiger>
+Date: Mon, 21 Dec 2015 14:41:15 +0800
+Subject: [PATCH 0/8] Add support for CL-SOM-iMX7 and SBC-iMX7
+In-Reply-To: <5671707E.5000908@compulab.co.il>
+References: <1449472479-2521-1-git-send-email-ilya@compulab.co.il>
+ <20151214024715.GD25756@tiger> <5671707E.5000908@compulab.co.il>
+Message-ID: <20151221064115.GC4703@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 16, 2015 at 04:01:08PM +0200, Igor Grinberg wrote:
+On Wed, Dec 16, 2015 at 04:09:02PM +0200, Igor Grinberg wrote:
 > Hi Shawn,
 > 
-> On 12/14/15 04:43, Shawn Guo wrote:
-> > On Thu, Dec 10, 2015 at 04:01:37PM +0200, Igor Grinberg wrote:
-> >> From: Ilya Ledvich <ilya@compulab.co.il>
-> 
-> [...]
-> 
-> >> diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-> >> index 34c88b0..30b0ba1 100644
-> >> --- a/Documentation/devicetree/bindings/arm/fsl.txt
-> >> +++ b/Documentation/devicetree/bindings/arm/fsl.txt
-> >> @@ -53,6 +53,10 @@ i.MX6 Quad SABRE Automotive Board
-> >>  Required root node properties:
-> >>      - compatible = "fsl,imx6q-sabreauto", "fsl,imx6q";
-> >>  
-> >> +i.MX7D CL-SOM-iMX7 Board
-> >> +Required root node properties:
-> >> +    - compatible = "compulab,cl-som-imx7", "fsl,imx7d";
-> >> +
+> On 12/14/15 04:47, Shawn Guo wrote:
+> > On Mon, Dec 07, 2015 at 09:14:31AM +0200, Ilya Ledvich wrote:
+> >> Ilya Ledvich (8):
+> >>   ARM: dts: imx7d: cl-som-imx7: add basic module support
+> >>   ARM: dts: imx7d: cl-som-imx7: add usb otg support
+> >>   ARM: dts: imx7d: cl-som-imx7: add eMMC support
+> >>   ARM: dts: imx7d: cl-som-imx7: add fec1 support
+> >>   ARM: dts: imx7d: cl-som-imx7: add eeprom support
+> >>   ARM: dts: imx7d: cl-som-imx7: add gpio extender support
+> >>   ARM: dts: imx7d: cl-som-imx7: add fec2 support
 > > 
-> > This is not a board produced by FSL, so it should be documented in
-> > fsl.txt.
+> > For the initial board support submission, it doesn't really need such
+> > splitting.  Please merge above patches into one.
 > 
-> You mean _should not_ be documented in fsl.txt, right?
+> Yeah, I know there is no need for such splitting, yet I think
+> if the splitting is done right - it is much simpler to review,
 
-Right.  Sorry.
+Not really for a initial board support.
 
-> Ok, I have no problem with that, we've just used the same approach OMAP
-> takes - all the OMAP based boards are documented in the same file:
-> Documentation/devicetree/bindings/arm/omap/omap.txt
+> it provides a better bisectability (in case it will be needed in
+> the future),
 
-omap.txt is probably fine, as it's not ti.txt.
+This is an initial board support submission and all the devices added
+there should be functional.  The bisectability shouldn't needed in this
+case.
+
+> and also if for some reason one (or more) patches are
+> needing some time consuming rework, others (earlier ones in the series)
+> can be accepted meanwhile.
+
+It's not really the case for this series.
 
 > 
-> Do you think we should document it in:
-> Documentation/devicetree/bindings/arm/compulab-boards.txt
-> (this file should already exist in arm-soc/next/dt)?
+> So, I really like to keep it this way, unless you insist.
 
-Yeah, if the file already exist, it's the best option.  But, as it
-doesn't exist on my tree, I can not apply this change.
-
-> 
-> > 
-> >>  Generic i.MX boards
-> >>  -------------------
-> >>  
-> >> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> >> index 30bbc37..83ed521 100644
-> >> --- a/arch/arm/boot/dts/Makefile
-> >> +++ b/arch/arm/boot/dts/Makefile
-> >> @@ -350,6 +350,7 @@ dtb-$(CONFIG_SOC_IMX6SX) += \
-> >>  dtb-$(CONFIG_SOC_IMX6UL) += \
-> >>  	imx6ul-14x14-evk.dtb
-> >>  dtb-$(CONFIG_SOC_IMX7D) += \
-> >> +	imx7d-cl-som-imx7.dtb \
-> >>  	imx7d-sdb.dtb
-> >>  dtb-$(CONFIG_SOC_LS1021A) += \
-> >>  	ls1021a-qds.dtb \
-> >> diff --git a/arch/arm/boot/dts/imx7d-cl-som-imx7.dts b/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
-> >> new file mode 100644
-> >> index 0000000..ba05198
-> >> --- /dev/null
-> >> +++ b/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
-> >> @@ -0,0 +1,150 @@
-> >> +/*
-> >> + * Support for CompuLab CL-SOM-iMX7 System-on-Module
-> >> + *
-> >> + * Copyright (C) 2015 CompuLab Ltd. - http://www.compulab.co.il/
-> >> + * Author: Ilya Ledvich <ilya@compulab.co.il>
-> >> + *
-> >> + * This program is free software; you can redistribute it and/or modify it
-> >> + * under the terms of the GNU General Public License version 2 as published by
-> >> + * the Free Software Foundation.
-> >> + */
-> > 
-> > GPL/X11 dual licence is generally suggested for newly added dts files,
-> > as it will let non-Linux OS use them.
-> 
-> I don't remember we've used this one before...
-> Can you please point to an example?
-
-The following command will give you a plenty of examples.
-
-$ git grep X11 arch/arm/boot/dts
+Please merge them.
 
 Shawn
