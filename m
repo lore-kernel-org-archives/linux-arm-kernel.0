@@ -1,72 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 21 Dec 2015 15:05:33 +0100
-Subject: next-20151221 build: 2 failures 13 warnings (next-20151221)
-In-Reply-To: <E1aAyjj-0007DR-4T@optimist>
-References: <E1aAyjj-0007DR-4T@optimist>
-Message-ID: <201512211505.34074.arnd@arndb.de>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Mon, 21 Dec 2015 23:06:21 +0900
+Subject: [PATCH v8 9/4] arm64: remove irq_count and do_softirq_own_stack()
+In-Reply-To: <20151221122148.GK23092@arm.com>
+References: <1449226948-14251-1-git-send-email-james.morse@arm.com>
+ <1450454507-8907-1-git-send-email-james.morse@arm.com>
+ <68E0E2C7-A4C2-45C2-95C5-842FA807F918@gmail.com>
+ <20151221113021.GH23092@arm.com>
+ <DB3PR08MB0041F2F26E5FABEE61ACA089F3E40@DB3PR08MB0041.eurprd08.prod.outlook.com>
+ <20151221122148.GK23092@arm.com>
+Message-ID: <FE5DE263-AC69-4C88-84DC-329280340148@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just looking at the remaining warnings/errors in linux-next:
-
-On Monday 21 December 2015, Build bot for Mark Brown wrote:
-> ../fs/orangefs/orangefs-kernel.h:773:2: error: implicit declaration of function 'ornagefs_inode_lock' [-Werror=implicit-function-declaration]
-> ../fs/orangefs/orangefs-kernel.h:773:2: error: implicit declaration of function 'ornagefs_inode_lock' [-Werror=implicit-function-declaration]
-> ../fs/orangefs/orangefs-kernel.h:773:2: error: implicit declaration of function 'ornagefs_inode_lock' [-Werror=implicit-function-declaration]
-> ../fs/orangefs/orangefs-kernel.h:773:2: error: implicit declaration of function 'ornagefs_inode_lock' [-Werror=implicit-function-declaration]
-
-I just sent a patch for this.
-
-> arm64-allmodconfig : PASS, 0 errors, 5 warnings, 0 section mismatches
+On Dec 21, 2015, at 9:21 PM, Will Deacon wrote:
+> On Mon, Dec 21, 2015 at 12:19:32PM +0000, James Morse wrote:
+>> Will Deacon wrote:
+>>>>> +   mrs     x26, sp_el0             // already masked
+>>>> 
+>>>> Nit: How about using 'get_thread_info x26'?
+>>> 
+>>> Something like the following?
+>> 
+>> Looks fine - I guess you're cleverly leaving the the el0_irq case to be
+>> covered by get_thread_info in kernel_entry?
 > 
-> Warnings:
->         ../drivers/gpu/drm/vc4/vc4_validate.c:864:4: warning: format '%d' expects argument of type 'int', but argument 4 has type 'size_t' [-Wformat=]
+> Yup. tsk is always valid for exceptions taken from el0, afaict.
 
-I have a trivial patch, need to send it out.
 
->         ../drivers/staging/emxx_udc/emxx_udc.c:843:45: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
->         ../drivers/staging/emxx_udc/emxx_udc.c:1085:45: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
->         ../drivers/staging/emxx_udc/emxx_udc.c:2731:6: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+Good idea! I like the change.
 
-Submitted this one again last week, I had sent it a month ago, but the maintainer was busy.
-
->         ../drivers/tty/serial/amba-pl011.c:190:27: warning: 'vendor_zte' defined but not used [-Wunused-variable]
-
-rmk pointed out the problem when the patch was sent originally, no idea what we should do
-about it other than reverting the patch that introduced the unused code.
-
-> Warnings:
->         <stdin>:1307:2: warning: #warning syscall copy_file_range not implemented [-Wcpp]
-
-Not sure how we can improve this, the same thing seems to happen every time a new syscall gets
-introduced. The actual change is trivial, but we need a better method to sync all architectures.
-
->         ../kernel/printk/nmi.c:143:3: warning: format '%lu' expects argument of type 'long unsigned int', but argument 3 has type 'size_t' [-Wformat]
-
-Sent a patch the other day.
-
->         ../drivers/gpio/gpiolib.c:225:31: warning: 'iterator' may be used uninitialized in this function [-Wmaybe-uninitialized]
-
-Introduced by Bamvor, currently discussing a solution with him and Linus. We can either shut up
-the compiler or rewrite the function in a nicer way.
-
-> arm-multi_v7_defconfig : PASS, 0 errors, 8 warnings, 0 section mismatches
-> 
-> Warnings:
->         arch/arm/configs/multi_v7_defconfig:433:warning: symbol value 'm' invalid for MFD_DA9063
-
-I need to look into this, probably the result of a defconfig change we merged, but it's not
-clear whether the driver should be a module, or the defconfig should have it built-in.
-
->         ../net/bluetooth/mgmt.c:5471:8: warning: 'r192' may be used uninitialized in this function [-Wmaybe-uninitialized]
->         ../net/bluetooth/mgmt.c:5471:8: warning: 'h192' may be used uninitialized in this function [-Wmaybe-uninitialized]
-
-I don't see these with gcc-5.1
-
->         ../crypto/wp512.c:987:1: warning: the frame size of 1112 bytes is larger than 1024 bytes [-Wframe-larger-than=]
-
-no this one. If we want to fix it, it's probably best to change the
-optimization level of the file, something gets misoptimzed here and it's
-clear it should not use that much stack.
-
-	Arnd
+Best Regards
+Jungseok Lee
