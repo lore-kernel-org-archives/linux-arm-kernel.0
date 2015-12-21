@@ -1,149 +1,127 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 21 Dec 2015 10:48:18 +0000
-Subject: [PATCH] arm64: reenable interrupt when handling ptrace breakpoint
-In-Reply-To: <5671CD5B.9030907@linaro.org>
-References: <1450225088-2456-1-git-send-email-yang.shi@linaro.org>
- <20151216111316.GD4308@arm.com> <5671CD5B.9030907@linaro.org>
-Message-ID: <20151221104818.GF23092@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Mon, 21 Dec 2015 10:55:29 +0000
+Subject: [PATCH v4 05/12] arm-cci: PMU: Add support for transactions
+In-Reply-To: <20151218114751.GP6344@twins.programming.kicks-ass.net>
+References: <1450374559-23315-1-git-send-email-suzuki.poulose@arm.com>
+ <1450374559-23315-6-git-send-email-suzuki.poulose@arm.com>
+ <20151217184255.GI6344@twins.programming.kicks-ass.net>
+ <5673DFC7.6060406@arm.com>
+ <20151218104234.GN6344@twins.programming.kicks-ass.net>
+ <5673E6C9.7040304@arm.com>
+ <20151218114751.GP6344@twins.programming.kicks-ass.net>
+Message-ID: <20151221105528.GA19617@e106634-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 16, 2015 at 12:45:15PM -0800, Shi, Yang wrote:
-> On 12/16/2015 3:13 AM, Will Deacon wrote:
-> >On Tue, Dec 15, 2015 at 04:18:08PM -0800, Yang Shi wrote:
-> >>The kernel just send out a SIGTRAP signal when handling ptrace breakpoint in
-> >>debug exception, so it sounds safe to have interrupt enabled if it is not
-> >>disabled by the parent process.
+On Fri, Dec 18, 2015 at 12:47:51PM +0100, Peter Zijlstra wrote:
+> On Fri, Dec 18, 2015 at 10:58:17AM +0000, Suzuki K. Poulose wrote:
+>
+> > We have a global Enable/Disable for CCI PMU and thats what we use
+> > currently. To be able to reprogram the counters with the event period
+> > (we program the counter with a specific count in pmu::start() and at
+> > overflow irq handler, not to be confused with the sampling period, which
+> > is not supported), we need to be sure that the counter value has been updated.
 > >
-> >Is this actually fixing an issue you're seeing, or did you just spot this?
-> >Given that force_sig_info disable interrupts, I don't think this is really
-> >worth doing.
-> 
-> I should made more comments at the first place, sorry for the inconvenience.
-> 
-> I did run into some problems on -rt kernel with CRIU restore, please see the
-> below kernel bug log:
+> > May be we could check the event->hw->state to see if we need to reprogram it.
+>
+> Right, have a look at arch/x86/kernel/cpu/perf_event.c:x86_pmu_enable()
+>
 
-Thanks.
+Thanks for that hint. Here is what I cam up with. We don't reschedule
+the events, all we need to do is group the writes to the counters. Hence
+we could as well add a flag for those events which need programming
+and perform the write in pmu::pmu_enable().
 
-> >My worry here is that we take an interrupt and, on the return path,
-> >decide to reschedule due to CONFIG_PREEMPT. If we somehow end up back
-> >in the debugger, I'm concerned that it could remove the breakpoint and
-> >then later see an unexpected SIGTRAP from the child.
-> >
-> >Having said that, I've failed to construct a non-racy scenario in which
-> >that can happen, but I'm just really uncomfortable making this change
-> >unless there's a real problem being solved.
-> 
-> The patch is inspired by the similar code in other architectures, e.g. x86
-> and powerpc which have hardware debug exception to handle breakpoint and
-> single step like arm64. And, they have interrupt enabled in both breakpoint
-> and single step. So, I'm supposed arm64 could do the same thing.
-> 
-> For the preempt case, it might be possible, but it sounds like a exception
-> handling problem to me. The preempt should not be allowed in debug exception
-> (current arm64 kernel does it), and in interrupt return path the code should
-> check if debug is on or not. If debug is on, preempt should be just skipped.
-> Or we could disable preempt in debug exception.
 
-Yeah, disabling preemption during the debug handler and then enabling
-interrupts if it came from userspace sounds like the best option. However,
-that's a fairly invasive change to entry.S at this point, so maybe we're
-better off with something like the patch below in the meantime?
+----8>-----
 
-Will
 
---->8
+arm-cci PMU: Delay counter writes to pmu_enable
 
-diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-index 8aee3aeec3e6..7f4913f2ea3c 100644
---- a/arch/arm64/kernel/debug-monitors.c
-+++ b/arch/arm64/kernel/debug-monitors.c
-@@ -226,11 +226,29 @@ static int call_step_hook(struct pt_regs *regs, unsigned int esr)
- 	return retval;
+Delay setting the event periods for enabled events to pmu::pmu_enable().
+We mark the event.hw->state PERF_HES_ARCH for the events that we know
+have their counts recorded and have been started. Since we reprogram the
+counters every time before count, we can set the counters for all the
+event counters which are !STOPPED && ARCH.
+
+Grouping the writes to counters can ammortise the cost of the operation
+on PMUs where it is expensive (e.g, CCI-500).
+
+
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Punit Agrawal <punit.agrawal@arm.com>
+Cc: peterz at infradead.org
+Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+---
+ drivers/bus/arm-cci.c |   42 ++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 40 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+index 0189f3a..c768ee4 100644
+--- a/drivers/bus/arm-cci.c
++++ b/drivers/bus/arm-cci.c
+@@ -916,6 +916,40 @@ static void hw_perf_event_destroy(struct perf_event *event)
+        }
  }
- 
-+static void send_user_sigtrap(int si_code)
+
++/*
++ * Program the CCI PMU counters which have PERF_HES_ARCH set
++ * with the event period and mark them ready before we enable
++ * PMU.
++ */
++void cci_pmu_update_counters(struct cci_pmu *cci_pmu)
 +{
-+	struct pt_regs *regs = current_pt_regs();
-+	siginfo_t info = {
-+		.si_signo	= SIGTRAP,
-+		.si_errno	= 0,
-+		.si_code	= si_code,
-+		.si_addr	= (void __user *)instruction_pointer(regs),
-+	};
++       int i;
++       unsigned long mask[BITS_TO_LONGS(cci_pmu->num_cntrs)];
 +
-+	if (WARN_ON(!user_mode(regs)))
-+		return;
++       memset(mask, 0, BITS_TO_LONGS(cci_pmu->num_cntrs) * sizeof(unsigned long));
 +
-+	preempt_disable();
-+	local_irq_enable();
-+	force_sig_info(SIGTRAP, &info, current);
-+	local_irq_disable();
-+	preempt_enable();
++       for_each_set_bit(i, cci_pmu->hw_events.used_mask, cci_pmu->num_cntrs) {
++               struct hw_perf_event *hwe;
++
++               if (!cci_pmu->hw_events.events[i]) {
++                       WARN_ON(1);
++                       continue;
++               }
++
++               hwe = &cci_pmu->hw_events.events[i]->hw;
++               /* Leave the events which are not counting */
++               if (hwe->state & PERF_HES_STOPPED)
++                       continue;
++               if (hwe->state & PERF_HES_ARCH) {
++                       set_bit(i, mask);
++                       hwe->state &= ~PERF_HES_ARCH;
++                       local64_set(&hwe->prev_count, CCI_CNTR_PERIOD);
++               }
++       }
++
++       pmu_write_counters(cci_pmu, mask, CCI_CNTR_PERIOD);
 +}
 +
- static int single_step_handler(unsigned long addr, unsigned int esr,
- 			       struct pt_regs *regs)
+ static void cci_pmu_enable(struct pmu *pmu)
  {
--	siginfo_t info;
+        struct cci_pmu *cci_pmu = to_cci_pmu(pmu);
+@@ -927,6 +961,7 @@ static void cci_pmu_enable(struct pmu *pmu)
+                return;
+
+        raw_spin_lock_irqsave(&hw_events->pmu_lock, flags);
++       cci_pmu_update_counters(cci_pmu);
+        __cci_pmu_enable();
+        raw_spin_unlock_irqrestore(&hw_events->pmu_lock, flags);
+
+@@ -980,8 +1015,11 @@ static void cci_pmu_start(struct perf_event *event, int pmu_flags)
+        /* Configure the counter unless you are counting a fixed event */
+        if (!pmu_fixed_hw_idx(cci_pmu, idx))
+                pmu_set_event(cci_pmu, idx, hwc->config_base);
 -
- 	/*
- 	 * If we are stepping a pending breakpoint, call the hw_breakpoint
- 	 * handler first.
-@@ -239,11 +257,7 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
- 		return 0;
- 
- 	if (user_mode(regs)) {
--		info.si_signo = SIGTRAP;
--		info.si_errno = 0;
--		info.si_code  = TRAP_HWBKPT;
--		info.si_addr  = (void __user *)instruction_pointer(regs);
--		force_sig_info(SIGTRAP, &info, current);
-+		send_user_sigtrap(TRAP_HWBKPT);
- 
- 		/*
- 		 * ptrace will disable single step unless explicitly
-@@ -307,17 +321,8 @@ static int call_break_hook(struct pt_regs *regs, unsigned int esr)
- static int brk_handler(unsigned long addr, unsigned int esr,
- 		       struct pt_regs *regs)
- {
--	siginfo_t info;
--
- 	if (user_mode(regs)) {
--		info = (siginfo_t) {
--			.si_signo = SIGTRAP,
--			.si_errno = 0,
--			.si_code  = TRAP_BRKPT,
--			.si_addr  = (void __user *)instruction_pointer(regs),
--		};
--
--		force_sig_info(SIGTRAP, &info, current);
-+		send_user_sigtrap(TRAP_BRKPT);
- 	} else if (call_break_hook(regs, esr) != DBG_HOOK_HANDLED) {
- 		pr_warning("Unexpected kernel BRK exception at EL1\n");
- 		return -EFAULT;
-@@ -328,7 +333,6 @@ static int brk_handler(unsigned long addr, unsigned int esr,
- 
- int aarch32_break_handler(struct pt_regs *regs)
- {
--	siginfo_t info;
- 	u32 arm_instr;
- 	u16 thumb_instr;
- 	bool bp = false;
-@@ -359,14 +363,7 @@ int aarch32_break_handler(struct pt_regs *regs)
- 	if (!bp)
- 		return -EFAULT;
- 
--	info = (siginfo_t) {
--		.si_signo = SIGTRAP,
--		.si_errno = 0,
--		.si_code  = TRAP_BRKPT,
--		.si_addr  = pc,
--	};
--
--	force_sig_info(SIGTRAP, &info, current);
-+	send_user_sigtrap(TRAP_BRKPT);
- 	return 0;
- }
- 
+-       pmu_event_set_period(event);
++       /*
++        * Mark this counter, so that we can program the
++        * counter with the event_period. see cci_pmu_enable()
++        */
++       hwc->state = PERF_HES_ARCH;
+        pmu_enable_counter(cci_pmu, idx);
+
+        raw_spin_unlock_irqrestore(&hw_events->pmu_lock, flags);
+--
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
