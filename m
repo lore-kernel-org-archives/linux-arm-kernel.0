@@ -1,67 +1,47 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Mon, 21 Dec 2015 17:39:47 +0100
-Subject: [PATCH 4/5] pinctrl: rockchip: add missing of_node_put
-In-Reply-To: <1450715988-4770-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1450715988-4770-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1450715988-4770-5-git-send-email-Julia.Lawall@lip6.fr>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Mon, 21 Dec 2015 18:58:50 +0200
+Subject: [PATCH 2/3] arm: dts: phy3250: add SD fixed regulator
+In-Reply-To: <5677F3DC.6070402@cogentembedded.com>
+References: <1450567932-22994-1-git-send-email-vz@mleia.com>
+ <1450567932-22994-3-git-send-email-vz@mleia.com>
+ <5677F3DC.6070402@cogentembedded.com>
+Message-ID: <56782FCA.2050504@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-for_each_child_of_node performs an of_node_get on each iteration, so a
-return from the loop requires an of_node_put.
+Hell Sergei,
 
-A simplified version of the semantic patch that fixes this problem is as
-follows (http://coccinelle.lip6.fr):
+On 21.12.2015 14:43, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 12/20/2015 2:32 AM, Vladimir Zapolskiy wrote:
+> 
+>> The change adds fixed voltage regulator for SD controller, ARM MMCI
+>> controller driver uses it to control card power management.
+>>
+>> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+>> ---
+>>   arch/arm/boot/dts/phy3250.dts | 10 ++++++++++
+>>   1 file changed, 10 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/phy3250.dts b/arch/arm/boot/dts/phy3250.dts
+>> index 34e15fd..5465b9e 100644
+>> --- a/arch/arm/boot/dts/phy3250.dts
+>> +++ b/arch/arm/boot/dts/phy3250.dts
+>> @@ -45,6 +45,15 @@
+>>   			enable-active-high;
+>>   			regulator-boot-on;
+>>   		};
+>> +
+>> +		sd_reg: fixed-regulator at 2 {
+> 
+>     Please just "regulator at 2", to comply with the ePAPR standard.
 
-// <smpl>
-@@
-local idexpression n;
-expression e,e1;
-@@
+thanks for review, just for my information, do I understand correctly
+that you reference to "Generic Names Recommendation" ?
 
- for_each_child_of_node(e1,n) {
-   ...
-(
-   of_node_put(n);
-|
-   e = n
-|
-   return n;
-|
-+  of_node_put(n);
-?  return ...;
-)
-   ...
- }
-// </smpl>
+I have no objection to generalize device tree node name as you
+suggested, will do it.
 
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-
----
- drivers/pinctrl/pinctrl-rockchip.c |    5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
-index 2b88a40..d0305a2 100644
---- a/drivers/pinctrl/pinctrl-rockchip.c
-+++ b/drivers/pinctrl/pinctrl-rockchip.c
-@@ -1258,8 +1258,10 @@ static int rockchip_pinctrl_parse_functions(struct device_node *np,
- 		func->groups[i] = child->name;
- 		grp = &info->groups[grp_index++];
- 		ret = rockchip_pinctrl_parse_groups(child, grp, info, i++);
--		if (ret)
-+		if (ret) {
-+			of_node_put(child);
- 			return ret;
-+		}
- 	}
- 
- 	return 0;
-@@ -1304,6 +1306,7 @@ static int rockchip_pinctrl_parse_dt(struct platform_device *pdev,
- 		ret = rockchip_pinctrl_parse_functions(child, info, i++);
- 		if (ret) {
- 			dev_err(&pdev->dev, "failed to parse function\n");
-+			of_node_put(child);
- 			return ret;
- 		}
- 	}
+With best wishes,
+Vladimir
