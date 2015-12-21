@@ -1,38 +1,31 @@
-From: v1ron@mail.ru (Roman Volkov)
-Date: Mon, 21 Dec 2015 11:29:16 +0300
-Subject: [PATCH 0/4] clocksource/vt8500: Fix hangs in small delays
-In-Reply-To: <1450650492-18996-1-git-send-email-v1ron@mail.ru>
-References: <1450650492-18996-1-git-send-email-v1ron@mail.ru>
-Message-ID: <20151221112916.40373d2f@anonymous>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 21 Dec 2015 09:42:17 +0100
+Subject: [PATCH] pinctrl: bcm/cygnys/iproc: fixup rebase issue
+Message-ID: <1450687337-16424-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 21 Dec 2015 01:28:08 +0300
-Roman Volkov <v1ron@mail.ru> wrote:
+Somehow this variable name screwed up in some rebase, fixed it.
 
-> From: Roman Volkov <rvolkov@v1ros.org>
-> 
-> vt8500 hangs in nanosleep() function, starting from commit
-> c6eb3f70d4482806dc2d3e1e3c7736f497b1d418, making the system unusable.
-> Per investigation, looks like set_next_event() now receives too small
-> delta and fails with -ETIME.
-> 
-> Google group discussion:
-> https://groups.google.com/forum/#!topic/vt8500-wm8505-linux-kernel/vDMF_mDOb1k
-> 
-> Roman Volkov (4):
->   clocksource/vt8500: Use [read\write]l_relaxed()
->   clocksource/vt8500: Remove the 'loops' variable
->   clocksource/vt8500: Use MIN_OSCR_DELTA from PXA
->   clocksource/vt8500: Add register R/W functions
-> 
->  drivers/clocksource/vt8500_timer.c | 98
-> +++++++++++++++++++++++++++----------- 1 file changed, 69
-> insertions(+), 29 deletions(-)
-> 
+Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>
+Reported-by: Pramod Kumar <pramodku@broadcom.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/bcm/pinctrl-iproc-gpio.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Please note that vt8500 maintainer (Tony Prisk) was silent in the last
-year. Any suggestions on this?
-
-Regards,
-Roman
+diff --git a/drivers/pinctrl/bcm/pinctrl-iproc-gpio.c b/drivers/pinctrl/bcm/pinctrl-iproc-gpio.c
+index 525ea138d9ca..314591a4609b 100644
+--- a/drivers/pinctrl/bcm/pinctrl-iproc-gpio.c
++++ b/drivers/pinctrl/bcm/pinctrl-iproc-gpio.c
+@@ -637,7 +637,7 @@ static int iproc_gpio_register_pinconf(struct iproc_gpio *chip)
+ 	return 0;
+ }
+ 
+-static void iproc_gpio_unregister_pinconf(struct cygnus_gpio *chip)
++static void iproc_gpio_unregister_pinconf(struct iproc_gpio *chip)
+ {
+ 	pinctrl_unregister(chip->pctl);
+ }
+-- 
+2.4.3
