@@ -1,41 +1,106 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 21 Dec 2015 15:10:31 +0100
-Subject: [PATCH V2 22/23] pci,
- acpi: Match PCI config space accessors against platfrom specific
- quirks.
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1EC14C0F@lhreml503-mbb>
-References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
- <1450278993-12664-23-git-send-email-tn@semihalf.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1EC14C0F@lhreml503-mbb>
-Message-ID: <201512211510.32029.arnd@arndb.de>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Mon, 21 Dec 2015 15:15:51 +0100
+Subject: [PATCH] gpmi-nand: Handle ECC Errors in erased pages
+Message-ID: <1450707351-9029-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 December 2015, Gabriele Paoloni wrote:
-> > -----Original Message-----
-> > From: linux-kernel-owner at vger.kernel.org [mailto:linux-kernel-
-> > owner at vger.kernel.org] On Behalf Of Tomasz Nowicki
+ECC is only calculated for written pages. As erased pages are not
+actively written the ECC is always invalid. For this purpose the
+Hardware BCH unit is able to check for erased pages and does not raise
+an ECC error in this case. This behaviour can be influenced using the
+BCH_MODE register which sets the number of allowed bitflips in an erased
+page. Unfortunately the unit is not capable of fixing the bitflips in
+memory.
 
-> > Some platforms may not be fully compliant with generic set of PCI
-> > config accessors. For these cases we implement the way to overwrite
-> > accessors set before PCI buses enumeration. Algorithm that overwrite
-> > accessors matches against platform ID (DMI), domain and bus number,
-> > hopefully enough for all cases. All quirks can be defined using:
-> > DECLARE_ACPI_MCFG_FIXUP() and keep self contained.
-> 
-> I've got a couple of comments/questions about this patch..
-> 
-> 1) So according to this mechanism quirks would be supported only by 
->    vendors whose BIOS are SMBIOS compliant. Now personally I am ok
->    with this but I don't know if this is OK in general as it would 
->    narrow down the number of platforms that would be able to define
->    the quirks...
->    Lorenzo, Arnd what is your opinion here?
+To avoid complete software checks for erased pages, we can simply check
+buffers with uncorrectable ECC errors because we know that any erased
+page with errors is uncorrectable by the BCH unit.
 
-I'd rather not see the quirks in mainline at all, and only support
-SBSA compliant machines, or require the BIOS to work around the hardware
-quirks differently (e.g. by trapping config space access through secure
-firmware, or going through an AML method to be defined). I'm certainly
-ok with making it depend on SMBIOS if we are going to use something like this.
+This patch adds the generic nand_check_erased_ecc_chunk() to gpmi-nand
+to correct erased pages. To have the valid data in the buffer before
+using them, this patch moves the read_page_swap_end() call before the
+ECC status checking for-loop.
 
-	Arnd
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 49 ++++++++++++++++++++++++++++++----
+ 1 file changed, 44 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+index 2064adac1d17..51ad1c500e9c 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+@@ -1035,14 +1035,58 @@ static int gpmi_ecc_read_page(struct mtd_info *mtd, struct nand_chip *chip,
+ 	/* Loop over status bytes, accumulating ECC status. */
+ 	status = auxiliary_virt + nfc_geo->auxiliary_status_offset;
+ 
++	read_page_swap_end(this, buf, nfc_geo->payload_size,
++			   this->payload_virt, this->payload_phys,
++			   nfc_geo->payload_size,
++			   payload_virt, payload_phys);
++
+ 	for (i = 0; i < nfc_geo->ecc_chunk_count; i++, status++) {
+ 		if ((*status == STATUS_GOOD) || (*status == STATUS_ERASED))
+ 			continue;
+ 
+ 		if (*status == STATUS_UNCORRECTABLE) {
++			int flips;
++
++			/*
++			 * The ECC hardware has an uncorrectable ECC status
++			 * code in case we have bitflips in an erased page. As
++			 * nothing was written into this subpage the ECC is
++			 * obviously wrong and we can not trust it. We assume
++			 * at this point that we are reading an erased page and
++			 * try to correct the bitflips in buffer up to
++			 * ecc_strength bitflips. If this is a page with random
++			 * data, we exceed this number of bitflips and have a
++			 * ECC failure. Otherwise we use the corrected buffer.
++			 */
++			if (i == 0) {
++				/* The first block includes metadata */
++				flips = nand_check_erased_ecc_chunk(
++						buf + i * nfc_geo->ecc_chunk_size,
++						nfc_geo->ecc_chunk_size,
++						NULL, 0,
++						auxiliary_virt,
++						nfc_geo->metadata_size,
++						nfc_geo->ecc_strength);
++			} else {
++				flips = nand_check_erased_ecc_chunk(
++						buf + i * nfc_geo->ecc_chunk_size,
++						nfc_geo->ecc_chunk_size,
++						NULL, 0,
++						NULL, 0,
++						nfc_geo->ecc_strength);
++			}
++
++			if (flips > 0) {
++				max_bitflips = max_t(unsigned int, max_bitflips,
++						     flips);
++				mtd->ecc_stats.corrected += flips;
++				continue;
++			}
++
+ 			mtd->ecc_stats.failed++;
+ 			continue;
+ 		}
++
+ 		mtd->ecc_stats.corrected += *status;
+ 		max_bitflips = max_t(unsigned int, max_bitflips, *status);
+ 	}
+@@ -1062,11 +1106,6 @@ static int gpmi_ecc_read_page(struct mtd_info *mtd, struct nand_chip *chip,
+ 		chip->oob_poi[0] = ((uint8_t *) auxiliary_virt)[0];
+ 	}
+ 
+-	read_page_swap_end(this, buf, nfc_geo->payload_size,
+-			this->payload_virt, this->payload_phys,
+-			nfc_geo->payload_size,
+-			payload_virt, payload_phys);
+-
+ 	return max_bitflips;
+ }
+ 
+-- 
+2.6.2
