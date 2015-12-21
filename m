@@ -1,65 +1,84 @@
-From: graeme.gregory@linaro.org (G Gregory)
-Date: Mon, 21 Dec 2015 21:02:34 +0000
-Subject: [PATCH v2 3/3] serial: amba-pl011: add ACPI support to AMBA probe
-In-Reply-To: <CAHp75VcLGTMemaDyezgtxjtPa+tEUGm8ULJE8feY8FX4FEqU6g@mail.gmail.com>
-References: <1450709399-7246-1-git-send-email-aleksey.makarov@linaro.org>
- <1450709399-7246-4-git-send-email-aleksey.makarov@linaro.org>
- <CAHp75VcLGTMemaDyezgtxjtPa+tEUGm8ULJE8feY8FX4FEqU6g@mail.gmail.com>
-Message-ID: <CAGCh1+mVXSPPPuFOC-F+JMvd2NUNgwKg_rThYS=VyLDT3jSyug@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 21 Dec 2015 13:06:34 -0800
+Subject: [GIT PULL 1/4] omap soc changes for v4.5 merge window
+Message-ID: <pull-1450731519-787330>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 December 2015 at 18:11, Andy Shevchenko <andy.shevchenko@gmail.com> wrote:
-> On Mon, Dec 21, 2015 at 4:49 PM, Aleksey Makarov
-> <aleksey.makarov@linaro.org> wrote:
->> From: Graeme Gregory <graeme.gregory@linaro.org>
->>
->> In ACPI this device is only defined in SBSA mode so
->> if we are coming from ACPI use this mode.
->>
->> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
->> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
->> ---
->>  drivers/tty/serial/amba-pl011.c | 37 ++++++++++++++++++++++++++-----------
->>  1 file changed, 26 insertions(+), 11 deletions(-)
->>
->> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
->> index 899a771..766ce4f 100644
->> --- a/drivers/tty/serial/amba-pl011.c
->> +++ b/drivers/tty/serial/amba-pl011.c
->> @@ -2368,18 +2368,33 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
->>         if (!uap)
->>                 return -ENOMEM;
->>
->> -       uap->clk = devm_clk_get(&dev->dev, NULL);
->> -       if (IS_ERR(uap->clk))
->> -               return PTR_ERR(uap->clk);
->> -
->> -       uap->vendor = vendor;
->> -       uap->lcrh_rx = vendor->lcrh_rx;
->> -       uap->lcrh_tx = vendor->lcrh_tx;
->> -       uap->fifosize = vendor->get_fifosize(dev);
->> -       uap->port.irq = dev->irq[0];
->> -       uap->port.ops = &amba_pl011_pops;
->> +       /* ACPI only defines SBSA variant */
->> +       if (ACPI_COMPANION(&dev->dev)) {
->
-> has_acpi_companion()
->
->> +               /*
->> +                * According to ARM ARMH0011 is currently the only mapping
->> +                * of pl011 in ACPI and it's mapped to SBSA UART mode
->> +                */
->> +               uap->vendor     = &vendor_sbsa;
->> +               uap->fifosize   = 32;
->> +               uap->port.ops   = &sbsa_uart_pops;
->> +               uap->fixed_baud = 115200;
->
-> Shouldn't you match by ID and provide the custom values if any?
-> On the other hand have you checked if it's possible to use _DSD in this case?
->
-So far I have not seen any use of SBSA UART other than this in real
-life. I am a little opposed to providing complexity people are not
-going to use.
+The following changes since commit 1ec218373b8ebda821aec00bb156a9c94fad9cd4:
 
-Graeme
+  Linux 4.4-rc2 (2015-11-22 16:45:59 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.5/soc-initcall
+
+for you to fetch changes up to f2e6a0a913b53f5af87c7e9a783ceae5bb4ae2c4:
+
+  ARM: OMAP2+: Remove device creation for omap-pcm-audio (2015-12-17 10:34:41 -0800)
+
+----------------------------------------------------------------
+SoC changes for omaps for v4.5 merge window. The main change here is to
+change the omap initcall levels a bit to initialize things later to allow
+early device drivers at core_initcall level. This makes things easier
+for us as most clocks can be made into regular device drivers except for
+a few early clocks needed to initialize system timers. I wanted to have
+these changes sit in Linux next for a few weeks before sending out a pull
+request, and so far now issues have showed up.
+
+The other changes in this series are timer changes for making use of the
+new PWM driver, and timer changes to support more high security SoCs.
+Also few minor improvments for module autoidle settings for ti81xx spinbox
+and dra7 debug on uart4 in hwmod code. The rest is pretty much just removal
+of platform data for SoCs that are all device tree only nowadays.
+
+----------------------------------------------------------------
+Aaro Koskinen (1):
+      ARM: OMAP: RX-51: fix a typo in log writing
+
+Franklin S Cooper Jr (1):
+      ARM: omap4: hwmod: Remove elm address space from hwmod data
+
+J.D. Schroeder (1):
+      ARM: DRA7: hwmod: Enable DEBUG_LL for UART4
+
+Neil Armstrong (3):
+      ARM: OMAP: dmtimer: Add clock source from DT
+      ARM: OMAP: add DT support for ti,dm816-timer
+      ARM: OMAP2+: Add hwmod spinbox support for dm816x
+
+Peter Ujfalusi (2):
+      ARM: OMAP1: Remove device creation for omap-pcm-audio
+      ARM: OMAP2+: Remove device creation for omap-pcm-audio
+
+Suman Anna (6):
+      ARM: OMAP2+: Remove legacy device instantiation of IOMMUs
+      ARM: OMAP3: hwmod data: Remove legacy IOMMU data
+      ARM: OMAP4: hwmod data: Remove legacy IOMMU attr and addrs
+      ARM: OMAP2+: Remove omap_mmu_dev_attr structure
+      ARM: OMAP: dmtimer: check for fixed timers during config
+      ARM: OMAP2+: timer: Remove secure timer for DRA7xx HS devices
+
+Tony Lindgren (2):
+      ARM: OMAP2+: Change core_initcall levels to postcore_initcall
+      Merge branch 'omap-for-v4.5/initcall' into omap-for-v4.5/soc-v2
+
+ arch/arm/mach-omap1/devices.c                | 19 --------
+ arch/arm/mach-omap2/Makefile                 |  2 -
+ arch/arm/mach-omap2/board-rx51-peripherals.c |  2 +-
+ arch/arm/mach-omap2/devices.c                | 25 ++---------
+ arch/arm/mach-omap2/omap-iommu.c             | 66 ----------------------------
+ arch/arm/mach-omap2/omap2-restart.c          |  2 +-
+ arch/arm/mach-omap2/omap_device.c            |  2 +-
+ arch/arm/mach-omap2/omap_hwmod.c             |  2 +-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c   | 42 ------------------
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c   | 41 -----------------
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c    |  2 +-
+ arch/arm/mach-omap2/omap_hwmod_81xx_data.c   | 35 +++++++++++++++
+ arch/arm/mach-omap2/pdata-quirks.c           |  2 +-
+ arch/arm/mach-omap2/serial.c                 |  2 +-
+ arch/arm/mach-omap2/timer.c                  |  6 +--
+ arch/arm/plat-omap/dmtimer.c                 | 42 +++++++++++++++++-
+ include/linux/platform_data/iommu-omap.h     |  9 ----
+ 17 files changed, 90 insertions(+), 211 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/omap-iommu.c
