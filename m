@@ -1,59 +1,44 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 21 Dec 2015 17:09:51 +0000
-Subject: [PATCH v5] arm64: run-time detection for aarch32 support
-In-Reply-To: <1450673050-12101-1-git-send-email-ynorov@caviumnetworks.com>
-References: <1450673050-12101-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <20151221170951.GA24894@e104818-lin.cambridge.arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 21 Dec 2015 09:18:42 -0800
+Subject: [PATCH] ARM: multi_v7_defconfig: enable TPS65217 regulator
+In-Reply-To: <20151221102408.GA4339@afzalpc>
+References: <1447225753-2788-1-git-send-email-afzal.mohd.ma@gmail.com>
+ <20151220184453.GB32594@localhost> <20151221102408.GA4339@afzalpc>
+Message-ID: <CAOesGMiA2+e2xNzuQyAXUkSHkGbTdGZMKF982=Py35wtxosECw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 21, 2015 at 07:44:10AM +0300, Yury Norov wrote:
-> Kernel option COMPAT defines the ability of executing aarch32 binaries.
-> Some platforms does not support aarch32 mode, and so cannot execute that
-> binaries. But we cannot just disable COMPAT for them because the same
-> kernel binary may be used by multiple platforms.
-> 
-> In this patch, system_supports_aarch32_el0() is introduced to detect
-> aarch32 support at run-time.
-> 
-> v4: use new CPU Feature API.
-> v5: use cpuid_feature_extract_field.
-> 
-> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-> ---
->  arch/arm64/include/asm/cpufeature.h | 7 +++++++
->  arch/arm64/include/asm/elf.h        | 6 ++++--
->  2 files changed, 11 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> index 8f271b8..bcb0dbe 100644
-> --- a/arch/arm64/include/asm/cpufeature.h
-> +++ b/arch/arm64/include/asm/cpufeature.h
-> @@ -184,6 +184,13 @@ static inline bool system_supports_mixed_endian_el0(void)
->  	return id_aa64mmfr0_mixed_endian_el0(read_system_reg(SYS_ID_AA64MMFR0_EL1));
->  }
->  
-> +static inline bool system_supports_aarch32_el0(void)
-> +{
-> +	u64 pfr0 = read_system_reg(SYS_ID_AA64PFR0_EL1);
-> +	return cpuid_feature_extract_field(pfr0, ID_AA64PFR0_EL0_SHIFT)
-> +						!= ID_AA64PFR0_EL0_64BIT_ONLY;
-> +}
+Hi,
 
-Suzuki already suggested to hook this into the existing arm64_features[]
-array:
+On Mon, Dec 21, 2015 at 2:24 AM, Afzal Mohammed <afzal.mohd.ma@gmail.com> wrote:
+> Hi Olof,
+>
+> On Sun, Dec 20, 2015 at 10:44:53AM -0800, Olof Johansson wrote:
+>> On Wed, Nov 11, 2015 at 12:39:13PM +0530, Afzal Mohammed wrote:
+>
+>> > Enable TPS65217 regulator to have rootfs in MMC for Beagle Bone's.
+>> >
+>> > Suggested-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> > Signed-off-by: Afzal Mohammed <afzal.mohd.ma@gmail.com>
+>
+>> Applied, thanks.
+>
+> Would it be possible to consider the similar patch [1] from Nishant
+> Menon instead of this patch ?, though i am not satisfied with the
+> changelog in his, i.e. regarding mention that it is required only for
+> older Beagle Bones. He has sent the initial version of it (identical in
+> diff) before mine.
+>
+> Sorry for the trouble and Thanks.
 
-http://lkml.kernel.org/g/56748437.2040905 at arm.com
+So the diff is the same, his is sent before yours but you're unhappy
+with his commit message? Sounds like we're better off using yours, and
+either way the code is the same.
 
-> +#define compat_elf_check_arch(x)	(system_supports_aarch32_el0()	\
-> +					 && ((x)->e_machine == EM_ARM)	\
-> +					 && ((x)->e_flags & EF_ARM_EABI_MASK))
+I'll keep it the way it is -- it's not worth the work to rewind the
+branch and break our downstream developers if there are any.
 
-And here use something like cpus_have_cap(ARM64_HAS_32BIT_EL0).
 
-And a nitpick: please use the same convention for placing the "&&"
-operator like in the rest of the file, i.e. on the previous line
-(similarly for "!=" etc.)
+Regards,
 
--- 
-Catalin
+-Olof
