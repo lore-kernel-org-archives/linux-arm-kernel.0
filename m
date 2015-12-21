@@ -1,151 +1,89 @@
-From: v1ron@mail.ru (Roman Volkov)
-Date: Mon, 21 Dec 2015 23:33:59 +0300
-Subject: [PATCH 0/4] clocksource/vt8500: Fix hangs in small delays
-In-Reply-To: <20151221112916.40373d2f@anonymous>
-References: <1450650492-18996-1-git-send-email-v1ron@mail.ru>
- <20151221112916.40373d2f@anonymous>
-Message-ID: <20151221233359.268fe6da@anonymous>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 21 Dec 2015 12:54:19 -0800
+Subject: [GIT PULL] few minor omap fixes against v4.4-rc6
+Message-ID: <20151221205418.GD2793@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Roman Volkov <v1ron <at> mail.ru> writes:
-> 
-> > 
-> > From: Roman Volkov <rvolkov <at> v1ros.org>
-> > 
-> > vt8500 timer requires special synchronization for accessing some of
-> > its registers. Define special read and write functions to handle
-> > this process transparently.
-> 
-> Maybe introduce such accessor functions (conditionally) into the PXA
-> driver and kill this one altogether then?
+The following changes since commit 14054fb1da099fd89208b8b319a00e0b902c7645:
 
-I don't think maintainers will accept a lot of #ifdefs. I have an idea
-to move the common code from the PXA to something like pxa_common.c
-(can we give the correct name for it?) and include it from the
-vt8500_timer.c and pxa_timer.c.
+  ARM: dts: am4372: fix clock source for arm twd and global timers (2015-12-09 16:46:25 -0800)
 
-> If I understood you right, this extra bus synchronization is the only
-> thing that makes vt8500 different from PXA, so merging the two files
-> right away might be a better long-term option.
+are available in the git repository at:
 
-Sure. But lets make the vt8500 working at this step.
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.4/fixes-rc6
 
-> > To perform a read from the Timer Count register, user must write a
-> > one to the Timer Control register and wait for completion flag by
-> > polling the Timer Read Count Active bit.
-> > 
-> > To perform a write to the Count or Match registers, user must poll
-> > the write completion flag for the corresponding register to ensure
-> > that the previous write completed and then write the actual value.
-> > 
-> > Signed-off-by: Roman Volkov <rvolkov <at> v1ros.org>
-> > ---
-> >  drivers/clocksource/vt8500_timer.c | 90
-> +++++++++++++++++++++++++++-----------
-> >  1 file changed, 65 insertions(+), 25 deletions(-)
-> 
-> > diff --git a/drivers/clocksource/vt8500_timer.c
-> b/drivers/clocksource/vt8500_timer.c
-> > index 7649852..4d7513f 100644
-> > --- a/drivers/clocksource/vt8500_timer.c
-> > +++ b/drivers/clocksource/vt8500_timer.c
-> >  <at>  <at>  -38,36 +38,75  <at>  <at> 
-> > 
-> >  #define VT8500_TIMER_OFFSET	0x0100
-> >  #define VT8500_TIMER_HZ		3000000
-> > -#define TIMER_MATCH_VAL		0x0000
-> > +#define TIMER_MATCH0_VAL	0
-> > +#define TIMER_MATCH1_VAL	0x04
-> > +#define TIMER_MATCH2_VAL	0x08
-> > +#define TIMER_MATCH3_VAL	0x0c
-> >  #define TIMER_COUNT_VAL		0x0010
-> >  #define TIMER_STATUS_VAL	0x0014
-> >  #define TIMER_IER_VAL		0x001c		/*
-> > interrupt enable */ #define TIMER_CTRL_VAL		0x0020
-> >  #define TIMER_AS_VAL		0x0024		/*
-> > access status */ -#define TIMER_COUNT_R_ACTIVE	(1 <<
-> > 5)	/* not ready for read */ -#define
-> > TIMER_COUNT_W_ACTIVE	(1 << 4)	/* not ready for write
-> > */ -#define TIMER_MATCH_W_ACTIVE	(1 << 0)	/* not
-> > ready for write */ - -#define timer_readl(addr)
-> > readl_relaxed(regbase + addr) -#define timer_writel(v, addr)
-> > writel_relaxed(v, regbase + addr) +/* R/W status flags */
-> > +#define TIMER_COUNT_R_ACTIVE	(1 << 5)
-> > +#define TIMER_COUNT_W_ACTIVE	(1 << 4)
-> > +#define TIMER_MATCH3_W_ACTIVE	(1 << 3)
-> > +#define TIMER_MATCH2_W_ACTIVE	(1 << 2)
-> > +#define TIMER_MATCH1_W_ACTIVE	(1 << 1)
-> > +#define TIMER_MATCH0_W_ACTIVE	(1 << 0)
-> > +
-> > +#define vt8500_timer_sync(bit)	{ while (readl_relaxed \
-> > +				    (regbase + TIMER_AS_VAL) &
-> > bit) \
-> > +					cpu_relax(); }
-> 
-> The whole issue around 'loops' counter in these busy waits basically
-> boils down to whether we would like a way to try and recover from a
-> potential hardware misbehavior.
-> 
-> You can of course argue that when the system timer misbehaves you
-> already have bigger issues to worry about, but does a 10 msec limit
-> that was in the original version really hurt?
+for you to fetch changes up to 0b4d6972d7b052b23d33ff9bdbb52958664fbb26:
 
-If we do the merging work with PXA, this code will go away. Have this
-variable already fixed some _real_ problem? Otherwise this is excessive
-coding.
+  ARM: dts: Fix UART wakeirq for omap4 duovero parlor (2015-12-18 16:43:22 -0800)
 
-> >  #define MIN_OSCR_DELTA		16
-> > 
-> >  static void __iomem *regbase;
-> > 
-> > -static cycle_t vt8500_timer_read(struct clocksource *cs)
-> > +static void vt8500_timer_write(unsigned long reg, u32 value)
-> 
-> Maybe define this with 'value' first, 'reg' second - to be in line
-> with the common prototype of writel and such?
+----------------------------------------------------------------
+Few fixes for omaps to allow am437x only builds to boot properly with
+CPU_IDLE and ARM TWD timer. This is probably a common configuration setup
+for people making products with these SoCs so let's make sure it works.
 
-Oh my right-handed habits :)
+Also a wakeirq fix for duovero parlor making my life a bit easier as that
+allows me to run basic PM regression tests on it.
 
-> Plus if you could take the same name for the macro above
-> (timer_writel) and this accessor (vt8500_timer_write) that would
-> somewhat reduce extra additions/deletions in this patch. Same for the
-> read function.
+It would be nice to have these in v4.4, but if it gets too late for that
+because of the holidays, it is not super critical if these get merged for
+v4.5.
 
-When we perform our merging work, we have to use the following glue:
-...
-vt8500_timer_read { ... }
-#define timer_read(reg)	vt8500_timer_read(reg)
-...
-#include pxa_common.c
+----------------------------------------------------------------
+Felipe Balbi (1):
+      ARM: OMAP2+: AM43xx: select ARM TWD timer
 
-> <skip>
-> 
-> >  <at>  <at>  -75,23 +114,24  <at>  <at>  static struct clocksource
-> clocksource = {
-> >  static int vt8500_timer_set_next_event(unsigned long cycles,
-> >  				    struct clock_event_device *evt)
-> >  {
-> > -	cycle_t alarm = clocksource.read(&clocksource) + cycles;
-> > -	while (timer_readl(TIMER_AS_VAL) & TIMER_MATCH_W_ACTIVE)
-> > -		cpu_relax();
-> > -	timer_writel((unsigned long)alarm, TIMER_MATCH_VAL);
-> > +	unsigned long alarm = vt8500_timer_read(TIMER_COUNT_VAL) +
-> > cycles;
-> 
-> I personally like the form above better (via clocksource.read) - even
-> if just for the fact that it's shorter and reduces the number of
-> places where we use TIMER_COUNT_VAL definition.
-> 
-> Any specific reasons to rewrite it?
+Grygorii Strashko (1):
+      ARM: OMAP2+: am43xx: enable GENERIC_CLOCKEVENTS_BROADCAST
 
-To avoid calculation of the 64-bit cycle_t and remove type casts.
+Tony Lindgren (1):
+      ARM: dts: Fix UART wakeirq for omap4 duovero parlor
 
-> > -	if ((signed)(alarm - clocksource.read(&clocksource)) <=
-> > MIN_OSCR_DELTA)
-> > +	vt8500_timer_write(TIMER_MATCH0_VAL, alarm);
-> > +	if ((signed)(alarm - vt8500_timer_read(
-> > +				TIMER_COUNT_VAL)) <=
-> > MIN_OSCR_DELTA) {
-> 
-> Same here.
+ arch/arm/boot/dts/omap4-duovero-parlor.dts | 4 ++++
+ arch/arm/mach-omap2/Kconfig                | 2 ++
+ arch/arm/mach-omap2/timer.c                | 6 ++++++
+ 3 files changed, 12 insertions(+)
+
+---
+diff --git a/arch/arm/boot/dts/omap4-duovero-parlor.dts b/arch/arm/boot/dts/omap4-duovero-parlor.dts
+index 1a78f01..b75f7b2 100644
+--- a/arch/arm/boot/dts/omap4-duovero-parlor.dts
++++ b/arch/arm/boot/dts/omap4-duovero-parlor.dts
+@@ -189,3 +189,7 @@
+ 	};
+ };
+ 
++&uart3 {
++	interrupts-extended = <&wakeupgen GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH
++			       &omap4_pmx_core OMAP4_UART3_RX>;
++};
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index 4b4371d..0517f0c 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -65,6 +65,8 @@ config SOC_AM43XX
+ 	select MACH_OMAP_GENERIC
+ 	select MIGHT_HAVE_CACHE_L2X0
+ 	select HAVE_ARM_SCU
++	select GENERIC_CLOCKEVENTS_BROADCAST
++	select HAVE_ARM_TWD
+ 
+ config SOC_DRA7XX
+ 	bool "TI DRA7XX"
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index b18ebbe..f86692d 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -320,6 +320,12 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+ 	return r;
+ }
+ 
++#if !defined(CONFIG_SMP) && defined(CONFIG_GENERIC_CLOCKEVENTS_BROADCAST)
++void tick_broadcast(const struct cpumask *mask)
++{
++}
++#endif
++
+ static void __init omap2_gp_clockevent_init(int gptimer_id,
+ 						const char *fck_source,
+ 						const char *property)
