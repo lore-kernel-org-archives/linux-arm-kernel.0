@@ -1,127 +1,169 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 21 Dec 2015 10:55:29 +0000
-Subject: [PATCH v4 05/12] arm-cci: PMU: Add support for transactions
-In-Reply-To: <20151218114751.GP6344@twins.programming.kicks-ass.net>
-References: <1450374559-23315-1-git-send-email-suzuki.poulose@arm.com>
- <1450374559-23315-6-git-send-email-suzuki.poulose@arm.com>
- <20151217184255.GI6344@twins.programming.kicks-ass.net>
- <5673DFC7.6060406@arm.com>
- <20151218104234.GN6344@twins.programming.kicks-ass.net>
- <5673E6C9.7040304@arm.com>
- <20151218114751.GP6344@twins.programming.kicks-ass.net>
-Message-ID: <20151221105528.GA19617@e106634-lin.cambridge.arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 21 Dec 2015 11:14:55 +0000
+Subject: [PATCH v6] arm/arm64: add arm-smccc
+In-Reply-To: <1449667495-23091-1-git-send-email-jens.wiklander@linaro.org>
+References: <1449667495-23091-1-git-send-email-jens.wiklander@linaro.org>
+Message-ID: <20151221111455.GA11145@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 12:47:51PM +0100, Peter Zijlstra wrote:
-> On Fri, Dec 18, 2015 at 10:58:17AM +0000, Suzuki K. Poulose wrote:
->
-> > We have a global Enable/Disable for CCI PMU and thats what we use
-> > currently. To be able to reprogram the counters with the event period
-> > (we program the counter with a specific count in pmu::start() and at
-> > overflow irq handler, not to be confused with the sampling period, which
-> > is not supported), we need to be sure that the counter value has been updated.
-> >
-> > May be we could check the event->hw->state to see if we need to reprogram it.
->
-> Right, have a look at arch/x86/kernel/cpu/perf_event.c:x86_pmu_enable()
->
+On Wed, Dec 09, 2015 at 02:24:55PM +0100, Jens Wiklander wrote:
+> Adds helpers to do SMC and HVC based on ARM SMC Calling Convention.
+> CONFIG_HAVE_ARM_SMCCC is enabled for architectures that may support the
+> SMC or HVC instruction. It's the responsibility of the caller to know if
+> the SMC instruction is supported by the platform.
+> 
+> This patch doesn't provide an implementation of the declared functions.
+> Later patches will bring in implementations and set
+> CONFIG_HAVE_ARM_SMCCC for ARM and ARM64 respectively.
+> 
+> Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+> ---
+> 
+> v6:
+> * Move HAVE_ARM_SMCCC from init/Kconfig
+> 
+>  arch/Kconfig              |  3 ++
+>  include/linux/arm-smccc.h | 98 +++++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 101 insertions(+)
+>  create mode 100644 include/linux/arm-smccc.h
+> 
+> diff --git a/arch/Kconfig b/arch/Kconfig
+> index 4e949e5..ce3c0b0 100644
+> --- a/arch/Kconfig
+> +++ b/arch/Kconfig
+> @@ -564,4 +564,7 @@ config OLD_SIGACTION
+>  config COMPAT_OLD_SIGACTION
+>  	bool
+>  
+> +config HAVE_ARM_SMCCC
+> +	bool
 
-Thanks for that hint. Here is what I cam up with. We don't reschedule
-the events, all we need to do is group the writes to the counters. Hence
-we could as well add a flag for those events which need programming
-and perform the write in pmu::pmu_enable().
+It is ok by me to move it there, probably we do not want it at the end of
+the "ABI hall of shame" list :)
 
+Or drivers/firmware/Kconfig ?
 
-----8>-----
+Strictly speaking, since PSCI uses this by default, you should also
+enforce an ARM_PSCI_FW dependency on HAVE_ARM_SMCCC.
 
+>  source "kernel/gcov/Kconfig"
+> diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
+> new file mode 100644
+> index 0000000..dea68a9
+> --- /dev/null
+> +++ b/include/linux/arm-smccc.h
+> @@ -0,0 +1,98 @@
+> +/*
+> + * Copyright (c) 2015, Linaro Limited
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + */
+> +#ifndef __LINUX_ARM_SMCCC_H
+> +#define __LINUX_ARM_SMCCC_H
+> +
+> +#include <linux/types.h>
+> +#include <linux/linkage.h>
 
-arm-cci PMU: Delay counter writes to pmu_enable
+Nit: alphabetical order please.
 
-Delay setting the event periods for enabled events to pmu::pmu_enable().
-We mark the event.hw->state PERF_HES_ARCH for the events that we know
-have their counts recorded and have been started. Since we reprogram the
-counters every time before count, we can set the counters for all the
-event counters which are !STOPPED && ARCH.
+> +
+> +/*
+> + * This file provides common defines for ARM SMC Calling Convention as
+> + * specified in
+> + * http://infocenter.arm.com/help/topic/com.arm.doc.den0028a/index.html
+> + */
+> +
+> +#define ARM_SMCCC_SMC_32		(0 << 30)
+> +#define ARM_SMCCC_SMC_64		(1 << 30)
+> +#define ARM_SMCCC_FAST_CALL		(1 << 31)
+> +#define ARM_SMCCC_STD_CALL		(0 << 31)
+> +
+> +#define ARM_SMCCC_OWNER_MASK		0x3F
+> +#define ARM_SMCCC_OWNER_SHIFT		24
+> +
+> +#define ARM_SMCCC_FUNC_MASK		0xFFFF
+> +
+> +#define ARM_SMCCC_IS_FAST_CALL(smc_val)	((smc_val) & ARM_SMCCC_FAST_CALL)
+> +#define ARM_SMCCC_IS_64(smc_val)	((smc_val) & ARM_SMCCC_SMC_64)
+> +#define ARM_SMCCC_FUNC_NUM(smc_val)	((smc_val) & ARM_SMCCC_FUNC_MASK)
+> +#define ARM_SMCCC_OWNER_NUM(smc_val) \
+> +	(((smc_val) >> ARM_SMCCC_OWNER_SHIFT) & ARM_SMCCC_OWNER_MASK)
+> +
+> +#define ARM_SMCCC_CALL_VAL(type, calling_convention, owner, func_num) \
+> +	((type) | (calling_convention) | \
 
-Grouping the writes to counters can ammortise the cost of the operation
-on PMUs where it is expensive (e.g, CCI-500).
+Nit: if you use a shift macro for some fields it would be clearer if you use
+for all of them (I am referring to type/calling_convention here), it can
+be changed later.
 
+Other than that:
 
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Punit Agrawal <punit.agrawal@arm.com>
-Cc: peterz at infradead.org
-Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
----
- drivers/bus/arm-cci.c |   42 ++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 40 insertions(+), 2 deletions(-)
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-index 0189f3a..c768ee4 100644
---- a/drivers/bus/arm-cci.c
-+++ b/drivers/bus/arm-cci.c
-@@ -916,6 +916,40 @@ static void hw_perf_event_destroy(struct perf_event *event)
-        }
- }
-
-+/*
-+ * Program the CCI PMU counters which have PERF_HES_ARCH set
-+ * with the event period and mark them ready before we enable
-+ * PMU.
-+ */
-+void cci_pmu_update_counters(struct cci_pmu *cci_pmu)
-+{
-+       int i;
-+       unsigned long mask[BITS_TO_LONGS(cci_pmu->num_cntrs)];
-+
-+       memset(mask, 0, BITS_TO_LONGS(cci_pmu->num_cntrs) * sizeof(unsigned long));
-+
-+       for_each_set_bit(i, cci_pmu->hw_events.used_mask, cci_pmu->num_cntrs) {
-+               struct hw_perf_event *hwe;
-+
-+               if (!cci_pmu->hw_events.events[i]) {
-+                       WARN_ON(1);
-+                       continue;
-+               }
-+
-+               hwe = &cci_pmu->hw_events.events[i]->hw;
-+               /* Leave the events which are not counting */
-+               if (hwe->state & PERF_HES_STOPPED)
-+                       continue;
-+               if (hwe->state & PERF_HES_ARCH) {
-+                       set_bit(i, mask);
-+                       hwe->state &= ~PERF_HES_ARCH;
-+                       local64_set(&hwe->prev_count, CCI_CNTR_PERIOD);
-+               }
-+       }
-+
-+       pmu_write_counters(cci_pmu, mask, CCI_CNTR_PERIOD);
-+}
-+
- static void cci_pmu_enable(struct pmu *pmu)
- {
-        struct cci_pmu *cci_pmu = to_cci_pmu(pmu);
-@@ -927,6 +961,7 @@ static void cci_pmu_enable(struct pmu *pmu)
-                return;
-
-        raw_spin_lock_irqsave(&hw_events->pmu_lock, flags);
-+       cci_pmu_update_counters(cci_pmu);
-        __cci_pmu_enable();
-        raw_spin_unlock_irqrestore(&hw_events->pmu_lock, flags);
-
-@@ -980,8 +1015,11 @@ static void cci_pmu_start(struct perf_event *event, int pmu_flags)
-        /* Configure the counter unless you are counting a fixed event */
-        if (!pmu_fixed_hw_idx(cci_pmu, idx))
-                pmu_set_event(cci_pmu, idx, hwc->config_base);
--
--       pmu_event_set_period(event);
-+       /*
-+        * Mark this counter, so that we can program the
-+        * counter with the event_period. see cci_pmu_enable()
-+        */
-+       hwc->state = PERF_HES_ARCH;
-        pmu_enable_counter(cci_pmu, idx);
-
-        raw_spin_unlock_irqrestore(&hw_events->pmu_lock, flags);
---
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+> +	(((owner) & ARM_SMCCC_OWNER_MASK) << ARM_SMCCC_OWNER_SHIFT) | \
+> +	((func_num) & ARM_SMCCC_FUNC_MASK))
+> +
+> +#define ARM_SMCCC_OWNER_ARCH		0
+> +#define ARM_SMCCC_OWNER_CPU		1
+> +#define ARM_SMCCC_OWNER_SIP		2
+> +#define ARM_SMCCC_OWNER_OEM		3
+> +#define ARM_SMCCC_OWNER_STANDARD	4
+> +#define ARM_SMCCC_OWNER_TRUSTED_APP	48
+> +#define ARM_SMCCC_OWNER_TRUSTED_APP_END	49
+> +#define ARM_SMCCC_OWNER_TRUSTED_OS	50
+> +#define ARM_SMCCC_OWNER_TRUSTED_OS_END	63
+> +
+> +/**
+> + * struct arm_smccc_res - Result from SMC/HVC call
+> + * @a0-a3 result values from registers 0 to 3
+> + */
+> +struct arm_smccc_res {
+> +	unsigned long a0;
+> +	unsigned long a1;
+> +	unsigned long a2;
+> +	unsigned long a3;
+> +};
+> +
+> +/**
+> + * arm_smccc_smc() - make SMC calls
+> + * @a0-a7: arguments passed in registers 0 to 7
+> + * @res: result values from registers 0 to 3
+> + *
+> + * This function is used to make SMC calls following SMC Calling Convention.
+> + * The content of the supplied param are copied to registers 0 to 7 prior
+> + * to the SMC instruction. The return values are updated with the content
+> + * from register 0 to 3 on return from the SMC instruction.
+> + */
+> +asmlinkage void arm_smccc_smc(unsigned long a0, unsigned long a1,
+> +			unsigned long a2, unsigned long a3, unsigned long a4,
+> +			unsigned long a5, unsigned long a6, unsigned long a7,
+> +			struct arm_smccc_res *res);
+> +
+> +/**
+> + * arm_smccc_hvc() - make HVC calls
+> + * @a0-a7: arguments passed in registers 0 to 7
+> + * @res: result values from registers 0 to 3
+> + *
+> + * This function is used to make HVC calls following SMC Calling
+> + * Convention.  The content of the supplied param are copied to registers 0
+> + * to 7 prior to the HVC instruction. The return values are updated with
+> + * the content from register 0 to 3 on return from the HVC instruction.
+> + */
+> +asmlinkage void arm_smccc_hvc(unsigned long a0, unsigned long a1,
+> +			unsigned long a2, unsigned long a3, unsigned long a4,
+> +			unsigned long a5, unsigned long a6, unsigned long a7,
+> +			struct arm_smccc_res *res);
+> +
+> +#endif /*__LINUX_ARM_SMCCC_H*/
+> -- 
+> 1.9.1
+> 
