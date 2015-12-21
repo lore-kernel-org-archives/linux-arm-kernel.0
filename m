@@ -1,57 +1,30 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 21 Dec 2015 09:50:08 +0000
-Subject: [PATCH] ARM: tegra: Fix suspend hang on Tegra124 Chromebooks
-In-Reply-To: <1449570409-30244-1-git-send-email-jonathanh@nvidia.com>
-References: <1449570409-30244-1-git-send-email-jonathanh@nvidia.com>
-Message-ID: <5677CB50.7030907@nvidia.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 21 Dec 2015 09:55:01 +0000
+Subject: [PATCH v2 1/2] IOMMU: arm-smmu-v3: Fix broken STE.VALID check in
+ Broadcom Vulcan
+In-Reply-To: <CC0BC9CB4553B146B290EC1D4DC5C35901096047@SJEXCHMB15.corp.ad.broadcom.com>
+References: <1450346376-30920-1-git-send-email-pmallapp@broadcom.com>
+ <20151217114216.GB11456@arm.com>
+ <CC0BC9CB4553B146B290EC1D4DC5C35901096047@SJEXCHMB15.corp.ad.broadcom.com>
+Message-ID: <20151221095500.GB23092@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping?
+On Sat, Dec 19, 2015 at 04:47:30AM +0000, Prem (Premachandra) Mallappa wrote:
+> Hi Will, 
 
-On 08/12/15 10:26, Jon Hunter wrote:
-> Enabling CPUFreq support for Tegra124 Chromebooks is causing the Tegra124
-> to hang when resuming from suspend.
+Hello Prem,
+
+> > 
+> > Is this workaround only needed for bypass STEs? If not, we have a problem
+> > when we install a stage-1 entry, because we'll clear the EATS bits as it stands.
+> >
 > 
-> When CPUFreq is enabled, the CPU clock is changed from the PLLX clock to
-> the DFLL clock during kernel boot. When resuming from suspend the CPU
-> clock is temporarily changed back to the PLLX clock before switching back
-> to the DFLL. If the DFLL is operating at a much lower frequency than the
-> PLLX when we enter suspend, and so the CPU voltage rail is at a voltage
-> too low for the CPUs to operate at the PLLX frequency, then the device
-> will hang.
-> 
-> Please note that the PLLX is used in the resume sequence to switch the CPU
-> clock from the very slow 32K clock to a faster clock during early resume
-> to speed up the resume sequence before the DFLL is resumed.
-> 
-> Ideally, we should fix this by setting the suspend frequency so that it
-> matches the PLLX frequency, however, that would be a bigger change. For
-> now simply disable CPUFreq support for Tegra124 Chromebooks to avoid the
-> hang when resuming from suspend.
-> 
-> Fixes: 9a0baee960a7 ("ARM: tegra: Enable CPUFreq support for Tegra124
-> 		      Chromebooks")
-> 
-> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
-> ---
-> 
-> Please note that this fix is required for v4.4
-> 
->  arch/arm/boot/dts/tegra124-nyan.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/tegra124-nyan.dtsi b/arch/arm/boot/dts/tegra124-nyan.dtsi
-> index 40c23a0b7cfc..ec1aa64ded68 100644
-> --- a/arch/arm/boot/dts/tegra124-nyan.dtsi
-> +++ b/arch/arm/boot/dts/tegra124-nyan.dtsi
-> @@ -399,7 +399,7 @@
->  
->  	/* CPU DFLL clock */
->  	clock at 0,70110000 {
-> -		status = "okay";
-> +		status = "disabled";
->  		vdd-cpu-supply = <&vdd_cpu>;
->  		nvidia,i2c-fs-rate = <400000>;
->  	};
-> 
+> Yes, this _was_ needed only in Bypass STEs, AFAIK.
+> However, the h/w fixes that were committed recently has this worked out. 
+> I have tested and confirmed this patch is no longer necessary. We'll drop
+> this series as STE.VALID is not broken anymore :).
+
+Hey, that's an early Christmas present! :)
+
+Will
