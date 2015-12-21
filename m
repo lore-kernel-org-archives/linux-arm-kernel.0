@@ -1,56 +1,38 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Mon, 21 Dec 2015 20:39:58 +0800
-Subject: [PATCH] pinctrl: mediatek: convert to arch_initcall
-In-Reply-To: <CAGS+omCDxj_wMDiAiywSv4hAtq6E9vm+CxgG8gs1TmrrS499mQ@mail.gmail.com>
-References: <1450412497-25872-1-git-send-email-djkurtz@chromium.org>
- <1450451196.19539.9.camel@mtksdaap41>
- <CAGS+omCDxj_wMDiAiywSv4hAtq6E9vm+CxgG8gs1TmrrS499mQ@mail.gmail.com>
-Message-ID: <1450701598.6795.11.camel@mtksdaap41>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 21 Dec 2015 15:43:08 +0300
+Subject: [PATCH 2/3] arm: dts: phy3250: add SD fixed regulator
+In-Reply-To: <1450567932-22994-3-git-send-email-vz@mleia.com>
+References: <1450567932-22994-1-git-send-email-vz@mleia.com>
+ <1450567932-22994-3-git-send-email-vz@mleia.com>
+Message-ID: <5677F3DC.6070402@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-12-21 at 14:51 +0800, Daniel Kurtz wrote:
-> On Fri, Dec 18, 2015 at 11:06 PM, Yingjoe Chen
-> <yingjoe.chen@mediatek.com> wrote:
-> > On Fri, 2015-12-18 at 12:21 +0800, Daniel Kurtz wrote:
-> >> Move pinctrl initialization earlier in boot so that real devices can find
-> >> their pctldev without probe deferring.
-> >>
-> >> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
-> >> ---
-> >>  drivers/pinctrl/mediatek/pinctrl-mt6397.c | 2 +-
-> >>  drivers/pinctrl/mediatek/pinctrl-mt8127.c | 2 +-
-> >>  drivers/pinctrl/mediatek/pinctrl-mt8135.c | 2 +-
-> >>  drivers/pinctrl/mediatek/pinctrl-mt8173.c | 2 +-
-> >>  4 files changed, 4 insertions(+), 4 deletions(-)
-> >>
-> >> diff --git a/drivers/pinctrl/mediatek/pinctrl-mt6397.c b/drivers/pinctrl/mediatek/pinctrl-mt6397.c
-> >> index f9751ae..a3780d4 100644
-> >> --- a/drivers/pinctrl/mediatek/pinctrl-mt6397.c
-> >> +++ b/drivers/pinctrl/mediatek/pinctrl-mt6397.c
-> >> @@ -70,7 +70,7 @@ static int __init mtk_pinctrl_init(void)
-> >>       return platform_driver_register(&mtk_pinctrl_driver);
-> >>  }
-> >>
-> >> -module_init(mtk_pinctrl_init);
-> >> +arch_initcall(mtk_pinctrl_init);
-> >
-> >
-> > MT6397 is PMIC, which depends on pwrap on main AP to work. Since
-> > pmic-wrap itself is module_platform_driver, I think it make sense to
-> > keep this one as module_init. Maybe adding a comment to explain why it
-> > is different from others will help.
-> 
-> I interpret this the other way - I think that since the PMIC wrapper
-> provides a bus required for the system PMIC it should also be a
-> builtin and use arch_initcall.
+Hello.
 
-We'll have to change mt8173 PMIC wrapper and mt6397 MFD core to
-arch_initcall if we want to do it.
+On 12/20/2015 2:32 AM, Vladimir Zapolskiy wrote:
 
-I think regulators on PMIC is more important than pinctrl. For all
-mt8173 systems, few drivers depends on PMIC pinctrl to work but many
-depends on the regulators. So if we adjust pinctrl to arch_initcall, we
-should change mt6397 regulator as well.
+> The change adds fixed voltage regulator for SD controller, ARM MMCI
+> controller driver uses it to control card power management.
+>
+> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+> ---
+>   arch/arm/boot/dts/phy3250.dts | 10 ++++++++++
+>   1 file changed, 10 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/phy3250.dts b/arch/arm/boot/dts/phy3250.dts
+> index 34e15fd..5465b9e 100644
+> --- a/arch/arm/boot/dts/phy3250.dts
+> +++ b/arch/arm/boot/dts/phy3250.dts
+> @@ -45,6 +45,15 @@
+>   			enable-active-high;
+>   			regulator-boot-on;
+>   		};
+> +
+> +		sd_reg: fixed-regulator at 2 {
 
-Joe.C
+    Please just "regulator at 2", to comply with the ePAPR standard.
+
+[...]
+
+MBR, Sergei
