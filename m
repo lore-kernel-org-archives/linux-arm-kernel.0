@@ -1,61 +1,56 @@
-From: pingbo.wen@linaro.org (Pingbo Wen)
-Date: Mon, 21 Dec 2015 12:00:28 +0800
-Subject: 16KB PAGE_SIZE not work on DB410C
-Message-ID: <5677795C.2060409@linaro.org>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Mon, 21 Dec 2015 12:07:58 +0800
+Subject: [PATCH 2/3] thermal: Add Mediatek thermal controller support
+In-Reply-To: <1448883753-19068-3-git-send-email-s.hauer@pengutronix.de>
+References: <1448883753-19068-1-git-send-email-s.hauer@pengutronix.de>
+ <1448883753-19068-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <CAGS+omC86=Kfdj0cFNHqs4fXCAT0uU+AxHCj3ORd2HetNZ2gVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, 
+Hi Sascha,
 
-I want to do some tests over 16KB page size on dragonboard 410c. And I merged 
-arm64-upstream branch over 
+One nit below that can be fixed up later, or now if you don't plan to
+spin this driver to
+address Eduardo's feedback...
 
-  https://git.linaro.org/landing-teams/working/qualcomm/kernel.git integration-linux-qcomlt
+On Mon, Nov 30, 2015 at 7:42 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> This adds support for the Mediatek thermal controller found on MT8173
+> and likely other SoCs.
+> The controller is a bit special. It does not have its own ADC, instead
+> it controls the on-SoC AUXADC via AHB bus accesses. For this reason
+> we need the physical address of the AUXADC. Also it controls a mux
+> using AHB bus accesses, so we need the APMIXEDSYS physical address aswell.
+>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-which is based on Linux Kernel 4.3.
+[snip]
 
-The db410c can boot into ubuntu in 4KB / 64KB page size, but when I set 16K page size, with
-47bit VA, the kernel hang before kernel_start(), no log output.
+> +static int mtk_thermal_get_calibration_data(struct device *dev, struct mtk_thermal *mt)
+> +{
+> +       struct nvmem_cell *cell;
+> +       u32 *buf;
+> +       size_t len;
+> +       int i, ret = 0;
+> +
+> +       /* Start with default values */
+> +       mt->adc_ge = 512;
+> +       for (i = 0; i < MT8173_NUM_SENSORS; i++)
+> +               mt->vts[i] = 260;
+> +       mt->degc_cali = 40;
+> +       mt->o_slope = 0;
+> +
+> +       cell = nvmem_cell_get(dev, "calibration-data");
+> +       if (IS_ERR(cell)) {
+> +               if (PTR_ERR(cell) == -EPROBE_DEFER)
 
-Does db410c support 16K page size? What can I do to boot it up?
+It is useful to know why the thermal driver is being probe defered, so
+I suggest here:
+dev_warn(dev, "Waiting for calibration data.\n");
 
-Below is what I got through serial port:
+> +                       return PTR_ERR(cell);
+> +               return 0;
+> +       }
 
-B -    437888 - QSEE Execution, Start
-D -        61 - QSEE Execution, Delta
-B -    443561 - SBL1, End
-D -    245982 - SBL1, Delta
-S - Flash Throughput, 111000 KB/s  (1151760 Bytes,  10309 us)
-S - DDR Frequency, 400 MHz
-Android Bootloader - UART_DM Initialized!!!
-[0] welcome to lk
-
-[10] platform_init()
-[10] target_init()
-[40] SDHC Running in HS200 mode
-[90] Done initialization of the card
-[90] pm8x41_get_is_cold_boot: cold boot
-[90] No 'frp' partition found
-[100] Not able to search the panel:
-[100] Display not enabled for 24 HW type
-[100] Target panel init not found!
-[110] pm8x41_get_is_cold_boot: cold boot
-[110] partition misc doesn't exist
-[110] error in emmc_recovery_init
-[120] Unable to locate /bootselect partition
-[120] No 'misc' partition found
-[120] Error reading MISC partition
-[130] failed to get ffbm cookie[130] use_signed_kernel=0, is_unlocked=0, is_tampered=0.
-[140] Loading boot image (15704064): start
-[240] Loading boot image (15704064): done
-[350] DTB Total entry: 15, DTB version: 2
-[360] Using DTB entry 0x000000f7/00000000/0x00010018/0 for device 0x000000f7/00010000/0x00010018/0
-[370] Using pmic info 0x2000b/0x0/0x0/0x0 for device 0x2000b/0x0/0x0/0x0
-[370] target_display_panel_node:510: hw_id=24 panel_name=""
-[380] cmdline: root=/dev/disk/by-partlabel/rootfs rw rootwait console=tty0 console=ttyMSM0,115200n8 earlycon=msm_serial androidboot.emmc=true androidboot.serialno=a4ce2318 androidboot.baseband=apq mdss_mdp.panel=0:dsi:0:
-[400] Updating device tree: start
-[490] Updating device tree: done
-[500] booting linux @ 0x80080000, ramdisk @ 0x82000000 (2854016), tags/device tree @ 0x81e00000
-[500] Jumping to kernel via monitor
-
-Pingbo
+Thanks,
+-Dan
