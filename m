@@ -1,35 +1,78 @@
-From: m.silentcreek@gmail.com (m.silentcreek at gmail.com)
-Date: Tue, 22 Dec 2015 06:42:07 -0800 (PST)
-Subject: [linux-sunxi] Re: BUG - Bananapi USB not working on Mainline
-In-Reply-To: <CAOP4N=98cjUYVAvEngdOXXdXeive7HB_ChC4B+uAASG5tKP1dg@mail.gmail.com>
-References: <CAOP4N=_Ux0FPSRep7AfBVovd59LeDTbBjH=LBdfWDb6Mc3e=Fg@mail.gmail.com>
- <ec8d762c-3e2b-4438-a43e-ae2740f8a5f3@googlegroups.com>
- <ed63cc0b-fb90-4947-ab4c-b89655538a1a@googlegroups.com>
- <CAOP4N=98cjUYVAvEngdOXXdXeive7HB_ChC4B+uAASG5tKP1dg@mail.gmail.com>
-Message-ID: <4c69f067-f61d-4cf2-b5e6-75e7a22bedf7@googlegroups.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 22 Dec 2015 14:46:06 +0000
+Subject: [PATCH RESEND v4] arm: remove !CPU_V6 and !GENERIC_ATOMIC64
+ build dependencies for XEN
+In-Reply-To: <alpine.DEB.2.02.1512221404060.3096@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1512221404060.3096@kaball.uk.xensource.com>
+Message-ID: <20151222144605.GJ8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
-Hi Maxime,
-
-Am Sonntag, 20. Dezember 2015 08:38:52 UTC+1 schrieb David Tulloh:
-> On 20 December 2015 at 08:39,  <m.sile...@gmail.com> wrote:
+On Tue, Dec 22, 2015 at 02:17:17PM +0000, Stefano Stabellini wrote:
+> Hello Russell,
 > 
-> I found the solution! The problem is CONFIG_AXP20X_POWER which was introduced in 4.4-rc1 but defaults to no and not set in sunxi_defconfig. Adding CONFIG_AXP20X_POWER=y to sunxi_defconfig solves that and get's my USB devices working again on linux 4.4-rc5. I actually brought that up on IRC once, but at that time nobody seemed to know so I forgot it again.
-> 
-> Thanks Timo,
-> 
-> I can confirm that adding CONFIG_AXP20X_POWER=y to sunxi_defconfig works for me as well.
+> Would you please consider this patch for the next merge window? It
+> is a very old patch (March 2014) which has been left over.
 
-Is this considered an issue worthwhile to be addressed before the release of 4.4?
+This patch has some obvious problems...
 
-The way I see it is that USB support is broken on A10/20 in mainline for anybody who builds on sunxi_defconfig or multi_v7_defconfig at the moment.
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 34e1569..e09ed94 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1807,8 +1807,7 @@ config XEN_DOM0
+>  config XEN
+>  	bool "Xen guest support on ARM"
+>  	depends on ARM && AEABI && OF
+> -	depends on CPU_V7 && !CPU_V6
+> -	depends on !GENERIC_ATOMIC64
+> +	depends on CPU_V7
 
-I think we should either have CONFIG_PHY_SUN4I_USB select CONFIG_AXP20X_POWER automatically (my preferred solution) or at least add it to sunxi_defconfig and multi_v7_defconfig.
+How sure are we that this won't cause regressions?  How much testing
+has been done with these changed dependencies?
 
-I'd be glad to submit a short patch for it depending on your viewpoint.
+> diff --git a/arch/arm/include/asm/sync_bitops.h b/arch/arm/include/asm/sync_bitops.h
+> index 9732b8e..4103319 100644
+> --- a/arch/arm/include/asm/sync_bitops.h
+> +++ b/arch/arm/include/asm/sync_bitops.h
+> @@ -20,7 +20,29 @@
+>  #define sync_test_and_clear_bit(nr, p)	_test_and_clear_bit(nr, p)
+>  #define sync_test_and_change_bit(nr, p)	_test_and_change_bit(nr, p)
+>  #define sync_test_bit(nr, addr)		test_bit(nr, addr)
+> -#define sync_cmpxchg			cmpxchg
+>  
+> +static inline unsigned long sync_cmpxchg(volatile void *ptr,
+> +										 unsigned long old,
+> +										 unsigned long new)
+> +{
+> +	unsigned long oldval;
+> +	int size = sizeof(*(ptr));
 
-Best wishes and happy holidays,
+This is buggy.  You're doing sizeof(void) here, which on GCC will always
+be 1:
 
-Timo
+   A consequence of this is that `sizeof' is also allowed on `void' and
+  on function types, and returns 1.
+
+> +
+> +	smp_mb();
+> +	switch (size) {
+> +	case 1:
+> +		oldval = __cmpxchg8(ptr, old, new);
+> +		break;
+> +	case 2:
+> +		oldval = __cmpxchg16(ptr, old, new);
+> +		break;
+
+The ldrexb/ldrexh instructions are not available on ARMv6 CPUs.  __xchg()
+and friends avoided these for ARMv6 CPUs, but this does not.
+
+I'd expect anything that uses sync_cmpxchg() will fail to build when a
+kernel including ARMv6 is attempted.
+
+So... I don't think this patch is ready.
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
