@@ -1,91 +1,141 @@
-From: alex.aring@gmail.com (Alexander Aring)
-Date: Tue, 22 Dec 2015 11:11:33 +0100
-Subject: [PATCH v2 6/8] ARM: bcm2835: Add devicetree for bcm2836 and
- Raspberry Pi 2 B
-In-Reply-To: <1450310115-22163-7-git-send-email-eric@anholt.net>
-References: <1450310115-22163-1-git-send-email-eric@anholt.net>
- <1450310115-22163-7-git-send-email-eric@anholt.net>
-Message-ID: <20151222101131.GA566@omega>
+From: shannon.zhao@linaro.org (Shannon Zhao)
+Date: Tue, 22 Dec 2015 18:15:54 +0800
+Subject: [PATCH 2/2] arm64: KVM: Do not update PC if the trap handler has
+ updated it
+In-Reply-To: <1450778118-12715-3-git-send-email-marc.zyngier@arm.com>
+References: <1450778118-12715-1-git-send-email-marc.zyngier@arm.com>
+ <1450778118-12715-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <567922DA.3090107@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 16, 2015 at 03:55:13PM -0800, Eric Anholt wrote:
-> The Pi 2 B ends up like a Pi 1 B+, with the same peripherals and
-> pinout, but the CPU and memory layout changed to use the 2836.
+
+
+On 2015/12/22 17:55, Marc Zyngier wrote:
+> Assuming we trap a system register, and decide that the access is
+> illegal, we will inject an exception in the guest. In this
+> case, we shouldn't increment the PC, or the vcpu will miss the
+> first instruction of the handler, leading to a mildly confused
+> guest.
 > 
-> Signed-off-by: Eric Anholt <eric@anholt.net>
+> Solve this by snapshoting PC before the access is performed,
+> and checking if it has moved or not before incrementing it.
+> 
+Thanks a lot. This solves the problem of guest PMU failing to inject EL1
+fault to guest.
+
+Tested-by: Shannon Zhao <shannon.zhao@linaro.org>
+Reviewed-by: Shannon Zhao <shannon.zhao@linaro.org>
+
+> Reported-by: Shannon Zhao <shannon.zhao@linaro.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  arch/arm/boot/dts/bcm2836-rpi-2-b.dts | 35 ++++++++++++++++
->  arch/arm/boot/dts/bcm2836.dtsi        | 77 +++++++++++++++++++++++++++++++++++
->  2 files changed, 112 insertions(+)
->  create mode 100644 arch/arm/boot/dts/bcm2836-rpi-2-b.dts
->  create mode 100644 arch/arm/boot/dts/bcm2836.dtsi
+>  arch/arm64/kvm/sys_regs.c | 73 +++++++++++++++++++++++------------------------
+>  1 file changed, 36 insertions(+), 37 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
-> new file mode 100644
-> index 0000000..ff94666
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
-> @@ -0,0 +1,35 @@
-> +/dts-v1/;
-> +#include "bcm2836.dtsi"
-> +#include "bcm2835-rpi.dtsi"
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index d2650e8..9c87e0c 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -966,6 +966,39 @@ static const struct sys_reg_desc *find_reg(const struct sys_reg_params *params,
+>  	return NULL;
+>  }
+>  
+> +/* Perform the sysreg access, returns 0 on success */
+> +static int access_sys_reg(struct kvm_vcpu *vcpu,
+> +			  struct sys_reg_params *params,
+> +			  const struct sys_reg_desc *r)
+> +{
+> +	u64 pc = *vcpu_pc(vcpu);
 > +
-> +/ {
-> +	compatible = "raspberrypi,2-model-b", "brcm,bcm2836";
-> +	model = "Raspberry Pi 2 Model B";
+> +	if (unlikely(!r))
+> +		return -1;
 > +
-> +	memory {
-> +		reg = <0 0x40000000>;
-> +	};
+> +	/*
+> +	 * Not having an accessor means that we have configured a trap
+> +	 * that we don't know how to handle. This certainly qualifies
+> +	 * as a gross bug that should be fixed right away.
+> +	 */
+> +	BUG_ON(!r->access);
 > +
-> +	leds {
-> +		act {
-> +			gpios = <&gpio 47 0>;
-> +		};
+> +	if (likely(r->access(vcpu, params, r))) {
+> +		/*
+> +		 * Skip the instruction if it was emulated without PC
+> +		 * having changed. This allows us to detect a fault
+> +		 * being injected (incrementing the PC here would
+> +		 * cause the vcpu to skip the first instruction of its
+> +		 * fault handler).
+> +		 */
+> +		if (pc == *vcpu_pc(vcpu))
+> +			kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
+> +		return 0;
+> +	}
 > +
-> +		pwr {
-> +			label = "PWR";
-> +			gpios = <&gpio 35 0>;
-> +			default-state = "keep";
-> +			linux,default-trigger = "default-on";
-> +		};
-> +	};
-> +};
+> +	return -1;
+> +}
 > +
-> +&gpio {
-> +	pinctrl-0 = <&gpioout &alt0 &i2s_alt0 &alt3>;
-> +
-> +	/* I2S interface */
-> +	i2s_alt0: i2s_alt0 {
-> +		brcm,pins = <18 19 20 21>;
-> +		brcm,function = <BCM2835_FSEL_ALT0>;
-> +	};
-> +};
-> diff --git a/arch/arm/boot/dts/bcm2836.dtsi b/arch/arm/boot/dts/bcm2836.dtsi
-> new file mode 100644
-> index 0000000..6693118
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/bcm2836.dtsi
-> @@ -0,0 +1,77 @@
-> +#include "bcm283x.dtsi"
-> +
-> +/ {
-> +	compatible = "brcm,bcm2836";
-> +
-> +	soc {
-> +		ranges = <0x7e000000 0x3f000000 0x1000000>,
+>  int kvm_handle_cp14_load_store(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  {
+>  	kvm_inject_undefined(vcpu);
+> @@ -994,26 +1027,7 @@ static int emulate_cp(struct kvm_vcpu *vcpu,
+>  
+>  	r = find_reg(params, table, num);
+>  
+> -	if (r) {
+> -		/*
+> -		 * Not having an accessor means that we have
+> -		 * configured a trap that we don't know how to
+> -		 * handle. This certainly qualifies as a gross bug
+> -		 * that should be fixed right away.
+> -		 */
+> -		BUG_ON(!r->access);
+> -
+> -		if (likely(r->access(vcpu, params, r))) {
+> -			/* Skip instruction, since it was emulated */
+> -			kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
+> -		}
+> -
+> -		/* Handled */
+> -		return 0;
+> -	}
+> -
+> -	/* Not handled */
+> -	return -1;
+> +	return access_sys_reg(vcpu, params, r);
+>  }
+>  
+>  static void unhandled_cp_access(struct kvm_vcpu *vcpu,
+> @@ -1178,27 +1192,12 @@ static int emulate_sys_reg(struct kvm_vcpu *vcpu,
+>  	if (!r)
+>  		r = find_reg(params, sys_reg_descs, ARRAY_SIZE(sys_reg_descs));
+>  
+> -	if (likely(r)) {
+> -		/*
+> -		 * Not having an accessor means that we have
+> -		 * configured a trap that we don't know how to
+> -		 * handle. This certainly qualifies as a gross bug
+> -		 * that should be fixed right away.
+> -		 */
+> -		BUG_ON(!r->access);
+> -
+> -		if (likely(r->access(vcpu, params, r))) {
+> -			/* Skip instruction, since it was emulated */
+> -			kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
+> -			return 1;
+> -		}
+> -		/* If access function fails, it should complain. */
+> -	} else {
+> +	if (access_sys_reg(vcpu, params, r)) {
+>  		kvm_err("Unsupported guest sys_reg access at: %lx\n",
+>  			*vcpu_pc(vcpu));
+>  		print_sys_reg_instr(params);
+> +		kvm_inject_undefined(vcpu);
+>  	}
+> -	kvm_inject_undefined(vcpu);
+>  	return 1;
+>  }
+>  
+> 
 
-nitpik, I would change it here to 0x01000000 for the size parameter,
-like below: 8-byte filled with zeroes.
-
-> +			 <0x40000000 0x40000000 0x00001000>;
-
-Is 0x00001000 correct here? I currently debug this part because the
-devicetree issues which I mentioned. I looked into some bcm2836
-datasheet. See [0], section "4 Registers", I assume this should be 0x00000100.
-Or are there more than these registers which need to be accessable?
-
-- Alex
-
-[0] https://github.com/raspberrypi/documentation/blob/master/hardware/raspberrypi/bcm2836/QA7_rev3.4.pdf
+-- 
+Shannon
