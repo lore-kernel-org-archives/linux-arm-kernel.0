@@ -1,82 +1,55 @@
-From: hare@suse.de (Hannes Reinecke)
-Date: Tue, 22 Dec 2015 08:10:46 +0100
-Subject: [PATCH v3 20/77] ncr5380: Introduce unbound workqueue
-In-Reply-To: <20151222011743.455500361@telegraphics.com.au>
-References: <20151222011737.980475848@telegraphics.com.au>
- <20151222011743.455500361@telegraphics.com.au>
-Message-ID: <5678F776.8080305@suse.de>
+From: majun258@huawei.com (MaJun)
+Date: Tue, 22 Dec 2015 15:10:23 +0800
+Subject: [RFC PATCH] irqchip/gic-v3-its:Fix the bug while calculating the page
+ number of ITS table
+Message-ID: <1450768223-10860-1-git-send-email-majun258@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/22/2015 02:17 AM, Finn Thain wrote:
-> Allocate a work queue that will permit busy waiting and sleeping. This
-> means NCR5380_init() can potentially fail, so add this error path.
->
-> Signed-off-by: Finn Thain <fthain@telegraphics.com.au>
->
-> ---
->
-> In subsequent patches, the work function adopts this work queue so it
-> can sleep while polling, which allows the removal of some flawed and
-> complicated code in NCR5380_select() in NCR5380.c.
->
-> Changed since v1:
-> - Dropped WQ_CPU_INTENSIVE flag because Documentation/workqueue.txt says it
->    "is meaningless for unbound wq".
->
-> ---
->   drivers/scsi/NCR5380.c       |   15 +++++++++++----
->   drivers/scsi/NCR5380.h       |    1 +
->   drivers/scsi/arm/cumana_1.c  |    8 ++++++--
->   drivers/scsi/arm/oak.c       |    8 ++++++--
->   drivers/scsi/atari_NCR5380.c |    8 +++++++-
->   drivers/scsi/atari_scsi.c    |    5 ++++-
->   drivers/scsi/dmx3191d.c      |   17 +++++++++++------
->   drivers/scsi/dtc.c           |   11 +++++++++--
->   drivers/scsi/g_NCR5380.c     |   31 +++++++++++++++----------------
->   drivers/scsi/mac_scsi.c      |    5 ++++-
->   drivers/scsi/pas16.c         |   10 ++++++++--
->   drivers/scsi/sun3_scsi.c     |    5 ++++-
->   drivers/scsi/t128.c          |   13 ++++++++++---
->   13 files changed, 96 insertions(+), 41 deletions(-)
->
-> Index: linux/drivers/scsi/NCR5380.c
-> ===================================================================
-> --- linux.orig/drivers/scsi/NCR5380.c	2015-12-22 12:15:52.000000000 +1100
-> +++ linux/drivers/scsi/NCR5380.c	2015-12-22 12:15:56.000000000 +1100
-> @@ -514,7 +514,7 @@ static int should_disconnect(unsigned ch
->   static void NCR5380_set_timer(struct NCR5380_hostdata *hostdata, unsigned long timeout)
->   {
->   	hostdata->time_expires = jiffies + timeout;
-> -	schedule_delayed_work(&hostdata->coroutine, timeout);
-> +	queue_delayed_work(hostdata->work_q, &hostdata->coroutine, timeout);
->   }
->
->
-> @@ -791,7 +791,12 @@ static int NCR5380_init(struct Scsi_Host
->   	hostdata->disconnected_queue = NULL;
->   	
->   	INIT_DELAYED_WORK(&hostdata->coroutine, NCR5380_main);
-> -	
-> +	hostdata->work_q = alloc_workqueue("ncr5380_%d",
-> +	                        WQ_UNBOUND | WQ_MEM_RECLAIM,
-> +	                        1, instance->host_no);
-> +	if (!hostdata->work_q)
-> +		return -ENOMEM;
-> +
->   	/* The CHECK code seems to break the 53C400. Will check it later maybe */
->   	if (flags & FLAG_NCR53C400)
->   		hostdata->flags = FLAG_HAS_LAST_BYTE_SENT | flags;
+From: Ma Jun <majun258@huawei.com>
 
-Wouldn't it be better to use a normal (ie bound) workqueue here?
-SCSI-2 is pretty much single-threaded, so shifting things onto arbitrary 
-CPUs don't sound very appealing.
+Hi Marc, Robert:
 
-Cheers,
+Maybe there is a bug introduced by commit
+"irqchip/gicv3-its: Add range check for number of allocated pages"
+30f2136346cab91e1ffd9ee6370d76809f20487a
 
-Hannes
+I think, before setting the page number, the variable "alloc_pages"
+should be calculated and checked again. 
+Or else, the page number programmed into GITS_BASER register is always
+the number of 64KB even though the page size is 16KB or 4KB.
+
+Signed-off-by: Ma Jun <majun258@huawei.com>
+---
+ drivers/irqchip/irq-gic-v3-its.c |    9 ++++++++-
+ 1 files changed, 8 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index e23d1d1..100181b 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -879,7 +879,7 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+ 		if (alloc_pages > GITS_BASER_PAGES_MAX) {
+ 			alloc_pages = GITS_BASER_PAGES_MAX;
+ 			order = get_order(GITS_BASER_PAGES_MAX * psz);
+-			pr_warn("%s: Device Table too large, reduce its page order to %u (%u pages)\n",
++			pr_warn("%s: Table too large, reduce its page order to %u (%u pages)\n",
+ 				node_name, order, alloc_pages);
+ 		}
+ 
+@@ -911,6 +911,13 @@ retry_baser:
+ 			break;
+ 		}
+ 
++               alloc_pages = (alloc_size / psz);
++                if (alloc_pages > GITS_BASER_PAGES_MAX) {
++                        alloc_pages = GITS_BASER_PAGES_MAX;
++                        pr_warn("%s: Table too large, reduce its page number to %u pages\n",
++                                node_name, alloc_pages);
++                }
++
+ 		val |= alloc_pages - 1;
+ 
+ 		writeq_relaxed(val, its->base + GITS_BASER + i * 8);
 -- 
-Dr. Hannes Reinecke		      zSeries & Storage
-hare at suse.de			      +49 911 74053 688
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg
-GF: J. Hawn, J. Guild, F. Imend?rffer, HRB 16746 (AG N?rnberg)
+1.7.1
