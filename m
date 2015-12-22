@@ -1,44 +1,79 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue, 22 Dec 2015 09:34:00 +0100
-Subject: [PATCH V2 06/23] XEN / PCI: Remove the dependence on arch x86
- when PCI_MMCONFIG=y
-In-Reply-To: <alpine.DEB.2.02.1512211811550.3096@kaball.uk.xensource.com>
-References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
- <1450278993-12664-7-git-send-email-tn@semihalf.com>
- <alpine.DEB.2.02.1512211811550.3096@kaball.uk.xensource.com>
-Message-ID: <56790AF8.9080807@semihalf.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 22 Dec 2015 09:44:29 +0100
+Subject: [RESEND RFC PATCH 0/2] Expose the PIO_ISR register on SAMA5D3
+In-Reply-To: <a5deeb3722254bd08d7a7e071fd42e7f@EMAIL.axentia.se>
+References: <1449544808-3163-1-git-send-email-peda@lysator.liu.se>
+ <CACRpkdYN=n=Q+UpLbWjxJHP-FYi_e4cHFE_d1_fR2r7QYcqgYQ@mail.gmail.com>
+ <566C6122.6040406@kernel.org>
+ <85d1850f20c141b2952d93be72199fdf@EMAIL.axentia.se>
+ <CACRpkdY9Nwg3B1bAJ53Y-tJJywC=ENvFR6S99+wUKzcUHTa5TQ@mail.gmail.com>
+ <a5deeb3722254bd08d7a7e071fd42e7f@EMAIL.axentia.se>
+Message-ID: <CACRpkdbVnpdPUaMZRr-Lh27MZjM-CUwzgsy1QfzDR7tbHFPZWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21.12.2015 19:12, Stefano Stabellini wrote:
-> On Wed, 16 Dec 2015, Tomasz Nowicki wrote:
->> In drivers/xen/pci.c, there are arch x86 dependent codes when
->> CONFIG_PCI_MMCONFIG is enabled, since CONFIG_PCI_MMCONFIG
->> depends on ACPI, so this will prevent XEN PCI running on other
->> architectures using ACPI with PCI_MMCONFIG enabled (such as ARM64).
->>
->> Fortunatly, it can be sloved in a simple way. In drivers/xen/pci.c,
->> the only x86 dependent code is if ((pci_probe & PCI_PROBE_MMCONF) == 0),
->> and it's defined in asm/pci_x86.h, the code means that
->> if the PCI resource is not probed in PCI_PROBE_MMCONF way, just
->> ingnore the xen mcfg init. Actually this is duplicate, because
->> if PCI resource is not probed in PCI_PROBE_MMCONF way, the
->> pci_mmconfig_list will be empty, and the if (list_empty())
->> after it will do the same job.
->>
->> So just remove the arch related code and the head file, this
->> will be no functional change for x86, and also makes xen/pci.c
->> usable for other architectures.
->>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
->> CC: Boris Ostrovsky <boris.ostrovsky@oracle.com>
->> Cc: Stefano Stabellini <Stefano.Stabellini@eu.citrix.com>
->> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->
-> Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
->
+On Fri, Dec 18, 2015 at 12:19 AM, Peter Rosin <peda@axentia.se> wrote:
 
-Thanks Stefano.
+> This all makes sense. The reason is that I'm not familiar with
+> the kernel APIs. I have to wrap my head around how to set up
+> work to be performed later, etc etc.
 
-Tomasz
+FWIW a random work to be performed later is a delayed work.
+It can be queued on a global workqueue or you can create your
+own workqueue. This is the latter way, it's even simpler if you
+just use NULL as workqueue, it will then end up on the big
+system workqueue. The workqueue in turn uses deferrable timers,
+and these can also be used directly.
+
+#include <linux/workqueue.h>
+
+struct foo {
+   struct workqueue_struct *foo_wq;
+   struct delayed_work delayed_foo_work;
+   ....
+};
+
+static void foo_work_cb(struct work_struct *work)
+{
+        struct foo *foo = container_of(work, struct foo, delayed_foo_work.work);
+
+        ... do the work ...
+};
+
+main {
+   INIT_DEFERRABLE_WORK(&foo->delayed_foo_work, foo_work_cb);
+   queue_delayed_work(foo->foo_wq, &foo->delayed_foo_work, 6*HZ);
+}
+
+6*HZ means wait for 6 seconds as the delay is given in ticks (jiffies)
+and the system does HZ ticks per second.
+
+>> > I have realized that I could work with one-shot-interrupts. Then the
+>> > urgency to disable interrupts go away, as only one interrupt would
+>> > be served. That was not my immediate solution though, as I have been
+>> > using isr type registers in this way several times before.
+>>
+>> That sounds like the right solution. With ONESHOT a threaded IRQ
+>> will have its line masked until you return from the ISR thread. Would this
+>> work for your usecase?
+>
+> The ISR thread would need to be able to disable further interrupts
+> before it returned, is that possible without deadlock? If so, it's
+> a good fit.
+
+Yes that is what the ONESHOT flag means. So like this:
+
+ret = request_threaded_irq(irqnum, NULL, foo_irq_handler,
+                                   IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+                                   "foo", foo);
+
+To register a threaded oneshot IRQ that will run on a falling edge,
+as a thread, until completed, masking its own interrupt line, but
+no others.
+
+The threaded handler can msleep(), mdelay()/udelay() etc since it
+is a thread. usleep_range(a, b) is the best as the system can idle
+while that happens, and can plan for a good wakeup point.
+
+Yours,
+Linus Walleij
