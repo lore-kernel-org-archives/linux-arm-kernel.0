@@ -1,47 +1,35 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 22 Dec 2015 15:01:49 -0800
-Subject: [GIT PULL] Add idle states to Juno device-tree
-In-Reply-To: <1450797456.3037.2.camel@linaro.org>
-References: <1450797456.3037.2.camel@linaro.org>
-Message-ID: <20151222230149.GR30172@localhost>
+Date: Tue, 22 Dec 2015 15:02:22 -0800
+Subject: [GIT PULL v2] at91: DT for 4.5 #2
+In-Reply-To: <20151222160159.GA9225@piout.net>
+References: <20151222160159.GA9225@piout.net>
+Message-ID: <20151222230222.GS30172@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 22, 2015 at 03:17:36PM +0000, Jon Medhurst (Tixy) wrote:
-> Hi ARM SoC people
+On Tue, Dec 22, 2015 at 05:01:59PM +0100, Alexandre Belloni wrote:
+> Arnd, Olof, Kevin,
 > 
-> Please consider these device-tree updates for inclusion into Linux.
-> This is a pull request for the single patch discussed on the lists [1]
-> a couple of weeks ago, and I'm sending it as a pull request in the hope
-> that it will be more noticeable.
+> Here are more DT materials for 4.5, please pull.
 > 
-> Thanks
+> The following changes since commit 0a804b5729bb0021e63662b772db0f52de653056:
 > 
-> Tixy
-> 
-> [1] http://www.spinics.net/lists/arm-kernel/msg467219.html
-> 
-> ------------------------------------------------------------------
-> 
-> The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
-> 
->   Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+>   ARM: at91/dt: sama5d2 Xplained: pmic needs a specific sda hold time (2015-12-15 12:23:32 +0100)
 > 
 > are available in the git repository at:
 > 
->   https://git.linaro.org/people/tixy/kernel.git juno-idle-dts
+>   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-4.5-dt2
 > 
-> for you to fetch changes up to 8ea5bf9418d621a27398a0d98987382343f0e94c:
+> for you to fetch changes up to ca6349a8c51f2e3d6f2acdb36431e7d7328261f7:
 > 
->   arm64: dts: juno: Add idle-states to device tree (2015-12-22 14:51:59 +0000)
+>   ARM: at91/dt: sama5d2 Xplained: add pdmic node (2015-12-22 10:37:53 +0100)
 > 
 > ----------------------------------------------------------------
-> Jon Medhurst (1):
->       arm64: dts: juno: Add idle-states to device tree
+> Second batch of DT changes for 4.5:
+> - addition of sound nodes for sama5d2 and its xplained board
+> - addition of a new platform, Landis + Gyr VInCo
 
-Hi,
-
-I applied the patch directly a little earlier today, so I'll skip this branch.
+Merged, thanks.
 
 
 -Olof
