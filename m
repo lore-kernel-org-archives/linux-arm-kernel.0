@@ -1,42 +1,23 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 22 Dec 2015 11:22:52 -0800
-Subject: [PATCH v5] bus: uniphier-system-bus: add UniPhier System Bus
- driver
-In-Reply-To: <1449643979-27329-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1449643979-27329-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20151222192252.GO30172@localhost>
+Date: Tue, 22 Dec 2015 11:23:28 -0800
+Subject: [PATCH v3] arm64: dts: juno: Add idle-states to device tree
+In-Reply-To: <1449654053.2818.6.camel@linaro.org>
+References: <1449654053.2818.6.camel@linaro.org>
+Message-ID: <20151222192328.GP30172@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 09, 2015 at 03:52:59PM +0900, Masahiro Yamada wrote:
-> The UniPhier System Bus is an external bus that connects on-board
-> devices to the UniPhier SoC.  Each bank (chip select) is dynamically
-> mapped to the CPU-viewed address base via the bus controller.  The
-> bus controller must be configured before any access to the bus.
+On Wed, Dec 09, 2015 at 09:40:53AM +0000, Jon Medhurst (Tixy) wrote:
+> This patch adds idle-states bindings data collected through a set of
+> benchmarking experiments (latency and energy consumption) on Juno
+> boards. Latencies data represents the worst case scenarios as required
+> by the DT idle-states bindings.
 > 
-> This driver parses the "ranges" property of the System Bus node and
-> initialized the bus controller.  After the bus becomes ready, devices
-> below it are populated.
-> 
-> Note:
-> Each bank can be mapped anywhere in the supported address space;
-> there is nothing preventing us from assigning bank 0 on 0x42000000,
-> 0x43000000, or anywhere as long as such region is not used by others.
-> So, the "ranges" is just one possible software configuration, which
-> does not seem to fit in device tree because device tree is a hardware
-> description language.  However, of_translate_address() requires
-> "ranges" in every bus node between CPUs and device mapped on the CPU
-> address space.  In other words, "ranges" properties must be statically
-> defined in device tree.  After some discussion, I decided the dynamic
-> address reassignment by the driver is too bothersome.  Instead, the
-> device tree should provide a reasonable translation setup that the OS
-> can rely on.
-> 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> Acked-by: Rob Herring <robh@kernel.org>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Jon Medhurst <tixy@linaro.org>
+> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
 
-Thanks, applied to next/drivers.
+Applied, thanks.
 
 
 -Olof
