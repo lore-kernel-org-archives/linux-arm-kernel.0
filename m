@@ -1,38 +1,29 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 22 Dec 2015 20:21:55 +0800
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Enable GPU support
-In-Reply-To: <1450723442-1518-1-git-send-email-festevam@gmail.com>
-References: <1450723442-1518-1-git-send-email-festevam@gmail.com>
-Message-ID: <20151222122154.GD26290@tiger>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 22 Dec 2015 12:22:28 +0000
+Subject: next-20151222 build: 3 failures 13 warnings (next-20151222)
+In-Reply-To: <E1aBIky-0007nI-7t@optimist>
+References: <E1aBIky-0007nI-7t@optimist>
+Message-ID: <20151222122228.GL5727@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 21, 2015 at 04:44:02PM -0200, Fabio Estevam wrote:
-> Select CONFIG_DRM_ETNAVIV, so that GPU support can be enabled by default.
-> 
-> Signed-off-by: Fabio Estevam <festevam@gmail.com>
-> ---
->  arch/arm/configs/imx_v6_v7_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-> index 2d5253d..be08ce7 100644
-> --- a/arch/arm/configs/imx_v6_v7_defconfig
-> +++ b/arch/arm/configs/imx_v6_v7_defconfig
-> @@ -231,6 +231,7 @@ CONFIG_DRM_IMX_PARALLEL_DISPLAY=y
->  CONFIG_DRM_IMX_TVE=y
->  CONFIG_DRM_IMX_LDB=y
->  CONFIG_DRM_IMX_HDMI=y
-> +CONFIG_DRM_ETNAVIV=y
+On Tue, Dec 22, 2015 at 08:57:20AM +0000, Build bot for Mark Brown wrote:
 
-I do not have this Kconfig option on my tree yet.
+Today's linux-next fails to link an arm64 allmodconfig due to:
 
-Shawn
+> ERROR: "of_irq_count" [drivers/pinctrl/qcom/pinctrl-ssbi-mpp.ko] undefined!
+> ERROR: "of_irq_count" [drivers/pinctrl/qcom/pinctrl-ssbi-gpio.ko] undefined!
+> ERROR: "of_irq_count" [drivers/pinctrl/qcom/pinctrl-spmi-mpp.ko] undefined!
+> ERROR: "of_irq_count" [drivers/pinctrl/qcom/pinctrl-spmi-gpio.ko] undefined!
 
->  CONFIG_FB_MXS=y
->  CONFIG_LCD_CLASS_DEVICE=y
->  CONFIG_LCD_L4F00242T03=y
-> -- 
-> 1.9.1
-> 
-> 
+which are caused by ab4256cfeab91569 (pinctrl: qcom: pmic-gpio/mpp:
+of_irq_count() == npins) which adds uses of irq_of_count() but that is
+not exported so can't be used in modules.  I've just sent a patch adding
+the export.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151222/f30bc86f/attachment.sig>
