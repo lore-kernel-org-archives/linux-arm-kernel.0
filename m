@@ -1,38 +1,69 @@
-From: majun258@huawei.com (MaJun)
-Date: Tue, 22 Dec 2015 10:47:22 +0800
-Subject: [PATCH v2] Irq/Platform-MSI:Increase the maximum MSIs the MSI
- framework can support.
-Message-ID: <1450752442-9392-1-git-send-email-majun258@huawei.com>
+From: naobsd@gmail.com (Naoki FUKAUMI)
+Date: Tue, 22 Dec 2015 12:04:01 +0900
+Subject: [PATCH 5/6] ARM: dts: rockchip: add reboot mode node
+In-Reply-To: <1450698149-30260-1-git-send-email-andy.yan@rock-chips.com>
+References: <1450697249-29994-1-git-send-email-andy.yan@rock-chips.com>
+ <1450698149-30260-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <CAFnsNoQbeAsuESSPeDDs_fQvPv96pBX=jNh=ahpWrTKLrpEExw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ma Jun <majun258@huawei.com>
+hi,
 
-The current MSI framework can only support 256 platform MSIs.
+On Mon, Dec 21, 2015 at 8:42 PM, Andy Yan <andy.yan@rock-chips.com> wrote:
+> Add reboot mode driver DT node for rk3xxx,rk3288 platform
+>
+> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+> ---
+>
+>  arch/arm/boot/dts/rk3288.dtsi                | 25 +++++++++++++++++++++++
+>  arch/arm/boot/dts/rk3xxx.dtsi                | 26 ++++++++++++++++++++++++
+>  include/dt-bindings/soc/rockchip_boot-mode.h | 30 ++++++++++++++++++++++++++++
+>  3 files changed, 81 insertions(+)
+>  create mode 100644 include/dt-bindings/soc/rockchip_boot-mode.h
+>
+> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+> index 04ea209..937ba4c 100644
+> --- a/arch/arm/boot/dts/rk3288.dtsi
+> +++ b/arch/arm/boot/dts/rk3288.dtsi
+> @@ -170,6 +170,31 @@
+>                 };
+>         };
+>
+> +       reboot_mode {
+> +               compatible = "rockchip,reboot-mode";
+> +               rockchip,regmap = <&pmu>;
+> +               offset = <0x94>;
+> +               loader {
+> +                       linux,mode = "loader";
+> +                       linux,magic = <0x5242C301>;
+> +               };
+> +
+> +               maskrom {
+> +                       linux,mode = "maskrom";
+> +                       linux,magic = <0x5242C302>;
+> +               };
+> +
+> +               recovery {
+> +                       linux,mode = "recovery";
+> +                       linux,magic = <0x5242C303>;
+> +               };
+> +
+> +               fastboot {
+> +                       linux,mode = "fastboot";
+> +                       linux,magic = <0x5242C309>;
+> +               };
+> +       };
+> +
+(snip)
 
-But on Hisilicon platform, some network related devices has about 500
-wired interrupts.
+I sometimes use 0xEF08A53C to load bootloader from SD card instead of
+on-board flash memory such as eMMC.
+ https://github.com/linux-rockchip/u-boot-rockchip/blob/u-boot-rk3288/common/cmd_rockusb.c#L893
 
-To support these devices and align with MSI-X, this value is changed
-to 2048.
+I don't know any detail about this function.
+(above code says "reboot to maskrom", but it should be wrong from my experience)
 
-Signed-off-by: Ma Jun <majun258@huawei.com>
----
- drivers/base/platform-msi.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+do you know something about this function? can you handle this too?
 
-diff --git a/drivers/base/platform-msi.c b/drivers/base/platform-msi.c
-index a203896..47c4338 100644
---- a/drivers/base/platform-msi.c
-+++ b/drivers/base/platform-msi.c
-@@ -24,7 +24,7 @@
- #include <linux/msi.h>
- #include <linux/slab.h>
- 
--#define DEV_ID_SHIFT	24
-+#define DEV_ID_SHIFT	21
- #define MAX_DEV_MSIS	(1 << (32 - DEV_ID_SHIFT))
- 
- /*
--- 
-1.7.1
+Regards,
