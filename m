@@ -1,112 +1,34 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Tue, 22 Dec 2015 11:18:01 -0800
-Subject: [PATCH 2/2] pci,
- pcie-thunder-pem: Add PCIe host driver for ThunderX processors.
-In-Reply-To: <20151222100352.GC32623@arm.com>
-References: <1450749222-15966-1-git-send-email-ddaney.cavm@gmail.com>
- <1450749222-15966-3-git-send-email-ddaney.cavm@gmail.com>
- <20151222100352.GC32623@arm.com>
-Message-ID: <5679A1E9.3050902@caviumnetworks.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Tue, 22 Dec 2015 11:25:41 -0800
+Subject: [PATCH v11 0/2] Sigma Designs Tango4 port
+In-Reply-To: <566FDF53.3030004@sigmadesigns.com> (Marc Gonzalez's message of
+ "Tue, 15 Dec 2015 10:37:23 +0100")
+References: <566FDF53.3030004@sigmadesigns.com>
+Message-ID: <7hr3iexp3e.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/22/2015 02:03 AM, Will Deacon wrote:
-> On Mon, Dec 21, 2015 at 05:53:42PM -0800, David Daney wrote:
->> From: David Daney <david.daney@cavium.com>
->>
->> Some Cavium ThunderX processors require quirky access methods for the
->> config space of the PCIe bridge.  Add a driver to provide these config
->> space accessor functions.  The pci-host-generic driver code is used to
->> configure the PCI machinery.
->>
->> Signed-off-by: David Daney <david.daney@cavium.com>
->> ---
->>   .../devicetree/bindings/pci/pcie-thunder-pem.txt   |  43 ++++
->>   drivers/pci/host/Kconfig                           |   6 +
->>   drivers/pci/host/Makefile                          |   1 +
->>   drivers/pci/host/pcie-thunder-pem.c                | 283 +++++++++++++++++++++
->>   4 files changed, 333 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/pci/pcie-thunder-pem.txt
->>   create mode 100644 drivers/pci/host/pcie-thunder-pem.c
->>
->> diff --git a/Documentation/devicetree/bindings/pci/pcie-thunder-pem.txt b/Documentation/devicetree/bindings/pci/pcie-thunder-pem.txt
->> new file mode 100644
->> index 0000000..66824d5
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/pci/pcie-thunder-pem.txt
->> @@ -0,0 +1,43 @@
->> +* ThunderX PEM PCIe host controller
->> +
->> +Firmware-initialized PCIe host controller found on some Cavium
->> +ThunderX processors.
->> +
->> +The properties and their meanings are identical to those described in
->> +host-heneric-pci.txt except as listed below.
->> +
->> +Properties of the host controller node that differ from
->> +host-heneric-pci.txt:
->
-> Consistently odd typo (s/heneric/generic/)!
->
+Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
 
-I'm not sure how I managed to do that.  I will fix these and resend.
-
->> +
->> +- compatible     : Must be "cavium,pci-host-thunder-pem"
->> +
->> +- reg            : Two entries: First the configuration space for down
->> +                   stream devices base address and size, as accessed
->> +                   from the parent bus. Second, the register bank of
->> +                   the PEM device PCIe bridge.
->> +
->> +Example:
->> +
->> +    pem2 {
->> +	compatible = "cavium,pci-host-thunder-pem";
->> +	device_type = "pci";
->> +	msi-parent = <&its>;
->> +	msi-map = <0 &its 0x10000 0x10000>;
->> +	bus-range = <0x8f 0xc7>;
->> +	#size-cells = <2>;
->> +	#address-cells = <3>;
->> +
->> +	reg = <0x8880 0x8f000000 0x0 0x39000000>,  /* Configuration space */
->> +	      <0x87e0 0xc2000000 0x0 0x00010000>; /* PEM space */
->> +	ranges = <0x01000000 0x00 0x00020000 0x88b0 0x00020000 0x00 0x00010000>, /* I/O */
->> +		 <0x03000000 0x00 0x10000000 0x8890 0x10000000 0x0f 0xf0000000>, /* mem64 */
->> +		 <0x43000000 0x10 0x00000000 0x88a0 0x00000000 0x10 0x00000000>, /* mem64-pref */
->> +		 <0x03000000 0x87e0 0xc2f00000 0x87e0 0xc2000000 0x00 0x00100000>; /* mem64 PEM BAR4 */
->> +
->> +	#interrupt-cells = <1>;
->> +	interrupt-map-mask = <0 0 0 7>;
->> +	interrupt-map = <0 0 0 1 &gic0 0 0 0 24 4>, /* INTA */
->> +			<0 0 0 2 &gic0 0 0 0 25 4>, /* INTB */
->> +			<0 0 0 3 &gic0 0 0 0 26 4>, /* INTC */
->> +			<0 0 0 4 &gic0 0 0 0 27 4>; /* INTD */
->> +    };
->> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
->> index f131ba9..16ed9c3 100644
->> --- a/drivers/pci/host/Kconfig
->> +++ b/drivers/pci/host/Kconfig
->> @@ -172,4 +172,10 @@ config PCI_HISI
->>   	help
->>   	  Say Y here if you want PCIe controller support on HiSilicon HIP05 SoC
->>
->> +config PCIE_HOST_THUNDER_PEM
->> +	bool "Cavium Thunder PCIe controller to off-chip devices"
->> +	depends on PCI_HOST_GENERIC && ARM64
+> "One more time. We're gonna celebrate."
 >
-> || COMPILE_TEST ?
+> Changes since v10:
+> Add aliases and chosen DT nodes
+> Use CPU_CLK and SYS_CLK symbolic names
+> MPCore private memory region DT node
+> select TANGO_IRQ instead of GENERIC_IRQ_CHIP
 >
-> (or does the use of writeq get you? If so, maybe COMPILE_TEST && 64BIT)
+> Changes planned for a future patch series:
+> Have clkgen driver export CD2 for USB, and CD6 for SDIO
 
-Yes, we must use writeq in the driver, I will change it to 
-||(COMPILE_TEST && 64BIT)
+Was it intentional to leave out a multi_v7_defconfig change so that this
+actually builds?  Or was that planned for a future series?
 
-Thanks,
-David Daney
+IMO, it should be part of this series so it gets build tested as soon as
+it's merged.
 
+Otherwise, looking good to me.
 
->
-> Will
->
+Reviewed-by: Kevin Hilman <khilman@linaro.org>
+
+Kevin
