@@ -1,129 +1,98 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 22 Dec 2015 09:55:18 +0000
-Subject: [PATCH 2/2] arm64: KVM: Do not update PC if the trap handler has
- updated it
-In-Reply-To: <1450778118-12715-1-git-send-email-marc.zyngier@arm.com>
-References: <1450778118-12715-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1450778118-12715-3-git-send-email-marc.zyngier@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 22 Dec 2015 10:03:52 +0000
+Subject: [PATCH 2/2] pci, pcie-thunder-pem: Add PCIe host driver for
+ ThunderX processors.
+In-Reply-To: <1450749222-15966-3-git-send-email-ddaney.cavm@gmail.com>
+References: <1450749222-15966-1-git-send-email-ddaney.cavm@gmail.com>
+ <1450749222-15966-3-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20151222100352.GC32623@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Assuming we trap a system register, and decide that the access is
-illegal, we will inject an exception in the guest. In this
-case, we shouldn't increment the PC, or the vcpu will miss the
-first instruction of the handler, leading to a mildly confused
-guest.
+On Mon, Dec 21, 2015 at 05:53:42PM -0800, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
+> 
+> Some Cavium ThunderX processors require quirky access methods for the
+> config space of the PCIe bridge.  Add a driver to provide these config
+> space accessor functions.  The pci-host-generic driver code is used to
+> configure the PCI machinery.
+> 
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> ---
+>  .../devicetree/bindings/pci/pcie-thunder-pem.txt   |  43 ++++
+>  drivers/pci/host/Kconfig                           |   6 +
+>  drivers/pci/host/Makefile                          |   1 +
+>  drivers/pci/host/pcie-thunder-pem.c                | 283 +++++++++++++++++++++
+>  4 files changed, 333 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/pcie-thunder-pem.txt
+>  create mode 100644 drivers/pci/host/pcie-thunder-pem.c
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/pcie-thunder-pem.txt b/Documentation/devicetree/bindings/pci/pcie-thunder-pem.txt
+> new file mode 100644
+> index 0000000..66824d5
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pci/pcie-thunder-pem.txt
+> @@ -0,0 +1,43 @@
+> +* ThunderX PEM PCIe host controller
+> +
+> +Firmware-initialized PCIe host controller found on some Cavium
+> +ThunderX processors.
+> +
+> +The properties and their meanings are identical to those described in
+> +host-heneric-pci.txt except as listed below.
+> +
+> +Properties of the host controller node that differ from
+> +host-heneric-pci.txt:
 
-Solve this by snapshoting PC before the access is performed,
-and checking if it has moved or not before incrementing it.
+Consistently odd typo (s/heneric/generic/)!
 
-Reported-by: Shannon Zhao <shannon.zhao@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/kvm/sys_regs.c | 73 +++++++++++++++++++++++------------------------
- 1 file changed, 36 insertions(+), 37 deletions(-)
+> +
+> +- compatible     : Must be "cavium,pci-host-thunder-pem"
+> +
+> +- reg            : Two entries: First the configuration space for down
+> +                   stream devices base address and size, as accessed
+> +                   from the parent bus. Second, the register bank of
+> +                   the PEM device PCIe bridge.
+> +
+> +Example:
+> +
+> +    pem2 {
+> +	compatible = "cavium,pci-host-thunder-pem";
+> +	device_type = "pci";
+> +	msi-parent = <&its>;
+> +	msi-map = <0 &its 0x10000 0x10000>;
+> +	bus-range = <0x8f 0xc7>;
+> +	#size-cells = <2>;
+> +	#address-cells = <3>;
+> +
+> +	reg = <0x8880 0x8f000000 0x0 0x39000000>,  /* Configuration space */
+> +	      <0x87e0 0xc2000000 0x0 0x00010000>; /* PEM space */
+> +	ranges = <0x01000000 0x00 0x00020000 0x88b0 0x00020000 0x00 0x00010000>, /* I/O */
+> +		 <0x03000000 0x00 0x10000000 0x8890 0x10000000 0x0f 0xf0000000>, /* mem64 */
+> +		 <0x43000000 0x10 0x00000000 0x88a0 0x00000000 0x10 0x00000000>, /* mem64-pref */
+> +		 <0x03000000 0x87e0 0xc2f00000 0x87e0 0xc2000000 0x00 0x00100000>; /* mem64 PEM BAR4 */
+> +
+> +	#interrupt-cells = <1>;
+> +	interrupt-map-mask = <0 0 0 7>;
+> +	interrupt-map = <0 0 0 1 &gic0 0 0 0 24 4>, /* INTA */
+> +			<0 0 0 2 &gic0 0 0 0 25 4>, /* INTB */
+> +			<0 0 0 3 &gic0 0 0 0 26 4>, /* INTC */
+> +			<0 0 0 4 &gic0 0 0 0 27 4>; /* INTD */
+> +    };
+> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> index f131ba9..16ed9c3 100644
+> --- a/drivers/pci/host/Kconfig
+> +++ b/drivers/pci/host/Kconfig
+> @@ -172,4 +172,10 @@ config PCI_HISI
+>  	help
+>  	  Say Y here if you want PCIe controller support on HiSilicon HIP05 SoC
+>  
+> +config PCIE_HOST_THUNDER_PEM
+> +	bool "Cavium Thunder PCIe controller to off-chip devices"
+> +	depends on PCI_HOST_GENERIC && ARM64
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index d2650e8..9c87e0c 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -966,6 +966,39 @@ static const struct sys_reg_desc *find_reg(const struct sys_reg_params *params,
- 	return NULL;
- }
- 
-+/* Perform the sysreg access, returns 0 on success */
-+static int access_sys_reg(struct kvm_vcpu *vcpu,
-+			  struct sys_reg_params *params,
-+			  const struct sys_reg_desc *r)
-+{
-+	u64 pc = *vcpu_pc(vcpu);
-+
-+	if (unlikely(!r))
-+		return -1;
-+
-+	/*
-+	 * Not having an accessor means that we have configured a trap
-+	 * that we don't know how to handle. This certainly qualifies
-+	 * as a gross bug that should be fixed right away.
-+	 */
-+	BUG_ON(!r->access);
-+
-+	if (likely(r->access(vcpu, params, r))) {
-+		/*
-+		 * Skip the instruction if it was emulated without PC
-+		 * having changed. This allows us to detect a fault
-+		 * being injected (incrementing the PC here would
-+		 * cause the vcpu to skip the first instruction of its
-+		 * fault handler).
-+		 */
-+		if (pc == *vcpu_pc(vcpu))
-+			kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
-+		return 0;
-+	}
-+
-+	return -1;
-+}
-+
- int kvm_handle_cp14_load_store(struct kvm_vcpu *vcpu, struct kvm_run *run)
- {
- 	kvm_inject_undefined(vcpu);
-@@ -994,26 +1027,7 @@ static int emulate_cp(struct kvm_vcpu *vcpu,
- 
- 	r = find_reg(params, table, num);
- 
--	if (r) {
--		/*
--		 * Not having an accessor means that we have
--		 * configured a trap that we don't know how to
--		 * handle. This certainly qualifies as a gross bug
--		 * that should be fixed right away.
--		 */
--		BUG_ON(!r->access);
--
--		if (likely(r->access(vcpu, params, r))) {
--			/* Skip instruction, since it was emulated */
--			kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
--		}
--
--		/* Handled */
--		return 0;
--	}
--
--	/* Not handled */
--	return -1;
-+	return access_sys_reg(vcpu, params, r);
- }
- 
- static void unhandled_cp_access(struct kvm_vcpu *vcpu,
-@@ -1178,27 +1192,12 @@ static int emulate_sys_reg(struct kvm_vcpu *vcpu,
- 	if (!r)
- 		r = find_reg(params, sys_reg_descs, ARRAY_SIZE(sys_reg_descs));
- 
--	if (likely(r)) {
--		/*
--		 * Not having an accessor means that we have
--		 * configured a trap that we don't know how to
--		 * handle. This certainly qualifies as a gross bug
--		 * that should be fixed right away.
--		 */
--		BUG_ON(!r->access);
--
--		if (likely(r->access(vcpu, params, r))) {
--			/* Skip instruction, since it was emulated */
--			kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
--			return 1;
--		}
--		/* If access function fails, it should complain. */
--	} else {
-+	if (access_sys_reg(vcpu, params, r)) {
- 		kvm_err("Unsupported guest sys_reg access at: %lx\n",
- 			*vcpu_pc(vcpu));
- 		print_sys_reg_instr(params);
-+		kvm_inject_undefined(vcpu);
- 	}
--	kvm_inject_undefined(vcpu);
- 	return 1;
- }
- 
--- 
-2.1.4
+|| COMPILE_TEST ?
+
+(or does the use of writeq get you? If so, maybe COMPILE_TEST && 64BIT)
+
+Will
