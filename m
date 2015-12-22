@@ -1,59 +1,36 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 22 Dec 2015 08:21:09 +0100
-Subject: [PATCH v2] ARM: PJ4: make coprocessor access sequences buildable in
- Thumb2 mode
-Message-ID: <1450768869-13450-1-git-send-email-ard.biesheuvel@linaro.org>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Tue, 22 Dec 2015 09:38:21 +0200
+Subject: [PATCH v2] ARM: dts: imx7d: cl-som-imx7: add basic module support
+In-Reply-To: <20151221135959.GA18858@tiger>
+References: <20151208151401.GA20042@rob-hp-laptop>
+ <1449756097-2921-1-git-send-email-grinberg@compulab.co.il>
+ <20151214024315.GC25756@tiger> <56716EA4.2080107@compulab.co.il>
+ <20151221063608.GB4703@tiger> <5677B341.6040203@compulab.co.il>
+ <20151221135959.GA18858@tiger>
+Message-ID: <5678FDED.8090500@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PJ4 inline asm sequence to write to cp15 cannot be built in Thumb-2
-mode, due to the way it performs arithmetic on the program counter, so it
-is built in ARM mode instead. However, building C files in ARM mode under
-CONFIG_THUMB2_KERNEL is problematic, since the instrumentation performed
-by subsystems like ftrace does not expect having to deal with interworking
-branches.
+On 12/21/15 15:59, Shawn Guo wrote:
+> On Mon, Dec 21, 2015 at 10:07:29AM +0200, Igor Grinberg wrote:
+>>>> Do you think we should document it in:
+>>>> Documentation/devicetree/bindings/arm/compulab-boards.txt
+>>>> (this file should already exist in arm-soc/next/dt)?
+>>>
+>>> Yeah, if the file already exist, it's the best option.  But, as it
+>>> doesn't exist on my tree, I can not apply this change.
+>>
+>> It is already in linux-next.
+>> Who do you think should apply the v2 patch then?
+>> May be the arm-soc guys? (Cc'ed Olof and Arnd)
+> 
+> I think you can leave out the change from the patch, so that I can
+> apply.  And you send that change separately to arm-soc folks.
 
-Since the sequence in question is simply a poor man's ISB instruction,
-let's use a straight 'isb' instead when building in Thumb2 mode. Thumb2
-implies V7, so 'isb' should always be supported in that case.
+Ok. We'll send a v2 today.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Nicolas Pitre <nico@linaro.org>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/kernel/Makefile  | 1 -
- arch/arm/kernel/pj4-cp0.c | 4 ++++
- 2 files changed, 4 insertions(+), 1 deletion(-)
+Thanks!
 
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index af9e59bf3831..3c789496297f 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -73,7 +73,6 @@ obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
- obj-$(CONFIG_PERF_EVENTS)	+= perf_regs.o perf_callchain.o
- obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event_xscale.o perf_event_v6.o \
- 				   perf_event_v7.o
--CFLAGS_pj4-cp0.o		:= -marm
- AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
- obj-$(CONFIG_ARM_CPU_TOPOLOGY)  += topology.o
- obj-$(CONFIG_VDSO)		+= vdso.o
-diff --git a/arch/arm/kernel/pj4-cp0.c b/arch/arm/kernel/pj4-cp0.c
-index 8153e36b2491..7c9248b74d3f 100644
---- a/arch/arm/kernel/pj4-cp0.c
-+++ b/arch/arm/kernel/pj4-cp0.c
-@@ -66,9 +66,13 @@ static void __init pj4_cp_access_write(u32 value)
- 
- 	__asm__ __volatile__ (
- 		"mcr	p15, 0, %1, c1, c0, 2\n\t"
-+#ifdef CONFIG_THUMB2_KERNEL
-+		"isb\n\t"
-+#else
- 		"mrc	p15, 0, %0, c1, c0, 2\n\t"
- 		"mov	%0, %0\n\t"
- 		"sub	pc, pc, #4\n\t"
-+#endif
- 		: "=r" (temp) : "r" (value));
- }
- 
 -- 
-2.1.4
+Regards,
+Igor.
