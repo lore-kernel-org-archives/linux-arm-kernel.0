@@ -1,44 +1,44 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 22 Dec 2015 12:14:58 -0800
-Subject: [GIT PULL] Qualcomm SoC Updates for 4.5
-In-Reply-To: <1450384435-4300-1-git-send-email-andy.gross@linaro.org>
-References: <1450384435-4300-1-git-send-email-andy.gross@linaro.org>
-Message-ID: <20151222201458.GL30172@localhost>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 22 Dec 2015 21:23:59 +0100
+Subject: [PATCH v11 0/2] Sigma Designs Tango4 port
+In-Reply-To: <7hr3iexp3e.fsf@deeprootsystems.com>
+References: <566FDF53.3030004@sigmadesigns.com>
+ <7hr3iexp3e.fsf@deeprootsystems.com>
+Message-ID: <5679B15F.80106@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 17, 2015 at 02:33:55PM -0600, Andy Gross wrote:
-> The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
-> 
->   Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-soc-for-4.5
-> 
-> for you to fetch changes up to bbeaa59598cae12626c9c42e91821e3abd5b87f0:
-> 
->   MAINTAINERS: Change QCOM entries (2015-12-17 13:55:38 -0600)
-> 
-> ----------------------------------------------------------------
-> Qualcomm ARM Based SoC Updates for 4.5
-> 
-> * Add WCNSS_CTRL client
-> * Various Kconfig changes to fix build issues
-> * Update SoC Qualcomm MAINTAINERS entry
-> * Add SMP2P, SMSM, and SMEM state machine drivers
-> * Add SMD-RPM support for existing platforms
-> 
-> ----------------------------------------------------------------
-> Andy Gross (2):
->       soc: qcom: smd-rpm: Add existing platform support
->       MAINTAINERS: Change QCOM entries
+On 22/12/2015 20:25, Kevin Hilman wrote:
 
-Andy,
+> Marc Gonzalez wrote:
+> 
+>> Changes since v10:
+>> Add aliases and chosen DT nodes
+>> Use CPU_CLK and SYS_CLK symbolic names
+>> MPCore private memory region DT node
+>> select TANGO_IRQ instead of GENERIC_IRQ_CHIP
+>>
+>> Changes planned for a future patch series:
+>> Have clkgen driver export CD2 for USB, and CD6 for SDIO
+> 
+> Was it intentional to leave out a multi_v7_defconfig change so that this
+> actually builds?  Or was that planned for a future series?
 
-This patch dropped Kumar when it was posted on the list (and acked by
-him), but doesn't now that it's applied. I've checked in a fix on top
-of it to do so.
+How is a multi_v7_defconfig different from any old defconfig?
 
+> IMO, it should be part of this series so it gets build tested as soon as
+> it's merged.
 
--Olof
+The problem is that a mandatory driver is missing upstream
+(interrupt controller).
+
+http://thread.gmane.org/gmane.linux.kernel/2089470
+
+> Otherwise, looking good to me.
+> 
+> Reviewed-by: Kevin Hilman <khilman@linaro.org>
+
+Woot! I already have the next patch series mostly ready, but I suppose
+I should wait for this one to be accepted before submitting a new one.
+
+Regards.
