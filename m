@@ -1,42 +1,40 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Tue, 22 Dec 2015 11:47:15 +0200
-Subject: [PATCH v3 1/3] ACPI: amba bus probing support
-In-Reply-To: <56789147.8070602@mleia.com>
-References: <1450716100-13688-1-git-send-email-aleksey.makarov@linaro.org>
- <1450716100-13688-2-git-send-email-aleksey.makarov@linaro.org>
- <56789147.8070602@mleia.com>
-Message-ID: <CAHp75VfiUJymwxxHxr-Cw3cSBDfVBm1aj=T5o+=1G4CcACq5kw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 22 Dec 2015 09:48:44 +0000
+Subject: [PATCH v7 5/6] arm64: ftrace: add arch-specific stack tracer
+In-Reply-To: <5678F07F.8030308@linaro.org>
+References: <1450168424-10010-1-git-send-email-takahiro.akashi@linaro.org>
+ <1450168424-10010-6-git-send-email-takahiro.akashi@linaro.org>
+ <20151221120438.GI23092@arm.com> <5678F07F.8030308@linaro.org>
+Message-ID: <20151222094844.GA32623@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 22, 2015 at 1:54 AM, Vladimir Zapolskiy <vz@mleia.com> wrote:
-> On 21.12.2015 18:41, Aleksey Makarov wrote:
+On Tue, Dec 22, 2015 at 03:41:03PM +0900, AKASHI Takahiro wrote:
+> On 12/21/2015 09:04 PM, Will Deacon wrote:
+> >On Tue, Dec 15, 2015 at 05:33:43PM +0900, AKASHI Takahiro wrote:
+> >>Regarding a function prologue analyzer, there is no guarantee that we can
+> >>handle all the possible patterns of function prologue as gcc does not use
+> >>any fixed templates to generate them. 'Instruction scheduling' is another
+> >>issue here.
+> >
+> >Have you run this past any of the GCC folks?  It would be good to at least
+> >make them aware of the heuristics you're using and the types of prologue
+> >that we can handle. They even have suggestions to improve on your approach
+> >(e.g. using -fstack-usage).
+> 
+> Yeah, I can, but do you mind my including you in CC?
+> 'cause I don't know what kind of comments you are expecting.
 
->> +static int amba_handler_attach(struct acpi_device *adev,
->> +                             const struct acpi_device_id *id)
->> +{
->> +     struct amba_device *dev = NULL;
->> +     struct acpi_device *acpi_parent;
->> +     struct resource_entry *rentry;
->> +     struct list_head resource_list;
->> +     struct resource *resources = NULL;
->> +     bool address_found = false;
->> +     int ret, count, irq_no = 0;
->> +
->> +     /* If the ACPI node already has a physical device attached, skip it. */
->> +     if (adev->physical_node_count)
->> +             return 0;
->> +
->> +     amba_register_dummy_clk();
->
-> Since it is a single time dummy clock registration, may be it is better
-> to move it to acpi_amba_init() or somewhere else? I understand that
-> "apb_pclk" is wanted, but I'm not sure that this driver should serve as
-> a clock provider.
+Sure, I'd be interested to be on Cc. I suspect they will say "we don't
+guarantee frame layout, why can't you use -fstack-usage?", to which I
+don't have a good answer.
 
-Depends on actual hardware topology. Intel HW has few drivers that are
-clock providers because they are really ones.
+Basically, I don't think a heuristic-based unwinder is supportable in
+the long-term, so we need a plan to have unwinding support when building
+under future compilers without having to pile more heuristics into this
+code. If we have a plan that the compiler guys sign up to, then I'm ok
+merging something like you have already as a stop-gap.
 
--- 
-With Best Regards,
-Andy Shevchenko
+Make sense?
+
+Will
