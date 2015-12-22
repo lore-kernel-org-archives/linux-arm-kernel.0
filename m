@@ -1,90 +1,60 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 22 Dec 2015 11:50:01 +0100
-Subject: [linux-sunxi] Re: [PATCH 4/5] ARM: dts: sun5i: Add dts file for
- the Empire Electronix D709 tablet
-In-Reply-To: <CAGb2v67+XpYwUFAVSGEGAfJ0bzubQ87Ebaf5W5Ze619mEE6uUA@mail.gmail.com>
-References: <1450611782-9494-1-git-send-email-hdegoede@redhat.com>
- <1450611782-9494-4-git-send-email-hdegoede@redhat.com>
- <CAGb2v65daCCOWf7EXDkNWnxv1idXHXesOp6Et_0h-o+9drdeMA@mail.gmail.com>
- <5677D87A.90805@redhat.com> <20151221161132.GA30359@lukather>
- <567854D5.7030601@redhat.com>
- <CAGb2v67+XpYwUFAVSGEGAfJ0bzubQ87Ebaf5W5Ze619mEE6uUA@mail.gmail.com>
-Message-ID: <56792AD9.9040209@redhat.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 22 Dec 2015 11:08:10 +0000
+Subject: [PATCH 1/2] arm: KVM: Do not update PC if the trap handler has
+ updated it
+In-Reply-To: <1450778118-12715-2-git-send-email-marc.zyngier@arm.com>
+References: <1450778118-12715-1-git-send-email-marc.zyngier@arm.com>
+ <1450778118-12715-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <CAFEAcA8F2TJuRR5ELvit0FPa3XFMJ847S8WK25i5aVdGBU=PUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 22-12-15 05:29, Chen-Yu Tsai wrote:
-> On Tue, Dec 22, 2015 at 3:36 AM, Hans de Goede <hdegoede@redhat.com> wrote:
->> Hi,
->>
->> On 21-12-15 17:11, Maxime Ripard wrote:
->>>
->>> Hi,x
->>>
->>> On Mon, Dec 21, 2015 at 11:46:18AM +0100, Hans de Goede wrote:
->>>>>
->>>>> On the side, any thoughts on how to handle the differences between
->>>>> various "Q8"
->>>>> tablets, like different I2C-based sensors and WiFi chips?
->>>>
->>>>
->>>> For i2c based sensors the plan is to use devicetree overlays + an in
->>>> kernel
->>>> overlay manager which probes the i2c bus (checking known touchscreen /
->>>> accelerometer
->>>> addresses) and then picks the right touchscreen + accelerometer overlays.
->>>>
->>>> Wifi is somewhat more tricky I must admit, esp. since there seem to be q8
->>>> a23 based
->>>> tablet variants with usb wifi and others with sdio wifi. Since both
->>>> busses are
->>>> discoverable I'm tempted to just enable both in devicetree, and let the
->>>> kernel probe
->>>> and see what is actually there. This assume that the way the wifichip is
->>>> powered
->>>> is the same on all boards, or at least that it is safe to enable the
->>>> necessary
->>>> regulators on all boards ...
->>>>
->>>>> I'm asking because with Maxime's couple-regulator we should be able to
->>>>> get the
->>>>> RTL8723BS on the Q8 A23/33 v1.5 working.
->>>>
->>>>
->>>> So this means enabled the sdio controller (should be safe on all boards?)
->>>> and
->>>> enabling 2 regulators to power the wifi-chip. I think it will be safe to
->>>> do this
->>>> even on boards where those regulators are not used, what do you think ?
->>>
->>>
->>> Wouldn't that introduce some useless power drain on those boards?
->>
->>
->> If nothing is attached to those regulators (which I expect to be the case
->> when
->> they are not used to power wifi) then I would expect the drain to be
->> minimal,
->> my biggest worry is some board having tied these to ground, but I don't
->> think
->> that is very likely.
+On 22 December 2015 at 09:55, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> Assuming we trap a coprocessor access, and decide that the access
+> is illegal, we will inject an exception in the guest. In this
+> case, we shouldn't increment the PC, or the vcpu will miss the
+> first instruction of the handler, leading to a mildly confused
+> guest.
 >
-> AFAIK the AXP datasheets mention that unused DCDC outputs should be left
-> floating. Not sure if this applies to LDO outputs as well. But any used
-> outputs would have a bypass capacitor.
+> Solve this by snapshoting PC before the access is performed,
+> and checking if it has moved or not before incrementing it.
 >
->  From the board designs I've seen, this seems to be the common case.
-> I'm not an electrical engineer, but I think we're covered here.
+> Reported-by: Shannon Zhao <shannon.zhao@linaro.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/kvm/coproc.c | 14 ++++++++++++--
+>  1 file changed, 12 insertions(+), 2 deletions(-)
 >
-> Another thing we need to deal with is the different power sequencing
-> requirements for the different SDIO chips.
+> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+> index f3d88dc..f4ad2f2 100644
+> --- a/arch/arm/kvm/coproc.c
+> +++ b/arch/arm/kvm/coproc.c
+> @@ -447,12 +447,22 @@ static int emulate_cp15(struct kvm_vcpu *vcpu,
+>                 r = find_reg(params, cp15_regs, ARRAY_SIZE(cp15_regs));
+>
+>         if (likely(r)) {
+> +               unsigned long pc = *vcpu_pc(vcpu);
+> +
+>                 /* If we don't have an accessor, we should never get here! */
+>                 BUG_ON(!r->access);
+>
+>                 if (likely(r->access(vcpu, params, r))) {
+> -                       /* Skip instruction, since it was emulated */
+> -                       kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
+> +                       /*
+> +                        * Skip the instruction if it was emulated
+> +                        * without PC having changed. This allows us
+> +                        * to detect a fault being injected
+> +                        * (incrementing the PC here would cause the
+> +                        * vcpu to skip the first instruction of its
+> +                        * fault handler).
+> +                        */
+> +                       if (pc == *vcpu_pc(vcpu))
+> +                               kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
 
-In my experience there are not that much sequences, as simply making sure
-all necessary resources are one before probing the sdio bus, I have yet to
-see a case where the order in which the resources are enabled matters.
+Won't this result in our incorrectly skipping the first insn
+in the fault handler if the original offending instruction
+was itself the first insn in the fault handler?
 
-Regards,
-
-Hans
+thanks
+-- PMM
