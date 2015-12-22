@@ -1,85 +1,83 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Tue, 22 Dec 2015 12:56:04 -0800
-Subject: [PATCH v4] clk: ti: Add support for dm814x ADPLL
-In-Reply-To: <20151222203224.GG2793@atomide.com>
-References: <1450798030-23680-1-git-send-email-tony@atomide.com>
- <5679B2D6.4050102@ti.com> <20151222203224.GG2793@atomide.com>
-Message-ID: <20151222205604.GA14912@quark.deferred.io>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Dec 2015 22:13:21 +0100
+Subject: [PATCH 1/2] PCI: generic: Refactor code to enable reuse by other
+ drivers.
+In-Reply-To: <5679968B.4090908@caviumnetworks.com>
+References: <1450749222-15966-1-git-send-email-ddaney.cavm@gmail.com>
+ <20151222100732.GD32623@arm.com> <5679968B.4090908@caviumnetworks.com>
+Message-ID: <201512222213.21744.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/22, Tony Lindgren wrote:
-> * Tero Kristo <t-kristo@ti.com> [151222 12:28]:
-> > On 12/22/2015 05:27 PM, Tony Lindgren wrote:
-> > >On dm814x we have 13 ADPLLs with 3 to 4 outputs on each. The
-> > >ADPLLs have several dividers and muxes controlled by a shared
-> > >control register for each PLL.
-> > >
-> > >Note that for the clocks to work as device drivers for booting on
-> > >dm814x, this patch depends on "ARM: OMAP2+: Change core_initcall
-> > >levels to postcore_initcall".
-> > >
-> > >Also note that this patch does not implement clk_set_rate for the
-> > >PLL, that will be posted later on when available.
-> > >
-> > >Cc: Michael Turquette <mturquette@baylibre.com>
-> > >Cc: Stephen Boyd <sboyd@codeaurora.org>
-> > >Cc: Tero Kristo <t-kristo@ti.com>
-> > >Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > >---
-> > >
-> > >If no more comments, Tero can you please apply into an immutable
-> > >branch against v4.4-rc1 that I can merge in too?
-> > >
-> > >Changes since v3:
-> > >
-> > >- We want to create the clkdev entry for all clocks, not just outputs
-> > >- ti_adpll_wait_lock loops did not do the right thing
-> > >- We want to use CLK_GET_RATE_NOCACHE in ti_adpll_init_dco
-> > 
-> > I have just one comment below still, once that is addressed:
-> > 
-> > Conditionally-acked-by: Tero Kristo <t-kristo@ti.com>
-> > 
-> > Stephen / Michael, can you pick this up for next merge? I don't have
-> > anything else coming for the window this time, and I am probably going to be
-> > on vacation just nicely to not be able to push anything anyway.
+On Tuesday 22 December 2015, David Daney wrote:
+> On 12/22/2015 02:07 AM, Will Deacon wrote:
+> > On Mon, Dec 21, 2015 at 05:53:41PM -0800, David Daney wrote:
+> >> From: David Daney <david.daney@cavium.com>
+> >> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+> >> index 5434c90..e83cec7 100644
+> >> --- a/drivers/pci/host/pci-host-generic.c
+> >> +++ b/drivers/pci/host/pci-host-generic.c
+> [...]
+> >> -static int gen_pci_probe(struct platform_device *pdev)
+> >> +int gen_pci_common_probe(struct platform_device *pdev,
+> >> +			 struct gen_pci *pci)
+> >
+> > Whilst I'm fine with this patch, I don't know how Bjorn will feel about
+> > exposing this function outside of the generic host driver. We could avoid
+> > it by turning things upside-down and having the generic driver probe
+> > the other drivers by matching a compatible string with a probe function
+> > pointer, but I'd be interested to see what others think.
+> >
 > 
-> Also, I managed to remove the dependency to the dts changes. So there's
-> no longer any need to set up an immutable branch for this patch.
+> Note: I know that pci-host-generic is not built as a loadable module, but...
+> 
+> struct of_device_id, MODULE_DEVICE_TABLE, struct platform_driver and the 
+> registering of platform drivers is fairly well standardized in the 
+> kernel, and module loading userpace tools.
 
-Can you split the binding description into a separate patch and send it
-to the dt mailing list? Feel free to add my Ack to it.
+Agreed, this is the correct way to do the abstraction if we want one, the way
+that Will describes is generally not a good idea, and we've converted a
+number of drivers that did it like that to the way you do it here.
 
-Stephen and I are trying to not take that stuff anymore.
+> The struct of_device_id, MODULE_DEVICE_TABLE must really reside in the 
+> same module as the driver for the device.   We are creating a separate 
+> driver precisely because we don't want to mix all this ThunderX specific 
+> code into the pci-host-generic driver when it is used by arm-32bit and 
+> others.  This means that, at a minimum, we would have to export the 
+> pci-host-generic probe function so that it could be referenced by struct 
+> platform_driver in other modules.
 
-Regards,
-Mike
+Right.
 
+> This brings up the next problem.  How to attach driver specific data to 
+> the generic driver structures?  At first I tried augmenting  struct 
+> gen_pci_cfg_bus_ops with a callback .init() function to be called by the 
+> generic driver, but this would also require adding an an element to 
+> struct gen_pci to point to a driver specific data object.  It felt a 
+> little convoluted and complex.
 > 
-> > <snip>
-> > 
-> > >+
-> > >+/* Warn if clkout or clkoutx2 try to set unavailable parent */
-> > >+static int ti_adpll_clkout_set_parent(struct clk_hw *hw, u8 index)
-> > >+{
-> > >+	struct ti_adpll_clkout_data *co = to_clkout(hw);
-> > >+	struct ti_adpll_data *d = co->adpll;
-> > >+
-> > >+	if (ti_adpll_clock_is_bypass(d) != index)
-> > >+		return -EAGAIN;
-> > >+
-> > 
-> > I think this part is still somewhat weird. You are not doing anything useful
-> > in this function, so do you need to implement it at all? Just returning
-> > -EINVAL always might work also. EAGAIN is wrong return value anyway as it
-> > can pretty much never succeed.
+> This led me to the current design where struct gen_pci is embedded in 
+> the driver specific structure, and the allocation of this is done in the 
+> driver specific probe function.  No more callbacks, no additions to the 
+> pci-host-generic structures.  I think it is a little cleaner this way.
 > 
-> OK thanks sounds good to me, I'll check it this after lunch.
-> 
-> Also noticed the do_div should be div64_u64 so v5 coming later
-> today.
-> 
-> Regards,
-> 
-> Tony
+> If there are suggestions as to how it can be made cleaner yet, I would 
+> be happy to implement and test them.
+
+My idea of the long-term direction for the pci-host-generic driver
+would be to move more parts into the PCI core code as library functions
+that can be used by other drivers as well. This would also address my
+other concern that I'd like to see the generic host driver remain the
+simplest example that we have, and only require any additional code in
+other drivers to add functionality or workarounds.
+
+Adding an abstraction layer within the driver to some degree goes in the
+opposite direction of that.
+
+One approach that might work would be to split the existing driver into
+three files: one for CAM, one for ECAM and one for the common parts,
+with an interface similar to what you have here. Then you can add your
+driver as a third front-end, and we can keep working on integrating the
+common parts further into the PCI core.
+
+	Arnd
