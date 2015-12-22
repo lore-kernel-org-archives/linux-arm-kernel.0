@@ -1,69 +1,103 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 22 Dec 2015 13:31:53 -0200
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Enable GPU support
-In-Reply-To: <20151222150259.GL8644@n2100.arm.linux.org.uk>
-References: <1450723442-1518-1-git-send-email-festevam@gmail.com>
- <20151222122154.GD26290@tiger>
- <CAOMZO5A8BEkNvrazmksRBRUQw+4mWwbfKtrK6KzD3XK5L5Fs7w@mail.gmail.com>
- <1450788454.2637.17.camel@pengutronix.de>
- <20151222125300.GH8644@n2100.arm.linux.org.uk>
- <20151222150259.GL8644@n2100.arm.linux.org.uk>
-Message-ID: <CAOMZO5CXqNNv7hv0kwyqQiQvo4d_X1jN8jf4QPmEJQvMogHzGA@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 22 Dec 2015 15:45:19 +0000
+Subject: [PATCH RESEND v4] arm: remove !CPU_V6 and !GENERIC_ATOMIC64
+ build dependencies for XEN
+In-Reply-To: <20151222144605.GJ8644@n2100.arm.linux.org.uk>
+References: <alpine.DEB.2.02.1512221404060.3096@kaball.uk.xensource.com>
+ <20151222144605.GJ8644@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.02.1512221535470.3096@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell and Jon,
+On Tue, 22 Dec 2015, Russell King - ARM Linux wrote:
+> On Tue, Dec 22, 2015 at 02:17:17PM +0000, Stefano Stabellini wrote:
+> > Hello Russell,
+> > 
+> > Would you please consider this patch for the next merge window? It
+> > is a very old patch (March 2014) which has been left over.
+> 
+> This patch has some obvious problems...
+> 
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index 34e1569..e09ed94 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -1807,8 +1807,7 @@ config XEN_DOM0
+> >  config XEN
+> >  	bool "Xen guest support on ARM"
+> >  	depends on ARM && AEABI && OF
+> > -	depends on CPU_V7 && !CPU_V6
+> > -	depends on !GENERIC_ATOMIC64
+> > +	depends on CPU_V7
+> 
+> How sure are we that this won't cause regressions?  How much testing
+> has been done with these changed dependencies?
 
-On Tue, Dec 22, 2015 at 1:02 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+I did build-test a range of combinations of those options, sorry for not
+spotting the error below.
 
-> I'm told by Jon that it's (basically) not as simple as that for several
-> reasons, mainly u-boot related, and u-boot is now one hell of a mess.
->
-> Apparently, Jon tried to submit u-boot support for Hummingboards upstream,
-> but it was rejected by u-boot developers saying "they didn't like it and
-> it wasn't "proper" with no information on how they wanted it fixed.".
->
-> When Jon tried pushing them privately, they said "they would only accept
-> "finished" patches."
->
-> However, u-boot people subsequently took _incomplete_ patches from someone
-> else to support _just_ the iMX6D Hummingboard.  The result is that the
-> SDRAM controller is incorrectly setup for the other versions of the
-> Hummingboards.
 
-It seems the information you got from Jon is not correct.
+> > diff --git a/arch/arm/include/asm/sync_bitops.h b/arch/arm/include/asm/sync_bitops.h
+> > index 9732b8e..4103319 100644
+> > --- a/arch/arm/include/asm/sync_bitops.h
+> > +++ b/arch/arm/include/asm/sync_bitops.h
+> > @@ -20,7 +20,29 @@
+> >  #define sync_test_and_clear_bit(nr, p)	_test_and_clear_bit(nr, p)
+> >  #define sync_test_and_change_bit(nr, p)	_test_and_change_bit(nr, p)
+> >  #define sync_test_bit(nr, addr)		test_bit(nr, addr)
+> > -#define sync_cmpxchg			cmpxchg
+> >  
+> > +static inline unsigned long sync_cmpxchg(volatile void *ptr,
+> > +										 unsigned long old,
+> > +										 unsigned long new)
+> > +{
+> > +	unsigned long oldval;
+> > +	int size = sizeof(*(ptr));
+> 
+> This is buggy.  You're doing sizeof(void) here, which on GCC will always
+> be 1:
+> 
+>    A consequence of this is that `sizeof' is also allowed on `void' and
+>   on function types, and returns 1.
 
-We do support several versions of Hummingboard and Cubox-i (at least
-for the board models I have access to) in mainline U-boot.
+You are right, thank you very much for looking at the patch and finding
+this bug. I think the issue can be solved with something like:
 
-The SDRAM is correctly setup depending on the board type:
-http://git.denx.de/?p=u-boot.git;a=history;f=board/solidrun/mx6cuboxi/mx6cuboxi.c;h=fc37f1eef06da5147e5403d4272d220836c9cfbc;hb=HEAD
++#define sync_cmpxchg(ptr, o, n) ({					\
++	(__typeof(*ptr))__sync_cmpxchg((ptr),				\
++				        (unsigned long)(o),		\
++				        (unsigned long)(n),		\
++				        sizeof(*(ptr)));		\
++})
+ 
++static inline unsigned long __sync_cmpxchg(volatile void *ptr,
++										 unsigned long old,
++										 unsigned long new,
++										 int size)
++{
 
-Like you said in the past only the old mx6d hummingboard was
-supported, but we are in better shape now and the old support has been
-removed.
 
-> Overall, this means that SolidRun's u-boot is now significantly different
-> from mainline u-boot - and now u-boot needs additional modification to
-> support the QP parts.  I suspect Jon will just have to say "screw mainline
-> u-boot, we're keeping our own vendor branch of it."  He doesn't want to,
-> he wants to be a good open source citizen, but when faced with this kind
-> of politics, I can see why people decide to say "screw contributing to
-> mainline" and keep their own vendor trees.
+> > +
+> > +	smp_mb();
+> > +	switch (size) {
+> > +	case 1:
+> > +		oldval = __cmpxchg8(ptr, old, new);
+> > +		break;
+> > +	case 2:
+> > +		oldval = __cmpxchg16(ptr, old, new);
+> > +		break;
+> 
+> The ldrexb/ldrexh instructions are not available on ARMv6 CPUs.  __xchg()
+> and friends avoided these for ARMv6 CPUs, but this does not.
+> 
+> I'd expect anything that uses sync_cmpxchg() will fail to build when a
+> kernel including ARMv6 is attempted.
 
-We already have support for mx6qpsabreauto support in U-boot mainline:
-configs/mx6qpsabreauto_defconfig
+The code builds, but of course it could not actually run on CPU_V6. But
+the use case for me is building drivers/xen/grant-table.c, which can
+only run on CPU_V7 anyway, so it is not a problem.
 
-> So... I'm going to have to wait for Jon to find time to spin up patches
-> for SolidRun's u-boot branch as well before I can do any testing with
-> the iMX6QP hardware.
+Is that acceptable for you? If not, do you have any other suggestions?
 
-Jon,
 
-I don't have access to a mx6qp solidrun board. Feel free to contact me
-directly if you need help on porting U-boot mainline to this board.
-
-Regards,
-
-Fabio Estevam
+> So... I don't think this patch is ready.
