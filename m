@@ -1,18 +1,17 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 22 Dec 2015 11:47:17 -0800
-Subject: [GIT PULL] at91: dt for 4.5 #1
-In-Reply-To: <1450260856-1375-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1450260856-1375-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20151222194717.GB30172@localhost>
+Date: Tue, 22 Dec 2015 11:47:40 -0800
+Subject: [GIT PULL] at91: defconfig for 4.5 #1
+In-Reply-To: <1450261226-2102-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1450261226-2102-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20151222194740.GC30172@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 16, 2015 at 11:14:16AM +0100, Nicolas Ferre wrote:
+On Wed, Dec 16, 2015 at 11:20:26AM +0100, Nicolas Ferre wrote:
 > Arnd, Olof, Kevin,
 > 
-> This is the first PR for AT91 DT material targeted to 4.5. The main part is the
-> addition for the new DENX platform. Other things are simply basic fixes and
-> updates.
+> As single patch for this pull-request: tell me if you would like to take it
+> independently, as a patch.
 > 
 > Thanks, best regards,
 > 
@@ -22,16 +21,13 @@ On Wed, Dec 16, 2015 at 11:14:16AM +0100, Nicolas Ferre wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-dt
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-defconfig
 > 
-> for you to fetch changes up to 0a804b5729bb0021e63662b772db0f52de653056:
+> for you to fetch changes up to 94c2317cf46a9c137650bf30f2aba7271886c0b4:
 > 
->   ARM: at91/dt: sama5d2 Xplained: pmic needs a specific sda hold time (2015-12-15 12:23:32 +0100)
+>   ARM: at91/defconfig: enable watchdog drivers in sama5_defconfig (2015-12-15 11:18:39 +0100)
 
 Merged, thanks.
-
-Btw, most other platforms use: ARM: dts: at91: ...   for format, so feel free
-to switch to that in the future.
 
 
 -Olof
