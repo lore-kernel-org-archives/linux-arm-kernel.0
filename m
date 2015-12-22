@@ -1,29 +1,61 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 22 Dec 2015 12:22:28 +0000
-Subject: next-20151222 build: 3 failures 13 warnings (next-20151222)
-In-Reply-To: <E1aBIky-0007nI-7t@optimist>
-References: <E1aBIky-0007nI-7t@optimist>
-Message-ID: <20151222122228.GL5727@sirena.org.uk>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 22 Dec 2015 13:23:20 +0100
+Subject: [PATCH 2/2] ARM: mvebu: use regulator-boot-on on Armada 388 GP
+In-Reply-To: <1450708916-15966-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ (Thomas Petazzoni's message of "Mon, 21 Dec 2015 15:41:56 +0100")
+References: <1450708916-15966-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1450708916-15966-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <87fuyur7t3.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 22, 2015 at 08:57:20AM +0000, Build bot for Mark Brown wrote:
+Hi Thomas,
+ 
+ On lun., d?c. 21 2015, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
-Today's linux-next fails to link an arm64 allmodconfig due to:
+> Really, what we meant by regulator-always-on is that the regulators
+> are already turned on by the bootloader, for which regulator-boot-on
+> is a better description.
+>
 
-> ERROR: "of_irq_count" [drivers/pinctrl/qcom/pinctrl-ssbi-mpp.ko] undefined!
-> ERROR: "of_irq_count" [drivers/pinctrl/qcom/pinctrl-ssbi-gpio.ko] undefined!
-> ERROR: "of_irq_count" [drivers/pinctrl/qcom/pinctrl-spmi-mpp.ko] undefined!
-> ERROR: "of_irq_count" [drivers/pinctrl/qcom/pinctrl-spmi-gpio.ko] undefined!
+What happened if the bootloader do not turn the regulator on?
+I fear that in this case the regulator won't be turned on at all.
 
-which are caused by ab4256cfeab91569 (pinctrl: qcom: pmic-gpio/mpp:
-of_irq_count() == npins) which adds uses of irq_of_count() but that is
-not exported so can't be used in modules.  I've just sent a patch adding
-the export.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151222/f30bc86f/attachment.sig>
+> A net advantage of using regulator-boot-on is that the regulator is
+> not touched at boot time by the kernel, which avoids having the hard
+> drives spinning down and then up again, taking several (~5) seconds of
+> additional boot time.
+>
+> In addition, there is no need to have such properties on the child
+> regulators used for SATA. Having it on the parent regulator that
+> really controls the GPIO is sufficient.
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/armada-388-gp.dts | 24 ++++++++----------------
+>  1 file changed, 8 insertions(+), 16 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
+> index d8dab0f..1ef6cc6 100644
+
+>  
+> @@ -309,7 +309,7 @@
+>  		regulator-min-microvolt = <5000000>;
+>  		regulator-max-microvolt = <5000000>;
+>  		enable-active-high;
+> -		regulator-always-on;
+> +		regulator-boot-on;
+>  		gpio = <&expander0 4 GPIO_ACTIVE_HIGH>;
+>  	};
+This node had been removed by a patch you sent few days ago:
+"ARM: mvebu: remove duplicated regulator definition in Armada 388 GP"
+
+Thanks,
+
+Gregory
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
