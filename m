@@ -1,258 +1,113 @@
-From: jingoohan1@gmail.com (Jingoo Han)
-Date: Tue, 22 Dec 2015 21:20:39 +0900
-Subject: [PATCH v11 09/19] phy: Add driver for rockchip Display Port PHY
-In-Reply-To: <1450237257-2208-1-git-send-email-ykk@rock-chips.com>
-References: <1450236018-1118-1-git-send-email-ykk@rock-chips.com>
- <1450237257-2208-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <000901d13cb3$341b6c40$9c5244c0$@com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 22 Dec 2015 13:21:12 +0100
+Subject: [GIT PULL] UEFI support for 32-bit ARM
+In-Reply-To: <CAKv+Gu_QvQnsYk=coEJQrRk94xATT9Fi5=9jCZhLoNUvTU7kJg@mail.gmail.com>
+References: <CAKv+Gu_QvQnsYk=coEJQrRk94xATT9Fi5=9jCZhLoNUvTU7kJg@mail.gmail.com>
+Message-ID: <CAKv+Gu_Bd4NyC3u96Un-JdzOcaKvsFadEwp06qHAF7xPMyLQ0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, December 16, 2015 12:41 PM, Yakir Yang wrote:
-> 
-> Add phy driver for the Rockchip DisplayPort PHY module. This
-> is required to get DisplayPort working in Rockchip SoCs.
-> 
-> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> ---
-> Changes in v11: None
-> Changes in v10:
-> - Fix the wrong macro value of GRF_EDP_REF_CLK_SEL_INTER_HIWORD_MASK
->     BIT(4) -> BIT(20)
-> 
-> Changes in v9:
-> - Removed the unused the variable "res" in probe function. (Heiko)
-> - Removed the unused head file.
-> 
-> Changes in v8:
-> - Fix the mixed spacers on macro definitions. (Heiko)
-> - Remove the unnecessary empty line after clk_prepare_enable. (Heiko)
-> 
-> Changes in v7:
-> - Simply the commit message. (Kishon)
-> - Symmetrical enable/disbale the phy clock and power. (Kishon)
-> 
-> Changes in v6: None
-> Changes in v5:
-> - Remove "reg" DT property, cause driver could poweron/poweroff phy via
->   the exist "grf" syscon already. And rename the example DT node from
->   "edp_phy: phy at ff770274" to "edp_phy: edp-phy" directly. (Heiko)
-> - Add deivce_node at the front of driver, update phy_ops type from "static
->   struct" to "static const struct". And correct the input paramters of
->   devm_phy_create() interfaces. (Heiko)
-> 
-> Changes in v4:
-> - Add commit message, and remove the redundant rockchip_dp_phy_init()
->   function, move those code to probe() method. And remove driver .owner
->   number. (Kishon)
-> 
-> Changes in v3:
-> - Suggest, add rockchip dp phy driver, collect the phy clocks and
->   power control. (Heiko)
-> 
-> Changes in v2: None
-> 
->  drivers/phy/Kconfig           |   7 ++
->  drivers/phy/Makefile          |   1 +
->  drivers/phy/phy-rockchip-dp.c | 151 ++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 159 insertions(+)
->  create mode 100644 drivers/phy/phy-rockchip-dp.c
-> 
-> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-> index 7eb5859d..7355819 100644
-> --- a/drivers/phy/Kconfig
-> +++ b/drivers/phy/Kconfig
-> @@ -319,6 +319,13 @@ config PHY_ROCKCHIP_USB
->  	help
->  	  Enable this to support the Rockchip USB 2.0 PHY.
-> 
-> +config PHY_ROCKCHIP_DP
-> +	tristate "Rockchip Display Port PHY Driver"
-> +	depends on ARCH_ROCKCHIP && OF
-> +	select GENERIC_PHY
-> +	help
-> +	  Enable this to support the Rockchip Display Port PHY.
-> +
->  config PHY_ST_SPEAR1310_MIPHY
->  	tristate "ST SPEAR1310-MIPHY driver"
->  	select GENERIC_PHY
-> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
-> index 075db1a..b1700cd 100644
-> --- a/drivers/phy/Makefile
-> +++ b/drivers/phy/Makefile
-> @@ -35,6 +35,7 @@ phy-exynos-usb2-$(CONFIG_PHY_S5PV210_USB2)	+= phy-s5pv210-usb2.o
->  obj-$(CONFIG_PHY_EXYNOS5_USBDRD)	+= phy-exynos5-usbdrd.o
->  obj-$(CONFIG_PHY_QCOM_APQ8064_SATA)	+= phy-qcom-apq8064-sata.o
->  obj-$(CONFIG_PHY_ROCKCHIP_USB) += phy-rockchip-usb.o
-> +obj-$(CONFIG_PHY_ROCKCHIP_DP)		+= phy-rockchip-dp.o
->  obj-$(CONFIG_PHY_QCOM_IPQ806X_SATA)	+= phy-qcom-ipq806x-sata.o
->  obj-$(CONFIG_PHY_ST_SPEAR1310_MIPHY)	+= phy-spear1310-miphy.o
->  obj-$(CONFIG_PHY_ST_SPEAR1340_MIPHY)	+= phy-spear1340-miphy.o
-> diff --git a/drivers/phy/phy-rockchip-dp.c b/drivers/phy/phy-rockchip-dp.c
-> new file mode 100644
-> index 0000000..3cb3bf8
-> --- /dev/null
-> +++ b/drivers/phy/phy-rockchip-dp.c
-> @@ -0,0 +1,151 @@
-> +/*
-> + * Rockchip DP PHY driver
-> + *
-> + * Copyright (C) 2015 FuZhou Rockchip Co., Ltd.
-> + * Author: Yakir Yang <ykk@@rock-chips.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License.
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/clk.h>
-> +#include <linux/phy/phy.h>
-> +#include <linux/regmap.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/platform_device.h>
+On 14 December 2015 at 18:10, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> Hello all,
+>
+> NOTE: this pull request is based on a stable, shared branch published
+> by the arm64 maintainers. This means that pulling the
+> arm32-efi-for-v4.5 tag will pull the following patches along with the
+> patches listed below:
+>
+> f7d924894265 arm64/efi: refactor EFI init and runtime code for reuse
+> by 32-bit ARM
+> e5bc22a42e4d arm64/efi: split off EFI init and runtime code for reuse
+> by 32-bit ARM
+> 4dffbfc48d65 arm64/efi: mark UEFI reserved regions as MEMBLOCK_NOMAP
+> 68709f45385a arm64: only consider memblocks with NOMAP cleared for
+> linear mapping
+> bf3d3cc580f9 mm/memblock: add MEMBLOCK_NOMAP attribute to memblock memory table
+>
+> @Will: please advise when you intend to send these to -next. Thanks.
+>
 
-Please order these headers alphabetically.
-It will enhance the readability.
+Russell,
 
-Best regards,
-Jingoo Han
+Could you please indicate whether or not, and when you intend to pull
+these changes?
 
-> +
-> +#define GRF_SOC_CON12                           0x0274
-> +
-> +#define GRF_EDP_REF_CLK_SEL_INTER_HIWORD_MASK   BIT(20)
-> +#define GRF_EDP_REF_CLK_SEL_INTER               BIT(4)
-> +
-> +#define GRF_EDP_PHY_SIDDQ_HIWORD_MASK           BIT(21)
-> +#define GRF_EDP_PHY_SIDDQ_ON                    0
-> +#define GRF_EDP_PHY_SIDDQ_OFF                   BIT(5)
-> +
-> +struct rockchip_dp_phy {
-> +	struct device  *dev;
-> +	struct regmap  *grf;
-> +	struct clk     *phy_24m;
-> +};
-> +
-> +static int rockchip_set_phy_state(struct phy *phy, bool enable)
-> +{
-> +	struct rockchip_dp_phy *dp = phy_get_drvdata(phy);
-> +	int ret;
-> +
-> +	if (enable) {
-> +		ret = regmap_write(dp->grf, GRF_SOC_CON12,
-> +				   GRF_EDP_PHY_SIDDQ_HIWORD_MASK |
-> +				   GRF_EDP_PHY_SIDDQ_ON);
-> +		if (ret < 0) {
-> +			dev_err(dp->dev, "Can't enable PHY power %d\n", ret);
-> +			return ret;
-> +		}
-> +
-> +		ret = clk_prepare_enable(dp->phy_24m);
-> +	} else {
-> +		clk_disable_unprepare(dp->phy_24m);
-> +
-> +		ret = regmap_write(dp->grf, GRF_SOC_CON12,
-> +				   GRF_EDP_PHY_SIDDQ_HIWORD_MASK |
-> +				   GRF_EDP_PHY_SIDDQ_OFF);
-> +	}
-> +
-> +	return ret;
-> +}
-> +
-> +static int rockchip_dp_phy_power_on(struct phy *phy)
-> +{
-> +	return rockchip_set_phy_state(phy, true);
-> +}
-> +
-> +static int rockchip_dp_phy_power_off(struct phy *phy)
-> +{
-> +	return rockchip_set_phy_state(phy, false);
-> +}
-> +
-> +static const struct phy_ops rockchip_dp_phy_ops = {
-> +	.power_on	= rockchip_dp_phy_power_on,
-> +	.power_off	= rockchip_dp_phy_power_off,
-> +	.owner		= THIS_MODULE,
-> +};
-> +
-> +static int rockchip_dp_phy_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct device_node *np = dev->of_node;
-> +	struct phy_provider *phy_provider;
-> +	struct rockchip_dp_phy *dp;
-> +	struct phy *phy;
-> +	int ret;
-> +
-> +	if (!np)
-> +		return -ENODEV;
-> +
-> +	dp = devm_kzalloc(dev, sizeof(*dp), GFP_KERNEL);
-> +	if (IS_ERR(dp))
-> +		return -ENOMEM;
-> +
-> +	dp->dev = dev;
-> +
-> +	dp->phy_24m = devm_clk_get(dev, "24m");
-> +	if (IS_ERR(dp->phy_24m)) {
-> +		dev_err(dev, "cannot get clock 24m\n");
-> +		return PTR_ERR(dp->phy_24m);
-> +	}
-> +
-> +	ret = clk_set_rate(dp->phy_24m, 24000000);
-> +	if (ret < 0) {
-> +		dev_err(dp->dev, "cannot set clock phy_24m %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	dp->grf = syscon_regmap_lookup_by_phandle(np, "rockchip,grf");
-> +	if (IS_ERR(dp->grf)) {
-> +		dev_err(dev, "rk3288-dp needs rockchip,grf property\n");
-> +		return PTR_ERR(dp->grf);
-> +	}
-> +
-> +	ret = regmap_write(dp->grf, GRF_SOC_CON12, GRF_EDP_REF_CLK_SEL_INTER |
-> +			   GRF_EDP_REF_CLK_SEL_INTER_HIWORD_MASK);
-> +	if (ret != 0) {
-> +		dev_err(dp->dev, "Could not config GRF edp ref clk: %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	phy = devm_phy_create(dev, np, &rockchip_dp_phy_ops);
-> +	if (IS_ERR(phy)) {
-> +		dev_err(dev, "failed to create phy\n");
-> +		return PTR_ERR(phy);
-> +	}
-> +	phy_set_drvdata(phy, dp);
-> +
-> +	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
-> +
-> +	return PTR_ERR_OR_ZERO(phy_provider);
-> +}
-> +
-> +static const struct of_device_id rockchip_dp_phy_dt_ids[] = {
-> +	{ .compatible = "rockchip,rk3288-dp-phy" },
-> +	{}
-> +};
-> +
-> +MODULE_DEVICE_TABLE(of, rockchip_dp_phy_dt_ids);
-> +
-> +static struct platform_driver rockchip_dp_phy_driver = {
-> +	.probe		= rockchip_dp_phy_probe,
-> +	.driver		= {
-> +		.name	= "rockchip-dp-phy",
-> +		.of_match_table = rockchip_dp_phy_dt_ids,
-> +	},
-> +};
-> +
-> +module_platform_driver(rockchip_dp_phy_driver);
-> +
-> +MODULE_AUTHOR("Yakir Yang <ykk@rock-chips.com>");
-> +MODULE_DESCRIPTION("Rockchip DP PHY driver");
-> +MODULE_LICENSE("GPL v2");
-> --
-> 1.9.1
-> 
+All prerequisites are in, including the arm64 changes that Will has
+queued for 4.5
+
+Thanks,
+Ard.
+
+
+
+> The following changes since commit f7d924894265794f447ea799dd853400749b5a22:
+>
+>   arm64/efi: refactor EFI init and runtime code for reuse by 32-bit ARM
+>   (2015-12-09 16:57:23 +0000)
+>
+> are available in the git repository at:
+>
+>   git://git.linaro.org/people/ard.biesheuvel/linux-arm.git \
+>   tags/arm32-efi-for-v4.5
+>
+> for you to fetch changes up to 81a0bc39ea1960bbf8ece6a895d7cfd2d9efa28a:
+>
+>   ARM: add UEFI stub support (2015-12-14 10:38:21 +0100)
+>
+> ----------------------------------------------------------------
+> This implements UEFI kernel support for 32-bit ARM, based on the existing
+> arm64 support and existing generic early ioremap support. It is based on
+> commit f7d924894265 ("arm64/efi: refactor EFI init and runtime code for
+> reuse by 32-bit ARM"), which was pulled from the arm64 repo [1] as branch
+> 'aarch64/efi'
+>
+> [1] git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git
+>
+> ----------------------------------------------------------------
+>
+> Weblink:
+> http://thread.gmane.org/gmane.linux.kernel.mm/142134
+>
+> Repo browse link:
+> http://git.linaro.org/people/ard.biesheuvel/linux-arm.git/shortlog/refs/tags/arm32-efi-for-v4.5
+>
+> Regression test results:
+> http://kernelci.org/build/ardb/kernel/v4.4-rc3-13-g81a0bc39ea19/
+>
+> Ard Biesheuvel (7):
+>       ARM: add support for generic early_ioremap/early_memremap
+>       ARM: split off core mapping logic from create_mapping
+>       ARM: factor out allocation routine from __create_mapping()
+>       ARM: add support for non-global kernel mappings
+>       ARM: implement create_mapping_late() for EFI use
+>       ARM: only consider memblocks with NOMAP cleared for linear mapping
+>       ARM: wire up UEFI init and runtime support
+>
+> Roy Franz (1):
+>       ARM: add UEFI stub support
+>
+>  arch/arm/Kconfig                          |  20 +++++
+>  arch/arm/boot/compressed/Makefile         |   4 +-
+>  arch/arm/boot/compressed/efi-header.S     | 130 ++++++++++++++++++++++++++++++
+>  arch/arm/boot/compressed/head.S           |  54 ++++++++++++-
+>  arch/arm/boot/compressed/vmlinux.lds.S    |   7 ++
+>  arch/arm/include/asm/Kbuild               |   1 +
+>  arch/arm/include/asm/efi.h                |  83 +++++++++++++++++++
+>  arch/arm/include/asm/fixmap.h             |  29 ++++++-
+>  arch/arm/include/asm/mach/map.h           |   2 +
+>  arch/arm/include/asm/mmu_context.h        |   2 +-
+>  arch/arm/kernel/Makefile                  |   1 +
+>  arch/arm/kernel/efi.c                     |  38 +++++++++
+>  arch/arm/kernel/setup.c                   |  10 ++-
+>  arch/arm/mm/init.c                        |   5 +-
+>  arch/arm/mm/ioremap.c                     |   9 +++
+>  arch/arm/mm/mmu.c                         | 128 +++++++++++++++++++----------
+>  drivers/firmware/efi/Makefile             |   1 +
+>  drivers/firmware/efi/libstub/Makefile     |   9 +++
+>  drivers/firmware/efi/libstub/arm-stub.c   |   4 +-
+>  drivers/firmware/efi/libstub/arm32-stub.c |  85 +++++++++++++++++++
+>  20 files changed, 572 insertions(+), 50 deletions(-)
+>  create mode 100644 arch/arm/boot/compressed/efi-header.S
+>  create mode 100644 arch/arm/include/asm/efi.h
+>  create mode 100644 arch/arm/kernel/efi.c
+>  create mode 100644 drivers/firmware/efi/libstub/arm32-stub.c
