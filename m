@@ -1,45 +1,65 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 22 Dec 2015 17:16:12 +0000
-Subject: [PATCH] arm64: fix off-by-one in compat syscall table for syscalls
- over 382
-Message-ID: <1450804573-322-1-git-send-email-will.deacon@arm.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Tue, 22 Dec 2015 17:30:09 +0000
+Subject: [PATCH v4 0/4] drm: Add support for the ARM HDLCD display
+ controller
+In-Reply-To: <20151203165606.GS8644@n2100.arm.linux.org.uk>
+References: <1449139249-9171-1-git-send-email-Liviu.Dudau@arm.com>
+ <20151203165606.GS8644@n2100.arm.linux.org.uk>
+Message-ID: <20151222173009.GT960@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[fix targetting -stable only, no upstream commit required]
+On Thu, Dec 03, 2015 at 04:56:07PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Dec 03, 2015 at 10:40:45AM +0000, Liviu Dudau wrote:
+> > This series depends on Sudeep Holla's SCPI driver (now in mainline) and on
+> > the tda998x patches that have been queued on Russell's patch system here [1].
+> 
+> Now merged into my tree.
 
-In the bad old days, our compat syscall table was a linear array
-defined in assembly code using a series of .quad directives generated
-from a preprocessed header file.
+Hi Russell,
 
-When I added compat support for memfd_create and getrandom in commit
-a97a42c47608 ("arm64: compat: wire up memfd_create and getrandom
-syscalls for aarch32"), I forgot to pad the gap where seccomp was due
-to go, and so the new syscalls actually ended up being off-by-one in the
-table for v3.17 and v3.18 (in 3.19 seccomp was added and in v4.0 we
-moved the table construction into C).
+Can I ask about the faith of the patches that I have queued here:
 
-This patch is intended for -stable trees based on v3.17 or v3.18.
+http://www.arm.linux.org.uk/developer/patches/search.php?uid=2895
 
-Cc: <stable@vger.kernel.org> # 3.17 and 3.18 only
-Fixes: a97a42c47608 ("arm64: compat: wire up memfd_create and getrandom syscalls for aarch32")
-Reported-by: Edmund Grimley-Evans <Edmund.Grimley-Evans@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/unistd32.h | 1 +
- 1 file changed, 1 insertion(+)
+I can't find them in any of your public git branches (or I failed at git 101).
 
-diff --git a/arch/arm64/include/asm/unistd32.h b/arch/arm64/include/asm/unistd32.h
-index 9dfdac4a74a1..fbe1ab059bbb 100644
---- a/arch/arm64/include/asm/unistd32.h
-+++ b/arch/arm64/include/asm/unistd32.h
-@@ -788,6 +788,7 @@ __SYSCALL(__NR_sched_getattr, sys_sched_getattr)
- #define __NR_renameat2 382
- __SYSCALL(__NR_renameat2, sys_renameat2)
- 			/* 383 for seccomp */
-+__SYSCALL(383, sys_ni_syscall)
- #define __NR_getrandom 384
- __SYSCALL(__NR_getrandom, sys_getrandom)
- #define __NR_memfd_create 385
+Best regards,
+Liviu
+
+> 
+> Can I ask a fairly obvious question...
+> 
+> >  drivers/gpu/drm/Kconfig                            |   2 +
+> >  drivers/gpu/drm/Makefile                           |   1 +
+> >  drivers/gpu/drm/arm/Kconfig                        |  29 ++
+> >  drivers/gpu/drm/arm/Makefile                       |   2 +
+> >  drivers/gpu/drm/arm/hdlcd_crtc.c                   | 327 ++++++++++++
+> >  drivers/gpu/drm/arm/hdlcd_drv.c                    | 555 +++++++++++++++++++++
+> >  drivers/gpu/drm/arm/hdlcd_drv.h                    |  42 ++
+> >  drivers/gpu/drm/arm/hdlcd_regs.h                   |  87 ++++
+> 
+> Why is the subdirectory called "arm" and not "hdlcd" ?
+> 
+> ARM Ltd have more than one display controller (they have the AMBA PL110
+> and PL111 in addition to this), and (afaics) this doesn't drive these.
+> HDLCD probably won't be the last display hardware which ARM Ltd comes
+> out with either.
+> 
+> So, I think naming the subdirectory after the vendor is probably a
+> mistake.
+> 
+> -- 
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
+> 
+
 -- 
-2.1.4
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
