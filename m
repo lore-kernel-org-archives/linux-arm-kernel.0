@@ -1,70 +1,40 @@
-From: andy.yan@rock-chips.com (Andy Yan)
-Date: Tue, 22 Dec 2015 17:05:24 +0800
-Subject: [PATCH v1 1/6] dt-bindings: misc: add document for reboot-mode driver
-In-Reply-To: <1450774949-23901-1-git-send-email-andy.yan@rock-chips.com>
-References: <1450774949-23901-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <1450775124-23966-1-git-send-email-andy.yan@rock-chips.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 22 Dec 2015 17:08:06 +0800
+Subject: [PATCH] regulator: axp20x: Fix GPIO LDO enable value for AXP22x
+Message-ID: <1450775286-25223-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add device tree bindings document for reboot-mode driver
+The enable/disable values for GPIO LDOs are reversed. It seems no one
+noticed as AXP22x support was introduced recently, and no one was using
+the GPIO LDOs, either because no designs actually use them or board
+support hasn't caught up.
 
-Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
-
+Fixes: 1b82b4e4f954 ("regulator: axp20x: Add support for AXP22X regulators")
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
 
-Changes in v1: None
+This was discovered while working on the newer AXP809, which uses the same
+register layout and values. I then double checked the AXP22X datasheets.
 
- .../devicetree/bindings/misc/reboot-mode.txt       | 41 ++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/misc/reboot-mode.txt
+---
+ drivers/regulator/axp20x-regulator.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/misc/reboot-mode.txt b/Documentation/devicetree/bindings/misc/reboot-mode.txt
-new file mode 100644
-index 0000000..082bc0c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/misc/reboot-mode.txt
-@@ -0,0 +1,41 @@
-+Generic reboot mode communication driver
-+
-+This driver get reboot mode arguments from userspace
-+and stores it in special register or ram . Then the
-+bootloader will read it and take different action
-+according the argument stored.
-+
-+Required properties:
-+        - compatible = "reboot-mode" or other vendor compatible string;
-+
-+Each mode is represented as a sub-node of reboot_mode:
-+
-+Subnode required properties:
-+        - linux,mode: reboot mode command,such as "loader","recovery", "fastboot".
-+        - linux,magic: magic number for the mode, this is vendor specific.
-+
-+example:
-+	reboot_mode {
-+		compatible = "rockchip,reboot-mode";
-+		rockchip,regmap = <&pmu>;
-+		offset = <0x40>;
-+		loader {
-+			linux,mode = "loader";
-+			linux,magic = <0x5242C301>;
-+		};
-+
-+		maskrom {
-+			linux,mode = "maskrom";
-+			linux,magic = <0x5242C302>;
-+		};
-+
-+		recovery {
-+			linux,mode = "recovery";
-+			linux,magic = <0x5242C303>;
-+		};
-+
-+		fastboot {
-+			linux,mode = "fastboot";
-+			linux,magic = <0x5242C309>;
-+		};
-+        };
+diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
+index 35de22fdb7a0..f2e1a39ce0f3 100644
+--- a/drivers/regulator/axp20x-regulator.c
++++ b/drivers/regulator/axp20x-regulator.c
+@@ -27,8 +27,8 @@
+ #define AXP20X_IO_ENABLED		0x03
+ #define AXP20X_IO_DISABLED		0x07
+ 
+-#define AXP22X_IO_ENABLED		0x04
+-#define AXP22X_IO_DISABLED		0x03
++#define AXP22X_IO_ENABLED		0x03
++#define AXP22X_IO_DISABLED		0x04
+ 
+ #define AXP20X_WORKMODE_DCDC2_MASK	BIT(2)
+ #define AXP20X_WORKMODE_DCDC3_MASK	BIT(1)
 -- 
-1.9.1
+2.6.4
