@@ -1,65 +1,75 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Tue, 22 Dec 2015 11:45:20 -0500
-Subject: [PATCH V2 22/23] pci, acpi: Match PCI config space accessors
- against platfrom specific quirks.
-In-Reply-To: <56797C16.2020802@redhat.com>
-References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
- <1450278993-12664-23-git-send-email-tn@semihalf.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1EC14C0F@lhreml503-mbb>
- <201512211510.32029.arnd@arndb.de>
- <335CDE2E-B588-43A8-8665-6023AFD0EA04@redhat.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1EC17CAC@lhreml503-mbb>
- <56797C16.2020802@redhat.com>
-Message-ID: <56797E20.2080107@redhat.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 22 Dec 2015 17:47:42 +0100
+Subject: [PATCH v1 0/6] misc: add reboot mode driver
+In-Reply-To: <1450774949-23901-1-git-send-email-andy.yan@rock-chips.com>
+References: <1450774949-23901-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <20151222164742.GA8623@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/22/2015 11:36 AM, Jon Masters wrote:
-> On 12/22/2015 04:29 AM, Gabriele Paoloni wrote:
->> Hi Jon, thanks for replying
->>
->>> -----Original Message-----
->>> From: Jon Masters [mailto:jcm at redhat.com]
->>> Sent: 21 December 2015 23:11
->>> To: Arnd Bergmann
->>> Cc: Gabriele Paoloni; Tomasz Nowicki; bhelgaas at google.com;
->>> will.deacon at arm.com; catalin.marinas at arm.com; rjw at rjwysocki.net;
->>> hanjun.guo at linaro.org; Lorenzo.Pieralisi at arm.com; okaya at codeaurora.org;
->>> jiang.liu at linux.intel.com; Stefano.Stabellini at eu.citrix.com;
->>> robert.richter at caviumnetworks.com; mw at semihalf.com; Liviu.Dudau at arm.com;
->>> ddaney at caviumnetworks.com; tglx at linutronix.de; Wangyijing;
->>> Suravee.Suthikulpanit at amd.com; msalter at redhat.com; linux-
->>> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
->>> acpi at vger.kernel.org; linux-kernel at vger.kernel.org; linaro-
->>> acpi at lists.linaro.org; jchandra at broadcom.com
->>> Subject: Re: [PATCH V2 22/23] pci, acpi: Match PCI config space
->>> accessors against platfrom specific quirks.
->>>
->>> Sorry for top-posting. A quick note that SMBIOS3 is required by SBBR so
->>> it can be presumed that compliant platforms will provide quirks via DMI.
->>
->> Ok so you completely clarified my question 1). Many Thanks for this
+Hi,
+
+On 22/12/2015 at 17:02:29 +0800, Andy Yan wrote :
 > 
-> No problem. One of the (many) reasons I pushed for requiring SMBIOS/DMI
-> in SBBR (I was lead author of one of the early drafts of that document)
-> was to make the experience ultimately equivalent across architectures.
-> We already know how to do quirks and handle platform deviations, and the
-> major Operating System vendors did not want to reinvent the wheel.
+> This driver parse the reboot commands like "reboot loader"
+> and "reboot recovery" to get a boot mode described in the
+> device tree , then call the vendor specific write interfae
+> to store the boot mode in some place like special register
+> or sram , which can be read by the bootloader after system
+> reboot.
+> 
+> This is commonly done on Android based devices, in order to
+> reboot the device into fastboot or recovery mode.
+> 
+> Before this patch , I have try some hack on[0], and then found
+> John Stultz also doing the same work[1].
+> 
+> As John is busy these days, I go on with this work.
+> 
+> [0]https://patchwork.kernel.org/patch/7647751/
+> [1]https://patchwork.kernel.org/patch/7802391/
+> 
+> Changes in v1:
+> - fix the embarrassed compile warning
+> - correct the maskrom magic number
+> - check for the normal reboot
+> - correct the maskrom magic number
+> - use macro defined in rockchip_boot-mode.h for reboot-mode DT node
+> 
+> Andy Yan (6):
+>   dt-bindings: misc: add document for reboot-mode driver
+>   dt-bindings: soc: add document for rockchip reboot-mode driver
+>   misc: add reboot mode driver
+>   soc: rockchip: add reboot mode driver
+>   ARM: dts: rockchip: add reboot-mode node
+>   ARM64: dts: rockchip: add reboot-mode node
+> 
 
-Additional: it is clear that more prescription is required to get the
-vendors onto the bandwagon that we have with other architectures (e.g.
-that other one). So there will be a Red Hat "ARM server whitepaper"
-coming in the early new year that will include the kind of "server 101"
-material we want to make sure people know. Things like making sure you
-implement and test PCIe correctly, handle backward compatibility (you
-will build hardware in the future that runs my existing OS release),
-design the hardware to allow for workarounds later, etc. I expect some
-other Operating System vendors to be involved in reviewing that.
+This seems nice and useful, some further ideas:
 
-Ultimately my objective is to make this whole thing dull and boring. You
-will get RHEL(SA)/upstream kernels and it will either boot or it will
-not. If it does not boot, vendor X screwed up their hardware. We know
-this story, it's been this way for over a decade already, and that is
-exactly how it is going to be with ARM servers shortly.
+>  .../devicetree/bindings/misc/reboot-mode.txt       | 41 +++++++++
+>  .../bindings/soc/rockchip/rockchip,reboot-mode.txt | 39 +++++++++
+>  arch/arm/boot/dts/rk3288.dtsi                      | 26 ++++++
+>  arch/arm/boot/dts/rk3xxx.dtsi                      | 26 ++++++
+>  arch/arm64/boot/dts/rockchip/rk3368.dtsi           | 26 ++++++
+>  drivers/misc/Kconfig                               |  7 ++
+>  drivers/misc/Makefile                              |  1 +
+>  drivers/misc/reboot_mode.c                         | 96 ++++++++++++++++++++++
 
-Jon.
+I think this actually belongs to drivers/power/reset/ instead of misc
+
+>  drivers/soc/rockchip/Kconfig                       |  9 ++
+>  drivers/soc/rockchip/Makefile                      |  1 +
+>  drivers/soc/rockchip/reboot.c                      | 68 +++++++++++++++
+
+And maybe that part could be made generic instead of rockchip specific.
+It simply uses a regmap to do the accesses, I guess a lot of other
+platforms will do that. We have syscon-reboot and syscon-poweroff for example.
+
+I think then we can extend the "framework" by having generic drivers to
+store the value in eeprom or nvram for example.
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
