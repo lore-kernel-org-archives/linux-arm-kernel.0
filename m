@@ -1,64 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 22 Dec 2015 14:18:48 -0800
-Subject: [PATCH v4] clk: ti: Add support for dm814x ADPLL
-In-Reply-To: <20151222205604.GA14912@quark.deferred.io>
-References: <1450798030-23680-1-git-send-email-tony@atomide.com>
- <5679B2D6.4050102@ti.com> <20151222203224.GG2793@atomide.com>
- <20151222205604.GA14912@quark.deferred.io>
-Message-ID: <20151222221847.GH2793@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Dec 2015 23:20:25 +0100
+Subject: [PATCH v7 0/4] ARM SMC Calling Convention interface
+In-Reply-To: <1450795956-18223-1-git-send-email-jens.wiklander@linaro.org>
+References: <1450795956-18223-1-git-send-email-jens.wiklander@linaro.org>
+Message-ID: <201512222320.25222.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Michael Turquette <mturquette@baylibre.com> [151222 12:56]:
-> On 12/22, Tony Lindgren wrote:
-> > * Tero Kristo <t-kristo@ti.com> [151222 12:28]:
-> > > On 12/22/2015 05:27 PM, Tony Lindgren wrote:
-> > > >On dm814x we have 13 ADPLLs with 3 to 4 outputs on each. The
-> > > >ADPLLs have several dividers and muxes controlled by a shared
-> > > >control register for each PLL.
-> > > >
-> > > >Note that for the clocks to work as device drivers for booting on
-> > > >dm814x, this patch depends on "ARM: OMAP2+: Change core_initcall
-> > > >levels to postcore_initcall".
-> > > >
-> > > >Also note that this patch does not implement clk_set_rate for the
-> > > >PLL, that will be posted later on when available.
-> > > >
-> > > >Cc: Michael Turquette <mturquette@baylibre.com>
-> > > >Cc: Stephen Boyd <sboyd@codeaurora.org>
-> > > >Cc: Tero Kristo <t-kristo@ti.com>
-> > > >Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > > >---
-> > > >
-> > > >If no more comments, Tero can you please apply into an immutable
-> > > >branch against v4.4-rc1 that I can merge in too?
-> > > >
-> > > >Changes since v3:
-> > > >
-> > > >- We want to create the clkdev entry for all clocks, not just outputs
-> > > >- ti_adpll_wait_lock loops did not do the right thing
-> > > >- We want to use CLK_GET_RATE_NOCACHE in ti_adpll_init_dco
-> > > 
-> > > I have just one comment below still, once that is addressed:
-> > > 
-> > > Conditionally-acked-by: Tero Kristo <t-kristo@ti.com>
-> > > 
-> > > Stephen / Michael, can you pick this up for next merge? I don't have
-> > > anything else coming for the window this time, and I am probably going to be
-> > > on vacation just nicely to not be able to push anything anyway.
-> > 
-> > Also, I managed to remove the dependency to the dts changes. So there's
-> > no longer any need to set up an immutable branch for this patch.
+On Tuesday 22 December 2015, Jens Wiklander wrote:
+> This patch set is based on the Generic TEE subsystem v6 patchset
+> (https://lwn.net/Articles/662495/) sent out a some time ago. By isolating
+> the ARM SMC Calling Convention patches that are useful for other purposes
+> than to support the Generic TEE subsystem some complexity is removed from
+> that patch set.
 > 
-> Can you split the binding description into a separate patch and send it
-> to the dt mailing list? Feel free to add my Ack to it.
+> This patch set adds a common interface to do an SMC or HVC following ARM
+> SMC Calling Convention. The interface is implemented for both the arm and
+> arm64 architectures and updates the PSCI driver to use this interface
+> instead for firmware communication.
+> 
+> Kevins previous Tested-by tag isn't included as the changes in the config
+> variables may affect some of the builds.
 
-OK will do thanks.
+I see that you have a lot of people addressed as 'To', which usually
+means that nobody is going to apply the patches, because none of us knows
+who should be responsible ;-)
 
-> Stephen and I are trying to not take that stuff anymore.
+Is the plan still for Russell to pick them up in his tree? Please clarify
+in the introductory mail what you would like to happen (more review, 
+apply to some tree, get Acks, ...) and change the recipient list accordingly.
 
-Sure, no problem.
-
-Regards,
-
-Tony
+	Arnd
