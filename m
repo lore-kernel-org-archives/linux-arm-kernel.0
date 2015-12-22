@@ -1,46 +1,31 @@
-From: slash.tmp@free.fr (Mason)
-Date: Tue, 22 Dec 2015 22:57:23 +0100
-Subject: [PATCH v11 0/2] Sigma Designs Tango4 port
-In-Reply-To: <7hoadi6wfw.fsf@deeprootsystems.com>
-References: <566FDF53.3030004@sigmadesigns.com>
- <7hr3iexp3e.fsf@deeprootsystems.com> <5679B15F.80106@free.fr>
- <7hoadi6wfw.fsf@deeprootsystems.com>
-Message-ID: <5679C743.1070000@free.fr>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 22 Dec 2015 23:00:17 +0100
+Subject: [PATCH] ASoC: sun4i-codec: Use proper output for external amp routes
+Message-ID: <1450821617-12906-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/12/2015 21:49, Kevin Hilman wrote:
+An external amp (if any) is connected to the external outputs of the SoC
+of course, rather then directly to the internal amp.
 
-> Mason wrote:
-> 
->> On 22/12/2015 20:25, Kevin Hilman wrote:
->>
->>> Was it intentional to leave out a multi_v7_defconfig change so that this
->>> actually builds?  Or was that planned for a future series?
->>
->> How is a multi_v7_defconfig different from any old defconfig?
-> 
-> Not sure what you're asking.
-> 
-> The point is that this series doesn't enable any defconfig to build it.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ sound/soc/sunxi/sun4i-codec.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-What is not clear to me is: are you asking me to submit a new defconfig
-(specific to my platform), or are you saying I need to add the new
-platform to arch/arm/configs/multi_v7_defconfig (I'm not sure how exactly
-to go about doing that; also I'm concerned about merge conflicts, since
-my patch set is based on v4.1)
-
->>> IMO, it should be part of this series so it gets build tested as soon as
->>> it's merged.
->>
->> The problem is that a mandatory driver is missing upstream
->> (interrupt controller).
->>
->> http://thread.gmane.org/gmane.linux.kernel/2089470
-> 
-> Which means it presumably wont boot without that, but it should still
-> build without it, correct?  (I tried it locally, and it does.)
-
-Can I submit the defconfig update as a follow-up patch?
-
-Regards.
+diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
+index e6cc6a1..44f170c 100644
+--- a/sound/soc/sunxi/sun4i-codec.c
++++ b/sound/soc/sunxi/sun4i-codec.c
+@@ -728,7 +728,8 @@ static const struct snd_soc_dapm_widget sun4i_codec_card_dapm_widgets[] = {
+ };
+ 
+ static const struct snd_soc_dapm_route sun4i_codec_card_dapm_routes[] = {
+-	{ "Speaker", NULL, "Power Amplifier" },
++	{ "Speaker", NULL, "HP Right" },
++	{ "Speaker", NULL, "HP Left" },
+ };
+ 
+ static struct snd_soc_card *sun4i_codec_create_card(struct device *dev)
+-- 
+2.5.0
