@@ -1,43 +1,24 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 22 Dec 2015 16:06:06 +0100
-Subject: [PATCH 00/10] ARM: debug-ll fixes
-In-Reply-To: <1449268242-808553-1-git-send-email-arnd@arndb.de>
-References: <1449268242-808553-1-git-send-email-arnd@arndb.de>
-Message-ID: <CAMuHMdW=U2x2sabVcsge-VKj7FwuPLZniKdoiKOkGZSJmqamDQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 22 Dec 2015 16:11:47 +0100
+Subject: [PATCH] pinctrl: mediatek: convert to arch_initcall
+In-Reply-To: <1450792017-7120-1-git-send-email-djkurtz@chromium.org>
+References: <1450792017-7120-1-git-send-email-djkurtz@chromium.org>
+Message-ID: <CACRpkdbRDzXunYK5d6Ld4Z2a=0mkp4KBvgL2P-St4P65Jajamw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Tue, Dec 22, 2015 at 2:46 PM, Daniel Kurtz <djkurtz@chromium.org> wrote:
 
-On Fri, Dec 4, 2015 at 11:30 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> I've carried most of these patches for a very long time in
-> my randconfig tree, and they follow up on work that Daniel
-> Thompson did last year. Most of the changes are really trivial,
-> and I'd like to put them into my next/randconfig branch in
-> arm-soc for merging in 4.5.
->
-> The last patch for orion/mvebu is the only one that is slightly
-> tricky, but it would be good to have that as part of the
-> multiplatform conversion for orion5x/mv78xx0.
->
-> The patches are currently based on top of my randconfig branch,
-> and there will be conflicts trying to apply them on mainline,
-> but I can handle that inside of arm-soc.
+> Move pinctrl initialization earlier in boot so that real devices can find
+> their pctldev without probe deferring.
+(...)
+> -module_init(mtk_pinctrl_init);
+> +arch_initcall(mtk_pinctrl_init);
 
-Now this is in arm-soc/for-next, I've dropped my local commit "[DEBUG] Remove
-all non-shmobile DEBUG_UART_PHYS defaults", and the value of
-CONFIG_DEBUG_UART_PHYS stays sane when enabling DEBUG_LL in
-multi_v7_defconfig.
+So I see why you're doing this (because of wanting to avoid nasty boot
+probe deferrals, right?) and I'm going to apply it, because the work
+with probe ordering is still in the works, but I'd like some general
+ARM people to come in with opinions.
 
-Thanks a lot!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Yours,
+Linus Walleij
