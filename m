@@ -1,72 +1,58 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 22 Dec 2015 08:59:59 +0800
-Subject: [PATCH 4/6] soc: rockchip: add reboot mode driver
-In-Reply-To: <1450697948-30205-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <201512220857.Zy8ybs1H%fengguang.wu@intel.com>
+From: ralf@linux-mips.org (Ralf Baechle)
+Date: Tue, 22 Dec 2015 02:16:09 +0100
+Subject: [PATCH v2 9/9] MIPS: dts: jz4780/ci20: Add compatible property
+ to "partitions" node
+In-Reply-To: <1450694033-27717-10-git-send-email-geert+renesas@glider.be>
+References: <1450694033-27717-1-git-send-email-geert+renesas@glider.be>
+ <1450694033-27717-10-git-send-email-geert+renesas@glider.be>
+Message-ID: <20151222011609.GA15881@linux-mips.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
+On Mon, Dec 21, 2015 at 11:33:53AM +0100, Geert Uytterhoeven wrote:
+> Date:   Mon, 21 Dec 2015 11:33:53 +0100
+> From: Geert Uytterhoeven <geert+renesas@glider.be>
+> To: arm at kernel.org, Andrew Lunn <andrew@lunn.ch>, Gregory Clement
+>  <gregory.clement@free-electrons.com>, Sebastian Hesselbarth
+>  <sebastian.hesselbarth@gmail.com>, Simon Horman <horms@verge.net.au>,
+>  Magnus Damm <magnus.damm@gmail.com>, Ralf Baechle <ralf@linux-mips.org>,
+>  Alex Smith <alex.smith@imgtec.com>
+> Cc: Brian Norris <computersforpeace@gmail.com>, Rob Herring
+>  <robh+dt@kernel.org>, devicetree at vger.kernel.org,
+>  linux-arm-kernel at lists.infradead.org, linux-sh at vger.kernel.org,
+>  linux-mips at linux-mips.org, linux-mtd at lists.infradead.org,
+>  linux-kernel at vger.kernel.org, Geert Uytterhoeven <geert+renesas@glider.be>
+> Subject: [PATCH v2 9/9] MIPS: dts: jz4780/ci20: Add compatible property to
+>  "partitions" node
+> 
+> As of commit e488ca9f8d4f62c2 ("doc: dt: mtd: partitions: add compatible
+> property to "partitions" node"), the "partitions" subnode of an SPI
+> FLASH device node must have a compatible property. The partitions are no
+> longer detected if it is not present.
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+> v2:
+>   - New.
+> ---
+>  arch/mips/boot/dts/ingenic/ci20.dts | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/mips/boot/dts/ingenic/ci20.dts b/arch/mips/boot/dts/ingenic/ci20.dts
+> index 782258c0e4fbba8e..1652d8d60b1e4b86 100644
+> --- a/arch/mips/boot/dts/ingenic/ci20.dts
+> +++ b/arch/mips/boot/dts/ingenic/ci20.dts
+> @@ -70,6 +70,7 @@
+>  			nand-on-flash-bbt;
+>  
+>  			partitions {
+> +				compatible = "fixed-partitions";
+>  				#address-cells = <2>;
+>  				#size-cells = <2>;
+>  
+> -- 
+> 1.9.1
 
-[auto build test WARNING on robh/for-next]
-[also build test WARNING on v4.4-rc6 next-20151221]
-[cannot apply to rockchip/for-next]
+Acked-by: Ralf Baechle <ralf@linux-mips.org>
 
-url:    https://github.com/0day-ci/linux/commits/Andy-Yan/misc-add-reboot-mode-driver/20151221-195031
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
-config: arm-allmodconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
-
-All warnings (new ones prefixed by >>):
-
-   drivers/soc/rockchip/reboot.c: In function 'rockchip_reboot_mode_write':
->> drivers/soc/rockchip/reboot.c:28:1: warning: no return statement in function returning non-void [-Wreturn-type]
-    }
-    ^
-   drivers/soc/rockchip/reboot.c: In function 'rockchip_reboot_probe':
-   drivers/soc/rockchip/reboot.c:32:26: warning: unused variable 'reboot' [-Wunused-variable]
-     struct rockchip_reboot *reboot;
-                             ^
-
-vim +28 drivers/soc/rockchip/reboot.c
-
-    12	#include <linux/of.h>
-    13	#include <linux/of_address.h>
-    14	#include <linux/platform_device.h>
-    15	#include <linux/reboot.h>
-    16	#include <linux/regmap.h>
-    17	#include <linux/mfd/syscon.h>
-    18	#include "loader.h"
-    19	
-    20	struct regmap *map;
-    21	u32 offset;
-    22	
-    23	static int rockchip_reboot_mode_write(int magic)
-    24	{
-    25		pr_info("%s---------magic:%x\n", __func__, magic);
-    26		regmap_write(map, offset, magic);
-    27	
-  > 28	}
-    29	
-    30	static int __init rockchip_reboot_probe(struct platform_device *pdev)
-    31	{
-    32		struct rockchip_reboot *reboot;
-    33		int ret;
-    34	
-    35		map = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
-    36							      "rockchip,regmap");
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 54607 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151222/456696f4/attachment-0001.obj>
+  Ralf
