@@ -1,23 +1,57 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 22 Dec 2015 10:51:44 -0200
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Enable GPU support
-In-Reply-To: <1450788454.2637.17.camel@pengutronix.de>
-References: <1450723442-1518-1-git-send-email-festevam@gmail.com>
- <20151222122154.GD26290@tiger>
- <CAOMZO5A8BEkNvrazmksRBRUQw+4mWwbfKtrK6KzD3XK5L5Fs7w@mail.gmail.com>
- <1450788454.2637.17.camel@pengutronix.de>
-Message-ID: <CAOMZO5A+=5Q9zqtAhvB9=Hx2QEsNATa3+Dv7x74q5ykAk1Tmtg@mail.gmail.com>
+From: rsahu@apm.com (Rameshwar Prasad Sahu)
+Date: Tue, 22 Dec 2015 18:22:06 +0530
+Subject: [PATCH] dmaengine: xgene-dma: Fix double IRQ issue by setting
+ IRQ_DISABLE_UNLAZY flag
+Message-ID: <1450788726-19981-1-git-send-email-rsahu@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 22, 2015 at 10:47 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
+For interrupt controller that doesn't support irq_disable and hardware
+with level interrupt, an extra interrupt can be pending. This patch fixes
+the issue by setting IRQ_DISABLE_UNLAZY flag for the interrupt line.
 
-> I don't see a need to rush this. We can always enable it in the -rc
-> phase of 4.5 is we desire.
-> But to be honest I would like to give etnaviv a cycle to stabilize
-> until we enable it by default. With i.MX6QP now hitting the street and
-> basically no testing of etnaviv being done there until now, I would
-> rather not have it in the defconfig just now. It's not like it's hard
-> for people willing to test this to enable a single Kconfig option...
+Reference: http://git.kernel.org/tip/e9849777d0e27cdd2902805be51da73e7c79578c
 
-Ok, let's enable it in 4.5-rc1.
+Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
+---
+ drivers/dma/xgene-dma.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/dma/xgene-dma.c b/drivers/dma/xgene-dma.c
+index 9dfa2b0..6363e84 100644
+--- a/drivers/dma/xgene-dma.c
++++ b/drivers/dma/xgene-dma.c
+@@ -29,6 +29,7 @@
+ #include <linux/dmapool.h>
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
++#include <linux/irq.h>
+ #include <linux/module.h>
+ #include <linux/of_device.h>
+
+@@ -1610,6 +1611,7 @@ static int xgene_dma_request_irqs(struct xgene_dma *pdma)
+ 	/* Register DMA channel rx irq */
+ 	for (i = 0; i < XGENE_DMA_MAX_CHANNEL; i++) {
+ 		chan = &pdma->chan[i];
++		irq_set_status_flags(chan->rx_irq, IRQ_DISABLE_UNLAZY);
+ 		ret = devm_request_irq(chan->dev, chan->rx_irq,
+ 				       xgene_dma_chan_ring_isr,
+ 				       0, chan->name, chan);
+@@ -1620,6 +1622,7 @@ static int xgene_dma_request_irqs(struct xgene_dma *pdma)
+
+ 			for (j = 0; j < i; j++) {
+ 				chan = &pdma->chan[i];
++				irq_clear_status_flags(chan->rx_irq, IRQ_DISABLE_UNLAZY);
+ 				devm_free_irq(chan->dev, chan->rx_irq, chan);
+ 			}
+
+@@ -1640,6 +1643,7 @@ static void xgene_dma_free_irqs(struct xgene_dma *pdma)
+
+ 	for (i = 0; i < XGENE_DMA_MAX_CHANNEL; i++) {
+ 		chan = &pdma->chan[i];
++		irq_clear_status_flags(chan->rx_irq, IRQ_DISABLE_UNLAZY);
+ 		devm_free_irq(chan->dev, chan->rx_irq, chan);
+ 	}
+ }
+--
+1.7.1
