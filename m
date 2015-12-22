@@ -1,22 +1,20 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 22 Dec 2015 13:05:42 -0800
-Subject: [GIT PULL] LPC18xx DTS changes for v4.5
-In-Reply-To: <1450649881-5677-1-git-send-email-manabian@gmail.com>
-References: <1450649881-5677-1-git-send-email-manabian@gmail.com>
-Message-ID: <20151222210542.GZ30172@localhost>
+Date: Tue, 22 Dec 2015 13:06:33 -0800
+Subject: [GIT PULL 1/3] rockchip soc changes for 4.5
+In-Reply-To: <2532363.CsR3D6sdor@diego>
+References: <2532363.CsR3D6sdor@diego>
+Message-ID: <20151222210633.GA30172@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 20, 2015 at 11:18:01PM +0100, Joachim Eastwood wrote:
-> Hi arm-soc team,
+On Mon, Dec 21, 2015 at 02:21:14AM +0100, Heiko St?bner wrote:
+> Hi Arnd, Kevin, Olof,
 > 
-> Please consider pulling these DTS changes for the NXP LPC18xx
-> platform and related boards into arm-soc/dt.
+> after Arnd didn't like the arch-timer-supply fixup for the rk3036, I've
+> dropped that patch for further discussion. So this pull request includes
+> the other changes from that req and additionally a compatible for the
+> newly supported rk3228 quad-core Cortex-A7.
 > 
-> Contain DTS additions for drivers that went upstream during the
-> previous merge cycle and some board updates.
-> 
-> Sorry for the late pull request. Hope it's not too late.
 > 
 > The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
 > 
@@ -24,11 +22,11 @@ On Sun, Dec 20, 2015 at 11:18:01PM +0100, Joachim Eastwood wrote:
 > 
 > are available in the git repository at:
 > 
->   https://github.com/manabian/linux-lpc.git tags/lpc18xx_dts_for_4.5
+>   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.5-rockchip-soc-1
 > 
-> for you to fetch changes up to 5743520806db4731cc30fad4cb2f01f0501a930c:
+> for you to fetch changes up to 2608224c81a7d242a9b451b97011410b182f0da7:
 > 
->   ARM: dts: lpc4337-ciaa: add i2c0 and devices (2015-12-14 23:13:06 +0100)
+>   ARM: rockchip: enable support for RK3228 SoCs (2015-12-16 22:15:06 +0100)
 
 Merged, thanks.
 
