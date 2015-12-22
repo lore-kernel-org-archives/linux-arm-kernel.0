@@ -1,173 +1,67 @@
-From: jingoohan1@gmail.com (Jingoo Han)
-Date: Tue, 22 Dec 2015 21:13:59 +0900
-Subject: [PATCH v11 06/19] ARM: dts: exynos/dp: remove some properties
- that deprecated by analogix_dp driver
-In-Reply-To: <1450236876-1951-1-git-send-email-ykk@rock-chips.com>
-References: <1450236018-1118-1-git-send-email-ykk@rock-chips.com>
- <1450236876-1951-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <000801d13cb2$43079270$c916b750$@com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 22 Dec 2015 12:14:49 +0000
+Subject: [PATCH v6] arm/arm64: add arm-smccc
+In-Reply-To: <20151222094606.GA30272@ermac>
+References: <1449667495-23091-1-git-send-email-jens.wiklander@linaro.org>
+ <20151221111455.GA11145@red-moon> <20151222094606.GA30272@ermac>
+Message-ID: <20151222121449.GE8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, December 16, 2015 12:35 PM, Yakir Yang wrote:
+On Tue, Dec 22, 2015 at 10:46:08AM +0100, Jens Wiklander wrote:
+> On Mon, Dec 21, 2015 at 11:14:55AM +0000, Lorenzo Pieralisi wrote:
+> > On Wed, Dec 09, 2015 at 02:24:55PM +0100, Jens Wiklander wrote:
+> > > diff --git a/arch/Kconfig b/arch/Kconfig
+> > > index 4e949e5..ce3c0b0 100644
+> > > --- a/arch/Kconfig
+> > > +++ b/arch/Kconfig
+> > > @@ -564,4 +564,7 @@ config OLD_SIGACTION
+> > >  config COMPAT_OLD_SIGACTION
+> > >  	bool
+> > >  
+> > > +config HAVE_ARM_SMCCC
+> > > +	bool
+> > 
+> > It is ok by me to move it there, probably we do not want it at the end of
+> > the "ABI hall of shame" list :)
+> > 
+> > Or drivers/firmware/Kconfig ?
 > 
-> After exynos_dp have been split the common IP code into analogix_dp driver,
-> the analogix_dp driver have deprecated some Samsung platform properties which
-> could be dynamically parsed from EDID/MODE/DPCD message, so this is an update
-> for Exynos DTS file for dp-controller.
+> You tell me, I'm too new here to have a feeling for this.
 > 
-> Beside the backward compatibility is fully preserved, so there are no
-> bisectability break that make this change in a separate patch.
+> > 
+> > Strictly speaking, since PSCI uses this by default, you should also
+> > enforce an ARM_PSCI_FW dependency on HAVE_ARM_SMCCC.
 > 
-> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> ARM_PSCI depends on CPU_V7 and ARM_PSCI_FW doesn't really depend on
+> anything today.
+> 
+> Would it be OK if I changed ARM_PSCI to depend on HAVE_ARM_SMCCC instead
+> of CPU_V7 in the "drivers: psci: replace psci firmware calls" patch?
+> At the same time I would move the "select HAVE_ARM_SMCCC if CPU_V7" line
+> to the "config ARM" block instead in the
+> "arm: add implementation for arm-smccc" patch.
+> 
+> I'll include this change in the v7 patch set if I don't hear anything.
 
-Reviewed-by: Jingoo Han < jingoohan1@gmail.com >
+Okay, I think as we don't have a decision on this, the proximity of
+Christmas, and the presumable opening of the merge window early in
+the new year, I can't merge these patches for the upcoming window.
+I'll discard those which have already been submitted to the patch
+system.
 
-Best regards,
-Jingoo Han
+This also has a knock-on effect on patch 8486/1:
 
-> ---
-> Changes in v11: None
-> Changes in v10: None
-> Changes in v9: None
-> Changes in v8: None
-> Changes in v7: None
-> Changes in v6:
-> - Fix Peach Pit hpd property name error:
-> -       hpd-gpio = <&gpx2 6 0>;
-> +       hpd-gpios = <&gpx2 6 0>;
-> 
-> Changes in v5:
-> - Correct the misspell in commit message. (Krzysztof)
-> 
-> Changes in v4:
-> - Separate all DTS changes to a separate patch. (Krzysztof)
-> 
-> Changes in v3: None
-> Changes in v2: None
-> 
->  arch/arm/boot/dts/exynos5250-arndale.dts      | 2 --
->  arch/arm/boot/dts/exynos5250-smdk5250.dts     | 2 --
->  arch/arm/boot/dts/exynos5250-snow-common.dtsi | 4 +---
->  arch/arm/boot/dts/exynos5250-spring.dts       | 4 +---
->  arch/arm/boot/dts/exynos5420-peach-pit.dts    | 4 +---
->  arch/arm/boot/dts/exynos5420-smdk5420.dts     | 2 --
->  arch/arm/boot/dts/exynos5800-peach-pi.dts     | 4 +---
->  7 files changed, 4 insertions(+), 18 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
-> index c000532..b1790cf 100644
-> --- a/arch/arm/boot/dts/exynos5250-arndale.dts
-> +++ b/arch/arm/boot/dts/exynos5250-arndale.dts
-> @@ -124,8 +124,6 @@
->  &dp {
->  	status = "okay";
->  	samsung,color-space = <0>;
-> -	samsung,dynamic-range = <0>;
-> -	samsung,ycbcr-coeff = <0>;
->  	samsung,color-depth = <1>;
->  	samsung,link-rate = <0x0a>;
->  	samsung,lane-count = <4>;
-> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> index 0f5dcd4..f30c2db 100644
-> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> @@ -80,8 +80,6 @@
-> 
->  &dp {
->  	samsung,color-space = <0>;
-> -	samsung,dynamic-range = <0>;
-> -	samsung,ycbcr-coeff = <0>;
->  	samsung,color-depth = <1>;
->  	samsung,link-rate = <0x0a>;
->  	samsung,lane-count = <4>;
-> diff --git a/arch/arm/boot/dts/exynos5250-snow-common.dtsi b/arch/arm/boot/dts/exynos5250-snow-
-> common.dtsi
-> index 5cb33ba..b96624b 100644
-> --- a/arch/arm/boot/dts/exynos5250-snow-common.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250-snow-common.dtsi
-> @@ -236,12 +236,10 @@
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&dp_hpd>;
->  	samsung,color-space = <0>;
-> -	samsung,dynamic-range = <0>;
-> -	samsung,ycbcr-coeff = <0>;
->  	samsung,color-depth = <1>;
->  	samsung,link-rate = <0x0a>;
->  	samsung,lane-count = <2>;
-> -	samsung,hpd-gpio = <&gpx0 7 GPIO_ACTIVE_HIGH>;
-> +	hpd-gpios = <&gpx0 7 GPIO_ACTIVE_HIGH>;
-> 
->  	ports {
->  		port at 0 {
-> diff --git a/arch/arm/boot/dts/exynos5250-spring.dts b/arch/arm/boot/dts/exynos5250-spring.dts
-> index c1edd6d..91881d7 100644
-> --- a/arch/arm/boot/dts/exynos5250-spring.dts
-> +++ b/arch/arm/boot/dts/exynos5250-spring.dts
-> @@ -74,12 +74,10 @@
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&dp_hpd_gpio>;
->  	samsung,color-space = <0>;
-> -	samsung,dynamic-range = <0>;
-> -	samsung,ycbcr-coeff = <0>;
->  	samsung,color-depth = <1>;
->  	samsung,link-rate = <0x0a>;
->  	samsung,lane-count = <1>;
-> -	samsung,hpd-gpio = <&gpc3 0 GPIO_ACTIVE_HIGH>;
-> +	hpd-gpios = <&gpc3 0 GPIO_ACTIVE_HIGH>;
->  };
-> 
->  &ehci {
-> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> index 35cfb07..2f37c87 100644
-> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> @@ -148,12 +148,10 @@
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&dp_hpd_gpio>;
->  	samsung,color-space = <0>;
-> -	samsung,dynamic-range = <0>;
-> -	samsung,ycbcr-coeff = <0>;
->  	samsung,color-depth = <1>;
->  	samsung,link-rate = <0x06>;
->  	samsung,lane-count = <2>;
-> -	samsung,hpd-gpio = <&gpx2 6 GPIO_ACTIVE_HIGH>;
-> +	hpd-gpios = <&gpx2 6 GPIO_ACTIVE_HIGH>;
-> 
->  	ports {
->  		port at 0 {
-> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> index ac35aef..f67344f 100644
-> --- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> @@ -93,8 +93,6 @@
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&dp_hpd>;
->  	samsung,color-space = <0>;
-> -	samsung,dynamic-range = <0>;
-> -	samsung,ycbcr-coeff = <0>;
->  	samsung,color-depth = <1>;
->  	samsung,link-rate = <0x0a>;
->  	samsung,lane-count = <4>;
-> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> index 7b018e4..363c95f 100644
-> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> @@ -142,12 +142,10 @@
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&dp_hpd_gpio>;
->  	samsung,color-space = <0>;
-> -	samsung,dynamic-range = <0>;
-> -	samsung,ycbcr-coeff = <0>;
->  	samsung,color-depth = <1>;
->  	samsung,link-rate = <0x0a>;
->  	samsung,lane-count = <2>;
-> -	samsung,hpd-gpio = <&gpx2 6 GPIO_ACTIVE_HIGH>;
-> +	hpd-gpios = <&gpx2 6 GPIO_ACTIVE_HIGH>;
->  	panel = <&panel>;
->  };
-> 
-> --
-> 1.9.1
+"ARM64: kernel: PSCI: move PSCI idle management code to drivers/firmware"
+
+which is based on top of this series.  If someone wants to replace
+that patch with one which has been tested _without_ this series
+then I'll look at applying it, provided its only trivially different
+from the existing one.
+
+Thanks.
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
