@@ -1,33 +1,52 @@
 From: hare@suse.de (Hannes Reinecke)
-Date: Tue, 22 Dec 2015 08:55:21 +0100
-Subject: [PATCH v3 57/77] ncr5380: Use standard list data structure
-In-Reply-To: <20151222011753.525503258@telegraphics.com.au>
+Date: Tue, 22 Dec 2015 09:03:54 +0100
+Subject: [PATCH v3 66/77] ncr5380: Fix soft lockups
+In-Reply-To: <20151222011755.965510468@telegraphics.com.au>
 References: <20151222011737.980475848@telegraphics.com.au>
- <20151222011753.525503258@telegraphics.com.au>
-Message-ID: <567901E9.70006@suse.de>
+ <20151222011755.965510468@telegraphics.com.au>
+Message-ID: <567903EA.7030803@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 12/22/2015 02:18 AM, Finn Thain wrote:
-> The NCR5380 drivers have a home-spun linked list implementation for
-> scsi_cmnd structs that uses cmd->host_scribble as a 'next' pointer. Adopt
-> the standard list_head data structure and list operations instead. Remove
-> the eh_abort_handler rather than convert it. Doing the conversion would
-> only be churn because the existing EH handlers don't work and get replaced
-> in a subsequent patch.
+> Because of the rudimentary design of the chip, it is necessary to poll the
+> SCSI bus signals during PIO and this tends to hog the CPU. The driver will
+> accept new commands while others execute, and this causes a soft lockup
+> because the workqueue item will not terminate until the issue queue is
+> emptied.
+>
+> When exercising dmx3191d using sequential IO from dd, the driver is sent
+> 512 KiB WRITE commands and 128 KiB READs. For a PIO transfer, the rate is
+> is only about 300 KiB/s, so these are long-running commands. And although
+> PDMA may run at several MiB/s, interrupts are disabled for the duration
+> of the transfer.
+>
+> Fix the unresponsiveness and soft lockup issues by calling cond_resched()
+> after each command is completed and by limiting max_sectors for drivers
+> that don't implement real DMA.
 >
 > Signed-off-by: Finn Thain <fthain@telegraphics.com.au>
 >
 > ---
 >
 > Changed since v2:
-> - Fix NULL pointer dereference in NCR5380_reselect() when SUPPORT_TAGS is
->    enabled in the atari_NCR5380.c core driver.
+> - Moved max_sectors initialization to wrapper drivers. It isn't really
+>    relevant to the core driver and compile-time configuration using macros
+>    like REAL_DMA should be avoided.
 >
-Well, using ->host_scribble allows for an easy check on the midlayer if 
-a command has been properly released by the LLDD. But that's just a 
-side-note.
-
+> ---
+>   drivers/scsi/NCR5380.c       |    6 ++++--
+>   drivers/scsi/arm/cumana_1.c  |    1 +
+>   drivers/scsi/arm/oak.c       |    1 +
+>   drivers/scsi/atari_NCR5380.c |    6 ++++--
+>   drivers/scsi/dmx3191d.c      |    1 +
+>   drivers/scsi/dtc.c           |    1 +
+>   drivers/scsi/g_NCR5380.c     |    1 +
+>   drivers/scsi/mac_scsi.c      |    1 +
+>   drivers/scsi/pas16.c         |    1 +
+>   drivers/scsi/t128.c          |    1 +
+>   10 files changed, 16 insertions(+), 4 deletions(-)
+>
 Reviewed-by: Hannes Reinecke <hare@suse.com>
 
 Cheers,
