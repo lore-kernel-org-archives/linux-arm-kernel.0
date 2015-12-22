@@ -1,43 +1,95 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 22 Dec 2015 11:43:26 +0100
-Subject: [PATCHv3 0/3] mv_xor improvements
-Message-ID: <1450781009-30618-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Tue, 22 Dec 2015 11:43:28 +0100
+Subject: [PATCHv3 2/3] dmaengine: mv_xor: de-duplicate mv_chan_set_mode*()
+In-Reply-To: <1450781009-30618-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1450781009-30618-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1450781009-30618-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Vinod,
+When commit 6f166312c6ea2 ("dmaengine: mv_xor: add support for a38x
+command in descriptor mode") added support for the descriptor mode
+available in Marvell Armada 38x and later SoCs, it added a new
+function mv_chan_set_mode_to_desc() which allows to configure a XOR
+channel to get the specific operation to be done from each individual
+DMA descriptor.
 
-Here is the third iteration of some mv_xor improvements patches. The
-previous iteration was sent in July earlier this year. Compared to the
-v2:
+However, this function was mainly a duplicate of the existing
+mv_chan_set_mode(), with just the operation being different.
 
- - rebased on top of v4.4-rc1
+This commit re-organizes the code into a single mv_chan_set_mode()
+function, which takes the operation mode as argument, and the
+mv_xor_channel_add() function decides whether to use
+XOR_OPERATION_MODE_IN_DESC or XOR_OPERATION_MODE_XOR.
 
- - dropped patches that were merged
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Reviewed-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/dma/mv_xor.c | 41 +++--------------------------------------
+ 1 file changed, 3 insertions(+), 38 deletions(-)
 
- - as you suggested, add a comment in the code to explain that our
-   suspend/resume implementation makes the assumption that there are
-   no in-flight DMA transactions because mv_xor is only used for
-   RAID5, and the block layer will have already suspended I/O
-   activity, so not special care needs to be taken in the driver
-   itself.
-
-I have retested this with a RAID5 array on Armada 388 GP, while the
-array is in reconstruction, and doing some suspend/resume cycles in
-the middle.
-
-Thanks!
-
-Thomas
-
-Thomas Petazzoni (3):
-  dmaengine: mv_xor: remove mv_xor_chan->current_type field
-  dmaengine: mv_xor: de-duplicate mv_chan_set_mode*()
-  dmaengine: mv_xor: add suspend/resume support
-
- drivers/dma/mv_xor.c | 95 +++++++++++++++++++++++++++++++---------------------
- drivers/dma/mv_xor.h |  2 +-
- 2 files changed, 57 insertions(+), 40 deletions(-)
-
+diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
+index 2d03379..a95878c 100644
+--- a/drivers/dma/mv_xor.c
++++ b/drivers/dma/mv_xor.c
+@@ -139,45 +139,10 @@ static void mv_chan_clear_err_status(struct mv_xor_chan *chan)
+ }
+ 
+ static void mv_chan_set_mode(struct mv_xor_chan *chan,
+-			     enum dma_transaction_type type)
++			     u32 op_mode)
+ {
+-	u32 op_mode;
+ 	u32 config = readl_relaxed(XOR_CONFIG(chan));
+ 
+-	switch (type) {
+-	case DMA_XOR:
+-		op_mode = XOR_OPERATION_MODE_XOR;
+-		break;
+-	case DMA_MEMCPY:
+-		op_mode = XOR_OPERATION_MODE_MEMCPY;
+-		break;
+-	default:
+-		dev_err(mv_chan_to_devp(chan),
+-			"error: unsupported operation %d\n",
+-			type);
+-		BUG();
+-		return;
+-	}
+-
+-	config &= ~0x7;
+-	config |= op_mode;
+-
+-#if defined(__BIG_ENDIAN)
+-	config |= XOR_DESCRIPTOR_SWAP;
+-#else
+-	config &= ~XOR_DESCRIPTOR_SWAP;
+-#endif
+-
+-	writel_relaxed(config, XOR_CONFIG(chan));
+-}
+-
+-static void mv_chan_set_mode_to_desc(struct mv_xor_chan *chan)
+-{
+-	u32 op_mode;
+-	u32 config = readl_relaxed(XOR_CONFIG(chan));
+-
+-	op_mode = XOR_OPERATION_MODE_IN_DESC;
+-
+ 	config &= ~0x7;
+ 	config |= op_mode;
+ 
+@@ -1042,9 +1007,9 @@ mv_xor_channel_add(struct mv_xor_device *xordev,
+ 	mv_chan_unmask_interrupts(mv_chan);
+ 
+ 	if (mv_chan->op_in_desc == XOR_MODE_IN_DESC)
+-		mv_chan_set_mode_to_desc(mv_chan);
++		mv_chan_set_mode(mv_chan, XOR_OPERATION_MODE_IN_DESC);
+ 	else
+-		mv_chan_set_mode(mv_chan, DMA_XOR);
++		mv_chan_set_mode(mv_chan, XOR_OPERATION_MODE_XOR);
+ 
+ 	spin_lock_init(&mv_chan->lock);
+ 	INIT_LIST_HEAD(&mv_chan->chain);
 -- 
 2.6.4
