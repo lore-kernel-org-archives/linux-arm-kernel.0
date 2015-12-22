@@ -1,127 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 22 Dec 2015 22:23:52 +0100
-Subject: [PATCH v2 0/8] Raspberry Pi 2 support.
-In-Reply-To: <20151222142045.GA29335@omega>
-References: <1450310115-22163-1-git-send-email-eric@anholt.net>
- <201512220011.32234.arnd@arndb.de> <20151222142045.GA29335@omega>
-Message-ID: <201512222223.52449.arnd@arndb.de>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 22 Dec 2015 22:28:02 +0100
+Subject: [PATCH v2 5/5] clk: rockchip: Allow the RK3288 SPDIF clocks to change
+ their parent
+In-Reply-To: <1450819682-4932-1-git-send-email-heiko@sntech.de>
+References: <1450819682-4932-1-git-send-email-heiko@sntech.de>
+Message-ID: <1450819682-4932-6-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 22 December 2015, Alexander Aring wrote:
-> On Tue, Dec 22, 2015 at 12:11:32AM +0100, Arnd Bergmann wrote:
-> > On Sunday 20 December 2015, Alexander Aring wrote:
-> > > On Fri, Dec 18, 2015 at 11:08:26AM +0100, Alexander Aring wrote:
-> > > > [    0.000000] Memory policy: Data cache writeback
-> > > > [    0.000000] BUG: mapping for 0x3f201000 at 0xf0201000 out of vmalloc space
-> > 
-> > This is a separate bug, right?
-> > 
-> 
-> Yes, I can remove this BUG when setting:
-> 
-> VMSPLIT_2G
-> 
-> or some other option, was "VMSPLIT_3G" before and with this option I
-> will get the above message.
+From: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
 
-Please try to figure out why this happened, it should really work with any
-vmsplit, in particular the one that everyone uses.
+The clock branches leading to sclk_spdif and sclk_spdif_8ch on RK3288
+SoCs only feed those clocks, allow those clocks to change their parents
+all the way up the hierarchy.
 
-> > > > [    0.000000] ------------[ cut here ]------------
-> > > > [    0.000000] WARNING: CPU: 0 PID: 0 at arch/arm/kernel/devtree.c:149 arm_dt_init_cpu_maps+0x100/0x1a4()
-> > > > [    0.000000] DT /cpu 2 nodes greater than max cores 1, capping them
-> > > > [    0.000000] Modules linked in:
-> > > > [    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted 4.4.0-rc5+ #989
-> > > > [    0.000000] Hardware name: BCM2835
-> > > > [    0.000000] [<c0016c4c>] (unwind_backtrace) from [<c0013e58>] (show_stack+0x20/0x24)
-> > > > [    0.000000] [<c0013e58>] (show_stack) from [<c0247620>] (dump_stack+0x20/0x28)
-> > > > [    0.000000] [<c0247620>] (dump_stack) from [<c0023a84>] (warn_slowpath_common+0x9c/0xc4)
-> > > > [    0.000000] [<c0023a84>] (warn_slowpath_common) from [<c0023aec>] (warn_slowpath_fmt+0x40/0x48)
-> > > > [    0.000000] [<c0023aec>] (warn_slowpath_fmt) from [<c074ef94>] (arm_dt_init_cpu_maps+0x100/0x1a4)
-> > > > [    0.000000] [<c074ef94>] (arm_dt_init_cpu_maps) from [<c074e60c>] (setup_arch+0x6f4/0x89c)
-> > > > [    0.000000] [<c074e60c>] (setup_arch) from [<c074b9cc>] (start_kernel+0x74/0x3a4)
-> > > > [    0.000000] [<c074b9cc>] (start_kernel) from [<00008078>] (0x8078)
-> > > > [    0.000000] ---[ end trace cb88537fdc8fa200 ]---
-> > > > [    0.000000] DT missing boot CPU MPIDR[23:0], fall back to default cpu_logical_map
-> > > > [    0.000000] CPU: All CPU(s) started in SVC mode.
-> > > 
-> > > I can remove this WARNING when I enable CONFIG_SMP.
-> > 
-> > I think we should try to change this in the code.
-> > 
-> 
-> mhhh, okay... I am not sure I think there is some missing
-> IS_ENABLED(CONFIG_SMP) check.
+Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ drivers/clk/rockchip/clk-rk3288.c | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-Makes sense.
-
-> > > > [    0.000000] Virtual kernel memory layout:
-> > > > [    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-> > > > [    0.000000]     fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
-> > > > [    0.000000]     vmalloc : 0xf0800000 - 0xff800000   ( 240 MB)
-> > > > [    0.000000]     lowmem  : 0xc0000000 - 0xf0000000   ( 768 MB)
-> > > > [    0.000000]     modules : 0xbf000000 - 0xc0000000   (  16 MB)
-> > > > [    0.000000]       .text : 0xc0008000 - 0xc074a7cc   (7434 kB)
-> > > > [    0.000000]       .init : 0xc074b000 - 0xc07b4000   ( 420 kB)
-> > > > [    0.000000]       .data : 0xc07b4000 - 0xc081e910   ( 427 kB)
-> > > > [    0.000000]        .bss : 0xc081e910 - 0xc08ca80c   ( 688 kB)
-> > > > [    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=1, Nodes=1
-> > > > [    0.000000] NR_IRQS:16 nr_irqs:16 16
-> > > > [    0.000000] Kernel panic - not syncing: /soc/local_intc: unable to map local interrupt registers
-> > > > [    0.000000] 
-> > > > [    0.000000] CPU: 0 PID: 0 Comm: swapper Tainted: G        W       4.4.0-rc5+ #989
-> > > > [    0.000000] Hardware name: BCM2835
-> > > > [    0.000000] [<c0016c4c>] (unwind_backtrace) from [<c0013e58>] (show_stack+0x20/0x24)
-> > > > [    0.000000] [<c0013e58>] (show_stack) from [<c0247620>] (dump_stack+0x20/0x28)
-> > > > [    0.000000] [<c0247620>] (dump_stack) from [<c00c17c0>] (panic+0x84/0x210)
-> > > > [    0.000000] [<c00c17c0>] (panic) from [<c0771d5c>] (bcm2836_arm_irqchip_l1_intc_of_init+0x94/0x110)
-> > > > [    0.000000] [<c0771d5c>] (bcm2836_arm_irqchip_l1_intc_of_init) from [<c0779f04>] (of_irq_init+0x1a0/0x2a8)
-> > > > [    0.000000] [<c0779f04>] (of_irq_init) from [<c0771af4>] (irqchip_init+0x14/0x1c)
-> > > > [    0.000000] [<c0771af4>] (irqchip_init) from [<c074d7a8>] (init_IRQ+0x28/0x88)
-> > > > [    0.000000] [<c074d7a8>] (init_IRQ) from [<c074bb64>] (start_kernel+0x20c/0x3a4)
-> > > > [    0.000000] [<c074bb64>] (start_kernel) from [<00008078>] (0x8078)
-> > > > [    0.000000] ---[ end Kernel panic - not syncing: /soc/local_intc: unable to map local interrupt registers
-> > > > 
-> > > 
-> > > But still getting this panic, your patches does not contain some
-> > > defconfig, so I still try to figure out what I need to enable to get it
-> > > working. Maybe it is some missing config entry which should be enabled.
-> > > 
-> > > But, for me it looks like some devicetree issue, because of_iomem returns
-> > > NULL, at [0]. Don't know what I am doing wrong.
-> > 
-> > That is the most likely cause, yes. You can try replacing it with an ioremap with a
-> > hardcoded physical address to see if that works.
-> > 
-> 
-> When I changed to "VMSPLIT_2G" the above issue doesn't occur anymore.
-
-Someone recently had a similar bug on some freescale platform, but unfortunately I don't
-remember the details. As above, it should really not depend on that option.
-
-> Later while booting the kernel hangs forever, the solution on my side
-> was to enable:
-> 
-> CONFIG_HAVE_ARM_ARCH_TIMER
-> 
-> I think this doesn't use the BCM2835 timer anymore and some cortex-a7
-> related "generic timer", or?
-
-Right, but I don't see how that relates to the irqchip. Is the BCM2835 timer
-connected to a secondary irqchip, while the arch timer connects to the primary GIC?
-
-> btw:
-> 
-> After the RPi is booted succesful I get several:
-> 
-> [   35.048513] unexpected IRQ trap at vector 00
-> 
-> When I type something via uart (after each character).
-> 
-> 
-> Any ideas?
-
-That also indicates that there is something wrong with the irqchip.
-
-	Arnd
+diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+index e0bb0f0..80065e6 100644
+--- a/drivers/clk/rockchip/clk-rk3288.c
++++ b/drivers/clk/rockchip/clk-rk3288.c
+@@ -317,25 +317,25 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
+ 
+ 	MUX(0, "spdif_src", mux_pll_src_cpll_gpll_p, 0,
+ 			RK3288_CLKSEL_CON(5), 15, 1, MFLAGS),
+-	COMPOSITE_NOMUX(0, "spdif_pre", "spdif_src", 0,
++	COMPOSITE_NOMUX(0, "spdif_pre", "spdif_src", CLK_SET_RATE_PARENT,
+ 			RK3288_CLKSEL_CON(5), 0, 7, DFLAGS,
+ 			RK3288_CLKGATE_CON(4), 4, GFLAGS),
+-	COMPOSITE_FRACMUX(0, "spdif_frac", "spdif_src", 0,
++	COMPOSITE_FRACMUX(0, "spdif_frac", "spdif_src", CLK_SET_RATE_PARENT,
+ 			RK3288_CLKSEL_CON(9), 0,
+ 			RK3288_CLKGATE_CON(4), 5, GFLAGS,
+-		MUX(0, "spdif_mux", mux_spdif_p, 0,
++		MUX(0, "spdif_mux", mux_spdif_p, CLK_SET_RATE_PARENT,
+ 				RK3288_CLKSEL_CON(5), 8, 2, MFLAGS)),
+-	GATE(SCLK_SPDIF, "sclk_spdif", "spdif_mux", 0,
++	GATE(SCLK_SPDIF, "sclk_spdif", "spdif_mux", CLK_SET_RATE_PARENT,
+ 			RK3288_CLKGATE_CON(4), 6, GFLAGS),
+-	COMPOSITE_NOMUX(0, "spdif_8ch_pre", "spdif_src", 0,
++	COMPOSITE_NOMUX(0, "spdif_8ch_pre", "spdif_src", CLK_SET_RATE_PARENT,
+ 			RK3288_CLKSEL_CON(40), 0, 7, DFLAGS,
+ 			RK3288_CLKGATE_CON(4), 7, GFLAGS),
+-	COMPOSITE_FRACMUX(0, "spdif_8ch_frac", "spdif_8ch_pre", 0,
++	COMPOSITE_FRACMUX(0, "spdif_8ch_frac", "spdif_8ch_pre", CLK_SET_RATE_PARENT,
+ 			RK3288_CLKSEL_CON(41), 0,
+ 			RK3288_CLKGATE_CON(4), 8, GFLAGS,
+-		MUX(0, "spdif_8ch_mux", mux_spdif_8ch_p, 0,
++		MUX(0, "spdif_8ch_mux", mux_spdif_8ch_p, CLK_SET_RATE_PARENT,
+ 				RK3288_CLKSEL_CON(40), 8, 2, MFLAGS)),
+-	GATE(SCLK_SPDIF8CH, "sclk_spdif_8ch", "spdif_8ch_mux", 0,
++	GATE(SCLK_SPDIF8CH, "sclk_spdif_8ch", "spdif_8ch_mux", CLK_SET_RATE_PARENT,
+ 			RK3288_CLKGATE_CON(4), 9, GFLAGS),
+ 
+ 	GATE(0, "sclk_acc_efuse", "xin24m", 0,
+-- 
+2.6.4
