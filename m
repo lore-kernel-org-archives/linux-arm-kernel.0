@@ -1,34 +1,74 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Tue, 22 Dec 2015 11:25:41 -0800
-Subject: [PATCH v11 0/2] Sigma Designs Tango4 port
-In-Reply-To: <566FDF53.3030004@sigmadesigns.com> (Marc Gonzalez's message of
- "Tue, 15 Dec 2015 10:37:23 +0100")
-References: <566FDF53.3030004@sigmadesigns.com>
-Message-ID: <7hr3iexp3e.fsf@deeprootsystems.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 22 Dec 2015 20:27:05 +0100
+Subject: [PATCH v4 1/2] serial: rewrite pxa2xx-uart to use 8250_core
+In-Reply-To: <1450610665.15911.53.camel@gmail.com> (Sergei Ianovich's message
+ of "Sun, 20 Dec 2015 14:24:25 +0300")
+References: <1387309071-22382-1-git-send-email-ynvich@gmail.com>
+ <1449700088-28076-1-git-send-email-ynvich@gmail.com>
+ <1449700088-28076-2-git-send-email-ynvich@gmail.com>
+ <8737uyhaji.fsf@belgarion.home> <87y4cqfu2j.fsf@belgarion.home>
+ <1450550792.15911.5.camel@gmail.com> <87twnefd67.fsf@belgarion.home>
+ <1450555955.15911.14.camel@gmail.com> <87poy2f2xw.fsf@belgarion.home>
+ <1450610665.15911.53.camel@gmail.com>
+Message-ID: <87a8p2ffna.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
+Sergei Ianovich <ynvich@gmail.com> writes:
 
-> "One more time. We're gonna celebrate."
+> On Sun, 2015-12-20 at 00:12 +0100, Robert Jarzmik wrote:
+>> Sergei Ianovich <ynvich@gmail.com> writes:
+>> 
+>> > On Sat, 2015-12-19 at 20:31 +0100, Robert Jarzmik wrote:
+>> > I understand that people are afraid of taking this patch. If it
+>> > starts
+>> > causing troubles at runtime, it will be difficult to diagnose. There
+>> > will be no console for most people. So it is probably good idea to
+>> > fail
+>> > at boot time.
+>> If it's about something already written in a mailing
+>> list, please point me to it so that it can help me think about it.
 >
-> Changes since v10:
-> Add aliases and chosen DT nodes
-> Use CPU_CLK and SYS_CLK symbolic names
-> MPCore private memory region DT node
-> select TANGO_IRQ instead of GENERIC_IRQ_CHIP
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-December/2167
+> 73.html
 >
-> Changes planned for a future patch series:
-> Have clkgen driver export CD2 for USB, and CD6 for SDIO
+> I can explain why I think so. Greg acked the patch, but hasn't merged it
+> since then. He has good reasons for this most probably. Russell's
+> comment pointed by the link seems to be the reason.
 
-Was it intentional to leave out a multi_v7_defconfig change so that this
-actually builds?  Or was that planned for a future series?
+> I think the problem raised by Russell could be addressed. My best guess
+> is compile time error, despite your comment above.
+I re-read carefully Russell's answer in [1].
 
-IMO, it should be part of this series so it gets build tested as soon as
-it's merged.
+What Russell asked is that for a period of time, the old pxa serial code and the
+new will be in the kernel, so that maintainers have the option to switch over to
+the old drivers/tty/serial/pxa.c if the new 8250 based version breaks their
+userspace getty.
 
-Otherwise, looking good to me.
+Then, once the transition is done, and that for a period (let's say 1 year) no
+maintainer had complained while its defconfig was switched over to the new 8520
+version, then and only then you will remove drivers/tty/serial/pxa.c.
 
-Reviewed-by: Kevin Hilman <khilman@linaro.org>
+> I have one more plan. For transition period, we can introduce a
+> temporary Kconfig option SERIAL_8250_PXA_OFF, and fail at build time if
+> neither SERIAL_8250_PXA nor SERIAL_8250_PXA_OFF is set. This way all
+> interested parties will be notified of this driver update.
+No, I'd like to stick with Russell's original plan :
+ - phase 1: both SERIAL_8250_PXA and SERIAL_PXA exist in KConfig
+            both are selectable
+            This lasts one year or something like that
+ - phase 2: remove SERIAL_PXA from KConfig and drivers/tty/serial/pxa.c
 
-Kevin
+This means a different patch from the one acked by Greg, and a new serie of
+acks. The diffstat will be way worse (as you won't have the -970 for pxa.c), but
+in the end it will end up on that -970.
+
+That sounds like a good transition plan to me.
+
+Cheers.
+
+-- 
+Robert
+
+[1]
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-December/216773.html
