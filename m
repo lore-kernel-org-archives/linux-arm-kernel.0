@@ -1,50 +1,47 @@
-From: wpdster@gmail.com (Patrick Doyle)
-Date: Tue, 22 Dec 2015 11:28:38 -0500
-Subject: How to get better precision out of getrusage on the ARM?
-In-Reply-To: <20151222151314.GM8644@n2100.arm.linux.org.uk>
-References: <CAF_dkJBjs1b+73ggvJyXwab6YL94HGT2jrqbcfaLxoETtQsD9Q@mail.gmail.com>
- <20151222144907.GK8644@n2100.arm.linux.org.uk>
- <CAF_dkJDFXSEgH+kO=k=Yj0_VDnFYgPtkoYznLUWZnq4=QTNDDg@mail.gmail.com>
- <20151222151314.GM8644@n2100.arm.linux.org.uk>
-Message-ID: <CAF_dkJAUyD3GRAETZUQG2yJTmOR95XKVguohBpBjUaM9JMaQyg@mail.gmail.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Tue, 22 Dec 2015 11:36:38 -0500
+Subject: [PATCH V2 22/23] pci, acpi: Match PCI config space accessors
+ against platfrom specific quirks.
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1EC17CAC@lhreml503-mbb>
+References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
+ <1450278993-12664-23-git-send-email-tn@semihalf.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1EC14C0F@lhreml503-mbb>
+ <201512211510.32029.arnd@arndb.de>
+ <335CDE2E-B588-43A8-8665-6023AFD0EA04@redhat.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1EC17CAC@lhreml503-mbb>
+Message-ID: <56797C16.2020802@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 22, 2015 at 10:13 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Dec 22, 2015 at 09:57:57AM -0500, Patrick Doyle wrote:
->> On Tue, Dec 22, 2015 at 9:49 AM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Tue, Dec 22, 2015 at 09:30:30AM -0500, Patrick Doyle wrote:
->> >> Short version:
->> >> My application running on a Cortex-A5 processor (the SAMA5D2 from
->> >> Atmel) calls getrusage(RUSAGE_THREAD, ...), which returns cpu time
->> >> quantized to the kernel tick frequency (100Hz or 1Khz, depending on
->> >> CONFIG_HZ_100 vs CONFIG_HZ_1000).
->> >>
->> >> How can I get better precision for sched_clock on the (Cortex-A5) ARM?
->> >>  The x86 uses the TSC.
->> >
->> > You need to provide a sched_clock() implementation using
->> > sched_clock_register().
->> >
->> Thank you, I tried that by modifying the (Atmel specific) tcb_clcksrc,
->> and got a sched_clock that never incremented.  I have a question out
->> at the Atmel forum asking about this, and will continue to investigate
->> on my own, but I figured it was about time to ask the experts :-)
-Thank you for your help.
+On 12/22/2015 04:29 AM, Gabriele Paoloni wrote:
+> Hi Jon, thanks for replying
+> 
+>> -----Original Message-----
+>> From: Jon Masters [mailto:jcm at redhat.com]
+>> Sent: 21 December 2015 23:11
+>> To: Arnd Bergmann
+>> Cc: Gabriele Paoloni; Tomasz Nowicki; bhelgaas at google.com;
+>> will.deacon at arm.com; catalin.marinas at arm.com; rjw at rjwysocki.net;
+>> hanjun.guo at linaro.org; Lorenzo.Pieralisi at arm.com; okaya at codeaurora.org;
+>> jiang.liu at linux.intel.com; Stefano.Stabellini at eu.citrix.com;
+>> robert.richter at caviumnetworks.com; mw at semihalf.com; Liviu.Dudau at arm.com;
+>> ddaney at caviumnetworks.com; tglx at linutronix.de; Wangyijing;
+>> Suravee.Suthikulpanit at amd.com; msalter at redhat.com; linux-
+>> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+>> acpi at vger.kernel.org; linux-kernel at vger.kernel.org; linaro-
+>> acpi at lists.linaro.org; jchandra at broadcom.com
+>> Subject: Re: [PATCH V2 22/23] pci, acpi: Match PCI config space
+>> accessors against platfrom specific quirks.
+>>
+>> Sorry for top-posting. A quick note that SMBIOS3 is required by SBBR so
+>> it can be presumed that compliant platforms will provide quirks via DMI.
+> 
+> Ok so you completely clarified my question 1). Many Thanks for this
 
-Now my sched_clock is incrementing, (I have no idea why it wasn't
-yesterday -- it must have been 5:00-itis).  I have passed a readback
-function to sched_clock_register(), but I'm still seeing 1ms
-resolution for the values returned by getrusage().  Are there other
-configuration items I should be setting to get better resolution?  I
-have tried setting CONFIG_HIGH_RES_TIMERS and
-CONFIG_IRQ_TIME_ACCOUNTING.  It seems like I should choose
-VIRT_CPU_ACCOUNTING_NATIVE, but that choice is not enabled because
-HAVE_VIRT_CPU_ACCOUNTING is not defined.  HAVE_VIRT_SPU_ACCOUNTING
-doesn't seem to be defined for the ARM architecture.
+No problem. One of the (many) reasons I pushed for requiring SMBIOS/DMI
+in SBBR (I was lead author of one of the early drafts of that document)
+was to make the experience ultimately equivalent across architectures.
+We already know how to do quirks and handle platform deviations, and the
+major Operating System vendors did not want to reinvent the wheel.
 
-Any more thoughts or ideas?
-
---wpd
+Jon.
