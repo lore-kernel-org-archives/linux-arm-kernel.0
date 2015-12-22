@@ -1,33 +1,36 @@
 From: hare@suse.de (Hannes Reinecke)
-Date: Tue, 22 Dec 2015 08:42:04 +0100
-Subject: [PATCH v3 45/77] ncr5380: Cleanup #include directives
-In-Reply-To: <20151222011750.245516745@telegraphics.com.au>
+Date: Tue, 22 Dec 2015 08:47:29 +0100
+Subject: [PATCH v3 51/77] ncr5380: Remove command list debug code
+In-Reply-To: <20151222011751.836236766@telegraphics.com.au>
 References: <20151222011737.980475848@telegraphics.com.au>
- <20151222011750.245516745@telegraphics.com.au>
-Message-ID: <5678FECC.4090509@suse.de>
+ <20151222011751.836236766@telegraphics.com.au>
+Message-ID: <56790011.4040302@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 12/22/2015 02:18 AM, Finn Thain wrote:
-> Remove unused includes (stat.h, signal.h, proc_fs.h) and move includes
-> needed by the core drivers into the common header (delay.h etc).
+> Some NCR5380 hosts offer a .show_info method to access the contents of
+> the various command list data structures from a procfs file. When NDEBUG
+> is set, the same information is sent to the console during EH.
+>
+> The two core drivers, atari_NCR5380.c and NCR5380.c differ here. Because
+> it is just for debugging, the easiest way to fix the discrepancy is
+> simply remove this code.
+>
+> The only remaining users of NCR5380_show_info() and NCR5380_write_info()
+> are drivers that define PSEUDO_DMA. The others have no use for the
+> .show_info method, so don't initialize it.
 >
 > Signed-off-by: Finn Thain <fthain@telegraphics.com.au>
 >
 > ---
->   drivers/scsi/NCR5380.c       |    2 --
->   drivers/scsi/NCR5380.h       |    4 ++++
->   drivers/scsi/arm/cumana_1.c  |    4 ----
->   drivers/scsi/arm/oak.c       |    2 --
->   drivers/scsi/atari_NCR5380.c |    5 -----
->   drivers/scsi/atari_scsi.c    |    1 -
->   drivers/scsi/dmx3191d.c      |    5 -----
->   drivers/scsi/dtc.c           |    4 +---
->   drivers/scsi/g_NCR5380.c     |    6 ++----
->   drivers/scsi/mac_scsi.c      |    1 -
->   drivers/scsi/pas16.c         |    4 ----
->   drivers/scsi/t128.c          |    3 ---
->   12 files changed, 7 insertions(+), 34 deletions(-)
+>   drivers/scsi/NCR5380.c       |   70 ++------------------------------
+>   drivers/scsi/arm/oak.c       |    2
+>   drivers/scsi/atari_NCR5380.c |   94 +------------------------------------------
+>   drivers/scsi/atari_scsi.c    |    2
+>   drivers/scsi/g_NCR5380.c     |    1
+>   drivers/scsi/sun3_scsi.c     |    2
+>   6 files changed, 9 insertions(+), 162 deletions(-)
 >
 Reviewed-by: Hannes Reinecke <hare@suse.com>
 
