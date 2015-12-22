@@ -1,39 +1,41 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 22 Dec 2015 12:27:42 +0000
-Subject: [RFC PATCH 0/5] arm64: prepare for basic Allwinner support
-Message-ID: <1450787267-26836-1-git-send-email-andre.przywara@arm.com>
+Date: Tue, 22 Dec 2015 12:27:43 +0000
+Subject: [RFC PATCH 1/5] drivers: sunxi-rsb: fix error output type
+In-Reply-To: <1450787267-26836-1-git-send-email-andre.przywara@arm.com>
+References: <1450787267-26836-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <1450787267-26836-2-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a first step for introducing support for the Allwinner A64
-SoC that made a recent appearance on the Pine A64 board featured on
-Kickstarter.
-This mini-series prepares the ground by allowing ARCH_SUNXI to be
-defined for an arm64 kernel.
-The patches fix some minor warnings which appear when Allwinner
-(aka. sunxi) drivers are compiled for a 64-bit architecture.
+"len" is actually a size_t in this function here, so properly annotate
+the dev_err printf type to allow compilation for 64-bit architectures.
 
-Due to a lack of official documentation and hardware availability
-this doesn't go any further at this moment.
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ drivers/bus/sunxi-rsb.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Please have a look and comment!
-
-Cheers,
-Andre.
-
-Andre Przywara (5):
-  drivers: sunxi-rsb: fix error output type
-  crypto: sunxi-ss: fix min3() call to match types
-  crypto: sunxi-ss: fix dev_dbg() output type
-  irqchip: sun4i: fix compilation outside of arch/arm
-  arm64: Introduce Allwinner SoC config option
-
- arch/arm64/Kconfig.platforms              |  5 +++++
- drivers/bus/sunxi-rsb.c                   |  4 ++--
- drivers/crypto/sunxi-ss/sun4i-ss-cipher.c | 14 +++++++-------
- drivers/crypto/sunxi-ss/sun4i-ss-hash.c   |  8 ++++----
- drivers/irqchip/irq-sun4i.c               |  1 -
- 5 files changed, 18 insertions(+), 14 deletions(-)
-
+diff --git a/drivers/bus/sunxi-rsb.c b/drivers/bus/sunxi-rsb.c
+index 846bc29..7f26bc1d 100644
+--- a/drivers/bus/sunxi-rsb.c
++++ b/drivers/bus/sunxi-rsb.c
+@@ -330,7 +330,7 @@ static int sunxi_rsb_read(struct sunxi_rsb *rsb, u8 rtaddr, u8 addr,
+ 		cmd = RSB_CMD_RD32;
+ 		break;
+ 	default:
+-		dev_err(rsb->dev, "Invalid access width: %d\n", len);
++		dev_err(rsb->dev, "Invalid access width: %zd\n", len);
+ 		return -EINVAL;
+ 	}
+ 
+@@ -372,7 +372,7 @@ static int sunxi_rsb_write(struct sunxi_rsb *rsb, u8 rtaddr, u8 addr,
+ 		cmd = RSB_CMD_WR32;
+ 		break;
+ 	default:
+-		dev_err(rsb->dev, "Invalid access width: %d\n", len);
++		dev_err(rsb->dev, "Invalid access width: %zd\n", len);
+ 		return -EINVAL;
+ 	}
+ 
 -- 
 2.5.1
