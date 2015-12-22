@@ -1,46 +1,53 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Tue, 22 Dec 2015 15:55:12 +0000
-Subject: [GIT PULL] Add idle states to Juno device-tree
-In-Reply-To: <1450797456.3037.2.camel@linaro.org>
-References: <1450797456.3037.2.camel@linaro.org>
-Message-ID: <1450799712.3037.6.camel@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 22 Dec 2015 15:57:13 +0000
+Subject: [PATCH RESEND v4] arm: remove !CPU_V6 and !GENERIC_ATOMIC64
+ build dependencies for XEN
+In-Reply-To: <alpine.DEB.2.02.1512221535470.3096@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1512221404060.3096@kaball.uk.xensource.com>
+ <20151222144605.GJ8644@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1512221535470.3096@kaball.uk.xensource.com>
+Message-ID: <20151222155713.GN8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-12-22 at 15:17 +0000, Jon Medhurst (Tixy) wrote:
-[...]
-> The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
-> 
->   Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
-> 
-> are available in the git repository at:
-> 
->   https://git.linaro.org/people/tixy/kernel.git juno-idle-dts
-> 
-> for you to fetch changes up to 8ea5bf9418d621a27398a0d98987382343f0e94c:
+On Tue, Dec 22, 2015 at 03:45:19PM +0000, Stefano Stabellini wrote:
+> The code builds, but of course it could not actually run on CPU_V6. But
+> the use case for me is building drivers/xen/grant-table.c, which can
+> only run on CPU_V7 anyway, so it is not a problem.
 
-I had accidentally pushed out the version without the updated commit
-message. I've now fixed that error and the updated commit details are...
+What I'm concerned about in this case is if you try to use instructions
+which are not supported by the CPU, even in assembly, the assembler
+will barf.
 
+So, if we're building an ARMv6 + ARMv7 kernel, and you try to use
+LDREXB in generic code, even though you may intend it to only be
+executed on ARMv7, the assembler will error out.
 
-for you to fetch changes up to 7a174ce3f39386f450e6b864c0e4261988fc5bfe:
+We used to be able to work around that by passing -Wa,-march=armv7
+to the compiler for specific files, which would then tell the assembler
+to accept ARMv7 instructions, but modern GCC output .arch pseudo-ops
+which override the command line.  So now the only way to do it is to
+override the assemblers selected archtecture using .arch pseudo-ops
+in the assembly code.
 
-  arm64: dts: juno: Add idle-states to device tree (2015-12-22 15:47:49 +0000)
+So, what I'm saying is that dropping the !ARMv6 dependency is not as
+simple as it would seem, and I'm nervous about including any such
+patches this close to Christmas and the merge window.
 
-> 
->   arm64: dts: juno: Add idle-states to device tree (2015-12-22 14:51:59 +0000)
-> 
-> ----------------------------------------------------------------
-> Jon Medhurst (1):
->       arm64: dts: juno: Add idle-states to device tree
-> 
->  arch/arm64/boot/dts/arm/juno-r1.dts | 28 ++++++++++++++++++++++++++++
->  arch/arm64/boot/dts/arm/juno.dts    | 28 ++++++++++++++++++++++++++++
->  2 files changed, 56 insertions(+)
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I've recently been through a run of "apply this patch, no it's wrong,
+drop it, apply the next version, no it's still wrong, drop it again."
+So, today is the last day I'm accepting _known_ good patches into my
+tree for the 4.5 merge window.  This is not yet a known good patch
+because it hasn't been through several iterations of testing - and I
+don't want to be adding and removing patches from my tree over
+Christmas.
+
+I'd rather leave my tree in a known good state before Christmas so
+that those who want to fiddle with the kernel over the holiday break
+can do so without having the hassle of trees containing partially
+tested patches.
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
