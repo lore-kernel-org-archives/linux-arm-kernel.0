@@ -1,117 +1,95 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 22 Dec 2015 12:36:42 +0000
-Subject: [GIT PULL] UEFI support for 32-bit ARM
-In-Reply-To: <CAKv+Gu_QvQnsYk=coEJQrRk94xATT9Fi5=9jCZhLoNUvTU7kJg@mail.gmail.com>
-References: <CAKv+Gu_QvQnsYk=coEJQrRk94xATT9Fi5=9jCZhLoNUvTU7kJg@mail.gmail.com>
-Message-ID: <20151222123642.GG8644@n2100.arm.linux.org.uk>
+From: fthain@telegraphics.com.au (Finn Thain)
+Date: Tue, 22 Dec 2015 23:44:21 +1100 (AEDT)
+Subject: [PATCH v3 20/77] ncr5380: Introduce unbound workqueue
+In-Reply-To: <5678F776.8080305@suse.de>
+References: <20151222011737.980475848@telegraphics.com.au>
+ <20151222011743.455500361@telegraphics.com.au> <5678F776.8080305@suse.de>
+Message-ID: <alpine.LNX.2.00.1512222238240.19799@nippy.intranet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 14, 2015 at 06:10:12PM +0100, Ard Biesheuvel wrote:
-> NOTE: this pull request is based on a stable, shared branch published
-> by the arm64 maintainers. This means that pulling the
-> arm32-efi-for-v4.5 tag will pull the following patches along with the
-> patches listed below:
-> 
-> f7d924894265 arm64/efi: refactor EFI init and runtime code for reuse
-> by 32-bit ARM
-> e5bc22a42e4d arm64/efi: split off EFI init and runtime code for reuse
-> by 32-bit ARM
-> 4dffbfc48d65 arm64/efi: mark UEFI reserved regions as MEMBLOCK_NOMAP
-> 68709f45385a arm64: only consider memblocks with NOMAP cleared for
-> linear mapping
-> bf3d3cc580f9 mm/memblock: add MEMBLOCK_NOMAP attribute to memblock memory table
-> 
-> @Will: please advise when you intend to send these to -next. Thanks.
-> 
-> The following changes since commit f7d924894265794f447ea799dd853400749b5a22:
-> 
->   arm64/efi: refactor EFI init and runtime code for reuse by 32-bit ARM
->   (2015-12-09 16:57:23 +0000)
-> 
-> are available in the git repository at:
-> 
->   git://git.linaro.org/people/ard.biesheuvel/linux-arm.git \
->   tags/arm32-efi-for-v4.5
-> 
-> for you to fetch changes up to 81a0bc39ea1960bbf8ece6a895d7cfd2d9efa28a:
-> 
->   ARM: add UEFI stub support (2015-12-14 10:38:21 +0100)
-> 
-> ----------------------------------------------------------------
-> This implements UEFI kernel support for 32-bit ARM, based on the existing
-> arm64 support and existing generic early ioremap support. It is based on
-> commit f7d924894265 ("arm64/efi: refactor EFI init and runtime code for
-> reuse by 32-bit ARM"), which was pulled from the arm64 repo [1] as branch
-> 'aarch64/efi'
-> 
-> [1] git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git
-> 
-> ----------------------------------------------------------------
-> 
-> Weblink:
-> http://thread.gmane.org/gmane.linux.kernel.mm/142134
-> 
-> Repo browse link:
-> http://git.linaro.org/people/ard.biesheuvel/linux-arm.git/shortlog/refs/tags/arm32-efi-for-v4.5
-> 
-> Regression test results:
-> http://kernelci.org/build/ardb/kernel/v4.4-rc3-13-g81a0bc39ea19/
-> 
-> Ard Biesheuvel (7):
->       ARM: add support for generic early_ioremap/early_memremap
->       ARM: split off core mapping logic from create_mapping
->       ARM: factor out allocation routine from __create_mapping()
->       ARM: add support for non-global kernel mappings
->       ARM: implement create_mapping_late() for EFI use
->       ARM: only consider memblocks with NOMAP cleared for linear mapping
->       ARM: wire up UEFI init and runtime support
-> 
-> Roy Franz (1):
->       ARM: add UEFI stub support
-> 
->  arch/arm/Kconfig                          |  20 +++++
->  arch/arm/boot/compressed/Makefile         |   4 +-
->  arch/arm/boot/compressed/efi-header.S     | 130 ++++++++++++++++++++++++++++++
->  arch/arm/boot/compressed/head.S           |  54 ++++++++++++-
->  arch/arm/boot/compressed/vmlinux.lds.S    |   7 ++
->  arch/arm/include/asm/Kbuild               |   1 +
->  arch/arm/include/asm/efi.h                |  83 +++++++++++++++++++
->  arch/arm/include/asm/fixmap.h             |  29 ++++++-
->  arch/arm/include/asm/mach/map.h           |   2 +
->  arch/arm/include/asm/mmu_context.h        |   2 +-
->  arch/arm/kernel/Makefile                  |   1 +
->  arch/arm/kernel/efi.c                     |  38 +++++++++
->  arch/arm/kernel/setup.c                   |  10 ++-
->  arch/arm/mm/init.c                        |   5 +-
->  arch/arm/mm/ioremap.c                     |   9 +++
->  arch/arm/mm/mmu.c                         | 128 +++++++++++++++++++----------
->  drivers/firmware/efi/Makefile             |   1 +
->  drivers/firmware/efi/libstub/Makefile     |   9 +++
->  drivers/firmware/efi/libstub/arm-stub.c   |   4 +-
->  drivers/firmware/efi/libstub/arm32-stub.c |  85 +++++++++++++++++++
->  20 files changed, 572 insertions(+), 50 deletions(-)
->  create mode 100644 arch/arm/boot/compressed/efi-header.S
->  create mode 100644 arch/arm/include/asm/efi.h
->  create mode 100644 arch/arm/kernel/efi.c
->  create mode 100644 drivers/firmware/efi/libstub/arm32-stub.c
 
-This pull request done in this way makes it _really_ difficult to
-validate that I've pulled what was intended to be pulled.
+On Tue, 22 Dec 2015, Hannes Reinecke wrote:
 
-The point of the diffstat is to be able to compare the resulting
-diffstat from pulling the changes with the one in the message.  In
-this case, because you've omitted some patches at the beginning of
-the series, it doesn't match:
+> On 12/22/2015 02:17 AM, Finn Thain wrote:
+> > Allocate a work queue that will permit busy waiting and sleeping. This
+> > means NCR5380_init() can potentially fail, so add this error path.
+> >
+> > Signed-off-by: Finn Thain <fthain@telegraphics.com.au>
+> >
+> > ---
+> >
+> > In subsequent patches, the work function adopts this work queue so it
+> > can sleep while polling, which allows the removal of some flawed and
+> > complicated code in NCR5380_select() in NCR5380.c.
+> >
+> > Changed since v1:
+> > - Dropped WQ_CPU_INTENSIVE flag because Documentation/workqueue.txt says it
+> >    "is meaningless for unbound wq".
+> >
+> > ---
+> >   drivers/scsi/NCR5380.c       |   15 +++++++++++----
+> >   drivers/scsi/NCR5380.h       |    1 +
+> >   drivers/scsi/arm/cumana_1.c  |    8 ++++++--
+> >   drivers/scsi/arm/oak.c       |    8 ++++++--
+> >   drivers/scsi/atari_NCR5380.c |    8 +++++++-
+> >   drivers/scsi/atari_scsi.c    |    5 ++++-
+> >   drivers/scsi/dmx3191d.c      |   17 +++++++++++------
+> >   drivers/scsi/dtc.c           |   11 +++++++++--
+> >   drivers/scsi/g_NCR5380.c     |   31 +++++++++++++++----------------
+> >   drivers/scsi/mac_scsi.c      |    5 ++++-
+> >   drivers/scsi/pas16.c         |   10 ++++++++--
+> >   drivers/scsi/sun3_scsi.c     |    5 ++++-
+> >   drivers/scsi/t128.c          |   13 ++++++++++---
+> >   13 files changed, 96 insertions(+), 41 deletions(-)
+> >
+> > Index: linux/drivers/scsi/NCR5380.c
+> > ===================================================================
+> > --- linux.orig/drivers/scsi/NCR5380.c	2015-12-22 12:15:52.000000000 +1100
+> > +++ linux/drivers/scsi/NCR5380.c	2015-12-22 12:15:56.000000000 +1100
+> > @@ -514,7 +514,7 @@ static int should_disconnect(unsigned ch
+> >   static void NCR5380_set_timer(struct NCR5380_hostdata *hostdata, unsigned
+> >   long timeout)
+> >   {
+> >   	hostdata->time_expires = jiffies + timeout;
+> > -	schedule_delayed_work(&hostdata->coroutine, timeout);
+> > +	queue_delayed_work(hostdata->work_q, &hostdata->coroutine, timeout);
+> >   }
+> >
+> >
+> > @@ -791,7 +791,12 @@ static int NCR5380_init(struct Scsi_Host
+> >    hostdata->disconnected_queue = NULL;
+> >    
+> >    INIT_DELAYED_WORK(&hostdata->coroutine, NCR5380_main);
+> > -	
+> > +	hostdata->work_q = alloc_workqueue("ncr5380_%d",
+> > +	                        WQ_UNBOUND | WQ_MEM_RECLAIM,
+> > +	                        1, instance->host_no);
+> > +	if (!hostdata->work_q)
+> > +		return -ENOMEM;
+> > +
+> >    /* The CHECK code seems to break the 53C400. Will check it later maybe */
+> >    if (flags & FLAG_NCR53C400)
+> >     hostdata->flags = FLAG_HAS_LAST_BYTE_SENT | flags;
+> 
+> Wouldn't it be better to use a normal (ie bound) workqueue here?
 
- 29 files changed, 986 insertions(+), 368 deletions(-)
+The polling algorithm I've used requires that the workqueue item is free 
+to busy-wait and sleep. Perhaps a kthread_worker would be better?
 
-So I can't validate it.
+> SCSI-2 is pretty much single-threaded, so shifting things onto arbitrary 
+> CPUs don't sound very appealing.
 
-Please send a replacement pull request which covers all the patches
-you want me to merge into my tree, thanks.
+Most of these drivers only run on UP systems. For the x86 drivers, I 
+suspect that the cache miss penalty would be insignificant compared to 
+some of the other overheads. The 5380 chip requires that the CPU is 
+involved in SCSI bus signalling and merely accessing a chip register 
+takes over a microsecond.
 
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+
+> 
+> Cheers,
+> 
+> Hannes
+> 
