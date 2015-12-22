@@ -1,76 +1,86 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Tue, 22 Dec 2015 09:29:02 +0000
-Subject: [PATCH V2 22/23] pci, acpi: Match PCI config space accessors
- against platfrom specific quirks.
-In-Reply-To: <335CDE2E-B588-43A8-8665-6023AFD0EA04@redhat.com>
-References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
- <1450278993-12664-23-git-send-email-tn@semihalf.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1EC14C0F@lhreml503-mbb>
- <201512211510.32029.arnd@arndb.de>
- <335CDE2E-B588-43A8-8665-6023AFD0EA04@redhat.com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1EC17CAC@lhreml503-mbb>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Tue, 22 Dec 2015 17:33:48 +0800
+Subject: [PATCH 0/5] Support the codec and wifi/bt for rk3036 Kylin board
+Message-ID: <1450776833-27639-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon, thanks for replying
 
-> -----Original Message-----
-> From: Jon Masters [mailto:jcm at redhat.com]
-> Sent: 21 December 2015 23:11
-> To: Arnd Bergmann
-> Cc: Gabriele Paoloni; Tomasz Nowicki; bhelgaas at google.com;
-> will.deacon at arm.com; catalin.marinas at arm.com; rjw at rjwysocki.net;
-> hanjun.guo at linaro.org; Lorenzo.Pieralisi at arm.com; okaya at codeaurora.org;
-> jiang.liu at linux.intel.com; Stefano.Stabellini at eu.citrix.com;
-> robert.richter at caviumnetworks.com; mw at semihalf.com; Liviu.Dudau at arm.com;
-> ddaney at caviumnetworks.com; tglx at linutronix.de; Wangyijing;
-> Suravee.Suthikulpanit at amd.com; msalter at redhat.com; linux-
-> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> acpi at vger.kernel.org; linux-kernel at vger.kernel.org; linaro-
-> acpi at lists.linaro.org; jchandra at broadcom.com
-> Subject: Re: [PATCH V2 22/23] pci, acpi: Match PCI config space
-> accessors against platfrom specific quirks.
-> 
-> Sorry for top-posting. A quick note that SMBIOS3 is required by SBBR so
-> it can be presumed that compliant platforms will provide quirks via DMI.
+Add the needed device for kylin board.
 
-Ok so you completely clarified my question 1). Many Thanks for this
+--------------
+This series patches have the following decriptions:
 
-Gab
+PATCH[1/5]:
+ARM: dts: set the pinctrl default setting for i2s
 
-> 
-> --
-> Computer Architect | Sent from my 64-bit #ARM Powered phone
-> 
-> > On Dec 21, 2015, at 09:11, Arnd Bergmann <arnd@arndb.de> wrote:
-> >
-> > On Monday 21 December 2015, Gabriele Paoloni wrote:
-> >>> -----Original Message-----
-> >>> From: linux-kernel-owner at vger.kernel.org [mailto:linux-kernel-
-> >>> owner at vger.kernel.org] On Behalf Of Tomasz Nowicki
-> >
-> >>> Some platforms may not be fully compliant with generic set of PCI
-> >>> config accessors. For these cases we implement the way to overwrite
-> >>> accessors set before PCI buses enumeration. Algorithm that
-> overwrite
-> >>> accessors matches against platform ID (DMI), domain and bus number,
-> >>> hopefully enough for all cases. All quirks can be defined using:
-> >>> DECLARE_ACPI_MCFG_FIXUP() and keep self contained.
-> >>
-> >> I've got a couple of comments/questions about this patch..
-> >>
-> >> 1) So according to this mechanism quirks would be supported only by
-> >>   vendors whose BIOS are SMBIOS compliant. Now personally I am ok
-> >>   with this but I don't know if this is OK in general as it would
-> >>   narrow down the number of platforms that would be able to define
-> >>   the quirks...
-> >>   Lorenzo, Arnd what is your opinion here?
-> >
-> > I'd rather not see the quirks in mainline at all, and only support
-> > SBSA compliant machines, or require the BIOS to work around the
-> > hardware quirks differently (e.g. by trapping config space access
-> > through secure firmware, or going through an AML method to be
-> > defined). I'm certainly ok with making it depend on SMBIOS if we are
-> going to use something like this.
-> >
-> >    Arnd
+The kylin will hang in system when enable the i2s,
+we need set the pinctrl default setting for i2s firstly.
+--------------
+
+PATCH[2/5]:
+ARM: dts: add the sound codec for kylin board
+
+Let the codec works.
+
+RT5616 driver is landed in Mark branch.
+(https://git.kernel.org/cgit/linux/kernel/git/broonie/sound.git/commit/
+?h=for-next&id=b1d15059957d33d111e0ed38724a6b2c5caac790)
+
+Maybe need wait the below patch be merged firstly.
+(add an of_match table: https://patchwork.kernel.org/patch/7901951/
+rt5616 document: https://patchwork.kernel.org/patch/7901971/)
+---------------
+
+PATCH[3/5]:
+ARM: dts: rockchip: enable the high speed on sdio for kylin board
+
+This patch is solving the wifi work frequency.
+37.5MHz frequency for rk3036.
+
+The wifi throughput:
+
+iperf -s -i 1
+...
+[  4] 116.0-117.0 sec  2.88 MBytes  24.1 Mbits/sec
+[  4] 117.0-118.0 sec  2.99 MBytes  25.0 Mbits/sec
+[  4] 118.0-119.0 sec  3.01 MBytes  25.2 Mbits/sec
+[  4] 119.0-120.0 sec  2.89 MBytes  24.2 Mbits/sec
+[  4]  0.0-120.4 sec   332 MBytes  23.1 Mbits/sec
+----------------
+
+PATCH[4/5]:
+ARM: dts: add the wifi/bt regulator for kylin board
+
+Add the wifi/bt regulator for wifi module, let the module work on bootup.
+
+Yep, this patch is based on olof patch[0].
+patch[0]:
+https://patchwork.kernel.org/patch/3510571/
+----------------
+
+PATCH[5/5]:
+ARM: dts: enable the uart0 for bluetooth module
+
+Enable the uart0 for BT module working.
+----------------
+
+Note: that's seem the wifi driver has not landed in mainline.
+This driver has existed in rockchip github develop4.1.
+https://github.com/rockchip-linux/kernel/commit/a731ffcd0d6ee3b3e6f015d3e2f7b4bf698a3533
+
+
+
+Caesar Wang (5):
+  ARM: dts: set the pinctrl default setting for i2s
+  ARM: dts: add the sound codec for kylin board
+  ARM: dts: rockchip: enable the high speed on sdio for kylin board
+  ARM: dts: add the wifi/bt regulator for kylin board
+  ARM: dts: enable the uart0 for bluetooth module
+
+ arch/arm/boot/dts/rk3036-kylin.dts | 85 +++++++++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/rk3036.dtsi      | 12 +++---
+ 2 files changed, 90 insertions(+), 7 deletions(-)
+
+-- 
+1.9.1
