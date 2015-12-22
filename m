@@ -1,53 +1,56 @@
 From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Tue, 22 Dec 2015 16:07:51 +0200
-Subject: [PATCH v2 1/2] ARM: dts: imx7d: cl-som-imx7: add basic module
- support
-In-Reply-To: <20151222121718.GB26290@tiger>
+Date: Tue, 22 Dec 2015 16:13:18 +0200
+Subject: [PATCH v2 2/2] ARM: dts: imx7d: sbc-imx7: add basic board support
+In-Reply-To: <20151222121920.GC26290@tiger>
 References: <1449472479-2521-1-git-send-email-ilya@compulab.co.il>
  <1450772120-18131-1-git-send-email-ilya@compulab.co.il>
- <1450772120-18131-2-git-send-email-ilya@compulab.co.il>
- <20151222121718.GB26290@tiger>
-Message-ID: <56795937.6090903@compulab.co.il>
+ <1450772120-18131-3-git-send-email-ilya@compulab.co.il>
+ <20151222121920.GC26290@tiger>
+Message-ID: <56795A7E.2000100@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
-
-On 12/22/15 14:17, Shawn Guo wrote:
-> On Tue, Dec 22, 2015 at 10:15:19AM +0200, Ilya Ledvich wrote:
+On 12/22/15 14:19, Shawn Guo wrote:
+> On Tue, Dec 22, 2015 at 10:15:20AM +0200, Ilya Ledvich wrote:
 
 [...]
 
->> +/ {
->> +	model = "CompuLab CL-SOM-iMX7";
->> +	compatible = "compulab,cl-som-imx7", "fsl,imx7d";
->> +
->> +	memory {
->> +		reg = <0x80000000 0x10000000>; /* 256 MB - minimal configuration */
+>> +&iomuxc {
+>> +	cl-som-imx7 {
+> 
+> This container should be dropped too.  Please check my imx/dt branch for
+> the fixup I made.
+
+Ahhh... Sorry, we've messed this up...
+While removing the redundant container from the other patch,
+this one was forgotten...
+Sorry about this. Will pay more attention next time.
+
+I've checked out your imx/dt branch and both patches look good.
+Thanks for fixing this for us!
+
+> 
+> Shawn
+> 
+>> +		pinctrl_usdhc1: usdhc1grp {
+>> +			fsl,pins = <
+>> +				MX7D_PAD_SD1_CMD__SD1_CMD		0x59
+>> +				MX7D_PAD_SD1_CLK__SD1_CLK		0x19
+>> +				MX7D_PAD_SD1_DATA0__SD1_DATA0		0x59
+>> +				MX7D_PAD_SD1_DATA1__SD1_DATA1		0x59
+>> +				MX7D_PAD_SD1_DATA2__SD1_DATA2		0x59
+>> +				MX7D_PAD_SD1_DATA3__SD1_DATA3		0x59
+>> +				MX7D_PAD_SD1_CD_B__GPIO5_IO0		0x59 /* CD */
+>> +				MX7D_PAD_SD1_WP__GPIO5_IO1		0x59 /* WP */
+>> +			>;
+>> +		};
 >> +	};
->> +
->> +	regulators {
->> +		compatible = "simple-bus";
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
+>> +};
+>> -- 
+>> 1.9.1
+>>
+>>
 > 
-> DT maintainers dislike this fake "simple-bus" container, and we were
-> asked to put fixed regulator directly under root.  I fixed it up like
-> below:
-> 
-> 	reg_usb_otg1_vbus: regulator-vbus {
-> 		compatible = "regulator-fixed";
-> 		regulator-name = "usb_otg1_vbus";
-> 		regulator-min-microvolt = <5000000>;
-> 		regulator-max-microvolt = <5000000>;
-> 		gpio = <&gpio1 5 GPIO_ACTIVE_HIGH>;
-> 		enable-active-high;
-> 	};
-> 
-
-Looks good! Thanks for adjusting this.
-
-[...]
 
 -- 
 Regards,
