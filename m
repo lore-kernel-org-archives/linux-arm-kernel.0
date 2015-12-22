@@ -1,43 +1,43 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 22 Dec 2015 11:41:18 -0800
-Subject: [GIT PULL] DaVinci fixes for v4.5
-In-Reply-To: <566FFB38.50801@ti.com>
-References: <566FFB38.50801@ti.com>
-Message-ID: <20151222194118.GZ30172@localhost>
+Date: Tue, 22 Dec 2015 11:44:16 -0800
+Subject: [PATCH 0/2] bus: sunxi-rsb: fix primary PMIC and peripheral IC
+ address mapping
+In-Reply-To: <1450257286-1645-1-git-send-email-wens@csie.org>
+References: <1450257286-1645-1-git-send-email-wens@csie.org>
+Message-ID: <20151222194416.GA30172@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 15, 2015 at 05:06:24PM +0530, Sekhar Nori wrote:
-> Hi,
+On Wed, Dec 16, 2015 at 05:14:44PM +0800, Chen-Yu Tsai wrote:
+> Hi Arnd, Olof,
 > 
-> Here are couple of fixes I collected for v4.5
+> Here are 2 fixes for the sunxi-rsb driver. There were some typos in the
+> hardware address mapping table, but as long as the assigned address
+> matched what the bootloader used, it still worked fine. The only
+> indication was "failed to set runtime address" error messages which I
+> mistook for some hardware quirk.
 > 
-> Thanks,
-> Sekhar
+> I looked deeper when the AC100 on my A80 boards refused to respond.
 > 
-> The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+> Patch 1 fixes the hardware address for primary PMICs (AXP223, AXP809...).
+> This is the part that still worked fine despite the error because the
+> runtime address matches the one set by the bootloader.
 > 
->   Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+> Patch 2 fixes the assigned runtime address for the peripheral IC
+> (AC100/AC200). This part does not work due to the runtime address being
+> invalid.
 > 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.5/fixes
-> 
-> for you to fetch changes up to 5bcd927233d18fbfabed461b31b0118147648525:
-> 
->   ARM: davinci: fix a problematic usage of WARN() (2015-12-15 15:29:34 +0530)
+> Maxime asked me to send them directly to you. Please pick them up for 4.4.
 
-Merged, thanks.
+Applied, thanks.
+
+In the future, for fixes late in the cycle like this, please describe in a few
+words in the commit message just what the error is for someone trying to use
+kernel without the fix, so someone just reading the changelog can determine if
+it's a high-priority fix or not.
 
 
-> 
-> ----------------------------------------------------------------
-> This pull request includes a fix for
-> improper usage of WARN() and a fix
-> for unmet 'select' dependencies.
-
-Feel free to use up to 70-80 characters per line or so. No need to linewrap
-quite that early. :-)
+Thanks!
 
 
 -Olof
