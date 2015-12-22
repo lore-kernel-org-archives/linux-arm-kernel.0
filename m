@@ -1,75 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 22 Dec 2015 12:32:25 -0800
-Subject: [PATCH v4] clk: ti: Add support for dm814x ADPLL
-In-Reply-To: <5679B2D6.4050102@ti.com>
-References: <1450798030-23680-1-git-send-email-tony@atomide.com>
- <5679B2D6.4050102@ti.com>
-Message-ID: <20151222203224.GG2793@atomide.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 22 Dec 2015 21:38:53 +0100
+Subject: [PATCH] [media] rc: sunxi-cir: Initialize the spinlock properly
+In-Reply-To: <1450758455-22945-1-git-send-email-wens@csie.org>
+References: <1450758455-22945-1-git-send-email-wens@csie.org>
+Message-ID: <20151222203853.GC30359@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [151222 12:28]:
-> On 12/22/2015 05:27 PM, Tony Lindgren wrote:
-> >On dm814x we have 13 ADPLLs with 3 to 4 outputs on each. The
-> >ADPLLs have several dividers and muxes controlled by a shared
-> >control register for each PLL.
-> >
-> >Note that for the clocks to work as device drivers for booting on
-> >dm814x, this patch depends on "ARM: OMAP2+: Change core_initcall
-> >levels to postcore_initcall".
-> >
-> >Also note that this patch does not implement clk_set_rate for the
-> >PLL, that will be posted later on when available.
-> >
-> >Cc: Michael Turquette <mturquette@baylibre.com>
-> >Cc: Stephen Boyd <sboyd@codeaurora.org>
-> >Cc: Tero Kristo <t-kristo@ti.com>
-> >Signed-off-by: Tony Lindgren <tony@atomide.com>
-> >---
-> >
-> >If no more comments, Tero can you please apply into an immutable
-> >branch against v4.4-rc1 that I can merge in too?
-> >
-> >Changes since v3:
-> >
-> >- We want to create the clkdev entry for all clocks, not just outputs
-> >- ti_adpll_wait_lock loops did not do the right thing
-> >- We want to use CLK_GET_RATE_NOCACHE in ti_adpll_init_dco
+Hi,
+
+On Tue, Dec 22, 2015 at 12:27:35PM +0800, Chen-Yu Tsai wrote:
+> The driver allocates the spinlock but fails to initialize it correctly.
+> The kernel reports a BUG indicating bad spinlock magic when spinlock
+> debugging is enabled.
 > 
-> I have just one comment below still, once that is addressed:
+> Call spin_lock_init() on it to initialize it correctly.
 > 
-> Conditionally-acked-by: Tero Kristo <t-kristo@ti.com>
-> 
-> Stephen / Michael, can you pick this up for next merge? I don't have
-> anything else coming for the window this time, and I am probably going to be
-> on vacation just nicely to not be able to push anything anyway.
+> Fixes: b4e3e59fb59c ("[media] rc: add sunxi-ir driver")
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Also, I managed to remove the dependency to the dts changes. So there's
-no longer any need to set up an immutable branch for this patch.
+You should probably Cc stable on this one.
 
-> <snip>
-> 
-> >+
-> >+/* Warn if clkout or clkoutx2 try to set unavailable parent */
-> >+static int ti_adpll_clkout_set_parent(struct clk_hw *hw, u8 index)
-> >+{
-> >+	struct ti_adpll_clkout_data *co = to_clkout(hw);
-> >+	struct ti_adpll_data *d = co->adpll;
-> >+
-> >+	if (ti_adpll_clock_is_bypass(d) != index)
-> >+		return -EAGAIN;
-> >+
-> 
-> I think this part is still somewhat weird. You are not doing anything useful
-> in this function, so do you need to implement it at all? Just returning
-> -EINVAL always might work also. EAGAIN is wrong return value anyway as it
-> can pretty much never succeed.
+Thanks!
+Maxime
 
-OK thanks sounds good to me, I'll check it this after lunch.
-
-Also noticed the do_div should be div64_u64 so v5 coming later
-today.
-
-Regards,
-
-Tony
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151222/fca30fd0/attachment.sig>
