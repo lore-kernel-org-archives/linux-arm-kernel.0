@@ -1,87 +1,33 @@
-From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
-Date: Tue, 22 Dec 2015 17:04:15 -0600
-Subject: [PATCH v7 3/4] gicv2m: Refactor to prepare for ACPI support
-In-Reply-To: <20151217165713.GA23549@localhost>
-References: <1449766530-16935-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1449766530-16935-4-git-send-email-Suravee.Suthikulpanit@amd.com>
- <20151216221208.GC27791@localhost> <56720095.70004@amd.com>
- <20151217165713.GA23549@localhost>
-Message-ID: <5679D6EF.6000002@amd.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 22 Dec 2015 15:12:52 -0800
+Subject: [PATCH v11 0/2] Sigma Designs Tango4 port
+In-Reply-To: <566FDF53.3030004@sigmadesigns.com>
+References: <566FDF53.3030004@sigmadesigns.com>
+Message-ID: <20151222231252.GA19378@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/17/2015 10:57 AM, Bjorn Helgaas wrote:
-> On Wed, Dec 16, 2015 at 06:23:49PM -0600, Suravee Suthikulanit wrote:
->> Hi Bjorn,
->>
->> Thanks for your review. Please see my comments below.
->>
->> On 12/16/2015 4:12 PM, Bjorn Helgaas wrote:
->>> On Thu, Dec 10, 2015 at 08:55:29AM -0800, Suravee Suthikulpanit wrote:
->>>> This patch replaces the struct device_node with struct fwnode_handle
->>>> since this structure is common between DT and ACPI.
->>>>
->>>> It also refactors gicv2m_init_one() to prepare for ACPI support.
->>>> The only functional change is removing the node name from pr_info.
->>>>
->>>> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
->>>> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->>>
->>>> @@ -359,10 +355,10 @@ static int __init gicv2m_init_one(struct device_node *node,
->>>>   	}
->>>>
->>>>   	list_add_tail(&v2m->entry, &v2m_nodes);
->>>> -	pr_info("Node %s: range[%#lx:%#lx], SPI[%d:%d]\n", node->name,
->>>> -		(unsigned long)v2m->res.start, (unsigned long)v2m->res.end,
->>>> -		v2m->spi_start, (v2m->spi_start + v2m->nr_spis));
->>>>
->>>> +	pr_info("range[%#lx:%#lx], SPI[%d:%d]\n",
->>>> +		(unsigned long)res->start, (unsigned long)res->end,
->>>> +		v2m->spi_start, (v2m->spi_start + v2m->nr_spis));
->>>
->>> You didn't change this, but I don't think this message has enough
->>> context.  It's pretty cryptic all by itself.  It'd be nice if it could
->>> at least include a device name, e.g., if you could use dev_info().
->>
->> Here is the example of the information printed:
->> [    0.000000] GICv2m: range[0xe1180000:0xe1181000], SPI[64:320]
->>
->> Basically, the v2m is just an extension of the GIC. Here, we are
->> printing the memory range that it is covering, which can be used to
->> identify different V2m frame and the associate interrupt range
->> (SPI). The node name is not really providing any values. So, we are
->> removing it.
->
-> I noticed the pr_fmt definition later; that adds some useful context I
-> didn't know about.  I guess there's no struct device for the GIC?  I
-> don't see one in struct device_node.  Seems like this piece of
-> hardware that apparently responds to a memory range *could* have a
-> struct device,but I'm a little fuzzy on how we handle ACPI and OF
-> device descriptions in that regard.
+On Tue, Dec 15, 2015 at 10:37:23AM +0100, Marc Gonzalez wrote:
+> "One more time. We're gonna celebrate."
+> 
+> Changes since v10:
+> Add aliases and chosen DT nodes
+> Use CPU_CLK and SYS_CLK symbolic names
+> MPCore private memory region DT node
+> select TANGO_IRQ instead of GENERIC_IRQ_CHIP
+> 
+> Changes planned for a future patch series:
+> Have clkgen driver export CD2 for USB, and CD6 for SDIO
+> 
+> Marc Gonzalez (2):
+>   arm-soc: Import initial tango4 device tree
+>   arm-soc: Add support for tango4 platforms
 
-For DT, v2m is advertised as a sub-node inside GIC. So, both of them has 
-the struct device_node references. IIUC, GIC node is match as irqchip, 
-and not as a traditional platform bus device.
+Thanks, I've applied these now (but with slightly modified patch subjects), and
+with Kevin's reviewed-by tag:
 
-Similarly, for ACPI, v2m is advertised as a sub-table inside MADT, and 
-we are using the fwnode_handle to reference to.
+ARM: dts: tango4: Initial device trees
+ARM: tango4: Initial platform support
 
-> I hadn't noticed the memory range part; maybe you could use %pR there?
 
-I guess we could have :) I can send a separate patch to clean this up.
-
-> Just to double-check, there's no off-by-one error in the SPI range, is
-> there?  The pattern I usually expect is "start, start + nr_items - 1".
-
-In that case, this should have been [64:319]. I'll send a small patch to 
-clean this up.
-
-> I'm just kibbitzing here; this isn't PCI code, and you don't need my
-> ack, so just consider these as random observations.
->
-> Bjorn
->
-
-Thanks for sharing your observation. It's always been good ones :)
-
-Suravee
+-Olof
