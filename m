@@ -1,78 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 22 Dec 2015 14:46:06 +0000
-Subject: [PATCH RESEND v4] arm: remove !CPU_V6 and !GENERIC_ATOMIC64
- build dependencies for XEN
-In-Reply-To: <alpine.DEB.2.02.1512221404060.3096@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1512221404060.3096@kaball.uk.xensource.com>
-Message-ID: <20151222144605.GJ8644@n2100.arm.linux.org.uk>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 22 Dec 2015 22:45:56 +0800
+Subject: [GIT PULL 1/3] ARM: imx: soc updates for 4.5
+Message-ID: <1450795558-10961-1-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 22, 2015 at 02:17:17PM +0000, Stefano Stabellini wrote:
-> Hello Russell,
-> 
-> Would you please consider this patch for the next merge window? It
-> is a very old patch (March 2014) which has been left over.
+The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
 
-This patch has some obvious problems...
+  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 34e1569..e09ed94 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1807,8 +1807,7 @@ config XEN_DOM0
->  config XEN
->  	bool "Xen guest support on ARM"
->  	depends on ARM && AEABI && OF
-> -	depends on CPU_V7 && !CPU_V6
-> -	depends on !GENERIC_ATOMIC64
-> +	depends on CPU_V7
+are available in the git repository at:
 
-How sure are we that this won't cause regressions?  How much testing
-has been done with these changed dependencies?
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-soc-4.5
 
-> diff --git a/arch/arm/include/asm/sync_bitops.h b/arch/arm/include/asm/sync_bitops.h
-> index 9732b8e..4103319 100644
-> --- a/arch/arm/include/asm/sync_bitops.h
-> +++ b/arch/arm/include/asm/sync_bitops.h
-> @@ -20,7 +20,29 @@
->  #define sync_test_and_clear_bit(nr, p)	_test_and_clear_bit(nr, p)
->  #define sync_test_and_change_bit(nr, p)	_test_and_change_bit(nr, p)
->  #define sync_test_bit(nr, addr)		test_bit(nr, addr)
-> -#define sync_cmpxchg			cmpxchg
->  
-> +static inline unsigned long sync_cmpxchg(volatile void *ptr,
-> +										 unsigned long old,
-> +										 unsigned long new)
-> +{
-> +	unsigned long oldval;
-> +	int size = sizeof(*(ptr));
+for you to fetch changes up to f1858b0e801a45d801dc23bc1ff5be14805022c8:
 
-This is buggy.  You're doing sizeof(void) here, which on GCC will always
-be 1:
+  ARM: imx: select SRC for i.MX7 (2015-12-21 21:24:05 +0800)
 
-   A consequence of this is that `sizeof' is also allowed on `void' and
-  on function types, and returns 1.
+----------------------------------------------------------------
+The i.MX SoC updates for 4.5:
+- Select HAVE_IMX_SRC for i.MX7 to avoid a randconfig build error
+- Enable cpufreq support on i.MX7D
+- A couple of random cleanup on iomux-imx31 and mach-imx6ul
 
-> +
-> +	smp_mb();
-> +	switch (size) {
-> +	case 1:
-> +		oldval = __cmpxchg8(ptr, old, new);
-> +		break;
-> +	case 2:
-> +		oldval = __cmpxchg16(ptr, old, new);
-> +		break;
+----------------------------------------------------------------
+Arnd Bergmann (1):
+      ARM: imx: select SRC for i.MX7
 
-The ldrexb/ldrexh instructions are not available on ARMv6 CPUs.  __xchg()
-and friends avoided these for ARMv6 CPUs, but this does not.
+Bai Ping (1):
+      ARM: imx: enable cpufreq device on i.mx7d
 
-I'd expect anything that uses sync_cmpxchg() will fail to build when a
-kernel including ARMv6 is attempted.
+Colin Ian King (1):
+      ARM: mach-imx: iomux-imx31: fix spelling mistake in error message
 
-So... I don't think this patch is ready.
+Nicolas Pitre (1):
+      mach-imx/mach-imx6ul.c: proper constness with __initconst
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+ arch/arm/mach-imx/Kconfig       | 1 +
+ arch/arm/mach-imx/iomux-imx31.c | 2 +-
+ arch/arm/mach-imx/mach-imx6ul.c | 2 +-
+ arch/arm/mach-imx/mach-imx7d.c  | 6 ++++++
+ 4 files changed, 9 insertions(+), 2 deletions(-)
