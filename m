@@ -1,17 +1,17 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 21 Dec 2015 20:49:26 -0800
-Subject: [GIT PULL 4/9] ARM64: EXYNOS: Soc specific code for v4.5
-In-Reply-To: <1449020386-20250-5-git-send-email-k.kozlowski@samsung.com>
+Date: Mon, 21 Dec 2015 20:50:42 -0800
+Subject: [GIT PULL 5/9] ARM: EXYNOS: Drivers for v4.5
+In-Reply-To: <1449020386-20250-6-git-send-email-k.kozlowski@samsung.com>
 References: <1449020386-20250-1-git-send-email-k.kozlowski@samsung.com>
- <1449020386-20250-5-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20151222044926.GE30172@localhost>
+ <1449020386-20250-6-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20151222045042.GF30172@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 02, 2015 at 10:39:41AM +0900, Krzysztof Kozlowski wrote:
+On Wed, Dec 02, 2015 at 10:39:42AM +0900, Krzysztof Kozlowski wrote:
 > Hi Kukjin,
 > 
-> ARM64 change touch also defconfig.
+> Pinctrl for v4.5.
 > 
 > Best regards,
 > Krzysztof
@@ -23,17 +23,17 @@ On Wed, Dec 02, 2015 at 10:39:41AM +0900, Krzysztof Kozlowski wrote:
 > 
 > are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-soc64-4.5
+>   https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-drivers-4.5
 > 
-> for you to fetch changes up to db44c07a3f0b32815bd1f3e731db9e043e57cf9c:
+> for you to fetch changes up to 023e06dfa6882f500b9c86fd61f0b1913aa07f36:
 > 
->   arm64: EXYNOS: Consolidate ARCH_EXYNOS7 symbol into ARCH_EXYNOS (2015-11-22 19:31:30 +0900)
+>   pinctrl: exynos: add exynos5410 SoC specific data (2015-11-16 10:54:43 +0900)
 
-Given that Arnd started splitting out config64 separately, there's a small
-chance we'll get a conflict here. We can deal with that if needed though.
+Hi,
 
-Still, since this branch contains the previous clock branch I can't apply it
-as it is. Can you respin without that for now?
+This should either go in through the pinctrl tree, or have an acked/reviewed-by
+one of the pinctrl maintainers.
+
 
 
 -Olof
