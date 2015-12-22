@@ -1,55 +1,51 @@
-From: majun258@huawei.com (MaJun)
-Date: Tue, 22 Dec 2015 15:10:23 +0800
-Subject: [RFC PATCH] irqchip/gic-v3-its:Fix the bug while calculating the page
- number of ITS table
-Message-ID: <1450768223-10860-1-git-send-email-majun258@huawei.com>
+From: hare@suse.de (Hannes Reinecke)
+Date: Tue, 22 Dec 2015 08:17:51 +0100
+Subject: [PATCH v3 24/77] ncr5380: Implement NCR5380_dma_xfer_len and
+ remove LIMIT_TRANSFERSIZE macro
+In-Reply-To: <20151222011744.545942658@telegraphics.com.au>
+References: <20151222011737.980475848@telegraphics.com.au>
+ <20151222011744.545942658@telegraphics.com.au>
+Message-ID: <5678F91F.3030306@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ma Jun <majun258@huawei.com>
+On 12/22/2015 02:18 AM, Finn Thain wrote:
+> Follow the example of the atari_NCR5380.c core driver and adopt the
+> NCR5380_dma_xfer_len() hook. Implement NCR5380_dma_xfer_len() for dtc.c
+> and g_NCR5380.c to take care of the limitations of these cards. Keep the
+> default for drivers using PSEUDO_DMA.
+>
+> Eliminate the unused macro LIMIT_TRANSFERSIZE.
+>
+> Signed-off-by: Finn Thain <fthain@telegraphics.com.au>
+>
+> ---
+>   drivers/scsi/NCR5380.c       |   32 +++++---------------------------
+>   drivers/scsi/arm/cumana_1.c  |    3 +++
+>   drivers/scsi/arm/oak.c       |    2 ++
+>   drivers/scsi/atari_NCR5380.c |    8 +++++---
+>   drivers/scsi/dtc.c           |   14 ++++++++++++++
+>   drivers/scsi/dtc.h           |    3 +++
+>   drivers/scsi/g_NCR5380.c     |   15 +++++++++++++++
+>   drivers/scsi/g_NCR5380.h     |    3 +++
+>   drivers/scsi/mac_scsi.c      |    1 +
+>   drivers/scsi/pas16.h         |    2 ++
+>   drivers/scsi/t128.h          |    2 ++
+>   11 files changed, 55 insertions(+), 30 deletions(-)
+>
+Hmm. I really, _really_, wish we could move away from the 'magic' 
+definitions and use a proper function template.
+But maybe next time.
 
-Hi Marc, Robert:
+So:
 
-Maybe there is a bug introduced by commit
-"irqchip/gicv3-its: Add range check for number of allocated pages"
-30f2136346cab91e1ffd9ee6370d76809f20487a
+Reviewed-by: Hannes Reinecke <hare@suse.com>
 
-I think, before setting the page number, the variable "alloc_pages"
-should be calculated and checked again. 
-Or else, the page number programmed into GITS_BASER register is always
-the number of 64KB even though the page size is 16KB or 4KB.
+Cheers,
 
-Signed-off-by: Ma Jun <majun258@huawei.com>
----
- drivers/irqchip/irq-gic-v3-its.c |    9 ++++++++-
- 1 files changed, 8 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index e23d1d1..100181b 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -879,7 +879,7 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
- 		if (alloc_pages > GITS_BASER_PAGES_MAX) {
- 			alloc_pages = GITS_BASER_PAGES_MAX;
- 			order = get_order(GITS_BASER_PAGES_MAX * psz);
--			pr_warn("%s: Device Table too large, reduce its page order to %u (%u pages)\n",
-+			pr_warn("%s: Table too large, reduce its page order to %u (%u pages)\n",
- 				node_name, order, alloc_pages);
- 		}
- 
-@@ -911,6 +911,13 @@ retry_baser:
- 			break;
- 		}
- 
-+               alloc_pages = (alloc_size / psz);
-+                if (alloc_pages > GITS_BASER_PAGES_MAX) {
-+                        alloc_pages = GITS_BASER_PAGES_MAX;
-+                        pr_warn("%s: Table too large, reduce its page number to %u pages\n",
-+                                node_name, alloc_pages);
-+                }
-+
- 		val |= alloc_pages - 1;
- 
- 		writeq_relaxed(val, its->base + GITS_BASER + i * 8);
+Hannes
 -- 
-1.7.1
+Dr. Hannes Reinecke		      zSeries & Storage
+hare at suse.de			      +49 911 74053 688
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg
+GF: J. Hawn, J. Guild, F. Imend?rffer, HRB 16746 (AG N?rnberg)
