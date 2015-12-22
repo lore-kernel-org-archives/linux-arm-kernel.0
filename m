@@ -1,47 +1,85 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 22 Dec 2015 16:07:29 +0000
-Subject: [PATCH RESEND v4] arm: remove !CPU_V6 and !GENERIC_ATOMIC64
- build dependencies for XEN
-In-Reply-To: <20151222155713.GN8644@n2100.arm.linux.org.uk>
-References: <alpine.DEB.2.02.1512221404060.3096@kaball.uk.xensource.com>
- <20151222144605.GJ8644@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1512221535470.3096@kaball.uk.xensource.com>
- <20151222155713.GN8644@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.02.1512221603000.3096@kaball.uk.xensource.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 22 Dec 2015 08:10:45 -0800
+Subject: [PATCH 3/3] ARM: dts: Add NAND support for dm8148-evm
+In-Reply-To: <1450800645-10766-1-git-send-email-tony@atomide.com>
+References: <1450800645-10766-1-git-send-email-tony@atomide.com>
+Message-ID: <1450800645-10766-4-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 Dec 2015, Russell King - ARM Linux wrote:
-> On Tue, Dec 22, 2015 at 03:45:19PM +0000, Stefano Stabellini wrote:
-> > The code builds, but of course it could not actually run on CPU_V6. But
-> > the use case for me is building drivers/xen/grant-table.c, which can
-> > only run on CPU_V7 anyway, so it is not a problem.
-> 
-> What I'm concerned about in this case is if you try to use instructions
-> which are not supported by the CPU, even in assembly, the assembler
-> will barf.
-> 
-> So, if we're building an ARMv6 + ARMv7 kernel, and you try to use
-> LDREXB in generic code, even though you may intend it to only be
-> executed on ARMv7, the assembler will error out.
-> 
-> We used to be able to work around that by passing -Wa,-march=armv7
-> to the compiler for specific files, which would then tell the assembler
-> to accept ARMv7 instructions, but modern GCC output .arch pseudo-ops
-> which override the command line.  So now the only way to do it is to
-> override the assemblers selected archtecture using .arch pseudo-ops
-> in the assembly code.
-> 
-> So, what I'm saying is that dropping the !ARMv6 dependency is not as
-> simple as it would seem, and I'm nervous about including any such
-> patches this close to Christmas and the merge window.
+Add NAND support for dm8148-evm.
+
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/boot/dts/dm8148-evm.dts | 56 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 56 insertions(+)
+
+diff --git a/arch/arm/boot/dts/dm8148-evm.dts b/arch/arm/boot/dts/dm8148-evm.dts
+index e070862..862977f 100644
+--- a/arch/arm/boot/dts/dm8148-evm.dts
++++ b/arch/arm/boot/dts/dm8148-evm.dts
+@@ -35,6 +35,62 @@
+ 	phy-mode = "rgmii";
+ };
  
-Sure, that's understandable.
-
-Merge window aside, do you think that for the future it might be better
-to change approach and write a Xen specific implementation of
-sync_cmpxchg?  Like this older patch tried to do
-
-http://marc.info/?l=linux-arm-kernel&m=138436406724990&w=2
-
-?
++&gpmc {
++	ranges = <0 0 0x04000000 0x01000000>;	/* CS0: 16MB for NAND */
++
++	nand at 0,0 {
++		linux,mtd-name= "micron,mt29f2g16aadwp";
++		reg = <0 0 4>; /* CS0, offset 0, IO size 4 */
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ti,nand-ecc-opt = "bch8";
++		nand-bus-width = <16>;
++		gpmc,device-width = <2>;
++		gpmc,sync-clk-ps = <0>;
++		gpmc,cs-on-ns = <0>;
++		gpmc,cs-rd-off-ns = <44>;
++		gpmc,cs-wr-off-ns = <44>;
++		gpmc,adv-on-ns = <6>;
++		gpmc,adv-rd-off-ns = <34>;
++		gpmc,adv-wr-off-ns = <44>;
++		gpmc,we-on-ns = <0>;
++		gpmc,we-off-ns = <40>;
++		gpmc,oe-on-ns = <0>;
++		gpmc,oe-off-ns = <54>;
++		gpmc,access-ns = <64>;
++		gpmc,rd-cycle-ns = <82>;
++		gpmc,wr-cycle-ns = <82>;
++		gpmc,wait-on-read = "true";
++		gpmc,wait-on-write = "true";
++		gpmc,bus-turnaround-ns = <0>;
++		gpmc,cycle2cycle-delay-ns = <0>;
++		gpmc,clk-activation-ns = <0>;
++		gpmc,wait-monitoring-ns = <0>;
++		gpmc,wr-access-ns = <40>;
++		gpmc,wr-data-mux-bus-ns = <0>;
++		partition at 0 {
++			label = "X-Loader";
++			reg = <0 0x80000>;
++		};
++		partition at 0x80000 {
++			label = "U-Boot";
++			reg = <0x80000 0x1c0000>;
++		};
++		partition at 0x1c0000 {
++			label = "Environment";
++			reg = <0x240000 0x40000>;
++		};
++		partition at 0x280000 {
++			label = "Kernel";
++			reg = <0x280000 0x500000>;
++		};
++		partition at 0x780000 {
++			label = "Filesystem";
++			reg = <0x780000 0xf880000>;
++		};
++	};
++};
++
+ &mmc2 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&sd1_pins>;
+-- 
+2.6.2
