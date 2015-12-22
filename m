@@ -1,17 +1,19 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 21 Dec 2015 20:50:42 -0800
-Subject: [GIT PULL 5/9] ARM: EXYNOS: Drivers for v4.5
-In-Reply-To: <1449020386-20250-6-git-send-email-k.kozlowski@samsung.com>
+Date: Mon, 21 Dec 2015 20:51:35 -0800
+Subject: [GIT PULL 6/9] ARM: EXYNOS: clk: Another clock dependency,
+ ARMv7, for v4.5
+In-Reply-To: <1449020386-20250-7-git-send-email-k.kozlowski@samsung.com>
 References: <1449020386-20250-1-git-send-email-k.kozlowski@samsung.com>
- <1449020386-20250-6-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20151222045042.GF30172@localhost>
+ <1449020386-20250-7-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20151222045135.GG30172@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 02, 2015 at 10:39:42AM +0900, Krzysztof Kozlowski wrote:
+On Wed, Dec 02, 2015 at 10:39:43AM +0900, Krzysztof Kozlowski wrote:
 > Hi Kukjin,
 > 
-> Pinctrl for v4.5.
+> This is also clock dependency. I put it in separate tag in case clock
+> folks want to pull it also.
 > 
 > Best regards,
 > Krzysztof
@@ -23,17 +25,15 @@ On Wed, Dec 02, 2015 at 10:39:42AM +0900, Krzysztof Kozlowski wrote:
 > 
 > are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-drivers-4.5
+>   https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-clk-exynos4-4.5
 > 
-> for you to fetch changes up to 023e06dfa6882f500b9c86fd61f0b1913aa07f36:
+> for you to fetch changes up to 94af7a3c310f5877dc6f756179b92f24f89a9b08:
 > 
->   pinctrl: exynos: add exynos5410 SoC specific data (2015-11-16 10:54:43 +0900)
+>   clk: samsung: exynos4: Add SSS gate clock (2015-11-18 22:02:02 +0900)
 
-Hi,
-
-This should either go in through the pinctrl tree, or have an acked/reviewed-by
-one of the pinctrl maintainers.
-
+Again, this should probably go through the clk maintainer (or have an ack).
+It's just two one-line changes though, so if they're slow to respond we can
+take it as a fallback. Resend if that's the case.
 
 
 -Olof
