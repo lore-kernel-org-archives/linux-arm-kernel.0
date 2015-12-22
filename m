@@ -1,45 +1,46 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 22 Dec 2015 15:42:03 -0800
-Subject: [PATCH] ARM: tegra: Fix suspend hang on Tegra124 Chromebooks
-In-Reply-To: <1449570409-30244-1-git-send-email-jonathanh@nvidia.com>
-References: <1449570409-30244-1-git-send-email-jonathanh@nvidia.com>
-Message-ID: <20151222234203.GA28181@localhost>
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Tue, 22 Dec 2015 15:43:50 -0800
+Subject: [PATCH v2 0/2] pci: Add host controller driver for Cavium ThunderX
+ PCIe
+Message-ID: <1450827832-3294-1-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 08, 2015 at 10:26:49AM +0000, Jon Hunter wrote:
-> Enabling CPUFreq support for Tegra124 Chromebooks is causing the Tegra124
-> to hang when resuming from suspend.
-> 
-> When CPUFreq is enabled, the CPU clock is changed from the PLLX clock to
-> the DFLL clock during kernel boot. When resuming from suspend the CPU
-> clock is temporarily changed back to the PLLX clock before switching back
-> to the DFLL. If the DFLL is operating at a much lower frequency than the
-> PLLX when we enter suspend, and so the CPU voltage rail is at a voltage
-> too low for the CPUs to operate at the PLLX frequency, then the device
-> will hang.
-> 
-> Please note that the PLLX is used in the resume sequence to switch the CPU
-> clock from the very slow 32K clock to a faster clock during early resume
-> to speed up the resume sequence before the DFLL is resumed.
-> 
-> Ideally, we should fix this by setting the suspend frequency so that it
-> matches the PLLX frequency, however, that would be a bigger change. For
-> now simply disable CPUFreq support for Tegra124 Chromebooks to avoid the
-> hang when resuming from suspend.
-> 
-> Fixes: 9a0baee960a7 ("ARM: tegra: Enable CPUFreq support for Tegra124
-> 		      Chromebooks")
-> 
-> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
-> ---
-> 
-> Please note that this fix is required for v4.4
+From: David Daney <david.daney@cavium.com>
 
-Since I saw this mentioned on IRC, I applied it directly to the arm-soc
-fixes branch.
+Some Cavium ThunderX processors require quirky access methods for the
+config space of the PCIe bridge.
+
+There are two patches:
+
+1) Refactor code in pci-host-generic so that it can more easily be
+   used by other drivers.  This splits the driver for CAM and ECAM
+   access methods to a separate file from the common host driver code.
+
+2) Add the ThunderX PCIe driver, which leverages the code in
+   pci-host-generic
 
 
-Thanks,
+Changes from v1: Split CAM and ECAM code from common driver code as
+suggested by Arnd Bergmann.  Fix spelling errors in
+pcie-thunder-pem.txt
 
--Olof
+David Daney (2):
+  PCI: generic: Refactor code to enable reuse by other drivers.
+  pci, pcie-thunder-pem: Add PCIe host driver for ThunderX processors.
+
+ .../devicetree/bindings/pci/pcie-thunder-pem.txt   |  43 ++++
+ drivers/pci/host/Kconfig                           |  11 +
+ drivers/pci/host/Makefile                          |   2 +
+ drivers/pci/host/pci-host-common.c                 | 194 ++++++++++++++
+ drivers/pci/host/pci-host-common.h                 |  56 ++++
+ drivers/pci/host/pci-host-generic.c                | 190 +-------------
+ drivers/pci/host/pcie-thunder-pem.c                | 283 +++++++++++++++++++++
+ 7 files changed, 593 insertions(+), 186 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pci/pcie-thunder-pem.txt
+ create mode 100644 drivers/pci/host/pci-host-common.c
+ create mode 100644 drivers/pci/host/pci-host-common.h
+ create mode 100644 drivers/pci/host/pcie-thunder-pem.c
+
+-- 
+1.8.3.1
