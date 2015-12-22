@@ -1,34 +1,79 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 22 Dec 2015 12:55:30 -0800
-Subject: [GIT PULL] Renesas ARM Based SoC GIC Cleanup for v4.5
-In-Reply-To: <cover.1450401902.git.horms+renesas@verge.net.au>
-References: <cover.1450401902.git.horms+renesas@verge.net.au>
-Message-ID: <20151222205530.GS30172@localhost>
+Date: Tue, 22 Dec 2015 12:53:23 -0800
+Subject: [GIT PULL] Third Round of Renesas ARM Based SoC DT Updates for
+ v4.5
+In-Reply-To: <cover.1450402264.git.horms+renesas@verge.net.au>
+References: <cover.1450402264.git.horms+renesas@verge.net.au>
+Message-ID: <20151222205323.GR30172@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 11:30:41AM +0900, Simon Horman wrote:
+On Fri, Dec 18, 2015 at 11:29:43AM +0900, Simon Horman wrote:
 > Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> Please consider these Renesas ARM based SoC GIC cleanup for v4.5.
+> Please consider these third round of Renesas ARM based SoC DT updates for v4.5.
 > 
-> This pull-request includes staging-board changes which have been
-> acked by Greg Kroah-Hartman. They are bundled into this pull-request
-> as not-doing so would break the drivers they update.
+> This pull request is based on the previous round of
+> such requests, tagged as renesas-dt2-for-v4.5,
+> which you have already pulled.
 > 
-> The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
 > 
->   Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+> The following changes since commit c8d9fdbe2d648caaa510d45dc13eba2e9957140b:
+> 
+>   ARM: shmobile: sh73a0 dtsi: Add L2 cache-controller node (2015-11-25 10:42:38 +0900)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-gic-cleanup-for-v4.5
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt3-for-v4.5
 > 
-> for you to fetch changes up to 1474136ce6a457a10a797b3de04adbb035e90901:
+> for you to fetch changes up to d01c8bec91414f2110370dfcb9dd33fc0e573cee:
 > 
->   staging: board: armadillo800eva: Use "arm,pl390" (2015-12-18 10:21:10 +0900)
+>   ARM: shmobile: r8a779x: use SoC-specific usb-dmac compatibility strings (2015-12-17 10:10:54 +0900)
 
 Merged, thanks.
+
+
+
+> ----------------------------------------------------------------
+> Geert Uytterhoeven (11):
+>       ARM: shmobile: sh73a0: Add MSIOF clocks
+>       ARM: shmobile: sh73a0: Add MSIOF device nodes
+>       ARM: shmobile: bockw dts: Override #sound-dai-cells to zero
+>       ARM: shmobile: koelsch dts: Add serial port config to chosen/stdout-path
+>       ARM: shmobile: alt dts: Add serial port config to chosen/stdout-path
+>       ARM: shmobile: ape6evm dts: Add serial port config to chosen/stdout-path
+>       ARM: shmobile: bockw dts: Update console parameters
+>       ARM: shmobile: gose dts: Add serial port config to chosen/stdout-path
+>       ARM: shmobile: silk dts: Add serial port config to chosen/stdout-path
+>       ARM: shmobile: porter dts: Add serial port config to chosen/stdout-path
+>       ARM: shmobile: lager dts: Add serial port config to chosen/stdout-path
+> 
+> Kuninori Morimoto (1):
+>       ARM: shmobile: r8a7778: tidyup #sound-dai-cells settings
+> 
+> Magnus Damm (4):
+>       ARM: shmobile: r8a7790: IPMMU compat string SoC part number update
+>       ARM: shmobile: r8a7791: IPMMU compat string SoC part number update
+>       ARM: shmobile: r8a7793: IPMMU compat string SoC part number update
+>       ARM: shmobile: r8a7794: IPMMU compat string SoC part number update
+> 
+> Sergei Shtylyov (2):
+>       ARM: shmobile: r8a7791: add EtherAVB clock
+>       ARM: shmobile: r8a7791: add EtherAVB DT support
+> 
+> Simon Horman (4):
+>       ARM: shmobile: r8a7793: remove deprecated #gpio-range-cells
+>       ARM: shmobile: r8a7793: Add missing serial devices to DT
+>       ARM: shmobile: r8a7793: Describe DMA for the serial ports
+>       ARM: shmobile: r8a779x: use SoC-specific usb-dmac compatibility strings
+> 
+> Wolfram Sang (3):
+>       ARM: shmobile: r8a7790: dtsi: add internal delay for i2c IPs
+>       ARM: shmobile: r8a7791: dtsi: add internal delay for i2c IPs
+>       ARM: shmobile: r8a7794: dtsi: add internal delay for i2c IPs
+
+Again, on ARM we use ARM: dts: <platform>: ...
+
 
 
 -Olof
