@@ -1,20 +1,173 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 22 Dec 2015 20:13:27 +0800
-Subject: [PATCH v2 0/2] Add support for CL-SOM-iMX7 and SBC-iMX7
-In-Reply-To: <1450772120-18131-1-git-send-email-ilya@compulab.co.il>
-References: <1449472479-2521-1-git-send-email-ilya@compulab.co.il>
- <1450772120-18131-1-git-send-email-ilya@compulab.co.il>
-Message-ID: <20151222121327.GA1194@tiger>
+From: jingoohan1@gmail.com (Jingoo Han)
+Date: Tue, 22 Dec 2015 21:13:59 +0900
+Subject: [PATCH v11 06/19] ARM: dts: exynos/dp: remove some properties
+ that deprecated by analogix_dp driver
+In-Reply-To: <1450236876-1951-1-git-send-email-ykk@rock-chips.com>
+References: <1450236018-1118-1-git-send-email-ykk@rock-chips.com>
+ <1450236876-1951-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <000801d13cb2$43079270$c916b750$@com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 22, 2015 at 10:15:18AM +0200, Ilya Ledvich wrote:
-> Ilya Ledvich (2):
->   ARM: dts: imx7d: cl-som-imx7: add basic module support
->   ARM: dts: imx7d: sbc-imx7: add basic board support
+On Wednesday, December 16, 2015 12:35 PM, Yakir Yang wrote:
+> 
+> After exynos_dp have been split the common IP code into analogix_dp driver,
+> the analogix_dp driver have deprecated some Samsung platform properties which
+> could be dynamically parsed from EDID/MODE/DPCD message, so this is an update
+> for Exynos DTS file for dp-controller.
+> 
+> Beside the backward compatibility is fully preserved, so there are no
+> bisectability break that make this change in a separate patch.
+> 
+> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-I still have two comments there.  But considering that I'm about to send
-v4.5 stuff today, I fixed them up and applied the series.  I will reply
-to individual patch with my comments.
+Reviewed-by: Jingoo Han < jingoohan1@gmail.com >
 
-Shawn
+Best regards,
+Jingoo Han
+
+> ---
+> Changes in v11: None
+> Changes in v10: None
+> Changes in v9: None
+> Changes in v8: None
+> Changes in v7: None
+> Changes in v6:
+> - Fix Peach Pit hpd property name error:
+> -       hpd-gpio = <&gpx2 6 0>;
+> +       hpd-gpios = <&gpx2 6 0>;
+> 
+> Changes in v5:
+> - Correct the misspell in commit message. (Krzysztof)
+> 
+> Changes in v4:
+> - Separate all DTS changes to a separate patch. (Krzysztof)
+> 
+> Changes in v3: None
+> Changes in v2: None
+> 
+>  arch/arm/boot/dts/exynos5250-arndale.dts      | 2 --
+>  arch/arm/boot/dts/exynos5250-smdk5250.dts     | 2 --
+>  arch/arm/boot/dts/exynos5250-snow-common.dtsi | 4 +---
+>  arch/arm/boot/dts/exynos5250-spring.dts       | 4 +---
+>  arch/arm/boot/dts/exynos5420-peach-pit.dts    | 4 +---
+>  arch/arm/boot/dts/exynos5420-smdk5420.dts     | 2 --
+>  arch/arm/boot/dts/exynos5800-peach-pi.dts     | 4 +---
+>  7 files changed, 4 insertions(+), 18 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
+> index c000532..b1790cf 100644
+> --- a/arch/arm/boot/dts/exynos5250-arndale.dts
+> +++ b/arch/arm/boot/dts/exynos5250-arndale.dts
+> @@ -124,8 +124,6 @@
+>  &dp {
+>  	status = "okay";
+>  	samsung,color-space = <0>;
+> -	samsung,dynamic-range = <0>;
+> -	samsung,ycbcr-coeff = <0>;
+>  	samsung,color-depth = <1>;
+>  	samsung,link-rate = <0x0a>;
+>  	samsung,lane-count = <4>;
+> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> index 0f5dcd4..f30c2db 100644
+> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> @@ -80,8 +80,6 @@
+> 
+>  &dp {
+>  	samsung,color-space = <0>;
+> -	samsung,dynamic-range = <0>;
+> -	samsung,ycbcr-coeff = <0>;
+>  	samsung,color-depth = <1>;
+>  	samsung,link-rate = <0x0a>;
+>  	samsung,lane-count = <4>;
+> diff --git a/arch/arm/boot/dts/exynos5250-snow-common.dtsi b/arch/arm/boot/dts/exynos5250-snow-
+> common.dtsi
+> index 5cb33ba..b96624b 100644
+> --- a/arch/arm/boot/dts/exynos5250-snow-common.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250-snow-common.dtsi
+> @@ -236,12 +236,10 @@
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&dp_hpd>;
+>  	samsung,color-space = <0>;
+> -	samsung,dynamic-range = <0>;
+> -	samsung,ycbcr-coeff = <0>;
+>  	samsung,color-depth = <1>;
+>  	samsung,link-rate = <0x0a>;
+>  	samsung,lane-count = <2>;
+> -	samsung,hpd-gpio = <&gpx0 7 GPIO_ACTIVE_HIGH>;
+> +	hpd-gpios = <&gpx0 7 GPIO_ACTIVE_HIGH>;
+> 
+>  	ports {
+>  		port at 0 {
+> diff --git a/arch/arm/boot/dts/exynos5250-spring.dts b/arch/arm/boot/dts/exynos5250-spring.dts
+> index c1edd6d..91881d7 100644
+> --- a/arch/arm/boot/dts/exynos5250-spring.dts
+> +++ b/arch/arm/boot/dts/exynos5250-spring.dts
+> @@ -74,12 +74,10 @@
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&dp_hpd_gpio>;
+>  	samsung,color-space = <0>;
+> -	samsung,dynamic-range = <0>;
+> -	samsung,ycbcr-coeff = <0>;
+>  	samsung,color-depth = <1>;
+>  	samsung,link-rate = <0x0a>;
+>  	samsung,lane-count = <1>;
+> -	samsung,hpd-gpio = <&gpc3 0 GPIO_ACTIVE_HIGH>;
+> +	hpd-gpios = <&gpc3 0 GPIO_ACTIVE_HIGH>;
+>  };
+> 
+>  &ehci {
+> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> index 35cfb07..2f37c87 100644
+> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> @@ -148,12 +148,10 @@
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&dp_hpd_gpio>;
+>  	samsung,color-space = <0>;
+> -	samsung,dynamic-range = <0>;
+> -	samsung,ycbcr-coeff = <0>;
+>  	samsung,color-depth = <1>;
+>  	samsung,link-rate = <0x06>;
+>  	samsung,lane-count = <2>;
+> -	samsung,hpd-gpio = <&gpx2 6 GPIO_ACTIVE_HIGH>;
+> +	hpd-gpios = <&gpx2 6 GPIO_ACTIVE_HIGH>;
+> 
+>  	ports {
+>  		port at 0 {
+> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+> index ac35aef..f67344f 100644
+> --- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
+> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+> @@ -93,8 +93,6 @@
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&dp_hpd>;
+>  	samsung,color-space = <0>;
+> -	samsung,dynamic-range = <0>;
+> -	samsung,ycbcr-coeff = <0>;
+>  	samsung,color-depth = <1>;
+>  	samsung,link-rate = <0x0a>;
+>  	samsung,lane-count = <4>;
+> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+> index 7b018e4..363c95f 100644
+> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
+> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+> @@ -142,12 +142,10 @@
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&dp_hpd_gpio>;
+>  	samsung,color-space = <0>;
+> -	samsung,dynamic-range = <0>;
+> -	samsung,ycbcr-coeff = <0>;
+>  	samsung,color-depth = <1>;
+>  	samsung,link-rate = <0x0a>;
+>  	samsung,lane-count = <2>;
+> -	samsung,hpd-gpio = <&gpx2 6 GPIO_ACTIVE_HIGH>;
+> +	hpd-gpios = <&gpx2 6 GPIO_ACTIVE_HIGH>;
+>  	panel = <&panel>;
+>  };
+> 
+> --
+> 1.9.1
