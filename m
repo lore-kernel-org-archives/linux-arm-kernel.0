@@ -1,68 +1,58 @@
-From: andy.yan@rock-chips.com (Andy Yan)
-Date: Tue, 22 Dec 2015 17:08:14 +0800
-Subject: [PATCH v1 2/6] dt-bindings: soc: add document for rockchip
- reboot-mode driver
-In-Reply-To: <1450774949-23901-1-git-send-email-andy.yan@rock-chips.com>
-References: <1450774949-23901-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <1450775294-24028-1-git-send-email-andy.yan@rock-chips.com>
+From: ilya@compulab.co.il (Ilya Ledvich)
+Date: Tue, 22 Dec 2015 11:10:59 +0200
+Subject: [PATCH] ARM: dts: compulab: add new board description
+Message-ID: <1450775459-18937-1-git-send-email-ilya@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree binding document for rockchip reboot-mode driver
+Add description for newly introduced Compulab devices:
+- CL-SOM-iMX7
+- SBC-iMX7
 
-Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+Signed-off-by: Ilya Ledvich <ilya@compulab.co.il>
 ---
 
-Changes in v1: None
+Arnd, Olof, this patch follows the discussion in [1].
+Can you please apply it on top of arm-soc next/dt branch?
 
- .../bindings/soc/rockchip/rockchip,reboot-mode.txt | 39 ++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/soc/rockchip/rockchip,reboot-mode.txt
+Thanks!
 
-diff --git a/Documentation/devicetree/bindings/soc/rockchip/rockchip,reboot-mode.txt b/Documentation/devicetree/bindings/soc/rockchip/rockchip,reboot-mode.txt
-new file mode 100644
-index 0000000..cdb5093
---- /dev/null
-+++ b/Documentation/devicetree/bindings/soc/rockchip/rockchip,reboot-mode.txt
-@@ -0,0 +1,39 @@
-+Rockchip reboot mode driver
+[1] - http://www.spinics.net/lists/arm-kernel/msg470410.html
+
+ .../devicetree/bindings/arm/compulab-boards.txt    | 24 ++++++++++++++++++++--
+ 1 file changed, 22 insertions(+), 2 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/arm/compulab-boards.txt b/Documentation/devicetree/bindings/arm/compulab-boards.txt
+index 71172d5..42a1028 100644
+--- a/Documentation/devicetree/bindings/arm/compulab-boards.txt
++++ b/Documentation/devicetree/bindings/arm/compulab-boards.txt
+@@ -1,5 +1,25 @@
+-CompuLab SB-SOM is a multi-module baseboard capable of carrying CM-T43, CM-T54,
+-and CM-QS600 modules with minor modifications to the SB-SOM assembly.
++CompuLab SB-SOM is a multi-module baseboard capable of carrying:
++ - CM-T43
++ - CM-T54
++ - CM-QS600
++ - CL-SOM-AM57x
++ - CL-SOM-iMX7
++modules with minor modifications to the SB-SOM assembly.
+ 
+ Required root node properties:
+     - compatible = should be "compulab,sb-som"
 +
-+This driver get reboot mode arguments from userspace
-+and stores it in special register. Then the bootloader
-+will read it and take different action according the
-+argument stored.
++Compulab CL-SOM-iMX7 is a miniature System-on-Module (SoM) based on
++Freescale i.MX7 ARM Cortex-A7 System-on-Chip.
 +
-+Required properties:
-+- compatible: should be "rockchip,reboot-mode"
-+- regmap: this is phandle to the register map node
-+- offset: offset in the register map for the storage register (in bytes)
-+The rest of the properties should follow the generic reboot-mode discription
-+found in ../../misc/reboot-mode.txt
++Required root node properties:
++    - compatible = "compulab,cl-som-imx7", "fsl,imx7d";
 +
-+Examples:
-+	reboot_mode {
-+		compatible = "rockchip,reboot-mode";
-+		rockchip,regmap = <&pmu>;
-+		offset = <0x40>;
-+		loader {
-+			linux,mode = "loader";
-+			linux,magic = <BOOT_LOADER>;
-+		};
++Compulab SBC-iMX7 is a single board computer based on the
++Freescale i.MX7 system-on-chip. SBC-iMX7 is implemented with
++the CL-SOM-iMX7 System-on-Module providing most of the functions,
++and SB-SOM-iMX7 carrier board providing additional peripheral
++functions and connectors.
 +
-+		maskrom {
-+			linux,mode = "maskrom";
-+			linux,magic = <BOOT_MASKROM>;
-+		};
-+
-+		recovery {
-+			linux,mode = "recovery";
-+			linux,magic = <BOOT_RECOVERY>;
-+		};
-+
-+		fastboot {
-+			linux,mode = "fastboot";
-+			linux,magic = <BOOT_FASTBOOT>;
-+		};
-+	};
++Required root node properties:
++    - compatible = "compulab,sbc-imx7", "compulab,cl-som-imx7", "fsl,imx7d";
 -- 
 1.9.1
