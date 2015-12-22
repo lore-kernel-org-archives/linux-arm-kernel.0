@@ -1,32 +1,38 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 22 Dec 2015 13:06:33 -0800
-Subject: [GIT PULL 1/3] rockchip soc changes for 4.5
-In-Reply-To: <2532363.CsR3D6sdor@diego>
+Date: Tue, 22 Dec 2015 13:07:31 -0800
+Subject: [GIT PULL 2/3] rockchip dts32 changes for 4.5, round 2
+In-Reply-To: <2674601.aqagTnGkXk@diego>
 References: <2532363.CsR3D6sdor@diego>
-Message-ID: <20151222210633.GA30172@localhost>
+ <2674601.aqagTnGkXk@diego>
+Message-ID: <20151222210731.GB30172@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 21, 2015 at 02:21:14AM +0100, Heiko St?bner wrote:
+On Mon, Dec 21, 2015 at 02:24:13AM +0100, Heiko St?bner wrote:
 > Hi Arnd, Kevin, Olof,
 > 
-> after Arnd didn't like the arch-timer-supply fixup for the rk3036, I've
-> dropped that patch for further discussion. So this pull request includes
-> the other changes from that req and additionally a compatible for the
-> newly supported rk3228 quad-core Cortex-A7.
+> here is another pile of dts32 changes. Rockchip choose to support another
+> of their Cortex-A7 socs in mainline, so we have a new dtsi for the rk3228
+> and some other misc improvements described in the tag.
 > 
 > 
-> The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
 > 
->   Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+> The following changes since commit 066111411101f6b020af1a7c752859a12476ba21:
+> 
+>   ARM: dts: rockchip: add gpio-ir-receiver to the R89 board (2015-12-04 20:01:27 +0100)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.5-rockchip-soc-1
+>   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.5-rockchip-dts32-2
 > 
-> for you to fetch changes up to 2608224c81a7d242a9b451b97011410b182f0da7:
+> for you to fetch changes up to 94cf32b97bbb043b99e914aacff1a6d7833daf58:
 > 
->   ARM: rockchip: enable support for RK3228 SoCs (2015-12-16 22:15:06 +0100)
+>   ARM: dts: rockchip: add the kylin board for rk3036 (2015-12-19 18:11:48 +0100)
+> 
+> ----------------------------------------------------------------
+> Another new soc - the rk3228 quad-core cortex-a7, a new rk3036 board,
+> support for the efuses on Rockchip socs and some improvements for
+> rk3288 regulators.
 
 Merged, thanks.
 
