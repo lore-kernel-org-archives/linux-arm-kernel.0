@@ -1,22 +1,33 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 22 Dec 2015 13:45:19 +0100
-Subject: [PATCH 2/5] pinctrl: sirf: add missing of_node_put
-In-Reply-To: <1450715988-4770-3-git-send-email-Julia.Lawall@lip6.fr>
-References: <1450715988-4770-1-git-send-email-Julia.Lawall@lip6.fr>
- <1450715988-4770-3-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <CACRpkdag9qaAiAqdGmFm9UMxzJ+S9DBs0Br2MdeE=x8_EYx2PA@mail.gmail.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 22 Dec 2015 13:47:34 +0100
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Enable GPU support
+In-Reply-To: <CAOMZO5A8BEkNvrazmksRBRUQw+4mWwbfKtrK6KzD3XK5L5Fs7w@mail.gmail.com>
+References: <1450723442-1518-1-git-send-email-festevam@gmail.com>
+ <20151222122154.GD26290@tiger>
+ <CAOMZO5A8BEkNvrazmksRBRUQw+4mWwbfKtrK6KzD3XK5L5Fs7w@mail.gmail.com>
+Message-ID: <1450788454.2637.17.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 21, 2015 at 5:39 PM, Julia Lawall <Julia.Lawall@lip6.fr> wrote:
+Am Dienstag, den 22.12.2015, 10:30 -0200 schrieb Fabio Estevam:
+> On Tue, Dec 22, 2015 at 10:21 AM, Shawn Guo <shawnguo@kernel.org>
+> wrote:
+> 
+> > I do not have this Kconfig option on my tree yet.
+> 
+> Yes, I know, but would this cause any issue?
+> 
+> This would allow etnaviv to be functional by default on 4.5.
+> Otherwise
+> we should wait for 4.6.
+> 
+I don't see a need to rush this. We can always enable it in the -rc
+phase of 4.5 is we desire.
+But to be honest I would like to give etnaviv a cycle to stabilize
+until we enable it by default. With i.MX6QP now hitting the street and
+basically no testing of etnaviv being done there until now, I would
+rather not have it in the defconfig just now. It's not like it's hard
+for people willing to test this to enable a single Kconfig option...
 
-> for_each_child_of_node performs an of_node_get on each iteration, so a
-> return from the loop requires an of_node_put.
->
-> A simplified version of the semantic patch that fixes this problem is as
-> follows (http://coccinelle.lip6.fr):
-
-Patch applied.
-
-Yours,
-Linus Walleij
+Regards,
+Lucas
