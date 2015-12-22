@@ -1,74 +1,92 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 22 Dec 2015 22:27:58 +0100
-Subject: [PATCH v2 1/5] clk: add flag for clocks that need to be enabled on
- rate changes
+Date: Tue, 22 Dec 2015 22:28:01 +0100
+Subject: [PATCH v2 4/5] clk: rockchip: rk3036: include downstream muxes into
+ fractional dividers
 In-Reply-To: <1450819682-4932-1-git-send-email-heiko@sntech.de>
 References: <1450819682-4932-1-git-send-email-heiko@sntech.de>
-Message-ID: <1450819682-4932-2-git-send-email-heiko@sntech.de>
+Message-ID: <1450819682-4932-5-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some clocks need to be enabled to accept rate changes. This patch adds a
-new flag CLK_SET_RATE_UNGATE that lets clk_change_rate enable the clock
-before trying to change the rate and disable it again afterwards.
-This of course doesn't effect clocks that are already running at that
-point, as their refcount will only temporarily increase.
+From: Xing Zheng <zhengxing@rock-chips.com>
 
+Use the newly introduced possibility to combine the fractional dividers
+with their downstream muxes for all fractional dividers on currently
+supported RK3036 SoCs.
+
+Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-Tested-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-Reviewed-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
 ---
- drivers/clk/clk.c            | 18 ++++++++++++++++++
- include/linux/clk-provider.h |  1 +
- 2 files changed, 19 insertions(+)
+ drivers/clk/rockchip/clk-rk3036.c | 34 +++++++++++++++++-----------------
+ 1 file changed, 17 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index f13c3f4..bd64a94 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -1443,6 +1443,15 @@ static void clk_change_rate(struct clk_core *core)
- 	else if (core->parent)
- 		best_parent_rate = core->parent->rate;
+diff --git a/drivers/clk/rockchip/clk-rk3036.c b/drivers/clk/rockchip/clk-rk3036.c
+index 7333b053..fb35263 100644
+--- a/drivers/clk/rockchip/clk-rk3036.c
++++ b/drivers/clk/rockchip/clk-rk3036.c
+@@ -227,21 +227,21 @@ static struct rockchip_clk_branch rk3036_clk_branches[] __initdata = {
+ 	COMPOSITE_NOMUX(0, "uart2_src", "uart_pll_clk", 0,
+ 			RK2928_CLKSEL_CON(13), 0, 7, DFLAGS,
+ 			RK2928_CLKGATE_CON(1), 8, GFLAGS),
+-	COMPOSITE_FRAC(0, "uart0_frac", "uart0_src", CLK_SET_RATE_PARENT,
++	COMPOSITE_FRACMUX(0, "uart0_frac", "uart0_src", CLK_SET_RATE_PARENT,
+ 			RK2928_CLKSEL_CON(17), 0,
+-			RK2928_CLKGATE_CON(1), 9, GFLAGS),
+-	COMPOSITE_FRAC(0, "uart1_frac", "uart1_src", CLK_SET_RATE_PARENT,
+-			RK2928_CLKSEL_CON(18), 0,
+-			RK2928_CLKGATE_CON(1), 11, GFLAGS),
+-	COMPOSITE_FRAC(0, "uart2_frac", "uart2_src", CLK_SET_RATE_PARENT,
+-			RK2928_CLKSEL_CON(19), 0,
+-			RK2928_CLKGATE_CON(1), 13, GFLAGS),
++			RK2928_CLKGATE_CON(1), 9, GFLAGS,
+ 	MUX(SCLK_UART0, "sclk_uart0", mux_uart0_p, CLK_SET_RATE_PARENT,
+-			RK2928_CLKSEL_CON(13), 8, 2, MFLAGS),
++			RK2928_CLKSEL_CON(13), 8, 2, MFLAGS)),
++	COMPOSITE_FRACMUX(0, "uart1_frac", "uart1_src", CLK_SET_RATE_PARENT,
++			RK2928_CLKSEL_CON(18), 0,
++			RK2928_CLKGATE_CON(1), 11, GFLAGS,
+ 	MUX(SCLK_UART1, "sclk_uart1", mux_uart1_p, CLK_SET_RATE_PARENT,
+-			RK2928_CLKSEL_CON(14), 8, 2, MFLAGS),
++			RK2928_CLKSEL_CON(14), 8, 2, MFLAGS)),
++	COMPOSITE_FRACMUX(0, "uart2_frac", "uart2_src", CLK_SET_RATE_PARENT,
++			RK2928_CLKSEL_CON(19), 0,
++			RK2928_CLKGATE_CON(1), 13, GFLAGS,
+ 	MUX(SCLK_UART2, "sclk_uart2", mux_uart2_p, CLK_SET_RATE_PARENT,
+-			RK2928_CLKSEL_CON(15), 8, 2, MFLAGS),
++			RK2928_CLKSEL_CON(15), 8, 2, MFLAGS)),
  
-+	if (core->flags & CLK_SET_RATE_UNGATE) {
-+		unsigned long flags;
-+
-+		clk_core_prepare(core);
-+		flags = clk_enable_lock();
-+		clk_core_enable(core);
-+		clk_enable_unlock(flags);
-+	}
-+
- 	if (core->new_parent && core->new_parent != core->parent) {
- 		old_parent = __clk_set_parent_before(core, core->new_parent);
- 		trace_clk_set_parent(core, core->new_parent);
-@@ -1469,6 +1478,15 @@ static void clk_change_rate(struct clk_core *core)
+ 	COMPOSITE(0, "aclk_vcodec", mux_pll_src_3plls_p, 0,
+ 			RK2928_CLKSEL_CON(32), 14, 2, MFLAGS, 8, 5, DFLAGS,
+@@ -289,11 +289,11 @@ static struct rockchip_clk_branch rk3036_clk_branches[] __initdata = {
+ 	COMPOSITE(0, "i2s_src", mux_pll_src_3plls_p, 0,
+ 			RK2928_CLKSEL_CON(3), 14, 2, MFLAGS, 0, 7, DFLAGS,
+ 			RK2928_CLKGATE_CON(0), 9, GFLAGS),
+-	COMPOSITE_FRAC(0, "i2s_frac", "i2s_src", CLK_SET_RATE_PARENT,
++	COMPOSITE_FRACMUX(0, "i2s_frac", "i2s_src", CLK_SET_RATE_PARENT,
+ 			RK2928_CLKSEL_CON(7), 0,
+-			RK2928_CLKGATE_CON(0), 10, GFLAGS),
++			RK2928_CLKGATE_CON(0), 10, GFLAGS,
+ 	MUX(0, "i2s_pre", mux_i2s_pre_p, CLK_SET_RATE_PARENT,
+-			RK2928_CLKSEL_CON(3), 8, 2, MFLAGS),
++			RK2928_CLKSEL_CON(3), 8, 2, MFLAGS)),
+ 	COMPOSITE_NODIV(SCLK_I2S_OUT, "i2s_clkout", mux_i2s_clkout_p, 0,
+ 			RK2928_CLKSEL_CON(3), 12, 1, MFLAGS,
+ 			RK2928_CLKGATE_CON(0), 13, GFLAGS),
+@@ -303,11 +303,11 @@ static struct rockchip_clk_branch rk3036_clk_branches[] __initdata = {
+ 	COMPOSITE(0, "spdif_src", mux_pll_src_3plls_p, 0,
+ 			RK2928_CLKSEL_CON(5), 10, 2, MFLAGS, 0, 7, DFLAGS,
+ 			RK2928_CLKGATE_CON(2), 10, GFLAGS),
+-	COMPOSITE_FRAC(0, "spdif_frac", "spdif_src", 0,
++	COMPOSITE_FRACMUX(0, "spdif_frac", "spdif_src", 0,
+ 			RK2928_CLKSEL_CON(9), 0,
+-			RK2928_CLKGATE_CON(2), 12, GFLAGS),
++			RK2928_CLKGATE_CON(2), 12, GFLAGS,
+ 	MUX(SCLK_SPDIF, "sclk_spdif", mux_spdif_p, 0,
+-			RK2928_CLKSEL_CON(5), 8, 2, MFLAGS),
++			RK2928_CLKSEL_CON(5), 8, 2, MFLAGS)),
  
- 	core->rate = clk_recalc(core, best_parent_rate);
- 
-+	if (core->flags & CLK_SET_RATE_UNGATE) {
-+		unsigned long flags;
-+
-+		flags = clk_enable_lock();
-+		clk_core_disable(core);
-+		clk_enable_unlock(flags);
-+		clk_core_unprepare(core);
-+	}
-+
- 	if (core->notifier_count && old_rate != core->rate)
- 		__clk_notify(core, POST_RATE_CHANGE, old_rate, core->rate);
- 
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index c56988a..a971ce4 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -31,6 +31,7 @@
- #define CLK_SET_RATE_NO_REPARENT BIT(7) /* don't re-parent on rate change */
- #define CLK_GET_ACCURACY_NOCACHE BIT(8) /* do not use the cached clk accuracy */
- #define CLK_RECALC_NEW_RATES	BIT(9) /* recalc rates after notifications */
-+#define CLK_SET_RATE_UNGATE	BIT(10) /* clock needs to run to set rate */
- 
- struct clk;
- struct clk_hw;
+ 	GATE(SCLK_OTGPHY0, "sclk_otgphy0", "xin12m", CLK_IGNORE_UNUSED,
+ 			RK2928_CLKGATE_CON(1), 5, GFLAGS),
 -- 
 2.6.4
