@@ -1,154 +1,99 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Tue, 22 Dec 2015 16:08:07 +0800
-Subject: [PATCH v8 12/20] KVM: ARM64: Add access handler for PMOVSSET and
- PMOVSCLR register
-In-Reply-To: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>
-References: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1450771695-11948-13-git-send-email-zhaoshenglong@huawei.com>
+From: ilya@compulab.co.il (Ilya Ledvich)
+Date: Tue, 22 Dec 2015 10:15:20 +0200
+Subject: [PATCH v2 2/2] ARM: dts: imx7d: sbc-imx7: add basic board support
+In-Reply-To: <1450772120-18131-1-git-send-email-ilya@compulab.co.il>
+References: <1449472479-2521-1-git-send-email-ilya@compulab.co.il>
+ <1450772120-18131-1-git-send-email-ilya@compulab.co.il>
+Message-ID: <1450772120-18131-3-git-send-email-ilya@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shannon Zhao <shannon.zhao@linaro.org>
+SBC-iMX7 is a single board computer designed for industrial
+and embedded applications. It is based on the Freescale i.MX7
+system-on-chip. SBC-iMX7 is implemented with the CL-SOM-iMX7
+System-on-Module providing most of the functions, and SB-SOM-iMX7
+carrier board providing additional peripheral functions and
+connectors.
 
-Since the reset value of PMOVSSET and PMOVSCLR is UNKNOWN, use
-reset_unknown for its reset handler. Add a handler to emulate writing
-PMOVSSET or PMOVSCLR register.
+http://www.compulab.co.il/products/sbcs/sbc-imx7-freescale-i-mx-7-single-board-computer/
 
-When writing non-zero value to PMOVSSET, the counter and its interrupt
-is enabled, kick this vcpu to sync PMU interrupt.
+http://www.compulab.co.il/products/computer-on-modules/cl-som-imx7-freescale-i-mx-7-system-on-module/
 
-Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+Add basic board support, including SD card as a secondary boot and storage device
+
+Signed-off-by: Ilya Ledvich <ilya@compulab.co.il>
+Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
 ---
- arch/arm64/kvm/sys_regs.c | 26 +++++++++++++++++++++++---
- include/kvm/arm_pmu.h     |  2 ++
- virt/kvm/arm/pmu.c        | 30 ++++++++++++++++++++++++++++++
- 3 files changed, 55 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 24ce4fe..d61f271dd 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -663,6 +663,25 @@ static bool access_pminten(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 	return true;
- }
- 
-+static bool access_pmovs(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
-+			 const struct sys_reg_desc *r)
-+{
-+	u64 mask = kvm_pmu_valid_counter_mask(vcpu);
-+
-+	if (p->is_write) {
-+		if (r->CRm & 0x2)
-+			/* accessing PMOVSSET_EL0 */
-+			kvm_pmu_overflow_set(vcpu, p->regval & mask);
-+		else
-+			/* accessing PMOVSCLR_EL0 */
-+			vcpu_sys_reg(vcpu, r->reg) &= ~(p->regval & mask);
-+	} else {
-+		p->regval = vcpu_sys_reg(vcpu, r->reg) & mask;
-+	}
-+
-+	return true;
-+}
-+
- /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
- #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
- 	/* DBGBVRn_EL1 */						\
-@@ -870,7 +889,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	  access_pmcnten, NULL, PMCNTENSET_EL0 },
- 	/* PMOVSCLR_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b011),
--	  trap_raz_wi },
-+	  access_pmovs, NULL, PMOVSSET_EL0 },
- 	/* PMSWINC_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b100),
- 	  trap_raz_wi },
-@@ -897,7 +916,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	  trap_raz_wi },
- 	/* PMOVSSET_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1110), Op2(0b011),
--	  trap_raz_wi },
-+	  access_pmovs, reset_unknown, PMOVSSET_EL0 },
- 
- 	/* TPIDR_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1101), CRm(0b0000), Op2(0b010),
-@@ -1211,7 +1230,7 @@ static const struct sys_reg_desc cp15_regs[] = {
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), access_pmcr },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), access_pmcnten },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), access_pmcnten },
--	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), trap_raz_wi },
-+	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), access_pmovs },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), access_pmselr },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), access_pmceid },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), access_pmceid },
-@@ -1221,6 +1240,7 @@ static const struct sys_reg_desc cp15_regs[] = {
- 	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), trap_raz_wi },
- 	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), access_pminten },
- 	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), access_pminten },
-+	{ Op1( 0), CRn( 9), CRm(14), Op2( 3), access_pmovs },
- 
- 	{ Op1( 0), CRn(10), CRm( 2), Op2( 0), access_vm_reg, NULL, c10_PRRR },
- 	{ Op1( 0), CRn(10), CRm( 2), Op2( 1), access_vm_reg, NULL, c10_NMRR },
-diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-index 9d2d0c0..244970b 100644
---- a/include/kvm/arm_pmu.h
-+++ b/include/kvm/arm_pmu.h
-@@ -39,6 +39,7 @@ u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx);
- u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu);
- void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val);
- void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val);
-+void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val);
- void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
- 				    u64 select_idx);
- #else
-@@ -55,6 +56,7 @@ u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu)
- }
- void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val) {}
- void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val) {}
-+void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val) {}
- void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
- 				    u64 select_idx) {}
- #endif
-diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-index bc64043..c23d57e 100644
---- a/virt/kvm/arm/pmu.c
-+++ b/virt/kvm/arm/pmu.c
-@@ -130,6 +130,36 @@ void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val)
- 	}
- }
- 
-+static inline u64 kvm_pmu_overflow_status(struct kvm_vcpu *vcpu)
-+{
-+	u64 reg;
-+
-+	reg = vcpu_sys_reg(vcpu, PMOVSSET_EL0);
-+	reg &= vcpu_sys_reg(vcpu, PMCNTENSET_EL0);
-+	reg &= vcpu_sys_reg(vcpu, PMINTENSET_EL1);
-+	reg &= kvm_pmu_valid_counter_mask(vcpu);
-+
-+	return reg;
-+}
-+
-+/**
-+ * kvm_pmu_overflow_set - set PMU overflow interrupt
-+ * @vcpu: The vcpu pointer
-+ * @val: the value guest writes to PMOVSSET register
+v2: move board description out of fsl.txt (Shawn)
+    use GPL/X11 dual licence for newly added dts files (Shawn)
+
+ arch/arm/boot/dts/Makefile           |  1 +
+ arch/arm/boot/dts/imx7d-sbc-imx7.dts | 44 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 45 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx7d-sbc-imx7.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 83ed521..72ef172 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -351,6 +351,7 @@ dtb-$(CONFIG_SOC_IMX6UL) += \
+ 	imx6ul-14x14-evk.dtb
+ dtb-$(CONFIG_SOC_IMX7D) += \
+ 	imx7d-cl-som-imx7.dtb \
++	imx7d-sbc-imx7.dtb \
+ 	imx7d-sdb.dtb
+ dtb-$(CONFIG_SOC_LS1021A) += \
+ 	ls1021a-qds.dtb \
+diff --git a/arch/arm/boot/dts/imx7d-sbc-imx7.dts b/arch/arm/boot/dts/imx7d-sbc-imx7.dts
+new file mode 100644
+index 0000000..000f5b6
+--- /dev/null
++++ b/arch/arm/boot/dts/imx7d-sbc-imx7.dts
+@@ -0,0 +1,44 @@
++/*
++ * Support for CompuLab SBC-iMX7 Single Board Computer
++ *
++ * Copyright (C) 2015 CompuLab Ltd. - http://www.compulab.co.il/
++ * Author: Ilya Ledvich <ilya@compulab.co.il>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
 + */
-+void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val)
-+{
-+	u64 reg;
 +
-+	if (val == 0)
-+		return;
++#include "imx7d-cl-som-imx7.dts"
 +
-+	vcpu_sys_reg(vcpu, PMOVSSET_EL0) |= val;
-+	reg = kvm_pmu_overflow_status(vcpu);
-+	if (reg != 0)
-+		kvm_vcpu_kick(vcpu);
-+}
++/ {
++	model = "CompuLab SBC-iMX7";
++	compatible = "compulab,sbc-imx7", "compulab,cl-som-imx7", "fsl,imx7d";
++};
 +
- static inline bool kvm_pmu_counter_is_enabled(struct kvm_vcpu *vcpu,
- 					      u64 select_idx)
- {
++&usdhc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc1>;
++	cd-gpios = <&gpio5 0 GPIO_ACTIVE_LOW>;
++	wp-gpios = <&gpio5 1 GPIO_ACTIVE_HIGH>;
++	enable-sdio-wakeup;
++	status = "okay";
++};
++
++&iomuxc {
++	cl-som-imx7 {
++		pinctrl_usdhc1: usdhc1grp {
++			fsl,pins = <
++				MX7D_PAD_SD1_CMD__SD1_CMD		0x59
++				MX7D_PAD_SD1_CLK__SD1_CLK		0x19
++				MX7D_PAD_SD1_DATA0__SD1_DATA0		0x59
++				MX7D_PAD_SD1_DATA1__SD1_DATA1		0x59
++				MX7D_PAD_SD1_DATA2__SD1_DATA2		0x59
++				MX7D_PAD_SD1_DATA3__SD1_DATA3		0x59
++				MX7D_PAD_SD1_CD_B__GPIO5_IO0		0x59 /* CD */
++				MX7D_PAD_SD1_WP__GPIO5_IO1		0x59 /* WP */
++			>;
++		};
++	};
++};
 -- 
-2.0.4
+1.9.1
