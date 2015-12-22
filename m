@@ -1,36 +1,35 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 22 Dec 2015 12:57:04 -0800
-Subject: [GIT PULL] ARM: mvebu: dt for v4.5 (#3)
-In-Reply-To: <87bn9nsvqg.fsf@free-electrons.com>
-References: <87bn9nsvqg.fsf@free-electrons.com>
-Message-ID: <20151222205704.GT30172@localhost>
+Date: Tue, 22 Dec 2015 13:00:27 -0800
+Subject: [GIT PULL] ARM: mediatek: arm64 updates for v4.4
+In-Reply-To: <CABuKBeJGS0a5tLFbH=hJtsZ-Uma=7p+M67NuLtBpzhN7d--11A@mail.gmail.com>
+References: <CABuKBeJGS0a5tLFbH=hJtsZ-Uma=7p+M67NuLtBpzhN7d--11A@mail.gmail.com>
+Message-ID: <20151222210027.GU30172@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 02:59:51PM +0100, Gregory CLEMENT wrote:
-> Hi,
+On Sun, Dec 20, 2015 at 10:17:50PM +0100, Matthias Brugger wrote:
+> Hi Arnd and Olof,
 > 
-> Here is the third pull request for dt for mvebu for v4.5. I thinks this
-> should be the last PR for 4.5. However, Linus said that he planned to
-> open the merge windows for 4.5 around Jan 10th. So if new patches are
-> coming during the week-end I don't exclude releasing a new PR next week
-> unless you already know that you won't take any new PR.
+> Please pull the following patches.
 > 
-> Gregory
+> Thanks,
+> Matthias
 > 
-> The following changes since commit 4c945e8556ec7ea5b19d4f8721b212f468656e0d:
+> ---
 > 
->   ARM: dts: Add SolidRun Armada 388 Clearfog A1 DT file (2015-12-08 17:58:01 +0100)
+> The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+> 
+>   Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.5-3
+>   https://github.com/mbgg/linux-mediatek.git tags/v4.4-next-arm64
 > 
-> for you to fetch changes up to 8b44f5be20fd531054e546b662f46e619bff2e72:
+> for you to fetch changes up to 05bdabe7ebc780e3cd9275f0f5795d337fa5acca:
 > 
->   ARM: dts: armada: replace isil, irq2-can-wakeup-machine with wakeup-source property (2015-12-15 17:55:35 +0100)
+>   arm64: dts: mediatek: mt8173 PSCI-1.0 support (2015-11-20 13:42:29 +0100)
 
-Merged, thanks!
+Merged, thanks.
 
 
 -Olof
