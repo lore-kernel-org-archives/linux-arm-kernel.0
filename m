@@ -1,215 +1,114 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 22 Dec 2015 14:17:17 +0000
-Subject: [PATCH RESEND v4] arm: remove !CPU_V6 and !GENERIC_ATOMIC64 build
- dependencies for XEN
-Message-ID: <alpine.DEB.2.02.1512221404060.3096@kaball.uk.xensource.com>
+From: alex.aring@gmail.com (Alexander Aring)
+Date: Tue, 22 Dec 2015 15:20:46 +0100
+Subject: [PATCH v2 0/8] Raspberry Pi 2 support.
+In-Reply-To: <201512220011.32234.arnd@arndb.de>
+References: <1450310115-22163-1-git-send-email-eric@anholt.net>
+ <20151218100826.GB1145@omega> <20151220221158.GA6416@omega>
+ <201512220011.32234.arnd@arndb.de>
+Message-ID: <20151222142045.GA29335@omega>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+On Tue, Dec 22, 2015 at 12:11:32AM +0100, Arnd Bergmann wrote:
+> On Sunday 20 December 2015, Alexander Aring wrote:
+> > On Fri, Dec 18, 2015 at 11:08:26AM +0100, Alexander Aring wrote:
+> > > [    0.000000] Memory policy: Data cache writeback
+> > > [    0.000000] BUG: mapping for 0x3f201000 at 0xf0201000 out of vmalloc space
+> 
+> This is a separate bug, right?
+> 
 
-Would you please consider this patch for the next merge window? It
-is a very old patch (March 2014) which has been left over.
+Yes, I can remove this BUG when setting:
 
-See some of the original threads here:
+VMSPLIT_2G
 
-http://marc.info/?l=linux-arm-kernel&m=138920414402610&w=2
-http://marc.info/?l=linux-arm-kernel&m=139031200118436&w=2
+or some other option, was "VMSPLIT_3G" before and with this option I
+will get the above message.
 
-Many thanks,
+> > > [    0.000000] ------------[ cut here ]------------
+> > > [    0.000000] WARNING: CPU: 0 PID: 0 at arch/arm/kernel/devtree.c:149 arm_dt_init_cpu_maps+0x100/0x1a4()
+> > > [    0.000000] DT /cpu 2 nodes greater than max cores 1, capping them
+> > > [    0.000000] Modules linked in:
+> > > [    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted 4.4.0-rc5+ #989
+> > > [    0.000000] Hardware name: BCM2835
+> > > [    0.000000] [<c0016c4c>] (unwind_backtrace) from [<c0013e58>] (show_stack+0x20/0x24)
+> > > [    0.000000] [<c0013e58>] (show_stack) from [<c0247620>] (dump_stack+0x20/0x28)
+> > > [    0.000000] [<c0247620>] (dump_stack) from [<c0023a84>] (warn_slowpath_common+0x9c/0xc4)
+> > > [    0.000000] [<c0023a84>] (warn_slowpath_common) from [<c0023aec>] (warn_slowpath_fmt+0x40/0x48)
+> > > [    0.000000] [<c0023aec>] (warn_slowpath_fmt) from [<c074ef94>] (arm_dt_init_cpu_maps+0x100/0x1a4)
+> > > [    0.000000] [<c074ef94>] (arm_dt_init_cpu_maps) from [<c074e60c>] (setup_arch+0x6f4/0x89c)
+> > > [    0.000000] [<c074e60c>] (setup_arch) from [<c074b9cc>] (start_kernel+0x74/0x3a4)
+> > > [    0.000000] [<c074b9cc>] (start_kernel) from [<00008078>] (0x8078)
+> > > [    0.000000] ---[ end trace cb88537fdc8fa200 ]---
+> > > [    0.000000] DT missing boot CPU MPIDR[23:0], fall back to default cpu_logical_map
+> > > [    0.000000] CPU: All CPU(s) started in SVC mode.
+> > 
+> > I can remove this WARNING when I enable CONFIG_SMP.
+> 
+> I think we should try to change this in the code.
+> 
 
-Stefano
+mhhh, okay... I am not sure I think there is some missing
+IS_ENABLED(CONFIG_SMP) check.
 
----
+> > > [    0.000000] Virtual kernel memory layout:
+> > > [    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+> > > [    0.000000]     fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
+> > > [    0.000000]     vmalloc : 0xf0800000 - 0xff800000   ( 240 MB)
+> > > [    0.000000]     lowmem  : 0xc0000000 - 0xf0000000   ( 768 MB)
+> > > [    0.000000]     modules : 0xbf000000 - 0xc0000000   (  16 MB)
+> > > [    0.000000]       .text : 0xc0008000 - 0xc074a7cc   (7434 kB)
+> > > [    0.000000]       .init : 0xc074b000 - 0xc07b4000   ( 420 kB)
+> > > [    0.000000]       .data : 0xc07b4000 - 0xc081e910   ( 427 kB)
+> > > [    0.000000]        .bss : 0xc081e910 - 0xc08ca80c   ( 688 kB)
+> > > [    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=1, Nodes=1
+> > > [    0.000000] NR_IRQS:16 nr_irqs:16 16
+> > > [    0.000000] Kernel panic - not syncing: /soc/local_intc: unable to map local interrupt registers
+> > > [    0.000000] 
+> > > [    0.000000] CPU: 0 PID: 0 Comm: swapper Tainted: G        W       4.4.0-rc5+ #989
+> > > [    0.000000] Hardware name: BCM2835
+> > > [    0.000000] [<c0016c4c>] (unwind_backtrace) from [<c0013e58>] (show_stack+0x20/0x24)
+> > > [    0.000000] [<c0013e58>] (show_stack) from [<c0247620>] (dump_stack+0x20/0x28)
+> > > [    0.000000] [<c0247620>] (dump_stack) from [<c00c17c0>] (panic+0x84/0x210)
+> > > [    0.000000] [<c00c17c0>] (panic) from [<c0771d5c>] (bcm2836_arm_irqchip_l1_intc_of_init+0x94/0x110)
+> > > [    0.000000] [<c0771d5c>] (bcm2836_arm_irqchip_l1_intc_of_init) from [<c0779f04>] (of_irq_init+0x1a0/0x2a8)
+> > > [    0.000000] [<c0779f04>] (of_irq_init) from [<c0771af4>] (irqchip_init+0x14/0x1c)
+> > > [    0.000000] [<c0771af4>] (irqchip_init) from [<c074d7a8>] (init_IRQ+0x28/0x88)
+> > > [    0.000000] [<c074d7a8>] (init_IRQ) from [<c074bb64>] (start_kernel+0x20c/0x3a4)
+> > > [    0.000000] [<c074bb64>] (start_kernel) from [<00008078>] (0x8078)
+> > > [    0.000000] ---[ end Kernel panic - not syncing: /soc/local_intc: unable to map local interrupt registers
+> > > 
+> > 
+> > But still getting this panic, your patches does not contain some
+> > defconfig, so I still try to figure out what I need to enable to get it
+> > working. Maybe it is some missing config entry which should be enabled.
+> > 
+> > But, for me it looks like some devicetree issue, because of_iomem returns
+> > NULL, at [0]. Don't know what I am doing wrong.
+> 
+> That is the most likely cause, yes. You can try replacing it with an ioremap with a
+> hardcoded physical address to see if that works.
+> 
 
-Remove !GENERIC_ATOMIC64 build dependency:
-- introduce xen_atomic64_xchg
-- use it to implement xchg_xen_ulong
+When I changed to "VMSPLIT_2G" the above issue doesn't occur anymore.
 
-Remove !CPU_V6 build dependency:
-- introduce __cmpxchg8 and __cmpxchg16, compiled even ifdef
-  CONFIG_CPU_V6
-- implement sync_cmpxchg using __cmpxchg8 and __cmpxchg16
+Later while booting the kernel hangs forever, the solution on my side
+was to enable:
 
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Reviewed-by: Will Deacon <will.deacon@arm.com>
-Acked-by: Ian Campbell <ian.campbell@citrix.com>
-CC: arnd at arndb.de
-CC: will.deacon at arm.com
-CC: catalin.marinas at arm.com
-CC: linux-arm-kernel at lists.infradead.org
-CC: linux-kernel at vger.kernel.org
-CC: xen-devel at lists.xenproject.org
+CONFIG_HAVE_ARM_ARCH_TIMER
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 34e1569..e09ed94 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1807,8 +1807,7 @@ config XEN_DOM0
- config XEN
- 	bool "Xen guest support on ARM"
- 	depends on ARM && AEABI && OF
--	depends on CPU_V7 && !CPU_V6
--	depends on !GENERIC_ATOMIC64
-+	depends on CPU_V7
- 	depends on MMU
- 	select ARCH_DMA_ADDR_T_64BIT
- 	select ARM_PSCI
-diff --git a/arch/arm/include/asm/cmpxchg.h b/arch/arm/include/asm/cmpxchg.h
-index 97882f9..3b342ec 100644
---- a/arch/arm/include/asm/cmpxchg.h
-+++ b/arch/arm/include/asm/cmpxchg.h
-@@ -152,6 +152,44 @@ extern void __bad_cmpxchg(volatile void *ptr, int size);
-  * cmpxchg only support 32-bits operands on ARMv6.
-  */
- 
-+static inline unsigned long __cmpxchg8(volatile void *ptr, unsigned long old,
-+				      unsigned long new)
-+{
-+	unsigned long oldval, res;
-+
-+	do {
-+		asm volatile("@ __cmpxchg8\n"
-+		"	ldrexb	%1, [%2]\n"
-+		"	mov	%0, #0\n"
-+		"	teq	%1, %3\n"
-+		"	strexbeq %0, %4, [%2]\n"
-+			: "=&r" (res), "=&r" (oldval)
-+			: "r" (ptr), "Ir" (old), "r" (new)
-+			: "memory", "cc");
-+	} while (res);
-+
-+	return oldval;
-+}
-+
-+static inline unsigned long __cmpxchg16(volatile void *ptr, unsigned long old,
-+				      unsigned long new)
-+{
-+	unsigned long oldval, res;
-+
-+	do {
-+		asm volatile("@ __cmpxchg16\n"
-+		"	ldrexh	%1, [%2]\n"
-+		"	mov	%0, #0\n"
-+		"	teq	%1, %3\n"
-+		"	strexheq %0, %4, [%2]\n"
-+			: "=&r" (res), "=&r" (oldval)
-+			: "r" (ptr), "Ir" (old), "r" (new)
-+			: "memory", "cc");
-+	} while (res);
-+
-+	return oldval;
-+}
-+
- static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
- 				      unsigned long new, int size)
- {
-@@ -162,28 +200,10 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
- 	switch (size) {
- #ifndef CONFIG_CPU_V6	/* min ARCH >= ARMv6K */
- 	case 1:
--		do {
--			asm volatile("@ __cmpxchg1\n"
--			"	ldrexb	%1, [%2]\n"
--			"	mov	%0, #0\n"
--			"	teq	%1, %3\n"
--			"	strexbeq %0, %4, [%2]\n"
--				: "=&r" (res), "=&r" (oldval)
--				: "r" (ptr), "Ir" (old), "r" (new)
--				: "memory", "cc");
--		} while (res);
-+		oldval = __cmpxchg8(ptr, old, new);
- 		break;
- 	case 2:
--		do {
--			asm volatile("@ __cmpxchg1\n"
--			"	ldrexh	%1, [%2]\n"
--			"	mov	%0, #0\n"
--			"	teq	%1, %3\n"
--			"	strexheq %0, %4, [%2]\n"
--				: "=&r" (res), "=&r" (oldval)
--				: "r" (ptr), "Ir" (old), "r" (new)
--				: "memory", "cc");
--		} while (res);
-+		oldval = __cmpxchg16(ptr, old, new);
- 		break;
- #endif
- 	case 4:
-diff --git a/arch/arm/include/asm/sync_bitops.h b/arch/arm/include/asm/sync_bitops.h
-index 9732b8e..4103319 100644
---- a/arch/arm/include/asm/sync_bitops.h
-+++ b/arch/arm/include/asm/sync_bitops.h
-@@ -20,7 +20,29 @@
- #define sync_test_and_clear_bit(nr, p)	_test_and_clear_bit(nr, p)
- #define sync_test_and_change_bit(nr, p)	_test_and_change_bit(nr, p)
- #define sync_test_bit(nr, addr)		test_bit(nr, addr)
--#define sync_cmpxchg			cmpxchg
- 
-+static inline unsigned long sync_cmpxchg(volatile void *ptr,
-+										 unsigned long old,
-+										 unsigned long new)
-+{
-+	unsigned long oldval;
-+	int size = sizeof(*(ptr));
-+
-+	smp_mb();
-+	switch (size) {
-+	case 1:
-+		oldval = __cmpxchg8(ptr, old, new);
-+		break;
-+	case 2:
-+		oldval = __cmpxchg16(ptr, old, new);
-+		break;
-+	default:
-+		oldval = __cmpxchg(ptr, old, new, size);
-+		break;
-+	}
-+	smp_mb();
-+
-+	return oldval;
-+}
- 
- #endif
-diff --git a/arch/arm/include/asm/xen/events.h b/arch/arm/include/asm/xen/events.h
-index 71e473d..f646422 100644
---- a/arch/arm/include/asm/xen/events.h
-+++ b/arch/arm/include/asm/xen/events.h
-@@ -16,7 +16,37 @@ static inline int xen_irqs_disabled(struct pt_regs *regs)
- 	return raw_irqs_disabled_flags(regs->ARM_cpsr);
- }
- 
--#define xchg_xen_ulong(ptr, val) atomic64_xchg(container_of((ptr),	\
-+#ifdef CONFIG_GENERIC_ATOMIC64
-+/* if CONFIG_GENERIC_ATOMIC64 is defined we cannot use the generic
-+ * atomic64_xchg function because it is implemented using spin locks.
-+ * Here we need proper atomic instructions to read and write memory
-+ * shared with the hypervisor.
-+ */
-+static inline u64 xen_atomic64_xchg(atomic64_t *ptr, u64 new)
-+{
-+	u64 result;
-+	unsigned long tmp;
-+
-+	smp_mb();
-+
-+	__asm__ __volatile__("@ xen_atomic64_xchg\n"
-+"1:	ldrexd	%0, %H0, [%3]\n"
-+"	strexd	%1, %4, %H4, [%3]\n"
-+"	teq	%1, #0\n"
-+"	bne	1b"
-+	: "=&r" (result), "=&r" (tmp), "+Qo" (ptr->counter)
-+	: "r" (&ptr->counter), "r" (new)
-+	: "cc");
-+
-+	smp_mb();
-+
-+	return result;
-+}
-+#else
-+#define xen_atomic64_xchg atomic64_xchg
-+#endif
-+
-+#define xchg_xen_ulong(ptr, val) xen_atomic64_xchg(container_of((ptr),	\
- 							    atomic64_t,	\
- 							    counter), (val))
- 
+I think this doesn't use the BCM2835 timer anymore and some cortex-a7
+related "generic timer", or?
+
+btw:
+
+After the RPi is booted succesful I get several:
+
+[   35.048513] unexpected IRQ trap at vector 00
+
+When I type something via uart (after each character).
+
+
+Any ideas?
+
+- Alex
