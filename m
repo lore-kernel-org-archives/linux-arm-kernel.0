@@ -1,37 +1,33 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 21 Dec 2015 20:56:49 -0800
-Subject: [GIT PULL 9/9] ARM: EXYNOS: Defconfig for v4.5
-In-Reply-To: <1449020386-20250-10-git-send-email-k.kozlowski@samsung.com>
-References: <1449020386-20250-1-git-send-email-k.kozlowski@samsung.com>
- <1449020386-20250-10-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20151222045649.GJ30172@localhost>
+Date: Tue, 22 Dec 2015 11:04:00 -0800
+Subject: [PATCH] ARM: defconfig: qcom: Enable SSBI drivers
+In-Reply-To: <20151208230127.GB12111@Agamemnon.attlocal.net>
+References: <1448932137-12717-1-git-send-email-sboyd@codeaurora.org>
+ <20151208225429.GA12111@Agamemnon.attlocal.net>
+ <20151208230127.GB12111@Agamemnon.attlocal.net>
+Message-ID: <20151222190400.GN30172@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 02, 2015 at 10:39:46AM +0900, Krzysztof Kozlowski wrote:
-> Hi Kukjin,
+On Tue, Dec 08, 2015 at 05:01:27PM -0600, Andy Gross wrote:
+> On Tue, Dec 08, 2015 at 04:54:29PM -0600, Andy Gross wrote:
+> > On Mon, Nov 30, 2015 at 05:08:57PM -0800, Stephen Boyd wrote:
+> > > Enable some ssbi drivers present on msm8660, msm8960 and apq8064
+> > > devices so that we fully exercise the devices present in the dts
+> > > files.
+> > > 
+> > > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> > 
+> > Acked-by: Andy Gross <andy.gross@codeaurora.org>
 > 
-> This may conflict with other arm-soc updates...
+> Arnd, Olof, Kevin,
 > 
-> Best regards,
-> Krzysztof
+> Can you guys pick this up.  This patch is based off the earlier qcom_defconfig
+> that was merged through the arm-soc directly.
 > 
-> 
-> The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
-> 
->   Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
-> 
-> are available in the git repository at:
-> 
->   https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-defconfig-4.5
-> 
-> for you to fetch changes up to 00a5e81fff2d81c3b1bf45712d3a12c905bc7c66:
-> 
->   ARM: exynos_defconfig: Set recommended options for systemd (2015-12-01 08:28:44 +0900)
 
-Merged into next/defconfig.
-
-Thanks!
+Sure, but please collect acks and resend since I just get this email in my
+folder, and not the original patch.
 
 
 -Olof
