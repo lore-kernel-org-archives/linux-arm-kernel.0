@@ -1,43 +1,35 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 22 Dec 2015 11:44:16 -0800
-Subject: [PATCH 0/2] bus: sunxi-rsb: fix primary PMIC and peripheral IC
- address mapping
-In-Reply-To: <1450257286-1645-1-git-send-email-wens@csie.org>
-References: <1450257286-1645-1-git-send-email-wens@csie.org>
-Message-ID: <20151222194416.GA30172@localhost>
+Date: Tue, 22 Dec 2015 11:49:34 -0800
+Subject: [GIT PULL] ARM: imx: fixes for 4.4, 3rd round
+In-Reply-To: <20151217085049.GA9161@tiger>
+References: <20151217085049.GA9161@tiger>
+Message-ID: <20151222194934.GE30172@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 16, 2015 at 05:14:44PM +0800, Chen-Yu Tsai wrote:
-> Hi Arnd, Olof,
+On Thu, Dec 17, 2015 at 04:50:49PM +0800, Shawn Guo wrote:
+> The following changes since commit 9c17190595840b4ed30e8d5f286636ceb28aae4f:
 > 
-> Here are 2 fixes for the sunxi-rsb driver. There were some typos in the
-> hardware address mapping table, but as long as the assigned address
-> matched what the bootloader used, it still worked fine. The only
-> indication was "failed to set runtime address" error messages which I
-> mistook for some hardware quirk.
+>   ARM: dts: vf610: use reset values for L2 cache latencies (2015-12-11 21:32:47 +0800)
 > 
-> I looked deeper when the AC100 on my A80 boards refused to respond.
+> are available in the git repository at:
 > 
-> Patch 1 fixes the hardware address for primary PMICs (AXP223, AXP809...).
-> This is the part that still worked fine despite the error because the
-> runtime address matches the one set by the bootloader.
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.4-3
 > 
-> Patch 2 fixes the assigned runtime address for the peripheral IC
-> (AC100/AC200). This part does not work due to the runtime address being
-> invalid.
+> for you to fetch changes up to 3a35e470bc6bc4ce34c19c410ebbe4e3bbf0bafe:
 > 
-> Maxime asked me to send them directly to you. Please pick them up for 4.4.
+>   ARM: dts: imx6: Fix Ethernet PHY mode on Ventana boards (2015-12-15 16:53:15 +0800)
+> 
+> ----------------------------------------------------------------
+> The i.MX fixes for 4.4, 3rd round:
+> - Fix Ethernet PHY mode on i.MX6 Ventana boards, which can result in
+>   a non-functional Ethernet when Marvell phy driver rather than generic
+>   phy driver is selected.
+> - Fix an assigned-clock configuration bug on imx6qdl-sabreauto board
+>   which was introduced by commit ed339363de1b ("ARM: dts:
+>   imx6qdl-sabreauto: Allow HDMI and LVDS to work simultaneously").
 
-Applied, thanks.
-
-In the future, for fixes late in the cycle like this, please describe in a few
-words in the commit message just what the error is for someone trying to use
-kernel without the fix, so someone just reading the changelog can determine if
-it's a high-priority fix or not.
-
-
-Thanks!
+Merged, thanks.
 
 
 -Olof
