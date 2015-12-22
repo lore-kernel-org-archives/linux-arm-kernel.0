@@ -1,40 +1,32 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 22 Dec 2015 10:18:35 +0000
-Subject: [PATCH] ARM: default to multi_v7_defconfig
-In-Reply-To: <2084866.x9T7k7V9eW@wuerfel>
-References: <2084866.x9T7k7V9eW@wuerfel>
-Message-ID: <20151222101834.GE32623@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 22 Dec 2015 11:20:58 +0100
+Subject: [PATCH 1/2 v2] ARM: l2x0: make it possible to disable outer sync
+ from DT
+In-Reply-To: <20151220161149.GU8644@n2100.arm.linux.org.uk>
+References: <1450126385-14517-1-git-send-email-linus.walleij@linaro.org>
+ <20151220033924.GK9883@rob-hp-laptop>
+ <20151220161149.GU8644@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdZWq71qkGF09W3Bp6tD=OGd0vLxevVaCAyTroahqO4HXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 11:44:23PM +0100, Arnd Bergmann wrote:
-> versatile_defconfig has not been a reasonable default for a very long
-> time, there is very little work happening on this platform and it's
-> based on an old ARM926 CPU core.
-> 
-> This changes the default to multi_v7_defconfig, which is much more
-> relevant to anyone doing a build test on ARM, as it covers a wide
-> range of platforms.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index 2c2b28ee4811..e9fb67913e6e 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -30,9 +30,8 @@ GZFLAGS		:=-9
->  # Never generate .eh_frame
->  KBUILD_CFLAGS	+= $(call cc-option,-fno-dwarf2-cfi-asm)
->  
-> -# Do not use arch/arm/defconfig - it's always outdated.
-> -# Select a platform tht is kept up-to-date
-> -KBUILD_DEFCONFIG := versatile_defconfig
-> +# This should work on most of the modern platforms
-> +KBUILD_DEFCONFIG := multi_v7_defconfig
->  
->  # defines filename extension depending memory management type.
->  ifeq ($(CONFIG_MMU),)
+On Sun, Dec 20, 2015 at 5:11 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+> It would be nice to have a faster response though, because Linus Walleij
+> put this in the patch system on the 15th December, and I could have
+> applied it without waiting for DT people to comment.  The good thing is
+> that I _have_ the patch system, which allows me to temporarily ignore
+> patches (provided I remember) while people chew the cud on stuff like
+> this.
+>
+> However, I'd _much_ rather prefer the authors to hold back the patches
+> until they get "approved" *before* sending them there, so I don't have
+> to find and remember to track the status of each patch on the mailing
+> list.
 
-Will
+OK sorry, I guess I was a bit trigger happy as my RealView was booting
+so nicely and all.
+
+Yours,
+Linus Walleij
