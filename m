@@ -1,39 +1,65 @@
-From: wpdster@gmail.com (Patrick Doyle)
-Date: Tue, 22 Dec 2015 09:57:57 -0500
-Subject: How to get better precision out of getrusage on the ARM?
-In-Reply-To: <20151222144907.GK8644@n2100.arm.linux.org.uk>
-References: <CAF_dkJBjs1b+73ggvJyXwab6YL94HGT2jrqbcfaLxoETtQsD9Q@mail.gmail.com>
- <20151222144907.GK8644@n2100.arm.linux.org.uk>
-Message-ID: <CAF_dkJDFXSEgH+kO=k=Yj0_VDnFYgPtkoYznLUWZnq4=QTNDDg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 22 Dec 2015 15:02:59 +0000
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Enable GPU support
+In-Reply-To: <20151222125300.GH8644@n2100.arm.linux.org.uk>
+References: <1450723442-1518-1-git-send-email-festevam@gmail.com>
+ <20151222122154.GD26290@tiger>
+ <CAOMZO5A8BEkNvrazmksRBRUQw+4mWwbfKtrK6KzD3XK5L5Fs7w@mail.gmail.com>
+ <1450788454.2637.17.camel@pengutronix.de>
+ <20151222125300.GH8644@n2100.arm.linux.org.uk>
+Message-ID: <20151222150259.GL8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 22, 2015 at 9:49 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Dec 22, 2015 at 09:30:30AM -0500, Patrick Doyle wrote:
->> Short version:
->> My application running on a Cortex-A5 processor (the SAMA5D2 from
->> Atmel) calls getrusage(RUSAGE_THREAD, ...), which returns cpu time
->> quantized to the kernel tick frequency (100Hz or 1Khz, depending on
->> CONFIG_HZ_100 vs CONFIG_HZ_1000).
->>
->> How can I get better precision for sched_clock on the (Cortex-A5) ARM?
->>  The x86 uses the TSC.
->
-> You need to provide a sched_clock() implementation using
-> sched_clock_register().
->
-Thank you, I tried that by modifying the (Atmel specific) tcb_clcksrc,
-and got a sched_clock that never incremented.  I have a question out
-at the Atmel forum asking about this, and will continue to investigate
-on my own, but I figured it was about time to ask the experts :-)
+On Tue, Dec 22, 2015 at 12:53:00PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Dec 22, 2015 at 01:47:34PM +0100, Lucas Stach wrote:
+> > But to be honest I would like to give etnaviv a cycle to stabilize
+> > until we enable it by default. With i.MX6QP now hitting the street and
+> > basically no testing of etnaviv being done there until now, I would
+> > rather not have it in the defconfig just now. It's not like it's hard
+> > for people willing to test this to enable a single Kconfig option...
+> 
+> I already have an iMX6QP uSOM for the Hummingboard/Cubox-i, but I've
+> been holding back testing it because (from what I've seen of the QP
+> patches) I think it needs different settings for stuff like pinmux
+> and similar?
+> 
+> If the QP stuff gets into the kernel soon, I'll throw the uSOM onto
+> one of the many hummingboards I have here and add it into the etnaviv
+> test pool.
 
-How does the kernel generate its tick clock?  Does it use a
-clocksource (or the clkevt abstraction), or does it rely upon the
-(PIT) timer registered much earlier in the boot process?
+I'm told by Jon that it's (basically) not as simple as that for several
+reasons, mainly u-boot related, and u-boot is now one hell of a mess.
 
-I guess I'm confused about the relationships between clocksources,
-clock events, sched_clock, and the HZ tick interrupt.  Can anybody
-point me at a good place to demystify these things for me?
+Apparently, Jon tried to submit u-boot support for Hummingboards upstream,
+but it was rejected by u-boot developers saying "they didn't like it and
+it wasn't "proper" with no information on how they wanted it fixed.".
 
---wpd
+When Jon tried pushing them privately, they said "they would only accept
+"finished" patches."
+
+However, u-boot people subsequently took _incomplete_ patches from someone
+else to support _just_ the iMX6D Hummingboard.  The result is that the
+SDRAM controller is incorrectly setup for the other versions of the
+Hummingboards.
+
+Overall, this means that SolidRun's u-boot is now significantly different
+from mainline u-boot - and now u-boot needs additional modification to
+support the QP parts.  I suspect Jon will just have to say "screw mainline
+u-boot, we're keeping our own vendor branch of it."  He doesn't want to,
+he wants to be a good open source citizen, but when faced with this kind
+of politics, I can see why people decide to say "screw contributing to
+mainline" and keep their own vendor trees.
+
+So... I'm going to have to wait for Jon to find time to spin up patches
+for SolidRun's u-boot branch as well before I can do any testing with
+the iMX6QP hardware.
+
+In other words, I've no idea if or when I'll be able to use the iMX6QP
+hardware I have, because open source projects sometimes become political
+and suck.
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
