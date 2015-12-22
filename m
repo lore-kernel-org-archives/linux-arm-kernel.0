@@ -1,46 +1,43 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 22 Dec 2015 11:43:27 +0100
-Subject: [PATCHv3 1/3] dmaengine: mv_xor: remove mv_xor_chan->current_type
- field
-In-Reply-To: <1450781009-30618-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1450781009-30618-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1450781009-30618-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Tue, 22 Dec 2015 11:43:26 +0100
+Subject: [PATCHv3 0/3] mv_xor improvements
+Message-ID: <1450781009-30618-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit 3e4f52e2da9f6 ("dma: mv_xor: Simplify the DMA_MEMCPY
-operation"), this field is no longer used, so get rid of it.
+Hello Vinod,
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Reviewed-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/dma/mv_xor.c | 1 -
- drivers/dma/mv_xor.h | 1 -
- 2 files changed, 2 deletions(-)
+Here is the third iteration of some mv_xor improvements patches. The
+previous iteration was sent in July earlier this year. Compared to the
+v2:
 
-diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-index 1c2de9a..2d03379 100644
---- a/drivers/dma/mv_xor.c
-+++ b/drivers/dma/mv_xor.c
-@@ -169,7 +169,6 @@ static void mv_chan_set_mode(struct mv_xor_chan *chan,
- #endif
- 
- 	writel_relaxed(config, XOR_CONFIG(chan));
--	chan->current_type = type;
- }
- 
- static void mv_chan_set_mode_to_desc(struct mv_xor_chan *chan)
-diff --git a/drivers/dma/mv_xor.h b/drivers/dma/mv_xor.h
-index b7455b4..3438914 100644
---- a/drivers/dma/mv_xor.h
-+++ b/drivers/dma/mv_xor.h
-@@ -110,7 +110,6 @@ struct mv_xor_chan {
- 	void __iomem		*mmr_high_base;
- 	unsigned int		idx;
- 	int                     irq;
--	enum dma_transaction_type	current_type;
- 	struct list_head	chain;
- 	struct list_head	free_slots;
- 	struct list_head	allocated_slots;
+ - rebased on top of v4.4-rc1
+
+ - dropped patches that were merged
+
+ - as you suggested, add a comment in the code to explain that our
+   suspend/resume implementation makes the assumption that there are
+   no in-flight DMA transactions because mv_xor is only used for
+   RAID5, and the block layer will have already suspended I/O
+   activity, so not special care needs to be taken in the driver
+   itself.
+
+I have retested this with a RAID5 array on Armada 388 GP, while the
+array is in reconstruction, and doing some suspend/resume cycles in
+the middle.
+
+Thanks!
+
+Thomas
+
+Thomas Petazzoni (3):
+  dmaengine: mv_xor: remove mv_xor_chan->current_type field
+  dmaengine: mv_xor: de-duplicate mv_chan_set_mode*()
+  dmaengine: mv_xor: add suspend/resume support
+
+ drivers/dma/mv_xor.c | 95 +++++++++++++++++++++++++++++++---------------------
+ drivers/dma/mv_xor.h |  2 +-
+ 2 files changed, 57 insertions(+), 40 deletions(-)
+
 -- 
 2.6.4
