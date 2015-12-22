@@ -1,61 +1,100 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 22 Dec 2015 21:48:42 +0800
-Subject: [GIT PULL] i.MX clock updates for 4.5
-Message-ID: <20151222134842.GF26290@tiger>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 22 Dec 2015 15:04:19 +0100
+Subject: [PATCH 2/2] ARM: mvebu: use regulator-boot-on on Armada 388 GP
+In-Reply-To: <87fuyur7t3.fsf@free-electrons.com> (Gregory CLEMENT's message of
+ "Tue, 22 Dec 2015 13:23:20 +0100")
+References: <1450708916-15966-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1450708916-15966-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <87fuyur7t3.fsf@free-electrons.com>
+Message-ID: <87bn9ir34s.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike, Stephen,
+Hi Thomas,
+ 
+ On mar., d?c. 22 2015, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
 
-Here is the i.MX clock updates I queued for 4.5.  Please pull and keep
-it stable, as it's been merged into imx/dt branch to resolve some
-dependency.  Thanks.
+> Hi Thomas,
+>  
+>  On lun., d?c. 21 2015, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+>
+>> Really, what we meant by regulator-always-on is that the regulators
+>> are already turned on by the bootloader, for which regulator-boot-on
+>> is a better description.
+>>
+>
+> What happened if the bootloader do not turn the regulator on?
+> I fear that in this case the regulator won't be turned on at all.
+>
+>> A net advantage of using regulator-boot-on is that the regulator is
+>> not touched at boot time by the kernel, which avoids having the hard
+>> drives spinning down and then up again, taking several (~5) seconds of
+>> additional boot time.
 
-Shawn
+I tested your patch, I didn't see so much time lost in boot time: with
+one hdd the difference was only about 0.3s. But with a second hdd it was
+around 1.9 (so 1.6s more for the second hhd). It looks like it really
+depends on the hdd. However, the most annoying point with the
+regulator-always-on for the SATA it turns the power down and up for the
+hdd during boot which is not very nice for the hdd. So, at least for
+this, it is useful.
 
-The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+For the USB part the regulators are completely disabled:
+usb3-vbus: disabling
+v5.0-vbus0: disabling
+v5.0-vbus1: disabling
 
-  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+And indeed the USB does not work with your patch applied.
 
-are available in the git repository at:
+Could you send a new version with the changes only done for the SATA
+regulator nodes?
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-clk-v4.5
+Thanks,
 
-for you to fetch changes up to c20737a2a7b8666648be3f4b386749339958dace:
+Gregory
 
-  clk: imx5: ipu_di_sel clocks can set parent rates (2015-12-02 21:02:33 +0800)
+>>
+>> In addition, there is no need to have such properties on the child
+>> regulators used for SATA. Having it on the parent regulator that
+>> really controls the GPIO is sufficient.
+>>
+>> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>> ---
+>>  arch/arm/boot/dts/armada-388-gp.dts | 24 ++++++++----------------
+>>  1 file changed, 8 insertions(+), 16 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
+>> index d8dab0f..1ef6cc6 100644
+>
+>>  
+>> @@ -309,7 +309,7 @@
+>>  		regulator-min-microvolt = <5000000>;
+>>  		regulator-max-microvolt = <5000000>;
+>>  		enable-active-high;
+>> -		regulator-always-on;
+>> +		regulator-boot-on;
+>>  		gpio = <&expander0 4 GPIO_ACTIVE_HIGH>;
+>>  	};
+> This node had been removed by a patch you sent few days ago:
+> "ARM: mvebu: remove duplicated regulator definition in Armada 388 GP"
+>
+> Thanks,
+>
+> Gregory
+>
+> -- 
+> Gregory Clement, Free Electrons
+> Kernel, drivers, real-time and embedded Linux
+> development, consulting, training and support.
+> http://free-electrons.com
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-----------------------------------------------------------------
-The i.MX clock updates for 4.5:
-- Add is_prepared function callback for pllv3 clock driver
-- Use imx_check_clocks() on imx6ul and imx7d clock drivers to save
-  some code
-- Add a core clock for imx7d to support generic cpufreq driver
-- Support imx6q clock routing with OSC to anaclk2/2b
-- To support more precise pixel clocks on imx5, allow ipu_di_sel clock
-  selectors to influence the PLLs that they are derived from
-- A cleanup on imx25 OSC clock
-
-----------------------------------------------------------------
-Bai Ping (3):
-      clk: imx: add 'is_prepared' clk_ops callback for pllv3 clk
-      clk: imx: Add a virtual arm clk on i.mx7d
-      clk: imx: Replace clk error check with imx_check_clocks()
-
-Markus Pargmann (1):
-      clk: imx25: Remove osc clock from driver
-
-Michael Trimarchi (1):
-      clk: imx: clk-imx6q: Let OSC to be routed to anaclk2/2b
-
-Patrick Br?nn (1):
-      clk: imx5: ipu_di_sel clocks can set parent rates
-
- drivers/clk/imx/clk-imx25.c             | 18 ++----------------
- drivers/clk/imx/clk-imx51-imx53.c       |  8 ++++----
- drivers/clk/imx/clk-imx6q.c             |  3 ++-
- drivers/clk/imx/clk-imx6ul.c            |  4 +---
- drivers/clk/imx/clk-imx7d.c             | 11 +++++++----
- drivers/clk/imx/clk-pllv3.c             | 14 ++++++++++++++
- include/dt-bindings/clock/imx7d-clock.h |  3 ++-
- 7 files changed, 32 insertions(+), 29 deletions(-)
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
