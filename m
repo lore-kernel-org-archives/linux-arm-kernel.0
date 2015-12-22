@@ -1,141 +1,40 @@
-From: shannon.zhao@linaro.org (Shannon Zhao)
-Date: Tue, 22 Dec 2015 18:15:54 +0800
-Subject: [PATCH 2/2] arm64: KVM: Do not update PC if the trap handler has
- updated it
-In-Reply-To: <1450778118-12715-3-git-send-email-marc.zyngier@arm.com>
-References: <1450778118-12715-1-git-send-email-marc.zyngier@arm.com>
- <1450778118-12715-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <567922DA.3090107@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 22 Dec 2015 10:18:35 +0000
+Subject: [PATCH] ARM: default to multi_v7_defconfig
+In-Reply-To: <2084866.x9T7k7V9eW@wuerfel>
+References: <2084866.x9T7k7V9eW@wuerfel>
+Message-ID: <20151222101834.GE32623@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2015/12/22 17:55, Marc Zyngier wrote:
-> Assuming we trap a system register, and decide that the access is
-> illegal, we will inject an exception in the guest. In this
-> case, we shouldn't increment the PC, or the vcpu will miss the
-> first instruction of the handler, leading to a mildly confused
-> guest.
+On Fri, Dec 18, 2015 at 11:44:23PM +0100, Arnd Bergmann wrote:
+> versatile_defconfig has not been a reasonable default for a very long
+> time, there is very little work happening on this platform and it's
+> based on an old ARM926 CPU core.
 > 
-> Solve this by snapshoting PC before the access is performed,
-> and checking if it has moved or not before incrementing it.
+> This changes the default to multi_v7_defconfig, which is much more
+> relevant to anyone doing a build test on ARM, as it covers a wide
+> range of platforms.
 > 
-Thanks a lot. This solves the problem of guest PMU failing to inject EL1
-fault to guest.
-
-Tested-by: Shannon Zhao <shannon.zhao@linaro.org>
-Reviewed-by: Shannon Zhao <shannon.zhao@linaro.org>
-
-> Reported-by: Shannon Zhao <shannon.zhao@linaro.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/kvm/sys_regs.c | 73 +++++++++++++++++++++++------------------------
->  1 file changed, 36 insertions(+), 37 deletions(-)
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > 
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index d2650e8..9c87e0c 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -966,6 +966,39 @@ static const struct sys_reg_desc *find_reg(const struct sys_reg_params *params,
->  	return NULL;
->  }
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index 2c2b28ee4811..e9fb67913e6e 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -30,9 +30,8 @@ GZFLAGS		:=-9
+>  # Never generate .eh_frame
+>  KBUILD_CFLAGS	+= $(call cc-option,-fno-dwarf2-cfi-asm)
 >  
-> +/* Perform the sysreg access, returns 0 on success */
-> +static int access_sys_reg(struct kvm_vcpu *vcpu,
-> +			  struct sys_reg_params *params,
-> +			  const struct sys_reg_desc *r)
-> +{
-> +	u64 pc = *vcpu_pc(vcpu);
-> +
-> +	if (unlikely(!r))
-> +		return -1;
-> +
-> +	/*
-> +	 * Not having an accessor means that we have configured a trap
-> +	 * that we don't know how to handle. This certainly qualifies
-> +	 * as a gross bug that should be fixed right away.
-> +	 */
-> +	BUG_ON(!r->access);
-> +
-> +	if (likely(r->access(vcpu, params, r))) {
-> +		/*
-> +		 * Skip the instruction if it was emulated without PC
-> +		 * having changed. This allows us to detect a fault
-> +		 * being injected (incrementing the PC here would
-> +		 * cause the vcpu to skip the first instruction of its
-> +		 * fault handler).
-> +		 */
-> +		if (pc == *vcpu_pc(vcpu))
-> +			kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
-> +		return 0;
-> +	}
-> +
-> +	return -1;
-> +}
-> +
->  int kvm_handle_cp14_load_store(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  {
->  	kvm_inject_undefined(vcpu);
-> @@ -994,26 +1027,7 @@ static int emulate_cp(struct kvm_vcpu *vcpu,
+> -# Do not use arch/arm/defconfig - it's always outdated.
+> -# Select a platform tht is kept up-to-date
+> -KBUILD_DEFCONFIG := versatile_defconfig
+> +# This should work on most of the modern platforms
+> +KBUILD_DEFCONFIG := multi_v7_defconfig
 >  
->  	r = find_reg(params, table, num);
->  
-> -	if (r) {
-> -		/*
-> -		 * Not having an accessor means that we have
-> -		 * configured a trap that we don't know how to
-> -		 * handle. This certainly qualifies as a gross bug
-> -		 * that should be fixed right away.
-> -		 */
-> -		BUG_ON(!r->access);
-> -
-> -		if (likely(r->access(vcpu, params, r))) {
-> -			/* Skip instruction, since it was emulated */
-> -			kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
-> -		}
-> -
-> -		/* Handled */
-> -		return 0;
-> -	}
-> -
-> -	/* Not handled */
-> -	return -1;
-> +	return access_sys_reg(vcpu, params, r);
->  }
->  
->  static void unhandled_cp_access(struct kvm_vcpu *vcpu,
-> @@ -1178,27 +1192,12 @@ static int emulate_sys_reg(struct kvm_vcpu *vcpu,
->  	if (!r)
->  		r = find_reg(params, sys_reg_descs, ARRAY_SIZE(sys_reg_descs));
->  
-> -	if (likely(r)) {
-> -		/*
-> -		 * Not having an accessor means that we have
-> -		 * configured a trap that we don't know how to
-> -		 * handle. This certainly qualifies as a gross bug
-> -		 * that should be fixed right away.
-> -		 */
-> -		BUG_ON(!r->access);
-> -
-> -		if (likely(r->access(vcpu, params, r))) {
-> -			/* Skip instruction, since it was emulated */
-> -			kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
-> -			return 1;
-> -		}
-> -		/* If access function fails, it should complain. */
-> -	} else {
-> +	if (access_sys_reg(vcpu, params, r)) {
->  		kvm_err("Unsupported guest sys_reg access at: %lx\n",
->  			*vcpu_pc(vcpu));
->  		print_sys_reg_instr(params);
-> +		kvm_inject_undefined(vcpu);
->  	}
-> -	kvm_inject_undefined(vcpu);
->  	return 1;
->  }
->  
-> 
+>  # defines filename extension depending memory management type.
+>  ifeq ($(CONFIG_MMU),)
 
--- 
-Shannon
+Acked-by: Will Deacon <will.deacon@arm.com>
+
+Will
