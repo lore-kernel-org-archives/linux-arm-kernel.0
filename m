@@ -1,64 +1,49 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Tue, 22 Dec 2015 21:46:37 +0800
-Subject: [PATCH] pinctrl: mediatek: convert to arch_initcall
-Message-ID: <1450792017-7120-1-git-send-email-djkurtz@chromium.org>
+From: fthain@telegraphics.com.au (Finn Thain)
+Date: Wed, 23 Dec 2015 00:47:36 +1100 (AEDT)
+Subject: [PATCH v3 66/77] ncr5380: Fix soft lockups
+In-Reply-To: <20151222113903.06422dbe@lxorguk.ukuu.org.uk>
+References: <20151222011737.980475848@telegraphics.com.au>
+ <20151222011755.965510468@telegraphics.com.au>
+ <20151222113903.06422dbe@lxorguk.ukuu.org.uk>
+Message-ID: <alpine.LNX.2.00.1512222347310.23505@nippy.intranet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move pinctrl initialization earlier in boot so that real devices can find
-their pctldev without probe deferring.
 
-Note: We don't change mt6397 probe order in this patch, since MT6397 is mfd
-PMIC, which depends on pwrap on main AP to work. Since pmic-wrap itself
-is module_platform_driver, we keep it as module_init.  A later patch
-will convert both pmic-wrap, and all functions of the MT6397 mfd to
-arch_initcall.
+On Tue, 22 Dec 2015, One Thousand Gnomes wrote:
 
-Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
----
- drivers/pinctrl/mediatek/pinctrl-mt8127.c | 2 +-
- drivers/pinctrl/mediatek/pinctrl-mt8135.c | 2 +-
- drivers/pinctrl/mediatek/pinctrl-mt8173.c | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+> On Tue, 22 Dec 2015 12:18:44 +1100 Finn Thain 
+> <fthain@telegraphics.com.au> wrote:
+> 
+> > Because of the rudimentary design of the chip, it is necessary to poll 
+> > the SCSI bus signals during PIO and this tends to hog the CPU. The 
+> > driver will accept new commands while others execute, and this causes 
+> > a soft lockup because the workqueue item will not terminate until the 
+> > issue queue is emptied.
+> > 
+> > When exercising dmx3191d using sequential IO from dd, the driver is 
+> > sent 512 KiB WRITE commands and 128 KiB READs. For a PIO transfer, the 
+> > rate is is only about 300 KiB/s, so these are long-running commands. 
+> > And although PDMA may run at several MiB/s, interrupts are disabled 
+> > for the duration of the transfer.
+> > 
+> > Fix the unresponsiveness and soft lockup issues by calling 
+> > cond_resched() after each command is completed and by limiting 
+> > max_sectors for drivers that don't implement real DMA.
+> 
+> Is there a reason for not doing some limiting in the DMA case too. A 
+> 512K write command even with DMA on a low end 68K box introduces a 
+> second of latency before another I/O can be scheduled ?
 
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mt8127.c b/drivers/pinctrl/mediatek/pinctrl-mt8127.c
-index b317b0b..98e0beb 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mt8127.c
-+++ b/drivers/pinctrl/mediatek/pinctrl-mt8127.c
-@@ -351,7 +351,7 @@ static int __init mtk_pinctrl_init(void)
- 	return platform_driver_register(&mtk_pinctrl_driver);
- }
- 
--module_init(mtk_pinctrl_init);
-+arch_initcall(mtk_pinctrl_init);
- 
- MODULE_LICENSE("GPL v2");
- MODULE_DESCRIPTION("MediaTek MT8127 Pinctrl Driver");
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mt8135.c b/drivers/pinctrl/mediatek/pinctrl-mt8135.c
-index 404f117..1c153b8 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mt8135.c
-+++ b/drivers/pinctrl/mediatek/pinctrl-mt8135.c
-@@ -366,7 +366,7 @@ static int __init mtk_pinctrl_init(void)
- 	return platform_driver_register(&mtk_pinctrl_driver);
- }
- 
--module_init(mtk_pinctrl_init);
-+arch_initcall(mtk_pinctrl_init);
- 
- MODULE_LICENSE("GPL");
- MODULE_DESCRIPTION("MediaTek Pinctrl Driver");
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mt8173.c b/drivers/pinctrl/mediatek/pinctrl-mt8173.c
-index ad27184..a62514e 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mt8173.c
-+++ b/drivers/pinctrl/mediatek/pinctrl-mt8173.c
-@@ -394,7 +394,7 @@ static int __init mtk_pinctrl_init(void)
- 	return platform_driver_register(&mtk_pinctrl_driver);
- }
- 
--module_init(mtk_pinctrl_init);
-+arch_initcall(mtk_pinctrl_init);
- 
- MODULE_LICENSE("GPL v2");
- MODULE_DESCRIPTION("MediaTek Pinctrl Driver");
+The DMA case is the atari_scsi case. I'd like to think that atari_scsi 
+would have only the latency issues that might be expected from any SCSI-2 
+host adapter driver.
+
+Unlike PDMA, interrupts are not disabled for these DMA transfers. Note 
+that this patch isn't really relevant to DMA, because the main loop 
+iterates only when done == 0, that is, !hostdata->dmalen.
+
 -- 
-2.6.0.rc2.230.g3dd15c0
+
+> 
+> Alan
