@@ -1,75 +1,121 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 22 Dec 2015 17:47:42 +0100
-Subject: [PATCH v1 0/6] misc: add reboot mode driver
-In-Reply-To: <1450774949-23901-1-git-send-email-andy.yan@rock-chips.com>
-References: <1450774949-23901-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <20151222164742.GA8623@piout.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 22 Dec 2015 17:08:06 +0000
+Subject: [PATCH v6 17/20] arm64: ilp32: introduce ilp32-specific handlers
+ for sigframe
+In-Reply-To: <1450215766-14765-18-git-send-email-ynorov@caviumnetworks.com>
+References: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
+ <1450215766-14765-18-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <20151222170806.GC1302@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Dec 16, 2015 at 12:42:43AM +0300, Yury Norov wrote:
+> diff --git a/arch/arm64/kernel/entry_ilp32.S b/arch/arm64/kernel/entry_ilp32.S
+> new file mode 100644
+> index 0000000..424060f
+> --- /dev/null
+> +++ b/arch/arm64/kernel/entry_ilp32.S
+> @@ -0,0 +1,32 @@
+> +/*
+> + * ILP32 system call wrappers
+> + *
+> + * Copyright (C) 2015 Cavium Networks.
+> + * Author: Yury Norov <ynorov@caviumnetworks.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/linkage.h>
+> +#include <linux/const.h>
+> +
+> +#include <asm/assembler.h>
+> +#include <asm/asm-offsets.h>
+> +#include <asm/errno.h>
+> +#include <asm/page.h>
+> +
+> +ENTRY(ilp32_sys_rt_sigreturn_wrapper)
+> +	mov	x0, sp
+> +	b	ilp32_sys_rt_sigreturn
+> +ENDPROC(ilp32_sys_rt_sigreturn_wrapper)
 
-On 22/12/2015 at 17:02:29 +0800, Andy Yan wrote :
-> 
-> This driver parse the reboot commands like "reboot loader"
-> and "reboot recovery" to get a boot mode described in the
-> device tree , then call the vendor specific write interfae
-> to store the boot mode in some place like special register
-> or sram , which can be read by the bootloader after system
-> reboot.
-> 
-> This is commonly done on Android based devices, in order to
-> reboot the device into fastboot or recovery mode.
-> 
-> Before this patch , I have try some hack on[0], and then found
-> John Stultz also doing the same work[1].
-> 
-> As John is busy these days, I go on with this work.
-> 
-> [0]https://patchwork.kernel.org/patch/7647751/
-> [1]https://patchwork.kernel.org/patch/7802391/
-> 
-> Changes in v1:
-> - fix the embarrassed compile warning
-> - correct the maskrom magic number
-> - check for the normal reboot
-> - correct the maskrom magic number
-> - use macro defined in rockchip_boot-mode.h for reboot-mode DT node
-> 
-> Andy Yan (6):
->   dt-bindings: misc: add document for reboot-mode driver
->   dt-bindings: soc: add document for rockchip reboot-mode driver
->   misc: add reboot mode driver
->   soc: rockchip: add reboot mode driver
->   ARM: dts: rockchip: add reboot-mode node
->   ARM64: dts: rockchip: add reboot-mode node
-> 
+Do you need all these header includes?
 
-This seems nice and useful, some further ideas:
+> diff --git a/arch/arm64/kernel/signal_ilp32.c b/arch/arm64/kernel/signal_ilp32.c
+> new file mode 100644
+> index 0000000..d38434b
+> --- /dev/null
+> +++ b/arch/arm64/kernel/signal_ilp32.c
+> @@ -0,0 +1,126 @@
+> +/*
+> + * Based on arch/arm/kernel/signal.c
+> + *
+> + * Copyright (C) 2015 Cavium Networks.
 
->  .../devicetree/bindings/misc/reboot-mode.txt       | 41 +++++++++
->  .../bindings/soc/rockchip/rockchip,reboot-mode.txt | 39 +++++++++
->  arch/arm/boot/dts/rk3288.dtsi                      | 26 ++++++
->  arch/arm/boot/dts/rk3xxx.dtsi                      | 26 ++++++
->  arch/arm64/boot/dts/rockchip/rk3368.dtsi           | 26 ++++++
->  drivers/misc/Kconfig                               |  7 ++
->  drivers/misc/Makefile                              |  1 +
->  drivers/misc/reboot_mode.c                         | 96 ++++++++++++++++++++++
+And missing extra copyright lines.
 
-I think this actually belongs to drivers/power/reset/ instead of misc
+> + * Yury Norov <ynorov@caviumnetworks.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/compat.h>
+> +#include <linux/signal.h>
+> +#include <linux/syscalls.h>
+> +#include <linux/ratelimit.h>
+> +
+> +#include <asm/esr.h>
+> +#include <asm/fpsimd.h>
+> +#include <asm/signal32_common.h>
+> +#include <asm/signal_common.h>
+> +#include <asm/uaccess.h>
+> +#include <asm/unistd.h>
+> +#include <asm/ucontext.h>
+> +
+> +struct ilp32_rt_sigframe {
+> +	struct compat_siginfo info;
+> +	struct sigframe sig;
+> +};
+> +
+> +asmlinkage int ilp32_sys_rt_sigreturn(struct pt_regs *regs)
+> +{
+> +	struct ilp32_rt_sigframe __user *frame;
+> +
+> +	/* Always make any pending restarted system calls return -EINTR */
+> +	current->restart_block.fn = do_no_restart_syscall;
+> +
+> +	/*
+> +	 * Since we stacked the signal on a 64-bit boundary,
+> +	 * then 'sp' should be word aligned here.  If it's
+> +	 * not, then the user is trying to mess with us.
+> +	 */
 
->  drivers/soc/rockchip/Kconfig                       |  9 ++
->  drivers/soc/rockchip/Makefile                      |  1 +
->  drivers/soc/rockchip/reboot.c                      | 68 +++++++++++++++
+The stack alignment is still 128-bit even with ILP32 (architecture
+requirement).
 
-And maybe that part could be made generic instead of rockchip specific.
-It simply uses a regmap to do the accesses, I guess a lot of other
-platforms will do that. We have syscon-reboot and syscon-poweroff for example.
+> +	if (regs->sp & 15)
+> +		goto badframe;
 
-I think then we can extend the "framework" by having generic drivers to
-store the value in eeprom or nvram for example.
+The check here is correct though.
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Catalin
