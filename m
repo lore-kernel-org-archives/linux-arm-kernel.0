@@ -1,32 +1,61 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 22 Dec 2015 11:20:58 +0100
-Subject: [PATCH 1/2 v2] ARM: l2x0: make it possible to disable outer sync
- from DT
-In-Reply-To: <20151220161149.GU8644@n2100.arm.linux.org.uk>
-References: <1450126385-14517-1-git-send-email-linus.walleij@linaro.org>
- <20151220033924.GK9883@rob-hp-laptop>
- <20151220161149.GU8644@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdZWq71qkGF09W3Bp6tD=OGd0vLxevVaCAyTroahqO4HXg@mail.gmail.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Tue, 22 Dec 2015 11:20:02 +0100
+Subject: [PATCH V2 22/23] pci, acpi: Match PCI config space accessors
+ against platfrom specific quirks.
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1EC14C0F@lhreml503-mbb>
+References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
+ <1450278993-12664-23-git-send-email-tn@semihalf.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1EC14C0F@lhreml503-mbb>
+Message-ID: <567923D2.2010202@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 20, 2015 at 5:11 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+On 21.12.2015 12:47, Gabriele Paoloni wrote:
+> 2) In the quirk mechanism you proposed, I see that the callback function
+>     allows to do some preparation work for the host bridge. For example in
+>     Hisilicon hip05 case we would need to read some values from the ACPI
+>     table (see acpi_pci_root_hisi_add() function in
+>     https://lkml.org/lkml/2015/12/3/426).
+>     I am quite new to ACPI and I wonder if it is OK to add such "Packages"
+>     to the  PCI host bridge ACPI device...or maybe we need to declare a new
+>     one...?
 
-> It would be nice to have a faster response though, because Linus Walleij
-> put this in the patch system on the 15th December, and I could have
-> applied it without waiting for DT people to comment.  The good thing is
-> that I _have_ the patch system, which allows me to temporarily ignore
-> patches (provided I remember) while people chew the cud on stuff like
-> this.
->
-> However, I'd _much_ rather prefer the authors to hold back the patches
-> until they get "approved" *before* sending them there, so I don't have
-> to find and remember to track the status of each patch on the mailing
-> list.
+I may miss sth so please correct me in that case.
 
-OK sorry, I guess I was a bit trigger happy as my RealView was booting
-so nicely and all.
+https://lkml.org/lkml/2015/12/3/426 shows that you need special handling 
+for root->secondary.start bus number only, right? So how about creating 
+special MCFG region <rc-base:rc-base+rc-size> only for <segment,bus>. 
+Like that:
 
-Yours,
-Linus Walleij
+[0008]                       Base Address : <rc-base>
+[0002]               Segment Group Number : <segment>
+[0001]                   Start Bus Number : <root->secondary.start>
+[0001]                     End Bus Number : <root->secondary.start>
+[0004]                           Reserved : 00000000
+
+
+static const struct dmi_system_id hisi_quirk[] = {
+	{
+		.ident = "HiSi...",
+		.matches = {
+			DMI_MATCH(<whatever you need to match your platform>),
+		},
+	},
+	{ }
+};
+
+static struct pci_ops hisi_ecam_pci_ops = {
+	.map_bus = pci_mcfg_dev_base,
+	.read = hisi_pcie_cfg_read,
+	.write = hisi_pcie_cfg_write,
+};
+
+DECLARE_ACPI_MCFG_FIXUP(hisi_quirk, &hisi_ecam_pci_ops,
+			<segment>, <bus>);
+
+With above code you can use your custom PCI config accessor only for 
+that region.
+
+Let me know if that is not enough for you.
+
+Tomasz
