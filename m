@@ -1,63 +1,53 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 22 Dec 2015 20:24:35 +0800
-Subject: [PATCH 1/2] ARM: dts: ts-4800: Add LCD support
-In-Reply-To: <20151221184057.GE12696@localhost>
-References: <1450458033-30471-1-git-send-email-damien.riegel@savoirfairelinux.com>
- <20151221133519.GC18410@tiger> <20151221184057.GE12696@localhost>
-Message-ID: <20151222122435.GE26290@tiger>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 22 Dec 2015 12:25:15 +0000
+Subject: [PATCH v6 13/20] arm64: ilp32: share aarch32 syscall wrappers to
+ ilp32
+In-Reply-To: <1450215766-14765-14-git-send-email-ynorov@caviumnetworks.com>
+References: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
+ <1450215766-14765-14-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <20151222122514.GA1302@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 21, 2015 at 01:40:59PM -0500, Damien Riegel wrote:
-> > > @@ -30,6 +30,60 @@
-> > >  			clock-frequency = <24576000>;
-> > >  		};
-> > >  	};
-> > > +
-> > > +	regulators {
-> > > +		compatible = "simple-bus";
-> > > +		#address-cells = <1>;
-> > > +		#size-cells = <0>;
-> > > +
-> > > +		backlight_reg: regulator at 0 {
-> > > +			compatible = "regulator-fixed";
-> > > +			reg = <0>;
-> > > +			pinctrl-names = "default";
-> > > +			pinctrl-0 = <&pinctrl_enable_lcd>;
-> > > +			regulator-name = "enable_lcd_reg";
-> > > +			regulator-min-microvolt = <3300000>;
-> > > +			regulator-max-microvolt = <3300000>;
-> > > +			gpio = <&gpio4 9 GPIO_ACTIVE_HIGH>;
-> > > +			enable-active-high;
-> > > +		};
-> > > +	};
-> > 
-> > DT maintainers dislike this fake simple-bus container.  Let's put the
-> > regulator directly under root like below.
-> > 
-> >         backlight_reg: regulator-backlight {
-> >                 compatible = "regulator-fixed";
-> >                 pinctrl-names = "default";
-> >                 pinctrl-0 = <&pinctrl_enable_lcd>;
-> >                 regulator-name = "enable_lcd_reg";
-> >                 regulator-min-microvolt = <3300000>;
-> >                 regulator-max-microvolt = <3300000>;
-> >                 gpio = <&gpio4 9 GPIO_ACTIVE_HIGH>;
-> >                 enable-active-high;
-> >         };
-> > 
-> > I fixed it up and applied both patches.
-> 
-> Thank you. I am using the imx51-*.dts as examples, maybe they should be
-> updated to be consistent with the newer device tree style? I'm willing
-> to do that but I don't want to make changes on dts files that I can't
-> test.
+On Wed, Dec 16, 2015 at 12:42:39AM +0300, Yury Norov wrote:
+> statfs64, fstat64 and mmap_pgoff has wrappers that needed both by aarch32 and
+> ilp32 to workaround some issues. Here we create common file to share aarch32
+> workarounds to with ilp32 code.
+[...]
+> --- /dev/null
+> +++ b/arch/arm64/kernel/entry32-common.S
+> @@ -0,0 +1,37 @@
+> +#include <linux/linkage.h>
+> +#include <linux/const.h>
+> +
+> +#include <asm/assembler.h>
+> +#include <asm/asm-offsets.h>
+> +#include <asm/errno.h>
+> +#include <asm/page.h>
+> +
+> +ENTRY(compat_sys_statfs64_wrapper)
+> +	mov	w3, #84
+> +	cmp	w1, #88
+> +	csel	w1, w3, w1, eq
+> +	b	compat_sys_statfs64
+> +ENDPROC(compat_sys_statfs64_wrapper)
+> +
+> +ENTRY(compat_sys_fstatfs64_wrapper)
+> +	mov	w3, #84
+> +	cmp	w1, #88
+> +	csel	w1, w3, w1, eq
+> +	b	compat_sys_fstatfs64
+> +ENDPROC(compat_sys_fstatfs64_wrapper)
 
-Leave them there for now.
+I'm not convinced we need these wrappers for ILP32. They've been
+introduced on arch/arm many years ago by commit Fixes: 713c481519f1
+([ARM] 3108/2: old ABI compat: statfs64 and fstatfs64) to deal with user
+space passing a size of 88 (the EABI size of struct compat_statfs64
+without the packing and alignment attribute). Since that commit, the
+sizeof(struct compat_statfs64) is 84 already. This should be the case
+with the new ILP32 exported headers (no backwards compatibility), so
+user space should never pass 88 as size. Therefore we could call
+compat_sys_(f)statfs64 directly without wrappers.
 
-> 
-> Sidenote: your Signed-off-by is missing on these two patches.
-
-Oops.  Thanks.  Fixed now.
-
-Shawn
+-- 
+Catalin
