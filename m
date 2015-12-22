@@ -1,177 +1,35 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 22 Dec 2015 15:40:00 +0100
-Subject: [PATCHv3] ARM: mvebu: use regulator-boot-on for SATA regulators
- on Armada 388 GP
-In-Reply-To: <1450794522-16483-1-git-send-email-thomas.petazzoni@free-electrons.com>
- (Thomas Petazzoni's message of "Tue, 22 Dec 2015 15:28:42 +0100")
-References: <1450794522-16483-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <877fk6r1hb.fsf@free-electrons.com>
+From: m.silentcreek@gmail.com (m.silentcreek at gmail.com)
+Date: Tue, 22 Dec 2015 06:42:07 -0800 (PST)
+Subject: [linux-sunxi] Re: BUG - Bananapi USB not working on Mainline
+In-Reply-To: <CAOP4N=98cjUYVAvEngdOXXdXeive7HB_ChC4B+uAASG5tKP1dg@mail.gmail.com>
+References: <CAOP4N=_Ux0FPSRep7AfBVovd59LeDTbBjH=LBdfWDb6Mc3e=Fg@mail.gmail.com>
+ <ec8d762c-3e2b-4438-a43e-ae2740f8a5f3@googlegroups.com>
+ <ed63cc0b-fb90-4947-ab4c-b89655538a1a@googlegroups.com>
+ <CAOP4N=98cjUYVAvEngdOXXdXeive7HB_ChC4B+uAASG5tKP1dg@mail.gmail.com>
+Message-ID: <4c69f067-f61d-4cf2-b5e6-75e7a22bedf7@googlegroups.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
- 
- On mar., d?c. 22 2015, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+Hi Hans,
+Hi Maxime,
 
-> Really, what we meant by regulator-always-on is that the regulators
-> are already turned on by the bootloader, for which regulator-boot-on
-> is a better description.
->
-> A net advantage of using regulator-boot-on is that the regulator is
-> not touched at boot time by the kernel, which avoids having the hard
-> drives spinning down and then up again, taking several (~5) seconds of
-> additional boot time.
->
-> In addition, there is no need to have such properties on the child
-> regulators used for SATA. Having it on the parent regulator that
-> really controls the GPIO is sufficient.
->
-> Without the patch:
->
-> [    3.945866] ata2: SATA link down (SStatus 0 SControl 300)
-> [    3.995862] ata3: SATA link down (SStatus 0 SControl 300)
-> [    4.005863] ata4: SATA link down (SStatus 0 SControl 300)
-> [    9.125861] ata1: SATA link up 3.0 Gbps (SStatus 123 SControl 300)
-> [    9.144575] ata1.00: ATA-8: WDC WD5003ABYX-01WERA1, 01.01S02, max UDMA/133
-> [    9.151471] ata1.00: 976773168 sectors, multi 0: LBA48 NCQ (depth 31/32)
->
->  (and you can hear the disk spinning down and up during this 5.1
->  seconds delay)
->
-> With the patch:
->
-> [    3.945988] ata2: SATA link down (SStatus 0 SControl 300)
-> [    4.005980] ata4: SATA link down (SStatus 0 SControl 300)
-> [    4.011404] ata3: SATA link down (SStatus 0 SControl 300)
-> [    4.145978] ata1: SATA link up 3.0 Gbps (SStatus 123 SControl 300)
-> [    4.153701] ata1.00: ATA-8: WDC WD5003ABYX-01WERA1, 01.01S02, max UDMA/133
-> [    4.160597] ata1.00: 976773168 sectors, multi 0: LBA48 NCQ (depth 31/32)
->
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Am Sonntag, 20. Dezember 2015 08:38:52 UTC+1 schrieb David Tulloh:
+> On 20 December 2015 at 08:39,  <m.sile...@gmail.com> wrote:
+> 
+> I found the solution! The problem is CONFIG_AXP20X_POWER which was introduced in 4.4-rc1 but defaults to no and not set in sunxi_defconfig. Adding CONFIG_AXP20X_POWER=y to sunxi_defconfig solves that and get's my USB devices working again on linux 4.4-rc5. I actually brought that up on IRC once, but at that time nobody seemed to know so I forgot it again.
+> 
+> Thanks Timo,
+> 
+> I can confirm that adding CONFIG_AXP20X_POWER=y to sunxi_defconfig works for me as well.
 
-Applied on mvebu/dt
+Is this considered an issue worthwhile to be addressed before the release of 4.4?
 
-Thanks,
+The way I see it is that USB support is broken on A10/20 in mainline for anybody who builds on sunxi_defconfig or multi_v7_defconfig at the moment.
 
-Gregory
-> ---
-> Changes since v2:
->  - Use regulator-boot-on only for SATA regulators, not for USB
->    regulators.
-> ---
->  arch/arm/boot/dts/armada-388-gp.dts | 16 ++++------------
->  1 file changed, 4 insertions(+), 12 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
-> index d8dab0f..5e47291 100644
-> --- a/arch/arm/boot/dts/armada-388-gp.dts
-> +++ b/arch/arm/boot/dts/armada-388-gp.dts
-> @@ -319,7 +319,7 @@
->  		regulator-min-microvolt = <12000000>;
->  		regulator-max-microvolt = <12000000>;
->  		enable-active-high;
-> -		regulator-always-on;
-> +		regulator-boot-on;
->  		gpio = <&expander0 2 GPIO_ACTIVE_HIGH>;
->  	};
->  
-> @@ -328,7 +328,6 @@
->  		regulator-name = "v5.0-sata0";
->  		regulator-min-microvolt = <5000000>;
->  		regulator-max-microvolt = <5000000>;
-> -		regulator-always-on;
->  		vin-supply = <&reg_sata0>;
->  	};
->  
-> @@ -337,7 +336,6 @@
->  		regulator-name = "v12.0-sata0";
->  		regulator-min-microvolt = <12000000>;
->  		regulator-max-microvolt = <12000000>;
-> -		regulator-always-on;
->  		vin-supply = <&reg_sata0>;
->  	};
->  
-> @@ -347,7 +345,7 @@
->  		regulator-min-microvolt = <12000000>;
->  		regulator-max-microvolt = <12000000>;
->  		enable-active-high;
-> -		regulator-always-on;
-> +		regulator-boot-on;
->  		gpio = <&expander0 3 GPIO_ACTIVE_HIGH>;
->  	};
->  
-> @@ -356,7 +354,6 @@
->  		regulator-name = "v5.0-sata1";
->  		regulator-min-microvolt = <5000000>;
->  		regulator-max-microvolt = <5000000>;
-> -		regulator-always-on;
->  		vin-supply = <&reg_sata1>;
->  	};
->  
-> @@ -365,7 +362,6 @@
->  		regulator-name = "v12.0-sata1";
->  		regulator-min-microvolt = <12000000>;
->  		regulator-max-microvolt = <12000000>;
-> -		regulator-always-on;
->  		vin-supply = <&reg_sata1>;
->  	};
->  
-> @@ -373,7 +369,7 @@
->  		compatible = "regulator-fixed";
->  		regulator-name = "pwr_en_sata2";
->  		enable-active-high;
-> -		regulator-always-on;
-> +		regulator-boot-on;
->  		gpio = <&expander0 11 GPIO_ACTIVE_HIGH>;
->  	};
->  
-> @@ -382,7 +378,6 @@
->  		regulator-name = "v5.0-sata2";
->  		regulator-min-microvolt = <5000000>;
->  		regulator-max-microvolt = <5000000>;
-> -		regulator-always-on;
->  		vin-supply = <&reg_sata2>;
->  	};
->  
-> @@ -391,7 +386,6 @@
->  		regulator-name = "v12.0-sata2";
->  		regulator-min-microvolt = <12000000>;
->  		regulator-max-microvolt = <12000000>;
-> -		regulator-always-on;
->  		vin-supply = <&reg_sata2>;
->  	};
->  
-> @@ -399,7 +393,7 @@
->  		compatible = "regulator-fixed";
->  		regulator-name = "pwr_en_sata3";
->  		enable-active-high;
-> -		regulator-always-on;
-> +		regulator-boot-on;
->  		gpio = <&expander0 12 GPIO_ACTIVE_HIGH>;
->  	};
->  
-> @@ -408,7 +402,6 @@
->  		regulator-name = "v5.0-sata3";
->  		regulator-min-microvolt = <5000000>;
->  		regulator-max-microvolt = <5000000>;
-> -		regulator-always-on;
->  		vin-supply = <&reg_sata3>;
->  	};
->  
-> @@ -417,7 +410,6 @@
->  		regulator-name = "v12.0-sata3";
->  		regulator-min-microvolt = <12000000>;
->  		regulator-max-microvolt = <12000000>;
-> -		regulator-always-on;
->  		vin-supply = <&reg_sata3>;
->  	};
->  };
-> -- 
-> 2.6.4
->
+I think we should either have CONFIG_PHY_SUN4I_USB select CONFIG_AXP20X_POWER automatically (my preferred solution) or at least add it to sunxi_defconfig and multi_v7_defconfig.
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+I'd be glad to submit a short patch for it depending on your viewpoint.
+
+Best wishes and happy holidays,
+
+Timo
