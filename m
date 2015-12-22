@@ -1,53 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 22 Dec 2015 15:57:13 +0000
-Subject: [PATCH RESEND v4] arm: remove !CPU_V6 and !GENERIC_ATOMIC64
- build dependencies for XEN
-In-Reply-To: <alpine.DEB.2.02.1512221535470.3096@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1512221404060.3096@kaball.uk.xensource.com>
- <20151222144605.GJ8644@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1512221535470.3096@kaball.uk.xensource.com>
-Message-ID: <20151222155713.GN8644@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 22 Dec 2015 08:01:15 -0800
+Subject: [PATCH] ARM: dts: The rate for auxclk is 22.59792 by default
+Message-ID: <1450800075-10108-1-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 22, 2015 at 03:45:19PM +0000, Stefano Stabellini wrote:
-> The code builds, but of course it could not actually run on CPU_V6. But
-> the use case for me is building drivers/xen/grant-table.c, which can
-> only run on CPU_V7 anyway, so it is not a problem.
+The rate for auxclk is 22.59792 by default.
 
-What I'm concerned about in this case is if you try to use instructions
-which are not supported by the CPU, even in assembly, the assembler
-will barf.
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/boot/dts/dm814x-clocks.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-So, if we're building an ARMv6 + ARMv7 kernel, and you try to use
-LDREXB in generic code, even though you may intend it to only be
-executed on ARMv7, the assembler will error out.
-
-We used to be able to work around that by passing -Wa,-march=armv7
-to the compiler for specific files, which would then tell the assembler
-to accept ARMv7 instructions, but modern GCC output .arch pseudo-ops
-which override the command line.  So now the only way to do it is to
-override the assemblers selected archtecture using .arch pseudo-ops
-in the assembly code.
-
-So, what I'm saying is that dropping the !ARMv6 dependency is not as
-simple as it would seem, and I'm nervous about including any such
-patches this close to Christmas and the merge window.
-
-I've recently been through a run of "apply this patch, no it's wrong,
-drop it, apply the next version, no it's still wrong, drop it again."
-So, today is the last day I'm accepting _known_ good patches into my
-tree for the 4.5 merge window.  This is not yet a known good patch
-because it hasn't been through several iterations of testing - and I
-don't want to be adding and removing patches from my tree over
-Christmas.
-
-I'd rather leave my tree in a known good state before Christmas so
-that those who want to fiddle with the kernel over the holiday break
-can do so without having the hassle of trees containing partially
-tested patches.
-
+diff --git a/arch/arm/boot/dts/dm814x-clocks.dtsi b/arch/arm/boot/dts/dm814x-clocks.dtsi
+index 2600158..e0ea6a9 100644
+--- a/arch/arm/boot/dts/dm814x-clocks.dtsi
++++ b/arch/arm/boot/dts/dm814x-clocks.dtsi
+@@ -41,11 +41,11 @@
+ 		reg = <0x0040>;
+ 	};
+ 
+-	/* Optional auxosc, 20 - 30 MHz range, assume 27 MHz by default */
++	/* Optional auxosc, 20 - 30 MHz range, assume 22.5729 MHz by default */
+ 	auxosc_ck: auxosc_ck {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-clock";
+-		clock-frequency = <27000000>;
++		clock-frequency = <22572900>;
+ 	};
+ 
+ 	/* Optional 32768Hz crystal or clock on RTCOSC pins */
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.6.2
