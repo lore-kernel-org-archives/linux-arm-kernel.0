@@ -1,61 +1,63 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 22 Dec 2015 13:23:20 +0100
-Subject: [PATCH 2/2] ARM: mvebu: use regulator-boot-on on Armada 388 GP
-In-Reply-To: <1450708916-15966-3-git-send-email-thomas.petazzoni@free-electrons.com>
- (Thomas Petazzoni's message of "Mon, 21 Dec 2015 15:41:56 +0100")
-References: <1450708916-15966-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1450708916-15966-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <87fuyur7t3.fsf@free-electrons.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 22 Dec 2015 20:24:35 +0800
+Subject: [PATCH 1/2] ARM: dts: ts-4800: Add LCD support
+In-Reply-To: <20151221184057.GE12696@localhost>
+References: <1450458033-30471-1-git-send-email-damien.riegel@savoirfairelinux.com>
+ <20151221133519.GC18410@tiger> <20151221184057.GE12696@localhost>
+Message-ID: <20151222122435.GE26290@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
- 
- On lun., d?c. 21 2015, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+On Mon, Dec 21, 2015 at 01:40:59PM -0500, Damien Riegel wrote:
+> > > @@ -30,6 +30,60 @@
+> > >  			clock-frequency = <24576000>;
+> > >  		};
+> > >  	};
+> > > +
+> > > +	regulators {
+> > > +		compatible = "simple-bus";
+> > > +		#address-cells = <1>;
+> > > +		#size-cells = <0>;
+> > > +
+> > > +		backlight_reg: regulator at 0 {
+> > > +			compatible = "regulator-fixed";
+> > > +			reg = <0>;
+> > > +			pinctrl-names = "default";
+> > > +			pinctrl-0 = <&pinctrl_enable_lcd>;
+> > > +			regulator-name = "enable_lcd_reg";
+> > > +			regulator-min-microvolt = <3300000>;
+> > > +			regulator-max-microvolt = <3300000>;
+> > > +			gpio = <&gpio4 9 GPIO_ACTIVE_HIGH>;
+> > > +			enable-active-high;
+> > > +		};
+> > > +	};
+> > 
+> > DT maintainers dislike this fake simple-bus container.  Let's put the
+> > regulator directly under root like below.
+> > 
+> >         backlight_reg: regulator-backlight {
+> >                 compatible = "regulator-fixed";
+> >                 pinctrl-names = "default";
+> >                 pinctrl-0 = <&pinctrl_enable_lcd>;
+> >                 regulator-name = "enable_lcd_reg";
+> >                 regulator-min-microvolt = <3300000>;
+> >                 regulator-max-microvolt = <3300000>;
+> >                 gpio = <&gpio4 9 GPIO_ACTIVE_HIGH>;
+> >                 enable-active-high;
+> >         };
+> > 
+> > I fixed it up and applied both patches.
+> 
+> Thank you. I am using the imx51-*.dts as examples, maybe they should be
+> updated to be consistent with the newer device tree style? I'm willing
+> to do that but I don't want to make changes on dts files that I can't
+> test.
 
-> Really, what we meant by regulator-always-on is that the regulators
-> are already turned on by the bootloader, for which regulator-boot-on
-> is a better description.
->
+Leave them there for now.
 
-What happened if the bootloader do not turn the regulator on?
-I fear that in this case the regulator won't be turned on at all.
+> 
+> Sidenote: your Signed-off-by is missing on these two patches.
 
-> A net advantage of using regulator-boot-on is that the regulator is
-> not touched at boot time by the kernel, which avoids having the hard
-> drives spinning down and then up again, taking several (~5) seconds of
-> additional boot time.
->
-> In addition, there is no need to have such properties on the child
-> regulators used for SATA. Having it on the parent regulator that
-> really controls the GPIO is sufficient.
->
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/boot/dts/armada-388-gp.dts | 24 ++++++++----------------
->  1 file changed, 8 insertions(+), 16 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
-> index d8dab0f..1ef6cc6 100644
+Oops.  Thanks.  Fixed now.
 
->  
-> @@ -309,7 +309,7 @@
->  		regulator-min-microvolt = <5000000>;
->  		regulator-max-microvolt = <5000000>;
->  		enable-active-high;
-> -		regulator-always-on;
-> +		regulator-boot-on;
->  		gpio = <&expander0 4 GPIO_ACTIVE_HIGH>;
->  	};
-This node had been removed by a patch you sent few days ago:
-"ARM: mvebu: remove duplicated regulator definition in Armada 388 GP"
-
-Thanks,
-
-Gregory
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Shawn
