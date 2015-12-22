@@ -1,21 +1,42 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue, 22 Dec 2015 09:45:28 +0100
-Subject: [PATCH V2 22/23] pci, acpi: Match PCI config space accessors
- against platfrom specific quirks.
-In-Reply-To: <335CDE2E-B588-43A8-8665-6023AFD0EA04@redhat.com>
-References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
- <1450278993-12664-23-git-send-email-tn@semihalf.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1EC14C0F@lhreml503-mbb>
- <201512211510.32029.arnd@arndb.de>
- <335CDE2E-B588-43A8-8665-6023AFD0EA04@redhat.com>
-Message-ID: <56790DA8.6050606@semihalf.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 22 Dec 2015 09:50:58 +0100
+Subject: [PATCH v2] pinctrl: at91-pio4: use %pr format string for resource
+In-Reply-To: <2376227.VpCVZMP4nr@wuerfel>
+References: <5199877.GVYeflqET9@wuerfel>
+ <CACRpkdZ4F8Loyoh6niCvkM=S8KcekTs8EvXRmB-0WxcRFw_8+g@mail.gmail.com>
+ <2376227.VpCVZMP4nr@wuerfel>
+Message-ID: <CACRpkdZwBjFDpHPPRWxoQ=NgQ68ABAxEsB1RCi3nsY1p33UUJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.12.2015 00:10, Jon Masters wrote:
-> Sorry for top-posting. A quick note that SMBIOS3 is required by SBBR so it can be presumed that compliant platforms will provide quirks via DMI.
+On Fri, Dec 18, 2015 at 4:29 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 30 November 2015 09:47:03 Linus Walleij wrote:
+>> On Wed, Nov 18, 2015 at 4:21 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>
+>> > resource_size_t may be defined as 32 or 64 bit depending on configuration,
+>> > so it cannot be printed using the normal format strings, as gcc correctly
+>> > warns:
+>> >
+>> > pinctrl-at91-pio4.c: In function 'atmel_pinctrl_probe':
+>> > pinctrl-at91-pio4.c:1003:41: warning: format '%u' expects argument of type 'unsigned int', but argument 5 has type 'resource_size_t {aka long long unsigned int}' [-Wformat=]
+>> >    dev_dbg(dev, "bank %i: hwirq=%u\n", i, res->start);
+>> >
+>> > This changes the format string to use the special "%pr" format
+>> > string that prints a resource, and changes the arguments so we
+>> > the resource structure directly.
+>> >
+>> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> > ---
+>> > v2: don't break ordering of arguments, that part was correct already, unlike
+>> > what I said in v1.
+>>
+>> Patch applied with Ludovic's review tag.
 >
+> I don't see this in linux-next, did the commit get lost accidentally?
 
-Thanks Jon for confirmation.
+No, it's just that I screwed up the next branch so many times and
+Stephen has not been able to pull it into linux-next.
 
-Tomasz
+Hope it works now...
+
+Linus Walleij
