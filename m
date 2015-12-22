@@ -1,50 +1,74 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 22 Dec 2015 22:27:57 +0100
-Subject: [PATCH v2 0/5] clk: rockchip: fix handling of fractional dividers
-Message-ID: <1450819682-4932-1-git-send-email-heiko@sntech.de>
+Date: Tue, 22 Dec 2015 22:27:58 +0100
+Subject: [PATCH v2 1/5] clk: add flag for clocks that need to be enabled on
+ rate changes
+In-Reply-To: <1450819682-4932-1-git-send-email-heiko@sntech.de>
+References: <1450819682-4932-1-git-send-email-heiko@sntech.de>
+Message-ID: <1450819682-4932-2-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Essentially unchanged from the first iteration from back in august, just
-including additional patches depending on that and fixing fractional
-dividers on the rk3036 and spdif parent settings.
+Some clocks need to be enabled to accept rate changes. This patch adds a
+new flag CLK_SET_RATE_UNGATE that lets clk_change_rate enable the clock
+before trying to change the rate and disable it again afterwards.
+This of course doesn't effect clocks that are already running at that
+point, as their refcount will only temporarily increase.
 
-In v1, Stephen seemed essentially ok with it but Mike put forward his wish
-to use his planned approach for connected clocks for handling this.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Tested-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+Reviewed-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+---
+ drivers/clk/clk.c            | 18 ++++++++++++++++++
+ include/linux/clk-provider.h |  1 +
+ 2 files changed, 19 insertions(+)
 
-While that in itself will be very interesting also for handling Rockchip's
-armclk generically, we're now in the situation that everything related
-to audio output relies on working fractional dividers to produce the
-needed clock frequencies, making audio-output essentially non-working on
-all Rockchip socs in mainline at the moment.
-
-So I'm somewhat hoping for some sort of intermediate solution here :-)
-
-
-changes in v2:
-- rebase original 3 patches onto 4.4
-- add the 2 new patches from other series, that need that change
-
-Heiko Stuebner (3):
-  clk: add flag for clocks that need to be enabled on rate changes
-  clk: rockchip: handle mux dependency of fractional dividers
-  clk: rockchip: include downstream muxes into fractional dividers
-
-Sjoerd Simons (1):
-  clk: rockchip: Allow the RK3288 SPDIF clocks to change their parent
-
-Xing Zheng (1):
-  clk: rockchip: rk3036: include downstream muxes into fractional
-    dividers
-
- drivers/clk/clk.c                 |  18 +++++
- drivers/clk/rockchip/clk-rk3036.c |  34 +++++-----
- drivers/clk/rockchip/clk-rk3188.c |  80 +++++++++++-----------
- drivers/clk/rockchip/clk-rk3288.c |  70 +++++++++----------
- drivers/clk/rockchip/clk.c        | 137 ++++++++++++++++++++++++++++++++++----
- drivers/clk/rockchip/clk.h        |  19 ++++++
- include/linux/clk-provider.h      |   1 +
- 7 files changed, 254 insertions(+), 105 deletions(-)
-
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index f13c3f4..bd64a94 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -1443,6 +1443,15 @@ static void clk_change_rate(struct clk_core *core)
+ 	else if (core->parent)
+ 		best_parent_rate = core->parent->rate;
+ 
++	if (core->flags & CLK_SET_RATE_UNGATE) {
++		unsigned long flags;
++
++		clk_core_prepare(core);
++		flags = clk_enable_lock();
++		clk_core_enable(core);
++		clk_enable_unlock(flags);
++	}
++
+ 	if (core->new_parent && core->new_parent != core->parent) {
+ 		old_parent = __clk_set_parent_before(core, core->new_parent);
+ 		trace_clk_set_parent(core, core->new_parent);
+@@ -1469,6 +1478,15 @@ static void clk_change_rate(struct clk_core *core)
+ 
+ 	core->rate = clk_recalc(core, best_parent_rate);
+ 
++	if (core->flags & CLK_SET_RATE_UNGATE) {
++		unsigned long flags;
++
++		flags = clk_enable_lock();
++		clk_core_disable(core);
++		clk_enable_unlock(flags);
++		clk_core_unprepare(core);
++	}
++
+ 	if (core->notifier_count && old_rate != core->rate)
+ 		__clk_notify(core, POST_RATE_CHANGE, old_rate, core->rate);
+ 
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index c56988a..a971ce4 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -31,6 +31,7 @@
+ #define CLK_SET_RATE_NO_REPARENT BIT(7) /* don't re-parent on rate change */
+ #define CLK_GET_ACCURACY_NOCACHE BIT(8) /* do not use the cached clk accuracy */
+ #define CLK_RECALC_NEW_RATES	BIT(9) /* recalc rates after notifications */
++#define CLK_SET_RATE_UNGATE	BIT(10) /* clock needs to run to set rate */
+ 
+ struct clk;
+ struct clk_hw;
 -- 
 2.6.4
