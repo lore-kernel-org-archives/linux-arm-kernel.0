@@ -1,87 +1,54 @@
-From: jingoohan1@gmail.com (Jingoo Han)
-Date: Tue, 22 Dec 2015 21:36:10 +0900
-Subject: [PATCH v4 1/5] PCI: designware: add memory barrier after enabling
- region
-In-Reply-To: <20151211134857.03601d0e@xhacker>
-References: <1449149725-27607-1-git-send-email-stanimir.varbanov@linaro.org>	<1449149725-27607-2-git-send-email-stanimir.varbanov@linaro.org>	<56669C50.9060700@linaro.org>	<CAHM4w1k_EAt+xBBYyG3B7W9Fegc4j+uRq5t_biUsxOGt+k+xUA@mail.gmail.com>	<20151209102359.GF8644@n2100.arm.linux.org.uk>	<CAHM4w1m-NiwyCLz9tikbOcNtCmVu0Vd9FhmKKSuMi5ChzfDafA@mail.gmail.com>
- <20151211134857.03601d0e@xhacker>
-Message-ID: <000b01d13cb5$5bb6d170$13247450$@com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 22 Dec 2015 13:36:26 +0100
+Subject: [GIT PULL] UEFI support for 32-bit ARM
+In-Reply-To: <20151222123131.GF8644@n2100.arm.linux.org.uk>
+References: <CAKv+Gu_QvQnsYk=coEJQrRk94xATT9Fi5=9jCZhLoNUvTU7kJg@mail.gmail.com>
+ <CAKv+Gu_Bd4NyC3u96Un-JdzOcaKvsFadEwp06qHAF7xPMyLQ0w@mail.gmail.com>
+ <20151222123131.GF8644@n2100.arm.linux.org.uk>
+Message-ID: <CAKv+Gu-rqZnZhD-00RdabwDx+mFB=POTNhAJX0CuX7s=QfOdpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, December 11, 2015 2:49 PM, Jisheng Zhang wrote:
-> 
-> On Fri, 11 Dec 2015 09:35:10 +0530 Pratyush Anand wrote:
-> 
-> > On Wed, Dec 9, 2015 at 3:53 PM, Russell King - ARM Linux wrote:
-> >
-> > [...]
-> >
-> > >> > >       dw_pcie_writel_rc(pp, PCIE_ATU_ENABLE, PCIE_ATU_CR2);
-> > >> > > +     /*
-> > >> > > +      * ensure that the ATU enable has been happaned before accessing
-> > >> > > +      * pci configuration/io spaces through dw_pcie_cfg_[read|write].
-> > >> > > +      */
-> > >> > > +     wmb();
-> > >> > >  }
-> > >> > >
-> > >>
-> > >>
-> > >> My understnading is that since writel() of dw_pcie_writel_rc() in
-> > >> above code and readl(), writel() of dw_pcie_cfg_[read|write]() (which
-> > >> will follow) goes through same device (ie PCIe host here). So, it is
-> > >> guaranteed that 1st writel() will be executed before later
-> > >> readl()/writel(). If that is true then we do not need any explicit
-> > >> barrier here.
-> > >>
-> > >> Arnd, Russel: whats your opinion here.
-> > >               ^l
-> >
-> > Sorry :(
-> >
-> > >
-> > > writel() has a barrier _before_ the access but not after.
-> > >
-> > > The fact is that there's nothing which guarantees that the write will hit
-> > > the hardware in a timely manner (forget any rules about PCI config space,
-> > > the PCI ordering rules apply to the PCI bus, not to the ARM buses.)
-> > >
-> > > If you need this write to have hit the hardware before continuing, you
-> > > need to read back from the same register.
-> >
-> > OK, so better to replace wmb() with read back of control register.
-> >
-> > >
-> > > I'm just looking at this driver, trying to decipher what it's doing.  It
-> > > _looks_ to me like it's reprogramming one of the outbound windows (IO?)
-> > > so that configuration space can be accessed.  Doesn't this have the
-> > > effect of disabling access to the IO segment of the PCI bus from the
-> > > host CPU?
-> > >
-> > > What protections are there against other CPUs in the system issuing a
-> > > PCI I/O read/write while this outbound window is programmed as
-> > > configuration space?
-> >
-> >
-> > Yes, that is an issue with this driver. Most of the host controller
-> > has 4 or more viewpoints, and it is very easy to handle for them. But
-> > there are few which has only two viewpoints. Do not know how to solve
-> > it, so that it works for all.
-> >
-> 
-> The default outbound iATU number is two, this may be the reason why the driver
-> is written in current style. And two outbound iATUs may be common for pcie dw
-> users because ASIC people just follow the default configuration ;).
-> 
-> In our case, Marvell Berlin SoCs have two outbound iATUs.
+On 22 December 2015 at 13:31, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Dec 22, 2015 at 01:21:12PM +0100, Ard Biesheuvel wrote:
+>> On 14 December 2015 at 18:10, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> > Hello all,
+>> >
+>> > NOTE: this pull request is based on a stable, shared branch published
+>> > by the arm64 maintainers. This means that pulling the
+>> > arm32-efi-for-v4.5 tag will pull the following patches along with the
+>> > patches listed below:
+>> >
+>> > f7d924894265 arm64/efi: refactor EFI init and runtime code for reuse
+>> > by 32-bit ARM
+>> > e5bc22a42e4d arm64/efi: split off EFI init and runtime code for reuse
+>> > by 32-bit ARM
+>> > 4dffbfc48d65 arm64/efi: mark UEFI reserved regions as MEMBLOCK_NOMAP
+>> > 68709f45385a arm64: only consider memblocks with NOMAP cleared for
+>> > linear mapping
+>> > bf3d3cc580f9 mm/memblock: add MEMBLOCK_NOMAP attribute to memblock memory table
+>> >
+>> > @Will: please advise when you intend to send these to -next. Thanks.
+>> >
+>>
+>> Russell,
+>>
+>> Could you please indicate whether or not, and when you intend to pull
+>> these changes?
+>>
+>> All prerequisites are in, including the arm64 changes that Will has
+>> queued for 4.5
+>
+> Thanks for the reminder.  It didn't show up as a pull request for me
+> because it was addressed to rmk+pull not linux+pull as I had requested
+> pull requests to be.
+>
+> linux+pull marks the message with a red background so it stands out
+> my the mailbox.
+>
 
-Hmm, we need to add new DT property to handle the number of outbound iATUs.
-Then, 'pcie-designware.c' should configure registers according to the number.
-Anyway, we should add this agenda to ToDo list.
+OK, I will make sure I remember that for the next time.
 
-Best regards,
-Jingoo Han
-
-> 
-> Thanks,
-> Jisheng
+Regards,
+Ard.
