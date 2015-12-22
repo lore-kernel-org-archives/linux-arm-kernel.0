@@ -1,65 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 22 Dec 2015 16:16:42 +0000
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Enable GPU support
-In-Reply-To: <CAOMZO5CXqNNv7hv0kwyqQiQvo4d_X1jN8jf4QPmEJQvMogHzGA@mail.gmail.com>
-References: <1450723442-1518-1-git-send-email-festevam@gmail.com>
- <20151222122154.GD26290@tiger>
- <CAOMZO5A8BEkNvrazmksRBRUQw+4mWwbfKtrK6KzD3XK5L5Fs7w@mail.gmail.com>
- <1450788454.2637.17.camel@pengutronix.de>
- <20151222125300.GH8644@n2100.arm.linux.org.uk>
- <20151222150259.GL8644@n2100.arm.linux.org.uk>
- <CAOMZO5CXqNNv7hv0kwyqQiQvo4d_X1jN8jf4QPmEJQvMogHzGA@mail.gmail.com>
-Message-ID: <20151222161642.GO8644@n2100.arm.linux.org.uk>
+From: wpdster@gmail.com (Patrick Doyle)
+Date: Tue, 22 Dec 2015 11:28:38 -0500
+Subject: How to get better precision out of getrusage on the ARM?
+In-Reply-To: <20151222151314.GM8644@n2100.arm.linux.org.uk>
+References: <CAF_dkJBjs1b+73ggvJyXwab6YL94HGT2jrqbcfaLxoETtQsD9Q@mail.gmail.com>
+ <20151222144907.GK8644@n2100.arm.linux.org.uk>
+ <CAF_dkJDFXSEgH+kO=k=Yj0_VDnFYgPtkoYznLUWZnq4=QTNDDg@mail.gmail.com>
+ <20151222151314.GM8644@n2100.arm.linux.org.uk>
+Message-ID: <CAF_dkJAUyD3GRAETZUQG2yJTmOR95XKVguohBpBjUaM9JMaQyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jon is busy at the moment, and I expect will reply in a few hours or
-so.
+On Tue, Dec 22, 2015 at 10:13 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Dec 22, 2015 at 09:57:57AM -0500, Patrick Doyle wrote:
+>> On Tue, Dec 22, 2015 at 9:49 AM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Tue, Dec 22, 2015 at 09:30:30AM -0500, Patrick Doyle wrote:
+>> >> Short version:
+>> >> My application running on a Cortex-A5 processor (the SAMA5D2 from
+>> >> Atmel) calls getrusage(RUSAGE_THREAD, ...), which returns cpu time
+>> >> quantized to the kernel tick frequency (100Hz or 1Khz, depending on
+>> >> CONFIG_HZ_100 vs CONFIG_HZ_1000).
+>> >>
+>> >> How can I get better precision for sched_clock on the (Cortex-A5) ARM?
+>> >>  The x86 uses the TSC.
+>> >
+>> > You need to provide a sched_clock() implementation using
+>> > sched_clock_register().
+>> >
+>> Thank you, I tried that by modifying the (Atmel specific) tcb_clcksrc,
+>> and got a sched_clock that never incremented.  I have a question out
+>> at the Atmel forum asking about this, and will continue to investigate
+>> on my own, but I figured it was about time to ask the experts :-)
+Thank you for your help.
 
-On Tue, Dec 22, 2015 at 01:31:53PM -0200, Fabio Estevam wrote:
-> It seems the information you got from Jon is not correct.
+Now my sched_clock is incrementing, (I have no idea why it wasn't
+yesterday -- it must have been 5:00-itis).  I have passed a readback
+function to sched_clock_register(), but I'm still seeing 1ms
+resolution for the values returned by getrusage().  Are there other
+configuration items I should be setting to get better resolution?  I
+have tried setting CONFIG_HIGH_RES_TIMERS and
+CONFIG_IRQ_TIME_ACCOUNTING.  It seems like I should choose
+VIRT_CPU_ACCOUNTING_NATIVE, but that choice is not enabled because
+HAVE_VIRT_CPU_ACCOUNTING is not defined.  HAVE_VIRT_SPU_ACCOUNTING
+doesn't seem to be defined for the ARM architecture.
 
-I suspect Jon is in a better position to comment about what works and
-what doesn't, as he's doing the customer facing support for SolidRun,
-and has to deal with people trying to run stock u-boot on SolidRun's
-hardware.
+Any more thoughts or ideas?
 
-_Especially_ when he gets regular reports from users trying to run
-Fedora 23 on SolidRun platforms, which ships with mainline u-boot,
-and it fails to work because mainline u-boot gets stuff wrong.  The
-telling thing for Jon is that when he gets users to switch to SR's
-u-boot, the problems magically vanish.
-
-> We do support several versions of Hummingboard and Cubox-i (at least
-> for the board models I have access to) in mainline U-boot.
-
-Maybe, rather than this "vendors are evil, we must write our own patches
-which are independent of the vendor" attitude, maybe people ought to
-work _with_ vendors?  Jon is an open source guy, he was working on OLPC
-before he switched to the SolidRun platforms, first as a hobby and later
-as their kernel and uboot maintainer.  He's not an evil vendor!
-
-> The SDRAM is correctly setup depending on the board type:
-> http://git.denx.de/?p=u-boot.git;a=history;f=board/solidrun/mx6cuboxi/mx6cuboxi.c;h=fc37f1eef06da5147e5403d4272d220836c9cfbc;hb=HEAD
-> 
-> Like you said in the past only the old mx6d hummingboard was
-> supported, but we are in better shape now and the old support has been
-> removed.
-
-Jon is aware of what's in mainline u-boot, and the memory timings there
-are wrong.  For a start, the highest DDR clock rate is 1066MHz, not
-1600MHz that you have in mainline u-boot.  So you're overclocking the
-SDRAM.
-
-I know that Jon has put a _lot_ of effort into getting the SDRAM setup
-stable on SolidRun hardware to eliminate hangs and other problems, and
-it seems the attitude is "we don't care about that, we're mainline, we
-know better."
-
-So, excuse me if I trust Jon's comments about uboot more than anyone
-elses.
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+--wpd
