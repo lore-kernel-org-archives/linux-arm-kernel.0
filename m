@@ -1,53 +1,60 @@
-From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Tue, 22 Dec 2015 20:13:08 +0000
-Subject: [PATCH] clk: bcm2835: added missing clock register definitions
-Message-ID: <1450815189-3342-1-git-send-email-kernel@martin.sperl.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 22 Dec 2015 12:11:39 -0800
+Subject: [GIT PULL] Qualcomm SoC Updates for 4.5
+In-Reply-To: <1450384435-4300-1-git-send-email-andy.gross@linaro.org>
+References: <1450384435-4300-1-git-send-email-andy.gross@linaro.org>
+Message-ID: <20151222201139.GK30172@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Martin Sperl <kernel@martin.sperl.org>
+Hi,
 
-Added missing CTRL and DIV clock register definitions for:
-PCM, SLIM, TCNT, TEC, TD0, TD1
+On Thu, Dec 17, 2015 at 02:33:55PM -0600, Andy Gross wrote:
+> The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+> 
+>   Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-soc-for-4.5
+> 
+> for you to fetch changes up to bbeaa59598cae12626c9c42e91821e3abd5b87f0:
+> 
+>   MAINTAINERS: Change QCOM entries (2015-12-17 13:55:38 -0600)
+> 
+> ----------------------------------------------------------------
+> Qualcomm ARM Based SoC Updates for 4.5
+> 
+> * Add WCNSS_CTRL client
+> * Various Kconfig changes to fix build issues
+> * Update SoC Qualcomm MAINTAINERS entry
+> * Add SMP2P, SMSM, and SMEM state machine drivers
+> * Add SMD-RPM support for existing platforms
 
-Register information taken from:
-https://rawgit.com/msperl/rpi-registers/master/rpi-registers.html#CM
-which extracted the information from the header files shared by
-Broadcom/rpi foundation in this file:
-http://www.broadcom.com/docs/support/videocore/Brcm_Android_ICS_Graphics_Stack.tar.gz
+Merged, thanks.
 
-Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
----
- drivers/clk/bcm/clk-bcm2835.c |   13 +++++++++++++
- 1 file changed, 13 insertions(+)
+> 
+> ----------------------------------------------------------------
+> Andy Gross (2):
+>       soc: qcom: smd-rpm: Add existing platform support
+>       MAINTAINERS: Change QCOM entries
+> 
+> Arnd Bergmann (2):
+>       soc: qcom: enable smsm/smp2p modular build
+>       ARM: qcom: select ARM_CPU_SUSPEND for power management
+> 
+> Bjorn Andersson (5):
+>       soc: qcom: Introduce common SMEM state machine code
+>       soc: qcom: smsm: Add driver for Qualcomm SMSM
+>       soc: qcom: smp2p: Qualcomm Shared Memory Point to Point
+>       MAINTAINERS: Add rules for Qualcomm dts files
+>       soc: qcom: Introduce WCNSS_CTRL SMD client
+> 
+> Stephen Boyd (1):
+>       serial: msm_serial: Make config tristate
 
-diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-index 39bf582..6fde8fe 100644
---- a/drivers/clk/bcm/clk-bcm2835.c
-+++ b/drivers/clk/bcm/clk-bcm2835.c
-@@ -88,10 +88,23 @@
- #define CM_HSMDIV		0x08c
- #define CM_OTPCTL		0x090
- #define CM_OTPDIV		0x094
-+#define CM_PCMCTL		0x098
-+#define CM_PCMDIV		0x09c
- #define CM_PWMCTL		0x0a0
- #define CM_PWMDIV		0x0a4
-+#define CM_SLIMCTL		0x0a8
-+#define CM_SLIMDIV		0x0ac
- #define CM_SMICTL		0x0b0
- #define CM_SMIDIV		0x0b4
-+/* no definition for 0x0b8  and 0x0bc */
-+#define CM_TCNTCTL		0x0c0
-+#define CM_TCNTDIV		0x0c4
-+#define CM_TECCTL		0x0c8
-+#define CM_TECDIV		0x0cc
-+#define CM_TD0CTL		0x0d0
-+#define CM_TD0DIV		0x0d4
-+#define CM_TD1CTL		0x0d8
-+#define CM_TD1DIV		0x0dc
- #define CM_TSENSCTL		0x0e0
- #define CM_TSENSDIV		0x0e4
- #define CM_TIMERCTL		0x0e8
--- 
-1.7.10.4
+This should really go through the serial maintainers, but it's a small change
+so I'll take it this time around.
+
+
+-Olof
