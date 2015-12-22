@@ -1,60 +1,91 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Tue, 22 Dec 2015 10:48:08 -0500
-Subject: [PATCH] soc: mediatek: SCPSYS: use builtin_platform_driver
-In-Reply-To: <CAGS+omDrZO8PteeFZMes0QRjG2KLhMG=qacFrho+UFPVAG=YXg@mail.gmail.com>
-References: <1450437573-32079-1-git-send-email-matthias.bgg@gmail.com>
- <CAGS+omA822+-srskZ08pa72xVTMFbWLkaZD0za=3MCBryS6PRg@mail.gmail.com>
- <CAGS+omDrZO8PteeFZMes0QRjG2KLhMG=qacFrho+UFPVAG=YXg@mail.gmail.com>
-Message-ID: <20151222154808.GC12458@windriver.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Tue, 22 Dec 2015 10:48:52 -0500 (EST)
+Subject: [PATCH v2 0/3] USB: add generic onboard USB HUB driver
+In-Reply-To: <CAL411-oVEbh1cDnUugs0Rxrt1opvH-NeffjcmeMy-OuZS38CbA@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1512221039580.1539-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Re: [PATCH] soc: mediatek: SCPSYS: use builtin_platform_driver] On 22/12/2015 (Tue 21:36) Daniel Kurtz wrote:
+On Tue, 22 Dec 2015, Peter Chen wrote:
 
-> Hi Matthias,
+> > I don't really understand this.  However, you can always specify a USB
+> > device by giving its port number on the parent hub, and the hub's port
+> > number on _its_ parent hub, and so on back to the root hub and host
+> > controller.  That works even if you're not using DT or OF or ACPI.
+> >
 > 
-> One thing below is missing from this version of the patch...
-> 
-> > On Fri, Dec 18, 2015 at 7:19 PM, Matthias Brugger
-> > <matthias.bgg@gmail.com> wrote:
-> >> SCPSYS can't be built as module. Use builtin_platform_driver instead.
-> >> For this probe must not be __init and the data accessed can't be
-> >> __initconst. Remove this macros. To make the impact as small as possible,
-> >> fold scp_domain_data into scp_domain via a pointer.
-> 
-> [snip]
-> 
-> >> @@ -542,10 +533,11 @@ static const struct of_device_id of_scpsys_match_tbl[] = {
-> >>  };
-> >>
-> >>  static struct platform_driver scpsys_drv = {
-> >> +       .probe = scpsys_probe,
-> >>         .driver = {
-> >>                 .name = "mtk-scpsys",
-> 
-> This was in Sascha's version of the patch:
-> 
->   .suppress_bind_attrs = true,
+> Thanks, so the HUB's physical port number is the same with its logical port
+> number which reported at its descriptor?
 
-Unless you've got a very specific use case where an unbind makes sense
-(like a quad port ethernet card, where you unbind one port and then do
-PCI pass through of it to a kvm guest for example) then yes, you should
-suppress unbind.  So for most drivers aimed at a single device, or where
-being built in but unbinding just makes no sense for any possible use
-case, then yes you should set the above.
+There's no distinction between logical and physical port numbers in
+USB.  (However, there can be an issue with USB-3 root hubs, because
+they may assign two different port numbers to the same physical port:
+One is the port number on the LS/FS/HS bus and the other is the port
+number on the SS bus.  This shouldn't cause any problems.)
 
-Paul.
---
+>  If we assumed all HUBs follow it,
+> then we can use port number to align the devices which we described at
+> DT and detected by USB bus.
 
+Yes.
+
+> If the host controller has DT supported, and there are two ports connects
+> two different onboard devices. When the device is found by the bus,
+> we will know its portnum and parent (see usb_alloc_dev), and we know parent's
+> device node, so we will know two children node by iterate its parent,
+> and match its port number
+> (property "reg" at below dts node) with udev->portnum we assigned at
+> usb_alloc_dev.
+> Then we can let the device know DT.
 > 
-> Do we still need it now that we use "builtin_platform_driver"?
+> After USB device knows DT, it can handle DT properties at its driver.
 > 
-> >>                 .owner = THIS_MODULE,
-> >>                 .of_match_table = of_match_ptr(of_scpsys_match_tbl),
-> >>         },
-> >>  };
-> >> -builtin_platform_driver_probe(scpsys_drv, scpsys_probe);
-> >> +builtin_platform_driver(scpsys_drv);
-> >> --
-> >> 2.6.2
-> >>
+> --- a/drivers/usb/core/usb.c
+> +++ b/drivers/usb/core/usb.c
+> @@ -494,6 +494,8 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent,
+>         dev->portnum = port1;
+>         dev->bus = bus;
+>         dev->parent = parent;
+> +       if (parent->of_node)
+> +               dev->dev->of_node = find_node_by_bus(parent->of_node,
+> dev->portnum);
+
+That's right, except you should also handle the case where parent is 
+NULL (a root hub).
+
+>         INIT_LIST_HEAD(&dev->filelist);
+> 
+> 
+> &usbh1 {
+>         vbus-supply = <&reg_usb_h1_vbus>;
+>         status = "okay";
+> 
+>         devices-pre-operation = <&usbh1_pre_operation>
+> 
+>         #address-cells = <1>;
+>         #size-cells = <0>;
+>         usb: usb_mfd2415 at 01 {
+>                 compatible = "usb multi-device";
+>                 reg = <0x01>;
+>                 clocks = <&clks IMX6QDL_CLK_CKO>;
+>                 reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
+>                 reset-duration-us = <3000>;
+>                 gpio-controller;
+>                 #gpio-cells = <2>;
+>         };
+> 
+>         usb: usb_mfd2415 at 02 {
+>                 compatible = "usb multi-device";
+>                 reg = <0x02>;
+>                 clocks = <&clks IMX6QDL_CLK_CKO2>;
+>                 reset-gpios = <&gpio7 13 GPIO_ACTIVE_LOW>;
+>                 reset-duration-us = <3000>;
+>                 gpio-controller;
+>                 #gpio-cells = <2>;
+>         };
+> };
+
+I'll leave this for the DT experts to discuss.  However, it's worth 
+pointing out that a similar scheme should work for ACPI.
+
+Alan Stern
