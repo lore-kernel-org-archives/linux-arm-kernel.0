@@ -1,71 +1,44 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Tue, 22 Dec 2015 17:33:50 +0800
-Subject: [PATCH 2/5] ARM: dts: add the sound codec for kylin board
+Date: Tue, 22 Dec 2015 17:33:51 +0800
+Subject: [PATCH 3/5] ARM: dts: rockchip: enable the high speed on sdio for
+ kylin board
 In-Reply-To: <1450776833-27639-1-git-send-email-wxt@rock-chips.com>
 References: <1450776833-27639-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1450776833-27639-3-git-send-email-wxt@rock-chips.com>
+Message-ID: <1450776833-27639-4-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support the rt5616 codec for kylin board, but we need
-enable the i2s firstly.
+We want to the higher speed for wifi module working.
+
+Bootup kernel log:
+...
+mmc_host mmc0: Bus speed (slot 0) = 37125000Hz (slot req 37500000Hz,
+actual 37125000HZ div = 0)
+
+or run 'cat /sys/kernel/debug/clk/clk_summary |grep phase -C 1' to check
+Otherwise, the mmc0 will run 400khz defalult value to work.
 
 Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 ---
 
- arch/arm/boot/dts/rk3036-kylin.dts | 33 +++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+ arch/arm/boot/dts/rk3036-kylin.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
 
 diff --git a/arch/arm/boot/dts/rk3036-kylin.dts b/arch/arm/boot/dts/rk3036-kylin.dts
-index 992f9ca..bb7e549 100644
+index bb7e549..2ef38be 100644
 --- a/arch/arm/boot/dts/rk3036-kylin.dts
 +++ b/arch/arm/boot/dts/rk3036-kylin.dts
-@@ -46,6 +46,28 @@
- 	model = "Rockchip RK3036 KylinBoard";
- 	compatible = "rockchip,rk3036-kylin", "rockchip,rk3036";
+@@ -297,6 +297,11 @@
  
-+	sound {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,format = "i2s";
-+		simple-audio-card,name = "rockchip,rt5616-codec";
-+		simple-audio-card,mclk-fs = <64>;
-+		simple-audio-card,widgets =
-+			"Microphone", "Microphone Jack",
-+			"Headphone", "Headphone Jack";
-+		simple-audio-card,routing =
-+			"MIC1", "Microphone Jack",
-+			"MIC2", "Microphone Jack",
-+			"Microphone Jack", "micbias1",
-+			"Headphone Jack", "HPOL",
-+			"Headphone Jack", "HPOR";
-+		simple-audio-card,cpu {
-+			sound-dai = <&i2s>;
-+		};
-+		simple-audio-card,codec {
-+			sound-dai = <&rt5616>;
-+		};
-+	};
-+
- 	vcc_sys: vsys-regulator {
- 		compatible = "regulator-fixed";
- 		regulator-name = "vcc_sys";
-@@ -257,6 +279,17 @@
- 
- &i2c2 {
- 	status = "okay";
-+
-+	rt5616: rt5616 at 1b {
-+		#sound-dai-cells = <0>;
-+		compatible = "rt5616";
-+		reg = <0x1b>;
-+	};
-+};
-+
-+&i2s {
-+	#sound-dai-cells = <0>;
-+	status = "okay";
- };
- 
- &sdio {
+ 	broken-cd;
+ 	bus-width = <4>;
++	cap-sd-highspeed;
++	sd-uhs-sdr12;
++	sd-uhs-sdr25;
++	sd-uhs-sdr50;
++	sd-uhs-sdr104;
+ 	cap-sdio-irq;
+ 	default-sample-phase = <90>;
+ 	keep-power-in-suspend;
 -- 
 1.9.1
