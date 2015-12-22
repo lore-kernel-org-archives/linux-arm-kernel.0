@@ -1,51 +1,31 @@
-From: hare@suse.de (Hannes Reinecke)
-Date: Tue, 22 Dec 2015 08:17:51 +0100
-Subject: [PATCH v3 24/77] ncr5380: Implement NCR5380_dma_xfer_len and
- remove LIMIT_TRANSFERSIZE macro
-In-Reply-To: <20151222011744.545942658@telegraphics.com.au>
-References: <20151222011737.980475848@telegraphics.com.au>
- <20151222011744.545942658@telegraphics.com.au>
-Message-ID: <5678F91F.3030306@suse.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 22 Dec 2015 08:19:25 +0100
+Subject: [arm:for-next 20/25] /tmp/ccMMP9pi.s:67: Error: selected
+ processor does not support ARM mode `isb'
+In-Reply-To: <201512221324.RTacS2Z7%fengguang.wu@intel.com>
+References: <201512221324.RTacS2Z7%fengguang.wu@intel.com>
+Message-ID: <CAKv+Gu98U0z_8FiyqgsdZkxc5P+jzNE1vj4BRSBsn7+7_8X2wA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/22/2015 02:18 AM, Finn Thain wrote:
-> Follow the example of the atari_NCR5380.c core driver and adopt the
-> NCR5380_dma_xfer_len() hook. Implement NCR5380_dma_xfer_len() for dtc.c
-> and g_NCR5380.c to take care of the limitations of these cards. Keep the
-> default for drivers using PSEUDO_DMA.
+On 22 December 2015 at 06:08, kbuild test robot <fengguang.wu@intel.com> wrote:
+> tree:   http://repo.or.cz/linux-2.6/linux-2.6-arm.git for-next
+> head:   952b96ba23e34ebe3ebef561336986005f3d8425
+> commit: 9afc4686531bf701670f329217b8b044ccd95297 [20/25] ARM: 8452/2: PJ4: make coprocessor access sequences buildable in Thumb2 mode
+> config: arm-allmodconfig (attached as .config)
+> reproduce:
+>         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         git checkout 9afc4686531bf701670f329217b8b044ccd95297
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=arm
 >
-> Eliminate the unused macro LIMIT_TRANSFERSIZE.
+> All errors (new ones prefixed by >>):
 >
-> Signed-off-by: Finn Thain <fthain@telegraphics.com.au>
+>    /tmp/ccMMP9pi.s: Assembler messages:
+>>> /tmp/ccMMP9pi.s:67: Error: selected processor does not support ARM mode `isb'
 >
-> ---
->   drivers/scsi/NCR5380.c       |   32 +++++---------------------------
->   drivers/scsi/arm/cumana_1.c  |    3 +++
->   drivers/scsi/arm/oak.c       |    2 ++
->   drivers/scsi/atari_NCR5380.c |    8 +++++---
->   drivers/scsi/dtc.c           |   14 ++++++++++++++
->   drivers/scsi/dtc.h           |    3 +++
->   drivers/scsi/g_NCR5380.c     |   15 +++++++++++++++
->   drivers/scsi/g_NCR5380.h     |    3 +++
->   drivers/scsi/mac_scsi.c      |    1 +
->   drivers/scsi/pas16.h         |    2 ++
->   drivers/scsi/t128.h          |    2 ++
->   11 files changed, 55 insertions(+), 30 deletions(-)
->
-Hmm. I really, _really_, wish we could move away from the 'magic' 
-definitions and use a proper function template.
-But maybe next time.
 
-So:
+Sigh. Apologies for this.
 
-Reviewed-by: Hannes Reinecke <hare@suse.com>
-
-Cheers,
-
-Hannes
--- 
-Dr. Hannes Reinecke		      zSeries & Storage
-hare at suse.de			      +49 911 74053 688
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg
-GF: J. Hawn, J. Guild, F. Imend?rffer, HRB 16746 (AG N?rnberg)
+I updated the patch to only use the 'isb' if CONFIG_THUMB2_KERNEL is defined.
