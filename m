@@ -1,26 +1,26 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 22 Dec 2015 14:49:07 +0000
-Subject: How to get better precision out of getrusage on the ARM?
-In-Reply-To: <CAF_dkJBjs1b+73ggvJyXwab6YL94HGT2jrqbcfaLxoETtQsD9Q@mail.gmail.com>
-References: <CAF_dkJBjs1b+73ggvJyXwab6YL94HGT2jrqbcfaLxoETtQsD9Q@mail.gmail.com>
-Message-ID: <20151222144907.GK8644@n2100.arm.linux.org.uk>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 22 Dec 2015 14:50:15 +0000
+Subject: [PATCH 1/2] arm: KVM: Do not update PC if the trap handler has
+ updated it
+In-Reply-To: <20151222143947.GA5631@cbox>
+References: <1450778118-12715-1-git-send-email-marc.zyngier@arm.com>
+ <1450778118-12715-2-git-send-email-marc.zyngier@arm.com>
+ <CAFEAcA8F2TJuRR5ELvit0FPa3XFMJ847S8WK25i5aVdGBU=PUA@mail.gmail.com>
+ <20151222143947.GA5631@cbox>
+Message-ID: <CAFEAcA9dALQv8Xcyg5FLAvRaJfH5UT2u4jrLjofLh5Ff2yo=8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 22, 2015 at 09:30:30AM -0500, Patrick Doyle wrote:
-> Short version:
-> My application running on a Cortex-A5 processor (the SAMA5D2 from
-> Atmel) calls getrusage(RUSAGE_THREAD, ...), which returns cpu time
-> quantized to the kernel tick frequency (100Hz or 1Khz, depending on
-> CONFIG_HZ_100 vs CONFIG_HZ_1000).
-> 
-> How can I get better precision for sched_clock on the (Cortex-A5) ARM?
->  The x86 uses the TSC.
+On 22 December 2015 at 14:39, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> On Tue, Dec 22, 2015 at 11:08:10AM +0000, Peter Maydell wrote:
+>> Won't this result in our incorrectly skipping the first insn
+>> in the fault handler if the original offending instruction
+>> was itself the first insn in the fault handler?
+>>
+> Wouldn't that then loop with the exception forever?
 
-You need to provide a sched_clock() implementation using
-sched_clock_register().
+Yes, but so would real hardware...
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+thanks
+-- PMM
