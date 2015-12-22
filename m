@@ -1,64 +1,42 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Tue, 22 Dec 2015 18:18:30 -0300
-Subject: OMAP display kconfig options changing
-In-Reply-To: <567430DB.4000507@ti.com>
-References: <5673CA0D.4000706@ti.com> <20151218135342.GF23396@atomide.com>
- <56741FA9.3080607@ti.com> <20151218160514.GK23396@atomide.com>
- <567430DB.4000507@ti.com>
-Message-ID: <CABxcv==VKi5jJ7=tEBe5fiPUpqpmaBd7C=t+_JohdXLA7eMR2Q@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 22 Dec 2015 13:19:28 -0800
+Subject: [GIT PULL] SoCFPGA DTS updates for v4.5, part 2
+In-Reply-To: <1450681610-14651-1-git-send-email-dinh.linux@gmail.com>
+References: <1450681610-14651-1-git-send-email-dinh.linux@gmail.com>
+Message-ID: <20151222211928.GD30172@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Tomi,
+On Mon, Dec 21, 2015 at 01:06:50AM -0600, Dinh Nguyen wrote:
+> Hi Arnd, Kevin and Olof,
+> 
+> Please consider pulling these 2 patches for v4.5.
+> 
+> Thanks,
+> Dinh
+> 
+> The following changes since commit 34a315883f60344f2116dcd445388531d09dc066:
+> 
+>   ARM: socfpga: Add support for DENX MCV SoM and MCVEVK baseboard (2015-11-19 10:15:05 -0600)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git socfpga_dts_for_v4.5_part_2
+> 
+> for you to fetch changes up to 91f69147d681e47e2aa2ff7dbf4c5468befa8a1b:
+> 
+>   ARM: socfpga: dts: Enable MMC support at correct place in the DT (2015-12-21 00:44:21 -0600)
 
-On Fri, Dec 18, 2015 at 1:14 PM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
-> On 18/12/15 18:05, Tony Lindgren wrote:
->
->>> Are you referring to Kconfig options? Or userspace?
->>
->> Well sounds like both need updating :)
->
-> Depends... For simple fb apps, omapdrm works fine, and X with the
-> standard fbdev driver should work with omapdrm too.
->
+Merged, thanks.
 
-It does, I just tested omapdrm + X with the fbdev DDX and I was able
-to start X and the xfce4 wm.
 
-I just needed to enable DRM_FBDEV_EMULATION in omap2plus_defconfig to
-have fbdev emulation over DRM.
+> Marek Vasut (2):
+>       ARM: socfpga: Repair incorrectly applied MCV patch
+>       ARM: socfpga: dts: Enable MMC support at correct place in the DT
 
-> But if the userspace is using any omapfb specific apps, then yes, update
-> is necessary.
->
+Same nit as several other pull requests today: please use "ARM: dts:
+<platform>: ..." as prefix for dt changes on 32-bit.
 
-Yes but these people should have a migration plan anyways since omapfb
-(and fbdev in general) is going away right?
 
->>> But no, I don't have links to either.
->>
->> So change the Kconfig options and then deal with the flood
->> of angry emails? :) I think we need instructions..
->
-> Ok. I think it's then best that I just update the defconfig to enable
-> omapfb as modules, as it is currently.
->
 
-In that case I think you should squash the defconfig changes with
-commit ("70ba4e05531f omapfb/displays: change CONFIG_DISPLAY_* to
-CONFIG_FB_OMAP2_*") to maintain bisectability.
-
-Alternatively, the current panel and encoders Kconfig symbols could
-remain for omapfb since that's the current ones used in
-omap2plus_defconfig where omapfb is the default and have new Kconfig
-symbols for omapdrm (i.e: CONFIG_DRM_OMAP_ENCODER_TFP410).
-
-> We can look again at changing the default to omapdrm after we've tested
-> it on OMAP2 too, and we have a better idea what the user needs to take
-> care of.
->
->  Tomi
->
-
-Best regards,
-Javier
+-Olof
