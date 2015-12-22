@@ -1,31 +1,59 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 22 Dec 2015 08:19:25 +0100
-Subject: [arm:for-next 20/25] /tmp/ccMMP9pi.s:67: Error: selected
- processor does not support ARM mode `isb'
-In-Reply-To: <201512221324.RTacS2Z7%fengguang.wu@intel.com>
-References: <201512221324.RTacS2Z7%fengguang.wu@intel.com>
-Message-ID: <CAKv+Gu98U0z_8FiyqgsdZkxc5P+jzNE1vj4BRSBsn7+7_8X2wA@mail.gmail.com>
+Date: Tue, 22 Dec 2015 08:21:09 +0100
+Subject: [PATCH v2] ARM: PJ4: make coprocessor access sequences buildable in
+ Thumb2 mode
+Message-ID: <1450768869-13450-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 December 2015 at 06:08, kbuild test robot <fengguang.wu@intel.com> wrote:
-> tree:   http://repo.or.cz/linux-2.6/linux-2.6-arm.git for-next
-> head:   952b96ba23e34ebe3ebef561336986005f3d8425
-> commit: 9afc4686531bf701670f329217b8b044ccd95297 [20/25] ARM: 8452/2: PJ4: make coprocessor access sequences buildable in Thumb2 mode
-> config: arm-allmodconfig (attached as .config)
-> reproduce:
->         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         git checkout 9afc4686531bf701670f329217b8b044ccd95297
->         # save the attached .config to linux build tree
->         make.cross ARCH=arm
->
-> All errors (new ones prefixed by >>):
->
->    /tmp/ccMMP9pi.s: Assembler messages:
->>> /tmp/ccMMP9pi.s:67: Error: selected processor does not support ARM mode `isb'
->
+The PJ4 inline asm sequence to write to cp15 cannot be built in Thumb-2
+mode, due to the way it performs arithmetic on the program counter, so it
+is built in ARM mode instead. However, building C files in ARM mode under
+CONFIG_THUMB2_KERNEL is problematic, since the instrumentation performed
+by subsystems like ftrace does not expect having to deal with interworking
+branches.
 
-Sigh. Apologies for this.
+Since the sequence in question is simply a poor man's ISB instruction,
+let's use a straight 'isb' instead when building in Thumb2 mode. Thumb2
+implies V7, so 'isb' should always be supported in that case.
 
-I updated the patch to only use the 'isb' if CONFIG_THUMB2_KERNEL is defined.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Nicolas Pitre <nico@linaro.org>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm/kernel/Makefile  | 1 -
+ arch/arm/kernel/pj4-cp0.c | 4 ++++
+ 2 files changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index af9e59bf3831..3c789496297f 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -73,7 +73,6 @@ obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
+ obj-$(CONFIG_PERF_EVENTS)	+= perf_regs.o perf_callchain.o
+ obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event_xscale.o perf_event_v6.o \
+ 				   perf_event_v7.o
+-CFLAGS_pj4-cp0.o		:= -marm
+ AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
+ obj-$(CONFIG_ARM_CPU_TOPOLOGY)  += topology.o
+ obj-$(CONFIG_VDSO)		+= vdso.o
+diff --git a/arch/arm/kernel/pj4-cp0.c b/arch/arm/kernel/pj4-cp0.c
+index 8153e36b2491..7c9248b74d3f 100644
+--- a/arch/arm/kernel/pj4-cp0.c
++++ b/arch/arm/kernel/pj4-cp0.c
+@@ -66,9 +66,13 @@ static void __init pj4_cp_access_write(u32 value)
+ 
+ 	__asm__ __volatile__ (
+ 		"mcr	p15, 0, %1, c1, c0, 2\n\t"
++#ifdef CONFIG_THUMB2_KERNEL
++		"isb\n\t"
++#else
+ 		"mrc	p15, 0, %0, c1, c0, 2\n\t"
+ 		"mov	%0, %0\n\t"
+ 		"sub	pc, pc, #4\n\t"
++#endif
+ 		: "=r" (temp) : "r" (value));
+ }
+ 
+-- 
+2.1.4
