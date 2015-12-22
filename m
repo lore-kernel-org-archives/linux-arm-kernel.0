@@ -1,40 +1,64 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 22 Dec 2015 13:08:03 -0800
-Subject: [GIT PULL 3/3] rockchip dts64 changes for 4.5, round 2
-In-Reply-To: <2617670.etrCQQMQaV@diego>
-References: <2532363.CsR3D6sdor@diego>
- <2617670.etrCQQMQaV@diego>
-Message-ID: <20151222210803.GC30172@localhost>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Tue, 22 Dec 2015 18:18:30 -0300
+Subject: OMAP display kconfig options changing
+In-Reply-To: <567430DB.4000507@ti.com>
+References: <5673CA0D.4000706@ti.com> <20151218135342.GF23396@atomide.com>
+ <56741FA9.3080607@ti.com> <20151218160514.GK23396@atomide.com>
+ <567430DB.4000507@ti.com>
+Message-ID: <CABxcv==VKi5jJ7=tEBe5fiPUpqpmaBd7C=t+_JohdXLA7eMR2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 21, 2015 at 02:28:27AM +0100, Heiko St?bner wrote:
-> Hi Arnd, Kevin, Olof,
-> 
-> and finally a small stack of 64bit devicetree changes, mainly adding the
-> broadcast-timer node for the driver that got improved to support arm64
-> compilations.
-> 
-> So if these 3 look ok, please pull.
-> 
-> 
-> Thanks
-> Heiko
-> 
-> 
-> The following changes since commit 5378e28c9776fbab6065cfb54417acff3ea5f1fd:
-> 
->   arm64: dts: rockchip: add rk3368 evaluation board (2015-12-02 00:35:22 +0100)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.5-rockchip-dts64-2
-> 
-> for you to fetch changes up to b8084e5b34e83875846053bf9cd951b7640e40fe:
-> 
->   arm64: dts: rockchip: Add the broadcast-timer for RK3368 SoC (2015-12-12 23:20:38 +0100)
+Hello Tomi,
 
-Merged, thanks.
+On Fri, Dec 18, 2015 at 1:14 PM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
+> On 18/12/15 18:05, Tony Lindgren wrote:
+>
+>>> Are you referring to Kconfig options? Or userspace?
+>>
+>> Well sounds like both need updating :)
+>
+> Depends... For simple fb apps, omapdrm works fine, and X with the
+> standard fbdev driver should work with omapdrm too.
+>
 
+It does, I just tested omapdrm + X with the fbdev DDX and I was able
+to start X and the xfce4 wm.
 
--Olof
+I just needed to enable DRM_FBDEV_EMULATION in omap2plus_defconfig to
+have fbdev emulation over DRM.
+
+> But if the userspace is using any omapfb specific apps, then yes, update
+> is necessary.
+>
+
+Yes but these people should have a migration plan anyways since omapfb
+(and fbdev in general) is going away right?
+
+>>> But no, I don't have links to either.
+>>
+>> So change the Kconfig options and then deal with the flood
+>> of angry emails? :) I think we need instructions..
+>
+> Ok. I think it's then best that I just update the defconfig to enable
+> omapfb as modules, as it is currently.
+>
+
+In that case I think you should squash the defconfig changes with
+commit ("70ba4e05531f omapfb/displays: change CONFIG_DISPLAY_* to
+CONFIG_FB_OMAP2_*") to maintain bisectability.
+
+Alternatively, the current panel and encoders Kconfig symbols could
+remain for omapfb since that's the current ones used in
+omap2plus_defconfig where omapfb is the default and have new Kconfig
+symbols for omapdrm (i.e: CONFIG_DRM_OMAP_ENCODER_TFP410).
+
+> We can look again at changing the default to omapdrm after we've tested
+> it on OMAP2 too, and we have a better idea what the user needs to take
+> care of.
+>
+>  Tomi
+>
+
+Best regards,
+Javier
