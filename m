@@ -1,47 +1,79 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Tue, 22 Dec 2015 12:49:07 -0800
-Subject: [PATCH v11 0/2] Sigma Designs Tango4 port
-In-Reply-To: <5679B15F.80106@free.fr> (Mason's message of "Tue, 22 Dec 2015
- 21:23:59 +0100")
-References: <566FDF53.3030004@sigmadesigns.com>
- <7hr3iexp3e.fsf@deeprootsystems.com> <5679B15F.80106@free.fr>
-Message-ID: <7hoadi6wfw.fsf@deeprootsystems.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 22 Dec 2015 21:54:46 +0100
+Subject: [GIT PULL] Allwinner DT changes for 4.5, round 2
+Message-ID: <20151222205446.GA20757@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mason <slash.tmp@free.fr> writes:
+Hi,
 
-> On 22/12/2015 20:25, Kevin Hilman wrote:
->
->> Marc Gonzalez wrote:
->> 
->>> Changes since v10:
->>> Add aliases and chosen DT nodes
->>> Use CPU_CLK and SYS_CLK symbolic names
->>> MPCore private memory region DT node
->>> select TANGO_IRQ instead of GENERIC_IRQ_CHIP
->>>
->>> Changes planned for a future patch series:
->>> Have clkgen driver export CD2 for USB, and CD6 for SDIO
->> 
->> Was it intentional to leave out a multi_v7_defconfig change so that this
->> actually builds?  Or was that planned for a future series?
->
-> How is a multi_v7_defconfig different from any old defconfig?
+Please pull the following late changes for the Allwinner SoCs.
 
-Not sure what you're asking.
+I expect it to be the last pull request for the 4.5 merge window on
+our side.
 
-The point is that this series doesn't enable any defconfig to build it.
+Thanks!
+Maxime
 
->> IMO, it should be part of this series so it gets build tested as soon as
->> it's merged.
->
-> The problem is that a mandatory driver is missing upstream
-> (interrupt controller).
->
-> http://thread.gmane.org/gmane.linux.kernel/2089470
+The following changes since commit 2367cee5fda1e9ebc605b13175492b31030acd9d:
 
-Which means it presumably wont boot without that, but it should still
-build without it, correct?  (I tried it locally, and it does.)
+  ARM: dts: sun7i: Olimex A20-SOM-EVB: Enable mmc3 (baseboard SD socket) (2015-12-11 09:21:29 +0100)
 
-Kevin
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git sunxi-dt-for-4.5-2
+
+for you to fetch changes up to 12ec9384036304e64904afdc6234b842fe54f411:
+
+  ARM: dts: sun5i: Add dts file for the Empire Electronix D709 tablet (2015-12-21 17:10:18 +0100)
+
+----------------------------------------------------------------
+Allwinner DT patches, round 2
+
+Mostly some audio codec patches to enable it on more boards, and a bunch
+devices activation (Ethernet, touchscreen, backlights). One more board has
+been added too.
+
+----------------------------------------------------------------
+Aleksei Mamlin (4):
+      ARM: dts: sun7i: Enable PWM controller on Wexler TAB7200 tablet
+      ARM: dts: sun7i: Enable touchscreen on Wexler TAB7200 tablet
+      ARM: dts: sun7i: Add backlight node to Wexler TAB7200 tablet
+      ARM: dts: sun7i: Add PA gpio pin to Wexler TAB7200 tablet
+
+Hans de Goede (4):
+      ARM: dts: sun5i: Enable onboard codec used on the UTOO P66 tablet
+      ARM: dts: sun4i: Enable onboard codec used on the pov protab2-ips9 tablet
+      ARM: dts: sun7i: Enable gmac on Wits Pro A20 DKT
+      ARM: dts: sun5i: Add dts file for the Empire Electronix D709 tablet
+
+Marcus Cooper (2):
+      ARM: sunxi: dt: enable audio codec on mk802
+      ARM: dt: sun7i: Enable audio codec on MK808C
+
+Priit Laes (1):
+      ARM: dts: sun4i: gemei-g9: Enable PA GPIO pin configuration
+
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/sun4i-a10-gemei-g9.dts           |  14 +-
+ arch/arm/boot/dts/sun4i-a10-mk802.dts              |   4 +
+ arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts   |  14 ++
+ .../boot/dts/sun5i-a13-empire-electronix-d709.dts  | 241 +++++++++++++++++++++
+ arch/arm/boot/dts/sun5i-a13-utoo-p66.dts           |  14 ++
+ arch/arm/boot/dts/sun7i-a20-mk808c.dts             |   4 +
+ arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts     |  53 +++++
+ arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts   |  12 +
+ 9 files changed, 356 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/sun5i-a13-empire-electronix-d709.dts
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151222/735f46aa/attachment-0001.sig>
