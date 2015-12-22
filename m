@@ -1,23 +1,23 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 22 Dec 2015 08:10:45 -0800
-Subject: [PATCH 3/3] ARM: dts: Add NAND support for dm8148-evm
+Date: Tue, 22 Dec 2015 08:10:44 -0800
+Subject: [PATCH 2/3] ARM: dts: Add NAND support for j5-eco evm
 In-Reply-To: <1450800645-10766-1-git-send-email-tony@atomide.com>
 References: <1450800645-10766-1-git-send-email-tony@atomide.com>
-Message-ID: <1450800645-10766-4-git-send-email-tony@atomide.com>
+Message-ID: <1450800645-10766-3-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add NAND support for dm8148-evm.
+Add NAND support for j5-eco evm.
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/boot/dts/dm8148-evm.dts | 56 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/dra62x-j5eco-evm.dts | 56 ++++++++++++++++++++++++++++++++++
  1 file changed, 56 insertions(+)
 
-diff --git a/arch/arm/boot/dts/dm8148-evm.dts b/arch/arm/boot/dts/dm8148-evm.dts
-index e070862..862977f 100644
---- a/arch/arm/boot/dts/dm8148-evm.dts
-+++ b/arch/arm/boot/dts/dm8148-evm.dts
+diff --git a/arch/arm/boot/dts/dra62x-j5eco-evm.dts b/arch/arm/boot/dts/dra62x-j5eco-evm.dts
+index 7900806..3937a58 100644
+--- a/arch/arm/boot/dts/dra62x-j5eco-evm.dts
++++ b/arch/arm/boot/dts/dra62x-j5eco-evm.dts
 @@ -35,6 +35,62 @@
  	phy-mode = "rgmii";
  };
