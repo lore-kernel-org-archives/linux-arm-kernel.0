@@ -1,123 +1,101 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Tue, 22 Dec 2015 16:07:57 +0800
-Subject: [PATCH v8 02/20] KVM: ARM64: Define PMU data structure for each vcpu
+Date: Tue, 22 Dec 2015 16:08:10 +0800
+Subject: [PATCH v8 15/20] KVM: ARM64: Add a helper to forward trap to guest EL1
 In-Reply-To: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1450771695-11948-3-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1450771695-11948-16-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Here we plan to support virtual PMU for guest by full software
-emulation, so define some basic structs and functions preparing for
-futher steps. Define struct kvm_pmc for performance monitor counter and
-struct kvm_pmu for performance monitor unit for each vcpu. According to
-ARMv8 spec, the PMU contains at most 32(ARMV8_MAX_COUNTERS) counters.
-
-Since this only supports ARM64 (or PMUv3), add a separate config symbol
-for it.
+This helper forward the trap caused by MRS/MSR for arch64 and MCR/MRC,
+MCRR/MRRC for arch32 CP15 to guest EL1.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- arch/arm64/include/asm/kvm_host.h |  2 ++
- arch/arm64/kvm/Kconfig            |  7 +++++++
- include/kvm/arm_pmu.h             | 42 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 51 insertions(+)
- create mode 100644 include/kvm/arm_pmu.h
+ arch/arm64/include/asm/kvm_emulate.h |  1 +
+ arch/arm64/kvm/inject_fault.c        | 52 +++++++++++++++++++++++++++++++++++-
+ 2 files changed, 52 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 689d4c9..6f0241f 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -36,6 +36,7 @@
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index 3066328..88b2958 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -36,6 +36,7 @@ unsigned long *vcpu_spsr32(const struct kvm_vcpu *vcpu);
+ bool kvm_condition_valid32(const struct kvm_vcpu *vcpu);
+ void kvm_skip_instr32(struct kvm_vcpu *vcpu, bool is_wide_instr);
  
- #include <kvm/arm_vgic.h>
- #include <kvm/arm_arch_timer.h>
-+#include <kvm/arm_pmu.h>
++void kvm_forward_trap_to_el1(struct kvm_vcpu *vcpu);
+ void kvm_inject_undefined(struct kvm_vcpu *vcpu);
+ void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr);
+ void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
+diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
+index 648112e..052ef25 100644
+--- a/arch/arm64/kvm/inject_fault.c
++++ b/arch/arm64/kvm/inject_fault.c
+@@ -27,7 +27,10 @@
  
- #define KVM_MAX_VCPUS VGIC_V3_MAX_CPUS
+ #define PSTATE_FAULT_BITS_64 	(PSR_MODE_EL1h | PSR_A_BIT | PSR_F_BIT | \
+ 				 PSR_I_BIT | PSR_D_BIT)
+-#define EL1_EXCEPT_SYNC_OFFSET	0x200
++#define EL1_EXCEPT_BAD_SYNC_OFFSET	0x0
++#define EL1_EXCEPT_SYNC_OFFSET		0x200
++#define EL0_EXCEPT_SYNC_OFFSET_64	0x400
++#define EL0_EXCEPT_SYNC_OFFSET_32	0x600
  
-@@ -211,6 +212,7 @@ struct kvm_vcpu_arch {
- 	/* VGIC state */
- 	struct vgic_cpu vgic_cpu;
- 	struct arch_timer_cpu timer_cpu;
-+	struct kvm_pmu pmu;
- 
- 	/*
- 	 * Anything that is not used directly from assembly code goes
-diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-index a5272c0..de7450d 100644
---- a/arch/arm64/kvm/Kconfig
-+++ b/arch/arm64/kvm/Kconfig
-@@ -36,6 +36,7 @@ config KVM
- 	select HAVE_KVM_EVENTFD
- 	select HAVE_KVM_IRQFD
- 	select KVM_ARM_VGIC_V3
-+	select KVM_ARM_PMU if HW_PERF_EVENTS
- 	---help---
- 	  Support hosting virtualized guest machines.
- 	  We don't support KVM with 16K page tables yet, due to the multiple
-@@ -48,6 +49,12 @@ config KVM_ARM_HOST
- 	---help---
- 	  Provides host support for ARM processors.
- 
-+config KVM_ARM_PMU
-+	bool
-+	---help---
-+	  Adds support for a virtual Performance Monitoring Unit (PMU) in
-+	  virtual machines.
+ static void prepare_fault32(struct kvm_vcpu *vcpu, u32 mode, u32 vect_offset)
+ {
+@@ -201,3 +204,50 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu)
+ 	else
+ 		inject_undef64(vcpu);
+ }
 +
- source drivers/vhost/Kconfig
- 
- endif # VIRTUALIZATION
-diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-new file mode 100644
-index 0000000..ddcb5b2
---- /dev/null
-+++ b/include/kvm/arm_pmu.h
-@@ -0,0 +1,42 @@
-+/*
-+ * Copyright (C) 2015 Linaro Ltd.
-+ * Author: Shannon Zhao <shannon.zhao@linaro.org>
++/**
++ * kvm_forward_trap_to_el1 - forward access trap to the guest EL1
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ * It is assumed that this code is called from the VCPU thread and that the
++ * VCPU therefore is not currently executing guest code.
 + */
++void kvm_forward_trap_to_el1(struct kvm_vcpu *vcpu)
++{
++	unsigned long cpsr;
++	u32 esr = vcpu->arch.fault.esr_el2;
++	u32 esr_ec = (esr & ESR_ELx_EC_MASK) >> ESR_ELx_EC_SHIFT;
 +
-+#ifndef __ASM_ARM_KVM_PMU_H
-+#define __ASM_ARM_KVM_PMU_H
++	if (esr_ec == ESR_ELx_EC_SYS64) {
++		u64 exc_offset;
 +
-+#ifdef CONFIG_KVM_ARM_PMU
++		cpsr = *vcpu_cpsr(vcpu);
++		*vcpu_spsr(vcpu) = cpsr;
++		*vcpu_elr_el1(vcpu) = *vcpu_pc(vcpu);
 +
-+#include <linux/perf_event.h>
-+#include <asm/pmu.h>
++		*vcpu_cpsr(vcpu) = PSTATE_FAULT_BITS_64;
 +
-+struct kvm_pmc {
-+	u8 idx;/* index into the pmu->pmc array */
-+	struct perf_event *perf_event;
-+	u64 bitmask;
-+};
++		switch (cpsr & (PSR_MODE_MASK | PSR_MODE32_BIT)) {
++		case PSR_MODE_EL0t:
++			exc_offset = EL0_EXCEPT_SYNC_OFFSET_64;
++			break;
++		case PSR_MODE_EL1t:
++			exc_offset = EL1_EXCEPT_BAD_SYNC_OFFSET;
++			break;
++		case PSR_MODE_EL1h:
++			exc_offset = EL1_EXCEPT_SYNC_OFFSET;
++			break;
++		default:
++			exc_offset = EL0_EXCEPT_SYNC_OFFSET_32;
++		}
 +
-+struct kvm_pmu {
-+	/* PMU IRQ Number per VCPU */
-+	int irq_num;
-+	struct kvm_pmc pmc[ARMV8_MAX_COUNTERS];
-+};
-+#else
-+struct kvm_pmu {
-+};
-+#endif
++		*vcpu_pc(vcpu) = vcpu_sys_reg(vcpu, VBAR_EL1) + exc_offset;
 +
-+#endif
++		if (kvm_vcpu_trap_il_is32bit(vcpu))
++			esr |= ESR_ELx_IL;
++
++		vcpu_sys_reg(vcpu, ESR_EL1) = esr;
++	} else if (esr_ec == ESR_ELx_EC_CP15_32 ||
++		   esr_ec == ESR_ELx_EC_CP15_64) {
++		prepare_fault32(vcpu, COMPAT_PSR_MODE_UND, 4);
++	}
++}
 -- 
 2.0.4
