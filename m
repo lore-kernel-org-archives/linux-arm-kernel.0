@@ -1,51 +1,774 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 22 Dec 2015 23:35:02 +0100
-Subject: [PATCH v2 3/3] ARM: dts: sun4i: Add touchscreen node to inet97fv2 dts
- file
-In-Reply-To: <1450823702-21565-1-git-send-email-hdegoede@redhat.com>
-References: <1450823702-21565-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1450823702-21565-3-git-send-email-hdegoede@redhat.com>
+From: akshay.bhat@timesys.com (Akshay Bhat)
+Date: Tue, 22 Dec 2015 17:42:01 -0500
+Subject: [PATCH v5 3/7] ARM: dts: imx: Add Advantech BA-16 Qseven module
+In-Reply-To: <20151222113742.GA26290@tiger>
+References: <1449177036-13317-1-git-send-email-akshay.bhat@timesys.com>
+ <1449177036-13317-4-git-send-email-akshay.bhat@timesys.com>
+ <20151222113742.GA26290@tiger>
+Message-ID: <5679D1B9.20304@timesys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a node describing the focaltech ft5306de4 touchscreen found on
-inet97fv2 tablets.
+Shawn, thanks for the feedback. I have addressed all the comments with 
+the exception of removing imx6q-ba16 container node in iomux. I get 
+errors if I do so, details in-line.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
-Changes in v2:
--Drop unused pinctrl-names = "default";
----
- arch/arm/boot/dts/sun4i-a10-inet97fv2.dts | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+On 12/22/2015 06:40 AM, Shawn Guo wrote:
+> On Thu, Dec 03, 2015 at 04:10:32PM -0500, Akshay Bhat wrote:
+>> From: Justin Waters <justin.waters@timesys.com>
+>>
+>> Add support for Advantech BA-16 module based on iMX6D processor
+>>
+>> http://www2.advantech.com/products/medical_computing_system/dms-ba16/mod_64aa1566-169c-483d-97c8-c2c22c163fc3.aspx
+>> Signed-off-by: Akshay Bhat <akshay.bhat@timesys.com>
+>> ---
+>>   arch/arm/boot/dts/imx6q-ba16.dtsi | 589 ++++++++++++++++++++++++++++++++++++++
+>>   1 file changed, 589 insertions(+)
+>>   create mode 100644 arch/arm/boot/dts/imx6q-ba16.dtsi
+>>
+>> diff --git a/arch/arm/boot/dts/imx6q-ba16.dtsi b/arch/arm/boot/dts/imx6q-ba16.dtsi
+>> new file mode 100644
+>> index 0000000..9510713
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/imx6q-ba16.dtsi
+>> @@ -0,0 +1,589 @@
+>> +/*
+>> + * Support for imx6 based Advantech DMS-BA16 Qseven module
+>> + *
+>> + * Copyright 2015 Timesys Corporation.
+>> + * Copyright 2015 General Electric Company
+>> + *
+>> + * The code contained herein is licensed under the GNU General Public
+>> + * License. You may obtain a copy of the GNU General Public License
+>> + * Version 2 or later at the following locations:
+>> + *
+>> + * http://www.opensource.org/licenses/gpl-license.html
+>> + * http://www.gnu.org/copyleft/gpl.html
+>> + */
+>
+> GPL/X11 dual licences are generally suggested for new dts files to
+> consider non-Linux users.  You can grep "X11" in arch/arm/boot/dts to
+> find a plenty of examples.
+>
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts b/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts
-index 77c31da..04b0d2d 100644
---- a/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts
-@@ -48,6 +48,7 @@
- 
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/input/input.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
- 
- / {
- 	model = "INet-97F Rev 02";
-@@ -93,6 +94,15 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c2_pins_a>;
- 	status = "okay";
-+
-+	ft5406ee8: touchscreen at 38 {
-+		compatible = "edt,edt-ft5406";
-+		reg = <0x38>;
-+		interrupt-parent = <&pio>;
-+		interrupts = <7 21 IRQ_TYPE_EDGE_FALLING>;
-+		touchscreen-size-x = <800>;
-+		touchscreen-size-y = <480>;
-+	};
- };
- 
- &lradc {
--- 
-2.5.0
+Will fix it.
+
+>> +
+>> +#include "imx6q.dtsi"
+>> +#include <dt-bindings/gpio/gpio.h>
+>> +
+>> +/ {
+>> +	memory {
+>> +		reg = <0x10000000 0x40000000>;
+>> +	};
+>> +
+>> +	clocks {
+>> +		clk24m: clk24m {
+>> +			compatible = "fixed-clock";
+>> +			#clock-cells = <0>;
+>> +			clock-frequency = <24000000>;
+>> +		};
+>> +	};
+>> +
+>> +	backlight_lvds: backlight {
+>> +		pinctrl-names = "default";
+>> +		pinctrl-0 = <&pinctrl_display>;
+>> +		compatible = "pwm-backlight";
+>> +		pwms = <&pwm1 0 5000000>;
+>> +		brightness-levels = <  0   1   2   3   4   5   6   7   8   9
+>> +				      10  11  12  13  14  15  16  17  18  19
+>> +				      20  21  22  23  24  25  26  27  28  29
+>> +				      30  31  32  33  34  35  36  37  38  39
+>> +				      40  41  42  43  44  45  46  47  48  49
+>> +				      50  51  52  53  54  55  56  57  58  59
+>> +				      60  61  62  63  64  65  66  67  68  69
+>> +				      70  71  72  73  74  75  76  77  78  79
+>> +				      80  81  82  83  84  85  86  87  88  89
+>> +				      90  91  92  93  94  95  96  97  98  99
+>> +				     100 101 102 103 104 105 106 107 108 109
+>> +				     110 111 112 113 114 115 116 117 118 119
+>> +				     120 121 122 123 124 125 126 127 128 129
+>> +				     130 131 132 133 134 135 136 137 138 139
+>> +				     140 141 142 143 144 145 146 147 148 149
+>> +				     150 151 152 153 154 155 156 157 158 159
+>> +				     160 161 162 163 164 165 166 167 168 169
+>> +				     170 171 172 173 174 175 176 177 178 179
+>> +				     180 181 182 183 184 185 186 187 188 189
+>> +				     190 191 192 193 194 195 196 197 198 199
+>> +				     200 201 202 203 204 205 206 207 208 209
+>> +				     210 211 212 213 214 215 216 217 218 219
+>> +				     220 221 222 223 224 225 226 227 228 229
+>> +				     230 231 232 233 234 235 236 237 238 239
+>> +				     240 241 242 243 244 245 246 247 248 249
+>> +				     250 251 252 253 254 255>;
+>> +		default-brightness-level = <255>;
+>> +		enable-gpios = <&gpio4 15 GPIO_ACTIVE_HIGH>;
+>> +	};
+>> +
+>> +	reg_1p8v: regulator at 1 {
+>
+> @unit-address should only present for nodes which have 'reg' property.
+> As we choose to put these regulators directly under root node, we would
+> probably want to name them like:
+>
+> 	reg_xxx: regulator-xxx {
+> 		...
+> 	}
+>
+Will fix it
+	
+>
+>> +		compatible = "regulator-fixed";
+>> +		regulator-name = "1P8V";
+>> +		regulator-min-microvolt = <1800000>;
+>> +		regulator-max-microvolt = <1800000>;
+>> +		regulator-always-on;
+>> +	};
+>> +
+>> +	reg_3p3v: regulator at 2 {
+>> +		compatible = "regulator-fixed";
+>> +		regulator-name = "3P3V";
+>> +		regulator-min-microvolt = <3300000>;
+>> +		regulator-max-microvolt = <3300000>;
+>> +		regulator-always-on;
+>> +	};
+>> +
+>> +	reg_lvds: regulator at 3 {
+>> +		compatible = "regulator-fixed";
+>> +		regulator-name = "lvds_ppen";
+>> +		regulator-min-microvolt = <3300000>;
+>> +		regulator-max-microvolt = <3300000>;
+>> +		regulator-boot-on;
+>> +		gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
+>> +		enable-active-high;
+>> +	};
+>> +
+>> +	reg_usb_otg_vbus: regulator at 4 {
+>> +		compatible = "regulator-fixed";
+>> +		regulator-name = "usb_otg_vbus";
+>> +		regulator-min-microvolt = <5000000>;
+>> +		regulator-max-microvolt = <5000000>;
+>> +	};
+>> +
+>> +	reg_usb_h1_vbus: regulator at 5 {
+>> +		compatible = "regulator-fixed";
+>> +		regulator-name = "usb_h1_vbus";
+>> +		regulator-min-microvolt = <5000000>;
+>> +		regulator-max-microvolt = <5000000>;
+>> +	};
+>> +};
+>> +
+>> +&audmux {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_audmux>;
+>> +	status = "okay";
+>> +};
+>> +
+>> +&ecspi1 {
+>> +	fsl,spi-num-chipselects = <1>;
+>> +	cs-gpios = <&gpio2 30 GPIO_ACTIVE_HIGH>;
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_ecspi1>;
+>> +	status = "okay";
+>> +
+>> +	flash: n25q032 at 0 {
+>> +		compatible = "jedec,spi-nor";
+>> +		spi-max-frequency = <20000000>;
+>> +		reg = <0>;
+>
+> Have a new line between properties and sub-nodes.
+>
+Will fix it
+
+
+>> +		partitions {
+>> +			#address-cells = <1>;
+>> +			#size-cells = <1>;
+>> +
+>> +			partition at 0 {
+>> +				label = "U-Boot";
+>> +				reg = <0x0 0xC0000>;
+>
+> Please consistently use lowercase for hex values.
+>
+Will fix it
+
+
+>> +			};
+>> +			partition at C0000 {
+>> +				label = "env";
+>> +				reg = <0xC0000 0x10000>;
+>> +			};
+>
+> Have a new line between nodes.
+>
+Will fix it
+
+
+>> +			partition at D0000 {
+>> +				label = "spare";
+>> +				reg = <0xD0000 0x130000>;
+>> +			};
+>> +		};
+>> +	};
+>> +};
+>> +
+>> +&fec {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_enet>;
+>> +	phy-mode = "rgmii";
+>> +	status = "okay";
+>> +};
+>> +
+>> +&hdmi {
+>> +	ddc-i2c-bus = <&i2c2>;
+>> +	status = "okay";
+>> +};
+>> +
+>> +&i2c1 {
+>> +	clock-frequency = <100000>;
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_i2c1>;
+>> +	status = "okay";
+>> +};
+>> +
+>> +&i2c2 {
+>> +	clock-frequency = <100000>;
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_i2c2>;
+>> +	status = "okay";
+>> +};
+>> +
+>> +&i2c3 {
+>> +	clock-frequency = <100000>;
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_i2c3>;
+>> +	status = "okay";
+>> +
+>> +	pmic at 58 {
+>> +		compatible = "dlg,da9063";
+>> +		reg = <0x58>;
+>> +		pinctrl-names = "default";
+>> +		pinctrl-0 = <&pinctrl_pmic>;
+>> +		interrupt-parent = <&gpio7>;
+>> +		interrupts = <13 IRQ_TYPE_LEVEL_LOW>;
+>> +
+>> +		regulators {
+>> +			vdd_bcore1: bcore1 {
+>> +				regulator-min-microvolt = <1420000>;
+>> +				regulator-max-microvolt = <1420000>;
+>> +				regulator-always-on;
+>> +				regulator-boot-on;
+>> +			};
+>> +
+>> +			vdd_bcore2: bcore2 {
+>> +				regulator-min-microvolt = <1420000>;
+>> +				regulator-max-microvolt = <1420000>;
+>> +				regulator-always-on;
+>> +				regulator-boot-on;
+>> +			};
+>> +
+>> +			vdd_bpro: bpro {
+>> +				regulator-min-microvolt = <1500000>;
+>> +				regulator-max-microvolt = <1500000>;
+>> +				regulator-always-on;
+>> +				regulator-boot-on;
+>> +			};
+>> +
+>> +			vdd_bmem: bmem {
+>> +				regulator-min-microvolt = <1800000>;
+>> +				regulator-max-microvolt = <1800000>;
+>> +				regulator-always-on;
+>> +				regulator-boot-on;
+>> +			};
+>> +
+>> +			vdd_bio: bio {
+>> +				regulator-min-microvolt = <1800000>;
+>> +				regulator-max-microvolt = <1800000>;
+>> +				regulator-always-on;
+>> +				regulator-boot-on;
+>> +			};
+>> +
+>> +			vdd_bperi: bperi {
+>> +				regulator-min-microvolt = <3300000>;
+>> +				regulator-max-microvolt = <3300000>;
+>> +				regulator-always-on;
+>> +				regulator-boot-on;
+>> +			};
+>> +
+>> +			vdd_ldo1: ldo1 {
+>> +				regulator-min-microvolt = <600000>;
+>> +				regulator-max-microvolt = <1860000>;
+>> +			};
+>> +
+>> +			vdd_ldo2: ldo2 {
+>> +				regulator-min-microvolt = <600000>;
+>> +				regulator-max-microvolt = <1860000>;
+>> +			};
+>> +
+>> +			vdd_ldo3: ldo3 {
+>> +				regulator-min-microvolt = <900000>;
+>> +				regulator-max-microvolt = <3440000>;
+>> +			};
+>> +
+>> +			vdd_ldo4: ldo4 {
+>> +				regulator-min-microvolt = <900000>;
+>> +				regulator-max-microvolt = <3440000>;
+>> +			};
+>> +
+>> +			vdd_ldo5: ldo5 {
+>> +				regulator-min-microvolt = <900000>;
+>> +				regulator-max-microvolt = <3600000>;
+>> +			};
+>> +
+>> +			vdd_ldo6: ldo6 {
+>> +				regulator-min-microvolt = <900000>;
+>> +				regulator-max-microvolt = <3600000>;
+>> +			};
+>> +
+>> +			vdd_ldo7: ldo7 {
+>> +				regulator-min-microvolt = <900000>;
+>> +				regulator-max-microvolt = <3600000>;
+>> +			};
+>> +
+>> +			vdd_ldo8: ldo8 {
+>> +				regulator-min-microvolt = <900000>;
+>> +				regulator-max-microvolt = <3600000>;
+>> +			};
+>> +
+>> +			vdd_ldo9: ldo9 {
+>> +				regulator-min-microvolt = <950000>;
+>> +				regulator-max-microvolt = <3600000>;
+>> +			};
+>> +
+>> +			vdd_ldo10: ldo10 {
+>> +				regulator-min-microvolt = <900000>;
+>> +				regulator-max-microvolt = <3600000>;
+>> +			};
+>> +
+>> +			vdd_ldo11: ldo11 {
+>> +				regulator-min-microvolt = <900000>;
+>> +				regulator-max-microvolt = <3600000>;
+>> +				regulator-always-on;
+>> +				regulator-boot-on;
+>> +			};
+>> +		};
+>> +	};
+>> +
+>> +	rtc at 32 {
+>> +		compatible = "epson,rx8010";
+>
+> Is this compatible string documented somewhere?
+>
+Will submit a separate patch to update 
+devicetree/bindings/i2c/trivial-devices.txt
+
+>> +		reg = <0x32>;
+>> +		interrupt-parent = <&gpio4>;
+>> +		interrupts = <10 IRQ_TYPE_LEVEL_HIGH>;
+>> +	};
+>> +};
+>> +
+>> +&iomuxc {
+>
+> Suggest to put the iomuxc node at the bottom of the dts to make the read
+> of this file a bit easier.
+>
+Will fix it
+
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_hog>;
+>> +
+>> +	imx6q-ba16 {
+>
+> With commit 5fcdf6a7ed95 (pinctrl: imx: Allow parsing DT without function
+> nodes) in place, we can get rid of this container node to save one level
+> of indentation.
+>
+
+If i remove the imx6q-ba16 container node, then I get multiple errors 
+during boot.
+
+[    2.043594] imx6q-pinctrl 20e0000.iomuxc: unable to find group for 
+node ecspi1grp
+.....
+[    2.467403] imx6q-pinctrl 20e0000.iomuxc: unable to find group for 
+node usbotggrp
+[    2.482394] imx6q-pinctrl 20e0000.iomuxc: unable to find group for 
+node usbhubgrp
+.....
+[    2.640509] imx6q-pinctrl 20e0000.iomuxc: unable to find group for 
+node usdhc2grp
+[    2.640889] imx6q-pinctrl 20e0000.iomuxc: unable to find group for 
+node usdhc2grp
+[    2.640986] sdhci-esdhc-imx: probe of 2194000.usdhc failed with error -22
+[    2.641048] imx6q-pinctrl 20e0000.iomuxc: unable to find group for 
+node usdhc3grp
+[    2.641301] imx6q-pinctrl 20e0000.iomuxc: unable to find group for 
+node usdhc3grp
+[    2.641385] sdhci-esdhc-imx: probe of 2198000.usdhc failed with error -22
+[    2.641446] imx6q-pinctrl 20e0000.iomuxc: unable to find group for 
+node usdhc4grp
+[    2.641688] imx6q-pinctrl 20e0000.iomuxc: unable to find group for 
+node usdhc4grp
+[    2.641770] sdhci-esdhc-imx: probe of 219c000.usdhc failed with error -22
+
+
+The change I did was:
+
+&iomuxc {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_hog>;
+
+	pinctrl_audmux: audmux {
+		fsl,pins = <
+			MX6QDL_PAD_DISP0_DAT20__AUD4_TXC  0x130b0
+			MX6QDL_PAD_DISP0_DAT21__AUD4_TXD  0x130b0
+			MX6QDL_PAD_DISP0_DAT22__AUD4_TXFS 0x130b0
+			MX6QDL_PAD_DISP0_DAT23__AUD4_RXD  0x130b0
+		>;
+	};
+
+	pinctrl_display: dispgrp {
+		fsl,pins = <
+			/* BLEN_OUT */
+			MX6QDL_PAD_KEY_ROW4__GPIO4_IO15  0x1b0b0
+			/* LVDS_PPEN_OUT */
+			MX6QDL_PAD_EIM_D22__GPIO3_IO22   0x1b0b0
+		>;
+	};
+
+	pinctrl_ecspi1: ecspi1grp {
+		fsl,pins = <
+			MX6QDL_PAD_EIM_D17__ECSPI1_MISO	0x100b1
+			MX6QDL_PAD_EIM_D18__ECSPI1_MOSI	0x100b1
+			MX6QDL_PAD_EIM_D16__ECSPI1_SCLK	0x100b1
+			/* SPI1 CS */
+			MX6QDL_PAD_EIM_EB2__GPIO2_IO30	0x1b0b0
+		>;
+	};
+
+	............
+
+	pinctrl_wdog: wdoggrp {
+		fsl,pins = <
+			MX6QDL_PAD_GPIO_9__WDOG1_B	0x1b0b0
+		>;
+	};
+};
+
+>> +		pinctrl_hog: hoggrp {
+>> +			fsl,pins = <
+>> +				MX6QDL_PAD_NANDF_D0__GPIO2_IO00  0x80000000	/* GPIO0 */
+>> +				MX6QDL_PAD_NANDF_D1__GPIO2_IO01  0x80000000	/* GPIO1 */
+>> +				MX6QDL_PAD_NANDF_D2__GPIO2_IO02  0x80000000	/* GPIO2 */
+>> +				MX6QDL_PAD_NANDF_D3__GPIO2_IO03  0x80000000	/* GPIO3 */
+>> +				MX6QDL_PAD_NANDF_D4__GPIO2_IO04  0x80000000	/* GPIO4 */
+>> +				MX6QDL_PAD_NANDF_D5__GPIO2_IO05  0x80000000	/* GPIO5 */
+>> +				MX6QDL_PAD_NANDF_D6__GPIO2_IO06  0x80000000	/* GPIO6 */
+>> +				MX6QDL_PAD_NANDF_D7__GPIO2_IO07  0x80000000	/* GPIO7 */
+>> +				MX6QDL_PAD_NANDF_CLE__GPIO6_IO07 0x80000000	/* CAM_PWDN */
+>> +				MX6QDL_PAD_GPIO_2__GPIO1_IO02    0x80000000	/* CAM_RST */
+>> +				MX6QDL_PAD_GPIO_0__CCM_CLKO1     0x130b0	/* CAM CLK */
+>> +				MX6QDL_PAD_KEY_ROW2__GPIO4_IO11  0x80000000	/* SUS_S3_OUT */
+>> +				MX6QDL_PAD_KEY_COL2__GPIO4_IO10  0x80000000	/* RTC_INT */
+>> +			>;
+>
+> The hog group should be used for very limited pins which do not have
+> clear owner device.  In the most case, the pins should go to owner
+> device's pin group.  Also, instead of using 0x80000000, a proper
+> pad configuration value should be used.
+>
+
+I will remove the CAM_PWDN/RST/CLK since it is not yet supported. I will 
+move RTC_INT into its own group. However the GPIO's are generic and does 
+not have any owner. Same goes for SUS_S3_OUT since it is connected to a 
+FPGA.
+
+>> +		};
+>> +
+>> +		pinctrl_wdog: wdoggrp {
+>> +			fsl,pins = <
+>> +				MX6QDL_PAD_GPIO_9__WDOG1_B       0x80000000	/* Watchdog out */
+>> +			>;
+>> +		};
+>> +
+>> +		pinctrl_pmic: pmicgrp {
+>> +			fsl,pins = <
+>> +				MX6QDL_PAD_GPIO_18__GPIO7_IO13   0x80000000	/* PMIC Interrupt */
+>> +			>;
+>> +		};
+>
+> Please try to sort these pinctrl nodes alphabetically, so that
+> searching and adding pinctrl entries can be easier.
+>
+> Shawn
+>
+
+Will fix it
+>> +
+>> +		pinctrl_usbhub: usbhubgrp {
+>> +			fsl,pins = <
+>> +				MX6QDL_PAD_GPIO_16__GPIO7_IO11   0x80000000	/* HUB_RESET */
+>> +			>;
+>> +		};
+>> +
+>> +		pinctrl_pcie: pciegrp {
+>> +			fsl,pins = <
+>> +				MX6QDL_PAD_GPIO_17__GPIO7_IO12   0x80000000	/* PCIe Reset */
+>> +				MX6QDL_PAD_GPIO_5__GPIO1_IO05    0x80000000	/* PCIe Wake */
+>> +			>;
+>> +		};
+>> +
+>> +		pinctrl_display: dispgrp {
+>> +			fsl,pins = <
+>> +				MX6QDL_PAD_KEY_ROW4__GPIO4_IO15  0x80000000 /* BLEN_OUT */
+>> +				MX6QDL_PAD_EIM_D22__GPIO3_IO22   0x80000000 /* LVDS_PPEN_OUT */
+>> +			>;
+>> +		};
+>> +
+>> +		pinctrl_usdhc4: usdhc4grp {
+>> +			fsl,pins = <
+>> +				MX6QDL_PAD_SD4_CMD__SD4_CMD    0x17059
+>> +				MX6QDL_PAD_SD4_CLK__SD4_CLK    0x17059
+>> +				MX6QDL_PAD_SD4_DAT0__SD4_DATA0 0x17059
+>> +				MX6QDL_PAD_SD4_DAT1__SD4_DATA1 0x17059
+>> +				MX6QDL_PAD_SD4_DAT2__SD4_DATA2 0x17059
+>> +				MX6QDL_PAD_SD4_DAT3__SD4_DATA3 0x17059
+>> +				MX6QDL_PAD_SD4_DAT4__SD4_DATA4 0x17059
+>> +				MX6QDL_PAD_SD4_DAT5__SD4_DATA5 0x17059
+>> +				MX6QDL_PAD_SD4_DAT6__SD4_DATA6 0x17059
+>> +				MX6QDL_PAD_SD4_DAT7__SD4_DATA7 0x17059
+>> +				MX6QDL_PAD_NANDF_CS0__GPIO6_IO11 0x80000000 /* uSDHC4 CD */
+>> +				MX6QDL_PAD_NANDF_CS1__GPIO6_IO14 0x80000000 /* uSDHC4 SDIO PWR */
+>> +				MX6QDL_PAD_NANDF_CS2__GPIO6_IO15 0x80000000 /* uSDHC4 SDIO WP */
+>> +				MX6QDL_PAD_NANDF_CS3__GPIO6_IO16 0x80000000 /* uSDHC4 SDIO LED */
+>> +			>;
+>> +		};
+>> +
+>> +		pinctrl_ecspi1: ecspi1grp {
+>> +			fsl,pins = <
+>> +				MX6QDL_PAD_EIM_D17__ECSPI1_MISO 0x100b1
+>> +				MX6QDL_PAD_EIM_D18__ECSPI1_MOSI 0x100b1
+>> +				MX6QDL_PAD_EIM_D16__ECSPI1_SCLK 0x100b1
+>> +				MX6QDL_PAD_EIM_EB2__GPIO2_IO30	0x80000000 /* SPI1 CS */
+>> +			>;
+>> +		};
+>> +
+>> +		pinctrl_ecspi5: ecspi5rp-1 {
+>> +			fsl,pins = <
+>> +				MX6QDL_PAD_SD1_DAT0__ECSPI5_MISO	0x80000000
+>> +				MX6QDL_PAD_SD1_CMD__ECSPI5_MOSI		0x80000000
+>> +				MX6QDL_PAD_SD1_CLK__ECSPI5_SCLK		0x80000000
+>> +				MX6QDL_PAD_SD1_DAT1__GPIO1_IO17		0x80000000
+>> +			>;
+>> +		};
+>> +
+>> +		pinctrl_pwm1: pwm1grp {
+>> +			fsl,pins = <
+>> +				MX6QDL_PAD_SD1_DAT3__PWM1_OUT 0x1b0b1
+>> +			>;
+>> +		};
+>> +
+>> +		pinctrl_pwm2: pwm2grp {
+>> +			fsl,pins = <
+>> +				MX6QDL_PAD_GPIO_1__PWM2_OUT 0x1b0b1
+>> +			>;
+>> +		};
+>> +
+>> +		pinctrl_usbotg: usbotggrp {
+>> +			fsl,pins = <
+>> +				MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID 0x17059
+>> +			>;
+>> +		};
+>> +
+>> +		pinctrl_i2c1: i2c1grp {
+>> +			fsl,pins = <
+>> +				MX6QDL_PAD_CSI0_DAT8__I2C1_SDA 0x4001b8b1
+>> +				MX6QDL_PAD_CSI0_DAT9__I2C1_SCL 0x4001b8b1
+>> +			>;
+>> +		};
+>> +
+>> +		pinctrl_i2c2: i2c2grp {
+>> +			fsl,pins = <
+>> +				MX6QDL_PAD_KEY_COL3__I2C2_SCL 0x4001b8b1
+>> +				MX6QDL_PAD_KEY_ROW3__I2C2_SDA 0x4001b8b1
+>> +			>;
+>> +		};
+>> +
+>> +		pinctrl_i2c3: i2c3grp {
+>> +			fsl,pins = <
+>> +				MX6QDL_PAD_GPIO_3__I2C3_SCL 0x4001b8b1
+>> +				MX6QDL_PAD_GPIO_6__I2C3_SDA 0x4001b8b1
+>> +			>;
+>> +		};
+>> +
+>> +		pinctrl_uart3: uart3grp {
+>> +			fsl,pins = <
+>> +				MX6QDL_PAD_EIM_D25__UART3_RX_DATA 0x1b0b1
+>> +				MX6QDL_PAD_EIM_D24__UART3_TX_DATA 0x1b0b1
+>> +				MX6QDL_PAD_EIM_D23__UART3_CTS_B   0x1b0b1
+>> +				MX6QDL_PAD_EIM_D31__UART3_RTS_B   0x1b0b1
+>> +			>;
+>> +		};
+>> +
+>> +		pinctrl_uart4: uart4grp {
+>> +			fsl,pins = <
+>> +				MX6QDL_PAD_KEY_COL0__UART4_TX_DATA 0x1b0b1
+>> +				MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA 0x1b0b1
+>> +			>;
+>> +		};
+>> +
+>> +		pinctrl_usdhc2: usdhc2grp {
+>> +			fsl,pins = <
+>> +				MX6QDL_PAD_SD2_CMD__SD2_CMD    0x17059
+>> +				MX6QDL_PAD_SD2_CLK__SD2_CLK    0x10059
+>> +				MX6QDL_PAD_SD2_DAT0__SD2_DATA0 0x17059
+>> +				MX6QDL_PAD_SD2_DAT1__SD2_DATA1 0x17059
+>> +				MX6QDL_PAD_SD2_DAT2__SD2_DATA2 0x17059
+>> +				MX6QDL_PAD_SD2_DAT3__SD2_DATA3 0x17059
+>> +				MX6QDL_PAD_GPIO_4__GPIO1_IO04  0x80000000 /* uSDHC2 CD */
+>> +			>;
+>> +		};
+>> +
+>> +		pinctrl_usdhc3: usdhc3grp {
+>> +			fsl,pins = <
+>> +				MX6QDL_PAD_SD3_CMD__SD3_CMD    0x17059
+>> +				MX6QDL_PAD_SD3_CLK__SD3_CLK    0x10059
+>> +				MX6QDL_PAD_SD3_DAT0__SD3_DATA0 0x17059
+>> +				MX6QDL_PAD_SD3_DAT1__SD3_DATA1 0x17059
+>> +				MX6QDL_PAD_SD3_DAT2__SD3_DATA2 0x17059
+>> +				MX6QDL_PAD_SD3_DAT3__SD3_DATA3 0x17059
+>> +				MX6QDL_PAD_SD3_DAT4__SD3_DATA4 0x17059
+>> +				MX6QDL_PAD_SD3_DAT5__SD3_DATA5 0x17059
+>> +				MX6QDL_PAD_SD3_DAT6__SD3_DATA6 0x17059
+>> +				MX6QDL_PAD_SD3_DAT7__SD3_DATA7 0x17059
+>> +			>;
+>> +		};
+>> +
+>> +		pinctrl_usdhc3_reset: usdhc3grp-reset {
+>> +			fsl,pins = <
+>> +				MX6QDL_PAD_SD3_RST__SD3_RESET   0x170F9
+>> +			>;
+>> +		};
+>> +
+>> +		pinctrl_audmux: audmux {
+>> +			fsl,pins = <
+>> +				MX6QDL_PAD_DISP0_DAT20__AUD4_TXC  0x130b0
+>> +				MX6QDL_PAD_DISP0_DAT21__AUD4_TXD  0x130b0
+>> +				MX6QDL_PAD_DISP0_DAT22__AUD4_TXFS 0x130b0
+>> +				MX6QDL_PAD_DISP0_DAT23__AUD4_RXD  0x130b0
+>> +			>;
+>> +		};
+>> +
+>> +		pinctrl_enet: pinctrl_enet {
+>> +			fsl,pins = <
+>> +				MX6QDL_PAD_ENET_MDIO__ENET_MDIO       0x100b0
+>> +				MX6QDL_PAD_ENET_MDC__ENET_MDC         0x100b0
+>> +				MX6QDL_PAD_RGMII_TXC__RGMII_TXC       0x100b0
+>> +				MX6QDL_PAD_RGMII_TD0__RGMII_TD0       0x100b0
+>> +				MX6QDL_PAD_RGMII_TD1__RGMII_TD1       0x100b0
+>> +				MX6QDL_PAD_RGMII_TD2__RGMII_TD2       0x100b0
+>> +				MX6QDL_PAD_RGMII_TD3__RGMII_TD3       0x100b0
+>> +				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL 0x100b0
+>> +				MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK  0x100b0
+>> +				MX6QDL_PAD_RGMII_RXC__RGMII_RXC       0x1b0b0
+>> +				MX6QDL_PAD_RGMII_RD0__RGMII_RD0       0x1b0b0
+>> +				MX6QDL_PAD_RGMII_RD1__RGMII_RD1       0x1b0b0
+>> +				MX6QDL_PAD_RGMII_RD2__RGMII_RD2       0x1b0b0
+>> +				MX6QDL_PAD_RGMII_RD3__RGMII_RD3       0x1b0b0
+>> +				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL 0x1b0b0
+>> +				MX6QDL_PAD_ENET_TX_EN__GPIO1_IO28     0x80000000 /* FEC Reset */
+>> +				MX6QDL_PAD_GPIO_19__GPIO4_IO05        0x80000000 /* AR8033 Interrupt */
+>> +			>;
+>> +		};
+>> +	};
+>> +};
+>> +
+>> +&pcie {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_pcie>;
+>> +	reset-gpio = <&gpio7 12 GPIO_ACTIVE_HIGH>;
+>> +	status = "okay";
+>> +};
+>> +
+>> +
+>> +&pwm1 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_pwm1>;
+>> +	status = "okay";
+>> +};
+>> +
+>> +&pwm2 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_pwm2>;
+>> +	status = "okay";
+>> +};
+>> +
+>> +&sata {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&ssi1 {
+>> +	fsl,mode = "i2s-master";
+>> +	status = "okay";
+>> +};
+>> +
+>> +&uart3 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_uart3>;
+>> +	fsl,uart-has-rtscts;
+>> +	status = "okay";
+>> +};
+>> +
+>> +&uart4 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_uart4>;
+>> +	status = "okay";
+>> +};
+>> +
+>> +&usbh1 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_usbhub>;
+>> +	vbus-supply = <&reg_usb_h1_vbus>;
+>> +	reset-gpios = <&gpio7 11 GPIO_ACTIVE_HIGH>;
+>> +	status = "okay";
+>> +};
+>> +
+>> +&usbotg {
+>> +	vbus-supply = <&reg_usb_otg_vbus>;
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_usbotg>;
+>> +	disable-over-current;
+>> +	status = "okay";
+>> +};
+>> +
+>> +&usdhc2 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_usdhc2>;
+>> +	cd-gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
+>> +	no-1-8-v;
+>> +	keep-power-in-suspend;
+>> +	enable-sdio-wakeup;
+>> +	status = "okay";
+>> +};
+>> +
+>> +&usdhc3 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_usdhc3 &pinctrl_usdhc3_reset>;
+>> +	bus-width = <8>;
+>> +	vmmc-supply = <&vdd_bperi>;
+>> +	vqmmc-supply = <&vdd_bio>;
+>> +	non-removable;
+>> +	keep-power-in-suspend;
+>> +	status = "okay";
+>> +};
+>> +
+>> +&wdog1 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_wdog>;
+>> +};
+>> --
+>> 2.6.3
+>>
+>>
