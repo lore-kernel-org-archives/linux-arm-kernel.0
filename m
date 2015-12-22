@@ -1,58 +1,37 @@
-From: ralf@linux-mips.org (Ralf Baechle)
-Date: Tue, 22 Dec 2015 02:16:09 +0100
-Subject: [PATCH v2 9/9] MIPS: dts: jz4780/ci20: Add compatible property
- to "partitions" node
-In-Reply-To: <1450694033-27717-10-git-send-email-geert+renesas@glider.be>
-References: <1450694033-27717-1-git-send-email-geert+renesas@glider.be>
- <1450694033-27717-10-git-send-email-geert+renesas@glider.be>
-Message-ID: <20151222011609.GA15881@linux-mips.org>
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Mon, 21 Dec 2015 17:53:40 -0800
+Subject: [PATCH 0/2] pci: Add host controller driver for Cavium ThunderX PCIe
+Message-ID: <1450749222-15966-1-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 21, 2015 at 11:33:53AM +0100, Geert Uytterhoeven wrote:
-> Date:   Mon, 21 Dec 2015 11:33:53 +0100
-> From: Geert Uytterhoeven <geert+renesas@glider.be>
-> To: arm at kernel.org, Andrew Lunn <andrew@lunn.ch>, Gregory Clement
->  <gregory.clement@free-electrons.com>, Sebastian Hesselbarth
->  <sebastian.hesselbarth@gmail.com>, Simon Horman <horms@verge.net.au>,
->  Magnus Damm <magnus.damm@gmail.com>, Ralf Baechle <ralf@linux-mips.org>,
->  Alex Smith <alex.smith@imgtec.com>
-> Cc: Brian Norris <computersforpeace@gmail.com>, Rob Herring
->  <robh+dt@kernel.org>, devicetree at vger.kernel.org,
->  linux-arm-kernel at lists.infradead.org, linux-sh at vger.kernel.org,
->  linux-mips at linux-mips.org, linux-mtd at lists.infradead.org,
->  linux-kernel at vger.kernel.org, Geert Uytterhoeven <geert+renesas@glider.be>
-> Subject: [PATCH v2 9/9] MIPS: dts: jz4780/ci20: Add compatible property to
->  "partitions" node
-> 
-> As of commit e488ca9f8d4f62c2 ("doc: dt: mtd: partitions: add compatible
-> property to "partitions" node"), the "partitions" subnode of an SPI
-> FLASH device node must have a compatible property. The partitions are no
-> longer detected if it is not present.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> v2:
->   - New.
-> ---
->  arch/mips/boot/dts/ingenic/ci20.dts | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/mips/boot/dts/ingenic/ci20.dts b/arch/mips/boot/dts/ingenic/ci20.dts
-> index 782258c0e4fbba8e..1652d8d60b1e4b86 100644
-> --- a/arch/mips/boot/dts/ingenic/ci20.dts
-> +++ b/arch/mips/boot/dts/ingenic/ci20.dts
-> @@ -70,6 +70,7 @@
->  			nand-on-flash-bbt;
->  
->  			partitions {
-> +				compatible = "fixed-partitions";
->  				#address-cells = <2>;
->  				#size-cells = <2>;
->  
-> -- 
-> 1.9.1
+From: David Daney <david.daney@cavium.com>
 
-Acked-by: Ralf Baechle <ralf@linux-mips.org>
+Some Cavium ThunderX processors require quirky access methods for the
+config space of the PCIe bridge.
 
-  Ralf
+There are two patches:
+
+1) Refactor code in pci-host-generic so that it can more easily be
+   used by other drivers.
+
+2) Add the ThunderX PCIe driver, which leverages the code in
+   pci-host-generic
+
+David Daney (2):
+  PCI: generic: Refactor code to enable reuse by other drivers.
+  pci, pcie-thunder-pem: Add PCIe host driver for ThunderX processors.
+
+ .../devicetree/bindings/pci/pcie-thunder-pem.txt   |  43 ++++
+ drivers/pci/host/Kconfig                           |   6 +
+ drivers/pci/host/Makefile                          |   1 +
+ drivers/pci/host/pci-host-generic.c                |  53 ++--
+ drivers/pci/host/pci-host-generic.h                |  56 ++++
+ drivers/pci/host/pcie-thunder-pem.c                | 283 +++++++++++++++++++++
+ 6 files changed, 407 insertions(+), 35 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pci/pcie-thunder-pem.txt
+ create mode 100644 drivers/pci/host/pci-host-generic.h
+ create mode 100644 drivers/pci/host/pcie-thunder-pem.c
+
+-- 
+1.8.3.1
