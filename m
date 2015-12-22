@@ -1,35 +1,87 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 22 Dec 2015 15:02:22 -0800
-Subject: [GIT PULL v2] at91: DT for 4.5 #2
-In-Reply-To: <20151222160159.GA9225@piout.net>
-References: <20151222160159.GA9225@piout.net>
-Message-ID: <20151222230222.GS30172@localhost>
+From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
+Date: Tue, 22 Dec 2015 17:04:15 -0600
+Subject: [PATCH v7 3/4] gicv2m: Refactor to prepare for ACPI support
+In-Reply-To: <20151217165713.GA23549@localhost>
+References: <1449766530-16935-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1449766530-16935-4-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <20151216221208.GC27791@localhost> <56720095.70004@amd.com>
+ <20151217165713.GA23549@localhost>
+Message-ID: <5679D6EF.6000002@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 22, 2015 at 05:01:59PM +0100, Alexandre Belloni wrote:
-> Arnd, Olof, Kevin,
-> 
-> Here are more DT materials for 4.5, please pull.
-> 
-> The following changes since commit 0a804b5729bb0021e63662b772db0f52de653056:
-> 
->   ARM: at91/dt: sama5d2 Xplained: pmic needs a specific sda hold time (2015-12-15 12:23:32 +0100)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-4.5-dt2
-> 
-> for you to fetch changes up to ca6349a8c51f2e3d6f2acdb36431e7d7328261f7:
-> 
->   ARM: at91/dt: sama5d2 Xplained: add pdmic node (2015-12-22 10:37:53 +0100)
-> 
-> ----------------------------------------------------------------
-> Second batch of DT changes for 4.5:
-> - addition of sound nodes for sama5d2 and its xplained board
-> - addition of a new platform, Landis + Gyr VInCo
+On 12/17/2015 10:57 AM, Bjorn Helgaas wrote:
+> On Wed, Dec 16, 2015 at 06:23:49PM -0600, Suravee Suthikulanit wrote:
+>> Hi Bjorn,
+>>
+>> Thanks for your review. Please see my comments below.
+>>
+>> On 12/16/2015 4:12 PM, Bjorn Helgaas wrote:
+>>> On Thu, Dec 10, 2015 at 08:55:29AM -0800, Suravee Suthikulpanit wrote:
+>>>> This patch replaces the struct device_node with struct fwnode_handle
+>>>> since this structure is common between DT and ACPI.
+>>>>
+>>>> It also refactors gicv2m_init_one() to prepare for ACPI support.
+>>>> The only functional change is removing the node name from pr_info.
+>>>>
+>>>> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>>>
+>>>> @@ -359,10 +355,10 @@ static int __init gicv2m_init_one(struct device_node *node,
+>>>>   	}
+>>>>
+>>>>   	list_add_tail(&v2m->entry, &v2m_nodes);
+>>>> -	pr_info("Node %s: range[%#lx:%#lx], SPI[%d:%d]\n", node->name,
+>>>> -		(unsigned long)v2m->res.start, (unsigned long)v2m->res.end,
+>>>> -		v2m->spi_start, (v2m->spi_start + v2m->nr_spis));
+>>>>
+>>>> +	pr_info("range[%#lx:%#lx], SPI[%d:%d]\n",
+>>>> +		(unsigned long)res->start, (unsigned long)res->end,
+>>>> +		v2m->spi_start, (v2m->spi_start + v2m->nr_spis));
+>>>
+>>> You didn't change this, but I don't think this message has enough
+>>> context.  It's pretty cryptic all by itself.  It'd be nice if it could
+>>> at least include a device name, e.g., if you could use dev_info().
+>>
+>> Here is the example of the information printed:
+>> [    0.000000] GICv2m: range[0xe1180000:0xe1181000], SPI[64:320]
+>>
+>> Basically, the v2m is just an extension of the GIC. Here, we are
+>> printing the memory range that it is covering, which can be used to
+>> identify different V2m frame and the associate interrupt range
+>> (SPI). The node name is not really providing any values. So, we are
+>> removing it.
+>
+> I noticed the pr_fmt definition later; that adds some useful context I
+> didn't know about.  I guess there's no struct device for the GIC?  I
+> don't see one in struct device_node.  Seems like this piece of
+> hardware that apparently responds to a memory range *could* have a
+> struct device,but I'm a little fuzzy on how we handle ACPI and OF
+> device descriptions in that regard.
 
-Merged, thanks.
+For DT, v2m is advertised as a sub-node inside GIC. So, both of them has 
+the struct device_node references. IIUC, GIC node is match as irqchip, 
+and not as a traditional platform bus device.
 
+Similarly, for ACPI, v2m is advertised as a sub-table inside MADT, and 
+we are using the fwnode_handle to reference to.
 
--Olof
+> I hadn't noticed the memory range part; maybe you could use %pR there?
+
+I guess we could have :) I can send a separate patch to clean this up.
+
+> Just to double-check, there's no off-by-one error in the SPI range, is
+> there?  The pattern I usually expect is "start, start + nr_items - 1".
+
+In that case, this should have been [64:319]. I'll send a small patch to 
+clean this up.
+
+> I'm just kibbitzing here; this isn't PCI code, and you don't need my
+> ack, so just consider these as random observations.
+>
+> Bjorn
+>
+
+Thanks for sharing your observation. It's always been good ones :)
+
+Suravee
