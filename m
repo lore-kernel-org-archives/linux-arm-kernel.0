@@ -1,49 +1,61 @@
-From: fthain@telegraphics.com.au (Finn Thain)
-Date: Wed, 23 Dec 2015 00:47:36 +1100 (AEDT)
-Subject: [PATCH v3 66/77] ncr5380: Fix soft lockups
-In-Reply-To: <20151222113903.06422dbe@lxorguk.ukuu.org.uk>
-References: <20151222011737.980475848@telegraphics.com.au>
- <20151222011755.965510468@telegraphics.com.au>
- <20151222113903.06422dbe@lxorguk.ukuu.org.uk>
-Message-ID: <alpine.LNX.2.00.1512222347310.23505@nippy.intranet>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 22 Dec 2015 21:48:42 +0800
+Subject: [GIT PULL] i.MX clock updates for 4.5
+Message-ID: <20151222134842.GF26290@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Mike, Stephen,
 
-On Tue, 22 Dec 2015, One Thousand Gnomes wrote:
+Here is the i.MX clock updates I queued for 4.5.  Please pull and keep
+it stable, as it's been merged into imx/dt branch to resolve some
+dependency.  Thanks.
 
-> On Tue, 22 Dec 2015 12:18:44 +1100 Finn Thain 
-> <fthain@telegraphics.com.au> wrote:
-> 
-> > Because of the rudimentary design of the chip, it is necessary to poll 
-> > the SCSI bus signals during PIO and this tends to hog the CPU. The 
-> > driver will accept new commands while others execute, and this causes 
-> > a soft lockup because the workqueue item will not terminate until the 
-> > issue queue is emptied.
-> > 
-> > When exercising dmx3191d using sequential IO from dd, the driver is 
-> > sent 512 KiB WRITE commands and 128 KiB READs. For a PIO transfer, the 
-> > rate is is only about 300 KiB/s, so these are long-running commands. 
-> > And although PDMA may run at several MiB/s, interrupts are disabled 
-> > for the duration of the transfer.
-> > 
-> > Fix the unresponsiveness and soft lockup issues by calling 
-> > cond_resched() after each command is completed and by limiting 
-> > max_sectors for drivers that don't implement real DMA.
-> 
-> Is there a reason for not doing some limiting in the DMA case too. A 
-> 512K write command even with DMA on a low end 68K box introduces a 
-> second of latency before another I/O can be scheduled ?
+Shawn
 
-The DMA case is the atari_scsi case. I'd like to think that atari_scsi 
-would have only the latency issues that might be expected from any SCSI-2 
-host adapter driver.
+The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
 
-Unlike PDMA, interrupts are not disabled for these DMA transfers. Note 
-that this patch isn't really relevant to DMA, because the main loop 
-iterates only when done == 0, that is, !hostdata->dmalen.
+  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
 
--- 
+are available in the git repository at:
 
-> 
-> Alan
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-clk-v4.5
+
+for you to fetch changes up to c20737a2a7b8666648be3f4b386749339958dace:
+
+  clk: imx5: ipu_di_sel clocks can set parent rates (2015-12-02 21:02:33 +0800)
+
+----------------------------------------------------------------
+The i.MX clock updates for 4.5:
+- Add is_prepared function callback for pllv3 clock driver
+- Use imx_check_clocks() on imx6ul and imx7d clock drivers to save
+  some code
+- Add a core clock for imx7d to support generic cpufreq driver
+- Support imx6q clock routing with OSC to anaclk2/2b
+- To support more precise pixel clocks on imx5, allow ipu_di_sel clock
+  selectors to influence the PLLs that they are derived from
+- A cleanup on imx25 OSC clock
+
+----------------------------------------------------------------
+Bai Ping (3):
+      clk: imx: add 'is_prepared' clk_ops callback for pllv3 clk
+      clk: imx: Add a virtual arm clk on i.mx7d
+      clk: imx: Replace clk error check with imx_check_clocks()
+
+Markus Pargmann (1):
+      clk: imx25: Remove osc clock from driver
+
+Michael Trimarchi (1):
+      clk: imx: clk-imx6q: Let OSC to be routed to anaclk2/2b
+
+Patrick Br?nn (1):
+      clk: imx5: ipu_di_sel clocks can set parent rates
+
+ drivers/clk/imx/clk-imx25.c             | 18 ++----------------
+ drivers/clk/imx/clk-imx51-imx53.c       |  8 ++++----
+ drivers/clk/imx/clk-imx6q.c             |  3 ++-
+ drivers/clk/imx/clk-imx6ul.c            |  4 +---
+ drivers/clk/imx/clk-imx7d.c             | 11 +++++++----
+ drivers/clk/imx/clk-pllv3.c             | 14 ++++++++++++++
+ include/dt-bindings/clock/imx7d-clock.h |  3 ++-
+ 7 files changed, 32 insertions(+), 29 deletions(-)
