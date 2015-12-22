@@ -1,17 +1,15 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 22 Dec 2015 11:48:56 -0800
-Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v4.5
-In-Reply-To: <cover.1450315426.git.horms+renesas@verge.net.au>
-References: <cover.1450315426.git.horms+renesas@verge.net.au>
-Message-ID: <20151222194856.GD30172@localhost>
+Date: Tue, 22 Dec 2015 11:54:46 -0800
+Subject: [GIT PULL 3/5] ARM: tegra: Core SoC changes for v4.5-rc1
+In-Reply-To: <1450356639-7758-3-git-send-email-thierry.reding@gmail.com>
+References: <1450356639-7758-1-git-send-email-thierry.reding@gmail.com>
+ <1450356639-7758-3-git-send-email-thierry.reding@gmail.com>
+Message-ID: <20151222195446.GH30172@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 17, 2015 at 02:24:46PM +0900, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
-> 
-> Please consider these Renesas ARM based SoC defconfig updates for v4.5.
-> 
+On Thu, Dec 17, 2015 at 01:50:37PM +0100, Thierry Reding wrote:
+> Hi ARM SoC maintainers,
 > 
 > The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
 > 
@@ -19,13 +17,33 @@ On Thu, Dec 17, 2015 at 02:24:46PM +0900, Simon Horman wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig-for-v4.5
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.5-soc
 > 
-> for you to fetch changes up to 3bf834e17c8736537a08abfa509ae3a8c8446b08:
+> for you to fetch changes up to a262e87ff354f12447bb6268bd63edf7ba1c20e0:
 > 
->   ARM: multi_v7_defconfig: Enable frame buffer console for armadillo800eva (2015-12-14 14:13:18 +0900)
+>   ARM: tegra: select USB_ULPI from EHCI rather than platform (2015-11-24 16:47:26 +0100)
+> 
+> Thanks,
+> Thierry
+> 
+> ----------------------------------------------------------------
+> ARM: tegra: Core SoC changes for v4.5-rc1
+> 
+> The big thing here is Tegra210 support, which is really only the Kconfig
+> symbol. Other than that there's a few miscellaneous fixes.
 
-Merged, thanks!
+Hi,
+
+We merge arch/arm and arch/arm64 and drivers/bus contents through separate
+branches, so having them come in from you in one combined branch isn't working
+very well.
+
+If you don't have any downstream users of this I can just cherry-pick them into
+the appropriate branches, but if you do, please send separate requests for
+those three categories.
+
+
+Thanks!
 
 
 -Olof
