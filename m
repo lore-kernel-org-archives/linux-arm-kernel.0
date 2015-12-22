@@ -1,44 +1,69 @@
-From: slash.tmp@free.fr (Mason)
-Date: Tue, 22 Dec 2015 21:23:59 +0100
-Subject: [PATCH v11 0/2] Sigma Designs Tango4 port
-In-Reply-To: <7hr3iexp3e.fsf@deeprootsystems.com>
-References: <566FDF53.3030004@sigmadesigns.com>
- <7hr3iexp3e.fsf@deeprootsystems.com>
-Message-ID: <5679B15F.80106@free.fr>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 22 Dec 2015 22:30:14 +0200
+Subject: [PATCH v4] clk: ti: Add support for dm814x ADPLL
+In-Reply-To: <1450798030-23680-1-git-send-email-tony@atomide.com>
+References: <1450798030-23680-1-git-send-email-tony@atomide.com>
+Message-ID: <5679B2D6.4050102@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/12/2015 20:25, Kevin Hilman wrote:
+On 12/22/2015 05:27 PM, Tony Lindgren wrote:
+> On dm814x we have 13 ADPLLs with 3 to 4 outputs on each. The
+> ADPLLs have several dividers and muxes controlled by a shared
+> control register for each PLL.
+>
+> Note that for the clocks to work as device drivers for booting on
+> dm814x, this patch depends on "ARM: OMAP2+: Change core_initcall
+> levels to postcore_initcall".
+>
+> Also note that this patch does not implement clk_set_rate for the
+> PLL, that will be posted later on when available.
+>
+> Cc: Michael Turquette <mturquette@baylibre.com>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Tero Kristo <t-kristo@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>
+> If no more comments, Tero can you please apply into an immutable
+> branch against v4.4-rc1 that I can merge in too?
+>
+> Changes since v3:
+>
+> - We want to create the clkdev entry for all clocks, not just outputs
+> - ti_adpll_wait_lock loops did not do the right thing
+> - We want to use CLK_GET_RATE_NOCACHE in ti_adpll_init_dco
 
-> Marc Gonzalez wrote:
-> 
->> Changes since v10:
->> Add aliases and chosen DT nodes
->> Use CPU_CLK and SYS_CLK symbolic names
->> MPCore private memory region DT node
->> select TANGO_IRQ instead of GENERIC_IRQ_CHIP
->>
->> Changes planned for a future patch series:
->> Have clkgen driver export CD2 for USB, and CD6 for SDIO
-> 
-> Was it intentional to leave out a multi_v7_defconfig change so that this
-> actually builds?  Or was that planned for a future series?
+I have just one comment below still, once that is addressed:
 
-How is a multi_v7_defconfig different from any old defconfig?
+Conditionally-acked-by: Tero Kristo <t-kristo@ti.com>
 
-> IMO, it should be part of this series so it gets build tested as soon as
-> it's merged.
+Stephen / Michael, can you pick this up for next merge? I don't have 
+anything else coming for the window this time, and I am probably going 
+to be on vacation just nicely to not be able to push anything anyway.
 
-The problem is that a mandatory driver is missing upstream
-(interrupt controller).
+<snip>
 
-http://thread.gmane.org/gmane.linux.kernel/2089470
+> +
+> +/* Warn if clkout or clkoutx2 try to set unavailable parent */
+> +static int ti_adpll_clkout_set_parent(struct clk_hw *hw, u8 index)
+> +{
+> +	struct ti_adpll_clkout_data *co = to_clkout(hw);
+> +	struct ti_adpll_data *d = co->adpll;
+> +
+> +	if (ti_adpll_clock_is_bypass(d) != index)
+> +		return -EAGAIN;
+> +
 
-> Otherwise, looking good to me.
-> 
-> Reviewed-by: Kevin Hilman <khilman@linaro.org>
+I think this part is still somewhat weird. You are not doing anything 
+useful in this function, so do you need to implement it at all? Just 
+returning -EINVAL always might work also. EAGAIN is wrong return value 
+anyway as it can pretty much never succeed.
 
-Woot! I already have the next patch series mostly ready, but I suppose
-I should wait for this one to be accepted before submitting a new one.
+-Tero
 
-Regards.
+> +	return 0;
+> +}
+> +
+
+<snip>
