@@ -1,33 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 22 Dec 2015 15:00:36 -0800
-Subject: [GIT PULL 3/3] ARM: imx: defconfig updates for 4.5
-In-Reply-To: <1450795558-10961-3-git-send-email-shawnguo@kernel.org>
-References: <1450795558-10961-1-git-send-email-shawnguo@kernel.org>
- <1450795558-10961-3-git-send-email-shawnguo@kernel.org>
-Message-ID: <20151222230036.GQ30172@localhost>
+Date: Tue, 22 Dec 2015 15:03:05 -0800
+Subject: [GIT PULL] Allwinner DT changes for 4.5, round 2
+In-Reply-To: <20151222205446.GA20757@lukather>
+References: <20151222205446.GA20757@lukather>
+Message-ID: <20151222230305.GT30172@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 22, 2015 at 10:45:58PM +0800, Shawn Guo wrote:
-> The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+On Tue, Dec 22, 2015 at 09:54:46PM +0100, Maxime Ripard wrote:
+> Hi,
 > 
->   Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+> Please pull the following late changes for the Allwinner SoCs.
+> 
+> I expect it to be the last pull request for the 4.5 merge window on
+> our side.
+> 
+> Thanks!
+> Maxime
+> 
+> The following changes since commit 2367cee5fda1e9ebc605b13175492b31030acd9d:
+> 
+>   ARM: dts: sun7i: Olimex A20-SOM-EVB: Enable mmc3 (baseboard SD socket) (2015-12-11 09:21:29 +0100)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-defconfig-4.5
+>   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git sunxi-dt-for-4.5-2
 > 
-> for you to fetch changes up to 31e98e0d24cd2537a63e06e235e050a06b175df7:
+> for you to fetch changes up to 12ec9384036304e64904afdc6234b842fe54f411:
 > 
->   ARM: imx_v6_v7_defconfig: enable PCI_MSI (2015-12-02 21:28:32 +0800)
-> 
-> ----------------------------------------------------------------
-> The i.MX defconfig updates for 4.5:
-> - Drop CONFIG_SOC_LS1021A support, as it needs LPAE which is not
->   available with imx_v6_v7_defconfig.
-> - Enable VF610_ADC, HDMI audio and PCI_MSI support
+>   ARM: dts: sun5i: Add dts file for the Empire Electronix D709 tablet (2015-12-21 17:10:18 +0100)
 
-Merged, thanks.
+Merged, thanks!
 
 
 -Olof
