@@ -1,33 +1,37 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 22 Dec 2015 12:27:45 +0000
-Subject: [RFC PATCH 3/5] crypto: sunxi-ss: fix dev_dbg() output type
+Date: Tue, 22 Dec 2015 12:27:47 +0000
+Subject: [RFC PATCH 5/5] arm64: Introduce Allwinner SoC config option
 In-Reply-To: <1450787267-26836-1-git-send-email-andre.przywara@arm.com>
 References: <1450787267-26836-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1450787267-26836-4-git-send-email-andre.przywara@arm.com>
+Message-ID: <1450787267-26836-6-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The length parameter in this dev_dbg() call is actually a size_t,
-so use the proper type to avoid warnings when compiling for 64-bit
-architectures.
+To prepare for supporting the Allwinner A64 SoC, introduce a config
+option to allow compiling Allwinner (aka. sunxi) specific drivers
+for ARM64.
+This patch just defines the ARCH_SUNXI symbol to allow Allwinner
+specific drivers to be selected during kernel configuration.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- drivers/crypto/sunxi-ss/sun4i-ss-cipher.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/Kconfig.platforms | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c b/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c
-index b3bc7bd..af2690c 100644
---- a/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c
-+++ b/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c
-@@ -251,7 +251,7 @@ static int sun4i_ss_cipher_poll(struct ablkcipher_request *areq)
- 		spaces = readl(ss->base + SS_FCSR);
- 		rx_cnt = SS_RXFIFO_SPACES(spaces);
- 		tx_cnt = SS_TXFIFO_SPACES(spaces);
--		dev_dbg(ss->dev, "%x %u/%u %u/%u cnt=%u %u/%u %u/%u cnt=%u %u %u\n",
-+		dev_dbg(ss->dev, "%x %u/%zu %u/%u cnt=%u %u/%zu %u/%u cnt=%u %u %u\n",
- 			mode,
- 			oi, mi.length, ileft, areq->nbytes, rx_cnt,
- 			oo, mo.length, oleft, areq->nbytes, tx_cnt,
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 4043c35..235e376 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -1,5 +1,10 @@
+ menu "Platform selection"
+ 
++config ARCH_SUNXI
++	bool "Allwinner sunxi 64-bit SoC Family"
++	help
++	  This enables support for Allwinner sunxi based SoCs like the A64.
++
+ config ARCH_BCM_IPROC
+ 	bool "Broadcom iProc SoC Family"
+ 	help
 -- 
 2.5.1
