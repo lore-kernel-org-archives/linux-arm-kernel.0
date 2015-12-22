@@ -1,26 +1,88 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Tue, 22 Dec 2015 14:50:15 +0000
-Subject: [PATCH 1/2] arm: KVM: Do not update PC if the trap handler has
- updated it
-In-Reply-To: <20151222143947.GA5631@cbox>
-References: <1450778118-12715-1-git-send-email-marc.zyngier@arm.com>
- <1450778118-12715-2-git-send-email-marc.zyngier@arm.com>
- <CAFEAcA8F2TJuRR5ELvit0FPa3XFMJ847S8WK25i5aVdGBU=PUA@mail.gmail.com>
- <20151222143947.GA5631@cbox>
-Message-ID: <CAFEAcA9dALQv8Xcyg5FLAvRaJfH5UT2u4jrLjofLh5Ff2yo=8Q@mail.gmail.com>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Tue, 22 Dec 2015 15:52:32 +0100
+Subject: [PATCH v7 0/4] ARM SMC Calling Convention interface
+Message-ID: <1450795956-18223-1-git-send-email-jens.wiklander@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 December 2015 at 14:39, Christoffer Dall
-<christoffer.dall@linaro.org> wrote:
-> On Tue, Dec 22, 2015 at 11:08:10AM +0000, Peter Maydell wrote:
->> Won't this result in our incorrectly skipping the first insn
->> in the fault handler if the original offending instruction
->> was itself the first insn in the fault handler?
->>
-> Wouldn't that then loop with the exception forever?
+Hi,
 
-Yes, but so would real hardware...
+This patch set is based on the Generic TEE subsystem v6 patchset
+(https://lwn.net/Articles/662495/) sent out a some time ago. By isolating
+the ARM SMC Calling Convention patches that are useful for other purposes
+than to support the Generic TEE subsystem some complexity is removed from
+that patch set.
 
-thanks
--- PMM
+This patch set adds a common interface to do an SMC or HVC following ARM
+SMC Calling Convention. The interface is implemented for both the arm and
+arm64 architectures and updates the PSCI driver to use this interface
+instead for firmware communication.
+
+Kevins previous Tested-by tag isn't included as the changes in the config
+variables may affect some of the builds.
+
+v7:
+* Use shift macros for all fields supplied to ARM_SMCCC_CALL_VAL()
+* Move "select HAVE_ARM_SMCCC if CPU_V7" from "select HAVE_ARM_SMCCC if CPU_V7"
+* arm: "config ARM_PSCI" now depends on HAVE_ARM_SMCCC instead of CPU_V7
+
+v6:
+* Move HAVE_ARM_SMCCC from init/Kconfig
+
+v5:
+* Fixes compile errors for Thumb-2 kernels reported by Kevin Hilman
+* drivers: psci: replace psci firmware calls
+  Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+  Tested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+
+v4:
+* Rebased on v4.4-rc3 to resolve a PSCI conflict
+* drivers: psci: replace psci firmware calls
+  Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+  Tested-by: Mark Rutland <mark.rutland@arm.com>
+
+v3:
+* Moved the export of arm_smccc_{smc,hvc} to armksyms.c for both arm and arm64
+* arm: add implementation for arm-smccc
+  Reviewed-by: Lars Persson <lars.persson@axis.com>
+* arm64: add implementation for arm-smccc
+  drivers: psci: replace psci firmware calls
+  Acked-by: Will Deacon <will.deacon@arm.com>
+
+v2:
+* Added unwinding support in the assembly functions
+
+Thanks,
+Jens
+
+
+
+Jens Wiklander (4):
+  arm/arm64: add arm-smccc
+  arm: add implementation for arm-smccc
+  arm64: add implementation for arm-smccc
+  drivers: psci: replace psci firmware calls
+
+ arch/Kconfig                    |   3 ++
+ arch/arm/Kconfig                |   3 +-
+ arch/arm/kernel/Makefile        |   3 +-
+ arch/arm/kernel/armksyms.c      |   6 +++
+ arch/arm/kernel/psci-call.S     |  31 ------------
+ arch/arm/kernel/smccc-call.S    |  62 ++++++++++++++++++++++++
+ arch/arm64/Kconfig              |   1 +
+ arch/arm64/kernel/Makefile      |   4 +-
+ arch/arm64/kernel/arm64ksyms.c  |   5 ++
+ arch/arm64/kernel/asm-offsets.c |   3 ++
+ arch/arm64/kernel/psci-call.S   |  28 -----------
+ arch/arm64/kernel/smccc-call.S  |  43 +++++++++++++++++
+ drivers/firmware/psci.c         |  23 ++++++++-
+ include/linux/arm-smccc.h       | 104 ++++++++++++++++++++++++++++++++++++++++
+ 14 files changed, 254 insertions(+), 65 deletions(-)
+ delete mode 100644 arch/arm/kernel/psci-call.S
+ create mode 100644 arch/arm/kernel/smccc-call.S
+ delete mode 100644 arch/arm64/kernel/psci-call.S
+ create mode 100644 arch/arm64/kernel/smccc-call.S
+ create mode 100644 include/linux/arm-smccc.h
+
+-- 
+1.9.1
