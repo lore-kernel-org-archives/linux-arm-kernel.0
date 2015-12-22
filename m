@@ -1,79 +1,21 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 22 Dec 2015 09:44:29 +0100
-Subject: [RESEND RFC PATCH 0/2] Expose the PIO_ISR register on SAMA5D3
-In-Reply-To: <a5deeb3722254bd08d7a7e071fd42e7f@EMAIL.axentia.se>
-References: <1449544808-3163-1-git-send-email-peda@lysator.liu.se>
- <CACRpkdYN=n=Q+UpLbWjxJHP-FYi_e4cHFE_d1_fR2r7QYcqgYQ@mail.gmail.com>
- <566C6122.6040406@kernel.org>
- <85d1850f20c141b2952d93be72199fdf@EMAIL.axentia.se>
- <CACRpkdY9Nwg3B1bAJ53Y-tJJywC=ENvFR6S99+wUKzcUHTa5TQ@mail.gmail.com>
- <a5deeb3722254bd08d7a7e071fd42e7f@EMAIL.axentia.se>
-Message-ID: <CACRpkdbVnpdPUaMZRr-Lh27MZjM-CUwzgsy1QfzDR7tbHFPZWw@mail.gmail.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Tue, 22 Dec 2015 09:45:28 +0100
+Subject: [PATCH V2 22/23] pci, acpi: Match PCI config space accessors
+ against platfrom specific quirks.
+In-Reply-To: <335CDE2E-B588-43A8-8665-6023AFD0EA04@redhat.com>
+References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
+ <1450278993-12664-23-git-send-email-tn@semihalf.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1EC14C0F@lhreml503-mbb>
+ <201512211510.32029.arnd@arndb.de>
+ <335CDE2E-B588-43A8-8665-6023AFD0EA04@redhat.com>
+Message-ID: <56790DA8.6050606@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 12:19 AM, Peter Rosin <peda@axentia.se> wrote:
-
-> This all makes sense. The reason is that I'm not familiar with
-> the kernel APIs. I have to wrap my head around how to set up
-> work to be performed later, etc etc.
-
-FWIW a random work to be performed later is a delayed work.
-It can be queued on a global workqueue or you can create your
-own workqueue. This is the latter way, it's even simpler if you
-just use NULL as workqueue, it will then end up on the big
-system workqueue. The workqueue in turn uses deferrable timers,
-and these can also be used directly.
-
-#include <linux/workqueue.h>
-
-struct foo {
-   struct workqueue_struct *foo_wq;
-   struct delayed_work delayed_foo_work;
-   ....
-};
-
-static void foo_work_cb(struct work_struct *work)
-{
-        struct foo *foo = container_of(work, struct foo, delayed_foo_work.work);
-
-        ... do the work ...
-};
-
-main {
-   INIT_DEFERRABLE_WORK(&foo->delayed_foo_work, foo_work_cb);
-   queue_delayed_work(foo->foo_wq, &foo->delayed_foo_work, 6*HZ);
-}
-
-6*HZ means wait for 6 seconds as the delay is given in ticks (jiffies)
-and the system does HZ ticks per second.
-
->> > I have realized that I could work with one-shot-interrupts. Then the
->> > urgency to disable interrupts go away, as only one interrupt would
->> > be served. That was not my immediate solution though, as I have been
->> > using isr type registers in this way several times before.
->>
->> That sounds like the right solution. With ONESHOT a threaded IRQ
->> will have its line masked until you return from the ISR thread. Would this
->> work for your usecase?
+On 22.12.2015 00:10, Jon Masters wrote:
+> Sorry for top-posting. A quick note that SMBIOS3 is required by SBBR so it can be presumed that compliant platforms will provide quirks via DMI.
 >
-> The ISR thread would need to be able to disable further interrupts
-> before it returned, is that possible without deadlock? If so, it's
-> a good fit.
 
-Yes that is what the ONESHOT flag means. So like this:
+Thanks Jon for confirmation.
 
-ret = request_threaded_irq(irqnum, NULL, foo_irq_handler,
-                                   IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
-                                   "foo", foo);
-
-To register a threaded oneshot IRQ that will run on a falling edge,
-as a thread, until completed, masking its own interrupt line, but
-no others.
-
-The threaded handler can msleep(), mdelay()/udelay() etc since it
-is a thread. usleep_range(a, b) is the best as the system can idle
-while that happens, and can plan for a good wakeup point.
-
-Yours,
-Linus Walleij
+Tomasz
