@@ -1,36 +1,47 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 22 Dec 2015 15:03:05 -0800
-Subject: [GIT PULL] Allwinner DT changes for 4.5, round 2
-In-Reply-To: <20151222205446.GA20757@lukather>
-References: <20151222205446.GA20757@lukather>
-Message-ID: <20151222230305.GT30172@localhost>
+Date: Tue, 22 Dec 2015 15:01:49 -0800
+Subject: [GIT PULL] Add idle states to Juno device-tree
+In-Reply-To: <1450797456.3037.2.camel@linaro.org>
+References: <1450797456.3037.2.camel@linaro.org>
+Message-ID: <20151222230149.GR30172@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 22, 2015 at 09:54:46PM +0100, Maxime Ripard wrote:
-> Hi,
+On Tue, Dec 22, 2015 at 03:17:36PM +0000, Jon Medhurst (Tixy) wrote:
+> Hi ARM SoC people
 > 
-> Please pull the following late changes for the Allwinner SoCs.
+> Please consider these device-tree updates for inclusion into Linux.
+> This is a pull request for the single patch discussed on the lists [1]
+> a couple of weeks ago, and I'm sending it as a pull request in the hope
+> that it will be more noticeable.
 > 
-> I expect it to be the last pull request for the 4.5 merge window on
-> our side.
+> Thanks
 > 
-> Thanks!
-> Maxime
+> Tixy
 > 
-> The following changes since commit 2367cee5fda1e9ebc605b13175492b31030acd9d:
+> [1] http://www.spinics.net/lists/arm-kernel/msg467219.html
 > 
->   ARM: dts: sun7i: Olimex A20-SOM-EVB: Enable mmc3 (baseboard SD socket) (2015-12-11 09:21:29 +0100)
+> ------------------------------------------------------------------
+> 
+> The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+> 
+>   Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
 > 
 > are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git sunxi-dt-for-4.5-2
+>   https://git.linaro.org/people/tixy/kernel.git juno-idle-dts
 > 
-> for you to fetch changes up to 12ec9384036304e64904afdc6234b842fe54f411:
+> for you to fetch changes up to 8ea5bf9418d621a27398a0d98987382343f0e94c:
 > 
->   ARM: dts: sun5i: Add dts file for the Empire Electronix D709 tablet (2015-12-21 17:10:18 +0100)
+>   arm64: dts: juno: Add idle-states to device tree (2015-12-22 14:51:59 +0000)
+> 
+> ----------------------------------------------------------------
+> Jon Medhurst (1):
+>       arm64: dts: juno: Add idle-states to device tree
 
-Merged, thanks!
+Hi,
+
+I applied the patch directly a little earlier today, so I'll skip this branch.
 
 
 -Olof
