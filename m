@@ -1,82 +1,30 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 23 Dec 2015 12:11:24 +0100
-Subject: [PATCH 1/4] irqchip: irq-armada-370-xp: add Kconfig option for
- the driver
-In-Reply-To: <1450707546-15060-2-git-send-email-thomas.petazzoni@free-electrons.com>
- (Thomas Petazzoni's message of "Mon, 21 Dec 2015 15:19:03 +0100")
-References: <1450707546-15060-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1450707546-15060-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <8760zpfmhv.fsf@free-electrons.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 23 Dec 2015 11:24:38 +0000
+Subject: [PATCH 13/19] ARM: dts: tegra: replace legacy *,wakeup property
+ with wakeup-source
+In-Reply-To: <1445422216-29375-14-git-send-email-sudeep.holla@arm.com>
+References: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
+ <1445422216-29375-14-git-send-email-sudeep.holla@arm.com>
+Message-ID: <CAPKp9uZ1hMegdL6wTUT0ROGd5CzyrnfKWsSRShXNdwRcyZ4Pnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
- 
- On lun., d?c. 21 2015, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
-
-> Instead of building the irq-armada-370-xp driver directly when
-> CONFIG_ARCH_MVEBU is enabled, this commit introduces an intermediate
-> CONFIG_ARMADA_370_XP_IRQ hidden Kconfig option.
+On Wed, Oct 21, 2015 at 11:10 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> Though the keyboard and other driver will continue to support the legacy
+> "gpio-key,wakeup", "nvidia,wakeup-source" boolean property to enable the
+> wakeup source, "wakeup-source" is the new standard binding.
 >
-> This allows this option to select other interrupt-related Kconfig
-> options (which will be needed in follow-up commits) rather than having
-> such selects done from arch/arm/mach-<foo>/.
+> This patch replaces all the legacy wakeup properties with the unified
+> "wakeup-source" property in order to avoid any futher copy-paste
+> duplication.
 >
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: Alexandre Courbot <gnurou@gmail.com>
 
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Ping, do you prefer taking via your tree or should I send to armsoc
+directly ?
 
-Thanks,
-
-Gregory
-
-> ---
->  drivers/irqchip/Kconfig  | 5 +++++
->  drivers/irqchip/Makefile | 2 +-
->  2 files changed, 6 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-> index 4d7294e..ab672b0 100644
-> --- a/drivers/irqchip/Kconfig
-> +++ b/drivers/irqchip/Kconfig
-> @@ -47,6 +47,11 @@ config ARM_VIC_NR
->  	  The maximum number of VICs available in the system, for
->  	  power management.
->  
-> +config ARMADA_370_XP_IRQ
-> +	bool
-> +	default y if ARCH_MVEBU
-> +	select GENERIC_IRQ_CHIP
-> +
->  config ATMEL_AIC_IRQ
->  	bool
->  	select GENERIC_IRQ_CHIP
-> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-> index 177f78f..4d740d8 100644
-> --- a/drivers/irqchip/Makefile
-> +++ b/drivers/irqchip/Makefile
-> @@ -5,7 +5,6 @@ obj-$(CONFIG_ARCH_BCM2835)		+= irq-bcm2836.o
->  obj-$(CONFIG_ARCH_EXYNOS)		+= exynos-combiner.o
->  obj-$(CONFIG_ARCH_HIP04)		+= irq-hip04.o
->  obj-$(CONFIG_ARCH_MMP)			+= irq-mmp.o
-> -obj-$(CONFIG_ARCH_MVEBU)		+= irq-armada-370-xp.o
->  obj-$(CONFIG_IRQ_MXS)			+= irq-mxs.o
->  obj-$(CONFIG_ARCH_TEGRA)		+= irq-tegra.o
->  obj-$(CONFIG_ARCH_S3C24XX)		+= irq-s3c24xx.o
-> @@ -26,6 +25,7 @@ obj-$(CONFIG_ARM_GIC_V3)		+= irq-gic-v3.o irq-gic-common.o
->  obj-$(CONFIG_ARM_GIC_V3_ITS)		+= irq-gic-v3-its.o irq-gic-v3-its-pci-msi.o irq-gic-v3-its-platform-msi.o
->  obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
->  obj-$(CONFIG_ARM_VIC)			+= irq-vic.o
-> +obj-$(CONFIG_ARMADA_370_XP_IRQ)		+= irq-armada-370-xp.o
->  obj-$(CONFIG_ATMEL_AIC_IRQ)		+= irq-atmel-aic-common.o irq-atmel-aic.o
->  obj-$(CONFIG_ATMEL_AIC5_IRQ)	+= irq-atmel-aic-common.o irq-atmel-aic5.o
->  obj-$(CONFIG_I8259)			+= irq-i8259.o
-> -- 
-> 2.6.4
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+--
+Regards,
+Sudeep
