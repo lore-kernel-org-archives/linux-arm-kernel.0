@@ -1,60 +1,144 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 23 Dec 2015 19:58:48 +0900
-Subject: [GIT PULL 5/9] ARM: EXYNOS: Drivers for v4.5
-In-Reply-To: <CA+Ln22Fk5UOgWzgOeEVb9sgPni028LMVDjgFhy3xQvnz4rwh_Q@mail.gmail.com>
-References: <1449020386-20250-1-git-send-email-k.kozlowski@samsung.com>
- <1449020386-20250-6-git-send-email-k.kozlowski@samsung.com>
- <20151222045042.GF30172@localhost> <567A7C9F.3020907@samsung.com>
- <CA+Ln22Fk5UOgWzgOeEVb9sgPni028LMVDjgFhy3xQvnz4rwh_Q@mail.gmail.com>
-Message-ID: <567A7E68.2050504@samsung.com>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Wed, 23 Dec 2015 11:58:34 +0100
+Subject: [PATCH 1/6] regulator: lp872x: Add missing of_match in regulators
+ descriptions
+In-Reply-To: <1450868319-20513-1-git-send-email-contact@paulk.fr>
+References: <1450868319-20513-1-git-send-email-contact@paulk.fr>
+Message-ID: <1450868319-20513-2-git-send-email-contact@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 23.12.2015 o 19:54, Tomasz Figa pisze:
-> Hi,
-> 
-> 2015-12-23 19:51 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
->> W dniu 22.12.2015 o 13:50, Olof Johansson pisze:
->>> On Wed, Dec 02, 2015 at 10:39:42AM +0900, Krzysztof Kozlowski wrote:
->>>> Hi Kukjin,
->>>>
->>>> Pinctrl for v4.5.
->>>>
->>>> Best regards,
->>>> Krzysztof
->>>>
->>>>
->>>> The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
->>>>
->>>>   Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
->>>>
->>>> are available in the git repository at:
->>>>
->>>>   https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-drivers-4.5
->>>>
->>>> for you to fetch changes up to 023e06dfa6882f500b9c86fd61f0b1913aa07f36:
->>>>
->>>>   pinctrl: exynos: add exynos5410 SoC specific data (2015-11-16 10:54:43 +0900)
->>>
->>> Hi,
->>>
->>> This should either go in through the pinctrl tree, or have an acked/reviewed-by
->>> one of the pinctrl maintainers.
->>
->> It was acked by Tomasz Figa - Samsung Pin Controller maintainer:
->> https://patchwork.ozlabs.org/patch/450340/
-> 
-> Actually, is there any reason to send this through ARM SoC? Looks like
-> this pull request contains only pinctrl changes which could normally
-> go through pinctrl tree. Maybe Linus W. could simply pull it?
+In order to select the regulators via of_find_regulator_by_node (and thus use
+them in devicetree), defining of_match for each regulator is required.
 
-Of course, I would be happy with it.
+Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+---
+ drivers/regulator/lp872x.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-But apparently I am the only one who continuously tracks all of these
-patches for Exynos (also for subsystems different than arch/arm/mach*).
-Yeah, I could ping everyone for every patch (not mine patch I mean)...
-but it is easier just to grab it after acking and send it. I really
-don't care about the method, just apply the damned patch ;)
-
-Best regards,
-Krzysztof
+diff --git a/drivers/regulator/lp872x.c b/drivers/regulator/lp872x.c
+index e5af072..9412353 100644
+--- a/drivers/regulator/lp872x.c
++++ b/drivers/regulator/lp872x.c
+@@ -520,6 +520,7 @@ static struct regulator_ops lp8725_buck_ops = {
+ static struct regulator_desc lp8720_regulator_desc[] = {
+ 	{
+ 		.name = "ldo1",
++		.of_match = of_match_ptr("ldo1"),
+ 		.id = LP8720_ID_LDO1,
+ 		.ops = &lp872x_ldo_ops,
+ 		.n_voltages = ARRAY_SIZE(lp872x_ldo_vtbl),
+@@ -533,6 +534,7 @@ static struct regulator_desc lp8720_regulator_desc[] = {
+ 	},
+ 	{
+ 		.name = "ldo2",
++		.of_match = of_match_ptr("ldo2"),
+ 		.id = LP8720_ID_LDO2,
+ 		.ops = &lp872x_ldo_ops,
+ 		.n_voltages = ARRAY_SIZE(lp872x_ldo_vtbl),
+@@ -546,6 +548,7 @@ static struct regulator_desc lp8720_regulator_desc[] = {
+ 	},
+ 	{
+ 		.name = "ldo3",
++		.of_match = of_match_ptr("ldo3"),
+ 		.id = LP8720_ID_LDO3,
+ 		.ops = &lp872x_ldo_ops,
+ 		.n_voltages = ARRAY_SIZE(lp872x_ldo_vtbl),
+@@ -559,6 +562,7 @@ static struct regulator_desc lp8720_regulator_desc[] = {
+ 	},
+ 	{
+ 		.name = "ldo4",
++		.of_match = of_match_ptr("ldo4"),
+ 		.id = LP8720_ID_LDO4,
+ 		.ops = &lp872x_ldo_ops,
+ 		.n_voltages = ARRAY_SIZE(lp8720_ldo4_vtbl),
+@@ -572,6 +576,7 @@ static struct regulator_desc lp8720_regulator_desc[] = {
+ 	},
+ 	{
+ 		.name = "ldo5",
++		.of_match = of_match_ptr("ldo5"),
+ 		.id = LP8720_ID_LDO5,
+ 		.ops = &lp872x_ldo_ops,
+ 		.n_voltages = ARRAY_SIZE(lp872x_ldo_vtbl),
+@@ -585,6 +590,7 @@ static struct regulator_desc lp8720_regulator_desc[] = {
+ 	},
+ 	{
+ 		.name = "buck",
++		.of_match = of_match_ptr("buck"),
+ 		.id = LP8720_ID_BUCK,
+ 		.ops = &lp8720_buck_ops,
+ 		.n_voltages = ARRAY_SIZE(lp8720_buck_vtbl),
+@@ -599,6 +605,7 @@ static struct regulator_desc lp8720_regulator_desc[] = {
+ static struct regulator_desc lp8725_regulator_desc[] = {
+ 	{
+ 		.name = "ldo1",
++		.of_match = of_match_ptr("ldo1"),
+ 		.id = LP8725_ID_LDO1,
+ 		.ops = &lp872x_ldo_ops,
+ 		.n_voltages = ARRAY_SIZE(lp872x_ldo_vtbl),
+@@ -612,6 +619,7 @@ static struct regulator_desc lp8725_regulator_desc[] = {
+ 	},
+ 	{
+ 		.name = "ldo2",
++		.of_match = of_match_ptr("ldo2"),
+ 		.id = LP8725_ID_LDO2,
+ 		.ops = &lp872x_ldo_ops,
+ 		.n_voltages = ARRAY_SIZE(lp872x_ldo_vtbl),
+@@ -625,6 +633,7 @@ static struct regulator_desc lp8725_regulator_desc[] = {
+ 	},
+ 	{
+ 		.name = "ldo3",
++		.of_match = of_match_ptr("ldo3"),
+ 		.id = LP8725_ID_LDO3,
+ 		.ops = &lp872x_ldo_ops,
+ 		.n_voltages = ARRAY_SIZE(lp872x_ldo_vtbl),
+@@ -638,6 +647,7 @@ static struct regulator_desc lp8725_regulator_desc[] = {
+ 	},
+ 	{
+ 		.name = "ldo4",
++		.of_match = of_match_ptr("ldo4"),
+ 		.id = LP8725_ID_LDO4,
+ 		.ops = &lp872x_ldo_ops,
+ 		.n_voltages = ARRAY_SIZE(lp872x_ldo_vtbl),
+@@ -651,6 +661,7 @@ static struct regulator_desc lp8725_regulator_desc[] = {
+ 	},
+ 	{
+ 		.name = "ldo5",
++		.of_match = of_match_ptr("ldo5"),
+ 		.id = LP8725_ID_LDO5,
+ 		.ops = &lp872x_ldo_ops,
+ 		.n_voltages = ARRAY_SIZE(lp872x_ldo_vtbl),
+@@ -664,6 +675,7 @@ static struct regulator_desc lp8725_regulator_desc[] = {
+ 	},
+ 	{
+ 		.name = "lilo1",
++		.of_match = of_match_ptr("lilo1"),
+ 		.id = LP8725_ID_LILO1,
+ 		.ops = &lp872x_ldo_ops,
+ 		.n_voltages = ARRAY_SIZE(lp8725_lilo_vtbl),
+@@ -677,6 +689,7 @@ static struct regulator_desc lp8725_regulator_desc[] = {
+ 	},
+ 	{
+ 		.name = "lilo2",
++		.of_match = of_match_ptr("lilo2"),
+ 		.id = LP8725_ID_LILO2,
+ 		.ops = &lp872x_ldo_ops,
+ 		.n_voltages = ARRAY_SIZE(lp8725_lilo_vtbl),
+@@ -690,6 +703,7 @@ static struct regulator_desc lp8725_regulator_desc[] = {
+ 	},
+ 	{
+ 		.name = "buck1",
++		.of_match = of_match_ptr("buck1"),
+ 		.id = LP8725_ID_BUCK1,
+ 		.ops = &lp8725_buck_ops,
+ 		.n_voltages = ARRAY_SIZE(lp8725_buck_vtbl),
+@@ -701,6 +715,7 @@ static struct regulator_desc lp8725_regulator_desc[] = {
+ 	},
+ 	{
+ 		.name = "buck2",
++		.of_match = of_match_ptr("buck2"),
+ 		.id = LP8725_ID_BUCK2,
+ 		.ops = &lp8725_buck_ops,
+ 		.n_voltages = ARRAY_SIZE(lp8725_buck_vtbl),
+-- 
+1.9.1
