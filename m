@@ -1,30 +1,32 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 23 Dec 2015 16:32:02 +0100
-Subject: [PATCH] ARM: mvebu: Add USB nop xceiv support in mvebu_v7_defconfig
-Message-ID: <1450884722-15529-1-git-send-email-gregory.clement@free-electrons.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 23 Dec 2015 07:36:31 -0800
+Subject: [PATCH 2/3] wlcore/wl12xx: spi: add device tree support
+In-Reply-To: <567AB1CB.1050203@compulab.co.il>
+References: <1450859744-9948-1-git-send-email-uri.mashiach@compulab.co.il>
+ <1450859744-9948-3-git-send-email-uri.mashiach@compulab.co.il>
+ <567A76B5.70605@ti.com> <567AB1CB.1050203@compulab.co.il>
+Message-ID: <20151223153630.GK2793@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 38x based boards use this "PHY" with their xhci usb
-controller. It would be also used for Armada 39x and Armada 375 base
-boars which also had xhci controller.
+* Uri Mashiach <uri.mashiach@compulab.co.il> [151223 06:38]:
+> On 12/23/2015 12:25 PM, Grygorii Strashko wrote:
+> 
+> >>+                        that services interrupts for this device
+> >>+- vwlan-supply :        Point the node of the regulator that controls the wl1271 chip WLAN_EN pin
+> >
+> >Pls, use gpio if this is required just to toggle WLAN_EN pin.
+> >
+> >[ti,] power-gpio or en-gpio
+> >
+> >
+> 
+> The controller's power might need toggling in some board implementation.
+> Maybe GPIO and regulator should be implemented?
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/configs/mvebu_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Yes a regulator for wlcore is best here because to properly control it
+and the wait needed.
 
-diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
-index c6729bf0a8dd..cf363abd974e 100644
---- a/arch/arm/configs/mvebu_v7_defconfig
-+++ b/arch/arm/configs/mvebu_v7_defconfig
-@@ -109,6 +109,7 @@ CONFIG_USB_XHCI_MVEBU=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_ROOT_HUB_TT=y
- CONFIG_USB_STORAGE=y
-+CONFIG_NOP_USB_XCEIV=y
- CONFIG_MMC=y
- CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_PLTFM=y
--- 
-2.5.0
+Regards,
+
+Tony
