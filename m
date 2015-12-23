@@ -1,7 +1,7 @@
 From: wangnan0@huawei.com (Wang Nan)
-Date: Wed, 23 Dec 2015 08:42:12 +0000
-Subject: [PATCH] arm64: Store breakpoint single step state into pstate
-Message-ID: <1450860132-194276-1-git-send-email-wangnan0@huawei.com>
+Date: Wed, 23 Dec 2015 08:52:11 +0000
+Subject: [RESEND PATCH] arm64: Store breakpoint single step state into pstate
+Message-ID: <1450860731-194418-1-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -61,8 +61,12 @@ After this patch:
 Signed-off-by: Wang Nan <wangnan0@huawei.com>
 Cc: AKASHI Takahiro <takahiro.akashi@linaro.org>
 Cc: Hanjun Guo <guohanjun@huawei.com>
-Cc: Jiri Olsa <jolsa@kernel.com>
+Cc: Jiri Olsa <jolsa@kernel.org>
 Cc: Will Deacon <will.deacon@arm.com>
+---
+
+Resend due to wrong email address.
+
 ---
  arch/arm64/include/asm/debug-monitors.h |  9 ++++++
  arch/arm64/include/uapi/asm/ptrace.h    | 12 ++++++++
