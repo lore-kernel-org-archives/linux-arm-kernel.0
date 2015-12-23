@@ -1,42 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 23 Dec 2015 20:15:29 +0000
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 23 Dec 2015 12:18:44 -0800
 Subject: [PATCH v2] ARM: mm: flip priority of CONFIG_DEBUG_RODATA
-In-Reply-To: <20151202202725.GA794@www.outflux.net>
+In-Reply-To: <20151223200132.GW8644@n2100.arm.linux.org.uk>
 References: <20151202202725.GA794@www.outflux.net>
-Message-ID: <20151223201529.GX8644@n2100.arm.linux.org.uk>
+ <20151223195129.GP2793@atomide.com>
+ <20151223200132.GW8644@n2100.arm.linux.org.uk>
+Message-ID: <20151223201843.GQ2793@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 02, 2015 at 12:27:25PM -0800, Kees Cook wrote:
-> The use of CONFIG_DEBUG_RODATA is generally seen as an essential part of
-> kernel self-protection:
-> http://www.openwall.com/lists/kernel-hardening/2015/11/30/13
-> Additionally, its name has grown to mean things beyond just rodata. To
-> get ARM closer to this, we ought to rearrange the names of the configs
-> that control how the kernel protects its memory. What was called
-> CONFIG_ARM_KERNMEM_PERMS is really doing the work that other architectures
-> call CONFIG_DEBUG_RODATA.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [151223 12:01]:
+> On Wed, Dec 23, 2015 at 11:51:29AM -0800, Tony Lindgren wrote:
+> > Also all omap3 boards are now oopsing in Linux next if PM is enabled:
+> 
+> I'm not sure that's entirely true.  My LDP3430 works fine with this
+> change in place, and that has CONFIG_PM=y.  See my nightly build/boot
+> results, which includes an attempt to enter hibernation.  Remember
+> that last night's results are from my tree plus arm-soc's for-next.
 
-Kees,
+Right but you don't have any deeper idle states enabled for your
+old ldp, see the script below. It may not work properly on your ldp
+because of the old silicon revision of the SoC..
 
-There is a subtle problem with the kernel memory permissions and the
-DMA debugging.
+> Maybe there's some other change in linux-next which, when combined
+> with this change, is provoking it?
 
-DMA debugging checks whether we're trying to do DMA from the kernel
-mappings (text, rodata, data etc).  It checks _text.._etext.  However,
-when RODATA is enabled, we have about one section between _text and
-_stext which are freed into the kernel's page pool, and then become
-available for allocation and use for DMA.
+Well it seems to be the new default Kconfig options selected by
+default as Geert is saying?
 
-This then causes the DMA debugging sanity check to fire.
+And it seems to require off mode enabled for idle to hit it, retention
+idle does not seem to trigger it.
 
-So, I think I'll revert this change for the time being as it seems to
-be causing many people problems, and having this enabled is creating
-extra warnings when kernel debug options are enabled along with it.
+Regards,
 
-Sorry.
+Tony
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+
+8< -------------------------
+#!/bin/bash
+
+uarts=$(find /sys/class/tty/tty[SO]*/device/power/ -type d)
+for uart in $uarts; do
+	echo 3000 > $uart/autosuspend_delay_ms 2>&1
+done
+
+uarts=$(find /sys/class/tty/tty[SO]*/power/ -type d 2>/dev/null)
+for uart in $uarts; do
+	echo enabled > $uart/wakeup 2>&1
+	echo auto > $uart/control 2>&1
+done
+
+echo 1 > /sys/kernel/debug/pm_debug/enable_off_mode
