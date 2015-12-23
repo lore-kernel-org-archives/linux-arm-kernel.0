@@ -1,40 +1,56 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 23 Dec 2015 13:29:12 -0800
-Subject: [PATCH v2] ARM: mm: flip priority of CONFIG_DEBUG_RODATA
-In-Reply-To: <567B04AB.6010906@redhat.com>
-References: <20151202202725.GA794@www.outflux.net>
- <20151223195129.GP2793@atomide.com> <567B04AB.6010906@redhat.com>
-Message-ID: <20151223212911.GR2793@atomide.com>
+From: v1ron@mail.ru (Roman Volkov)
+Date: Thu, 24 Dec 2015 00:35:09 +0300
+Subject: [PATCH v2 1/3] clocksource/vt8500: Use MIN_OSCR_DELTA from PXA
+In-Reply-To: <1450906511-342-1-git-send-email-v1ron@mail.ru>
+References: <1450906511-342-1-git-send-email-v1ron@mail.ru>
+Message-ID: <1450906511-342-2-git-send-email-v1ron@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Roman Volkov <rvolkov@v1ros.org>
 
-* Laura Abbott <labbott@redhat.com> [151223 12:31]:
-> 
-> Looks like a case similar to Geert's
-> 
->         adr     r7, kick_counter
-> wait_dll_lock_timed:
->         ldr     r4, wait_dll_lock_counter
->         add     r4, r4, #1
->         str     r4, [r7, #wait_dll_lock_counter - kick_counter]
->         ldr     r4, sdrc_dlla_status
->         /* Wait 20uS for lock */
->         mov     r6, #8
-> 
-> 
-> kick_counter and wait_dll_lock_counter are in the text section which is marked read only.
-> They need to be moved to the data section along with a few other variables from what I
-> can tell (maybe those are read only?).
+Since vt8500 and PXA timers are identical, use MIN_OSCR_DELTA from PXA,
+which is bigger than existing value. It is required to determine the
+minimum delay which hardware can generate.
 
-Thanks for looking, yeah so it seem.
+This commit fixes vt8500 breakage in Linux 4.2 introduced by
+c6eb3f7 ('hrtimer: Get rid of hrtimer softirq')
 
-> I suspect this is going to be a common issue with suspend/resume code paths since those
-> are hand written assembly.
+Signed-off-by: Roman Volkov <rvolkov@v1ros.org>
+---
+ drivers/clocksource/vt8500_timer.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-Yes I suspect we have quite a few cases like this.
-
-Regards,
-
-Tony
+diff --git a/drivers/clocksource/vt8500_timer.c b/drivers/clocksource/vt8500_timer.c
+index a92e94b..dfc3bb4 100644
+--- a/drivers/clocksource/vt8500_timer.c
++++ b/drivers/clocksource/vt8500_timer.c
+@@ -50,6 +50,8 @@
+ 
+ #define msecs_to_loops(t) (loops_per_jiffy / 1000 * HZ * t)
+ 
++#define MIN_OSCR_DELTA		16
++
+ static void __iomem *regbase;
+ 
+ static cycle_t vt8500_timer_read(struct clocksource *cs)
+@@ -80,7 +82,7 @@ static int vt8500_timer_set_next_event(unsigned long cycles,
+ 		cpu_relax();
+ 	writel((unsigned long)alarm, regbase + TIMER_MATCH_VAL);
+ 
+-	if ((signed)(alarm - clocksource.read(&clocksource)) <= 16)
++	if ((signed)(alarm - clocksource.read(&clocksource)) <= MIN_OSCR_DELTA)
+ 		return -ETIME;
+ 
+ 	writel(1, regbase + TIMER_IER_VAL);
+@@ -151,7 +153,7 @@ static void __init vt8500_timer_init(struct device_node *np)
+ 		pr_err("%s: setup_irq failed for %s\n", __func__,
+ 							clockevent.name);
+ 	clockevents_config_and_register(&clockevent, VT8500_TIMER_HZ,
+-					4, 0xf0000000);
++					MIN_OSCR_DELTA * 2, 0xf0000000);
+ }
+ 
+ CLOCKSOURCE_OF_DECLARE(vt8500, "via,vt8500-timer", vt8500_timer_init);
+-- 
+2.6.2
