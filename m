@@ -1,81 +1,124 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 23 Dec 2015 16:00:34 +0100
-Subject: [PATCH] ARM: mvebu: Update the mpp63 function in the device tree
- on Armada 370
-In-Reply-To: <20151223145707.GJ18249@io.lakedaemon.net> (Jason Cooper's
- message of "Wed, 23 Dec 2015 14:57:07 +0000")
-References: <1450881770-21189-1-git-send-email-gregory.clement@free-electrons.com>
- <20151223145707.GJ18249@io.lakedaemon.net>
-Message-ID: <87k2o5dxbh.fsf@free-electrons.com>
+From: jingoohan1@gmail.com (Jingoo Han)
+Date: Thu, 24 Dec 2015 00:10:22 +0900
+Subject: [PATCH v12 16/18] drm: bridge: analogix/dp: expand the wait time
+ for looking AUX CH reply flag
+In-Reply-To: <1450875064-19627-1-git-send-email-ykk@rock-chips.com>
+References: <1450873538-18304-1-git-send-email-ykk@rock-chips.com>
+ <1450875064-19627-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <000001d13d94$120e0d60$362a2820$@com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
- 
- On mer., d?c. 23 2015, Jason Cooper <jason@lakedaemon.net> wrote:
+On Wednesday, December 23, 2015 9:51 PM, Yakir Yang wrote:
+> 
+> On Rockchip platform, sometimes driver would failed at reading EDID
+> message, and it's caused by the AUX reply flag wouldn't received under
+> the 100*10us wait time.
 
-> Hey Gregory,
->
-> On Wed, Dec 23, 2015 at 03:42:50PM +0100, Gregory CLEMENT wrote:
->> Since the commit a526973e0291 ("pinctrl: mvebu: Fix mapping of pin
->> 63 (gpo -> gpio)"), the mpp63 is no more declared as a GPO but is a
->> GPIO. Even if in the datasheet this pin is described as GPO, the
->> experience of the D-Link DNS-327L board shows that it can be used as a
->> GPIO.
->
-> I think this is worth a comment in the binding doc to prevent confusion.
->
->> This commits generated warnings for the board using this pin as gpo, with
->> this patch the dts are fixed by using the new function (gpio) instead of
->> the old one.
->> 
->> The binding documentation has also been updated accordingly.
->> 
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> ---
->>  .../devicetree/bindings/pinctrl/marvell,armada-370-pinctrl.txt       | 5 ++++-
->>  arch/arm/boot/dts/armada-370-mirabox.dts                             | 2 +-
->>  arch/arm/boot/dts/armada-370-netgear-rn104.dts                       | 2 +-
->>  arch/arm/boot/dts/armada-370-synology-ds213j.dts                     | 2 +-
->>  4 files changed, 7 insertions(+), 4 deletions(-)
->> 
->> diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,armada-370-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,armada-370-pinctrl.txt
->> index add7c38ec7d8..8662f3aaf312 100644
->> --- a/Documentation/devicetree/bindings/pinctrl/marvell,armada-370-pinctrl.txt
->> +++ b/Documentation/devicetree/bindings/pinctrl/marvell,armada-370-pinctrl.txt
->> @@ -91,6 +91,9 @@ mpp60         60       gpio, dev(ale1), uart1(rxd), sata0(prsnt), pcie(rstout),
->>  mpp61         61       gpo, dev(we1), uart1(txd), audio(lrclk)
->>  mpp62         62       gpio, dev(a2), uart1(cts), tdm(drx), pcie(clkreq0),
->>                         audio(mclk), uart0(cts)
->> -mpp63         63       gpo, spi0(sck), tclk
->> +mpp63         63       gpio, spi0(sck), tclk
->
-> e.g.
->
-> mpp63		63	gpio, spi0(sck), tclk (datasheet incorrectly says gpo)
->
-> or similar.
->
-> thx,
->
-> Jason.
->
->>  mpp64         64       gpio, spi0(miso), spi0(cs1)
->>  mpp65         65       gpio, spi0(mosi), spi0(cs2)
+The problem is specific for Rockchip platform.
+Also, 1 ms is long time.
+The best way is that your hardware engineers find the root cause.
+I cannot understand why your engineers cannot find the root cause. :-(
+
+> 
+> But after expand the wait time a little, the AUX reply flag would be
+> set, so maybe the wait time is a little critical. Besides the analogix
+> dp book haven't reminded the standard wait for looking AUX reply flag,
+> so I thought it's okay to expand the wait time.
+> 
+> And the external wait time won't hurt Exynos DP too much, cause they
+> wouldn't meet this problem, then driver would received the reply command
+> very soon, so no more additional wait time would bring to Exynos platform.
+
+Then, when loop time happens on Exynos platform, it will take long time
+to return error.
+
+> 
+> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+> ---
+> Changes in v12:
+> - Using another way to expand the AUX reply wait time (Jingoo)
+> 
+> Changes in v11: None
+> Changes in v10: None
+> Changes in v9: None
+> Changes in v8: None
+> Changes in v7: None
+> Changes in v6: None
+> Changes in v5: None
+> Changes in v4: None
+> Changes in v3: None
+> Changes in v2: None
+> 
+>  drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c | 10 ++++------
+>  1 file changed, 4 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+> b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+> index cba3ffd..8687eea 100644
+> --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+> +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+> @@ -471,7 +471,7 @@ int analogix_dp_start_aux_transaction(struct analogix_dp_device *dp)
+>  {
+>  	int reg;
+>  	int retval = 0;
+> -	int timeout_loop = 0;
+> +	unsigned long timeout;
+> 
+>  	/* Enable AUX CH operation */
+>  	reg = readl(dp->reg_base + ANALOGIX_DP_AUX_CH_CTL_2);
+> @@ -479,14 +479,12 @@ int analogix_dp_start_aux_transaction(struct analogix_dp_device *dp)
+>  	writel(reg, dp->reg_base + ANALOGIX_DP_AUX_CH_CTL_2);
+> 
+>  	/* Is AUX CH command reply received? */
+> -	reg = readl(dp->reg_base + ANALOGIX_DP_INT_STA);
+> -	while (!(reg & RPLY_RECEIV)) {
+> -		timeout_loop++;
+> -		if (DP_TIMEOUT_LOOP_COUNT < timeout_loop) {
+> +	timeout = jiffies + msecs_to_jiffies(5);
+> +	while ((readl(dp->reg_base + ANALOGIX_DP_INT_STA) & RPLY_RECEIV) == 0) {
+> +		if (time_after(jiffies, timeout)) {
+>  			dev_err(dp->dev, "AUX CH command reply failed!\n");
+>  			return -ETIMEDOUT;
+>  		}
+> -		reg = readl(dp->reg_base + ANALOGIX_DP_INT_STA);
+
+Sorry, I don't like your patch.
+
+The problem happens because of Rockchip platform.
+So, you need to add workaround for only Rockchip platform.
+
+Just add new DT property and new variable for the value for wait time.
+When, the probe is called, new wait time value is read from Rockchip DT file.
+Then, the new wait time value can be written to the new variable.
+
+    new DT property: wait-time-aux
+    new variable: wait_time_aux
 
 
+If ( ) // New DT 
+    wait_time_aux = New DT;
+else 
+    wait_time_aux = 10;
 
->> +
->> +Note: According to the datasheet mpp63 is a gpo but there is at least
->> +one example of a gpio usage on the board D-Link DNS-327L
-This is why I added this note, I thought it was enough.
 
-Thanks,
+>  		usleep_range(10, 11);
 
-Gregory
+If there is NO  new wait time value from DT file, the default value '10' is
+used for sleep.
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+But, if there is new wait time value from DT file, new wait time value
+can be used for sleep.
+
+                 usleep_range(dp->wait_time_aux, dp->wait_time_aux + 1);
+
+What I want to say is that there should be NO effect on Exynos platform,
+because of the hardware bug of Rockchip platform.
+
+Best regards,
+Jingoo Han
+
+>  	}
+> 
+> --
+> 1.9.1
