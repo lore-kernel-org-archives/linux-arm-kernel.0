@@ -1,53 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 23 Dec 2015 12:18:44 -0800
-Subject: [PATCH v2] ARM: mm: flip priority of CONFIG_DEBUG_RODATA
-In-Reply-To: <20151223200132.GW8644@n2100.arm.linux.org.uk>
-References: <20151202202725.GA794@www.outflux.net>
- <20151223195129.GP2793@atomide.com>
- <20151223200132.GW8644@n2100.arm.linux.org.uk>
-Message-ID: <20151223201843.GQ2793@atomide.com>
+From: wpdster@gmail.com (Patrick Doyle)
+Date: Wed, 23 Dec 2015 15:22:42 -0500
+Subject: What happens if sched_clock_suspend() is never called?
+In-Reply-To: <20151223194511.GU8644@n2100.arm.linux.org.uk>
+References: <CAF_dkJAJ3g7S2i2zW81OD50Bwsg7NzuakbeeQaBhJvtVCyg86w@mail.gmail.com>
+ <20151223194511.GU8644@n2100.arm.linux.org.uk>
+Message-ID: <CAF_dkJArNbcn31s7Sj7c-3a2nSEdpLbP1Tr8=0Y6gXm_3_nQzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [151223 12:01]:
-> On Wed, Dec 23, 2015 at 11:51:29AM -0800, Tony Lindgren wrote:
-> > Also all omap3 boards are now oopsing in Linux next if PM is enabled:
-> 
-> I'm not sure that's entirely true.  My LDP3430 works fine with this
-> change in place, and that has CONFIG_PM=y.  See my nightly build/boot
-> results, which includes an attempt to enter hibernation.  Remember
-> that last night's results are from my tree plus arm-soc's for-next.
+On Wed, Dec 23, 2015 at 2:45 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Dec 23, 2015 at 11:11:20AM -0500, Patrick Doyle wrote:
+>> This feels like a bug to me.  It seems like sched_clock_register()
+>> should update the sched_clock_timer whenever it changes cd.wrap_kt.
+>
+> sched_clock needs to be up and running early in the boot process
+> so the scheduler has a stable time source.  sched_clock must be
+> registered and configured by the time sched_clock_postinit() is
+> called, and after that no further registrations should be made.
+>
+OK, that makes sense.  I guess that's why all of the drivers in
+drivers/clocksource invoke sched_clock_register() from within
+CLOCKSOURCE_OF_DECLARE(), and I guess that CLOCKSOURCE_OF_DECLARE()
+must do the right thing to ensure that the init function is called at
+the appropriate time in the boot process.
 
-Right but you don't have any deeper idle states enabled for your
-old ldp, see the script below. It may not work properly on your ldp
-because of the old silicon revision of the SoC..
+Now the dots are starting to get connected.  Thank you.  I'll go
+investigate what needs to be done to change:
 
-> Maybe there's some other change in linux-next which, when combined
-> with this change, is provoking it?
+arch_initcall(tcb_clksrc_init);
 
-Well it seems to be the new default Kconfig options selected by
-default as Geert is saying?
+to be some appropriate form of call to CLOCKSOURCE_OF_DECLARE() (which
+will be complicated by Atmel's usage of atmel_tclib.c)
 
-And it seems to require off mode enabled for idle to hit it, retention
-idle does not seem to trigger it.
+Thanks again for the help.
 
-Regards,
-
-Tony
-
-
-8< -------------------------
-#!/bin/bash
-
-uarts=$(find /sys/class/tty/tty[SO]*/device/power/ -type d)
-for uart in $uarts; do
-	echo 3000 > $uart/autosuspend_delay_ms 2>&1
-done
-
-uarts=$(find /sys/class/tty/tty[SO]*/power/ -type d 2>/dev/null)
-for uart in $uarts; do
-	echo enabled > $uart/wakeup 2>&1
-	echo auto > $uart/control 2>&1
-done
-
-echo 1 > /sys/kernel/debug/pm_debug/enable_off_mode
+--wpd
