@@ -1,52 +1,62 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 23 Dec 2015 15:21:29 +0100
-Subject: [PATCH v2 0/9] ARM: dts: Add compatible property to "partitions"
- node
-In-Reply-To: <87egedfmsm.fsf@free-electrons.com>
-References: <1450694033-27717-1-git-send-email-geert+renesas@glider.be>
- <20151222212350.GF30172@localhost>
- <87egedfmsm.fsf@free-electrons.com>
-Message-ID: <CAMuHMdVJY6+vFvO44kQkzbPJGDkY8SfRz3Dwt4-_RVJL2o=pdw@mail.gmail.com>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Wed, 23 Dec 2015 17:19:39 +0300
+Subject: [PATCH v4 0/3] Add AMBA bus probing support to ACPI
+Message-ID: <1450880383-29560-1-git-send-email-aleksey.makarov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Gregory,
+As discussed when Shannon Zhao sent a patch to add platform_device support
+to pl061 driver. Russel and other maintainers prefered that ACPI learned
+how to create AMBA devices rather than converting/adding platform_device
+support to AMBA drivers.
 
-On Wed, Dec 23, 2015 at 12:04 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
->  On mar., d?c. 22 2015, Olof Johansson <olof@lixom.net> wrote:
->> On Mon, Dec 21, 2015 at 11:33:44AM +0100, Geert Uytterhoeven wrote:
->>> As of commit e488ca9f8d4f62c2 ("doc: dt: mtd: partitions: add compatible
->>> property to "partitions" node"), which is in v4.4-rc6, the "partitions"
->>> subnode of an SPI FLASH device node must have a compatible property. The
->>> partitions are no longer detected if it is not present.
->>>
->>> However, several DTSes in -next have already been converted to the
->>> "partitions" subnode without "compatible" property, introduced by
->>> commits 5cfdedb7b9a0fe38 ("mtd: ofpart: move ofpart partitions to a
->>> dedicated dt node") and fe2585e9c29a650a ("doc: dt: mtd: support
->>> partitions in a special 'partitions' subnode"). Hence all of these are
->>> now broken in -next, and will be broken in upstream during the merge
->>> window.
->>
->> So, if I understand this correctly, the partitions format was added for v4.4,
->> then this non-backwards compatible change was added in -rc6. But, there were
->> also DT files that had the new-for-v4.4 partitions nodes in them that then
->> stopped working in -rc6?
->
-> At least for the mvebu dts, the change was added for v4.5 not
-> v4.4. Currently it is only in the next branches (and also in your
-> arm-soc tree in next/dt).
+http://comments.gmane.org/gmane.linux.ports.arm.kernel/431364
 
-The same is true for the shmobile changes: they are queued up for v4.5.
+1) Adds basic AMBA device probing support to ACPI, it uses a whitelist of
+device IDs as the number of AMBA devices is limited. Currently the two ids
+present are those used in QEMU for arm64.
 
-Gr{oetje,eeting}s,
+2) Adds the plumbing into ACPI probe sequence.
 
-                        Geert
+3) From ACPI pl011 is only defined (SBSA document) to be in SBSA mode which has
+reduced functionality. There may be a better method to do this that I have
+overlooked.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+v4:
+- A memory leak has been fixed (Vladimir Zapolskiy)
+- ACPI_COMPANION() -> has_acpi_companion() (Andy Shevchenko)
+- pr_err() -> dev_err() (Andy Shevchenko)
+- The call to amba_register_dummy_clk() has been moved to to acpi_amba_init()
+  (Vladimir Zapolskiy)
+- Return value has been fixed (Vladimir Zapolskiy)
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+v3:
+https://lkml.kernel.org/g/1450716100-13688-1-git-send-email-aleksey.makarov at linaro.org
+- Compilation without CONFIG_ARM_AMBA has been fixed
+
+v2:
+https://lkml.kernel.org/g/1450709399-7246-1-git-send-email-aleksey.makarov at linaro.org
+- A new ACPI scan handler for AMBA devices has been implemented
+- The order of `if` branches in amba-pl011.c has been changed
+- A couple of `static`s have been added
+- The compilation of the acpi_amba.c unit has made conditional
+- A comment on SBSA UART has been added
+
+v1:
+https://lkml.kernel.org/g/1443609530-21524-1-git-send-email-graeme.gregory at linaro.org
+
+Graeme Gregory (3):
+  ACPI: amba bus probing support
+  ACPI: scan add in amba probing
+  serial: amba-pl011: add ACPI support to AMBA probe
+
+ drivers/acpi/Makefile           |   1 +
+ drivers/acpi/acpi_amba.c        | 140 ++++++++++++++++++++++++++++++++++++++++
+ drivers/acpi/internal.h         |   5 ++
+ drivers/acpi/scan.c             |   1 +
+ drivers/tty/serial/amba-pl011.c |  37 +++++++----
+ 5 files changed, 173 insertions(+), 11 deletions(-)
+ create mode 100644 drivers/acpi/acpi_amba.c
+
+-- 
+2.6.4
