@@ -1,118 +1,49 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 23 Dec 2015 18:44:09 +0800
-Subject: [RESEND PATCH] arm64: Store breakpoint single step state into
- pstate
-In-Reply-To: <1450860731-194418-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <201512231805.1WQG4VQp%fengguang.wu@intel.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 23 Dec 2015 19:55:11 +0900
+Subject: [GIT PULL 6/9] ARM: EXYNOS: clk: Another clock dependency, ARMv7,
+ for v4.5
+In-Reply-To: <20151222045135.GG30172@localhost>
+References: <1449020386-20250-1-git-send-email-k.kozlowski@samsung.com>
+ <1449020386-20250-7-git-send-email-k.kozlowski@samsung.com>
+ <20151222045135.GG30172@localhost>
+Message-ID: <567A7D8F.3010209@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wang,
+W dniu 22.12.2015 o 13:51, Olof Johansson pisze:
+> On Wed, Dec 02, 2015 at 10:39:43AM +0900, Krzysztof Kozlowski wrote:
+>> Hi Kukjin,
+>>
+>> This is also clock dependency. I put it in separate tag in case clock
+>> folks want to pull it also.
+>>
+>> Best regards,
+>> Krzysztof
+>>
+>>
+>> The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+>>
+>>   Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+>>
+>> are available in the git repository at:
+>>
+>>   https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-clk-exynos4-4.5
+>>
+>> for you to fetch changes up to 94af7a3c310f5877dc6f756179b92f24f89a9b08:
+>>
+>>   clk: samsung: exynos4: Add SSS gate clock (2015-11-18 22:02:02 +0900)
+> 
+> Again, this should probably go through the clk maintainer (or have an ack).
+> It's just two one-line changes though, so if they're slow to respond we can
+> take it as a fallback. Resend if that's the case.
+> 
 
-[auto build test ERROR on arm64/for-next/core]
-[also build test ERROR on v4.4-rc6 next-20151223]
+Wait, I am missing something. This contains only one patch which has the
+Stephen's Boyd ack:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/379230.html
+(this is in commit message already)
 
-url:    https://github.com/0day-ci/linux/commits/Wang-Nan/arm64-Store-breakpoint-single-step-state-into-pstate/20151223-165432
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux for-next/core
-config: arm64-allnoconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+What kind of ack do you expect here? Ack for pull-request?
 
-All errors (new ones prefixed by >>):
-
-   arch/arm64/kernel//irq.o: In function `signal_reinstall_single_step':
->> irq.c:(.text+0x0): multiple definition of `signal_reinstall_single_step'
-   arch/arm64/kernel//debug-monitors.o:debug-monitors.c:(.text+0x2b4): first defined here
-   arch/arm64/kernel//fpsimd.o: In function `signal_reinstall_single_step':
-   fpsimd.c:(.text+0x0): multiple definition of `signal_reinstall_single_step'
-   arch/arm64/kernel//debug-monitors.o:debug-monitors.c:(.text+0x2b4): first defined here
-   arch/arm64/kernel//process.o: In function `signal_reinstall_single_step':
-   process.c:(.text+0x0): multiple definition of `signal_reinstall_single_step'
-   arch/arm64/kernel//debug-monitors.o:debug-monitors.c:(.text+0x2b4): first defined here
-   arch/arm64/kernel//ptrace.o: In function `signal_reinstall_single_step':
-   ptrace.c:(.text+0x368): multiple definition of `signal_reinstall_single_step'
-   arch/arm64/kernel//debug-monitors.o:debug-monitors.c:(.text+0x2b4): first defined here
-   arch/arm64/kernel//setup.o: In function `signal_reinstall_single_step':
-   setup.c:(.text+0x0): multiple definition of `signal_reinstall_single_step'
-   arch/arm64/kernel//debug-monitors.o:debug-monitors.c:(.text+0x2b4): first defined here
-   aarch64-linux-gnu-ld: cannot find arch/arm64/kernel//signal.o: No such file or directory
-   arch/arm64/kernel//sys.o: In function `signal_reinstall_single_step':
-   sys.c:(.text+0x28): multiple definition of `signal_reinstall_single_step'
-   arch/arm64/kernel//debug-monitors.o:debug-monitors.c:(.text+0x2b4): first defined here
-   arch/arm64/kernel//stacktrace.o: In function `signal_reinstall_single_step':
-   stacktrace.c:(.text+0x0): multiple definition of `signal_reinstall_single_step'
-   arch/arm64/kernel//debug-monitors.o:debug-monitors.c:(.text+0x2b4): first defined here
-   arch/arm64/kernel//time.o: In function `signal_reinstall_single_step':
-   time.c:(.text+0x0): multiple definition of `signal_reinstall_single_step'
-   arch/arm64/kernel//debug-monitors.o:debug-monitors.c:(.text+0x2b4): first defined here
-   arch/arm64/kernel//traps.o: In function `signal_reinstall_single_step':
-   traps.c:(.text+0x2c0): multiple definition of `signal_reinstall_single_step'
-   arch/arm64/kernel//debug-monitors.o:debug-monitors.c:(.text+0x2b4): first defined here
-   arch/arm64/kernel//io.o: In function `signal_reinstall_single_step':
-   io.c:(.text+0x0): multiple definition of `signal_reinstall_single_step'
-   arch/arm64/kernel//debug-monitors.o:debug-monitors.c:(.text+0x2b4): first defined here
-   arch/arm64/kernel//vdso.o: In function `signal_reinstall_single_step':
-   vdso.c:(.text+0x0): multiple definition of `signal_reinstall_single_step'
-   arch/arm64/kernel//debug-monitors.o:debug-monitors.c:(.text+0x2b4): first defined here
-   arch/arm64/kernel//psci.o: In function `signal_reinstall_single_step':
-   psci.c:(.text+0x44): multiple definition of `signal_reinstall_single_step'
-   arch/arm64/kernel//debug-monitors.o:debug-monitors.c:(.text+0x2b4): first defined here
-   arch/arm64/kernel//cpu_ops.o: In function `signal_reinstall_single_step':
-   cpu_ops.c:(.text+0x0): multiple definition of `signal_reinstall_single_step'
-   arch/arm64/kernel//debug-monitors.o:debug-monitors.c:(.text+0x2b4): first defined here
-   arch/arm64/kernel//insn.o: In function `signal_reinstall_single_step':
-   insn.c:(.text+0x250): multiple definition of `signal_reinstall_single_step'
-   arch/arm64/kernel//debug-monitors.o:debug-monitors.c:(.text+0x2b4): first defined here
-   arch/arm64/kernel//return_address.o: In function `signal_reinstall_single_step':
-   return_address.c:(.text+0x90): multiple definition of `signal_reinstall_single_step'
-   arch/arm64/kernel//debug-monitors.o:debug-monitors.c:(.text+0x2b4): first defined here
-   arch/arm64/kernel//cpuinfo.o: In function `signal_reinstall_single_step':
-   cpuinfo.c:(.text+0x3dc): multiple definition of `signal_reinstall_single_step'
-   arch/arm64/kernel//debug-monitors.o:debug-monitors.c:(.text+0x2b4): first defined here
-   arch/arm64/kernel//cpu_errata.o: In function `signal_reinstall_single_step':
-   cpu_errata.c:(.text+0x0): multiple definition of `signal_reinstall_single_step'
-   arch/arm64/kernel//debug-monitors.o:debug-monitors.c:(.text+0x2b4): first defined here
-   arch/arm64/kernel//cpufeature.o: In function `signal_reinstall_single_step':
-   cpufeature.c:(.text+0x1c8): multiple definition of `signal_reinstall_single_step'
-   arch/arm64/kernel//debug-monitors.o:debug-monitors.c:(.text+0x2b4): first defined here
-   arch/arm64/kernel//alternative.o: In function `signal_reinstall_single_step':
-   alternative.c:(.text+0x13c): multiple definition of `signal_reinstall_single_step'
-   arch/arm64/kernel//debug-monitors.o:debug-monitors.c:(.text+0x2b4): first defined here
-   arch/arm64/kernel//cacheinfo.o: In function `signal_reinstall_single_step':
-   cacheinfo.c:(.text+0x230): multiple definition of `signal_reinstall_single_step'
-   arch/arm64/kernel//debug-monitors.o:debug-monitors.c:(.text+0x2b4): first defined here
-   arch/arm64/kernel//smp.o: In function `signal_reinstall_single_step':
-   smp.c:(.text+0x0): multiple definition of `signal_reinstall_single_step'
-   arch/arm64/kernel//debug-monitors.o:debug-monitors.c:(.text+0x2b4): first defined here
-   arch/arm64/kernel//smp_spin_table.o: In function `signal_reinstall_single_step':
-   smp_spin_table.c:(.text+0x108): multiple definition of `signal_reinstall_single_step'
-   arch/arm64/kernel//debug-monitors.o:debug-monitors.c:(.text+0x2b4): first defined here
-   arch/arm64/kernel//topology.o: In function `signal_reinstall_single_step':
-   topology.c:(.text+0x0): multiple definition of `signal_reinstall_single_step'
-   arch/arm64/kernel//debug-monitors.o:debug-monitors.c:(.text+0x2b4): first defined here
---
-   arch/arm64/kernel/signal.c: In function 'sys_rt_sigreturn':
->> arch/arm64/kernel/signal.c:154:2: error: too many arguments to function 'signal_reinstall_single_step'
-     signal_reinstall_single_step(regs->pstate);
-     ^
-   In file included from arch/arm64/include/asm/bug.h:21:0,
-                    from include/linux/bug.h:4,
-                    from include/linux/signal.h:5,
-                    from arch/arm64/kernel/signal.c:22:
-   arch/arm64/include/asm/debug-monitors.h:146:6: note: declared here
-    void signal_reinstall_single_step(void)
-         ^
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 5635 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151223/0ac60ff7/attachment-0001.obj>
+Best regards,
+Krzysztof
