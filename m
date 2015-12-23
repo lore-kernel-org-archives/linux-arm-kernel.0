@@ -1,26 +1,61 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Tue, 22 Dec 2015 21:46:36 -0600
-Subject: next-20151222 build: 3 failures 13 warnings (next-20151222)
-In-Reply-To: <20151222122228.GL5727@sirena.org.uk>
-References: <E1aBIky-0007nI-7t@optimist> <20151222122228.GL5727@sirena.org.uk>
-Message-ID: <20151223034636.GA4569@hector.tx.rr.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Wed, 23 Dec 2015 07:21:33 +0300
+Subject: [PATCH v6 13/20] arm64: ilp32: share aarch32 syscall wrappers to
+ ilp32
+In-Reply-To: <20151222122514.GA1302@e104818-lin.cambridge.arm.com>
+References: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
+ <1450215766-14765-14-git-send-email-ynorov@caviumnetworks.com>
+ <20151222122514.GA1302@e104818-lin.cambridge.arm.com>
+Message-ID: <20151223042133.GA18231@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 22, 2015 at 12:22:28PM +0000, Mark Brown wrote:
-> On Tue, Dec 22, 2015 at 08:57:20AM +0000, Build bot for Mark Brown wrote:
+On Tue, Dec 22, 2015 at 12:25:15PM +0000, Catalin Marinas wrote:
+> On Wed, Dec 16, 2015 at 12:42:39AM +0300, Yury Norov wrote:
+> > statfs64, fstat64 and mmap_pgoff has wrappers that needed both by aarch32 and
+> > ilp32 to workaround some issues. Here we create common file to share aarch32
+> > workarounds to with ilp32 code.
+> [...]
+> > --- /dev/null
+> > +++ b/arch/arm64/kernel/entry32-common.S
+> > @@ -0,0 +1,37 @@
+> > +#include <linux/linkage.h>
+> > +#include <linux/const.h>
+> > +
+> > +#include <asm/assembler.h>
+> > +#include <asm/asm-offsets.h>
+> > +#include <asm/errno.h>
+> > +#include <asm/page.h>
+> > +
+> > +ENTRY(compat_sys_statfs64_wrapper)
+> > +	mov	w3, #84
+> > +	cmp	w1, #88
+> > +	csel	w1, w3, w1, eq
+> > +	b	compat_sys_statfs64
+> > +ENDPROC(compat_sys_statfs64_wrapper)
+> > +
+> > +ENTRY(compat_sys_fstatfs64_wrapper)
+> > +	mov	w3, #84
+> > +	cmp	w1, #88
+> > +	csel	w1, w3, w1, eq
+> > +	b	compat_sys_fstatfs64
+> > +ENDPROC(compat_sys_fstatfs64_wrapper)
 > 
-> Today's linux-next fails to link an arm64 allmodconfig due to:
+> I'm not convinced we need these wrappers for ILP32. They've been
+> introduced on arch/arm many years ago by commit Fixes: 713c481519f1
+> ([ARM] 3108/2: old ABI compat: statfs64 and fstatfs64) to deal with user
+> space passing a size of 88 (the EABI size of struct compat_statfs64
+> without the packing and alignment attribute). Since that commit, the
+> sizeof(struct compat_statfs64) is 84 already. This should be the case
+> with the new ILP32 exported headers (no backwards compatibility), so
+> user space should never pass 88 as size. Therefore we could call
+> compat_sys_(f)statfs64 directly without wrappers.
 > 
-> > ERROR: "of_irq_count" [drivers/pinctrl/qcom/pinctrl-ssbi-mpp.ko] undefined!
-> > ERROR: "of_irq_count" [drivers/pinctrl/qcom/pinctrl-ssbi-gpio.ko] undefined!
-> > ERROR: "of_irq_count" [drivers/pinctrl/qcom/pinctrl-spmi-mpp.ko] undefined!
-> > ERROR: "of_irq_count" [drivers/pinctrl/qcom/pinctrl-spmi-gpio.ko] undefined!
-> 
-> which are caused by ab4256cfeab91569 (pinctrl: qcom: pmic-gpio/mpp:
-> of_irq_count() == npins) which adds uses of irq_of_count() but that is
-> not exported so can't be used in modules.  I've just sent a patch adding
-> the export.
 
-Thanks for fixing that Mark.  I had seen it in the pinctrl builds but hadn't
-gotten the screen time to send in a fix.
+With current glibc, sizeof(struct compat_statfs64) is 88, so I added
+wrappers just to make this couple of syscalls work. AFAIR, glibc
+doesn't use exported headers here, so we'd change it. Maybe Andrew
+will share more details.
+
+> -- 
+> Catalin
