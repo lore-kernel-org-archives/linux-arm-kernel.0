@@ -1,26 +1,33 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 23 Dec 2015 11:41:26 +0000
-Subject: [PATCH 3/6] regulator: lp872x: Remove warning about invalid DVS
- GPIO
-In-Reply-To: <1450868319-20513-4-git-send-email-contact@paulk.fr>
-References: <1450868319-20513-1-git-send-email-contact@paulk.fr>
- <1450868319-20513-4-git-send-email-contact@paulk.fr>
-Message-ID: <20151223114126.GR16023@sirena.org.uk>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Wed, 23 Dec 2015 03:49:08 -0800
+Subject: [RFC LINUX PATCH] dt: xilinx: xadc: provision to control clock
+ frequency
+In-Reply-To: <1450866505-22069-1-git-send-email-ranjit.waghmode@xilinx.com>
+References: <1450866505-22069-1-git-send-email-ranjit.waghmode@xilinx.com>
+Message-ID: <20151223114908.GG6491@xsjsorenbubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 23, 2015 at 11:58:36AM +0100, Paul Kocialkowski wrote:
-> Some devices don't hook the DVS pin to a GPIO but to ground or VCC.
-> In those cases, it is not a problem to have no DVS GPIO.
+On Wed, 2015-12-23 at 03:58PM +0530, Ranjit Waghmode wrote:
+> This patch adds parameter to the xilinx-xadc node for controlling
+> clock frequency.
+> 
+> Following are the possible options for user to control the frequency:
+> 	* 00 : 1/2 of clock frequency
+> 	* 01 : 1/4 of clock frequency
+> 	* 10 : 1/8 of clock frequency
+> 	* 11 : 1/16 of clock frequency
 
-I would expect the driver at least needs to know how the pins or
-strapped, or otherwise have configuration for ignoring the input on the
-pins.  This just deletes the warnings, it doesn't have any handling for
-this case that I can see.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151223/f4e21bf8/attachment.sig>
+How is this chosen? Are these just arbitrary values that you need for
+some use-case? Or are these the options HW allows?
+
+> 
+> So this patch adds parameter tck-rate to set user defined values from
+> above pool to control the clock frequency.
+
+This is no longer describing HW, but configuring driver/HW. Why does
+this have to be in DT? Why can't the driver request/set the frequency as
+operation requires it?
+
+	Thanks,
+	S?ren
