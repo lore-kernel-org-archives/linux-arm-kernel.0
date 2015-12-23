@@ -1,31 +1,46 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 23 Dec 2015 19:05:39 +0800
-Subject: [PATCH] spi: dw: Use SPI_TMOD_TR rather than magic const 0 to set
- tmode
-Message-ID: <1450868739-1093-1-git-send-email-jszhang@marvell.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 23 Dec 2015 12:07:12 +0100
+Subject: [PATCH v2 1/9] ARM: mvebu: ix4-300d: Add compatible property to
+ "partitions" node
+In-Reply-To: <20151222212225.GE30172@localhost> (Olof Johansson's message of
+ "Tue, 22 Dec 2015 13:22:25 -0800")
+References: <1450694033-27717-1-git-send-email-geert+renesas@glider.be>
+ <1450694033-27717-2-git-send-email-geert+renesas@glider.be>
+ <87zix3rbm7.fsf@free-electrons.com> <20151222212225.GE30172@localhost>
+Message-ID: <87a8p1fmov.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The TMODE available value is well defined and documented in the header
-file. Use it and remove the comment.
-
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- drivers/spi/spi-dw.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/spi/spi-dw.c b/drivers/spi/spi-dw.c
-index 882cd66..c09bb74 100644
---- a/drivers/spi/spi-dw.c
-+++ b/drivers/spi/spi-dw.c
-@@ -425,7 +425,7 @@ static int dw_spi_setup(struct spi_device *spi)
- 		chip->type = chip_info->type;
- 	}
+Hi Olof,
  
--	chip->tmode = 0; /* Tx & Rx */
-+	chip->tmode = SPI_TMOD_TR;
- 
- 	if (gpio_is_valid(spi->cs_gpio)) {
- 		ret = gpio_direction_output(spi->cs_gpio,
+ On mar., d?c. 22 2015, Olof Johansson <olof@lixom.net> wrote:
+
+> On Mon, Dec 21, 2015 at 05:48:48PM +0100, Gregory CLEMENT wrote:
+>> Hi Geert,
+>>  
+>>  On lun., d??c. 21 2015, Geert Uytterhoeven <geert+renesas@glider.be> wrote:
+>> 
+>> > As of commit e488ca9f8d4f62c2 ("doc: dt: mtd: partitions: add compatible
+>> > property to "partitions" node"), the "partitions" subnode of an SPI
+>> > FLASH device node must have a compatible property. The partitions are no
+>> > longer detected if it is not present.
+>> >
+>> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> > Acked-by: Brian Norris <computersforpeace@gmail.com>
+>> 
+>> Applied on mvebu/dt (with the hope that it is still time to push it to
+>> arm-soc)
+>
+> I think we should just take this directly, so feel free to drop it. I'll
+> followup on 0/9.
+
+OK I will drop it of my mvebu/dt and for-next branches.
+
+Gregory
+
+
 -- 
-2.6.4
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
