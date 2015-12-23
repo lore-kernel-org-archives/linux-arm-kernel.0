@@ -1,59 +1,59 @@
-From: ranjit.waghmode@xilinx.com (Ranjit Waghmode)
-Date: Wed, 23 Dec 2015 15:58:25 +0530
-Subject: [RFC LINUX PATCH] dt: xilinx: xadc: provision to control clock
- frequency
-Message-ID: <1450866505-22069-1-git-send-email-ranjit.waghmode@xilinx.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 23 Dec 2015 11:29:10 +0100
+Subject: [PATCH 1/5] iio:adc:at91_adc8xx: introduce new atmel adc driver
+In-Reply-To: <20151223005118.GA29457@rob-hp-laptop>
+References: <1450689852-22763-1-git-send-email-ludovic.desroches@atmel.com>
+ <1450689852-22763-2-git-send-email-ludovic.desroches@atmel.com>
+ <20151223005118.GA29457@rob-hp-laptop>
+Message-ID: <20151223102910.GD2789@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds parameter to the xilinx-xadc node for controlling
-clock frequency.
+On Tue, Dec 22, 2015 at 06:51:18PM -0600, Rob Herring wrote:
+> On Mon, Dec 21, 2015 at 10:24:08AM +0100, Ludovic Desroches wrote:
+> > This driver supports the new version of the Atmel ADC device introduced
+> > with the SAMA5D2 SoC family.
+> > 
+> > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> > ---
+> >  .../devicetree/bindings/iio/adc/at91_adc8xx.txt    |  27 ++
+> >  drivers/iio/adc/Kconfig                            |  11 +
+> >  drivers/iio/adc/Makefile                           |   1 +
+> >  drivers/iio/adc/at91_adc8xx.c                      | 417 +++++++++++++++++++++
+> >  4 files changed, 456 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/iio/adc/at91_adc8xx.txt
+> >  create mode 100644 drivers/iio/adc/at91_adc8xx.c
+> > 
+> > diff --git a/Documentation/devicetree/bindings/iio/adc/at91_adc8xx.txt b/Documentation/devicetree/bindings/iio/adc/at91_adc8xx.txt
+> > new file mode 100644
+> > index 0000000..64ad6a5
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/iio/adc/at91_adc8xx.txt
+> > @@ -0,0 +1,27 @@
+> > +* AT91 SAMA5D2 Analog to Digital Converter (ADC)
+> > +
+> > +Required properties:
+> > +  - compatible: Should be "atmel,sama5d2-adc".
+> > +  - reg: Should contain ADC registers location and length.
+> > +  - interrupts: Should contain the IRQ line for the ADC.
+> > +  - clocks: phandles to clocks.
+> > +  - clock-names: tuple listing clock names.
+> > +      Required elements: "adc_clk", "adc_op_clk". "adc_clk" is the peripheral
+> > +      clock, "adc_clk" is the sampling clock.
+> > +  - vref-supply: Supply used as reference for conversions.
+> > +
+> > +Optional properties:
+> > +  - vddana-supply: Supply for the adc device.
+> 
+> What makes a supply optional? If chip dependent, then then you need a 
+> more specific compatible string.
+> 
 
-Following are the possible options for user to control the frequency:
-	* 00 : 1/2 of clock frequency
-	* 01 : 1/4 of clock frequency
-	* 10 : 1/8 of clock frequency
-	* 11 : 1/16 of clock frequency
+I thought I had read that we can supply an external vddana or having a
+default one. Double checking the datasheet. I can't find it, I probably
+read it on a draft version. Will move the vddana supply to required
+properties.
 
-So this patch adds parameter tck-rate to set user defined values from
-above pool to control the clock frequency.
+Thanks
 
-Signed-off-by: Ranjit Waghmode <ranjit.waghmode@xilinx.com>
----
- Documentation/devicetree/bindings/iio/adc/xilinx-xadc.txt | 7 +++++++
- 1 file changed, 7 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/iio/adc/xilinx-xadc.txt b/Documentation/devicetree/bindings/iio/adc/xilinx-xadc.txt
-index d71258e..2cabb9b 100644
---- a/Documentation/devicetree/bindings/iio/adc/xilinx-xadc.txt
-+++ b/Documentation/devicetree/bindings/iio/adc/xilinx-xadc.txt
-@@ -20,6 +20,11 @@ Required properties:
- 	- clocks: When using the ZYNQ this must be the ZYNQ PCAP clock,
- 	  when using the AXI-XADC pcore this must be the clock that provides the
- 	  clock to the AXI bus interface of the core.
-+	- tck-rate: clock frequency control
-+		* 0x0: 1/2  of clock frequency
-+		* 0x1: 1/4  of clock frequency
-+		* 0x2: 1/8  of clock frequency
-+		* 0x3: 1/16 of clock frequency
-
- Optional properties:
- 	- interrupt-parent: phandle to the parent interrupt controller
-@@ -79,6 +84,7 @@ Examples:
- 		interrupts = <0 7 4>;
- 		interrupt-parent = <&gic>;
- 		clocks = <&pcap_clk>;
-+		tck-rate = <0x3>;
-
- 		xlnx,channels {
- 			#address-cells = <1>;
-@@ -101,6 +107,7 @@ Examples:
- 		interrupts = <0 53 4>;
- 		interrupt-parent = <&gic>;
- 		clocks = <&fpga1_clk>;
-+		tck-rate = <0x3>;
-
- 		xlnx,channels {
- 			#address-cells = <1>;
---
-2.1.2
+Ludovic
