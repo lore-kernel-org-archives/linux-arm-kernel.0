@@ -1,24 +1,36 @@
-From: mika.westerberg@linux.intel.com (Mika Westerberg)
-Date: Wed, 23 Dec 2015 12:09:59 +0200
-Subject: [PATCH v2 0/2] i2c:dw: Add APM X-Gene ACPI I2C device support
-In-Reply-To: <BLUPR12MB0451770284D7788418640F699DE60@BLUPR12MB0451.namprd12.prod.outlook.com>
-References: <1449782357-22982-1-git-send-email-lho@apm.com>
- <566F6485.2000508@amd.com>
- <20151215132721.GJ1762@lahna.fi.intel.com>
- <56702923.9010305@amd.com>
- <20151215145953.GK1762@lahna.fi.intel.com>
- <1450863241.7740.30.camel@kxue-X58A-UD3R>
- <20151223095237.GJ1758@lahna.fi.intel.com>
- <BLUPR12MB0451770284D7788418640F699DE60@BLUPR12MB0451.namprd12.prod.outlook.com>
-Message-ID: <20151223100959.GK1758@lahna.fi.intel.com>
+From: henryc.chen@mediatek.com (Henry Chen)
+Date: Wed, 23 Dec 2015 18:16:08 +0800
+Subject: [PATCH] regulator: mt6397: convert to arch_initcall
+Message-ID: <1450865768-10317-1-git-send-email-henryc.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 23, 2015 at 10:02:04AM +0000, Zheng, Ivan wrote:
-> Why/how can Linux driver make use of such non-ACPI defined methods?
+Due to some device may need reulator operation in earlier boot time like gpu module which
+power domain need regulator power on first. Move regulator of mt6397
+initialization earlier in boot so that real devices can use regulator
+without probe deferring.
 
-What do you mean exactly?
+Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
+---
+ drivers/regulator/mt6397-regulator.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-I added support for these (well, SSCN and FMCN) because I found out that
-some vendors include such methods with their BIOS implementation.
-Windows driver uses these if present and so do we.
+diff --git a/drivers/regulator/mt6397-regulator.c b/drivers/regulator/mt6397-regulator.c
+index a5b2f47..9b89023 100644
+--- a/drivers/regulator/mt6397-regulator.c
++++ b/drivers/regulator/mt6397-regulator.c
+@@ -324,7 +324,11 @@ static struct platform_driver mt6397_regulator_driver = {
+ 	.probe = mt6397_regulator_probe,
+ };
+ 
+-module_platform_driver(mt6397_regulator_driver);
++static int __init mt6397_regulator_init(void)
++{
++	return platform_driver_register(&mt6397_regulator_driver);
++}
++arch_initcall(mt6397_regulator_init);
+ 
+ MODULE_AUTHOR("Flora Fu <flora.fu@mediatek.com>");
+ MODULE_DESCRIPTION("Regulator Driver for MediaTek MT6397 PMIC");
+-- 
+1.9.1
