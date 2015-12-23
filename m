@@ -1,165 +1,261 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Wed, 23 Dec 2015 20:32:05 +0800
-Subject: [PATCH v12 06/18] ARM: dts: exynos/dp: remove some properties that
- deprecated by analogix_dp driver
-In-Reply-To: <1450873538-18304-1-git-send-email-ykk@rock-chips.com>
-References: <1450873538-18304-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1450873925-19109-1-git-send-email-ykk@rock-chips.com>
+From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
+Date: Wed, 23 Dec 2015 10:32:42 -0200
+Subject: [PATCH v3 00/23] Unrestricted media entity ID range support
+In-Reply-To: <20151216140301.GO17128@valkosipuli.retiisi.org.uk>
+References: <1450272758-29446-1-git-send-email-sakari.ailus@iki.fi>
+ <20151216140301.GO17128@valkosipuli.retiisi.org.uk>
+Message-ID: <20151223103242.44deaea4@recife.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After exynos_dp have been split the common IP code into analogix_dp driver,
-the analogix_dp driver have deprecated some Samsung platform properties which
-could be dynamically parsed from EDID/MODE/DPCD message, so this is an update
-for Exynos DTS file for dp-controller.
+Em Wed, 16 Dec 2015 16:03:01 +0200
+Sakari Ailus <sakari.ailus@iki.fi> escreveu:
 
-Beside the backward compatibility is fully preserved, so there are no
-bisectability break that make this change in a separate patch.
+> Hi Javier,
+> 
+> On Wed, Dec 16, 2015 at 03:32:15PM +0200, Sakari Ailus wrote:
+> > This is the third version of the unrestricted media entity ID range
+> > support set. I've taken Mauro's comments into account and fixed a number
+> > of bugs as well (omap3isp memory leak and omap4iss stream start).
+> 
+> Javier: Mauro told me you might have OMAP4 hardware. Would you be able to
+> test the OMAP4 ISS with these patches?
+> 
+> Thanks.
+> 
 
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Reviewed-by: Jingoo Han < jingoohan1@gmail.com> 
-Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Sakari,
+
+Testing with OMAP4 is not possible. The driver is broken: it doesn't
+support DT, and the required pdata definition is missing.
+
+Both Javier and I tried to fix it in the last couple days, in order to test
+it with a PandaBoard. We came with the enclosed patch, but it is still 
+incomplete. Based on what's written on this e-mail:
+	 https://www.mail-archive.com/linux-media at vger.kernel.org/msg89247.html
+
+It seems that this is an already known issue.
+
+So, I'm considering this driver as BROKEN. Not much sense on doing any
+tests on it, while this doesn't get fixed.
+
+Regards,
+Mauro
+
+PS.: With the enclosed patch, I got this error:
+	[    0.267639] platform omap4iss: failed to claim resource 2
+
+But, even if I comment out the platform code that returns this error,
+there are still other missing things:
+	[    7.131622] omap4iss omap4iss: Unable to get iss_fck clock info
+	[    7.137878] omap4iss omap4iss: Unable to get clocks
+
 ---
-Changes in v12: None
-Changes in v11: None
-Changes in v10: None
-Changes in v9: None
-Changes in v8: None
-Changes in v7: None
-Changes in v6:
-- Fix Peach Pit hpd property name error:
--       hpd-gpio = <&gpx2 6 0>;
-+       hpd-gpios = <&gpx2 6 0>;
 
-Changes in v5:
-- Correct the misspell in commit message. (Krzysztof)
+ARM: add a pdata quirks for OMAP4 panda camera
+    
+This is a hack to make it to believe that the pandaboard
+has a camera.
 
-Changes in v4:
-- Separate all DTS changes to a separate patch. (Krzysztof)
 
-Changes in v3: None
-Changes in v2: None
+diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+index 1dfe34654c43..998bb6936dc0 100644
+--- a/arch/arm/mach-omap2/pdata-quirks.c
++++ b/arch/arm/mach-omap2/pdata-quirks.c
+@@ -36,6 +36,8 @@
+ #include "soc.h"
+ #include "hsmmc.h"
+ 
++#include "../../../drivers/staging/media/omap4iss/iss.h"
++
+ struct pdata_init {
+ 	const char *compatible;
+ 	void (*fn)(void);
+@@ -408,6 +410,124 @@ static void __init t410_abort_init(void)
+ }
+ #endif
+ 
++#ifdef CONFIG_ARCH_OMAP4
++
++static struct resource panda_iss_resource[] = {
++	{
++		.start = 0x52000000,
++		.end = 0x52000000 + 0x100,
++		.name = "top",
++		.flags = IORESOURCE_MEM,
++	}, {
++		.start = 0x52001000,
++		.end = 0x52001000 + 0x170,
++		.name = "csi2_a_regs1",
++		.flags = IORESOURCE_MEM,
++	}, {
++		.start = 0x52001170,
++		.end = 0x52001170 + 0x020,
++		.name = "camerarx_core1",
++		.flags = IORESOURCE_MEM,
++	}, {
++		.start = 0x52001400,
++		.end = 0x52001400 + 0x170,
++		.name = "csi2_b_regs1",
++		.flags = IORESOURCE_MEM,
++	}, {
++		.start = 0x52001570,
++		.end = 0x52001570 + 0x020,
++		.name = "camerarx_core2",
++		.flags = IORESOURCE_MEM,
++	}, {
++		.start = 0x52002000,
++		.end = 0x52002000 + 0x200,
++		.name = "bte",
++		.flags = IORESOURCE_MEM,
++	}, {
++		.start = 0x52010000,
++		.end = 0x52010000 + 0x0a0,
++		.name = "isp_sys1",
++		.flags = IORESOURCE_MEM,
++	}, {
++		.start = 0x52010400,
++		.end = 0x52010400 + 0x400,
++		.name = "isp_resizer",
++		.flags = IORESOURCE_MEM,
++	}, {
++		.start = 0x52010800,
++		.end = 0x52010800 + 0x800,
++		.name = "isp_ipipe",
++		.flags = IORESOURCE_MEM,
++	}, {
++		.start = 0x52011000,
++		.end = 0x52011000 + 0x200,
++		.name = "isp_isif",
++		.flags = IORESOURCE_MEM,
++	}, {
++		.start = 0x52011200,
++		.end = 0x52011200 + 0x080,
++		.name = "isp_ipipeif",
++		.flags = IORESOURCE_MEM,
++	}
++};
++
++static struct i2c_board_info panda_camera_i2c_device = {
++	I2C_BOARD_INFO("smia", 0x10),
++};
++
++static struct iss_subdev_i2c_board_info panda_camera_subdevs[] = {
++	{
++		.board_info = &panda_camera_i2c_device,
++		.i2c_adapter_id = 3,
++	},
++};
++
++static struct iss_v4l2_subdevs_group iss_subdevs[] = {
++	{
++		.subdevs = panda_camera_subdevs,
++		.interface = ISS_INTERFACE_CSI2A_PHY1,
++		.bus = {
++			.csi2 = {
++				.lanecfg = {
++					.clk = {
++						.pol = 0,
++						.pos = 2,
++					},
++					.data[0] = {
++						.pol = 0,
++						.pos = 1,
++					},
++					.data[1] = {
++						.pol = 0,
++						.pos = 3,
++					},
++				},
++			} },
++	},
++	{ /* sentinel */ },
++};
++
++static struct iss_platform_data iss_pdata = {
++	.subdevs = iss_subdevs,
++};
++
++static struct platform_device omap4iss_device = {
++	.name           = "omap4iss",
++	.id             = -1,
++	.dev = {
++		.platform_data = &iss_pdata,
++	},
++	.num_resources  = ARRAY_SIZE(panda_iss_resource),
++	.resource       = panda_iss_resource,
++};
++
++static void __init omap4_panda_legacy_init(void)
++{
++	platform_device_register(&omap4iss_device);
++}
++
++#endif /* CONFIG_ARCH_OMAP4 */
++
+ #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
+ static struct iommu_platform_data omap4_iommu_pdata = {
+ 	.reset_name = "mmu_cache",
+@@ -539,6 +659,9 @@ static struct pdata_init pdata_quirks[] __initdata = {
+ #ifdef CONFIG_SOC_TI81XX
+ 	{ "hp,t410", t410_abort_init, },
+ #endif
++#ifdef CONFIG_ARCH_OMAP4
++	{ "ti,omap4-panda", omap4_panda_legacy_init, },
++#endif
+ #ifdef CONFIG_SOC_OMAP5
+ 	{ "ti,omap5-uevm", omap5_uevm_legacy_init, },
+ #endif
 
- arch/arm/boot/dts/exynos5250-arndale.dts      | 2 --
- arch/arm/boot/dts/exynos5250-smdk5250.dts     | 2 --
- arch/arm/boot/dts/exynos5250-snow-common.dtsi | 4 +---
- arch/arm/boot/dts/exynos5250-spring.dts       | 4 +---
- arch/arm/boot/dts/exynos5420-peach-pit.dts    | 4 +---
- arch/arm/boot/dts/exynos5420-smdk5420.dts     | 2 --
- arch/arm/boot/dts/exynos5800-peach-pi.dts     | 4 +---
- 7 files changed, 4 insertions(+), 18 deletions(-)
-
-diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
-index c000532..b1790cf 100644
---- a/arch/arm/boot/dts/exynos5250-arndale.dts
-+++ b/arch/arm/boot/dts/exynos5250-arndale.dts
-@@ -124,8 +124,6 @@
- &dp {
- 	status = "okay";
- 	samsung,color-space = <0>;
--	samsung,dynamic-range = <0>;
--	samsung,ycbcr-coeff = <0>;
- 	samsung,color-depth = <1>;
- 	samsung,link-rate = <0x0a>;
- 	samsung,lane-count = <4>;
-diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-index 0f5dcd4..f30c2db 100644
---- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-+++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-@@ -80,8 +80,6 @@
+diff --git a/drivers/staging/media/omap4iss/iss.c b/drivers/staging/media/omap4iss/iss.c
+index 30b473cfb020..b528cacda17b 100644
+--- a/drivers/staging/media/omap4iss/iss.c
++++ b/drivers/staging/media/omap4iss/iss.c
+@@ -1412,6 +1412,9 @@ static int iss_probe(struct platform_device *pdev)
+ 	unsigned int i;
+ 	int ret;
  
- &dp {
- 	samsung,color-space = <0>;
--	samsung,dynamic-range = <0>;
--	samsung,ycbcr-coeff = <0>;
- 	samsung,color-depth = <1>;
- 	samsung,link-rate = <0x0a>;
- 	samsung,lane-count = <4>;
-diff --git a/arch/arm/boot/dts/exynos5250-snow-common.dtsi b/arch/arm/boot/dts/exynos5250-snow-common.dtsi
-index 5cb33ba..b96624b 100644
---- a/arch/arm/boot/dts/exynos5250-snow-common.dtsi
-+++ b/arch/arm/boot/dts/exynos5250-snow-common.dtsi
-@@ -236,12 +236,10 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&dp_hpd>;
- 	samsung,color-space = <0>;
--	samsung,dynamic-range = <0>;
--	samsung,ycbcr-coeff = <0>;
- 	samsung,color-depth = <1>;
- 	samsung,link-rate = <0x0a>;
- 	samsung,lane-count = <2>;
--	samsung,hpd-gpio = <&gpx0 7 GPIO_ACTIVE_HIGH>;
-+	hpd-gpios = <&gpx0 7 GPIO_ACTIVE_HIGH>;
++
++printk("%s: pdata=%p\n", __func__, pdata);
++
+ 	if (!pdata)
+ 		return -EINVAL;
  
- 	ports {
- 		port at 0 {
-diff --git a/arch/arm/boot/dts/exynos5250-spring.dts b/arch/arm/boot/dts/exynos5250-spring.dts
-index c1edd6d..91881d7 100644
---- a/arch/arm/boot/dts/exynos5250-spring.dts
-+++ b/arch/arm/boot/dts/exynos5250-spring.dts
-@@ -74,12 +74,10 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&dp_hpd_gpio>;
- 	samsung,color-space = <0>;
--	samsung,dynamic-range = <0>;
--	samsung,ycbcr-coeff = <0>;
- 	samsung,color-depth = <1>;
- 	samsung,link-rate = <0x0a>;
- 	samsung,lane-count = <1>;
--	samsung,hpd-gpio = <&gpc3 0 GPIO_ACTIVE_HIGH>;
-+	hpd-gpios = <&gpc3 0 GPIO_ACTIVE_HIGH>;
- };
+@@ -1437,24 +1440,33 @@ static int iss_probe(struct platform_device *pdev)
+ 	iss->syscon = syscon_regmap_lookup_by_compatible("syscon");
+ 	if (IS_ERR(iss->syscon)) {
+ 		ret = PTR_ERR(iss->syscon);
++		dev_err(iss->dev, "Unable to find syscon");
+ 		goto error;
+ 	}
  
- &ehci {
-diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-index 35cfb07..2f37c87 100644
---- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-+++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-@@ -148,12 +148,10 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&dp_hpd_gpio>;
- 	samsung,color-space = <0>;
--	samsung,dynamic-range = <0>;
--	samsung,ycbcr-coeff = <0>;
- 	samsung,color-depth = <1>;
- 	samsung,link-rate = <0x06>;
- 	samsung,lane-count = <2>;
--	samsung,hpd-gpio = <&gpx2 6 GPIO_ACTIVE_HIGH>;
-+	hpd-gpios = <&gpx2 6 GPIO_ACTIVE_HIGH>;
+ 	/* Clocks */
+ 	ret = iss_map_mem_resource(pdev, iss, OMAP4_ISS_MEM_TOP);
+-	if (ret < 0)
++	if (ret < 0) {
++		dev_err(iss->dev, "Unable to map memory resource\n");
+ 		goto error;
++	}
  
- 	ports {
- 		port at 0 {
-diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-index ac35aef..f67344f 100644
---- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
-+++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-@@ -93,8 +93,6 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&dp_hpd>;
- 	samsung,color-space = <0>;
--	samsung,dynamic-range = <0>;
--	samsung,ycbcr-coeff = <0>;
- 	samsung,color-depth = <1>;
- 	samsung,link-rate = <0x0a>;
- 	samsung,lane-count = <4>;
-diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-index 7b018e4..363c95f 100644
---- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-+++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-@@ -142,12 +142,10 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&dp_hpd_gpio>;
- 	samsung,color-space = <0>;
--	samsung,dynamic-range = <0>;
--	samsung,ycbcr-coeff = <0>;
- 	samsung,color-depth = <1>;
- 	samsung,link-rate = <0x0a>;
- 	samsung,lane-count = <2>;
--	samsung,hpd-gpio = <&gpx2 6 GPIO_ACTIVE_HIGH>;
-+	hpd-gpios = <&gpx2 6 GPIO_ACTIVE_HIGH>;
- 	panel = <&panel>;
- };
+ 	ret = iss_get_clocks(iss);
+-	if (ret < 0)
++	if (ret < 0) {
++		dev_err(iss->dev, "Unable to get clocks\n");
+ 		goto error;
++	}
  
--- 
-1.9.1
+-	if (!omap4iss_get(iss))
++	if (!omap4iss_get(iss)) {
++		dev_err(iss->dev, "Failed to acquire ISS resource\n");
+ 		goto error;
++	}
+ 
+ 	ret = iss_reset(iss);
+-	if (ret < 0)
++	if (ret < 0) {
++		dev_err(iss->dev, "Unable to reset ISS\n");
+ 		goto error_iss;
++	}
+ 
+ 	iss->revision = iss_reg_read(iss, OMAP4_ISS_MEM_TOP, ISS_HL_REVISION);
+ 	dev_info(iss->dev, "Revision %08x found\n", iss->revision);
