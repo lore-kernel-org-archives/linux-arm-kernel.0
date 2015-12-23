@@ -1,47 +1,32 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 23 Dec 2015 19:48:08 +0900
-Subject: [GIT PULL 4/9] ARM64: EXYNOS: Soc specific code for v4.5
-In-Reply-To: <20151222044926.GE30172@localhost>
-References: <1449020386-20250-1-git-send-email-k.kozlowski@samsung.com>
- <1449020386-20250-5-git-send-email-k.kozlowski@samsung.com>
- <20151222044926.GE30172@localhost>
-Message-ID: <567A7BE8.8000303@samsung.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 23 Dec 2015 10:48:24 +0000
+Subject: [PATCH] cpufreq/scpi: fix handling return value of
+ topology_physical_package_id
+In-Reply-To: <1450867041-729-1-git-send-email-a.hajda@samsung.com>
+References: <1450867041-729-1-git-send-email-a.hajda@samsung.com>
+Message-ID: <567A7BF8.1030107@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 22.12.2015 o 13:49, Olof Johansson pisze:
-> On Wed, Dec 02, 2015 at 10:39:41AM +0900, Krzysztof Kozlowski wrote:
->> Hi Kukjin,
->>
->> ARM64 change touch also defconfig.
->>
->> Best regards,
->> Krzysztof
->>
->>
->> The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
->>
->>   Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
->>
->> are available in the git repository at:
->>
->>   https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-soc64-4.5
->>
->> for you to fetch changes up to db44c07a3f0b32815bd1f3e731db9e043e57cf9c:
->>
->>   arm64: EXYNOS: Consolidate ARCH_EXYNOS7 symbol into ARCH_EXYNOS (2015-11-22 19:31:30 +0900)
-> 
-> Given that Arnd started splitting out config64 separately, there's a small
-> chance we'll get a conflict here. We can deal with that if needed though.
-> 
-> Still, since this branch contains the previous clock branch I can't apply it
-> as it is. Can you respin without that for now?
 
-This depends on the clock change because:
-1. Clock change removes last usage of ARCH_EXYNOS7,
-2. This patch removes the ARCH_EXYNOS7 itself.
 
-So if #1 has to wait, then skip this as well.
+On 23/12/15 10:37, Andrzej Hajda wrote:
+> The function can return negative values, so its result should
+> be assigned to signed variable.
+>
+> The problem has been detected using proposed semantic patch
+> scripts/coccinelle/tests/unsigned_lesser_than_zero.cocci [1].
+>
+> [1]: http://permalink.gmane.org/gmane.linux.kernel/2038576
+>
 
-Best regards,
-Krzysztof
+There has a patch posted by Dan Carpenter [1] which I reposted[2],
+but it again slipped through the cracks. I will poke Rafael again on that.
+
+[1] 
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/380292.html
+[2] https://lkml.org/lkml/2015/12/15/219
+
+-- 
+Regards,
+Sudeep
