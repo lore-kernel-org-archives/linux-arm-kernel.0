@@ -1,261 +1,491 @@
-From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
-Date: Wed, 23 Dec 2015 10:32:42 -0200
-Subject: [PATCH v3 00/23] Unrestricted media entity ID range support
-In-Reply-To: <20151216140301.GO17128@valkosipuli.retiisi.org.uk>
-References: <1450272758-29446-1-git-send-email-sakari.ailus@iki.fi>
- <20151216140301.GO17128@valkosipuli.retiisi.org.uk>
-Message-ID: <20151223103242.44deaea4@recife.lan>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Wed, 23 Dec 2015 20:32:11 +0800
+Subject: [PATCH v12 07/18] drm: rockchip: dp: add rockchip platform dp driver
+In-Reply-To: <1450873538-18304-1-git-send-email-ykk@rock-chips.com>
+References: <1450873538-18304-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1450873931-19152-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Wed, 16 Dec 2015 16:03:01 +0200
-Sakari Ailus <sakari.ailus@iki.fi> escreveu:
+Rockchip have three clocks for dp controller, we leave pclk_edp
+to analogix_dp driver control, and keep the sclk_edp_24m and
+sclk_edp in platform driver.
 
-> Hi Javier,
-> 
-> On Wed, Dec 16, 2015 at 03:32:15PM +0200, Sakari Ailus wrote:
-> > This is the third version of the unrestricted media entity ID range
-> > support set. I've taken Mauro's comments into account and fixed a number
-> > of bugs as well (omap3isp memory leak and omap4iss stream start).
-> 
-> Javier: Mauro told me you might have OMAP4 hardware. Would you be able to
-> test the OMAP4 ISS with these patches?
-> 
-> Thanks.
-> 
-
-Sakari,
-
-Testing with OMAP4 is not possible. The driver is broken: it doesn't
-support DT, and the required pdata definition is missing.
-
-Both Javier and I tried to fix it in the last couple days, in order to test
-it with a PandaBoard. We came with the enclosed patch, but it is still 
-incomplete. Based on what's written on this e-mail:
-	 https://www.mail-archive.com/linux-media at vger.kernel.org/msg89247.html
-
-It seems that this is an already known issue.
-
-So, I'm considering this driver as BROKEN. Not much sense on doing any
-tests on it, while this doesn't get fixed.
-
-Regards,
-Mauro
-
-PS.: With the enclosed patch, I got this error:
-	[    0.267639] platform omap4iss: failed to claim resource 2
-
-But, even if I comment out the platform code that returns this error,
-there are still other missing things:
-	[    7.131622] omap4iss omap4iss: Unable to get iss_fck clock info
-	[    7.137878] omap4iss omap4iss: Unable to get clocks
-
+Signed-off-by: Yakir Yang <ykk@rock-chips.com>
 ---
+Changes in v12: None
+Changes in v11: None
+Changes in v10:
+- Correct the ROCKCHIP_ANALOGIX_DP indentation in Kconfig to tabs here (Heiko)
 
-ARM: add a pdata quirks for OMAP4 panda camera
-    
-This is a hack to make it to believe that the pandaboard
-has a camera.
+Changes in v9: None
+Changes in v8: None
+Changes in v7: None
+Changes in v6: None
+Changes in v5:
+- Remove the empty line at the end of document, and correct the endpoint
+  numbers in the example DT node, and remove the regulator iomux setting
+  in driver code while using the pinctl in devicetree instead. (Heiko)
+- Add device type declared, cause the previous "platform device type
+  support (v4 11/16)" already merge into (v5 02/14).
+- Implement connector registration code. (Thierry)
 
+Changes in v4:
+- Remove some deprecated DT properties in rockchip dp document.
 
-diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-index 1dfe34654c43..998bb6936dc0 100644
---- a/arch/arm/mach-omap2/pdata-quirks.c
-+++ b/arch/arm/mach-omap2/pdata-quirks.c
-@@ -36,6 +36,8 @@
- #include "soc.h"
- #include "hsmmc.h"
+Changes in v3:
+- Leave "sclk_edp_24m" to rockchip dp phy driver which name to "24m",
+  and leave "sclk_edp" to analogix dp core driver which name to "dp",
+  and leave "pclk_edp" to rockchip dp platform driver which name to
+  "pclk". (Thierry & Heiko)
+- Add devicetree binding document. (Heiko)
+- Remove "rockchip,panel" DT property, take use of remote point to get panel
+  node. (Heiko)
+- Add the new function point dp_platdata->get_modes() init.
+
+Changes in v2:
+- Get panel node with remote-endpoint method, and create devicetree binding
+  for driver. (Heiko)
+- Remove the clock enable/disbale with "sclk_edp" & "sclk_edp_24m",
+  leave those clock to rockchip dp phy driver.
+
+ drivers/gpu/drm/rockchip/Kconfig                |   9 +
+ drivers/gpu/drm/rockchip/Makefile               |   1 +
+ drivers/gpu/drm/rockchip/analogix_dp-rockchip.c | 385 ++++++++++++++++++++++++
+ include/drm/bridge/analogix_dp.h                |   1 +
+ 4 files changed, 396 insertions(+)
+ create mode 100644 drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+
+diff --git a/drivers/gpu/drm/rockchip/Kconfig b/drivers/gpu/drm/rockchip/Kconfig
+index 35215f6..686cb49 100644
+--- a/drivers/gpu/drm/rockchip/Kconfig
++++ b/drivers/gpu/drm/rockchip/Kconfig
+@@ -25,3 +25,12 @@ config ROCKCHIP_DW_HDMI
+ 	  for the Synopsys DesignWare HDMI driver. If you want to
+ 	  enable HDMI on RK3288 based SoC, you should selet this
+ 	  option.
++
++config ROCKCHIP_ANALOGIX_DP
++	tristate "Rockchip specific extensions for Analogix DP driver"
++	depends on DRM_ROCKCHIP
++	select DRM_ANALOGIX_DP
++	help
++	  This selects support for Rockchip SoC specific extensions
++	  for the Analogix Core DP driver. If you want to enable DP
++	  on RK3288 based SoC, you should selet this option.
+diff --git a/drivers/gpu/drm/rockchip/Makefile b/drivers/gpu/drm/rockchip/Makefile
+index f3d8a19..8ad01fb 100644
+--- a/drivers/gpu/drm/rockchip/Makefile
++++ b/drivers/gpu/drm/rockchip/Makefile
+@@ -6,5 +6,6 @@ rockchipdrm-y := rockchip_drm_drv.o rockchip_drm_fb.o rockchip_drm_fbdev.o \
+ 		rockchip_drm_gem.o
  
-+#include "../../../drivers/staging/media/omap4iss/iss.h"
-+
- struct pdata_init {
- 	const char *compatible;
- 	void (*fn)(void);
-@@ -408,6 +410,124 @@ static void __init t410_abort_init(void)
- }
- #endif
+ obj-$(CONFIG_ROCKCHIP_DW_HDMI) += dw_hdmi-rockchip.o
++obj-$(CONFIG_ROCKCHIP_ANALOGIX_DP) += analogix_dp-rockchip.o
  
-+#ifdef CONFIG_ARCH_OMAP4
+ obj-$(CONFIG_DRM_ROCKCHIP) += rockchipdrm.o rockchip_drm_vop.o
+diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+new file mode 100644
+index 0000000..9552273
+--- /dev/null
++++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+@@ -0,0 +1,385 @@
++/*
++ * Rockchip SoC DP (Display Port) interface driver.
++ *
++ * Copyright (C) Fuzhou Rockchip Electronics Co., Ltd.
++ * Author: Andy Yan <andy.yan@rock-chips.com>
++ *         Yakir Yang <ykk@rock-chips.com>
++ *         Jeff Chen <jeff.chen@rock-chips.com>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License as published by the
++ * Free Software Foundation; either version 2 of the License, or (at your
++ * option) any later version.
++ */
 +
-+static struct resource panda_iss_resource[] = {
-+	{
-+		.start = 0x52000000,
-+		.end = 0x52000000 + 0x100,
-+		.name = "top",
-+		.flags = IORESOURCE_MEM,
-+	}, {
-+		.start = 0x52001000,
-+		.end = 0x52001000 + 0x170,
-+		.name = "csi2_a_regs1",
-+		.flags = IORESOURCE_MEM,
-+	}, {
-+		.start = 0x52001170,
-+		.end = 0x52001170 + 0x020,
-+		.name = "camerarx_core1",
-+		.flags = IORESOURCE_MEM,
-+	}, {
-+		.start = 0x52001400,
-+		.end = 0x52001400 + 0x170,
-+		.name = "csi2_b_regs1",
-+		.flags = IORESOURCE_MEM,
-+	}, {
-+		.start = 0x52001570,
-+		.end = 0x52001570 + 0x020,
-+		.name = "camerarx_core2",
-+		.flags = IORESOURCE_MEM,
-+	}, {
-+		.start = 0x52002000,
-+		.end = 0x52002000 + 0x200,
-+		.name = "bte",
-+		.flags = IORESOURCE_MEM,
-+	}, {
-+		.start = 0x52010000,
-+		.end = 0x52010000 + 0x0a0,
-+		.name = "isp_sys1",
-+		.flags = IORESOURCE_MEM,
-+	}, {
-+		.start = 0x52010400,
-+		.end = 0x52010400 + 0x400,
-+		.name = "isp_resizer",
-+		.flags = IORESOURCE_MEM,
-+	}, {
-+		.start = 0x52010800,
-+		.end = 0x52010800 + 0x800,
-+		.name = "isp_ipipe",
-+		.flags = IORESOURCE_MEM,
-+	}, {
-+		.start = 0x52011000,
-+		.end = 0x52011000 + 0x200,
-+		.name = "isp_isif",
-+		.flags = IORESOURCE_MEM,
-+	}, {
-+		.start = 0x52011200,
-+		.end = 0x52011200 + 0x080,
-+		.name = "isp_ipipeif",
-+		.flags = IORESOURCE_MEM,
-+	}
++#include <linux/component.h>
++#include <linux/mfd/syscon.h>
++#include <linux/of_graph.h>
++#include <linux/regmap.h>
++#include <linux/reset.h>
++#include <linux/clk.h>
++
++#include <drm/drmP.h>
++#include <drm/drm_crtc_helper.h>
++#include <drm/drm_dp_helper.h>
++#include <drm/drm_of.h>
++#include <drm/drm_panel.h>
++
++#include <video/of_videomode.h>
++#include <video/videomode.h>
++
++#include <drm/bridge/analogix_dp.h>
++
++#include "rockchip_drm_drv.h"
++#include "rockchip_drm_vop.h"
++
++#define to_dp(nm)	container_of(nm, struct rockchip_dp_device, nm)
++
++/* dp grf register offset */
++#define GRF_SOC_CON6                            0x025c
++#define GRF_EDP_LCD_SEL_MASK                    BIT(5)
++#define GRF_EDP_SEL_VOP_LIT                     BIT(5)
++#define GRF_EDP_SEL_VOP_BIG                     0
++
++struct rockchip_dp_device {
++	struct drm_device        *drm_dev;
++	struct device            *dev;
++	struct drm_encoder       encoder;
++	struct drm_display_mode  mode;
++
++	struct clk               *pclk;
++	struct regmap            *grf;
++	struct reset_control     *rst;
++
++	struct analogix_dp_plat_data plat_data;
 +};
 +
-+static struct i2c_board_info panda_camera_i2c_device = {
-+	I2C_BOARD_INFO("smia", 0x10),
-+};
-+
-+static struct iss_subdev_i2c_board_info panda_camera_subdevs[] = {
-+	{
-+		.board_info = &panda_camera_i2c_device,
-+		.i2c_adapter_id = 3,
-+	},
-+};
-+
-+static struct iss_v4l2_subdevs_group iss_subdevs[] = {
-+	{
-+		.subdevs = panda_camera_subdevs,
-+		.interface = ISS_INTERFACE_CSI2A_PHY1,
-+		.bus = {
-+			.csi2 = {
-+				.lanecfg = {
-+					.clk = {
-+						.pol = 0,
-+						.pos = 2,
-+					},
-+					.data[0] = {
-+						.pol = 0,
-+						.pos = 1,
-+					},
-+					.data[1] = {
-+						.pol = 0,
-+						.pos = 3,
-+					},
-+				},
-+			} },
-+	},
-+	{ /* sentinel */ },
-+};
-+
-+static struct iss_platform_data iss_pdata = {
-+	.subdevs = iss_subdevs,
-+};
-+
-+static struct platform_device omap4iss_device = {
-+	.name           = "omap4iss",
-+	.id             = -1,
-+	.dev = {
-+		.platform_data = &iss_pdata,
-+	},
-+	.num_resources  = ARRAY_SIZE(panda_iss_resource),
-+	.resource       = panda_iss_resource,
-+};
-+
-+static void __init omap4_panda_legacy_init(void)
++static int rockchip_dp_pre_init(struct rockchip_dp_device *dp)
 +{
-+	platform_device_register(&omap4iss_device);
++	reset_control_assert(dp->rst);
++	usleep_range(10, 20);
++	reset_control_deassert(dp->rst);
++
++	return 0;
 +}
 +
-+#endif /* CONFIG_ARCH_OMAP4 */
++static int rockchip_dp_poweron(struct analogix_dp_plat_data *plat_data)
++{
++	struct rockchip_dp_device *dp = to_dp(plat_data);
++	int ret;
 +
- #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
- static struct iommu_platform_data omap4_iommu_pdata = {
- 	.reset_name = "mmu_cache",
-@@ -539,6 +659,9 @@ static struct pdata_init pdata_quirks[] __initdata = {
- #ifdef CONFIG_SOC_TI81XX
- 	{ "hp,t410", t410_abort_init, },
- #endif
-+#ifdef CONFIG_ARCH_OMAP4
-+	{ "ti,omap4-panda", omap4_panda_legacy_init, },
++	ret = clk_prepare_enable(dp->pclk);
++	if (ret < 0) {
++		dev_err(dp->dev, "failed to enable pclk %d\n", ret);
++		return ret;
++	}
++
++	ret = rockchip_dp_pre_init(dp);
++	if (ret < 0) {
++		dev_err(dp->dev, "failed to dp pre init %d\n", ret);
++		return ret;
++	}
++
++	return 0;
++}
++
++static int rockchip_dp_powerdown(struct analogix_dp_plat_data *plat_data)
++{
++	struct rockchip_dp_device *dp = to_dp(plat_data);
++
++	clk_disable_unprepare(dp->pclk);
++
++	return 0;
++}
++
++static bool
++rockchip_dp_drm_encoder_mode_fixup(struct drm_encoder *encoder,
++				   const struct drm_display_mode *mode,
++				   struct drm_display_mode *adjusted_mode)
++{
++	/* do nothing */
++	return true;
++}
++
++static void rockchip_dp_drm_encoder_mode_set(struct drm_encoder *encoder,
++					     struct drm_display_mode *mode,
++					     struct drm_display_mode *adjusted)
++{
++	/* do nothing */
++}
++
++static void rockchip_dp_drm_encoder_prepare(struct drm_encoder *encoder)
++{
++	struct rockchip_dp_device *dp = to_dp(encoder);
++	int ret;
++	u32 val;
++
++	/*
++	 * FIXME(Yakir): driver should configure the CRTC output video
++	 * mode with the display information which indicated the monitor
++	 * support colorimetry.
++	 *
++	 * But don't know why the CRTC driver seems could only output the
++	 * RGBaaa rightly. For example, if connect the "innolux,n116bge"
++	 * eDP screen, EDID would indicated that screen only accepted the
++	 * 6bpc mode. But if I configure CRTC to RGB666 output, then eDP
++	 * screen would show a blue picture (RGB888 show a green picture).
++	 * But if I configure CTRC to RGBaaa, and eDP driver still keep
++	 * RGB666 input video mode, then screen would works prefect.
++	 */
++	ret = rockchip_drm_crtc_mode_config(encoder->crtc,
++					    DRM_MODE_CONNECTOR_eDP,
++					    ROCKCHIP_OUT_MODE_AAAA);
++	if (ret < 0) {
++		dev_err(dp->dev, "Could not set crtc mode config (%d)\n", ret);
++		return;
++	}
++
++	ret = rockchip_drm_encoder_get_mux_id(dp->dev->of_node, encoder);
++	if (ret < 0)
++		return;
++
++	if (ret)
++		val = GRF_EDP_SEL_VOP_LIT | (GRF_EDP_LCD_SEL_MASK << 16);
++	else
++		val = GRF_EDP_SEL_VOP_BIG | (GRF_EDP_LCD_SEL_MASK << 16);
++
++	dev_dbg(dp->dev, "vop %s output to dp\n", (ret) ? "LIT" : "BIG");
++
++	ret = regmap_write(dp->grf, GRF_SOC_CON6, val);
++	if (ret != 0) {
++		dev_err(dp->dev, "Could not write to GRF: %d\n", ret);
++		return;
++	}
++}
++
++static void rockchip_dp_drm_encoder_nop(struct drm_encoder *encoder)
++{
++	/* do nothing */
++}
++
++static struct drm_encoder_helper_funcs rockchip_dp_encoder_helper_funcs = {
++	.mode_fixup = rockchip_dp_drm_encoder_mode_fixup,
++	.mode_set = rockchip_dp_drm_encoder_mode_set,
++	.prepare = rockchip_dp_drm_encoder_prepare,
++	.commit = rockchip_dp_drm_encoder_nop,
++	.disable = rockchip_dp_drm_encoder_nop,
++};
++
++static void rockchip_dp_drm_encoder_destroy(struct drm_encoder *encoder)
++{
++	drm_encoder_cleanup(encoder);
++}
++
++static struct drm_encoder_funcs rockchip_dp_encoder_funcs = {
++	.destroy = rockchip_dp_drm_encoder_destroy,
++};
++
++static int rockchip_dp_init(struct rockchip_dp_device *dp)
++{
++	struct device *dev = dp->dev;
++	struct device_node *np = dev->of_node;
++	int ret;
++
++	dp->grf = syscon_regmap_lookup_by_phandle(np, "rockchip,grf");
++	if (IS_ERR(dp->grf)) {
++		dev_err(dev, "failed to get rockchip,grf property\n");
++		return PTR_ERR(dp->grf);
++	}
++
++	dp->pclk = devm_clk_get(dev, "pclk");
++	if (IS_ERR(dp->pclk)) {
++		dev_err(dev, "failed to get pclk property\n");
++		return PTR_ERR(dp->pclk);
++	}
++
++	dp->rst = devm_reset_control_get(dev, "dp");
++	if (IS_ERR(dp->rst)) {
++		dev_err(dev, "failed to get dp reset control\n");
++		return PTR_ERR(dp->rst);
++	}
++
++	ret = clk_prepare_enable(dp->pclk);
++	if (ret < 0) {
++		dev_err(dp->dev, "failed to enable pclk %d\n", ret);
++		return ret;
++	}
++
++	ret = rockchip_dp_pre_init(dp);
++	if (ret < 0) {
++		dev_err(dp->dev, "failed to pre init %d\n", ret);
++		return ret;
++	}
++
++	return 0;
++}
++
++static int rockchip_dp_drm_create_encoder(struct rockchip_dp_device *dp)
++{
++	struct drm_encoder *encoder = &dp->encoder;
++	struct drm_device *drm_dev = dp->drm_dev;
++	struct device *dev = dp->dev;
++	int ret;
++
++	encoder->possible_crtcs = drm_of_find_possible_crtcs(drm_dev,
++							     dev->of_node);
++	DRM_DEBUG_KMS("possible_crtcs = 0x%x\n", encoder->possible_crtcs);
++
++	ret = drm_encoder_init(drm_dev, encoder, &rockchip_dp_encoder_funcs,
++			       DRM_MODE_ENCODER_TMDS);
++	if (ret) {
++		DRM_ERROR("failed to initialize encoder with drm\n");
++		return ret;
++	}
++
++	drm_encoder_helper_add(encoder, &rockchip_dp_encoder_helper_funcs);
++
++	return 0;
++}
++
++static int rockchip_dp_bind(struct device *dev, struct device *master,
++			    void *data)
++{
++	struct rockchip_dp_device *dp = dev_get_drvdata(dev);
++	struct drm_device *drm_dev = data;
++	int ret;
++
++	/*
++	 * Just like the probe function said, we don't need the
++	 * device drvrate anymore, we should leave the charge to
++	 * analogix dp driver, set the device drvdata to NULL.
++	 */
++	dev_set_drvdata(dev, NULL);
++
++	ret = rockchip_dp_init(dp);
++	if (ret < 0)
++		return ret;
++
++	dp->drm_dev = drm_dev;
++
++	ret = rockchip_dp_drm_create_encoder(dp);
++	if (ret) {
++		DRM_ERROR("failed to create drm encoder\n");
++		return ret;
++	}
++
++	dp->plat_data.encoder = &dp->encoder;
++
++	dp->plat_data.dev_type = RK3288_DP;
++	dp->plat_data.power_on = rockchip_dp_poweron;
++	dp->plat_data.power_off = rockchip_dp_powerdown;
++
++	return analogix_dp_bind(dev, dp->drm_dev, &dp->plat_data);
++}
++
++static void rockchip_dp_unbind(struct device *dev, struct device *master,
++			       void *data)
++{
++	return analogix_dp_unbind(dev, master, data);
++}
++
++static const struct component_ops rockchip_dp_component_ops = {
++	.bind = rockchip_dp_bind,
++	.unbind = rockchip_dp_unbind,
++};
++
++static int rockchip_dp_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct device_node *panel_node, *port, *endpoint;
++	struct rockchip_dp_device *dp;
++	struct drm_panel *panel;
++
++	port = of_graph_get_port_by_id(dev->of_node, 1);
++	if (!port) {
++		dev_err(dev, "can't find output port\n");
++		return -EINVAL;
++	}
++
++	endpoint = of_get_child_by_name(port, "endpoint");
++	of_node_put(port);
++	if (!endpoint) {
++		dev_err(dev, "no output endpoint found\n");
++		return -EINVAL;
++	}
++
++	panel_node = of_graph_get_remote_port_parent(endpoint);
++	of_node_put(endpoint);
++	if (!panel_node) {
++		dev_err(dev, "no output node found\n");
++		return -EINVAL;
++	}
++
++	panel = of_drm_find_panel(panel_node);
++	if (!panel) {
++		DRM_ERROR("failed to find panel\n");
++		of_node_put(panel_node);
++		return -EPROBE_DEFER;
++	}
++
++	of_node_put(panel_node);
++
++	dp = devm_kzalloc(dev, sizeof(*dp), GFP_KERNEL);
++	if (!dp)
++		return -ENOMEM;
++
++	dp->dev = dev;
++
++	dp->plat_data.panel = panel;
++
++	/*
++	 * We just use the drvdata until driver run into component
++	 * add function, and then we would set drvdata to null, so
++	 * that analogix dp driver could take charge of the drvdata.
++	 */
++	platform_set_drvdata(pdev, dp);
++
++	return component_add(dev, &rockchip_dp_component_ops);
++}
++
++static int rockchip_dp_remove(struct platform_device *pdev)
++{
++	component_del(&pdev->dev, &rockchip_dp_component_ops);
++
++	return 0;
++}
++
++#ifdef CONFIG_PM_SLEEP
++static int rockchip_dp_suspend(struct device *dev)
++{
++	return analogix_dp_suspend(dev);
++}
++
++static int rockchip_dp_resume(struct device *dev)
++{
++	return analogix_dp_resume(dev);
++}
 +#endif
- #ifdef CONFIG_SOC_OMAP5
- 	{ "ti,omap5-uevm", omap5_uevm_legacy_init, },
- #endif
-
-diff --git a/drivers/staging/media/omap4iss/iss.c b/drivers/staging/media/omap4iss/iss.c
-index 30b473cfb020..b528cacda17b 100644
---- a/drivers/staging/media/omap4iss/iss.c
-+++ b/drivers/staging/media/omap4iss/iss.c
-@@ -1412,6 +1412,9 @@ static int iss_probe(struct platform_device *pdev)
- 	unsigned int i;
- 	int ret;
- 
 +
-+printk("%s: pdata=%p\n", __func__, pdata);
++static const struct dev_pm_ops rockchip_dp_pm_ops = {
++	SET_SYSTEM_SLEEP_PM_OPS(rockchip_dp_suspend, rockchip_dp_resume)
++};
 +
- 	if (!pdata)
- 		return -EINVAL;
++static const struct of_device_id rockchip_dp_dt_ids[] = {
++	{.compatible = "rockchip,rk3288-dp",},
++	{}
++};
++MODULE_DEVICE_TABLE(of, rockchip_dp_dt_ids);
++
++static struct platform_driver rockchip_dp_driver = {
++	.probe = rockchip_dp_probe,
++	.remove = rockchip_dp_remove,
++	.driver = {
++		   .name = "rockchip-dp",
++		   .owner = THIS_MODULE,
++		   .pm = &rockchip_dp_pm_ops,
++		   .of_match_table = of_match_ptr(rockchip_dp_dt_ids),
++	},
++};
++
++module_platform_driver(rockchip_dp_driver);
++
++MODULE_AUTHOR("Yakir Yang <ykk@rock-chips.com>");
++MODULE_AUTHOR("Jeff chen <jeff.chen@rock-chips.com>");
++MODULE_DESCRIPTION("Rockchip Specific Analogix-DP Driver Extension");
++MODULE_LICENSE("GPL v2");
+diff --git a/include/drm/bridge/analogix_dp.h b/include/drm/bridge/analogix_dp.h
+index d1188db..25afb31 100644
+--- a/include/drm/bridge/analogix_dp.h
++++ b/include/drm/bridge/analogix_dp.h
+@@ -15,6 +15,7 @@
  
-@@ -1437,24 +1440,33 @@ static int iss_probe(struct platform_device *pdev)
- 	iss->syscon = syscon_regmap_lookup_by_compatible("syscon");
- 	if (IS_ERR(iss->syscon)) {
- 		ret = PTR_ERR(iss->syscon);
-+		dev_err(iss->dev, "Unable to find syscon");
- 		goto error;
- 	}
+ enum analogix_dp_devtype {
+ 	EXYNOS_DP,
++	RK3288_DP,
+ };
  
- 	/* Clocks */
- 	ret = iss_map_mem_resource(pdev, iss, OMAP4_ISS_MEM_TOP);
--	if (ret < 0)
-+	if (ret < 0) {
-+		dev_err(iss->dev, "Unable to map memory resource\n");
- 		goto error;
-+	}
- 
- 	ret = iss_get_clocks(iss);
--	if (ret < 0)
-+	if (ret < 0) {
-+		dev_err(iss->dev, "Unable to get clocks\n");
- 		goto error;
-+	}
- 
--	if (!omap4iss_get(iss))
-+	if (!omap4iss_get(iss)) {
-+		dev_err(iss->dev, "Failed to acquire ISS resource\n");
- 		goto error;
-+	}
- 
- 	ret = iss_reset(iss);
--	if (ret < 0)
-+	if (ret < 0) {
-+		dev_err(iss->dev, "Unable to reset ISS\n");
- 		goto error_iss;
-+	}
- 
- 	iss->revision = iss_reg_read(iss, OMAP4_ISS_MEM_TOP, ISS_HL_REVISION);
- 	dev_info(iss->dev, "Revision %08x found\n", iss->revision);
+ struct analogix_dp_plat_data {
+-- 
+1.9.1
