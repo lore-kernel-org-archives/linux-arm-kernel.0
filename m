@@ -1,33 +1,58 @@
 From: v1ron@mail.ru (Roman Volkov)
-Date: Thu, 24 Dec 2015 00:35:08 +0300
-Subject: [PATCH v2 0/3] clocksource/vt8500: Fix hangs in small delays
-Message-ID: <1450906511-342-1-git-send-email-v1ron@mail.ru>
+Date: Thu, 24 Dec 2015 00:35:10 +0300
+Subject: [PATCH v2 2/3] clocksource/vt8500: Remove the 'loops' variable
+In-Reply-To: <1450906511-342-1-git-send-email-v1ron@mail.ru>
+References: <1450906511-342-1-git-send-email-v1ron@mail.ru>
+Message-ID: <1450906511-342-3-git-send-email-v1ron@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Roman Volkov <rvolkov@v1ros.org>
 
-vt8500 hangs in nanosleep() function, starting from commit
-c6eb3f70d4482806dc2d3e1e3c7736f497b1d418, making the system unusable.
-Per investigation, looks like set_next_event() now receives too small
-delta and fails with -ETIME.
+The purpose of the 'loops' variable is unclear. vt8500 hardware does not
+require any protections, in case if these variables intended for preventing
+infinite loops (identical PXA timer works perfectly without these ones).
 
-Google group discussion:
-https://groups.google.com/forum/#!topic/vt8500-wm8505-linux-kernel/vDMF_mDOb1k
+Signed-off-by: Roman Volkov <rvolkov@v1ros.org>
+---
+ drivers/clocksource/vt8500_timer.c | 10 ++--------
+ 1 file changed, 2 insertions(+), 8 deletions(-)
 
-v2:
-Address comments by Alexey Charkov. Merge patches to get less amount of
-changes (three patches instead of four).
-
-Tested on my WM8650, no issues in three days uptime.
-
-Roman Volkov (3):
-  clocksource/vt8500: Use MIN_OSCR_DELTA from PXA
-  clocksource/vt8500: Remove the 'loops' variable
-  clocksource/vt8500: Add register R/W functions
-
- drivers/clocksource/vt8500_timer.c | 98 +++++++++++++++++++++++++++-----------
- 1 file changed, 69 insertions(+), 29 deletions(-)
-
+diff --git a/drivers/clocksource/vt8500_timer.c b/drivers/clocksource/vt8500_timer.c
+index dfc3bb4..eb08d96 100644
+--- a/drivers/clocksource/vt8500_timer.c
++++ b/drivers/clocksource/vt8500_timer.c
+@@ -48,18 +48,14 @@
+ #define TIMER_COUNT_W_ACTIVE	(1 << 4)	/* not ready for write */
+ #define TIMER_MATCH_W_ACTIVE	(1 << 0)	/* not ready for write */
+ 
+-#define msecs_to_loops(t) (loops_per_jiffy / 1000 * HZ * t)
+-
+ #define MIN_OSCR_DELTA		16
+ 
+ static void __iomem *regbase;
+ 
+ static cycle_t vt8500_timer_read(struct clocksource *cs)
+ {
+-	int loops = msecs_to_loops(10);
+ 	writel(3, regbase + TIMER_CTRL_VAL);
+-	while ((readl((regbase + TIMER_AS_VAL)) & TIMER_COUNT_R_ACTIVE)
+-						&& --loops)
++	while (readl(regbase + TIMER_AS_VAL) & TIMER_COUNT_R_ACTIVE)
+ 		cpu_relax();
+ 	return readl(regbase + TIMER_COUNT_VAL);
+ }
+@@ -75,10 +71,8 @@ static struct clocksource clocksource = {
+ static int vt8500_timer_set_next_event(unsigned long cycles,
+ 				    struct clock_event_device *evt)
+ {
+-	int loops = msecs_to_loops(10);
+ 	cycle_t alarm = clocksource.read(&clocksource) + cycles;
+-	while ((readl(regbase + TIMER_AS_VAL) & TIMER_MATCH_W_ACTIVE)
+-						&& --loops)
++	while (readl(regbase + TIMER_AS_VAL) & TIMER_MATCH_W_ACTIVE)
+ 		cpu_relax();
+ 	writel((unsigned long)alarm, regbase + TIMER_MATCH_VAL);
+ 
 -- 
 2.6.2
