@@ -1,59 +1,149 @@
-From: michael@amarulasolutions.com (Michael Trimarchi)
-Date: Wed, 23 Dec 2015 10:18:17 +0100
-Subject: [PATCH V3] ARM: dts: imx6q-icore-rqs: Add Engicam IMX6 Q7 initial
- support
-In-Reply-To: <20151223022707.GG26290@tiger>
-References: <1447673895.3144.16.camel@pengutronix.de>
- <20151116114127.GB10464@panicking>
- <1447674695.3144.21.camel@pengutronix.de>
- <20151116115421.GC10464@panicking> <20151116172318.GA513@panicking>
- <1447752697.3144.47.camel@pengutronix.de>
- <20151118151030.GA11558@panicking> <20151211083512.GB11252@tiger>
- <20151214084456.GA4305@panicking>
- <20151216181159.GC20121@panicking> <20151223022707.GG26290@tiger>
-Message-ID: <CAOf5uwmuBeCG7TYrbRHAXa_JM3Ck7W9nsktrPc45b7Nny1tzZQ@mail.gmail.com>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Wed, 23 Dec 2015 17:19:48 +0800
+Subject: [PATCH 2/4] net: ethernet: arc: Keep emac compatibility for more
+ Rockchip SoCs
+In-Reply-To: <1450862390-407-1-git-send-email-zhengxing@rock-chips.com>
+References: <1450862390-407-1-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <1450862390-407-2-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On the RK3066/RK3188, there was fixed GRF offset configuration to set emac
+and fixed DIV2 mac TX/RX clock. So, we need to easily set and fit to other
+SoCs (RK3036) which maybe have different GRF offset, and need adjust mac
+TX/RX clock.
 
-On Wed, Dec 23, 2015 at 3:27 AM, Shawn Guo <shawnguo@kernel.org> wrote:
-> On Wed, Dec 16, 2015 at 07:12:05PM +0100, Michael Trimarchi wrote:
->> > > > +       imx6qdl-icore-rqs {
->> > > > +
->> > >
->> > > With commit 5fcdf6a7ed95 (pinctrl: imx: Allow parsing DT without function
->> > > nodes) in place, we can now save this container.
->> > >
->>
->> If I save this I can not register usb. Group is not found
->>
->> [    2.768476] imx6q-pinctrl 20e0000.iomuxc: unable to find group for node usdhc1grp-1
->> [    2.768844] imx6q-pinctrl 20e0000.iomuxc: unable to find group for node usdhc1grp-1
->> [    2.768932] sdhci-esdhc-imx: probe of 2190000.usdhc failed with error -22
->> [    2.768994] imx6q-pinctrl 20e0000.iomuxc: unable to find group for node usdhc3grp-2
->> [    2.769240] imx6q-pinctrl 20e0000.iomuxc: unable to find group for node usdhc3grp-2
->> [    2.769322] sdhci-esdhc-imx: probe of 2198000.usdhc failed with error -22
->> [    2.769381] imx6q-pinctrl 20e0000.iomuxc: unable to find group for node usdhc4grp-1
->> [    2.769621] imx6q-pinctrl 20e0000.iomuxc: unable to find group for node usdhc4grp-1
->> [    2.769701] sdhci-esdhc-imx: probe of 219c000.usdhc failed with error -22
->
-> Sorry.  I just found that to get this work on imx6q board we need to
-> clean up the ipu2/ipu2grp-1 group.  I just send a patch doing that with
-> you on copy.  Let me know if it works for you.
->
+Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+---
 
-Make sense. Sorry not to fix before by myself. I will take the board
-this afternoon and check it again
+ drivers/net/ethernet/arc/emac_rockchip.c |   66 ++++++++++++++++++++----------
+ 1 file changed, 44 insertions(+), 22 deletions(-)
 
-Michael
-
-> Shawn
-
-
-
+diff --git a/drivers/net/ethernet/arc/emac_rockchip.c b/drivers/net/ethernet/arc/emac_rockchip.c
+index 36e9eb1..d1a9c28 100644
+--- a/drivers/net/ethernet/arc/emac_rockchip.c
++++ b/drivers/net/ethernet/arc/emac_rockchip.c
+@@ -25,17 +25,13 @@
+ #include "emac.h"
+ 
+ #define DRV_NAME        "rockchip_emac"
+-#define DRV_VERSION     "1.0"
+-
+-#define GRF_MODE_MII		(1UL << 0)
+-#define GRF_MODE_RMII		(0UL << 0)
+-#define GRF_SPEED_10M		(0UL << 1)
+-#define GRF_SPEED_100M		(1UL << 1)
+-#define GRF_SPEED_ENABLE_BIT	(1UL << 17)
+-#define GRF_MODE_ENABLE_BIT	(1UL << 16)
++#define DRV_VERSION     "1.1"
+ 
+ struct emac_rockchip_soc_data {
+-	int grf_offset;
++	unsigned int grf_offset;
++	unsigned int grf_mode_offset;
++	unsigned int grf_speed_offset;
++	bool need_div_macclk;
+ };
+ 
+ struct rockchip_priv_data {
+@@ -44,23 +40,22 @@ struct rockchip_priv_data {
+ 	const struct emac_rockchip_soc_data *soc_data;
+ 	struct regulator *regulator;
+ 	struct clk *refclk;
++	struct clk *macclk;
+ };
+ 
+ static void emac_rockchip_set_mac_speed(void *priv, unsigned int speed)
+ {
+ 	struct rockchip_priv_data *emac = priv;
++	u32 speed_offset = emac->soc_data->grf_speed_offset;
+ 	u32 data;
+ 	int err = 0;
+ 
+-	/* write-enable bits */
+-	data = GRF_SPEED_ENABLE_BIT;
+-
+ 	switch(speed) {
+ 	case 10:
+-		data |= GRF_SPEED_10M;
++		data = (1 << (speed_offset + 16)) | (0 << speed_offset);
+ 		break;
+ 	case 100:
+-		data |= GRF_SPEED_100M;
++		data = (1 << (speed_offset + 16)) | (1 << speed_offset);
+ 		break;
+ 	default:
+ 		pr_err("speed %u not supported\n", speed);
+@@ -73,8 +68,14 @@ static void emac_rockchip_set_mac_speed(void *priv, unsigned int speed)
+ }
+ 
+ static const struct emac_rockchip_soc_data emac_rockchip_dt_data[] = {
+-	{ .grf_offset = 0x154 }, /* rk3066 */
+-	{ .grf_offset = 0x0a4 }, /* rk3188 */
++	{
++	  .grf_offset = 0x154,   .grf_mode_offset = 0,
++	  .grf_speed_offset = 1, .need_div_macclk = 0
++	}, /* rk3066 */
++	{
++	  .grf_offset = 0x0a4,   .grf_mode_offset = 0,
++	  .grf_speed_offset = 1, .need_div_macclk = 0
++	}, /* rk3188 */
+ };
+ 
+ static const struct of_device_id emac_rockchip_dt_ids[] = {
+@@ -110,7 +111,7 @@ static int emac_rockchip_probe(struct platform_device *pdev)
+ 
+ 	interface = of_get_phy_mode(dev->of_node);
+ 
+-	/* RK3066 and RK3188 SoCs only support RMII */
++	/* RK3036/RK3066/RK3188 SoCs only support RMII */
+ 	if (interface != PHY_INTERFACE_MODE_RMII) {
+ 		dev_err(dev, "unsupported phy interface mode %d\n", interface);
+ 		err = -ENOTSUPP;
+@@ -164,11 +165,12 @@ static int emac_rockchip_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
+-	/* write-enable bits */
+-	data = GRF_MODE_ENABLE_BIT | GRF_SPEED_ENABLE_BIT;
+-
+-	data |= GRF_SPEED_100M;
+-	data |= GRF_MODE_RMII;
++	/* Set speed 100M */
++	data = (1 << (priv->soc_data->grf_speed_offset + 16)) |
++	       (1 << priv->soc_data->grf_speed_offset);
++	/* Set RMII mode */
++	data |= (1 << (priv->soc_data->grf_mode_offset + 16)) |
++		(0 << priv->soc_data->grf_mode_offset);
+ 
+ 	err = regmap_write(priv->grf, priv->soc_data->grf_offset, data);
+ 	if (err) {
+@@ -181,6 +183,26 @@ static int emac_rockchip_probe(struct platform_device *pdev)
+ 	if (err)
+ 		dev_err(dev, "failed to change reference clock rate (%d)\n", err);
+ 
++	if (priv->soc_data->need_div_macclk) {
++		priv->macclk = devm_clk_get(dev, "macclk");
++		if (IS_ERR(priv->macclk)) {
++			dev_err(dev, "failed to retrieve mac clock (%ld)\n", PTR_ERR(priv->macclk));
++			err = PTR_ERR(priv->macclk);
++			goto out_regulator_disable;
++		}
++
++		err = clk_prepare_enable(priv->macclk);
++		if (err) {
++			dev_err(dev, "failed to enable mac clock (%d)\n", err);
++			goto out_regulator_disable;
++		}
++
++		/* RMII TX/RX needs always a rate of 25MHz */
++		err = clk_set_rate(priv->macclk, 25000000);
++		if (err)
++			dev_err(dev, "failed to change mac clock rate (%d)\n", err);
++	}
++
+ 	err = arc_emac_probe(ndev, interface);
+ 	if (err) {
+ 		dev_err(dev, "failed to probe arc emac (%d)\n", err);
 -- 
-| Michael Nazzareno Trimarchi                     Amarula Solutions BV |
-| COO  -  Founder                                      Cruquiuskade 47 |
-| +31(0)851119172                                 Amsterdam 1018 AM NL |
-|                  [`as] http://www.amarulasolutions.com               |
+1.7.9.5
