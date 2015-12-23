@@ -1,71 +1,44 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Wed, 23 Dec 2015 17:19:42 +0300
-Subject: [PATCH v4 3/3] serial: amba-pl011: add ACPI support to AMBA probe
-In-Reply-To: <1450880383-29560-1-git-send-email-aleksey.makarov@linaro.org>
-References: <1450880383-29560-1-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <1450880383-29560-4-git-send-email-aleksey.makarov@linaro.org>
+From: slash.tmp@free.fr (Mason)
+Date: Wed, 23 Dec 2015 15:23:32 +0100
+Subject: [PATCH v11 0/2] Sigma Designs Tango4 port
+In-Reply-To: <7h60zqund8.fsf@deeprootsystems.com>
+References: <566FDF53.3030004@sigmadesigns.com>
+ <7hr3iexp3e.fsf@deeprootsystems.com> <5679B15F.80106@free.fr>
+ <7hoadi6wfw.fsf@deeprootsystems.com> <5679C743.1070000@free.fr>
+ <7h60zqund8.fsf@deeprootsystems.com>
+Message-ID: <567AAE64.8010603@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Graeme Gregory <graeme.gregory@linaro.org>
+On 22/12/2015 23:31, Kevin Hilman wrote:
 
-In ACPI this device is only defined in SBSA mode so
-if we are coming from ACPI use this mode.
+> Mason wrote:
+> 
+>> What is not clear to me is: are you asking me to submit a new defconfig
+>> (specific to my platform), or are you saying I need to add the new
+>> platform to arch/arm/configs/multi_v7_defconfig
+> 
+> multi_v7_defconfig, which is what I've been assuming you've been testing
+> it with.  Is that correct?
 
-Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
----
- drivers/tty/serial/amba-pl011.c | 37 ++++++++++++++++++++++++++-----------
- 1 file changed, 26 insertions(+), 11 deletions(-)
+No, I'm not using the Christmas Tree kernel :-)
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 899a771..974cb9e 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -2368,18 +2368,33 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
- 	if (!uap)
- 		return -ENOMEM;
- 
--	uap->clk = devm_clk_get(&dev->dev, NULL);
--	if (IS_ERR(uap->clk))
--		return PTR_ERR(uap->clk);
--
--	uap->vendor = vendor;
--	uap->lcrh_rx = vendor->lcrh_rx;
--	uap->lcrh_tx = vendor->lcrh_tx;
--	uap->fifosize = vendor->get_fifosize(dev);
--	uap->port.irq = dev->irq[0];
--	uap->port.ops = &amba_pl011_pops;
-+	/* ACPI only defines SBSA variant */
-+	if (has_acpi_companion(&dev->dev)) {
-+		/*
-+		 * According to ARM ARMH0011 is currently the only mapping
-+		 * of pl011 in ACPI and it's mapped to SBSA UART mode
-+		 */
-+		uap->vendor	= &vendor_sbsa;
-+		uap->fifosize	= 32;
-+		uap->port.ops	= &sbsa_uart_pops;
-+		uap->fixed_baud = 115200;
- 
--	snprintf(uap->type, sizeof(uap->type), "PL011 rev%u", amba_rev(dev));
-+		snprintf(uap->type, sizeof(uap->type), "SBSA");
-+	} else {
-+		uap->clk = devm_clk_get(&dev->dev, NULL);
-+		if (IS_ERR(uap->clk))
-+			return PTR_ERR(uap->clk);
-+
-+		uap->vendor = vendor;
-+		uap->lcrh_rx = vendor->lcrh_rx;
-+		uap->lcrh_tx = vendor->lcrh_tx;
-+		uap->fifosize = vendor->get_fifosize(dev);
-+		uap->port.ops = &amba_pl011_pops;
-+
-+		snprintf(uap->type, sizeof(uap->type), "PL011 rev%u",
-+				amba_rev(dev));
-+	}
-+	uap->port.irq = dev->irq[0];
- 
- 	ret = pl011_setup_port(&dev->dev, uap, &dev->res, portnr);
- 	if (ret)
--- 
-2.6.4
+I needed a small kernel, so I created a config from scratch, just for
+my platform (as things were before ARCH_MULTI_V7)
+
+> The latter.  Something like below[1].  Just keep the multi_v7_defconfig
+> patch as a separate patch, and we'll take care of the merge conflicts
+> when applying to the relevant arm-soc branches.
+
+I'll send the patch ASAP (probably next week).
+
+>> Can I submit the defconfig update as a follow-up patch?
+> 
+> IMO, it should be part of this series that adds the platform.  That way,
+> as soon as it gets merged, it will be automatically build tested by
+> various automated builders.  (also note that it would be automatically
+> boot tested if I had the hardware as well... hint, hint) ;)
+
+I will contact HQ and ask if they have boards to spare.
+
+Regards.
