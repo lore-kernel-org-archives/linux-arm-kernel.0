@@ -1,69 +1,91 @@
-From: schmitzmic@gmail.com (Michael Schmitz)
-Date: Wed, 23 Dec 2015 13:42:54 +1300
-Subject: [PATCH v3 66/77] ncr5380: Fix soft lockups
-In-Reply-To: <alpine.LNX.2.00.1512222347310.23505@nippy.intranet>
-References: <20151222011737.980475848@telegraphics.com.au>
- <20151222011755.965510468@telegraphics.com.au>
- <20151222113903.06422dbe@lxorguk.ukuu.org.uk>
- <alpine.LNX.2.00.1512222347310.23505@nippy.intranet>
-Message-ID: <CAOmrzkKit7to8Rp28soAcMG2CtxwWdKhBD2m1zaYLSnD4XnXAg@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 22 Dec 2015 18:43:12 -0600
+Subject: [PATCH 2/2] pci, pcie-thunder-pem: Add PCIe host driver for
+ ThunderX processors.
+In-Reply-To: <1450749222-15966-3-git-send-email-ddaney.cavm@gmail.com>
+References: <1450749222-15966-1-git-send-email-ddaney.cavm@gmail.com>
+ <1450749222-15966-3-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20151223004312.GA23676@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'd like to think that, too - probably true for the Atari TT SCSI case
-(can do scatter-gather, can do more than one command per LUN). Worse
-for the Falcon SCSI which is the only one I can test (no
-scatter-gather, one command per LUN, interrupt shared with IDE and IDE
-driver locked out while SCSI command handled).
+On Mon, Dec 21, 2015 at 05:53:42PM -0800, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
+> 
+> Some Cavium ThunderX processors require quirky access methods for the
+> config space of the PCIe bridge.  Add a driver to provide these config
+> space accessor functions.  The pci-host-generic driver code is used to
+> configure the PCI machinery.
+> 
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> ---
+>  .../devicetree/bindings/pci/pcie-thunder-pem.txt   |  43 ++++
+>  drivers/pci/host/Kconfig                           |   6 +
+>  drivers/pci/host/Makefile                          |   1 +
+>  drivers/pci/host/pcie-thunder-pem.c                | 283 +++++++++++++++++++++
+>  4 files changed, 333 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/pcie-thunder-pem.txt
+>  create mode 100644 drivers/pci/host/pcie-thunder-pem.c
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/pcie-thunder-pem.txt b/Documentation/devicetree/bindings/pci/pcie-thunder-pem.txt
+> new file mode 100644
+> index 0000000..66824d5
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pci/pcie-thunder-pem.txt
+> @@ -0,0 +1,43 @@
+> +* ThunderX PEM PCIe host controller
+> +
+> +Firmware-initialized PCIe host controller found on some Cavium
+> +ThunderX processors.
+> +
+> +The properties and their meanings are identical to those described in
+> +host-heneric-pci.txt except as listed below.
 
-But that only affects balancing of I/O between IDE and SCSI drivers.
-Is that what you are worried about, Alan?
+s/heneric/generic/
 
-Happy to test whether limiting max_sectors makes a difference in the DMA case.
+> +
+> +Properties of the host controller node that differ from
+> +host-heneric-pci.txt:
 
-Cheers,
+ditto
 
-  Michael
+> +
+> +- compatible     : Must be "cavium,pci-host-thunder-pem"
+
+pcie rather than pci?
 
 
+> +
+> +- reg            : Two entries: First the configuration space for down
+> +                   stream devices base address and size, as accessed
+> +                   from the parent bus. Second, the register bank of
+> +                   the PEM device PCIe bridge.
+> +
+> +Example:
+> +
+> +    pem2 {
 
-On Wed, Dec 23, 2015 at 2:47 AM, Finn Thain <fthain@telegraphics.com.au> wrote:
->
-> On Tue, 22 Dec 2015, One Thousand Gnomes wrote:
->
->> On Tue, 22 Dec 2015 12:18:44 +1100 Finn Thain
->> <fthain@telegraphics.com.au> wrote:
->>
->> > Because of the rudimentary design of the chip, it is necessary to poll
->> > the SCSI bus signals during PIO and this tends to hog the CPU. The
->> > driver will accept new commands while others execute, and this causes
->> > a soft lockup because the workqueue item will not terminate until the
->> > issue queue is emptied.
->> >
->> > When exercising dmx3191d using sequential IO from dd, the driver is
->> > sent 512 KiB WRITE commands and 128 KiB READs. For a PIO transfer, the
->> > rate is is only about 300 KiB/s, so these are long-running commands.
->> > And although PDMA may run at several MiB/s, interrupts are disabled
->> > for the duration of the transfer.
->> >
->> > Fix the unresponsiveness and soft lockup issues by calling
->> > cond_resched() after each command is completed and by limiting
->> > max_sectors for drivers that don't implement real DMA.
->>
->> Is there a reason for not doing some limiting in the DMA case too. A
->> 512K write command even with DMA on a low end 68K box introduces a
->> second of latency before another I/O can be scheduled ?
->
-> The DMA case is the atari_scsi case. I'd like to think that atari_scsi
-> would have only the latency issues that might be expected from any SCSI-2
-> host adapter driver.
->
-> Unlike PDMA, interrupts are not disabled for these DMA transfers. Note
-> that this patch isn't really relevant to DMA, because the main loop
-> iterates only when done == 0, that is, !hostdata->dmalen.
->
-> --
->
->>
->> Alan
->
+pcie-controller at ...
+
+> +	compatible = "cavium,pci-host-thunder-pem";
+> +	device_type = "pci";
+> +	msi-parent = <&its>;
+> +	msi-map = <0 &its 0x10000 0x10000>;
+> +	bus-range = <0x8f 0xc7>;
+> +	#size-cells = <2>;
+> +	#address-cells = <3>;
+> +
+> +	reg = <0x8880 0x8f000000 0x0 0x39000000>,  /* Configuration space */
+> +	      <0x87e0 0xc2000000 0x0 0x00010000>; /* PEM space */
+> +	ranges = <0x01000000 0x00 0x00020000 0x88b0 0x00020000 0x00 0x00010000>, /* I/O */
+> +		 <0x03000000 0x00 0x10000000 0x8890 0x10000000 0x0f 0xf0000000>, /* mem64 */
+> +		 <0x43000000 0x10 0x00000000 0x88a0 0x00000000 0x10 0x00000000>, /* mem64-pref */
+> +		 <0x03000000 0x87e0 0xc2f00000 0x87e0 0xc2000000 0x00 0x00100000>; /* mem64 PEM BAR4 */
+> +
+> +	#interrupt-cells = <1>;
+> +	interrupt-map-mask = <0 0 0 7>;
+> +	interrupt-map = <0 0 0 1 &gic0 0 0 0 24 4>, /* INTA */
+> +			<0 0 0 2 &gic0 0 0 0 25 4>, /* INTB */
+> +			<0 0 0 3 &gic0 0 0 0 26 4>, /* INTC */
+> +			<0 0 0 4 &gic0 0 0 0 27 4>; /* INTD */
+> +    };
