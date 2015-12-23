@@ -1,48 +1,77 @@
-From: uri.mashiach@compulab.co.il (Uri Mashiach)
-Date: Wed, 23 Dec 2015 16:11:21 +0200
-Subject: [PATCH 1/3] wlcore/wl12xx: spi: fix NULL pointer dereference
- (Oops)
-In-Reply-To: <567A7287.3010205@ti.com>
-References: <1450859744-9948-1-git-send-email-uri.mashiach@compulab.co.il>
- <1450859744-9948-2-git-send-email-uri.mashiach@compulab.co.il>
- <567A7287.3010205@ti.com>
-Message-ID: <567AAB89.4010101@compulab.co.il>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 23 Dec 2015 15:17:47 +0100
+Subject: [PATCH] ARM: mvebu: use usb-nop-xceiv PHY for the xhci nodes on
+ Armada 388 GP
+Message-ID: <1450880267-20558-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grygorii,
+Using the usb-nop-xceiv PHY for the xhci nodes allows a better
+representation of the hardware but also a better handling of the
+regulator. By linking the regulator to the PHY there is no more need to
+use the regulator-always-on property, then it allows a better power
+management.
 
-On 12/23/2015 12:08 PM, Grygorii Strashko wrote:
-> On 12/23/2015 10:35 AM, Uri Mashiach wrote:
->> The power function uses a consumer regulator access to update the WiFi
->> enable GPIO value.
->>
->> Fix the below Oops when trying to modprobe wlcore_spi.
->> The oops occurs because the wl1271_power_{off,on}()
->> function doesn't check the power() function pointer.
->>
->> [   23.401447] Unable to handle kernel NULL pointer dereference at
->> virtual address 00000000
->> [   23.409954] pgd = c0004000
->> [   23.412922] [00000000] *pgd=00000000
->> [   23.416693] Internal error: Oops: 80000007 [#1] SMP ARM
->> [   23.422168] Modules linked in: wl12xx wlcore mac80211 cfg80211
->> musb_dsps musb_hdrc usbcore usb_common snd_soc_simple_card evdev joydev
->> omap_rng wlcore_spi snd_soc_tlv320aic23_i2c rng_core snd_soc_tlv320aic23
->> c_can_platform c_can can_dev snd_soc_davinci_mcasp snd_soc_edma
->> snd_soc_omap omap_wdt musb_am335x cpufreq_dt thermal_sys hwmon
->> [   23.453253] CPU: 0 PID: 36 Comm: kworker/0:2 Not tainted
->> 4.2.0-00002-g951efee-dirty #233
->> [   23.461720] Hardware name: Generic AM33XX (Flattened Device Tree)
->> [   23.468123] Workqueue: events request_firmware_work_func
->> [   23.473690] task: de32efc0 ti: de4ee000 task.ti: de4ee000
->> [   23.479341] PC is at 0x0
->> [   23.482112] LR is at wl12xx_set_power_on+0x28/0x124 [wlcore]
->
-> Why can't you just add proper check in wl1271_power_on/wl1271_power_off() instead?
->
+The remaining usb node uses the ehci-orion driver which can't be used
+with the usb-nop-xceiv PHY and must keeps the direct link to the
+regulator with the regulator-always-on property.
 
-Will be done in v2.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-388-gp.dts | 16 ++++++++++++----
+ 1 file changed, 12 insertions(+), 4 deletions(-)
 
-Thanks,
-Uri
+diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
+index ac3c9445ce57..51943598d858 100644
+--- a/arch/arm/boot/dts/armada-388-gp.dts
++++ b/arch/arm/boot/dts/armada-388-gp.dts
+@@ -229,13 +229,13 @@
+ 
+ 			/* CON5 */
+ 			usb3 at f0000 {
+-				vcc-supply = <&reg_usb2_1_vbus>;
++				usb-phy = <&usb2_1_phy>;
+ 				status = "okay";
+ 			};
+ 
+ 			/* CON7 */
+ 			usb3 at f8000 {
+-				vcc-supply = <&reg_usb3_vbus>;
++				usb-phy = <&usb3_phy>;
+ 				status = "okay";
+ 			};
+ 		};
+@@ -273,13 +273,22 @@
+ 		};
+ 	};
+ 
++	usb2_1_phy: usb2_1_phy {
++		compatible = "usb-nop-xceiv";
++		vcc-supply = <&reg_usb2_1_vbus>;
++	};
++
++	usb3_phy: usb3_phy {
++		compatible = "usb-nop-xceiv";
++		vcc-supply = <&reg_usb3_vbus>;
++	};
++
+ 	reg_usb3_vbus: usb3-vbus {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "usb3-vbus";
+ 		regulator-min-microvolt = <5000000>;
+ 		regulator-max-microvolt = <5000000>;
+ 		enable-active-high;
+-		regulator-always-on;
+ 		gpio = <&expander1 15 GPIO_ACTIVE_HIGH>;
+ 	};
+ 
+@@ -299,7 +308,6 @@
+ 		regulator-min-microvolt = <5000000>;
+ 		regulator-max-microvolt = <5000000>;
+ 		enable-active-high;
+-		regulator-always-on;
+ 		gpio = <&expander0 4 GPIO_ACTIVE_HIGH>;
+ 	};
+ 
+-- 
+2.5.0
