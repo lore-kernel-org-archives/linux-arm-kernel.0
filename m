@@ -1,37 +1,34 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 23 Dec 2015 11:59:24 +0100
-Subject: [PATCH v5 1/5] drivers: nvdimm: ensure no negative value gets returned
- on positive match
+Date: Wed, 23 Dec 2015 11:59:25 +0100
+Subject: [PATCH v5 2/5] ARM: sa1111: ensure no negative value gets returned on
+ positive match
 In-Reply-To: <1450868368-5650-1-git-send-email-m.szyprowski@samsung.com>
 References: <1450868368-5650-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1450868368-5650-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1450868368-5650-3-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-From: Dan Williams <dan.j.williams@intel.com>
 
 This patch ensures that existing bus match callbacks don't return
 negative values (which might be interpreted as potential errors in the
 future) in case of positive match.
 
-Signed-off-by: Dan Williams <dan.j.williams@intel.com>
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/nvdimm/bus.c | 2 +-
+ arch/arm/common/sa1111.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/nvdimm/bus.c b/drivers/nvdimm/bus.c
-index 7e2c43f..2b2181c 100644
---- a/drivers/nvdimm/bus.c
-+++ b/drivers/nvdimm/bus.c
-@@ -62,7 +62,7 @@ static int nvdimm_bus_match(struct device *dev, struct device_driver *drv)
- {
- 	struct nd_device_driver *nd_drv = to_nd_device_driver(drv);
+diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
+index 3d22494..fb0a0a4 100644
+--- a/arch/arm/common/sa1111.c
++++ b/arch/arm/common/sa1111.c
+@@ -1290,7 +1290,7 @@ static int sa1111_match(struct device *_dev, struct device_driver *_drv)
+ 	struct sa1111_dev *dev = SA1111_DEV(_dev);
+ 	struct sa1111_driver *drv = SA1111_DRV(_drv);
  
--	return test_bit(to_nd_device_type(dev), &nd_drv->type);
-+	return !!test_bit(to_nd_device_type(dev), &nd_drv->type);
+-	return dev->devid & drv->devid;
++	return !!(dev->devid & drv->devid);
  }
  
- static struct module *to_bus_provider(struct device *dev)
+ static int sa1111_bus_suspend(struct device *dev, pm_message_t state)
 -- 
 1.9.2
