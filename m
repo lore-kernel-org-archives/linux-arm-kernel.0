@@ -1,39 +1,64 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 23 Dec 2015 01:10:58 +0100
-Subject: [PATCH 1/3] ARM: multi_v7_defconfig: enable Rockchip io-domain
- driver
-In-Reply-To: <20151222225614.GL30172@localhost>
-References: <2111669.2aeXLpXsWE@diego> <20151222225614.GL30172@localhost>
-Message-ID: <5336978.7p06ZKmlEQ@diego>
+From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
+Date: Tue, 22 Dec 2015 16:24:23 -0800
+Subject: [PATCH] gicv2m: Miscellaneous fixes for V2m resources and SPI ranges
+Message-ID: <1450830263-28914-1-git-send-email-Suravee.Suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 22. Dezember 2015, 14:56:14 schrieb Olof Johansson:
-> On Mon, Dec 21, 2015 at 10:21:14PM +0100, Heiko St?bner wrote:
-> > The io-domain driver is necessary to notify the soc about voltages changes
-> > happening on supplying regulators. Probably the most important user right
-> > now is the mmc tuning code, where the soc needs to get notified when the
-> > voltage is dropped to the 1.8V point.
-> > 
-> > As this option is necessary to sucessfully tune UHS cards etc, it should
-> > get built in.
-> > 
-> > Signed-off-by: Heiko Stuebner <heiko.stuebner@collabora.com>
-> > ---
-> > When booting a Veyron-Jerry from an sd-card it got stuck, as the tuning
-> > failed due to the missing voltage notification and the mmc completely
-> > fails initialization of the card, if this happens.
-> > With this option enabled, I could again boot from my sd-card.
-> > 
-> > This is based on the
-> 
-> Looks cut off :)
+This patch contain fixes for v2m resources and SPI ranges:
 
-I only wanted to say that this is based on the latest multi_v7 from the 
-armsoc/defconfig branch, but it looks I forgot to finish that sentence ;-)
+  * Fix off-by-one error when set up v2m resource end range in
+    gicv2m_acpi_init().
 
+  * Fix the off-by-one print error for SPI range.
 
-> Anyway, applied 1-3.
+  * Use %pR to properly print resource range information.
 
-Thanks
-Heiko
+Both ACPI and DT should now print:
+
+  GICv2m: range[mem 0xe1180000-0xe1180fff], SPI[64:319]
+
+Suggested-by: Bjorn Helgaas <bhelgaas@google.com>
+Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+---
+
+ Hi Marc,
+
+ Sorry for this minor last minute fixup. This should go on top
+ of the V7 of the GICv2m ACPI patch series. Although, this is
+ not urgent.
+
+ Thanks,
+ Suravee
+
+ drivers/irqchip/irq-gic-v2m.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
+index 7e2975d..5f346ea 100644
+--- a/drivers/irqchip/irq-gic-v2m.c
++++ b/drivers/irqchip/irq-gic-v2m.c
+@@ -365,9 +365,8 @@ static int __init gicv2m_init_one(struct fwnode_handle *fwnode,
+ 
+ 	list_add_tail(&v2m->entry, &v2m_nodes);
+ 
+-	pr_info("range[%#lx:%#lx], SPI[%d:%d]\n",
+-		(unsigned long)res->start, (unsigned long)res->end,
+-		v2m->spi_start, (v2m->spi_start + v2m->nr_spis));
++	pr_info("range%pR, SPI[%d:%d]\n", res,
++		v2m->spi_start, (v2m->spi_start + v2m->nr_spis - 1));
+ 	return 0;
+ 
+ err_iounmap:
+@@ -456,7 +455,8 @@ acpi_parse_madt_msi(struct acpi_subtable_header *header,
+ 		return -EINVAL;
+ 
+ 	res.start = m->base_address;
+-	res.end = m->base_address + SZ_4K;
++	res.end = m->base_address + SZ_4K - 1;
++	res.flags = IORESOURCE_MEM;
+ 
+ 	if (m->flags & ACPI_MADT_OVERRIDE_SPI_VALUES) {
+ 		spi_start = m->spi_base;
+-- 
+2.1.0
