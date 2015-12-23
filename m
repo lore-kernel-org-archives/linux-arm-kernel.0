@@ -1,43 +1,43 @@
-From: ken.xue@amd.com (Ken Xue)
-Date: Wed, 23 Dec 2015 17:59:49 +0800
-Subject: [PATCH v2 0/2] i2c:dw: Add APM X-Gene ACPI I2C device support
-In-Reply-To: <20151223095237.GJ1758@lahna.fi.intel.com>
-References: <1449782357-22982-1-git-send-email-lho@apm.com>
- <566F6485.2000508@amd.com> <20151215132721.GJ1762@lahna.fi.intel.com>
- <56702923.9010305@amd.com> <20151215145953.GK1762@lahna.fi.intel.com>
- <1450863241.7740.30.camel@kxue-X58A-UD3R>
- <20151223095237.GJ1758@lahna.fi.intel.com>
-Message-ID: <1450864789.7740.35.camel@kxue-X58A-UD3R>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Wed, 23 Dec 2015 10:06:21 +0000
+Subject: [PATCH v7 2/4] drm: Add support for ARM's HDLCD controller.
+In-Reply-To: <CAPj87rPK4gaFw79poT+Gwfg3R39svdvBTP=GD-E4Lvbm4ysSAg@mail.gmail.com>
+References: <1450806109-470-1-git-send-email-Liviu.Dudau@arm.com>
+ <1450806109-470-3-git-send-email-Liviu.Dudau@arm.com>
+ <CAPj87rPK4gaFw79poT+Gwfg3R39svdvBTP=GD-E4Lvbm4ysSAg@mail.gmail.com>
+Message-ID: <20151223100621.GX960@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-12-23 at 11:52 +0200, Mika Westerberg wrote:
-> On Wed, Dec 23, 2015 at 05:34:01PM +0800, Ken Xue wrote:
-> > 1) Regarding
-> > https://msdn.microsoft.com/en-us/library/windows/hardware/dn919852(v=vs.85).aspx
-> > , Window I2C driver should pass MITT test. There are 5 I2C devices
-> > connect to one I2C bus for test. And those devices defined different
-> > "ConnectionSpeed" over the I2C bus by ACPI resource "I2CSerialBus".
-> > 
-> > During test, I2C bus should run in different "ConnectionSpeed" of
-> > device.
-> > 
-> > That means windows driver can modify I2C bus speed to match the
-> > "ConnectionSpeed" of device on-the-fly. Static value from SSCN and FMCN
-> > can not work for WITT test cases.
+On Wed, Dec 23, 2015 at 10:03:00AM +0000, Daniel Stone wrote:
+> Hi,
 > 
-> That is why there are *CNT methods for all supported I2C modes:
+> On 22 December 2015 at 17:41, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> > The HDLCD controller is a display controller that supports resolutions
+> > up to 4096x4096 pixels. It is present on various development boards
+> > produced by ARM Ltd and emulated by the latest Fast Models from the
+> > company.
 > 
->   - SSCN() - returns for standard mode (100kHz)
->   - FMCN() - returns for fast mode (400kHz)
->   - FPCN() - returns for fast mode+ (1MHz)
->  
-> for High-speed mode I'm not sure what the method name is ;-)
+> I didn't get to take as close a look as last time, but I only had
+> fairly minor quibbles then, and nothing jumped out at me this time
+> either.
 > 
-> Then the Windows driver switches between those based on what the
-> ConnectionSpeed is in the ACPI I2C connector.
+> Reviewed-by: Daniel Stone <daniels@collabora.com>
 
-Window driver can set Bus speed based on "ConnectionSpeed". But Current
-Linux driver only sets Bus speed during probe. How can Linux diver
-determine which Bus speed should be applied, if all *CNT methods return
-non-zero? 
+Cheers and Merry Holidays!
+Liviu
+
+> 
+> Cheers,
+> Daniel
+> 
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
