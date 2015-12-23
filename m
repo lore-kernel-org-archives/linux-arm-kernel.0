@@ -1,32 +1,52 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 23 Dec 2015 10:48:24 +0000
-Subject: [PATCH] cpufreq/scpi: fix handling return value of
- topology_physical_package_id
-In-Reply-To: <1450867041-729-1-git-send-email-a.hajda@samsung.com>
-References: <1450867041-729-1-git-send-email-a.hajda@samsung.com>
-Message-ID: <567A7BF8.1030107@arm.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 23 Dec 2015 11:48:33 +0100
+Subject: [PATCH 1/5] iio:adc:at91_adc8xx: introduce new atmel adc driver
+In-Reply-To: <20151223102700.GC2789@odux.rfo.atmel.com>
+References: <1450689852-22763-1-git-send-email-ludovic.desroches@atmel.com>
+ <1450689852-22763-2-git-send-email-ludovic.desroches@atmel.com>
+ <56799798.203@kernel.org>
+ <20151223102700.GC2789@odux.rfo.atmel.com>
+Message-ID: <20151223104833.GE2789@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Dec 23, 2015 at 11:27:00AM +0100, Ludovic Desroches wrote:
+> On Tue, Dec 22, 2015 at 06:34:00PM +0000, Jonathan Cameron wrote:
+> > On 21/12/15 09:24, Ludovic Desroches wrote:
+> > > This driver supports the new version of the Atmel ADC device introduced
+> > > with the SAMA5D2 SoC family.
+> > > 
 
+[...]
 
-On 23/12/15 10:37, Andrzej Hajda wrote:
-> The function can return negative values, so its result should
-> be assigned to signed variable.
->
-> The problem has been detected using proposed semantic patch
-> scripts/coccinelle/tests/unsigned_lesser_than_zero.cocci [1].
->
-> [1]: http://permalink.gmane.org/gmane.linux.kernel/2038576
->
+> > > +static irqreturn_t at91_adc_interrupt(int irq, void *private)
+> > > +{
+> > > +	struct iio_dev *indio = private;
+> > > +	struct at91_adc_state *st = iio_priv(indio);
+> > > +	u32 status = at91_adc_readl(st, ADC_ISR);
+> > > +
+> > > +	status &= at91_adc_readl(st, ADC_IMR);
+> > > +	if (status & 0xFFF) {
+> > > +		st->last_value = at91_adc_readl(st, st->chan->address);
+> > If this is a polled read - is there any reason to read this value here
+> > rather than outside the interrupt?
+> 
+> No it can be done outside the interrupt. I have taken some parts from the
+> previous driver but it was reading a register used by all the channels
+> when it has been designed. So yes there is probably no more reason to
+> read it into the interrupt.
+> 
 
-There has a patch posted by Dan Carpenter [1] which I reposted[2],
-but it again slipped through the cracks. I will poke Rafael again on that.
+Thinking about it. Is it really useful to move reading outside the
+interrupt?
 
-[1] 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/380292.html
-[2] https://lkml.org/lkml/2015/12/15/219
+By the way this is not a polled read.
 
--- 
-Regards,
-Sudeep
+> > > +		st->done = true;
+> > > +		wake_up_interruptible(&st->wq_data_available);
+> > > +	}
+> > > +
+> > > +	return IRQ_HANDLED;
+> > > +}
+
+Ludovic
