@@ -1,38 +1,42 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Wed, 23 Dec 2015 11:37:19 +0100
-Subject: [PATCH] pinctrl: nsp-gpio: fix type of iterator
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 23 Dec 2015 16:11:06 +0530
+Subject: [PATCH] cpufreq/scpi: fix handling return value of
+ topology_physical_package_id
 In-Reply-To: <1450867041-729-1-git-send-email-a.hajda@samsung.com>
 References: <1450867041-729-1-git-send-email-a.hajda@samsung.com>
-Message-ID: <1450867041-729-2-git-send-email-a.hajda@samsung.com>
+Message-ID: <20151223104105.GB3455@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Iterator i declared as unsigned is always non-negative so the
-loop will never end.
+On 23-12-15, 11:37, Andrzej Hajda wrote:
+> The function can return negative values, so its result should
+> be assigned to signed variable.
+> 
+> The problem has been detected using proposed semantic patch
+> scripts/coccinelle/tests/unsigned_lesser_than_zero.cocci [1].
+> 
+> [1]: http://permalink.gmane.org/gmane.linux.kernel/2038576
+> 
+> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+> ---
+>  drivers/cpufreq/scpi-cpufreq.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/cpufreq/scpi-cpufreq.c b/drivers/cpufreq/scpi-cpufreq.c
+> index 2c3b16f..de5e89b 100644
+> --- a/drivers/cpufreq/scpi-cpufreq.c
+> +++ b/drivers/cpufreq/scpi-cpufreq.c
+> @@ -31,7 +31,7 @@ static struct scpi_ops *scpi_ops;
+>  
+>  static struct scpi_dvfs_info *scpi_get_dvfs_info(struct device *cpu_dev)
+>  {
+> -	u8 domain = topology_physical_package_id(cpu_dev->id);
+> +	int domain = topology_physical_package_id(cpu_dev->id);
+>  
+>  	if (domain < 0)
+>  		return ERR_PTR(-EINVAL);
 
-The problem has been detected using proposed semantic patch
-scripts/coccinelle/tests/unsigned_lesser_than_zero.cocci [1].
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-[1]: http://permalink.gmane.org/gmane.linux.kernel/2038576
-
-Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
----
- drivers/pinctrl/bcm/pinctrl-nsp-gpio.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/pinctrl/bcm/pinctrl-nsp-gpio.c b/drivers/pinctrl/bcm/pinctrl-nsp-gpio.c
-index 34648f6..ad5b04c 100644
---- a/drivers/pinctrl/bcm/pinctrl-nsp-gpio.c
-+++ b/drivers/pinctrl/bcm/pinctrl-nsp-gpio.c
-@@ -439,7 +439,8 @@ static int nsp_gpio_set_strength(struct nsp_gpio *chip, unsigned gpio,
- static int nsp_gpio_get_strength(struct nsp_gpio *chip, unsigned gpio,
- 				 u16 *strength)
- {
--	unsigned int i, offset, shift;
-+	unsigned int offset, shift;
-+	int i;
- 	u32 val;
- 	unsigned long flags;
- 
 -- 
-1.9.1
+viresh
