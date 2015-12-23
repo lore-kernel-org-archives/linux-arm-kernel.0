@@ -1,38 +1,69 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Wed, 23 Dec 2015 18:20:33 +0100
-Subject: [PATCH v2 0/2] Improve drm_of_component_probe() and move
- rockchip to use it
-In-Reply-To: <20151223100534.GW960@e106497-lin.cambridge.arm.com>
-References: <1448029325-14602-1-git-send-email-Liviu.Dudau@arm.com>
- <20151222173800.GU960@e106497-lin.cambridge.arm.com>
- <20151223103906.2aae53595345240d57d57b41@free.fr>
- <20151223100534.GW960@e106497-lin.cambridge.arm.com>
-Message-ID: <20151223182033.a52356408b9a81e9497464e7@free.fr>
+From: jic23@jic23.retrosnub.co.uk (Jonathan Cameron)
+Date: Wed, 23 Dec 2015 17:21:25 +0000
+Subject: [PATCH 1/5] iio:adc:at91_adc8xx: introduce new atmel adc driver
+In-Reply-To: <20151223104833.GE2789@odux.rfo.atmel.com>
+References: <1450689852-22763-1-git-send-email-ludovic.desroches@atmel.com>
+ <1450689852-22763-2-git-send-email-ludovic.desroches@atmel.com>
+ <56799798.203@kernel.org> <20151223102700.GC2789@odux.rfo.atmel.com>
+ <20151223104833.GE2789@odux.rfo.atmel.com>
+Message-ID: <E2C27D1A-1035-4330-AEF3-C72B87C27FEF@jic23.retrosnub.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 23 Dec 2015 10:05:34 +0000
-Liviu Dudau <Liviu.Dudau@arm.com> wrote:
 
-> > What was the reason to keep the "ports" node instead of the device?
-> 
-> The function is an extract of common code sprinkled through a few DRM drivers,
-> they all used port rather than port->parent.
 
-Sorry for I could find such drivers. May you give me any pointer?
-
-> Have a look at my v2 where I've introduced two compare functions and also
-> modified the Rockchip compare_port() to use port->parent in the comparison. I
-> guess that should solve your problem.
-
-Keeping the port instead of the parent asks for more code, but,
-especially, it also asks for changes in the component drivers because,
-at bind time, in 'data', they get a port instead of the device.
-
-You might say that this could be interesting for components with many
-different masters (video and audio), but this could be solved adding
-intermediate device nodes in the DT (ports).
+On 23 December 2015 10:48:33 GMT+00:00, Ludovic Desroches <ludovic.desroches@atmel.com> wrote:
+>On Wed, Dec 23, 2015 at 11:27:00AM +0100, Ludovic Desroches wrote:
+>> On Tue, Dec 22, 2015 at 06:34:00PM +0000, Jonathan Cameron wrote:
+>> > On 21/12/15 09:24, Ludovic Desroches wrote:
+>> > > This driver supports the new version of the Atmel ADC device
+>introduced
+>> > > with the SAMA5D2 SoC family.
+>> > > 
+>
+>[...]
+>
+>> > > +static irqreturn_t at91_adc_interrupt(int irq, void *private)
+>> > > +{
+>> > > +	struct iio_dev *indio = private;
+>> > > +	struct at91_adc_state *st = iio_priv(indio);
+>> > > +	u32 status = at91_adc_readl(st, ADC_ISR);
+>> > > +
+>> > > +	status &= at91_adc_readl(st, ADC_IMR);
+>> > > +	if (status & 0xFFF) {
+>> > > +		st->last_value = at91_adc_readl(st, st->chan->address);
+>> > If this is a polled read - is there any reason to read this value
+>here
+>> > rather than outside the interrupt?
+>> 
+>> No it can be done outside the interrupt. I have taken some parts from
+>the
+>> previous driver but it was reading a register used by all the
+>channels
+>> when it has been designed. So yes there is probably no more reason to
+>> read it into the interrupt.
+>> 
+>
+>Thinking about it. Is it really useful to move reading outside the
+>interrupt?
+It avoids needing to know the channel in here, hence simplifying the code a bit.
+>
+>By the way this is not a polled read.
+I meant that it is an individually requested conversion rather than a free running
+ sampling system where the value read might change before it is read out.
+>
+>> > > +		st->done = true;
+>> > > +		wake_up_interruptible(&st->wq_data_available);
+>> > > +	}
+>> > > +
+>> > > +	return IRQ_HANDLED;
+>> > > +}
+>
+>Ludovic
+>--
+>To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+>the body of a message to majordomo at vger.kernel.org
+>More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Sent from my Android device with K-9 Mail. Please excuse my brevity.
