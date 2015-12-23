@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 23 Dec 2015 16:59:13 +0530
-Subject: [PATCH 2/3] clockevents/arm_global_timer: Implement
+Date: Wed, 23 Dec 2015 16:59:14 +0530
+Subject: [PATCH 3/3] clockevents/exynos_mct: Implement
  ->set_state_oneshot_stopped()
 In-Reply-To: <cover.1450869375.git.viresh.kumar@linaro.org>
 References: <cover.1450869375.git.viresh.kumar@linaro.org>
-Message-ID: <e50fc01132e229071993d674c22e55cc14e30ffa.1450869375.git.viresh.kumar@linaro.org>
+Message-ID: <230cc7fd48dcb72312acbc512c724f7da13bec0a.1450869375.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,20 +18,28 @@ avoid spurious interrupts, as explained by: commit 8fff52fd5093
 
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/clocksource/arm_global_timer.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/clocksource/exynos_mct.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
-index a2cb6fae9295..801cfe5833c1 100644
---- a/drivers/clocksource/arm_global_timer.c
-+++ b/drivers/clocksource/arm_global_timer.c
-@@ -174,6 +174,7 @@ static int gt_clockevents_init(struct clock_event_device *clk)
- 	clk->set_state_shutdown = gt_clockevent_shutdown;
- 	clk->set_state_periodic = gt_clockevent_set_periodic;
- 	clk->set_state_oneshot = gt_clockevent_shutdown;
-+	clk->set_state_oneshot_stopped = gt_clockevent_shutdown;
- 	clk->set_next_event = gt_clockevent_set_next_event;
- 	clk->cpumask = cpumask_of(cpu);
- 	clk->rating = 300;
+diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+index ff44082a0827..be09bc0b5e26 100644
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -313,6 +313,7 @@ static struct clock_event_device mct_comp_device = {
+ 	.set_state_periodic	= mct_set_state_periodic,
+ 	.set_state_shutdown	= mct_set_state_shutdown,
+ 	.set_state_oneshot	= mct_set_state_shutdown,
++	.set_state_oneshot_stopped = mct_set_state_shutdown,
+ 	.tick_resume		= mct_set_state_shutdown,
+ };
+ 
+@@ -452,6 +453,7 @@ static int exynos4_local_timer_setup(struct mct_clock_event_device *mevt)
+ 	evt->set_state_periodic = set_state_periodic;
+ 	evt->set_state_shutdown = set_state_shutdown;
+ 	evt->set_state_oneshot = set_state_shutdown;
++	evt->set_state_oneshot_stopped = set_state_shutdown;
+ 	evt->tick_resume = set_state_shutdown;
+ 	evt->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
+ 	evt->rating = 450;
 -- 
 2.7.0.rc1.186.g94414c4
