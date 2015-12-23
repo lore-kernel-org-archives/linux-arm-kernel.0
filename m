@@ -1,42 +1,52 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 23 Dec 2015 16:11:06 +0530
-Subject: [PATCH] cpufreq/scpi: fix handling return value of
- topology_physical_package_id
-In-Reply-To: <1450867041-729-1-git-send-email-a.hajda@samsung.com>
-References: <1450867041-729-1-git-send-email-a.hajda@samsung.com>
-Message-ID: <20151223104105.GB3455@ubuntu>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 23 Dec 2015 19:44:32 +0900
+Subject: [GIT PULL 3/9] ARM64: EXYNOS: clk: Clock dependency for ARM64 for
+ v4.5
+In-Reply-To: <20151222044636.GD30172@localhost>
+References: <1449020386-20250-1-git-send-email-k.kozlowski@samsung.com>
+ <1449020386-20250-4-git-send-email-k.kozlowski@samsung.com>
+ <20151222044636.GD30172@localhost>
+Message-ID: <567A7B10.3030501@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23-12-15, 11:37, Andrzej Hajda wrote:
-> The function can return negative values, so its result should
-> be assigned to signed variable.
+W dniu 22.12.2015 o 13:46, Olof Johansson pisze:
+> On Wed, Dec 02, 2015 at 10:39:40AM +0900, Krzysztof Kozlowski wrote:
+>> Hi Kukjin,
+>>
+>> Dependency for soc64 changes.
+>>
+>> Best regards,
+>> Krzysztof
+>>
+>>
+>> The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+>>
+>>   Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+>>
+>> are available in the git repository at:
+>>
+>>   https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-clk-arm64-symbols-4.5
+>>
+>> for you to fetch changes up to 8c2a90ed18a74e8b9cdbba679403faa44d6024fc:
+>>
+>>   clk: samsung: Don't build ARMv8 clock drivers on ARMv7 (2015-11-22 19:25:29 +0900)
 > 
-> The problem has been detected using proposed semantic patch
-> scripts/coccinelle/tests/unsigned_lesser_than_zero.cocci [1].
+> Hi,
 > 
-> [1]: http://permalink.gmane.org/gmane.linux.kernel/2038576
-> 
-> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
-> ---
->  drivers/cpufreq/scpi-cpufreq.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/cpufreq/scpi-cpufreq.c b/drivers/cpufreq/scpi-cpufreq.c
-> index 2c3b16f..de5e89b 100644
-> --- a/drivers/cpufreq/scpi-cpufreq.c
-> +++ b/drivers/cpufreq/scpi-cpufreq.c
-> @@ -31,7 +31,7 @@ static struct scpi_ops *scpi_ops;
->  
->  static struct scpi_dvfs_info *scpi_get_dvfs_info(struct device *cpu_dev)
->  {
-> -	u8 domain = topology_physical_package_id(cpu_dev->id);
-> +	int domain = topology_physical_package_id(cpu_dev->id);
->  
->  	if (domain < 0)
->  		return ERR_PTR(-EINVAL);
+> Looks like this lacks ack from any of the clock maintainers.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+It got the ack from Sylwester and Tomasz - Samsung clock maintainers. If
+it is not sufficient... then let's wait with it for v4.6. I am on
+holidays now so I cannot really do anything meaningful with it.
 
--- 
-viresh
+
+> 
+> Given that EXYNOS_ARM64_COMMON_CLK is not yet introduced, this will cause
+> a breakage in bisectability on some of these platforms as well.
+
+The patch introduces EXYNOS_ARM64_COMMON_CLK which will be enabled by
+default on our platforms. What kind of breakage do you have in mind?
+
+Best regards,
+Krzysztof
