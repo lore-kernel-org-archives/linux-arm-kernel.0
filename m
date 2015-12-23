@@ -1,127 +1,30 @@
 From: ykk@rock-chips.com (Yakir Yang)
-Date: Wed, 23 Dec 2015 08:46:42 +0800
-Subject: [PATCH v11 09/19] phy: Add driver for rockchip Display Port PHY
-In-Reply-To: <000901d13cb3$341b6c40$9c5244c0$@com>
+Date: Wed, 23 Dec 2015 08:47:12 +0800
+Subject: [PATCH v11 06/19] ARM: dts: exynos/dp: remove some properties
+ that deprecated by analogix_dp driver
+In-Reply-To: <000801d13cb2$43079270$c916b750$@com>
 References: <1450236018-1118-1-git-send-email-ykk@rock-chips.com>
- <1450237257-2208-1-git-send-email-ykk@rock-chips.com>
- <000901d13cb3$341b6c40$9c5244c0$@com>
-Message-ID: <5679EEF2.1050309@rock-chips.com>
+ <1450236876-1951-1-git-send-email-ykk@rock-chips.com>
+ <000801d13cb2$43079270$c916b750$@com>
+Message-ID: <5679EF10.7070807@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jingoo,
 
-Thanks for your respond.
-
-On 12/22/2015 08:20 PM, Jingoo Han wrote:
-> On Wednesday, December 16, 2015 12:41 PM, Yakir Yang wrote:
->> Add phy driver for the Rockchip DisplayPort PHY module. This
->> is required to get DisplayPort working in Rockchip SoCs.
+On 12/22/2015 08:13 PM, Jingoo Han wrote:
+> On Wednesday, December 16, 2015 12:35 PM, Yakir Yang wrote:
+>> After exynos_dp have been split the common IP code into analogix_dp driver,
+>> the analogix_dp driver have deprecated some Samsung platform properties which
+>> could be dynamically parsed from EDID/MODE/DPCD message, so this is an update
+>> for Exynos DTS file for dp-controller.
+>>
+>> Beside the backward compatibility is fully preserved, so there are no
+>> bisectability break that make this change in a separate patch.
 >>
 >> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
->> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
->> ---
->> Changes in v11: None
->> Changes in v10:
->> - Fix the wrong macro value of GRF_EDP_REF_CLK_SEL_INTER_HIWORD_MASK
->>      BIT(4) -> BIT(20)
->>
->> Changes in v9:
->> - Removed the unused the variable "res" in probe function. (Heiko)
->> - Removed the unused head file.
->>
->> Changes in v8:
->> - Fix the mixed spacers on macro definitions. (Heiko)
->> - Remove the unnecessary empty line after clk_prepare_enable. (Heiko)
->>
->> Changes in v7:
->> - Simply the commit message. (Kishon)
->> - Symmetrical enable/disbale the phy clock and power. (Kishon)
->>
->> Changes in v6: None
->> Changes in v5:
->> - Remove "reg" DT property, cause driver could poweron/poweroff phy via
->>    the exist "grf" syscon already. And rename the example DT node from
->>    "edp_phy: phy at ff770274" to "edp_phy: edp-phy" directly. (Heiko)
->> - Add deivce_node at the front of driver, update phy_ops type from "static
->>    struct" to "static const struct". And correct the input paramters of
->>    devm_phy_create() interfaces. (Heiko)
->>
->> Changes in v4:
->> - Add commit message, and remove the redundant rockchip_dp_phy_init()
->>    function, move those code to probe() method. And remove driver .owner
->>    number. (Kishon)
->>
->> Changes in v3:
->> - Suggest, add rockchip dp phy driver, collect the phy clocks and
->>    power control. (Heiko)
->>
->> Changes in v2: None
->>
->>   drivers/phy/Kconfig           |   7 ++
->>   drivers/phy/Makefile          |   1 +
->>   drivers/phy/phy-rockchip-dp.c | 151 ++++++++++++++++++++++++++++++++++++++++++
->>   3 files changed, 159 insertions(+)
->>   create mode 100644 drivers/phy/phy-rockchip-dp.c
->>
->> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
->> index 7eb5859d..7355819 100644
->> --- a/drivers/phy/Kconfig
->> +++ b/drivers/phy/Kconfig
->> @@ -319,6 +319,13 @@ config PHY_ROCKCHIP_USB
->>   	help
->>   	  Enable this to support the Rockchip USB 2.0 PHY.
->>
->> +config PHY_ROCKCHIP_DP
->> +	tristate "Rockchip Display Port PHY Driver"
->> +	depends on ARCH_ROCKCHIP && OF
->> +	select GENERIC_PHY
->> +	help
->> +	  Enable this to support the Rockchip Display Port PHY.
->> +
->>   config PHY_ST_SPEAR1310_MIPHY
->>   	tristate "ST SPEAR1310-MIPHY driver"
->>   	select GENERIC_PHY
->> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
->> index 075db1a..b1700cd 100644
->> --- a/drivers/phy/Makefile
->> +++ b/drivers/phy/Makefile
->> @@ -35,6 +35,7 @@ phy-exynos-usb2-$(CONFIG_PHY_S5PV210_USB2)	+= phy-s5pv210-usb2.o
->>   obj-$(CONFIG_PHY_EXYNOS5_USBDRD)	+= phy-exynos5-usbdrd.o
->>   obj-$(CONFIG_PHY_QCOM_APQ8064_SATA)	+= phy-qcom-apq8064-sata.o
->>   obj-$(CONFIG_PHY_ROCKCHIP_USB) += phy-rockchip-usb.o
->> +obj-$(CONFIG_PHY_ROCKCHIP_DP)		+= phy-rockchip-dp.o
->>   obj-$(CONFIG_PHY_QCOM_IPQ806X_SATA)	+= phy-qcom-ipq806x-sata.o
->>   obj-$(CONFIG_PHY_ST_SPEAR1310_MIPHY)	+= phy-spear1310-miphy.o
->>   obj-$(CONFIG_PHY_ST_SPEAR1340_MIPHY)	+= phy-spear1340-miphy.o
->> diff --git a/drivers/phy/phy-rockchip-dp.c b/drivers/phy/phy-rockchip-dp.c
->> new file mode 100644
->> index 0000000..3cb3bf8
->> --- /dev/null
->> +++ b/drivers/phy/phy-rockchip-dp.c
->> @@ -0,0 +1,151 @@
->> +/*
->> + * Rockchip DP PHY driver
->> + *
->> + * Copyright (C) 2015 FuZhou Rockchip Co., Ltd.
->> + * Author: Yakir Yang <ykk@@rock-chips.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; either version 2 of the License.
->> + */
->> +
->> +#include <linux/module.h>
->> +#include <linux/of.h>
->> +#include <linux/clk.h>
->> +#include <linux/phy/phy.h>
->> +#include <linux/regmap.h>
->> +#include <linux/mfd/syscon.h>
->> +#include <linux/platform_device.h>
-> Please order these headers alphabetically.
-> It will enhance the readability.
-
-Done,
+>> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> Reviewed-by: Jingoo Han < jingoohan1@gmail.com >
 
 Thanks,
 - Yakir
@@ -129,142 +32,149 @@ Thanks,
 > Best regards,
 > Jingoo Han
 >
->> +
->> +#define GRF_SOC_CON12                           0x0274
->> +
->> +#define GRF_EDP_REF_CLK_SEL_INTER_HIWORD_MASK   BIT(20)
->> +#define GRF_EDP_REF_CLK_SEL_INTER               BIT(4)
->> +
->> +#define GRF_EDP_PHY_SIDDQ_HIWORD_MASK           BIT(21)
->> +#define GRF_EDP_PHY_SIDDQ_ON                    0
->> +#define GRF_EDP_PHY_SIDDQ_OFF                   BIT(5)
->> +
->> +struct rockchip_dp_phy {
->> +	struct device  *dev;
->> +	struct regmap  *grf;
->> +	struct clk     *phy_24m;
->> +};
->> +
->> +static int rockchip_set_phy_state(struct phy *phy, bool enable)
->> +{
->> +	struct rockchip_dp_phy *dp = phy_get_drvdata(phy);
->> +	int ret;
->> +
->> +	if (enable) {
->> +		ret = regmap_write(dp->grf, GRF_SOC_CON12,
->> +				   GRF_EDP_PHY_SIDDQ_HIWORD_MASK |
->> +				   GRF_EDP_PHY_SIDDQ_ON);
->> +		if (ret < 0) {
->> +			dev_err(dp->dev, "Can't enable PHY power %d\n", ret);
->> +			return ret;
->> +		}
->> +
->> +		ret = clk_prepare_enable(dp->phy_24m);
->> +	} else {
->> +		clk_disable_unprepare(dp->phy_24m);
->> +
->> +		ret = regmap_write(dp->grf, GRF_SOC_CON12,
->> +				   GRF_EDP_PHY_SIDDQ_HIWORD_MASK |
->> +				   GRF_EDP_PHY_SIDDQ_OFF);
->> +	}
->> +
->> +	return ret;
->> +}
->> +
->> +static int rockchip_dp_phy_power_on(struct phy *phy)
->> +{
->> +	return rockchip_set_phy_state(phy, true);
->> +}
->> +
->> +static int rockchip_dp_phy_power_off(struct phy *phy)
->> +{
->> +	return rockchip_set_phy_state(phy, false);
->> +}
->> +
->> +static const struct phy_ops rockchip_dp_phy_ops = {
->> +	.power_on	= rockchip_dp_phy_power_on,
->> +	.power_off	= rockchip_dp_phy_power_off,
->> +	.owner		= THIS_MODULE,
->> +};
->> +
->> +static int rockchip_dp_phy_probe(struct platform_device *pdev)
->> +{
->> +	struct device *dev = &pdev->dev;
->> +	struct device_node *np = dev->of_node;
->> +	struct phy_provider *phy_provider;
->> +	struct rockchip_dp_phy *dp;
->> +	struct phy *phy;
->> +	int ret;
->> +
->> +	if (!np)
->> +		return -ENODEV;
->> +
->> +	dp = devm_kzalloc(dev, sizeof(*dp), GFP_KERNEL);
->> +	if (IS_ERR(dp))
->> +		return -ENOMEM;
->> +
->> +	dp->dev = dev;
->> +
->> +	dp->phy_24m = devm_clk_get(dev, "24m");
->> +	if (IS_ERR(dp->phy_24m)) {
->> +		dev_err(dev, "cannot get clock 24m\n");
->> +		return PTR_ERR(dp->phy_24m);
->> +	}
->> +
->> +	ret = clk_set_rate(dp->phy_24m, 24000000);
->> +	if (ret < 0) {
->> +		dev_err(dp->dev, "cannot set clock phy_24m %d\n", ret);
->> +		return ret;
->> +	}
->> +
->> +	dp->grf = syscon_regmap_lookup_by_phandle(np, "rockchip,grf");
->> +	if (IS_ERR(dp->grf)) {
->> +		dev_err(dev, "rk3288-dp needs rockchip,grf property\n");
->> +		return PTR_ERR(dp->grf);
->> +	}
->> +
->> +	ret = regmap_write(dp->grf, GRF_SOC_CON12, GRF_EDP_REF_CLK_SEL_INTER |
->> +			   GRF_EDP_REF_CLK_SEL_INTER_HIWORD_MASK);
->> +	if (ret != 0) {
->> +		dev_err(dp->dev, "Could not config GRF edp ref clk: %d\n", ret);
->> +		return ret;
->> +	}
->> +
->> +	phy = devm_phy_create(dev, np, &rockchip_dp_phy_ops);
->> +	if (IS_ERR(phy)) {
->> +		dev_err(dev, "failed to create phy\n");
->> +		return PTR_ERR(phy);
->> +	}
->> +	phy_set_drvdata(phy, dp);
->> +
->> +	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
->> +
->> +	return PTR_ERR_OR_ZERO(phy_provider);
->> +}
->> +
->> +static const struct of_device_id rockchip_dp_phy_dt_ids[] = {
->> +	{ .compatible = "rockchip,rk3288-dp-phy" },
->> +	{}
->> +};
->> +
->> +MODULE_DEVICE_TABLE(of, rockchip_dp_phy_dt_ids);
->> +
->> +static struct platform_driver rockchip_dp_phy_driver = {
->> +	.probe		= rockchip_dp_phy_probe,
->> +	.driver		= {
->> +		.name	= "rockchip-dp-phy",
->> +		.of_match_table = rockchip_dp_phy_dt_ids,
->> +	},
->> +};
->> +
->> +module_platform_driver(rockchip_dp_phy_driver);
->> +
->> +MODULE_AUTHOR("Yakir Yang <ykk@rock-chips.com>");
->> +MODULE_DESCRIPTION("Rockchip DP PHY driver");
->> +MODULE_LICENSE("GPL v2");
+>> ---
+>> Changes in v11: None
+>> Changes in v10: None
+>> Changes in v9: None
+>> Changes in v8: None
+>> Changes in v7: None
+>> Changes in v6:
+>> - Fix Peach Pit hpd property name error:
+>> -       hpd-gpio = <&gpx2 6 0>;
+>> +       hpd-gpios = <&gpx2 6 0>;
+>>
+>> Changes in v5:
+>> - Correct the misspell in commit message. (Krzysztof)
+>>
+>> Changes in v4:
+>> - Separate all DTS changes to a separate patch. (Krzysztof)
+>>
+>> Changes in v3: None
+>> Changes in v2: None
+>>
+>>   arch/arm/boot/dts/exynos5250-arndale.dts      | 2 --
+>>   arch/arm/boot/dts/exynos5250-smdk5250.dts     | 2 --
+>>   arch/arm/boot/dts/exynos5250-snow-common.dtsi | 4 +---
+>>   arch/arm/boot/dts/exynos5250-spring.dts       | 4 +---
+>>   arch/arm/boot/dts/exynos5420-peach-pit.dts    | 4 +---
+>>   arch/arm/boot/dts/exynos5420-smdk5420.dts     | 2 --
+>>   arch/arm/boot/dts/exynos5800-peach-pi.dts     | 4 +---
+>>   7 files changed, 4 insertions(+), 18 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
+>> index c000532..b1790cf 100644
+>> --- a/arch/arm/boot/dts/exynos5250-arndale.dts
+>> +++ b/arch/arm/boot/dts/exynos5250-arndale.dts
+>> @@ -124,8 +124,6 @@
+>>   &dp {
+>>   	status = "okay";
+>>   	samsung,color-space = <0>;
+>> -	samsung,dynamic-range = <0>;
+>> -	samsung,ycbcr-coeff = <0>;
+>>   	samsung,color-depth = <1>;
+>>   	samsung,link-rate = <0x0a>;
+>>   	samsung,lane-count = <4>;
+>> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+>> index 0f5dcd4..f30c2db 100644
+>> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
+>> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+>> @@ -80,8 +80,6 @@
+>>
+>>   &dp {
+>>   	samsung,color-space = <0>;
+>> -	samsung,dynamic-range = <0>;
+>> -	samsung,ycbcr-coeff = <0>;
+>>   	samsung,color-depth = <1>;
+>>   	samsung,link-rate = <0x0a>;
+>>   	samsung,lane-count = <4>;
+>> diff --git a/arch/arm/boot/dts/exynos5250-snow-common.dtsi b/arch/arm/boot/dts/exynos5250-snow-
+>> common.dtsi
+>> index 5cb33ba..b96624b 100644
+>> --- a/arch/arm/boot/dts/exynos5250-snow-common.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5250-snow-common.dtsi
+>> @@ -236,12 +236,10 @@
+>>   	pinctrl-names = "default";
+>>   	pinctrl-0 = <&dp_hpd>;
+>>   	samsung,color-space = <0>;
+>> -	samsung,dynamic-range = <0>;
+>> -	samsung,ycbcr-coeff = <0>;
+>>   	samsung,color-depth = <1>;
+>>   	samsung,link-rate = <0x0a>;
+>>   	samsung,lane-count = <2>;
+>> -	samsung,hpd-gpio = <&gpx0 7 GPIO_ACTIVE_HIGH>;
+>> +	hpd-gpios = <&gpx0 7 GPIO_ACTIVE_HIGH>;
+>>
+>>   	ports {
+>>   		port at 0 {
+>> diff --git a/arch/arm/boot/dts/exynos5250-spring.dts b/arch/arm/boot/dts/exynos5250-spring.dts
+>> index c1edd6d..91881d7 100644
+>> --- a/arch/arm/boot/dts/exynos5250-spring.dts
+>> +++ b/arch/arm/boot/dts/exynos5250-spring.dts
+>> @@ -74,12 +74,10 @@
+>>   	pinctrl-names = "default";
+>>   	pinctrl-0 = <&dp_hpd_gpio>;
+>>   	samsung,color-space = <0>;
+>> -	samsung,dynamic-range = <0>;
+>> -	samsung,ycbcr-coeff = <0>;
+>>   	samsung,color-depth = <1>;
+>>   	samsung,link-rate = <0x0a>;
+>>   	samsung,lane-count = <1>;
+>> -	samsung,hpd-gpio = <&gpc3 0 GPIO_ACTIVE_HIGH>;
+>> +	hpd-gpios = <&gpc3 0 GPIO_ACTIVE_HIGH>;
+>>   };
+>>
+>>   &ehci {
+>> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+>> index 35cfb07..2f37c87 100644
+>> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
+>> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+>> @@ -148,12 +148,10 @@
+>>   	pinctrl-names = "default";
+>>   	pinctrl-0 = <&dp_hpd_gpio>;
+>>   	samsung,color-space = <0>;
+>> -	samsung,dynamic-range = <0>;
+>> -	samsung,ycbcr-coeff = <0>;
+>>   	samsung,color-depth = <1>;
+>>   	samsung,link-rate = <0x06>;
+>>   	samsung,lane-count = <2>;
+>> -	samsung,hpd-gpio = <&gpx2 6 GPIO_ACTIVE_HIGH>;
+>> +	hpd-gpios = <&gpx2 6 GPIO_ACTIVE_HIGH>;
+>>
+>>   	ports {
+>>   		port at 0 {
+>> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+>> index ac35aef..f67344f 100644
+>> --- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
+>> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+>> @@ -93,8 +93,6 @@
+>>   	pinctrl-names = "default";
+>>   	pinctrl-0 = <&dp_hpd>;
+>>   	samsung,color-space = <0>;
+>> -	samsung,dynamic-range = <0>;
+>> -	samsung,ycbcr-coeff = <0>;
+>>   	samsung,color-depth = <1>;
+>>   	samsung,link-rate = <0x0a>;
+>>   	samsung,lane-count = <4>;
+>> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+>> index 7b018e4..363c95f 100644
+>> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
+>> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+>> @@ -142,12 +142,10 @@
+>>   	pinctrl-names = "default";
+>>   	pinctrl-0 = <&dp_hpd_gpio>;
+>>   	samsung,color-space = <0>;
+>> -	samsung,dynamic-range = <0>;
+>> -	samsung,ycbcr-coeff = <0>;
+>>   	samsung,color-depth = <1>;
+>>   	samsung,link-rate = <0x0a>;
+>>   	samsung,lane-count = <2>;
+>> -	samsung,hpd-gpio = <&gpx2 6 GPIO_ACTIVE_HIGH>;
+>> +	hpd-gpios = <&gpx2 6 GPIO_ACTIVE_HIGH>;
+>>   	panel = <&panel>;
+>>   };
+>>
 >> --
 >> 1.9.1
->>
 >
 >
 >
