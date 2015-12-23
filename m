@@ -1,78 +1,42 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 23 Dec 2015 10:22:57 +0800
-Subject: [PATCH] ARM: dts: imx6q: clean up unused ipu2grp
-Message-ID: <1450837377-23103-1-git-send-email-shawnguo@kernel.org>
+Date: Wed, 23 Dec 2015 10:27:34 +0800
+Subject: [PATCH V3] ARM: dts: imx6q-icore-rqs: Add Engicam IMX6 Q7
+ initial support
+In-Reply-To: <20151216181159.GC20121@panicking>
+References: <1447673895.3144.16.camel@pengutronix.de>
+ <20151116114127.GB10464@panicking>
+ <1447674695.3144.21.camel@pengutronix.de>
+ <20151116115421.GC10464@panicking> <20151116172318.GA513@panicking>
+ <1447752697.3144.47.camel@pengutronix.de>
+ <20151118151030.GA11558@panicking> <20151211083512.GB11252@tiger>
+ <20151214084456.GA4305@panicking>
+ <20151216181159.GC20121@panicking>
+Message-ID: <20151223022707.GG26290@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pinctrl group ipu2grp is a leftover from the previous iomuxc DT
-cleanup.  It's not used by anyone now.  More importantly, it's getting
-in the way of saving the unnecessary pinfunc container node from the
-board dts files that include imx6q.dtsi.
+On Wed, Dec 16, 2015 at 07:12:05PM +0100, Michael Trimarchi wrote:
+> > > > +	imx6qdl-icore-rqs {
+> > > > +
+> > > 
+> > > With commit 5fcdf6a7ed95 (pinctrl: imx: Allow parsing DT without function
+> > > nodes) in place, we can now save this container.
+> > > 
+> 
+> If I save this I can not register usb. Group is not found
+> 
+> [    2.768476] imx6q-pinctrl 20e0000.iomuxc: unable to find group for node usdhc1grp-1
+> [    2.768844] imx6q-pinctrl 20e0000.iomuxc: unable to find group for node usdhc1grp-1
+> [    2.768932] sdhci-esdhc-imx: probe of 2190000.usdhc failed with error -22
+> [    2.768994] imx6q-pinctrl 20e0000.iomuxc: unable to find group for node usdhc3grp-2
+> [    2.769240] imx6q-pinctrl 20e0000.iomuxc: unable to find group for node usdhc3grp-2
+> [    2.769322] sdhci-esdhc-imx: probe of 2198000.usdhc failed with error -22
+> [    2.769381] imx6q-pinctrl 20e0000.iomuxc: unable to find group for node usdhc4grp-1
+> [    2.769621] imx6q-pinctrl 20e0000.iomuxc: unable to find group for node usdhc4grp-1
+> [    2.769701] sdhci-esdhc-imx: probe of 219c000.usdhc failed with error -22
 
-Let's clean it up.
-
-Signed-off-by: Shawn Guo <shawnguo@kernel.org>
----
-Hi arm-soc folks,
-
-Olof just merged my 4.5 pull requests (thanks).  And here is one cleanup
-patch, which will be quite useful for imx6q board files we are going to
-add in the next development cycle.  It helps to save the pinfunc
-container node and thus one level of indentation from board dts.  So
-please apply it to arm-soc for 4.5 merge window.  Thanks.
+Sorry.  I just found that to get this work on imx6q board we need to
+clean up the ipu2/ipu2grp-1 group.  I just send a patch doing that with
+you on copy.  Let me know if it works for you.
 
 Shawn
-
- arch/arm/boot/dts/imx6q.dtsi | 36 ------------------------------------
- 1 file changed, 36 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 9b6a193b64ca..0d93c0e8f9ba 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -104,42 +104,6 @@
- 
- 			iomuxc: iomuxc at 020e0000 {
- 				compatible = "fsl,imx6q-iomuxc";
--
--				ipu2 {
--					pinctrl_ipu2_1: ipu2grp-1 {
--						fsl,pins = <
--							MX6QDL_PAD_DI0_DISP_CLK__IPU2_DI0_DISP_CLK 0x10
--							MX6QDL_PAD_DI0_PIN15__IPU2_DI0_PIN15       0x10
--							MX6QDL_PAD_DI0_PIN2__IPU2_DI0_PIN02        0x10
--							MX6QDL_PAD_DI0_PIN3__IPU2_DI0_PIN03        0x10
--							MX6QDL_PAD_DI0_PIN4__IPU2_DI0_PIN04        0x80000000
--							MX6QDL_PAD_DISP0_DAT0__IPU2_DISP0_DATA00   0x10
--							MX6QDL_PAD_DISP0_DAT1__IPU2_DISP0_DATA01   0x10
--							MX6QDL_PAD_DISP0_DAT2__IPU2_DISP0_DATA02   0x10
--							MX6QDL_PAD_DISP0_DAT3__IPU2_DISP0_DATA03   0x10
--							MX6QDL_PAD_DISP0_DAT4__IPU2_DISP0_DATA04   0x10
--							MX6QDL_PAD_DISP0_DAT5__IPU2_DISP0_DATA05   0x10
--							MX6QDL_PAD_DISP0_DAT6__IPU2_DISP0_DATA06   0x10
--							MX6QDL_PAD_DISP0_DAT7__IPU2_DISP0_DATA07   0x10
--							MX6QDL_PAD_DISP0_DAT8__IPU2_DISP0_DATA08   0x10
--							MX6QDL_PAD_DISP0_DAT9__IPU2_DISP0_DATA09   0x10
--							MX6QDL_PAD_DISP0_DAT10__IPU2_DISP0_DATA10  0x10
--							MX6QDL_PAD_DISP0_DAT11__IPU2_DISP0_DATA11  0x10
--							MX6QDL_PAD_DISP0_DAT12__IPU2_DISP0_DATA12  0x10
--							MX6QDL_PAD_DISP0_DAT13__IPU2_DISP0_DATA13  0x10
--							MX6QDL_PAD_DISP0_DAT14__IPU2_DISP0_DATA14  0x10
--							MX6QDL_PAD_DISP0_DAT15__IPU2_DISP0_DATA15  0x10
--							MX6QDL_PAD_DISP0_DAT16__IPU2_DISP0_DATA16  0x10
--							MX6QDL_PAD_DISP0_DAT17__IPU2_DISP0_DATA17  0x10
--							MX6QDL_PAD_DISP0_DAT18__IPU2_DISP0_DATA18  0x10
--							MX6QDL_PAD_DISP0_DAT19__IPU2_DISP0_DATA19  0x10
--							MX6QDL_PAD_DISP0_DAT20__IPU2_DISP0_DATA20  0x10
--							MX6QDL_PAD_DISP0_DAT21__IPU2_DISP0_DATA21  0x10
--							MX6QDL_PAD_DISP0_DAT22__IPU2_DISP0_DATA22  0x10
--							MX6QDL_PAD_DISP0_DAT23__IPU2_DISP0_DATA23  0x10
--						>;
--					};
--				};
- 			};
- 		};
- 
--- 
-1.9.1
