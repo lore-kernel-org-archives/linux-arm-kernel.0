@@ -1,38 +1,70 @@
-From: Ivan.Zheng@amd.com (Zheng, Ivan)
-Date: Wed, 23 Dec 2015 11:24:44 +0000
-Subject: [PATCH v2 0/2] i2c:dw: Add APM X-Gene ACPI I2C device support
-In-Reply-To: <20151223100959.GK1758@lahna.fi.intel.com>
-References: <1449782357-22982-1-git-send-email-lho@apm.com>
- <566F6485.2000508@amd.com> <20151215132721.GJ1762@lahna.fi.intel.com>
- <56702923.9010305@amd.com> <20151215145953.GK1762@lahna.fi.intel.com>
- <1450863241.7740.30.camel@kxue-X58A-UD3R>
- <20151223095237.GJ1758@lahna.fi.intel.com>
- <BLUPR12MB0451770284D7788418640F699DE60@BLUPR12MB0451.namprd12.prod.outlook.com>
- <20151223100959.GK1758@lahna.fi.intel.com>
-Message-ID: <BLUPR12MB0451852E89B0848DA16067609DE60@BLUPR12MB0451.namprd12.prod.outlook.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 23 Dec 2015 12:23:19 +0100
+Subject: [PATCH 3/4] irqchip: irq-armada-370-xp: use shorter names for
+ irq_chip
+In-Reply-To: <1450707546-15060-4-git-send-email-thomas.petazzoni@free-electrons.com>
+ (Thomas Petazzoni's message of "Mon, 21 Dec 2015 15:19:05 +0100")
+References: <1450707546-15060-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1450707546-15060-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <871tadfly0.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Mika for the background.
+Hi Thomas,
+ 
+ On lun., d?c. 21 2015, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
-I'm a BIOS engineer and my point is that such non-ACPI defined methods rely on BIOS implementation, so how the generic I2C driver works on a platform without such methods? Should the vendor implement their own driver in such case?
+> In order to make the output of /proc/interrupts, use shorter names for
+                                                 ^
+                    in order to make it what ?---|
+> the irq_chip registered by the irq-armada-370-xp driver. Using capital
+> letters also matches better what is done for the GIC driver, which
+> uses just "GIC" as the irq_chip->name.
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  drivers/irqchip/irq-armada-370-xp.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+> index 304166b..31a183d 100644
+> --- a/drivers/irqchip/irq-armada-370-xp.c
+> +++ b/drivers/irqchip/irq-armada-370-xp.c
+> @@ -117,7 +117,7 @@ static void armada_370_xp_irq_unmask(struct irq_data *d)
+>  #ifdef CONFIG_PCI_MSI
+>  
+>  static struct irq_chip armada_370_xp_msi_irq_chip = {
+> -	.name = "armada_370_xp_msi_irq",
+> +	.name = "MSI MPIC",
+>  	.irq_enable = pci_msi_unmask_irq,
+>  	.irq_disable = pci_msi_mask_irq,
+>  	.irq_mask = pci_msi_mask_irq,
+> @@ -144,7 +144,7 @@ static int armada_370_xp_msi_set_affinity(struct irq_data *irq_data,
+>  }
+>  
+>  static struct irq_chip armada_370_xp_msi_bottom_irq_chip = {
+> -	.name			= "MPIC MSI",
+> +	.name			= "MSI MPIC",
+>  	.irq_compose_msi_msg	= armada_370_xp_compose_msi_msg,
+>  	.irq_set_affinity	= armada_370_xp_msi_set_affinity,
+>  };
+> @@ -256,7 +256,7 @@ static int armada_xp_set_affinity(struct irq_data *d,
+>  #endif
+>  
+>  static struct irq_chip armada_370_xp_irq_chip = {
+> -	.name		= "armada_370_xp_irq",
+> +	.name		= "MPIC",
 
-I think Windows driver use ConnectionSpeed field in I2CSerialBus declaration for a certain device and it's defined in ACPI 5.0.
+MPIC is the name also used by the power PC interrupt controller, so it
+would be confusing to use exactly the same name.
 
-Thanks,
-Ivan
+What about calling it "MRVL MPIC" or "MVEBU MPIC"?
+the name remains short but it won't be confused with the power PC ones.
 
------Original Message-----
-From: Mika Westerberg [mailto:mika.westerberg at linux.intel.com] 
-Sent: Wednesday, December 23, 2015 18:10
-To: Zheng, Ivan
-Cc: Xue, Ken; wsa at the-dreams.de; Suthikulpanit, Suravee; Loc Ho; rjw at rjwysocki.net; lenb at kernel.org; linux-i2c at vger.kernel.org; linux-acpi at vger.kernel.org; linux-arm-kernel at lists.infradead.org; jcm at redhat.com; patches at apm.com; Hurwitz, Sherry; Duran, Leo; Hanjun Guo; Al Stone; Yu, Xiangliang
-Subject: Re: [PATCH v2 0/2] i2c:dw: Add APM X-Gene ACPI I2C device support
+Gregory
 
-On Wed, Dec 23, 2015 at 10:02:04AM +0000, Zheng, Ivan wrote:
-> Why/how can Linux driver make use of such non-ACPI defined methods?
-
-What do you mean exactly?
-
-I added support for these (well, SSCN and FMCN) because I found out that some vendors include such methods with their BIOS implementation.
-Windows driver uses these if present and so do we.
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
