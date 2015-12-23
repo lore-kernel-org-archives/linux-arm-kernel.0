@@ -1,65 +1,48 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 23 Dec 2015 13:37:36 +0000
-Subject: [PATCH v6 13/20] arm64: ilp32: share aarch32 syscall wrappers to
- ilp32
-In-Reply-To: <201512222244.15155.arnd@arndb.de>
-References: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
- <1450215766-14765-14-git-send-email-ynorov@caviumnetworks.com>
- <20151222122514.GA1302@e104818-lin.cambridge.arm.com>
- <201512222244.15155.arnd@arndb.de>
-Message-ID: <20151223133736.GB28445@e104818-lin.cambridge.arm.com>
+From: uri.mashiach@compulab.co.il (Uri Mashiach)
+Date: Wed, 23 Dec 2015 16:11:21 +0200
+Subject: [PATCH 1/3] wlcore/wl12xx: spi: fix NULL pointer dereference
+ (Oops)
+In-Reply-To: <567A7287.3010205@ti.com>
+References: <1450859744-9948-1-git-send-email-uri.mashiach@compulab.co.il>
+ <1450859744-9948-2-git-send-email-uri.mashiach@compulab.co.il>
+ <567A7287.3010205@ti.com>
+Message-ID: <567AAB89.4010101@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 22, 2015 at 10:44:14PM +0100, Arnd Bergmann wrote:
-> On Tuesday 22 December 2015, Catalin Marinas wrote:
-> > > +
-> > > +ENTRY(compat_sys_statfs64_wrapper)
-> > > +     mov     w3, #84
-> > > +     cmp     w1, #88
-> > > +     csel    w1, w3, w1, eq
-> > > +     b       compat_sys_statfs64
-> > > +ENDPROC(compat_sys_statfs64_wrapper)
-> > > +
-> > > +ENTRY(compat_sys_fstatfs64_wrapper)
-> > > +     mov     w3, #84
-> > > +     cmp     w1, #88
-> > > +     csel    w1, w3, w1, eq
-> > > +     b       compat_sys_fstatfs64
-> > > +ENDPROC(compat_sys_fstatfs64_wrapper)
-> > 
-> > I'm not convinced we need these wrappers for ILP32. They've been
-> > introduced on arch/arm many years ago by commit Fixes: 713c481519f1
-> > ([ARM] 3108/2: old ABI compat: statfs64 and fstatfs64) to deal with user
-> > space passing a size of 88 (the EABI size of struct compat_statfs64
-> > without the packing and alignment attribute). Since that commit, the
-> > sizeof(struct compat_statfs64) is 84 already. This should be the case
-> > with the new ILP32 exported headers (no backwards compatibility), so
-> > user space should never pass 88 as size. Therefore we could call
-> > compat_sys_(f)statfs64 directly without wrappers.
-> 
-> That means we have to set ARCH_PACK_STATFS64 in the arm64 header files
-> though, and propagate the OABI alignment to arm64/ilp32 as well, rather
-> than using the 88-byte version that every other 32-bit architecture
-> except for x86-32 and arm32 has.
+Hi Grygorii,
 
-Yuri replied that for EABI glibc, sizeof(struct statfs64) is already 88.
-If that's correct and the packing attribute is ignored by glibc, we
-could drop ARCH_PACK_COMPAT_STATFS64 as well (OABI not supported by
-arm64). But I would be slightly worried since glibc is not the only user
-of the kernel ABI.
+On 12/23/2015 12:08 PM, Grygorii Strashko wrote:
+> On 12/23/2015 10:35 AM, Uri Mashiach wrote:
+>> The power function uses a consumer regulator access to update the WiFi
+>> enable GPIO value.
+>>
+>> Fix the below Oops when trying to modprobe wlcore_spi.
+>> The oops occurs because the wl1271_power_{off,on}()
+>> function doesn't check the power() function pointer.
+>>
+>> [   23.401447] Unable to handle kernel NULL pointer dereference at
+>> virtual address 00000000
+>> [   23.409954] pgd = c0004000
+>> [   23.412922] [00000000] *pgd=00000000
+>> [   23.416693] Internal error: Oops: 80000007 [#1] SMP ARM
+>> [   23.422168] Modules linked in: wl12xx wlcore mac80211 cfg80211
+>> musb_dsps musb_hdrc usbcore usb_common snd_soc_simple_card evdev joydev
+>> omap_rng wlcore_spi snd_soc_tlv320aic23_i2c rng_core snd_soc_tlv320aic23
+>> c_can_platform c_can can_dev snd_soc_davinci_mcasp snd_soc_edma
+>> snd_soc_omap omap_wdt musb_am335x cpufreq_dt thermal_sys hwmon
+>> [   23.453253] CPU: 0 PID: 36 Comm: kworker/0:2 Not tainted
+>> 4.2.0-00002-g951efee-dirty #233
+>> [   23.461720] Hardware name: Generic AM33XX (Flattened Device Tree)
+>> [   23.468123] Workqueue: events request_firmware_work_func
+>> [   23.473690] task: de32efc0 ti: de4ee000 task.ti: de4ee000
+>> [   23.479341] PC is at 0x0
+>> [   23.482112] LR is at wl12xx_set_power_on+0x28/0x124 [wlcore]
+>
+> Why can't you just add proper check in wl1271_power_on/wl1271_power_off() instead?
+>
 
-For ILP32, I think we can skip defining ARCH_PACK_STATFS64 (of course,
-only if __ILP32__) and state that sizeof(struct statfs64) is 88
-(unpacked). In which case we need the wrappers above to be able to reuse
-the compat_sys_statfs64 code.
+Will be done in v2.
 
-> Another option would be to set "#define __statfs_word __u64" and use
-> the 64-bit statfs call, instead of compat_sys_statfs64, but that in turn
-> requires special-casing statfs in libc.
-
-I wouldn't go this route as we kind of agreed that ILP32 should look
-like any other 32-bit ABI.
-
--- 
-Catalin
+Thanks,
+Uri
