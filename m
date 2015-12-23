@@ -1,53 +1,39 @@
-From: mika.westerberg@linux.intel.com (Mika Westerberg)
-Date: Wed, 23 Dec 2015 12:17:28 +0200
-Subject: [PATCH v2 0/2] i2c:dw: Add APM X-Gene ACPI I2C device support
-In-Reply-To: <1450864789.7740.35.camel@kxue-X58A-UD3R>
-References: <1449782357-22982-1-git-send-email-lho@apm.com>
- <566F6485.2000508@amd.com>
- <20151215132721.GJ1762@lahna.fi.intel.com>
- <56702923.9010305@amd.com>
- <20151215145953.GK1762@lahna.fi.intel.com>
- <1450863241.7740.30.camel@kxue-X58A-UD3R>
- <20151223095237.GJ1758@lahna.fi.intel.com>
- <1450864789.7740.35.camel@kxue-X58A-UD3R>
-Message-ID: <20151223101728.GL1758@lahna.fi.intel.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Wed, 23 Dec 2015 18:24:33 +0800
+Subject: [PATCH 00/24] crypto: atmel-aes: global rework of the driver
+In-Reply-To: <cover.1450366831.git.cyrille.pitchen@atmel.com>
+References: <cover.1450366831.git.cyrille.pitchen@atmel.com>
+Message-ID: <20151223102433.GA1205@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 23, 2015 at 05:59:49PM +0800, Ken Xue wrote:
-> On Wed, 2015-12-23 at 11:52 +0200, Mika Westerberg wrote:
-> > On Wed, Dec 23, 2015 at 05:34:01PM +0800, Ken Xue wrote:
-> > > 1) Regarding
-> > > https://msdn.microsoft.com/en-us/library/windows/hardware/dn919852(v=vs.85).aspx
-> > > , Window I2C driver should pass MITT test. There are 5 I2C devices
-> > > connect to one I2C bus for test. And those devices defined different
-> > > "ConnectionSpeed" over the I2C bus by ACPI resource "I2CSerialBus".
-> > > 
-> > > During test, I2C bus should run in different "ConnectionSpeed" of
-> > > device.
-> > > 
-> > > That means windows driver can modify I2C bus speed to match the
-> > > "ConnectionSpeed" of device on-the-fly. Static value from SSCN and FMCN
-> > > can not work for WITT test cases.
-> > 
-> > That is why there are *CNT methods for all supported I2C modes:
-> > 
-> >   - SSCN() - returns for standard mode (100kHz)
-> >   - FMCN() - returns for fast mode (400kHz)
-> >   - FPCN() - returns for fast mode+ (1MHz)
-> >  
-> > for High-speed mode I'm not sure what the method name is ;-)
-> > 
-> > Then the Windows driver switches between those based on what the
-> > ConnectionSpeed is in the ACPI I2C connector.
+On Thu, Dec 17, 2015 at 05:48:31PM +0100, Cyrille Pitchen wrote:
+> Hi all,
 > 
-> Window driver can set Bus speed based on "ConnectionSpeed". But Current
-> Linux driver only sets Bus speed during probe. How can Linux diver
-> determine which Bus speed should be applied, if all *CNT methods return
-> non-zero? 
+> this series of patches is a global rework of the Atmel driver. Some
+> patches improve the performances whereas others fix some bugs like
+> the counter overflow in CTR mode.
+> 
+> It also updates some part of the code to make them more generic. For
+> instance the crypto request queue management supports both async block
+> cipher and AEAD requests, which allows us to add support the the GCM
+> mode. The support of the GCM mode is only available on sama5d4 and later.
+> 
+> This series is based on linux-next and was tested on sama5d2, sama5d3 and
+> sama5d4 boards. The driver implementation was validated using the tcrypt
+> module running modes:
+> - 10: ecb(aes), cbc(aes), ctr(aes), rfc3686(ctr(aes))
+> - 35: gcm(aes)
+> 
+> tcrypt speed test was run with modes:
+> - 211: rfc4106(gcm(aes)), gcm(aes)
+> - 500: ecb(aes), cbc(aes), ctr(aes), cfb(aes), ofc(aes), rfc3686(ctr(aes))
+> 
+> Finally iperf was run for at least 5 mins over an IPSEC/L2TP tunnel using
+> the rfc4106(gcm(aes)) cipher suite.
 
-By default Linux driver uses 400kHz so it picks values returned from
-FMCN(). You can hack clk_freq in the driver to use 100kHz which then
-picks SSCN().
-
-There is no support for reading ConnectionSpeed in Linux yet.
+All applied.  Thanks!
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
