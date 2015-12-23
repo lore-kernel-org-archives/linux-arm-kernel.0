@@ -1,82 +1,82 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 23 Dec 2015 20:11:15 +0900
-Subject: [GIT PULL 5/9] ARM: EXYNOS: Drivers for v4.5
-In-Reply-To: <CA+Ln22HCvb1wt2o=2QcJ5FpLRBO1VB8EcRSxf4jE-19wWmp9MQ@mail.gmail.com>
-References: <1449020386-20250-1-git-send-email-k.kozlowski@samsung.com>
- <1449020386-20250-6-git-send-email-k.kozlowski@samsung.com>
- <20151222045042.GF30172@localhost> <567A7C9F.3020907@samsung.com>
- <CA+Ln22Fk5UOgWzgOeEVb9sgPni028LMVDjgFhy3xQvnz4rwh_Q@mail.gmail.com>
- <567A7E68.2050504@samsung.com>
- <CA+Ln22HCvb1wt2o=2QcJ5FpLRBO1VB8EcRSxf4jE-19wWmp9MQ@mail.gmail.com>
-Message-ID: <567A8153.7080009@samsung.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 23 Dec 2015 12:11:24 +0100
+Subject: [PATCH 1/4] irqchip: irq-armada-370-xp: add Kconfig option for
+ the driver
+In-Reply-To: <1450707546-15060-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ (Thomas Petazzoni's message of "Mon, 21 Dec 2015 15:19:03 +0100")
+References: <1450707546-15060-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1450707546-15060-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <8760zpfmhv.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 23.12.2015 o 20:06, Tomasz Figa pisze:
-> 2015-12-23 19:58 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
->> W dniu 23.12.2015 o 19:54, Tomasz Figa pisze:
->>> Hi,
->>>
->>> 2015-12-23 19:51 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
->>>> W dniu 22.12.2015 o 13:50, Olof Johansson pisze:
->>>>> On Wed, Dec 02, 2015 at 10:39:42AM +0900, Krzysztof Kozlowski wrote:
->>>>>> Hi Kukjin,
->>>>>>
->>>>>> Pinctrl for v4.5.
->>>>>>
->>>>>> Best regards,
->>>>>> Krzysztof
->>>>>>
->>>>>>
->>>>>> The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
->>>>>>
->>>>>>   Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
->>>>>>
->>>>>> are available in the git repository at:
->>>>>>
->>>>>>   https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-drivers-4.5
->>>>>>
->>>>>> for you to fetch changes up to 023e06dfa6882f500b9c86fd61f0b1913aa07f36:
->>>>>>
->>>>>>   pinctrl: exynos: add exynos5410 SoC specific data (2015-11-16 10:54:43 +0900)
->>>>>
->>>>> Hi,
->>>>>
->>>>> This should either go in through the pinctrl tree, or have an acked/reviewed-by
->>>>> one of the pinctrl maintainers.
->>>>
->>>> It was acked by Tomasz Figa - Samsung Pin Controller maintainer:
->>>> https://patchwork.ozlabs.org/patch/450340/
->>>
->>> Actually, is there any reason to send this through ARM SoC? Looks like
->>> this pull request contains only pinctrl changes which could normally
->>> go through pinctrl tree. Maybe Linus W. could simply pull it?
->>
->> Of course, I would be happy with it.
->>
->> But apparently I am the only one who continuously tracks all of these
->> patches for Exynos (also for subsystems different than arch/arm/mach*).
->> Yeah, I could ping everyone for every patch (not mine patch I mean)...
->> but it is easier just to grab it after acking and send it. I really
->> don't care about the method, just apply the damned patch ;)
-> 
-> My intention was by no means to belittle your effort, really thanks
-> for doing this. :)
-> 
-> I was just wondering if Linus couldn't pull this just as is, without
-> causing further commotion and unnecessarily introducing field for
-> potential conflicts between trees.
+Hi Thomas,
+ 
+ On lun., d?c. 21 2015, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
-That makes sense. The pinctrl driver change is not a direct dependency
-for anything in this pull request so from my side:
+> Instead of building the irq-armada-370-xp driver directly when
+> CONFIG_ARCH_MVEBU is enabled, this commit introduces an intermediate
+> CONFIG_ARMADA_370_XP_IRQ hidden Kconfig option.
+>
+> This allows this option to select other interrupt-related Kconfig
+> options (which will be needed in follow-up commits) rather than having
+> such selects done from arch/arm/mach-<foo>/.
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Linus,
-The patch can be cherry-picked from:
-https://git.kernel.org/cgit/linux/kernel/git/krzk/linux.git/log/?h=samsung-drivers-4.5
+Thanks,
 
-(the only commit in tag: samsung-drivers-4.5)
+Gregory
 
-Best regards,
-Krzysztof
+> ---
+>  drivers/irqchip/Kconfig  | 5 +++++
+>  drivers/irqchip/Makefile | 2 +-
+>  2 files changed, 6 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+> index 4d7294e..ab672b0 100644
+> --- a/drivers/irqchip/Kconfig
+> +++ b/drivers/irqchip/Kconfig
+> @@ -47,6 +47,11 @@ config ARM_VIC_NR
+>  	  The maximum number of VICs available in the system, for
+>  	  power management.
+>  
+> +config ARMADA_370_XP_IRQ
+> +	bool
+> +	default y if ARCH_MVEBU
+> +	select GENERIC_IRQ_CHIP
+> +
+>  config ATMEL_AIC_IRQ
+>  	bool
+>  	select GENERIC_IRQ_CHIP
+> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+> index 177f78f..4d740d8 100644
+> --- a/drivers/irqchip/Makefile
+> +++ b/drivers/irqchip/Makefile
+> @@ -5,7 +5,6 @@ obj-$(CONFIG_ARCH_BCM2835)		+= irq-bcm2836.o
+>  obj-$(CONFIG_ARCH_EXYNOS)		+= exynos-combiner.o
+>  obj-$(CONFIG_ARCH_HIP04)		+= irq-hip04.o
+>  obj-$(CONFIG_ARCH_MMP)			+= irq-mmp.o
+> -obj-$(CONFIG_ARCH_MVEBU)		+= irq-armada-370-xp.o
+>  obj-$(CONFIG_IRQ_MXS)			+= irq-mxs.o
+>  obj-$(CONFIG_ARCH_TEGRA)		+= irq-tegra.o
+>  obj-$(CONFIG_ARCH_S3C24XX)		+= irq-s3c24xx.o
+> @@ -26,6 +25,7 @@ obj-$(CONFIG_ARM_GIC_V3)		+= irq-gic-v3.o irq-gic-common.o
+>  obj-$(CONFIG_ARM_GIC_V3_ITS)		+= irq-gic-v3-its.o irq-gic-v3-its-pci-msi.o irq-gic-v3-its-platform-msi.o
+>  obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
+>  obj-$(CONFIG_ARM_VIC)			+= irq-vic.o
+> +obj-$(CONFIG_ARMADA_370_XP_IRQ)		+= irq-armada-370-xp.o
+>  obj-$(CONFIG_ATMEL_AIC_IRQ)		+= irq-atmel-aic-common.o irq-atmel-aic.o
+>  obj-$(CONFIG_ATMEL_AIC5_IRQ)	+= irq-atmel-aic-common.o irq-atmel-aic5.o
+>  obj-$(CONFIG_I8259)			+= irq-i8259.o
+> -- 
+> 2.6.4
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
