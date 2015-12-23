@@ -1,20 +1,19 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 23 Dec 2015 19:44:32 +0900
-Subject: [GIT PULL 3/9] ARM64: EXYNOS: clk: Clock dependency for ARM64 for
- v4.5
-In-Reply-To: <20151222044636.GD30172@localhost>
+Date: Wed, 23 Dec 2015 19:48:08 +0900
+Subject: [GIT PULL 4/9] ARM64: EXYNOS: Soc specific code for v4.5
+In-Reply-To: <20151222044926.GE30172@localhost>
 References: <1449020386-20250-1-git-send-email-k.kozlowski@samsung.com>
- <1449020386-20250-4-git-send-email-k.kozlowski@samsung.com>
- <20151222044636.GD30172@localhost>
-Message-ID: <567A7B10.3030501@samsung.com>
+ <1449020386-20250-5-git-send-email-k.kozlowski@samsung.com>
+ <20151222044926.GE30172@localhost>
+Message-ID: <567A7BE8.8000303@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 22.12.2015 o 13:46, Olof Johansson pisze:
-> On Wed, Dec 02, 2015 at 10:39:40AM +0900, Krzysztof Kozlowski wrote:
+W dniu 22.12.2015 o 13:49, Olof Johansson pisze:
+> On Wed, Dec 02, 2015 at 10:39:41AM +0900, Krzysztof Kozlowski wrote:
 >> Hi Kukjin,
 >>
->> Dependency for soc64 changes.
+>> ARM64 change touch also defconfig.
 >>
 >> Best regards,
 >> Krzysztof
@@ -26,27 +25,23 @@ W dniu 22.12.2015 o 13:46, Olof Johansson pisze:
 >>
 >> are available in the git repository at:
 >>
->>   https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-clk-arm64-symbols-4.5
+>>   https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-soc64-4.5
 >>
->> for you to fetch changes up to 8c2a90ed18a74e8b9cdbba679403faa44d6024fc:
+>> for you to fetch changes up to db44c07a3f0b32815bd1f3e731db9e043e57cf9c:
 >>
->>   clk: samsung: Don't build ARMv8 clock drivers on ARMv7 (2015-11-22 19:25:29 +0900)
+>>   arm64: EXYNOS: Consolidate ARCH_EXYNOS7 symbol into ARCH_EXYNOS (2015-11-22 19:31:30 +0900)
 > 
-> Hi,
+> Given that Arnd started splitting out config64 separately, there's a small
+> chance we'll get a conflict here. We can deal with that if needed though.
 > 
-> Looks like this lacks ack from any of the clock maintainers.
+> Still, since this branch contains the previous clock branch I can't apply it
+> as it is. Can you respin without that for now?
 
-It got the ack from Sylwester and Tomasz - Samsung clock maintainers. If
-it is not sufficient... then let's wait with it for v4.6. I am on
-holidays now so I cannot really do anything meaningful with it.
+This depends on the clock change because:
+1. Clock change removes last usage of ARCH_EXYNOS7,
+2. This patch removes the ARCH_EXYNOS7 itself.
 
-
-> 
-> Given that EXYNOS_ARM64_COMMON_CLK is not yet introduced, this will cause
-> a breakage in bisectability on some of these platforms as well.
-
-The patch introduces EXYNOS_ARM64_COMMON_CLK which will be enabled by
-default on our platforms. What kind of breakage do you have in mind?
+So if #1 has to wait, then skip this as well.
 
 Best regards,
 Krzysztof
