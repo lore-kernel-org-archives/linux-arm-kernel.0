@@ -1,57 +1,36 @@
-From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Wed, 23 Dec 2015 19:37:17 +0900
-Subject: [PATCH] ARM: multi_v7_defconfig: Enable fan,
- sensors and audio for Odroid XU3
-Message-ID: <1450867037-19705-1-git-send-email-k.kozlowski.k@gmail.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Wed, 23 Dec 2015 11:37:18 +0100
+Subject: [PATCH] cpufreq/scpi: fix handling return value of
+ topology_physical_package_id
+Message-ID: <1450867041-729-1-git-send-email-a.hajda@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+The function can return negative values, so its result should
+be assigned to signed variable.
 
-For Odroid XU3-family enable the:
- - PWM fan (to control the CPU fan using thermal subsystem),
- - TI INA231 sensors (provide power measurements of big.LITTLE cores,
-   DRAM and GPU),
- - Samsung sound (for Odroid XU3 and Snow as well).
+The problem has been detected using proposed semantic patch
+scripts/coccinelle/tests/unsigned_lesser_than_zero.cocci [1].
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+[1]: http://permalink.gmane.org/gmane.linux.kernel/2038576
 
+Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
 ---
+ drivers/cpufreq/scpi-cpufreq.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Resending with Javier's tag.
----
- arch/arm/configs/multi_v7_defconfig | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index f6a2557b55df..419f9413402c 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -390,7 +390,8 @@ CONFIG_POWER_RESET_RMOBILE=y
- CONFIG_SENSORS_LM90=y
- CONFIG_SENSORS_LM95245=y
- CONFIG_SENSORS_NTC_THERMISTOR=m
--CONFIG_THERMAL=y
-+CONFIG_SENSORS_PWM_FAN=m
-+CONFIG_SENSORS_INA2XX=m
- CONFIG_CPU_THERMAL=y
- CONFIG_ROCKCHIP_THERMAL=y
- CONFIG_RCAR_THERMAL=y
-@@ -521,10 +522,13 @@ CONFIG_SND_HDA_INPUT_BEEP=y
- CONFIG_SND_HDA_PATCH_LOADER=y
- CONFIG_SND_HDA_CODEC_REALTEK=m
- CONFIG_SND_HDA_CODEC_HDMI=m
--CONFIG_SND_USB_AUDIO=y
-+CONFIG_SND_USB_AUDIO=m
- CONFIG_SND_SOC=m
- CONFIG_SND_ATMEL_SOC=m
- CONFIG_SND_ATMEL_SOC_WM8904=m
-+CONFIG_SND_SOC_SAMSUNG=m
-+CONFIG_SND_SOC_SNOW=m
-+CONFIG_SND_SOC_ODROIDX2=m
- CONFIG_SND_SOC_SH4_FSI=m
- CONFIG_SND_SOC_RCAR=m
- CONFIG_SND_SOC_RSRC_CARD=m
+diff --git a/drivers/cpufreq/scpi-cpufreq.c b/drivers/cpufreq/scpi-cpufreq.c
+index 2c3b16f..de5e89b 100644
+--- a/drivers/cpufreq/scpi-cpufreq.c
++++ b/drivers/cpufreq/scpi-cpufreq.c
+@@ -31,7 +31,7 @@ static struct scpi_ops *scpi_ops;
+ 
+ static struct scpi_dvfs_info *scpi_get_dvfs_info(struct device *cpu_dev)
+ {
+-	u8 domain = topology_physical_package_id(cpu_dev->id);
++	int domain = topology_physical_package_id(cpu_dev->id);
+ 
+ 	if (domain < 0)
+ 		return ERR_PTR(-EINVAL);
 -- 
-2.1.4
+1.9.1
