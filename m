@@ -1,48 +1,18 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 23 Dec 2015 09:46:29 -0700
-Subject: [PATCH V7 24/24] perf tools: adding coresight etm PMU record
- capabilities
-In-Reply-To: <20151219172705.GC2437@debian>
-References: <1450472361-426-1-git-send-email-mathieu.poirier@linaro.org>
- <1450472361-426-25-git-send-email-mathieu.poirier@linaro.org>
- <20151219172705.GC2437@debian>
-Message-ID: <CANLsYkyZkb4=DwFGpPCsnny1KKiHd0reQSJxFniqerdB3P0shg@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 23 Dec 2015 12:04:25 -0500 (EST)
+Subject: [PATCH 0/3] drivers: net: cpsw: phy-handle fixes
+In-Reply-To: <1450830994-5450-1-git-send-email-drivshin.allworx@gmail.com>
+References: <1450830994-5450-1-git-send-email-drivshin.allworx@gmail.com>
+Message-ID: <20151223.120425.2005941258192616350.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 December 2015 at 10:27, Rabin Vincent <rabin@rab.in> wrote:
-> On Fri, Dec 18, 2015 at 01:59:20PM -0700, Mathieu Poirier wrote:
->> +struct auxtrace_record
->> +*auxtrace_record__init(struct perf_evlist *evlist, int *err)
->> +{
->> +     struct perf_pmu *cs_etm_pmu;
->> +     struct perf_evsel *evsel;
->> +     bool found_etm = false;
->> +
->> +     cs_etm_pmu = perf_pmu__find(CORESIGHT_ETM_PMU_NAME);
->> +
->> +      if (evlist) {
->> +             evlist__for_each(evlist, evsel) {
->> +                     if (cs_etm_pmu &&
->> +                         evsel->attr.type == cs_etm_pmu->type)
->> +                             found_etm = true;
->> +             }
->> +     }
->> +
->> +     if (found_etm)
->> +             return cs_etm_record_init(err);
->> +
->> +     *err = -EINVAL;
->
-> This should not set an error code when found_etm is false.  Otherwise
-> any attempt to uses perf record without a cs_etm event enabled errors
-> out.
+From: "David Rivshin (Allworx)" <drivshin.allworx@gmail.com>
+Date: Tue, 22 Dec 2015 19:36:31 -0500
 
-Yes, you're right.
+> Testing by anyone who has real hardware using phy-handle or dual_emac
+> with fixed-link would be appreciated.
 
-Many thanks for the thorough review,
-Mathieu
+I'm going to wait for such testing before applying this series.
 
->
->> +     return NULL;
->> +}
+Thanks.
