@@ -1,77 +1,49 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 23 Dec 2015 15:17:47 +0100
-Subject: [PATCH] ARM: mvebu: use usb-nop-xceiv PHY for the xhci nodes on
- Armada 388 GP
-Message-ID: <1450880267-20558-1-git-send-email-gregory.clement@free-electrons.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Wed, 23 Dec 2015 17:15:58 +0300
+Subject: [PATCH v6 04/20] arm64: change some CONFIG_COMPAT over to use
+ CONFIG_AARCH32_EL0 instead
+In-Reply-To: <1450215766-14765-5-git-send-email-ynorov@caviumnetworks.com>
+References: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
+ <1450215766-14765-5-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <20151223141558.GA22543@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using the usb-nop-xceiv PHY for the xhci nodes allows a better
-representation of the hardware but also a better handling of the
-regulator. By linking the regulator to the PHY there is no more need to
-use the regulator-always-on property, then it allows a better power
-management.
+On Wed, Dec 16, 2015 at 12:42:30AM +0300, Yury Norov wrote:
+> --- a/arch/arm64/include/asm/unistd.h
+> +++ b/arch/arm64/include/asm/unistd.h
+> @@ -13,9 +13,8 @@
+>   * You should have received a copy of the GNU General Public License
+>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>   */
+> -#ifdef CONFIG_COMPAT
+> +#ifdef CONFIG_AARCH32_EL0
+>  #define __ARCH_WANT_COMPAT_SYS_GETDENTS64
+> -#define __ARCH_WANT_COMPAT_STAT64
+>  #define __ARCH_WANT_SYS_GETHOSTNAME
+>  #define __ARCH_WANT_SYS_PAUSE
+>  #define __ARCH_WANT_SYS_GETPGRP
+> @@ -26,7 +25,9 @@
+>  #define __ARCH_WANT_COMPAT_SYS_SENDFILE
+>  #define __ARCH_WANT_SYS_FORK
+>  #define __ARCH_WANT_SYS_VFORK
+> +#endif
+>  
+> +#ifdef CONFIG_COMPAT
 
-The remaining usb node uses the ehci-orion driver which can't be used
-with the usb-nop-xceiv PHY and must keeps the direct link to the
-regulator with the regulator-always-on property.
+It seems like __NR_compat_* and __ARM_NR_compat_*
+are needed by aarch32 only. If so, it should not be
+defined for ilp32. And the only common definition
+here would be __ARCH_WANT_COMPAT_STAT64.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/boot/dts/armada-388-gp.dts | 16 ++++++++++++----
- 1 file changed, 12 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
-index ac3c9445ce57..51943598d858 100644
---- a/arch/arm/boot/dts/armada-388-gp.dts
-+++ b/arch/arm/boot/dts/armada-388-gp.dts
-@@ -229,13 +229,13 @@
- 
- 			/* CON5 */
- 			usb3 at f0000 {
--				vcc-supply = <&reg_usb2_1_vbus>;
-+				usb-phy = <&usb2_1_phy>;
- 				status = "okay";
- 			};
- 
- 			/* CON7 */
- 			usb3 at f8000 {
--				vcc-supply = <&reg_usb3_vbus>;
-+				usb-phy = <&usb3_phy>;
- 				status = "okay";
- 			};
- 		};
-@@ -273,13 +273,22 @@
- 		};
- 	};
- 
-+	usb2_1_phy: usb2_1_phy {
-+		compatible = "usb-nop-xceiv";
-+		vcc-supply = <&reg_usb2_1_vbus>;
-+	};
-+
-+	usb3_phy: usb3_phy {
-+		compatible = "usb-nop-xceiv";
-+		vcc-supply = <&reg_usb3_vbus>;
-+	};
-+
- 	reg_usb3_vbus: usb3-vbus {
- 		compatible = "regulator-fixed";
- 		regulator-name = "usb3-vbus";
- 		regulator-min-microvolt = <5000000>;
- 		regulator-max-microvolt = <5000000>;
- 		enable-active-high;
--		regulator-always-on;
- 		gpio = <&expander1 15 GPIO_ACTIVE_HIGH>;
- 	};
- 
-@@ -299,7 +308,6 @@
- 		regulator-min-microvolt = <5000000>;
- 		regulator-max-microvolt = <5000000>;
- 		enable-active-high;
--		regulator-always-on;
- 		gpio = <&expander0 4 GPIO_ACTIVE_HIGH>;
- 	};
- 
--- 
-2.5.0
+>  /*
+>   * Compat syscall numbers used by the AArch64 kernel.
+>   */
+> @@ -44,6 +45,8 @@
+>  #define __ARM_NR_compat_cacheflush	(__ARM_NR_COMPAT_BASE+2)
+>  #define __ARM_NR_compat_set_tls		(__ARM_NR_COMPAT_BASE+5)
+>  
+> +#define __ARCH_WANT_COMPAT_STAT64
+> +
+>  #define __NR_compat_syscalls		390
+>  #endif
