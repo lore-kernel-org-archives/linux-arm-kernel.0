@@ -1,84 +1,60 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 23 Dec 2015 15:42:50 +0100
-Subject: [PATCH] ARM: mvebu: Update the mpp63 function in the device tree on
- Armada 370
-Message-ID: <1450881770-21189-1-git-send-email-gregory.clement@free-electrons.com>
+From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
+Date: Wed, 23 Dec 2015 16:54:32 +0200
+Subject: [PATCH 5/5] arm: boot: store ATAGs structure into DT
+ "/chosen/linux,atags" entry
+In-Reply-To: <20151215122038.GI30871@n2100.arm.linux.org.uk>
+References: <20150713131902.GH26485@atomide.com>
+ <20151129180939.GE30871@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.20.1511291902100.22569@knanqh.ubzr> <201511300115.12478@pali>
+ <20151130152352.GY2517@atomide.com> <20151130153933.GD29576@pali>
+ <alpine.LFD.2.20.1511301041090.22569@knanqh.ubzr>
+ <20151215093325.GK13531@pali> <20151215122038.GI30871@n2100.arm.linux.org.uk>
+Message-ID: <567AB5A8.4000505@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the commit a526973e0291 ("pinctrl: mvebu: Fix mapping of pin
-63 (gpo -> gpio)"), the mpp63 is no more declared as a GPO but is a
-GPIO. Even if in the datasheet this pin is described as GPO, the
-experience of the D-Link DNS-327L board shows that it can be used as a
-GPIO.
+Hi,
 
-This commits generated warnings for the board using this pin as gpo, with
-this patch the dts are fixed by using the new function (gpio) instead of
-the old one.
+On 15.12.2015 14:20, Russell King - ARM Linux wrote:
+>
+> You could also just save_atags() in there, with a comment saying that
+> this is a work-around for N900 which needs the ATAGs saved, and this
+> is allowed in ->reserve as a special exception.
+>
 
-The binding documentation has also been updated accordingly.
+What about this (just to confirm I got the idea correctly, proper patch 
+will follow if that's the case):
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- .../devicetree/bindings/pinctrl/marvell,armada-370-pinctrl.txt       | 5 ++++-
- arch/arm/boot/dts/armada-370-mirabox.dts                             | 2 +-
- arch/arm/boot/dts/armada-370-netgear-rn104.dts                       | 2 +-
- arch/arm/boot/dts/armada-370-synology-ds213j.dts                     | 2 +-
- 4 files changed, 7 insertions(+), 4 deletions(-)
+diff --git a/arch/arm/mach-omap2/board-generic.c 
+b/arch/arm/mach-omap2/board-generic.c
+index 34ff14b..8916856 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -83,8 +83,25 @@ static const char *const n900_boards_compat[] 
+__initconst = {
+         NULL,
+  };
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,armada-370-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,armada-370-pinctrl.txt
-index add7c38ec7d8..8662f3aaf312 100644
---- a/Documentation/devicetree/bindings/pinctrl/marvell,armada-370-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/marvell,armada-370-pinctrl.txt
-@@ -91,6 +91,9 @@ mpp60         60       gpio, dev(ale1), uart1(rxd), sata0(prsnt), pcie(rstout),
- mpp61         61       gpo, dev(we1), uart1(txd), audio(lrclk)
- mpp62         62       gpio, dev(a2), uart1(cts), tdm(drx), pcie(clkreq0),
-                        audio(mclk), uart0(cts)
--mpp63         63       gpo, spi0(sck), tclk
-+mpp63         63       gpio, spi0(sck), tclk
- mpp64         64       gpio, spi0(miso), spi0(cs1)
- mpp65         65       gpio, spi0(mosi), spi0(cs2)
++#ifdef CONFIG_ATAGS_PROC
++extern void save_atags(const struct tag *tags);
 +
-+Note: According to the datasheet mpp63 is a gpo but there is at least
-+one example of a gpio usage on the board D-Link DNS-327L
-diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
-index 3aa980ad64f0..d5e19cd4d256 100644
---- a/arch/arm/boot/dts/armada-370-mirabox.dts
-+++ b/arch/arm/boot/dts/armada-370-mirabox.dts
-@@ -200,7 +200,7 @@
- &pinctrl {
- 	pwr_led_pin: pwr-led-pin {
- 		marvell,pins = "mpp63";
--		marvell,function = "gpo";
-+		marvell,function = "gpio";
- 	};
- 
- 	stat_led_pins: stat-led-pins {
-diff --git a/arch/arm/boot/dts/armada-370-netgear-rn104.dts b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-index faa474874cb8..11565752b9f6 100644
---- a/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-+++ b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-@@ -297,7 +297,7 @@
- 
- 	backup_led_pin: backup-led-pin {
- 		marvell,pins = "mpp63";
--		marvell,function = "gpo";
-+		marvell,function = "gpio";
- 	};
- 
- 	power_led_pin: power-led-pin {
-diff --git a/arch/arm/boot/dts/armada-370-synology-ds213j.dts b/arch/arm/boot/dts/armada-370-synology-ds213j.dts
-index 836bcc07afc5..8ca7a4340c0f 100644
---- a/arch/arm/boot/dts/armada-370-synology-ds213j.dts
-+++ b/arch/arm/boot/dts/armada-370-synology-ds213j.dts
-@@ -339,7 +339,7 @@
- 
- 	fan_ctrl_high_pin: fan-ctrl-high-pin {
- 		marvell,pins = "mpp63";
--		marvell,function = "gpo";
-+		marvell,function = "gpio";
- 	};
- 
- 	fan_alarm_pin: fan-alarm-pin {
--- 
-2.5.0
++/* Legacy userspace on Nokia N900 needs ATAGS exported in /proc/atags,
++ * save them while the data is still not overwritten
++ */
++static void __init rx51_reserve(void)
++{
++       const phys_addr_t __atags_pointer = 0x100;
++
++       save_atags(phys_to_virt(__atags_pointer));
++       omap_reserve();
++}
++#else
++#define rx51_reserve omap_reserve
++#endif
++
+  DT_MACHINE_START(OMAP3_N900_DT, "Nokia RX-51 board")
+-       .reserve        = omap_reserve,
++       .reserve        = rx51_reserve,
+         .map_io         = omap3_map_io,
+         .init_early     = omap3430_init_early,
+         .init_machine   = omap_generic_init,
