@@ -1,64 +1,70 @@
-From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Tue, 22 Dec 2015 16:24:23 -0800
-Subject: [PATCH] gicv2m: Miscellaneous fixes for V2m resources and SPI ranges
-Message-ID: <1450830263-28914-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 22 Dec 2015 18:32:17 -0600
+Subject: [PATCH v1 1/6] dt-bindings: misc: add document for reboot-mode
+ driver
+In-Reply-To: <1450775124-23966-1-git-send-email-andy.yan@rock-chips.com>
+References: <1450774949-23901-1-git-send-email-andy.yan@rock-chips.com>
+ <1450775124-23966-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <20151223003217.GA18700@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch contain fixes for v2m resources and SPI ranges:
+On Tue, Dec 22, 2015 at 05:05:24PM +0800, Andy Yan wrote:
+> add device tree bindings document for reboot-mode driver
+> 
+> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+> 
+> ---
+> 
+> Changes in v1: None
+> 
+>  .../devicetree/bindings/misc/reboot-mode.txt       | 41 ++++++++++++++++++++++
+>  1 file changed, 41 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/misc/reboot-mode.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/misc/reboot-mode.txt b/Documentation/devicetree/bindings/misc/reboot-mode.txt
+> new file mode 100644
+> index 0000000..082bc0c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/misc/reboot-mode.txt
+> @@ -0,0 +1,41 @@
+> +Generic reboot mode communication driver
 
-  * Fix off-by-one error when set up v2m resource end range in
-    gicv2m_acpi_init().
+You're not describing a driver. It is a mapping of boot modes to values.
+> +
+> +This driver get reboot mode arguments from userspace
 
-  * Fix the off-by-one print error for SPI range.
+Coming from userspace is a Linuxism.
 
-  * Use %pR to properly print resource range information.
+> +and stores it in special register or ram . Then the
+> +bootloader will read it and take different action
+> +according the argument stored.
+> +
+> +Required properties:
+> +        - compatible = "reboot-mode" or other vendor compatible string;
+> +
+> +Each mode is represented as a sub-node of reboot_mode:
+> +
+> +Subnode required properties:
+> +        - linux,mode: reboot mode command,such as "loader","recovery", "fastboot".
+> +        - linux,magic: magic number for the mode, this is vendor specific.
+> +
+> +example:
+> +	reboot_mode {
+> +		compatible = "rockchip,reboot-mode";
+> +		rockchip,regmap = <&pmu>;
+> +		offset = <0x40>;
+> +		loader {
+> +			linux,mode = "loader";
+> +			linux,magic = <0x5242C301>;
+> +		};
 
-Both ACPI and DT should now print:
+These can be much more simply expressed as:
 
-  GICv2m: range[mem 0xe1180000-0xe1180fff], SPI[64:319]
+loader = <0x5242c301>;
 
-Suggested-by: Bjorn Helgaas <bhelgaas@google.com>
-Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
----
+I would like to see the property names here standardized as much as
+possible. I'm not sure if we can define the properties as a u32 or need
+some flexibility here.
 
- Hi Marc,
-
- Sorry for this minor last minute fixup. This should go on top
- of the V7 of the GICv2m ACPI patch series. Although, this is
- not urgent.
-
- Thanks,
- Suravee
-
- drivers/irqchip/irq-gic-v2m.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
-index 7e2975d..5f346ea 100644
---- a/drivers/irqchip/irq-gic-v2m.c
-+++ b/drivers/irqchip/irq-gic-v2m.c
-@@ -365,9 +365,8 @@ static int __init gicv2m_init_one(struct fwnode_handle *fwnode,
- 
- 	list_add_tail(&v2m->entry, &v2m_nodes);
- 
--	pr_info("range[%#lx:%#lx], SPI[%d:%d]\n",
--		(unsigned long)res->start, (unsigned long)res->end,
--		v2m->spi_start, (v2m->spi_start + v2m->nr_spis));
-+	pr_info("range%pR, SPI[%d:%d]\n", res,
-+		v2m->spi_start, (v2m->spi_start + v2m->nr_spis - 1));
- 	return 0;
- 
- err_iounmap:
-@@ -456,7 +455,8 @@ acpi_parse_madt_msi(struct acpi_subtable_header *header,
- 		return -EINVAL;
- 
- 	res.start = m->base_address;
--	res.end = m->base_address + SZ_4K;
-+	res.end = m->base_address + SZ_4K - 1;
-+	res.flags = IORESOURCE_MEM;
- 
- 	if (m->flags & ACPI_MADT_OVERRIDE_SPI_VALUES) {
- 		spi_start = m->spi_base;
--- 
-2.1.0
+Rob
