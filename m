@@ -1,28 +1,73 @@
-From: akshay.bhat@timesys.com (Akshay Bhat)
-Date: Wed, 23 Dec 2015 17:22:41 -0500
-Subject: [PATCH v5 3/7] ARM: dts: imx: Add Advantech BA-16 Qseven module
-In-Reply-To: <20151222113742.GA26290@tiger>
-References: <1449177036-13317-1-git-send-email-akshay.bhat@timesys.com>
- <1449177036-13317-4-git-send-email-akshay.bhat@timesys.com>
- <20151222113742.GA26290@tiger>
-Message-ID: <567B1EB1.40208@timesys.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Wed, 23 Dec 2015 14:35:57 -0800
+Subject: [PATCH] pinctrl: nsp-gpio: fix type of iterator
+In-Reply-To: <1450867041-729-2-git-send-email-a.hajda@samsung.com>
+References: <1450867041-729-1-git-send-email-a.hajda@samsung.com>
+ <1450867041-729-2-git-send-email-a.hajda@samsung.com>
+Message-ID: <567B21CD.9090900@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
++ Reddy
 
-
-On 12/22/2015 06:40 AM, Shawn Guo wrote:
-> On Thu, Dec 03, 2015 at 04:10:32PM -0500, Akshay Bhat wrote:
-
->> +
->> +	rtc at 32 {
->> +		compatible = "epson,rx8010";
+On 12/23/2015 2:37 AM, Andrzej Hajda wrote:
+> Iterator i declared as unsigned is always non-negative so the
+> loop will never end.
 >
-> Is this compatible string documented somewhere?
+> The problem has been detected using proposed semantic patch
+> scripts/coccinelle/tests/unsigned_lesser_than_zero.cocci [1].
 >
-Patches have been submitted to update the documentation for the above 
-string along with a couple others that were missing/incorrect:
+> [1]: http://permalink.gmane.org/gmane.linux.kernel/2038576
+>
+> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+> ---
+>   drivers/pinctrl/bcm/pinctrl-nsp-gpio.c | 3 ++-
+>   1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/pinctrl/bcm/pinctrl-nsp-gpio.c b/drivers/pinctrl/bcm/pinctrl-nsp-gpio.c
+> index 34648f6..ad5b04c 100644
+> --- a/drivers/pinctrl/bcm/pinctrl-nsp-gpio.c
+> +++ b/drivers/pinctrl/bcm/pinctrl-nsp-gpio.c
+> @@ -439,7 +439,8 @@ static int nsp_gpio_set_strength(struct nsp_gpio *chip, unsigned gpio,
+>   static int nsp_gpio_get_strength(struct nsp_gpio *chip, unsigned gpio,
+>   				 u16 *strength)
+>   {
+> -	unsigned int i, offset, shift;
+> +	unsigned int offset, shift;
+> +	int i;
+>   	u32 val;
+>   	unsigned long flags;
+>
+>
 
-http://marc.info/?l=linux-i2c&m=145089597514804&w=2
-http://marc.info/?l=linux-i2c&m=145089715915019&w=2
-http://marc.info/?l=linux-i2c&m=145089835615289&w=2
+The fix is a valid fix. And at the same time it exposes other potential 
+issues in the driver. I just found the loop used in _set_strength and 
+_get_strength is inconsistent:
+
+In _set_strength:
+
+427         for (i = GPIO_DRV_STRENGTH_BITS; i > 0; i--) {
+
+For i to start at GPIO_DRV_STRENGTH_BITS, it seems to be wrong.
+
+428                 val = readl(chip->io_ctrl + offset);
+429                 val &= ~BIT(shift);
+430                 val |= ((strength >> (i-1)) & 0x1) << shift;
+431                 writel(val, chip->io_ctrl + offset);
+432                 offset += 4;
+433         }
+
+In _get_strength:
+
+451         for (i = (GPIO_DRV_STRENGTH_BITS - 1); i >= 0; i--) {
+452                 val = readl(chip->io_ctrl + offset) & BIT(shift);
+453                 val >>= shift;
+454                 *strength += (val << i);
+455                 offset += 4;
+456         }
+
+Reddy, could you please review and comment?
+
+Thanks,
+
+Ray
