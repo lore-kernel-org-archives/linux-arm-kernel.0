@@ -1,50 +1,69 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 23 Dec 2015 11:05:00 +0000
-Subject: [PATCH v5 2/5] ARM: sa1111: ensure no negative value gets
- returned on positive match
-In-Reply-To: <1450868368-5650-3-git-send-email-m.szyprowski@samsung.com>
-References: <1450868368-5650-1-git-send-email-m.szyprowski@samsung.com>
- <1450868368-5650-3-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20151223110500.GQ8644@n2100.arm.linux.org.uk>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 23 Dec 2015 20:06:41 +0900
+Subject: [GIT PULL 5/9] ARM: EXYNOS: Drivers for v4.5
+In-Reply-To: <567A7E68.2050504@samsung.com>
+References: <1449020386-20250-1-git-send-email-k.kozlowski@samsung.com>
+ <1449020386-20250-6-git-send-email-k.kozlowski@samsung.com>
+ <20151222045042.GF30172@localhost> <567A7C9F.3020907@samsung.com>
+ <CA+Ln22Fk5UOgWzgOeEVb9sgPni028LMVDjgFhy3xQvnz4rwh_Q@mail.gmail.com>
+ <567A7E68.2050504@samsung.com>
+Message-ID: <CA+Ln22HCvb1wt2o=2QcJ5FpLRBO1VB8EcRSxf4jE-19wWmp9MQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 23, 2015 at 11:59:25AM +0100, Marek Szyprowski wrote:
-> This patch ensures that existing bus match callbacks don't return
-> negative values (which might be interpreted as potential errors in the
-> future) in case of positive match.
+2015-12-23 19:58 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
+> W dniu 23.12.2015 o 19:54, Tomasz Figa pisze:
+>> Hi,
+>>
+>> 2015-12-23 19:51 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
+>>> W dniu 22.12.2015 o 13:50, Olof Johansson pisze:
+>>>> On Wed, Dec 02, 2015 at 10:39:42AM +0900, Krzysztof Kozlowski wrote:
+>>>>> Hi Kukjin,
+>>>>>
+>>>>> Pinctrl for v4.5.
+>>>>>
+>>>>> Best regards,
+>>>>> Krzysztof
+>>>>>
+>>>>>
+>>>>> The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+>>>>>
+>>>>>   Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+>>>>>
+>>>>> are available in the git repository at:
+>>>>>
+>>>>>   https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-drivers-4.5
+>>>>>
+>>>>> for you to fetch changes up to 023e06dfa6882f500b9c86fd61f0b1913aa07f36:
+>>>>>
+>>>>>   pinctrl: exynos: add exynos5410 SoC specific data (2015-11-16 10:54:43 +0900)
+>>>>
+>>>> Hi,
+>>>>
+>>>> This should either go in through the pinctrl tree, or have an acked/reviewed-by
+>>>> one of the pinctrl maintainers.
+>>>
+>>> It was acked by Tomasz Figa - Samsung Pin Controller maintainer:
+>>> https://patchwork.ozlabs.org/patch/450340/
+>>
+>> Actually, is there any reason to send this through ARM SoC? Looks like
+>> this pull request contains only pinctrl changes which could normally
+>> go through pinctrl tree. Maybe Linus W. could simply pull it?
+>
+> Of course, I would be happy with it.
+>
+> But apparently I am the only one who continuously tracks all of these
+> patches for Exynos (also for subsystems different than arch/arm/mach*).
+> Yeah, I could ping everyone for every patch (not mine patch I mean)...
+> but it is easier just to grab it after acking and send it. I really
+> don't care about the method, just apply the damned patch ;)
 
-This actually can't return a negative number - only valid devid bits
-are 0 to 9 inclusive, and this isn't going to ever change.  So the
-patch isn't strictly necessary, but is good from the point of view
-of ensuring consistency.  Hence:
+My intention was by no means to belittle your effort, really thanks
+for doing this. :)
 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+I was just wondering if Linus couldn't pull this just as is, without
+causing further commotion and unnecessarily introducing field for
+potential conflicts between trees.
 
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
-
-> ---
->  arch/arm/common/sa1111.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
-> index 3d22494..fb0a0a4 100644
-> --- a/arch/arm/common/sa1111.c
-> +++ b/arch/arm/common/sa1111.c
-> @@ -1290,7 +1290,7 @@ static int sa1111_match(struct device *_dev, struct device_driver *_drv)
->  	struct sa1111_dev *dev = SA1111_DEV(_dev);
->  	struct sa1111_driver *drv = SA1111_DRV(_drv);
->  
-> -	return dev->devid & drv->devid;
-> +	return !!(dev->devid & drv->devid);
->  }
->  
->  static int sa1111_bus_suspend(struct device *dev, pm_message_t state)
-> -- 
-> 1.9.2
-> 
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Best regards,
+Tomasz
