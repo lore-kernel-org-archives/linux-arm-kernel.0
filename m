@@ -1,39 +1,34 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Wed, 23 Dec 2015 18:24:33 +0800
-Subject: [PATCH 00/24] crypto: atmel-aes: global rework of the driver
-In-Reply-To: <cover.1450366831.git.cyrille.pitchen@atmel.com>
-References: <cover.1450366831.git.cyrille.pitchen@atmel.com>
-Message-ID: <20151223102433.GA1205@gondor.apana.org.au>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 23 Dec 2015 11:27:01 +0100
+Subject: [PATCH 1/5] iio:adc:at91_adc8xx: introduce new atmel adc driver
+In-Reply-To: <1450689852-22763-2-git-send-email-ludovic.desroches@atmel.com>
+References: <1450689852-22763-1-git-send-email-ludovic.desroches@atmel.com>
+ <1450689852-22763-2-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20151223102701.GH8623@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 17, 2015 at 05:48:31PM +0100, Cyrille Pitchen wrote:
-> Hi all,
-> 
-> this series of patches is a global rework of the Atmel driver. Some
-> patches improve the performances whereas others fix some bugs like
-> the counter overflow in CTR mode.
-> 
-> It also updates some part of the code to make them more generic. For
-> instance the crypto request queue management supports both async block
-> cipher and AEAD requests, which allows us to add support the the GCM
-> mode. The support of the GCM mode is only available on sama5d4 and later.
-> 
-> This series is based on linux-next and was tested on sama5d2, sama5d3 and
-> sama5d4 boards. The driver implementation was validated using the tcrypt
-> module running modes:
-> - 10: ecb(aes), cbc(aes), ctr(aes), rfc3686(ctr(aes))
-> - 35: gcm(aes)
-> 
-> tcrypt speed test was run with modes:
-> - 211: rfc4106(gcm(aes)), gcm(aes)
-> - 500: ecb(aes), cbc(aes), ctr(aes), cfb(aes), ofc(aes), rfc3686(ctr(aes))
-> 
-> Finally iperf was run for at least 5 mins over an IPSEC/L2TP tunnel using
-> the rfc4106(gcm(aes)) cipher suite.
+On 21/12/2015 at 10:24:08 +0100, Ludovic Desroches wrote :
+> +++ b/Documentation/devicetree/bindings/iio/adc/at91_adc8xx.txt
+> @@ -0,0 +1,27 @@
+> +* AT91 SAMA5D2 Analog to Digital Converter (ADC)
+> +
+> +Required properties:
+> +  - compatible: Should be "atmel,sama5d2-adc".
+> +  - reg: Should contain ADC registers location and length.
+> +  - interrupts: Should contain the IRQ line for the ADC.
+> +  - clocks: phandles to clocks.
+> +  - clock-names: tuple listing clock names.
+> +      Required elements: "adc_clk", "adc_op_clk". "adc_clk" is the peripheral
+> +      clock, "adc_clk" is the sampling clock.
 
-All applied.  Thanks!
+I think we should not have adc_op_clk but rather have a property like
+vf610 has fsl,adck-max-frequency.
+Even better, would be the ability to change it with
+/sys/bus/iio/devices/iio:deviceX/sampling_frequency
+
+
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
