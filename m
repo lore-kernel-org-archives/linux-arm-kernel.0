@@ -1,64 +1,34 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Wed, 23 Dec 2015 17:19:49 +0800
-Subject: [PATCH 3/4] net: ethernet: arc: Add support emac for RK3036
-In-Reply-To: <1450862390-407-1-git-send-email-zhengxing@rock-chips.com>
-References: <1450862390-407-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <1450862390-407-3-git-send-email-zhengxing@rock-chips.com>
+From: henryc.chen@mediatek.com (Henry Chen)
+Date: Wed, 23 Dec 2015 17:25:11 +0800
+Subject: [PATCH] mfd: mt6397: convert to arch_initcall
+Message-ID: <1450862711-22124-1-git-send-email-henryc.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The RK3036's GRFs offset are different with RK3066/RK3188, and need to set
-mac TX/RX clock before probe emac.
+Since pinctrl or regulator of mt6396 need to initialize earlier to avoid
+probe deferring, also change the core driver to arch_init.
 
-Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
 ---
+ drivers/mfd/mt6397-core.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
- drivers/net/ethernet/arc/Kconfig         |    4 ++--
- drivers/net/ethernet/arc/emac_rockchip.c |    9 +++++++--
- 2 files changed, 9 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/net/ethernet/arc/Kconfig b/drivers/net/ethernet/arc/Kconfig
-index 52a6b16..6890451 100644
---- a/drivers/net/ethernet/arc/Kconfig
-+++ b/drivers/net/ethernet/arc/Kconfig
-@@ -34,9 +34,9 @@ config EMAC_ROCKCHIP
- 	select ARC_EMAC_CORE
- 	depends on OF_IRQ && OF_NET && REGULATOR && HAS_DMA
- 	---help---
--	  Support for Rockchip RK3066/RK3188 EMAC ethernet controllers.
-+	  Support for Rockchip RK3036/RK3066/RK3188 EMAC ethernet controllers.
- 	  This selects Rockchip SoC glue layer support for the
--	  emac device driver. This driver is used for RK3066/RK3188
-+	  emac device driver. This driver is used for RK3036/RK3066/RK3188
- 	  EMAC ethernet controller.
- 
- endif # NET_VENDOR_ARC
-diff --git a/drivers/net/ethernet/arc/emac_rockchip.c b/drivers/net/ethernet/arc/emac_rockchip.c
-index d1a9c28..2433eeb 100644
---- a/drivers/net/ethernet/arc/emac_rockchip.c
-+++ b/drivers/net/ethernet/arc/emac_rockchip.c
-@@ -69,6 +69,10 @@ static void emac_rockchip_set_mac_speed(void *priv, unsigned int speed)
- 
- static const struct emac_rockchip_soc_data emac_rockchip_dt_data[] = {
- 	{
-+	  .grf_offset = 0x140,   .grf_mode_offset = 8,
-+	  .grf_speed_offset = 9, .need_div_macclk = 1
-+	}, /* rk3036 */
-+	{
- 	  .grf_offset = 0x154,   .grf_mode_offset = 0,
- 	  .grf_speed_offset = 1, .need_div_macclk = 0
- 	}, /* rk3066 */
-@@ -79,8 +83,9 @@ static const struct emac_rockchip_soc_data emac_rockchip_dt_data[] = {
+diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
+index 1749c1c..af98b4b 100644
+--- a/drivers/mfd/mt6397-core.c
++++ b/drivers/mfd/mt6397-core.c
+@@ -285,7 +285,11 @@ static struct platform_driver mt6397_driver = {
+ 	},
  };
  
- static const struct of_device_id emac_rockchip_dt_ids[] = {
--	{ .compatible = "rockchip,rk3066-emac", .data = &emac_rockchip_dt_data[0] },
--	{ .compatible = "rockchip,rk3188-emac", .data = &emac_rockchip_dt_data[1] },
-+	{ .compatible = "rockchip,rk3036-emac", .data = &emac_rockchip_dt_data[0] },
-+	{ .compatible = "rockchip,rk3066-emac", .data = &emac_rockchip_dt_data[1] },
-+	{ .compatible = "rockchip,rk3188-emac", .data = &emac_rockchip_dt_data[2] },
- 	{ /* Sentinel */ }
- };
+-module_platform_driver(mt6397_driver);
++static int __init mt6397_core_init(void)
++{
++	return platform_driver_register(&mt6397_driver);
++}
++arch_initcall(mt6397_core_init);
  
+ MODULE_AUTHOR("Flora Fu, MediaTek");
+ MODULE_DESCRIPTION("Driver for MediaTek MT6397 PMIC");
 -- 
-1.7.9.5
+1.9.1
