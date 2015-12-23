@@ -1,57 +1,72 @@
-From: rsahu@apm.com (Rameshwar Prasad Sahu)
-Date: Wed, 23 Dec 2015 18:09:55 +0530
-Subject: [PATCH] dmaengine: xgene-dma: Fix double IRQ issue by setting
- IRQ_DISABLE_UNLAZY flag
-Message-ID: <1450874395-1448-1-git-send-email-rsahu@apm.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Wed, 23 Dec 2015 20:38:30 +0800
+Subject: [PATCH v12 10/18] dt-bindings: add document for rockchip dp phy
+In-Reply-To: <1450873538-18304-1-git-send-email-ykk@rock-chips.com>
+References: <1450873538-18304-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1450874310-19309-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For interrupt controller that doesn't support irq_disable and hardware
-with level interrupt, an extra interrupt can be pending. This patch fixes
-the issue by setting IRQ_DISABLE_UNLAZY flag for the interrupt line.
+Add dt binding documentation for rockchip display port PHY.
 
-Reference: http://git.kernel.org/tip/e9849777d0e27cdd2902805be51da73e7c79578c
-
-Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
+Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/dma/xgene-dma.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+Changes in v12: None
+Changes in v11:
+- Correct the title of this rockchip dp phy document(Rob)
+- Add the ack from Rob Herring
 
-diff --git a/drivers/dma/xgene-dma.c b/drivers/dma/xgene-dma.c
-index 9dfa2b0..6363e84 100644
---- a/drivers/dma/xgene-dma.c
-+++ b/drivers/dma/xgene-dma.c
-@@ -29,6 +29,7 @@
- #include <linux/dmapool.h>
- #include <linux/interrupt.h>
- #include <linux/io.h>
-+#include <linux/irq.h>
- #include <linux/module.h>
- #include <linux/of_device.h>
+Changes in v10: None
+Changes in v9: None
+Changes in v8:
+- Remove the specific address in the example node name. (Heiko)
 
-@@ -1610,6 +1611,7 @@ static int xgene_dma_request_irqs(struct xgene_dma *pdma)
- 	/* Register DMA channel rx irq */
- 	for (i = 0; i < XGENE_DMA_MAX_CHANNEL; i++) {
- 		chan = &pdma->chan[i];
-+		irq_set_status_flags(chan->rx_irq, IRQ_DISABLE_UNLAZY);
- 		ret = devm_request_irq(chan->dev, chan->rx_irq,
- 				       xgene_dma_chan_ring_isr,
- 				       0, chan->name, chan);
-@@ -1620,6 +1622,7 @@ static int xgene_dma_request_irqs(struct xgene_dma *pdma)
+Changes in v7:
+- Simplify the commit message. (Kishon)
 
- 			for (j = 0; j < i; j++) {
- 				chan = &pdma->chan[i];
-+				irq_clear_status_flags(chan->rx_irq, IRQ_DISABLE_UNLAZY);
- 				devm_free_irq(chan->dev, chan->rx_irq, chan);
- 			}
+Changes in v6: None
+Changes in v5:
+- Split binding doc's from driver changes. (Rob)
+- Update the rockchip,grf explain in document, and correct the clock required
+  elemets in document. (Rob & Heiko)
 
-@@ -1640,6 +1643,7 @@ static void xgene_dma_free_irqs(struct xgene_dma *pdma)
+Changes in v4: None
+Changes in v3: None
+Changes in v2: None
 
- 	for (i = 0; i < XGENE_DMA_MAX_CHANNEL; i++) {
- 		chan = &pdma->chan[i];
-+		irq_clear_status_flags(chan->rx_irq, IRQ_DISABLE_UNLAZY);
- 		devm_free_irq(chan->dev, chan->rx_irq, chan);
- 	}
- }
---
-1.7.1
+ .../devicetree/bindings/phy/rockchip-dp-phy.txt    | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
+
+diff --git a/Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt b/Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
+new file mode 100644
+index 0000000..50c4f9b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
+@@ -0,0 +1,22 @@
++Rockchip specific extensions to the Analogix Display Port PHY
++------------------------------------
++
++Required properties:
++- compatible : should be one of the following supported values:
++	 - "rockchip.rk3288-dp-phy"
++- clocks: from common clock binding: handle to dp clock.
++	of memory mapped region.
++- clock-names: from common clock binding:
++	Required elements: "24m"
++- rockchip,grf: phandle to the syscon managing the "general register files"
++- #phy-cells : from the generic PHY bindings, must be 0;
++
++Example:
++
++edp_phy: edp-phy {
++	compatible = "rockchip,rk3288-dp-phy";
++	rockchip,grf = <&grf>;
++	clocks = <&cru SCLK_EDP_24M>;
++	clock-names = "24m";
++	#phy-cells = <0>;
++};
+-- 
+1.9.1
