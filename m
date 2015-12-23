@@ -1,38 +1,71 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 24 Dec 2015 03:52:39 +0800
-Subject: [PATCH 4/4] ARM: dts: rockchip: Add support emac for RK3036
-In-Reply-To: <1450862390-407-4-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <201512240333.QnElWSVi%fengguang.wu@intel.com>
+From: akshay.bhat@timesys.com (Akshay Bhat)
+Date: Wed, 23 Dec 2015 17:12:37 -0500
+Subject: [PATCH v5 3/7] ARM: dts: imx: Add Advantech BA-16 Qseven module
+In-Reply-To: <20151223023035.GH26290@tiger>
+References: <1449177036-13317-1-git-send-email-akshay.bhat@timesys.com>
+ <1449177036-13317-4-git-send-email-akshay.bhat@timesys.com>
+ <20151222113742.GA26290@tiger> <5679D1B9.20304@timesys.com>
+ <20151223023035.GH26290@tiger>
+Message-ID: <567B1C55.1050709@timesys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Xing,
 
-[auto build test ERROR on rockchip/for-next]
-[also build test ERROR on next-20151223]
-[cannot apply to v4.4-rc6]
 
-url:    https://github.com/0day-ci/linux/commits/Xing-Zheng/net-ethernet-arc-Probe-emac-after-set-RMII-clock/20151223-172442
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git for-next
-config: arm-allmodconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+On 12/22/2015 09:31 PM, Shawn Guo wrote:
+> On Tue, Dec 22, 2015 at 05:42:01PM -0500, Akshay Bhat wrote:
+>>>> +&iomuxc {
+>>>
+>>> Suggest to put the iomuxc node at the bottom of the dts to make the read
+>>> of this file a bit easier.
+>>>
+>> Will fix it
+>>
+>>>> +	pinctrl-names = "default";
+>>>> +	pinctrl-0 = <&pinctrl_hog>;
+>>>> +
+>>>> +	imx6q-ba16 {
+>>>
+>>> With commit 5fcdf6a7ed95 (pinctrl: imx: Allow parsing DT without function
+>>> nodes) in place, we can get rid of this container node to save one level
+>>> of indentation.
+>>>
+>>
+>> If i remove the imx6q-ba16 container node, then I get multiple
+>> errors during boot.
+>>
+>> [    2.043594] imx6q-pinctrl 20e0000.iomuxc: unable to find group
+>> for node ecspi1grp
+>> .....
+>> [    2.467403] imx6q-pinctrl 20e0000.iomuxc: unable to find group
+>> for node usbotggrp
+>> [    2.482394] imx6q-pinctrl 20e0000.iomuxc: unable to find group
+>> for node usbhubgrp
+>> .....
+>> [    2.640509] imx6q-pinctrl 20e0000.iomuxc: unable to find group
+>> for node usdhc2grp
+>> [    2.640889] imx6q-pinctrl 20e0000.iomuxc: unable to find group
+>> for node usdhc2grp
+>> [    2.640986] sdhci-esdhc-imx: probe of 2194000.usdhc failed with error -22
+>> [    2.641048] imx6q-pinctrl 20e0000.iomuxc: unable to find group
+>> for node usdhc3grp
+>> [    2.641301] imx6q-pinctrl 20e0000.iomuxc: unable to find group
+>> for node usdhc3grp
+>> [    2.641385] sdhci-esdhc-imx: probe of 2198000.usdhc failed with error -22
+>> [    2.641446] imx6q-pinctrl 20e0000.iomuxc: unable to find group
+>> for node usdhc4grp
+>> [    2.641688] imx6q-pinctrl 20e0000.iomuxc: unable to find group
+>> for node usdhc4grp
+>> [    2.641770] sdhci-esdhc-imx: probe of 219c000.usdhc failed with error -22
+>
+> Sorry.  I just found that to get this work on imx6q board we need to
+> clean up the ipu2/ipu2grp-1 group from imx6q.dtsi.  I just send a patch
+> doing that with you on copy.  Let me know if it works for you with that
+> change.
+>
+> Shawn
+>
+Thanks Shawn, I applied the patch you sent and it fixed the above issue. 
+Also I have addressed all the comments and re-submitted the patches.
 
-All errors (new ones prefixed by >>):
-
->> Error: arch/arm/boot/dts/rk3036.dtsi:196.18-19 syntax error
-   FATAL ERROR: Unable to parse input tree
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 54588 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151224/15bfefee/attachment-0001.obj>
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/396131.html
