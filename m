@@ -1,57 +1,40 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Wed, 23 Dec 2015 13:26:14 -0800
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 23 Dec 2015 13:29:12 -0800
 Subject: [PATCH v2] ARM: mm: flip priority of CONFIG_DEBUG_RODATA
-In-Reply-To: <20151223201529.GX8644@n2100.arm.linux.org.uk>
+In-Reply-To: <567B04AB.6010906@redhat.com>
 References: <20151202202725.GA794@www.outflux.net>
- <20151223201529.GX8644@n2100.arm.linux.org.uk>
-Message-ID: <567B1176.4000106@redhat.com>
+ <20151223195129.GP2793@atomide.com> <567B04AB.6010906@redhat.com>
+Message-ID: <20151223212911.GR2793@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/23/2015 12:15 PM, Russell King - ARM Linux wrote:
-> On Wed, Dec 02, 2015 at 12:27:25PM -0800, Kees Cook wrote:
->> The use of CONFIG_DEBUG_RODATA is generally seen as an essential part of
->> kernel self-protection:
->> http://www.openwall.com/lists/kernel-hardening/2015/11/30/13
->> Additionally, its name has grown to mean things beyond just rodata. To
->> get ARM closer to this, we ought to rearrange the names of the configs
->> that control how the kernel protects its memory. What was called
->> CONFIG_ARM_KERNMEM_PERMS is really doing the work that other architectures
->> call CONFIG_DEBUG_RODATA.
->
-> Kees,
->
-> There is a subtle problem with the kernel memory permissions and the
-> DMA debugging.
->
-> DMA debugging checks whether we're trying to do DMA from the kernel
-> mappings (text, rodata, data etc).  It checks _text.._etext.  However,
-> when RODATA is enabled, we have about one section between _text and
-> _stext which are freed into the kernel's page pool, and then become
-> available for allocation and use for DMA.
->
-> This then causes the DMA debugging sanity check to fire.
->
-> So, I think I'll revert this change for the time being as it seems to
-> be causing many people problems, and having this enabled is creating
-> extra warnings when kernel debug options are enabled along with it.
->
-> Sorry.
->
+Hi,
 
-in include/asm-generic/sections.h:
+* Laura Abbott <labbott@redhat.com> [151223 12:31]:
+> 
+> Looks like a case similar to Geert's
+> 
+>         adr     r7, kick_counter
+> wait_dll_lock_timed:
+>         ldr     r4, wait_dll_lock_counter
+>         add     r4, r4, #1
+>         str     r4, [r7, #wait_dll_lock_counter - kick_counter]
+>         ldr     r4, sdrc_dlla_status
+>         /* Wait 20uS for lock */
+>         mov     r6, #8
+> 
+> 
+> kick_counter and wait_dll_lock_counter are in the text section which is marked read only.
+> They need to be moved to the data section along with a few other variables from what I
+> can tell (maybe those are read only?).
 
-/*
-  * Usage guidelines:
-  * _text, _data: architecture specific, don't use them in arch-independent code
-  * [_stext, _etext]: contains .text.* sections, may also contain .rodata.*
-  *                   and/or .init.* sections
+Thanks for looking, yeah so it seem.
 
+> I suspect this is going to be a common issue with suspend/resume code paths since those
+> are hand written assembly.
 
-So based on that comment it seems like the dma-debug should be checking for
-_stext not _text since only _stext is guaranteed across all architectures.
-I'll submit a patch to dma-debug.c if this seems appropriate or if you
-haven't done so already.
+Yes I suspect we have quite a few cases like this.
 
-Thanks,
-Laura
+Regards,
+
+Tony
