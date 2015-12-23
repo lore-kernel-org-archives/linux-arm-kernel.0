@@ -1,49 +1,41 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 22 Dec 2015 18:51:18 -0600
-Subject: [PATCH 1/5] iio:adc:at91_adc8xx: introduce new atmel adc driver
-In-Reply-To: <1450689852-22763-2-git-send-email-ludovic.desroches@atmel.com>
-References: <1450689852-22763-1-git-send-email-ludovic.desroches@atmel.com>
- <1450689852-22763-2-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20151223005118.GA29457@rob-hp-laptop>
+From: tom_usenet@optusnet.com.au (Tom Evans)
+Date: Wed, 23 Dec 2015 11:53:29 +1100
+Subject: can: flexcan: Ancient Freescale Reference FlexCAN Driver and bug
+ fixes so it works.
+In-Reply-To: <56723869.5060900@optusnet.com.au>
+References: <1431603215-25546-1-git-send-email-bhupesh.sharma@freescale.com>
+ <1431603215-25546-6-git-send-email-bhupesh.sharma@freescale.com>
+ <5554C244.80809@pengutronix.de>
+ <BY1PR0301MB130358076C3A5969406DE69182D80@BY1PR0301MB1303.namprd03.prod.outlook.com>
+ <BY1PR0301MB130384E91308C49A850DEC4782E90@BY1PR0301MB1303.namprd03.prod.outlook.com>
+ <56696582.7020503@optusnet.com.au> <566973A4.5000703@pengutronix.de>
+ <566A0267.2080809@optusnet.com.au> <56723869.5060900@optusnet.com.au>
+Message-ID: <5679F089.9080509@optusnet.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 21, 2015 at 10:24:08AM +0100, Ludovic Desroches wrote:
-> This driver supports the new version of the Atmel ADC device introduced
-> with the SAMA5D2 SoC family.
-> 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> ---
->  .../devicetree/bindings/iio/adc/at91_adc8xx.txt    |  27 ++
->  drivers/iio/adc/Kconfig                            |  11 +
->  drivers/iio/adc/Makefile                           |   1 +
->  drivers/iio/adc/at91_adc8xx.c                      | 417 +++++++++++++++++++++
->  4 files changed, 456 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iio/adc/at91_adc8xx.txt
->  create mode 100644 drivers/iio/adc/at91_adc8xx.c
-> 
-> diff --git a/Documentation/devicetree/bindings/iio/adc/at91_adc8xx.txt b/Documentation/devicetree/bindings/iio/adc/at91_adc8xx.txt
-> new file mode 100644
-> index 0000000..64ad6a5
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/iio/adc/at91_adc8xx.txt
-> @@ -0,0 +1,27 @@
-> +* AT91 SAMA5D2 Analog to Digital Converter (ADC)
-> +
-> +Required properties:
-> +  - compatible: Should be "atmel,sama5d2-adc".
-> +  - reg: Should contain ADC registers location and length.
-> +  - interrupts: Should contain the IRQ line for the ADC.
-> +  - clocks: phandles to clocks.
-> +  - clock-names: tuple listing clock names.
-> +      Required elements: "adc_clk", "adc_op_clk". "adc_clk" is the peripheral
-> +      clock, "adc_clk" is the sampling clock.
-> +  - vref-supply: Supply used as reference for conversions.
-> +
-> +Optional properties:
-> +  - vddana-supply: Supply for the adc device.
+On 17/12/15 15:22, Tom Evans wrote:
+> On 11/12/15 09:53, Tom Evans wrote:
+>> On 10/12/2015 11:44 PM, Marc Kleine-Budde wrote:
+ >>
+>> The simplest path was to fix the simple and stupidly obvious
+ >> bugs in the existing driver rather than add new complicated bugs.
+>
+> There seems to be no end of bugs in this driver. It is a lesson
+ > in something.
 
-What makes a supply optional? If chip dependent, then then you need a 
-more specific compatible string.
+The Bus Off Recovery doesn't work either. A Bus Off condition results in the 
+module being soft-reset and then never woken up again, mainly because the 
+calls to "mod_timer()" forget to add "jiffies", so the timer doesn't trigger. 
+Then the Auto/Manual mode recovery test is probably backwards. Then it tests 
+MDIS instead of HALT, so it never resets the module after the soft reset. If 
+you program it in "Auto Recovery" mode it resets it anyway.
 
-Rob
+Bugs detailed here:
+
+https://community.freescale.com/message/599099#599099
+
+There'll probably be a link on that page to the patches to fix it after I've 
+tested it some more.
+
+Tom
