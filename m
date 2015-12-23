@@ -1,93 +1,73 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 23 Dec 2015 09:23:56 -0700
-Subject: [PATCH V7 02/24] coresight: associating path with session rather
- than tracer
-In-Reply-To: <20151220152939.GA11552@debian>
+Date: Wed, 23 Dec 2015 09:27:28 -0700
+Subject: [PATCH V7 04/24] coresight: moving PM runtime operations to core
+ framework
+In-Reply-To: <20151219171342.GA2437@debian>
 References: <1450472361-426-1-git-send-email-mathieu.poirier@linaro.org>
- <1450472361-426-3-git-send-email-mathieu.poirier@linaro.org>
- <20151220152939.GA11552@debian>
-Message-ID: <CANLsYkxD+7=B4YeTr2wjmSQfusvG_5YSPKpTcesEsFH07_OdVA@mail.gmail.com>
+ <1450472361-426-5-git-send-email-mathieu.poirier@linaro.org>
+ <20151219171342.GA2437@debian>
+Message-ID: <CANLsYkzgMq1caiE+wA2RRBpe4Bg14Fy7Eu8CnRkrhYmNg7j1Bg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 December 2015 at 08:29, Rabin Vincent <rabin@rab.in> wrote:
-> On Fri, Dec 18, 2015 at 01:58:58PM -0700, Mathieu Poirier wrote:
->> When using the Coresight framework from the sysFS interface a
->> tracer is always handling a single session and as such, a path
->> can be associated with a tracer.  But when supporting multiple
->> session per tracer there is no guarantee that sessions will always
->> have the same path from source to sink.
+On 19 December 2015 at 10:13, Rabin Vincent <rabin@rab.in> wrote:
+> On Fri, Dec 18, 2015 at 01:59:00PM -0700, Mathieu Poirier wrote:
+>> @@ -415,9 +418,13 @@ struct list_head *coresight_build_path(struct coresight_device *csdev)
+>>   */
+>>  void coresight_release_path(struct list_head *path)
+>>  {
+>> +     struct coresight_device *csdev;
+>>       struct coresight_node *nd, *next;
 >>
->> This patch is removing the automatic association between path and
->> tracers.  The building of a path and enablement of the components
->> in the path are decoupled, allowing for the association of a path
->> with a session rather than a tracer.
+>>       list_for_each_entry_safe(nd, next, path, link) {
+>> +             csdev = nd->csdev;
+>> +
+>> +             pm_runtime_put_sync(csdev->dev.parent);
+>>               list_del(&nd->link);
+>>               kfree(nd);
+>>       }
 >
-> This patch introduces a use-after-free/double kfree() if the sink is
-> disabled after the source.
+> This leads to the following splat:
 >
-> With this command sequence:
+>  BUG: sleeping function called from invalid context at /home/rabin/dev/linux/drivers/base/power/runtime.c:892
+>  in_atomic(): 1, irqs_disabled(): 128, pid: 763, name: perf
+>  2 locks held by perf/763:
+>   #0:  (&mm->mmap_sem){++++++}, at: [<c012e42c>] vm_munmap+0x2c/0x50
+>   #1:  (&event->mmap_mutex){+.+.+.}, at: [<c008248c>] atomic_dec_and_mutex_lock+0x58/0x98
+>  irq event stamp: 63152
+>  hardirqs last  enabled at (63151): [<c04f7edc>] _raw_spin_unlock_irqrestore+0x30/0x5c
+>  hardirqs last disabled at (63152): [<c04f88e8>] __irq_svc+0x48/0x78
+>  softirqs last  enabled at (61242): [<c003a914>] __do_softirq+0x408/0x4fc
+>  softirqs last disabled at (61223): [<c003ad50>] irq_exit+0xcc/0x130
+>  CPU: 1 PID: 763 Comm: perf Not tainted 4.4.0-rc5-00224-ge461459-dirty #152
+>  Hardware name: Generic OMAP4 (Flattened Device Tree)
+>  [<c00184dc>] (unwind_backtrace) from [<c0014c74>] (show_stack+0x10/0x14)
+>  [<c0014c74>] (show_stack) from [<c025c834>] (dump_stack+0x90/0xb8)
+>  [<c025c834>] (dump_stack) from [<c02f026c>] (__pm_runtime_idle+0xa4/0xa8)
+>  [<c02f026c>] (__pm_runtime_idle) from [<c03e1a08>] (coresight_release_path+0x38/0x7c)
+>  [<c03e1a08>] (coresight_release_path) from [<c03e210c>] (free_event_data+0x84/0x9c)
+>  [<c03e210c>] (free_event_data) from [<c00f8be8>] (rb_irq_work+0x4c/0xcc)
+>  [<c00f8be8>] (rb_irq_work) from [<c00e8860>] (irq_work_run_list+0x7c/0xb4)
+>  [<c00e8860>] (irq_work_run_list) from [<c00e88b8>] (irq_work_run+0x20/0x34)
+>  [<c00e88b8>] (irq_work_run) from [<c0016dcc>] (handle_IPI+0x1cc/0x334)
+>  [<c0016dcc>] (handle_IPI) from [<c0009538>] (gic_handle_irq+0x84/0x88)
+>  [<c0009538>] (gic_handle_irq) from [<c04f88f8>] (__irq_svc+0x58/0x78)
+>  Exception stack(0xed865e98 to 0xed865ee0)
+>  5e80:                                                       00000001 00000110
+>  5ea0: 00000000 ee2f1080 20000113 c0784808 edbe4e1c b6ae5000 edb882f0 ed9b1e04
+>  5ec0: edb88298 c075648c 00000002 ed865ee8 c008724c c04f7ee0 20000113 ffffffff
+>  [<c04f88f8>] (__irq_svc) from [<c04f7ee0>] (_raw_spin_unlock_irqrestore+0x34/0x5c)
+>  [<c04f7ee0>] (_raw_spin_unlock_irqrestore) from [<c00e8978>] (irq_work_queue+0xac/0xb4)
+>  [<c00e8978>] (irq_work_queue) from [<c00f5020>] (perf_mmap_close+0x370/0x3c8)
+>  [<c00f5020>] (perf_mmap_close) from [<c012c560>] (remove_vma+0x40/0x6c)
+>  [<c012c560>] (remove_vma) from [<c012e2b4>] (do_munmap+0x210/0x35c)
+>  [<c012e2b4>] (do_munmap) from [<c012e43c>] (vm_munmap+0x3c/0x50)
+>  [<c012e43c>] (vm_munmap) from [<c0010320>] (ret_fast_syscall+0x0/0x1c)
 >
-> # echo 1 > /sys/bus/coresight/devices/54162000.etb/enable_sink
-> # echo 1 > /sys/bus/coresight/devices/5414c000.ptm/enable_source
-> ...
-> # echo 0 > /sys/bus/coresight/devices/54162000.etb/enable_sink
-> # echo 0 > /sys/bus/coresight/devices/5414c000.ptm/enable_source
->
-> Before these patches, we get these messages while disabling:
->
-> [  165.822326] coresight-etm3x 5414c000.ptm: ETM tracing disabled
-> [  165.828491] coresight 5414c000.ptm: releasing path(s) failed
+> It should presumably be using pm_runtime_put() instead.
 
-I always assumed the source would gets disabled first followed by the
-sink but your sequence is entirely valid.  This will be addressed.
+That's a first - what platform did you test on?  If I send you fixes
+will you be able to help me with the verification?
 
->
-> After these patches, we get this (with SLUB debugging enabled):
->
-> =============================================================================
-> BUG kmalloc-512 (Not tainted): Invalid object pointer 0xed60e164
-> -----------------------------------------------------------------------------
->
-> Disabling lock debugging due to kernel taint
-> INFO: Slab 0xeebac180 objects=23 used=23 fp=0x  (null) flags=0x4081
-> CPU: 0 PID: 856 Comm: sh Tainted: G    B           4.4.0-rc5-00224-ge461459-dirty #168
-> Hardware name: Generic OMAP4 (Flattened Device Tree)
-> Backtrace:
-> [<c00154d4>] (dump_backtrace) from [<c00156d0>] (show_stack+0x18/0x1c)
->  r7:00000001 r6:eebac180 r5:c07ae71c r4:00000000
-> [<c00156b8>] (show_stack) from [<c027e69c>] (dump_stack+0x98/0xc0)
-> [<c027e604>] (dump_stack) from [<c014f018>] (slab_err+0x78/0x80)
->  r5:ee0013c0 r4:eebac180
-> [<c014efa4>] (slab_err) from [<c0153880>] (free_debug_processing+0x234/0x34c)
->  r3:ed60e164 r2:c068d484
->  r5:ee0013c0 r4:ed60e164
-> [<c015364c>] (free_debug_processing) from [<c0153c34>] (__slab_free+0x29c/0x428)
->  r10:ee0013c0 r9:00000000 r8:20000013 r7:c041a5f4 r6:ed60e164 r5:00010d00
->  r4:eebac180
-> [<c0153998>] (__slab_free) from [<c0154770>] (kfree+0x2dc/0x2f4)
->  r10:eda29f80 r9:00000000 r8:20000013 r7:c041a5f4 r6:ed60e164 r5:eebac180
->  r4:ee0013c0
-> [<c0154494>] (kfree) from [<c041a5f4>] (etm_disable+0xf8/0x148)
->  r10:eda29f80 r9:00000000 r8:ed7ba500 r7:00000000 r6:ed60e120 r5:00000001
->  r4:ed60e110
-> [<c041a4fc>] (etm_disable) from [<c0415e64>] (coresight_disable+0xbc/0x100)
->  r7:00000000 r6:c0771150 r5:c076c900 r4:ed662600
-> [<c0415da8>] (coresight_disable) from [<c0415ef0>] (enable_source_store+0x48/0x68)
->  r9:ed67ec8c r8:ed7d7900 r7:00000000 r6:ed7d7900 r5:00000002 r4:ed662620
-> [<c0415ea8>] (enable_source_store) from [<c030b37c>] (dev_attr_store+0x20/0x2c)
->  r5:ed67ec80 r4:c0415ea8
-> [<c030b35c>] (dev_attr_store) from [<c01d55d8>] (sysfs_kf_write+0x50/0x54)
->  r5:ed67ec80 r4:c030b35c
-> [<c01d5588>] (sysfs_kf_write) from [<c01d4b98>] (kernfs_fop_write+0xc4/0x1c0)
->  r7:00000000 r6:00000000 r5:00000002 r4:ed67ec80
-> [<c01d4ad4>] (kernfs_fop_write) from [<c015b60c>] (__vfs_write+0x34/0xe4)
->  r10:00000000 r9:eda28000 r8:c0010964 r7:eda29f80 r6:00000002 r5:c01d4ad4
->  r4:ed811180
-> [<c015b5d8>] (__vfs_write) from [<c015bf38>] (vfs_write+0x98/0x174)
->  r9:eda28000 r8:c0010964 r7:eda29f80 r6:000a9e40 r5:00000002 r4:ed811180
-> [<c015bea0>] (vfs_write) from [<c015c7a8>] (SyS_write+0x4c/0xa8)
->  r8:c0010964 r7:00000002 r6:000a9e40 r5:ed811180 r4:ed811180
-> [<c015c75c>] (SyS_write) from [<c00107c0>] (ret_fast_syscall+0x0/0x1c)
->  r7:00000004 r6:00000001 r5:000a9e40 r4:00000002
-> FIX kmalloc-512: Object at 0xed60e164 not freed
+Thanks,
+Mathieu
