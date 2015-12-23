@@ -1,67 +1,75 @@
-From: v1ron@mail.ru (Roman Volkov)
-Date: Thu, 24 Dec 2015 00:48:25 +0300
-Subject: [PATCH v3 0/2] WM8505/WM8650 DT fixes for SD card controller
-In-Reply-To: <20150404152720.1059e741@v1ron-s7>
-References: <1423130878-3894-1-git-send-email-v1ron@v1ros.org>
- <1425226007-2757-1-git-send-email-rvolkov@v1ros.org>
- <2119510.55A8Br1LeL@wuerfel> <20150301233911.2352ce48@v1ron-s7>
- <20150404152720.1059e741@v1ron-s7>
-Message-ID: <20151224004825.4350790e@anonymous>
+From: drivshin.allworx@gmail.com (David Rivshin (Allworx))
+Date: Wed, 23 Dec 2015 16:54:54 -0500
+Subject: [PATCH 0/3] drivers: net: cpsw: phy-handle fixes
+In-Reply-To: <CABr+WT=oDpp56jouAD57UM8_38geD1MMizZcDnx14maf2ohpCw@mail.gmail.com>
+References: <1450830994-5450-1-git-send-email-drivshin.allworx@gmail.com>
+ <CABr+WT=oDpp56jouAD57UM8_38geD1MMizZcDnx14maf2ohpCw@mail.gmail.com>
+Message-ID: <20151223165454.6e4d5950.drivshin.allworx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? Sat, 4 Apr 2015 15:27:20 +0300
-Roman Volkov <v1ron@v1ros.org> ?????:
+On Wed, 23 Dec 2015 22:20:58 +0100
+Nicolas Chauvet <kwizart@gmail.com> wrote:
 
-> ? Sun, 1 Mar 2015 23:39:11 +0300
-> Roman Volkov <rvolkov@v1ros.org> ?????:
+> 2015-12-23 1:36 GMT+01:00 David Rivshin (Allworx) <
+> drivshin.allworx at gmail.com>:
 > 
-> > ? Sun, 01 Mar 2015 20:52:55 +0100
-> > Arnd Bergmann <arnd@arndb.de> ?????:
-> >   
-> > > On Sunday 01 March 2015 19:06:45 Roman Volkov wrote:  
-> > > > This patch set enables SD controller support for WM8650 and
-> > > > fixes minor errors in WM8505 Device Tree file.
-> > > > 
-> > > > Changes in v3:
-> > > > 1. Add minor fixes for WM8505 SDHC node
-> > > > 
-> > > > Tested on both WM8505 and WM8650.
-> > > > 
-> > > > Roman Volkov (2):
-> > > >   dts: vt8500: Add SDHC node to DTS file for WM8650
-> > > >   dts: vt8500: Fix errors in SDHC node for WM8505
-> > > > 
-> > > >  arch/arm/boot/dts/wm8505.dtsi | 4 ++--
-> > > >  arch/arm/boot/dts/wm8650.dtsi | 9 +++++++++
-> > > >  2 files changed, 11 insertions(+), 2 deletions(-)
-> > > > 
-> > > > -- 
-> > > > Hi maintainers, I see my previous versions were not applied.
-> > > > Could this little patch set be applied for the linux-next? I
-> > > > don't think this is new functionality, this must be considered
-> > > > as bugfix for existing Device Tree.
-> > > > 
-> > > > Any other suggestions?  
-> > > 
-> > > According to the MAINTAINERS file, Tony Prisk should be the person
-> > > to pick them up, but he was not the recipient of the mail.
-> > > 
-> > > 	Arnd  
-> > 
-> > Thanks for the tip. Tony probably need to add these files to his
-> > list of maintained files. get_maintainer.pl doesn't mention him.
-> > 
-> > Roman  
+> > From: David Rivshin <drivshin@allworx.com>
+> >
+> > This series is based on the tip of the net tree.
+> >
+> > The first patch fixes a bug that makes dual_emac mode break if
+> > either slave uses the phy-handle property in the devicetree.
+> >
+> > The second patch fixes some cosmetic problems with error messages,
+> > and also makes the binding documentation more explicit.
+> >
+> > The third patch cleans up the fixed-link case to work like
+> > the now-fixed phy-handle case.
+> >
+> > I have tested on the following hardware configurations:
+> >  - (EVMSK) dual emac, phy_id property in both slaves
+> >  - (BeagleBoneBlack) single emac, phy_id property
+> >  - (custom) single emac, fixed-link subnode
+> > Note that I don't have a board which would uses a phy-handle
+> > property, though I have used hacked devicetrees to exercise the
+> > code paths. Testing by anyone who has real hardware using
+> > phy-handle or dual_emac with fixed-link would be appreciated.
+> >
+> > David Rivshin (3):
+> >   drivers: net: cpsw: fix parsing of phy-handle DT property in
+> > dual_emac config
+> >   drivers: net: cpsw: fix error messages when using phy-handle DT
+> >     property
+> >   drivers: net: cpsw: use of_phy_connect() in fixed-link case
+> >
+> >  Documentation/devicetree/bindings/net/cpsw.txt |  4 +--
+> >  drivers/net/ethernet/ti/cpsw.c                 | 40
+> > +++++++++++++-------------
+> >  drivers/net/ethernet/ti/cpsw.h                 |  1 +
+> >  3 files changed, 23 insertions(+), 22 deletions(-)
+> >
+> >
+> This serie failed with me on dm8418 hp-t410 on top of linux-next from
+> today whereas the same patch level and same methods without this
+> serie is working fine.
+> I wasn't able to ping anything on a minimal rootfs with static ip set
+> from cmdline from kernel.
 > 
-> Arnd,
-> 
-> No response yet from Tony for over a month.
-> 
-> Roman
+> Sorry for  the lack of details, feel free to add me to any other
+> revision of the patch if any.
+> I will be able to do more testing next month.
 
-Ping. At least two patch sets for vt8500 are waiting to be picked up.
-vt8500 maintainer is inactive for over a year.
+(Sorry for the duplicate, doing a reply-all this time. Not sure why it 
+looked like a non-list email the first time)
 
-Regards,
-Roman
+Thanks for testing. I found the dm8148-t410.dts devicetree in the
+kernel source, and it uses the phy_id for both slaves, just like the
+EVMSK board I tested. So I can't think of an obvious reason for the
+problem. 
+Would you be able to send the 'dmesg' log from right after bootup? 
+I'm hoping there is an error message in there with some clue.
+
+Just to verify, is your linux-next tree up-to-date? This series needs
+to be applied is based on another recent series of 3 patches to cpsw.c. 
+Although I doubt it would apply cleanly at all without those.
