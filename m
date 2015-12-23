@@ -1,52 +1,75 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Wed, 23 Dec 2015 13:52:45 +0100
-Subject: [PATCH 4/6] regulator: lp872x: Add enable GPIO pin support
-In-Reply-To: <20151223115632.GS16023@sirena.org.uk>
-References: <1450868319-20513-1-git-send-email-contact@paulk.fr>
- <1450868319-20513-5-git-send-email-contact@paulk.fr>
- <20151223115632.GS16023@sirena.org.uk>
-Message-ID: <1450875165.2648.7.camel@collins>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Wed, 23 Dec 2015 20:51:04 +0800
+Subject: [PATCH v12 16/18] drm: bridge: analogix/dp: expand the wait time for
+ looking AUX CH reply flag
+In-Reply-To: <1450873538-18304-1-git-send-email-ykk@rock-chips.com>
+References: <1450873538-18304-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1450875064-19627-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le mercredi 23 d?cembre 2015 ? 11:56 +0000, Mark Brown a ?crit :
-> On Wed, Dec 23, 2015 at 11:58:37AM +0100, Paul Kocialkowski wrote:
-> 
-> > +	gpio = lp->pdata->enable_gpio;
-> > +	if (!gpio_is_valid(gpio))
-> > +		return 0;
-> > +
-> > +	/* Always set enable GPIO high. */
-> > +	ret = devm_gpio_request_one(lp->dev, gpio, GPIOF_OUT_INIT_HIGH, "LP872X EN");
-> > +	if (ret) {
-> > +		dev_err(lp->dev, "gpio request err: %d\n", ret);
-> > +		return ret;
-> > +	}
-> 
-> This isn't really adding support for the enable GPIO as the changelog
-> suggests, it's requesting but not managing the GPIO.  Since there is
-> core support for manging enable GPIOs this seems especially silly,
-> please tell the core about the GPIO and then it will work at runtime
-> too.
+On Rockchip platform, sometimes driver would failed at reading EDID
+message, and it's caused by the AUX reply flag wouldn't received under
+the 100*10us wait time.
 
-You're right, I had clearly overlooked this, thanks for pointing it out.
-Will send v2 using GPIO handling from core.
+But after expand the wait time a little, the AUX reply flag would be
+set, so maybe the wait time is a little critical. Besides the analogix
+dp book haven't reminded the standard wait for looking AUX reply flag,
+so I thought it's okay to expand the wait time.
 
+And the external wait time won't hurt Exynos DP too much, cause they
+wouldn't meet this problem, then driver would received the reply command
+very soon, so no more additional wait time would bring to Exynos platform.
+
+Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+---
+Changes in v12:
+- Using another way to expand the AUX reply wait time (Jingoo)
+
+Changes in v11: None
+Changes in v10: None
+Changes in v9: None
+Changes in v8: None
+Changes in v7: None
+Changes in v6: None
+Changes in v5: None
+Changes in v4: None
+Changes in v3: None
+Changes in v2: None
+
+ drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+index cba3ffd..8687eea 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+@@ -471,7 +471,7 @@ int analogix_dp_start_aux_transaction(struct analogix_dp_device *dp)
+ {
+ 	int reg;
+ 	int retval = 0;
+-	int timeout_loop = 0;
++	unsigned long timeout;
+ 
+ 	/* Enable AUX CH operation */
+ 	reg = readl(dp->reg_base + ANALOGIX_DP_AUX_CH_CTL_2);
+@@ -479,14 +479,12 @@ int analogix_dp_start_aux_transaction(struct analogix_dp_device *dp)
+ 	writel(reg, dp->reg_base + ANALOGIX_DP_AUX_CH_CTL_2);
+ 
+ 	/* Is AUX CH command reply received? */
+-	reg = readl(dp->reg_base + ANALOGIX_DP_INT_STA);
+-	while (!(reg & RPLY_RECEIV)) {
+-		timeout_loop++;
+-		if (DP_TIMEOUT_LOOP_COUNT < timeout_loop) {
++	timeout = jiffies + msecs_to_jiffies(5);
++	while ((readl(dp->reg_base + ANALOGIX_DP_INT_STA) & RPLY_RECEIV) == 0) {
++		if (time_after(jiffies, timeout)) {
+ 			dev_err(dp->dev, "AUX CH command reply failed!\n");
+ 			return -ETIMEDOUT;
+ 		}
+-		reg = readl(dp->reg_base + ANALOGIX_DP_INT_STA);
+ 		usleep_range(10, 11);
+ 	}
+ 
 -- 
-Paul Kocialkowski, Replicant developer
-
-Replicant is a fully free Android distribution running on several
-devices, a free software mobile operating system putting the emphasis on
-freedom and privacy/security.
-
-Website: https://www.replicant.us/
-Blog: https://blog.replicant.us/
-Wiki/tracker/forums: https://redmine.replicant.us/
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151223/7258df16/attachment-0001.sig>
+1.9.1
