@@ -1,76 +1,97 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Wed, 23 Dec 2015 10:39:06 +0100
-Subject: [PATCH v2 0/2] Improve drm_of_component_probe() and move
- rockchip to use it
-In-Reply-To: <20151222173800.GU960@e106497-lin.cambridge.arm.com>
-References: <1448029325-14602-1-git-send-email-Liviu.Dudau@arm.com>
- <20151222173800.GU960@e106497-lin.cambridge.arm.com>
-Message-ID: <20151223103906.2aae53595345240d57d57b41@free.fr>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 23 Dec 2015 17:38:45 +0800
+Subject: [PATCH V2 22/23] pci, acpi: Match PCI config space accessors
+ against platfrom specific quirks.
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1EC183BD@lhreml503-mbb>
+References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
+ <1450278993-12664-23-git-send-email-tn@semihalf.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1EC14C0F@lhreml503-mbb>
+ <567923D2.2010202@semihalf.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1EC183BD@lhreml503-mbb>
+Message-ID: <567A6BA5.1030408@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 Dec 2015 17:38:00 +0000
-Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+On 12/22/2015 10:48 PM, Gabriele Paoloni wrote:
+> Hi Tomasz
+>
+>> -----Original Message-----
+>> From: linux-kernel-owner at vger.kernel.org [mailto:linux-kernel-
+>> owner at vger.kernel.org] On Behalf Of Tomasz Nowicki
+>> Sent: 22 December 2015 10:20
+>> To: Gabriele Paoloni; bhelgaas at google.com; arnd at arndb.de;
+>> will.deacon at arm.com; catalin.marinas at arm.com; rjw at rjwysocki.net;
+>> hanjun.guo at linaro.org; Lorenzo.Pieralisi at arm.com; okaya at codeaurora.org;
+>> jiang.liu at linux.intel.com; Stefano.Stabellini at eu.citrix.com
+>> Cc: robert.richter at caviumnetworks.com; mw at semihalf.com;
+>> Liviu.Dudau at arm.com; ddaney at caviumnetworks.com; tglx at linutronix.de;
+>> Wangyijing; Suravee.Suthikulpanit at amd.com; msalter at redhat.com; linux-
+>> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+>> acpi at vger.kernel.org; linux-kernel at vger.kernel.org; linaro-
+>> acpi at lists.linaro.org; jchandra at broadcom.com; jcm at redhat.com
+>> Subject: Re: [PATCH V2 22/23] pci, acpi: Match PCI config space
+>> accessors against platfrom specific quirks.
+>>
+>> On 21.12.2015 12:47, Gabriele Paoloni wrote:
+>>> 2) In the quirk mechanism you proposed, I see that the callback
+>> function
+>>>      allows to do some preparation work for the host bridge. For
+>> example in
+>>>      Hisilicon hip05 case we would need to read some values from the
+>> ACPI
+>>>      table (see acpi_pci_root_hisi_add() function in
+>>>      https://lkml.org/lkml/2015/12/3/426).
+>>>      I am quite new to ACPI and I wonder if it is OK to add such
+>> "Packages"
+>>>      to the  PCI host bridge ACPI device...or maybe we need to declare
+>> a new
+>>>      one...?
+>>
+>> I may miss sth so please correct me in that case.
+>>
+>> https://lkml.org/lkml/2015/12/3/426 shows that you need special
+>> handling for root->secondary.start bus number only, right? So how about
+>> creating special MCFG region <rc-base:rc-base+rc-size> only for
+>> <segment,bus>.
+>> Like that:
+>>
+>> [0008]                       Base Address : <rc-base>
+>> [0002]               Segment Group Number : <segment>
+>> [0001]                   Start Bus Number : <root->secondary.start>
+>> [0001]                     End Bus Number : <root->secondary.start>
+>> [0004]                           Reserved : 00000000
+>>
+>>
+>> static const struct dmi_system_id hisi_quirk[] = {
+>> 	{
+>> 		.ident = "HiSi...",
+>> 		.matches = {
+>> 			DMI_MATCH(<whatever you need to match your platform>),
+>> 		},
+>> 	},
+>> 	{ }
+>> };
+>>
+>> static struct pci_ops hisi_ecam_pci_ops = {
+>> 	.map_bus = pci_mcfg_dev_base,
+>> 	.read = hisi_pcie_cfg_read,
+>> 	.write = hisi_pcie_cfg_write,
+>> };
+>>
+>> DECLARE_ACPI_MCFG_FIXUP(hisi_quirk, &hisi_ecam_pci_ops,
+>> 			<segment>, <bus>);
+>>
+>> With above code you can use your custom PCI config accessor only for
+>> that region.
+>>
+>> Let me know if that is not enough for you.
+>
+> In principle I think it can work...
+>
+> Liudongdong, Guo Hanjun what is your opinion about?
 
-> On Fri, Nov 20, 2015 at 02:22:03PM +0000, Liviu Dudau wrote:
-> > Hello,
-> > 
-> > This is v2 of the patchset trying to make drm_of_component_probe() cope with finding
-> > both local crtc ports and remote encoder ones. Heiko St?bner was nice enough to test
-> > an earlier version that was patched following Russell's suggestions on rk3288, but
-> > I haven't seen any reports from iMX or Armada users.
-> > 
-> > Changelog:
-> >  v2: Updated the drm_of_component_probe() comment to explain why the reference count
-> >      is not dropped. Fixed the compare_port() function for rockchip as described by
-> >      Russell.
-> >  v1: Original submission. http://lists.freedesktop.org/archives/dri-devel/2015-November/094546.html
-> 
-> Gentle ping, this has now been tested by Rockchip people and fixes the earlier version
-> that had to be reverted in mainline. Can it be included in the -next somewhere?
+Let me and Dongdong prepare a patch for Hip05 and then will
+back to this discussion to see if we met some problems.
 
-Hi Liviu,
-
-Sorry for being a bit late.
-
-I wanted to use drm_of_component_probe() for a new DRM driver, but I
-could not find any way to do it: you add the "ports" nodes as
-components while, usually, the components are the device nodes
-themselves.
-
-With this simple patch:
-
-diff --git a/drivers/gpu/drm/drm_of.c b/drivers/gpu/drm/drm_of.c
-index 493c05c..dbd2921 100644
---- a/drivers/gpu/drm/drm_of.c
-+++ b/drivers/gpu/drm/drm_of.c
-@@ -101,7 +101,7 @@ int drm_of_component_probe(struct device *dev,
- 			continue;
- 		}
- 
--		component_match_add(dev, &match, compare_of, port);
-+		component_match_add(dev, &match, compare_of, port->parent);
- 		of_node_put(port);
- 	}
- 
-everything is easy, my DT being like:
-
-	de_controller {
-		...
-		ports = <&lcd0_p>;
-	};
-
-	lcd_controller {
-		...
-		lcd0_p: port {
-			lcd0_ep: endpoint {
-				remote-endpoint = <&hdmi_ep>;
-			};
-		};
-	};
-
-What was the reason to keep the "ports" node instead of the device?
-
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Thanks
+Hanjun
