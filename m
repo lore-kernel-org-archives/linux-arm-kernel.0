@@ -1,30 +1,106 @@
 From: ykk@rock-chips.com (Yakir Yang)
-Date: Wed, 23 Dec 2015 08:47:12 +0800
-Subject: [PATCH v11 06/19] ARM: dts: exynos/dp: remove some properties
- that deprecated by analogix_dp driver
-In-Reply-To: <000801d13cb2$43079270$c916b750$@com>
+Date: Wed, 23 Dec 2015 08:49:34 +0800
+Subject: [PATCH v11 03/19] drm: bridge: analogix/dp: remove duplicate
+ configuration of link rate and link count
+In-Reply-To: <000701d13cb1$a3d5f0c0$eb81d240$@com>
 References: <1450236018-1118-1-git-send-email-ykk@rock-chips.com>
- <1450236876-1951-1-git-send-email-ykk@rock-chips.com>
- <000801d13cb2$43079270$c916b750$@com>
-Message-ID: <5679EF10.7070807@rock-chips.com>
+ <1450236502-1713-1-git-send-email-ykk@rock-chips.com>
+ <000701d13cb1$a3d5f0c0$eb81d240$@com>
+Message-ID: <5679EF9E.30703@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Jingoo,
 
-On 12/22/2015 08:13 PM, Jingoo Han wrote:
-> On Wednesday, December 16, 2015 12:35 PM, Yakir Yang wrote:
->> After exynos_dp have been split the common IP code into analogix_dp driver,
->> the analogix_dp driver have deprecated some Samsung platform properties which
->> could be dynamically parsed from EDID/MODE/DPCD message, so this is an update
->> for Exynos DTS file for dp-controller.
+Thanks for your respond.
+
+On 12/22/2015 08:09 PM, Jingoo Han wrote:
+> On Wednesday, December 16, 2015 12:28 PM, Yakir Yang wrote:
+>> link_rate and lane_count already configured in analogix_dp_set_link_train(),
+>> so we don't need to config those repeatly after training finished, just
+>> remove them out.
 >>
->> Beside the backward compatibility is fully preserved, so there are no
->> bisectability break that make this change in a separate patch.
+>> Beside Display Port 1.2 already support 5.4Gbps link rate, the maximum sets
+>> would change from {1.62Gbps, 2.7Gbps} to {1.62Gbps, 2.7Gbps, 5.4Gbps}.
 >>
 >> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
->> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 >> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> Reviewed-by: Jingoo Han < jingoohan1@gmail.com >
+>> ---
+>> Changes in v11: None
+>> Changes in v10: None
+>> Changes in v9: None
+>> Changes in v8: None
+>> Changes in v7: None
+>> Changes in v6: None
+>> Changes in v5: None
+>> Changes in v4:
+>> - Update commit message more readable. (Jingoo)
+>> - Adjust the order from 05 to 04
+>>
+>> Changes in v3:
+>> - The link_rate and lane_count shouldn't config to the DT property value
+>>    directly, but we can take those as hardware limite. For example, RK3288
+>>    only support 4 physical lanes of 2.7/1.62 Gbps/lane, so DT property would
+>>    like "link-rate = 0x0a" "lane-count = 4". (Thierry)
+>>
+>> Changes in v2: None
+>>
+>>   drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 8 ++++----
+>>   drivers/gpu/drm/bridge/analogix/analogix_dp_core.h | 5 +++--
+>>   2 files changed, 7 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+>> b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+>> index 4a05c2b..6f899cd 100644
+>> --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+>> +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+>> @@ -624,6 +624,8 @@ static void analogix_dp_get_max_rx_bandwidth(struct analogix_dp_device *dp,
+>>   	/*
+>>   	 * For DP rev.1.1, Maximum link rate of Main Link lanes
+>>   	 * 0x06 = 1.62 Gbps, 0x0a = 2.7 Gbps
+>> +	 * For DP rev.1.2, Maximum link rate of Main Link lanes
+>> +	 * 0x06 = 1.62 Gbps, 0x0a = 2.7 Gbps, 0x14 = 5.4Gbps
+>>   	 */
+>>   	analogix_dp_read_byte_from_dpcd(dp, DP_MAX_LINK_RATE, &data);
+>>   	*bandwidth = data;
+>> @@ -657,7 +659,8 @@ static void analogix_dp_init_training(struct analogix_dp_device *dp,
+>>   	analogix_dp_get_max_rx_lane_count(dp, &dp->link_train.lane_count);
+>>
+>>   	if ((dp->link_train.link_rate != LINK_RATE_1_62GBPS) &&
+>> -	    (dp->link_train.link_rate != LINK_RATE_2_70GBPS)) {
+>> +	    (dp->link_train.link_rate != LINK_RATE_2_70GBPS) &&
+>> +	    (dp->link_train.link_rate != LINK_RATE_5_40GBPS)) {
+>>   		dev_err(dp->dev, "Rx Max Link Rate is abnormal :%x !\n",
+>>   			dp->link_train.link_rate);
+>>   		dp->link_train.link_rate = LINK_RATE_1_62GBPS;
+>> @@ -898,9 +901,6 @@ static void analogix_dp_commit(struct analogix_dp_device *dp)
+>>   	analogix_dp_enable_rx_to_enhanced_mode(dp, 1);
+>>   	analogix_dp_enable_enhanced_mode(dp, 1);
+>>
+>> -	analogix_dp_set_lane_count(dp, dp->video_info->lane_count);
+>> -	analogix_dp_set_link_bandwidth(dp, dp->video_info->link_rate);
+>> -
+>>   	analogix_dp_init_video(dp);
+>>   	ret = analogix_dp_config_video(dp);
+>>   	if (ret)
+>> diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+>> b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+>> index 8e84208..57aa4b0d 100644
+>> --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+>> +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+>> @@ -21,8 +21,9 @@
+>>   #define MAX_EQ_LOOP			5
+>>
+>>   enum link_rate_type {
+>> -	LINK_RATE_1_62GBPS = 0x06,
+>> -	LINK_RATE_2_70GBPS = 0x0a
+>> +	LINK_RATE_1_62GBPS = DP_LINK_BW_1_62,
+>> +	LINK_RATE_2_70GBPS = DP_LINK_BW_2_7,
+>> +	LINK_RATE_5_40GBPS = DP_LINK_BW_5_4,
+> Then, how about removing 'enum link_rate_type'?
+> If DP_LINK_BW_* are used, LINK_RATE_* are not necessary.
+
+Sure, good catch.
 
 Thanks,
 - Yakir
@@ -32,147 +108,10 @@ Thanks,
 > Best regards,
 > Jingoo Han
 >
->> ---
->> Changes in v11: None
->> Changes in v10: None
->> Changes in v9: None
->> Changes in v8: None
->> Changes in v7: None
->> Changes in v6:
->> - Fix Peach Pit hpd property name error:
->> -       hpd-gpio = <&gpx2 6 0>;
->> +       hpd-gpios = <&gpx2 6 0>;
->>
->> Changes in v5:
->> - Correct the misspell in commit message. (Krzysztof)
->>
->> Changes in v4:
->> - Separate all DTS changes to a separate patch. (Krzysztof)
->>
->> Changes in v3: None
->> Changes in v2: None
->>
->>   arch/arm/boot/dts/exynos5250-arndale.dts      | 2 --
->>   arch/arm/boot/dts/exynos5250-smdk5250.dts     | 2 --
->>   arch/arm/boot/dts/exynos5250-snow-common.dtsi | 4 +---
->>   arch/arm/boot/dts/exynos5250-spring.dts       | 4 +---
->>   arch/arm/boot/dts/exynos5420-peach-pit.dts    | 4 +---
->>   arch/arm/boot/dts/exynos5420-smdk5420.dts     | 2 --
->>   arch/arm/boot/dts/exynos5800-peach-pi.dts     | 4 +---
->>   7 files changed, 4 insertions(+), 18 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
->> index c000532..b1790cf 100644
->> --- a/arch/arm/boot/dts/exynos5250-arndale.dts
->> +++ b/arch/arm/boot/dts/exynos5250-arndale.dts
->> @@ -124,8 +124,6 @@
->>   &dp {
->>   	status = "okay";
->>   	samsung,color-space = <0>;
->> -	samsung,dynamic-range = <0>;
->> -	samsung,ycbcr-coeff = <0>;
->>   	samsung,color-depth = <1>;
->>   	samsung,link-rate = <0x0a>;
->>   	samsung,lane-count = <4>;
->> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
->> index 0f5dcd4..f30c2db 100644
->> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
->> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
->> @@ -80,8 +80,6 @@
->>
->>   &dp {
->>   	samsung,color-space = <0>;
->> -	samsung,dynamic-range = <0>;
->> -	samsung,ycbcr-coeff = <0>;
->>   	samsung,color-depth = <1>;
->>   	samsung,link-rate = <0x0a>;
->>   	samsung,lane-count = <4>;
->> diff --git a/arch/arm/boot/dts/exynos5250-snow-common.dtsi b/arch/arm/boot/dts/exynos5250-snow-
->> common.dtsi
->> index 5cb33ba..b96624b 100644
->> --- a/arch/arm/boot/dts/exynos5250-snow-common.dtsi
->> +++ b/arch/arm/boot/dts/exynos5250-snow-common.dtsi
->> @@ -236,12 +236,10 @@
->>   	pinctrl-names = "default";
->>   	pinctrl-0 = <&dp_hpd>;
->>   	samsung,color-space = <0>;
->> -	samsung,dynamic-range = <0>;
->> -	samsung,ycbcr-coeff = <0>;
->>   	samsung,color-depth = <1>;
->>   	samsung,link-rate = <0x0a>;
->>   	samsung,lane-count = <2>;
->> -	samsung,hpd-gpio = <&gpx0 7 GPIO_ACTIVE_HIGH>;
->> +	hpd-gpios = <&gpx0 7 GPIO_ACTIVE_HIGH>;
->>
->>   	ports {
->>   		port at 0 {
->> diff --git a/arch/arm/boot/dts/exynos5250-spring.dts b/arch/arm/boot/dts/exynos5250-spring.dts
->> index c1edd6d..91881d7 100644
->> --- a/arch/arm/boot/dts/exynos5250-spring.dts
->> +++ b/arch/arm/boot/dts/exynos5250-spring.dts
->> @@ -74,12 +74,10 @@
->>   	pinctrl-names = "default";
->>   	pinctrl-0 = <&dp_hpd_gpio>;
->>   	samsung,color-space = <0>;
->> -	samsung,dynamic-range = <0>;
->> -	samsung,ycbcr-coeff = <0>;
->>   	samsung,color-depth = <1>;
->>   	samsung,link-rate = <0x0a>;
->>   	samsung,lane-count = <1>;
->> -	samsung,hpd-gpio = <&gpc3 0 GPIO_ACTIVE_HIGH>;
->> +	hpd-gpios = <&gpc3 0 GPIO_ACTIVE_HIGH>;
+>
 >>   };
 >>
->>   &ehci {
->> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
->> index 35cfb07..2f37c87 100644
->> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
->> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
->> @@ -148,12 +148,10 @@
->>   	pinctrl-names = "default";
->>   	pinctrl-0 = <&dp_hpd_gpio>;
->>   	samsung,color-space = <0>;
->> -	samsung,dynamic-range = <0>;
->> -	samsung,ycbcr-coeff = <0>;
->>   	samsung,color-depth = <1>;
->>   	samsung,link-rate = <0x06>;
->>   	samsung,lane-count = <2>;
->> -	samsung,hpd-gpio = <&gpx2 6 GPIO_ACTIVE_HIGH>;
->> +	hpd-gpios = <&gpx2 6 GPIO_ACTIVE_HIGH>;
->>
->>   	ports {
->>   		port at 0 {
->> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
->> index ac35aef..f67344f 100644
->> --- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
->> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
->> @@ -93,8 +93,6 @@
->>   	pinctrl-names = "default";
->>   	pinctrl-0 = <&dp_hpd>;
->>   	samsung,color-space = <0>;
->> -	samsung,dynamic-range = <0>;
->> -	samsung,ycbcr-coeff = <0>;
->>   	samsung,color-depth = <1>;
->>   	samsung,link-rate = <0x0a>;
->>   	samsung,lane-count = <4>;
->> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
->> index 7b018e4..363c95f 100644
->> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
->> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
->> @@ -142,12 +142,10 @@
->>   	pinctrl-names = "default";
->>   	pinctrl-0 = <&dp_hpd_gpio>;
->>   	samsung,color-space = <0>;
->> -	samsung,dynamic-range = <0>;
->> -	samsung,ycbcr-coeff = <0>;
->>   	samsung,color-depth = <1>;
->>   	samsung,link-rate = <0x0a>;
->>   	samsung,lane-count = <2>;
->> -	samsung,hpd-gpio = <&gpx2 6 GPIO_ACTIVE_HIGH>;
->> +	hpd-gpios = <&gpx2 6 GPIO_ACTIVE_HIGH>;
->>   	panel = <&panel>;
->>   };
->>
+>>   enum link_lane_count_type {
 >> --
 >> 1.9.1
 >
