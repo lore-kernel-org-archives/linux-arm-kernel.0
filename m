@@ -1,42 +1,32 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed, 23 Dec 2015 11:58:38 +0000
-Subject: [PATCH 3/6] regulator: lp872x: Remove warning about invalid DVS
- GPIO
-In-Reply-To: <1450871420.2648.6.camel@collins>
-References: <1450868319-20513-1-git-send-email-contact@paulk.fr>
- <1450868319-20513-4-git-send-email-contact@paulk.fr>
- <20151223114126.GR16023@sirena.org.uk>
- <1450871420.2648.6.camel@collins>
-Message-ID: <20151223115838.GT16023@sirena.org.uk>
+Date: Wed, 23 Dec 2015 12:00:19 +0000
+Subject: [PATCH] regulator: mt6397: convert to arch_initcall
+In-Reply-To: <1450865768-10317-1-git-send-email-henryc.chen@mediatek.com>
+References: <1450865768-10317-1-git-send-email-henryc.chen@mediatek.com>
+Message-ID: <20151223120019.GU16023@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 23, 2015 at 12:50:20PM +0100, Paul Kocialkowski wrote:
-> Le mercredi 23 d?cembre 2015 ? 11:41 +0000, Mark Brown a ?crit :
+On Wed, Dec 23, 2015 at 06:16:08PM +0800, Henry Chen wrote:
 
-> > I would expect the driver at least needs to know how the pins or
-> > strapped, or otherwise have configuration for ignoring the input on the
-> > pins.  This just deletes the warnings, it doesn't have any handling for
-> > this case that I can see.
+Please fix your mail client to word wrap within paragraphs at something
+substantially less than 80 columns.  Doing this makes your messages much
+easier to read and reply to.
 
-> When the DVS GPIO is invalid, lp872x_init_dvs jumps to the
-> set_default_dvs_mode label, which instructs the chip not to use the DVS
-> pin at all and do it all in software instead (by clearing the
-> LP8720_EXT_DVS_M bit in the LP872X_GENERAL_CFG register).
+> Due to some device may need reulator operation in earlier boot time like gpu module which
+> power domain need regulator power on first. Move regulator of mt6397
+> initialization earlier in boot so that real devices can use regulator
+> without probe deferring.
 
-> That is reflected later in the code, when setting the bucks (the DVS pin
-> only applies to the bucks) by checking for the LP8720_EXT_DVS_M bit on
-> the LP872X_GENERAL_CFG register (in lp872x_select_buck_vout_addr) to
-> decide whether to use software or hardware DVS selection.
-
-> As far as I understood, everything goes well when the GPIO is invalid.
-
-So please put this analysis in the changelog so that the changelog
-accurately reflects what the change is doing.
+Several problems here.  One is that we usually use subsys_initcall() for
+working around the known broken subsystems here, why have you decided to
+go for arch_initcall() instead.  Another is that you're saying this is
+for GPUs but I'm not aware of any reason why GPUs are broken and we
+should not be introducing new problems here - what's going on?
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 473 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151223/acf0cc3a/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151223/3fc42bee/attachment.sig>
