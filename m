@@ -1,71 +1,41 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 22 Dec 2015 17:44:47 -0800
-Subject: [GIT PULL 3/3] reworked dts changes for ti81xx devices and minimal
+Date: Tue, 22 Dec 2015 17:44:46 -0800
+Subject: [GIT PULL 2/3] reworked soc changes for ti81xx devices and minimal
  dra62x j5ec-evm support
 In-Reply-To: <pull-1450834180-928842>
 References: <pull-1450834180-928842>
-Message-ID: <pull-1450834180-928842-3>
+Message-ID: <pull-1450834180-928842-2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit d893656e61040f3ff7b5f72a986052a348f3c94e:
+The following changes since commit f2e6a0a913b53f5af87c7e9a783ceae5bb4ae2c4:
 
-  ARM: OMAP2+: Remove useless check for legacy booting for dm814x (2015-12-09 16:53:46 -0800)
+  ARM: OMAP2+: Remove device creation for omap-pcm-audio (2015-12-17 10:34:41 -0800)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.5/81xx-dts-signed
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.5/81xx-soc-signed
 
-for you to fetch changes up to 43fe6de38ea57bf3ef20e89d8bf9b799a7ff0c0b:
+for you to fetch changes up to f53850b5dc625ca37ae84b47f4f92b1d55df2aa0:
 
-  ARM: dts: Add usb support for j5-eco evm (2015-12-22 16:01:41 -0800)
-
-----------------------------------------------------------------
-Add minimal device tree support for dra62x also known j5eco. It is
-related to dm814x, just the clocks are a bit different and it has a
-different set of integrated devices. And let's get some basic dm814x
-and dra62x devices working as many of the devices are like on am33xx::
-
-- pinctrl using the pinctrl defines as for am33xx
-
-- Updated EDMA bindings with support for using exma_xbar
-
-- MMC support for dm814x-evm, t410 and dra62x-j5eco-evm
-
-- USB support for dm814x-evm, t410 and dra62x-j5eco-evm
-
-This branch depends on an earlier omap-for-v4.5/81xx-fixes-signed
-branch that has dm814x dts fixes interlaced with SoC related fixes to
-keep things booting. The interlaced SoC and dts fixes were needed
-because of issues with the device tree defined clocks that just
-happened to work on bootloader timings for t410 earlier.
+  ARM: OMAP2+: Add support for dm814x and dra62x usb (2015-12-22 16:23:08 -0800)
 
 ----------------------------------------------------------------
-Tony Lindgren (12):
-      ARM: dts: Add basic support for dra62x j5-eco SoC
-      ARM: dts: Add minimal dra62x j5-eco evm support
-      ARM: dts: Add pinctrl macros for dm814x
-      ARM: dts: Update edma bindings on dm814x to use edma_xbar
-      ARM: dts: Add mmc device entries for dm814x
-      ARM: dts: Add mmc support for dm8148-evm
-      ARM: dts: Add mmc support for dra62x j5-eco evm
-      ARM: dts: Enable emmc on hp t410
-      ARM: dts: Add usb support for dm814x and dra62x
-      ARM: dts: Add usb support for dm814x-evm
-      ARM: dts: Add usb support for hp t410
-      ARM: dts: Add usb support for j5-eco evm
+Add minimal SoC support for dra62x also known as j5eco. As it's closely
+related to dm814x, we can treat it as a dm814x variant for now and do
+rest of the configuration with DTS just files. And let's add hwmod
+support for MMC and USB on dm814x and dra62x.
 
- arch/arm/boot/dts/Makefile             |   3 +-
- arch/arm/boot/dts/dm8148-evm.dts       |  55 ++++++++
- arch/arm/boot/dts/dm8148-t410.dts      |  70 ++++++++++
- arch/arm/boot/dts/dm814x.dtsi          | 226 +++++++++++++++++++++++++++++++--
- arch/arm/boot/dts/dra62x-clocks.dtsi   |  23 ++++
- arch/arm/boot/dts/dra62x-j5eco-evm.dts |  80 ++++++++++++
- arch/arm/boot/dts/dra62x.dtsi          |  23 ++++
- include/dt-bindings/pinctrl/dm814x.h   |  48 +++++++
- include/dt-bindings/pinctrl/omap.h     |   1 +
- 9 files changed, 517 insertions(+), 12 deletions(-)
- create mode 100644 arch/arm/boot/dts/dra62x-clocks.dtsi
- create mode 100644 arch/arm/boot/dts/dra62x-j5eco-evm.dts
- create mode 100644 arch/arm/boot/dts/dra62x.dtsi
- create mode 100644 include/dt-bindings/pinctrl/dm814x.h
+----------------------------------------------------------------
+Tony Lindgren (4):
+      ARM: OMAP2+: Fix SoC detection for dra62x j5-eco
+      ARM: OMAP2+: Update 81xx clock and power domains for default, active and sgx
+      ARM: OMAP2+: Add mmc hwmod entries for dm814x
+      ARM: OMAP2+: Add support for dm814x and dra62x usb
+
+ arch/arm/mach-omap2/clockdomains81xx_data.c |  29 +++---
+ arch/arm/mach-omap2/cm81xx.h                |   6 +-
+ arch/arm/mach-omap2/id.c                    |   4 +-
+ arch/arm/mach-omap2/omap_hwmod_81xx_data.c  | 131 ++++++++++++++++++++++++----
+ arch/arm/mach-omap2/powerdomains3xxx_data.c |  10 ++-
+ 5 files changed, 139 insertions(+), 41 deletions(-)
