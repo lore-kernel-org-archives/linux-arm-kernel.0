@@ -1,36 +1,40 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 23 Dec 2015 09:29:43 -0700
-Subject: [PATCH V7 00/24] Coresight integration with perf
-In-Reply-To: <20151219174231.GD2437@debian>
+Date: Wed, 23 Dec 2015 09:33:11 -0700
+Subject: [PATCH V7 17/24] coresight: etb10: implementing AUX space API
+In-Reply-To: <20151219172314.GB2437@debian>
 References: <1450472361-426-1-git-send-email-mathieu.poirier@linaro.org>
- <20151219174231.GD2437@debian>
-Message-ID: <CANLsYkw7X_B7EKj=_zOXZugAztsPZf2cmPLQXbj37dByMrqA2g@mail.gmail.com>
+ <1450472361-426-18-git-send-email-mathieu.poirier@linaro.org>
+ <20151219172314.GB2437@debian>
+Message-ID: <CANLsYkwgo0pQFAvdO+dbPxYUqqj0xWoa_i_RkX2bWJYv-UOvHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 December 2015 at 10:42, Rabin Vincent <rabin@rab.in> wrote:
-> On Fri, Dec 18, 2015 at 01:58:56PM -0700, Mathieu Poirier wrote:
->> This patchset aims to integrate configuration and control of
->> the Coresight tracers with the perf sub-system.
->>
->> The goal is to use PMUs to represent tracers and the auxiliary
->> buffer enhancement to collect processor traces.  As such a lot
->> of work is done to move the current Coresight sysFS oriented
->> configuration and control commands to perf's AUX API.
+On 19 December 2015 at 10:23, Rabin Vincent <rabin@rab.in> wrote:
+> On Fri, Dec 18, 2015 at 01:59:13PM -0700, Mathieu Poirier wrote:
+>> +static void etb_update_buffer(struct coresight_device *csdev,
+>> +                           struct perf_output_handle *handle,
+>> +                           void *sink_config)
+>> +{
+>> +     int i, cur;
+>> +     u32 *buf_ptr;
 >
-> These patches allow the trace to be recorded with perf, but what do you
-> use to actually get something useful out of the resulting perf.data?
-> AFAICS it can't be processed by perf script or the other perf tools.
+> ...
+>
+>> +     for (i = 0; i < to_read; i += 4) {
+>> +             buf_ptr = buf->data_pages[cur] + offset;
+>> +             read_data = readl_relaxed(drvdata->base +
+>> +                                       ETB_RAM_READ_DATA_REG);
+>> +             *buf_ptr++ = read_data >> 0;
+>> +             *buf_ptr++ = read_data >> 8;
+>> +             *buf_ptr++ = read_data >> 16;
+>> +             *buf_ptr++ = read_data >> 24;
+>
+> buf_ptr should either be changed to a u8* or just the first write should
+> be present.  Otherwise this overwrites lots of memory.
 
-You are correct.  The team is working on a trace decoder that will be
-embedded in the perf tool suite.
+Good catch!
 
 >
-> # echo 1 > /sys/bus/coresight/devices/54162000.etb/enable_sink
->
-> # perf record -e cs_etm// true
-> [ perf record: Woken up 1 times to write data ]
-> [ perf record: Captured and wrote 0.032 MB perf.data ]
->
-> # perf script
-> 0x188 [0x80]: failed to process type: 70
+>> +
+>> +             offset += 4;
+>> +             if (offset >= PAGE_SIZE) {
