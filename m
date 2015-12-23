@@ -1,52 +1,43 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 23 Dec 2015 11:48:33 +0100
-Subject: [PATCH 1/5] iio:adc:at91_adc8xx: introduce new atmel adc driver
-In-Reply-To: <20151223102700.GC2789@odux.rfo.atmel.com>
-References: <1450689852-22763-1-git-send-email-ludovic.desroches@atmel.com>
- <1450689852-22763-2-git-send-email-ludovic.desroches@atmel.com>
- <56799798.203@kernel.org>
- <20151223102700.GC2789@odux.rfo.atmel.com>
-Message-ID: <20151223104833.GE2789@odux.rfo.atmel.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 23 Dec 2015 19:51:11 +0900
+Subject: [GIT PULL 5/9] ARM: EXYNOS: Drivers for v4.5
+In-Reply-To: <20151222045042.GF30172@localhost>
+References: <1449020386-20250-1-git-send-email-k.kozlowski@samsung.com>
+ <1449020386-20250-6-git-send-email-k.kozlowski@samsung.com>
+ <20151222045042.GF30172@localhost>
+Message-ID: <567A7C9F.3020907@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 23, 2015 at 11:27:00AM +0100, Ludovic Desroches wrote:
-> On Tue, Dec 22, 2015 at 06:34:00PM +0000, Jonathan Cameron wrote:
-> > On 21/12/15 09:24, Ludovic Desroches wrote:
-> > > This driver supports the new version of the Atmel ADC device introduced
-> > > with the SAMA5D2 SoC family.
-> > > 
-
-[...]
-
-> > > +static irqreturn_t at91_adc_interrupt(int irq, void *private)
-> > > +{
-> > > +	struct iio_dev *indio = private;
-> > > +	struct at91_adc_state *st = iio_priv(indio);
-> > > +	u32 status = at91_adc_readl(st, ADC_ISR);
-> > > +
-> > > +	status &= at91_adc_readl(st, ADC_IMR);
-> > > +	if (status & 0xFFF) {
-> > > +		st->last_value = at91_adc_readl(st, st->chan->address);
-> > If this is a polled read - is there any reason to read this value here
-> > rather than outside the interrupt?
+W dniu 22.12.2015 o 13:50, Olof Johansson pisze:
+> On Wed, Dec 02, 2015 at 10:39:42AM +0900, Krzysztof Kozlowski wrote:
+>> Hi Kukjin,
+>>
+>> Pinctrl for v4.5.
+>>
+>> Best regards,
+>> Krzysztof
+>>
+>>
+>> The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+>>
+>>   Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+>>
+>> are available in the git repository at:
+>>
+>>   https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-drivers-4.5
+>>
+>> for you to fetch changes up to 023e06dfa6882f500b9c86fd61f0b1913aa07f36:
+>>
+>>   pinctrl: exynos: add exynos5410 SoC specific data (2015-11-16 10:54:43 +0900)
 > 
-> No it can be done outside the interrupt. I have taken some parts from the
-> previous driver but it was reading a register used by all the channels
-> when it has been designed. So yes there is probably no more reason to
-> read it into the interrupt.
+> Hi,
 > 
+> This should either go in through the pinctrl tree, or have an acked/reviewed-by
+> one of the pinctrl maintainers.
 
-Thinking about it. Is it really useful to move reading outside the
-interrupt?
+It was acked by Tomasz Figa - Samsung Pin Controller maintainer:
+https://patchwork.ozlabs.org/patch/450340/
 
-By the way this is not a polled read.
-
-> > > +		st->done = true;
-> > > +		wake_up_interruptible(&st->wq_data_available);
-> > > +	}
-> > > +
-> > > +	return IRQ_HANDLED;
-> > > +}
-
-Ludovic
+Best regards,
+Krzysztof
