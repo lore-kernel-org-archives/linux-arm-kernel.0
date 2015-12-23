@@ -1,34 +1,42 @@
-From: henryc.chen@mediatek.com (Henry Chen)
-Date: Wed, 23 Dec 2015 17:25:11 +0800
-Subject: [PATCH] mfd: mt6397: convert to arch_initcall
-Message-ID: <1450862711-22124-1-git-send-email-henryc.chen@mediatek.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 23 Dec 2015 10:29:28 +0100
+Subject: [PATCH] efi: stub: define DISABLE_BRANCH_PROFILING for all
+ architectures
+Message-ID: <1450862968-20222-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since pinctrl or regulator of mt6396 need to initialize earlier to avoid
-probe deferring, also change the core driver to arch_init.
+This moves the DISABLE_BRANCH_PROFILING define from the x86 specific
+to the general CFLAGS definition for the stub. This fixes build errors
+when building for arm64 with CONFIG_PROFILE_ALL_BRANCHES_ENABLED.
 
-Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
+Reported-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/mfd/mt6397-core.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ drivers/firmware/efi/libstub/Makefile | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
-index 1749c1c..af98b4b 100644
---- a/drivers/mfd/mt6397-core.c
-+++ b/drivers/mfd/mt6397-core.c
-@@ -285,7 +285,11 @@ static struct platform_driver mt6397_driver = {
- 	},
- };
+diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
+index 3c0467d3688c..c0ddd1b8dca3 100644
+--- a/drivers/firmware/efi/libstub/Makefile
++++ b/drivers/firmware/efi/libstub/Makefile
+@@ -8,7 +8,7 @@ cflags-$(CONFIG_X86_32)		:= -march=i386
+ cflags-$(CONFIG_X86_64)		:= -mcmodel=small
+ cflags-$(CONFIG_X86)		+= -m$(BITS) -D__KERNEL__ $(LINUX_INCLUDE) -O2 \
+ 				   -fPIC -fno-strict-aliasing -mno-red-zone \
+-				   -mno-mmx -mno-sse -DDISABLE_BRANCH_PROFILING
++				   -mno-mmx -mno-sse
  
--module_platform_driver(mt6397_driver);
-+static int __init mt6397_core_init(void)
-+{
-+	return platform_driver_register(&mt6397_driver);
-+}
-+arch_initcall(mt6397_core_init);
+ cflags-$(CONFIG_ARM64)		:= $(subst -pg,,$(KBUILD_CFLAGS))
+ cflags-$(CONFIG_ARM)		:= $(subst -pg,,$(KBUILD_CFLAGS)) \
+@@ -16,7 +16,7 @@ cflags-$(CONFIG_ARM)		:= $(subst -pg,,$(KBUILD_CFLAGS)) \
  
- MODULE_AUTHOR("Flora Fu, MediaTek");
- MODULE_DESCRIPTION("Driver for MediaTek MT6397 PMIC");
+ cflags-$(CONFIG_EFI_ARMSTUB)	+= -I$(srctree)/scripts/dtc/libfdt
+ 
+-KBUILD_CFLAGS			:= $(cflags-y) \
++KBUILD_CFLAGS			:= $(cflags-y) -DDISABLE_BRANCH_PROFILING \
+ 				   $(call cc-option,-ffreestanding) \
+ 				   $(call cc-option,-fno-stack-protector)
+ 
 -- 
-1.9.1
+2.5.0
