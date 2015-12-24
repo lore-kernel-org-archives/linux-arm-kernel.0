@@ -1,73 +1,55 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Wed, 23 Dec 2015 14:35:57 -0800
-Subject: [PATCH] pinctrl: nsp-gpio: fix type of iterator
-In-Reply-To: <1450867041-729-2-git-send-email-a.hajda@samsung.com>
-References: <1450867041-729-1-git-send-email-a.hajda@samsung.com>
- <1450867041-729-2-git-send-email-a.hajda@samsung.com>
-Message-ID: <567B21CD.9090900@broadcom.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 23 Dec 2015 16:11:22 -0800
+Subject: [PATCH v2] ARM: mm: flip priority of CONFIG_DEBUG_RODATA
+In-Reply-To: <alpine.LFD.2.20.1512231637110.3603@knanqh.ubzr>
+References: <20151202202725.GA794@www.outflux.net>
+ <20151223195129.GP2793@atomide.com> <567B04AB.6010906@redhat.com>
+ <20151223212911.GR2793@atomide.com>
+ <alpine.LFD.2.20.1512231637110.3603@knanqh.ubzr>
+Message-ID: <20151224001121.GS2793@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Reddy
+* Nicolas Pitre <nicolas.pitre@linaro.org> [151223 13:45]:
+> On Wed, 23 Dec 2015, Tony Lindgren wrote:
+> 
+> > Hi,
+> > 
+> > * Laura Abbott <labbott@redhat.com> [151223 12:31]:
+> > > 
+> > > Looks like a case similar to Geert's
+> > > 
+> > >         adr     r7, kick_counter
+> > > wait_dll_lock_timed:
+> > >         ldr     r4, wait_dll_lock_counter
+> > >         add     r4, r4, #1
+> > >         str     r4, [r7, #wait_dll_lock_counter - kick_counter]
+> > >         ldr     r4, sdrc_dlla_status
+> > >         /* Wait 20uS for lock */
+> > >         mov     r6, #8
+> > > 
+> > > 
+> > > kick_counter and wait_dll_lock_counter are in the text section which is marked read only.
+> > > They need to be moved to the data section along with a few other variables from what I
+> > > can tell (maybe those are read only?).
+> > 
+> > Thanks for looking, yeah so it seem.
+> > 
+> > > I suspect this is going to be a common issue with suspend/resume code paths since those
+> > > are hand written assembly.
+> > 
+> > Yes I suspect we have quite a few cases like this.
+> 
+> We fixed a bunch of similar issues where code was located in the .data 
+> section for ease of use from assembly code.  See commit b4e61537 and 
+> d0776aff for example.
 
-On 12/23/2015 2:37 AM, Andrzej Hajda wrote:
-> Iterator i declared as unsigned is always non-negative so the
-> loop will never end.
->
-> The problem has been detected using proposed semantic patch
-> scripts/coccinelle/tests/unsigned_lesser_than_zero.cocci [1].
->
-> [1]: http://permalink.gmane.org/gmane.linux.kernel/2038576
->
-> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
-> ---
->   drivers/pinctrl/bcm/pinctrl-nsp-gpio.c | 3 ++-
->   1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/pinctrl/bcm/pinctrl-nsp-gpio.c b/drivers/pinctrl/bcm/pinctrl-nsp-gpio.c
-> index 34648f6..ad5b04c 100644
-> --- a/drivers/pinctrl/bcm/pinctrl-nsp-gpio.c
-> +++ b/drivers/pinctrl/bcm/pinctrl-nsp-gpio.c
-> @@ -439,7 +439,8 @@ static int nsp_gpio_set_strength(struct nsp_gpio *chip, unsigned gpio,
->   static int nsp_gpio_get_strength(struct nsp_gpio *chip, unsigned gpio,
->   				 u16 *strength)
->   {
-> -	unsigned int i, offset, shift;
-> +	unsigned int offset, shift;
-> +	int i;
->   	u32 val;
->   	unsigned long flags;
->
->
+Thanks hey some assembly fun for the holidays :) I also need to check what
+all gets relocated to SRAM here.
 
-The fix is a valid fix. And at the same time it exposes other potential 
-issues in the driver. I just found the loop used in _set_strength and 
-_get_strength is inconsistent:
+In any case, seems like the $subject patch is too intrusive for v4.5 at
+this point.
 
-In _set_strength:
+Regards,
 
-427         for (i = GPIO_DRV_STRENGTH_BITS; i > 0; i--) {
-
-For i to start at GPIO_DRV_STRENGTH_BITS, it seems to be wrong.
-
-428                 val = readl(chip->io_ctrl + offset);
-429                 val &= ~BIT(shift);
-430                 val |= ((strength >> (i-1)) & 0x1) << shift;
-431                 writel(val, chip->io_ctrl + offset);
-432                 offset += 4;
-433         }
-
-In _get_strength:
-
-451         for (i = (GPIO_DRV_STRENGTH_BITS - 1); i >= 0; i--) {
-452                 val = readl(chip->io_ctrl + offset) & BIT(shift);
-453                 val >>= shift;
-454                 *strength += (val << i);
-455                 offset += 4;
-456         }
-
-Reddy, could you please review and comment?
-
-Thanks,
-
-Ray
+Tony
