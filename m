@@ -1,60 +1,40 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Wed, 23 Dec 2015 16:11:38 -0800
-Subject: [PATCH v2 0/5] clk: rockchip: fix handling of fractional dividers
-In-Reply-To: <1450819682-4932-1-git-send-email-heiko@sntech.de>
-References: <1450819682-4932-1-git-send-email-heiko@sntech.de>
-Message-ID: <20151224001138.GA5927@quark.deferred.io>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 24 Dec 2015 00:34:07 +0000
+Subject: [PATCH v2] ARM: mm: flip priority of CONFIG_DEBUG_RODATA
+In-Reply-To: <20151224001121.GS2793@atomide.com>
+References: <20151202202725.GA794@www.outflux.net>
+ <20151223195129.GP2793@atomide.com> <567B04AB.6010906@redhat.com>
+ <20151223212911.GR2793@atomide.com>
+ <alpine.LFD.2.20.1512231637110.3603@knanqh.ubzr>
+ <20151224001121.GS2793@atomide.com>
+Message-ID: <20151224003406.GA8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/22, Heiko Stuebner wrote:
-> Essentially unchanged from the first iteration from back in august, just
-> including additional patches depending on that and fixing fractional
-> dividers on the rk3036 and spdif parent settings.
+On Wed, Dec 23, 2015 at 04:11:22PM -0800, Tony Lindgren wrote:
+> * Nicolas Pitre <nicolas.pitre@linaro.org> [151223 13:45]:
+> > We fixed a bunch of similar issues where code was located in the .data 
+> > section for ease of use from assembly code.  See commit b4e61537 and 
+> > d0776aff for example.
 > 
-> In v1, Stephen seemed essentially ok with it but Mike put forward his wish
-> to use his planned approach for connected clocks for handling this.
+> Thanks hey some assembly fun for the holidays :) I also need to check what
+> all gets relocated to SRAM here.
 > 
-> While that in itself will be very interesting also for handling Rockchip's
-> armclk generically, we're now in the situation that everything related
-> to audio output relies on working fractional dividers to produce the
-> needed clock frequencies, making audio-output essentially non-working on
-> all Rockchip socs in mainline at the moment.
-> 
-> So I'm somewhat hoping for some sort of intermediate solution here :-)
+> In any case, seems like the $subject patch is too intrusive for v4.5 at
+> this point.
 
-Intermediate solution applied.
+Given Christmas and an unknown time between that and the merge window
+actually opening, I decided Tuesday would be the last day I take any
+patches into my tree - and today would be the day that I drop anything
+that causes problems.
 
-Regards,
-Mike
+So, I've already dropped this, so tomorrow's linux-next should not have
+this change.
 
-> 
-> 
-> changes in v2:
-> - rebase original 3 patches onto 4.4
-> - add the 2 new patches from other series, that need that change
-> 
-> Heiko Stuebner (3):
->   clk: add flag for clocks that need to be enabled on rate changes
->   clk: rockchip: handle mux dependency of fractional dividers
->   clk: rockchip: include downstream muxes into fractional dividers
-> 
-> Sjoerd Simons (1):
->   clk: rockchip: Allow the RK3288 SPDIF clocks to change their parent
-> 
-> Xing Zheng (1):
->   clk: rockchip: rk3036: include downstream muxes into fractional
->     dividers
-> 
->  drivers/clk/clk.c                 |  18 +++++
->  drivers/clk/rockchip/clk-rk3036.c |  34 +++++-----
->  drivers/clk/rockchip/clk-rk3188.c |  80 +++++++++++-----------
->  drivers/clk/rockchip/clk-rk3288.c |  70 +++++++++----------
->  drivers/clk/rockchip/clk.c        | 137 ++++++++++++++++++++++++++++++++++----
->  drivers/clk/rockchip/clk.h        |  19 ++++++
->  include/linux/clk-provider.h      |   1 +
->  7 files changed, 254 insertions(+), 105 deletions(-)
-> 
-> -- 
-> 2.6.4
-> 
+You'll still see breakage if people enable RODATA though, but that's no
+different from previous kernels.
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
