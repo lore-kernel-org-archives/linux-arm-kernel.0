@@ -1,211 +1,76 @@
-From: Zhiqiang.Hou@freescale.com (Zhiqiang Hou)
-Date: Thu, 24 Dec 2015 17:11:38 +0800
-Subject: [PATCH v2 2/2] ARM64: dts: add LS1043a-QDS board support
-In-Reply-To: <1450948298-33238-1-git-send-email-Zhiqiang.Hou@freescale.com>
-References: <1450948298-33238-1-git-send-email-Zhiqiang.Hou@freescale.com>
-Message-ID: <1450948298-33238-2-git-send-email-Zhiqiang.Hou@freescale.com>
+From: alchark@gmail.com (Alexey Charkov)
+Date: Thu, 24 Dec 2015 12:24:02 +0300
+Subject: [PATCH v3 0/2] WM8505/WM8650 DT fixes for SD card controller
+In-Reply-To: <20151224004825.4350790e@anonymous>
+References: <1423130878-3894-1-git-send-email-v1ron@v1ros.org>
+ <1425226007-2757-1-git-send-email-rvolkov@v1ros.org>
+ <2119510.55A8Br1LeL@wuerfel> <20150301233911.2352ce48@v1ron-s7>
+ <20150404152720.1059e741@v1ron-s7>
+ <20151224004825.4350790e@anonymous>
+Message-ID: <CABjd4YxLex0Or8PzJkNK_KWm2KhpGp7xqQL1on0hCbvi+ow5Fg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shaohui Xie <Shaohui.Xie@freescale.com>
+2015-12-24 0:48 GMT+03:00 Roman Volkov <v1ron@mail.ru>:
+> ? Sat, 4 Apr 2015 15:27:20 +0300
+> Roman Volkov <v1ron@v1ros.org> ?????:
+>
+>> ? Sun, 1 Mar 2015 23:39:11 +0300
+>> Roman Volkov <rvolkov@v1ros.org> ?????:
+>>
+>> > ? Sun, 01 Mar 2015 20:52:55 +0100
+>> > Arnd Bergmann <arnd@arndb.de> ?????:
+>> >
+>> > > On Sunday 01 March 2015 19:06:45 Roman Volkov wrote:
+>> > > > This patch set enables SD controller support for WM8650 and
+>> > > > fixes minor errors in WM8505 Device Tree file.
+>> > > >
+>> > > > Changes in v3:
+>> > > > 1. Add minor fixes for WM8505 SDHC node
+>> > > >
+>> > > > Tested on both WM8505 and WM8650.
+>> > > >
+>> > > > Roman Volkov (2):
+>> > > >   dts: vt8500: Add SDHC node to DTS file for WM8650
+>> > > >   dts: vt8500: Fix errors in SDHC node for WM8505
+>> > > >
+>> > > >  arch/arm/boot/dts/wm8505.dtsi | 4 ++--
+>> > > >  arch/arm/boot/dts/wm8650.dtsi | 9 +++++++++
+>> > > >  2 files changed, 11 insertions(+), 2 deletions(-)
+>> > > >
+>> > > > --
+>> > > > Hi maintainers, I see my previous versions were not applied.
+>> > > > Could this little patch set be applied for the linux-next? I
+>> > > > don't think this is new functionality, this must be considered
+>> > > > as bugfix for existing Device Tree.
+>> > > >
+>> > > > Any other suggestions?
+>> > >
+>> > > According to the MAINTAINERS file, Tony Prisk should be the person
+>> > > to pick them up, but he was not the recipient of the mail.
+>> > >
+>> > >   Arnd
+>> >
+>> > Thanks for the tip. Tony probably need to add these files to his
+>> > list of maintained files. get_maintainer.pl doesn't mention him.
+>> >
+>> > Roman
+>>
+>> Arnd,
+>>
+>> No response yet from Tony for over a month.
+>>
+>> Roman
+>
+> Ping. At least two patch sets for vt8500 are waiting to be picked up.
+> vt8500 maintainer is inactive for over a year.
 
-Signed-off-by: Shaohui Xie <Shaohui.Xie@freescale.com>
-Signed-off-by: Mingkai Hu <Mingkai.Hu@freescale.com>
-Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@freescale.com>
----
-v2:
- - add root node compatible property
+This series (as available at https://lkml.org/lkml/2015/3/1/172) looks
+good to me as far as VT8500 is concerned. Tony is unfortunately
+unresponsive lately, but I was the author of vt8500 code pre-DT, and
+these changes look all correct.
 
- arch/arm64/boot/dts/freescale/Makefile            |   1 +
- arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts | 168 ++++++++++++++++++++++
- 2 files changed, 169 insertions(+)
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
+Rob/Grant, any chance you could push these via the OF tree?
 
-diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
-index f3c2516..1423fa4 100644
---- a/arch/arm64/boot/dts/freescale/Makefile
-+++ b/arch/arm64/boot/dts/freescale/Makefile
-@@ -2,6 +2,7 @@ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-qds.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-rdb.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-simu.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1043a-rdb.dtb
-+dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1043a-qds.dtb
-  
- always		:= $(dtb-y)
- subdir-y	:= $(dts-dirs)
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
-new file mode 100644
-index 0000000..d7aae69
---- /dev/null
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
-@@ -0,0 +1,168 @@
-+/*
-+ * Device Tree Include file for Freescale Layerscape-1043A family SoC.
-+ *
-+ * Copyright 2014-2015, Freescale Semiconductor
-+ *
-+ * Mingkai Hu <Mingkai.hu@freescale.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPLv2 or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+/include/ "fsl-ls1043a.dtsi"
-+
-+/ {
-+	model = "LS1043A QDS Board";
-+	compatible = "fsl,ls1043a-qds", "fsl,ls1043a";
-+
-+	aliases {
-+		serial0 = &lpuart0;
-+		serial1 = &lpuart1;
-+		serial2 = &lpuart2;
-+		serial3 = &lpuart3;
-+		serial4 = &lpuart4;
-+		serial5 = &lpuart5;
-+
-+		gpio0 = &gpio1;
-+		gpio1 = &gpio2;
-+		gpio2 = &gpio3;
-+		gpio3 = &gpio4;
-+	};
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+	pca9547 at 77 {
-+		compatible = "philips,pca9547";
-+		reg = <0x77>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		i2c at 0 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x0>;
-+
-+			rtc at 68 {
-+				compatible = "dallas,ds3232";
-+				reg = <0x68>;
-+				/* IRQ10_B */
-+				interrupts = <0 150 0x4>;
-+			};
-+		};
-+
-+		i2c at 2 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x2>;
-+
-+			ina220 at 40 {
-+				compatible = "ti,ina220";
-+				reg = <0x40>;
-+				shunt-resistor = <1000>;
-+			};
-+
-+			ina220 at 41 {
-+				compatible = "ti,ina220";
-+				reg = <0x41>;
-+				shunt-resistor = <1000>;
-+			};
-+		};
-+
-+		i2c at 3 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x3>;
-+
-+			eeprom at 56 {
-+				compatible = "at24,24c512";
-+				reg = <0x56>;
-+			};
-+
-+			eeprom at 57 {
-+				compatible = "at24,24c512";
-+				reg = <0x57>;
-+			};
-+
-+			adt7461a at 4c {
-+				compatible = "adt7461a";
-+				reg = <0x4c>;
-+			};
-+		};
-+	};
-+};
-+
-+&ifc {
-+	status = "okay";
-+	#address-cells = <2>;
-+	#size-cells = <1>;
-+	/* NOR, NAND Flashes and FPGA on board */
-+	ranges = <0x0 0x0 0x0 0x60000000 0x08000000
-+		  0x1 0x0 0x0 0x7e800000 0x00010000
-+		  0x2 0x0 0x0 0x7fb00000 0x00000100>;
-+
-+	nor at 0,0 {
-+		compatible = "cfi-flash";
-+		reg = <0x0 0x0 0x8000000>;
-+		bank-width = <2>;
-+		device-width = <1>;
-+	};
-+
-+	nand at 1,0 {
-+		compatible = "fsl,ifc-nand";
-+		reg = <0x1 0x0 0x10000>;
-+	};
-+
-+	fpga: board-control at 2,0 {
-+		compatible = "fsl,ls1043aqds-fpga", "fsl,fpga-qixis";
-+		reg = <0x2 0x0 0x0000100>;
-+	};
-+};
-+
-+&lpuart0 {
-+	status = "okay";
-+};
-+
-+&duart0 {
-+	status = "okay";
-+};
-+
-+&duart1 {
-+	status = "okay";
-+};
--- 
-2.1.0.27.g96db324
+Best regards,
+Alexey
