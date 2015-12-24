@@ -1,63 +1,65 @@
-From: private@roeck-us.net (Guenter Roeck)
-Date: Thu, 24 Dec 2015 11:51:34 -0800
-Subject: Running arm:versatile_defconfig with qemu in linux-next
-In-Reply-To: <201512241058.30249.arnd@arndb.de>
-References: <567B76E0.6050106@roeck-us.net> <201512241058.30249.arnd@arndb.de>
-Message-ID: <567C4CC6.40104@roeck-us.net>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Thu, 24 Dec 2015 21:05:38 +0100
+Subject: [PATCH 4/6] regulator: lp872x: Add enable GPIO pin support
+In-Reply-To: <20151224193538.GJ579@sirena.org.uk>
+References: <1450868319-20513-1-git-send-email-contact@paulk.fr>
+ <1450868319-20513-5-git-send-email-contact@paulk.fr>
+ <20151223115632.GS16023@sirena.org.uk> <1450980773.11913.3.camel@collins>
+ <20151224193538.GJ579@sirena.org.uk>
+Message-ID: <1450987538.11913.12.camel@collins>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Le jeudi 24 d?cembre 2015 ? 19:35 +0000, Mark Brown a ?crit :
+> On Thu, Dec 24, 2015 at 07:12:53PM +0100, Paul Kocialkowski wrote:
+> > Le mercredi 23 d?cembre 2015 ? 11:56 +0000, Mark Brown a ?crit :
+> 
+> > > This isn't really adding support for the enable GPIO as the changelog
+> > > suggests, it's requesting but not managing the GPIO.  Since there is
+> > > core support for manging enable GPIOs this seems especially silly,
+> > > please tell the core about the GPIO and then it will work at runtime
+> > > too.
+> 
+> > It looks like the core bindings for GPIO can only be used instead of the
+> > rdev->desc->ops->enable callback, not jointly, which doesn't fit my use
+> > case, where both the GPIO and register write have to be used to enable
+> > regulators.
+> 
+> > I think it would be worth making it possible to use both in core, since
+> > that situation is probably shared with other regulators. I suggest the
+> > following diff (that would be split into a separate patch in v2 of this
+> > series):
+> 
+> No, that's broken - the whole point with using a GPIO for enable control
+> on a lot of devices is that it is much faster than doing a register
+> write.  What I would expect to happen in this case is that when
+> initialsing the GPIO we set the register to enabled and then only manage
+> the GPIO at runtime.
 
-On 12/24/2015 01:58 AM, Arnd Bergmann wrote:
-> On Thursday 24 December 2015, Guenter Roeck wrote:
->> Hi all,
->>
->> various versatile and realview configurations fail to run for me with
->> qemu (2.5) in linux-next. Some of those are qemu configurations
->> I collected from various sources, so I guess I am on my own there.
->> However, the following standard configurations no longer work.
->>
->> arm:versatileab:versatile_defconfig
->> arm:versatilepb:versatile_defconfig
-> Just to be sure to rule out the obvious: are you using the dtb files from
-> the kernel, or do you have your own?
-I managed to get versatile_defconfig to work using the available dtb files
-from the kernel, so this part is solved.
+That GPIO is shared with all regulators that the chip provides, so doing
+things this way certainly won't work if we don't want all the regulators
+powered at all times: in that case, the GPIO has precedence over the
+regulator-specific registers.
 
->> I can no longer get realview-eb-mpcore and realview-eb to work either,
->> but, again, that is with a qemu specific configuration.
-> These are still based on board files, right? Do the normal defconfigs
-> work?
+Doing things the other way round would work and I suppose that chips
+that can use a GPIO over registers just wouldn't register any
+ops->enable callback in their description.
 
-I got the following combinations to work.
+-- 
+Paul Kocialkowski, Replicant developer
 
-Configuration                    QEMU machine            QEMU CPU
-realview-smp_defconfig    realview-eb-mpcore    default (arm11mpcore)
-realview_defconfig            realview-eb                  cortex-a8 (default arm926 fails)
-realview-defconfig            realview-pbx-a9           default (cortex-a9)
+Replicant is a fully free Android distribution running on several
+devices, a free software mobile operating system putting the emphasis on
+freedom and privacy/security.
 
-I can not get the available dtb files for realview (arm-realview-pb1176.dtb
-and arm-realview-pb11mp.dtb) to work with anything I tried.
-If you know a working configuration and qemu command line,
-please let me know.
+Website: https://www.replicant.us/
+Blog: https://blog.replicant.us/
+Wiki/tracker/forums: https://redmine.replicant.us/
 
-I don't find a working default configuration and qemu command line for the
-realview-pb-a8 machine. For pb-a8 to work, I (still) need to unconfigure
-all other machines.
-
->> I tried to bisect, but there have been too many related changes in the code
->> for it to succeed; some of the bisect attempts don't even compile, others fail
->> due to different problems. Is it known if versatile_defconfig in linux-next runs
->> on a real system ? If so, any idea what it might take to get it to work again
->> with qemu ?
-> Please start with the next/multiplatform branch in arm-soc, which has the
-> conversion to devicetree. Let's first see if that works by itself. I would
-> hope that all commits on that branch build, but something may have gone wrong.
-I think the mystery is resolved with the above results. My old configuration
-for realview-pb-a8 no longer works because of configuration file changes,
-and versatile now requires devicetree files.
-
-Thanks a lot for the hint!
-
-Guenter
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151224/b1fe28d0/attachment.sig>
