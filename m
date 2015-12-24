@@ -1,60 +1,139 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 24 Dec 2015 11:12:21 +0000
-Subject: [PATCH 13/31] arm64: KVM: Add patchable function selector
+Date: Thu, 24 Dec 2015 11:12:16 +0000
+Subject: [PATCH 08/31] arm64: KVM: Implement timer save/restore
 In-Reply-To: <1450955559-15639-1-git-send-email-marc.zyngier@arm.com>
 References: <1450955559-15639-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1450955559-15639-14-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1450955559-15639-9-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KVM so far relies on code patching, and is likely to use it more
-in the future. The main issue is that our alternative system works
-at the instruction level, while we'd like to have alternatives at
-the function level.
-
-In order to cope with this, add the "hyp_alternate_select" macro that
-outputs a brief sequence of code that in turn can be patched, allowing
-an alternative function to be selected.
+Implement the timer save restore as a direct translation of
+the assembly code version.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp/hyp.h | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ arch/arm64/kvm/hyp/Makefile          |  1 +
+ arch/arm64/kvm/hyp/hyp.h             |  3 ++
+ arch/arm64/kvm/hyp/timer-sr.c        | 71 ++++++++++++++++++++++++++++++++++++
+ include/clocksource/arm_arch_timer.h |  6 +++
+ 4 files changed, 81 insertions(+)
+ create mode 100644 arch/arm64/kvm/hyp/timer-sr.c
 
+diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+index d1e38ce..455dc0a 100644
+--- a/arch/arm64/kvm/hyp/Makefile
++++ b/arch/arm64/kvm/hyp/Makefile
+@@ -4,3 +4,4 @@
+ 
+ obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
+ obj-$(CONFIG_KVM_ARM_HOST) += vgic-v3-sr.o
++obj-$(CONFIG_KVM_ARM_HOST) += timer-sr.o
 diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
-index 0809653..73419a7 100644
+index 5759f9f..f213e46 100644
 --- a/arch/arm64/kvm/hyp/hyp.h
 +++ b/arch/arm64/kvm/hyp/hyp.h
-@@ -29,6 +29,30 @@
- #define hyp_kern_va(v) (typeof(v))((unsigned long)(v) - HYP_PAGE_OFFSET \
- 						      + PAGE_OFFSET)
+@@ -35,5 +35,8 @@ void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
+ void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
+ void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
  
-+/**
-+ * hyp_alternate_select - Generates patchable code sequences that are
-+ * used to switch between two implementations of a function, depending
-+ * on the availability of a feature.
++void __timer_save_state(struct kvm_vcpu *vcpu);
++void __timer_restore_state(struct kvm_vcpu *vcpu);
++
+ #endif /* __ARM64_KVM_HYP_H__ */
+ 
+diff --git a/arch/arm64/kvm/hyp/timer-sr.c b/arch/arm64/kvm/hyp/timer-sr.c
+new file mode 100644
+index 0000000..1051e5d
+--- /dev/null
++++ b/arch/arm64/kvm/hyp/timer-sr.c
+@@ -0,0 +1,71 @@
++/*
++ * Copyright (C) 2012-2015 - ARM Ltd
++ * Author: Marc Zyngier <marc.zyngier@arm.com>
 + *
-+ * @fname: a symbol name that will be defined as a function returning a
-+ * function pointer whose type will match @orig and @alt
-+ * @orig: A pointer to the default function, as returned by @fname when
-+ * @cond doesn't hold
-+ * @alt: A pointer to the alternate function, as returned by @fname
-+ * when @cond holds
-+ * @cond: a CPU feature (as described in asm/cpufeature.h)
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+#define hyp_alternate_select(fname, orig, alt, cond)			\
-+typeof(orig) * __hyp_text fname(void)					\
-+{									\
-+	typeof(alt) *val = orig;					\
-+	asm volatile(ALTERNATIVE("nop		\n",			\
-+				 "mov	%0, %1	\n",			\
-+				 cond)					\
-+		     : "+r" (val) : "r" (alt));				\
-+	return val;							\
++
++#include <clocksource/arm_arch_timer.h>
++#include <linux/compiler.h>
++#include <linux/kvm_host.h>
++
++#include <asm/kvm_mmu.h>
++
++#include "hyp.h"
++
++/* vcpu is already in the HYP VA space */
++void __hyp_text __timer_save_state(struct kvm_vcpu *vcpu)
++{
++	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
++	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
++	u64 val;
++
++	if (kvm->arch.timer.enabled) {
++		timer->cntv_ctl = read_sysreg(cntv_ctl_el0);
++		timer->cntv_cval = read_sysreg(cntv_cval_el0);
++	}
++
++	/* Disable the virtual timer */
++	write_sysreg(0, cntv_ctl_el0);
++
++	/* Allow physical timer/counter access for the host */
++	val = read_sysreg(cnthctl_el2);
++	val |= CNTHCTL_EL1PCTEN | CNTHCTL_EL1PCEN;
++	write_sysreg(val, cnthctl_el2);
++
++	/* Clear cntvoff for the host */
++	write_sysreg(0, cntvoff_el2);
 +}
 +
- void __vgic_v2_save_state(struct kvm_vcpu *vcpu);
- void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
++void __hyp_text __timer_restore_state(struct kvm_vcpu *vcpu)
++{
++	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
++	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
++	u64 val;
++
++	/*
++	 * Disallow physical timer access for the guest
++	 * Physical counter access is allowed
++	 */
++	val = read_sysreg(cnthctl_el2);
++	val &= ~CNTHCTL_EL1PCEN;
++	val |= CNTHCTL_EL1PCTEN;
++	write_sysreg(val, cnthctl_el2);
++
++	if (kvm->arch.timer.enabled) {
++		write_sysreg(kvm->arch.timer.cntvoff, cntvoff_el2);
++		write_sysreg(timer->cntv_cval, cntv_cval_el0);
++		isb();
++		write_sysreg(timer->cntv_ctl, cntv_ctl_el0);
++	}
++}
+diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
+index 9916d0e..25d0914 100644
+--- a/include/clocksource/arm_arch_timer.h
++++ b/include/clocksource/arm_arch_timer.h
+@@ -23,6 +23,12 @@
+ #define ARCH_TIMER_CTRL_IT_MASK		(1 << 1)
+ #define ARCH_TIMER_CTRL_IT_STAT		(1 << 2)
  
++#define CNTHCTL_EL1PCTEN		(1 << 0)
++#define CNTHCTL_EL1PCEN			(1 << 1)
++#define CNTHCTL_EVNTEN			(1 << 2)
++#define CNTHCTL_EVNTDIR			(1 << 3)
++#define CNTHCTL_EVNTI			(0xF << 4)
++
+ enum arch_timer_reg {
+ 	ARCH_TIMER_REG_CTRL,
+ 	ARCH_TIMER_REG_TVAL,
 -- 
 2.1.4
