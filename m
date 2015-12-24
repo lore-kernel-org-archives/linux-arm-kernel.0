@@ -1,38 +1,25 @@
-From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
-Date: Thu, 24 Dec 2015 21:02:41 +0200
-Subject: [PATCH 1/2] ARM: ATAGS: move save_atags() to include/asm
- arch/arm/include/asm/setup.h
-In-Reply-To: <20151224185319.GT2793@atomide.com>
-References: <20151224153536.GJ30871@n2100.arm.linux.org.uk>
- <1450975076-7411-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
- <1450975076-7411-2-git-send-email-ivo.g.dimitrov.75@gmail.com>
- <201512241848.17946@pali> <20151224185319.GT2793@atomide.com>
-Message-ID: <567C4151.2090003@gmail.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Thu, 24 Dec 2015 20:20:48 +0100
+Subject: [PATCH V7 04/24] coresight: moving PM runtime operations to core
+ framework
+In-Reply-To: <CANLsYkzgMq1caiE+wA2RRBpe4Bg14Fy7Eu8CnRkrhYmNg7j1Bg@mail.gmail.com>
+References: <1450472361-426-1-git-send-email-mathieu.poirier@linaro.org>
+ <1450472361-426-5-git-send-email-mathieu.poirier@linaro.org>
+ <20151219171342.GA2437@debian>
+ <CANLsYkzgMq1caiE+wA2RRBpe4Bg14Fy7Eu8CnRkrhYmNg7j1Bg@mail.gmail.com>
+Message-ID: <20151224192047.GA2914@debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Dec 23, 2015 at 09:27:28AM -0700, Mathieu Poirier wrote:
+> On 19 December 2015 at 10:13, Rabin Vincent <rabin@rab.in> wrote:
+> > It should presumably be using pm_runtime_put() instead.
+> 
+> That's a first - what platform did you test on?  If I send you fixes
+> will you be able to help me with the verification?
 
+I tested on a Pandaboard (OMAP4), with [1] applied,  but you're likely
+to see this on any platform if you have CONFIG_PM=y and
+CONFIG_DEBUG_ATOMIC_SLEEP=y.
 
-On 24.12.2015 20:53, Tony Lindgren wrote:
-> * Pali Roh?r <pali.rohar@gmail.com> [151224 09:48]:
->> On Thursday 24 December 2015 17:37:55 Ivaylo Dimitrov wrote:
->>> So it can be used by code outside arch/arm/kernel/. Fix save_atags()
->>> declaration to match its definition while at it.
->>>
->>> Signed-off-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
->>
->> Tested-by: Pali Roh?r <pali.rohar@gmail.com>
->
-> Nice, please upload both to Russell's patch system after no
-> more comments:
->
-> Acked-by: Tony Lindgren <tony@atomide.com>
->
-
-Hi Tony,
-
-Could you elaborate on that patch system? Where it is and do I need some 
-special account/access?
-
-Regards,
-Ivo
+[1] https://github.com/rabinv/linux/commit/omap-coresight
