@@ -1,67 +1,75 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 24 Dec 2015 11:12:35 +0000
-Subject: [PATCH 27/31] arm/arm64: KVM: Remove unreferenced S2_PGD_ORDER
+Date: Thu, 24 Dec 2015 11:12:31 +0000
+Subject: [PATCH 23/31] arm64: KVM: Cleanup asm-offset.c
 In-Reply-To: <1450955559-15639-1-git-send-email-marc.zyngier@arm.com>
 References: <1450955559-15639-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1450955559-15639-28-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1450955559-15639-24-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vladimir Murzin <vladimir.murzin@arm.com>
+As we've now rewritten most of our code-base in C, most of the
+KVM-specific code in asm-offset.c is useless. Delete-time again!
 
-Since commit a987370 ("arm64: KVM: Fix stage-2 PGD allocation to have
-per-page refcounting") there is no reference to S2_PGD_ORDER, so kill it
-for the good.
-
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/include/asm/kvm_arm.h   | 1 -
- arch/arm/kvm/mmu.c               | 6 +++---
- arch/arm64/include/asm/kvm_mmu.h | 1 -
- 3 files changed, 3 insertions(+), 5 deletions(-)
+ arch/arm64/kernel/asm-offsets.c | 39 ---------------------------------------
+ 1 file changed, 39 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
-index dc641dd..b05bb5a 100644
---- a/arch/arm/include/asm/kvm_arm.h
-+++ b/arch/arm/include/asm/kvm_arm.h
-@@ -135,7 +135,6 @@
- #define KVM_PHYS_SIZE	(1ULL << KVM_PHYS_SHIFT)
- #define KVM_PHYS_MASK	(KVM_PHYS_SIZE - 1ULL)
- #define PTRS_PER_S2_PGD	(1ULL << (KVM_PHYS_SHIFT - 30))
--#define S2_PGD_ORDER	get_order(PTRS_PER_S2_PGD * sizeof(pgd_t))
- 
- /* Virtualization Translation Control Register (VTCR) bits */
- #define VTCR_SH0	(3 << 12)
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 61d96a6..22f7fa0 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -656,9 +656,9 @@ static void *kvm_alloc_hwpgd(void)
-  * kvm_alloc_stage2_pgd - allocate level-1 table for stage-2 translation.
-  * @kvm:	The KVM struct pointer for the VM.
-  *
-- * Allocates the 1st level table only of size defined by S2_PGD_ORDER (can
-- * support either full 40-bit input addresses or limited to 32-bit input
-- * addresses). Clears the allocated pages.
-+ * Allocates only the stage-2 HW PGD level table(s) (can support either full
-+ * 40-bit input addresses or limited to 32-bit input addresses). Clears the
-+ * allocated pages.
-  *
-  * Note we don't need locking here as this is only called when the VM is
-  * created, which can only be done once.
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 6150567..54cba80 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -158,7 +158,6 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
- #define PTRS_PER_S2_PGD_SHIFT	(KVM_PHYS_SHIFT - PGDIR_SHIFT)
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index 4b72231..94090a6 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -108,50 +108,11 @@ int main(void)
+   DEFINE(CPU_GP_REGS,		offsetof(struct kvm_cpu_context, gp_regs));
+   DEFINE(CPU_USER_PT_REGS,	offsetof(struct kvm_regs, regs));
+   DEFINE(CPU_FP_REGS,		offsetof(struct kvm_regs, fp_regs));
+-  DEFINE(CPU_SP_EL1,		offsetof(struct kvm_regs, sp_el1));
+-  DEFINE(CPU_ELR_EL1,		offsetof(struct kvm_regs, elr_el1));
+-  DEFINE(CPU_SPSR,		offsetof(struct kvm_regs, spsr));
+-  DEFINE(CPU_SYSREGS,		offsetof(struct kvm_cpu_context, sys_regs));
+   DEFINE(VCPU_FPEXC32_EL2,	offsetof(struct kvm_vcpu, arch.ctxt.sys_regs[FPEXC32_EL2]));
+   DEFINE(VCPU_ESR_EL2,		offsetof(struct kvm_vcpu, arch.fault.esr_el2));
+   DEFINE(VCPU_FAR_EL2,		offsetof(struct kvm_vcpu, arch.fault.far_el2));
+   DEFINE(VCPU_HPFAR_EL2,	offsetof(struct kvm_vcpu, arch.fault.hpfar_el2));
+-  DEFINE(VCPU_DEBUG_FLAGS,	offsetof(struct kvm_vcpu, arch.debug_flags));
+-  DEFINE(VCPU_DEBUG_PTR,	offsetof(struct kvm_vcpu, arch.debug_ptr));
+-  DEFINE(DEBUG_BCR, 		offsetof(struct kvm_guest_debug_arch, dbg_bcr));
+-  DEFINE(DEBUG_BVR, 		offsetof(struct kvm_guest_debug_arch, dbg_bvr));
+-  DEFINE(DEBUG_WCR, 		offsetof(struct kvm_guest_debug_arch, dbg_wcr));
+-  DEFINE(DEBUG_WVR, 		offsetof(struct kvm_guest_debug_arch, dbg_wvr));
+-  DEFINE(VCPU_HCR_EL2,		offsetof(struct kvm_vcpu, arch.hcr_el2));
+-  DEFINE(VCPU_MDCR_EL2,	offsetof(struct kvm_vcpu, arch.mdcr_el2));
+-  DEFINE(VCPU_IRQ_LINES,	offsetof(struct kvm_vcpu, arch.irq_lines));
+   DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
+-  DEFINE(VCPU_HOST_DEBUG_STATE, offsetof(struct kvm_vcpu, arch.host_debug_state));
+-  DEFINE(VCPU_TIMER_CNTV_CTL,	offsetof(struct kvm_vcpu, arch.timer_cpu.cntv_ctl));
+-  DEFINE(VCPU_TIMER_CNTV_CVAL,	offsetof(struct kvm_vcpu, arch.timer_cpu.cntv_cval));
+-  DEFINE(KVM_TIMER_CNTVOFF,	offsetof(struct kvm, arch.timer.cntvoff));
+-  DEFINE(KVM_TIMER_ENABLED,	offsetof(struct kvm, arch.timer.enabled));
+-  DEFINE(VCPU_KVM,		offsetof(struct kvm_vcpu, kvm));
+-  DEFINE(VCPU_VGIC_CPU,		offsetof(struct kvm_vcpu, arch.vgic_cpu));
+-  DEFINE(VGIC_V2_CPU_HCR,	offsetof(struct vgic_cpu, vgic_v2.vgic_hcr));
+-  DEFINE(VGIC_V2_CPU_VMCR,	offsetof(struct vgic_cpu, vgic_v2.vgic_vmcr));
+-  DEFINE(VGIC_V2_CPU_MISR,	offsetof(struct vgic_cpu, vgic_v2.vgic_misr));
+-  DEFINE(VGIC_V2_CPU_EISR,	offsetof(struct vgic_cpu, vgic_v2.vgic_eisr));
+-  DEFINE(VGIC_V2_CPU_ELRSR,	offsetof(struct vgic_cpu, vgic_v2.vgic_elrsr));
+-  DEFINE(VGIC_V2_CPU_APR,	offsetof(struct vgic_cpu, vgic_v2.vgic_apr));
+-  DEFINE(VGIC_V2_CPU_LR,	offsetof(struct vgic_cpu, vgic_v2.vgic_lr));
+-  DEFINE(VGIC_V3_CPU_SRE,	offsetof(struct vgic_cpu, vgic_v3.vgic_sre));
+-  DEFINE(VGIC_V3_CPU_HCR,	offsetof(struct vgic_cpu, vgic_v3.vgic_hcr));
+-  DEFINE(VGIC_V3_CPU_VMCR,	offsetof(struct vgic_cpu, vgic_v3.vgic_vmcr));
+-  DEFINE(VGIC_V3_CPU_MISR,	offsetof(struct vgic_cpu, vgic_v3.vgic_misr));
+-  DEFINE(VGIC_V3_CPU_EISR,	offsetof(struct vgic_cpu, vgic_v3.vgic_eisr));
+-  DEFINE(VGIC_V3_CPU_ELRSR,	offsetof(struct vgic_cpu, vgic_v3.vgic_elrsr));
+-  DEFINE(VGIC_V3_CPU_AP0R,	offsetof(struct vgic_cpu, vgic_v3.vgic_ap0r));
+-  DEFINE(VGIC_V3_CPU_AP1R,	offsetof(struct vgic_cpu, vgic_v3.vgic_ap1r));
+-  DEFINE(VGIC_V3_CPU_LR,	offsetof(struct vgic_cpu, vgic_v3.vgic_lr));
+-  DEFINE(VGIC_CPU_NR_LR,	offsetof(struct vgic_cpu, nr_lr));
+-  DEFINE(KVM_VTTBR,		offsetof(struct kvm, arch.vttbr));
+-  DEFINE(KVM_VGIC_VCTRL,	offsetof(struct kvm, arch.vgic.vctrl_base));
  #endif
- #define PTRS_PER_S2_PGD		(1 << PTRS_PER_S2_PGD_SHIFT)
--#define S2_PGD_ORDER		get_order(PTRS_PER_S2_PGD * sizeof(pgd_t))
- 
- #define kvm_pgd_index(addr)	(((addr) >> PGDIR_SHIFT) & (PTRS_PER_S2_PGD - 1))
- 
+ #ifdef CONFIG_CPU_PM
+   DEFINE(CPU_SUSPEND_SZ,	sizeof(struct cpu_suspend_ctx));
 -- 
 2.1.4
