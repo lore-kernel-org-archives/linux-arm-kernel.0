@@ -1,129 +1,206 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Thu, 24 Dec 2015 09:23:05 +0800
-Subject: [PATCH v12 16/18] drm: bridge: analogix/dp: expand the wait time
- for looking AUX CH reply flag
-In-Reply-To: <000001d13d94$120e0d60$362a2820$@com>
-References: <1450873538-18304-1-git-send-email-ykk@rock-chips.com>
- <1450875064-19627-1-git-send-email-ykk@rock-chips.com>
- <000001d13d94$120e0d60$362a2820$@com>
-Message-ID: <567B48F9.6010902@rock-chips.com>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Thu, 24 Dec 2015 01:42:42 +0000
+Subject: [PATCH v2] arm64: Store breakpoint single step state into pstate
+In-Reply-To: <1450860731-194418-1-git-send-email-wangnan0@huawei.com>
+References: <1450860731-194418-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <1450921362-198371-1-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jingoo,
+Two 'perf test' fail on arm64:
 
-Okay, fine, I would drop this patch, until I found the the root cause.
+ # perf test overflow
+ 17: Test breakpoint overflow signal handler                  : FAILED!
+ 18: Test breakpoint overflow sampling                        : FAILED!
 
-- Yakir
+When breakpoint raises, after perf_bp_event, breakpoint_handler()
+temporary disables breakpoint and enables single step. Then in
+single_step_handler(), reenable breakpoint. Without doing this
+the breakpoint would be triggered again.
 
-On 12/23/2015 11:10 PM, Jingoo Han wrote:
-> On Wednesday, December 23, 2015 9:51 PM, Yakir Yang wrote:
->> On Rockchip platform, sometimes driver would failed at reading EDID
->> message, and it's caused by the AUX reply flag wouldn't received under
->> the 100*10us wait time.
-> The problem is specific for Rockchip platform.
-> Also, 1 ms is long time.
-> The best way is that your hardware engineers find the root cause.
-> I cannot understand why your engineers cannot find the root cause. :-(
->
->> But after expand the wait time a little, the AUX reply flag would be
->> set, so maybe the wait time is a little critical. Besides the analogix
->> dp book haven't reminded the standard wait for looking AUX reply flag,
->> so I thought it's okay to expand the wait time.
->>
->> And the external wait time won't hurt Exynos DP too much, cause they
->> wouldn't meet this problem, then driver would received the reply command
->> very soon, so no more additional wait time would bring to Exynos platform.
-> Then, when loop time happens on Exynos platform, it will take long time
-> to return error.
->
->> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
->> ---
->> Changes in v12:
->> - Using another way to expand the AUX reply wait time (Jingoo)
->>
->> Changes in v11: None
->> Changes in v10: None
->> Changes in v9: None
->> Changes in v8: None
->> Changes in v7: None
->> Changes in v6: None
->> Changes in v5: None
->> Changes in v4: None
->> Changes in v3: None
->> Changes in v2: None
->>
->>   drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c | 10 ++++------
->>   1 file changed, 4 insertions(+), 6 deletions(-)
->>
->> diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
->> b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
->> index cba3ffd..8687eea 100644
->> --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
->> +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
->> @@ -471,7 +471,7 @@ int analogix_dp_start_aux_transaction(struct analogix_dp_device *dp)
->>   {
->>   	int reg;
->>   	int retval = 0;
->> -	int timeout_loop = 0;
->> +	unsigned long timeout;
->>
->>   	/* Enable AUX CH operation */
->>   	reg = readl(dp->reg_base + ANALOGIX_DP_AUX_CH_CTL_2);
->> @@ -479,14 +479,12 @@ int analogix_dp_start_aux_transaction(struct analogix_dp_device *dp)
->>   	writel(reg, dp->reg_base + ANALOGIX_DP_AUX_CH_CTL_2);
->>
->>   	/* Is AUX CH command reply received? */
->> -	reg = readl(dp->reg_base + ANALOGIX_DP_INT_STA);
->> -	while (!(reg & RPLY_RECEIV)) {
->> -		timeout_loop++;
->> -		if (DP_TIMEOUT_LOOP_COUNT < timeout_loop) {
->> +	timeout = jiffies + msecs_to_jiffies(5);
->> +	while ((readl(dp->reg_base + ANALOGIX_DP_INT_STA) & RPLY_RECEIV) == 0) {
->> +		if (time_after(jiffies, timeout)) {
->>   			dev_err(dp->dev, "AUX CH command reply failed!\n");
->>   			return -ETIMEDOUT;
->>   		}
->> -		reg = readl(dp->reg_base + ANALOGIX_DP_INT_STA);
-> Sorry, I don't like your patch.
->
-> The problem happens because of Rockchip platform.
-> So, you need to add workaround for only Rockchip platform.
->
-> Just add new DT property and new variable for the value for wait time.
-> When, the probe is called, new wait time value is read from Rockchip DT file.
-> Then, the new wait time value can be written to the new variable.
->
->      new DT property: wait-time-aux
->      new variable: wait_time_aux
->
->
-> If ( ) // New DT
->      wait_time_aux = New DT;
-> else
->      wait_time_aux = 10;
->
->
->>   		usleep_range(10, 11);
-> If there is NO  new wait time value from DT file, the default value '10' is
-> used for sleep.
->
-> But, if there is new wait time value from DT file, new wait time value
-> can be used for sleep.
->
->                   usleep_range(dp->wait_time_aux, dp->wait_time_aux + 1);
->
-> What I want to say is that there should be NO effect on Exynos platform,
-> because of the hardware bug of Rockchip platform.
->
-> Best regards,
-> Jingoo Han
->
->>   	}
->>
->> --
->> 1.9.1
->
->
->
->
+However, if there's a pending signal and it have signal handler,
+control would be transfer to signal handler, so single step handler
+would be applied to the first instruction of signal handler. After
+the handler return, the instruction triggered the breakpoint would be
+executed again. At this time the breakpoint is enabled, so the
+breakpoint is triggered again.
+
+There was similar problem on x86, so we have following two commits:
+
+commit 24cda10996f5420ab962f91cd03c15869a3a94b1("x86/signals: Clear RF
+EFLAGS bit for signal handler"),
+
+commit 5e219b3c671b34b2d79468fe89c44c0460c0f02b("x86/signals: Propagate
+RF EFLAGS bit through the signal restore call").
+
+When breakpoint handler enables single step, task is in a special state
+that, the breakpoint should be disabled, the single step should be
+enabled, and they should be toggled in single step handler.
+This state should be cleared when entering signal handler and restored
+after signal return like other program state. Considering the
+situation that signal raises inside signal handler, the only safe way
+to avoid the problem is to save this state into signal frame, like what
+x86 does.
+
+Different from x86 which has an RF EFLAGS bit to control debug
+behavior, there's no such bits on ARM64. Creating new fields in signal
+frame makes trouble because it is part of user API. Fortunately, on
+ARM64, we use a 64 bits pstate but the hardware only utilises the
+lowest 32 bits. The other 32 bits can be used by kernel to record this
+state.
+
+This patch create two bits in pstate to record the special state caused
+by breakpoint and watchpoint. In handle_signal, the state is checked
+and the bits are set accordingly, then the hardware is restored.
+When signal return, single step can be reenabled based on these bits.
+
+After this patch:
+
+ # perf test overflow
+ 17: Test breakpoint overflow signal handler                  : Ok
+ 18: Test breakpoint overflow sampling                        : Ok
+
+Signed-off-by: Wang Nan <wangnan0@huawei.com>
+Cc: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Cc: Fengguang Wu <fengguang.wu@intel.com>
+Cc: Hanjun Guo <guohanjun@huawei.com>
+Cc: Jiri Olsa <jolsa@kernel.org>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+
+v1 -> v2: Fix !CONFIG_HAVE_HW_BREAKPOINT build: add missing 'static inline'.
+
+ arch/arm64/include/asm/debug-monitors.h |  9 ++++++
+ arch/arm64/include/uapi/asm/ptrace.h    | 12 ++++++++
+ arch/arm64/kernel/hw_breakpoint.c       | 50 +++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/signal.c              |  2 ++
+ 4 files changed, 73 insertions(+)
+
+diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
+index 279c85b5..5529060 100644
+--- a/arch/arm64/include/asm/debug-monitors.h
++++ b/arch/arm64/include/asm/debug-monitors.h
+@@ -132,11 +132,20 @@ int kernel_active_single_step(void);
+ 
+ #ifdef CONFIG_HAVE_HW_BREAKPOINT
+ int reinstall_suspended_bps(struct pt_regs *regs);
++u64 signal_toggle_single_step(void);
++void signal_reinstall_single_step(u64 pstate);
+ #else
+ static inline int reinstall_suspended_bps(struct pt_regs *regs)
+ {
+ 	return -ENODEV;
+ }
++static inline u64 signal_toggle_single_step(void)
++{
++	return 0;
++}
++static inline void signal_reinstall_single_step(u64 pstate)
++{
++}
+ #endif
+ 
+ int aarch32_break_handler(struct pt_regs *regs);
+diff --git a/arch/arm64/include/uapi/asm/ptrace.h b/arch/arm64/include/uapi/asm/ptrace.h
+index 208db3d..bfb90f6 100644
+--- a/arch/arm64/include/uapi/asm/ptrace.h
++++ b/arch/arm64/include/uapi/asm/ptrace.h
+@@ -52,6 +52,18 @@
+ #define PSR_N_BIT	0x80000000
+ 
+ /*
++ * pstat in pt_regs and user_pt_regs are 64 bits. The highest 32 bits
++ * of it can be utilized by other. One user of them is signal handler.
++ */
++#define PSR_LINUX_MASK		(0xffffffffUL << 32)
++/* Single step and disable breakpoints */
++#define PSR_LINUX_HW_BP_SS	(1UL << 32)
++/* Single step and disable watchpoints */
++#define PSR_LINUX_HW_WP_SS	(2UL << 32)
++
++#define PSR_LINUX_HW_SS	(PSR_LINUX_HW_BP_SS | PSR_LINUX_HW_WP_SS)
++
++/*
+  * Groups of PSR bits
+  */
+ #define PSR_f		0xff000000	/* Flags		*/
+diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
+index b45c95d..e5a0998 100644
+--- a/arch/arm64/kernel/hw_breakpoint.c
++++ b/arch/arm64/kernel/hw_breakpoint.c
+@@ -954,3 +954,53 @@ int hw_breakpoint_exceptions_notify(struct notifier_block *unused,
+ {
+ 	return NOTIFY_DONE;
+ }
++
++u64 signal_toggle_single_step(void)
++{
++	struct debug_info *debug_info = &current->thread.debug;
++	u64 retval = 0;
++
++	if (likely(!debug_info->bps_disabled && !debug_info->wps_disabled))
++		return 0;
++
++	if (debug_info->bps_disabled) {
++		retval |= PSR_LINUX_HW_BP_SS;
++		toggle_bp_registers(AARCH64_DBG_REG_BCR, DBG_ACTIVE_EL0, 1);
++		debug_info->bps_disabled = 0;
++	}
++
++	if (debug_info->wps_disabled) {
++		retval |= PSR_LINUX_HW_WP_SS;
++		toggle_bp_registers(AARCH64_DBG_REG_WCR, DBG_ACTIVE_EL0, 1);
++		debug_info->wps_disabled = 0;
++	}
++
++	if (debug_info->suspended_step)
++		debug_info->suspended_step = 0;
++	else
++		user_disable_single_step(current);
++	return retval;
++}
++
++void signal_reinstall_single_step(u64 pstate)
++{
++	struct debug_info *debug_info = &current->thread.debug;
++
++	if (likely(!(pstate & PSR_LINUX_HW_SS)))
++		return;
++
++	if (pstate & PSR_LINUX_HW_BP_SS) {
++		debug_info->bps_disabled = 1;
++		toggle_bp_registers(AARCH64_DBG_REG_BCR, DBG_ACTIVE_EL0, 0);
++	}
++
++	if (pstate & PSR_LINUX_HW_WP_SS) {
++		debug_info->wps_disabled = 1;
++		toggle_bp_registers(AARCH64_DBG_REG_WCR, DBG_ACTIVE_EL0, 0);
++	}
++
++	if (test_thread_flag(TIF_SINGLESTEP))
++		debug_info->suspended_step = 1;
++	else
++		user_enable_single_step(current);
++}
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index e18c48c..1737710 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -151,6 +151,7 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
+ 	if (restore_altstack(&frame->uc.uc_stack))
+ 		goto badframe;
+ 
++	signal_reinstall_single_step(regs->pstate);
+ 	return regs->regs[0];
+ 
+ badframe:
+@@ -292,6 +293,7 @@ static void handle_signal(struct ksignal *ksig, struct pt_regs *regs)
+ 	int usig = ksig->sig;
+ 	int ret;
+ 
++	regs->pstate |= signal_toggle_single_step();
+ 	/*
+ 	 * Set up the stack frame
+ 	 */
+-- 
+1.8.3.4
