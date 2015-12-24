@@ -1,52 +1,22 @@
-From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
-Date: Thu, 24 Dec 2015 16:00:58 +0200
-Subject: [PATCH 3/3] OMAP: RX51: save ATAGS data in the early boot stage
-In-Reply-To: <1450965658-2675-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
-References: <1450965658-2675-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
-Message-ID: <1450965658-2675-4-git-send-email-ivo.g.dimitrov.75@gmail.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Thu, 24 Dec 2015 09:03:12 -0600
+Subject: [PATCH 05/12] tty: amba-pl011: add register lookup table
+In-Reply-To: <20151224065437.GA18445@robwan01-pc.asiapac.arm.com>
+References: <20151116173935.GQ8644@n2100.arm.linux.org.uk>
+ <E1ZyNlS-0003jg-46@rmk-PC.arm.linux.org.uk>
+ <20151224065437.GA18445@robwan01-pc.asiapac.arm.com>
+Message-ID: <CAOZdJXWmBYrjgC2GcY2NSeuJ2MAuwvtYVLP9AvTMkLUWsi9DhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nokia N900 (RX51) legacy userspace needs various ATAGS passed by the
-bootloader (boot reason, device serial, boot mode, various GPIO swithes,
-etc). Save that data early enough in the boot process, so it can be
-exported later in /proc/atags
+On Thu, Dec 24, 2015 at 12:54 AM, Huang Shijie <shijie.huang@arm.com> wrote:
+> My kernel cmdline:
+>   console=ttyAMA0,115200 earlycon=pl011,0x7ff80000 root=/dev/sda1 rootwait verbose debug sky2.mac_address=0x00,0x02,0xF7,0x00,0x63,0x3C dtb=r1a57.dtb
 
-Signed-off-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
----
- arch/arm/mach-omap2/board-generic.c | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+earlycon is broken with Russell's patches.  My patch fixes it, but
+only for standard pl011 devices.
 
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index 04a56cc..594eefe 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -17,6 +17,7 @@
- #include <linux/irqdomain.h>
- 
- #include <asm/mach/arch.h>
-+#include <asm/atags.h>
- 
- #include "common.h"
- 
-@@ -76,8 +77,17 @@ static const char *const n900_boards_compat[] __initconst = {
- 	NULL,
- };
- 
-+/* Legacy userspace on Nokia N900 needs ATAGS exported in /proc/atags,
-+ * save them while the data is still there
-+ */
-+static void __init rx51_reserve(void)
-+{
-+	save_atags((const struct tag *)(PAGE_OFFSET + 0x100));
-+	omap_reserve();
-+}
-+
- DT_MACHINE_START(OMAP3_N900_DT, "Nokia RX-51 board")
--	.reserve	= omap_reserve,
-+	.reserve	= rx51_reserve,
- 	.map_io		= omap3_map_io,
- 	.init_early	= omap3430_init_early,
- 	.init_machine	= omap_generic_init,
 -- 
-1.9.1
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
