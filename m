@@ -1,116 +1,127 @@
 From: jchandra@broadcom.com (Jayachandran C)
-Date: Thu, 24 Dec 2015 17:27:31 +0530
-Subject: [PATCH v4 4/5] arm64: pci: Add ACPI support
+Date: Thu, 24 Dec 2015 17:27:30 +0530
+Subject: [PATCH v4 3/5] ACPI: PCI: Support platforms that need
+ pci_remap_iospace
 In-Reply-To: <1450958252-29892-1-git-send-email-jchandra@broadcom.com>
 References: <1450958252-29892-1-git-send-email-jchandra@broadcom.com>
-Message-ID: <1450958252-29892-5-git-send-email-jchandra@broadcom.com>
+Message-ID: <1450958252-29892-4-git-send-email-jchandra@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add functions needed for ACPI support.
+On some platforms (in this case ARM64), the PCI iospace needs to
+be mapped with pci_remap_iospace and the resources have to be
+adjusted for the iospace physical address.
 
-pci_acpi_scan_root(), raw_pci_read and raw_pci_write are marked as
-weak so that it can be implemented by the generic ACPI PCI driver.
+This has to be done before acpi_pci_root_validate_resources()
+checks and removes resource windows. Handle this by adding
+a function acpi_pci_root_remap_iospace that is called in
+acpi_pci_probe_root_resources(), before the validate call.
 
-pcibios_enable_device and pcibios_disable_device handle acpi irq enable
-and disable. And, pcibios_add_bus and pcibios_remove_bus have been
-added call the corresponding ACPI functions.
+Also fix the address check in acpi_dev_ioresource_flags for
+similar platforms.
 
 Signed-off-by: Jayachandran C <jchandra@broadcom.com>
 ---
- arch/arm64/Kconfig      |  3 +++
- arch/arm64/kernel/pci.c | 34 +++++++++++++++++++++++++++++-----
- 2 files changed, 32 insertions(+), 5 deletions(-)
+ drivers/acpi/pci_root.c | 62 +++++++++++++++++++++++++++++++++++++++++++++++--
+ drivers/acpi/resource.c |  2 ++
+ 2 files changed, 62 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 871f217..8c93af2 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -203,6 +203,9 @@ config PCI_DOMAINS_GENERIC
- config PCI_SYSCALL
- 	def_bool PCI
+diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
+index ae3fe4e..fcaa484 100644
+--- a/drivers/acpi/pci_root.c
++++ b/drivers/acpi/pci_root.c
+@@ -720,6 +720,61 @@ next:
+ 	}
+ }
  
-+config PCI_MMCONFIG
-+	def_bool PCI && ACPI
++#ifdef PCI_IOBASE
++/*
++ * The IO ports are mapped to a memory range, fixup IO resources to
++ * handle that
++ */
++static int acpi_pci_root_remap_iospace(struct acpi_pci_root_info *ci)
++{
++	struct resource_entry *entry;
++	struct resource iores;
++	resource_size_t iostart;
++	int err;
 +
- source "drivers/pci/Kconfig"
- source "drivers/pci/pcie/Kconfig"
- source "drivers/pci/hotplug/Kconfig"
-diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-index b3d098b..db0a6a9 100644
---- a/arch/arm64/kernel/pci.c
-+++ b/arch/arm64/kernel/pci.c
-@@ -17,6 +17,7 @@
- #include <linux/mm.h>
- #include <linux/of_pci.h>
- #include <linux/of_platform.h>
-+#include <linux/pci-acpi.h>
- #include <linux/slab.h>
++	iores.flags = IORESOURCE_IO;
++	iores.start = (resource_size_t)-1;
++	iores.end = 0;
++	resource_list_for_each_entry(entry, &ci->resources) {
++		if (entry->res->flags & IORESOURCE_IO) {
++			iores.start = min(entry->res->start, iores.start);
++			iores.end = max(entry->res->end, iores.end);
++		}
++	}
++	if (iores.end == 0)
++		return 0;
++	iostart = iores.start;
++
++	resource_list_for_each_entry(entry, &ci->resources) {
++		if (entry->res->flags & IORESOURCE_IO) {
++			entry->res->start -= iostart;
++			entry->res->end -= iostart;
++			entry->offset -= iostart;
++		}
++	}
++	iores.start -= iostart;
++	iores.end -= iostart;
++
++	err = pci_remap_iospace(&iores, iostart);
++	if (err) {
++		pr_err("PCI: ACPI: err %d mapping IO %pR\n", err, &iores);
++		return -ENODEV;
++	}
++	pr_info(PREFIX "Mapped %pR at %#lx for IO.\n",
++			&iores, (unsigned long)iostart);
++	return 0;
++}
++#else
++/*
++ * The IO ports are mapped to a memory range, fixup IO resources to
++ * handle that
++ */
++static int acpi_pci_root_remap_iospace(struct acpi_pci_root_info *ci)
++{
++	return 0;
++}
++#endif /* PCI_IOBASE */
++
+ int acpi_pci_probe_root_resources(struct acpi_pci_root_info *info)
+ {
+ 	int ret;
+@@ -745,10 +800,13 @@ int acpi_pci_probe_root_resources(struct acpi_pci_root_info *info)
+ 			else
+ 				entry->res->name = info->name;
+ 		}
+-		acpi_pci_root_validate_resources(&device->dev, list,
++		ret = acpi_pci_root_remap_iospace(info);
++		if (ret >= 0) {
++			acpi_pci_root_validate_resources(&device->dev, list,
+ 						 IORESOURCE_MEM);
+-		acpi_pci_root_validate_resources(&device->dev, list,
++			acpi_pci_root_validate_resources(&device->dev, list,
+ 						 IORESOURCE_IO);
++		}
+ 	}
  
- #include <asm/pci-bridge.h>
-@@ -48,9 +49,22 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
- 	if (pci_has_flag(PCI_PROBE_ONLY))
- 		return 0;
+ 	return ret;
+diff --git a/drivers/acpi/resource.c b/drivers/acpi/resource.c
+index cdc5c25..530cad4 100644
+--- a/drivers/acpi/resource.c
++++ b/drivers/acpi/resource.c
+@@ -126,8 +126,10 @@ static void acpi_dev_ioresource_flags(struct resource *res, u64 len,
+ 	if (!acpi_dev_resource_len_valid(res->start, res->end, len, true))
+ 		res->flags |= IORESOURCE_DISABLED | IORESOURCE_UNSET;
  
-+#ifdef CONFIG_ACPI
-+	if (acpi_find_root_bridge_handle(dev))
-+		acpi_pci_irq_enable(dev);
++#ifndef PCI_IOBASE
+ 	if (res->end >= 0x10003)
+ 		res->flags |= IORESOURCE_DISABLED | IORESOURCE_UNSET;
 +#endif
-+
- 	return pci_enable_resources(dev, mask);
- }
  
-+void pcibios_disable_device(struct pci_dev *dev)
-+{
-+#ifdef CONFIG_ACPI
-+	if (acpi_find_root_bridge_handle(dev))
-+		acpi_pci_irq_disable(dev);
-+#endif
-+}
-+
- /*
-  * Try to assign the IRQ number from DT when adding a new device
-  */
-@@ -62,15 +76,15 @@ int pcibios_add_device(struct pci_dev *dev)
- }
- 
- /*
-- * raw_pci_read/write - Platform-specific PCI config space access.
-+ * ACPI uses these - leave it to the generic ACPI PCI driver
-  */
--int raw_pci_read(unsigned int domain, unsigned int bus,
-+int __weak raw_pci_read(unsigned int domain, unsigned int bus,
- 		  unsigned int devfn, int reg, int len, u32 *val)
- {
- 	return -ENXIO;
- }
- 
--int raw_pci_write(unsigned int domain, unsigned int bus,
-+int __weak raw_pci_write(unsigned int domain, unsigned int bus,
- 		unsigned int devfn, int reg, int len, u32 val)
- {
- 	return -ENXIO;
-@@ -78,9 +92,19 @@ int raw_pci_write(unsigned int domain, unsigned int bus,
- 
- #ifdef CONFIG_ACPI
- /* Root bridge scanning */
--struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
-+struct pci_bus * __weak pci_acpi_scan_root(struct acpi_pci_root *root)
- {
--	/* TODO: Should be revisited when implementing PCI on ACPI */
- 	return NULL;
- }
-+
-+void pcibios_add_bus(struct pci_bus *bus)
-+{
-+	acpi_pci_add_bus(bus);
-+}
-+
-+void pcibios_remove_bus(struct pci_bus *bus)
-+{
-+	acpi_pci_remove_bus(bus);
-+}
-+
- #endif
+ 	if (io_decode == ACPI_DECODE_16)
+ 		res->flags |= IORESOURCE_IO_16BIT_ADDR;
 -- 
 1.9.1
