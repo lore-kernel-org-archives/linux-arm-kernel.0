@@ -1,46 +1,34 @@
-From: private@roeck-us.net (Guenter Roeck)
-Date: Thu, 24 Dec 2015 07:33:39 -0800
-Subject: Running arm:versatile_defconfig with qemu in linux-next
-In-Reply-To: <201512241058.30249.arnd@arndb.de>
-References: <567B76E0.6050106@roeck-us.net> <201512241058.30249.arnd@arndb.de>
-Message-ID: <567C1053.7010408@roeck-us.net>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Thu, 24 Dec 2015 09:35:52 -0600
+Subject: [PATCH 05/12] tty: amba-pl011: add register lookup table
+In-Reply-To: <20151224150552.GF8644@n2100.arm.linux.org.uk>
+References: <20151116173935.GQ8644@n2100.arm.linux.org.uk>
+ <E1ZyNlS-0003jg-46@rmk-PC.arm.linux.org.uk>
+ <20151224065437.GA18445@robwan01-pc.asiapac.arm.com>
+ <CAOZdJXWmBYrjgC2GcY2NSeuJ2MAuwvtYVLP9AvTMkLUWsi9DhQ@mail.gmail.com>
+ <20151224150552.GF8644@n2100.arm.linux.org.uk>
+Message-ID: <CAOZdJXXdMHG7c9yDTo+oh7uNPCmH_Mc08s5YCoL3j--7uj5Mow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On 12/24/2015 01:58 AM, Arnd Bergmann wrote:
-> On Thursday 24 December 2015, Guenter Roeck wrote:
->> Hi all,
+On Thu, Dec 24, 2015 at 9:05 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Dec 24, 2015 at 09:03:12AM -0600, Timur Tabi wrote:
+>> On Thu, Dec 24, 2015 at 12:54 AM, Huang Shijie <shijie.huang@arm.com> wrote:
+>> > My kernel cmdline:
+>> >   console=ttyAMA0,115200 earlycon=pl011,0x7ff80000 root=/dev/sda1 rootwait verbose debug sky2.mac_address=0x00,0x02,0xF7,0x00,0x63,0x3C dtb=r1a57.dtb
 >>
->> various versatile and realview configurations fail to run for me with
->> qemu (2.5) in linux-next. Some of those are qemu configurations
->> I collected from various sources, so I guess I am on my own there.
->> However, the following standard configurations no longer work.
->>
->> arm:versatileab:versatile_defconfig
->> arm:versatilepb:versatile_defconfig
-> Just to be sure to rule out the obvious: are you using the dtb files from
-> the kernel, or do you have your own?
-I don't use any dtb files for the failing configurations. That wasn't
-needed (and didn't work when I first set up my test system).
+>> earlycon is broken with Russell's patches.  My patch fixes it, but
+>> only for standard pl011 devices.
+>
+> No, it shouldn't be.  Earlycon uses pl011_putc() which remains exactly
+> the same as it was before these patches.
 
->> I can no longer get realview-eb-mpcore and realview-eb to work either,
->> but, again, that is with a qemu specific configuration.
-> These are still based on board files, right? Do the normal defconfigs
-> work?
-I'll try to find working "normal" defconfigs. When I set up my test
-system, I could not get any to work for realview-eb with qemu.
+        while (readl(port->membase + REG_FR) & UART01x_FR_TXFF)
 
->> I tried to bisect, but there have been too many related changes in the code
->> for it to succeed; some of the bisect attempts don't even compile, others fail
->> due to different problems. Is it known if versatile_defconfig in linux-next runs
->> on a real system ? If so, any idea what it might take to get it to work again
->> with qemu ?
-> Please start with the next/multiplatform branch in arm-soc, which has the
-> conversion to devicetree. Let's first see if that works by itself. I would
-> hope that all commits on that branch build, but something may have gone wrong.
-Maybe I'll just need to start using devicetree files. I'll try that.
+is broken because REG_FR is equal to 1.
 
-Thanks,
-Guenter
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
