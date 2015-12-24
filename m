@@ -1,65 +1,124 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Thu, 24 Dec 2015 21:05:38 +0100
-Subject: [PATCH 4/6] regulator: lp872x: Add enable GPIO pin support
-In-Reply-To: <20151224193538.GJ579@sirena.org.uk>
-References: <1450868319-20513-1-git-send-email-contact@paulk.fr>
- <1450868319-20513-5-git-send-email-contact@paulk.fr>
- <20151223115632.GS16023@sirena.org.uk> <1450980773.11913.3.camel@collins>
- <20151224193538.GJ579@sirena.org.uk>
-Message-ID: <1450987538.11913.12.camel@collins>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Thu, 24 Dec 2015 12:37:19 -0800
+Subject: [PATCH v2 0/5] clk: lpc32xx: add clock support for NXP LPC32xx
+In-Reply-To: <56785436.4000505@mleia.com>
+References: <1449398757-16834-1-git-send-email-vz@mleia.com>
+ <56785436.4000505@mleia.com>
+Message-ID: <20151224203719.GA29521@quark.deferred.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le jeudi 24 d?cembre 2015 ? 19:35 +0000, Mark Brown a ?crit :
-> On Thu, Dec 24, 2015 at 07:12:53PM +0100, Paul Kocialkowski wrote:
-> > Le mercredi 23 d?cembre 2015 ? 11:56 +0000, Mark Brown a ?crit :
+On 12/21, Vladimir Zapolskiy wrote:
+> Hi Stephen, Michael,
 > 
-> > > This isn't really adding support for the enable GPIO as the changelog
-> > > suggests, it's requesting but not managing the GPIO.  Since there is
-> > > core support for manging enable GPIOs this seems especially silly,
-> > > please tell the core about the GPIO and then it will work at runtime
-> > > too.
+> On 06.12.2015 12:45, Vladimir Zapolskiy wrote:
+> > This changeset adds common clock framework driver for NXP LPC32xx
+> > boards.
+> > 
+> > The change can be applied without any dependencies, LPC32xx device tree
+> > and mach changes will be done, when this changeset is accepted.
+> > 
+> > The v1 version of CCF driver can be found here:
+> >   http://www.spinics.net/lists/arm-kernel/msg461632.html
+> > 
+> > The RFC version of CCF driver 9/11 can be found here:
+> >   http://www.spinics.net/lists/devicetree/msg100583.html
+> > 
+> > Changes from v1 to v2:
+> > * removed dependency on the recent LPC32xx device tree changes,
+> >   also removed LPC32xx device tree and mach changes, which depend
+> >   on this series,
+> > * use lowercase hex numbers in a DT binding example,
+> > * incremented by 1 all clock values, possibly clock "0" may have a
+> >   special meaning in future,
+> > * removed explicit COMMON_CLK selection for NXP LPC18xx,
+> > * LPC32XX_CLK_DEFINE() does not stringify clock names,
+> > * fixed a minor bug in clk_pll_set_rate().
+> > 
+> > Changes from RFC to v1:
+> > * added definitions of a missed IRDA clock,
+> > * renamed compatible property from lpc32xx-scb to lpc32xx-clk
+> > * switched to regmap interface instead of mmio, this is required to
+> >   secure access to registers shared between pinmux, dma and clock
+> >   driver, unfortunately this change has to pull some code snippets
+> >   from common gate, divider and mux helpers rebased on regmap API,
+> > * split clock definitions from the driver to be able to update
+> >   dts files separately from CCF driver.
+> > 
+> > The driver is written from scratch, here are main functional
+> > differences with the legacy driver arch/arm/mach-lpc32xx/clock.c:
+> > * serialized access to SCB registers,
+> > * reworked routines to select PLL parameters,
+> > * now the clock driver has detailed description of all clocks,
+> >   the original driver misses several clock entries and most of fine
+> >   grained clock controls, here every mux and divider are accounted,
+> > * now clocks and clock hierarchies can be described in board DT file,
+> > * sophisticated management of USB clocks, for example now USB device
+> >   controller needs only one clock instead of USB PLL, USB OTG and USB
+> >   device clocks,
+> > * other benefits from a driver powered by CCF.
+> > 
+> > Patch 5/5 may produce false positives from checkpatch.pl, the fix
+> > to checkpatch is found in Andrew's tree
+> > 
+> > Vladimir Zapolskiy (5):
+> >   dt-bindings: clock: add description of LPC32xx clock controller
+> >   dt-bindings: clock: add description of LPC32xx USB clock controller
+> >   dt-bindings: clock: add NXP LPC32xx clock list for consumers
+> >   clk: lpc18xx: add NXP specific COMMON_CLK_NXP configuration symbol
+> >   clk: lpc32xx: add common clock framework driver
+> > 
+> >  .../devicetree/bindings/clock/nxp,lpc3220-clk.txt  |   30 +
+> >  .../bindings/clock/nxp,lpc3220-usb-clk.txt         |   22 +
+> >  drivers/clk/Kconfig                                |    6 +
+> >  drivers/clk/Makefile                               |    2 +-
+> >  drivers/clk/nxp/Makefile                           |    1 +
+> >  drivers/clk/nxp/clk-lpc32xx.c                      | 1569 ++++++++++++++++++++
+> >  include/dt-bindings/clock/lpc32xx-clock.h          |   56 +
+> >  7 files changed, 1685 insertions(+), 1 deletion(-)
+> >  create mode 100644 Documentation/devicetree/bindings/clock/nxp,lpc3220-clk.txt
+> >  create mode 100644 Documentation/devicetree/bindings/clock/nxp,lpc3220-usb-clk.txt
+> >  create mode 100644 drivers/clk/nxp/clk-lpc32xx.c
+> >  create mode 100644 include/dt-bindings/clock/lpc32xx-clock.h
+> > 
 > 
-> > It looks like the core bindings for GPIO can only be used instead of the
-> > rdev->desc->ops->enable callback, not jointly, which doesn't fit my use
-> > case, where both the GPIO and register write have to be used to enable
-> > regulators.
+> this is a gentle ping, the first version of the driver was published
+> in October, the only functional change is switching from iomap to regmap
+> API to access the registers.
 > 
-> > I think it would be worth making it possible to use both in core, since
-> > that situation is probably shared with other regulators. I suggest the
-> > following diff (that would be split into a separate patch in v2 of this
-> > series):
+> A couple of words about the change to mitigate your impression of
+> apparently imperfect code.
 > 
-> No, that's broken - the whole point with using a GPIO for enable control
-> on a lot of devices is that it is much faster than doing a register
-> write.  What I would expect to happen in this case is that when
-> initialsing the GPIO we set the register to enabled and then only manage
-> the GPIO at runtime.
+> The NXP LPC32xx platform is unmaintained and broken for about one
+> and a half years, so I presume you won't get an ack from Roland, who
+> is an official maintainer. Adding a CCF driver will be a huge progress,
+> since it allows in +1 kernel release to fix the platform -- there is
+> a critical problem in legacy IRQ handling based on hardware IRQs,
+> irqchip driver change is ready as well, but CCF should go first,
+> because it allows to remove a legacy clocksource/clockevent driver
+> arch/arm/mach-lpc32xx/timer.c. That driver depends on legacy broken
+> irqchip (hardware IRQs are used, irqchip with virtual IRQs will break
+> the driver), it has a proper replacement drivers/clocksource/time-lpc32xx.c,
+> but to use the new driver common clock support is needed. The CCF
+> driver will let me remove tons of other legacy stuff as well, and this
+> should be a step towards inclusion of the platform to multiarch builds.
+> 
+> If you find impossible to include this CCF driver to v4.5, please add
+> the first 4 of 5 changes, dt bindings include file is needed to
+> update DTS files independently on CCF driver inclusion status.
 
-That GPIO is shared with all regulators that the chip provides, so doing
-things this way certainly won't work if we don't want all the regulators
-powered at all times: in that case, the GPIO has precedence over the
-regulator-specific registers.
+Thanks for the helpful background information.
 
-Doing things the other way round would work and I suppose that chips
-that can use a GPIO over registers just wouldn't register any
-ops->enable callback in their description.
+Applied to clk-next towards 4.5.
 
--- 
-Paul Kocialkowski, Replicant developer
+Regards,
+Mike
 
-Replicant is a fully free Android distribution running on several
-devices, a free software mobile operating system putting the emphasis on
-freedom and privacy/security.
-
-Website: https://www.replicant.us/
-Blog: https://blog.replicant.us/
-Wiki/tracker/forums: https://redmine.replicant.us/
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151224/b1fe28d0/attachment.sig>
+> 
+> Thank you in advance.
+> 
+> Merry Christmas, Happy Holidays!
+> 
+> --
+> With best wishes,
+> Vladimir
