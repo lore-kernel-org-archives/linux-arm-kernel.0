@@ -1,54 +1,45 @@
-From: systemprogrammierung.brunner@gmail.com (Markus Brunner)
-Date: Thu, 24 Dec 2015 10:10:28 +0100
-Subject: [PATCH 0/3] drivers: net: cpsw: phy-handle fixes
-In-Reply-To: <20151223201816.1a4bd0f6.drivshin.allworx@gmail.com>
-References: <1450830994-5450-1-git-send-email-drivshin.allworx@gmail.com>
- <CABr+WTm=Oo16=qB6dyO6ZhUUz0307ROi=o270Rac2R4W5-usjg@mail.gmail.com>
- <20151223201816.1a4bd0f6.drivshin.allworx@gmail.com>
-Message-ID: <15436621.qYLgeqbLMk@localhost>
+From: alchark@gmail.com (Alexey Charkov)
+Date: Thu, 24 Dec 2015 12:12:48 +0300
+Subject: [PATCH v2 0/3] clocksource/vt8500: Fix hangs in small delays
+In-Reply-To: <1450906511-342-1-git-send-email-v1ron@mail.ru>
+References: <1450906511-342-1-git-send-email-v1ron@mail.ru>
+Message-ID: <CABjd4Yx82Mu2YSNrzcHnq+giaz9hSha_=P0mC_UO-m1XuP4EMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 23 December 2015 20:18:16 David Rivshin wrote:
-> On Thu, 24 Dec 2015 00:34:49 +0100
-> 
-> Nicolas Chauvet <kwizart@gmail.com> wrote:
-> > 2015-12-23 22:54 GMT+01:00 David Rivshin (Allworx) <
-> > 
-> > here is the full dmesg output with this serie applied to linux-next:
-> > http://ur1.ca/ocvs6
-Linux version 4.4.0-rc6-next-20151223-00029-g858e234 (kwizart at nchauvet-
-desktop) (gcc version 5.2.1 20150716 (Red Hat Cross 5.2.1-3) (GCC) ) #15 SMP 
-Wed Dec 23 18:29:57 CET 2015
+2015-12-24 0:35 GMT+03:00 Roman Volkov <v1ron@mail.ru>:
+> From: Roman Volkov <rvolkov@v1ros.org>
+>
+> vt8500 hangs in nanosleep() function, starting from commit
+> c6eb3f70d4482806dc2d3e1e3c7736f497b1d418, making the system unusable.
+> Per investigation, looks like set_next_event() now receives too small
+> delta and fails with -ETIME.
+>
+> Google group discussion:
+> https://groups.google.com/forum/#!topic/vt8500-wm8505-linux-kernel/vDMF_mDOb1k
+>
+> v2:
+> Address comments by Alexey Charkov. Merge patches to get less amount of
+> changes (three patches instead of four).
+>
+> Tested on my WM8650, no issues in three days uptime.
+>
+> Roman Volkov (3):
+>   clocksource/vt8500: Use MIN_OSCR_DELTA from PXA
+>   clocksource/vt8500: Remove the 'loops' variable
+>   clocksource/vt8500: Add register R/W functions
+>
+>  drivers/clocksource/vt8500_timer.c | 98 +++++++++++++++++++++++++++-----------
+>  1 file changed, 69 insertions(+), 29 deletions(-)
 
-I will refer to this as 0029
+This whole series looks good to me as far as VT8500 is concerned.
+Thanks a lot Roman for fixing it and streamlining the bus
+synchronization.
 
-> > Comparing a dmesg output where the driver work: it doesn't show any
-> > difference from the quoted lines:
-> > http://paste.fedoraproject.org/304248/45086839/
-Linux version 4.4.0-rc6-next-20151223-00023-g71d15d9 (kwizart at nchauvet-
-desktop) (gcc version 5.2.1 20150716 (Red Hat Cross 5.2.1-3) (GCC) ) #12 SMP 
-Wed Dec 23 10:36:46 CET 2015
+Acked-by: Alexey Charkov <alchark@gmail.com>
 
-I will refer to this as 0023
+Daniel, Thomas, any chance you could push this to -next via your
+clocksource tree?
 
-I made a "grep fail" on both dmesg and 0023 seems to lack edma, mmc and usb. I 
-wonder how ethernet could have worked. There seems also to be a problem with 
-the clocks.
-
-fails that are specific to 0023:
-
-ti_dt_clocks_register: failed to lookup clock node sysclk5_ck
-ti_dt_clocks_register: failed to lookup clock node sysclk8_ck
-platform 47400000.usb: clk_get for pll260dcoclkldo failed
-platform 48060000.mmc: clk_get for sysclk8_ck failed
-platform 481d8000.mmc: clk_get for sysclk8_ck failed
-platform 47810000.mmc: clk_get for sysclk8_ck failed
-edma 49000000.edma: pm_runtime_get_sync() failed
-edma: probe of 49000000.edma failed with error -22
-musb-dsps: probe of 47401400.usb failed with error -16
-musb-dsps: probe of 47401c00.usb failed with error -16
-cppi41-dma-engine: probe of 47400000.dma-controller failed with error -16
-omap_hsmmc: probe of 48060000.mmc failed with error -2
-omap_hsmmc: probe of 481d8000.mmc failed with error -2
-omap_hsmmc: probe of 47810000.mmc failed with error -2
+Best regards,
+Alexey
