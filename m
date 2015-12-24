@@ -1,170 +1,40 @@
-From: Zhiqiang.Hou@freescale.com (Zhiqiang Hou)
-Date: Thu, 24 Dec 2015 17:37:53 +0800
-Subject: [PATCH v9 3/3] ARM64: dts: add LS1043a-RDB board support
-In-Reply-To: <1450949873-34260-1-git-send-email-Zhiqiang.Hou@freescale.com>
-References: <1450949873-34260-1-git-send-email-Zhiqiang.Hou@freescale.com>
-Message-ID: <1450949873-34260-3-git-send-email-Zhiqiang.Hou@freescale.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 24 Dec 2015 10:58:30 +0100
+Subject: Running arm:versatile_defconfig with qemu in linux-next
+In-Reply-To: <567B76E0.6050106@roeck-us.net>
+References: <567B76E0.6050106@roeck-us.net>
+Message-ID: <201512241058.30249.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shaohui Xie <Shaohui.Xie@freescale.com>
+On Thursday 24 December 2015, Guenter Roeck wrote:
+> Hi all,
+> 
+> various versatile and realview configurations fail to run for me with
+> qemu (2.5) in linux-next. Some of those are qemu configurations
+> I collected from various sources, so I guess I am on my own there.
+> However, the following standard configurations no longer work.
+> 
+> arm:versatileab:versatile_defconfig
+> arm:versatilepb:versatile_defconfig
 
-Signed-off-by: Shaohui Xie <Shaohui.Xie@freescale.com>
-Signed-off-by: Mingkai Hu <Mingkai.Hu@freescale.com>
-Signed-off-by: Wenbin Song <Wenbin.Song@freescale.com>
-Signed-off-by: Hou Zhiqiang <B48286@freescale.com>
----
-V9:
- - Add root node compatible property.
+Just to be sure to rule out the obvious: are you using the dtb files from
+the kernel, or do you have your own?
 
-V8 - V7:
- - Rebased on latest LS2080 patches.
+> I can no longer get realview-eb-mpcore and realview-eb to work either,
+> but, again, that is with a qemu specific configuration.
 
-V6: V5 V4 V3
- - No change.
+These are still based on board files, right? Do the normal defconfigs
+work?
 
-V2:
- - Remove the useless compatible "simple-bus" from cpld node.
+> I tried to bisect, but there have been too many related changes in the code
+> for it to succeed; some of the bisect attempts don't even compile, others fail
+> due to different problems. Is it known if versatile_defconfig in linux-next runs
+> on a real system ? If so, any idea what it might take to get it to work again
+> with qemu ?
 
- arch/arm64/boot/dts/freescale/Makefile            |   1 +
- arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts | 117 ++++++++++++++++++++++
- 2 files changed, 118 insertions(+)
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+Please start with the next/multiplatform branch in arm-soc, which has the
+conversion to devicetree. Let's first see if that works by itself. I would
+hope that all commits on that branch build, but something may have gone wrong.
 
-diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
-index c4957a4..f3c2516 100644
---- a/arch/arm64/boot/dts/freescale/Makefile
-+++ b/arch/arm64/boot/dts/freescale/Makefile
-@@ -1,6 +1,7 @@
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-qds.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-rdb.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-simu.dtb
-+dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1043a-rdb.dtb
-  
- always		:= $(dtb-y)
- subdir-y	:= $(dts-dirs)
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-new file mode 100644
-index 0000000..2e96e4f
---- /dev/null
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-@@ -0,0 +1,117 @@
-+/*
-+ * Device Tree Include file for Freescale Layerscape-1043A family SoC.
-+ *
-+ * Copyright 2014-2015, Freescale Semiconductor
-+ *
-+ * Mingkai Hu <Mingkai.hu@freescale.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPLv2 or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+/include/ "fsl-ls1043a.dtsi"
-+
-+/ {
-+	model = "LS1043A RDB Board";
-+	compatible = "fsl,ls1043a-rdb", "fsl,ls1043a";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+	ina220 at 40 {
-+		compatible = "ti,ina220";
-+		reg = <0x40>;
-+		shunt-resistor = <1000>;
-+	};
-+	adt7461a at 4c {
-+		compatible = "adi,adt7461";
-+		reg = <0x4c>;
-+	};
-+	eeprom at 52 {
-+		compatible = "at24,24c512";
-+		reg = <0x52>;
-+	};
-+	eeprom at 53 {
-+		compatible = "at24,24c512";
-+		reg = <0x53>;
-+	};
-+	rtc at 68 {
-+		compatible = "pericom,pt7c4338";
-+		reg = <0x68>;
-+	};
-+};
-+
-+&ifc {
-+	status = "okay";
-+	#address-cells = <2>;
-+	#size-cells = <1>;
-+	/* NOR, NAND Flashes and FPGA on board */
-+	ranges = <0x0 0x0 0x0 0x60000000 0x08000000
-+		  0x1 0x0 0x0 0x7e800000 0x00010000
-+		  0x2 0x0 0x0 0x7fb00000 0x00000100>;
-+
-+		nor at 0,0 {
-+			compatible = "cfi-flash";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0x0 0x0 0x8000000>;
-+			bank-width = <2>;
-+			device-width = <1>;
-+		};
-+
-+		nand at 1,0 {
-+			compatible = "fsl,ifc-nand";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0x1 0x0 0x10000>;
-+		};
-+
-+		cpld: board-control at 2,0 {
-+			compatible = "fsl,ls1043ardb-cpld";
-+			reg = <0x2 0x0 0x0000100>;
-+		};
-+};
-+
-+&duart0 {
-+	status = "okay";
-+};
-+
-+&duart1 {
-+	status = "okay";
-+};
--- 
-2.1.0.27.g96db324
+	Arnd
