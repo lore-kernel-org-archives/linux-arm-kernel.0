@@ -1,20 +1,187 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Wed, 23 Dec 2015 23:40:15 -0600
-Subject: [PATCH] ARM64: dts: add LS1043a-QDS board support
-In-Reply-To: <1450935037-42930-1-git-send-email-Zhiqiang.Hou@freescale.com>
-References: <1450935037-42930-1-git-send-email-Zhiqiang.Hou@freescale.com>
-Message-ID: <1450935615.18314.125.camel@freescale.com>
+From: shijie.huang@arm.com (Huang Shijie)
+Date: Thu, 24 Dec 2015 06:54:40 +0000
+Subject: [PATCH 05/12] tty: amba-pl011: add register lookup table
+In-Reply-To: <E1ZyNlS-0003jg-46@rmk-PC.arm.linux.org.uk>
+References: <20151116173935.GQ8644@n2100.arm.linux.org.uk>
+ <E1ZyNlS-0003jg-46@rmk-PC.arm.linux.org.uk>
+Message-ID: <20151224065437.GA18445@robwan01-pc.asiapac.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-12-24 at 13:30 +0800, Zhiqiang Hou wrote:
-> +/dts-v1/;
-> +/include/ "fsl-ls1043a.dtsi"
-> +
-> +/ {
-> +	model = "LS1043A QDS Board";
-> +
+On Mon, Nov 16, 2015 at 05:40:26PM +0000, Russell King wrote:
+Hi Russell,
 
-compatible?
+> Add a register lookup table, which allows the register offsets to be
+> adjusted on a per-port basis.
+I met a console hang with my ARM juno-r1 board after the linux-next merge this patch.
 
--Scott
+The console hang like this:
+
+==================================
+on will start in   1 seconds
+EFI stub: Booting Linux Kernel...
+EFI stub: Using DTB from command line
+EFI stub: Exiting boot services and installing virtual address map...
+==================================
+
+The console runs well if I revert this patch. Does anyone also meet the
+same hang issue?
+
+My kernel cmdline:
+  console=ttyAMA0,115200 earlycon=pl011,0x7ff80000 root=/dev/sda1 rootwait verbose debug sky2.mac_address=0x00,0x02,0xF7,0x00,0x63,0x3C dtb=r1a57.dtb
+
+thanks
+Huang Shijie
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  drivers/tty/serial/amba-pl011.c | 33 ++++++++++++++++++++++++-
+>  drivers/tty/serial/amba-pl011.h | 53 ++++++++++++++++++++++-------------------
+>  2 files changed, 60 insertions(+), 26 deletions(-)
+>
+> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> index 5ea5b0a3dbb9..628557f6a7a1 100644
+> --- a/drivers/tty/serial/amba-pl011.c
+> +++ b/drivers/tty/serial/amba-pl011.c
+> @@ -73,6 +73,34 @@
+>  #define UART_DR_ERROR                (UART011_DR_OE|UART011_DR_BE|UART011_DR_PE|UART011_DR_FE)
+>  #define UART_DUMMY_DR_RX     (1 << 16)
+>
+> +static u16 pl011_std_offsets[REG_ARRAY_SIZE] = {
+> +     [REG_DR] = UART01x_DR,
+> +     [REG_ST_DMAWM] = ST_UART011_DMAWM,
+> +     [REG_ST_TIMEOUT] = ST_UART011_TIMEOUT,
+> +     [REG_FR] = UART01x_FR,
+> +     [REG_ST_LCRH_RX] = ST_UART011_LCRH_RX,
+> +     [REG_IBRD] = UART011_IBRD,
+> +     [REG_FBRD] = UART011_FBRD,
+> +     [REG_LCRH] = UART011_LCRH,
+> +     [REG_ST_LCRH_TX] = ST_UART011_LCRH_TX,
+> +     [REG_CR] = UART011_CR,
+> +     [REG_IFLS] = UART011_IFLS,
+> +     [REG_IMSC] = UART011_IMSC,
+> +     [REG_RIS] = UART011_RIS,
+> +     [REG_MIS] = UART011_MIS,
+> +     [REG_ICR] = UART011_ICR,
+> +     [REG_DMACR] = UART011_DMACR,
+> +     [REG_ST_XFCR] = ST_UART011_XFCR,
+> +     [REG_ST_XON1] = ST_UART011_XON1,
+> +     [REG_ST_XON2] = ST_UART011_XON2,
+> +     [REG_ST_XOFF1] = ST_UART011_XOFF1,
+> +     [REG_ST_XOFF2] = ST_UART011_XOFF2,
+> +     [REG_ST_ITCR] = ST_UART011_ITCR,
+> +     [REG_ST_ITIP] = ST_UART011_ITIP,
+> +     [REG_ST_ABCR] = ST_UART011_ABCR,
+> +     [REG_ST_ABIMSC] = ST_UART011_ABIMSC,
+> +};
+> +
+>  /* There is by now at least one vendor with differing details, so handle it */
+>  struct vendor_data {
+>       unsigned int            ifls;
+> @@ -164,6 +192,7 @@ struct pl011_dmatx_data {
+>   */
+>  struct uart_amba_port {
+>       struct uart_port        port;
+> +     const u16               *reg_offset;
+>       struct clk              *clk;
+>       const struct vendor_data *vendor;
+>       unsigned int            dmacr;          /* dma control reg */
+> @@ -189,7 +218,7 @@ struct uart_amba_port {
+>  static unsigned int pl011_reg_to_offset(const struct uart_amba_port *uap,
+>       unsigned int reg)
+>  {
+> -     return reg;
+> +     return uap->reg_offset[reg];
+>  }
+>
+>  static unsigned int pl011_read(const struct uart_amba_port *uap,
+> @@ -2397,6 +2426,7 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+>       if (IS_ERR(uap->clk))
+>               return PTR_ERR(uap->clk);
+>
+> +     uap->reg_offset = pl011_std_offsets;
+>       uap->vendor = vendor;
+>       uap->lcrh_rx = vendor->lcrh_rx;
+>       uap->lcrh_tx = vendor->lcrh_tx;
+> @@ -2478,6 +2508,7 @@ static int sbsa_uart_probe(struct platform_device *pdev)
+>       if (!uap)
+>               return -ENOMEM;
+>
+> +     uap->reg_offset = pl011_std_offsets;
+>       uap->vendor     = &vendor_sbsa;
+>       uap->fifosize   = 32;
+>       uap->port.irq   = platform_get_irq(pdev, 0);
+> diff --git a/drivers/tty/serial/amba-pl011.h b/drivers/tty/serial/amba-pl011.h
+> index b7eb1bc2fab9..0c6756dba2fe 100644
+> --- a/drivers/tty/serial/amba-pl011.h
+> +++ b/drivers/tty/serial/amba-pl011.h
+> @@ -2,31 +2,34 @@
+>  #define AMBA_PL011_H
+>
+>  enum {
+> -     REG_DR = UART01x_DR,
+> -     REG_ST_DMAWM = ST_UART011_DMAWM,
+> -     REG_ST_TIMEOUT = ST_UART011_TIMEOUT,
+> -     REG_FR = UART01x_FR,
+> -     REG_ST_LCRH_RX = ST_UART011_LCRH_RX,
+> -     REG_IBRD = UART011_IBRD,
+> -     REG_FBRD = UART011_FBRD,
+> -     REG_LCRH = UART011_LCRH,
+> -     REG_ST_LCRH_TX = ST_UART011_LCRH_TX,
+> -     REG_CR = UART011_CR,
+> -     REG_IFLS = UART011_IFLS,
+> -     REG_IMSC = UART011_IMSC,
+> -     REG_RIS = UART011_RIS,
+> -     REG_MIS = UART011_MIS,
+> -     REG_ICR = UART011_ICR,
+> -     REG_DMACR = UART011_DMACR,
+> -     REG_ST_XFCR = ST_UART011_XFCR,
+> -     REG_ST_XON1 = ST_UART011_XON1,
+> -     REG_ST_XON2 = ST_UART011_XON2,
+> -     REG_ST_XOFF1 = ST_UART011_XOFF1,
+> -     REG_ST_XOFF2 = ST_UART011_XOFF2,
+> -     REG_ST_ITCR = ST_UART011_ITCR,
+> -     REG_ST_ITIP = ST_UART011_ITIP,
+> -     REG_ST_ABCR = ST_UART011_ABCR,
+> -     REG_ST_ABIMSC = ST_UART011_ABIMSC,
+> +     REG_DR,
+> +     REG_ST_DMAWM,
+> +     REG_ST_TIMEOUT,
+> +     REG_FR,
+> +     REG_ST_LCRH_RX,
+> +     REG_IBRD,
+> +     REG_FBRD,
+> +     REG_LCRH,
+> +     REG_ST_LCRH_TX,
+> +     REG_CR,
+> +     REG_IFLS,
+> +     REG_IMSC,
+> +     REG_RIS,
+> +     REG_MIS,
+> +     REG_ICR,
+> +     REG_DMACR,
+> +     REG_ST_XFCR,
+> +     REG_ST_XON1,
+> +     REG_ST_XON2,
+> +     REG_ST_XOFF1,
+> +     REG_ST_XOFF2,
+> +     REG_ST_ITCR,
+> +     REG_ST_ITIP,
+> +     REG_ST_ABCR,
+> +     REG_ST_ABIMSC,
+> +
+> +     /* The size of the array - must be last */
+> +     REG_ARRAY_SIZE,
+>  };
+>
+>  #endif
+> --
+> 2.1.0
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
