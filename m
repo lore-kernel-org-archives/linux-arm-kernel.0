@@ -1,39 +1,35 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 24 Dec 2015 10:45:30 +0100
-Subject: [PATCH] doc: PCI: altera: Fix the 'ranges' property in example
-Message-ID: <1450950330-28393-1-git-send-email-marex@denx.de>
+From: Zhiqiang.Hou@freescale.com (Zhiqiang Hou)
+Date: Thu, 24 Dec 2015 17:37:51 +0800
+Subject: [PATCH v9 1/3] Documentation: DT: Add entry for Freescale LS1043a-RDB
+ board
+Message-ID: <1450949873-34260-1-git-send-email-Zhiqiang.Hou@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The example does not work on real hardware with the PCIe HIP [1].
-The problem is with incorrect "ranges" property in the example, so
-one cannot just copy-paste the example into his DT and expect this
-to work. This patches aligns the "ranges" in the example with the
-reference FPGA design.
+From: Mingkai Hu <Mingkai.Hu@freescale.com>
 
-[1] http://rocketboards.org/foswiki/view/Projects/PCIeRootPortWithMSI
-
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Ley Foon Tan <lftan@altera.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Rob Herring <robh@kernel.org>
+Signed-off-by: Mingkai Hu <Mingkai.Hu@freescale.com>
+Signed-off-by: Hou Zhiqiang <B48286@freescale.com>
 ---
- Documentation/devicetree/bindings/pci/altera-pcie.txt | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+V9 - V2:
+ - No change.
+ Documentation/devicetree/bindings/arm/fsl.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/pci/altera-pcie.txt b/Documentation/devicetree/bindings/pci/altera-pcie.txt
-index 2951a6a..d2427c1 100644
---- a/Documentation/devicetree/bindings/pci/altera-pcie.txt
-+++ b/Documentation/devicetree/bindings/pci/altera-pcie.txt
-@@ -44,6 +44,6 @@ Example
- 			            <0 0 0 2 &pcie_0 2>,
- 			            <0 0 0 3 &pcie_0 3>,
- 			            <0 0 0 4 &pcie_0 4>;
--		ranges = <0x82000000 0x00000000 0x00000000 0xc0000000 0x00000000 0x10000000
--			    0x82000000 0x00000000 0x10000000 0xd0000000 0x00000000 0x10000000>;
-+		ranges = <0x82000000 0x00000000 0xc0000000 0xc0000000 0x00000000 0x10000000
-+			  0x82000000 0x00000000 0xd0000000 0xd0000000 0x00000000 0x10000000>;
- 	};
+diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
+index 34c88b0..752a685 100644
+--- a/Documentation/devicetree/bindings/arm/fsl.txt
++++ b/Documentation/devicetree/bindings/arm/fsl.txt
+@@ -131,6 +131,10 @@ Example:
+ Freescale ARMv8 based Layerscape SoC family Device Tree Bindings
+ ----------------------------------------------------------------
+ 
++LS1043A ARMv8 based RDB Board
++Required root node properties:
++    - compatible = "fsl,ls1043a-rdb", "fsl,ls1043a";
++
+ LS2080A ARMv8 based Simulator model
+ Required root node properties:
+     - compatible = "fsl,ls2080a-simu", "fsl,ls2080a";
 -- 
-2.1.4
+2.1.0.27.g96db324
