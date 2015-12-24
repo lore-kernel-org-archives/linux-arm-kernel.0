@@ -1,58 +1,63 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Thu, 24 Dec 2015 20:38:52 +0100
-Subject: [PATCH 5/6] ARM: LG Optimus Black (P970) codename sniper
- support, with basic features
-In-Reply-To: <CABxcv=moAUEPo8sq5KhuLZChrQtwjF1aBeNvV1i8HvUnwDXMZA@mail.gmail.com>
-References: <1450868319-20513-1-git-send-email-contact@paulk.fr>
- <1450868319-20513-6-git-send-email-contact@paulk.fr>
- <CABxcv=moAUEPo8sq5KhuLZChrQtwjF1aBeNvV1i8HvUnwDXMZA@mail.gmail.com>
-Message-ID: <1450985932.11913.7.camel@collins>
+From: private@roeck-us.net (Guenter Roeck)
+Date: Thu, 24 Dec 2015 11:51:34 -0800
+Subject: Running arm:versatile_defconfig with qemu in linux-next
+In-Reply-To: <201512241058.30249.arnd@arndb.de>
+References: <567B76E0.6050106@roeck-us.net> <201512241058.30249.arnd@arndb.de>
+Message-ID: <567C4CC6.40104@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Arnd,
 
-Le mercredi 23 d?cembre 2015 ? 13:03 -0300, Javier Martinez Canillas a
-?crit :
-> Hello Paul,
-> 
-> [snip]
-> 
-> > +
-> > +&omap3_pmx_core {
-> > +       pinctrl-names = "default";
-> > +
-> > +       uart3_pins: pinmux_uart3_pins {
-> > +               pinctrl-single,pins = <
-> > +                       0x16e (PIN_INPUT | MUX_MODE0)           /* uart3_rx_irrx */
-> > +                       0x170 (PIN_OUTPUT | MUX_MODE0)          /* uart3_tx_irtx */
-> > +               >;
-> 
-> Could you please use the IOPAD mux macros from
-> include/dt-bindings/pinctrl/omap.h instead?
-> 
-> We just did a massive cleanup on the OMAP DTS to use them instead of
-> an offset from the padconf registers.
+On 12/24/2015 01:58 AM, Arnd Bergmann wrote:
+> On Thursday 24 December 2015, Guenter Roeck wrote:
+>> Hi all,
+>>
+>> various versatile and realview configurations fail to run for me with
+>> qemu (2.5) in linux-next. Some of those are qemu configurations
+>> I collected from various sources, so I guess I am on my own there.
+>> However, the following standard configurations no longer work.
+>>
+>> arm:versatileab:versatile_defconfig
+>> arm:versatilepb:versatile_defconfig
+> Just to be sure to rule out the obvious: are you using the dtb files from
+> the kernel, or do you have your own?
+I managed to get versatile_defconfig to work using the available dtb files
+from the kernel, so this part is solved.
 
-Sure thing, will do in v2.
+>> I can no longer get realview-eb-mpcore and realview-eb to work either,
+>> but, again, that is with a qemu specific configuration.
+> These are still based on board files, right? Do the normal defconfigs
+> work?
 
-Thanks for the review!
+I got the following combinations to work.
 
--- 
-Paul Kocialkowski, Replicant developer
+Configuration                    QEMU machine            QEMU CPU
+realview-smp_defconfig    realview-eb-mpcore    default (arm11mpcore)
+realview_defconfig            realview-eb                  cortex-a8 (default arm926 fails)
+realview-defconfig            realview-pbx-a9           default (cortex-a9)
 
-Replicant is a fully free Android distribution running on several
-devices, a free software mobile operating system putting the emphasis on
-freedom and privacy/security.
+I can not get the available dtb files for realview (arm-realview-pb1176.dtb
+and arm-realview-pb11mp.dtb) to work with anything I tried.
+If you know a working configuration and qemu command line,
+please let me know.
 
-Website: https://www.replicant.us/
-Blog: https://blog.replicant.us/
-Wiki/tracker/forums: https://redmine.replicant.us/
+I don't find a working default configuration and qemu command line for the
+realview-pb-a8 machine. For pb-a8 to work, I (still) need to unconfigure
+all other machines.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151224/0b50f6ab/attachment.sig>
+>> I tried to bisect, but there have been too many related changes in the code
+>> for it to succeed; some of the bisect attempts don't even compile, others fail
+>> due to different problems. Is it known if versatile_defconfig in linux-next runs
+>> on a real system ? If so, any idea what it might take to get it to work again
+>> with qemu ?
+> Please start with the next/multiplatform branch in arm-soc, which has the
+> conversion to devicetree. Let's first see if that works by itself. I would
+> hope that all commits on that branch build, but something may have gone wrong.
+I think the mystery is resolved with the above results. My old configuration
+for realview-pb-a8 no longer works because of configuration file changes,
+and versatile now requires devicetree files.
+
+Thanks a lot for the hint!
+
+Guenter
