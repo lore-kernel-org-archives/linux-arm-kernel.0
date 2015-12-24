@@ -1,154 +1,91 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 24 Dec 2015 11:12:34 +0000
-Subject: [PATCH 26/31] arm64: KVM: debug: Remove spurious inline attributes
-In-Reply-To: <1450955559-15639-1-git-send-email-marc.zyngier@arm.com>
-References: <1450955559-15639-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1450955559-15639-27-git-send-email-marc.zyngier@arm.com>
+From: jchandra@broadcom.com (Jayachandran C)
+Date: Thu, 24 Dec 2015 17:27:27 +0530
+Subject: [PATCH v4 0/5] ACPI based PCI support for arm64
+Message-ID: <1450958252-29892-1-git-send-email-jchandra@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The debug trapping code is pretty heavy on the "inline" attribute,
-but most functions are actually referenced in the sysreg tables,
-making the inlining imposible.
+This patchset provides a generic ACPI based PCI host controller
+implementation and uses it on arm64.
 
-Removing the useless inline qualifier seems the right thing to do,
-having verified that the output code is similar.
+The first patch moves the common code to handle MCFG ACPI table from
+arch/x86 to drivers/acpi/pci_mcfg.c. The last patch in the patchset
+provides the generic implementation of an ACPI based PCI host
+controller with a new file drivers/acpi/pci_host_acpi.c. The other
+patches are to fix up arm64 and ACPI code to work with these two
+patches.
 
-Cc: Alex Benn?e <alex.bennee@linaro.org>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/kvm/sys_regs.c | 58 +++++++++++++++++++++++------------------------
- 1 file changed, 29 insertions(+), 29 deletions(-)
+The pci host controller implementation keeps a reference to
+pci_mmcfg_region entry so that config space access is done with a
+simple mapping and generic PCI config read/write. There is also an
+implementation of raw_pci_read/raw_pci_write provided by walking the
+pci_mmcfg_list
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 88adebf..eec3598 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -220,9 +220,9 @@ static bool trap_debug_regs(struct kvm_vcpu *vcpu,
-  * All writes will set the KVM_ARM64_DEBUG_DIRTY flag to ensure the
-  * hyp.S code switches between host and guest values in future.
-  */
--static inline void reg_to_dbg(struct kvm_vcpu *vcpu,
--			      struct sys_reg_params *p,
--			      u64 *dbg_reg)
-+static void reg_to_dbg(struct kvm_vcpu *vcpu,
-+		       struct sys_reg_params *p,
-+		       u64 *dbg_reg)
- {
- 	u64 val = p->regval;
- 
-@@ -235,18 +235,18 @@ static inline void reg_to_dbg(struct kvm_vcpu *vcpu,
- 	vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
- }
- 
--static inline void dbg_to_reg(struct kvm_vcpu *vcpu,
--			      struct sys_reg_params *p,
--			      u64 *dbg_reg)
-+static void dbg_to_reg(struct kvm_vcpu *vcpu,
-+		       struct sys_reg_params *p,
-+		       u64 *dbg_reg)
- {
- 	p->regval = *dbg_reg;
- 	if (p->is_32bit)
- 		p->regval &= 0xffffffffUL;
- }
- 
--static inline bool trap_bvr(struct kvm_vcpu *vcpu,
--			    struct sys_reg_params *p,
--			    const struct sys_reg_desc *rd)
-+static bool trap_bvr(struct kvm_vcpu *vcpu,
-+		     struct sys_reg_params *p,
-+		     const struct sys_reg_desc *rd)
- {
- 	u64 *dbg_reg = &vcpu->arch.vcpu_debug_state.dbg_bvr[rd->reg];
- 
-@@ -280,15 +280,15 @@ static int get_bvr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
- 	return 0;
- }
- 
--static inline void reset_bvr(struct kvm_vcpu *vcpu,
--			     const struct sys_reg_desc *rd)
-+static void reset_bvr(struct kvm_vcpu *vcpu,
-+		      const struct sys_reg_desc *rd)
- {
- 	vcpu->arch.vcpu_debug_state.dbg_bvr[rd->reg] = rd->val;
- }
- 
--static inline bool trap_bcr(struct kvm_vcpu *vcpu,
--			    struct sys_reg_params *p,
--			    const struct sys_reg_desc *rd)
-+static bool trap_bcr(struct kvm_vcpu *vcpu,
-+		     struct sys_reg_params *p,
-+		     const struct sys_reg_desc *rd)
- {
- 	u64 *dbg_reg = &vcpu->arch.vcpu_debug_state.dbg_bcr[rd->reg];
- 
-@@ -323,15 +323,15 @@ static int get_bcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
- 	return 0;
- }
- 
--static inline void reset_bcr(struct kvm_vcpu *vcpu,
--			     const struct sys_reg_desc *rd)
-+static void reset_bcr(struct kvm_vcpu *vcpu,
-+		      const struct sys_reg_desc *rd)
- {
- 	vcpu->arch.vcpu_debug_state.dbg_bcr[rd->reg] = rd->val;
- }
- 
--static inline bool trap_wvr(struct kvm_vcpu *vcpu,
--			    struct sys_reg_params *p,
--			    const struct sys_reg_desc *rd)
-+static bool trap_wvr(struct kvm_vcpu *vcpu,
-+		     struct sys_reg_params *p,
-+		     const struct sys_reg_desc *rd)
- {
- 	u64 *dbg_reg = &vcpu->arch.vcpu_debug_state.dbg_wvr[rd->reg];
- 
-@@ -366,15 +366,15 @@ static int get_wvr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
- 	return 0;
- }
- 
--static inline void reset_wvr(struct kvm_vcpu *vcpu,
--			     const struct sys_reg_desc *rd)
-+static void reset_wvr(struct kvm_vcpu *vcpu,
-+		      const struct sys_reg_desc *rd)
- {
- 	vcpu->arch.vcpu_debug_state.dbg_wvr[rd->reg] = rd->val;
- }
- 
--static inline bool trap_wcr(struct kvm_vcpu *vcpu,
--			    struct sys_reg_params *p,
--			    const struct sys_reg_desc *rd)
-+static bool trap_wcr(struct kvm_vcpu *vcpu,
-+		     struct sys_reg_params *p,
-+		     const struct sys_reg_desc *rd)
- {
- 	u64 *dbg_reg = &vcpu->arch.vcpu_debug_state.dbg_wcr[rd->reg];
- 
-@@ -408,8 +408,8 @@ static int get_wcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
- 	return 0;
- }
- 
--static inline void reset_wcr(struct kvm_vcpu *vcpu,
--			     const struct sys_reg_desc *rd)
-+static void reset_wcr(struct kvm_vcpu *vcpu,
-+		      const struct sys_reg_desc *rd)
- {
- 	vcpu->arch.vcpu_debug_state.dbg_wcr[rd->reg] = rd->val;
- }
-@@ -723,9 +723,9 @@ static bool trap_debug32(struct kvm_vcpu *vcpu,
-  * system is in.
-  */
- 
--static inline bool trap_xvr(struct kvm_vcpu *vcpu,
--			    struct sys_reg_params *p,
--			    const struct sys_reg_desc *rd)
-+static bool trap_xvr(struct kvm_vcpu *vcpu,
-+		     struct sys_reg_params *p,
-+		     const struct sys_reg_desc *rd)
- {
- 	u64 *dbg_reg = &vcpu->arch.vcpu_debug_state.dbg_bvr[rd->reg];
- 
+The patchset is against 4.4-rc6, but it can be applied to pci/next
+with a very minor fixup.  This is tested with arm64 QEMU and OVMF
+and on x86 with qemu.
+
+More testing or comments are welcome. The idea is to provide a
+simpler alternative for ACPI PCI support in arm64, any feedback
+from PCI or ACPI maintainers would be appreciated on this front.
+
+Thanks,
+JC.
+
+v3->v4:
+ - Handle suggestions from Arnd Bergmann <arnd@arndb.de>
+    * move the implementation of host controller to drivers/acpi
+      under config option CONFIG_ACPI_PCI_HOST_GENERIC
+    * remove unnecessary arch hooks (this done as much as possible
+      without affecting the scope of the patch, will need another
+      separate patchset for the rest).
+    * remove pcibios_assign_resources fs_initcall that was added
+ - fixup domain_nr assignment code, and move ACPI companion set
+   to PCI code.
+ - Call map resource correctly in setup code
+ - fix kbuild robot report
+ - More testing
+
+v2->v3:
+ - Move maintenance of the pci_mmcfg_list to drivers/acpi/pci_mcfg.c
+   without changing x86 logic
+ - use the pci_mmcfg_list in ARM64 implementation
+ - provide raw_pci_read/raw_pci_write
+
+v1->v2:
+ - use CONFIG_PCI_MMCONFIG on arm64, provide a weak implementation
+   of pci_mmcfg_late_init for arm64.
+ - The real implementation of pci_mmcfg_late_init is in pci-host-acpi.c
+   and it will save the MCFG table entries to an array. Earlier this
+   was done with an arch_init call
+ - remove unneeded pci_bus_add_devices call and fix MCFG saving code
+ - Added a patch to ACPI pci_root.c to handle arm64 PCI IO resources
+
+Jayachandran C (5):
+  APCI: MCFG: Move mmcfg_list management to drivers/acpi
+  PCI: Handle NULL parent in pci_bus_assign_domain_nr
+  ACPI: PCI: Support platforms that need pci_remap_iospace
+  arm64: pci: Add ACPI support
+  PCI: ACPI: Add a generic ACPI based host controller
+
+ arch/arm64/Kconfig             |   3 +
+ arch/arm64/kernel/pci.c        |  34 ++++-
+ arch/x86/include/asm/pci_x86.h |  24 +---
+ arch/x86/pci/mmconfig-shared.c | 269 +++++-----------------------------
+ arch/x86/pci/mmconfig_32.c     |   1 +
+ arch/x86/pci/mmconfig_64.c     |   1 +
+ drivers/acpi/Kconfig           |   8 ++
+ drivers/acpi/Makefile          |   2 +
+ drivers/acpi/pci_host_acpi.c   | 186 ++++++++++++++++++++++++
+ drivers/acpi/pci_mcfg.c        | 317 +++++++++++++++++++++++++++++++++++++++++
+ drivers/acpi/pci_root.c        |  62 +++++++-
+ drivers/acpi/resource.c        |   2 +
+ drivers/pci/pci.c              |  19 ++-
+ drivers/pci/probe.c            |   2 +
+ include/linux/pci-acpi.h       |  59 ++++++++
+ 15 files changed, 724 insertions(+), 265 deletions(-)
+ create mode 100644 drivers/acpi/pci_host_acpi.c
+ create mode 100644 drivers/acpi/pci_mcfg.c
+
 -- 
-2.1.4
+1.9.1
