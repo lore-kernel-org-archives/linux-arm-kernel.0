@@ -1,91 +1,39 @@
-From: michael@amarulasolutions.com (Michael Trimarchi)
-Date: Thu, 24 Dec 2015 10:27:49 +0100
-Subject: [PATCH] ARM: dts: imx6q: clean up unused ipu2grp
-In-Reply-To: <1450837377-23103-1-git-send-email-shawnguo@kernel.org>
-References: <1450837377-23103-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <20151224092740.GB9078@panicking>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 24 Dec 2015 10:45:30 +0100
+Subject: [PATCH] doc: PCI: altera: Fix the 'ranges' property in example
+Message-ID: <1450950330-28393-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 23, 2015 at 10:22:57AM +0800, Shawn Guo wrote:
-> The pinctrl group ipu2grp is a leftover from the previous iomuxc DT
-> cleanup.  It's not used by anyone now.  More importantly, it's getting
-> in the way of saving the unnecessary pinfunc container node from the
-> board dts files that include imx6q.dtsi.
-> 
-> Let's clean it up.
-> 
-> Signed-off-by: Shawn Guo <shawnguo@kernel.org>
+The example does not work on real hardware with the PCIe HIP [1].
+The problem is with incorrect "ranges" property in the example, so
+one cannot just copy-paste the example into his DT and expect this
+to work. This patches aligns the "ranges" in the example with the
+reference FPGA design.
 
-Tested-by: Michael Trimarchi <michael@amarulasolutions.com>
+[1] http://rocketboards.org/foswiki/view/Projects/PCIeRootPortWithMSI
 
-> ---
-> Hi arm-soc folks,
-> 
-> Olof just merged my 4.5 pull requests (thanks).  And here is one cleanup
-> patch, which will be quite useful for imx6q board files we are going to
-> add in the next development cycle.  It helps to save the pinfunc
-> container node and thus one level of indentation from board dts.  So
-> please apply it to arm-soc for 4.5 merge window.  Thanks.
-> 
-> Shawn
-> 
->  arch/arm/boot/dts/imx6q.dtsi | 36 ------------------------------------
->  1 file changed, 36 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-> index 9b6a193b64ca..0d93c0e8f9ba 100644
-> --- a/arch/arm/boot/dts/imx6q.dtsi
-> +++ b/arch/arm/boot/dts/imx6q.dtsi
-> @@ -104,42 +104,6 @@
->  
->  			iomuxc: iomuxc at 020e0000 {
->  				compatible = "fsl,imx6q-iomuxc";
-> -
-> -				ipu2 {
-> -					pinctrl_ipu2_1: ipu2grp-1 {
-> -						fsl,pins = <
-> -							MX6QDL_PAD_DI0_DISP_CLK__IPU2_DI0_DISP_CLK 0x10
-> -							MX6QDL_PAD_DI0_PIN15__IPU2_DI0_PIN15       0x10
-> -							MX6QDL_PAD_DI0_PIN2__IPU2_DI0_PIN02        0x10
-> -							MX6QDL_PAD_DI0_PIN3__IPU2_DI0_PIN03        0x10
-> -							MX6QDL_PAD_DI0_PIN4__IPU2_DI0_PIN04        0x80000000
-> -							MX6QDL_PAD_DISP0_DAT0__IPU2_DISP0_DATA00   0x10
-> -							MX6QDL_PAD_DISP0_DAT1__IPU2_DISP0_DATA01   0x10
-> -							MX6QDL_PAD_DISP0_DAT2__IPU2_DISP0_DATA02   0x10
-> -							MX6QDL_PAD_DISP0_DAT3__IPU2_DISP0_DATA03   0x10
-> -							MX6QDL_PAD_DISP0_DAT4__IPU2_DISP0_DATA04   0x10
-> -							MX6QDL_PAD_DISP0_DAT5__IPU2_DISP0_DATA05   0x10
-> -							MX6QDL_PAD_DISP0_DAT6__IPU2_DISP0_DATA06   0x10
-> -							MX6QDL_PAD_DISP0_DAT7__IPU2_DISP0_DATA07   0x10
-> -							MX6QDL_PAD_DISP0_DAT8__IPU2_DISP0_DATA08   0x10
-> -							MX6QDL_PAD_DISP0_DAT9__IPU2_DISP0_DATA09   0x10
-> -							MX6QDL_PAD_DISP0_DAT10__IPU2_DISP0_DATA10  0x10
-> -							MX6QDL_PAD_DISP0_DAT11__IPU2_DISP0_DATA11  0x10
-> -							MX6QDL_PAD_DISP0_DAT12__IPU2_DISP0_DATA12  0x10
-> -							MX6QDL_PAD_DISP0_DAT13__IPU2_DISP0_DATA13  0x10
-> -							MX6QDL_PAD_DISP0_DAT14__IPU2_DISP0_DATA14  0x10
-> -							MX6QDL_PAD_DISP0_DAT15__IPU2_DISP0_DATA15  0x10
-> -							MX6QDL_PAD_DISP0_DAT16__IPU2_DISP0_DATA16  0x10
-> -							MX6QDL_PAD_DISP0_DAT17__IPU2_DISP0_DATA17  0x10
-> -							MX6QDL_PAD_DISP0_DAT18__IPU2_DISP0_DATA18  0x10
-> -							MX6QDL_PAD_DISP0_DAT19__IPU2_DISP0_DATA19  0x10
-> -							MX6QDL_PAD_DISP0_DAT20__IPU2_DISP0_DATA20  0x10
-> -							MX6QDL_PAD_DISP0_DAT21__IPU2_DISP0_DATA21  0x10
-> -							MX6QDL_PAD_DISP0_DAT22__IPU2_DISP0_DATA22  0x10
-> -							MX6QDL_PAD_DISP0_DAT23__IPU2_DISP0_DATA23  0x10
-> -						>;
-> -					};
-> -				};
->  			};
->  		};
->  
-> -- 
-> 1.9.1
-> 
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Ley Foon Tan <lftan@altera.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/pci/altera-pcie.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/pci/altera-pcie.txt b/Documentation/devicetree/bindings/pci/altera-pcie.txt
+index 2951a6a..d2427c1 100644
+--- a/Documentation/devicetree/bindings/pci/altera-pcie.txt
++++ b/Documentation/devicetree/bindings/pci/altera-pcie.txt
+@@ -44,6 +44,6 @@ Example
+ 			            <0 0 0 2 &pcie_0 2>,
+ 			            <0 0 0 3 &pcie_0 3>,
+ 			            <0 0 0 4 &pcie_0 4>;
+-		ranges = <0x82000000 0x00000000 0x00000000 0xc0000000 0x00000000 0x10000000
+-			    0x82000000 0x00000000 0x10000000 0xd0000000 0x00000000 0x10000000>;
++		ranges = <0x82000000 0x00000000 0xc0000000 0xc0000000 0x00000000 0x10000000
++			  0x82000000 0x00000000 0xd0000000 0xd0000000 0x00000000 0x10000000>;
+ 	};
 -- 
-| Michael Nazzareno Trimarchi                     Amarula Solutions BV |
-| COO  -  Founder                                      Cruquiuskade 47 |
-| +31(0)851119172                                 Amsterdam 1018 AM NL |
-|                  [`as] http://www.amarulasolutions.com               |
+2.1.4
