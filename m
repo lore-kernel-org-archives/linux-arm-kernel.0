@@ -1,90 +1,38 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
-Date: Thu, 24 Dec 2015 20:02:37 +0100
-Subject: [PATCH 1/5] arm: devtree: Set system_rev from DT "/revision"
-In-Reply-To: <1436214373-12969-2-git-send-email-pali.rohar@gmail.com>
-References: <1436214373-12969-1-git-send-email-pali.rohar@gmail.com>
- <1436214373-12969-2-git-send-email-pali.rohar@gmail.com>
-Message-ID: <20151224190237.GA17343@pali>
+From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
+Date: Thu, 24 Dec 2015 21:02:41 +0200
+Subject: [PATCH 1/2] ARM: ATAGS: move save_atags() to include/asm
+ arch/arm/include/asm/setup.h
+In-Reply-To: <20151224185319.GT2793@atomide.com>
+References: <20151224153536.GJ30871@n2100.arm.linux.org.uk>
+ <1450975076-7411-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
+ <1450975076-7411-2-git-send-email-ivo.g.dimitrov.75@gmail.com>
+ <201512241848.17946@pali> <20151224185319.GT2793@atomide.com>
+Message-ID: <567C4151.2090003@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 06 July 2015 22:26:09 Pali Roh?r wrote:
-> With this patch "/revision" DT entry is used to set global system_rev
-> variable. DT "/revision" is expected to be u32 numeric value.
-> 
-> TODO: add documentation
-> 
-> Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
-> ---
->  arch/arm/kernel/devtree.c |   12 ++++++++++--
->  1 file changed, 10 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-> index 11c54de..7d82749 100644
-> --- a/arch/arm/kernel/devtree.c
-> +++ b/arch/arm/kernel/devtree.c
-> @@ -19,6 +19,7 @@
->  #include <linux/of_irq.h>
->  #include <linux/of_platform.h>
->  #include <linux/smp.h>
-> +#include <linux/libfdt_env.h>
->  
->  #include <asm/cputype.h>
->  #include <asm/setup.h>
-> @@ -26,6 +27,7 @@
->  #include <asm/smp_plat.h>
->  #include <asm/mach/arch.h>
->  #include <asm/mach-types.h>
-> +#include <asm/system_info.h>
->  
->  
->  #ifdef CONFIG_SMP
-> @@ -204,6 +206,8 @@ static const void * __init arch_get_next_mach(const char *const **match)
->  const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
->  {
->  	const struct machine_desc *mdesc, *mdesc_best = NULL;
-> +	unsigned long dt_root;
-> +	const u32 *rev;
->  
->  #ifdef CONFIG_ARCH_MULTIPLATFORM
->  	DT_MACHINE_START(GENERIC_DT, "Generic DT based system")
-> @@ -215,17 +219,16 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
->  	if (!dt_phys || !early_init_dt_verify(phys_to_virt(dt_phys)))
->  		return NULL;
->  
-> +	dt_root = of_get_flat_dt_root();
->  	mdesc = of_flat_dt_match_machine(mdesc_best, arch_get_next_mach);
->  
->  	if (!mdesc) {
->  		const char *prop;
->  		int size;
-> -		unsigned long dt_root;
->  
->  		early_print("\nError: unrecognized/unsupported "
->  			    "device tree compatible list:\n[ ");
->  
-> -		dt_root = of_get_flat_dt_root();
->  		prop = of_get_flat_dt_prop(dt_root, "compatible", &size);
->  		while (size > 0) {
->  			early_print("'%s' ", prop);
-> @@ -246,5 +249,10 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
->  	/* Change machine number to match the mdesc we're using */
->  	__machine_arch_type = mdesc->nr;
->  
-> +	/* Set system revision from DT */
-> +	rev = of_get_flat_dt_prop(dt_root, "revision", NULL);
-> +	if (rev)
-> +		system_rev = fdt32_to_cpu(*rev);
-> +
->  	return mdesc;
->  }
 
-This patch and second one (with subject "[PATCH 2/5] arm: boot: convert
-ATAG_REVISION to DT "/revision" entry") are still needed.
 
-Are there any objections for them? If not, I will add missing DT
-documentation and will resend them.
+On 24.12.2015 20:53, Tony Lindgren wrote:
+> * Pali Roh?r <pali.rohar@gmail.com> [151224 09:48]:
+>> On Thursday 24 December 2015 17:37:55 Ivaylo Dimitrov wrote:
+>>> So it can be used by code outside arch/arm/kernel/. Fix save_atags()
+>>> declaration to match its definition while at it.
+>>>
+>>> Signed-off-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
+>>
+>> Tested-by: Pali Roh?r <pali.rohar@gmail.com>
+>
+> Nice, please upload both to Russell's patch system after no
+> more comments:
+>
+> Acked-by: Tony Lindgren <tony@atomide.com>
+>
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
+Hi Tony,
+
+Could you elaborate on that patch system? Where it is and do I need some 
+special account/access?
+
+Regards,
+Ivo
