@@ -1,36 +1,34 @@
-From: zhiqiang.hou@nxp.com (Zhiqiang Hou)
-Date: Thu, 24 Dec 2015 09:16:00 +0000
-Subject: [PATCH] ARM64: dts: add LS1043a-QDS board support
-In-Reply-To: <1450935615.18314.125.camel@freescale.com>
-References: <1450935037-42930-1-git-send-email-Zhiqiang.Hou@freescale.com>
- <1450935615.18314.125.camel@freescale.com>
-Message-ID: <HE1PR04MB0906CD54FAA8EED00DE1F4B384E70@HE1PR04MB0906.eurprd04.prod.outlook.com>
+From: Zhiqiang.Hou@freescale.com (Zhiqiang Hou)
+Date: Thu, 24 Dec 2015 17:11:37 +0800
+Subject: [PATCH v2 1/2] Documentation: DT: Add entry for Freescale LS1043a-QDS
+ board
+Message-ID: <1450948298-33238-1-git-send-email-Zhiqiang.Hou@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Hou Zhiqiang <Zhiqiang.Hou@freescale.com>
 
+Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@freescale.com>
+---
+new patch
 
-> -----Original Message-----
-> From: Scott Wood [mailto:scottwood at freescale.com]
-> Sent: 2015?12?24? 13:40
-> To: Zhiqiang Hou <Zhiqiang.Hou@freescale.com>; devicetree at vger.kernel.org;
-> robh+dt at kernel.org; mark.rutland at arm.com; pawel.moll at arm.com;
-> ijc+devicetree at hellion.org.uk; galak at codeaurora.org; linux-arm-
-> kernel at lists.infradead.org; catalin.marinas at arm.com; will.deacon at arm.com
-> Cc: Mingkai.Hu at freescale.com; Shaohui.Xie at freescale.com
-> Subject: Re: [PATCH] ARM64: dts: add LS1043a-QDS board support
-> 
-> On Thu, 2015-12-24 at 13:30 +0800, Zhiqiang Hou wrote:
-> > +/dts-v1/;
-> > +/include/ "fsl-ls1043a.dtsi"
-> > +
-> > +/ {
-> > +	model = "LS1043A QDS Board";
-> > +
-> 
-> compatible?
+ Documentation/devicetree/bindings/arm/fsl.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-will add root node compatible in v2.
-
-Thanks,
-Zhiqiang
+diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
+index 752a685..dbbc095 100644
+--- a/Documentation/devicetree/bindings/arm/fsl.txt
++++ b/Documentation/devicetree/bindings/arm/fsl.txt
+@@ -135,6 +135,10 @@ LS1043A ARMv8 based RDB Board
+ Required root node properties:
+     - compatible = "fsl,ls1043a-rdb", "fsl,ls1043a";
+ 
++LS1043A ARMv8 based QDS Board
++Required root node properties:
++    - compatible = "fsl,ls1043a-qds", "fsl,ls1043a";
++
+ LS2080A ARMv8 based Simulator model
+ Required root node properties:
+     - compatible = "fsl,ls2080a-simu", "fsl,ls2080a";
+-- 
+2.1.0.27.g96db324
