@@ -1,138 +1,154 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 24 Dec 2015 11:12:33 +0000
-Subject: [PATCH 25/31] ARM: KVM: Cleanup exception injection
+Date: Thu, 24 Dec 2015 11:12:34 +0000
+Subject: [PATCH 26/31] arm64: KVM: debug: Remove spurious inline attributes
 In-Reply-To: <1450955559-15639-1-git-send-email-marc.zyngier@arm.com>
 References: <1450955559-15639-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1450955559-15639-26-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1450955559-15639-27-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David Binderman reported that the exception injection code had a
-couple of unused variables lingering around.
+The debug trapping code is pretty heavy on the "inline" attribute,
+but most functions are actually referenced in the sysreg tables,
+making the inlining imposible.
 
-Upon examination, it looked like this code could do with an
-anticipated spring cleaning, which amounts to deduplicating
-the CPSR/SPSR update, and making it look a bit more like
-the architecture spec.
+Removing the useless inline qualifier seems the right thing to do,
+having verified that the output code is similar.
 
-The spurious variables are removed in the process.
-
-Reported-by: David Binderman <dcb314@hotmail.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Alex Benn?e <alex.bennee@linaro.org>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/emulate.c | 74 ++++++++++++++++++++++++++------------------------
- 1 file changed, 38 insertions(+), 36 deletions(-)
+ arch/arm64/kvm/sys_regs.c | 58 +++++++++++++++++++++++------------------------
+ 1 file changed, 29 insertions(+), 29 deletions(-)
 
-diff --git a/arch/arm/kvm/emulate.c b/arch/arm/kvm/emulate.c
-index d6c0052..dc99159 100644
---- a/arch/arm/kvm/emulate.c
-+++ b/arch/arm/kvm/emulate.c
-@@ -275,6 +275,40 @@ static u32 exc_vector_base(struct kvm_vcpu *vcpu)
- 		return vbar;
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 88adebf..eec3598 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -220,9 +220,9 @@ static bool trap_debug_regs(struct kvm_vcpu *vcpu,
+  * All writes will set the KVM_ARM64_DEBUG_DIRTY flag to ensure the
+  * hyp.S code switches between host and guest values in future.
+  */
+-static inline void reg_to_dbg(struct kvm_vcpu *vcpu,
+-			      struct sys_reg_params *p,
+-			      u64 *dbg_reg)
++static void reg_to_dbg(struct kvm_vcpu *vcpu,
++		       struct sys_reg_params *p,
++		       u64 *dbg_reg)
+ {
+ 	u64 val = p->regval;
+ 
+@@ -235,18 +235,18 @@ static inline void reg_to_dbg(struct kvm_vcpu *vcpu,
+ 	vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
  }
  
-+/*
-+ * Switch to an exception mode, updating both CPSR and SPSR. Follow
-+ * the logic described in AArch32.EnterMode() from the ARMv8 ARM.
-+ */
-+static void kvm_update_psr(struct kvm_vcpu *vcpu, unsigned long mode)
-+{
-+	unsigned long cpsr = *vcpu_cpsr(vcpu);
-+	u32 sctlr = vcpu->arch.cp15[c1_SCTLR];
-+
-+	*vcpu_cpsr(vcpu) = (cpsr & ~MODE_MASK) | mode;
-+
-+	switch (mode) {
-+	case FIQ_MODE:
-+		*vcpu_cpsr(vcpu) |= PSR_F_BIT;
-+		/* Fall through */
-+	case ABT_MODE:
-+	case IRQ_MODE:
-+		*vcpu_cpsr(vcpu) |= PSR_A_BIT;
-+		/* Fall through */
-+	default:
-+		*vcpu_cpsr(vcpu) |= PSR_I_BIT;
-+	}
-+
-+	*vcpu_cpsr(vcpu) &= ~(PSR_IT_MASK | PSR_J_BIT | PSR_E_BIT | PSR_T_BIT);
-+
-+	if (sctlr & SCTLR_TE)
-+		*vcpu_cpsr(vcpu) |= PSR_T_BIT;
-+	if (sctlr & SCTLR_EE)
-+		*vcpu_cpsr(vcpu) |= PSR_E_BIT;
-+
-+	/* Note: These now point to the mode banked copies */
-+	*vcpu_spsr(vcpu) = cpsr;
-+}
-+
- /**
-  * kvm_inject_undefined - inject an undefined exception into the guest
-  * @vcpu: The VCPU to receive the undefined exception
-@@ -286,29 +320,13 @@ static u32 exc_vector_base(struct kvm_vcpu *vcpu)
-  */
- void kvm_inject_undefined(struct kvm_vcpu *vcpu)
+-static inline void dbg_to_reg(struct kvm_vcpu *vcpu,
+-			      struct sys_reg_params *p,
+-			      u64 *dbg_reg)
++static void dbg_to_reg(struct kvm_vcpu *vcpu,
++		       struct sys_reg_params *p,
++		       u64 *dbg_reg)
  {
--	unsigned long new_lr_value;
--	unsigned long new_spsr_value;
- 	unsigned long cpsr = *vcpu_cpsr(vcpu);
--	u32 sctlr = vcpu->arch.cp15[c1_SCTLR];
- 	bool is_thumb = (cpsr & PSR_T_BIT);
- 	u32 vect_offset = 4;
- 	u32 return_offset = (is_thumb) ? 2 : 4;
+ 	p->regval = *dbg_reg;
+ 	if (p->is_32bit)
+ 		p->regval &= 0xffffffffUL;
+ }
  
--	new_spsr_value = cpsr;
--	new_lr_value = *vcpu_pc(vcpu) - return_offset;
--
--	*vcpu_cpsr(vcpu) = (cpsr & ~MODE_MASK) | UND_MODE;
--	*vcpu_cpsr(vcpu) |= PSR_I_BIT;
--	*vcpu_cpsr(vcpu) &= ~(PSR_IT_MASK | PSR_J_BIT | PSR_E_BIT | PSR_T_BIT);
--
--	if (sctlr & SCTLR_TE)
--		*vcpu_cpsr(vcpu) |= PSR_T_BIT;
--	if (sctlr & SCTLR_EE)
--		*vcpu_cpsr(vcpu) |= PSR_E_BIT;
--
--	/* Note: These now point to UND banked copies */
--	*vcpu_spsr(vcpu) = cpsr;
--	*vcpu_reg(vcpu, 14) = new_lr_value;
-+	kvm_update_psr(vcpu, UND_MODE);
-+	*vcpu_reg(vcpu, 14) = *vcpu_pc(vcpu) - return_offset;
- 
- 	/* Branch to exception vector */
- 	*vcpu_pc(vcpu) = exc_vector_base(vcpu) + vect_offset;
-@@ -320,30 +338,14 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu)
-  */
- static void inject_abt(struct kvm_vcpu *vcpu, bool is_pabt, unsigned long addr)
+-static inline bool trap_bvr(struct kvm_vcpu *vcpu,
+-			    struct sys_reg_params *p,
+-			    const struct sys_reg_desc *rd)
++static bool trap_bvr(struct kvm_vcpu *vcpu,
++		     struct sys_reg_params *p,
++		     const struct sys_reg_desc *rd)
  {
--	unsigned long new_lr_value;
--	unsigned long new_spsr_value;
- 	unsigned long cpsr = *vcpu_cpsr(vcpu);
--	u32 sctlr = vcpu->arch.cp15[c1_SCTLR];
- 	bool is_thumb = (cpsr & PSR_T_BIT);
- 	u32 vect_offset;
- 	u32 return_offset = (is_thumb) ? 4 : 0;
- 	bool is_lpae;
+ 	u64 *dbg_reg = &vcpu->arch.vcpu_debug_state.dbg_bvr[rd->reg];
  
--	new_spsr_value = cpsr;
--	new_lr_value = *vcpu_pc(vcpu) + return_offset;
--
--	*vcpu_cpsr(vcpu) = (cpsr & ~MODE_MASK) | ABT_MODE;
--	*vcpu_cpsr(vcpu) |= PSR_I_BIT | PSR_A_BIT;
--	*vcpu_cpsr(vcpu) &= ~(PSR_IT_MASK | PSR_J_BIT | PSR_E_BIT | PSR_T_BIT);
--
--	if (sctlr & SCTLR_TE)
--		*vcpu_cpsr(vcpu) |= PSR_T_BIT;
--	if (sctlr & SCTLR_EE)
--		*vcpu_cpsr(vcpu) |= PSR_E_BIT;
--
--	/* Note: These now point to ABT banked copies */
--	*vcpu_spsr(vcpu) = cpsr;
--	*vcpu_reg(vcpu, 14) = new_lr_value;
-+	kvm_update_psr(vcpu, ABT_MODE);
-+	*vcpu_reg(vcpu, 14) = *vcpu_pc(vcpu) + return_offset;
+@@ -280,15 +280,15 @@ static int get_bvr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
+ 	return 0;
+ }
  
- 	if (is_pabt)
- 		vect_offset = 12;
+-static inline void reset_bvr(struct kvm_vcpu *vcpu,
+-			     const struct sys_reg_desc *rd)
++static void reset_bvr(struct kvm_vcpu *vcpu,
++		      const struct sys_reg_desc *rd)
+ {
+ 	vcpu->arch.vcpu_debug_state.dbg_bvr[rd->reg] = rd->val;
+ }
+ 
+-static inline bool trap_bcr(struct kvm_vcpu *vcpu,
+-			    struct sys_reg_params *p,
+-			    const struct sys_reg_desc *rd)
++static bool trap_bcr(struct kvm_vcpu *vcpu,
++		     struct sys_reg_params *p,
++		     const struct sys_reg_desc *rd)
+ {
+ 	u64 *dbg_reg = &vcpu->arch.vcpu_debug_state.dbg_bcr[rd->reg];
+ 
+@@ -323,15 +323,15 @@ static int get_bcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
+ 	return 0;
+ }
+ 
+-static inline void reset_bcr(struct kvm_vcpu *vcpu,
+-			     const struct sys_reg_desc *rd)
++static void reset_bcr(struct kvm_vcpu *vcpu,
++		      const struct sys_reg_desc *rd)
+ {
+ 	vcpu->arch.vcpu_debug_state.dbg_bcr[rd->reg] = rd->val;
+ }
+ 
+-static inline bool trap_wvr(struct kvm_vcpu *vcpu,
+-			    struct sys_reg_params *p,
+-			    const struct sys_reg_desc *rd)
++static bool trap_wvr(struct kvm_vcpu *vcpu,
++		     struct sys_reg_params *p,
++		     const struct sys_reg_desc *rd)
+ {
+ 	u64 *dbg_reg = &vcpu->arch.vcpu_debug_state.dbg_wvr[rd->reg];
+ 
+@@ -366,15 +366,15 @@ static int get_wvr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
+ 	return 0;
+ }
+ 
+-static inline void reset_wvr(struct kvm_vcpu *vcpu,
+-			     const struct sys_reg_desc *rd)
++static void reset_wvr(struct kvm_vcpu *vcpu,
++		      const struct sys_reg_desc *rd)
+ {
+ 	vcpu->arch.vcpu_debug_state.dbg_wvr[rd->reg] = rd->val;
+ }
+ 
+-static inline bool trap_wcr(struct kvm_vcpu *vcpu,
+-			    struct sys_reg_params *p,
+-			    const struct sys_reg_desc *rd)
++static bool trap_wcr(struct kvm_vcpu *vcpu,
++		     struct sys_reg_params *p,
++		     const struct sys_reg_desc *rd)
+ {
+ 	u64 *dbg_reg = &vcpu->arch.vcpu_debug_state.dbg_wcr[rd->reg];
+ 
+@@ -408,8 +408,8 @@ static int get_wcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
+ 	return 0;
+ }
+ 
+-static inline void reset_wcr(struct kvm_vcpu *vcpu,
+-			     const struct sys_reg_desc *rd)
++static void reset_wcr(struct kvm_vcpu *vcpu,
++		      const struct sys_reg_desc *rd)
+ {
+ 	vcpu->arch.vcpu_debug_state.dbg_wcr[rd->reg] = rd->val;
+ }
+@@ -723,9 +723,9 @@ static bool trap_debug32(struct kvm_vcpu *vcpu,
+  * system is in.
+  */
+ 
+-static inline bool trap_xvr(struct kvm_vcpu *vcpu,
+-			    struct sys_reg_params *p,
+-			    const struct sys_reg_desc *rd)
++static bool trap_xvr(struct kvm_vcpu *vcpu,
++		     struct sys_reg_params *p,
++		     const struct sys_reg_desc *rd)
+ {
+ 	u64 *dbg_reg = &vcpu->arch.vcpu_debug_state.dbg_bvr[rd->reg];
+ 
 -- 
 2.1.4
