@@ -1,104 +1,34 @@
 From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
-Date: Thu, 24 Dec 2015 16:00:56 +0200
-Subject: [PATCH 1/3] ARM: ATAGS: move atags.h to include/asm so it can be
- included by files outside kernel/
+Date: Thu, 24 Dec 2015 16:00:57 +0200
+Subject: [PATCH 2/3] ARM: ATAGS: Fix declaration of function save_atags
 In-Reply-To: <1450965658-2675-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
 References: <1450965658-2675-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
-Message-ID: <1450965658-2675-2-git-send-email-ivo.g.dimitrov.75@gmail.com>
+Message-ID: <1450965658-2675-3-git-send-email-ivo.g.dimitrov.75@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is needed by a follow-up patch that saves atags on RX51 device
+In file atags_proc.c function save_atags() expect const argument, but in
+atags.h file is declarated as non const. Fix declaration in atags.h file to
+match what is expected.
 
 Signed-off-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
 ---
- arch/arm/include/asm/atags.h  | 20 ++++++++++++++++++++
- arch/arm/kernel/atags.h       | 20 --------------------
- arch/arm/kernel/atags_parse.c |  3 +--
- arch/arm/kernel/setup.c       |  3 +--
- 4 files changed, 22 insertions(+), 24 deletions(-)
- create mode 100644 arch/arm/include/asm/atags.h
- delete mode 100644 arch/arm/kernel/atags.h
+ arch/arm/include/asm/atags.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/include/asm/atags.h b/arch/arm/include/asm/atags.h
-new file mode 100644
-index 0000000..ec4164d
---- /dev/null
+index ec4164d..2dfc30f 100644
+--- a/arch/arm/include/asm/atags.h
 +++ b/arch/arm/include/asm/atags.h
-@@ -0,0 +1,20 @@
-+#ifdef CONFIG_ATAGS_PROC
-+extern void save_atags(struct tag *tags);
-+#else
-+static inline void save_atags(struct tag *tags) { }
-+#endif
-+
-+void convert_to_tag_list(struct tag *tags);
-+
-+#ifdef CONFIG_ATAGS
-+const struct machine_desc *setup_machine_tags(phys_addr_t __atags_pointer,
-+	unsigned int machine_nr);
-+#else
-+static inline const struct machine_desc *
-+setup_machine_tags(phys_addr_t __atags_pointer, unsigned int machine_nr)
-+{
-+	early_print("no ATAGS support: can't continue\n");
-+	while (true);
-+	unreachable();
-+}
-+#endif
-diff --git a/arch/arm/kernel/atags.h b/arch/arm/kernel/atags.h
-deleted file mode 100644
-index ec4164d..0000000
---- a/arch/arm/kernel/atags.h
-+++ /dev/null
-@@ -1,20 +0,0 @@
--#ifdef CONFIG_ATAGS_PROC
+@@ -1,7 +1,7 @@
+ #ifdef CONFIG_ATAGS_PROC
 -extern void save_atags(struct tag *tags);
--#else
++extern void save_atags(const struct tag *tags);
+ #else
 -static inline void save_atags(struct tag *tags) { }
--#endif
--
--void convert_to_tag_list(struct tag *tags);
--
--#ifdef CONFIG_ATAGS
--const struct machine_desc *setup_machine_tags(phys_addr_t __atags_pointer,
--	unsigned int machine_nr);
--#else
--static inline const struct machine_desc *
--setup_machine_tags(phys_addr_t __atags_pointer, unsigned int machine_nr)
--{
--	early_print("no ATAGS support: can't continue\n");
--	while (true);
--	unreachable();
--}
--#endif
-diff --git a/arch/arm/kernel/atags_parse.c b/arch/arm/kernel/atags_parse.c
-index 68c6ae0..faac2d1 100644
---- a/arch/arm/kernel/atags_parse.c
-+++ b/arch/arm/kernel/atags_parse.c
-@@ -28,8 +28,7 @@
- #include <asm/system_info.h>
- #include <asm/page.h>
- #include <asm/mach/arch.h>
--
--#include "atags.h"
-+#include <asm/atags.h>
++static inline void save_atags(const struct tag *tags) { }
+ #endif
  
- static char default_command_line[COMMAND_LINE_SIZE] __initdata = CONFIG_CMDLINE;
- 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 20edd34..aa0193a 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -60,8 +60,7 @@
- #include <asm/unwind.h>
- #include <asm/memblock.h>
- #include <asm/virt.h>
--
--#include "atags.h"
-+#include <asm/atags.h>
- 
- 
- #if defined(CONFIG_FPE_NWFPE) || defined(CONFIG_FPE_FASTFPE)
+ void convert_to_tag_list(struct tag *tags);
 -- 
 1.9.1
