@@ -1,124 +1,61 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Thu, 24 Dec 2015 12:37:19 -0800
-Subject: [PATCH v2 0/5] clk: lpc32xx: add clock support for NXP LPC32xx
-In-Reply-To: <56785436.4000505@mleia.com>
-References: <1449398757-16834-1-git-send-email-vz@mleia.com>
- <56785436.4000505@mleia.com>
-Message-ID: <20151224203719.GA29521@quark.deferred.io>
+From: bhupesh.sharma@freescale.com (Sharma Bhupesh)
+Date: Thu, 24 Dec 2015 20:41:54 +0000
+Subject: [PATCH v3 2/2] dts/ls2080a: Update DTSI to add support of SP805
+ WDT
+In-Reply-To: <201512241118.32946.arnd@arndb.de>
+References: <1450189825-29065-1-git-send-email-bhupesh.sharma@freescale.com>
+ <1450189825-29065-3-git-send-email-bhupesh.sharma@freescale.com>
+ <CAFTCetS7P6wF3MhgMSXSXP_jnLQvBc-NSY0TW3OOnCjtbL0N_w@mail.gmail.com>
+ <201512241118.32946.arnd@arndb.de>
+Message-ID: <BN3PR0301MB1298AF2C5A88FCA392D0E9DD82E70@BN3PR0301MB1298.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/21, Vladimir Zapolskiy wrote:
-> Hi Stephen, Michael,
-> 
-> On 06.12.2015 12:45, Vladimir Zapolskiy wrote:
-> > This changeset adds common clock framework driver for NXP LPC32xx
-> > boards.
-> > 
-> > The change can be applied without any dependencies, LPC32xx device tree
-> > and mach changes will be done, when this changeset is accepted.
-> > 
-> > The v1 version of CCF driver can be found here:
-> >   http://www.spinics.net/lists/arm-kernel/msg461632.html
-> > 
-> > The RFC version of CCF driver 9/11 can be found here:
-> >   http://www.spinics.net/lists/devicetree/msg100583.html
-> > 
-> > Changes from v1 to v2:
-> > * removed dependency on the recent LPC32xx device tree changes,
-> >   also removed LPC32xx device tree and mach changes, which depend
-> >   on this series,
-> > * use lowercase hex numbers in a DT binding example,
-> > * incremented by 1 all clock values, possibly clock "0" may have a
-> >   special meaning in future,
-> > * removed explicit COMMON_CLK selection for NXP LPC18xx,
-> > * LPC32XX_CLK_DEFINE() does not stringify clock names,
-> > * fixed a minor bug in clk_pll_set_rate().
-> > 
-> > Changes from RFC to v1:
-> > * added definitions of a missed IRDA clock,
-> > * renamed compatible property from lpc32xx-scb to lpc32xx-clk
-> > * switched to regmap interface instead of mmio, this is required to
-> >   secure access to registers shared between pinmux, dma and clock
-> >   driver, unfortunately this change has to pull some code snippets
-> >   from common gate, divider and mux helpers rebased on regmap API,
-> > * split clock definitions from the driver to be able to update
-> >   dts files separately from CCF driver.
-> > 
-> > The driver is written from scratch, here are main functional
-> > differences with the legacy driver arch/arm/mach-lpc32xx/clock.c:
-> > * serialized access to SCB registers,
-> > * reworked routines to select PLL parameters,
-> > * now the clock driver has detailed description of all clocks,
-> >   the original driver misses several clock entries and most of fine
-> >   grained clock controls, here every mux and divider are accounted,
-> > * now clocks and clock hierarchies can be described in board DT file,
-> > * sophisticated management of USB clocks, for example now USB device
-> >   controller needs only one clock instead of USB PLL, USB OTG and USB
-> >   device clocks,
-> > * other benefits from a driver powered by CCF.
-> > 
-> > Patch 5/5 may produce false positives from checkpatch.pl, the fix
-> > to checkpatch is found in Andrew's tree
-> > 
-> > Vladimir Zapolskiy (5):
-> >   dt-bindings: clock: add description of LPC32xx clock controller
-> >   dt-bindings: clock: add description of LPC32xx USB clock controller
-> >   dt-bindings: clock: add NXP LPC32xx clock list for consumers
-> >   clk: lpc18xx: add NXP specific COMMON_CLK_NXP configuration symbol
-> >   clk: lpc32xx: add common clock framework driver
-> > 
-> >  .../devicetree/bindings/clock/nxp,lpc3220-clk.txt  |   30 +
-> >  .../bindings/clock/nxp,lpc3220-usb-clk.txt         |   22 +
-> >  drivers/clk/Kconfig                                |    6 +
-> >  drivers/clk/Makefile                               |    2 +-
-> >  drivers/clk/nxp/Makefile                           |    1 +
-> >  drivers/clk/nxp/clk-lpc32xx.c                      | 1569 ++++++++++++++++++++
-> >  include/dt-bindings/clock/lpc32xx-clock.h          |   56 +
-> >  7 files changed, 1685 insertions(+), 1 deletion(-)
-> >  create mode 100644 Documentation/devicetree/bindings/clock/nxp,lpc3220-clk.txt
-> >  create mode 100644 Documentation/devicetree/bindings/clock/nxp,lpc3220-usb-clk.txt
-> >  create mode 100644 drivers/clk/nxp/clk-lpc32xx.c
-> >  create mode 100644 include/dt-bindings/clock/lpc32xx-clock.h
-> > 
-> 
-> this is a gentle ping, the first version of the driver was published
-> in October, the only functional change is switching from iomap to regmap
-> API to access the registers.
-> 
-> A couple of words about the change to mitigate your impression of
-> apparently imperfect code.
-> 
-> The NXP LPC32xx platform is unmaintained and broken for about one
-> and a half years, so I presume you won't get an ack from Roland, who
-> is an official maintainer. Adding a CCF driver will be a huge progress,
-> since it allows in +1 kernel release to fix the platform -- there is
-> a critical problem in legacy IRQ handling based on hardware IRQs,
-> irqchip driver change is ready as well, but CCF should go first,
-> because it allows to remove a legacy clocksource/clockevent driver
-> arch/arm/mach-lpc32xx/timer.c. That driver depends on legacy broken
-> irqchip (hardware IRQs are used, irqchip with virtual IRQs will break
-> the driver), it has a proper replacement drivers/clocksource/time-lpc32xx.c,
-> but to use the new driver common clock support is needed. The CCF
-> driver will let me remove tons of other legacy stuff as well, and this
-> should be a step towards inclusion of the platform to multiarch builds.
-> 
-> If you find impossible to include this CCF driver to v4.5, please add
-> the first 4 of 5 changes, dt bindings include file is needed to
-> update DTS files independently on CCF driver inclusion status.
 
-Thanks for the helpful background information.
 
-Applied to clk-next towards 4.5.
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Thursday, December 24, 2015 3:49 PM
+> To: Bhupesh SHARMA
+> Cc: Sharma Bhupesh-B45370; Mark Rutland; linux-arm-
+> kernel at lists.infradead.org; Olof Johansson; devicetree at vger.kernel.org;
+> Rob Herring; Will Deacon; Catalin Marinas; Li Yang-Leo-R58472; Wood
+> Scott-B07421; Yoder Stuart-B08248; shawn.guo at linaro.org
+> Subject: Re: [PATCH v3 2/2] dts/ls2080a: Update DTSI to add support of
+> SP805 WDT
+> 
+> On Wednesday 23 December 2015, Bhupesh SHARMA wrote:
+> >
+> > Hi Arnd, Olof, Kevin
+> >
+> > On Tue, Dec 15, 2015 at 8:00 PM, Bhupesh Sharma
+> > <bhupesh.sharma@freescale.com> wrote:
+> > > This patch updates the LS2080a DTSI (DTS Include) file to add
+> > > support for eight SP805 Watchdog units which can be used to reset
+> > > the eight Cortex-A57 cores available on LS2080A.
+> > >
+> > > Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
+> > > ---
+> > >  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi |   56
+> ++++++++++++++++++++++++
+> > >  1 file changed, 56 insertions(+)
+> >
+> > Since Rob has acked the SP805 WDT binding documentation patch (patch
+> > 1/2 of this series),
+> > can this DTSI change, please be considered for absorption in the arm-
+> soc tree.
+> 
+> Sure, please submit it for inclusion. Who is the maintainer for
+> arch/arm64/boot/dts/freescale/ ? Can they pick up all the freescale
+> related dts changes and submit them as a pull request? Should they go
+> through Shawn's tree maybe?
+
+Thanks Arnd. For now, may-be I can send this patchset with Rob's Acked-by added
+for 1/2 to 'arm at kernel.org'. So that this can be picked by via the arm-soc tree.
+Shawn, I hope it's ok with you.
+
+In the meanwhile, I will discuss internally as to how we can have in place a freescale maintainer,
+who can submit the pull requests to the 'arm-soc' tree.
 
 Regards,
-Mike
-
-> 
-> Thank you in advance.
-> 
-> Merry Christmas, Happy Holidays!
-> 
-> --
-> With best wishes,
-> Vladimir
+Bhupesh
