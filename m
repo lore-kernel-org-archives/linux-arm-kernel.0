@@ -1,105 +1,89 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 24 Dec 2015 11:12:36 +0000
-Subject: [PATCH 28/31] arm: KVM: Make kvm_arm.h friendly to assembly code
+Date: Thu, 24 Dec 2015 11:12:18 +0000
+Subject: [PATCH 10/31] arm64: KVM: Implement 32bit system register save/restore
 In-Reply-To: <1450955559-15639-1-git-send-email-marc.zyngier@arm.com>
 References: <1450955559-15639-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1450955559-15639-29-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1450955559-15639-11-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vladimir Murzin <vladimir.murzin@arm.com>
+Implement the 32bit system register save/restore as a direct
+translation of the assembly code version.
 
-kvm_arm.h is included from both C code and assembly code; however some
-definitions in this header supplied with U/UL/ULL suffixes which might
-confuse assembly once they got evaluated.
-We have _AC macro for such cases, so just wrap problem places with it.
-
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/include/asm/kvm_arm.h | 33 +++++++++++++++++----------------
- 1 file changed, 17 insertions(+), 16 deletions(-)
+ arch/arm64/kvm/hyp/hyp.h       |  2 ++
+ arch/arm64/kvm/hyp/sysreg-sr.c | 47 ++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 49 insertions(+)
 
-diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
-index b05bb5a..01d4d7a 100644
---- a/arch/arm/include/asm/kvm_arm.h
-+++ b/arch/arm/include/asm/kvm_arm.h
-@@ -19,6 +19,7 @@
- #ifndef __ARM_KVM_ARM_H__
- #define __ARM_KVM_ARM_H__
+diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
+index 778d56d..bffd308 100644
+--- a/arch/arm64/kvm/hyp/hyp.h
++++ b/arch/arm64/kvm/hyp/hyp.h
+@@ -40,6 +40,8 @@ void __timer_restore_state(struct kvm_vcpu *vcpu);
  
-+#include <linux/const.h>
- #include <linux/types.h>
+ void __sysreg_save_state(struct kvm_cpu_context *ctxt);
+ void __sysreg_restore_state(struct kvm_cpu_context *ctxt);
++void __sysreg32_save_state(struct kvm_vcpu *vcpu);
++void __sysreg32_restore_state(struct kvm_vcpu *vcpu);
  
- /* Hyp Configuration Register (HCR) bits */
-@@ -132,9 +133,9 @@
-  * space.
-  */
- #define KVM_PHYS_SHIFT	(40)
--#define KVM_PHYS_SIZE	(1ULL << KVM_PHYS_SHIFT)
--#define KVM_PHYS_MASK	(KVM_PHYS_SIZE - 1ULL)
--#define PTRS_PER_S2_PGD	(1ULL << (KVM_PHYS_SHIFT - 30))
-+#define KVM_PHYS_SIZE	(_AC(1, ULL) << KVM_PHYS_SHIFT)
-+#define KVM_PHYS_MASK	(KVM_PHYS_SIZE - _AC(1, ULL))
-+#define PTRS_PER_S2_PGD	(_AC(1, ULL) << (KVM_PHYS_SHIFT - 30))
+ #endif /* __ARM64_KVM_HYP_H__ */
  
- /* Virtualization Translation Control Register (VTCR) bits */
- #define VTCR_SH0	(3 << 12)
-@@ -161,17 +162,17 @@
- #define VTTBR_X		(5 - KVM_T0SZ)
- #endif
- #define VTTBR_BADDR_SHIFT (VTTBR_X - 1)
--#define VTTBR_BADDR_MASK  (((1LLU << (40 - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
--#define VTTBR_VMID_SHIFT  (48LLU)
--#define VTTBR_VMID_MASK	  (0xffLLU << VTTBR_VMID_SHIFT)
-+#define VTTBR_BADDR_MASK  (((_AC(1, ULL) << (40 - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
-+#define VTTBR_VMID_SHIFT  _AC(48, ULL)
-+#define VTTBR_VMID_MASK	  (_AC(0xff, ULL) << VTTBR_VMID_SHIFT)
- 
- /* Hyp Syndrome Register (HSR) bits */
- #define HSR_EC_SHIFT	(26)
--#define HSR_EC		(0x3fU << HSR_EC_SHIFT)
--#define HSR_IL		(1U << 25)
-+#define HSR_EC		(_AC(0x3f, UL) << HSR_EC_SHIFT)
-+#define HSR_IL		(_AC(1, UL) << 25)
- #define HSR_ISS		(HSR_IL - 1)
- #define HSR_ISV_SHIFT	(24)
--#define HSR_ISV		(1U << HSR_ISV_SHIFT)
-+#define HSR_ISV		(_AC(1, UL) << HSR_ISV_SHIFT)
- #define HSR_SRT_SHIFT	(16)
- #define HSR_SRT_MASK	(0xf << HSR_SRT_SHIFT)
- #define HSR_FSC		(0x3f)
-@@ -179,9 +180,9 @@
- #define HSR_SSE		(1 << 21)
- #define HSR_WNR		(1 << 6)
- #define HSR_CV_SHIFT	(24)
--#define HSR_CV		(1U << HSR_CV_SHIFT)
-+#define HSR_CV		(_AC(1, UL) << HSR_CV_SHIFT)
- #define HSR_COND_SHIFT	(20)
--#define HSR_COND	(0xfU << HSR_COND_SHIFT)
-+#define HSR_COND	(_AC(0xf, UL) << HSR_COND_SHIFT)
- 
- #define FSC_FAULT	(0x04)
- #define FSC_ACCESS	(0x08)
-@@ -209,13 +210,13 @@
- #define HSR_EC_DABT	(0x24)
- #define HSR_EC_DABT_HYP	(0x25)
- 
--#define HSR_WFI_IS_WFE		(1U << 0)
-+#define HSR_WFI_IS_WFE		(_AC(1, UL) << 0)
- 
--#define HSR_HVC_IMM_MASK	((1UL << 16) - 1)
-+#define HSR_HVC_IMM_MASK	((_AC(1, UL) << 16) - 1)
- 
--#define HSR_DABT_S1PTW		(1U << 7)
--#define HSR_DABT_CM		(1U << 8)
--#define HSR_DABT_EA		(1U << 9)
-+#define HSR_DABT_S1PTW		(_AC(1, UL) << 7)
-+#define HSR_DABT_CM		(_AC(1, UL) << 8)
-+#define HSR_DABT_EA		(_AC(1, UL) << 9)
- 
- #define kvm_arm_exception_type	\
- 	{0, "RESET" }, 		\
+diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+index add8fcb..eb05afb 100644
+--- a/arch/arm64/kvm/hyp/sysreg-sr.c
++++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+@@ -88,3 +88,50 @@ void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
+ 	write_sysreg(ctxt->gp_regs.elr_el1,	elr_el1);
+ 	write_sysreg(ctxt->gp_regs.spsr[KVM_SPSR_EL1], spsr_el1);
+ }
++
++void __hyp_text __sysreg32_save_state(struct kvm_vcpu *vcpu)
++{
++	u64 *spsr, *sysreg;
++
++	if (read_sysreg(hcr_el2) & HCR_RW)
++		return;
++
++	spsr = vcpu->arch.ctxt.gp_regs.spsr;
++	sysreg = vcpu->arch.ctxt.sys_regs;
++
++	spsr[KVM_SPSR_ABT] = read_sysreg(spsr_abt);
++	spsr[KVM_SPSR_UND] = read_sysreg(spsr_und);
++	spsr[KVM_SPSR_IRQ] = read_sysreg(spsr_irq);
++	spsr[KVM_SPSR_FIQ] = read_sysreg(spsr_fiq);
++
++	sysreg[DACR32_EL2] = read_sysreg(dacr32_el2);
++	sysreg[IFSR32_EL2] = read_sysreg(ifsr32_el2);
++
++	if (!(read_sysreg(cptr_el2) & CPTR_EL2_TFP))
++		sysreg[FPEXC32_EL2] = read_sysreg(fpexc32_el2);
++
++	if (vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
++		sysreg[DBGVCR32_EL2] = read_sysreg(dbgvcr32_el2);
++}
++
++void __hyp_text __sysreg32_restore_state(struct kvm_vcpu *vcpu)
++{
++	u64 *spsr, *sysreg;
++
++	if (read_sysreg(hcr_el2) & HCR_RW)
++		return;
++
++	spsr = vcpu->arch.ctxt.gp_regs.spsr;
++	sysreg = vcpu->arch.ctxt.sys_regs;
++
++	write_sysreg(spsr[KVM_SPSR_ABT], spsr_abt);
++	write_sysreg(spsr[KVM_SPSR_UND], spsr_und);
++	write_sysreg(spsr[KVM_SPSR_IRQ], spsr_irq);
++	write_sysreg(spsr[KVM_SPSR_FIQ], spsr_fiq);
++
++	write_sysreg(sysreg[DACR32_EL2], dacr32_el2);
++	write_sysreg(sysreg[IFSR32_EL2], ifsr32_el2);
++
++	if (vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
++		write_sysreg(sysreg[DBGVCR32_EL2], dbgvcr32_el2);
++}
 -- 
 2.1.4
