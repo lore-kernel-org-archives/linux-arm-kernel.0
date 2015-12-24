@@ -1,91 +1,132 @@
 From: jchandra@broadcom.com (Jayachandran C)
-Date: Thu, 24 Dec 2015 17:27:27 +0530
-Subject: [PATCH v4 0/5] ACPI based PCI support for arm64
-Message-ID: <1450958252-29892-1-git-send-email-jchandra@broadcom.com>
+Date: Thu, 24 Dec 2015 17:27:29 +0530
+Subject: [PATCH v4 2/5] PCI: Handle ACPI companion and domain number
+In-Reply-To: <1450958252-29892-1-git-send-email-jchandra@broadcom.com>
+References: <1450958252-29892-1-git-send-email-jchandra@broadcom.com>
+Message-ID: <1450958252-29892-3-git-send-email-jchandra@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset provides a generic ACPI based PCI host controller
-implementation and uses it on arm64.
+pci_create_root_bus is called with NULL as parent in ACPI. This
+ends up calling pci_bus_assign_domain_nr with a NULL parent, which
+crashes when dereferencing parent.
 
-The first patch moves the common code to handle MCFG ACPI table from
-arch/x86 to drivers/acpi/pci_mcfg.c. The last patch in the patchset
-provides the generic implementation of an ACPI based PCI host
-controller with a new file drivers/acpi/pci_host_acpi.c. The other
-patches are to fix up arm64 and ACPI code to work with these two
-patches.
+Fix this by providing away to set the ACPI domain number, we define
+acpi_pci_sysdata_to_root_info() to get the acpi root info from
+sysdata. This is a simple cast the generic ACPI PCI implementation.
 
-The pci host controller implementation keeps a reference to
-pci_mmcfg_region entry so that config space access is done with a
-simple mapping and generic PCI config read/write. There is also an
-implementation of raw_pci_read/raw_pci_write provided by walking the
-pci_mmcfg_list
+Similarly, setting up the ACPI companion in case of generic ACPI PCI
+implementation is staright forward.
 
-The patchset is against 4.4-rc6, but it can be applied to pci/next
-with a very minor fixup.  This is tested with arm64 QEMU and OVMF
-and on x86 with qemu.
+Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+---
+ drivers/pci/pci.c        | 19 ++++++++++++++++++-
+ drivers/pci/probe.c      |  2 ++
+ include/linux/pci-acpi.h | 28 +++++++++++++++++++++++++++-
+ 3 files changed, 47 insertions(+), 2 deletions(-)
 
-More testing or comments are welcome. The idea is to provide a
-simpler alternative for ACPI PCI support in arm64, any feedback
-from PCI or ACPI maintainers would be appreciated on this front.
-
-Thanks,
-JC.
-
-v3->v4:
- - Handle suggestions from Arnd Bergmann <arnd@arndb.de>
-    * move the implementation of host controller to drivers/acpi
-      under config option CONFIG_ACPI_PCI_HOST_GENERIC
-    * remove unnecessary arch hooks (this done as much as possible
-      without affecting the scope of the patch, will need another
-      separate patchset for the rest).
-    * remove pcibios_assign_resources fs_initcall that was added
- - fixup domain_nr assignment code, and move ACPI companion set
-   to PCI code.
- - Call map resource correctly in setup code
- - fix kbuild robot report
- - More testing
-
-v2->v3:
- - Move maintenance of the pci_mmcfg_list to drivers/acpi/pci_mcfg.c
-   without changing x86 logic
- - use the pci_mmcfg_list in ARM64 implementation
- - provide raw_pci_read/raw_pci_write
-
-v1->v2:
- - use CONFIG_PCI_MMCONFIG on arm64, provide a weak implementation
-   of pci_mmcfg_late_init for arm64.
- - The real implementation of pci_mmcfg_late_init is in pci-host-acpi.c
-   and it will save the MCFG table entries to an array. Earlier this
-   was done with an arch_init call
- - remove unneeded pci_bus_add_devices call and fix MCFG saving code
- - Added a patch to ACPI pci_root.c to handle arm64 PCI IO resources
-
-Jayachandran C (5):
-  APCI: MCFG: Move mmcfg_list management to drivers/acpi
-  PCI: Handle NULL parent in pci_bus_assign_domain_nr
-  ACPI: PCI: Support platforms that need pci_remap_iospace
-  arm64: pci: Add ACPI support
-  PCI: ACPI: Add a generic ACPI based host controller
-
- arch/arm64/Kconfig             |   3 +
- arch/arm64/kernel/pci.c        |  34 ++++-
- arch/x86/include/asm/pci_x86.h |  24 +---
- arch/x86/pci/mmconfig-shared.c | 269 +++++-----------------------------
- arch/x86/pci/mmconfig_32.c     |   1 +
- arch/x86/pci/mmconfig_64.c     |   1 +
- drivers/acpi/Kconfig           |   8 ++
- drivers/acpi/Makefile          |   2 +
- drivers/acpi/pci_host_acpi.c   | 186 ++++++++++++++++++++++++
- drivers/acpi/pci_mcfg.c        | 317 +++++++++++++++++++++++++++++++++++++++++
- drivers/acpi/pci_root.c        |  62 +++++++-
- drivers/acpi/resource.c        |   2 +
- drivers/pci/pci.c              |  19 ++-
- drivers/pci/probe.c            |   2 +
- include/linux/pci-acpi.h       |  59 ++++++++
- 15 files changed, 724 insertions(+), 265 deletions(-)
- create mode 100644 drivers/acpi/pci_host_acpi.c
- create mode 100644 drivers/acpi/pci_mcfg.c
-
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index 314db8c..f578af4 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -20,6 +20,7 @@
+ #include <linux/string.h>
+ #include <linux/log2.h>
+ #include <linux/pci-aspm.h>
++#include <linux/pci-acpi.h>
+ #include <linux/pm_wakeup.h>
+ #include <linux/interrupt.h>
+ #include <linux/device.h>
+@@ -4772,9 +4773,25 @@ int pci_get_new_domain_nr(void)
+ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+ {
+ 	static int use_dt_domains = -1;
+-	int domain = of_get_pci_domain_nr(parent->of_node);
++	int domain;
+ 
+ 	/*
++	 * Handle ACPI early
++	 *
++	 * the companion is not set at this point, and ACPI sets parent to
++	 * NULL, we have to try to get the segment from acpi root info.
++	 */
++	if (!parent || !parent->of_node) {
++		struct acpi_pci_root_info *ci;
++
++		ci = acpi_pci_sysdata_to_root_info(bus->sysdata);
++		if (ci)
++			bus->domain_nr = ci->root->segment;
++		return;
++	}
++
++	domain = of_get_pci_domain_nr(parent->of_node);
++	/*
+ 	 * Check DT domain and use_dt_domains values.
+ 	 *
+ 	 * If DT domain property is valid (domain >= 0) and
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index edb1984..5af66496 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -13,6 +13,7 @@
+ #include <linux/module.h>
+ #include <linux/cpumask.h>
+ #include <linux/pci-aspm.h>
++#include <linux/pci-acpi.h>
+ #include <linux/aer.h>
+ #include <linux/acpi.h>
+ #include <asm-generic/pci-bridge.h>
+@@ -2105,6 +2106,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+ 	bridge->dev.parent = parent;
+ 	bridge->dev.release = pci_release_host_bridge_dev;
+ 	dev_set_name(&bridge->dev, "pci%04x:%02x", pci_domain_nr(b), bus);
++	pci_acpi_set_companion(bridge);
+ 	error = pcibios_root_bridge_prepare(bridge);
+ 	if (error) {
+ 		kfree(bridge);
+diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
+index e9450ef..79448ce 100644
+--- a/include/linux/pci-acpi.h
++++ b/include/linux/pci-acpi.h
+@@ -138,12 +138,38 @@ extern struct list_head pci_mmcfg_list;
+ 
+ #define PCI_MMCFG_BUS_OFFSET(bus)      ((bus) << 20)
+ #define PCI_MMCFG_OFFSET(bus, devfn)   ((bus) << 20 | (devfn) << 12)
+-
+ #else	/* CONFIG_ACPI */
+ static inline void acpi_pci_add_bus(struct pci_bus *bus) { }
+ static inline void acpi_pci_remove_bus(struct pci_bus *bus) { }
+ #endif	/* CONFIG_ACPI */
+ 
++#if defined(CONFIG_ACPI) && defined(CONFIG_ACPI_PCI_HOST_GENERIC)
++static inline struct acpi_pci_root_info *acpi_pci_sysdata_to_root_info(void *sd)
++{
++	return (struct acpi_pci_root_info *)sd;
++}
++
++static inline void pci_acpi_set_companion(struct pci_host_bridge *bridge)
++{
++	struct pci_bus *b = bridge->bus;
++	struct acpi_pci_root_info *ci;
++
++	ci = acpi_pci_sysdata_to_root_info(b->sysdata);
++	if (ci)
++		ACPI_COMPANION_SET(&bridge->dev, ci->bridge);
++}
++#else
++static inline struct acpi_pci_root_info *acpi_pci_sysdata_to_root_info(void *sd)
++{
++	return NULL;
++}
++
++static inline void pci_acpi_set_companion(struct pci_host_bridge *bridge)
++{
++	/* leave it to the platform for now */
++}
++#endif
++
+ #ifdef CONFIG_ACPI_APEI
+ extern bool aer_acpi_firmware_first(void);
+ #else
 -- 
 1.9.1
