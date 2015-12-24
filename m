@@ -1,220 +1,47 @@
-From: uri.mashiach@compulab.co.il (Uri Mashiach)
-Date: Thu, 24 Dec 2015 09:41:34 +0200
-Subject: [PATCH 2/3] wlcore/wl12xx: spi: add device tree support
-In-Reply-To: <567A76B5.70605@ti.com>
-References: <1450859744-9948-1-git-send-email-uri.mashiach@compulab.co.il>
- <1450859744-9948-3-git-send-email-uri.mashiach@compulab.co.il>
- <567A76B5.70605@ti.com>
-Message-ID: <567BA1AE.4010606@compulab.co.il>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Thu, 24 Dec 2015 16:10:43 +0800
+Subject: [PATCH] regulator: mt6397: convert to arch_initcall
+In-Reply-To: <20151223120019.GU16023@sirena.org.uk>
+References: <1450865768-10317-1-git-send-email-henryc.chen@mediatek.com>
+ <20151223120019.GU16023@sirena.org.uk>
+Message-ID: <1450944643.30352.9.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grygorii,
+On Wed, 2015-12-23 at 12:00 +0000, Mark Brown wrote:
+> On Wed, Dec 23, 2015 at 06:16:08PM +0800, Henry Chen wrote:
+> 
+> Please fix your mail client to word wrap within paragraphs at something
+> substantially less than 80 columns.  Doing this makes your messages much
+> easier to read and reply to.
+> 
+> > Due to some device may need reulator operation in earlier boot time like gpu module which
+> > power domain need regulator power on first. Move regulator of mt6397
+> > initialization earlier in boot so that real devices can use regulator
+> > without probe deferring.
+> 
+> Several problems here.  One is that we usually use subsys_initcall() for
+> working around the known broken subsystems here, why have you decided to
+> go for arch_initcall() instead.  Another is that you're saying this is
+> for GPUs but I'm not aware of any reason why GPUs are broken and we
+> should not be introducing new problems here - what's going on?
 
-On 12/23/2015 12:25 PM, Grygorii Strashko wrote:
-> On 12/23/2015 10:35 AM, Uri Mashiach wrote:
->> Add DT support for the wl1271 SPI WiFi.
->>
->> Add documentation file for the wl1271 SPI WiFi.
->>
->> Signed-off-by: Uri Mashiach <uri.mashiach@compulab.co.il>
->> Acked-by: Igor Grinberg <grinberg@compulab.co.il>
->> ---
->>    .../bindings/net/wireless/ti,wlcore,spi.txt        | 35 +++++++++++
->>    drivers/net/wireless/ti/wlcore/spi.c               | 67 +++++++++++++++++++---
->>    2 files changed, 95 insertions(+), 7 deletions(-)
->>    create mode 100644 Documentation/devicetree/bindings/net/wireless/ti,wlcore,spi.txt
->>
->> diff --git a/Documentation/devicetree/bindings/net/wireless/ti,wlcore,spi.txt b/Documentation/devicetree/bindings/net/wireless/ti,wlcore,spi.txt
->> new file mode 100644
->> index 0000000..a3e7eb7
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/net/wireless/ti,wlcore,spi.txt
->> @@ -0,0 +1,35 @@
->> +* Texas Instruments wl1271 wireless lan controller
->> +
->> +The wl1271 chip can be connected via SPI or via SDIO. This
->> +document describes the binding for the SPI connected chip.
->> +
->> +Required properties:
->> +- compatible :          Should be "ti,wl1271"
->> +- reg :                 Chip select address of device
->> +- spi-max-frequency :   Maximum SPI clocking speed of device in Hz
->> +- ref-clock-frequency : Reference clock frequency
->> +- interrupts :          Should contain interrupt line and trigger type
->
-> It's good to describe here number of IRQ lines your device have and IRQ types (edge/level)
->
->> +- interrupt-parent :    Should be the phandle for the interrupt controller
-> interrupt-parent is not required (also interrupts-extended can be used)
->
->> +                        that services interrupts for this device
->> +- vwlan-supply :        Point the node of the regulator that controls the wl1271 chip WLAN_EN pin
->
-> Pls, use gpio if this is required just to toggle WLAN_EN pin.
->
-> [ti,] power-gpio or en-gpio
->
->
->> +
->> +Optional properties:
->> +- clock-xtal :          boolean, clock is generated from XTAL
->> +
->> +- Please consult Documentation/devicetree/bindings/spi/spi-bus.txt
->> +  for optional SPI connection related properties,just
->> +
->> +Examples:
->> +
->> +&spi1 {
->> +	wl1271 at 1 {
->> +		compatible = "ti,wl1271";
->> +
->> +		reg = <1>;
->> +		spi-max-frequency = <48000000>;
->> +		clock-xtal;
->> +		interrupt-parent = <&gpio3>;
->> +		interrupts = <8 IRQ_TYPE_LEVEL_HIGH>;
->> +		wifi-supply = <&wifi_fixed>;
->> +	};
->> +};
->> diff --git a/drivers/net/wireless/ti/wlcore/spi.c b/drivers/net/wireless/ti/wlcore/spi.c
->> index d3a4bcb..7281f5a 100644
->> --- a/drivers/net/wireless/ti/wlcore/spi.c
->> +++ b/drivers/net/wireless/ti/wlcore/spi.c
->> @@ -30,6 +30,7 @@
->>    #include <linux/spi/spi.h>
->>    #include <linux/wl12xx.h>
->>    #include <linux/platform_device.h>
->> +#include <linux/of_irq.h>
->>    #include <linux/regulator/consumer.h>
->>
->>    #include "wlcore.h"
->> @@ -357,6 +358,54 @@ static struct wl1271_if_operations spi_ops = {
->>    	.set_block_size = NULL,
->>    };
->>
->> +#ifdef CONFIG_OF
->> +static const struct of_device_id wlcore_spi_of_match_table[] = {
->> +	{ .compatible = "ti,wl1271" },
->> +	{ }
->> +};
->> +
->> +/**
->> + * wlcore_probe_of - DT node parsing.
->> + * @spi: SPI slave device parameters.
->> + * @res: resource parameters.
->> + * @glue: wl12xx SPI bus to slave device glue parameters.
->> + * @pdev_data: wlcore device parameters
->> + */
->> +static int wlcore_probe_of(struct spi_device *spi, struct resource *res,
->> +			   struct wl12xx_spi_glue *glue,
->> +			   struct wlcore_platdev_data *pdev_data)
->> +{
->> +	struct device_node *dt_node = spi->dev.of_node;
->> +	int ret;
->> +
->> +	ret = of_irq_to_resource(dt_node, 0, &res[0]);
->> +	if (spi->irq != ret) {
->> +		dev_err(glue->dev, "can't get interrupt resource\n");
->> +		return -EINVAL;
->> +	}
->
-> SPI core will parse IRQ for you (see below)
->
 
-The IRQ type should be stored in res[0].flags.
-Is there an alternative to of_irq_to_resource() for getting the IRQ type?
+These changes are related to pinctrl init order patch. The related
+discussion is here:
+http://lists.infradead.org/pipermail/linux-mediatek/2015-December/003298.html
 
->> +
->> +	if (of_find_property(dt_node, "clock-xtal", NULL))
->> +		pdev_data->ref_clock_xtal = true;
->> +
->> +	ret = of_property_read_u32(dt_node, "ref-clock-frequency",
->> +				   &pdev_data->ref_clock_freq);
->> +	if (IS_ERR_VALUE(ret)) {
->> +		dev_err(glue->dev,
->> +			"can't get reference clock frequency (%d)\n", ret);
->> +		return ret;
->> +	}
->> +
->> +	return 0;
->> +}
->> +#else /* CONFIG_OF */
->> +static int wlcore_probe_of(struct spi_device *spi, struct resource *res,
->> +			   struct wl12xx_spi_glue *glue,
->> +			   struct wlcore_platdev_data *pdev_data)
->> +{
->> +	return -ENODATA;
->> +}
->> +#endif /* CONFIG_OF */
->> +
->>    static int wl1271_probe(struct spi_device *spi)
->>    {
->>    	struct wl12xx_spi_glue *glue;
->> @@ -365,8 +414,7 @@ static int wl1271_probe(struct spi_device *spi)
->>    	int ret;
->>
->>    	memset(&pdev_data, 0x00, sizeof(pdev_data));
->> -
->> -	/* TODO: add DT parsing when needed */
->> +	memset(res, 0x00, sizeof(res));
->>
->>    	pdev_data.if_ops = &spi_ops;
->>
->> @@ -390,6 +438,13 @@ static int wl1271_probe(struct spi_device *spi)
->>    		return PTR_ERR(glue->reg);
->>    	}
->>
->> +	ret = wlcore_probe_of(spi, &res[0], glue, &pdev_data);
->> +	if (IS_ERR_VALUE(ret)) {
->> +		dev_err(glue->dev,
->> +			"can't get device tree parameters (%d)\n", ret);
->> +		return ret;
->
-> So, wl1271_probe will fail always if CONFIG_OF=n. Right?
->
->
->> +	}
->> +
->>    	ret = spi_setup(spi);
->>    	if (ret < 0) {
->>    		dev_err(glue->dev, "spi_setup failed\n");
->> @@ -404,10 +459,6 @@ static int wl1271_probe(struct spi_device *spi)
->>
->>    	glue->core->dev.parent = &spi->dev;
->>
->> -	memset(res, 0x00, sizeof(res));
->> -
->> -	res[0].start = spi->irq;
->> -	res[0].flags = IORESOURCE_IRQ;
->>    	res[0].name = "irq";
->
-> Above code might be left unchaenged.
->
->
->>
->>    	ret = platform_device_add_resources(glue->core, res, ARRAY_SIZE(res));
->> @@ -445,10 +496,12 @@ static int wl1271_remove(struct spi_device *spi)
->>    	return 0;
->>    }
->>
->> -
->>    static struct spi_driver wl1271_spi_driver = {
->>    	.driver = {
->>    		.name		= "wl1271_spi",
->> +#ifdef CONFIG_OF
->> +		.of_match_table = of_match_ptr(wlcore_spi_of_match_table),
->> +#endif /* CONFIG_OF */
->
-> These ifdefs are not needed - see of_match_ptr() definition
->
->>    	},
->>
->>    	.probe		= wl1271_probe,
->>
->
->
+and these should really be a series:
 
--- 
-Thanks,
-Uri
+mediatek pwrap
+http://lists.infradead.org/pipermail/linux-mediatek/2015-December/003347.html
+mt6397 MFD core
+http://lists.infradead.org/pipermail/linux-mediatek/2015-December/003348.html
+mt6397 regulator
+http://lists.infradead.org/pipermail/linux-mediatek/2015-December/003349.html
+
+
+I think Henry use arch_initcall because that's what pinctrl patch was
+using. In this case, we should use subsys_initcall for all these.
+
+Joe.C
