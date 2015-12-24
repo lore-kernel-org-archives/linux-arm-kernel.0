@@ -1,47 +1,70 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Thu, 24 Dec 2015 16:10:43 +0800
-Subject: [PATCH] regulator: mt6397: convert to arch_initcall
-In-Reply-To: <20151223120019.GU16023@sirena.org.uk>
-References: <1450865768-10317-1-git-send-email-henryc.chen@mediatek.com>
- <20151223120019.GU16023@sirena.org.uk>
-Message-ID: <1450944643.30352.9.camel@mtksdaap41>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Thu, 24 Dec 2015 09:15:28 +0100
+Subject: [PATCH v2 0/2] Improve drm_of_component_probe() and move
+ rockchip to use it
+In-Reply-To: <20151223185948.GT8644@n2100.arm.linux.org.uk>
+References: <1448029325-14602-1-git-send-email-Liviu.Dudau@arm.com>
+ <20151222173800.GU960@e106497-lin.cambridge.arm.com>
+ <20151223103906.2aae53595345240d57d57b41@free.fr>
+ <20151223100534.GW960@e106497-lin.cambridge.arm.com>
+ <20151223182033.a52356408b9a81e9497464e7@free.fr>
+ <20151223185948.GT8644@n2100.arm.linux.org.uk>
+Message-ID: <20151224091528.4f68d0f5838735a1a38c02c6@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-12-23 at 12:00 +0000, Mark Brown wrote:
-> On Wed, Dec 23, 2015 at 06:16:08PM +0800, Henry Chen wrote:
+On Wed, 23 Dec 2015 18:59:48 +0000
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+
+> > > Have a look at my v2 where I've introduced two compare functions and also
+> > > modified the Rockchip compare_port() to use port->parent in the comparison. I
+> > > guess that should solve your problem.
+> > 
+> > Keeping the port instead of the parent asks for more code, but,
+> > especially, it also asks for changes in the component drivers because,
+> > at bind time, in 'data', they get a port instead of the device.
 > 
-> Please fix your mail client to word wrap within paragraphs at something
-> substantially less than 80 columns.  Doing this makes your messages much
-> easier to read and reply to.
-> 
-> > Due to some device may need reulator operation in earlier boot time like gpu module which
-> > power domain need regulator power on first. Move regulator of mt6397
-> > initialization earlier in boot so that real devices can use regulator
-> > without probe deferring.
-> 
-> Several problems here.  One is that we usually use subsys_initcall() for
-> working around the known broken subsystems here, why have you decided to
-> go for arch_initcall() instead.  Another is that you're saying this is
-> for GPUs but I'm not aware of any reason why GPUs are broken and we
-> should not be introducing new problems here - what's going on?
+> Sorry, this doesn't make sense.  You have far too many sub-clauses
+> which mean nothing at all.  Please rephrase.
 
+Well, two topics:
 
-These changes are related to pinctrl init order patch. The related
-discussion is here:
-http://lists.infradead.org/pipermail/linux-mediatek/2015-December/003298.html
+- adding a second 'of_compare' function complexifies the code
+  and people may wonder why such a function is needed and what
+  they have to put inside.
 
-and these should really be a series:
+- usually, the component drivers just do a component_add() of the device
+  at probe time.
+  Now, as the bind() function of the components of the first level
+  returns the port in 'data', some work has to be done for retrieving
+  the device.
+  This can (should?) be done in the bind() function.
+  In drm/imx/ipuv3-crtc.c, this is done by a hack, changing the device
+  node reference before calling component_add()!
 
-mediatek pwrap
-http://lists.infradead.org/pipermail/linux-mediatek/2015-December/003347.html
-mt6397 MFD core
-http://lists.infradead.org/pipermail/linux-mediatek/2015-December/003348.html
-mt6397 regulator
-http://lists.infradead.org/pipermail/linux-mediatek/2015-December/003349.html
+I looked at the imx-drm and the associated DTs, and I think that,
+without the v2 patch and keeping the port parent as the component
+(previous mail), the code could be simplified adding an intermediate
+device node in the DT.
 
+For example, in imx6qdl.dtsi:
 
-I think Henry use arch_initcall because that's what pinctrl patch was
-using. In this case, we should use subsys_initcall for all these.
+	ipu1: ipu at 02400000 {
+		...
+		ports at 2 {			/* di<x> device */
+			ipu1_di0: port {
+				...
+				ipu1_di0_hdmi: endpoint at 1 {
+					remote-endpoint = <&hdmi_mux_0>;
+				};
+				...
+			};
+		};
+	}
 
-Joe.C
+In the code, the ipu driver searches the 'ports' and adds them as components.
+After binding, the devices are the 'ports'.
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
