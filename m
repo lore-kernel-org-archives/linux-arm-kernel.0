@@ -1,162 +1,141 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 24 Dec 2015 11:12:37 +0000
-Subject: [PATCH 29/31] arm64: KVM: Add support for 16-bit VMID
+Date: Thu, 24 Dec 2015 11:12:17 +0000
+Subject: [PATCH 09/31] arm64: KVM: Implement system register save/restore
 In-Reply-To: <1450955559-15639-1-git-send-email-marc.zyngier@arm.com>
 References: <1450955559-15639-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1450955559-15639-30-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1450955559-15639-10-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vladimir Murzin <vladimir.murzin@arm.com>
+Implement the system register save/restore as a direct translation of
+the assembly code version.
 
-The ARMv8.1 architecture extension allows to choose between 8-bit and
-16-bit of VMID, so use this capability for KVM.
-
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/include/asm/kvm_arm.h   |  2 +-
- arch/arm/include/asm/kvm_mmu.h   |  5 +++++
- arch/arm/kvm/arm.c               | 10 ++++++++--
- arch/arm64/include/asm/kvm_arm.h |  3 ++-
- arch/arm64/include/asm/kvm_mmu.h |  8 ++++++++
- arch/arm64/kvm/hyp-init.S        |  9 +++++++++
- 6 files changed, 33 insertions(+), 4 deletions(-)
+ arch/arm64/kvm/hyp/Makefile    |  1 +
+ arch/arm64/kvm/hyp/hyp.h       |  3 ++
+ arch/arm64/kvm/hyp/sysreg-sr.c | 90 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 94 insertions(+)
+ create mode 100644 arch/arm64/kvm/hyp/sysreg-sr.c
 
-diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
-index 01d4d7a..e22089f 100644
---- a/arch/arm/include/asm/kvm_arm.h
-+++ b/arch/arm/include/asm/kvm_arm.h
-@@ -164,7 +164,7 @@
- #define VTTBR_BADDR_SHIFT (VTTBR_X - 1)
- #define VTTBR_BADDR_MASK  (((_AC(1, ULL) << (40 - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
- #define VTTBR_VMID_SHIFT  _AC(48, ULL)
--#define VTTBR_VMID_MASK	  (_AC(0xff, ULL) << VTTBR_VMID_SHIFT)
-+#define VTTBR_VMID_MASK(size)	(_AT(u64, (1 << size) - 1) << VTTBR_VMID_SHIFT)
+diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+index 455dc0a..ec94200 100644
+--- a/arch/arm64/kvm/hyp/Makefile
++++ b/arch/arm64/kvm/hyp/Makefile
+@@ -5,3 +5,4 @@
+ obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
+ obj-$(CONFIG_KVM_ARM_HOST) += vgic-v3-sr.o
+ obj-$(CONFIG_KVM_ARM_HOST) += timer-sr.o
++obj-$(CONFIG_KVM_ARM_HOST) += sysreg-sr.o
+diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
+index f213e46..778d56d 100644
+--- a/arch/arm64/kvm/hyp/hyp.h
++++ b/arch/arm64/kvm/hyp/hyp.h
+@@ -38,5 +38,8 @@ void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
+ void __timer_save_state(struct kvm_vcpu *vcpu);
+ void __timer_restore_state(struct kvm_vcpu *vcpu);
  
- /* Hyp Syndrome Register (HSR) bits */
- #define HSR_EC_SHIFT	(26)
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 405aa18..9203c21 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -279,6 +279,11 @@ static inline void __kvm_extend_hypmap(pgd_t *boot_hyp_pgd,
- 				       pgd_t *merged_hyp_pgd,
- 				       unsigned long hyp_idmap_start) { }
++void __sysreg_save_state(struct kvm_cpu_context *ctxt);
++void __sysreg_restore_state(struct kvm_cpu_context *ctxt);
++
+ #endif /* __ARM64_KVM_HYP_H__ */
  
-+static inline unsigned int kvm_get_vmid_bits(void)
+diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+new file mode 100644
+index 0000000..add8fcb
+--- /dev/null
++++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+@@ -0,0 +1,90 @@
++/*
++ * Copyright (C) 2012-2015 - ARM Ltd
++ * Author: Marc Zyngier <marc.zyngier@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/compiler.h>
++#include <linux/kvm_host.h>
++
++#include <asm/kvm_mmu.h>
++
++#include "hyp.h"
++
++/* ctxt is already in the HYP VA space */
++void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
 +{
-+	return 8;
++	ctxt->sys_regs[MPIDR_EL1]	= read_sysreg(vmpidr_el2);
++	ctxt->sys_regs[CSSELR_EL1]	= read_sysreg(csselr_el1);
++	ctxt->sys_regs[SCTLR_EL1]	= read_sysreg(sctlr_el1);
++	ctxt->sys_regs[ACTLR_EL1]	= read_sysreg(actlr_el1);
++	ctxt->sys_regs[CPACR_EL1]	= read_sysreg(cpacr_el1);
++	ctxt->sys_regs[TTBR0_EL1]	= read_sysreg(ttbr0_el1);
++	ctxt->sys_regs[TTBR1_EL1]	= read_sysreg(ttbr1_el1);
++	ctxt->sys_regs[TCR_EL1]		= read_sysreg(tcr_el1);
++	ctxt->sys_regs[ESR_EL1]		= read_sysreg(esr_el1);
++	ctxt->sys_regs[AFSR0_EL1]	= read_sysreg(afsr0_el1);
++	ctxt->sys_regs[AFSR1_EL1]	= read_sysreg(afsr1_el1);
++	ctxt->sys_regs[FAR_EL1]		= read_sysreg(far_el1);
++	ctxt->sys_regs[MAIR_EL1]	= read_sysreg(mair_el1);
++	ctxt->sys_regs[VBAR_EL1]	= read_sysreg(vbar_el1);
++	ctxt->sys_regs[CONTEXTIDR_EL1]	= read_sysreg(contextidr_el1);
++	ctxt->sys_regs[TPIDR_EL0]	= read_sysreg(tpidr_el0);
++	ctxt->sys_regs[TPIDRRO_EL0]	= read_sysreg(tpidrro_el0);
++	ctxt->sys_regs[TPIDR_EL1]	= read_sysreg(tpidr_el1);
++	ctxt->sys_regs[AMAIR_EL1]	= read_sysreg(amair_el1);
++	ctxt->sys_regs[CNTKCTL_EL1]	= read_sysreg(cntkctl_el1);
++	ctxt->sys_regs[PAR_EL1]		= read_sysreg(par_el1);
++	ctxt->sys_regs[MDSCR_EL1]	= read_sysreg(mdscr_el1);
++
++	ctxt->gp_regs.regs.sp		= read_sysreg(sp_el0);
++	ctxt->gp_regs.regs.pc		= read_sysreg(elr_el2);
++	ctxt->gp_regs.regs.pstate	= read_sysreg(spsr_el2);
++	ctxt->gp_regs.sp_el1		= read_sysreg(sp_el1);
++	ctxt->gp_regs.elr_el1		= read_sysreg(elr_el1);
++	ctxt->gp_regs.spsr[KVM_SPSR_EL1]= read_sysreg(spsr_el1);
 +}
 +
- #endif	/* !__ASSEMBLY__ */
- 
- #endif /* __ARM_KVM_MMU_H__ */
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 6e35d1d..f6bcc2e 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -59,7 +59,8 @@ static DEFINE_PER_CPU(struct kvm_vcpu *, kvm_arm_running_vcpu);
- 
- /* The VMID used in the VTTBR */
- static atomic64_t kvm_vmid_gen = ATOMIC64_INIT(1);
--static u8 kvm_next_vmid;
-+static u32 kvm_next_vmid;
-+static unsigned int kvm_vmid_bits __read_mostly;
- static DEFINE_SPINLOCK(kvm_vmid_lock);
- 
- static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
-@@ -434,11 +435,12 @@ static void update_vttbr(struct kvm *kvm)
- 	kvm->arch.vmid_gen = atomic64_read(&kvm_vmid_gen);
- 	kvm->arch.vmid = kvm_next_vmid;
- 	kvm_next_vmid++;
-+	kvm_next_vmid &= (1 << kvm_vmid_bits) - 1;
- 
- 	/* update vttbr to be used with the new vmid */
- 	pgd_phys = virt_to_phys(kvm_get_hwpgd(kvm));
- 	BUG_ON(pgd_phys & ~VTTBR_BADDR_MASK);
--	vmid = ((u64)(kvm->arch.vmid) << VTTBR_VMID_SHIFT) & VTTBR_VMID_MASK;
-+	vmid = ((u64)(kvm->arch.vmid) << VTTBR_VMID_SHIFT) & VTTBR_VMID_MASK(kvm_vmid_bits);
- 	kvm->arch.vttbr = pgd_phys | vmid;
- 
- 	spin_unlock(&kvm_vmid_lock);
-@@ -1135,6 +1137,10 @@ static int init_hyp_mode(void)
- 
- 	kvm_perf_init();
- 
-+	/* set size of VMID supported by CPU */
-+	kvm_vmid_bits = kvm_get_vmid_bits();
-+	kvm_info("%d-bit VMID\n", kvm_vmid_bits);
-+
- 	kvm_info("Hyp mode initialized successfully\n");
- 
- 	return 0;
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 5e6857b..738a95f 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -125,6 +125,7 @@
- #define VTCR_EL2_SL0_LVL1	(1 << 6)
- #define VTCR_EL2_T0SZ_MASK	0x3f
- #define VTCR_EL2_T0SZ_40B	24
-+#define VTCR_EL2_VS		19
- 
- /*
-  * We configure the Stage-2 page tables to always restrict the IPA space to be
-@@ -169,7 +170,7 @@
- #define VTTBR_BADDR_SHIFT (VTTBR_X - 1)
- #define VTTBR_BADDR_MASK  (((UL(1) << (PHYS_MASK_SHIFT - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
- #define VTTBR_VMID_SHIFT  (UL(48))
--#define VTTBR_VMID_MASK	  (UL(0xFF) << VTTBR_VMID_SHIFT)
-+#define VTTBR_VMID_MASK(size) (_AT(u64, (1 << size) - 1) << VTTBR_VMID_SHIFT)
- 
- /* Hyp System Trap Register */
- #define HSTR_EL2_T(x)	(1 << x)
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 54cba80..0bf8b43 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -20,6 +20,7 @@
- 
- #include <asm/page.h>
- #include <asm/memory.h>
-+#include <asm/cpufeature.h>
- 
- /*
-  * As we only have the TTBR0_EL2 register, we cannot express
-@@ -301,5 +302,12 @@ static inline void __kvm_extend_hypmap(pgd_t *boot_hyp_pgd,
- 	merged_hyp_pgd[idmap_idx] = __pgd(__pa(boot_hyp_pgd) | PMD_TYPE_TABLE);
- }
- 
-+static inline unsigned int kvm_get_vmid_bits(void)
++void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
 +{
-+	int reg = read_system_reg(SYS_ID_AA64MMFR1_EL1);
++	write_sysreg(ctxt->sys_regs[MPIDR_EL1],	  vmpidr_el2);
++	write_sysreg(ctxt->sys_regs[CSSELR_EL1],  csselr_el1);
++	write_sysreg(ctxt->sys_regs[SCTLR_EL1],	  sctlr_el1);
++	write_sysreg(ctxt->sys_regs[ACTLR_EL1],	  actlr_el1);
++	write_sysreg(ctxt->sys_regs[CPACR_EL1],	  cpacr_el1);
++	write_sysreg(ctxt->sys_regs[TTBR0_EL1],	  ttbr0_el1);
++	write_sysreg(ctxt->sys_regs[TTBR1_EL1],	  ttbr1_el1);
++	write_sysreg(ctxt->sys_regs[TCR_EL1],	  tcr_el1);
++	write_sysreg(ctxt->sys_regs[ESR_EL1],	  esr_el1);
++	write_sysreg(ctxt->sys_regs[AFSR0_EL1],	  afsr0_el1);
++	write_sysreg(ctxt->sys_regs[AFSR1_EL1],	  afsr1_el1);
++	write_sysreg(ctxt->sys_regs[FAR_EL1],	  far_el1);
++	write_sysreg(ctxt->sys_regs[MAIR_EL1],	  mair_el1);
++	write_sysreg(ctxt->sys_regs[VBAR_EL1],	  vbar_el1);
++	write_sysreg(ctxt->sys_regs[CONTEXTIDR_EL1], contextidr_el1);
++	write_sysreg(ctxt->sys_regs[TPIDR_EL0],	  tpidr_el0);
++	write_sysreg(ctxt->sys_regs[TPIDRRO_EL0], tpidrro_el0);
++	write_sysreg(ctxt->sys_regs[TPIDR_EL1],	  tpidr_el1);
++	write_sysreg(ctxt->sys_regs[AMAIR_EL1],	  amair_el1);
++	write_sysreg(ctxt->sys_regs[CNTKCTL_EL1], cntkctl_el1);
++	write_sysreg(ctxt->sys_regs[PAR_EL1],	  par_el1);
++	write_sysreg(ctxt->sys_regs[MDSCR_EL1],	  mdscr_el1);
 +
-+	return (cpuid_feature_extract_field(reg, ID_AA64MMFR1_VMIDBITS_SHIFT) == 2) ? 16 : 8;
++	write_sysreg(ctxt->gp_regs.regs.sp,	sp_el0);
++	write_sysreg(ctxt->gp_regs.regs.pc,	elr_el2);
++	write_sysreg(ctxt->gp_regs.regs.pstate,	spsr_el2);
++	write_sysreg(ctxt->gp_regs.sp_el1,	sp_el1);
++	write_sysreg(ctxt->gp_regs.elr_el1,	elr_el1);
++	write_sysreg(ctxt->gp_regs.spsr[KVM_SPSR_EL1], spsr_el1);
 +}
-+
- #endif /* __ASSEMBLY__ */
- #endif /* __ARM64_KVM_MMU_H__ */
-diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-index 178ba22..3e568dc 100644
---- a/arch/arm64/kvm/hyp-init.S
-+++ b/arch/arm64/kvm/hyp-init.S
-@@ -94,6 +94,15 @@ __do_hyp_init:
- 	 */
- 	mrs	x5, ID_AA64MMFR0_EL1
- 	bfi	x4, x5, #16, #3
-+	/*
-+	 * Read the VMIDBits bits from ID_AA64MMFR1_EL1 and set the VS bit in
-+	 * VTCR_EL2.
-+	 */
-+	mrs	x5, ID_AA64MMFR1_EL1
-+	ubfx	x5, x5, #5, #1
-+	lsl	x5, x5, #VTCR_EL2_VS
-+	orr	x4, x4, x5
-+
- 	msr	vtcr_el2, x4
- 
- 	mrs	x4, mair_el1
 -- 
 2.1.4
