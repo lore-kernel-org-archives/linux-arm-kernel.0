@@ -1,75 +1,165 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 25 Dec 2015 08:56:53 +0800
-Subject: [PATCH 1/3] ARM: ATAGS: move atags.h to include/asm so it can be
- included by files outside kernel/
-In-Reply-To: <1450965658-2675-2-git-send-email-ivo.g.dimitrov.75@gmail.com>
-Message-ID: <201512250816.bPnwSXzT%fengguang.wu@intel.com>
+From: caesar.upstream@gmail.com (Caesar Wang)
+Date: Fri, 25 Dec 2015 10:36:04 +0800
+Subject: [PATCH 4/4] ARM: dts: rockchip: Add support emac for RK3036
+In-Reply-To: <1450862390-407-4-git-send-email-zhengxing@rock-chips.com>
+References: <1450862390-407-1-git-send-email-zhengxing@rock-chips.com>
+ <1450862390-407-4-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <567CAB94.7090701@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
-Hi Ivaylo,
+Hi Xing,
 
-[auto build test ERROR on omap/for-next]
-[also build test ERROR on v4.4-rc6 next-20151223]
+? 2015?12?23? 17:19, Xing Zheng ??:
+> This patch describe the emac, and we need to let mac clock under
+> the APLL which is able to provide the accurate 50MHz what mac_ref
+> need.
+>
+> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+> ---
+>
+>   arch/arm/boot/dts/rk3036-evb.dts   |   25 +++++++++++++++++++++++++
+>   arch/arm/boot/dts/rk3036-kylin.dts |   23 +++++++++++++++++++++++
+>   arch/arm/boot/dts/rk3036.dtsi      |   32 ++++++++++++++++++++++++++++++++
+>   3 files changed, 80 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/rk3036-evb.dts b/arch/arm/boot/dts/rk3036-evb.dts
+> index 28a0336..69b96e6 100644
+> --- a/arch/arm/boot/dts/rk3036-evb.dts
+> +++ b/arch/arm/boot/dts/rk3036-evb.dts
+> @@ -62,3 +62,28 @@
+>   &uart2 {
+>   	status = "okay";
+>   };
+> +
+> +&emac {
+> +	assigned-clocks = <&cru SCLK_MACPLL>;
+> +	assigned-clock-parents = <&cru PLL_APLL>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&emac_xfer>, <&emac_mdio>, <&rmii_rst>;
+> +	phy = <&phy0>;
+> +	status = "okay";
+> +
+> +	phy0: ethernet-phy at 0 {
+> +		reg = <0>;
+> +	};
+> +};
+> +
+> +&pinctrl {
+> +	pcfg_output_high: pcfg-output-high {
+> +		output-high;
+> +	};
+> +
 
-url:    https://github.com/0day-ci/linux/commits/Ivaylo-Dimitrov/OMAP-RX51-save-atags-data-to-be-exported-on-proc-atags/20151224-220541
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git for-next
-config: arm-allyesconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+That's seem a new preperty for pinctrl on rk3036, we should submit it in 
+rk3036 dtsi.
 
-All errors (new ones prefixed by >>):
+Do we are really need it?
 
->> arch/arm/kernel/atags_compat.c:29:19: fatal error: atags.h: No such file or directory
-    #include "atags.h"
-                      ^
-   compilation terminated.
+GPIO2_C6 is pulled up in internal chip.
+So, maybe you only do that:
 
-vim +29 arch/arm/kernel/atags_compat.c
+rockchip,pins = <2 22 RK_FUNC_GPIO &pcfg_pull_default>;
 
-^1da177e arch/arm/kernel/compat.c       Linus Torvalds 2005-04-16  13   * NOTE:
-^1da177e arch/arm/kernel/compat.c       Linus Torvalds 2005-04-16  14   *  The old struct param_struct is deprecated, but it will be kept in
-^1da177e arch/arm/kernel/compat.c       Linus Torvalds 2005-04-16  15   *  the kernel for 5 years from now (2001). This will allow boot loaders
-^1da177e arch/arm/kernel/compat.c       Linus Torvalds 2005-04-16  16   *  to convert to the new struct tag way.
-^1da177e arch/arm/kernel/compat.c       Linus Torvalds 2005-04-16  17   */
-^1da177e arch/arm/kernel/compat.c       Linus Torvalds 2005-04-16  18  #include <linux/types.h>
-^1da177e arch/arm/kernel/compat.c       Linus Torvalds 2005-04-16  19  #include <linux/kernel.h>
-^1da177e arch/arm/kernel/compat.c       Linus Torvalds 2005-04-16  20  #include <linux/string.h>
-^1da177e arch/arm/kernel/compat.c       Linus Torvalds 2005-04-16  21  #include <linux/init.h>
-^1da177e arch/arm/kernel/compat.c       Linus Torvalds 2005-04-16  22  
-^1da177e arch/arm/kernel/compat.c       Linus Torvalds 2005-04-16  23  #include <asm/setup.h>
-^1da177e arch/arm/kernel/compat.c       Linus Torvalds 2005-04-16  24  #include <asm/mach-types.h>
-^1da177e arch/arm/kernel/compat.c       Linus Torvalds 2005-04-16  25  #include <asm/page.h>
-^1da177e arch/arm/kernel/compat.c       Linus Torvalds 2005-04-16  26  
-^1da177e arch/arm/kernel/compat.c       Linus Torvalds 2005-04-16  27  #include <asm/mach/arch.h>
-^1da177e arch/arm/kernel/compat.c       Linus Torvalds 2005-04-16  28  
-aa783b6f arch/arm/kernel/atags_compat.c Nicolas Pitre  2012-09-01 @29  #include "atags.h"
-0fc1c832 arch/arm/kernel/compat.c       Ben Dooks      2006-03-15  30  
-^1da177e arch/arm/kernel/compat.c       Linus Torvalds 2005-04-16  31  /*
-^1da177e arch/arm/kernel/compat.c       Linus Torvalds 2005-04-16  32   * Usage:
-^1da177e arch/arm/kernel/compat.c       Linus Torvalds 2005-04-16  33   *  - do not go blindly adding fields, add them at the end
-^1da177e arch/arm/kernel/compat.c       Linus Torvalds 2005-04-16  34   *  - when adding fields, don't rely on the address until
-^1da177e arch/arm/kernel/compat.c       Linus Torvalds 2005-04-16  35   *    a patch from me has been released
-^1da177e arch/arm/kernel/compat.c       Linus Torvalds 2005-04-16  36   *  - unused fields should be zero (for future expansion)
-^1da177e arch/arm/kernel/compat.c       Linus Torvalds 2005-04-16  37   *  - this structure is relatively short-lived - only
 
-:::::: The code at line 29 was first introduced by commit
-:::::: aa783b6fd60b3844e199b1c2d2f4068f3caa1358 ARM: 7505/1: split out ATAGS parsing
+> +	emac {
+> +		rmii_rst: rmii-rst {
+> +			rockchip,pins = <2 22 RK_FUNC_GPIO &pcfg_output_high>;
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm/boot/dts/rk3036-kylin.dts b/arch/arm/boot/dts/rk3036-kylin.dts
+> index 992f9ca..3fb1cfe 100644
+> --- a/arch/arm/boot/dts/rk3036-kylin.dts
+> +++ b/arch/arm/boot/dts/rk3036-kylin.dts
+> @@ -285,7 +285,24 @@
+>   	status = "okay";
+>   };
+>   
+> +&emac {
+> +	assigned-clocks = <&cru SCLK_MACPLL>;
+> +	assigned-clock-parents = <&cru PLL_APLL>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&emac_xfer>, <&emac_mdio>, <&rmii_rst>;
+> +	phy = <&phy0>;
+> +	status = "okay";
+> +
+> +	phy0: ethernet-phy at 0 {
+> +		reg = <0>;
+> +	};
+> +};
+> +
+>   &pinctrl {
+> +	pcfg_output_high: pcfg-output-high {
+> +		output-high;
+> +	};
+> +
+>   	pmic {
+>   		pmic_int: pmic-int {
+>   			rockchip,pins = <2 2 RK_FUNC_GPIO &pcfg_pull_default>;
+> @@ -297,4 +314,10 @@
+>   			rockchip,pins = <2 7 RK_FUNC_1 &pcfg_pull_none>;
+>   		};
+>   	};
+> +
+> +	emac {
+> +		rmii_rst: rmii-rst {
+> +			rockchip,pins = <2 22 RK_FUNC_GPIO &pcfg_output_high>;
+> +		};
+> +	};
+>   };
+> diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
+> index b9567c1..0c09fb3 100644
+> --- a/arch/arm/boot/dts/rk3036.dtsi
+> +++ b/arch/arm/boot/dts/rk3036.dtsi
+> @@ -186,6 +186,20 @@
+>   		status = "disabled";
+>   	};
+>   
+> +	emac: ethernet at 10200000 {
+> +		compatible = "rockchip,rk3036-emac", "snps,arc-emac";
+> +		reg = <0x10200000 0x4000>;
+> +		interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		rockchip,grf = <&grf>;
+> +		clocks = <&cru HCLK_MAC>, <&cru SCLK_MACREF>, <&cru SCLK_MAC>;
+> +		clock-names = "hclk", "macref", "macclk";
+> +		max-speed = <100>;
+> +		phy-mode = "rmii";
+> +		status = "disabled";
+> +	};
+> +
+>   	sdmmc: dwmmc at 10214000 {
+>   		compatible = "rockchip,rk3036-dw-mshc", "rockchip,rk3288-dw-mshc";
+>   		reg = <0x10214000 0x4000>;
+> @@ -556,6 +570,24 @@
+>   			};
+>   		};
+>   
+> +		emac {
+> +			emac_xfer: emac-xfer {
+> +				rockchip,pins = <2 10 RK_FUNC_1 &pcfg_pull_none>, /* crs_dvalid */
+> +						<2 13 RK_FUNC_1 &pcfg_pull_none>, /* tx_en */
+> +						<2 14 RK_FUNC_1 &pcfg_pull_none>, /* mac_clk */
+> +						<2 15 RK_FUNC_1 &pcfg_pull_none>, /* rx_err */
+> +						<2 16 RK_FUNC_1 &pcfg_pull_none>, /* rxd1 */
+> +						<2 17 RK_FUNC_1 &pcfg_pull_none>, /* rxd0 */
+> +						<2 18 RK_FUNC_1 &pcfg_pull_none>, /* txd1 */
+> +						<2 19 RK_FUNC_1 &pcfg_pull_none>; /* txd0 */
+> +			};
+> +
+> +			emac_mdio: emac-mdio {
+> +				rockchip,pins = <2 12 RK_FUNC_1 &pcfg_pull_none>, /* mac_md */
+> +						<2 25 RK_FUNC_1 &pcfg_pull_none>; /* mac_mdclk */
+> +			};
+> +		};
+> +
+>   		i2c0 {
+>   			i2c0_xfer: i2c0-xfer {
+>   				rockchip,pins = <0 0 RK_FUNC_1 &pcfg_pull_none>,
 
-:::::: TO: Nicolas Pitre <nicolas.pitre@linaro.org>
-:::::: CC: Russell King <rmk+kernel@arm.linux.org.uk>
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 53927 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151225/0cf70633/attachment-0001.obj>
+-- 
+Thanks,
+Caesar
