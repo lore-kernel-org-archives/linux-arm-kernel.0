@@ -1,79 +1,50 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 25 Dec 2015 22:49:56 +0100
-Subject: [PATCH RFC] ARM: tango4: Fix build issues
-Message-ID: <567DBA04.4060709@free.fr>
+From: pali.rohar@gmail.com (=?UTF-8?q?Pali=20Roh=C3=A1r?=)
+Date: Sat, 26 Dec 2015 00:32:25 +0100
+Subject: [PATCH] ARM: dts: omap3: Include missing bandgap data for
+ ti-soc-thermal driver
+Message-ID: <1451086345-3340-1-git-send-email-pali.rohar@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+Driver for omap3 with documentation is there since v4.4-rc1.
 
-Move SMP setup to platsmp.c
-Specify the CPU type to the assembler, and only for smc.S
-
-Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
 ---
- arch/arm/mach-tango/Makefile  |  3 ++-
- arch/arm/mach-tango/platsmp.c | 16 ++++++++++++++++
- arch/arm/mach-tango/setup.c   | 14 --------------
- 3 files changed, 18 insertions(+), 15 deletions(-)
- create mode 100644 arch/arm/mach-tango/platsmp.c
+ arch/arm/boot/dts/omap34xx.dtsi |    5 +++++
+ arch/arm/boot/dts/omap36xx.dtsi |    5 +++++
+ 2 files changed, 10 insertions(+)
 
-diff --git a/arch/arm/mach-tango/Makefile b/arch/arm/mach-tango/Makefile
-index 0d7e2b5976e3..d33eab2941cb 100644
---- a/arch/arm/mach-tango/Makefile
-+++ b/arch/arm/mach-tango/Makefile
-@@ -1,2 +1,3 @@
--asflags-y += -mcpu=cortex-a9
- obj-y += setup.o smc.o
-+obj-$(CONFIG_SMP) += platsmp.o
-+AFLAGS_smc.o := -Wa,-mcpu=cortex-a9
-diff --git a/arch/arm/mach-tango/platsmp.c b/arch/arm/mach-tango/platsmp.c
-new file mode 100644
-index 000000000000..a18d5a34e2f5
---- /dev/null
-+++ b/arch/arm/mach-tango/platsmp.c
-@@ -0,0 +1,16 @@
-+#include <linux/init.h>
-+#include <linux/smp.h>
-+#include "smc.h"
+diff --git a/arch/arm/boot/dts/omap34xx.dtsi b/arch/arm/boot/dts/omap34xx.dtsi
+index 4f6b2d5..c3f488f 100644
+--- a/arch/arm/boot/dts/omap34xx.dtsi
++++ b/arch/arm/boot/dts/omap34xx.dtsi
+@@ -54,6 +54,11 @@
+ 				#size-cells = <0>;
+ 			};
+ 		};
 +
-+static int tango_boot_secondary(unsigned int cpu, struct task_struct *idle)
-+{
-+	tango_set_aux_boot_addr(virt_to_phys(secondary_startup));
-+	tango_start_aux_core(cpu);
-+	return 0;
-+}
-+
-+static struct smp_operations tango_smp_ops __initdata = {
-+	.smp_boot_secondary	= tango_boot_secondary,
-+};
-+
-+CPU_METHOD_OF_DECLARE(tango4_smp, "sigma,tango4-smp", &tango_smp_ops);
-diff --git a/arch/arm/mach-tango/setup.c b/arch/arm/mach-tango/setup.c
-index d86900550e63..f14b6c7d255b 100644
---- a/arch/arm/mach-tango/setup.c
-+++ b/arch/arm/mach-tango/setup.c
-@@ -1,21 +1,7 @@
--#include <linux/smp.h>
- #include <asm/mach/arch.h>
- #include <asm/hardware/cache-l2x0.h>
- #include "smc.h"
++		bandgap {
++			reg = <0x48002524 0x4>;
++			compatible = "ti,omap34xx-bandgap";
++		};
+ 	};
+ };
  
--static int tango4_boot_secondary(unsigned int cpu, struct task_struct *idle)
--{
--	tango_set_aux_boot_addr(virt_to_phys(secondary_startup));
--	tango_start_aux_core(cpu);
--	return 0;
--}
--
--static struct smp_operations tango4_smp_ops __initdata = {
--	.smp_boot_secondary	= tango4_boot_secondary,
--};
--
--CPU_METHOD_OF_DECLARE(tango4_smp, "sigma,tango4-smp", &tango4_smp_ops);
--
- static void tango_l2c_write(unsigned long val, unsigned int reg)
- {
- 	if (reg == L2X0_CTRL)
+diff --git a/arch/arm/boot/dts/omap36xx.dtsi b/arch/arm/boot/dts/omap36xx.dtsi
+index 86253de..00f98c1 100644
+--- a/arch/arm/boot/dts/omap36xx.dtsi
++++ b/arch/arm/boot/dts/omap36xx.dtsi
+@@ -86,6 +86,11 @@
+ 				#size-cells = <0>;
+ 			};
+ 		};
++
++		bandgap {
++			reg = <0x48002524 0x4>;
++			compatible = "ti,omap36xx-bandgap";
++		};
+ 	};
+ };
+ 
 -- 
-2.4.3
+1.7.9.5
