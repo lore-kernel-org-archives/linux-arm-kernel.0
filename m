@@ -1,40 +1,64 @@
-From: shijie.huang@arm.com (Huang Shijie)
-Date: Fri, 25 Dec 2015 01:46:50 +0000
-Subject: [PATCH 1/2] tty: amba-pl011: fix earlycon register offsets
-In-Reply-To: <1450972189-22639-1-git-send-email-timur@codeaurora.org>
-References: <1450972189-22639-1-git-send-email-timur@codeaurora.org>
-Message-ID: <20151225014649.GA26561@robwan01-pc.asiapac.arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 25 Dec 2015 09:56:17 +0800
+Subject: [PATCH v3 2/2] dts/ls2080a: Update DTSI to add support of SP805
+ WDT
+In-Reply-To: <BN3PR0301MB1298AF2C5A88FCA392D0E9DD82E70@BN3PR0301MB1298.namprd03.prod.outlook.com>
+References: <1450189825-29065-1-git-send-email-bhupesh.sharma@freescale.com>
+ <1450189825-29065-3-git-send-email-bhupesh.sharma@freescale.com>
+ <CAFTCetS7P6wF3MhgMSXSXP_jnLQvBc-NSY0TW3OOnCjtbL0N_w@mail.gmail.com>
+ <201512241118.32946.arnd@arndb.de>
+ <BN3PR0301MB1298AF2C5A88FCA392D0E9DD82E70@BN3PR0301MB1298.namprd03.prod.outlook.com>
+Message-ID: <20151225015616.GA27329@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 24, 2015 at 09:49:48AM -0600, Timur Tabi wrote:
-> The REG_x macros are indices into a table, not register offsets.  Since
-> earlycon does not have access to the vendor data, we can currently only
-> support standard ARM PL011 devices.
->
-> Signed-off-by: Timur Tabi <timur@codeaurora.org>
-> ---
->  drivers/tty/serial/amba-pl011.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-> index f6ad383..06f827a 100644
-> --- a/drivers/tty/serial/amba-pl011.c
-> +++ b/drivers/tty/serial/amba-pl011.c
-> @@ -2302,10 +2302,10 @@ static struct console amba_console = {
->
->  static void pl011_putc(struct uart_port *port, int c)
->  {
-> -     while (readl(port->membase + REG_FR) & UART01x_FR_TXFF)
-> +     while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
->               ;
-> -     writeb(c, port->membase + REG_DR);
-> -     while (readl(port->membase + REG_FR) & UART01x_FR_BUSY)
-> +     writeb(c, port->membase + UART01x_DR);
-> +     while (readl(port->membase + UART01x_FR) & UART011_FR_BUSY)
-We will meet the compiler error, since there is no UART011_FR_BUSY.
-Please test it before you send it out :)
+On Thu, Dec 24, 2015 at 08:41:54PM +0000, Sharma Bhupesh wrote:
+> 
+> 
+> > -----Original Message-----
+> > From: Arnd Bergmann [mailto:arnd at arndb.de]
+> > Sent: Thursday, December 24, 2015 3:49 PM
+> > To: Bhupesh SHARMA
+> > Cc: Sharma Bhupesh-B45370; Mark Rutland; linux-arm-
+> > kernel at lists.infradead.org; Olof Johansson; devicetree at vger.kernel.org;
+> > Rob Herring; Will Deacon; Catalin Marinas; Li Yang-Leo-R58472; Wood
+> > Scott-B07421; Yoder Stuart-B08248; shawn.guo at linaro.org
+> > Subject: Re: [PATCH v3 2/2] dts/ls2080a: Update DTSI to add support of
+> > SP805 WDT
+> > 
+> > On Wednesday 23 December 2015, Bhupesh SHARMA wrote:
+> > >
+> > > Hi Arnd, Olof, Kevin
+> > >
+> > > On Tue, Dec 15, 2015 at 8:00 PM, Bhupesh Sharma
+> > > <bhupesh.sharma@freescale.com> wrote:
+> > > > This patch updates the LS2080a DTSI (DTS Include) file to add
+> > > > support for eight SP805 Watchdog units which can be used to reset
+> > > > the eight Cortex-A57 cores available on LS2080A.
+> > > >
+> > > > Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
+> > > > ---
+> > > >  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi |   56
+> > ++++++++++++++++++++++++
+> > > >  1 file changed, 56 insertions(+)
+> > >
+> > > Since Rob has acked the SP805 WDT binding documentation patch (patch
+> > > 1/2 of this series),
+> > > can this DTSI change, please be considered for absorption in the arm-
+> > soc tree.
+> > 
+> > Sure, please submit it for inclusion. Who is the maintainer for
+> > arch/arm64/boot/dts/freescale/ ? Can they pick up all the freescale
+> > related dts changes and submit them as a pull request? Should they go
+> > through Shawn's tree maybe?
+> 
+> Thanks Arnd. For now, may-be I can send this patchset with Rob's Acked-by added
+> for 1/2 to 'arm at kernel.org'. So that this can be picked by via the arm-soc tree.
+> Shawn, I hope it's ok with you.
 
-thanks
-Huang Shijie
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+Yeah.  I'm maintaining a git tree, collecting all Freescale arm32
+platform patches, and sending them to arm-soc for each merge window.
+If I can be copied on those arm64 patches, I do not mind handling them
+together with arm32 ones.
+
+Shawn
