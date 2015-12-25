@@ -1,43 +1,47 @@
-From: pingbo.wen@linaro.org (Pingbo Wen)
-Date: Fri, 25 Dec 2015 20:24:59 +0800
-Subject: 16KB PAGE_SIZE not work on DB410C
-In-Reply-To: <CAKv+Gu9mUVn80Vqr5NT7jjkSGd6BY_0cB6gVJ8VakHHWeWxM2A@mail.gmail.com>
-References: <5677795C.2060409@linaro.org>
- <CAKv+Gu9mUVn80Vqr5NT7jjkSGd6BY_0cB6gVJ8VakHHWeWxM2A@mail.gmail.com>
-Message-ID: <6DB39B31-8902-4A03-A66B-DC75E90A1C1C@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 25 Dec 2015 13:31:10 +0100
+Subject: [PATCH] pinctrl: qcom: make PMIC drivers bool
+Message-ID: <1451046670-11032-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard
+commit ab4256cfeab91569e1d96e7f0014538fe0845259
+"pinctrl: qcom: pmic-gpio/mpp: of_irq_count() == npins"
+made the Qualcomm PMIC pin control drivers make use of
+of_irq_count() which is not an exported function, making
+modular builds fail.
 
-> ? 2015?12?21??15:06?Ard Biesheuvel <ard.biesheuvel@linaro.org> ???
-> 
-> On 21 December 2015 at 05:00, Pingbo Wen <pingbo.wen@linaro.org> wrote:
->> Hello,
->> 
->> I want to do some tests over 16KB page size on dragonboard 410c. And I merged
->> arm64-upstream branch over
->> 
->>  https://git.linaro.org/landing-teams/working/qualcomm/kernel.git integration-linux-qcomlt
->> 
->> which is based on Linux Kernel 4.3.
->> 
->> The db410c can boot into ubuntu in 4KB / 64KB page size, but when I set 16K page size, with
->> 47bit VA, the kernel hang before kernel_start(), no log output.
->> 
->> Does db410c support 16K page size? What can I do to boot it up?
->> 
-> 
-> Cortex-A5x does not support 16 KB page size
+Fix this by marking the drivers as compiled-in/bool.
 
-Is there any documents I can reference? As I have get from ARM document, the Cortex-A53 support 16k page size, and Cortex-A57 don?t. The document can be found at:
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Andy Gross <andy.gross@linaro.org>
+Cc: Mark Brown <broonie@kernel.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/qcom/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-	http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0024a/BABDJHAD.html
-
-Reference it here:
-
-The supported granule sizes are 4KB, 16KB, and 64KB, and it is implementation defined which of the three are supported. Code that creates page tables is able to read the system register ID_AA64MMFR0_EL1, to find out which are the supported sizes. The Cortex-A53 processor supports all three sizes, but this is not the case for early versions of some processors, such as the Cortex-A57, which did not support the 16K granule size. The size is configurable for each translation table within the Translation Control Register (TCR_EL1).
-
-Did I miss something?
-
-Pingbo
+diff --git a/drivers/pinctrl/qcom/Kconfig b/drivers/pinctrl/qcom/Kconfig
+index eeac8cba8a21..c658d9bce285 100644
+--- a/drivers/pinctrl/qcom/Kconfig
++++ b/drivers/pinctrl/qcom/Kconfig
+@@ -80,7 +80,7 @@ config PINCTRL_QDF2XXX
+ 	  Qualcomm Technologies QDF2xxx SOCs.
+ 
+ config PINCTRL_QCOM_SPMI_PMIC
+-       tristate "Qualcomm SPMI PMIC pin controller driver"
++       bool "Qualcomm SPMI PMIC pin controller driver"
+        depends on GPIOLIB && OF && SPMI
+        select REGMAP_SPMI
+        select PINMUX
+@@ -93,7 +93,7 @@ config PINCTRL_QCOM_SPMI_PMIC
+          devices are pm8841, pm8941 and pma8084.
+ 
+ config PINCTRL_QCOM_SSBI_PMIC
+-       tristate "Qualcomm SSBI PMIC pin controller driver"
++       bool "Qualcomm SSBI PMIC pin controller driver"
+        depends on GPIOLIB && OF
+        select PINMUX
+        select PINCONF
+-- 
+2.4.3
