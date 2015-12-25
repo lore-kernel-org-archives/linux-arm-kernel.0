@@ -1,35 +1,40 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 24 Dec 2015 16:01:40 -0800
-Subject: [PATCH v2 0/8] Raspberry Pi 2 support.
-In-Reply-To: <201512222223.52449.arnd@arndb.de>
-References: <1450310115-22163-1-git-send-email-eric@anholt.net>
- <201512220011.32234.arnd@arndb.de> <20151222142045.GA29335@omega>
- <201512222223.52449.arnd@arndb.de>
-Message-ID: <87lh8jqtuj.fsf@eliezer.anholt.net>
+From: shijie.huang@arm.com (Huang Shijie)
+Date: Fri, 25 Dec 2015 01:46:50 +0000
+Subject: [PATCH 1/2] tty: amba-pl011: fix earlycon register offsets
+In-Reply-To: <1450972189-22639-1-git-send-email-timur@codeaurora.org>
+References: <1450972189-22639-1-git-send-email-timur@codeaurora.org>
+Message-ID: <20151225014649.GA26561@robwan01-pc.asiapac.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
-
-> On Tuesday 22 December 2015, Alexander Aring wrote:
->> Later while booting the kernel hangs forever, the solution on my side
->> was to enable:
->> 
->> CONFIG_HAVE_ARM_ARCH_TIMER
->> 
->> I think this doesn't use the BCM2835 timer anymore and some cortex-a7
->> related "generic timer", or?
+On Thu, Dec 24, 2015 at 09:49:48AM -0600, Timur Tabi wrote:
+> The REG_x macros are indices into a table, not register offsets.  Since
+> earlycon does not have access to the vendor data, we can currently only
+> support standard ARM PL011 devices.
 >
-> Right, but I don't see how that relates to the irqchip. Is the BCM2835 timer
-> connected to a secondary irqchip, while the arch timer connects to the primary GIC?
+> Signed-off-by: Timur Tabi <timur@codeaurora.org>
+> ---
+>  drivers/tty/serial/amba-pl011.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> index f6ad383..06f827a 100644
+> --- a/drivers/tty/serial/amba-pl011.c
+> +++ b/drivers/tty/serial/amba-pl011.c
+> @@ -2302,10 +2302,10 @@ static struct console amba_console = {
+>
+>  static void pl011_putc(struct uart_port *port, int c)
+>  {
+> -     while (readl(port->membase + REG_FR) & UART01x_FR_TXFF)
+> +     while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
+>               ;
+> -     writeb(c, port->membase + REG_DR);
+> -     while (readl(port->membase + REG_FR) & UART01x_FR_BUSY)
+> +     writeb(c, port->membase + UART01x_DR);
+> +     while (readl(port->membase + UART01x_FR) & UART011_FR_BUSY)
+We will meet the compiler error, since there is no UART011_FR_BUSY.
+Please test it before you send it out :)
 
-The 2835 timer is a "peripheral", and connects to the second level
-irqchip, while the arm arch timer can give us per-cpu interrupts in the
-first level controller.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151224/f28d54c2/attachment.sig>
+thanks
+Huang Shijie
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
