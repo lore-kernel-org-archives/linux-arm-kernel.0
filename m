@@ -1,106 +1,43 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Fri, 25 Dec 2015 10:38:17 +0100
-Subject: [PATCH v2 0/2] Improve drm_of_component_probe() and move
- rockchip to use it
-In-Reply-To: <20151224123610.GE8644@n2100.arm.linux.org.uk>
-References: <1448029325-14602-1-git-send-email-Liviu.Dudau@arm.com>
- <20151222173800.GU960@e106497-lin.cambridge.arm.com>
- <20151223103906.2aae53595345240d57d57b41@free.fr>
- <20151223100534.GW960@e106497-lin.cambridge.arm.com>
- <20151223182033.a52356408b9a81e9497464e7@free.fr>
- <20151223185948.GT8644@n2100.arm.linux.org.uk>
- <20151224091528.4f68d0f5838735a1a38c02c6@free.fr>
- <20151224105206.GB8644@n2100.arm.linux.org.uk>
- <20151224132708.10a35feafb44a5bb8e65ba6d@free.fr>
- <20151224123610.GE8644@n2100.arm.linux.org.uk>
-Message-ID: <20151225103817.3aa1d89433607ee7fbf5181f@free.fr>
+From: pingbo.wen@linaro.org (Pingbo Wen)
+Date: Fri, 25 Dec 2015 20:24:59 +0800
+Subject: 16KB PAGE_SIZE not work on DB410C
+In-Reply-To: <CAKv+Gu9mUVn80Vqr5NT7jjkSGd6BY_0cB6gVJ8VakHHWeWxM2A@mail.gmail.com>
+References: <5677795C.2060409@linaro.org>
+ <CAKv+Gu9mUVn80Vqr5NT7jjkSGd6BY_0cB6gVJ8VakHHWeWxM2A@mail.gmail.com>
+Message-ID: <6DB39B31-8902-4A03-A66B-DC75E90A1C1C@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 24 Dec 2015 12:36:10 +0000
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+Hi Ard
 
-> It seems that you're trying to work around a limitation in Linux by
-> modifying the hardware representation...
+> ? 2015?12?21??15:06?Ard Biesheuvel <ard.biesheuvel@linaro.org> ???
+> 
+> On 21 December 2015 at 05:00, Pingbo Wen <pingbo.wen@linaro.org> wrote:
+>> Hello,
+>> 
+>> I want to do some tests over 16KB page size on dragonboard 410c. And I merged
+>> arm64-upstream branch over
+>> 
+>>  https://git.linaro.org/landing-teams/working/qualcomm/kernel.git integration-linux-qcomlt
+>> 
+>> which is based on Linux Kernel 4.3.
+>> 
+>> The db410c can boot into ubuntu in 4KB / 64KB page size, but when I set 16K page size, with
+>> 47bit VA, the kernel hang before kernel_start(), no log output.
+>> 
+>> Does db410c support 16K page size? What can I do to boot it up?
+>> 
+> 
+> Cortex-A5x does not support 16 KB page size
 
-Sorry to come back to this topic, but I think you are wrong.
+Is there any documents I can reference? As I have get from ARM document, the Cortex-A53 support 16k page size, and Cortex-A57 don?t. The document can be found at:
 
-Looking at the imx6 DTs, the problem comes from the display-subsystem
-node which is a pure Linux specific software entity.
+	http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0024a/BABDJHAD.html
 
-If you want to describe only the hardware in the DT, everything is
-simple.
+Reference it here:
 
-A IPU is a image controller with its sub-devices. Seen from the system, it
-is like a 'board' with its devices (LCDs, camera...).
+The supported granule sizes are 4KB, 16KB, and 64KB, and it is implementation defined which of the three are supported. Code that creates page tables is able to read the system register ID_AA64MMFR0_EL1, to find out which are the supported sizes. The Cortex-A53 processor supports all three sizes, but this is not the case for early versions of some processors, such as the Cortex-A57, which did not support the 16K granule size. The size is configurable for each translation table within the Translation Control Register (TCR_EL1).
 
-When 2 IPUs, there are 2 independant boards.
+Did I miss something?
 
-Here is what could be a pure hardware DT:
-
-/* no display-subsystem */
-
-	ipu1: ipu at 02400000 {		/* image controller / board 1 */
-		compatible = "fsl,imx6q-ipu";
-		...
-		ports = <&ipu1_di0>, <&ipu1_di1>;
-	};
-	ipu1_di0: di at 0 {		/* display interface / crtc 1 */
-		compatible = "fsl,imx6q-di";
-		...
-		ipu1_di0_hdmi: endpoint at 1 {
-			remote-endpoint = <&hdmi_mux_0>;
-		};
-		ipu1_di0_mipi: endpoint at 2 {
-			remote-endpoint = <&mipi_mux_0>;
-		}
-		...
-	};
-	ipu1_di1: di at 1 {		/* display interface / crtc 2 */
-		compatible = "fsl,imx6q-di";
-		...
-		ipu1_di1_hdmi: endpoint at 1 {
-			remote-endpoint = <&hdmi_mux_1>;
-		};
-		ipu1_di1_mipi: endpoint at 2 {
-			remote-endpoint = <&mipi_mux_1>;
-		}
-		...
-	};
-
-	ipu2: ipu at 02800000 {		/* image controller / board 2 */
-		compatible = "fsl,imx6q-ipu";
-		...
-		ports = <&ipu2_di0>, <&ipu2_di1>;
-	};
-	ipu2_di0: di at 0 {		/* display interface / crtc 1 */
-		compatible = "fsl,imx6q-di";
-		...
-		ipu2_di0_hdmi: endpoint at 1 {
-			remote-endpoint = <&hdmi_mux_2>;
-		};
-		ipu2_di0_mipi: endpoint at 2 {
-			remote-endpoint = <&mipi_mux_2>;
-		}
-		...
-	};
-	ipu2_di1: di at 1 {		/* display interface / crtc 2 */
-		compatible = "fsl,imx6q-di";
-		...
-		ipu2_di1_hdmi: endpoint at 1 {
-			remote-endpoint = <&hdmi_mux_3>;
-		};
-		ipu2_di1_mipi: endpoint at 2 {
-			remote-endpoint = <&mipi_mux_3>;
-		}
-		...
-	};
-
-Then, a standard component binding (port->parent) works fine...
-
-(you may note that the same problem exists with audio: the
-'simple-card' is also a pure Linux specific software entity)
-
--- 
-Merry Christmas	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Pingbo
