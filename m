@@ -1,137 +1,79 @@
-From: jingoohan1@gmail.com (Jingoo Han)
-Date: Fri, 25 Dec 2015 22:01:44 +0900
-Subject: [PATCH v12 16/18] drm: bridge: analogix/dp: expand the wait time
- for looking AUX CH reply flag
-In-Reply-To: <567B48F9.6010902@rock-chips.com>
-References: <1450873538-18304-1-git-send-email-ykk@rock-chips.com>
- <1450875064-19627-1-git-send-email-ykk@rock-chips.com>
- <000001d13d94$120e0d60$362a2820$@com> <567B48F9.6010902@rock-chips.com>
-Message-ID: <000001d13f14$6e7210c0$4b563240$@com>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 25 Dec 2015 22:49:56 +0100
+Subject: [PATCH RFC] ARM: tango4: Fix build issues
+Message-ID: <567DBA04.4060709@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, December 24, 2015 10:23 AM, Yakir Yang wrote:
-> 
-> Hi Jingoo,
-> 
-> Okay, fine, I would drop this patch, until I found the the root cause.
+From: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
 
-OK, I see.
+Move SMP setup to platsmp.c
+Specify the CPU type to the assembler, and only for smc.S
 
-Best regards,
-Jingoo Han
+Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+---
+ arch/arm/mach-tango/Makefile  |  3 ++-
+ arch/arm/mach-tango/platsmp.c | 16 ++++++++++++++++
+ arch/arm/mach-tango/setup.c   | 14 --------------
+ 3 files changed, 18 insertions(+), 15 deletions(-)
+ create mode 100644 arch/arm/mach-tango/platsmp.c
 
-> 
-> - Yakir
-> 
-> On 12/23/2015 11:10 PM, Jingoo Han wrote:
-> > On Wednesday, December 23, 2015 9:51 PM, Yakir Yang wrote:
-> >> On Rockchip platform, sometimes driver would failed at reading EDID
-> >> message, and it's caused by the AUX reply flag wouldn't received under
-> >> the 100*10us wait time.
-> > The problem is specific for Rockchip platform.
-> > Also, 1 ms is long time.
-> > The best way is that your hardware engineers find the root cause.
-> > I cannot understand why your engineers cannot find the root cause. :-(
-> >
-> >> But after expand the wait time a little, the AUX reply flag would be
-> >> set, so maybe the wait time is a little critical. Besides the analogix
-> >> dp book haven't reminded the standard wait for looking AUX reply flag,
-> >> so I thought it's okay to expand the wait time.
-> >>
-> >> And the external wait time won't hurt Exynos DP too much, cause they
-> >> wouldn't meet this problem, then driver would received the reply command
-> >> very soon, so no more additional wait time would bring to Exynos platform.
-> > Then, when loop time happens on Exynos platform, it will take long time
-> > to return error.
-> >
-> >> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> >> ---
-> >> Changes in v12:
-> >> - Using another way to expand the AUX reply wait time (Jingoo)
-> >>
-> >> Changes in v11: None
-> >> Changes in v10: None
-> >> Changes in v9: None
-> >> Changes in v8: None
-> >> Changes in v7: None
-> >> Changes in v6: None
-> >> Changes in v5: None
-> >> Changes in v4: None
-> >> Changes in v3: None
-> >> Changes in v2: None
-> >>
-> >>   drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c | 10 ++++------
-> >>   1 file changed, 4 insertions(+), 6 deletions(-)
-> >>
-> >> diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-> >> b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-> >> index cba3ffd..8687eea 100644
-> >> --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-> >> +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-> >> @@ -471,7 +471,7 @@ int analogix_dp_start_aux_transaction(struct analogix_dp_device *dp)
-> >>   {
-> >>   	int reg;
-> >>   	int retval = 0;
-> >> -	int timeout_loop = 0;
-> >> +	unsigned long timeout;
-> >>
-> >>   	/* Enable AUX CH operation */
-> >>   	reg = readl(dp->reg_base + ANALOGIX_DP_AUX_CH_CTL_2);
-> >> @@ -479,14 +479,12 @@ int analogix_dp_start_aux_transaction(struct analogix_dp_device *dp)
-> >>   	writel(reg, dp->reg_base + ANALOGIX_DP_AUX_CH_CTL_2);
-> >>
-> >>   	/* Is AUX CH command reply received? */
-> >> -	reg = readl(dp->reg_base + ANALOGIX_DP_INT_STA);
-> >> -	while (!(reg & RPLY_RECEIV)) {
-> >> -		timeout_loop++;
-> >> -		if (DP_TIMEOUT_LOOP_COUNT < timeout_loop) {
-> >> +	timeout = jiffies + msecs_to_jiffies(5);
-> >> +	while ((readl(dp->reg_base + ANALOGIX_DP_INT_STA) & RPLY_RECEIV) == 0) {
-> >> +		if (time_after(jiffies, timeout)) {
-> >>   			dev_err(dp->dev, "AUX CH command reply failed!\n");
-> >>   			return -ETIMEDOUT;
-> >>   		}
-> >> -		reg = readl(dp->reg_base + ANALOGIX_DP_INT_STA);
-> > Sorry, I don't like your patch.
-> >
-> > The problem happens because of Rockchip platform.
-> > So, you need to add workaround for only Rockchip platform.
-> >
-> > Just add new DT property and new variable for the value for wait time.
-> > When, the probe is called, new wait time value is read from Rockchip DT file.
-> > Then, the new wait time value can be written to the new variable.
-> >
-> >      new DT property: wait-time-aux
-> >      new variable: wait_time_aux
-> >
-> >
-> > If ( ) // New DT
-> >      wait_time_aux = New DT;
-> > else
-> >      wait_time_aux = 10;
-> >
-> >
-> >>   		usleep_range(10, 11);
-> > If there is NO  new wait time value from DT file, the default value '10' is
-> > used for sleep.
-> >
-> > But, if there is new wait time value from DT file, new wait time value
-> > can be used for sleep.
-> >
-> >                   usleep_range(dp->wait_time_aux, dp->wait_time_aux + 1);
-> >
-> > What I want to say is that there should be NO effect on Exynos platform,
-> > because of the hardware bug of Rockchip platform.
-> >
-> > Best regards,
-> > Jingoo Han
-> >
-> >>   	}
-> >>
-> >> --
-> >> 1.9.1
-> >
-> >
-> >
-> >
+diff --git a/arch/arm/mach-tango/Makefile b/arch/arm/mach-tango/Makefile
+index 0d7e2b5976e3..d33eab2941cb 100644
+--- a/arch/arm/mach-tango/Makefile
++++ b/arch/arm/mach-tango/Makefile
+@@ -1,2 +1,3 @@
+-asflags-y += -mcpu=cortex-a9
+ obj-y += setup.o smc.o
++obj-$(CONFIG_SMP) += platsmp.o
++AFLAGS_smc.o := -Wa,-mcpu=cortex-a9
+diff --git a/arch/arm/mach-tango/platsmp.c b/arch/arm/mach-tango/platsmp.c
+new file mode 100644
+index 000000000000..a18d5a34e2f5
+--- /dev/null
++++ b/arch/arm/mach-tango/platsmp.c
+@@ -0,0 +1,16 @@
++#include <linux/init.h>
++#include <linux/smp.h>
++#include "smc.h"
++
++static int tango_boot_secondary(unsigned int cpu, struct task_struct *idle)
++{
++	tango_set_aux_boot_addr(virt_to_phys(secondary_startup));
++	tango_start_aux_core(cpu);
++	return 0;
++}
++
++static struct smp_operations tango_smp_ops __initdata = {
++	.smp_boot_secondary	= tango_boot_secondary,
++};
++
++CPU_METHOD_OF_DECLARE(tango4_smp, "sigma,tango4-smp", &tango_smp_ops);
+diff --git a/arch/arm/mach-tango/setup.c b/arch/arm/mach-tango/setup.c
+index d86900550e63..f14b6c7d255b 100644
+--- a/arch/arm/mach-tango/setup.c
++++ b/arch/arm/mach-tango/setup.c
+@@ -1,21 +1,7 @@
+-#include <linux/smp.h>
+ #include <asm/mach/arch.h>
+ #include <asm/hardware/cache-l2x0.h>
+ #include "smc.h"
+ 
+-static int tango4_boot_secondary(unsigned int cpu, struct task_struct *idle)
+-{
+-	tango_set_aux_boot_addr(virt_to_phys(secondary_startup));
+-	tango_start_aux_core(cpu);
+-	return 0;
+-}
+-
+-static struct smp_operations tango4_smp_ops __initdata = {
+-	.smp_boot_secondary	= tango4_boot_secondary,
+-};
+-
+-CPU_METHOD_OF_DECLARE(tango4_smp, "sigma,tango4-smp", &tango4_smp_ops);
+-
+ static void tango_l2c_write(unsigned long val, unsigned int reg)
+ {
+ 	if (reg == L2X0_CTRL)
+-- 
+2.4.3
