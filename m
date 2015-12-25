@@ -1,37 +1,35 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Thu, 24 Dec 2015 15:55:54 -0800
-Subject: [PATCH] clk: bcm2835: added missing clock register definitions
-In-Reply-To: <1450815189-3342-1-git-send-email-kernel@martin.sperl.org>
-References: <1450815189-3342-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <87oadfqu45.fsf@eliezer.anholt.net>
+Date: Thu, 24 Dec 2015 16:01:40 -0800
+Subject: [PATCH v2 0/8] Raspberry Pi 2 support.
+In-Reply-To: <201512222223.52449.arnd@arndb.de>
+References: <1450310115-22163-1-git-send-email-eric@anholt.net>
+ <201512220011.32234.arnd@arndb.de> <20151222142045.GA29335@omega>
+ <201512222223.52449.arnd@arndb.de>
+Message-ID: <87lh8jqtuj.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kernel at martin.sperl.org writes:
+Arnd Bergmann <arnd@arndb.de> writes:
 
-> From: Martin Sperl <kernel@martin.sperl.org>
+> On Tuesday 22 December 2015, Alexander Aring wrote:
+>> Later while booting the kernel hangs forever, the solution on my side
+>> was to enable:
+>> 
+>> CONFIG_HAVE_ARM_ARCH_TIMER
+>> 
+>> I think this doesn't use the BCM2835 timer anymore and some cortex-a7
+>> related "generic timer", or?
 >
-> Added missing CTRL and DIV clock register definitions for:
-> PCM, SLIM, TCNT, TEC, TD0, TD1
->
-> Register information taken from:
-> https://rawgit.com/msperl/rpi-registers/master/rpi-registers.html#CM
-> which extracted the information from the header files shared by
-> Broadcom/rpi foundation in this file:
-> http://www.broadcom.com/docs/support/videocore/Brcm_Android_ICS_Graphics_Stack.tar.gz
->
-> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+> Right, but I don't see how that relates to the irqchip. Is the BCM2835 timer
+> connected to a secondary irqchip, while the arch timer connects to the primary GIC?
 
-I had previously generated the list of registers by typing in a bunch of
-them from specs, sorting, and adding missing ones for the clocks I meant
-to expose.  I'm happy to see these missing registers added, even if we
-haven't exposed those clocks yet.
-
-Reviewed-by: Eric Anholt <eric@anholt.net>
+The 2835 timer is a "peripheral", and connects to the second level
+irqchip, while the arm arch timer can give us per-cpu interrupts in the
+first level controller.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 818 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151224/1682c739/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151224/f28d54c2/attachment.sig>
