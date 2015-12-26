@@ -1,131 +1,55 @@
-From: yangyingliang@huawei.com (Yang Yingliang)
-Date: Sat, 26 Dec 2015 15:42:10 +0800
-Subject: [RFC PATCH] ARM64: mm: check if the read/write block is in memblock
-Message-ID: <1451115730-4244-1-git-send-email-yangyingliang@huawei.com>
+From: itaru.kitayama@riken.jp (Itaru Kitayama)
+Date: Sat, 26 Dec 2015 17:23:51 +0900
+Subject: v4.3-rc1 or later kernels fail to boot the Mustang board
+Message-ID: <567E4E97.7040209@riken.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the address is non-RAM address, when we read/write
-the /dev/mem it will cause an exception. It is not enough
-that just check if the address is out of high_memory in
-valid_phys_addr_range(), when we read/write the /dev/mem.
-Because it may have memory holes below the high_memory,
-when the system tries to access them, it will trigger an
-exception. To avoid the exception, it needs to check
-if the read/write range is a subset of a System RAM in
-valid_phys_addr_range().
+Hi,
+After this commit between the tags v4.2 and v4.3-rc1,
 
- Reproduce the problem by command:
- # cat /dev/mem > /tmp/mem
+commit 752240e74d650faa24425adc523f1308973ea51c
+Merge: b8cb642 626d750
+Author: Linus Torvalds <torvalds@linux-foundation.org>
+Date:   Tue Sep 8 11:46:48 2015 -0700
 
-Unable to handle kernel paging request at virtual address ffff80007fc00000
-pgd = ffff8011f5ee8000
-[ffff80007fc00000] *pgd=0000000000000000
-Internal error: Oops: 96000006 [#1] SMP
+     Merge tag 'for-linus-4.3-rc0-tag' of 
+git://git.kernel.org/pub/scm/linux/kernel/git/xen/tip
 
-Modules linked in:
+     Pull xen updates from David Vrabel:
+      "Xen features and fixes for 4.3:
 
-CPU: 2 PID: 885 Comm: cat Not tainted 4.1.12+ #3
-task: ffff8011f604a100 ti: ffff8011f54b4000 task.ti: ffff8011f54b4000
-PC is at __copy_to_user+0xc/0x60
-LR is at read_mem+0xc8/0x150
-pc : [<ffff80000035ab9c>] lr : [<ffff800000402178>] pstate: 20000145
-sp : ffff8011f54b7d70
-x29: ffff8011f54b7d70 x28: ffff800000987000
-x27: 0000fffffcda5c70 x26: 000000007fc00000
-x25: 0000000000001000 x24: ffff8011f54b4000
-x23: ffff800000000000 x22: 0000000000001000
-x21: 0000000000000000 x20: ffff8011f54b7ec8
-x19: 0000000000001000 x18: 0000000000000000
-x17: 0000ffff7c4e8e10 x16: ffff8000001aabd0
-x15: 000000000000579b x14: 0000ffff7c42daa0
-x13: 0000ffff7c430aa8 x12: 000000000000081a
-x11: 0101010101010101 x10: 0000ffff7c645cb0
-x9 : 6b6872731f203c1f x8 : 000000000000003f
-x7 : 0000000000000000 x6 : ffff8000006c5c68
-x5 : ffff8000004020b0 x4 : 0000fffffcda6c70
-x3 : 0000000000000001 x2 : 0000000000000ff8
-x1 : ffff80007fc00000 x0 : 0000fffffcda5c70
+        - Convert xen-blkfront to the multiqueue API
+        - [arm] Support binding event channels to different VCPUs.
+        - [x86] Support > 512 GiB in a PV guests (off by default as such a
+          guest cannot be migrated with the current toolstack).
+        - [x86] PMU support for PV dom0 (limited support for using perf with
+          Xen and other guests)"
 
-Process cat (pid: 885, stack limit = 0xffff8011f54b4020)
-Stack: (0xffff8011f54b7d70 to 0xffff8011f54b8000)
-7d60:                                     ffff8011 f54b7dd0 ffff8000 001a96c8
-7d80: ffff8011 f51b3a00 ffff8011 f54b7ec8 ffff8011 f54b7ec8 00000000 00001000
-7da0: 00000000 60000000 00000000 00000015 00000000 0000011a 00000000 0000003f
-7dc0: ffff8000 00674000 ffff8011 f54b4000 ffff8011 f54b7e50 ffff8000 001aa00c
-7de0: ffff8011 f51b3a00 0000ffff fcda5c70 00000000 00000000 00000000 00000000
-7e00: ffff8011 f54b7e30 ffff8000 001a9ee4 00000000 00001000 ffff8011 f51b3a00
-7e20: ffff8011 f54b7ec8 00000000 00001000 ffff8011 f54b7e50 ffff8000 001a9ff0
-7e40: ffff8011 f51b3a00 0000ffff fcda5c70 ffff8011 f54b7e90 ffff8000 001aac14
-7e60: ffff8011 f51b3a00 ffff8011 f51b3a00 0000ffff fcda5c70 00000000 00001000
-7e80: 00000000 60000000 00000000 00001000 0000ffff fcda6d90 ffff8000 00084c30
-7ea0: 00000000 00000000 00000000 00001000 ffffffff ffffffff 0000ffff 7c4e8df8
-7ec0: 00000000 00000038 00000000 7fc00000 00000000 00000003 0000ffff fcda5c70
-7ee0: 00000000 00001000 00000000 00000000 00000000 00000000 00000000 00000001
-7f00: 00000000 00000080 00000000 00000000 00000000 0000003f 6b687273 1f203c1f
-7f20: 0000ffff 7c645cb0 01010101 01010101 00000000 0000081a 0000ffff 7c430aa8
-7f40: 0000ffff 7c42daa0 00000000 0000579b 00000000 00000000 0000ffff 7c4e8e10
-7f60: 00000000 00000000 00000000 0049e000 00000000 00001000 0000ffff fcda5c70
-7f80: 00000000 00000003 00000000 00000003 00000000 00000001 00000000 00000001
-7fa0: 00000000 00001000 00000000 00000038 00000000 00000000 0000ffff fcda6d90
-7fc0: 00000000 0040a9a4 0000ffff fcda5bf0 0000ffff 7c4e8df8 00000000 60000000
-7fe0: 00000000 00000003 00000000 0000003f afafafaf afafafaf afafafaf afafafaf
-Call trace:
-[<ffff80000035ab9c>] __copy_to_user+0xc/0x60
-[<ffff8000001a96c4>] __vfs_read+0x24/0x110
-[<ffff8000001aa008>] vfs_read+0x78/0x150
-[<ffff8000001aac10>] SyS_read+0x40/0xa0
-Code: 1f2003d5 0400028b 422000f1 a4000054 (238440f8)
----[ end trace 0fa00f6f46f79c5a ]---
+     * tag 'for-linus-4.3-rc0-tag' of 
+git://git.kernel.org/pub/scm/linux/kernel/git/xen/tip: (33 commits)
+       xen: switch extra memory accounting to use pfns
+       xen: limit memory to architectural maximum
+       xen: avoid another early crash of memory limited dom0
+       xen: avoid early crash of memory limited dom0
+       arm/xen: Remove helpers which are PV specific
+       xen/x86: Don't try to set PCE bit in CR4
+       xen/PMU: PMU emulation code
+       xen/PMU: Intercept PMU-related MSR and APIC accesses
+       xen/PMU: Describe vendor-specific PMU registers
+       xen/PMU: Initialization code for Xen PMU
+       xen/PMU: Sysfs interface for setting Xen PMU mode
+       xen: xensyms support
+       xen: remove no longer needed p2m.h
+       xen: allow more than 512 GB of RAM for 64 bit pv-domains
+       xen: move p2m list if conflicting with e820 map
+       xen: add explicit memblock_reserve() calls for special pages
+       mm: provide early_memremap_ro to establish read-only mapping
+       xen: check for initrd conflicting with e820 map
+       xen: check pre-allocated page tables for conflict with memory map
+       xen: check for kernel memory conflicting with memory layout
+       ...
 
-Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Leif Lindholm <leif.lindholm@linaro.org>
-Cc: Xishi Qiu <qiuxishi@huawei.com>
----
- arch/arm64/mm/mmap.c | 17 +++++++++++++++--
- 1 file changed, 15 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/mm/mmap.c b/arch/arm64/mm/mmap.c
-index ed17747..5e89dcf 100644
---- a/arch/arm64/mm/mmap.c
-+++ b/arch/arm64/mm/mmap.c
-@@ -26,6 +26,7 @@
- #include <linux/io.h>
- #include <linux/personality.h>
- #include <linux/random.h>
-+#include <linux/memblock.h>
- 
- #include <asm/cputype.h>
- 
-@@ -100,12 +101,24 @@ EXPORT_SYMBOL_GPL(arch_pick_mmap_layout);
-  */
- int valid_phys_addr_range(phys_addr_t addr, size_t size)
- {
-+	int i;
-+	int cnt = memblock.memory.cnt;
-+	phys_addr_t addr_end = addr + size;
-+
- 	if (addr < PHYS_OFFSET)
- 		return 0;
--	if (addr + size > __pa(high_memory - 1) + 1)
-+	if (addr_end > __pa(high_memory - 1) + 1)
- 		return 0;
- 
--	return 1;
-+	for (i = 0; i < cnt; i++) {
-+		phys_addr_t mem_start = memblock.memory.regions[i].base;
-+		phys_addr_t mem_end = memblock.memory.regions[i].base + memblock.memory.regions[i].size;
-+
-+		if (addr >= mem_start && addr_end <= mem_end)
-+			return 1;
-+	}
-+
-+	return 0;
- }
- 
- /*
--- 
-2.5.0
+Kernels fail to boot the Mustang board which I have access. Do I need a 
+newer F/W so I can
+use recent, v4.4-rcX mainline kernels?
