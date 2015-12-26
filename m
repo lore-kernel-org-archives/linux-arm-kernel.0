@@ -1,40 +1,131 @@
-From: zhizhou.zh@gmail.com (Zhi-zhou Zhang)
-Date: Sat, 26 Dec 2015 13:57:18 +0800
-Subject: [PATCH] arm64: entry.S: add missing trace_hardirqs_off
-Message-ID: <1451109438-5834-1-git-send-email-zhizhou.zh@gmail.com>
+From: yangyingliang@huawei.com (Yang Yingliang)
+Date: Sat, 26 Dec 2015 15:42:10 +0800
+Subject: [RFC PATCH] ARM64: mm: check if the read/write block is in memblock
+Message-ID: <1451115730-4244-1-git-send-email-yangyingliang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before calling schedule, we should trace hardirqs correctly. If not,
-we get following warning message when enabled CONFIG_DEBUG_LOCKDEP:
+If the address is non-RAM address, when we read/write
+the /dev/mem it will cause an exception. It is not enough
+that just check if the address is out of high_memory in
+valid_phys_addr_range(), when we read/write the /dev/mem.
+Because it may have memory holes below the high_memory,
+when the system tries to access them, it will trigger an
+exception. To avoid the exception, it needs to check
+if the read/write range is a subset of a System RAM in
+valid_phys_addr_range().
 
-[    9.243073] DEBUG_LOCKS_WARN_ON(current->hardirqs_enabled)
-[ ... ]
-[    9.262681] possible reason: unannotated irqs-off.
-[    9.263018] irq event stamp: 256209
-[    9.263266] hardirqs last  enabled at (256209): [<ffffffc000085a98>] el0_irq_naked+0x1c/0x24
-[    9.263820] hardirqs last disabled at (256207): [<ffffffc0000bad20>] __do_softirq+0x170/0x28c
-[    9.264419] softirqs last  enabled at (256208): [<ffffffc0000bad9c>] __do_softirq+0x1ec/0x28c
-[    9.264976] softirqs last disabled at (256189): [<ffffffc0000bb194>] irq_exit+0x9c/0xec
+ Reproduce the problem by command:
+ # cat /dev/mem > /tmp/mem
 
-Signed-off-by: Zhi-zhou Zhang <zhizhou.zh@gmail.com>
+Unable to handle kernel paging request at virtual address ffff80007fc00000
+pgd = ffff8011f5ee8000
+[ffff80007fc00000] *pgd=0000000000000000
+Internal error: Oops: 96000006 [#1] SMP
+
+Modules linked in:
+
+CPU: 2 PID: 885 Comm: cat Not tainted 4.1.12+ #3
+task: ffff8011f604a100 ti: ffff8011f54b4000 task.ti: ffff8011f54b4000
+PC is at __copy_to_user+0xc/0x60
+LR is at read_mem+0xc8/0x150
+pc : [<ffff80000035ab9c>] lr : [<ffff800000402178>] pstate: 20000145
+sp : ffff8011f54b7d70
+x29: ffff8011f54b7d70 x28: ffff800000987000
+x27: 0000fffffcda5c70 x26: 000000007fc00000
+x25: 0000000000001000 x24: ffff8011f54b4000
+x23: ffff800000000000 x22: 0000000000001000
+x21: 0000000000000000 x20: ffff8011f54b7ec8
+x19: 0000000000001000 x18: 0000000000000000
+x17: 0000ffff7c4e8e10 x16: ffff8000001aabd0
+x15: 000000000000579b x14: 0000ffff7c42daa0
+x13: 0000ffff7c430aa8 x12: 000000000000081a
+x11: 0101010101010101 x10: 0000ffff7c645cb0
+x9 : 6b6872731f203c1f x8 : 000000000000003f
+x7 : 0000000000000000 x6 : ffff8000006c5c68
+x5 : ffff8000004020b0 x4 : 0000fffffcda6c70
+x3 : 0000000000000001 x2 : 0000000000000ff8
+x1 : ffff80007fc00000 x0 : 0000fffffcda5c70
+
+Process cat (pid: 885, stack limit = 0xffff8011f54b4020)
+Stack: (0xffff8011f54b7d70 to 0xffff8011f54b8000)
+7d60:                                     ffff8011 f54b7dd0 ffff8000 001a96c8
+7d80: ffff8011 f51b3a00 ffff8011 f54b7ec8 ffff8011 f54b7ec8 00000000 00001000
+7da0: 00000000 60000000 00000000 00000015 00000000 0000011a 00000000 0000003f
+7dc0: ffff8000 00674000 ffff8011 f54b4000 ffff8011 f54b7e50 ffff8000 001aa00c
+7de0: ffff8011 f51b3a00 0000ffff fcda5c70 00000000 00000000 00000000 00000000
+7e00: ffff8011 f54b7e30 ffff8000 001a9ee4 00000000 00001000 ffff8011 f51b3a00
+7e20: ffff8011 f54b7ec8 00000000 00001000 ffff8011 f54b7e50 ffff8000 001a9ff0
+7e40: ffff8011 f51b3a00 0000ffff fcda5c70 ffff8011 f54b7e90 ffff8000 001aac14
+7e60: ffff8011 f51b3a00 ffff8011 f51b3a00 0000ffff fcda5c70 00000000 00001000
+7e80: 00000000 60000000 00000000 00001000 0000ffff fcda6d90 ffff8000 00084c30
+7ea0: 00000000 00000000 00000000 00001000 ffffffff ffffffff 0000ffff 7c4e8df8
+7ec0: 00000000 00000038 00000000 7fc00000 00000000 00000003 0000ffff fcda5c70
+7ee0: 00000000 00001000 00000000 00000000 00000000 00000000 00000000 00000001
+7f00: 00000000 00000080 00000000 00000000 00000000 0000003f 6b687273 1f203c1f
+7f20: 0000ffff 7c645cb0 01010101 01010101 00000000 0000081a 0000ffff 7c430aa8
+7f40: 0000ffff 7c42daa0 00000000 0000579b 00000000 00000000 0000ffff 7c4e8e10
+7f60: 00000000 00000000 00000000 0049e000 00000000 00001000 0000ffff fcda5c70
+7f80: 00000000 00000003 00000000 00000003 00000000 00000001 00000000 00000001
+7fa0: 00000000 00001000 00000000 00000038 00000000 00000000 0000ffff fcda6d90
+7fc0: 00000000 0040a9a4 0000ffff fcda5bf0 0000ffff 7c4e8df8 00000000 60000000
+7fe0: 00000000 00000003 00000000 0000003f afafafaf afafafaf afafafaf afafafaf
+Call trace:
+[<ffff80000035ab9c>] __copy_to_user+0xc/0x60
+[<ffff8000001a96c4>] __vfs_read+0x24/0x110
+[<ffff8000001aa008>] vfs_read+0x78/0x150
+[<ffff8000001aac10>] SyS_read+0x40/0xa0
+Code: 1f2003d5 0400028b 422000f1 a4000054 (238440f8)
+---[ end trace 0fa00f6f46f79c5a ]---
+
+Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Leif Lindholm <leif.lindholm@linaro.org>
+Cc: Xishi Qiu <qiuxishi@huawei.com>
 ---
- arch/arm64/kernel/entry.S | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm64/mm/mmap.c | 17 +++++++++++++++--
+ 1 file changed, 15 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 7ed3d75..4769190 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -634,6 +634,9 @@ work_pending:
- 	bl	do_notify_resume
- 	b	ret_to_user
- work_resched:
-+#ifdef CONFIG_TRACE_IRQFLAGS
-+	bl	trace_hardirqs_off
-+#endif
- 	bl	schedule
+diff --git a/arch/arm64/mm/mmap.c b/arch/arm64/mm/mmap.c
+index ed17747..5e89dcf 100644
+--- a/arch/arm64/mm/mmap.c
++++ b/arch/arm64/mm/mmap.c
+@@ -26,6 +26,7 @@
+ #include <linux/io.h>
+ #include <linux/personality.h>
+ #include <linux/random.h>
++#include <linux/memblock.h>
+ 
+ #include <asm/cputype.h>
+ 
+@@ -100,12 +101,24 @@ EXPORT_SYMBOL_GPL(arch_pick_mmap_layout);
+  */
+ int valid_phys_addr_range(phys_addr_t addr, size_t size)
+ {
++	int i;
++	int cnt = memblock.memory.cnt;
++	phys_addr_t addr_end = addr + size;
++
+ 	if (addr < PHYS_OFFSET)
+ 		return 0;
+-	if (addr + size > __pa(high_memory - 1) + 1)
++	if (addr_end > __pa(high_memory - 1) + 1)
+ 		return 0;
+ 
+-	return 1;
++	for (i = 0; i < cnt; i++) {
++		phys_addr_t mem_start = memblock.memory.regions[i].base;
++		phys_addr_t mem_end = memblock.memory.regions[i].base + memblock.memory.regions[i].size;
++
++		if (addr >= mem_start && addr_end <= mem_end)
++			return 1;
++	}
++
++	return 0;
+ }
  
  /*
 -- 
-2.1.4
+2.5.0
