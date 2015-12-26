@@ -1,39 +1,72 @@
-From: noralf@tronnes.org (=?UTF-8?Q?Noralf_Tr=c3=b8nnes?=)
-Date: Sat, 26 Dec 2015 22:38:05 +0100
-Subject: [PATCH v2 0/8] Raspberry Pi 2 support.
-In-Reply-To: <87si2uux2s.fsf@eliezer.anholt.net>
-References: <1450310115-22163-1-git-send-email-eric@anholt.net>
- <20151218100826.GB1145@omega> <20151220221158.GA6416@omega>
- <874mfbflj3.fsf@eliezer.anholt.net> <20151222142643.GB29335@omega>
- <87si2uux2s.fsf@eliezer.anholt.net>
-Message-ID: <567F08BD.50204@tronnes.org>
+From: eric@anholt.net (Eric Anholt)
+Date: Sat, 26 Dec 2015 13:47:21 -0800
+Subject: [PATCH 1/4] irqchip: bcm2836: Fix initialization of the
+ LOCAL_IRQ_CNT*IRQ timers
+In-Reply-To: <1451166444-11044-1-git-send-email-eric@anholt.net>
+References: <1451166444-11044-1-git-send-email-eric@anholt.net>
+Message-ID: <1451166444-11044-2-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The irqchip's register area includes the the setup for the timer's
+scaling factors, and for the platform we want a fixed configuration of
+these registers.
 
-Den 22.12.2015 20:01, skrev Eric Anholt:
+Signed-off-by: Eric Anholt <eric@anholt.net>
+---
+ drivers/irqchip/irq-bcm2836.c | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
->
->> After finally booting the RPi2 I get several messages of:
->>
->> unexpected IRQ trap at vector 00
->>
->> while typing _one_ character over uart.
-> We were doing some debugging of that recently.  It seems that every once
-> in a while we get woken up but nothing shows up in the top-level status
-> register.  We need to just make the irqchip ignore instead of trying to
-> look up a handler in that case, but I haven't prioritized it because it
-> makes me worry that I'm just papering over a problem in our IRQ masking
-> or something.
->
-> I haven't seen any problems other than the printk, though.
-
-Downstream has this patch[1]:
-irq-bcm2836: Prevent spurious interrupts, and trap them early
-
-It has been used in the nightly build of OpenELEC[2] for 5 days now without
-any complaints (used with the downstream ARCH_BCM2709).
-
-[1] 
-https://github.com/raspberrypi/linux/commit/688a5f2ada4fbd16547b574a17e6d359ab2364d0
-[2] http://forum.kodi.tv/showthread.php?tid=250817&pid=2192054#pid2192054
+diff --git a/drivers/irqchip/irq-bcm2836.c b/drivers/irqchip/irq-bcm2836.c
+index f687082..6ec125e 100644
+--- a/drivers/irqchip/irq-bcm2836.c
++++ b/drivers/irqchip/irq-bcm2836.c
+@@ -21,6 +21,9 @@
+ #include <linux/irqdomain.h>
+ #include <asm/exception.h>
+ 
++#define LOCAL_CONTROL			0x000
++#define LOCAL_PRESCALER			0x008
++
+ /*
+  * The low 2 bits identify the CPU that the GPU IRQ goes to, and the
+  * next 2 bits identify the CPU that the GPU FIQ goes to.
+@@ -237,6 +240,27 @@ bcm2836_arm_irqchip_smp_init(void)
+ #endif
+ }
+ 
++/*
++ * The LOCAL_IRQ_CNT* timer firings are based off of the external
++ * oscillator with some scaling.  The firmware sets up CNTFRQ to
++ * report 19.2Mhz, but doesn't set up the scaling registers.
++ */
++static void bcm2835_init_local_timer_frequency(void)
++{
++	/*
++	 * Set the timer to source from the 19.2Mhz crystal clock (bit
++	 * 8 unset), and only increment by 1 instead of 2 (bit 9
++	 * unset).
++	 */
++	writel(0, intc.base + LOCAL_CONTROL);
++
++	/*
++	 * Set the timer prescaler to 1:1 (timer freq = input freq *
++	 * 2**31 / prescaler)
++	 */
++	writel(0x80000000, intc.base + LOCAL_PRESCALER);
++}
++
+ static int __init bcm2836_arm_irqchip_l1_intc_of_init(struct device_node *node,
+ 						      struct device_node *parent)
+ {
+@@ -246,6 +270,8 @@ static int __init bcm2836_arm_irqchip_l1_intc_of_init(struct device_node *node,
+ 			node->full_name);
+ 	}
+ 
++	bcm2835_init_local_timer_frequency();
++
+ 	intc.domain = irq_domain_add_linear(node, LAST_IRQ + 1,
+ 					    &bcm2836_arm_irqchip_intc_ops,
+ 					    NULL);
+-- 
+2.6.2
