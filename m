@@ -1,74 +1,33 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Sat, 26 Dec 2015 02:43:50 -0800
-Subject: [PATCH LINUX v5 2/8] tty: xuartps: Use spinlock to serialize HW access
+Date: Sat, 26 Dec 2015 02:43:54 -0800
+Subject: [PATCH LINUX v5 6/8] tty: xuartps: Keep lock for whole ISR
 In-Reply-To: <1451126636-13699-1-git-send-email-soren.brinkmann@xilinx.com>
 References: <1451126636-13699-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1451126636-13699-3-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1451126636-13699-7-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of disabling the IRQ, use the spin lock to serialize accesses to
-the HW. This protects the driver from interference of non-IRQ callbacks
-with each other and makes the driver more consistent in its
-serialization method.
+The RX path in the interrupt handler released a lock unnecessarily.
 
 Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
 ---
- drivers/tty/serial/xilinx_uartps.c | 18 ++++++------------
- 1 file changed, 6 insertions(+), 12 deletions(-)
+ drivers/tty/serial/xilinx_uartps.c | 2 --
+ 1 file changed, 2 deletions(-)
 
 diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index 50d4082d2354..2c98c357d9a0 100644
+index 6ffd3bbe3e18..ab3995d00973 100644
 --- a/drivers/tty/serial/xilinx_uartps.c
 +++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -945,12 +945,10 @@ static void cdns_uart_set_mctrl(struct uart_port *port, unsigned int mctrl)
- #ifdef CONFIG_CONSOLE_POLL
- static int cdns_uart_poll_get_char(struct uart_port *port)
- {
--	u32 imr;
- 	int c;
-+	unsigned long flags;
+@@ -265,9 +265,7 @@ static irqreturn_t cdns_uart_isr(int irq, void *dev_id)
+ 			uart_insert_char(port, isrstatus, CDNS_UART_IXR_OVERRUN,
+ 					data, status);
+ 		}
+-		spin_unlock(&port->lock);
+ 		tty_flip_buffer_push(&port->state->port);
+-		spin_lock(&port->lock);
+ 	}
  
--	/* Disable all interrupts */
--	imr = readl(port->membase + CDNS_UART_IMR_OFFSET);
--	writel(imr, port->membase + CDNS_UART_IDR_OFFSET);
-+	spin_lock_irqsave(&port->lock, flags);
- 
- 	/* Check if FIFO is empty */
- 	if (readl(port->membase + CDNS_UART_SR_OFFSET) & CDNS_UART_SR_RXEMPTY)
-@@ -959,19 +957,16 @@ static int cdns_uart_poll_get_char(struct uart_port *port)
- 		c = (unsigned char) readl(
- 					port->membase + CDNS_UART_FIFO_OFFSET);
- 
--	/* Enable interrupts */
--	writel(imr, port->membase + CDNS_UART_IER_OFFSET);
-+	spin_unlock_irqrestore(&port->lock, flags);
- 
- 	return c;
- }
- 
- static void cdns_uart_poll_put_char(struct uart_port *port, unsigned char c)
- {
--	u32 imr;
-+	unsigned long flags;
- 
--	/* Disable all interrupts */
--	imr = readl(port->membase + CDNS_UART_IMR_OFFSET);
--	writel(imr, port->membase + CDNS_UART_IDR_OFFSET);
-+	spin_lock_irqsave(&port->lock, flags);
- 
- 	/* Wait until FIFO is empty */
- 	while (!(readl(port->membase + CDNS_UART_SR_OFFSET) &
-@@ -986,8 +981,7 @@ static void cdns_uart_poll_put_char(struct uart_port *port, unsigned char c)
- 				CDNS_UART_SR_TXEMPTY))
- 		cpu_relax();
- 
--	/* Enable interrupts */
--	writel(imr, port->membase + CDNS_UART_IER_OFFSET);
-+	spin_unlock_irqrestore(&port->lock, flags);
- 
- 	return;
- }
+ 	/* Dispatch an appropriate handler */
 -- 
 2.6.3.3.g9bb996a
