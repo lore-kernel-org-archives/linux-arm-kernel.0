@@ -1,24 +1,29 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 26 Dec 2015 19:50:33 +0100
-Subject: [PATCH] ARM: dts: omap3: Include missing bandgap data for
- ti-soc-thermal driver
-In-Reply-To: <1451086345-3340-1-git-send-email-pali.rohar@gmail.com>
-References: <1451086345-3340-1-git-send-email-pali.rohar@gmail.com>
-Message-ID: <20151226185033.GC31847@amd>
+From: eric@anholt.net (Eric Anholt)
+Date: Sat, 26 Dec 2015 13:15:50 -0800
+Subject: Including Raspberry Pi -next trees in linux-next
+Message-ID: <87fuyozzax.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat 2015-12-26 00:32:25, Pali Roh?r wrote:
-> Driver for omap3 with documentation is there since v4.4-rc1.
-> 
-> Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
+I'll be sending pull-requests to Florian soon, but I would like to get
+my trees included in linux-next to get increased testing coverage of
+them against everything else going on for 4.5.  I'm expecting to produce
+trees under these branch names for the forseeable future.
 
-Acked-by: Pavel Machek <pavel@ucw.cz>
-Tested-by: Pavel Machek <pavel@ucw.cz>
+Repo: https://github.com/anholt/linux.git
 
-Thanks!
-									Pavel
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+branches:
+drm-vc4-next
+bcm2835-dt-next
+bcm2835-soc-next
+bcm2835-drivers-next
+bcm2385-defconfig-next
+(bcm2835-maintainers-next is a placeholder since we have nothing for it
+this round)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151226/6f657379/attachment.sig>
