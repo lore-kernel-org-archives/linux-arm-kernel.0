@@ -1,115 +1,87 @@
 From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Sat, 26 Dec 2015 13:54:55 -0800
-Subject: [PATCH v6 1/6] arm/arm64: KVM: Introduce armv7 fp/simd vcpu fields and
- helpers
+Date: Sat, 26 Dec 2015 13:54:56 -0800
+Subject: [PATCH v6 2/6] arm: KVM: Introduce host fp/simd context switch
+ function
 In-Reply-To: <1451166900-3711-1-git-send-email-m.smarduch@samsung.com>
 References: <1451166900-3711-1-git-send-email-m.smarduch@samsung.com>
-Message-ID: <1451166900-3711-2-git-send-email-m.smarduch@samsung.com>
+Message-ID: <1451166900-3711-3-git-send-email-m.smarduch@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add helper functions to enable access to fp/smid on guest entry and save host
-fpexc on vcpu put, check if fp/simd registers are dirty and add new vcpu
-fields.
+Add fp/simd context switch function callable from host kernel mode.
 
 Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
 ---
- arch/arm/include/asm/kvm_emulate.h   | 42 ++++++++++++++++++++++++++++++++++++
- arch/arm/include/asm/kvm_host.h      |  6 ++++++
- arch/arm64/include/asm/kvm_emulate.h |  8 +++++++
- 3 files changed, 56 insertions(+)
+ arch/arm/kvm/Makefile        |  2 +-
+ arch/arm/kvm/fpsimd_switch.S | 47 ++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 48 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/kvm/fpsimd_switch.S
 
-diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-index 3095df0..d4d9da1 100644
---- a/arch/arm/include/asm/kvm_emulate.h
-+++ b/arch/arm/include/asm/kvm_emulate.h
-@@ -24,6 +24,8 @@
- #include <asm/kvm_mmio.h>
- #include <asm/kvm_arm.h>
- #include <asm/cputype.h>
-+#include <asm/vfp.h>
-+#include "../vfp/vfpinstr.h"
+diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
+index c5eef02c..411b3e4 100644
+--- a/arch/arm/kvm/Makefile
++++ b/arch/arm/kvm/Makefile
+@@ -19,7 +19,7 @@ kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o $(KVM)/vf
  
- unsigned long *vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num);
- unsigned long *vcpu_spsr(struct kvm_vcpu *vcpu);
-@@ -255,4 +257,44 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
- 	}
- }
- 
+ obj-y += kvm-arm.o init.o interrupts.o
+ obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
+-obj-y += coproc.o coproc_a15.o coproc_a7.o mmio.o psci.o perf.o
++obj-y += coproc.o coproc_a15.o coproc_a7.o mmio.o psci.o perf.o fpsimd_switch.o
+ obj-y += $(KVM)/arm/vgic.o
+ obj-y += $(KVM)/arm/vgic-v2.o
+ obj-y += $(KVM)/arm/vgic-v2-emul.o
+diff --git a/arch/arm/kvm/fpsimd_switch.S b/arch/arm/kvm/fpsimd_switch.S
+new file mode 100644
+index 0000000..7e48c16
+--- /dev/null
++++ b/arch/arm/kvm/fpsimd_switch.S
+@@ -0,0 +1,47 @@
++/*
++ * Copyright (C) 2015 - Samsung - Open Source Group
++ * Author: Mario Smarduch <m.smarduch@samsung.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, version 2, as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#include <linux/linkage.h>
++#include <linux/const.h>
++#include <asm/unified.h>
++#include <asm/page.h>
++#include <asm/ptrace.h>
++#include <asm/asm-offsets.h>
++#include <asm/kvm_asm.h>
++#include <asm/kvm_arm.h>
++#include <asm/vfpmacros.h>
++#include "interrupts_head.S"
++
++	.text
++/**
++  * void vcpu_restore_host_vfp_state(struct vcpu *vcpu) -
++  * 	This function is called from host to save the guest, and restore host
++  *     fp/simd hardware context.
++  */
++ENTRY(vcpu_restore_host_vfp_state)
 +#ifdef CONFIG_VFPv3
-+/* Called from vcpu_load - save fpexc and enable guest access to fp/simd unit */
-+static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
-+{
-+	u32 fpexc;
++	push	{r4-r7}
 +
-+	/* Save host fpexc, and enable guest access to fp unit */
-+	fpexc = fmrx(FPEXC);
-+	vcpu->arch.host_fpexc = fpexc;
-+	fpexc |= FPEXC_EN;
-+	fmxr(FPEXC, fpexc);
++	add	r7, r0, #VCPU_VFP_GUEST
++	store_vfp_state r7
 +
-+	/* Configure HCPTR to trap on tracing and fp/simd access */
-+	vcpu->arch.hcptr = HCPTR_TTA | HCPTR_TCP(10)  | HCPTR_TCP(11);
-+}
++	add	r7, r0, #VCPU_VFP_HOST
++	ldr	r7, [r7]
++	restore_vfp_state r7
 +
-+/* Called from vcpu_put - restore host fpexc */
-+static inline void vcpu_restore_host_fpexc(struct kvm_vcpu *vcpu)
-+{
-+	fmxr(FPEXC, vcpu->arch.host_fpexc);
-+}
-+
-+/* If trap bits are reset then fp/simd registers are dirty */
-+static inline bool vcpu_vfp_isdirty(struct kvm_vcpu *vcpu)
-+{
-+	return !(vcpu->arch.hcptr & (HCPTR_TCP(10) | HCPTR_TCP(11)));
-+}
-+#else
-+static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
-+{
-+	vcpu->arch.hcptr = HCPTR_TTA;
-+}
-+
-+static inline void vcpu_restore_host_fpexc(struct kvm_vcpu *vcpu) {}
-+static inline bool vcpu_vfp_isdirty(struct kvm_vcpu *vcpu)
-+{
-+	return false;
-+}
++	pop	{r4-r7}
 +#endif
-+
- #endif /* __ARM_KVM_EMULATE_H__ */
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index f9f2779..d3ef58a 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -105,6 +105,12 @@ struct kvm_vcpu_arch {
- 	/* HYP trapping configuration */
- 	u32 hcr;
- 
-+	/* HYP Co-processor fp/simd and trace trapping configuration */
-+	u32 hcptr;
-+
-+	/* Save host FPEXC register to later restore on vcpu put */
-+	u32 host_fpexc;
-+
- 	/* Interrupt related fields */
- 	u32 irq_lines;		/* IRQ and FIQ levels */
- 
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index 3066328..ffe8ccf 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -299,4 +299,12 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
- 	return data;		/* Leave LE untouched */
- }
- 
-+static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu) {}
-+static inline void vcpu_restore_host_fpexc(struct kvm_vcpu *vcpu) {}
-+
-+static inline bool vcpu_vfp_isdirty(struct kvm_vcpu *vcpu)
-+{
-+	return false;
-+}
-+
- #endif /* __ARM64_KVM_EMULATE_H__ */
++	bx	lr
++ENDPROC(vcpu_restore_host_vfp_state)
 -- 
 1.9.1
