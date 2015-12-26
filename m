@@ -1,72 +1,43 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Sat, 26 Dec 2015 13:47:21 -0800
-Subject: [PATCH 1/4] irqchip: bcm2836: Fix initialization of the
- LOCAL_IRQ_CNT*IRQ timers
+Date: Sat, 26 Dec 2015 13:47:23 -0800
+Subject: [PATCH 3/4] irqchip: bcm2836: tolerate IRQs while no flag is set in
+ ISR
 In-Reply-To: <1451166444-11044-1-git-send-email-eric@anholt.net>
 References: <1451166444-11044-1-git-send-email-eric@anholt.net>
-Message-ID: <1451166444-11044-2-git-send-email-eric@anholt.net>
+Message-ID: <1451166444-11044-4-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The irqchip's register area includes the the setup for the timer's
-scaling factors, and for the platform we want a fixed configuration of
-these registers.
+From: Andrea Merello <andrea.merello@gmail.com>
 
+On my RPi2 I got a lot of:
+unexpected IRQ trap at vector 00
+
+This happens because bcm2836_arm_irqchip_handle_irq() is sometimes
+invoked even if the ISR is clear, and this case is not handled.
+
+This patch explicitly handle this case, fixing the kernel complaints
+about the bad IRQ lookup.
+
+Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
+Reviewed-by: Eric Anholt <eric@anholt.net>
 Signed-off-by: Eric Anholt <eric@anholt.net>
 ---
- drivers/irqchip/irq-bcm2836.c | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ drivers/irqchip/irq-bcm2836.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/irqchip/irq-bcm2836.c b/drivers/irqchip/irq-bcm2836.c
-index f687082..6ec125e 100644
+index 59ac40c..bb8f234 100644
 --- a/drivers/irqchip/irq-bcm2836.c
 +++ b/drivers/irqchip/irq-bcm2836.c
-@@ -21,6 +21,9 @@
- #include <linux/irqdomain.h>
- #include <asm/exception.h>
- 
-+#define LOCAL_CONTROL			0x000
-+#define LOCAL_PRESCALER			0x008
-+
- /*
-  * The low 2 bits identify the CPU that the GPU IRQ goes to, and the
-  * next 2 bits identify the CPU that the GPU FIQ goes to.
-@@ -237,6 +240,27 @@ bcm2836_arm_irqchip_smp_init(void)
+@@ -177,7 +177,7 @@ __exception_irq_entry bcm2836_arm_irqchip_handle_irq(struct pt_regs *regs)
+ 		writel(1 << ipi, mailbox0);
+ 		handle_IPI(ipi, regs);
  #endif
- }
+-	} else {
++	} else if (stat) {
+ 		u32 hwirq = ffs(stat) - 1;
  
-+/*
-+ * The LOCAL_IRQ_CNT* timer firings are based off of the external
-+ * oscillator with some scaling.  The firmware sets up CNTFRQ to
-+ * report 19.2Mhz, but doesn't set up the scaling registers.
-+ */
-+static void bcm2835_init_local_timer_frequency(void)
-+{
-+	/*
-+	 * Set the timer to source from the 19.2Mhz crystal clock (bit
-+	 * 8 unset), and only increment by 1 instead of 2 (bit 9
-+	 * unset).
-+	 */
-+	writel(0, intc.base + LOCAL_CONTROL);
-+
-+	/*
-+	 * Set the timer prescaler to 1:1 (timer freq = input freq *
-+	 * 2**31 / prescaler)
-+	 */
-+	writel(0x80000000, intc.base + LOCAL_PRESCALER);
-+}
-+
- static int __init bcm2836_arm_irqchip_l1_intc_of_init(struct device_node *node,
- 						      struct device_node *parent)
- {
-@@ -246,6 +270,8 @@ static int __init bcm2836_arm_irqchip_l1_intc_of_init(struct device_node *node,
- 			node->full_name);
- 	}
- 
-+	bcm2835_init_local_timer_frequency();
-+
- 	intc.domain = irq_domain_add_linear(node, LAST_IRQ + 1,
- 					    &bcm2836_arm_irqchip_intc_ops,
- 					    NULL);
+ 		handle_IRQ(irq_linear_revmap(intc.domain, hwirq), regs);
 -- 
 2.6.2
