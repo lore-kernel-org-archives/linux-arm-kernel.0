@@ -1,31 +1,45 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Sat, 26 Dec 2015 02:43:48 -0800
-Subject: [PATCH LINUX v5 0/8] tty: xuartps: Fix lock ups
-Message-ID: <1451126636-13699-1-git-send-email-soren.brinkmann@xilinx.com>
+Date: Sat, 26 Dec 2015 02:43:55 -0800
+Subject: [PATCH LINUX v5 7/8] tty: xuartps: Acquire port lock for shutdown
+In-Reply-To: <1451126636-13699-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1451126636-13699-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1451126636-13699-8-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Shutting down the UART port can happen while console operations are in
+progress. Holding the port lock serializes these operations and avoids
+the UART HW to be disabled in the middle of console prints.
 
-as requested by Peter, this is the first part of my series which has the
-patches reviewed by Peter. I'll submit the second part separately. There
-are no new changes within the patches.
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
+---
+ drivers/tty/serial/xilinx_uartps.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-	Thanks,
-	S?ren
-
-S?ren Brinkmann (8):
-  tty: xuartps: Beautify read-modify writes
-  tty: xuartps: Use spinlock to serialize HW access
-  tty: xuartps: Don't consider circular buffer when enabling transmitter
-  tty: xuartps: Clear interrupt status register in shutdown
-  tty: xuartps: Improve startup function
-  tty: xuartps: Keep lock for whole ISR
-  tty: xuartps: Acquire port lock for shutdown
-  tty: xuartps: Move RX path into helper function
-
- drivers/tty/serial/xilinx_uartps.c | 117 +++++++++++++++++++++----------------
- 1 file changed, 66 insertions(+), 51 deletions(-)
-
+diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
+index ab3995d00973..f3ac69387b0a 100644
+--- a/drivers/tty/serial/xilinx_uartps.c
++++ b/drivers/tty/serial/xilinx_uartps.c
+@@ -826,6 +826,9 @@ static int cdns_uart_startup(struct uart_port *port)
+ static void cdns_uart_shutdown(struct uart_port *port)
+ {
+ 	int status;
++	unsigned long flags;
++
++	spin_lock_irqsave(&port->lock, flags);
+ 
+ 	/* Disable interrupts */
+ 	status = readl(port->membase + CDNS_UART_IMR_OFFSET);
+@@ -835,6 +838,9 @@ static void cdns_uart_shutdown(struct uart_port *port)
+ 	/* Disable the TX and RX */
+ 	writel(CDNS_UART_CR_TX_DIS | CDNS_UART_CR_RX_DIS,
+ 			port->membase + CDNS_UART_CR_OFFSET);
++
++	spin_unlock_irqrestore(&port->lock, flags);
++
+ 	free_irq(port->irq, port);
+ }
+ 
 -- 
 2.6.3.3.g9bb996a
