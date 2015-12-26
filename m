@@ -1,43 +1,29 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Sat, 26 Dec 2015 13:47:23 -0800
-Subject: [PATCH 3/4] irqchip: bcm2836: tolerate IRQs while no flag is set in
- ISR
-In-Reply-To: <1451166444-11044-1-git-send-email-eric@anholt.net>
-References: <1451166444-11044-1-git-send-email-eric@anholt.net>
-Message-ID: <1451166444-11044-4-git-send-email-eric@anholt.net>
+Date: Sat, 26 Dec 2015 13:47:20 -0800
+Subject: [PATCH 0/4] bcm2836 (Raspberry Pi 2) interrupt controller updates for
+ 4.5
+Message-ID: <1451166444-11044-1-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrea Merello <andrea.merello@gmail.com>
+While the 2836 interrupt controller technically works, it would be
+nice to merge these improvements to it, adding SMP booting, fixing the
+timers, and fixing an apparently-spurious error message.
 
-On my RPi2 I got a lot of:
-unexpected IRQ trap at vector 00
+Patches 1, 2 were seen before in the full Pi 2 series I sent recently,
+now with their summary prefixes fixed and a minor style cleanup to #2.
+Patches 3, 4 are new, but trivial.
 
-This happens because bcm2836_arm_irqchip_handle_irq() is sometimes
-invoked even if the ISR is clear, and this case is not handled.
+Andrea Merello (3):
+  irqchip: bcm2836: Add SMP support for the 2836
+  irqchip: bcm2836: tolerate IRQs while no flag is set in ISR
+  irqchip: bcm2836: make code more readable
 
-This patch explicitly handle this case, fixing the kernel complaints
-about the bad IRQ lookup.
+Eric Anholt (1):
+  irqchip: bcm2836: Fix initialization of the LOCAL_IRQ_CNT*IRQ timers
 
-Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
-Reviewed-by: Eric Anholt <eric@anholt.net>
-Signed-off-by: Eric Anholt <eric@anholt.net>
----
- drivers/irqchip/irq-bcm2836.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/irqchip/irq-bcm2836.c | 55 +++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 51 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/irqchip/irq-bcm2836.c b/drivers/irqchip/irq-bcm2836.c
-index 59ac40c..bb8f234 100644
---- a/drivers/irqchip/irq-bcm2836.c
-+++ b/drivers/irqchip/irq-bcm2836.c
-@@ -177,7 +177,7 @@ __exception_irq_entry bcm2836_arm_irqchip_handle_irq(struct pt_regs *regs)
- 		writel(1 << ipi, mailbox0);
- 		handle_IPI(ipi, regs);
- #endif
--	} else {
-+	} else if (stat) {
- 		u32 hwirq = ffs(stat) - 1;
- 
- 		handle_IRQ(irq_linear_revmap(intc.domain, hwirq), regs);
 -- 
 2.6.2
