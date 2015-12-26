@@ -1,103 +1,34 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Sat, 26 Dec 2015 02:43:56 -0800
-Subject: [PATCH LINUX v5 8/8] tty: xuartps: Move RX path into helper function
-In-Reply-To: <1451126636-13699-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1451126636-13699-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1451126636-13699-9-git-send-email-soren.brinkmann@xilinx.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Sat, 26 Dec 2015 11:52:03 +0000
+Subject: 16KB PAGE_SIZE not work on DB410C
+In-Reply-To: <6DB39B31-8902-4A03-A66B-DC75E90A1C1C@linaro.org>
+References: <5677795C.2060409@linaro.org>
+ <CAKv+Gu9mUVn80Vqr5NT7jjkSGd6BY_0cB6gVJ8VakHHWeWxM2A@mail.gmail.com>
+ <6DB39B31-8902-4A03-A66B-DC75E90A1C1C@linaro.org>
+Message-ID: <567E7F63.80707@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move RX-related IRQ handling into a helper function.
-Fixes a problem where every char received after a parity or frame error
-in the current isr will also be tagged as a parity or frame error.
+On 25/12/15 12:24, Pingbo Wen wrote:
+> Hi Ard
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
----
-v4:
- - added Peter's additional information to the commit message (thx)
----
- drivers/tty/serial/xilinx_uartps.c | 50 +++++++++++++++++++++-----------------
- 1 file changed, 28 insertions(+), 22 deletions(-)
+Pingbo
 
-diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index f3ac69387b0a..db9e23eaf300 100644
---- a/drivers/tty/serial/xilinx_uartps.c
-+++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -172,28 +172,8 @@ struct cdns_uart {
- #define to_cdns_uart(_nb) container_of(_nb, struct cdns_uart, \
- 		clk_rate_change_nb);
- 
--/**
-- * cdns_uart_isr - Interrupt handler
-- * @irq: Irq number
-- * @dev_id: Id of the port
-- *
-- * Return: IRQHANDLED
-- */
--static irqreturn_t cdns_uart_isr(int irq, void *dev_id)
-+static void cdns_uart_handle_rx(struct uart_port *port, unsigned int isrstatus)
- {
--	struct uart_port *port = (struct uart_port *)dev_id;
--	unsigned long flags;
--	unsigned int isrstatus, numbytes;
--	unsigned int data;
--	char status = TTY_NORMAL;
--
--	spin_lock_irqsave(&port->lock, flags);
--
--	/* Read the interrupt status register to determine which
--	 * interrupt(s) is/are active.
--	 */
--	isrstatus = readl(port->membase + CDNS_UART_ISR_OFFSET);
--
- 	/*
- 	 * There is no hardware break detection, so we interpret framing
- 	 * error with all-zeros data as a break sequence. Most of the time,
-@@ -223,6 +203,9 @@ static irqreturn_t cdns_uart_isr(int irq, void *dev_id)
- 		/* Receive Timeout Interrupt */
- 		while (!(readl(port->membase + CDNS_UART_SR_OFFSET) &
- 					CDNS_UART_SR_RXEMPTY)) {
-+			u32 data;
-+			char status = TTY_NORMAL;
-+
- 			data = readl(port->membase + CDNS_UART_FIFO_OFFSET);
- 
- 			/* Non-NULL byte after BREAK is garbage (99%) */
-@@ -263,10 +246,33 @@ static irqreturn_t cdns_uart_isr(int irq, void *dev_id)
- 			}
- 
- 			uart_insert_char(port, isrstatus, CDNS_UART_IXR_OVERRUN,
--					data, status);
-+					 data, status);
- 		}
- 		tty_flip_buffer_push(&port->state->port);
- 	}
-+}
-+
-+/**
-+ * cdns_uart_isr - Interrupt handler
-+ * @irq: Irq number
-+ * @dev_id: Id of the port
-+ *
-+ * Return: IRQHANDLED
-+ */
-+static irqreturn_t cdns_uart_isr(int irq, void *dev_id)
-+{
-+	struct uart_port *port = (struct uart_port *)dev_id;
-+	unsigned long flags;
-+	unsigned int isrstatus, numbytes;
-+
-+	spin_lock_irqsave(&port->lock, flags);
-+
-+	/* Read the interrupt status register to determine which
-+	 * interrupt(s) is/are active.
-+	 */
-+	isrstatus = readl(port->membase + CDNS_UART_ISR_OFFSET);
-+
-+	cdns_uart_handle_rx(port, isrstatus);
- 
- 	/* Dispatch an appropriate handler */
- 	if ((isrstatus & CDNS_UART_IXR_TXEMPTY) == CDNS_UART_IXR_TXEMPTY) {
--- 
-2.6.3.3.g9bb996a
+>> Cortex-A5x does not support 16 KB page size
+>
+> Is there any documents I can reference? As I have get from ARM document, the Cortex-A53 support 16k page size, and Cortex-A57 don?t. The document can be found at:
+>
+> 	http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0024a/BABDJHAD.html
+>
+> Reference it here:
+>
+> The supported granule sizes are 4KB, 16KB, and 64KB, and it is implementation defined which of the three are supported. Code that creates page tables is able to read the system register ID_AA64MMFR0_EL1, to find out which are the supported sizes. The Cortex-A53 processor supports all three sizes, but this is not the case for early versions of some processors, such as the Cortex-A57, which did not support the 16K granule size. The size is configurable for each translation table within the Translation Control Register (TCR_EL1).
+>
+
+
+As it clearly says, it really depends on the implementation and by default A53 doesn't enable 16K support. If you have a debugger
+could you check the $PC on the booting core and map it to the vmlinux symbol ? Please be aware that the address could be PA.
+If the 16K is not supported the $PC will be in PA(__no_granule_support).
+
+Cheers
+Suzuki
