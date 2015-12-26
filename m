@@ -1,43 +1,40 @@
-From: pali.rohar@gmail.com (=?UTF-8?q?Pali=20Roh=C3=A1r?=)
-Date: Sat, 26 Dec 2015 00:40:12 +0100
-Subject: [PATCH] ARM: dts: n900: Include adp1653 device
-Message-ID: <1451086812-3729-1-git-send-email-pali.rohar@gmail.com>
+From: zhizhou.zh@gmail.com (Zhi-zhou Zhang)
+Date: Sat, 26 Dec 2015 13:57:18 +0800
+Subject: [PATCH] arm64: entry.S: add missing trace_hardirqs_off
+Message-ID: <1451109438-5834-1-git-send-email-zhizhou.zh@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds adp1653 device into n900 DT structure. DT support in
-adp1653 driver is there since v4.2-rc1 version.
+Before calling schedule, we should trace hardirqs correctly. If not,
+we get following warning message when enabled CONFIG_DEBUG_LOCKDEP:
 
-Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
+[    9.243073] DEBUG_LOCKS_WARN_ON(current->hardirqs_enabled)
+[ ... ]
+[    9.262681] possible reason: unannotated irqs-off.
+[    9.263018] irq event stamp: 256209
+[    9.263266] hardirqs last  enabled at (256209): [<ffffffc000085a98>] el0_irq_naked+0x1c/0x24
+[    9.263820] hardirqs last disabled at (256207): [<ffffffc0000bad20>] __do_softirq+0x170/0x28c
+[    9.264419] softirqs last  enabled at (256208): [<ffffffc0000bad9c>] __do_softirq+0x1ec/0x28c
+[    9.264976] softirqs last disabled at (256189): [<ffffffc0000bb194>] irq_exit+0x9c/0xec
+
+Signed-off-by: Zhi-zhou Zhang <zhizhou.zh@gmail.com>
 ---
- arch/arm/boot/dts/omap3-n900.dts |   15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm64/kernel/entry.S | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
-index 5f5e0f3..ba93642 100644
---- a/arch/arm/boot/dts/omap3-n900.dts
-+++ b/arch/arm/boot/dts/omap3-n900.dts
-@@ -522,6 +522,21 @@
- 		amstaos,cover-comp-gain = <16>;
- 	};
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 7ed3d75..4769190 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -634,6 +634,9 @@ work_pending:
+ 	bl	do_notify_resume
+ 	b	ret_to_user
+ work_resched:
++#ifdef CONFIG_TRACE_IRQFLAGS
++	bl	trace_hardirqs_off
++#endif
+ 	bl	schedule
  
-+	adp1653: led-controller at 30 {
-+		compatible = "adi,adp1653";
-+		reg = <0x30>;
-+		enable-gpios = <&gpio3 24 GPIO_ACTIVE_HIGH>; /* 88 */
-+
-+		flash {
-+			flash-timeout-us = <500000>;
-+			flash-max-microamp = <320000>;
-+			led-max-microamp = <50000>;
-+		};
-+		indicator {
-+			led-max-microamp = <17500>;
-+		};
-+	};
-+
- 	lp5523: lp5523 at 32 {
- 		compatible = "national,lp5523";
- 		reg = <0x32>;
+ /*
 -- 
-1.7.9.5
+2.1.4
