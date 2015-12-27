@@ -1,65 +1,42 @@
 From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
-Date: Sun, 27 Dec 2015 14:21:57 +0800
-Subject: [PATCH v2 2/3] cpufreq: mt8173: migrate to use operating-points-v2
- bindings
+Date: Sun, 27 Dec 2015 14:21:56 +0800
+Subject: [PATCH v2 1/3] PM/OPP: Don't skip cpu_dev->id when setting up cpumask
 In-Reply-To: <1451197318-12418-1-git-send-email-pi-cheng.chen@linaro.org>
 References: <1451197318-12418-1-git-send-email-pi-cheng.chen@linaro.org>
-Message-ID: <1451197318-12418-3-git-send-email-pi-cheng.chen@linaro.org>
+Message-ID: <1451197318-12418-2-git-send-email-pi-cheng.chen@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Modify mt8173-cpufreq driver to get OPP-sharing information and set up
-OPP table provided by operating-points-v2 bindings.
+Don't skip cpu_dev->id when setting up cpumask for CPUs that share the
+same OPP table. This might be helpful when handling cpumask without the
+original CPU bitfield set.
 
 Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
 ---
- drivers/cpufreq/mt8173-cpufreq.c | 17 +++++++++++------
- 1 file changed, 11 insertions(+), 6 deletions(-)
+ drivers/base/power/opp/cpu.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mt8173-cpufreq.c
-index fd601b9..1efba34 100644
---- a/drivers/cpufreq/mt8173-cpufreq.c
-+++ b/drivers/cpufreq/mt8173-cpufreq.c
-@@ -390,7 +390,15 @@ static int mtk_cpu_dvfs_info_init(struct mtk_cpu_dvfs_info *info, int cpu)
- 	/* Both presence and absence of sram regulator are valid cases. */
- 	sram_reg = regulator_get_exclusive(cpu_dev, "sram");
+diff --git a/drivers/base/power/opp/cpu.c b/drivers/base/power/opp/cpu.c
+index 7b445e8..4914a0d 100644
+--- a/drivers/base/power/opp/cpu.c
++++ b/drivers/base/power/opp/cpu.c
+@@ -214,7 +214,6 @@ EXPORT_SYMBOL_GPL(dev_pm_opp_of_cpumask_add_table);
+ /*
+  * Works only for OPP v2 bindings.
+  *
+- * cpumask should be already set to mask of cpu_dev->id.
+  * Returns -ENOENT if operating-points-v2 bindings aren't supported.
+  */
+ int dev_pm_opp_of_get_sharing_cpus(struct device *cpu_dev, cpumask_var_t cpumask)
+@@ -235,9 +234,6 @@ int dev_pm_opp_of_get_sharing_cpus(struct device *cpu_dev, cpumask_var_t cpumask
+ 		goto put_cpu_node;
  
--	ret = dev_pm_opp_of_add_table(cpu_dev);
-+	/* Get OPP-sharing information from "operating-points-v2" bindings */
-+	ret = dev_pm_opp_of_get_sharing_cpus(cpu_dev, &info->cpus);
-+	if (ret) {
-+		pr_err("failed to get OPP-sharing information for cpu%d\n",
-+		       cpu);
-+		goto out_free_resources;
-+	}
-+
-+	ret = dev_pm_opp_of_cpumask_add_table(&info->cpus);
- 	if (ret) {
- 		pr_warn("no OPP table for cpu%d\n", cpu);
- 		goto out_free_resources;
-@@ -421,13 +429,10 @@ static int mtk_cpu_dvfs_info_init(struct mtk_cpu_dvfs_info *info, int cpu)
- 	 */
- 	info->need_voltage_tracking = !IS_ERR(sram_reg);
- 
--	/* CPUs in the same cluster share a clock and power domain. */
--	cpumask_copy(&info->cpus, &cpu_topology[cpu].core_sibling);
+ 	for_each_possible_cpu(cpu) {
+-		if (cpu == cpu_dev->id)
+-			continue;
 -
- 	return 0;
- 
- out_free_opp_table:
--	dev_pm_opp_of_remove_table(cpu_dev);
-+	dev_pm_opp_of_cpumask_remove_table(&info->cpus);
- 
- out_free_resources:
- 	if (!IS_ERR(proc_reg))
-@@ -453,7 +458,7 @@ static void mtk_cpu_dvfs_info_release(struct mtk_cpu_dvfs_info *info)
- 	if (!IS_ERR(info->inter_clk))
- 		clk_put(info->inter_clk);
- 
--	dev_pm_opp_of_remove_table(info->cpu_dev);
-+	dev_pm_opp_of_cpumask_remove_table(&info->cpus);
- }
- 
- static int mtk_cpufreq_init(struct cpufreq_policy *policy)
+ 		tcpu_dev = get_cpu_device(cpu);
+ 		if (!tcpu_dev) {
+ 			dev_err(cpu_dev, "%s: failed to get cpu%d device\n",
 -- 
 1.9.1
