@@ -1,48 +1,57 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 27 Dec 2015 22:20:59 +0100
-Subject: [PATCH v3 2/3] ARM: dts: sun8i: Add Allwinner A83T dtsi
-In-Reply-To: <CAEzqOZuVdLS+b9KO9YPgAFiQhXg9KfkmA0i5AEPQPUaben0GCQ@mail.gmail.com>
-References: <1450445451-311-1-git-send-email-vishnupatekar0510@gmail.com>
- <1450445451-311-3-git-send-email-vishnupatekar0510@gmail.com>
- <20151218214112.GU30359@lukather>
- <CAEzqOZuVdLS+b9KO9YPgAFiQhXg9KfkmA0i5AEPQPUaben0GCQ@mail.gmail.com>
-Message-ID: <20151227212059.GN30359@lukather>
+Date: Sun, 27 Dec 2015 22:40:41 +0100
+Subject: [linux-sunxi] Re: BUG - Bananapi USB not working on Mainline
+In-Reply-To: <4c69f067-f61d-4cf2-b5e6-75e7a22bedf7@googlegroups.com>
+References: <CAOP4N=_Ux0FPSRep7AfBVovd59LeDTbBjH=LBdfWDb6Mc3e=Fg@mail.gmail.com>
+ <ec8d762c-3e2b-4438-a43e-ae2740f8a5f3@googlegroups.com>
+ <ed63cc0b-fb90-4947-ab4c-b89655538a1a@googlegroups.com>
+ <CAOP4N=98cjUYVAvEngdOXXdXeive7HB_ChC4B+uAASG5tKP1dg@mail.gmail.com>
+ <4c69f067-f61d-4cf2-b5e6-75e7a22bedf7@googlegroups.com>
+Message-ID: <20151227214041.GO30359@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 22, 2015 at 05:41:22PM +0800, Vishnu Patekar wrote:
-> >> +     clocks {
-> >> +             #address-cells = <1>;
-> >> +             #size-cells = <1>;
-> >> +             ranges;
-> >> +
-> >> +             osc24M: osc24M_clk {
-> >> +                     #clock-cells = <0>;
-> >> +                     compatible = "fixed-clock";
-> >> +                     clock-frequency = <24000000>;
-> >> +                     clock-output-names = "osc24M";
-> >> +             };
-> >> +
-> >> +             osc32k: osc32k_clk {
-> >> +                     #clock-cells = <0>;
-> >> +                     compatible = "fixed-clock";
-> >> +                     clock-frequency = <32768>;
-> >> +                     clock-output-names = "osc32k";
-> >> +             };
-> >
-> > Do you need to modify the clocks driver in your first commit then?
-> I did not get what you are trying to say here, could you please elaborate?
+Hi,
+
+On Tue, Dec 22, 2015 at 06:42:07AM -0800, m.silentcreek at gmail.com wrote:
+> Am Sonntag, 20. Dezember 2015 08:38:52 UTC+1 schrieb David Tulloh:
+> > On 20 December 2015 at 08:39,  <m.sile...@gmail.com> wrote:
+> > 
+> > I found the solution! The problem is CONFIG_AXP20X_POWER which was
+> > introduced in 4.4-rc1 but defaults to no and not set in
+> > sunxi_defconfig. Adding CONFIG_AXP20X_POWER=y to sunxi_defconfig
+> > solves that and get's my USB devices working again on linux
+> > 4.4-rc5. I actually brought that up on IRC once, but at that time
+> > nobody seemed to know so I forgot it again.
+> > 
+> > Thanks Timo,
+> > 
+> > I can confirm that adding CONFIG_AXP20X_POWER=y to sunxi_defconfig
+> > works for me as well.
 > 
-> I'll correct mistakes, and re-send this patch, is it okie?
+> Is this considered an issue worthwhile to be addressed before the
+> release of 4.4?
+> 
+> The way I see it is that USB support is broken on A10/20 in mainline
+> for anybody who builds on sunxi_defconfig or multi_v7_defconfig at
+> the moment.
 
-In your first patch, you add a CLK_OF_DECLARE for the H3 compatible in
-clk-sunxi.c
+I don't consider it a "release blocker". The defconfig is just what it
+says: a default configuration. It's not a one-size-fits-all
+configuration.
 
-Judging from your clocks node above, you don't need it at all.
+> I think we should either have CONFIG_PHY_SUN4I_USB select
+> CONFIG_AXP20X_POWER automatically (my preferred solution)
 
-I'm guessing you'll need it later on, but I wanted to know if that was
-intentional :)
+It actually depends on the board, so no.
 
+> or at least add it to sunxi_defconfig and multi_v7_defconfig.
+
+Feel free to send a patch for it to arm at kernel.org in addition to the
+usual recipients (Chen-Yu, LAKML and myself), and make it clear that
+you want them to apply it.
+
+Thanks!
 Maxime
 
 -- 
@@ -55,4 +64,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151227/8f055c2e/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151227/16c6bdc7/attachment.sig>
