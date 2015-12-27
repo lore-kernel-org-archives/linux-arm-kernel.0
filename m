@@ -1,65 +1,28 @@
-From: geliangtang@163.com (Geliang Tang)
-Date: Sun, 27 Dec 2015 21:15:39 +0800
-Subject: [PATCH 01/10] PM / devfreq: exynos: use to_platform_device()
-Message-ID: <a554e6af3a3528c2206c94dab62b7800f96caa4b.1451221174.git.geliangtang@163.com>
+From: torso.nafi@gmail.com (=?UTF-8?B?0JjQu9GM0Y/RgSDQk9Cw0YHQsNC90L7Qsg==?=)
+Date: Sun, 27 Dec 2015 16:43:07 +0300
+Subject: GPIO-driven RTS on TI hardware with 8250_omap driver
+In-Reply-To: <CAJs94EZ6ooNvD5bf0NrjcRci+WS_f3Utf1wkboF_twCZt=8m7A@mail.gmail.com>
+References: <CAEo2pzugEO+jnwdWrRqKR3y4Gzveh9MMaZmRrksfgYzMf6WpPA@mail.gmail.com>
+ <CAHp75Vd6eTXnwErTZdug_rW51mk2sZv5=nT2800ourp=VEHY=Q@mail.gmail.com>
+ <CAJs94EZ6ooNvD5bf0NrjcRci+WS_f3Utf1wkboF_twCZt=8m7A@mail.gmail.com>
+Message-ID: <CAEo2pzvg3W9zVyxKMAH0QwfSZLufc76o=DiN5QT0hqcm8cCAFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use to_platform_device() instead of open-coding it.
+Hi Matwey,
 
-Signed-off-by: Geliang Tang <geliangtang@163.com>
----
- drivers/devfreq/exynos/exynos4_bus.c | 3 +--
- drivers/devfreq/exynos/exynos5_bus.c | 9 +++------
- 2 files changed, 4 insertions(+), 8 deletions(-)
+2015-12-27 16:14 GMT+03:00 Matwey V. Kornilov <matwey@sai.msu.ru>:
+> The half of what is described here are implemented in my patches.
+> But I cannot understand the other half. Each of six AM335x UARTs has
+> RTS/CTS pins which are controlled by pinmux in device tree, no magic
+> required here.
 
-diff --git a/drivers/devfreq/exynos/exynos4_bus.c b/drivers/devfreq/exynos/exynos4_bus.c
-index da95092..e3124bf 100644
---- a/drivers/devfreq/exynos/exynos4_bus.c
-+++ b/drivers/devfreq/exynos/exynos4_bus.c
-@@ -566,8 +566,7 @@ static int exynos4_bus_target(struct device *dev, unsigned long *_freq,
- 			      u32 flags)
- {
- 	int err = 0;
--	struct platform_device *pdev = container_of(dev, struct platform_device,
--						    dev);
-+	struct platform_device *pdev = to_platform_device(dev);
- 	struct busfreq_data *data = platform_get_drvdata(pdev);
- 	struct dev_pm_opp *opp;
- 	unsigned long freq;
-diff --git a/drivers/devfreq/exynos/exynos5_bus.c b/drivers/devfreq/exynos/exynos5_bus.c
-index 297ea30..81da78e 100644
---- a/drivers/devfreq/exynos/exynos5_bus.c
-+++ b/drivers/devfreq/exynos/exynos5_bus.c
-@@ -85,8 +85,7 @@ static int exynos5_busfreq_int_target(struct device *dev, unsigned long *_freq,
- 			      u32 flags)
- {
- 	int err = 0;
--	struct platform_device *pdev = container_of(dev, struct platform_device,
--						    dev);
-+	struct platform_device *pdev = to_platform_device(dev);
- 	struct busfreq_data_int *data = platform_get_drvdata(pdev);
- 	struct dev_pm_opp *opp;
- 	unsigned long old_freq, freq;
-@@ -145,8 +144,7 @@ out:
- static int exynos5_int_get_dev_status(struct device *dev,
- 				      struct devfreq_dev_status *stat)
- {
--	struct platform_device *pdev = container_of(dev, struct platform_device,
--						    dev);
-+	struct platform_device *pdev = to_platform_device(dev);
- 	struct busfreq_data_int *data = platform_get_drvdata(pdev);
- 	struct busfreq_ppmu_data *ppmu_data = &data->ppmu_data;
- 	int busier_dmc;
-@@ -370,8 +368,7 @@ static int exynos5_busfreq_int_remove(struct platform_device *pdev)
- #ifdef CONFIG_PM_SLEEP
- static int exynos5_busfreq_int_resume(struct device *dev)
- {
--	struct platform_device *pdev = container_of(dev, struct platform_device,
--						    dev);
-+	struct platform_device *pdev = to_platform_device(dev);
- 	struct busfreq_data_int *data = platform_get_drvdata(pdev);
- 	struct busfreq_ppmu_data *ppmu_data = &data->ppmu_data;
- 
--- 
-2.5.0
+The problem here is, the appliance schematics are already designed in
+such way that pins which can be configured as "native" RTS are not
+used for RS485 control - the ones that are though may only be used as
+GPIO flipped by software on transmission start/end for that purpose.
+We simply cannot change the schematics on production because of this
+issue alone.
+
+Regards,
+Ilyas G.
