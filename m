@@ -1,25 +1,48 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 27 Dec 2015 22:12:57 +0100
-Subject: [PATCH v6 3/3] spi: sun4i: Add support for wait time between
- word transmissions
-In-Reply-To: <1451145186-14235-4-git-send-email-mweseloh42@gmail.com>
-References: <1451145186-14235-1-git-send-email-mweseloh42@gmail.com>
- <1451145186-14235-4-git-send-email-mweseloh42@gmail.com>
-Message-ID: <20151227211257.GM30359@lukather>
+Date: Sun, 27 Dec 2015 22:20:59 +0100
+Subject: [PATCH v3 2/3] ARM: dts: sun8i: Add Allwinner A83T dtsi
+In-Reply-To: <CAEzqOZuVdLS+b9KO9YPgAFiQhXg9KfkmA0i5AEPQPUaben0GCQ@mail.gmail.com>
+References: <1450445451-311-1-git-send-email-vishnupatekar0510@gmail.com>
+ <1450445451-311-3-git-send-email-vishnupatekar0510@gmail.com>
+ <20151218214112.GU30359@lukather>
+ <CAEzqOZuVdLS+b9KO9YPgAFiQhXg9KfkmA0i5AEPQPUaben0GCQ@mail.gmail.com>
+Message-ID: <20151227212059.GN30359@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 26, 2015 at 04:53:06PM +0100, Marcus Weseloh wrote:
-> Modifies the sun4i SPI master driver to make use of the
-> "spi-word-wait-ns" property. This specific SPI controller needs 3 clock
-> cycles to set up the delay, which makes the minimum non-zero wait time
-> on this hardware 4 clock cycles.
+On Tue, Dec 22, 2015 at 05:41:22PM +0800, Vishnu Patekar wrote:
+> >> +     clocks {
+> >> +             #address-cells = <1>;
+> >> +             #size-cells = <1>;
+> >> +             ranges;
+> >> +
+> >> +             osc24M: osc24M_clk {
+> >> +                     #clock-cells = <0>;
+> >> +                     compatible = "fixed-clock";
+> >> +                     clock-frequency = <24000000>;
+> >> +                     clock-output-names = "osc24M";
+> >> +             };
+> >> +
+> >> +             osc32k: osc32k_clk {
+> >> +                     #clock-cells = <0>;
+> >> +                     compatible = "fixed-clock";
+> >> +                     clock-frequency = <32768>;
+> >> +                     clock-output-names = "osc32k";
+> >> +             };
+> >
+> > Do you need to modify the clocks driver in your first commit then?
+> I did not get what you are trying to say here, could you please elaborate?
 > 
-> Signed-off-by: Marcus Weseloh <mweseloh42@gmail.com>
+> I'll correct mistakes, and re-send this patch, is it okie?
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+In your first patch, you add a CLK_OF_DECLARE for the H3 compatible in
+clk-sunxi.c
 
-Thanks!
+Judging from your clocks node above, you don't need it at all.
+
+I'm guessing you'll need it later on, but I wanted to know if that was
+intentional :)
+
 Maxime
 
 -- 
@@ -32,4 +55,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151227/03aa003c/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151227/8f055c2e/attachment.sig>
