@@ -1,38 +1,28 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Sat, 26 Dec 2015 14:38:05 -0800
-Subject: [PATCH v2 8/8] ARM: bcm2835: Add Kconfig support for bcm2836
-In-Reply-To: <1450310115-22163-9-git-send-email-eric@anholt.net>
-References: <1450310115-22163-1-git-send-email-eric@anholt.net>
- <1450310115-22163-9-git-send-email-eric@anholt.net>
-Message-ID: <87y4cg96pe.fsf@eliezer.anholt.net>
+From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
+Date: Sun, 27 Dec 2015 14:21:55 +0800
+Subject: [PATCH v2 0/3] ARM64: dts: cpufreq: mt8173: Migrate mt8173-cpufreq to
+ use OPPv2 bindings
+Message-ID: <1451197318-12418-1-git-send-email-pi-cheng.chen@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eric Anholt <eric@anholt.net> writes:
+This series tries to migrate mt8173-cpufreq driver to use
+operating-points-v2 bindings and add support for mt8173-cpufreq driver
 
-> This should be a complete port of bcm2835 functionality to bcm2836
-> (Raspberry Pi 2).
->
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> ---
->
-> v2: Implement Arnd's feedback to not split to ARCH_BCM2836, and
->     instead use more conditionals in ARCH_BCM2835.  Also reduce diff
->     between 2835 and 2836.
->
->  arch/arm/Kconfig.debug     | 10 ++++++++--
->  arch/arm/boot/dts/Makefile |  3 ++-
->  arch/arm/mach-bcm/Kconfig  |  8 ++++----
->  3 files changed, 14 insertions(+), 7 deletions(-)
+v1->v2:
+- update dev_pm_opp_of_get_sharing_cpus() to setup bitfield of original CPU
+- rename OPP nodes in dts according to OPPv2 bindings in linux-next
 
-I noticed a minor bug in this commit, that the dts/Makefile hunk should
-be in the Pi2 DT patch, instead.  Otherwise the -soc branch for
-submitting this doesn't build on its own before the merge of all the
-branches together.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151226/768f1cc0/attachment.sig>
+Pi-Cheng Chen (3):
+  PM/OPP: Don't skip cpu_dev->id when setting up cpumask
+  cpufreq: mt8173: migrate to use operating-points-v2 bindings
+  ARM64: dts: mt8173: Add CPU OPP, clock and regulator supply properties
+
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 18 ++++++
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 90 +++++++++++++++++++++++++++++
+ drivers/base/power/opp/cpu.c                |  4 --
+ drivers/cpufreq/mt8173-cpufreq.c            | 17 ++++--
+ 4 files changed, 119 insertions(+), 10 deletions(-)
+
+-- 
+1.9.1
