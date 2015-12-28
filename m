@@ -1,44 +1,46 @@
-From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
-Date: Mon, 28 Dec 2015 21:06:17 +0800
-Subject: [PATCH v2] PM/OPP: Set cpu_dev->id in cpumask first
-In-Reply-To: <20151228031123.GB3598@ubuntu>
-References: <20151228031123.GB3598@ubuntu>
-Message-ID: <1451307977-7427-1-git-send-email-pi-cheng.chen@linaro.org>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Mon, 28 Dec 2015 15:52:04 +0200
+Subject: [PATCH] ARM: dts: am4372: fix irq type for arm twd and global timer
+Message-ID: <1451310724-29454-1-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set cpu_dev->id in cpumask first when setting up cpumask for CPUs that
-share the same OPP table. This might be helpful when handling cpumask
-without the original CPU bitfield set.
+As per ARM documentation
+PPI(0) ID27 - global timer interrupt is rising-edge sensitive.
+PPI(2) ID29 - twd interrupt is rising-edge sensitive.
 
-Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
----
-v1->v2:
-- Set cpu_dev->id in cpumask at the top instead of skip it in the loop
----
- drivers/base/power/opp/cpu.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+and the same is proved by GIC distributor register value
+GIC_DIST_CONFIG(0xC04) = 0x7DC00000.
 
-diff --git a/drivers/base/power/opp/cpu.c b/drivers/base/power/opp/cpu.c
-index 7b445e8..9f0c155 100644
---- a/drivers/base/power/opp/cpu.c
-+++ b/drivers/base/power/opp/cpu.c
-@@ -214,7 +214,6 @@ EXPORT_SYMBOL_GPL(dev_pm_opp_of_cpumask_add_table);
- /*
-  * Works only for OPP v2 bindings.
-  *
-- * cpumask should be already set to mask of cpu_dev->id.
-  * Returns -ENOENT if operating-points-v2 bindings aren't supported.
-  */
- int dev_pm_opp_of_get_sharing_cpus(struct device *cpu_dev, cpumask_var_t cpumask)
-@@ -230,6 +229,8 @@ int dev_pm_opp_of_get_sharing_cpus(struct device *cpu_dev, cpumask_var_t cpumask
- 		return -ENOENT;
- 	}
- 
-+	cpumask_set_cpu(cpu_dev->id, cpumask);
-+
- 	/* OPPs are shared ? */
- 	if (!of_property_read_bool(np, "opp-shared"))
- 		goto put_cpu_node;
+Hence, set IRQ triggering type to IRQ_TYPE_EDGE_RISING
+for ARM TWD and Global timers.
+
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+---
+ arch/arm/boot/dts/am4372.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+index de8791a..dfa1a29 100644
+--- a/arch/arm/boot/dts/am4372.dtsi
++++ b/arch/arm/boot/dts/am4372.dtsi
+@@ -72,7 +72,7 @@
+ 	global_timer: timer at 48240200 {
+ 		compatible = "arm,cortex-a9-global-timer";
+ 		reg = <0x48240200 0x100>;
+-		interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <GIC_PPI 11 IRQ_TYPE_EDGE_RISING>;
+ 		interrupt-parent = <&gic>;
+ 		clocks = <&mpu_periphclk>;
+ 	};
+@@ -80,7 +80,7 @@
+ 	local_timer: timer at 48240600 {
+ 		compatible = "arm,cortex-a9-twd-timer";
+ 		reg = <0x48240600 0x100>;
+-		interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <GIC_PPI 13 IRQ_TYPE_EDGE_RISING>;
+ 		interrupt-parent = <&gic>;
+ 		clocks = <&mpu_periphclk>;
+ 	};
 -- 
-1.9.1
+2.6.4
