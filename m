@@ -1,7 +1,7 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 28 Dec 2015 19:20:03 +0900
-Subject: [PATCH v2] clk: uniphier: add clock drivers for UniPhier SoCs
-Message-ID: <1451298003-28841-1-git-send-email-yamada.masahiro@socionext.com>
+Date: Mon, 28 Dec 2015 19:20:58 +0900
+Subject: [PATCH v2,RESEND] clk: uniphier: add clock drivers for UniPhier SoCs
+Message-ID: <1451298058-28910-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
