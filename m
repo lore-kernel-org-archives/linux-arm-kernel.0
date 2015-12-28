@@ -1,50 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 28 Dec 2015 13:28:02 -0800
-Subject: [PATCH] mmc: pwrseq_simple: Fix regression with optional GPIOs
-In-Reply-To: <CAPDyKFpUWyZj99upK8Q_vNtwpZ67q3pD1229qG4yQ6+OmtCBUQ@mail.gmail.com>
-References: <1449528845-25189-1-git-send-email-tony@atomide.com>
- <CAPDyKFpxiOJJdh-nLXjxv3DYJnW3RAf_9aqMfds46=-oqPd5ng@mail.gmail.com>
- <20151218161406.GL23396@atomide.com>
- <CAPDyKFr8e6wDxkGwnOwijQiOgF7oq6gCoHmqbubv6oSbpYbwqg@mail.gmail.com>
- <20151218223156.GP23396@atomide.com>
- <CAPDyKFpUWyZj99upK8Q_vNtwpZ67q3pD1229qG4yQ6+OmtCBUQ@mail.gmail.com>
-Message-ID: <20151228212802.GA6414@atomide.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 29 Dec 2015 08:43:25 +1100
+Subject: [PATCH] ARM: shmobile: porter: add DU DT support
+In-Reply-To: <568148B5.6080202@cogentembedded.com>
+References: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
+ <2158897.lfmL4b1c4V@wasted.cogentembedded.com>
+ <20151228052902.GF1066@verge.net.au>
+ <568148B5.6080202@cogentembedded.com>
+Message-ID: <20151228214325.GA16456@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ulf Hansson <ulf.hansson@linaro.org> [151228 04:18]:
-> On 18 December 2015 at 23:31, Tony Lindgren <tony@atomide.com> wrote:
-> > * Ulf Hansson <ulf.hansson@linaro.org> [151218 14:20]:
-> >> On 18 December 2015 at 17:14, Tony Lindgren <tony@atomide.com> wrote:
-> >> > * Ulf Hansson <ulf.hansson@linaro.org> [151207 16:20]:
-> >> >> +Linus
-> >> >>
-> >> >> On 7 December 2015 at 23:54, Tony Lindgren <tony@atomide.com> wrote:
-> >> >> > Commit ce037275861e ("mmc: pwrseq_simple: use GPIO descriptors array API")
-> >> >> > changed the handling MMC power sequence so GPIOs no longer are optional.
-> >> >> >
-> >> >> > This broke SDIO WLAN at least for omap5 that can't yet use the reset GPIOs
-> >> >> > with pwrseq_simple as a wait is needed after enabling the SDIO device.
-> >> >>
-> >> >> Can you elaborate on this. Did it break omap5 or not? :-)
-> >> >
-> >> > Ulf, is this patch queued for v4.4 as a regression fix? I don't see it
-> >> > in Linux next or mainline trees?
-> >>
-> >> Ohh, I guess there where some misunderstanding. I made a bunch of
-> >> comments on your patch as well, so I have been expecting a new
-> >> version.
-> >
-> > Well this $subject patch was intended as a regression fix for v4.4-rc cycle.
-> > All the other things discussed are not fixes but new features instead.
-> >
-> >> Sorry if that was unclear!
-> >
-> > I think this patch should be still fine as is, care to take a look again?
+On Mon, Dec 28, 2015 at 05:35:33PM +0300, Sergei Shtylyov wrote:
+> Hello.
 > 
-> No, the patch have issues that needs to be fixed.
-> http://www.spinics.net/lists/linux-mmc/msg34399.html
+> On 12/28/2015 08:29 AM, Simon Horman wrote:
+> 
+> >>Define  the Porter board dependent part of the DU device node.
+> >>Add the device node  for Analog Devices ADV7511W  HDMI transmitter to I2C2
+> >>bus and the HDMI connector. Add the necessary subnodes to interconnect  DU
+> >>and HDMI devices.
+> >>
+> >>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> >>
+> >>---
+> >>This patch is against 'renesas-devel-20151221-v4.4-rc6' tag of Simon Horman's
+> >>'renesas.git' repo.
+> >
+> >Thanks, I have queued this up for v4.6.
+> 
+>    Actually, I was going to check this patch WRT the DU channels used, given
+> Laurent's remark. OK, I will just send an incremental patch if needed.
 
-Oh sorry, somehow I did not notice those comments earlier, will take a look.
-
-Tony
+Thanks and sorry for being a bit hasty.
