@@ -1,24 +1,290 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 28 Dec 2015 11:01:08 +0900
-Subject: [PATCH 10/10] ARM: plat-samsung: use to_platform_device()
-In-Reply-To: <ad91078d5cbe93341709b249a83ae81c00eaa3d4.1451221174.git.geliangtang@163.com>
-References: <a554e6af3a3528c2206c94dab62b7800f96caa4b.1451221174.git.geliangtang@163.com>
- <ad91078d5cbe93341709b249a83ae81c00eaa3d4.1451221174.git.geliangtang@163.com>
-Message-ID: <568097E4.8010708@samsung.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 28 Dec 2015 00:06:26 -0300
+Subject: [PATCH v3 00/23] Unrestricted media entity ID range support
+In-Reply-To: <26879584.9P9vDMYfPM@avalon>
+References: <1450272758-29446-1-git-send-email-sakari.ailus@iki.fi>
+ <20151216140301.GO17128@valkosipuli.retiisi.org.uk>
+ <20151223103242.44deaea4@recife.lan> <26879584.9P9vDMYfPM@avalon>
+Message-ID: <5680A732.1010601@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27.12.2015 22:17, Geliang Tang wrote:
-> Use to_platform_device() instead of open-coding it.
+Hello Laurent,
+
+On 12/27/2015 02:11 PM, Laurent Pinchart wrote:
+> Hi Mauro,
 > 
-> Signed-off-by: Geliang Tang <geliangtang@163.com>
-> ---
->  arch/arm/plat-samsung/adc.c | 6 ++----
->  1 file changed, 2 insertions(+), 4 deletions(-)
+> On Wednesday 23 December 2015 10:32:42 Mauro Carvalho Chehab wrote:
+>> Em Wed, 16 Dec 2015 16:03:01 +0200 Sakari Ailus escreveu:
+>>> On Wed, Dec 16, 2015 at 03:32:15PM +0200, Sakari Ailus wrote:
+>>>> This is the third version of the unrestricted media entity ID range
+>>>> support set. I've taken Mauro's comments into account and fixed a number
+>>>> of bugs as well (omap3isp memory leak and omap4iss stream start).
+>>>
+>>> Javier: Mauro told me you might have OMAP4 hardware. Would you be able to
+>>> test the OMAP4 ISS with these patches?
+>>>
+>>> Thanks.
+>>
+>> Sakari,
+>>
+>> Testing with OMAP4 is not possible. The driver is broken: it doesn't
+>> support DT, and the required pdata definition is missing.
+> 
+> What do you mean by missing ? struct iss_platform_data is defined in 
+> include/media/omap4iss.h.
+>
 
-Thanks!
+That's true but at the very least the omap4iss hwmod is broken in mainline
+as you mentioned in the linux-media thread that Mauro shared below.
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+I think what Mauro meant is that there isn't an omap4 board supported in
+mainline that makes use of the iss platform data structures. So testing the
+driver in a popular omap4 board such as the pandaboard isn't possible without
+adding plumbing board code. And even in that case, the driver fails to probe
+due a missing iss_fck clock as Mauro mentioned in his boot log below as well.
+
+I know is not a requirement for a driver to have mainline users but without
+DT bindings, using this driver will not be possible sooner rather than later
+once the mach-omap2 pdata-quirks.c workaround is removed from mainline since
+the omap4 board files were deleted almost 3 years ago (3.11 according to git).
+ 
+>> Both Javier and I tried to fix it in the last couple days, in order to test
+>> it with a PandaBoard. We came with the enclosed patch, but it is still
+>> incomplete. Based on what's written on this e-mail:
+>> 	 https://www.mail-archive.com/linux-media at vger.kernel.org/msg89247.html
+>>
+>> It seems that this is an already known issue.
+>>
+>> So, I'm considering this driver as BROKEN. Not much sense on doing any
+>> tests on it, while this doesn't get fixed.
+>>
+>> Regards,
+>> Mauro
+>>
+>> PS.: With the enclosed patch, I got this error:
+>> 	[    0.267639] platform omap4iss: failed to claim resource 2
+>>
+>> But, even if I comment out the platform code that returns this error,
+>> there are still other missing things:
+>> 	[    7.131622] omap4iss omap4iss: Unable to get iss_fck clock info
+>> 	[    7.137878] omap4iss omap4iss: Unable to get clocks
+>>
+>> ---
+>>
+>> ARM: add a pdata quirks for OMAP4 panda camera
+>>
+>> This is a hack to make it to believe that the pandaboard
+>> has a camera.
+>>
+>>
+>> diff --git a/arch/arm/mach-omap2/pdata-quirks.c
+>> b/arch/arm/mach-omap2/pdata-quirks.c index 1dfe34654c43..998bb6936dc0
+>> 100644
+>> --- a/arch/arm/mach-omap2/pdata-quirks.c
+>> +++ b/arch/arm/mach-omap2/pdata-quirks.c
+>> @@ -36,6 +36,8 @@
+>>  #include "soc.h"
+>>  #include "hsmmc.h"
+>>
+>> +#include "../../../drivers/staging/media/omap4iss/iss.h"
+>> +
+>>  struct pdata_init {
+>>  	const char *compatible;
+>>  	void (*fn)(void);
+>> @@ -408,6 +410,124 @@ static void __init t410_abort_init(void)
+>>  }
+>>  #endif
+>>
+>> +#ifdef CONFIG_ARCH_OMAP4
+>> +
+>> +static struct resource panda_iss_resource[] = {
+>> +	{
+>> +		.start = 0x52000000,
+>> +		.end = 0x52000000 + 0x100,
+>> +		.name = "top",
+>> +		.flags = IORESOURCE_MEM,
+>> +	}, {
+>> +		.start = 0x52001000,
+>> +		.end = 0x52001000 + 0x170,
+>> +		.name = "csi2_a_regs1",
+>> +		.flags = IORESOURCE_MEM,
+>> +	}, {
+>> +		.start = 0x52001170,
+>> +		.end = 0x52001170 + 0x020,
+>> +		.name = "camerarx_core1",
+>> +		.flags = IORESOURCE_MEM,
+>> +	}, {
+>> +		.start = 0x52001400,
+>> +		.end = 0x52001400 + 0x170,
+>> +		.name = "csi2_b_regs1",
+>> +		.flags = IORESOURCE_MEM,
+>> +	}, {
+>> +		.start = 0x52001570,
+>> +		.end = 0x52001570 + 0x020,
+>> +		.name = "camerarx_core2",
+>> +		.flags = IORESOURCE_MEM,
+>> +	}, {
+>> +		.start = 0x52002000,
+>> +		.end = 0x52002000 + 0x200,
+>> +		.name = "bte",
+>> +		.flags = IORESOURCE_MEM,
+>> +	}, {
+>> +		.start = 0x52010000,
+>> +		.end = 0x52010000 + 0x0a0,
+>> +		.name = "isp_sys1",
+>> +		.flags = IORESOURCE_MEM,
+>> +	}, {
+>> +		.start = 0x52010400,
+>> +		.end = 0x52010400 + 0x400,
+>> +		.name = "isp_resizer",
+>> +		.flags = IORESOURCE_MEM,
+>> +	}, {
+>> +		.start = 0x52010800,
+>> +		.end = 0x52010800 + 0x800,
+>> +		.name = "isp_ipipe",
+>> +		.flags = IORESOURCE_MEM,
+>> +	}, {
+>> +		.start = 0x52011000,
+>> +		.end = 0x52011000 + 0x200,
+>> +		.name = "isp_isif",
+>> +		.flags = IORESOURCE_MEM,
+>> +	}, {
+>> +		.start = 0x52011200,
+>> +		.end = 0x52011200 + 0x080,
+>> +		.name = "isp_ipipeif",
+>> +		.flags = IORESOURCE_MEM,
+>> +	}
+>> +};
+>> +
+>> +static struct i2c_board_info panda_camera_i2c_device = {
+>> +	I2C_BOARD_INFO("smia", 0x10),
+>> +};
+>> +
+>> +static struct iss_subdev_i2c_board_info panda_camera_subdevs[] = {
+>> +	{
+>> +		.board_info = &panda_camera_i2c_device,
+>> +		.i2c_adapter_id = 3,
+>> +	},
+>> +};
+>> +
+>> +static struct iss_v4l2_subdevs_group iss_subdevs[] = {
+>> +	{
+>> +		.subdevs = panda_camera_subdevs,
+>> +		.interface = ISS_INTERFACE_CSI2A_PHY1,
+>> +		.bus = {
+>> +			.csi2 = {
+>> +				.lanecfg = {
+>> +					.clk = {
+>> +						.pol = 0,
+>> +						.pos = 2,
+>> +					},
+>> +					.data[0] = {
+>> +						.pol = 0,
+>> +						.pos = 1,
+>> +					},
+>> +					.data[1] = {
+>> +						.pol = 0,
+>> +						.pos = 3,
+>> +					},
+>> +				},
+>> +			} },
+>> +	},
+>> +	{ /* sentinel */ },
+>> +};
+>> +
+>> +static struct iss_platform_data iss_pdata = {
+>> +	.subdevs = iss_subdevs,
+>> +};
+>> +
+>> +static struct platform_device omap4iss_device = {
+>> +	.name           = "omap4iss",
+>> +	.id             = -1,
+>> +	.dev = {
+>> +		.platform_data = &iss_pdata,
+>> +	},
+>> +	.num_resources  = ARRAY_SIZE(panda_iss_resource),
+>> +	.resource       = panda_iss_resource,
+>> +};
+>> +
+>> +static void __init omap4_panda_legacy_init(void)
+>> +{
+>> +	platform_device_register(&omap4iss_device);
+>> +}
+>> +
+>> +#endif /* CONFIG_ARCH_OMAP4 */
+>> +
+>>  #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
+>>  static struct iommu_platform_data omap4_iommu_pdata = {
+>>  	.reset_name = "mmu_cache",
+>> @@ -539,6 +659,9 @@ static struct pdata_init pdata_quirks[] __initdata = {
+>>  #ifdef CONFIG_SOC_TI81XX
+>>  	{ "hp,t410", t410_abort_init, },
+>>  #endif
+>> +#ifdef CONFIG_ARCH_OMAP4
+>> +	{ "ti,omap4-panda", omap4_panda_legacy_init, },
+>> +#endif
+>>  #ifdef CONFIG_SOC_OMAP5
+>>  	{ "ti,omap5-uevm", omap5_uevm_legacy_init, },
+>>  #endif
+>>
+>> diff --git a/drivers/staging/media/omap4iss/iss.c
+>> b/drivers/staging/media/omap4iss/iss.c index 30b473cfb020..b528cacda17b
+>> 100644
+>> --- a/drivers/staging/media/omap4iss/iss.c
+>> +++ b/drivers/staging/media/omap4iss/iss.c
+>> @@ -1412,6 +1412,9 @@ static int iss_probe(struct platform_device *pdev)
+>>  	unsigned int i;
+>>  	int ret;
+>>
+>> +
+>> +printk("%s: pdata=%p\n", __func__, pdata);
+>> +
+>>  	if (!pdata)
+>>  		return -EINVAL;
+>>
+>> @@ -1437,24 +1440,33 @@ static int iss_probe(struct platform_device *pdev)
+>>  	iss->syscon = syscon_regmap_lookup_by_compatible("syscon");
+>>  	if (IS_ERR(iss->syscon)) {
+>>  		ret = PTR_ERR(iss->syscon);
+>> +		dev_err(iss->dev, "Unable to find syscon");
+>>  		goto error;
+>>  	}
+>>
+>>  	/* Clocks */
+>>  	ret = iss_map_mem_resource(pdev, iss, OMAP4_ISS_MEM_TOP);
+>> -	if (ret < 0)
+>> +	if (ret < 0) {
+>> +		dev_err(iss->dev, "Unable to map memory resource\n");
+>>  		goto error;
+>> +	}
+>>
+>>  	ret = iss_get_clocks(iss);
+>> -	if (ret < 0)
+>> +	if (ret < 0) {
+>> +		dev_err(iss->dev, "Unable to get clocks\n");
+>>  		goto error;
+>> +	}
+>>
+>> -	if (!omap4iss_get(iss))
+>> +	if (!omap4iss_get(iss)) {
+>> +		dev_err(iss->dev, "Failed to acquire ISS resource\n");
+>>  		goto error;
+>> +	}
+>>
+>>  	ret = iss_reset(iss);
+>> -	if (ret < 0)
+>> +	if (ret < 0) {
+>> +		dev_err(iss->dev, "Unable to reset ISS\n");
+>>  		goto error_iss;
+>> +	}
+>>
+>>  	iss->revision = iss_reg_read(iss, OMAP4_ISS_MEM_TOP, ISS_HL_REVISION);
+>>  	dev_info(iss->dev, "Revision %08x found\n", iss->revision);
+> 
 
 Best regards,
-Krzysztof
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
