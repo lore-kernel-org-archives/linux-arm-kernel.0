@@ -1,115 +1,85 @@
-From: uri.mashiach@compulab.co.il (Uri Mashiach)
-Date: Mon, 28 Dec 2015 14:02:19 +0200
-Subject: [PATCH v3 3/3] wlcore/wl12xx: spi: add wifi support to cm-t335
-In-Reply-To: <1451304139-10899-1-git-send-email-uri.mashiach@compulab.co.il>
-References: <1451304139-10899-1-git-send-email-uri.mashiach@compulab.co.il>
-Message-ID: <1451304139-10899-4-git-send-email-uri.mashiach@compulab.co.il>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 28 Dec 2015 13:07:44 +0100
+Subject: [RFC PATCH 01/10] arm64: introduce KIMAGE_VADDR as the virtual
+ base of the kernel region
+In-Reply-To: <11539877.krH4qBJsp9@wuerfel>
+References: <1451301654-32019-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1451301654-32019-2-git-send-email-ard.biesheuvel@linaro.org>
+ <11539877.krH4qBJsp9@wuerfel>
+Message-ID: <CAKv+Gu9nFaPES8u6fc7SQ0WFJVgV3O4uM2wNNoVWz8iaajyqTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Device tree modifications:
-- Pinmux for SPI0 and WiFi GPIOs.
-- SPI0 node with wlcore as a child node.
+On 28 December 2015 at 12:50, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 28 December 2015 12:20:45 Ard Biesheuvel wrote:
+>> @@ -75,8 +76,13 @@
+>>   * private definitions which should NOT be used outside memory.h
+>>   * files.  Use virt_to_phys/phys_to_virt/__pa/__va instead.
+>>   */
+>> -#define __virt_to_phys(x)      (((phys_addr_t)(x) - PAGE_OFFSET + PHYS_OFFSET))
+>> +#define __virt_to_phys(x) ({                                           \
+>> +       phys_addr_t __x = (phys_addr_t)(x);                             \
+>> +       __x >= PAGE_OFFSET ? (__x - PAGE_OFFSET + PHYS_OFFSET) :        \
+>> +                            (__x - KIMAGE_VADDR + PHYS_OFFSET); })
+>> +
+>>  #define __phys_to_virt(x)      ((unsigned long)((x) - PHYS_OFFSET + PAGE_OFFSET))
+>> +#define __phys_to_kimg(x)      ((unsigned long)((x) - PHYS_OFFSET + KIMAGE_VADDR))
+>
+> Having a conditional here is a bit unfortunate.
+>
 
-Cc: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Uri Mashiach <uri.mashiach@compulab.co.il>
-Acked-by: Igor Grinberg <grinberg@complab.co.il>
----
-v1 -> v2: Replace interrupts and interrupt-parent with interrupts-extended.
-v2 -> v3: Move the pinctrl-0 = <&wifi_pins> to the wlcore node.
+Yes. Unfortunately, the assumption that kernel symbols live in the
+same address space as dynamic allocations in the linear mapping is
+widespread throughout the code base, otherwise we could strictly
+separate the two, and this would not be necessary. I played around
+with adding another sparse address space for kernel addresses, but
+that gives a lot of hits in generic code as well.
 
-arch/arm/boot/dts/am335x-cm-t335.dts | 54 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 54 insertions(+)
+> IIRC KASLR means something different depending on the architecture, we either randomize
+> the physical address, or the virtual address, or both, and that addresses different
+> attack scenarios. You seem to leave the physical address unchanged, which means that
+> an attacker that has gained access to a DMA master device can potentially still modify
+> the kernel without knowing the virtual address.
 
-diff --git a/arch/arm/boot/dts/am335x-cm-t335.dts b/arch/arm/boot/dts/am335x-cm-t335.dts
-index 42e9b66..b700940 100644
---- a/arch/arm/boot/dts/am335x-cm-t335.dts
-+++ b/arch/arm/boot/dts/am335x-cm-t335.dts
-@@ -11,6 +11,7 @@
- /dts-v1/;
- 
- #include "am33xx.dtsi"
-+#include <dt-bindings/interrupt-controller/irq.h>
- 
- / {
- 	model = "CompuLab CM-T335";
-@@ -40,6 +41,15 @@
- 		regulator-max-microvolt = <3300000>;
- 	};
- 
-+	/* Regulator for WiFi */
-+	vwlan_fixed: fixedregulator at 2 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vwlan_fixed";
-+		gpio = <&gpio0 20 GPIO_ACTIVE_HIGH>; /* gpio0_20 */
-+		enable-active-high;
-+		regulator-boot-off;
-+	};
-+
- 	backlight {
- 		compatible = "pwm-backlight";
- 		pwms = <&ecap0 0 50000 0>;
-@@ -223,6 +233,21 @@
- 		>;
- 	};
- 
-+	spi0_pins: pinmux_spi0_pins {
-+		pinctrl-single,pins = <
-+			/* spi0_sclk.spi0_sclk */
-+			AM33XX_IOPAD(0x950, PIN_INPUT | MUX_MODE0)
-+			/* spi0_d0.spi0_d0 */
-+			AM33XX_IOPAD(0x954, PIN_OUTPUT_PULLUP | MUX_MODE0)
-+			/* spi0_d1.spi0_d1 */
-+			AM33XX_IOPAD(0x958, PIN_INPUT | MUX_MODE0)
-+			/* spi0_cs0.spi0_cs0 */
-+			AM33XX_IOPAD(0x95C, PIN_OUTPUT | MUX_MODE0)
-+			/* spi0_cs1.spi0_cs1 */
-+			AM33XX_IOPAD(0x960, PIN_OUTPUT | MUX_MODE0)
-+		>;
-+	};
-+
- 	/* wl1271 bluetooth */
- 	bluetooth_pins: pinmux_bluetooth_pins {
- 		pinctrl-single,pins = <
-@@ -230,6 +255,16 @@
- 			AM33XX_IOPAD(0x9b0, PIN_OUTPUT_PULLUP | MUX_MODE7)
- 		>;
- 	};
-+
-+	/* wl1271 WiFi */
-+	wifi_pins: pinmux_wifi_pins {
-+		pinctrl-single,pins = <
-+			/* EMU1.gpio3_8 - WiFi IRQ */
-+			AM33XX_IOPAD(0x9e8, PIN_INPUT_PULLUP | MUX_MODE7)
-+			/* XDMA_EVENT_INTR1.gpio0_20 - WiFi enable */
-+			AM33XX_IOPAD(0x9b4, PIN_OUTPUT | MUX_MODE7)
-+		>;
-+	};
- };
- 
- &uart0 {
-@@ -394,3 +429,22 @@ status = "okay";
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc1_pins>;
- };
-+
-+&spi0 {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&spi0_pins>;
-+	ti,pindir-d0-out-d1-in = <1>;
-+	/* WLS1271 WiFi */
-+	wlcore: wlcore at 1 {
-+		compatible = "ti,wl1271";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&wifi_pins>;
-+		reg = <1>;
-+		spi-max-frequency = <48000000>;
-+		clock-xtal;
-+		ref-clock-frequency = <38400000>;
-+		interrupts-extended = <&gpio3 8 IRQ_TYPE_LEVEL_HIGH>;
-+		vwlan-supply = <&vwlan_fixed>;
-+	};
-+};
--- 
-2.5.0
+Indeed. I did not mention it in the cover letter, but this work is
+somewhat related to series I proposed which allows the kernel Image to
+reside anywhere (i.e., at any 2 MB aligned offset + TEXT_OFFSET) in
+physical memory. This is fairly straight forward once we have moved
+the kernel virtual mapping out of the linear mapping, but since this
+series has enough moving parts as it is, I omitted those pieces for
+now.
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/455151
+
+After Mark Rutland proposed his pagetable rework series, a lot of
+those changes became much easier to implement, but did require rework,
+and because of queries I received personally regarding KASLR, I
+decided to focus on that part first.
+
+> Similarly, you seem to leave the kernel mapped at the original virtual address and
+> just add a second map (or your __phys_to_virt is wrong), so if someone has the
+> ability to access a kernel virtual memory address from user space, they also don't
+> need the relocated address because they can potentially access the kernel .text
+> and .data through the linear mapping.
+>
+
+True. Catalin mentioned this as well in response to the series
+mentioned above. Unmapping the kernel text in the linear mapping is an
+important enhancement from security pov, but not essential from a
+functionality pov.
+
+> How about a different approach that keeps the relocatable kernel, but moves it in
+> physical memory with the same random offset as the virtual address? That way, both
+> would be random, and you can keep the simple virt_to_phys() function.
+>
+> I suppose the downside of that is that the number of random bits is then limited
+> by the size of the first memblock, which is smaller than the vmalloc area.
+>
+
+I don't see a reason to use the same virtual and physical offset
+(other than the conditional). On arm64, it would be up to the
+bootloader to decide where to put the Image in physical memory, and it
+would be up to the kernel to decide whether or not to virtually remap
+itself.
+
+Regards,
+Ard.
