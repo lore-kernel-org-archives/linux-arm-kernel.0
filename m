@@ -1,57 +1,34 @@
-From: bamvor.zhangjian@huawei.com (Zhangjian (Bamvor))
-Date: Mon, 28 Dec 2015 17:01:15 +0800
-Subject: [PATCH v6 04/20] arm64: change some CONFIG_COMPAT over to use
- CONFIG_AARCH32_EL0 instead
-In-Reply-To: <1451292190-15024-1-git-send-email-bamvor.zhangjian@linaro.org>
-References: <1450215766-14765-5-git-send-email-ynorov@caviumnetworks.com>
- <1451292190-15024-1-git-send-email-bamvor.zhangjian@linaro.org>
-Message-ID: <5680FA5B.9040803@huawei.com>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Mon, 28 Dec 2015 17:03:52 +0800
+Subject: [RESEND PATCH v1 3/4] clk: rockchip: rk3036: rename emac ext source
+ clock
+In-Reply-To: <1451293433-32392-1-git-send-email-zhengxing@rock-chips.com>
+References: <1451293433-32392-1-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <1451293433-32392-4-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the title.
+There is only support rmii in the RK3036, so we should use the correct
+ext clock name.
 
-On 16:43 2015/12/28, Bamvor Jian Zhang wrote:
-> I feel we need something like this to avoid the failure of compiling
-> when build with ARM64_ILP32(which will select COMPAT) and
-> ARMV8_DEPRECATED (which depends on the opcodes.o).
->
->  From f8b8ffdb449491ecf8ba465238bbdb4625a74ac0 Mon Sep 17 00:00:00 2001
-> From: Bamvor Jian Zhang <bamvor.zhangjian@linaro.org>
-> Date: Mon, 28 Dec 2015 12:57:46 +0800
-> Subject: [PATCH] arm64: compat: fix wrong dependency of ARMV8_DEPRECATED
->
-> When compile with ARM64_ILP32, ARMV8_DEPRECATED will be selected due
-> to the dependency of COMPAT. It leads to the following error:
->      LD      init/built-in.o
->      arch/arm64/kernel/built-in.o: In function `cp15barrier_handler':
->      /home/bamvor/works/source/kernel/linux_ilp32/arch/arm64/kernel/armv8_deprecated.c:467: undefined reference to `arm_check_condition'
->      /home/bamvor/works/source/kernel/linux_ilp32/arch/arm64/kernel/armv8_deprecated.c:467: undefined reference to `arm_check_condition'
->      arch/arm64/kernel/built-in.o: In function `swp_handler':
->      /home/bamvor/works/source/kernel/linux_ilp32/arch/arm64/kernel/armv8_deprecated.c:386: undefined reference to `arm_check_condition'
->      /home/bamvor/works/source/kernel/linux_ilp32/arch/arm64/kernel/armv8_deprecated.c:386: undefined reference to `arm_check_condition'
->      Makefile:927: recipe for target 'vmlinux' failed
->      make: *** [vmlinux] Error 1
->
-> This patch fix this by updating the dependency from COMPAT to
-> AARCH32_EL0.
->
-> Signed-off-by: Bamvor Jian Zhang <bamvor.zhangjian@linaro.org>
-> ---
->   arch/arm64/Kconfig | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index deec37a..e52fd03 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -509,7 +509,7 @@ config FORCE_MAX_ZONEORDER
->
->   menuconfig ARMV8_DEPRECATED
->   	bool "Emulate deprecated/obsolete ARMv8 instructions"
-> -	depends on COMPAT
-> +	depends on AARCH32_EL0
->   	help
->   	  Legacy software support may require certain instructions
->   	  that have been deprecated or obsoleted in the architecture.
->
+Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+---
+
+ drivers/clk/rockchip/clk-rk3036.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clk/rockchip/clk-rk3036.c b/drivers/clk/rockchip/clk-rk3036.c
+index 47fe35b..7420cbe 100644
+--- a/drivers/clk/rockchip/clk-rk3036.c
++++ b/drivers/clk/rockchip/clk-rk3036.c
+@@ -133,7 +133,7 @@ PNAME(mux_spdif_p)	= { "spdif_src", "spdif_frac", "xin12m" };
+ PNAME(mux_uart0_p)	= { "uart0_src", "uart0_frac", "xin24m" };
+ PNAME(mux_uart1_p)	= { "uart1_src", "uart1_frac", "xin24m" };
+ PNAME(mux_uart2_p)	= { "uart2_src", "uart2_frac", "xin24m" };
+-PNAME(mux_mac_p)	= { "mac_pll_src", "ext_gmac" };
++PNAME(mux_mac_p)	= { "mac_pll_src", "rmii_clkin" };
+ PNAME(mux_dclk_p)	= { "dclk_lcdc", "dclk_cru" };
+ 
+ static struct rockchip_pll_clock rk3036_pll_clks[] __initdata = {
+-- 
+1.7.9.5
