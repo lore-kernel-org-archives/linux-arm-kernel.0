@@ -1,30 +1,47 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 28 Dec 2015 08:43:40 +0530
-Subject: [PATCH v2 3/3] ARM64: dts: mt8173: Add CPU OPP, clock and
- regulator supply properties
-In-Reply-To: <1451197318-12418-4-git-send-email-pi-cheng.chen@linaro.org>
-References: <1451197318-12418-1-git-send-email-pi-cheng.chen@linaro.org>
- <1451197318-12418-4-git-send-email-pi-cheng.chen@linaro.org>
-Message-ID: <20151228031340.GD3598@ubuntu>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 28 Dec 2015 15:55:59 +1100
+Subject: [GIT PULL] Third Round of Renesas ARM64 Based SoC DT Updates for
+ v4.5
+In-Reply-To: <20151222205208.GQ30172@localhost>
+References: <cover.1450401186.git.horms+renesas@verge.net.au>
+ <20151222205208.GQ30172@localhost>
+Message-ID: <20151228045559.GD1066@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27-12-15, 14:21, Pi-Cheng Chen wrote:
-> Add operating-points-v2, clock, and regulator supply properties
-> required by mt8173-cpufreq driver to enable it.
+On Tue, Dec 22, 2015 at 12:52:08PM -0800, Olof Johansson wrote:
+> On Fri, Dec 18, 2015 at 11:29:14AM +0900, Simon Horman wrote:
+> > Hi Olof, Hi Kevin, Hi Arnd,
+> > 
+> > Please consider these third round of Renesas ARM64 based SoC DT updates
+> > for v4.5.
+> > 
+> > This pull request is based on the previous round of
+> > such requests, tagged as renesas-arm64-dt2-for-v4.5,
+> > which you have already pulled.
+> > 
+> > 
+> > The following changes since commit 672b79312c04016481a11d4b996b4512207ffbd3:
+> > 
+> >   arm64: renesas: salvator-x: Sound DVC support (2015-11-26 11:31:43 +0900)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt3-for-v4.5
 > 
-> Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
-> ---
-> This patch is based on the patch[1] that adds underlying clock MUX for
-> MT8173 which is needed by mt8173-cpufreq driver but not yet picked.
+> Merged, but:
 > 
-> [1] http://article.gmane.org/gmane.linux.kernel.clk/325
-> ---
->  arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 18 ++++++
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 90 +++++++++++++++++++++++++++++
->  2 files changed, 108 insertions(+)
+> >       arm64: dts: r8a7795: Add PSCI node
+> >       arm64: dts: r8a7795: Add Cortex-A57 CPU cores
+> >       arm64: renesas: salvator-x: Add board part number to DT bindings
+> >       arm64: dts: r8a7795: Add SATA controller node
+> >       arm64: dts: salvator-x: Enable SATA controller
+> >       arm64: renesas: salvator-x: set ak4613 In/Out pin as single-end
+> >       arm64: renesas: salvator-x: use CS2000 as AUDIO_CLK_B
+> >       arm64: renesas: r8a7795: fix SATA clock assignment
+> >       arm64: renesas: r8a7795: add internal delay for i2c IPs
+> >       arm64: dts: r8a7795: Add pmu device nodes
+> 
+> Please me more consistent in patch description prefixes.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-
--- 
-viresh
+Sure, sorry for not being more attentive to that.
