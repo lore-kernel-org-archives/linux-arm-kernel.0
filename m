@@ -1,97 +1,126 @@
-From: mweseloh42@gmail.com (Marcus Weseloh)
-Date: Mon, 28 Dec 2015 00:29:16 +0100
-Subject: [PATCH v6 2/3] spi: sun4i: Fix clock calculations to be
- predictable and never exceed the requested rate
-In-Reply-To: <20151227210946.GL30359@lukather>
-References: <1451145186-14235-1-git-send-email-mweseloh42@gmail.com>
- <1451145186-14235-3-git-send-email-mweseloh42@gmail.com>
- <20151227210946.GL30359@lukather>
-Message-ID: <CAGNoLaPcBAqDqFuff7sWWADjVH3Z-LWhZatSmzvEm4mLSrSNvw@mail.gmail.com>
+From: milo.kim@ti.com (Milo Kim)
+Date: Mon, 28 Dec 2015 09:34:38 +0900
+Subject: [PATCH 4/6] regulator: lp872x: Add enable GPIO pin support
+In-Reply-To: <1450868319-20513-5-git-send-email-contact@paulk.fr>
+References: <1450868319-20513-1-git-send-email-contact@paulk.fr>
+ <1450868319-20513-5-git-send-email-contact@paulk.fr>
+Message-ID: <5680839E.4080800@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Paul,
 
-2015-12-27 22:09 GMT+01:00 Maxime Ripard <maxime.ripard@free-electrons.com>:
-> On Sat, Dec 26, 2015 at 04:53:05PM +0100, Marcus Weseloh wrote:
->> This patch fixes multiple problems with the current clock calculations:
->>
->> 1. The A10/A20 datasheet contains the formula AHB_CLK / (2^(n+1)) to
->> calculate SPI_CLK from CDR1, but this formula is wrong. The actual
->> formula - determined by analyzing the actual waveforms - is
->> AHB_CLK / (2^n).
->>
->> 2. The divisor calculations for CDR1 and CDR2 both rounded to the
->> nearest integer. This could lead to a transfer speed that is higher than
->> the requested speed. This patch changes both calculations to always
->> round down.
->>
->> 3. The mclk frequency was only ever increased, never decreased. This could
->> lead to unpredictable transfer speeds, depending on the order in which
->> transfers with different speeds where serviced by the SPI driver.
+Thanks for the patches. Please see my comments below.
+
+On 23/12/15 19:58, Paul Kocialkowski wrote:
+> LP872x regulators are made active via the EN pin, which might be hooked to a
+> GPIO. This adds support for driving the GPIO high when the driver is in use.
+
+EN pin is used for enabling HW logic like I2C block. It's not regulator 
+enable pin. Please check the block diagram in the datasheet.
+
+All regulators of LP8720 and LP8725 are controlled through I2C 
+registers. Additionally, LP8725 provides external pin control for LDO3 
+and BUCK2. In this case, you can use 'regulator_config.ena_gpio' when a 
+regulator is registered.
+
 >
-> These 3 should probably be separate patches (and be Cc'd to stable
-
-Will do. But I have the feeling that at least 1. and 2. should be in
-the same patch as they touch the same lines of code. Do you think that
-would be ok?
-And before CC'ing stable, I would love to have someone with access to
-A10 hardware and a scope (or even a bus pirate) check that the A10 SPI
-controller does indeed have the same "bug". I strongly think so, but
-would sleep better if it could be confirmed.
-
-[...]
->> -     /* Ensure that we have a parent clock fast enough */
->> +     /*
->> +      * Ensure that the parent clock is set to twice the max speed
->> +      * of the spi device (possibly rounded up by the clk driver)
->> +      */
->>       mclk_rate = clk_get_rate(sspi->mclk);
->> -     if (mclk_rate < (2 * tfr->speed_hz)) {
->> -             clk_set_rate(sspi->mclk, 2 * tfr->speed_hz);
->> +     if (spi->max_speed_hz != sspi->cur_max_speed ||
->> +         mclk_rate != sspi->cur_mclk) {
+> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+> ---
+>   .../devicetree/bindings/regulator/lp872x.txt       |  1 +
+>   drivers/regulator/lp872x.c                         | 33 ++++++++++++++++++++--
+>   include/linux/regulator/lp872x.h                   |  2 ++
+>   3 files changed, 33 insertions(+), 3 deletions(-)
 >
-> Do you need to cache the values? As far as I'm aware, you end up doing
-> the computation all the time anyway.
+> diff --git a/Documentation/devicetree/bindings/regulator/lp872x.txt b/Documentation/devicetree/bindings/regulator/lp872x.txt
+> index 7818318..0559c25 100644
+> --- a/Documentation/devicetree/bindings/regulator/lp872x.txt
+> +++ b/Documentation/devicetree/bindings/regulator/lp872x.txt
+> @@ -28,6 +28,7 @@ Optional properties:
+>     - ti,dvs-gpio: GPIO specifier for external DVS pin control of LP872x devices.
+>     - ti,dvs-vsel: DVS selector. 0 = SEL_V1, 1 = SEL_V2.
+>     - ti,dvs-state: initial DVS pin state. 0 = DVS_LOW, 1 = DVS_HIGH.
+> +  - ti,enable-gpio: GPIO specifier for EN pin control of LP872x devices.
 
-By caching the values we optimize the case when a single SPI slave
-device (or even multiple slave devices with the same max_speed) are
-used multiple times in a row. In that case, we're saving two calls:
-clk_set_rate and clk_get_rate. I was unsure about how expensive the
-clk_* calls were, so I thought it would be safer use caching. But
-maybe it's not worth the extra code?
+Please use general property, "enable-gpios" instead of "ti,enable-gpio".
 
-Oh, and I just noticed a mistake in the comment: the clock driver
-rounds up _or_ down, so I should drop the "up".
-
-[...]
->> -     div = mclk_rate / (2 * tfr->speed_hz);
->> -     if (div <= (SUN4I_CLK_CTL_CDR2_MASK + 1)) {
->> -             if (div > 0)
->> -                     div--;
->> -
->> +     div = DIV_ROUND_UP(mclk_rate, 2 * tfr->speed_hz) - 1;
 >
-> Isn't it exactly the same thing as mclk_rate / (2 * tfr->speed_hz) ?
+>     Sub nodes for regulator_init_data
+>       LP8720 has maximum 6 nodes. (child name: ldo1 ~ 5 and buck)
+> diff --git a/drivers/regulator/lp872x.c b/drivers/regulator/lp872x.c
+> index 21c49d8..c8855f3 100644
+> --- a/drivers/regulator/lp872x.c
+> +++ b/drivers/regulator/lp872x.c
+> @@ -726,6 +726,27 @@ static struct regulator_desc lp8725_regulator_desc[] = {
+>   	},
+>   };
+>
+> +static int lp872x_init_enable(struct lp872x *lp)
 
-It is quite often, but not in all cases. The plain division rounds to
-the nearest integer, so it rounds down sometimes. Consider the
-following case: we have a slow SPI device with a spi-max-frequency of
-50kHz. Our clock driver can't find a clock as slow as 100kHz, so it
-sets mclk to 214,285Hz.
+lp872x_enable_hw() would be better.
 
-Using the old calculation we get: 214,285 / (2 * 50,000) = 2, so div =
-1 as the old code subtracts 1 two lines further down
-The new calculation results in: DIV_ROUND_UP(214,285, 2 * 50,000)  =
-3, so div = 2 if we add the -1
-We end up with a SPI_CLK of 53,571Hz using the old calculation and
-35,714Hz using the new one. The old SPI_CLK is obviously closer to the
-requested speed, but nevertheless it exceeds the requested limit and
-should not have been chosen.
+> +{
+> +	int ret, gpio;
+> +
+> +	if (!lp->pdata)
+> +		return -EINVAL;
+> +
+> +	gpio = lp->pdata->enable_gpio;
+> +	if (!gpio_is_valid(gpio))
+> +		return 0;
+> +
+> +	/* Always set enable GPIO high. */
+> +	ret = devm_gpio_request_one(lp->dev, gpio, GPIOF_OUT_INIT_HIGH, "LP872X EN");
+> +	if (ret) {
+> +		dev_err(lp->dev, "gpio request err: %d\n", ret);
+> +		return ret;
+> +	}
 
-Thanks for the review!
+LP8720 device needs max 200usec for startup time.
+LP8725 also requires enable time about 30ms.
+Please use usleep_range() after EN pin control.
 
-Cheers,
+> +
+> +	return 0;
+> +}
+> +
+>   static int lp872x_init_dvs(struct lp872x *lp)
+>   {
+>   	int ret, gpio;
+> @@ -763,14 +784,18 @@ static int lp872x_config(struct lp872x *lp)
+>   	int ret;
+>
+>   	if (!pdata || !pdata->update_config)
+> -		goto init_dvs;
+> +		goto init_dvs_enable;
+>
+>   	ret = lp872x_write_byte(lp, LP872X_GENERAL_CFG, pdata->general_config);
+>   	if (ret)
+>   		return ret;
+>
+> -init_dvs:
+> -	return lp872x_init_dvs(lp);
+> +init_dvs_enable:
+> +	ret = lp872x_init_dvs(lp);
+> +	if (ret)
+> +		return ret;
+> +
+> +	return lp872x_init_enable(lp);
+>   }
 
-   Marcus
+Logic should be enabled prior to DVS configuration. And please call 
+lp872x_enable_hw() in _probe().
+
+>
+>   static struct regulator_init_data
+> @@ -875,6 +900,8 @@ static struct lp872x_platform_data
+>   	of_property_read_u8(np, "ti,dvs-state", &dvs_state);
+>   	pdata->dvs->init_state = dvs_state ? DVS_HIGH : DVS_LOW;
+>
+> +	pdata->enable_gpio = of_get_named_gpio(np, "ti,enable-gpio", 0);
+> +
+
+Please replace "ti,enable-gpio" with "enable-gpios".
+
+Best regards,
+Milo
