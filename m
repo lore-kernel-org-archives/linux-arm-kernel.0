@@ -1,36 +1,43 @@
-From: yalin.wang2010@gmail.com (yalin wang)
-Date: Mon, 28 Dec 2015 15:07:35 +0800
-Subject: [RFC] arm: change to use generic sign_extend32() function
-Message-ID: <1451286455-13121-1-git-send-email-yalin.wang2010@gmail.com>
+From: biao.huang@mediatek.com (Biao Huang)
+Date: Mon, 28 Dec 2015 15:09:01 +0800
+Subject: [PATCH v3 0/5] pinctrl: mediatek: add pinctrl/GPIO/EINT driver for
+ mt2701
+Message-ID: <1451286546-5920-1-git-send-email-biao.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-change to use generic sign_extend32() to caaculate branch_displacement.
+Change in v3:
+1. convert to arch_initcall.
+2. set direction to input when do input-enable/disable and input-schmitt-enable/disable properties.
 
-Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
----
- arch/arm/probes/decode-arm.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+Change in v2:
+1. add special pinmux setting for some pins.
+2. fix mt2701 direction control issue.
+3. resort dt-bindings.
 
-diff --git a/arch/arm/probes/decode-arm.c b/arch/arm/probes/decode-arm.c
-index f72c33a..ff794c0 100644
---- a/arch/arm/probes/decode-arm.c
-+++ b/arch/arm/probes/decode-arm.c
-@@ -20,13 +20,12 @@
- #include <linux/module.h>
- #include <linux/stddef.h>
- #include <linux/ptrace.h>
-+#include <linux/bitops.h>
- 
- #include "decode.h"
- #include "decode-arm.h"
- 
--#define sign_extend(x, signbit) ((x) | (0 - ((x) & (1 << (signbit)))))
--
--#define branch_displacement(insn) sign_extend(((insn) & 0xffffff) << 2, 25)
-+#define branch_displacement(insn) sign_extend32(((insn) & 0xffffff) << 2, 25)
- 
- /*
-  * To avoid the complications of mimicing single-stepping on a
+Biao Huang (4):
+  dt-bindings: mediatek: Modify pinctrl bindings for mt2701
+  pinctrl: dt bindings: Add pinfunc header file for mt2701
+  pinctrl: mediatek: Add Pinctrl/GPIO/EINT driver for mt2701
+  arm: dts: Add pinctrl/GPIO/EINT node for mt2701
+
+Erin Lo (1):
+  ARM: mediatek: Add MT2701 config options for mediatek SoCs.
+
+ .../devicetree/bindings/pinctrl/pinctrl-mt65xx.txt |    9 +-
+ arch/arm/boot/dts/mt2701-pinfunc.h                 |  735 +++++++
+ arch/arm/boot/dts/mt2701.dtsi                      |   19 +
+ arch/arm/mach-mediatek/Kconfig                     |    4 +
+ drivers/pinctrl/mediatek/Kconfig                   |    6 +
+ drivers/pinctrl/mediatek/Makefile                  |    1 +
+ drivers/pinctrl/mediatek/pinctrl-mt2701.c          |  586 +++++
+ drivers/pinctrl/mediatek/pinctrl-mtk-common.c      |   16 +
+ drivers/pinctrl/mediatek/pinctrl-mtk-common.h      |   12 +-
+ drivers/pinctrl/mediatek/pinctrl-mtk-mt2701.h      | 2323 ++++++++++++++++++++
+ 10 files changed, 3706 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm/boot/dts/mt2701-pinfunc.h
+ create mode 100644 drivers/pinctrl/mediatek/pinctrl-mt2701.c
+ create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-mt2701.h
+
 -- 
-1.9.1
+1.7.9.5 
