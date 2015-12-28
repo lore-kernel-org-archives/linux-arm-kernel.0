@@ -1,61 +1,53 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 28 Dec 2015 15:52:39 +0200
-Subject: [PATCH] ARM: dts: am437x: pixcir_tangoc: use correct flags for irq
- types
-Message-ID: <1451310759-29536-1-git-send-email-grygorii.strashko@ti.com>
+From: geliangtang@163.com (Geliang Tang)
+Date: Mon, 28 Dec 2015 21:53:07 +0800
+Subject: [PATCH] crypto: hifn_795x, picoxcell - use ablkcipher_request_cast
+Message-ID: <9b6f300df7ffd4c5d65253fdbbb2d1a1cba04835.1451310459.git.geliangtang@163.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now IRQs for Pixcir Tangoc touchscreen are defined using
-IRQ_TYPE_NONE in am437x-gp-evm.dts and am43x-epos-evm.dts wich
-do not correspond HW.
+Use ablkcipher_request_cast() instead of open-coding it.
 
-Hence, update am437x-gp-evm.dts and am43x-epos-evm.dts files
-and use correct flag IRQ_TYPE_EDGE_FALLING for irq types.
-
-While here, remove duplicated irq declaration for pixcir_ts at 5c node
-in am437x-gp-evm.dts.
-
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+Signed-off-by: Geliang Tang <geliangtang@163.com>
 ---
- arch/arm/boot/dts/am437x-gp-evm.dts  | 4 +---
- arch/arm/boot/dts/am43x-epos-evm.dts | 2 +-
- 2 files changed, 2 insertions(+), 4 deletions(-)
+ drivers/crypto/hifn_795x.c        | 4 ++--
+ drivers/crypto/picoxcell_crypto.c | 3 +--
+ 2 files changed, 3 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am437x-gp-evm.dts b/arch/arm/boot/dts/am437x-gp-evm.dts
-index d2450ab..fc4c371 100644
---- a/arch/arm/boot/dts/am437x-gp-evm.dts
-+++ b/arch/arm/boot/dts/am437x-gp-evm.dts
-@@ -590,8 +590,6 @@
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pixcir_ts_pins>;
- 		reg = <0x5c>;
--		interrupt-parent = <&gpio3>;
--		interrupts = <22 0>;
+diff --git a/drivers/crypto/hifn_795x.c b/drivers/crypto/hifn_795x.c
+index 201e57d..eee2c7e 100644
+--- a/drivers/crypto/hifn_795x.c
++++ b/drivers/crypto/hifn_795x.c
+@@ -1943,7 +1943,7 @@ static void hifn_flush(struct hifn_device *dev)
  
- 		attb-gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
+ 	spin_lock_irqsave(&dev->lock, flags);
+ 	while ((async_req = crypto_dequeue_request(&dev->queue))) {
+-		req = container_of(async_req, struct ablkcipher_request, base);
++		req = ablkcipher_request_cast(async_req);
+ 		spin_unlock_irqrestore(&dev->lock, flags);
  
-@@ -599,7 +597,7 @@
- 		 * 0x264 represents the offset of padconf register of
- 		 * gpio3_22 from am43xx_pinmux base.
- 		 */
--		interrupts-extended = <&gpio3 22 IRQ_TYPE_NONE>,
-+		interrupts-extended = <&gpio3 22 IRQ_TYPE_EDGE_FALLING>,
- 				      <&am43xx_pinmux 0x264>;
- 		interrupt-names = "tsc", "wakeup";
+ 		hifn_process_ready(req, -ENODEV);
+@@ -2062,7 +2062,7 @@ static int hifn_process_queue(struct hifn_device *dev)
+ 		if (backlog)
+ 			backlog->complete(backlog, -EINPROGRESS);
  
-diff --git a/arch/arm/boot/dts/am43x-epos-evm.dts b/arch/arm/boot/dts/am43x-epos-evm.dts
-index 47954ed..29c6580 100644
---- a/arch/arm/boot/dts/am43x-epos-evm.dts
-+++ b/arch/arm/boot/dts/am43x-epos-evm.dts
-@@ -491,7 +491,7 @@
- 		pinctrl-0 = <&pixcir_ts_pins>;
- 		reg = <0x5c>;
- 		interrupt-parent = <&gpio1>;
--		interrupts = <17 0>;
-+		interrupts = <17 IRQ_TYPE_EDGE_FALLING>;
+-		req = container_of(async_req, struct ablkcipher_request, base);
++		req = ablkcipher_request_cast(async_req);
  
- 		attb-gpio = <&gpio1 17 GPIO_ACTIVE_HIGH>;
+ 		err = hifn_handle_req(req);
+ 		if (err)
+diff --git a/drivers/crypto/picoxcell_crypto.c b/drivers/crypto/picoxcell_crypto.c
+index 15b5e39..3b1c7ec 100644
+--- a/drivers/crypto/picoxcell_crypto.c
++++ b/drivers/crypto/picoxcell_crypto.c
+@@ -856,8 +856,7 @@ static int spacc_ablk_need_fallback(struct spacc_req *req)
  
+ static void spacc_ablk_complete(struct spacc_req *req)
+ {
+-	struct ablkcipher_request *ablk_req =
+-		container_of(req->req, struct ablkcipher_request, base);
++	struct ablkcipher_request *ablk_req = ablkcipher_request_cast(req->req);
+ 
+ 	if (ablk_req->src != ablk_req->dst) {
+ 		spacc_free_ddt(req, req->src_ddt, req->src_addr, ablk_req->src,
 -- 
-2.6.4
+2.5.0
