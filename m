@@ -1,70 +1,102 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 28 Dec 2015 11:15:30 +0100
-Subject: [PATCH v2 0/9] ARM: dts: Add compatible property to "partitions"
- node
-In-Reply-To: <20151228050147.GE1066@verge.net.au>
-References: <1450694033-27717-1-git-send-email-geert+renesas@glider.be>
- <20151228050147.GE1066@verge.net.au>
-Message-ID: <CAMuHMdXt36GSDuoFVGBebJVN9OHPh=ze8u8KvQ0B+RcvT6xTYQ@mail.gmail.com>
+From: js07.lee@samsung.com (Jungseung Lee)
+Date: Mon, 28 Dec 2015 19:15:42 +0900
+Subject: [PATCH] ARM: mm: Speed up page list initialization during boot
+In-Reply-To: <004001d14158$114be8d0$33e3ba70$@samsung.com>
+References: <004001d14158$114be8d0$33e3ba70$@samsung.com>
+Message-ID: <005101d14158$b50842c0$1f18c840$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi,
 
-On Mon, Dec 28, 2015 at 6:01 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Mon, Dec 21, 2015 at 11:33:44AM +0100, Geert Uytterhoeven wrote:
->> As of commit e488ca9f8d4f62c2 ("doc: dt: mtd: partitions: add compatible
->> property to "partitions" node"), which is in v4.4-rc6, the "partitions"
->> subnode of an SPI FLASH device node must have a compatible property. The
->> partitions are no longer detected if it is not present.
->>
->> However, several DTSes in -next have already been converted to the
->> "partitions" subnode without "compatible" property, introduced by
->> commits 5cfdedb7b9a0fe38 ("mtd: ofpart: move ofpart partitions to a
->> dedicated dt node") and fe2585e9c29a650a ("doc: dt: mtd: support
->> partitions in a special 'partitions' subnode"). Hence all of these are
->> now broken in -next, and will be broken in upstream during the merge
->> window.
->>
->> This series fixes all users in next-20151221.
->> Tested on r8a7791/koelsch.
->>
->> Changes since v1:
->>   - Add Acked-by,
->>   - Fix new users in -next (kirkwood, ci20).
->>
->> Most of these are in arm-soc/for-next. Exceptions are kirkwood (in
->> mvebu/for-next), and ci20 (in mips/mips-for-linux-next).
->>
->> Given we're late in the v4.4-rc cycle, perhaps it's easiest if the
->> arm-soc maintainers take all applicable patches directly, bypassing the
->> mvebu and shmobile maintainers?
->>
->> Thanks for queuing for v4.5!
->>
->> Geert Uytterhoeven (9):
->>   ARM: mvebu: ix4-300d: Add compatible property to "partitions" node
->>   ARM: mvebu: kirkwood: Add compatible property to "partitions" node
->>   ARM: shmobile: bockw dts: Add compatible property to "partitions" node
->>   ARM: shmobile: lager dts: Add compatible property to "partitions" node
->>   ARM: shmobile: koelsch dts: Add compatible property to "partitions"
->>     node
->>   ARM: shmobile: porter dts: Add compatible property to "partitions"
->>     node
->>   ARM: shmobile: gose dts: Add compatible property to "partitions" node
->>   ARM: shmobile: silk dts: Add compatible property to "partitions" node
+>During boot, we populate the page lists by using the page freeing 
+>mechanism on every individual page.  Unfortunately, this is very 
+>inefficient because the memory manager spends a lot of time coalescing 
+>pairs of adjacent free pages into bigger blocks.
 >
-> Thanks, I have queued up the above "shmobile" patches for v4.6.
+>Rather than adding a single order 0 page at a time, we can take 
+>advantage of the fact that we know that all the pages are available and 
+>free up big blocks of pages at a time instead.
+>
+>Signed-off-by: Chirantan Ekbote <chirantan@chromium.org>
+>---
+> arch/arm/mm/init.c  | 19 +++++++++++++++++--  include/linux/gfp.h |  1 
+>+
+> mm/internal.h       |  1 -
+> 3 files changed, 18 insertions(+), 3 deletions(-)
+>
+>diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c index 
+>97c293e..c7fc2d8 100644
+>--- a/arch/arm/mm/init.c
+>+++ b/arch/arm/mm/init.c
+>@@ -22,6 +22,7 @@
+> #include <linux/memblock.h>
+> #include <linux/dma-contiguous.h>
+> #include <linux/sizes.h>
+>+#include <linux/bitops.h>
+> 
+> #include <asm/mach-types.h>
+> #include <asm/memblock.h>
+>@@ -469,8 +470,22 @@ static void __init free_unused_memmap(struct 
+>meminfo
+*mi)
+> #ifdef CONFIG_HIGHMEM
+> static inline void free_area_high(unsigned long pfn, unsigned long 
+>end)  {
+>-	for (; pfn < end; pfn++)
+>-		free_highmem_page(pfn_to_page(pfn));
+>+	while (pfn < end) {
+>+		struct page *page = pfn_to_page(pfn);
+>+		unsigned long order = min(__ffs(pfn), MAX_ORDER - 1);
+>+		unsigned long nr_pages = 1 << order;
+>+		unsigned long rem = end - pfn;
+>+
+>+		if (nr_pages > rem) {
+>+			order = __fls(rem);
+>+			nr_pages = 1 << order;
+>+		}
+>+
+>+		__free_pages_bootmem(page, order);
+>+		totalram_pages += nr_pages;
+>+		totalhigh_pages += nr_pages;
+>+		pfn += nr_pages;
+>+	}
+> }
+> #endif
+> 
+>diff --git a/include/linux/gfp.h b/include/linux/gfp.h index 
+>39b81dc..a63d666 100644
+>--- a/include/linux/gfp.h
+>+++ b/include/linux/gfp.h
+>@@ -367,6 +367,7 @@ void *alloc_pages_exact_nid(int nid, size_t size, 
+>gfp_t
+gfp_mask);
+> #define __get_dma_pages(gfp_mask, order) \
+> 		__get_free_pages((gfp_mask) | GFP_DMA, (order))
+> 
+>+extern void __free_pages_bootmem(struct page *page, unsigned int 
+>+order);
+> extern void __free_pages(struct page *page, unsigned int order);  
+>extern void free_pages(unsigned long addr, unsigned int order);  extern 
+>void free_hot_cold_page(struct page *page, int cold); diff --git 
+>a/mm/internal.h b/mm/internal.h index 29e1e76..d2b8738 100644
+>--- a/mm/internal.h
+>+++ b/mm/internal.h
+>@@ -93,7 +93,6 @@ extern pmd_t *mm_find_pmd(struct mm_struct *mm, 
+>unsigned
+long address);
+> /*
+>  * in mm/page_alloc.c
+>  */
+>-extern void __free_pages_bootmem(struct page *page, unsigned int 
+>order);  extern void prep_compound_page(struct page *page, unsigned 
+>long order);  #ifdef CONFIG_MEMORY_FAILURE  extern bool 
+>is_free_buddy_page(struct page *page);
+>--
+>1.9.1.423.g4596e3a
 
-I'm afraid v4.6 is too late, leaving all SPI FLASHes broken in v4.5.
+This patch really could save boot time. 
+Is there any reason this patch is not merged to mainline kernel?
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Best Regards,
+Jungseung Lee
