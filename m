@@ -1,51 +1,100 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Mon, 28 Dec 2015 10:41:37 -0800
-Subject: [RESEND v4 0/6] remoteproc: Add driver for STMicroelectronics
- platforms
-In-Reply-To: <CAK=WgbbWTdDGMYOFjVO3s1bt1r5iou6Q-hHOh4SZG=rQuEa2eQ@mail.gmail.com>
-References: <1448370862-19120-1-git-send-email-lee.jones@linaro.org>
- <CAK=WgbZbiq_BAUEti9tWUtWqZPU_4gDJ5Mfqur=Ou2N4Ea+2GQ@mail.gmail.com>
- <20151126091043.GO12874@x1>
- <CAK=WgbbWTdDGMYOFjVO3s1bt1r5iou6Q-hHOh4SZG=rQuEa2eQ@mail.gmail.com>
-Message-ID: <CAJAp7OgZwf-Cd+Drypqo92YNJBYtB-XCbW-noy-4BB5JZojRnw@mail.gmail.com>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Mon, 28 Dec 2015 13:01:22 -0800
+Subject: [PATCH 1/5] arm: devtree: Set system_rev from DT "/revision"
+In-Reply-To: <20151224190237.GA17343@pali>
+References: <1436214373-12969-1-git-send-email-pali.rohar@gmail.com>
+ <1436214373-12969-2-git-send-email-pali.rohar@gmail.com>
+ <20151224190237.GA17343@pali>
+Message-ID: <5681A322.2090204@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 26, 2015 at 1:32 AM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> On Thu, Nov 26, 2015 at 11:10 AM, Lee Jones <lee.jones@linaro.org> wrote:
->> On Thu, 26 Nov 2015, Ohad Ben-Cohen wrote:
->>> On Tue, Nov 24, 2015 at 3:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
->>> > ST's platforms often have multiple co-processors (usually ST40s or ST231s)
->>> > on-board.  This provides the Linux-side infrastructure to flash and boot
->>> > them successfully.
->>> >
->>> > This set has been tested on an STiH410-B2120.
->>>
->>> It would be nice if you could get at least one Reviewed-by tag coming
->>> outside of ST (e.g., Suman or Bjorn who are actively using and
->>> improving remoteproc).
+Adding devicetree-spec, and commenting below.
+
+On 12/24/2015 11:02 AM, Pali Roh?r wrote:
+> On Monday 06 July 2015 22:26:09 Pali Roh?r wrote:
+>> With this patch "/revision" DT entry is used to set global system_rev
+>> variable. DT "/revision" is expected to be u32 numeric value.
 >>
->> If you require reviews by these guys, shouldn't they be Maintainers?
->
-> Additional review isn't a requirement, but it's a plus.
->
->> Please be aware that
->> the DTS(I) changes are applied to this set for your information only
->> and are not to be applied through the RemoteProc tree.  The usual
->> process to which we conform is that Maxime (the STi Maintainer) will
->> apply the DT changes *after* the main driver has been applied, in this
->> case by you.
->
-> Ok, great, so I will not take patches 5 and 6.
->
+>> TODO: add documentation
+>>
+>> Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
+>> ---
+>>  arch/arm/kernel/devtree.c |   12 ++++++++++--
+>>  1 file changed, 10 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+>> index 11c54de..7d82749 100644
+>> --- a/arch/arm/kernel/devtree.c
+>> +++ b/arch/arm/kernel/devtree.c
+>> @@ -19,6 +19,7 @@
+>>  #include <linux/of_irq.h>
+>>  #include <linux/of_platform.h>
+>>  #include <linux/smp.h>
+>> +#include <linux/libfdt_env.h>
+>>  
+>>  #include <asm/cputype.h>
+>>  #include <asm/setup.h>
+>> @@ -26,6 +27,7 @@
+>>  #include <asm/smp_plat.h>
+>>  #include <asm/mach/arch.h>
+>>  #include <asm/mach-types.h>
+>> +#include <asm/system_info.h>
+>>  
+>>  
+>>  #ifdef CONFIG_SMP
+>> @@ -204,6 +206,8 @@ static const void * __init arch_get_next_mach(const char *const **match)
+>>  const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
+>>  {
+>>  	const struct machine_desc *mdesc, *mdesc_best = NULL;
+>> +	unsigned long dt_root;
+>> +	const u32 *rev;
+>>  
+>>  #ifdef CONFIG_ARCH_MULTIPLATFORM
+>>  	DT_MACHINE_START(GENERIC_DT, "Generic DT based system")
+>> @@ -215,17 +219,16 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
+>>  	if (!dt_phys || !early_init_dt_verify(phys_to_virt(dt_phys)))
+>>  		return NULL;
+>>  
+>> +	dt_root = of_get_flat_dt_root();
+>>  	mdesc = of_flat_dt_match_machine(mdesc_best, arch_get_next_mach);
+>>  
+>>  	if (!mdesc) {
+>>  		const char *prop;
+>>  		int size;
+>> -		unsigned long dt_root;
+>>  
+>>  		early_print("\nError: unrecognized/unsupported "
+>>  			    "device tree compatible list:\n[ ");
+>>  
+>> -		dt_root = of_get_flat_dt_root();
+>>  		prop = of_get_flat_dt_prop(dt_root, "compatible", &size);
+>>  		while (size > 0) {
+>>  			early_print("'%s' ", prop);
+>> @@ -246,5 +249,10 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
+>>  	/* Change machine number to match the mdesc we're using */
+>>  	__machine_arch_type = mdesc->nr;
+>>  
+>> +	/* Set system revision from DT */
+>> +	rev = of_get_flat_dt_prop(dt_root, "revision", NULL);
+>> +	if (rev)
+>> +		system_rev = fdt32_to_cpu(*rev);
+>> +
+>>  	return mdesc;
+>>  }
+> 
+> This patch and second one (with subject "[PATCH 2/5] arm: boot: convert
+> ATAG_REVISION to DT "/revision" entry") are still needed.
+> 
+> Are there any objections for them? If not, I will add missing DT
+> documentation and will resend them.
 
-I interpreted this as you picked patch 1-4 and didn't pay more
-attention to them, but I can't find them in your kernel.org trees. So
-I've looked through them again.
+Patch 2/5 copies the value from ATAG_REVISION into the fdt "/revision"
+property.
 
-Please apply patch 1, 3 and 4 to your tree Ohad. I was unable to find
-a v5 of patch 2, but it's unrelated so no need to wait for a new
-version of that.
+If the use of /revision is limited to being a location to hold an ATAG
+value to pass to the global variable system_rev, then it would make
+sense to just copy directly from the ATAG value into system_rev in the
+same board file where you are copying the ATAGs.
 
-Regards,
-Bjorn
+-Frank
