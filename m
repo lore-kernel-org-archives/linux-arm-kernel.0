@@ -1,44 +1,36 @@
-From: milo.kim@ti.com (Milo Kim)
-Date: Mon, 28 Dec 2015 09:56:20 +0900
-Subject: [PATCH 4/6] regulator: lp872x: Add enable GPIO pin support
-In-Reply-To: <20151223115632.GS16023@sirena.org.uk>
-References: <1450868319-20513-1-git-send-email-contact@paulk.fr>
- <1450868319-20513-5-git-send-email-contact@paulk.fr>
- <20151223115632.GS16023@sirena.org.uk>
-Message-ID: <568088B4.6090207@ti.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 28 Dec 2015 10:02:57 +0900
+Subject: [PATCH] ARM: s3c: simplify s3c_irqwake_{e,}intallow definition
+In-Reply-To: <16503982.4JeEM7ZXq8@wuerfel>
+References: <16503982.4JeEM7ZXq8@wuerfel>
+Message-ID: <56808A41.2050105@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On 18.12.2015 23:45, Arnd Bergmann wrote:
+> For a long time, gcc has warned about odd configurations on s3c64xx:
+> 
+> In file included from arch/arm/plat-samsung/pm.c:34:0:
+> arch/arm/mach-s3c64xx/include/mach/pm-core.h:61:0: warning: "s3c_irqwake_eintallow" redefined
+>  #define s3c_irqwake_eintallow ((1 << 28) - 1)
+> In file included from arch/arm/plat-samsung/pm.c:33:0:
+> arch/arm/plat-samsung/include/plat/pm.h:49:0: note: this is the location of the previous definition
+>  #define s3c_irqwake_eintallow 0
+> 
+> The definitions of s3c_irqwake_intallow and s3c_irqwake_eintallow are a bit consistent
+> between the various platforms. Things have become easier now that it's only s3c24xx
+> and s3c64xx that use them at all, so I've tried to rearrange the definitions to
+> make it more obvious what is going on.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> This fixes a very old and harmless warning, please apply to a cleanup branch
+> if you agree.
+> 
 
-On 23/12/15 20:56, Mark Brown wrote:
-> On Wed, Dec 23, 2015 at 11:58:37AM +0100, Paul Kocialkowski wrote:
->
->> +	gpio = lp->pdata->enable_gpio;
->> +	if (!gpio_is_valid(gpio))
->> +		return 0;
->> +
->> +	/* Always set enable GPIO high. */
->> +	ret = devm_gpio_request_one(lp->dev, gpio, GPIOF_OUT_INIT_HIGH, "LP872X EN");
->> +	if (ret) {
->> +		dev_err(lp->dev, "gpio request err: %d\n", ret);
->> +		return ret;
->> +	}
->
-> This isn't really adding support for the enable GPIO as the changelog
-> suggests, it's requesting but not managing the GPIO.  Since there is
-> core support for manging enable GPIOs this seems especially silly,
-> please tell the core about the GPIO and then it will work at runtime
-> too.
->
+Looks correct and makes sense. Hoping you compiled it on all machs:
 
-With reference to my previous mail, external GPIOs for LDO3 and BUCK2 in 
-LP8725 can be specified through regulator_config.ena_gpio. BUCK2 only 
-can be controlled by external pin when CONFIG pin is grounded.
-
-Please see the description at page 5 of the datasheet.
-
-	http://www.ti.com/lit/ds/symlink/lp8725.pdf
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
 Best regards,
-Milo
+Krzysztof
