@@ -1,46 +1,65 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 28 Dec 2015 12:50:03 +0100
-Subject: [RFC PATCH 01/10] arm64: introduce KIMAGE_VADDR as the virtual
- base of the kernel region
-In-Reply-To: <1451301654-32019-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1451301654-32019-1-git-send-email-ard.biesheuvel@linaro.org>
- <1451301654-32019-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <11539877.krH4qBJsp9@wuerfel>
+Date: Mon, 28 Dec 2015 12:54:28 +0100
+Subject: [PATCH] arm: kernel: utilize hrtimer based broadcast
+In-Reply-To: <DB3PR04MB07407D83CC5F8F5F19A7207F4FB0@DB3PR04MB074.eurprd04.prod.outlook.com>
+References: <1437124312-44700-1-git-send-email-b18965@freescale.com>
+ <20151027081834.GB1425@svinekod>
+ <DB3PR04MB07407D83CC5F8F5F19A7207F4FB0@DB3PR04MB074.eurprd04.prod.outlook.com>
+Message-ID: <4875455.lvoc6XpkZc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 28 December 2015 12:20:45 Ard Biesheuvel wrote:
-> @@ -75,8 +76,13 @@
->   * private definitions which should NOT be used outside memory.h
->   * files.  Use virt_to_phys/phys_to_virt/__pa/__va instead.
->   */
-> -#define __virt_to_phys(x)      (((phys_addr_t)(x) - PAGE_OFFSET + PHYS_OFFSET))
-> +#define __virt_to_phys(x) ({                                           \
-> +       phys_addr_t __x = (phys_addr_t)(x);                             \
-> +       __x >= PAGE_OFFSET ? (__x - PAGE_OFFSET + PHYS_OFFSET) :        \
-> +                            (__x - KIMAGE_VADDR + PHYS_OFFSET); })
-> +
->  #define __phys_to_virt(x)      ((unsigned long)((x) - PHYS_OFFSET + PAGE_OFFSET))
-> +#define __phys_to_kimg(x)      ((unsigned long)((x) - PHYS_OFFSET + KIMAGE_VADDR))
+On Monday 28 December 2015 07:18:58 Huan Wang wrote:
+> Hi, Arnd,
+> 
+> 	Could you help to review the following patch? Thanks.
+> 
 
-Having a conditional here is a bit unfortunate.
+Hi Alison,
 
-IIRC KASLR means something different depending on the architecture, we either randomize
-the physical address, or the virtual address, or both, and that addresses different
-attack scenarios. You seem to leave the physical address unchanged, which means that
-an attacker that has gained access to a DMA master device can potentially still modify
-the kernel without knowing the virtual address.
-Similarly, you seem to leave the kernel mapped at the original virtual address and
-just add a second map (or your __phys_to_virt is wrong), so if someone has the
-ability to access a kernel virtual memory address from user space, they also don't
-need the relocated address because they can potentially access the kernel .text
-and .data through the linear mapping.
+I'm sorry but I understand very little of this particular area of the kernel.
 
-How about a different approach that keeps the relocatable kernel, but moves it in
-physical memory with the same random offset as the virtual address? That way, both
-would be random, and you can keep the simple virt_to_phys() function.
-
-I suppose the downside of that is that the number of random bits is then limited
-by the size of the first memblock, which is smaller than the vmalloc area.
+I've added Daniel Lezcano, John Stultz and Thomas Gleixner to Cc, they all
+know this much better than I do and one of them should be able to comment after
+their Christmas break.
 
 	Arnd
+
+> > On Fri, Jul 17, 2015 at 10:11:52AM +0100, Alison Wang wrote:
+> > > Hrtimer based broadcast is used on ARM platform. It can be registered
+> > > as the tick broadcast device in the absence of a real external clock
+> > > device.
+> > >
+> > > Signed-off-by: Alison Wang <alison.wang@freescale.com>
+> > 
+> > This looks sensible to me. FWIW:
+> > 
+> > Acked-by: Mark Rutland <mark.rutland@arm.com>
+> > 
+> > Thanks,
+> > Mark.
+> > 
+> > > ---
+> > >  arch/arm/kernel/time.c | 3 +++
+> > >  1 file changed, 3 insertions(+)
+> > >
+> > > diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c index
+> > > a66e37e..a9bc73c 100644
+> > > --- a/arch/arm/kernel/time.c
+> > > +++ b/arch/arm/kernel/time.c
+> > > @@ -12,6 +12,7 @@
+> > >   *  reading the RTC at bootup, etc...
+> > >   */
+> > >  #include <linux/clk-provider.h>
+> > > +#include <linux/clockchips.h>
+> > >  #include <linux/clocksource.h>
+> > >  #include <linux/errno.h>
+> > >  #include <linux/export.h>
+> > > @@ -121,5 +122,7 @@ void __init time_init(void)
+> > >  		of_clk_init(NULL);
+> > >  #endif
+> > >  		clocksource_of_init();
+> > > +
+> > > +		tick_setup_hrtimer_broadcast();
+> > >  	}
+> > >  }
