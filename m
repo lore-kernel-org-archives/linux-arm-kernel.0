@@ -1,225 +1,123 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 28 Dec 2015 12:20:51 +0100
-Subject: [RFC PATCH 07/10] arm64: use assembly time constants for Image header
- fields
+Date: Mon, 28 Dec 2015 12:20:54 +0100
+Subject: [RFC PATCH 10/10] arm64: efi: invoke EFI_RNG_PROTOCOL to supply KASLR
+ randomness
 In-Reply-To: <1451301654-32019-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1451301654-32019-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1451301654-32019-8-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1451301654-32019-11-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Unfortunately, using the linker to emit build time constants into
-the Image header will no longer work once we switch to the use of
-PIE executables. The reason is that such constants are emitted into
-the binary using R_AARCH64_ABS64 relocations, which we will resolve
-at runtime, not at build time, and the places targeted by those
-relocations will contain zeroes before that.
+Since arm64 does not use a decompressor that supplies an execution
+environment where it is feasible to some extent to provide a source of
+randomness, the arm64 KASLR kernel depends on the bootloader to supply
+some random bits in register x1 upon kernel entry.
 
-So move back to assembly time constants. These will be emitted in the
-endianness of the target binary, so we will need a post-link fixup
-step to byte swap the header fields.
+On UEFI systems, we can use the EFI_RNG_PROTOCOL, if supplied, to obtain
+some random bits.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/boot/Makefile        |  1 +
- arch/arm64/kernel/head.S        | 32 ++++++++++------
- arch/arm64/kernel/image.h       | 40 --------------------
- arch/arm64/kernel/vmlinux.lds.S |  2 -
- scripts/arm64fixhdr.pl          | 25 ++++++++++++
- 5 files changed, 46 insertions(+), 54 deletions(-)
+ arch/arm64/kernel/efi-entry.S           |  7 +++--
+ drivers/firmware/efi/libstub/arm-stub.c | 31 ++++++++++++++++++++
+ include/linux/efi.h                     |  5 +++-
+ 3 files changed, 40 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/boot/Makefile b/arch/arm64/boot/Makefile
-index abcbba2f01ba..b2da54b4b796 100644
---- a/arch/arm64/boot/Makefile
-+++ b/arch/arm64/boot/Makefile
-@@ -18,6 +18,7 @@ targets := Image Image.gz
- 
- $(obj)/Image: vmlinux FORCE
- 	$(call if_changed,objcopy)
-+	@$(srctree)/scripts/arm64fixhdr.pl $@
- 
- $(obj)/Image.bz2: $(obj)/Image FORCE
- 	$(call if_changed,bzip2)
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 6434c844a0e4..a03ffffd84cb 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -51,6 +51,17 @@
- #define KERNEL_START	_text
- #define KERNEL_END	_end
- 
-+#ifdef CONFIG_CPU_BIG_ENDIAN
-+#define __HEAD_FLAG_BE	1
-+#else
-+#define __HEAD_FLAG_BE	0
-+#endif
+diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
+index f82036e02485..e9bd55de14dd 100644
+--- a/arch/arm64/kernel/efi-entry.S
++++ b/arch/arm64/kernel/efi-entry.S
+@@ -110,7 +110,7 @@ ENTRY(entry)
+ 2:
+ 	/* Jump to kernel entry point */
+ 	mov	x0, x20
+-	mov	x1, xzr
++	ldr	x1, efi_random_bytes
+ 	mov	x2, xzr
+ 	mov	x3, xzr
+ 	br	x21
+@@ -119,6 +119,9 @@ efi_load_fail:
+ 	mov	x0, #EFI_LOAD_ERROR
+ 	ldp	x29, x30, [sp], #32
+ 	ret
++ENDPROC(entry)
 +
-+#define __HEAD_FLAG_PAGE_SIZE ((PAGE_SHIFT - 10) / 2)
-+
-+#define __HEAD_FLAGS	((__HEAD_FLAG_BE << 0) |	\
-+			 (__HEAD_FLAG_PAGE_SIZE << 1))
-+
- /*
-  * Kernel startup entry point.
-  * ---------------------------
-@@ -67,12 +78,12 @@
-  * in the entry routines.
-  */
- 	__HEAD
-+_head:
++ENTRY(efi_random_bytes)
++	.quad	0
  
- 	/*
- 	 * DO NOT MODIFY. Image header expected by Linux boot-loaders.
- 	 */
- #ifdef CONFIG_EFI
--efi_head:
- 	/*
- 	 * This add instruction has no meaningful effect except that
- 	 * its opcode forms the magic "MZ" signature required by UEFI.
-@@ -83,25 +94,22 @@ efi_head:
- 	b	stext				// branch to kernel start, magic
- 	.long	0				// reserved
- #endif
--	.quad	_kernel_offset_le		// Image load offset from start of RAM, little-endian
--	.quad	_kernel_size_le			// Effective size of kernel image, little-endian
--	.quad	_kernel_flags_le		// Informative flags, little-endian
-+	.quad	TEXT_OFFSET			// Image load offset from start of RAM, little-endian
-+	.quad	_end - _head			// Effective size of kernel image, little-endian
-+	.quad	__HEAD_FLAGS			// Informative flags, little-endian
- 	.quad	0				// reserved
- 	.quad	0				// reserved
- 	.quad	0				// reserved
--	.byte	0x41				// Magic number, "ARM\x64"
--	.byte	0x52
--	.byte	0x4d
--	.byte	0x64
-+	.long	0x644d5241			// Magic number, "ARM\x64"
- #ifdef CONFIG_EFI
--	.long	pe_header - efi_head		// Offset to the PE header.
-+	.long	pe_header - _head		// Offset to the PE header.
- #else
- 	.word	0				// reserved
- #endif
- 
- #ifdef CONFIG_EFI
- 	.globl	__efistub_stext_offset
--	.set	__efistub_stext_offset, stext - efi_head
-+	.set	__efistub_stext_offset, stext - _head
- 	.align 3
- pe_header:
- 	.ascii	"PE"
-@@ -124,7 +132,7 @@ optional_header:
- 	.long	_end - stext			// SizeOfCode
- 	.long	0				// SizeOfInitializedData
- 	.long	0				// SizeOfUninitializedData
--	.long	__efistub_entry - efi_head	// AddressOfEntryPoint
-+	.long	__efistub_entry - _head		// AddressOfEntryPoint
- 	.long	__efistub_stext_offset		// BaseOfCode
- 
- extra_header_fields:
-@@ -139,7 +147,7 @@ extra_header_fields:
- 	.short	0				// MinorSubsystemVersion
- 	.long	0				// Win32VersionValue
- 
--	.long	_end - efi_head			// SizeOfImage
-+	.long	_end - _head			// SizeOfImage
- 
- 	// Everything before the kernel image is considered part of the header
- 	.long	__efistub_stext_offset		// SizeOfHeaders
-diff --git a/arch/arm64/kernel/image.h b/arch/arm64/kernel/image.h
-index bc2abb8b1599..5f34770ba924 100644
---- a/arch/arm64/kernel/image.h
-+++ b/arch/arm64/kernel/image.h
-@@ -22,46 +22,6 @@
- #error This file should only be included in vmlinux.lds.S
- #endif
- 
--/*
-- * There aren't any ELF relocations we can use to endian-swap values known only
-- *@link time (e.g. the subtraction of two symbol addresses), so we must get
-- * the linker to endian-swap certain values before emitting them.
-- */
--#ifdef CONFIG_CPU_BIG_ENDIAN
--#define DATA_LE64(data)					\
--	((((data) & 0x00000000000000ff) << 56) |	\
--	 (((data) & 0x000000000000ff00) << 40) |	\
--	 (((data) & 0x0000000000ff0000) << 24) |	\
--	 (((data) & 0x00000000ff000000) << 8)  |	\
--	 (((data) & 0x000000ff00000000) >> 8)  |	\
--	 (((data) & 0x0000ff0000000000) >> 24) |	\
--	 (((data) & 0x00ff000000000000) >> 40) |	\
--	 (((data) & 0xff00000000000000) >> 56))
--#else
--#define DATA_LE64(data) ((data) & 0xffffffffffffffff)
--#endif
--
--#ifdef CONFIG_CPU_BIG_ENDIAN
--#define __HEAD_FLAG_BE	1
--#else
--#define __HEAD_FLAG_BE	0
--#endif
--
--#define __HEAD_FLAG_PAGE_SIZE ((PAGE_SHIFT - 10) / 2)
--
--#define __HEAD_FLAGS	((__HEAD_FLAG_BE << 0) |	\
--			 (__HEAD_FLAG_PAGE_SIZE << 1))
--
--/*
-- * These will output as part of the Image header, which should be little-endian
-- * regardless of the endianness of the kernel. While constant values could be
-- * endian swapped in head.S, all are done here for consistency.
-- */
--#define HEAD_SYMBOLS						\
--	_kernel_size_le		= DATA_LE64(_end - _text);	\
--	_kernel_offset_le	= DATA_LE64(TEXT_OFFSET);	\
--	_kernel_flags_le	= DATA_LE64(__HEAD_FLAGS);
--
- #ifdef CONFIG_EFI
- 
- /*
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 363c2f529951..69dfa376e843 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -171,8 +171,6 @@ SECTIONS
- 	_end = .;
- 
- 	STABS_DEBUG
--
--	HEAD_SYMBOLS
+ entry_end:
+-ENDPROC(entry)
+diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
+index 950c87f5d279..ebdf7137fe97 100644
+--- a/drivers/firmware/efi/libstub/arm-stub.c
++++ b/drivers/firmware/efi/libstub/arm-stub.c
+@@ -145,6 +145,31 @@ void efi_char16_printk(efi_system_table_t *sys_table_arg,
+ 	out->output_string(out, str);
  }
  
++struct efi_rng_protocol_t {
++	efi_status_t (*get_info)(struct efi_rng_protocol_t *, unsigned long *, efi_guid_t *);
++	efi_status_t (*get_rng)(struct efi_rng_protocol_t *, efi_guid_t *, unsigned long, u8 *out);
++};
++
++static int efi_get_random_bytes(efi_system_table_t *sys_table)
++{
++	extern u64 efi_random_bytes;
++
++	efi_guid_t rng_proto = EFI_RNG_PROTOCOL_GUID;
++	efi_status_t status;
++	struct efi_rng_protocol_t *rng;
++
++	status = sys_table->boottime->locate_protocol(&rng_proto, NULL,
++						      (void **)&rng);
++	if (status == EFI_NOT_FOUND) {
++		pr_efi(sys_table, "EFI_RNG_PROTOCOL unavailable, no randomness supplied\n");
++		return EFI_SUCCESS;
++	}
++
++	if (status != EFI_SUCCESS)
++		return status;
++
++	return rng->get_rng(rng, NULL, sizeof(u64), (u8 *)&efi_random_bytes);
++}
+ 
  /*
-diff --git a/scripts/arm64fixhdr.pl b/scripts/arm64fixhdr.pl
-new file mode 100755
-index 000000000000..09895f412e5d
---- /dev/null
-+++ b/scripts/arm64fixhdr.pl
-@@ -0,0 +1,25 @@
-+#!/usr/bin/perl -w
+  * This function handles the architcture specific differences between arm and
+@@ -267,6 +292,12 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
+ 	if (status != EFI_SUCCESS)
+ 		pr_efi_err(sys_table, "Failed initrd from command line!\n");
+ 
++	if (IS_ENABLED(CONFIG_ARM64_RELOCATABLE_KERNEL)) {
++		status = efi_get_random_bytes(sys_table);
++		if (status != EFI_SUCCESS)
++			pr_efi_err(sys_table, "efi_get_random_bytes() failed\n");
++	}
 +
-+# Copyright (C) 2015 Linaro Ltd <ard.biesheuvel@linaro.org>
-+#
-+# This program is free software; you can redistribute it and/or modify
-+# it under the terms of the GNU General Public License version 2 as
-+# published by the Free Software Foundation.
+ 	new_fdt_addr = fdt_addr;
+ 	status = allocate_new_fdt_and_exit_boot(sys_table, handle,
+ 				&new_fdt_addr, dram_base + MAX_FDT_OFFSET,
+diff --git a/include/linux/efi.h b/include/linux/efi.h
+index 569b5a866bb1..13783fdc9bdd 100644
+--- a/include/linux/efi.h
++++ b/include/linux/efi.h
+@@ -299,7 +299,7 @@ typedef struct {
+ 	void *open_protocol_information;
+ 	void *protocols_per_handle;
+ 	void *locate_handle_buffer;
+-	void *locate_protocol;
++	efi_status_t (*locate_protocol)(efi_guid_t *, void *, void **);
+ 	void *install_multiple_protocol_interfaces;
+ 	void *uninstall_multiple_protocol_interfaces;
+ 	void *calculate_crc32;
+@@ -599,6 +599,9 @@ void efi_native_runtime_setup(void);
+ #define EFI_PROPERTIES_TABLE_GUID \
+     EFI_GUID(  0x880aaca3, 0x4adc, 0x4a04, 0x90, 0x79, 0xb7, 0x47, 0x34, 0x08, 0x25, 0xe5 )
+ 
++#define EFI_RNG_PROTOCOL_GUID \
++    EFI_GUID(  0x3152bca5, 0xeade, 0x433d, 0x86, 0x2e, 0xc0, 0x1c, 0xdc, 0x29, 0x1f, 0x44 )
 +
-+use strict;
-+
-+undef $/;
-+
-+my $image = "arch/arm64/boot/Image";
-+$image = $ARGV[0] if ($ARGV[0]);
-+
-+open(my $INFILE, "<", $image) or die("Failed to open $image for reading\n");
-+my ($c,$to,$is,$fl,$r2,$r3,$r4,$magic,$pe) = unpack("Q<7L<2", <$INFILE>);
-+close($INFILE);
-+
-+exit 0 if ($magic == 0x644d5241);
-+die sprintf("ERROR: incorrect magic 0x%x\n",$magic) if ($magic != 0x41524d64);
-+
-+open(my $OUTFILE, "+<", $image) or die("Failed to open $image for writing\n");
-+print $OUTFILE pack("Q<Q>6L>2",$c,$to,$is,$fl,$r2,$r3,$r4,$magic,$pe);
-+close($OUTFILE);
+ typedef struct {
+ 	efi_guid_t guid;
+ 	u64 table;
 -- 
 2.5.0
