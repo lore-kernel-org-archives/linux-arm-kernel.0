@@ -1,123 +1,342 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 28 Dec 2015 12:20:54 +0100
-Subject: [RFC PATCH 10/10] arm64: efi: invoke EFI_RNG_PROTOCOL to supply KASLR
- randomness
+Date: Mon, 28 Dec 2015 12:20:53 +0100
+Subject: [RFC PATCH 09/10] arm64: add support for relocatable kernel
 In-Reply-To: <1451301654-32019-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1451301654-32019-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1451301654-32019-11-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1451301654-32019-10-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since arm64 does not use a decompressor that supplies an execution
-environment where it is feasible to some extent to provide a source of
-randomness, the arm64 KASLR kernel depends on the bootloader to supply
-some random bits in register x1 upon kernel entry.
-
-On UEFI systems, we can use the EFI_RNG_PROTOCOL, if supplied, to obtain
-some random bits.
+This adds support for runtime relocation of the kernel Image, by
+building it as a PIE (ET_DYN) executable and applying the dynamic
+relocations in the early boot code.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/kernel/efi-entry.S           |  7 +++--
- drivers/firmware/efi/libstub/arm-stub.c | 31 ++++++++++++++++++++
- include/linux/efi.h                     |  5 +++-
- 3 files changed, 40 insertions(+), 3 deletions(-)
+ Documentation/arm64/booting.txt |  3 +-
+ arch/arm64/Kconfig              | 13 ++++
+ arch/arm64/Makefile             |  6 +-
+ arch/arm64/include/asm/memory.h | 10 ++-
+ arch/arm64/kernel/arm64ksyms.c  |  5 ++
+ arch/arm64/kernel/head.S        | 76 +++++++++++++++++++-
+ arch/arm64/kernel/setup.c       | 22 +++---
+ arch/arm64/kernel/vmlinux.lds.S |  9 +++
+ scripts/sortextable.c           |  4 +-
+ 9 files changed, 130 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
-index f82036e02485..e9bd55de14dd 100644
---- a/arch/arm64/kernel/efi-entry.S
-+++ b/arch/arm64/kernel/efi-entry.S
-@@ -110,7 +110,7 @@ ENTRY(entry)
- 2:
- 	/* Jump to kernel entry point */
- 	mov	x0, x20
--	mov	x1, xzr
-+	ldr	x1, efi_random_bytes
- 	mov	x2, xzr
- 	mov	x3, xzr
- 	br	x21
-@@ -119,6 +119,9 @@ efi_load_fail:
- 	mov	x0, #EFI_LOAD_ERROR
- 	ldp	x29, x30, [sp], #32
- 	ret
-+ENDPROC(entry)
-+
-+ENTRY(efi_random_bytes)
-+	.quad	0
+diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+index 701d39d3171a..dcd8eee72984 100644
+--- a/Documentation/arm64/booting.txt
++++ b/Documentation/arm64/booting.txt
+@@ -109,7 +109,8 @@ Header notes:
+ 			1 - 4K
+ 			2 - 16K
+ 			3 - 64K
+-  Bits 3-63:	Reserved.
++  Bit 3:	Relocatable kernel.
++  Bits 4-63:	Reserved.
  
- entry_end:
--ENDPROC(entry)
-diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
-index 950c87f5d279..ebdf7137fe97 100644
---- a/drivers/firmware/efi/libstub/arm-stub.c
-+++ b/drivers/firmware/efi/libstub/arm-stub.c
-@@ -145,6 +145,31 @@ void efi_char16_printk(efi_system_table_t *sys_table_arg,
- 	out->output_string(out, str);
- }
+ - When image_size is zero, a bootloader should attempt to keep as much
+   memory as possible free for use by the kernel immediately after the
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 54eeab140bca..f458fb9e0dce 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -363,6 +363,7 @@ config ARM64_ERRATUM_843419
+ 	bool "Cortex-A53: 843419: A load or store might access an incorrect address"
+ 	depends on MODULES
+ 	default y
++	select ARM64_MODULE_CMODEL_LARGE
+ 	help
+ 	  This option builds kernel modules using the large memory model in
+ 	  order to avoid the use of the ADRP instruction, which can cause
+@@ -709,6 +710,18 @@ config ARM64_MODULE_PLTS
+ 	bool
+ 	select HAVE_MOD_ARCH_SPECIFIC
  
-+struct efi_rng_protocol_t {
-+	efi_status_t (*get_info)(struct efi_rng_protocol_t *, unsigned long *, efi_guid_t *);
-+	efi_status_t (*get_rng)(struct efi_rng_protocol_t *, efi_guid_t *, unsigned long, u8 *out);
-+};
++config ARM64_MODULE_CMODEL_LARGE
++	bool
 +
-+static int efi_get_random_bytes(efi_system_table_t *sys_table)
-+{
-+	extern u64 efi_random_bytes;
++config ARM64_RELOCATABLE_KERNEL
++	bool "Kernel address space layout randomization (KASLR)"
++	select ARM64_MODULE_PLTS
++	select ARM64_MODULE_CMODEL_LARGE
++	help
++	  This feature randomizes the virtual address of the kernel image, to
++	  harden against exploits that rely on knowledge about the absolute
++	  addresses of certain kernel data structures.
 +
-+	efi_guid_t rng_proto = EFI_RNG_PROTOCOL_GUID;
-+	efi_status_t status;
-+	struct efi_rng_protocol_t *rng;
+ endmenu
+ 
+ menu "Boot options"
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index d4654830e536..75dc477d45f5 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -15,6 +15,10 @@ CPPFLAGS_vmlinux.lds = -DTEXT_OFFSET=$(TEXT_OFFSET)
+ OBJCOPYFLAGS	:=-O binary -R .note -R .note.gnu.build-id -R .comment -S
+ GZFLAGS		:=-9
+ 
++ifneq ($(CONFIG_ARM64_RELOCATABLE_KERNEL),)
++LDFLAGS_vmlinux		+= -pie
++endif
 +
-+	status = sys_table->boottime->locate_protocol(&rng_proto, NULL,
-+						      (void **)&rng);
-+	if (status == EFI_NOT_FOUND) {
-+		pr_efi(sys_table, "EFI_RNG_PROTOCOL unavailable, no randomness supplied\n");
-+		return EFI_SUCCESS;
-+	}
-+
-+	if (status != EFI_SUCCESS)
-+		return status;
-+
-+	return rng->get_rng(rng, NULL, sizeof(u64), (u8 *)&efi_random_bytes);
-+}
+ KBUILD_DEFCONFIG := defconfig
+ 
+ # Check for binutils support for specific extensions
+@@ -41,7 +45,7 @@ endif
+ 
+ CHECKFLAGS	+= -D__aarch64__
+ 
+-ifeq ($(CONFIG_ARM64_ERRATUM_843419), y)
++ifeq ($(CONFIG_ARM64_MODULE_CMODEL_LARGE), y)
+ KBUILD_CFLAGS_MODULE	+= -mcmodel=large
+ endif
+ 
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index 1dcbf142d36c..e435423f9731 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -88,10 +88,10 @@
+ #define __virt_to_phys(x) ({						\
+ 	phys_addr_t __x = (phys_addr_t)(x);				\
+ 	__x >= PAGE_OFFSET ? (__x - PAGE_OFFSET + PHYS_OFFSET) :	\
+-			     (__x - KIMAGE_VADDR + PHYS_OFFSET); })
++			     (__x - kimage_vaddr + PHYS_OFFSET); })
+ 
+ #define __phys_to_virt(x)	((unsigned long)((x) - PHYS_OFFSET + PAGE_OFFSET))
+-#define __phys_to_kimg(x)	((unsigned long)((x) - PHYS_OFFSET + KIMAGE_VADDR))
++#define __phys_to_kimg(x)	((unsigned long)((x) - PHYS_OFFSET + kimage_vaddr))
  
  /*
-  * This function handles the architcture specific differences between arm and
-@@ -267,6 +292,12 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
- 	if (status != EFI_SUCCESS)
- 		pr_efi_err(sys_table, "Failed initrd from command line!\n");
+  * Convert a page to/from a physical address
+@@ -121,6 +121,12 @@ extern phys_addr_t		memstart_addr;
+ /* PHYS_OFFSET - the physical address of the start of memory. */
+ #define PHYS_OFFSET		({ memstart_addr; })
  
-+	if (IS_ENABLED(CONFIG_ARM64_RELOCATABLE_KERNEL)) {
-+		status = efi_get_random_bytes(sys_table);
-+		if (status != EFI_SUCCESS)
-+			pr_efi_err(sys_table, "efi_get_random_bytes() failed\n");
++#ifdef CONFIG_ARM64_RELOCATABLE_KERNEL
++extern u64			kimage_vaddr;
++#else
++#define kimage_vaddr		KIMAGE_VADDR
++#endif
++
+ /*
+  * The maximum physical address that the linear direct mapping
+  * of system RAM can cover. (PAGE_OFFSET can be interpreted as
+diff --git a/arch/arm64/kernel/arm64ksyms.c b/arch/arm64/kernel/arm64ksyms.c
+index 3b6d8cc9dfe0..4f7b7f44e2b5 100644
+--- a/arch/arm64/kernel/arm64ksyms.c
++++ b/arch/arm64/kernel/arm64ksyms.c
+@@ -41,6 +41,11 @@ EXPORT_SYMBOL(__copy_in_user);
+ 	/* physical memory */
+ EXPORT_SYMBOL(memstart_addr);
+ 
++#ifdef CONFIG_ARM64_RELOCATABLE_KERNEL
++	/* runtime kernel virtual base address */
++EXPORT_SYMBOL(kimage_vaddr);
++#endif
++
+ 	/* string / mem functions */
+ EXPORT_SYMBOL(strchr);
+ EXPORT_SYMBOL(strrchr);
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 4f086e247eea..5ec779412436 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -59,8 +59,15 @@
+ 
+ #define __HEAD_FLAG_PAGE_SIZE ((PAGE_SHIFT - 10) / 2)
+ 
++#ifdef CONFIG_ARM64_RELOCATABLE_KERNEL
++#define __HEAD_FLAG_RELOC	1
++#else
++#define __HEAD_FLAG_RELOC	0
++#endif
++
+ #define __HEAD_FLAGS	((__HEAD_FLAG_BE << 0) |	\
+-			 (__HEAD_FLAG_PAGE_SIZE << 1))
++			 (__HEAD_FLAG_PAGE_SIZE << 1) |	\
++			 (__HEAD_FLAG_RELOC << 3))
+ 
+ /*
+  * Kernel startup entry point.
+@@ -229,6 +236,9 @@ ENTRY(stext)
+ 	 */
+ 	ldr	x27, 0f				// address to jump to after
+ 						// MMU has been enabled
++#ifdef CONFIG_ARM64_RELOCATABLE_KERNEL
++	add	x27, x27, x23			// add KASLR displacement
++#endif
+ 	adr_l	lr, __enable_mmu		// return (PIC) address
+ 	b	__cpu_setup			// initialise processor
+ ENDPROC(stext)
+@@ -241,6 +251,16 @@ ENDPROC(stext)
+ preserve_boot_args:
+ 	mov	x21, x0				// x21=FDT
+ 
++#ifdef CONFIG_ARM64_RELOCATABLE_KERNEL
++	/*
++	 * Mask off the bits of the random value supplied in x1 so it can serve
++	 * as a KASLR displacement value which will move the kernel image to a
++	 * random offset in the lower half of the VMALLOC area.
++	 */
++	mov	x23, #(1 << (VA_BITS - 2)) - 1
++	and	x23, x23, x1, lsl #SWAPPER_BLOCK_SHIFT
++#endif
++
+ 	adr_l	x0, boot_args			// record the contents of
+ 	stp	x21, x1, [x0]			// x0 .. x3 at kernel entry
+ 	stp	x2, x3, [x0, #16]
+@@ -400,6 +420,9 @@ __create_page_tables:
+ 	 */
+ 	mov	x0, x26				// swapper_pg_dir
+ 	ldr	x5, =KIMAGE_VADDR
++#ifdef CONFIG_ARM64_RELOCATABLE_KERNEL
++	add	x5, x5, x23			// add KASLR displacement
++#endif
+ 	create_pgd_entry x0, x5, x3, x6
+ 	ldr	w6, kernel_img_size
+ 	add	x6, x6, x5
+@@ -437,6 +460,51 @@ __mmap_switched:
+ 	str	xzr, [x6], #8			// Clear BSS
+ 	b	1b
+ 2:
++
++#ifdef CONFIG_ARM64_RELOCATABLE_KERNEL
++
++#define R_AARCH64_RELATIVE	0x403
++#define R_AARCH64_ABS64		0x101
++
++	/*
++	 * Iterate over each entry in the relocation table, and apply the
++	 * relocations in place.
++	 */
++	adr_l	x8, __dynsym_start		// start of symbol table
++	adr_l	x9, __reloc_start		// start of reloc table
++	adr_l	x10, __reloc_end		// end of reloc table
++
++0:	cmp	x9, x10
++	b.hs	2f
++	ldp	x11, x12, [x9], #24
++	cmp	x12, #R_AARCH64_RELATIVE
++	b.ne	1f
++	ldr	x12, [x9, #-8]
++	add	x12, x12, x23			// relocate
++	str	x12, [x11, x23]
++	b	0b
++
++1:	ubfx	x13, x12, #0, #32
++	cmp	x13, #R_AARCH64_ABS64
++	b.ne	0b
++	lsr	x13, x12, #32			// symbol index
++	ldr	x12, [x9, #-8]
++	add	x13, x13, x13, lsl #1		// x 3
++	add	x13, x8, x13, lsl #3		// x 8
++	ldrsh	w14, [x13, #6]			// Elf64_Sym::st_shndx
++	ldr	x15, [x13, #8]			// Elf64_Sym::st_value
++	cmp	w14, #-0xf			// SHN_ABS (0xfff1) ?
++	add	x14, x15, x23			// relocate
++	csel	x15, x14, x15, ne
++	add	x15, x12, x15
++	str	x15, [x11, x23]
++	b	0b
++
++2:	ldr	x8, =vectors			// reload VBAR_EL1 with
++	msr	vbar_el1, x8			// relocated address
++	isb
++#endif
++
+ 	adr_l	sp, initial_sp, x4
+ 	str_l	x21, __fdt_pointer, x5		// Save FDT pointer
+ 	str_l	x24, memstart_addr, x6		// Save PHYS_OFFSET
+@@ -452,6 +520,12 @@ ENDPROC(__mmap_switched)
+  * hotplug and needs to have the same protections as the text region
+  */
+ 	.section ".text","ax"
++
++#ifdef CONFIG_ARM64_RELOCATABLE_KERNEL
++ENTRY(kimage_vaddr)
++	.quad		_text - TEXT_OFFSET
++#endif
++
+ /*
+  * If we're fortunate enough to boot@EL2, ensure that the world is
+  * sane before dropping to EL1.
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 96177a7c0f05..2faee6042e99 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -292,16 +292,15 @@ u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
+ 
+ void __init setup_arch(char **cmdline_p)
+ {
+-	static struct vm_struct vmlinux_vm __initdata = {
+-		.addr		= (void *)KIMAGE_VADDR,
+-		.size		= 0,
+-		.flags		= VM_IOREMAP,
+-		.caller		= setup_arch,
+-	};
+-
+-	vmlinux_vm.size = round_up((unsigned long)_end - KIMAGE_VADDR,
+-				   1 << SWAPPER_BLOCK_SHIFT);
+-	vmlinux_vm.phys_addr = __pa(KIMAGE_VADDR);
++	static struct vm_struct vmlinux_vm __initdata;
++
++	vmlinux_vm.addr = (void *)kimage_vaddr;
++	vmlinux_vm.size = round_up((u64)_end - kimage_vaddr,
++				   SWAPPER_BLOCK_SIZE);
++	vmlinux_vm.phys_addr = __pa(kimage_vaddr);
++	vmlinux_vm.flags = VM_IOREMAP;
++	vmlinux_vm.caller = setup_arch;
++
+ 	vm_area_add_early(&vmlinux_vm);
+ 
+ 	pr_info("Boot CPU: AArch64 Processor [%08x]\n", read_cpuid_id());
+@@ -367,7 +366,8 @@ void __init setup_arch(char **cmdline_p)
+ 	conswitchp = &dummy_con;
+ #endif
+ #endif
+-	if (boot_args[1] || boot_args[2] || boot_args[3]) {
++	if ((!IS_ENABLED(CONFIG_ARM64_RELOCATABLE_KERNEL) && boot_args[1]) ||
++	    boot_args[2] || boot_args[3]) {
+ 		pr_err("WARNING: x1-x3 nonzero in violation of boot protocol:\n"
+ 			"\tx1: %016llx\n\tx2: %016llx\n\tx3: %016llx\n"
+ 			"This indicates a broken bootloader or old kernel\n",
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 69dfa376e843..77faf85f6d46 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -148,6 +148,15 @@ SECTIONS
+ 	.altinstr_replacement : {
+ 		*(.altinstr_replacement)
+ 	}
++	.rela : ALIGN(8) {
++		__reloc_start = .;
++		*(.rela .rela*)
++		__reloc_end = .;
 +	}
-+
- 	new_fdt_addr = fdt_addr;
- 	status = allocate_new_fdt_and_exit_boot(sys_table, handle,
- 				&new_fdt_addr, dram_base + MAX_FDT_OFFSET,
-diff --git a/include/linux/efi.h b/include/linux/efi.h
-index 569b5a866bb1..13783fdc9bdd 100644
---- a/include/linux/efi.h
-+++ b/include/linux/efi.h
-@@ -299,7 +299,7 @@ typedef struct {
- 	void *open_protocol_information;
- 	void *protocols_per_handle;
- 	void *locate_handle_buffer;
--	void *locate_protocol;
-+	efi_status_t (*locate_protocol)(efi_guid_t *, void *, void **);
- 	void *install_multiple_protocol_interfaces;
- 	void *uninstall_multiple_protocol_interfaces;
- 	void *calculate_crc32;
-@@ -599,6 +599,9 @@ void efi_native_runtime_setup(void);
- #define EFI_PROPERTIES_TABLE_GUID \
-     EFI_GUID(  0x880aaca3, 0x4adc, 0x4a04, 0x90, 0x79, 0xb7, 0x47, 0x34, 0x08, 0x25, 0xe5 )
++	.dynsym : ALIGN(8) {
++		__dynsym_start = .;
++		*(.dynsym)
++	}
  
-+#define EFI_RNG_PROTOCOL_GUID \
-+    EFI_GUID(  0x3152bca5, 0xeade, 0x433d, 0x86, 0x2e, 0xc0, 0x1c, 0xdc, 0x29, 0x1f, 0x44 )
-+
- typedef struct {
- 	efi_guid_t guid;
- 	u64 table;
+ 	. = ALIGN(PAGE_SIZE);
+ 	__init_end = .;
+diff --git a/scripts/sortextable.c b/scripts/sortextable.c
+index af247c70fb66..5ecbedefdb0f 100644
+--- a/scripts/sortextable.c
++++ b/scripts/sortextable.c
+@@ -266,9 +266,9 @@ do_file(char const *const fname)
+ 		break;
+ 	}  /* end switch */
+ 	if (memcmp(ELFMAG, ehdr->e_ident, SELFMAG) != 0
+-	||  r2(&ehdr->e_type) != ET_EXEC
++	|| (r2(&ehdr->e_type) != ET_EXEC && r2(&ehdr->e_type) != ET_DYN)
+ 	||  ehdr->e_ident[EI_VERSION] != EV_CURRENT) {
+-		fprintf(stderr, "unrecognized ET_EXEC file %s\n", fname);
++		fprintf(stderr, "unrecognized ET_EXEC/ET_DYN file %s\n", fname);
+ 		fail_file();
+ 	}
+ 
 -- 
 2.5.0
