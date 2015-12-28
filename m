@@ -1,53 +1,49 @@
-From: bjorn@kryo.se (bjorn at kryo.se)
-Date: Sun, 27 Dec 2015 17:51:13 -0800
-Subject: [PATCH] ARM: dts: qcom: msm8974: Add WCNSS SMP2P node
-Message-ID: <1451267473-15948-1-git-send-email-bjorn@kryo.se>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 28 Dec 2015 10:54:10 +0900
+Subject: [PATCH] ARM: s3c64xx: fix pm-debug compilation
+In-Reply-To: <5515725.ojLSny3TOX@wuerfel>
+References: <5515725.ojLSny3TOX@wuerfel>
+Message-ID: <56809642.2060100@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+On 18.12.2015 23:46, Arnd Bergmann wrote:
+> I got one randconfig build that failed to compile plat-samsung/pm-debug.c
+> on s3c64xx:
+> 
+> In file included from arch/arm/plat-samsung/pm-debug.c:27:0:
+> arch/arm/mach-s3c64xx/include/mach/pm-core.h: In function 's3c_pm_debug_init_uart':
+> arch/arm/mach-s3c64xx/include/mach/pm-core.h:25:25: error: 'S3C_VA_SYS' undeclared (first use in this function)
+>   u32 tmp = __raw_readl(S3C_PCLK_GATE);
+> arch/arm/mach-s3c64xx/include/mach/pm-core.h:25:25: note: each undeclared identifier is reported only once for each function it appears in
+> arch/arm/mach-s3c64xx/include/mach/pm-core.h:39:2: error: implicit declaration of function 'udelay' [-Werror=implicit-function-declaration]
+>   udelay(10);
+> 
+> I have not investigated why this does not show up much more often, I
+> guess the headers are usually included from elsewhere, but adding
+> explicit #include statements is an obvious fix.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> I suspect this has been broken for a long time, so no rush, but please
+> apply this to a cleanup branch.
+> 
 
-Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
----
- arch/arm/boot/dts/qcom-msm8974.dtsi | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+The dependencies for plat-samsung/SAMSUNG_PM_* symbols are little bit
+mixed up:
+1. pm-common.o depends on PM_SLEEP,
+2. pm.o and pm-debug.o depend on PM and sometimes they use stuff from
+pm-common.
 
-diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-index 18c419ee9d48..3a88228e4358 100644
---- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-@@ -160,6 +160,32 @@
- 		hwlocks = <&tcsr_mutex 3>;
- 	};
- 
-+	smp2p-wcnss {
-+		compatible = "qcom,smp2p";
-+		qcom,smem = <451>, <431>;
-+
-+		interrupt-parent = <&intc>;
-+		interrupts = <0 143 IRQ_TYPE_EDGE_RISING>;
-+
-+		qcom,ipc = <&apcs 8 18>;
-+
-+		qcom,local-pid = <0>;
-+		qcom,remote-pid = <4>;
-+
-+		wcnss_smp2p_out: master-kernel {
-+			qcom,entry-name = "master-kernel";
-+
-+			#qcom,state-cells = <1>;
-+		};
-+
-+		wcnss_smp2p_in: slave-kernel {
-+			qcom,entry-name = "slave-kernel";
-+
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+		};
-+	};
-+
- 	smsm {
- 		compatible = "qcom,smsm";
- 
--- 
-2.5.0
+It is possible to create a config with PM_SLEEP=n and PM=y so this is
+confusing (pm-common won't be linked).
+
+I think this still compiles fine because of various #ifdefs but it would
+be nice to clean it up.
+
+Anyway your patch looks correct:
+
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+Best regards,
+Krzysztof
