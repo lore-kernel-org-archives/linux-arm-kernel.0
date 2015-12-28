@@ -1,22 +1,28 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 28 Dec 2015 08:42:33 +0530
-Subject: [PATCH v2 2/3] cpufreq: mt8173: migrate to use
- operating-points-v2 bindings
-In-Reply-To: <1451197318-12418-3-git-send-email-pi-cheng.chen@linaro.org>
+Date: Mon, 28 Dec 2015 08:43:40 +0530
+Subject: [PATCH v2 3/3] ARM64: dts: mt8173: Add CPU OPP, clock and
+ regulator supply properties
+In-Reply-To: <1451197318-12418-4-git-send-email-pi-cheng.chen@linaro.org>
 References: <1451197318-12418-1-git-send-email-pi-cheng.chen@linaro.org>
- <1451197318-12418-3-git-send-email-pi-cheng.chen@linaro.org>
-Message-ID: <20151228031233.GC3598@ubuntu>
+ <1451197318-12418-4-git-send-email-pi-cheng.chen@linaro.org>
+Message-ID: <20151228031340.GD3598@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 27-12-15, 14:21, Pi-Cheng Chen wrote:
-> Modify mt8173-cpufreq driver to get OPP-sharing information and set up
-> OPP table provided by operating-points-v2 bindings.
+> Add operating-points-v2, clock, and regulator supply properties
+> required by mt8173-cpufreq driver to enable it.
 > 
 > Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
 > ---
->  drivers/cpufreq/mt8173-cpufreq.c | 17 +++++++++++------
->  1 file changed, 11 insertions(+), 6 deletions(-)
+> This patch is based on the patch[1] that adds underlying clock MUX for
+> MT8173 which is needed by mt8173-cpufreq driver but not yet picked.
+> 
+> [1] http://article.gmane.org/gmane.linux.kernel.clk/325
+> ---
+>  arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 18 ++++++
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 90 +++++++++++++++++++++++++++++
+>  2 files changed, 108 insertions(+)
 
 Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
