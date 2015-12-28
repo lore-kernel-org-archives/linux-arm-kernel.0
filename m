@@ -1,100 +1,50 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Mon, 28 Dec 2015 13:01:22 -0800
-Subject: [PATCH 1/5] arm: devtree: Set system_rev from DT "/revision"
-In-Reply-To: <20151224190237.GA17343@pali>
-References: <1436214373-12969-1-git-send-email-pali.rohar@gmail.com>
- <1436214373-12969-2-git-send-email-pali.rohar@gmail.com>
- <20151224190237.GA17343@pali>
-Message-ID: <5681A322.2090204@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 28 Dec 2015 13:28:02 -0800
+Subject: [PATCH] mmc: pwrseq_simple: Fix regression with optional GPIOs
+In-Reply-To: <CAPDyKFpUWyZj99upK8Q_vNtwpZ67q3pD1229qG4yQ6+OmtCBUQ@mail.gmail.com>
+References: <1449528845-25189-1-git-send-email-tony@atomide.com>
+ <CAPDyKFpxiOJJdh-nLXjxv3DYJnW3RAf_9aqMfds46=-oqPd5ng@mail.gmail.com>
+ <20151218161406.GL23396@atomide.com>
+ <CAPDyKFr8e6wDxkGwnOwijQiOgF7oq6gCoHmqbubv6oSbpYbwqg@mail.gmail.com>
+ <20151218223156.GP23396@atomide.com>
+ <CAPDyKFpUWyZj99upK8Q_vNtwpZ67q3pD1229qG4yQ6+OmtCBUQ@mail.gmail.com>
+Message-ID: <20151228212802.GA6414@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding devicetree-spec, and commenting below.
-
-On 12/24/2015 11:02 AM, Pali Roh?r wrote:
-> On Monday 06 July 2015 22:26:09 Pali Roh?r wrote:
->> With this patch "/revision" DT entry is used to set global system_rev
->> variable. DT "/revision" is expected to be u32 numeric value.
->>
->> TODO: add documentation
->>
->> Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
->> ---
->>  arch/arm/kernel/devtree.c |   12 ++++++++++--
->>  1 file changed, 10 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
->> index 11c54de..7d82749 100644
->> --- a/arch/arm/kernel/devtree.c
->> +++ b/arch/arm/kernel/devtree.c
->> @@ -19,6 +19,7 @@
->>  #include <linux/of_irq.h>
->>  #include <linux/of_platform.h>
->>  #include <linux/smp.h>
->> +#include <linux/libfdt_env.h>
->>  
->>  #include <asm/cputype.h>
->>  #include <asm/setup.h>
->> @@ -26,6 +27,7 @@
->>  #include <asm/smp_plat.h>
->>  #include <asm/mach/arch.h>
->>  #include <asm/mach-types.h>
->> +#include <asm/system_info.h>
->>  
->>  
->>  #ifdef CONFIG_SMP
->> @@ -204,6 +206,8 @@ static const void * __init arch_get_next_mach(const char *const **match)
->>  const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
->>  {
->>  	const struct machine_desc *mdesc, *mdesc_best = NULL;
->> +	unsigned long dt_root;
->> +	const u32 *rev;
->>  
->>  #ifdef CONFIG_ARCH_MULTIPLATFORM
->>  	DT_MACHINE_START(GENERIC_DT, "Generic DT based system")
->> @@ -215,17 +219,16 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
->>  	if (!dt_phys || !early_init_dt_verify(phys_to_virt(dt_phys)))
->>  		return NULL;
->>  
->> +	dt_root = of_get_flat_dt_root();
->>  	mdesc = of_flat_dt_match_machine(mdesc_best, arch_get_next_mach);
->>  
->>  	if (!mdesc) {
->>  		const char *prop;
->>  		int size;
->> -		unsigned long dt_root;
->>  
->>  		early_print("\nError: unrecognized/unsupported "
->>  			    "device tree compatible list:\n[ ");
->>  
->> -		dt_root = of_get_flat_dt_root();
->>  		prop = of_get_flat_dt_prop(dt_root, "compatible", &size);
->>  		while (size > 0) {
->>  			early_print("'%s' ", prop);
->> @@ -246,5 +249,10 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
->>  	/* Change machine number to match the mdesc we're using */
->>  	__machine_arch_type = mdesc->nr;
->>  
->> +	/* Set system revision from DT */
->> +	rev = of_get_flat_dt_prop(dt_root, "revision", NULL);
->> +	if (rev)
->> +		system_rev = fdt32_to_cpu(*rev);
->> +
->>  	return mdesc;
->>  }
+* Ulf Hansson <ulf.hansson@linaro.org> [151228 04:18]:
+> On 18 December 2015 at 23:31, Tony Lindgren <tony@atomide.com> wrote:
+> > * Ulf Hansson <ulf.hansson@linaro.org> [151218 14:20]:
+> >> On 18 December 2015 at 17:14, Tony Lindgren <tony@atomide.com> wrote:
+> >> > * Ulf Hansson <ulf.hansson@linaro.org> [151207 16:20]:
+> >> >> +Linus
+> >> >>
+> >> >> On 7 December 2015 at 23:54, Tony Lindgren <tony@atomide.com> wrote:
+> >> >> > Commit ce037275861e ("mmc: pwrseq_simple: use GPIO descriptors array API")
+> >> >> > changed the handling MMC power sequence so GPIOs no longer are optional.
+> >> >> >
+> >> >> > This broke SDIO WLAN at least for omap5 that can't yet use the reset GPIOs
+> >> >> > with pwrseq_simple as a wait is needed after enabling the SDIO device.
+> >> >>
+> >> >> Can you elaborate on this. Did it break omap5 or not? :-)
+> >> >
+> >> > Ulf, is this patch queued for v4.4 as a regression fix? I don't see it
+> >> > in Linux next or mainline trees?
+> >>
+> >> Ohh, I guess there where some misunderstanding. I made a bunch of
+> >> comments on your patch as well, so I have been expecting a new
+> >> version.
+> >
+> > Well this $subject patch was intended as a regression fix for v4.4-rc cycle.
+> > All the other things discussed are not fixes but new features instead.
+> >
+> >> Sorry if that was unclear!
+> >
+> > I think this patch should be still fine as is, care to take a look again?
 > 
-> This patch and second one (with subject "[PATCH 2/5] arm: boot: convert
-> ATAG_REVISION to DT "/revision" entry") are still needed.
-> 
-> Are there any objections for them? If not, I will add missing DT
-> documentation and will resend them.
+> No, the patch have issues that needs to be fixed.
+> http://www.spinics.net/lists/linux-mmc/msg34399.html
 
-Patch 2/5 copies the value from ATAG_REVISION into the fdt "/revision"
-property.
+Oh sorry, somehow I did not notice those comments earlier, will take a look.
 
-If the use of /revision is limited to being a location to hold an ATAG
-value to pass to the global variable system_rev, then it would make
-sense to just copy directly from the ATAG value into system_rev in the
-same board file where you are copying the ATAGs.
-
--Frank
+Tony
