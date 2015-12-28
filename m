@@ -1,61 +1,53 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 28 Dec 2015 09:26:52 +0100
-Subject: [PATCH] doc: PCI: altera: Fix the 'ranges' property in example
-In-Reply-To: <CAFiDJ5_Xy_O3Ux6ojcY-hEm3d4O8QXBR1e5KSUyThszZ40aWHQ@mail.gmail.com>
-References: <1450950330-28393-1-git-send-email-marex@denx.de>
- <201512280834.52893.marex@denx.de>
- <CAFiDJ5_Xy_O3Ux6ojcY-hEm3d4O8QXBR1e5KSUyThszZ40aWHQ@mail.gmail.com>
-Message-ID: <201512280926.53004.marex@denx.de>
+From: bamvor.zhangjian@linaro.org (Bamvor Jian Zhang)
+Date: Mon, 28 Dec 2015 16:43:06 +0800
+Subject: > diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+In-Reply-To: <1450215766-14765-5-git-send-email-ynorov@caviumnetworks.com>
+References: <1450215766-14765-5-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1451292190-15024-1-git-send-email-bamvor.zhangjian@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, December 28, 2015 at 08:42:00 AM, Ley Foon Tan wrote:
-> On Mon, Dec 28, 2015 at 3:34 PM, Marek Vasut <marex@denx.de> wrote:
-> > On Monday, December 28, 2015 at 07:56:15 AM, Ley Foon Tan wrote:
-> >> On Thu, 2015-12-24 at 10:45 +0100, Marek Vasut wrote:
-> >> > The example does not work on real hardware with the PCIe HIP [1].
-> >> > The problem is with incorrect "ranges" property in the example, so
-> >> > one cannot just copy-paste the example into his DT and expect this
-> >> > to work. This patches aligns the "ranges" in the example with the
-> >> > reference FPGA design.
-> >> 
-> >> Hi Marek
-> > 
-> > Hi Ley,
-> > 
-> >> The original "ranges" is working for me. What error did you encounter?
-> > 
-> > Every time a driver accessed the Txs range, the system got stuck hard.
-> > The Cra access always worked fine though, so the PCIe devices were always
-> > detected.
-> > 
-> > I checked with signaltap and my impression is that the wrong address
-> > propagated into the request passed to the Txs port of the HardIP block,
-> > unless I change the range configuration.
-> > 
-> > Note that I tested Intel Centrino 6235 WiFi card and Atheros AR5006 WiFi
-> > card. The intel in particular uses both the Txs and even MSI , so to use
-> > the intel, the whole PCIe block has to work properly ; with this change,
-> > it does and I can use the intel card just fine.
-> > 
-> >> Thanks.
-> 
-> Hi Marek
-> 
-> I tested two Ethernet adapters, one SSD NVMe and our custom endpoint
-> without the problem.
-> Can you please send me your dts file if possible?
-> 
-> Do you use the latest Altera pcie driver in v4.4?
+I feel we need something like this to avoid the failure of compiling
+when build with ARM64_ILP32(which will select COMPAT) and
+ARMV8_DEPRECATED (which depends on the opcodes.o).
 
-I'm using next from 20151223, crude patch is attached.
+>From f8b8ffdb449491ecf8ba465238bbdb4625a74ac0 Mon Sep 17 00:00:00 2001
+From: Bamvor Jian Zhang <bamvor.zhangjian@linaro.org>
+Date: Mon, 28 Dec 2015 12:57:46 +0800
+Subject: [PATCH] arm64: compat: fix wrong dependency of ARMV8_DEPRECATED
 
-Best regards,
-Marek Vasut
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-ARM-socfpga-Enable-PCIe-support.patch
-Type: text/x-patch
-Size: 2018 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151228/5a3c326f/attachment.bin>
+When compile with ARM64_ILP32, ARMV8_DEPRECATED will be selected due
+to the dependency of COMPAT. It leads to the following error:
+    LD      init/built-in.o
+    arch/arm64/kernel/built-in.o: In function `cp15barrier_handler':
+    /home/bamvor/works/source/kernel/linux_ilp32/arch/arm64/kernel/armv8_deprecated.c:467: undefined reference to `arm_check_condition'
+    /home/bamvor/works/source/kernel/linux_ilp32/arch/arm64/kernel/armv8_deprecated.c:467: undefined reference to `arm_check_condition'
+    arch/arm64/kernel/built-in.o: In function `swp_handler':
+    /home/bamvor/works/source/kernel/linux_ilp32/arch/arm64/kernel/armv8_deprecated.c:386: undefined reference to `arm_check_condition'
+    /home/bamvor/works/source/kernel/linux_ilp32/arch/arm64/kernel/armv8_deprecated.c:386: undefined reference to `arm_check_condition'
+    Makefile:927: recipe for target 'vmlinux' failed
+    make: *** [vmlinux] Error 1
+
+This patch fix this by updating the dependency from COMPAT to
+AARCH32_EL0.
+
+Signed-off-by: Bamvor Jian Zhang <bamvor.zhangjian@linaro.org>
+---
+ arch/arm64/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index deec37a..e52fd03 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -509,7 +509,7 @@ config FORCE_MAX_ZONEORDER
+ 
+ menuconfig ARMV8_DEPRECATED
+ 	bool "Emulate deprecated/obsolete ARMv8 instructions"
+-	depends on COMPAT
++	depends on AARCH32_EL0
+ 	help
+ 	  Legacy software support may require certain instructions
+ 	  that have been deprecated or obsoleted in the architecture.
+-- 
+2.1.4
