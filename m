@@ -1,149 +1,146 @@
 From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Mon, 28 Dec 2015 15:22:19 +0800
-Subject: [RESEND PATCH v1 2/4] net: ethernet: arc: Keep emac compatibility for
- more Rockchip SoCs
+Date: Mon, 28 Dec 2015 15:22:21 +0800
+Subject: [RESEND PATCH v1 4/4] ARM: dts: rockchip: Add support emac for RK3036
 In-Reply-To: <1451287341-16453-1-git-send-email-zhengxing@rock-chips.com>
 References: <1451287341-16453-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <1451287341-16453-3-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <1451287341-16453-5-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the RK3066/RK3188, there was fixed GRF offset configuration to set emac
-and fixed DIV2 mac TX/RX clock. So, we need to easily set and fit to other
-SoCs (RK3036) which maybe have different GRF offset, and need adjust mac
-TX/RX clock.
+This patch describe the emac, and we need to let mac clock under
+the APLL which is able to provide the accurate 50MHz what mac_ref
+need.
 
 Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
 ---
 
- drivers/net/ethernet/arc/emac_rockchip.c |   66 ++++++++++++++++++++----------
- 1 file changed, 44 insertions(+), 22 deletions(-)
+ arch/arm/boot/dts/rk3036-evb.dts   |   25 +++++++++++++++++++++++++
+ arch/arm/boot/dts/rk3036-kylin.dts |   23 +++++++++++++++++++++++
+ arch/arm/boot/dts/rk3036.dtsi      |   32 ++++++++++++++++++++++++++++++++
+ 3 files changed, 80 insertions(+)
 
-diff --git a/drivers/net/ethernet/arc/emac_rockchip.c b/drivers/net/ethernet/arc/emac_rockchip.c
-index 36e9eb1..d1a9c28 100644
---- a/drivers/net/ethernet/arc/emac_rockchip.c
-+++ b/drivers/net/ethernet/arc/emac_rockchip.c
-@@ -25,17 +25,13 @@
- #include "emac.h"
- 
- #define DRV_NAME        "rockchip_emac"
--#define DRV_VERSION     "1.0"
--
--#define GRF_MODE_MII		(1UL << 0)
--#define GRF_MODE_RMII		(0UL << 0)
--#define GRF_SPEED_10M		(0UL << 1)
--#define GRF_SPEED_100M		(1UL << 1)
--#define GRF_SPEED_ENABLE_BIT	(1UL << 17)
--#define GRF_MODE_ENABLE_BIT	(1UL << 16)
-+#define DRV_VERSION     "1.1"
- 
- struct emac_rockchip_soc_data {
--	int grf_offset;
-+	unsigned int grf_offset;
-+	unsigned int grf_mode_offset;
-+	unsigned int grf_speed_offset;
-+	bool need_div_macclk;
+diff --git a/arch/arm/boot/dts/rk3036-evb.dts b/arch/arm/boot/dts/rk3036-evb.dts
+index 28a0336..69b96e6 100644
+--- a/arch/arm/boot/dts/rk3036-evb.dts
++++ b/arch/arm/boot/dts/rk3036-evb.dts
+@@ -62,3 +62,28 @@
+ &uart2 {
+ 	status = "okay";
+ };
++
++&emac {
++	assigned-clocks = <&cru SCLK_MACPLL>;
++	assigned-clock-parents = <&cru PLL_APLL>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&emac_xfer>, <&emac_mdio>, <&rmii_rst>;
++	phy = <&phy0>;
++	status = "okay";
++
++	phy0: ethernet-phy at 0 {
++		reg = <0>;
++	};
++};
++
++&pinctrl {
++	pcfg_output_high: pcfg-output-high {
++		output-high;
++	};
++
++	emac {
++		rmii_rst: rmii-rst {
++			rockchip,pins = <2 22 RK_FUNC_GPIO &pcfg_output_high>;
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/rk3036-kylin.dts b/arch/arm/boot/dts/rk3036-kylin.dts
+index 992f9ca..3fb1cfe 100644
+--- a/arch/arm/boot/dts/rk3036-kylin.dts
++++ b/arch/arm/boot/dts/rk3036-kylin.dts
+@@ -285,7 +285,24 @@
+ 	status = "okay";
  };
  
- struct rockchip_priv_data {
-@@ -44,23 +40,22 @@ struct rockchip_priv_data {
- 	const struct emac_rockchip_soc_data *soc_data;
- 	struct regulator *regulator;
- 	struct clk *refclk;
-+	struct clk *macclk;
++&emac {
++	assigned-clocks = <&cru SCLK_MACPLL>;
++	assigned-clock-parents = <&cru PLL_APLL>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&emac_xfer>, <&emac_mdio>, <&rmii_rst>;
++	phy = <&phy0>;
++	status = "okay";
++
++	phy0: ethernet-phy at 0 {
++		reg = <0>;
++	};
++};
++
+ &pinctrl {
++	pcfg_output_high: pcfg-output-high {
++		output-high;
++	};
++
+ 	pmic {
+ 		pmic_int: pmic-int {
+ 			rockchip,pins = <2 2 RK_FUNC_GPIO &pcfg_pull_default>;
+@@ -297,4 +314,10 @@
+ 			rockchip,pins = <2 7 RK_FUNC_1 &pcfg_pull_none>;
+ 		};
+ 	};
++
++	emac {
++		rmii_rst: rmii-rst {
++			rockchip,pins = <2 22 RK_FUNC_GPIO &pcfg_output_high>;
++		};
++	};
  };
+diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
+index b9567c1..0c09fb3 100644
+--- a/arch/arm/boot/dts/rk3036.dtsi
++++ b/arch/arm/boot/dts/rk3036.dtsi
+@@ -186,6 +186,20 @@
+ 		status = "disabled";
+ 	};
  
- static void emac_rockchip_set_mac_speed(void *priv, unsigned int speed)
- {
- 	struct rockchip_priv_data *emac = priv;
-+	u32 speed_offset = emac->soc_data->grf_speed_offset;
- 	u32 data;
- 	int err = 0;
- 
--	/* write-enable bits */
--	data = GRF_SPEED_ENABLE_BIT;
--
- 	switch(speed) {
- 	case 10:
--		data |= GRF_SPEED_10M;
-+		data = (1 << (speed_offset + 16)) | (0 << speed_offset);
- 		break;
- 	case 100:
--		data |= GRF_SPEED_100M;
-+		data = (1 << (speed_offset + 16)) | (1 << speed_offset);
- 		break;
- 	default:
- 		pr_err("speed %u not supported\n", speed);
-@@ -73,8 +68,14 @@ static void emac_rockchip_set_mac_speed(void *priv, unsigned int speed)
- }
- 
- static const struct emac_rockchip_soc_data emac_rockchip_dt_data[] = {
--	{ .grf_offset = 0x154 }, /* rk3066 */
--	{ .grf_offset = 0x0a4 }, /* rk3188 */
-+	{
-+	  .grf_offset = 0x154,   .grf_mode_offset = 0,
-+	  .grf_speed_offset = 1, .need_div_macclk = 0
-+	}, /* rk3066 */
-+	{
-+	  .grf_offset = 0x0a4,   .grf_mode_offset = 0,
-+	  .grf_speed_offset = 1, .need_div_macclk = 0
-+	}, /* rk3188 */
- };
- 
- static const struct of_device_id emac_rockchip_dt_ids[] = {
-@@ -110,7 +111,7 @@ static int emac_rockchip_probe(struct platform_device *pdev)
- 
- 	interface = of_get_phy_mode(dev->of_node);
- 
--	/* RK3066 and RK3188 SoCs only support RMII */
-+	/* RK3036/RK3066/RK3188 SoCs only support RMII */
- 	if (interface != PHY_INTERFACE_MODE_RMII) {
- 		dev_err(dev, "unsupported phy interface mode %d\n", interface);
- 		err = -ENOTSUPP;
-@@ -164,11 +165,12 @@ static int emac_rockchip_probe(struct platform_device *pdev)
- 		}
- 	}
- 
--	/* write-enable bits */
--	data = GRF_MODE_ENABLE_BIT | GRF_SPEED_ENABLE_BIT;
--
--	data |= GRF_SPEED_100M;
--	data |= GRF_MODE_RMII;
-+	/* Set speed 100M */
-+	data = (1 << (priv->soc_data->grf_speed_offset + 16)) |
-+	       (1 << priv->soc_data->grf_speed_offset);
-+	/* Set RMII mode */
-+	data |= (1 << (priv->soc_data->grf_mode_offset + 16)) |
-+		(0 << priv->soc_data->grf_mode_offset);
- 
- 	err = regmap_write(priv->grf, priv->soc_data->grf_offset, data);
- 	if (err) {
-@@ -181,6 +183,26 @@ static int emac_rockchip_probe(struct platform_device *pdev)
- 	if (err)
- 		dev_err(dev, "failed to change reference clock rate (%d)\n", err);
- 
-+	if (priv->soc_data->need_div_macclk) {
-+		priv->macclk = devm_clk_get(dev, "macclk");
-+		if (IS_ERR(priv->macclk)) {
-+			dev_err(dev, "failed to retrieve mac clock (%ld)\n", PTR_ERR(priv->macclk));
-+			err = PTR_ERR(priv->macclk);
-+			goto out_regulator_disable;
-+		}
++	emac: ethernet at 10200000 {
++		compatible = "rockchip,rk3036-emac", "snps,arc-emac";
++		reg = <0x10200000 0x4000>;
++		interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		rockchip,grf = <&grf>;
++		clocks = <&cru HCLK_MAC>, <&cru SCLK_MACREF>, <&cru SCLK_MAC>;
++		clock-names = "hclk", "macref", "macclk";
++		max-speed = <100>;
++		phy-mode = "rmii";
++		status = "disabled";
++	};
 +
-+		err = clk_prepare_enable(priv->macclk);
-+		if (err) {
-+			dev_err(dev, "failed to enable mac clock (%d)\n", err);
-+			goto out_regulator_disable;
-+		}
+ 	sdmmc: dwmmc at 10214000 {
+ 		compatible = "rockchip,rk3036-dw-mshc", "rockchip,rk3288-dw-mshc";
+ 		reg = <0x10214000 0x4000>;
+@@ -556,6 +570,24 @@
+ 			};
+ 		};
+ 
++		emac {
++			emac_xfer: emac-xfer {
++				rockchip,pins = <2 10 RK_FUNC_1 &pcfg_pull_none>, /* crs_dvalid */
++						<2 13 RK_FUNC_1 &pcfg_pull_none>, /* tx_en */
++						<2 14 RK_FUNC_1 &pcfg_pull_none>, /* mac_clk */
++						<2 15 RK_FUNC_1 &pcfg_pull_none>, /* rx_err */
++						<2 16 RK_FUNC_1 &pcfg_pull_none>, /* rxd1 */
++						<2 17 RK_FUNC_1 &pcfg_pull_none>, /* rxd0 */
++						<2 18 RK_FUNC_1 &pcfg_pull_none>, /* txd1 */
++						<2 19 RK_FUNC_1 &pcfg_pull_none>; /* txd0 */
++			};
 +
-+		/* RMII TX/RX needs always a rate of 25MHz */
-+		err = clk_set_rate(priv->macclk, 25000000);
-+		if (err)
-+			dev_err(dev, "failed to change mac clock rate (%d)\n", err);
-+	}
++			emac_mdio: emac-mdio {
++				rockchip,pins = <2 12 RK_FUNC_1 &pcfg_pull_none>, /* mac_md */
++						<2 25 RK_FUNC_1 &pcfg_pull_none>; /* mac_mdclk */
++			};
++		};
 +
- 	err = arc_emac_probe(ndev, interface);
- 	if (err) {
- 		dev_err(dev, "failed to probe arc emac (%d)\n", err);
+ 		i2c0 {
+ 			i2c0_xfer: i2c0-xfer {
+ 				rockchip,pins = <0 0 RK_FUNC_1 &pcfg_pull_none>,
 -- 
 1.7.9.5
