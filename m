@@ -1,88 +1,174 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 28 Dec 2015 12:20:52 +0100
-Subject: [RFC PATCH 08/10] arm64: avoid dynamic relocations in early boot code
+Date: Mon, 28 Dec 2015 12:20:47 +0100
+Subject: [RFC PATCH 03/10] arm64: decouple early fixmap init from linear
+ mapping
 In-Reply-To: <1451301654-32019-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1451301654-32019-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1451301654-32019-9-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1451301654-32019-4-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before implementing KASLR for arm64 by building a self-relocating PIE
-executable, we have to ensure that values we use before the relocation
-routine is executed are not subject to dynamic relocation themselves.
-This applies not only to virtual addresses, but also to values that are
-supplied by the linker at build time and relocated using R_AARCH64_ABS64
-relocations.
+Since the early fixmap page tables are populated using pages that are
+part of the static footprint of the kernel, they are covered by the
+initial kernel mapping, and we can refer to them without using __va/__pa
+translations, which are tied to the linear mapping.
 
-So instead, use assemble time constants, or force the use of static
-relocations by folding the constants into the instructions.
+Instead, let's introduce __phys_to_kimg, which will be tied to the kernel
+virtual mapping, regardless of whether or not it intersects with the linear
+mapping. This will allow us to move the kernel out of the linear mapping in
+a subsequent patch.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/kernel/efi-entry.S |  2 +-
- arch/arm64/kernel/head.S      | 12 +++++++++---
- 2 files changed, 10 insertions(+), 4 deletions(-)
+ arch/arm64/include/asm/compiler.h |  2 +
+ arch/arm64/kernel/vmlinux.lds.S   | 12 +--
+ arch/arm64/mm/mmu.c               | 85 ++++++++------------
+ 3 files changed, 42 insertions(+), 57 deletions(-)
 
-diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
-index a773db92908b..f82036e02485 100644
---- a/arch/arm64/kernel/efi-entry.S
-+++ b/arch/arm64/kernel/efi-entry.S
-@@ -61,7 +61,7 @@ ENTRY(entry)
- 	 */
- 	mov	x20, x0		// DTB address
- 	ldr	x0, [sp, #16]	// relocated _text address
--	ldr	x21, =stext_offset
-+	movz	x21, #:abs_g0:stext_offset
- 	add	x21, x0, x21
+diff --git a/arch/arm64/include/asm/compiler.h b/arch/arm64/include/asm/compiler.h
+index ee35fd0f2236..dd342af63673 100644
+--- a/arch/arm64/include/asm/compiler.h
++++ b/arch/arm64/include/asm/compiler.h
+@@ -27,4 +27,6 @@
+  */
+ #define __asmeq(x, y)  ".ifnc " x "," y " ; .err ; .endif\n\t"
  
- 	/*
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index a03ffffd84cb..4f086e247eea 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -227,11 +227,13 @@ ENTRY(stext)
- 	 * On return, the CPU will be ready for the MMU to be turned on and
- 	 * the TCR will have been set.
- 	 */
--	ldr	x27, =__mmap_switched		// address to jump to after
-+	ldr	x27, 0f				// address to jump to after
- 						// MMU has been enabled
- 	adr_l	lr, __enable_mmu		// return (PIC) address
- 	b	__cpu_setup			// initialise processor
- ENDPROC(stext)
-+	.align	3
-+0:	.quad	__mmap_switched - (_head - TEXT_OFFSET) + KIMAGE_VADDR
- 
- /*
-  * Preserve the arguments passed by the bootloader in x0 .. x3
-@@ -341,7 +343,7 @@ __create_page_tables:
- 	cmp	x0, x6
- 	b.lo	1b
- 
--	ldr	x7, =SWAPPER_MM_MMUFLAGS
-+	mov	x7, SWAPPER_MM_MMUFLAGS
- 
- 	/*
- 	 * Create the identity mapping.
-@@ -399,7 +401,8 @@ __create_page_tables:
- 	mov	x0, x26				// swapper_pg_dir
- 	ldr	x5, =KIMAGE_VADDR
- 	create_pgd_entry x0, x5, x3, x6
--	ldr	x6, =KERNEL_END			// __va(KERNEL_END)
-+	ldr	w6, kernel_img_size
-+	add	x6, x6, x5
- 	mov	x3, x24				// phys offset
- 	create_block_map x0, x7, x3, x5, x6
- 
-@@ -416,6 +419,9 @@ __create_page_tables:
- 	mov	lr, x27
- 	ret
- ENDPROC(__create_page_tables)
++#define __pgdir		__attribute__((section(".pgdir"),aligned(PAGE_SIZE)))
 +
-+kernel_img_size:
-+	.long	_end - (_head - TEXT_OFFSET)
- 	.ltorg
+ #endif	/* __ASM_COMPILER_H */
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index ced0dedcabcc..363c2f529951 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -160,11 +160,13 @@ SECTIONS
  
- /*
+ 	BSS_SECTION(0, 0, 0)
+ 
+-	. = ALIGN(PAGE_SIZE);
+-	idmap_pg_dir = .;
+-	. += IDMAP_DIR_SIZE;
+-	swapper_pg_dir = .;
+-	. += SWAPPER_DIR_SIZE;
++	.pgdir (NOLOAD) : ALIGN(PAGE_SIZE) {
++		idmap_pg_dir = .;
++		. += IDMAP_DIR_SIZE;
++		swapper_pg_dir = .;
++		. += SWAPPER_DIR_SIZE;
++		*(.pgdir)
++	}
+ 
+ 	_end = .;
+ 
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 50b1de8e127b..3435c316d607 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -540,39 +540,11 @@ void vmemmap_free(unsigned long start, unsigned long end)
+ }
+ #endif	/* CONFIG_SPARSEMEM_VMEMMAP */
+ 
+-static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
+-#if CONFIG_PGTABLE_LEVELS > 2
+-static pmd_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss;
+-#endif
+-#if CONFIG_PGTABLE_LEVELS > 3
+-static pud_t bm_pud[PTRS_PER_PUD] __page_aligned_bss;
+-#endif
+-
+-static inline pud_t * fixmap_pud(unsigned long addr)
+-{
+-	pgd_t *pgd = pgd_offset_k(addr);
+-
+-	BUG_ON(pgd_none(*pgd) || pgd_bad(*pgd));
+-
+-	return pud_offset(pgd, addr);
+-}
+-
+-static inline pmd_t * fixmap_pmd(unsigned long addr)
+-{
+-	pud_t *pud = fixmap_pud(addr);
+-
+-	BUG_ON(pud_none(*pud) || pud_bad(*pud));
++static pte_t *__fixmap_pte;
+ 
+-	return pmd_offset(pud, addr);
+-}
+-
+-static inline pte_t * fixmap_pte(unsigned long addr)
++static inline pte_t *fixmap_pte(unsigned long addr)
+ {
+-	pmd_t *pmd = fixmap_pmd(addr);
+-
+-	BUG_ON(pmd_none(*pmd) || pmd_bad(*pmd));
+-
+-	return pte_offset_kernel(pmd, addr);
++	return __fixmap_pte + pte_index(addr);
+ }
+ 
+ void __init early_fixmap_init(void)
+@@ -583,33 +555,42 @@ void __init early_fixmap_init(void)
+ 	unsigned long addr = FIXADDR_START;
+ 
+ 	pgd = pgd_offset_k(addr);
+-	pgd_populate(&init_mm, pgd, bm_pud);
+-	pud = pud_offset(pgd, addr);
+-	pud_populate(&init_mm, pud, bm_pmd);
+-	pmd = pmd_offset(pud, addr);
+-	pmd_populate_kernel(&init_mm, pmd, bm_pte);
++#if CONFIG_PGTABLE_LEVELS > 3
++	if (pgd_none(*pgd)) {
++		static pud_t bm_pud[PTRS_PER_PUD] __pgdir;
++
++		__pgd_populate(pgd, __pa(bm_pud), PUD_TYPE_TABLE);
++		memblock_reserve(__pa(bm_pud), sizeof(bm_pud));
++	}
++	pud = (pud_t *)__phys_to_kimg(pud_offset_phys(pgd, addr));
++#else
++	pud = (pud_t *)pgd;
++#endif
++#if CONFIG_PGTABLE_LEVELS > 2
++	if (pud_none(*pud)) {
++		static pmd_t bm_pmd[PTRS_PER_PMD] __pgdir;
++
++		__pud_populate(pud, __pa(bm_pmd), PMD_TYPE_TABLE);
++		memblock_reserve(__pa(bm_pmd), sizeof(bm_pmd));
++	}
++	pmd = (pmd_t *)__phys_to_kimg(pmd_offset_phys(pud, addr));
++#else
++	pmd = (pmd_t *)pud;
++#endif
++	if (pmd_none(*pmd)) {
++		static pte_t bm_pte[PTRS_PER_PTE] __pgdir;
++
++		__pmd_populate(pmd, __pa(bm_pte), PMD_TYPE_TABLE);
++		memblock_reserve(__pa(bm_pte), sizeof(bm_pte));
++	}
++	__fixmap_pte = (pte_t *)__phys_to_kimg(pmd_page_paddr(*pmd));
+ 
+ 	/*
+ 	 * The boot-ioremap range spans multiple pmds, for which
+-	 * we are not preparted:
++	 * we are not prepared:
+ 	 */
+ 	BUILD_BUG_ON((__fix_to_virt(FIX_BTMAP_BEGIN) >> PMD_SHIFT)
+ 		     != (__fix_to_virt(FIX_BTMAP_END) >> PMD_SHIFT));
+-
+-	if ((pmd != fixmap_pmd(fix_to_virt(FIX_BTMAP_BEGIN)))
+-	     || pmd != fixmap_pmd(fix_to_virt(FIX_BTMAP_END))) {
+-		WARN_ON(1);
+-		pr_warn("pmd %p != %p, %p\n",
+-			pmd, fixmap_pmd(fix_to_virt(FIX_BTMAP_BEGIN)),
+-			fixmap_pmd(fix_to_virt(FIX_BTMAP_END)));
+-		pr_warn("fix_to_virt(FIX_BTMAP_BEGIN): %08lx\n",
+-			fix_to_virt(FIX_BTMAP_BEGIN));
+-		pr_warn("fix_to_virt(FIX_BTMAP_END):   %08lx\n",
+-			fix_to_virt(FIX_BTMAP_END));
+-
+-		pr_warn("FIX_BTMAP_END:       %d\n", FIX_BTMAP_END);
+-		pr_warn("FIX_BTMAP_BEGIN:     %d\n", FIX_BTMAP_BEGIN);
+-	}
+ }
+ 
+ void __set_fixmap(enum fixed_addresses idx,
 -- 
 2.5.0
