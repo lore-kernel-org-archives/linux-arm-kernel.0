@@ -1,30 +1,39 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 28 Dec 2015 16:56:12 +0100
-Subject: [PATCH v1 0/6] misc: add reboot mode driver
-In-Reply-To: <3460735.DIRnhNBgbJ@wuerfel>
-References: <1450774949-23901-1-git-send-email-andy.yan@rock-chips.com>
- <567A6A01.8080305@rock-chips.com> <3460735.DIRnhNBgbJ@wuerfel>
-Message-ID: <3171716.cOpneyGyL8@diego>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Mon, 28 Dec 2015 17:05:52 +0100
+Subject: [PATCH 2/3] iommu/dma: Use correct offset in map_sg
+In-Reply-To: <4812a34857b081e45c36d7e887840f3675da74dc.1450457730.git.robin.murphy@arm.com>
+References: <9a84191ed813c23db7901f8c73f514d081495bdf.1450457730.git.robin.murphy@arm.com>
+ <4812a34857b081e45c36d7e887840f3675da74dc.1450457730.git.robin.murphy@arm.com>
+Message-ID: <20151228160551.GA17673@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 28. Dezember 2015, 16:28:55 schrieb Arnd Bergmann:
-> On Wednesday 23 December 2015 17:31:45 Andy Yan wrote:
-> > +        { .compatible = "rockchip,reboot-mode-nvram",
-> > +                .data = (void *)&reboot-mode-nvram },
-> > +        {},
-> > +};
+On Fri, Dec 18, 2015 at 05:01:47PM +0000, Robin Murphy wrote:
+> When mapping a non-page-aligned scatterlist entry, we copy the original
+> offset to the output DMA address before aligning it to hand off to
+> iommu_map_sg(), then later adding the IOVA page address portion to get
+> the final mapped address. However, when the IOVA page size is smaller
+> than the CPU page size, it is the offset within the IOVA page we want,
+> not that within the CPU page, which can easily be larger than an IOVA
+> page and thus result in an incorrect final address.
 > 
-> nvram is a complex topic by itself, because there are so many ways to do it.
-> I think what you are referring to here is a battery-backed memory that uses
-> one or more bytes at a fixed offset to store a particular piece of
-> information, as the drivers/char/nvram.c driver does. Maybe we should put
-> the reboot mode into that driver then?
+> Fix the bug by taking only the IOVA-aligned part of the offset as the
+> basis of the DMA address, not the whole thing.
 > 
-> There are other nvram drivers at various places in the kernel, and each may
-> be slightly different, or completely different, like the EFIVARs driver on
-> UEFI firmware or the key/value store on Open Firmware, these probably need
-> their own methods and not share the generic driver.
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  drivers/iommu/dma-iommu.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+> index 982e716..03811e3 100644
+> --- a/drivers/iommu/dma-iommu.c
+> +++ b/drivers/iommu/dma-iommu.c
+> @@ -458,7 +458,7 @@ int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
+>  		size_t s_length = s->length;
+>  		size_t pad_len = (mask - iova_len + 1) & mask;
+>  
+> -		sg_dma_address(s) = s->offset;
+> +		sg_dma_address(s) = s_offset;
 
-actually we now have drivers/nvmem/* that does that byte-wise addressing for 
-eeproms, efuses, etc in a generic way.
+Does not apply on v4.4-rc7.
