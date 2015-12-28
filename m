@@ -1,55 +1,86 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 28 Dec 2015 15:11:25 +0100
-Subject: [RFC PATCH 01/10] arm64: introduce KIMAGE_VADDR as the virtual
- base of the kernel region
-In-Reply-To: <CAKv+Gu9nFaPES8u6fc7SQ0WFJVgV3O4uM2wNNoVWz8iaajyqTQ@mail.gmail.com>
-References: <1451301654-32019-1-git-send-email-ard.biesheuvel@linaro.org>
- <11539877.krH4qBJsp9@wuerfel>
- <CAKv+Gu9nFaPES8u6fc7SQ0WFJVgV3O4uM2wNNoVWz8iaajyqTQ@mail.gmail.com>
-Message-ID: <11016384.rorhLcDd8i@wuerfel>
+From: uri.mashiach@compulab.co.il (Uri Mashiach)
+Date: Mon, 28 Dec 2015 16:16:05 +0200
+Subject: [PATCH v2 1/3] wlcore/wl12xx: spi: add power operation function
+In-Reply-To: <5681241F.1060603@ti.com>
+References: <1450971335-15961-1-git-send-email-uri.mashiach@compulab.co.il>
+ <1450971335-15961-2-git-send-email-uri.mashiach@compulab.co.il>
+ <567C1E3B.3020404@ti.com> <56801C78.9040102@compulab.co.il>
+ <5681241F.1060603@ti.com>
+Message-ID: <56814425.7000601@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 28 December 2015 13:07:44 Ard Biesheuvel wrote:
-> On 28 December 2015 at 12:50, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Monday 28 December 2015 12:20:45 Ard Biesheuvel wrote:
-> > How about a different approach that keeps the relocatable kernel, but moves it in
-> > physical memory with the same random offset as the virtual address? That way, both
-> > would be random, and you can keep the simple virt_to_phys() function.
-> >
-> > I suppose the downside of that is that the number of random bits is then limited
-> > by the size of the first memblock, which is smaller than the vmalloc area.
-> >
-> 
-> I don't see a reason to use the same virtual and physical offset
-> (other than the conditional). On arm64, it would be up to the
-> bootloader to decide where to put the Image in physical memory, and it
-> would be up to the kernel to decide whether or not to virtually remap
-> itself.
+Hi Grygorii,
 
-I see. If we pull in the bootloader to the discussion, there are a couple
-of related points that are not directly required for your series but that
-we should keep in mind anyway:
+On 12/28/2015 01:59 PM, Grygorii Strashko wrote:
+> On 12/27/2015 07:14 PM, Uri Mashiach wrote:
+>> Hello Grygorii,
+>>
+>> On 12/24/2015 06:32 PM, Grygorii Strashko wrote:
+>>> On 12/24/2015 05:35 PM, Uri Mashiach wrote:
+>>>> The power function uses a consumer regulator access to update the WiFi
+>>>> enable GPIO value.
+>>>>
+>>>> Signed-off-by: Uri Mashiach <uri.mashiach@compulab.co.il>
+>>>> ---
+>>>> v1 -> v2: oops fix was removed to a separate fix.
+>>>>
+>>>>    drivers/net/wireless/ti/wlcore/spi.c | 37
+>>>> ++++++++++++++++++++++++++++++++++++
+>>>>    1 file changed, 37 insertions(+)
+>>>>
+>>>> diff --git a/drivers/net/wireless/ti/wlcore/spi.c
+>>>> b/drivers/net/wireless/ti/wlcore/spi.c
+>>>>
+>>>
+>>> [...]
+>>>
+>>>> +
+>>>>    static struct wl1271_if_operations spi_ops = {
+>>>>        .read        = wl12xx_spi_raw_read,
+>>>>        .write        = wl12xx_spi_raw_write,
+>>>>        .reset        = wl12xx_spi_reset,
+>>>>        .init        = wl12xx_spi_init,
+>>>> +    .power        = wl12xx_spi_set_power,
+>>>>        .set_block_size = NULL,
+>>>>    };
+>>>>
+>>>> @@ -353,6 +384,12 @@ static int wl1271_probe(struct spi_device *spi)
+>>>>         * comes from the board-peripherals file */
+>>>>        spi->bits_per_word = 32;
+>>>>
+>>>> +    glue->reg = devm_regulator_get(&spi->dev, "vwlan");
+>>>> +    if (IS_ERR(glue->reg)) {
+>>>
+>>> It will be more correct to handle -EPROBE_DEFER here also. Like:
+>>>            if (PTR_ERR(glue->reg) == -EPROBE_DEFER)
+>>>               return PTR_ERR(glue->reg);
+>>>
+>>
+>> It seems that the IS_ERR(glue->reg) condition covers the EPROBE_DEFER case.
+>
+> True. But this is not an error and it's common practice do not print
+> any log messages in this case from driver :)
+>
 
-- We need to implement the randomization for each boot loader separately.
-  This is probably easy enough for grub, as it can tap the same random
-  number source that you use here, but a little harder for u-boot (requiring
-  to implement access to hardware rng separately on each platform) and
-  much harder to get done consistently in UEFI for direct kernel loading
-  since there is no common upstream.
+Sorry, already posted v3.
+Will be in v4.
 
-- once we have a random number in the bootloader, we should also pass that
-  through a DT property. This has been discussed multiple times in the past
-  and I think we had reached consensus already but don't know if we had
-  agreed on a specific DT property that contains the random number seed.
+>>
+>>>> +        dev_err(glue->dev, "can't get regulator\n");
+>>>> +        return PTR_ERR(glue->reg);
+>>>> +    }
+>>>> +
+>>>>        ret = spi_setup(spi);
+>>>>        if (ret < 0) {
+>>>>            dev_err(glue->dev, "spi_setup failed\n");
+>>>>
+>>>
+>>>
+>>
+>
+>
 
-- For machines that don't have strong hardware RNG, or where we don't
-  trust that hardware enough, we may want to have a way to feed back a
-  random seed into the bootloader during shutdown, the equivalent of
-  /etc/random-seed. On real Open Firmware, we'd do this through a
-  nvram variable that gets copied into a /chosen DT property, but we don't
-  have a generic way to do the same with u-boot. On UEFI we could probably
-  do it through efivars, but I'm not sure if that's accessible early
-  enough in the kernel, so we might need help from grub again.  
-
-	Arnd
+-- 
+Thanks,
+Uri
