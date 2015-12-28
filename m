@@ -1,150 +1,44 @@
-From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
-Date: Mon, 28 Dec 2015 10:52:48 -0200
-Subject: [PATCH 2/2] [media] media-device: split media initialization
- and registration
-In-Reply-To: <20151228082633.1786af24@recife.lan>
-References: <1441890195-11650-1-git-send-email-javier@osg.samsung.com>
- <1441890195-11650-3-git-send-email-javier@osg.samsung.com>
- <55F1BA5C.50508@linux.intel.com>
- <20151215091342.2f825d91@recife.lan>
- <20151228011452.GA26561@valkosipuli.retiisi.org.uk>
- <20151228082633.1786af24@recife.lan>
-Message-ID: <20151228105248.4d59a15c@recife.lan>
+From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
+Date: Mon, 28 Dec 2015 21:06:17 +0800
+Subject: [PATCH v2] PM/OPP: Set cpu_dev->id in cpumask first
+In-Reply-To: <20151228031123.GB3598@ubuntu>
+References: <20151228031123.GB3598@ubuntu>
+Message-ID: <1451307977-7427-1-git-send-email-pi-cheng.chen@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Mon, 28 Dec 2015 08:26:33 -0200
-Mauro Carvalho Chehab <mchehab@osg.samsung.com> escreveu:
+Set cpu_dev->id in cpumask first when setting up cpumask for CPUs that
+share the same OPP table. This might be helpful when handling cpumask
+without the original CPU bitfield set.
 
-> Em Mon, 28 Dec 2015 03:14:53 +0200
-> Sakari Ailus <sakari.ailus@iki.fi> escreveu:
-> 
-> > Hi Mauro,
-> > 
-> > On Tue, Dec 15, 2015 at 09:13:42AM -0200, Mauro Carvalho Chehab wrote:
-> > > Em Thu, 10 Sep 2015 20:14:04 +0300
-> > > Sakari Ailus <sakari.ailus@linux.intel.com> escreveu:
-> > > 
-> > > > Hi Javier,
-> > > > 
-> > > > Thanks for the set! A few comments below.
-> > > > 
-> > > > Javier Martinez Canillas wrote:
-> > > > > The media device node is registered and so made visible to user-space
-> > > > > before entities are registered and links created which means that the
-> > > > > media graph obtained by user-space could be only partially enumerated
-> > > > > if that happens too early before all the graph has been created.
-> > > > > 
-> > > > > To avoid this race condition, split the media init and registration
-> > > > > in separate functions and only register the media device node when
-> > > > > all the pending subdevices have been registered, either explicitly
-> > > > > by the driver or asynchronously using v4l2_async_register_subdev().
-> > > > > 
-> > > > > Also, add a media_entity_cleanup() function that will destroy the
-> > > > > graph_mutex that is initialized in media_entity_init().
-> > > > > 
-> > > > > Suggested-by: Sakari Ailus <sakari.ailus@linux.intel.com>
-> > > > > Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> > > > > 
-> > > > > ---
-> > > > > 
-> > > > >  drivers/media/common/siano/smsdvb-main.c      |  1 +
-> > > > >  drivers/media/media-device.c                  | 38 +++++++++++++++++++++++----
-> > > > >  drivers/media/platform/exynos4-is/media-dev.c | 12 ++++++---
-> > > > >  drivers/media/platform/omap3isp/isp.c         | 11 +++++---
-> > > > >  drivers/media/platform/s3c-camif/camif-core.c | 13 ++++++---
-> > > > >  drivers/media/platform/vsp1/vsp1_drv.c        | 19 ++++++++++----
-> > > > >  drivers/media/platform/xilinx/xilinx-vipp.c   | 11 +++++---
-> > > > >  drivers/media/usb/au0828/au0828-core.c        | 26 +++++++++++++-----
-> > > > >  drivers/media/usb/cx231xx/cx231xx-cards.c     | 22 +++++++++++-----
-> > > > >  drivers/media/usb/dvb-usb-v2/dvb_usb_core.c   | 11 +++++---
-> > > > >  drivers/media/usb/dvb-usb/dvb-usb-dvb.c       | 13 ++++++---
-> > > > >  drivers/media/usb/siano/smsusb.c              | 14 ++++++++--
-> > > > >  drivers/media/usb/uvc/uvc_driver.c            |  9 +++++--
-> > > > >  include/media/media-device.h                  |  2 ++
-> > > > >  14 files changed, 156 insertions(+), 46 deletions(-)
-> > > > > 
-> > > > > diff --git a/drivers/media/common/siano/smsdvb-main.c b/drivers/media/common/siano/smsdvb-main.c
-> > > > > index ab345490a43a..8a1ea2192439 100644
-> > > > > --- a/drivers/media/common/siano/smsdvb-main.c
-> > > > > +++ b/drivers/media/common/siano/smsdvb-main.c
-> > > > > @@ -617,6 +617,7 @@ static void smsdvb_media_device_unregister(struct smsdvb_client_t *client)
-> > > > >  	if (!coredev->media_dev)
-> > > > >  		return;
-> > > > >  	media_device_unregister(coredev->media_dev);
-> > > > > +	media_device_cleanup(coredev->media_dev);
-> > > > >  	kfree(coredev->media_dev);
-> > > > >  	coredev->media_dev = NULL;
-> > > > >  #endif
-> > > > > diff --git a/drivers/media/media-device.c b/drivers/media/media-device.c
-> > > > > index 745defb34b33..a8beb0b445a6 100644
-> > > > > --- a/drivers/media/media-device.c
-> > > > > +++ b/drivers/media/media-device.c
-> > > > > @@ -526,7 +526,7 @@ static void media_device_release(struct media_devnode *mdev)
-> > > > >  }
-> > > > >  
-> > > > >  /**
-> > > > > - * media_device_register - register a media device
-> > > > > + * media_device_init() - initialize a media device
-> > > > >   * @mdev:	The media device
-> > > > >   *
-> > > > >   * The caller is responsible for initializing the media device before
-> > > > > @@ -534,12 +534,11 @@ static void media_device_release(struct media_devnode *mdev)
-> > > > >   *
-> > > > >   * - dev must point to the parent device
-> > > > >   * - model must be filled with the device model name
-> > > > > + *
-> > > > > + * returns zero on success or a negative error code.
-> > > > >   */
-> > > > > -int __must_check __media_device_register(struct media_device *mdev,
-> > > > > -					 struct module *owner)
-> > > > > +int __must_check media_device_init(struct media_device *mdev)
-> > > > 
-> > > > I think I suggested making media_device_init() return void as the only
-> > > > remaining source of errors would be driver bugs.
-> > > > 
-> > > > I'd simply replace the WARN_ON() below with BUG().
-> > > 
-> > > That sounds like bad idea to me, and it is against the current
-> > > Kernel policy of using BUG() only when there's no other way, e. g. on
-> > > event so severe that the Kernel has no other thing to do except to
-> > > stop running.
-> > > 
-> > > For sure, this is not the case here. Also, all drivers have already
-> > > a logic that checks if the device init happened. So, they should already
-> > > be doing the right thing.
-> > 
-> > My point is that it's simply counter-productive to require the caller to
-> > perform error handling in cases such as the only possible source of the
-> > error being a NULL argument passed to the callee.
-> > 
-> > To give you some examples, device_register(), device_add() nor mutex_lock()
-> > perform such checks. Some functions in V4L2 do, but I understand that's
-> > sometimes for historical reasons where NULL arguments were allowed. Or that
-> > there are other possible sources for errors in non-trivial functions and the
-> > rest of the checks are done on the side.
-> > 
-> > If you don't like BUG_ON(), just drop it. It's as simple as that.
-> 
-> Ah, I see your point. Yeah, dropping WARN_ON makes sense. I'll address
-> it.
+Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
+---
+v1->v2:
+- Set cpu_dev->id in cpumask at the top instead of skip it in the loop
+---
+ drivers/base/power/opp/cpu.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Ok, I dropped BUG_ON() from Javier's patch. I also fold with the 3
-build fixups if !CONFIG_MEDIA_CONTROLLER, as requested by Laurent, plus
-one fixup from me (that I sent today to the ML), removing two uneeded
-vars and fixing one call for the DVB frontend that were passing the
-wrong struct.
-
-The final patch is at:
-	https://git.linuxtv.org/mchehab/experimental.git/commit/?h=media-controller-rc6&id=337a643d4ac04c4c6681c9ae2b37d700c9a3fa5f
-
-There two new warnings after Javier's patch related to check if
-the device was properly registered, and if the memory allocation for
-the media_device has succeded. 
-
-As such checks were actually unrelated to Javier's changes, I added
-them on a separate patch:
-	https://git.linuxtv.org/mchehab/experimental.git/commit/?h=media-controller-rc6&id=180a506ef4021a68c061e19c11046978a42934f7
-
-Regards,
-Mauro
+diff --git a/drivers/base/power/opp/cpu.c b/drivers/base/power/opp/cpu.c
+index 7b445e8..9f0c155 100644
+--- a/drivers/base/power/opp/cpu.c
++++ b/drivers/base/power/opp/cpu.c
+@@ -214,7 +214,6 @@ EXPORT_SYMBOL_GPL(dev_pm_opp_of_cpumask_add_table);
+ /*
+  * Works only for OPP v2 bindings.
+  *
+- * cpumask should be already set to mask of cpu_dev->id.
+  * Returns -ENOENT if operating-points-v2 bindings aren't supported.
+  */
+ int dev_pm_opp_of_get_sharing_cpus(struct device *cpu_dev, cpumask_var_t cpumask)
+@@ -230,6 +229,8 @@ int dev_pm_opp_of_get_sharing_cpus(struct device *cpu_dev, cpumask_var_t cpumask
+ 		return -ENOENT;
+ 	}
+ 
++	cpumask_set_cpu(cpu_dev->id, cpumask);
++
+ 	/* OPPs are shared ? */
+ 	if (!of_property_read_bool(np, "opp-shared"))
+ 		goto put_cpu_node;
+-- 
+1.9.1
