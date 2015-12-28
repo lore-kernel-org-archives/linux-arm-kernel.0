@@ -1,71 +1,46 @@
-From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
-Date: Mon, 28 Dec 2015 09:32:46 -0200
-Subject: [PATCH] [media] call media_device_init() before registering the V4L2
- device
-Message-ID: <75cff54a4808086de9d043b2a15a590372c6ab60.1451302363.git.mchehab@osg.samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 28 Dec 2015 12:50:03 +0100
+Subject: [RFC PATCH 01/10] arm64: introduce KIMAGE_VADDR as the virtual
+ base of the kernel region
+In-Reply-To: <1451301654-32019-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1451301654-32019-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1451301654-32019-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <11539877.krH4qBJsp9@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, v4l2_device_register() doesn't use the media_device
-struct. So, calling media_device_init() could be called either
-before or after v4l2_device_register().
+On Monday 28 December 2015 12:20:45 Ard Biesheuvel wrote:
+> @@ -75,8 +76,13 @@
+>   * private definitions which should NOT be used outside memory.h
+>   * files.  Use virt_to_phys/phys_to_virt/__pa/__va instead.
+>   */
+> -#define __virt_to_phys(x)      (((phys_addr_t)(x) - PAGE_OFFSET + PHYS_OFFSET))
+> +#define __virt_to_phys(x) ({                                           \
+> +       phys_addr_t __x = (phys_addr_t)(x);                             \
+> +       __x >= PAGE_OFFSET ? (__x - PAGE_OFFSET + PHYS_OFFSET) :        \
+> +                            (__x - KIMAGE_VADDR + PHYS_OFFSET); })
+> +
+>  #define __phys_to_virt(x)      ((unsigned long)((x) - PHYS_OFFSET + PAGE_OFFSET))
+> +#define __phys_to_kimg(x)      ((unsigned long)((x) - PHYS_OFFSET + KIMAGE_VADDR))
 
-Yet, it is a good practice to initialize everything before calling
-the register functions. Also, the other drivers call
-media_device_init() before registering the V4L2 device.
+Having a conditional here is a bit unfortunate.
 
-So, move the call for media_device_init() to happen earlier on
-exynos4-is and s3c-camif.
+IIRC KASLR means something different depending on the architecture, we either randomize
+the physical address, or the virtual address, or both, and that addresses different
+attack scenarios. You seem to leave the physical address unchanged, which means that
+an attacker that has gained access to a DMA master device can potentially still modify
+the kernel without knowing the virtual address.
+Similarly, you seem to leave the kernel mapped at the original virtual address and
+just add a second map (or your __phys_to_virt is wrong), so if someone has the
+ability to access a kernel virtual memory address from user space, they also don't
+need the relocated address because they can potentially access the kernel .text
+and .data through the linear mapping.
 
-This is just a cleanup patch.
+How about a different approach that keeps the relocatable kernel, but moves it in
+physical memory with the same random offset as the virtual address? That way, both
+would be random, and you can keep the simple virt_to_phys() function.
 
-Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
----
- drivers/media/platform/exynos4-is/media-dev.c | 4 ++--
- drivers/media/platform/s3c-camif/camif-core.c | 8 ++++----
- 2 files changed, 6 insertions(+), 6 deletions(-)
+I suppose the downside of that is that the number of random bits is then limited
+by the size of the first memblock, which is smaller than the vmalloc area.
 
-diff --git a/drivers/media/platform/exynos4-is/media-dev.c b/drivers/media/platform/exynos4-is/media-dev.c
-index 27663dd45294..e96d246043ad 100644
---- a/drivers/media/platform/exynos4-is/media-dev.c
-+++ b/drivers/media/platform/exynos4-is/media-dev.c
-@@ -1347,14 +1347,14 @@ static int fimc_md_probe(struct platform_device *pdev)
- 	fmd->use_isp = fimc_md_is_isp_available(dev->of_node);
- 	fmd->user_subdev_api = true;
- 
-+	media_device_init(&fmd->media_dev);
-+
- 	ret = v4l2_device_register(dev, &fmd->v4l2_dev);
- 	if (ret < 0) {
- 		v4l2_err(v4l2_dev, "Failed to register v4l2_device: %d\n", ret);
- 		return ret;
- 	}
- 
--	media_device_init(&fmd->media_dev);
--
- 	ret = fimc_md_get_clocks(fmd);
- 	if (ret)
- 		goto err_md;
-diff --git a/drivers/media/platform/s3c-camif/camif-core.c b/drivers/media/platform/s3c-camif/camif-core.c
-index ea02b7ef2119..0b44b9accf50 100644
---- a/drivers/media/platform/s3c-camif/camif-core.c
-+++ b/drivers/media/platform/s3c-camif/camif-core.c
-@@ -324,12 +324,12 @@ static int camif_media_dev_init(struct camif_dev *camif)
- 	strlcpy(v4l2_dev->name, "s3c-camif", sizeof(v4l2_dev->name));
- 	v4l2_dev->mdev = md;
- 
--	ret = v4l2_device_register(camif->dev, v4l2_dev);
--	if (ret < 0)
--		return ret;
--
- 	media_device_init(md);
- 
-+	ret = v4l2_device_register(camif->dev, v4l2_dev);
-+	if (ret < 0)
-+		return ret;
-+
- 	return ret;
- }
- 
--- 
-2.5.0
+	Arnd
