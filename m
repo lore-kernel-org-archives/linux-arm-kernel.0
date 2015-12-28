@@ -1,69 +1,61 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Mon, 28 Dec 2015 16:07:46 +0800
-Subject: [PATCH v3 4/5] pinctrl: mediatek: Add Pinctrl/GPIO/EINT driver
- for mt2701
-In-Reply-To: <1451286546-5920-5-git-send-email-biao.huang@mediatek.com>
-References: <1451286546-5920-1-git-send-email-biao.huang@mediatek.com>
- <1451286546-5920-5-git-send-email-biao.huang@mediatek.com>
-Message-ID: <1451290066.11129.4.camel@mtksdaap41>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 28 Dec 2015 09:26:52 +0100
+Subject: [PATCH] doc: PCI: altera: Fix the 'ranges' property in example
+In-Reply-To: <CAFiDJ5_Xy_O3Ux6ojcY-hEm3d4O8QXBR1e5KSUyThszZ40aWHQ@mail.gmail.com>
+References: <1450950330-28393-1-git-send-email-marex@denx.de>
+ <201512280834.52893.marex@denx.de>
+ <CAFiDJ5_Xy_O3Ux6ojcY-hEm3d4O8QXBR1e5KSUyThszZ40aWHQ@mail.gmail.com>
+Message-ID: <201512280926.53004.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-12-28 at 15:09 +0800, Biao Huang wrote:
-> Add mt2701 support using mediatek common pinctrl driver.
-> MT2701 have some special pins need an extra setting register
-> than other ICs, so adding this support to common code.
+On Monday, December 28, 2015 at 08:42:00 AM, Ley Foon Tan wrote:
+> On Mon, Dec 28, 2015 at 3:34 PM, Marek Vasut <marex@denx.de> wrote:
+> > On Monday, December 28, 2015 at 07:56:15 AM, Ley Foon Tan wrote:
+> >> On Thu, 2015-12-24 at 10:45 +0100, Marek Vasut wrote:
+> >> > The example does not work on real hardware with the PCIe HIP [1].
+> >> > The problem is with incorrect "ranges" property in the example, so
+> >> > one cannot just copy-paste the example into his DT and expect this
+> >> > to work. This patches aligns the "ranges" in the example with the
+> >> > reference FPGA design.
+> >> 
+> >> Hi Marek
+> > 
+> > Hi Ley,
+> > 
+> >> The original "ranges" is working for me. What error did you encounter?
+> > 
+> > Every time a driver accessed the Txs range, the system got stuck hard.
+> > The Cra access always worked fine though, so the PCIe devices were always
+> > detected.
+> > 
+> > I checked with signaltap and my impression is that the wrong address
+> > propagated into the request passed to the Txs port of the HardIP block,
+> > unless I change the range configuration.
+> > 
+> > Note that I tested Intel Centrino 6235 WiFi card and Atheros AR5006 WiFi
+> > card. The intel in particular uses both the Txs and even MSI , so to use
+> > the intel, the whole PCIe block has to work properly ; with this change,
+> > it does and I can use the intel card just fine.
+> > 
+> >> Thanks.
 > 
-> Signed-off-by: Biao Huang <biao.huang@mediatek.com>
-> Acked-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-<...>
-> +
-> +static struct platform_driver mtk_pinctrl_driver = {
-> +	.probe = mt2701_pinctrl_probe,
-> +	.driver = {
-> +		.name = "mediatek-mt2701-pinctrl",
-> +		.owner = THIS_MODULE,
-> +		.of_match_table = mt2701_pctrl_match,
-> +	},
-> +};
-> +
-> +static int __init mtk_pinctrl_init(void)
-> +{
-> +	return platform_driver_register(&mtk_pinctrl_driver);
-> +}
-> +
-> +arch_initcall(mtk_pinctrl_init);
+> Hi Marek
+> 
+> I tested two Ethernet adapters, one SSD NVMe and our custom endpoint
+> without the problem.
+> Can you please send me your dts file if possible?
+> 
+> Do you use the latest Altera pcie driver in v4.4?
 
+I'm using next from 20151223, crude patch is attached.
 
-As discussed in
-http://lists.infradead.org/pipermail/linux-mediatek/2015-December/003350.html
-we should use subsys_initcall() instead.
-
-
-> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> index f307f1d..76279f0 100644
-> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-<...>
-> @@ -347,6 +352,7 @@ static int mtk_pconf_parse_conf(struct pinctrl_dev *pctldev,
->  		ret = mtk_pconf_set_pull_select(pctl, pin, true, false, arg);
->  		break;
->  	case PIN_CONFIG_INPUT_ENABLE:
-> +		mtk_pmx_gpio_set_direction(pctldev, NULL, pin, true);
->  		ret = mtk_pconf_set_ies_smt(pctl, pin, arg, param);
->  		break;
->  	case PIN_CONFIG_OUTPUT:
-> @@ -354,6 +360,7 @@ static int mtk_pconf_parse_conf(struct pinctrl_dev *pctldev,
->  		ret = mtk_pmx_gpio_set_direction(pctldev, NULL, pin, false);
->  		break;
->  	case PIN_CONFIG_INPUT_SCHMITT_ENABLE:
-> +		mtk_pmx_gpio_set_direction(pctldev, NULL, pin, true);
->  		ret = mtk_pconf_set_ies_smt(pctl, pin, arg, param);
->  		break;
->  	case PIN_CONFIG_DRIVE_STRENGTH:
-
-This change is not directly related to adding mt2710 support and change
-behavior for all MTK pinctrl drivers, please create a separate patch for
-this.
-
-Joe.C
+Best regards,
+Marek Vasut
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-ARM-socfpga-Enable-PCIe-support.patch
+Type: text/x-patch
+Size: 2018 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151228/5a3c326f/attachment.bin>
