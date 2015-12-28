@@ -1,53 +1,55 @@
-From: geliangtang@163.com (Geliang Tang)
-Date: Mon, 28 Dec 2015 21:53:07 +0800
-Subject: [PATCH] crypto: hifn_795x, picoxcell - use ablkcipher_request_cast
-Message-ID: <9b6f300df7ffd4c5d65253fdbbb2d1a1cba04835.1451310459.git.geliangtang@163.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 28 Dec 2015 15:11:25 +0100
+Subject: [RFC PATCH 01/10] arm64: introduce KIMAGE_VADDR as the virtual
+ base of the kernel region
+In-Reply-To: <CAKv+Gu9nFaPES8u6fc7SQ0WFJVgV3O4uM2wNNoVWz8iaajyqTQ@mail.gmail.com>
+References: <1451301654-32019-1-git-send-email-ard.biesheuvel@linaro.org>
+ <11539877.krH4qBJsp9@wuerfel>
+ <CAKv+Gu9nFaPES8u6fc7SQ0WFJVgV3O4uM2wNNoVWz8iaajyqTQ@mail.gmail.com>
+Message-ID: <11016384.rorhLcDd8i@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use ablkcipher_request_cast() instead of open-coding it.
+On Monday 28 December 2015 13:07:44 Ard Biesheuvel wrote:
+> On 28 December 2015 at 12:50, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Monday 28 December 2015 12:20:45 Ard Biesheuvel wrote:
+> > How about a different approach that keeps the relocatable kernel, but moves it in
+> > physical memory with the same random offset as the virtual address? That way, both
+> > would be random, and you can keep the simple virt_to_phys() function.
+> >
+> > I suppose the downside of that is that the number of random bits is then limited
+> > by the size of the first memblock, which is smaller than the vmalloc area.
+> >
+> 
+> I don't see a reason to use the same virtual and physical offset
+> (other than the conditional). On arm64, it would be up to the
+> bootloader to decide where to put the Image in physical memory, and it
+> would be up to the kernel to decide whether or not to virtually remap
+> itself.
 
-Signed-off-by: Geliang Tang <geliangtang@163.com>
----
- drivers/crypto/hifn_795x.c        | 4 ++--
- drivers/crypto/picoxcell_crypto.c | 3 +--
- 2 files changed, 3 insertions(+), 4 deletions(-)
+I see. If we pull in the bootloader to the discussion, there are a couple
+of related points that are not directly required for your series but that
+we should keep in mind anyway:
 
-diff --git a/drivers/crypto/hifn_795x.c b/drivers/crypto/hifn_795x.c
-index 201e57d..eee2c7e 100644
---- a/drivers/crypto/hifn_795x.c
-+++ b/drivers/crypto/hifn_795x.c
-@@ -1943,7 +1943,7 @@ static void hifn_flush(struct hifn_device *dev)
- 
- 	spin_lock_irqsave(&dev->lock, flags);
- 	while ((async_req = crypto_dequeue_request(&dev->queue))) {
--		req = container_of(async_req, struct ablkcipher_request, base);
-+		req = ablkcipher_request_cast(async_req);
- 		spin_unlock_irqrestore(&dev->lock, flags);
- 
- 		hifn_process_ready(req, -ENODEV);
-@@ -2062,7 +2062,7 @@ static int hifn_process_queue(struct hifn_device *dev)
- 		if (backlog)
- 			backlog->complete(backlog, -EINPROGRESS);
- 
--		req = container_of(async_req, struct ablkcipher_request, base);
-+		req = ablkcipher_request_cast(async_req);
- 
- 		err = hifn_handle_req(req);
- 		if (err)
-diff --git a/drivers/crypto/picoxcell_crypto.c b/drivers/crypto/picoxcell_crypto.c
-index 15b5e39..3b1c7ec 100644
---- a/drivers/crypto/picoxcell_crypto.c
-+++ b/drivers/crypto/picoxcell_crypto.c
-@@ -856,8 +856,7 @@ static int spacc_ablk_need_fallback(struct spacc_req *req)
- 
- static void spacc_ablk_complete(struct spacc_req *req)
- {
--	struct ablkcipher_request *ablk_req =
--		container_of(req->req, struct ablkcipher_request, base);
-+	struct ablkcipher_request *ablk_req = ablkcipher_request_cast(req->req);
- 
- 	if (ablk_req->src != ablk_req->dst) {
- 		spacc_free_ddt(req, req->src_ddt, req->src_addr, ablk_req->src,
--- 
-2.5.0
+- We need to implement the randomization for each boot loader separately.
+  This is probably easy enough for grub, as it can tap the same random
+  number source that you use here, but a little harder for u-boot (requiring
+  to implement access to hardware rng separately on each platform) and
+  much harder to get done consistently in UEFI for direct kernel loading
+  since there is no common upstream.
+
+- once we have a random number in the bootloader, we should also pass that
+  through a DT property. This has been discussed multiple times in the past
+  and I think we had reached consensus already but don't know if we had
+  agreed on a specific DT property that contains the random number seed.
+
+- For machines that don't have strong hardware RNG, or where we don't
+  trust that hardware enough, we may want to have a way to feed back a
+  random seed into the bootloader during shutdown, the equivalent of
+  /etc/random-seed. On real Open Firmware, we'd do this through a
+  nvram variable that gets copied into a /chosen DT property, but we don't
+  have a generic way to do the same with u-boot. On UEFI we could probably
+  do it through efivars, but I'm not sure if that's accessible early
+  enough in the kernel, so we might need help from grub again.  
+
+	Arnd
