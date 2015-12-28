@@ -1,74 +1,80 @@
-From: mweseloh42@gmail.com (Marcus Weseloh)
-Date: Mon, 28 Dec 2015 18:31:32 +0100
-Subject: [PATCH] clk: sunxi: Fix mod0 clock calculation to return stable
- results and check divisor size limits
-Message-ID: <1451323892-13060-1-git-send-email-mweseloh42@gmail.com>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Mon, 28 Dec 2015 10:33:00 -0800
+Subject: [RESEND v4 1/6] remoteproc: dt: Provide bindings for ST's Remote
+ Processor Controller driver
+In-Reply-To: <1448370862-19120-2-git-send-email-lee.jones@linaro.org>
+References: <1448370862-19120-1-git-send-email-lee.jones@linaro.org>
+ <1448370862-19120-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <CAJAp7Oi6t=VDcTh5tLGne_LQFi8cBJH+=rDy1tgeh__SQwrpyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes some problems in the mod0 clock calculation. It has
-the potential to break stuff, as the issues explained below had the
-effect that clk_set_rate would always return successfully, sometimes
-setting a frequency that is higher than the requested value. Code that
-"accidentally worked" because of this might fail after applying
-this patch.
+On Tue, Nov 24, 2015 at 5:14 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
 
-The problems in detail:
+Acked-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 
-1. If a very low frequency is requested from a high parent clock, the
-divisors "div" and "calcm" might be > 255. This patch changes the type
-of both variables to unsigned int, because the silent cast to u8 will
-result in invalid frequencies and register values.
+Regards,
+Bjorn
 
-2. The width of the "m" divisor in the clock control registers is only
-4 bit, but that limitation is not checked when calculating the divisor
-and the resulting frequency. This patch adds a check that m never
-exceeds the field width.
-
-3. During a call to clk_set_rate, the sun4i_a10_get_mod0_factors
-function is called multiple times: first to find the best parent and
-frequency, then again to calculate the p and m divisors, passing the
-frequencies returned by the previous call(s). In certain cases
-those chained calls do not result in the best frequency choice.
-
-An example:
-parent_rate = 24Mhz, freq = 1.4Mhz results in p=1, m=9, freq=1333333,3333
-(which gets rounded down to 1333333).
-Calling the function again with parent_rate = 24Mhz and freq = 1333333
-results in p=1, m=10, freq=1200000.
-
-Rounding up the returned frequency removes this problem.
-
-Signed-off-by: Marcus Weseloh <mweseloh42@gmail.com>
----
- drivers/clk/sunxi/clk-mod0.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/clk/sunxi/clk-mod0.c b/drivers/clk/sunxi/clk-mod0.c
-index d167e1e..d03f099 100644
---- a/drivers/clk/sunxi/clk-mod0.c
-+++ b/drivers/clk/sunxi/clk-mod0.c
-@@ -31,7 +31,8 @@
- static void sun4i_a10_get_mod0_factors(u32 *freq, u32 parent_rate,
- 				       u8 *n, u8 *k, u8 *m, u8 *p)
- {
--	u8 div, calcm, calcp;
-+	unsigned int div, calcm;
-+	u8 calcp;
- 
- 	/* These clocks can only divide, so we will never be able to achieve
- 	 * frequencies higher than the parent frequency */
-@@ -50,8 +51,10 @@ static void sun4i_a10_get_mod0_factors(u32 *freq, u32 parent_rate,
- 		calcp = 3;
- 
- 	calcm = DIV_ROUND_UP(div, 1 << calcp);
-+	if (calcm > 16)
-+		calcm = 16;
- 
--	*freq = (parent_rate >> calcp) / calcm;
-+	*freq = DIV_ROUND_UP(parent_rate >> calcp, calcm);
- 
- 	/* we were called to round the frequency, we can now return */
- 	if (n == NULL)
--- 
-1.9.1
+>  .../devicetree/bindings/remoteproc/st-rproc.txt    | 41 ++++++++++++++++++++++
+>  1 file changed, 41 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/remoteproc/st-rproc.txt
+>
+> diff --git a/Documentation/devicetree/bindings/remoteproc/st-rproc.txt b/Documentation/devicetree/bindings/remoteproc/st-rproc.txt
+> new file mode 100644
+> index 0000000..1031bcd
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/remoteproc/st-rproc.txt
+> @@ -0,0 +1,41 @@
+> +STMicroelectronics Co-Processor Bindings
+> +----------------------------------------
+> +
+> +This binding provides support for adjunct processors found on ST SoCs.
+> +
+> +Co-processors can be controlled from the bootloader or the primary OS. If
+> +the bootloader starts a co-processor, the primary OS must detect its state
+> +and act accordingly.
+> +
+> +Required properties:
+> +- compatible           Should be one of:
+> +                               "st,st231-rproc"
+> +                               "st,st40-rproc"
+> +- memory-region                Reserved memory (See: ../reserved-memory/reserved-memory.txt)
+> +- resets               Reset lines (See: ../reset/reset.txt)
+> +- reset-names          Must be "sw_reset" and "pwr_reset"
+> +- clocks               Clock for co-processor (See: ../clock/clock-bindings.txt)
+> +- clock-frequency      Clock frequency to set co-processor at if the bootloader
+> +                       hasn't already done so
+> +- st,syscfg            System configuration register which holds the boot vector
+> +                       for the co-processor
+> +                               1st cell: Phandle to syscon block
+> +                               2nd cell: Boot vector register offset
+> +
+> +Example:
+> +
+> +       audio_reserved: rproc at 42000000 {
+> +               compatible = "shared-dma-pool";
+> +               reg = <0x42000000 0x01000000>;
+> +               no-map;
+> +       };
+> +
+> +       st231-audio {
+> +               compatible      = "st,st231-rproc";
+> +               memory-region   = <&audio_reserved>;
+> +               resets          = <&softreset STIH407_ST231_AUD_SOFTRESET>;
+> +               reset-names     = "sw_reset";
+> +               clocks          = <&clk_s_c0_flexgen CLK_ST231_AUD_0>;
+> +               clock-frequency = <600000000>;
+> +               st,syscfg       = <&syscfg_core 0x228>;
+> +       };
+> --
+> 1.9.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
