@@ -1,9 +1,9 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Mon, 28 Dec 2015 21:01:19 -0800
-Subject: [GIT PULL 1/4] BCM2835 SOC changes for 4.5
+Date: Mon, 28 Dec 2015 21:01:20 -0800
+Subject: [GIT PULL 2/4] BCM2835 drivers changes for 4.5
 In-Reply-To: <1451365282-10505-1-git-send-email-eric@anholt.net>
 References: <1451365282-10505-1-git-send-email-eric@anholt.net>
-Message-ID: <1451365282-10505-2-git-send-email-eric@anholt.net>
+Message-ID: <1451365282-10505-3-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,24 +13,35 @@ The following changes since commit f74875dc36135ebae82a8e005f4b7f52289d2c40:
 
 are available in the git repository at:
 
-  http://github.com/anholt/linux tags/bcm2835-soc-next-2015-12-28
+  http://github.com/anholt/linux tags/bcm2835-drivers-next-2015-12-28
 
-for you to fetch changes up to 5234c34e4cd7695647ccc1cabb50c3e7720dd3fb:
+for you to fetch changes up to a09cd356586d33f64cbe64ee4f5c1a7c4a6abee5:
 
-  ARM: bcm2835: Add Kconfig support for bcm2836 (2015-12-26 14:34:03 -0800)
+  ARM: bcm2835: add rpi power domain driver (2015-12-21 20:00:41 -0800)
 
 ----------------------------------------------------------------
 This pull request includes the bcm2835 changes for 4.5 targeting the
-arm-soc next/soc branch.
+arm-soc next/drivers branch.
 
 ----------------------------------------------------------------
-Eric Anholt (3):
-      dt-bindings: Add root properties for Raspberry Pi 2
-      ARM: bcm2835: Add a compat string for bcm2836 machine probe
-      ARM: bcm2835: Add Kconfig support for bcm2836
+Alexander Aring (2):
+      dt-bindings: add rpi power domain driver bindings
+      ARM: bcm2835: add rpi power domain driver
 
- Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt |  4 ++++
- arch/arm/Kconfig.debug                                     | 10 ++++++++--
- arch/arm/mach-bcm/Kconfig                                  |  9 +++++----
- arch/arm/mach-bcm/board_bcm2835.c                          |  5 +++++
- 4 files changed, 22 insertions(+), 6 deletions(-)
+Eric Anholt (1):
+      ARM: bcm2835: Define two new packets from the latest firmware.
+
+ .../bindings/soc/bcm/raspberrypi,bcm2835-power.txt |  47 ++++
+ drivers/soc/Kconfig                                |   1 +
+ drivers/soc/Makefile                               |   1 +
+ drivers/soc/bcm/Kconfig                            |   9 +
+ drivers/soc/bcm/Makefile                           |   1 +
+ drivers/soc/bcm/raspberrypi-power.c                | 247 +++++++++++++++++++++
+ include/dt-bindings/power/raspberrypi-power.h      |  41 ++++
+ include/soc/bcm2835/raspberrypi-firmware.h         |   2 +
+ 8 files changed, 349 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/bcm/raspberrypi,bcm2835-power.txt
+ create mode 100644 drivers/soc/bcm/Kconfig
+ create mode 100644 drivers/soc/bcm/Makefile
+ create mode 100644 drivers/soc/bcm/raspberrypi-power.c
+ create mode 100644 include/dt-bindings/power/raspberrypi-power.h
