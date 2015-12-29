@@ -1,42 +1,37 @@
-From: bamvor.zhangjian@linaro.org (Bamvor Jian Zhang)
-Date: Tue, 29 Dec 2015 22:59:42 +0800
-Subject: [PATCH] arm64: compat: fix wrong dependency
-In-Reply-To: <20151229122721.GA20341@yury-N73SV>
-References: <20151229122721.GA20341@yury-N73SV>
-Message-ID: <1451401182-10629-1-git-send-email-bamvor.zhangjian@linaro.org>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 29 Dec 2015 16:41:09 +0000
+Subject: [PATCH 2/2] dt-bindings: ci-hdrc-usb2: add missing compatibles
+In-Reply-To: <1451407269-14905-1-git-send-email-stefan.wahren@i2se.com>
+References: <1451407269-14905-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1451407269-14905-2-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the patches of ILP32, COMPAT is not equivalent to AARCH32 in EL0.
-This patch fix this by updating the dependency from COMPAT to
-AARCH32_EL0 for ARMV8_DEPRECATED and ARM64_ERRATUM_845719.
+This patch adds the missing compatible strings from ci_hdrc_imx.
 
-Signed-off-by: Bamvor Jian Zhang <bamvor.zhangjian@linaro.org>
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 ---
- arch/arm64/Kconfig | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ .../devicetree/bindings/usb/ci-hdrc-usb2.txt       |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index deec37a..7ea783b 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -313,7 +313,7 @@ config ARM64_ERRATUM_832075
+diff --git a/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
+index 781296b..1e83509 100644
+--- a/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
++++ b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
+@@ -2,7 +2,14 @@
  
- config ARM64_ERRATUM_845719
- 	bool "Cortex-A53: 845719: a load might read incorrect data"
--	depends on COMPAT
-+	depends on AARCH32_EL0
- 	default y
- 	help
- 	  This option adds an alternative code sequence to work around ARM
-@@ -509,7 +509,7 @@ config FORCE_MAX_ZONEORDER
- 
- menuconfig ARMV8_DEPRECATED
- 	bool "Emulate deprecated/obsolete ARMv8 instructions"
--	depends on COMPAT
-+	depends on AARCH32_EL0
- 	help
- 	  Legacy software support may require certain instructions
- 	  that have been deprecated or obsoleted in the architecture.
+ Required properties:
+ - compatible: should be one of:
++	"fsl,imx23-usb"
+ 	"fsl,imx27-usb"
++	"fsl,imx28-usb"
++	"fsl,imx6q-usb"
++	"fsl,imx6sl-usb"
++	"fsl,imx6sx-usb"
++	"fsl,imx6ul-usb"
++	"fsl,imx7d-usb"
+ 	"lsi,zevio-usb"
+ 	"qcom,ci-hdrc"
+ 	"chipidea,usb2"
 -- 
-2.1.4
+1.7.9.5
