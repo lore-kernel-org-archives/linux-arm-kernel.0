@@ -1,83 +1,40 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 29 Dec 2015 16:15:09 -0600
-Subject: [PATCH v2 1/3] clk: bcm2835: Add bindings for the auxiliary
- peripheral clock gates.
-In-Reply-To: <20151228223935.25842.28675@quark.deferred.io>
-References: <1450222559-22461-1-git-send-email-eric@anholt.net>
- <20151219041935.GS14936@rob-hp-laptop>
- <CAEG3pNCOO1F8+nwOQGSjUKxYCGbWW_Ripc6xUwDyg6ay66uL7w@mail.gmail.com>
- <87wps3qulw.fsf@eliezer.anholt.net>
- <20151228223935.25842.28675@quark.deferred.io>
-Message-ID: <CAL_JsqLu7=66jEuaezesEuoPsBBhRAT0UQcLVNOLVwkEvQacRA@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 29 Dec 2015 23:27:55 +0100
+Subject: [RESEND PATCH v1 0/4] Add support emac for the RK3036 SoC platform
+In-Reply-To: <20151229.155314.1522114236952280828.davem@davemloft.net>
+References: <1451287341-16453-1-git-send-email-zhengxing@rock-chips.com>
+ <20151229.155314.1522114236952280828.davem@davemloft.net>
+Message-ID: <3925713.yDzK1dvrIv@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Arnd and Olof
+Hi Dave,
 
-On Mon, Dec 28, 2015 at 4:39 PM, Michael Turquette
-<mturquette@baylibre.com> wrote:
-> Quoting Eric Anholt (2015-12-24 15:45:15)
->> Michael Turquette <mturquette@baylibre.com> writes:
->>
->> > On Fri, Dec 18, 2015 at 8:19 PM, Rob Herring <robh@kernel.org> wrote:
->> >> On Tue, Dec 15, 2015 at 03:35:57PM -0800, Eric Anholt wrote:
->> >>> These will be used for enabling UART1, SPI1, and SPI2.
->> >>>
->> >>> Signed-off-by: Eric Anholt <eric@anholt.net>
->> >>> ---
->> >>>
->> >>> v2: Make the binding cover both the IRQ and clock enable registers.
->> >>>
->> >>>  .../bindings/clock/brcm,bcm2835-aux-clock.txt      | 31 ++++++++++++++++++++++
->> >>>  include/dt-bindings/clock/bcm2835-aux.h            | 17 ++++++++++++
->> >>>  2 files changed, 48 insertions(+)
->> >>>  create mode 100644 Documentation/devicetree/bindings/clock/brcm,bcm2835-aux-clock.txt
->> >>>  create mode 100644 include/dt-bindings/clock/bcm2835-aux.h
->> >>
->> >> Acked-by: Rob Herring <robh@kernel.org>
->> >
->> > Applied to clk-next.
->> >
->> > Next time if you put the header into the clk driver patch then we can
->> > send the binding description through the DT tree and take the header
->> > and C file through the clk tree in one patch.
->>
->> I would *love* to do that, but I've previously been told that having the
->> bindings patch reference a header file not present as of the bindings
->> patch is not acceptable and made to change it.
->
-> Ugh, that is annoying. I would think that having code compile properly
-> would trump the desire to have all of the documentation merged as one
-> patch.
+Am Dienstag, 29. Dezember 2015, 15:53:14 schrieb David Miller:
+> You have to submit this series properly, the same problem happend twice
+> now.
+> 
+> When you submit a series you should:
+> 
+> 1) Make it clear which tree you expect these changes to be applied
+>    to.  Here it is completely ambiguous, do you want it to go into
+>    my networking tree or some other subsystem tree?
+> 
+> 2) You MUST keep all parties informed about all patches for a series
+>    like this.  That means you cannot drop netdev from patch #4 as
+>    you did both times.  Doing this aggravates the situation for
+>    #1 even more, because if a patch is not CC:'d to netdev it does
+>    not enter patchwork.  And if it doesn't go into patchwork, I'm
+>    not looking at it.
 
-What about compiling the dts?
+I guess that is some unfortunate result of git send-email combined with 
+get_maintainer.pl . In general I also prefer to see the whole series, but have 
+gotten such partial series from other maintainers as well in the past, so it 
+seems to be depending on preferences somewhat.
 
-> On the other hand, I've been asked to not take binding descriptions
-> through the clk tree. That is a policy that I'm happy to comply with,
-> but it is at odds with the recommendation for the header and the binding
-> description to be merged together.
+For the series at hand, the 4th patch is the devicetree addition, which the 
+expected way is me picking it up, after you are comfortable with the code-
+related changes.
 
-By who? Any bindings in a series I always expect the subsystem
-maintainers to take the whole series. That doesn't solve the problem
-though as there is still a dependency between a subsystem tree and
-arm-soc typically.
 
-> DT folks, what is the right way to do this? An immutable, shared branch
-> just for a single header file solves the problem, but also feels very
-> cumbersome for such a trivial issue.
-
-Arnd and Olof have been complaining about this problem which is worse
-when it is a binding, driver and dts.
-
-I'm open to maintaining a branch for this purpose if that helps. That
-or staggering merging of bindings and drivers/dts are the only ideas
-I've come up with.
-
-> How about allowing binding descriptions to be merged without the header
-> file, so long as it is merged through another tree?
-
-I think that is wrong if we have the goal to separate bindings from
-the kernel and the bindings should stand on their own. However, if it
-greatly simplifies things, i'd be okay with that.
-
-Rob
+Heiko
