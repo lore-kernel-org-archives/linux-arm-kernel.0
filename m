@@ -1,43 +1,23 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 29 Dec 2015 16:41:08 +0000
-Subject: [PATCH 1/2] usb: chipidea: add CI_HDRC_TURN_VBUS_EARLY_ON for imx23
-Message-ID: <1451407269-14905-1-git-send-email-stefan.wahren@i2se.com>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Tue, 29 Dec 2015 10:01:04 -0800
+Subject: [PATCH 02/10] spi: cadence, zynq: use to_platform_device()
+In-Reply-To: <522ef92bb1d83c651cbdd12ff10b594b2e2a691c.1451221174.git.geliangtang@163.com>
+References: <a554e6af3a3528c2206c94dab62b7800f96caa4b.1451221174.git.geliangtang@163.com>
+ <522ef92bb1d83c651cbdd12ff10b594b2e2a691c.1451221174.git.geliangtang@163.com>
+Message-ID: <CAAtXAHd_Xp4WbXMSY5QVLT7cYnpbzObf5UHCnuzh64LgOBER3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Until now the imx23 uses the imx27 platform flag. But the
-imx23 needs the flag CI_HDRC_TURN_VBUS_EARLY_ON, too. So
-fix this by adding a separate platform flag.
+Hi,
 
-Suggested-by: Peter Chen <peter.chen@nxp.com>
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- drivers/usb/chipidea/ci_hdrc_imx.c |    6 ++++++
- 1 file changed, 6 insertions(+)
+On Sun, Dec 27, 2015 at 5:15 AM, Geliang Tang <geliangtang@163.com> wrote:
+> Use to_platform_device() instead of open-coding it.
+>
+Reviewed-by: Moritz Fischer <moritz.fischer@ettus.com>
+> Signed-off-by: Geliang Tang <geliangtang@163.com>
 
-diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
-index f14f4ab..b4605dd 100644
---- a/drivers/usb/chipidea/ci_hdrc_imx.c
-+++ b/drivers/usb/chipidea/ci_hdrc_imx.c
-@@ -28,6 +28,11 @@ struct ci_hdrc_imx_platform_flag {
- 	bool runtime_pm;
- };
- 
-+static const struct ci_hdrc_imx_platform_flag imx23_usb_data = {
-+	.flags = CI_HDRC_TURN_VBUS_EARLY_ON |
-+		CI_HDRC_DISABLE_STREAMING,
-+};
-+
- static const struct ci_hdrc_imx_platform_flag imx27_usb_data = {
- 		CI_HDRC_DISABLE_STREAMING,
- };
-@@ -66,6 +71,7 @@ static const struct ci_hdrc_imx_platform_flag imx7d_usb_data = {
- };
- 
- static const struct of_device_id ci_hdrc_imx_dt_ids[] = {
-+	{ .compatible = "fsl,imx23-usb", .data = &imx23_usb_data},
- 	{ .compatible = "fsl,imx28-usb", .data = &imx28_usb_data},
- 	{ .compatible = "fsl,imx27-usb", .data = &imx27_usb_data},
- 	{ .compatible = "fsl,imx6q-usb", .data = &imx6q_usb_data},
--- 
-1.7.9.5
+Looks good to me, maybe (nit) split it up into two commits.
+
+Cheers,
+
+Moritz
