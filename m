@@ -1,47 +1,83 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 29 Dec 2015 15:55:45 -0600
-Subject: [PATCH 4/6] regulator: lp872x: Add enable GPIO pin support
-In-Reply-To: <1451424412.13576.1.camel@collins>
-References: <1450868319-20513-1-git-send-email-contact@paulk.fr>
- <1450868319-20513-5-git-send-email-contact@paulk.fr>
- <20151229200244.GA27426@rob-hp-laptop>
- <1451424412.13576.1.camel@collins>
-Message-ID: <CAL_JsqLiuNR_MQ+eX_TQVMDtn85hUTweNRL2Q+7Z8Tq-HJhx2g@mail.gmail.com>
+Date: Tue, 29 Dec 2015 16:15:09 -0600
+Subject: [PATCH v2 1/3] clk: bcm2835: Add bindings for the auxiliary
+ peripheral clock gates.
+In-Reply-To: <20151228223935.25842.28675@quark.deferred.io>
+References: <1450222559-22461-1-git-send-email-eric@anholt.net>
+ <20151219041935.GS14936@rob-hp-laptop>
+ <CAEG3pNCOO1F8+nwOQGSjUKxYCGbWW_Ripc6xUwDyg6ay66uL7w@mail.gmail.com>
+ <87wps3qulw.fsf@eliezer.anholt.net>
+ <20151228223935.25842.28675@quark.deferred.io>
+Message-ID: <CAL_JsqLu7=66jEuaezesEuoPsBBhRAT0UQcLVNOLVwkEvQacRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 29, 2015 at 3:26 PM, Paul Kocialkowski <contact@paulk.fr> wrote:
-> Le mardi 29 d?cembre 2015 ? 14:02 -0600, Rob Herring a ?crit :
->> On Wed, Dec 23, 2015 at 11:58:37AM +0100, Paul Kocialkowski wrote:
->> > LP872x regulators are made active via the EN pin, which might be hooked to a
->> > GPIO. This adds support for driving the GPIO high when the driver is in use.
->> >
->> > Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
->> > ---
->> >  .../devicetree/bindings/regulator/lp872x.txt       |  1 +
->> >  drivers/regulator/lp872x.c                         | 33 ++++++++++++++++++++--
->> >  include/linux/regulator/lp872x.h                   |  2 ++
->> >  3 files changed, 33 insertions(+), 3 deletions(-)
->> >
->> > diff --git a/Documentation/devicetree/bindings/regulator/lp872x.txt b/Documentation/devicetree/bindings/regulator/lp872x.txt
->> > index 7818318..0559c25 100644
->> > --- a/Documentation/devicetree/bindings/regulator/lp872x.txt
->> > +++ b/Documentation/devicetree/bindings/regulator/lp872x.txt
->> > @@ -28,6 +28,7 @@ Optional properties:
->> >    - ti,dvs-gpio: GPIO specifier for external DVS pin control of LP872x devices.
->> >    - ti,dvs-vsel: DVS selector. 0 = SEL_V1, 1 = SEL_V2.
->> >    - ti,dvs-state: initial DVS pin state. 0 = DVS_LOW, 1 = DVS_HIGH.
->> > +  - ti,enable-gpio: GPIO specifier for EN pin control of LP872x devices.
++Arnd and Olof
+
+On Mon, Dec 28, 2015 at 4:39 PM, Michael Turquette
+<mturquette@baylibre.com> wrote:
+> Quoting Eric Anholt (2015-12-24 15:45:15)
+>> Michael Turquette <mturquette@baylibre.com> writes:
 >>
->> Should be "-gpios" instead of "-gpio".
+>> > On Fri, Dec 18, 2015 at 8:19 PM, Rob Herring <robh@kernel.org> wrote:
+>> >> On Tue, Dec 15, 2015 at 03:35:57PM -0800, Eric Anholt wrote:
+>> >>> These will be used for enabling UART1, SPI1, and SPI2.
+>> >>>
+>> >>> Signed-off-by: Eric Anholt <eric@anholt.net>
+>> >>> ---
+>> >>>
+>> >>> v2: Make the binding cover both the IRQ and clock enable registers.
+>> >>>
+>> >>>  .../bindings/clock/brcm,bcm2835-aux-clock.txt      | 31 ++++++++++++++++++++++
+>> >>>  include/dt-bindings/clock/bcm2835-aux.h            | 17 ++++++++++++
+>> >>>  2 files changed, 48 insertions(+)
+>> >>>  create mode 100644 Documentation/devicetree/bindings/clock/brcm,bcm2835-aux-clock.txt
+>> >>>  create mode 100644 include/dt-bindings/clock/bcm2835-aux.h
+>> >>
+>> >> Acked-by: Rob Herring <robh@kernel.org>
+>> >
+>> > Applied to clk-next.
+>> >
+>> > Next time if you put the header into the clk driver patch then we can
+>> > send the binding description through the DT tree and take the header
+>> > and C file through the clk tree in one patch.
+>>
+>> I would *love* to do that, but I've previously been told that having the
+>> bindings patch reference a header file not present as of the bindings
+>> patch is not acceptable and made to change it.
 >
-> Care to comment why? There is only one GPIO that can be used here, since
-> there is only one single EN pin. I thought this matched what is done
-> already with "ti,dvs-gpio".
+> Ugh, that is annoying. I would think that having code compile properly
+> would trump the desire to have all of the documentation merged as one
+> patch.
 
-To be consistent. We use "clocks" and "interrupts" always whether one
-or more for example.
+What about compiling the dts?
 
--gpio is documented as deprecated now.
+> On the other hand, I've been asked to not take binding descriptions
+> through the clk tree. That is a policy that I'm happy to comply with,
+> but it is at odds with the recommendation for the header and the binding
+> description to be merged together.
+
+By who? Any bindings in a series I always expect the subsystem
+maintainers to take the whole series. That doesn't solve the problem
+though as there is still a dependency between a subsystem tree and
+arm-soc typically.
+
+> DT folks, what is the right way to do this? An immutable, shared branch
+> just for a single header file solves the problem, but also feels very
+> cumbersome for such a trivial issue.
+
+Arnd and Olof have been complaining about this problem which is worse
+when it is a binding, driver and dts.
+
+I'm open to maintaining a branch for this purpose if that helps. That
+or staggering merging of bindings and drivers/dts are the only ideas
+I've come up with.
+
+> How about allowing binding descriptions to be merged without the header
+> file, so long as it is merged through another tree?
+
+I think that is wrong if we have the goal to separate bindings from
+the kernel and the bindings should stand on their own. However, if it
+greatly simplifies things, i'd be okay with that.
 
 Rob
