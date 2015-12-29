@@ -1,30 +1,59 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 29 Dec 2015 10:23:52 +0200
-Subject: [RESEND v4 0/6] remoteproc: Add driver for STMicroelectronics
- platforms
-In-Reply-To: <CAJAp7OgZwf-Cd+Drypqo92YNJBYtB-XCbW-noy-4BB5JZojRnw@mail.gmail.com>
-References: <1448370862-19120-1-git-send-email-lee.jones@linaro.org>
- <CAK=WgbZbiq_BAUEti9tWUtWqZPU_4gDJ5Mfqur=Ou2N4Ea+2GQ@mail.gmail.com>
- <20151126091043.GO12874@x1>
- <CAK=WgbbWTdDGMYOFjVO3s1bt1r5iou6Q-hHOh4SZG=rQuEa2eQ@mail.gmail.com>
- <CAJAp7OgZwf-Cd+Drypqo92YNJBYtB-XCbW-noy-4BB5JZojRnw@mail.gmail.com>
-Message-ID: <CAK=Wgba-JuidsUgrTZM+vZc7p3cWeYuKwKYUD7ru_nWm7Jybew@mail.gmail.com>
+From: zhongkaihua@huawei.com (Zhong Kaihua)
+Date: Tue, 29 Dec 2015 16:28:22 +0800
+Subject: [PATCH V3 1/1] arm64: dts: add Hi6220 spi configuration nodes
+Message-ID: <1451377702-16385-1-git-send-email-zhongkaihua@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 28, 2015 at 8:41 PM, Bjorn Andersson <bjorn@kryo.se> wrote:
-> I interpreted this as you picked patch 1-4 and didn't pay more
-> attention to them, but I can't find them in your kernel.org trees. So
-> I've looked through them again.
->
-> Please apply patch 1, 3 and 4 to your tree Ohad. I was unable to find
-> a v5 of patch 2, but it's unrelated so no need to wait for a new
-> version of that.
+arm64: dts: add Hi6220 spi configuration nodes
 
-I was under the impression that Lee plans to resubmit once the
-discussion around patch 2 settles, so I haven't picked the series yet.
+Signed-off-by: Zhong Kaihua <zhongkaihua@huawei.com>
+---
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts |  1 +
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi      | 20 ++++++++++++++++++++
+ 2 files changed, 21 insertions(+)
 
-Lee please let me know - I can take 1/3/4 and wait for the new 2 as well.
-
-Thanks,
-Ohad.
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+index 4fb0bdc..2313ae0 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
++++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+@@ -23,6 +23,7 @@
+ 		serial1 = &uart1; /* BT UART */
+ 		serial2 = &uart2; /* LS Expansion UART0 */
+ 		serial3 = &uart3; /* LS Expansion UART1 */
++		spi0 = &spi_0;
+ 	};
+ 
+ 	chosen {
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+index 0f11e2a..da0fe37 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+@@ -489,5 +489,25 @@
+ 			clock-names = "apb_pclk";
+ 			status = "ok";
+ 		};
++
++		spi_0: spi at f7106000 {
++			compatible = "arm,pl022", "arm,primecell";
++			reg = <0x0 0xf7106000 0x0 0x1000>;
++			interrupts = <0 50 4>;
++			bus-id = <0>;
++			enable-dma = <0>;
++			/*dmas = <&dma0 12 &dma0 13>;*/
++			/*dma-names = "rx", "tx";*/
++
++			clocks = <&sys_ctrl HI6220_SPI_CLK>;
++			clock-names = "apb_pclk";
++			pinctrl-names = "default";
++			pinctrl-0 = <&spi0_pmx_func &spi0_cfg_func>;
++			num-cs = <1>;
++			cs-gpios = <&gpio6 2 0>;
++
++			status = "ok";
++		};
++
+ 	};
+ };
+-- 
+1.9.1
