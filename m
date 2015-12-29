@@ -1,29 +1,27 @@
-From: slash.tmp@free.fr (Mason)
-Date: Tue, 29 Dec 2015 21:48:47 +0100
-Subject: [PATCH RFC] ARM: tango4: Fix build issues
-In-Reply-To: <567DBA04.4060709@free.fr>
-References: <567DBA04.4060709@free.fr>
-Message-ID: <5682F1AE.60108@free.fr>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 29 Dec 2015 15:53:14 -0500 (EST)
+Subject: [RESEND PATCH v1 0/4] Add support emac for the RK3036 SoC platform
+In-Reply-To: <1451287341-16453-1-git-send-email-zhengxing@rock-chips.com>
+References: <1451287341-16453-1-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <20151229.155314.1522114236952280828.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/12/2015 22:49, Mason wrote:
 
-> Move SMP setup to platsmp.c
-> Specify the CPU type to the assembler, and only for smc.S
-> 
-> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
-> ---
->  arch/arm/mach-tango/Makefile  |  3 ++-
->  arch/arm/mach-tango/platsmp.c | 16 ++++++++++++++++
->  arch/arm/mach-tango/setup.c   | 14 --------------
->  3 files changed, 18 insertions(+), 15 deletions(-)
->  create mode 100644 arch/arm/mach-tango/platsmp.c
+You have to submit this series properly, the same problem happend twice
+now.
 
-I have a question. When the original commit hasn't been pushed to
-Linus' tree yet, is the original commit simply amended?
-(fixup option in rebase -i)
+When you submit a series you should:
 
-Or are they handled as regular commits on top of the previous commits?
+1) Make it clear which tree you expect these changes to be applied
+   to.  Here it is completely ambiguous, do you want it to go into
+   my networking tree or some other subsystem tree?
 
-Regards.
+2) You MUST keep all parties informed about all patches for a series
+   like this.  That means you cannot drop netdev from patch #4 as
+   you did both times.  Doing this aggravates the situation for
+   #1 even more, because if a patch is not CC:'d to netdev it does
+   not enter patchwork.  And if it doesn't go into patchwork, I'm
+   not looking at it.
+
+Thanks.
