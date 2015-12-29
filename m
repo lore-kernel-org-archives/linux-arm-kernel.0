@@ -1,97 +1,78 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 29 Dec 2015 13:48:52 +0000
-Subject: [PATCH] ARM: mm: Enable PXN when running non-LPAE kernel on LPAE
-In-Reply-To: <1451341389.25978.39.camel@decadent.org.uk>
-References: <005201d1415a$e5fe5ed0$b1fb1c70$@samsung.com>
- <1451341389.25978.39.camel@decadent.org.uk>
-Message-ID: <56828F44.9030204@arm.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 29 Dec 2015 14:54:10 +0100 (CET)
+Subject: [PATCH] arm: kernel: utilize hrtimer based broadcast
+In-Reply-To: <4875455.lvoc6XpkZc@wuerfel>
+References: <1437124312-44700-1-git-send-email-b18965@freescale.com>
+ <20151027081834.GB1425@svinekod>
+ <DB3PR04MB07407D83CC5F8F5F19A7207F4FB0@DB3PR04MB074.eurprd04.prod.outlook.com>
+ <4875455.lvoc6XpkZc@wuerfel>
+Message-ID: <alpine.DEB.2.11.1512291449380.28591@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/12/15 22:23, Ben Hutchings wrote:
-> On Mon, 2015-12-28 at 19:31 +0900, Jungseung Lee wrote:
->> 2015-05-11 23:36 GMT+09:00 Catalin Marinas <catalin.marinas@arm.com>:
->>> On Mon, May 11, 2015 at 05:09:35PM +0900, Jungseung Lee wrote:
->>>> Hi, Ben.
->>>>
->>>> 2014-12-25 2:20 GMT+09:00 Catalin Marinas :
->>>>> On Wed, Dec 24, 2014 at 03:54:28PM +0000, Ben Hutchings wrote:
->>>>>> The VMSA field of MMFR0 (bottom 4 bits) is incremented for each
->>>>>> added feature.  PXN is supported if the value is >= 4 and LPAE
->>>>>> is supported if it is >= 5.
->>>>>>
->>>>>> In case a kernel with CONFIG_ARM_LPAE disabled is used on a
->>>>>> processor that supports LPAE, we can still use PXN in short
->>>>>> descriptors.  So check for >= 4 not == 4.
->>>>>>
->>>>>> Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
->>>>>> Cc: Jungseung Lee <js07.lee@gmail.com>
->>>>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
->>>>>
->>>>> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->>>>
->>>> Is this patch handled?
->>>
->>> If it's not in mainline already, than it probably isn't handled.
->>>
->>>> or you can send it to Russell's patch system:
->>>> http://www.arm.linux.org.uk/developer/patches/
->>>
->>> Check mainline first, otherwise please submit it.
->>>
->>
->>> --
->>> Catalin
->>
->> Hi, Ben
->>
->> It looks still not submitted yet. Could you send it to Russell's patch
->> system?
->> http://www.arm.linux.org.uk/developer/patches/
->>
-> 
-> I've never needed to use a web-based system to submit kernel patches
-> before, and I'm not going to start now.  Someone else can re-submit
+On Mon, 28 Dec 2015, Arnd Bergmann wrote:
 
-You don't have to... I just quote Catalin's recipe [1]
+> On Monday 28 December 2015 07:18:58 Huan Wang wrote:
+> > Hi, Arnd,
+> > 
+> > 	Could you help to review the following patch? Thanks.
+> > 
+> 
+> Hi Alison,
+> 
+> I'm sorry but I understand very little of this particular area of the kernel.
+> 
+> I've added Daniel Lezcano, John Stultz and Thomas Gleixner to Cc, they all
+> know this much better than I do and one of them should be able to comment after
+> their Christmas break.
 
-> You can send patches as usual to patches at arm.linux.org.uk, just add
-> KernelVersion: v3.?? after the --- line in your patch (maybe this could
-> be automate as well but I didn't bother).
-> 
-> For series, because the arrival order is not guaranteed, I use the git
-> alias below to trick it into sleeping 60s between patches:
-> 
-> ksend-rmk-patch = !git send-email --annotate --no-thread --suppress-cc=all --to-cmd='sleep 60 && echo patches at arm.linux.org.uk "#"'
-> 
-> For stgit, I have a dedicated template:
-> 
-> From: %(sender)s
-> To: patches at arm.linux.org.uk
-> Subject: %(prefix)s%(shortdescr)s
-> 
-> %(longdescr)s
-> PATCH FOLLOWS
-> KernelVersion:%(version)s
-> %(diff)s
-> 
-> And there is always git pull request that Russell is happy with.
+I have no real opinion about that patch. It does no harm to unconditionally
+setup the hrtimer based broadcast even if it's never used.
 
-Does it work for you?
+Up to the arch maintainer to decide. 
 
-[1] https://lkml.org/lkml/2014/8/22/228
+Thanks,
 
-Happy NY
-Vladimir
-
-> this if they want it.
+	tglx
+ 
+> > > On Fri, Jul 17, 2015 at 10:11:52AM +0100, Alison Wang wrote:
+> > > > Hrtimer based broadcast is used on ARM platform. It can be registered
+> > > > as the tick broadcast device in the absence of a real external clock
+> > > > device.
+> > > >
+> > > > Signed-off-by: Alison Wang <alison.wang@freescale.com>
+> > > 
+> > > This looks sensible to me. FWIW:
+> > > 
+> > > Acked-by: Mark Rutland <mark.rutland@arm.com>
+> > > 
+> > > Thanks,
+> > > Mark.
+> > > 
+> > > > ---
+> > > >  arch/arm/kernel/time.c | 3 +++
+> > > >  1 file changed, 3 insertions(+)
+> > > >
+> > > > diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c index
+> > > > a66e37e..a9bc73c 100644
+> > > > --- a/arch/arm/kernel/time.c
+> > > > +++ b/arch/arm/kernel/time.c
+> > > > @@ -12,6 +12,7 @@
+> > > >   *  reading the RTC at bootup, etc...
+> > > >   */
+> > > >  #include <linux/clk-provider.h>
+> > > > +#include <linux/clockchips.h>
+> > > >  #include <linux/clocksource.h>
+> > > >  #include <linux/errno.h>
+> > > >  #include <linux/export.h>
+> > > > @@ -121,5 +122,7 @@ void __init time_init(void)
+> > > >  		of_clk_init(NULL);
+> > > >  #endif
+> > > >  		clocksource_of_init();
+> > > > +
+> > > > +		tick_setup_hrtimer_broadcast();
+> > > >  	}
+> > > >  }
 > 
-> Ben.
 > 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
