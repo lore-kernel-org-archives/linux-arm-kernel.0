@@ -1,44 +1,38 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 29 Dec 2015 14:56:24 -0800
-Subject: [RESEND PATCH v1 0/4] Add support emac for the RK3036 SoC platform
-In-Reply-To: <3925713.yDzK1dvrIv@diego>
+Date: Tue, 29 Dec 2015 14:59:59 -0800
+Subject: [RESEND PATCH v1 3/4] net: ethernet: arc: Add support emac for
+ RK3036
+In-Reply-To: <1451287341-16453-4-git-send-email-zhengxing@rock-chips.com>
 References: <1451287341-16453-1-git-send-email-zhengxing@rock-chips.com>
- <20151229.155314.1522114236952280828.davem@davemloft.net>
- <3925713.yDzK1dvrIv@diego>
-Message-ID: <20898DB3-4FB5-4130-A69D-1DE4BC819A5C@gmail.com>
+ <1451287341-16453-4-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <FFCE9129-357E-4643-A350-9927A5AD5720@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On December 29, 2015 2:27:55 PM PST, "Heiko St?bner" <heiko@sntech.de> wrote:
->Hi Dave,
+On December 27, 2015 11:22:20 PM PST, Xing Zheng <zhengxing@rock-chips.com> wrote:
+>The RK3036's GRFs offset are different with RK3066/RK3188, and need to
+>set
+>mac TX/RX clock before probe emac.
 >
->Am Dienstag, 29. Dezember 2015, 15:53:14 schrieb David Miller:
->> You have to submit this series properly, the same problem happend
->twice
->> now.
->> 
->> When you submit a series you should:
->> 
->> 1) Make it clear which tree you expect these changes to be applied
->>    to.  Here it is completely ambiguous, do you want it to go into
->>    my networking tree or some other subsystem tree?
->> 
->> 2) You MUST keep all parties informed about all patches for a series
->>    like this.  That means you cannot drop netdev from patch #4 as
->>    you did both times.  Doing this aggravates the situation for
->>    #1 even more, because if a patch is not CC:'d to netdev it does
->>    not enter patchwork.  And if it doesn't go into patchwork, I'm
->>    not looking at it.
->
->I guess that is some unfortunate result of git send-email combined with
->
->get_maintainer.pl . In general I also prefer to see the whole series,
->but have 
->gotten such partial series from other maintainers as well in the past,
->so it 
->seems to be depending on preferences somewhat.
+>Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+>---
+<snip>
+> };
+> 
+> static const struct of_device_id emac_rockchip_dt_ids[] = {
+>-	{ .compatible = "rockchip,rk3066-emac", .data =
+>&emac_rockchip_dt_data[0] },
+>-	{ .compatible = "rockchip,rk3188-emac", .data =
+>&emac_rockchip_dt_data[1] },
+>+	{ .compatible = "rockchip,rk3036-emac", .data =
+>&emac_rockchip_dt_data[0] },
+>+	{ .compatible = "rockchip,rk3066-emac", .data =
+>&emac_rockchip_dt_data[1] },
+>+	{ .compatible = "rockchip,rk3188-emac", .data =
+>&emac_rockchip_dt_data[2] },
+> 	{ /* Sentinel */ }
 
-You could run get_maintainer.pl against the individual patches in the series, merge the cc list somewhere in a file/variable and then do the actual mail submission with that full list for all patches. There could be a way to automate that with a bit of help from git send-email eventually.
+Food for thought, you might want to use an enum here to index emac_rockchip_dt_data which would be less error prone if you add/remove entries in this structure.
 
 -- 
 Florian
