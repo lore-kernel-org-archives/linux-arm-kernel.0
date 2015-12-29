@@ -1,67 +1,69 @@
-From: bintian.wang@huawei.com (Bintian)
-Date: Tue, 29 Dec 2015 21:15:02 +0800
-Subject: [PATCH v4] arm64: dts: add all hi6220 i2c nodes
-In-Reply-To: <1449051201-7288-1-git-send-email-kong.kongxinwei@hisilicon.com>
-References: <1449051201-7288-1-git-send-email-kong.kongxinwei@hisilicon.com>
-Message-ID: <56828756.2040500@huawei.com>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 29 Dec 2015 14:33:16 +0100
+Subject: [PATCH] doc: PCI: altera: Fix the 'ranges' property in example
+In-Reply-To: <1451375313.2990.8.camel@ubuntu>
+References: <1450950330-28393-1-git-send-email-marex@denx.de>
+ <201512280926.53004.marex@denx.de> <1451375313.2990.8.camel@ubuntu>
+Message-ID: <201512291433.16561.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/12/2 18:13, Xinwei Kong wrote:
-> This patch adds all I2C nodes for the Hi6220 SoC. This hi6220 Soc
-> use this I2C IP of Synopsys Designware for HiKey board.
->
-> Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
-> Signed-off-by: Chen Feng <puck.chen@hisilicon.com>
-> ---
->   arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 34 +++++++++++++++++++++++++++++++
->   1 file changed, 34 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> index 82d2488..8cec56a 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> @@ -208,5 +208,39 @@
->   			clock-names = "uartclk", "apb_pclk";
->   			status = "disabled";
->   		};
-> +
-> +		i2c0: i2c at f7100000 {
-> +			compatible = "snps,designware-i2c";
-> +			reg = <0x0 0xf7100000 0x0 0x1000>;
-> +			interrupts = <0 44 4>;
-> +			clocks = <&sys_ctrl HI6220_I2C0_CLK>;
-> +			i2c-sda-hold-time-ns = <300>;
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&i2c0_pmx_func &i2c0_cfg_func>;
-> +			status = "disabled";
-> +		};
-> +
-> +		i2c1: i2c at f7101000 {
-> +			compatible = "snps,designware-i2c";
-> +			reg = <0x0 0xf7101000 0x0 0x1000>;
-> +			clocks = <&sys_ctrl HI6220_I2C1_CLK>;
-> +			interrupts = <0 45 4>;
-> +			i2c-sda-hold-time-ns = <300>;
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&i2c1_pmx_func &i2c1_cfg_func>;
-> +			status = "disabled";
-> +		};
-> +
-> +		i2c2: i2c at f7102000 {
-> +			compatible = "snps,designware-i2c";
-> +			reg = <0x0 0xf7102000 0x0 0x1000>;
-> +			clocks = <&sys_ctrl HI6220_I2C2_CLK>;
-> +			interrupts = <0 46 4>;
-> +			i2c-sda-hold-time-ns = <300>;
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&i2c2_pmx_func &i2c2_cfg_func>;
-> +			status = "disabled";
-> +		};
-> +
->   	};
->   };
+On Tuesday, December 29, 2015 at 08:48:33 AM, Ley Foon Tan wrote:
+> On Mon, 2015-12-28 at 09:26 +0100, Marek Vasut wrote:
+> > On Monday, December 28, 2015 at 08:42:00 AM, Ley Foon Tan wrote:
+> > > On Mon, Dec 28, 2015 at 3:34 PM, Marek Vasut <marex@denx.de> wrote:
+> > > > On Monday, December 28, 2015 at 07:56:15 AM, Ley Foon Tan wrote:
+> > > >> On Thu, 2015-12-24 at 10:45 +0100, Marek Vasut wrote:
+> > > >> > The example does not work on real hardware with the PCIe HIP [1].
+> > > >> > The problem is with incorrect "ranges" property in the example, so
+> > > >> > one cannot just copy-paste the example into his DT and expect this
+> > > >> > to work. This patches aligns the "ranges" in the example with the
+> > > >> > reference FPGA design.
+> > > >> 
+> > > >> Hi Marek
+> > > > 
+> > > > Hi Ley,
+> > > > 
+> > > >> The original "ranges" is working for me. What error did you
+> > > >> encounter?
+> > > > 
+> > > > Every time a driver accessed the Txs range, the system got stuck
+> > > > hard. The Cra access always worked fine though, so the PCIe devices
+> > > > were always detected.
+> > > > 
+> > > > I checked with signaltap and my impression is that the wrong address
+> > > > propagated into the request passed to the Txs port of the HardIP
+> > > > block, unless I change the range configuration.
+> > > > 
+> > > > Note that I tested Intel Centrino 6235 WiFi card and Atheros AR5006
+> > > > WiFi card. The intel in particular uses both the Txs and even MSI ,
+> > > > so to use the intel, the whole PCIe block has to work properly ;
+> > > > with this change, it does and I can use the intel card just fine.
+> > > > 
+> > > >> Thanks.
+> > > 
+> > > Hi Marek
+> > > 
+> > > I tested two Ethernet adapters, one SSD NVMe and our custom endpoint
+> > > without the problem.
+> > > Can you please send me your dts file if possible?
+> > > 
+> > > Do you use the latest Altera pcie driver in v4.4?
+> > 
+> > I'm using next from 20151223, crude patch is attached.
+> 
+> Hi Marek
+> 
+> Your dts looks fine, same as mine; except the 'ranges' parameter. Not
+> sure why it is not working on your side.
+> 
+> I may try again with the linux-next later.
 
-Looks good to me!
+Looking forward to your observations ;-)
 
-Reviewed-by: Bintian Wang<bintian.wang@huawei.com>
+btw the other difference is location of the Cra port, in my case it's at 
+0xff220000 , which matches the altera reference design. The example code
+uses 0xff240000 for whatever reason.
+
+Best regards,
+Marek Vasut
