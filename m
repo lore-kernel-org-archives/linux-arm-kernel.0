@@ -1,59 +1,42 @@
-From: ben@decadent.org.uk (Ben Hutchings)
-Date: Tue, 29 Dec 2015 14:11:50 +0000
-Subject: [PATCH] ARM: mm: Enable PXN when running non-LPAE kernel on LPAE
-In-Reply-To: <56828F44.9030204@arm.com>
-References: <005201d1415a$e5fe5ed0$b1fb1c70$@samsung.com>
- <1451341389.25978.39.camel@decadent.org.uk> <56828F44.9030204@arm.com>
-Message-ID: <1451398310.25978.51.camel@decadent.org.uk>
+From: bamvor.zhangjian@linaro.org (Bamvor Jian Zhang)
+Date: Tue, 29 Dec 2015 22:59:42 +0800
+Subject: [PATCH] arm64: compat: fix wrong dependency
+In-Reply-To: <20151229122721.GA20341@yury-N73SV>
+References: <20151229122721.GA20341@yury-N73SV>
+Message-ID: <1451401182-10629-1-git-send-email-bamvor.zhangjian@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-12-29 at 13:48 +0000, Vladimir Murzin wrote:
-> On 28/12/15 22:23, Ben Hutchings wrote:
-[...]
-> > I've never needed to use a web-based system to submit kernel patches
-> > before, and I'm not going to start now.??Someone else can re-submit
-> 
-> You don't have to... I just quote Catalin's recipe [1]
-> 
-> > You can send patches as usual to patches at arm.linux.org.uk, just add
-> > KernelVersion: v3.?? after the --- line in your patch (maybe this could
-> > be automate as well but I didn't bother).
-> > 
-> > For series, because the arrival order is not guaranteed, I use the git
-> > alias below to trick it into sleeping 60s between patches:
-> > 
-> > ksend-rmk-patch = !git send-email --annotate --no-thread --suppress-cc=all --to-cmd='sleep 60 && echo patches at arm.linux.org.uk "#"'
-> > 
-> > For stgit, I have a dedicated template:
-> > 
-> > From: %(sender)s
-> > To: patches at arm.linux.org.uk
-> > Subject: %(prefix)s%(shortdescr)s
-> > 
-> > %(longdescr)s
-> > PATCH FOLLOWS
-> > KernelVersion:%(version)s
-> > %(diff)s
-> > 
-> > And there is always git pull request that Russell is happy with.
-> 
-> Does it work for you?
-> 
-> [1] https://lkml.org/lkml/2014/8/22/228
+With the patches of ILP32, COMPAT is not equivalent to AARCH32 in EL0.
+This patch fix this by updating the dependency from COMPAT to
+AARCH32_EL0 for ARMV8_DEPRECATED and ARM64_ERRATUM_845719.
 
-Thanks.  Jungseung Lee has already re-submitted this patch, though.
+Signed-off-by: Bamvor Jian Zhang <bamvor.zhangjian@linaro.org>
+---
+ arch/arm64/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Ben.
-
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index deec37a..7ea783b 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -313,7 +313,7 @@ config ARM64_ERRATUM_832075
+ 
+ config ARM64_ERRATUM_845719
+ 	bool "Cortex-A53: 845719: a load might read incorrect data"
+-	depends on COMPAT
++	depends on AARCH32_EL0
+ 	default y
+ 	help
+ 	  This option adds an alternative code sequence to work around ARM
+@@ -509,7 +509,7 @@ config FORCE_MAX_ZONEORDER
+ 
+ menuconfig ARMV8_DEPRECATED
+ 	bool "Emulate deprecated/obsolete ARMv8 instructions"
+-	depends on COMPAT
++	depends on AARCH32_EL0
+ 	help
+ 	  Legacy software support may require certain instructions
+ 	  that have been deprecated or obsoleted in the architecture.
 -- 
-Ben Hutchings
-If God had intended Man to program,
-we'd have been born with serial I/O ports.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 811 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151229/015636b9/attachment.sig>
+2.1.4
