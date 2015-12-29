@@ -1,45 +1,67 @@
-From: mamlinav@gmail.com (Aleksei Mamlin)
-Date: Tue, 29 Dec 2015 16:58:19 +0300
-Subject: [PATCH] ARM: dts: sun4i: Use red1 LED for heartbeat indication
- on Marsboard A10
-In-Reply-To: <20151227205151.GK30359@lukather>
-References: <1451123879-7212-1-git-send-email-mamlinav@gmail.com>
- <20151227205151.GK30359@lukather>
-Message-ID: <20151229165819.a4c0e978aa5ebd121113cad1@gmail.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Tue, 29 Dec 2015 16:12:49 +0300
+Subject: [PATCH v6 04/20] arm64: change some CONFIG_COMPAT over to use
+ CONFIG_AARCH32_EL0 instead
+In-Reply-To: <5680FA5B.9040803@huawei.com>
+References: <1450215766-14765-5-git-send-email-ynorov@caviumnetworks.com>
+ <1451292190-15024-1-git-send-email-bamvor.zhangjian@linaro.org>
+ <5680FA5B.9040803@huawei.com>
+Message-ID: <20151229131249.GA22925@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 27 Dec 2015 21:51:51 +0100
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+On Mon, Dec 28, 2015 at 05:01:15PM +0800, Zhangjian (Bamvor) wrote:
+> Fix the title.
 
-> On Sat, Dec 26, 2015 at 12:57:59PM +0300, Aleksei Mamlin wrote:
-> > Marsboard A10 have four red LEDs, the first one can be used for
-> > heartbeat indication.
-> > 
-> > Signed-off-by: Aleksei Mamlin <mamlinav@gmail.com>
+Hi,
+
+Could you re-send your patch, as previous version has wrong subject,
+and this - commented body. Or, I can just meld your change to patch #4.
+
+Yury.
+
 > 
-> I'm really not sure about this one.
-> 
-> This is something that can easily be changed through sysfs, and it
-> will likely end up being a "war" on what trigger people want to use.
-> 
-
-If so, then Ok, please ignore this patch.
-
-Is there any way to set led triggers through cmdline instead of sysfs?
-
->
-> Hans, Chen-Yu, What's your view on this?
-> 
-> Thanks,
-> Maxime
-> 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
-
-
--- 
-Thanks and regards,
-Aleksei Mamlin
+> On 16:43 2015/12/28, Bamvor Jian Zhang wrote:
+> >I feel we need something like this to avoid the failure of compiling
+> >when build with ARM64_ILP32(which will select COMPAT) and
+> >ARMV8_DEPRECATED (which depends on the opcodes.o).
+> >
+> > From f8b8ffdb449491ecf8ba465238bbdb4625a74ac0 Mon Sep 17 00:00:00 2001
+> >From: Bamvor Jian Zhang <bamvor.zhangjian@linaro.org>
+> >Date: Mon, 28 Dec 2015 12:57:46 +0800
+> >Subject: [PATCH] arm64: compat: fix wrong dependency of ARMV8_DEPRECATED
+> >
+> >When compile with ARM64_ILP32, ARMV8_DEPRECATED will be selected due
+> >to the dependency of COMPAT. It leads to the following error:
+> >     LD      init/built-in.o
+> >     arch/arm64/kernel/built-in.o: In function `cp15barrier_handler':
+> >     /home/bamvor/works/source/kernel/linux_ilp32/arch/arm64/kernel/armv8_deprecated.c:467: undefined reference to `arm_check_condition'
+> >     /home/bamvor/works/source/kernel/linux_ilp32/arch/arm64/kernel/armv8_deprecated.c:467: undefined reference to `arm_check_condition'
+> >     arch/arm64/kernel/built-in.o: In function `swp_handler':
+> >     /home/bamvor/works/source/kernel/linux_ilp32/arch/arm64/kernel/armv8_deprecated.c:386: undefined reference to `arm_check_condition'
+> >     /home/bamvor/works/source/kernel/linux_ilp32/arch/arm64/kernel/armv8_deprecated.c:386: undefined reference to `arm_check_condition'
+> >     Makefile:927: recipe for target 'vmlinux' failed
+> >     make: *** [vmlinux] Error 1
+> >
+> >This patch fix this by updating the dependency from COMPAT to
+> >AARCH32_EL0.
+> >
+> >Signed-off-by: Bamvor Jian Zhang <bamvor.zhangjian@linaro.org>
+> >---
+> >  arch/arm64/Kconfig | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> >diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> >index deec37a..e52fd03 100644
+> >--- a/arch/arm64/Kconfig
+> >+++ b/arch/arm64/Kconfig
+> >@@ -509,7 +509,7 @@ config FORCE_MAX_ZONEORDER
+> >
+> >  menuconfig ARMV8_DEPRECATED
+> >  	bool "Emulate deprecated/obsolete ARMv8 instructions"
+> >-	depends on COMPAT
+> >+	depends on AARCH32_EL0
+> >  	help
+> >  	  Legacy software support may require certain instructions
+> >  	  that have been deprecated or obsoleted in the architecture.
+> >
