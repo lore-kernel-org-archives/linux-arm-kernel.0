@@ -1,86 +1,173 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 30 Dec 2015 16:26:01 +0100
-Subject: [PATCH v2 02/13] arm64: introduce KIMAGE_VADDR as the virtual base of
- the kernel region
+Date: Wed, 30 Dec 2015 16:26:03 +0100
+Subject: [PATCH v2 04/13] arm64: decouple early fixmap init from linear mapping
 In-Reply-To: <1451489172-17420-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1451489172-17420-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1451489172-17420-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1451489172-17420-5-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This introduces the preprocessor symbol KIMAGE_VADDR which will serve as
-the symbolic virtual base of the kernel region, i.e., the kernel's virtual
-offset will be KIMAGE_VADDR + TEXT_OFFSET. For now, we define it as being
-equal to PAGE_OFFSET, but in the future, it will be moved below it once
-we move the kernel virtual mapping out of the linear mapping.
+Since the early fixmap page tables are populated using pages that are
+part of the static footprint of the kernel, they are covered by the
+initial kernel mapping, and we can refer to them without using __va/__pa
+translations, which are tied to the linear mapping.
+
+Instead, let's introduce __phys_to_kimg, which will be tied to the kernel
+virtual mapping, regardless of whether or not it intersects with the linear
+mapping. This will allow us to move the kernel out of the linear mapping in
+a subsequent patch.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/include/asm/memory.h | 10 ++++++++--
- arch/arm64/kernel/head.S        |  2 +-
- arch/arm64/kernel/vmlinux.lds.S |  4 ++--
- 3 files changed, 11 insertions(+), 5 deletions(-)
+ arch/arm64/include/asm/compiler.h |  2 +
+ arch/arm64/kernel/vmlinux.lds.S   | 12 +--
+ arch/arm64/mm/mmu.c               | 85 ++++++++------------
+ 3 files changed, 42 insertions(+), 57 deletions(-)
 
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index 853953cd1f08..bea9631b34a8 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -51,7 +51,8 @@
- #define VA_BITS			(CONFIG_ARM64_VA_BITS)
- #define VA_START		(UL(0xffffffffffffffff) << VA_BITS)
- #define PAGE_OFFSET		(UL(0xffffffffffffffff) << (VA_BITS - 1))
--#define MODULES_END		(PAGE_OFFSET)
-+#define KIMAGE_VADDR		(PAGE_OFFSET)
-+#define MODULES_END		(KIMAGE_VADDR)
- #define MODULES_VADDR		(MODULES_END - SZ_64M)
- #define PCI_IO_END		(MODULES_VADDR - SZ_2M)
- #define PCI_IO_START		(PCI_IO_END - PCI_IO_SIZE)
-@@ -75,8 +76,13 @@
-  * private definitions which should NOT be used outside memory.h
-  * files.  Use virt_to_phys/phys_to_virt/__pa/__va instead.
+diff --git a/arch/arm64/include/asm/compiler.h b/arch/arm64/include/asm/compiler.h
+index ee35fd0f2236..dd342af63673 100644
+--- a/arch/arm64/include/asm/compiler.h
++++ b/arch/arm64/include/asm/compiler.h
+@@ -27,4 +27,6 @@
   */
--#define __virt_to_phys(x)	(((phys_addr_t)(x) - PAGE_OFFSET + PHYS_OFFSET))
-+#define __virt_to_phys(x) ({						\
-+	phys_addr_t __x = (phys_addr_t)(x);				\
-+	__x >= PAGE_OFFSET ? (__x - PAGE_OFFSET + PHYS_OFFSET) :	\
-+			     (__x - KIMAGE_VADDR + PHYS_OFFSET); })
-+
- #define __phys_to_virt(x)	((unsigned long)((x) - PHYS_OFFSET + PAGE_OFFSET))
-+#define __phys_to_kimg(x)	((unsigned long)((x) - PHYS_OFFSET + KIMAGE_VADDR))
+ #define __asmeq(x, y)  ".ifnc " x "," y " ; .err ; .endif\n\t"
  
- /*
-  * Convert a page to/from a physical address
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 23cfc08fc8ba..6434c844a0e4 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -389,7 +389,7 @@ __create_page_tables:
- 	 * Map the kernel image (starting with PHYS_OFFSET).
- 	 */
- 	mov	x0, x26				// swapper_pg_dir
--	mov	x5, #PAGE_OFFSET
-+	ldr	x5, =KIMAGE_VADDR
- 	create_pgd_entry x0, x5, x3, x6
- 	ldr	x6, =KERNEL_END			// __va(KERNEL_END)
- 	mov	x3, x24				// phys offset
++#define __pgdir		__attribute__((section(".pgdir"),aligned(PAGE_SIZE)))
++
+ #endif	/* __ASM_COMPILER_H */
 diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 7de6c39858a5..ced0dedcabcc 100644
+index ced0dedcabcc..363c2f529951 100644
 --- a/arch/arm64/kernel/vmlinux.lds.S
 +++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -88,7 +88,7 @@ SECTIONS
- 		*(.discard.*)
- 	}
+@@ -160,11 +160,13 @@ SECTIONS
  
--	. = PAGE_OFFSET + TEXT_OFFSET;
-+	. = KIMAGE_VADDR + TEXT_OFFSET;
+ 	BSS_SECTION(0, 0, 0)
  
- 	.head.text : {
- 		_text = .;
-@@ -185,4 +185,4 @@ ASSERT(__idmap_text_end - (__idmap_text_start & ~(SZ_4K - 1)) <= SZ_4K,
- /*
-  * If padding is applied before .head.text, virt<->phys conversions will fail.
-  */
--ASSERT(_text == (PAGE_OFFSET + TEXT_OFFSET), "HEAD is misaligned")
-+ASSERT(_text == (KIMAGE_VADDR + TEXT_OFFSET), "HEAD is misaligned")
+-	. = ALIGN(PAGE_SIZE);
+-	idmap_pg_dir = .;
+-	. += IDMAP_DIR_SIZE;
+-	swapper_pg_dir = .;
+-	. += SWAPPER_DIR_SIZE;
++	.pgdir (NOLOAD) : ALIGN(PAGE_SIZE) {
++		idmap_pg_dir = .;
++		. += IDMAP_DIR_SIZE;
++		swapper_pg_dir = .;
++		. += SWAPPER_DIR_SIZE;
++		*(.pgdir)
++	}
+ 
+ 	_end = .;
+ 
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 50b1de8e127b..a78fc5a882da 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -540,39 +540,11 @@ void vmemmap_free(unsigned long start, unsigned long end)
+ }
+ #endif	/* CONFIG_SPARSEMEM_VMEMMAP */
+ 
+-static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
+-#if CONFIG_PGTABLE_LEVELS > 2
+-static pmd_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss;
+-#endif
+-#if CONFIG_PGTABLE_LEVELS > 3
+-static pud_t bm_pud[PTRS_PER_PUD] __page_aligned_bss;
+-#endif
+-
+-static inline pud_t * fixmap_pud(unsigned long addr)
+-{
+-	pgd_t *pgd = pgd_offset_k(addr);
+-
+-	BUG_ON(pgd_none(*pgd) || pgd_bad(*pgd));
+-
+-	return pud_offset(pgd, addr);
+-}
+-
+-static inline pmd_t * fixmap_pmd(unsigned long addr)
+-{
+-	pud_t *pud = fixmap_pud(addr);
+-
+-	BUG_ON(pud_none(*pud) || pud_bad(*pud));
++static pte_t *__fixmap_pte;
+ 
+-	return pmd_offset(pud, addr);
+-}
+-
+-static inline pte_t * fixmap_pte(unsigned long addr)
++static inline pte_t *fixmap_pte(unsigned long addr)
+ {
+-	pmd_t *pmd = fixmap_pmd(addr);
+-
+-	BUG_ON(pmd_none(*pmd) || pmd_bad(*pmd));
+-
+-	return pte_offset_kernel(pmd, addr);
++	return __fixmap_pte + pte_index(addr);
+ }
+ 
+ void __init early_fixmap_init(void)
+@@ -583,33 +555,42 @@ void __init early_fixmap_init(void)
+ 	unsigned long addr = FIXADDR_START;
+ 
+ 	pgd = pgd_offset_k(addr);
+-	pgd_populate(&init_mm, pgd, bm_pud);
+-	pud = pud_offset(pgd, addr);
+-	pud_populate(&init_mm, pud, bm_pmd);
+-	pmd = pmd_offset(pud, addr);
+-	pmd_populate_kernel(&init_mm, pmd, bm_pte);
++#if CONFIG_PGTABLE_LEVELS > 3
++	if (pgd_none(*pgd)) {
++		static pud_t bm_pud[PTRS_PER_PUD] __pgdir;
++
++		pgd_populate(&init_mm, pgd, bm_pud);
++		memblock_reserve(__pa(bm_pud), sizeof(bm_pud));
++	}
++	pud = (pud_t *)__phys_to_kimg(pud_offset_phys(pgd, addr));
++#else
++	pud = (pud_t *)pgd;
++#endif
++#if CONFIG_PGTABLE_LEVELS > 2
++	if (pud_none(*pud)) {
++		static pmd_t bm_pmd[PTRS_PER_PMD] __pgdir;
++
++		pud_populate(&init_mm, pud, bm_pmd);
++		memblock_reserve(__pa(bm_pmd), sizeof(bm_pmd));
++	}
++	pmd = (pmd_t *)__phys_to_kimg(pmd_offset_phys(pud, addr));
++#else
++	pmd = (pmd_t *)pud;
++#endif
++	if (pmd_none(*pmd)) {
++		static pte_t bm_pte[PTRS_PER_PTE] __pgdir;
++
++		pmd_populate_kernel(&init_mm, pmd, bm_pte);
++		memblock_reserve(__pa(bm_pte), sizeof(bm_pte));
++	}
++	__fixmap_pte = (pte_t *)__phys_to_kimg(pmd_page_paddr(*pmd));
+ 
+ 	/*
+ 	 * The boot-ioremap range spans multiple pmds, for which
+-	 * we are not preparted:
++	 * we are not prepared:
+ 	 */
+ 	BUILD_BUG_ON((__fix_to_virt(FIX_BTMAP_BEGIN) >> PMD_SHIFT)
+ 		     != (__fix_to_virt(FIX_BTMAP_END) >> PMD_SHIFT));
+-
+-	if ((pmd != fixmap_pmd(fix_to_virt(FIX_BTMAP_BEGIN)))
+-	     || pmd != fixmap_pmd(fix_to_virt(FIX_BTMAP_END))) {
+-		WARN_ON(1);
+-		pr_warn("pmd %p != %p, %p\n",
+-			pmd, fixmap_pmd(fix_to_virt(FIX_BTMAP_BEGIN)),
+-			fixmap_pmd(fix_to_virt(FIX_BTMAP_END)));
+-		pr_warn("fix_to_virt(FIX_BTMAP_BEGIN): %08lx\n",
+-			fix_to_virt(FIX_BTMAP_BEGIN));
+-		pr_warn("fix_to_virt(FIX_BTMAP_END):   %08lx\n",
+-			fix_to_virt(FIX_BTMAP_END));
+-
+-		pr_warn("FIX_BTMAP_END:       %d\n", FIX_BTMAP_END);
+-		pr_warn("FIX_BTMAP_BEGIN:     %d\n", FIX_BTMAP_BEGIN);
+-	}
+ }
+ 
+ void __set_fixmap(enum fixed_addresses idx,
 -- 
 2.5.0
