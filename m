@@ -1,83 +1,34 @@
 From: mturquette@baylibre.com (Michael Turquette)
-Date: Wed, 30 Dec 2015 15:19:59 -0800
-Subject: [PATCH 1/5] clk: mediatek: Refine the makefile to support
- multiple clock drivers
-In-Reply-To: <1451456865-44139-2-git-send-email-jamesjj.liao@mediatek.com>
+Date: Wed, 30 Dec 2015 15:34:06 -0800
+Subject: [PATCH 3/5] clk: mediatek: Add MT2701 clock support
+In-Reply-To: <1451456865-44139-4-git-send-email-jamesjj.liao@mediatek.com>
 References: <1451456865-44139-1-git-send-email-jamesjj.liao@mediatek.com>
- <1451456865-44139-2-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <20151230231959.19557.55186@quark.deferred.io>
+ <1451456865-44139-4-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <20151230233406.19557.35006@quark.deferred.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting James Liao (2015-12-29 22:27:41)
-> Add a Kconfig to define clock configuration for each SoC, and
-> modify the Makefile to build drivers that only selected in config.
-> 
-> Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
-> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+Hi James,
 
-Looks good to me.
+Quoting James Liao (2015-12-29 22:27:43)
+> +CLK_OF_DECLARE(mtk_topckgen, "mediatek,mt2701-topckgen", mtk_topckgen_init);
+> +CLK_OF_DECLARE(mtk_infrasys, "mediatek,mt2701-infracfg", mtk_infrasys_init);
+> +CLK_OF_DECLARE(mtk_pericfg, "mediatek,mt2701-pericfg", mtk_pericfg_init);
+> +CLK_OF_DECLARE(mtk_mmsys, "mediatek,mt2701-mmsys", mtk_mmsys_init);
+> +CLK_OF_DECLARE(mtk_imgsys, "mediatek,mt2701-imgsys", mtk_imgsys_init);
+> +CLK_OF_DECLARE(mtk_vdecsys, "mediatek,mt2701-vdecsys", mtk_vdecsys_init);
+> +CLK_OF_DECLARE(mtk_hifsys, "mediatek,mt2701-hifsys", mtk_hifsys_init);
+> +CLK_OF_DECLARE(mtk_ethsys, "mediatek,mt2701-ethsys", mtk_ethsys_init);
+> +CLK_OF_DECLARE(mtk_bdpsys, "mediatek,mt2701-bdpsys", mtk_bdpsys_init);
+> +CLK_OF_DECLARE(mtk_apmixedsys, "mediatek,mt2701-apmixedsys",
 
-Regards,
+None of these compatible strings are documented with a binding
+description in this patch series. In fact looking through
+Documentation/devicetree/bindings/clock/ on the latest linux-next tag I
+see that the only existing binding is mt8173-cpu-dvfs.txt.
+
+Am I looking in the wrong place or do we have a case of missing binding
+descriptions?
+
+Thanks,
 Mike
-
-> ---
->  drivers/clk/Kconfig           |  1 +
->  drivers/clk/mediatek/Kconfig  | 23 +++++++++++++++++++++++
->  drivers/clk/mediatek/Makefile |  6 +++---
->  3 files changed, 27 insertions(+), 3 deletions(-)
->  create mode 100644 drivers/clk/mediatek/Kconfig
-> 
-> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-> index c3e3a02..b7a37dc 100644
-> --- a/drivers/clk/Kconfig
-> +++ b/drivers/clk/Kconfig
-> @@ -198,3 +198,4 @@ source "drivers/clk/mvebu/Kconfig"
->  
->  source "drivers/clk/samsung/Kconfig"
->  source "drivers/clk/tegra/Kconfig"
-> +source "drivers/clk/mediatek/Kconfig"
-> diff --git a/drivers/clk/mediatek/Kconfig b/drivers/clk/mediatek/Kconfig
-> new file mode 100644
-> index 0000000..dc224e6
-> --- /dev/null
-> +++ b/drivers/clk/mediatek/Kconfig
-> @@ -0,0 +1,23 @@
-> +#
-> +# MediaTek SoC drivers
-> +#
-> +config COMMON_CLK_MEDIATEK
-> +       bool
-> +       ---help---
-> +         Mediatek SoCs' clock support.
-> +
-> +config COMMON_CLK_MT8135
-> +       bool "Clock driver for Mediatek MT8135"
-> +       depends on COMMON_CLK
-> +       select COMMON_CLK_MEDIATEK
-> +       default ARCH_MEDIATEK
-> +       ---help---
-> +         This driver supports Mediatek MT8135 clocks.
-> +
-> +config COMMON_CLK_MT8173
-> +       bool "Clock driver for Mediatek MT8173"
-> +       depends on COMMON_CLK
-> +       select COMMON_CLK_MEDIATEK
-> +       default ARCH_MEDIATEK
-> +       ---help---
-> +         This driver supports Mediatek MT8173 clocks.
-> diff --git a/drivers/clk/mediatek/Makefile b/drivers/clk/mediatek/Makefile
-> index 95fdfac..32e7222 100644
-> --- a/drivers/clk/mediatek/Makefile
-> +++ b/drivers/clk/mediatek/Makefile
-> @@ -1,4 +1,4 @@
-> -obj-y += clk-mtk.o clk-pll.o clk-gate.o clk-apmixed.o
-> +obj-$(CONFIG_COMMON_CLK_MEDIATEK) += clk-mtk.o clk-pll.o clk-gate.o clk-apmixed.o
->  obj-$(CONFIG_RESET_CONTROLLER) += reset.o
-> -obj-y += clk-mt8135.o
-> -obj-y += clk-mt8173.o
-> +obj-$(CONFIG_COMMON_CLK_MT8135) += clk-mt8135.o
-> +obj-$(CONFIG_COMMON_CLK_MT8173) += clk-mt8173.o
-> -- 
-> 1.9.1
-> 
