@@ -1,23 +1,29 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 30 Dec 2015 10:30:31 -0600
-Subject: [PATCH 2/3] wlcore/wl12xx: spi: add device tree support
-In-Reply-To: <1450859744-9948-3-git-send-email-uri.mashiach@compulab.co.il>
-References: <1450859744-9948-1-git-send-email-uri.mashiach@compulab.co.il>
- <1450859744-9948-3-git-send-email-uri.mashiach@compulab.co.il>
-Message-ID: <20151230163031.GA24863@rob-hp-laptop>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 30 Dec 2015 16:33:07 +0000
+Subject: [PATCH 4/6] regulator: lp872x: Add enable GPIO pin support
+In-Reply-To: <1451464521.2531.4.camel@collins>
+References: <1450868319-20513-1-git-send-email-contact@paulk.fr>
+ <1450868319-20513-5-git-send-email-contact@paulk.fr>
+ <20151223115632.GS16023@sirena.org.uk> <568088B4.6090207@ti.com>
+ <1451342963.14631.13.camel@collins> <5681D7A8.2030101@ti.com>
+ <1451387613.18148.9.camel@collins> <568323B7.7080101@ti.com>
+ <1451464521.2531.4.camel@collins>
+Message-ID: <20151230163307.GW16023@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 23, 2015 at 10:35:43AM +0200, Uri Mashiach wrote:
-> Add DT support for the wl1271 SPI WiFi.
-> 
-> Add documentation file for the wl1271 SPI WiFi.
-> 
-> Signed-off-by: Uri Mashiach <uri.mashiach@compulab.co.il>
-> Acked-by: Igor Grinberg <grinberg@compulab.co.il>
-> ---
->  .../bindings/net/wireless/ti,wlcore,spi.txt        | 35 +++++++++++
+On Wed, Dec 30, 2015 at 09:35:21AM +0100, Paul Kocialkowski wrote:
 
-For the binding:
+> In my opinion, it would be more elegant to adapt the core regulator
+> framework to first enable the GPIO and then call the regulator enable
+> ops callback instead of handling the GPIO in the driver.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Why would we want to actively manage both things at runtime?  It's more
+work, what do we gain from it?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151230/c9d94e37/attachment.sig>
