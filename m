@@ -1,238 +1,266 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 30 Dec 2015 16:26:10 +0100
-Subject: [PATCH v2 11/13] arm64: allow kernel Image to be loaded anywhere in
- physical memory
+Date: Wed, 30 Dec 2015 16:26:12 +0100
+Subject: [PATCH v2 13/13] arm64: efi: invoke EFI_RNG_PROTOCOL to supply KASLR
+ randomness
 In-Reply-To: <1451489172-17420-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1451489172-17420-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1451489172-17420-12-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1451489172-17420-14-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This relaxes the kernel Image placement requirements, so that it
-may be placed at any 2 MB aligned offset in physical memory.
+Since arm64 does not use a decompressor that supplies an execution
+environment where it is feasible to some extent to provide a source of
+randomness, the arm64 KASLR kernel depends on the bootloader to supply
+some random bits in register x1 upon kernel entry.
 
-This is accomplished by ignoring PHYS_OFFSET when installing
-memblocks, and accounting for the apparent virtual offset of
-the kernel Image. As a result, virtual address references
-below PAGE_OFFSET are correctly mapped onto physical references
-into the kernel Image regardless of where it sits in memory.
+On UEFI systems, we can use the EFI_RNG_PROTOCOL, if supplied, to obtain
+some random bits. At the same time, use it to randomize the offset of the
+kernel Image in physical memory.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- Documentation/arm64/booting.txt  | 12 ++---
- arch/arm64/include/asm/boot.h    |  5 ++
- arch/arm64/include/asm/kvm_mmu.h |  2 +-
- arch/arm64/include/asm/memory.h  | 15 +++---
- arch/arm64/kernel/head.S         |  6 ++-
- arch/arm64/mm/init.c             | 50 +++++++++++++++++++-
- arch/arm64/mm/mmu.c              | 12 +++++
- 7 files changed, 86 insertions(+), 16 deletions(-)
+ arch/arm64/kernel/efi-entry.S             |   7 +-
+ drivers/firmware/efi/libstub/arm-stub.c   |   1 -
+ drivers/firmware/efi/libstub/arm64-stub.c | 134 +++++++++++++++++---
+ include/linux/efi.h                       |   5 +-
+ 4 files changed, 127 insertions(+), 20 deletions(-)
 
-diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
-index 701d39d3171a..03e02ebc1b0c 100644
---- a/Documentation/arm64/booting.txt
-+++ b/Documentation/arm64/booting.txt
-@@ -117,14 +117,14 @@ Header notes:
-   depending on selected features, and is effectively unbound.
- 
- The Image must be placed text_offset bytes from a 2MB aligned base
--address near the start of usable system RAM and called there. Memory
--below that base address is currently unusable by Linux, and therefore it
--is strongly recommended that this location is the start of system RAM.
--The region between the 2 MB aligned base address and the start of the
--image has no special significance to the kernel, and may be used for
--other purposes.
-+address anywhere in usable system RAM and called there. The region
-+between the 2 MB aligned base address and the start of the image has no
-+special significance to the kernel, and may be used for other purposes.
- At least image_size bytes from the start of the image must be free for
- use by the kernel.
-+NOTE: versions prior to v4.6 cannot make use of memory below the
-+physical offset of the Image so it is recommended that the Image be
-+placed as close as possible to the start of system RAM.
- 
- Any memory described to the kernel (even that below the start of the
- image) which is not marked as reserved from the kernel (e.g., with a
-diff --git a/arch/arm64/include/asm/boot.h b/arch/arm64/include/asm/boot.h
-index 81151b67b26b..984cb0fa61ce 100644
---- a/arch/arm64/include/asm/boot.h
-+++ b/arch/arm64/include/asm/boot.h
-@@ -11,4 +11,9 @@
- #define MIN_FDT_ALIGN		8
- #define MAX_FDT_SIZE		SZ_2M
- 
-+/*
-+ * arm64 requires the kernel image to be 2 MB aligned
-+ */
-+#define MIN_KIMG_ALIGN         SZ_2M
-+
- #endif
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 0899026a2821..7e9516365b76 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -73,7 +73,7 @@
- 
- #define KERN_TO_HYP(kva)	((unsigned long)kva - PAGE_OFFSET + HYP_PAGE_OFFSET)
- 
--#define kvm_ksym_ref(sym)	((void *)&sym - KIMAGE_VADDR + PAGE_OFFSET)
-+#define kvm_ksym_ref(sym)	phys_to_virt((u64)&sym - kimage_voffset)
- 
- /*
-  * We currently only support a 40bit IPA.
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index 1dcbf142d36c..557228658666 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -88,10 +88,10 @@
- #define __virt_to_phys(x) ({						\
- 	phys_addr_t __x = (phys_addr_t)(x);				\
- 	__x >= PAGE_OFFSET ? (__x - PAGE_OFFSET + PHYS_OFFSET) :	\
--			     (__x - KIMAGE_VADDR + PHYS_OFFSET); })
-+			     (__x - kimage_voffset); })
- 
- #define __phys_to_virt(x)	((unsigned long)((x) - PHYS_OFFSET + PAGE_OFFSET))
--#define __phys_to_kimg(x)	((unsigned long)((x) - PHYS_OFFSET + KIMAGE_VADDR))
-+#define __phys_to_kimg(x)	((unsigned long)((x) + kimage_voffset))
- 
- /*
-  * Convert a page to/from a physical address
-@@ -121,13 +121,14 @@ extern phys_addr_t		memstart_addr;
- /* PHYS_OFFSET - the physical address of the start of memory. */
- #define PHYS_OFFSET		({ memstart_addr; })
- 
-+/* the offset between the kernel virtual and physical mappings */
-+extern u64			kimage_voffset;
-+
- /*
-- * The maximum physical address that the linear direct mapping
-- * of system RAM can cover. (PAGE_OFFSET can be interpreted as
-- * a 2's complement signed quantity and negated to derive the
-- * maximum size of the linear mapping.)
-+ * Allow all memory at the discovery stage. We will clip it later.
-  */
--#define MAX_MEMBLOCK_ADDR	({ memstart_addr - PAGE_OFFSET - 1; })
-+#define MIN_MEMBLOCK_ADDR	0
-+#define MAX_MEMBLOCK_ADDR	U64_MAX
- 
- /*
-  * PFNs are used to describe any physical page; this means
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 1230fa93fd8c..01a33e42ed70 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -445,7 +445,11 @@ __mmap_switched:
+diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
+index f82036e02485..f41073dde7e0 100644
+--- a/arch/arm64/kernel/efi-entry.S
++++ b/arch/arm64/kernel/efi-entry.S
+@@ -110,7 +110,7 @@ ENTRY(entry)
  2:
- 	adr_l	sp, initial_sp, x4
- 	str_l	x21, __fdt_pointer, x5		// Save FDT pointer
--	str_l	x24, memstart_addr, x6		// Save PHYS_OFFSET
+ 	/* Jump to kernel entry point */
+ 	mov	x0, x20
+-	mov	x1, xzr
++	ldr	x1, efi_rnd
+ 	mov	x2, xzr
+ 	mov	x3, xzr
+ 	br	x21
+@@ -119,6 +119,9 @@ efi_load_fail:
+ 	mov	x0, #EFI_LOAD_ERROR
+ 	ldp	x29, x30, [sp], #32
+ 	ret
++ENDPROC(entry)
 +
-+	ldr	x0, =KIMAGE_VADDR		// Save the offset between
-+	sub	x24, x0, x24			// the kernel virtual and
-+	str_l	x24, kimage_voffset, x0		// physical mappings
-+
- 	mov	x29, #0
- #ifdef CONFIG_KASAN
- 	bl	kasan_early_init
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 2cfc9c54bf51..6aafe15c7754 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -35,6 +35,7 @@
- #include <linux/efi.h>
- #include <linux/swiotlb.h>
++ENTRY(efi_rnd)
++	.quad	0, 0
  
-+#include <asm/boot.h>
- #include <asm/fixmap.h>
- #include <asm/kernel-pgtable.h>
- #include <asm/memory.h>
-@@ -158,9 +159,56 @@ static int __init early_mem(char *p)
+ entry_end:
+-ENDPROC(entry)
+diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
+index 950c87f5d279..f580bcdfae4f 100644
+--- a/drivers/firmware/efi/libstub/arm-stub.c
++++ b/drivers/firmware/efi/libstub/arm-stub.c
+@@ -145,7 +145,6 @@ void efi_char16_printk(efi_system_table_t *sys_table_arg,
+ 	out->output_string(out, str);
  }
- early_param("mem", early_mem);
  
-+static void __init enforce_memory_limit(void)
+-
+ /*
+  * This function handles the architcture specific differences between arm and
+  * arm64 regarding where the kernel image must be loaded and any memory that
+diff --git a/drivers/firmware/efi/libstub/arm64-stub.c b/drivers/firmware/efi/libstub/arm64-stub.c
+index 78dfbd34b6bf..4e5c306346b4 100644
+--- a/drivers/firmware/efi/libstub/arm64-stub.c
++++ b/drivers/firmware/efi/libstub/arm64-stub.c
+@@ -13,6 +13,68 @@
+ #include <asm/efi.h>
+ #include <asm/sections.h>
+ 
++struct efi_rng_protocol_t {
++	efi_status_t (*get_info)(struct efi_rng_protocol_t *,
++				 unsigned long *,
++				 efi_guid_t *);
++	efi_status_t (*get_rng)(struct efi_rng_protocol_t *,
++				efi_guid_t *,
++				unsigned long,
++				u8 *out);
++};
++
++extern struct {
++	u64	virt_seed;
++	u64	phys_seed;
++} efi_rnd;
++
++static int efi_get_random_bytes(efi_system_table_t *sys_table)
 +{
-+	const phys_addr_t kbase = round_down(__pa(_text), MIN_KIMG_ALIGN);
-+	u64 to_remove = memblock_phys_mem_size() - memory_limit;
-+	phys_addr_t max_addr = 0;
-+	struct memblock_region *r;
++	efi_guid_t rng_proto = EFI_RNG_PROTOCOL_GUID;
++	efi_status_t status;
++	struct efi_rng_protocol_t *rng;
 +
-+	if (memory_limit == (phys_addr_t)ULLONG_MAX)
-+		return;
-+
-+	/*
-+	 * The kernel may be high up in physical memory, so try to apply the
-+	 * limit below the kernel first, and only let the generic handling
-+	 * take over if it turns out we haven't clipped enough memory yet.
-+	 */
-+	for_each_memblock(memory, r) {
-+		if (r->base + r->size > kbase) {
-+			u64 rem = min(to_remove, kbase - r->base);
-+
-+			max_addr = r->base + rem;
-+			to_remove -= rem;
-+			break;
-+		}
-+		if (to_remove <= r->size) {
-+			max_addr = r->base + to_remove;
-+			to_remove = 0;
-+			break;
-+		}
-+		to_remove -= r->size;
++	status = sys_table->boottime->locate_protocol(&rng_proto, NULL,
++						      (void **)&rng);
++	if (status == EFI_NOT_FOUND) {
++		pr_efi(sys_table, "EFI_RNG_PROTOCOL unavailable, no randomness supplied\n");
++		return EFI_SUCCESS;
 +	}
 +
-+	memblock_remove(0, max_addr);
++	if (status != EFI_SUCCESS)
++		return status;
 +
-+	if (to_remove)
-+		memblock_enforce_memory_limit(memory_limit);
++	return rng->get_rng(rng, NULL, sizeof(efi_rnd), (u8 *)&efi_rnd);
 +}
 +
- void __init arm64_memblock_init(void)
- {
--	memblock_enforce_memory_limit(memory_limit);
-+	/*
-+	 * Remove the memory that we will not be able to cover
-+	 * with the linear mapping.
-+	 */
-+	const s64 linear_region_size = -(s64)PAGE_OFFSET;
++static efi_status_t get_dram_top(efi_system_table_t *sys_table_arg, u64 *top)
++{
++	unsigned long map_size, desc_size;
++	efi_memory_desc_t *memory_map;
++	efi_status_t status;
++	int l;
 +
-+	memblock_remove(round_down(memblock_start_of_DRAM(),
-+				   1 << SWAPPER_TABLE_SHIFT) +
-+			linear_region_size, ULLONG_MAX);
++	status = efi_get_memory_map(sys_table_arg, &memory_map, &map_size,
++				    &desc_size, NULL, NULL);
++	if (status != EFI_SUCCESS)
++		return status;
 +
-+	enforce_memory_limit();
++	for (l = 0; l < map_size; l += desc_size) {
++		efi_memory_desc_t *md = (void *)memory_map + l;
++
++		if (md->attribute & EFI_MEMORY_WB) {
++			u64 phys_end = md->phys_addr +
++				       md->num_pages * EFI_PAGE_SIZE;
++			if (phys_end > *top)
++				*top = phys_end;
++		}
++	}
++
++	efi_call_early(free_pool, memory_map);
++
++	return EFI_SUCCESS;
++}
++
+ efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table_arg,
+ 					unsigned long *image_addr,
+ 					unsigned long *image_size,
+@@ -27,6 +89,14 @@ efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table_arg,
+ 	void *old_image_addr = (void *)*image_addr;
+ 	unsigned long preferred_offset;
  
++	if (IS_ENABLED(CONFIG_ARM64_RELOCATABLE_KERNEL)) {
++		status = efi_get_random_bytes(sys_table_arg);
++		if (status != EFI_SUCCESS) {
++			pr_efi_err(sys_table_arg, "efi_get_random_bytes() failed\n");
++			return status;
++		}
++	}
++
  	/*
- 	 * Register the kernel text, kernel data, initrd, and initial
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 6275d183c005..10067385e40f 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -44,6 +44,9 @@
+ 	 * The preferred offset of the kernel Image is TEXT_OFFSET bytes beyond
+ 	 * a 2 MB aligned base, which itself may be lower than dram_base, as
+@@ -36,13 +106,42 @@ efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table_arg,
+ 	if (preferred_offset < dram_base)
+ 		preferred_offset += SZ_2M;
  
- u64 idmap_t0sz = TCR_T0SZ(VA_BITS);
- 
-+u64 kimage_voffset __read_mostly;
-+EXPORT_SYMBOL(kimage_voffset);
+-	/* Relocate the image, if required. */
+ 	kernel_size = _edata - _text;
+-	if (*image_addr != preferred_offset) {
+-		kernel_memsize = kernel_size + (_end - _edata);
++	kernel_memsize = kernel_size + (_end - _edata);
 +
- /*
-  * Empty_zero_page is a special page that is used for zero-initialized data
-  * and COW.
-@@ -326,6 +329,15 @@ static void __init map_mem(pgd_t *pgd)
- {
- 	struct memblock_region *reg;
- 
-+	/*
-+	 * Select a suitable value for the base of physical memory.
-+	 * This should be equal to or below the lowest usable physical
-+	 * memory address, and aligned to PUD/PMD size so that we can map
-+	 * it efficiently.
-+	 */
-+	memstart_addr = round_down(memblock_start_of_DRAM(),
-+				   1 << SWAPPER_TABLE_SHIFT);
++	if (IS_ENABLED(CONFIG_ARM64_RELOCATABLE_KERNEL) && efi_rnd.phys_seed) {
++		/*
++		 * If KASLR is enabled, and we have some randomness available,
++		 * locate the kernel at a randomized offset in physical memory.
++		 */
++		u64 dram_top = dram_base;
 +
- 	/* map all the memory banks */
- 	for_each_memblock(memory, reg) {
- 		phys_addr_t start = reg->base;
++		status = get_dram_top(sys_table_arg, &dram_top);
++		if (status != EFI_SUCCESS) {
++			pr_efi_err(sys_table_arg, "get_dram_size() failed\n");
++			return status;
++		}
++
++		kernel_memsize += SZ_2M;
++		nr_pages = round_up(kernel_memsize, EFI_ALLOC_ALIGN) /
++				    EFI_PAGE_SIZE;
+ 
+ 		/*
+-		 * First, try a straight allocation@the preferred offset.
++		 * Use the random seed to scale the size and add it to the DRAM
++		 * base. Note that this may give suboptimal results on systems
++		 * with discontiguous DRAM regions with large holes between them.
++		 */
++		*reserve_addr = dram_base +
++			((dram_top - dram_base) >> 16) * (u16)efi_rnd.phys_seed;
++
++		status = efi_call_early(allocate_pages, EFI_ALLOCATE_MAX_ADDRESS,
++					EFI_LOADER_DATA, nr_pages,
++					(efi_physical_addr_t *)reserve_addr);
++
++		*image_addr = round_up(*reserve_addr, SZ_2M) + TEXT_OFFSET;
++	} else {
++		/*
++		 * Else, try a straight allocation at the preferred offset.
+ 		 * This will work around the issue where, if dram_base == 0x0,
+ 		 * efi_low_alloc() refuses to allocate at 0x0 (to prevent the
+ 		 * address of the allocation to be mistaken for a FAIL return
+@@ -52,27 +151,30 @@ efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table_arg,
+ 		 * Mustang), we can still place the kernel at the address
+ 		 * 'dram_base + TEXT_OFFSET'.
+ 		 */
++		if (*image_addr == preferred_offset)
++			return EFI_SUCCESS;
++
+ 		*image_addr = *reserve_addr = preferred_offset;
+ 		nr_pages = round_up(kernel_memsize, EFI_ALLOC_ALIGN) /
+ 			   EFI_PAGE_SIZE;
+ 		status = efi_call_early(allocate_pages, EFI_ALLOCATE_ADDRESS,
+ 					EFI_LOADER_DATA, nr_pages,
+ 					(efi_physical_addr_t *)reserve_addr);
++	}
++
++	if (status != EFI_SUCCESS) {
++		kernel_memsize += TEXT_OFFSET;
++		status = efi_low_alloc(sys_table_arg, kernel_memsize,
++				       SZ_2M, reserve_addr);
++
+ 		if (status != EFI_SUCCESS) {
+-			kernel_memsize += TEXT_OFFSET;
+-			status = efi_low_alloc(sys_table_arg, kernel_memsize,
+-					       SZ_2M, reserve_addr);
+-
+-			if (status != EFI_SUCCESS) {
+-				pr_efi_err(sys_table_arg, "Failed to relocate kernel\n");
+-				return status;
+-			}
+-			*image_addr = *reserve_addr + TEXT_OFFSET;
++			pr_efi_err(sys_table_arg, "Failed to relocate kernel\n");
++			return status;
+ 		}
+-		memcpy((void *)*image_addr, old_image_addr, kernel_size);
+-		*reserve_size = kernel_memsize;
++		*image_addr = *reserve_addr + TEXT_OFFSET;
+ 	}
+-
++	memcpy((void *)*image_addr, old_image_addr, kernel_size);
++	*reserve_size = kernel_memsize;
+ 
+ 	return EFI_SUCCESS;
+ }
+diff --git a/include/linux/efi.h b/include/linux/efi.h
+index 569b5a866bb1..13783fdc9bdd 100644
+--- a/include/linux/efi.h
++++ b/include/linux/efi.h
+@@ -299,7 +299,7 @@ typedef struct {
+ 	void *open_protocol_information;
+ 	void *protocols_per_handle;
+ 	void *locate_handle_buffer;
+-	void *locate_protocol;
++	efi_status_t (*locate_protocol)(efi_guid_t *, void *, void **);
+ 	void *install_multiple_protocol_interfaces;
+ 	void *uninstall_multiple_protocol_interfaces;
+ 	void *calculate_crc32;
+@@ -599,6 +599,9 @@ void efi_native_runtime_setup(void);
+ #define EFI_PROPERTIES_TABLE_GUID \
+     EFI_GUID(  0x880aaca3, 0x4adc, 0x4a04, 0x90, 0x79, 0xb7, 0x47, 0x34, 0x08, 0x25, 0xe5 )
+ 
++#define EFI_RNG_PROTOCOL_GUID \
++    EFI_GUID(  0x3152bca5, 0xeade, 0x433d, 0x86, 0x2e, 0xc0, 0x1c, 0xdc, 0x29, 0x1f, 0x44 )
++
+ typedef struct {
+ 	efi_guid_t guid;
+ 	u64 table;
 -- 
 2.5.0
