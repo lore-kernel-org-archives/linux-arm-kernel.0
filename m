@@ -1,266 +1,203 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 30 Dec 2015 16:26:12 +0100
-Subject: [PATCH v2 13/13] arm64: efi: invoke EFI_RNG_PROTOCOL to supply KASLR
- randomness
-In-Reply-To: <1451489172-17420-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1451489172-17420-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1451489172-17420-14-git-send-email-ard.biesheuvel@linaro.org>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 30 Dec 2015 10:28:30 -0500
+Subject: [PATCH V10 7/7] dma: qcom_hidma: add support for object hierarchy
+In-Reply-To: <CAHp75Vd-ku1E4+BWGwtL06mO7EZHFmwCvwFiAhLUVwrJHNKD7w@mail.gmail.com>
+References: <1450371684-23415-1-git-send-email-okaya@codeaurora.org>
+ <1450371684-23415-8-git-send-email-okaya@codeaurora.org>
+ <CAHp75Vd-ku1E4+BWGwtL06mO7EZHFmwCvwFiAhLUVwrJHNKD7w@mail.gmail.com>
+Message-ID: <5683F81E.5050406@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since arm64 does not use a decompressor that supplies an execution
-environment where it is feasible to some extent to provide a source of
-randomness, the arm64 KASLR kernel depends on the bootloader to supply
-some random bits in register x1 upon kernel entry.
+On 12/19/2015 1:37 PM, Andy Shevchenko wrote:
+> On Thu, Dec 17, 2015 at 7:01 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+>> In order to create a relationship model between the channels and the
+>> management object, we are adding support for object hierarchy to the
+>> drivers. This patch simplifies the userspace application development.
+>> We will not have to traverse different firmware paths based on device
+>> tree or ACPI baed kernels.
+>>
+>> No matter what flavor of kernel is used, objects will be represented as
+>> platform devices.
+>>
+>> The new layout is as follows:
+>>
+>> hidmam_10: hidma-mgmt at 0x5A000000 {
+>>         compatible = "qcom,hidma-mgmt-1.0";
+>>         ...
+>>
+>>         hidma_10: hidma at 0x5a010000 {
+>>                         compatible = "qcom,hidma-1.0";
+>>                         ...
+>>         }
+>> }
+>>
+>> The hidma_mgmt_init detects each instance of the hidma-mgmt-1.0 objects
+>> in device tree and calls into the channel driver to create platform devices
+>> for each child of the management object.
+>>
+>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> 
+> 
+>> +What:          /sys/devices/platform/hidma-*/chid
+>> +               /sys/devices/platform/QCOM8061:*/chid
+>> +Date:          Dec 2015
+>> +KernelVersion: 4.4
+>> +Contact:       "Sinan Kaya <okaya@cudeaurora.org>"
+>> +Description:
+>> +               Contains the ID of the channel within the HIDMA instance.
+>> +               It is used to associate a given HIDMA channel with the
+>> +               priority and weight calls in the management interface.
+> 
+>> -module_platform_driver(hidma_mgmt_driver);
+>> +#ifdef CONFIG_OF
+>> +static int object_counter;
+>> +
+>> +static int __init hidma_mgmt_of_populate_channels(struct device_node *np)
+>> +{
+>> +       struct platform_device *pdev_parent = of_find_device_by_node(np);
+>> +       struct platform_device_info pdevinfo;
+>> +       struct of_phandle_args out_irq;
+>> +       struct device_node *child;
+>> +       struct resource *res;
+>> +       const __be32 *cell;
+> 
+> Always BE ?
 
-On UEFI systems, we can use the EFI_RNG_PROTOCOL, if supplied, to obtain
-some random bits. At the same time, use it to randomize the offset of the
-kernel Image in physical memory.
+Yes, as Timur indicated device tree is big endian all the time.
+> 
+>> +       int ret = 0, size, i, num;
+>> +       u64 addr, addr_size;
+> 
+> resource_size_t
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/efi-entry.S             |   7 +-
- drivers/firmware/efi/libstub/arm-stub.c   |   1 -
- drivers/firmware/efi/libstub/arm64-stub.c | 134 +++++++++++++++++---
- include/linux/efi.h                       |   5 +-
- 4 files changed, 127 insertions(+), 20 deletions(-)
+These values are read from the device tree blob using of_read_number function. of_read_number
+returns a u64.
+> 
+>> +
+>> +       for_each_available_child_of_node(np, child) {
+>> +               int iter = 0;
+>> +
+>> +               cell = of_get_property(child, "reg", &size);
+>> +               if (!cell) {
+>> +                       ret = -EINVAL;
+>> +                       goto out;
+>> +               }
+>> +
+>> +               size /= (sizeof(*cell));
+> 
+> Redundant parens. I think it might be good to use common sense for
+> operator precedence, here is a radical example of ignoring it. And
+> this is not the first case.
 
-diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
-index f82036e02485..f41073dde7e0 100644
---- a/arch/arm64/kernel/efi-entry.S
-+++ b/arch/arm64/kernel/efi-entry.S
-@@ -110,7 +110,7 @@ ENTRY(entry)
- 2:
- 	/* Jump to kernel entry point */
- 	mov	x0, x20
--	mov	x1, xzr
-+	ldr	x1, efi_rnd
- 	mov	x2, xzr
- 	mov	x3, xzr
- 	br	x21
-@@ -119,6 +119,9 @@ efi_load_fail:
- 	mov	x0, #EFI_LOAD_ERROR
- 	ldp	x29, x30, [sp], #32
- 	ret
-+ENDPROC(entry)
-+
-+ENTRY(efi_rnd)
-+	.quad	0, 0
- 
- entry_end:
--ENDPROC(entry)
-diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
-index 950c87f5d279..f580bcdfae4f 100644
---- a/drivers/firmware/efi/libstub/arm-stub.c
-+++ b/drivers/firmware/efi/libstub/arm-stub.c
-@@ -145,7 +145,6 @@ void efi_char16_printk(efi_system_table_t *sys_table_arg,
- 	out->output_string(out, str);
- }
- 
--
- /*
-  * This function handles the architcture specific differences between arm and
-  * arm64 regarding where the kernel image must be loaded and any memory that
-diff --git a/drivers/firmware/efi/libstub/arm64-stub.c b/drivers/firmware/efi/libstub/arm64-stub.c
-index 78dfbd34b6bf..4e5c306346b4 100644
---- a/drivers/firmware/efi/libstub/arm64-stub.c
-+++ b/drivers/firmware/efi/libstub/arm64-stub.c
-@@ -13,6 +13,68 @@
- #include <asm/efi.h>
- #include <asm/sections.h>
- 
-+struct efi_rng_protocol_t {
-+	efi_status_t (*get_info)(struct efi_rng_protocol_t *,
-+				 unsigned long *,
-+				 efi_guid_t *);
-+	efi_status_t (*get_rng)(struct efi_rng_protocol_t *,
-+				efi_guid_t *,
-+				unsigned long,
-+				u8 *out);
-+};
-+
-+extern struct {
-+	u64	virt_seed;
-+	u64	phys_seed;
-+} efi_rnd;
-+
-+static int efi_get_random_bytes(efi_system_table_t *sys_table)
-+{
-+	efi_guid_t rng_proto = EFI_RNG_PROTOCOL_GUID;
-+	efi_status_t status;
-+	struct efi_rng_protocol_t *rng;
-+
-+	status = sys_table->boottime->locate_protocol(&rng_proto, NULL,
-+						      (void **)&rng);
-+	if (status == EFI_NOT_FOUND) {
-+		pr_efi(sys_table, "EFI_RNG_PROTOCOL unavailable, no randomness supplied\n");
-+		return EFI_SUCCESS;
-+	}
-+
-+	if (status != EFI_SUCCESS)
-+		return status;
-+
-+	return rng->get_rng(rng, NULL, sizeof(efi_rnd), (u8 *)&efi_rnd);
-+}
-+
-+static efi_status_t get_dram_top(efi_system_table_t *sys_table_arg, u64 *top)
-+{
-+	unsigned long map_size, desc_size;
-+	efi_memory_desc_t *memory_map;
-+	efi_status_t status;
-+	int l;
-+
-+	status = efi_get_memory_map(sys_table_arg, &memory_map, &map_size,
-+				    &desc_size, NULL, NULL);
-+	if (status != EFI_SUCCESS)
-+		return status;
-+
-+	for (l = 0; l < map_size; l += desc_size) {
-+		efi_memory_desc_t *md = (void *)memory_map + l;
-+
-+		if (md->attribute & EFI_MEMORY_WB) {
-+			u64 phys_end = md->phys_addr +
-+				       md->num_pages * EFI_PAGE_SIZE;
-+			if (phys_end > *top)
-+				*top = phys_end;
-+		}
-+	}
-+
-+	efi_call_early(free_pool, memory_map);
-+
-+	return EFI_SUCCESS;
-+}
-+
- efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table_arg,
- 					unsigned long *image_addr,
- 					unsigned long *image_size,
-@@ -27,6 +89,14 @@ efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table_arg,
- 	void *old_image_addr = (void *)*image_addr;
- 	unsigned long preferred_offset;
- 
-+	if (IS_ENABLED(CONFIG_ARM64_RELOCATABLE_KERNEL)) {
-+		status = efi_get_random_bytes(sys_table_arg);
-+		if (status != EFI_SUCCESS) {
-+			pr_efi_err(sys_table_arg, "efi_get_random_bytes() failed\n");
-+			return status;
-+		}
-+	}
-+
- 	/*
- 	 * The preferred offset of the kernel Image is TEXT_OFFSET bytes beyond
- 	 * a 2 MB aligned base, which itself may be lower than dram_base, as
-@@ -36,13 +106,42 @@ efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table_arg,
- 	if (preferred_offset < dram_base)
- 		preferred_offset += SZ_2M;
- 
--	/* Relocate the image, if required. */
- 	kernel_size = _edata - _text;
--	if (*image_addr != preferred_offset) {
--		kernel_memsize = kernel_size + (_end - _edata);
-+	kernel_memsize = kernel_size + (_end - _edata);
-+
-+	if (IS_ENABLED(CONFIG_ARM64_RELOCATABLE_KERNEL) && efi_rnd.phys_seed) {
-+		/*
-+		 * If KASLR is enabled, and we have some randomness available,
-+		 * locate the kernel at a randomized offset in physical memory.
-+		 */
-+		u64 dram_top = dram_base;
-+
-+		status = get_dram_top(sys_table_arg, &dram_top);
-+		if (status != EFI_SUCCESS) {
-+			pr_efi_err(sys_table_arg, "get_dram_size() failed\n");
-+			return status;
-+		}
-+
-+		kernel_memsize += SZ_2M;
-+		nr_pages = round_up(kernel_memsize, EFI_ALLOC_ALIGN) /
-+				    EFI_PAGE_SIZE;
- 
- 		/*
--		 * First, try a straight allocation@the preferred offset.
-+		 * Use the random seed to scale the size and add it to the DRAM
-+		 * base. Note that this may give suboptimal results on systems
-+		 * with discontiguous DRAM regions with large holes between them.
-+		 */
-+		*reserve_addr = dram_base +
-+			((dram_top - dram_base) >> 16) * (u16)efi_rnd.phys_seed;
-+
-+		status = efi_call_early(allocate_pages, EFI_ALLOCATE_MAX_ADDRESS,
-+					EFI_LOADER_DATA, nr_pages,
-+					(efi_physical_addr_t *)reserve_addr);
-+
-+		*image_addr = round_up(*reserve_addr, SZ_2M) + TEXT_OFFSET;
-+	} else {
-+		/*
-+		 * Else, try a straight allocation at the preferred offset.
- 		 * This will work around the issue where, if dram_base == 0x0,
- 		 * efi_low_alloc() refuses to allocate at 0x0 (to prevent the
- 		 * address of the allocation to be mistaken for a FAIL return
-@@ -52,27 +151,30 @@ efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table_arg,
- 		 * Mustang), we can still place the kernel at the address
- 		 * 'dram_base + TEXT_OFFSET'.
- 		 */
-+		if (*image_addr == preferred_offset)
-+			return EFI_SUCCESS;
-+
- 		*image_addr = *reserve_addr = preferred_offset;
- 		nr_pages = round_up(kernel_memsize, EFI_ALLOC_ALIGN) /
- 			   EFI_PAGE_SIZE;
- 		status = efi_call_early(allocate_pages, EFI_ALLOCATE_ADDRESS,
- 					EFI_LOADER_DATA, nr_pages,
- 					(efi_physical_addr_t *)reserve_addr);
-+	}
-+
-+	if (status != EFI_SUCCESS) {
-+		kernel_memsize += TEXT_OFFSET;
-+		status = efi_low_alloc(sys_table_arg, kernel_memsize,
-+				       SZ_2M, reserve_addr);
-+
- 		if (status != EFI_SUCCESS) {
--			kernel_memsize += TEXT_OFFSET;
--			status = efi_low_alloc(sys_table_arg, kernel_memsize,
--					       SZ_2M, reserve_addr);
--
--			if (status != EFI_SUCCESS) {
--				pr_efi_err(sys_table_arg, "Failed to relocate kernel\n");
--				return status;
--			}
--			*image_addr = *reserve_addr + TEXT_OFFSET;
-+			pr_efi_err(sys_table_arg, "Failed to relocate kernel\n");
-+			return status;
- 		}
--		memcpy((void *)*image_addr, old_image_addr, kernel_size);
--		*reserve_size = kernel_memsize;
-+		*image_addr = *reserve_addr + TEXT_OFFSET;
- 	}
--
-+	memcpy((void *)*image_addr, old_image_addr, kernel_size);
-+	*reserve_size = kernel_memsize;
- 
- 	return EFI_SUCCESS;
- }
-diff --git a/include/linux/efi.h b/include/linux/efi.h
-index 569b5a866bb1..13783fdc9bdd 100644
---- a/include/linux/efi.h
-+++ b/include/linux/efi.h
-@@ -299,7 +299,7 @@ typedef struct {
- 	void *open_protocol_information;
- 	void *protocols_per_handle;
- 	void *locate_handle_buffer;
--	void *locate_protocol;
-+	efi_status_t (*locate_protocol)(efi_guid_t *, void *, void **);
- 	void *install_multiple_protocol_interfaces;
- 	void *uninstall_multiple_protocol_interfaces;
- 	void *calculate_crc32;
-@@ -599,6 +599,9 @@ void efi_native_runtime_setup(void);
- #define EFI_PROPERTIES_TABLE_GUID \
-     EFI_GUID(  0x880aaca3, 0x4adc, 0x4a04, 0x90, 0x79, 0xb7, 0x47, 0x34, 0x08, 0x25, 0xe5 )
- 
-+#define EFI_RNG_PROTOCOL_GUID \
-+    EFI_GUID(  0x3152bca5, 0xeade, 0x433d, 0x86, 0x2e, 0xc0, 0x1c, 0xdc, 0x29, 0x1f, 0x44 )
-+
- typedef struct {
- 	efi_guid_t guid;
- 	u64 table;
+Removed. Note that I copied most of this function from another driver. 
+
+> 
+>> +               num = size /
+>> +                       (of_n_addr_cells(child) + of_n_size_cells(child)) + 1;
+>> +
+>> +               /* allocate a resource array */
+>> +               res = kcalloc(num, sizeof(*res), GFP_KERNEL);
+>> +               if (!res) {
+>> +                       ret = -ENOMEM;
+>> +                       goto out;
+>> +               }
+>> +
+>> +               /* read each reg value */
+>> +               i = 0;
+>> +               while (i < size) {
+>> +                       addr = of_read_number(&cell[i],
+>> +                                             of_n_addr_cells(child));
+>> +                       i += of_n_addr_cells(child);
+>> +
+>> +                       addr_size = of_read_number(&cell[i],
+>> +                                                  of_n_size_cells(child));
+>> +                       i += of_n_size_cells(child);
+>> +
+>> +                       res[iter].start = addr;
+>> +                       res[iter].end = res[iter].start + addr_size - 1;
+>> +                       res[iter].flags = IORESOURCE_MEM;
+> 
+> res->start = ?
+> ?
+> res++;
+
+ok
+
+> 
+>> +                       iter++;
+>> +               }
+>> +
+>> +               ret = of_irq_parse_one(child, 0, &out_irq);
+>> +               if (ret)
+>> +                       goto out;
+>> +
+>> +               res[iter].start = irq_create_of_mapping(&out_irq);
+>> +               res[iter].name = "hidma event irq";
+>> +               res[iter].flags = IORESOURCE_IRQ;
+> 
+> Ditto.
+ok
+
+> 
+>> +
+>> +               pdevinfo.fwnode = &child->fwnode;
+>> +               pdevinfo.parent = pdev_parent ? &pdev_parent->dev : NULL;
+>> +               pdevinfo.name = child->name;
+>> +               pdevinfo.id = object_counter++;
+>> +               pdevinfo.res = res;
+>> +               pdevinfo.num_res = num;
+>> +               pdevinfo.data = NULL;
+>> +               pdevinfo.size_data = 0;
+>> +               pdevinfo.dma_mask = DMA_BIT_MASK(64);
+>> +               platform_device_register_full(&pdevinfo);
+>> +
+>> +               kfree(res);
+>> +               res = NULL;
+>> +       }
+>> +out:
+> 
+>> +       kfree(res);
+> 
+> 
+>> +
+>> +       return ret;
+>> +}
+>> +#endif
+>> +
+>> +static int __init hidma_mgmt_init(void)
+>> +{
+>> +#ifdef CONFIG_OF
+>> +       struct device_node *child;
+>> +
+>> +       for (child = of_find_matching_node(NULL, hidma_mgmt_match); child;
+>> +            child = of_find_matching_node(child, hidma_mgmt_match)) {
+>> +               /* device tree based firmware here */
+>> +               hidma_mgmt_of_populate_channels(child);
+>> +               of_node_put(child);
+>> +       }
+> 
+> And why this is can't be done in probe of parent node driver?
+
+The populate function creates platform objects using platform_device_register_full function above. 
+The hidma device driver later probes the object during object enumeration phase. 
+
+I tried moving platform_device_register_full into the probe context. The objects got generated but hidma 
+device driver didn't probe the object. I suppose we are required to create the objects before the probing starts.
+
+I copied this pattern from another driver.
+
+> 
+>> +#endif
+>> +       platform_driver_register(&hidma_mgmt_driver);
+>> +
+>> +       return 0;
+>> +}
+>> +module_init(hidma_mgmt_init);
+> 
+
+
 -- 
-2.5.0
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
