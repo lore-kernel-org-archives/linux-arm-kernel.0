@@ -1,261 +1,145 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 30 Dec 2015 16:26:06 +0100
-Subject: [PATCH v2 07/13] arm64: add support for module PLTs
+Date: Wed, 30 Dec 2015 16:26:08 +0100
+Subject: [PATCH v2 09/13] arm64: avoid R_AARCH64_ABS64 relocations for Image
+ header fields
 In-Reply-To: <1451489172-17420-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1451489172-17420-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1451489172-17420-8-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1451489172-17420-10-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for emitting PLTs at module load time for relative
-branches that are out of range. This is a prerequisite for KASLR,
-which may place the kernel and the modules anywhere in the vmalloc
-area, making it likely that branch target offsets exceed the maximum
-range of +/- 128 MB.
+Unfortunately, the current way of using the linker to emit build time
+constants into the Image header will no longer work once we switch to
+the use of PIE executables. The reason is that such constants are emitted
+into the binary using R_AARCH64_ABS64 relocations, which we will resolve
+at runtime, not at build time, and the places targeted by those
+relocations will contain zeroes before that.
+
+So move back to assembly time constants or R_AARCH64_ABS32 relocations
+(which, interestingly enough, do get resolved at build time)
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/Kconfig              |   4 +
- arch/arm64/Makefile             |   4 +
- arch/arm64/include/asm/module.h |  11 ++
- arch/arm64/kernel/Makefile      |   1 +
- arch/arm64/kernel/module-plts.c | 137 ++++++++++++++++++++
- arch/arm64/kernel/module.c      |   7 +
- arch/arm64/kernel/module.lds    |   4 +
- 7 files changed, 168 insertions(+)
+ arch/arm64/include/asm/assembler.h | 15 ++++++++
+ arch/arm64/kernel/head.S           | 17 +++++++--
+ arch/arm64/kernel/image.h          | 37 ++++++--------------
+ 3 files changed, 40 insertions(+), 29 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 871f21783866..827e78f33944 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -704,6 +704,10 @@ config ARM64_LSE_ATOMICS
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index 8094d50f05bc..39bf158255d7 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -204,4 +204,19 @@ lr	.req	x30		// link register
+ 	.size	__pi_##x, . - x;	\
+ 	ENDPROC(x)
  
- endmenu
- 
-+config ARM64_MODULE_PLTS
-+	bool
-+	select HAVE_MOD_ARCH_SPECIFIC
++	.macro	le16, val
++	.byte	\val & 0xff
++	.byte	(\val >> 8) & 0xff
++	.endm
 +
- endmenu
- 
- menu "Boot options"
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index cd822d8454c0..d4654830e536 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -45,6 +45,10 @@ ifeq ($(CONFIG_ARM64_ERRATUM_843419), y)
- KBUILD_CFLAGS_MODULE	+= -mcmodel=large
- endif
- 
-+ifeq ($(CONFIG_ARM64_MODULE_PLTS),y)
-+KBUILD_LDFLAGS_MODULE	+= -T $(srctree)/arch/arm64/kernel/module.lds
-+endif
++	.macro	le32, val
++	le16	\val
++	le16	\val >> 16
++	.endm
 +
- # Default value
- head-y		:= arch/arm64/kernel/head.o
++	.macro	le64, val
++	le32	\val
++	le32	\val >> 32
++	.endm
++
+ #endif	/* __ASM_ASSEMBLER_H */
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 6434c844a0e4..ccbb1bd46026 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -51,6 +51,17 @@
+ #define KERNEL_START	_text
+ #define KERNEL_END	_end
  
-diff --git a/arch/arm64/include/asm/module.h b/arch/arm64/include/asm/module.h
-index e80e232b730e..7b8cd3dc9d8e 100644
---- a/arch/arm64/include/asm/module.h
-+++ b/arch/arm64/include/asm/module.h
-@@ -20,4 +20,15 @@
- 
- #define MODULE_ARCH_VERMAGIC	"aarch64"
- 
-+#ifdef CONFIG_ARM64_MODULE_PLTS
-+struct mod_arch_specific {
-+	struct elf64_shdr	*core_plt;
-+	struct elf64_shdr	*init_plt;
-+	int			core_plt_count;
-+	int			init_plt_count;
-+};
++#ifdef CONFIG_CPU_BIG_ENDIAN
++#define __HEAD_FLAG_BE	1
++#else
++#define __HEAD_FLAG_BE	0
 +#endif
 +
-+u64 get_module_plt(struct module *mod, void *loc, u64 val);
++#define __HEAD_FLAG_PAGE_SIZE ((PAGE_SHIFT - 10) / 2)
 +
- #endif /* __ASM_MODULE_H */
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 474691f8b13a..f42b0fff607f 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -30,6 +30,7 @@ arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
- 					   ../../arm/kernel/opcodes.o
- arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
- arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
-+arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
- arm64-obj-$(CONFIG_PERF_EVENTS)		+= perf_regs.o perf_callchain.o
- arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
- arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)	+= hw_breakpoint.o
-diff --git a/arch/arm64/kernel/module-plts.c b/arch/arm64/kernel/module-plts.c
-new file mode 100644
-index 000000000000..4a8ef9ea01ee
---- /dev/null
-+++ b/arch/arm64/kernel/module-plts.c
-@@ -0,0 +1,137 @@
-+/*
-+ * Copyright (C) 2014-2015 Linaro Ltd. <ard.biesheuvel@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
++#define __HEAD_FLAGS	((__HEAD_FLAG_BE << 0) |	\
++			 (__HEAD_FLAG_PAGE_SIZE << 1))
 +
-+#include <linux/elf.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+
-+struct plt_entry {
-+	__le32	mov0;	/* movn	x16, #0x....			*/
-+	__le32	mov1;	/* movk	x16, #0x...., lsl #16		*/
-+	__le32	mov2;	/* movk	x16, #0x...., lsl #32		*/
-+	__le32	br;	/* br	x16				*/
-+} __aligned(8);
-+
-+static bool in_init(const struct module *mod, void *addr)
-+{
-+	return (u64)addr - (u64)mod->module_init < mod->init_size;
-+}
-+
-+u64 get_module_plt(struct module *mod, void *loc, u64 val)
-+{
-+	struct plt_entry entry = {
-+		cpu_to_le32(0x92800010 | (((~val      ) & 0xffff)) << 5),
-+		cpu_to_le32(0xf2a00010 | ((( val >> 16) & 0xffff)) << 5),
-+		cpu_to_le32(0xf2c00010 | ((( val >> 32) & 0xffff)) << 5),
-+		cpu_to_le32(0xd61f0200)
-+	}, *plt;
-+	int i, *count;
-+
-+	if (in_init(mod, loc)) {
-+		plt = (struct plt_entry *)mod->arch.init_plt->sh_addr;
-+		count = &mod->arch.init_plt_count;
-+	} else {
-+		plt = (struct plt_entry *)mod->arch.core_plt->sh_addr;
-+		count = &mod->arch.core_plt_count;
-+	}
-+
-+	/* Look for an existing entry pointing to 'val' */
-+	for (i = 0; i < *count; i++)
-+		if (plt[i].mov0 == entry.mov0 &&
-+		    plt[i].mov1 == entry.mov1 &&
-+		    plt[i].mov2 == entry.mov2)
-+			return (u64)&plt[i];
-+
-+	i = (*count)++;
-+	plt[i] = entry;
-+	return (u64)&plt[i];
-+}
-+
-+static int duplicate_rel(Elf64_Addr base, const Elf64_Rela *rela, int num)
-+{
-+	int i;
-+
-+	for (i = 0; i < num; i++) {
-+		if (rela[i].r_info == rela[num].r_info &&
-+		    rela[i].r_addend == rela[num].r_addend)
-+			return 1;
-+	}
-+	return 0;
-+}
-+
-+/* Count how many PLT entries we may need */
-+static unsigned int count_plts(Elf64_Addr base, const Elf64_Rela *rela, int num)
-+{
-+	unsigned int ret = 0;
-+	int i;
-+
-+	/*
-+	 * Sure, this is order(n^2), but it's usually short, and not
-+	 * time critical
-+	 */
-+	for (i = 0; i < num; i++)
-+		switch (ELF64_R_TYPE(rela[i].r_info)) {
-+		case R_AARCH64_JUMP26:
-+		case R_AARCH64_CALL26:
-+			if (!duplicate_rel(base, rela, i))
-+				ret++;
-+			break;
-+		}
-+	return ret;
-+}
-+
-+int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
-+			      char *secstrings, struct module *mod)
-+{
-+	unsigned long core_plts = 0, init_plts = 0;
-+	Elf64_Shdr *s, *sechdrs_end = sechdrs + ehdr->e_shnum;
-+
-+	/*
-+	 * To store the PLTs, we expand the .text section for core module code
-+	 * and the .init.text section for initialization code.
-+	 */
-+	for (s = sechdrs; s < sechdrs_end; ++s)
-+		if (strcmp(".core.plt", secstrings + s->sh_name) == 0)
-+			mod->arch.core_plt = s;
-+		else if (strcmp(".init.plt", secstrings + s->sh_name) == 0)
-+			mod->arch.init_plt = s;
-+
-+	if (!mod->arch.core_plt || !mod->arch.init_plt) {
-+		pr_err("%s: sections missing\n", mod->name);
-+		return -ENOEXEC;
-+	}
-+
-+	for (s = sechdrs + 1; s < sechdrs_end; ++s) {
-+		const Elf64_Rela *rels = (void *)ehdr + s->sh_offset;
-+		int numrels = s->sh_size / sizeof(Elf64_Rela);
-+		Elf64_Shdr *dstsec = sechdrs + s->sh_info;
-+
-+		if (s->sh_type != SHT_RELA)
-+			continue;
-+
-+		if (strstr(secstrings + s->sh_name, ".init"))
-+			init_plts += count_plts(dstsec->sh_addr, rels, numrels);
-+		else
-+			core_plts += count_plts(dstsec->sh_addr, rels, numrels);
-+	}
-+
-+	mod->arch.core_plt->sh_type = SHT_NOBITS;
-+	mod->arch.core_plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
-+	mod->arch.core_plt->sh_addralign = L1_CACHE_BYTES;
-+	mod->arch.core_plt->sh_size = core_plts * sizeof(struct plt_entry);
-+	mod->arch.core_plt_count = 0;
-+
-+	mod->arch.init_plt->sh_type = SHT_NOBITS;
-+	mod->arch.init_plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
-+	mod->arch.init_plt->sh_addralign = L1_CACHE_BYTES;
-+	mod->arch.init_plt->sh_size = init_plts * sizeof(struct plt_entry);
-+	mod->arch.init_plt_count = 0;
-+	pr_debug("%s: core.plt=%lld, init.plt=%lld\n", __func__,
-+		 mod->arch.core_plt->sh_size, mod->arch.init_plt->sh_size);
-+	return 0;
-+}
-diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
-index f4bc779e62e8..14880d77ec6f 100644
---- a/arch/arm64/kernel/module.c
-+++ b/arch/arm64/kernel/module.c
-@@ -388,6 +388,13 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
- 		case R_AARCH64_CALL26:
- 			ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 2, 26,
- 					     AARCH64_INSN_IMM_26);
-+
-+			if (IS_ENABLED(CONFIG_ARM64_MODULE_PLTS) &&
-+			    ovf == -ERANGE) {
-+				val = get_module_plt(me, loc, val);
-+				ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 2,
-+						     26, AARCH64_INSN_IMM_26);
-+			}
- 			break;
+ /*
+  * Kernel startup entry point.
+  * ---------------------------
+@@ -83,9 +94,9 @@ efi_head:
+ 	b	stext				// branch to kernel start, magic
+ 	.long	0				// reserved
+ #endif
+-	.quad	_kernel_offset_le		// Image load offset from start of RAM, little-endian
+-	.quad	_kernel_size_le			// Effective size of kernel image, little-endian
+-	.quad	_kernel_flags_le		// Informative flags, little-endian
++	le64	TEXT_OFFSET			// Image load offset from start of RAM, little-endian
++	.long	_kernel_size_le, 0		// Effective size of kernel image, little-endian
++	le64	__HEAD_FLAGS			// Informative flags, little-endian
+ 	.quad	0				// reserved
+ 	.quad	0				// reserved
+ 	.quad	0				// reserved
+diff --git a/arch/arm64/kernel/image.h b/arch/arm64/kernel/image.h
+index bc2abb8b1599..bb6b0e69d0a4 100644
+--- a/arch/arm64/kernel/image.h
++++ b/arch/arm64/kernel/image.h
+@@ -26,41 +26,26 @@
+  * There aren't any ELF relocations we can use to endian-swap values known only
+  * at link time (e.g. the subtraction of two symbol addresses), so we must get
+  * the linker to endian-swap certain values before emitting them.
++ * Note that this will not work for 64-bit values: these are resolved using
++ * R_AARCH64_ABS64 relocations, which are fixed up@runtime rather than at
++ * build time when building the PIE executable (for KASLR).
+  */
+ #ifdef CONFIG_CPU_BIG_ENDIAN
+-#define DATA_LE64(data)					\
+-	((((data) & 0x00000000000000ff) << 56) |	\
+-	 (((data) & 0x000000000000ff00) << 40) |	\
+-	 (((data) & 0x0000000000ff0000) << 24) |	\
+-	 (((data) & 0x00000000ff000000) << 8)  |	\
+-	 (((data) & 0x000000ff00000000) >> 8)  |	\
+-	 (((data) & 0x0000ff0000000000) >> 24) |	\
+-	 (((data) & 0x00ff000000000000) >> 40) |	\
+-	 (((data) & 0xff00000000000000) >> 56))
++#define DATA_LE32(data)				\
++	((((data) & 0x000000ff) << 24) |	\
++	 (((data) & 0x0000ff00) << 8)  |	\
++	 (((data) & 0x00ff0000) >> 8)  |	\
++	 (((data) & 0xff000000) >> 24))
+ #else
+-#define DATA_LE64(data) ((data) & 0xffffffffffffffff)
++#define DATA_LE32(data) ((data) & 0xffffffff)
+ #endif
  
- 		default:
-diff --git a/arch/arm64/kernel/module.lds b/arch/arm64/kernel/module.lds
-new file mode 100644
-index 000000000000..3682fa107918
---- /dev/null
-+++ b/arch/arm64/kernel/module.lds
-@@ -0,0 +1,4 @@
-+SECTIONS {
-+        .core.plt : { BYTE(0) }
-+        .init.plt : { BYTE(0) }
-+}
+-#ifdef CONFIG_CPU_BIG_ENDIAN
+-#define __HEAD_FLAG_BE	1
+-#else
+-#define __HEAD_FLAG_BE	0
+-#endif
+-
+-#define __HEAD_FLAG_PAGE_SIZE ((PAGE_SHIFT - 10) / 2)
+-
+-#define __HEAD_FLAGS	((__HEAD_FLAG_BE << 0) |	\
+-			 (__HEAD_FLAG_PAGE_SIZE << 1))
+-
+ /*
+  * These will output as part of the Image header, which should be little-endian
+- * regardless of the endianness of the kernel. While constant values could be
+- * endian swapped in head.S, all are done here for consistency.
++ * regardless of the endianness of the kernel.
+  */
+ #define HEAD_SYMBOLS						\
+-	_kernel_size_le		= DATA_LE64(_end - _text);	\
+-	_kernel_offset_le	= DATA_LE64(TEXT_OFFSET);	\
+-	_kernel_flags_le	= DATA_LE64(__HEAD_FLAGS);
++	_kernel_size_le		= DATA_LE32(_end - _text);
+ 
+ #ifdef CONFIG_EFI
+ 
 -- 
 2.5.0
