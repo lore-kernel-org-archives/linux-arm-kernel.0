@@ -1,36 +1,43 @@
-From: henryc.chen@mediatek.com (Henry Chen)
-Date: Wed, 30 Dec 2015 20:36:01 +0800
-Subject: [PATCH] soc: mediatek: PMIC wrap: Enable STAUPD_PRD before WDT_SRC_EN
- enabled.
-Message-ID: <1451478961-5668-1-git-send-email-henryc.chen@mediatek.com>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Wed, 30 Dec 2015 15:24:56 +0200
+Subject: [PATCH 10/34] arm64: reuse asm-generic/barrier.h
+In-Reply-To: <1451473761-30019-1-git-send-email-mst@redhat.com>
+References: <1451473761-30019-1-git-send-email-mst@redhat.com>
+Message-ID: <1451473761-30019-11-git-send-email-mst@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The STAUPD_TRIG will be enable when WDT_INT enable on probe function, if
-doesn't enable STAUPD_PRD together, interrupt will be triggered because
-STAUPD timeout. To avoid unexpected interrupt, enable periodic status
-update which will be updated to PMIC every selected time period.
+On arm64 nop, read_barrier_depends, smp_read_barrier_depends
+smp_store_mb(), smp_mb__before_atomic and smp_mb__after_atomic match the
+asm-generic variants exactly. Drop the local definitions and pull in
+asm-generic/barrier.h instead.
 
-Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
+This is in preparation to refactoring this code area.
+
+Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
 ---
- drivers/soc/mediatek/mtk-pmic-wrap.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm64/include/asm/barrier.h | 9 +--------
+ 1 file changed, 1 insertion(+), 8 deletions(-)
 
-diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-index a8cde17..6e5c20f 100644
---- a/drivers/soc/mediatek/mtk-pmic-wrap.c
-+++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-@@ -904,6 +904,11 @@ static int pwrap_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
+diff --git a/arch/arm64/include/asm/barrier.h b/arch/arm64/include/asm/barrier.h
+index 9622eb4..91a43f4 100644
+--- a/arch/arm64/include/asm/barrier.h
++++ b/arch/arm64/include/asm/barrier.h
+@@ -91,14 +91,7 @@ do {									\
+ 	__u.__val;							\
+ })
  
-+	/*
-+	 * Enable periodic status update which will be updated to PMIC
-+	 * every selected time period.
-+	 */
-+	pwrap_writel(wrp, 0x5, PWRAP_STAUPD_PRD);
- 	/* Initialize watchdog, may not be done by the bootloader */
- 	pwrap_writel(wrp, 0xf, PWRAP_WDT_UNIT);
- 	pwrap_writel(wrp, 0xffffffff, PWRAP_WDT_SRC_EN);
+-#define read_barrier_depends()		do { } while(0)
+-#define smp_read_barrier_depends()	do { } while(0)
+-
+-#define smp_store_mb(var, value)	do { WRITE_ONCE(var, value); smp_mb(); } while (0)
+-#define nop()		asm volatile("nop");
+-
+-#define smp_mb__before_atomic()	smp_mb()
+-#define smp_mb__after_atomic()	smp_mb()
++#include <asm-generic/barrier.h>
+ 
+ #endif	/* __ASSEMBLY__ */
+ 
 -- 
-1.9.1
+MST
