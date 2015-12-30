@@ -1,318 +1,269 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 30 Dec 2015 16:26:05 +0100
-Subject: [PATCH v2 06/13] arm64: move kernel image to base of vmalloc area
+Date: Wed, 30 Dec 2015 16:26:04 +0100
+Subject: [PATCH v2 05/13] arm64: kvm: deal with kernel symbols outside of
+ linear mapping
 In-Reply-To: <1451489172-17420-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1451489172-17420-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1451489172-17420-7-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1451489172-17420-6-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This moves the module area to right before the vmalloc area, and
-moves the kernel image to the base of the vmalloc area. This is
-an intermediate step towards implementing kASLR, where the kernel
-image can be located anywhere in the vmalloc area.
+KVM on arm64 uses a fixed offset between the linear mapping at EL1 and
+the HYP mapping at EL2. Before we can move the kernel virtual mapping
+out of the linear mapping, we have to make sure that references to kernel
+symbols that are accessed via the HYP mapping are translated to their
+linear equivalent.
+
+To prevent inadvertent direct references from sneaking in later, change
+the type of all extern declarations to HYP kernel symbols to the opaque
+'struct kvm_ksym', which does not decay to a pointer type like char arrays
+and function references. This is not bullet proof, but at least forces the
+user to take the address explicitly rather than referencing it directly.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/include/asm/kasan.h          | 17 ++++-----
- arch/arm64/include/asm/kernel-pgtable.h |  5 +--
- arch/arm64/include/asm/memory.h         | 17 ++++++---
- arch/arm64/include/asm/pgtable.h        |  7 ----
- arch/arm64/kernel/setup.c               | 13 +++++++
- arch/arm64/mm/dump.c                    | 12 +++----
- arch/arm64/mm/init.c                    | 20 +++++------
- arch/arm64/mm/mmu.c                     | 37 ++------------------
- 8 files changed, 56 insertions(+), 72 deletions(-)
+ arch/arm/include/asm/kvm_asm.h   |  2 ++
+ arch/arm/include/asm/kvm_mmu.h   |  2 ++
+ arch/arm/kvm/arm.c               |  9 +++++----
+ arch/arm/kvm/mmu.c               | 12 +++++------
+ arch/arm64/include/asm/kvm_asm.h | 21 +++++++++++---------
+ arch/arm64/include/asm/kvm_mmu.h |  2 ++
+ arch/arm64/include/asm/virt.h    |  4 ----
+ arch/arm64/kernel/vmlinux.lds.S  |  4 ++--
+ arch/arm64/kvm/debug.c           |  4 +++-
+ virt/kvm/arm/vgic-v3.c           |  2 +-
+ 10 files changed, 34 insertions(+), 28 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kasan.h b/arch/arm64/include/asm/kasan.h
-index 2774fa384c47..476d56e0f04c 100644
---- a/arch/arm64/include/asm/kasan.h
-+++ b/arch/arm64/include/asm/kasan.h
-@@ -1,19 +1,16 @@
- #ifndef __ASM_KASAN_H
- #define __ASM_KASAN_H
+diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+index 194c91b610ff..484ffdf7c70b 100644
+--- a/arch/arm/include/asm/kvm_asm.h
++++ b/arch/arm/include/asm/kvm_asm.h
+@@ -99,6 +99,8 @@ extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
+ extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
  
--#ifndef __ASSEMBLY__
--
- #ifdef CONFIG_KASAN
+ extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
++
++extern char __hyp_idmap_text_start[], __hyp_idmap_text_end[];
+ #endif
  
- #include <linux/linkage.h>
--#include <asm/memory.h>
+ #endif /* __ARM_KVM_ASM_H__ */
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 405aa1883307..412b363f79e9 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -30,6 +30,8 @@
+ #define HYP_PAGE_OFFSET		PAGE_OFFSET
+ #define KERN_TO_HYP(kva)	(kva)
  
++#define kvm_ksym_ref(kva)	(kva)
++
  /*
-  * KASAN_SHADOW_START: beginning of the kernel virtual addresses.
-  * KASAN_SHADOW_END: KASAN_SHADOW_START + 1/8 of kernel virtual addresses.
-  */
--#define KASAN_SHADOW_START      (VA_START)
--#define KASAN_SHADOW_END        (KASAN_SHADOW_START + (1UL << (VA_BITS - 3)))
-+#define KASAN_SHADOW_START	(VA_START)
-+#define KASAN_SHADOW_END	(KASAN_SHADOW_START + (_AC(1, UL) << (VA_BITS - 3)))
- 
- /*
-  * This value is used to map an address to the corresponding shadow
-@@ -25,14 +22,18 @@
-  * should satisfy the following equation:
-  *      KASAN_SHADOW_OFFSET = KASAN_SHADOW_END - (1ULL << 61)
-  */
--#define KASAN_SHADOW_OFFSET     (KASAN_SHADOW_END - (1ULL << (64 - 3)))
-+#define KASAN_SHADOW_OFFSET	(KASAN_SHADOW_END - (_AC(1, ULL) << (64 - 3)))
- 
-+#ifndef __ASSEMBLY__
- void kasan_init(void);
- asmlinkage void kasan_early_init(void);
-+#endif
- 
- #else
-+
-+#ifndef __ASSEMBLY__
- static inline void kasan_init(void) { }
- #endif
- 
--#endif
--#endif
-+#endif /* CONFIG_KASAN */
-+#endif /* __ASM_KASAN_H */
-diff --git a/arch/arm64/include/asm/kernel-pgtable.h b/arch/arm64/include/asm/kernel-pgtable.h
-index a459714ee29e..daa8a7b9917a 100644
---- a/arch/arm64/include/asm/kernel-pgtable.h
-+++ b/arch/arm64/include/asm/kernel-pgtable.h
-@@ -70,8 +70,9 @@
- /*
-  * Initial memory map attributes.
-  */
--#define SWAPPER_PTE_FLAGS	(PTE_TYPE_PAGE | PTE_AF | PTE_SHARED)
--#define SWAPPER_PMD_FLAGS	(PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S)
-+#define SWAPPER_PTE_FLAGS	(PTE_TYPE_PAGE | PTE_AF | PTE_SHARED | PTE_UXN)
-+#define SWAPPER_PMD_FLAGS	(PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S | \
-+				 PMD_SECT_UXN)
- 
- #if ARM64_SWAPPER_USES_SECTION_MAPS
- #define SWAPPER_MM_MMUFLAGS	(PMD_ATTRINDX(MT_NORMAL) | SWAPPER_PMD_FLAGS)
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index bea9631b34a8..1dcbf142d36c 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -51,14 +51,23 @@
- #define VA_BITS			(CONFIG_ARM64_VA_BITS)
- #define VA_START		(UL(0xffffffffffffffff) << VA_BITS)
- #define PAGE_OFFSET		(UL(0xffffffffffffffff) << (VA_BITS - 1))
--#define KIMAGE_VADDR		(PAGE_OFFSET)
--#define MODULES_END		(KIMAGE_VADDR)
--#define MODULES_VADDR		(MODULES_END - SZ_64M)
--#define PCI_IO_END		(MODULES_VADDR - SZ_2M)
-+#define PCI_IO_END		(PAGE_OFFSET - SZ_2M)
- #define PCI_IO_START		(PCI_IO_END - PCI_IO_SIZE)
- #define FIXADDR_TOP		(PCI_IO_START - SZ_2M)
- #define TASK_SIZE_64		(UL(1) << VA_BITS)
- 
-+#ifndef CONFIG_KASAN
-+#define MODULES_VADDR		(VA_START)
-+#else
-+#include <asm/kasan.h>
-+#define MODULES_VADDR		(KASAN_SHADOW_END)
-+#endif
-+
-+#define MODULES_END		(MODULES_VADDR + SZ_64M)
-+
-+#define KIMAGE_VADDR		(MODULES_END)
-+#define VMALLOC_START		(MODULES_END)
-+
- #ifdef CONFIG_COMPAT
- #define TASK_SIZE_32		UL(0x100000000)
- #define TASK_SIZE		(test_thread_flag(TIF_32BIT) ? \
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 0664468466fb..93203a6b9574 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -42,13 +42,6 @@
-  */
- #define VMEMMAP_SIZE		ALIGN((1UL << (VA_BITS - PAGE_SHIFT)) * sizeof(struct page), PUD_SIZE)
- 
--#ifndef CONFIG_KASAN
--#define VMALLOC_START		(VA_START)
--#else
--#include <asm/kasan.h>
--#define VMALLOC_START		(KASAN_SHADOW_END + SZ_64K)
--#endif
--
- #define VMALLOC_END		(PAGE_OFFSET - PUD_SIZE - VMEMMAP_SIZE - SZ_64K)
- 
- #define vmemmap			((struct page *)(VMALLOC_END + SZ_64K))
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index cfed56f0ad26..96177a7c0f05 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -53,6 +53,7 @@
- #include <asm/cpufeature.h>
- #include <asm/cpu_ops.h>
- #include <asm/kasan.h>
-+#include <asm/kernel-pgtable.h>
- #include <asm/sections.h>
- #include <asm/setup.h>
- #include <asm/smp_plat.h>
-@@ -291,6 +292,18 @@ u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
- 
- void __init setup_arch(char **cmdline_p)
- {
-+	static struct vm_struct vmlinux_vm __initdata = {
-+		.addr		= (void *)KIMAGE_VADDR,
-+		.size		= 0,
-+		.flags		= VM_IOREMAP,
-+		.caller		= setup_arch,
-+	};
-+
-+	vmlinux_vm.size = round_up((unsigned long)_end - KIMAGE_VADDR,
-+				   1 << SWAPPER_BLOCK_SHIFT);
-+	vmlinux_vm.phys_addr = __pa(KIMAGE_VADDR);
-+	vm_area_add_early(&vmlinux_vm);
-+
- 	pr_info("Boot CPU: AArch64 Processor [%08x]\n", read_cpuid_id());
- 
- 	sprintf(init_utsname()->machine, ELF_PLATFORM);
-diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
-index 5a22a119a74c..e83ffb00560c 100644
---- a/arch/arm64/mm/dump.c
-+++ b/arch/arm64/mm/dump.c
-@@ -35,7 +35,9 @@ struct addr_marker {
- };
- 
- enum address_markers_idx {
--	VMALLOC_START_NR = 0,
-+	MODULES_START_NR = 0,
-+	MODULES_END_NR,
-+	VMALLOC_START_NR,
- 	VMALLOC_END_NR,
- #ifdef CONFIG_SPARSEMEM_VMEMMAP
- 	VMEMMAP_START_NR,
-@@ -45,12 +47,12 @@ enum address_markers_idx {
- 	FIXADDR_END_NR,
- 	PCI_START_NR,
- 	PCI_END_NR,
--	MODULES_START_NR,
--	MODUELS_END_NR,
- 	KERNEL_SPACE_NR,
- };
- 
- static struct addr_marker address_markers[] = {
-+	{ MODULES_VADDR,	"Modules start" },
-+	{ MODULES_END,		"Modules end" },
- 	{ VMALLOC_START,	"vmalloc() Area" },
- 	{ VMALLOC_END,		"vmalloc() End" },
- #ifdef CONFIG_SPARSEMEM_VMEMMAP
-@@ -61,9 +63,7 @@ static struct addr_marker address_markers[] = {
- 	{ FIXADDR_TOP,		"Fixmap end" },
- 	{ PCI_IO_START,		"PCI I/O start" },
- 	{ PCI_IO_END,		"PCI I/O end" },
--	{ MODULES_VADDR,	"Modules start" },
--	{ MODULES_END,		"Modules end" },
--	{ PAGE_OFFSET,		"Kernel Mapping" },
-+	{ PAGE_OFFSET,		"Linear Mapping" },
- 	{ -1,			NULL },
- };
- 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 8e678d05ad84..2cfc9c54bf51 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -305,22 +305,26 @@ void __init mem_init(void)
- #ifdef CONFIG_KASAN
- 		  "    kasan   : 0x%16lx - 0x%16lx   (%6ld GB)\n"
- #endif
-+		  "    modules : 0x%16lx - 0x%16lx   (%6ld MB)\n"
- 		  "    vmalloc : 0x%16lx - 0x%16lx   (%6ld GB)\n"
-+		  "      .init : 0x%p" " - 0x%p" "   (%6ld KB)\n"
-+		  "      .text : 0x%p" " - 0x%p" "   (%6ld KB)\n"
-+		  "      .data : 0x%p" " - 0x%p" "   (%6ld KB)\n"
- #ifdef CONFIG_SPARSEMEM_VMEMMAP
- 		  "    vmemmap : 0x%16lx - 0x%16lx   (%6ld GB maximum)\n"
- 		  "              0x%16lx - 0x%16lx   (%6ld MB actual)\n"
- #endif
- 		  "    fixed   : 0x%16lx - 0x%16lx   (%6ld KB)\n"
- 		  "    PCI I/O : 0x%16lx - 0x%16lx   (%6ld MB)\n"
--		  "    modules : 0x%16lx - 0x%16lx   (%6ld MB)\n"
--		  "    memory  : 0x%16lx - 0x%16lx   (%6ld MB)\n"
--		  "      .init : 0x%p" " - 0x%p" "   (%6ld KB)\n"
--		  "      .text : 0x%p" " - 0x%p" "   (%6ld KB)\n"
--		  "      .data : 0x%p" " - 0x%p" "   (%6ld KB)\n",
-+		  "    memory  : 0x%16lx - 0x%16lx   (%6ld MB)\n",
- #ifdef CONFIG_KASAN
- 		  MLG(KASAN_SHADOW_START, KASAN_SHADOW_END),
- #endif
-+		  MLM(MODULES_VADDR, MODULES_END),
- 		  MLG(VMALLOC_START, VMALLOC_END),
-+		  MLK_ROUNDUP(__init_begin, __init_end),
-+		  MLK_ROUNDUP(_text, _etext),
-+		  MLK_ROUNDUP(_sdata, _edata),
- #ifdef CONFIG_SPARSEMEM_VMEMMAP
- 		  MLG((unsigned long)vmemmap,
- 		      (unsigned long)vmemmap + VMEMMAP_SIZE),
-@@ -329,11 +333,7 @@ void __init mem_init(void)
- #endif
- 		  MLK(FIXADDR_START, FIXADDR_TOP),
- 		  MLM(PCI_IO_START, PCI_IO_END),
--		  MLM(MODULES_VADDR, MODULES_END),
--		  MLM(PAGE_OFFSET, (unsigned long)high_memory),
--		  MLK_ROUNDUP(__init_begin, __init_end),
--		  MLK_ROUNDUP(_text, _etext),
--		  MLK_ROUNDUP(_sdata, _edata));
-+		  MLM(PAGE_OFFSET, (unsigned long)high_memory));
- 
- #undef MLK
- #undef MLM
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index a78fc5a882da..6275d183c005 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -322,40 +322,6 @@ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
- 	__create_pgd_mapping(init_mm.pgd, phys, virt, size, prot, late_alloc);
- }
- 
--static void __init __map_memblock(pgd_t *pgd, phys_addr_t start, phys_addr_t end)
--{
--
--	unsigned long kernel_start = __pa(_stext);
--	unsigned long kernel_end = __pa(_end);
--
--	/*
--	 * The kernel itself is mapped at page granularity. Map all other
--	 * memory, making sure we don't overwrite the existing kernel mappings.
--	 */
--
--	/* No overlap with the kernel. */
--	if (end < kernel_start || start >= kernel_end) {
--		__create_pgd_mapping(pgd, start, __phys_to_virt(start),
--				     end - start, PAGE_KERNEL, early_alloc);
--		return;
--	}
--
--	/*
--	 * This block overlaps the kernel mapping. Map the portion(s) which
--	 * don't overlap.
--	 */
--	if (start < kernel_start)
--		__create_pgd_mapping(pgd, start,
--				     __phys_to_virt(start),
--				     kernel_start - start, PAGE_KERNEL,
--				     early_alloc);
--	if (kernel_end < end)
--		__create_pgd_mapping(pgd, kernel_end,
--				     __phys_to_virt(kernel_end),
--				     end - kernel_end, PAGE_KERNEL,
--				     early_alloc);
--}
--
- static void __init map_mem(pgd_t *pgd)
- {
- 	struct memblock_region *reg;
-@@ -370,7 +336,8 @@ static void __init map_mem(pgd_t *pgd)
- 		if (memblock_is_nomap(reg))
- 			continue;
- 
--		__map_memblock(pgd, start, end);
-+		__create_pgd_mapping(pgd, start, __phys_to_virt(start),
-+				     end - start, PAGE_KERNEL, early_alloc);
+  * Our virtual mapping for the boot-time MMU-enable code. Must be
+  * shared across all the page-tables. Conveniently, we use the vectors
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index e06fd299de08..014b542ea658 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -427,7 +427,7 @@ static void update_vttbr(struct kvm *kvm)
+ 		 * shareable domain to make sure all data structures are
+ 		 * clean.
+ 		 */
+-		kvm_call_hyp(__kvm_flush_vm_context);
++		kvm_call_hyp(kvm_ksym_ref(__kvm_flush_vm_context));
  	}
+ 
+ 	kvm->arch.vmid_gen = atomic64_read(&kvm_vmid_gen);
+@@ -600,7 +600,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		__kvm_guest_enter();
+ 		vcpu->mode = IN_GUEST_MODE;
+ 
+-		ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);
++		ret = kvm_call_hyp(kvm_ksym_ref(__kvm_vcpu_run), vcpu);
+ 
+ 		vcpu->mode = OUTSIDE_GUEST_MODE;
+ 		/*
+@@ -969,7 +969,7 @@ static void cpu_init_hyp_mode(void *dummy)
+ 	pgd_ptr = kvm_mmu_get_httbr();
+ 	stack_page = __this_cpu_read(kvm_arm_hyp_stack_page);
+ 	hyp_stack_ptr = stack_page + PAGE_SIZE;
+-	vector_ptr = (unsigned long)__kvm_hyp_vector;
++	vector_ptr = (unsigned long)kvm_ksym_ref(__kvm_hyp_vector);
+ 
+ 	__cpu_init_hyp_mode(boot_pgd_ptr, pgd_ptr, hyp_stack_ptr, vector_ptr);
+ 
+@@ -1061,7 +1061,8 @@ static int init_hyp_mode(void)
+ 	/*
+ 	 * Map the Hyp-code called directly from the host
+ 	 */
+-	err = create_hyp_mappings(__kvm_hyp_code_start, __kvm_hyp_code_end);
++	err = create_hyp_mappings(kvm_ksym_ref(__kvm_hyp_code_start),
++				  kvm_ksym_ref(__kvm_hyp_code_end));
+ 	if (err) {
+ 		kvm_err("Cannot map world-switch code\n");
+ 		goto out_free_mappings;
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 7dace909d5cf..7c448b943e3a 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -31,8 +31,6 @@
+ 
+ #include "trace.h"
+ 
+-extern char  __hyp_idmap_text_start[], __hyp_idmap_text_end[];
+-
+ static pgd_t *boot_hyp_pgd;
+ static pgd_t *hyp_pgd;
+ static pgd_t *merged_hyp_pgd;
+@@ -63,7 +61,7 @@ static bool memslot_is_logging(struct kvm_memory_slot *memslot)
+  */
+ void kvm_flush_remote_tlbs(struct kvm *kvm)
+ {
+-	kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
++	kvm_call_hyp(kvm_ksym_ref(__kvm_tlb_flush_vmid), kvm);
  }
  
+ static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+@@ -75,7 +73,7 @@ static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+ 	 * anything there.
+ 	 */
+ 	if (kvm)
+-		kvm_call_hyp(__kvm_tlb_flush_vmid_ipa, kvm, ipa);
++		kvm_call_hyp(kvm_ksym_ref(__kvm_tlb_flush_vmid_ipa), kvm, ipa);
+ }
+ 
+ /*
+@@ -1647,9 +1645,9 @@ int kvm_mmu_init(void)
+ {
+ 	int err;
+ 
+-	hyp_idmap_start = kvm_virt_to_phys(__hyp_idmap_text_start);
+-	hyp_idmap_end = kvm_virt_to_phys(__hyp_idmap_text_end);
+-	hyp_idmap_vector = kvm_virt_to_phys(__kvm_hyp_init);
++	hyp_idmap_start = kvm_virt_to_phys(&__hyp_idmap_text_start);
++	hyp_idmap_end = kvm_virt_to_phys(&__hyp_idmap_text_end);
++	hyp_idmap_vector = kvm_virt_to_phys(&__kvm_hyp_init);
+ 
+ 	/*
+ 	 * We rely on the linker script to ensure at build time that the HYP
+diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+index 5e377101f919..830402f847e0 100644
+--- a/arch/arm64/include/asm/kvm_asm.h
++++ b/arch/arm64/include/asm/kvm_asm.h
+@@ -105,24 +105,27 @@
+ #ifndef __ASSEMBLY__
+ struct kvm;
+ struct kvm_vcpu;
++struct kvm_ksym;
+ 
+ extern char __kvm_hyp_init[];
+ extern char __kvm_hyp_init_end[];
+ 
+-extern char __kvm_hyp_vector[];
++extern struct kvm_ksym __kvm_hyp_vector;
+ 
+-#define	__kvm_hyp_code_start	__hyp_text_start
+-#define	__kvm_hyp_code_end	__hyp_text_end
++extern struct kvm_ksym __kvm_hyp_code_start;
++extern struct kvm_ksym __kvm_hyp_code_end;
+ 
+-extern void __kvm_flush_vm_context(void);
+-extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
+-extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
++extern struct kvm_ksym __kvm_flush_vm_context;
++extern struct kvm_ksym __kvm_tlb_flush_vmid_ipa;
++extern struct kvm_ksym __kvm_tlb_flush_vmid;
+ 
+-extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
++extern struct kvm_ksym __kvm_vcpu_run;
+ 
+-extern u64 __vgic_v3_get_ich_vtr_el2(void);
++extern struct kvm_ksym __hyp_idmap_text_start, __hyp_idmap_text_end;
+ 
+-extern u32 __kvm_get_mdcr_el2(void);
++extern struct kvm_ksym __vgic_v3_get_ich_vtr_el2;
++
++extern struct kvm_ksym __kvm_get_mdcr_el2;
+ 
+ #endif
+ 
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 61505676d085..0899026a2821 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -73,6 +73,8 @@
+ 
+ #define KERN_TO_HYP(kva)	((unsigned long)kva - PAGE_OFFSET + HYP_PAGE_OFFSET)
+ 
++#define kvm_ksym_ref(sym)	((void *)&sym - KIMAGE_VADDR + PAGE_OFFSET)
++
+ /*
+  * We currently only support a 40bit IPA.
+  */
+diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+index 7a5df5252dd7..215ad4649dd7 100644
+--- a/arch/arm64/include/asm/virt.h
++++ b/arch/arm64/include/asm/virt.h
+@@ -50,10 +50,6 @@ static inline bool is_hyp_mode_mismatched(void)
+ 	return __boot_cpu_mode[0] != __boot_cpu_mode[1];
+ }
+ 
+-/* The section containing the hypervisor text */
+-extern char __hyp_text_start[];
+-extern char __hyp_text_end[];
+-
+ #endif /* __ASSEMBLY__ */
+ 
+ #endif /* ! __ASM__VIRT_H */
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 363c2f529951..f935f082188d 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -35,9 +35,9 @@ jiffies = jiffies_64;
+ 	VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;	\
+ 	*(.hyp.idmap.text)				\
+ 	VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;	\
+-	VMLINUX_SYMBOL(__hyp_text_start) = .;		\
++	VMLINUX_SYMBOL(__kvm_hyp_code_start) = .;	\
+ 	*(.hyp.text)					\
+-	VMLINUX_SYMBOL(__hyp_text_end) = .;
++	VMLINUX_SYMBOL(__kvm_hyp_code_end) = .;
+ 
+ #define IDMAP_TEXT					\
+ 	. = ALIGN(SZ_4K);				\
+diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
+index 47e5f0feaee8..99e5a403af4e 100644
+--- a/arch/arm64/kvm/debug.c
++++ b/arch/arm64/kvm/debug.c
+@@ -24,6 +24,7 @@
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_arm.h>
+ #include <asm/kvm_emulate.h>
++#include <asm/kvm_mmu.h>
+ 
+ #include "trace.h"
+ 
+@@ -72,7 +73,8 @@ static void restore_guest_debug_regs(struct kvm_vcpu *vcpu)
+ 
+ void kvm_arm_init_debug(void)
+ {
+-	__this_cpu_write(mdcr_el2, kvm_call_hyp(__kvm_get_mdcr_el2));
++	__this_cpu_write(mdcr_el2,
++			 kvm_call_hyp(kvm_ksym_ref(__kvm_get_mdcr_el2)));
+ }
+ 
+ /**
+diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
+index 487d6357b7e7..58f5a6521307 100644
+--- a/virt/kvm/arm/vgic-v3.c
++++ b/virt/kvm/arm/vgic-v3.c
+@@ -247,7 +247,7 @@ int vgic_v3_probe(struct device_node *vgic_node,
+ 		goto out;
+ 	}
+ 
+-	ich_vtr_el2 = kvm_call_hyp(__vgic_v3_get_ich_vtr_el2);
++	ich_vtr_el2 = kvm_call_hyp(kvm_ksym_ref(__vgic_v3_get_ich_vtr_el2));
+ 
+ 	/*
+ 	 * The ListRegs field is 5 bits, but there is a architectural
 -- 
 2.5.0
