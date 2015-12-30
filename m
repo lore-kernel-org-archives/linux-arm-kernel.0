@@ -1,27 +1,36 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Wed, 30 Dec 2015 16:57:20 +0000
-Subject: Domain faults when CONFIG_CPU_SW_DOMAIN_PAN is enabled
-References: <f7774151e4a849e682ae5a607a98140b@EMAIL.axentia.se>
- <20151203115143.GM8644@n2100.arm.linux.org.uk>
- <533b0f1f264e42e78b94bbff9570fb50@EMAIL.axentia.se>
- <20151203133727.GN8644@n2100.arm.linux.org.uk>
- <94580382ca344ae2b64f66fb778c6ff7@EMAIL.axentia.se>
- <20151203164118.GR8644@n2100.arm.linux.org.uk>
- <20151203172708.GT8644@n2100.arm.linux.org.uk>
- <45b615420548463ebd1d582bc5da2eff@EMAIL.axentia.se>
- <20151210002213.GL8644@n2100.arm.linux.org.uk>
- <7e60a8ccde1940d68ec4780abe154cbd@EMAIL.axentia.se>
- <20151210162054.GM8644@n2100.arm.linux.org.uk>  
-Message-ID: <b0e47cfd6f9341ef95859b4555032735@EMAIL.axentia.se>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 30 Dec 2015 17:22:12 +0000
+Subject: [PATCH] pinctrl: mediatek: convert to arch_initcall
+In-Reply-To: <CACRpkdbRDzXunYK5d6Ld4Z2a=0mkp4KBvgL2P-St4P65Jajamw@mail.gmail.com>
+References: <1450792017-7120-1-git-send-email-djkurtz@chromium.org>
+ <CACRpkdbRDzXunYK5d6Ld4Z2a=0mkp4KBvgL2P-St4P65Jajamw@mail.gmail.com>
+Message-ID: <20151230172212.GZ16023@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I wrote:
-> [I repeat myself just in case my last message disappeared. It would be
->  a shame if 4.4 was also regressed because of a missing response.]
+On Tue, Dec 22, 2015 at 04:11:47PM +0100, Linus Walleij wrote:
+> On Tue, Dec 22, 2015 at 2:46 PM, Daniel Kurtz <djkurtz@chromium.org> wrote:
 
-Crap, I should have checked one more time before hitting send. The patch
-is already in there! Sorry for the confusion.
+> > Move pinctrl initialization earlier in boot so that real devices can find
+> > their pctldev without probe deferring.
+> (...)
+> > -module_init(mtk_pinctrl_init);
+> > +arch_initcall(mtk_pinctrl_init);
 
-Cheers,
-Peter
+> So I see why you're doing this (because of wanting to avoid nasty boot
+> probe deferrals, right?) and I'm going to apply it, because the work
+> with probe ordering is still in the works, but I'd like some general
+> ARM people to come in with opinions.
+
+I really don't think we should be applying this sort of stuff unless
+things are actively broken right now.  It's a bit of a rabbit hole we
+could spend a long time going down tweaking things for different
+systems in the same way that tweaking the link order can be and it masks
+the underlying issues.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151230/cffcf7fd/attachment-0001.sig>
