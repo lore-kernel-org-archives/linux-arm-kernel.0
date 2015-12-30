@@ -1,269 +1,261 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 30 Dec 2015 16:26:04 +0100
-Subject: [PATCH v2 05/13] arm64: kvm: deal with kernel symbols outside of
- linear mapping
+Date: Wed, 30 Dec 2015 16:26:06 +0100
+Subject: [PATCH v2 07/13] arm64: add support for module PLTs
 In-Reply-To: <1451489172-17420-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1451489172-17420-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1451489172-17420-6-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1451489172-17420-8-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KVM on arm64 uses a fixed offset between the linear mapping at EL1 and
-the HYP mapping at EL2. Before we can move the kernel virtual mapping
-out of the linear mapping, we have to make sure that references to kernel
-symbols that are accessed via the HYP mapping are translated to their
-linear equivalent.
-
-To prevent inadvertent direct references from sneaking in later, change
-the type of all extern declarations to HYP kernel symbols to the opaque
-'struct kvm_ksym', which does not decay to a pointer type like char arrays
-and function references. This is not bullet proof, but at least forces the
-user to take the address explicitly rather than referencing it directly.
+This adds support for emitting PLTs at module load time for relative
+branches that are out of range. This is a prerequisite for KASLR,
+which may place the kernel and the modules anywhere in the vmalloc
+area, making it likely that branch target offsets exceed the maximum
+range of +/- 128 MB.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/include/asm/kvm_asm.h   |  2 ++
- arch/arm/include/asm/kvm_mmu.h   |  2 ++
- arch/arm/kvm/arm.c               |  9 +++++----
- arch/arm/kvm/mmu.c               | 12 +++++------
- arch/arm64/include/asm/kvm_asm.h | 21 +++++++++++---------
- arch/arm64/include/asm/kvm_mmu.h |  2 ++
- arch/arm64/include/asm/virt.h    |  4 ----
- arch/arm64/kernel/vmlinux.lds.S  |  4 ++--
- arch/arm64/kvm/debug.c           |  4 +++-
- virt/kvm/arm/vgic-v3.c           |  2 +-
- 10 files changed, 34 insertions(+), 28 deletions(-)
+ arch/arm64/Kconfig              |   4 +
+ arch/arm64/Makefile             |   4 +
+ arch/arm64/include/asm/module.h |  11 ++
+ arch/arm64/kernel/Makefile      |   1 +
+ arch/arm64/kernel/module-plts.c | 137 ++++++++++++++++++++
+ arch/arm64/kernel/module.c      |   7 +
+ arch/arm64/kernel/module.lds    |   4 +
+ 7 files changed, 168 insertions(+)
 
-diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-index 194c91b610ff..484ffdf7c70b 100644
---- a/arch/arm/include/asm/kvm_asm.h
-+++ b/arch/arm/include/asm/kvm_asm.h
-@@ -99,6 +99,8 @@ extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
- extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 871f21783866..827e78f33944 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -704,6 +704,10 @@ config ARM64_LSE_ATOMICS
  
- extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+ endmenu
+ 
++config ARM64_MODULE_PLTS
++	bool
++	select HAVE_MOD_ARCH_SPECIFIC
 +
-+extern char __hyp_idmap_text_start[], __hyp_idmap_text_end[];
- #endif
+ endmenu
  
- #endif /* __ARM_KVM_ASM_H__ */
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 405aa1883307..412b363f79e9 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -30,6 +30,8 @@
- #define HYP_PAGE_OFFSET		PAGE_OFFSET
- #define KERN_TO_HYP(kva)	(kva)
+ menu "Boot options"
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index cd822d8454c0..d4654830e536 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -45,6 +45,10 @@ ifeq ($(CONFIG_ARM64_ERRATUM_843419), y)
+ KBUILD_CFLAGS_MODULE	+= -mcmodel=large
+ endif
  
-+#define kvm_ksym_ref(kva)	(kva)
++ifeq ($(CONFIG_ARM64_MODULE_PLTS),y)
++KBUILD_LDFLAGS_MODULE	+= -T $(srctree)/arch/arm64/kernel/module.lds
++endif
 +
- /*
-  * Our virtual mapping for the boot-time MMU-enable code. Must be
-  * shared across all the page-tables. Conveniently, we use the vectors
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index e06fd299de08..014b542ea658 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -427,7 +427,7 @@ static void update_vttbr(struct kvm *kvm)
- 		 * shareable domain to make sure all data structures are
- 		 * clean.
- 		 */
--		kvm_call_hyp(__kvm_flush_vm_context);
-+		kvm_call_hyp(kvm_ksym_ref(__kvm_flush_vm_context));
- 	}
+ # Default value
+ head-y		:= arch/arm64/kernel/head.o
  
- 	kvm->arch.vmid_gen = atomic64_read(&kvm_vmid_gen);
-@@ -600,7 +600,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		__kvm_guest_enter();
- 		vcpu->mode = IN_GUEST_MODE;
+diff --git a/arch/arm64/include/asm/module.h b/arch/arm64/include/asm/module.h
+index e80e232b730e..7b8cd3dc9d8e 100644
+--- a/arch/arm64/include/asm/module.h
++++ b/arch/arm64/include/asm/module.h
+@@ -20,4 +20,15 @@
  
--		ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);
-+		ret = kvm_call_hyp(kvm_ksym_ref(__kvm_vcpu_run), vcpu);
+ #define MODULE_ARCH_VERMAGIC	"aarch64"
  
- 		vcpu->mode = OUTSIDE_GUEST_MODE;
- 		/*
-@@ -969,7 +969,7 @@ static void cpu_init_hyp_mode(void *dummy)
- 	pgd_ptr = kvm_mmu_get_httbr();
- 	stack_page = __this_cpu_read(kvm_arm_hyp_stack_page);
- 	hyp_stack_ptr = stack_page + PAGE_SIZE;
--	vector_ptr = (unsigned long)__kvm_hyp_vector;
-+	vector_ptr = (unsigned long)kvm_ksym_ref(__kvm_hyp_vector);
- 
- 	__cpu_init_hyp_mode(boot_pgd_ptr, pgd_ptr, hyp_stack_ptr, vector_ptr);
- 
-@@ -1061,7 +1061,8 @@ static int init_hyp_mode(void)
- 	/*
- 	 * Map the Hyp-code called directly from the host
- 	 */
--	err = create_hyp_mappings(__kvm_hyp_code_start, __kvm_hyp_code_end);
-+	err = create_hyp_mappings(kvm_ksym_ref(__kvm_hyp_code_start),
-+				  kvm_ksym_ref(__kvm_hyp_code_end));
- 	if (err) {
- 		kvm_err("Cannot map world-switch code\n");
- 		goto out_free_mappings;
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 7dace909d5cf..7c448b943e3a 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -31,8 +31,6 @@
- 
- #include "trace.h"
- 
--extern char  __hyp_idmap_text_start[], __hyp_idmap_text_end[];
--
- static pgd_t *boot_hyp_pgd;
- static pgd_t *hyp_pgd;
- static pgd_t *merged_hyp_pgd;
-@@ -63,7 +61,7 @@ static bool memslot_is_logging(struct kvm_memory_slot *memslot)
-  */
- void kvm_flush_remote_tlbs(struct kvm *kvm)
- {
--	kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
-+	kvm_call_hyp(kvm_ksym_ref(__kvm_tlb_flush_vmid), kvm);
- }
- 
- static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
-@@ -75,7 +73,7 @@ static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
- 	 * anything there.
- 	 */
- 	if (kvm)
--		kvm_call_hyp(__kvm_tlb_flush_vmid_ipa, kvm, ipa);
-+		kvm_call_hyp(kvm_ksym_ref(__kvm_tlb_flush_vmid_ipa), kvm, ipa);
- }
- 
- /*
-@@ -1647,9 +1645,9 @@ int kvm_mmu_init(void)
- {
- 	int err;
- 
--	hyp_idmap_start = kvm_virt_to_phys(__hyp_idmap_text_start);
--	hyp_idmap_end = kvm_virt_to_phys(__hyp_idmap_text_end);
--	hyp_idmap_vector = kvm_virt_to_phys(__kvm_hyp_init);
-+	hyp_idmap_start = kvm_virt_to_phys(&__hyp_idmap_text_start);
-+	hyp_idmap_end = kvm_virt_to_phys(&__hyp_idmap_text_end);
-+	hyp_idmap_vector = kvm_virt_to_phys(&__kvm_hyp_init);
- 
- 	/*
- 	 * We rely on the linker script to ensure at build time that the HYP
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index 5e377101f919..830402f847e0 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -105,24 +105,27 @@
- #ifndef __ASSEMBLY__
- struct kvm;
- struct kvm_vcpu;
-+struct kvm_ksym;
- 
- extern char __kvm_hyp_init[];
- extern char __kvm_hyp_init_end[];
- 
--extern char __kvm_hyp_vector[];
-+extern struct kvm_ksym __kvm_hyp_vector;
- 
--#define	__kvm_hyp_code_start	__hyp_text_start
--#define	__kvm_hyp_code_end	__hyp_text_end
-+extern struct kvm_ksym __kvm_hyp_code_start;
-+extern struct kvm_ksym __kvm_hyp_code_end;
- 
--extern void __kvm_flush_vm_context(void);
--extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
--extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
-+extern struct kvm_ksym __kvm_flush_vm_context;
-+extern struct kvm_ksym __kvm_tlb_flush_vmid_ipa;
-+extern struct kvm_ksym __kvm_tlb_flush_vmid;
- 
--extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
-+extern struct kvm_ksym __kvm_vcpu_run;
- 
--extern u64 __vgic_v3_get_ich_vtr_el2(void);
-+extern struct kvm_ksym __hyp_idmap_text_start, __hyp_idmap_text_end;
- 
--extern u32 __kvm_get_mdcr_el2(void);
-+extern struct kvm_ksym __vgic_v3_get_ich_vtr_el2;
++#ifdef CONFIG_ARM64_MODULE_PLTS
++struct mod_arch_specific {
++	struct elf64_shdr	*core_plt;
++	struct elf64_shdr	*init_plt;
++	int			core_plt_count;
++	int			init_plt_count;
++};
++#endif
 +
-+extern struct kvm_ksym __kvm_get_mdcr_el2;
- 
- #endif
- 
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 61505676d085..0899026a2821 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -73,6 +73,8 @@
- 
- #define KERN_TO_HYP(kva)	((unsigned long)kva - PAGE_OFFSET + HYP_PAGE_OFFSET)
- 
-+#define kvm_ksym_ref(sym)	((void *)&sym - KIMAGE_VADDR + PAGE_OFFSET)
++u64 get_module_plt(struct module *mod, void *loc, u64 val);
 +
- /*
-  * We currently only support a 40bit IPA.
-  */
-diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-index 7a5df5252dd7..215ad4649dd7 100644
---- a/arch/arm64/include/asm/virt.h
-+++ b/arch/arm64/include/asm/virt.h
-@@ -50,10 +50,6 @@ static inline bool is_hyp_mode_mismatched(void)
- 	return __boot_cpu_mode[0] != __boot_cpu_mode[1];
- }
+ #endif /* __ASM_MODULE_H */
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 474691f8b13a..f42b0fff607f 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -30,6 +30,7 @@ arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
+ 					   ../../arm/kernel/opcodes.o
+ arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
+ arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
++arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
+ arm64-obj-$(CONFIG_PERF_EVENTS)		+= perf_regs.o perf_callchain.o
+ arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
+ arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)	+= hw_breakpoint.o
+diff --git a/arch/arm64/kernel/module-plts.c b/arch/arm64/kernel/module-plts.c
+new file mode 100644
+index 000000000000..4a8ef9ea01ee
+--- /dev/null
++++ b/arch/arm64/kernel/module-plts.c
+@@ -0,0 +1,137 @@
++/*
++ * Copyright (C) 2014-2015 Linaro Ltd. <ard.biesheuvel@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/elf.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++
++struct plt_entry {
++	__le32	mov0;	/* movn	x16, #0x....			*/
++	__le32	mov1;	/* movk	x16, #0x...., lsl #16		*/
++	__le32	mov2;	/* movk	x16, #0x...., lsl #32		*/
++	__le32	br;	/* br	x16				*/
++} __aligned(8);
++
++static bool in_init(const struct module *mod, void *addr)
++{
++	return (u64)addr - (u64)mod->module_init < mod->init_size;
++}
++
++u64 get_module_plt(struct module *mod, void *loc, u64 val)
++{
++	struct plt_entry entry = {
++		cpu_to_le32(0x92800010 | (((~val      ) & 0xffff)) << 5),
++		cpu_to_le32(0xf2a00010 | ((( val >> 16) & 0xffff)) << 5),
++		cpu_to_le32(0xf2c00010 | ((( val >> 32) & 0xffff)) << 5),
++		cpu_to_le32(0xd61f0200)
++	}, *plt;
++	int i, *count;
++
++	if (in_init(mod, loc)) {
++		plt = (struct plt_entry *)mod->arch.init_plt->sh_addr;
++		count = &mod->arch.init_plt_count;
++	} else {
++		plt = (struct plt_entry *)mod->arch.core_plt->sh_addr;
++		count = &mod->arch.core_plt_count;
++	}
++
++	/* Look for an existing entry pointing to 'val' */
++	for (i = 0; i < *count; i++)
++		if (plt[i].mov0 == entry.mov0 &&
++		    plt[i].mov1 == entry.mov1 &&
++		    plt[i].mov2 == entry.mov2)
++			return (u64)&plt[i];
++
++	i = (*count)++;
++	plt[i] = entry;
++	return (u64)&plt[i];
++}
++
++static int duplicate_rel(Elf64_Addr base, const Elf64_Rela *rela, int num)
++{
++	int i;
++
++	for (i = 0; i < num; i++) {
++		if (rela[i].r_info == rela[num].r_info &&
++		    rela[i].r_addend == rela[num].r_addend)
++			return 1;
++	}
++	return 0;
++}
++
++/* Count how many PLT entries we may need */
++static unsigned int count_plts(Elf64_Addr base, const Elf64_Rela *rela, int num)
++{
++	unsigned int ret = 0;
++	int i;
++
++	/*
++	 * Sure, this is order(n^2), but it's usually short, and not
++	 * time critical
++	 */
++	for (i = 0; i < num; i++)
++		switch (ELF64_R_TYPE(rela[i].r_info)) {
++		case R_AARCH64_JUMP26:
++		case R_AARCH64_CALL26:
++			if (!duplicate_rel(base, rela, i))
++				ret++;
++			break;
++		}
++	return ret;
++}
++
++int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
++			      char *secstrings, struct module *mod)
++{
++	unsigned long core_plts = 0, init_plts = 0;
++	Elf64_Shdr *s, *sechdrs_end = sechdrs + ehdr->e_shnum;
++
++	/*
++	 * To store the PLTs, we expand the .text section for core module code
++	 * and the .init.text section for initialization code.
++	 */
++	for (s = sechdrs; s < sechdrs_end; ++s)
++		if (strcmp(".core.plt", secstrings + s->sh_name) == 0)
++			mod->arch.core_plt = s;
++		else if (strcmp(".init.plt", secstrings + s->sh_name) == 0)
++			mod->arch.init_plt = s;
++
++	if (!mod->arch.core_plt || !mod->arch.init_plt) {
++		pr_err("%s: sections missing\n", mod->name);
++		return -ENOEXEC;
++	}
++
++	for (s = sechdrs + 1; s < sechdrs_end; ++s) {
++		const Elf64_Rela *rels = (void *)ehdr + s->sh_offset;
++		int numrels = s->sh_size / sizeof(Elf64_Rela);
++		Elf64_Shdr *dstsec = sechdrs + s->sh_info;
++
++		if (s->sh_type != SHT_RELA)
++			continue;
++
++		if (strstr(secstrings + s->sh_name, ".init"))
++			init_plts += count_plts(dstsec->sh_addr, rels, numrels);
++		else
++			core_plts += count_plts(dstsec->sh_addr, rels, numrels);
++	}
++
++	mod->arch.core_plt->sh_type = SHT_NOBITS;
++	mod->arch.core_plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
++	mod->arch.core_plt->sh_addralign = L1_CACHE_BYTES;
++	mod->arch.core_plt->sh_size = core_plts * sizeof(struct plt_entry);
++	mod->arch.core_plt_count = 0;
++
++	mod->arch.init_plt->sh_type = SHT_NOBITS;
++	mod->arch.init_plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
++	mod->arch.init_plt->sh_addralign = L1_CACHE_BYTES;
++	mod->arch.init_plt->sh_size = init_plts * sizeof(struct plt_entry);
++	mod->arch.init_plt_count = 0;
++	pr_debug("%s: core.plt=%lld, init.plt=%lld\n", __func__,
++		 mod->arch.core_plt->sh_size, mod->arch.init_plt->sh_size);
++	return 0;
++}
+diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
+index f4bc779e62e8..14880d77ec6f 100644
+--- a/arch/arm64/kernel/module.c
++++ b/arch/arm64/kernel/module.c
+@@ -388,6 +388,13 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
+ 		case R_AARCH64_CALL26:
+ 			ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 2, 26,
+ 					     AARCH64_INSN_IMM_26);
++
++			if (IS_ENABLED(CONFIG_ARM64_MODULE_PLTS) &&
++			    ovf == -ERANGE) {
++				val = get_module_plt(me, loc, val);
++				ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 2,
++						     26, AARCH64_INSN_IMM_26);
++			}
+ 			break;
  
--/* The section containing the hypervisor text */
--extern char __hyp_text_start[];
--extern char __hyp_text_end[];
--
- #endif /* __ASSEMBLY__ */
- 
- #endif /* ! __ASM__VIRT_H */
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 363c2f529951..f935f082188d 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -35,9 +35,9 @@ jiffies = jiffies_64;
- 	VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;	\
- 	*(.hyp.idmap.text)				\
- 	VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;	\
--	VMLINUX_SYMBOL(__hyp_text_start) = .;		\
-+	VMLINUX_SYMBOL(__kvm_hyp_code_start) = .;	\
- 	*(.hyp.text)					\
--	VMLINUX_SYMBOL(__hyp_text_end) = .;
-+	VMLINUX_SYMBOL(__kvm_hyp_code_end) = .;
- 
- #define IDMAP_TEXT					\
- 	. = ALIGN(SZ_4K);				\
-diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
-index 47e5f0feaee8..99e5a403af4e 100644
---- a/arch/arm64/kvm/debug.c
-+++ b/arch/arm64/kvm/debug.c
-@@ -24,6 +24,7 @@
- #include <asm/kvm_asm.h>
- #include <asm/kvm_arm.h>
- #include <asm/kvm_emulate.h>
-+#include <asm/kvm_mmu.h>
- 
- #include "trace.h"
- 
-@@ -72,7 +73,8 @@ static void restore_guest_debug_regs(struct kvm_vcpu *vcpu)
- 
- void kvm_arm_init_debug(void)
- {
--	__this_cpu_write(mdcr_el2, kvm_call_hyp(__kvm_get_mdcr_el2));
-+	__this_cpu_write(mdcr_el2,
-+			 kvm_call_hyp(kvm_ksym_ref(__kvm_get_mdcr_el2)));
- }
- 
- /**
-diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
-index 487d6357b7e7..58f5a6521307 100644
---- a/virt/kvm/arm/vgic-v3.c
-+++ b/virt/kvm/arm/vgic-v3.c
-@@ -247,7 +247,7 @@ int vgic_v3_probe(struct device_node *vgic_node,
- 		goto out;
- 	}
- 
--	ich_vtr_el2 = kvm_call_hyp(__vgic_v3_get_ich_vtr_el2);
-+	ich_vtr_el2 = kvm_call_hyp(kvm_ksym_ref(__vgic_v3_get_ich_vtr_el2));
- 
- 	/*
- 	 * The ListRegs field is 5 bits, but there is a architectural
+ 		default:
+diff --git a/arch/arm64/kernel/module.lds b/arch/arm64/kernel/module.lds
+new file mode 100644
+index 000000000000..3682fa107918
+--- /dev/null
++++ b/arch/arm64/kernel/module.lds
+@@ -0,0 +1,4 @@
++SECTIONS {
++        .core.plt : { BYTE(0) }
++        .init.plt : { BYTE(0) }
++}
 -- 
 2.5.0
