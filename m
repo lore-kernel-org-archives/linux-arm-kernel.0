@@ -1,53 +1,86 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 30 Dec 2015 16:36:22 +0100
-Subject: [GIT PULL 2/5] memory: tegra: Changes for v4.5-rc1
-In-Reply-To: <20151222195318.GG30172@localhost>
-References: <1450356639-7758-1-git-send-email-thierry.reding@gmail.com>
- <1450356639-7758-2-git-send-email-thierry.reding@gmail.com>
- <20151222195318.GG30172@localhost>
-Message-ID: <20151230153622.GA7085@ulmo>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Wed, 30 Dec 2015 16:45:43 +0100
+Subject: [PATCH] ARM: dts: rockchip: Adding LEDs handling via leds-gpio
+ for the Radxa Rock2 Square
+In-Reply-To: <3613784.8JLtyMHEE9@diego>
+References: <1451474219-1313-1-git-send-email-romain.perier@gmail.com>
+ <3613784.8JLtyMHEE9@diego>
+Message-ID: <1451490343.11453.28.camel@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 22, 2015 at 11:53:18AM -0800, Olof Johansson wrote:
-> On Thu, Dec 17, 2015 at 01:50:36PM +0100, Thierry Reding wrote:
-> > Hi ARM SoC maintainers,
-> > 
-> > The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
-> > 
-> >   Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.5-memory
-> > 
-> > for you to fetch changes up to e2127ae7a5e80eb53ad431c39145767391da40cd:
-> > 
-> >   memory/tegra: Add number of TLB lines for Tegra124 (2015-12-14 16:11:35 +0100)
-> > 
-> > Thanks,
-> > Thierry
-> > 
-> > ----------------------------------------------------------------
-> > memory: tegra: Changes for v4.5-rc1
-> > 
-> > This is a single fix to improve performance of the SMMU on Tegra124.
+On Wed, 2015-12-30 at 16:20 +0100, Heiko St?bner wrote:
+> Hi Romain,
 > 
-> Merged, thanks.
+> Am Mittwoch, 30. Dezember 2015, 12:16:59 schrieb Romain Perier:
 > 
+> even a oneliner is generally preferred, compared to no commit message
+> at all?
+> ;-)
 > 
-> Btw, it's a little confusing when there's [GIT PULL x/5] and we only
-> see 2-5. I wasn't sure if 1/5 had gotten lost, so I had to go search for
-> it. Seems like it was destined for the clk tree. It'd be nice if those
-> were sent outside of the series to avoid confusion in the future.
+> > Signed-off-by: Romain Perier <romain.perier@gmail.com>
+> > ---
+> > ?arch/arm/boot/dts/rk3288-rock2-square.dts | 17 +++++++++++++++++
+> > ?1 file changed, 17 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/rk3288-rock2-square.dts
+> > b/arch/arm/boot/dts/rk3288-rock2-square.dts index c5453a0..a33020f
+> > 100644
+> > --- a/arch/arm/boot/dts/rk3288-rock2-square.dts
+> > +++ b/arch/arm/boot/dts/rk3288-rock2-square.dts
+> > @@ -56,6 +56,23 @@
+> > ?		pinctrl-0 = <&ir_int>;
+> > ?	};
+> > 
+> > +	gpio-leds {
+> > +		compatible = "gpio-leds";
+> > +
+> > +		heartbeat {
+> > +			gpios = <&gpio7 15 GPIO_ACTIVE_LOW>;
+> > +			label = "rock2:green:heartbeat";
+> > +			linux,default-trigger = "heartbeat";
+> > +		};
+> > +
+> > +		mmc {
+> > +			gpios = <&gpio0 11 GPIO_ACTIVE_LOW>;
+> > +			label = "rock2:blue:mmc";
+> > +			linux,default-trigger = "mmc0";
+> > +		};
+> 
+> the rock2 core schematics seem to not list these leds at all
+> (especially when?
+> looking at the gpio-side). But looking at the schematics my guess
+> would be?
+> led_state1 and led_state2, so the naming should reflect that?
+> (rock2:green:state1 ...).
+> 
+> Also I'd like to refrain from encoding user-specific configurations
+> in the?
+> devicetree - aka please do a default trigger of "off" for those
+> generic leds.
 
-Alright, I'll make a mental note to not do this in the future.
+Seems a grey area. The vendor kernel configures these LEDs with the
+same default triggers as Romains patch does, so one could argue these
+are the intended usages for those LEDs (as such it's hardware
+description not use-specific configuration?).?
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151230/7e4d58a8/attachment-0001.sig>
+In any case having sensible default triggers (e.g. having the default
+mainline behaviour act the same as the vendor behaviour) seems quite a
+lot more useful then keeping these LEDs off and forcing usespace to set
+them up.
+
+
+> Thanks
+> Heiko
+> 
+> > +	};
+> > +
+> > +
+> > ?	sound {
+> > ?		compatible = "simple-audio-card";
+> > ?		simple-audio-card,name = "SPDIF";
+> 
+
+-- 
+Sjoerd Simons
+Collabora Ltd.
