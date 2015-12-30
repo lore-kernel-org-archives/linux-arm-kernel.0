@@ -1,41 +1,55 @@
 From: jamesjj.liao@mediatek.com (James Liao)
-Date: Wed, 30 Dec 2015 14:41:44 +0800
-Subject: [PATCH 2/4] soc: mediatek: Init MT8173 scpsys driver earlier
+Date: Wed, 30 Dec 2015 14:41:45 +0800
+Subject: [PATCH 3/4] soc: mediatek: Add MT2701 power dt-bindings
 In-Reply-To: <1451457706-14798-1-git-send-email-jamesjj.liao@mediatek.com>
 References: <1451457706-14798-1-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <1451457706-14798-3-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <1451457706-14798-4-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some power domain comsumers may init before module_init.
-So the power domain provider (scpsys) need to be initialized
-earlier too.
+From: Shunli Wang <shunli.wang@mediatek.com>
 
+Add power dt-bindings for MT2701.
+
+Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
 Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
 ---
- drivers/soc/mediatek/mtk-scpsys-mt8173.c | 13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
+ include/dt-bindings/power/mt2701-power.h | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+ create mode 100644 include/dt-bindings/power/mt2701-power.h
 
-diff --git a/drivers/soc/mediatek/mtk-scpsys-mt8173.c b/drivers/soc/mediatek/mtk-scpsys-mt8173.c
-index 3c7b569..827e696 100644
---- a/drivers/soc/mediatek/mtk-scpsys-mt8173.c
-+++ b/drivers/soc/mediatek/mtk-scpsys-mt8173.c
-@@ -176,4 +176,15 @@ static struct platform_driver scpsys_drv = {
- 	},
- };
- 
--module_platform_driver_probe(scpsys_drv, scpsys_probe);
-+static int __init scpsys_drv_init(void)
-+{
-+	return platform_driver_probe(&scpsys_drv, scpsys_probe);
-+}
+diff --git a/include/dt-bindings/power/mt2701-power.h b/include/dt-bindings/power/mt2701-power.h
+new file mode 100644
+index 0000000..64cc826
+--- /dev/null
++++ b/include/dt-bindings/power/mt2701-power.h
+@@ -0,0 +1,27 @@
++/*
++ * Copyright (C) 2015 MediaTek Inc.
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ */
 +
-+static void __exit scpsys_drv_exit(void)
-+{
-+	platform_driver_unregister(&scpsys_drv);
-+}
++#ifndef _DT_BINDINGS_POWER_MT2701_POWER_H
++#define _DT_BINDINGS_POWER_MT2701_POWER_H
 +
-+subsys_initcall(scpsys_drv_init);
-+module_exit(scpsys_drv_exit);
++#define MT2701_POWER_DOMAIN_CONN	0
++#define MT2701_POWER_DOMAIN_DISP	1
++#define MT2701_POWER_DOMAIN_MFG		2
++#define MT2701_POWER_DOMAIN_VDEC	3
++#define MT2701_POWER_DOMAIN_ISP		4
++#define MT2701_POWER_DOMAIN_BDP		5
++#define MT2701_POWER_DOMAIN_ETH		6
++#define MT2701_POWER_DOMAIN_HIF		7
++#define MT2701_POWER_DOMAIN_IFR_MSC	8
++
++#endif /* _DT_BINDINGS_POWER_MT2701_POWER_H */
 -- 
 1.9.1
