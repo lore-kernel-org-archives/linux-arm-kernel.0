@@ -1,5 +1,5 @@
 From: peda@axentia.se (Peter Rosin)
-Date: Wed, 30 Dec 2015 16:51:37 +0000
+Date: Wed, 30 Dec 2015 16:57:20 +0000
 Subject: Domain faults when CONFIG_CPU_SW_DOMAIN_PAN is enabled
 References: <f7774151e4a849e682ae5a607a98140b@EMAIL.axentia.se>
  <20151203115143.GM8644@n2100.arm.linux.org.uk>
@@ -11,46 +11,17 @@ References: <f7774151e4a849e682ae5a607a98140b@EMAIL.axentia.se>
  <45b615420548463ebd1d582bc5da2eff@EMAIL.axentia.se>
  <20151210002213.GL8644@n2100.arm.linux.org.uk>
  <7e60a8ccde1940d68ec4780abe154cbd@EMAIL.axentia.se>
- <20151210162054.GM8644@n2100.arm.linux.org.uk>
-Message-ID: <bc5dfe76333842f8af88862826b16571@EMAIL.axentia.se>
+ <20151210162054.GM8644@n2100.arm.linux.org.uk>  
+Message-ID: <b0e47cfd6f9341ef95859b4555032735@EMAIL.axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[I repeat myself just in case my last message disappeared. It would be
- a shame if 4.4 was also regressed because of a missing response.]
-
 I wrote:
-> Russell King wrote:
-> > On Thu, Dec 10, 2015 at 03:29:37PM +0000, Peter Rosin wrote:
-> > > Russell King wrote:
-> > > > On Thu, Dec 03, 2015 at 09:37:51PM +0000, Peter Rosin wrote:
-> > > > > I took both patches for a quick spin (a dozen boots and one hour 
-> > > > > uptime after that for each patch) and no incidents. I have not 
-> > > > > gathered data, but the crash on boot feels like it's quite a bit 
-> > > > > above 50% when there is a problem so this feels good (I used 5 
-> > > > > clean reboots when I bisected and that worked).
-> > > > > 
-> > > > > Reported-by: Peter Rosin <peda@axentia.se>
-> > > > > Tested-by: Peter Rosin <peda@axentia.se>
-> > > > > 
-> > > > > (and please don't forget to cc stable)
-> > > > 
-> > > > I've decided to do a more in-depth fix, so that we also solve the 
-> > > > issue that when we schedule in these down_read()s, we don't leak 
-> > > > the permissive domain register setting into the switched-to context.
-> > > > 
-> > > > Can you test this patch please?  Thanks.
-> > > 
-> > > Still looking good.
-> > 
-> > Does that mean I can add your reported and tested-by to this latest patch?
-> 
-> Right, I thought that was obvious, sorry for the confusion.
+> [I repeat myself just in case my last message disappeared. It would be
+>  a shame if 4.4 was also regressed because of a missing response.]
 
-Reported-by: Peter Rosin <peda@axentia.se>
-Tested-by: Peter Rosin <peda@axentia.se>
-
-(and please don't forget to cc stable)
+Crap, I should have checked one more time before hitting send. The patch
+is already in there! Sorry for the confusion.
 
 Cheers,
 Peter
