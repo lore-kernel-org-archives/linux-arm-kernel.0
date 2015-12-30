@@ -1,29 +1,38 @@
 From: lifshitz@compulab.co.il (Dmitry Lifshitz)
-Date: Wed, 30 Dec 2015 15:38:59 +0200
-Subject: [PATCH 0/6] ARM: dts: am57xx: cl-som-am57x: set of non critical DT
- fixes
-Message-ID: <1451482745-1820-1-git-send-email-lifshitz@compulab.co.il>
+Date: Wed, 30 Dec 2015 15:39:05 +0200
+Subject: [PATCH 6/6] ARM: dts: am57xx: sbc-am57x: correct Eth PHY settings
+In-Reply-To: <1451482745-1820-1-git-send-email-lifshitz@compulab.co.il>
+References: <1451482745-1820-1-git-send-email-lifshitz@compulab.co.il>
+Message-ID: <1451482745-1820-7-git-send-email-lifshitz@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This pacth set apply a set of non critical DT fixes for CompuLab CL-SOM-AM57x SoM
+Update Eth PHY settings to make it possible to run both phys at 1Gbps.
 
-* Improve Eth functionality
-* Pinmux fix for several devices
-* Improve SPI flash access
-* Set USB2 in HOST mode to enable connection of keyboard/mouse on eval board
+Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
+---
+ arch/arm/boot/dts/am57xx-cl-som-am57x.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Dmitry Lifshitz (6):
-  ARM: dts: am57xx: sbc-am57x: fix SB-SOM EEPROM I2C address
-  ARM: dts: am57xx: cl-som-am57x: set HOST mode for USB2
-  ARM: dts: am57xx: cl-som-am57x: update SPI Flash frequency
-  ARM: dts: am57xx: sbc-am57x: fix UART3 pinmux
-  ARM: dts: am57xx: cl-som-am57x: fix CPSW EMAC pinmux
-  ARM: dts: am57xx: sbc-am57x: correct Eth PHY settings
-
- arch/arm/boot/dts/am57xx-cl-som-am57x.dts | 12 ++++++------
- arch/arm/boot/dts/am57xx-sbc-am57x.dts    |  8 ++++----
- 2 files changed, 10 insertions(+), 10 deletions(-)
-
+diff --git a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
+index 9e0153a..8d93882 100644
+--- a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
++++ b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
+@@ -559,13 +559,13 @@
+ 
+ &cpsw_emac0 {
+ 	phy_id = <&davinci_mdio>, <0>;
+-	phy-mode = "rgmii";
++	phy-mode = "rgmii-txid";
+ 	dual_emac_res_vlan = <0>;
+ };
+ 
+ &cpsw_emac1 {
+ 	phy_id = <&davinci_mdio>, <1>;
+-	phy-mode = "rgmii";
++	phy-mode = "rgmii-txid";
+ 	dual_emac_res_vlan = <1>;
+ };
+ 
 -- 
 1.9.1
