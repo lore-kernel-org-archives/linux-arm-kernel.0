@@ -1,50 +1,29 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 30 Dec 2015 21:05:09 +0100
-Subject: [PATCH] ARM: realview: set up cache correctly on the PB11MPCore
-Message-ID: <1451505909-3820-1-git-send-email-linus.walleij@linaro.org>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Wed, 30 Dec 2015 13:03:58 -0800
+Subject: [PATCH v4 03/24] clk: pwm: use pwm_get_xxx() helpers where
+ appropriate
+In-Reply-To: <1447664207-24370-4-git-send-email-boris.brezillon@free-electrons.com>
+References: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1447664207-24370-4-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20151230210358.19557.32933@quark.deferred.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The L2 cache comes up in a "safe mode" on the PB11MPCore, as
-it has several issues. This sets it up properly with the right
-size and associativity, also requiring the outer sync to be
-disabled for the machine to boot properly.
+Hi Boris,
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ARM SoC folks: Russell has merged the outer cache sync disable
-patch so it would be nice if you'd merge this directly on top
-of the branch holding the PB11MPCore device tree, so that the
-cache is feature complete for v4.5.
----
- arch/arm/boot/dts/arm-realview-pb11mp.dts | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+Quoting Boris Brezillon (2015-11-16 00:56:26)
+> diff --git a/drivers/clk/clk-pwm.c b/drivers/clk/clk-pwm.c
+> index 328fcfc..b6306a2 100644
+> --- a/drivers/clk/clk-pwm.c
+> +++ b/drivers/clk/clk-pwm.c
+> @@ -71,22 +71,23 @@ static int clk_pwm_probe(struct platform_device *pdev)
+>         if (IS_ERR(pwm))
+>                 return PTR_ERR(pwm);
+>  
+> -       if (!pwm->period) {
+> +       if (!pwm_get_period((pwm))) {
 
-diff --git a/arch/arm/boot/dts/arm-realview-pb11mp.dts b/arch/arm/boot/dts/arm-realview-pb11mp.dts
-index 28bd5aea285f..3d9b1b0f4ffc 100644
---- a/arch/arm/boot/dts/arm-realview-pb11mp.dts
-+++ b/arch/arm/boot/dts/arm-realview-pb11mp.dts
-@@ -99,6 +99,19 @@
- 			     <0 31 IRQ_TYPE_LEVEL_HIGH>;
- 		cache-unified;
- 		cache-level = <2>;
-+		/*
-+		 * Override default cache size, sets and
-+		 * associativity as these may be erroneously set
-+		 * up by boot loader(s), probably for safety
-+		 * since th outer sync operation can cause the
-+		 * cache to hang unless disabled.
-+		 */
-+		cache-size = <1048576>; // 1MB
-+		cache-sets = <4096>;
-+		cache-line-size = <32>;
-+		arm,shared-override;
-+		arm,parity-enable;
-+		arm,outer-sync-disable;
- 	};
- 
- 	scu at 1f000000 {
--- 
-2.4.3
+The change itself looks fine, but the semantic patch added extra parens.
+Can you remove them? After doing so feel free to add:
+
+Acked-by: Michael Turquette <mturquette@baylibre.com>
