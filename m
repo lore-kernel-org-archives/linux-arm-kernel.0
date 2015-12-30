@@ -1,39 +1,29 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Wed, 30 Dec 2015 13:05:11 -0800
-Subject: [PATCH v4 14/24] clk: pwm: use pwm_get/set_default_xxx() helpers
- where appropriate
-In-Reply-To: <1447664207-24370-15-git-send-email-boris.brezillon@free-electrons.com>
-References: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
- <1447664207-24370-15-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20151230210511.19557.73321@quark.deferred.io>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 30 Dec 2015 23:36:27 +0100
+Subject: [PATCH v6 13/20] arm64: ilp32: share aarch32 syscall wrappers to
+ ilp32
+In-Reply-To: <20151230172905.GA8296@yury-N73SV>
+References: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
+ <201512232141.54384.arnd@arndb.de> <20151230172905.GA8296@yury-N73SV>
+Message-ID: <1875383.FRuM9m49WW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
-
-Quoting Boris Brezillon (2015-11-16 00:56:37)
-> pwm_set/get_default_xxx() helpers have been introduced to differentiate
-> the default PWM states (those retrieved through DT, PWM lookup table or
-> statically assigned by the driver) and the current ones.
-> Make use of those helpers where appropriate.
+On Wednesday 30 December 2015 20:29:05 Yury Norov wrote:
 > 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
->  drivers/clk/clk-pwm.c | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
+> So. For ilp32, the only wrapper left here, is compat_sys_mmap2_wrapper.
+> But this is workaroud, as comment tells:
+>         Note: off_4k (w5) is always in units of 4K. If we can't do the
+>         requested offset because it is not page-aligned, we return -EINVAL.
 > 
-> diff --git a/drivers/clk/clk-pwm.c b/drivers/clk/clk-pwm.c
-> index b6306a2..642a49a 100644
-> --- a/drivers/clk/clk-pwm.c
-> +++ b/drivers/clk/clk-pwm.c
-> @@ -71,23 +71,23 @@ static int clk_pwm_probe(struct platform_device *pdev)
->         if (IS_ERR(pwm))
->                 return PTR_ERR(pwm);
->  
-> -       if (!pwm_get_period((pwm))) {
-> +       if (!pwm_get_default_period((pwm))) {
+> Not sure we should pull it to ILP32. If so, we can call sys_mmap_pgoff()
+> directly. And we don't need this patch at all therefore. Any throughts?
+> 
+> 
 
-The change itself looks fine, but the semantic patch added extra parens.
-Can you remove them? After doing so feel free to add:
+I think providing the 64-bit version of sys_mmap() would be the simplest
+API, as that avoids any possible confusion about the shift amount (hardcoded
+12 bits vs PAGE_BITS). It fits in with the other syscalls that pass an loff_t
+value here.
 
-Acked-by: Michael Turquette <mturquette@baylibre.com>
+	Arnd
