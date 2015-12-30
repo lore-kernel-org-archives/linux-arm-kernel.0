@@ -1,103 +1,40 @@
 From: jamesjj.liao@mediatek.com (James Liao)
-Date: Wed, 30 Dec 2015 14:27:44 +0800
-Subject: [PATCH 4/5] reset: mediatek: mt2701 reset controller dt-binding file
-In-Reply-To: <1451456865-44139-1-git-send-email-jamesjj.liao@mediatek.com>
-References: <1451456865-44139-1-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <1451456865-44139-5-git-send-email-jamesjj.liao@mediatek.com>
+Date: Wed, 30 Dec 2015 14:27:40 +0800
+Subject: [PATCH 0/5] Add clock support for Mediatek MT2701 
+Message-ID: <1451456865-44139-1-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shunli Wang <shunli.wang@mediatek.com>
+This patchset is based on 4.4-rc7, add clock and reset controller support
+for Mediatek MT2701.
 
-Dt-binding file about reset controller is used to provide
-kinds of definition, which is referenced by dts file and
-IC-specified reset controller driver code.
+This patchset also refined makefile and Kconfig to support configurable
+multiple SoC clock support.
 
-Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
----
- .../dt-bindings/reset-controller/mt2701-resets.h   | 74 ++++++++++++++++++++++
- 1 file changed, 74 insertions(+)
+James Liao (1):
+  clk: mediatek: Refine the makefile to support multiple clock drivers
+
+Shunli Wang (4):
+  clk: mediatek: Add dt-bindings for MT2701 clocks
+  clk: mediatek: Add MT2701 clock support
+  reset: mediatek: mt2701 reset controller dt-binding file
+  reset: mediatek: mt2701 reset driver
+
+ drivers/clk/Kconfig                                |    1 +
+ drivers/clk/mediatek/Kconfig                       |   31 +
+ drivers/clk/mediatek/Makefile                      |    7 +-
+ drivers/clk/mediatek/clk-gate.c                    |   56 +
+ drivers/clk/mediatek/clk-gate.h                    |    2 +
+ drivers/clk/mediatek/clk-mt2701.c                  | 1215 ++++++++++++++++++++
+ drivers/clk/mediatek/clk-mtk.c                     |   25 +
+ drivers/clk/mediatek/clk-mtk.h                     |   35 +-
+ include/dt-bindings/clock/mt2701-clk.h             |  481 ++++++++
+ .../dt-bindings/reset-controller/mt2701-resets.h   |   74 ++
+ 10 files changed, 1921 insertions(+), 6 deletions(-)
+ create mode 100644 drivers/clk/mediatek/Kconfig
+ create mode 100644 drivers/clk/mediatek/clk-mt2701.c
+ create mode 100644 include/dt-bindings/clock/mt2701-clk.h
  create mode 100644 include/dt-bindings/reset-controller/mt2701-resets.h
 
-diff --git a/include/dt-bindings/reset-controller/mt2701-resets.h b/include/dt-bindings/reset-controller/mt2701-resets.h
-new file mode 100644
-index 0000000..00efeb0
---- /dev/null
-+++ b/include/dt-bindings/reset-controller/mt2701-resets.h
-@@ -0,0 +1,74 @@
-+/*
-+ * Copyright (c) 2015 MediaTek, Shunli Wang <shunli.wang@mediatek.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef _DT_BINDINGS_RESET_CONTROLLER_MT2701
-+#define _DT_BINDINGS_RESET_CONTROLLER_MT2701
-+
-+/* INFRACFG resets */
-+#define MT2701_INFRA_EMI_REG_RST		0
-+#define MT2701_INFRA_DRAMC0_A0_RST		1
-+#define MT2701_INFRA_FHCTL_RST			2
-+#define MT2701_INFRA_APCIRQ_EINT_RST		3
-+#define MT2701_INFRA_APXGPT_RST			4
-+#define MT2701_INFRA_SCPSYS_RST			5
-+#define MT2701_INFRA_KP_RST			6
-+#define MT2701_INFRA_PMIC_WRAP_RST		7
-+#define MT2701_INFRA_MIPI_RST			8
-+#define MT2701_INFRA_IRRX_RST			9
-+#define MT2701_INFRA_CEC_RST			10
-+#define MT2701_INFRA_EMI_RST			32
-+#define MT2701_INFRA_DRAMC0_RST			34
-+#define MT2701_INFRA_TRNG_RST			37
-+#define MT2701_INFRA_SYSIRQ_RST			38
-+
-+/*  PERICFG resets */
-+#define MT2701_PERI_UART0_SW_RST		0
-+#define MT2701_PERI_UART1_SW_RST		1
-+#define MT2701_PERI_UART2_SW_RST		2
-+#define MT2701_PERI_UART3_SW_RST		3
-+#define MT2701_PERI_GCPU_SW_RST			5
-+#define MT2701_PERI_BTIF_SW_RST			6
-+#define MT2701_PERI_PWM_SW_RST			8
-+#define MT2701_PERI_AUXADC_SW_RST		10
-+#define MT2701_PERI_DMA_SW_RST			11
-+#define MT2701_PERI_NFI_SW_RST			14
-+#define MT2701_PERI_NLI_SW_RST			15
-+#define MT2701_PERI_THERM_SW_RST		16
-+#define MT2701_PERI_MSDC2_SW_RST		17
-+#define MT2701_PERI_MSDC0_SW_RST		19
-+#define MT2701_PERI_MSDC1_SW_RST		20
-+#define MT2701_PERI_I2C0_SW_RST			22
-+#define MT2701_PERI_I2C1_SW_RST			23
-+#define MT2701_PERI_I2C2_SW_RST			24
-+#define MT2701_PERI_I2C3_SW_RST			25
-+#define MT2701_PERI_USB_SW_RST			28
-+#define MT2701_PERI_ETH_SW_RST			29
-+#define MT2701_PERI_SPI0_SW_RST			33
-+
-+/* TOPRGU resets */
-+#define MT2701_TOPRGU_INFRA_RST			0
-+#define MT2701_TOPRGU_MM_RST			1
-+#define MT2701_TOPRGU_MFG_RST			2
-+#define MT2701_TOPRGU_ETHDMA_RST		3
-+#define MT2701_TOPRGU_VDEC_RST			4
-+#define MT2701_TOPRGU_VENC_IMG_RST		5
-+#define MT2701_TOPRGU_DDRPHY_RST		6
-+#define MT2701_TOPRGU_MD_RST			7
-+#define MT2701_TOPRGU_INFRA_AO_RST		8
-+#define MT2701_TOPRGU_CONN_RST			9
-+#define MT2701_TOPRGU_APMIXED_RST		10
-+#define MT2701_TOPRGU_HIFSYS_RST		11
-+#define MT2701_TOPRGU_CONN_MCU_RST		12
-+#define MT2701_TOPRGU_BDP_DISP_RST		13
-+
-+#endif  /* _DT_BINDINGS_RESET_CONTROLLER_MT2701 */
--- 
+--
 1.9.1
