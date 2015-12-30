@@ -1,65 +1,64 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 30 Dec 2015 11:17:59 +0100
-Subject: [RESEND PATCH v1 0/4] Add support emac for the RK3036 SoC platform
-In-Reply-To: <20151229.204847.578920480799799256.davem@davemloft.net>
-References: <1451287341-16453-1-git-send-email-zhengxing@rock-chips.com>
- <20151229.155314.1522114236952280828.davem@davemloft.net>
- <3925713.yDzK1dvrIv@diego>
- <20151229.204847.578920480799799256.davem@davemloft.net>
-Message-ID: <CAMuHMdVEj6MGtUPYLmGCtMcLxKs4rLoh+if23_Bk1p=qwQM_Gg@mail.gmail.com>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Wed, 30 Dec 2015 18:18:12 +0800
+Subject: [PATCH 4/4] soc: mediatek: Add MT2701/MT7623 scpsys driver
+In-Reply-To: <CAGS+omCwxB+4VFOA1hA9Rg-ekWCVM8Y_c7woTEXnvX6FG1y9mQ@mail.gmail.com>
+References: <1451457706-14798-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1451457706-14798-5-git-send-email-jamesjj.liao@mediatek.com>
+ <CAGS+omCwxB+4VFOA1hA9Rg-ekWCVM8Y_c7woTEXnvX6FG1y9mQ@mail.gmail.com>
+Message-ID: <1451470692.22426.11.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Hi Daniel,
 
-On Wed, Dec 30, 2015 at 2:48 AM, David Miller <davem@davemloft.net> wrote:
-> From: Heiko St?bner <heiko@sntech.de>
-> Date: Tue, 29 Dec 2015 23:27:55 +0100
->> Am Dienstag, 29. Dezember 2015, 15:53:14 schrieb David Miller:
->>> You have to submit this series properly, the same problem happend twice
->>> now.
->>>
->>> When you submit a series you should:
->>>
->>> 1) Make it clear which tree you expect these changes to be applied
->>>    to.  Here it is completely ambiguous, do you want it to go into
->>>    my networking tree or some other subsystem tree?
->>>
->>> 2) You MUST keep all parties informed about all patches for a series
->>>    like this.  That means you cannot drop netdev from patch #4 as
->>>    you did both times.  Doing this aggravates the situation for
->>>    #1 even more, because if a patch is not CC:'d to netdev it does
->>>    not enter patchwork.  And if it doesn't go into patchwork, I'm
->>>    not looking at it.
->>
->> I guess that is some unfortunate result of git send-email combined with
->> get_maintainer.pl . In general I also prefer to see the whole series, but have
->> gotten such partial series from other maintainers as well in the past, so it
->> seems to be depending on preferences somewhat.
->>
->> For the series at hand, the 4th patch is the devicetree addition, which the
->> expected way is me picking it up, after you are comfortable with the code-
->> related changes.
->
-> Why would it not be appropriate for a DT file change to go into my tree
-> if it corresponds to functionality created by the rest of the patches
-> in the series?
+On Wed, 2015-12-30 at 17:01 +0800, Daniel Kurtz wrote:
+> On Wed, Dec 30, 2015 at 2:41 PM, James Liao <jamesjj.liao@mediatek.com> wrote:
+> >
+> > From: Shunli Wang <shunli.wang@mediatek.com>
+> >
+> > Add scpsys driver for MT2701 and MT7623.
+> >
+> > Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
+> > Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> > ---
+> >  drivers/soc/mediatek/Kconfig             |  11 +++
+> >  drivers/soc/mediatek/Makefile            |   1 +
+> >  drivers/soc/mediatek/mtk-scpsys-mt2701.c | 161 +++++++++++++++++++++++++++++++
+> >  3 files changed, 173 insertions(+)
+> >  create mode 100644 drivers/soc/mediatek/mtk-scpsys-mt2701.c
+> >
+> > diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
+> > index eca6fb7..92cf838 100644
+> > --- a/drivers/soc/mediatek/Kconfig
+> > +++ b/drivers/soc/mediatek/Kconfig
+> > @@ -39,3 +39,14 @@ config MTK_SCPSYS_MT8173
+> >           driver.
+> >           The System Control Processor System (SCPSYS) has several power
+> >           management related tasks in the system.
+> > +
+> > +config MTK_SCPSYS_MT2701
+> > +       bool "SCPSYS Support MediaTek MT2701 and MT7623"
+> > +       depends on ARCH_MEDIATEK || COMPILE_TEST
+> > +       select MTK_SCPSYS
+> > +       default ARCH_MEDIATEK
+> > +       help
+> > +         Say yes here to add support for the MT2701/MT7623 SCPSYS power
+> > +         domain driver.
+> > +         The System Control Processor System (SCPSYS) has several power
+> > +         management related tasks in the system.
+> 
+> I don't think we really want different drivers and Kconfig options.
+> 
+> Can we just use different compatibles to select the appropriate scp_domain_data?
 
-Because the DT change is very likely to conflict with other DT changes.
-That's why typically all DT changes go in through the platform/architecture
-maintainer.
+Yes, we can. All scpsys drivers are built-in by default, and they will
+be activate by specific compatible string.
 
-> It looks better to put it all together as a unit, via one series, with
-> a merge commit containing your "[PATCH 0/N]" description in the commit
-> message.
+But some projects don't want to build unused drivers into kernel to save
+code size. Use different Kconfig options for each SoC so that these
+projects can disable unused drivers.
 
-Gr{oetje,eeting}s,
 
-                        Geert
+Best regards,
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+James
