@@ -1,118 +1,40 @@
-From: uri.mashiach@compulab.co.il (Uri Mashiach)
-Date: Wed, 30 Dec 2015 15:35:33 +0200
-Subject: [PATCH v4 3/3] wlcore/wl12xx: spi: add wifi support to cm-t335
-In-Reply-To: <1451482533-8624-1-git-send-email-uri.mashiach@compulab.co.il>
-References: <1451482533-8624-1-git-send-email-uri.mashiach@compulab.co.il>
-Message-ID: <1451482533-8624-4-git-send-email-uri.mashiach@compulab.co.il>
+From: lifshitz@compulab.co.il (Dmitry Lifshitz)
+Date: Wed, 30 Dec 2015 15:39:02 +0200
+Subject: [PATCH 3/6] ARM: dts: am57xx: cl-som-am57x: update SPI Flash frequency
+In-Reply-To: <1451482745-1820-1-git-send-email-lifshitz@compulab.co.il>
+References: <1451482745-1820-1-git-send-email-lifshitz@compulab.co.il>
+Message-ID: <1451482745-1820-4-git-send-email-lifshitz@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Device tree modifications:
-- Pinmux for SPI0 and WiFi GPIOs.
-- SPI0 node with wlcore as a child node.
+On-board SPI flash cat act at 48Mhz SPI bus frequency.
+Update the DT frequency property.
 
-Cc: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Uri Mashiach <uri.mashiach@compulab.co.il>
+Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
 ---
-v1 -> v2: Replace interrupts and interrupt-parent with interrupts-extended.
-v2 -> v3: Move the pinctrl-0 = <&wifi_pins> to the wlcore node.
-v3 -> v4: replace interrupts-extended with interrupts and interrupt-parent. (revert v2 modification).
-          According to Rob Herring and Documentation/devicetree/bindings/interrupt-controller/interrupts.txt,
-	  interrupts-extended should only be used when a device has multiple interrupt parents.
+ arch/arm/boot/dts/am57xx-cl-som-am57x.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
- arch/arm/boot/dts/am335x-cm-t335.dts | 55 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 55 insertions(+)
-
-diff --git a/arch/arm/boot/dts/am335x-cm-t335.dts b/arch/arm/boot/dts/am335x-cm-t335.dts
-index 42e9b66..65f1099 100644
---- a/arch/arm/boot/dts/am335x-cm-t335.dts
-+++ b/arch/arm/boot/dts/am335x-cm-t335.dts
-@@ -11,6 +11,7 @@
- /dts-v1/;
- 
- #include "am33xx.dtsi"
-+#include <dt-bindings/interrupt-controller/irq.h>
- 
- / {
- 	model = "CompuLab CM-T335";
-@@ -40,6 +41,15 @@
- 		regulator-max-microvolt = <3300000>;
- 	};
- 
-+	/* Regulator for WiFi */
-+	vwlan_fixed: fixedregulator at 2 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vwlan_fixed";
-+		gpio = <&gpio0 20 GPIO_ACTIVE_HIGH>; /* gpio0_20 */
-+		enable-active-high;
-+		regulator-boot-off;
-+	};
-+
- 	backlight {
- 		compatible = "pwm-backlight";
- 		pwms = <&ecap0 0 50000 0>;
-@@ -223,6 +233,21 @@
- 		>;
- 	};
- 
-+	spi0_pins: pinmux_spi0_pins {
-+		pinctrl-single,pins = <
-+			/* spi0_sclk.spi0_sclk */
-+			AM33XX_IOPAD(0x950, PIN_INPUT | MUX_MODE0)
-+			/* spi0_d0.spi0_d0 */
-+			AM33XX_IOPAD(0x954, PIN_OUTPUT_PULLUP | MUX_MODE0)
-+			/* spi0_d1.spi0_d1 */
-+			AM33XX_IOPAD(0x958, PIN_INPUT | MUX_MODE0)
-+			/* spi0_cs0.spi0_cs0 */
-+			AM33XX_IOPAD(0x95C, PIN_OUTPUT | MUX_MODE0)
-+			/* spi0_cs1.spi0_cs1 */
-+			AM33XX_IOPAD(0x960, PIN_OUTPUT | MUX_MODE0)
-+		>;
-+	};
-+
- 	/* wl1271 bluetooth */
- 	bluetooth_pins: pinmux_bluetooth_pins {
- 		pinctrl-single,pins = <
-@@ -230,6 +255,16 @@
- 			AM33XX_IOPAD(0x9b0, PIN_OUTPUT_PULLUP | MUX_MODE7)
- 		>;
- 	};
-+
-+	/* wl1271 WiFi */
-+	wifi_pins: pinmux_wifi_pins {
-+		pinctrl-single,pins = <
-+			/* EMU1.gpio3_8 - WiFi IRQ */
-+			AM33XX_IOPAD(0x9e8, PIN_INPUT_PULLUP | MUX_MODE7)
-+			/* XDMA_EVENT_INTR1.gpio0_20 - WiFi enable */
-+			AM33XX_IOPAD(0x9b4, PIN_OUTPUT | MUX_MODE7)
-+		>;
-+	};
- };
- 
- &uart0 {
-@@ -394,3 +429,23 @@ status = "okay";
+diff --git a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
+index 513ec62..cb9a518 100644
+--- a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
++++ b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
+@@ -492,14 +492,14 @@
  	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc1_pins>;
- };
-+
-+&spi0 {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&spi0_pins>;
-+	ti,pindir-d0-out-d1-in = <1>;
-+	/* WLS1271 WiFi */
-+	wlcore: wlcore at 1 {
-+		compatible = "ti,wl1271";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&wifi_pins>;
-+		reg = <1>;
+ 	pinctrl-0 = <&qspi1_pins>;
+ 
+-	spi-max-frequency = <20000000>;
++	spi-max-frequency = <48000000>;
+ 
+ 	spi_flash: spi_flash at 0 {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		compatible = "spansion,m25p80", "jedec,spi-nor";
+ 		reg = <0>;				/* CS0 */
+-		spi-max-frequency = <20000000>;
 +		spi-max-frequency = <48000000>;
-+		clock-xtal;
-+		ref-clock-frequency = <38400000>;
-+		interrupt-parent = <&gpio3>;
-+		interrupts = <8 IRQ_TYPE_LEVEL_HIGH>;
-+		vwlan-supply = <&vwlan_fixed>;
-+	};
-+};
+ 
+ 		partition at 0 {
+ 			label = "uboot";
 -- 
-2.5.0
+1.9.1
