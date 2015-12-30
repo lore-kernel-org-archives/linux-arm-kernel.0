@@ -1,127 +1,39 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Wed, 30 Dec 2015 09:35:21 +0100
-Subject: [PATCH 4/6] regulator: lp872x: Add enable GPIO pin support
-In-Reply-To: <568323B7.7080101@ti.com>
-References: <1450868319-20513-1-git-send-email-contact@paulk.fr>
- <1450868319-20513-5-git-send-email-contact@paulk.fr>
- <20151223115632.GS16023@sirena.org.uk> <568088B4.6090207@ti.com>
- <1451342963.14631.13.camel@collins> <5681D7A8.2030101@ti.com>
- <1451387613.18148.9.camel@collins> <568323B7.7080101@ti.com>
-Message-ID: <1451464521.2531.4.camel@collins>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 30 Dec 2015 09:52:19 +0100
+Subject: [PATCH 1/4] soc: mediatek: Separate scpsys driver common code
+In-Reply-To: <1451457706-14798-2-git-send-email-jamesjj.liao@mediatek.com>
+References: <1451457706-14798-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1451457706-14798-2-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <2524123.scG8tD5NSM@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Milo,
-
-Le mercredi 30 d?cembre 2015 ? 09:22 +0900, Milo Kim a ?crit :
-> Hi Paul,
+On Wednesday 30 December 2015 14:41:43 James Liao wrote:
+> diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
+> index 0a4ea80..eca6fb7 100644
+> --- a/drivers/soc/mediatek/Kconfig
+> +++ b/drivers/soc/mediatek/Kconfig
+> @@ -22,11 +22,20 @@ config MTK_PMIC_WRAP
+>  
+>  config MTK_SCPSYS
+>         bool "MediaTek SCPSYS Support"
+> -       depends on ARCH_MEDIATEK || COMPILE_TEST
+> -       default ARM64 && ARCH_MEDIATEK
+>         select REGMAP
+>         select MTK_INFRACFG
+>         select PM_GENERIC_DOMAINS if PM
+>         help
+>           Say yes here to add support for the MediaTek SCPSYS power domain
+>           driver.
+> +
+> +config MTK_SCPSYS_MT8173
+> +       bool "MediaTek MT8173 SCPSYS Support"
+> +       depends on ARCH_MEDIATEK || COMPILE_TEST
+> +       select MTK_SCPSYS
+> +       default ARCH_MEDIATEK
 > 
-> On 29/12/15 20:13, Paul Kocialkowski wrote:
-> > Hi Milo,
-> >
-> > Le mardi 29 d?cembre 2015 ? 09:45 +0900, Milo Kim a ?crit :
-> >> Hi Paul,
-> >>
-> >> On 29/12/15 07:49, Paul Kocialkowski wrote:
-> >>> Hi Milo, thanks for the review,
-> >>>
-> >>> Le lundi 28 d?cembre 2015 ? 09:56 +0900, Milo Kim a ?crit :
-> >>>> Hi Paul,
-> >>>>
-> >>>> On 23/12/15 20:56, Mark Brown wrote:
-> >>>>> On Wed, Dec 23, 2015 at 11:58:37AM +0100, Paul Kocialkowski wrote:
-> >>>>>
-> >>>>>> +	gpio = lp->pdata->enable_gpio;
-> >>>>>> +	if (!gpio_is_valid(gpio))
-> >>>>>> +		return 0;
-> >>>>>> +
-> >>>>>> +	/* Always set enable GPIO high. */
-> >>>>>> +	ret = devm_gpio_request_one(lp->dev, gpio, GPIOF_OUT_INIT_HIGH, "LP872X EN");
-> >>>>>> +	if (ret) {
-> >>>>>> +		dev_err(lp->dev, "gpio request err: %d\n", ret);
-> >>>>>> +		return ret;
-> >>>>>> +	}
-> >>>>>
-> >>>>> This isn't really adding support for the enable GPIO as the changelog
-> >>>>> suggests, it's requesting but not managing the GPIO.  Since there is
-> >>>>> core support for manging enable GPIOs this seems especially silly,
-> >>>>> please tell the core about the GPIO and then it will work at runtime
-> >>>>> too.
-> >>>>>
-> >>>>
-> >>>> With reference to my previous mail, external GPIOs for LDO3 and BUCK2 in
-> >>>> LP8725 can be specified through regulator_config.ena_gpio. BUCK2 only
-> >>>> can be controlled by external pin when CONFIG pin is grounded.
-> >>>>
-> >>>> Please see the description at page 5 of the datasheet.
-> >>>>
-> >>>> 	http://www.ti.com/lit/ds/symlink/lp8725.pdf
-> >>>
-> >>> After reading the datasheets thoroughly, it seems to me that for the
-> >>> lp8720, the EN pin is used to enable the regulators output, which is a
-> >>> good fit for the core regulator GPIO framework, as there is no reason to
-> >>> keep it on when no regulator is in use. The serial interface is already
-> >>> available when EN=0 and regulators can be configured in that state. The
-> >>> lp8725 seems seems to behave the same when CONFIG=0 (the datasheet
-> >>> clearly states: "CONFIG=0: EN=1 turns on outputs or standby mode if
-> >>> EN=0"). On the other hand, it is indeed used as a power-on pin when
-> >>> CONFIG=1.
-> >>
-> >> I think it's different use case. LP8720/5 are designed for system PMU,
-> >> so some regulators are enabled by default after the device is on. EN pin
-> >> is used for turning on/off the chip. This pin does not control regulator
-> >> outputs directly. It's separate functional block in the silicon.
-> >
-> > Well, I really don't understand why the EN pin would turn on/off the
-> > chip. All it does it enable the regulators outputs (by entering IDLE
-> > mode), the serial block is already available in STANDBY state.
-> >
-> > If we want some regulators enabled at boot, the best thing to do seems
-> > to be to request the GPIO with the GPIOF_INIT_HIGH flag, as done in e.g.
-> > the max8952 regulator driver:
-> >
-> > 	if (pdata->reg_data->constraints.boot_on)
-> > 		config.ena_gpio_flags |= GPIOF_OUT_INIT_HIGH;
-> 
-> According to MAX8952 datasheet, output regulator is enabled/disabled 
-> using EN pin, so ena_gpio is used correctly.
-> However, LP8720/5 regulators are enabled/disabled through I2C command. 
-> Only few regulators of LP8725 can be on/off by separate external pins. 
-> (B2_EN and LDO3_EN)
-> Please note that EN pin in LP8720/5 is not the control pin for 
-> enabling/disabling regulators.
 
-Oh, I should have mentionned that I also suggest making it possible to
-use *both* an enable GPIO and registers to enable a regulator. You are
-of course right in saying that the GPIO alone is not enough, and the
-core regulator framework will currently only do GPIO or registers to
-enable not both.
+Please don't "select" a user-visible Kconfig symbol. Either hide MTK_SCPSYS
+by removing the string behind 'bool', or make this "depends on MTK_SCPSYS".
 
-In my opinion, it would be more elegant to adapt the core regulator
-framework to first enable the GPIO and then call the regulator enable
-ops callback instead of handling the GPIO in the driver.
-
-However, if that change is not welcome to the core regulator framework,
-we'll have to deal with the GPIO in the driver (and probably keep it
-enabled at all times there).
-
-Cheers,
-
--- 
-Paul Kocialkowski, Replicant developer
-
-Replicant is a fully free Android distribution running on several
-devices, a free software mobile operating system putting the emphasis on
-freedom and privacy/security.
-
-Website: https://www.replicant.us/
-Blog: https://blog.replicant.us/
-Wiki/tracker/forums: https://redmine.replicant.us/
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151230/a7a57791/attachment.sig>
+	Arnd
