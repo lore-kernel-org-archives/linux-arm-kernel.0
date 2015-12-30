@@ -1,73 +1,75 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 30 Dec 2015 18:49:31 +0100
-Subject: [PATCH 4/4] soc: mediatek: Add MT2701/MT7623 scpsys driver
-In-Reply-To: <1451470692.22426.11.camel@mtksdaap41>
-References: <1451457706-14798-1-git-send-email-jamesjj.liao@mediatek.com>
- <1451457706-14798-5-git-send-email-jamesjj.liao@mediatek.com>
- <CAGS+omCwxB+4VFOA1hA9Rg-ekWCVM8Y_c7woTEXnvX6FG1y9mQ@mail.gmail.com>
- <1451470692.22426.11.camel@mtksdaap41>
-Message-ID: <5684192B.4020806@gmail.com>
+Date: Wed, 30 Dec 2015 19:02:41 +0100
+Subject: [PATCH] soc: mediatek: PMIC wrap: Clear the vldclr if state
+ machine is stay on FSM_VLDCLR state.
+In-Reply-To: <1450770677-13557-1-git-send-email-henryc.chen@mediatek.com>
+References: <1450770677-13557-1-git-send-email-henryc.chen@mediatek.com>
+Message-ID: <56841C41.4040901@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 30/12/15 11:18, James Liao wrote:
-> Hi Daniel,
+On 22/12/15 08:51, Henry Chen wrote:
+> Sometimes PMIC is too busy to send data in time to cause pmic wrap timeout,
+> because pmic wrap is waiting for FSM_VLDCLR after finishing WACS2_CMD. It
+> just return error when issue happened, so the state machine will stay on
+> FSM_VLDCLR state when data send back later by PMIC and timeout again in next
+> time because pmic wrap waiting for FSM_IDLE state at the begining of the
+> read/write function.
 >
-> On Wed, 2015-12-30 at 17:01 +0800, Daniel Kurtz wrote:
->> On Wed, Dec 30, 2015 at 2:41 PM, James Liao <jamesjj.liao@mediatek.com> wrote:
->>>
->>> From: Shunli Wang <shunli.wang@mediatek.com>
->>>
->>> Add scpsys driver for MT2701 and MT7623.
->>>
->>> Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
->>> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
->>> ---
->>>   drivers/soc/mediatek/Kconfig             |  11 +++
->>>   drivers/soc/mediatek/Makefile            |   1 +
->>>   drivers/soc/mediatek/mtk-scpsys-mt2701.c | 161 +++++++++++++++++++++++++++++++
->>>   3 files changed, 173 insertions(+)
->>>   create mode 100644 drivers/soc/mediatek/mtk-scpsys-mt2701.c
->>>
->>> diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
->>> index eca6fb7..92cf838 100644
->>> --- a/drivers/soc/mediatek/Kconfig
->>> +++ b/drivers/soc/mediatek/Kconfig
->>> @@ -39,3 +39,14 @@ config MTK_SCPSYS_MT8173
->>>            driver.
->>>            The System Control Processor System (SCPSYS) has several power
->>>            management related tasks in the system.
->>> +
->>> +config MTK_SCPSYS_MT2701
->>> +       bool "SCPSYS Support MediaTek MT2701 and MT7623"
->>> +       depends on ARCH_MEDIATEK || COMPILE_TEST
->>> +       select MTK_SCPSYS
->>> +       default ARCH_MEDIATEK
->>> +       help
->>> +         Say yes here to add support for the MT2701/MT7623 SCPSYS power
->>> +         domain driver.
->>> +         The System Control Processor System (SCPSYS) has several power
->>> +         management related tasks in the system.
->>
->> I don't think we really want different drivers and Kconfig options.
->>
->> Can we just use different compatibles to select the appropriate scp_domain_data?
+> Clear the vldclr when timeout if state machine is stay on FSM_VLDCLR.
 >
-> Yes, we can. All scpsys drivers are built-in by default, and they will
-> be activate by specific compatible string.
+> Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
+> ---
+>   drivers/soc/mediatek/mtk-pmic-wrap.c | 16 ++++++++++++++--
+>   1 file changed, 14 insertions(+), 2 deletions(-)
 >
-> But some projects don't want to build unused drivers into kernel to save
-> code size. Use different Kconfig options for each SoC so that these
-> projects can disable unused drivers.
+> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> index 105597a..ccd5337 100644
+> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
+> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> @@ -443,10 +443,16 @@ static int pwrap_wait_for_state(struct pmic_wrapper *wrp,
+>   static int pwrap_write(struct pmic_wrapper *wrp, u32 adr, u32 wdata)
+>   {
+>   	int ret;
+> +	u32 val;
 >
+>   	ret = pwrap_wait_for_state(wrp, pwrap_is_fsm_idle);
+> -	if (ret)
+> +	if (ret) {
+> +		/* Clear vldclr bit if state is on the WACS_FSM_WFVLDCLR */
+> +		val = pwrap_readl(wrp, PWRAP_WACS2_RDATA);
+> +		if (PWRAP_GET_WACS_FSM(val) == PWRAP_WACS_FSM_WFVLDCLR)
+> +			pwrap_writel(wrp, 1, PWRAP_WACS2_VLDCLR);
+>   		return ret;
+> +	}
 
-Scpsys is a bool right now, you can disable it if you don't need it for 
-your project.
+I would prefer to have this encapsulated in a (inline) function. Maybe 
+with better description then just the one line comment.
 
-I don't think the impact of adding scp_domain_data justifies adding SoC 
-specific scpsys drivers and bloat the drivers/soc/mediatek folder.
-
-Best regards,
+Thanks,
 Matthias
+
+>
+>   	pwrap_writel(wrp, (1 << 31) | ((adr >> 1) << 16) | wdata,
+>   			PWRAP_WACS2_CMD);
+> @@ -457,10 +463,16 @@ static int pwrap_write(struct pmic_wrapper *wrp, u32 adr, u32 wdata)
+>   static int pwrap_read(struct pmic_wrapper *wrp, u32 adr, u32 *rdata)
+>   {
+>   	int ret;
+> +	u32 val;
+>
+>   	ret = pwrap_wait_for_state(wrp, pwrap_is_fsm_idle);
+> -	if (ret)
+> +	if (ret) {
+> +		/* Clear vldclr bit if state is on the WACS_FSM_WFVLDCLR */
+> +		val = pwrap_readl(wrp, PWRAP_WACS2_RDATA);
+> +		if (PWRAP_GET_WACS_FSM(val) == PWRAP_WACS_FSM_WFVLDCLR)
+> +			pwrap_writel(wrp, 1, PWRAP_WACS2_VLDCLR);
+>   		return ret;
+> +	}
+>
+>   	pwrap_writel(wrp, (adr >> 1) << 16, PWRAP_WACS2_CMD);
+>
+>
