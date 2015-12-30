@@ -1,86 +1,56 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 30 Dec 2015 17:43:05 +0100
-Subject: [PATCH] ARM: dts: rockchip: Adding LEDs handling via leds-gpio
- for the Radxa Rock2 Square
-In-Reply-To: <CABgxDoLS+WKX+5YGGgHHzsnxHRF9iMqUDo7nmBm6YXD99J5GAA@mail.gmail.com>
-References: <1451474219-1313-1-git-send-email-romain.perier@gmail.com>
- <3020768.zersTrE99c@diego>
- <CABgxDoLS+WKX+5YGGgHHzsnxHRF9iMqUDo7nmBm6YXD99J5GAA@mail.gmail.com>
-Message-ID: <1737278.m4cbh3zLlq@diego>
+From: peda@axentia.se (Peter Rosin)
+Date: Wed, 30 Dec 2015 16:51:37 +0000
+Subject: Domain faults when CONFIG_CPU_SW_DOMAIN_PAN is enabled
+References: <f7774151e4a849e682ae5a607a98140b@EMAIL.axentia.se>
+ <20151203115143.GM8644@n2100.arm.linux.org.uk>
+ <533b0f1f264e42e78b94bbff9570fb50@EMAIL.axentia.se>
+ <20151203133727.GN8644@n2100.arm.linux.org.uk>
+ <94580382ca344ae2b64f66fb778c6ff7@EMAIL.axentia.se>
+ <20151203164118.GR8644@n2100.arm.linux.org.uk>
+ <20151203172708.GT8644@n2100.arm.linux.org.uk>
+ <45b615420548463ebd1d582bc5da2eff@EMAIL.axentia.se>
+ <20151210002213.GL8644@n2100.arm.linux.org.uk>
+ <7e60a8ccde1940d68ec4780abe154cbd@EMAIL.axentia.se>
+ <20151210162054.GM8644@n2100.arm.linux.org.uk>
+Message-ID: <bc5dfe76333842f8af88862826b16571@EMAIL.axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 30. Dezember 2015, 17:07:54 schrieb Romain Perier:
-> Hi all,
-> 
-> I agree with Sjoerd, that's more useful to keep these LEDs in sync
-> with the default vendor behaviour than put their default state to off
-> and ask the user to manipulate them explicitly... in the worst case,
-> he can still change the default state from sysfs...
-> 
-> 2015-12-30 16:53 GMT+01:00 Heiko St?bner <heiko@sntech.de>:
-> >> > even a oneliner is generally preferred, compared to no commit message
-> >> > at all
-> >> > ;-)
-> 
-> Well, lack of inspiration :P
-> No, just kidding, I agree.
-> 
-> >> > > Signed-off-by: Romain Perier <romain.perier@gmail.com>
-> >> > > ---
-> >> > > 
-> >> > >  arch/arm/boot/dts/rk3288-rock2-square.dts | 17 +++++++++++++++++
-> >> > >  1 file changed, 17 insertions(+)
-> >> > > 
-> >> > > diff --git a/arch/arm/boot/dts/rk3288-rock2-square.dts
-> >> > > b/arch/arm/boot/dts/rk3288-rock2-square.dts index c5453a0..a33020f
-> >> > > 100644
-> >> > > --- a/arch/arm/boot/dts/rk3288-rock2-square.dts
-> >> > > +++ b/arch/arm/boot/dts/rk3288-rock2-square.dts
-> >> > > @@ -56,6 +56,23 @@
-> >> > > 
-> >> > >           pinctrl-0 = <&ir_int>;
-> >> > >   
-> >> > >   };
-> >> > > 
-> >> > > + gpio-leds {
-> >> > > +         compatible = "gpio-leds";
-> >> > > +
-> >> > > +         heartbeat {
-> >> > > +                 gpios = <&gpio7 15 GPIO_ACTIVE_LOW>;
-> >> > > +                 label = "rock2:green:heartbeat";
-> >> > > +                 linux,default-trigger = "heartbeat";
-> >> > > +         };
-> >> > > +
-> >> > > +         mmc {
-> >> > > +                 gpios = <&gpio0 11 GPIO_ACTIVE_LOW>;
-> >> > > +                 label = "rock2:blue:mmc";
-> >> > > +                 linux,default-trigger = "mmc0";
-> >> > > +         };
-> >> > 
-> >> > the rock2 core schematics seem to not list these leds at all
-> >> > (especially when
-> >> > looking at the gpio-side). But looking at the schematics my guess
-> >> > would be
-> >> > led_state1 and led_state2, so the naming should reflect that
-> >> > (rock2:green:state1 ...).
-> 
-> I used the schematic and the vendor devicetree to retrieve these
-> informations.
-> > Anybody opposed to me adding the following commit message?
+[I repeat myself just in case my last message disappeared. It would be
+ a shame if 4.4 was also regressed because of a missing response.]
+
+I wrote:
+> Russell King wrote:
+> > On Thu, Dec 10, 2015 at 03:29:37PM +0000, Peter Rosin wrote:
+> > > Russell King wrote:
+> > > > On Thu, Dec 03, 2015 at 09:37:51PM +0000, Peter Rosin wrote:
+> > > > > I took both patches for a quick spin (a dozen boots and one hour 
+> > > > > uptime after that for each patch) and no incidents. I have not 
+> > > > > gathered data, but the crash on boot feels like it's quite a bit 
+> > > > > above 50% when there is a problem so this feels good (I used 5 
+> > > > > clean reboots when I bisected and that worked).
+> > > > > 
+> > > > > Reported-by: Peter Rosin <peda@axentia.se>
+> > > > > Tested-by: Peter Rosin <peda@axentia.se>
+> > > > > 
+> > > > > (and please don't forget to cc stable)
+> > > > 
+> > > > I've decided to do a more in-depth fix, so that we also solve the 
+> > > > issue that when we schedule in these down_read()s, we don't leak 
+> > > > the permissive domain register setting into the switched-to context.
+> > > > 
+> > > > Can you test this patch please?  Thanks.
+> > > 
+> > > Still looking good.
 > > 
-> > ----
-> > Describe the two user-controllable LEDs on Rock2-square boards.
-> > The default-triggers mimic the behaviour of the vendor-kernel to
-> > keep functionalities in sync.
-> > ----
+> > Does that mean I can add your reported and tested-by to this latest patch?
 > 
-> +1
-> Please do.
-> 
-> Do you want a v2 patch ? (the label of these leds is wrong)
+> Right, I thought that was obvious, sorry for the confusion.
 
-yep, bringing everything together makes sense :-)
+Reported-by: Peter Rosin <peda@axentia.se>
+Tested-by: Peter Rosin <peda@axentia.se>
 
+(and please don't forget to cc stable)
 
-Heiko
+Cheers,
+Peter
