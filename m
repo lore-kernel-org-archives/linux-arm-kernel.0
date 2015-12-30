@@ -1,33 +1,50 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 30 Dec 2015 14:35:08 -0500
-Subject: [PATCH] arm64: defconfig: Enable PL031
-Message-ID: <1451504108-5245-1-git-send-email-cov@codeaurora.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 30 Dec 2015 21:05:09 +0100
+Subject: [PATCH] ARM: realview: set up cache correctly on the PB11MPCore
+Message-ID: <1451505909-3820-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since Real Time Clock (RTC) configuration options were first enabled in the
-arm64 defconfig (commit 2d39ad6 "arm64: defconfig: update defconfig for
-3.18"), QEMU's device tree based virt machine has grown to include a PL031
-RTC. Update the defconfig accordingly.
+The L2 cache comes up in a "safe mode" on the PB11MPCore, as
+it has several issues. This sets it up properly with the right
+size and associativity, also requiring the outer sync to be
+disabled for the machine to boot properly.
 
-Signed-off-by: Christopher Covington <cov@codeaurora.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ARM SoC folks: Russell has merged the outer cache sync disable
+patch so it would be nice if you'd merge this directly on top
+of the branch holding the PB11MPCore device tree, so that the
+cache is feature complete for v4.5.
+---
+ arch/arm/boot/dts/arm-realview-pb11mp.dts | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index bdd7aa3..9bd25e0 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -168,6 +168,7 @@ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
- CONFIG_LEDS_TRIGGER_CPU=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_EFI=y
-+CONFIG_RTC_DRV_PL031=y
- CONFIG_RTC_DRV_XGENE=y
- CONFIG_DMADEVICES=y
- CONFIG_QCOM_BAM_DMA=y
+diff --git a/arch/arm/boot/dts/arm-realview-pb11mp.dts b/arch/arm/boot/dts/arm-realview-pb11mp.dts
+index 28bd5aea285f..3d9b1b0f4ffc 100644
+--- a/arch/arm/boot/dts/arm-realview-pb11mp.dts
++++ b/arch/arm/boot/dts/arm-realview-pb11mp.dts
+@@ -99,6 +99,19 @@
+ 			     <0 31 IRQ_TYPE_LEVEL_HIGH>;
+ 		cache-unified;
+ 		cache-level = <2>;
++		/*
++		 * Override default cache size, sets and
++		 * associativity as these may be erroneously set
++		 * up by boot loader(s), probably for safety
++		 * since th outer sync operation can cause the
++		 * cache to hang unless disabled.
++		 */
++		cache-size = <1048576>; // 1MB
++		cache-sets = <4096>;
++		cache-line-size = <32>;
++		arm,shared-override;
++		arm,parity-enable;
++		arm,outer-sync-disable;
+ 	};
+ 
+ 	scu at 1f000000 {
 -- 
-Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.4.3
