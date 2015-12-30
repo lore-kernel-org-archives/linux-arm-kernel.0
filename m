@@ -1,45 +1,63 @@
-From: geliangtang@163.com (Geliang Tang)
-Date: Wed, 30 Dec 2015 22:57:36 +0800
-Subject: [PATCH 2/2] spi: zynq: use to_platform_device()
-In-Reply-To: <eba9c4fde1cf48cc56afba6275a4efdda998cbbe.1451485340.git.geliangtang@163.com>
-References: <eba9c4fde1cf48cc56afba6275a4efdda998cbbe.1451485340.git.geliangtang@163.com>
-Message-ID: <917c5adcc61a2a9e6390c0fe54445aa7c8642462.1451485340.git.geliangtang@163.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 30 Dec 2015 16:20:10 +0100
+Subject: [PATCH] ARM: dts: rockchip: Adding LEDs handling via leds-gpio
+ for the Radxa Rock2 Square
+In-Reply-To: <1451474219-1313-1-git-send-email-romain.perier@gmail.com>
+References: <1451474219-1313-1-git-send-email-romain.perier@gmail.com>
+Message-ID: <3613784.8JLtyMHEE9@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use to_platform_device() instead of open-coding it.
+Hi Romain,
 
-Signed-off-by: Geliang Tang <geliangtang@163.com>
-Reviewed-by: Moritz Fischer <moritz.fischer@ettus.com>
----
- drivers/spi/spi-zynqmp-gqspi.c | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+Am Mittwoch, 30. Dezember 2015, 12:16:59 schrieb Romain Perier:
 
-diff --git a/drivers/spi/spi-zynqmp-gqspi.c b/drivers/spi/spi-zynqmp-gqspi.c
-index f23f36e..aab9b49 100644
---- a/drivers/spi/spi-zynqmp-gqspi.c
-+++ b/drivers/spi/spi-zynqmp-gqspi.c
-@@ -917,9 +917,7 @@ static int zynqmp_qspi_start_transfer(struct spi_master *master,
-  */
- static int __maybe_unused zynqmp_qspi_suspend(struct device *dev)
- {
--	struct platform_device *pdev = container_of(dev,
--						    struct platform_device,
--						    dev);
-+	struct platform_device *pdev = to_platform_device(dev);
- 	struct spi_master *master = platform_get_drvdata(pdev);
- 
- 	spi_master_suspend(master);
-@@ -940,9 +938,7 @@ static int __maybe_unused zynqmp_qspi_suspend(struct device *dev)
-  */
- static int __maybe_unused zynqmp_qspi_resume(struct device *dev)
- {
--	struct platform_device *pdev = container_of(dev,
--						    struct platform_device,
--						    dev);
-+	struct platform_device *pdev = to_platform_device(dev);
- 	struct spi_master *master = platform_get_drvdata(pdev);
- 	struct zynqmp_qspi *xqspi = spi_master_get_devdata(master);
- 	int ret = 0;
--- 
-2.5.0
+even a oneliner is generally preferred, compared to no commit message at all 
+;-)
+
+> Signed-off-by: Romain Perier <romain.perier@gmail.com>
+> ---
+>  arch/arm/boot/dts/rk3288-rock2-square.dts | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/rk3288-rock2-square.dts
+> b/arch/arm/boot/dts/rk3288-rock2-square.dts index c5453a0..a33020f 100644
+> --- a/arch/arm/boot/dts/rk3288-rock2-square.dts
+> +++ b/arch/arm/boot/dts/rk3288-rock2-square.dts
+> @@ -56,6 +56,23 @@
+>  		pinctrl-0 = <&ir_int>;
+>  	};
+> 
+> +	gpio-leds {
+> +		compatible = "gpio-leds";
+> +
+> +		heartbeat {
+> +			gpios = <&gpio7 15 GPIO_ACTIVE_LOW>;
+> +			label = "rock2:green:heartbeat";
+> +			linux,default-trigger = "heartbeat";
+> +		};
+> +
+> +		mmc {
+> +			gpios = <&gpio0 11 GPIO_ACTIVE_LOW>;
+> +			label = "rock2:blue:mmc";
+> +			linux,default-trigger = "mmc0";
+> +		};
+
+the rock2 core schematics seem to not list these leds at all (especially when 
+looking at the gpio-side). But looking at the schematics my guess would be 
+led_state1 and led_state2, so the naming should reflect that 
+(rock2:green:state1 ...).
+
+Also I'd like to refrain from encoding user-specific configurations in the 
+devicetree - aka please do a default trigger of "off" for those generic leds.
+
+
+Thanks
+Heiko
+
+> +	};
+> +
+> +
+>  	sound {
+>  		compatible = "simple-audio-card";
+>  		simple-audio-card,name = "SPDIF";
