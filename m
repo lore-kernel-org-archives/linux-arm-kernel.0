@@ -1,219 +1,164 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Wed, 30 Dec 2015 14:41:46 +0800
-Subject: [PATCH 4/4] soc: mediatek: Add MT2701/MT7623 scpsys driver
-In-Reply-To: <1451457706-14798-1-git-send-email-jamesjj.liao@mediatek.com>
-References: <1451457706-14798-1-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <1451457706-14798-5-git-send-email-jamesjj.liao@mediatek.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 30 Dec 2015 09:30:40 +0100
+Subject: [PATCH v2] soc: mediatek: SCPSYS: use builtin_platform_driver
+Message-ID: <1451464240-5313-1-git-send-email-matthias.bgg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shunli Wang <shunli.wang@mediatek.com>
+SCPSYS can't be built as module. Use builtin_platform_driver instead.
+For this probe must not be __init and the data accessed can't be
+__initconst. Remove this macros. To make the impact as small as possible,
+fold scp_domain_data into scp_domain via a pointer.
 
-Add scpsys driver for MT2701 and MT7623.
-
-Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
-Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Reported-by: Daniel Kurtz <djkurtz@chromium.org>
+Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
 ---
- drivers/soc/mediatek/Kconfig             |  11 +++
- drivers/soc/mediatek/Makefile            |   1 +
- drivers/soc/mediatek/mtk-scpsys-mt2701.c | 161 +++++++++++++++++++++++++++++++
- 3 files changed, 173 insertions(+)
- create mode 100644 drivers/soc/mediatek/mtk-scpsys-mt2701.c
+Changes for v2:
+- set suppress_bind_attrs to true
 
-diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
-index eca6fb7..92cf838 100644
---- a/drivers/soc/mediatek/Kconfig
-+++ b/drivers/soc/mediatek/Kconfig
-@@ -39,3 +39,14 @@ config MTK_SCPSYS_MT8173
- 	  driver.
- 	  The System Control Processor System (SCPSYS) has several power
- 	  management related tasks in the system.
-+
-+config MTK_SCPSYS_MT2701
-+	bool "SCPSYS Support MediaTek MT2701 and MT7623"
-+	depends on ARCH_MEDIATEK || COMPILE_TEST
-+	select MTK_SCPSYS
-+	default ARCH_MEDIATEK
-+	help
-+	  Say yes here to add support for the MT2701/MT7623 SCPSYS power
-+	  domain driver.
-+	  The System Control Processor System (SCPSYS) has several power
-+	  management related tasks in the system.
-diff --git a/drivers/soc/mediatek/Makefile b/drivers/soc/mediatek/Makefile
-index 3b22baa..822986d 100644
---- a/drivers/soc/mediatek/Makefile
-+++ b/drivers/soc/mediatek/Makefile
-@@ -2,3 +2,4 @@ obj-$(CONFIG_MTK_INFRACFG) += mtk-infracfg.o
- obj-$(CONFIG_MTK_PMIC_WRAP) += mtk-pmic-wrap.o
- obj-$(CONFIG_MTK_SCPSYS) += mtk-scpsys.o
- obj-$(CONFIG_MTK_SCPSYS_MT8173) += mtk-scpsys-mt8173.o
-+obj-$(CONFIG_MTK_SCPSYS_MT2701) += mtk-scpsys-mt2701.o
-diff --git a/drivers/soc/mediatek/mtk-scpsys-mt2701.c b/drivers/soc/mediatek/mtk-scpsys-mt2701.c
-new file mode 100644
-index 0000000..339d5b8
---- /dev/null
-+++ b/drivers/soc/mediatek/mtk-scpsys-mt2701.c
-@@ -0,0 +1,161 @@
-+/*
-+ * Copyright (c) 2015 Mediatek, Shunli Wang <shunli.wang@mediatek.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+#include <linux/mfd/syscon.h>
-+#include <linux/module.h>
-+#include <linux/of_device.h>
-+#include <linux/pm_domain.h>
-+#include <linux/soc/mediatek/infracfg.h>
-+#include <dt-bindings/power/mt2701-power.h>
-+
-+#include "mtk-scpsys.h"
-+
-+#define SPM_VDE_PWR_CON			0x0210
-+#define SPM_MFG_PWR_CON			0x0214
-+#define SPM_ISP_PWR_CON			0x0238
-+#define SPM_DIS_PWR_CON			0x023C
-+#define SPM_CONN_PWR_CON		0x0280
-+#define SPM_BDP_PWR_CON			0x029C
-+#define SPM_ETH_PWR_CON			0x02A0
-+#define SPM_HIF_PWR_CON			0x02A4
-+#define SPM_IFR_MSC_PWR_CON		0x02A8
-+#define SPM_PWR_STATUS			0x060c
-+#define SPM_PWR_STATUS_2ND		0x0610
-+
-+#define CONN_PWR_STA_MASK		BIT(1)
-+#define DIS_PWR_STA_MASK		BIT(3)
-+#define MFG_PWR_STA_MASK		BIT(4)
-+#define ISP_PWR_STA_MASK		BIT(5)
-+#define VDE_PWR_STA_MASK		BIT(7)
-+#define BDP_PWR_STA_MASK		BIT(14)
-+#define ETH_PWR_STA_MASK		BIT(15)
-+#define HIF_PWR_STA_MASK		BIT(16)
-+#define IFR_MSC_PWR_STA_MASK		BIT(17)
-+
-+#define MT2701_TOP_AXI_PROT_EN_CONN	0x0104
-+#define MT2701_TOP_AXI_PROT_EN_DISP	0x0002
-+
+ drivers/soc/mediatek/mtk-scpsys.c | 49 +++++++++++++++++----------------------
+ 1 file changed, 21 insertions(+), 28 deletions(-)
+
+diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+index 0221387..837effe 100644
+--- a/drivers/soc/mediatek/mtk-scpsys.c
++++ b/drivers/soc/mediatek/mtk-scpsys.c
+@@ -76,7 +76,7 @@ struct scp_domain_data {
+ 	bool active_wakeup;
+ };
+ 
+-static const struct scp_domain_data scp_domain_data[] __initconst = {
 +static const struct scp_domain_data scp_domain_data[] = {
-+	[MT2701_POWER_DOMAIN_CONN] = {
-+		.name = "conn",
-+		.sta_mask = CONN_PWR_STA_MASK,
-+		.ctl_offs = SPM_CONN_PWR_CON,
-+		.bus_prot_mask = MT2701_TOP_AXI_PROT_EN_CONN,
-+		.active_wakeup = true,
-+	},
-+	[MT2701_POWER_DOMAIN_DISP] = {
-+		.name = "disp",
-+		.sta_mask = DIS_PWR_STA_MASK,
-+		.ctl_offs = SPM_DIS_PWR_CON,
-+		.sram_pdn_bits = GENMASK(11, 8),
-+		.clk_id = {CLK_MM},
-+		.bus_prot_mask = MT2701_TOP_AXI_PROT_EN_DISP,
-+		.active_wakeup = true,
-+	},
-+	[MT2701_POWER_DOMAIN_MFG] = {
-+		.name = "mfg",
-+		.sta_mask = MFG_PWR_STA_MASK,
-+		.ctl_offs = SPM_MFG_PWR_CON,
-+		.sram_pdn_bits = GENMASK(11, 8),
-+		.sram_pdn_ack_bits = GENMASK(12, 12),
-+		.active_wakeup = true,
-+	},
-+	[MT2701_POWER_DOMAIN_VDEC] = {
-+		.name = "vdec",
-+		.sta_mask = VDE_PWR_STA_MASK,
-+		.ctl_offs = SPM_VDE_PWR_CON,
-+		.sram_pdn_bits = GENMASK(11, 8),
-+		.sram_pdn_ack_bits = GENMASK(12, 12),
-+		.clk_id = {CLK_MM},
-+		.active_wakeup = true,
-+	},
-+	[MT2701_POWER_DOMAIN_ISP] = {
-+		.name = "isp",
-+		.sta_mask = ISP_PWR_STA_MASK,
-+		.ctl_offs = SPM_ISP_PWR_CON,
-+		.sram_pdn_bits = GENMASK(11, 8),
-+		.sram_pdn_ack_bits = GENMASK(13, 12),
-+		.active_wakeup = true,
-+	},
-+	[MT2701_POWER_DOMAIN_BDP] = {
-+		.name = "bdp",
-+		.sta_mask = BDP_PWR_STA_MASK,
-+		.ctl_offs = SPM_BDP_PWR_CON,
-+		.sram_pdn_bits = GENMASK(11, 8),
-+		.active_wakeup = true,
-+	},
-+	[MT2701_POWER_DOMAIN_ETH] = {
-+		.name = "eth",
-+		.sta_mask = ETH_PWR_STA_MASK,
-+		.ctl_offs = SPM_ETH_PWR_CON,
-+		.sram_pdn_bits = GENMASK(11, 8),
-+		.sram_pdn_ack_bits = GENMASK(15, 12),
-+		.active_wakeup = true,
-+	},
-+	[MT2701_POWER_DOMAIN_HIF] = {
-+		.name = "hif",
-+		.sta_mask = HIF_PWR_STA_MASK,
-+		.ctl_offs = SPM_HIF_PWR_CON,
-+		.sram_pdn_bits = GENMASK(11, 8),
-+		.sram_pdn_ack_bits = GENMASK(15, 12),
-+		.active_wakeup = true,
-+	},
-+	[MT2701_POWER_DOMAIN_IFR_MSC] = {
-+		.name = "ifr_msc",
-+		.sta_mask = IFR_MSC_PWR_STA_MASK,
-+		.ctl_offs = SPM_IFR_MSC_PWR_CON,
-+		.active_wakeup = true,
-+	},
-+};
-+
-+#define NUM_DOMAINS	ARRAY_SIZE(scp_domain_data)
-+
-+static int __init scpsys_probe(struct platform_device *pdev)
-+{
-+	struct scp *scp;
-+
-+	scp = init_scp(pdev, scp_domain_data, NUM_DOMAINS);
-+	if (IS_ERR(scp))
-+		return PTR_ERR(scp);
-+
-+	mtk_register_power_domains(pdev, scp, NUM_DOMAINS);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id of_scpsys_match_tbl[] = {
-+	{
-+		.compatible = "mediatek,mt2701-scpsys",
-+	}, {
-+		/* sentinel */
-+	}
-+};
-+MODULE_DEVICE_TABLE(of, of_scpsys_match_tbl);
-+
-+static struct platform_driver scpsys_drv = {
-+	.driver = {
-+		.name = "mtk-scpsys-mt2701",
-+		.owner = THIS_MODULE,
-+		.of_match_table = of_match_ptr(of_scpsys_match_tbl),
-+	},
+ 	[MT8173_POWER_DOMAIN_VDEC] = {
+ 		.name = "vdec",
+ 		.sta_mask = PWR_STATUS_VDEC,
+@@ -174,12 +174,7 @@ struct scp_domain {
+ 	struct generic_pm_domain genpd;
+ 	struct scp *scp;
+ 	struct clk *clk[MAX_CLKS];
+-	u32 sta_mask;
+-	void __iomem *ctl_addr;
+-	u32 sram_pdn_bits;
+-	u32 sram_pdn_ack_bits;
+-	u32 bus_prot_mask;
+-	bool active_wakeup;
++	const struct scp_domain_data *data;
+ 	struct regulator *supply;
+ };
+ 
+@@ -195,8 +190,9 @@ static int scpsys_domain_is_on(struct scp_domain *scpd)
+ {
+ 	struct scp *scp = scpd->scp;
+ 
+-	u32 status = readl(scp->base + SPM_PWR_STATUS) & scpd->sta_mask;
+-	u32 status2 = readl(scp->base + SPM_PWR_STATUS_2ND) & scpd->sta_mask;
++	u32 status = readl(scp->base + SPM_PWR_STATUS) & scpd->data->sta_mask;
++	u32 status2 = readl(scp->base + SPM_PWR_STATUS_2ND) &
++				scpd->data->sta_mask;
+ 
+ 	/*
+ 	 * A domain is on when both status bits are set. If only one is set
+@@ -217,8 +213,8 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
+ 	struct scp *scp = scpd->scp;
+ 	unsigned long timeout;
+ 	bool expired;
+-	void __iomem *ctl_addr = scpd->ctl_addr;
+-	u32 sram_pdn_ack = scpd->sram_pdn_ack_bits;
++	void __iomem *ctl_addr = scp->base + scpd->data->ctl_offs;
++	u32 sram_pdn_ack = scpd->data->sram_pdn_ack_bits;
+ 	u32 val;
+ 	int ret;
+ 	int i;
+@@ -273,7 +269,7 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
+ 	val |= PWR_RST_B_BIT;
+ 	writel(val, ctl_addr);
+ 
+-	val &= ~scpd->sram_pdn_bits;
++	val &= ~scpd->data->sram_pdn_bits;
+ 	writel(val, ctl_addr);
+ 
+ 	/* wait until SRAM_PDN_ACK all 0 */
+@@ -292,9 +288,9 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
+ 			expired = true;
+ 	}
+ 
+-	if (scpd->bus_prot_mask) {
++	if (scpd->data->bus_prot_mask) {
+ 		ret = mtk_infracfg_clear_bus_protection(scp->infracfg,
+-				scpd->bus_prot_mask);
++				scpd->data->bus_prot_mask);
+ 		if (ret)
+ 			goto err_pwr_ack;
+ 	}
+@@ -321,21 +317,21 @@ static int scpsys_power_off(struct generic_pm_domain *genpd)
+ 	struct scp *scp = scpd->scp;
+ 	unsigned long timeout;
+ 	bool expired;
+-	void __iomem *ctl_addr = scpd->ctl_addr;
+-	u32 pdn_ack = scpd->sram_pdn_ack_bits;
++	void __iomem *ctl_addr = scp->base + scpd->data->ctl_offs;
++	u32 pdn_ack = scpd->data->sram_pdn_ack_bits;
+ 	u32 val;
+ 	int ret;
+ 	int i;
+ 
+-	if (scpd->bus_prot_mask) {
++	if (scpd->data->bus_prot_mask) {
+ 		ret = mtk_infracfg_set_bus_protection(scp->infracfg,
+-				scpd->bus_prot_mask);
++				scpd->data->bus_prot_mask);
+ 		if (ret)
+ 			goto out;
+ 	}
+ 
+ 	val = readl(ctl_addr);
+-	val |= scpd->sram_pdn_bits;
++	val |= scpd->data->sram_pdn_bits;
+ 	writel(val, ctl_addr);
+ 
+ 	/* wait until SRAM_PDN_ACK all 1 */
+@@ -409,10 +405,10 @@ static bool scpsys_active_wakeup(struct device *dev)
+ 	genpd = pd_to_genpd(dev->pm_domain);
+ 	scpd = container_of(genpd, struct scp_domain, genpd);
+ 
+-	return scpd->active_wakeup;
++	return scpd->data->active_wakeup;
+ }
+ 
+-static int __init scpsys_probe(struct platform_device *pdev)
++static int scpsys_probe(struct platform_device *pdev)
+ {
+ 	struct genpd_onecell_data *pd_data;
+ 	struct resource *res;
+@@ -485,12 +481,7 @@ static int __init scpsys_probe(struct platform_device *pdev)
+ 		pd_data->domains[i] = genpd;
+ 		scpd->scp = scp;
+ 
+-		scpd->sta_mask = data->sta_mask;
+-		scpd->ctl_addr = scp->base + data->ctl_offs;
+-		scpd->sram_pdn_bits = data->sram_pdn_bits;
+-		scpd->sram_pdn_ack_bits = data->sram_pdn_ack_bits;
+-		scpd->bus_prot_mask = data->bus_prot_mask;
+-		scpd->active_wakeup = data->active_wakeup;
++		scpd->data = data;
+ 		for (j = 0; j < MAX_CLKS && data->clk_id[j]; j++)
+ 			scpd->clk[j] = clk[data->clk_id[j]];
+ 
+@@ -542,10 +533,12 @@ static const struct of_device_id of_scpsys_match_tbl[] = {
+ };
+ 
+ static struct platform_driver scpsys_drv = {
 +	.probe = scpsys_probe,
-+};
-+
-+static int __init scpsys_init(void)
-+{
-+	return platform_driver_register(&scpsys_drv);
-+}
-+
-+subsys_initcall(scpsys_init);
-+
-+MODULE_DESCRIPTION("MediaTek MT2701 scpsys driver");
-+MODULE_LICENSE("GPL v2");
+ 	.driver = {
+ 		.name = "mtk-scpsys",
++		.suppress_bind_attrs = true,
+ 		.owner = THIS_MODULE,
+ 		.of_match_table = of_match_ptr(of_scpsys_match_tbl),
+ 	},
+ };
+-builtin_platform_driver_probe(scpsys_drv, scpsys_probe);
++builtin_platform_driver(scpsys_drv);
 -- 
-1.9.1
+2.6.2
