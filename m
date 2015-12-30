@@ -1,44 +1,62 @@
-From: wpdster@gmail.com (Patrick Doyle)
-Date: Wed, 30 Dec 2015 10:00:46 -0500
-Subject: How to get better precision out of getrusage on the ARM?
-In-Reply-To: <CAF_dkJBrfd=YUnG=ja2KE_z2DM8NQTLGiWVyvW6mrPYP4i+sFA@mail.gmail.com>
-References: <CAF_dkJBjs1b+73ggvJyXwab6YL94HGT2jrqbcfaLxoETtQsD9Q@mail.gmail.com>
- <20151222144907.GK8644@n2100.arm.linux.org.uk>
- <CAF_dkJDFXSEgH+kO=k=Yj0_VDnFYgPtkoYznLUWZnq4=QTNDDg@mail.gmail.com>
- <20151222151314.GM8644@n2100.arm.linux.org.uk>
- <CAF_dkJAUyD3GRAETZUQG2yJTmOR95XKVguohBpBjUaM9JMaQyg@mail.gmail.com>
- <CAF_dkJBrfd=YUnG=ja2KE_z2DM8NQTLGiWVyvW6mrPYP4i+sFA@mail.gmail.com>
-Message-ID: <CAF_dkJBM3qbs3GB8jdgonus7dgVSyn-7QtogtqmMQWzR2BK+OQ@mail.gmail.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Wed, 30 Dec 2015 09:03:11 -0600
+Subject: [RESEND PATCH v1 0/4] Add support emac for the RK3036 SoC platform
+In-Reply-To: <CAMuHMdVEj6MGtUPYLmGCtMcLxKs4rLoh+if23_Bk1p=qwQM_Gg@mail.gmail.com>
+References: <1451287341-16453-1-git-send-email-zhengxing@rock-chips.com>
+ <20151229.155314.1522114236952280828.davem@davemloft.net>
+ <3925713.yDzK1dvrIv@diego>
+ <20151229.204847.578920480799799256.davem@davemloft.net>
+ <CAMuHMdVEj6MGtUPYLmGCtMcLxKs4rLoh+if23_Bk1p=qwQM_Gg@mail.gmail.com>
+Message-ID: <CAL_JsqKP0QsbeP-8c5XusTcFEsgNgu==ca+5Z57Wq6Yq9EHVzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Continuing on...
-I now have a CLOCKSOURCE_OF_DECLARED()'ed 10 MHz clock source running
-on my ARM processor (Atmel SAMA5D2 Xplained board).  It registers
-itself through sched_clock_register() to provide a high resolution
-sched clock.  Once I turned on "Full dynticks CPU time accounting"
-(CONFIG_VIRT_CPU_ACCOUNTING_GEN), I was able to get better than jiffy
-resolution from my calls to getrusage(RUSAGE_THREAD,..).  But things
-still aren't quite right.  I am using getrusage() to provide some
-runtime profile information to an existing application (that was
-ported to run on Linux instead of a custom RTOS).  I have code that
-looks like:
+On Wed, Dec 30, 2015 at 4:17 AM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> Hi David,
+>
+> On Wed, Dec 30, 2015 at 2:48 AM, David Miller <davem@davemloft.net> wrote:
+>> From: Heiko St?bner <heiko@sntech.de>
+>> Date: Tue, 29 Dec 2015 23:27:55 +0100
+>>> Am Dienstag, 29. Dezember 2015, 15:53:14 schrieb David Miller:
+>>>> You have to submit this series properly, the same problem happend twice
+>>>> now.
+>>>>
+>>>> When you submit a series you should:
+>>>>
+>>>> 1) Make it clear which tree you expect these changes to be applied
+>>>>    to.  Here it is completely ambiguous, do you want it to go into
+>>>>    my networking tree or some other subsystem tree?
+>>>>
+>>>> 2) You MUST keep all parties informed about all patches for a series
+>>>>    like this.  That means you cannot drop netdev from patch #4 as
+>>>>    you did both times.  Doing this aggravates the situation for
+>>>>    #1 even more, because if a patch is not CC:'d to netdev it does
+>>>>    not enter patchwork.  And if it doesn't go into patchwork, I'm
+>>>>    not looking at it.
+>>>
+>>> I guess that is some unfortunate result of git send-email combined with
+>>> get_maintainer.pl . In general I also prefer to see the whole series, but have
+>>> gotten such partial series from other maintainers as well in the past, so it
+>>> seems to be depending on preferences somewhat.
+>>>
+>>> For the series at hand, the 4th patch is the devicetree addition, which the
+>>> expected way is me picking it up, after you are comfortable with the code-
+>>> related changes.
+>>
+>> Why would it not be appropriate for a DT file change to go into my tree
+>> if it corresponds to functionality created by the rest of the patches
+>> in the series?
+>
+> Because the DT change is very likely to conflict with other DT changes.
+> That's why typically all DT changes go in through the platform/architecture
+> maintainer.
 
-tick()
-// commented out code that used to do something
-tock()
+I assume you mean DTS changes only here. Send the DTS changes as a
+separate series/patch as there is not inter-dependency (if there is,
+there is a problem with the change) with DTS changes. I expect the
+sub-arch maintainers to be the main reviewers of DTS files anyway. If
+there is a binding doc change, then I'd prefer that to be merged with
+the driver.
 
-where tick() & tock() are my profile "start" and "stop" points that
-call getrusage() to record and and accumulate time spent between calls
-to tick() & tock().  Most of the time, I get a delta of 0 between the
-two calls, which I expect.  But occasionally, I get a delta ranging
-between 800us and 1000us, which I don't understand at all.  It seems
-like my thread is being "charged" for time spent doing something else.
-Perhaps an interrupt occurred and its time got charged to my thread;
-perhaps a higher priority thread ran for 1ms, I don't know (yet).
-
-Does anybody have any suggestions as to where I might look, or as to
-what kernel CONFIG options might make the most sense for an
-application such as this?
-
---wpd
+Rob
