@@ -1,31 +1,29 @@
 From: lifshitz@compulab.co.il (Dmitry Lifshitz)
-Date: Wed, 30 Dec 2015 15:39:01 +0200
-Subject: [PATCH 2/6] ARM: dts: am57xx: cl-som-am57x: set HOST mode for USB2
-In-Reply-To: <1451482745-1820-1-git-send-email-lifshitz@compulab.co.il>
-References: <1451482745-1820-1-git-send-email-lifshitz@compulab.co.il>
-Message-ID: <1451482745-1820-3-git-send-email-lifshitz@compulab.co.il>
+Date: Wed, 30 Dec 2015 15:38:59 +0200
+Subject: [PATCH 0/6] ARM: dts: am57xx: cl-som-am57x: set of non critical DT
+ fixes
+Message-ID: <1451482745-1820-1-git-send-email-lifshitz@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Setup USB2 to act in "HOST" mode by default.
+This pacth set apply a set of non critical DT fixes for CompuLab CL-SOM-AM57x SoM
 
-Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
----
- arch/arm/boot/dts/am57xx-cl-som-am57x.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+* Improve Eth functionality
+* Pinmux fix for several devices
+* Improve SPI flash access
+* Set USB2 in HOST mode to enable connection of keyboard/mouse on eval board
 
-diff --git a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
-index c538826..513ec62 100644
---- a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
-+++ b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
-@@ -588,7 +588,7 @@
- };
- 
- &usb2 {
--	dr_mode = "peripheral";
-+	dr_mode = "host";
- };
- 
- &mcasp3 {
+Dmitry Lifshitz (6):
+  ARM: dts: am57xx: sbc-am57x: fix SB-SOM EEPROM I2C address
+  ARM: dts: am57xx: cl-som-am57x: set HOST mode for USB2
+  ARM: dts: am57xx: cl-som-am57x: update SPI Flash frequency
+  ARM: dts: am57xx: sbc-am57x: fix UART3 pinmux
+  ARM: dts: am57xx: cl-som-am57x: fix CPSW EMAC pinmux
+  ARM: dts: am57xx: sbc-am57x: correct Eth PHY settings
+
+ arch/arm/boot/dts/am57xx-cl-som-am57x.dts | 12 ++++++------
+ arch/arm/boot/dts/am57xx-sbc-am57x.dts    |  8 ++++----
+ 2 files changed, 10 insertions(+), 10 deletions(-)
+
 -- 
 1.9.1
