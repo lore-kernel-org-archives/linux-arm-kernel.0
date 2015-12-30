@@ -1,40 +1,31 @@
 From: lifshitz@compulab.co.il (Dmitry Lifshitz)
-Date: Wed, 30 Dec 2015 15:39:02 +0200
-Subject: [PATCH 3/6] ARM: dts: am57xx: cl-som-am57x: update SPI Flash frequency
+Date: Wed, 30 Dec 2015 15:39:04 +0200
+Subject: [PATCH 5/6] ARM: dts: am57xx: cl-som-am57x: fix CPSW EMAC pinmux
 In-Reply-To: <1451482745-1820-1-git-send-email-lifshitz@compulab.co.il>
 References: <1451482745-1820-1-git-send-email-lifshitz@compulab.co.il>
-Message-ID: <1451482745-1820-4-git-send-email-lifshitz@compulab.co.il>
+Message-ID: <1451482745-1820-6-git-send-email-lifshitz@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On-board SPI flash cat act at 48Mhz SPI bus frequency.
-Update the DT frequency property.
+Fix CPSW EMAC pinmux
 
 Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
 ---
- arch/arm/boot/dts/am57xx-cl-som-am57x.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/am57xx-cl-som-am57x.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
-index 513ec62..cb9a518 100644
+index cb9a518..9e0153a 100644
 --- a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
 +++ b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
-@@ -492,14 +492,14 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&qspi1_pins>;
+@@ -167,7 +167,7 @@
+ 			DRA7XX_CORE_IOPAD(0x35b8, PIN_INPUT_PULLDOWN | MUX_MODE3) /* vin2a_d20.rgmii1_rd3 */
+ 			DRA7XX_CORE_IOPAD(0x35bc, PIN_INPUT_PULLDOWN | MUX_MODE3) /* vin2a_d21.rgmii1_rd2 */
+ 			DRA7XX_CORE_IOPAD(0x35c0, PIN_INPUT_PULLDOWN | MUX_MODE3) /* vin2a_d22.rgmii1_rd1 */
+-			DRA7XX_CORE_IOPAD(0x35c4, PIN_INPUT_PULLUP | MUX_MODE3)	/* vin2a_d23.rgmii1_rd0 */
++			DRA7XX_CORE_IOPAD(0x35c4, PIN_INPUT_PULLDOWN | MUX_MODE3) /* vin2a_d23.rgmii1_rd0 */
+ 		>;
+ 	};
  
--	spi-max-frequency = <20000000>;
-+	spi-max-frequency = <48000000>;
- 
- 	spi_flash: spi_flash at 0 {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
- 		compatible = "spansion,m25p80", "jedec,spi-nor";
- 		reg = <0>;				/* CS0 */
--		spi-max-frequency = <20000000>;
-+		spi-max-frequency = <48000000>;
- 
- 		partition at 0 {
- 			label = "uboot";
 -- 
 1.9.1
