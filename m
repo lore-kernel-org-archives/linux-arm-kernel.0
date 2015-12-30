@@ -1,60 +1,45 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 30 Dec 2015 09:09:46 -0600
-Subject: [PATCH] arm64: Add DT support for Juno r2 board
-In-Reply-To: <5683BE7A.9020404@arm.com>
-References: <1450872611-15326-1-git-send-email-sudeep.holla@arm.com>
- <20151229183521.GL12450@rob-hp-laptop> <5683BE7A.9020404@arm.com>
-Message-ID: <CAL_Jsq+RZk3LnOhGtiXRFmxmA6bTOEdymtF1yN=6q=iRmUr_9Q@mail.gmail.com>
+From: geliangtang@163.com (Geliang Tang)
+Date: Wed, 30 Dec 2015 22:57:36 +0800
+Subject: [PATCH 2/2] spi: zynq: use to_platform_device()
+In-Reply-To: <eba9c4fde1cf48cc56afba6275a4efdda998cbbe.1451485340.git.geliangtang@163.com>
+References: <eba9c4fde1cf48cc56afba6275a4efdda998cbbe.1451485340.git.geliangtang@163.com>
+Message-ID: <917c5adcc61a2a9e6390c0fe54445aa7c8642462.1451485340.git.geliangtang@163.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 30, 2015 at 5:22 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> Hi Rob,
->
-> Thanks for the review.
->
-> On 29/12/15 18:35, Rob Herring wrote:
->>
->> On Wed, Dec 23, 2015 at 12:10:11PM +0000, Sudeep Holla wrote:
->>>
->>> Juno r2 is identical to Juno r1 with Cortex A57 cores replaced by
->>> Cortex A72 cores.
->>
->>
->> That's a bigger change than I'd expect...
->>
->
-> I am not sure if I understood what you meant by that. Do you want me to
-> elaborate with more details ?
+Use to_platform_device() instead of open-coding it.
 
-No, just my commentary that I'd expect r1 -> r2 to be a board or Si
-spin rather than a whole new core.
+Signed-off-by: Geliang Tang <geliangtang@163.com>
+Reviewed-by: Moritz Fischer <moritz.fischer@ettus.com>
+---
+ drivers/spi/spi-zynqmp-gqspi.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
->>> Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
->>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->>> ---
->>>   Documentation/devicetree/bindings/arm/arm-boards |   1 +
->>>   Documentation/devicetree/bindings/arm/cpus.txt   |   1 +
->>
->>
->> This should probably be a separate patch, but I already have a patch in
->> my tree for 4.5 adding arm,cortex-a72. So just drop this hunk.
->>
->
-> OK, will post DT binding separately.
-
-No need, it is already in my tree.
-
->>> +       pcie-controller at 40000000 {
->>> +               compatible = "arm,juno-r1-pcie", "plda,xpressrich3-axi",
->>> "pci-host-ecam-generic";
->>
->>
->> Is this common with r1?
->>
->
-> AFAIK it is. Liviu can you confirm ?
-
-Then perhaps you should move this to a common spot.
-
-Rob
+diff --git a/drivers/spi/spi-zynqmp-gqspi.c b/drivers/spi/spi-zynqmp-gqspi.c
+index f23f36e..aab9b49 100644
+--- a/drivers/spi/spi-zynqmp-gqspi.c
++++ b/drivers/spi/spi-zynqmp-gqspi.c
+@@ -917,9 +917,7 @@ static int zynqmp_qspi_start_transfer(struct spi_master *master,
+  */
+ static int __maybe_unused zynqmp_qspi_suspend(struct device *dev)
+ {
+-	struct platform_device *pdev = container_of(dev,
+-						    struct platform_device,
+-						    dev);
++	struct platform_device *pdev = to_platform_device(dev);
+ 	struct spi_master *master = platform_get_drvdata(pdev);
+ 
+ 	spi_master_suspend(master);
+@@ -940,9 +938,7 @@ static int __maybe_unused zynqmp_qspi_suspend(struct device *dev)
+  */
+ static int __maybe_unused zynqmp_qspi_resume(struct device *dev)
+ {
+-	struct platform_device *pdev = container_of(dev,
+-						    struct platform_device,
+-						    dev);
++	struct platform_device *pdev = to_platform_device(dev);
+ 	struct spi_master *master = platform_get_drvdata(pdev);
+ 	struct zynqmp_qspi *xqspi = spi_master_get_devdata(master);
+ 	int ret = 0;
+-- 
+2.5.0
