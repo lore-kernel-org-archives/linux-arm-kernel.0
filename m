@@ -1,164 +1,127 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 30 Dec 2015 09:30:40 +0100
-Subject: [PATCH v2] soc: mediatek: SCPSYS: use builtin_platform_driver
-Message-ID: <1451464240-5313-1-git-send-email-matthias.bgg@gmail.com>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Wed, 30 Dec 2015 09:35:21 +0100
+Subject: [PATCH 4/6] regulator: lp872x: Add enable GPIO pin support
+In-Reply-To: <568323B7.7080101@ti.com>
+References: <1450868319-20513-1-git-send-email-contact@paulk.fr>
+ <1450868319-20513-5-git-send-email-contact@paulk.fr>
+ <20151223115632.GS16023@sirena.org.uk> <568088B4.6090207@ti.com>
+ <1451342963.14631.13.camel@collins> <5681D7A8.2030101@ti.com>
+ <1451387613.18148.9.camel@collins> <568323B7.7080101@ti.com>
+Message-ID: <1451464521.2531.4.camel@collins>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SCPSYS can't be built as module. Use builtin_platform_driver instead.
-For this probe must not be __init and the data accessed can't be
-__initconst. Remove this macros. To make the impact as small as possible,
-fold scp_domain_data into scp_domain via a pointer.
+Hi Milo,
 
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Reported-by: Daniel Kurtz <djkurtz@chromium.org>
-Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
----
-Changes for v2:
-- set suppress_bind_attrs to true
+Le mercredi 30 d?cembre 2015 ? 09:22 +0900, Milo Kim a ?crit :
+> Hi Paul,
+> 
+> On 29/12/15 20:13, Paul Kocialkowski wrote:
+> > Hi Milo,
+> >
+> > Le mardi 29 d?cembre 2015 ? 09:45 +0900, Milo Kim a ?crit :
+> >> Hi Paul,
+> >>
+> >> On 29/12/15 07:49, Paul Kocialkowski wrote:
+> >>> Hi Milo, thanks for the review,
+> >>>
+> >>> Le lundi 28 d?cembre 2015 ? 09:56 +0900, Milo Kim a ?crit :
+> >>>> Hi Paul,
+> >>>>
+> >>>> On 23/12/15 20:56, Mark Brown wrote:
+> >>>>> On Wed, Dec 23, 2015 at 11:58:37AM +0100, Paul Kocialkowski wrote:
+> >>>>>
+> >>>>>> +	gpio = lp->pdata->enable_gpio;
+> >>>>>> +	if (!gpio_is_valid(gpio))
+> >>>>>> +		return 0;
+> >>>>>> +
+> >>>>>> +	/* Always set enable GPIO high. */
+> >>>>>> +	ret = devm_gpio_request_one(lp->dev, gpio, GPIOF_OUT_INIT_HIGH, "LP872X EN");
+> >>>>>> +	if (ret) {
+> >>>>>> +		dev_err(lp->dev, "gpio request err: %d\n", ret);
+> >>>>>> +		return ret;
+> >>>>>> +	}
+> >>>>>
+> >>>>> This isn't really adding support for the enable GPIO as the changelog
+> >>>>> suggests, it's requesting but not managing the GPIO.  Since there is
+> >>>>> core support for manging enable GPIOs this seems especially silly,
+> >>>>> please tell the core about the GPIO and then it will work at runtime
+> >>>>> too.
+> >>>>>
+> >>>>
+> >>>> With reference to my previous mail, external GPIOs for LDO3 and BUCK2 in
+> >>>> LP8725 can be specified through regulator_config.ena_gpio. BUCK2 only
+> >>>> can be controlled by external pin when CONFIG pin is grounded.
+> >>>>
+> >>>> Please see the description at page 5 of the datasheet.
+> >>>>
+> >>>> 	http://www.ti.com/lit/ds/symlink/lp8725.pdf
+> >>>
+> >>> After reading the datasheets thoroughly, it seems to me that for the
+> >>> lp8720, the EN pin is used to enable the regulators output, which is a
+> >>> good fit for the core regulator GPIO framework, as there is no reason to
+> >>> keep it on when no regulator is in use. The serial interface is already
+> >>> available when EN=0 and regulators can be configured in that state. The
+> >>> lp8725 seems seems to behave the same when CONFIG=0 (the datasheet
+> >>> clearly states: "CONFIG=0: EN=1 turns on outputs or standby mode if
+> >>> EN=0"). On the other hand, it is indeed used as a power-on pin when
+> >>> CONFIG=1.
+> >>
+> >> I think it's different use case. LP8720/5 are designed for system PMU,
+> >> so some regulators are enabled by default after the device is on. EN pin
+> >> is used for turning on/off the chip. This pin does not control regulator
+> >> outputs directly. It's separate functional block in the silicon.
+> >
+> > Well, I really don't understand why the EN pin would turn on/off the
+> > chip. All it does it enable the regulators outputs (by entering IDLE
+> > mode), the serial block is already available in STANDBY state.
+> >
+> > If we want some regulators enabled at boot, the best thing to do seems
+> > to be to request the GPIO with the GPIOF_INIT_HIGH flag, as done in e.g.
+> > the max8952 regulator driver:
+> >
+> > 	if (pdata->reg_data->constraints.boot_on)
+> > 		config.ena_gpio_flags |= GPIOF_OUT_INIT_HIGH;
+> 
+> According to MAX8952 datasheet, output regulator is enabled/disabled 
+> using EN pin, so ena_gpio is used correctly.
+> However, LP8720/5 regulators are enabled/disabled through I2C command. 
+> Only few regulators of LP8725 can be on/off by separate external pins. 
+> (B2_EN and LDO3_EN)
+> Please note that EN pin in LP8720/5 is not the control pin for 
+> enabling/disabling regulators.
 
- drivers/soc/mediatek/mtk-scpsys.c | 49 +++++++++++++++++----------------------
- 1 file changed, 21 insertions(+), 28 deletions(-)
+Oh, I should have mentionned that I also suggest making it possible to
+use *both* an enable GPIO and registers to enable a regulator. You are
+of course right in saying that the GPIO alone is not enough, and the
+core regulator framework will currently only do GPIO or registers to
+enable not both.
 
-diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-index 0221387..837effe 100644
---- a/drivers/soc/mediatek/mtk-scpsys.c
-+++ b/drivers/soc/mediatek/mtk-scpsys.c
-@@ -76,7 +76,7 @@ struct scp_domain_data {
- 	bool active_wakeup;
- };
- 
--static const struct scp_domain_data scp_domain_data[] __initconst = {
-+static const struct scp_domain_data scp_domain_data[] = {
- 	[MT8173_POWER_DOMAIN_VDEC] = {
- 		.name = "vdec",
- 		.sta_mask = PWR_STATUS_VDEC,
-@@ -174,12 +174,7 @@ struct scp_domain {
- 	struct generic_pm_domain genpd;
- 	struct scp *scp;
- 	struct clk *clk[MAX_CLKS];
--	u32 sta_mask;
--	void __iomem *ctl_addr;
--	u32 sram_pdn_bits;
--	u32 sram_pdn_ack_bits;
--	u32 bus_prot_mask;
--	bool active_wakeup;
-+	const struct scp_domain_data *data;
- 	struct regulator *supply;
- };
- 
-@@ -195,8 +190,9 @@ static int scpsys_domain_is_on(struct scp_domain *scpd)
- {
- 	struct scp *scp = scpd->scp;
- 
--	u32 status = readl(scp->base + SPM_PWR_STATUS) & scpd->sta_mask;
--	u32 status2 = readl(scp->base + SPM_PWR_STATUS_2ND) & scpd->sta_mask;
-+	u32 status = readl(scp->base + SPM_PWR_STATUS) & scpd->data->sta_mask;
-+	u32 status2 = readl(scp->base + SPM_PWR_STATUS_2ND) &
-+				scpd->data->sta_mask;
- 
- 	/*
- 	 * A domain is on when both status bits are set. If only one is set
-@@ -217,8 +213,8 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
- 	struct scp *scp = scpd->scp;
- 	unsigned long timeout;
- 	bool expired;
--	void __iomem *ctl_addr = scpd->ctl_addr;
--	u32 sram_pdn_ack = scpd->sram_pdn_ack_bits;
-+	void __iomem *ctl_addr = scp->base + scpd->data->ctl_offs;
-+	u32 sram_pdn_ack = scpd->data->sram_pdn_ack_bits;
- 	u32 val;
- 	int ret;
- 	int i;
-@@ -273,7 +269,7 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
- 	val |= PWR_RST_B_BIT;
- 	writel(val, ctl_addr);
- 
--	val &= ~scpd->sram_pdn_bits;
-+	val &= ~scpd->data->sram_pdn_bits;
- 	writel(val, ctl_addr);
- 
- 	/* wait until SRAM_PDN_ACK all 0 */
-@@ -292,9 +288,9 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
- 			expired = true;
- 	}
- 
--	if (scpd->bus_prot_mask) {
-+	if (scpd->data->bus_prot_mask) {
- 		ret = mtk_infracfg_clear_bus_protection(scp->infracfg,
--				scpd->bus_prot_mask);
-+				scpd->data->bus_prot_mask);
- 		if (ret)
- 			goto err_pwr_ack;
- 	}
-@@ -321,21 +317,21 @@ static int scpsys_power_off(struct generic_pm_domain *genpd)
- 	struct scp *scp = scpd->scp;
- 	unsigned long timeout;
- 	bool expired;
--	void __iomem *ctl_addr = scpd->ctl_addr;
--	u32 pdn_ack = scpd->sram_pdn_ack_bits;
-+	void __iomem *ctl_addr = scp->base + scpd->data->ctl_offs;
-+	u32 pdn_ack = scpd->data->sram_pdn_ack_bits;
- 	u32 val;
- 	int ret;
- 	int i;
- 
--	if (scpd->bus_prot_mask) {
-+	if (scpd->data->bus_prot_mask) {
- 		ret = mtk_infracfg_set_bus_protection(scp->infracfg,
--				scpd->bus_prot_mask);
-+				scpd->data->bus_prot_mask);
- 		if (ret)
- 			goto out;
- 	}
- 
- 	val = readl(ctl_addr);
--	val |= scpd->sram_pdn_bits;
-+	val |= scpd->data->sram_pdn_bits;
- 	writel(val, ctl_addr);
- 
- 	/* wait until SRAM_PDN_ACK all 1 */
-@@ -409,10 +405,10 @@ static bool scpsys_active_wakeup(struct device *dev)
- 	genpd = pd_to_genpd(dev->pm_domain);
- 	scpd = container_of(genpd, struct scp_domain, genpd);
- 
--	return scpd->active_wakeup;
-+	return scpd->data->active_wakeup;
- }
- 
--static int __init scpsys_probe(struct platform_device *pdev)
-+static int scpsys_probe(struct platform_device *pdev)
- {
- 	struct genpd_onecell_data *pd_data;
- 	struct resource *res;
-@@ -485,12 +481,7 @@ static int __init scpsys_probe(struct platform_device *pdev)
- 		pd_data->domains[i] = genpd;
- 		scpd->scp = scp;
- 
--		scpd->sta_mask = data->sta_mask;
--		scpd->ctl_addr = scp->base + data->ctl_offs;
--		scpd->sram_pdn_bits = data->sram_pdn_bits;
--		scpd->sram_pdn_ack_bits = data->sram_pdn_ack_bits;
--		scpd->bus_prot_mask = data->bus_prot_mask;
--		scpd->active_wakeup = data->active_wakeup;
-+		scpd->data = data;
- 		for (j = 0; j < MAX_CLKS && data->clk_id[j]; j++)
- 			scpd->clk[j] = clk[data->clk_id[j]];
- 
-@@ -542,10 +533,12 @@ static const struct of_device_id of_scpsys_match_tbl[] = {
- };
- 
- static struct platform_driver scpsys_drv = {
-+	.probe = scpsys_probe,
- 	.driver = {
- 		.name = "mtk-scpsys",
-+		.suppress_bind_attrs = true,
- 		.owner = THIS_MODULE,
- 		.of_match_table = of_match_ptr(of_scpsys_match_tbl),
- 	},
- };
--builtin_platform_driver_probe(scpsys_drv, scpsys_probe);
-+builtin_platform_driver(scpsys_drv);
+In my opinion, it would be more elegant to adapt the core regulator
+framework to first enable the GPIO and then call the regulator enable
+ops callback instead of handling the GPIO in the driver.
+
+However, if that change is not welcome to the core regulator framework,
+we'll have to deal with the GPIO in the driver (and probably keep it
+enabled at all times there).
+
+Cheers,
+
 -- 
-2.6.2
+Paul Kocialkowski, Replicant developer
+
+Replicant is a fully free Android distribution running on several
+devices, a free software mobile operating system putting the emphasis on
+freedom and privacy/security.
+
+Website: https://www.replicant.us/
+Blog: https://blog.replicant.us/
+Wiki/tracker/forums: https://redmine.replicant.us/
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151230/a7a57791/attachment.sig>
