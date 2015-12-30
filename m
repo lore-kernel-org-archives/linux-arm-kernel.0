@@ -1,79 +1,53 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 30 Dec 2015 15:34:09 +0000
-Subject: [PATCH] arm64: Add DT support for Juno r2 board
-In-Reply-To: <CAL_Jsq+RZk3LnOhGtiXRFmxmA6bTOEdymtF1yN=6q=iRmUr_9Q@mail.gmail.com>
-References: <1450872611-15326-1-git-send-email-sudeep.holla@arm.com>
- <20151229183521.GL12450@rob-hp-laptop> <5683BE7A.9020404@arm.com>
- <CAL_Jsq+RZk3LnOhGtiXRFmxmA6bTOEdymtF1yN=6q=iRmUr_9Q@mail.gmail.com>
-Message-ID: <5683F971.9000300@arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 30 Dec 2015 16:36:22 +0100
+Subject: [GIT PULL 2/5] memory: tegra: Changes for v4.5-rc1
+In-Reply-To: <20151222195318.GG30172@localhost>
+References: <1450356639-7758-1-git-send-email-thierry.reding@gmail.com>
+ <1450356639-7758-2-git-send-email-thierry.reding@gmail.com>
+ <20151222195318.GG30172@localhost>
+Message-ID: <20151230153622.GA7085@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Dec 22, 2015 at 11:53:18AM -0800, Olof Johansson wrote:
+> On Thu, Dec 17, 2015 at 01:50:36PM +0100, Thierry Reding wrote:
+> > Hi ARM SoC maintainers,
+> > 
+> > The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+> > 
+> >   Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.5-memory
+> > 
+> > for you to fetch changes up to e2127ae7a5e80eb53ad431c39145767391da40cd:
+> > 
+> >   memory/tegra: Add number of TLB lines for Tegra124 (2015-12-14 16:11:35 +0100)
+> > 
+> > Thanks,
+> > Thierry
+> > 
+> > ----------------------------------------------------------------
+> > memory: tegra: Changes for v4.5-rc1
+> > 
+> > This is a single fix to improve performance of the SMMU on Tegra124.
+> 
+> Merged, thanks.
+> 
+> 
+> Btw, it's a little confusing when there's [GIT PULL x/5] and we only
+> see 2-5. I wasn't sure if 1/5 had gotten lost, so I had to go search for
+> it. Seems like it was destined for the clk tree. It'd be nice if those
+> were sent outside of the series to avoid confusion in the future.
 
+Alright, I'll make a mental note to not do this in the future.
 
-On 30/12/15 15:09, Rob Herring wrote:
-> On Wed, Dec 30, 2015 at 5:22 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> Hi Rob,
->>
->> Thanks for the review.
->>
->> On 29/12/15 18:35, Rob Herring wrote:
->>>
->>> On Wed, Dec 23, 2015 at 12:10:11PM +0000, Sudeep Holla wrote:
->>>>
->>>> Juno r2 is identical to Juno r1 with Cortex A57 cores replaced by
->>>> Cortex A72 cores.
->>>
->>>
->>> That's a bigger change than I'd expect...
->>>
->>
->> I am not sure if I understood what you meant by that. Do you want me to
->> elaborate with more details ?
->
-> No, just my commentary that I'd expect r1 -> r2 to be a board or Si
-> spin rather than a whole new core.
->
-
-Ah OK, yes it's new Si and has other minor updates like latest revisions
-of Cortex-A53 and other IPs. I just mentioned only the DT visible
-changes in the commit log.
-
->>>> Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
->>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->>>> ---
->>>>    Documentation/devicetree/bindings/arm/arm-boards |   1 +
->>>>    Documentation/devicetree/bindings/arm/cpus.txt   |   1 +
->>>
->>>
->>> This should probably be a separate patch, but I already have a patch in
->>> my tree for 4.5 adding arm,cortex-a72. So just drop this hunk.
->>>
->>
->> OK, will post DT binding separately.
->
-> No need, it is already in my tree.
->
-
-Sorry for not being clear earlier. I was referring the "arm,juno-r2"
-compatible addition. I assume you have no objection if it's part of the
-same patch.
-
->>>> +       pcie-controller at 40000000 {
->>>> +               compatible = "arm,juno-r1-pcie", "plda,xpressrich3-axi",
->>>> "pci-host-ecam-generic";
->>>
->>>
->>> Is this common with r1?
->>>
->>
->> AFAIK it is. Liviu can you confirm ?
->
-> Then perhaps you should move this to a common spot.
->
-
-True, will wait for Liviu's response.
-
--- 
-Regards,
-Sudeep
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151230/7e4d58a8/attachment-0001.sig>
