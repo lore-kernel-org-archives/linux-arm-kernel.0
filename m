@@ -1,277 +1,171 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 30 Dec 2015 16:26:07 +0100
-Subject: [PATCH v2 08/13] arm64: use relative references in exception tables
+Date: Wed, 30 Dec 2015 16:26:09 +0100
+Subject: [PATCH v2 10/13] arm64: avoid dynamic relocations in early boot code
 In-Reply-To: <1451489172-17420-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1451489172-17420-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1451489172-17420-9-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1451489172-17420-11-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of using absolute addresses for both the exception location and
-the fixup, use offsets relative to the exception table entry values. This
-is a prerequisite for KASLR, since absolute exception table entries are
-subject to dynamic relocation, which is incompatible with the sorting of
-the exception table that occurs at build time.
+Before implementing KASLR for arm64 by building a self-relocating PIE
+executable, we have to ensure that values we use before the relocation
+routine is executed are not subject to dynamic relocation themselves.
+This applies not only to virtual addresses, but also to values that are
+supplied by the linker at build time and relocated using R_AARCH64_ABS64
+relocations.
+
+So instead, use assemble time constants, or force the use of static
+relocations by folding the constants into the instructions.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/Kconfig                   |   1 +
- arch/arm64/include/asm/assembler.h   |   2 +-
- arch/arm64/include/asm/futex.h       |   4 +-
- arch/arm64/include/asm/uaccess.h     |  16 +--
- arch/arm64/kernel/armv8_deprecated.c |   4 +-
- arch/arm64/mm/extable.c              | 102 +++++++++++++++++++-
- scripts/sortextable.c                |   2 +-
- 7 files changed, 116 insertions(+), 15 deletions(-)
+ arch/arm64/kernel/efi-entry.S |  2 +-
+ arch/arm64/kernel/head.S      | 39 +++++++++++++-------
+ 2 files changed, 27 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 827e78f33944..54eeab140bca 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -7,6 +7,7 @@ config ARM64
- 	select ARCH_HAS_ELF_RANDOMIZE
- 	select ARCH_HAS_GCOV_PROFILE_ALL
- 	select ARCH_HAS_SG_CHAIN
-+	select ARCH_HAS_SORT_EXTABLE
- 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
- 	select ARCH_USE_CMPXCHG_LOCKREF
- 	select ARCH_SUPPORTS_ATOMIC_RMW
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 12eff928ef8b..8094d50f05bc 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -98,7 +98,7 @@
- 9999:	x;					\
- 	.section __ex_table,"a";		\
- 	.align	3;				\
--	.quad	9999b,l;			\
-+	.long	(9999b - .), (l - .);		\
- 	.previous
+diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
+index a773db92908b..f82036e02485 100644
+--- a/arch/arm64/kernel/efi-entry.S
++++ b/arch/arm64/kernel/efi-entry.S
+@@ -61,7 +61,7 @@ ENTRY(entry)
+ 	 */
+ 	mov	x20, x0		// DTB address
+ 	ldr	x0, [sp, #16]	// relocated _text address
+-	ldr	x21, =stext_offset
++	movz	x21, #:abs_g0:stext_offset
+ 	add	x21, x0, x21
  
- /*
-diff --git a/arch/arm64/include/asm/futex.h b/arch/arm64/include/asm/futex.h
-index 007a69fc4f40..35e73e255ad3 100644
---- a/arch/arm64/include/asm/futex.h
-+++ b/arch/arm64/include/asm/futex.h
-@@ -44,7 +44,7 @@
- "	.popsection\n"							\
- "	.pushsection __ex_table,\"a\"\n"				\
- "	.align	3\n"							\
--"	.quad	1b, 4b, 2b, 4b\n"					\
-+"	.long	(1b - .), (4b - .), (2b - .), (4b - .)\n"		\
- "	.popsection\n"							\
- 	ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN,		\
- 		    CONFIG_ARM64_PAN)					\
-@@ -135,7 +135,7 @@ futex_atomic_cmpxchg_inatomic(u32 *uval, u32 __user *uaddr,
- "	.popsection\n"
- "	.pushsection __ex_table,\"a\"\n"
- "	.align	3\n"
--"	.quad	1b, 4b, 2b, 4b\n"
-+"	.long	(1b - .), (4b - .), (2b - .), (4b - .)\n"
- "	.popsection\n"
- 	: "+r" (ret), "=&r" (val), "+Q" (*uaddr), "=&r" (tmp)
- 	: "r" (oldval), "r" (newval), "Ir" (-EFAULT)
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index b2ede967fe7d..064efe4b0063 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -36,11 +36,11 @@
- #define VERIFY_WRITE 1
- 
- /*
-- * The exception table consists of pairs of addresses: the first is the
-- * address of an instruction that is allowed to fault, and the second is
-- * the address at which the program should continue.  No registers are
-- * modified, so it is entirely up to the continuation code to figure out
-- * what to do.
-+ * The exception table consists of pairs of relative offsets: the first
-+ * is the relative offset to an instruction that is allowed to fault,
-+ * and the second is the relative offset at which the program should
-+ * continue. No registers are modified, so it is entirely up to the
-+ * continuation code to figure out what to do.
-  *
-  * All the routines below use bits of fixup code that are out of line
-  * with the main instruction path.  This means when everything is well,
-@@ -50,7 +50,7 @@
- 
- struct exception_table_entry
- {
--	unsigned long insn, fixup;
-+	int insn, fixup;
- };
- 
- extern int fixup_exception(struct pt_regs *regs);
-@@ -125,7 +125,7 @@ static inline void set_fs(mm_segment_t fs)
- 	"	.previous\n"						\
- 	"	.section __ex_table,\"a\"\n"				\
- 	"	.align	3\n"						\
--	"	.quad	1b, 3b\n"					\
-+	"	.long	(1b - .), (3b - .)\n"				\
- 	"	.previous"						\
- 	: "+r" (err), "=&r" (x)						\
- 	: "r" (addr), "i" (-EFAULT))
-@@ -192,7 +192,7 @@ do {									\
- 	"	.previous\n"						\
- 	"	.section __ex_table,\"a\"\n"				\
- 	"	.align	3\n"						\
--	"	.quad	1b, 3b\n"					\
-+	"	.long	(1b - .), (3b - .)\n"				\
- 	"	.previous"						\
- 	: "+r" (err)							\
- 	: "r" (x), "r" (addr), "i" (-EFAULT))
-diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
-index 937f5e58a4d3..8f21b1363387 100644
---- a/arch/arm64/kernel/armv8_deprecated.c
-+++ b/arch/arm64/kernel/armv8_deprecated.c
-@@ -299,8 +299,8 @@ static void register_insn_emulation_sysctl(struct ctl_table *table)
- 	"	.popsection"					\
- 	"	.pushsection	 __ex_table,\"a\"\n"		\
- 	"	.align		3\n"				\
--	"	.quad		0b, 4b\n"			\
--	"	.quad		1b, 4b\n"			\
-+	"	.long		(0b - .), (4b - .)\n"		\
-+	"	.long		(1b - .), (4b - .)\n"		\
- 	"	.popsection\n"					\
- 	ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN,	\
- 		CONFIG_ARM64_PAN)				\
-diff --git a/arch/arm64/mm/extable.c b/arch/arm64/mm/extable.c
-index 79444279ba8c..d803e3e5d3da 100644
---- a/arch/arm64/mm/extable.c
-+++ b/arch/arm64/mm/extable.c
-@@ -3,15 +3,115 @@
+ 	/*
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index ccbb1bd46026..1230fa93fd8c 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -78,12 +78,11 @@
+  * in the entry routines.
   */
+ 	__HEAD
+-
++_head:
+ 	/*
+ 	 * DO NOT MODIFY. Image header expected by Linux boot-loaders.
+ 	 */
+ #ifdef CONFIG_EFI
+-efi_head:
+ 	/*
+ 	 * This add instruction has no meaningful effect except that
+ 	 * its opcode forms the magic "MZ" signature required by UEFI.
+@@ -105,14 +104,14 @@ efi_head:
+ 	.byte	0x4d
+ 	.byte	0x64
+ #ifdef CONFIG_EFI
+-	.long	pe_header - efi_head		// Offset to the PE header.
++	.long	pe_header - _head		// Offset to the PE header.
+ #else
+ 	.word	0				// reserved
+ #endif
  
- #include <linux/module.h>
-+#include <linux/sort.h>
- #include <linux/uaccess.h>
+ #ifdef CONFIG_EFI
+ 	.globl	__efistub_stext_offset
+-	.set	__efistub_stext_offset, stext - efi_head
++	.set	__efistub_stext_offset, stext - _head
+ 	.align 3
+ pe_header:
+ 	.ascii	"PE"
+@@ -135,7 +134,7 @@ optional_header:
+ 	.long	_end - stext			// SizeOfCode
+ 	.long	0				// SizeOfInitializedData
+ 	.long	0				// SizeOfUninitializedData
+-	.long	__efistub_entry - efi_head	// AddressOfEntryPoint
++	.long	__efistub_entry - _head		// AddressOfEntryPoint
+ 	.long	__efistub_stext_offset		// BaseOfCode
  
-+static unsigned long ex_insn_addr(const struct exception_table_entry *x)
-+{
-+	return (unsigned long)&x->insn + x->insn;
-+}
-+
-+static unsigned long ex_fixup_addr(const struct exception_table_entry *x)
-+{
-+	return (unsigned long)&x->fixup + x->fixup;
-+}
-+
- int fixup_exception(struct pt_regs *regs)
- {
- 	const struct exception_table_entry *fixup;
+ extra_header_fields:
+@@ -150,7 +149,7 @@ extra_header_fields:
+ 	.short	0				// MinorSubsystemVersion
+ 	.long	0				// Win32VersionValue
  
- 	fixup = search_exception_tables(instruction_pointer(regs));
- 	if (fixup)
--		regs->pc = fixup->fixup;
-+		regs->pc = ex_fixup_addr(fixup);
+-	.long	_end - efi_head			// SizeOfImage
++	.long	_end - _head			// SizeOfImage
  
- 	return fixup != NULL;
- }
+ 	// Everything before the kernel image is considered part of the header
+ 	.long	__efistub_stext_offset		// SizeOfHeaders
+@@ -230,11 +229,13 @@ ENTRY(stext)
+ 	 * On return, the CPU will be ready for the MMU to be turned on and
+ 	 * the TCR will have been set.
+ 	 */
+-	ldr	x27, =__mmap_switched		// address to jump to after
++	ldr	x27, 0f				// address to jump to after
+ 						// MMU has been enabled
+ 	adr_l	lr, __enable_mmu		// return (PIC) address
+ 	b	__cpu_setup			// initialise processor
+ ENDPROC(stext)
++	.align	3
++0:	.quad	__mmap_switched - (_head - TEXT_OFFSET) + KIMAGE_VADDR
+ 
+ /*
+  * Preserve the arguments passed by the bootloader in x0 .. x3
+@@ -402,7 +403,8 @@ __create_page_tables:
+ 	mov	x0, x26				// swapper_pg_dir
+ 	ldr	x5, =KIMAGE_VADDR
+ 	create_pgd_entry x0, x5, x3, x6
+-	ldr	x6, =KERNEL_END			// __va(KERNEL_END)
++	ldr	w6, kernel_img_size
++	add	x6, x6, x5
+ 	mov	x3, x24				// phys offset
+ 	create_block_map x0, x7, x3, x5, x6
+ 
+@@ -419,6 +421,9 @@ __create_page_tables:
+ 	mov	lr, x27
+ 	ret
+ ENDPROC(__create_page_tables)
 +
-+/*
-+ * Search one exception table for an entry corresponding to the
-+ * given instruction address, and return the address of the entry,
-+ * or NULL if none is found.
-+ * We use a binary search, and thus we assume that the table is
-+ * already sorted.
-+ */
-+const struct exception_table_entry *
-+search_extable(const struct exception_table_entry *first,
-+	       const struct exception_table_entry *last,
-+	       unsigned long value)
-+{
-+	while (first <= last) {
-+		const struct exception_table_entry *mid;
-+		unsigned long addr;
++kernel_img_size:
++	.long	_end - (_head - TEXT_OFFSET)
+ 	.ltorg
+ 
+ /*
+@@ -426,6 +431,10 @@ ENDPROC(__create_page_tables)
+  */
+ 	.set	initial_sp, init_thread_union + THREAD_START_SP
+ __mmap_switched:
++	adr_l	x8, vectors			// load VBAR_EL1 with
++	msr	vbar_el1, x8			// relocated address
++	isb
 +
-+		mid = ((last - first) >> 1) + first;
-+		addr = ex_insn_addr(mid);
-+		if (addr < value)
-+			first = mid + 1;
-+		else if (addr > value)
-+			last = mid - 1;
-+		else
-+			return mid;
-+        }
-+        return NULL;
-+}
+ 	adr_l	x6, __bss_start
+ 	adr_l	x7, __bss_stop
+ 
+@@ -609,13 +618,19 @@ ENTRY(secondary_startup)
+ 	adrp	x26, swapper_pg_dir
+ 	bl	__cpu_setup			// initialise processor
+ 
+-	ldr	x21, =secondary_data
+-	ldr	x27, =__secondary_switched	// address to jump to after enabling the MMU
++	ldr	x8, =KIMAGE_VADDR
++	ldr	w9, 0f
++	sub	x27, x8, w9, sxtw		// address to jump to after enabling the MMU
+ 	b	__enable_mmu
+ ENDPROC(secondary_startup)
++0:	.long	(_text - TEXT_OFFSET) - __secondary_switched
+ 
+ ENTRY(__secondary_switched)
+-	ldr	x0, [x21]			// get secondary_data.stack
++	adr_l	x5, vectors
++	msr	vbar_el1, x5
++	isb
 +
-+static int cmp_ex(const void *a, const void *b)
-+{
-+	const struct exception_table_entry *x = a, *y = b;
-+
-+	return x->insn - y->insn;
-+}
-+
-+/*
-+ * The exception table needs to be sorted so that the binary
-+ * search that we use to find entries in it works properly.
-+ * This is used both for the kernel exception table and for
-+ * the exception tables of modules that get loaded.
-+ *
-+ */
-+void sort_extable(struct exception_table_entry *start,
-+		  struct exception_table_entry *finish)
-+{
-+	struct exception_table_entry *p;
-+	int i;
-+
-+	/* Convert all entries to being relative to the start of the section */
-+	i = 0;
-+	for (p = start; p < finish; p++) {
-+		p->insn += i;
-+		i += 4;
-+		p->fixup += i;
-+		i += 4;
-+	}
-+
-+	sort(start, finish - start, sizeof(struct exception_table_entry),
-+	     cmp_ex, NULL);
-+
-+	/* Denormalize all entries */
-+	i = 0;
-+	for (p = start; p < finish; p++) {
-+		p->insn -= i;
-+		i += 4;
-+		p->fixup -= i;
-+		i += 4;
-+	}
-+}
-+
-+#ifdef CONFIG_MODULES
-+/*
-+ * If the exception table is sorted, any referring to the module init
-+ * will be at the beginning or the end.
-+ */
-+void trim_init_extable(struct module *m)
-+{
-+	/* trim the beginning */
-+	while (m->num_exentries && within_module_init(m->extable[0].insn, m)) {
-+		m->extable++;
-+		m->num_exentries--;
-+	}
-+	/* trim the end */
-+	while (m->num_exentries &&
-+		within_module_init(m->extable[m->num_exentries-1].insn, m))
-+		m->num_exentries--;
-+}
-+#endif /* CONFIG_MODULES */
-diff --git a/scripts/sortextable.c b/scripts/sortextable.c
-index c2423d913b46..af247c70fb66 100644
---- a/scripts/sortextable.c
-+++ b/scripts/sortextable.c
-@@ -282,12 +282,12 @@ do_file(char const *const fname)
- 	case EM_386:
- 	case EM_X86_64:
- 	case EM_S390:
-+	case EM_AARCH64:
- 		custom_sort = sort_relative_table;
- 		break;
- 	case EM_ARCOMPACT:
- 	case EM_ARCV2:
- 	case EM_ARM:
--	case EM_AARCH64:
- 	case EM_MICROBLAZE:
- 	case EM_MIPS:
- 	case EM_XTENSA:
++	ldr_l	x0, secondary_data		// get secondary_data.stack
+ 	mov	sp, x0
+ 	mov	x29, #0
+ 	b	secondary_start_kernel
+@@ -638,8 +653,6 @@ __enable_mmu:
+ 	ubfx	x2, x1, #ID_AA64MMFR0_TGRAN_SHIFT, 4
+ 	cmp	x2, #ID_AA64MMFR0_TGRAN_SUPPORTED
+ 	b.ne	__no_granule_support
+-	ldr	x5, =vectors
+-	msr	vbar_el1, x5
+ 	msr	ttbr0_el1, x25			// load TTBR0
+ 	msr	ttbr1_el1, x26			// load TTBR1
+ 	isb
 -- 
 2.5.0
