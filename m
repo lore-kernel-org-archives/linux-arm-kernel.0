@@ -1,64 +1,43 @@
-From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
-Date: Thu, 31 Dec 2015 10:25:48 +0000
-Subject: [Question about DMA] Consistent memory?
-In-Reply-To: <CAK7LNASd1amcHinXzYy=8mtYbnHUY1G_v=fthpachAVSyjqPZA@mail.gmail.com>
-References: <CAK7LNASd1amcHinXzYy=8mtYbnHUY1G_v=fthpachAVSyjqPZA@mail.gmail.com>
-Message-ID: <20151231102548.3ed389fb@lxorguk.ukuu.org.uk>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 31 Dec 2015 12:14:54 +0100
+Subject: [PATCH v3 2/5] dt-bindings: mediatek: Modify pinctrl bindings for
+ mt2701
+In-Reply-To: <1451286546-5920-3-git-send-email-biao.huang@mediatek.com>
+References: <1451286546-5920-1-git-send-email-biao.huang@mediatek.com>
+ <1451286546-5920-3-git-send-email-biao.huang@mediatek.com>
+Message-ID: <56850E2E.4060101@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 31 Dec 2015 16:50:54 +0900
-> But, I think such a system is rare.
 
-Actually its quite normal for some vendors processors but not others.
 
-> At least on my SoC (ARM SoC), DMA controllers
-> for NAND, MMC, etc. are directly connected to the DRAM
-> like Fig.2.
-> 
-> So, cache operations must be explicitly done
-> by software before/after DMAs are kicked.
-> (I think this is very normal.)
+On 28/12/15 08:09, Biao Huang wrote:
+> Signed-off-by: Biao Huang <biao.huang@mediatek.com>
+> ---
+>   .../devicetree/bindings/pinctrl/pinctrl-mt65xx.txt |    9 +++++----
+>   1 file changed, 5 insertions(+), 4 deletions(-)
+>
 
-For ARM certainly.
+Reviewed-by: Mathias Brugger <matthias.bgg@gmail.com>
 
-> 
-> Fig.2
-> 
-> |------|  |------| |-----|
-> | CPU0 |  | CPU1 | | DMA |
-> |------|  |------| |-----|
->    |         |        |
->    |         |        |
-> |------|  |------|    |
-> | L1-C |  | L1-C |    |
-> |------|  |------|    |
->    |         |        |
-> |------------------|  |
-> |Snoop Control Unit|  |
-> |------------------|  |
->          |            |
-> |------------------|  |
-> |   L2-cache       |  |
-> |------------------|  |
->          |            |
-> |--------------------------|
-> |           DRAM           |
-> |--------------------------|
-> 
-> 
-> In a system like Fig.2, is the memory non-consistent?
-
-dma_alloc_coherent will always provide you with coherent memory. On a
-machine with good cache interfaces it will provide you with normal
-memory. On some systems it may be memory from a special window, in other
-cases it will fall back to providing uncached memory for this.
-
-If the platform genuinely cannot support this (even by marking those areas
-uncacheable) then it will fail the allocation.
-
-What it does mean is that you need to use non-coherent mappings when
-accessing a lot of data. On hardware without proper cache coherency it
-may be quite expensive to access coherent memory.
-
-Alan
+> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt
+> index 0480bc3..9ffb0b2 100644
+> --- a/Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt
+> +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt
+> @@ -4,10 +4,11 @@ The Mediatek's Pin controller is used to control SoC pins.
+>
+>   Required properties:
+>   - compatible: value should be one of the following.
+> -    (a) "mediatek,mt8135-pinctrl", compatible with mt8135 pinctrl.
+> -    (b) "mediatek,mt8173-pinctrl", compatible with mt8173 pinctrl.
+> -    (c) "mediatek,mt6397-pinctrl", compatible with mt6397 pinctrl.
+> -    (d) "mediatek,mt8127-pinctrl", compatible with mt8127 pinctrl.
+> +	"mediatek,mt2701-pinctrl", compatible with mt2701 pinctrl.
+> +	"mediatek,mt6397-pinctrl", compatible with mt6397 pinctrl.
+> +	"mediatek,mt8127-pinctrl", compatible with mt8127 pinctrl.
+> +	"mediatek,mt8135-pinctrl", compatible with mt8135 pinctrl.
+> +	"mediatek,mt8173-pinctrl", compatible with mt8173 pinctrl.
+>   - pins-are-numbered: Specify the subnodes are using numbered pinmux to
+>     specify pins.
+>   - gpio-controller : Marks the device node as a gpio controller.
+>
