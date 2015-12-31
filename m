@@ -1,49 +1,54 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 31 Dec 2015 17:21:07 +0100
-Subject: [GIT PULL] BCM2835/6 changes for 4.5 (I hope)
-In-Reply-To: <568499D7.8030400@gmail.com>
-References: <1451365282-10505-1-git-send-email-eric@anholt.net>
- <568499D7.8030400@gmail.com>
-Message-ID: <2793907.Tpb2ePsxfs@wuerfel>
+Date: Thu, 31 Dec 2015 17:27:34 +0100
+Subject: [PATCH] ARM: s3c64xx: fix pm-debug compilation
+In-Reply-To: <56809642.2060100@samsung.com>
+References: <5515725.ojLSny3TOX@wuerfel> <56809642.2060100@samsung.com>
+Message-ID: <2791852.KVKFoWj0aZ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 30 December 2015 18:58:31 Florian Fainelli wrote:
-> Le 28/12/2015 21:01, Eric Anholt a ?crit :
-> > Apparently this is really late in the process (sorry!  I still haven't
-> > figured out the timelines.), but I'm hoping we could merge these
-> > changes for 4.5.  This includes the Raspberry Pi 2 port, with just two
-> > minor fixes from the last submission.
+On Monday 28 December 2015 10:54:10 Krzysztof Kozlowski wrote:
+> On 18.12.2015 23:46, Arnd Bergmann wrote:
+> > I got one randconfig build that failed to compile plat-samsung/pm-debug.c
+> > on s3c64xx:
 > > 
-> > The reason I've been pushing hard to get pi2 in is:
+> > In file included from arch/arm/plat-samsung/pm-debug.c:27:0:
+> > arch/arm/mach-s3c64xx/include/mach/pm-core.h: In function 's3c_pm_debug_init_uart':
+> > arch/arm/mach-s3c64xx/include/mach/pm-core.h:25:25: error: 'S3C_VA_SYS' undeclared (first use in this function)
+> >   u32 tmp = __raw_readl(S3C_PCLK_GATE);
+> > arch/arm/mach-s3c64xx/include/mach/pm-core.h:25:25: note: each undeclared identifier is reported only once for each function it appears in
+> > arch/arm/mach-s3c64xx/include/mach/pm-core.h:39:2: error: implicit declaration of function 'udelay' [-Werror=implicit-function-declaration]
+> >   udelay(10);
 > > 
-> > 1) It's a lot of conflict resolution every version since it requires
-> > splitting the 2835 DT file.
+> > I have not investigated why this does not show up much more often, I
+> > guess the headers are usually included from elsewhere, but adding
+> > explicit #include statements is an obvious fix.
 > > 
-> > 2) People are generally using pi2 these days, so it means people are
-> > more likely to upstream 2835 driver code if we have an upstream port
-> > they can run.
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > ---
+> > I suspect this has been broken for a long time, so no rush, but please
+> > apply this to a cleanup branch.
 > > 
-> > Testing status: kbuild test robot builds passed.  Boot tested each
-> > branch head on pi1.  Boot tested the merge of all 4 branches on pi1.
-> > Boot tested the merge of all 4 branches on pi2, with and without the
-> > irqchip fixes.
 > 
-> Considering that we are fairly late for v4.5, I would prefer if Arnd,
-> Olof or Kevin could take these directly into their respective branches,
-> if this is really really too late, then I will queue these changes, and
-> the next ones you have for v4.6.
+> The dependencies for plat-samsung/SAMSUNG_PM_* symbols are little bit
+> mixed up:
+> 1. pm-common.o depends on PM_SLEEP,
+> 2. pm.o and pm-debug.o depend on PM and sometimes they use stuff from
+> pm-common.
 > 
-> Thanks and happy holidays!
-> 
+> It is possible to create a config with PM_SLEEP=n and PM=y so this is
+> confusing (pm-common won't be linked).
 
-I've merged them now into the respective branches. However, I only
-merged the usb-fixes branch for the first two (next/soc and next/drivers)
-and decided to cherry-pick the patches from the other two branches
-into next/dt and next/defconfig, to minimize the amount of backmerges
-when the changes in those branches are clearly not meant to be useful
-by themselves without at least the first branch merged in as well.
+Ok, thanks for taking a deeper look into this.
 
-Please follow up with one more patch to enable bcm2836 in multi_v7_defconfig.
+> I think this still compiles fine because of various #ifdefs but it would
+> be nice to clean it up.
+>
+> Anyway your patch looks correct:
+> 
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+I've applied both patches on top of next/multiplatform now, to avoid
+conflicts with other changes in that branch.
 
 	Arnd
