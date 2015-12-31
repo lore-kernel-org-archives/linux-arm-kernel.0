@@ -1,21 +1,26 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 31 Dec 2015 16:30:51 -0600
-Subject: [PATCH v4 5/6] mfd: dt-bindings: add device tree bindings for
- Hi3519 sysctrl
-In-Reply-To: <1451439832-13927-6-git-send-email-xuejiancheng@huawei.com>
-References: <1451439832-13927-1-git-send-email-xuejiancheng@huawei.com>
- <1451439832-13927-6-git-send-email-xuejiancheng@huawei.com>
-Message-ID: <20151231223051.GA3144@rob-hp-laptop>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 31 Dec 2015 23:33:45 +0100 (CET)
+Subject: [PATCH v2 RESEND 1/3] clocksource/vt8500: Use MIN_OSCR_DELTA
+ from PXA
+In-Reply-To: <1451584927-4051-2-git-send-email-v1ron@mail.ru>
+References: <1451584927-4051-1-git-send-email-v1ron@mail.ru>
+ <1451584927-4051-2-git-send-email-v1ron@mail.ru>
+Message-ID: <alpine.DEB.2.11.1512312331580.28591@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 30, 2015 at 09:43:51AM +0800, Jiancheng Xue wrote:
-> Add device tree bindings for Hi3519 system controller.
-> 
-> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
-> ---
->  Documentation/devicetree/bindings/mfd/hi3519.txt | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/hi3519.txt
+Roman,
 
-Acked-by: Rob Herring <robh@kernel.org>
+On Thu, 31 Dec 2015, Roman Volkov wrote:
+> Since vt8500 and PXA timers are identical, use MIN_OSCR_DELTA from PXA,
+> which is bigger than existing value. It is required to determine the
+> minimum delay which hardware can generate.
+
+Now that brings up the obvious question:
+
+If the vt8500 and PXA timers are identical why has vt8500 it's own slightly
+different implementation and does not use the PXA timer?
+
+Thanks,
+
+	tglx
