@@ -1,66 +1,36 @@
 From: leilk.liu@mediatek.com (Leilk Liu)
-Date: Thu, 31 Dec 2015 10:59:02 +0800
-Subject: [PATCH 3/4] dts: mt2701: add spi dts for mt2701
+Date: Thu, 31 Dec 2015 10:59:03 +0800
+Subject: [PATCH 4/4] Document: spi: Add bindings for mediatek MT2701 soc
+ platform
 In-Reply-To: <1451530743-8995-1-git-send-email-leilk.liu@mediatek.com>
 References: <1451530743-8995-1-git-send-email-leilk.liu@mediatek.com>
-Message-ID: <1451530743-8995-4-git-send-email-leilk.liu@mediatek.com>
+Message-ID: <1451530743-8995-5-git-send-email-leilk.liu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds dtsi node of spi for mt2701.
+This patch adds a DT binding documentation for the MT2701 soc.
 
 Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
 ---
- arch/arm/boot/dts/mt2701.dtsi |   39 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+ .../devicetree/bindings/spi/spi-mt65xx.txt         |    5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-index bd88ae9..9ccd1f0 100644
---- a/arch/arm/boot/dts/mt2701.dtsi
-+++ b/arch/arm/boot/dts/mt2701.dtsi
-@@ -194,4 +194,43 @@
- 		clocks = <&uart_clk>;
- 		status = "disabled";
- 	};
-+
-+	spi0: spi at 1100a000 {
-+		compatible = "mediatek,mt2701-spi";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0 0x1100a000 0 0x100>;
-+		interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&topckgen CLK_TOP_SYSPLL3_D2>,
-+			 <&topckgen CLK_TOP_SPI0_SEL>,
-+			 <&pericfg CLK_PERI_SPI0>;
-+		clock-names = "parent-clk", "sel-clk", "spi-clk";
-+		status = "disabled";
-+	};
-+
-+	spi1: spi at 11016000 {
-+		compatible = "mediatek,mt2701-spi";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0 0x11016000 0 0x100>;
-+		interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&topckgen CLK_TOP_SYSPLL3_D2>,
-+			 <&topckgen CLK_TOP_SPI1_SEL>,
-+			 <&pericfg CLK_PERI_SPI1>;
-+		clock-names = "parent-clk", "sel-clk", "spi-clk";
-+		status = "disabled";
-+	};
-+
-+	spi2: spi at 11017000 {
-+		compatible = "mediatek,mt2701-spi";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0 0x11017000 0 0x1000>;
-+		interrupts = <GIC_SPI 142 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&topckgen CLK_TOP_SYSPLL3_D2>,
-+			 <&topckgen CLK_TOP_SPI2_SEL>,
-+			 <&pericfg CLK_PERI_SPI2>;
-+		clock-names = "parent-clk", "sel-clk", "spi-clk";
-+		status = "disabled";
-+	};
- };
+diff --git a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+index ce363c923f..bf489e0 100644
+--- a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
++++ b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+@@ -2,9 +2,10 @@ Binding for MTK SPI controller
+ 
+ Required properties:
+ - compatible: should be one of the following.
+-    - mediatek,mt8173-spi: for mt8173 platforms
+-    - mediatek,mt8135-spi: for mt8135 platforms
++    - mediatek,mt2701-spi: for mt2701 platforms
+     - mediatek,mt6589-spi: for mt6589 platforms
++    - mediatek,mt8135-spi: for mt8135 platforms
++    - mediatek,mt8173-spi: for mt8173 platforms
+ 
+ - #address-cells: should be 1.
+ 
 -- 
 1.7.9.5
