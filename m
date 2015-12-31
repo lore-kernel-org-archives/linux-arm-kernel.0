@@ -1,99 +1,75 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 31 Dec 2015 23:57:55 +0900
-Subject: [Question about DMA] Consistent memory?
-In-Reply-To: <20151231102548.3ed389fb@lxorguk.ukuu.org.uk>
-References: <CAK7LNASd1amcHinXzYy=8mtYbnHUY1G_v=fthpachAVSyjqPZA@mail.gmail.com>
- <20151231102548.3ed389fb@lxorguk.ukuu.org.uk>
-Message-ID: <CAK7LNAS3wXfJ_syOEMoi1aEt5_maNur05figQ472_9usGQagHQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 31 Dec 2015 16:06:52 +0100
+Subject: [RFC PATCH] ARM: pxa: add defconfig covering all the boards
+In-Reply-To: <1450630483-28037-1-git-send-email-robert.jarzmik@free.fr>
+References: <1450630483-28037-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <22731126.qdCRlGzc5c@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alan, Mike,
+On Sunday 20 December 2015 17:54:43 Robert Jarzmik wrote:
+> Add a defconfig covering all known pxa board, ie. all selectable machine
+> files in arch/arm/mach-pxa/*.c.
+> 
+> This defconfig was built by doing :
+>  - aggregation of all known defconfigs by cat
+>         am200epdkit_defconfig
+>         cm_x2xx_defconfig
+>         cm_x300_defconfig
+>         colibri_pxa270_defconfig
+>         colibri_pxa300_defconfig
+>         corgi_defconfig
+>         em_x270_defconfig
+>         eseries_pxa_defconfig
+>         ezx_defconfig
+>         h5000_defconfig
+>         imote2_defconfig
+>         lpd270_defconfig
+>         lubbock_defconfig
+>         magician_defconfig
+>         mainstone_defconfig
+>         multi_v7_defconfig
+>         palmz72_defconfig
+>         pcm027_defconfig
+>         pxa168_defconfig
+>         pxa255-idp_defconfig
+>         pxa3xx_defconfig
+>         pxa910_defconfig
+>         raumfeld_defconfig
+>         spitz_defconfig
+>         trizeps4_defconfig
+>         viper_defconfig
+>         xcep_defconfig
+>         zeus_defconfig
+>  - manual make menuconfig to ensure :
+>    - all pxa implementation were selected
+>    - all drivers were transformed into modules rather than builtin
+>      => as a consequence this single kernel will rely on an initramfs
+>      => as kernel size matters on pxa, each machine can take the subset
+>         of modules required for it to work
+>  - CONFIG_PXA_SHARPSL was disabled
+>    This breaks the boot very early on any non Sharp platform, see
+>    head-sharpsl.S
+> 
+> This defconfig was tested as booting up to the login phase on :
+>  - lubbock (pxa25x)
+>  - mainstone (pxa27x)
+>  - zylonite (pxa3xx)
+> 
+> The completion of this work will require to :
+>  - parse manually all the arch/arm/mach-pxa/*c files, look for all
+>    platform devices added, and verify they are all in pxa_defconfig
+>  - do the same to ensure all pxa specific drivers (leds, gpio, ...) are
+>    included
+> 
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> 
 
-Thanks for your help!
+Sorry for the late reply. I think this is great and I'd like to just apply it.
+Can you re-send to arm at kernel.org if you're happy with that?
 
+Looking at your description above, I see that you included pxa168_defconfig
+and pxa910_defconfig as well, but they are mach-mmp rather than mach-pxa.
+Can you check if that has added in anything we don't want?
 
-2015-12-31 19:25 GMT+09:00 One Thousand Gnomes <gnomes@lxorguk.ukuu.org.uk>:
-
->>
->> In a system like Fig.2, is the memory non-consistent?
->
-> dma_alloc_coherent will always provide you with coherent memory. On a
-> machine with good cache interfaces it will provide you with normal
-> memory. On some systems it may be memory from a special window, in other
-> cases it will fall back to providing uncached memory for this.
->
-> If the platform genuinely cannot support this (even by marking those areas
-> uncacheable) then it will fail the allocation.
->
-> What it does mean is that you need to use non-coherent mappings when
-> accessing a lot of data. On hardware without proper cache coherency it
-> may be quite expensive to access coherent memory.
-
-
-Now, it is clearer to me.
-The following is what I understood.
-(Please point out if I am wrong.)
-
-
-I think, roughly, there are two ways for handling DMA:
-(At first, I was so confused that I was thinking about [1] and [2] mixed.)
-
-
-
-[1] DMA-coherent buffers
-
-Allocate buffers with dma_alloc_coherent()
-and just have access to the buffers without cache synchronization.
-
-There is no need to call dma_sync_single_for_*().
-
-
-
-[2] Streaming DMA
-
-Allocate buffers with kmalloc() or friends,
-and then map them for DMA with dma_map_single().
-
-The buffers are cached, so they are non-consitent
-unless there exists hardware assist such as
-Cache Coherency Interconnect.
-
-The drivers must invoke cache operations
-by calling dma_sync_single_for_*().
-
-
-
-
-Is there any guideline about which way should be used in drivers?
-
-I think, if the buffer size is small, [1] is more efficient
-because it need not invoke cache operations.
-
-If the buffer is large, [2] seems better because
-the cost of uncached memory access gets more expensive
-than that of cache operations.
-
-(If devices are connected to the memory controller
-via Cache Coherency Interconnect, [1] always works very well.
-But drivers should be written in a portable way, so
-such a hardware implementation should not be expected.)
-
-I am not sure about the border line between [1] and [2], though...
-
-
-
-BTW, I am studying the DMA APIs in order to write a new
-MMC host driver for my ARM SoC.
-
-
-I grepped under drivers/mmc/host, and
-I found many drivers call dma_alloc_coherent(),
-but there are also some drivers that use dma_map_single().
-
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+	Arnd
