@@ -1,75 +1,49 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 31 Dec 2015 16:06:52 +0100
-Subject: [RFC PATCH] ARM: pxa: add defconfig covering all the boards
-In-Reply-To: <1450630483-28037-1-git-send-email-robert.jarzmik@free.fr>
-References: <1450630483-28037-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <22731126.qdCRlGzc5c@wuerfel>
+Date: Thu, 31 Dec 2015 16:11:54 +0100
+Subject: [PATCH] ARM: default to multi_v7_defconfig
+In-Reply-To: <20151222101834.GE32623@arm.com>
+References: <2084866.x9T7k7V9eW@wuerfel> <20151222101834.GE32623@arm.com>
+Message-ID: <5177946.MPbmr7k9Kd@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 20 December 2015 17:54:43 Robert Jarzmik wrote:
-> Add a defconfig covering all known pxa board, ie. all selectable machine
-> files in arch/arm/mach-pxa/*.c.
+On Tuesday 22 December 2015 10:18:35 Will Deacon wrote:
+> On Fri, Dec 18, 2015 at 11:44:23PM +0100, Arnd Bergmann wrote:
+> > versatile_defconfig has not been a reasonable default for a very long
+> > time, there is very little work happening on this platform and it's
+> > based on an old ARM926 CPU core.
+> > 
+> > This changes the default to multi_v7_defconfig, which is much more
+> > relevant to anyone doing a build test on ARM, as it covers a wide
+> > range of platforms.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > 
+> > diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> > index 2c2b28ee4811..e9fb67913e6e 100644
+> > --- a/arch/arm/Makefile
+> > +++ b/arch/arm/Makefile
+> > @@ -30,9 +30,8 @@ GZFLAGS             :=-9
+> >  # Never generate .eh_frame
+> >  KBUILD_CFLAGS        += $(call cc-option,-fno-dwarf2-cfi-asm)
+> >  
+> > -# Do not use arch/arm/defconfig - it's always outdated.
+> > -# Select a platform tht is kept up-to-date
+> > -KBUILD_DEFCONFIG := versatile_defconfig
+> > +# This should work on most of the modern platforms
+> > +KBUILD_DEFCONFIG := multi_v7_defconfig
+> >  
+> >  # defines filename extension depending memory management type.
+> >  ifeq ($(CONFIG_MMU),)
 > 
-> This defconfig was built by doing :
->  - aggregation of all known defconfigs by cat
->         am200epdkit_defconfig
->         cm_x2xx_defconfig
->         cm_x300_defconfig
->         colibri_pxa270_defconfig
->         colibri_pxa300_defconfig
->         corgi_defconfig
->         em_x270_defconfig
->         eseries_pxa_defconfig
->         ezx_defconfig
->         h5000_defconfig
->         imote2_defconfig
->         lpd270_defconfig
->         lubbock_defconfig
->         magician_defconfig
->         mainstone_defconfig
->         multi_v7_defconfig
->         palmz72_defconfig
->         pcm027_defconfig
->         pxa168_defconfig
->         pxa255-idp_defconfig
->         pxa3xx_defconfig
->         pxa910_defconfig
->         raumfeld_defconfig
->         spitz_defconfig
->         trizeps4_defconfig
->         viper_defconfig
->         xcep_defconfig
->         zeus_defconfig
->  - manual make menuconfig to ensure :
->    - all pxa implementation were selected
->    - all drivers were transformed into modules rather than builtin
->      => as a consequence this single kernel will rely on an initramfs
->      => as kernel size matters on pxa, each machine can take the subset
->         of modules required for it to work
->  - CONFIG_PXA_SHARPSL was disabled
->    This breaks the boot very early on any non Sharp platform, see
->    head-sharpsl.S
-> 
-> This defconfig was tested as booting up to the login phase on :
->  - lubbock (pxa25x)
->  - mainstone (pxa27x)
->  - zylonite (pxa3xx)
-> 
-> The completion of this work will require to :
->  - parse manually all the arch/arm/mach-pxa/*c files, look for all
->    platform devices added, and verify they are all in pxa_defconfig
->  - do the same to ensure all pxa specific drivers (leds, gpio, ...) are
->    included
-> 
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> 
+> Acked-by: Will Deacon <will.deacon@arm.com>
+... 
+> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-Sorry for the late reply. I think this is great and I'd like to just apply it.
-Can you re-send to arm at kernel.org if you're happy with that?
+I've applied this patch to the next/defconfig branch of arm-soc now,
+as it seems to fit in with the defconfig changes better than in Russell's
+tree.
 
-Looking at your description above, I see that you included pxa168_defconfig
-and pxa910_defconfig as well, but they are mach-mmp rather than mach-pxa.
-Can you check if that has added in anything we don't want?
+Thanks,
 
 	Arnd
