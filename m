@@ -1,24 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 31 Dec 2015 16:51:59 +0100
-Subject: [GIT PULL] arm64: DTS fixes for X-Gene platforms for v4.5
-In-Reply-To: <CADaLNDnwz-gyzN-1bzyGxAWL-5Jt2zSc_hvYQ2TpExGLC=Df3A@mail.gmail.com>
-References: <CADaLNDnwz-gyzN-1bzyGxAWL-5Jt2zSc_hvYQ2TpExGLC=Df3A@mail.gmail.com>
-Message-ID: <2734316.CUGyZXSbzW@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 31 Dec 2015 17:00:49 +0100
+Subject: [PATCH 0/1 for 4.4-rc8] ARM: Fix broken USB support in
+ sunxi_defconfig
+In-Reply-To: <4865776.yyMBHQfnua@wuerfel>
+References: <1451353653-17484-1-git-send-email-public_timo.s@silentcreek.de>
+ <4865776.yyMBHQfnua@wuerfel>
+Message-ID: <20151231160049.GA23528@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 30 December 2015 16:09:46 Duc Dang wrote:
-> Fixes for X-Gene DTS for v4.5
-> 
-> This patch set fixes the node names of X-Gene I2C, GPIO
-> controller DT nodes; and also removes I2C clock nodes as
-> the same clock is shared between 2 I2C controllers
-> on X-Gene SoC.
-> 
-> 
+Hi Arnd,
 
-Thanks a lot for the follow-up!
+On Thu, Dec 31, 2015 at 04:46:01PM +0100, Arnd Bergmann wrote:
+> On Tuesday 29 December 2015 02:47:32 Timo Sigurdsson wrote:
+> > Here is a late patch aimed for 4.4-rc8 (or 4.4). It would be nice if this   
+> > could make it into 4.4 in order to avoid unpleasent surprises (and
+> > subsequent questions) with builds based on sunxi_defconfig. At the moment,
+> > some boards (e.g. LeMaker BananaPi) are left with non-functional USB ports
+> > as a newly added driver is required to power them.
+> 
+> It's a bit confusing to send a patch to so many recipients, that usually
+> leads to nobody applying it. I can put it into the fixes branch in arm-soc
+> but need an Ack from the sunxi maintainer(s).
 
-Merged into next/dt64 now.
+You have mine
 
-	Arnd
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Timo, don't we need the same thing for multi_v7?
+
+Thanks,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151231/64e93d12/attachment-0001.sig>
