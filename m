@@ -1,58 +1,38 @@
 From: mst@redhat.com (Michael S. Tsirkin)
-Date: Thu, 31 Dec 2015 21:08:38 +0200
-Subject: [PATCH v2 22/32] s390: define __smp_xxx
+Date: Thu, 31 Dec 2015 21:08:46 +0200
+Subject: [PATCH v2 23/32] sh: define __smp_xxx, fix smp_store_mb for !SMP
 In-Reply-To: <1451572003-2440-1-git-send-email-mst@redhat.com>
 References: <1451572003-2440-1-git-send-email-mst@redhat.com>
-Message-ID: <1451572003-2440-23-git-send-email-mst@redhat.com>
+Message-ID: <1451572003-2440-24-git-send-email-mst@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This defines __smp_xxx barriers for s390,
-for use by virtualization.
+sh variant of smp_store_mb() calls xchg() on !SMP which is stronger than
+implied by both the name and the documentation.
 
-Some smp_xxx barriers are removed as they are
-defined correctly by asm-generic/barriers.h
-
-Note: smp_mb, smp_rmb and smp_wmb are defined as full barriers
-unconditionally on this architecture.
+define __smp_store_mb instead: code in asm-generic/barrier.h
+will then define smp_store_mb correctly depending on
+CONFIG_SMP.
 
 Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/s390/include/asm/barrier.h | 15 +++++++++------
- 1 file changed, 9 insertions(+), 6 deletions(-)
+ arch/sh/include/asm/barrier.h | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/s390/include/asm/barrier.h b/arch/s390/include/asm/barrier.h
-index c358c31..fbd25b2 100644
---- a/arch/s390/include/asm/barrier.h
-+++ b/arch/s390/include/asm/barrier.h
-@@ -26,18 +26,21 @@
- #define wmb()				barrier()
- #define dma_rmb()			mb()
- #define dma_wmb()			mb()
--#define smp_mb()			mb()
--#define smp_rmb()			rmb()
--#define smp_wmb()			wmb()
--
--#define smp_store_release(p, v)						\
-+#define __smp_mb()			mb()
-+#define __smp_rmb()			rmb()
-+#define __smp_wmb()			wmb()
-+#define smp_mb()			__smp_mb()
-+#define smp_rmb()			__smp_rmb()
-+#define smp_wmb()			__smp_wmb()
-+
-+#define __smp_store_release(p, v)					\
- do {									\
- 	compiletime_assert_atomic_type(*p);				\
- 	barrier();							\
- 	WRITE_ONCE(*p, v);						\
- } while (0)
+diff --git a/arch/sh/include/asm/barrier.h b/arch/sh/include/asm/barrier.h
+index bf91037..f887c64 100644
+--- a/arch/sh/include/asm/barrier.h
++++ b/arch/sh/include/asm/barrier.h
+@@ -32,7 +32,8 @@
+ #define ctrl_barrier()	__asm__ __volatile__ ("nop;nop;nop;nop;nop;nop;nop;nop")
+ #endif
  
--#define smp_load_acquire(p)						\
-+#define __smp_load_acquire(p)						\
- ({									\
- 	typeof(*p) ___p1 = READ_ONCE(*p);				\
- 	compiletime_assert_atomic_type(*p);				\
+-#define smp_store_mb(var, value) do { (void)xchg(&var, value); } while (0)
++#define __smp_store_mb(var, value) do { (void)xchg(&var, value); } while (0)
++#define smp_store_mb(var, value) __smp_store_mb(var, value)
+ 
+ #include <asm-generic/barrier.h>
+ 
 -- 
 MST
