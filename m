@@ -1,138 +1,488 @@
 From: mturquette@baylibre.com (Michael Turquette)
-Date: Wed, 30 Dec 2015 16:18:59 -0800
-Subject: [PATCH v2 1/3] clk: bcm2835: Add bindings for the auxiliary
- peripheral clock gates.
-In-Reply-To: <1477432.fTm0GUZ57A@wuerfel>
-References: <1450222559-22461-1-git-send-email-eric@anholt.net>
- <20151228223935.25842.28675@quark.deferred.io>
- <CAL_JsqLu7=66jEuaezesEuoPsBBhRAT0UQcLVNOLVwkEvQacRA@mail.gmail.com>
- <1477432.fTm0GUZ57A@wuerfel>
-Message-ID: <20151231001859.19557.99512@quark.deferred.io>
+Date: Wed, 30 Dec 2015 16:23:23 -0800
+Subject: [PATCH v4 1/6] clk: hisilicon: add CRG driver for hi3519 soc
+In-Reply-To: <1451439832-13927-2-git-send-email-xuejiancheng@huawei.com>
+References: <1451439832-13927-1-git-send-email-xuejiancheng@huawei.com>
+ <1451439832-13927-2-git-send-email-xuejiancheng@huawei.com>
+Message-ID: <20151231002323.19557.50218@quark.deferred.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hello Jiancheng Xue,
 
-Quoting Arnd Bergmann (2015-12-30 01:29:02)
-> On Tuesday 29 December 2015 16:15:09 Rob Herring wrote:
-> > On Mon, Dec 28, 2015 at 4:39 PM, Michael Turquette
-> > <mturquette@baylibre.com> wrote:
-> > > Quoting Eric Anholt (2015-12-24 15:45:15)
-> > >> Michael Turquette <mturquette@baylibre.com> writes:
-> > >> I would *love* to do that, but I've previously been told that having the
-> > >> bindings patch reference a header file not present as of the bindings
-> > >> patch is not acceptable and made to change it.
-> > >
-> > > Ugh, that is annoying. I would think that having code compile properly
-> > > would trump the desire to have all of the documentation merged as one
-> > > patch.
-> > 
-> > What about compiling the dts?
-
-Oops, good point Rob.
-
-> > 
-> > > On the other hand, I've been asked to not take binding descriptions
-> > > through the clk tree. That is a policy that I'm happy to comply with,
-> > > but it is at odds with the recommendation for the header and the binding
-> > > description to be merged together.
-> > 
-> > By who? Any bindings in a series I always expect the subsystem
-> > maintainers to take the whole series. That doesn't solve the problem
-> > though as there is still a dependency between a subsystem tree and
-> > arm-soc typically.
+Quoting Jiancheng Xue (2015-12-29 17:43:47)
+> The CRG(Clock and Reset Generator) block provides clock
+> and reset signals for other modules in hi3519 soc.
 > 
-> I don't care too much which tree the binding description goes through either,
-> as long as it is kept in sync.
+> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
+> ---
+>  .../devicetree/bindings/clock/hi3519-crg.txt       |  46 +++++++
+>  drivers/clk/hisilicon/Kconfig                      |   7 +
+>  drivers/clk/hisilicon/Makefile                     |   2 +
+>  drivers/clk/hisilicon/clk-hi3519.c                 | 103 ++++++++++++++
+>  drivers/clk/hisilicon/reset.c                      | 149 +++++++++++++++++++++
+>  drivers/clk/hisilicon/reset.h                      |  32 +++++
+>  include/dt-bindings/clock/hi3519-clock.h           |  43 ++++++
+>  7 files changed, 382 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/hi3519-crg.txt
+>  create mode 100644 drivers/clk/hisilicon/clk-hi3519.c
+>  create mode 100644 drivers/clk/hisilicon/reset.c
+>  create mode 100644 drivers/clk/hisilicon/reset.h
+>  create mode 100644 include/dt-bindings/clock/hi3519-clock.h
 
-OK, I'm happy to merge the whole enchilada.
+Please keep Philipp Zabel Cc'd for reset-related patches. I've added
+him to Cc.
 
 > 
-> > > DT folks, what is the right way to do this? An immutable, shared branch
-> > > just for a single header file solves the problem, but also feels very
-> > > cumbersome for such a trivial issue.
-> > 
-> > Arnd and Olof have been complaining about this problem which is worse
-> > when it is a binding, driver and dts.
-> > 
-> > I'm open to maintaining a branch for this purpose if that helps. That
-> > or staggering merging of bindings and drivers/dts are the only ideas
-> > I've come up with.
-> 
-> 
-> > > How about allowing binding descriptions to be merged without the header
-> > > file, so long as it is merged through another tree?
-> > 
-> > I think that is wrong if we have the goal to separate bindings from
-> > the kernel and the bindings should stand on their own. However, if it
-> > greatly simplifies things, i'd be okay with that.
-> 
-> The header file is really the main issue we need to worry about. My preferred
-> way of doing this would be to give it an extra merge window: add the binding
-> document and the header file in one merge window, and then add the dts files
-> and the driver one release later.
+> diff --git a/Documentation/devicetree/bindings/clock/hi3519-crg.txt b/Documentation/devicetree/bindings/clock/hi3519-crg.txt
+> new file mode 100644
+> index 0000000..2d23950
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/hi3519-crg.txt
+> @@ -0,0 +1,46 @@
+> +* Hisilicon Hi3519 Clock and Reset Generator(CRG)
+> +
+> +The Hi3519 CRG module provides clock and reset signals to various
+> +controllers within the SoC.
+> +
+> +This binding uses the following bindings:
+> +    Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +    Documentation/devicetree/bindings/reset/reset.txt
+> +
+> +Required Properties:
+> +
+> +- compatible: should be one of the following.
+> +  - "hisilicon,hi3519-crg" - controller compatible with Hi3519 SoC.
+> +
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +
+> +- #clock-cells: should be 1.
+> +
+> +Each clock is assigned an identifier and client nodes use this identifier
+> +to specify the clock which they consume.
+> +
+> +All these identifier could be found in <dt-bindings/clock/hi3519-clock.h>.
+> +
+> +- #reset-cells: should be 2.
+> +
+> +A reset signal can be controlled by writing a bit register in the CRG module.
+> +The reset specifier consists of two cells. The first cell represents the
+> +register offset relative to the base address. The second cell represents the
+> +bit index in the register.
+> +
+> +Example: CRG nodes
+> +CRG: clock-reset-controller at 12010000 {
+> +       compatible = "hisilicon,hi3519-crg";
+> +        reg = <0x12010000 0x10000>;
+> +        #clock-cells = <1>;
+> +        #reset-cells = <2>;
+> +};
+> +
+> +Example: consumer nodes
+> +i2c0: i2c at 12110000 {
+> +       compatible = "hisilicon,hi3519-i2c";
+> +        reg = <0x12110000 0x1000>;
+> +        clocks = <&CRG HI3519_I2C0_RST>;*/
+> +        resets = <&CRG 0xe4 0>;
+> +};
+> diff --git a/drivers/clk/hisilicon/Kconfig b/drivers/clk/hisilicon/Kconfig
+> index e434854..b6baebf 100644
+> --- a/drivers/clk/hisilicon/Kconfig
+> +++ b/drivers/clk/hisilicon/Kconfig
+> @@ -1,3 +1,10 @@
+> +config COMMON_CLK_HI3519
+> +       tristate "Clock Driver for Hi3519"
+> +       depends on ARCH_HISI
+> +       default y
+> +       help
+> +         Build the clock driver for hi3519.
+> +
+>  config COMMON_CLK_HI6220
+>         bool "Hi6220 Clock Driver"
+>         depends on ARCH_HISI || COMPILE_TEST
+> diff --git a/drivers/clk/hisilicon/Makefile b/drivers/clk/hisilicon/Makefile
+> index 74dba31..3f57b09 100644
+> --- a/drivers/clk/hisilicon/Makefile
+> +++ b/drivers/clk/hisilicon/Makefile
+> @@ -4,8 +4,10 @@
+>  
+>  obj-y  += clk.o clkgate-separated.o clkdivider-hi6220.o
+>  
+> +obj-$(CONFIG_RESET_CONTROLLER) += reset.o
+>  obj-$(CONFIG_ARCH_HI3xxx)      += clk-hi3620.o
+>  obj-$(CONFIG_ARCH_HIP04)       += clk-hip04.o
+>  obj-$(CONFIG_ARCH_HIX5HD2)     += clk-hix5hd2.o
+>  obj-$(CONFIG_COMMON_CLK_HI6220)        += clk-hi6220.o
+>  obj-$(CONFIG_STUB_CLK_HI6220)  += clk-hi6220-stub.o
+> +obj-$(CONFIG_COMMON_CLK_HI3519)        += clk-hi3519.o
+> diff --git a/drivers/clk/hisilicon/clk-hi3519.c b/drivers/clk/hisilicon/clk-hi3519.c
+> new file mode 100644
+> index 0000000..e220234
+> --- /dev/null
+> +++ b/drivers/clk/hisilicon/clk-hi3519.c
+> @@ -0,0 +1,103 @@
+> +/*
+> + * Copyright (c) 2015 HiSilicon Technologies Co., Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program. If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/of_address.h>
+> +#include <dt-bindings/clock/hi3519-clock.h>
+> +#include <linux/slab.h>
+> +#include <linux/delay.h>
+> +#include "clk.h"
+> +#include "reset.h"
+> +
+> +#define HI3519_FIXED_24M       (HI3519_EXT_CLKS + 1)
+> +#define HI3519_FIXED_50M       (HI3519_EXT_CLKS + 2)
+> +#define HI3519_FIXED_75M       (HI3519_EXT_CLKS + 3)
+> +#define HI3519_FIXED_125M      (HI3519_EXT_CLKS + 4)
+> +#define HI3519_FIXED_150M      (HI3519_EXT_CLKS + 5)
+> +#define HI3519_FIXED_200M      (HI3519_EXT_CLKS + 6)
+> +#define HI3519_FIXED_250M      (HI3519_EXT_CLKS + 7)
+> +#define HI3519_FIXED_300M      (HI3519_EXT_CLKS + 8)
+> +#define HI3519_FIXED_400M      (HI3519_EXT_CLKS + 9)
+> +#define HI3519_FMC_MUX         (HI3519_EXT_CLKS + 10)
+> +
+> +#define HI3519_NR_CLKS 128
+> +#define HI3519_NR_RSTS 128
+> +
+> +static struct hisi_fixed_rate_clock hi3519_fixed_rate_clks[] __initdata = {
+> +       { HI3519_FIXED_3M, "3m", NULL, CLK_IS_ROOT, 3000000, },
+> +       { HI3519_FIXED_24M, "24m", NULL, CLK_IS_ROOT, 24000000, },
+> +       { HI3519_FIXED_50M, "50m", NULL, CLK_IS_ROOT, 50000000, },
+> +       { HI3519_FIXED_75M, "75m", NULL, CLK_IS_ROOT, 75000000, },
+> +       { HI3519_FIXED_125M, "125m", NULL, CLK_IS_ROOT, 125000000, },
+> +       { HI3519_FIXED_150M, "150m", NULL, CLK_IS_ROOT, 150000000, },
+> +       { HI3519_FIXED_200M, "200m", NULL, CLK_IS_ROOT, 200000000, },
+> +       { HI3519_FIXED_250M, "250m", NULL, CLK_IS_ROOT, 250000000, },
+> +       { HI3519_FIXED_300M, "300m", NULL, CLK_IS_ROOT, 300000000, },
+> +       { HI3519_FIXED_400M, "400m", NULL, CLK_IS_ROOT, 400000000, },
+> +};
+> +
+> +static const char *fmc_mux_p[] __initconst = {
+> +               "24m", "75m", "125m", "150m", "200m", "250m", "300m", "400m", };
+> +static u32 fmc_mux_table[] = {0, 1, 2, 3, 4, 5, 6, 7};
+> +
+> +static struct hisi_mux_clock hi3519_mux_clks[] __initdata = {
+> +       { HI3519_FMC_MUX, "fmc_mux", fmc_mux_p, ARRAY_SIZE(fmc_mux_p),
+> +               CLK_SET_RATE_PARENT, 0xc0, 2, 3, 0, fmc_mux_table, },
+> +};
+> +
+> +static struct hisi_gate_clock hi3519_gate_clks[] __initdata = {
+> +       /* fmc */
+> +       { HI3519_FMC_CLK, "clk_fmc", "fmc_mux",
+> +               CLK_SET_RATE_PARENT, 0xc0, 1, 0, },
+> +       /* uart */
+> +       { HI3519_UART0_CLK, "clk_uart0", "24m",
+> +               CLK_SET_RATE_PARENT, 0xe4, 20, 0, },
+> +       { HI3519_UART1_CLK, "clk_uart1", "24m",
+> +               CLK_SET_RATE_PARENT, 0xe4, 21, 0, },
+> +       { HI3519_UART2_CLK, "clk_uart2", "24m",
+> +               CLK_SET_RATE_PARENT, 0xe4, 22, 0, },
+> +       { HI3519_UART3_CLK, "clk_uart3", "24m",
+> +               CLK_SET_RATE_PARENT, 0xe4, 23, 0, },
+> +       { HI3519_UART4_CLK, "clk_uart4", "24m",
+> +               CLK_SET_RATE_PARENT, 0xe4, 24, 0, },
+> +       { HI3519_SPI0_CLK, "clk_spi0", "50m",
+> +               CLK_SET_RATE_PARENT, 0xe4, 16, 0, },
+> +       { HI3519_SPI1_CLK, "clk_spi1", "50m",
+> +               CLK_SET_RATE_PARENT, 0xe4, 17, 0, },
+> +       { HI3519_SPI2_CLK, "clk_spi2", "50m",
+> +               CLK_SET_RATE_PARENT, 0xe4, 18, 0, },
+> +};
+> +
+> +static void __init hi3519_clk_init(struct device_node *np)
+> +{
+> +       struct hisi_clock_data *clk_data;
+> +
+> +       clk_data = hisi_clk_init(np, HI3519_NR_CLKS);
+> +       if (!clk_data)
+> +               return;
+> +
+> +       hisi_reset_init(np, HI3519_NR_RSTS);
+> +
+> +       hisi_clk_register_fixed_rate(hi3519_fixed_rate_clks,
+> +                                    ARRAY_SIZE(hi3519_fixed_rate_clks),
+> +                                    clk_data);
+> +       hisi_clk_register_mux(hi3519_mux_clks, ARRAY_SIZE(hi3519_mux_clks),
+> +                                       clk_data);
+> +       hisi_clk_register_gate(hi3519_gate_clks,
+> +                       ARRAY_SIZE(hi3519_gate_clks), clk_data);
+> +}
+> +
+> +CLK_OF_DECLARE(hi3519_clk, "hisilicon,hi3519-crg", hi3519_clk_init);
 
-I'd prefer not to stagger, as it just adds unnecessary delay to getting
-things upstream. And the code being merged first (the binding doc +
-header) is fairly useless on its own.
+Is CLK_OF_DECLARE required here? Why do you need to register these
+clocks so early?
 
-> I've seen a lot of header files added for
-> no good reason at all, and at least that way we can get people to think about
-> the dependency more.
+Can this be a real platform driver instead? See,
 
-Do you mean you prefer to declare the magic numbers in the binding
-description directly instead of using a header and relying on the C code
-to stay in sync?
-
-Or do you mean that there is no reason to declare the constants/magic
-numbers in a shared way at all?
-
-> 
-> It's also ok to merge the header file and binding with either the dts file
-> changes or the driver and then do the other part the following release.
-> 
-> In the past, we've worked around the issue by merging the driver through
-> arm-soc, or by merging the dts changes through a driver tree, with the
-> appropriate Acks in each case. Both of those approaches work of course,
-> but the former always feels awkward to me as we are not using the right
-> maintainer path, and the latter approach tends to cause merge conflicts,
-> especially when multiple headers for different subsystems get added or
-> the dts files are added at the same time.
-> 
-> Having a shared branch for the header file is another way to do it, and
-> we can do that in some cases, but I'd prefer not to make it the default.
-
-Well, I'm thinking that an immutable branch isn't such a bad idea given
-that both you and Rob are OK with subsystems merging headers and binding
-descriptions.
-
-A while back Stephen Boyd and I started to use topic branches for every
-driver, all based on -rc1 and merging those into clk-next. This makes it
-trivial for us to push a shareable branch with minimal dependencies.
-
-So at least for the clk tree, how do you feel about us merging driver +
-header + binding description and then sharing our topic branch as-needed
-with arm-soc? We could even push our topic branches by default to cut
-down on coordinating over email back-and-forth.
-
-As an example, patch #1 from the Hi3519 series[0] includes the clk
-driver, binding description and a shared header. Any objection to me
-taking that patch as-is, based on -rc1, and pushing out that topic
-branch as clk-hi3519 to the clk git tree with the expectation that
-you'll just merge that if you need to?
-
-You can let me know if you've pulled it in, and then I won't rebase
-without consulting with the arm-soc folks first.
-
-Does this workflow agreement Solve All the Problems?
-
-(Note that the patch I referenced is still under review so the branch
-name I mentioned above doesn't exist yet. It is just an example)
-
-[0] http://lkml.kernel.org/r/<1451439832-13927-2-git-send-email-xuejiancheng@huawei.com>
+grep platform_driver drivers/clk/qcom/*.c
 
 Regards,
 Mike
 
+> diff --git a/drivers/clk/hisilicon/reset.c b/drivers/clk/hisilicon/reset.c
+> new file mode 100644
+> index 0000000..cf5c32a
+> --- /dev/null
+> +++ b/drivers/clk/hisilicon/reset.c
+> @@ -0,0 +1,149 @@
+> +/*
+> + * Hisilicon Reset Controller driver
+> + *
+> + * Copyright (c) 2015 HiSilicon Technologies Co., Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program. If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/reset-controller.h>
+> +#include <linux/slab.h>
+> +#include <linux/spinlock.h>
+> +#include <linux/types.h>
+> +
+> +#define        HISI_RESET_BIT_SHIFT    0
+> +#define        HISI_RESET_BIT_WIDTH    16
+> +#define        HISI_RESET_OFFSET_SHIFT 16
+> +#define        HISI_RESET_OFFSET_WIDTH 16
+> +
+> +struct hisi_reset_controller {
+> +       spinlock_t      lock;
+> +       void __iomem    *membase;
+> +       struct reset_controller_dev     rcdev;
+> +};
+> +
+> +
+> +#define to_hisi_reset_controller(rcdev)  \
+> +       container_of(rcdev, struct hisi_reset_controller, rcdev)
+> +
+> +/*31                        16                         0
+> + * |---reset_spec->args[0]---|---reset_spec->args[1]---|
+> + * |-------reg_offset--------|--------reg_bit----------|
+> + */
+> +static int hisi_reset_of_xlate(struct reset_controller_dev *rcdev,
+> +                       const struct of_phandle_args *reset_spec)
+> +{
+> +       unsigned int offset, bit, id;
+> +       const __be32 *addr;
+> +       u64 size;
+> +
+> +       if (WARN_ON(reset_spec->args_count != rcdev->of_reset_n_cells))
+> +               return -EINVAL;
+> +
+> +       addr = of_get_address(rcdev->of_node, 0, &size, NULL);
+> +       if (!addr)
+> +               return -EINVAL;
+> +
+> +       if (reset_spec->args[1] >= 32
+> +               || reset_spec->args[0] + reset_spec->args[1] / 8 > size)
+> +               return -EINVAL;
+> +
+> +       offset = reset_spec->args[0] & (BIT(HISI_RESET_OFFSET_WIDTH) - 1);
+> +       bit = (reset_spec->args[1] & (BIT(HISI_RESET_BIT_WIDTH) - 1));
+> +       id = offset << HISI_RESET_OFFSET_SHIFT | bit;
+> +
+> +       return id;
+> +}
+> +
+> +static int hisi_reset_assert(struct reset_controller_dev *rcdev,
+> +                             unsigned long id)
+> +{
+> +       struct hisi_reset_controller *rstc = to_hisi_reset_controller(rcdev);
+> +       unsigned int offset, bit;
+> +       unsigned long flags;
+> +       u32 reg;
+> +
+> +       offset = id >> HISI_RESET_OFFSET_SHIFT;
+> +       offset &= (BIT(HISI_RESET_OFFSET_WIDTH) - 1);
+> +       bit = id & (BIT(HISI_RESET_BIT_WIDTH) - 1);
+> +
+> +       spin_lock_irqsave(&rstc->lock, flags);
+> +
+> +       reg = readl(rstc->membase + offset);
+> +       writel(reg | BIT(bit), rstc->membase + offset);
+> +
+> +       spin_unlock_irqrestore(&rstc->lock, flags);
+> +
+> +       return 0;
+> +}
+> +
+> +static int hisi_reset_deassert(struct reset_controller_dev *rcdev,
+> +                               unsigned long id)
+> +{
+> +       struct hisi_reset_controller *rstc = to_hisi_reset_controller(rcdev);
+> +       unsigned int offset, bit;
+> +       unsigned long flags;
+> +       u32 reg;
+> +
+> +       offset = id >> HISI_RESET_OFFSET_SHIFT;
+> +       offset &= (BIT(HISI_RESET_OFFSET_WIDTH) - 1);
+> +       bit = id & (BIT(HISI_RESET_BIT_WIDTH) - 1);
+> +
+> +       spin_lock_irqsave(&rstc->lock, flags);
+> +
+> +       reg = readl(rstc->membase + offset);
+> +       writel(reg & ~BIT(bit), rstc->membase + offset);
+> +
+> +       spin_unlock_irqrestore(&rstc->lock, flags);
+> +
+> +       return 0;
+> +}
+> +
+> +static struct reset_control_ops hisi_reset_ops = {
+> +       .assert         = hisi_reset_assert,
+> +       .deassert       = hisi_reset_deassert,
+> +};
+> +
+> +int __init hisi_reset_init(struct device_node *np,
+> +                                            int nr_rsts)
+> +{
+> +       struct hisi_reset_controller *rstc;
+> +
+> +       rstc = kzalloc(sizeof(*rstc), GFP_KERNEL);
+> +       if (!rstc)
+> +               return -ENOMEM;
+> +
+> +       rstc->membase = of_iomap(np, 0);
+> +       if (!rstc->membase)
+> +               return -EINVAL;
+> +
+> +       spin_lock_init(&rstc->lock);
+> +
+> +       rstc->rcdev.owner = THIS_MODULE;
+> +       rstc->rcdev.nr_resets = nr_rsts;
+> +       rstc->rcdev.ops = &hisi_reset_ops;
+> +       rstc->rcdev.of_node = np;
+> +       rstc->rcdev.of_reset_n_cells = 2;
+> +       rstc->rcdev.of_xlate = hisi_reset_of_xlate;
+> +
+> +       return reset_controller_register(&rstc->rcdev);
+> +}
+> +
+> diff --git a/drivers/clk/hisilicon/reset.h b/drivers/clk/hisilicon/reset.h
+> new file mode 100644
+> index 0000000..b04796f
+> --- /dev/null
+> +++ b/drivers/clk/hisilicon/reset.h
+> @@ -0,0 +1,32 @@
+> +/*
+> + * Copyright (c) 2015 HiSilicon Technologies Co., Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program. If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#ifndef        __HISI_RESET_H
+> +#define        __HISI_RESET_H
+> +
+> +#include <linux/of.h>
+> +
+> +#ifdef CONFIG_RESET_CONTROLLER
+> +int __init hisi_reset_init(struct device_node *np, int nr_rsts);
+> +#else
+> +static inline int __init hisi_reset_init(struct device_node *np, int nr_rsts)
+> +{
+> +       return 0;
+> +}
+> +#endif
+> +
+> +#endif /* __HISI_RESET_H */
+> diff --git a/include/dt-bindings/clock/hi3519-clock.h b/include/dt-bindings/clock/hi3519-clock.h
+> new file mode 100644
+> index 0000000..1e4a3c1
+> --- /dev/null
+> +++ b/include/dt-bindings/clock/hi3519-clock.h
+> @@ -0,0 +1,43 @@
+> +/*
+> + * Copyright (c) 2015 HiSilicon Technologies Co., Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program. If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#ifndef __DTS_HI3519_CLOCK_H
+> +#define __DTS_HI3519_CLOCK_H
+> +
+> +#define HI3519_FIXED_3M                        1
+> +#define HI3519_FMC_CLK                 2
+> +#define HI3519_USB2_BUS_CLK            3
+> +#define HI3519_USB2_PORT_CLK           4
+> +#define HI3519_USB3_CLK                        5
+> +#define HI3519_ETH_PHY_CLK             6
+> +#define HI3519_ETH_MAC_CLK             7
+> +#define HI3519_ETH_MACIF_CLK           8
+> +#define HI3519_PWM_CLK                 9
+> +#define HI3519_DMA_CLK                 10
+> +#define HI3519_SPI0_CLK                        11
+> +#define HI3519_SPI1_CLK                        12
+> +#define HI3519_SPI2_CLK                        13
+> +#define HI3519_IR_CLK                  14
+> +#define HI3519_UART0_CLK               15
+> +#define HI3519_UART1_CLK               16
+> +#define HI3519_UART2_CLK               17
+> +#define HI3519_UART3_CLK               18
+> +#define HI3519_UART4_CLK               19
+> +
+> +#define HI3519_EXT_CLKS                        19
+> +
+> +#endif /* __DTS_HI3519_CLOCK_H */
+> -- 
+> 1.9.1
 > 
->         Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
