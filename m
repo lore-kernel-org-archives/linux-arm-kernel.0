@@ -1,36 +1,72 @@
-From: leilk.liu@mediatek.com (Leilk Liu)
-Date: Thu, 31 Dec 2015 10:59:03 +0800
-Subject: [PATCH 4/4] Document: spi: Add bindings for mediatek MT2701 soc
- platform
-In-Reply-To: <1451530743-8995-1-git-send-email-leilk.liu@mediatek.com>
-References: <1451530743-8995-1-git-send-email-leilk.liu@mediatek.com>
-Message-ID: <1451530743-8995-5-git-send-email-leilk.liu@mediatek.com>
+From: lftan@altera.com (Ley Foon Tan)
+Date: Thu, 31 Dec 2015 11:09:01 +0800
+Subject: [PATCH] doc: PCI: altera: Fix the 'ranges' property in example
+In-Reply-To: <201512291433.16561.marex@denx.de>
+References: <1450950330-28393-1-git-send-email-marex@denx.de>
+ <201512280926.53004.marex@denx.de> <1451375313.2990.8.camel@ubuntu>
+ <201512291433.16561.marex@denx.de>
+Message-ID: <1451531341.3051.4.camel@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a DT binding documentation for the MT2701 soc.
+On Tue, 2015-12-29 at 14:33 +0100, Marek Vasut wrote:
+> On Tuesday, December 29, 2015 at 08:48:33 AM, Ley Foon Tan wrote:
+> > On Mon, 2015-12-28 at 09:26 +0100, Marek Vasut wrote:
+> > > On Monday, December 28, 2015 at 08:42:00 AM, Ley Foon Tan wrote:
+> > > > On Mon, Dec 28, 2015 at 3:34 PM, Marek Vasut <marex@denx.de> wrote:
+> > > > > On Monday, December 28, 2015 at 07:56:15 AM, Ley Foon Tan wrote:
+> > > > >> On Thu, 2015-12-24 at 10:45 +0100, Marek Vasut wrote:
+> > > > >> > The example does not work on real hardware with the PCIe HIP [1].
+> > > > >> > The problem is with incorrect "ranges" property in the example, so
+> > > > >> > one cannot just copy-paste the example into his DT and expect this
+> > > > >> > to work. This patches aligns the "ranges" in the example with the
+> > > > >> > reference FPGA design.
+> > > > >> 
+> > > > >> Hi Marek
+> > > > > 
+> > > > > Hi Ley,
+> > > > > 
+> > > > >> The original "ranges" is working for me. What error did you
+> > > > >> encounter?
+> > > > > 
+> > > > > Every time a driver accessed the Txs range, the system got stuck
+> > > > > hard. The Cra access always worked fine though, so the PCIe devices
+> > > > > were always detected.
+> > > > > 
+> > > > > I checked with signaltap and my impression is that the wrong address
+> > > > > propagated into the request passed to the Txs port of the HardIP
+> > > > > block, unless I change the range configuration.
+> > > > > 
+> > > > > Note that I tested Intel Centrino 6235 WiFi card and Atheros AR5006
+> > > > > WiFi card. The intel in particular uses both the Txs and even MSI ,
+> > > > > so to use the intel, the whole PCIe block has to work properly ;
+> > > > > with this change, it does and I can use the intel card just fine.
+> > > > > 
+> > > > >> Thanks.
+> > > > 
+> > > > Hi Marek
+> > > > 
+> > > > I tested two Ethernet adapters, one SSD NVMe and our custom endpoint
+> > > > without the problem.
+> > > > Can you please send me your dts file if possible?
+> > > > 
+> > > > Do you use the latest Altera pcie driver in v4.4?
+> > > 
+> > > I'm using next from 20151223, crude patch is attached.
+> > 
+> > Hi Marek
+> > 
+> > Your dts looks fine, same as mine; except the 'ranges' parameter. Not
+> > sure why it is not working on your side.
+> > 
+> > I may try again with the linux-next later.
+> 
+> Looking forward to your observations ;-)
+Tested with 20151223 linux-next, it is working with original dts.
 
-Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
----
- .../devicetree/bindings/spi/spi-mt65xx.txt         |    5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-index ce363c923f..bf489e0 100644
---- a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-@@ -2,9 +2,10 @@ Binding for MTK SPI controller
- 
- Required properties:
- - compatible: should be one of the following.
--    - mediatek,mt8173-spi: for mt8173 platforms
--    - mediatek,mt8135-spi: for mt8135 platforms
-+    - mediatek,mt2701-spi: for mt2701 platforms
-     - mediatek,mt6589-spi: for mt6589 platforms
-+    - mediatek,mt8135-spi: for mt8135 platforms
-+    - mediatek,mt8173-spi: for mt8173 platforms
- 
- - #address-cells: should be 1.
- 
--- 
-1.7.9.5
+> 
+> btw the other difference is location of the Cra port, in my case it's at 
+> 0xff220000 , which matches the altera reference design. The example code
+> uses 0xff240000 for whatever reason.
+> 
+The example code uses 0xff220000, where do you see 0xff240000?
