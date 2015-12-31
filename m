@@ -1,64 +1,51 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Thu, 31 Dec 2015 22:47:31 +0100
-Subject: [PATCH] net-thunder: One check less in nicvf_register_interrupts()
- after error detection
-In-Reply-To: <566ABCD9.1060404@users.sourceforge.net>
-References: <566ABCD9.1060404@users.sourceforge.net>
-Message-ID: <5685A273.6070607@users.sourceforge.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 31 Dec 2015 21:40:07 +0000
+Subject: [PATCH 4/6] regulator: lp872x: Add enable GPIO pin support
+In-Reply-To: <1451500639.14341.6.camel@collins>
+References: <1450868319-20513-5-git-send-email-contact@paulk.fr>
+ <20151223115632.GS16023@sirena.org.uk> <568088B4.6090207@ti.com>
+ <1451342963.14631.13.camel@collins> <5681D7A8.2030101@ti.com>
+ <1451387613.18148.9.camel@collins> <568323B7.7080101@ti.com>
+ <1451464521.2531.4.camel@collins>
+ <20151230163307.GW16023@sirena.org.uk>
+ <1451500639.14341.6.camel@collins>
+Message-ID: <20151231214007.GC16023@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Thu, 31 Dec 2015 22:40:39 +0100
+On Wed, Dec 30, 2015 at 07:37:19PM +0100, Paul Kocialkowski wrote:
+> Le mercredi 30 d?cembre 2015 ? 16:33 +0000, Mark Brown a ?crit :
+> > On Wed, Dec 30, 2015 at 09:35:21AM +0100, Paul Kocialkowski wrote:
 
-Adjust a jump target to eliminate a check before error logging.
-Use the identifier "report_failure" instead of "err".
+> > > In my opinion, it would be more elegant to adapt the core regulator
+> > > framework to first enable the GPIO and then call the regulator enable
+> > > ops callback instead of handling the GPIO in the driver.
 
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- drivers/net/ethernet/cavium/thunder/nicvf_main.c | 15 +++++++--------
- 1 file changed, 7 insertions(+), 8 deletions(-)
+> > Why would we want to actively manage both things at runtime?  It's more
+> > work, what do we gain from it?
 
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-index c24cb2a..21e1579 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-@@ -922,7 +922,7 @@ static int nicvf_register_interrupts(struct nicvf *nic)
- 		ret = request_irq(vector, nicvf_intr_handler,
- 				  0, nic->irq_name[irq], nic->napi[irq]);
- 		if (ret)
--			goto err;
-+			goto report_failure;
- 		nic->irq_allocated[irq] = true;
- 	}
- 
-@@ -933,7 +933,7 @@ static int nicvf_register_interrupts(struct nicvf *nic)
- 		ret = request_irq(vector, nicvf_rbdr_intr_handler,
- 				  0, nic->irq_name[irq], nic);
- 		if (ret)
--			goto err;
-+			goto report_failure;
- 		nic->irq_allocated[irq] = true;
- 	}
- 
-@@ -944,13 +944,12 @@ static int nicvf_register_interrupts(struct nicvf *nic)
- 	ret = request_irq(nic->msix_entries[irq].vector,
- 			  nicvf_qs_err_intr_handler,
- 			  0, nic->irq_name[irq], nic);
--	if (!ret)
-+	if (!ret) {
- 		nic->irq_allocated[irq] = true;
--
--err:
--	if (ret)
--		netdev_err(nic->netdev, "request_irq failed, vector %d\n", irq);
--
-+		return 0;
-+	}
-+report_failure:
-+	netdev_err(nic->netdev, "request_irq failed, vector %d\n", irq);
- 	return ret;
- }
- 
--- 
-2.6.3
+> Well, I figured that it would be best to disable the EN pin when we're
+> not using any of the regulators, since that allows the chip to enter
+> standby mode (and thus consume less power).
+
+This doesn't sound like it's anything to do with the regulators, that's
+a chip wide power management function which should be implemented via
+runtime PM if there's any value in implementing it at all (if the device
+is a primary PMIC normally this would be handled by the CPU core when it
+enters low power state without any software).  It's not something we
+should be considering on a per regulator basis since it's at the chip
+level and on a per regulator basis it's not doing anything useful for
+the reasons above.
+
+> It also doesn't hurt regulators that only use a GPIO for enable.
+
+It causes problems for any device with an optional GPIO,  it means that
+we end up mantaining both GPIO and register which as I've said a couple
+of times now defeats the point of having the GPIO.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151231/d1194fca/attachment.sig>
