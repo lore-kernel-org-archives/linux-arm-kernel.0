@@ -1,80 +1,42 @@
 From: mst@redhat.com (Michael S. Tsirkin)
-Date: Thu, 31 Dec 2015 21:09:54 +0200
-Subject: [PATCH v2 32/32] virtio_ring: use virt_store_mb
+Date: Thu, 31 Dec 2015 21:07:18 +0200
+Subject: [PATCH v2 12/32] x86/um: reuse asm-generic/barrier.h
 In-Reply-To: <1451572003-2440-1-git-send-email-mst@redhat.com>
 References: <1451572003-2440-1-git-send-email-mst@redhat.com>
-Message-ID: <1451572003-2440-33-git-send-email-mst@redhat.com>
+Message-ID: <1451572003-2440-13-git-send-email-mst@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need a full barrier after writing out event index, using
-virt_store_mb there seems better than open-coding.  As usual, we need a
-wrapper to account for strong barriers.
+On x86/um CONFIG_SMP is never defined.  As a result, several macros
+match the asm-generic variant exactly. Drop the local definitions and
+pull in asm-generic/barrier.h instead.
 
-It's tempting to use this in vhost as well, for that, we'll
-need a variant of smp_store_mb that works on __user pointers.
+This is in preparation to refactoring this code area.
 
 Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- include/linux/virtio_ring.h  | 12 ++++++++++++
- drivers/virtio/virtio_ring.c | 15 +++++++++------
- 2 files changed, 21 insertions(+), 6 deletions(-)
+ arch/x86/um/asm/barrier.h | 9 +--------
+ 1 file changed, 1 insertion(+), 8 deletions(-)
 
-diff --git a/include/linux/virtio_ring.h b/include/linux/virtio_ring.h
-index f3fa55b..3a74d91 100644
---- a/include/linux/virtio_ring.h
-+++ b/include/linux/virtio_ring.h
-@@ -45,6 +45,18 @@ static inline void virtio_wmb(bool weak_barriers)
- 		wmb();
- }
+diff --git a/arch/x86/um/asm/barrier.h b/arch/x86/um/asm/barrier.h
+index 755481f..174781a 100644
+--- a/arch/x86/um/asm/barrier.h
++++ b/arch/x86/um/asm/barrier.h
+@@ -36,13 +36,6 @@
+ #endif /* CONFIG_X86_PPRO_FENCE */
+ #define dma_wmb()	barrier()
  
-+static inline void virtio_store_mb(bool weak_barriers,
-+				   __virtio16 *p, __virtio16 v)
-+{
-+	if (weak_barriers)
-+		virt_store_mb(*p, v);
-+	else
-+	{
-+		WRITE_ONCE(*p, v);
-+		mb();
-+	}
-+}
-+
- struct virtio_device;
- struct virtqueue;
+-#define smp_mb()	barrier()
+-#define smp_rmb()	barrier()
+-#define smp_wmb()	barrier()
+-
+-#define smp_store_mb(var, value) do { WRITE_ONCE(var, value); barrier(); } while (0)
+-
+-#define read_barrier_depends()		do { } while (0)
+-#define smp_read_barrier_depends()	do { } while (0)
++#include <asm-generic/barrier.h>
  
-diff --git a/drivers/virtio/virtio_ring.c b/drivers/virtio/virtio_ring.c
-index ee663c4..e12e385 100644
---- a/drivers/virtio/virtio_ring.c
-+++ b/drivers/virtio/virtio_ring.c
-@@ -517,10 +517,10 @@ void *virtqueue_get_buf(struct virtqueue *_vq, unsigned int *len)
- 	/* If we expect an interrupt for the next entry, tell host
- 	 * by writing event index and flush out the write before
- 	 * the read in the next get_buf call. */
--	if (!(vq->avail_flags_shadow & VRING_AVAIL_F_NO_INTERRUPT)) {
--		vring_used_event(&vq->vring) = cpu_to_virtio16(_vq->vdev, vq->last_used_idx);
--		virtio_mb(vq->weak_barriers);
--	}
-+	if (!(vq->avail_flags_shadow & VRING_AVAIL_F_NO_INTERRUPT))
-+		virtio_store_mb(vq->weak_barriers,
-+				&vring_used_event(&vq->vring),
-+				cpu_to_virtio16(_vq->vdev, vq->last_used_idx));
- 
- #ifdef DEBUG
- 	vq->last_add_time_valid = false;
-@@ -653,8 +653,11 @@ bool virtqueue_enable_cb_delayed(struct virtqueue *_vq)
- 	}
- 	/* TODO: tune this threshold */
- 	bufs = (u16)(vq->avail_idx_shadow - vq->last_used_idx) * 3 / 4;
--	vring_used_event(&vq->vring) = cpu_to_virtio16(_vq->vdev, vq->last_used_idx + bufs);
--	virtio_mb(vq->weak_barriers);
-+
-+	virtio_store_mb(vq->weak_barriers,
-+			&vring_used_event(&vq->vring),
-+			cpu_to_virtio16(_vq->vdev, vq->last_used_idx + bufs));
-+
- 	if (unlikely((u16)(virtio16_to_cpu(_vq->vdev, vq->vring.used->idx) - vq->last_used_idx) > bufs)) {
- 		END_USE(vq);
- 		return false;
+ #endif
 -- 
 MST
