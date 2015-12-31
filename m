@@ -1,22 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 31 Dec 2015 16:46:01 +0100
-Subject: [PATCH 0/1 for 4.4-rc8] ARM: Fix broken USB support in
- sunxi_defconfig
-In-Reply-To: <1451353653-17484-1-git-send-email-public_timo.s@silentcreek.de>
-References: <1451353653-17484-1-git-send-email-public_timo.s@silentcreek.de>
-Message-ID: <4865776.yyMBHQfnua@wuerfel>
+Date: Thu, 31 Dec 2015 16:49:43 +0100
+Subject: [PATCH] ARM: realview: set up cache correctly on the PB11MPCore
+In-Reply-To: <1451505909-3820-1-git-send-email-linus.walleij@linaro.org>
+References: <1451505909-3820-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <3175687.xW1SWKiffP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 December 2015 02:47:32 Timo Sigurdsson wrote:
-> Here is a late patch aimed for 4.4-rc8 (or 4.4). It would be nice if this   
-> could make it into 4.4 in order to avoid unpleasent surprises (and
-> subsequent questions) with builds based on sunxi_defconfig. At the moment,
-> some boards (e.g. LeMaker BananaPi) are left with non-functional USB ports
-> as a newly added driver is required to power them.
+On Wednesday 30 December 2015 21:05:09 Linus Walleij wrote:
+> The L2 cache comes up in a "safe mode" on the PB11MPCore, as
+> it has several issues. This sets it up properly with the right
+> size and associativity, also requiring the outer sync to be
+> disabled for the machine to boot properly.
+> 
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ARM SoC folks: Russell has merged the outer cache sync disable
+> patch so it would be nice if you'd merge this directly on top
+> of the branch holding the PB11MPCore device tree, so that the
+> cache is feature complete for v4.5.
 
-It's a bit confusing to send a patch to so many recipients, that usually
-leads to nobody applying it. I can put it into the fixes branch in arm-soc
-but need an Ack from the sunxi maintainer(s).
+Applied on next/dt, thanks!
 
 	Arnd
