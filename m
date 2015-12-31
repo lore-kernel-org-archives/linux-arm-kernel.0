@@ -1,21 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 31 Dec 2015 17:28:41 +0100
-Subject: [PATCH] ARM: dts: uniphier: fix a typo in comment block
-In-Reply-To: <1450884220-8751-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1450884220-8751-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <2655737.rfUv6oI9D8@wuerfel>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 31 Dec 2015 17:31:57 +0100
+Subject: [PATCH RFC] ARM: tango4: Fix build issues
+In-Reply-To: <20151231132116.GB1547@localhost>
+References: <567DBA04.4060709@free.fr>
+	<20151231132116.GB1547@localhost>
+Message-ID: <CAOesGMhBkacNRxQaBKG8f5Bv2FXH504YCj_O0eL=FwGzY03H-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 24 December 2015 00:23:40 Masahiro Yamada wrote:
-> 
-> -/* UART3 unavilable: the pads are not wired to the package balls */
-> +/* UART3 unavailable: the pads are not wired to the package balls */
->  &serial3 {
->         status = "disabled";
->  };
-> 
+On Thu, Dec 31, 2015 at 2:21 PM, Olof Johansson <olof@lixom.net> wrote:
+> On Fri, Dec 25, 2015 at 10:49:56PM +0100, Mason wrote:
+>> From: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>>
+>> Move SMP setup to platsmp.c
+>> Specify the CPU type to the assembler, and only for smc.S
+>>
+>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>> ---
+>
+> Applied, thanks.
 
-Applied on next/dt, thanks!
+Actually, I just noticed that the smc.c Makefile part isn't done as it
+should, so I'll drop this again.
 
-	Arnd
+
+-Olof
