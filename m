@@ -1,76 +1,49 @@
-From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
-Date: Thu, 31 Dec 2015 04:12:45 +0100
-Subject: [PATCH] serial: imx: fix dcd interrupt firing during probe
-Message-ID: <1451531565-1233-1-git-send-email-marcel.ziswiler@toradex.com>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Thu, 31 Dec 2015 13:59:26 +0800
+Subject: [PATCH 2/4] soc: mediatek: Init MT8173 scpsys driver earlier
+In-Reply-To: <6145950.8rtkDup7QD@wuerfel>
+References: <1451457706-14798-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1670989.QknqqsXE3p@wuerfel> <1451470328.22426.5.camel@mtksdaap41>
+ <6145950.8rtkDup7QD@wuerfel>
+Message-ID: <1451541566.10610.10.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Continuing on the Apalis iMX6 mainlining work started by Petr ?tetiar I
-noticed that it only boots when rebooting from NXP's downstream 3.14.28
-kernel or mainline otherwise (e.g. when cold booted) I did not get any
-serial debug output at all. Enabling earlyprintk I got the following:
+Hi Arnd,
 
-[    1.136806] INFO: trying to register non-static key.
-[    1.136871] 2020000.serial: ttymxc0 at MMIO 0x2020000 (irq = 25,
-base_baud = 5000000) is a IMX
-[    1.150651] the code is fine but needs lockdep annotation.
-[    1.150653] turning off the locking correctness validator.
-[    1.150664] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.4.0-rc6-
-next-20151223-00002-g6008f30-dirty #27
-[    1.150668] Hardware name: Freescale i.MX6 Quad/DualLite (Device
-Tree)
-[    1.150675] Backtrace:
-[    1.150701] [<c010c45c>] (dump_backtrace) from [<c010c654>]
-(show_stack+0x18/0x1c)
-[    1.150722]  r7:00000000 r6:c0d20848 r5:00000000 r4:00000000
-[    1.150739] [<c010c63c>] (show_stack) from [<c03dadcc>]
-(dump_stack+0x8c/0xa4)
-[    1.150760] [<c03dad40>] (dump_stack) from [<c016b60c>]
-(__lock_acquire+0x1d88/0x1eb4)
-[    1.150774]  r7:00000000 r6:c0d063f8 r5:c155f834 r4:e503bc20
-[    1.150785] [<c0169884>] (__lock_acquire) from [<c016bf54>]
-(lock_acquire+0x74/0x94)
-[    1.150803]  r10:c0d6eb5e r9:e597b300 r8:00000019 r7:00000001
-r6:00000001 r5:60000193
-[    1.150808]  r4:00000000
-[    1.150821] [<c016bee0>] (lock_acquire) from [<c08d49d4>]
-(_raw_spin_lock_irqsave+0x40/0x54)
-[    1.150834]  r7:000052c8 r6:c0481470 r5:40000193 r4:e503bc10
-[    1.150852] [<c08d4994>] (_raw_spin_lock_irqsave) from [<c0481470>]
-(imx_rxint+0x20/0x2a4)
-[    1.150862]  r6:00000000 r5:000052d0 r4:e503bc10
-[    1.150874] [<c0481450>] (imx_rxint) from [<c0482540>]
-(imx_int+0x170/0x1f4)
+On Wed, 2015-12-30 at 11:35 +0100, Arnd Bergmann wrote:
+> On Wednesday 30 December 2015 18:12:08 James Liao wrote:
+> > On Wed, 2015-12-30 at 09:52 +0100, Arnd Bergmann wrote:
+> > > On Wednesday 30 December 2015 14:41:44 James Liao wrote:
+> > > > Some power domain comsumers may init before module_init.
+> > > > So the power domain provider (scpsys) need to be initialized
+> > > > earlier too.
+> > > > 
+> > > > Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> > > > ---
+> > > > 
+> > > 
+> > > Why?
+> > 
+> > Some drivers use different init level to ensure they can be initialized
+> > before other drivers. To support these drivers, moving scpsys driver's
+> > initial function to subsys_init is the most easy way.
+> 
+> This is just the same generic explanation that you already have.
+> 
+> Please be more specific what the dependency is and why we can't rely
+> on deferred probing here.
 
-Debugging a little further I noticed this actually happening after
-calling devm_request_irq() during serial_imx_probe() even before
-uart_add_one_port() did initialise the spin_lock acquired in
-imx_rxint(). Turns out the data carrier detect interrupt fired
-immediately upon requesting interrupts. This patch fixes this by
-explicitly disabling data carrier detect before requesting interrupts.
+In our case, there is a SMI driver provide APIs to control multiple
+devices that attached to different power domains.Video encoder / decoder
+and GPU drivers are SMI users. It's not easy for SMI users to detect SMI
+and scpsys driver are initialized or not. A most easy way to resolve the
+init sequence issue is moving SMI and scpsys driver in early init stage.
 
-Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+Do you prefer to keep scpsys driver's init in module_init? If yes, I can
+remove this patch in next version.
 
----
 
- drivers/tty/serial/imx.c | 5 +++++
- 1 file changed, 5 insertions(+)
+Best regards,
 
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index 9362f54c..b1588f9 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -2032,6 +2032,11 @@ static int serial_imx_probe(struct platform_device *pdev)
- 		 UCR1_TXMPTYEN | UCR1_RTSDEN);
- 	writel_relaxed(reg, sport->port.membase + UCR1);
- 
-+	/* Disable data carrier detect before requesting interrupts */
-+	reg = readl_relaxed(sport->port.membase + UCR3);
-+	reg &= ~(UCR3_DCD);
-+	writel_relaxed(reg, sport->port.membase + UCR3);
-+
- 	clk_disable_unprepare(sport->clk_ipg);
- 
- 	/*
--- 
-2.5.0
+James
