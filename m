@@ -1,84 +1,53 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 31 Dec 2015 10:04:35 +0100
-Subject: [PATCH] doc: PCI: altera: Fix the 'ranges' property in example
-In-Reply-To: <1451531341.3051.4.camel@ubuntu>
-References: <1450950330-28393-1-git-send-email-marex@denx.de>
- <201512291433.16561.marex@denx.de> <1451531341.3051.4.camel@ubuntu>
-Message-ID: <201512311004.35234.marex@denx.de>
+From: romain.perier@gmail.com (Romain Perier)
+Date: Thu, 31 Dec 2015 10:13:52 +0100
+Subject: [PATCH v2] ARM: dts: rockchip: Adding LEDs handling via leds-gpio for
+ the Radxa Rock2 Square
+Message-ID: <1451553232-2533-1-git-send-email-romain.perier@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, December 31, 2015 at 04:09:01 AM, Ley Foon Tan wrote:
-> On Tue, 2015-12-29 at 14:33 +0100, Marek Vasut wrote:
-> > On Tuesday, December 29, 2015 at 08:48:33 AM, Ley Foon Tan wrote:
-> > > On Mon, 2015-12-28 at 09:26 +0100, Marek Vasut wrote:
-> > > > On Monday, December 28, 2015 at 08:42:00 AM, Ley Foon Tan wrote:
-> > > > > On Mon, Dec 28, 2015 at 3:34 PM, Marek Vasut <marex@denx.de> wrote:
-> > > > > > On Monday, December 28, 2015 at 07:56:15 AM, Ley Foon Tan wrote:
-> > > > > >> On Thu, 2015-12-24 at 10:45 +0100, Marek Vasut wrote:
-> > > > > >> > The example does not work on real hardware with the PCIe HIP
-> > > > > >> > [1]. The problem is with incorrect "ranges" property in the
-> > > > > >> > example, so one cannot just copy-paste the example into his
-> > > > > >> > DT and expect this to work. This patches aligns the "ranges"
-> > > > > >> > in the example with the reference FPGA design.
-> > > > > >> 
-> > > > > >> Hi Marek
-> > > > > > 
-> > > > > > Hi Ley,
-> > > > > > 
-> > > > > >> The original "ranges" is working for me. What error did you
-> > > > > >> encounter?
-> > > > > > 
-> > > > > > Every time a driver accessed the Txs range, the system got stuck
-> > > > > > hard. The Cra access always worked fine though, so the PCIe
-> > > > > > devices were always detected.
-> > > > > > 
-> > > > > > I checked with signaltap and my impression is that the wrong
-> > > > > > address propagated into the request passed to the Txs port of
-> > > > > > the HardIP block, unless I change the range configuration.
-> > > > > > 
-> > > > > > Note that I tested Intel Centrino 6235 WiFi card and Atheros
-> > > > > > AR5006 WiFi card. The intel in particular uses both the Txs and
-> > > > > > even MSI , so to use the intel, the whole PCIe block has to work
-> > > > > > properly ; with this change, it does and I can use the intel
-> > > > > > card just fine.
-> > > > > > 
-> > > > > >> Thanks.
-> > > > > 
-> > > > > Hi Marek
-> > > > > 
-> > > > > I tested two Ethernet adapters, one SSD NVMe and our custom
-> > > > > endpoint without the problem.
-> > > > > Can you please send me your dts file if possible?
-> > > > > 
-> > > > > Do you use the latest Altera pcie driver in v4.4?
-> > > > 
-> > > > I'm using next from 20151223, crude patch is attached.
-> > > 
-> > > Hi Marek
-> > > 
-> > > Your dts looks fine, same as mine; except the 'ranges' parameter. Not
-> > > sure why it is not working on your side.
-> > > 
-> > > I may try again with the linux-next later.
-> > 
-> > Looking forward to your observations ;-)
-> 
-> Tested with 20151223 linux-next, it is working with original dts.
+Describe the two user-controllable LEDs on Rock2 Square boards.
+All information have been retrieved from the schematics and the vendor
+devicetree. The default-triggers mimic the behaviour of the vendor-kernel to
+keep functionalities in sync.
 
-Well, do you have a good explanation why the system works with this change
-and doesn't work without it on my design ? I'd really love to understand
-this.
+Signed-off-by: Romain Perier <romain.perier@gmail.com>
+---
 
-> > btw the other difference is location of the Cra port, in my case it's at
-> > 0xff220000 , which matches the altera reference design. The example code
-> > uses 0xff240000 for whatever reason.
-> 
-> The example code uses 0xff220000, where do you see 0xff240000?
+Changes in v2:
+- Changed labels according to what is defined in the schematics
+- Added a long commit message describing this patch in details
 
-I thought the ccb_lw_50_to_125 was at +0x40000 in the original design, but I
-can't seem to be able to find that. I've been studying multiple PCIe designs
-and this notion somehow crawled into my skull. Sorry, please ignore then.
+ arch/arm/boot/dts/rk3288-rock2-square.dts | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-Best regards,
-Marek Vasut
+diff --git a/arch/arm/boot/dts/rk3288-rock2-square.dts b/arch/arm/boot/dts/rk3288-rock2-square.dts
+index c5453a0..0813428 100644
+--- a/arch/arm/boot/dts/rk3288-rock2-square.dts
++++ b/arch/arm/boot/dts/rk3288-rock2-square.dts
+@@ -56,6 +56,23 @@
+ 		pinctrl-0 = <&ir_int>;
+ 	};
+ 
++	gpio-leds {
++		compatible = "gpio-leds";
++
++		heartbeat {
++			gpios = <&gpio7 15 GPIO_ACTIVE_LOW>;
++			label = "rock2:green:state1";
++			linux,default-trigger = "heartbeat";
++		};
++
++		mmc {
++			gpios = <&gpio0 11 GPIO_ACTIVE_LOW>;
++			label = "rock2:blue:state2";
++			linux,default-trigger = "mmc0";
++		};
++	};
++
++
+ 	sound {
+ 		compatible = "simple-audio-card";
+ 		simple-audio-card,name = "SPDIF";
+-- 
+2.5.0
