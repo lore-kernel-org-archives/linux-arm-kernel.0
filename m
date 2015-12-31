@@ -1,45 +1,62 @@
 From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Thu, 31 Dec 2015 21:45:51 +0800
-Subject: [PATCH] pinctrl: mediatek: convert to arch_initcall
-In-Reply-To: <20151230172212.GZ16023@sirena.org.uk>
-References: <1450792017-7120-1-git-send-email-djkurtz@chromium.org>
- <CACRpkdbRDzXunYK5d6Ld4Z2a=0mkp4KBvgL2P-St4P65Jajamw@mail.gmail.com>
- <20151230172212.GZ16023@sirena.org.uk>
-Message-ID: <CAGS+omA9AarzE2sp1Ry3RuOt8EOa-sL=DL1iDA2OeVVdjn=xgg@mail.gmail.com>
+Date: Thu, 31 Dec 2015 22:19:03 +0800
+Subject: [PATCH] soc: mediatek: PMIC wrap: Enable STAUPD_PRD before
+ WDT_SRC_EN enabled.
+In-Reply-To: <1451478961-5668-1-git-send-email-henryc.chen@mediatek.com>
+References: <1451478961-5668-1-git-send-email-henryc.chen@mediatek.com>
+Message-ID: <CAGS+omBc2XVESu1t+_iKj1gTk-7JVDK1KDoQEJR_-wcL4m0qWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 31, 2015 at 1:22 AM, Mark Brown <broonie@kernel.org> wrote:
+On Wed, Dec 30, 2015 at 8:36 PM, Henry Chen <henryc.chen@mediatek.com> wrote:
 >
-> On Tue, Dec 22, 2015 at 04:11:47PM +0100, Linus Walleij wrote:
-> > On Tue, Dec 22, 2015 at 2:46 PM, Daniel Kurtz <djkurtz@chromium.org> wrote:
->
-> > > Move pinctrl initialization earlier in boot so that real devices can find
-> > > their pctldev without probe deferring.
-> > (...)
-> > > -module_init(mtk_pinctrl_init);
-> > > +arch_initcall(mtk_pinctrl_init);
->
-> > So I see why you're doing this (because of wanting to avoid nasty boot
-> > probe deferrals, right?) and I'm going to apply it, because the work
-> > with probe ordering is still in the works, but I'd like some general
-> > ARM people to come in with opinions.
->
-> I really don't think we should be applying this sort of stuff unless
-> things are actively broken right now.  It's a bit of a rabbit hole we
-> could spend a long time going down tweaking things for different
-> systems in the same way that tweaking the link order can be and it masks
-> the underlying issues.
+> The STAUPD_TRIG will be enable when WDT_INT enable on probe function, if
+> doesn't enable STAUPD_PRD together, interrupt will be triggered because
+> STAUPD timeout. To avoid unexpected interrupt, enable periodic status
+> update which will be updated to PMIC every selected time period.
 
-Things are actively broken right now, in the sense that there are many
-needless probe deferrals on boot.
-These are pinctrl drivers, which are required to load before every
-other driver that requests a gpio.
-AFAICT, the pinctrl is part of the platform "architecture", hence why
-I suggest we move this to arch_initcall().
-arch_initcall() is also consistent with 39 other pinctrl drivers in
-drivers/pinctrl.
-19 others use subsys_initcall(), core_initcall() or
-postcore_initcall(), any of which would also work.
+Sorry, I don't really understand this.
 
--Dan
+What exactly is triggering the unexpected watchdog interrupt (WDT_INT)?
+
+How does setting STAUPD_PRD disable this "unexpected interrupt"?
+
+>From the MT8173 Datasheet, I can see that the value written to
+STAUPD_PRD is the "periodic status update timing (period)".
+
+> Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
+> ---
+>  drivers/soc/mediatek/mtk-pmic-wrap.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+>
+> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> index a8cde17..6e5c20f 100644
+> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
+> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> @@ -904,6 +904,11 @@ static int pwrap_probe(struct platform_device *pdev)
+>                 return -ENODEV;
+>         }
+>
+> +       /*
+> +        * Enable periodic status update which will be updated to PMIC
+> +        * every selected time period.
+> +        */
+> +       pwrap_writel(wrp, 0x5, PWRAP_STAUPD_PRD);
+
+nit: Perhaps use a define for 5, and specify the real period value.
+Something like this:
+
+#define PWRAP_STAUPD_98_5US  5
+
+
+>         /* Initialize watchdog, may not be done by the bootloader */
+>         pwrap_writel(wrp, 0xf, PWRAP_WDT_UNIT);
+>         pwrap_writel(wrp, 0xffffffff, PWRAP_WDT_SRC_EN);
+> --
+> 1.9.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
