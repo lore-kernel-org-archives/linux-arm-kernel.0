@@ -1,121 +1,49 @@
-From: mike.looijmans@topic.nl (Mike Looijmans)
-Date: Thu, 31 Dec 2015 09:38:16 +0100
-Subject: [Question about DMA] Consistent memory?
-In-Reply-To: <CAK7LNASd1amcHinXzYy=8mtYbnHUY1G_v=fthpachAVSyjqPZA@mail.gmail.com>
-References: <CAK7LNASd1amcHinXzYy=8mtYbnHUY1G_v=fthpachAVSyjqPZA@mail.gmail.com>
-Message-ID: <5684E978.5050903@topic.nl>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 31 Dec 2015 10:05:25 +0100
+Subject: 16KB PAGE_SIZE not work on DB410C
+In-Reply-To: <6DB39B31-8902-4A03-A66B-DC75E90A1C1C@linaro.org>
+References: <5677795C.2060409@linaro.org>
+ <CAKv+Gu9mUVn80Vqr5NT7jjkSGd6BY_0cB6gVJ8VakHHWeWxM2A@mail.gmail.com>
+ <6DB39B31-8902-4A03-A66B-DC75E90A1C1C@linaro.org>
+Message-ID: <CAKv+Gu9FkmzRd9V3hbeJrfpLN3=Gdh+j77LLngjctJSK+re1fg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31-12-15 08:50, Masahiro Yamada wrote:
-> Hi.
+On 25 December 2015 at 13:24, Pingbo Wen <pingbo.wen@linaro.org> wrote:
+> Hi Ard
 >
-> I am new to the Linux DMA APIs.
+>> ? 2015?12?21??15:06?Ard Biesheuvel <ard.biesheuvel@linaro.org> ???
+>>
+>> On 21 December 2015 at 05:00, Pingbo Wen <pingbo.wen@linaro.org> wrote:
+>>> Hello,
+>>>
+>>> I want to do some tests over 16KB page size on dragonboard 410c. And I merged
+>>> arm64-upstream branch over
+>>>
+>>>  https://git.linaro.org/landing-teams/working/qualcomm/kernel.git integration-linux-qcomlt
+>>>
+>>> which is based on Linux Kernel 4.3.
+>>>
+>>> The db410c can boot into ubuntu in 4KB / 64KB page size, but when I set 16K page size, with
+>>> 47bit VA, the kernel hang before kernel_start(), no log output.
+>>>
+>>> Does db410c support 16K page size? What can I do to boot it up?
+>>>
+>>
+>> Cortex-A5x does not support 16 KB page size
 >
-> First, I started by reading Documentation/DMA-API.txt,
-> but I am confused with the term "consistent memory".
+> Is there any documents I can reference? As I have get from ARM document, the Cortex-A53 support 16k page size, and Cortex-A57 don?t. The document can be found at:
 >
-> Please help me understand the document correctly.
+>         http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0024a/BABDJHAD.html
 >
+> Reference it here:
 >
-> The DMA-API.txt says as follows:
+> The supported granule sizes are 4KB, 16KB, and 64KB, and it is implementation defined which of the three are supported. Code that creates page tables is able to read the system register ID_AA64MMFR0_EL1, to find out which are the supported sizes. The Cortex-A53 processor supports all three sizes, but this is not the case for early versions of some processors, such as the Cortex-A57, which did not support the 16K granule size. The size is configurable for each translation table within the Translation Control Register (TCR_EL1).
 >
-> ----------------------->8--------------------------------------------
-> void *
-> dma_alloc_coherent(struct device *dev, size_t size,
->      dma_addr_t *dma_handle, gfp_t flag)
->
-> Consistent memory is memory for which a write by either the device or
-> the processor can immediately be read by the processor or device
-> without having to worry about caching effects.  (You may however need
-> to make sure to flush the processor's write buffers before telling
-> devices to read that memory.)
-> ------------------------8<--------------------------------------------
->
->
-> As far as I understand the the cited sentence, for the memory
-> to be consistent, DMA controllers must be connected to
-> DRAM through some special hardware that keeps the memory
-> coherency, such as SCU.  I assume the system like Fig.1
->
->
-> Fig.1
->
-> |------|  |------| |-----|
-> | CPU0 |  | CPU1 | | DMA |
-> |------|  |------| |-----|
->     |         |        |
->     |         |        |
-> |------|  |------| |-----|
-> | L1-C |  | L1-C | | ACP |
-> |------|  |------| |-----|
->     |         |        |
-> |------------------------|
-> |    Snoop Control Unit  |
-> |------------------------|
->               |
-> |------------------------|
-> |         L2-cache       |
-> |------------------------|
->               |
-> |------------------------|
-> |           DRAM         |
-> |------------------------|
->
-> (ACP = accelerator coherency port)
->
->
->
-> But, I think such a system is rare.
->
-> At least on my SoC (ARM SoC), DMA controllers
-> for NAND, MMC, etc. are directly connected to the DRAM
-> like Fig.2.
->
-> So, cache operations must be explicitly done
-> by software before/after DMAs are kicked.
-> (I think this is very normal.)
->
-> Fig.2
->
-> |------|  |------| |-----|
-> | CPU0 |  | CPU1 | | DMA |
-> |------|  |------| |-----|
->     |         |        |
->     |         |        |
-> |------|  |------|    |
-> | L1-C |  | L1-C |    |
-> |------|  |------|    |
->     |         |        |
-> |------------------|  |
-> |Snoop Control Unit|  |
-> |------------------|  |
->           |            |
-> |------------------|  |
-> |   L2-cache       |  |
-> |------------------|  |
->           |            |
-> |--------------------------|
-> |           DRAM           |
-> |--------------------------|
->
->
-> In a system like Fig.2, is the memory non-consistent?
->
-> As long as I read DMA-API.txt, it is non-consistent.
-> There is no consistent memory on my SoC.
->
-> But, not only dma_alloc_noncoherent, but also dma_alloc_coherent()
-> returns a memory region on my SoC.  I am confused...
+> Did I miss something?
 >
 
-On systems like this, dma_alloc_coherent() will simply return 
-non-cacheable memory. Since the cache is not being used, the memory is 
-coherent.
-
-If you mmap the DMA buffer to user space, this will have performance 
-implications for the userspace program. If you use the region as a 
-"bounce" buffer, this is usually faster than using the streaming API.
-
--- 
-Mike Looijmans
+Ah, apologies for sharing incorrect information. I was under the
+impression that A53 does not support 16k pages either, but apparently
+I was wrong.
+So what does your ID_AA64MMFR0_EL1 register say?
