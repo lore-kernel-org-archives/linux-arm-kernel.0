@@ -1,37 +1,29 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 30 Dec 2015 18:58:31 -0800
-Subject: [GIT PULL] BCM2835/6 changes for 4.5 (I hope)
-In-Reply-To: <1451365282-10505-1-git-send-email-eric@anholt.net>
-References: <1451365282-10505-1-git-send-email-eric@anholt.net>
-Message-ID: <568499D7.8030400@gmail.com>
+From: leilk.liu@mediatek.com (Leilk Liu)
+Date: Thu, 31 Dec 2015 10:58:59 +0800
+Subject: [PATCH 0/4] SPI: support mt2701 IC
+Message-ID: <1451530743-8995-1-git-send-email-leilk.liu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 28/12/2015 21:01, Eric Anholt a ?crit :
-> Apparently this is really late in the process (sorry!  I still haven't
-> figured out the timelines.), but I'm hoping we could merge these
-> changes for 4.5.  This includes the Raspberry Pi 2 port, with just two
-> minor fixes from the last submission.
-> 
-> The reason I've been pushing hard to get pi2 in is:
-> 
-> 1) It's a lot of conflict resolution every version since it requires
-> splitting the 2835 DT file.
-> 
-> 2) People are generally using pi2 these days, so it means people are
-> more likely to upstream 2835 driver code if we have an upstream port
-> they can run.
-> 
-> Testing status: kbuild test robot builds passed.  Boot tested each
-> branch head on pi1.  Boot tested the merge of all 4 branches on pi1.
-> Boot tested the merge of all 4 branches on pi2, with and without the
-> irqchip fixes.
+This series are based on 4.4-rc1 and provide 4 patches to support
+mt2701 spi HW.
 
-Considering that we are fairly late for v4.5, I would prefer if Arnd,
-Olof or Kevin could take these directly into their respective branches,
-if this is really really too late, then I will queue these changes, and
-the next ones you have for v4.6.
+Change in this series:
+1. merge all identical compat to mtk_common_compat;
+2. Add spi support for mt2701 IC;
+3. add spi dts for mt2701;
+4. Add bindings for mediatek MT2701 soc platform.
 
-Thanks and happy holidays!
--- 
-Florian
+Leilk Liu (4):
+  spi: mediatek: merge all identical compat to mtk_common_compat
+  spi: mediatek: Add spi support for mt2701 IC
+  dts: mt2701: add spi dts for mt2701
+  Document: spi: Add bindings for mediatek MT2701 soc platform
+
+ .../devicetree/bindings/spi/spi-mt65xx.txt         |    5 ++-
+ arch/arm/boot/dts/mt2701.dtsi                      |   39 ++++++++++++++++++++
+ drivers/spi/spi-mt65xx.c                           |   18 ++++++---
+ 3 files changed, 55 insertions(+), 7 deletions(-)
+
+--
+1.7.9.5
