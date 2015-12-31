@@ -1,47 +1,99 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 31 Dec 2015 15:45:22 +0100
-Subject: [PATCH 2/4] soc: mediatek: Init MT8173 scpsys driver earlier
-In-Reply-To: <1451553394.10610.14.camel@mtksdaap41>
-References: <1451457706-14798-1-git-send-email-jamesjj.liao@mediatek.com>
- <1451541566.10610.10.camel@mtksdaap41> <1451553394.10610.14.camel@mtksdaap41>
-Message-ID: <4141203.8f3N9nOLLy@wuerfel>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 31 Dec 2015 23:57:55 +0900
+Subject: [Question about DMA] Consistent memory?
+In-Reply-To: <20151231102548.3ed389fb@lxorguk.ukuu.org.uk>
+References: <CAK7LNASd1amcHinXzYy=8mtYbnHUY1G_v=fthpachAVSyjqPZA@mail.gmail.com>
+ <20151231102548.3ed389fb@lxorguk.ukuu.org.uk>
+Message-ID: <CAK7LNAS3wXfJ_syOEMoi1aEt5_maNur05figQ472_9usGQagHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 31 December 2015 17:16:34 James Liao wrote:
-> 
-> """
-> Take a example for our IOMMU(M4U) and SMI.  The IOMMU which is
-> subsys_init defaultly will depend on SMI. 
-> The SMI is a bridge between m4u and the Multimedia HW.  About the HW
-> block diagram and more other information please help check  [1].
-> SMI is responsible to enable/disable iommu and help transfer data for
-> each Multimedia HW,  Both have to wait until the power and the clocks is
-> enabled.  
-> 
-> So our iommu should probe done after smi, smi should be after
-> power-domain, and all the iommu consumer(display/vdec/venc/camera etc.)
-> should be after the iommu.
-> Then all the multimedia module will be delayed by power-domain who is
-> module_init currently.
-> 
-> After grep, we get some example whose  pm is not module_init:
-> core_initcall(exynos4_pm_init_power_domain);
-> subsys_initcall(imx_pgc_init);
-> 
-> So we expect move the power-domain initial more earlier too.  The
-> power-domain seems to be a basic module like ccf.
-> Is there some special reason about we should use module_init,  or do you
-> have any concern if we change it?
-> Thanks.
+Hi Alan, Mike,
 
-Ok, got it. Generally, we should try to avoid using the earlier initcall
-levels, but a few things like clock controllers, iommus etc are special
-enough that we need to make sure their dependencies are there by the
-time those are probed.
+Thanks for your help!
 
-Please put your explanation above into the patch changelog and add a code
-comment about the IOMMU next to the subsys_initcall() so it doesn't
-accidentally get changed when someone tries to do a code cleanup.
 
-	Arnd
+2015-12-31 19:25 GMT+09:00 One Thousand Gnomes <gnomes@lxorguk.ukuu.org.uk>:
+
+>>
+>> In a system like Fig.2, is the memory non-consistent?
+>
+> dma_alloc_coherent will always provide you with coherent memory. On a
+> machine with good cache interfaces it will provide you with normal
+> memory. On some systems it may be memory from a special window, in other
+> cases it will fall back to providing uncached memory for this.
+>
+> If the platform genuinely cannot support this (even by marking those areas
+> uncacheable) then it will fail the allocation.
+>
+> What it does mean is that you need to use non-coherent mappings when
+> accessing a lot of data. On hardware without proper cache coherency it
+> may be quite expensive to access coherent memory.
+
+
+Now, it is clearer to me.
+The following is what I understood.
+(Please point out if I am wrong.)
+
+
+I think, roughly, there are two ways for handling DMA:
+(At first, I was so confused that I was thinking about [1] and [2] mixed.)
+
+
+
+[1] DMA-coherent buffers
+
+Allocate buffers with dma_alloc_coherent()
+and just have access to the buffers without cache synchronization.
+
+There is no need to call dma_sync_single_for_*().
+
+
+
+[2] Streaming DMA
+
+Allocate buffers with kmalloc() or friends,
+and then map them for DMA with dma_map_single().
+
+The buffers are cached, so they are non-consitent
+unless there exists hardware assist such as
+Cache Coherency Interconnect.
+
+The drivers must invoke cache operations
+by calling dma_sync_single_for_*().
+
+
+
+
+Is there any guideline about which way should be used in drivers?
+
+I think, if the buffer size is small, [1] is more efficient
+because it need not invoke cache operations.
+
+If the buffer is large, [2] seems better because
+the cost of uncached memory access gets more expensive
+than that of cache operations.
+
+(If devices are connected to the memory controller
+via Cache Coherency Interconnect, [1] always works very well.
+But drivers should be written in a portable way, so
+such a hardware implementation should not be expected.)
+
+I am not sure about the border line between [1] and [2], though...
+
+
+
+BTW, I am studying the DMA APIs in order to write a new
+MMC host driver for my ARM SoC.
+
+
+I grepped under drivers/mmc/host, and
+I found many drivers call dma_alloc_coherent(),
+but there are also some drivers that use dma_map_single().
+
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
