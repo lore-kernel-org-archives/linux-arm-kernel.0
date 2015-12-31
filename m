@@ -1,42 +1,48 @@
 From: mst@redhat.com (Michael S. Tsirkin)
-Date: Thu, 31 Dec 2015 21:07:18 +0200
-Subject: [PATCH v2 12/32] x86/um: reuse asm-generic/barrier.h
+Date: Thu, 31 Dec 2015 21:07:59 +0200
+Subject: [PATCH v2 17/32] arm: define __smp_xxx
 In-Reply-To: <1451572003-2440-1-git-send-email-mst@redhat.com>
 References: <1451572003-2440-1-git-send-email-mst@redhat.com>
-Message-ID: <1451572003-2440-13-git-send-email-mst@redhat.com>
+Message-ID: <1451572003-2440-18-git-send-email-mst@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On x86/um CONFIG_SMP is never defined.  As a result, several macros
-match the asm-generic variant exactly. Drop the local definitions and
-pull in asm-generic/barrier.h instead.
+This defines __smp_xxx barriers for arm,
+for use by virtualization.
 
-This is in preparation to refactoring this code area.
+smp_xxx barriers are removed as they are
+defined correctly by asm-generic/barriers.h
+
+This reduces the amount of arch-specific boiler-plate code.
 
 Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/x86/um/asm/barrier.h | 9 +--------
- 1 file changed, 1 insertion(+), 8 deletions(-)
+ arch/arm/include/asm/barrier.h | 12 +++---------
+ 1 file changed, 3 insertions(+), 9 deletions(-)
 
-diff --git a/arch/x86/um/asm/barrier.h b/arch/x86/um/asm/barrier.h
-index 755481f..174781a 100644
---- a/arch/x86/um/asm/barrier.h
-+++ b/arch/x86/um/asm/barrier.h
-@@ -36,13 +36,6 @@
- #endif /* CONFIG_X86_PPRO_FENCE */
+diff --git a/arch/arm/include/asm/barrier.h b/arch/arm/include/asm/barrier.h
+index 31152e8..112cc1a 100644
+--- a/arch/arm/include/asm/barrier.h
++++ b/arch/arm/include/asm/barrier.h
+@@ -60,15 +60,9 @@ extern void arm_heavy_mb(void);
  #define dma_wmb()	barrier()
+ #endif
  
+-#ifndef CONFIG_SMP
 -#define smp_mb()	barrier()
 -#define smp_rmb()	barrier()
 -#define smp_wmb()	barrier()
--
--#define smp_store_mb(var, value) do { WRITE_ONCE(var, value); barrier(); } while (0)
--
--#define read_barrier_depends()		do { } while (0)
--#define smp_read_barrier_depends()	do { } while (0)
-+#include <asm-generic/barrier.h>
+-#else
+-#define smp_mb()	dmb(ish)
+-#define smp_rmb()	smp_mb()
+-#define smp_wmb()	dmb(ishst)
+-#endif
++#define __smp_mb()	dmb(ish)
++#define __smp_rmb()	__smp_mb()
++#define __smp_wmb()	dmb(ishst)
  
- #endif
+ #include <asm-generic/barrier.h>
+ 
 -- 
 MST
