@@ -1,38 +1,53 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 01 Jan 2016 15:09:10 +0100
-Subject: [PATCH] drm: arm-hdlcd: remove DMA_CMA select
-Message-ID: <4194408.X82ccDjh5X@wuerfel>
+Date: Fri, 01 Jan 2016 15:21:54 +0100
+Subject: [PATCH v2] udf: avoid uninitialized variable use
+In-Reply-To: <9221187.T0u8gszVyj@wuerfel>
+References: <9221187.T0u8gszVyj@wuerfel>
+Message-ID: <5491623.oZlI0zcRmi@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly added DRM_HDLCD driver tries to select DMA_CMA, but that is
-not necessarily possible, as not all configurations contain HAVE_DMA_CONTIGUOUS:
+A new warning about a real bug has come up from a recent cleanup:
 
-warning: (DRM_HDLCD) selects DMA_CMA which has unmet direct dependencies (HAVE_DMA_CONTIGUOUS && CMA)
-drivers/built-in.o: In function `dma_alloc_from_contiguous':
-:(.text+0x1dee00): undefined reference to `cma_alloc'
-drivers/built-in.o: In function `dma_release_from_contiguous':
-:(.text+0x1dee24): undefined reference to `cma_release'
+fs/udf/inode.c: In function 'udf_setup_indirect_aext':
+fs/udf/inode.c:1927:28: warning: 'adsize' may be used uninitialized in this function [-Wmaybe-uninitialized]
 
-This removes the 'select' statement. It is not needed because CMA is meant
-to transparently change the behavior of dma_alloc_coherent to make it succeed
-for larger allocations, but there is no actual build-time dependency, and
-the driver can still work without CMA in many cases.
+If the alloc_type is neither ICBTAG_FLAG_AD_SHORT nor ICBTAG_FLAG_AD_LONG,
+the value of adsize is undefined. This changes the code to use zero for adsize
+in that case, which may be the correct solution, though I have not looked
+at the code in enough detail to know if it should be something else instead.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 1561e558334d ("drm: Add support for ARM's HDLCD controller.")
+Fixes: fcea62babc81 ("udf: Factor out code for creating indirect extent")
 ---
-Found on ARM randconfig builds with yesterday's linux-next
+sorry for missing another instance the first time around. The warning is
+a bit unreliable and it seems in my first configuration I got it only
+for one of the two instances that show it in other configuration.
 
-diff --git a/drivers/gpu/drm/arm/Kconfig b/drivers/gpu/drm/arm/Kconfig
-index 5e8c8a86860b..2f4d3b7fb871 100644
---- a/drivers/gpu/drm/arm/Kconfig
-+++ b/drivers/gpu/drm/arm/Kconfig
-@@ -10,7 +10,6 @@ config DRM_HDLCD
- 	depends on DRM_ARM
- 	depends on COMMON_CLK
- 	select COMMON_CLK_SCPI
--	select DMA_CMA
- 	select DRM_KMS_CMA_HELPER
- 	select DRM_GEM_CMA_HELPER
- 	help
+After checking the remaining functions in this file for the same possible
+problem, I found that the other functions use either 'BUG()' or 'return -EIO'
+in the 'else' path, so I assume the two functions here should one of those
+as well, but I don't know which.
+
+diff --git a/fs/udf/inode.c b/fs/udf/inode.c
+index 5b83351041a4..42f68dd7e6ef 100644
+--- a/fs/udf/inode.c
++++ b/fs/udf/inode.c
+@@ -1890,6 +1890,8 @@ int udf_setup_indirect_aext(struct inode *inode, int block,
+ 		adsize = sizeof(struct short_ad);
+ 	else if (UDF_I(inode)->i_alloc_type == ICBTAG_FLAG_AD_LONG)
+ 		adsize = sizeof(struct long_ad);
++	else
++		adsize = 0;
+ 
+ 	neloc.logicalBlockNum = block;
+ 	neloc.partitionReferenceNum = epos->block.partitionReferenceNum;
+@@ -1963,6 +1965,8 @@ int __udf_add_aext(struct inode *inode, struct extent_position *epos,
+ 		adsize = sizeof(struct short_ad);
+ 	else if (iinfo->i_alloc_type == ICBTAG_FLAG_AD_LONG)
+ 		adsize = sizeof(struct long_ad);
++	else
++		adsize = 0;
+ 
+ 	if (!epos->bh) {
+ 		WARN_ON(iinfo->i_lenAlloc !=
