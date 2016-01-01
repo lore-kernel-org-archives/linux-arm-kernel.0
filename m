@@ -1,50 +1,44 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 01 Jan 2016 14:55:24 +0100
-Subject: [PATCH] fsl/fman: allow modular build
-Message-ID: <4109142.02mezJXbJM@wuerfel>
+Date: Fri, 01 Jan 2016 14:59:41 +0100
+Subject: [PATCH 0/1 for 4.4-rc8] ARM: Fix broken USB support in
+ sunxi_defconfig
+In-Reply-To: <20160101132501.F192B6C803F0@dd34104.kasserver.com>
+References: <1451353653-17484-1-git-send-email-public_timo.s@silentcreek.de>
+ <4865776.yyMBHQfnua@wuerfel>
+ <20160101132501.F192B6C803F0@dd34104.kasserver.com>
+Message-ID: <4797602.u4tEtbBRPK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM allmodconfig fails because of the addition of the FMAN driver:
+On Friday 01 January 2016 14:25:01 Timo Sigurdsson wrote:
+> Hi Arnd,
+> 
+> Arnd Bergmann schrieb am 31.12.2015 16:46:
+> 
+> > On Tuesday 29 December 2015 02:47:32 Timo Sigurdsson wrote:
+> >> Here is a late patch aimed for 4.4-rc8 (or 4.4). It would be nice if this   
+> >> could make it into 4.4 in order to avoid unpleasent surprises (and
+> >> subsequent questions) with builds based on sunxi_defconfig. At the moment,
+> >> some boards (e.g. LeMaker BananaPi) are left with non-functional USB ports
+> >> as a newly added driver is required to power them.
+> > 
+> > It's a bit confusing to send a patch to so many recipients, that usually
+> > leads to nobody applying it. I can put it into the fixes branch in arm-soc
+> > but need an Ack from the sunxi maintainer(s).
+> 
+> Sorry, I didn't know any better. Almost all recipients came from the
+> get-maintainers script (which I thought were mandatory to include). What's
+> the recommended way in such cases?
 
-drivers/built-in.o: In function `dtsec_restart_autoneg':
-binder.c:(.text+0x173328): undefined reference to `mdiobus_read'
-binder.c:(.text+0x173348): undefined reference to `mdiobus_write'
-drivers/built-in.o: In function `dtsec_config':
-binder.c:(.text+0x173d24): undefined reference to `of_phy_find_device'
-drivers/built-in.o: In function `init_phy':
-binder.c:(.text+0x1763b0): undefined reference to `of_phy_connect'
-drivers/built-in.o: In function `stop':
-binder.c:(.text+0x176014): undefined reference to `phy_stop'
-drivers/built-in.o: In function `start':
-binder.c:(.text+0x176078): undefined reference to `phy_start'
+Just put everyone on Cc, and have the most appropriate recipient (which you
+expect to act on the path) as 'To'. Also, address that person in the
+cover letter so they know they should act on it, e.g. "Hi Maxime,
+can you pick up this patch and forward it to arm-soc?".
+ 
+> I already prepared and tested a patch for multi_v7_defconfig which I'll
+> send to the same recipients as before just for the sake of not shutting
+> out people that were previously addressed in this conversation.
 
-The reason is that the driver uses PHYLIB, but that is a loadable
-module here, and fman itself is built-in.
+Ok, thanks.
 
-This patch makes it possible to configure fman as a module as well
-so we don't change the status of PHYLIB in an allmodconfig kernel,
-and it adds a 'select PHYLIB' statement to ensure that phylib is
-always built-in when fman is.
-
-The driver uses "builtin_platform_driver(fman_driver);", which means
-it cannot be unloaded, but it's still possible to have it as a loadable
-module that gets loaded once and never removed.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 5adae51a64b8 ("fsl/fman: Add FMan MURAM support")
-
-diff --git a/drivers/net/ethernet/freescale/fman/Kconfig b/drivers/net/ethernet/freescale/fman/Kconfig
-index 66b729692b48..79b7c84b7869 100644
---- a/drivers/net/ethernet/freescale/fman/Kconfig
-+++ b/drivers/net/ethernet/freescale/fman/Kconfig
-@@ -1,7 +1,8 @@
- config FSL_FMAN
--	bool "FMan support"
-+	tristate "FMan support"
- 	depends on FSL_SOC || COMPILE_TEST
- 	select GENERIC_ALLOCATOR
-+	select PHYLIB
- 	default n
- 	help
- 		Freescale Data-Path Acceleration Architecture Frame Manager
+	Arnd
