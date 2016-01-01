@@ -1,32 +1,45 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 01 Jan 2016 15:38:53 +0100
-Subject: [PATCH 2/3] drm: arm-hdlcd: remove COMMON_CLK_SCPI select
+Date: Fri, 01 Jan 2016 15:39:17 +0100
+Subject: [PATCH 3/3] drm: arm-hdlcd: fix build warnings for !CONFIG_PM
 In-Reply-To: <4194408.X82ccDjh5X@wuerfel>
 References: <4194408.X82ccDjh5X@wuerfel>
-Message-ID: <3381082.HCMeGm07UJ@wuerfel>
+Message-ID: <2621741.YulfsnvZOh@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The hdlcd driver has no build-time dependency on the SCPI clock
-and the bogus 'select' causes a warning when SCPI is disabled:
+The hdlcd_pm_suspend and hdlcd_pm_resume are intentionally unused
+when CONFIG_PM is not set in this driver, and we get a compiler warning
+for this:
 
-warning: (DRM_HDLCD) selects COMMON_CLK_SCPI which has unmet direct dependencies (COMMON_CLK && (ARM_SCPI_PROTOCOL || COMPILE_TEST))
+drivers/gpu/drm/arm/hdlcd_drv.c:521:12: warning: 'hdlcd_pm_suspend' defined but not used [-Wunused-function]
+drivers/gpu/drm/arm/hdlcd_drv.c:536:12: warning: 'hdlcd_pm_resume' defined but not used [-Wunused-function]
 
-This removes the select statement.
+This adds a __maybe_unused annotation for the two functions, to let
+the compiler know this is the intended behavior. This is better than
+an #ifdef as it improves the compile time coverage of the code and it
+looks nicer.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-Found two more bugs in the same driver, so this is now a patch series
 
-diff --git a/drivers/gpu/drm/arm/Kconfig b/drivers/gpu/drm/arm/Kconfig
-index 2f4d3b7fb871..81ea7802ca50 100644
---- a/drivers/gpu/drm/arm/Kconfig
-+++ b/drivers/gpu/drm/arm/Kconfig
-@@ -9,7 +9,6 @@ config DRM_HDLCD
- 	tristate "ARM HDLCD"
- 	depends on DRM_ARM
- 	depends on COMMON_CLK
--	select COMMON_CLK_SCPI
- 	select DRM_KMS_CMA_HELPER
- 	select DRM_GEM_CMA_HELPER
- 	help
+diff --git a/drivers/gpu/drm/arm/hdlcd_drv.c b/drivers/gpu/drm/arm/hdlcd_drv.c
+index 31969efe97d4..6173bb835223 100644
+--- a/drivers/gpu/drm/arm/hdlcd_drv.c
++++ b/drivers/gpu/drm/arm/hdlcd_drv.c
+@@ -518,7 +518,7 @@ static const struct of_device_id  hdlcd_of_match[] = {
+ };
+ MODULE_DEVICE_TABLE(of, hdlcd_of_match);
+ 
+-static int hdlcd_pm_suspend(struct device *dev)
++static int __maybe_unused hdlcd_pm_suspend(struct device *dev)
+ {
+ 	struct drm_device *drm = dev_get_drvdata(dev);
+ 	struct drm_crtc *crtc;
+@@ -533,7 +533,7 @@ static int hdlcd_pm_suspend(struct device *dev)
+ 	return 0;
+ }
+ 
+-static int hdlcd_pm_resume(struct device *dev)
++static int __maybe_unused hdlcd_pm_resume(struct device *dev)
+ {
+ 	struct drm_device *drm = dev_get_drvdata(dev);
+ 	struct drm_crtc *crtc;
