@@ -1,45 +1,53 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 1 Jan 2016 18:29:15 +0100
-Subject: [PATCH] pinctrl: mediatek: convert to arch_initcall
-In-Reply-To: <DBFC9B9B-5E81-44FD-9E26-8B50545004C1@gmail.com>
-References: <1450792017-7120-1-git-send-email-djkurtz@chromium.org>
- <CACRpkdbRDzXunYK5d6Ld4Z2a=0mkp4KBvgL2P-St4P65Jajamw@mail.gmail.com>
- <20151230172212.GZ16023@sirena.org.uk>
- <CAGS+omA9AarzE2sp1Ry3RuOt8EOa-sL=DL1iDA2OeVVdjn=xgg@mail.gmail.com>
- <20151231220712.GD16023@sirena.org.uk>
- <CAGS+omDesPTYHhVLv_EtQsYxa6MNuSi06MwcXz6RcY=uAcEtnQ@mail.gmail.com>
- <DBFC9B9B-5E81-44FD-9E26-8B50545004C1@gmail.com>
-Message-ID: <CACRpkdZsQc_Jug1dy-qist4Dv7HTDDx-fBjXTxj+s7W0sgJSuw@mail.gmail.com>
+From: v1ron@mail.ru (Roman Volkov)
+Date: Fri, 1 Jan 2016 20:32:30 +0300
+Subject: [PATCH v3 RESEND 0/2] WM8505/WM8650 DT fixes for SD card
+ controller
+In-Reply-To: <7786478.TezhYjHkEF@wuerfel>
+References: <1451655492-2569-1-git-send-email-v1ron@mail.ru>
+ <7786478.TezhYjHkEF@wuerfel>
+Message-ID: <20160101203230.1dc5e655@v1ron-s7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 1, 2016 at 3:27 PM, Matthias Brugger <matthias.bgg@gmail.com> wrote:
-> On January 1, 2016 3:56:01 AM EET, Daniel Kurtz <djkurtz@chromium.org> wrote:
+? Fri, 01 Jan 2016 15:29:29 +0100
+Arnd Bergmann <arnd@arndb.de> ?????:
 
->>> It's fairly clear that there's at least a case for simplifying the
->>> existing practice here, for example by moving everything into a
->>single
->>> (perhaps aliased) initcall rather than by randomly picking a level
->>per
->>> system or by actually fiddling with the link ordering if the case is
->>> sufficiently clear that pinctrl in general ought to load earlier than
->>it
->>> does.
->>
->>Nothing above sounds like a reason not to merge this patch, however.
->>Why should we block useful patches that use existing tools to fix real
->>architecture-specific issues until new infrastructure is merged that
->>solves general problems?
->
-> I think what Mark means is, that we define some pinctrl_initcall which
-> is a macro to subsys_initcall (or arch_initcall or similar). We apply this
-> to all pinctrl drivers including the one from Mediatek. This way at least
-> we have a common method and changing the behaviour in the future is
-> easier to handle.
+> On Friday 01 January 2016 16:38:10 Roman Volkov wrote:
+> > From: Roman Volkov <rvolkov@v1ros.org>
+> > 
+> > This patch set enables SD controller support for WM8650 and
+> > fixes minor errors in WM8505 Device Tree file.
+> > 
+> > Changes in v3:
+> > 1. Add minor fixes for WM8505 SDHC node
+> > 
+> > Tested on both WM8505 and WM8650.
+> > 
+> > Roman Volkov (2):
+> >   dts: vt8500: Add SDHC node to DTS file for WM8650
+> >   dts: vt8500: Fix errors in SDHC node for WM8505
+> > 
+> >  arch/arm/boot/dts/wm8505.dtsi | 4 ++--
+> >  arch/arm/boot/dts/wm8650.dtsi | 9 +++++++++
+> >  2 files changed, 11 insertions(+), 2 deletions(-)
+> > 
+> > -- 
+> > Hi maintainers, I see my previous versions were not applied. Could
+> > this little patch set be applied for the linux-next? I don't think
+> > this is new functionality, this must be considered as bugfix for
+> > existing Device Tree.
+> > 
+> > Any other suggestions?
+> >   
+> 
+> Applied both to next/dt, thanks a lot for following up!
+> 
+> Let me know if you think this should go into stable backports as well,
+> I did not apply it to the fixes branch as you don't have a
+> 'Cc: stable at vger.kernel.org' tag and it has never worked so far.
 
-That would be pinctrl_soc_initcall() in that case. Just pinctrl_initcall()
-would assume it's for all drivers and there is a bunch of them that are just
-fine with simple device_initcall()s.
+Yes, this must go into the stable too. Let me know if I must change
+something or resend.
 
-Yours,
-Linus Walleij
+Thanks,
+Roman
