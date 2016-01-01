@@ -1,57 +1,48 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 1 Jan 2016 13:03:05 +0100
-Subject: [PATCH RFC] ARM: tango4: Fix build issues
-In-Reply-To: <56865A5C.5050601@free.fr>
-References: <567DBA04.4060709@free.fr> <20151231132116.GB1547@localhost>
- <CAOesGMhBkacNRxQaBKG8f5Bv2FXH504YCj_O0eL=FwGzY03H-Q@mail.gmail.com>
- <56865A5C.5050601@free.fr>
-Message-ID: <56866AF9.5000601@free.fr>
+From: geliangtang@163.com (Geliang Tang)
+Date: Fri,  1 Jan 2016 20:29:00 +0800
+Subject: [PATCH 2/2 v2] spi: zynq: use to_platform_device()
+In-Reply-To: <80986828f7ac394fef839514fbbc78ce0b18a675.1451650817.git.geliangtang@163.com>
+References: <80986828f7ac394fef839514fbbc78ce0b18a675.1451650817.git.geliangtang@163.com>
+Message-ID: <ef19dceeb9e5175b59d2d875f7fad4cd59ca4ff0.1451650817.git.geliangtang@163.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/01/2016 11:52, Mason wrote:
-> On 31/12/2015 17:31, Olof Johansson wrote:
->> On Thu, Dec 31, 2015 at 2:21 PM, Olof Johansson <olof@lixom.net> wrote:
->>> On Fri, Dec 25, 2015 at 10:49:56PM +0100, Mason wrote:
->>>> From: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
->>>>
->>>> Move SMP setup to platsmp.c
->>>> Specify the CPU type to the assembler, and only for smc.S
->>>>
->>>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
->>>> ---
->>>
->>> Applied, thanks.
->>
->> Actually, I just noticed that the smc.c Makefile part isn't done as it
->> should, so I'll drop this again.
-> 
-> <grumble>
-> 
-> This is probably a bike-shed issue that I should let slide...
-> 
-> But can someone explain to me: in what circumstances
-> 
-> plus_sec := $(call as-instr,.arch_extension sec,+sec)
-> AFLAGS_smc.o :=-Wa,-march=armv7-a$(plus_sec)
-> 
-> is preferable over
-> 
-> AFLAGS_smc.o := -Wa,-mcpu=cortex-a9
-> 
-> in a machine-specific Makefile?
-> 
-> 
-> Arnd mentioned consistency with other machines; ISTM that
-> simplicity and obviousness are also desirable characteristics.
+Use to_platform_device() instead of open-coding it.
 
-For the sake of completeness, the +sec shenanigans are required
-because of this 2010 binutils patch:
+Signed-off-by: Geliang Tang <geliangtang@163.com>
+Reviewed-by: Moritz Fischer <moritz.fischer@ettus.com>
+---
+Changes in v2:
+ - split from 'spi: cadence, zynq: use to_platform_device()'
+---
+ drivers/spi/spi-zynqmp-gqspi.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
-https://sourceware.org/ml/binutils/2010-09/msg00412.html
-
-Specifying the CPU instead of an ISA (plus extensions) leaves
-the instruction set selection up to the assembler, so the same
-flag works for both old and new binutils.
-
-Regards.
+diff --git a/drivers/spi/spi-zynqmp-gqspi.c b/drivers/spi/spi-zynqmp-gqspi.c
+index f23f36e..aab9b49 100644
+--- a/drivers/spi/spi-zynqmp-gqspi.c
++++ b/drivers/spi/spi-zynqmp-gqspi.c
+@@ -917,9 +917,7 @@ static int zynqmp_qspi_start_transfer(struct spi_master *master,
+  */
+ static int __maybe_unused zynqmp_qspi_suspend(struct device *dev)
+ {
+-	struct platform_device *pdev = container_of(dev,
+-						    struct platform_device,
+-						    dev);
++	struct platform_device *pdev = to_platform_device(dev);
+ 	struct spi_master *master = platform_get_drvdata(pdev);
+ 
+ 	spi_master_suspend(master);
+@@ -940,9 +938,7 @@ static int __maybe_unused zynqmp_qspi_suspend(struct device *dev)
+  */
+ static int __maybe_unused zynqmp_qspi_resume(struct device *dev)
+ {
+-	struct platform_device *pdev = container_of(dev,
+-						    struct platform_device,
+-						    dev);
++	struct platform_device *pdev = to_platform_device(dev);
+ 	struct spi_master *master = platform_get_drvdata(pdev);
+ 	struct zynqmp_qspi *xqspi = spi_master_get_devdata(master);
+ 	int ret = 0;
+-- 
+2.5.0
