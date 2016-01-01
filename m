@@ -1,66 +1,43 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 01 Jan 2016 21:23:48 +0100
-Subject: [PATCH v2 RESEND 1/3] clocksource/vt8500: Use MIN_OSCR_DELTA from
- PXA
-In-Reply-To: <20160101023208.7721e085@v1ron-s7> (Roman Volkov's message of
- "Fri, 1 Jan 2016 02:32:08 +0300")
-References: <1451584927-4051-1-git-send-email-v1ron@mail.ru>
- <1451584927-4051-2-git-send-email-v1ron@mail.ru>
- <alpine.DEB.2.11.1512312331580.28591@nanos>
- <20160101023208.7721e085@v1ron-s7>
-Message-ID: <871ta1f3qj.fsf@belgarion.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 01 Jan 2016 22:50:43 +0100
+Subject: [PATCH] [BUG] clk: rockchip: don't mark clock names as initconst
+In-Reply-To: <1799610.nrn5HMCSxL@diego>
+References: <2791943.MBZ53mI7Gp@wuerfel> <1799610.nrn5HMCSxL@diego>
+Message-ID: <6692523.e5K11FUKe0@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Roman Volkov <v1ron@mail.ru> writes:
+On Friday 01 January 2016 18:06:30 Heiko St?bner wrote:
+> 
+> "[PATCH] clk: rockchip: fix section mismatches with new child-clocks" [0]
+> 
+> should be in Mike's + Stephen's inbox since last week as well, which moves the 
+> offending new elements into separate entities, which can have __initdata 
+> attributes again.
+> 
+> 
+> Heiko
+> 
+> [0] http://www.spinics.net/lists/arm-kernel/msg471295.html
 
-> ? Thu, 31 Dec 2015 23:33:45 +0100 (CET)
-> Thomas Gleixner <tglx@linutronix.de> ?????:
->
->> Roman,
->> 
->> On Thu, 31 Dec 2015, Roman Volkov wrote:
->> > Since vt8500 and PXA timers are identical, use MIN_OSCR_DELTA from
->> > PXA, which is bigger than existing value. It is required to
->> > determine the minimum delay which hardware can generate.  
->> 
->> Now that brings up the obvious question:
->> 
->> If the vt8500 and PXA timers are identical why has vt8500 it's own
->> slightly different implementation and does not use the PXA timer?
->
-> Thomas,
->
-> I occasionally noticed that the PXA can be reused, when working on the
-> bugfix for vt8500. Another good question would be how exactly this code
-> can be reused. We may rework PXA driver to make it working under
-> vt8500, or include the C code from the vt8500 and get two slightly
-> different modules. You may look at our previous discussion with Alexey:
->
-> https://lkml.org/lkml/2015/12/21/437
->
-> Adding Robert and Bill to get more opinions. At this step, fixing the
-> vt8500 nanosleep bug is a priority.
+The patch looks good, but for some reason, the next-20151223 kernel had no
+problem and next-20151231 was broken, the top commits in drivers/clk/rockchips
+are:
 
-Personnaly I'm not very thrilled by combining pxa and vt8500 drivers into one.
+commit a915e30dd26ea5f3cc2e2c044aba38ee5973d3fa
+Merge: ce6dd266d535 b0158bb27c7b
+Author: Michael Turquette <mturquette@baylibre.com>
+Date:   Wed Dec 23 13:08:56 2015 -0800
 
-The rationale I have behind is that :
- - the new driver will have new ifs to switch form vt8500 to pxa
-   For example, suspend/resume functions will be different.
-   Moreover in order to not impact the pxa runtime some ifs will be necessary
-   (will that be if (IS_ENABLED(CONFIG_ARCH_PXA) && ...)
- - the IPs do not look that similar to me
-   They seems inter-operable, but that seems to me to be just because of the 3
-   common register placement : register at match (@0x00), counter (@0x10) and
-   interrupt enabled (@0x1c).
-   The register acces semantics are different (vt8500 needs a bit to access),
-   the input clock seems different.
+    Merge branch 'clk-rockchip' into clk-next
 
-For ~140 lines of code, I prefer the simplicity brought by drivers
-separation. The diffstat should be pretty equivalent between 2 drivers and 1
-combined driver with many ifs.
+commit b0158bb27c7b6e9843f541c17b24dbd964b76db6
+Author: Xing Zheng <zhengxing@rock-chips.com>
+Date:   Tue Dec 22 22:28:01 2015 +0100
 
-Cheers.
+    clk: rockchip: rk3036: include downstream muxes into fractional dividers
+    
+    Use the newly introduced possibility to combine the fractional dividers
 
--- 
-Robert
+
+	Arnd
