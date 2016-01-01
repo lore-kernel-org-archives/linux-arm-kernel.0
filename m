@@ -1,48 +1,35 @@
-From: geliangtang@163.com (Geliang Tang)
-Date: Fri,  1 Jan 2016 20:29:00 +0800
-Subject: [PATCH 2/2 v2] spi: zynq: use to_platform_device()
-In-Reply-To: <80986828f7ac394fef839514fbbc78ce0b18a675.1451650817.git.geliangtang@163.com>
-References: <80986828f7ac394fef839514fbbc78ce0b18a675.1451650817.git.geliangtang@163.com>
-Message-ID: <ef19dceeb9e5175b59d2d875f7fad4cd59ca4ff0.1451650817.git.geliangtang@163.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 01 Jan 2016 13:47:41 +0100
+Subject: [PATCH] udf: avoid uninitialized variable use
+Message-ID: <9221187.T0u8gszVyj@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use to_platform_device() instead of open-coding it.
+A new warning about a real bug has come up from a recent cleanup:
 
-Signed-off-by: Geliang Tang <geliangtang@163.com>
-Reviewed-by: Moritz Fischer <moritz.fischer@ettus.com>
----
-Changes in v2:
- - split from 'spi: cadence, zynq: use to_platform_device()'
----
- drivers/spi/spi-zynqmp-gqspi.c | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+fs/udf/inode.c: In function 'udf_setup_indirect_aext':
+fs/udf/inode.c:1927:28: warning: 'adsize' may be used uninitialized in this function [-Wmaybe-uninitialized]
 
-diff --git a/drivers/spi/spi-zynqmp-gqspi.c b/drivers/spi/spi-zynqmp-gqspi.c
-index f23f36e..aab9b49 100644
---- a/drivers/spi/spi-zynqmp-gqspi.c
-+++ b/drivers/spi/spi-zynqmp-gqspi.c
-@@ -917,9 +917,7 @@ static int zynqmp_qspi_start_transfer(struct spi_master *master,
-  */
- static int __maybe_unused zynqmp_qspi_suspend(struct device *dev)
- {
--	struct platform_device *pdev = container_of(dev,
--						    struct platform_device,
--						    dev);
-+	struct platform_device *pdev = to_platform_device(dev);
- 	struct spi_master *master = platform_get_drvdata(pdev);
+If the alloc_type is neither ICBTAG_FLAG_AD_SHORT nor ICBTAG_FLAG_AD_LONG,
+the value of adsize is undefined. This changes the code to use zero for adsize
+in that case, which may be the correct solution, though I have not looked
+at the code in enough detail to know if it should be something else instead.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: fcea62babc81 ("udf: Factor out code for creating indirect extent")
+---
+Found on ARM randconfig kernels starting with yesterday's linux-next
+
+diff --git a/fs/udf/inode.c b/fs/udf/inode.c
+index 5b83351041a4..a1cc074c656f 100644
+--- a/fs/udf/inode.c
++++ b/fs/udf/inode.c
+@@ -1890,6 +1890,8 @@ int udf_setup_indirect_aext(struct inode *inode, int block,
+ 		adsize = sizeof(struct short_ad);
+ 	else if (UDF_I(inode)->i_alloc_type == ICBTAG_FLAG_AD_LONG)
+ 		adsize = sizeof(struct long_ad);
++	else
++		adsize = 0;
  
- 	spi_master_suspend(master);
-@@ -940,9 +938,7 @@ static int __maybe_unused zynqmp_qspi_suspend(struct device *dev)
-  */
- static int __maybe_unused zynqmp_qspi_resume(struct device *dev)
- {
--	struct platform_device *pdev = container_of(dev,
--						    struct platform_device,
--						    dev);
-+	struct platform_device *pdev = to_platform_device(dev);
- 	struct spi_master *master = platform_get_drvdata(pdev);
- 	struct zynqmp_qspi *xqspi = spi_master_get_devdata(master);
- 	int ret = 0;
--- 
-2.5.0
+ 	neloc.logicalBlockNum = block;
+ 	neloc.partitionReferenceNum = epos->block.partitionReferenceNum;
