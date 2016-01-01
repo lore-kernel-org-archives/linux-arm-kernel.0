@@ -1,100 +1,41 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 01 Jan 2016 23:27:57 +0100
-Subject: [PATCH] net: hns: avoid uninitialized variable warning:
-Message-ID: <6649249.INrAY8KJG0@wuerfel>
+Date: Fri, 01 Jan 2016 23:40:46 +0100
+Subject: [PATCH] gpiolib: always initialize *flags from of_get_named_gpio_flags
+Message-ID: <6037371.CvRA1dDj1l@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gcc fails to see that the use of the 'last_offset' variable
-in hns_nic_reuse_page() is used correctly and issues a bogus
-warning:
+The of_get_named_gpio_flags() function does nothing other than returning
+an error when CONFIG_OF_GPIO is disabled, but that causes spurious
+warnings about possible use of uninitialized variables in any code that
+does not check the of_get_named_gpio_flags() return value before trying
+to use the flags:
 
-drivers/net/ethernet/hisilicon/hns/hns_enet.c: In function 'hns_nic_reuse_page':
-drivers/net/ethernet/hisilicon/hns/hns_enet.c:541:6: warning: 'last_offset' may be used uninitialized in this function [-Wmaybe-uninitialized]
+drivers/input/misc/rotary_encoder.c: In function 'rotary_encoder_probe':
+drivers/input/misc/rotary_encoder.c:223:28: warning: 'flags' may be used uninitialized in this function [-Wmaybe-uninitialized]
+drivers/power/bq24735-charger.c: In function 'bq24735_charger_probe':
+drivers/power/bq24735-charger.c:227:12: warning: 'flags' may be used uninitialized in this function [-Wmaybe-uninitialized]
+drivers/power/sbs-battery.c: In function 'sbs_probe':
+drivers/power/sbs-battery.c:782:17: warning: 'gpio_flags' may be used uninitialized in this function [-Wmaybe-uninitialized]
 
-This simplifies the function to make it more obvious what is
-going on to both readers and compilers, which makes the warning
-go away.
+This changes the behavior of the inline helper to set the flags to zero
+when OF_GPIO is disabled, to avoid the warnings. In all cases I've
+encountered, we don't actually get to the place that uses the flags
+if CONFIG_OF is disabled because we won't enter the DT parser code.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-Compile-tested only, and complex enough that this requires a proper
-review and testing before it gets apply. Please have a look at this.
 
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_enet.c b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
-index 5a81dafd725e..0e30846a24f8 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_enet.c
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
-@@ -499,50 +499,47 @@ static void hns_nic_reuse_page(struct sk_buff *skb, int i,
- 	struct hnae_desc *desc;
- 	int truesize, size;
- 	int last_offset;
-+	bool twobufs;
+diff --git a/include/linux/of_gpio.h b/include/linux/of_gpio.h
+index 87d6d1632dd4..bb85a8eeba6a 100644
+--- a/include/linux/of_gpio.h
++++ b/include/linux/of_gpio.h
+@@ -67,6 +67,9 @@ extern int of_gpio_simple_xlate(struct gpio_chip *gc,
+ static inline int of_get_named_gpio_flags(struct device_node *np,
+ 		const char *list_name, int index, enum of_gpio_flags *flags)
+ {
++	if (flags)
++		*flags = 0;
 +
-+	twobufs = ((PAGE_SIZE < 8192) && hnae_buf_size(ring) == HNS_BUFFER_SIZE_2048);
- 
- 	desc = &ring->desc[ring->next_to_clean];
- 	size = le16_to_cpu(desc->rx.size);
- 
--#if (PAGE_SIZE < 8192)
--	if (hnae_buf_size(ring) == HNS_BUFFER_SIZE_2048) {
-+	if (twobufs) {
- 		truesize = hnae_buf_size(ring);
- 	} else {
- 		truesize = ALIGN(size, L1_CACHE_BYTES);
- 		last_offset = hnae_page_size(ring) - hnae_buf_size(ring);
- 	}
- 
--#else
--	truesize = ALIGN(size, L1_CACHE_BYTES);
--	last_offset = hnae_page_size(ring) - hnae_buf_size(ring);
--#endif
--
- 	skb_add_rx_frag(skb, i, desc_cb->priv, desc_cb->page_offset + pull_len,
- 			size - pull_len, truesize - pull_len);
- 
- 	 /* avoid re-using remote pages,flag default unreuse */
--	if (likely(page_to_nid(desc_cb->priv) == numa_node_id())) {
--#if (PAGE_SIZE < 8192)
--		if (hnae_buf_size(ring) == HNS_BUFFER_SIZE_2048) {
--			/* if we are only owner of page we can reuse it */
--			if (likely(page_count(desc_cb->priv) == 1)) {
--				/* flip page offset to other buffer */
--				desc_cb->page_offset ^= truesize;
--
--				desc_cb->reuse_flag = 1;
--				/* bump ref count on page before it is given*/
--				get_page(desc_cb->priv);
--			}
--			return;
--		}
--#endif
--		/* move offset up to the next cache line */
--		desc_cb->page_offset += truesize;
-+	if (unlikely(page_to_nid(desc_cb->priv) != numa_node_id()))
-+		return;
-+
-+	if (twobufs) {
-+		/* if we are only owner of page we can reuse it */
-+		if (likely(page_count(desc_cb->priv) == 1)) {
-+			/* flip page offset to other buffer */
-+			desc_cb->page_offset ^= truesize;
- 
--		if (desc_cb->page_offset <= last_offset) {
- 			desc_cb->reuse_flag = 1;
- 			/* bump ref count on page before it is given*/
- 			get_page(desc_cb->priv);
- 		}
-+		return;
-+	}
-+
-+	/* move offset up to the next cache line */
-+	desc_cb->page_offset += truesize;
-+
-+	if (desc_cb->page_offset <= last_offset) {
-+		desc_cb->reuse_flag = 1;
-+		/* bump ref count on page before it is given*/
-+		get_page(desc_cb->priv);
- 	}
+ 	return -ENOSYS;
  }
  
