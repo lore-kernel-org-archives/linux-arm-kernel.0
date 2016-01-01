@@ -1,45 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 01 Jan 2016 14:42:52 +0100
-Subject: [PATCH] [BUG] clk: rockchip: don't mark clock names as initconst
-Message-ID: <2791943.MBZ53mI7Gp@wuerfel>
+From: v1ron@mail.ru (Roman Volkov)
+Date: Fri,  1 Jan 2016 16:38:11 +0300
+Subject: [PATCH v3 RESEND 1/2] dts: vt8500: Add SDHC node to DTS file for
+ WM8650
+In-Reply-To: <1451655492-2569-1-git-send-email-v1ron@mail.ru>
+References: <1451655492-2569-1-git-send-email-v1ron@mail.ru>
+Message-ID: <1451655492-2569-2-git-send-email-v1ron@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The latest changes to the rockchip clk implementation cause
-tons of warnings and/or errors (depending on the configuration):
+From: Roman Volkov <rvolkov@v1ros.org>
 
-WARNING: vmlinux.o(.data+0x125394): Section mismatch in reference from the variable __compound_literal.125 to the (unknown reference) .init.rodata:(unknown)
+Since WM8650 has the same 'WMT' SDHC controller as WM8505, and the driver
+is already in the kernel, this node enables the controller support for
+WM8650
 
-The reason is a compount literal in a macro that refers to an
-object in the .init.rodata section:
+Signed-off-by: Roman Volkov <rvolkov@v1ros.org>
+Reviewed-by: Alexey Charkov <alchark@gmail.com>
+---
+ arch/arm/boot/dts/wm8650.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
- #define COMPOSITE_FRACMUX(_id, cname, pname, f, mo, df, go, gs, gf, ch) \
-        {                                                       \
-		...
-                .child          = &(struct rockchip_clk_branch)ch, \
-        }
-
-'ch' here is placed in .data, and I could find no way to override that
-using an attribute or pragma because there is no identifier associated
-with it.
-
-This patch avoids the warning by placing the names in .rodata rather than
-.init.rodata. However, it is not an ideal solution because we really
-want all those data structures to be discarded along with the initdata.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 8ca1ca8f6039 ("clk: rockchip: handle mux dependency of fractional dividers")
-
-diff --git a/drivers/clk/rockchip/clk.h b/drivers/clk/rockchip/clk.h
-index 3f71ee5d1bc9..5cadf5e3fb16 100644
---- a/drivers/clk/rockchip/clk.h
-+++ b/drivers/clk/rockchip/clk.h
-@@ -244,7 +244,7 @@ struct clk *rockchip_clk_register_inverter(const char *name,
- 				void __iomem *reg, int shift, int flags,
- 				spinlock_t *lock);
+diff --git a/arch/arm/boot/dts/wm8650.dtsi b/arch/arm/boot/dts/wm8650.dtsi
+index b1c59a7..e12213d 100644
+--- a/arch/arm/boot/dts/wm8650.dtsi
++++ b/arch/arm/boot/dts/wm8650.dtsi
+@@ -187,6 +187,15 @@
+ 			interrupts = <43>;
+ 		};
  
--#define PNAME(x) static const char *const x[] __initconst
-+#define PNAME(x) static const char *const x[]
- 
- enum rockchip_clk_branch_type {
- 	branch_composite,
++		sdhc at d800a000 {
++			compatible = "wm,wm8505-sdhc";
++			reg = <0xd800a000 0x400>;
++			interrupts = <20>, <21>;
++			clocks = <&clksdhc>;
++			bus-width = <4>;
++			sdon-inverted;
++		};
++
+ 		fb: fb at d8050800 {
+ 			compatible = "wm,wm8505-fb";
+ 			reg = <0xd8050800 0x200>;
+-- 
+2.3.1
