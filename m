@@ -1,42 +1,57 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 01 Jan 2016 18:06:30 +0100
-Subject: [PATCH] [BUG] clk: rockchip: don't mark clock names as initconst
-In-Reply-To: <2791943.MBZ53mI7Gp@wuerfel>
-References: <2791943.MBZ53mI7Gp@wuerfel>
-Message-ID: <1799610.nrn5HMCSxL@diego>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 1 Jan 2016 20:23:46 +0300
+Subject: [PATCH v2 32/32] virtio_ring: use virt_store_mb
+In-Reply-To: <1451572003-2440-33-git-send-email-mst@redhat.com>
+References: <1451572003-2440-1-git-send-email-mst@redhat.com>
+ <1451572003-2440-33-git-send-email-mst@redhat.com>
+Message-ID: <5686B622.6070600@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hello.
 
-Am Freitag, 1. Januar 2016, 14:42:52 schrieb Arnd Bergmann:
-> The latest changes to the rockchip clk implementation cause
-> tons of warnings and/or errors (depending on the configuration):
-> 
-> WARNING: vmlinux.o(.data+0x125394): Section mismatch in reference from the
-> variable __compound_literal.125 to the (unknown reference)
-> .init.rodata:(unknown)
-> 
-> The reason is a compount literal in a macro that refers to an
-> object in the .init.rodata section:
-> 
->  #define COMPOSITE_FRACMUX(_id, cname, pname, f, mo, df, go, gs, gf, ch) \
->         {                                                       \
-> 		...
->                 .child          = &(struct rockchip_clk_branch)ch, \
->         }
-> 
-> 'ch' here is placed in .data, and I could find no way to override that
-> using an attribute or pragma because there is no identifier associated
-> with it.
+On 12/31/2015 10:09 PM, Michael S. Tsirkin wrote:
 
-"[PATCH] clk: rockchip: fix section mismatches with new child-clocks" [0]
+> We need a full barrier after writing out event index, using
+> virt_store_mb there seems better than open-coding.  As usual, we need a
+> wrapper to account for strong barriers.
+>
+> It's tempting to use this in vhost as well, for that, we'll
+> need a variant of smp_store_mb that works on __user pointers.
+>
+> Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+> ---
+>   include/linux/virtio_ring.h  | 12 ++++++++++++
+>   drivers/virtio/virtio_ring.c | 15 +++++++++------
+>   2 files changed, 21 insertions(+), 6 deletions(-)
+>
+> diff --git a/include/linux/virtio_ring.h b/include/linux/virtio_ring.h
+> index f3fa55b..3a74d91 100644
+> --- a/include/linux/virtio_ring.h
+> +++ b/include/linux/virtio_ring.h
+> @@ -45,6 +45,18 @@ static inline void virtio_wmb(bool weak_barriers)
+>   		wmb();
+>   }
+>
+> +static inline void virtio_store_mb(bool weak_barriers,
+> +				   __virtio16 *p, __virtio16 v)
+> +{
+> +	if (weak_barriers)
+> +		virt_store_mb(*p, v);
+> +	else
+> +	{
 
-should be in Mike's + Stephen's inbox since last week as well, which moves the 
-offending new elements into separate entities, which can have __initdata 
-attributes again.
+    The kernel coding style dictates:
 
+	if (weak_barriers) {
+		virt_store_mb(*p, v);
+	} else {
 
-Heiko
+> +		WRITE_ONCE(*p, v);
+> +		mb();
+> +	}
+> +}
+> +
+[...]
 
-[0] http://www.spinics.net/lists/arm-kernel/msg471295.html
+MBR, Sergei
