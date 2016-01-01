@@ -1,37 +1,45 @@
-From: v1ron@mail.ru (Roman Volkov)
-Date: Fri,  1 Jan 2016 16:38:12 +0300
-Subject: [PATCH v3 RESEND 2/2] dts: vt8500: Fix errors in SDHC node for WM8505
-In-Reply-To: <1451655492-2569-1-git-send-email-v1ron@mail.ru>
-References: <1451655492-2569-1-git-send-email-v1ron@mail.ru>
-Message-ID: <1451655492-2569-3-git-send-email-v1ron@mail.ru>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 01 Jan 2016 14:48:59 +0100
+Subject: [PATCH] ip_tunnel: make ip6tunnel_xmit definition conditional
+Message-ID: <12586917.ah4bPMnYUH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Roman Volkov <rvolkov@v1ros.org>
+>From 433df301cf49624871346fa63f3fc65033caeda3 Mon Sep 17 00:00:00 2001
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Fri, 1 Jan 2016 13:18:48 +0100
+Subject: [PATCH] net: make ip6tunnel_xmit definition conditional
 
-According to datasheet, the registers space of SDHC controller is 1Kb,
-not '0x1000', the correct value should be '0x400'. Bracket interrupt
-numbers individually per recommendations.
+Moving the caller of iptunnel_xmit_stats causes a build error in
+randconfig builds that disable CONFIG_INET:
 
-Signed-off-by: Roman Volkov <rvolkov@v1ros.org>
----
- arch/arm/boot/dts/wm8505.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+In file included from ../net/xfrm/xfrm_input.c:17:0:
+../include/net/ip6_tunnel.h: In function 'ip6tunnel_xmit':
+../include/net/ip6_tunnel.h:93:2: error: implicit declaration of function 'iptunnel_xmit_stats' [-Werror=implicit-function-declaration]
+  iptunnel_xmit_stats(dev, pkt_len);
 
-diff --git a/arch/arm/boot/dts/wm8505.dtsi b/arch/arm/boot/dts/wm8505.dtsi
-index a1a854b..e9ef539 100644
---- a/arch/arm/boot/dts/wm8505.dtsi
-+++ b/arch/arm/boot/dts/wm8505.dtsi
-@@ -281,8 +281,8 @@
+The reason is that the iptunnel_xmit_stats definition is hidden
+inside #ifdef CONFIG_INET but the caller is not. We can change
+one or the other to fix it, and this patch adds a second #ifdef
+around ip6tunnel_xmit() to avoid seeing the invalid call.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 039f50629b7f ("ip_tunnel: Move stats update to iptunnel_xmit()")
+
+diff --git a/include/net/ip6_tunnel.h b/include/net/ip6_tunnel.h
+index ae07e94778d8..0d0ce0b2d870 100644
+--- a/include/net/ip6_tunnel.h
++++ b/include/net/ip6_tunnel.h
+@@ -81,6 +81,7 @@ __u32 ip6_tnl_get_cap(struct ip6_tnl *t, const struct in6_addr *laddr,
+ struct net *ip6_tnl_get_link_net(const struct net_device *dev);
+ int ip6_tnl_get_iflink(const struct net_device *dev);
  
- 		sdhc at d800a000 {
- 			compatible = "wm,wm8505-sdhc";
--			reg = <0xd800a000 0x1000>;
--			interrupts = <20 21>;
-+			reg = <0xd800a000 0x400>;
-+			interrupts = <20>, <21>;
- 			clocks = <&clksdhc>;
- 			bus-width = <4>;
- 		};
--- 
-2.3.1
++#ifdef CONFIG_INET
+ static inline void ip6tunnel_xmit(struct sock *sk, struct sk_buff *skb,
+ 				  struct net_device *dev)
+ {
+@@ -93,3 +94,4 @@ static inline void ip6tunnel_xmit(struct sock *sk, struct sk_buff *skb,
+ 	iptunnel_xmit_stats(dev, pkt_len);
+ }
+ #endif
++#endif
