@@ -1,96 +1,46 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Fri, 1 Jan 2016 12:21:52 +0200
-Subject: [PATCH v2 30/32] virtio_ring: update weak barriers to use
- __smp_xxx
-In-Reply-To: <1451572003-2440-31-git-send-email-mst@redhat.com>
-References: <1451572003-2440-1-git-send-email-mst@redhat.com>
- <1451572003-2440-31-git-send-email-mst@redhat.com>
-Message-ID: <20160101122115-mutt-send-email-mst@redhat.com>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 1 Jan 2016 11:52:12 +0100
+Subject: [PATCH RFC] ARM: tango4: Fix build issues
+In-Reply-To: <CAOesGMhBkacNRxQaBKG8f5Bv2FXH504YCj_O0eL=FwGzY03H-Q@mail.gmail.com>
+References: <567DBA04.4060709@free.fr> <20151231132116.GB1547@localhost>
+ <CAOesGMhBkacNRxQaBKG8f5Bv2FXH504YCj_O0eL=FwGzY03H-Q@mail.gmail.com>
+Message-ID: <56865A5C.5050601@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 01, 2016 at 11:39:40AM +0200, Michael S. Tsirkin wrote:
-> virtio ring uses smp_wmb on SMP and wmb on !SMP,
-> the reason for the later being that it might be
-> talking to another kernel on the same SMP machine.
+On 31/12/2015 17:31, Olof Johansson wrote:
+> On Thu, Dec 31, 2015 at 2:21 PM, Olof Johansson <olof@lixom.net> wrote:
+>> On Fri, Dec 25, 2015 at 10:49:56PM +0100, Mason wrote:
+>>> From: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>>>
+>>> Move SMP setup to platsmp.c
+>>> Specify the CPU type to the assembler, and only for smc.S
+>>>
+>>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>>> ---
+>>
+>> Applied, thanks.
 > 
-> This is exactly what __smp_XXX barriers do,
-> so switch to these instead of homegrown ifdef hacks.
-> 
-> Cc: Peter Zijlstra <peterz@infradead.org>
-> Cc: Alexander Duyck <alexander.duyck@gmail.com>
-> Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+> Actually, I just noticed that the smc.c Makefile part isn't done as it
+> should, so I'll drop this again.
 
-The subject and commit log should say
-virt_xxx and not __smp_xxx - I fixed this up in
-my tree.
+<grumble>
 
-> ---
->  include/linux/virtio_ring.h | 25 ++++---------------------
->  1 file changed, 4 insertions(+), 21 deletions(-)
-> 
-> diff --git a/include/linux/virtio_ring.h b/include/linux/virtio_ring.h
-> index 67e06fe..f3fa55b 100644
-> --- a/include/linux/virtio_ring.h
-> +++ b/include/linux/virtio_ring.h
-> @@ -12,7 +12,7 @@
->   * anyone care?
->   *
->   * For virtio_pci on SMP, we don't need to order with respect to MMIO
-> - * accesses through relaxed memory I/O windows, so smp_mb() et al are
-> + * accesses through relaxed memory I/O windows, so virt_mb() et al are
->   * sufficient.
->   *
->   * For using virtio to talk to real devices (eg. other heterogeneous
-> @@ -21,11 +21,10 @@
->   * actually quite cheap.
->   */
->  
-> -#ifdef CONFIG_SMP
->  static inline void virtio_mb(bool weak_barriers)
->  {
->  	if (weak_barriers)
-> -		smp_mb();
-> +		virt_mb();
->  	else
->  		mb();
->  }
-> @@ -33,7 +32,7 @@ static inline void virtio_mb(bool weak_barriers)
->  static inline void virtio_rmb(bool weak_barriers)
->  {
->  	if (weak_barriers)
-> -		smp_rmb();
-> +		virt_rmb();
->  	else
->  		rmb();
->  }
-> @@ -41,26 +40,10 @@ static inline void virtio_rmb(bool weak_barriers)
->  static inline void virtio_wmb(bool weak_barriers)
->  {
->  	if (weak_barriers)
-> -		smp_wmb();
-> +		virt_wmb();
->  	else
->  		wmb();
->  }
-> -#else
-> -static inline void virtio_mb(bool weak_barriers)
-> -{
-> -	mb();
-> -}
-> -
-> -static inline void virtio_rmb(bool weak_barriers)
-> -{
-> -	rmb();
-> -}
-> -
-> -static inline void virtio_wmb(bool weak_barriers)
-> -{
-> -	wmb();
-> -}
-> -#endif
->  
->  struct virtio_device;
->  struct virtqueue;
-> -- 
-> MST
+This is probably a bike-shed issue that I should let slide...
+
+But can someone explain to me: in what circumstances
+
+plus_sec := $(call as-instr,.arch_extension sec,+sec)
+AFLAGS_smc.o :=-Wa,-march=armv7-a$(plus_sec)
+
+is preferable over
+
+AFLAGS_smc.o := -Wa,-mcpu=cortex-a9
+
+in a machine-specific Makefile?
+
+
+Arnd mentioned consistency with other machines; ISTM that
+simplicity and obviousness are also desirable characteristics.
+
+Regards.
