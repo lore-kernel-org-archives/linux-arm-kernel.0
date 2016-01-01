@@ -1,51 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 01 Jan 2016 13:55:42 +0100
-Subject: [RESEND PATCH v1 3/4] net: ethernet: arc: Add support emac for
- RK3036
-In-Reply-To: <FFCE9129-357E-4643-A350-9927A5AD5720@gmail.com>
-References: <1451287341-16453-1-git-send-email-zhengxing@rock-chips.com>
- <1451287341-16453-4-git-send-email-zhengxing@rock-chips.com>
- <FFCE9129-357E-4643-A350-9927A5AD5720@gmail.com>
-Message-ID: <3169681.aSJgN2TRic@wuerfel>
+From: public_timo.s@silentcreek.de (Timo Sigurdsson)
+Date: Fri,  1 Jan 2016 14:16:08 +0100 (CET)
+Subject: [PATCH 0/1 for 4.4-rc8] ARM: Fix broken USB support in
+ sunxi_defconfig
+In-Reply-To: <20151231160049.GA23528@lukather>
+References: <1451353653-17484-1-git-send-email-public_timo.s@silentcreek.de>
+ <4865776.yyMBHQfnua@wuerfel><20151231160049.GA23528@lukather>
+Message-ID: <20160101131608.5B9456C803F0@dd34104.kasserver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 December 2015 14:59:59 Florian Fainelli wrote:
-> On December 27, 2015 11:22:20 PM PST, Xing Zheng <zhengxing@rock-chips.com> wrote:
-> >The RK3036's GRFs offset are different with RK3066/RK3188, and need to
-> >set
-> >mac TX/RX clock before probe emac.
-> >
-> >Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
-> >---
-> <snip>
-> > };
-> > 
-> > static const struct of_device_id emac_rockchip_dt_ids[] = {
-> >-      { .compatible = "rockchip,rk3066-emac", .data =
-> >&emac_rockchip_dt_data[0] },
-> >-      { .compatible = "rockchip,rk3188-emac", .data =
-> >&emac_rockchip_dt_data[1] },
-> >+      { .compatible = "rockchip,rk3036-emac", .data =
-> >&emac_rockchip_dt_data[0] },
-> >+      { .compatible = "rockchip,rk3066-emac", .data =
-> >&emac_rockchip_dt_data[1] },
-> >+      { .compatible = "rockchip,rk3188-emac", .data =
-> >&emac_rockchip_dt_data[2] },
-> >       { /* Sentinel */ }
+Hi Maxime,
+
+Maxime Ripard schrieb am 31.12.2015 17:00:
+
+> Hi Arnd,
 > 
-> Food for thought, you might want to use an enum here to index emac_rockchip_dt_data which would be less error prone if you add/remove entries in this structure.
+> On Thu, Dec 31, 2015 at 04:46:01PM +0100, Arnd Bergmann wrote:
+>> On Tuesday 29 December 2015 02:47:32 Timo Sigurdsson wrote:
+>> > Here is a late patch aimed for 4.4-rc8 (or 4.4). It would be nice if this   
+>> > could make it into 4.4 in order to avoid unpleasent surprises (and
+>> > subsequent questions) with builds based on sunxi_defconfig. At the moment,
+>> > some boards (e.g. LeMaker BananaPi) are left with non-functional USB ports
+>> > as a newly added driver is required to power them.
+>> 
+>> It's a bit confusing to send a patch to so many recipients, that usually
+>> leads to nobody applying it. I can put it into the fixes branch in arm-soc
+>> but need an Ack from the sunxi maintainer(s).
 > 
+> You have mine
+> 
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> 
+> Timo, don't we need the same thing for multi_v7?
 
-I would use named structures instead:
+Yes, we do. I thought I saw it already in there as a module, but that must
+have been on linux-next... Anyway, patch will come right away. I take it
+your question implies an ack for the multi_v7 patch, too.
 
-static const struct emac_rockchip_soc_data emac_rk3066_emac_data = {
-	.grf_offset = 0x154,
-};
 
-static const struct of_device_id emac_rockchip_dt_ids[] = {
-	{ .compatible = "rockchip,rk3066-emac", .data = &emac_rk3066_emac_data,
-	...
-};
+Thanks and Happy New Year,
 
-	Armd
+Timo
