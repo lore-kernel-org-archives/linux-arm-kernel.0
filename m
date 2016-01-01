@@ -1,38 +1,57 @@
-From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
-Date: Fri, 1 Jan 2016 13:39:15 +0200
-Subject: [PATCH 2/2] OMAP: RX51: save ATAGS data in the early boot stage
-In-Reply-To: <20151224185604.GU2793@atomide.com>
-References: <20151224153536.GJ30871@n2100.arm.linux.org.uk>
- <1450975076-7411-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
- <1450975076-7411-3-git-send-email-ivo.g.dimitrov.75@gmail.com>
- <201512241849.11704@pali> <20151224185604.GU2793@atomide.com>
-Message-ID: <56866563.2010702@gmail.com>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 1 Jan 2016 13:03:05 +0100
+Subject: [PATCH RFC] ARM: tango4: Fix build issues
+In-Reply-To: <56865A5C.5050601@free.fr>
+References: <567DBA04.4060709@free.fr> <20151231132116.GB1547@localhost>
+ <CAOesGMhBkacNRxQaBKG8f5Bv2FXH504YCj_O0eL=FwGzY03H-Q@mail.gmail.com>
+ <56865A5C.5050601@free.fr>
+Message-ID: <56866AF9.5000601@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 01/01/2016 11:52, Mason wrote:
+> On 31/12/2015 17:31, Olof Johansson wrote:
+>> On Thu, Dec 31, 2015 at 2:21 PM, Olof Johansson <olof@lixom.net> wrote:
+>>> On Fri, Dec 25, 2015 at 10:49:56PM +0100, Mason wrote:
+>>>> From: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>>>>
+>>>> Move SMP setup to platsmp.c
+>>>> Specify the CPU type to the assembler, and only for smc.S
+>>>>
+>>>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>>>> ---
+>>>
+>>> Applied, thanks.
+>>
+>> Actually, I just noticed that the smc.c Makefile part isn't done as it
+>> should, so I'll drop this again.
+> 
+> <grumble>
+> 
+> This is probably a bike-shed issue that I should let slide...
+> 
+> But can someone explain to me: in what circumstances
+> 
+> plus_sec := $(call as-instr,.arch_extension sec,+sec)
+> AFLAGS_smc.o :=-Wa,-march=armv7-a$(plus_sec)
+> 
+> is preferable over
+> 
+> AFLAGS_smc.o := -Wa,-mcpu=cortex-a9
+> 
+> in a machine-specific Makefile?
+> 
+> 
+> Arnd mentioned consistency with other machines; ISTM that
+> simplicity and obviousness are also desirable characteristics.
 
-On 24.12.2015 20:56, Tony Lindgren wrote:
->
-> Maybe update the description to say "This fixes a regression with
-> device tree based booting compared to legacy booting for n900 to
-> make the n900 legacy user space to also work with device tree based
-> booting".
->
+For the sake of completeness, the +sec shenanigans are required
+because of this 2010 binutils patch:
 
-OK, will do.
+https://sourceware.org/ml/binutils/2010-09/msg00412.html
 
-> It would be nice to get these two in as fixes after -rc1 assuming
-> people have no objections to it. So please upload this one also
-> into Russell's patch system after no more comments:
->
+Specifying the CPU instead of an ISA (plus extensions) leaves
+the instruction set selection up to the assembler, so the same
+flag works for both old and new binutils.
 
-Seems there are no more comments (and objections) so I will *try* to 
-upload the patches in Russell's patch system. Will pester you to do it 
-for me if I fail to do so :)
-
-> Acked-by: Tony Lindgren <tony@atomide.com>
->
-
-Thanks,
-Ivo
+Regards.
