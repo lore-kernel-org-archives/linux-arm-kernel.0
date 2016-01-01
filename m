@@ -1,47 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 01 Jan 2016 23:04:07 +0100
-Subject: [PATCH 4/3] drm: arm-hdlcd: add explictit DRM dependency
-In-Reply-To: <4194408.X82ccDjh5X@wuerfel>
-References: <4194408.X82ccDjh5X@wuerfel>
-Message-ID: <5213510.IMdSbsXdoQ@wuerfel>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 01 Jan 2016 23:05:10 +0100
+Subject: [PATCH] [BUG] clk: rockchip: don't mark clock names as initconst
+In-Reply-To: <6692523.e5K11FUKe0@wuerfel>
+References: <2791943.MBZ53mI7Gp@wuerfel> <1799610.nrn5HMCSxL@diego>
+ <6692523.e5K11FUKe0@wuerfel>
+Message-ID: <3926467.jaQRQH5bEO@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_DRM_HDLCD is a tristate option that depends on the boolean
-CONFIG_DRM_ARM, which in turn depends on the tristate CONFIG_DRM.
-The effect of this is that a configuration with CONFIG_DRM=m
-and CONFIG_DRM_HDLCD=y can be chosen, but won't link because the
-DRM core symbols are not reachable from builtin code:
+Am Freitag, 1. Januar 2016, 22:50:43 schrieb Arnd Bergmann:
+> On Friday 01 January 2016 18:06:30 Heiko St?bner wrote:
+> > "[PATCH] clk: rockchip: fix section mismatches with new child-clocks" [0]
+> > 
+> > should be in Mike's + Stephen's inbox since last week as well, which moves
+> > the offending new elements into separate entities, which can have
+> > __initdata attributes again.
+> > 
+> > 
+> > Heiko
+> > 
+> > [0] http://www.spinics.net/lists/arm-kernel/msg471295.html
+> 
+> The patch looks good, but for some reason, the next-20151223 kernel had no
+> problem and next-20151231 was broken, the top commits in
+> drivers/clk/rockchips are:
 
-drivers/built-in.o: In function `hdlcd_drm_unbind':
-drivers/gpu/drm/arm/hdlcd_drv.c:445: undefined reference to `drm_fbdev_cma_fini'
-drivers/gpu/drm/arm/hdlcd_drv.c:448: undefined reference to `drm_kms_helper_poll_fini'
-drivers/gpu/drm/arm/hdlcd_drv.c:450: undefined reference to `drm_vblank_cleanup'
-drivers/gpu/drm/arm/hdlcd_drv.c:452: undefined reference to `drm_irq_uninstall'
-drivers/gpu/drm/arm/hdlcd_drv.c:460: undefined reference to `drm_mode_config_cleanup'
-drivers/gpu/drm/arm/hdlcd_drv.c:461: undefined reference to `drm_dev_unregister'
-drivers/gpu/drm/arm/hdlcd_drv.c:462: undefined reference to `drm_dev_unref'
-...
+That is correct. next-20151223 did not contain the offending patches yet. 
+After the patches got merged into the clock-tree the kbuild-robot alerted us 
+to the __initdata issue, so I created the linked patch as fixup.
 
-This adds another dependency on CONFIG_DRM to enforce that DRM_HDLCD
-cannot be builtin if DRM is not.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-Ok, I found yet another one after a few hundred extra randconfig builds
-on today's next. Let me know if you'd rather have the three Kconfig
-changes combined into a single patch, it's starting to get ridiculous.
+Heiko
 
-diff --git a/drivers/gpu/drm/arm/Kconfig b/drivers/gpu/drm/arm/Kconfig
-index 81ea7802ca50..487fb1f0c979 100644
---- a/drivers/gpu/drm/arm/Kconfig
-+++ b/drivers/gpu/drm/arm/Kconfig
-@@ -7,7 +7,7 @@ config DRM_ARM
- 
- config DRM_HDLCD
- 	tristate "ARM HDLCD"
--	depends on DRM_ARM
-+	depends on DRM_ARM && DRM
- 	depends on COMMON_CLK
- 	select DRM_KMS_CMA_HELPER
- 	select DRM_GEM_CMA_HELPER
+> 
+> commit a915e30dd26ea5f3cc2e2c044aba38ee5973d3fa
+> Merge: ce6dd266d535 b0158bb27c7b
+> Author: Michael Turquette <mturquette@baylibre.com>
+> Date:   Wed Dec 23 13:08:56 2015 -0800
+> 
+>     Merge branch 'clk-rockchip' into clk-next
+> 
+> commit b0158bb27c7b6e9843f541c17b24dbd964b76db6
+> Author: Xing Zheng <zhengxing@rock-chips.com>
+> Date:   Tue Dec 22 22:28:01 2015 +0100
+> 
+>     clk: rockchip: rk3036: include downstream muxes into fractional dividers
+> 
+>     Use the newly introduced possibility to combine the fractional dividers
+> 
+> 
+> 	Arnd
