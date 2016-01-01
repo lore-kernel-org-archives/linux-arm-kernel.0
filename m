@@ -1,53 +1,71 @@
-From: v1ron@mail.ru (Roman Volkov)
-Date: Fri, 1 Jan 2016 20:32:30 +0300
-Subject: [PATCH v3 RESEND 0/2] WM8505/WM8650 DT fixes for SD card
- controller
-In-Reply-To: <7786478.TezhYjHkEF@wuerfel>
-References: <1451655492-2569-1-git-send-email-v1ron@mail.ru>
- <7786478.TezhYjHkEF@wuerfel>
-Message-ID: <20160101203230.1dc5e655@v1ron-s7>
+From: tcminyard@gmail.com (Corey Minyard)
+Date: Fri, 1 Jan 2016 12:14:41 -0600
+Subject: How to get better precision out of getrusage on the ARM?
+In-Reply-To: <CAF_dkJBOf87J__X9Gdpb_b0P9NzS44w-bhRaUi+z0EKXLkg_5g@mail.gmail.com>
+References: <CAF_dkJBjs1b+73ggvJyXwab6YL94HGT2jrqbcfaLxoETtQsD9Q@mail.gmail.com>
+ <20151222144907.GK8644@n2100.arm.linux.org.uk>
+ <CAF_dkJDFXSEgH+kO=k=Yj0_VDnFYgPtkoYznLUWZnq4=QTNDDg@mail.gmail.com>
+ <20151222151314.GM8644@n2100.arm.linux.org.uk>
+ <CAF_dkJAUyD3GRAETZUQG2yJTmOR95XKVguohBpBjUaM9JMaQyg@mail.gmail.com>
+ <CAF_dkJBrfd=YUnG=ja2KE_z2DM8NQTLGiWVyvW6mrPYP4i+sFA@mail.gmail.com>
+ <CAF_dkJBM3qbs3GB8jdgonus7dgVSyn-7QtogtqmMQWzR2BK+OQ@mail.gmail.com>
+ <CAF_dkJBOf87J__X9Gdpb_b0P9NzS44w-bhRaUi+z0EKXLkg_5g@mail.gmail.com>
+Message-ID: <5686C211.5040606@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? Fri, 01 Jan 2016 15:29:29 +0100
-Arnd Bergmann <arnd@arndb.de> ?????:
+Those numbers are statistical, if a tick occurs while something is 
+running, that something is assigned the entire timer tick.  So as you 
+have found, you can get some pretty unusual numbers on this, especially 
+with short intervals.
 
-> On Friday 01 January 2016 16:38:10 Roman Volkov wrote:
-> > From: Roman Volkov <rvolkov@v1ros.org>
-> > 
-> > This patch set enables SD controller support for WM8650 and
-> > fixes minor errors in WM8505 Device Tree file.
-> > 
-> > Changes in v3:
-> > 1. Add minor fixes for WM8505 SDHC node
-> > 
-> > Tested on both WM8505 and WM8650.
-> > 
-> > Roman Volkov (2):
-> >   dts: vt8500: Add SDHC node to DTS file for WM8650
-> >   dts: vt8500: Fix errors in SDHC node for WM8505
-> > 
-> >  arch/arm/boot/dts/wm8505.dtsi | 4 ++--
-> >  arch/arm/boot/dts/wm8650.dtsi | 9 +++++++++
-> >  2 files changed, 11 insertions(+), 2 deletions(-)
-> > 
-> > -- 
-> > Hi maintainers, I see my previous versions were not applied. Could
-> > this little patch set be applied for the linux-next? I don't think
-> > this is new functionality, this must be considered as bugfix for
-> > existing Device Tree.
-> > 
-> > Any other suggestions?
-> >   
-> 
-> Applied both to next/dt, thanks a lot for following up!
-> 
-> Let me know if you think this should go into stable backports as well,
-> I did not apply it to the fixes branch as you don't have a
-> 'Cc: stable at vger.kernel.org' tag and it has never worked so far.
+I have some patches at https://sourceforge.net/projects/microstate that 
+add the ability to do accurate accounting of time, if you really need that.
 
-Yes, this must go into the stable too. Let me know if I must change
-something or resend.
+-corey
 
-Thanks,
-Roman
+On 12/30/2015 09:52 AM, Patrick Doyle wrote:
+> On Wed, Dec 30, 2015 at 10:00 AM, Patrick Doyle <wpdster@gmail.com> wrote:
+>> Continuing on...
+>> I now have a CLOCKSOURCE_OF_DECLARED()'ed 10 MHz clock source running
+>> on my ARM processor (Atmel SAMA5D2 Xplained board).  It registers
+>> itself through sched_clock_register() to provide a high resolution
+>> sched clock.  Once I turned on "Full dynticks CPU time accounting"
+>> (CONFIG_VIRT_CPU_ACCOUNTING_GEN), I was able to get better than jiffy
+>> resolution from my calls to getrusage(RUSAGE_THREAD,..).  But things
+>> still aren't quite right.  I am using getrusage() to provide some
+>> runtime profile information to an existing application (that was
+>> ported to run on Linux instead of a custom RTOS).  I have code that
+>> looks like:
+>>
+>> tick()
+>> // commented out code that used to do something
+>> tock()
+>>
+>> where tick() & tock() are my profile "start" and "stop" points that
+>> call getrusage() to record and and accumulate time spent between calls
+>> to tick() & tock().  Most of the time, I get a delta of 0 between the
+>> two calls, which I expect.  But occasionally, I get a delta ranging
+>> between 800us and 1000us, which I don't understand at all.  It seems
+>> like my thread is being "charged" for time spent doing something else.
+>> Perhaps an interrupt occurred and its time got charged to my thread;
+>> perhaps a higher priority thread ran for 1ms, I don't know (yet).
+>>
+>> Does anybody have any suggestions as to where I might look, or as to
+>> what kernel CONFIG options might make the most sense for an
+>> application such as this?
+>>
+>> --wpd
+> A couple of more (confusing) data points...
+> - Changing the tick rate to 100Hz results in deltas as extreme as 9400us.
+> - Using clock_gettime(CLOCK_THREAD_CPUTIME_ID,...) instead of
+> getrusage(RUSAGE_THREAD,...) gives much more believable numbers in the
+> 15-25us range, but still with a few bizarre excursions to 41, 69, and
+> 172us (for one random test case).
+>
+> --wpd
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
