@@ -1,48 +1,45 @@
-From: public_timo.s@silentcreek.de (Timo Sigurdsson)
-Date: Fri,  1 Jan 2016 14:38:22 +0100
-Subject: [PATCH for 4.4-rc8] ARM: Fix broken USB support in multi_v7_defconfig
- for sunxi devices
-In-Reply-To: <1451353653-17484-1-git-send-email-public_timo.s@silentcreek.de>
-References: <1451353653-17484-1-git-send-email-public_timo.s@silentcreek.de>
-Message-ID: <1451655502-8561-1-git-send-email-public_timo.s@silentcreek.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 01 Jan 2016 14:42:52 +0100
+Subject: [PATCH] [BUG] clk: rockchip: don't mark clock names as initconst
+Message-ID: <2791943.MBZ53mI7Gp@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 69fb4dcada77 ("power: Add an axp20x-usb-power driver") introduced a
-new driver for the USB power supply used on various Allwinner based SBCs.
-However, the driver was not added to multi_v7_defconfig which breaks USB
-support for some boards (e.g. LeMaker BananaPi) as the kernel will now
-turn off the USB power supply during boot by default if the driver isn't
-present. (This was not the case in linux 4.3 or lower where the USB power
-was always left on.)
+The latest changes to the rockchip clk implementation cause
+tons of warnings and/or errors (depending on the configuration):
 
-Hence, add the driver to multi_v7_defconfig in order to keep USB support
-working on those boards that require it.
+WARNING: vmlinux.o(.data+0x125394): Section mismatch in reference from the variable __compound_literal.125 to the (unknown reference) .init.rodata:(unknown)
 
-Signed-off-by: Timo Sigurdsson <public_timo.s@silentcreek.de>
-Tested-by: Timo Sigurdsson <public_timo.s@silentcreek.de>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
-Notes:
+The reason is a compount literal in a macro that refers to an
+object in the .init.rodata section:
 
-I chose to add AXP20X_POWER as a module here, since linux-next already
-has it this way, see commit 83e9e1f84074 ("ARM: multi_v7_defconfig:
-Enable RSB and AXP20X related drivers as modules").
----
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ #define COMPOSITE_FRACMUX(_id, cname, pname, f, mo, df, go, gs, gf, ch) \
+        {                                                       \
+		...
+                .child          = &(struct rockchip_clk_branch)ch, \
+        }
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 69a22fd..cd7b198 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -366,6 +366,7 @@ CONFIG_BATTERY_MAX17042=m
- CONFIG_CHARGER_MAX14577=m
- CONFIG_CHARGER_MAX77693=m
- CONFIG_CHARGER_TPS65090=y
-+CONFIG_AXP20X_POWER=m
- CONFIG_POWER_RESET_AS3722=y
- CONFIG_POWER_RESET_GPIO=y
- CONFIG_POWER_RESET_GPIO_RESTART=y
--- 
-2.1.4
+'ch' here is placed in .data, and I could find no way to override that
+using an attribute or pragma because there is no identifier associated
+with it.
+
+This patch avoids the warning by placing the names in .rodata rather than
+.init.rodata. However, it is not an ideal solution because we really
+want all those data structures to be discarded along with the initdata.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 8ca1ca8f6039 ("clk: rockchip: handle mux dependency of fractional dividers")
+
+diff --git a/drivers/clk/rockchip/clk.h b/drivers/clk/rockchip/clk.h
+index 3f71ee5d1bc9..5cadf5e3fb16 100644
+--- a/drivers/clk/rockchip/clk.h
++++ b/drivers/clk/rockchip/clk.h
+@@ -244,7 +244,7 @@ struct clk *rockchip_clk_register_inverter(const char *name,
+ 				void __iomem *reg, int shift, int flags,
+ 				spinlock_t *lock);
+ 
+-#define PNAME(x) static const char *const x[] __initconst
++#define PNAME(x) static const char *const x[]
+ 
+ enum rockchip_clk_branch_type {
+ 	branch_composite,
