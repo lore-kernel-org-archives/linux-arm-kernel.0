@@ -1,45 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 01 Jan 2016 15:39:17 +0100
-Subject: [PATCH 3/3] drm: arm-hdlcd: fix build warnings for !CONFIG_PM
-In-Reply-To: <4194408.X82ccDjh5X@wuerfel>
-References: <4194408.X82ccDjh5X@wuerfel>
-Message-ID: <2621741.YulfsnvZOh@wuerfel>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 01 Jan 2016 18:06:30 +0100
+Subject: [PATCH] [BUG] clk: rockchip: don't mark clock names as initconst
+In-Reply-To: <2791943.MBZ53mI7Gp@wuerfel>
+References: <2791943.MBZ53mI7Gp@wuerfel>
+Message-ID: <1799610.nrn5HMCSxL@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The hdlcd_pm_suspend and hdlcd_pm_resume are intentionally unused
-when CONFIG_PM is not set in this driver, and we get a compiler warning
-for this:
+Hi Arnd,
 
-drivers/gpu/drm/arm/hdlcd_drv.c:521:12: warning: 'hdlcd_pm_suspend' defined but not used [-Wunused-function]
-drivers/gpu/drm/arm/hdlcd_drv.c:536:12: warning: 'hdlcd_pm_resume' defined but not used [-Wunused-function]
+Am Freitag, 1. Januar 2016, 14:42:52 schrieb Arnd Bergmann:
+> The latest changes to the rockchip clk implementation cause
+> tons of warnings and/or errors (depending on the configuration):
+> 
+> WARNING: vmlinux.o(.data+0x125394): Section mismatch in reference from the
+> variable __compound_literal.125 to the (unknown reference)
+> .init.rodata:(unknown)
+> 
+> The reason is a compount literal in a macro that refers to an
+> object in the .init.rodata section:
+> 
+>  #define COMPOSITE_FRACMUX(_id, cname, pname, f, mo, df, go, gs, gf, ch) \
+>         {                                                       \
+> 		...
+>                 .child          = &(struct rockchip_clk_branch)ch, \
+>         }
+> 
+> 'ch' here is placed in .data, and I could find no way to override that
+> using an attribute or pragma because there is no identifier associated
+> with it.
 
-This adds a __maybe_unused annotation for the two functions, to let
-the compiler know this is the intended behavior. This is better than
-an #ifdef as it improves the compile time coverage of the code and it
-looks nicer.
+"[PATCH] clk: rockchip: fix section mismatches with new child-clocks" [0]
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+should be in Mike's + Stephen's inbox since last week as well, which moves the 
+offending new elements into separate entities, which can have __initdata 
+attributes again.
 
-diff --git a/drivers/gpu/drm/arm/hdlcd_drv.c b/drivers/gpu/drm/arm/hdlcd_drv.c
-index 31969efe97d4..6173bb835223 100644
---- a/drivers/gpu/drm/arm/hdlcd_drv.c
-+++ b/drivers/gpu/drm/arm/hdlcd_drv.c
-@@ -518,7 +518,7 @@ static const struct of_device_id  hdlcd_of_match[] = {
- };
- MODULE_DEVICE_TABLE(of, hdlcd_of_match);
- 
--static int hdlcd_pm_suspend(struct device *dev)
-+static int __maybe_unused hdlcd_pm_suspend(struct device *dev)
- {
- 	struct drm_device *drm = dev_get_drvdata(dev);
- 	struct drm_crtc *crtc;
-@@ -533,7 +533,7 @@ static int hdlcd_pm_suspend(struct device *dev)
- 	return 0;
- }
- 
--static int hdlcd_pm_resume(struct device *dev)
-+static int __maybe_unused hdlcd_pm_resume(struct device *dev)
- {
- 	struct drm_device *drm = dev_get_drvdata(dev);
- 	struct drm_crtc *crtc;
+
+Heiko
+
+[0] http://www.spinics.net/lists/arm-kernel/msg471295.html
