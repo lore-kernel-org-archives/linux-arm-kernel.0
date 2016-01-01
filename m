@@ -1,35 +1,51 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 01 Jan 2016 13:47:41 +0100
-Subject: [PATCH] udf: avoid uninitialized variable use
-Message-ID: <9221187.T0u8gszVyj@wuerfel>
+Date: Fri, 01 Jan 2016 13:55:42 +0100
+Subject: [RESEND PATCH v1 3/4] net: ethernet: arc: Add support emac for
+ RK3036
+In-Reply-To: <FFCE9129-357E-4643-A350-9927A5AD5720@gmail.com>
+References: <1451287341-16453-1-git-send-email-zhengxing@rock-chips.com>
+ <1451287341-16453-4-git-send-email-zhengxing@rock-chips.com>
+ <FFCE9129-357E-4643-A350-9927A5AD5720@gmail.com>
+Message-ID: <3169681.aSJgN2TRic@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A new warning about a real bug has come up from a recent cleanup:
+On Tuesday 29 December 2015 14:59:59 Florian Fainelli wrote:
+> On December 27, 2015 11:22:20 PM PST, Xing Zheng <zhengxing@rock-chips.com> wrote:
+> >The RK3036's GRFs offset are different with RK3066/RK3188, and need to
+> >set
+> >mac TX/RX clock before probe emac.
+> >
+> >Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+> >---
+> <snip>
+> > };
+> > 
+> > static const struct of_device_id emac_rockchip_dt_ids[] = {
+> >-      { .compatible = "rockchip,rk3066-emac", .data =
+> >&emac_rockchip_dt_data[0] },
+> >-      { .compatible = "rockchip,rk3188-emac", .data =
+> >&emac_rockchip_dt_data[1] },
+> >+      { .compatible = "rockchip,rk3036-emac", .data =
+> >&emac_rockchip_dt_data[0] },
+> >+      { .compatible = "rockchip,rk3066-emac", .data =
+> >&emac_rockchip_dt_data[1] },
+> >+      { .compatible = "rockchip,rk3188-emac", .data =
+> >&emac_rockchip_dt_data[2] },
+> >       { /* Sentinel */ }
+> 
+> Food for thought, you might want to use an enum here to index emac_rockchip_dt_data which would be less error prone if you add/remove entries in this structure.
+> 
 
-fs/udf/inode.c: In function 'udf_setup_indirect_aext':
-fs/udf/inode.c:1927:28: warning: 'adsize' may be used uninitialized in this function [-Wmaybe-uninitialized]
+I would use named structures instead:
 
-If the alloc_type is neither ICBTAG_FLAG_AD_SHORT nor ICBTAG_FLAG_AD_LONG,
-the value of adsize is undefined. This changes the code to use zero for adsize
-in that case, which may be the correct solution, though I have not looked
-at the code in enough detail to know if it should be something else instead.
+static const struct emac_rockchip_soc_data emac_rk3066_emac_data = {
+	.grf_offset = 0x154,
+};
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: fcea62babc81 ("udf: Factor out code for creating indirect extent")
----
-Found on ARM randconfig kernels starting with yesterday's linux-next
+static const struct of_device_id emac_rockchip_dt_ids[] = {
+	{ .compatible = "rockchip,rk3066-emac", .data = &emac_rk3066_emac_data,
+	...
+};
 
-diff --git a/fs/udf/inode.c b/fs/udf/inode.c
-index 5b83351041a4..a1cc074c656f 100644
---- a/fs/udf/inode.c
-+++ b/fs/udf/inode.c
-@@ -1890,6 +1890,8 @@ int udf_setup_indirect_aext(struct inode *inode, int block,
- 		adsize = sizeof(struct short_ad);
- 	else if (UDF_I(inode)->i_alloc_type == ICBTAG_FLAG_AD_LONG)
- 		adsize = sizeof(struct long_ad);
-+	else
-+		adsize = 0;
- 
- 	neloc.logicalBlockNum = block;
- 	neloc.partitionReferenceNum = epos->block.partitionReferenceNum;
+	Armd
