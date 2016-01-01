@@ -1,26 +1,62 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 31 Dec 2015 23:33:45 +0100 (CET)
-Subject: [PATCH v2 RESEND 1/3] clocksource/vt8500: Use MIN_OSCR_DELTA
- from PXA
-In-Reply-To: <1451584927-4051-2-git-send-email-v1ron@mail.ru>
-References: <1451584927-4051-1-git-send-email-v1ron@mail.ru>
- <1451584927-4051-2-git-send-email-v1ron@mail.ru>
-Message-ID: <alpine.DEB.2.11.1512312331580.28591@nanos>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Thu, 31 Dec 2015 21:48:15 -0800
+Subject: [RFC 6/9] clk: ti: add support for omap4 module clocks
+In-Reply-To: <1450447141-29936-7-git-send-email-t-kristo@ti.com>
+References: <1450447141-29936-1-git-send-email-t-kristo@ti.com>
+ <1450447141-29936-7-git-send-email-t-kristo@ti.com>
+Message-ID: <20160101054815.21738.79820@quark.deferred.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Roman,
+Hi Tero,
 
-On Thu, 31 Dec 2015, Roman Volkov wrote:
-> Since vt8500 and PXA timers are identical, use MIN_OSCR_DELTA from PXA,
-> which is bigger than existing value. It is required to determine the
-> minimum delay which hardware can generate.
+Quoting Tero Kristo (2015-12-18 05:58:58)
+> Previously, hwmod core has been used for controlling the hwmod level
+> clocks. This has certain drawbacks, like being unable to share the
+> clocks for multiple users, missing usecounting and generally being
+> totally incompatible with common clock framework.
+> 
+> Add support for new clock type under the TI clock driver, which will
+> be used to convert all the existing hwmdo clocks to. This helps to
+> get rid of the clock related hwmod data from kernel and instead
+> parsing this from DT.
 
-Now that brings up the obvious question:
+I'm really happy to see this series. Looks pretty good to me.
 
-If the vt8500 and PXA timers are identical why has vt8500 it's own slightly
-different implementation and does not use the PXA timer?
+> +static int _omap4_hwmod_clk_enable(struct clk_hw *hw)
+> +{
+> +       struct clk_hw_omap *clk = to_clk_hw_omap(hw);
+> +       u32 val;
+> +       int timeout = 0;
+> +       int ret;
+> +
+> +       if (!clk->enable_bit)
+> +               return 0;
+> +
+> +       if (clk->clkdm) {
+> +               ret = ti_clk_ll_ops->clkdm_clk_enable(clk->clkdm, hw->clk);
+> +               if (ret) {
+> +                       WARN(1,
+> +                            "%s: could not enable %s's clockdomain %s: %d\n",
+> +                            __func__, clk_hw_get_name(hw),
+> +                            clk->clkdm_name, ret);
+> +                       return ret;
+> +               }
+> +       }
+> +
+> +       val = ti_clk_ll_ops->clk_readl(clk->enable_reg);
+> +
+> +       val &= ~OMAP4_MODULEMODE_MASK;
+> +       val |= clk->enable_bit;
+> +
+> +       ti_clk_ll_ops->clk_writel(val, clk->enable_reg);
+> +
+> +       /* Wait until module is enabled */
+> +       while (!_omap4_is_ready(val)) {
+> +               udelay(1);
 
-Thanks,
+This should really be a .prepare callback if you plan to keep the delays
+in there.
 
-	tglx
+Regards,
+Mike
