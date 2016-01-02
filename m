@@ -1,34 +1,147 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Fri, 1 Jan 2016 20:33:36 -0800
-Subject: [GIT PULL] arm64: DTS fixes for X-Gene platforms for v4.5
-In-Reply-To: <2734316.CUGyZXSbzW@wuerfel>
-References: <CADaLNDnwz-gyzN-1bzyGxAWL-5Jt2zSc_hvYQ2TpExGLC=Df3A@mail.gmail.com>
- <2734316.CUGyZXSbzW@wuerfel>
-Message-ID: <CADaLNDmdgm3udzPNFMEuhkVg1ThiwyuEV56YT9wfeYkODD+nHQ@mail.gmail.com>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Sat, 2 Jan 2016 10:44:32 +0530
+Subject: Odroid U3 mutex deadlock.
+In-Reply-To: <566E0319.6040100@samsung.com>
+References: <CANAwSgSE4UE5jn4Rp0LfVhDcSP=ynDsbCaUSHmM31_MF849bSw@mail.gmail.com>
+ <566E0319.6040100@samsung.com>
+Message-ID: <CANAwSgTrz8=9r9jkKQY_ZN3fsvBs9QpeTxLG1Ac_8SfAULoyHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 31, 2015 at 7:51 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->
-> On Wednesday 30 December 2015 16:09:46 Duc Dang wrote:
-> > Fixes for X-Gene DTS for v4.5
-> >
-> > This patch set fixes the node names of X-Gene I2C, GPIO
-> > controller DT nodes; and also removes I2C clock nodes as
-> > the same clock is shared between 2 I2C controllers
-> > on X-Gene SoC.
-> >
-> >
->
-> Thanks a lot for the follow-up!
->
-> Merged into next/dt64 now.
+Hi Krzysztof
 
-Thanks, Arnd.
-
-Happy Holidays!
-
+On 14 December 2015 at 05:15, Krzysztof Kozlowski
+<k.kozlowski@samsung.com> wrote:
+> On 12.12.2015 13:32, Anand Moon wrote:
+>> Hi Krzysztof,
+>>
+>> I am just observing this deadlock om my Odroid U3.
 >
->         Arnd
-Regards,
-Duc Dang.
+> This is not a deadlock yet, just a report from lockdep. Could be a real
+> issue, could be false positive, maybe some locks miss nesting annotations.
+>
+> Typical information for bug report would be useful, like the exact
+> version (it is mentioned in lockdep report but is it really correct?)
+> and reproducibility. And of course git-bisect would be nice to have, see:
+> Documentation/BUG-HUNTING
+>
+> Best regards,
+> Krzysztof
+>
+>
+Thanks for your inputs. I narrowed down to this commit.
+----------------------------------------------------------------------------------
+commit ec459c0c77faca53cf161830cb264e51bb1abba6
+Author: Marek Szyprowski <m.szyprowski@samsung.com>
+Date:   Wed Feb 4 23:44:15 2015 +0900
+
+    ARM: dts: add dependency between TV and LCD0 power domains for exynos4
+
+    TV Mixer needs both TV and LCD0 domains enabled to be fully operational.
+    This dependency is modelled by making TV power domains a sub-domain of
+    LCD0 power domain.
+
+    Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+    Signed-off-by: Kukjin Kim <kgene@kernel.org>
+-------------------------------------------------------------------------------------
+After reverting this I am not observing below lockdep warning report.
+But after reverting this patch I observer another bug.
+
+Best regards.
+-Anand Moon
+
+>> ------------------------------------------------------------------------------------------------------------------
+>>
+>> [    2.937531] =============================================
+>> [    2.938733] [ INFO: possible recursive locking detected ]
+>> [    2.944117] 4.4.0-rc4-xu3s #32 Not tainted
+>> [    2.948195] ---------------------------------------------
+>> [    2.953577] swapper/0/1 is trying to acquire lock:
+>> [    2.958351]  (&genpd->lock){+.+...}, at: [<c0361550>]
+>> __genpd_poweron+0x64/0x108
+>> [    2.965727]
+>> [    2.965727] but task is already holding lock:
+>> [    2.971543]  (&genpd->lock){+.+...}, at: [<c0361af8>]
+>> genpd_dev_pm_attach+0x168/0x1b8
+>> [    2.979355]
+>> [    2.979355] other info that might help us debug this:
+>> [    2.985865]  Possible unsafe locking scenario:
+>> [    2.985865]
+>> [    2.991768]        CPU0
+>> [    2.994198]        ----
+>> [    2.996628]   lock(&genpd->lock);
+>> [    2.999926]   lock(&genpd->lock);
+>> [    3.003225]
+>> [    3.003225]  *** DEADLOCK ***
+>> [    3.003225]
+>> [    3.009128]  May be due to missing lock nesting notation
+>> [    3.009128]
+>> [    3.015900] 3 locks held by swapper/0/1:
+>> [    3.019804]  #0:  (&dev->mutex){......}, at: [<c0350910>]
+>> __driver_attach+0x48/0x98
+>> [    3.027442]  #1:  (&dev->mutex){......}, at: [<c0350920>]
+>> __driver_attach+0x58/0x98
+>> [    3.035081]  #2:  (&genpd->lock){+.+...}, at: [<c0361af8>]
+>> genpd_dev_pm_attach+0x168/0x1b8
+>> [    3.043326]
+>> [    3.043326] stack backtrace:
+>> [    3.047671] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.4.0-rc4-xu3s #32
+>> [    3.054351] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+>> [    3.060444] [<c0016c98>] (unwind_backtrace) from [<c00139c4>]
+>> (show_stack+0x10/0x14)
+>> [    3.068163] [<c00139c4>] (show_stack) from [<c0270df0>]
+>> (dump_stack+0x84/0xc4)
+>> [    3.075367] [<c0270df0>] (dump_stack) from [<c00780b8>]
+>> (__lock_acquire+0x1f88/0x215c)
+>> [    3.083262] [<c00780b8>] (__lock_acquire) from [<c007886c>]
+>> (lock_acquire+0xa4/0xd0)
+>> [    3.090990] [<c007886c>] (lock_acquire) from [<c0641f2c>]
+>> (mutex_lock_nested+0x70/0x4d4)
+>> [    3.099061] [<c0641f2c>] (mutex_lock_nested) from [<c0361550>]
+>> (__genpd_poweron+0x64/0x108)
+>> [    3.107393] [<c0361550>] (__genpd_poweron) from [<c0361b00>]
+>> (genpd_dev_pm_attach+0x170/0x1b8)
+>> [    3.115986] [<c0361b00>] (genpd_dev_pm_attach) from [<c03520a8>]
+>> (platform_drv_probe+0x2c/0xac)
+>> [    3.124667] [<c03520a8>] (platform_drv_probe) from [<c03507d4>]
+>> (driver_probe_device+0x208/0x2fc)
+>> [    3.133519] [<c03507d4>] (driver_probe_device) from [<c035095c>]
+>> (__driver_attach+0x94/0x98)
+>> [    3.141939] [<c035095c>] (__driver_attach) from [<c034ec14>]
+>> (bus_for_each_dev+0x68/0x9c)
+>> [    3.150097] [<c034ec14>] (bus_for_each_dev) from [<c034fec8>]
+>> (bus_add_driver+0x1a0/0x218)
+>> [    3.158344] [<c034fec8>] (bus_add_driver) from [<c035115c>]
+>> (driver_register+0x78/0xf8)
+>> [    3.166330] [<c035115c>] (driver_register) from [<c0338488>]
+>> (exynos_drm_register_drivers+0x28/0x74)
+>> [    3.175441] [<c0338488>] (exynos_drm_register_drivers) from
+>> [<c0338594>] (exynos_drm_init+0x6c/0xc4)
+>> [    3.184556] [<c0338594>] (exynos_drm_init) from [<c00097f4>]
+>> (do_one_initcall+0x90/0x1dc)
+>> [    3.192718] [<c00097f4>] (do_one_initcall) from [<c0895e08>]
+>> (kernel_init_freeable+0x158/0x1f8)
+>> [    3.201396] [<c0895e08>] (kernel_init_freeable) from [<c063ecac>]
+>> (kernel_init+0x8/0xe8)
+>> [    3.209469] [<c063ecac>] (kernel_init) from [<c000f7d0>]
+>> (ret_from_fork+0x14/0x24)
+>> [    3.217932] exynos-hdmi 12d00000.hdmi: GPIO lookup for consumer hpd
+>> [    3.223293] exynos-hdmi 12d00000.hdmi: using device tree for GPIO lookup
+>> [    3.229980] of_get_named_gpiod_flags: can't parse 'hpd-gpios'
+>> property of node '/hdmi at 12D00000[0]'
+>> [    3.238945] of_get_named_gpiod_flags: parsed 'hpd-gpio' property of
+>> node '/hdmi at 12D00000[0]' - status (0)
+>> [    3.253430] exynos-drm exynos-drm: bound 12c10000.mixer (ops
+>> mixer_component_ops)
+>> [    3.256216] exynos-drm exynos-drm: bound 12d00000.hdmi (ops
+>> hdmi_component_ops)
+>> [    3.263245] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
+>> [    3.269812] [drm] No driver support for vblank timestamp query.
+>> [    3.323251] exynos-drm exynos-drm: fb0:  frame buffer device
+>> [    3.341464] [drm] Initialized exynos 1.0.0 20110530 on minor 0
+>>
+>> -----------------------------------------------------------------------------------------------------------------------
+>> -Anand Moon
+>>
+>>
+>
