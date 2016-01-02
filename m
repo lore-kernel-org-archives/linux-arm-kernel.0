@@ -1,147 +1,90 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Sat, 2 Jan 2016 10:44:32 +0530
-Subject: Odroid U3 mutex deadlock.
-In-Reply-To: <566E0319.6040100@samsung.com>
-References: <CANAwSgSE4UE5jn4Rp0LfVhDcSP=ynDsbCaUSHmM31_MF849bSw@mail.gmail.com>
- <566E0319.6040100@samsung.com>
-Message-ID: <CANAwSgTrz8=9r9jkKQY_ZN3fsvBs9QpeTxLG1Ac_8SfAULoyHw@mail.gmail.com>
+From: dyoung@redhat.com (Dave Young)
+Date: Sat, 2 Jan 2016 15:02:31 +0800
+Subject: bbb kexec bug: Unhandled fault external abort on non-linefetch
+ (0x1028) at 0xfa1ac140
+In-Reply-To: <568127FE.3010001@ti.com>
+References: <20151227073840.GC23608@dhcp-128-65.nay.redhat.com>
+ <20151228071809.GA20621@dhcp-128-65.nay.redhat.com>
+ <568127FE.3010001@ti.com>
+Message-ID: <20160102070231.GA23855@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof
+Hi, Grygorii
 
-On 14 December 2015 at 05:15, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
-> On 12.12.2015 13:32, Anand Moon wrote:
->> Hi Krzysztof,
->>
->> I am just observing this deadlock om my Odroid U3.
->
-> This is not a deadlock yet, just a report from lockdep. Could be a real
-> issue, could be false positive, maybe some locks miss nesting annotations.
->
-> Typical information for bug report would be useful, like the exact
-> version (it is mentioned in lockdep report but is it really correct?)
-> and reproducibility. And of course git-bisect would be nice to have, see:
-> Documentation/BUG-HUNTING
->
-> Best regards,
-> Krzysztof
->
->
-Thanks for your inputs. I narrowed down to this commit.
-----------------------------------------------------------------------------------
-commit ec459c0c77faca53cf161830cb264e51bb1abba6
-Author: Marek Szyprowski <m.szyprowski@samsung.com>
-Date:   Wed Feb 4 23:44:15 2015 +0900
+Thanks fot your reply.
 
-    ARM: dts: add dependency between TV and LCD0 power domains for exynos4
+On 12/28/15 at 02:15pm, Grygorii Strashko wrote:
+> On 12/28/2015 09:18 AM, Dave Young wrote:
+> > On 12/27/15 at 03:38pm, Dave Young wrote:
+> >> Here is what I get when I test kdump on Beagle bone black:
+> >>
+> >> Added a printk line at the begin of function omap_gpio_rmw:
+> >> printk("########## %lx, %x, %x\n", base, reg, mask);
+> >>
+> >> Any hints how to fix it? I tried call the machine_kexec_mask_interrupts
+> >> at runtime kernel also panics so it may not limit to kdump case.
+> >>
+> >> [   66.340168] ########## fa1ac000, 140, 1
+> >> [   66.344456] Unhandled fault: external abort on non-linefetch (0x1028) at 0xfa1ac140
+> >> [   66.352142] pgd = dd9f0000
+> 
+> [...]
+> 
+> >> [   66.727278] [<c01f2276>] (omap_set_gpio_triggering) from [<c01f2551>] (omap_gpio_mask_irq+0x29/0x34)
+> 
+> Usually such back-trace means that you are trying to access HW
+> which is disabled (powered off) already. Or this HW IP has never been enabled.
 
-    TV Mixer needs both TV and LCD0 domains enabled to be fully operational.
-    This dependency is modelled by making TV power domains a sub-domain of
-    LCD0 power domain.
+It is possible, but how to detect such disabled gpio in this for_each_irq_desc
+loop? I tried below, it works for me but I'm not sure if it is a right fix.
 
-    Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-    Signed-off-by: Kukjin Kim <kgene@kernel.org>
--------------------------------------------------------------------------------------
-After reverting this I am not observing below lockdep warning report.
-But after reverting this patch I observer another bug.
+---
+ arch/arm/kernel/machine_kexec.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Best regards.
--Anand Moon
+--- linux.orig/arch/arm/kernel/machine_kexec.c
++++ linux/arch/arm/kernel/machine_kexec.c
+@@ -106,7 +106,7 @@ static void machine_kexec_mask_interrupt
+ 		if (chip->irq_eoi && irqd_irq_inprogress(&desc->irq_data))
+ 			chip->irq_eoi(&desc->irq_data);
+ 
+-		if (chip->irq_mask)
++		if ((chip->irq_mask) && !irqd_irq_masked(&desc->irq_data))
+ 			chip->irq_mask(&desc->irq_data);
+ 
+ 		if (chip->irq_disable && !irqd_irq_disabled(&desc->irq_data))
 
->> ------------------------------------------------------------------------------------------------------------------
->>
->> [    2.937531] =============================================
->> [    2.938733] [ INFO: possible recursive locking detected ]
->> [    2.944117] 4.4.0-rc4-xu3s #32 Not tainted
->> [    2.948195] ---------------------------------------------
->> [    2.953577] swapper/0/1 is trying to acquire lock:
->> [    2.958351]  (&genpd->lock){+.+...}, at: [<c0361550>]
->> __genpd_poweron+0x64/0x108
->> [    2.965727]
->> [    2.965727] but task is already holding lock:
->> [    2.971543]  (&genpd->lock){+.+...}, at: [<c0361af8>]
->> genpd_dev_pm_attach+0x168/0x1b8
->> [    2.979355]
->> [    2.979355] other info that might help us debug this:
->> [    2.985865]  Possible unsafe locking scenario:
->> [    2.985865]
->> [    2.991768]        CPU0
->> [    2.994198]        ----
->> [    2.996628]   lock(&genpd->lock);
->> [    2.999926]   lock(&genpd->lock);
->> [    3.003225]
->> [    3.003225]  *** DEADLOCK ***
->> [    3.003225]
->> [    3.009128]  May be due to missing lock nesting notation
->> [    3.009128]
->> [    3.015900] 3 locks held by swapper/0/1:
->> [    3.019804]  #0:  (&dev->mutex){......}, at: [<c0350910>]
->> __driver_attach+0x48/0x98
->> [    3.027442]  #1:  (&dev->mutex){......}, at: [<c0350920>]
->> __driver_attach+0x58/0x98
->> [    3.035081]  #2:  (&genpd->lock){+.+...}, at: [<c0361af8>]
->> genpd_dev_pm_attach+0x168/0x1b8
->> [    3.043326]
->> [    3.043326] stack backtrace:
->> [    3.047671] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.4.0-rc4-xu3s #32
->> [    3.054351] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
->> [    3.060444] [<c0016c98>] (unwind_backtrace) from [<c00139c4>]
->> (show_stack+0x10/0x14)
->> [    3.068163] [<c00139c4>] (show_stack) from [<c0270df0>]
->> (dump_stack+0x84/0xc4)
->> [    3.075367] [<c0270df0>] (dump_stack) from [<c00780b8>]
->> (__lock_acquire+0x1f88/0x215c)
->> [    3.083262] [<c00780b8>] (__lock_acquire) from [<c007886c>]
->> (lock_acquire+0xa4/0xd0)
->> [    3.090990] [<c007886c>] (lock_acquire) from [<c0641f2c>]
->> (mutex_lock_nested+0x70/0x4d4)
->> [    3.099061] [<c0641f2c>] (mutex_lock_nested) from [<c0361550>]
->> (__genpd_poweron+0x64/0x108)
->> [    3.107393] [<c0361550>] (__genpd_poweron) from [<c0361b00>]
->> (genpd_dev_pm_attach+0x170/0x1b8)
->> [    3.115986] [<c0361b00>] (genpd_dev_pm_attach) from [<c03520a8>]
->> (platform_drv_probe+0x2c/0xac)
->> [    3.124667] [<c03520a8>] (platform_drv_probe) from [<c03507d4>]
->> (driver_probe_device+0x208/0x2fc)
->> [    3.133519] [<c03507d4>] (driver_probe_device) from [<c035095c>]
->> (__driver_attach+0x94/0x98)
->> [    3.141939] [<c035095c>] (__driver_attach) from [<c034ec14>]
->> (bus_for_each_dev+0x68/0x9c)
->> [    3.150097] [<c034ec14>] (bus_for_each_dev) from [<c034fec8>]
->> (bus_add_driver+0x1a0/0x218)
->> [    3.158344] [<c034fec8>] (bus_add_driver) from [<c035115c>]
->> (driver_register+0x78/0xf8)
->> [    3.166330] [<c035115c>] (driver_register) from [<c0338488>]
->> (exynos_drm_register_drivers+0x28/0x74)
->> [    3.175441] [<c0338488>] (exynos_drm_register_drivers) from
->> [<c0338594>] (exynos_drm_init+0x6c/0xc4)
->> [    3.184556] [<c0338594>] (exynos_drm_init) from [<c00097f4>]
->> (do_one_initcall+0x90/0x1dc)
->> [    3.192718] [<c00097f4>] (do_one_initcall) from [<c0895e08>]
->> (kernel_init_freeable+0x158/0x1f8)
->> [    3.201396] [<c0895e08>] (kernel_init_freeable) from [<c063ecac>]
->> (kernel_init+0x8/0xe8)
->> [    3.209469] [<c063ecac>] (kernel_init) from [<c000f7d0>]
->> (ret_from_fork+0x14/0x24)
->> [    3.217932] exynos-hdmi 12d00000.hdmi: GPIO lookup for consumer hpd
->> [    3.223293] exynos-hdmi 12d00000.hdmi: using device tree for GPIO lookup
->> [    3.229980] of_get_named_gpiod_flags: can't parse 'hpd-gpios'
->> property of node '/hdmi at 12D00000[0]'
->> [    3.238945] of_get_named_gpiod_flags: parsed 'hpd-gpio' property of
->> node '/hdmi at 12D00000[0]' - status (0)
->> [    3.253430] exynos-drm exynos-drm: bound 12c10000.mixer (ops
->> mixer_component_ops)
->> [    3.256216] exynos-drm exynos-drm: bound 12d00000.hdmi (ops
->> hdmi_component_ops)
->> [    3.263245] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
->> [    3.269812] [drm] No driver support for vblank timestamp query.
->> [    3.323251] exynos-drm exynos-drm: fb0:  frame buffer device
->> [    3.341464] [drm] Initialized exynos 1.0.0 20110530 on minor 0
->>
->> -----------------------------------------------------------------------------------------------------------------------
->> -Anand Moon
->>
->>
->
+> 
+> >> [   66.736457] [<c01f2551>] (omap_gpio_mask_irq) from [<c0012f35>] (machine_crash_shutdown+0xb9/0x104)
+> >> [   66.745551] [<c0012f35>] (machine_crash_shutdown) from [<c00803fd>] (crash_kexec+0x35/0x68)
+> >> [   66.753942] [<c00803fd>] (crash_kexec) from [<c0010f51>] (die+0x1b9/0x390)
+> >> [   66.760859] [<c0010f51>] (die) from [<c001bc23>] (__do_kernel_fault.part.0+0x4f/0x1cc)
+> >> [   66.768824] [<c001bc23>] (__do_kernel_fault.part.0) from [<c0412e11>] (do_page_fault+0x155/0x29c)
+> >> [   66.777740] [<c0412e11>] (do_page_fault) from [<c00091ff>] (do_DataAbort+0x2f/0x88)
+> >> [   66.785432] [<c00091ff>] (do_DataAbort) from [<c041247b>] (__dabt_svc+0x3b/0x80)
+> >> [   66.792858] Exception stack(0xddc39e58 to 0xddc39ea0)
+> >> [   66.797929] 9e40:                                                       00000063 df93647c
+> >> [   66.806144] 9e60: 1f26a000 00000000 00000001 00000063 00000007 c0702e3c 00000000 ddc38000
+> >> [   66.814359] 9e80: 00000000 7f70d614 00000030 ddc39ea8 c021e54b c021e54c 600e0033 ffffffff
+> >> [   66.822575] [<c041247b>] (__dabt_svc) from [<c021e54c>] (sysrq_handle_crash+0x18/0x1c)
+> >> [   66.830530] [<c021e54c>] (sysrq_handle_crash) from [<c021e8b5>] (__handle_sysrq+0x79/0x10c)
+> >> [   66.838919] [<c021e8b5>] (__handle_sysrq) from [<c021ec79>] (write_sysrq_trigger+0x45/0x50)
+> >> [   66.847310] [<c021ec79>] (write_sysrq_trigger) from [<c010695f>] (proc_reg_write+0x43/0x68)
+> >> [   66.855700] [<c010695f>] (proc_reg_write) from [<c00ca6a3>] (__vfs_write+0xf/0x8c)
+> >> [   66.863304] [<c00ca6a3>] (__vfs_write) from [<c00cacd7>] (vfs_write+0x5f/0x128)
+> >> [   66.870646] [<c00cacd7>] (vfs_write) from [<c00cb313>] (SyS_write+0x2b/0x68)
+> >> [   66.877729] [<c00cb313>] (SyS_write) from [<c000ddc1>] (ret_fast_syscall+0x1/0x4c)
+> >> [   66.885332] Code: 443c 4643 f6a9 f9a1 (6823) 0732
+> >> [   66.890145] ---[ end trace 5a39094ece4dc200 ]---
+> >> [   66.894782] Kernel panic - not syncing: Fatal exception
+> >> [   66.900033] ---[ end Kernel panic - not syncing: Fatal exception
+> >>
+> 
+> 
+> -- 
+> regards,
+> -grygorii
+
+Thanks
+Dave
