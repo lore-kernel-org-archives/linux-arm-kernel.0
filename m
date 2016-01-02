@@ -1,33 +1,34 @@
-From: pshelar@nicira.com (Pravin Shelar)
-Date: Fri, 1 Jan 2016 18:58:10 -0800
-Subject: [PATCH] ip_tunnel: make ip6tunnel_xmit definition conditional
-In-Reply-To: <12586917.ah4bPMnYUH@wuerfel>
-References: <12586917.ah4bPMnYUH@wuerfel>
-Message-ID: <CALnjE+ptYadm5btYd3jFvd7h70-FJAh1Bm0nS4fRTa+5w8j+mg@mail.gmail.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Fri, 1 Jan 2016 20:33:36 -0800
+Subject: [GIT PULL] arm64: DTS fixes for X-Gene platforms for v4.5
+In-Reply-To: <2734316.CUGyZXSbzW@wuerfel>
+References: <CADaLNDnwz-gyzN-1bzyGxAWL-5Jt2zSc_hvYQ2TpExGLC=Df3A@mail.gmail.com>
+ <2734316.CUGyZXSbzW@wuerfel>
+Message-ID: <CADaLNDmdgm3udzPNFMEuhkVg1ThiwyuEV56YT9wfeYkODD+nHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 1, 2016 at 5:48 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> From 433df301cf49624871346fa63f3fc65033caeda3 Mon Sep 17 00:00:00 2001
-> From: Arnd Bergmann <arnd@arndb.de>
-> Date: Fri, 1 Jan 2016 13:18:48 +0100
-> Subject: [PATCH] net: make ip6tunnel_xmit definition conditional
+On Thu, Dec 31, 2015 at 7:51 AM, Arnd Bergmann <arnd@arndb.de> wrote:
 >
-> Moving the caller of iptunnel_xmit_stats causes a build error in
-> randconfig builds that disable CONFIG_INET:
+> On Wednesday 30 December 2015 16:09:46 Duc Dang wrote:
+> > Fixes for X-Gene DTS for v4.5
+> >
+> > This patch set fixes the node names of X-Gene I2C, GPIO
+> > controller DT nodes; and also removes I2C clock nodes as
+> > the same clock is shared between 2 I2C controllers
+> > on X-Gene SoC.
+> >
+> >
 >
-> In file included from ../net/xfrm/xfrm_input.c:17:0:
-> ../include/net/ip6_tunnel.h: In function 'ip6tunnel_xmit':
-> ../include/net/ip6_tunnel.h:93:2: error: implicit declaration of function 'iptunnel_xmit_stats' [-Werror=implicit-function-declaration]
->   iptunnel_xmit_stats(dev, pkt_len);
+> Thanks a lot for the follow-up!
 >
-> The reason is that the iptunnel_xmit_stats definition is hidden
-> inside #ifdef CONFIG_INET but the caller is not. We can change
-> one or the other to fix it, and this patch adds a second #ifdef
-> around ip6tunnel_xmit() to avoid seeing the invalid call.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 039f50629b7f ("ip_tunnel: Move stats update to iptunnel_xmit()")
+> Merged into next/dt64 now.
 
-Thanks for the fix.
-Acked-by: Pravin B Shelar <pshelar@nicira.com>
+Thanks, Arnd.
+
+Happy Holidays!
+
+>
+>         Arnd
+Regards,
+Duc Dang.
