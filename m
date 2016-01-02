@@ -1,38 +1,77 @@
-From: v1ron@mail.ru (Roman Volkov)
-Date: Sat, 2 Jan 2016 12:12:39 +0300
-Subject: [PATCH v3 RESEND 0/2] WM8505/WM8650 DT fixes for SD card
- controller
-In-Reply-To: <9863929.DgKyDlgJ1e@wuerfel>
-References: <1451655492-2569-1-git-send-email-v1ron@mail.ru>
- <7786478.TezhYjHkEF@wuerfel> <20160101203230.1dc5e655@v1ron-s7>
- <9863929.DgKyDlgJ1e@wuerfel>
-Message-ID: <20160102121239.01b64a0c@v1ron-s7>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Sat, 02 Jan 2016 10:01:34 +0000
+Subject: [PATCH] clk: fix clk-gpio.c with optional clock= DT property
+Message-ID: <E1aFJ0A-00086Z-0I@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? Fri, 01 Jan 2016 22:53:33 +0100
-Arnd Bergmann <arnd@arndb.de> ?????:
+When the clock DT property is not given, of_clk_get_parent_count()
+returns -ENOENT, which then tries to allocate -2 x 4 bytes of memory,
+which of course fails, causing the whole driver to fail to create
+the clock.
 
-> On Friday 01 January 2016 20:32:30 Roman Volkov wrote:
-> > > Applied both to next/dt, thanks a lot for following up!
-> > > 
-> > > Let me know if you think this should go into stable backports as
-> > > well, I did not apply it to the fixes branch as you don't have a
-> > > 'Cc: stable at vger.kernel.org' tag and it has never worked so far.  
-> > 
-> > Yes, this must go into the stable too. Let me know if I must change
-> > something or resend.  
-> 
-> I can put them in the fixes branch with the appropriate stable
-> tag myself, but please clarify whether we need just the first or
-> both patches there. It looks to me that the second one while
-> correct only addresses a cosmetic problem and everything works
-> without it.
+This causes the SolidRun platforms to fail probing the SDHCI1 interface
+which is connected to the WiFi.
 
-Correct, everything works without the second one. One of reviewers
-noticed that addresses are different between WM8505 and WM8650 where
-the hardware is the same. If such trivial changes are not accepted,
-please do not apply.
+Fix this by detecting errno codes, skipping the allocation, and fixing
+of_clk_gpio_gate_delayed_register_get() to handle a NULL parent_names
+array.
 
-Happy New Year,
-Roman
+Fixes: 80eeb1f0f757 ("clk: add gpio controlled clock multiplexer")
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+This goes all the way back to 80eeb1f0f757 ("clk: add gpio controlled
+clock multiplexer") introduced in June in v4.3-rc2 - which raises the
+question why _development_ work in clk is being merged outside of the
+merge window.
+
+A rewrite of this patch will be necessary to apply to v4.3 kernels.
+
+This applies on top of v4.4-rc6.
+
+ drivers/clk/clk-gpio.c | 23 ++++++++++++++---------
+ 1 file changed, 14 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/clk/clk-gpio.c b/drivers/clk/clk-gpio.c
+index 335322dc403f..05cca9298f44 100644
+--- a/drivers/clk/clk-gpio.c
++++ b/drivers/clk/clk-gpio.c
+@@ -264,8 +264,8 @@ static struct clk *of_clk_gpio_gate_delayed_register_get(const char *name,
+ 		const char * const *parent_names, u8 num_parents,
+ 		unsigned gpio, bool active_low)
+ {
+-	return clk_register_gpio_gate(NULL, name, parent_names[0],
+-			gpio, active_low, 0);
++	return clk_register_gpio_gate(NULL, name, parent_names ?
++			parent_names[0] : NULL, gpio, active_low, 0);
+ }
+ 
+ static struct clk *of_clk_gpio_mux_delayed_register_get(const char *name,
+@@ -292,13 +292,18 @@ static void __init of_gpio_clk_setup(struct device_node *node,
+ 		return;
+ 
+ 	num_parents = of_clk_get_parent_count(node);
+-
+-	parent_names = kcalloc(num_parents, sizeof(char *), GFP_KERNEL);
+-	if (!parent_names)
+-		return;
+-
+-	for (i = 0; i < num_parents; i++)
+-		parent_names[i] = of_clk_get_parent_name(node, i);
++	if (num_parents > 0) {
++		parent_names = kcalloc(num_parents, sizeof(char *), GFP_KERNEL);
++		if (!parent_names) {
++			kfree(data);
++			return;
++		}
++
++		for (i = 0; i < num_parents; i++)
++			parent_names[i] = of_clk_get_parent_name(node, i);
++	} else {
++		parent_names = NULL;
++	}
+ 
+ 	data->num_parents = num_parents;
+ 	data->parent_names = parent_names;
+-- 
+2.1.0
