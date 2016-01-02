@@ -1,90 +1,52 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sat, 02 Jan 2016 10:06:29 +0000
-Subject: [PATCH] mmc: sd: limit SD card power limit according to cards
- capabilities
-Message-ID: <E1aFJ4v-00087o-NH@rmk-PC.arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 2 Jan 2016 10:29:55 +0000
+Subject: [PATCH] arm: kernel: utilize hrtimer based broadcast
+In-Reply-To: <alpine.DEB.2.11.1512291449380.28591@nanos>
+References: <1437124312-44700-1-git-send-email-b18965@freescale.com>
+ <20151027081834.GB1425@svinekod>
+ <DB3PR04MB07407D83CC5F8F5F19A7207F4FB0@DB3PR04MB074.eurprd04.prod.outlook.com>
+ <4875455.lvoc6XpkZc@wuerfel>
+ <alpine.DEB.2.11.1512291449380.28591@nanos>
+Message-ID: <20160102102955.GP8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SD card specification allows cards to error out a SWITCH command
-where the requested function in a group is not supported.  The spec
-provides for a set of capabilities which indicate which functions are
-supported.
+On Tue, Dec 29, 2015 at 02:54:10PM +0100, Thomas Gleixner wrote:
+> On Mon, 28 Dec 2015, Arnd Bergmann wrote:
+> 
+> > On Monday 28 December 2015 07:18:58 Huan Wang wrote:
+> > > Hi, Arnd,
+> > > 
+> > > 	Could you help to review the following patch? Thanks.
+> > > 
+> > 
+> > Hi Alison,
+> > 
+> > I'm sorry but I understand very little of this particular area of the kernel.
+> > 
+> > I've added Daniel Lezcano, John Stultz and Thomas Gleixner to Cc, they all
+> > know this much better than I do and one of them should be able to comment after
+> > their Christmas break.
+> 
+> I have no real opinion about that patch. It does no harm to unconditionally
+> setup the hrtimer based broadcast even if it's never used.
+> 
+> Up to the arch maintainer to decide. 
 
-In the case of the power limit, requesting an unsupported power level
-via the SWITCH command fails, resulting in the power level remaining at
-the power-on default of 0.72W, even though the host and card may support
-higher powers levels.
+That's really not fair to keep shovelling these kinds of decisions onto
+architecture maintainers without any kind of explanation about how an
+architecture maintainer should make such a decision.
 
-This has been seen with SanDisk 8GB cards, which support the default
-0.72W and 1.44W (200mA and 400mA) in combination with an iMX6 host,
-supporting up to 2.88W (800mA).  This currently causes us to try to set
-a power limit function value of '3' (2.88W) which the card errors out
-on, and thereby causes the power level to remain at 0.72W rather than
-the desired 1.44W.
+Do I roll a 6-face dice, and if it gives an odd number, I apply this
+patch, otherwise I reject it?
 
-Arrange to limit the selected current limit by the capabilities reported
-by the card to avoid the SWITCH command failing.  Select the highest
-current limit that the host and card combination support.
+Is there a technical basis for making the decision?  If so, please
+explain what the technical arguments are against having or not having
+this change.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
-This is a bug fix, and as such needs merging into v4.4-rc and stable
-kernels.  There is probably more to come on this, as the SD simplified
-spec says that the power limit should be set _after_ switching to UHS
-mode:
+Thanks.
 
-"In UHS-I mode, *after* selecting one of SDR50, SDR104 or DDR50 mode
- by Function Group 1, host needs to change the Power Limit to enable
- the card to operate in higher performance."
-
-However, unlike this patch, I have not (yet) seen any detrimental
-effects from setting this before.
-
- drivers/mmc/core/sd.c | 20 ++++++++++++++++----
- 1 file changed, 16 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/mmc/core/sd.c b/drivers/mmc/core/sd.c
-index 141eaa923e18..c4c6e4200d18 100644
---- a/drivers/mmc/core/sd.c
-+++ b/drivers/mmc/core/sd.c
-@@ -329,6 +329,7 @@ static int mmc_read_switch(struct mmc_card *card)
- 		card->sw_caps.sd3_bus_mode = status[13];
- 		/* Driver Strengths supported by the card */
- 		card->sw_caps.sd3_drv_type = status[9];
-+		card->sw_caps.sd3_curr_limit = status[7] | status[6] << 8;
- 	}
- 
- out:
-@@ -545,14 +546,25 @@ static int sd_set_current_limit(struct mmc_card *card, u8 *status)
- 	 * when we set current limit to 200ma, the card will draw 200ma, and
- 	 * when we set current limit to 400/600/800ma, the card will draw its
- 	 * maximum 300ma from the host.
-+	 *
-+	 * The above is incorrect: if we try to set a current limit that is
-+	 * not supported by the card, the card can rightfully error out the
-+	 * attempt, and remain@the default current limit.  This results
-+	 * in a 300mA card being limited to 200mA even though the host
-+	 * supports 800mA. Failures seen with SanDisk 8GB UHS cards with
-+	 * an iMX6 host. --rmk
- 	 */
--	if (max_current >= 800)
-+	if (max_current >= 800 &&
-+	    card->sw_caps.sd3_curr_limit & SD_MAX_CURRENT_800)
- 		current_limit = SD_SET_CURRENT_LIMIT_800;
--	else if (max_current >= 600)
-+	else if (max_current >= 600 &&
-+		 card->sw_caps.sd3_curr_limit & SD_MAX_CURRENT_600)
- 		current_limit = SD_SET_CURRENT_LIMIT_600;
--	else if (max_current >= 400)
-+	else if (max_current >= 400 &&
-+		 card->sw_caps.sd3_curr_limit & SD_MAX_CURRENT_400)
- 		current_limit = SD_SET_CURRENT_LIMIT_400;
--	else if (max_current >= 200)
-+	else if (max_current >= 200 &&
-+		 card->sw_caps.sd3_curr_limit & SD_MAX_CURRENT_200)
- 		current_limit = SD_SET_CURRENT_LIMIT_200;
- 
- 	if (current_limit != SD_SET_CURRENT_NO_CHANGE) {
 -- 
-2.1.0
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
