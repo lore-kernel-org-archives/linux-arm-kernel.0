@@ -1,38 +1,33 @@
-From: andrea.merello@gmail.com (Andrea Merello)
-Date: Sat, 2 Jan 2016 17:05:34 +0100
-Subject: [PATCH 2/4] irqchip: bcm2836: Add SMP support for the 2836
-In-Reply-To: <20160102102747.GO8644@n2100.arm.linux.org.uk>
-References: <1451166444-11044-1-git-send-email-eric@anholt.net>
- <1451166444-11044-3-git-send-email-eric@anholt.net>
- <20160102102747.GO8644@n2100.arm.linux.org.uk>
-Message-ID: <CAN8YU5N+5XH9npZ8Y4GzNi_iskyap=4wBgSn0L4gF80qf7CicQ@mail.gmail.com>
+From: James.Bottomley@HansenPartnership.com (James Bottomley)
+Date: Sat, 02 Jan 2016 08:17:51 -0800
+Subject: [Question about DMA] Consistent memory?
+In-Reply-To: <20160102103948.GR8644@n2100.arm.linux.org.uk>
+References: <CAK7LNASd1amcHinXzYy=8mtYbnHUY1G_v=fthpachAVSyjqPZA@mail.gmail.com>
+ <20160102103948.GR8644@n2100.arm.linux.org.uk>
+Message-ID: <1451751471.2323.3.camel@HansenPartnership.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Agreed.
-This probably comes from the downstream code, I think.. But I agree
-it's actually redundant.
+On Sat, 2016-01-02 at 10:39 +0000, Russell King - ARM Linux wrote:
+> On Thu, Dec 31, 2015 at 04:50:54PM +0900, Masahiro Yamada wrote:
+> > Hi.
+> > 
+> > I am new to the Linux DMA APIs.
+> > 
+> > First, I started by reading Documentation/DMA-API.txt,
+> > but I am confused with the term "consistent memory".
+> 
+> Just read "coherent memory" instead - the documentation confusingly 
+> uses the two terms to refer to the same thing.  I think there was a 
+> patch a while back to replace "consistent" with "coherent" in this 
+> document, though I'm not sure what happened to it.
 
-Thank you for pointing this out.
+It's an standards issue.  The Document was originally based on the PCI
+DMA API.  All the PCI standards documentation refers to "consistent
+memory" instead of "coherent memory".  The original DMA API was
+designed for PA-RISC and its standards documentation refers to
+"coherent memory" hence the confusion.  The two terms are equivalent,
+but there's no real way of removing either without someone reading the
+actual specs and wondering what the other term means.
 
-On Sat, Jan 2, 2016 at 11:27 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sat, Dec 26, 2015 at 01:47:22PM -0800, Eric Anholt wrote:
->> +int __init bcm2836_smp_boot_secondary(unsigned int cpu,
->> +                                   struct task_struct *idle)
->> +{
->> +     unsigned long secondary_startup_phys =
->> +             (unsigned long)virt_to_phys((void *)secondary_startup);
->> +
->> +     dsb();
->> +     writel(secondary_startup_phys,
->> +            intc.base + LOCAL_MAILBOX3_SET0 + 16 * cpu);
->
-> Please explain why you need this dsb() - I can't see a reason for it.
-> writel() has a barrier internally prior to writing the register, and
-> therefore I think the above dsb() is entirely redundant.
->
-> --
-> RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+James
