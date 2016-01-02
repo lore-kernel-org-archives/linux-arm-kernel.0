@@ -1,77 +1,90 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sat, 02 Jan 2016 10:01:34 +0000
-Subject: [PATCH] clk: fix clk-gpio.c with optional clock= DT property
-Message-ID: <E1aFJ0A-00086Z-0I@rmk-PC.arm.linux.org.uk>
+Date: Sat, 02 Jan 2016 10:06:29 +0000
+Subject: [PATCH] mmc: sd: limit SD card power limit according to cards
+ capabilities
+Message-ID: <E1aFJ4v-00087o-NH@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the clock DT property is not given, of_clk_get_parent_count()
-returns -ENOENT, which then tries to allocate -2 x 4 bytes of memory,
-which of course fails, causing the whole driver to fail to create
-the clock.
+The SD card specification allows cards to error out a SWITCH command
+where the requested function in a group is not supported.  The spec
+provides for a set of capabilities which indicate which functions are
+supported.
 
-This causes the SolidRun platforms to fail probing the SDHCI1 interface
-which is connected to the WiFi.
+In the case of the power limit, requesting an unsupported power level
+via the SWITCH command fails, resulting in the power level remaining at
+the power-on default of 0.72W, even though the host and card may support
+higher powers levels.
 
-Fix this by detecting errno codes, skipping the allocation, and fixing
-of_clk_gpio_gate_delayed_register_get() to handle a NULL parent_names
-array.
+This has been seen with SanDisk 8GB cards, which support the default
+0.72W and 1.44W (200mA and 400mA) in combination with an iMX6 host,
+supporting up to 2.88W (800mA).  This currently causes us to try to set
+a power limit function value of '3' (2.88W) which the card errors out
+on, and thereby causes the power level to remain at 0.72W rather than
+the desired 1.44W.
 
-Fixes: 80eeb1f0f757 ("clk: add gpio controlled clock multiplexer")
+Arrange to limit the selected current limit by the capabilities reported
+by the card to avoid the SWITCH command failing.  Select the highest
+current limit that the host and card combination support.
+
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
-This goes all the way back to 80eeb1f0f757 ("clk: add gpio controlled
-clock multiplexer") introduced in June in v4.3-rc2 - which raises the
-question why _development_ work in clk is being merged outside of the
-merge window.
+This is a bug fix, and as such needs merging into v4.4-rc and stable
+kernels.  There is probably more to come on this, as the SD simplified
+spec says that the power limit should be set _after_ switching to UHS
+mode:
 
-A rewrite of this patch will be necessary to apply to v4.3 kernels.
+"In UHS-I mode, *after* selecting one of SDR50, SDR104 or DDR50 mode
+ by Function Group 1, host needs to change the Power Limit to enable
+ the card to operate in higher performance."
 
-This applies on top of v4.4-rc6.
+However, unlike this patch, I have not (yet) seen any detrimental
+effects from setting this before.
 
- drivers/clk/clk-gpio.c | 23 ++++++++++++++---------
- 1 file changed, 14 insertions(+), 9 deletions(-)
+ drivers/mmc/core/sd.c | 20 ++++++++++++++++----
+ 1 file changed, 16 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/clk/clk-gpio.c b/drivers/clk/clk-gpio.c
-index 335322dc403f..05cca9298f44 100644
---- a/drivers/clk/clk-gpio.c
-+++ b/drivers/clk/clk-gpio.c
-@@ -264,8 +264,8 @@ static struct clk *of_clk_gpio_gate_delayed_register_get(const char *name,
- 		const char * const *parent_names, u8 num_parents,
- 		unsigned gpio, bool active_low)
- {
--	return clk_register_gpio_gate(NULL, name, parent_names[0],
--			gpio, active_low, 0);
-+	return clk_register_gpio_gate(NULL, name, parent_names ?
-+			parent_names[0] : NULL, gpio, active_low, 0);
- }
+diff --git a/drivers/mmc/core/sd.c b/drivers/mmc/core/sd.c
+index 141eaa923e18..c4c6e4200d18 100644
+--- a/drivers/mmc/core/sd.c
++++ b/drivers/mmc/core/sd.c
+@@ -329,6 +329,7 @@ static int mmc_read_switch(struct mmc_card *card)
+ 		card->sw_caps.sd3_bus_mode = status[13];
+ 		/* Driver Strengths supported by the card */
+ 		card->sw_caps.sd3_drv_type = status[9];
++		card->sw_caps.sd3_curr_limit = status[7] | status[6] << 8;
+ 	}
  
- static struct clk *of_clk_gpio_mux_delayed_register_get(const char *name,
-@@ -292,13 +292,18 @@ static void __init of_gpio_clk_setup(struct device_node *node,
- 		return;
+ out:
+@@ -545,14 +546,25 @@ static int sd_set_current_limit(struct mmc_card *card, u8 *status)
+ 	 * when we set current limit to 200ma, the card will draw 200ma, and
+ 	 * when we set current limit to 400/600/800ma, the card will draw its
+ 	 * maximum 300ma from the host.
++	 *
++	 * The above is incorrect: if we try to set a current limit that is
++	 * not supported by the card, the card can rightfully error out the
++	 * attempt, and remain@the default current limit.  This results
++	 * in a 300mA card being limited to 200mA even though the host
++	 * supports 800mA. Failures seen with SanDisk 8GB UHS cards with
++	 * an iMX6 host. --rmk
+ 	 */
+-	if (max_current >= 800)
++	if (max_current >= 800 &&
++	    card->sw_caps.sd3_curr_limit & SD_MAX_CURRENT_800)
+ 		current_limit = SD_SET_CURRENT_LIMIT_800;
+-	else if (max_current >= 600)
++	else if (max_current >= 600 &&
++		 card->sw_caps.sd3_curr_limit & SD_MAX_CURRENT_600)
+ 		current_limit = SD_SET_CURRENT_LIMIT_600;
+-	else if (max_current >= 400)
++	else if (max_current >= 400 &&
++		 card->sw_caps.sd3_curr_limit & SD_MAX_CURRENT_400)
+ 		current_limit = SD_SET_CURRENT_LIMIT_400;
+-	else if (max_current >= 200)
++	else if (max_current >= 200 &&
++		 card->sw_caps.sd3_curr_limit & SD_MAX_CURRENT_200)
+ 		current_limit = SD_SET_CURRENT_LIMIT_200;
  
- 	num_parents = of_clk_get_parent_count(node);
--
--	parent_names = kcalloc(num_parents, sizeof(char *), GFP_KERNEL);
--	if (!parent_names)
--		return;
--
--	for (i = 0; i < num_parents; i++)
--		parent_names[i] = of_clk_get_parent_name(node, i);
-+	if (num_parents > 0) {
-+		parent_names = kcalloc(num_parents, sizeof(char *), GFP_KERNEL);
-+		if (!parent_names) {
-+			kfree(data);
-+			return;
-+		}
-+
-+		for (i = 0; i < num_parents; i++)
-+			parent_names[i] = of_clk_get_parent_name(node, i);
-+	} else {
-+		parent_names = NULL;
-+	}
- 
- 	data->num_parents = num_parents;
- 	data->parent_names = parent_names;
+ 	if (current_limit != SD_SET_CURRENT_NO_CHANGE) {
 -- 
 2.1.0
