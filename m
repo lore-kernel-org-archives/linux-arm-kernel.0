@@ -1,61 +1,60 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Sat, 02 Jan 2016 13:42:17 -0800
-Subject: [PATCH] [BUG] clk: rockchip: don't mark clock names as initconst
-In-Reply-To: <3926467.jaQRQH5bEO@diego>
-References: <2791943.MBZ53mI7Gp@wuerfel> <1799610.nrn5HMCSxL@diego>
- <6692523.e5K11FUKe0@wuerfel> <3926467.jaQRQH5bEO@diego>
-Message-ID: <20160102214217.20626.98999@quark.deferred.io>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Sun, 03 Jan 2016 01:39:22 +0100
+Subject: [PATCH v4 0/3] Add AMBA bus probing support to ACPI
+In-Reply-To: <1450880383-29560-1-git-send-email-aleksey.makarov@linaro.org>
+References: <1450880383-29560-1-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <2297330.oDddnOnJb4@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Heiko St?bner (2016-01-01 14:05:10)
-> Am Freitag, 1. Januar 2016, 22:50:43 schrieb Arnd Bergmann:
-> > On Friday 01 January 2016 18:06:30 Heiko St?bner wrote:
-> > > "[PATCH] clk: rockchip: fix section mismatches with new child-clocks" [0]
-> > > 
-> > > should be in Mike's + Stephen's inbox since last week as well, which moves
-> > > the offending new elements into separate entities, which can have
-> > > __initdata attributes again.
-> > > 
-> > > 
-> > > Heiko
-> > > 
-> > > [0] http://www.spinics.net/lists/arm-kernel/msg471295.html
-> > 
-> > The patch looks good, but for some reason, the next-20151223 kernel had no
-> > problem and next-20151231 was broken, the top commits in
-> > drivers/clk/rockchips are:
+On Wednesday, December 23, 2015 05:19:39 PM Aleksey Makarov wrote:
+> As discussed when Shannon Zhao sent a patch to add platform_device support
+> to pl061 driver. Russel and other maintainers prefered that ACPI learned
+> how to create AMBA devices rather than converting/adding platform_device
+> support to AMBA drivers.
 > 
-> That is correct. next-20151223 did not contain the offending patches yet. 
-> After the patches got merged into the clock-tree the kbuild-robot alerted us 
-> to the __initdata issue, so I created the linked patch as fixup.
+> http://comments.gmane.org/gmane.linux.ports.arm.kernel/431364
+> 
+> 1) Adds basic AMBA device probing support to ACPI, it uses a whitelist of
+> device IDs as the number of AMBA devices is limited. Currently the two ids
+> present are those used in QEMU for arm64.
+> 
+> 2) Adds the plumbing into ACPI probe sequence.
+> 
+> 3) From ACPI pl011 is only defined (SBSA document) to be in SBSA mode which has
+> reduced functionality. There may be a better method to do this that I have
+> overlooked.
+> 
+> v4:
+> - A memory leak has been fixed (Vladimir Zapolskiy)
+> - ACPI_COMPANION() -> has_acpi_companion() (Andy Shevchenko)
+> - pr_err() -> dev_err() (Andy Shevchenko)
+> - The call to amba_register_dummy_clk() has been moved to to acpi_amba_init()
+>   (Vladimir Zapolskiy)
+> - Return value has been fixed (Vladimir Zapolskiy)
+> 
+> v3:
+> https://lkml.kernel.org/g/1450716100-13688-1-git-send-email-aleksey.makarov at linaro.org
+> - Compilation without CONFIG_ARM_AMBA has been fixed
+> 
+> v2:
+> https://lkml.kernel.org/g/1450709399-7246-1-git-send-email-aleksey.makarov at linaro.org
+> - A new ACPI scan handler for AMBA devices has been implemented
+> - The order of `if` branches in amba-pl011.c has been changed
+> - A couple of `static`s have been added
+> - The compilation of the acpi_amba.c unit has made conditional
+> - A comment on SBSA UART has been added
+> 
+> v1:
+> https://lkml.kernel.org/g/1443609530-21524-1-git-send-email-graeme.gregory at linaro.org
+> 
+> Graeme Gregory (3):
+>   ACPI: amba bus probing support
+>   ACPI: scan add in amba probing
+>   serial: amba-pl011: add ACPI support to AMBA probe
 
-The fix has been pushed to the clk mirror. The next -next should no
-longer have the section mismatch warnings.
+The ACPI part looks OK to me, but I'd really like to know whether or not the
+ARM maintainers like this series too.
 
-Regards,
-Mike
-
-> 
-> 
-> Heiko
-> 
-> > 
-> > commit a915e30dd26ea5f3cc2e2c044aba38ee5973d3fa
-> > Merge: ce6dd266d535 b0158bb27c7b
-> > Author: Michael Turquette <mturquette@baylibre.com>
-> > Date:   Wed Dec 23 13:08:56 2015 -0800
-> > 
-> >     Merge branch 'clk-rockchip' into clk-next
-> > 
-> > commit b0158bb27c7b6e9843f541c17b24dbd964b76db6
-> > Author: Xing Zheng <zhengxing@rock-chips.com>
-> > Date:   Tue Dec 22 22:28:01 2015 +0100
-> > 
-> >     clk: rockchip: rk3036: include downstream muxes into fractional dividers
-> > 
-> >     Use the newly introduced possibility to combine the fractional dividers
-> > 
-> > 
-> >       Arnd
-> 
+Thanks,
+Rafael
