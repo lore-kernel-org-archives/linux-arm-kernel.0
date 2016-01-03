@@ -1,120 +1,155 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun,  3 Jan 2016 17:05:52 +0100
-Subject: [PATCH 1/6] extable: add support for relative extables to search and
- sort routines
+Date: Sun,  3 Jan 2016 17:05:53 +0100
+Subject: [PATCH 2/6] alpha/extable: use generic search and sort routines
 In-Reply-To: <1451837157-447-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1451837157-447-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1451837157-447-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1451837157-447-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support to the generic search_extable() and sort_extable()
-implementations for dealing with exception table entries whose fields
-contain relative offsets rather than absolute addresses.
+Replace the arch specific versions of search_extable() and sort_extable()
+with calls to the generic ones, which now support relative exception
+tables as well.
 
+Cc: Richard Henderson <rth@twiddle.net>
+Cc: Ivan Kokshaysky <ink@jurassic.park.msu.ru>
+Cc: Matt Turner <mattst88@gmail.com>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- lib/extable.c | 50 ++++++++++++++++----
- 1 file changed, 41 insertions(+), 9 deletions(-)
+ arch/alpha/include/asm/uaccess.h | 10 ++-
+ arch/alpha/mm/Makefile           |  2 +-
+ arch/alpha/mm/extable.c          | 92 --------------------
+ 3 files changed, 9 insertions(+), 95 deletions(-)
 
-diff --git a/lib/extable.c b/lib/extable.c
-index 4cac81ec225e..0be02ad561e9 100644
---- a/lib/extable.c
-+++ b/lib/extable.c
-@@ -14,7 +14,37 @@
- #include <linux/sort.h>
- #include <asm/uaccess.h>
+diff --git a/arch/alpha/include/asm/uaccess.h b/arch/alpha/include/asm/uaccess.h
+index 9b0d40093c9a..c419b43c461d 100644
+--- a/arch/alpha/include/asm/uaccess.h
++++ b/arch/alpha/include/asm/uaccess.h
+@@ -483,7 +483,13 @@ struct exception_table_entry
+ 	(pc) + (_fixup)->fixup.bits.nextinsn;			\
+ })
  
-+#ifndef ARCH_HAS_RELATIVE_EXTABLE
-+#define ex_to_insn(x)	((x)->insn)
-+#else
-+static inline unsigned long ex_to_insn(const struct exception_table_entry *x)
-+{
-+	return (unsigned long)&x->insn + x->insn;
-+}
-+#endif
+-#define ARCH_HAS_SORT_EXTABLE
+-#define ARCH_HAS_SEARCH_EXTABLE
++#define ARCH_HAS_RELATIVE_EXTABLE
 +
- #ifndef ARCH_HAS_SORT_EXTABLE
-+#ifndef ARCH_HAS_RELATIVE_EXTABLE
-+#define swap_ex		NULL
-+#else
-+static void swap_ex(void *a, void *b, int size)
-+{
-+	struct exception_table_entry *x = a, *y = b, tmp;
-+	int delta = b - a;
++#define swap_ex_entry_fixup(a, b, tmp, delta)			\
++	do {							\
++		(a)->fixup.unit = (b)->fixup.unit;		\
++		(b)->fixup.unit = (tmp).fixup.unit;		\
++	} while (0)
 +
-+	tmp = *x;
-+	x->insn = y->insn + delta;
-+	y->insn = tmp.insn - delta;
-+
-+#ifdef swap_ex_entry_fixup
-+	swap_ex_entry_fixup(x, y, tmp, delta);
-+#else
-+	x->fixup = y->fixup + delta;
-+	y->fixup = tmp.fixup - delta;
-+#endif
-+}
-+#endif /* ARCH_HAS_RELATIVE_EXTABLE */
-+
- /*
-  * The exception table needs to be sorted so that the binary
-  * search that we use to find entries in it works properly.
-@@ -26,9 +56,9 @@ static int cmp_ex(const void *a, const void *b)
- 	const struct exception_table_entry *x = a, *y = b;
  
- 	/* avoid overflow */
--	if (x->insn > y->insn)
-+	if (ex_to_insn(x) > ex_to_insn(y))
- 		return 1;
--	if (x->insn < y->insn)
-+	if (ex_to_insn(x) < ex_to_insn(y))
- 		return -1;
- 	return 0;
- }
-@@ -37,7 +67,7 @@ void sort_extable(struct exception_table_entry *start,
- 		  struct exception_table_entry *finish)
- {
- 	sort(start, finish - start, sizeof(struct exception_table_entry),
--	     cmp_ex, NULL);
-+	     cmp_ex, swap_ex);
- }
+ #endif /* __ALPHA_UACCESS_H */
+diff --git a/arch/alpha/mm/Makefile b/arch/alpha/mm/Makefile
+index c993d3f93cf6..5a9807936411 100644
+--- a/arch/alpha/mm/Makefile
++++ b/arch/alpha/mm/Makefile
+@@ -4,6 +4,6 @@
  
- #ifdef CONFIG_MODULES
-@@ -48,13 +78,15 @@ void sort_extable(struct exception_table_entry *start,
- void trim_init_extable(struct module *m)
- {
- 	/*trim the beginning*/
--	while (m->num_exentries && within_module_init(m->extable[0].insn, m)) {
-+	while (m->num_exentries &&
-+	       within_module_init(ex_to_insn(&m->extable[0]), m)) {
- 		m->extable++;
- 		m->num_exentries--;
- 	}
- 	/*trim the end*/
- 	while (m->num_exentries &&
--		within_module_init(m->extable[m->num_exentries-1].insn, m))
-+	       within_module_init(ex_to_insn(&m->extable[m->num_exentries - 1]),
-+				  m))
- 		m->num_exentries--;
- }
- #endif /* CONFIG_MODULES */
-@@ -81,13 +113,13 @@ search_extable(const struct exception_table_entry *first,
- 		 * careful, the distance between value and insn
- 		 * can be larger than MAX_LONG:
- 		 */
--		if (mid->insn < value)
-+		if (ex_to_insn(mid) < value)
- 			first = mid + 1;
--		else if (mid->insn > value)
-+		else if (ex_to_insn(mid) > value)
- 			last = mid - 1;
- 		else
- 			return mid;
+ ccflags-y := -Werror
+ 
+-obj-y	:= init.o fault.o extable.o
++obj-y	:= init.o fault.o
+ 
+ obj-$(CONFIG_DISCONTIGMEM) += numa.o
+diff --git a/arch/alpha/mm/extable.c b/arch/alpha/mm/extable.c
+deleted file mode 100644
+index 813c9b63c0e1..000000000000
+--- a/arch/alpha/mm/extable.c
++++ /dev/null
+@@ -1,92 +0,0 @@
+-/*
+- * linux/arch/alpha/mm/extable.c
+- */
+-
+-#include <linux/module.h>
+-#include <linux/sort.h>
+-#include <asm/uaccess.h>
+-
+-static inline unsigned long ex_to_addr(const struct exception_table_entry *x)
+-{
+-	return (unsigned long)&x->insn + x->insn;
+-}
+-
+-static void swap_ex(void *a, void *b, int size)
+-{
+-	struct exception_table_entry *ex_a = a, *ex_b = b;
+-	unsigned long addr_a = ex_to_addr(ex_a), addr_b = ex_to_addr(ex_b);
+-	unsigned int t = ex_a->fixup.unit;
+-
+-	ex_a->fixup.unit = ex_b->fixup.unit;
+-	ex_b->fixup.unit = t;
+-	ex_a->insn = (int)(addr_b - (unsigned long)&ex_a->insn);
+-	ex_b->insn = (int)(addr_a - (unsigned long)&ex_b->insn);
+-}
+-
+-/*
+- * The exception table needs to be sorted so that the binary
+- * search that we use to find entries in it works properly.
+- * This is used both for the kernel exception table and for
+- * the exception tables of modules that get loaded.
+- */
+-static int cmp_ex(const void *a, const void *b)
+-{
+-	const struct exception_table_entry *x = a, *y = b;
+-
+-	/* avoid overflow */
+-	if (ex_to_addr(x) > ex_to_addr(y))
+-		return 1;
+-	if (ex_to_addr(x) < ex_to_addr(y))
+-		return -1;
+-	return 0;
+-}
+-
+-void sort_extable(struct exception_table_entry *start,
+-		  struct exception_table_entry *finish)
+-{
+-	sort(start, finish - start, sizeof(struct exception_table_entry),
+-	     cmp_ex, swap_ex);
+-}
+-
+-#ifdef CONFIG_MODULES
+-/*
+- * Any entry referring to the module init will be@the beginning or
+- * the end.
+- */
+-void trim_init_extable(struct module *m)
+-{
+-	/*trim the beginning*/
+-	while (m->num_exentries &&
+-	       within_module_init(ex_to_addr(&m->extable[0]), m)) {
+-		m->extable++;
+-		m->num_exentries--;
+-	}
+-	/*trim the end*/
+-	while (m->num_exentries &&
+-	       within_module_init(ex_to_addr(&m->extable[m->num_exentries-1]),
+-				  m))
+-		m->num_exentries--;
+-}
+-#endif /* CONFIG_MODULES */
+-
+-const struct exception_table_entry *
+-search_extable(const struct exception_table_entry *first,
+-	       const struct exception_table_entry *last,
+-	       unsigned long value)
+-{
+-        while (first <= last) {
+-		const struct exception_table_entry *mid;
+-		unsigned long mid_value;
+-
+-		mid = (last - first) / 2 + first;
+-		mid_value = ex_to_addr(mid);
+-                if (mid_value == value)
+-                        return mid;
+-                else if (mid_value < value)
+-                        first = mid+1;
+-                else
+-                        last = mid-1;
 -        }
+-
 -        return NULL;
-+	}
-+	return NULL;
- }
- #endif
+-}
 -- 
 1.9.1
