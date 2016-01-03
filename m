@@ -1,167 +1,38 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun,  3 Jan 2016 17:05:57 +0100
-Subject: [PATCH 6/6] arm64: switch to relative exception tables
-In-Reply-To: <1451837157-447-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1451837157-447-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1451837157-447-7-git-send-email-ard.biesheuvel@linaro.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sun, 3 Jan 2016 19:30:12 +0100
+Subject: [PATCH v2] i2c: imx: make bus recovery through pinctrl optional
+In-Reply-To: <CACRpkdbb-GFJSVvxOLda6CVG_fB2zAPPC2MMzQ6P1mAfvsrkPw@mail.gmail.com>
+References: <1448055950-21190-1-git-send-email-leoli@freescale.com>
+ <CACRpkdbb-GFJSVvxOLda6CVG_fB2zAPPC2MMzQ6P1mAfvsrkPw@mail.gmail.com>
+Message-ID: <20160103183012.GE1522@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of using absolute addresses for both the exception location
-and the fixup, use offsets relative to the exception table entry values.
-Not only does this cut the size of the exception table in half, it is
-also a prerequisite for KASLR, since absolute exception table entries
-are subject to dynamic relocation, which is incompatible with the sorting
-of the exception table that occurs at build time.
+On Mon, Nov 30, 2015 at 01:55:19PM +0100, Linus Walleij wrote:
+> On Fri, Nov 20, 2015 at 10:45 PM, Li Yang <leoli@freescale.com> wrote:
+> 
+> > -       if (IS_ERR(i2c_imx->pinctrl)) {
+> > +       /* bailout on -ENOMEM or -EPROBE_DEFER, continue for other errors */
+> > +       if (PTR_ERR(i2c_imx->pinctrl) == -ENOMEM ||
+> > +                       PTR_ERR(i2c_imx->pinctrl) == -EPROBE_DEFER) {
+> 
+> This is one of the evils of deferred probe: you never know if
+> something will eventually turn up. It feels wrong to bail out
+> on deferred probe...
+> 
+> I have no better idea though.
+> Acked-by
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
+Linus, proper ack next time please, so patchwork will pick it up
+automatically.
 
-Note that this patch supersedes the version I sent as part of the series that
-implements KASLR for arm64: http://thread.gmane.org/gmane.linux.kernel/2116531
+Li Yang: There have been some other changes to the imx driver. Could you
+rebase against my for-next or for-4.5 and add Linus' ack? Thanks!
 
- arch/arm64/include/asm/assembler.h   |  2 +-
- arch/arm64/include/asm/futex.h       |  4 ++--
- arch/arm64/include/asm/uaccess.h     | 18 ++++++++++--------
- arch/arm64/kernel/armv8_deprecated.c |  4 ++--
- arch/arm64/mm/extable.c              |  2 +-
- scripts/sortextable.c                |  2 +-
- 6 files changed, 17 insertions(+), 15 deletions(-)
-
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 12eff928ef8b..8094d50f05bc 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -98,7 +98,7 @@
- 9999:	x;					\
- 	.section __ex_table,"a";		\
- 	.align	3;				\
--	.quad	9999b,l;			\
-+	.long	(9999b - .), (l - .);		\
- 	.previous
- 
- /*
-diff --git a/arch/arm64/include/asm/futex.h b/arch/arm64/include/asm/futex.h
-index 007a69fc4f40..35e73e255ad3 100644
---- a/arch/arm64/include/asm/futex.h
-+++ b/arch/arm64/include/asm/futex.h
-@@ -44,7 +44,7 @@
- "	.popsection\n"							\
- "	.pushsection __ex_table,\"a\"\n"				\
- "	.align	3\n"							\
--"	.quad	1b, 4b, 2b, 4b\n"					\
-+"	.long	(1b - .), (4b - .), (2b - .), (4b - .)\n"		\
- "	.popsection\n"							\
- 	ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN,		\
- 		    CONFIG_ARM64_PAN)					\
-@@ -135,7 +135,7 @@ futex_atomic_cmpxchg_inatomic(u32 *uval, u32 __user *uaddr,
- "	.popsection\n"
- "	.pushsection __ex_table,\"a\"\n"
- "	.align	3\n"
--"	.quad	1b, 4b, 2b, 4b\n"
-+"	.long	(1b - .), (4b - .), (2b - .), (4b - .)\n"
- "	.popsection\n"
- 	: "+r" (ret), "=&r" (val), "+Q" (*uaddr), "=&r" (tmp)
- 	: "r" (oldval), "r" (newval), "Ir" (-EFAULT)
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index b2ede967fe7d..ab627e6c06c9 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -36,11 +36,11 @@
- #define VERIFY_WRITE 1
- 
- /*
-- * The exception table consists of pairs of addresses: the first is the
-- * address of an instruction that is allowed to fault, and the second is
-- * the address at which the program should continue.  No registers are
-- * modified, so it is entirely up to the continuation code to figure out
-- * what to do.
-+ * The exception table consists of pairs of relative offsets: the first
-+ * is the relative offset to an instruction that is allowed to fault,
-+ * and the second is the relative offset at which the program should
-+ * continue. No registers are modified, so it is entirely up to the
-+ * continuation code to figure out what to do.
-  *
-  * All the routines below use bits of fixup code that are out of line
-  * with the main instruction path.  This means when everything is well,
-@@ -50,9 +50,11 @@
- 
- struct exception_table_entry
- {
--	unsigned long insn, fixup;
-+	int insn, fixup;
- };
- 
-+#define ARCH_HAS_RELATIVE_EXTABLE
-+
- extern int fixup_exception(struct pt_regs *regs);
- 
- #define KERNEL_DS	(-1UL)
-@@ -125,7 +127,7 @@ static inline void set_fs(mm_segment_t fs)
- 	"	.previous\n"						\
- 	"	.section __ex_table,\"a\"\n"				\
- 	"	.align	3\n"						\
--	"	.quad	1b, 3b\n"					\
-+	"	.long	(1b - .), (3b - .)\n"				\
- 	"	.previous"						\
- 	: "+r" (err), "=&r" (x)						\
- 	: "r" (addr), "i" (-EFAULT))
-@@ -192,7 +194,7 @@ do {									\
- 	"	.previous\n"						\
- 	"	.section __ex_table,\"a\"\n"				\
- 	"	.align	3\n"						\
--	"	.quad	1b, 3b\n"					\
-+	"	.long	(1b - .), (3b - .)\n"				\
- 	"	.previous"						\
- 	: "+r" (err)							\
- 	: "r" (x), "r" (addr), "i" (-EFAULT))
-diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
-index 937f5e58a4d3..8f21b1363387 100644
---- a/arch/arm64/kernel/armv8_deprecated.c
-+++ b/arch/arm64/kernel/armv8_deprecated.c
-@@ -299,8 +299,8 @@ static void register_insn_emulation_sysctl(struct ctl_table *table)
- 	"	.popsection"					\
- 	"	.pushsection	 __ex_table,\"a\"\n"		\
- 	"	.align		3\n"				\
--	"	.quad		0b, 4b\n"			\
--	"	.quad		1b, 4b\n"			\
-+	"	.long		(0b - .), (4b - .)\n"		\
-+	"	.long		(1b - .), (4b - .)\n"		\
- 	"	.popsection\n"					\
- 	ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN,	\
- 		CONFIG_ARM64_PAN)				\
-diff --git a/arch/arm64/mm/extable.c b/arch/arm64/mm/extable.c
-index 79444279ba8c..81acd4706878 100644
---- a/arch/arm64/mm/extable.c
-+++ b/arch/arm64/mm/extable.c
-@@ -11,7 +11,7 @@ int fixup_exception(struct pt_regs *regs)
- 
- 	fixup = search_exception_tables(instruction_pointer(regs));
- 	if (fixup)
--		regs->pc = fixup->fixup;
-+		regs->pc = (unsigned long)&fixup->fixup + fixup->fixup;
- 
- 	return fixup != NULL;
- }
-diff --git a/scripts/sortextable.c b/scripts/sortextable.c
-index c2423d913b46..af247c70fb66 100644
---- a/scripts/sortextable.c
-+++ b/scripts/sortextable.c
-@@ -282,12 +282,12 @@ do_file(char const *const fname)
- 	case EM_386:
- 	case EM_X86_64:
- 	case EM_S390:
-+	case EM_AARCH64:
- 		custom_sort = sort_relative_table;
- 		break;
- 	case EM_ARCOMPACT:
- 	case EM_ARCV2:
- 	case EM_ARM:
--	case EM_AARCH64:
- 	case EM_MICROBLAZE:
- 	case EM_MIPS:
- 	case EM_XTENSA:
--- 
-1.9.1
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160103/53375360/attachment.sig>
