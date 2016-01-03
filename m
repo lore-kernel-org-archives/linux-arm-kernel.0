@@ -1,127 +1,61 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Sat, 02 Jan 2016 22:47:49 -0800
-Subject: [PATCH] clk: fix clk-gpio.c with optional clock= DT property
-In-Reply-To: <E1aFJ0A-00086Z-0I@rmk-PC.arm.linux.org.uk>
-References: <E1aFJ0A-00086Z-0I@rmk-PC.arm.linux.org.uk>
-Message-ID: <20160103064749.15239.59588@quark.deferred.io>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Sun, 3 Jan 2016 11:01:05 +0200
+Subject: [PATCH v2 32/32] virtio_ring: use virt_store_mb
+In-Reply-To: <5686B622.6070600@cogentembedded.com>
+References: <1451572003-2440-1-git-send-email-mst@redhat.com>
+ <1451572003-2440-33-git-send-email-mst@redhat.com>
+ <5686B622.6070600@cogentembedded.com>
+Message-ID: <20160103110052-mutt-send-email-mst@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-Quoting Russell King (2016-01-02 02:01:34)
-> When the clock DT property is not given, of_clk_get_parent_count()
-> returns -ENOENT, which then tries to allocate -2 x 4 bytes of memory,
-> which of course fails, causing the whole driver to fail to create
-> the clock.
+On Fri, Jan 01, 2016 at 08:23:46PM +0300, Sergei Shtylyov wrote:
+> Hello.
 > 
-> This causes the SolidRun platforms to fail probing the SDHCI1 interface
-> which is connected to the WiFi.
+> On 12/31/2015 10:09 PM, Michael S. Tsirkin wrote:
 > 
-> Fix this by detecting errno codes, skipping the allocation, and fixing
-> of_clk_gpio_gate_delayed_register_get() to handle a NULL parent_names
-> array.
-
-Thanks for the fix. Applied to clk-next manually.
-
+> >We need a full barrier after writing out event index, using
+> >virt_store_mb there seems better than open-coding.  As usual, we need a
+> >wrapper to account for strong barriers.
+> >
+> >It's tempting to use this in vhost as well, for that, we'll
+> >need a variant of smp_store_mb that works on __user pointers.
+> >
+> >Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+> >---
+> >  include/linux/virtio_ring.h  | 12 ++++++++++++
+> >  drivers/virtio/virtio_ring.c | 15 +++++++++------
+> >  2 files changed, 21 insertions(+), 6 deletions(-)
+> >
+> >diff --git a/include/linux/virtio_ring.h b/include/linux/virtio_ring.h
+> >index f3fa55b..3a74d91 100644
+> >--- a/include/linux/virtio_ring.h
+> >+++ b/include/linux/virtio_ring.h
+> >@@ -45,6 +45,18 @@ static inline void virtio_wmb(bool weak_barriers)
+> >  		wmb();
+> >  }
+> >
+> >+static inline void virtio_store_mb(bool weak_barriers,
+> >+				   __virtio16 *p, __virtio16 v)
+> >+{
+> >+	if (weak_barriers)
+> >+		virt_store_mb(*p, v);
+> >+	else
+> >+	{
 > 
-> Fixes: 80eeb1f0f757 ("clk: add gpio controlled clock multiplexer")
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
-> This goes all the way back to 80eeb1f0f757 ("clk: add gpio controlled
-> clock multiplexer") introduced in June in v4.3-rc2 - which raises the
-> question why _development_ work in clk is being merged outside of the
-> merge window.
-
-That patch was merged into the clk tree in June 2015, based on 4.2-rc1.
-
-v4.2 was release on Sunday, August 30, 2015. My pull request to Linus
-containing this patch was sent on Monday, August 31, 2015. Thread
-archived here:
-
-http://lkml.kernel.org/r/<20150831192125.11508.92473@quantum>
-
-Looks like it was merged in 4.3-rc1 as well:
-
-$ git log v4.3-rc1..clk-for-linus-4.3
-$
-
+>    The kernel coding style dictates:
 > 
-> A rewrite of this patch will be necessary to apply to v4.3 kernels.
+> 	if (weak_barriers) {
+> 		virt_store_mb(*p, v);
+> 	} else {
 > 
-> This applies on top of v4.4-rc6.
+> >+		WRITE_ONCE(*p, v);
+> >+		mb();
+> >+	}
+> >+}
+> >+
+> [...]
+> 
+> MBR, Sergei
 
-Alternatively we can send f66541ba02d5 "clk: gpio: Get parent clk names
-in of_gpio_clk_setup()" along with your fix.
-
-Below is the modified version of your patch.
-
-Regards,
-Mike
-
-
-
-commit 60f7e5a537f367d3be7cff2bce13c91c10bdf451
-Author: Russell King <rmk+kernel@arm.linux.org.uk>
-Date:   Sat Jan 2 10:01:34 2016 +0000
-
-    clk: fix clk-gpio.c with optional clock= DT property
-    
-    When the clock DT property is not given, of_clk_get_parent_count()
-    returns -ENOENT, which then tries to allocate -2 x 4 bytes of memory,
-    which of course fails, causing the whole driver to fail to create
-    the clock.
-    
-    This causes the SolidRun platforms to fail probing the SDHCI1 interface
-    which is connected to the WiFi.
-    
-    Fix this by detecting errno codes, skipping the allocation, and fixing
-    of_clk_gpio_gate_delayed_register_get() to handle a NULL parent_names
-    array.
-    
-    Fixes: 80eeb1f0f757 ("clk: add gpio controlled clock multiplexer")
-    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-    Signed-off-by: Michael Turquette <mturquette@baylibre.com>
-
-diff --git a/drivers/clk/clk-gpio.c b/drivers/clk/clk-gpio.c
-index 1767b9e..19fed65 100644
---- a/drivers/clk/clk-gpio.c
-+++ b/drivers/clk/clk-gpio.c
-@@ -264,8 +264,8 @@ static struct clk *of_clk_gpio_gate_delayed_register_get(const char *name,
- 		const char * const *parent_names, u8 num_parents,
- 		unsigned gpio, bool active_low)
- {
--	return clk_register_gpio_gate(NULL, name, parent_names[0],
--			gpio, active_low, 0);
-+	return clk_register_gpio_gate(NULL, name, parent_names ?
-+			parent_names[0] : NULL, gpio, active_low, 0);
- }
- 
- static struct clk *of_clk_gpio_mux_delayed_register_get(const char *name,
-@@ -295,15 +295,19 @@ static void __init of_gpio_clk_setup(struct device_node *node,
- 	if (!data)
- 		return;
- 
--	parent_names = kcalloc(num_parents, sizeof(char *), GFP_KERNEL);
--	if (!parent_names) {
--		kfree(data);
--		return;
-+	if (num_parents) {
-+		parent_names = kcalloc(num_parents, sizeof(char *), GFP_KERNEL);
-+		if (!parent_names) {
-+			kfree(data);
-+			return;
-+		}
-+
-+		for (i = 0; i < num_parents; i++)
-+			parent_names[i] = of_clk_get_parent_name(node, i);
-+	} else {
-+		parent_names = NULL;
- 	}
- 
--	for (i = 0; i < num_parents; i++)
--		parent_names[i] = of_clk_get_parent_name(node, i);
--
- 	data->num_parents = num_parents;
- 	data->parent_names = parent_names;
- 	data->node = node;
+Will fix, thanks!
