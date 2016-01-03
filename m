@@ -1,41 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 3 Jan 2016 13:36:46 +0000
-Subject: [PATCH v4 1/3] ACPI: amba bus probing support
-In-Reply-To: <1450880383-29560-2-git-send-email-aleksey.makarov@linaro.org>
-References: <1450880383-29560-1-git-send-email-aleksey.makarov@linaro.org>
- <1450880383-29560-2-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <20160103133645.GC5779@n2100.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Sun, 3 Jan 2016 14:50:10 +0000
+Subject: [RFC PATCH 01/10] arm64: introduce KIMAGE_VADDR as the virtual
+ base of the kernel region
+In-Reply-To: <11016384.rorhLcDd8i@wuerfel>
+References: <1451301654-32019-1-git-send-email-ard.biesheuvel@linaro.org>
+ <11539877.krH4qBJsp9@wuerfel>
+ <CAKv+Gu9nFaPES8u6fc7SQ0WFJVgV3O4uM2wNNoVWz8iaajyqTQ@mail.gmail.com>
+ <11016384.rorhLcDd8i@wuerfel>
+Message-ID: <20160103145008.GA1642@svinekod>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 23, 2015 at 05:19:40PM +0300, Aleksey Makarov wrote:
-> +	dev = amba_device_alloc(NULL, 0, 0);
-> +	if (!dev) {
-> +		dev_err(&adev->dev, "%s(): amba_device_alloc() failed\n",
-> +			__func__);
-> +		return -ENOMEM;
-> +	}
-...
-> +	/*
-> +	 * If the ACPI node has a parent and that parent has a physical device
-> +	 * attached to it, that physical device should be the parent of the
-> +	 * platform device we are about to create.
-> +	 */
-> +	dev->dev.parent = NULL;
+On Mon, Dec 28, 2015 at 03:11:25PM +0100, Arnd Bergmann wrote:
+> On Monday 28 December 2015 13:07:44 Ard Biesheuvel wrote:
+> > On 28 December 2015 at 12:50, Arnd Bergmann <arnd@arndb.de> wrote:
+> > > On Monday 28 December 2015 12:20:45 Ard Biesheuvel wrote:
+> > > How about a different approach that keeps the relocatable kernel, but moves it in
+> > > physical memory with the same random offset as the virtual address? That way, both
+> > > would be random, and you can keep the simple virt_to_phys() function.
+> > >
+> > > I suppose the downside of that is that the number of random bits is then limited
+> > > by the size of the first memblock, which is smaller than the vmalloc area.
+> > >
+> > 
+> > I don't see a reason to use the same virtual and physical offset
+> > (other than the conditional). On arm64, it would be up to the
+> > bootloader to decide where to put the Image in physical memory, and it
+> > would be up to the kernel to decide whether or not to virtually remap
+> > itself.
+> 
+> I see. If we pull in the bootloader to the discussion, there are a couple
+> of related points that are not directly required for your series but that
+> we should keep in mind anyway:
+> 
+> - We need to implement the randomization for each boot loader separately.
+>   This is probably easy enough for grub, as it can tap the same random
+>   number source that you use here, but a little harder for u-boot (requiring
+>   to implement access to hardware rng separately on each platform) and
+>   much harder to get done consistently in UEFI for direct kernel loading
+>   since there is no common upstream.
 
-No need to initialise this; amba_device_alloc() uses kzalloc(), and so
-dev->dev.parent will already be NULL.
+In the GRUB case the kernel is loaded as an EFI application -- as far as I am
+aware, GRUB for arm64 doesn't know anything about the Linux kernel Image
+binary.
 
-...
-> +	dev_set_name(&dev->dev, "%s", dev_name(&adev->dev));
+When loaded as an EFI application the EFI stub can perform the relocation,
+which it already does if the kernel was laoded at an address it cannot execute
+from. It looks like Ard's implemented that for v2.
 
-Is there a reason not to use:
+Being (cold) booted from EFI is likely to be the most consistent case as we
+have complete control over where the kernel is placed, bar some limitations
+imposed by prior EFI applications or EFI itself.
 
-	dev = amba_device_alloc(dev_name(&adev->dev), 0, 0);
+> - once we have a random number in the bootloader, we should also pass that
+>   through a DT property. This has been discussed multiple times in the past
+>   and I think we had reached consensus already but don't know if we had
+>   agreed on a specific DT property that contains the random number seed.
 
-above?
+Any links for this? I don't recall spotting this discussion.
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thanks,
+Mark.
