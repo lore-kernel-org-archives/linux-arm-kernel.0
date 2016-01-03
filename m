@@ -1,49 +1,63 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Sun, 3 Jan 2016 11:12:44 +0200
-Subject: [PATCH v2 17/32] arm: define __smp_xxx
-In-Reply-To: <20160102112438.GU8644@n2100.arm.linux.org.uk>
-References: <1451572003-2440-1-git-send-email-mst@redhat.com>
- <1451572003-2440-18-git-send-email-mst@redhat.com>
- <20160102112438.GU8644@n2100.arm.linux.org.uk>
-Message-ID: <20160103110158-mutt-send-email-mst@redhat.com>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Sun, 03 Jan 2016 11:19:26 +0100
+Subject: [PATCH 4/6] regulator: lp872x: Add enable GPIO pin support
+In-Reply-To: <20151231221407.GF16023@sirena.org.uk>
+References: <568088B4.6090207@ti.com> <1451342963.14631.13.camel@collins>
+ <5681D7A8.2030101@ti.com> <1451387613.18148.9.camel@collins>
+ <568323B7.7080101@ti.com> <1451464521.2531.4.camel@collins>
+ <20151230163307.GW16023@sirena.org.uk> <1451500639.14341.6.camel@collins>
+ <20151231214007.GC16023@sirena.org.uk> <1451599146.9673.2.camel@collins>
+ <20151231221407.GF16023@sirena.org.uk>
+Message-ID: <1451816366.3428.4.camel@collins>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 02, 2016 at 11:24:38AM +0000, Russell King - ARM Linux wrote:
-> On Thu, Dec 31, 2015 at 09:07:59PM +0200, Michael S. Tsirkin wrote:
-> > This defines __smp_xxx barriers for arm,
-> > for use by virtualization.
-> > 
-> > smp_xxx barriers are removed as they are
-> > defined correctly by asm-generic/barriers.h
-> > 
-> > This reduces the amount of arch-specific boiler-plate code.
-> > 
-> > Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
-> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+Le jeudi 31 d?cembre 2015 ? 22:14 +0000, Mark Brown a ?crit :
+> On Thu, Dec 31, 2015 at 10:59:06PM +0100, Paul Kocialkowski wrote:
 > 
-> In combination with patch 14, this looks like it should result in no
-> change to the resulting code.
+> > I understand, thanks for pointing this out. Well, for my use case, there
+> > is no use in disabling the chip at any point as it powers the external
+> > mmc.
 > 
-> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Presumably someone might decide not to use the MMC in some case (perhaps
+> only mounting it when explicitly needed in order to save power for
+> example, or the MMC subsystem might figure out a way to power down an
+> idle MMC block device).
+
+Makes sense, I'll keep that in mind.
+
+> > Would you agree to have the enable pin handled directly (and by that, I
+> > mean enabled once, when requested, as I first suggested in the patchset)
+> > in the driver then?
 > 
-> My only concern is that it gives people an additional handle onto a
-> "new" set of barriers - just because they're prefixed with __*
-> unfortunately doesn't stop anyone from using it (been there with
-> other arch stuff before.)
-> 
-> I wonder whether we should consider making the smp memory barriers
-> inline functions, so these __smp_xxx() variants can be undef'd
-> afterwards, thereby preventing drivers getting their hands on these
-> new macros?
+> That's probably fine, or do it via runtime PM (the framework is fairly
+> simple to use, I'll probably go add support in the core for it in the
+> next day or two as this seems like a sensible use case).  I can't
+> remember if this device is a MFD or not and I'm just on my way out the
+> door.
 
-That'd be tricky to do cleanly since asm-generic depends on
-ifndef to add generic variants where needed.
+Runtime PM seems like a good fit (though I hadn't heard about it before:
+you can guess I'm fairly new to kernel development), please let me know
+whether you end up implementing it so I can try to handle the GPIO this
+way.
 
-But it would be possible to add a checkpatch test for this.
+Thanks!
 
+-- 
+Paul Kocialkowski, Replicant developer
 
-> -- 
-> RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+Replicant is a fully free Android distribution running on several
+devices, a free software mobile operating system putting the emphasis on
+freedom and privacy/security.
+
+Website: https://www.replicant.us/
+Blog: https://blog.replicant.us/
+Wiki/tracker/forums: https://redmine.replicant.us/
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160103/025b5c72/attachment.sig>
