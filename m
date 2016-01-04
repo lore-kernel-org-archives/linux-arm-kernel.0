@@ -1,50 +1,51 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 4 Jan 2016 19:03:53 +0000
-Subject: [PATCH v5 03/11] arm-cci: Group writes to counter
-In-Reply-To: <1451908490-2615-4-git-send-email-suzuki.poulose@arm.com>
-References: <1451908490-2615-1-git-send-email-suzuki.poulose@arm.com>
- <1451908490-2615-4-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20160104190353.GC17127@leverpostej>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 4 Jan 2016 19:10:14 +0000
+Subject: [PATCH] serial: imx: Fix suspend / resume.
+In-Reply-To: <20160104182206.10852.47155.stgit@localhost>
+References: <20160104182206.10852.47155.stgit@localhost>
+Message-ID: <20160104191014.GN19062@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 04, 2016 at 11:54:42AM +0000, Suzuki K. Poulose wrote:
-> Add a helper to group the writes to PMU counter, this will be
-> used to delay setting the event period to pmu::pmu_enable()
-> 
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Punit Agrawal <punit.agrawal@arm.com>
-> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-> ---
->  drivers/bus/arm-cci.c |   15 +++++++++++++++
->  1 file changed, 15 insertions(+)
-> 
-> diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-> index ce0d3ef..f6b8717 100644
-> --- a/drivers/bus/arm-cci.c
-> +++ b/drivers/bus/arm-cci.c
-> @@ -785,6 +785,21 @@ static void pmu_write_counter(struct perf_event *event, u32 value)
->  	__pmu_write_counter(cci_pmu, value, idx);
->  }
+On Mon, Jan 04, 2016 at 07:22:06PM +0100, Martin Fuzzey wrote:
+> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+> index 016e4be..16a551b 100644
+> --- a/drivers/tty/serial/imx.c
+> +++ b/drivers/tty/serial/imx.c
+> @@ -2071,13 +2071,13 @@ static int imx_serial_port_suspend_noirq(struct device *dev)
+>  	struct imx_port *sport = platform_get_drvdata(pdev);
+>  	int ret;
 >  
-> +/* Write a value to a given set of counters */
-> +static void __pmu_write_counters(struct cci_pmu *cci_pmu, unsigned long *mask, u32 value)
-> +{
-> +	int i;
-> +
-> +	for_each_set_bit(i, mask, cci_pmu->num_cntrs)
-> +		__pmu_write_counter(cci_pmu, value, i);
-> +}
+> -	ret = clk_enable(sport->clk_ipg);
+> +	ret = clk_prepare_enable(sport->clk_ipg);
+>  	if (ret)
+>  		return ret;
+>  
+>  	serial_imx_save_context(sport);
+>  
+> -	clk_disable(sport->clk_ipg);
+> +	clk_disable_unprepare(sport->clk_ipg);
 
-I don't understand this as-is. Why do all the counters have the same
-value?
+NAK.  If this is _noirq, then it's a context which can't sleep.  Therefore,
+calling functions that do sleep is not permitted.
 
-> +static void __maybe_unused
-> +pmu_write_counters(struct cci_pmu *cci_pmu, unsigned long *mask, u32 value)
-> +{
-> +	__pmu_write_counters(cci_pmu, mask, value);
-> +}
+> @@ -2088,13 +2088,13 @@ static int imx_serial_port_resume_noirq(struct device *dev)
+>  	struct imx_port *sport = platform_get_drvdata(pdev);
+>  	int ret;
+>  
+> -	ret = clk_enable(sport->clk_ipg);
+> +	ret = clk_prepare_enable(sport->clk_ipg);
+>  	if (ret)
+>  		return ret;
+>  
+>  	serial_imx_restore_context(sport);
+>  
+> -	clk_disable(sport->clk_ipg);
+> +	clk_disable_unprepare(sport->clk_ipg);
 
-Why are these not just one function for now?
+Ditto.
 
-Mark.
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
