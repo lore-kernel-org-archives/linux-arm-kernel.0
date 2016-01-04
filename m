@@ -1,21 +1,23 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  4 Jan 2016 17:56:49 +0000
-Subject: [PATCHv2 16/18] arm64: mm: allow passing a pgdir to alloc_init_*
+Date: Mon,  4 Jan 2016 17:56:48 +0000
+Subject: [PATCHv2 15/18] arm64: mm: allocate pagetables anywhere
 In-Reply-To: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
 References: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1451930211-22460-17-git-send-email-mark.rutland@arm.com>
+Message-ID: <1451930211-22460-16-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To allow us to initialise pgdirs which are fixmapped, allow explicitly
-passing a pgdir rather than an mm. A new __create_pgd_mapping function
-is added for this, with existing __create_mapping callers migrated to
-this.
+Now that create_mapping uses fixmap slots to modify pte, pmd, and pud
+entries, we can access page tables anywhere in physical memory,
+regardless of the extent of the linear mapping.
 
-The mm argument was previously only used at the top level. Now that it
-is redundant at all levels, it is removed. To indicate its new found
-similarity to alloc_init_{pud,pmd,pte}, __create_mapping is renamed to
-init_pgd.
+Given that, we no longer need to limit memblock allocations during page
+table creation, and can leave the limit as its default
+MEMBLOCK_ALLOC_ANYWHERE.
+
+We never add memory which will fall outside of the linear map range
+given phys_offset and MAX_MEMBLOCK_ADDR are configured appropriately, so
+any tables we create will fall in the linear map of the final tables.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
@@ -24,107 +26,63 @@ Cc: Jeremy Linton <jeremy.linton@arm.com>
 Cc: Laura Abbott <labbott@fedoraproject.org>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/mm/mmu.c | 33 +++++++++++++++++++--------------
- 1 file changed, 19 insertions(+), 14 deletions(-)
+ arch/arm64/mm/mmu.c | 35 -----------------------------------
+ 1 file changed, 35 deletions(-)
 
 diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 28bc764..f3cd8f4 100644
+index bf09d44..28bc764 100644
 --- a/arch/arm64/mm/mmu.c
 +++ b/arch/arm64/mm/mmu.c
-@@ -146,8 +146,7 @@ static void split_pud(pud_t *old_pud, pmd_t *pmd)
- 	} while (pmd++, i++, i < PTRS_PER_PMD);
- }
+@@ -382,20 +382,6 @@ static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
+ static void __init map_mem(void)
+ {
+ 	struct memblock_region *reg;
+-	phys_addr_t limit;
+-
+-	/*
+-	 * Temporarily limit the memblock range. We need to do this as
+-	 * create_mapping requires puds, pmds and ptes to be allocated from
+-	 * memory addressable from the initial direct kernel mapping.
+-	 *
+-	 * The initial direct kernel mapping, located at swapper_pg_dir, gives
+-	 * us PUD_SIZE (with SECTION maps) or PMD_SIZE (without SECTION maps,
+-	 * memory starting from PHYS_OFFSET (which must be aligned to 2MB as
+-	 * per Documentation/arm64/booting.txt).
+-	 */
+-	limit = PHYS_OFFSET + SWAPPER_INIT_MAP_SIZE;
+-	memblock_set_current_limit(limit);
  
--static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
--				  unsigned long addr, unsigned long end,
-+static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
- 				  phys_addr_t phys, pgprot_t prot,
- 				  phys_addr_t (*pgtable_alloc)(void))
- {
-@@ -215,8 +214,7 @@ static inline bool use_1G_block(unsigned long addr, unsigned long next,
- 	return true;
- }
+ 	/* map all the memory banks */
+ 	for_each_memblock(memory, reg) {
+@@ -407,29 +393,8 @@ static void __init map_mem(void)
+ 		if (memblock_is_nomap(reg))
+ 			continue;
  
--static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
--				  unsigned long addr, unsigned long end,
-+static void alloc_init_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
- 				  phys_addr_t phys, pgprot_t prot,
- 				  phys_addr_t (*pgtable_alloc)(void))
- {
-@@ -257,7 +255,7 @@ static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
- 				}
- 			}
- 		} else {
--			alloc_init_pmd(mm, pud, addr, next, phys, prot,
-+			alloc_init_pmd(pud, addr, next, phys, prot,
- 				       pgtable_alloc);
- 		}
- 		phys += next - addr;
-@@ -270,8 +268,7 @@ static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
-  * Create the page directory entries and any necessary page tables for the
-  * mapping specified by 'md'.
-  */
--static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
--				    phys_addr_t phys, unsigned long virt,
-+static void init_pgd(pgd_t *pgd, phys_addr_t phys, unsigned long virt,
- 				    phys_addr_t size, pgprot_t prot,
- 				    phys_addr_t (*pgtable_alloc)(void))
- {
-@@ -291,7 +288,7 @@ static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
- 	end = addr + length;
- 	do {
- 		next = pgd_addr_end(addr, end);
--		alloc_init_pud(mm, pgd, addr, next, phys, prot, pgtable_alloc);
-+		alloc_init_pud(pgd, addr, next, phys, prot, pgtable_alloc);
- 		phys += next - addr;
- 	} while (pgd++, addr = next, addr != end);
- }
-@@ -304,6 +301,14 @@ static phys_addr_t late_pgtable_alloc(void)
- 	return __pa(ptr);
- }
- 
-+static void __create_pgd_mapping(pgd_t *pgdir, phys_addr_t phys,
-+				 unsigned long virt, phys_addr_t size,
-+				 pgprot_t prot,
-+				 phys_addr_t (*alloc)(void))
-+{
-+	init_pgd(pgd_offset_raw(pgdir, virt), phys, virt, size, prot, alloc);
-+}
-+
- static void __init create_mapping(phys_addr_t phys, unsigned long virt,
- 				  phys_addr_t size, pgprot_t prot)
- {
-@@ -312,16 +317,16 @@ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
- 			&phys, virt);
- 		return;
+-		if (ARM64_SWAPPER_USES_SECTION_MAPS) {
+-			/*
+-			 * For the first memory bank align the start address and
+-			 * current memblock limit to prevent create_mapping() from
+-			 * allocating pte page tables from unmapped memory. With
+-			 * the section maps, if the first block doesn't end on section
+-			 * size boundary, create_mapping() will try to allocate a pte
+-			 * page, which may be returned from an unmapped area.
+-			 * When section maps are not used, the pte page table for the
+-			 * current limit is already present in swapper_pg_dir.
+-			 */
+-			if (start < limit)
+-				start = ALIGN(start, SECTION_SIZE);
+-			if (end < limit) {
+-				limit = end & SECTION_MASK;
+-				memblock_set_current_limit(limit);
+-			}
+-		}
+ 		__map_memblock(start, end);
  	}
--	__create_mapping(&init_mm, pgd_offset_k(virt), phys, virt,
--			 size, prot, early_pgtable_alloc);
-+	__create_pgd_mapping(init_mm.pgd, phys, virt, size, prot,
-+			     early_pgtable_alloc);
+-
+-	/* Limit no longer required. */
+-	memblock_set_current_limit(MEMBLOCK_ALLOC_ANYWHERE);
  }
  
- void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
- 			       unsigned long virt, phys_addr_t size,
- 			       pgprot_t prot)
- {
--	__create_mapping(mm, pgd_offset(mm, virt), phys, virt, size, prot,
--				late_pgtable_alloc);
-+	__create_pgd_mapping(mm->pgd, phys, virt, size, prot,
-+			     late_pgtable_alloc);
- }
- 
- static void create_mapping_late(phys_addr_t phys, unsigned long virt,
-@@ -333,8 +338,8 @@ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
- 		return;
- 	}
- 
--	return __create_mapping(&init_mm, pgd_offset_k(virt),
--				phys, virt, size, prot, late_pgtable_alloc);
-+	__create_pgd_mapping(init_mm.pgd, phys, virt, size, prot,
-+			     late_pgtable_alloc);
- }
- 
- #ifdef CONFIG_DEBUG_RODATA
+ static void __init fixup_executable(void)
 -- 
 1.9.1
