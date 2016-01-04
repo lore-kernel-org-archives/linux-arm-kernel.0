@@ -1,35 +1,30 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 4 Jan 2016 22:42:33 +0000
-Subject: Widespread boot failures on ARM due to "mm/page_alloc.c: calculate
- zone_start_pfn at zone_spanned_pages_in_node()"
-Message-ID: <20160104224233.GU16023@sirena.org.uk>
+Date: Mon, 4 Jan 2016 22:44:05 +0000
+Subject: next-20160104 build: 3 failures 15 warnings (next-20160104)
+In-Reply-To: <3705737.6TGxRxdFzW@wuerfel>
+References: <E1aG3zo-0000gt-2t@optimist> <20160104165025.GN16023@sirena.org.uk>
+ <3705737.6TGxRxdFzW@wuerfel>
+Message-ID: <20160104224405.GV16023@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since 20151231 -next has been failing to boot on a wide range of ARM
-platforms in the kernelci.org boot tests[1].  Doing bisections with
-Arndale and BeagleBone Black identifies 904769ac82ebf (mm/page_alloc.c:
-calculate zone_start_pfn at zone_spanned_pages_in_node()) from the akpm
-tree as the first broken commit[2,3].  An example bootlog from the
-failure is:
+On Mon, Jan 04, 2016 at 11:07:41PM +0100, Arnd Bergmann wrote:
+> On Monday 04 January 2016 16:50:25 Mark Brown wrote:
+> > On Mon, Jan 04, 2016 at 12:12:20PM +0000, Build bot for Mark Brown wrote:
 
-   http://storage.kernelci.org/next/next-20151231/arm-multi_v7_defconfig/lab-cambridge/boot-exynos5250-arndale.html
+> > and various other linker errors caused by the fact that the new fman
+> > driver uses PHYLIB but does not depend on or select it.
 
-which shows no output on the console once we start the kernel, a brief
-sampling of failing boards suggests this is the normal failure mode.
-x86 and arm64 targets seem fine (juno shows up as failing but the boot
-log seems fine so it's probably a false positive, Mustang was failing
-already) and there are a small number of ARM platforms that boot.  I've
-not yet had any time to investigate further than that (including trying
-a revert of that commit), sorry.
+> This is the patch I submitted for the problem. I don't think that simply
+> adding the 'select' would be a good idea because that would force PHYLIB
+> builtin for allmodconfig.
 
-[1] http://kernelci.org/boot/all/job/next/kernel/next-20151231/
-[2] https://ci.linaro.org/view/people/job/tbaker-boot-bisect-bot/135/console
-[3] https://ci.linaro.org/view/people/job/tbaker-boot-bisect-bot/136/console
+Indeed, that was why I held off on my own patch - I wanted to go back
+and try to understand why we were using a bool there.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 473 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160104/4feed3d4/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160104/8dd9e541/attachment.sig>
