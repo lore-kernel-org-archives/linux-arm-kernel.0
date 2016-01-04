@@ -1,42 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 4 Jan 2016 11:16:27 +0000
-Subject: [PATCH v6] arm/arm64: add arm-smccc
-In-Reply-To: <20160104111102.GA19062@n2100.arm.linux.org.uk>
-References: <1449667495-23091-1-git-send-email-jens.wiklander@linaro.org>
- <20151221111455.GA11145@red-moon> <20151222094606.GA30272@ermac>
- <20151222121449.GE8644@n2100.arm.linux.org.uk>
- <20160104101323.GA24963@red-moon>
- <20160104111102.GA19062@n2100.arm.linux.org.uk>
-Message-ID: <20160104111627.GB19062@n2100.arm.linux.org.uk>
+From: heiko.carstens@de.ibm.com (Heiko Carstens)
+Date: Mon, 4 Jan 2016 12:20:26 +0100
+Subject: [PATCH 0/6] generic relative extable support
+In-Reply-To: <1451837157-447-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1451837157-447-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160104112026.GC4179@osiris>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 04, 2016 at 11:11:02AM +0000, Russell King - ARM Linux wrote:
-> The reason I said what I did above was to head-off the merge window
-> opening last night, and having a rushed job dealing with problems
-> with patches merged at the last minute.
+On Sun, Jan 03, 2016 at 05:05:51PM +0100, Ard Biesheuvel wrote:
+> There are currently four architectures (x86, ia64, alpha and s390) whose
+> user-access exception tables are relative to the table entry address rather
+> than absolute. Each of these architectures has its own search_extable() and
+> sort_extable() implementation, which are not only mostly identical to each
+> other, but also deviate very little from the generic absolute implementations
+> in lib/extable.c that they override.
 > 
-> Consider that the period 24th December to 3rd January does not exist
-> for many as far as working on the kernel is concerned, and linux-next
-> probably wasn't running over that period either.
+> So before making arm64 the fifth architecture that reimplements this, let's
+> refactor the existing code so that all of these architectures use common code
+> for searching and sorting the relative extables. Archs may set
+> ARCH_HAS_RELATIVE_EXTABLE to indicate that the table consists of a pair of
+> relative ints, and may define swap_ex_entry_fixup() if the fixup member needs
+> special treatment in the swapping step of the sorting routine (such as alpha).
 > 
-> The situation has changed though; last night, Linus released -rc8,
-> which means we have one week of breathing space before the merge window
-> is likely to open, and we have four days of linux-next trees.
+> Note that the s390 patch applies on top of the following patch:
 > 
-> This means that I'm willing to take patches today (and today only), as
-> it will give the remainder of the week (up to Thursday - due to the
-> linux-next timing) to sort out any deficiencies in those patches.
+>   http://article.gmane.org/gmane.linux.kernel/2117036
+> 
+> which fixes a bug I spotted while working on this code. Since that probably
+> needs to go to -stable, I broke it out and posted it separately.
+> 
+> Ard Biesheuvel (6):
+>   extable: add support for relative extables to search and sort routines
+>   alpha/extable: use generic search and sort routines
+>   s390/extable: use generic search and sort routines
+>   x86/extable: use generic search and sort routines
+>   ia64/extable: use generic search and sort routines
+>   arm64: switch to relative exception tables
 
-That all said, 8486/1 _is_ the patch you've just asked me to merge,
-which has open questions from Jens that you (Lorenzo) have _not_
-responded to.
+For the s390 bits:
 
-Jens was asking, in response to your feedback, whether an alternative
-Kconfig structure would satisfy your feedback... to which he's had no
-reply from you.  So, we're waiting on your response.
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Acked-by: Heiko Carstens <heiko.carstens@de.ibm.com>
