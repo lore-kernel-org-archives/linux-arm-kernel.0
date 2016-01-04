@@ -1,30 +1,134 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 4 Jan 2016 22:44:05 +0000
-Subject: next-20160104 build: 3 failures 15 warnings (next-20160104)
-In-Reply-To: <3705737.6TGxRxdFzW@wuerfel>
-References: <E1aG3zo-0000gt-2t@optimist> <20160104165025.GN16023@sirena.org.uk>
- <3705737.6TGxRxdFzW@wuerfel>
-Message-ID: <20160104224405.GV16023@sirena.org.uk>
+From: labbott@redhat.com (Laura Abbott)
+Date: Mon, 4 Jan 2016 14:49:46 -0800
+Subject: [PATCHv2 13/18] arm64: mm: add functions to walk tables in fixmap
+In-Reply-To: <1451930211-22460-14-git-send-email-mark.rutland@arm.com>
+References: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
+ <1451930211-22460-14-git-send-email-mark.rutland@arm.com>
+Message-ID: <568AF70A.6020004@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 04, 2016 at 11:07:41PM +0100, Arnd Bergmann wrote:
-> On Monday 04 January 2016 16:50:25 Mark Brown wrote:
-> > On Mon, Jan 04, 2016 at 12:12:20PM +0000, Build bot for Mark Brown wrote:
+On 01/04/2016 09:56 AM, Mark Rutland wrote:
+> As a prepratory step to allow us to allocate early page tables from
+> unmapped memory using memblock_alloc, add new p??_fixmap* functions that
+> can be used to walk page tables outside of the linear mapping by using
+> fixmap slots.
+>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Jeremy Linton <jeremy.linton@arm.com>
+> Cc: Laura Abbott <labbott@fedoraproject.org>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>   arch/arm64/include/asm/fixmap.h  | 10 ++++++++++
+>   arch/arm64/include/asm/pgtable.h | 26 ++++++++++++++++++++++++++
+>   2 files changed, 36 insertions(+)
+>
+> diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
+> index 3097045..1a617d4 100644
+> --- a/arch/arm64/include/asm/fixmap.h
+> +++ b/arch/arm64/include/asm/fixmap.h
+> @@ -62,6 +62,16 @@ enum fixed_addresses {
+>
+>   	FIX_BTMAP_END = __end_of_permanent_fixed_addresses,
+>   	FIX_BTMAP_BEGIN = FIX_BTMAP_END + TOTAL_FIX_BTMAPS - 1,
+> +
+> +	/*
+> +	 * Used for kernel page table creation, so unmapped memory may be used
+> +	 * for tables.
+> +	 */
+> +	FIX_PTE,
+> +	FIX_PMD,
+> +	FIX_PUD,
+> +	FIX_PGD,
+> +
+>   	__end_of_fixed_addresses
+>   };
+>
+> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+> index f5742db..824e7f0 100644
+> --- a/arch/arm64/include/asm/pgtable.h
+> +++ b/arch/arm64/include/asm/pgtable.h
+> @@ -57,6 +57,7 @@
+>
+>   #ifndef __ASSEMBLY__
+>
+> +#include <asm/fixmap.h>
+>   #include <linux/mmdebug.h>
+>
+>   extern void __pte_error(const char *file, int line, unsigned long val);
+> @@ -442,6 +443,10 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
+>   #define pte_unmap(pte)			do { } while (0)
+>   #define pte_unmap_nested(pte)		do { } while (0)
+>
+> +#define pte_fixmap(addr)		((pte_t *)set_fixmap_offset(FIX_PTE, addr))
+> +#define pte_fixmap_offset(pmd, addr)	pte_fixmap(pte_offset_phys(pmd, addr))
+> +#define pte_fixmap_unmap()		clear_fixmap(FIX_PTE)
+> +
+>   #define pmd_page(pmd)		pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
+>
+>   /*
+> @@ -481,12 +486,21 @@ static inline phys_addr_t pud_page_paddr(pud_t pud)
+>   #define pmd_offset_phys(dir, addr)	(pud_page_paddr(*(dir)) + pmd_index(addr) * sizeof(pmd_t))
+>   #define pmd_offset(dir, addr)		((pmd_t *)__va(pmd_offset_phys((dir), (addr))))
+>
+> +#define pmd_fixmap(addr)		((pmd_t *)set_fixmap_offset(FIX_PMD, addr))
+> +#define pmd_fixmap_offset(pud, addr)	pmd_fixmap(pmd_offset_phys(pud, addr))
+> +#define pmd_fixmap_unmap()		clear_fixmap(FIX_PMD)
+> +
+>   #define pud_page(pud)		pfn_to_page(__phys_to_pfn(pud_val(pud) & PHYS_MASK))
+>
+>   #else
+>
+>   #define pud_page_paddr(pud)	({ BUILD_BUG(); 0; })
+>
+> +/* Match pmd_offset folding in <asm/generic/pgtable-nopmd.h> */
+> +#define pmd_fixmap(addr)		NULL
+> +#define pmd_fixmap_offset(pudp, addr)	((pmd_t *)pudp)
+> +#define pmd_fixmap_unmap()
+> +
+>   #endif	/* CONFIG_PGTABLE_LEVELS > 2 */
+>
+>   #if CONFIG_PGTABLE_LEVELS > 3
+> @@ -519,12 +533,21 @@ static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
+>   #define pud_offset_phys(dir, addr)	(pgd_page_paddr(*(dir)) + pud_index(addr) * sizeof(pud_t))
+>   #define pud_offset(dir, addr)		((pud_t *)__va(pud_offset_phys((dir), (addr))))
+>
+> +#define pud_fixmap(addr)		((pud_t *)set_fixmap_offset(FIX_PUD, addr))
+> +#define pud_fixmap_offset(pgd, addr)	pud_fixmap(pmd_offset_phys(pgd, addr))
+> +#define pud_fixmap_unmap()		clear_fixmap(FIX_PUD)
+> +
+>   #define pgd_page(pgd)		pfn_to_page(__phys_to_pfn(pgd_val(pgd) & PHYS_MASK))
+>
+>   #else
+>
+>   #define pgd_page_paddr(pgd)	({ BUILD_BUG(); 0;})
+>
+> +/* Match pud_offset folding in <asm/generic/pgtable-nopud.h> */
+> +#define pud_fixmap(addr)		NULL
+> +#define pud_fixmap_offset(pgdp, addr)	((pud_t *)pgdp)
+> +#define pud_fixmap_unmap()
+> +
+>   #endif  /* CONFIG_PGTABLE_LEVELS > 3 */
+>
+>   #define pgd_ERROR(pgd)		__pgd_error(__FILE__, __LINE__, pgd_val(pgd))
+> @@ -539,6 +562,9 @@ static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
+>   /* to find an entry in a kernel page-table-directory */
+>   #define pgd_offset_k(addr)	pgd_offset(&init_mm, addr)
+>
+> +#define pgd_fixmap(addr)		((pgd_t *)set_fixmap_offset(FIX_PGD, addr))
+> +#define pgd_fixmap_unmap()		clear_fixmap(FIX_PGD)
+> +
+>   static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
+>   {
+>   	const pteval_t mask = PTE_USER | PTE_PXN | PTE_UXN | PTE_RDONLY |
+>
 
-> > and various other linker errors caused by the fact that the new fman
-> > driver uses PHYLIB but does not depend on or select it.
+Bikeshed: p??_fixmap_offset doesn't make it obvious that this is an
+operation with a side effect. It seems more similar to
+p??_offset_kernel which is read only. Perhaps it's the lack of set/map
+in the name.
 
-> This is the patch I submitted for the problem. I don't think that simply
-> adding the 'select' would be a good idea because that would force PHYLIB
-> builtin for allmodconfig.
-
-Indeed, that was why I held off on my own patch - I wanted to go back
-and try to understand why we were using a bool there.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160104/8dd9e541/attachment.sig>
+Thanks,
+Laura
