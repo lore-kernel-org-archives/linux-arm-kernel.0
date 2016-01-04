@@ -1,68 +1,45 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon,  4 Jan 2016 11:01:53 +0000
-Subject: [PATCH v2] clk:gcc-msm8916: add missing mss_q6_bimc_axi clock
-Message-ID: <1451905313-6461-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 4 Jan 2016 11:02:37 +0000
+Subject: reason for Allwinner SoC specific pinctrl drivers?
+Message-ID: <568A514D.7070102@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This clock is required for loading the qdsp firmware.
+Hi,
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
-Changes since v1:
-	fixed parent name as spotted by Georgi
+while looking at the Allwinner A64 SoC support, I was wondering why we
+would actually need a pinctrl driver (file) for each and every Allwinner
+SoC that we support.
+Looking at both the A20 and the A64 doc I don't see any differences in
+the port controller implementation apart from the actual
+muxval <-> subsystem assignment, which is just data, right?
+Comparing the code files in drivers/pinctrl/sunxi seems to support this,
+as those drivers only consist of the table and some boilerplate code.
 
- drivers/clk/qcom/gcc-msm8916.c               | 18 ++++++++++++++++++
- include/dt-bindings/clock/qcom,gcc-msm8916.h |  1 +
- 2 files changed, 19 insertions(+)
+Now I was wondering whether we could get away with one generic Allwinner
+pinctrl driver and put the SoC specific pin assignments in DT instead.
+It looks like adding an "allwinner,muxval" property in addition to the
+existing "allwinner,function" in the SoC's .dtsi would give us all the
+information we need. This could look like:
 
-diff --git a/drivers/clk/qcom/gcc-msm8916.c b/drivers/clk/qcom/gcc-msm8916.c
-index e643944..89fe930 100644
---- a/drivers/clk/qcom/gcc-msm8916.c
-+++ b/drivers/clk/qcom/gcc-msm8916.c
-@@ -2590,6 +2590,23 @@ static struct clk_branch gcc_mss_cfg_ahb_clk = {
- 	},
- };
- 
-+static struct clk_branch gcc_mss_q6_bimc_axi_clk = {
-+	.halt_reg = 0x49004,
-+	.clkr = {
-+		.enable_reg = 0x49004,
-+		.enable_mask = BIT(0),
-+		.hw.init = &(struct clk_init_data){
-+			.name = "gcc_mss_q6_bimc_axi_clk",
-+			.parent_names = (const char *[]){
-+				"bimc_ddr_clk_src",
-+			},
-+			.num_parents = 1,
-+			.flags = CLK_SET_RATE_PARENT,
-+			.ops = &clk_branch2_ops,
-+		},
-+	},
-+};
-+
- static struct clk_branch gcc_oxili_ahb_clk = {
- 	.halt_reg = 0x59028,
- 	.clkr = {
-@@ -3228,6 +3245,7 @@ static struct clk_regmap *gcc_msm8916_clocks[] = {
- 	[GCC_ULTAUDIO_LPAIF_SEC_I2S_CLK] = &gcc_ultaudio_lpaif_sec_i2s_clk.clkr,
- 	[GCC_ULTAUDIO_LPAIF_AUX_I2S_CLK] = &gcc_ultaudio_lpaif_aux_i2s_clk.clkr,
- 	[GCC_CODEC_DIGCODEC_CLK] = &gcc_codec_digcodec_clk.clkr,
-+	[GCC_MSS_Q6_BIMC_AXI_CLK] = &gcc_mss_q6_bimc_axi_clk.clkr,
- };
- 
- static struct gdsc *gcc_msm8916_gdscs[] = {
-diff --git a/include/dt-bindings/clock/qcom,gcc-msm8916.h b/include/dt-bindings/clock/qcom,gcc-msm8916.h
-index 257e2fb..28a27a4 100644
---- a/include/dt-bindings/clock/qcom,gcc-msm8916.h
-+++ b/include/dt-bindings/clock/qcom,gcc-msm8916.h
-@@ -174,6 +174,7 @@
- #define GCC_ULTAUDIO_LPAIF_SEC_I2S_CLK		157
- #define GCC_ULTAUDIO_LPAIF_AUX_I2S_CLK		158
- #define GCC_CODEC_DIGCODEC_CLK			159
-+#define GCC_MSS_Q6_BIMC_AXI_CLK			160
- 
- /* Indexes for GDSCs */
- #define BIMC_GDSC				0
--- 
-1.9.1
+	uart0_pins_a: uart0 at 0 {
+		allwinner,pins =   "PB22", "PB23";
++		allwinner,muxval = <0x02    0x02>;
+		allwinner,function = "uart0";
+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+	};
+
+Would it make sense that I sit down and prototype such a driver?
+
+We should keep compatibility with older DTs by keeping the existing
+drivers in (or maybe emulating the current behaviour by providing just
+those tables as a fallback) , but newer SoCs (like the A64?) would not
+need a SoC specific driver, but just go with that generic driver and
+appropriate DT properties.
+
+I appreciate any comments on this, especially if I missed something
+which would render this approach impossible or tedious.
+
+Cheers,
+Andre.
