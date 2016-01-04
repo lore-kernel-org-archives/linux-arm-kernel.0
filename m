@@ -1,37 +1,24 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 4 Jan 2016 09:39:17 +0100
-Subject: [PATCH v2 0/3] ARM: shmobile: r8a779x: use fallback usbhs
- compatibility string
-In-Reply-To: <1451856019-4222-1-git-send-email-horms+renesas@verge.net.au>
-References: <1451856019-4222-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdUALH_FQvOVH77V5JC3d4n7444zTh2VU-MEsOoKymFSDg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 04 Jan 2016 09:39:46 +0100
+Subject: [PATCH 4/3] drm: arm-hdlcd: add explictit DRM dependency
+In-Reply-To: <20160104082416.GB23797@ulmo>
+References: <4194408.X82ccDjh5X@wuerfel> <5213510.IMdSbsXdoQ@wuerfel>
+ <20160104082416.GB23797@ulmo>
+Message-ID: <4350671.DP0mBIml5S@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 3, 2016 at 10:20 PM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> this short series makes use of the recently added fallback usbhs
-> compatibility string in the r8a779[014] device trees.
->
-> Based on renesas-devel-20151228-v4.4-rc7.
->
-> Changes since v1:
-> * Use "renesas,rcar-gen2-usbhs" instead of "renesas,usbhs"
->
-> Simon Horman (3):
->   ARM: shmobile: r8a7790: use fallback usbhs compatibility string
->   ARM: shmobile: r8a7791: use fallback usbhs compatibility string
->   ARM: shmobile: r8a7794: use fallback usbhs compatibility string
+On Monday 04 January 2016 09:24:16 Thierry Reding wrote:
+> 
+> Ugh... wouldn't it be much simpler to get rid of DRM_ARM? It seems like
+> a completely superfluous option to me. I don't think we've ever had the
+> equivalent of "vendor" Kconfig options in DRM, and I don't see why we'd
+> need to start now. If ARM was going to add another driver it can simply
+> have a separate Kconfig entry. There should be no need to select the
+> vendor option first.
 
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Fine with me too. I vaguely remembered having seen some discussion about
+this, so I decided to do a minimal fix, but I agree that would be more
+in line with the other drivers.
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+	Arnd
