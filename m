@@ -1,8 +1,8 @@
 From: henryc.chen@mediatek.com (Henry Chen)
-Date: Mon, 4 Jan 2016 19:59:35 +0800
-Subject: [PATCH] soc: mediatek: PMIC wrap: Clear the vldclr if state machine
- stay on FSM_VLDCLR state.
-Message-ID: <1451908775-21527-1-git-send-email-henryc.chen@mediatek.com>
+Date: Mon, 4 Jan 2016 20:02:52 +0800
+Subject: [RESEND PATCH v2] soc: mediatek: PMIC wrap: Clear the vldclr if state
+ machine stay on FSM_VLDCLR state.
+Message-ID: <1451908972-11882-1-git-send-email-henryc.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
