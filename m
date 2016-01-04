@@ -1,113 +1,131 @@
-From: cmetcalf@ezchip.com (Chris Metcalf)
-Date: Mon, 4 Jan 2016 16:01:05 -0500
-Subject: [PATCH v9 08/13] arch/arm64: adopt prepare_exit_to_usermode()
- model from x86
-In-Reply-To: <20160104203316.GE17127@leverpostej>
-References: <1451936091-29247-1-git-send-email-cmetcalf@ezchip.com>
- <1451936091-29247-9-git-send-email-cmetcalf@ezchip.com>
- <20160104203316.GE17127@leverpostej>
-Message-ID: <568ADD91.1050100@ezchip.com>
+From: deller@gmx.de (Helge Deller)
+Date: Mon, 4 Jan 2016 22:05:07 +0100
+Subject: [PATCH 1/6] extable: add support for relative extables to search
+ and sort routines
+In-Reply-To: <1451837157-447-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1451837157-447-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1451837157-447-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <568ADE83.3090502@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/04/2016 03:33 PM, Mark Rutland wrote:
-> Hi,
->
-> On Mon, Jan 04, 2016 at 02:34:46PM -0500, Chris Metcalf wrote:
->> This change is a prerequisite change for TASK_ISOLATION but also
->> stands on its own for readability and maintainability.
-> I have also been looking into converting the userspace return path from
-> assembly to C [1], for the latter two reasons. Based on that, I have a
-> couple of comments.
+On 03.01.2016 17:05, Ard Biesheuvel wrote:
+> This adds support to the generic search_extable() and sort_extable()
+> implementations for dealing with exception table entries whose fields
+> contain relative offsets rather than absolute addresses.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Thanks!
+I tested the generic parts with an upcoming patch which handles relative
+exception tables on the parisc platform.
+Everything worked as expected.
+So for the non arch-relevant changes:
+Acked-by: Helge Deller <deller@gmx.de>
 
-> It seems unfortunate to leave behind portions of the entry.S
-> _TIF_WORK_MASK state machine (i.e. a small portion of ret_fast_syscall,
-> and the majority of work_pending and ret_to_user).
->
-> I think it would be nicer if we could handle all of that in one place
-> (or at least all in C).
 
-Yes, in principle I agree with this, and I think your deasm tree looks
-like an excellent idea.
+Helge
 
-For this patch series I wanted to focus more on what was necessary
-for the various platforms to implement task isolation, and less on
-additional cleanups of the platforms in question.  I think my changes
-don't make the TIF state machine any less clear, nor do they make
-it harder for an eventual further migration to C code along the lines
-of what you've done, so it seems plausible to me to commit them
-upstream independently of your work.
-
->> diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
->> index e18c48cb6db1..fde59c1139a9 100644
->> --- a/arch/arm64/kernel/signal.c
->> +++ b/arch/arm64/kernel/signal.c
->> @@ -399,18 +399,30 @@ static void do_signal(struct pt_regs *regs)
->>   	restore_saved_sigmask();
->>   }
->>   
->> -asmlinkage void do_notify_resume(struct pt_regs *regs,
->> -				 unsigned int thread_flags)
->> +asmlinkage void prepare_exit_to_usermode(struct pt_regs *regs,
->> +					 unsigned int thread_flags)
->>   {
->> -	if (thread_flags & _TIF_SIGPENDING)
->> -		do_signal(regs);
->> +	do {
->> +		local_irq_enable();
->>   
->> -	if (thread_flags & _TIF_NOTIFY_RESUME) {
->> -		clear_thread_flag(TIF_NOTIFY_RESUME);
->> -		tracehook_notify_resume(regs);
->> -	}
->> +		if (thread_flags & _TIF_NEED_RESCHED)
->> +			schedule();
-> Previously, had we called schedule(), we'd reload the thread info flags
-> and start that state machine again, whereas now we'll handle all the
-> cached flags before reloading.
->
-> Are we sure nothing is relying on the prior behaviour?
-
-Good eye, and I probably should have called that out in the commit
-message.  My best guess is that there should be nothing that depends
-on the old semantics.  Other platforms (certainly x86 and tile, anyway)
-already have the semantics that you run out the old state machine on
-return from schedule(), so regardless, it's probably appropriate for
-arm to follow that same convention.
-
->> +
->> +		if (thread_flags & _TIF_SIGPENDING)
->> +			do_signal(regs);
->> +
->> +		if (thread_flags & _TIF_NOTIFY_RESUME) {
->> +			clear_thread_flag(TIF_NOTIFY_RESUME);
->> +			tracehook_notify_resume(regs);
->> +		}
->> +
->> +		if (thread_flags & _TIF_FOREIGN_FPSTATE)
->> +			fpsimd_restore_current_state();
->> +
->> +		local_irq_disable();
->>   
->> -	if (thread_flags & _TIF_FOREIGN_FPSTATE)
->> -		fpsimd_restore_current_state();
->> +		thread_flags = READ_ONCE(current_thread_info()->flags) &
->> +			_TIF_WORK_MASK;
->>   
->> +	} while (thread_flags);
->>   }
-> Other than that, this looks good to me.
->
-> Thanks,
-> Mark.
->
-> [1] https://git.kernel.org/cgit/linux/kernel/git/mark/linux.git/log/?h=arm64/entry-deasm
-
-Thanks again for the review - shall I add your Reviewed-by (or Acked-by?)
-to this patch?
-
--- 
-Chris Metcalf, EZChip Semiconductor
-http://www.ezchip.com
+> ---
+>  lib/extable.c | 50 ++++++++++++++++----
+>  1 file changed, 41 insertions(+), 9 deletions(-)
+> 
+> diff --git a/lib/extable.c b/lib/extable.c
+> index 4cac81ec225e..0be02ad561e9 100644
+> --- a/lib/extable.c
+> +++ b/lib/extable.c
+> @@ -14,7 +14,37 @@
+>  #include <linux/sort.h>
+>  #include <asm/uaccess.h>
+>  
+> +#ifndef ARCH_HAS_RELATIVE_EXTABLE
+> +#define ex_to_insn(x)	((x)->insn)
+> +#else
+> +static inline unsigned long ex_to_insn(const struct exception_table_entry *x)
+> +{
+> +	return (unsigned long)&x->insn + x->insn;
+> +}
+> +#endif
+> +
+>  #ifndef ARCH_HAS_SORT_EXTABLE
+> +#ifndef ARCH_HAS_RELATIVE_EXTABLE
+> +#define swap_ex		NULL
+> +#else
+> +static void swap_ex(void *a, void *b, int size)
+> +{
+> +	struct exception_table_entry *x = a, *y = b, tmp;
+> +	int delta = b - a;
+> +
+> +	tmp = *x;
+> +	x->insn = y->insn + delta;
+> +	y->insn = tmp.insn - delta;
+> +
+> +#ifdef swap_ex_entry_fixup
+> +	swap_ex_entry_fixup(x, y, tmp, delta);
+> +#else
+> +	x->fixup = y->fixup + delta;
+> +	y->fixup = tmp.fixup - delta;
+> +#endif
+> +}
+> +#endif /* ARCH_HAS_RELATIVE_EXTABLE */
+> +
+>  /*
+>   * The exception table needs to be sorted so that the binary
+>   * search that we use to find entries in it works properly.
+> @@ -26,9 +56,9 @@ static int cmp_ex(const void *a, const void *b)
+>  	const struct exception_table_entry *x = a, *y = b;
+>  
+>  	/* avoid overflow */
+> -	if (x->insn > y->insn)
+> +	if (ex_to_insn(x) > ex_to_insn(y))
+>  		return 1;
+> -	if (x->insn < y->insn)
+> +	if (ex_to_insn(x) < ex_to_insn(y))
+>  		return -1;
+>  	return 0;
+>  }
+> @@ -37,7 +67,7 @@ void sort_extable(struct exception_table_entry *start,
+>  		  struct exception_table_entry *finish)
+>  {
+>  	sort(start, finish - start, sizeof(struct exception_table_entry),
+> -	     cmp_ex, NULL);
+> +	     cmp_ex, swap_ex);
+>  }
+>  
+>  #ifdef CONFIG_MODULES
+> @@ -48,13 +78,15 @@ void sort_extable(struct exception_table_entry *start,
+>  void trim_init_extable(struct module *m)
+>  {
+>  	/*trim the beginning*/
+> -	while (m->num_exentries && within_module_init(m->extable[0].insn, m)) {
+> +	while (m->num_exentries &&
+> +	       within_module_init(ex_to_insn(&m->extable[0]), m)) {
+>  		m->extable++;
+>  		m->num_exentries--;
+>  	}
+>  	/*trim the end*/
+>  	while (m->num_exentries &&
+> -		within_module_init(m->extable[m->num_exentries-1].insn, m))
+> +	       within_module_init(ex_to_insn(&m->extable[m->num_exentries - 1]),
+> +				  m))
+>  		m->num_exentries--;
+>  }
+>  #endif /* CONFIG_MODULES */
+> @@ -81,13 +113,13 @@ search_extable(const struct exception_table_entry *first,
+>  		 * careful, the distance between value and insn
+>  		 * can be larger than MAX_LONG:
+>  		 */
+> -		if (mid->insn < value)
+> +		if (ex_to_insn(mid) < value)
+>  			first = mid + 1;
+> -		else if (mid->insn > value)
+> +		else if (ex_to_insn(mid) > value)
+>  			last = mid - 1;
+>  		else
+>  			return mid;
+> -        }
+> -        return NULL;
+> +	}
+> +	return NULL;
+>  }
+>  #endif
+> 
