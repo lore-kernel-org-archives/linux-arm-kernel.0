@@ -1,33 +1,65 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 4 Jan 2016 15:35:02 +0000
-Subject: next-20160104 build: 3 failures 15 warnings (next-20160104)
-In-Reply-To: <E1aG3zo-0000gt-2t@optimist>
-References: <E1aG3zo-0000gt-2t@optimist>
-Message-ID: <20160104153502.GK16023@sirena.org.uk>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Mon, 4 Jan 2016 23:43:48 +0800
+Subject: [PATCH 2/3] thermal: Add Mediatek thermal controller support
+In-Reply-To: <20160104143129.GJ13058@pengutronix.de>
+References: <1448883753-19068-1-git-send-email-s.hauer@pengutronix.de>
+ <1448883753-19068-3-git-send-email-s.hauer@pengutronix.de>
+ <CAGS+omC86=Kfdj0cFNHqs4fXCAT0uU+AxHCj3ORd2HetNZ2gVQ@mail.gmail.com>
+ <20160104143129.GJ13058@pengutronix.de>
+Message-ID: <CAGS+omAHXE15aYcrUzAJ_hN=Fry=uTPk6=P3Cy2xL25j9+WpOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 04, 2016 at 12:12:20PM +0000, Build bot for Mark Brown wrote:
+On Mon, Jan 4, 2016 at 10:31 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Mon, Dec 21, 2015 at 12:07:58PM +0800, Daniel Kurtz wrote:
+>> Hi Sascha,
+>>
+>> One nit below that can be fixed up later, or now if you don't plan to
+>> spin this driver to
+>> address Eduardo's feedback...
+>>
+>> On Mon, Nov 30, 2015 at 7:42 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+>> > This adds support for the Mediatek thermal controller found on MT8173
+>> > and likely other SoCs.
+>> > The controller is a bit special. It does not have its own ADC, instead
+>> > it controls the on-SoC AUXADC via AHB bus accesses. For this reason
+>> > we need the physical address of the AUXADC. Also it controls a mux
+>> > using AHB bus accesses, so we need the APMIXEDSYS physical address aswell.
+>> >
+>> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+>>
+>> [snip]
+>>
+>> > +static int mtk_thermal_get_calibration_data(struct device *dev, struct mtk_thermal *mt)
+>> > +{
+>> > +       struct nvmem_cell *cell;
+>> > +       u32 *buf;
+>> > +       size_t len;
+>> > +       int i, ret = 0;
+>> > +
+>> > +       /* Start with default values */
+>> > +       mt->adc_ge = 512;
+>> > +       for (i = 0; i < MT8173_NUM_SENSORS; i++)
+>> > +               mt->vts[i] = 260;
+>> > +       mt->degc_cali = 40;
+>> > +       mt->o_slope = 0;
+>> > +
+>> > +       cell = nvmem_cell_get(dev, "calibration-data");
+>> > +       if (IS_ERR(cell)) {
+>> > +               if (PTR_ERR(cell) == -EPROBE_DEFER)
+>>
+>> It is useful to know why the thermal driver is being probe defered, so
+>> I suggest here:
+>> dev_warn(dev, "Waiting for calibration data.\n");
+>
+> The problem with that is that this message is not shown once but
+> possibly many times and may not even show a problem because in the end
+> the device may be probed successfully. In this case the last thing you
+> see from the device is "Waiting for calibration data." and get annoyed
+> by all this useless noise from the driver.
+>
+> Of course I agree that this information may be useful in the case you
+> wonder why your device doesn't show up...
 
-Today's linux-next fails to build for arm64 due to 44d3d051253 (ARM64:
-dts: mt8173: Add CPU OPP, clock and regulator supply properties) in one
-of Raphael's trees:
-
-> 	arm64-allmodconfig
-> Error: ../arch/arm64/boot/dts/mediatek/mt8173.dtsi:132.24-25 syntax error
-> Error: ../arch/arm64/boot/dts/mediatek/mt8173.dtsi:132.24-25 syntax error
-
-> 	arm64-defconfig
-> Error: ../arch/arm64/boot/dts/mediatek/mt8173.dtsi:132.24-25 syntax error
-
-which is failing because at least CLK_INFRA_CA53SEL is used but never
-defined, presumably there is some dependency which wasn't integrated.
-Normally we merge DT changes via the architecture to help avoid these
-issues.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160104/6ae7e456/attachment-0001.sig>
+The solution for this, then, is:
+ dev_dbg()
