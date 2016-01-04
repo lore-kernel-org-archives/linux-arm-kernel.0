@@ -1,41 +1,29 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 04 Jan 2016 16:15:32 +0100
-Subject: [PATCH 2/2] arm: configs: add kvm_defconfig
-In-Reply-To: <1451919034-12846-3-git-send-email-andre.przywara@arm.com>
-References: <1451919034-12846-1-git-send-email-andre.przywara@arm.com>
- <1451919034-12846-3-git-send-email-andre.przywara@arm.com>
-Message-ID: <4522790.HLBFMYIalT@wuerfel>
+Date: Mon, 04 Jan 2016 16:17:47 +0100
+Subject: [PATCH] ASoC: cs35l32: avoid uninitialized variable access
+In-Reply-To: <20160102141746.GH16023@sirena.org.uk>
+References: <2884997.s8B8BuE04L@wuerfel> <20160102141746.GH16023@sirena.org.uk>
+Message-ID: <9222694.IRNnfpj6Tn@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 04 January 2016 14:50:34 Andre Przywara wrote:
-> This new config enables KVM (and thus LPAE) on top of
-> multi_v7_defconfig. This creates a kernel that can _host_ KVM guests,
-> for guests a multi_v7_defconfig with virtio drivers is sufficient.
-> Since LPAE kernels are not compatible with non-LPAE capable hardware,
-> this has to be separate from the existing multi_v7_defconfig.
+On Saturday 02 January 2016 14:17:46 Mark Brown wrote:
+> On Sat, Jan 02, 2016 at 12:19:52AM +0100, Arnd Bergmann wrote:
 > 
-> The purpose of this new defconfig is both to simplify creation of KVM
-> host kernels as well as to give the LPAE option some better testing
-> coverage, as the enlarged dma_addr_t and phys_addr_t types create some
-> headache to some drivers.
+> > -             if (i2c_client->dev.of_node) {
+> > +             if (IS_ENABLED(CONFIG_OF) && i2c_client->dev.of_node) {
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> This would be a lot nicer if there was an __always_null annotation we
+> could put on of_node for !OF configurations, that'd Just Work and this
+> can't be the only case where we have this idiom.
 > 
 
-I agree about the purpose, but I want something better here:
+How about an inline helper like
 
-* Use config fragments to just set the few extra options that
-  we can't enable otherwise, and have a shared config file
-  with the normal multi_v7. There is still an ongoing question
-  about big-endian defconfig, which has exactly the same problem,
-  and we should have a common approach for all combinations.
-
-  We might also want to do this in a way that lets us build
-  v6/v6k/v7/v7ve/v8 kernels in big-endian and little-endian
-  all from the same defconfig file, with the set of platforms
-  getting smaller as we go to higher arch levels.
-
-* I really want to see the ARMv7VE dependencies sorted out.
+static inline struct device_node *dev_of_node(struct device *dev)
+{
+	if (IS_ENABLED(CONFIG_OF))
+		return dev->of_node;	
+}
 
 	Arnd
