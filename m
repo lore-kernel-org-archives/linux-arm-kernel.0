@@ -1,94 +1,128 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  4 Jan 2016 17:56:41 +0000
-Subject: [PATCHv2 08/18] arm64: kasan: avoid TLB conflicts
+Date: Mon,  4 Jan 2016 17:56:43 +0000
+Subject: [PATCHv2 10/18] arm64: mm: add functions to walk page tables by PA
 In-Reply-To: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
 References: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1451930211-22460-9-git-send-email-mark.rutland@arm.com>
+Message-ID: <1451930211-22460-11-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The page table modification performed during the KASAN init risks the
-allocation of conflicting TLB entries, as it swaps a set of valid global
-entries for another without suitable TLB maintenance.
+To allow us to walk tables allocated into the fixmap, we need to acquire
+the physical address of a page, rather than the virtual address in the
+linear map.
 
-The presence of conflicting TLB entries can result in the delivery of
-synchronous TLB conflict aborts, or may result in the use of erroneous
-data being returned in response to a TLB lookup. This can affect
-explicit data accesses from software as well as translations performed
-asynchronously (e.g. as part of page table walks or speculative I-cache
-fetches), and can therefore result in a wide variety of problems.
+This patch adds new p??_page_paddr and p??_offset_phys functions to
+acquire the physical address of a next-level table, and changes
+p??_offset* into macros which simply convert this to a linear map VA.
+This renders p??_page_vaddr unused, end hence they are removed.
 
-To avoid this, use cpu_replace_ttbr1 to swap the page tables. This
-ensures that when the new tables are installed there are no stale
-entries from the old tables which may conflict. As all updates are made
-to the tables while they are not active, the updates themselves are
-safe.
-
-At the same time, add the missing barrier to ensure that the tmp_pg_dir
-entries updated via memcpy are visible to the page table walkers at the
-point the tmp_pg_dir is installed. All other page table updates made as
-part of KASAN initialisation have the requisite barriers due to the use
-of the standard page table accessors.
+At the pgd level, a new pgd_offset_raw function is added to find the
+relevant PGD entry given the base of a PGD and a virtual address.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Andrey Ryabinin <ryabinin.a.a@gmail.com>
 Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Jeremy Linton <jeremy.linton@arm.com>
 Cc: Laura Abbott <labbott@fedoraproject.org>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/mm/kasan_init.c | 17 ++++-------------
- 1 file changed, 4 insertions(+), 13 deletions(-)
+ arch/arm64/include/asm/pgtable.h | 39 +++++++++++++++++++++++----------------
+ 1 file changed, 23 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
-index cf038c7..3e3d280 100644
---- a/arch/arm64/mm/kasan_init.c
-+++ b/arch/arm64/mm/kasan_init.c
-@@ -16,6 +16,7 @@
- #include <linux/memblock.h>
- #include <linux/start_kernel.h>
- 
-+#include <asm/mmu_context.h>
- #include <asm/page.h>
- #include <asm/pgalloc.h>
- #include <asm/pgtable.h>
-@@ -108,15 +109,6 @@ static void __init clear_pgds(unsigned long start,
- 		set_pgd(pgd_offset_k(start), __pgd(0));
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 3603cca..f5742db 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -426,15 +426,16 @@ static inline void pmd_clear(pmd_t *pmdp)
+ 	set_pmd(pmdp, __pmd(0));
  }
  
--static void __init cpu_set_ttbr1(unsigned long ttbr1)
--{
--	asm(
--	"	msr	ttbr1_el1, %0\n"
--	"	isb"
--	:
--	: "r" (ttbr1));
--}
--
- void __init kasan_init(void)
+-static inline pte_t *pmd_page_vaddr(pmd_t pmd)
++static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
  {
- 	struct memblock_region *reg;
-@@ -129,8 +121,8 @@ void __init kasan_init(void)
- 	 * setup will be finished.
- 	 */
- 	memcpy(tmp_pg_dir, swapper_pg_dir, sizeof(tmp_pg_dir));
--	cpu_set_ttbr1(__pa(tmp_pg_dir));
--	flush_tlb_all();
-+	dsb(ishst);
-+	cpu_replace_ttbr1(tmp_pg_dir);
+-	return __va(pmd_val(pmd) & PHYS_MASK & (s32)PAGE_MASK);
++	return pmd_val(pmd) & PHYS_MASK & (s32)PAGE_MASK;
+ }
  
- 	clear_pgds(KASAN_SHADOW_START, KASAN_SHADOW_END);
+ /* Find an entry in the third-level page table. */
+ #define pte_index(addr)		(((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
  
-@@ -156,8 +148,7 @@ void __init kasan_init(void)
- 	}
+-#define pte_offset_kernel(dir,addr)	(pmd_page_vaddr(*(dir)) + pte_index(addr))
++#define pte_offset_phys(dir,addr)	(pmd_page_paddr(*(dir)) + pte_index(addr) * sizeof(pte_t))
++#define pte_offset_kernel(dir,addr)	((pte_t *)__va(pte_offset_phys((dir), (addr))))
  
- 	memset(kasan_zero_page, 0, PAGE_SIZE);
--	cpu_set_ttbr1(__pa(swapper_pg_dir));
--	flush_tlb_all();
-+	cpu_replace_ttbr1(swapper_pg_dir);
+ #define pte_offset_map(dir,addr)	pte_offset_kernel((dir), (addr))
+ #define pte_offset_map_nested(dir,addr)	pte_offset_kernel((dir), (addr))
+@@ -469,21 +470,23 @@ static inline void pud_clear(pud_t *pudp)
+ 	set_pud(pudp, __pud(0));
+ }
  
- 	/* At this point kasan is fully initialized. Enable error messages */
- 	init_task.kasan_depth = 0;
+-static inline pmd_t *pud_page_vaddr(pud_t pud)
++static inline phys_addr_t pud_page_paddr(pud_t pud)
+ {
+-	return __va(pud_val(pud) & PHYS_MASK & (s32)PAGE_MASK);
++	return pud_val(pud) & PHYS_MASK & (s32)PAGE_MASK;
+ }
+ 
+ /* Find an entry in the second-level page table. */
+ #define pmd_index(addr)		(((addr) >> PMD_SHIFT) & (PTRS_PER_PMD - 1))
+ 
+-static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
+-{
+-	return (pmd_t *)pud_page_vaddr(*pud) + pmd_index(addr);
+-}
++#define pmd_offset_phys(dir, addr)	(pud_page_paddr(*(dir)) + pmd_index(addr) * sizeof(pmd_t))
++#define pmd_offset(dir, addr)		((pmd_t *)__va(pmd_offset_phys((dir), (addr))))
+ 
+ #define pud_page(pud)		pfn_to_page(__phys_to_pfn(pud_val(pud) & PHYS_MASK))
+ 
++#else
++
++#define pud_page_paddr(pud)	({ BUILD_BUG(); 0; })
++
+ #endif	/* CONFIG_PGTABLE_LEVELS > 2 */
+ 
+ #if CONFIG_PGTABLE_LEVELS > 3
+@@ -505,21 +508,23 @@ static inline void pgd_clear(pgd_t *pgdp)
+ 	set_pgd(pgdp, __pgd(0));
+ }
+ 
+-static inline pud_t *pgd_page_vaddr(pgd_t pgd)
++static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
+ {
+-	return __va(pgd_val(pgd) & PHYS_MASK & (s32)PAGE_MASK);
++	return pgd_val(pgd) & PHYS_MASK & (s32)PAGE_MASK;
+ }
+ 
+ /* Find an entry in the frst-level page table. */
+ #define pud_index(addr)		(((addr) >> PUD_SHIFT) & (PTRS_PER_PUD - 1))
+ 
+-static inline pud_t *pud_offset(pgd_t *pgd, unsigned long addr)
+-{
+-	return (pud_t *)pgd_page_vaddr(*pgd) + pud_index(addr);
+-}
++#define pud_offset_phys(dir, addr)	(pgd_page_paddr(*(dir)) + pud_index(addr) * sizeof(pud_t))
++#define pud_offset(dir, addr)		((pud_t *)__va(pud_offset_phys((dir), (addr))))
+ 
+ #define pgd_page(pgd)		pfn_to_page(__phys_to_pfn(pgd_val(pgd) & PHYS_MASK))
+ 
++#else
++
++#define pgd_page_paddr(pgd)	({ BUILD_BUG(); 0;})
++
+ #endif  /* CONFIG_PGTABLE_LEVELS > 3 */
+ 
+ #define pgd_ERROR(pgd)		__pgd_error(__FILE__, __LINE__, pgd_val(pgd))
+@@ -527,7 +532,9 @@ static inline pud_t *pud_offset(pgd_t *pgd, unsigned long addr)
+ /* to find an entry in a page-table-directory */
+ #define pgd_index(addr)		(((addr) >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1))
+ 
+-#define pgd_offset(mm, addr)	((mm)->pgd+pgd_index(addr))
++#define pgd_offset_raw(pgd, addr)	((pgd) + pgd_index(addr))
++
++#define pgd_offset(mm, addr)	(pgd_offset_raw((mm)->pgd, (addr)))
+ 
+ /* to find an entry in a kernel page-table-directory */
+ #define pgd_offset_k(addr)	pgd_offset(&init_mm, addr)
 -- 
 1.9.1
