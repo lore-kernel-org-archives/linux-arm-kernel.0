@@ -1,30 +1,37 @@
 From: peterz@infradead.org (Peter Zijlstra)
-Date: Mon, 4 Jan 2016 14:26:10 +0100
-Subject: [PATCH v2 11/32] mips: reuse asm-generic/barrier.h
-In-Reply-To: <1451572003-2440-12-git-send-email-mst@redhat.com>
+Date: Mon, 4 Jan 2016 14:36:58 +0100
+Subject: [PATCH v2 17/32] arm: define __smp_xxx
+In-Reply-To: <20160103110158-mutt-send-email-mst@redhat.com>
 References: <1451572003-2440-1-git-send-email-mst@redhat.com>
- <1451572003-2440-12-git-send-email-mst@redhat.com>
-Message-ID: <20160104132610.GX6344@twins.programming.kicks-ass.net>
+ <1451572003-2440-18-git-send-email-mst@redhat.com>
+ <20160102112438.GU8644@n2100.arm.linux.org.uk>
+ <20160103110158-mutt-send-email-mst@redhat.com>
+Message-ID: <20160104133658.GY6344@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 31, 2015 at 09:07:10PM +0200, Michael S. Tsirkin wrote:
-> -#define smp_store_release(p, v)						\
-> -do {									\
-> -	compiletime_assert_atomic_type(*p);				\
-> -	smp_mb();							\
-> -	WRITE_ONCE(*p, v);						\
-> -} while (0)
-> -
-> -#define smp_load_acquire(p)						\
-> -({									\
-> -	typeof(*p) ___p1 = READ_ONCE(*p);				\
-> -	compiletime_assert_atomic_type(*p);				\
-> -	smp_mb();							\
-> -	___p1;								\
-> -})
+On Sun, Jan 03, 2016 at 11:12:44AM +0200, Michael S. Tsirkin wrote:
+> On Sat, Jan 02, 2016 at 11:24:38AM +0000, Russell King - ARM Linux wrote:
 
-David Daney wanted to use fancy new MIPS barriers to provide better
-implementations of this.
+> > My only concern is that it gives people an additional handle onto a
+> > "new" set of barriers - just because they're prefixed with __*
+> > unfortunately doesn't stop anyone from using it (been there with
+> > other arch stuff before.)
+> > 
+> > I wonder whether we should consider making the smp memory barriers
+> > inline functions, so these __smp_xxx() variants can be undef'd
+> > afterwards, thereby preventing drivers getting their hands on these
+> > new macros?
+> 
+> That'd be tricky to do cleanly since asm-generic depends on
+> ifndef to add generic variants where needed.
+> 
+> But it would be possible to add a checkpatch test for this.
 
-This patch isn't in the way of that, just a FYI.
+Wasn't the whole purpose of these things for 'drivers' (namely
+virtio/xen hypervisor interaction) to use these?
+
+And I suppose most of virtio would actually be modules, so you cannot do
+what I did with preempt_enable_no_resched() either.
+
+But yes, it would be good to limit the use of these things.
