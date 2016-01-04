@@ -1,69 +1,92 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 4 Jan 2016 15:32:37 +0100
-Subject: linux-4.4-rc8/arch/arm64/kernel/module.c:78: 32/64 bit problem ?
-In-Reply-To: <20160104141657.GC1616@arm.com>
-References: <DUB128-W158A3195DB26F149DD52E59CF20@phx.gbl>
- <20160104141657.GC1616@arm.com>
-Message-ID: <CAKv+Gu8KT-vOPN=ypt-qViLc74CumJUorxxM1wPnzf7h-nqKFg@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 4 Jan 2016 14:34:40 +0000
+Subject: [Xen-devel] [PATCH v3 40/62] arm/acpi: Estimate memory required
+ for acpi/efi tables
+In-Reply-To: <568A3545.7030009@huawei.com>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-41-git-send-email-shannon.zhao@linaro.org>
+ <565C67BF.4040804@citrix.com> <568A3545.7030009@huawei.com>
+Message-ID: <alpine.DEB.2.02.1601041433580.19710@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 January 2016 at 15:16, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Jan 04, 2016 at 08:25:30AM +0000, David Binderman wrote:
->> Hello there,
->
-> Hi David,
->
->> [linux-4.4-rc8/arch/arm64/kernel/module.c:78] ->
->> [linux-4.4-rc8/arch/arm64/kernel/module.c:88]: (warning) Shifting 32-bit
->> value by 64 bits is undefined behaviour. See condition at line 88.
->
-> Curious, but how are you seeing this warning? GCC is silent for me...
->
->> Source code is
->>
->>     u64 imm_mask = (1 << len) - 1;
->>     s64 sval = do_reloc(op, place, val);
->>
->>     switch (len) {
->>     case 16:
->>         *(s16 *)place = sval;
->>         break;
->>     case 32:
->>         *(s32 *)place = sval;
->>         break;
->>     case 64:
->>
->> So it seems that len can be 64. Suggest new code
->>
->>     u64 imm_mask = (1UL << len) - 1;
->
-> That still ends up shifting by the width of the type when len == 64,
-> which is potentially still broken. We're better off using GENMASK.
->
+On Mon, 4 Jan 2016, Shannon Zhao wrote:
+> On 2015/11/30 23:14, Julien Grall wrote:
+> > Hi Shannon,
+> > 
+> > On 17/11/15 09:40, shannon.zhao at linaro.org wrote:
+> >> diff --git a/xen/common/efi/boot.c b/xen/common/efi/boot.c
+> >> index 53c7452..78d8ae9 100644
+> >> --- a/xen/common/efi/boot.c
+> >> +++ b/xen/common/efi/boot.c
+> >> @@ -13,6 +13,7 @@
+> >>  #include <xen/multiboot.h>
+> >>  #include <xen/pci_regs.h>
+> >>  #include <xen/pfn.h>
+> >> +#include <asm/acpi.h>
+> >>  #if EFI_PAGE_SIZE != PAGE_SIZE
+> >>  # error Cannot use xen/pfn.h here!
+> >>  #endif
+> >> @@ -1171,6 +1172,26 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
+> >>      for( ; ; ); /* not reached */
+> >>  }
+> >>  
+> >> +#ifdef CONFIG_ACPI
+> >> +/* Constant to indicate "Xen" in unicode u16 format */
+> >> +static const u16 XEN_EFI_FW_VENDOR[] ={0x0058,0x0065,0x006E,0x0000};
+> >> +
+> >> +int __init estimate_efi_size(int mem_nr_banks)
+> >> +{
+> >> +    int size;
+> >> +    int est_size = sizeof(EFI_SYSTEM_TABLE);
+> >> +    int ect_size = sizeof(EFI_CONFIGURATION_TABLE);
+> >> +    int emd_size = sizeof(EFI_MEMORY_DESCRIPTOR);
+> >> +    int fw_vendor_size = sizeof(XEN_EFI_FW_VENDOR);
+> >> +
+> >> +    size = PAGE_ALIGN(est_size + ect_size + fw_vendor_size)
+> >> +           + PAGE_ALIGN(emd_size *
+> >> +                        (mem_nr_banks + acpi_mem.nr_banks + TBL_MMAX));
+> >> +
+> >> +    return size;
+> >> +}
+> >> +#endif
+> >> +
+> > 
+> > efi/boot.c only contains code related to the stub EFI. This is not the
+> > case of this code.
+> > 
+> 
+> I add these codes at this file because I want to reuse the definitions
+> of EFI structures like EFI_SYSTEM_TABLE. Parth re-define those
+> structures at previous patch set and one comment suggested to reuse the
+> existing ones. If I add these codes in xen/arch/arm/domain_build.c, it
+> will have some conflicts. E.g:
+> 
+> In file included from /home/open-source/xen/xen/include/asm/efibind.h:2:0,
+>                  from domain_build.c:29:
+> /home/open-source/xen/xen/include/asm/arm64/efibind.h:86:20: error:
+> conflicting types for 'UINT64'
+>  typedef uint64_t   UINT64;
+>                     ^
+> In file included from /home/open-source/xen/xen/include/acpi/acpi.h:57:0,
+>                  from /home/open-source/xen/xen/include/xen/acpi.h:33,
+>                  from domain_build.c:15:
+> /home/open-source/xen/xen/include/acpi/actypes.h:130:35: note: previous
+> declaration of 'UINT64' was here
+>  typedef COMPILER_DEPENDENT_UINT64 UINT64;
 
-Can't we simply return from the function rather than break from the
-switch statement if len == 64?
-The range check does not make any sense in that case anyway.
+I think that having this code in efi/boot.c might be OK, but let's see
+what Jan thinks.
 
 
-> --->8
->
-> diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
-> index f4bc779e62e8..266e7490e85c 100644
-> --- a/arch/arm64/kernel/module.c
-> +++ b/arch/arm64/kernel/module.c
-> @@ -75,7 +75,7 @@ static u64 do_reloc(enum aarch64_reloc_op reloc_op, void *place, u64 val)
->
->  static int reloc_data(enum aarch64_reloc_op op, void *place, u64 val, int len)
->  {
-> -       u64 imm_mask = (1 << len) - 1;
-> +       u64 imm_mask = GENMASK(len - 1, 0);
->         s64 sval = do_reloc(op, place, val);
->
->         switch (len) {
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+> > Moreover, this code won't compile on x86 because acpi_mem is only
+> > defined for ARM.
+> > 
+> > Regards,
+> > 
+> 
+> Thanks,
+> -- 
+> Shannon
+> 
