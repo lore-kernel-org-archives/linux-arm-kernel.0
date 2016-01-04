@@ -1,80 +1,71 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 4 Jan 2016 17:25:18 +0000
-Subject: [PATCH 0/4] Component helper updates
-In-Reply-To: <20151207150143.GR8644@n2100.arm.linux.org.uk>
-References: <20151123160210.GR8644@n2100.arm.linux.org.uk>
- <20151207150143.GR8644@n2100.arm.linux.org.uk>
-Message-ID: <20160104172518.GM19062@n2100.arm.linux.org.uk>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 4 Jan 2016 17:21:12 +0000
+Subject: [PATCH] arm64: fix relocation of movz instruction with negative
+ immediate
+In-Reply-To: <1451923762-8387-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1451923762-8387-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160104171749.GA4436@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 07, 2015 at 03:01:43PM +0000, Russell King - ARM Linux wrote:
-> Given the lack of interest in these patches, I've put these into my
-> "for-next" branch so that they can get some exposure in linux-next.
-
-These have been in for-next, and no one's reported any issues.
-I've now queued these into my for-linus branch in preparation to
-merging during the next merge window.
-
-> On Mon, Nov 23, 2015 at 04:02:11PM +0000, Russell King - ARM Linux wrote:
-> > Greg,
-> > 
-> > These four patches update the component helper by:
-> > * Removing the legacy matching code with the .add_components method
-> >   in the master's operation structure.  Nothing in -rc1 appears to be
-> >   using the legacy functions or method, according to my git greps.
-> > 
-> > * A slight code reorganisation which results in slightly easier to read
-> >   code.
-> > 
-> > * Switch to tracking components via an array rather than a list, which
-> >   allows us to keep the matching and matched components together, and
-> >   more importantly allows us to reduce the amount of matching - with
-> >   this structure, we can incrementally add the component devices as
-> >   they become available, rather than re-running the list of matches
-> >   each time something changes.
-> > 
-> > * Fix the lack of match release functionality, which Liviu Dudau
-> >   reminded me was missing.  This allows people who want to pass
-> >   device_node structures in to (correctly) retain the reference to the
-> >   node, and drop the node when the need to do matches is no longer
-> >   required.
-> > 
-> > The first three patches have been well tested over the last year as I've
-> > had them in my tree that long.  I hadn't considered them important enough
-> > to send as they're only removing and cleaning up functionality.  However,
-> > with the need to fix something, it now makes sense to get them merged.
-> > 
-> > The last patch has been tested with etnaviv DRM to prove that the match
-> > release works by unloading the module.  On unload, the release function
-> > is correctly called.
-> > 
-> > This is intended for the next merge window.  Please apply.
-> > 
-> >  drivers/base/component.c  | 281 ++++++++++++++++++++++++----------------------
-> >  include/linux/component.h |  33 ++++--
-> >  2 files changed, 167 insertions(+), 147 deletions(-)
-> > 
-> > -- 
-> > FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> > according to speedtest.net.
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+On Mon, Jan 04, 2016 at 05:09:22PM +0100, Ard Biesheuvel wrote:
+> The test whether a movz instruction with a signed immediate should be
+> turned into a movn instruction (i.e., when the immediate is negative)
+> is flawed, since the value of imm is always positive. So check sval
+> instead.
 > 
-> -- 
-> RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/kernel/module.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
+> index f4bc779e62e8..39e4a29cab50 100644
+> --- a/arch/arm64/kernel/module.c
+> +++ b/arch/arm64/kernel/module.c
+> @@ -128,7 +128,7 @@ static int reloc_insn_movw(enum aarch64_reloc_op op, void *place, u64 val,
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+#define AARCH64_INSN_IMM_MOVNZ          AARCH64_INSN_IMM_MAX
+#define AARCH64_INSN_IMM_MOVK           AARCH64_INSN_IMM_16
+
+/* ... */
+
+        if (imm_type == AARCH64_INSN_IMM_MOVNZ) {
+
+/* ... */
+
+>  		 * immediate is less than zero.
+>  		 */
+>  		insn &= ~(3 << 29);
+> -		if ((s64)imm >= 0) {
+> +		if (sval >= 0) {
+>  			/* >=0: Set the instruction to MOVZ (opcode 10b). */
+>  			insn |= 2 << 29;
+>  		} else {
+
+I _think_ this may be correct, but...
+
+		}
+		imm_type = AARCH64_INSN_IMM_MOVK;
+	} 
+
+        /* Update the instruction with the new encoding. */
+        insn = aarch64_insn_encode_immediate(imm_type, insn, imm);
+
+/* ... */
+
+leaves imm_type as either AARCH64_INSN_IMM_16 or AARCH64_INSN_IMM_MOVK.
+
+But because AARCH64_INSN_IMM_16 == AARCH64_INSN_IMM_MOVK (required for , the negative
+overflow fudge is never applied, no?
+
+        if (imm_type != AARCH64_INSN_IMM_16) {
+                sval++;
+                limit++;
+        }
+
+
+I'm wondering whether there is a less confusing way to do all this...
+
+Cheers
+---Dave
