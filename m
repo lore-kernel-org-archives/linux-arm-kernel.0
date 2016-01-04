@@ -1,15 +1,15 @@
 From: david.vrabel@citrix.com (David Vrabel)
-Date: Mon, 4 Jan 2016 11:32:00 +0000
-Subject: [Xen-devel] [PATCH v2 33/34] xenbus: use virt_xxx barriers
-In-Reply-To: <1451572003-2440-34-git-send-email-mst@redhat.com>
+Date: Mon, 4 Jan 2016 11:32:28 +0000
+Subject: [Xen-devel] [PATCH v2 34/34] xen/io: use virt_xxx barriers
+In-Reply-To: <1451572003-2440-35-git-send-email-mst@redhat.com>
 References: <1451572003-2440-1-git-send-email-mst@redhat.com>
- <1451572003-2440-34-git-send-email-mst@redhat.com>
-Message-ID: <568A5830.9000501@citrix.com>
+ <1451572003-2440-35-git-send-email-mst@redhat.com>
+Message-ID: <568A584C.2070501@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 31/12/15 19:10, Michael S. Tsirkin wrote:
-> drivers/xen/xenbus/xenbus_comms.c uses
+> include/xen/interface/io/ring.h uses
 > full memory barriers to communicate with the other side.
 > 
 > For guests compiled with CONFIG_SMP, smp_wmb and smp_mb
@@ -19,9 +19,5 @@ On 31/12/15 19:10, Michael S. Tsirkin wrote:
 > Switch to virt_xxx barriers which serve this exact purpose.
 
 Acked-by: David Vrabel <david.vrabel@citrix.com>
-
-If you're feeling particularly keen there's a rmb() consume_one_event()
-in drivers/xen/events/events_fifo.c that can be converted to virt_rmb()
-as well.
 
 David
