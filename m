@@ -1,66 +1,41 @@
-From: dcb314@hotmail.com (David Binderman)
-Date: Mon, 4 Jan 2016 15:14:29 +0000
-Subject: linux-4.4-rc8/arch/arm64/kernel/module.c:78: 32/64 bit problem ?
-In-Reply-To: <20160104141657.GC1616@arm.com>
-References: <DUB128-W158A3195DB26F149DD52E59CF20@phx.gbl>,
- <20160104141657.GC1616@arm.com>
-Message-ID: <DUB128-W50B7B3ECEE2D2A6598224B9CF20@phx.gbl>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 04 Jan 2016 16:15:32 +0100
+Subject: [PATCH 2/2] arm: configs: add kvm_defconfig
+In-Reply-To: <1451919034-12846-3-git-send-email-andre.przywara@arm.com>
+References: <1451919034-12846-1-git-send-email-andre.przywara@arm.com>
+ <1451919034-12846-3-git-send-email-andre.przywara@arm.com>
+Message-ID: <4522790.HLBFMYIalT@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello there Will,
+On Monday 04 January 2016 14:50:34 Andre Przywara wrote:
+> This new config enables KVM (and thus LPAE) on top of
+> multi_v7_defconfig. This creates a kernel that can _host_ KVM guests,
+> for guests a multi_v7_defconfig with virtio drivers is sufficient.
+> Since LPAE kernels are not compatible with non-LPAE capable hardware,
+> this has to be separate from the existing multi_v7_defconfig.
+> 
+> The purpose of this new defconfig is both to simplify creation of KVM
+> host kernels as well as to give the LPAE option some better testing
+> coverage, as the enlarged dma_addr_t and phys_addr_t types create some
+> headache to some drivers.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> 
 
-----------------------------------------
-> Curious, but how are you seeing this warning? GCC is silent for me...
+I agree about the purpose, but I want something better here:
 
-Static analyser called cppcheck, available from sourceforge.
+* Use config fragments to just set the few extra options that
+  we can't enable otherwise, and have a shared config file
+  with the normal multi_v7. There is still an ongoing question
+  about big-endian defconfig, which has exactly the same problem,
+  and we should have a common approach for all combinations.
 
-GCC will be silent for all sorts of dodgy code. clang produces more warnings, 
-but I am not sure how much of the linux kernel it can compile. 
-Hence use of cppcheck.
+  We might also want to do this in a way that lets us build
+  v6/v6k/v7/v7ve/v8 kernels in big-endian and little-endian
+  all from the same defconfig file, with the set of platforms
+  getting smaller as we go to higher arch levels.
 
+* I really want to see the ARMv7VE dependencies sorted out.
 
-Regards
-
-David Binderman
-
->
->> Source code is
->>
->>     u64 imm_mask = (1 << len) - 1;
->>     s64 sval = do_reloc(op, place, val);
->>
->>     switch (len) {
->>     case 16:
->>         *(s16 *)place = sval;
->>         break;
->>     case 32:
->>         *(s32 *)place = sval;
->>         break;
->>     case 64:
->>
->> So it seems that len can be 64. Suggest new code
->>
->>     u64 imm_mask = (1UL << len) - 1;
->
-> That still ends up shifting by the width of the type when len == 64,
-> which is potentially still broken. We're better off using GENMASK.
->
-> Will
->
-> --->8
->
-> diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
-> index f4bc779e62e8..266e7490e85c 100644
-> --- a/arch/arm64/kernel/module.c
-> +++ b/arch/arm64/kernel/module.c
-> @@ -75,7 +75,7 @@ static u64 do_reloc(enum aarch64_reloc_op reloc_op, void *place, u64 val)
->
-> static int reloc_data(enum aarch64_reloc_op op, void *place, u64 val, int len)
-> {
-> - u64 imm_mask = (1 << len) - 1;
-> + u64 imm_mask = GENMASK(len - 1, 0);
-> s64 sval = do_reloc(op, place, val);
->
-> switch (len) {
- 		 	   		  
+	Arnd
