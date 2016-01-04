@@ -1,29 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 04 Jan 2016 16:17:47 +0100
-Subject: [PATCH] ASoC: cs35l32: avoid uninitialized variable access
-In-Reply-To: <20160102141746.GH16023@sirena.org.uk>
-References: <2884997.s8B8BuE04L@wuerfel> <20160102141746.GH16023@sirena.org.uk>
-Message-ID: <9222694.IRNnfpj6Tn@wuerfel>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 4 Jan 2016 15:18:41 +0000
+Subject: [PATCH] arm64: entry.S: add missing trace_hardirqs_off
+In-Reply-To: <1451109438-5834-1-git-send-email-zhizhou.zh@gmail.com>
+References: <1451109438-5834-1-git-send-email-zhizhou.zh@gmail.com>
+Message-ID: <20160104151840.GF6301@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 02 January 2016 14:17:46 Mark Brown wrote:
-> On Sat, Jan 02, 2016 at 12:19:52AM +0100, Arnd Bergmann wrote:
+On Sat, Dec 26, 2015 at 01:57:18PM +0800, Zhi-zhou Zhang wrote:
+> Before calling schedule, we should trace hardirqs correctly. If not,
+> we get following warning message when enabled CONFIG_DEBUG_LOCKDEP:
 > 
-> > -             if (i2c_client->dev.of_node) {
-> > +             if (IS_ENABLED(CONFIG_OF) && i2c_client->dev.of_node) {
+> [    9.243073] DEBUG_LOCKS_WARN_ON(current->hardirqs_enabled)
+> [ ... ]
+> [    9.262681] possible reason: unannotated irqs-off.
+> [    9.263018] irq event stamp: 256209
+> [    9.263266] hardirqs last  enabled at (256209): [<ffffffc000085a98>] el0_irq_naked+0x1c/0x24
+> [    9.263820] hardirqs last disabled at (256207): [<ffffffc0000bad20>] __do_softirq+0x170/0x28c
+> [    9.264419] softirqs last  enabled at (256208): [<ffffffc0000bad9c>] __do_softirq+0x1ec/0x28c
+> [    9.264976] softirqs last disabled at (256189): [<ffffffc0000bb194>] irq_exit+0x9c/0xec
 > 
-> This would be a lot nicer if there was an __always_null annotation we
-> could put on of_node for !OF configurations, that'd Just Work and this
-> can't be the only case where we have this idiom.
+> Signed-off-by: Zhi-zhou Zhang <zhizhou.zh@gmail.com>
+> ---
+>  arch/arm64/kernel/entry.S | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index 7ed3d75..4769190 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -634,6 +634,9 @@ work_pending:
+>  	bl	do_notify_resume
+>  	b	ret_to_user
+>  work_resched:
+> +#ifdef CONFIG_TRACE_IRQFLAGS
+> +	bl	trace_hardirqs_off
+> +#endif
+>  	bl	schedule
 
-How about an inline helper like
+A similar patch is already in -next as commit db3899a6477a (arm64: Add
+trace_hardirqs_off annotation in ret_to_user)
 
-static inline struct device_node *dev_of_node(struct device *dev)
-{
-	if (IS_ENABLED(CONFIG_OF))
-		return dev->of_node;	
-}
-
-	Arnd
+-- 
+Catalin
