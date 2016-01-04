@@ -1,91 +1,66 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  4 Jan 2016 21:36:59 +1100
-Subject: [PATCH v2] ARM: shmobile: alt: Add QSPI device to DT
-Message-ID: <1451903819-19218-1-git-send-email-horms+renesas@verge.net.au>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 04 Jan 2016 11:38:29 +0100
+Subject: Odroid U3 mutex deadlock.
+In-Reply-To: <CANAwSgTrz8=9r9jkKQY_ZN3fsvBs9QpeTxLG1Ac_8SfAULoyHw@mail.gmail.com>
+References: <CANAwSgSE4UE5jn4Rp0LfVhDcSP=ynDsbCaUSHmM31_MF849bSw@mail.gmail.com>
+ <566E0319.6040100@samsung.com>
+ <CANAwSgTrz8=9r9jkKQY_ZN3fsvBs9QpeTxLG1Ac_8SfAULoyHw@mail.gmail.com>
+Message-ID: <568A4BA5.3090203@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the QSPI controller in the alt device tree.
+Hi Anand,
 
-Based similar work for the silk board by by Vladimir Barinov and
-Sergei Shtylyov.
+On 2016-01-02 06:14, Anand Moon wrote:
+> Hi Krzysztof
+>
+> On 14 December 2015 at 05:15, Krzysztof Kozlowski
+> <k.kozlowski@samsung.com> wrote:
+>> On 12.12.2015 13:32, Anand Moon wrote:
+>>> Hi Krzysztof,
+>>>
+>>> I am just observing this deadlock om my Odroid U3.
+>> This is not a deadlock yet, just a report from lockdep. Could be a real
+>> issue, could be false positive, maybe some locks miss nesting annotations.
+>>
+>> Typical information for bug report would be useful, like the exact
+>> version (it is mentioned in lockdep report but is it really correct?)
+>> and reproducibility. And of course git-bisect would be nice to have, see:
+>> Documentation/BUG-HUNTING
+>>
+>> Best regards,
+>> Krzysztof
+>>
+>>
+> Thanks for your inputs. I narrowed down to this commit.
+> ----------------------------------------------------------------------------------
+> commit ec459c0c77faca53cf161830cb264e51bb1abba6
+> Author: Marek Szyprowski <m.szyprowski@samsung.com>
+> Date:   Wed Feb 4 23:44:15 2015 +0900
+>
+>      ARM: dts: add dependency between TV and LCD0 power domains for exynos4
+>
+>      TV Mixer needs both TV and LCD0 domains enabled to be fully operational.
+>      This dependency is modelled by making TV power domains a sub-domain of
+>      LCD0 power domain.
+>
+>      Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>      Signed-off-by: Kukjin Kim <kgene@kernel.org>
+> -------------------------------------------------------------------------------------
+> After reverting this I am not observing below lockdep warning report.
+> But after reverting this patch I observer another bug.
 
-Cc: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Cc: Geert Uytterhoeven <geert@linux-m68k.org>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+The mentioned lockdep warning is a false positive. Such warning is 
+reported for
+every subdomain present in a system. As you noticed that removing dependency
+between power domains also removes this warning, but it will introduce real
+problems with power on/off sequences of graphics devices.
 
----
-v2
-* Added compatible = "fixed-partitions";
-* Update partitioning scheme to reflect
-  ALT_MiniMonitor_Manual(SPI_Boot)_Rev0.01_e.pdf
-* Tested on top of renesas-devel-20151228-v4.4-rc7
-  Read /dev/mtd0 with 512K blocks at 6.5Mb/s
----
- arch/arm/boot/dts/r8a7794-alt.dts | 46 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
+I will send a patch for genpd core fixing the deplock warning. Thanks for
+reporting the issue and pointing a good place to start digging in the 
+source :)
 
-diff --git a/arch/arm/boot/dts/r8a7794-alt.dts b/arch/arm/boot/dts/r8a7794-alt.dts
-index 2394e4883786..773f304d1142 100644
---- a/arch/arm/boot/dts/r8a7794-alt.dts
-+++ b/arch/arm/boot/dts/r8a7794-alt.dts
-@@ -138,6 +138,13 @@
- 	status = "okay";
- };
- 
-+&pfc {
-+	qspi_pins: spi0 {
-+		renesas,groups = "qspi_ctrl", "qspi_data4";
-+		renesas,function = "qspi";
-+	};
-+};
-+
- &ether {
- 	pinctrl-0 = <&ether_pins &phy1_pins>;
- 	pinctrl-names = "default";
-@@ -197,3 +204,42 @@
- 
- 	status = "okay";
- };
-+
-+&qspi {
-+	pinctrl-0 = <&qspi_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+
-+	flash at 0 {
-+		compatible = "spansion,s25fl512s", "jedec,spi-nor";
-+		reg = <0>;
-+		spi-max-frequency = <30000000>;
-+		spi-tx-bus-width = <4>;
-+		spi-rx-bus-width = <4>;
-+		spi-cpol;
-+		spi-cpha;
-+		m25p,fast-read;
-+
-+		partitions {
-+			compatible = "fixed-partitions";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			partition at 0 {
-+				label = "loader";
-+				reg = <0x00000000 0x00040000>;
-+				read-only;
-+			};
-+			partition at 40000 {
-+				label = "system";
-+				reg = <0x00040000 0x00040000>;
-+				read-only;
-+			};
-+			partition at 80000 {
-+				label = "user";
-+				reg = <0x00080000 0x03f80000>;
-+			};
-+		};
-+	};
-+};
+Best regards
 -- 
-2.1.4
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
