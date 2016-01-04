@@ -1,85 +1,45 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 4 Jan 2016 11:21:04 +0100
-Subject: [RFC 6/9] clk: ti: add support for omap4 module clocks
-In-Reply-To: <568A20E5.6040005@ti.com>
-References: <1450447141-29936-1-git-send-email-t-kristo@ti.com>
- <1450447141-29936-7-git-send-email-t-kristo@ti.com>
- <20160101054815.21738.79820@quark.deferred.io>
- <568A20E5.6040005@ti.com>
-Message-ID: <CAMuHMdUZMUSYC1XHydVQHRibWtHw2=T-7nXe=5Pf4UCcb=mKTQ@mail.gmail.com>
+From: zourongrong@huawei.com (Rongrong Zou)
+Date: Mon, 4 Jan 2016 18:27:12 +0800
+Subject: [PATCH v1 1/3] ARM64 LPC: indirect ISA PORT IO introduced
+In-Reply-To: <20160104101124.GA1616@arm.com>
+References: <1451396032-23708-1-git-send-email-zourongrong@gmail.com>
+ <1628979.qkJQGmVH0I@wuerfel> <5683A3B4.7040005@huawei.com>
+ <23432380.Bk9bdl2Z0r@wuerfel> <20160104101124.GA1616@arm.com>
+Message-ID: <568A4900.2030300@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tero,
-
-On Mon, Jan 4, 2016 at 8:36 AM, Tero Kristo <t-kristo@ti.com> wrote:
-> On 01/01/2016 07:48 AM, Michael Turquette wrote:
->> Quoting Tero Kristo (2015-12-18 05:58:58)
->>> +static int _omap4_hwmod_clk_enable(struct clk_hw *hw)
->>> +{
->>> +       struct clk_hw_omap *clk = to_clk_hw_omap(hw);
->>> +       u32 val;
->>> +       int timeout = 0;
->>> +       int ret;
->>> +
->>> +       if (!clk->enable_bit)
->>> +               return 0;
->>> +
->>> +       if (clk->clkdm) {
->>> +               ret = ti_clk_ll_ops->clkdm_clk_enable(clk->clkdm,
->>> hw->clk);
->>> +               if (ret) {
->>> +                       WARN(1,
->>> +                            "%s: could not enable %s's clockdomain %s:
->>> %d\n",
->>> +                            __func__, clk_hw_get_name(hw),
->>> +                            clk->clkdm_name, ret);
->>> +                       return ret;
->>> +               }
->>> +       }
->>> +
->>> +       val = ti_clk_ll_ops->clk_readl(clk->enable_reg);
->>> +
->>> +       val &= ~OMAP4_MODULEMODE_MASK;
->>> +       val |= clk->enable_bit;
->>> +
->>> +       ti_clk_ll_ops->clk_writel(val, clk->enable_reg);
->>> +
->>> +       /* Wait until module is enabled */
->>> +       while (!_omap4_is_ready(val)) {
->>> +               udelay(1);
+? 2016/1/4 18:11, Will Deacon ??:
+> On Wed, Dec 30, 2015 at 10:42:50AM +0100, Arnd Bergmann wrote:
+>> On Wednesday 30 December 2015 17:28:20 Rongrong Zou wrote:
+>>>>>
+>>>>
+>>>> config ARM64_INDIRECT_PIO
+>>>>        bool
+>>>>        help
+>>>>          Any driver that provides indirect ISA I/O port access should select
+>>>>          this symbol
+>>>
+>>>
+>>>>
+>>>> config HISILICON_HI123456_LPC
+>>>>        bool "Workaround for nonstandard ISA I/O space on Hisilicon Hi123456 SoC"
+>>>>        depends on ARCH_HISI || COMPILE_TEST
+>>>>        select ARM64_INDIRECT_PIO
+>>>>        help
+>>>>          ...
+>>> Can it be a submenu of "Platform selection--->Hisilicon SoC Family"?
 >>
->> This should really be a .prepare callback if you plan to keep the delays
->> in there.
+>> The first should be in the main Kconfig file for arm64, the second one depends
+>> on where we put the respective code. I'd say both the Kconfig entry and the file
+>> can go into drivers/bus, but arch/arm64/kernel/ is also fine with me.
 >
-> If this is changed to a .prepare, then all OMAP power management is
-> effectively ruined as all clocks are going to be enabled all the time. hwmod
-> core doesn't support .prepare/.enable at the moment that well, and changing
-> that is going to be a big burden (educated guess, haven't checked this
-> yet)... The call chain that comes here is:
+> Unsurprisingly, I'd *much* prefer drivers/bus/ !
+
+I'll move it to drivers/bus on next version of patch, thanks!
+
 >
-> device driver -> pm_runtime -> hwmod_core -> hwmod_clk_enable / disable.
+> Will
 >
-> The delay within this function should usually be pretty short, just to wait
-> that the module comes up from idle.
-
-Does it take multiple ?s? Perhaps even one ?s is much longer than needed?
-
-> I recall the discussions regarding the udelays within clk_enable/disable
-> calls, but what is the preferred approach then? Typically clk_enable/disable
-> just becomes a NOP if it is not allowed to wait for hardware to complete
-> transitioning before exiting the function.
-
-FWIW, there are small loops with just a cpu_relax() in various clock drivers
-under drivers/clk/shmobile/.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> .
+>
