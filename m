@@ -1,41 +1,58 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  5 Jan 2016 09:27:37 +1100
-Subject: [PATCH v2 02/13] ARM: shmobile: r8a7793: add m2 clock to device tree
+Date: Tue,  5 Jan 2016 09:27:36 +1100
+Subject: [PATCH v2 01/13] ARM: shmobile: r8a7793: add audio clock to device
+ tree
 In-Reply-To: <1451946468-20499-1-git-send-email-horms+renesas@verge.net.au>
 References: <1451946468-20499-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1451946468-20499-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1451946468-20499-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Declare m2 clock in r8a7793 device tree.
+Instantiate audio clock in r8a7793 device tree.
+audio_clk_a/b/c are required for R-Car sound.
 
-Based on similar work for the r8a7791 by Laurent Pinchart.
+Based on similar work for the r8a7791 by Kuninori Morimoto.
 
+Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7793.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/r8a7793.dtsi | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
 diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
-index bf6be4a40e31..fa8a0d772d51 100644
+index 221f5707a622..bf6be4a40e31 100644
 --- a/arch/arm/boot/dts/r8a7793.dtsi
 +++ b/arch/arm/boot/dts/r8a7793.dtsi
-@@ -817,6 +817,14 @@
- 			clock-mult = <1>;
- 			clock-output-names = "p";
+@@ -706,6 +706,29 @@
+ 			clock-output-names = "extal";
  		};
-+		m2_clk: m2_clk {
-+			compatible = "fixed-factor-clock";
-+			clocks = <&cpg_clocks R8A7793_CLK_PLL1>;
+ 
++		/*
++		 * The external audio clocks are configured as 0 Hz fixed frequency clocks by
++		 * default. Boards that provide audio clocks should override them.
++		 */
++		audio_clk_a: audio_clk_a {
++			compatible = "fixed-clock";
 +			#clock-cells = <0>;
-+			clock-div = <8>;
-+			clock-mult = <1>;
-+			clock-output-names = "m2";
++			clock-frequency = <0>;
++			clock-output-names = "audio_clk_a";
 +		};
- 		rclk_clk: rclk_clk {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7793_CLK_PLL1>;
++		audio_clk_b: audio_clk_b {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <0>;
++			clock-output-names = "audio_clk_b";
++		};
++		audio_clk_c: audio_clk_c {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <0>;
++			clock-output-names = "audio_clk_c";
++		};
++
+ 		/* Special CPG clocks */
+ 		cpg_clocks: cpg_clocks at e6150000 {
+ 			compatible = "renesas,r8a7793-cpg-clocks",
 -- 
 2.1.4
