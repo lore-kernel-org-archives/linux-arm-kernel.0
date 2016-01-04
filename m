@@ -1,44 +1,40 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon,  4 Jan 2016 02:18:28 +0100
-Subject: [PATCH] ARM: nomadik: set latencies to 8 cycles
-Message-ID: <1451870308-19245-1-git-send-email-linus.walleij@linaro.org>
+Date: Mon,  4 Jan 2016 02:21:55 +0100
+Subject: [PATCH 1/2] mmc: mmci: fix an ages old detection error
+Message-ID: <1451870515-21049-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Nomadik has sporadic crashes because of these latencies, setting
-them to max makes the platform work nicely, so use this values for
-now.
-
-These latencies were set to 2 since the Nomadik platform was merged,
-but I suspect they never took effect until the right size and
-associativity for the cache was specified in the device tree and
-that is why the crash comes now.
+commit 4956e10903fd3459306dd9438c1e714ba3068a2a
+"ARM: 6244/1: mmci: add variant data and default MCICLOCK support"
+added variant data for ARM, U300 and Ux500 variants. The
+Nomadik NHK8815/8820 variant was erroneously labeled as a
+U300 variant, and when the proper Nomadik variant was
+later introduced in commit
+34fd421349ffc6a4280b71276bf7c6d48f92156f
+"ARM: 7378/1: mmci: add support for the Nomadik MMCI variant"
+this was not fixes. Let's say this fixes the latter commit
+as there was no proper Nomadik support until then.
 
 Cc: stable at vger.kernel.org
+Fixes: 34fd421349ff "ARM: 7378/1: mmci: add support for the Nomadik MMCI variant"
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-ARM SoC folks: please apply this directly for fixes at your
-convenience.
----
- arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/mmc/host/mmci.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-index 314f59c12162..d0c743853318 100644
---- a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-+++ b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-@@ -25,9 +25,9 @@
- 		cache-sets = <512>;
- 		cache-line-size = <32>;
- 		/* At full speed latency must be >=2 */
--		arm,tag-latency = <2>;
--		arm,data-latency = <2 2>;
--		arm,dirty-latency = <2>;
-+		arm,tag-latency = <8>;
-+		arm,data-latency = <8 8>;
-+		arm,dirty-latency = <8>;
- 	};
- 
- 	mtu0: mtu at 101e2000 {
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index fb266745f824..acece3299756 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -1886,7 +1886,7 @@ static struct amba_id mmci_ids[] = {
+ 	{
+ 		.id     = 0x00280180,
+ 		.mask   = 0x00ffffff,
+-		.data	= &variant_u300,
++		.data	= &variant_nomadik,
+ 	},
+ 	{
+ 		.id     = 0x00480180,
 -- 
 2.4.3
