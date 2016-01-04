@@ -1,45 +1,36 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  5 Jan 2016 09:27:45 +1100
-Subject: [PATCH v2 10/13] ARM: shmobile: gose: enable sound DMA support via
- BUSIF in device tree
-In-Reply-To: <1451946468-20499-1-git-send-email-horms+renesas@verge.net.au>
-References: <1451946468-20499-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1451946468-20499-11-git-send-email-horms+renesas@verge.net.au>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Mon, 4 Jan 2016 14:31:42 -0800
+Subject: [PATCH v9 08/13] arch/arm64: adopt prepare_exit_to_usermode()
+ model from x86
+In-Reply-To: <20160104203316.GE17127@leverpostej>
+References: <1451936091-29247-1-git-send-email-cmetcalf@ezchip.com>
+ <1451936091-29247-9-git-send-email-cmetcalf@ezchip.com>
+ <20160104203316.GE17127@leverpostej>
+Message-ID: <CALCETrUyB5dHn0OQwwYwB28pEDqMeGmnFv1mQLfHXhW-4YWCjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable DMA transfer to/from SSIU in gose/r8a7791 device tree.
+On Mon, Jan 4, 2016 at 12:33 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi,
+>
+> On Mon, Jan 04, 2016 at 02:34:46PM -0500, Chris Metcalf wrote:
+>> This change is a prerequisite change for TASK_ISOLATION but also
+>> stands on its own for readability and maintainability.
+>
+> I have also been looking into converting the userspace return path from
+> assembly to C [1], for the latter two reasons. Based on that, I have a
+> couple of comments.
+>
 
-     DMA
-[MEM] -> [SSIU] -> [SSI]
+>
+> [1] https://git.kernel.org/cgit/linux/kernel/git/mark/linux.git/log/?h=arm64/entry-deasm
 
-     DMA
-[MEM] <- [SSIU] <- [SSI]
+Neat!
 
-Based on similar work for the r8a7791/koelsch by Kuninori Morimoto.
+In case you want to compare notes, I have a branch with the entire
+syscall path on x86 in C except for cleanly separated asm fast path
+optimizations:
 
-Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7793-gose.dts | 5 -----
- 1 file changed, 5 deletions(-)
+https://git.kernel.org/cgit/linux/kernel/git/luto/linux.git/log/?h=x86/entry_compat
 
-diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
-index 0ab0abb9f889..4a7048d676c8 100644
---- a/arch/arm/boot/dts/r8a7793-gose.dts
-+++ b/arch/arm/boot/dts/r8a7793-gose.dts
-@@ -321,11 +321,6 @@
- 	};
- };
- 
--&ssi0 {
--	no-busif;
--};
--
- &ssi1 {
--	no-busif;
- 	shared-pin;
- };
--- 
-2.1.4
+Even in Linus' tree, the x86 32-bit syscalls are in C.
