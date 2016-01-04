@@ -1,56 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 4 Jan 2016 22:42:34 +0000
-Subject: [PATCH 2/2] ARM: dts: imx6qdl-microsom-ar8035: Adjust Ethernet
- PHY reset duration
-In-Reply-To: <1451934700-28060-2-git-send-email-festevam@gmail.com>
-References: <1451934700-28060-1-git-send-email-festevam@gmail.com>
- <1451934700-28060-2-git-send-email-festevam@gmail.com>
-Message-ID: <20160104224234.GR19062@n2100.arm.linux.org.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 4 Jan 2016 22:42:33 +0000
+Subject: Widespread boot failures on ARM due to "mm/page_alloc.c: calculate
+ zone_start_pfn at zone_spanned_pages_in_node()"
+Message-ID: <20160104224233.GU16023@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 04, 2016 at 05:11:40PM -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
-> 
-> As per the AR8035 datasheet:
-> 
-> "For a reliable power on reset, suggest to keep asserting the reset
-> low long enough (10ms) to ensure the clock is stable and clock-to-reset
-> 1ms requirement is satisfied."
+Since 20151231 -next has been failing to boot on a wide range of ARM
+platforms in the kernelci.org boot tests[1].  Doing bisections with
+Arndale and BeagleBone Black identifies 904769ac82ebf (mm/page_alloc.c:
+calculate zone_start_pfn at zone_spanned_pages_in_node()) from the akpm
+tree as the first broken commit[2,3].  An example bootlog from the
+failure is:
 
-This is questionable.  The quote you indicate above is "For a reliable
-POWER ON RESET".  It depends what use this DT is being put to.  Given
-that the only boot loader which is trustworthy on SoldRun hardware is
-their uboot versions, and these don't use DT, I would say that the
-only time that this is used is when the kernel is booting.
+   http://storage.kernelci.org/next/next-20151231/arm-multi_v7_defconfig/lab-cambridge/boot-exynos5250-arndale.html
 
-That reset is not a power on reset, the phy has been powered for a
-comparitively long time by the time the kernel gets to use it.  So, I
-think on balance I'm going to NAK this change until there is a reason
-for it to be made - iow, when there _is_ a boot loader where the
-requirement for this parameter to be used at power on is required.
+which shows no output on the console once we start the kernel, a brief
+sampling of failing boards suggests this is the normal failure mode.
+x86 and arm64 targets seem fine (juno shows up as failing but the boot
+log seems fine so it's probably a false positive, Mustang was failing
+already) and there are a small number of ARM platforms that boot.  I've
+not yet had any time to investigate further than that (including trying
+a revert of that commit), sorry.
 
-However, I think that should be discussed, in particular whether
-there should be a separate property for the power on reset duration.
-
-The final argument against it is that most "power on reset" requirements
-are to keep the reset signal asserted while the _power_ _and_ _clocks_
-both stabilise.  By the time we get to running any code, the power must
-have stabilised (otherwise the SoC won't be operating.)  Moreover, as
-the SoC is responsible for providing the AR8035 with its clock, the
-SoC must be sufficiently out of reset for its own clocks to have
-stabilised internally.  The clock manager software (whatever it is)
-is responsible for ensuring that when a clock output is enabled, the
-user knows when the clock has stabilised.  So, a boot loader enabling
-the clock output which drives the AR8035 should be aware of the point
-at which the clock has stabilised, and at that time should start timing
-out the reset delay specified in the _existing_ DT file, which is
-sufficiently long to satisfy the clock-to-reset delay of 1ms.
-
-So, on that second point, it's also a NAK.  That's two good reasons
-why the existing DT specification here is actually correct.
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+[1] http://kernelci.org/boot/all/job/next/kernel/next-20151231/
+[2] https://ci.linaro.org/view/people/job/tbaker-boot-bisect-bot/135/console
+[3] https://ci.linaro.org/view/people/job/tbaker-boot-bisect-bot/136/console
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160104/4feed3d4/attachment-0001.sig>
