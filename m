@@ -1,40 +1,42 @@
-From: joe@perches.com (Joe Perches)
-Date: Mon, 04 Jan 2016 08:15:14 -0800
-Subject: [PATCH 1/3] checkpatch.pl: add missing memory barriers
-In-Reply-To: <20160104161123.GJ19062@n2100.arm.linux.org.uk>
-References: <1451907395-15978-1-git-send-email-mst@redhat.com>
- <1451907395-15978-2-git-send-email-mst@redhat.com>
- <1451923660.4334.83.camel@perches.com>
- <20160104161123.GJ19062@n2100.arm.linux.org.uk>
-Message-ID: <1451924114.4334.85.camel@perches.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon,  4 Jan 2016 16:19:42 +0000
+Subject: [PATCH RESEND] iommu/dma: Use correct offset in map_sg
+In-Reply-To: <4812a34857b081e45c36d7e887840f3675da74dc.1450457730.git.robin.murphy@arm.com>
+Message-ID: <8317d001da4f48831fa23d8d7729a4659ac72b49.1451924092.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-01-04 at 16:11 +0000, Russell King - ARM Linux wrote:
-> On Mon, Jan 04, 2016 at 08:07:40AM -0800, Joe Perches wrote:
-> > On Mon, 2016-01-04 at 13:36 +0200, Michael S. Tsirkin wrote:
-> > > +		my $all_barriers = join('|', (@barriers, @smp_barriers));
-> > > +
-> > > +		if ($line =~ /\b($all_barriers)\(/) {
-> > 
-> > It would be better to use /\b$all_barriers\s*\(/
-> > as there's no reason for the capture and there
-> > could be a space between the function and the
-> > open parenthesis.
-> 
-> I think you mean
-> 
-> 	/\b(?:$all_barriers)\s*\(/
-> 
-> as 'all_barriers' will be:
-> 
-> 	mb|wmb|rmb|smp_mb|smp_wmb|smp_rmb
-> 
-> and putting that into your suggestion results in:
-> 
-> 	/\bmb|wmb|rmb|smp_mb|smp_wmb|smp_rmb\s*\(/
-> 
-> which is clearly wrong - the \b only applies to 'mb' and the \s*\( only
-> applies to smp_rmb.
+When mapping a non-page-aligned scatterlist entry, we copy the original
+offset to the output DMA address before aligning it to hand off to
+iommu_map_sg(), then later adding the IOVA page address portion to get
+the final mapped address. However, when the IOVA page size is smaller
+than the CPU page size, it is the offset within the IOVA page we want,
+not that within the CPU page, which can easily be larger than an IOVA
+page and thus result in an incorrect final address.
 
-right, thanks.
+Fix the bug by taking only the IOVA-aligned part of the offset as the
+basis of the DMA address, not the whole thing.
+
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+
+Rebased onto iommu/fixes.
+
+ drivers/iommu/dma-iommu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+index 2e7417f..72d6182 100644
+--- a/drivers/iommu/dma-iommu.c
++++ b/drivers/iommu/dma-iommu.c
+@@ -458,7 +458,7 @@ int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
+ 		size_t s_offset = iova_offset(iovad, s->offset);
+ 		size_t s_length = s->length;
+ 
+-		sg_dma_address(s) = s->offset;
++		sg_dma_address(s) = s_offset;
+ 		sg_dma_len(s) = s_length;
+ 		s->offset -= s_offset;
+ 		s_length = iova_align(iovad, s_length + s_offset);
+-- 
+1.9.1
