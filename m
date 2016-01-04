@@ -1,116 +1,254 @@
 From: jchandra@broadcom.com (Jayachandran C)
-Date: Mon, 4 Jan 2016 10:43:22 +0530
-Subject: [PATCH v5 4/5] arm64: pci: Add ACPI support
+Date: Mon, 4 Jan 2016 10:43:23 +0530
+Subject: [PATCH v5 5/5] PCI: ACPI: Add a generic ACPI based host controller
 In-Reply-To: <1451884403-21437-1-git-send-email-jchandra@broadcom.com>
 References: <1451884403-21437-1-git-send-email-jchandra@broadcom.com>
-Message-ID: <1451884403-21437-5-git-send-email-jchandra@broadcom.com>
+Message-ID: <1451884403-21437-6-git-send-email-jchandra@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add functions needed for ACPI support.
+Add a simple ACPI based PCI host controller. This is done by
+providing a simple implementation for pci_acpi_scan_root().
 
-pci_acpi_scan_root(), raw_pci_read and raw_pci_write are marked as
-weak so that it can be implemented by the generic ACPI PCI driver.
+The pci_mmcfg_list handling is done by the ACPI code, we
+keep a reference to the pci_mmcfg_region which is already
+mapped.
 
-pcibios_enable_device and pcibios_disable_device handle acpi irq enable
-and disable. And, pcibios_add_bus and pcibios_remove_bus have been
-added call the corresponding ACPI functions.
+Provide implementations of raw_pci_read and raw_pci_write based
+on the pci_mmcfg_list
+
+This is enabled only for ARM64 now.
 
 Signed-off-by: Jayachandran C <jchandra@broadcom.com>
 ---
- arch/arm64/Kconfig      |  3 +++
- arch/arm64/kernel/pci.c | 34 +++++++++++++++++++++++++++++-----
- 2 files changed, 32 insertions(+), 5 deletions(-)
+ drivers/acpi/Kconfig         |   8 ++
+ drivers/acpi/Makefile        |   1 +
+ drivers/acpi/pci_host_acpi.c | 186 +++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 195 insertions(+)
+ create mode 100644 drivers/acpi/pci_host_acpi.c
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 871f217..8c93af2 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -203,6 +203,9 @@ config PCI_DOMAINS_GENERIC
- config PCI_SYSCALL
- 	def_bool PCI
+diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+index 25dbb76..dceb871 100644
+--- a/drivers/acpi/Kconfig
++++ b/drivers/acpi/Kconfig
+@@ -283,6 +283,14 @@ config ACPI_NUMA
+ 	depends on (X86 || IA64)
+ 	default y if IA64_GENERIC || IA64_SGI_SN2
  
-+config PCI_MMCONFIG
-+	def_bool PCI && ACPI
++config ACPI_PCI_HOST_GENERIC
++	bool "Generic ACPI PCI host controller"
++	depends on ARM64 && ACPI
++	help
++	  Say Y here if you want to support a simple generic ACPI PCI host
++	  controller.
 +
- source "drivers/pci/Kconfig"
- source "drivers/pci/pcie/Kconfig"
- source "drivers/pci/hotplug/Kconfig"
-diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-index b3d098b..db0a6a9 100644
---- a/arch/arm64/kernel/pci.c
-+++ b/arch/arm64/kernel/pci.c
-@@ -17,6 +17,7 @@
- #include <linux/mm.h>
- #include <linux/of_pci.h>
- #include <linux/of_platform.h>
++
+ config ACPI_CUSTOM_DSDT_FILE
+ 	string "Custom DSDT Table file to include"
+ 	default ""
+diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+index 0780ced..52eb38f 100644
+--- a/drivers/acpi/Makefile
++++ b/drivers/acpi/Makefile
+@@ -41,6 +41,7 @@ acpi-y				+= ec.o
+ acpi-$(CONFIG_ACPI_DOCK)	+= dock.o
+ acpi-y				+= pci_root.o pci_link.o pci_irq.o
+ acpi-$(CONFIG_PCI_MMCONFIG)	+= pci_mcfg.o
++acpi-$(CONFIG_ACPI_PCI_HOST_GENERIC) += pci_host_acpi.o
+ acpi-y				+= acpi_lpss.o acpi_apd.o
+ acpi-y				+= acpi_platform.o
+ acpi-y				+= acpi_pnp.o
+diff --git a/drivers/acpi/pci_host_acpi.c b/drivers/acpi/pci_host_acpi.c
+new file mode 100644
+index 0000000..9dbdd81
+--- /dev/null
++++ b/drivers/acpi/pci_host_acpi.c
+@@ -0,0 +1,186 @@
++/*
++ * Generic PCI host controller driver for ACPI based systems
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Copyright (c) 2015 Broadcom Corporation
++ *
++ * Based on drivers/pci/host/pci-host-generic.c
++ * Copyright (C) 2014 ARM Limited
++ */
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/pci.h>
++#include <linux/acpi.h>
 +#include <linux/pci-acpi.h>
- #include <linux/slab.h>
- 
- #include <asm/pci-bridge.h>
-@@ -48,9 +49,22 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
- 	if (pci_has_flag(PCI_PROBE_ONLY))
- 		return 0;
- 
-+#ifdef CONFIG_ACPI
-+	if (acpi_find_root_bridge_handle(dev))
-+		acpi_pci_irq_enable(dev);
-+#endif
++#include <linux/sfi_acpi.h>
++#include <linux/slab.h>
 +
- 	return pci_enable_resources(dev, mask);
- }
- 
-+void pcibios_disable_device(struct pci_dev *dev)
++#define PREFIX			"pci-host-acpi:"
++
++/* sysdata pointer is ->root_info */
++struct gen_acpi_root_info {
++	struct acpi_pci_root_info	common;
++	struct pci_mmcfg_region		*mcfg;
++	bool				mcfg_added;
++};
++
++/* find mapping of a MCFG area */
++static void __iomem *gen_acpi_map_cfg_bus(struct pci_bus *bus,
++			unsigned int devfn, int where)
 +{
-+#ifdef CONFIG_ACPI
-+	if (acpi_find_root_bridge_handle(dev))
-+		acpi_pci_irq_disable(dev);
-+#endif
++	struct gen_acpi_root_info *pci = bus->sysdata;
++	struct pci_mmcfg_region *mcfg = pci->mcfg;
++
++	if (bus->number < mcfg->start_bus || bus->number > mcfg->end_bus)
++		return NULL;
++
++	return mcfg->virt +
++		PCI_MMCFG_OFFSET(bus->number - mcfg->start_bus, devfn) +
++		where;
 +}
 +
- /*
-  * Try to assign the IRQ number from DT when adding a new device
-  */
-@@ -62,15 +76,15 @@ int pcibios_add_device(struct pci_dev *dev)
- }
- 
- /*
-- * raw_pci_read/write - Platform-specific PCI config space access.
-+ * ACPI uses these - leave it to the generic ACPI PCI driver
-  */
--int raw_pci_read(unsigned int domain, unsigned int bus,
-+int __weak raw_pci_read(unsigned int domain, unsigned int bus,
- 		  unsigned int devfn, int reg, int len, u32 *val)
- {
- 	return -ENXIO;
- }
- 
--int raw_pci_write(unsigned int domain, unsigned int bus,
-+int __weak raw_pci_write(unsigned int domain, unsigned int bus,
- 		unsigned int devfn, int reg, int len, u32 val)
- {
- 	return -ENXIO;
-@@ -78,9 +92,19 @@ int raw_pci_write(unsigned int domain, unsigned int bus,
- 
- #ifdef CONFIG_ACPI
- /* Root bridge scanning */
--struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
-+struct pci_bus * __weak pci_acpi_scan_root(struct acpi_pci_root *root)
- {
--	/* TODO: Should be revisited when implementing PCI on ACPI */
- 	return NULL;
- }
++static struct pci_ops gen_acpi_pci_ops = {
++	.map_bus	= gen_acpi_map_cfg_bus,
++	.read		= pci_generic_config_read,
++	.write		= pci_generic_config_write,
++};
 +
-+void pcibios_add_bus(struct pci_bus *bus)
++/* Insert the ECFG area for a root bus */
++static int pci_acpi_root_init_info(struct acpi_pci_root_info *ci)
 +{
-+	acpi_pci_add_bus(bus);
++	struct gen_acpi_root_info *info;
++	struct acpi_pci_root *root = ci->root;
++	struct device *dev = &ci->bridge->dev;
++	int err;
++
++	info = container_of(ci, struct gen_acpi_root_info, common);
++	err = pci_mmconfig_insert(dev, root->segment, root->secondary.start,
++			root->secondary.end, root->mcfg_addr);
++	if (err && err != -EEXIST)
++		return err;
++
++	info->mcfg = pci_mmconfig_lookup(root->segment, root->secondary.start);
++	WARN_ON(info->mcfg == NULL);
++	info->mcfg_added = (err == -EEXIST);
++	return 0;
 +}
 +
-+void pcibios_remove_bus(struct pci_bus *bus)
++static void pci_acpi_root_release_info(struct acpi_pci_root_info *ci)
 +{
-+	acpi_pci_remove_bus(bus);
++	struct gen_acpi_root_info *info;
++	struct acpi_pci_root *root = ci->root;
++
++	info = container_of(ci, struct gen_acpi_root_info, common);
++	if (info->mcfg_added)
++		pci_mmconfig_delete(root->segment, root->secondary.start,
++					root->secondary.end);
++	info->mcfg = NULL;
 +}
 +
- #endif
++static struct acpi_pci_root_ops pci_acpi_root_ops = {
++	.pci_ops = &gen_acpi_pci_ops,
++	.init_info = pci_acpi_root_init_info,
++	.release_info = pci_acpi_root_release_info,
++};
++
++struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
++{
++	struct acpi_device *device = root->device;
++	struct gen_acpi_root_info *ri;
++	struct pci_bus *bus, *child;
++
++	/* allocate acpi_info/sysdata */
++	ri = devm_kzalloc(&device->dev, sizeof(*ri), GFP_KERNEL);
++	if (!ri) {
++		dev_err(&device->dev,
++			"pci_bus %04x:%02x: ignored (out of memory)\n",
++			root->segment, (int)root->secondary.start);
++		return NULL;
++	}
++
++	bus =  acpi_pci_root_create(root, &pci_acpi_root_ops,
++					&ri->common, ri);
++	if (!bus) {
++		dev_err(&device->dev, "Scanning rootbus failed");
++		return NULL;
++	}
++
++	pci_bus_size_bridges(bus);
++	pci_bus_assign_resources(bus);
++	list_for_each_entry(child, &bus->children, node)
++		pcie_bus_configure_settings(child);
++
++	return bus;
++}
++
++int raw_pci_read(unsigned int seg, unsigned int bus,
++		  unsigned int devfn, int reg, int len, u32 *val)
++{
++	struct pci_mmcfg_region *mcfg;
++	void __iomem *addr;
++	int err = -EINVAL;
++
++	rcu_read_lock();
++	mcfg = pci_mmconfig_lookup(seg, bus);
++	if (!mcfg || !mcfg->virt)
++		goto err;
++
++	addr = mcfg->virt + PCI_MMCFG_OFFSET(bus, devfn);
++	switch (len) {
++	case 1:
++		*val = readb(addr + reg);
++		break;
++	case 2:
++		*val = readw(addr + reg);
++		break;
++	case 4:
++		*val = readl(addr + reg);
++		break;
++	}
++	err = 0;
++err:
++	rcu_read_unlock();
++	return err;
++}
++
++int raw_pci_write(unsigned int seg, unsigned int bus,
++		unsigned int devfn, int reg, int len, u32 val)
++{
++	struct pci_mmcfg_region *mcfg;
++	void __iomem *addr;
++	int err = -EINVAL;
++
++	rcu_read_lock();
++	mcfg = pci_mmconfig_lookup(seg, bus);
++	if (!mcfg || !mcfg->virt)
++		goto err;
++
++	addr = mcfg->virt + PCI_MMCFG_OFFSET(bus, devfn);
++	switch (len) {
++	case 1:
++		writeb(val, addr + reg);
++		break;
++	case 2:
++		writew(val, addr + reg);
++		break;
++	case 4:
++		writel(val, addr + reg);
++		break;
++	}
++	err = 0;
++err:
++	rcu_read_unlock();
++	return err;
++}
 -- 
 1.9.1
