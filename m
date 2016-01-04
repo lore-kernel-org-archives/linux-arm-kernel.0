@@ -1,41 +1,66 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 4 Jan 2016 15:14:09 +0000
-Subject: [Xen-devel] [PATCH v3 20/62] arm/acpi: Add ACPI support for SMP
- initialization
-In-Reply-To: <20160104150044.GC7050@leverpostej>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-21-git-send-email-shannon.zhao@linaro.org>
- <565C63F1.5070303@citrix.com> <56834B4C.40409@huawei.com>
- <alpine.DEB.2.02.1601041451210.19710@kaball.uk.xensource.com>
- <20160104150044.GC7050@leverpostej>
-Message-ID: <20160104151409.GE7050@leverpostej>
+From: dcb314@hotmail.com (David Binderman)
+Date: Mon, 4 Jan 2016 15:14:29 +0000
+Subject: linux-4.4-rc8/arch/arm64/kernel/module.c:78: 32/64 bit problem ?
+In-Reply-To: <20160104141657.GC1616@arm.com>
+References: <DUB128-W158A3195DB26F149DD52E59CF20@phx.gbl>,
+ <20160104141657.GC1616@arm.com>
+Message-ID: <DUB128-W50B7B3ECEE2D2A6598224B9CF20@phx.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 04, 2016 at 03:00:45PM +0000, Mark Rutland wrote:
-> On Mon, Jan 04, 2016 at 02:51:51PM +0000, Stefano Stabellini wrote:
-> > On Wed, 30 Dec 2015, Shannon Zhao wrote:
-> > > I check this again. There are not limitations of supporting PSCI version
-> > > in ACPI SPEC. It should support PSCI 0.1 as well. But look at the code
-> > > of linux kernel, it says it only supports PSCI 0.2+.
-> > > 
-> > > #define ACPI_FADT_PSCI_COMPLIANT    (1)	/* 00: [V5+] PSCI 0.2+ is
-> > > implemented */
-> > > 
-> > > So does it need to be consistent with Linux or support PSCI 0.1 in Xen
-> > > as well?
-> > 
-> > I don't think it needs to be consistent with Linux. I would support PSCI
-> > 0.1 too.
-> 
-> That's not possible, so I don't follow. Prior to 0.2 the function IDs
-> are not defined.
-> 
-> The FADT has a single bit which describes PSCI 0.2+ being implemented,
-> and does not describe function IDs.
+Hello there Will,
 
-I've now spotted that this wording is indeed missing from the ACPI
-documentation. I believe this is a documentation bug, as the intent was
-always for the bit to imply PSCI 0.2+.
+----------------------------------------
+> Curious, but how are you seeing this warning? GCC is silent for me...
 
-Mark.
+Static analyser called cppcheck, available from sourceforge.
+
+GCC will be silent for all sorts of dodgy code. clang produces more warnings, 
+but I am not sure how much of the linux kernel it can compile. 
+Hence use of cppcheck.
+
+
+Regards
+
+David Binderman
+
+>
+>> Source code is
+>>
+>>     u64 imm_mask = (1 << len) - 1;
+>>     s64 sval = do_reloc(op, place, val);
+>>
+>>     switch (len) {
+>>     case 16:
+>>         *(s16 *)place = sval;
+>>         break;
+>>     case 32:
+>>         *(s32 *)place = sval;
+>>         break;
+>>     case 64:
+>>
+>> So it seems that len can be 64. Suggest new code
+>>
+>>     u64 imm_mask = (1UL << len) - 1;
+>
+> That still ends up shifting by the width of the type when len == 64,
+> which is potentially still broken. We're better off using GENMASK.
+>
+> Will
+>
+> --->8
+>
+> diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
+> index f4bc779e62e8..266e7490e85c 100644
+> --- a/arch/arm64/kernel/module.c
+> +++ b/arch/arm64/kernel/module.c
+> @@ -75,7 +75,7 @@ static u64 do_reloc(enum aarch64_reloc_op reloc_op, void *place, u64 val)
+>
+> static int reloc_data(enum aarch64_reloc_op op, void *place, u64 val, int len)
+> {
+> - u64 imm_mask = (1 << len) - 1;
+> + u64 imm_mask = GENMASK(len - 1, 0);
+> s64 sval = do_reloc(op, place, val);
+>
+> switch (len) {
+ 		 	   		  
