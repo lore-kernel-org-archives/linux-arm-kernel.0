@@ -1,69 +1,86 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Tue, 5 Jan 2016 09:04:00 +1100
-Subject: [linux-sunxi] reason for Allwinner SoC specific pinctrl drivers?
-In-Reply-To: <568A514D.7070102@arm.com>
-References: <568A514D.7070102@arm.com>
-Message-ID: <CAGRGNgUVNGoOUNqyySjYzkL4KfEWK8orYH-AMxoCX-9N0R80-A@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 04 Jan 2016 23:07:41 +0100
+Subject: next-20160104 build: 3 failures 15 warnings (next-20160104)
+In-Reply-To: <20160104165025.GN16023@sirena.org.uk>
+References: <E1aG3zo-0000gt-2t@optimist> <20160104165025.GN16023@sirena.org.uk>
+Message-ID: <3705737.6TGxRxdFzW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
+On Monday 04 January 2016 16:50:25 Mark Brown wrote:
+> On Mon, Jan 04, 2016 at 12:12:20PM +0000, Build bot for Mark Brown wrote:
+> 
+> Today's linux-next fails to build an arm allmodconfig (and probably also
+> at least arm64 though other errors prevent that getting to linking
+> currently) due to:
+> 
+> | drivers/built-in.o: In function `dtsec_restart_autoneg':
+> | :(.text+0x30f86c): undefined reference to `mdiobus_read'
+> | :(.text+0x30f89c): undefined reference to `mdiobus_write'
+> | drivers/built-in.o: In function `dtsec_init':
+> | :(.text+0x31008c): undefined reference to `mdiobus_write'
+> | :(.text+0x3100b4): undefined reference to `mdiobus_write'
+> | :(.text+0x3100dc): undefined reference to `mdiobus_write'
+> | :(.text+0x310128): undefined reference to `mdiobus_write'
+> | drivers/built-in.o::(.text+0x310150): more undefined references to `mdiobus_write' follow
+> | drivers/built-in.o: In function `dtsec_config':
+> | :(.text+0x310804): undefined reference to `of_phy_find_device'
+> 
+> and various other linker errors caused by the fact that the new fman
+> driver uses PHYLIB but does not depend on or select it.
 
-On Mon, Jan 4, 2016 at 10:02 PM, Andre Przywara <andre.przywara@arm.com> wrote:
-> Hi,
->
-> while looking at the Allwinner A64 SoC support, I was wondering why we
-> would actually need a pinctrl driver (file) for each and every Allwinner
-> SoC that we support.
-> Looking at both the A20 and the A64 doc I don't see any differences in
-> the port controller implementation apart from the actual
-> muxval <-> subsystem assignment, which is just data, right?
-> Comparing the code files in drivers/pinctrl/sunxi seems to support this,
-> as those drivers only consist of the table and some boilerplate code.
->
-> Now I was wondering whether we could get away with one generic Allwinner
-> pinctrl driver and put the SoC specific pin assignments in DT instead.
-> It looks like adding an "allwinner,muxval" property in addition to the
-> existing "allwinner,function" in the SoC's .dtsi would give us all the
-> information we need. This could look like:
->
->         uart0_pins_a: uart0 at 0 {
->                 allwinner,pins =   "PB22", "PB23";
-> +               allwinner,muxval = <0x02    0x02>;
->                 allwinner,function = "uart0";
->                 allwinner,drive = <SUN4I_PINCTRL_10_MA>;
->                 allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
->         };
->
-> Would it make sense that I sit down and prototype such a driver?
->
-> We should keep compatibility with older DTs by keeping the existing
-> drivers in (or maybe emulating the current behaviour by providing just
-> those tables as a fallback) , but newer SoCs (like the A64?) would not
-> need a SoC specific driver, but just go with that generic driver and
-> appropriate DT properties.
->
-> I appreciate any comments on this, especially if I missed something
-> which would render this approach impossible or tedious.
+This is the patch I submitted for the problem. I don't think that simply
+adding the 'select' would be a good idea because that would force PHYLIB
+builtin for allmodconfig.
 
-I think that, as Michal said, merging the drivers might be possible,
-however there's another three functions the drivers serve:
+	Arnd
 
-1. they're good documentation of how it's all configured. I'm not sure
-your device tree based approach will be as user friendly in this
-regard.
+commit 609a5b98a4b703a4fba8becb7ffb2aa1859c4164
+Author: Arnd Bergmann <arnd@arndb.de>
+Date:   Fri Jan 1 13:24:03 2016 +0100
 
-2. they list stuff we don't have a driver / hardware for yet
+    [SUBMITTED] fsl/fman: allow modular build
+    
+    ARM allmodconfig fails because of the addition of the FMAN driver:
+    
+    drivers/built-in.o: In function `dtsec_restart_autoneg':
+    binder.c:(.text+0x173328): undefined reference to `mdiobus_read'
+    binder.c:(.text+0x173348): undefined reference to `mdiobus_write'
+    drivers/built-in.o: In function `dtsec_config':
+    binder.c:(.text+0x173d24): undefined reference to `of_phy_find_device'
+    drivers/built-in.o: In function `init_phy':
+    binder.c:(.text+0x1763b0): undefined reference to `of_phy_connect'
+    drivers/built-in.o: In function `stop':
+    binder.c:(.text+0x176014): undefined reference to `phy_stop'
+    drivers/built-in.o: In function `start':
+    binder.c:(.text+0x176078): undefined reference to `phy_start'
+    
+    The reason is that the driver uses PHYLIB, but that is a loadable
+    module here, and fman itself is built-in.
+    
+    This patch makes it possible to configure fman as a module as well
+    so we don't change the status of PHYLIB in an allmodconfig kernel,
+    and it adds a 'select PHYLIB' statement to ensure that phylib is
+    always built-in when fman is.
+    
+    The driver uses "builtin_platform_driver(fman_driver);", which means
+    it cannot be unloaded, but it's still possible to have it as a loadable
+    module that gets loaded once and never removed.
+    
+    Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+    Fixes: 5adae51a64b8 ("fsl/fman: Add FMan MURAM support")
 
-3. the policy on device-tree is to only include stuff we know is
-working, which means we have a driver and hardware for that particular
-thing. Device tree files for boards or SoCs have been rejected because
-they list stuff that isn't used yet.
-
-Thanks,
-
--- 
-Julian Calaby
-
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
+diff --git a/drivers/net/ethernet/freescale/fman/Kconfig b/drivers/net/ethernet/freescale/fman/Kconfig
+index 66b729692b48..79b7c84b7869 100644
+--- a/drivers/net/ethernet/freescale/fman/Kconfig
++++ b/drivers/net/ethernet/freescale/fman/Kconfig
+@@ -1,7 +1,8 @@
+ config FSL_FMAN
+-	bool "FMan support"
++	tristate "FMan support"
+ 	depends on FSL_SOC || COMPILE_TEST
+ 	select GENERIC_ALLOCATOR
++	select PHYLIB
+ 	default n
+ 	help
+ 		Freescale Data-Path Acceleration Architecture Frame Manager
