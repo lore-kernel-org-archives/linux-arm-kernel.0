@@ -1,40 +1,83 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 4 Jan 2016 08:37:41 -0800
-Subject: [RFC 6/9] clk: ti: add support for omap4 module clocks
-In-Reply-To: <20160104144221.GA5783@n2100.arm.linux.org.uk>
-References: <1450447141-29936-1-git-send-email-t-kristo@ti.com>
- <1450447141-29936-7-git-send-email-t-kristo@ti.com>
- <20160101054815.21738.79820@quark.deferred.io>
- <568A20E5.6040005@ti.com>
- <CAMuHMdUZMUSYC1XHydVQHRibWtHw2=T-7nXe=5Pf4UCcb=mKTQ@mail.gmail.com>
- <568A735D.2060309@ti.com>
- <20160104144221.GA5783@n2100.arm.linux.org.uk>
-Message-ID: <20160104162853.GA12777@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 04 Jan 2016 17:41:05 +0100
+Subject: [PATCH] ASoC: cs35l32: avoid uninitialized variable access
+In-Reply-To: <20160104152058.GH19062@n2100.arm.linux.org.uk>
+References: <2884997.s8B8BuE04L@wuerfel> <9222694.IRNnfpj6Tn@wuerfel>
+ <20160104152058.GH19062@n2100.arm.linux.org.uk>
+Message-ID: <3088017.xkc6Hgo0y2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [160104 06:43]:
-> On Mon, Jan 04, 2016 at 03:27:57PM +0200, Tero Kristo wrote:
-> > On 01/04/2016 12:21 PM, Geert Uytterhoeven wrote:
-> > >FWIW, there are small loops with just a cpu_relax() in various clock drivers
-> > >under drivers/clk/shmobile/.
+On Monday 04 January 2016 15:20:58 Russell King - ARM Linux wrote:
+> On Mon, Jan 04, 2016 at 04:17:47PM +0100, Arnd Bergmann wrote:
+> > On Saturday 02 January 2016 14:17:46 Mark Brown wrote:
+> > > On Sat, Jan 02, 2016 at 12:19:52AM +0100, Arnd Bergmann wrote:
+> > > 
+> > > > -             if (i2c_client->dev.of_node) {
+> > > > +             if (IS_ENABLED(CONFIG_OF) && i2c_client->dev.of_node) {
+> > > 
+> > > This would be a lot nicer if there was an __always_null annotation we
+> > > could put on of_node for !OF configurations, that'd Just Work and this
+> > > can't be the only case where we have this idiom.
+> > > 
 > > 
-> > Just did a quick profiling round, and the clk_enable/disable delay loops
-> > take anything from 0...1500ns, most typically consuming some 400-600ns. So,
-> > based on this, dropping the udelay and adding cpu_relax instead looks like a
-> > good change. I just verified that changing the udelay to cpu_relax works
-> > fine also, I just need to change the bail-out period to be something sane.
+> > How about an inline helper like
+> > 
+> > static inline struct device_node *dev_of_node(struct device *dev)
+> > {
+> >       if (IS_ENABLED(CONFIG_OF))
+> >               return dev->of_node;    
 > 
-> Was that profiling done with lockdep/lock debugging enabled or disabled?
+> ITYM:
+> 
+>         return IS_ENABLED(CONFIG_OF) ? dev->of_node : NULL;
+> 
+> or
+> 
+>         if (IS_ENABLED(CONFIG_OF))
+>                 return dev->of_node;
+>         else
+>                 return NULL;
+> 
 
-And also the thing to check from the hw folks is what all do these clkctrl
-bits really control. If they group together the OCP clock and an extra
-functional clock for some devices the delays could be larger.
+Right, yes.
 
-In general, I think we need to get rid of pm_runtime_irq_safe usage to
-allow clocks to sleep properly. The other option is to allow toggling
-pm_runtime_irq_safe but that probably gets super messy.
+That reminds of a different problem that has been bugging me for a
+while: We frequently have a pattern like
 
-Regards,
+#ifdef CONFIG_FOO
+static int function(void)
+{
+	...
+}
+#endif
 
-Tony
+struct operations = {
+	...
+#ifdef CONFIG_FOO
+	.function = function;
+#endif
+	...
+};
+
+Except that people constantly get it wrong, e.g. by using the
+wrong ifdef, forgetting one of the two ifdefs, or by leaving
+unused static functions that only get called indirectly from the
+other one that is built conditionally.
+
+We could add a macro like
+
+#define COND_PTR(config, ptr) (IS_ENABLED(config) ? (ptr) : NULL)
+
+and then let the compiler figure out that "function" is unused even
+without an explicit __maybe_unused annotation.  The function above
+can be simplied to
+
+static inline struct device_node *dev_of_node(struct device *dev)
+{
+	return COND_PTR(CONFIG_OF, dev->of_node);
+}
+
+with that, which is another benefit.
+
+	Arnd
