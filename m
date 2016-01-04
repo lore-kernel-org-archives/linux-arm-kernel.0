@@ -1,37 +1,24 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  4 Jan 2016 17:56:40 +0000
-Subject: [PATCHv2 07/18] arm64: mm: add code to safely replace TTBR1_EL1
+Date: Mon,  4 Jan 2016 17:56:42 +0000
+Subject: [PATCHv2 09/18] arm64: mm: move pte_* macros
 In-Reply-To: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
 References: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1451930211-22460-8-git-send-email-mark.rutland@arm.com>
+Message-ID: <1451930211-22460-10-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If page tables are modified without suitable TLB maintenance, the ARM
-architecture permits multiple TLB entries to be allocated for the same
-VA. When this occurs, it is permitted that TLB conflict aborts are
-raised in response to synchronous data/instruction accesses, and/or and
-amalgamation of the TLB entries may be used as a result of a TLB lookup.
+For pmd, pud, and pgd levels of table, functions including p?d_index and
+p?d_offset are defined after the p?d_page_vaddr function for the
+immediately higher level of table.
 
-The presence of conflicting TLB entries may result in a variety of
-behaviours detrimental to the system (e.g. erroneous physical addresses
-may be used by I-cache fetches and/or page table walks). Some of these
-cases may result in unexpected changes of hardware state, and/or result
-in the (asynchronous) delivery of SError.
+The pte functions however are defined much earlier, even though several
+rely on the later definition of pmd_page_vaddr. While this isn't
+currently a problem as these are macros, it prevents the logical
+grouping of later C functions (which cannot rely on prototypes for
+functions not yet defined).
 
-To avoid these issues, we must avoid situations where conflicting
-entries may be allocated into TLBs. For user and module mappings we can
-follow a strict break-before-make approach, but this cannot work for
-modifications to the swapper page tables that cover the kernel text and
-data.
-
-Instead, this patch adds code which is intended to be executed from the
-idmap, which can safely unmap the swapper page tables as it only
-requires the idmap to be active. This enables us to uninstall the active
-TTBR1_EL1 entry, invalidate TLBs, then install a new TTBR1_EL1 entry
-without potentially unmapping code or data required for the sequence.
-This avoids the risk of conflict, but requires that updates are staged
-in a copy of the swapper page tables prior to being installed.
+Move these definitions after pmd_page_vaddr, for consistency with the
+placement of these functions for other levels of table.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
@@ -40,78 +27,46 @@ Cc: Jeremy Linton <jeremy.linton@arm.com>
 Cc: Laura Abbott <labbott@fedoraproject.org>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/mmu_context.h | 20 ++++++++++++++++++++
- arch/arm64/mm/proc.S                 | 27 +++++++++++++++++++++++++++
- 2 files changed, 47 insertions(+)
+ arch/arm64/include/asm/pgtable.h | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-index 944f273..280ce2e 100644
---- a/arch/arm64/include/asm/mmu_context.h
-+++ b/arch/arm64/include/asm/mmu_context.h
-@@ -127,6 +127,26 @@ static inline void cpu_install_idmap(void)
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 382d627..3603cca 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -134,16 +134,6 @@ extern unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)];
+ #define pte_clear(mm,addr,ptep)	set_pte(ptep, __pte(0))
+ #define pte_page(pte)		(pfn_to_page(pte_pfn(pte)))
+ 
+-/* Find an entry in the third-level page table. */
+-#define pte_index(addr)		(((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
+-
+-#define pte_offset_kernel(dir,addr)	(pmd_page_vaddr(*(dir)) + pte_index(addr))
+-
+-#define pte_offset_map(dir,addr)	pte_offset_kernel((dir), (addr))
+-#define pte_offset_map_nested(dir,addr)	pte_offset_kernel((dir), (addr))
+-#define pte_unmap(pte)			do { } while (0)
+-#define pte_unmap_nested(pte)		do { } while (0)
+-
+ /*
+  * The following only work if pte_present(). Undefined behaviour otherwise.
+  */
+@@ -441,6 +431,16 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
+ 	return __va(pmd_val(pmd) & PHYS_MASK & (s32)PAGE_MASK);
  }
  
- /*
-+ * Atomically replaces the active TTBR1_EL1 PGD with a new VA-compatible PGD,
-+ * avoiding the possibility of conflicting TLB entries being allocated.
-+ */
-+static inline void cpu_replace_ttbr1(pgd_t *pgd)
-+{
-+	typedef void (ttbr_replace_func)(phys_addr_t, phys_addr_t);
-+	extern ttbr_replace_func idmap_cpu_replace_ttbr1;
-+	ttbr_replace_func *replace_phys;
++/* Find an entry in the third-level page table. */
++#define pte_index(addr)		(((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
 +
-+	phys_addr_t pgd_phys = virt_to_phys(pgd);
-+	phys_addr_t reserved_phys = virt_to_phys(empty_zero_page);
++#define pte_offset_kernel(dir,addr)	(pmd_page_vaddr(*(dir)) + pte_index(addr))
 +
-+	replace_phys = (void*)virt_to_phys(idmap_cpu_replace_ttbr1);
++#define pte_offset_map(dir,addr)	pte_offset_kernel((dir), (addr))
++#define pte_offset_map_nested(dir,addr)	pte_offset_kernel((dir), (addr))
++#define pte_unmap(pte)			do { } while (0)
++#define pte_unmap_nested(pte)		do { } while (0)
 +
-+	cpu_install_idmap();
-+	replace_phys(pgd_phys, reserved_phys);
-+	cpu_uninstall_idmap();
-+}
-+
-+/*
-  * It would be nice to return ASIDs back to the allocator, but unfortunately
-  * that introduces a race with a generation rollover where we could erroneously
-  * free an ASID allocated in a future generation. We could workaround this by
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index b6f9053..025dea5 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -139,6 +139,33 @@ ENTRY(cpu_do_switch_mm)
- 	ret
- ENDPROC(cpu_do_switch_mm)
+ #define pmd_page(pmd)		pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
  
-+	.pushsection ".idmap.text", "ax"
-+/*
-+ * void idmap_cpu_replace_ttbr1(phys_addr_t new_pgd, phys_addr_t reserved_pgd)
-+ *
-+ * This is the low-level counterpart to cpu_replace_ttbr1, and should not be
-+ * called by anything else. It can only be executed from a TTBR0 mapping.
-+ */
-+ENTRY(idmap_cpu_replace_ttbr1)
-+	mrs	x2, daif
-+	msr	daifset, #0xf
-+
-+	msr	ttbr1_el1, x1
-+	isb
-+
-+	tlbi	vmalle1
-+	dsb	nsh
-+	isb
-+
-+	msr	ttbr1_el1, x0
-+	isb
-+
-+	msr	daif, x2
-+
-+	ret
-+ENDPROC(idmap_cpu_replace_ttbr1)
-+	.popsection
-+
  /*
-  *	__cpu_setup
-  *
 -- 
 1.9.1
