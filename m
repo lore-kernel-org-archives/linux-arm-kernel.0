@@ -1,44 +1,54 @@
 From: hpa@zytor.com (H. Peter Anvin)
-Date: Mon, 04 Jan 2016 10:13:46 -0800
-Subject: [PATCH 6/6] arm64: switch to relative exception tables
-In-Reply-To: <20160104144643.GE1616@arm.com>
+Date: Mon, 04 Jan 2016 10:15:28 -0800
+Subject: [PATCH 0/6] generic relative extable support
+In-Reply-To: <20160104112026.GC4179@osiris>
 References: <1451837157-447-1-git-send-email-ard.biesheuvel@linaro.org>
- <1451837157-447-7-git-send-email-ard.biesheuvel@linaro.org>
- <20160104144643.GE1616@arm.com>
-Message-ID: <568AB65A.8030901@zytor.com>
+ <20160104112026.GC4179@osiris>
+Message-ID: <568AB6C0.4060502@zytor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/04/2016 06:46 AM, Will Deacon wrote:
-> On Sun, Jan 03, 2016 at 05:05:57PM +0100, Ard Biesheuvel wrote:
->> Instead of using absolute addresses for both the exception location
->> and the fixup, use offsets relative to the exception table entry values.
->> Not only does this cut the size of the exception table in half, it is
->> also a prerequisite for KASLR, since absolute exception table entries
->> are subject to dynamic relocation, which is incompatible with the sorting
->> of the exception table that occurs at build time.
+On 01/04/2016 03:20 AM, Heiko Carstens wrote:
+> On Sun, Jan 03, 2016 at 05:05:51PM +0100, Ard Biesheuvel wrote:
+>> There are currently four architectures (x86, ia64, alpha and s390) whose
+>> user-access exception tables are relative to the table entry address rather
+>> than absolute. Each of these architectures has its own search_extable() and
+>> sort_extable() implementation, which are not only mostly identical to each
+>> other, but also deviate very little from the generic absolute implementations
+>> in lib/extable.c that they override.
 >>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
+>> So before making arm64 the fifth architecture that reimplements this, let's
+>> refactor the existing code so that all of these architectures use common code
+>> for searching and sorting the relative extables. Archs may set
+>> ARCH_HAS_RELATIVE_EXTABLE to indicate that the table consists of a pair of
+>> relative ints, and may define swap_ex_entry_fixup() if the fixup member needs
+>> special treatment in the swapping step of the sorting routine (such as alpha).
 >>
->> Note that this patch supersedes the version I sent as part of the series that
->> implements KASLR for arm64: http://thread.gmane.org/gmane.linux.kernel/2116531
+>> Note that the s390 patch applies on top of the following patch:
 >>
->>  arch/arm64/include/asm/assembler.h   |  2 +-
->>  arch/arm64/include/asm/futex.h       |  4 ++--
->>  arch/arm64/include/asm/uaccess.h     | 18 ++++++++++--------
->>  arch/arm64/kernel/armv8_deprecated.c |  4 ++--
->>  arch/arm64/mm/extable.c              |  2 +-
->>  scripts/sortextable.c                |  2 +-
->>  6 files changed, 17 insertions(+), 15 deletions(-)
+>>   http://article.gmane.org/gmane.linux.kernel/2117036
+>>
+>> which fixes a bug I spotted while working on this code. Since that probably
+>> needs to go to -stable, I broke it out and posted it separately.
+>>
+>> Ard Biesheuvel (6):
+>>   extable: add support for relative extables to search and sort routines
+>>   alpha/extable: use generic search and sort routines
+>>   s390/extable: use generic search and sort routines
+>>   x86/extable: use generic search and sort routines
+>>   ia64/extable: use generic search and sort routines
+>>   arm64: switch to relative exception tables
 > 
-> This looks good to me, so for the arm64 part (i.e. this patch):
+> For the s390 bits:
 > 
->   Acked-by: Will Deacon <will.deacon@arm.com>
+> Acked-by: Heiko Carstens <heiko.carstens@de.ibm.com>
+> 
 
-May I humbly ask why the [Finnish] you don't use the equivalent of the
-x86 _ASM_EXTABLE() macro?  In fact, why don't we make that one generic, too?
+For the x86 bits:
+
+Acked-by: H. Peter Anvin <hpa@linux.intel.com>
+
+*However*, please see my comment about generalizing _ASM_EXTABLE() for
+the non-x86 architectures.
 
 	-hpa
