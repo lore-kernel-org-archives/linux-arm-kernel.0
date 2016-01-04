@@ -1,45 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 04 Jan 2016 11:46:28 +0100
-Subject: [PATCH v2] udf: avoid uninitialized variable use
-In-Reply-To: <20160104095605.GC3888@quack.suse.cz>
-References: <9221187.T0u8gszVyj@wuerfel> <5491623.oZlI0zcRmi@wuerfel>
- <20160104095605.GC3888@quack.suse.cz>
-Message-ID: <3635579.F68L9XXk6v@wuerfel>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Mon,  4 Jan 2016 11:01:53 +0000
+Subject: [PATCH v2] clk:gcc-msm8916: add missing mss_q6_bimc_axi clock
+Message-ID: <1451905313-6461-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 04 January 2016 10:56:05 Jan Kara wrote:
-> On Fri 01-01-16 15:21:54, Arnd Bergmann wrote:
-> > A new warning about a real bug has come up from a recent cleanup:
-> > 
-> > fs/udf/inode.c: In function 'udf_setup_indirect_aext':
-> > fs/udf/inode.c:1927:28: warning: 'adsize' may be used uninitialized in this function [-Wmaybe-uninitialized]
-> > 
-> > If the alloc_type is neither ICBTAG_FLAG_AD_SHORT nor ICBTAG_FLAG_AD_LONG,
-> > the value of adsize is undefined. This changes the code to use zero for adsize
-> > in that case, which may be the correct solution, though I have not looked
-> > at the code in enough detail to know if it should be something else instead.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Fixes: fcea62babc81 ("udf: Factor out code for creating indirect extent")
-> > ---
-> > sorry for missing another instance the first time around. The warning is
-> > a bit unreliable and it seems in my first configuration I got it only
-> > for one of the two instances that show it in other configuration.
-> > 
-> > After checking the remaining functions in this file for the same possible
-> > problem, I found that the other functions use either 'BUG()' or 'return -EIO'
-> > in the 'else' path, so I assume the two functions here should one of those
-> > as well, but I don't know which.
-> 
-> Callers of these functions make sure alloc_type is one of the two valid
-> ones. However for future-proofing you're right that probably we should
-> handle the invalid case as well. Setting adsize to zero is problematic -
-> not sure what the code would actually do but it wouldn't definitely work.
-> I'd just return -EIO. Attached is the patch I have merged.
-> 
-> 
+This clock is required for loading the qdsp firmware.
 
-Looks good, thanks!
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+Changes since v1:
+	fixed parent name as spotted by Georgi
 
-	Arnd
+ drivers/clk/qcom/gcc-msm8916.c               | 18 ++++++++++++++++++
+ include/dt-bindings/clock/qcom,gcc-msm8916.h |  1 +
+ 2 files changed, 19 insertions(+)
+
+diff --git a/drivers/clk/qcom/gcc-msm8916.c b/drivers/clk/qcom/gcc-msm8916.c
+index e643944..89fe930 100644
+--- a/drivers/clk/qcom/gcc-msm8916.c
++++ b/drivers/clk/qcom/gcc-msm8916.c
+@@ -2590,6 +2590,23 @@ static struct clk_branch gcc_mss_cfg_ahb_clk = {
+ 	},
+ };
+ 
++static struct clk_branch gcc_mss_q6_bimc_axi_clk = {
++	.halt_reg = 0x49004,
++	.clkr = {
++		.enable_reg = 0x49004,
++		.enable_mask = BIT(0),
++		.hw.init = &(struct clk_init_data){
++			.name = "gcc_mss_q6_bimc_axi_clk",
++			.parent_names = (const char *[]){
++				"bimc_ddr_clk_src",
++			},
++			.num_parents = 1,
++			.flags = CLK_SET_RATE_PARENT,
++			.ops = &clk_branch2_ops,
++		},
++	},
++};
++
+ static struct clk_branch gcc_oxili_ahb_clk = {
+ 	.halt_reg = 0x59028,
+ 	.clkr = {
+@@ -3228,6 +3245,7 @@ static struct clk_regmap *gcc_msm8916_clocks[] = {
+ 	[GCC_ULTAUDIO_LPAIF_SEC_I2S_CLK] = &gcc_ultaudio_lpaif_sec_i2s_clk.clkr,
+ 	[GCC_ULTAUDIO_LPAIF_AUX_I2S_CLK] = &gcc_ultaudio_lpaif_aux_i2s_clk.clkr,
+ 	[GCC_CODEC_DIGCODEC_CLK] = &gcc_codec_digcodec_clk.clkr,
++	[GCC_MSS_Q6_BIMC_AXI_CLK] = &gcc_mss_q6_bimc_axi_clk.clkr,
+ };
+ 
+ static struct gdsc *gcc_msm8916_gdscs[] = {
+diff --git a/include/dt-bindings/clock/qcom,gcc-msm8916.h b/include/dt-bindings/clock/qcom,gcc-msm8916.h
+index 257e2fb..28a27a4 100644
+--- a/include/dt-bindings/clock/qcom,gcc-msm8916.h
++++ b/include/dt-bindings/clock/qcom,gcc-msm8916.h
+@@ -174,6 +174,7 @@
+ #define GCC_ULTAUDIO_LPAIF_SEC_I2S_CLK		157
+ #define GCC_ULTAUDIO_LPAIF_AUX_I2S_CLK		158
+ #define GCC_CODEC_DIGCODEC_CLK			159
++#define GCC_MSS_Q6_BIMC_AXI_CLK			160
+ 
+ /* Indexes for GDSCs */
+ #define BIMC_GDSC				0
+-- 
+1.9.1
