@@ -1,37 +1,37 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 4 Jan 2016 09:27:25 +0100
-Subject: [PATCH] drm: arm-hdlcd: remove DMA_CMA select
-In-Reply-To: <4194408.X82ccDjh5X@wuerfel>
-References: <4194408.X82ccDjh5X@wuerfel>
-Message-ID: <20160104082725.GE23797@ulmo>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 4 Jan 2016 09:39:17 +0100
+Subject: [PATCH v2 0/3] ARM: shmobile: r8a779x: use fallback usbhs
+ compatibility string
+In-Reply-To: <1451856019-4222-1-git-send-email-horms+renesas@verge.net.au>
+References: <1451856019-4222-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdUALH_FQvOVH77V5JC3d4n7444zTh2VU-MEsOoKymFSDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 01, 2016 at 03:09:10PM +0100, Arnd Bergmann wrote:
-> The newly added DRM_HDLCD driver tries to select DMA_CMA, but that is
-> not necessarily possible, as not all configurations contain HAVE_DMA_CONTIGUOUS:
-> 
-> warning: (DRM_HDLCD) selects DMA_CMA which has unmet direct dependencies (HAVE_DMA_CONTIGUOUS && CMA)
-> drivers/built-in.o: In function `dma_alloc_from_contiguous':
-> :(.text+0x1dee00): undefined reference to `cma_alloc'
-> drivers/built-in.o: In function `dma_release_from_contiguous':
-> :(.text+0x1dee24): undefined reference to `cma_release'
-> 
-> This removes the 'select' statement. It is not needed because CMA is meant
-> to transparently change the behavior of dma_alloc_coherent to make it succeed
-> for larger allocations, but there is no actual build-time dependency, and
-> the driver can still work without CMA in many cases.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 1561e558334d ("drm: Add support for ARM's HDLCD controller.")
-> ---
-> Found on ARM randconfig builds with yesterday's linux-next
+On Sun, Jan 3, 2016 at 10:20 PM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> this short series makes use of the recently added fallback usbhs
+> compatibility string in the r8a779[014] device trees.
+>
+> Based on renesas-devel-20151228-v4.4-rc7.
+>
+> Changes since v1:
+> * Use "renesas,rcar-gen2-usbhs" instead of "renesas,usbhs"
+>
+> Simon Horman (3):
+>   ARM: shmobile: r8a7790: use fallback usbhs compatibility string
+>   ARM: shmobile: r8a7791: use fallback usbhs compatibility string
+>   ARM: shmobile: r8a7794: use fallback usbhs compatibility string
 
-Reviewed-by: Thierry Reding <treding@nvidia.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160104/e10f1e0d/attachment.sig>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
