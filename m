@@ -1,91 +1,65 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Mon,  4 Jan 2016 22:36:40 +0100
-Subject: [PATCHv2] drivers: dma-coherent: simplify dma_init_coherent_memory
- return value
-Message-ID: <1451943400-17190-1-git-send-email-mina86@mina86.com>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Mon, 4 Jan 2016 22:36:28 +0100
+Subject: [linux-sunxi] reason for Allwinner SoC specific pinctrl drivers?
+In-Reply-To: <CAEzqOZu8wkPKLp6bZZ7JuiM07ixDksdD=U-WK=3kFPYJZMon4Q@mail.gmail.com>
+References: <568A514D.7070102@arm.com>
+ <CAEzqOZu8wkPKLp6bZZ7JuiM07ixDksdD=U-WK=3kFPYJZMon4Q@mail.gmail.com>
+Message-ID: <CAOMqctQL3nmWECpQgtVdxgzEfn2obu4cdj67W1ESONO=5EpQdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since only dma_declare_coherent_memory cares about
-dma_init_coherent_memory returning part of flags as it return value,
-move the condition to the former and simplify the latter.  This in
-turn makes rmem_dma_device_init less confusing.
+Hello,
 
-Reported-by: Fugang Duan <B38611@freescale.com>
-Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
-Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- drivers/base/dma-coherent.c | 28 +++++++++++-----------------
- 1 file changed, 11 insertions(+), 17 deletions(-)
+On 4 January 2016 at 18:27, Vishnu Patekar <vishnupatekar0510@gmail.com> wrote:
+> Hello Andre,
+> This is something we can do for future SOCs.
+>
+> On 4 Jan 2016 19:02, "Andre Przywara" <andre.przywara@arm.com> wrote:
+>>
+>> Hi,
+>>
+>> while looking at the Allwinner A64 SoC support, I was wondering why we
+>> would actually need a pinctrl driver (file) for each and every Allwinner
+>> SoC that we support.
+>> Looking at both the A20 and the A64 doc I don't see any differences in
+>> the port controller implementation apart from the actual
+>> muxval <-> subsystem assignment, which is just data, right?
+>> Comparing the code files in drivers/pinctrl/sunxi seems to support this,
+>> as those drivers only consist of the table and some boilerplate code.
+>>
+>> Now I was wondering whether we could get away with one generic Allwinner
+>> pinctrl driver and put the SoC specific pin assignments in DT instead.
+>> It looks like adding an "allwinner,muxval" property in addition to the
+>> existing "allwinner,function" in the SoC's .dtsi would give us all the
+>> information we need. This could look like:
+>>
+>>         uart0_pins_a: uart0 at 0 {
+>>                 allwinner,pins =   "PB22", "PB23";
+>> +               allwinner,muxval = <0x02    0x02>;
+>>                 allwinner,function = "uart0";
 
-diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
-index 55b8398..87b8083 100644
---- a/drivers/base/dma-coherent.c
-+++ b/drivers/base/dma-coherent.c
-@@ -17,9 +17,9 @@ struct dma_coherent_mem {
- 	spinlock_t	spinlock;
- };
- 
--static int dma_init_coherent_memory(phys_addr_t phys_addr, dma_addr_t device_addr,
--			     size_t size, int flags,
--			     struct dma_coherent_mem **mem)
-+static bool dma_init_coherent_memory(
-+	phys_addr_t phys_addr, dma_addr_t device_addr, size_t size, int flags,
-+	struct dma_coherent_mem **mem)
- {
- 	struct dma_coherent_mem *dma_mem = NULL;
- 	void __iomem *mem_base = NULL;
-@@ -50,17 +50,13 @@ static int dma_init_coherent_memory(phys_addr_t phys_addr, dma_addr_t device_add
- 	spin_lock_init(&dma_mem->spinlock);
- 
- 	*mem = dma_mem;
--
--	if (flags & DMA_MEMORY_MAP)
--		return DMA_MEMORY_MAP;
--
--	return DMA_MEMORY_IO;
-+	return true;
- 
- out:
- 	kfree(dma_mem);
- 	if (mem_base)
- 		iounmap(mem_base);
--	return 0;
-+	return false;
- }
- 
- static void dma_release_coherent_memory(struct dma_coherent_mem *mem)
-@@ -88,15 +84,13 @@ int dma_declare_coherent_memory(struct device *dev, phys_addr_t phys_addr,
- 				dma_addr_t device_addr, size_t size, int flags)
- {
- 	struct dma_coherent_mem *mem;
--	int ret;
- 
--	ret = dma_init_coherent_memory(phys_addr, device_addr, size, flags,
--				       &mem);
--	if (ret == 0)
-+	if (!dma_init_coherent_memory(phys_addr, device_addr, size, flags,
-+				      &mem))
- 		return 0;
- 
- 	if (dma_assign_coherent_memory(dev, mem) == 0)
--		return ret;
-+		return flags & DMA_MEMORY_MAP ? DMA_MEMORY_MAP : DMA_MEMORY_IO;
- 
- 	dma_release_coherent_memory(mem);
- 	return 0;
-@@ -281,9 +275,9 @@ static int rmem_dma_device_init(struct reserved_mem *rmem, struct device *dev)
- 	struct dma_coherent_mem *mem = rmem->priv;
- 
- 	if (!mem &&
--	    dma_init_coherent_memory(rmem->base, rmem->base, rmem->size,
--				     DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE,
--				     &mem) != DMA_MEMORY_MAP) {
-+	    !dma_init_coherent_memory(rmem->base, rmem->base, rmem->size,
-+				      DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE,
-+				      &mem)) {
- 		pr_err("Reserved memory: failed to init DMA memory pool at %pa, size %ld MiB\n",
- 			&rmem->base, (unsigned long)rmem->size / SZ_1M);
- 		return -ENODEV;
--- 
-2.6.0.rc2.230.g3dd15c0
+As I understand it
+
+1) uart0 is basically a mnemonic for muxval 2
+2) if you try to mux uart0 on pins for which it is not in the table it fails
+
+So it makes no sense to have both function and muxval - this is redundant.
+
+And it does not make sense to move from function to muxval - it's like
+moving from assembly programing to raw machine code programming.
+
+For compatibility it's not possible to move the table to the shared
+SoC DT although it would be possible to have the pin tables in DT.
+However, it would inflate the DT and make working in u-boot (SPL)
+where full DT parser is not available problematic.
+
+What might be possible is merging the different pinmux drivers in one.
+Instead of replicating some pinmux boilerplate you will probably end
+up with lots of ifdefs so only tables for SoC support compiled in the
+kernel are built into the driver.
+I am not sure how large the tables are and if anybody should care but
+you might be also missing some symbols for them.
+
+Thanks
+
+Michal
