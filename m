@@ -1,60 +1,70 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Mon, 4 Jan 2016 22:39:19 +0200
-Subject: [PATCH v2 17/32] arm: define __smp_xxx
-In-Reply-To: <20160104135420.GS6373@twins.programming.kicks-ass.net>
-References: <1451572003-2440-1-git-send-email-mst@redhat.com>
- <1451572003-2440-18-git-send-email-mst@redhat.com>
- <20160102112438.GU8644@n2100.arm.linux.org.uk>
- <20160103110158-mutt-send-email-mst@redhat.com>
- <20160104133658.GY6344@twins.programming.kicks-ass.net>
- <20160104135420.GS6373@twins.programming.kicks-ass.net>
-Message-ID: <20160104223529-mutt-send-email-mst@redhat.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 04 Jan 2016 21:39:59 +0100
+Subject: [linux-sunxi] Re: [PATCH v2 1/3] reset: Add shared
+ reset_control_[de]assert variants
+In-Reply-To: <5675378F.5010904@redhat.com>
+References: <1449848520-27379-1-git-send-email-hdegoede@redhat.com>
+ <20151214093607.GF19456@lukather> <1450086655.3407.23.camel@pengutronix.de>
+ <20151216102934.GR19456@lukather> <1450264908.3421.36.camel@pengutronix.de>
+ <20151218110810.GK30359@lukather> <5675378F.5010904@redhat.com>
+Message-ID: <1451939999.3884.89.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 04, 2016 at 02:54:20PM +0100, Peter Zijlstra wrote:
-> On Mon, Jan 04, 2016 at 02:36:58PM +0100, Peter Zijlstra wrote:
-> > On Sun, Jan 03, 2016 at 11:12:44AM +0200, Michael S. Tsirkin wrote:
-> > > On Sat, Jan 02, 2016 at 11:24:38AM +0000, Russell King - ARM Linux wrote:
-> > 
-> > > > My only concern is that it gives people an additional handle onto a
-> > > > "new" set of barriers - just because they're prefixed with __*
-> > > > unfortunately doesn't stop anyone from using it (been there with
-> > > > other arch stuff before.)
-> > > > 
-> > > > I wonder whether we should consider making the smp memory barriers
-> > > > inline functions, so these __smp_xxx() variants can be undef'd
-> > > > afterwards, thereby preventing drivers getting their hands on these
-> > > > new macros?
-> > > 
-> > > That'd be tricky to do cleanly since asm-generic depends on
-> > > ifndef to add generic variants where needed.
-> > > 
-> > > But it would be possible to add a checkpatch test for this.
-> > 
-> > Wasn't the whole purpose of these things for 'drivers' (namely
-> > virtio/xen hypervisor interaction) to use these?
-> 
-> Ah, I see, you add virt_*mb() stuff later on for that use case.
-> 
-> So, assuming everybody does include asm-generic/barrier.h, you could
-> simply #undef the __smp version at the end of that, once we've generated
-> all the regular primitives from it, no?
+Am Samstag, den 19.12.2015, 11:55 +0100 schrieb Hans de Goede:
+> On 18-12-15 12:08, Maxime Ripard wrote:
+[...]
+> > I guess we could also have something like this:
+> >
+> >    * The driver gets the reference to the reset line using
+> >      reset_control_get or its shared variant.
+> >
+> >      - If you call reset_control_get on a free line, it succeeds, and
+> >        marks the line in exclusive use.
+> >      - If you call reset_control_get on a busy line, it fails with
+> >        EBUSY
+> >
+> >      - If you call the shared variant on a free line, it succeeds
+> >      - If you call the shared variant on a busy exclusive line, it
+> >        fails with EBUSY
+> >      - If you call the shared variant on a busy !exclusive line, it
+> >        succeeds.
+>>
+> >    * The customer driver can then call reset_control_assert / deassert:
+> >
+> >      - If the reset line is in exclusive use, the assertion happens
+> >        right away, it succeeds and returns 0.
+> >
+> >      - If the reset line is in a !exclusive use, but with a single
+> >        user, the assertion happens right away, it succeeds and returns
+> >        0.
+>
+> Ack for all of the above, this is what I had in mind at first, but I started
+> with a more lightweight version as I'm lazy :)  If Philipp likes this
+> suggestion I can rework my patch-set into this.
 
-Maybe I misunderstand, but I don't think so:
+Seconded, this all sounds good to me.
 
------->
-#define __smp_xxx FOO
-#define smp_xxx __smp_xxx
-#undef __smp_xxx
+> >      - If the reset line is in a !exclusive use with more than 1 user,
+> >        the refcount is modified and an error is returned to notify that
+> >        it didn't happen.
+>
+> Also ack, except for returning the error, if a driver has used
+> reset_control_get_shared, it should simply be aware that doing an assert
+> might not necessarily actually assert the line, just like doing a clk-disable
+> does not really necessary disable the clock, etc. If a driver is not prepared
+> to deal with this, it should simply not use reset_control_get_shared.
+>
+> I see returning an error if the assert did not happen due to other users /
+> deassert_count != 0 as inconsistent compared to how clks, regulators and phys
+> handle this, these all simply return success in this case.
 
-smp_xxx
-<------
+I wouldn't want drivers to have to differentiate between relevant and
+irrelevant error codes, so in the clock-like refcounting use case
+reset_assert should not return an error if it just correctly decremented
+the refcount. I'd still prefer to have separate API for the counted
+must_deassert/may_assert vs the exclusive must_assert/must_deassert use
+cases, but I just can't think of a good name.
 
-resolves to __smp_xxx, not FOO.
-
-That's why I went the checkpatch way.
-
-
--- 
-MST
+regards
+Philipp
