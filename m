@@ -1,748 +1,1070 @@
-From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
-Date: Mon, 4 Jan 2016 20:59:05 +0200
-Subject: [PATCH 2/2] memory: omap-gpmc: Add Kconfig option for debug
-In-Reply-To: <20160104174001.GD12777@atomide.com>
-References: <1432156863-19695-1-git-send-email-tony@atomide.com>
- <568662FC.9050206@gmail.com> <20160104170206.GC12777@atomide.com>
- <201601041834.56056@pali> <20160104174001.GD12777@atomide.com>
-Message-ID: <568AC0F9.2010304@gmail.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Mon, 4 Jan 2016 21:01:04 +0200
+Subject: [PATCH V11 5/7] dma: qcom_hidma: implement lower level hardware
+ interface
+In-Reply-To: <1451865996-12808-6-git-send-email-okaya@codeaurora.org>
+References: <1451865996-12808-1-git-send-email-okaya@codeaurora.org>
+ <1451865996-12808-6-git-send-email-okaya@codeaurora.org>
+Message-ID: <CAHp75VdxiZnHZcw6GXw58-tn-oAHphy9EyQgyODoDuoX1JD8wA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Jan 4, 2016 at 2:06 AM, Sinan Kaya <okaya@codeaurora.org> wrote:
+> This patch implements the hardware hooks for the HIDMA channel driver.
+>
+> The main functions of interest are:
+> - hidma_ll_init
+> - hidma_ll_request
+> - hidma_ll_queue_request
+> - hidma_ll_hw_start
+>
+> OS layer calls the hidma_ll_init function during probe to set up the
+> hardware. At this moment, the number of supported descriptors are also
+> given. On each request, a descriptor is allocated from the free pool and
+> filled in with the transfer parameters. Multiple requests can be queued
+> into the hardware via the OS interface. When client is ready for requests
+> to be executed, start method is called.
+>
+> Completions are delivered via callbacks via tasklet.
 
-On  4.01.2016 19:40, Tony Lindgren wrote:
->> On Monday 04 January 2016 18:02:06 Tony Lindgren wrote:
->>> > >Care to boot with CONFIG_OMAP_GPMC_DEBUG=y and post the gpmc related
->>> > >dmesg output?
+Few nitpicks below.
 
-Here it is, including the pre-gpmc log, keep in mind this is with 
-restored HWMOD_INIT_NO_RESET flag so rootfs is functional and I can get 
-dmesg output from the syslog. Don't know if it is helpful :). Also, this 
-device has Numonyx onenand (HW rev. 2204), unlike most of the others 
-which have Samsung onenand (HW rev. 2101 etc), no idea if it is relevant.
+>
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/dma/qcom/Makefile   |   2 +
+>  drivers/dma/qcom/hidma.h    |   2 +-
+>  drivers/dma/qcom/hidma_ll.c | 927 ++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 930 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/dma/qcom/hidma_ll.c
+>
+> diff --git a/drivers/dma/qcom/Makefile b/drivers/dma/qcom/Makefile
+> index bfea699..6bf9267 100644
+> --- a/drivers/dma/qcom/Makefile
+> +++ b/drivers/dma/qcom/Makefile
+> @@ -1,3 +1,5 @@
+>  obj-$(CONFIG_QCOM_BAM_DMA) += bam_dma.o
+>  obj-$(CONFIG_QCOM_HIDMA_MGMT) += hdma_mgmt.o
+>  hdma_mgmt-objs  := hidma_mgmt.o hidma_mgmt_sys.o
+> +obj-$(CONFIG_QCOM_HIDMA) +=  hdma.o
+> +hdma-objs        := hidma_ll.o hidma.o
+> diff --git a/drivers/dma/qcom/hidma.h b/drivers/dma/qcom/hidma.h
+> index 231e306..1e09d7c 100644
+> --- a/drivers/dma/qcom/hidma.h
+> +++ b/drivers/dma/qcom/hidma.h
+> @@ -37,7 +37,7 @@ struct hidma_tre {
+>         atomic_t allocated;             /* if this channel is allocated     */
+>         bool queued;                    /* flag whether this is pending     */
+>         u16 status;                     /* status                           */
+> -       u32 chidx;                      /* index of the tre                 */
+> +       u32 idx;                        /* index of the tre                 */
+>         u32 dma_sig;                    /* signature of the tre             */
+>         const char *dev_name;           /* name of the device               */
+>         void (*callback)(void *data);   /* requester callback               */
+> diff --git a/drivers/dma/qcom/hidma_ll.c b/drivers/dma/qcom/hidma_ll.c
+> new file mode 100644
+> index 0000000..0cd8d70
+> --- /dev/null
+> +++ b/drivers/dma/qcom/hidma_ll.c
+> @@ -0,0 +1,927 @@
+> +/*
+> + * Qualcomm Technologies HIDMA DMA engine low level code
+> + *
+> + * Copyright (c) 2015, The Linux Foundation. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/dmaengine.h>
+> +#include <linux/slab.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/mm.h>
+> +#include <linux/highmem.h>
+> +#include <linux/dma-mapping.h>
+> +#include <linux/delay.h>
+> +#include <linux/atomic.h>
+> +#include <linux/iopoll.h>
+> +#include <linux/kfifo.h>
+> +#include <linux/bitops.h>
+> +
+> +#include "hidma.h"
+> +
+> +#define EVRE_SIZE                      16      /* each EVRE is 16 bytes */
+> +
+> +#define TRCA_CTRLSTS_OFFSET            0x0
+> +#define TRCA_RING_LOW_OFFSET           0x8
+> +#define TRCA_RING_HIGH_OFFSET          0xC
+> +#define TRCA_RING_LEN_OFFSET           0x10
+> +#define TRCA_READ_PTR_OFFSET           0x18
+> +#define TRCA_WRITE_PTR_OFFSET          0x20
+> +#define TRCA_DOORBELL_OFFSET           0x400
 
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000] Booting Linux on 
-physical CPU 0x0
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000] Initializing cgroup 
-subsys cpu
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000] Linux version 
-4.4.0-rc7+ (ivo at ivo-H81M-S2PV) (gcc version 4.7.2 20120701 (prerelease) 
-(Linaro GCC 4.7-2012.07) ) #4 PREEMPT Mon Jan 4 20:30:31 EET 2016
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000] CPU: ARMv7 Processor 
-[411fc083] revision 3 (ARMv7), cr=10c5387d
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000] CPU: PIPT / VIPT 
-nonaliasing data cache, VIPT nonaliasing instruction cache
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000] Machine model: Nokia N900
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000] Memory policy: Data 
-cache writeback
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000] On node 0 totalpages: 
-65280
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000] free_area_init_node: 
-node 0, pgdat c06776f8, node_mem_map cfcf9000
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000]   Normal zone: 512 
-pages used for memmap
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000]   Normal zone: 0 pages 
-reserved
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000]   Normal zone: 65280 
-pages, LIFO batch:15
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000] CPU: All CPU(s) 
-started in SVC mode.
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000] OMAP3430/3530 ES3.1 
-(l2cache iva sgx neon isp )
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000] pcpu-alloc: s0 r0 
-d32768 u32768 alloc=1*32768
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000] pcpu-alloc: [0] 0
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000] Built 1 zonelists in 
-Zone order, mobility grouping on.  Total pages: 64768
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000] Kernel command line: 
-init=/sbin/preinit ubi.mtd=rootfs root=ubi0:rootfs rootfstype=ubifs 
-rootflags=bulk_read,no_chk_data_crc rw mtdoops.mtddev=log console=tty0 
-console=ttyO2 omapfb_vram=7M omapfb.mode=lcd:848x480-16 nokia-modem.pm=0
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000] PID hash table 
-entries: 1024 (order: 0, 4096 bytes)
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000] Dentry cache hash 
-table entries: 32768 (order: 5, 131072 bytes)
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000] Inode-cache hash table 
-entries: 16384 (order: 4, 65536 bytes)
-Jan  4 20:42:50 Nokia-N900 cellular: csd[1026]: com.nokia.phone.SIM: 
-csd-libsimpb::configure: args=<(null)>
-Jan  4 20:42:50 Nokia-N900 cellular: csd[1026]: Succesfully loaded 
-plugin <simpb>
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000] Memory: 
-251588K/261120K available (4487K kernel code, 232K rwdata, 1624K rodata, 
-244K init, 256K bss, 9532K reserved, 0K cma-reserved, 0K highmem)
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000] Virtual kernel memory 
-layout:
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000]     vector  : 
-0xffff0000 - 0xffff1000   (   4 kB)
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000]     fixmap  : 
-0xffc00000 - 0xfff00000   (3072 kB)
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000]     vmalloc : 
-0xd0800000 - 0xff800000   ( 752 MB)
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000]     lowmem  : 
-0xc0000000 - 0xd0000000   ( 256 MB)
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000]     pkmap   : 
-0xbfe00000 - 0xc0000000   (   2 MB)
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000]     modules : 
-0xbf000000 - 0xbfe00000   (  14 MB)
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000]       .text : 
-0xc0008000 - 0xc0600044   (6113 kB)
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000]       .init : 
-0xc0601000 - 0xc063e000   ( 244 kB)
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000]       .data : 
-0xc063e000 - 0xc0678240   ( 233 kB)
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000]        .bss : 
-0xc0678240 - 0xc06b8628   ( 257 kB)
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000] SLUB: HWalign=64, 
-Order=0-3, MinObjects=0, CPUs=1, Nodes=1
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000] Preemptible 
-hierarchical RCU implementation.
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000] ^IBuild-time 
-adjustment of leaf fanout to 32.
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000] NR_IRQS:16 nr_irqs:16 16
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000] IRQ: Found an INTC at 
-0xfa200000 (revision 4.0) with 96 interrupts
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000] Clocking rate 
-(Crystal/Core/MPU): 19.2/332/500 MHz
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000] OMAP clockevent 
-source: timer1 at 32768 Hz
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000000] clocksource: 
-32k_counter: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 
-58327039986419 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000030] sched_clock: 32 bits 
-at 32kHz, resolution 30517ns, wraps every 65535999984741ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000030] OMAP clocksource: 
-32k_counter at 32768 Hz
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.000579] Console: colour dummy 
-device 80x30
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.001922] console [tty0] enabled
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.001983] Calibrating delay 
-loop... 496.43 BogoMIPS (lpj=2482176)
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.048522] pid_max: default: 
-32768 minimum: 301
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.048675] Security Framework 
-initialized
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.048797] Mount-cache hash table 
-entries: 1024 (order: 0, 4096 bytes)
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.048858] Mountpoint-cache hash 
-table entries: 1024 (order: 0, 4096 bytes)
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.049987] Initializing cgroup 
-subsys io
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.050079] Initializing cgroup 
-subsys freezer
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.050201] CPU: Testing write 
-buffer coherency: ok
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.050842] Setting up static 
-identity map for 0x80008200 - 0x80008258
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.055541] devtmpfs: initialized
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.102020] VFP support v0.3: 
-implementor 41 architecture 3 part 30 variant c rev 1
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.122650] omap_hwmod: 
-mcbsp2_sidetone using broken dt data from mcbsp
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.123352] omap_hwmod: 
-mcbsp3_sidetone using broken dt data from mcbsp
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.163696] clocksource: jiffies: 
-mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 19112604462750000 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.164520] pinctrl core: 
-initialized pinctrl subsystem
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.166320] NET: Registered 
-protocol family 16
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.168090] DMA: preallocated 256 
-KiB pool for atomic coherent allocations
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.198181] cpuidle: using 
-governor ladder
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.228118] cpuidle: using 
-governor menu
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.228942] Reprogramming SDRC 
-clock to 332000000 Hz
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.236511] OMAP GPIO hardware 
-version 2.5
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.244018] irq: no irq domain 
-found for /ocp/l4 at 48000000/scm at 2000/pinmux at 30 !
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.244720] irq: no irq domain 
-found for /ocp/l4 at 48000000/scm at 2000/pinmux at 30 !
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.259796] omap-gpmc 
-6e000000.gpmc: could not find pctldev for node 
-/ocp/l4 at 48000000/scm at 2000/pinmux at 30/pinmux_gpmc_pins, deferring probe
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.264739] RX-51: Add gpio switches
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.264831] RX-51: Enabling ARM 
-errata 430973 workaround
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.266632] RX-51: Registring 
-OMAP3 HWRNG device
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.270538] hw-breakpoint: debug 
-architecture 0x4 unsupported.
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.271789] Reserving DMA channels 
-0 and 1 for HS ROM code
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.271881] OMAP DMA hardware 
-revision 4.0
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.293609] omap-dma-engine 
-48056000.dma-controller: OMAP DMA engine driver
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.299499] omap-iommu 
-480bd400.mmu: 480bd400.mmu registered
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.300292] usbcore: registered 
-new interface driver usbfs
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.300476] usbcore: registered 
-new interface driver hub
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.300689] usbcore: registered 
-new device driver usb
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.301818] omap_i2c 48070000.i2c: 
-could not find pctldev for node 
-/ocp/l4 at 48000000/scm at 2000/pinmux at 30/pinmux_i2c1_pins, deferring probe
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.301940] omap_i2c 48072000.i2c: 
-could not find pctldev for node 
-/ocp/l4 at 48000000/scm at 2000/pinmux at 30/pinmux_i2c2_pins, deferring probe
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.302093] omap_i2c 48060000.i2c: 
-could not find pctldev for node 
-/ocp/l4 at 48000000/scm at 2000/pinmux at 30/pinmux_i2c3_pins, deferring probe
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.303466] omap-mailbox 
-48094000.mailbox: omap mailbox rev 0x40
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.304077] Advanced Linux Sound 
-Architecture Driver Initialized.
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.305694] clocksource: Switched 
-to clocksource 32k_counter
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.325592] NET: Registered 
-protocol family 2
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.326934] TCP established hash 
-table entries: 2048 (order: 1, 8192 bytes)
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.327056] TCP bind hash table 
-entries: 2048 (order: 1, 8192 bytes)
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.327148] TCP: Hash tables 
-configured (established 2048 bind 2048)
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.327331] UDP hash table 
-entries: 256 (order: 0, 4096 bytes)
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.327423] UDP-Lite hash table 
-entries: 256 (order: 0, 4096 bytes)
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.327697] NET: Registered 
-protocol family 1
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.332336] futex hash table 
-entries: 256 (order: -1, 3072 bytes)
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.350402] VFS: Disk quotas 
-dquot_6.6.0
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.350891] VFS: Dquot-cache hash 
-table entries: 1024 (order 0, 4096 bytes)
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.353790] squashfs: version 4.0 
-(2009/01/31) Phillip Lougher
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.356262] io scheduler noop 
-registered
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.356323] io scheduler deadline 
-registered
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.356781] io scheduler cfq 
-registered (default)
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.358276] pinctrl-single 
-48002030.pinmux: 284 pins at pa fa002030 size 568
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.358734] pinctrl-single 
-48002a00.pinmux: 46 pins at pa fa002a00 size 92
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.359436] pinctrl-single 
-480025d8.pinmux: 18 pins at pa fa0025d8 size 36
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.361846] 48050000.dss supply 
-vdda_video not found, using dummy regulator
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.362213] OMAP DSS rev 2.0
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.362579] omapdss_dss 
-48050000.dss: bound 48050400.dispc (ops dispc_component_ops)
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.362884] omapdss_dss 
-48050000.dss: bound 48050c00.encoder (ops venc_component_ops)
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.364379] omapfb omapfb: no displays
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.364562] omapfb omapfb: failed 
-to setup omapfb
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.366119] 4806c000.serial: ttyO1 
-at MMIO 0x4806c000 (irq = 89, base_baud = 3000000) is a OMAP UART1
-Jan  4 20:42:50 Nokia-N900 kernel: [    0.367340] 49020000.serial: ttyO2 
-at MMIO 0x49020000 (irq = 90, base_baud = 3000000) is a OMAP UART2
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.059082] console [ttyO2] enabled
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.064483] omap3_rom_rng: 
-initializing
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.096862] brd: module loaded
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.115020] acx565akm spi1.2: 
-omapfb: acx565akm rev ad LCD detected
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.126892] HS USB OTG: no 
-transceiver configured
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.131958] musb-hdrc 
-musb-hdrc.0.auto: musb_init_controller failed with status -517
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.141479] i2c /dev entries driver
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.209594] rx51-audio n900-audio: 
-could not get speaker enable gpio
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.217315] Initializing XFRM 
-netlink socket
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.221893] NET: Registered 
-protocol family 17
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.226837] NET: Registered 
-protocol family 15
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.231597] NET: Registered 
-protocol family 35
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.236541] Key type dns_resolver 
-registered
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.241485] 
-omap2_set_init_voltage: unable to find boot up OPP for vdd_mpu_iva
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.249176] 
-omap2_set_init_voltage: unable to set vdd_mpu_iva
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.255218] 
-omap2_set_init_voltage: unable to find boot up OPP for vdd_core
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.262603] 
-omap2_set_init_voltage: unable to set vdd_core
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.274322] ThumbEE CPU extension 
-supported.
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.278991] SmartReflex Class3 
-initialized
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.283721] Bootup reason: pwr_key
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.287414] OMAP GPIO switch 
-handler initializing
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.293090] gpio-switch: 
-gpio_reguest failed for cam_focus 68
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.299438] gpio-switch: 
-gpio_reguest failed for cam_launch 69
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.305847] gpio-switch: 
-gpio_reguest failed for cam_shutter 110
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.313842] gpio-switch: 
-gpio_reguest failed for headphone 177
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.320281] gpio-switch: 
-gpio_reguest failed for kb_lock 113
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.326507] gpio-switch: 
-gpio_reguest failed for proximity 89
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.332794] gpio-switch: 
-gpio_reguest failed for sleep_ind 162
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.339172] gpio-switch: 
-gpio_reguest failed for slide 71
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.344970] slide (GPIO 71) is now 
-open
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.349090] proximity (GPIO 89) is 
-now open
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.353485] kb_lock (GPIO 113) is 
-now closed
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.358032] headphone (GPIO 177) 
-is now connected
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.363037] cam_shutter (GPIO 110) 
-is now closed
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.367980] cam_launch (GPIO 69) 
-is now active
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.372680] cam_focus (GPIO 68) is 
-now active
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.378692] registered taskstats 
-version 1
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.385314] omap-gpmc 
-6e000000.gpmc: GPMC revision 5.0
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.391510] GPMC CS0: cs_on 
-      :   0 ticks,   0 ns (was   0 ticks)   0 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.399536] GPMC CS0: cs_rd_off 
-      :  14 ticks,  84 ns (was  16 ticks)  84 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.407531] GPMC CS0: cs_wr_off 
-      :  12 ticks,  72 ns (was  16 ticks)  72 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.415435] GPMC CS0: adv_on 
-      :   0 ticks,   0 ns (was   0 ticks)   0 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.423431] GPMC CS0: adv_rd_off 
-      :   3 ticks,  18 ns (was   2 ticks)  18 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.431365] GPMC CS0: adv_wr_off 
-      :   3 ticks,  18 ns (was   2 ticks)  18 ns
-Jan  4 20:42:50 Nokia-N900 DSME: process '/usr/bin/Xorg -logfile 
-/tmp/Xorg.0.log -logverbose 1 -nolisten tcp -noreset -s 0 -core' started 
-with pid 1095
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.439361] GPMC CS0: oe_on 
-      :   5 ticks,  30 ns (was   2 ticks)  30 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.447357] GPMC CS0: oe_off 
-      :  14 ticks,  84 ns (was  16 ticks)  84 ns
-Jan  4 20:42:50 Nokia-N900 cellular: csd[1026]: Succesfully loaded 
-plugin <sms>
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.455322] GPMC CS0: we_on 
-      :   0 ticks,   0 ns (was   0 ticks)   0 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.463226] GPMC CS0: we_off 
-      :   7 ticks,  42 ns (was  16 ticks)  42 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.471160] GPMC CS0: rd_cycle 
-      :  18 ticks, 108 ns (was  19 ticks) 108 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.479156] GPMC CS0: wr_cycle 
-      :  16 ticks,  96 ns (was  19 ticks)  96 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.487152] GPMC CS0: access 
-      :  13 ticks,  78 ns (was  15 ticks)  78 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.495117] GPMC CS0: 
-page_burst_access:   0 ticks,   0 ns (was   2 ticks)   0 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.503112] GPMC CS0: 
-bus_turnaround   :   0 ticks,   0 ns (was   0 ticks)   0 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.511047] GPMC CS0: 
-cycle2cycle_delay:   0 ticks,   0 ns (was   0 ticks)   0 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.518981] GPMC CS0: 
-wr_data_mux_bus  :   5 ticks,  30 ns (was   5 ticks)  30 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.526916] GPMC CS0: wr_access 
-      :   0 ticks,   0 ns (was  15 ticks)   0 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.534851] GPMC CS0: 
-wait_monitoring  :   0 ticks,   0 ns (was   0 ticks)   0 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.542785] GPMC CS0: 
-clk_activation   :   0 ticks,   0 ns (was   0 ticks)   0 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.550720] GPMC CS0 CLK period is 
-6 ns (div 1)
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.555511] gpmc cs0 after 
-gpmc_cs_set_timings:
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.560333] cs0 GPMC_CS_CONFIG1: 
-0xd1001200
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.564758] cs0 GPMC_CS_CONFIG2: 
-0x000c0e00
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.571014] cs0 GPMC_CS_CONFIG3: 
-0x00030300
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.575500] cs0 GPMC_CS_CONFIG4: 
-0x07000e05
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.580047] cs0 GPMC_CS_CONFIG5: 
-0x000d1012
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.584503] cs0 GPMC_CS_CONFIG6: 
-0x80050000
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.588958] gpmc cs0 access 
-configuration:
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.593292] gpmc,mux-add-data = <2>
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.597015] gpmc,device-width = <1>
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.600738] gpmc,wait-pin = <0>
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.604064] gpmc,burst-length = <16>
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.607910] gpmc,burst-write = <1>
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.611511] gpmc,burst-read = <1>
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.615020] gpmc,burst-wrap = <1>
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.618591] gpmc cs0 timings 
-configuration:
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.623016] gpmc,cs-on-ns = <0> /* 
-0 ns - 0 ns; 0 ticks */
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.628875] gpmc,cs-rd-off-ns = 
-<84> /* 79 ns - 84 ns; 14 ticks */
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.635375] gpmc,cs-wr-off-ns = 
-<72> /* 67 ns - 72 ns; 12 ticks */
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.641967] gpmc,adv-on-ns = <0> 
-/* 0 ns - 0 ns; 0 ticks */
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.647857] gpmc,adv-rd-off-ns = 
-<18> /* 13 ns - 18 ns; 3 ticks */
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.654388] gpmc,adv-wr-off-ns = 
-<18> /* 13 ns - 18 ns; 3 ticks */
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.660919] gpmc,oe-on-ns = <30> 
-/* 25 ns - 30 ns; 5 ticks */
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.667053] gpmc,oe-off-ns = <84> 
-/* 79 ns - 84 ns; 14 ticks */
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.673309] gpmc,we-on-ns = <0> /* 
-0 ns - 0 ns; 0 ticks */
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.679107] gpmc,we-off-ns = <42> 
-/* 37 ns - 42 ns; 7 ticks */
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.685272] gpmc,rd-cycle-ns = 
-<108> /* 103 ns - 108 ns; 18 ticks */
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.691986] gpmc,wr-cycle-ns = 
-<96> /* 91 ns - 96 ns; 16 ticks */
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.698455] gpmc,access-ns = <78> 
-/* 73 ns - 78 ns; 13 ticks */
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.704681] 
-gpmc,page-burst-access-ns = <0> /* 0 ns - 0 ns; 0 ticks */
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.711608] gpmc,bus-turnaround-ns 
-= <0> /* 0 ns - 0 ns; 0 ticks */
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.718231] 
-gpmc,cycle2cycle-delay-ns = <0> /* 0 ns - 0 ns; 0 ticks */
-Jan  4 20:42:50 Nokia-N900 cellular: csd[1026]: Succesfully loaded 
-plugin <ss>
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.725128] 
-gpmc,wait-monitoring-ns = <0> /* 0 ns - 0 ns; 0 ticks */
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.731903] gpmc,clk-activation-ns 
-= <0> /* 0 ns - 0 ns; 0 ticks */
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.738525] 
-gpmc,wr-data-mux-bus-ns = <30> /* 25 ns - 30 ns; 5 ticks */
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.745544] gpmc,wr-access-ns = 
-<0> /* 0 ns - 0 ns; 0 ticks */
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.751831] GPMC CS0: cs_on 
-      :   0 ticks,   0 ns (was   0 ticks)   0 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.759765] GPMC CS0: cs_rd_off 
-      :  16 ticks,  96 ns (was  14 ticks)  96 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.767761] GPMC CS0: cs_wr_off 
-      :  16 ticks,  96 ns (was  12 ticks)  96 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.775665] GPMC CS0: adv_on 
-      :   0 ticks,   0 ns (was   0 ticks)   0 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.783569] GPMC CS0: adv_rd_off 
-      :   2 ticks,  12 ns (was   3 ticks)  12 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.791534] GPMC CS0: adv_wr_off 
-      :   2 ticks,  12 ns (was   3 ticks)  12 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.799468] GPMC CS0: oe_on 
-      :   3 ticks,  18 ns (was   5 ticks)  18 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.807403] GPMC CS0: oe_off 
-      :  16 ticks,  96 ns (was  14 ticks)  96 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.815307] GPMC CS0: we_on 
-      :   0 ticks,   0 ns (was   0 ticks)   0 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.823242] GPMC CS0: we_off 
-      :  16 ticks,  96 ns (was   7 ticks)  96 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.831176] GPMC CS0: rd_cycle 
-      :  19 ticks, 114 ns (was  18 ticks) 114 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.839111] GPMC CS0: wr_cycle 
-      :  19 ticks, 114 ns (was  16 ticks) 114 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.847106] GPMC CS0: access 
-      :  15 ticks,  90 ns (was  13 ticks)  90 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.854980] GPMC CS0: 
-page_burst_access:   2 ticks,  12 ns (was   0 ticks)  12 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.862976] GPMC CS0: 
-bus_turnaround   :   0 ticks,   0 ns (was   0 ticks)   0 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.870971] GPMC CS0: 
-cycle2cycle_delay:   0 ticks,   0 ns (was   0 ticks)   0 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.878906] GPMC CS0: 
-wr_data_mux_bus  :   5 ticks,  30 ns (was   5 ticks)  30 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.886840] GPMC CS0: wr_access 
-      :  15 ticks,  90 ns (was   0 ticks)  90 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.894744] GPMC CS0: 
-wait_monitoring  :   0 ticks,   0 ns (was   0 ticks)   0 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.902740] GPMC CS0: 
-clk_activation   :   1 ticks,   6 ns (was   0 ticks)   6 ns
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.910675] GPMC CS0 CLK period is 
-12 ns (div 2)
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.915557] gpmc cs0 after 
-gpmc_cs_set_timings:
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.920410] cs0 GPMC_CS_CONFIG1: 
-0xfb001201
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.924835] cs0 GPMC_CS_CONFIG2: 
-0x00101000
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.929321] cs0 GPMC_CS_CONFIG3: 
-0x00020200
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.933776] cs0 GPMC_CS_CONFIG4: 
-0x10001003
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.938262] cs0 GPMC_CS_CONFIG5: 
-0x020f1313
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.942687] cs0 GPMC_CS_CONFIG6: 
-0x8f050000
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.947143] gpmc cs0 access 
-configuration:
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.951477] gpmc,mux-add-data = <2>
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.955169] gpmc,device-width = <1>
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.958892] gpmc,wait-pin = <0>
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.962249] gpmc,burst-length = <16>
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.966094] gpmc,sync-write = <1>
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.969604] gpmc,burst-write = <1>
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.973236] gpmc,gpmc,sync-read = <1>
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.977142] gpmc,burst-read = <1>
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.980651] gpmc,burst-wrap = <1>
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.984161] gpmc cs0 timings 
-configuration:
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.988616] gpmc,cs-on-ns = <0> /* 
-0 ns - 0 ns; 0 ticks */
-Jan  4 20:42:50 Nokia-N900 kernel: [    1.994415] gpmc,cs-rd-off-ns = 
-<96> /* 91 ns - 96 ns; 16 ticks */
-Jan  4 20:42:50 Nokia-N900 kernel: [    2.000976] gpmc,cs-wr-off-ns = 
-<96> /* 91 ns - 96 ns; 16 ticks */
-Jan  4 20:42:50 Nokia-N900 kernel: [    2.007537] gpmc,adv-on-ns = <0> 
-/* 0 ns - 0 ns; 0 ticks */
-Jan  4 20:42:50 Nokia-N900 kernel: [    2.013397] gpmc,adv-rd-off-ns = 
-<12> /* 7 ns - 12 ns; 2 ticks */
-Jan  4 20:42:50 Nokia-N900 kernel: [    2.019836] gpmc,adv-wr-off-ns = 
-<12> /* 7 ns - 12 ns; 2 ticks */
-Jan  4 20:42:50 Nokia-N900 kernel: [    2.026306] gpmc,oe-on-ns = <18> 
-/* 13 ns - 18 ns; 3 ticks */
-Jan  4 20:42:50 Nokia-N900 kernel: [    2.032348] gpmc,oe-off-ns = <96> 
-/* 91 ns - 96 ns; 16 ticks */
-Jan  4 20:42:50 Nokia-N900 kernel: [    2.038635] gpmc,we-on-ns = <0> /* 
-0 ns - 0 ns; 0 ticks */
-Jan  4 20:42:50 Nokia-N900 kernel: [    2.044464] gpmc,we-off-ns = <96> 
-/* 91 ns - 96 ns; 16 ticks */
-Jan  4 20:42:50 Nokia-N900 kernel: [    2.050781] gpmc,rd-cycle-ns = 
-<114> /* 109 ns - 114 ns; 19 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.057525] gpmc,wr-cycle-ns = 
-<114> /* 109 ns - 114 ns; 19 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.064208] gpmc,access-ns = <90> 
-/* 85 ns - 90 ns; 15 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.070526] 
-gpmc,page-burst-access-ns = <12> /* 7 ns - 12 ns; 2 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.077636] gpmc,bus-turnaround-ns 
-= <0> /* 0 ns - 0 ns; 0 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.084289] 
-gpmc,cycle2cycle-delay-ns = <0> /* 0 ns - 0 ns; 0 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.091186] 
-gpmc,wait-monitoring-ns = <0> /* 0 ns - 0 ns; 0 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.097930] gpmc,clk-activation-ns 
-= <6> /* 1 ns - 6 ns; 1 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.104583] 
-gpmc,wr-data-mux-bus-ns = <30> /* 25 ns - 30 ns; 5 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.111633] gpmc,wr-access-ns = 
-<90> /* 85 ns - 90 ns; 15 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.118194] omap2-onenand 
-omap2-onenand: initializing on CS0, phys base 0x01000000, virtual base 
-d0940000, freq 83 MHz
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.129486] OneNAND Manufacturer: 
-Numonyx (0x20)
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.129516] Muxed OneNAND 256MB 
-1.8V 16-bit (0x40)
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.134582] OneNAND version = 0x0031
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.138366] Chip support all block 
-unlock
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.138366] Chip has 2 plane
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.139953] Scanning device for 
-bad blocks
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.238616] 6 ofpart partitions 
-found on MTD device (null)
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.244415] Creating 6 MTD 
-partitions on "(null)":
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.249633] 
-0x000000000000-0x000000020000 : "bootloader"
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.256164] 
-0x000000020000-0x000000080000 : "config"
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.262084] 
-0x000000080000-0x0000000c0000 : "log"
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.270233] mtdoops: ready 33, 
-959521135 (no erase)
-Jan  4 20:42:51 Nokia-N900 gconfd (root-1094): starting (version 
-2.16.0), pid 1094 user 'root'
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.270233] mtdoops: Attached to 
-MTD device 2
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.274871] 
-0x0000000c0000-0x0000002c0000 : "kernel"
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.280914] 
-0x0000002c0000-0x0000004c0000 : "initfs"
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.286895] 
-0x0000004c0000-0x000010000000 : "rootfs"
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.294494] gpmc cs1 before 
-gpmc_cs_program_settings:
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.299865] cs1 GPMC_CS_CONFIG1: 
-0x00001000
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.304290] cs1 GPMC_CS_CONFIG2: 
-0x00101001
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.308776] cs1 GPMC_CS_CONFIG3: 
-0x00020201
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.313232] cs1 GPMC_CS_CONFIG4: 
-0x10031003
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.317718] cs1 GPMC_CS_CONFIG5: 
-0x010f1111
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.322143] cs1 GPMC_CS_CONFIG6: 
-0x8f030000
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.326599] gpmc cs1 access 
-configuration:
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.330902] gpmc,mux-add-data = <0>
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.334625] gpmc,device-width = <1>
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.338348] gpmc,wait-pin = <0>
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.341674] gpmc,burst-length = <4>
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.345367] gpmc cs1 timings 
-configuration:
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.349822] gpmc,cs-on-ns = <6> /* 
-1 ns - 6 ns; 1 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.355651] gpmc,cs-rd-off-ns = 
-<96> /* 91 ns - 96 ns; 16 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.362243] gpmc,cs-wr-off-ns = 
-<96> /* 91 ns - 96 ns; 16 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.368804] gpmc,adv-on-ns = <6> 
-/* 1 ns - 6 ns; 1 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.374664] gpmc,adv-rd-off-ns = 
-<12> /* 7 ns - 12 ns; 2 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.381195] gpmc,adv-wr-off-ns = 
-<12> /* 7 ns - 12 ns; 2 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.387695] gpmc,oe-on-ns = <18> 
-/* 13 ns - 18 ns; 3 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.393798] gpmc,oe-off-ns = <96> 
-/* 91 ns - 96 ns; 16 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.400054] gpmc,we-on-ns = <18> 
-/* 13 ns - 18 ns; 3 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.406188] gpmc,we-off-ns = <96> 
-/* 91 ns - 96 ns; 16 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.412414] gpmc,rd-cycle-ns = 
-<102> /* 97 ns - 102 ns; 17 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.419067] gpmc,wr-cycle-ns = 
-<102> /* 97 ns - 102 ns; 17 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.425720] gpmc,access-ns = <90> 
-/* 85 ns - 90 ns; 15 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.432006] 
-gpmc,page-burst-access-ns = <6> /* 1 ns - 6 ns; 1 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.438964] gpmc,bus-turnaround-ns 
-= <0> /* 0 ns - 0 ns; 0 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.445556] 
-gpmc,cycle2cycle-delay-ns = <0> /* 0 ns - 0 ns; 0 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.452484] 
-gpmc,wait-monitoring-ns = <0> /* 0 ns - 0 ns; 0 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.459197] gpmc,clk-activation-ns 
-= <0> /* 0 ns - 0 ns; 0 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.465850] 
-gpmc,wr-data-mux-bus-ns = <18> /* 13 ns - 18 ns; 3 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.472869] gpmc,wr-access-ns = 
-<90> /* 85 ns - 90 ns; 15 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.479461] GPMC CS1: cs_on 
-      :   0 ticks,   0 ns (was   1 ticks)   0 ns
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.487396] GPMC CS1: cs_rd_off 
-      :   8 ticks,  48 ns (was  16 ticks)  48 ns
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.495361] GPMC CS1: cs_wr_off 
-      :   4 ticks,  24 ns (was  16 ticks)  24 ns
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.503295] GPMC CS1: adv_on 
-      :   0 ticks,   0 ns (was   1 ticks)   0 ns
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.511230] GPMC CS1: adv_rd_off 
-      :   0 ticks,   0 ns (was   2 ticks)   0 ns
-Jan  4 20:42:51 Nokia-N900 waitx[1097]: trying to get X display
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.519165] GPMC CS1: adv_wr_off 
-      :   0 ticks,   0 ns (was   2 ticks)   0 ns
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.527099] GPMC CS1: oe_on 
-      :   2 ticks,  12 ns (was   3 ticks)  12 ns
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.535003] GPMC CS1: oe_off 
-      :   8 ticks,  48 ns (was  16 ticks)  48 ns
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.542999] GPMC CS1: we_on 
-      :   2 ticks,  12 ns (was   3 ticks)  12 ns
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.550933] GPMC CS1: we_off 
-      :   3 ticks,  18 ns (was  16 ticks)  18 ns
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.558929] GPMC CS1: rd_cycle 
-      :  30 ticks, 180 ns (was  17 ticks) 180 ns
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.566864] GPMC CS1: wr_cycle 
-      :  30 ticks, 180 ns (was  17 ticks) 180 ns
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.574768] GPMC CS1: access 
-      :   7 ticks,  42 ns (was  15 ticks)  42 ns
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.582733] GPMC CS1: 
-page_burst_access:   0 ticks,   0 ns (was   1 ticks)   0 ns
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.590728] GPMC CS1: 
-bus_turnaround   :   0 ticks,   0 ns (was   0 ticks)   0 ns
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.598663] GPMC CS1: 
-cycle2cycle_delay:   0 ticks,   0 ns (was   0 ticks)   0 ns
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.606658] GPMC CS1: 
-wr_data_mux_bus  :   2 ticks,  12 ns (was   3 ticks)  12 ns
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.614624] GPMC CS1: wr_access 
-      :   0 ticks,   0 ns (was  15 ticks)   0 ns
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.622528] GPMC CS1: 
-wait_monitoring  :   0 ticks,   0 ns (was   0 ticks)   0 ns
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.630523] GPMC CS1: 
-clk_activation   :   0 ticks,   0 ns (was   0 ticks)   0 ns
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.638458] GPMC CS1 CLK period is 
-6 ns (div 1)
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.643249] gpmc cs1 after 
-gpmc_cs_set_timings:
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.648040] cs1 GPMC_CS_CONFIG1: 
-0x00001000
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.652465] cs1 GPMC_CS_CONFIG2: 
-0x00040800
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.656951] cs1 GPMC_CS_CONFIG3: 
-0x00000000
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.661376] cs1 GPMC_CS_CONFIG4: 
-0x03020802
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.665863] cs1 GPMC_CS_CONFIG5: 
-0x00071e1e
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.670318] cs1 GPMC_CS_CONFIG6: 
-0x80020000
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.674713] gpmc cs1 access 
-configuration:
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.679107] gpmc,mux-add-data = <0>
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.682769] gpmc,device-width = <1>
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.686523] gpmc,wait-pin = <0>
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.689880] gpmc,burst-length = <4>
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.693572] gpmc cs1 timings 
-configuration:
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.698059] gpmc,cs-on-ns = <0> /* 
-0 ns - 0 ns; 0 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.703857] gpmc,cs-rd-off-ns = 
-<48> /* 43 ns - 48 ns; 8 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.710296] gpmc,cs-wr-off-ns = 
-<24> /* 19 ns - 24 ns; 4 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.716735] gpmc,adv-on-ns = <0> 
-/* 0 ns - 0 ns; 0 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.722656] gpmc,adv-rd-off-ns = 
-<0> /* 0 ns - 0 ns; 0 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.728942] gpmc,adv-wr-off-ns = 
-<0> /* 0 ns - 0 ns; 0 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.735168] gpmc,oe-on-ns = <12> 
-/* 7 ns - 12 ns; 2 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.741180] gpmc,oe-off-ns = <48> 
-/* 43 ns - 48 ns; 8 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.747344] gpmc,we-on-ns = <12> 
-/* 7 ns - 12 ns; 2 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.753356] gpmc,we-off-ns = <18> 
-/* 13 ns - 18 ns; 3 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.759552] gpmc,rd-cycle-ns = 
-<180> /* 175 ns - 180 ns; 30 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.766296] gpmc,wr-cycle-ns = 
-<180> /* 175 ns - 180 ns; 30 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.772979] gpmc,access-ns = <42> 
-/* 37 ns - 42 ns; 7 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.779144] 
-gpmc,page-burst-access-ns = <0> /* 0 ns - 0 ns; 0 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.786102] gpmc,bus-turnaround-ns 
-= <0> /* 0 ns - 0 ns; 0 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.792785] 
-gpmc,cycle2cycle-delay-ns = <0> /* 0 ns - 0 ns; 0 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.799743] 
-gpmc,wait-monitoring-ns = <0> /* 0 ns - 0 ns; 0 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.806518] gpmc,clk-activation-ns 
-= <0> /* 0 ns - 0 ns; 0 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.813110] 
-gpmc,wr-data-mux-bus-ns = <12> /* 7 ns - 12 ns; 2 ticks */
-Jan  4 20:42:51 Nokia-N900 kernel: [    2.820037] gpmc,wr-access-ns = 
-<0> /* 0 ns - 0 ns; 0 ticks */
+I would rather have same precision for all offsets
+like
+...CTRLSTS_OFFSET  0x000
+and so on
+
+> +
+> +#define EVCA_CTRLSTS_OFFSET            0x0
+> +#define EVCA_INTCTRL_OFFSET            0x4
+> +#define EVCA_RING_LOW_OFFSET           0x8
+> +#define EVCA_RING_HIGH_OFFSET          0xC
+> +#define EVCA_RING_LEN_OFFSET           0x10
+> +#define EVCA_READ_PTR_OFFSET           0x18
+> +#define EVCA_WRITE_PTR_OFFSET          0x20
+> +#define EVCA_DOORBELL_OFFSET           0x400
+
+Ditto.
+
+> +
+> +#define EVCA_IRQ_STAT_OFFSET           0x100
+> +#define EVCA_IRQ_CLR_OFFSET            0x108
+> +#define EVCA_IRQ_EN_OFFSET             0x110
+> +
+> +#define EVRE_CFG_IDX                   0
+> +#define EVRE_LEN_IDX                   1
+> +#define EVRE_DEST_LOW_IDX              2
+> +#define EVRE_DEST_HI_IDX               3
+> +
+> +#define EVRE_ERRINFO_BIT_POS           24
+> +#define EVRE_CODE_BIT_POS              28
+> +
+> +#define EVRE_ERRINFO_MASK              GENMASK(3, 0)
+> +#define EVRE_CODE_MASK                 GENMASK(3, 0)
+> +
+> +#define CH_CONTROL_MASK                GENMASK(7, 0)
+> +#define CH_STATE_MASK                  GENMASK(7, 0)
+> +#define CH_STATE_BIT_POS               0x8
+> +
+> +#define IRQ_EV_CH_EOB_IRQ_BIT_POS      0
+> +#define IRQ_EV_CH_WR_RESP_BIT_POS      1
+> +#define IRQ_TR_CH_TRE_RD_RSP_ER_BIT_POS 9
+> +#define IRQ_TR_CH_DATA_RD_ER_BIT_POS   10
+> +#define IRQ_TR_CH_DATA_WR_ER_BIT_POS   11
+> +#define IRQ_TR_CH_INVALID_TRE_BIT_POS  14
+> +
+> +#define        ENABLE_IRQS (BIT(IRQ_EV_CH_EOB_IRQ_BIT_POS)     | \
+> +               BIT(IRQ_EV_CH_WR_RESP_BIT_POS)          | \
+> +               BIT(IRQ_TR_CH_TRE_RD_RSP_ER_BIT_POS)    | \
+> +               BIT(IRQ_TR_CH_DATA_RD_ER_BIT_POS)       | \
+> +               BIT(IRQ_TR_CH_DATA_WR_ER_BIT_POS)       | \
+> +               BIT(IRQ_TR_CH_INVALID_TRE_BIT_POS))
+> +
+> +enum ch_command {
+> +       CH_DISABLE = 0,
+> +       CH_ENABLE = 1,
+> +       CH_SUSPEND = 2,
+> +       CH_RESET = 9,
+> +};
+> +
+> +enum ch_state {
+> +       CH_DISABLED = 0,
+> +       CH_ENABLED = 1,
+> +       CH_RUNNING = 2,
+> +       CH_SUSPENDED = 3,
+> +       CH_STOPPED = 4,
+> +       CH_ERROR = 5,
+> +       CH_IN_RESET = 9,
+> +};
+> +
+> +enum tre_type {
+> +       TRE_MEMCPY = 3,
+> +       TRE_MEMSET = 4,
+> +};
+> +
+> +enum evre_type {
+> +       EVRE_DMA_COMPLETE = 0x23,
+> +       EVRE_IMM_DATA = 0x24,
+> +};
+> +
+> +enum err_code {
+> +       EVRE_STATUS_COMPLETE = 1,
+> +       EVRE_STATUS_ERROR = 4,
+> +};
+> +
+> +void hidma_ll_free(struct hidma_lldev *lldev, u32 tre_ch)
+> +{
+> +       struct hidma_tre *tre;
+> +
+> +       if (tre_ch >= lldev->nr_tres) {
+> +               dev_err(lldev->dev, "invalid TRE number in free:%d", tre_ch);
+> +               return;
+> +       }
+> +
+> +       tre = &lldev->trepool[tre_ch];
+> +       if (atomic_read(&tre->allocated) != true) {
+> +               dev_err(lldev->dev, "trying to free an unused TRE:%d", tre_ch);
+> +               return;
+> +       }
+> +
+> +       atomic_set(&tre->allocated, 0);
+> +}
+> +
+> +int hidma_ll_request(struct hidma_lldev *lldev, u32 dma_sig,
+> +                    const char *dev_name,
+> +                    void (*callback)(void *data), void *data, u32 *tre_ch)
+> +{
+> +       unsigned int i;
+> +       struct hidma_tre *tre;
+> +       u32 *tre_local;
+> +
+> +       if (!tre_ch || !lldev)
+> +               return -EINVAL;
+> +
+> +       /* need to have at least one empty spot in the queue */
+> +       for (i = 0; i < lldev->nr_tres - 1; i++) {
+> +               if (atomic_add_unless(&lldev->trepool[i].allocated, 1, 1))
+> +                       break;
+> +       }
+> +
+> +       if (i == (lldev->nr_tres - 1))
+> +               return -ENOMEM;
+> +
+> +       tre = &lldev->trepool[i];
+> +       tre->dma_sig = dma_sig;
+> +       tre->dev_name = dev_name;
+> +       tre->callback = callback;
+> +       tre->data = data;
+> +       tre->idx = i;
+> +       tre->status = 0;
+> +       tre->queued = 0;
+> +       lldev->tx_status_list[i].err_code = 0;
+> +       tre->lldev = lldev;
+> +       tre_local = &tre->tre_local[0];
+> +       tre_local[TRE_CFG_IDX] = TRE_MEMCPY;
+> +       tre_local[TRE_CFG_IDX] |= (lldev->chidx & 0xFF) << 8;
+> +       tre_local[TRE_CFG_IDX] |= BIT(16);      /* set IEOB */
+> +       *tre_ch = i;
+> +       if (callback)
+> +               callback(data);
+> +       return 0;
+> +}
+> +
+> +/*
+> + * Multiple TREs may be queued and waiting in the
+> + * pending queue.
+> + */
+> +static void hidma_ll_tre_complete(unsigned long arg)
+> +{
+> +       struct hidma_lldev *lldev = (struct hidma_lldev *)arg;
+> +       struct hidma_tre *tre;
+> +
+> +       while (kfifo_out(&lldev->handoff_fifo, &tre, 1)) {
+> +               /* call the user if it has been read by the hardware */
+> +               if (tre->callback)
+> +                       tre->callback(tre->data);
+> +       }
+> +}
+> +
+> +/*
+> + * Called to handle the interrupt for the channel.
+> + * Return a positive number if TRE or EVRE were consumed on this run.
+> + * Return a positive number if there are pending TREs or EVREs.
+> + * Return 0 if there is nothing to consume or no pending TREs/EVREs found.
+> + */
+> +static int hidma_handle_tre_completion(struct hidma_lldev *lldev)
+> +{
+> +       struct hidma_tre *tre;
+> +       u32 evre_write_off;
+> +       u32 evre_ring_size = lldev->evre_ring_size;
+> +       u32 tre_ring_size = lldev->tre_ring_size;
+> +       u32 num_completed = 0, tre_iterator, evre_iterator;
+> +       unsigned long flags;
+> +
+> +       evre_write_off = readl_relaxed(lldev->evca + EVCA_WRITE_PTR_OFFSET);
+> +       tre_iterator = lldev->tre_processed_off;
+> +       evre_iterator = lldev->evre_processed_off;
+> +
+> +       if ((evre_write_off > evre_ring_size) ||
+> +           ((evre_write_off % EVRE_SIZE) != 0)) {
+> +               dev_err(lldev->dev, "HW reports invalid EVRE write offset\n");
+> +               return 0;
+> +       }
+> +
+> +       /*
+> +        * By the time control reaches here the number of EVREs and TREs
+> +        * may not match. Only consume the ones that hardware told us.
+> +        */
+> +       while ((evre_iterator != evre_write_off)) {
+> +               u32 *current_evre = lldev->evre_ring + evre_iterator;
+> +               u32 cfg;
+> +               u8 err_info;
+> +
+> +               spin_lock_irqsave(&lldev->lock, flags);
+> +               tre = lldev->pending_tre_list[tre_iterator / TRE_SIZE];
+> +               if (!tre) {
+> +                       spin_unlock_irqrestore(&lldev->lock, flags);
+> +                       dev_warn(lldev->dev,
+> +                                "tre_index [%d] and tre out of sync\n",
+> +                                tre_iterator / TRE_SIZE);
+> +                       tre_iterator += TRE_SIZE;
+> +                       if (tre_iterator >= tre_ring_size)
+> +                               tre_iterator -= tre_ring_size;
+
+Could it be refactored to macro
+increment_iterator(iter,size,ring_size) ?
+
+> +                       evre_iterator += EVRE_SIZE;
+> +                       if (evre_iterator >= evre_ring_size)
+> +                               evre_iterator -= evre_ring_size;
+
+Ditto.
+
+> +
+> +                       continue;
+> +               }
+> +               lldev->pending_tre_list[tre->tre_index] = NULL;
+> +
+> +               /*
+> +                * Keep track of pending TREs that SW is expecting to receive
+> +                * from HW. We got one now. Decrement our counter.
+> +                */
+> +               lldev->pending_tre_count--;
+> +               if (lldev->pending_tre_count < 0) {
+> +                       dev_warn(lldev->dev,
+> +                                "tre count mismatch on completion");
+> +                       lldev->pending_tre_count = 0;
+> +               }
+> +
+> +               spin_unlock_irqrestore(&lldev->lock, flags);
+> +
+> +               cfg = current_evre[EVRE_CFG_IDX];
+> +               err_info = cfg >> EVRE_ERRINFO_BIT_POS;
+> +               err_info &= EVRE_ERRINFO_MASK;
+> +               lldev->tx_status_list[tre->idx].err_info = err_info;
+> +               lldev->tx_status_list[tre->idx].err_code =
+> +                   (cfg >> EVRE_CODE_BIT_POS) & EVRE_CODE_MASK;
+> +               tre->queued = 0;
+> +
+> +               kfifo_put(&lldev->handoff_fifo, tre);
+> +               tasklet_schedule(&lldev->task);
+> +
+> +               tre_iterator += TRE_SIZE;
+> +               if (tre_iterator >= tre_ring_size)
+> +                       tre_iterator -= tre_ring_size;
+
+Ditto.
+
+> +               evre_iterator += EVRE_SIZE;
+> +               if (evre_iterator >= evre_ring_size)
+> +                       evre_iterator -= evre_ring_size;
+
+Ditto.
+
+> +
+> +               /*
+> +                * Read the new event descriptor written by the HW.
+> +                * As we are processing the delivered events, other events
+> +                * get queued to the SW for processing.
+> +                */
+> +               evre_write_off =
+> +                   readl_relaxed(lldev->evca + EVCA_WRITE_PTR_OFFSET);
+> +               num_completed++;
+> +       }
+> +
+> +       if (num_completed) {
+> +               u32 evre_read_off = (lldev->evre_processed_off +
+> +                                    EVRE_SIZE * num_completed);
+> +               u32 tre_read_off = (lldev->tre_processed_off +
+> +                                   TRE_SIZE * num_completed);
+> +
+> +               evre_read_off = evre_read_off % evre_ring_size;
+> +               tre_read_off = tre_read_off % tre_ring_size;
+> +
+> +               writel(evre_read_off, lldev->evca + EVCA_DOORBELL_OFFSET);
+> +
+> +               /* record the last processed tre offset */
+> +               lldev->tre_processed_off = tre_read_off;
+> +               lldev->evre_processed_off = evre_read_off;
+> +       }
+> +
+> +       return num_completed;
+> +}
+> +
+> +void hidma_cleanup_pending_tre(struct hidma_lldev *lldev, u8 err_info,
+> +                              u8 err_code)
+> +{
+> +       u32 tre_iterator;
+> +       struct hidma_tre *tre;
+> +       u32 tre_ring_size = lldev->tre_ring_size;
+> +       int num_completed = 0;
+> +       u32 tre_read_off;
+> +       unsigned long flags;
+> +
+> +       tre_iterator = lldev->tre_processed_off;
+> +       while (lldev->pending_tre_count) {
+> +               int tre_index = tre_iterator / TRE_SIZE;
+> +
+> +               spin_lock_irqsave(&lldev->lock, flags);
+> +               tre = lldev->pending_tre_list[tre_index];
+> +               if (!tre) {
+> +                       spin_unlock_irqrestore(&lldev->lock, flags);
+> +                       tre_iterator += TRE_SIZE;
+> +                       if (tre_iterator >= tre_ring_size)
+> +                               tre_iterator -= tre_ring_size;
+
+Ditto.
+
+> +                       continue;
+> +               }
+> +               lldev->pending_tre_list[tre_index] = NULL;
+> +               lldev->pending_tre_count--;
+> +               if (lldev->pending_tre_count < 0) {
+> +                       dev_warn(lldev->dev,
+> +                                "tre count mismatch on completion");
+> +                       lldev->pending_tre_count = 0;
+> +               }
+> +               spin_unlock_irqrestore(&lldev->lock, flags);
+> +
+> +               lldev->tx_status_list[tre->idx].err_info = err_info;
+> +               lldev->tx_status_list[tre->idx].err_code = err_code;
+> +               tre->queued = 0;
+> +
+> +               kfifo_put(&lldev->handoff_fifo, tre);
+> +               tasklet_schedule(&lldev->task);
+> +
+> +               tre_iterator += TRE_SIZE;
+> +               if (tre_iterator >= tre_ring_size)
+> +                       tre_iterator -= tre_ring_size;
+
+Ditto.
+
+> +
+> +               num_completed++;
+> +       }
+> +       tre_read_off = (lldev->tre_processed_off + TRE_SIZE * num_completed);
+> +
+> +       tre_read_off = tre_read_off % tre_ring_size;
+> +
+> +       /* record the last processed tre offset */
+> +       lldev->tre_processed_off = tre_read_off;
+> +}
+> +
+> +static int hidma_ll_reset(struct hidma_lldev *lldev)
+> +{
+> +       u32 val;
+> +       int ret;
+> +
+> +       val = readl(lldev->trca + TRCA_CTRLSTS_OFFSET);
+> +       val &= ~(CH_CONTROL_MASK << 16);
+> +       val |= CH_RESET << 16;
+> +       writel(val, lldev->trca + TRCA_CTRLSTS_OFFSET);
+> +
+> +       /*
+> +        * Delay 10ms after reset to allow DMA logic to quiesce.
+> +        * Do a polled read up to 1ms and 10ms maximum.
+> +        */
+> +       ret = readl_poll_timeout(lldev->trca + TRCA_CTRLSTS_OFFSET, val,
+> +                                (((val >> CH_STATE_BIT_POS) & CH_STATE_MASK) ==
+> +                                 CH_DISABLED), 1000, 10000);
+> +       if (ret) {
+> +               dev_err(lldev->dev, "transfer channel did not reset\n");
+> +               return ret;
+> +       }
+> +
+> +       val = readl(lldev->evca + EVCA_CTRLSTS_OFFSET);
+> +       val &= ~(CH_CONTROL_MASK << 16);
+> +       val |= CH_RESET << 16;
+> +       writel(val, lldev->evca + EVCA_CTRLSTS_OFFSET);
+> +
+> +       /*
+> +        * Delay 10ms after reset to allow DMA logic to quiesce.
+> +        * Do a polled read up to 1ms and 10ms maximum.
+> +        */
+> +       ret = readl_poll_timeout(lldev->evca + EVCA_CTRLSTS_OFFSET, val,
+> +                                (((val >> CH_STATE_BIT_POS) & CH_STATE_MASK) ==
+> +                                 CH_DISABLED), 1000, 10000);
+> +       if (ret)
+> +               return ret;
+> +
+> +       lldev->trch_state = CH_DISABLED;
+> +       lldev->evch_state = CH_DISABLED;
+> +       return 0;
+> +}
+> +
+> +static void hidma_ll_enable_irq(struct hidma_lldev *lldev, u32 irq_bits)
+> +{
+> +       writel(irq_bits, lldev->evca + EVCA_IRQ_EN_OFFSET);
+> +}
+> +
+> +/*
+> + * The interrupt handler for HIDMA will try to consume as many pending
+> + * EVRE from the event queue as possible. Each EVRE has an associated
+> + * TRE that holds the user interface parameters. EVRE reports the
+> + * result of the transaction. Hardware guarantees ordering between EVREs
+> + * and TREs. We use last processed offset to figure out which TRE is
+> + * associated with which EVRE. If two TREs are consumed by HW, the EVREs
+> + * are in order in the event ring.
+> + *
+> + * This handler will do a one pass for consuming EVREs. Other EVREs may
+> + * be delivered while we are working. It will try to consume incoming
+> + * EVREs one more time and return.
+> + *
+> + * For unprocessed EVREs, hardware will trigger another interrupt until
+> + * all the interrupt bits are cleared.
+> + *
+> + * Hardware guarantees that by the time interrupt is observed, all data
+> + * transactions in flight are delivered to their respective places and
+> + * are visible to the CPU.
+> + *
+> + * On demand paging for IOMMU is only supported for PCIe via PRI
+> + * (Page Request Interface) not for HIDMA. All other hardware instances
+> + * including HIDMA work on pinned DMA addresses.
+> + *
+> + * HIDMA is not aware of IOMMU presence since it follows the DMA API. All
+> + * IOMMU latency will be built into the data movement time. By the time
+> + * interrupt happens, IOMMU lookups + data movement has already taken place.
+> + *
+> + * While the first read in a typical PCI endpoint ISR flushes all outstanding
+> + * requests traditionally to the destination, this concept does not apply
+> + * here for this HW.
+> + */
+> +static void hidma_ll_int_handler_internal(struct hidma_lldev *lldev)
+> +{
+> +       u32 status;
+> +       u32 enable;
+> +       u32 cause;
+> +       int repeat = 2;
+> +       unsigned long timeout;
+> +
+> +       /*
+> +        * Fine tuned for this HW...
+> +        *
+> +        * This ISR has been designed for this particular hardware. Relaxed
+> +        * read and write accessors are used for performance reasons due to
+> +        * interrupt delivery guarantees. Do not copy this code blindly and
+> +        * expect that to work.
+> +        */
+> +       status = readl_relaxed(lldev->evca + EVCA_IRQ_STAT_OFFSET);
+> +       enable = readl_relaxed(lldev->evca + EVCA_IRQ_EN_OFFSET);
+> +       cause = status & enable;
+> +
+> +       if ((cause & (BIT(IRQ_TR_CH_INVALID_TRE_BIT_POS))) ||
+> +           (cause & BIT(IRQ_TR_CH_TRE_RD_RSP_ER_BIT_POS)) ||
+> +           (cause & BIT(IRQ_EV_CH_WR_RESP_BIT_POS)) ||
+> +           (cause & BIT(IRQ_TR_CH_DATA_RD_ER_BIT_POS)) ||
+> +           (cause & BIT(IRQ_TR_CH_DATA_WR_ER_BIT_POS))) {
+> +               u8 err_code = EVRE_STATUS_ERROR;
+> +               u8 err_info = 0xFF;
+> +
+> +               /* Clear out pending interrupts */
+> +               writel(cause, lldev->evca + EVCA_IRQ_CLR_OFFSET);
+> +
+> +               dev_err(lldev->dev, "error 0x%x, resetting...\n", cause);
+> +
+> +               hidma_cleanup_pending_tre(lldev, err_info, err_code);
+> +
+> +               /* reset the channel for recovery */
+> +               if (hidma_ll_setup(lldev)) {
+> +                       dev_err(lldev->dev,
+> +                               "channel reinitialize failed after error\n");
+> +                       return;
+> +               }
+> +               hidma_ll_enable_irq(lldev, ENABLE_IRQS);
+> +               return;
+> +       }
+> +
+> +       /*
+> +        * Try to consume as many EVREs as possible.
+> +        * skip this loop if the interrupt is spurious.
+> +        */
+> +       while (cause && repeat) {
+> +               unsigned long start = jiffies;
+> +
+> +               /* This timeout should be sufficent for core to finish */
+> +               timeout = start + msecs_to_jiffies(500);
+> +
+> +               while (lldev->pending_tre_count) {
+> +                       hidma_handle_tre_completion(lldev);
+> +                       if (time_is_before_jiffies(timeout)) {
+> +                               dev_warn(lldev->dev,
+> +                                        "ISR timeout %lx-%lx from %lx [%d]\n",
+> +                                        jiffies, timeout, start,
+> +                                        lldev->pending_tre_count);
+> +                               break;
+> +                       }
+> +               }
+> +
+> +               /* We consumed TREs or there are pending TREs or EVREs. */
+> +               writel_relaxed(cause, lldev->evca + EVCA_IRQ_CLR_OFFSET);
+> +
+> +               /*
+> +                * Another interrupt might have arrived while we are
+> +                * processing this one. Read the new cause.
+> +                */
+> +               status = readl_relaxed(lldev->evca + EVCA_IRQ_STAT_OFFSET);
+> +               enable = readl_relaxed(lldev->evca + EVCA_IRQ_EN_OFFSET);
+> +               cause = status & enable;
+> +
+> +               repeat--;
+> +       }
+> +}
+> +
+> +static int hidma_ll_enable(struct hidma_lldev *lldev)
+> +{
+> +       u32 val;
+> +       int ret;
+> +
+> +       val = readl(lldev->evca + EVCA_CTRLSTS_OFFSET);
+> +       val &= ~(CH_CONTROL_MASK << 16);
+> +       val |= CH_ENABLE << 16;
+> +       writel(val, lldev->evca + EVCA_CTRLSTS_OFFSET);
+> +
+> +       ret = readl_poll_timeout(lldev->evca + EVCA_CTRLSTS_OFFSET, val,
+> +                                ((((val >> CH_STATE_BIT_POS) & CH_STATE_MASK)
+> +                                  == CH_ENABLED)
+> +                                 ||
+> +                                 (((val >> CH_STATE_BIT_POS) & CH_STATE_MASK)
+> +                                  == CH_RUNNING)), 1000, 10000);
+> +       if (ret) {
+> +               dev_err(lldev->dev, "event channel did not get enabled\n");
+> +               return ret;
+> +       }
+> +
+> +       val = readl(lldev->trca + TRCA_CTRLSTS_OFFSET);
+> +       val &= ~(CH_CONTROL_MASK << 16);
+> +       val |= CH_ENABLE << 16;
+> +       writel(val, lldev->trca + TRCA_CTRLSTS_OFFSET);
+> +
+> +       ret = readl_poll_timeout(lldev->trca + TRCA_CTRLSTS_OFFSET, val,
+> +                                ((((val >> CH_STATE_BIT_POS) & CH_STATE_MASK)
+> +                                  == CH_ENABLED)
+> +                                 ||
+> +                                 (((val >> CH_STATE_BIT_POS) & CH_STATE_MASK)
+> +                                  == CH_RUNNING)), 1000, 10000);
+
+u32 val, state;
+
+state = (val >> CH_STATE_BIT_POS) & CH_STATE_MASK;
+
+...
+
+And above.
+
+> +       if (ret) {
+> +               dev_err(lldev->dev, "transfer channel did not get enabled\n");
+> +               return ret;
+> +       }
+> +
+> +       lldev->trch_state = CH_ENABLED;
+> +       lldev->evch_state = CH_ENABLED;
+> +
+> +       return 0;
+> +}
+> +
+> +int hidma_ll_resume(struct hidma_lldev *lldev)
+> +{
+> +       return hidma_ll_enable(lldev);
+> +}
+> +
+> +static void hidma_ll_hw_start(struct hidma_lldev *lldev)
+> +{
+> +       unsigned long irqflags;
+> +
+> +       spin_lock_irqsave(&lldev->lock, irqflags);
+> +       writel(lldev->tre_write_offset, lldev->trca + TRCA_DOORBELL_OFFSET);
+> +       spin_unlock_irqrestore(&lldev->lock, irqflags);
+> +}
+> +
+> +bool hidma_ll_isenabled(struct hidma_lldev *lldev)
+> +{
+> +       u32 val;
+> +
+> +       val = readl(lldev->trca + TRCA_CTRLSTS_OFFSET);
+> +       lldev->trch_state = (val >> CH_STATE_BIT_POS) & CH_STATE_MASK;
+> +       val = readl(lldev->evca + EVCA_CTRLSTS_OFFSET);
+> +       lldev->evch_state = (val >> CH_STATE_BIT_POS) & CH_STATE_MASK;
+
+Even macro
+
+#define CH_STATE(v) ...
+
+> +
+> +       /* both channels have to be enabled before calling this function */
+> +       if (((lldev->trch_state == CH_ENABLED) ||
+> +            (lldev->trch_state == CH_RUNNING)) &&
+> +           ((lldev->evch_state == CH_ENABLED) ||
+> +            (lldev->evch_state == CH_RUNNING)))
+> +               return true;
+> +
+> +       return false;
+> +}
+> +
+> +void hidma_ll_queue_request(struct hidma_lldev *lldev, u32 tre_ch)
+> +{
+> +       struct hidma_tre *tre;
+> +       unsigned long flags;
+> +
+> +       tre = &lldev->trepool[tre_ch];
+> +
+> +       /* copy the TRE into its location in the TRE ring */
+> +       spin_lock_irqsave(&lldev->lock, flags);
+> +       tre->tre_index = lldev->tre_write_offset / TRE_SIZE;
+> +       lldev->pending_tre_list[tre->tre_index] = tre;
+> +       memcpy(lldev->tre_ring + lldev->tre_write_offset, &tre->tre_local[0],
+> +              TRE_SIZE);
+> +       lldev->tx_status_list[tre->idx].err_code = 0;
+> +       lldev->tx_status_list[tre->idx].err_info = 0;
+> +       tre->queued = 1;
+> +       lldev->pending_tre_count++;
+> +       lldev->tre_write_offset = (lldev->tre_write_offset + TRE_SIZE)
+> +           % lldev->tre_ring_size;
+> +       spin_unlock_irqrestore(&lldev->lock, flags);
+> +}
+> +
+> +void hidma_ll_start(struct hidma_lldev *lldev)
+> +{
+> +       hidma_ll_hw_start(lldev);
+> +}
+> +
+> +/*
+> + * Note that even though we stop this channel
+> + * if there is a pending transaction in flight
+> + * it will complete and follow the callback.
+> + * This request will prevent further requests
+> + * to be made.
+> + */
+> +int hidma_ll_pause(struct hidma_lldev *lldev)
+> +{
+> +       u32 val;
+> +       int ret;
+> +
+> +       val = readl(lldev->evca + EVCA_CTRLSTS_OFFSET);
+> +       lldev->evch_state = (val >> CH_STATE_BIT_POS) & CH_STATE_MASK;
+> +       val = readl(lldev->trca + TRCA_CTRLSTS_OFFSET);
+> +       lldev->trch_state = (val >> CH_STATE_BIT_POS) & CH_STATE_MASK;
+
+
+Ditto.
+
+> +
+> +       /* already suspended by this OS */
+> +       if ((lldev->trch_state == CH_SUSPENDED) ||
+> +           (lldev->evch_state == CH_SUSPENDED))
+> +               return 0;
+> +
+> +       /* already stopped by the manager */
+> +       if ((lldev->trch_state == CH_STOPPED) ||
+> +           (lldev->evch_state == CH_STOPPED))
+> +               return 0;
+> +
+> +       val = readl(lldev->trca + TRCA_CTRLSTS_OFFSET);
+> +       val &= ~(CH_CONTROL_MASK << 16);
+> +       val |= CH_SUSPEND << 16;
+> +       writel(val, lldev->trca + TRCA_CTRLSTS_OFFSET);
+> +
+> +       /*
+> +        * Start the wait right after the suspend is confirmed.
+> +        * Do a polled read up to 1ms and 10ms maximum.
+> +        */
+> +       ret = readl_poll_timeout(lldev->trca + TRCA_CTRLSTS_OFFSET, val,
+> +                                (((val >> CH_STATE_BIT_POS) & CH_STATE_MASK) ==
+
+Ditto. And everywhere else.
+
+> +                                 CH_SUSPENDED), 1000, 10000);
+> +       if (ret)
+> +               return ret;
+> +
+> +       val = readl(lldev->evca + EVCA_CTRLSTS_OFFSET);
+> +       val &= ~(CH_CONTROL_MASK << 16);
+> +       val |= CH_SUSPEND << 16;
+> +       writel(val, lldev->evca + EVCA_CTRLSTS_OFFSET);
+> +
+> +       /*
+> +        * Start the wait right after the suspend is confirmed
+> +        * Delay up to 10ms after reset to allow DMA logic to quiesce.
+> +        */
+> +       ret = readl_poll_timeout(lldev->evca + EVCA_CTRLSTS_OFFSET, val,
+> +                                (((val >> CH_STATE_BIT_POS) & CH_STATE_MASK) ==
+> +                                 CH_SUSPENDED), 1000, 10000);
+> +       if (ret)
+> +               return ret;
+> +
+> +       lldev->trch_state = CH_SUSPENDED;
+> +       lldev->evch_state = CH_SUSPENDED;
+> +       return 0;
+> +}
+> +
+> +void hidma_ll_set_transfer_params(struct hidma_lldev *lldev, u32 tre_ch,
+> +                                 dma_addr_t src, dma_addr_t dest, u32 len,
+> +                                 u32 flags)
+> +{
+> +       struct hidma_tre *tre;
+> +       u32 *tre_local;
+> +
+> +       if (tre_ch >= lldev->nr_tres) {
+> +               dev_err(lldev->dev,
+> +                       "invalid TRE number in transfer params:%d", tre_ch);
+> +               return;
+> +       }
+> +
+> +       tre = &lldev->trepool[tre_ch];
+> +       if (atomic_read(&tre->allocated) != true) {
+> +               dev_err(lldev->dev,
+> +                       "trying to set params on an unused TRE:%d", tre_ch);
+> +               return;
+> +       }
+> +
+> +       tre_local = &tre->tre_local[0];
+> +       tre_local[TRE_LEN_IDX] = len;
+> +       tre_local[TRE_SRC_LOW_IDX] = lower_32_bits(src);
+> +       tre_local[TRE_SRC_HI_IDX] = upper_32_bits(src);
+> +       tre_local[TRE_DEST_LOW_IDX] = lower_32_bits(dest);
+> +       tre_local[TRE_DEST_HI_IDX] = upper_32_bits(dest);
+> +       tre->int_flags = flags;
+> +}
+> +
+> +/*
+> + * Called during initialization and after an error condition
+> + * to restore hardware state.
+> + */
+> +int hidma_ll_setup(struct hidma_lldev *lldev)
+> +{
+> +       int rc;
+> +       u64 addr;
+> +       u32 val;
+> +       u32 nr_tres = lldev->nr_tres;
+> +
+> +       lldev->pending_tre_count = 0;
+> +       lldev->tre_processed_off = 0;
+> +       lldev->evre_processed_off = 0;
+> +       lldev->tre_write_offset = 0;
+> +
+> +       /* disable interrupts */
+> +       hidma_ll_enable_irq(lldev, 0);
+> +
+> +       /* clear all pending interrupts */
+> +       val = readl(lldev->evca + EVCA_IRQ_STAT_OFFSET);
+> +       writel(val, lldev->evca + EVCA_IRQ_CLR_OFFSET);
+> +
+> +       rc = hidma_ll_reset(lldev);
+> +       if (rc)
+> +               return rc;
+> +
+> +       /*
+> +        * Clear all pending interrupts again.
+> +        * Otherwise, we observe reset complete interrupts.
+> +        */
+> +       val = readl(lldev->evca + EVCA_IRQ_STAT_OFFSET);
+> +       writel(val, lldev->evca + EVCA_IRQ_CLR_OFFSET);
+> +
+> +       /* disable interrupts again after reset */
+> +       hidma_ll_enable_irq(lldev, 0);
+> +
+> +       addr = lldev->tre_ring_handle;
+> +       writel(lower_32_bits(addr), lldev->trca + TRCA_RING_LOW_OFFSET);
+> +       writel(upper_32_bits(addr), lldev->trca + TRCA_RING_HIGH_OFFSET);
+> +       writel(lldev->tre_ring_size, lldev->trca + TRCA_RING_LEN_OFFSET);
+> +
+> +       addr = lldev->evre_ring_handle;
+> +       writel(lower_32_bits(addr), lldev->evca + EVCA_RING_LOW_OFFSET);
+> +       writel(upper_32_bits(addr), lldev->evca + EVCA_RING_HIGH_OFFSET);
+> +       writel(EVRE_SIZE * nr_tres, lldev->evca + EVCA_RING_LEN_OFFSET);
+> +
+> +       /* support IRQ only for now */
+> +       val = readl(lldev->evca + EVCA_INTCTRL_OFFSET);
+> +       val &= ~0xF;
+> +       val |= 0x1;
+> +       writel(val, lldev->evca + EVCA_INTCTRL_OFFSET);
+> +
+> +       /* clear all pending interrupts and enable them */
+> +       writel(ENABLE_IRQS, lldev->evca + EVCA_IRQ_CLR_OFFSET);
+> +       hidma_ll_enable_irq(lldev, ENABLE_IRQS);
+> +
+> +       rc = hidma_ll_enable(lldev);
+> +       if (rc)
+> +               return rc;
+> +
+> +       return rc;
+> +}
+> +
+> +struct hidma_lldev *hidma_ll_init(struct device *dev, u32 nr_tres,
+> +                                 void __iomem *trca, void __iomem *evca,
+> +                                 u8 chidx)
+> +{
+> +       u32 required_bytes;
+> +       struct hidma_lldev *lldev;
+> +       int rc;
+> +
+> +       if (!trca || !evca || !dev || !nr_tres)
+> +               return NULL;
+> +
+> +       /* need at least four TREs */
+> +       if (nr_tres < 4)
+> +               return NULL;
+> +
+> +       /* need an extra space */
+> +       nr_tres += 1;
+> +
+> +       lldev = devm_kzalloc(dev, sizeof(struct hidma_lldev), GFP_KERNEL);
+> +       if (!lldev)
+> +               return NULL;
+> +
+> +       lldev->evca = evca;
+> +       lldev->trca = trca;
+> +       lldev->dev = dev;
+> +       required_bytes = sizeof(struct hidma_tre) * nr_tres;
+> +       lldev->trepool = devm_kzalloc(lldev->dev, required_bytes, GFP_KERNEL);
+> +       if (!lldev->trepool)
+> +               return NULL;
+> +
+> +       required_bytes = sizeof(lldev->pending_tre_list[0]) * nr_tres;
+> +       lldev->pending_tre_list = devm_kzalloc(dev, required_bytes, GFP_KERNEL);
+
+devm_kcalloc for each?
+
+> +       if (!lldev->pending_tre_list)
+> +               return NULL;
+> +
+> +       required_bytes = sizeof(lldev->tx_status_list[0]) * nr_tres;
+> +       lldev->tx_status_list = devm_kzalloc(dev, required_bytes, GFP_KERNEL);
+
+Ditto.
+
+> +       if (!lldev->tx_status_list)
+> +               return NULL;
+> +
+> +       lldev->tre_ring = dmam_alloc_coherent(dev, (TRE_SIZE + 1) * nr_tres,
+> +                                             &lldev->tre_ring_handle,
+> +                                             GFP_KERNEL);
+> +       if (!lldev->tre_ring)
+> +               return NULL;
+> +
+> +       memset(lldev->tre_ring, 0, (TRE_SIZE + 1) * nr_tres);
+> +       lldev->tre_ring_size = TRE_SIZE * nr_tres;
+> +       lldev->nr_tres = nr_tres;
+> +
+> +       /* the TRE ring has to be TRE_SIZE aligned */
+> +       if (!IS_ALIGNED(lldev->tre_ring_handle, TRE_SIZE)) {
+> +               u8 tre_ring_shift;
+> +
+> +               tre_ring_shift = lldev->tre_ring_handle % TRE_SIZE;
+> +               tre_ring_shift = TRE_SIZE - tre_ring_shift;
+> +               lldev->tre_ring_handle += tre_ring_shift;
+> +               lldev->tre_ring += tre_ring_shift;
+> +       }
+> +
+> +       lldev->evre_ring = dmam_alloc_coherent(dev, (EVRE_SIZE + 1) * nr_tres,
+> +                                              &lldev->evre_ring_handle,
+> +                                              GFP_KERNEL);
+> +       if (!lldev->evre_ring)
+> +               return NULL;
+> +
+> +       memset(lldev->evre_ring, 0, (EVRE_SIZE + 1) * nr_tres);
+> +       lldev->evre_ring_size = EVRE_SIZE * nr_tres;
+> +
+> +       /* the EVRE ring has to be EVRE_SIZE aligned */
+> +       if (!IS_ALIGNED(lldev->evre_ring_handle, EVRE_SIZE)) {
+> +               u8 evre_ring_shift;
+> +
+> +               evre_ring_shift = lldev->evre_ring_handle % EVRE_SIZE;
+> +               evre_ring_shift = EVRE_SIZE - evre_ring_shift;
+> +               lldev->evre_ring_handle += evre_ring_shift;
+> +               lldev->evre_ring += evre_ring_shift;
+> +       }
+> +       lldev->nr_tres = nr_tres;
+> +       lldev->chidx = chidx;
+> +
+> +       rc = kfifo_alloc(&lldev->handoff_fifo,
+> +                        nr_tres * sizeof(struct hidma_tre *), GFP_KERNEL);
+> +       if (rc)
+> +               return NULL;
+> +
+> +       rc = hidma_ll_setup(lldev);
+> +       if (rc)
+> +               return NULL;
+> +
+> +       spin_lock_init(&lldev->lock);
+> +       tasklet_init(&lldev->task, hidma_ll_tre_complete, (unsigned long)lldev);
+> +       lldev->initialized = 1;
+> +       hidma_ll_enable_irq(lldev, ENABLE_IRQS);
+> +       return lldev;
+> +}
+> +
+> +int hidma_ll_uninit(struct hidma_lldev *lldev)
+> +{
+> +       int rc = 0;
+> +       u32 val;
+> +
+> +       if (!lldev)
+> +               return -ENODEV;
+> +
+> +       if (lldev->initialized) {
+> +               u32 required_bytes;
+> +
+> +               lldev->initialized = 0;
+> +
+> +               required_bytes = sizeof(struct hidma_tre) * lldev->nr_tres;
+
+> +               tasklet_kill(&lldev->task);
+
+Can this be moved up? Or you afraid of racing?
+
+> +               memset(lldev->trepool, 0, required_bytes);
+> +               lldev->trepool = NULL;
+> +               lldev->pending_tre_count = 0;
+> +               lldev->tre_write_offset = 0;
+> +
+> +               rc = hidma_ll_reset(lldev);
+> +
+> +               /*
+> +                * Clear all pending interrupts again.
+> +                * Otherwise, we observe reset complete interrupts.
+> +                */
+> +               val = readl(lldev->evca + EVCA_IRQ_STAT_OFFSET);
+> +               writel(val, lldev->evca + EVCA_IRQ_CLR_OFFSET);
+> +               hidma_ll_enable_irq(lldev, 0);
+> +       }
+> +       return rc;
+> +}
+> +
+> +irqreturn_t hidma_ll_inthandler(int chirq, void *arg)
+> +{
+> +       struct hidma_lldev *lldev = arg;
+> +
+> +       hidma_ll_int_handler_internal(lldev);
+> +       return IRQ_HANDLED;
+> +}
+> +
+> +enum dma_status hidma_ll_status(struct hidma_lldev *lldev, u32 tre_ch)
+> +{
+> +       enum dma_status ret = DMA_ERROR;
+> +       unsigned long flags;
+> +       u8 err_code;
+> +
+> +       spin_lock_irqsave(&lldev->lock, flags);
+> +       err_code = lldev->tx_status_list[tre_ch].err_code;
+> +
+> +       if (err_code & EVRE_STATUS_COMPLETE)
+> +               ret = DMA_COMPLETE;
+> +       else if (err_code & EVRE_STATUS_ERROR)
+> +               ret = DMA_ERROR;
+> +       else
+> +               ret = DMA_IN_PROGRESS;
+> +       spin_unlock_irqrestore(&lldev->lock, flags);
+> +
+> +       return ret;
+> +}
+> --
+> Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+
+
+
+-- 
+With Best Regards,
+Andy Shevchenko
