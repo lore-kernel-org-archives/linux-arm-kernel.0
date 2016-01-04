@@ -1,71 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 4 Jan 2016 16:52:20 +0000
-Subject: [PATCH] ASoC: cs35l32: avoid uninitialized variable access
-In-Reply-To: <3088017.xkc6Hgo0y2@wuerfel>
-References: <2884997.s8B8BuE04L@wuerfel> <9222694.IRNnfpj6Tn@wuerfel>
- <20160104152058.GH19062@n2100.arm.linux.org.uk>
- <3088017.xkc6Hgo0y2@wuerfel>
-Message-ID: <20160104165220.GL19062@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 4 Jan 2016 16:55:35 +0000
+Subject: [PATCH v2] arm64: Store breakpoint single step state into pstate
+In-Reply-To: <1450921362-198371-1-git-send-email-wangnan0@huawei.com>
+References: <1450860731-194418-1-git-send-email-wangnan0@huawei.com>
+ <1450921362-198371-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <20160104165535.GI1616@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 04, 2016 at 05:41:05PM +0100, Arnd Bergmann wrote:
-> That reminds of a different problem that has been bugging me for a
-> while: We frequently have a pattern like
-> 
-> #ifdef CONFIG_FOO
-> static int function(void)
-> {
-> 	...
-> }
-> #endif
-> 
-> struct operations = {
-> 	...
-> #ifdef CONFIG_FOO
-> 	.function = function;
-> #endif
-> 	...
-> };
-> 
-> Except that people constantly get it wrong, e.g. by using the
-> wrong ifdef, forgetting one of the two ifdefs, or by leaving
-> unused static functions that only get called indirectly from the
-> other one that is built conditionally.
+Hello,
 
-We already have a solution to that.  __maybe_unused against the
-function, and use the correct #ifdef in the structure initialiser.
-We just need reviewers to be better at picking that up.
-
-> We could add a macro like
+On Thu, Dec 24, 2015 at 01:42:42AM +0000, Wang Nan wrote:
+> Two 'perf test' fail on arm64:
 > 
-> #define COND_PTR(config, ptr) (IS_ENABLED(config) ? (ptr) : NULL)
+>  # perf test overflow
+>  17: Test breakpoint overflow signal handler                  : FAILED!
+>  18: Test breakpoint overflow sampling                        : FAILED!
 > 
-> and then let the compiler figure out that "function" is unused even
-> without an explicit __maybe_unused annotation.  The function above
-> can be simplied to
+> When breakpoint raises, after perf_bp_event, breakpoint_handler()
+> temporary disables breakpoint and enables single step. Then in
+> single_step_handler(), reenable breakpoint. Without doing this
+> the breakpoint would be triggered again.
 > 
-> static inline struct device_node *dev_of_node(struct device *dev)
-> {
-> 	return COND_PTR(CONFIG_OF, dev->of_node);
-> }
-> 
-> with that, which is another benefit.
+> However, if there's a pending signal and it have signal handler,
+> control would be transfer to signal handler, so single step handler
+> would be applied to the first instruction of signal handler. After
+> the handler return, the instruction triggered the breakpoint would be
+> executed again. At this time the breakpoint is enabled, so the
+> breakpoint is triggered again.
 
-You're just inventing another way for people to get it wrong though.
-Instead of having mismatched #ifdefs, we can now have a mismatched
-#ifdef around the function and the COND_PTR config - and people will
-add #ifdef's because they won't realise they don't need them.
+Whilst I appreciate that you're just trying to get those tests passing
+on arm64, I really don't think its a good idea for us to try and emulate
+the x86 debug semantics here. This doesn't happen for ptrace, and I think
+we're likely to break more than we fix if we try to do it for perf too.
 
-You're reliant on reviewers to spotting the pattern, and suggesting
-using COND_PTR() without #ifdefs around the function.  It's the same
-problem with spotting the existing pattern and suggesting dropping
-the #ifdef around the function and annotating the function with
-__maybe_unused.
+The problem seems to be that we take the debug exception before the
+breakpointed instruction has been executed and call perf_bp_event at
+that moment, so when we single-step the faulting instruction we actually
+step into the SIGIO handler and end up getting stuck.
 
-So, I don't see the benefit.
+Your fix doesn't really address this afaict, in that you don't (can't?)
+handle:
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+  * A longjmp out of a signal handler
+  * A watchpoint and a breakpoint that fire on the same instruction
+  * User-controlled single-step from a signal handler that enables a
+    breakpoint explicitly
+  * Nested signals
+
+so I'd really rather leave the code as-is.
+
+Will
