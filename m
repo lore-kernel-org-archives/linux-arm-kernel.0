@@ -1,123 +1,50 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 4 Jan 2016 20:33:16 +0000
-Subject: [PATCH v9 08/13] arch/arm64: adopt prepare_exit_to_usermode()
- model from x86
-In-Reply-To: <1451936091-29247-9-git-send-email-cmetcalf@ezchip.com>
-References: <1451936091-29247-1-git-send-email-cmetcalf@ezchip.com>
- <1451936091-29247-9-git-send-email-cmetcalf@ezchip.com>
-Message-ID: <20160104203316.GE17127@leverpostej>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 4 Jan 2016 12:34:28 -0800
+Subject: [PATCH v2] ARM: mm: flip priority of CONFIG_DEBUG_RODATA
+In-Reply-To: <20151224003406.GA8644@n2100.arm.linux.org.uk>
+References: <20151202202725.GA794@www.outflux.net>
+ <20151223195129.GP2793@atomide.com> <567B04AB.6010906@redhat.com>
+ <20151223212911.GR2793@atomide.com>
+ <alpine.LFD.2.20.1512231637110.3603@knanqh.ubzr>
+ <20151224001121.GS2793@atomide.com>
+ <20151224003406.GA8644@n2100.arm.linux.org.uk>
+Message-ID: <CAGXu5j+MrX-OvnVTYH0hqF2XgZW10PQOviyN=e5heejLsXewVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Jan 04, 2016 at 02:34:46PM -0500, Chris Metcalf wrote:
-> This change is a prerequisite change for TASK_ISOLATION but also
-> stands on its own for readability and maintainability. 
-
-I have also been looking into converting the userspace return path from
-assembly to C [1], for the latter two reasons. Based on that, I have a
-couple of comments.
-
-> The existing arm64 do_notify_resume() is called in a loop from
-> assembly on the slow path; this change moves the loop into C code as
-> well.  For the x86 version see commit c5c46f59e4e7 ("x86/entry: Add
-> new, comprehensible entry and exit handlers written in C").
+On Wed, Dec 23, 2015 at 4:34 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Dec 23, 2015 at 04:11:22PM -0800, Tony Lindgren wrote:
+>> * Nicolas Pitre <nicolas.pitre@linaro.org> [151223 13:45]:
+>> > We fixed a bunch of similar issues where code was located in the .data
+>> > section for ease of use from assembly code.  See commit b4e61537 and
+>> > d0776aff for example.
+>>
+>> Thanks hey some assembly fun for the holidays :) I also need to check what
+>> all gets relocated to SRAM here.
+>>
+>> In any case, seems like the $subject patch is too intrusive for v4.5 at
+>> this point.
 >
-> Signed-off-by: Chris Metcalf <cmetcalf@ezchip.com>
-> ---
->  arch/arm64/kernel/entry.S  |  6 +++---
->  arch/arm64/kernel/signal.c | 32 ++++++++++++++++++++++----------
->  2 files changed, 25 insertions(+), 13 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 7ed3d75f6304..04eff4c4ac6e 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -630,9 +630,8 @@ work_pending:
->  	mov	x0, sp				// 'regs'
->  	tst	x2, #PSR_MODE_MASK		// user mode regs?
->  	b.ne	no_work_pending			// returning to kernel
-> -	enable_irq				// enable interrupts for do_notify_resume()
-> -	bl	do_notify_resume
-> -	b	ret_to_user
-> +	bl	prepare_exit_to_usermode
-> +	b	no_user_work_pending
->  work_resched:
->  	bl	schedule
->  
-> @@ -644,6 +643,7 @@ ret_to_user:
->  	ldr	x1, [tsk, #TI_FLAGS]
->  	and	x2, x1, #_TIF_WORK_MASK
->  	cbnz	x2, work_pending
-> +no_user_work_pending:
->  	enable_step_tsk x1, x2
->  no_work_pending:
->  	kernel_exit 0
+> Given Christmas and an unknown time between that and the merge window
+> actually opening, I decided Tuesday would be the last day I take any
+> patches into my tree - and today would be the day that I drop anything
+> that causes problems.
+>
+> So, I've already dropped this, so tomorrow's linux-next should not have
+> this change.
+>
+> You'll still see breakage if people enable RODATA though, but that's no
+> different from previous kernels.
 
-It seems unfortunate to leave behind portions of the entry.S
-_TIF_WORK_MASK state machine (i.e. a small portion of ret_fast_syscall,
-and the majority of work_pending and ret_to_user).
+Ugh, sorry for the breakage.
 
-I think it would be nicer if we could handle all of that in one place
-(or at least all in C).
+Should this patch stay as-is and people will fix their various RODATA
+failures during the next devel window, or should I remove the "default
+y if CPU_V7"?
 
-> diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-> index e18c48cb6db1..fde59c1139a9 100644
-> --- a/arch/arm64/kernel/signal.c
-> +++ b/arch/arm64/kernel/signal.c
-> @@ -399,18 +399,30 @@ static void do_signal(struct pt_regs *regs)
->  	restore_saved_sigmask();
->  }
->  
-> -asmlinkage void do_notify_resume(struct pt_regs *regs,
-> -				 unsigned int thread_flags)
-> +asmlinkage void prepare_exit_to_usermode(struct pt_regs *regs,
-> +					 unsigned int thread_flags)
->  {
-> -	if (thread_flags & _TIF_SIGPENDING)
-> -		do_signal(regs);
-> +	do {
-> +		local_irq_enable();
->  
-> -	if (thread_flags & _TIF_NOTIFY_RESUME) {
-> -		clear_thread_flag(TIF_NOTIFY_RESUME);
-> -		tracehook_notify_resume(regs);
-> -	}
-> +		if (thread_flags & _TIF_NEED_RESCHED)
-> +			schedule();
+-Kees
 
-Previously, had we called schedule(), we'd reload the thread info flags
-and start that state machine again, whereas now we'll handle all the
-cached flags before reloading.
-
-Are we sure nothing is relying on the prior behaviour?
-
-> +
-> +		if (thread_flags & _TIF_SIGPENDING)
-> +			do_signal(regs);
-> +
-> +		if (thread_flags & _TIF_NOTIFY_RESUME) {
-> +			clear_thread_flag(TIF_NOTIFY_RESUME);
-> +			tracehook_notify_resume(regs);
-> +		}
-> +
-> +		if (thread_flags & _TIF_FOREIGN_FPSTATE)
-> +			fpsimd_restore_current_state();
-> +
-> +		local_irq_disable();
->  
-> -	if (thread_flags & _TIF_FOREIGN_FPSTATE)
-> -		fpsimd_restore_current_state();
-> +		thread_flags = READ_ONCE(current_thread_info()->flags) &
-> +			_TIF_WORK_MASK;
->  
-> +	} while (thread_flags);
->  }
-
-Other than that, this looks good to me.
-
-Thanks,
-Mark.
-
-[1] https://git.kernel.org/cgit/linux/kernel/git/mark/linux.git/log/?h=arm64/entry-deasm
+-- 
+Kees Cook
+Chrome OS & Brillo Security
