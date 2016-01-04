@@ -1,71 +1,55 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 4 Jan 2016 09:02:06 -0800
-Subject: [PATCH 2/2] memory: omap-gpmc: Add Kconfig option for debug
-In-Reply-To: <568662FC.9050206@gmail.com>
-References: <1432156863-19695-1-git-send-email-tony@atomide.com>
- <1432156863-19695-3-git-send-email-tony@atomide.com>
- <568662FC.9050206@gmail.com>
-Message-ID: <20160104170206.GC12777@atomide.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 4 Jan 2016 09:12:15 -0800
+Subject: [PATCH v5 3/5] driver core: handle -EPROBE_DEFER from
+ bus_type.match()
+In-Reply-To: <20160104163100.GK19062@n2100.arm.linux.org.uk>
+References: <1450868368-5650-1-git-send-email-m.szyprowski@samsung.com>
+ <1450868368-5650-4-git-send-email-m.szyprowski@samsung.com>
+ <20160104163100.GK19062@n2100.arm.linux.org.uk>
+Message-ID: <20160104171215.GB25961@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [160101 03:29]:
-> Hi Tony,
+On Mon, Jan 04, 2016 at 04:31:00PM +0000, Russell King - ARM Linux wrote:
+> On Wed, Dec 23, 2015 at 11:59:26AM +0100, Marek Szyprowski wrote:
+> > From: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> > 
+> > Allow implementations of the match() callback in struct bus_type to
+> > return errors and if it's -EPROBE_DEFER then queue the device for
+> > deferred probing.
+> > 
+> > This is useful to buses such as AMBA in which devices are registered
+> > before their matching information can be retrieved from the HW
+> > (typically because a clock driver hasn't probed yet).
+> > 
+> > Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> > [changed if-else code structure, adjusted documentation to match the code,
+> > extended comments]
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 > 
-> On 21.05.2015 00:21, Tony Lindgren wrote:
-> >We support decoding the bootloader values if DEBUG is defined.
-> >But we also need to change the struct omap_hwmod flags to have
-> >HWMOD_INIT_NO_RESET to avoid the GPMC being reset during the
-> >boot. Otherwise just the default timings will be displayed
-> >instead of the bootloader configured timings.
-> >
-> >This also allows us to clean up the various GPMC related
-> >hwmod flags. For debugging, we only need HWMOD_INIT_NO_RESET,
-> >and HWMOD_INIT_NO_IDLE is not needed.
-> >
-> >Cc: Brian Hutchinson <b.hutchman@gmail.com>
-> >Cc: Paul Walmsley <paul@pwsan.com>
-> >Cc: Roger Quadros <rogerq@ti.com>
-> >Signed-off-by: Tony Lindgren <tony@atomide.com>
-> >---
-> >  arch/arm/mach-omap2/omap_hwmod.h                        |  6 ++++++
-> >  arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c      | 12 ++----------
-> >  arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c |  3 ++-
-> >  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c              | 12 ++----------
-> >  arch/arm/mach-omap2/omap_hwmod_44xx_data.c              | 11 ++---------
-> >  arch/arm/mach-omap2/omap_hwmod_7xx_data.c               |  4 ++--
-> >  arch/arm/mach-omap2/omap_hwmod_81xx_data.c              |  2 ++
-> >  drivers/memory/Kconfig                                  |  8 ++++++++
-> >  drivers/memory/omap-gpmc.c                              |  6 +++---
-> >  9 files changed, 29 insertions(+), 35 deletions(-)
-> >
+> This patch _really_ needs an ack from Greg before I can merge it.
 > 
-> 1. Happy new year :)
+> DRIVER CORE, KOBJECTS, DEBUGFS, KERNFS AND SYSFS
+> M:      Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> T:      git git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/driver-core.gitS:      Supported
+> F:      Documentation/kobject.txt
+> F:      drivers/base/
+> 
+> alternatively, the whole series should be taken by Greg, with my ack
+> for the amba and ARM bits.
+> 
+> Given that Greg is unlikely to respond this close to the merge window
+> (he's not responded to my messages about the amba-pl011 driver having
+> been messed up by the wrong patch set being taken...) I think this has
+> basically missed the 4.5 merge window.  Sorry.
 
-Same to you :)
+I've been on vacation, so give me a week or so to catch up on
+everything...
 
-> 2. It was a while I tested upstream on N900 but I had some spare time during
-> the holidays to play, so I tried to boot 4.4-rc6 with Maemo 5. To my
-> surprise, after that try, Maemo 5 rootfs, which is located on onenand became
-> irreversibly corrupted. I bisected the tree to the $subject commit and after
-> restoring HWMOD_INIT_NO_RESET in omap3xxx_gpmc_hwmod flags, the problem was
-> solved. It seems that GPMC is either incorrectly or incompletely setup by
-> the kernel, leading to failed onenand reads/writes and whatnot.
-> Unfortunately, what I have here is a release device, so I am unable to
-> capture any logs through the serial port. BTW keep in mind that rootfs
-> corruption happens as soon as a boot is attempted, even after a freshly
-> flashed rootfs.
+And yes, this missed the 4.5 merge window, that closed last week for my
+trees.
 
-Oh crap, sorry to hear that :(
+thanks,
 
-Care to boot with CONFIG_OMAP_GPMC_DEBUG=y and post the gpmc related dmesg
-output? The dmesg timings with CONFIG_OMAP_GPMC_DEBUG enabled should be
-compared against omap3-n900.dts gpmc timings. And if you don't see the whole
-dmesg after booting, you may need to also increase CONFIG_LOG_BUF_SHIFT.
-Meanwhile, I'll try to also produce it here.
-
-Chances are we have bad or incomplete timings in the n900 :(
-
-Regards,
-
-Tony
+greg k-h
