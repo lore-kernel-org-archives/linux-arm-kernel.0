@@ -1,40 +1,50 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon,  4 Jan 2016 17:11:40 -0200
-Subject: [PATCH 2/2] ARM: dts: imx6qdl-microsom-ar8035: Adjust Ethernet PHY
- reset duration
-In-Reply-To: <1451934700-28060-1-git-send-email-festevam@gmail.com>
-References: <1451934700-28060-1-git-send-email-festevam@gmail.com>
-Message-ID: <1451934700-28060-2-git-send-email-festevam@gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 4 Jan 2016 21:15:36 +0200
+Subject: [RFC 6/9] clk: ti: add support for omap4 module clocks
+In-Reply-To: <20160104162853.GA12777@atomide.com>
+References: <1450447141-29936-1-git-send-email-t-kristo@ti.com>
+ <1450447141-29936-7-git-send-email-t-kristo@ti.com>
+ <20160101054815.21738.79820@quark.deferred.io> <568A20E5.6040005@ti.com>
+ <CAMuHMdUZMUSYC1XHydVQHRibWtHw2=T-7nXe=5Pf4UCcb=mKTQ@mail.gmail.com>
+ <568A735D.2060309@ti.com> <20160104144221.GA5783@n2100.arm.linux.org.uk>
+ <20160104162853.GA12777@atomide.com>
+Message-ID: <568AC4D8.2060509@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+On 01/04/2016 06:37 PM, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [160104 06:43]:
+>> On Mon, Jan 04, 2016 at 03:27:57PM +0200, Tero Kristo wrote:
+>>> On 01/04/2016 12:21 PM, Geert Uytterhoeven wrote:
+>>>> FWIW, there are small loops with just a cpu_relax() in various clock drivers
+>>>> under drivers/clk/shmobile/.
+>>>
+>>> Just did a quick profiling round, and the clk_enable/disable delay loops
+>>> take anything from 0...1500ns, most typically consuming some 400-600ns. So,
+>>> based on this, dropping the udelay and adding cpu_relax instead looks like a
+>>> good change. I just verified that changing the udelay to cpu_relax works
+>>> fine also, I just need to change the bail-out period to be something sane.
+>>
+>> Was that profiling done with lockdep/lock debugging enabled or disabled?
 
-As per the AR8035 datasheet:
+omap2plus_defconfig, so lockdep was enabled. The profiling was done 
+around the while {} block though, which should not have any locks within 
+it (except for the SCM clocks, which may explain some of the higher 
+latency numbers seen.)
 
-"For a reliable power on reset, suggest to keep asserting the reset
-low long enough (10ms) to ensure the clock is stable and clock-to-reset
-1ms requirement is satisfied."
+> And also the thing to check from the hw folks is what all do these clkctrl
+> bits really control. If they group together the OCP clock and an extra
+> functional clock for some devices the delays could be larger.
 
-So do as suggested and keep the reset low for 10ms.
+Does it matter really? The latencies are only imposed to the device in 
+question, and lets face it, the same latencies are there already with 
+the hwmod implementation. This series moves the implementation under 
+clock driver with as less modifications as possible to avoid any problems.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> In general, I think we need to get rid of pm_runtime_irq_safe usage to
+> allow clocks to sleep properly. The other option is to allow toggling
+> pm_runtime_irq_safe but that probably gets super messy.
 
-diff --git a/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi b/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
-index 469ef58..d187177 100644
---- a/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
-@@ -45,7 +45,7 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_microsom_enet_ar8035>;
- 	phy-mode = "rgmii";
--	phy-reset-duration = <2>;
-+	phy-reset-duration = <10>;
- 	phy-reset-gpios = <&gpio4 15 0>;
- 	status = "okay";
- };
--- 
-1.9.1
+That is something not to be done with this set though.
+
+-Tero
