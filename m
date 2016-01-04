@@ -1,46 +1,85 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Mon, 4 Jan 2016 11:18:16 +0100
-Subject: [GIT PULL] Amlogic DT changes for 4.5
-Message-ID: <CAOQ7t2ZrdOVedX4OcxKYAayaDWSFsZNuv988oED7oDRnu70Wiw@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 4 Jan 2016 11:21:04 +0100
+Subject: [RFC 6/9] clk: ti: add support for omap4 module clocks
+In-Reply-To: <568A20E5.6040005@ti.com>
+References: <1450447141-29936-1-git-send-email-t-kristo@ti.com>
+ <1450447141-29936-7-git-send-email-t-kristo@ti.com>
+ <20160101054815.21738.79820@quark.deferred.io>
+ <568A20E5.6040005@ti.com>
+Message-ID: <CAMuHMdUZMUSYC1XHydVQHRibWtHw2=T-7nXe=5Pf4UCcb=mKTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-just a few patches for the Meson8b SoC. Wim has already added the new
-watchdog driver to linux-watchdog-next.
+Hi Tero,
 
-Thanks
----
+On Mon, Jan 4, 2016 at 8:36 AM, Tero Kristo <t-kristo@ti.com> wrote:
+> On 01/01/2016 07:48 AM, Michael Turquette wrote:
+>> Quoting Tero Kristo (2015-12-18 05:58:58)
+>>> +static int _omap4_hwmod_clk_enable(struct clk_hw *hw)
+>>> +{
+>>> +       struct clk_hw_omap *clk = to_clk_hw_omap(hw);
+>>> +       u32 val;
+>>> +       int timeout = 0;
+>>> +       int ret;
+>>> +
+>>> +       if (!clk->enable_bit)
+>>> +               return 0;
+>>> +
+>>> +       if (clk->clkdm) {
+>>> +               ret = ti_clk_ll_ops->clkdm_clk_enable(clk->clkdm,
+>>> hw->clk);
+>>> +               if (ret) {
+>>> +                       WARN(1,
+>>> +                            "%s: could not enable %s's clockdomain %s:
+>>> %d\n",
+>>> +                            __func__, clk_hw_get_name(hw),
+>>> +                            clk->clkdm_name, ret);
+>>> +                       return ret;
+>>> +               }
+>>> +       }
+>>> +
+>>> +       val = ti_clk_ll_ops->clk_readl(clk->enable_reg);
+>>> +
+>>> +       val &= ~OMAP4_MODULEMODE_MASK;
+>>> +       val |= clk->enable_bit;
+>>> +
+>>> +       ti_clk_ll_ops->clk_writel(val, clk->enable_reg);
+>>> +
+>>> +       /* Wait until module is enabled */
+>>> +       while (!_omap4_is_ready(val)) {
+>>> +               udelay(1);
+>>
+>> This should really be a .prepare callback if you plan to keep the delays
+>> in there.
+>
+> If this is changed to a .prepare, then all OMAP power management is
+> effectively ruined as all clocks are going to be enabled all the time. hwmod
+> core doesn't support .prepare/.enable at the moment that well, and changing
+> that is going to be a big burden (educated guess, haven't checked this
+> yet)... The call chain that comes here is:
+>
+> device driver -> pm_runtime -> hwmod_core -> hwmod_clk_enable / disable.
+>
+> The delay within this function should usually be pretty short, just to wait
+> that the module comes up from idle.
 
-The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+Does it take multiple ?s? Perhaps even one ?s is much longer than needed?
 
-  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+> I recall the discussions regarding the udelays within clk_enable/disable
+> calls, but what is the preferred approach then? Typically clk_enable/disable
+> just becomes a NOP if it is not allowed to wait for hardware to complete
+> transitioning before exiting the function.
 
-are available in the git repository at:
+FWIW, there are small loops with just a cpu_relax() in various clock drivers
+under drivers/clk/shmobile/.
 
-  https://github.com/carlocaione/linux-meson tags/meson-for-4.5/dts
+Gr{oetje,eeting}s,
 
-for you to fetch changes up to e9c478a93c113e0ee47f40b80962abe2e2feccc0:
+                        Geert
 
-  ARM: dts: meson8b: Add watchdog node (2016-01-04 10:54:45 +0100)
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-----------------------------------------------------------------
-This pull request includes the Amlogic Meson8b DTS changes for v4.5
-
-----------------------------------------------------------------
-Carlo Caione (2):
-      Documentation: watchdog: Add new bindings for meson8b
-      ARM: dts: meson8b: Add watchdog node
-
-Edward Cragg (1):
-      ARM: meson: Add status LED for Odroid-C1
-
- Documentation/devicetree/bindings/watchdog/{meson6-wdt.txt =>
-meson-wdt.txt} |  2 +-
- arch/arm/boot/dts/meson8b-odroidc1.dts
-       | 11 +++++++++++
- arch/arm/boot/dts/meson8b.dtsi
-       |  6 ++++++
- 3 files changed, 18 insertions(+), 1 deletion(-)
- rename Documentation/devicetree/bindings/watchdog/{meson6-wdt.txt =>
-meson-wdt.txt} (75%)
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
