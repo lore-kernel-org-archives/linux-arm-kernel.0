@@ -1,48 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 4 Jan 2016 16:31:00 +0000
-Subject: [PATCH v5 3/5] driver core: handle -EPROBE_DEFER from
- bus_type.match()
-In-Reply-To: <1450868368-5650-4-git-send-email-m.szyprowski@samsung.com>
-References: <1450868368-5650-1-git-send-email-m.szyprowski@samsung.com>
- <1450868368-5650-4-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20160104163100.GK19062@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 04 Jan 2016 17:34:06 +0100
+Subject: [PATCH v1 3/3] ARM64 LPC: update binding doc
+In-Reply-To: <568A9803.6050108@gmail.com>
+References: <1451396032-23708-1-git-send-email-zourongrong@gmail.com>
+ <15026471.7nGZ0rWlIf@wuerfel> <568A9803.6050108@gmail.com>
+Message-ID: <6384244.Uhpjfgly6O@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 23, 2015 at 11:59:26AM +0100, Marek Szyprowski wrote:
-> From: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+On Tuesday 05 January 2016 00:04:19 Rongrong Zou wrote:
+> ? 2016/1/4 19:13, Arnd Bergmann ??:
+> > On Sunday 03 January 2016 20:24:14 Rongrong Zou wrote:
+> >> ? 2015/12/31 23:00, Rongrong Zou ??:
+> >> */
+> >>      compatible = "low-pin-count";
+> >>      device_type = "isa";
+> >>      #address-cells = <2>;
+> >>      #size-cells = <1>;
+> >>      reg = <0x0 0xa01b0000 0x0 0x10000>;
+> >>      ranges = <0x1 0x0 0x0 0x0 0x1000>;
+> >> /*
+> >> *  ranges is required, then i can get the IORESOURCE_IO <0xe4,4> from "reg = <0x1, 0x000000e4, 4>".
+> >> *
+> >> */
+> >>      ipmi_0:ipmi at 000000e4{
+> >>              device_type = "ipmi";
+> >>              compatible = "ipmi-bt";
+> >>              reg = <0x1 0x000000e4 0x4>;
+> >> };
+> >>
+> >
+> > This looks wrong: the property above says that the I/O port range is
+> > translated to MMIO address 0x00000000 to 0x00010000, which is not
+> > true on your hardware. I think this needs to be changed in the code
+> > so the ranges property is not required for I/O ports.
 > 
-> Allow implementations of the match() callback in struct bus_type to
-> return errors and if it's -EPROBE_DEFER then queue the device for
-> deferred probing.
-> 
-> This is useful to buses such as AMBA in which devices are registered
-> before their matching information can be retrieved from the HW
-> (typically because a clock driver hasn't probed yet).
-> 
-> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> [changed if-else code structure, adjusted documentation to match the code,
-> extended comments]
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Ranges property can set empty, but this means 1:1 translation. the I/O 
+> port range is translated to MMIO address 0x00000001 00000000 to 
+> 0x00000001 00000004, it looks wrong else. I wonder if anyone get legacy 
+> I/O port resource from dts.
 
-This patch _really_ needs an ack from Greg before I can merge it.
+As I said, nothing should really require the ranges property here, unless
+you have a valid IORESOURCE_MEM translation. The code that requires
+the ranges to be present is wrong.
 
-DRIVER CORE, KOBJECTS, DEBUGFS, KERNFS AND SYSFS
-M:      Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-T:      git git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/driver-core.gitS:      Supported
-F:      Documentation/kobject.txt
-F:      drivers/base/
+> For ipmi driver, I can get I/O port resource by DMI rather than dts.
 
-alternatively, the whole series should be taken by Greg, with my ack
-for the amba and ARM bits.
+No, the ipmi driver uses the resource that belongs to the platform
+device already, you can't rely on DMI data to be present there.
 
-Given that Greg is unlikely to respond this close to the merge window
-(he's not responded to my messages about the amba-pl011 driver having
-been messed up by the wrong patch set being taken...) I think this has
-basically missed the 4.5 merge window.  Sorry.
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+	Arnd
