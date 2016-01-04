@@ -1,66 +1,51 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon,  4 Jan 2016 14:50:34 +0000
-Subject: [PATCH 2/2] arm: configs: add kvm_defconfig
-In-Reply-To: <1451919034-12846-1-git-send-email-andre.przywara@arm.com>
-References: <1451919034-12846-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1451919034-12846-3-git-send-email-andre.przywara@arm.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 4 Jan 2016 14:51:51 +0000
+Subject: [Xen-devel] [PATCH v3 20/62] arm/acpi: Add ACPI support for SMP
+ initialization
+In-Reply-To: <56834B4C.40409@huawei.com>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-21-git-send-email-shannon.zhao@linaro.org>
+ <565C63F1.5070303@citrix.com> <56834B4C.40409@huawei.com>
+Message-ID: <alpine.DEB.2.02.1601041451210.19710@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This new config enables KVM (and thus LPAE) on top of
-multi_v7_defconfig. This creates a kernel that can _host_ KVM guests,
-for guests a multi_v7_defconfig with virtio drivers is sufficient.
-Since LPAE kernels are not compatible with non-LPAE capable hardware,
-this has to be separate from the existing multi_v7_defconfig.
+On Wed, 30 Dec 2015, Shannon Zhao wrote:
+> On 2015/11/30 22:57, Julien Grall wrote:
+> > Hi Shannon,
+> > 
+> > On 17/11/15 09:40, shannon.zhao at linaro.org wrote:
+> >> > diff --git a/xen/arch/arm/psci.c b/xen/arch/arm/psci.c
+> >> > index d800cb6..dede0e1 100644
+> >> > --- a/xen/arch/arm/psci.c
+> >> > +++ b/xen/arch/arm/psci.c
+> >> > @@ -22,6 +22,7 @@
+> >> >  #include <xen/mm.h>
+> >> >  #include <xen/smp.h>
+> >> >  #include <asm/psci.h>
+> >> > +#include <asm/acpi.h>
+> >> >  
+> >> >  /*
+> >> >   * While a 64-bit OS can make calls with SMC32 calling conventions, for
+> >> > @@ -86,6 +87,9 @@ int __init psci_init_0_1(void)
+> >> >      int ret;
+> >> >      const struct dt_device_node *psci;
+> >> >  
+> >> > +    if ( !acpi_disabled )
+> >> > +        return -EINVAL;
+> > Please explain in the commit message why PSCI 0.1 is not supported on ACPI.
+> 
+> Hi,
+> 
+> I check this again. There are not limitations of supporting PSCI version
+> in ACPI SPEC. It should support PSCI 0.1 as well. But look at the code
+> of linux kernel, it says it only supports PSCI 0.2+.
+> 
+> #define ACPI_FADT_PSCI_COMPLIANT    (1)	/* 00: [V5+] PSCI 0.2+ is
+> implemented */
+> 
+> So does it need to be consistent with Linux or support PSCI 0.1 in Xen
+> as well?
 
-The purpose of this new defconfig is both to simplify creation of KVM
-host kernels as well as to give the LPAE option some better testing
-coverage, as the enlarged dma_addr_t and phys_addr_t types create some
-headache to some drivers.
-
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- arch/arm/configs/{multi_v7_defconfig => kvm_defconfig} | 6 ++++++
- 1 file changed, 6 insertions(+)
- copy arch/arm/configs/{multi_v7_defconfig => kvm_defconfig} (99%)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/kvm_defconfig
-similarity index 99%
-copy from arch/arm/configs/multi_v7_defconfig
-copy to arch/arm/configs/kvm_defconfig
-index 4ee2f36..2a3d81a 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/kvm_defconfig
-@@ -24,6 +24,7 @@ CONFIG_ARCH_AT91=y
- CONFIG_SOC_SAMA5D2=y
- CONFIG_SOC_SAMA5D3=y
- CONFIG_SOC_SAMA5D4=y
-+CONFIG_ARCH_AXXIA=y
- CONFIG_ARCH_BCM=y
- CONFIG_ARCH_BCM_CYGNUS=y
- CONFIG_ARCH_BCM_NSP=y
-@@ -105,6 +106,8 @@ CONFIG_ARCH_VEXPRESS_CA9X4=y
- CONFIG_ARCH_VEXPRESS_TC2_PM=y
- CONFIG_ARCH_WM8850=y
- CONFIG_ARCH_ZYNQ=y
-+CONFIG_ARM_LPAE=y
-+CONFIG_TRANSPARENT_HUGEPAGE=y
- CONFIG_TRUSTED_FOUNDATIONS=y
- CONFIG_PCI=y
- CONFIG_PCI_HOST_GENERIC=y
-@@ -204,6 +207,7 @@ CONFIG_SATA_MV=y
- CONFIG_SATA_RCAR=y
- CONFIG_NETDEVICES=y
- CONFIG_VIRTIO_NET=y
-+CONFIG_VHOST_NET=y
- CONFIG_HIX5HD2_GMAC=y
- CONFIG_SUN4I_EMAC=y
- CONFIG_MACB=y
-@@ -753,3 +757,5 @@ CONFIG_VIRTIO=y
- CONFIG_VIRTIO_PCI=y
- CONFIG_VIRTIO_PCI_LEGACY=y
- CONFIG_VIRTIO_MMIO=y
-+CONFIG_VIRTUALIZATION=y
-+CONFIG_KVM=y
--- 
-2.6.4
+I don't think it needs to be consistent with Linux. I would support PSCI
+0.1 too.
