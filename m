@@ -1,35 +1,64 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Mon, 4 Jan 2016 09:09:37 +0000
-Subject: [PATCH v2 0/2] i2c:dw: Add APM X-Gene ACPI I2C device support
-In-Reply-To: <1450863241.7740.30.camel@kxue-X58A-UD3R>
-References: <1449782357-22982-1-git-send-email-lho@apm.com>
- <566F6485.2000508@amd.com> <20151215132721.GJ1762@lahna.fi.intel.com>
- <56702923.9010305@amd.com> <20151215145953.GK1762@lahna.fi.intel.com>
- <1450863241.7740.30.camel@kxue-X58A-UD3R>
-Message-ID: <568A36D1.8070808@codethink.co.uk>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Mon, 04 Jan 2016 10:10:29 +0100
+Subject: [PATCH v2] ARM: dts: rockchip: Adding LEDs handling via
+ leds-gpio for the Radxa Rock2 Square
+In-Reply-To: <1451553232-2533-1-git-send-email-romain.perier@gmail.com>
+References: <1451553232-2533-1-git-send-email-romain.perier@gmail.com>
+Message-ID: <1451898629.3269.11.camel@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/12/15 09:34, Ken Xue wrote:
-> On Tue, 2015-12-15 at 16:59 +0200, Mika Westerberg wrote:
->> On Tue, Dec 15, 2015 at 08:52:19AM -0600, Suravee Suthikulpanit wrote:
-
-> During test, I2C bus should run in different "ConnectionSpeed" of
-> device.
+On Thu, 2015-12-31 at 10:13 +0100, Romain Perier wrote:
+> Describe the two user-controllable LEDs on Rock2 Square boards.
+> All information have been retrieved from the schematics and the
+> vendor
+> devicetree. The default-triggers mimic the behaviour of the vendor-
+> kernel to
+> keep functionalities in sync.
 > 
-> That means windows driver can modify I2C bus speed to match the
-> "ConnectionSpeed" of device on-the-fly. Static value from SSCN and FMCN
-> can not work for WITT test cases.
-> 
-> It sounds like odd that multi-speed can be applied over one I2C bus, But
-> everything goes well.
-> Does this behavior(multi-speed) violate the I2C spec?
+> Signed-off-by: Romain Perier <romain.perier@gmail.com>
 
-I can't remember if the spec says it, but I would say the bus should
-run at the speed of the slowest attached peripheral as they all have
-to listen for the address-byte being sent at the start of each i2c
-transaction.
+Reviewed-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+
+> ---
+> 
+> Changes in v2:
+> - Changed labels according to what is defined in the schematics
+> - Added a long commit message describing this patch in details
+> 
+> ?arch/arm/boot/dts/rk3288-rock2-square.dts | 17 +++++++++++++++++
+> ?1 file changed, 17 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/rk3288-rock2-square.dts
+> b/arch/arm/boot/dts/rk3288-rock2-square.dts
+> index c5453a0..0813428 100644
+> --- a/arch/arm/boot/dts/rk3288-rock2-square.dts
+> +++ b/arch/arm/boot/dts/rk3288-rock2-square.dts
+> @@ -56,6 +56,23 @@
+> ?		pinctrl-0 = <&ir_int>;
+> ?	};
+> ?
+> +	gpio-leds {
+> +		compatible = "gpio-leds";
+> +
+> +		heartbeat {
+> +			gpios = <&gpio7 15 GPIO_ACTIVE_LOW>;
+> +			label = "rock2:green:state1";
+> +			linux,default-trigger = "heartbeat";
+> +		};
+> +
+> +		mmc {
+> +			gpios = <&gpio0 11 GPIO_ACTIVE_LOW>;
+> +			label = "rock2:blue:state2";
+> +			linux,default-trigger = "mmc0";
+> +		};
+> +	};
+> +
+> +
+> ?	sound {
+> ?		compatible = "simple-audio-card";
+> ?		simple-audio-card,name = "SPDIF";
 
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Sjoerd Simons
+Collabora Ltd.
