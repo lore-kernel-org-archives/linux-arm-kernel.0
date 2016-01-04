@@ -1,68 +1,35 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 4 Jan 2016 15:31:29 +0100
-Subject: [PATCH 2/3] thermal: Add Mediatek thermal controller support
-In-Reply-To: <CAGS+omC86=Kfdj0cFNHqs4fXCAT0uU+AxHCj3ORd2HetNZ2gVQ@mail.gmail.com>
-References: <1448883753-19068-1-git-send-email-s.hauer@pengutronix.de>
- <1448883753-19068-3-git-send-email-s.hauer@pengutronix.de>
- <CAGS+omC86=Kfdj0cFNHqs4fXCAT0uU+AxHCj3ORd2HetNZ2gVQ@mail.gmail.com>
-Message-ID: <20160104143129.GJ13058@pengutronix.de>
+From: svarbanov@mm-sol.com (Stanimir Varbanov)
+Date: Mon, 4 Jan 2016 16:31:27 +0200
+Subject: [PATCH v5 1/5] PCI: designware: ensure ATU is enabled before
+ IO/conf space accesses
+In-Reply-To: <CAHM4w1kzGKahVOTdTxMciZBs81U9EVoSYPgCw9=ph3R9vSwCwQ@mail.gmail.com>
+References: <1450442339-18765-1-git-send-email-stanimir.varbanov@linaro.org>
+ <1450442339-18765-2-git-send-email-stanimir.varbanov@linaro.org>
+ <CAHM4w1kzGKahVOTdTxMciZBs81U9EVoSYPgCw9=ph3R9vSwCwQ@mail.gmail.com>
+Message-ID: <568A823F.5090209@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 21, 2015 at 12:07:58PM +0800, Daniel Kurtz wrote:
-> Hi Sascha,
+On 12/18/2015 04:41 PM, Pratyush Anand wrote:
+> On Fri, Dec 18, 2015 at 6:08 PM, Stanimir Varbanov
+> <stanimir.varbanov@linaro.org> wrote:
+>> There is no guarantees that enabling ATU will hit the hardware
+>> immediately, and subsequent accesses to configuration / IO spaces
+>> are reliable. So fixing this by read back PCIE_ATU_CR2 register
+>> just after writing.
+>>
+>> Without such a fix the PCI device enumeration during kernel boot
+>> is not reliable, and reading configuration space for particular
+>> PCI device on the bus returns zero aka no device.
+>>
+>> Signed-off-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
 > 
-> One nit below that can be fixed up later, or now if you don't plan to
-> spin this driver to
-> address Eduardo's feedback...
-> 
-> On Mon, Nov 30, 2015 at 7:42 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > This adds support for the Mediatek thermal controller found on MT8173
-> > and likely other SoCs.
-> > The controller is a bit special. It does not have its own ADC, instead
-> > it controls the on-SoC AUXADC via AHB bus accesses. For this reason
-> > we need the physical address of the AUXADC. Also it controls a mux
-> > using AHB bus accesses, so we need the APMIXEDSYS physical address aswell.
-> >
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> 
-> [snip]
-> 
-> > +static int mtk_thermal_get_calibration_data(struct device *dev, struct mtk_thermal *mt)
-> > +{
-> > +       struct nvmem_cell *cell;
-> > +       u32 *buf;
-> > +       size_t len;
-> > +       int i, ret = 0;
-> > +
-> > +       /* Start with default values */
-> > +       mt->adc_ge = 512;
-> > +       for (i = 0; i < MT8173_NUM_SENSORS; i++)
-> > +               mt->vts[i] = 260;
-> > +       mt->degc_cali = 40;
-> > +       mt->o_slope = 0;
-> > +
-> > +       cell = nvmem_cell_get(dev, "calibration-data");
-> > +       if (IS_ERR(cell)) {
-> > +               if (PTR_ERR(cell) == -EPROBE_DEFER)
-> 
-> It is useful to know why the thermal driver is being probe defered, so
-> I suggest here:
-> dev_warn(dev, "Waiting for calibration data.\n");
+> Acked-by: Pratyush Anand <pratyush.anand@gmail.com>
 
-The problem with that is that this message is not shown once but
-possibly many times and may not even show a problem because in the end
-the device may be probed successfully. In this case the last thing you
-see from the device is "Waiting for calibration data." and get annoyed
-by all this useless noise from the driver.
+Bjorn, Do you want to resend the whole patchset with collected acks and
+tested tags?
 
-Of course I agree that this information may be useful in the case you
-wonder why your device doesn't show up...
-
-Sascha
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+regards,
+Stan
