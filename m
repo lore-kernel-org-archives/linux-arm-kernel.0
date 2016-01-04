@@ -1,106 +1,91 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sun,  3 Jan 2016 19:06:30 -0500
-Subject: [PATCH V11 2/7] dma: hidma: Add Device Tree support
-In-Reply-To: <1451865996-12808-1-git-send-email-okaya@codeaurora.org>
-References: <1451865996-12808-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1451865996-12808-3-git-send-email-okaya@codeaurora.org>
+Date: Sun,  3 Jan 2016 19:06:28 -0500
+Subject: [PATCH V11 0/7] dma: add Qualcomm Technologies HIDMA driver
+Message-ID: <1451865996-12808-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add documentation for the Qualcomm Technologies HIDMA driver.
+The Qualcomm Technologies HIDMA device has been designed
+to support virtualization technology. The driver has been
+divided into two to follow the hardware design.
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-Acked-by: Rob Herring <robh@kernel.org>
----
- .../devicetree/bindings/dma/qcom_hidma_mgmt.txt    | 79 ++++++++++++++++++++++
- 1 file changed, 79 insertions(+)
+1. HIDMA Management driver
+2. HIDMA Channel driver
+
+Each HIDMA HW consists of multiple channels. These channels
+share some set of common parameters. These parameters are
+initialized by the management driver during power up.
+Same management driver is used for monitoring the execution
+of the channels. Management driver can change the performance
+behavior dynamically such as bandwidth allocation and
+prioritization in the future.
+
+The management driver is executed in hypervisor context and
+is the main management entity for all channels provided by
+the device.
+
+Changes from V10: (https://lkml.org/lkml/2015/12/17/454)
+* none
+
+Changes from V10: (https://lkml.org/lkml/2015/12/17/448)
+* none
+
+Changes from V10: (https://lkml.org/lkml/2015/12/17/449)
+* none
+
+Changes from V10: (https://lkml.org/lkml/2015/12/17/451)
+* none
+
+Changes from V10: (https://lkml.org/lkml/2015/12/17/452)
+* none
+
+Changes from V10: (https://lkml.org/lkml/2015/12/17/453)
+* none
+
+Changes from V10: (https://lkml.org/lkml/2015/12/17/450)
+* Clean up style issues
+* make depend on CONFIG_OF_IRQ too as SPARC arch doesn't seem to define
+CONFIG_OF_IRQ but it defines CONFIG_OF.
+
+Sinan Kaya (7):
+  dma: qcom_bam_dma: move to qcom directory
+  dma: hidma: Add Device Tree support
+  dma: add Qualcomm Technologies HIDMA management driver
+  dma: add Qualcomm Technologies HIDMA channel driver
+  dma: qcom_hidma: implement lower level hardware interface
+  dma: qcom_hidma: add debugfs hooks
+  dma: qcom_hidma: add support for object hierarchy
+
+ Documentation/ABI/testing/sysfs-platform-hidma     |   9 +
+ .../ABI/testing/sysfs-platform-hidma-mgmt          |  97 +++
+ .../devicetree/bindings/dma/qcom_hidma_mgmt.txt    |  79 ++
+ drivers/dma/Kconfig                                |  11 +-
+ drivers/dma/Makefile                               |   2 +-
+ drivers/dma/qcom/Kconfig                           |  29 +
+ drivers/dma/qcom/Makefile                          |   5 +
+ drivers/dma/{qcom_bam_dma.c => qcom/bam_dma.c}     |   4 +-
+ drivers/dma/qcom/hidma.c                           | 784 +++++++++++++++++
+ drivers/dma/qcom/hidma.h                           | 162 ++++
+ drivers/dma/qcom/hidma_dbg.c                       | 219 +++++
+ drivers/dma/qcom/hidma_ll.c                        | 927 +++++++++++++++++++++
+ drivers/dma/qcom/hidma_mgmt.c                      | 400 +++++++++
+ drivers/dma/qcom/hidma_mgmt.h                      |  39 +
+ drivers/dma/qcom/hidma_mgmt_sys.c                  | 295 +++++++
+ 15 files changed, 3050 insertions(+), 12 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-platform-hidma
+ create mode 100644 Documentation/ABI/testing/sysfs-platform-hidma-mgmt
  create mode 100644 Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
+ create mode 100644 drivers/dma/qcom/Kconfig
+ create mode 100644 drivers/dma/qcom/Makefile
+ rename drivers/dma/{qcom_bam_dma.c => qcom/bam_dma.c} (99%)
+ create mode 100644 drivers/dma/qcom/hidma.c
+ create mode 100644 drivers/dma/qcom/hidma.h
+ create mode 100644 drivers/dma/qcom/hidma_dbg.c
+ create mode 100644 drivers/dma/qcom/hidma_ll.c
+ create mode 100644 drivers/dma/qcom/hidma_mgmt.c
+ create mode 100644 drivers/dma/qcom/hidma_mgmt.h
+ create mode 100644 drivers/dma/qcom/hidma_mgmt_sys.c
 
-diff --git a/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
-new file mode 100644
-index 0000000..0e6ed1f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
-@@ -0,0 +1,79 @@
-+Qualcomm Technologies HIDMA Management interface
-+
-+Qualcomm Technologies HIDMA is a high speed DMA device. It only supports
-+memcpy and memset capabilities. It has been designed for virtualized
-+environments.
-+
-+Each HIDMA HW instance consists of multiple DMA channels. These channels
-+share the same bandwidth. The bandwidth utilization can be parititioned
-+among channels based on the priority and weight assignments.
-+
-+There are only two priority levels and 15 weigh assignments possible.
-+
-+Other parameters here determine how much of the system bus this HIDMA
-+instance can use like maximum read/write request and and number of bytes to
-+read/write in a single burst.
-+
-+Main node required properties:
-+- compatible: "qcom,hidma-mgmt-1.0";
-+- reg: Address range for DMA device
-+- dma-channels: Number of channels supported by this DMA controller.
-+- max-write-burst-bytes: Maximum write burst in bytes. A memcpy requested is
-+  fragmented to multiples of this amount.
-+- max-read-burst-bytes: Maximum read burst in bytes. A memcpy request is
-+  fragmented to multiples of this amount.
-+- max-write-transactions: Maximum write transactions to perform in a burst
-+- max-read-transactions: Maximum read transactions to perform in a burst
-+- channel-reset-timeout-cycles: Channel reset timeout in cycles for this SOC.
-+
-+Sub-nodes:
-+
-+HIDMA has one or more DMA channels that are used to move data from one
-+memory location to another.
-+
-+Each DMA channel is described as a sub-node under the management object.
-+When a transfer channel is given to the guest operating system, only the channel
-+object is created. The drivers have support for both flat and hierarchical
-+configuration.
-+
-+Required properties:
-+- compatible: must contain "qcom,hidma-1.0"
-+- reg: Addresses for the transfer and event channel
-+- interrupts: Should contain the event interrupt
-+- desc-count: Number of asynchronous requests this channel can handle
-+- channel-index: The HW event channel completions will be delivered.
-+
-+Example:
-+
-+Hypervisor OS configuration:
-+
-+	hidma-mgmt at f9984000 = {
-+		compatible = "qcom,hidma-mgmt-1.0";
-+		reg = <0xf9984000 0x15000>;
-+		dma-channels = <6>;
-+		max-write-burst-bytes = <1024>;
-+		max-read-burst-bytes = <1024>;
-+		max-write-transactions = <31>;
-+		max-read-transactions = <31>;
-+		channel-reset-timeout-cycles = <0x500>;
-+
-+		hidma_24: dma-controller at 0x5c050000 {
-+			compatible = "qcom,hidma-1.0";
-+			reg = <0 0x5c050000 0x0 0x1000>,
-+			      <0 0x5c0b0000 0x0 0x1000>;
-+			interrupts = <0 389 0>;
-+			desc-count = <10>;
-+			channel-index = <4>;
-+		};
-+	};
-+
-+Guest OS configuration:
-+
-+	hidma_24: dma-controller at 0x5c050000 {
-+		compatible = "qcom,hidma-1.0";
-+		reg = <0 0x5c050000 0x0 0x1000>,
-+		      <0 0x5c0b0000 0x0 0x1000>;
-+		interrupts = <0 389 0>;
-+		desc-count = <10>;
-+		channel-index = <4>;
-+	};
 -- 
 Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
