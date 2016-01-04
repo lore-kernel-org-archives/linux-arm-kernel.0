@@ -1,42 +1,54 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon,  4 Jan 2016 16:19:42 +0000
-Subject: [PATCH RESEND] iommu/dma: Use correct offset in map_sg
-In-Reply-To: <4812a34857b081e45c36d7e887840f3675da74dc.1450457730.git.robin.murphy@arm.com>
-Message-ID: <8317d001da4f48831fa23d8d7729a4659ac72b49.1451924092.git.robin.murphy@arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 4 Jan 2016 16:26:10 +0000
+Subject: Tegra baseline test results for v4.4-rc7
+Message-ID: <568A9D22.1070705@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When mapping a non-page-aligned scatterlist entry, we copy the original
-offset to the output DMA address before aligning it to hand off to
-iommu_map_sg(), then later adding the IOVA page address portion to get
-the final mapped address. However, when the IOVA page size is smaller
-than the CPU page size, it is the offset within the IOVA page we want,
-not that within the CPU page, which can easily be larger than an IOVA
-page and thus result in an incorrect final address.
+Here are some basic Tegra test results for Linux v4.4-rc7.
+Logs and other details at:
 
-Fix the bug by taking only the IOVA-aligned part of the offset as the
-basis of the DMA address, not the whole thing.
+    https://nvtb.github.io//linux/test_v4.4-rc7/20151227183102/
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
 
-Rebased onto iommu/fixes.
+Test summary
+------------
 
- drivers/iommu/dma-iommu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
 
-diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-index 2e7417f..72d6182 100644
---- a/drivers/iommu/dma-iommu.c
-+++ b/drivers/iommu/dma-iommu.c
-@@ -458,7 +458,7 @@ int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
- 		size_t s_offset = iova_offset(iovad, s->offset);
- 		size_t s_length = s->length;
- 
--		sg_dma_address(s) = s->offset;
-+		sg_dma_address(s) = s_offset;
- 		sg_dma_len(s) = s_length;
- 		s->offset -= s_offset;
- 		s_length = iova_align(iovad, s_length + s_offset);
--- 
-1.9.1
+Build: Image:
+    Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+    Pass: ( 1/ 1): qemu-vexpress64
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.4-rc6 (4ef7675344d687a0ef5b0d7c0cee12da005870c0)):
+   text     data      bss    total  kernel
+      0        0        0        0  defconfig
+    -32        0        0      -32  multi_v7_defconfig
+    -24       -8        0      -32  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.4-rc6 (4ef7675344d687a0ef5b0d7c0cee12da005870c0))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
