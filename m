@@ -1,59 +1,30 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Mon, 4 Jan 2016 22:34:57 +0200
-Subject: [PATCH v2 06/32] s390: reuse asm-generic/barrier.h
-In-Reply-To: <20160104132042.GW6344@twins.programming.kicks-ass.net>
-References: <1451572003-2440-1-git-send-email-mst@redhat.com>
- <1451572003-2440-7-git-send-email-mst@redhat.com>
- <20160104132042.GW6344@twins.programming.kicks-ass.net>
-Message-ID: <20160104221924-mutt-send-email-mst@redhat.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 5 Jan 2016 07:39:05 +1100
+Subject: [PATCH v2 0/3] ARM: shmobile: r8a779x: use fallback usbhs
+ compatibility string
+In-Reply-To: <CAMuHMdUALH_FQvOVH77V5JC3d4n7444zTh2VU-MEsOoKymFSDg@mail.gmail.com>
+References: <1451856019-4222-1-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdUALH_FQvOVH77V5JC3d4n7444zTh2VU-MEsOoKymFSDg@mail.gmail.com>
+Message-ID: <20160104203904.GC12748@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 04, 2016 at 02:20:42PM +0100, Peter Zijlstra wrote:
-> On Thu, Dec 31, 2015 at 09:06:30PM +0200, Michael S. Tsirkin wrote:
-> > On s390 read_barrier_depends, smp_read_barrier_depends
-> > smp_store_mb(), smp_mb__before_atomic and smp_mb__after_atomic match the
-> > asm-generic variants exactly. Drop the local definitions and pull in
-> > asm-generic/barrier.h instead.
-> > 
-> > This is in preparation to refactoring this code area.
-> > 
-> > Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
-> > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > ---
-> >  arch/s390/include/asm/barrier.h | 10 ++--------
-> >  1 file changed, 2 insertions(+), 8 deletions(-)
-> > 
-> > diff --git a/arch/s390/include/asm/barrier.h b/arch/s390/include/asm/barrier.h
-> > index 7ffd0b1..c358c31 100644
-> > --- a/arch/s390/include/asm/barrier.h
-> > +++ b/arch/s390/include/asm/barrier.h
-> > @@ -30,14 +30,6 @@
-> >  #define smp_rmb()			rmb()
-> >  #define smp_wmb()			wmb()
-> >  
-> > -#define read_barrier_depends()		do { } while (0)
-> > -#define smp_read_barrier_depends()	do { } while (0)
-> > -
-> > -#define smp_mb__before_atomic()		smp_mb()
-> > -#define smp_mb__after_atomic()		smp_mb()
+On Mon, Jan 04, 2016 at 09:39:17AM +0100, Geert Uytterhoeven wrote:
+> On Sun, Jan 3, 2016 at 10:20 PM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > this short series makes use of the recently added fallback usbhs
+> > compatibility string in the r8a779[014] device trees.
+> >
+> > Based on renesas-devel-20151228-v4.4-rc7.
+> >
+> > Changes since v1:
+> > * Use "renesas,rcar-gen2-usbhs" instead of "renesas,usbhs"
+> >
+> > Simon Horman (3):
+> >   ARM: shmobile: r8a7790: use fallback usbhs compatibility string
+> >   ARM: shmobile: r8a7791: use fallback usbhs compatibility string
+> >   ARM: shmobile: r8a7794: use fallback usbhs compatibility string
 > 
-> As per:
-> 
->   lkml.kernel.org/r/20150921112252.3c2937e1 at mschwide
-> 
-> s390 should change this to barrier() instead of smp_mb() and hence
-> should not use the generic versions.
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Thanks Peter!
-
-OK so I will just rename this to __smp_mb__before_atomic and
-__smp_mb__after_atomic but keep them around.
-
-I'm not changing these - that's best left to s390 maintainers.
-
-Should I add a TODO comment to change them to barrier so
-we don't forget?
-
--- 
-MST
+Thanks, I have queued these up for v4.6.
