@@ -1,10 +1,10 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 4 Jan 2016 09:53:47 +0100
-Subject: [PATCH 1/2] ARM: shmobile: r8a7790: use GIC_* defines
-In-Reply-To: <1451856807-8081-2-git-send-email-horms+renesas@verge.net.au>
+Date: Mon, 4 Jan 2016 09:56:43 +0100
+Subject: [PATCH 2/2] ARM: shmobile: r8a7791: use GIC_* defines
+In-Reply-To: <1451856807-8081-3-git-send-email-horms+renesas@verge.net.au>
 References: <1451856807-8081-1-git-send-email-horms+renesas@verge.net.au>
- <1451856807-8081-2-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdW_b0DSn1x29r-0sdWsF47JyxAWKpN7JG025RTmB0aOuw@mail.gmail.com>
+ <1451856807-8081-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdWH6Hi4yU0gYfxmyCDF3JNZiii00SwiNrZomQ_-pWbkdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,20 +14,35 @@ On Sun, Jan 3, 2016 at 10:33 PM, Simon Horman
 <horms+renesas@verge.net.au> wrote:
 > Use GIC_* defines for GIC interrupt cells in r8a7791 device tree.
 
-Thanks a lot for doing this!
+Thanks for doing this!
 
 > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 > ---
->  arch/arm/boot/dts/r8a7790.dtsi | 348 ++++++++++++++++++++---------------------
->  1 file changed, 174 insertions(+), 174 deletions(-)
+>  arch/arm/boot/dts/r8a7791.dtsi | 370 ++++++++++++++++++++---------------------
+>  1 file changed, 185 insertions(+), 185 deletions(-)
 >
-> diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-> index 7dfd393bfc7e..fd732bd942a3 100644
+> diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+> index 2a369ddcb6fd..c24276375c53 100644
+> --- a/arch/arm/boot/dts/r8a7791.dtsi
+> +++ b/arch/arm/boot/dts/r8a7791.dtsi
 
-> @@ -1580,9 +1580,9 @@
+> @@ -782,7 +782,7 @@
+>         ether: ethernet at ee700000 {
+>                 compatible = "renesas,ether-r8a7791";
+>                 reg = <0 0xee700000 0 0x400>;
+> -               interrupts = <0 162 IRQ_TYPE_LEVEL_HIGH>;
+> +               interrupts = <GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>;
+>                 clocks = <&mstp8_clks R8A7791_CLK_ETHER>;
+>                 power-domains = <&cpg_clocks>;
+>                 phy-mode = "rmii";
+> @@ -806,7 +806,7 @@
+
+You forgot to update the avb node in between these two chunks.
+
+> @@ -1577,9 +1577,9 @@
 >                 /* Map all possible DDR as inbound ranges */
 >                 dma-ranges = <0x42000000 0 0x40000000 0 0x40000000 0 0x80000000
->                               0x43000000 1 0x80000000 1 0x80000000 0 0x80000000>;
+>                               0x43000000 2 0x00000000 2 0x00000000 1 0x00000000>;
 > -               interrupts = <0 116 IRQ_TYPE_LEVEL_HIGH>,
 > -                            <0 117 IRQ_TYPE_LEVEL_HIGH>,
 > -                            <0 118 IRQ_TYPE_LEVEL_HIGH>;
