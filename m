@@ -1,16 +1,21 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  4 Jan 2016 17:56:46 +0000
-Subject: [PATCHv2 13/18] arm64: mm: add functions to walk tables in fixmap
+Date: Mon,  4 Jan 2016 17:56:49 +0000
+Subject: [PATCHv2 16/18] arm64: mm: allow passing a pgdir to alloc_init_*
 In-Reply-To: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
 References: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1451930211-22460-14-git-send-email-mark.rutland@arm.com>
+Message-ID: <1451930211-22460-17-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As a prepratory step to allow us to allocate early page tables from
-unmapped memory using memblock_alloc, add new p??_fixmap* functions that
-can be used to walk page tables outside of the linear mapping by using
-fixmap slots.
+To allow us to initialise pgdirs which are fixmapped, allow explicitly
+passing a pgdir rather than an mm. A new __create_pgd_mapping function
+is added for this, with existing __create_mapping callers migrated to
+this.
+
+The mm argument was previously only used at the top level. Now that it
+is redundant at all levels, it is removed. To indicate its new found
+similarity to alloc_init_{pud,pmd,pte}, __create_mapping is renamed to
+init_pgd.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
@@ -19,107 +24,107 @@ Cc: Jeremy Linton <jeremy.linton@arm.com>
 Cc: Laura Abbott <labbott@fedoraproject.org>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/fixmap.h  | 10 ++++++++++
- arch/arm64/include/asm/pgtable.h | 26 ++++++++++++++++++++++++++
- 2 files changed, 36 insertions(+)
+ arch/arm64/mm/mmu.c | 33 +++++++++++++++++++--------------
+ 1 file changed, 19 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
-index 3097045..1a617d4 100644
---- a/arch/arm64/include/asm/fixmap.h
-+++ b/arch/arm64/include/asm/fixmap.h
-@@ -62,6 +62,16 @@ enum fixed_addresses {
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 28bc764..f3cd8f4 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -146,8 +146,7 @@ static void split_pud(pud_t *old_pud, pmd_t *pmd)
+ 	} while (pmd++, i++, i < PTRS_PER_PMD);
+ }
  
- 	FIX_BTMAP_END = __end_of_permanent_fixed_addresses,
- 	FIX_BTMAP_BEGIN = FIX_BTMAP_END + TOTAL_FIX_BTMAPS - 1,
-+
-+	/*
-+	 * Used for kernel page table creation, so unmapped memory may be used
-+	 * for tables.
-+	 */
-+	FIX_PTE,
-+	FIX_PMD,
-+	FIX_PUD,
-+	FIX_PGD,
-+
- 	__end_of_fixed_addresses
- };
- 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index f5742db..824e7f0 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -57,6 +57,7 @@
- 
- #ifndef __ASSEMBLY__
- 
-+#include <asm/fixmap.h>
- #include <linux/mmdebug.h>
- 
- extern void __pte_error(const char *file, int line, unsigned long val);
-@@ -442,6 +443,10 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
- #define pte_unmap(pte)			do { } while (0)
- #define pte_unmap_nested(pte)		do { } while (0)
- 
-+#define pte_fixmap(addr)		((pte_t *)set_fixmap_offset(FIX_PTE, addr))
-+#define pte_fixmap_offset(pmd, addr)	pte_fixmap(pte_offset_phys(pmd, addr))
-+#define pte_fixmap_unmap()		clear_fixmap(FIX_PTE)
-+
- #define pmd_page(pmd)		pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
- 
- /*
-@@ -481,12 +486,21 @@ static inline phys_addr_t pud_page_paddr(pud_t pud)
- #define pmd_offset_phys(dir, addr)	(pud_page_paddr(*(dir)) + pmd_index(addr) * sizeof(pmd_t))
- #define pmd_offset(dir, addr)		((pmd_t *)__va(pmd_offset_phys((dir), (addr))))
- 
-+#define pmd_fixmap(addr)		((pmd_t *)set_fixmap_offset(FIX_PMD, addr))
-+#define pmd_fixmap_offset(pud, addr)	pmd_fixmap(pmd_offset_phys(pud, addr))
-+#define pmd_fixmap_unmap()		clear_fixmap(FIX_PMD)
-+
- #define pud_page(pud)		pfn_to_page(__phys_to_pfn(pud_val(pud) & PHYS_MASK))
- 
- #else
- 
- #define pud_page_paddr(pud)	({ BUILD_BUG(); 0; })
- 
-+/* Match pmd_offset folding in <asm/generic/pgtable-nopmd.h> */
-+#define pmd_fixmap(addr)		NULL
-+#define pmd_fixmap_offset(pudp, addr)	((pmd_t *)pudp)
-+#define pmd_fixmap_unmap()
-+
- #endif	/* CONFIG_PGTABLE_LEVELS > 2 */
- 
- #if CONFIG_PGTABLE_LEVELS > 3
-@@ -519,12 +533,21 @@ static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
- #define pud_offset_phys(dir, addr)	(pgd_page_paddr(*(dir)) + pud_index(addr) * sizeof(pud_t))
- #define pud_offset(dir, addr)		((pud_t *)__va(pud_offset_phys((dir), (addr))))
- 
-+#define pud_fixmap(addr)		((pud_t *)set_fixmap_offset(FIX_PUD, addr))
-+#define pud_fixmap_offset(pgd, addr)	pud_fixmap(pmd_offset_phys(pgd, addr))
-+#define pud_fixmap_unmap()		clear_fixmap(FIX_PUD)
-+
- #define pgd_page(pgd)		pfn_to_page(__phys_to_pfn(pgd_val(pgd) & PHYS_MASK))
- 
- #else
- 
- #define pgd_page_paddr(pgd)	({ BUILD_BUG(); 0;})
- 
-+/* Match pud_offset folding in <asm/generic/pgtable-nopud.h> */
-+#define pud_fixmap(addr)		NULL
-+#define pud_fixmap_offset(pgdp, addr)	((pud_t *)pgdp)
-+#define pud_fixmap_unmap()
-+
- #endif  /* CONFIG_PGTABLE_LEVELS > 3 */
- 
- #define pgd_ERROR(pgd)		__pgd_error(__FILE__, __LINE__, pgd_val(pgd))
-@@ -539,6 +562,9 @@ static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
- /* to find an entry in a kernel page-table-directory */
- #define pgd_offset_k(addr)	pgd_offset(&init_mm, addr)
- 
-+#define pgd_fixmap(addr)		((pgd_t *)set_fixmap_offset(FIX_PGD, addr))
-+#define pgd_fixmap_unmap()		clear_fixmap(FIX_PGD)
-+
- static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
+-static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
+-				  unsigned long addr, unsigned long end,
++static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
+ 				  phys_addr_t phys, pgprot_t prot,
+ 				  phys_addr_t (*pgtable_alloc)(void))
  {
- 	const pteval_t mask = PTE_USER | PTE_PXN | PTE_UXN | PTE_RDONLY |
+@@ -215,8 +214,7 @@ static inline bool use_1G_block(unsigned long addr, unsigned long next,
+ 	return true;
+ }
+ 
+-static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
+-				  unsigned long addr, unsigned long end,
++static void alloc_init_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
+ 				  phys_addr_t phys, pgprot_t prot,
+ 				  phys_addr_t (*pgtable_alloc)(void))
+ {
+@@ -257,7 +255,7 @@ static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
+ 				}
+ 			}
+ 		} else {
+-			alloc_init_pmd(mm, pud, addr, next, phys, prot,
++			alloc_init_pmd(pud, addr, next, phys, prot,
+ 				       pgtable_alloc);
+ 		}
+ 		phys += next - addr;
+@@ -270,8 +268,7 @@ static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
+  * Create the page directory entries and any necessary page tables for the
+  * mapping specified by 'md'.
+  */
+-static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
+-				    phys_addr_t phys, unsigned long virt,
++static void init_pgd(pgd_t *pgd, phys_addr_t phys, unsigned long virt,
+ 				    phys_addr_t size, pgprot_t prot,
+ 				    phys_addr_t (*pgtable_alloc)(void))
+ {
+@@ -291,7 +288,7 @@ static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
+ 	end = addr + length;
+ 	do {
+ 		next = pgd_addr_end(addr, end);
+-		alloc_init_pud(mm, pgd, addr, next, phys, prot, pgtable_alloc);
++		alloc_init_pud(pgd, addr, next, phys, prot, pgtable_alloc);
+ 		phys += next - addr;
+ 	} while (pgd++, addr = next, addr != end);
+ }
+@@ -304,6 +301,14 @@ static phys_addr_t late_pgtable_alloc(void)
+ 	return __pa(ptr);
+ }
+ 
++static void __create_pgd_mapping(pgd_t *pgdir, phys_addr_t phys,
++				 unsigned long virt, phys_addr_t size,
++				 pgprot_t prot,
++				 phys_addr_t (*alloc)(void))
++{
++	init_pgd(pgd_offset_raw(pgdir, virt), phys, virt, size, prot, alloc);
++}
++
+ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
+ 				  phys_addr_t size, pgprot_t prot)
+ {
+@@ -312,16 +317,16 @@ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
+ 			&phys, virt);
+ 		return;
+ 	}
+-	__create_mapping(&init_mm, pgd_offset_k(virt), phys, virt,
+-			 size, prot, early_pgtable_alloc);
++	__create_pgd_mapping(init_mm.pgd, phys, virt, size, prot,
++			     early_pgtable_alloc);
+ }
+ 
+ void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
+ 			       unsigned long virt, phys_addr_t size,
+ 			       pgprot_t prot)
+ {
+-	__create_mapping(mm, pgd_offset(mm, virt), phys, virt, size, prot,
+-				late_pgtable_alloc);
++	__create_pgd_mapping(mm->pgd, phys, virt, size, prot,
++			     late_pgtable_alloc);
+ }
+ 
+ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
+@@ -333,8 +338,8 @@ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
+ 		return;
+ 	}
+ 
+-	return __create_mapping(&init_mm, pgd_offset_k(virt),
+-				phys, virt, size, prot, late_pgtable_alloc);
++	__create_pgd_mapping(init_mm.pgd, phys, virt, size, prot,
++			     late_pgtable_alloc);
+ }
+ 
+ #ifdef CONFIG_DEBUG_RODATA
 -- 
 1.9.1
