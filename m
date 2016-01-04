@@ -1,28 +1,69 @@
-From: hpa@zytor.com (H. Peter Anvin)
-Date: Mon, 04 Jan 2016 11:21:46 -0800
-Subject: [PATCH 6/6] arm64: switch to relative exception tables
-In-Reply-To: <3908561D78D1C84285E8C5FCA982C28F39FA127B@ORSMSX114.amr.corp.intel.com>
-References: <1451837157-447-1-git-send-email-ard.biesheuvel@linaro.org>
- <1451837157-447-7-git-send-email-ard.biesheuvel@linaro.org>
- <20160104144643.GE1616@arm.com> <568AB65A.8030901@zytor.com>
- <3908561D78D1C84285E8C5FCA982C28F39FA127B@ORSMSX114.amr.corp.intel.com>
-Message-ID: <568AC64A.4090601@zytor.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Mon, 4 Jan 2016 14:22:59 -0500
+Subject: [PATCH] drivers/bus: make uniphier-system-bus.c explicitly non-modular
+Message-ID: <1451935379-14107-1-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/04/2016 10:20 AM, Luck, Tony wrote:
->> May I humbly ask why the [Finnish] you don't use the equivalent of the
->> x86 _ASM_EXTABLE() macro?  In fact, why don't we make that one generic, too?
-> 
-> I'm messing with that right now (with help from Andy Lutomirski and Boris) to
-> add different classes of exception table (so I can tag some instructions as being
-> suitable for fixup from the machine check handler).  So it might not be generic
-> for much longer.
-> 
-> http://marc.info/?l=linux-kernel&m=145187079504846&w=2
-> 
+The Kconfig currently controlling compilation of this code is:
 
-I suspect that means we will also need to go back to arch-specific
-sorting for x86.
+drivers/bus/Kconfig:config UNIPHIER_SYSTEM_BUS
+drivers/bus/Kconfig:    bool "UniPhier System Bus driver"
 
-	-hpa
+...meaning that it currently is not being built as a module by anyone.
+
+Lets remove the modular code that is essentially orphaned, so that
+when reading the driver there is no doubt it is builtin-only.
+
+Since module_platform_driver() uses the same init level priority as
+builtin_platform_driver() the init ordering remains unchanged with
+this commit.
+
+Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
+
+We also delete the MODULE_LICENSE tag etc. since all that information
+is already contained at the top of the file in the comments.
+
+Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+Cc: Rob Herring <robh@kernel.org>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+---
+ drivers/bus/uniphier-system-bus.c | 9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/bus/uniphier-system-bus.c b/drivers/bus/uniphier-system-bus.c
+index 834a2aeaf27a..6b14b8d0a1a2 100644
+--- a/drivers/bus/uniphier-system-bus.c
++++ b/drivers/bus/uniphier-system-bus.c
+@@ -14,7 +14,7 @@
+ 
+ #include <linux/io.h>
+ #include <linux/log2.h>
+-#include <linux/module.h>
++#include <linux/init.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/of_platform.h>
+@@ -265,7 +265,6 @@ static const struct of_device_id uniphier_system_bus_match[] = {
+ 	{ .compatible = "socionext,uniphier-system-bus" },
+ 	{ /* sentinel */ }
+ };
+-MODULE_DEVICE_TABLE(of, uniphier_system_bus_match);
+ 
+ static struct platform_driver uniphier_system_bus_driver = {
+ 	.probe		= uniphier_system_bus_probe,
+@@ -274,8 +273,4 @@ static struct platform_driver uniphier_system_bus_driver = {
+ 		.of_match_table = uniphier_system_bus_match,
+ 	},
+ };
+-module_platform_driver(uniphier_system_bus_driver);
+-
+-MODULE_AUTHOR("Masahiro Yamada <yamada.masahiro@socionext.com>");
+-MODULE_DESCRIPTION("UniPhier System Bus driver");
+-MODULE_LICENSE("GPL");
++builtin_platform_driver(uniphier_system_bus_driver);
+-- 
+2.6.1
