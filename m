@@ -1,35 +1,69 @@
-From: svarbanov@mm-sol.com (Stanimir Varbanov)
-Date: Mon, 4 Jan 2016 16:31:27 +0200
-Subject: [PATCH v5 1/5] PCI: designware: ensure ATU is enabled before
- IO/conf space accesses
-In-Reply-To: <CAHM4w1kzGKahVOTdTxMciZBs81U9EVoSYPgCw9=ph3R9vSwCwQ@mail.gmail.com>
-References: <1450442339-18765-1-git-send-email-stanimir.varbanov@linaro.org>
- <1450442339-18765-2-git-send-email-stanimir.varbanov@linaro.org>
- <CAHM4w1kzGKahVOTdTxMciZBs81U9EVoSYPgCw9=ph3R9vSwCwQ@mail.gmail.com>
-Message-ID: <568A823F.5090209@mm-sol.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 4 Jan 2016 15:32:37 +0100
+Subject: linux-4.4-rc8/arch/arm64/kernel/module.c:78: 32/64 bit problem ?
+In-Reply-To: <20160104141657.GC1616@arm.com>
+References: <DUB128-W158A3195DB26F149DD52E59CF20@phx.gbl>
+ <20160104141657.GC1616@arm.com>
+Message-ID: <CAKv+Gu8KT-vOPN=ypt-qViLc74CumJUorxxM1wPnzf7h-nqKFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/18/2015 04:41 PM, Pratyush Anand wrote:
-> On Fri, Dec 18, 2015 at 6:08 PM, Stanimir Varbanov
-> <stanimir.varbanov@linaro.org> wrote:
->> There is no guarantees that enabling ATU will hit the hardware
->> immediately, and subsequent accesses to configuration / IO spaces
->> are reliable. So fixing this by read back PCIE_ATU_CR2 register
->> just after writing.
+On 4 January 2016 at 15:16, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Jan 04, 2016 at 08:25:30AM +0000, David Binderman wrote:
+>> Hello there,
+>
+> Hi David,
+>
+>> [linux-4.4-rc8/arch/arm64/kernel/module.c:78] ->
+>> [linux-4.4-rc8/arch/arm64/kernel/module.c:88]: (warning) Shifting 32-bit
+>> value by 64 bits is undefined behaviour. See condition at line 88.
+>
+> Curious, but how are you seeing this warning? GCC is silent for me...
+>
+>> Source code is
 >>
->> Without such a fix the PCI device enumeration during kernel boot
->> is not reliable, and reading configuration space for particular
->> PCI device on the bus returns zero aka no device.
+>>     u64 imm_mask = (1 << len) - 1;
+>>     s64 sval = do_reloc(op, place, val);
 >>
->> Signed-off-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
-> 
-> Acked-by: Pratyush Anand <pratyush.anand@gmail.com>
+>>     switch (len) {
+>>     case 16:
+>>         *(s16 *)place = sval;
+>>         break;
+>>     case 32:
+>>         *(s32 *)place = sval;
+>>         break;
+>>     case 64:
+>>
+>> So it seems that len can be 64. Suggest new code
+>>
+>>     u64 imm_mask = (1UL << len) - 1;
+>
+> That still ends up shifting by the width of the type when len == 64,
+> which is potentially still broken. We're better off using GENMASK.
+>
 
-Bjorn, Do you want to resend the whole patchset with collected acks and
-tested tags?
+Can't we simply return from the function rather than break from the
+switch statement if len == 64?
+The range check does not make any sense in that case anyway.
 
 
--- 
-regards,
-Stan
+> --->8
+>
+> diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
+> index f4bc779e62e8..266e7490e85c 100644
+> --- a/arch/arm64/kernel/module.c
+> +++ b/arch/arm64/kernel/module.c
+> @@ -75,7 +75,7 @@ static u64 do_reloc(enum aarch64_reloc_op reloc_op, void *place, u64 val)
+>
+>  static int reloc_data(enum aarch64_reloc_op op, void *place, u64 val, int len)
+>  {
+> -       u64 imm_mask = (1 << len) - 1;
+> +       u64 imm_mask = GENMASK(len - 1, 0);
+>         s64 sval = do_reloc(op, place, val);
+>
+>         switch (len) {
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
