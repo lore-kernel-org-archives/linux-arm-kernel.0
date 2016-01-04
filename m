@@ -1,39 +1,93 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 4 Jan 2016 17:12:57 +0000
-Subject: [PATCH] pinctrl: mediatek: convert to arch_initcall
-In-Reply-To: <CACRpkdZsQc_Jug1dy-qist4Dv7HTDDx-fBjXTxj+s7W0sgJSuw@mail.gmail.com>
-References: <1450792017-7120-1-git-send-email-djkurtz@chromium.org>
- <CACRpkdbRDzXunYK5d6Ld4Z2a=0mkp4KBvgL2P-St4P65Jajamw@mail.gmail.com>
- <20151230172212.GZ16023@sirena.org.uk>
- <CAGS+omA9AarzE2sp1Ry3RuOt8EOa-sL=DL1iDA2OeVVdjn=xgg@mail.gmail.com>
- <20151231220712.GD16023@sirena.org.uk>
- <CAGS+omDesPTYHhVLv_EtQsYxa6MNuSi06MwcXz6RcY=uAcEtnQ@mail.gmail.com>
- <DBFC9B9B-5E81-44FD-9E26-8B50545004C1@gmail.com>
- <CACRpkdZsQc_Jug1dy-qist4Dv7HTDDx-fBjXTxj+s7W0sgJSuw@mail.gmail.com>
-Message-ID: <20160104171257.GO16023@sirena.org.uk>
+From: john.stultz@linaro.org (John Stultz)
+Date: Mon, 4 Jan 2016 09:13:39 -0800
+Subject: [tip:timers/core] clocksource: Make clocksource validation work
+ for all clocksources
+In-Reply-To: <tip-1f45f1f33c8c8b96722dbc5e6b7acf74eaa721f7@git.kernel.org>
+References: <56349607.6070708@huawei.com>
+ <tip-1f45f1f33c8c8b96722dbc5e6b7acf74eaa721f7@git.kernel.org>
+Message-ID: <CANcMJZD4P5qe7HtjsibjD_CNpv+yz=ttDJdpgg=vz3kUN5StOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 01, 2016 at 06:29:15PM +0100, Linus Walleij wrote:
-> On Fri, Jan 1, 2016 at 3:27 PM, Matthias Brugger <matthias.bgg@gmail.com> wrote:
+On Sat, Dec 19, 2015 at 7:03 AM, tip-bot for Yang Yingliang
+<tipbot@zytor.com> wrote:
+> Commit-ID:  1f45f1f33c8c8b96722dbc5e6b7acf74eaa721f7
+> Gitweb:     http://git.kernel.org/tip/1f45f1f33c8c8b96722dbc5e6b7acf74eaa721f7
+> Author:     Yang Yingliang <yangyingliang@huawei.com>
+> AuthorDate: Sat, 31 Oct 2015 18:20:55 +0800
+> Committer:  Thomas Gleixner <tglx@linutronix.de>
+> CommitDate: Sat, 19 Dec 2015 15:59:57 +0100
+>
+> clocksource: Make clocksource validation work for all clocksources
+>
+> The clocksource validation which makes sure that the newly read value
+> is not smaller than the last value only works if the clocksource mask
+> is 64bit, i.e. the counter is 64bit wide. But we want to use that
+> mechanism also for clocksources which are less than 64bit wide.
+>
+> So instead of checking whether bit 63 is set, we check whether the
+> most significant bit of the clocksource mask is set in the delta
+> result. If it is set, we return 0.
+>
+> [ tglx: Simplified the implementation, added a comment and massaged
+>         the commit message ]
+>
+> Suggested-by: Thomas Gleixner <tglx@linutronix.de>
+> Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
+> Cc: <linux-arm-kernel@lists.infradead.org>
+> Link: http://lkml.kernel.org/r/56349607.6070708 at huawei.com
+> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+> ---
+>  kernel/time/timekeeping_internal.h | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
+>
+> diff --git a/kernel/time/timekeeping_internal.h b/kernel/time/timekeeping_internal.h
+> index e20466f..5be7627 100644
+> --- a/kernel/time/timekeeping_internal.h
+> +++ b/kernel/time/timekeeping_internal.h
+> @@ -17,7 +17,11 @@ static inline cycle_t clocksource_delta(cycle_t now, cycle_t last, cycle_t mask)
+>  {
+>         cycle_t ret = (now - last) & mask;
+>
+> -       return (s64) ret > 0 ? ret : 0;
+> +       /*
+> +        * Prevent time going backwards by checking the MSB of mask in
+> +        * the result. If set, return 0.
+> +        */
+> +       return ret & ~(mask >> 1) ? 0 : ret;
 
-> > I think what Mark means is, that we define some pinctrl_initcall which
-> > is a macro to subsys_initcall (or arch_initcall or similar). We apply this
-> > to all pinctrl drivers including the one from Mediatek. This way at least
-> > we have a common method and changing the behaviour in the future is
-> > easier to handle.
+Hey Thomas, Yang,
+   I just noticed this patch, and I'm a little worried that its not
+totally safe.  When testing 64bit values, if the msb is set, we know
+its negative because no system going to get through more then 63 bits
+of cycles between updates.
 
-> That would be pinctrl_soc_initcall() in that case. Just pinctrl_initcall()
-> would assume it's for all drivers and there is a bunch of them that are just
-> fine with simple device_initcall()s.
+However, for systems with much shorter masks (ACPI PM for example is
+only 24 bits), the MSB of the mask bit being set doesn't necessarily
+indicate a invalid negative interval. This patch would possibly cause
+time inconsistencies (time going backwards) on those systems.
 
-OTOH it might be easier to just have an initcall (or fiddle with the
-link order) for everything to avoid having to think about which drivers
-things apply to.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160104/ac8ca8f8/attachment.sig>
+So if something like this is added, we probably need some additional
+smarts to ensure we don't cause problems with quick-wrapping
+clocksources with the same fix to try to avoid negative intervals with
+unsynced clocksources.
+
+That said, back when we added the TIMEKEEPING_DEBUGGING work, we did
+add non-terminal warnings if we saw cycle offsets larger then 50% of
+the mask, so the intent of this patch isn't totally off base, but it
+seems like leaning heavily on an assumption that isn't quite a hard
+design rule of the subsystem (as with a warning, we can continue
+working fine, but with this patch we might introduce inconsistencies).
+
+One potential hack that could be tried: If unsynced clocksource has a
+long enough interval that we can be sure the MSB being set always
+means its an invalid negative interval, you could have the clocksource
+shift the read value up by however many bits the mask length is short
+of 64 (similarly adjusting the frequency up proportionally), and then
+set its mask to all 64 bits. That way negative reads would be caught
+by the pre-existing generic logic.
+
+Sorry I didn't see this earlier, I wasn't on the cc list.
+
+thanks
+-john
