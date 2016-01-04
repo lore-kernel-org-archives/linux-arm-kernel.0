@@ -1,40 +1,91 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 4 Jan 2016 13:25:15 -0800
-Subject: [PATCH v2] ARM: shmobile: alt: Add QSPI device to DT
-In-Reply-To: <CAMuHMdWbFHLKgkn9ShJkyyimpwJAbbL5TjqEp1E9GBteVKQmKg@mail.gmail.com>
-References: <1451903819-19218-1-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdVFC1TEeTT5Gas8jz0Tvn2HB3EHBo7gp6pthsnOo6x5UQ@mail.gmail.com>
- <20160104203136.GB12748@verge.net.au>
- <CAMuHMdWbFHLKgkn9ShJkyyimpwJAbbL5TjqEp1E9GBteVKQmKg@mail.gmail.com>
-Message-ID: <20160104212515.GA39910@google.com>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Mon,  4 Jan 2016 22:36:40 +0100
+Subject: [PATCHv2] drivers: dma-coherent: simplify dma_init_coherent_memory
+ return value
+Message-ID: <1451943400-17190-1-git-send-email-mina86@mina86.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 04, 2016 at 09:42:59PM +0100, Geert Uytterhoeven wrote:
-> On Mon, Jan 4, 2016 at 9:31 PM, Simon Horman <horms@verge.net.au> wrote:
-> > Should we document "spansion,s25fl512s" for the benefit of checkpatch.pl?
-> 
-> Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt used to point to
-> drivers/mtd/devices/m25p80.c for the list of supported chips.
-> 
-> That seems to have been changed lately. Now jedec,spi-nor.txt includes the
-> list, but lacks the manufacturers' names, so checkpatch.pl is still not happpy.
-> 
-> Brian: Shouldn't the manufacturers's names be added?
+Since only dma_declare_coherent_memory cares about
+dma_init_coherent_memory returning part of flags as it return value,
+move the condition to the former and simplify the latter.  This in
+turn makes rmem_dma_device_init less confusing.
 
-We've had some of this discussion recently:
+Reported-by: Fugang Duan <B38611@freescale.com>
+Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
+Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ drivers/base/dma-coherent.c | 28 +++++++++++-----------------
+ 1 file changed, 11 insertions(+), 17 deletions(-)
 
-http://lkml.kernel.org/g/20151118194340.GF140057 at google.com
-
-I don't think we can reasonably determine a good list of complete
-strings, due to historical failures (IMO) in the SPI subsystem. We could
-add a separate list of possible manufacturers, so people can do the MxN
-pairing themselves.
-
-checkpatch.pl has enough false positives that its author doesn't care to
-fix that I'm not personally worried about yet another class of them. But
-if you have good reasons and good patches for the documentation, I'm all
-ears.
-
-Regards,
-Brian
+diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
+index 55b8398..87b8083 100644
+--- a/drivers/base/dma-coherent.c
++++ b/drivers/base/dma-coherent.c
+@@ -17,9 +17,9 @@ struct dma_coherent_mem {
+ 	spinlock_t	spinlock;
+ };
+ 
+-static int dma_init_coherent_memory(phys_addr_t phys_addr, dma_addr_t device_addr,
+-			     size_t size, int flags,
+-			     struct dma_coherent_mem **mem)
++static bool dma_init_coherent_memory(
++	phys_addr_t phys_addr, dma_addr_t device_addr, size_t size, int flags,
++	struct dma_coherent_mem **mem)
+ {
+ 	struct dma_coherent_mem *dma_mem = NULL;
+ 	void __iomem *mem_base = NULL;
+@@ -50,17 +50,13 @@ static int dma_init_coherent_memory(phys_addr_t phys_addr, dma_addr_t device_add
+ 	spin_lock_init(&dma_mem->spinlock);
+ 
+ 	*mem = dma_mem;
+-
+-	if (flags & DMA_MEMORY_MAP)
+-		return DMA_MEMORY_MAP;
+-
+-	return DMA_MEMORY_IO;
++	return true;
+ 
+ out:
+ 	kfree(dma_mem);
+ 	if (mem_base)
+ 		iounmap(mem_base);
+-	return 0;
++	return false;
+ }
+ 
+ static void dma_release_coherent_memory(struct dma_coherent_mem *mem)
+@@ -88,15 +84,13 @@ int dma_declare_coherent_memory(struct device *dev, phys_addr_t phys_addr,
+ 				dma_addr_t device_addr, size_t size, int flags)
+ {
+ 	struct dma_coherent_mem *mem;
+-	int ret;
+ 
+-	ret = dma_init_coherent_memory(phys_addr, device_addr, size, flags,
+-				       &mem);
+-	if (ret == 0)
++	if (!dma_init_coherent_memory(phys_addr, device_addr, size, flags,
++				      &mem))
+ 		return 0;
+ 
+ 	if (dma_assign_coherent_memory(dev, mem) == 0)
+-		return ret;
++		return flags & DMA_MEMORY_MAP ? DMA_MEMORY_MAP : DMA_MEMORY_IO;
+ 
+ 	dma_release_coherent_memory(mem);
+ 	return 0;
+@@ -281,9 +275,9 @@ static int rmem_dma_device_init(struct reserved_mem *rmem, struct device *dev)
+ 	struct dma_coherent_mem *mem = rmem->priv;
+ 
+ 	if (!mem &&
+-	    dma_init_coherent_memory(rmem->base, rmem->base, rmem->size,
+-				     DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE,
+-				     &mem) != DMA_MEMORY_MAP) {
++	    !dma_init_coherent_memory(rmem->base, rmem->base, rmem->size,
++				      DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE,
++				      &mem)) {
+ 		pr_err("Reserved memory: failed to init DMA memory pool at %pa, size %ld MiB\n",
+ 			&rmem->base, (unsigned long)rmem->size / SZ_1M);
+ 		return -ENODEV;
+-- 
+2.6.0.rc2.230.g3dd15c0
