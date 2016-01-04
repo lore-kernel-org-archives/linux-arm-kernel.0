@@ -1,117 +1,156 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  4 Jan 2016 17:56:36 +0000
-Subject: [PATCHv2 03/18] arm64: mm: place empty_zero_page in bss
+Date: Mon,  4 Jan 2016 17:56:37 +0000
+Subject: [PATCHv2 04/18] arm64: unify idmap removal
 In-Reply-To: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
 References: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1451930211-22460-4-git-send-email-mark.rutland@arm.com>
+Message-ID: <1451930211-22460-5-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the zero page is set up in paging_init, and thus we cannot use
-the zero page earlier. We use the zero page as a reserved TTBR value
-from which no TLB entries may be allocated (e.g. when uninstalling the
-idmap). To enable such usage earlier (as may be required for invasive
-changes to the kernel page tables), and to minimise the time that the
-idmap is active, we need to be able to use the zero page before
-paging_init.
+We currently open-code the removal of the idmap and restoration of the
+current task's MMU state in a few places.
 
-This patch follows the example set by x86, by allocating the zero page
-at compile time, in .bss. This means that the zero page itself is
-available immediately upon entry to start_kernel (as we zero .bss before
-this), and also means that the zero page takes up no space in the raw
-Image binary. The associated struct page is allocated in bootmem_init,
-and remains unavailable until this time.
-
-Outside of arch code, the only users of empty_zero_page assume that the
-empty_zero_page symbol refers to the zeroed memory itself, and that
-ZERO_PAGE(x) must be used to acquire the associated struct page,
-following the example of x86. This patch also brings arm64 inline with
-these assumptions.
+Before introducing yet more copies of this sequence, unify these to call
+a new helper, cpu_uninstall_idmap.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Jeremy Linton <jeremy.linton@arm.com>
 Cc: Laura Abbott <labbott@fedoraproject.org>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/mmu_context.h | 2 +-
- arch/arm64/include/asm/pgtable.h     | 4 ++--
- arch/arm64/kernel/head.S             | 1 +
- arch/arm64/mm/mmu.c                  | 9 +--------
- 4 files changed, 5 insertions(+), 11 deletions(-)
+ arch/arm64/include/asm/mmu_context.h | 25 +++++++++++++++++++++++++
+ arch/arm64/kernel/setup.c            |  1 +
+ arch/arm64/kernel/smp.c              |  4 +---
+ arch/arm64/kernel/suspend.c          | 20 ++++----------------
+ arch/arm64/mm/mmu.c                  |  4 +---
+ 5 files changed, 32 insertions(+), 22 deletions(-)
 
 diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-index 2416578..600eacb 100644
+index 600eacb..b1b2514 100644
 --- a/arch/arm64/include/asm/mmu_context.h
 +++ b/arch/arm64/include/asm/mmu_context.h
-@@ -48,7 +48,7 @@ static inline void contextidr_thread_switch(struct task_struct *next)
-  */
- static inline void cpu_set_reserved_ttbr0(void)
- {
--	unsigned long ttbr = page_to_phys(empty_zero_page);
-+	unsigned long ttbr = virt_to_phys(empty_zero_page);
+@@ -27,6 +27,7 @@
+ #include <asm-generic/mm_hooks.h>
+ #include <asm/cputype.h>
+ #include <asm/pgtable.h>
++#include <asm/tlbflush.h>
  
- 	asm(
- 	"	msr	ttbr0_el1, %0			// set TTBR0\n"
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 35a318c..382d627 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -121,8 +121,8 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
-  * ZERO_PAGE is a global shared page that is always zero: used
-  * for zero-mapped memory areas etc..
-  */
--extern struct page *empty_zero_page;
--#define ZERO_PAGE(vaddr)	(empty_zero_page)
-+extern unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)];
-+#define ZERO_PAGE(vaddr)	virt_to_page(empty_zero_page)
+ #ifdef CONFIG_PID_IN_CONTEXTIDR
+ static inline void contextidr_thread_switch(struct task_struct *next)
+@@ -90,6 +91,30 @@ static inline void cpu_set_default_tcr_t0sz(void)
+ }
  
- #define pte_ERROR(pte)		__pte_error(__FILE__, __LINE__, pte_val(pte))
+ /*
++ * Remove the idmap from TTBR0_EL1 and install the pgd of the active mm.
++ *
++ * The idmap lives in the same VA range as userspace, but uses global entries
++ * and may use a different TCR_EL1.T0SZ. To avoid issues resulting from
++ * speculative TLB fetches, we must temporarily install the reserved page
++ * tables while we invalidate the TLBs and set up the correct TCR_EL1.T0SZ.
++ *
++ * If current is a not a user task, the mm covers the TTBR1_EL1 page tables,
++ * which should not be installed in TTBR0_EL1. In this case we can leave the
++ * reserved page tables in place.
++ */
++static inline void cpu_uninstall_idmap(void)
++{
++	struct mm_struct *mm = current->active_mm;
++
++	cpu_set_reserved_ttbr0();
++	local_flush_tlb_all();
++	cpu_set_default_tcr_t0sz();
++
++	if (mm != &init_mm)
++		cpu_switch_mm(mm->pgd, mm);
++}
++
++/*
+  * It would be nice to return ASIDs back to the allocator, but unfortunately
+  * that introduces a race with a generation rollover where we could erroneously
+  * free an ASID allocated in a future generation. We could workaround this by
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 8119479..f6621ba 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -62,6 +62,7 @@
+ #include <asm/memblock.h>
+ #include <asm/efi.h>
+ #include <asm/xen/hypervisor.h>
++#include <asm/mmu_context.h>
  
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index b363f34..9da5d0c 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -423,6 +423,7 @@ __mmap_switched:
- 	str	xzr, [x6], #8			// Clear BSS
- 	b	1b
- 2:
-+	dsb	ishst				// Make zero page visible to PTW
- 	adr_l	sp, initial_sp, x4
- 	mov	x4, sp
- 	and	x4, x4, #~(THREAD_SIZE - 1)
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index b25d5cb..cdbf055 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -49,7 +49,7 @@ u64 idmap_t0sz = TCR_T0SZ(VA_BITS);
-  * Empty_zero_page is a special page that is used for zero-initialized data
-  * and COW.
-  */
--struct page *empty_zero_page;
-+unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)] __page_aligned_bss;
- EXPORT_SYMBOL(empty_zero_page);
+ phys_addr_t __fdt_pointer __initdata;
  
- pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
-@@ -459,18 +459,11 @@ void fixup_init(void)
-  */
- void __init paging_init(void)
- {
--	void *zero_page;
--
- 	map_mem();
- 	fixup_executable();
- 
--	/* allocate the zero page. */
--	zero_page = early_pgtable_alloc();
--
- 	bootmem_init();
- 
--	empty_zero_page = virt_to_page(zero_page);
--
- 	/*
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index b1adc51..68e7f79 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -149,9 +149,7 @@ asmlinkage void secondary_start_kernel(void)
  	 * TTBR0 is only used for the identity mapping at this stage. Make it
  	 * point to zero page to avoid speculatively fetching new entries.
+ 	 */
+-	cpu_set_reserved_ttbr0();
+-	local_flush_tlb_all();
+-	cpu_set_default_tcr_t0sz();
++	cpu_uninstall_idmap();
+ 
+ 	preempt_disable();
+ 	trace_hardirqs_off();
+diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
+index 1095aa4..6605539 100644
+--- a/arch/arm64/kernel/suspend.c
++++ b/arch/arm64/kernel/suspend.c
+@@ -60,7 +60,6 @@ void __init cpu_suspend_set_dbg_restorer(void (*hw_bp_restore)(void *))
+  */
+ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+ {
+-	struct mm_struct *mm = current->active_mm;
+ 	int ret;
+ 	unsigned long flags;
+ 
+@@ -87,22 +86,11 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+ 	ret = __cpu_suspend_enter(arg, fn);
+ 	if (ret == 0) {
+ 		/*
+-		 * We are resuming from reset with TTBR0_EL1 set to the
+-		 * idmap to enable the MMU; set the TTBR0 to the reserved
+-		 * page tables to prevent speculative TLB allocations, flush
+-		 * the local tlb and set the default tcr_el1.t0sz so that
+-		 * the TTBR0 address space set-up is properly restored.
+-		 * If the current active_mm != &init_mm we entered cpu_suspend
+-		 * with mappings in TTBR0 that must be restored, so we switch
+-		 * them back to complete the address space configuration
+-		 * restoration before returning.
++		 * We are resuming from reset with the idmap active in TTBR0_EL1.
++		 * We must uninstall the idmap and restore the expected MMU
++		 * state before we can possibly return to userspace.
+ 		 */
+-		cpu_set_reserved_ttbr0();
+-		local_flush_tlb_all();
+-		cpu_set_default_tcr_t0sz();
+-
+-		if (mm != &init_mm)
+-			cpu_switch_mm(mm->pgd, mm);
++		cpu_uninstall_idmap();
+ 
+ 		/*
+ 		 * Restore per-cpu offset before any kernel
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index cdbf055..e85a719 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -468,9 +468,7 @@ void __init paging_init(void)
+ 	 * TTBR0 is only used for the identity mapping at this stage. Make it
+ 	 * point to zero page to avoid speculatively fetching new entries.
+ 	 */
+-	cpu_set_reserved_ttbr0();
+-	local_flush_tlb_all();
+-	cpu_set_default_tcr_t0sz();
++	cpu_uninstall_idmap();
+ }
+ 
+ /*
 -- 
 1.9.1
