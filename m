@@ -1,61 +1,55 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  5 Jan 2016 09:16:20 +1100
-Subject: [PATCH v2] ARM: shmobile: gose: add i2c2 bus to device tree
-Message-ID: <1451945780-17558-1-git-send-email-horms+renesas@verge.net.au>
+Date: Tue,  5 Jan 2016 09:27:35 +1100
+Subject: [PATCH v2 00/13] r8a7793, gose: Add audio support to device tree
+Message-ID: <1451946468-20499-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Activate i2c2 bus in r8a7793/gose device tree.
+Hi,
 
-Based on similar work for the r8a7791/koelsch by Wolfram Sang.
+this series adds support to r8a7793 and gose device trees for
+rcar sound: first in PIO mode then using DMA
 
-Cc: Wolfram Sang <wsa@sang-engineering.com>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+I have been unable to test if audio works (in PIO mode) as I
+do not have physical access to a gose board. I would appreciate
+some assistance there too.
 
----
-v2
-* Update eprom compat strings to "renesas,r1ex24002", "atmel,24c02".
-  The former needs to be documented once the desired mechanism
-  for documenting eprom compat strings has been confirmed
-  with the maintainer.
----
- arch/arm/boot/dts/r8a7793-gose.dts | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+This work is based heavily on the work of others for the r8a7791 and
+koelsch as noted in the changelogs of individual patches.
 
-diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
-index 90b587c3c736..987ed03b1e02 100644
---- a/arch/arm/boot/dts/r8a7793-gose.dts
-+++ b/arch/arm/boot/dts/r8a7793-gose.dts
-@@ -136,6 +136,11 @@
- };
- 
- &pfc {
-+	i2c2_pins: i2c2 {
-+		renesas,groups = "i2c2";
-+		renesas,function = "i2c2";
-+	};
-+
- 	scif0_pins: serial0 {
- 		renesas,groups = "scif0_data_d";
- 		renesas,function = "scif0";
-@@ -234,3 +239,17 @@
- 		};
- 	};
- };
-+
-+&i2c2 {
-+	pinctrl-0 = <&i2c2_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+	clock-frequency = <100000>;
-+
-+	eeprom at 50 {
-+		compatible = "renesas,r1ex24002", "atmel,24c02";
-+		reg = <0x50>;
-+		pagesize = <16>;
-+	};
-+};
+This series is based on renesas-devel-20160105-v4.4-rc8.
+
+This series depends on:
+
+* [PATCH] ARM: shmobile: r8a7793: move dmac nodes
+* [PATCH v2] ARM: shmobile: gose: add i2c2 bus to device tree
+
+Changes since v1:
+* Dropped RFC designation
+* Dropped i2c patches: they have been posted and partially merged separately
+* Dropped MIX/CTU support pending more work on that feature
+* Enable Audio DMAC peri peri via sound driver
+* Other changes noted in per-patch changelogs
+
+
+Simon Horman (13):
+  ARM: shmobile: r8a7793: add audio clock to device tree
+  ARM: shmobile: r8a7793: add m2 clock to device tree
+  ARM: shmobile: r8a7793: add R-Car sound support to device tree
+  ARM: shmobile: r8a7793: add DVC support to device tree
+  ARM: shmobile: r8a7793: add audio DMAC clocks to device tree
+  ARM: shmobile: r8a7793: add audio DMAC to device tree
+  ARM: shmobile: r8a7793: enable Audio DMAC peri peri via sound driver
+  ARM: shmobile: gose: Enable sound PIO support in device tree
+  ARM: shmobile: gose: enable sound DMA support in device tree
+  ARM: shmobile: gose: enable sound DMA support via BUSIF in device tree
+  ARM: shmobile: gose: enable sound DMA support via SRC in device tree
+  ARM: shmobile: gose: enable sound DMA support via DVC in device tree
+  ARM: shmobile: r8a7793: enable audio DMAC in device tree
+
+ arch/arm/boot/dts/r8a7793-gose.dts |  88 +++++++++++++
+ arch/arm/boot/dts/r8a7793.dtsi     | 253 ++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 338 insertions(+), 3 deletions(-)
+
 -- 
 2.1.4
