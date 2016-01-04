@@ -1,23 +1,25 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Mon, 4 Jan 2016 11:32:28 +0000
-Subject: [Xen-devel] [PATCH v2 34/34] xen/io: use virt_xxx barriers
-In-Reply-To: <1451572003-2440-35-git-send-email-mst@redhat.com>
-References: <1451572003-2440-1-git-send-email-mst@redhat.com>
- <1451572003-2440-35-git-send-email-mst@redhat.com>
-Message-ID: <568A584C.2070501@citrix.com>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Mon, 4 Jan 2016 13:36:44 +0200
+Subject: [PATCH 0/3] checkpatch: handling of memory barriers
+Message-ID: <1451907395-15978-1-git-send-email-mst@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/12/15 19:10, Michael S. Tsirkin wrote:
-> include/xen/interface/io/ring.h uses
-> full memory barriers to communicate with the other side.
-> 
-> For guests compiled with CONFIG_SMP, smp_wmb and smp_mb
-> would be sufficient, so mb() and wmb() here are only needed if
-> a non-SMP guest runs on an SMP host.
-> 
-> Switch to virt_xxx barriers which serve this exact purpose.
+As part of memory barrier cleanup, this patchset
+extends checkpatch to make it easier to stop
+incorrect memory barrier usage.
 
-Acked-by: David Vrabel <david.vrabel@citrix.com>
+This applies on top of my series
+	arch: barrier cleanup + barriers for virt
+and will be included in the next version of the series.
 
-David
+Michael S. Tsirkin (3):
+  checkpatch.pl: add missing memory barriers
+  checkpatch: check for __smp outside barrier.h
+  checkpatch: add virt barriers
+
+ scripts/checkpatch.pl | 21 ++++++++++++++++++++-
+ 1 file changed, 20 insertions(+), 1 deletion(-)
+
+-- 
+MST
