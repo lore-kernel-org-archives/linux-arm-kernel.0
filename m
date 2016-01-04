@@ -1,101 +1,303 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 4 Jan 2016 18:00:21 +0000
-Subject: [PATCH] arm64: fix relocation of movz instruction with negative
- immediate
-In-Reply-To: <CAKv+Gu_T8PUZszv3RpC+nHrjKV_3gdqO1UjxizLQOYqBUQU5hA@mail.gmail.com>
-References: <1451923762-8387-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160104171749.GA4436@e103592.cambridge.arm.com>
- <CAKv+Gu_T8PUZszv3RpC+nHrjKV_3gdqO1UjxizLQOYqBUQU5hA@mail.gmail.com>
-Message-ID: <20160104180020.GB4436@e103592.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon,  4 Jan 2016 17:56:51 +0000
+Subject: [PATCHv2 18/18] arm64: mm: create new fine-grained mappings at boot
+In-Reply-To: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
+References: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1451930211-22460-19-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 04, 2016 at 06:33:03PM +0100, Ard Biesheuvel wrote:
-> On 4 January 2016 at 18:21, Dave Martin <Dave.Martin@arm.com> wrote:
-> > On Mon, Jan 04, 2016 at 05:09:22PM +0100, Ard Biesheuvel wrote:
-> >> The test whether a movz instruction with a signed immediate should be
-> >> turned into a movn instruction (i.e., when the immediate is negative)
-> >> is flawed, since the value of imm is always positive. So check sval
-> >> instead.
-> >>
-> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> ---
-> >>  arch/arm64/kernel/module.c | 2 +-
-> >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>
-> >> diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
-> >> index f4bc779e62e8..39e4a29cab50 100644
-> >> --- a/arch/arm64/kernel/module.c
-> >> +++ b/arch/arm64/kernel/module.c
-> >> @@ -128,7 +128,7 @@ static int reloc_insn_movw(enum aarch64_reloc_op op, void *place, u64 val,
-> >
-> > #define AARCH64_INSN_IMM_MOVNZ          AARCH64_INSN_IMM_MAX
-> > #define AARCH64_INSN_IMM_MOVK           AARCH64_INSN_IMM_16
-> >
-> > /* ... */
-> >
-> >         if (imm_type == AARCH64_INSN_IMM_MOVNZ) {
-> >
-> > /* ... */
-> >
-> >>                * immediate is less than zero.
-> >>                */
-> >>               insn &= ~(3 << 29);
-> >> -             if ((s64)imm >= 0) {
-> >> +             if (sval >= 0) {
-> >>                       /* >=0: Set the instruction to MOVZ (opcode 10b). */
-> >>                       insn |= 2 << 29;
-> >>               } else {
-> >
-> > I _think_ this may be correct, but...
-> >
-> >                 }
-> >                 imm_type = AARCH64_INSN_IMM_MOVK;
-> >         }
-> >
-> >         /* Update the instruction with the new encoding. */
-> >         insn = aarch64_insn_encode_immediate(imm_type, insn, imm);
-> >
-> > /* ... */
-> >
-> > leaves imm_type as either AARCH64_INSN_IMM_16 or AARCH64_INSN_IMM_MOVK.
-> >
-> > But because AARCH64_INSN_IMM_16 == AARCH64_INSN_IMM_MOVK (required for , the negative
-> > overflow fudge is never applied, no?
-> >
-> >         if (imm_type != AARCH64_INSN_IMM_16) {
-> >                 sval++;
-> >                 limit++;
-> >         }
-> >
-> >
-> > I'm wondering whether there is a less confusing way to do all this...
-> >
-> 
-> I hadn't spotted that AARCH64_INSN_IMM_16 == AARCH64_INSN_IMM_MOVK, so
-> you are correct that my single change is not sufficient to fix this
-> code.
-> 
-> Let me try to come up with something better ..
+At boot we may change the granularity of the tables mapping the kernel
+(by splitting or making sections). This may happen when we create the
+linear mapping (in __map_memblock), or at any point we try to apply
+fine-grained permissions to the kernel (e.g. fixup_executable,
+mark_rodata_ro, fixup_init).
 
-I think a simpler flow might go something like
+Changing the active page tables in this manner may result in multiple
+entries for the same address being allocated into TLBs, risking problems
+such as TLB conflict aborts or issues derived from the amalgamation of
+TLB entries. Generally, a break-before-make (BBM) approach is necessary
+to avoid conflicts, but we cannot do this for the kernel tables as it
+risks unmapping text or data being used to do so.
 
-	u64 uval = (u64)do_reloc(op, place, val);
+Instead, we can create a new set of tables from scratch in the safety of
+the existing mappings, and subsequently migrate over to these using the
+new cpu_replace_ttbr1 helper, which avoids the two sets of tables being
+active simultaneously.
 
-	if (is a SABS or PREL reloc that is not _NC, && (uval & (1 << 63))) {
-		change insn to MOVN;
-		uval = ~uval;
-	}
+To avoid issues when we later modify permissions of the page tables
+(e.g. in fixup_init), we must create the page tables at a granularity
+such that later modification does not result in splitting of tables.
 
-	/* encode the insn using the bottom 16 bits of uval */
+This patch applies this strategy, creating a new set of fine-grained
+page tables from scratch, and safely migrating to them. The existing
+fixmap and kasan shadow page tables are reused in the new fine-grained
+tables.
 
-	if (not an _NC reloc && (uval >> 16) > 0)
-		return -ERANGE;
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Andrey Ryabinin <ryabinin.a.a@gmail.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Jeremy Linton <jeremy.linton@arm.com>
+Cc: Laura Abbott <labbott@fedoraproject.org>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/kasan.h |   3 +
+ arch/arm64/mm/kasan_init.c     |  15 ++++
+ arch/arm64/mm/mmu.c            | 153 ++++++++++++++++++++++++-----------------
+ 3 files changed, 109 insertions(+), 62 deletions(-)
 
-
-...or something along those lines.
-
-I haven't tried to implement that yet, though.
-
-Cheers
----Dave
+diff --git a/arch/arm64/include/asm/kasan.h b/arch/arm64/include/asm/kasan.h
+index 2774fa3..de0d212 100644
+--- a/arch/arm64/include/asm/kasan.h
++++ b/arch/arm64/include/asm/kasan.h
+@@ -7,6 +7,7 @@
+ 
+ #include <linux/linkage.h>
+ #include <asm/memory.h>
++#include <asm/pgtable-types.h>
+ 
+ /*
+  * KASAN_SHADOW_START: beginning of the kernel virtual addresses.
+@@ -28,10 +29,12 @@
+ #define KASAN_SHADOW_OFFSET     (KASAN_SHADOW_END - (1ULL << (64 - 3)))
+ 
+ void kasan_init(void);
++void kasan_copy_shadow(pgd_t *pgdir);
+ asmlinkage void kasan_early_init(void);
+ 
+ #else
+ static inline void kasan_init(void) { }
++static inline void kasan_copy_shadow(pgd_t *pgdir) { }
+ #endif
+ 
+ #endif
+diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
+index 3e3d280..0ca411f 100644
+--- a/arch/arm64/mm/kasan_init.c
++++ b/arch/arm64/mm/kasan_init.c
+@@ -97,6 +97,21 @@ asmlinkage void __init kasan_early_init(void)
+ 	kasan_map_early_shadow();
+ }
+ 
++/*
++ * Copy the current shadow region into a new pgdir.
++ */
++void __init kasan_copy_shadow(pgd_t *pgdir)
++{
++	pgd_t *pgd, *pgd_new, *pgd_end;
++
++	pgd = pgd_offset_k(KASAN_SHADOW_START);
++	pgd_end = pgd_offset_k(KASAN_SHADOW_END);
++	pgd_new = pgd_offset_raw(pgdir, KASAN_SHADOW_START);
++	do {
++		set_pgd(pgd_new, *pgd);
++	} while (pgd++, pgd_new++, pgd != pgd_end);
++}
++
+ static void __init clear_pgds(unsigned long start,
+ 			unsigned long end)
+ {
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index f3cd8f4..e141762 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -33,6 +33,7 @@
+ #include <asm/barrier.h>
+ #include <asm/cputype.h>
+ #include <asm/fixmap.h>
++#include <asm/kasan.h>
+ #include <asm/kernel-pgtable.h>
+ #include <asm/sections.h>
+ #include <asm/setup.h>
+@@ -342,49 +343,42 @@ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
+ 			     late_pgtable_alloc);
+ }
+ 
+-#ifdef CONFIG_DEBUG_RODATA
+-static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
++static void __init __map_memblock(pgd_t *pgd, phys_addr_t start, phys_addr_t end)
+ {
++
++	unsigned long kernel_start = __pa(_stext);
++	unsigned long kernel_end = __pa(_end);
++
+ 	/*
+-	 * Set up the executable regions using the existing section mappings
+-	 * for now. This will get more fine grained later once all memory
+-	 * is mapped
++	 * The kernel itself is mapped at page granularity. Map all other
++	 * memory, making sure we don't overwrite the existing kernel mappings.
+ 	 */
+-	unsigned long kernel_x_start = round_down(__pa(_stext), SWAPPER_BLOCK_SIZE);
+-	unsigned long kernel_x_end = round_up(__pa(__init_end), SWAPPER_BLOCK_SIZE);
+-
+-	if (end < kernel_x_start) {
+-		create_mapping(start, __phys_to_virt(start),
+-			end - start, PAGE_KERNEL);
+-	} else if (start >= kernel_x_end) {
+-		create_mapping(start, __phys_to_virt(start),
+-			end - start, PAGE_KERNEL);
+-	} else {
+-		if (start < kernel_x_start)
+-			create_mapping(start, __phys_to_virt(start),
+-				kernel_x_start - start,
+-				PAGE_KERNEL);
+-		create_mapping(kernel_x_start,
+-				__phys_to_virt(kernel_x_start),
+-				kernel_x_end - kernel_x_start,
+-				PAGE_KERNEL_EXEC);
+-		if (kernel_x_end < end)
+-			create_mapping(kernel_x_end,
+-				__phys_to_virt(kernel_x_end),
+-				end - kernel_x_end,
+-				PAGE_KERNEL);
++
++	/* No overlap with the kernel. */
++	if (end < kernel_start || start >= kernel_end) {
++		__create_pgd_mapping(pgd, start, __phys_to_virt(start),
++				     end - start, PAGE_KERNEL,
++				     early_pgtable_alloc);
++		return;
+ 	}
+ 
++	/*
++	 * This block overlaps the kernel mapping. Map the portion(s) which
++	 * don't overlap.
++	 */
++	if (start < kernel_start)
++		__create_pgd_mapping(pgd, start,
++				     __phys_to_virt(start),
++				     kernel_start - start, PAGE_KERNEL,
++				     early_pgtable_alloc);
++	if (kernel_end < end)
++		__create_pgd_mapping(pgd, kernel_end,
++				     __phys_to_virt(kernel_end),
++				     end - kernel_end, PAGE_KERNEL,
++				     early_pgtable_alloc);
+ }
+-#else
+-static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
+-{
+-	create_mapping(start, __phys_to_virt(start), end - start,
+-			PAGE_KERNEL_EXEC);
+-}
+-#endif
+ 
+-static void __init map_mem(void)
++static void __init map_mem(pgd_t *pgd)
+ {
+ 	struct memblock_region *reg;
+ 
+@@ -398,33 +392,10 @@ static void __init map_mem(void)
+ 		if (memblock_is_nomap(reg))
+ 			continue;
+ 
+-		__map_memblock(start, end);
++		__map_memblock(pgd, start, end);
+ 	}
+ }
+ 
+-static void __init fixup_executable(void)
+-{
+-#ifdef CONFIG_DEBUG_RODATA
+-	/* now that we are actually fully mapped, make the start/end more fine grained */
+-	if (!IS_ALIGNED((unsigned long)_stext, SWAPPER_BLOCK_SIZE)) {
+-		unsigned long aligned_start = round_down(__pa(_stext),
+-							 SWAPPER_BLOCK_SIZE);
+-
+-		create_mapping(aligned_start, __phys_to_virt(aligned_start),
+-				__pa(_stext) - aligned_start,
+-				PAGE_KERNEL);
+-	}
+-
+-	if (!IS_ALIGNED((unsigned long)__init_end, SWAPPER_BLOCK_SIZE)) {
+-		unsigned long aligned_end = round_up(__pa(__init_end),
+-							  SWAPPER_BLOCK_SIZE);
+-		create_mapping(__pa(__init_end), (unsigned long)__init_end,
+-				aligned_end - __pa(__init_end),
+-				PAGE_KERNEL);
+-	}
+-#endif
+-}
+-
+ #ifdef CONFIG_DEBUG_RODATA
+ void mark_rodata_ro(void)
+ {
+@@ -442,14 +413,72 @@ void fixup_init(void)
+ 			PAGE_KERNEL);
+ }
+ 
++static void __init map_kernel_chunk(pgd_t *pgd, void *va_start, void *va_end,
++				    pgprot_t prot)
++{
++	phys_addr_t pa_start = __pa(va_start);
++	unsigned long size = va_end - va_start;
++
++	BUG_ON(!PAGE_ALIGNED(pa_start));
++	BUG_ON(!PAGE_ALIGNED(size));
++
++	__create_pgd_mapping(pgd, pa_start, (unsigned long)va_start, size, prot,
++			     early_pgtable_alloc);
++}
++
++/*
++ * Create fine-grained mappings for the kernel.
++ */
++static void __init map_kernel(pgd_t *pgd)
++{
++
++	map_kernel_chunk(pgd, _stext, _etext, PAGE_KERNEL_EXEC);
++	map_kernel_chunk(pgd, __init_begin, __init_end, PAGE_KERNEL_EXEC);
++	map_kernel_chunk(pgd, _data, _end, PAGE_KERNEL);
++
++	/*
++	 * The fixmap falls in a separate pgd to the kernel, and doesn't live
++	 * in the carveout for the swapper_pg_dir. We can simply re-use the
++	 * existing dir for the fixmap.
++	 */
++	set_pgd(pgd_offset_raw(pgd, FIXADDR_START), *pgd_offset_k(FIXADDR_START));
++
++	kasan_copy_shadow(pgd);
++}
++
+ /*
+  * paging_init() sets up the page tables, initialises the zone memory
+  * maps and sets up the zero page.
+  */
+ void __init paging_init(void)
+ {
+-	map_mem();
+-	fixup_executable();
++	phys_addr_t pgd_phys = early_pgtable_alloc();
++	pgd_t *pgd = pgd_fixmap(pgd_phys);
++
++	map_kernel(pgd);
++	map_mem(pgd);
++
++	/*
++	 * We want to reuse the original swapper_pg_dir so we don't have to
++	 * communicate the new address to non-coherent secondaries in
++	 * secondary_entry, and so cpu_switch_mm can generate the address with
++	 * adrp+add rather than a load from some global variable.
++	 *
++	 * To do this we need to go via a temporary pgd.
++	 */
++	cpu_replace_ttbr1(__va(pgd_phys));
++	memcpy(swapper_pg_dir, pgd, PAGE_SIZE);
++	cpu_replace_ttbr1(swapper_pg_dir);
++
++	pgd_fixmap_unmap();
++	memblock_free(pgd_phys, PAGE_SIZE);
++
++	/*
++	 * We only reuse the PGD from the swapper_pg_dir, not the pud + pmd
++	 * allocated with it.
++	 */
++	memblock_free(__pa(swapper_pg_dir) + PAGE_SIZE,
++		      SWAPPER_DIR_SIZE - PAGE_SIZE);
+ 
+ 	bootmem_init();
+ }
+-- 
+1.9.1
