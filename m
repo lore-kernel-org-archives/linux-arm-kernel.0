@@ -1,153 +1,87 @@
-From: kamal@canonical.com (Kamal Mostafa)
-Date: Mon,  4 Jan 2016 15:22:31 -0800
-Subject: [4.2.y-ckt stable] Patch "arm64: bpf: fix div-by-zero case" has been
- added to staging queue
-Message-ID: <1451949751-26071-1-git-send-email-kamal@canonical.com>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Mon, 4 Jan 2016 23:24:04 +0000
+Subject: [PATCH v2 10/32] metag: reuse asm-generic/barrier.h
+In-Reply-To: <1451572003-2440-11-git-send-email-mst@redhat.com>
+References: <1451572003-2440-1-git-send-email-mst@redhat.com>
+ <1451572003-2440-11-git-send-email-mst@redhat.com>
+Message-ID: <20160104232404.GL17861@jhogan-linux.le.imgtec.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a note to let you know that I have just added a patch titled
+On Thu, Dec 31, 2015 at 09:07:02PM +0200, Michael S. Tsirkin wrote:
+> On metag dma_rmb, dma_wmb, smp_store_mb, read_barrier_depends,
+> smp_read_barrier_depends, smp_store_release and smp_load_acquire  match
+> the asm-generic variants exactly. Drop the local definitions and pull in
+> asm-generic/barrier.h instead.
+> 
+> This is in preparation to refactoring this code area.
+> 
+> Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-    arm64: bpf: fix div-by-zero case
+Looks good, and confirmed no text change (once patch 1 is applied that
+is).
 
-to the linux-4.2.y-queue branch of the 4.2.y-ckt extended stable tree 
-which can be found at:
+Acked-by: James Hogan <james.hogan@imgtec.com>
 
-    http://kernel.ubuntu.com/git/ubuntu/linux.git/log/?h=linux-4.2.y-queue
+Thanks
+James
 
-This patch is scheduled to be released in version 4.2.8-ckt1.
-
-If you, or anyone else, feels it should not be added to this tree, please 
-reply to this email.
-
-For more information about the 4.2.y-ckt tree, see
-https://wiki.ubuntu.com/Kernel/Dev/ExtendedStable
-
-Thanks.
--Kamal
-
-------
-
->From 2d1726efaefaee9e95587f83a3b15e18c5d8f436 Mon Sep 17 00:00:00 2001
-From: Zi Shen Lim <zlim.lnx@gmail.com>
-Date: Tue, 3 Nov 2015 22:56:44 -0800
-Subject: arm64: bpf: fix div-by-zero case
-
-commit 251599e1d6906621f49218d7b474ddd159e58f3b upstream.
-
-In the case of division by zero in a BPF program:
-	A = A / X;  (X == 0)
-the expected behavior is to terminate with return value 0.
-
-This is confirmed by the test case introduced in commit 86bf1721b226
-("test_bpf: add tests checking that JIT/interpreter sets A and X to 0.").
-
-Reported-by: Yang Shi <yang.shi@linaro.org>
-Tested-by: Yang Shi <yang.shi@linaro.org>
-CC: Xi Wang <xi.wang@gmail.com>
-CC: Alexei Starovoitov <ast@plumgrid.com>
-CC: linux-arm-kernel at lists.infradead.org
-CC: linux-kernel at vger.kernel.org
-Fixes: e54bcde3d69d ("arm64: eBPF JIT compiler")
-Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Kamal Mostafa <kamal@canonical.com>
----
- arch/arm64/net/bpf_jit.h      |  3 ++-
- arch/arm64/net/bpf_jit_comp.c | 37 +++++++++++++++++++++++++------------
- 2 files changed, 27 insertions(+), 13 deletions(-)
-
-diff --git a/arch/arm64/net/bpf_jit.h b/arch/arm64/net/bpf_jit.h
-index 98a26ce..aee5637 100644
---- a/arch/arm64/net/bpf_jit.h
-+++ b/arch/arm64/net/bpf_jit.h
-@@ -1,7 +1,7 @@
- /*
-  * BPF JIT compiler for ARM64
-  *
-- * Copyright (C) 2014 Zi Shen Lim <zlim.lnx@gmail.com>
-+ * Copyright (C) 2014-2015 Zi Shen Lim <zlim.lnx@gmail.com>
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -35,6 +35,7 @@
- 	aarch64_insn_gen_comp_branch_imm(0, offset, Rt, A64_VARIANT(sf), \
- 		AARCH64_INSN_BRANCH_COMP_##type)
- #define A64_CBZ(sf, Rt, imm19) A64_COMP_BRANCH(sf, Rt, (imm19) << 2, ZERO)
-+#define A64_CBNZ(sf, Rt, imm19) A64_COMP_BRANCH(sf, Rt, (imm19) << 2, NONZERO)
-
- /* Conditional branch (immediate) */
- #define A64_COND_BRANCH(cond, offset) \
-diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
-index c047598..9ae6f23 100644
---- a/arch/arm64/net/bpf_jit_comp.c
-+++ b/arch/arm64/net/bpf_jit_comp.c
-@@ -1,7 +1,7 @@
- /*
-  * BPF JIT compiler for ARM64
-  *
-- * Copyright (C) 2014 Zi Shen Lim <zlim.lnx@gmail.com>
-+ * Copyright (C) 2014-2015 Zi Shen Lim <zlim.lnx@gmail.com>
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -225,6 +225,17 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
- 	u8 jmp_cond;
- 	s32 jmp_offset;
-
-+#define check_imm(bits, imm) do {				\
-+	if ((((imm) > 0) && ((imm) >> (bits))) ||		\
-+	    (((imm) < 0) && (~(imm) >> (bits)))) {		\
-+		pr_info("[%2d] imm=%d(0x%x) out of range\n",	\
-+			i, imm, imm);				\
-+		return -EINVAL;					\
-+	}							\
-+} while (0)
-+#define check_imm19(imm) check_imm(19, imm)
-+#define check_imm26(imm) check_imm(26, imm)
-+
- 	switch (code) {
- 	/* dst = src */
- 	case BPF_ALU | BPF_MOV | BPF_X:
-@@ -258,8 +269,21 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
- 		break;
- 	case BPF_ALU | BPF_DIV | BPF_X:
- 	case BPF_ALU64 | BPF_DIV | BPF_X:
-+	{
-+		const u8 r0 = bpf2a64[BPF_REG_0];
-+
-+		/* if (src == 0) return 0 */
-+		jmp_offset = 3; /* skip ahead to else path */
-+		check_imm19(jmp_offset);
-+		emit(A64_CBNZ(is64, src, jmp_offset), ctx);
-+		emit(A64_MOVZ(1, r0, 0, 0), ctx);
-+		jmp_offset = epilogue_offset(ctx);
-+		check_imm26(jmp_offset);
-+		emit(A64_B(jmp_offset), ctx);
-+		/* else */
- 		emit(A64_UDIV(is64, dst, dst, src), ctx);
- 		break;
-+	}
- 	case BPF_ALU | BPF_MOD | BPF_X:
- 	case BPF_ALU64 | BPF_MOD | BPF_X:
- 		ctx->tmp_used = 1;
-@@ -393,17 +417,6 @@ emit_bswap_uxt:
- 		emit(A64_ASR(is64, dst, dst, imm), ctx);
- 		break;
-
--#define check_imm(bits, imm) do {				\
--	if ((((imm) > 0) && ((imm) >> (bits))) ||		\
--	    (((imm) < 0) && (~(imm) >> (bits)))) {		\
--		pr_info("[%2d] imm=%d(0x%x) out of range\n",	\
--			i, imm, imm);				\
--		return -EINVAL;					\
--	}							\
--} while (0)
--#define check_imm19(imm) check_imm(19, imm)
--#define check_imm26(imm) check_imm(26, imm)
--
- 	/* JUMP off */
- 	case BPF_JMP | BPF_JA:
- 		jmp_offset = bpf2a64_offset(i + off, i, ctx);
---
-1.9.1
+> ---
+>  arch/metag/include/asm/barrier.h | 25 ++-----------------------
+>  1 file changed, 2 insertions(+), 23 deletions(-)
+> 
+> diff --git a/arch/metag/include/asm/barrier.h b/arch/metag/include/asm/barrier.h
+> index 172b7e5..b5b778b 100644
+> --- a/arch/metag/include/asm/barrier.h
+> +++ b/arch/metag/include/asm/barrier.h
+> @@ -44,9 +44,6 @@ static inline void wr_fence(void)
+>  #define rmb()		barrier()
+>  #define wmb()		mb()
+>  
+> -#define dma_rmb()	rmb()
+> -#define dma_wmb()	wmb()
+> -
+>  #ifndef CONFIG_SMP
+>  #define fence()		do { } while (0)
+>  #define smp_mb()        barrier()
+> @@ -81,27 +78,9 @@ static inline void fence(void)
+>  #endif
+>  #endif
+>  
+> -#define read_barrier_depends()		do { } while (0)
+> -#define smp_read_barrier_depends()	do { } while (0)
+> -
+> -#define smp_store_mb(var, value) do { WRITE_ONCE(var, value); smp_mb(); } while (0)
+> -
+> -#define smp_store_release(p, v)						\
+> -do {									\
+> -	compiletime_assert_atomic_type(*p);				\
+> -	smp_mb();							\
+> -	WRITE_ONCE(*p, v);						\
+> -} while (0)
+> -
+> -#define smp_load_acquire(p)						\
+> -({									\
+> -	typeof(*p) ___p1 = READ_ONCE(*p);				\
+> -	compiletime_assert_atomic_type(*p);				\
+> -	smp_mb();							\
+> -	___p1;								\
+> -})
+> -
+>  #define smp_mb__before_atomic()	barrier()
+>  #define smp_mb__after_atomic()	barrier()
+>  
+> +#include <asm-generic/barrier.h>
+> +
+>  #endif /* _ASM_METAG_BARRIER_H */
+> -- 
+> MST
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160104/fd33fa53/attachment.sig>
