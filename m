@@ -1,60 +1,77 @@
-From: james.hogan@imgtec.com (James Hogan)
-Date: Mon, 4 Jan 2016 15:25:58 +0000
-Subject: [PATCH v2 20/32] metag: define __smp_xxx
-In-Reply-To: <20160104134128.GZ6344@twins.programming.kicks-ass.net>
-References: <1451572003-2440-1-git-send-email-mst@redhat.com>
- <1451572003-2440-21-git-send-email-mst@redhat.com>
- <20160104134128.GZ6344@twins.programming.kicks-ass.net>
-Message-ID: <20160104152558.GD17861@jhogan-linux.le.imgtec.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 4 Jan 2016 15:28:41 +0000
+Subject: linux-4.4-rc8/arch/arm64/kernel/module.c:78: 32/64 bit problem ?
+In-Reply-To: <CAKv+Gu9Ve6=1evFD4V2jtOCHOEqOzhmud=guioVR5NMrc=HPBw@mail.gmail.com>
+References: <DUB128-W158A3195DB26F149DD52E59CF20@phx.gbl>
+ <20160104141657.GC1616@arm.com>
+ <CAKv+Gu8KT-vOPN=ypt-qViLc74CumJUorxxM1wPnzf7h-nqKFg@mail.gmail.com>
+ <CAKv+Gu9Ve6=1evFD4V2jtOCHOEqOzhmud=guioVR5NMrc=HPBw@mail.gmail.com>
+Message-ID: <20160104152841.GG1616@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
-
-On Mon, Jan 04, 2016 at 02:41:28PM +0100, Peter Zijlstra wrote:
-> On Thu, Dec 31, 2015 at 09:08:22PM +0200, Michael S. Tsirkin wrote:
-> > +#ifdef CONFIG_SMP
-> > +#define fence() metag_fence()
-> > +#else
-> > +#define fence()		do { } while (0)
-> >  #endif
+On Mon, Jan 04, 2016 at 04:24:49PM +0100, Ard Biesheuvel wrote:
+> On 4 January 2016 at 15:32, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > On 4 January 2016 at 15:16, Will Deacon <will.deacon@arm.com> wrote:
+> >> On Mon, Jan 04, 2016 at 08:25:30AM +0000, David Binderman wrote:
+> >>> Hello there,
+> >>
+> >> Hi David,
+> >>
+> >>> [linux-4.4-rc8/arch/arm64/kernel/module.c:78] ->
+> >>> [linux-4.4-rc8/arch/arm64/kernel/module.c:88]: (warning) Shifting 32-bit
+> >>> value by 64 bits is undefined behaviour. See condition at line 88.
+> >>
+> >> Curious, but how are you seeing this warning? GCC is silent for me...
+> >>
+> >>> Source code is
+> >>>
+> >>>     u64 imm_mask = (1 << len) - 1;
+> >>>     s64 sval = do_reloc(op, place, val);
+> >>>
+> >>>     switch (len) {
+> >>>     case 16:
+> >>>         *(s16 *)place = sval;
+> >>>         break;
+> >>>     case 32:
+> >>>         *(s32 *)place = sval;
+> >>>         break;
+> >>>     case 64:
+> >>>
+> >>> So it seems that len can be 64. Suggest new code
+> >>>
+> >>>     u64 imm_mask = (1UL << len) - 1;
+> >>
+> >> That still ends up shifting by the width of the type when len == 64,
+> >> which is potentially still broken. We're better off using GENMASK.
+> >>
+> >
+> > Can't we simply return from the function rather than break from the
+> > switch statement if len == 64?
+> > The range check does not make any sense in that case anyway.
+> >
 > 
-> James, it strikes me as odd that fence() is a no-op instead of a
-> barrier() for UP, can you verify/explain?
+> Or perhaps:
+> 
+> ------------8<-----------------
+> diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
+> index f4bc779e62e8..fd1f4e678655 100644
+> --- a/arch/arm64/kernel/module.c
+> +++ b/arch/arm64/kernel/module.c
+> @@ -75,14 +75,17 @@ static u64 do_reloc(enum aarch64_reloc_op
+> reloc_op, void *place, u64 val)
+> 
+>  static int reloc_data(enum aarch64_reloc_op op, void *place, u64 val, int len)
+>  {
+> -       u64 imm_mask = (1 << len) - 1;
+>         s64 sval = do_reloc(op, place, val);
+> 
+>         switch (len) {
+>         case 16:
+> +               if (sval < S16_MIN || sval > U16_MAX)
+> +                       return -ERANGE;
+>                 *(s16 *)place = sval;
 
-fence() is an unfortunate workaround for a specific issue on a certain
-SoC, where writes from different hw threads get reordered outside of the
-core, resulting in incoherency between RAM and cache. It has slightly
-different semantics to the normal SMP barriers, since I was assured it
-is required before a write rather than after it.
+Doesn't this break ABS relocs, which are allowed to overflow?
 
-Here's the comment:
-
-> This is needed before a write to shared memory in a critical section,
-> to prevent external reordering of writes before the fence on other
-> threads with writes after the fence on this thread (and to prevent the
-> ensuing cache-memory incoherence). It is therefore ineffective if used
-> after and on the same thread as a write.
-
-It is used along with the metag specific __global_lock1() (global
-voluntary lock between hw threads) whenever a write is performed, and by
-smp_mb/smp_rmb to try to catch other cases, but I've never been
-confident this fixes every single corner case, since there could be
-other places where multiple CPUs perform unsynchronised writes to the
-same memory location, and expect cache not to become incoherent at that
-location.
-
-It seemed to be sufficient to achieve stability however, and SMP on Meta
-Linux never made it into a product anyway, since the other hw thread
-tended to be used for RTOS stuff, so it didn't seem worth extending the
-generic barrier API for it.
-
-Cheers
-James
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160104/c898072c/attachment.sig>
+Will
