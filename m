@@ -1,84 +1,81 @@
-From: henryc.chen@mediatek.com (Henry Chen)
-Date: Mon, 4 Jan 2016 20:02:52 +0800
-Subject: [RESEND PATCH v2] soc: mediatek: PMIC wrap: Clear the vldclr if state
- machine stay on FSM_VLDCLR state.
-Message-ID: <1451908972-11882-1-git-send-email-henryc.chen@mediatek.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 4 Jan 2016 12:03:11 +0000
+Subject: [PATCH v2 33/34] xenbus: use virt_xxx barriers
+In-Reply-To: <1451572003-2440-34-git-send-email-mst@redhat.com>
+References: <1451572003-2440-1-git-send-email-mst@redhat.com>
+ <1451572003-2440-34-git-send-email-mst@redhat.com>
+Message-ID: <alpine.DEB.2.02.1601041201120.19710@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sometimes PMIC is too busy to send data in time to cause pmic wrap timeout,
-because pmic wrap is waiting for FSM_VLDCLR after finishing WACS2_CMD. It
-just return error when issue happened, so the state machine will stay on
-FSM_VLDCLR state when data send back later by PMIC and timeout again in next
-time because pmic wrap waiting for FSM_IDLE state at the beginning of the
-read/write function.
+On Thu, 31 Dec 2015, Michael S. Tsirkin wrote:
+> drivers/xen/xenbus/xenbus_comms.c uses
+> full memory barriers to communicate with the other side.
+> 
+> For guests compiled with CONFIG_SMP, smp_wmb and smp_mb
+> would be sufficient, so mb() and wmb() here are only needed if
+> a non-SMP guest runs on an SMP host.
+> 
+> Switch to virt_xxx barriers which serve this exact purpose.
+> 
+> Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
 
-Clear the vldclr when timeout if state machine stay on FSM_VLDCLR.
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
----
-Changes since v1:
-Encapsulated the code in a inline function, and add a descriptive comment.
----
- drivers/soc/mediatek/mtk-pmic-wrap.c | 30 ++++++++++++++++++++++++++++--
- 1 file changed, 28 insertions(+), 2 deletions(-)
+Are you also going to take care of
 
-diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-index 105597a..af919b1 100644
---- a/drivers/soc/mediatek/mtk-pmic-wrap.c
-+++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-@@ -412,6 +412,12 @@ static bool pwrap_is_fsm_vldclr(struct pmic_wrapper *wrp)
- 	return PWRAP_GET_WACS_FSM(val) == PWRAP_WACS_FSM_WFVLDCLR;
- }
- 
-+static inline void pwrap_leave_fsm_vldclr(struct pmic_wrapper *wrp)
-+{
-+	if (pwrap_is_fsm_vldclr(wrp))
-+		pwrap_writel(wrp, 1, PWRAP_WACS2_VLDCLR);
-+}
-+
- static bool pwrap_is_sync_idle(struct pmic_wrapper *wrp)
- {
- 	return pwrap_readl(wrp, PWRAP_WACS2_RDATA) & PWRAP_STATE_SYNC_IDLE0;
-@@ -445,8 +451,18 @@ static int pwrap_write(struct pmic_wrapper *wrp, u32 adr, u32 wdata)
- 	int ret;
- 
- 	ret = pwrap_wait_for_state(wrp, pwrap_is_fsm_idle);
--	if (ret)
-+	if (ret) {
-+		/*
-+		 * Timeout issue sometimes caused by the last read command
-+		 * failed because pmic wrap could not got the FSM_VLDCLR
-+		 * in time after finishing WACS2_CMD. It made state machine
-+		 * still on FSM_VLDCLR and timeout next time.
-+		 * Check the status of FSM and clear the vldclr to recovery the
-+		 * error.
-+		 */
-+		pwrap_leave_fsm_vldclr(wrp);
- 		return ret;
-+	}
- 
- 	pwrap_writel(wrp, (1 << 31) | ((adr >> 1) << 16) | wdata,
- 			PWRAP_WACS2_CMD);
-@@ -459,8 +475,18 @@ static int pwrap_read(struct pmic_wrapper *wrp, u32 adr, u32 *rdata)
- 	int ret;
- 
- 	ret = pwrap_wait_for_state(wrp, pwrap_is_fsm_idle);
--	if (ret)
-+	if (ret) {
-+		/*
-+		 * Timeout issue sometimes caused by the last read command
-+		 * failed because pmic wrap could not got the FSM_VLDCLR
-+		 * in time after finishing WACS2_CMD. It made state machine
-+		 * still on FSM_VLDCLR and timeout next time.
-+		 * Check the status of FSM and clear the vldclr to recovery the
-+		 * error.
-+		 */
-+		pwrap_leave_fsm_vldclr(wrp);
- 		return ret;
-+	}
- 
- 	pwrap_writel(wrp, (adr >> 1) << 16, PWRAP_WACS2_CMD);
- 
--- 
-1.9.1
+drivers/xen/grant-table.c
+drivers/xen/evtchn.c
+drivers/xen/events/events_fifo.c
+drivers/xen/xen-scsiback.c
+drivers/xen/tmem.c
+drivers/xen/xen-pciback/pci_stub.c
+drivers/xen/xen-pciback/pciback_ops.c
+
+?
+
+
+>  drivers/xen/xenbus/xenbus_comms.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/xen/xenbus/xenbus_comms.c b/drivers/xen/xenbus/xenbus_comms.c
+> index fdb0f33..ecdecce 100644
+> --- a/drivers/xen/xenbus/xenbus_comms.c
+> +++ b/drivers/xen/xenbus/xenbus_comms.c
+> @@ -123,14 +123,14 @@ int xb_write(const void *data, unsigned len)
+>  			avail = len;
+>  
+>  		/* Must write data /after/ reading the consumer index. */
+> -		mb();
+> +		virt_mb();
+>  
+>  		memcpy(dst, data, avail);
+>  		data += avail;
+>  		len -= avail;
+>  
+>  		/* Other side must not see new producer until data is there. */
+> -		wmb();
+> +		virt_wmb();
+>  		intf->req_prod += avail;
+>  
+>  		/* Implies mb(): other side will see the updated producer. */
+> @@ -180,14 +180,14 @@ int xb_read(void *data, unsigned len)
+>  			avail = len;
+>  
+>  		/* Must read data /after/ reading the producer index. */
+> -		rmb();
+> +		virt_rmb();
+>  
+>  		memcpy(data, src, avail);
+>  		data += avail;
+>  		len -= avail;
+>  
+>  		/* Other side must not see free space until we've copied out */
+> -		mb();
+> +		virt_mb();
+>  		intf->rsp_cons += avail;
+>  
+>  		pr_debug("Finished read of %i bytes (%i to go)\n", avail, len);
+> -- 
+> MST
+> 
