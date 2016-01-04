@@ -1,50 +1,28 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 4 Jan 2016 21:15:36 +0200
-Subject: [RFC 6/9] clk: ti: add support for omap4 module clocks
-In-Reply-To: <20160104162853.GA12777@atomide.com>
-References: <1450447141-29936-1-git-send-email-t-kristo@ti.com>
- <1450447141-29936-7-git-send-email-t-kristo@ti.com>
- <20160101054815.21738.79820@quark.deferred.io> <568A20E5.6040005@ti.com>
- <CAMuHMdUZMUSYC1XHydVQHRibWtHw2=T-7nXe=5Pf4UCcb=mKTQ@mail.gmail.com>
- <568A735D.2060309@ti.com> <20160104144221.GA5783@n2100.arm.linux.org.uk>
- <20160104162853.GA12777@atomide.com>
-Message-ID: <568AC4D8.2060509@ti.com>
+From: hpa@zytor.com (H. Peter Anvin)
+Date: Mon, 04 Jan 2016 11:21:46 -0800
+Subject: [PATCH 6/6] arm64: switch to relative exception tables
+In-Reply-To: <3908561D78D1C84285E8C5FCA982C28F39FA127B@ORSMSX114.amr.corp.intel.com>
+References: <1451837157-447-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1451837157-447-7-git-send-email-ard.biesheuvel@linaro.org>
+ <20160104144643.GE1616@arm.com> <568AB65A.8030901@zytor.com>
+ <3908561D78D1C84285E8C5FCA982C28F39FA127B@ORSMSX114.amr.corp.intel.com>
+Message-ID: <568AC64A.4090601@zytor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/04/2016 06:37 PM, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [160104 06:43]:
->> On Mon, Jan 04, 2016 at 03:27:57PM +0200, Tero Kristo wrote:
->>> On 01/04/2016 12:21 PM, Geert Uytterhoeven wrote:
->>>> FWIW, there are small loops with just a cpu_relax() in various clock drivers
->>>> under drivers/clk/shmobile/.
->>>
->>> Just did a quick profiling round, and the clk_enable/disable delay loops
->>> take anything from 0...1500ns, most typically consuming some 400-600ns. So,
->>> based on this, dropping the udelay and adding cpu_relax instead looks like a
->>> good change. I just verified that changing the udelay to cpu_relax works
->>> fine also, I just need to change the bail-out period to be something sane.
->>
->> Was that profiling done with lockdep/lock debugging enabled or disabled?
+On 01/04/2016 10:20 AM, Luck, Tony wrote:
+>> May I humbly ask why the [Finnish] you don't use the equivalent of the
+>> x86 _ASM_EXTABLE() macro?  In fact, why don't we make that one generic, too?
+> 
+> I'm messing with that right now (with help from Andy Lutomirski and Boris) to
+> add different classes of exception table (so I can tag some instructions as being
+> suitable for fixup from the machine check handler).  So it might not be generic
+> for much longer.
+> 
+> http://marc.info/?l=linux-kernel&m=145187079504846&w=2
+> 
 
-omap2plus_defconfig, so lockdep was enabled. The profiling was done 
-around the while {} block though, which should not have any locks within 
-it (except for the SCM clocks, which may explain some of the higher 
-latency numbers seen.)
+I suspect that means we will also need to go back to arch-specific
+sorting for x86.
 
-> And also the thing to check from the hw folks is what all do these clkctrl
-> bits really control. If they group together the OCP clock and an extra
-> functional clock for some devices the delays could be larger.
-
-Does it matter really? The latencies are only imposed to the device in 
-question, and lets face it, the same latencies are there already with 
-the hwmod implementation. This series moves the implementation under 
-clock driver with as less modifications as possible to avoid any problems.
-
-> In general, I think we need to get rid of pm_runtime_irq_safe usage to
-> allow clocks to sleep properly. The other option is to allow toggling
-> pm_runtime_irq_safe but that probably gets super messy.
-
-That is something not to be done with this set though.
-
--Tero
+	-hpa
