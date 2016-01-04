@@ -1,53 +1,52 @@
-From: james.hogan@imgtec.com (James Hogan)
-Date: Mon, 4 Jan 2016 16:04:55 +0000
-Subject: [PATCH v2 20/32] metag: define __smp_xxx
-In-Reply-To: <20160104153036.GG6344@twins.programming.kicks-ass.net>
-References: <1451572003-2440-1-git-send-email-mst@redhat.com>
- <1451572003-2440-21-git-send-email-mst@redhat.com>
- <20160104134128.GZ6344@twins.programming.kicks-ass.net>
- <20160104152558.GD17861@jhogan-linux.le.imgtec.org>
- <20160104153036.GG6344@twins.programming.kicks-ass.net>
-Message-ID: <20160104160455.GE17861@jhogan-linux.le.imgtec.org>
+From: joe@perches.com (Joe Perches)
+Date: Mon, 04 Jan 2016 08:07:40 -0800
+Subject: [PATCH 1/3] checkpatch.pl: add missing memory barriers
+In-Reply-To: <1451907395-15978-2-git-send-email-mst@redhat.com>
+References: <1451907395-15978-1-git-send-email-mst@redhat.com>
+ <1451907395-15978-2-git-send-email-mst@redhat.com>
+Message-ID: <1451923660.4334.83.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 04, 2016 at 04:30:36PM +0100, Peter Zijlstra wrote:
-> On Mon, Jan 04, 2016 at 03:25:58PM +0000, James Hogan wrote:
-> > It is used along with the metag specific __global_lock1() (global
-> > voluntary lock between hw threads) whenever a write is performed, and by
-> > smp_mb/smp_rmb to try to catch other cases, but I've never been
-> > confident this fixes every single corner case, since there could be
-> > other places where multiple CPUs perform unsynchronised writes to the
-> > same memory location, and expect cache not to become incoherent at that
-> > location.
+On Mon, 2016-01-04 at 13:36 +0200, Michael S. Tsirkin wrote:
+> SMP-only barriers were missing in checkpatch.pl
 > 
-> Ah, yuck, I thought blackfin was the only one attempting !coherent SMP.
-> And yes, this is bound to break in lots of places in subtle ways. We
-> very much assume cache coherency for SMP in generic code.
-
-Well, its usually completely coherent, its just a bit dodgy in a
-particular hardware corner case, which was pretty hard to hit, even
-without these workarounds.
-
+> Refactor code slightly to make adding more variants easier.
 > 
-> > It seemed to be sufficient to achieve stability however, and SMP on Meta
-> > Linux never made it into a product anyway, since the other hw thread
-> > tended to be used for RTOS stuff, so it didn't seem worth extending the
-> > generic barrier API for it.
+> Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+> ---
+> ?scripts/checkpatch.pl | 9 ++++++++-
+> ?1 file changed, 8 insertions(+), 1 deletion(-)
 > 
-> *phew*, should we take it out then, just to be sure nobody accidentally
-> tries to use it then?
+> diff --git a/scripts/checkpatch.pl b/scripts/checkpatch.pl
+> index 2b3c228..0245bbe 100755
+> --- a/scripts/checkpatch.pl
+> +++ b/scripts/checkpatch.pl
+> @@ -5116,7 +5116,14 @@ sub process {
+> ?			}
+> ?		}
+> ?# check for memory barriers without a comment.
+> -		if ($line =~ /\b(mb|rmb|wmb|read_barrier_depends|smp_mb|smp_rmb|smp_wmb|smp_read_barrier_depends)\(/) {
+> +
+> +		my @barriers = ('mb', 'rmb', 'wmb', 'read_barrier_depends');
+> +		my @smp_barriers = ('smp_store_release', 'smp_load_acquire', 'smp_store_mb');
+> +
+> +		@smp_barriers = (@smp_barriers, map {"smp_" . $_} @barriers);
 
-SMP support on this SoC you mean? I doubt it'll be a problem tbh, and
-it'd work fine in QEMU when emulating this SoC, so I'd prefer to keep it
-in.
+I think using map, which so far checkpatch doesn't use,
+makes smp_barriers harder to understand and it'd be
+better to enumerate them.
 
-Cheers
-James
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160104/faded8fa/attachment.sig>
+> +		my $all_barriers = join('|', (@barriers, @smp_barriers));
+> +
+> +		if ($line =~ /\b($all_barriers)\(/) {
+
+It would be better to use /\b$all_barriers\s*\(/
+as there's no reason for the capture and there
+could be a space between the function and the
+open parenthesis.
+
+
+> ?			if (!ctx_has_comment($first_line, $linenr)) {
+> ?				WARN("MEMORY_BARRIER",
+> ?				?????"memory barrier without comment\n" . $herecurr);
