@@ -1,65 +1,35 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Mon, 4 Jan 2016 23:43:48 +0800
-Subject: [PATCH 2/3] thermal: Add Mediatek thermal controller support
-In-Reply-To: <20160104143129.GJ13058@pengutronix.de>
-References: <1448883753-19068-1-git-send-email-s.hauer@pengutronix.de>
- <1448883753-19068-3-git-send-email-s.hauer@pengutronix.de>
- <CAGS+omC86=Kfdj0cFNHqs4fXCAT0uU+AxHCj3ORd2HetNZ2gVQ@mail.gmail.com>
- <20160104143129.GJ13058@pengutronix.de>
-Message-ID: <CAGS+omAHXE15aYcrUzAJ_hN=Fry=uTPk6=P3Cy2xL25j9+WpOQ@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 4 Jan 2016 15:45:11 +0000
+Subject: [PATCH] ASoC: cs35l32: avoid uninitialized variable access
+In-Reply-To: <9222694.IRNnfpj6Tn@wuerfel>
+References: <2884997.s8B8BuE04L@wuerfel> <20160102141746.GH16023@sirena.org.uk>
+ <9222694.IRNnfpj6Tn@wuerfel>
+Message-ID: <20160104154511.GL16023@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 4, 2016 at 10:31 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Mon, Dec 21, 2015 at 12:07:58PM +0800, Daniel Kurtz wrote:
->> Hi Sascha,
->>
->> One nit below that can be fixed up later, or now if you don't plan to
->> spin this driver to
->> address Eduardo's feedback...
->>
->> On Mon, Nov 30, 2015 at 7:42 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
->> > This adds support for the Mediatek thermal controller found on MT8173
->> > and likely other SoCs.
->> > The controller is a bit special. It does not have its own ADC, instead
->> > it controls the on-SoC AUXADC via AHB bus accesses. For this reason
->> > we need the physical address of the AUXADC. Also it controls a mux
->> > using AHB bus accesses, so we need the APMIXEDSYS physical address aswell.
->> >
->> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
->>
->> [snip]
->>
->> > +static int mtk_thermal_get_calibration_data(struct device *dev, struct mtk_thermal *mt)
->> > +{
->> > +       struct nvmem_cell *cell;
->> > +       u32 *buf;
->> > +       size_t len;
->> > +       int i, ret = 0;
->> > +
->> > +       /* Start with default values */
->> > +       mt->adc_ge = 512;
->> > +       for (i = 0; i < MT8173_NUM_SENSORS; i++)
->> > +               mt->vts[i] = 260;
->> > +       mt->degc_cali = 40;
->> > +       mt->o_slope = 0;
->> > +
->> > +       cell = nvmem_cell_get(dev, "calibration-data");
->> > +       if (IS_ERR(cell)) {
->> > +               if (PTR_ERR(cell) == -EPROBE_DEFER)
->>
->> It is useful to know why the thermal driver is being probe defered, so
->> I suggest here:
->> dev_warn(dev, "Waiting for calibration data.\n");
->
-> The problem with that is that this message is not shown once but
-> possibly many times and may not even show a problem because in the end
-> the device may be probed successfully. In this case the last thing you
-> see from the device is "Waiting for calibration data." and get annoyed
-> by all this useless noise from the driver.
->
-> Of course I agree that this information may be useful in the case you
-> wonder why your device doesn't show up...
+On Mon, Jan 04, 2016 at 04:17:47PM +0100, Arnd Bergmann wrote:
+> On Saturday 02 January 2016 14:17:46 Mark Brown wrote:
 
-The solution for this, then, is:
- dev_dbg()
+> > This would be a lot nicer if there was an __always_null annotation we
+> > could put on of_node for !OF configurations, that'd Just Work and this
+> > can't be the only case where we have this idiom.
+
+> How about an inline helper like
+
+> static inline struct device_node *dev_of_node(struct device *dev)
+> {
+> 	if (IS_ENABLED(CONFIG_OF))
+> 		return dev->of_node;	
+> }
+
+Yeah, that'd work as well (with the correction Russell mentioned) - it's
+a bit more typing but we already do similar things for the ID tables and
+it looks nicer than the IS_ENABLED() in code does.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160104/ce59d166/attachment.sig>
