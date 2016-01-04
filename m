@@ -1,127 +1,128 @@
 From: jchandra@broadcom.com (Jayachandran C)
-Date: Mon, 4 Jan 2016 10:43:21 +0530
-Subject: [PATCH v5 3/5] ACPI: PCI: Support platforms that need
- pci_remap_iospace
+Date: Mon, 4 Jan 2016 10:43:20 +0530
+Subject: [PATCH v5 2/5] PCI: Handle ACPI companion and domain number
 In-Reply-To: <1451884403-21437-1-git-send-email-jchandra@broadcom.com>
 References: <1451884403-21437-1-git-send-email-jchandra@broadcom.com>
-Message-ID: <1451884403-21437-4-git-send-email-jchandra@broadcom.com>
+Message-ID: <1451884403-21437-3-git-send-email-jchandra@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some platforms (in this case ARM64), the PCI iospace needs to
-be mapped with pci_remap_iospace and the resources have to be
-adjusted for the iospace physical address.
+pci_create_root_bus is called with NULL as parent in ACPI. This
+ends up calling pci_bus_assign_domain_nr with a NULL paretn, which
+crashes when dereferencing parent.
 
-This has to be done before acpi_pci_root_validate_resources()
-checks and removes resource windows. Handle this by adding
-a function acpi_pci_root_remap_iospace that is called in
-acpi_pci_probe_root_resources(), before the validate call.
+Fix this by providing away to set the ACPI domain number, we define
+acpi_pci_sysdata_to_root_info() to provide the acpi root info from
+sysdata. This is a simple cast the generic ACPI PCI implementation.
 
-Also fix the address check in acpi_dev_ioresource_flags for
-similar platforms.
+Similarly, setting up the ACPI companion in case of generic ACPI PCI
+implementation is staright forward.
 
 Signed-off-by: Jayachandran C <jchandra@broadcom.com>
 ---
- drivers/acpi/pci_root.c | 62 +++++++++++++++++++++++++++++++++++++++++++++++--
- drivers/acpi/resource.c |  2 ++
- 2 files changed, 62 insertions(+), 2 deletions(-)
+ drivers/pci/pci.c        | 15 ++++++++++++++-
+ drivers/pci/probe.c      |  2 ++
+ include/linux/pci-acpi.h | 28 +++++++++++++++++++++++++++-
+ 3 files changed, 43 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
-index 850d7bf..58093ba 100644
---- a/drivers/acpi/pci_root.c
-+++ b/drivers/acpi/pci_root.c
-@@ -720,6 +720,61 @@ next:
- 	}
- }
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index 314db8c..39d2bcc 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -20,6 +20,7 @@
+ #include <linux/string.h>
+ #include <linux/log2.h>
+ #include <linux/pci-aspm.h>
++#include <linux/pci-acpi.h>
+ #include <linux/pm_wakeup.h>
+ #include <linux/interrupt.h>
+ #include <linux/device.h>
+@@ -4772,9 +4773,21 @@ int pci_get_new_domain_nr(void)
+ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+ {
+ 	static int use_dt_domains = -1;
+-	int domain = of_get_pci_domain_nr(parent->of_node);
++	int domain;
  
-+#ifdef PCI_IOBASE
-+/*
-+ * The IO ports are mapped to a memory range, fixup IO resources to
-+ * handle that
-+ */
-+static int acpi_pci_root_remap_iospace(struct acpi_pci_root_info *ci)
+ 	/*
++	 * Handle ACPI early
++	 *
++	 * The companion is not set at this point, and ACPI sets parent to
++	 * NULL, we have to try to get the segment from acpi root info.
++	 */
++	if (!parent || !parent->of_node) {
++		bus->domain_nr = acpi_pci_get_segment(bus->sysdata);
++		return;
++	}
++
++	domain = of_get_pci_domain_nr(parent->of_node);
++	/*
+ 	 * Check DT domain and use_dt_domains values.
+ 	 *
+ 	 * If DT domain property is valid (domain >= 0) and
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index edb1984..5af66496 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -13,6 +13,7 @@
+ #include <linux/module.h>
+ #include <linux/cpumask.h>
+ #include <linux/pci-aspm.h>
++#include <linux/pci-acpi.h>
+ #include <linux/aer.h>
+ #include <linux/acpi.h>
+ #include <asm-generic/pci-bridge.h>
+@@ -2105,6 +2106,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+ 	bridge->dev.parent = parent;
+ 	bridge->dev.release = pci_release_host_bridge_dev;
+ 	dev_set_name(&bridge->dev, "pci%04x:%02x", pci_domain_nr(b), bus);
++	pci_acpi_set_companion(bridge);
+ 	error = pcibios_root_bridge_prepare(bridge);
+ 	if (error) {
+ 		kfree(bridge);
+diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
+index e9450ef..f8d62e3 100644
+--- a/include/linux/pci-acpi.h
++++ b/include/linux/pci-acpi.h
+@@ -138,12 +138,38 @@ extern struct list_head pci_mmcfg_list;
+ 
+ #define PCI_MMCFG_BUS_OFFSET(bus)      ((bus) << 20)
+ #define PCI_MMCFG_OFFSET(bus, devfn)   ((bus) << 20 | (devfn) << 12)
+-
+ #else	/* CONFIG_ACPI */
+ static inline void acpi_pci_add_bus(struct pci_bus *bus) { }
+ static inline void acpi_pci_remove_bus(struct pci_bus *bus) { }
+ #endif	/* CONFIG_ACPI */
+ 
++#if defined(CONFIG_ACPI) && defined(CONFIG_ACPI_PCI_HOST_GENERIC)
++static inline void pci_acpi_set_companion(struct pci_host_bridge *bridge)
 +{
-+	struct resource_entry *entry;
-+	struct resource iores;
-+	resource_size_t iostart;
-+	int err;
++	struct pci_bus *b = bridge->bus;
++	struct acpi_pci_root_info *ci = (struct acpi_pci_root_info *)b->sysdata;
 +
-+	iores.flags = IORESOURCE_IO;
-+	iores.start = (resource_size_t)-1;
-+	iores.end = 0;
-+	resource_list_for_each_entry(entry, &ci->resources) {
-+		if (entry->res->flags & IORESOURCE_IO) {
-+			iores.start = min(entry->res->start, iores.start);
-+			iores.end = max(entry->res->end, iores.end);
-+		}
-+	}
-+	if (iores.end == 0)
-+		return 0;
-+	iostart = iores.start;
++	ACPI_COMPANION_SET(&bridge->dev, ci->bridge);
++}
 +
-+	resource_list_for_each_entry(entry, &ci->resources) {
-+		if (entry->res->flags & IORESOURCE_IO) {
-+			entry->res->start -= iostart;
-+			entry->res->end -= iostart;
-+			entry->offset -= iostart;
-+		}
-+	}
-+	iores.start -= iostart;
-+	iores.end -= iostart;
++static inline u16 acpi_pci_get_segment(void *sysdata)
++{
++	struct acpi_pci_root_info *ci = (struct acpi_pci_root_info *)sysdata;
 +
-+	err = pci_remap_iospace(&iores, iostart);
-+	if (err) {
-+		pr_err("PCI: ACPI: err %d mapping IO %pR\n", err, &iores);
-+		return -ENODEV;
-+	}
-+	pr_info(PREFIX "Mapped %pR at %#lx for IO.\n",
-+			&iores, (unsigned long)iostart);
-+	return 0;
++	return ci->root->segment;
 +}
 +#else
-+/*
-+ * The IO ports are mapped to a memory range, fixup IO resources to
-+ * handle that
-+ */
-+static int acpi_pci_root_remap_iospace(struct acpi_pci_root_info *ci)
++static inline void pci_acpi_set_companion(struct pci_host_bridge *bridge)
++{
++	/* leave it to the platform for now */
++}
++
++static inline u16 acpi_pci_get_segment(void *sysdata)
 +{
 +	return 0;
 +}
-+#endif /* PCI_IOBASE */
-+
- int acpi_pci_probe_root_resources(struct acpi_pci_root_info *info)
- {
- 	int ret;
-@@ -745,10 +800,13 @@ int acpi_pci_probe_root_resources(struct acpi_pci_root_info *info)
- 			else
- 				entry->res->name = info->name;
- 		}
--		acpi_pci_root_validate_resources(&device->dev, list,
-+		ret = acpi_pci_root_remap_iospace(info);
-+		if (ret >= 0) {
-+			acpi_pci_root_validate_resources(&device->dev, list,
- 						 IORESOURCE_MEM);
--		acpi_pci_root_validate_resources(&device->dev, list,
-+			acpi_pci_root_validate_resources(&device->dev, list,
- 						 IORESOURCE_IO);
-+		}
- 	}
- 
- 	return ret;
-diff --git a/drivers/acpi/resource.c b/drivers/acpi/resource.c
-index cdc5c25..530cad4 100644
---- a/drivers/acpi/resource.c
-+++ b/drivers/acpi/resource.c
-@@ -126,8 +126,10 @@ static void acpi_dev_ioresource_flags(struct resource *res, u64 len,
- 	if (!acpi_dev_resource_len_valid(res->start, res->end, len, true))
- 		res->flags |= IORESOURCE_DISABLED | IORESOURCE_UNSET;
- 
-+#ifndef PCI_IOBASE
- 	if (res->end >= 0x10003)
- 		res->flags |= IORESOURCE_DISABLED | IORESOURCE_UNSET;
 +#endif
- 
- 	if (io_decode == ACPI_DECODE_16)
- 		res->flags |= IORESOURCE_IO_16BIT_ADDR;
++
+ #ifdef CONFIG_ACPI_APEI
+ extern bool aer_acpi_firmware_first(void);
+ #else
 -- 
 1.9.1
