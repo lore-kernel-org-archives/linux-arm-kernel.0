@@ -1,36 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 4 Jan 2016 08:49:30 +0100
-Subject: [PATCH] gpiolib: always initialize *flags from
- of_get_named_gpio_flags
-In-Reply-To: <6037371.CvRA1dDj1l@wuerfel>
-References: <6037371.CvRA1dDj1l@wuerfel>
-Message-ID: <CACRpkdZpax1RKu44nR9qbDjDj32cJpSCvTcdjSknmWVbRSxN3g@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 4 Jan 2016 09:24:16 +0100
+Subject: [PATCH 4/3] drm: arm-hdlcd: add explictit DRM dependency
+In-Reply-To: <5213510.IMdSbsXdoQ@wuerfel>
+References: <4194408.X82ccDjh5X@wuerfel>
+ <5213510.IMdSbsXdoQ@wuerfel>
+Message-ID: <20160104082416.GB23797@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 1, 2016 at 11:40 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Fri, Jan 01, 2016 at 11:04:07PM +0100, Arnd Bergmann wrote:
+> CONFIG_DRM_HDLCD is a tristate option that depends on the boolean
+> CONFIG_DRM_ARM, which in turn depends on the tristate CONFIG_DRM.
+> The effect of this is that a configuration with CONFIG_DRM=m
+> and CONFIG_DRM_HDLCD=y can be chosen, but won't link because the
+> DRM core symbols are not reachable from builtin code:
+> 
+> drivers/built-in.o: In function `hdlcd_drm_unbind':
+> drivers/gpu/drm/arm/hdlcd_drv.c:445: undefined reference to `drm_fbdev_cma_fini'
+> drivers/gpu/drm/arm/hdlcd_drv.c:448: undefined reference to `drm_kms_helper_poll_fini'
+> drivers/gpu/drm/arm/hdlcd_drv.c:450: undefined reference to `drm_vblank_cleanup'
+> drivers/gpu/drm/arm/hdlcd_drv.c:452: undefined reference to `drm_irq_uninstall'
+> drivers/gpu/drm/arm/hdlcd_drv.c:460: undefined reference to `drm_mode_config_cleanup'
+> drivers/gpu/drm/arm/hdlcd_drv.c:461: undefined reference to `drm_dev_unregister'
+> drivers/gpu/drm/arm/hdlcd_drv.c:462: undefined reference to `drm_dev_unref'
+> ...
+> 
+> This adds another dependency on CONFIG_DRM to enforce that DRM_HDLCD
+> cannot be builtin if DRM is not.
 
-> The of_get_named_gpio_flags() function does nothing other than returning
-> an error when CONFIG_OF_GPIO is disabled, but that causes spurious
-> warnings about possible use of uninitialized variables in any code that
-> does not check the of_get_named_gpio_flags() return value before trying
-> to use the flags:
->
-> drivers/input/misc/rotary_encoder.c: In function 'rotary_encoder_probe':
-> drivers/input/misc/rotary_encoder.c:223:28: warning: 'flags' may be used uninitialized in this function [-Wmaybe-uninitialized]
-> drivers/power/bq24735-charger.c: In function 'bq24735_charger_probe':
-> drivers/power/bq24735-charger.c:227:12: warning: 'flags' may be used uninitialized in this function [-Wmaybe-uninitialized]
-> drivers/power/sbs-battery.c: In function 'sbs_probe':
-> drivers/power/sbs-battery.c:782:17: warning: 'gpio_flags' may be used uninitialized in this function [-Wmaybe-uninitialized]
->
-> This changes the behavior of the inline helper to set the flags to zero
-> when OF_GPIO is disabled, to avoid the warnings. In all cases I've
-> encountered, we don't actually get to the place that uses the flags
-> if CONFIG_OF is disabled because we won't enter the DT parser code.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Ugh... wouldn't it be much simpler to get rid of DRM_ARM? It seems like
+a completely superfluous option to me. I don't think we've ever had the
+equivalent of "vendor" Kconfig options in DRM, and I don't see why we'd
+need to start now. If ARM was going to add another driver it can simply
+have a separate Kconfig entry. There should be no need to select the
+vendor option first.
 
-Patch applied!
-
-Yours,
-Linus Walleij
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160104/2937e3ba/attachment.sig>
