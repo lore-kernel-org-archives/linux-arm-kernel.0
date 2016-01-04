@@ -1,77 +1,32 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 4 Jan 2016 15:28:41 +0000
-Subject: linux-4.4-rc8/arch/arm64/kernel/module.c:78: 32/64 bit problem ?
-In-Reply-To: <CAKv+Gu9Ve6=1evFD4V2jtOCHOEqOzhmud=guioVR5NMrc=HPBw@mail.gmail.com>
-References: <DUB128-W158A3195DB26F149DD52E59CF20@phx.gbl>
- <20160104141657.GC1616@arm.com>
- <CAKv+Gu8KT-vOPN=ypt-qViLc74CumJUorxxM1wPnzf7h-nqKFg@mail.gmail.com>
- <CAKv+Gu9Ve6=1evFD4V2jtOCHOEqOzhmud=guioVR5NMrc=HPBw@mail.gmail.com>
-Message-ID: <20160104152841.GG1616@arm.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Mon, 4 Jan 2016 16:30:36 +0100
+Subject: [PATCH v2 20/32] metag: define __smp_xxx
+In-Reply-To: <20160104152558.GD17861@jhogan-linux.le.imgtec.org>
+References: <1451572003-2440-1-git-send-email-mst@redhat.com>
+ <1451572003-2440-21-git-send-email-mst@redhat.com>
+ <20160104134128.GZ6344@twins.programming.kicks-ass.net>
+ <20160104152558.GD17861@jhogan-linux.le.imgtec.org>
+Message-ID: <20160104153036.GG6344@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 04, 2016 at 04:24:49PM +0100, Ard Biesheuvel wrote:
-> On 4 January 2016 at 15:32, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> > On 4 January 2016 at 15:16, Will Deacon <will.deacon@arm.com> wrote:
-> >> On Mon, Jan 04, 2016 at 08:25:30AM +0000, David Binderman wrote:
-> >>> Hello there,
-> >>
-> >> Hi David,
-> >>
-> >>> [linux-4.4-rc8/arch/arm64/kernel/module.c:78] ->
-> >>> [linux-4.4-rc8/arch/arm64/kernel/module.c:88]: (warning) Shifting 32-bit
-> >>> value by 64 bits is undefined behaviour. See condition at line 88.
-> >>
-> >> Curious, but how are you seeing this warning? GCC is silent for me...
-> >>
-> >>> Source code is
-> >>>
-> >>>     u64 imm_mask = (1 << len) - 1;
-> >>>     s64 sval = do_reloc(op, place, val);
-> >>>
-> >>>     switch (len) {
-> >>>     case 16:
-> >>>         *(s16 *)place = sval;
-> >>>         break;
-> >>>     case 32:
-> >>>         *(s32 *)place = sval;
-> >>>         break;
-> >>>     case 64:
-> >>>
-> >>> So it seems that len can be 64. Suggest new code
-> >>>
-> >>>     u64 imm_mask = (1UL << len) - 1;
-> >>
-> >> That still ends up shifting by the width of the type when len == 64,
-> >> which is potentially still broken. We're better off using GENMASK.
-> >>
-> >
-> > Can't we simply return from the function rather than break from the
-> > switch statement if len == 64?
-> > The range check does not make any sense in that case anyway.
-> >
-> 
-> Or perhaps:
-> 
-> ------------8<-----------------
-> diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
-> index f4bc779e62e8..fd1f4e678655 100644
-> --- a/arch/arm64/kernel/module.c
-> +++ b/arch/arm64/kernel/module.c
-> @@ -75,14 +75,17 @@ static u64 do_reloc(enum aarch64_reloc_op
-> reloc_op, void *place, u64 val)
-> 
->  static int reloc_data(enum aarch64_reloc_op op, void *place, u64 val, int len)
->  {
-> -       u64 imm_mask = (1 << len) - 1;
->         s64 sval = do_reloc(op, place, val);
-> 
->         switch (len) {
->         case 16:
-> +               if (sval < S16_MIN || sval > U16_MAX)
-> +                       return -ERANGE;
->                 *(s16 *)place = sval;
+On Mon, Jan 04, 2016 at 03:25:58PM +0000, James Hogan wrote:
+> It is used along with the metag specific __global_lock1() (global
+> voluntary lock between hw threads) whenever a write is performed, and by
+> smp_mb/smp_rmb to try to catch other cases, but I've never been
+> confident this fixes every single corner case, since there could be
+> other places where multiple CPUs perform unsynchronised writes to the
+> same memory location, and expect cache not to become incoherent at that
+> location.
 
-Doesn't this break ABS relocs, which are allowed to overflow?
+Ah, yuck, I thought blackfin was the only one attempting !coherent SMP.
+And yes, this is bound to break in lots of places in subtle ways. We
+very much assume cache coherency for SMP in generic code.
 
-Will
+> It seemed to be sufficient to achieve stability however, and SMP on Meta
+> Linux never made it into a product anyway, since the other hw thread
+> tended to be used for RTOS stuff, so it didn't seem worth extending the
+> generic barrier API for it.
+
+*phew*, should we take it out then, just to be sure nobody accidentally
+tries to use it then?
