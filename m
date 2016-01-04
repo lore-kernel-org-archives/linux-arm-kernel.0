@@ -1,24 +1,143 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 04 Jan 2016 09:39:46 +0100
-Subject: [PATCH 4/3] drm: arm-hdlcd: add explictit DRM dependency
-In-Reply-To: <20160104082416.GB23797@ulmo>
-References: <4194408.X82ccDjh5X@wuerfel> <5213510.IMdSbsXdoQ@wuerfel>
- <20160104082416.GB23797@ulmo>
-Message-ID: <4350671.DP0mBIml5S@wuerfel>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 4 Jan 2016 16:40:02 +0800
+Subject: [PATCH v6 0/9] mfd: axp20x: Add support for RSB based AXP223
+In-Reply-To: <1450283538-25067-1-git-send-email-wens@csie.org>
+References: <1450283538-25067-1-git-send-email-wens@csie.org>
+Message-ID: <CAGb2v645fRATYK2x-Axcga2jEtcLJVa1iTTWFUC+vfRjXVD06A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 04 January 2016 09:24:16 Thierry Reding wrote:
-> 
-> Ugh... wouldn't it be much simpler to get rid of DRM_ARM? It seems like
-> a completely superfluous option to me. I don't think we've ever had the
-> equivalent of "vendor" Kconfig options in DRM, and I don't see why we'd
-> need to start now. If ARM was going to add another driver it can simply
-> have a separate Kconfig entry. There should be no need to select the
-> vendor option first.
+Hi Lee,
 
-Fine with me too. I vaguely remembered having seen some discussion about
-this, so I decided to do a minimal fix, but I agree that would be more
-in line with the other drivers.
+On Thu, Dec 17, 2015 at 12:32 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+> Hi everyone,
+>
+> This is v6 of the AXP223 PMIC series. v6 fixes the address of the AXP223
+> in the DT. Hope this series makes it into 4.5, and we can then support
+> even more AXP PMICs in 4.6+.
+>
+> Lee, can you take the first 7 patches. Once they're in, Maxime can take
+> the DTS patches.
 
-	Arnd
+We're at -rc8. Any chance the first 7 patches make the next release?
+
+Thanks
+
+ChenYu
+
+>
+> Changes since v5:
+>
+>   - Correct AXP223 address to 0x3a3.
+>
+> Changes since v4:
+>
+>   - Get rid of second parameter of axp20x_match_device() (new patch 2)
+>
+>   - Match against dev->driver->of_match_table, so the entirety of
+>     axp20x_match_device() can be kept in the core. (new patch 3)
+>
+>   - Move *_device_id tables to bottom of the driver, right above driver
+>     declaration. (patch 4 & 6)
+>
+>   - Remove extra whitespaces while moving i2c specific code (patch 4)
+>
+>   - Remove leftover whitespace and code style issues in axp20x core
+>     (new patch 5)
+>
+>   - Remove extra whitespaces in rsb specific code (patch 6)
+>
+> Changes since v3:
+>
+>   - Removed settings for axp223 reg_rtc_ldo from board dts files that
+>     are already in axp22x.dtsi. The name is kept.
+>
+>   - Dropped simplefb label and defconfig patches, as they are merged.
+>
+> Changes since v2:
+>
+>   - s/It's/Its/ for the commit messages of patches 5 and 7
+>
+>   - Add Rob's Acked-by for patch 1
+>
+> Changes since v1:
+>
+>   - Dropped NMI interrupt controller dts patch (Merged)
+>
+>   - Change MFD_AXP20X to represent the axp20x core, and drop MFD_AXP20X_CORE
+>
+>   - Keep the axp20x core bits named axp20x.c
+>
+>   - Add patch 7 to add AXP223 to sun8i-q8-common.dtsi
+>
+>   - Add patch 8 & 9 to update defconfigs
+>
+>   - Make axp20x drivers tristate and buildable as modules
+>
+>   - Drop "_sunxi" substring from identifiers in axp20x-rsb driver
+>
+>
+> This series adds support for the Reduced Serial Bus based AXP223 PMIC.
+> The AXP223 is functionally identical to the AXP221, which we already
+> support. Only some default values for the regulators are different.
+> The defaults fit their recommended application, paired with different
+> SoCs.
+>
+> Patch 1 adds AXP223 to the list of supported chips in the DT binding.
+>
+> Patch 2 gets rid of the extra "struct device *" parameter from
+> axp20x_match_device().
+>
+> Patch 3 makes axp20x_match_device() use dev->driver->of_match_table,
+> so the function can be library-ized without modification.
+>
+> Patch 4 splits the axp20x mfd driver into 2 parts, a core library, and
+> an I2C driver.
+>
+> Patch 5 cleans up some leftover whitespace issues in axp20x core.
+>
+> Patch 6 adds an RSB based driver for the AXP223.
+>
+> Patch 7 adds support for the AXP223 regulators
+>
+> Patch 8 enables the AXP223 PMIC and its regulators for the Sinlinx
+> SinA33.
+>
+> Patch 9 enables the AXP223 PMIC and its regulators for A23/A33 based
+> Q8 tablet devices.
+>
+>
+> Regards
+> ChenYu
+>
+>
+> Chen-Yu Tsai (9):
+>   mfd: axp20x: Add AXP223 to list of supported PMICs in DT bindings
+>   mfd: axp20x: Remove second struct device * parameter for
+>     axp20x_match_device()
+>   mfd: axp20x: use dev->driver->of_match_table in axp20x_match_device()
+>   mfd: axp20x: Split the driver into core and i2c bits
+>   mfd: axp20x: Whitespace, open parenthesis alignment code style fixes
+>   mfd: axp20x: Add support for RSB based AXP223 PMIC
+>   regulator: axp20x: Support new AXP223 PMIC
+>   ARM: dts: sun8i: sinlinx-sina33: Add AXP223 PMIC device and regulator
+>     nodes
+>   ARM: dts: sun8i: q8-common: Add AXP223 PMIC device and regulator nodes
+>
+>  Documentation/devicetree/bindings/mfd/axp20x.txt |   7 +-
+>  arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts   |  76 ++++++++++++++++-
+>  arch/arm/boot/dts/sun8i-q8-common.dtsi           |  83 +++++++++++++++++-
+>  drivers/mfd/Kconfig                              |  25 ++++--
+>  drivers/mfd/Makefile                             |   2 +
+>  drivers/mfd/axp20x-i2c.c                         | 102 +++++++++++++++++++++++
+>  drivers/mfd/axp20x-rsb.c                         |  78 +++++++++++++++++
+>  drivers/mfd/axp20x.c                             | 101 +++++-----------------
+>  drivers/regulator/axp20x-regulator.c             |   3 +
+>  include/linux/mfd/axp20x.h                       |  34 +++++++-
+>  10 files changed, 418 insertions(+), 93 deletions(-)
+>  create mode 100644 drivers/mfd/axp20x-i2c.c
+>  create mode 100644 drivers/mfd/axp20x-rsb.c
+>
+> --
+> 2.6.4
+>
