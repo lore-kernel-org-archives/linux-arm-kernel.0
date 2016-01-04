@@ -1,82 +1,94 @@
-From: mfuzzey@parkeon.com (Martin Fuzzey)
-Date: Mon, 04 Jan 2016 19:22:06 +0100
-Subject: [PATCH] serial: imx: Fix suspend / resume.
-Message-ID: <20160104182206.10852.47155.stgit@localhost>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 4 Jan 2016 18:23:15 +0000
+Subject: [PATCH] pinctrl: mediatek: convert to arch_initcall
+In-Reply-To: <CAGS+omDesPTYHhVLv_EtQsYxa6MNuSi06MwcXz6RcY=uAcEtnQ@mail.gmail.com>
+References: <1450792017-7120-1-git-send-email-djkurtz@chromium.org>
+ <CACRpkdbRDzXunYK5d6Ld4Z2a=0mkp4KBvgL2P-St4P65Jajamw@mail.gmail.com>
+ <20151230172212.GZ16023@sirena.org.uk>
+ <CAGS+omA9AarzE2sp1Ry3RuOt8EOa-sL=DL1iDA2OeVVdjn=xgg@mail.gmail.com>
+ <20151231220712.GD16023@sirena.org.uk>
+ <CAGS+omDesPTYHhVLv_EtQsYxa6MNuSi06MwcXz6RcY=uAcEtnQ@mail.gmail.com>
+Message-ID: <20160104182315.GP16023@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suspend fails due to unprepared clock:
+On Fri, Jan 01, 2016 at 09:56:01AM +0800, Daniel Kurtz wrote:
+> On Fri, Jan 1, 2016 at 6:07 AM, Mark Brown <broonie@kernel.org> wrote:
+> > On Thu, Dec 31, 2015 at 09:45:51PM +0800, Daniel Kurtz wrote:
 
-[  638.794563] PM: Syncing filesystems ... done.
-[  638.878902] Freezing user space processes ... (elapsed 0.002 seconds) done.
-[  638.888454] Freezing remaining freezable tasks ... (elapsed 0.001 seconds) done.
-[  638.996697] PM: suspend of devices complete after 97.200 msecs
-[  639.002611] PM: suspend devices took 0.100 seconds
-[  639.013020] PM: late suspend of devices complete after 2.288 msecs
-[  639.021486] ------------[ cut here ]------------
-[  639.026147] WARNING: CPU: 0 PID: 488 at drivers/clk/clk.c:732 clk_core_enable+0xc0/0x12c()
-[  639.034413] Modules linked in:
-[  639.037490] CPU: 0 PID: 488 Comm: system_server Tainted: G        W       4.4.0-rc5-pknbsp-svn2214-atag-v4.4-rc5-121-gebfd9cb #1304
-[  639.049312] Hardware name: Freescale i.MX53 (Device Tree Support)
-[  639.055444] [<c0016d54>] (unwind_backtrace) from [<c00140f8>] (show_stack+0x20/0x24)
-[  639.063199] [<c00140f8>] (show_stack) from [<c02c99a0>] (dump_stack+0x20/0x28)
-[  639.070442] [<c02c99a0>] (dump_stack) from [<c0024ca8>] (warn_slowpath_common+0x88/0xc0)
-[  639.078541] [<c0024ca8>] (warn_slowpath_common) from [<c0024d0c>] (warn_slowpath_null+0x2c/0x34)
-[  639.087332] [<c0024d0c>] (warn_slowpath_null) from [<c05171e8>] (clk_core_enable+0xc0/0x12c)
-[  639.095777] [<c05171e8>] (clk_core_enable) from [<c05172f8>] (clk_enable+0x2c/0x40)
-[  639.103441] [<c05172f8>] (clk_enable) from [<c0349880>] (imx_serial_port_suspend_noirq+0x20/0xe0)
-[  639.112336] [<c0349880>] (imx_serial_port_suspend_noirq) from [<c03a26a0>] (dpm_run_callback+0x68/0x16c)
-[  639.121825] [<c03a26a0>] (dpm_run_callback) from [<c03a2898>] (__device_suspend_noirq+0xf4/0x22c)
-[  639.130705] [<c03a2898>] (__device_suspend_noirq) from [<c03a4b0c>] (dpm_suspend_noirq+0x148/0x30c)
-[  639.139764] [<c03a4b0c>] (dpm_suspend_noirq) from [<c00511d4>] (suspend_devices_and_enter+0x2e8/0x6a4)
-[  639.149078] [<c00511d4>] (suspend_devices_and_enter) from [<c00518a0>] (pm_suspend+0x310/0x4b8)
-[  639.157782] [<c00518a0>] (pm_suspend) from [<c00500ec>] (state_store+0x7c/0xcc)
-[  639.165099] [<c00500ec>] (state_store) from [<c02cb6dc>] (kobj_attr_store+0x1c/0x28)
-[  639.172858] [<c02cb6dc>] (kobj_attr_store) from [<c01633d4>] (sysfs_kf_write+0x54/0x58)
-[  639.180871] [<c01633d4>] (sysfs_kf_write) from [<c01629b4>] (kernfs_fop_write+0x100/0x1c8)
-[  639.189152] [<c01629b4>] (kernfs_fop_write) from [<c00fb8b8>] (__vfs_write+0x3c/0xe8)
-[  639.196991] [<c00fb8b8>] (__vfs_write) from [<c00fc810>] (vfs_write+0xa4/0x160)
-[  639.204307] [<c00fc810>] (vfs_write) from [<c00fcac4>] (SyS_write+0x4c/0x98)
-[  639.211363] [<c00fcac4>] (SyS_write) from [<c0010760>] (ret_fast_syscall+0x0/0x3c)
+> >> Things are actively broken right now, in the sense that there are many
+> >> needless probe deferrals on boot.
 
-Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
----
- drivers/tty/serial/imx.c |    8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+> > That's just noisy, everything does end up loading OK.
 
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index 016e4be..16a551b 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -2071,13 +2071,13 @@ static int imx_serial_port_suspend_noirq(struct device *dev)
- 	struct imx_port *sport = platform_get_drvdata(pdev);
- 	int ret;
- 
--	ret = clk_enable(sport->clk_ipg);
-+	ret = clk_prepare_enable(sport->clk_ipg);
- 	if (ret)
- 		return ret;
- 
- 	serial_imx_save_context(sport);
- 
--	clk_disable(sport->clk_ipg);
-+	clk_disable_unprepare(sport->clk_ipg);
- 
- 	return 0;
- }
-@@ -2088,13 +2088,13 @@ static int imx_serial_port_resume_noirq(struct device *dev)
- 	struct imx_port *sport = platform_get_drvdata(pdev);
- 	int ret;
- 
--	ret = clk_enable(sport->clk_ipg);
-+	ret = clk_prepare_enable(sport->clk_ipg);
- 	if (ret)
- 		return ret;
- 
- 	serial_imx_restore_context(sport);
- 
--	clk_disable(sport->clk_ipg);
-+	clk_disable_unprepare(sport->clk_ipg);
- 
- 	return 0;
- }
+> It's not just noisy, it also adds to boot time.
+
+If you've got meaningful boot time numbers from practical systems it'd
+be good to share them, nobody was able to show any actual problem there.
+
+> >> These are pinctrl drivers, which are required to load before every
+> >> other driver that requests a gpio.
+> >> AFAICT, the pinctrl is part of the platform "architecture", hence why
+> >> I suggest we move this to arch_initcall().
+
+> > This is exactly the sort of hacking that leads to problems
+
+> What problems?
+> More patches as people adjust / tune / optimize boot time, or something else?
+
+There's that and also general fragility when multiple drivers interact -
+it can get really problematic when different systems end up with
+different requirements for the sasme driver and disrupt each other or
+conflict with each other.
+
+> > you can
+> > also make the same argument for a bunch of other things like regulators
+> > but then you find there's circular dependencies or extra devices with
+> > different requirements on some systems that cause further issues and
+> > need more special casing, or you find that some other device gets pushed
+> > earlier so you have to go round tweaking everything it uses.
+
+> For regulators, I think things are a bit more subtle.  Most regulators
+> are external components that can be used on different boards for
+> different purposes, so I can see an argument for treating them in a
+> more generic way by using a later device_initcall.  The exception
+> being architecture specific PMICs that only make sense when paired
+> with a specific small set of CPUs - and if you look, there are many
+> PMIC regulator drivers that are at earlier initcall levels, presumably
+> because they are required by cpufreq drivers, and/or their initcall
+> level is set as the same as the rest of the functions exposed by the
+> same PMIC MFD.
+
+The reason the regulator drivers are earlier is that cpufreq and a
+couple of other things are broken and don't use the device model so we
+have to use link order hacks.  I'm pushing any driver that doesn't
+specifically have problems with those to just use normal initcall.
+
+> >> arch_initcall() is also consistent with 39 other pinctrl drivers in
+> >> drivers/pinctrl.
+> >> 19 others use subsys_initcall(), core_initcall() or
+> >> postcore_initcall(), any of which would also work.
+
+> > It's fairly clear that there's at least a case for simplifying the
+> > existing practice here, for example by moving everything into a single
+> > (perhaps aliased) initcall rather than by randomly picking a level per
+> > system or by actually fiddling with the link ordering if the case is
+> > sufficiently clear that pinctrl in general ought to load earlier than it
+> > does.
+
+> Nothing above sounds like a reason not to merge this patch, however.
+> Why should we block useful patches that use existing tools to fix real
+> architecture-specific issues until new infrastructure is merged that
+> solves general problems?
+
+Some of the infrastructure here is really trivial if we are saying that
+basically all drivers do this.  That way you don't end up so much with
+things like wondering why different drivers made different decisions so
+much.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160104/542c5549/attachment-0001.sig>
