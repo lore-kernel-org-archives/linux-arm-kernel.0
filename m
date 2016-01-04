@@ -1,20 +1,20 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  5 Jan 2016 09:27:44 +1100
-Subject: [PATCH v2 09/13] ARM: shmobile: gose: enable sound DMA support in
- device tree
+Date: Tue,  5 Jan 2016 09:27:47 +1100
+Subject: [PATCH v2 12/13] ARM: shmobile: gose: enable sound DMA support via
+ DVC in device tree
 In-Reply-To: <1451946468-20499-1-git-send-email-horms+renesas@verge.net.au>
 References: <1451946468-20499-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1451946468-20499-10-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1451946468-20499-13-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable DMA transfer to/from SSI in r8a7793/gose device tree.
+Enable DMA transfer using DVC in r8a7793/gose device tree.
 
-     DMA
-[MEM] -> [SSI]
+     DMA               DMApp
+[MEM] -> [SRC] -> [DVC] -> [SSIU] -> [SSI]
 
-     DMA
-[MEM] <- [SSI]
+     DMA               DMApp
+[MEM] <- [DVC] <- [SRC] <- [SSIU] <- [SSI]
 
 Based on similar work for the r8a7791/koelsch by Kuninori Morimoto.
 
@@ -22,25 +22,48 @@ Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7793-gose.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/r8a7793-gose.dts | 21 +++++++++++++++++++--
+ 1 file changed, 19 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
-index a90af303e21a..0ab0abb9f889 100644
+index ad20ddc5203d..958ef72991c5 100644
 --- a/arch/arm/boot/dts/r8a7793-gose.dts
 +++ b/arch/arm/boot/dts/r8a7793-gose.dts
-@@ -322,10 +322,10 @@
- };
+@@ -18,7 +18,24 @@
+  * This command is required when Playback/Capture
+  *
+  *	amixer set "LINEOUT Mixer DACL" on
++ *	amixer set "DVC Out" 100%
++ *	amixer set "DVC In" 100%
++ *
++ * You can use Mute
++ *
++ *	amixer set "DVC Out Mute" on
++ *	amixer set "DVC In Mute" on
++ *
++ * You can use Volume Ramp
++ *
++ *	amixer set "DVC Out Ramp Up Rate"   "0.125 dB/64 steps"
++ *	amixer set "DVC Out Ramp Down Rate" "0.125 dB/512 steps"
++ *	amixer set "DVC Out Ramp" on
++ *	aplay xxx.wav &
++ *	amixer set "DVC Out"  80%  // Volume Down
++ *	amixer set "DVC Out" 100%  // Volume Up
+  */
++
+ /dts-v1/;
+ #include "r8a7793.dtsi"
+ #include <dt-bindings/gpio/gpio.h>
+@@ -315,8 +332,8 @@
  
- &ssi0 {
--	pio-transfer;
-+	no-busif;
- };
- 
- &ssi1 {
--	pio-transfer;
-+	no-busif;
- 	shared-pin;
+ 	rcar_sound,dai {
+ 		dai0 {
+-			playback = <&ssi0 &src2>;
+-			capture  = <&ssi1 &src3>;
++			playback = <&ssi0 &src2 &dvc0>;
++			capture  = <&ssi1 &src3 &dvc1>;
+ 		};
+ 	};
  };
 -- 
 2.1.4
