@@ -1,55 +1,39 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 4 Jan 2016 09:12:15 -0800
-Subject: [PATCH v5 3/5] driver core: handle -EPROBE_DEFER from
- bus_type.match()
-In-Reply-To: <20160104163100.GK19062@n2100.arm.linux.org.uk>
-References: <1450868368-5650-1-git-send-email-m.szyprowski@samsung.com>
- <1450868368-5650-4-git-send-email-m.szyprowski@samsung.com>
- <20160104163100.GK19062@n2100.arm.linux.org.uk>
-Message-ID: <20160104171215.GB25961@kroah.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 4 Jan 2016 17:12:57 +0000
+Subject: [PATCH] pinctrl: mediatek: convert to arch_initcall
+In-Reply-To: <CACRpkdZsQc_Jug1dy-qist4Dv7HTDDx-fBjXTxj+s7W0sgJSuw@mail.gmail.com>
+References: <1450792017-7120-1-git-send-email-djkurtz@chromium.org>
+ <CACRpkdbRDzXunYK5d6Ld4Z2a=0mkp4KBvgL2P-St4P65Jajamw@mail.gmail.com>
+ <20151230172212.GZ16023@sirena.org.uk>
+ <CAGS+omA9AarzE2sp1Ry3RuOt8EOa-sL=DL1iDA2OeVVdjn=xgg@mail.gmail.com>
+ <20151231220712.GD16023@sirena.org.uk>
+ <CAGS+omDesPTYHhVLv_EtQsYxa6MNuSi06MwcXz6RcY=uAcEtnQ@mail.gmail.com>
+ <DBFC9B9B-5E81-44FD-9E26-8B50545004C1@gmail.com>
+ <CACRpkdZsQc_Jug1dy-qist4Dv7HTDDx-fBjXTxj+s7W0sgJSuw@mail.gmail.com>
+Message-ID: <20160104171257.GO16023@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 04, 2016 at 04:31:00PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Dec 23, 2015 at 11:59:26AM +0100, Marek Szyprowski wrote:
-> > From: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> > 
-> > Allow implementations of the match() callback in struct bus_type to
-> > return errors and if it's -EPROBE_DEFER then queue the device for
-> > deferred probing.
-> > 
-> > This is useful to buses such as AMBA in which devices are registered
-> > before their matching information can be retrieved from the HW
-> > (typically because a clock driver hasn't probed yet).
-> > 
-> > Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> > [changed if-else code structure, adjusted documentation to match the code,
-> > extended comments]
-> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
-> 
-> This patch _really_ needs an ack from Greg before I can merge it.
-> 
-> DRIVER CORE, KOBJECTS, DEBUGFS, KERNFS AND SYSFS
-> M:      Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> T:      git git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/driver-core.gitS:      Supported
-> F:      Documentation/kobject.txt
-> F:      drivers/base/
-> 
-> alternatively, the whole series should be taken by Greg, with my ack
-> for the amba and ARM bits.
-> 
-> Given that Greg is unlikely to respond this close to the merge window
-> (he's not responded to my messages about the amba-pl011 driver having
-> been messed up by the wrong patch set being taken...) I think this has
-> basically missed the 4.5 merge window.  Sorry.
+On Fri, Jan 01, 2016 at 06:29:15PM +0100, Linus Walleij wrote:
+> On Fri, Jan 1, 2016 at 3:27 PM, Matthias Brugger <matthias.bgg@gmail.com> wrote:
 
-I've been on vacation, so give me a week or so to catch up on
-everything...
+> > I think what Mark means is, that we define some pinctrl_initcall which
+> > is a macro to subsys_initcall (or arch_initcall or similar). We apply this
+> > to all pinctrl drivers including the one from Mediatek. This way at least
+> > we have a common method and changing the behaviour in the future is
+> > easier to handle.
 
-And yes, this missed the 4.5 merge window, that closed last week for my
-trees.
+> That would be pinctrl_soc_initcall() in that case. Just pinctrl_initcall()
+> would assume it's for all drivers and there is a bunch of them that are just
+> fine with simple device_initcall()s.
 
-thanks,
-
-greg k-h
+OTOH it might be easier to just have an initcall (or fiddle with the
+link order) for everything to avoid having to think about which drivers
+things apply to.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160104/ac8ca8f8/attachment.sig>
