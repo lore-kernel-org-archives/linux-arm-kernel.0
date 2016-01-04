@@ -1,82 +1,61 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Mon, 4 Jan 2016 15:09:46 -0800
-Subject: Widespread boot failures on ARM due to
- "mm/page_alloc.c: calculate zone_start_pfn at zone_spanned_pages_in_node()"
-In-Reply-To: <20160104224233.GU16023@sirena.org.uk>
-References: <20160104224233.GU16023@sirena.org.uk>
-Message-ID: <20160104150946.373ed02b8e8b81221340b7c8@linux-foundation.org>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Mon, 4 Jan 2016 17:13:08 -0600
+Subject: [PATCH v4 3/3] serial: amba-pl011: add ACPI support to AMBA probe
+In-Reply-To: <1450880383-29560-4-git-send-email-aleksey.makarov@linaro.org>
+References: <1450880383-29560-1-git-send-email-aleksey.makarov@linaro.org>
+ <1450880383-29560-4-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <CAOZdJXUpjWi7Dy=GFi7_58FqD_UZxxrw_QKJ4sdHLKVOLCyNAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 4 Jan 2016 22:42:33 +0000 Mark Brown <broonie@kernel.org> wrote:
+On Wed, Dec 23, 2015 at 8:19 AM, Aleksey Makarov
+<aleksey.makarov@linaro.org> wrote:
+> From: Graeme Gregory <graeme.gregory@linaro.org>
+>
+> In ACPI this device is only defined in SBSA mode so
+> if we are coming from ACPI use this mode.
+>
+> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+> ---
+>  drivers/tty/serial/amba-pl011.c | 37 ++++++++++++++++++++++++++-----------
+>  1 file changed, 26 insertions(+), 11 deletions(-)
+>
+> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> index 899a771..974cb9e 100644
+> --- a/drivers/tty/serial/amba-pl011.c
+> +++ b/drivers/tty/serial/amba-pl011.c
+> @@ -2368,18 +2368,33 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+>         if (!uap)
+>                 return -ENOMEM;
+>
+> -       uap->clk = devm_clk_get(&dev->dev, NULL);
+> -       if (IS_ERR(uap->clk))
+> -               return PTR_ERR(uap->clk);
+> -
+> -       uap->vendor = vendor;
+> -       uap->lcrh_rx = vendor->lcrh_rx;
+> -       uap->lcrh_tx = vendor->lcrh_tx;
+> -       uap->fifosize = vendor->get_fifosize(dev);
+> -       uap->port.irq = dev->irq[0];
+> -       uap->port.ops = &amba_pl011_pops;
+> +       /* ACPI only defines SBSA variant */
+> +       if (has_acpi_companion(&dev->dev)) {
+> +               /*
+> +                * According to ARM ARMH0011 is currently the only mapping
+> +                * of pl011 in ACPI and it's mapped to SBSA UART mode
+> +                */
+> +               uap->vendor     = &vendor_sbsa;
+> +               uap->fifosize   = 32;
+> +               uap->port.ops   = &sbsa_uart_pops;
+> +               uap->fixed_baud = 115200;
 
-> Since 20151231 -next has been failing to boot on a wide range of ARM
-> platforms in the kernelci.org boot tests[1].  Doing bisections with
-> Arndale and BeagleBone Black identifies 904769ac82ebf (mm/page_alloc.c:
-> calculate zone_start_pfn at zone_spanned_pages_in_node()) from the akpm
-> tree as the first broken commit[2,3].  An example bootlog from the
-> failure is:
-> 
->    http://storage.kernelci.org/next/next-20151231/arm-multi_v7_defconfig/lab-cambridge/boot-exynos5250-arndale.html
-> 
-> which shows no output on the console once we start the kernel, a brief
-> sampling of failing boards suggests this is the normal failure mode.
-> x86 and arm64 targets seem fine (juno shows up as failing but the boot
-> log seems fine so it's probably a false positive, Mustang was failing
-> already) and there are a small number of ARM platforms that boot.  I've
-> not yet had any time to investigate further than that (including trying
-> a revert of that commit), sorry.
-> 
-> [1] http://kernelci.org/boot/all/job/next/kernel/next-20151231/
-> [2] https://ci.linaro.org/view/people/job/tbaker-boot-bisect-bot/135/console
-> [3] https://ci.linaro.org/view/people/job/tbaker-boot-bisect-bot/136/console
+I'm confused by this patch.  We already have code like this in
+tty-next, in the form of sbsa_uart_probe():
 
-Thanks.  That patch has rather a blooper if
-CONFIG_HAVE_MEMBLOCK_NODE_MAP=n.  Is that the case in your testing?
+https://kernel.googlesource.com/pub/scm/linux/kernel/git/gregkh/tty/+/tty-next/drivers/tty/serial/amba-pl011.c#2553
 
-Arnd's tentative fix is below.
-
-I shall drop that patchset for now.
-
-
-
-
-
-
-From: Arnd Bergmann <arnd@arndb.de>
-Subject: mm/page_alloc.c: set a zone_start_pfn value in zone_spanned_pages_in_node
-
-We got a new build warning in linux-next:
-
-mm/page_alloc.c: In function 'free_area_init_node':
-mm/page_alloc.c:5278:25: warning: 'zone_start_pfn' may be used uninitialized in this function [-Wmaybe-uninitialized]
-    zone->zone_start_pfn = zone_start_pfn;
-mm/page_alloc.c:5265:17: note: 'zone_start_pfn' was declared here
-   unsigned long zone_start_pfn, zone_end_pfn;
-
-The code indeed looks wrong, but this is just a guess of what the
-fix might be: I have not looked it in detail, so please treat this
-as a bug report.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Taku Izumi <izumi.taku@jp.fujitsu.com>
-Cc: Tony Luck <tony.luck@intel.com>
-Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
----
-
- mm/page_alloc.c |    2 ++
- 1 file changed, 2 insertions(+)
-
-diff -puN mm/page_alloc.c~mm-calculate-zone_start_pfn-at-zone_spanned_pages_in_node-fix mm/page_alloc.c
---- a/mm/page_alloc.c~mm-calculate-zone_start_pfn-at-zone_spanned_pages_in_node-fix
-+++ a/mm/page_alloc.c
-@@ -5013,6 +5013,8 @@ static inline unsigned long __meminit zo
- 					unsigned long *zone_end_pfn,
- 					unsigned long *zones_size)
- {
-+	*zone_start_pfn = node_start_pfn;
-+	*zone_end_pfn = node_end_pfn;
- 	return zones_size[zone_type];
- }
- 
-_
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
