@@ -1,58 +1,84 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 4 Jan 2016 18:26:14 +1100
-Subject: Including Raspberry Pi -next trees in linux-next
-In-Reply-To: <87fuyozzax.fsf@eliezer.anholt.net>
-References: <87fuyozzax.fsf@eliezer.anholt.net>
-Message-ID: <20160104182614.4be3fa06@canb.auug.org.au>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 4 Jan 2016 09:36:05 +0200
+Subject: [RFC 6/9] clk: ti: add support for omap4 module clocks
+In-Reply-To: <20160101054815.21738.79820@quark.deferred.io>
+References: <1450447141-29936-1-git-send-email-t-kristo@ti.com>
+ <1450447141-29936-7-git-send-email-t-kristo@ti.com>
+ <20160101054815.21738.79820@quark.deferred.io>
+Message-ID: <568A20E5.6040005@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
-
-On Sat, 26 Dec 2015 13:15:50 -0800 Eric Anholt <eric@anholt.net> wrote:
+On 01/01/2016 07:48 AM, Michael Turquette wrote:
+> Hi Tero,
 >
-> I'll be sending pull-requests to Florian soon, but I would like to get
-> my trees included in linux-next to get increased testing coverage of
-> them against everything else going on for 4.5.  I'm expecting to produce
-> trees under these branch names for the forseeable future.
-> 
-> Repo: https://github.com/anholt/linux.git
-> 
-> branches:
-> drm-vc4-next
-> bcm2835-dt-next
-> bcm2835-soc-next
-> bcm2835-drivers-next
-> bcm2385-defconfig-next
-> (bcm2835-maintainers-next is a placeholder since we have nothing for it
-> this round)
+> Quoting Tero Kristo (2015-12-18 05:58:58)
+>> Previously, hwmod core has been used for controlling the hwmod level
+>> clocks. This has certain drawbacks, like being unable to share the
+>> clocks for multiple users, missing usecounting and generally being
+>> totally incompatible with common clock framework.
+>>
+>> Add support for new clock type under the TI clock driver, which will
+>> be used to convert all the existing hwmdo clocks to. This helps to
+>> get rid of the clock related hwmod data from kernel and instead
+>> parsing this from DT.
+>
+> I'm really happy to see this series. Looks pretty good to me.
+>
+>> +static int _omap4_hwmod_clk_enable(struct clk_hw *hw)
+>> +{
+>> +       struct clk_hw_omap *clk = to_clk_hw_omap(hw);
+>> +       u32 val;
+>> +       int timeout = 0;
+>> +       int ret;
+>> +
+>> +       if (!clk->enable_bit)
+>> +               return 0;
+>> +
+>> +       if (clk->clkdm) {
+>> +               ret = ti_clk_ll_ops->clkdm_clk_enable(clk->clkdm, hw->clk);
+>> +               if (ret) {
+>> +                       WARN(1,
+>> +                            "%s: could not enable %s's clockdomain %s: %d\n",
+>> +                            __func__, clk_hw_get_name(hw),
+>> +                            clk->clkdm_name, ret);
+>> +                       return ret;
+>> +               }
+>> +       }
+>> +
+>> +       val = ti_clk_ll_ops->clk_readl(clk->enable_reg);
+>> +
+>> +       val &= ~OMAP4_MODULEMODE_MASK;
+>> +       val |= clk->enable_bit;
+>> +
+>> +       ti_clk_ll_ops->clk_writel(val, clk->enable_reg);
+>> +
+>> +       /* Wait until module is enabled */
+>> +       while (!_omap4_is_ready(val)) {
+>> +               udelay(1);
+>
+> This should really be a .prepare callback if you plan to keep the delays
+> in there.
 
-I have added the first 5 from today.  Can you tell me which trees they
-will be merged via so I can position them in my list correctly,
-please?
+If this is changed to a .prepare, then all OMAP power management is 
+effectively ruined as all clocks are going to be enabled all the time. 
+hwmod core doesn't support .prepare/.enable at the moment that well, and 
+changing that is going to be a big burden (educated guess, haven't 
+checked this yet)... The call chain that comes here is:
 
-Also, I was wondering how they relate to the bcm2835 tree I currently
-have (git://git.kernel.org/pub/scm/linux/kernel/git/rpi/linux-rpi.git
-for-next) currently maintained by Stephen Warren (cc'd).
+device driver -> pm_runtime -> hwmod_core -> hwmod_clk_enable / disable.
 
-Thanks for adding your subsystem tree as a participant of linux-next.  As
-you may know, this is not a judgment of your code.  The purpose of
-linux-next is for integration testing and to lower the impact of
-conflicts between subsystems in the next merge window. 
+The delay within this function should usually be pretty short, just to 
+wait that the module comes up from idle.
 
-You will need to ensure that the patches/commits in your tree/series have
-been:
-     * submitted under GPL v2 (or later) and include the Contributor's
-        Signed-off-by,
-     * posted to the relevant mailing list,
-     * reviewed by you (or another maintainer of your subsystem tree),
-     * successfully unit tested, and 
-     * destined for the current or next Linux merge window.
+I recall the discussions regarding the udelays within clk_enable/disable 
+calls, but what is the preferred approach then? Typically 
+clk_enable/disable just becomes a NOP if it is not allowed to wait for 
+hardware to complete transitioning before exiting the function.
 
-Basically, this should be just what you would send to Linus (or ask him
-to fetch).  It is allowed to be rebased if you deem it necessary.
+-Tero
 
--- 
-Cheers,
-Stephen Rothwell 
-sfr at canb.auug.org.au
+>
+> Regards,
+> Mike
+>
