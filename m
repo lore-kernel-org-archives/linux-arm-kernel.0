@@ -1,94 +1,105 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 4 Jan 2016 18:23:15 +0000
-Subject: [PATCH] pinctrl: mediatek: convert to arch_initcall
-In-Reply-To: <CAGS+omDesPTYHhVLv_EtQsYxa6MNuSi06MwcXz6RcY=uAcEtnQ@mail.gmail.com>
-References: <1450792017-7120-1-git-send-email-djkurtz@chromium.org>
- <CACRpkdbRDzXunYK5d6Ld4Z2a=0mkp4KBvgL2P-St4P65Jajamw@mail.gmail.com>
- <20151230172212.GZ16023@sirena.org.uk>
- <CAGS+omA9AarzE2sp1Ry3RuOt8EOa-sL=DL1iDA2OeVVdjn=xgg@mail.gmail.com>
- <20151231220712.GD16023@sirena.org.uk>
- <CAGS+omDesPTYHhVLv_EtQsYxa6MNuSi06MwcXz6RcY=uAcEtnQ@mail.gmail.com>
-Message-ID: <20160104182315.GP16023@sirena.org.uk>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 4 Jan 2016 11:24:14 -0700
+Subject: [PATCH V7 02/24] coresight: associating path with session rather
+ than tracer
+In-Reply-To: <20151220152939.GA11552@debian>
+References: <1450472361-426-1-git-send-email-mathieu.poirier@linaro.org>
+ <1450472361-426-3-git-send-email-mathieu.poirier@linaro.org>
+ <20151220152939.GA11552@debian>
+Message-ID: <CANLsYkwhC0fSqrZrHH+P68Dev1j6n19o=2g8kJpZfzBMTbcNdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 01, 2016 at 09:56:01AM +0800, Daniel Kurtz wrote:
-> On Fri, Jan 1, 2016 at 6:07 AM, Mark Brown <broonie@kernel.org> wrote:
-> > On Thu, Dec 31, 2015 at 09:45:51PM +0800, Daniel Kurtz wrote:
+On 20 December 2015 at 08:29, Rabin Vincent <rabin@rab.in> wrote:
+> On Fri, Dec 18, 2015 at 01:58:58PM -0700, Mathieu Poirier wrote:
+>> When using the Coresight framework from the sysFS interface a
+>> tracer is always handling a single session and as such, a path
+>> can be associated with a tracer.  But when supporting multiple
+>> session per tracer there is no guarantee that sessions will always
+>> have the same path from source to sink.
+>>
+>> This patch is removing the automatic association between path and
+>> tracers.  The building of a path and enablement of the components
+>> in the path are decoupled, allowing for the association of a path
+>> with a session rather than a tracer.
+>
+> This patch introduces a use-after-free/double kfree() if the sink is
+> disabled after the source.
+>
+> With this command sequence:
+>
+> # echo 1 > /sys/bus/coresight/devices/54162000.etb/enable_sink
+> # echo 1 > /sys/bus/coresight/devices/5414c000.ptm/enable_source
+> ...
+> # echo 0 > /sys/bus/coresight/devices/54162000.etb/enable_sink
+> # echo 0 > /sys/bus/coresight/devices/5414c000.ptm/enable_source
 
-> >> Things are actively broken right now, in the sense that there are many
-> >> needless probe deferrals on boot.
+Hey Vincent,
 
-> > That's just noisy, everything does end up loading OK.
+Can you send me the full suite of commands to get to this result? I
+simply can't trigger the trace you are collecting on your side.  I
+have the following SLUB debugging settings - can you double check
+yours as well?
 
-> It's not just noisy, it also adds to boot time.
+CONFIG_SLUB_DEBUG=y
+CONFIG_SLUB=y
+CONFIG_SLUB_CPU_PARTIAL=y
+CONFIG_SLUB_DEBUG_ON=y
 
-If you've got meaningful boot time numbers from practical systems it'd
-be good to share them, nobody was able to show any actual problem there.
+Many thanks for the help,
+Mathieu
 
-> >> These are pinctrl drivers, which are required to load before every
-> >> other driver that requests a gpio.
-> >> AFAICT, the pinctrl is part of the platform "architecture", hence why
-> >> I suggest we move this to arch_initcall().
-
-> > This is exactly the sort of hacking that leads to problems
-
-> What problems?
-> More patches as people adjust / tune / optimize boot time, or something else?
-
-There's that and also general fragility when multiple drivers interact -
-it can get really problematic when different systems end up with
-different requirements for the sasme driver and disrupt each other or
-conflict with each other.
-
-> > you can
-> > also make the same argument for a bunch of other things like regulators
-> > but then you find there's circular dependencies or extra devices with
-> > different requirements on some systems that cause further issues and
-> > need more special casing, or you find that some other device gets pushed
-> > earlier so you have to go round tweaking everything it uses.
-
-> For regulators, I think things are a bit more subtle.  Most regulators
-> are external components that can be used on different boards for
-> different purposes, so I can see an argument for treating them in a
-> more generic way by using a later device_initcall.  The exception
-> being architecture specific PMICs that only make sense when paired
-> with a specific small set of CPUs - and if you look, there are many
-> PMIC regulator drivers that are at earlier initcall levels, presumably
-> because they are required by cpufreq drivers, and/or their initcall
-> level is set as the same as the rest of the functions exposed by the
-> same PMIC MFD.
-
-The reason the regulator drivers are earlier is that cpufreq and a
-couple of other things are broken and don't use the device model so we
-have to use link order hacks.  I'm pushing any driver that doesn't
-specifically have problems with those to just use normal initcall.
-
-> >> arch_initcall() is also consistent with 39 other pinctrl drivers in
-> >> drivers/pinctrl.
-> >> 19 others use subsys_initcall(), core_initcall() or
-> >> postcore_initcall(), any of which would also work.
-
-> > It's fairly clear that there's at least a case for simplifying the
-> > existing practice here, for example by moving everything into a single
-> > (perhaps aliased) initcall rather than by randomly picking a level per
-> > system or by actually fiddling with the link ordering if the case is
-> > sufficiently clear that pinctrl in general ought to load earlier than it
-> > does.
-
-> Nothing above sounds like a reason not to merge this patch, however.
-> Why should we block useful patches that use existing tools to fix real
-> architecture-specific issues until new infrastructure is merged that
-> solves general problems?
-
-Some of the infrastructure here is really trivial if we are saying that
-basically all drivers do this.  That way you don't end up so much with
-things like wondering why different drivers made different decisions so
-much.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160104/542c5549/attachment-0001.sig>
+>
+> Before these patches, we get these messages while disabling:
+>
+> [  165.822326] coresight-etm3x 5414c000.ptm: ETM tracing disabled
+> [  165.828491] coresight 5414c000.ptm: releasing path(s) failed
+>
+> After these patches, we get this (with SLUB debugging enabled):
+>
+> =============================================================================
+> BUG kmalloc-512 (Not tainted): Invalid object pointer 0xed60e164
+> -----------------------------------------------------------------------------
+>
+> Disabling lock debugging due to kernel taint
+> INFO: Slab 0xeebac180 objects=23 used=23 fp=0x  (null) flags=0x4081
+> CPU: 0 PID: 856 Comm: sh Tainted: G    B           4.4.0-rc5-00224-ge461459-dirty #168
+> Hardware name: Generic OMAP4 (Flattened Device Tree)
+> Backtrace:
+> [<c00154d4>] (dump_backtrace) from [<c00156d0>] (show_stack+0x18/0x1c)
+>  r7:00000001 r6:eebac180 r5:c07ae71c r4:00000000
+> [<c00156b8>] (show_stack) from [<c027e69c>] (dump_stack+0x98/0xc0)
+> [<c027e604>] (dump_stack) from [<c014f018>] (slab_err+0x78/0x80)
+>  r5:ee0013c0 r4:eebac180
+> [<c014efa4>] (slab_err) from [<c0153880>] (free_debug_processing+0x234/0x34c)
+>  r3:ed60e164 r2:c068d484
+>  r5:ee0013c0 r4:ed60e164
+> [<c015364c>] (free_debug_processing) from [<c0153c34>] (__slab_free+0x29c/0x428)
+>  r10:ee0013c0 r9:00000000 r8:20000013 r7:c041a5f4 r6:ed60e164 r5:00010d00
+>  r4:eebac180
+> [<c0153998>] (__slab_free) from [<c0154770>] (kfree+0x2dc/0x2f4)
+>  r10:eda29f80 r9:00000000 r8:20000013 r7:c041a5f4 r6:ed60e164 r5:eebac180
+>  r4:ee0013c0
+> [<c0154494>] (kfree) from [<c041a5f4>] (etm_disable+0xf8/0x148)
+>  r10:eda29f80 r9:00000000 r8:ed7ba500 r7:00000000 r6:ed60e120 r5:00000001
+>  r4:ed60e110
+> [<c041a4fc>] (etm_disable) from [<c0415e64>] (coresight_disable+0xbc/0x100)
+>  r7:00000000 r6:c0771150 r5:c076c900 r4:ed662600
+> [<c0415da8>] (coresight_disable) from [<c0415ef0>] (enable_source_store+0x48/0x68)
+>  r9:ed67ec8c r8:ed7d7900 r7:00000000 r6:ed7d7900 r5:00000002 r4:ed662620
+> [<c0415ea8>] (enable_source_store) from [<c030b37c>] (dev_attr_store+0x20/0x2c)
+>  r5:ed67ec80 r4:c0415ea8
+> [<c030b35c>] (dev_attr_store) from [<c01d55d8>] (sysfs_kf_write+0x50/0x54)
+>  r5:ed67ec80 r4:c030b35c
+> [<c01d5588>] (sysfs_kf_write) from [<c01d4b98>] (kernfs_fop_write+0xc4/0x1c0)
+>  r7:00000000 r6:00000000 r5:00000002 r4:ed67ec80
+> [<c01d4ad4>] (kernfs_fop_write) from [<c015b60c>] (__vfs_write+0x34/0xe4)
+>  r10:00000000 r9:eda28000 r8:c0010964 r7:eda29f80 r6:00000002 r5:c01d4ad4
+>  r4:ed811180
+> [<c015b5d8>] (__vfs_write) from [<c015bf38>] (vfs_write+0x98/0x174)
+>  r9:eda28000 r8:c0010964 r7:eda29f80 r6:000a9e40 r5:00000002 r4:ed811180
+> [<c015bea0>] (vfs_write) from [<c015c7a8>] (SyS_write+0x4c/0xa8)
+>  r8:c0010964 r7:00000002 r6:000a9e40 r5:ed811180 r4:ed811180
+> [<c015c75c>] (SyS_write) from [<c00107c0>] (ret_fast_syscall+0x0/0x1c)
+>  r7:00000004 r6:00000001 r5:000a9e40 r4:00000002
+> FIX kmalloc-512: Object at 0xed60e164 not freed
