@@ -1,23 +1,25 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  4 Jan 2016 17:56:43 +0000
-Subject: [PATCHv2 10/18] arm64: mm: add functions to walk page tables by PA
+Date: Mon,  4 Jan 2016 17:56:45 +0000
+Subject: [PATCHv2 12/18] arm64: mm: add __{pud,pgd}_populate
 In-Reply-To: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
 References: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1451930211-22460-11-git-send-email-mark.rutland@arm.com>
+Message-ID: <1451930211-22460-13-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To allow us to walk tables allocated into the fixmap, we need to acquire
-the physical address of a page, rather than the virtual address in the
-linear map.
+We currently have __pmd_populate for creating a pmd table entry given
+the physical address of a pte, but don't have equivalents for the pud or
+pgd levels of table.
 
-This patch adds new p??_page_paddr and p??_offset_phys functions to
-acquire the physical address of a next-level table, and changes
-p??_offset* into macros which simply convert this to a linear map VA.
-This renders p??_page_vaddr unused, end hence they are removed.
+To enable us to manipulate tables which are mapped outside of the linear
+mapping (where we have a PA, but not a linear map VA), it is useful to
+have these functions.
 
-At the pgd level, a new pgd_offset_raw function is added to find the
-relevant PGD entry given the base of a PGD and a virtual address.
+This patch adds __{pud,pgd}_populate. As these should not be called when
+the kernel uses folded {pmd,pud}s, in these cases they expand to
+BUILD_BUG(). So long as the appropriate checks are made on the {pud,pgd}
+entry prior to attempting population, these should be optimized out at
+compile time.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
@@ -26,103 +28,58 @@ Cc: Jeremy Linton <jeremy.linton@arm.com>
 Cc: Laura Abbott <labbott@fedoraproject.org>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/pgtable.h | 39 +++++++++++++++++++++++----------------
- 1 file changed, 23 insertions(+), 16 deletions(-)
+ arch/arm64/include/asm/pgalloc.h | 26 ++++++++++++++++++++++----
+ 1 file changed, 22 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 3603cca..f5742db 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -426,15 +426,16 @@ static inline void pmd_clear(pmd_t *pmdp)
- 	set_pmd(pmdp, __pmd(0));
+diff --git a/arch/arm64/include/asm/pgalloc.h b/arch/arm64/include/asm/pgalloc.h
+index c150539..ff98585 100644
+--- a/arch/arm64/include/asm/pgalloc.h
++++ b/arch/arm64/include/asm/pgalloc.h
+@@ -42,11 +42,20 @@ static inline void pmd_free(struct mm_struct *mm, pmd_t *pmd)
+ 	free_page((unsigned long)pmd);
  }
  
--static inline pte_t *pmd_page_vaddr(pmd_t pmd)
-+static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
+-static inline void pud_populate(struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
++static inline void __pud_populate(pud_t *pud, phys_addr_t pmd, pudval_t prot)
  {
--	return __va(pmd_val(pmd) & PHYS_MASK & (s32)PAGE_MASK);
-+	return pmd_val(pmd) & PHYS_MASK & (s32)PAGE_MASK;
+-	set_pud(pud, __pud(__pa(pmd) | PMD_TYPE_TABLE));
++	set_pud(pud, __pud(pmd | prot));
  }
  
- /* Find an entry in the third-level page table. */
- #define pte_index(addr)		(((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
- 
--#define pte_offset_kernel(dir,addr)	(pmd_page_vaddr(*(dir)) + pte_index(addr))
-+#define pte_offset_phys(dir,addr)	(pmd_page_paddr(*(dir)) + pte_index(addr) * sizeof(pte_t))
-+#define pte_offset_kernel(dir,addr)	((pte_t *)__va(pte_offset_phys((dir), (addr))))
- 
- #define pte_offset_map(dir,addr)	pte_offset_kernel((dir), (addr))
- #define pte_offset_map_nested(dir,addr)	pte_offset_kernel((dir), (addr))
-@@ -469,21 +470,23 @@ static inline void pud_clear(pud_t *pudp)
- 	set_pud(pudp, __pud(0));
- }
- 
--static inline pmd_t *pud_page_vaddr(pud_t pud)
-+static inline phys_addr_t pud_page_paddr(pud_t pud)
- {
--	return __va(pud_val(pud) & PHYS_MASK & (s32)PAGE_MASK);
-+	return pud_val(pud) & PHYS_MASK & (s32)PAGE_MASK;
- }
- 
- /* Find an entry in the second-level page table. */
- #define pmd_index(addr)		(((addr) >> PMD_SHIFT) & (PTRS_PER_PMD - 1))
- 
--static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
--{
--	return (pmd_t *)pud_page_vaddr(*pud) + pmd_index(addr);
--}
-+#define pmd_offset_phys(dir, addr)	(pud_page_paddr(*(dir)) + pmd_index(addr) * sizeof(pmd_t))
-+#define pmd_offset(dir, addr)		((pmd_t *)__va(pmd_offset_phys((dir), (addr))))
- 
- #define pud_page(pud)		pfn_to_page(__phys_to_pfn(pud_val(pud) & PHYS_MASK))
- 
++static inline void pud_populate(struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
++{
++	__pud_populate(pud, __pa(pmd), PMD_TYPE_TABLE);
++}
 +#else
-+
-+#define pud_page_paddr(pud)	({ BUILD_BUG(); 0; })
-+
++static inline void __pud_populate(pud_t *pud, phys_addr_t pmd, pudval_t prot)
++{
++	BUILD_BUG();
++}
  #endif	/* CONFIG_PGTABLE_LEVELS > 2 */
  
  #if CONFIG_PGTABLE_LEVELS > 3
-@@ -505,21 +508,23 @@ static inline void pgd_clear(pgd_t *pgdp)
- 	set_pgd(pgdp, __pgd(0));
+@@ -62,11 +71,20 @@ static inline void pud_free(struct mm_struct *mm, pud_t *pud)
+ 	free_page((unsigned long)pud);
  }
  
--static inline pud_t *pgd_page_vaddr(pgd_t pgd)
-+static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
+-static inline void pgd_populate(struct mm_struct *mm, pgd_t *pgd, pud_t *pud)
++static inline void __pgd_populate(pgd_t *pgdp, phys_addr_t pud, pgdval_t prot)
  {
--	return __va(pgd_val(pgd) & PHYS_MASK & (s32)PAGE_MASK);
-+	return pgd_val(pgd) & PHYS_MASK & (s32)PAGE_MASK;
+-	set_pgd(pgd, __pgd(__pa(pud) | PUD_TYPE_TABLE));
++	set_pgd(pgdp, __pgd(pud | prot));
  }
  
- /* Find an entry in the frst-level page table. */
- #define pud_index(addr)		(((addr) >> PUD_SHIFT) & (PTRS_PER_PUD - 1))
- 
--static inline pud_t *pud_offset(pgd_t *pgd, unsigned long addr)
--{
--	return (pud_t *)pgd_page_vaddr(*pgd) + pud_index(addr);
--}
-+#define pud_offset_phys(dir, addr)	(pgd_page_paddr(*(dir)) + pud_index(addr) * sizeof(pud_t))
-+#define pud_offset(dir, addr)		((pud_t *)__va(pud_offset_phys((dir), (addr))))
- 
- #define pgd_page(pgd)		pfn_to_page(__phys_to_pfn(pgd_val(pgd) & PHYS_MASK))
- 
++static inline void pgd_populate(struct mm_struct *mm, pgd_t *pgd, pud_t *pud)
++{
++	__pgd_populate(pgd, __pa(pud), PUD_TYPE_TABLE);
++}
 +#else
-+
-+#define pgd_page_paddr(pgd)	({ BUILD_BUG(); 0;})
-+
- #endif  /* CONFIG_PGTABLE_LEVELS > 3 */
++static inline void __pgd_populate(pgd_t *pgdp, phys_addr_t pud, pgdval_t prot)
++{
++	BUILD_BUG();
++}
+ #endif	/* CONFIG_PGTABLE_LEVELS > 3 */
  
- #define pgd_ERROR(pgd)		__pgd_error(__FILE__, __LINE__, pgd_val(pgd))
-@@ -527,7 +532,9 @@ static inline pud_t *pud_offset(pgd_t *pgd, unsigned long addr)
- /* to find an entry in a page-table-directory */
- #define pgd_index(addr)		(((addr) >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1))
- 
--#define pgd_offset(mm, addr)	((mm)->pgd+pgd_index(addr))
-+#define pgd_offset_raw(pgd, addr)	((pgd) + pgd_index(addr))
-+
-+#define pgd_offset(mm, addr)	(pgd_offset_raw((mm)->pgd, (addr)))
- 
- /* to find an entry in a kernel page-table-directory */
- #define pgd_offset_k(addr)	pgd_offset(&init_mm, addr)
+ extern pgd_t *pgd_alloc(struct mm_struct *mm);
 -- 
 1.9.1
