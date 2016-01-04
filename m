@@ -1,25 +1,23 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  4 Jan 2016 17:56:45 +0000
-Subject: [PATCHv2 12/18] arm64: mm: add __{pud,pgd}_populate
+Date: Mon,  4 Jan 2016 17:56:44 +0000
+Subject: [PATCHv2 11/18] arm64: mm: avoid redundant __pa(__va(x))
 In-Reply-To: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
 References: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1451930211-22460-13-git-send-email-mark.rutland@arm.com>
+Message-ID: <1451930211-22460-12-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We currently have __pmd_populate for creating a pmd table entry given
-the physical address of a pte, but don't have equivalents for the pud or
-pgd levels of table.
+When we "upgrade" to a section mapping, we free any table we made
+redundant by giving it back to memblock. To get the PA, we acquire the
+physical address and convert this to a VA, then subsequently convert
+this back to a PA.
 
-To enable us to manipulate tables which are mapped outside of the linear
-mapping (where we have a PA, but not a linear map VA), it is useful to
-have these functions.
+This works currently, but will not work if the tables are not accessed
+via linear map VAs (e.g. is we use fixmap slots).
 
-This patch adds __{pud,pgd}_populate. As these should not be called when
-the kernel uses folded {pmd,pud}s, in these cases they expand to
-BUILD_BUG(). So long as the appropriate checks are made on the {pud,pgd}
-entry prior to attempting population, these should be optimized out at
-compile time.
+This patch uses {pmd,pud}_page_paddr to acquire the PA. This avoids the
+__pa(__va()) round trip, saving some work and avoiding reliance on the
+linear mapping.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
@@ -28,58 +26,30 @@ Cc: Jeremy Linton <jeremy.linton@arm.com>
 Cc: Laura Abbott <labbott@fedoraproject.org>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/pgalloc.h | 26 ++++++++++++++++++++++----
- 1 file changed, 22 insertions(+), 4 deletions(-)
+ arch/arm64/mm/mmu.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/pgalloc.h b/arch/arm64/include/asm/pgalloc.h
-index c150539..ff98585 100644
---- a/arch/arm64/include/asm/pgalloc.h
-+++ b/arch/arm64/include/asm/pgalloc.h
-@@ -42,11 +42,20 @@ static inline void pmd_free(struct mm_struct *mm, pmd_t *pmd)
- 	free_page((unsigned long)pmd);
- }
- 
--static inline void pud_populate(struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
-+static inline void __pud_populate(pud_t *pud, phys_addr_t pmd, pudval_t prot)
- {
--	set_pud(pud, __pud(__pa(pmd) | PMD_TYPE_TABLE));
-+	set_pud(pud, __pud(pmd | prot));
- }
- 
-+static inline void pud_populate(struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
-+{
-+	__pud_populate(pud, __pa(pmd), PMD_TYPE_TABLE);
-+}
-+#else
-+static inline void __pud_populate(pud_t *pud, phys_addr_t pmd, pudval_t prot)
-+{
-+	BUILD_BUG();
-+}
- #endif	/* CONFIG_PGTABLE_LEVELS > 2 */
- 
- #if CONFIG_PGTABLE_LEVELS > 3
-@@ -62,11 +71,20 @@ static inline void pud_free(struct mm_struct *mm, pud_t *pud)
- 	free_page((unsigned long)pud);
- }
- 
--static inline void pgd_populate(struct mm_struct *mm, pgd_t *pgd, pud_t *pud)
-+static inline void __pgd_populate(pgd_t *pgdp, phys_addr_t pud, pgdval_t prot)
- {
--	set_pgd(pgd, __pgd(__pa(pud) | PUD_TYPE_TABLE));
-+	set_pgd(pgdp, __pgd(pud | prot));
- }
- 
-+static inline void pgd_populate(struct mm_struct *mm, pgd_t *pgd, pud_t *pud)
-+{
-+	__pgd_populate(pgd, __pa(pud), PUD_TYPE_TABLE);
-+}
-+#else
-+static inline void __pgd_populate(pgd_t *pgdp, phys_addr_t pud, pgdval_t prot)
-+{
-+	BUILD_BUG();
-+}
- #endif	/* CONFIG_PGTABLE_LEVELS > 3 */
- 
- extern pgd_t *pgd_alloc(struct mm_struct *mm);
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index c3ea9df..8879aed 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -171,7 +171,7 @@ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
+ 			if (!pmd_none(old_pmd)) {
+ 				flush_tlb_all();
+ 				if (pmd_table(old_pmd)) {
+-					phys_addr_t table = __pa(pte_offset_map(&old_pmd, 0));
++					phys_addr_t table = pmd_page_paddr(old_pmd);
+ 					if (!WARN_ON_ONCE(slab_is_available()))
+ 						memblock_free(table, PAGE_SIZE);
+ 				}
+@@ -232,7 +232,7 @@ static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
+ 			if (!pud_none(old_pud)) {
+ 				flush_tlb_all();
+ 				if (pud_table(old_pud)) {
+-					phys_addr_t table = __pa(pmd_offset(&old_pud, 0));
++					phys_addr_t table = pud_page_paddr(old_pud);
+ 					if (!WARN_ON_ONCE(slab_is_available()))
+ 						memblock_free(table, PAGE_SIZE);
+ 				}
 -- 
 1.9.1
