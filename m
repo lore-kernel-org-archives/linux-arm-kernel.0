@@ -1,30 +1,60 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 5 Jan 2016 07:39:05 +1100
-Subject: [PATCH v2 0/3] ARM: shmobile: r8a779x: use fallback usbhs
- compatibility string
-In-Reply-To: <CAMuHMdUALH_FQvOVH77V5JC3d4n7444zTh2VU-MEsOoKymFSDg@mail.gmail.com>
-References: <1451856019-4222-1-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdUALH_FQvOVH77V5JC3d4n7444zTh2VU-MEsOoKymFSDg@mail.gmail.com>
-Message-ID: <20160104203904.GC12748@verge.net.au>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Mon, 4 Jan 2016 22:39:19 +0200
+Subject: [PATCH v2 17/32] arm: define __smp_xxx
+In-Reply-To: <20160104135420.GS6373@twins.programming.kicks-ass.net>
+References: <1451572003-2440-1-git-send-email-mst@redhat.com>
+ <1451572003-2440-18-git-send-email-mst@redhat.com>
+ <20160102112438.GU8644@n2100.arm.linux.org.uk>
+ <20160103110158-mutt-send-email-mst@redhat.com>
+ <20160104133658.GY6344@twins.programming.kicks-ass.net>
+ <20160104135420.GS6373@twins.programming.kicks-ass.net>
+Message-ID: <20160104223529-mutt-send-email-mst@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 04, 2016 at 09:39:17AM +0100, Geert Uytterhoeven wrote:
-> On Sun, Jan 3, 2016 at 10:20 PM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > this short series makes use of the recently added fallback usbhs
-> > compatibility string in the r8a779[014] device trees.
-> >
-> > Based on renesas-devel-20151228-v4.4-rc7.
-> >
-> > Changes since v1:
-> > * Use "renesas,rcar-gen2-usbhs" instead of "renesas,usbhs"
-> >
-> > Simon Horman (3):
-> >   ARM: shmobile: r8a7790: use fallback usbhs compatibility string
-> >   ARM: shmobile: r8a7791: use fallback usbhs compatibility string
-> >   ARM: shmobile: r8a7794: use fallback usbhs compatibility string
+On Mon, Jan 04, 2016 at 02:54:20PM +0100, Peter Zijlstra wrote:
+> On Mon, Jan 04, 2016 at 02:36:58PM +0100, Peter Zijlstra wrote:
+> > On Sun, Jan 03, 2016 at 11:12:44AM +0200, Michael S. Tsirkin wrote:
+> > > On Sat, Jan 02, 2016 at 11:24:38AM +0000, Russell King - ARM Linux wrote:
+> > 
+> > > > My only concern is that it gives people an additional handle onto a
+> > > > "new" set of barriers - just because they're prefixed with __*
+> > > > unfortunately doesn't stop anyone from using it (been there with
+> > > > other arch stuff before.)
+> > > > 
+> > > > I wonder whether we should consider making the smp memory barriers
+> > > > inline functions, so these __smp_xxx() variants can be undef'd
+> > > > afterwards, thereby preventing drivers getting their hands on these
+> > > > new macros?
+> > > 
+> > > That'd be tricky to do cleanly since asm-generic depends on
+> > > ifndef to add generic variants where needed.
+> > > 
+> > > But it would be possible to add a checkpatch test for this.
+> > 
+> > Wasn't the whole purpose of these things for 'drivers' (namely
+> > virtio/xen hypervisor interaction) to use these?
 > 
-> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Ah, I see, you add virt_*mb() stuff later on for that use case.
+> 
+> So, assuming everybody does include asm-generic/barrier.h, you could
+> simply #undef the __smp version at the end of that, once we've generated
+> all the regular primitives from it, no?
 
-Thanks, I have queued these up for v4.6.
+Maybe I misunderstand, but I don't think so:
+
+------>
+#define __smp_xxx FOO
+#define smp_xxx __smp_xxx
+#undef __smp_xxx
+
+smp_xxx
+<------
+
+resolves to __smp_xxx, not FOO.
+
+That's why I went the checkpatch way.
+
+
+-- 
+MST
