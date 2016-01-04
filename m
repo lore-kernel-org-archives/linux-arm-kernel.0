@@ -1,92 +1,146 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 4 Jan 2016 12:05:57 +0000
-Subject: [PATCH v2 34/34] xen/io: use virt_xxx barriers
-In-Reply-To: <1451572003-2440-35-git-send-email-mst@redhat.com>
-References: <1451572003-2440-1-git-send-email-mst@redhat.com>
- <1451572003-2440-35-git-send-email-mst@redhat.com>
-Message-ID: <alpine.DEB.2.02.1601041201440.19710@kaball.uk.xensource.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 4 Jan 2016 12:14:01 +0000
+Subject: [PATCH v6] arm/arm64: add arm-smccc
+In-Reply-To: <20151222094606.GA30272@ermac>
+References: <1449667495-23091-1-git-send-email-jens.wiklander@linaro.org>
+ <20151221111455.GA11145@red-moon> <20151222094606.GA30272@ermac>
+Message-ID: <20160104121401.GA698@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 31 Dec 2015, Michael S. Tsirkin wrote:
-> include/xen/interface/io/ring.h uses
-> full memory barriers to communicate with the other side.
+On Tue, Dec 22, 2015 at 10:46:08AM +0100, Jens Wiklander wrote:
+> On Mon, Dec 21, 2015 at 11:14:55AM +0000, Lorenzo Pieralisi wrote:
+> > On Wed, Dec 09, 2015 at 02:24:55PM +0100, Jens Wiklander wrote:
+> > > Adds helpers to do SMC and HVC based on ARM SMC Calling Convention.
+> > > CONFIG_HAVE_ARM_SMCCC is enabled for architectures that may support the
+> > > SMC or HVC instruction. It's the responsibility of the caller to know if
+> > > the SMC instruction is supported by the platform.
+> > > 
+> > > This patch doesn't provide an implementation of the declared functions.
+> > > Later patches will bring in implementations and set
+> > > CONFIG_HAVE_ARM_SMCCC for ARM and ARM64 respectively.
+> > > 
+> > > Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+> > > ---
+> > > 
+> > > v6:
+> > > * Move HAVE_ARM_SMCCC from init/Kconfig
+> > > 
+> > >  arch/Kconfig              |  3 ++
+> > >  include/linux/arm-smccc.h | 98 +++++++++++++++++++++++++++++++++++++++++++++++
+> > >  2 files changed, 101 insertions(+)
+> > >  create mode 100644 include/linux/arm-smccc.h
+> > > 
+> > > diff --git a/arch/Kconfig b/arch/Kconfig
+> > > index 4e949e5..ce3c0b0 100644
+> > > --- a/arch/Kconfig
+> > > +++ b/arch/Kconfig
+> > > @@ -564,4 +564,7 @@ config OLD_SIGACTION
+> > >  config COMPAT_OLD_SIGACTION
+> > >  	bool
+> > >  
+> > > +config HAVE_ARM_SMCCC
+> > > +	bool
+> > 
+> > It is ok by me to move it there, probably we do not want it at the end of
+> > the "ABI hall of shame" list :)
+> > 
+> > Or drivers/firmware/Kconfig ?
 > 
-> For guests compiled with CONFIG_SMP, smp_wmb and smp_mb
-> would be sufficient, so mb() and wmb() here are only needed if
-> a non-SMP guest runs on an SMP host.
+> You tell me, I'm too new here to have a feeling for this.
 > 
-> Switch to virt_xxx barriers which serve this exact purpose.
+> > 
+> > Strictly speaking, since PSCI uses this by default, you should also
+> > enforce an ARM_PSCI_FW dependency on HAVE_ARM_SMCCC.
 > 
-> Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+> ARM_PSCI depends on CPU_V7 and ARM_PSCI_FW doesn't really depend on
+> anything today.
+> 
+> Would it be OK if I changed ARM_PSCI to depend on HAVE_ARM_SMCCC instead
+> of CPU_V7 in the "drivers: psci: replace psci firmware calls" patch?
+> At the same time I would move the "select HAVE_ARM_SMCCC if CPU_V7" line
+> to the "config ARM" block instead in the
+> "arm: add implementation for arm-smccc" patch.
+> 
+> I'll include this change in the v7 patch set if I don't hear anything.
 
-Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Sorry for the delay in getting back to you.
 
+Yes, I still think that HAVE_ARM_SMCCC should not be listed at the
+end of "ABI hall of shame" in arch/Kconfig and you can move it to
+drivers/firmware/Kconfig.
 
->  include/xen/interface/io/ring.h | 16 ++++++++--------
->  1 file changed, 8 insertions(+), 8 deletions(-)
+Other than that your v7 is fine by me, can you respin quickly and
+ask Russell to pull today please ?
+
+Thanks,
+Lorenzo
+
 > 
-> diff --git a/include/xen/interface/io/ring.h b/include/xen/interface/io/ring.h
-> index 7dc685b..21f4fbd 100644
-> --- a/include/xen/interface/io/ring.h
-> +++ b/include/xen/interface/io/ring.h
-> @@ -208,12 +208,12 @@ struct __name##_back_ring {						\
->  
->  
->  #define RING_PUSH_REQUESTS(_r) do {					\
-> -    wmb(); /* back sees requests /before/ updated producer index */	\
-> +    virt_wmb(); /* back sees requests /before/ updated producer index */	\
->      (_r)->sring->req_prod = (_r)->req_prod_pvt;				\
->  } while (0)
->  
->  #define RING_PUSH_RESPONSES(_r) do {					\
-> -    wmb(); /* front sees responses /before/ updated producer index */	\
-> +    virt_wmb(); /* front sees responses /before/ updated producer index */	\
->      (_r)->sring->rsp_prod = (_r)->rsp_prod_pvt;				\
->  } while (0)
->  
-> @@ -250,9 +250,9 @@ struct __name##_back_ring {						\
->  #define RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(_r, _notify) do {		\
->      RING_IDX __old = (_r)->sring->req_prod;				\
->      RING_IDX __new = (_r)->req_prod_pvt;				\
-> -    wmb(); /* back sees requests /before/ updated producer index */	\
-> +    virt_wmb(); /* back sees requests /before/ updated producer index */	\
->      (_r)->sring->req_prod = __new;					\
-> -    mb(); /* back sees new requests /before/ we check req_event */	\
-> +    virt_mb(); /* back sees new requests /before/ we check req_event */	\
->      (_notify) = ((RING_IDX)(__new - (_r)->sring->req_event) <		\
->  		 (RING_IDX)(__new - __old));				\
->  } while (0)
-> @@ -260,9 +260,9 @@ struct __name##_back_ring {						\
->  #define RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(_r, _notify) do {		\
->      RING_IDX __old = (_r)->sring->rsp_prod;				\
->      RING_IDX __new = (_r)->rsp_prod_pvt;				\
-> -    wmb(); /* front sees responses /before/ updated producer index */	\
-> +    virt_wmb(); /* front sees responses /before/ updated producer index */	\
->      (_r)->sring->rsp_prod = __new;					\
-> -    mb(); /* front sees new responses /before/ we check rsp_event */	\
-> +    virt_mb(); /* front sees new responses /before/ we check rsp_event */	\
->      (_notify) = ((RING_IDX)(__new - (_r)->sring->rsp_event) <		\
->  		 (RING_IDX)(__new - __old));				\
->  } while (0)
-> @@ -271,7 +271,7 @@ struct __name##_back_ring {						\
->      (_work_to_do) = RING_HAS_UNCONSUMED_REQUESTS(_r);			\
->      if (_work_to_do) break;						\
->      (_r)->sring->req_event = (_r)->req_cons + 1;			\
-> -    mb();								\
-> +    virt_mb();								\
->      (_work_to_do) = RING_HAS_UNCONSUMED_REQUESTS(_r);			\
->  } while (0)
->  
-> @@ -279,7 +279,7 @@ struct __name##_back_ring {						\
->      (_work_to_do) = RING_HAS_UNCONSUMED_RESPONSES(_r);			\
->      if (_work_to_do) break;						\
->      (_r)->sring->rsp_event = (_r)->rsp_cons + 1;			\
-> -    mb();								\
-> +    virt_mb();								\
->      (_work_to_do) = RING_HAS_UNCONSUMED_RESPONSES(_r);			\
->  } while (0)
->  
-> -- 
-> MST
+> > 
+> > >  source "kernel/gcov/Kconfig"
+> > > diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
+> > > new file mode 100644
+> > > index 0000000..dea68a9
+> > > --- /dev/null
+> > > +++ b/include/linux/arm-smccc.h
+> > > @@ -0,0 +1,98 @@
+> > > +/*
+> > > + * Copyright (c) 2015, Linaro Limited
+> > > + *
+> > > + * This software is licensed under the terms of the GNU General Public
+> > > + * License version 2, as published by the Free Software Foundation, and
+> > > + * may be copied, distributed, and modified under those terms.
+> > > + *
+> > > + * This program is distributed in the hope that it will be useful,
+> > > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > > + * GNU General Public License for more details.
+> > > + *
+> > > + */
+> > > +#ifndef __LINUX_ARM_SMCCC_H
+> > > +#define __LINUX_ARM_SMCCC_H
+> > > +
+> > > +#include <linux/types.h>
+> > > +#include <linux/linkage.h>
+> > 
+> > Nit: alphabetical order please.
+> > 
+> > > +
+> > > +/*
+> > > + * This file provides common defines for ARM SMC Calling Convention as
+> > > + * specified in
+> > > + * http://infocenter.arm.com/help/topic/com.arm.doc.den0028a/index.html
+> > > + */
+> > > +
+> > > +#define ARM_SMCCC_SMC_32		(0 << 30)
+> > > +#define ARM_SMCCC_SMC_64		(1 << 30)
+> > > +#define ARM_SMCCC_FAST_CALL		(1 << 31)
+> > > +#define ARM_SMCCC_STD_CALL		(0 << 31)
+> > > +
+> > > +#define ARM_SMCCC_OWNER_MASK		0x3F
+> > > +#define ARM_SMCCC_OWNER_SHIFT		24
+> > > +
+> > > +#define ARM_SMCCC_FUNC_MASK		0xFFFF
+> > > +
+> > > +#define ARM_SMCCC_IS_FAST_CALL(smc_val)	((smc_val) & ARM_SMCCC_FAST_CALL)
+> > > +#define ARM_SMCCC_IS_64(smc_val)	((smc_val) & ARM_SMCCC_SMC_64)
+> > > +#define ARM_SMCCC_FUNC_NUM(smc_val)	((smc_val) & ARM_SMCCC_FUNC_MASK)
+> > > +#define ARM_SMCCC_OWNER_NUM(smc_val) \
+> > > +	(((smc_val) >> ARM_SMCCC_OWNER_SHIFT) & ARM_SMCCC_OWNER_MASK)
+> > > +
+> > > +#define ARM_SMCCC_CALL_VAL(type, calling_convention, owner, func_num) \
+> > > +	((type) | (calling_convention) | \
+> > 
+> > Nit: if you use a shift macro for some fields it would be clearer if you use
+> > for all of them (I am referring to type/calling_convention here), it can
+> > be changed later.
+> > 
+> > Other than that:
+> > 
+> > Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> 
+> Thanks for the review.
+> --
+> Jens
 > 
