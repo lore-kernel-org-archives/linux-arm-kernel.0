@@ -1,44 +1,37 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Mon, 4 Jan 2016 14:20:42 +0100
-Subject: [PATCH v2 06/32] s390: reuse asm-generic/barrier.h
-In-Reply-To: <1451572003-2440-7-git-send-email-mst@redhat.com>
-References: <1451572003-2440-1-git-send-email-mst@redhat.com>
- <1451572003-2440-7-git-send-email-mst@redhat.com>
-Message-ID: <20160104132042.GW6344@twins.programming.kicks-ass.net>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 4 Jan 2016 14:21:42 +0100
+Subject: [PATCH] PCI: provide of_pci_get_host_bridge_resources helper
+In-Reply-To: <8759253.sZisGJ6Km3@wuerfel>
+References: <8759253.sZisGJ6Km3@wuerfel>
+Message-ID: <20160104132142.GA11689@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 31, 2015 at 09:06:30PM +0200, Michael S. Tsirkin wrote:
-> On s390 read_barrier_depends, smp_read_barrier_depends
-> smp_store_mb(), smp_mb__before_atomic and smp_mb__after_atomic match the
-> asm-generic variants exactly. Drop the local definitions and pull in
-> asm-generic/barrier.h instead.
+On Fri, Dec 18, 2015 at 04:02:41PM +0100, Arnd Bergmann wrote:
+> The pcie-rcar driver can be built for any ARM platform (for COMPILE_TEST)
+> including those without CONFIG_OF enabled, and that results in a compile-time
+> error:
 > 
-> This is in preparation to refactoring this code area.
+> drivers/pci/host/pcie-rcar.c: In function 'rcar_pcie_parse_request_of_pci_ranges':
+> drivers/pci/host/pcie-rcar.c:939:8: error: implicit declaration of function 'of_pci_get_host_bridge_resources' [-Werror=implicit-function-declaration]
+>   err = of_pci_get_host_bridge_resources(np, 0, 0xff, &pci->resources, &iobase);
 > 
-> Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/s390/include/asm/barrier.h | 10 ++--------
->  1 file changed, 2 insertions(+), 8 deletions(-)
+> In order to allow compile-testing on all platforms, this adds a
+> of_pci_get_host_bridge_resources() helper stub function that gets
+> used when CONFIG_OF_ADDRESS is disabled. This mirrors what we do for
+> other OF-specific functions.
 > 
-> diff --git a/arch/s390/include/asm/barrier.h b/arch/s390/include/asm/barrier.h
-> index 7ffd0b1..c358c31 100644
-> --- a/arch/s390/include/asm/barrier.h
-> +++ b/arch/s390/include/asm/barrier.h
-> @@ -30,14 +30,6 @@
->  #define smp_rmb()			rmb()
->  #define smp_wmb()			wmb()
->  
-> -#define read_barrier_depends()		do { } while (0)
-> -#define smp_read_barrier_depends()	do { } while (0)
-> -
-> -#define smp_mb__before_atomic()		smp_mb()
-> -#define smp_mb__after_atomic()		smp_mb()
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 5d2917d469fa ("PCI: rcar: Convert to DT resource parsing API")
 
-As per:
+Makes sense :)
 
-  lkml.kernel.org/r/20150921112252.3c2937e1 at mschwide
+Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-s390 should change this to barrier() instead of smp_mb() and hence
-should not use the generic versions.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160104/ec54467d/attachment.sig>
