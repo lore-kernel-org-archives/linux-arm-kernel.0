@@ -1,57 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 4 Jan 2016 22:07:43 +0000
-Subject: [PATCH v2] ARM: mm: flip priority of CONFIG_DEBUG_RODATA
-In-Reply-To: <CAGXu5j+MrX-OvnVTYH0hqF2XgZW10PQOviyN=e5heejLsXewVA@mail.gmail.com>
-References: <20151202202725.GA794@www.outflux.net>
- <20151223195129.GP2793@atomide.com> <567B04AB.6010906@redhat.com>
- <20151223212911.GR2793@atomide.com>
- <alpine.LFD.2.20.1512231637110.3603@knanqh.ubzr>
- <20151224001121.GS2793@atomide.com>
- <20151224003406.GA8644@n2100.arm.linux.org.uk>
- <CAGXu5j+MrX-OvnVTYH0hqF2XgZW10PQOviyN=e5heejLsXewVA@mail.gmail.com>
-Message-ID: <20160104220743.GP19062@n2100.arm.linux.org.uk>
+From: joe@perches.com (Joe Perches)
+Date: Mon, 04 Jan 2016 14:11:37 -0800
+Subject: [PATCH 3/3] checkpatch: add virt barriers
+In-Reply-To: <20160104230528-mutt-send-email-mst@redhat.com>
+References: <1451907395-15978-1-git-send-email-mst@redhat.com>
+ <1451907395-15978-4-git-send-email-mst@redhat.com>
+ <1451926073.4334.90.camel@perches.com>
+ <20160104230528-mutt-send-email-mst@redhat.com>
+Message-ID: <1451945497.4334.107.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 04, 2016 at 12:34:28PM -0800, Kees Cook wrote:
-> On Wed, Dec 23, 2015 at 4:34 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Wed, Dec 23, 2015 at 04:11:22PM -0800, Tony Lindgren wrote:
-> >> * Nicolas Pitre <nicolas.pitre@linaro.org> [151223 13:45]:
-> >> > We fixed a bunch of similar issues where code was located in the .data
-> >> > section for ease of use from assembly code.  See commit b4e61537 and
-> >> > d0776aff for example.
-> >>
-> >> Thanks hey some assembly fun for the holidays :) I also need to check what
-> >> all gets relocated to SRAM here.
-> >>
-> >> In any case, seems like the $subject patch is too intrusive for v4.5 at
-> >> this point.
-> >
-> > Given Christmas and an unknown time between that and the merge window
-> > actually opening, I decided Tuesday would be the last day I take any
-> > patches into my tree - and today would be the day that I drop anything
-> > that causes problems.
-> >
-> > So, I've already dropped this, so tomorrow's linux-next should not have
-> > this change.
-> >
-> > You'll still see breakage if people enable RODATA though, but that's no
-> > different from previous kernels.
+On Mon, 2016-01-04 at 23:07 +0200, Michael S. Tsirkin wrote:
+> On Mon, Jan 04, 2016 at 08:47:53AM -0800, Joe Perches wrote:
+> > On Mon, 2016-01-04 at 13:37 +0200, Michael S. Tsirkin wrote:
+> > > Add virt_ barriers to list of barriers to check for
+> > > presence of a comment.
+> > 
+> > Are these virt_ barriers used anywhere?
+> > 
+> > I see some virtio_ barrier like uses.
 > 
-> Ugh, sorry for the breakage.
+> They will be :) They are added and used by patchset
+> 	????????arch: barrier cleanup + barriers for virt
 > 
-> Should this patch stay as-is and people will fix their various RODATA
-> failures during the next devel window, or should I remove the "default
-> y if CPU_V7"?
+> See
+> http://article.gmane.org/gmane.linux.kernel.virtualization/26555
 
-I think we'll keep it as-is, and have another go with it at -rc1 time,
-when people have ample chance to then queue up fixes.
+Ah, OK, thanks.
 
-They'll have had notice of it, so there's no excuse folk can't work on
-the problem in the mean time.  (But, of course, they won't...)
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Are the virtio_ barriers going away?
+If not, maybe those should be added too.
