@@ -1,140 +1,87 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 4 Jan 2016 09:59:13 +0100
-Subject: [PATCH] ARM: shmobile: alt: Add QSPI device to DT
-In-Reply-To: <20160103210707.GC22806@verge.net.au>
-References: <1448863990-16276-1-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdWnyZbHiLEPn-6dEweBEXHzWr6o2KF2iCpzg2-OhZRVSw@mail.gmail.com>
- <20151201064149.GH16260@verge.net.au>
- <CAMuHMdXgr5FbS0_L8g0xdesFZ-utPH+G8VgXQKqXZd3t4OsXcw@mail.gmail.com>
- <20151218025410.GA10973@verge.net.au>
- <CAMuHMdWtv3Vin9jiwAsqZOmnuSYJeviCA6PuHt6C=-fvOSFsVA@mail.gmail.com>
- <20160103210707.GC22806@verge.net.au>
-Message-ID: <CAMuHMdUYaq9Q+qh0=hmzG8ZFPa2-CXay-PAggxuMCi3nWMuu4A@mail.gmail.com>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Mon, 4 Jan 2016 17:03:01 +0800
+Subject: [Xen-devel] [PATCH v3 40/62] arm/acpi: Estimate memory required
+ for acpi/efi tables
+In-Reply-To: <565C67BF.4040804@citrix.com>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-41-git-send-email-shannon.zhao@linaro.org>
+ <565C67BF.4040804@citrix.com>
+Message-ID: <568A3545.7030009@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
 
-On Sun, Jan 3, 2016 at 10:07 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Fri, Dec 18, 2015 at 11:07:23AM +0100, Geert Uytterhoeven wrote:
->> On Fri, Dec 18, 2015 at 3:54 AM, Simon Horman <horms@verge.net.au> wrote:
->> > On Tue, Dec 01, 2015 at 09:06:17AM +0100, Geert Uytterhoeven wrote:
->> >> On Tue, Dec 1, 2015 at 7:41 AM, Simon Horman <horms@verge.net.au> wrote:
->> >> > On Mon, Nov 30, 2015 at 09:34:10AM +0100, Geert Uytterhoeven wrote:
->> >> >> On Mon, Nov 30, 2015 at 7:13 AM, Simon Horman
->> >> >> <horms+renesas@verge.net.au> wrote:
->> >> >> > Enable the QSPI controller in the alt device tree.
->> >> >> >
->> >> >> > Based similar work for the silk board by by Vladimir Barinov and
->> >> >> > Sergei Shtylyov.
->> >> >> >
->> >> >> > Cc: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->> >> >> > Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->> >> >> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->> >> >>
->> >> >> Verified against Alt schematics and r8a7794 datasheet.
->> >> >>
->> >> >> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
->> >> >>
->> >> >> I can't verify the FLASH layout. Note that p.11 of
->> >> >> ALT_MiniMonitor_Manual(SPI_Boot)_Rev0.01_e.pdf shows a different
->> >> >> FLASH layout for the second and third partition.
->> >> >
->> >> > Thanks. I see the following in v1.9.6 of the BSP[1]. Is it
->> >> > the same as the document you referred to above?
->> >> >
->> >> >
->> >> >                 partition at 0 {
->> >> >                         label = "loader";
->> >> >                         reg = <0x00000000 0x00080000>;
->> >> >                         read-only;
->> >> >                 };
->> >> >                 partition at 40000 {
->> >> >                         label = "user";
->> >> >                         reg = <0x00080000 0x00580000>;
->> >> >                         read-only;
->> >> >                 };
->> >> >                 partition at 440000 {
->> >> >                         label = "flash";
->> >> >                         reg = <0x00600000 0x03a00000>;
->> >> >                 };
->> >> >
->> >> >
->> >> > [1] https://git.kernel.org/cgit/linux/kernel/git/horms/renesas-backport.git/tree/arch/arm/boot/dts/r8a7794-alt.dts?h=rcar-gen2/v1.9.6&id=e1acbe074f36d96e901bf5346c50ee51da2ced42#n379
->> >>
->> >> No, the document specifies 3 partitions:
->> >>   - SA0: loader program area, 16 KiB,
->>
->> Sorry, I missed a "Not used" part after that, and started miscounting zeroes
->> on top of that :-(
->>
->> So the loader consumes 16 KiB out of the 256 KiB SA0 partition.
->>
->> >>   - SA1: System area, 16 KiB,
->>
->> Should be 256 KiB.
->>
->> >>   - SA2: User program area, remainder.
->> >>
->> >> FWIW, the unit addresses in the device nodes above are not consistent
->> >> with their reg properties.
->> >
->> > My feeling is that we should follow the documentation.
->> > Does this reflect the scheme it describes?
->> >
->> >
->> >                 partitions {
->> >                         #address-cells = <1>;
->> >                         #size-cells = <1>;
->> >
->> >                         partition at 0 {
->> >                                 label = "loader";
->> >                                 reg = <0x00000000 0x00004000>;
->>
->> reg = <0x00000000 0x00040000>;
->>
->> >                                 read-only;
->> >                         };
->> >                         partition at 4000 {
->>
->> partition at 40000
->>
->> >                                 label = "system";
->> >                                 reg = <0x00004000 0x00004000>;
->>
->> reg = <0x00040000 0x00040000>;
->>
->> >                                 read-only;
->> >                         };
->> >                         partition at 8000 {
->>
->> partition at 80000
->>
->> >                                 label = "user";
->> >                                 reg = <0x00008000 0x03ff8000>;
->>
->> reg = <0x00080000 0x03f80000>;
->>
->> >                         };
->> >                 };
->>
->> I don't have an ALT. Does this match with the actual FLASH contents?
->
-> I'm a little unsure how to verify that.
 
-Usually the FLASH is empty (all ones) at the end of each partition.
+On 2015/11/30 23:14, Julien Grall wrote:
+> Hi Shannon,
+> 
+> On 17/11/15 09:40, shannon.zhao at linaro.org wrote:
+>> diff --git a/xen/common/efi/boot.c b/xen/common/efi/boot.c
+>> index 53c7452..78d8ae9 100644
+>> --- a/xen/common/efi/boot.c
+>> +++ b/xen/common/efi/boot.c
+>> @@ -13,6 +13,7 @@
+>>  #include <xen/multiboot.h>
+>>  #include <xen/pci_regs.h>
+>>  #include <xen/pfn.h>
+>> +#include <asm/acpi.h>
+>>  #if EFI_PAGE_SIZE != PAGE_SIZE
+>>  # error Cannot use xen/pfn.h here!
+>>  #endif
+>> @@ -1171,6 +1172,26 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
+>>      for( ; ; ); /* not reached */
+>>  }
+>>  
+>> +#ifdef CONFIG_ACPI
+>> +/* Constant to indicate "Xen" in unicode u16 format */
+>> +static const u16 XEN_EFI_FW_VENDOR[] ={0x0058,0x0065,0x006E,0x0000};
+>> +
+>> +int __init estimate_efi_size(int mem_nr_banks)
+>> +{
+>> +    int size;
+>> +    int est_size = sizeof(EFI_SYSTEM_TABLE);
+>> +    int ect_size = sizeof(EFI_CONFIGURATION_TABLE);
+>> +    int emd_size = sizeof(EFI_MEMORY_DESCRIPTOR);
+>> +    int fw_vendor_size = sizeof(XEN_EFI_FW_VENDOR);
+>> +
+>> +    size = PAGE_ALIGN(est_size + ect_size + fw_vendor_size)
+>> +           + PAGE_ALIGN(emd_size *
+>> +                        (mem_nr_banks + acpi_mem.nr_banks + TBL_MMAX));
+>> +
+>> +    return size;
+>> +}
+>> +#endif
+>> +
+> 
+> efi/boot.c only contains code related to the stub EFI. This is not the
+> case of this code.
+> 
 
-Hence "dd if=/dev/mtd0 bs=16M | hd | less" should report lots of
-identical lines of
-data.
+I add these codes at this file because I want to reuse the definitions
+of EFI structures like EFI_SYSTEM_TABLE. Parth re-define those
+structures at previous patch set and one comment suggested to reuse the
+existing ones. If I add these codes in xen/arch/arm/domain_build.c, it
+will have some conflicts. E.g:
 
-Gr{oetje,eeting}s,
+In file included from /home/open-source/xen/xen/include/asm/efibind.h:2:0,
+                 from domain_build.c:29:
+/home/open-source/xen/xen/include/asm/arm64/efibind.h:86:20: error:
+conflicting types for 'UINT64'
+ typedef uint64_t   UINT64;
+                    ^
+In file included from /home/open-source/xen/xen/include/acpi/acpi.h:57:0,
+                 from /home/open-source/xen/xen/include/xen/acpi.h:33,
+                 from domain_build.c:15:
+/home/open-source/xen/xen/include/acpi/actypes.h:130:35: note: previous
+declaration of 'UINT64' was here
+ typedef COMPILER_DEPENDENT_UINT64 UINT64;
 
-                        Geert
+> Moreover, this code won't compile on x86 because acpi_mem is only
+> defined for ARM.
+> 
+> Regards,
+> 
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks,
+-- 
+Shannon
