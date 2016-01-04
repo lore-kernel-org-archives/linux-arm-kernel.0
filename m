@@ -1,49 +1,61 @@
-From: joe@perches.com (Joe Perches)
-Date: Mon, 04 Jan 2016 14:15:50 -0800
-Subject: [PATCH 1/3] checkpatch.pl: add missing memory barriers
-In-Reply-To: <20160104224415-mutt-send-email-mst@redhat.com>
-References: <1451907395-15978-1-git-send-email-mst@redhat.com>
- <1451907395-15978-2-git-send-email-mst@redhat.com>
- <1451923660.4334.83.camel@perches.com>
- <20160104224415-mutt-send-email-mst@redhat.com>
-Message-ID: <1451945750.4334.111.camel@perches.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue,  5 Jan 2016 09:16:20 +1100
+Subject: [PATCH v2] ARM: shmobile: gose: add i2c2 bus to device tree
+Message-ID: <1451945780-17558-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-01-04 at 22:45 +0200, Michael S. Tsirkin wrote:
-> On Mon, Jan 04, 2016 at 08:07:40AM -0800, Joe Perches wrote:
-> > On Mon, 2016-01-04 at 13:36 +0200, Michael S. Tsirkin wrote:
-> > > SMP-only barriers were missing in checkpatch.pl
-> > > 
-> > > Refactor code slightly to make adding more variants easier.
-> > > 
-> > > Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
-> > > ---
-> > > ?scripts/checkpatch.pl | 9 ++++++++-
-> > > ?1 file changed, 8 insertions(+), 1 deletion(-)
-> > > 
-> > > diff --git a/scripts/checkpatch.pl b/scripts/checkpatch.pl
-> > > index 2b3c228..0245bbe 100755
-> > > --- a/scripts/checkpatch.pl
-> > > +++ b/scripts/checkpatch.pl
-> > > @@ -5116,7 +5116,14 @@ sub process {
-> > > ?			}
-> > > ?		}
-> > > ?# check for memory barriers without a comment.
-> > > -		if ($line =~ /\b(mb|rmb|wmb|read_barrier_depends|smp_mb|smp_rmb|smp_wmb|smp_read_barrier_depends)\(/) {
-> > > +
-> > > +		my @barriers = ('mb', 'rmb', 'wmb', 'read_barrier_depends');
-> > > +		my @smp_barriers = ('smp_store_release', 'smp_load_acquire', 'smp_store_mb');
-> > > +
-> > > +		@smp_barriers = (@smp_barriers, map {"smp_" . $_} @barriers);
-> > 
-> > I think using map, which so far checkpatch doesn't use,
-> > makes smp_barriers harder to understand and it'd be
-> > better to enumerate them.
-> 
-> Okay - I'll rewrite using foreach.
-> 
+Activate i2c2 bus in r8a7793/gose device tree.
 
-I think using the qr form (like 'our $Attribute' and
-a bunch of others) is the general style that should
-be used for checkpatch.
+Based on similar work for the r8a7791/koelsch by Wolfram Sang.
+
+Cc: Wolfram Sang <wsa@sang-engineering.com>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
+---
+v2
+* Update eprom compat strings to "renesas,r1ex24002", "atmel,24c02".
+  The former needs to be documented once the desired mechanism
+  for documenting eprom compat strings has been confirmed
+  with the maintainer.
+---
+ arch/arm/boot/dts/r8a7793-gose.dts | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+
+diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
+index 90b587c3c736..987ed03b1e02 100644
+--- a/arch/arm/boot/dts/r8a7793-gose.dts
++++ b/arch/arm/boot/dts/r8a7793-gose.dts
+@@ -136,6 +136,11 @@
+ };
+ 
+ &pfc {
++	i2c2_pins: i2c2 {
++		renesas,groups = "i2c2";
++		renesas,function = "i2c2";
++	};
++
+ 	scif0_pins: serial0 {
+ 		renesas,groups = "scif0_data_d";
+ 		renesas,function = "scif0";
+@@ -234,3 +239,17 @@
+ 		};
+ 	};
+ };
++
++&i2c2 {
++	pinctrl-0 = <&i2c2_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++	clock-frequency = <100000>;
++
++	eeprom at 50 {
++		compatible = "renesas,r1ex24002", "atmel,24c02";
++		reg = <0x50>;
++		pagesize = <16>;
++	};
++};
+-- 
+2.1.4
