@@ -1,30 +1,32 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  4 Jan 2016 17:56:35 +0000
-Subject: [PATCHv2 02/18] arm64: mm: specialise pagetable allocators
+Date: Mon,  4 Jan 2016 17:56:36 +0000
+Subject: [PATCHv2 03/18] arm64: mm: place empty_zero_page in bss
 In-Reply-To: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
 References: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1451930211-22460-3-git-send-email-mark.rutland@arm.com>
+Message-ID: <1451930211-22460-4-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We pass a size parameter to early_alloc and late_alloc, but these are
-only ever used to allocate single pages. In late_alloc we always
-allocate a single page.
+Currently the zero page is set up in paging_init, and thus we cannot use
+the zero page earlier. We use the zero page as a reserved TTBR value
+from which no TLB entries may be allocated (e.g. when uninstalling the
+idmap). To enable such usage earlier (as may be required for invasive
+changes to the kernel page tables), and to minimise the time that the
+idmap is active, we need to be able to use the zero page before
+paging_init.
 
-Both allocators provide us with zeroed pages (such that all entries are
-invalid), but we have no barriers between allocating a page and adding
-that page to existing (live) tables. A concurrent page table walk may
-see stale data, leading to a number of issues.
+This patch follows the example set by x86, by allocating the zero page
+at compile time, in .bss. This means that the zero page itself is
+available immediately upon entry to start_kernel (as we zero .bss before
+this), and also means that the zero page takes up no space in the raw
+Image binary. The associated struct page is allocated in bootmem_init,
+and remains unavailable until this time.
 
-This patch specialises the two allocators for page tables. The size
-parameter is removed and the necessary dsb(ishst) is folded into each.
-To make it clear that the functions are intended for use for page table
-allocation, they are renamed to {early_,late_}pgtable_alloc, with the
-related function pointed renamed to pgtable_alloc.
-
-As the dsb(ishst) is now in the allocator, the existing barrier for the
-zero page is redundant and thus is removed. The previously missing
-include of barrier.h is added.
+Outside of arch code, the only users of empty_zero_page assume that the
+empty_zero_page symbol refers to the zeroed memory itself, and that
+ZERO_PAGE(x) must be used to acquire the associated struct page,
+following the example of x86. This patch also brings arm64 inline with
+these assumptions.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
@@ -33,185 +35,80 @@ Cc: Jeremy Linton <jeremy.linton@arm.com>
 Cc: Laura Abbott <labbott@fedoraproject.org>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/mm/mmu.c | 52 +++++++++++++++++++++++++++-------------------------
- 1 file changed, 27 insertions(+), 25 deletions(-)
+ arch/arm64/include/asm/mmu_context.h | 2 +-
+ arch/arm64/include/asm/pgtable.h     | 4 ++--
+ arch/arm64/kernel/head.S             | 1 +
+ arch/arm64/mm/mmu.c                  | 9 +--------
+ 4 files changed, 5 insertions(+), 11 deletions(-)
 
+diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
+index 2416578..600eacb 100644
+--- a/arch/arm64/include/asm/mmu_context.h
++++ b/arch/arm64/include/asm/mmu_context.h
+@@ -48,7 +48,7 @@ static inline void contextidr_thread_switch(struct task_struct *next)
+  */
+ static inline void cpu_set_reserved_ttbr0(void)
+ {
+-	unsigned long ttbr = page_to_phys(empty_zero_page);
++	unsigned long ttbr = virt_to_phys(empty_zero_page);
+ 
+ 	asm(
+ 	"	msr	ttbr0_el1, %0			// set TTBR0\n"
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 35a318c..382d627 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -121,8 +121,8 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
+  * ZERO_PAGE is a global shared page that is always zero: used
+  * for zero-mapped memory areas etc..
+  */
+-extern struct page *empty_zero_page;
+-#define ZERO_PAGE(vaddr)	(empty_zero_page)
++extern unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)];
++#define ZERO_PAGE(vaddr)	virt_to_page(empty_zero_page)
+ 
+ #define pte_ERROR(pte)		__pte_error(__FILE__, __LINE__, pte_val(pte))
+ 
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index b363f34..9da5d0c 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -423,6 +423,7 @@ __mmap_switched:
+ 	str	xzr, [x6], #8			// Clear BSS
+ 	b	1b
+ 2:
++	dsb	ishst				// Make zero page visible to PTW
+ 	adr_l	sp, initial_sp, x4
+ 	mov	x4, sp
+ 	and	x4, x4, #~(THREAD_SIZE - 1)
 diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 58faeaa..b25d5cb 100644
+index b25d5cb..cdbf055 100644
 --- a/arch/arm64/mm/mmu.c
 +++ b/arch/arm64/mm/mmu.c
-@@ -30,6 +30,7 @@
- #include <linux/slab.h>
- #include <linux/stop_machine.h>
+@@ -49,7 +49,7 @@ u64 idmap_t0sz = TCR_T0SZ(VA_BITS);
+  * Empty_zero_page is a special page that is used for zero-initialized data
+  * and COW.
+  */
+-struct page *empty_zero_page;
++unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)] __page_aligned_bss;
+ EXPORT_SYMBOL(empty_zero_page);
  
-+#include <asm/barrier.h>
- #include <asm/cputype.h>
- #include <asm/fixmap.h>
- #include <asm/kernel-pgtable.h>
-@@ -62,15 +63,18 @@ pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
- }
- EXPORT_SYMBOL(phys_mem_access_prot);
- 
--static void __init *early_alloc(unsigned long sz)
-+static void __init *early_pgtable_alloc(void)
+ pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
+@@ -459,18 +459,11 @@ void fixup_init(void)
+  */
+ void __init paging_init(void)
  {
- 	phys_addr_t phys;
- 	void *ptr;
- 
--	phys = memblock_alloc(sz, sz);
-+	phys = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
- 	BUG_ON(!phys);
- 	ptr = __va(phys);
--	memset(ptr, 0, sz);
-+	memset(ptr, 0, PAGE_SIZE);
-+
-+	/* Ensure the zeroed page is visible to the page table walker */
-+	dsb(ishst);
- 	return ptr;
- }
- 
-@@ -95,12 +99,12 @@ static void split_pmd(pmd_t *pmd, pte_t *pte)
- static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
- 				  unsigned long end, unsigned long pfn,
- 				  pgprot_t prot,
--				  void *(*alloc)(unsigned long size))
-+				  void *(*pgtable_alloc)(void))
- {
- 	pte_t *pte;
- 
- 	if (pmd_none(*pmd) || pmd_sect(*pmd)) {
--		pte = alloc(PTRS_PER_PTE * sizeof(pte_t));
-+		pte = pgtable_alloc();
- 		if (pmd_sect(*pmd))
- 			split_pmd(pmd, pte);
- 		__pmd_populate(pmd, __pa(pte), PMD_TYPE_TABLE);
-@@ -130,7 +134,7 @@ static void split_pud(pud_t *old_pud, pmd_t *pmd)
- static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
- 				  unsigned long addr, unsigned long end,
- 				  phys_addr_t phys, pgprot_t prot,
--				  void *(*alloc)(unsigned long size))
-+				  void *(*pgtable_alloc)(void))
- {
- 	pmd_t *pmd;
- 	unsigned long next;
-@@ -139,7 +143,7 @@ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
- 	 * Check for initial section mappings in the pgd/pud and remove them.
- 	 */
- 	if (pud_none(*pud) || pud_sect(*pud)) {
--		pmd = alloc(PTRS_PER_PMD * sizeof(pmd_t));
-+		pmd = pgtable_alloc();
- 		if (pud_sect(*pud)) {
- 			/*
- 			 * need to have the 1G of mappings continue to be
-@@ -174,7 +178,7 @@ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
- 			}
- 		} else {
- 			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
--				       prot, alloc);
-+				       prot, pgtable_alloc);
- 		}
- 		phys += next - addr;
- 	} while (pmd++, addr = next, addr != end);
-@@ -195,13 +199,13 @@ static inline bool use_1G_block(unsigned long addr, unsigned long next,
- static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
- 				  unsigned long addr, unsigned long end,
- 				  phys_addr_t phys, pgprot_t prot,
--				  void *(*alloc)(unsigned long size))
-+				  void *(*pgtable_alloc)(void))
- {
- 	pud_t *pud;
- 	unsigned long next;
- 
- 	if (pgd_none(*pgd)) {
--		pud = alloc(PTRS_PER_PUD * sizeof(pud_t));
-+		pud = pgtable_alloc();
- 		pgd_populate(mm, pgd, pud);
- 	}
- 	BUG_ON(pgd_bad(*pgd));
-@@ -234,7 +238,8 @@ static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
- 				}
- 			}
- 		} else {
--			alloc_init_pmd(mm, pud, addr, next, phys, prot, alloc);
-+			alloc_init_pmd(mm, pud, addr, next, phys, prot,
-+				       pgtable_alloc);
- 		}
- 		phys += next - addr;
- 	} while (pud++, addr = next, addr != end);
-@@ -247,7 +252,7 @@ static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
- static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
- 				    phys_addr_t phys, unsigned long virt,
- 				    phys_addr_t size, pgprot_t prot,
--				    void *(*alloc)(unsigned long size))
-+				    void *(*pgtable_alloc)(void))
- {
- 	unsigned long addr, length, end, next;
- 
-@@ -265,18 +270,18 @@ static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
- 	end = addr + length;
- 	do {
- 		next = pgd_addr_end(addr, end);
--		alloc_init_pud(mm, pgd, addr, next, phys, prot, alloc);
-+		alloc_init_pud(mm, pgd, addr, next, phys, prot, pgtable_alloc);
- 		phys += next - addr;
- 	} while (pgd++, addr = next, addr != end);
- }
- 
--static void *late_alloc(unsigned long size)
-+static void *late_pgtable_alloc(void)
- {
--	void *ptr;
+-	void *zero_page;
 -
--	BUG_ON(size > PAGE_SIZE);
--	ptr = (void *)__get_free_page(PGALLOC_GFP);
-+	void *ptr = (void *)__get_free_page(PGALLOC_GFP);
- 	BUG_ON(!ptr);
-+
-+	/* Ensure the zeroed page is visible to the page table walker */
-+	dsb(ishst);
- 	return ptr;
- }
- 
-@@ -289,7 +294,7 @@ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
- 		return;
- 	}
- 	__create_mapping(&init_mm, pgd_offset_k(virt), phys, virt,
--			 size, prot, early_alloc);
-+			 size, prot, early_pgtable_alloc);
- }
- 
- void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
-@@ -297,7 +302,7 @@ void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
- 			       pgprot_t prot)
- {
- 	__create_mapping(mm, pgd_offset(mm, virt), phys, virt, size, prot,
--				late_alloc);
-+				late_pgtable_alloc);
- }
- 
- static void create_mapping_late(phys_addr_t phys, unsigned long virt,
-@@ -310,7 +315,7 @@ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
- 	}
- 
- 	return __create_mapping(&init_mm, pgd_offset_k(virt),
--				phys, virt, size, prot, late_alloc);
-+				phys, virt, size, prot, late_pgtable_alloc);
- }
- 
- #ifdef CONFIG_DEBUG_RODATA
-@@ -460,15 +465,12 @@ void __init paging_init(void)
+ 	map_mem();
  	fixup_executable();
  
- 	/* allocate the zero page. */
--	zero_page = early_alloc(PAGE_SIZE);
-+	zero_page = early_pgtable_alloc();
- 
+-	/* allocate the zero page. */
+-	zero_page = early_pgtable_alloc();
+-
  	bootmem_init();
  
- 	empty_zero_page = virt_to_page(zero_page);
- 
--	/* Ensure the zero page is visible to the page table walker */
--	dsb(ishst);
+-	empty_zero_page = virt_to_page(zero_page);
 -
  	/*
  	 * TTBR0 is only used for the identity mapping at this stage. Make it
