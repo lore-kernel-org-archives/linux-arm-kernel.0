@@ -1,33 +1,43 @@
-From: lho@apm.com (Loc Ho)
-Date: Sun, 3 Jan 2016 22:23:44 -0800
-Subject: [PATCH v2 0/2] i2c:dw: Add APM X-Gene ACPI I2C device support
-In-Reply-To: <4133541.hlxbdmvYbG@vostro.rjw.lan>
-References: <1449782357-22982-1-git-send-email-lho@apm.com>
- <4133541.hlxbdmvYbG@vostro.rjw.lan>
-Message-ID: <CAPw-ZTkZ5Su9CfgGQCHGFFCw-RE=tFeCF1GyMP3EUaZ8WDisSg@mail.gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Mon, 4 Jan 2016 14:34:02 +0800
+Subject: [PATCH v5 0/5] ACPI based PCI support for arm64
+In-Reply-To: <1451884403-21437-1-git-send-email-jchandra@broadcom.com>
+References: <1451884403-21437-1-git-send-email-jchandra@broadcom.com>
+Message-ID: <568A125A.9090608@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi JC,
 
-On Sat, Jan 2, 2016 at 4:54 PM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Thursday, December 10, 2015 02:19:15 PM Loc Ho wrote:
->> Add APM X-Gene ACPI I2C device support. These patches follow
->> the same implementation as AMD I2C driver - changes in ACPI APD
->> and Designware I2C drivers.
->>
->> v2:
->> * Spilt the acpi_apd change with defines for AMD and X-Gene I2C's
->>
->> Signed-off-by: Loc Ho <lho@apm.com>
->> ---
->> Loc Ho (2):
->>   acpi:apd: Add APM X-Gene ACPI I2C device support
->>   i2c:dw: Add APM X-Gene ACPI I2C device support
+On 2016/1/4 13:13, Jayachandran C wrote:
+> This patchset provides a generic ACPI based PCI host controller
+> implementation and uses it on arm64.
 >
-> Both patches applied, thanks!
+> The first patch moves the common code to handle MCFG ACPI table from
+> arch/x86 to drivers/acpi/pci_mcfg.c. The last patch in the patchset
+> provides the generic implementation of an ACPI based PCI host
+> controller with a new file drivers/acpi/pci_host_acpi.c. The other
+> patches are to fix up arm64 and ACPI code to work with these two
+> patches.
 >
+> The pci host controller implementation keeps a reference to
+> pci_mmcfg_region entry so that config space access is done with a
+> simple mapping and generic PCI config read/write. There is also an
+> implementation of raw_pci_read/raw_pci_write provided by walking the
+> pci_mmcfg_list
+>
+> The patchset is against 4.4-rc6, but it can be applied to pci/next
+> with a very minor fixup.  This is tested with arm64 QEMU and OVMF
+> and on x86 with qemu.
 
-Thanks...
+Are there any specific problems that Tomasz didn't address in this
+patch set?
 
--Loc
+https://lkml.org/lkml/2015/12/16/246
+
+As Lorenzo pointed out, that patch set was going several rounds and
+addressed lots of comments, why not comment on it and push it forward
+together?
+
+Thanks
+Hanjun
