@@ -1,41 +1,116 @@
-From: wpdster@gmail.com (Patrick Doyle)
-Date: Mon, 4 Jan 2016 10:46:31 -0500
-Subject: How to get better precision out of getrusage on the ARM?
-In-Reply-To: <5686C211.5040606@gmail.com>
-References: <CAF_dkJBjs1b+73ggvJyXwab6YL94HGT2jrqbcfaLxoETtQsD9Q@mail.gmail.com>
- <20151222144907.GK8644@n2100.arm.linux.org.uk>
- <CAF_dkJDFXSEgH+kO=k=Yj0_VDnFYgPtkoYznLUWZnq4=QTNDDg@mail.gmail.com>
- <20151222151314.GM8644@n2100.arm.linux.org.uk>
- <CAF_dkJAUyD3GRAETZUQG2yJTmOR95XKVguohBpBjUaM9JMaQyg@mail.gmail.com>
- <CAF_dkJBrfd=YUnG=ja2KE_z2DM8NQTLGiWVyvW6mrPYP4i+sFA@mail.gmail.com>
- <CAF_dkJBM3qbs3GB8jdgonus7dgVSyn-7QtogtqmMQWzR2BK+OQ@mail.gmail.com>
- <CAF_dkJBOf87J__X9Gdpb_b0P9NzS44w-bhRaUi+z0EKXLkg_5g@mail.gmail.com>
- <5686C211.5040606@gmail.com>
-Message-ID: <CAF_dkJAdbugFO4_C0A22hLT33mk4W6MzON4i0jhxK+vzrPraWQ@mail.gmail.com>
+From: zourongrong@gmail.com (Rongrong Zou)
+Date: Tue, 5 Jan 2016 00:04:19 +0800
+Subject: [PATCH v1 3/3] ARM64 LPC: update binding doc
+In-Reply-To: <15026471.7nGZ0rWlIf@wuerfel>
+References: <1451396032-23708-1-git-send-email-zourongrong@gmail.com>
+ <CABTftiT1+AmrNjiAie-T6on-oWA4Zz73+Tj2pQrixMT3o475uw@mail.gmail.com>
+ <568912EE.9030009@huawei.com> <15026471.7nGZ0rWlIf@wuerfel>
+Message-ID: <568A9803.6050108@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 1, 2016 at 1:14 PM, Corey Minyard <tcminyard@gmail.com> wrote:
-> Those numbers are statistical, if a tick occurs while something is running,
-> that something is assigned the entire timer tick.  So as you have found, you
-> can get some pretty unusual numbers on this, especially with short
-> intervals.
+
+
+? 2016/1/4 19:13, Arnd Bergmann ??:
+> On Sunday 03 January 2016 20:24:14 Rongrong Zou wrote:
+>> ? 2015/12/31 23:00, Rongrong Zou ??:
+>>> 2015-12-31 22:40 GMT+08:00 Arnd Bergmann <arnd at arndb.de <mailto:arnd@arndb.de>>:
+>>>   > On Thursday 31 December 2015 22:12:19 Rongrong Zou wrote:
+>>>   > > ? 2015/12/30 17:06, Arnd Bergmann ??:
+>>>   > > > On Tuesday 29 December 2015 21:33:52 Rongrong Zou wrote:
+>>>   >
+>>>   > The DT sample above looks good in principle. I believe what you are missing
+>>>   > here is code in your driver to scan the child nodes to create the platform
+>>>   > devices. of_bus_isa_translate() should work with your definition here
+>>>   > and create the correct IORESOURCE_IO resources. You don't have any MMIO
+>>>   > resources, so the absence of a ranges property is ok. Maybe all you
+>>>   > are missing is a call to of_platform_populate() or of_platform_bus_probe()?
+>>>   >
+>>>
+>>> You are right. thanks, i'll try on test board .  if i get the correct result , the new patch
+>>> will be sent later. By the way, it's my another email account use when i at home.
+>>
+>> I tried, and there need some additional changes.
+>>
+>> isa at a01b0000 {
+>>
+>> /*the node name should start with "isa", because of below definition
+>> * static int of_bus_isa_match(struct device_node *np)
+>> * {
+>> *	return !strcmp(np->name, "isa");
+>> * }
 >
-> I have some patches at https://sourceforge.net/projects/microstate that add
-> the ability to do accurate accounting of time, if you really need that.
-Thank you Corey,
-That makes sense.  I have found that using
-clock_gettime(CLOCK_THREAD_CPUTIME_ID, ...) provides the information I
-require.  I was confused by the accounting of timer ticks, and
-especially by the fact that the accounting changed from exactly 1000us
-(or 10000us) to a range centered about 1000us as I fiddled with config
-parameters.  I felt sure that one of those config options would result
-in accounting only such time to a thread as the thread used.
-clock_gettime() returns a thread specific timer that I can use.
+> Looks good. It would be nicer to match on device_type than on name,
+> but this is ancient code and it's probably best not to touch it
+> so we don't accidentally break some old SPARC or PPC system.
+>
+>> */
+>> 	compatible = "low-pin-count";
+>> 	device_type = "isa";
+>> 	#address-cells = <2>;
+>> 	#size-cells = <1>;
+>> 	reg = <0x0 0xa01b0000 0x0 0x10000>;
+>> 	ranges = <0x1 0x0 0x0 0x0 0x1000>;
+>> /*
+>> *  ranges is required, then i can get the IORESOURCE_IO <0xe4,4> from "reg = <0x1, 0x000000e4, 4>".
+>> *
+>> */
+>> 	ipmi_0:ipmi at 000000e4{
+>> 		device_type = "ipmi";
+>> 		compatible = "ipmi-bt";
+>> 		reg = <0x1 0x000000e4 0x4>;
+>> };
+>>
+>
+> This looks wrong: the property above says that the I/O port range is
+> translated to MMIO address 0x00000000 to 0x00010000, which is not
+> true on your hardware. I think this needs to be changed in the code
+> so the ranges property is not required for I/O ports.
 
-At this point, I remain confused/disappointed by the 3us time interval
-between calls to clock_gettime().  That feels like a long time for a
-pair of context switches into the kernel to get the thread timer, but
-I guess that's what it is (on my 500 MHz Cortex-A5).
+Ranges property can set empty, but this means 1:1 translation. the I/O 
+port range is translated to MMIO address 0x00000001 00000000 to 
+0x00000001 00000004, it looks wrong else. I wonder if anyone get legacy 
+I/O port resource from dts.
 
---wpd
+For ipmi driver, I can get I/O port resource by DMI rather than dts.
+
+>
+>> drivers\of\address.c
+>> static int __of_address_to_resource(struct device_node *dev,
+>>                   const __be32 *addrp, u64 size, unsigned int flags,
+>>                   const char *name, struct resource *r)
+>> {
+>>           u64 taddr;
+>>
+>>           if ((flags & (IORESOURCE_IO | IORESOURCE_MEM)) == 0)
+>>                   return -EINVAL;
+>>           taddr = of_translate_address(dev, addrp);
+>>           if (taddr == OF_BAD_ADDR)
+>>                   return -EINVAL;
+>>           memset(r, 0, sizeof(struct resource));
+>>           if (flags & IORESOURCE_IO) {
+>>                   unsigned long port;
+>>
+>> /*****************************************************************/
+>> /*legacy port(< 0x1000) is reserved, and need no translation here*/
+>> /*****************************************************************/
+>>                   if(taddr + size < PCIBIOS_MIN_IO){
+>>                           r->start = taddr;
+>>                           r->end = taddr + size - 1;
+>>                   }
+>
+> I don't like having a special case based on the address here,
+> the same kind of hack might be needed for PCI I/O spaces in
+> hardware that uses an indirect method like your LPC bus
+> does, and the code above will not work on any LPC implementation
+> that correctly multiplexes its I/O ports with the first PCI domain.
+>
+> I think it would be better to avoid translating the port into
+> a physical address to start with just to translate it back into
+> a port number, what we need instead is the offset between the
+> bus specific port number and the linux port number. I've added
+> Liviu to Cc, he wrote this code originally and may have some idea
+> of how we could do that.
+>
+> 	Arnd
+>
