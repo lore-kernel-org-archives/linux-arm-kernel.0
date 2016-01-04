@@ -1,86 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 04 Jan 2016 23:07:41 +0100
-Subject: next-20160104 build: 3 failures 15 warnings (next-20160104)
-In-Reply-To: <20160104165025.GN16023@sirena.org.uk>
-References: <E1aG3zo-0000gt-2t@optimist> <20160104165025.GN16023@sirena.org.uk>
-Message-ID: <3705737.6TGxRxdFzW@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 4 Jan 2016 22:07:43 +0000
+Subject: [PATCH v2] ARM: mm: flip priority of CONFIG_DEBUG_RODATA
+In-Reply-To: <CAGXu5j+MrX-OvnVTYH0hqF2XgZW10PQOviyN=e5heejLsXewVA@mail.gmail.com>
+References: <20151202202725.GA794@www.outflux.net>
+ <20151223195129.GP2793@atomide.com> <567B04AB.6010906@redhat.com>
+ <20151223212911.GR2793@atomide.com>
+ <alpine.LFD.2.20.1512231637110.3603@knanqh.ubzr>
+ <20151224001121.GS2793@atomide.com>
+ <20151224003406.GA8644@n2100.arm.linux.org.uk>
+ <CAGXu5j+MrX-OvnVTYH0hqF2XgZW10PQOviyN=e5heejLsXewVA@mail.gmail.com>
+Message-ID: <20160104220743.GP19062@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 04 January 2016 16:50:25 Mark Brown wrote:
-> On Mon, Jan 04, 2016 at 12:12:20PM +0000, Build bot for Mark Brown wrote:
+On Mon, Jan 04, 2016 at 12:34:28PM -0800, Kees Cook wrote:
+> On Wed, Dec 23, 2015 at 4:34 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Wed, Dec 23, 2015 at 04:11:22PM -0800, Tony Lindgren wrote:
+> >> * Nicolas Pitre <nicolas.pitre@linaro.org> [151223 13:45]:
+> >> > We fixed a bunch of similar issues where code was located in the .data
+> >> > section for ease of use from assembly code.  See commit b4e61537 and
+> >> > d0776aff for example.
+> >>
+> >> Thanks hey some assembly fun for the holidays :) I also need to check what
+> >> all gets relocated to SRAM here.
+> >>
+> >> In any case, seems like the $subject patch is too intrusive for v4.5 at
+> >> this point.
+> >
+> > Given Christmas and an unknown time between that and the merge window
+> > actually opening, I decided Tuesday would be the last day I take any
+> > patches into my tree - and today would be the day that I drop anything
+> > that causes problems.
+> >
+> > So, I've already dropped this, so tomorrow's linux-next should not have
+> > this change.
+> >
+> > You'll still see breakage if people enable RODATA though, but that's no
+> > different from previous kernels.
 > 
-> Today's linux-next fails to build an arm allmodconfig (and probably also
-> at least arm64 though other errors prevent that getting to linking
-> currently) due to:
+> Ugh, sorry for the breakage.
 > 
-> | drivers/built-in.o: In function `dtsec_restart_autoneg':
-> | :(.text+0x30f86c): undefined reference to `mdiobus_read'
-> | :(.text+0x30f89c): undefined reference to `mdiobus_write'
-> | drivers/built-in.o: In function `dtsec_init':
-> | :(.text+0x31008c): undefined reference to `mdiobus_write'
-> | :(.text+0x3100b4): undefined reference to `mdiobus_write'
-> | :(.text+0x3100dc): undefined reference to `mdiobus_write'
-> | :(.text+0x310128): undefined reference to `mdiobus_write'
-> | drivers/built-in.o::(.text+0x310150): more undefined references to `mdiobus_write' follow
-> | drivers/built-in.o: In function `dtsec_config':
-> | :(.text+0x310804): undefined reference to `of_phy_find_device'
-> 
-> and various other linker errors caused by the fact that the new fman
-> driver uses PHYLIB but does not depend on or select it.
+> Should this patch stay as-is and people will fix their various RODATA
+> failures during the next devel window, or should I remove the "default
+> y if CPU_V7"?
 
-This is the patch I submitted for the problem. I don't think that simply
-adding the 'select' would be a good idea because that would force PHYLIB
-builtin for allmodconfig.
+I think we'll keep it as-is, and have another go with it at -rc1 time,
+when people have ample chance to then queue up fixes.
 
-	Arnd
+They'll have had notice of it, so there's no excuse folk can't work on
+the problem in the mean time.  (But, of course, they won't...)
 
-commit 609a5b98a4b703a4fba8becb7ffb2aa1859c4164
-Author: Arnd Bergmann <arnd@arndb.de>
-Date:   Fri Jan 1 13:24:03 2016 +0100
-
-    [SUBMITTED] fsl/fman: allow modular build
-    
-    ARM allmodconfig fails because of the addition of the FMAN driver:
-    
-    drivers/built-in.o: In function `dtsec_restart_autoneg':
-    binder.c:(.text+0x173328): undefined reference to `mdiobus_read'
-    binder.c:(.text+0x173348): undefined reference to `mdiobus_write'
-    drivers/built-in.o: In function `dtsec_config':
-    binder.c:(.text+0x173d24): undefined reference to `of_phy_find_device'
-    drivers/built-in.o: In function `init_phy':
-    binder.c:(.text+0x1763b0): undefined reference to `of_phy_connect'
-    drivers/built-in.o: In function `stop':
-    binder.c:(.text+0x176014): undefined reference to `phy_stop'
-    drivers/built-in.o: In function `start':
-    binder.c:(.text+0x176078): undefined reference to `phy_start'
-    
-    The reason is that the driver uses PHYLIB, but that is a loadable
-    module here, and fman itself is built-in.
-    
-    This patch makes it possible to configure fman as a module as well
-    so we don't change the status of PHYLIB in an allmodconfig kernel,
-    and it adds a 'select PHYLIB' statement to ensure that phylib is
-    always built-in when fman is.
-    
-    The driver uses "builtin_platform_driver(fman_driver);", which means
-    it cannot be unloaded, but it's still possible to have it as a loadable
-    module that gets loaded once and never removed.
-    
-    Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-    Fixes: 5adae51a64b8 ("fsl/fman: Add FMan MURAM support")
-
-diff --git a/drivers/net/ethernet/freescale/fman/Kconfig b/drivers/net/ethernet/freescale/fman/Kconfig
-index 66b729692b48..79b7c84b7869 100644
---- a/drivers/net/ethernet/freescale/fman/Kconfig
-+++ b/drivers/net/ethernet/freescale/fman/Kconfig
-@@ -1,7 +1,8 @@
- config FSL_FMAN
--	bool "FMan support"
-+	tristate "FMan support"
- 	depends on FSL_SOC || COMPILE_TEST
- 	select GENERIC_ALLOCATOR
-+	select PHYLIB
- 	default n
- 	help
- 		Freescale Data-Path Acceleration Architecture Frame Manager
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
