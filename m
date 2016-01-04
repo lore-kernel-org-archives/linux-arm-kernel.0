@@ -1,54 +1,68 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 4 Jan 2016 15:20:01 +0100
-Subject: [RFC PATCH 2/5] crypto: sunxi-ss: fix min3() call to match types
-In-Reply-To: <1450787267-26836-3-git-send-email-andre.przywara@arm.com>
-References: <1450787267-26836-1-git-send-email-andre.przywara@arm.com>
- <1450787267-26836-3-git-send-email-andre.przywara@arm.com>
-Message-ID: <20160104142001.GB28361@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 4 Jan 2016 15:31:29 +0100
+Subject: [PATCH 2/3] thermal: Add Mediatek thermal controller support
+In-Reply-To: <CAGS+omC86=Kfdj0cFNHqs4fXCAT0uU+AxHCj3ORd2HetNZ2gVQ@mail.gmail.com>
+References: <1448883753-19068-1-git-send-email-s.hauer@pengutronix.de>
+ <1448883753-19068-3-git-send-email-s.hauer@pengutronix.de>
+ <CAGS+omC86=Kfdj0cFNHqs4fXCAT0uU+AxHCj3ORd2HetNZ2gVQ@mail.gmail.com>
+Message-ID: <20160104143129.GJ13058@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 22, 2015 at 12:27:44PM +0000, Andre Przywara wrote:
-> The min3() macro expects all arguments to be of the same type (or
-> size at least). While two arguments are ints or u32s, one is size_t,
-> which does not match on 64-bit architectures.
-> Cast the size_t to u32 to make min3() happy. In this context here the
-> length should never exceed 32 bits anyway.
+On Mon, Dec 21, 2015 at 12:07:58PM +0800, Daniel Kurtz wrote:
+> Hi Sascha,
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  drivers/crypto/sunxi-ss/sun4i-ss-cipher.c | 12 ++++++------
->  drivers/crypto/sunxi-ss/sun4i-ss-hash.c   |  8 ++++----
->  2 files changed, 10 insertions(+), 10 deletions(-)
+> One nit below that can be fixed up later, or now if you don't plan to
+> spin this driver to
+> address Eduardo's feedback...
 > 
-> diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c b/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c
-> index a19ee12..b3bc7bd 100644
-> --- a/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c
-> +++ b/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c
-> @@ -79,7 +79,7 @@ static int sun4i_ss_opti_poll(struct ablkcipher_request *areq)
->  	oi = 0;
->  	oo = 0;
->  	do {
-> -		todo = min3(rx_cnt, ileft, (mi.length - oi) / 4);
-> +		todo = min3(rx_cnt, ileft, (u32)(mi.length - oi) / 4);
+> On Mon, Nov 30, 2015 at 7:42 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > This adds support for the Mediatek thermal controller found on MT8173
+> > and likely other SoCs.
+> > The controller is a bit special. It does not have its own ADC, instead
+> > it controls the on-SoC AUXADC via AHB bus accesses. For this reason
+> > we need the physical address of the AUXADC. Also it controls a mux
+> > using AHB bus accesses, so we need the APMIXEDSYS physical address aswell.
+> >
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> 
+> [snip]
+> 
+> > +static int mtk_thermal_get_calibration_data(struct device *dev, struct mtk_thermal *mt)
+> > +{
+> > +       struct nvmem_cell *cell;
+> > +       u32 *buf;
+> > +       size_t len;
+> > +       int i, ret = 0;
+> > +
+> > +       /* Start with default values */
+> > +       mt->adc_ge = 512;
+> > +       for (i = 0; i < MT8173_NUM_SENSORS; i++)
+> > +               mt->vts[i] = 260;
+> > +       mt->degc_cali = 40;
+> > +       mt->o_slope = 0;
+> > +
+> > +       cell = nvmem_cell_get(dev, "calibration-data");
+> > +       if (IS_ERR(cell)) {
+> > +               if (PTR_ERR(cell) == -EPROBE_DEFER)
+> 
+> It is useful to know why the thermal driver is being probe defered, so
+> I suggest here:
+> dev_warn(dev, "Waiting for calibration data.\n");
 
-For this case the min function has a min_t variant to specify the
-argument. What about introducing min3_t?
+The problem with that is that this message is not shown once but
+possibly many times and may not even show a problem because in the end
+the device may be probed successfully. In this case the last thing you
+see from the device is "Waiting for calibration data." and get annoyed
+by all this useless noise from the driver.
 
-BTW, I don't understand why min3(x, y, z) isn't just defined as
+Of course I agree that this information may be useful in the case you
+wonder why your device doesn't show up...
 
-	#define min3(x, y, z) min(min(x, y), z)
-
-but instead as:
-
-	#define min3(x, y, z) min((typeof(x))min(x, y), z)
-
-. I thought min(x, y) has the same type as x anyhow?
-
-Best regards
-Uwe
-
+Sascha
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
