@@ -1,59 +1,113 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Mon, 4 Jan 2016 22:45:19 +0200
-Subject: [PATCH 1/3] checkpatch.pl: add missing memory barriers
-In-Reply-To: <1451923660.4334.83.camel@perches.com>
-References: <1451907395-15978-1-git-send-email-mst@redhat.com>
- <1451907395-15978-2-git-send-email-mst@redhat.com>
- <1451923660.4334.83.camel@perches.com>
-Message-ID: <20160104224415-mutt-send-email-mst@redhat.com>
+From: cmetcalf@ezchip.com (Chris Metcalf)
+Date: Mon, 4 Jan 2016 16:01:05 -0500
+Subject: [PATCH v9 08/13] arch/arm64: adopt prepare_exit_to_usermode()
+ model from x86
+In-Reply-To: <20160104203316.GE17127@leverpostej>
+References: <1451936091-29247-1-git-send-email-cmetcalf@ezchip.com>
+ <1451936091-29247-9-git-send-email-cmetcalf@ezchip.com>
+ <20160104203316.GE17127@leverpostej>
+Message-ID: <568ADD91.1050100@ezchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 04, 2016 at 08:07:40AM -0800, Joe Perches wrote:
-> On Mon, 2016-01-04 at 13:36 +0200, Michael S. Tsirkin wrote:
-> > SMP-only barriers were missing in checkpatch.pl
-> > 
-> > Refactor code slightly to make adding more variants easier.
-> > 
-> > Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
-> > ---
-> > ?scripts/checkpatch.pl | 9 ++++++++-
-> > ?1 file changed, 8 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/scripts/checkpatch.pl b/scripts/checkpatch.pl
-> > index 2b3c228..0245bbe 100755
-> > --- a/scripts/checkpatch.pl
-> > +++ b/scripts/checkpatch.pl
-> > @@ -5116,7 +5116,14 @@ sub process {
-> > ?			}
-> > ?		}
-> > ?# check for memory barriers without a comment.
-> > -		if ($line =~ /\b(mb|rmb|wmb|read_barrier_depends|smp_mb|smp_rmb|smp_wmb|smp_read_barrier_depends)\(/) {
-> > +
-> > +		my @barriers = ('mb', 'rmb', 'wmb', 'read_barrier_depends');
-> > +		my @smp_barriers = ('smp_store_release', 'smp_load_acquire', 'smp_store_mb');
-> > +
-> > +		@smp_barriers = (@smp_barriers, map {"smp_" . $_} @barriers);
-> 
-> I think using map, which so far checkpatch doesn't use,
-> makes smp_barriers harder to understand and it'd be
-> better to enumerate them.
+On 01/04/2016 03:33 PM, Mark Rutland wrote:
+> Hi,
+>
+> On Mon, Jan 04, 2016 at 02:34:46PM -0500, Chris Metcalf wrote:
+>> This change is a prerequisite change for TASK_ISOLATION but also
+>> stands on its own for readability and maintainability.
+> I have also been looking into converting the userspace return path from
+> assembly to C [1], for the latter two reasons. Based on that, I have a
+> couple of comments.
 
-Okay - I'll rewrite using foreach.
+Thanks!
 
-> > +		my $all_barriers = join('|', (@barriers, @smp_barriers));
-> > +
-> > +		if ($line =~ /\b($all_barriers)\(/) {
-> 
-> It would be better to use /\b$all_barriers\s*\(/
-> as there's no reason for the capture and there
-> could be a space between the function and the
-> open parenthesis.
+> It seems unfortunate to leave behind portions of the entry.S
+> _TIF_WORK_MASK state machine (i.e. a small portion of ret_fast_syscall,
+> and the majority of work_pending and ret_to_user).
+>
+> I think it would be nicer if we could handle all of that in one place
+> (or at least all in C).
 
-That's the way it was - space before ( will trigger other
-warnings. But sure, ok.
+Yes, in principle I agree with this, and I think your deasm tree looks
+like an excellent idea.
 
-> 
-> > ?			if (!ctx_has_comment($first_line, $linenr)) {
-> > ?				WARN("MEMORY_BARRIER",
-> > ?				?????"memory barrier without comment\n" . $herecurr);
+For this patch series I wanted to focus more on what was necessary
+for the various platforms to implement task isolation, and less on
+additional cleanups of the platforms in question.  I think my changes
+don't make the TIF state machine any less clear, nor do they make
+it harder for an eventual further migration to C code along the lines
+of what you've done, so it seems plausible to me to commit them
+upstream independently of your work.
+
+>> diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+>> index e18c48cb6db1..fde59c1139a9 100644
+>> --- a/arch/arm64/kernel/signal.c
+>> +++ b/arch/arm64/kernel/signal.c
+>> @@ -399,18 +399,30 @@ static void do_signal(struct pt_regs *regs)
+>>   	restore_saved_sigmask();
+>>   }
+>>   
+>> -asmlinkage void do_notify_resume(struct pt_regs *regs,
+>> -				 unsigned int thread_flags)
+>> +asmlinkage void prepare_exit_to_usermode(struct pt_regs *regs,
+>> +					 unsigned int thread_flags)
+>>   {
+>> -	if (thread_flags & _TIF_SIGPENDING)
+>> -		do_signal(regs);
+>> +	do {
+>> +		local_irq_enable();
+>>   
+>> -	if (thread_flags & _TIF_NOTIFY_RESUME) {
+>> -		clear_thread_flag(TIF_NOTIFY_RESUME);
+>> -		tracehook_notify_resume(regs);
+>> -	}
+>> +		if (thread_flags & _TIF_NEED_RESCHED)
+>> +			schedule();
+> Previously, had we called schedule(), we'd reload the thread info flags
+> and start that state machine again, whereas now we'll handle all the
+> cached flags before reloading.
+>
+> Are we sure nothing is relying on the prior behaviour?
+
+Good eye, and I probably should have called that out in the commit
+message.  My best guess is that there should be nothing that depends
+on the old semantics.  Other platforms (certainly x86 and tile, anyway)
+already have the semantics that you run out the old state machine on
+return from schedule(), so regardless, it's probably appropriate for
+arm to follow that same convention.
+
+>> +
+>> +		if (thread_flags & _TIF_SIGPENDING)
+>> +			do_signal(regs);
+>> +
+>> +		if (thread_flags & _TIF_NOTIFY_RESUME) {
+>> +			clear_thread_flag(TIF_NOTIFY_RESUME);
+>> +			tracehook_notify_resume(regs);
+>> +		}
+>> +
+>> +		if (thread_flags & _TIF_FOREIGN_FPSTATE)
+>> +			fpsimd_restore_current_state();
+>> +
+>> +		local_irq_disable();
+>>   
+>> -	if (thread_flags & _TIF_FOREIGN_FPSTATE)
+>> -		fpsimd_restore_current_state();
+>> +		thread_flags = READ_ONCE(current_thread_info()->flags) &
+>> +			_TIF_WORK_MASK;
+>>   
+>> +	} while (thread_flags);
+>>   }
+> Other than that, this looks good to me.
+>
+> Thanks,
+> Mark.
+>
+> [1] https://git.kernel.org/cgit/linux/kernel/git/mark/linux.git/log/?h=arm64/entry-deasm
+
+Thanks again for the review - shall I add your Reviewed-by (or Acked-by?)
+to this patch?
+
+-- 
+Chris Metcalf, EZChip Semiconductor
+http://www.ezchip.com
