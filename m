@@ -1,116 +1,161 @@
-From: zourongrong@gmail.com (Rongrong Zou)
-Date: Tue, 5 Jan 2016 00:04:19 +0800
-Subject: [PATCH v1 3/3] ARM64 LPC: update binding doc
-In-Reply-To: <15026471.7nGZ0rWlIf@wuerfel>
-References: <1451396032-23708-1-git-send-email-zourongrong@gmail.com>
- <CABTftiT1+AmrNjiAie-T6on-oWA4Zz73+Tj2pQrixMT3o475uw@mail.gmail.com>
- <568912EE.9030009@huawei.com> <15026471.7nGZ0rWlIf@wuerfel>
-Message-ID: <568A9803.6050108@gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 4 Jan 2016 15:59:54 +0000
+Subject: [PATCH v8 1/4] arm/arm64: add arm-smccc
+In-Reply-To: <1451912079-29258-2-git-send-email-jens.wiklander@linaro.org>
+References: <1451912079-29258-1-git-send-email-jens.wiklander@linaro.org>
+ <1451912079-29258-2-git-send-email-jens.wiklander@linaro.org>
+Message-ID: <20160104155954.GC890@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jan 04, 2016 at 01:54:36PM +0100, Jens Wiklander wrote:
+> Adds helpers to do SMC and HVC based on ARM SMC Calling Convention.
+> CONFIG_HAVE_ARM_SMCCC is enabled for architectures that may support the
+> SMC or HVC instruction. It's the responsibility of the caller to know if
+> the SMC instruction is supported by the platform.
+> 
+> This patch doesn't provide an implementation of the declared functions.
+> Later patches will bring in implementations and set
+> CONFIG_HAVE_ARM_SMCCC for ARM and ARM64 respectively.
+> 
+> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+> ---
+>  drivers/firmware/Kconfig  |   3 ++
+>  include/linux/arm-smccc.h | 104 ++++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 107 insertions(+)
+>  create mode 100644 include/linux/arm-smccc.h
+> 
+> diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
+> index cf478fe..49a3a11 100644
+> --- a/drivers/firmware/Kconfig
+> +++ b/drivers/firmware/Kconfig
+> @@ -173,6 +173,9 @@ config QCOM_SCM_64
+>  	def_bool y
+>  	depends on QCOM_SCM && ARM64
+>  
+> +config HAVE_ARM_SMCCC
+> +	bool
 
+Nit: It should be added in alphabetical order.
 
-? 2016/1/4 19:13, Arnd Bergmann ??:
-> On Sunday 03 January 2016 20:24:14 Rongrong Zou wrote:
->> ? 2015/12/31 23:00, Rongrong Zou ??:
->>> 2015-12-31 22:40 GMT+08:00 Arnd Bergmann <arnd at arndb.de <mailto:arnd@arndb.de>>:
->>>   > On Thursday 31 December 2015 22:12:19 Rongrong Zou wrote:
->>>   > > ? 2015/12/30 17:06, Arnd Bergmann ??:
->>>   > > > On Tuesday 29 December 2015 21:33:52 Rongrong Zou wrote:
->>>   >
->>>   > The DT sample above looks good in principle. I believe what you are missing
->>>   > here is code in your driver to scan the child nodes to create the platform
->>>   > devices. of_bus_isa_translate() should work with your definition here
->>>   > and create the correct IORESOURCE_IO resources. You don't have any MMIO
->>>   > resources, so the absence of a ranges property is ok. Maybe all you
->>>   > are missing is a call to of_platform_populate() or of_platform_bus_probe()?
->>>   >
->>>
->>> You are right. thanks, i'll try on test board .  if i get the correct result , the new patch
->>> will be sent later. By the way, it's my another email account use when i at home.
->>
->> I tried, and there need some additional changes.
->>
->> isa at a01b0000 {
->>
->> /*the node name should start with "isa", because of below definition
->> * static int of_bus_isa_match(struct device_node *np)
->> * {
->> *	return !strcmp(np->name, "isa");
->> * }
->
-> Looks good. It would be nicer to match on device_type than on name,
-> but this is ancient code and it's probably best not to touch it
-> so we don't accidentally break some old SPARC or PPC system.
->
->> */
->> 	compatible = "low-pin-count";
->> 	device_type = "isa";
->> 	#address-cells = <2>;
->> 	#size-cells = <1>;
->> 	reg = <0x0 0xa01b0000 0x0 0x10000>;
->> 	ranges = <0x1 0x0 0x0 0x0 0x1000>;
->> /*
->> *  ranges is required, then i can get the IORESOURCE_IO <0xe4,4> from "reg = <0x1, 0x000000e4, 4>".
->> *
->> */
->> 	ipmi_0:ipmi at 000000e4{
->> 		device_type = "ipmi";
->> 		compatible = "ipmi-bt";
->> 		reg = <0x1 0x000000e4 0x4>;
->> };
->>
->
-> This looks wrong: the property above says that the I/O port range is
-> translated to MMIO address 0x00000000 to 0x00010000, which is not
-> true on your hardware. I think this needs to be changed in the code
-> so the ranges property is not required for I/O ports.
+Thanks,
+Lorenzo
 
-Ranges property can set empty, but this means 1:1 translation. the I/O 
-port range is translated to MMIO address 0x00000001 00000000 to 
-0x00000001 00000004, it looks wrong else. I wonder if anyone get legacy 
-I/O port resource from dts.
-
-For ipmi driver, I can get I/O port resource by DMI rather than dts.
-
->
->> drivers\of\address.c
->> static int __of_address_to_resource(struct device_node *dev,
->>                   const __be32 *addrp, u64 size, unsigned int flags,
->>                   const char *name, struct resource *r)
->> {
->>           u64 taddr;
->>
->>           if ((flags & (IORESOURCE_IO | IORESOURCE_MEM)) == 0)
->>                   return -EINVAL;
->>           taddr = of_translate_address(dev, addrp);
->>           if (taddr == OF_BAD_ADDR)
->>                   return -EINVAL;
->>           memset(r, 0, sizeof(struct resource));
->>           if (flags & IORESOURCE_IO) {
->>                   unsigned long port;
->>
->> /*****************************************************************/
->> /*legacy port(< 0x1000) is reserved, and need no translation here*/
->> /*****************************************************************/
->>                   if(taddr + size < PCIBIOS_MIN_IO){
->>                           r->start = taddr;
->>                           r->end = taddr + size - 1;
->>                   }
->
-> I don't like having a special case based on the address here,
-> the same kind of hack might be needed for PCI I/O spaces in
-> hardware that uses an indirect method like your LPC bus
-> does, and the code above will not work on any LPC implementation
-> that correctly multiplexes its I/O ports with the first PCI domain.
->
-> I think it would be better to avoid translating the port into
-> a physical address to start with just to translate it back into
-> a port number, what we need instead is the offset between the
-> bus specific port number and the linux port number. I've added
-> Liviu to Cc, he wrote this code originally and may have some idea
-> of how we could do that.
->
-> 	Arnd
->
+> +
+>  source "drivers/firmware/broadcom/Kconfig"
+>  source "drivers/firmware/google/Kconfig"
+>  source "drivers/firmware/efi/Kconfig"
+> diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
+> new file mode 100644
+> index 0000000..b5abfda
+> --- /dev/null
+> +++ b/include/linux/arm-smccc.h
+> @@ -0,0 +1,104 @@
+> +/*
+> + * Copyright (c) 2015, Linaro Limited
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + */
+> +#ifndef __LINUX_ARM_SMCCC_H
+> +#define __LINUX_ARM_SMCCC_H
+> +
+> +#include <linux/linkage.h>
+> +#include <linux/types.h>
+> +
+> +/*
+> + * This file provides common defines for ARM SMC Calling Convention as
+> + * specified in
+> + * http://infocenter.arm.com/help/topic/com.arm.doc.den0028a/index.html
+> + */
+> +
+> +#define ARM_SMCCC_STD_CALL		0
+> +#define ARM_SMCCC_FAST_CALL		1
+> +#define ARM_SMCCC_TYPE_SHIFT		31
+> +
+> +#define ARM_SMCCC_SMC_32		0
+> +#define ARM_SMCCC_SMC_64		1
+> +#define ARM_SMCCC_CALL_CONV_SHIFT	30
+> +
+> +#define ARM_SMCCC_OWNER_MASK		0x3F
+> +#define ARM_SMCCC_OWNER_SHIFT		24
+> +
+> +#define ARM_SMCCC_FUNC_MASK		0xFFFF
+> +
+> +#define ARM_SMCCC_IS_FAST_CALL(smc_val)	\
+> +	((smc_val) & (ARM_SMCCC_FAST_CALL << ARM_SMCCC_TYPE_SHIFT))
+> +#define ARM_SMCCC_IS_64(smc_val) \
+> +	((smc_val) & (ARM_SMCCC_SMC_64 << ARM_SMCCC_CALL_CONV_SHIFT))
+> +#define ARM_SMCCC_FUNC_NUM(smc_val)	((smc_val) & ARM_SMCCC_FUNC_MASK)
+> +#define ARM_SMCCC_OWNER_NUM(smc_val) \
+> +	(((smc_val) >> ARM_SMCCC_OWNER_SHIFT) & ARM_SMCCC_OWNER_MASK)
+> +
+> +#define ARM_SMCCC_CALL_VAL(type, calling_convention, owner, func_num) \
+> +	(((type) << ARM_SMCCC_TYPE_SHIFT) | \
+> +	((calling_convention) << ARM_SMCCC_CALL_CONV_SHIFT) | \
+> +	(((owner) & ARM_SMCCC_OWNER_MASK) << ARM_SMCCC_OWNER_SHIFT) | \
+> +	((func_num) & ARM_SMCCC_FUNC_MASK))
+> +
+> +#define ARM_SMCCC_OWNER_ARCH		0
+> +#define ARM_SMCCC_OWNER_CPU		1
+> +#define ARM_SMCCC_OWNER_SIP		2
+> +#define ARM_SMCCC_OWNER_OEM		3
+> +#define ARM_SMCCC_OWNER_STANDARD	4
+> +#define ARM_SMCCC_OWNER_TRUSTED_APP	48
+> +#define ARM_SMCCC_OWNER_TRUSTED_APP_END	49
+> +#define ARM_SMCCC_OWNER_TRUSTED_OS	50
+> +#define ARM_SMCCC_OWNER_TRUSTED_OS_END	63
+> +
+> +/**
+> + * struct arm_smccc_res - Result from SMC/HVC call
+> + * @a0-a3 result values from registers 0 to 3
+> + */
+> +struct arm_smccc_res {
+> +	unsigned long a0;
+> +	unsigned long a1;
+> +	unsigned long a2;
+> +	unsigned long a3;
+> +};
+> +
+> +/**
+> + * arm_smccc_smc() - make SMC calls
+> + * @a0-a7: arguments passed in registers 0 to 7
+> + * @res: result values from registers 0 to 3
+> + *
+> + * This function is used to make SMC calls following SMC Calling Convention.
+> + * The content of the supplied param are copied to registers 0 to 7 prior
+> + * to the SMC instruction. The return values are updated with the content
+> + * from register 0 to 3 on return from the SMC instruction.
+> + */
+> +asmlinkage void arm_smccc_smc(unsigned long a0, unsigned long a1,
+> +			unsigned long a2, unsigned long a3, unsigned long a4,
+> +			unsigned long a5, unsigned long a6, unsigned long a7,
+> +			struct arm_smccc_res *res);
+> +
+> +/**
+> + * arm_smccc_hvc() - make HVC calls
+> + * @a0-a7: arguments passed in registers 0 to 7
+> + * @res: result values from registers 0 to 3
+> + *
+> + * This function is used to make HVC calls following SMC Calling
+> + * Convention.  The content of the supplied param are copied to registers 0
+> + * to 7 prior to the HVC instruction. The return values are updated with
+> + * the content from register 0 to 3 on return from the HVC instruction.
+> + */
+> +asmlinkage void arm_smccc_hvc(unsigned long a0, unsigned long a1,
+> +			unsigned long a2, unsigned long a3, unsigned long a4,
+> +			unsigned long a5, unsigned long a6, unsigned long a7,
+> +			struct arm_smccc_res *res);
+> +
+> +#endif /*__LINUX_ARM_SMCCC_H*/
+> -- 
+> 1.9.1
+> 
