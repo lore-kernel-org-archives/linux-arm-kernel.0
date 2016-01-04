@@ -1,52 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 04 Jan 2016 17:34:06 +0100
-Subject: [PATCH v1 3/3] ARM64 LPC: update binding doc
-In-Reply-To: <568A9803.6050108@gmail.com>
-References: <1451396032-23708-1-git-send-email-zourongrong@gmail.com>
- <15026471.7nGZ0rWlIf@wuerfel> <568A9803.6050108@gmail.com>
-Message-ID: <6384244.Uhpjfgly6O@wuerfel>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 4 Jan 2016 08:37:41 -0800
+Subject: [RFC 6/9] clk: ti: add support for omap4 module clocks
+In-Reply-To: <20160104144221.GA5783@n2100.arm.linux.org.uk>
+References: <1450447141-29936-1-git-send-email-t-kristo@ti.com>
+ <1450447141-29936-7-git-send-email-t-kristo@ti.com>
+ <20160101054815.21738.79820@quark.deferred.io>
+ <568A20E5.6040005@ti.com>
+ <CAMuHMdUZMUSYC1XHydVQHRibWtHw2=T-7nXe=5Pf4UCcb=mKTQ@mail.gmail.com>
+ <568A735D.2060309@ti.com>
+ <20160104144221.GA5783@n2100.arm.linux.org.uk>
+Message-ID: <20160104162853.GA12777@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 January 2016 00:04:19 Rongrong Zou wrote:
-> ? 2016/1/4 19:13, Arnd Bergmann ??:
-> > On Sunday 03 January 2016 20:24:14 Rongrong Zou wrote:
-> >> ? 2015/12/31 23:00, Rongrong Zou ??:
-> >> */
-> >>      compatible = "low-pin-count";
-> >>      device_type = "isa";
-> >>      #address-cells = <2>;
-> >>      #size-cells = <1>;
-> >>      reg = <0x0 0xa01b0000 0x0 0x10000>;
-> >>      ranges = <0x1 0x0 0x0 0x0 0x1000>;
-> >> /*
-> >> *  ranges is required, then i can get the IORESOURCE_IO <0xe4,4> from "reg = <0x1, 0x000000e4, 4>".
-> >> *
-> >> */
-> >>      ipmi_0:ipmi at 000000e4{
-> >>              device_type = "ipmi";
-> >>              compatible = "ipmi-bt";
-> >>              reg = <0x1 0x000000e4 0x4>;
-> >> };
-> >>
-> >
-> > This looks wrong: the property above says that the I/O port range is
-> > translated to MMIO address 0x00000000 to 0x00010000, which is not
-> > true on your hardware. I think this needs to be changed in the code
-> > so the ranges property is not required for I/O ports.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [160104 06:43]:
+> On Mon, Jan 04, 2016 at 03:27:57PM +0200, Tero Kristo wrote:
+> > On 01/04/2016 12:21 PM, Geert Uytterhoeven wrote:
+> > >FWIW, there are small loops with just a cpu_relax() in various clock drivers
+> > >under drivers/clk/shmobile/.
+> > 
+> > Just did a quick profiling round, and the clk_enable/disable delay loops
+> > take anything from 0...1500ns, most typically consuming some 400-600ns. So,
+> > based on this, dropping the udelay and adding cpu_relax instead looks like a
+> > good change. I just verified that changing the udelay to cpu_relax works
+> > fine also, I just need to change the bail-out period to be something sane.
 > 
-> Ranges property can set empty, but this means 1:1 translation. the I/O 
-> port range is translated to MMIO address 0x00000001 00000000 to 
-> 0x00000001 00000004, it looks wrong else. I wonder if anyone get legacy 
-> I/O port resource from dts.
+> Was that profiling done with lockdep/lock debugging enabled or disabled?
 
-As I said, nothing should really require the ranges property here, unless
-you have a valid IORESOURCE_MEM translation. The code that requires
-the ranges to be present is wrong.
+And also the thing to check from the hw folks is what all do these clkctrl
+bits really control. If they group together the OCP clock and an extra
+functional clock for some devices the delays could be larger.
 
-> For ipmi driver, I can get I/O port resource by DMI rather than dts.
+In general, I think we need to get rid of pm_runtime_irq_safe usage to
+allow clocks to sleep properly. The other option is to allow toggling
+pm_runtime_irq_safe but that probably gets super messy.
 
-No, the ipmi driver uses the resource that belongs to the platform
-device already, you can't rely on DMI data to be present there.
+Regards,
 
-	Arnd
+Tony
