@@ -1,46 +1,53 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 4 Jan 2016 09:43:28 +0100
-Subject: [linux-sunxi] [RFC PATCH] drivers: pinctrl: add driver for
- Allwinner A64 SoC
-In-Reply-To: <CAEzqOZsE_kDChAbLkwmwjqdDbovv1e0G1tTffhhp25PkwJQ0+Q@mail.gmail.com>
-References: <1451582246-32373-1-git-send-email-andre.przywara@arm.com>
- <CAEzqOZsE_kDChAbLkwmwjqdDbovv1e0G1tTffhhp25PkwJQ0+Q@mail.gmail.com>
-Message-ID: <20160104084328.GB23528@lukather>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 4 Jan 2016 09:53:47 +0100
+Subject: [PATCH 1/2] ARM: shmobile: r8a7790: use GIC_* defines
+In-Reply-To: <1451856807-8081-2-git-send-email-horms+renesas@verge.net.au>
+References: <1451856807-8081-1-git-send-email-horms+renesas@verge.net.au>
+ <1451856807-8081-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdW_b0DSn1x29r-0sdWsF47JyxAWKpN7JG025RTmB0aOuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Simon,
 
-On Mon, Jan 04, 2016 at 02:34:52PM +0800, Vishnu Patekar wrote:
-> > diff --git a/drivers/pinctrl/sunxi/Makefile b/drivers/pinctrl/sunxi/Makefile
-> > index e080290..130e7bc 100644
-> > --- a/drivers/pinctrl/sunxi/Makefile
-> > +++ b/drivers/pinctrl/sunxi/Makefile
-> > @@ -12,5 +12,6 @@ obj-$(CONFIG_PINCTRL_SUN7I_A20)               += pinctrl-sun7i-a20.o
-> >  obj-$(CONFIG_PINCTRL_SUN8I_A23)                += pinctrl-sun8i-a23.o
-> >  obj-$(CONFIG_PINCTRL_SUN8I_A23_R)      += pinctrl-sun8i-a23-r.o
-> >  obj-$(CONFIG_PINCTRL_SUN8I_A33)                += pinctrl-sun8i-a33.o
-> > +obj-$(CONFIG_PINCTRL_A64)              += pinctrl-a64.o
-> 
-> Shouldn't this follow pinctrl config name like other sunXi SOCs?
-> This should be PINCTRL_SUN??_A64.
-> 
-> First, we should find family name for A64. I remember, on IRC Maxime
-> refering A64 to family named sun10i.
+On Sun, Jan 3, 2016 at 10:33 PM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Use GIC_* defines for GIC interrupt cells in r8a7791 device tree.
 
-It's called sun50i in the BSP, so I guess we can go with that.
+Thanks a lot for doing this!
 
-Thanks!
-Maxime
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>  arch/arm/boot/dts/r8a7790.dtsi | 348 ++++++++++++++++++++---------------------
+>  1 file changed, 174 insertions(+), 174 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+> index 7dfd393bfc7e..fd732bd942a3 100644
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160104/e3a356ed/attachment.sig>
+> @@ -1580,9 +1580,9 @@
+>                 /* Map all possible DDR as inbound ranges */
+>                 dma-ranges = <0x42000000 0 0x40000000 0 0x40000000 0 0x80000000
+>                               0x43000000 1 0x80000000 1 0x80000000 0 0x80000000>;
+> -               interrupts = <0 116 IRQ_TYPE_LEVEL_HIGH>,
+> -                            <0 117 IRQ_TYPE_LEVEL_HIGH>,
+> -                            <0 118 IRQ_TYPE_LEVEL_HIGH>;
+> +               interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>,
+> +                            <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>,
+> +                            <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
+>                 #interrupt-cells = <1>;
+>                 interrupt-map-mask = <0 0 0 0>;
+>                 interrupt-map = <0 0 0 0 &gic 0 116 IRQ_TYPE_LEVEL_HIGH>;
+
+You forgot to update the "interrupt-map" properties in the various PCI nodes
+(the "0" after the "&gic").
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
