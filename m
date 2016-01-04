@@ -1,87 +1,35 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Mon, 4 Jan 2016 17:03:01 +0800
-Subject: [Xen-devel] [PATCH v3 40/62] arm/acpi: Estimate memory required
- for acpi/efi tables
-In-Reply-To: <565C67BF.4040804@citrix.com>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-41-git-send-email-shannon.zhao@linaro.org>
- <565C67BF.4040804@citrix.com>
-Message-ID: <568A3545.7030009@huawei.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Mon, 4 Jan 2016 09:09:37 +0000
+Subject: [PATCH v2 0/2] i2c:dw: Add APM X-Gene ACPI I2C device support
+In-Reply-To: <1450863241.7740.30.camel@kxue-X58A-UD3R>
+References: <1449782357-22982-1-git-send-email-lho@apm.com>
+ <566F6485.2000508@amd.com> <20151215132721.GJ1762@lahna.fi.intel.com>
+ <56702923.9010305@amd.com> <20151215145953.GK1762@lahna.fi.intel.com>
+ <1450863241.7740.30.camel@kxue-X58A-UD3R>
+Message-ID: <568A36D1.8070808@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 23/12/15 09:34, Ken Xue wrote:
+> On Tue, 2015-12-15 at 16:59 +0200, Mika Westerberg wrote:
+>> On Tue, Dec 15, 2015 at 08:52:19AM -0600, Suravee Suthikulpanit wrote:
 
-
-On 2015/11/30 23:14, Julien Grall wrote:
-> Hi Shannon,
+> During test, I2C bus should run in different "ConnectionSpeed" of
+> device.
 > 
-> On 17/11/15 09:40, shannon.zhao at linaro.org wrote:
->> diff --git a/xen/common/efi/boot.c b/xen/common/efi/boot.c
->> index 53c7452..78d8ae9 100644
->> --- a/xen/common/efi/boot.c
->> +++ b/xen/common/efi/boot.c
->> @@ -13,6 +13,7 @@
->>  #include <xen/multiboot.h>
->>  #include <xen/pci_regs.h>
->>  #include <xen/pfn.h>
->> +#include <asm/acpi.h>
->>  #if EFI_PAGE_SIZE != PAGE_SIZE
->>  # error Cannot use xen/pfn.h here!
->>  #endif
->> @@ -1171,6 +1172,26 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
->>      for( ; ; ); /* not reached */
->>  }
->>  
->> +#ifdef CONFIG_ACPI
->> +/* Constant to indicate "Xen" in unicode u16 format */
->> +static const u16 XEN_EFI_FW_VENDOR[] ={0x0058,0x0065,0x006E,0x0000};
->> +
->> +int __init estimate_efi_size(int mem_nr_banks)
->> +{
->> +    int size;
->> +    int est_size = sizeof(EFI_SYSTEM_TABLE);
->> +    int ect_size = sizeof(EFI_CONFIGURATION_TABLE);
->> +    int emd_size = sizeof(EFI_MEMORY_DESCRIPTOR);
->> +    int fw_vendor_size = sizeof(XEN_EFI_FW_VENDOR);
->> +
->> +    size = PAGE_ALIGN(est_size + ect_size + fw_vendor_size)
->> +           + PAGE_ALIGN(emd_size *
->> +                        (mem_nr_banks + acpi_mem.nr_banks + TBL_MMAX));
->> +
->> +    return size;
->> +}
->> +#endif
->> +
+> That means windows driver can modify I2C bus speed to match the
+> "ConnectionSpeed" of device on-the-fly. Static value from SSCN and FMCN
+> can not work for WITT test cases.
 > 
-> efi/boot.c only contains code related to the stub EFI. This is not the
-> case of this code.
-> 
+> It sounds like odd that multi-speed can be applied over one I2C bus, But
+> everything goes well.
+> Does this behavior(multi-speed) violate the I2C spec?
 
-I add these codes at this file because I want to reuse the definitions
-of EFI structures like EFI_SYSTEM_TABLE. Parth re-define those
-structures at previous patch set and one comment suggested to reuse the
-existing ones. If I add these codes in xen/arch/arm/domain_build.c, it
-will have some conflicts. E.g:
+I can't remember if the spec says it, but I would say the bus should
+run at the speed of the slowest attached peripheral as they all have
+to listen for the address-byte being sent at the start of each i2c
+transaction.
 
-In file included from /home/open-source/xen/xen/include/asm/efibind.h:2:0,
-                 from domain_build.c:29:
-/home/open-source/xen/xen/include/asm/arm64/efibind.h:86:20: error:
-conflicting types for 'UINT64'
- typedef uint64_t   UINT64;
-                    ^
-In file included from /home/open-source/xen/xen/include/acpi/acpi.h:57:0,
-                 from /home/open-source/xen/xen/include/xen/acpi.h:33,
-                 from domain_build.c:15:
-/home/open-source/xen/xen/include/acpi/actypes.h:130:35: note: previous
-declaration of 'UINT64' was here
- typedef COMPILER_DEPENDENT_UINT64 UINT64;
-
-> Moreover, this code won't compile on x86 because acpi_mem is only
-> defined for ARM.
-> 
-> Regards,
-> 
-
-Thanks,
 -- 
-Shannon
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
