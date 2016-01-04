@@ -1,69 +1,126 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 04 Jan 2016 20:23:37 +0100
-Subject: [Regression] No display on i.MX53 after update to 4.4-rc4
-In-Reply-To: <5674149C.90206@parkeon.com>
-References: <5674149C.90206@parkeon.com>
-Message-ID: <1451935417.3884.49.camel@pengutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 4 Jan 2016 19:24:01 +0000
+Subject: [PATCH v5 05/11] arm-cci PMU: Delay counter writes to pmu_enable
+In-Reply-To: <1451908490-2615-6-git-send-email-suzuki.poulose@arm.com>
+References: <1451908490-2615-1-git-send-email-suzuki.poulose@arm.com>
+ <1451908490-2615-6-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20160104192401.GD17127@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Martin,
+On Mon, Jan 04, 2016 at 11:54:44AM +0000, Suzuki K. Poulose wrote:
+> Delay setting the event periods for enabled events to pmu::pmu_enable().
+> We mark the event.hw->state PERF_HES_ARCH for the events that we know
+> have their counts recorded and have been started.
 
-Am Freitag, den 18.12.2015, 15:13 +0100 schrieb Martin Fuzzey:
-> Hi Philipp,
+Please add a comment to the code stating exactly what PERF_HES_ARCH
+means for the CCI PMU driver, so it's easy to find.
+
+> Since we reprogram the counters every time before count, we can set
+> the counters for all the event counters which are !STOPPED && ARCH.
 > 
-> after updating my kernel to include:
+> Grouping the writes to counters can ammortise the cost of the operation
+> on PMUs where it is expensive (e.g, CCI-500).
 > 
->      gpu: ipu-v3: Assign of_node of child platform devices to 
-> corresponding ports  [304e6be652e2ef2190adf9c23a2a1e5f9f39800d]
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Punit Agrawal <punit.agrawal@arm.com>
+> Cc: Peter Zijlstra <peterz@infradead.org>
+> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+> ---
+>  drivers/bus/arm-cci.c |   42 ++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 40 insertions(+), 2 deletions(-)
 > 
-> the display initialisation fails with:
+> diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+> index 0189f3a..c768ee4 100644
+> --- a/drivers/bus/arm-cci.c
+> +++ b/drivers/bus/arm-cci.c
+> @@ -916,6 +916,40 @@ static void hw_perf_event_destroy(struct perf_event *event)
+>  	}
+>  }
+>  
+> +/*
+> + * Program the CCI PMU counters which have PERF_HES_ARCH set
+> + * with the event period and mark them ready before we enable
+> + * PMU.
+> + */
+> +void cci_pmu_update_counters(struct cci_pmu *cci_pmu)
+> +{
+> +	int i;
+> +	unsigned long mask[BITS_TO_LONGS(cci_pmu->num_cntrs)];
+
+I think this can be:
+
+	DECLARE_BITMAP(mask, cci_pmu->num_cntrs);
+
+> +
+> +	memset(mask, 0, BITS_TO_LONGS(cci_pmu->num_cntrs) * sizeof(unsigned long));
+
+Likewise:
+
+	bitmap_zero(mask, cci_pmu->num_cntrs);
+
+> +
+> +	for_each_set_bit(i, cci_pmu->hw_events.used_mask, cci_pmu->num_cntrs) {
+> +		struct hw_perf_event *hwe;
+> +
+> +		if (!cci_pmu->hw_events.events[i]) {
+> +			WARN_ON(1);
+> +			continue;
+> +		}
+> +
+
+		if (WARN_ON(!cci_pmu->hw_events.events[i]))
+			continue;
+
+> +		hwe = &cci_pmu->hw_events.events[i]->hw;
+> +		/* Leave the events which are not counting */
+> +		if (hwe->state & PERF_HES_STOPPED)
+> +			continue;
+> +		if (hwe->state & PERF_HES_ARCH) {
+> +			set_bit(i, mask);
+> +			hwe->state &= ~PERF_HES_ARCH;
+> +			local64_set(&hwe->prev_count, CCI_CNTR_PERIOD);
+> +		}
+> +	}
+> +
+> +	pmu_write_counters(cci_pmu, mask, CCI_CNTR_PERIOD);
+> +}
+> +
+>  static void cci_pmu_enable(struct pmu *pmu)
+>  {
+>  	struct cci_pmu *cci_pmu = to_cci_pmu(pmu);
+> @@ -927,6 +961,7 @@ static void cci_pmu_enable(struct pmu *pmu)
+>  		return;
+>  
+>  	raw_spin_lock_irqsave(&hw_events->pmu_lock, flags);
+> +	cci_pmu_update_counters(cci_pmu);
+>  	__cci_pmu_enable();
+>  	raw_spin_unlock_irqrestore(&hw_events->pmu_lock, flags);
+>  
+> @@ -980,8 +1015,11 @@ static void cci_pmu_start(struct perf_event *event, int pmu_flags)
+>  	/* Configure the counter unless you are counting a fixed event */
+>  	if (!pmu_fixed_hw_idx(cci_pmu, idx))
+>  		pmu_set_event(cci_pmu, idx, hwc->config_base);
+> -
+> -	pmu_event_set_period(event);
+> +	/*
+> +	 * Mark this counter, so that we can program the
+> +	 * counter with the event_period. see cci_pmu_enable()
+> +	 */
+> +	hwc->state = PERF_HES_ARCH;
+
+Why couldn't we have kept pmu_event_set_period here, and have that set
+prev_count and PERF_HES_ARCH?
+
+Then we'd be able to do the same betching for overflow too.
+
+What am I missing?
+
+Mark.
+
+>  	pmu_enable_counter(cci_pmu, idx);
+>  
+>  	raw_spin_unlock_irqrestore(&hw_events->pmu_lock, flags);
+> -- 
+> 1.7.9.5
 > 
->      "imx-ipuv3 18000000.ipu: missing port at 0 node in /soc/ipu at 18000000"
-> 
-> Indeed the in tree imx53.dtsi file does not contain that node.
-> 
-> Does the node need to be added (even if the camera is not being used) or 
-> should ipu_add_client_devices() not bail out if one node is missing?
-
-The ports are marked as optional in the binding docs, so the driver
-should not bail out if they are not present. How about this patch:
-
------8<-----
->From d82649ac3bde511eb5977beb1080f0c6c78e391a Mon Sep 17 00:00:00 2001
-From: Philipp Zabel <p.zabel@pengutronix.de>
-Subject: [PATCH] gpu: ipu-v3: Do not bail out on missing optional port nodes
-
-The port nodes are documented as optional, treat them accordingly.
-
-Reported-by: Martin Fuzzey <mfuzzey@parkeon.com>
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-Fixes: 304e6be652e2 ("gpu: ipu-v3: Assign of_node of child platform devices to corresponding ports")
----
- drivers/gpu/ipu-v3/ipu-common.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/gpu/ipu-v3/ipu-common.c b/drivers/gpu/ipu-v3/ipu-common.c
-index 8ba367b..2093de2 100644
---- a/drivers/gpu/ipu-v3/ipu-common.c
-+++ b/drivers/gpu/ipu-v3/ipu-common.c
-@@ -1094,10 +1094,11 @@ static int ipu_add_client_devices(struct ipu_soc *ipu, unsigned long ipu_base)
- 		/* Associate subdevice with the corresponding port node */
- 		pdev->dev.of_node = of_graph_get_port_by_id(dev->of_node, i);
- 		if (i < 4 && !pdev->dev.of_node) {
--			dev_err(dev, "missing port@%d node in %s\n", i,
--				dev->of_node->full_name);
--			ret = -ENODEV;
--			goto err_register;
-+			dev_info(dev,
-+				 "no port@%d node in %s, not using %s%d\n",
-+				 i, dev->of_node->full_name,
-+				 (i / 2) ? "DI" : "CSI", i % 2);
-+			continue;
- 		}
- 
- 		ret = platform_device_add_data(pdev, &reg->pdata,
------>8-----
-
-regards
-Philipp
