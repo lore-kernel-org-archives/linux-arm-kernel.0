@@ -1,60 +1,132 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 4 Jan 2016 09:56:43 +0100
-Subject: [PATCH 2/2] ARM: shmobile: r8a7791: use GIC_* defines
-In-Reply-To: <1451856807-8081-3-git-send-email-horms+renesas@verge.net.au>
-References: <1451856807-8081-1-git-send-email-horms+renesas@verge.net.au>
- <1451856807-8081-3-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdWH6Hi4yU0gYfxmyCDF3JNZiii00SwiNrZomQ_-pWbkdA@mail.gmail.com>
+Date: Mon, 4 Jan 2016 09:59:13 +0100
+Subject: [PATCH] ARM: shmobile: alt: Add QSPI device to DT
+In-Reply-To: <20160103210707.GC22806@verge.net.au>
+References: <1448863990-16276-1-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdWnyZbHiLEPn-6dEweBEXHzWr6o2KF2iCpzg2-OhZRVSw@mail.gmail.com>
+ <20151201064149.GH16260@verge.net.au>
+ <CAMuHMdXgr5FbS0_L8g0xdesFZ-utPH+G8VgXQKqXZd3t4OsXcw@mail.gmail.com>
+ <20151218025410.GA10973@verge.net.au>
+ <CAMuHMdWtv3Vin9jiwAsqZOmnuSYJeviCA6PuHt6C=-fvOSFsVA@mail.gmail.com>
+ <20160103210707.GC22806@verge.net.au>
+Message-ID: <CAMuHMdUYaq9Q+qh0=hmzG8ZFPa2-CXay-PAggxuMCi3nWMuu4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Simon,
 
-On Sun, Jan 3, 2016 at 10:33 PM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Use GIC_* defines for GIC interrupt cells in r8a7791 device tree.
-
-Thanks for doing this!
-
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->  arch/arm/boot/dts/r8a7791.dtsi | 370 ++++++++++++++++++++---------------------
->  1 file changed, 185 insertions(+), 185 deletions(-)
+On Sun, Jan 3, 2016 at 10:07 PM, Simon Horman <horms@verge.net.au> wrote:
+> On Fri, Dec 18, 2015 at 11:07:23AM +0100, Geert Uytterhoeven wrote:
+>> On Fri, Dec 18, 2015 at 3:54 AM, Simon Horman <horms@verge.net.au> wrote:
+>> > On Tue, Dec 01, 2015 at 09:06:17AM +0100, Geert Uytterhoeven wrote:
+>> >> On Tue, Dec 1, 2015 at 7:41 AM, Simon Horman <horms@verge.net.au> wrote:
+>> >> > On Mon, Nov 30, 2015 at 09:34:10AM +0100, Geert Uytterhoeven wrote:
+>> >> >> On Mon, Nov 30, 2015 at 7:13 AM, Simon Horman
+>> >> >> <horms+renesas@verge.net.au> wrote:
+>> >> >> > Enable the QSPI controller in the alt device tree.
+>> >> >> >
+>> >> >> > Based similar work for the silk board by by Vladimir Barinov and
+>> >> >> > Sergei Shtylyov.
+>> >> >> >
+>> >> >> > Cc: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+>> >> >> > Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>> >> >> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>> >> >>
+>> >> >> Verified against Alt schematics and r8a7794 datasheet.
+>> >> >>
+>> >> >> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> >> >>
+>> >> >> I can't verify the FLASH layout. Note that p.11 of
+>> >> >> ALT_MiniMonitor_Manual(SPI_Boot)_Rev0.01_e.pdf shows a different
+>> >> >> FLASH layout for the second and third partition.
+>> >> >
+>> >> > Thanks. I see the following in v1.9.6 of the BSP[1]. Is it
+>> >> > the same as the document you referred to above?
+>> >> >
+>> >> >
+>> >> >                 partition at 0 {
+>> >> >                         label = "loader";
+>> >> >                         reg = <0x00000000 0x00080000>;
+>> >> >                         read-only;
+>> >> >                 };
+>> >> >                 partition at 40000 {
+>> >> >                         label = "user";
+>> >> >                         reg = <0x00080000 0x00580000>;
+>> >> >                         read-only;
+>> >> >                 };
+>> >> >                 partition at 440000 {
+>> >> >                         label = "flash";
+>> >> >                         reg = <0x00600000 0x03a00000>;
+>> >> >                 };
+>> >> >
+>> >> >
+>> >> > [1] https://git.kernel.org/cgit/linux/kernel/git/horms/renesas-backport.git/tree/arch/arm/boot/dts/r8a7794-alt.dts?h=rcar-gen2/v1.9.6&id=e1acbe074f36d96e901bf5346c50ee51da2ced42#n379
+>> >>
+>> >> No, the document specifies 3 partitions:
+>> >>   - SA0: loader program area, 16 KiB,
+>>
+>> Sorry, I missed a "Not used" part after that, and started miscounting zeroes
+>> on top of that :-(
+>>
+>> So the loader consumes 16 KiB out of the 256 KiB SA0 partition.
+>>
+>> >>   - SA1: System area, 16 KiB,
+>>
+>> Should be 256 KiB.
+>>
+>> >>   - SA2: User program area, remainder.
+>> >>
+>> >> FWIW, the unit addresses in the device nodes above are not consistent
+>> >> with their reg properties.
+>> >
+>> > My feeling is that we should follow the documentation.
+>> > Does this reflect the scheme it describes?
+>> >
+>> >
+>> >                 partitions {
+>> >                         #address-cells = <1>;
+>> >                         #size-cells = <1>;
+>> >
+>> >                         partition at 0 {
+>> >                                 label = "loader";
+>> >                                 reg = <0x00000000 0x00004000>;
+>>
+>> reg = <0x00000000 0x00040000>;
+>>
+>> >                                 read-only;
+>> >                         };
+>> >                         partition at 4000 {
+>>
+>> partition at 40000
+>>
+>> >                                 label = "system";
+>> >                                 reg = <0x00004000 0x00004000>;
+>>
+>> reg = <0x00040000 0x00040000>;
+>>
+>> >                                 read-only;
+>> >                         };
+>> >                         partition at 8000 {
+>>
+>> partition at 80000
+>>
+>> >                                 label = "user";
+>> >                                 reg = <0x00008000 0x03ff8000>;
+>>
+>> reg = <0x00080000 0x03f80000>;
+>>
+>> >                         };
+>> >                 };
+>>
+>> I don't have an ALT. Does this match with the actual FLASH contents?
 >
-> diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-> index 2a369ddcb6fd..c24276375c53 100644
-> --- a/arch/arm/boot/dts/r8a7791.dtsi
-> +++ b/arch/arm/boot/dts/r8a7791.dtsi
+> I'm a little unsure how to verify that.
 
-> @@ -782,7 +782,7 @@
->         ether: ethernet at ee700000 {
->                 compatible = "renesas,ether-r8a7791";
->                 reg = <0 0xee700000 0 0x400>;
-> -               interrupts = <0 162 IRQ_TYPE_LEVEL_HIGH>;
-> +               interrupts = <GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>;
->                 clocks = <&mstp8_clks R8A7791_CLK_ETHER>;
->                 power-domains = <&cpg_clocks>;
->                 phy-mode = "rmii";
-> @@ -806,7 +806,7 @@
+Usually the FLASH is empty (all ones) at the end of each partition.
 
-You forgot to update the avb node in between these two chunks.
-
-> @@ -1577,9 +1577,9 @@
->                 /* Map all possible DDR as inbound ranges */
->                 dma-ranges = <0x42000000 0 0x40000000 0 0x40000000 0 0x80000000
->                               0x43000000 2 0x00000000 2 0x00000000 1 0x00000000>;
-> -               interrupts = <0 116 IRQ_TYPE_LEVEL_HIGH>,
-> -                            <0 117 IRQ_TYPE_LEVEL_HIGH>,
-> -                            <0 118 IRQ_TYPE_LEVEL_HIGH>;
-> +               interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>,
-> +                            <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>,
-> +                            <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
->                 #interrupt-cells = <1>;
->                 interrupt-map-mask = <0 0 0 0>;
->                 interrupt-map = <0 0 0 0 &gic 0 116 IRQ_TYPE_LEVEL_HIGH>;
-
-You forgot to update the "interrupt-map" properties in the various PCI nodes
-(the "0" after the "&gic").
+Hence "dd if=/dev/mtd0 bs=16M | hd | less" should report lots of
+identical lines of
+data.
 
 Gr{oetje,eeting}s,
 
