@@ -1,30 +1,22 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Mon,  4 Jan 2016 11:18:56 +0800
-Subject: [PATCH] ARM: zx_defconfig: remove CONFIG_MMC_DW_IDMAC
-Message-ID: <1451877536-21603-1-git-send-email-shawn.lin@rock-chips.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 4 Jan 2016 09:06:58 +0530
+Subject: [PATCH V11 0/7] dma: add Qualcomm Technologies HIDMA driver
+In-Reply-To: <5689B833.7010901@codeaurora.org>
+References: <1451865996-12808-1-git-send-email-okaya@codeaurora.org>
+ <5689B833.7010901@codeaurora.org>
+Message-ID: <20160104033658.GB2940@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dw_mmc driver never use this macro, so remove it from
-zx_defconfig
+On Sun, Jan 03, 2016 at 07:09:23PM -0500, Sinan Kaya wrote:
+> Hi Vinod,
+> 
+> > 
+> 
+> Can I have your ACK on your series if you are OK?
 
-Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
----
+Why ACK, shouldn't this be merged thru dmaengine tree? I would need ack on
+DT patches first :)
 
- arch/arm/configs/zx_defconfig | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/configs/zx_defconfig b/arch/arm/configs/zx_defconfig
-index b200bb0..ab683fb 100644
---- a/arch/arm/configs/zx_defconfig
-+++ b/arch/arm/configs/zx_defconfig
-@@ -83,7 +83,6 @@ CONFIG_MMC=y
- CONFIG_MMC_UNSAFE_RESUME=y
- CONFIG_MMC_BLOCK_MINORS=16
- CONFIG_MMC_DW=y
--CONFIG_MMC_DW_IDMAC=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT4_FS=y
- CONFIG_EXT4_FS_POSIX_ACL=y
 -- 
-2.3.7
+~Vinod
