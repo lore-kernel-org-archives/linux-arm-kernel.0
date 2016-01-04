@@ -1,93 +1,80 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Mon, 4 Jan 2016 09:13:39 -0800
-Subject: [tip:timers/core] clocksource: Make clocksource validation work
- for all clocksources
-In-Reply-To: <tip-1f45f1f33c8c8b96722dbc5e6b7acf74eaa721f7@git.kernel.org>
-References: <56349607.6070708@huawei.com>
- <tip-1f45f1f33c8c8b96722dbc5e6b7acf74eaa721f7@git.kernel.org>
-Message-ID: <CANcMJZD4P5qe7HtjsibjD_CNpv+yz=ttDJdpgg=vz3kUN5StOQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 4 Jan 2016 17:25:18 +0000
+Subject: [PATCH 0/4] Component helper updates
+In-Reply-To: <20151207150143.GR8644@n2100.arm.linux.org.uk>
+References: <20151123160210.GR8644@n2100.arm.linux.org.uk>
+ <20151207150143.GR8644@n2100.arm.linux.org.uk>
+Message-ID: <20160104172518.GM19062@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 19, 2015 at 7:03 AM, tip-bot for Yang Yingliang
-<tipbot@zytor.com> wrote:
-> Commit-ID:  1f45f1f33c8c8b96722dbc5e6b7acf74eaa721f7
-> Gitweb:     http://git.kernel.org/tip/1f45f1f33c8c8b96722dbc5e6b7acf74eaa721f7
-> Author:     Yang Yingliang <yangyingliang@huawei.com>
-> AuthorDate: Sat, 31 Oct 2015 18:20:55 +0800
-> Committer:  Thomas Gleixner <tglx@linutronix.de>
-> CommitDate: Sat, 19 Dec 2015 15:59:57 +0100
->
-> clocksource: Make clocksource validation work for all clocksources
->
-> The clocksource validation which makes sure that the newly read value
-> is not smaller than the last value only works if the clocksource mask
-> is 64bit, i.e. the counter is 64bit wide. But we want to use that
-> mechanism also for clocksources which are less than 64bit wide.
->
-> So instead of checking whether bit 63 is set, we check whether the
-> most significant bit of the clocksource mask is set in the delta
-> result. If it is set, we return 0.
->
-> [ tglx: Simplified the implementation, added a comment and massaged
->         the commit message ]
->
-> Suggested-by: Thomas Gleixner <tglx@linutronix.de>
-> Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
-> Cc: <linux-arm-kernel@lists.infradead.org>
-> Link: http://lkml.kernel.org/r/56349607.6070708 at huawei.com
-> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-> ---
->  kernel/time/timekeeping_internal.h | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
->
-> diff --git a/kernel/time/timekeeping_internal.h b/kernel/time/timekeeping_internal.h
-> index e20466f..5be7627 100644
-> --- a/kernel/time/timekeeping_internal.h
-> +++ b/kernel/time/timekeeping_internal.h
-> @@ -17,7 +17,11 @@ static inline cycle_t clocksource_delta(cycle_t now, cycle_t last, cycle_t mask)
->  {
->         cycle_t ret = (now - last) & mask;
->
-> -       return (s64) ret > 0 ? ret : 0;
-> +       /*
-> +        * Prevent time going backwards by checking the MSB of mask in
-> +        * the result. If set, return 0.
-> +        */
-> +       return ret & ~(mask >> 1) ? 0 : ret;
+On Mon, Dec 07, 2015 at 03:01:43PM +0000, Russell King - ARM Linux wrote:
+> Given the lack of interest in these patches, I've put these into my
+> "for-next" branch so that they can get some exposure in linux-next.
 
-Hey Thomas, Yang,
-   I just noticed this patch, and I'm a little worried that its not
-totally safe.  When testing 64bit values, if the msb is set, we know
-its negative because no system going to get through more then 63 bits
-of cycles between updates.
+These have been in for-next, and no one's reported any issues.
+I've now queued these into my for-linus branch in preparation to
+merging during the next merge window.
 
-However, for systems with much shorter masks (ACPI PM for example is
-only 24 bits), the MSB of the mask bit being set doesn't necessarily
-indicate a invalid negative interval. This patch would possibly cause
-time inconsistencies (time going backwards) on those systems.
+> On Mon, Nov 23, 2015 at 04:02:11PM +0000, Russell King - ARM Linux wrote:
+> > Greg,
+> > 
+> > These four patches update the component helper by:
+> > * Removing the legacy matching code with the .add_components method
+> >   in the master's operation structure.  Nothing in -rc1 appears to be
+> >   using the legacy functions or method, according to my git greps.
+> > 
+> > * A slight code reorganisation which results in slightly easier to read
+> >   code.
+> > 
+> > * Switch to tracking components via an array rather than a list, which
+> >   allows us to keep the matching and matched components together, and
+> >   more importantly allows us to reduce the amount of matching - with
+> >   this structure, we can incrementally add the component devices as
+> >   they become available, rather than re-running the list of matches
+> >   each time something changes.
+> > 
+> > * Fix the lack of match release functionality, which Liviu Dudau
+> >   reminded me was missing.  This allows people who want to pass
+> >   device_node structures in to (correctly) retain the reference to the
+> >   node, and drop the node when the need to do matches is no longer
+> >   required.
+> > 
+> > The first three patches have been well tested over the last year as I've
+> > had them in my tree that long.  I hadn't considered them important enough
+> > to send as they're only removing and cleaning up functionality.  However,
+> > with the need to fix something, it now makes sense to get them merged.
+> > 
+> > The last patch has been tested with etnaviv DRM to prove that the match
+> > release works by unloading the module.  On unload, the release function
+> > is correctly called.
+> > 
+> > This is intended for the next merge window.  Please apply.
+> > 
+> >  drivers/base/component.c  | 281 ++++++++++++++++++++++++----------------------
+> >  include/linux/component.h |  33 ++++--
+> >  2 files changed, 167 insertions(+), 147 deletions(-)
+> > 
+> > -- 
+> > FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> > according to speedtest.net.
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> -- 
+> RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-So if something like this is added, we probably need some additional
-smarts to ensure we don't cause problems with quick-wrapping
-clocksources with the same fix to try to avoid negative intervals with
-unsynced clocksources.
-
-That said, back when we added the TIMEKEEPING_DEBUGGING work, we did
-add non-terminal warnings if we saw cycle offsets larger then 50% of
-the mask, so the intent of this patch isn't totally off base, but it
-seems like leaning heavily on an assumption that isn't quite a hard
-design rule of the subsystem (as with a warning, we can continue
-working fine, but with this patch we might introduce inconsistencies).
-
-One potential hack that could be tried: If unsynced clocksource has a
-long enough interval that we can be sure the MSB being set always
-means its an invalid negative interval, you could have the clocksource
-shift the read value up by however many bits the mask length is short
-of 64 (similarly adjusting the frequency up proportionally), and then
-set its mask to all 64 bits. That way negative reads would be caught
-by the pre-existing generic logic.
-
-Sorry I didn't see this earlier, I wasn't on the cc list.
-
-thanks
--john
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
