@@ -1,54 +1,41 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 4 Jan 2016 16:26:10 +0000
-Subject: Tegra baseline test results for v4.4-rc7
-Message-ID: <568A9D22.1070705@nvidia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 4 Jan 2016 16:11:23 +0000
+Subject: [PATCH 1/3] checkpatch.pl: add missing memory barriers
+In-Reply-To: <1451923660.4334.83.camel@perches.com>
+References: <1451907395-15978-1-git-send-email-mst@redhat.com>
+ <1451907395-15978-2-git-send-email-mst@redhat.com>
+ <1451923660.4334.83.camel@perches.com>
+Message-ID: <20160104161123.GJ19062@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.4-rc7.
-Logs and other details at:
+On Mon, Jan 04, 2016 at 08:07:40AM -0800, Joe Perches wrote:
+> On Mon, 2016-01-04 at 13:36 +0200, Michael S. Tsirkin wrote:
+> > +		my $all_barriers = join('|', (@barriers, @smp_barriers));
+> > +
+> > +		if ($line =~ /\b($all_barriers)\(/) {
+> 
+> It would be better to use /\b$all_barriers\s*\(/
+> as there's no reason for the capture and there
+> could be a space between the function and the
+> open parenthesis.
 
-    https://nvtb.github.io//linux/test_v4.4-rc7/20151227183102/
+I think you mean
 
+	/\b(?:$all_barriers)\s*\(/
 
-Test summary
-------------
+as 'all_barriers' will be:
 
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+	mb|wmb|rmb|smp_mb|smp_wmb|smp_rmb
 
-Build: Image:
-    Pass: ( 1/ 1): defconfig
+and putting that into your suggestion results in:
 
-Boot to userspace: defconfig:
-    Pass: ( 1/ 1): qemu-vexpress64
+	/\bmb|wmb|rmb|smp_mb|smp_wmb|smp_rmb\s*\(/
 
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
+which is clearly wrong - the \b only applies to 'mb' and the \s*\( only
+applies to smp_rmb.
 
-Boot to userspace: tegra_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v4.4-rc6 (4ef7675344d687a0ef5b0d7c0cee12da005870c0)):
-   text     data      bss    total  kernel
-      0        0        0        0  defconfig
-    -32        0        0      -32  multi_v7_defconfig
-    -24       -8        0      -32  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v4.4-rc6 (4ef7675344d687a0ef5b0d7c0cee12da005870c0))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        .      qemu-vexpress64            defconfig           __internal
-        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
