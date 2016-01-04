@@ -1,38 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 4 Jan 2016 15:30:28 +0000
-Subject: linux-4.4-rc8/arch/arm64/kernel/module.c:78: 32/64 bit problem ?
-In-Reply-To: <20160104152841.GG1616@arm.com>
-References: <DUB128-W158A3195DB26F149DD52E59CF20@phx.gbl>
- <20160104141657.GC1616@arm.com>
- <CAKv+Gu8KT-vOPN=ypt-qViLc74CumJUorxxM1wPnzf7h-nqKFg@mail.gmail.com>
- <CAKv+Gu9Ve6=1evFD4V2jtOCHOEqOzhmud=guioVR5NMrc=HPBw@mail.gmail.com>
- <20160104152841.GG1616@arm.com>
-Message-ID: <20160104153027.GH1616@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 4 Jan 2016 15:35:02 +0000
+Subject: next-20160104 build: 3 failures 15 warnings (next-20160104)
+In-Reply-To: <E1aG3zo-0000gt-2t@optimist>
+References: <E1aG3zo-0000gt-2t@optimist>
+Message-ID: <20160104153502.GK16023@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 04, 2016 at 03:28:41PM +0000, Will Deacon wrote:
-> On Mon, Jan 04, 2016 at 04:24:49PM +0100, Ard Biesheuvel wrote:
-> > diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
-> > index f4bc779e62e8..fd1f4e678655 100644
-> > --- a/arch/arm64/kernel/module.c
-> > +++ b/arch/arm64/kernel/module.c
-> > @@ -75,14 +75,17 @@ static u64 do_reloc(enum aarch64_reloc_op
-> > reloc_op, void *place, u64 val)
-> > 
-> >  static int reloc_data(enum aarch64_reloc_op op, void *place, u64 val, int len)
-> >  {
-> > -       u64 imm_mask = (1 << len) - 1;
-> >         s64 sval = do_reloc(op, place, val);
-> > 
-> >         switch (len) {
-> >         case 16:
-> > +               if (sval < S16_MIN || sval > U16_MAX)
-> > +                       return -ERANGE;
-> >                 *(s16 *)place = sval;
-> 
-> Doesn't this break ABS relocs, which are allowed to overflow?
+On Mon, Jan 04, 2016 at 12:12:20PM +0000, Build bot for Mark Brown wrote:
 
-Gah, that only applies to the 64-bit relocs. Sorry for the noise.
+Today's linux-next fails to build for arm64 due to 44d3d051253 (ARM64:
+dts: mt8173: Add CPU OPP, clock and regulator supply properties) in one
+of Raphael's trees:
 
-Will
+> 	arm64-allmodconfig
+> Error: ../arch/arm64/boot/dts/mediatek/mt8173.dtsi:132.24-25 syntax error
+> Error: ../arch/arm64/boot/dts/mediatek/mt8173.dtsi:132.24-25 syntax error
+
+> 	arm64-defconfig
+> Error: ../arch/arm64/boot/dts/mediatek/mt8173.dtsi:132.24-25 syntax error
+
+which is failing because at least CLK_INFRA_CA53SEL is used but never
+defined, presumably there is some dependency which wasn't integrated.
+Normally we merge DT changes via the architecture to help avoid these
+issues.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160104/6ae7e456/attachment-0001.sig>
