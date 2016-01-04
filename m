@@ -1,64 +1,51 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Mon, 4 Jan 2016 22:42:44 +0200
-Subject: [PATCH v2 06/32] s390: reuse asm-generic/barrier.h
-In-Reply-To: <20160104160339.25101b5d@mschwide>
-References: <1451572003-2440-1-git-send-email-mst@redhat.com>
- <1451572003-2440-7-git-send-email-mst@redhat.com>
- <20160104132042.GW6344@twins.programming.kicks-ass.net>
- <20160104160339.25101b5d@mschwide>
-Message-ID: <20160104224135-mutt-send-email-mst@redhat.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 4 Jan 2016 21:42:59 +0100
+Subject: [PATCH v2] ARM: shmobile: alt: Add QSPI device to DT
+In-Reply-To: <20160104203136.GB12748@verge.net.au>
+References: <1451903819-19218-1-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdVFC1TEeTT5Gas8jz0Tvn2HB3EHBo7gp6pthsnOo6x5UQ@mail.gmail.com>
+ <20160104203136.GB12748@verge.net.au>
+Message-ID: <CAMuHMdWbFHLKgkn9ShJkyyimpwJAbbL5TjqEp1E9GBteVKQmKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 04, 2016 at 04:03:39PM +0100, Martin Schwidefsky wrote:
-> On Mon, 4 Jan 2016 14:20:42 +0100
-> Peter Zijlstra <peterz@infradead.org> wrote:
-> 
-> > On Thu, Dec 31, 2015 at 09:06:30PM +0200, Michael S. Tsirkin wrote:
-> > > On s390 read_barrier_depends, smp_read_barrier_depends
-> > > smp_store_mb(), smp_mb__before_atomic and smp_mb__after_atomic match the
-> > > asm-generic variants exactly. Drop the local definitions and pull in
-> > > asm-generic/barrier.h instead.
-> > > 
-> > > This is in preparation to refactoring this code area.
-> > > 
-> > > Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
-> > > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > > ---
-> > >  arch/s390/include/asm/barrier.h | 10 ++--------
-> > >  1 file changed, 2 insertions(+), 8 deletions(-)
-> > > 
-> > > diff --git a/arch/s390/include/asm/barrier.h b/arch/s390/include/asm/barrier.h
-> > > index 7ffd0b1..c358c31 100644
-> > > --- a/arch/s390/include/asm/barrier.h
-> > > +++ b/arch/s390/include/asm/barrier.h
-> > > @@ -30,14 +30,6 @@
-> > >  #define smp_rmb()			rmb()
-> > >  #define smp_wmb()			wmb()
-> > >  
-> > > -#define read_barrier_depends()		do { } while (0)
-> > > -#define smp_read_barrier_depends()	do { } while (0)
-> > > -
-> > > -#define smp_mb__before_atomic()		smp_mb()
-> > > -#define smp_mb__after_atomic()		smp_mb()
-> > 
-> > As per:
-> > 
-> >   lkml.kernel.org/r/20150921112252.3c2937e1 at mschwide
-> > 
-> > s390 should change this to barrier() instead of smp_mb() and hence
-> > should not use the generic versions.
->  
-> Yes, we wanted to simplify this. Thanks for the reminder, I'll queue
-> a patch.
+Hi Simon,
 
-Could you base on my patchset maybe, to avoid conflicts,
-and I'll merge it?
-Or if it's just replacing these 2 with barrier() I can do this
-myself easily.
+On Mon, Jan 4, 2016 at 9:31 PM, Simon Horman <horms@verge.net.au> wrote:
+> On Mon, Jan 04, 2016 at 12:15:10PM +0100, Geert Uytterhoeven wrote:
+>> On Mon, Jan 4, 2016 at 11:36 AM, Simon Horman
+>> <horms+renesas@verge.net.au> wrote:
+>> > Enable the QSPI controller in the alt device tree.
+>> >
+>> > Based similar work for the silk board by by Vladimir Barinov and
+>> > Sergei Shtylyov.
+>> >
+>> > Cc: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+>> > Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>> > Cc: Geert Uytterhoeven <geert@linux-m68k.org>
+>> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>>
+>> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>
+> Thanks, I have queued this up for v4.6.
+>
+> Should we document "spansion,s25fl512s" for the benefit of checkpatch.pl?
 
-> -- 
-> blue skies,
->    Martin.
-> 
-> "Reality continues to ruin my life." - Calvin.
+Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt used to point to
+drivers/mtd/devices/m25p80.c for the list of supported chips.
+
+That seems to have been changed lately. Now jedec,spi-nor.txt includes the
+list, but lacks the manufacturers' names, so checkpatch.pl is still not happpy.
+
+Brian: Shouldn't the manufacturers's names be added?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
