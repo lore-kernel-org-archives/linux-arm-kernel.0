@@ -1,53 +1,165 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 4 Jan 2016 12:31:45 +0000
-Subject: [PATCH] efi: stub: define DISABLE_BRANCH_PROFILING for all
- architectures
-In-Reply-To: <1450862968-20222-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1450862968-20222-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160104123145.GB1616@arm.com>
+From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
+Date: Mon, 4 Jan 2016 12:42:26 +0000
+Subject: [PATCH v11] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
+ PCIe Host Controller
+References: <1448798633-12697-1-git-send-email-bharatku@xilinx.com>
+ <20151209231921.GI31930@localhost>
+ <8520D5D51A55D047800579B09414719825869A85@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <20151210201817.GB367@localhost>
+ <8520D5D51A55D047800579B09414719825869EDC@XAP-PVEXMBX01.xlnx.xilinx.com>
+Message-ID: <8520D5D51A55D047800579B0941471982586E3A3@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 23, 2015 at 10:29:28AM +0100, Ard Biesheuvel wrote:
-> This moves the DISABLE_BRANCH_PROFILING define from the x86 specific
-> to the general CFLAGS definition for the stub. This fixes build errors
-> when building for arm64 with CONFIG_PROFILE_ALL_BRANCHES_ENABLED.
-> 
-> Reported-by: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  drivers/firmware/efi/libstub/Makefile | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+Hi Bjorn, can you comment on this. Marc has also replied for query on
+irq_dispose_mapping().
 
-Cheers, Ard. The kernel now builds and boots as an EFI application for
-me when the dreaded #define if config option is enabled:
-
-  Tested-by: Will Deacon <will.deacon@arm.com>
-
-Will
-
-> diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
-> index 3c0467d3688c..c0ddd1b8dca3 100644
-> --- a/drivers/firmware/efi/libstub/Makefile
-> +++ b/drivers/firmware/efi/libstub/Makefile
-> @@ -8,7 +8,7 @@ cflags-$(CONFIG_X86_32)		:= -march=i386
->  cflags-$(CONFIG_X86_64)		:= -mcmodel=small
->  cflags-$(CONFIG_X86)		+= -m$(BITS) -D__KERNEL__ $(LINUX_INCLUDE) -O2 \
->  				   -fPIC -fno-strict-aliasing -mno-red-zone \
-> -				   -mno-mmx -mno-sse -DDISABLE_BRANCH_PROFILING
-> +				   -mno-mmx -mno-sse
->  
->  cflags-$(CONFIG_ARM64)		:= $(subst -pg,,$(KBUILD_CFLAGS))
->  cflags-$(CONFIG_ARM)		:= $(subst -pg,,$(KBUILD_CFLAGS)) \
-> @@ -16,7 +16,7 @@ cflags-$(CONFIG_ARM)		:= $(subst -pg,,$(KBUILD_CFLAGS)) \
->  
->  cflags-$(CONFIG_EFI_ARMSTUB)	+= -I$(srctree)/scripts/dtc/libfdt
->  
-> -KBUILD_CFLAGS			:= $(cflags-y) \
-> +KBUILD_CFLAGS			:= $(cflags-y) -DDISABLE_BRANCH_PROFILING \
->  				   $(call cc-option,-ffreestanding) \
->  				   $(call cc-option,-fno-stack-protector)
->  
-> -- 
-> 2.5.0
-> 
+> > Subject: RE: [PATCH v11] PCI: Xilinx-NWL-PCIe: Added support for
+> > Xilinx NWL PCIe Host Controller
+> >
+> > > Subject: Re: [PATCH v11] PCI: Xilinx-NWL-PCIe: Added support for
+> > > Xilinx NWL PCIe Host Controller
+> > >
+> > > [+cc Marc for irq_dispose_mapping() question]
+> > >
+> > > On Thu, Dec 10, 2015 at 02:10:34PM +0000, Bharat Kumar Gogada wrote:
+> > > I'm trying to figure out what the difference is between these two
+> > > checks and why you have both of them:
+> > >
+> > > > +	if (bus->number == pcie->root_busno && devfn > 0)
+> > > > +	if (bus->primary == pcie->root_busno && devfn > 0)
+> > >
+> > > If I understand correctly, pcie->root_busno is the bus number of the
+> > > Root Port device (likely 00).  I think the "bus->number ==
+> > > pcie->root_busno && devfn > 0" check means that the Root Port, e.g.,
+> > > 00:00.0, is the only device allowed on bus 00.  Often a Root Complex
+> > > contains several Root Ports and other integrated devices that
+> > > typically are
+> > on bus 00.
+> > > But in your case, I think you're saying there is only the single
+> > > Root Port and no other devices.
+> > >
+> > > I think that first check takes care of everything on bus 00, so I'm
+> > > trying to figure out what the second check is for.  Assume your Root
+> > > Port is device
+> > > 00:00.0 and it is a bridge to [bus 01-ff].  Then we have two pci_bus
+> > > structs with these values:
+> > >
+> > >   bus->number = 00
+> > >   bus->primary = 00
+> > >   bus->busn_res = [bus 00-ff]
+> > >
+> > >   bus->number = 01
+> > >   bus->primary = 00
+> > >   bus->busn_res = [bus 01-ff]
+> > >
+> > > Because of the first check, 00:00.0 is the only possible device on
+> > > bus 00, and because of the second check, 01:00.0 is the only
+> > > possible device on
+> > bus 01.
+> > > Therefore, you don't support a multifunction device connected to the
+> > > Root Port.  Right?
+> > >
+> > We support multifunction devices also, so this check should not be
+> > there, will remove this check in next patch.
+> >
+> > > > > > +		return false;
+> > > > > > +
+> > > > > > +	return true;
+> > > > > > +}
+> > > > > > + * nwl_setup_sspl - Set Slot Power limit
+> > > > > > + *
+> > > > > > + * @pcie: PCIe port information  */ static int
+> > > > > > +nwl_setup_sspl(struct nwl_pcie *pcie)
+> > > > >
+> > > > The Set_Slot_Power_Limit Message includes a one DW data payload.
+> > > > The data payload is copied from the Slot Capabilities register of
+> > > > the Downstream Port and is written into the Device Capabilities
+> > > > register of the Upstream Port on the other side of the Link. Bits
+> > > > 9:8 of the data payload map to the Slot Power Limit Scale field
+> > > > and bits 7:0 map to the Slot Power Limit Value field. Bits 31:10
+> > > > of the data payload must be set to all 0's by the Transmitter and
+> > > > ignored by the
+> > Receiver.
+> > >
+> > > > This Message is sent automatically by the Downstream Port (of a
+> > > > Root Complex or a Switch) when one of the following events occurs:
+> > > > -> On a Configuration Write to the Slot Capabilities register (see
+> > > > Section 7.8.9) when the Data Link Layer reports DL_Up status.
+> > >
+> > > I interpret this as meaning "the *hardware* automatically sends a
+> > > Set_Slot_Power_Limit Message."  There's no mention of software doing
+> > > anything other than the configuration write.
+> > >
+> > > If your hardware doesn't do that, I think it's a defect.  It's fine
+> > > to work around it, but we should have a comment to that effect so
+> > > people don't copy the code to new drivers that don't need it.
+> >
+> > Our hardware is not capable of doing it, so we are doing it software.
+> > Yes I will add some comments.
+> >
+> > >
+> > > It's a little strange that 7.8.9 talks about writing to this
+> > > register when all of its fields are HwInit and supposedly read-only.
+> > > I had assumed devices would use strapping or implementation-specific
+> > > registers to set the Slot Power values, but maybe some devices use
+> > > direct
+> > writes to Slot Capabilities instead.
+> > >
+> > > BTW, I noticed a related lspci bug: it didn't decode the Capture
+> > > Slot Power Limit in Device Capabilities of Endpoints.  I posted a
+> > > fix for that
+> > separately.
+> > >
+> > > The Slot Power Limit (in Slot Capabilities) indicates how much power
+> > > the slot can supply to a downstream device.  That's a function of
+> > > the platform design, so it seems like this is something you want to
+> > > set via DT or some other mechanism that knows about the platform.
+> > > Intercepting all config writes and updating it with whatever the
+> > > caller supplies doesn't sound wise.  The value might be coming from
+> > > setpci or some other source with no knowledge of the platform.
+> >
+> > Agreed, but this is what can be done, it is difficult to determine who
+> > does what.
+> > >
+> > > > > > +			status = nwl_bridge_readl(pcie,
+> > TX_PCIE_MSG)
+> > > > > > +						  & MSG_DONE_BIT;
+> > > > > > +			if (status) {
+> > > > > > +				status = nwl_bridge_readl(pcie,
+> > > > > TX_PCIE_MSG)
+> > > > > > +						  &
+> > MSG_DONE_STATUS_BIT;
+> > >
+> > > > > It's not clear to me whether you need to re-read TX_PCIE_MSG here.
+> > > >
+> > > > MSG_DONE_BIT qualifies MSG_DONE_STATUS_BIT; so value of
+> > > > MSG_DONE_STATUS_BIT is valid only when MSG_DONE_BIT = 1
+> > >
+> > > That doesn't answer the question of whether another read is required.
+> > > In fact, I would argue that if MSG_DONE_STATUS_BIT is only valid
+> > > when MSG_DONE_BIT = 1, you *should* only do one read, because you
+> > > want to capture both bits simultaneously so you know they're
+> > > consistent, e.g.,
+> > >
+> > >   status = nwl_bridge_readl(pcie, TX_PCIE_MSG);
+> > >   if (status & MSG_DONE_BIT) {
+> > >     if (status & MSG_DONE_STATUS_BIT)
+> > >       ...
+> > >   }
+> > >
+> > > If you read the register twice, you always have to worry about what
+> > > changes MSG_DONE_BIT, and how you guarantee that the second read
+> > > happens before MSG_DONE_BIT changes.
+> > >
+> > Agreed, will do it in this way, once will also confirm with IP owner
+> > regarding both bits being updated parallel.
+> >
+> > > > > > +		}
+> > > > > > +	} while (status);
+> > Bharat
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-pci"
+> > in the body of a message to majordomo at vger.kernel.org More
+> majordomo
+> > info at http://vger.kernel.org/majordomo-info.html
