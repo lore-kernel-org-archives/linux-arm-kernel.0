@@ -1,88 +1,101 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  4 Jan 2016 17:56:48 +0000
-Subject: [PATCHv2 15/18] arm64: mm: allocate pagetables anywhere
-In-Reply-To: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
-References: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1451930211-22460-16-git-send-email-mark.rutland@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 4 Jan 2016 18:00:21 +0000
+Subject: [PATCH] arm64: fix relocation of movz instruction with negative
+ immediate
+In-Reply-To: <CAKv+Gu_T8PUZszv3RpC+nHrjKV_3gdqO1UjxizLQOYqBUQU5hA@mail.gmail.com>
+References: <1451923762-8387-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20160104171749.GA4436@e103592.cambridge.arm.com>
+ <CAKv+Gu_T8PUZszv3RpC+nHrjKV_3gdqO1UjxizLQOYqBUQU5hA@mail.gmail.com>
+Message-ID: <20160104180020.GB4436@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that create_mapping uses fixmap slots to modify pte, pmd, and pud
-entries, we can access page tables anywhere in physical memory,
-regardless of the extent of the linear mapping.
+On Mon, Jan 04, 2016 at 06:33:03PM +0100, Ard Biesheuvel wrote:
+> On 4 January 2016 at 18:21, Dave Martin <Dave.Martin@arm.com> wrote:
+> > On Mon, Jan 04, 2016 at 05:09:22PM +0100, Ard Biesheuvel wrote:
+> >> The test whether a movz instruction with a signed immediate should be
+> >> turned into a movn instruction (i.e., when the immediate is negative)
+> >> is flawed, since the value of imm is always positive. So check sval
+> >> instead.
+> >>
+> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> ---
+> >>  arch/arm64/kernel/module.c | 2 +-
+> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>
+> >> diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
+> >> index f4bc779e62e8..39e4a29cab50 100644
+> >> --- a/arch/arm64/kernel/module.c
+> >> +++ b/arch/arm64/kernel/module.c
+> >> @@ -128,7 +128,7 @@ static int reloc_insn_movw(enum aarch64_reloc_op op, void *place, u64 val,
+> >
+> > #define AARCH64_INSN_IMM_MOVNZ          AARCH64_INSN_IMM_MAX
+> > #define AARCH64_INSN_IMM_MOVK           AARCH64_INSN_IMM_16
+> >
+> > /* ... */
+> >
+> >         if (imm_type == AARCH64_INSN_IMM_MOVNZ) {
+> >
+> > /* ... */
+> >
+> >>                * immediate is less than zero.
+> >>                */
+> >>               insn &= ~(3 << 29);
+> >> -             if ((s64)imm >= 0) {
+> >> +             if (sval >= 0) {
+> >>                       /* >=0: Set the instruction to MOVZ (opcode 10b). */
+> >>                       insn |= 2 << 29;
+> >>               } else {
+> >
+> > I _think_ this may be correct, but...
+> >
+> >                 }
+> >                 imm_type = AARCH64_INSN_IMM_MOVK;
+> >         }
+> >
+> >         /* Update the instruction with the new encoding. */
+> >         insn = aarch64_insn_encode_immediate(imm_type, insn, imm);
+> >
+> > /* ... */
+> >
+> > leaves imm_type as either AARCH64_INSN_IMM_16 or AARCH64_INSN_IMM_MOVK.
+> >
+> > But because AARCH64_INSN_IMM_16 == AARCH64_INSN_IMM_MOVK (required for , the negative
+> > overflow fudge is never applied, no?
+> >
+> >         if (imm_type != AARCH64_INSN_IMM_16) {
+> >                 sval++;
+> >                 limit++;
+> >         }
+> >
+> >
+> > I'm wondering whether there is a less confusing way to do all this...
+> >
+> 
+> I hadn't spotted that AARCH64_INSN_IMM_16 == AARCH64_INSN_IMM_MOVK, so
+> you are correct that my single change is not sufficient to fix this
+> code.
+> 
+> Let me try to come up with something better ..
 
-Given that, we no longer need to limit memblock allocations during page
-table creation, and can leave the limit as its default
-MEMBLOCK_ALLOC_ANYWHERE.
+I think a simpler flow might go something like
 
-We never add memory which will fall outside of the linear map range
-given phys_offset and MAX_MEMBLOCK_ADDR are configured appropriately, so
-any tables we create will fall in the linear map of the final tables.
+	u64 uval = (u64)do_reloc(op, place, val);
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Jeremy Linton <jeremy.linton@arm.com>
-Cc: Laura Abbott <labbott@fedoraproject.org>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/mm/mmu.c | 35 -----------------------------------
- 1 file changed, 35 deletions(-)
+	if (is a SABS or PREL reloc that is not _NC, && (uval & (1 << 63))) {
+		change insn to MOVN;
+		uval = ~uval;
+	}
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index bf09d44..28bc764 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -382,20 +382,6 @@ static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
- static void __init map_mem(void)
- {
- 	struct memblock_region *reg;
--	phys_addr_t limit;
--
--	/*
--	 * Temporarily limit the memblock range. We need to do this as
--	 * create_mapping requires puds, pmds and ptes to be allocated from
--	 * memory addressable from the initial direct kernel mapping.
--	 *
--	 * The initial direct kernel mapping, located at swapper_pg_dir, gives
--	 * us PUD_SIZE (with SECTION maps) or PMD_SIZE (without SECTION maps,
--	 * memory starting from PHYS_OFFSET (which must be aligned to 2MB as
--	 * per Documentation/arm64/booting.txt).
--	 */
--	limit = PHYS_OFFSET + SWAPPER_INIT_MAP_SIZE;
--	memblock_set_current_limit(limit);
- 
- 	/* map all the memory banks */
- 	for_each_memblock(memory, reg) {
-@@ -407,29 +393,8 @@ static void __init map_mem(void)
- 		if (memblock_is_nomap(reg))
- 			continue;
- 
--		if (ARM64_SWAPPER_USES_SECTION_MAPS) {
--			/*
--			 * For the first memory bank align the start address and
--			 * current memblock limit to prevent create_mapping() from
--			 * allocating pte page tables from unmapped memory. With
--			 * the section maps, if the first block doesn't end on section
--			 * size boundary, create_mapping() will try to allocate a pte
--			 * page, which may be returned from an unmapped area.
--			 * When section maps are not used, the pte page table for the
--			 * current limit is already present in swapper_pg_dir.
--			 */
--			if (start < limit)
--				start = ALIGN(start, SECTION_SIZE);
--			if (end < limit) {
--				limit = end & SECTION_MASK;
--				memblock_set_current_limit(limit);
--			}
--		}
- 		__map_memblock(start, end);
- 	}
--
--	/* Limit no longer required. */
--	memblock_set_current_limit(MEMBLOCK_ALLOC_ANYWHERE);
- }
- 
- static void __init fixup_executable(void)
--- 
-1.9.1
+	/* encode the insn using the bottom 16 bits of uval */
+
+	if (not an _NC reloc && (uval >> 16) > 0)
+		return -ERANGE;
+
+
+...or something along those lines.
+
+I haven't tried to implement that yet, though.
+
+Cheers
+---Dave
