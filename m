@@ -1,34 +1,46 @@
-From: jun.nie@linaro.org (Jun Nie)
-Date: Tue, 5 Jan 2016 09:38:13 +0800
-Subject: [PATCH] ARM: zx_defconfig: remove CONFIG_MMC_DW_IDMAC
-In-Reply-To: <1451877536-21603-1-git-send-email-shawn.lin@rock-chips.com>
-References: <1451877536-21603-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <568B1E85.1040604@linaro.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 4 Jan 2016 20:42:29 -0500 (EST)
+Subject: [PATCH] ARM: Runtime patch udiv/sdiv instructions into
+ __aeabi_{u}idiv()
+In-Reply-To: <20160105012319.GC22188@codeaurora.org>
+References: <alpine.LFD.2.20.1512110105450.26920@knanqh.ubzr>
+ <alpine.LFD.2.20.1512111125330.26920@knanqh.ubzr>
+ <alpine.LFD.2.20.1512111216350.26920@knanqh.ubzr>
+ <1941958.3p422lB7Mz@wuerfel>
+ <alpine.LFD.2.20.1512111842280.26920@knanqh.ubzr>
+ <20160105012319.GC22188@codeaurora.org>
+Message-ID: <alpine.LFD.2.20.1601042035190.3603@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016?01?04? 11:18, Shawn Lin wrote:
-> dw_mmc driver never use this macro, so remove it from
-> zx_defconfig
->
-> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
-> ---
->
->   arch/arm/configs/zx_defconfig | 1 -
->   1 file changed, 1 deletion(-)
->
-> diff --git a/arch/arm/configs/zx_defconfig b/arch/arm/configs/zx_defconfig
-> index b200bb0..ab683fb 100644
-> --- a/arch/arm/configs/zx_defconfig
-> +++ b/arch/arm/configs/zx_defconfig
-> @@ -83,7 +83,6 @@ CONFIG_MMC=y
->   CONFIG_MMC_UNSAFE_RESUME=y
->   CONFIG_MMC_BLOCK_MINORS=16
->   CONFIG_MMC_DW=y
-> -CONFIG_MMC_DW_IDMAC=y
->   CONFIG_EXT2_FS=y
->   CONFIG_EXT4_FS=y
->   CONFIG_EXT4_FS_POSIX_ACL=y
->
+On Mon, 4 Jan 2016, Stephen Boyd wrote:
 
-Reviewed-by: Jun Nie <jun.nie@linaro.org>
+> On 12/11, Nicolas Pitre wrote:
+> > Stephen's series could still be relevant by extending what is done here, 
+> > and it requires what this patch is doing anyway for those call sites 
+> > that can't be substituted by a div instruction (like conditional 
+> > branches, tail call optimizations, etc.)
+> > 
+> 
+> I'm back from vacation now. Where have we left off on this topic?
+> 
+> I can update the patches to be based on this patch here and
+> handle the conditional branches and tail call optimization cases
+> by adding some safety checks like we have for the ftrace branch
+> patching. But I'd rather not do that work unless we all agree
+> that it's worthwhile pursuing it.
+> 
+> Is there still any concern about the benefit of patching each
+> call site vs. patching the functions? The micro benchmark seems
+> to show some theoretical improvement on cortex-a7 and I can run
+> it on Scorpion and Krait processors to look for any potential
+> benefits there, but I'm not sure of any good kernel benchmark for
+> this. If it will be rejected due to complexity vs. benefit
+> arguments I'd rather work on something else.
+
+You could run the benchmark on Scorpion and Krait to start with. If 
+there is no improvement what so ever like on A15's then the answer might 
+be rather simple.
+
+
+Nicolas
