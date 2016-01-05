@@ -1,24 +1,33 @@
-From: richard@nod.at (Richard Weinberger)
-Date: Wed, 6 Jan 2016 00:12:42 +0100
-Subject: [PATCH v2 12/32] x86/um: reuse asm-generic/barrier.h
-In-Reply-To: <1451572003-2440-13-git-send-email-mst@redhat.com>
-References: <1451572003-2440-1-git-send-email-mst@redhat.com>
- <1451572003-2440-13-git-send-email-mst@redhat.com>
-Message-ID: <568C4DEA.5070601@nod.at>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 6 Jan 2016 00:24:24 +0100
+Subject: [PATCH 1/2] ARM: versatile: add the syscon LEDs to the DT
+In-Reply-To: <CAL_JsqLOLO0Y2h5LDruAutEGtjMfQPHhqUJ8mXEwAdgVW4JifQ@mail.gmail.com>
+References: <1452002529-3335-1-git-send-email-linus.walleij@linaro.org>
+ <1452002529-3335-2-git-send-email-linus.walleij@linaro.org>
+ <CAL_JsqLOLO0Y2h5LDruAutEGtjMfQPHhqUJ8mXEwAdgVW4JifQ@mail.gmail.com>
+Message-ID: <CACRpkdYg9SNaNvQJpOjBPbsp4tx4eia-fXLMgu7oynnKiqTHug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 31.12.2015 um 20:07 schrieb Michael S. Tsirkin:
-> On x86/um CONFIG_SMP is never defined.  As a result, several macros
-> match the asm-generic variant exactly. Drop the local definitions and
-> pull in asm-generic/barrier.h instead.
-> 
-> This is in preparation to refactoring this code area.
-> 
-> Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+On Tue, Jan 5, 2016 at 4:37 PM, Rob Herring <robh@kernel.org> wrote:
+> On Tue, Jan 5, 2016 at 8:02 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> The device tree version of Versatile AP/PB never had LED support
+>> so we are missing LEDs from our hardware boards. Add this as
+>> syscon LEDs like we did for Integrator and Juno. We need to
+>> spawn devices in the syscon with "simple-mfd" for this to work.
+>>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> ---
+>>  arch/arm/boot/dts/versatile-ab.dts | 62 +++++++++++++++++++++++++++++++++++++-
+>>  1 file changed, 61 insertions(+), 1 deletion(-)
+>
+> Acked-by: Rob Herring <robh@kernel.org>
+>
+> I guess this means you have tested my series on actual h/w now?
 
-Acked-by: Richard Weinberger <richard@nod.at>
+Yups tested today on Versatile AB. I sent some 4 different
+patches for various issues (that were there all the time with
+the device tree boot) and after that it works like a charm.
 
-Thanks,
-//richard
+Yours,
+Linus Walleij
