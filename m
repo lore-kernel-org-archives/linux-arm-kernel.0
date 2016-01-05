@@ -1,74 +1,74 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 5 Jan 2016 10:21:47 +0800
-Subject: [linux-sunxi] reason for Allwinner SoC specific pinctrl drivers?
-In-Reply-To: <568A514D.7070102@arm.com>
-References: <568A514D.7070102@arm.com>
-Message-ID: <CAGb2v65WttmGunT1ipekdZN_orjbWa43p9w2tcq_SCi-fzQMnQ@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 5 Jan 2016 11:26:04 +0900
+Subject: [PATCH] drivers/bus: make uniphier-system-bus.c explicitly
+ non-modular
+In-Reply-To: <CAK7LNASDdpt0zVHUe=EMdKCH6N25CwBLtR0A4jXP=P8zAaaqRA@mail.gmail.com>
+References: <1451935379-14107-1-git-send-email-paul.gortmaker@windriver.com>
+ <CAK7LNASK5GCQ-Jk7ApmSinnW2PAaSmD-k2X9BbGg66-_b5kASg@mail.gmail.com>
+ <CAK7LNASDdpt0zVHUe=EMdKCH6N25CwBLtR0A4jXP=P8zAaaqRA@mail.gmail.com>
+Message-ID: <CAK7LNASU3OMhhPTQvEUKEX_5RNiCeaF-QUBgvuSVpEvd4awWww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 4, 2016 at 7:02 PM, Andre Przywara <andre.przywara@arm.com> wrote:
-> Hi,
->
-> while looking at the Allwinner A64 SoC support, I was wondering why we
-> would actually need a pinctrl driver (file) for each and every Allwinner
-> SoC that we support.
-> Looking at both the A20 and the A64 doc I don't see any differences in
-> the port controller implementation apart from the actual
-> muxval <-> subsystem assignment, which is just data, right?
-> Comparing the code files in drivers/pinctrl/sunxi seems to support this,
-> as those drivers only consist of the table and some boilerplate code.
->
-> Now I was wondering whether we could get away with one generic Allwinner
-> pinctrl driver and put the SoC specific pin assignments in DT instead.
-> It looks like adding an "allwinner,muxval" property in addition to the
-> existing "allwinner,function" in the SoC's .dtsi would give us all the
-> information we need. This could look like:
->
->         uart0_pins_a: uart0 at 0 {
->                 allwinner,pins =   "PB22", "PB23";
-> +               allwinner,muxval = <0x02    0x02>;
->                 allwinner,function = "uart0";
->                 allwinner,drive = <SUN4I_PINCTRL_10_MA>;
->                 allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
->         };
-
-Using a mux value over a string does not gain us much, other than
-smaller driver code, since all the strings are gone, and smaller DT,
-again no strings. However, if you want some sensible debug output
-from the driver, you're going to keep the strings anyway.
-
-The mux values would need to be macros defined in some header file,
-instead of raw values which are hard to understand.
-
-That's only half of it. The driver should know what pins are available
-and which mux values can be used for them. So you'd still need a table
-of some sort. That means it's unlikely you can have a generic driver.
-Leaking the internals into the DT is not a good way either.
-
-The current approach of a generic driver library and SoC specific
-tables maybe isn't the best approach, but it is easy enough to add new
-SoC support.
+Hi Paul,
 
 
-Regards
-ChenYu
+2016-01-05 8:24 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> Hi Olof,
+>
+> Sorry my misunderstanding.
+>
+>
+> 2016-01-05 8:15 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+>> Hi Paul, Olof,
+>>
+>> 2016-01-05 4:22 GMT+09:00 Paul Gortmaker <paul.gortmaker@windriver.com>:
+>>> The Kconfig currently controlling compilation of this code is:
+>>>
+>>> drivers/bus/Kconfig:config UNIPHIER_SYSTEM_BUS
+>>> drivers/bus/Kconfig:    bool "UniPhier System Bus driver"
+>>>
+>>> ...meaning that it currently is not being built as a module by anyone.
+>>>
+>>> Lets remove the modular code that is essentially orphaned, so that
+>>> when reading the driver there is no doubt it is builtin-only.
+>>>
+>>> Since module_platform_driver() uses the same init level priority as
+>>> builtin_platform_driver() the init ordering remains unchanged with
+>>> this commit.
+>>>
+>>> Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
+>>>
+>>> We also delete the MODULE_LICENSE tag etc. since all that information
+>>> is already contained at the top of the file in the comments.
+>>>
+>>> Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+>>> Cc: Rob Herring <robh@kernel.org>
+>>> Cc: Arnd Bergmann <arnd@arndb.de>
+>>> Cc: Olof Johansson <olof@lixom.net>
+>>> Cc: linux-arm-kernel at lists.infradead.org
+>>> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 
-> Would it make sense that I sit down and prototype such a driver?
->
-> We should keep compatibility with older DTs by keeping the existing
-> drivers in (or maybe emulating the current behaviour by providing just
-> those tables as a fallback) , but newer SoCs (like the A64?) would not
-> need a SoC specific driver, but just go with that generic driver and
-> appropriate DT properties.
->
-> I appreciate any comments on this, especially if I missed something
-> which would render this approach impossible or tedious.
->
-> Cheers,
-> Andre.
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+
+
+I assume commit 326ea45aa827 ("bus: uniphier: allow only built-in driver")
+is a temporary fix.
+
+I'd like to revive the tristate for this driver
+by hook or by crook.
+
+
+I've sent the following to fix the build error.
+http://www.thefreedictionary.com/
+
+I want to see how it goes.
+
+
+So, please hold back yours for now.
+
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
