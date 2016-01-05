@@ -1,93 +1,135 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 5 Jan 2016 15:36:34 +0100
-Subject: [PATCH v2 02/13] arm64: introduce KIMAGE_VADDR as the virtual
- base of the kernel region
-In-Reply-To: <1451489172-17420-3-git-send-email-ard.biesheuvel@linaro.org>
-References: <1451489172-17420-1-git-send-email-ard.biesheuvel@linaro.org>
- <1451489172-17420-3-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160105143634.GD28354@cbox>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Tue, 5 Jan 2016 08:36:31 -0600
+Subject: [PATCH v2 0/3] USB: add generic onboard USB HUB driver
+In-Reply-To: <CAL411-qKE=12VZAN9=tUWPqkC5BfSgpQb9aNgCU6rmPLasXNHQ@mail.gmail.com>
+References: <CAL411-rK6qfkbQsSjvXH5VPAQAm4tMyD6fVTEgFQrpLHNGMXeA@mail.gmail.com>
+ <Pine.LNX.4.44L0.1512181030590.1682-100000@iolanthe.rowland.org>
+ <CAL411-qKE=12VZAN9=tUWPqkC5BfSgpQb9aNgCU6rmPLasXNHQ@mail.gmail.com>
+Message-ID: <CAL_Jsq+P8SBmWzNURrmNgz8soCn4QPOPid4SXF0a3TYL_SH27A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 30, 2015 at 04:26:01PM +0100, Ard Biesheuvel wrote:
-> This introduces the preprocessor symbol KIMAGE_VADDR which will serve as
-> the symbolic virtual base of the kernel region, i.e., the kernel's virtual
-> offset will be KIMAGE_VADDR + TEXT_OFFSET. For now, we define it as being
-> equal to PAGE_OFFSET, but in the future, it will be moved below it once
-> we move the kernel virtual mapping out of the linear mapping.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/include/asm/memory.h | 10 ++++++++--
->  arch/arm64/kernel/head.S        |  2 +-
->  arch/arm64/kernel/vmlinux.lds.S |  4 ++--
->  3 files changed, 11 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-> index 853953cd1f08..bea9631b34a8 100644
-> --- a/arch/arm64/include/asm/memory.h
-> +++ b/arch/arm64/include/asm/memory.h
-> @@ -51,7 +51,8 @@
->  #define VA_BITS			(CONFIG_ARM64_VA_BITS)
->  #define VA_START		(UL(0xffffffffffffffff) << VA_BITS)
->  #define PAGE_OFFSET		(UL(0xffffffffffffffff) << (VA_BITS - 1))
-> -#define MODULES_END		(PAGE_OFFSET)
-> +#define KIMAGE_VADDR		(PAGE_OFFSET)
-> +#define MODULES_END		(KIMAGE_VADDR)
->  #define MODULES_VADDR		(MODULES_END - SZ_64M)
->  #define PCI_IO_END		(MODULES_VADDR - SZ_2M)
->  #define PCI_IO_START		(PCI_IO_END - PCI_IO_SIZE)
-> @@ -75,8 +76,13 @@
->   * private definitions which should NOT be used outside memory.h
->   * files.  Use virt_to_phys/phys_to_virt/__pa/__va instead.
->   */
-> -#define __virt_to_phys(x)	(((phys_addr_t)(x) - PAGE_OFFSET + PHYS_OFFSET))
-> +#define __virt_to_phys(x) ({						\
-> +	phys_addr_t __x = (phys_addr_t)(x);				\
-> +	__x >= PAGE_OFFSET ? (__x - PAGE_OFFSET + PHYS_OFFSET) :	\
-> +			     (__x - KIMAGE_VADDR + PHYS_OFFSET); })
+On Mon, Dec 21, 2015 at 2:33 AM, Peter Chen <hzpeterchen@gmail.com> wrote:
+> On Fri, Dec 18, 2015 at 11:38 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
+>> On Fri, 18 Dec 2015, Peter Chen wrote:
+>>
+>>> On Fri, Dec 18, 2015 at 12:13 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
+>>
+>>> > It's not clear (to me, anyway) how this is meant to work.  USB is a
+>>> > completely discoverable bus: There is no way to represent devices
+>>> > statically; they have to be discovered.  But a device can't be
+>>> > discovered unless it is functional, so if an onboard hub (or any other
+>>> > sort of USB device) requires power, clocks, or something similar in
+>>> > order to function, it won't be discovered.  There won't be any device
+>>> > structure to probe, and "forcing driver probe" won't accomplish
+>>> > anything.
+>>> >
+>>> > It seems to me that the only way something like this could be made to
+>>> > work is if the necessary actions are keyed off the host controller (and
+>>> > in particular, _not_ the hub driver), presumably at the time the
+>>> > controller is probed.
 
-so __virt_to_phys will now work with a subset of the non-linear namely
-all except vmalloced and ioremapped ones?
+The problem with putting this in the the host controller driver is it
+assumes the initialization sequence is generic enough to be described
+in DT and that initialization is the only time we need DT data. The
+MFD example is a perfect example of another case. Suspend/resume also
+comes to mind. Even if we could put the control in both places, that
+is poor design IMO. I'd rather just make it a requirement that the
+bootloader do enough setup that devices can be discovered.
 
+[...]
+
+>>> +static int hub_of_children_register(struct usb_device *hdev)
+>>> +{
+>>> +     struct device *dev;
+>>> +
+>>> +     if (hdev->parent)
+>>> +             dev = &hdev->dev;
+>>> +     else
+>>> +             dev = bus_to_hcd(hdev->bus)->self.controller;
+>>> +
+>>> +     if (!dev->of_node)
+>>> +             return 0;
+>>
+>> Suppose hdev->parent is not NULL (hdev isn't the root hub -- maybe it's
+>> a 2nd-level hub).  Then how did hdev->dev->of_node get set?
+>>
+>
+> Yes, the USB device doesn't know device node.
+
+That should be a solvable problem...
+
+
+> There are two problems which needs device tree to support, I have
+> below solutions for them, please help to see if it is reasonable.
+>
+> 1. The USB device can't work without external clock, power, reset operation.
+> At device tree, we have a node to describe external signals like clocks, gpios
+> for all onboard devices under this controller. And this node is as phandle for
+> host controller, see below:
+>
+> --- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> @@ -108,6 +108,21 @@
+>                 default-brightness-level = <7>;
+>                 status = "okay";
+>         };
 > +
->  #define __phys_to_virt(x)	((unsigned long)((x) - PHYS_OFFSET + PAGE_OFFSET))
-> +#define __phys_to_kimg(x)	((unsigned long)((x) - PHYS_OFFSET + KIMAGE_VADDR))
->  
->  /*
->   * Convert a page to/from a physical address
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 23cfc08fc8ba..6434c844a0e4 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -389,7 +389,7 @@ __create_page_tables:
->  	 * Map the kernel image (starting with PHYS_OFFSET).
->  	 */
->  	mov	x0, x26				// swapper_pg_dir
-> -	mov	x5, #PAGE_OFFSET
-> +	ldr	x5, =KIMAGE_VADDR
->  	create_pgd_entry x0, x5, x3, x6
->  	ldr	x6, =KERNEL_END			// __va(KERNEL_END)
->  	mov	x3, x24				// phys offset
-> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-> index 7de6c39858a5..ced0dedcabcc 100644
-> --- a/arch/arm64/kernel/vmlinux.lds.S
-> +++ b/arch/arm64/kernel/vmlinux.lds.S
-> @@ -88,7 +88,7 @@ SECTIONS
->  		*(.discard.*)
->  	}
->  
-> -	. = PAGE_OFFSET + TEXT_OFFSET;
-> +	. = KIMAGE_VADDR + TEXT_OFFSET;
->  
->  	.head.text : {
->  		_text = .;
-> @@ -185,4 +185,4 @@ ASSERT(__idmap_text_end - (__idmap_text_start & ~(SZ_4K - 1)) <= SZ_4K,
->  /*
->   * If padding is applied before .head.text, virt<->phys conversions will fail.
->   */
-> -ASSERT(_text == (PAGE_OFFSET + TEXT_OFFSET), "HEAD is misaligned")
-> +ASSERT(_text == (KIMAGE_VADDR + TEXT_OFFSET), "HEAD is misaligned")
-> -- 
-> 2.5.0
-> 
+> +       usbh1_pre_operation: usbh1_pre_operation {
+> +               clocks = <&clks IMX6QDL_CLK_1>,
+> +                        <&clks IMX6QDL_CLK_2>,
+> +                        <&clks IMX6QDL_CLK_3>,
+> +                        <&clks IMX6QDL_CLK_4>,
+> +                        <&clks IMX6QDL_CLK_5>,
+> +                        <&clks IMX6QDL_CLK_6>;
+> +               reset-gpios = <&gpio4 5 GPIO_ACTIVE_LOW>,
+> +                             <&gpio4 7 GPIO_ACTIVE_LOW>,
+> +                             <&gpio3 25 GPIO_ACTIVE_LOW>,
+> +                             <&gpio3 27 GPIO_ACTIVE_LOW>,
+> +                             <&gpio4 4 GPIO_ACTIVE_LOW>,
+> +                             <&gpio4 6 GPIO_ACTIVE_LOW>;
+> +       };
+>  };
+>
+>  &clks {
+> @@ -590,6 +605,8 @@
+>  &usbh1 {
+>         vbus-supply = <&reg_usb_h1_vbus>;
+>         status = "okay";
+> +
+> +       devices-pre-operation = <&usbh1_pre_operation>
+>  };
+
+No. The binding should reflect the hardware connections. The hub is a
+child of the USB controller/root hub. so the hub node had better be a
+child of the controller in the DT. The clocks and reset are
+connections to the hub, so they had better be in the hub's DT node.
+There is really nothing more to discuss on the binding. Anything else
+you are coming up with is working around kernel issues.
+
+
+> At code, we add one API of_usb_pre_operation to get clocks and gpios through
+> host controller's device node, and this API is called at usb_add_hcd,
+> and opposite
+> operation is called at usb_remove_hcd.
+>
+> This solution is almost the same with MMC power sequence solution.
+> (see drivers/mmc/core/pwrseq.c)
+>
+> 2. There are MFD USB devices, which includes several interfaces under
+> USB device,
+> like i2c, gpios, etc. Due to lack of device tree support, USB
+> class/device driver doesn't know
+> which kinds of interfaces are needed for this board.
+
+Are you talking about a device hard wired on the same board or
+something like GPIOs on FTDI chip which could be hot-plugged in any
+host (including non-DT based)?
+
+For the hotplug case, we will need a way to associate a DT overlay
+with the USB device and there may not even be a base DT to map the
+overlay into. In this case, the USB device's driver will need to load
+the overlay and trigger enumerating the child devices. Anyway, this is
+a separate issue from your problem.
+
+Rob
