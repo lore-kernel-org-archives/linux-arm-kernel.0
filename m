@@ -1,75 +1,38 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 5 Jan 2016 13:22:43 +0800
-Subject: [PATCH v5 4/5] arm64: pci: Add ACPI support
-In-Reply-To: <1451884403-21437-5-git-send-email-jchandra@broadcom.com>
-Message-ID: <201601051319.7OgVNJxN%fengguang.wu@intel.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 5 Jan 2016 16:47:16 +1100
+Subject: Widespread boot failures on ARM due to "mm/page_alloc.c:
+ calculate zone_start_pfn at zone_spanned_pages_in_node()"
+In-Reply-To: <20160105114918.2641f95d@canb.auug.org.au>
+References: <20160104224233.GU16023@sirena.org.uk>
+ <20160104150946.373ed02b8e8b81221340b7c8@linux-foundation.org>
+ <20160104235512.GW16023@sirena.org.uk>
+ <20160104163528.be56a4b1.akpm@linux-foundation.org>
+ <20160105114918.2641f95d@canb.auug.org.au>
+Message-ID: <20160105164716.44b9db6d@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jayachandran,
+Hi Andrew,
 
-[auto build test ERROR on pm/linux-next]
-[also build test ERROR on v4.4-rc8 next-20160104]
-[cannot apply to pci/next]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+On Tue, 5 Jan 2016 11:49:18 +1100 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+>
+> On Mon, 4 Jan 2016 16:35:28 -0800 Andrew Morton <akpm@linux-foundation.org> wrote:
+> >
+> > Stephen, can we please retain
+> > 
+> > mm-calculate-zone_start_pfn-at-zone_spanned_pages_in_node.patch
+> > mm-introduce-kernelcore=mirror-option.patch
+> > mm-introduce-kernelcore=mirror-option-fix.patch
+> > mm-introduce-kernelcore=mirror-option-fix-2.patch
+> > 
+> > and add the below?  
+> 
+> Sure, that is easier than dropping the above patches, anyway.
 
-url:    https://github.com/0day-ci/linux/commits/Jayachandran-C/ACPI-based-PCI-support-for-arm64/20160104-125550
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git linux-next
-config: arm64-allmodconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+I have done that *except* that
+mm-introduce-kernelcore=mirror-option-fix-2.patch is not in mmotm and I
+cannot find it anywhere.
 
-All errors (new ones prefixed by >>):
-
->> drivers/xen/pci.c:31:25: fatal error: asm/pci_x86.h: No such file or directory
-    #include <asm/pci_x86.h>
-                            ^
-   compilation terminated.
-
-vim +31 drivers/xen/pci.c
-
-e28c31a9 Weidong Han           2010-10-27  15   * Place - Suite 330, Boston, MA 02111-1307 USA.
-e28c31a9 Weidong Han           2010-10-27  16   *
-e28c31a9 Weidong Han           2010-10-27  17   * Author: Weidong Han <weidong.han@intel.com>
-e28c31a9 Weidong Han           2010-10-27  18   */
-e28c31a9 Weidong Han           2010-10-27  19  
-e28c31a9 Weidong Han           2010-10-27  20  #include <linux/pci.h>
-55e901fc Jan Beulich           2011-09-22  21  #include <linux/acpi.h>
-0b97b03d Ross Lagerwall        2015-04-09  22  #include <linux/pci-acpi.h>
-e28c31a9 Weidong Han           2010-10-27  23  #include <xen/xen.h>
-e28c31a9 Weidong Han           2010-10-27  24  #include <xen/interface/physdev.h>
-e28c31a9 Weidong Han           2010-10-27  25  #include <xen/interface/xen.h>
-e28c31a9 Weidong Han           2010-10-27  26  
-e28c31a9 Weidong Han           2010-10-27  27  #include <asm/xen/hypervisor.h>
-e28c31a9 Weidong Han           2010-10-27  28  #include <asm/xen/hypercall.h>
-e28c31a9 Weidong Han           2010-10-27  29  #include "../pci/pci.h"
-b7ef4a6d Ben Hutchings         2013-12-31  30  #ifdef CONFIG_PCI_MMCONFIG
-8deb3eb1 Konrad Rzeszutek Wilk 2013-10-25 @31  #include <asm/pci_x86.h>
-b7ef4a6d Ben Hutchings         2013-12-31  32  #endif
-e28c31a9 Weidong Han           2010-10-27  33  
-55e901fc Jan Beulich           2011-09-22  34  static bool __read_mostly pci_seg_supported = true;
-55e901fc Jan Beulich           2011-09-22  35  
-e28c31a9 Weidong Han           2010-10-27  36  static int xen_add_device(struct device *dev)
-e28c31a9 Weidong Han           2010-10-27  37  {
-e28c31a9 Weidong Han           2010-10-27  38  	int r;
-e28c31a9 Weidong Han           2010-10-27  39  	struct pci_dev *pci_dev = to_pci_dev(dev);
-
-:::::: The code at line 31 was first introduced by commit
-:::::: 8deb3eb1461e4cb136c88d03ec5a6729ccf2f933 xen/mcfg: Call PHYSDEVOP_pci_mmcfg_reserved for MCFG areas.
-
-:::::: TO: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-:::::: CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 46720 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160105/14fada82/attachment-0001.obj>
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
