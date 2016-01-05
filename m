@@ -1,24 +1,48 @@
-From: alexei.starovoitov@gmail.com (Alexei Starovoitov)
-Date: Tue, 5 Jan 2016 09:50:39 -0800
-Subject: [PATCH] ARM: net: bpf: fix zero right shift
-In-Reply-To: <1452015244-1230-1-git-send-email-rabin@rab.in>
-References: <1452015244-1230-1-git-send-email-rabin@rab.in>
-Message-ID: <20160105175038.GB83548@ast-mbp.thefacebook.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 5 Jan 2016 17:51:14 +0000
+Subject: [PATCH] efi: stub: define DISABLE_BRANCH_PROFILING for all
+ architectures
+In-Reply-To: <20160105153918.GA2714@codeblueprint.co.uk>
+References: <1450862968-20222-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20160104123145.GB1616@arm.com>
+ <CAKv+Gu-n-7tk1NXYAbf7+O79gYG82QOsbzLuYG1yX=LSizksWQ@mail.gmail.com>
+ <20160105153918.GA2714@codeblueprint.co.uk>
+Message-ID: <20160105175114.GG10705@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 05, 2016 at 06:34:04PM +0100, Rabin Vincent wrote:
-> The LSR instruction cannot be used to perform a zero right shift since a
-> 0 as the immediate value (imm5) in the LSR instruction encoding means
-> that a shift of 32 is perfomed.  See DecodeIMMShift() in the ARM ARM.
+On Tue, Jan 05, 2016 at 03:39:18PM +0000, Matt Fleming wrote:
+> On Tue, 05 Jan, at 03:56:39PM, Ard Biesheuvel wrote:
+> > (+ Arnd)
+> > 
+> > On 4 January 2016 at 13:31, Will Deacon <will.deacon@arm.com> wrote:
+> > > On Wed, Dec 23, 2015 at 10:29:28AM +0100, Ard Biesheuvel wrote:
+> > >> This moves the DISABLE_BRANCH_PROFILING define from the x86 specific
+> > >> to the general CFLAGS definition for the stub. This fixes build errors
+> > >> when building for arm64 with CONFIG_PROFILE_ALL_BRANCHES_ENABLED.
+> > >>
+> > >> Reported-by: Will Deacon <will.deacon@arm.com>
+> > >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > >> ---
+> > >>  drivers/firmware/efi/libstub/Makefile | 4 ++--
+> > >>  1 file changed, 2 insertions(+), 2 deletions(-)
+> > >
+> > > Cheers, Ard. The kernel now builds and boots as an EFI application for
+> > > me when the dreaded #define if config option is enabled:
+> > >
+> > >   Tested-by: Will Deacon <will.deacon@arm.com>
+> > >
+> > > Will
+> > >
+> > 
+> > @Matt: this is causing randconfig build errors for ARM in -next. Mind
+> > if we take this through some other tree?
 > 
-> Make the JIT skip generation of the LSR if a zero-shift is requested.
+> Go ahead.
 > 
-> This was found using american fuzzy lop.
-> 
-> Signed-off-by: Rabin Vincent <rabin@rab.in>
+> Reviewed-by: Matt Fleming <matt@codeblueprint.co.uk>
 
-Looks good as a fix for classic jit. For eBPF we would want to check
-this in verifier.
+I can take this via the arm64 tree, unless Arnd wants to queue it in
+arm-soc. Arnd?
 
-Acked-by: Alexei Starovoitov <ast@kernel.org>
+Will
