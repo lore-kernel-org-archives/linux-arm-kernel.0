@@ -1,32 +1,38 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
-Date: Tue, 5 Jan 2016 12:30:20 +0100
-Subject: [PATCH] ARM: dts: omap3: Include missing bandgap data for
- ti-soc-thermal driver
-In-Reply-To: <20151231173844.GD11863@localhost.localdomain>
-References: <1451086345-3340-1-git-send-email-pali.rohar@gmail.com>
- <20151231173844.GD11863@localhost.localdomain>
-Message-ID: <20160105113020.GK22661@pali>
+From: vinaysimha@inforcecomputing.com (Vinay Simha BN)
+Date: Tue,  5 Jan 2016 17:06:56 +0530
+Subject: [PATCH] arm64: dts: qcom: apq8016-sbc: leds: bt and wlan
+Message-ID: <1451993818-3469-1-git-send-email-vinaysimha@inforcecomputing.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 31 December 2015 09:38:45 Eduardo Valentin wrote:
-> > +
-> > +		bandgap {
-> > +			reg = <0x48002524 0x4>;
-> > +			compatible = "ti,omap36xx-bandgap";
-> 
-> Can you please already add on both cases
-> 
-> #thermal-sensor-cells = <0>;
-> ?
-> 
-> This way we can already use them to define thermal zones. Of course,
-> that alone won't add the thermal zones. A separated patch would be
-> needed to add the thermal zone for OMAP3.
+BT LED   - PMIC - MPP_03
+WLAN LED - PMIC - MPP_02
 
-Are you going to add thermal zone defines? If yes, then it would make
-sense to add that #thermal line together with thermal zone defines...
+Signed-off-by: Vinay Simha BN <vinaysimha@inforcecomputing.com>
+---
+ arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+index 7bb0ab8..37ca0c8 100644
+--- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
++++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+@@ -94,14 +94,14 @@
+ 		led at 5 {
+ 			label = "apq8016-sbc:yellow:wifi";
+ 			gpios = <&pm8916_mpps 2 GPIO_ACTIVE_HIGH>;
+-			linux,default-trigger = "wlan";
++			linux,default-trigger = "rfkill0";
+ 			default-state = "off";
+ 		};
+ 
+ 		led at 6 {
+ 			label = "apq8016-sbc:blue:bt";
+ 			gpios = <&pm8916_mpps 3 GPIO_ACTIVE_HIGH>;
+-			linux,default-trigger = "bt";
++			linux,default-trigger = "rfkill1";
+ 			default-state = "off";
+ 		};
+ 	};
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
+2.1.2
