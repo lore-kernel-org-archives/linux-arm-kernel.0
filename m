@@ -1,122 +1,98 @@
-From: james.hogan@imgtec.com (James Hogan)
-Date: Tue, 5 Jan 2016 00:09:30 +0000
-Subject: [PATCH v2 20/32] metag: define __smp_xxx
-In-Reply-To: <1451572003-2440-21-git-send-email-mst@redhat.com>
-References: <1451572003-2440-1-git-send-email-mst@redhat.com>
- <1451572003-2440-21-git-send-email-mst@redhat.com>
-Message-ID: <20160105000929.GM17861@jhogan-linux.le.imgtec.org>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Mon, 04 Jan 2016 16:23:51 -0800
+Subject: [GIT PULL 1/5] clk: tegra: Changes for v4.5-rc1
+In-Reply-To: <1450356639-7758-1-git-send-email-thierry.reding@gmail.com>
+References: <1450356639-7758-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <20160105002351.15239.82225@quark.deferred.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michael,
-
-On Thu, Dec 31, 2015 at 09:08:22PM +0200, Michael S. Tsirkin wrote:
-> This defines __smp_xxx barriers for metag,
-> for use by virtualization.
+Quoting Thierry Reding (2015-12-17 04:50:35)
+> Hi Mike, Stephen,
 > 
-> smp_xxx barriers are removed as they are
-> defined correctly by asm-generic/barriers.h
+> The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
 > 
-> Note: as __smp_XX macros should not depend on CONFIG_SMP, they can not
-> use the existing fence() macro since that is defined differently between
-> SMP and !SMP.  For this reason, this patch introduces a wrapper
-> metag_fence() that doesn't depend on CONFIG_SMP.
-> fence() is then defined using that, depending on CONFIG_SMP.
+>   Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.5-clk
 
-I'm not a fan of the inconsistent commit message wrapping. I wrap to 72
-columns (although I now notice SubmittingPatches says to use 75...).
+Pulled.
+
+Regards,
+Mike
 
 > 
-> Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/metag/include/asm/barrier.h | 32 +++++++++++++++-----------------
->  1 file changed, 15 insertions(+), 17 deletions(-)
+> for you to fetch changes up to 2d7f61f37731f635af47615a8a331ffe7f884934:
 > 
-> diff --git a/arch/metag/include/asm/barrier.h b/arch/metag/include/asm/barrier.h
-> index b5b778b..84880c9 100644
-> --- a/arch/metag/include/asm/barrier.h
-> +++ b/arch/metag/include/asm/barrier.h
-> @@ -44,13 +44,6 @@ static inline void wr_fence(void)
->  #define rmb()		barrier()
->  #define wmb()		mb()
->  
-> -#ifndef CONFIG_SMP
-> -#define fence()		do { } while (0)
-> -#define smp_mb()        barrier()
-> -#define smp_rmb()       barrier()
-> -#define smp_wmb()       barrier()
-> -#else
-
-!SMP kernel text differs, but only because of new presence of unused
-metag_fence() inline function. If I #if 0 that out, then it matches, so
-thats fine.
-
-> -
->  #ifdef CONFIG_METAG_SMP_WRITE_REORDERING
->  /*
->   * Write to the atomic memory unlock system event register (command 0). This is
-> @@ -60,26 +53,31 @@ static inline void wr_fence(void)
->   * incoherence). It is therefore ineffective if used after and on the same
->   * thread as a write.
->   */
-> -static inline void fence(void)
-> +static inline void metag_fence(void)
->  {
->  	volatile int *flushptr = (volatile int *) LINSYSEVENT_WR_ATOMIC_UNLOCK;
->  	barrier();
->  	*flushptr = 0;
->  	barrier();
->  }
-> -#define smp_mb()        fence()
-> -#define smp_rmb()       fence()
-> -#define smp_wmb()       barrier()
-> +#define __smp_mb()        metag_fence()
-> +#define __smp_rmb()       metag_fence()
-> +#define __smp_wmb()       barrier()
->  #else
-> -#define fence()		do { } while (0)
-> -#define smp_mb()        barrier()
-> -#define smp_rmb()       barrier()
-> -#define smp_wmb()       barrier()
-> +#define metag_fence()		do { } while (0)
-> +#define __smp_mb()        barrier()
-> +#define __smp_rmb()       barrier()
-> +#define __smp_wmb()       barrier()
-
-Whitespace is now messed up. Admitedly its already inconsistent
-tabs/spaces, but it'd be nice if the definitions at least still all
-lined up. You're touching all the definitions which use spaces anyway,
-so feel free to convert them to tabs while you're at it.
-
-Other than those niggles, it looks sensible to me:
-Acked-by: James Hogan <james.hogan@imgtec.com>
-
-Cheers
-James
-
->  #endif
-> +
-> +#ifdef CONFIG_SMP
-> +#define fence() metag_fence()
-> +#else
-> +#define fence()		do { } while (0)
->  #endif
->  
-> -#define smp_mb__before_atomic()	barrier()
-> -#define smp_mb__after_atomic()	barrier()
-> +#define __smp_mb__before_atomic()	barrier()
-> +#define __smp_mb__after_atomic()	barrier()
->  
->  #include <asm-generic/barrier.h>
->  
-> -- 
-> MST
+>   clk: tegra: Read correct IDDQ register in PLL_SS registration (2015-12-17 13:37:58 +0100)
 > 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160105/822d84d1/attachment-0001.sig>
+> Note that the first commit in this set adds the device tree bindings for
+> Tegra210. This is a dependency for the for-4.5/dt branch because it adds
+> the dt-bindings include file used by the Tegra210 DTS files.
+> 
+> Thanks,
+> Thierry
+> 
+> ----------------------------------------------------------------
+> clk: tegra: Changes for v4.5-rc1
+> 
+> This set of changes adds support for the Tegra210 SoC and contains a
+> couple fixes and cleanups.
+> 
+> ----------------------------------------------------------------
+> Andrew Bresticker (1):
+>       clk: tegra: pll: Fix issues with rates for VCO PLLs
+> 
+> Bill Huang (8):
+>       clk: tegra: pll: Change misc_reg count from 3 to 6
+>       clk: tegra: pll: Add code to handle if resets are supported by PLL
+>       clk: tegra: pll: Adjust vco_min if SDM present
+>       clk: tegra: pll: Add Set_default logic
+>       clk: tegra: pll: Add logic for SS
+>       clk: tegra: Add Super Gen5 Logic
+>       clk: tegra: Fix WARN_ON in PLL_RE registration
+>       clk: tegra: Read correct IDDQ register in PLL_SS registration
+> 
+> Danny Huang (1):
+>       clk: tegra: pll: Update PLLM handling
+> 
+> Rhyland Klein (12):
+>       clk: tegra: periph: Add new periph clks and muxes for Tegra210
+>       clk: tegra: pll: Add tegra_pll_wait_for_lock to clk header
+>       clk: tegra: pll: Simplify clk_enable_path
+>       clk: tegra: pll: Update warning message
+>       clk: tegra: pll: Don't unconditionally set LOCK flags
+>       clk: tegra: pll: Add logic for handling SDM data
+>       clk: tegra: pll: Add logic for out-of-table rates for T210
+>       clk: tegra: pll: Fix _pll_ramp_calc_pll logic and _calc_dynamic_ramp_rate
+>       clk: tegra: pll: Add specialized logic for Tegra210
+>       clk: tegra: pll: Add support for PLLMB for Tegra210
+>       clk: tegra: pll: Add dyn_ramp callback
+>       clk: tegra: Add support for Tegra210 clocks
+> 
+> Thierry Reding (5):
+>       clk: tegra: Add Tegra210 device tree binding
+>       clk: tegra: Fix 26 MHz oscillator frequency
+>       clk: tegra: Miscellaneous coding style cleanups
+>       clk: tegra: Format tables consistently
+>       clk: tegra: Constify pdiv-to-hw mappings
+> 
+>  .../bindings/clock/nvidia,tegra210-car.txt         |   56 +
+>  drivers/clk/tegra/Makefile                         |    1 +
+>  drivers/clk/tegra/clk-id.h                         |   75 +-
+>  drivers/clk/tegra/clk-pll.c                        |  838 ++++--
+>  drivers/clk/tegra/clk-tegra-periph.c               |  371 ++-
+>  drivers/clk/tegra/clk-tegra-super-gen4.c           |  142 +-
+>  drivers/clk/tegra/clk-tegra114.c                   |  339 +--
+>  drivers/clk/tegra/clk-tegra124.c                   |  453 ++--
+>  drivers/clk/tegra/clk-tegra20.c                    |  314 ++-
+>  drivers/clk/tegra/clk-tegra210.c                   | 2852 ++++++++++++++++++++
+>  drivers/clk/tegra/clk-tegra30.c                    |  426 +--
+>  drivers/clk/tegra/clk.h                            |  101 +-
+>  include/dt-bindings/clock/tegra210-car.h           |  401 +++
+>  13 files changed, 5439 insertions(+), 930 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/nvidia,tegra210-car.txt
+>  create mode 100644 drivers/clk/tegra/clk-tegra210.c
+>  create mode 100644 include/dt-bindings/clock/tegra210-car.h
