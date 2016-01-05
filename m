@@ -1,46 +1,126 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
-Date: Tue, 5 Jan 2016 09:49:47 +0100
-Subject: [PATCH 2/2] memory: omap-gpmc: Add Kconfig option for debug
-In-Reply-To: <20160105041356.GE12777@atomide.com>
-References: <1432156863-19695-1-git-send-email-tony@atomide.com>
- <568662FC.9050206@gmail.com> <20160104170206.GC12777@atomide.com>
- <201601041834.56056@pali> <20160104174001.GD12777@atomide.com>
- <568AC0F9.2010304@gmail.com> <20160105041356.GE12777@atomide.com>
-Message-ID: <20160105084947.GG22661@pali>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Tue, 5 Jan 2016 10:51:17 +0200
+Subject: [PATCH v2 15/32] powerpc: define __smp_xxx
+In-Reply-To: <20160105013648.GA1256@fixme-laptop.cn.ibm.com>
+References: <1451572003-2440-1-git-send-email-mst@redhat.com>
+ <1451572003-2440-16-git-send-email-mst@redhat.com>
+ <20160105013648.GA1256@fixme-laptop.cn.ibm.com>
+Message-ID: <20160105085117.GA11858@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 04 January 2016 20:13:56 Tony Lindgren wrote:
-> * Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [160104 10:59]:
-> > Hi,
+On Tue, Jan 05, 2016 at 09:36:55AM +0800, Boqun Feng wrote:
+> Hi Michael,
+> 
+> On Thu, Dec 31, 2015 at 09:07:42PM +0200, Michael S. Tsirkin wrote:
+> > This defines __smp_xxx barriers for powerpc
+> > for use by virtualization.
 > > 
-> > On  4.01.2016 19:40, Tony Lindgren wrote:
-> > >>On Monday 04 January 2016 18:02:06 Tony Lindgren wrote:
-> > >>>> >Care to boot with CONFIG_OMAP_GPMC_DEBUG=y and post the gpmc related
-> > >>>> >dmesg output?
+> > smp_xxx barriers are removed as they are
+> > defined correctly by asm-generic/barriers.h
+
+I think this is the part that was missed in review.
+
+> > This reduces the amount of arch-specific boiler-plate code.
 > > 
-> > Here it is, including the pre-gpmc log, keep in mind this is with restored
-> > HWMOD_INIT_NO_RESET flag so rootfs is functional and I can get dmesg output
-> > from the syslog. Don't know if it is helpful :). Also, this device has
-> > Numonyx onenand (HW rev. 2204), unlike most of the others which have Samsung
-> > onenand (HW rev. 2101 etc), no idea if it is relevant.
+> > Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > ---
+> >  arch/powerpc/include/asm/barrier.h | 24 ++++++++----------------
+> >  1 file changed, 8 insertions(+), 16 deletions(-)
+> > 
+> > diff --git a/arch/powerpc/include/asm/barrier.h b/arch/powerpc/include/asm/barrier.h
+> > index 980ad0c..c0deafc 100644
+> > --- a/arch/powerpc/include/asm/barrier.h
+> > +++ b/arch/powerpc/include/asm/barrier.h
+> > @@ -44,19 +44,11 @@
+> >  #define dma_rmb()	__lwsync()
+> >  #define dma_wmb()	__asm__ __volatile__ (stringify_in_c(SMPWMB) : : :"memory")
+> >  
+> > -#ifdef CONFIG_SMP
+> > -#define smp_lwsync()	__lwsync()
+> > +#define __smp_lwsync()	__lwsync()
+> >  
 > 
-> Thanks. I got the problem reproduced here too.
+> so __smp_lwsync() is always mapped to lwsync, right?
+
+Yes.
+
+> > -#define smp_mb()	mb()
+> > -#define smp_rmb()	__lwsync()
+> > -#define smp_wmb()	__asm__ __volatile__ (stringify_in_c(SMPWMB) : : :"memory")
+> > -#else
+> > -#define smp_lwsync()	barrier()
+> > -
+> > -#define smp_mb()	barrier()
+> > -#define smp_rmb()	barrier()
+> > -#define smp_wmb()	barrier()
+> > -#endif /* CONFIG_SMP */
+> > +#define __smp_mb()	mb()
+> > +#define __smp_rmb()	__lwsync()
+> > +#define __smp_wmb()	__asm__ __volatile__ (stringify_in_c(SMPWMB) : : :"memory")
+> >  
+> >  /*
+> >   * This is a barrier which prevents following instructions from being
+> > @@ -67,18 +59,18 @@
+> >  #define data_barrier(x)	\
+> >  	asm volatile("twi 0,%0,0; isync" : : "r" (x) : "memory");
+> >  
+> > -#define smp_store_release(p, v)						\
+> > +#define __smp_store_release(p, v)						\
+> >  do {									\
+> >  	compiletime_assert_atomic_type(*p);				\
+> > -	smp_lwsync();							\
+> > +	__smp_lwsync();							\
 > 
-> [    1.915557] gpmc cs0 after gpmc_cs_set_timings:
-> [    1.920410] cs0 GPMC_CS_CONFIG1: 0xfb001201
+> , therefore this will emit an lwsync no matter SMP or UP.
+
+Absolutely. But smp_store_release (without __) will not.
+
+Please note I did test this: for ppc code before and after
+this patch generates exactly the same binary on SMP and UP.
+
+
+> Another thing is that smp_lwsync() may have a third user(other than
+> smp_load_acquire() and smp_store_release()):
 > 
-> Looks like in the failing case the clock rates are not properly
-> calculated in GPMC and GPMCFCLKDIVIDER is set wrong in
-> GPMC_CS_CONFIG1. Need to look at it more to figure out what's the
-> best way to fix this.
+> http://article.gmane.org/gmane.linux.ports.ppc.embedded/89877
+> 
+> I'm OK to change my patch accordingly, but do we really want
+> smp_lwsync() get involved in this cleanup? If I understand you
+> correctly, this cleanup focuses on external API like smp_{r,w,}mb(),
+> while smp_lwsync() is internal to PPC.
 > 
 > Regards,
-> 
-> Tony
+> Boqun
 
-Hm... Maybe this problem is in U-Boot too?
+I think you missed the leading ___ :)
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
+smp_store_release is external and it needs __smp_lwsync as
+defined here.
+
+I can duplicate some code and have smp_lwsync *not* call __smp_lwsync
+but why do this? Still, if you prefer it this way,
+please let me know.
+
+> >  	WRITE_ONCE(*p, v);						\
+> >  } while (0)
+> >  
+> > -#define smp_load_acquire(p)						\
+> > +#define __smp_load_acquire(p)						\
+> >  ({									\
+> >  	typeof(*p) ___p1 = READ_ONCE(*p);				\
+> >  	compiletime_assert_atomic_type(*p);				\
+> > -	smp_lwsync();							\
+> > +	__smp_lwsync();							\
+> >  	___p1;								\
+> >  })
+> >  
+> > -- 
+> > MST
+> > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > Please read the FAQ at  http://www.tux.org/lkml/
