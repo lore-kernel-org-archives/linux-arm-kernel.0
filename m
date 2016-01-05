@@ -1,82 +1,132 @@
-From: jay.xu@rock-chips.com (Jianqun Xu)
-Date: Tue, 5 Jan 2016 15:42:55 +0800
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 05 Jan 2016 09:00:20 +0100
 Subject: [PATCH] i2c: rk3x: init module as subsys call
-In-Reply-To: <2513923.8oltbpbAin@phil>
+In-Reply-To: <568B73E8.3010901@rock-chips.com>
 References: <1451962938-17398-1-git-send-email-jay.xu@rock-chips.com>
- <2513923.8oltbpbAin@phil>
-Message-ID: <568B73FF.9090508@rock-chips.com>
+ <2513923.8oltbpbAin@phil> <568B73E8.3010901@rock-chips.com>
+Message-ID: <7893052.zgDX0r4i77@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko:
+Hi Tao,
 
-? 05/01/2016 15:02, Heiko Stuebner ??:
-> Hi Jianqun,
->
-> Am Dienstag, 5. Januar 2016, 11:02:18 schrieb jianqun.xu:
->> From: Xu Jianqun <jay.xu@rock-chips.com>
->>
->> There is a requirement from pmic device, which is on the i2c bus,
->> that the pmic needs to be called earlier then devices powered by
->> the outputs of the pmic, if not, the devices maybe fail to probe.
->>
->> For example, a pmic on i2c0, and touchscreen device on i2c2,
->> i2c0: - pmic(rk818)
->> i2c2: - ts(gt911), powered by rk818 on i2c0
->>
->> The problem will happen if the i2c2 node in dts file is ordered
->> before i2c0 node, then ts(gt911) will be probed before pmic(rk818),
->> since the power from the pmic(rk818) for ts(gt911) hasn't enabled,
->> so ts(gt911) will fail to probe due to the failure of i2c test.
->>
->> But if we set the i2c0 node before i2c2, there is no this issue.
->>
->> The stable way to make sure that pmic can be intalized before other
->> peripher devices is to make the pmic module be subsys call, the i2c
->> module need to be subsys call firstly.
->
-> I do believe that came up in the past already and the direction from then
-> was (and most likely still is) that drivers should make use of the probe-
-> deferral mechanism instead of wiggling with the initcall ordering.
->
-> Your touchscreen will have a "xyz-supply" property and I think the
-> regulator-framework should already emit a -EPROBE_DEFER at regulator_get,
-> when the regulator is specified but not available yet.
->
-It seems more reasonable, thanks for advice, I will have a try.
->
-> Heiko
->
->>
->> Signed-off-by: Xu Jianqun <jay.xu@rock-chips.com>
->> ---
->>   drivers/i2c/busses/i2c-rk3x.c | 12 +++++++++++-
->>   1 file changed, 11 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
->> index c1935eb..00e5959 100644
->> --- a/drivers/i2c/busses/i2c-rk3x.c
->> +++ b/drivers/i2c/busses/i2c-rk3x.c
->> @@ -1037,7 +1037,17 @@ static struct platform_driver rk3x_i2c_driver = {
->>   	},
->>   };
->>
->> -module_platform_driver(rk3x_i2c_driver);
->> +static int __init rk3x_i2c_init(void)
->> +{
->> +	return platform_driver_register(&rk3x_i2c_driver);
->> +}
->> +subsys_initcall(rk3x_i2c_init);
->> +
->> +static void __exit rk3x_i2c_exit(void)
->> +{
->> +	platform_driver_unregister(&rk3x_i2c_driver);
->> +}
->> +module_exit(rk3x_i2c_exit);
->>
->>   MODULE_DESCRIPTION("Rockchip RK3xxx I2C Bus driver");
->>   MODULE_AUTHOR("Max Schwarz <max.schwarz@online.de>");
->
->
->
->
+Am Dienstag, 5. Januar 2016, 15:42:32 schrieb Huang, Tao:
+> On 2016?01?05? 15:02, Heiko Stuebner wrote:
+> > Hi Jianqun,
+> > 
+> > Am Dienstag, 5. Januar 2016, 11:02:18 schrieb jianqun.xu:
+> >> From: Xu Jianqun <jay.xu@rock-chips.com>
+> >> 
+> >> There is a requirement from pmic device, which is on the i2c bus,
+> >> that the pmic needs to be called earlier then devices powered by
+> >> the outputs of the pmic, if not, the devices maybe fail to probe.
+> >> 
+> >> For example, a pmic on i2c0, and touchscreen device on i2c2,
+> >> i2c0: - pmic(rk818)
+> >> i2c2: - ts(gt911), powered by rk818 on i2c0
+> >> 
+> >> The problem will happen if the i2c2 node in dts file is ordered
+> >> before i2c0 node, then ts(gt911) will be probed before pmic(rk818),
+> >> since the power from the pmic(rk818) for ts(gt911) hasn't enabled,
+> >> so ts(gt911) will fail to probe due to the failure of i2c test.
+> >> 
+> >> But if we set the i2c0 node before i2c2, there is no this issue.
+> >> 
+> >> The stable way to make sure that pmic can be intalized before other
+> >> peripher devices is to make the pmic module be subsys call, the i2c
+> >> module need to be subsys call firstly.
+> > 
+> > I do believe that came up in the past already and the direction from
+> > then
+> > was (and most likely still is) that drivers should make use of the
+> > probe-
+> > deferral mechanism instead of wiggling with the initcall ordering.
+> 
+> I don't think this is a good idea. This will trigger a lots of init call
+> failed. Before pmic init, all i2c device driver transmit will failed,
+> and because i2c is slow bus, and i2c transmit may failed by other
+> reasons, so the i2c driver and i2c device driver will try many times to
+> make sure the transmit completion. These unnecessary transmission will
+> make Linux boot very slow.
+
+In general, the slowdown won't be _this_ much if touchscreen drivers need 
+one deferral-round before i2c is available. I'm also only pointing out 
+things I remember from the last time this came up. 
+
+rk3x-i2c even was here already:
+http://www.spinics.net/lists/linux-i2c/msg16680.html
+
+
+> I2C bus should be subsys, and we can easy resolve this problem, why we
+> depends on a complicated and slow implementation?
+
+because it's the only safe way to do that. Because now you need i2c-init at 
+subsys-init time, some months later some other soc may need some other 
+ordering, especially needing i2c-init later/earlier.
+
+Going through the deferral mechanism is the only way currently available to 
+actually make this work on all socs.
+
+Tomeu from Collabora is working on some better scheme to optimize device 
+probing order but it looks like this may be a bit off still.
+
+
+> > Your touchscreen will have a "xyz-supply" property and I think the
+> > regulator-framework should already emit a -EPROBE_DEFER at
+> > regulator_get,
+> > when the regulator is specified but not available yet.
+> 
+> Unfortunately, mostly driver do not support regulator api. They are
+> suppose power is on.
+
+Having touchscreen drivers support its proper supply-regulators is not 
+rocket science ;-) [0] , so I would consider this a bug in the touchscreen 
+driver itself.
+
+Just look into the datasheet and add the appropriate supplies to the drivers 
+in question.
+
+
+Heiko
+
+[0] citiing my own work: 
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/input/touchscreen/zforce_ts.c#n806
+
+> 
+> Thanks.
+> Huang, Tao
+> 
+> > Heiko
+> > 
+> >> Signed-off-by: Xu Jianqun <jay.xu@rock-chips.com>
+> >> ---
+> >> 
+> >>  drivers/i2c/busses/i2c-rk3x.c | 12 +++++++++++-
+> >>  1 file changed, 11 insertions(+), 1 deletion(-)
+> >> 
+> >> diff --git a/drivers/i2c/busses/i2c-rk3x.c
+> >> b/drivers/i2c/busses/i2c-rk3x.c index c1935eb..00e5959 100644
+> >> --- a/drivers/i2c/busses/i2c-rk3x.c
+> >> +++ b/drivers/i2c/busses/i2c-rk3x.c
+> >> @@ -1037,7 +1037,17 @@ static struct platform_driver rk3x_i2c_driver =
+> >> {
+> >> 
+> >>  	},
+> >>  
+> >>  };
+> >> 
+> >> -module_platform_driver(rk3x_i2c_driver);
+> >> +static int __init rk3x_i2c_init(void)
+> >> +{
+> >> +	return platform_driver_register(&rk3x_i2c_driver);
+> >> +}
+> >> +subsys_initcall(rk3x_i2c_init);
+> >> +
+> >> +static void __exit rk3x_i2c_exit(void)
+> >> +{
+> >> +	platform_driver_unregister(&rk3x_i2c_driver);
+> >> +}
+> >> +module_exit(rk3x_i2c_exit);
+> >> 
+> >>  MODULE_DESCRIPTION("Rockchip RK3xxx I2C Bus driver");
+> >>  MODULE_AUTHOR("Max Schwarz <max.schwarz@online.de>");
