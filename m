@@ -1,126 +1,192 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 5 Jan 2016 12:05:36 +0000
-Subject: [linux-sunxi] reason for Allwinner SoC specific pinctrl drivers?
-In-Reply-To: <CAOMqctQL3nmWECpQgtVdxgzEfn2obu4cdj67W1ESONO=5EpQdQ@mail.gmail.com>
-References: <568A514D.7070102@arm.com>
- <CAEzqOZu8wkPKLp6bZZ7JuiM07ixDksdD=U-WK=3kFPYJZMon4Q@mail.gmail.com>
- <CAOMqctQL3nmWECpQgtVdxgzEfn2obu4cdj67W1ESONO=5EpQdQ@mail.gmail.com>
-Message-ID: <568BB190.1080006@arm.com>
+From: schwidefsky@de.ibm.com (Martin Schwidefsky)
+Date: Tue, 5 Jan 2016 13:08:52 +0100
+Subject: [PATCH v2 22/32] s390: define __smp_xxx
+In-Reply-To: <20160105105335-mutt-send-email-mst@redhat.com>
+References: <1451572003-2440-1-git-send-email-mst@redhat.com>
+ <1451572003-2440-23-git-send-email-mst@redhat.com>
+ <20160104134525.GA6344@twins.programming.kicks-ass.net>
+ <20160104221323-mutt-send-email-mst@redhat.com>
+ <20160105091319.59ddefc7@mschwide>
+ <20160105105335-mutt-send-email-mst@redhat.com>
+Message-ID: <20160105130852.11148a7f@mschwide>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michal,
+On Tue, 5 Jan 2016 11:30:19 +0200
+"Michael S. Tsirkin" <mst@redhat.com> wrote:
 
-thanks for your input!
-
-On 04/01/16 21:36, Michal Suchanek wrote:
-> Hello,
+> On Tue, Jan 05, 2016 at 09:13:19AM +0100, Martin Schwidefsky wrote:
+> > On Mon, 4 Jan 2016 22:18:58 +0200
+> > "Michael S. Tsirkin" <mst@redhat.com> wrote:
+> > 
+> > > On Mon, Jan 04, 2016 at 02:45:25PM +0100, Peter Zijlstra wrote:
+> > > > On Thu, Dec 31, 2015 at 09:08:38PM +0200, Michael S. Tsirkin wrote:
+> > > > > This defines __smp_xxx barriers for s390,
+> > > > > for use by virtualization.
+> > > > > 
+> > > > > Some smp_xxx barriers are removed as they are
+> > > > > defined correctly by asm-generic/barriers.h
+> > > > > 
+> > > > > Note: smp_mb, smp_rmb and smp_wmb are defined as full barriers
+> > > > > unconditionally on this architecture.
+> > > > > 
+> > > > > Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+> > > > > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > > > > ---
+> > > > >  arch/s390/include/asm/barrier.h | 15 +++++++++------
+> > > > >  1 file changed, 9 insertions(+), 6 deletions(-)
+> > > > > 
+> > > > > diff --git a/arch/s390/include/asm/barrier.h b/arch/s390/include/asm/barrier.h
+> > > > > index c358c31..fbd25b2 100644
+> > > > > --- a/arch/s390/include/asm/barrier.h
+> > > > > +++ b/arch/s390/include/asm/barrier.h
+> > > > > @@ -26,18 +26,21 @@
+> > > > >  #define wmb()				barrier()
+> > > > >  #define dma_rmb()			mb()
+> > > > >  #define dma_wmb()			mb()
+> > > > > -#define smp_mb()			mb()
+> > > > > -#define smp_rmb()			rmb()
+> > > > > -#define smp_wmb()			wmb()
+> > > > > -
+> > > > > -#define smp_store_release(p, v)						\
+> > > > > +#define __smp_mb()			mb()
+> > > > > +#define __smp_rmb()			rmb()
+> > > > > +#define __smp_wmb()			wmb()
+> > > > > +#define smp_mb()			__smp_mb()
+> > > > > +#define smp_rmb()			__smp_rmb()
+> > > > > +#define smp_wmb()			__smp_wmb()
+> > > > 
+> > > > Why define the smp_*mb() primitives here? Would not the inclusion of
+> > > > asm-generic/barrier.h do this?
+> > > 
+> > > No because the generic one is a nop on !SMP, this one isn't.
+> > > 
+> > > Pls note this patch is just reordering code without making
+> > > functional changes.
+> > > And at the moment, on s390 smp_xxx barriers are always non empty.
+> > 
+> > The s390 kernel is SMP to 99.99%, we just didn't bother with a
+> > non-smp variant for the memory-barriers. If the generic header
+> > is used we'd get the non-smp version for free. It will save a
+> > small amount of text space for CONFIG_SMP=n. 
 > 
-> On 4 January 2016 at 18:27, Vishnu Patekar <vishnupatekar0510@gmail.com> wrote:
->> Hello Andre,
->> This is something we can do for future SOCs.
->>
->> On 4 Jan 2016 19:02, "Andre Przywara" <andre.przywara@arm.com> wrote:
->>>
->>> Hi,
->>>
->>> while looking at the Allwinner A64 SoC support, I was wondering why we
->>> would actually need a pinctrl driver (file) for each and every Allwinner
->>> SoC that we support.
->>> Looking at both the A20 and the A64 doc I don't see any differences in
->>> the port controller implementation apart from the actual
->>> muxval <-> subsystem assignment, which is just data, right?
->>> Comparing the code files in drivers/pinctrl/sunxi seems to support this,
->>> as those drivers only consist of the table and some boilerplate code.
->>>
->>> Now I was wondering whether we could get away with one generic Allwinner
->>> pinctrl driver and put the SoC specific pin assignments in DT instead.
->>> It looks like adding an "allwinner,muxval" property in addition to the
->>> existing "allwinner,function" in the SoC's .dtsi would give us all the
->>> information we need. This could look like:
->>>
->>>         uart0_pins_a: uart0 at 0 {
->>>                 allwinner,pins =   "PB22", "PB23";
->>> +               allwinner,muxval = <0x02    0x02>;
->>>                 allwinner,function = "uart0";
+> OK, so I'll queue a patch to do this then?
+
+Yes please.
+ 
+> Just to make sure: the question would be, are smp_xxx barriers ever used
+> in s390 arch specific code to flush in/out memory accesses for
+> synchronization with the hypervisor?
 > 
-> As I understand it
+> I went over s390 arch code and it seems to me the answer is no
+> (except of course for virtio).
+
+Correct. Guest to host communication either uses instructions which
+imply a memory barrier or QDIO which uses atomics.
+
+> But I also see a lot of weirdness on this architecture.
+
+Mostly historical, s390 actually is one of the easiest architectures in
+regard to memory barriers.
+
+> I found these calls:
 > 
-> 1) uart0 is basically a mnemonic for muxval 2
+> arch/s390/include/asm/bitops.h: smp_mb__before_atomic();
+> arch/s390/include/asm/bitops.h: smp_mb();
+> 
+> Not used in arch specific code so this is likely OK.
 
-Not really. At the moment uart0 is used to lookup the (hard-coded) table
-entry for pins PB22 and PB23, which returns the said value of 0x02 (in
-this example, cf. line 246 in pinctrl-sun7i-a20.c).
-But if there are other pins where UART0 can be muxed too, there is
-another node describing them (cf. uart3_pins_a and uart3_pins_b in
-sun7i-a20.dtsi). This one uses the "uart0" name as well, but the muxval
-returned for _those pins_ can be different. So the string only makes
-sense in connection with a certain pin.
+This has been introduced with git commit 5402ea6af11dc5a9, the smp_mb
+and smp_mb__before_atomic are used in clear_bit_unlock and
+__clear_bit_unlock which are 1:1 copies from the code in
+include/asm-generic/bitops/lock.h. Only test_and_set_bit_lock differs
+from the generic implementation.
 
-> 2) if you try to mux uart0 on pins for which it is not in the table it fails
+> arch/s390/kernel/vdso.c:        smp_mb();
+> 
+> Looking at
+> 	Author: Christian Borntraeger <borntraeger@de.ibm.com>
+> 	Date:   Fri Sep 11 16:23:06 2015 +0200
+> 
+> 	    s390/vdso: use correct memory barrier
+> 
+> 	    By definition smp_wmb only orders writes against writes. (Finish all
+> 	    previous writes, and do not start any future write). To protect the
+> 	    vdso init code against early reads on other CPUs, let's use a full
+> 	    smp_mb at the end of vdso init. As right now smp_wmb is implemented
+> 	    as full serialization, this needs no stable backport, but this change
+> 	    will be necessary if we reimplement smp_wmb.
+> 
+> ok from hypervisor point of view, but it's also strange:
+> 1. why isn't this paired with another mb somewhere?
+>    this seems to violate barrier pairing rules.
+> 2. how does smp_mb protect against early reads on other CPUs?
+>    It normally does not: it orders reads from this CPU versus writes
+>    from same CPU. But init code does not appear to read anything.
+>    Maybe this is some s390 specific trick?
+> 
+> I could not figure out the above commit.
 
-How would you mux them if they are not in the table?
+That smp_mb can be removed. The initial s390 vdso code is heavily influenced
+by the powerpc version which does have a smp_wmb in vdso_init right before
+the vdso_ready=1 assignment. s390 has no need for that.
+ 
+> 
+> arch/s390/kvm/kvm-s390.c:       smp_mb();
+> 
+> Does not appear to be paired with anything.
 
-> So it makes no sense to have both function and muxval - this is redundant.
+This one does not make sense to me. Imho can be removed as well. 
+ 
+> arch/s390/lib/spinlock.c:               smp_mb();
+> arch/s390/lib/spinlock.c:                       smp_mb();
+> 
+> Seems ok, and appears paired properly.
+> Just to make sure - spinlock is not paravirtualized on s390, is it?
 
-Kind of, but not if we want to keep compatibility with older and newer
-DTs and older and newer kernels (drivers, really) - which is my goal.
-So we just _add_ the muxval values. The existing chip-specific drivers
-would naturally ignore the values and just use their built-in table for
-lookup. The generic driver on the other hand would use the DT
-information. An appropriate compatible string could then be added to
-refer to the generic driver as a fallback.
-For (future) SoCs (which would not have a specific driver) we could omit
-the function string (if this isn't needed elsewhere, I have to check).
-So I don't see how the redundancy would be an issue here.
+s390 just uses the compare-and-swap instruction for the basic lock/unlock
+operation, this implies the memory barrier. We do call the hypervisor for
+contended locks if the lock can not be acquired after a number of retries.
 
-> And it does not make sense to move from function to muxval - it's like
-> moving from assembly programing to raw machine code programming.
+A while ago we did play with ticket spinlocks but they behaved badly in
+out usual virtualized environments. If we find the time we might take a
+closer look at the para-virtualized queued spinlocks.
 
-But it removes the requirement of relying on the built-in lookup table.
-So by using a more readable uart0 "mnemonic" we rely on some hardcoded,
-chip specific table in each kernel, which is just wrong IMHO. Other DT
-users (be it Xen or *BSD, for instance) would have to replicate this
-table and since it's really SoC specific, it does not make any sense to
-me to keep it separate. After all this DT node is SoC specific as well,
-so I don't see the point of abstracting this with some string lookup.
+> rch/s390/kernel/time.c:        smp_wmb();
+> arch/s390/kernel/time.c:        smp_wmb();
+> arch/s390/kernel/time.c:        smp_wmb();
+> arch/s390/kernel/time.c:        smp_wmb();
+> 
+> It's all around vdso, so I'm guessing userspace is using this,
+> this is why there's no pairing.
 
-So to stay with your comparison: Yes, we move from assembly to machine
-code, but we get rid of the need for a SoC specific assembler, which is
-maintained separately.
+Correct, this is the update count mechanics with the vdso user space code.
 
-> For compatibility it's not possible to move the table to the shared
-> SoC DT
+> > > Some of this could be sub-optimal, but
+> > > since on s390 Linux always runs on a hypervisor,
+> > > I am not sure it's safe to use the generic version -
+> > > in other words, it just might be that for s390 smp_ and virt_
+> > > barriers must be equivalent.
+> > 
+> > The definition of the memory barriers is independent from the fact
+> > if the system is running on an hypervisor or not.
+> > Is there really
+> > an architecture where you need special virt_xxx barriers?!? 
+> 
+> It is whenever host and guest or two guests access memory at
+> the same time.
+> 
+> The optimization where smp_xxx barriers are compiled out when
+> CONFIG_SMP is cleared means that two UP guests running
+> on an SMP host can not use smp_xxx barriers for communication.
+> 
+> See explanation here:
+> http://thread.gmane.org/gmane.linux.kernel.virtualization/26555
 
-Why is that? We have the actual pin tables in the shared SoC DT, each
-board specific DT just refers to the actually connected pins by
-reference. That wouldn't change at all. So the above example for
-instance is from sun7i-a20.dtsi, board specific .dts files just use:
-pinctrl-0 = <&uart0_pins_a>;
+Got it, makes sense.
 
-> although it would be possible to have the pin tables in DT.
-> However, it would inflate the DT and make working in u-boot (SPL)
-> where full DT parser is not available problematic.
+-- 
+blue skies,
+   Martin.
 
-I don't get this. Having the actual values instead of a string lookup
-would make it actually easier to lookup for more light-weight kernels.
-
-> What might be possible is merging the different pinmux drivers in one.
-> Instead of replicating some pinmux boilerplate you will probably end
-> up with lots of ifdefs so only tables for SoC support compiled in the
-> kernel are built into the driver.
-
-That doesn't sound to tempting to me.
-
-> I am not sure how large the tables are and if anybody should care but
-> you might be also missing some symbols for them.
-
-So I guess I just failed to express my approach properly.
-I will try to code a proof of concept this week and convert once SoC
-over to the new driver, maybe this clears things up.
-
-If I have a blatant misunderstanding of the concepts (quite possible),
-please keep correcting me!
-
-Thanks!
-Andre.
+"Reality continues to ruin my life." - Calvin.
