@@ -1,42 +1,74 @@
-From: dennis.chen@arm.com (Dennis Chen)
-Date: Tue, 5 Jan 2016 10:18:19 +0800
-Subject: [linux-next PATCH] arm64: fix kernel crash with 48-bit VA and 64KB
- granule
-Message-ID: <1451960299-14123-1-git-send-email-dennis.chen@arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 5 Jan 2016 10:21:47 +0800
+Subject: [linux-sunxi] reason for Allwinner SoC specific pinctrl drivers?
+In-Reply-To: <568A514D.7070102@arm.com>
+References: <568A514D.7070102@arm.com>
+Message-ID: <CAGb2v65WttmGunT1ipekdZN_orjbWa43p9w2tcq_SCi-fzQMnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit 3400749b5a22 ("arm64/efi: refactor EFI init and runtime
-code for reuse by 32-bit ARM") uses pgd_alloc() to allocate space for
-efi_mm.pgd while not the static efi_pgd[], since this function will be
-called with early_initcall, which results in the pgd_cache used by
-pgd_alloc() has not been initialized yet, kernel will hang in this
-case. This patch is trying to make the pgd_cache_init() called before
-arm_enable_runtime_services() by changing its core_initcall to
-early_initcall.
+On Mon, Jan 4, 2016 at 7:02 PM, Andre Przywara <andre.przywara@arm.com> wrote:
+> Hi,
+>
+> while looking at the Allwinner A64 SoC support, I was wondering why we
+> would actually need a pinctrl driver (file) for each and every Allwinner
+> SoC that we support.
+> Looking at both the A20 and the A64 doc I don't see any differences in
+> the port controller implementation apart from the actual
+> muxval <-> subsystem assignment, which is just data, right?
+> Comparing the code files in drivers/pinctrl/sunxi seems to support this,
+> as those drivers only consist of the table and some boilerplate code.
+>
+> Now I was wondering whether we could get away with one generic Allwinner
+> pinctrl driver and put the SoC specific pin assignments in DT instead.
+> It looks like adding an "allwinner,muxval" property in addition to the
+> existing "allwinner,function" in the SoC's .dtsi would give us all the
+> information we need. This could look like:
+>
+>         uart0_pins_a: uart0 at 0 {
+>                 allwinner,pins =   "PB22", "PB23";
+> +               allwinner,muxval = <0x02    0x02>;
+>                 allwinner,function = "uart0";
+>                 allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>                 allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>         };
 
-Signed-off-by: Dennis Chen <dennis.chen@arm.com>
-Tested-by: Sudeep Holla <sudeep.holla@arm.com>
+Using a mux value over a string does not gain us much, other than
+smaller driver code, since all the strings are gone, and smaller DT,
+again no strings. However, if you want some sensible debug output
+from the driver, you're going to keep the strings anyway.
 
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
----
- arch/arm64/mm/pgd.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+The mux values would need to be macros defined in some header file,
+instead of raw values which are hard to understand.
 
-diff --git a/arch/arm64/mm/pgd.c b/arch/arm64/mm/pgd.c
-index cb3ba1b..859a788 100644
---- a/arch/arm64/mm/pgd.c
-+++ b/arch/arm64/mm/pgd.c
-@@ -56,4 +56,4 @@ static int __init pgd_cache_init(void)
-                                              SLAB_PANIC, NULL);
-        return 0;
- }
--core_initcall(pgd_cache_init);
-+early_initcall(pgd_cache_init);
---
-1.9.1
+That's only half of it. The driver should know what pins are available
+and which mux values can be used for them. So you'd still need a table
+of some sort. That means it's unlikely you can have a generic driver.
+Leaking the internals into the DT is not a good way either.
 
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+The current approach of a generic driver library and SoC specific
+tables maybe isn't the best approach, but it is easy enough to add new
+SoC support.
+
+
+Regards
+ChenYu
+
+> Would it make sense that I sit down and prototype such a driver?
+>
+> We should keep compatibility with older DTs by keeping the existing
+> drivers in (or maybe emulating the current behaviour by providing just
+> those tables as a fallback) , but newer SoCs (like the A64?) would not
+> need a SoC specific driver, but just go with that generic driver and
+> appropriate DT properties.
+>
+> I appreciate any comments on this, especially if I missed something
+> which would render this approach impossible or tedious.
+>
+> Cheers,
+> Andre.
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
