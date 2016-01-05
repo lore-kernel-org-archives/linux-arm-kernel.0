@@ -1,33 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 6 Jan 2016 00:24:24 +0100
-Subject: [PATCH 1/2] ARM: versatile: add the syscon LEDs to the DT
-In-Reply-To: <CAL_JsqLOLO0Y2h5LDruAutEGtjMfQPHhqUJ8mXEwAdgVW4JifQ@mail.gmail.com>
-References: <1452002529-3335-1-git-send-email-linus.walleij@linaro.org>
- <1452002529-3335-2-git-send-email-linus.walleij@linaro.org>
- <CAL_JsqLOLO0Y2h5LDruAutEGtjMfQPHhqUJ8mXEwAdgVW4JifQ@mail.gmail.com>
-Message-ID: <CACRpkdYg9SNaNvQJpOjBPbsp4tx4eia-fXLMgu7oynnKiqTHug@mail.gmail.com>
+From: dbasehore@chromium.org (dbasehore .)
+Date: Tue, 5 Jan 2016 15:38:25 -0800
+Subject: [PATCH v11 0/4] Allow USB devices to remain runtime-suspended
+ when sleeping
+In-Reply-To: <1791136.5K3qHuXCRE@vostro.rjw.lan>
+References: <1445956731-6304-1-git-send-email-tomeu.vizoso@collabora.com>
+ <2496228.i2Z9PmMBtz@vostro.rjw.lan>
+ <20160105021052.GA32392@google.com>
+ <1791136.5K3qHuXCRE@vostro.rjw.lan>
+Message-ID: <CAGAzgsrdw8pmntQYrLbWsFzO7epp7JX84FN2Y-KkuZOfA18gmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 5, 2016 at 4:37 PM, Rob Herring <robh@kernel.org> wrote:
-> On Tue, Jan 5, 2016 at 8:02 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> The device tree version of Versatile AP/PB never had LED support
->> so we are missing LEDs from our hardware boards. Add this as
->> syscon LEDs like we did for Integrator and Juno. We need to
->> spawn devices in the syscon with "simple-mfd" for this to work.
+On Tue, Jan 5, 2016 at 4:48 AM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Monday, January 04, 2016 06:27:18 PM Derek Basehore wrote:
+>> On Mon, Nov 02, 2015 at 02:50:40AM +0100, Rafael J. Wysocki wrote:
+>> >
+>> > I've queued up this series for the second half of the v4.4 merge window.
+>> >
+>> > Thanks,
+>> > Rafael
+>> >
+>> >
+>> > _______________________________________________
+>> > linux-arm-kernel mailing list
+>> > linux-arm-kernel at lists.infradead.org
+>> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 >>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->> ---
->>  arch/arm/boot/dts/versatile-ab.dts | 62 +++++++++++++++++++++++++++++++++++++-
->>  1 file changed, 61 insertions(+), 1 deletion(-)
+>> What's the status of this patch series? I haven't seen the patches
+>> posted for v4.4, plus there's the issue that Dan found that needs to be
+>> addressed.
+>>
+>> Is there a new revision of the patch series being worked on?
 >
-> Acked-by: Rob Herring <robh@kernel.org>
+> Tomeu is not working on one AFAICS, but I may just revive his series.
 >
-> I guess this means you have tested my series on actual h/w now?
+> Do you have a pointer to the Dan's report?
+>
+> Thanks,
+> Rafael
+>
 
-Yups tested today on Versatile AB. I sent some 4 different
-patches for various issues (that were there all the time with
-the device tree boot) and after that it works like a charm.
-
-Yours,
-Linus Walleij
+It was a reply to the second patch in the series. Here's a link to it
+https://lkml.org/lkml/2015/11/10/107
