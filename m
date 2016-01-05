@@ -1,50 +1,81 @@
-From: jolsa@redhat.com (Jiri Olsa)
-Date: Tue, 5 Jan 2016 11:07:08 +0100
-Subject: [RFC PATCH v2] perf test: Improve bp_signal
-In-Reply-To: <1451987875-15893-1-git-send-email-wangnan0@huawei.com>
-References: <20160104165535.GI1616@arm.com>
- <1451987875-15893-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <20160105100708.GA29394@krava.brq.redhat.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 5 Jan 2016 11:09:29 +0100
+Subject: [PATCH v3 1/3] clocksource/vt8500: Increase the minimum delta
+In-Reply-To: <20160105124242.17bbe09d@v1ron-s7>
+References: <1451654683-2401-1-git-send-email-v1ron@mail.ru>
+ <1451654683-2401-2-git-send-email-v1ron@mail.ru>
+ <568B8653.2010301@linaro.org> <20160105124242.17bbe09d@v1ron-s7>
+Message-ID: <568B9659.6080809@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 05, 2016 at 09:57:55AM +0000, Wang Nan wrote:
-> Will Deacon [1] has some question on patch [2]. This patch improves
-> test__bp_signal so we can test:
-> 
->  1. A watchpoint and a breakpoint that fire on the same instruction
->  2. Nested signals
-> 
-> Test result:
-> 
->  On x86_64 and ARM64 (result are similar with patch [2] on ARM64):
-> 
->  # ./perf test -v signal
->  17: Test breakpoint overflow signal handler                  :
->  --- start ---
->  test child forked, pid 10213
->  count1 1, count2 3, count3 2, overflow 3, overflows_2 3
->  test child finished with 0
->  ---- end ----
->  Test breakpoint overflow signal handler: Ok
-> 
-> So at least 2 cases Will doubted are handled correctly.
-> 
-> [1] http://lkml.kernel.org/g/20160104165535.GI1616 at arm.com
-> [2] http://lkml.kernel.org/g/1450921362-198371-1-git-send-email-wangnan0 at huawei.com
-> 
-> Signed-off-by: Wang Nan <wangnan0@huawei.com>
-> Signed-off-by: Jiri Olsa <jolsa@kernel.org>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Arnaldo Carvalho de Melo <acme@redhat.com>
-> ---
-> 
-> v1 -> v2: Improve readability, fix typo. Thanks to Jiri Olsa.
-> 
-> To Jiri: I guess you will be okay to provide your SOB for your code at [3],
->          so I add it in this v2 patch.
+On 01/05/2016 10:42 AM, Roman Volkov wrote:
+> ? Tue, 5 Jan 2016 10:01:07 +0100
+> Daniel Lezcano <daniel.lezcano@linaro.org> ?????:
+>
+>> On 01/01/2016 02:24 PM, Roman Volkov wrote:
+>>> From: Roman Volkov <rvolkov@v1ros.org>
+>>>
+>>> The vt8500 clocksource driver declares itself as capable to handle
+>>> the minimum delay of 4 cycles by passing the value into
+>>> clockevents_config_and_register(). The vt8500_timer_set_next_event()
+>>> requires the passed cycles value to be at least 16. The impact is
+>>> that userspace hangs in nanosleep() calls with small delay
+>>> intervals.
+>>>
+>>> This problem is reproducible in Linux 4.2 starting from:
+>>> c6eb3f70d448 ('hrtimer: Get rid of hrtimer softirq')
+>>>
+>>> Signed-off-by: Roman Volkov <rvolkov@v1ros.org>
+>>> Acked-by: Alexey Charkov <alchark@gmail.com>
+>>
+>> Hi Roman,
+>>
+>> I looked at the email thread, and IIUC if set_next_event fails, the
+>> system freeze. Your patch fixes the issue for your driver but not the
+>> real issue because if set_next_event fails, at least a warning should
+>> appear in the log or better nanosleep should fail gracefully.
+>
+> Hi Daniel,
+>
+> I agree, but if nanosleep will return immediately, this can lead to
+> undefined behavior in the software.
 
-sure, patch looks good to me
+The nanosleep syscall is supposed to return an error code. If the 
+software does not pay attention to the syscall's return code, then the 
+bug is in the software, it is not up to the kernel to work around it.
 
-thanks,
-jirka
+> Maybe the system can go busyloop
+> to somehow recover from this state and print a message to the log? At
+> the driver level it seems to be enough to fail the function without
+> printing logs.
+>
+>> BTW why min delta is MIN_OSCR_DELTA * 2 in
+>> clockevents_config_and_register ?
+>
+> All this just to be consistent with PXA. Maybe PXA works with lesser
+> values, e.g., 8. For vt8500, accessing the registers is more complex,
+> and this should consume more time. IIUC, if the driver does not support
+> too small delays, the system will handle it with busyloop?
+
+[ Added John Stultz and Thomas Gleixner ] to answer those questions above.
+
+> Why multiply by two? Good question. Maybe there is a reserve for
+> stability. The value passed by the system to the set_next_event() should
+> be not lesser than this value, and theoretically, we should not
+> multiply MIN_OSCR_DELTA by two. As I can see, in many drivers there is
+> no such minimal values at all.
+>
+> Added Robert
+>
+> Regards,
+> Roman
+>
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
