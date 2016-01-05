@@ -1,98 +1,71 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 5 Jan 2016 11:54:14 +0000
-Subject: [PATCHv2 00/18] arm64: mm: rework page table creation
-In-Reply-To: <568B17AA.1050002@redhat.com>
-References: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
- <568B17AA.1050002@redhat.com>
-Message-ID: <20160105115414.GC24664@leverpostej>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Tue, 5 Jan 2016 12:00:11 +0000
+Subject: [linux-sunxi] [RFC PATCH] drivers: pinctrl: add driver for
+ Allwinner A64 SoC
+In-Reply-To: <20160104203059.GG11722@lukather>
+References: <1451582246-32373-1-git-send-email-andre.przywara@arm.com>
+ <CAEzqOZsE_kDChAbLkwmwjqdDbovv1e0G1tTffhhp25PkwJQ0+Q@mail.gmail.com>
+ <568A4972.8030602@arm.com> <20160104203059.GG11722@lukather>
+Message-ID: <568BB04B.30100@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 04, 2016 at 05:08:58PM -0800, Laura Abbott wrote:
-> On 01/04/2016 09:56 AM, Mark Rutland wrote:
-> >Hi all,
-> >
-> >This series reworks the arm64 early page table code, in order to:
-> >
-> >(a) Avoid issues with potentially-conflicting TTBR1 TLB entries (as raised in
-> >     Jeremy's thread [1]). This can happen when splitting/merging sections or
-> >     contiguous ranges, and per a pessimistic reading of the ARM ARM may happen
-> >     for changes to other fields in translation table entries.
-> >
-> >(b) Allow for more complex page table creation early on, with tables created
-> >     with fine-grained permissions as early as possible. In the cases where we
-> >     currently use fine-grained permissions (e.g. DEBUG_RODATA and marking .init
-> >     as non-executable), this is required for the same reasons as (a), as we
-> >     must ensure that changes to page tables do not split/merge sections or
-> >     contiguous regions for memory in active use.
+Hi Maxime,
 
-[...]
-
-> >There are still opportunities for improvement:
-> >
-> >* BUG() when splitting sections or creating overlapping entries in
-> >   create_mapping, as these both indicate serious bugs in kernel page table
-> >   creation.
-> >
-> >   This will require rework to the EFI runtime services pagetable creation, as
-> >   for >4K page kernels EFI memory descriptors may share pages (and currently
-> >   such overlap is assumed to be benign).
+On 04/01/16 20:30, Maxime Ripard wrote:
+> Hi Andre,
 > 
-> Given the split_{pmd,pud} were added for DEBUG_RODATA, is there any reason
-> those can't be dropped now since it sounds like the EFI problem is for overlapping
-> entries and not splitting?
-
-Good point. I think they can be removed.
-
-I'll take a look into that.
-
-> This series points out that my attempt to allow set_memory_* to
-> work on regular kernel memory[1] is broken right now because it breaks down
-> the larger block sizes.
-
-What's the rationale for set_memory_* on kernel mappings? I see
-"security", but I couldn't figure out a concrete use-case. Is there any
-example of a subsystem that wants to use this?
-
-For statically-allocated data, an alternative approach would be for such
-memory to be mapped with minimal permissions from the outset (e.g. being
-placed in .rodata), and when elevated permissions are required a
-(temporary) memremap'd alias could be used, like what patch_map does to
-modify ROX kernel/module text.
-
-For dynamically-allocated data, we could create (minimal permission)
-mappings in the vmalloc region and pass those around. The linear map
-alias would still be writeable, but as the offset between the two isn't
-linear (and the owner of that allocation doesn't have to know/care about
-the linear map address), it would be much harder to find the linear map
-address to attack. An alias with elevated permissions could be used as
-required, or if it's a one-time RW->RO switch, the mapping could me
-modified in-place as the granularity wouldn't change.
-
-> Do you have any suggestions for a cleaner approach
-> short of requiring all memory mapped with 4K pages? The only solution I see
-> right now is having a separate copy of page tables to switch to. Any idea
-> other idea I come up with would have problems if we tried to invalidate an
-> entry before breaking it down.
-
-The other option I looked into was to have a completely independent
-TTBR0 mapping (like the idmap or efi runtime tables), and have that map
-code for modifying page tables. That way you could modify the tables
-in-place (with TTBR1 disabled for the duration of the modification).
-
-That ended up having its own set of problems, as you could only rely on
-self-contained position independent code, which ruled out most kernel
-APIs (including locking/atomic primitives due to debug paths). That gets
-worse when secondaries are online and you have to synchronise those
-disabling/invalidating/enabling the TTBR1 mapping.
-
-Other than that I haven't managed to come up with other functional
-ideas. The RCU-like approach is the cleanest I've found so far.
-
-Thanks,
-Mark.
-
-> Thanks,
-> Laura
+> On Mon, Jan 04, 2016 at 10:29:06AM +0000, Andre Przywara wrote:
+>>>> diff --git a/drivers/pinctrl/sunxi/Makefile b/drivers/pinctrl/sunxi/Makefile
+>>>> index e080290..130e7bc 100644
+>>>> --- a/drivers/pinctrl/sunxi/Makefile
+>>>> +++ b/drivers/pinctrl/sunxi/Makefile
+>>>> @@ -12,5 +12,6 @@ obj-$(CONFIG_PINCTRL_SUN7I_A20)               += pinctrl-sun7i-a20.o
+>>>>  obj-$(CONFIG_PINCTRL_SUN8I_A23)                += pinctrl-sun8i-a23.o
+>>>>  obj-$(CONFIG_PINCTRL_SUN8I_A23_R)      += pinctrl-sun8i-a23-r.o
+>>>>  obj-$(CONFIG_PINCTRL_SUN8I_A33)                += pinctrl-sun8i-a33.o
+>>>> +obj-$(CONFIG_PINCTRL_A64)              += pinctrl-a64.o
+>>>
+>>> Shouldn't this follow pinctrl config name like other sunXi SOCs?
+>>> This should be PINCTRL_SUN??_A64.
+>>
+>> I never really got the reason we use those sunxi names in addition to
+>> the SoC name in the first place, maybe apart from copying from some
+>> Allwinner code.
+>> Since I decided to not look at Allwinner's BSP at all (if avoidable), I
+>> also thought it would be time to drop that sunxi naming, which looks
+>> redundant to me.
+>> Is there any reason why we would need this (beside having a rather
+>> unique identifier prefix)?
 > 
-> [1]https://lkml.kernel.org/g/<1447207057-11323-1-git-send-email-labbott@fedoraproject.org>
+> It's mostly historical.
+> 
+> 
+> Back when we started this, There was a few SoCs already out: A10,
+> A10s, A12 and A13, which was very similar to the Cortex-A naming
+> scheme (and I think the Cortex-A12 was also announced at the time).
+> 
+> We couldn't really use the SoC family either, since there was already
+> multiple SoCs that were part of the same family (the A10s, A12 and
+> A13, part of the sun5i family).
+> 
+> In order to avoid any confusion, we chose to go with both to uniquely
+> and without any confusion possible, and we just went on with that
+> naming scheme for consistency.
+
+I see, thanks for the explanation.
+I was wondering since we now move to a new architecture as well to avoid
+this historic "ballast", but I have no problems with adding "_sun50i_"
+to the identifiers and file names.
+To me as only a casual sunxi user I found it mostly hard to memorize the
+connections between the sunxi numbering and the SoC names (I just know
+that the A20 is sun7i ;-). So for finding a specific dts for instance,
+you have to start with the sunxi number to get it TAB completed ...
+
+With that being said: Would you prefer to have a sun50i prefix? I see
+that having just "a64" on itself is not very specific.
+
+Please let me know so that I can amend the code for the next post.
+
+Cheers,
+Andre.
