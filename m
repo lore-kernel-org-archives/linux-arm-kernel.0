@@ -1,43 +1,53 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 5 Jan 2016 10:40:23 +0000
-Subject: [PATCHv2 14/18] arm64: mm: use fixmap when creating page tables
-In-Reply-To: <568AF472.6060901@redhat.com>
-References: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
- <1451930211-22460-15-git-send-email-mark.rutland@arm.com>
- <568AF472.6060901@redhat.com>
-Message-ID: <20160105104022.GA24664@leverpostej>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Tue, 5 Jan 2016 10:51:47 +0000
+Subject: [PATCH v5 03/11] arm-cci: Group writes to counter
+In-Reply-To: <20160104190353.GC17127@leverpostej>
+References: <1451908490-2615-1-git-send-email-suzuki.poulose@arm.com>
+ <1451908490-2615-4-git-send-email-suzuki.poulose@arm.com>
+ <20160104190353.GC17127@leverpostej>
+Message-ID: <568BA043.2020302@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 04/01/16 19:03, Mark Rutland wrote:
+> On Mon, Jan 04, 2016 at 11:54:42AM +0000, Suzuki K. Poulose wrote:
+>> Add a helper to group the writes to PMU counter, this will be
+>> used to delay setting the event period to pmu::pmu_enable()
+>>
 
-On Mon, Jan 04, 2016 at 02:38:42PM -0800, Laura Abbott wrote:
-> On 01/04/2016 09:56 AM, Mark Rutland wrote:
-> >As a prepratory step to allow us to allocate early page tables form
-> "page tables from"
+>> +/* Write a value to a given set of counters */
+>> +static void __pmu_write_counters(struct cci_pmu *cci_pmu, unsigned long *mask, u32 value)
+>> +{
+>> +	int i;
+>> +
+>> +	for_each_set_bit(i, mask, cci_pmu->num_cntrs)
+>> +		__pmu_write_counter(cci_pmu, value, i);
+>> +}
+>
+> I don't understand this as-is. Why do all the counters have the same
+> value?
 
-Fixed.
+The only value we write to the counters is the period. This routine writes
+a given value to a set of counters specified by the mask (not to be confused
+with the PMU->hw_events->mask). This will help to group the writes to the counters,
+especially since preparatory steps to write to a single counter itself is costly.
+So, we do all the preparation only once for a batch of counters.
 
-> >-#define pud_fixmap_offset(pgd, addr)	pud_fixmap(pmd_offset_phys(pgd, addr))
-> >+#define pud_fixmap_offset(pgd, addr)	pud_fixmap(pud_offset_phys(pgd, addr))
-> 
-> Was this supposed to be folded into a previous patch?
+The other option is to use hw_events->prev_count (which should be set before calling
+the function) for each counter specified in the mask. I am fine with either of the
+two.
 
-Yes. I've folded that into the prior patch now.
+>
+>> +static void __maybe_unused
+>> +pmu_write_counters(struct cci_pmu *cci_pmu, unsigned long *mask, u32 value)
+>> +{
+>> +	__pmu_write_counters(cci_pmu, mask, value);
+>> +}
+>
+> Why are these not just one function for now?
 
-> >-static void *late_pgtable_alloc(void)
-> >+static phys_addr_t late_pgtable_alloc(void)
-> >  {
-> >  	void *ptr = (void *)__get_free_page(PGALLOC_GFP);
-> >  	BUG_ON(!ptr);
-> >-
-> >-	/* Ensure the zeroed page is visible to the page table walker */
-> >  	dsb(ishst);
-> 
-> This dropped the comment but not the actual barrier, was that intentional?
+Yes, this could be just one function for now, until we introduce the hooks. This was
+a written to avoid another refactoring in the later patch.
 
-I messed that up when rebasing. Restored now.
-
-Thanks for pointing those out!
-
-Mark.
+Thanks
+Suzuki
