@@ -1,50 +1,34 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 5 Jan 2016 15:42:06 -0600
-Subject: [PATCH v5 0/5] Qualcomm PCIe driver and designware fixes
-In-Reply-To: <1450442339-18765-1-git-send-email-stanimir.varbanov@linaro.org>
-References: <1450442339-18765-1-git-send-email-stanimir.varbanov@linaro.org>
-Message-ID: <20160105214206.GA23814@localhost>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 05 Jan 2016 16:43:20 -0500 (EST)
+Subject: [PATCH] net: hns: avoid uninitialized variable warning:
+In-Reply-To: <6649249.INrAY8KJG0@wuerfel>
+References: <6649249.INrAY8KJG0@wuerfel>
+Message-ID: <20160105.164320.2255971055498857833.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 02:38:54PM +0200, Stanimir Varbanov wrote:
-> Hi,
-> 
-> I'm sending v5 with following changes:
-> - in 1/5 - replace wmb() call with PCIE_ATU_CR2 register read.
-> - in 3/5 - addressed comments from Born Helgaas about usage of a
-> standard PCI capabilities register names and rename link training
-> function to the way that other Designware based drivers use.
-> - in 5/5 - addressed a comment from Bjorn Andersson about regulator
-> label duplication.
-> 
-> Comments are welcome!
-> 
-> The previous v4 of the patch set can be found at [1].
-> 
-> regards,
-> Stan
-> 
-> [1] https://lkml.org/lkml/2015/12/3/370
-> 
-> Stanimir Varbanov (5):
->   PCI: designware: ensure ATU is enabled before IO/conf space accesses
->   DT: PCI: qcom: Document PCIe devicetree bindings
->   PCI: qcom: Add Qualcomm PCIe controller driver
->   ARM: dts: apq8064: add pcie devicetree node
->   ARM: dts: ifc6410: enable pcie dt node for this board
-> 
->  .../devicetree/bindings/pci/qcom,pcie.txt          |  233 ++++++++
->  MAINTAINERS                                        |    7 +
->  arch/arm/boot/dts/qcom-apq8064-ifc6410.dts         |   26 +
->  arch/arm/boot/dts/qcom-apq8064.dtsi                |   36 ++
->  drivers/pci/host/Kconfig                           |   10 +
->  drivers/pci/host/Makefile                          |    1 +
->  drivers/pci/host/pcie-designware.c                 |    7 +
->  drivers/pci/host/pcie-qcom.c                       |  617 ++++++++++++++++++++
->  8 files changed, 937 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/qcom,pcie.txt
->  create mode 100644 drivers/pci/host/pcie-qcom.c
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Fri, 01 Jan 2016 23:27:57 +0100
 
-Applied to pci/host-qcom for v4.5, with Pratyush's ack on the first patch.
-Thanks!
+> gcc fails to see that the use of the 'last_offset' variable
+> in hns_nic_reuse_page() is used correctly and issues a bogus
+> warning:
+> 
+> drivers/net/ethernet/hisilicon/hns/hns_enet.c: In function 'hns_nic_reuse_page':
+> drivers/net/ethernet/hisilicon/hns/hns_enet.c:541:6: warning: 'last_offset' may be used uninitialized in this function [-Wmaybe-uninitialized]
+> 
+> This simplifies the function to make it more obvious what is
+> going on to both readers and compilers, which makes the warning
+> go away.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> Compile-tested only, and complex enough that this requires a proper
+> review and testing before it gets apply. Please have a look at this.
+
+If this goes yet another day without being reviewed, I'm just applying
+it.
+
+You hisilicon folks can't just let patches rot, you must review them
+in a timely manner or else I'm applying them without waiting for you
+to look at them.
