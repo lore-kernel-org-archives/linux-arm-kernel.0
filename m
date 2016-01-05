@@ -1,74 +1,142 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 5 Jan 2016 15:58:42 +0100
-Subject: [PATCH v2 02/13] arm64: introduce KIMAGE_VADDR as the virtual
- base of the kernel region
-In-Reply-To: <20160105144649.GD24664@leverpostej>
-References: <1451489172-17420-1-git-send-email-ard.biesheuvel@linaro.org>
- <1451489172-17420-3-git-send-email-ard.biesheuvel@linaro.org>
- <20160105143634.GD28354@cbox> <20160105144649.GD24664@leverpostej>
-Message-ID: <20160105145842.GB3234@cbox>
+Date: Tue, 5 Jan 2016 16:00:40 +0100
+Subject: [PATCH v6 1/6] arm/arm64: KVM: Introduce armv7 fp/simd vcpu
+ fields and helpers
+In-Reply-To: <1451166900-3711-2-git-send-email-m.smarduch@samsung.com>
+References: <1451166900-3711-1-git-send-email-m.smarduch@samsung.com>
+ <1451166900-3711-2-git-send-email-m.smarduch@samsung.com>
+Message-ID: <20160105150040.GF28354@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 05, 2016 at 02:46:50PM +0000, Mark Rutland wrote:
-> On Tue, Jan 05, 2016 at 03:36:34PM +0100, Christoffer Dall wrote:
-> > On Wed, Dec 30, 2015 at 04:26:01PM +0100, Ard Biesheuvel wrote:
-> > > This introduces the preprocessor symbol KIMAGE_VADDR which will serve as
-> > > the symbolic virtual base of the kernel region, i.e., the kernel's virtual
-> > > offset will be KIMAGE_VADDR + TEXT_OFFSET. For now, we define it as being
-> > > equal to PAGE_OFFSET, but in the future, it will be moved below it once
-> > > we move the kernel virtual mapping out of the linear mapping.
-> > > 
-> > > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > > ---
-> > >  arch/arm64/include/asm/memory.h | 10 ++++++++--
-> > >  arch/arm64/kernel/head.S        |  2 +-
-> > >  arch/arm64/kernel/vmlinux.lds.S |  4 ++--
-> > >  3 files changed, 11 insertions(+), 5 deletions(-)
-> > > 
-> > > diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-> > > index 853953cd1f08..bea9631b34a8 100644
-> > > --- a/arch/arm64/include/asm/memory.h
-> > > +++ b/arch/arm64/include/asm/memory.h
-> > > @@ -51,7 +51,8 @@
-> > >  #define VA_BITS			(CONFIG_ARM64_VA_BITS)
-> > >  #define VA_START		(UL(0xffffffffffffffff) << VA_BITS)
-> > >  #define PAGE_OFFSET		(UL(0xffffffffffffffff) << (VA_BITS - 1))
-> > > -#define MODULES_END		(PAGE_OFFSET)
-> > > +#define KIMAGE_VADDR		(PAGE_OFFSET)
-> > > +#define MODULES_END		(KIMAGE_VADDR)
-> > >  #define MODULES_VADDR		(MODULES_END - SZ_64M)
-> > >  #define PCI_IO_END		(MODULES_VADDR - SZ_2M)
-> > >  #define PCI_IO_START		(PCI_IO_END - PCI_IO_SIZE)
-> > > @@ -75,8 +76,13 @@
-> > >   * private definitions which should NOT be used outside memory.h
-> > >   * files.  Use virt_to_phys/phys_to_virt/__pa/__va instead.
-> > >   */
-> > > -#define __virt_to_phys(x)	(((phys_addr_t)(x) - PAGE_OFFSET + PHYS_OFFSET))
-> > > +#define __virt_to_phys(x) ({						\
-> > > +	phys_addr_t __x = (phys_addr_t)(x);				\
-> > > +	__x >= PAGE_OFFSET ? (__x - PAGE_OFFSET + PHYS_OFFSET) :	\
-> > > +			     (__x - KIMAGE_VADDR + PHYS_OFFSET); })
-> > 
-> > so __virt_to_phys will now work with a subset of the non-linear namely
-> > all except vmalloced and ioremapped ones?
+On Sat, Dec 26, 2015 at 01:54:55PM -0800, Mario Smarduch wrote:
+> Add helper functions to enable access to fp/smid on guest entry and save host
+> fpexc on vcpu put, check if fp/simd registers are dirty and add new vcpu
+> fields.
 > 
-> It will work for linear mapped memory and for the kernel image, which is
-> what it used to do. It's just that the relationship between the image
-> and the linear map is broken.
+> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+> ---
+>  arch/arm/include/asm/kvm_emulate.h   | 42 ++++++++++++++++++++++++++++++++++++
+>  arch/arm/include/asm/kvm_host.h      |  6 ++++++
+>  arch/arm64/include/asm/kvm_emulate.h |  8 +++++++
+>  3 files changed, 56 insertions(+)
 > 
-> The same rules apply to x86, where their virt_to_phys eventually boils down to:
-> 
-> static inline unsigned long __phys_addr_nodebug(unsigned long x)
-> {
->         unsigned long y = x - __START_KERNEL_map;
-> 
->         /* use the carry flag to determine if x was < __START_KERNEL_map */
->         x = y + ((x > y) ? phys_base : (__START_KERNEL_map - PAGE_OFFSET));
-> 
->         return x;
-> }
-> 
-ok, thanks for the snippet :)
+> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+> index 3095df0..d4d9da1 100644
+> --- a/arch/arm/include/asm/kvm_emulate.h
+> +++ b/arch/arm/include/asm/kvm_emulate.h
+> @@ -24,6 +24,8 @@
+>  #include <asm/kvm_mmio.h>
+>  #include <asm/kvm_arm.h>
+>  #include <asm/cputype.h>
+> +#include <asm/vfp.h>
+> +#include "../vfp/vfpinstr.h"
 
+this looks dodgy...
+
+can you move vfpinstr.h instead?
+
+>  
+>  unsigned long *vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num);
+>  unsigned long *vcpu_spsr(struct kvm_vcpu *vcpu);
+> @@ -255,4 +257,44 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
+>  	}
+>  }
+>  
+> +#ifdef CONFIG_VFPv3
+> +/* Called from vcpu_load - save fpexc and enable guest access to fp/simd unit */
+
+the comment is misleading, you're not enabling guest access to the
+fp/simd unit, you're just setting the enabled bit to ensure guest
+accesses trap.
+
+> +static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
+> +{
+> +	u32 fpexc;
+> +
+> +	/* Save host fpexc, and enable guest access to fp unit */
+> +	fpexc = fmrx(FPEXC);
+> +	vcpu->arch.host_fpexc = fpexc;
+> +	fpexc |= FPEXC_EN;
+> +	fmxr(FPEXC, fpexc);
+> +
+> +	/* Configure HCPTR to trap on tracing and fp/simd access */
+> +	vcpu->arch.hcptr = HCPTR_TTA | HCPTR_TCP(10)  | HCPTR_TCP(11);
+> +}
+> +
+> +/* Called from vcpu_put - restore host fpexc */
+
+I would probably get rid of the "Called from" stuff and just describe
+what these functions do locally.  Comments like this are likely to be
+out of date soon'ish.
+
+> +static inline void vcpu_restore_host_fpexc(struct kvm_vcpu *vcpu)
+> +{
+> +	fmxr(FPEXC, vcpu->arch.host_fpexc);
+> +}
+> +
+> +/* If trap bits are reset then fp/simd registers are dirty */
+> +static inline bool vcpu_vfp_isdirty(struct kvm_vcpu *vcpu)
+> +{
+> +	return !(vcpu->arch.hcptr & (HCPTR_TCP(10) | HCPTR_TCP(11)));
+> +}
+> +#else
+> +static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
+> +{
+> +	vcpu->arch.hcptr = HCPTR_TTA;
+> +}
+> +
+> +static inline void vcpu_restore_host_fpexc(struct kvm_vcpu *vcpu) {}
+> +static inline bool vcpu_vfp_isdirty(struct kvm_vcpu *vcpu)
+> +{
+> +	return false;
+> +}
+> +#endif
+
+this kind of feels like it belongs in its own C-file instead of a header
+file, perhaps arch/arm/kvm/vfp.C.
+
+Marc, what do you think?
+
+> +
+>  #endif /* __ARM_KVM_EMULATE_H__ */
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index f9f2779..d3ef58a 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -105,6 +105,12 @@ struct kvm_vcpu_arch {
+>  	/* HYP trapping configuration */
+>  	u32 hcr;
+>  
+> +	/* HYP Co-processor fp/simd and trace trapping configuration */
+> +	u32 hcptr;
+> +
+> +	/* Save host FPEXC register to later restore on vcpu put */
+> +	u32 host_fpexc;
+> +
+>  	/* Interrupt related fields */
+>  	u32 irq_lines;		/* IRQ and FIQ levels */
+>  
+> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+> index 3066328..ffe8ccf 100644
+> --- a/arch/arm64/include/asm/kvm_emulate.h
+> +++ b/arch/arm64/include/asm/kvm_emulate.h
+> @@ -299,4 +299,12 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
+>  	return data;		/* Leave LE untouched */
+>  }
+>  
+> +static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu) {}
+> +static inline void vcpu_restore_host_fpexc(struct kvm_vcpu *vcpu) {}
+> +
+> +static inline bool vcpu_vfp_isdirty(struct kvm_vcpu *vcpu)
+> +{
+> +	return false;
+> +}
+> +
+>  #endif /* __ARM64_KVM_EMULATE_H__ */
+> -- 
+> 1.9.1
+> 
+
+Thanks,
 -Christoffer
