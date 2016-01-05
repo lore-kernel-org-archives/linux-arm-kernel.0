@@ -1,69 +1,68 @@
-From: jolsa@redhat.com (Jiri Olsa)
-Date: Tue, 5 Jan 2016 09:53:38 +0100
-Subject: [RFC PATCH] arm64: perf test: Improbe bp_signal
-In-Reply-To: <1451969880-14877-1-git-send-email-wangnan0@huawei.com>
-References: <20160104165535.GI1616@arm.com>
- <1451969880-14877-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <20160105085338.GB2192@krava.brq.redhat.com>
+From: graeme.gregory@linaro.org (G Gregory)
+Date: Tue, 5 Jan 2016 08:55:25 +0000
+Subject: [PATCH v4 3/3] serial: amba-pl011: add ACPI support to AMBA probe
+In-Reply-To: <CAOZdJXUpjWi7Dy=GFi7_58FqD_UZxxrw_QKJ4sdHLKVOLCyNAA@mail.gmail.com>
+References: <1450880383-29560-1-git-send-email-aleksey.makarov@linaro.org>
+ <1450880383-29560-4-git-send-email-aleksey.makarov@linaro.org>
+ <CAOZdJXUpjWi7Dy=GFi7_58FqD_UZxxrw_QKJ4sdHLKVOLCyNAA@mail.gmail.com>
+Message-ID: <CAGCh1+ksWFLkE8Y_a5SW98tpgGBWdVH5TYJAoS17EExuPd65oQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 05, 2016 at 04:58:00AM +0000, Wang Nan wrote:
+On 4 January 2016 at 23:13, Timur Tabi <timur@codeaurora.org> wrote:
+> On Wed, Dec 23, 2015 at 8:19 AM, Aleksey Makarov
+> <aleksey.makarov@linaro.org> wrote:
+>> From: Graeme Gregory <graeme.gregory@linaro.org>
+>>
+>> In ACPI this device is only defined in SBSA mode so
+>> if we are coming from ACPI use this mode.
+>>
+>> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+>> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+>> ---
+>>  drivers/tty/serial/amba-pl011.c | 37 ++++++++++++++++++++++++++-----------
+>>  1 file changed, 26 insertions(+), 11 deletions(-)
+>>
+>> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+>> index 899a771..974cb9e 100644
+>> --- a/drivers/tty/serial/amba-pl011.c
+>> +++ b/drivers/tty/serial/amba-pl011.c
+>> @@ -2368,18 +2368,33 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+>>         if (!uap)
+>>                 return -ENOMEM;
+>>
+>> -       uap->clk = devm_clk_get(&dev->dev, NULL);
+>> -       if (IS_ERR(uap->clk))
+>> -               return PTR_ERR(uap->clk);
+>> -
+>> -       uap->vendor = vendor;
+>> -       uap->lcrh_rx = vendor->lcrh_rx;
+>> -       uap->lcrh_tx = vendor->lcrh_tx;
+>> -       uap->fifosize = vendor->get_fifosize(dev);
+>> -       uap->port.irq = dev->irq[0];
+>> -       uap->port.ops = &amba_pl011_pops;
+>> +       /* ACPI only defines SBSA variant */
+>> +       if (has_acpi_companion(&dev->dev)) {
+>> +               /*
+>> +                * According to ARM ARMH0011 is currently the only mapping
+>> +                * of pl011 in ACPI and it's mapped to SBSA UART mode
+>> +                */
+>> +               uap->vendor     = &vendor_sbsa;
+>> +               uap->fifosize   = 32;
+>> +               uap->port.ops   = &sbsa_uart_pops;
+>> +               uap->fixed_baud = 115200;
+>
+> I'm confused by this patch.  We already have code like this in
+> tty-next, in the form of sbsa_uart_probe():
+>
+> https://kernel.googlesource.com/pub/scm/linux/kernel/git/gregkh/tty/+/tty-next/drivers/tty/serial/amba-pl011.c#2553
+>
+Because Russell expressed unhappiness at that code existing. So this
+is an alternative method to do same thing with ACPI.
 
-SNIP
+If the "arm,sbsa-uart" id was added to drivers/of/platform.c as an
+AMBA id then the same could be done for DT as well.
 
-> diff --git a/tools/perf/tests/bp_signal.c b/tools/perf/tests/bp_signal.c
-> index fb80c9e..0bc4f76 100644
-> --- a/tools/perf/tests/bp_signal.c
-> +++ b/tools/perf/tests/bp_signal.c
-> @@ -29,14 +29,55 @@
->  
->  static int fd1;
->  static int fd2;
-> +static int fd3;
->  static int overflows;
-> +static int overflows_2;
-> +
-> +volatile long the_var;
-> +
-> +
+Ultimately this patch is optional depending on maintainers opinion!
 
-please put comment in here explaning the assembly is used
-to have watchpoint and breakpoint on single instruction
-
-IIUC ;-)
-
-thanks,
-jirka
-
-> +#if defined (__x86_64__)
-> +extern void __test_function(volatile long *ptr);
-> +asm (
-> +	".globl __test_function\n"
-> +	"__test_function:\n"
-> +	"incq (%rdi)\n"
-> +	"ret\n");
-> +#elif defined (__aarch64__)
-> +extern void __test_function(volatile long *ptr);
-> +asm (
-> +	".globl __test_function\n"
-> +	"__test_function:\n"
-> +	"str x30, [x0]\n"
-> +	"ret\n");
-> +
-> +#else
-> +static void __test_function(volatile long *ptr)
-> +{
-> +	*ptr++;
-> +}
-> +#endif
->  
->  __attribute__ ((noinline))
->  static int test_function(void)
->  {
-> +	__test_function(&the_var);
-> +	the_var++;
->  	return time(NULL);
->  }
-
-SNIP
+Graeme
