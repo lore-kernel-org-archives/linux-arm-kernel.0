@@ -1,41 +1,56 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Tue, 5 Jan 2016 15:39:18 +0000
-Subject: [PATCH] efi: stub: define DISABLE_BRANCH_PROFILING for all
- architectures
-In-Reply-To: <CAKv+Gu-n-7tk1NXYAbf7+O79gYG82QOsbzLuYG1yX=LSizksWQ@mail.gmail.com>
-References: <1450862968-20222-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160104123145.GB1616@arm.com>
- <CAKv+Gu-n-7tk1NXYAbf7+O79gYG82QOsbzLuYG1yX=LSizksWQ@mail.gmail.com>
-Message-ID: <20160105153918.GA2714@codeblueprint.co.uk>
+From: borntraeger@de.ibm.com (Christian Borntraeger)
+Date: Tue, 5 Jan 2016 16:39:37 +0100
+Subject: [PATCH v2 22/32] s390: define __smp_xxx
+In-Reply-To: <20160105105335-mutt-send-email-mst@redhat.com>
+References: <1451572003-2440-1-git-send-email-mst@redhat.com>
+ <1451572003-2440-23-git-send-email-mst@redhat.com>
+ <20160104134525.GA6344@twins.programming.kicks-ass.net>
+ <20160104221323-mutt-send-email-mst@redhat.com>
+ <20160105091319.59ddefc7@mschwide>
+ <20160105105335-mutt-send-email-mst@redhat.com>
+Message-ID: <568BE3B9.8020901@de.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 05 Jan, at 03:56:39PM, Ard Biesheuvel wrote:
-> (+ Arnd)
-> 
-> On 4 January 2016 at 13:31, Will Deacon <will.deacon@arm.com> wrote:
-> > On Wed, Dec 23, 2015 at 10:29:28AM +0100, Ard Biesheuvel wrote:
-> >> This moves the DISABLE_BRANCH_PROFILING define from the x86 specific
-> >> to the general CFLAGS definition for the stub. This fixes build errors
-> >> when building for arm64 with CONFIG_PROFILE_ALL_BRANCHES_ENABLED.
-> >>
-> >> Reported-by: Will Deacon <will.deacon@arm.com>
-> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> ---
-> >>  drivers/firmware/efi/libstub/Makefile | 4 ++--
-> >>  1 file changed, 2 insertions(+), 2 deletions(-)
-> >
-> > Cheers, Ard. The kernel now builds and boots as an EFI application for
-> > me when the dreaded #define if config option is enabled:
-> >
-> >   Tested-by: Will Deacon <will.deacon@arm.com>
-> >
-> > Will
-> >
-> 
-> @Matt: this is causing randconfig build errors for ARM in -next. Mind
-> if we take this through some other tree?
+On 01/05/2016 10:30 AM, Michael S. Tsirkin wrote:
 
-Go ahead.
+> 
+> arch/s390/kernel/vdso.c:        smp_mb();
+> 
+> Looking at
+> 	Author: Christian Borntraeger <borntraeger@de.ibm.com>
+> 	Date:   Fri Sep 11 16:23:06 2015 +0200
+> 
+> 	    s390/vdso: use correct memory barrier
+> 
+> 	    By definition smp_wmb only orders writes against writes. (Finish all
+> 	    previous writes, and do not start any future write). To protect the
+> 	    vdso init code against early reads on other CPUs, let's use a full
+> 	    smp_mb at the end of vdso init. As right now smp_wmb is implemented
+> 	    as full serialization, this needs no stable backport, but this change
+> 	    will be necessary if we reimplement smp_wmb.
+> 
+> ok from hypervisor point of view, but it's also strange:
+> 1. why isn't this paired with another mb somewhere?
+>    this seems to violate barrier pairing rules.
+> 2. how does smp_mb protect against early reads on other CPUs?
+>    It normally does not: it orders reads from this CPU versus writes
+>    from same CPU. But init code does not appear to read anything.
+>    Maybe this is some s390 specific trick?
+> 
+> I could not figure out the above commit.
 
-Reviewed-by: Matt Fleming <matt@codeblueprint.co.uk>
+It was probably me misreading the code. I change a wmb into a full mb here
+since I was changing the defintion of wmb to a compiler barrier. I tried to
+fixup all users of wmb that really pair with other code. I assumed that there
+must be some reader (as there was a wmb before) but I could not figure out
+which. So I just played safe here.
+
+But it probably can be removed.
+
+> arch/s390/kvm/kvm-s390.c:       smp_mb();
+
+This can go. If you have a patch, I can carry that via the kvms390 tree,
+or I will spin a new patch with you as suggested-by.
+
+Christian
