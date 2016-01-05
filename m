@@ -1,56 +1,53 @@
-From: mweseloh42@gmail.com (Marcus Weseloh)
-Date: Tue,  5 Jan 2016 21:46:20 +0100
-Subject: [PATCH v2] spi: sun4i: Prevent chip-select from being activated twice
- before a transfer
-Message-ID: <1452026780-8819-1-git-send-email-mweseloh42@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 05 Jan 2016 22:12:20 +0100
+Subject: [PATCH v6 12/20] arm64:ilp32: add sys_ilp32.c and a separate
+ table (in entry.S) to use it
+In-Reply-To: <20160105152657.GA31598@yury-N73SV>
+References: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
+ <2634904.E1fnEZUKo9@wuerfel> <20160105152657.GA31598@yury-N73SV>
+Message-ID: <13371161.AI9IgZN0G2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SPI core calls set_cs before a transfer, but the SUN4I_CTL_CS_MANUAL
-flag is only set in transfer_one. This leads to the following pattern on
-the chip-select line (with runtime power-management on every transfer,
-without it only on the first one):
+On Tuesday 05 January 2016 18:26:57 Yury Norov wrote:
+> > So the calling conventions avoid the problem of being able to set
+> > the upper bits from malicious user space when the kernel assumes they
+> > are zeroed out (we had security bugs in this area, before we introduced
+> > SYSCALL_DEFINEx()), but it means that we need wrappers around each
+> > syscall that takes an argument that is different length between user
+> > and kernel space (as Catalin guessed). arch/s390 has the same problem and
+> > works around it with code in arch/s390/kernel/compat_wrapper.c, while
+> > other architectures (at least powerpc, x86 and tile IIRC, don't know much
+> > about mips, parisc and sparc) don't have the problem because of their
+> > calling conventions.
+> > 
+> > This also means that we cannot work around it in glibc at all, because
+> > we have to be able to handle malicious user space, so it has to be
+> > done in the kernel using something similar to what s390 does.
+> > 
+> >       Arnd
+> 
+> So it seems like we (should) have 2 compat modes - with and without access
+> to upper half of register. I'm thinking now on how put it in generic
+> unistd.h less painfull way.
 
-activate, deactivate, activate, transfer, deactivate
+I think we can do that by slightly modifying the existing __SYSCALL/__SC_3264/
+__SC_COMP/__SC_COMP_3264 macros: The first two need extra wrappers for
+arm64-ilp32 and s390, the other two don't.
 
-Moving the configuration of the SUN4I_CTL_CS_MANUAL flag from transfer_one
-to set_cs removes the double activation.
+We can use some clever string concatenation to add a ##_wrapper to the name
+of the handler where needed and then just have a file that implements
+the wrappers, copied from s390.
 
-Signed-off-by: Marcus Weseloh <mweseloh42@gmail.com>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
+Unfortunately, we can't just zero out all the upper halves and be done with
+it: even if we went back to passing 64-bit arguments as separate 32-bit
+registers, we'd still need to deal with sign-extending negative 32-bit
+numbers.
 
-Changes from v1:
-- Added Maximes Acked-by
+> Beside of that, I think I almost finished with all current comments. As
+> this issue is not related to ILP32 directly, I think, it's better to show
+> it now, as there is pretty massive rework. What do you think?
 
----
+Good idea, yes.
 
- drivers/spi/spi-sun4i.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
-index fbb0a4d..a6d936c 100644
---- a/drivers/spi/spi-sun4i.c
-+++ b/drivers/spi/spi-sun4i.c
-@@ -140,6 +140,9 @@ static void sun4i_spi_set_cs(struct spi_device *spi, bool enable)
- 	reg &= ~SUN4I_CTL_CS_MASK;
- 	reg |= SUN4I_CTL_CS(spi->chip_select);
- 
-+	/* We want to control the chip select manually */
-+	reg |= SUN4I_CTL_CS_MANUAL;
-+
- 	if (enable)
- 		reg |= SUN4I_CTL_CS_LEVEL;
- 	else
-@@ -222,9 +225,6 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
- 	else
- 		reg |= SUN4I_CTL_DHB;
- 
--	/* We want to control the chip select manually */
--	reg |= SUN4I_CTL_CS_MANUAL;
--
- 	sun4i_spi_write(sspi, SUN4I_CTL_REG, reg);
- 
- 	/* Ensure that we have a parent clock fast enough */
--- 
-1.9.1
+	Arnd
