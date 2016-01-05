@@ -1,67 +1,53 @@
-From: brian.starkey@arm.com (Brian Starkey)
-Date: Tue,  5 Jan 2016 16:41:28 +0000
-Subject: [RESEND PATCH 3/3] drivers: dma-coherent: use memset_io for
- DMA_MEMORY_IO mappings
-In-Reply-To: <cover.1452010802.git.brian.starkey@arm.com>
-References: <cover.1452010802.git.brian.starkey@arm.com>
-Message-ID: <073de716b49028bbbd819fc403c2532a12992abe.1452010803.git.brian.starkey@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 5 Jan 2016 17:21:06 +0000
+Subject: [PATCH v9 08/13] arch/arm64: adopt prepare_exit_to_usermode()
+ model from x86
+In-Reply-To: <568ADD91.1050100@ezchip.com>
+References: <1451936091-29247-1-git-send-email-cmetcalf@ezchip.com>
+ <1451936091-29247-9-git-send-email-cmetcalf@ezchip.com>
+ <20160104203316.GE17127@leverpostej> <568ADD91.1050100@ezchip.com>
+Message-ID: <20160105172106.GA7088@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use memset_io() for DMA_MEMORY_IO mappings which are mapped as I/O
-memory, and regular memset() for DMA_MEMORY_MAP mappings.
+On Mon, Jan 04, 2016 at 04:01:05PM -0500, Chris Metcalf wrote:
+> On 01/04/2016 03:33 PM, Mark Rutland wrote:
+> >Hi,
+> >
+> >On Mon, Jan 04, 2016 at 02:34:46PM -0500, Chris Metcalf wrote:
+> >>This change is a prerequisite change for TASK_ISOLATION but also
+> >>stands on its own for readability and maintainability.
+> >I have also been looking into converting the userspace return path from
+> >assembly to C [1], for the latter two reasons. Based on that, I have a
+> >couple of comments.
+> 
+> Thanks!
+> 
+> >It seems unfortunate to leave behind portions of the entry.S
+> >_TIF_WORK_MASK state machine (i.e. a small portion of ret_fast_syscall,
+> >and the majority of work_pending and ret_to_user).
+> >
+> >I think it would be nicer if we could handle all of that in one place
+> >(or at least all in C).
+> 
+> Yes, in principle I agree with this, and I think your deasm tree looks
+> like an excellent idea.
+> 
+> For this patch series I wanted to focus more on what was necessary
+> for the various platforms to implement task isolation, and less on
+> additional cleanups of the platforms in question.  I think my changes
+> don't make the TIF state machine any less clear, nor do they make
+> it harder for an eventual further migration to C code along the lines
+> of what you've done, so it seems plausible to me to commit them
+> upstream independently of your work.
 
-This fixes the below alignment fault on arm64 for DMA_MEMORY_IO
-mappings, where memset() uses the DC ZVA instruction which is
-invalid on device memory.
+I appreciate that you don't want to rewrite all the code.
 
-   Unhandled fault: alignment fault (0x96000061) at 0xffffff8000380000
-   Internal error: : 96000061 [#1] PREEMPT SMP
-   Modules linked in: hdlcd(+) clk_scpi
-   CPU: 4 PID: 1355 Comm: systemd-udevd Not tainted 4.4.0-rc1+ #5
-   Hardware name: ARM Juno development board (r0) (DT)
-   task: ffffffc9763eee00 ti: ffffffc9758c4000 task.ti: ffffffc9758c4000
-   PC is at __efistub_memset+0x1ac/0x200
-   LR is at dma_alloc_from_coherent+0xb0/0x120
-   pc : [<ffffffc00030ff2c>] lr : [<ffffffc00042a918>] pstate: 400001c5
-   sp : ffffffc9758c79a0
-   x29: ffffffc9758c79a0 x28: ffffffc000635cd0
-   x27: 0000000000000124 x26: ffffffc000119ef4
-   x25: 0000000000010000 x24: 0000000000000140
-   x23: ffffffc07e9ac3a8 x22: ffffffc9758c7a58
-   x21: ffffffc9758c7a68 x20: 0000000000000004
-   x19: ffffffc07e9ac380 x18: 0000000000000001
-   x17: 0000007fae1bbba8 x16: ffffffc0001b2d1c
-   x15: ffffffffffffffff x14: 0ffffffffffffffe
-   x13: 0000000000000010 x12: ffffff800837ffff
-   x11: ffffff800837ffff x10: 0000000040000000
-   x9 : 0000000000000000 x8 : ffffff8000380000
-   x7 : 0000000000000000 x6 : 000000000000003f
-   x5 : 0000000000000040 x4 : 0000000000000000
-   x3 : 0000000000000004 x2 : 000000000000ffc0
-   x1 : 0000000000000000 x0 : ffffff8000380000
+However, I think it's easier to factor out a small amount of additional
+code now and evlove that as a whole than it will be to evolve part of it
+and try to put it back together later.
 
-Signed-off-by: Brian Starkey <brian.starkey@arm.com>
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
----
- drivers/base/dma-coherent.c |    5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+I have a patch which I will reply with momentarily.
 
-diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
-index f98359a..4e4ad30 100644
---- a/drivers/base/dma-coherent.c
-+++ b/drivers/base/dma-coherent.c
-@@ -193,7 +193,10 @@ int dma_alloc_from_coherent(struct device *dev, ssize_t size,
- 	 */
- 	*dma_handle = mem->device_base + (pageno << PAGE_SHIFT);
- 	*ret = mem->virt_base + (pageno << PAGE_SHIFT);
--	memset(*ret, 0, size);
-+	if (mem->flags & DMA_MEMORY_MAP)
-+		memset(*ret, 0, size);
-+	else
-+		memset_io(*ret, 0, size);
- 	spin_unlock_irqrestore(&mem->spinlock, flags);
- 
- 	return 1;
--- 
-1.7.9.5
+Thanks,
+Mark.
