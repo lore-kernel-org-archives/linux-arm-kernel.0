@@ -1,150 +1,65 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Mon, 4 Jan 2016 17:08:58 -0800
-Subject: [PATCHv2 00/18] arm64: mm: rework page table creation
-In-Reply-To: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
-References: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <568B17AA.1050002@redhat.com>
+From: lftan@altera.com (Ley Foon Tan)
+Date: Tue, 5 Jan 2016 01:18:18 +0000
+Subject: [PATCH] doc: PCI: altera: Fix the 'ranges' property in example
+In-Reply-To: <201601050147.40997.marex@denx.de>
+References: <1450950330-28393-1-git-send-email-marex@denx.de>
+ <201601040212.23854.marex@denx.de> <1451954745.3051.24.camel@ubuntu>
+ <201601050147.40997.marex@denx.de>
+Message-ID: <E7E66AD1AD65064486AD57C361DF091C062AE3A4@PG-ITEXCH02.altera.priv.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/04/2016 09:56 AM, Mark Rutland wrote:
-> Hi all,
+On Tue, 2016-01-05 at 01:47 +0100, Marek Vasut wrote:
+> On Tuesday, January 05, 2016 at 01:45:45 AM, Ley Foon Tan wrote:
+> > On Mon, 2016-01-04 at 02:12 +0100, Marek Vasut wrote:
+> > > On Monday, January 04, 2016 at 01:53:22 AM, Ley Foon Tan wrote:
+> > > > On Mon, 2016-01-04 at 01:37 +0100, Marek Vasut wrote:
+> > > > > On Monday, January 04, 2016 at 01:10:13 AM, Ley Foon Tan wrote:
+> > > > >
+> > > > > Hi!
+> > > > >
+> > > > > > > > > Well, do you have a good explanation why the system works
+> > > > > > > > > with this change and doesn't work without it on my design ?
+> > > > > > > > > I'd really love to understand this.
+> > > > > > > >
+> > > > > > > > Do you modify the driver to setup the translation table?
+> > > > > > >
+> > > > > > > No, I didn't change the driver. What do you refer to please ?
+> > > > > >
+> > > > > > There is Address Translation Table at address offset 0x1000 in the
+> > > > > > IP.
+> > > > >
+> > > > > Oh, I didn't configure that in any way. Should I or does the driver
+> > > > > configure it in some way?
+> > > > >
+> > > > > > Do you use the hardware design from the rocketboards.org or your
+> > > > > > own design?
+> > > > >
+> > > > > I use the one from rocketboards, I just ported it over to the MCVEVK
+> > > > > (custom cyclone v soc board)
+> > > >
+> > > > You may check again the base addresses use in the MCVEVK board.
+> > >
+> > > The address map is attached ; I don't see anything which would differ
+> > > from the reference design.
+> >
+> > Address map looks fine.
 >
-> This series reworks the arm64 early page table code, in order to:
+> Well do you have any other idea then ? I guess I should pull out the SOCDK, huh?
+Can't think of any other thing that impact this, I expect the bus width
+used in the pipeline/bridge are same with the example design.
+Do you have our CV, AV or A10 SoC devkit?
 >
-> (a) Avoid issues with potentially-conflicting TTBR1 TLB entries (as raised in
->      Jeremy's thread [1]). This can happen when splitting/merging sections or
->      contiguous ranges, and per a pessimistic reading of the ARM ARM may happen
->      for changes to other fields in translation table entries.
+> > > btw I am honestly surprised that Quartus cannot export the address map
+> > > into some text file :-(
+> >
+> > There is a *.html file in the generated directory.
 >
-> (b) Allow for more complex page table creation early on, with tables created
->      with fine-grained permissions as early as possible. In the cases where we
->      currently use fine-grained permissions (e.g. DEBUG_RODATA and marking .init
->      as non-executable), this is required for the same reasons as (a), as we
->      must ensure that changes to page tables do not split/merge sections or
->      contiguous regions for memory in active use.
+> Oh, I didn't know that, thanks!
 >
-> (c) Avoid edge cases where we need to allocate memory before a sufficient
->      proportion of the early linear map is in place to accommodate allocations.
->
-> This series:
->
-> * Introduces the necessary infrastructure to safely swap TTBR1_EL1 (i.e.
->    without risking conflicting TLB entries being allocated). The arm64 KASAN
->    code is migrated to this.
->
-> * Adds helpers to walk page tables by physical address, independent of the
->    linear mapping, and modifies __create_mapping and friends to relying on a new
->    set of FIX_{PGD,PUD,PMD,PTE} to map tables as required for modification.
->
-> * Removes the early memblock limit, now that create_mapping does not rely on the
->    early linear map. This solves (c), and allows for (b).
->
-> * Generates an entirely new set of kernel page tables with fine-grained (i.e.
->    page-level) permission boundaries, which can then be safely installed. These
->    are created with sufficient granularity such that later changes (currently
->    only fixup_init) will not split/merge sections or contiguous regions, and can
->    follow a break-before-make approach without affecting the rest of the page
->    tables.
->
-> There are still opportunities for improvement:
->
-> * BUG() when splitting sections or creating overlapping entries in
->    create_mapping, as these both indicate serious bugs in kernel page table
->    creation.
->
->    This will require rework to the EFI runtime services pagetable creation, as
->    for >4K page kernels EFI memory descriptors may share pages (and currently
->    such overlap is assumed to be benign).
 
-Given the split_{pmd,pud} were added for DEBUG_RODATA, is there any reason
-those can't be dropped now since it sounds like the EFI problem is for overlapping
-entries and not splitting?
 
->
-> * Use ROX mappings for the kernel text and rodata when creating the new tables.
->    This avoiding potential conflicts from changes to translation tables, and
->    giving us better protections earlier.
->
->    Currently the alternatives patching code relies on being able to use the
->    kernel mapping to update the text. We cannot rely on any text which itself
->    may be patched, and updates may straddle page boundaries, so this is
->    non-trivial.
->
-> * Clean up usage of swapper_pg_dir so we can switch to the new tables without
->    having to reuse the existing pgd. This will allow us to free the original
->    pgd (i.e. we can free all the initial tables in one go).
->
-> Any and all feedback is welcome.
+________________________________
 
-This series points out that my attempt to allow set_memory_* to
-work on regular kernel memory[1] is broken right now because it breaks down
-the larger block sizes. Do you have any suggestions for a cleaner approach
-short of requiring all memory mapped with 4K pages? The only solution I see
-right now is having a separate copy of page tables to switch to. Any idea
-other idea I come up with would have problems if we tried to invalidate an
-entry before breaking it down.
-
-Thanks,
-Laura
-
-[1]https://lkml.kernel.org/g/<1447207057-11323-1-git-send-email-labbott@fedoraproject.org>
-
->
-> This series is based on today's arm64 [2] for-next/core branch (commit
-> c9cd0ed925c0b927), and this version is tagged as
-> arm64-pagetable-rework-20160104 while the latest version should be in the
-> unstable branch arm64/pagetable-rework in my git repo [3].
->
-> Since v1 [4] (tagged arm64-pagetable-rework-20151209):
-> * Drop patches taken into the arm64 tree.
-> * Rebase to arm64 for-next/core.
-> * Copy early KASAN tables.
-> * Fix KASAN pgd manipulation.
-> * Specialise allocators for page tables, in function and naming.
-> * Update comments.
->
-> Thanks,
-> Mark.
->
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/386178.html
-> [2] git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git
-> [3] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git
-> [4] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/392292.html
->
-> Mark Rutland (18):
->    asm-generic: make __set_fixmap_offset a static inline
->    arm64: mm: specialise pagetable allocators
->    arm64: mm: place empty_zero_page in bss
->    arm64: unify idmap removal
->    arm64: unmap idmap earlier
->    arm64: add function to install the idmap
->    arm64: mm: add code to safely replace TTBR1_EL1
->    arm64: kasan: avoid TLB conflicts
->    arm64: mm: move pte_* macros
->    arm64: mm: add functions to walk page tables by PA
->    arm64: mm: avoid redundant __pa(__va(x))
->    arm64: mm: add __{pud,pgd}_populate
->    arm64: mm: add functions to walk tables in fixmap
->    arm64: mm: use fixmap when creating page tables
->    arm64: mm: allocate pagetables anywhere
->    arm64: mm: allow passing a pgdir to alloc_init_*
->    arm64: ensure _stext and _etext are page-aligned
->    arm64: mm: create new fine-grained mappings at boot
->
->   arch/arm64/include/asm/fixmap.h      |  10 ++
->   arch/arm64/include/asm/kasan.h       |   3 +
->   arch/arm64/include/asm/mmu_context.h |  63 ++++++-
->   arch/arm64/include/asm/pgalloc.h     |  26 ++-
->   arch/arm64/include/asm/pgtable.h     |  87 +++++++---
->   arch/arm64/kernel/head.S             |   1 +
->   arch/arm64/kernel/setup.c            |   7 +
->   arch/arm64/kernel/smp.c              |   4 +-
->   arch/arm64/kernel/suspend.c          |  20 +--
->   arch/arm64/kernel/vmlinux.lds.S      |   5 +-
->   arch/arm64/mm/kasan_init.c           |  32 ++--
->   arch/arm64/mm/mmu.c                  | 311 ++++++++++++++++++-----------------
->   arch/arm64/mm/proc.S                 |  27 +++
->   include/asm-generic/fixmap.h         |  14 +-
->   14 files changed, 381 insertions(+), 229 deletions(-)
->
+Confidentiality Notice.
+This message may contain information that is confidential or otherwise protected from disclosure. If you are not the intended recipient, you are hereby notified that any use, disclosure, dissemination, distribution, or copying of this message, or any attachments, is strictly prohibited. If you have received this message in error, please advise the sender by reply e-mail, and delete the message and any attachments. Thank you.
