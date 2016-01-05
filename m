@@ -1,32 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 05 Jan 2016 22:26:33 +0100
-Subject: Including Raspberry Pi -next trees in linux-next
-In-Reply-To: <568C2619.20705@wwwdotorg.org>
-References: <87fuyozzax.fsf@eliezer.anholt.net>
- <87d1tfrdu0.fsf@eliezer.anholt.net> <568C2619.20705@wwwdotorg.org>
-Message-ID: <3082544.lZk2r7IkWv@wuerfel>
+From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
+Date: Tue, 5 Jan 2016 15:22:05 -0600
+Subject: [PATCH] ARM: dts: socfpga: add the clk-phase property for sd/mmc clock
+Message-ID: <1452028925-8947-1-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 January 2016 13:22:49 Stephen Warren wrote:
-> >>>
-> >>> branches:
-> >>> drm-vc4-next
-> >>> bcm2835-dt-next
-> >>> bcm2835-soc-next
-> >>> bcm2835-drivers-next
-> >>> bcm2385-defconfig-next
-> >>> (bcm2835-maintainers-next is a placeholder since we have nothing for it
-> >>> this round)
-> 
-> Typically maintainers merge everything together into a single "for-next" 
-> to maintain a reasonable set of branches. I guess it doesn't affect me 
-> so my opinion isn't too relevant though:-)
+From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-In my experience the common for-next branch works best because
-you can change the set of branches that get merged into it as
-needed. If there are 6 branches today, it's quite likely that there
-will be another one in the future and if only one branch gets
-merged into for-next, you don't need to worry about updating the list.
+The CIU clock for the SD/MMC should be the sdmmc_clk and not the
+sdmmc_free_clk. Also, add the correct phase shift the sdmmc_clk.
 
-	Arnd
+Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+---
+ arch/arm/boot/dts/socfpga_arria10.dtsi | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
+index cce9e50..89a3558 100644
+--- a/arch/arm/boot/dts/socfpga_arria10.dtsi
++++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
+@@ -362,6 +362,7 @@
+ 						compatible = "altr,socfpga-a10-gate-clk";
+ 						clocks = <&sdmmc_free_clk>;
+ 						clk-gate = <0xC8 5>;
++						clk-phase = <0 135>;
+ 					};
+ 
+ 					qspi_clk: qspi_clk {
+@@ -589,7 +590,7 @@
+ 			reg = <0xff808000 0x1000>;
+ 			interrupts = <0 98 IRQ_TYPE_LEVEL_HIGH>;
+ 			fifo-depth = <0x400>;
+-			clocks = <&l4_mp_clk>, <&sdmmc_free_clk>;
++			clocks = <&l4_mp_clk>, <&sdmmc_clk>;
+ 			clock-names = "biu", "ciu";
+ 			status = "disabled";
+ 		};
+-- 
+2.6.2
