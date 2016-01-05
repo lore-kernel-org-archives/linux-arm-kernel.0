@@ -1,78 +1,74 @@
 From: brian.starkey@arm.com (Brian Starkey)
-Date: Tue,  5 Jan 2016 16:41:26 +0000
-Subject: [RESEND PATCH 1/3] memremap: add MEMREMAP_WC flag
+Date: Tue,  5 Jan 2016 16:41:27 +0000
+Subject: [RESEND PATCH 2/3] drivers: dma-coherent: use MEMREMAP_WC for
+ DMA_MEMORY_MAP
 In-Reply-To: <cover.1452010802.git.brian.starkey@arm.com>
 References: <cover.1452010802.git.brian.starkey@arm.com>
-Message-ID: <9085d37fa97a762a46b9d58719c085368682c64f.1452010802.git.brian.starkey@arm.com>
+Message-ID: <a85c534af867534e6693ce50a746fda096426586.1452010803.git.brian.starkey@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a flag to memremap() for writecombine mappings. Mappings satisfied
-by this flag will not be cached, however writes may be delayed or
-combined into more efficient bursts. This is most suitable for
-buffers written sequentially by the CPU for use by other DMA devices.
+When the DMA_MEMORY_MAP flag is used, memory which can be accessed
+directly should be returned, so use memremap(..., MEMREMAP_WC) to
+provide a writecombine mapping.
 
 Signed-off-by: Brian Starkey <brian.starkey@arm.com>
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- include/linux/io.h |    1 +
- kernel/memremap.c  |   15 +++++++++++++--
- 2 files changed, 14 insertions(+), 2 deletions(-)
+ drivers/base/dma-coherent.c |   20 ++++++++++++++++----
+ 1 file changed, 16 insertions(+), 4 deletions(-)
 
-diff --git a/include/linux/io.h b/include/linux/io.h
-index 32403b5..e2c8419 100644
---- a/include/linux/io.h
-+++ b/include/linux/io.h
-@@ -135,6 +135,7 @@ enum {
- 	/* See memremap() kernel-doc for usage description... */
- 	MEMREMAP_WB = 1 << 0,
- 	MEMREMAP_WT = 1 << 1,
-+	MEMREMAP_WC = 1 << 2,
- };
- 
- void *memremap(resource_size_t offset, size_t size, unsigned long flags);
-diff --git a/kernel/memremap.c b/kernel/memremap.c
-index e517a16..3849987 100644
---- a/kernel/memremap.c
-+++ b/kernel/memremap.c
-@@ -41,11 +41,13 @@ static void *try_ram_remap(resource_size_t offset, size_t size)
-  * memremap() - remap an iomem_resource as cacheable memory
-  * @offset: iomem resource start address
-  * @size: size of remap
-- * @flags: either MEMREMAP_WB or MEMREMAP_WT
-+ * @flags: any of MEMREMAP_WB, MEMREMAP_WT and MEMREMAP_WC
-  *
-  * memremap() is "ioremap" for cases where it is known that the resource
-  * being mapped does not have i/o side effects and the __iomem
-- * annotation is not applicable.
-+ * annotation is not applicable. In the case of multiple flags, the different
-+ * mapping types will be attempted in the order listed below until one of
-+ * them succeeds.
-  *
-  * MEMREMAP_WB - matches the default mapping for "System RAM" on
-  * the architecture.  This is usually a read-allocate write-back cache.
-@@ -57,6 +59,10 @@ static void *try_ram_remap(resource_size_t offset, size_t size)
-  * cache or are written through to memory and never exist in a
-  * cache-dirty state with respect to program visibility.  Attempts to
-  * map "System RAM" with this mapping type will fail.
-+ *
-+ * MEMREMAP_WC - establish a writecombine mapping, whereby writes may
-+ * be coalesced together (e.g. in the CPU's write buffers), but is otherwise
-+ * uncached. Attempts to map "System RAM" with this mapping type will fail.
+diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
+index 55b8398..f98359a 100644
+--- a/drivers/base/dma-coherent.c
++++ b/drivers/base/dma-coherent.c
+@@ -2,6 +2,7 @@
+  * Coherent per-device memory handling.
+  * Borrowed from i386
   */
- void *memremap(resource_size_t offset, size_t size, unsigned long flags)
- {
-@@ -101,6 +107,11 @@ void *memremap(resource_size_t offset, size_t size, unsigned long flags)
- 		addr = ioremap_wt(offset, size);
- 	}
++#include <linux/io.h>
+ #include <linux/slab.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+@@ -31,7 +32,10 @@ static int dma_init_coherent_memory(phys_addr_t phys_addr, dma_addr_t device_add
+ 	if (!size)
+ 		goto out;
  
-+	if (!addr && (flags & MEMREMAP_WC)) {
-+		flags &= ~MEMREMAP_WC;
-+		addr = ioremap_wc(offset, size);
+-	mem_base = ioremap(phys_addr, size);
++	if (flags & DMA_MEMORY_MAP)
++		mem_base = memremap(phys_addr, size, MEMREMAP_WC);
++	else
++		mem_base = ioremap(phys_addr, size);
+ 	if (!mem_base)
+ 		goto out;
+ 
+@@ -58,8 +62,12 @@ static int dma_init_coherent_memory(phys_addr_t phys_addr, dma_addr_t device_add
+ 
+ out:
+ 	kfree(dma_mem);
+-	if (mem_base)
+-		iounmap(mem_base);
++	if (mem_base) {
++		if (flags & DMA_MEMORY_MAP)
++			memunmap(mem_base);
++		else
++			iounmap(mem_base);
 +	}
-+
- 	return addr;
+ 	return 0;
  }
- EXPORT_SYMBOL(memremap);
+ 
+@@ -67,7 +75,11 @@ static void dma_release_coherent_memory(struct dma_coherent_mem *mem)
+ {
+ 	if (!mem)
+ 		return;
+-	iounmap(mem->virt_base);
++
++	if (mem->flags & DMA_MEMORY_MAP)
++		memunmap(mem->virt_base);
++	else
++		iounmap(mem->virt_base);
+ 	kfree(mem->bitmap);
+ 	kfree(mem);
+ }
 -- 
 1.7.9.5
