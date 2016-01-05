@@ -1,79 +1,68 @@
-From: dennis.chen@arm.com (Dennis Chen)
-Date: Tue, 5 Jan 2016 16:40:44 +0800
-Subject: [linux-next PATCH] arm64: fix kernel crash with 48-bit VA and
- 64KB granule
-In-Reply-To: <CAKv+Gu9Q3CmC37dL3o+hcBeG-NJ7+bkOiLQihirje4YbazizJQ@mail.gmail.com>
-References: <1451960299-14123-1-git-send-email-dennis.chen@arm.com>
- <CAKv+Gu-pz8rA2EfU6NwCndmoYneOjYUt8_PodTdZkepV3cRXJQ@mail.gmail.com>
- <20160105083533.GD13942@arm.org>
- <CAKv+Gu9Q3CmC37dL3o+hcBeG-NJ7+bkOiLQihirje4YbazizJQ@mail.gmail.com>
-Message-ID: <20160105084042.GF13942@arm.org>
+From: huangtao@rock-chips.com (Huang, Tao)
+Date: Tue, 5 Jan 2016 16:48:59 +0800
+Subject: [PATCH] i2c: rk3x: init module as subsys call
+In-Reply-To: <7893052.zgDX0r4i77@phil>
+References: <1451962938-17398-1-git-send-email-jay.xu@rock-chips.com>
+ <2513923.8oltbpbAin@phil> <568B73E8.3010901@rock-chips.com>
+ <7893052.zgDX0r4i77@phil>
+Message-ID: <568B837B.50607@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 05, 2016 at 09:38:11AM +0100, Ard Biesheuvel wrote:
-> On 5 January 2016 at 09:35, Dennis Chen <dennis.chen@arm.com> wrote:
-> > On Tue, Jan 05, 2016 at 08:36:39AM +0100, Ard Biesheuvel wrote:
-> >> On 5 January 2016 at 03:18, Dennis Chen <dennis.chen@arm.com> wrote:
-> >> > The commit 3400749b5a22 ("arm64/efi: refactor EFI init and runtime
-> >> > code for reuse by 32-bit ARM") uses pgd_alloc() to allocate space for
-> >> > efi_mm.pgd while not the static efi_pgd[], since this function will be
-> >> > called with early_initcall, which results in the pgd_cache used by
-> >> > pgd_alloc() has not been initialized yet, kernel will hang in this
-> >> > case. This patch is trying to make the pgd_cache_init() called before
-> >> > arm_enable_runtime_services() by changing its core_initcall to
-> >> > early_initcall.
-> >> >
-> >> > Signed-off-by: Dennis Chen <dennis.chen@arm.com>
-> >> > Tested-by: Sudeep Holla <sudeep.holla@arm.com>
-> >> >
-> >> > Cc: Will Deacon <will.deacon@arm.com>
-> >> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> >> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> > Cc: Sudeep Holla <sudeep.holla@arm.com>
-> >> > ---
-> >> >  arch/arm64/mm/pgd.c | 2 +-
-> >> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >> >
-> >> > diff --git a/arch/arm64/mm/pgd.c b/arch/arm64/mm/pgd.c
-> >> > index cb3ba1b..859a788 100644
-> >> > --- a/arch/arm64/mm/pgd.c
-> >> > +++ b/arch/arm64/mm/pgd.c
-> >> > @@ -56,4 +56,4 @@ static int __init pgd_cache_init(void)
-> >> >                                               SLAB_PANIC, NULL);
-> >> >         return 0;
-> >> >  }
-> >> > -core_initcall(pgd_cache_init);
-> >> > +early_initcall(pgd_cache_init);
-> >>
-> >>
-> >> Hello all,
-> >>
-> >> Apologies for not spotting this before sending it out.
-> >>
-> >> The issue only occurs when PGD_SIZE != PAGE_SIZE, which is why I did
-> >> not see it myself. I only tested with 4k/39-bits and 64k/42-bits IIRC,
-> >> since the series this is part of primarily concerns ARM not arm64.
-> >>
-> >> Anyway, shuffling init ordering is my least favorite way of fixing
-> >> bugs. Since only ARM requires pgd_alloc() (for the kernel mappings),
-> >> we could also simply factor out pgd_alloc() into efi_pgd_alloc(), and
-> >> define it to mean '__get_free_page(PGALLOC_GFP)' on arm64.
-> >>
-> >>
-> > Ard,
-> >
-> > Both arm and arm64 provide pgd_alloc(), I don't think it's a good idea to create
-> > another efi_pgd_alloc() used by efi only, which looks more like a temp workaround.
-> > Plus, for 64KB page granule when VA = 48bit, the PGD_SIZE = 0x200, it doesn't make
-> > sense to get an entire page as the space for the efi.pgd. Changing the init order
-> > sequence is a reasonable way to fix it unless you can see some potential issues there.
-> >
->
-> Well, since arm_enable_runtime_services() is an early_initcall()
-> itself, how are you guaranteeing the ordering between the two? Link
-> order?
->
+Hi, Heiko:
 
-Link order.
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+On 2016?01?05? 16:00, Heiko Stuebner wrote:
+> Hi Tao,
+> 
+> Am Dienstag, 5. Januar 2016, 15:42:32 schrieb Huang, Tao:
+
+>> I don't think this is a good idea. This will trigger a lots of init call
+>> failed. Before pmic init, all i2c device driver transmit will failed,
+>> and because i2c is slow bus, and i2c transmit may failed by other
+>> reasons, so the i2c driver and i2c device driver will try many times to
+>> make sure the transmit completion. These unnecessary transmission will
+>> make Linux boot very slow.
+> 
+> In general, the slowdown won't be _this_ much if touchscreen drivers need 
+> one deferral-round before i2c is available. I'm also only pointing out 
+> things I remember from the last time this came up. 
+> 
+> rk3x-i2c even was here already:
+> http://www.spinics.net/lists/linux-i2c/msg16680.html
+
+OK. I don't agree with the rule, but we will follow it.
+
+> 
+> 
+>> I2C bus should be subsys, and we can easy resolve this problem, why we
+>> depends on a complicated and slow implementation?
+> 
+> because it's the only safe way to do that. Because now you need i2c-init at 
+> subsys-init time, some months later some other soc may need some other 
+> ordering, especially needing i2c-init later/earlier.
+> 
+> Going through the deferral mechanism is the only way currently available to 
+> actually make this work on all socs.
+> 
+> Tomeu from Collabora is working on some better scheme to optimize device 
+> probing order but it looks like this may be a bit off still.
+> 
+> 
+>>> Your touchscreen will have a "xyz-supply" property and I think the
+>>> regulator-framework should already emit a -EPROBE_DEFER at
+>>> regulator_get,
+>>> when the regulator is specified but not available yet.
+>>
+>> Unfortunately, mostly driver do not support regulator api. They are
+>> suppose power is on.
+> 
+> Having touchscreen drivers support its proper supply-regulators is not 
+> rocket science ;-) [0] , so I would consider this a bug in the touchscreen 
+> driver itself.
+
+I don't just talk about touch screen driver, most i2c device driver such
+as input sensor/camera/rtc/battery will suffer. So people will see their
+drivers do not work or slow down on rk3368 platform :(
+
+Thanks!
+Huang, Tao
