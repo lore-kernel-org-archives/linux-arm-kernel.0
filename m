@@ -1,44 +1,71 @@
-From: dbasehore@chromium.org (dbasehore .)
-Date: Tue, 5 Jan 2016 15:38:25 -0800
-Subject: [PATCH v11 0/4] Allow USB devices to remain runtime-suspended
- when sleeping
-In-Reply-To: <1791136.5K3qHuXCRE@vostro.rjw.lan>
-References: <1445956731-6304-1-git-send-email-tomeu.vizoso@collabora.com>
- <2496228.i2Z9PmMBtz@vostro.rjw.lan>
- <20160105021052.GA32392@google.com>
- <1791136.5K3qHuXCRE@vostro.rjw.lan>
-Message-ID: <CAGAzgsrdw8pmntQYrLbWsFzO7epp7JX84FN2Y-KkuZOfA18gmg@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 5 Jan 2016 17:43:47 -0600
+Subject: [PATCH 2/2] ARM: versatile: fix MMC/SD interrupt assignment
+In-Reply-To: <1451984370-16932-1-git-send-email-linus.walleij@linaro.org>
+References: <1451984370-16932-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CAL_Jsq+8JOSpUefSUMakAsESbjFgfGFpFsH=7utZWP_H6HPM6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 5, 2016 at 4:48 AM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Monday, January 04, 2016 06:27:18 PM Derek Basehore wrote:
->> On Mon, Nov 02, 2015 at 02:50:40AM +0100, Rafael J. Wysocki wrote:
->> >
->> > I've queued up this series for the second half of the v4.4 merge window.
->> >
->> > Thanks,
->> > Rafael
->> >
->> >
->> > _______________________________________________
->> > linux-arm-kernel mailing list
->> > linux-arm-kernel at lists.infradead.org
->> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->> What's the status of this patch series? I haven't seen the patches
->> posted for v4.4, plus there's the issue that Dan found that needs to be
->> addressed.
->>
->> Is there a new revision of the patch series being worked on?
+On Tue, Jan 5, 2016 at 2:59 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> Commit 0976c946a610d06e907335b7a3afa6db046f8e1b
+> "arm/versatile: Fix versatile irq specifications"
+> has an off-by-one error on the Versatile AB that has
+> been regressing the Versatile AB hardware for some time.
 >
-> Tomeu is not working on one AFAICS, but I may just revive his series.
+> However it seems like the interrupt assignments have
+> never been correct and I have now adjusted them according
+> to the specification. The masks for the valid interrupts
+> made it impossible to assign the right SIC interrupt
+> for the MMCI, so I went in and fixed these to correspond
+> to the specifications, and added references if anyone
+> wants to double-check.
 >
-> Do you have a pointer to the Dan's report?
+> Due to the Versatile PB including the Versatile AB
+> as a base DTS file, we need to override and correct
+> some values to correspond to the actual changes in the
+> hardware.
 >
-> Thanks,
-> Rafael
+> For the Versatile PB I don't think the IRQ line
+> assignment for MMCI has ever been correct for either of
+> the two MMCI blocks. It would be nice if someone with the
+> physical PB board could test this.
 >
+> Patch tested on the Versatile AB, QEMU for Versatile AB
+> and QEMU for Versatile PB.
+>
+> Cc: Rob Herring <robh@kernel.org>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: stable at vger.kernel.org
+> Fixes: 0976c946a610 ("arm/versatile: Fix versatile irq specifications")
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ARM SoC people: please apply this directly for fixes if
+> you find it OK.
+> ---
+>  arch/arm/boot/dts/versatile-ab.dts | 10 +++++++---
+>  arch/arm/boot/dts/versatile-pb.dts | 20 +++++++++++++++++++-
+>  2 files changed, 26 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/versatile-ab.dts b/arch/arm/boot/dts/versatile-ab.dts
+> index 01f40197ea13..3279bf1a17a1 100644
+> --- a/arch/arm/boot/dts/versatile-ab.dts
+> +++ b/arch/arm/boot/dts/versatile-ab.dts
+> @@ -110,7 +110,11 @@
+>                         interrupt-parent = <&vic>;
+>                         interrupts = <31>; /* Cascaded to vic */
+>                         clear-mask = <0xffffffff>;
+> -                       valid-mask = <0xffc203f8>;
+> +                       /*
+> +                        * Valid interrupt lines mask according to
+> +                        * table 4-36 page 4-50 of ARM DUI 0225D
+> +                        */
+> +                       valid-mask = <0x0760031b>;
 
-It was a reply to the second patch in the series. Here's a link to it
-https://lkml.org/lkml/2015/11/10/107
+I never really liked valid-mask in the first place. Valid interrupts
+are the ones specified by devices and we don't need this extra data.
+If we do, then *every* interrupt controller needs this property.
+Perhaps the driver should just ignore it. But you've already done the
+work here, so this is okay too.
+
+Rob
