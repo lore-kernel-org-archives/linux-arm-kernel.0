@@ -1,18 +1,18 @@
-From: huangtao@rock-chips.com (Huang, Tao)
-Date: Tue, 5 Jan 2016 15:42:32 +0800
+From: jay.xu@rock-chips.com (Jianqun Xu)
+Date: Tue, 5 Jan 2016 15:42:55 +0800
 Subject: [PATCH] i2c: rk3x: init module as subsys call
 In-Reply-To: <2513923.8oltbpbAin@phil>
 References: <1451962938-17398-1-git-send-email-jay.xu@rock-chips.com>
  <2513923.8oltbpbAin@phil>
-Message-ID: <568B73E8.3010901@rock-chips.com>
+Message-ID: <568B73FF.9090508@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Heiko:
+Hi Heiko:
 
-On 2016?01?05? 15:02, Heiko Stuebner wrote:
+? 05/01/2016 15:02, Heiko Stuebner ??:
 > Hi Jianqun,
-> 
+>
 > Am Dienstag, 5. Januar 2016, 11:02:18 schrieb jianqun.xu:
 >> From: Xu Jianqun <jay.xu@rock-chips.com>
 >>
@@ -34,50 +34,32 @@ On 2016?01?05? 15:02, Heiko Stuebner wrote:
 >> The stable way to make sure that pmic can be intalized before other
 >> peripher devices is to make the pmic module be subsys call, the i2c
 >> module need to be subsys call firstly.
-> 
-> I do believe that came up in the past already and the direction from then 
+>
+> I do believe that came up in the past already and the direction from then
 > was (and most likely still is) that drivers should make use of the probe-
 > deferral mechanism instead of wiggling with the initcall ordering.
-
-
-I don't think this is a good idea. This will trigger a lots of init call
-failed. Before pmic init, all i2c device driver transmit will failed,
-and because i2c is slow bus, and i2c transmit may failed by other
-reasons, so the i2c driver and i2c device driver will try many times to
-make sure the transmit completion. These unnecessary transmission will
-make Linux boot very slow.
-
-I2C bus should be subsys, and we can easy resolve this problem, why we
-depends on a complicated and slow implementation?
-
-> 
-> Your touchscreen will have a "xyz-supply" property and I think the 
-> regulator-framework should already emit a -EPROBE_DEFER at regulator_get, 
+>
+> Your touchscreen will have a "xyz-supply" property and I think the
+> regulator-framework should already emit a -EPROBE_DEFER at regulator_get,
 > when the regulator is specified but not available yet.
-
-Unfortunately, mostly driver do not support regulator api. They are
-suppose power is on.
-
-Thanks.
-Huang, Tao
-
-> 
-> 
+>
+It seems more reasonable, thanks for advice, I will have a try.
+>
 > Heiko
-> 
+>
 >>
 >> Signed-off-by: Xu Jianqun <jay.xu@rock-chips.com>
 >> ---
->>  drivers/i2c/busses/i2c-rk3x.c | 12 +++++++++++-
->>  1 file changed, 11 insertions(+), 1 deletion(-)
+>>   drivers/i2c/busses/i2c-rk3x.c | 12 +++++++++++-
+>>   1 file changed, 11 insertions(+), 1 deletion(-)
 >>
 >> diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
 >> index c1935eb..00e5959 100644
 >> --- a/drivers/i2c/busses/i2c-rk3x.c
 >> +++ b/drivers/i2c/busses/i2c-rk3x.c
 >> @@ -1037,7 +1037,17 @@ static struct platform_driver rk3x_i2c_driver = {
->>  	},
->>  };
+>>   	},
+>>   };
 >>
 >> -module_platform_driver(rk3x_i2c_driver);
 >> +static int __init rk3x_i2c_init(void)
@@ -92,9 +74,9 @@ Huang, Tao
 >> +}
 >> +module_exit(rk3x_i2c_exit);
 >>
->>  MODULE_DESCRIPTION("Rockchip RK3xxx I2C Bus driver");
->>  MODULE_AUTHOR("Max Schwarz <max.schwarz@online.de>");
-> 
-> 
-> 
-> 
+>>   MODULE_DESCRIPTION("Rockchip RK3xxx I2C Bus driver");
+>>   MODULE_AUTHOR("Max Schwarz <max.schwarz@online.de>");
+>
+>
+>
+>
