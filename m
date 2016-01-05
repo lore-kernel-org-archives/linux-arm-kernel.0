@@ -1,73 +1,34 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 5 Jan 2016 11:31:00 +0900
-Subject: [PATCH] drivers/bus: make uniphier-system-bus.c explicitly
- non-modular
-In-Reply-To: <CAK7LNASU3OMhhPTQvEUKEX_5RNiCeaF-QUBgvuSVpEvd4awWww@mail.gmail.com>
-References: <1451935379-14107-1-git-send-email-paul.gortmaker@windriver.com>
- <CAK7LNASK5GCQ-Jk7ApmSinnW2PAaSmD-k2X9BbGg66-_b5kASg@mail.gmail.com>
- <CAK7LNASDdpt0zVHUe=EMdKCH6N25CwBLtR0A4jXP=P8zAaaqRA@mail.gmail.com>
- <CAK7LNASU3OMhhPTQvEUKEX_5RNiCeaF-QUBgvuSVpEvd4awWww@mail.gmail.com>
-Message-ID: <CAK7LNARdg5UCU99mL6Jhz_rHgyOkQ=pugdSMz_BmFRxH-eYSsA@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 04 Jan 2016 21:51:32 -0500 (EST)
+Subject: [PATCH] ip_tunnel: make ip6tunnel_xmit definition conditional
+In-Reply-To: <12586917.ah4bPMnYUH@wuerfel>
+References: <12586917.ah4bPMnYUH@wuerfel>
+Message-ID: <20160104.215132.601618412229369596.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-01-05 11:26 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> Hi Paul,
->
->
-> 2016-01-05 8:24 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
->> Hi Olof,
->>
->> Sorry my misunderstanding.
->>
->>
->> 2016-01-05 8:15 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
->>> Hi Paul, Olof,
->>>
->>> 2016-01-05 4:22 GMT+09:00 Paul Gortmaker <paul.gortmaker@windriver.com>:
->>>> The Kconfig currently controlling compilation of this code is:
->>>>
->>>> drivers/bus/Kconfig:config UNIPHIER_SYSTEM_BUS
->>>> drivers/bus/Kconfig:    bool "UniPhier System Bus driver"
->>>>
->>>> ...meaning that it currently is not being built as a module by anyone.
->>>>
->>>> Lets remove the modular code that is essentially orphaned, so that
->>>> when reading the driver there is no doubt it is builtin-only.
->>>>
->>>> Since module_platform_driver() uses the same init level priority as
->>>> builtin_platform_driver() the init ordering remains unchanged with
->>>> this commit.
->>>>
->>>> Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
->>>>
->>>> We also delete the MODULE_LICENSE tag etc. since all that information
->>>> is already contained at the top of the file in the comments.
->>>>
->>>> Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
->>>> Cc: Rob Herring <robh@kernel.org>
->>>> Cc: Arnd Bergmann <arnd@arndb.de>
->>>> Cc: Olof Johansson <olof@lixom.net>
->>>> Cc: linux-arm-kernel at lists.infradead.org
->>>> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
->
->
->
-> I assume commit 326ea45aa827 ("bus: uniphier: allow only built-in driver")
-> is a temporary fix.
->
-> I'd like to revive the tristate for this driver
-> by hook or by crook.
->
->
-> I've sent the following to fix the build error.
-> http://www.thefreedictionary.com/
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Fri, 01 Jan 2016 14:48:59 +0100
 
-Sorry, I mean this one:
-https://patchwork.kernel.org/patch/7952361/
+> From 433df301cf49624871346fa63f3fc65033caeda3 Mon Sep 17 00:00:00 2001
+> From: Arnd Bergmann <arnd@arndb.de>
+> Date: Fri, 1 Jan 2016 13:18:48 +0100
+> Subject: [PATCH] net: make ip6tunnel_xmit definition conditional
+> 
+> Moving the caller of iptunnel_xmit_stats causes a build error in
+> randconfig builds that disable CONFIG_INET:
+> 
+> In file included from ../net/xfrm/xfrm_input.c:17:0:
+> ../include/net/ip6_tunnel.h: In function 'ip6tunnel_xmit':
+> ../include/net/ip6_tunnel.h:93:2: error: implicit declaration of function 'iptunnel_xmit_stats' [-Werror=implicit-function-declaration]
+>   iptunnel_xmit_stats(dev, pkt_len);
+> 
+> The reason is that the iptunnel_xmit_stats definition is hidden
+> inside #ifdef CONFIG_INET but the caller is not. We can change
+> one or the other to fix it, and this patch adds a second #ifdef
+> around ip6tunnel_xmit() to avoid seeing the invalid call.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 039f50629b7f ("ip_tunnel: Move stats update to iptunnel_xmit()")
 
-
-
--- 
-Best Regards
-Masahiro Yamada
+Applied, thanks.
