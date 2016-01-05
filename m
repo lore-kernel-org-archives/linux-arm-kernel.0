@@ -1,81 +1,48 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 5 Jan 2016 11:09:29 +0100
-Subject: [PATCH v3 1/3] clocksource/vt8500: Increase the minimum delta
-In-Reply-To: <20160105124242.17bbe09d@v1ron-s7>
-References: <1451654683-2401-1-git-send-email-v1ron@mail.ru>
- <1451654683-2401-2-git-send-email-v1ron@mail.ru>
- <568B8653.2010301@linaro.org> <20160105124242.17bbe09d@v1ron-s7>
-Message-ID: <568B9659.6080809@linaro.org>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 05 Jan 2016 11:12:22 +0100
+Subject: [PATCH v4 5/6] mfd: dt-bindings: add device tree bindings for
+ Hi3519 sysctrl
+In-Reply-To: <1451439832-13927-6-git-send-email-xuejiancheng@huawei.com>
+References: <1451439832-13927-1-git-send-email-xuejiancheng@huawei.com>
+ <1451439832-13927-6-git-send-email-xuejiancheng@huawei.com>
+Message-ID: <1451988742.3391.22.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/05/2016 10:42 AM, Roman Volkov wrote:
-> ? Tue, 5 Jan 2016 10:01:07 +0100
-> Daniel Lezcano <daniel.lezcano@linaro.org> ?????:
->
->> On 01/01/2016 02:24 PM, Roman Volkov wrote:
->>> From: Roman Volkov <rvolkov@v1ros.org>
->>>
->>> The vt8500 clocksource driver declares itself as capable to handle
->>> the minimum delay of 4 cycles by passing the value into
->>> clockevents_config_and_register(). The vt8500_timer_set_next_event()
->>> requires the passed cycles value to be at least 16. The impact is
->>> that userspace hangs in nanosleep() calls with small delay
->>> intervals.
->>>
->>> This problem is reproducible in Linux 4.2 starting from:
->>> c6eb3f70d448 ('hrtimer: Get rid of hrtimer softirq')
->>>
->>> Signed-off-by: Roman Volkov <rvolkov@v1ros.org>
->>> Acked-by: Alexey Charkov <alchark@gmail.com>
->>
->> Hi Roman,
->>
->> I looked at the email thread, and IIUC if set_next_event fails, the
->> system freeze. Your patch fixes the issue for your driver but not the
->> real issue because if set_next_event fails, at least a warning should
->> appear in the log or better nanosleep should fail gracefully.
->
-> Hi Daniel,
->
-> I agree, but if nanosleep will return immediately, this can lead to
-> undefined behavior in the software.
+Am Mittwoch, den 30.12.2015, 09:43 +0800 schrieb Jiancheng Xue:
+> Add device tree bindings for Hi3519 system controller.
+> 
+> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
+> ---
+>  Documentation/devicetree/bindings/mfd/hi3519.txt | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/hi3519.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/hi3519.txt b/Documentation/devicetree/bindings/mfd/hi3519.txt
+> new file mode 100644
+> index 0000000..2536edc
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/hi3519.txt
+> @@ -0,0 +1,14 @@
+> +* Hisilicon Hi3519 System Controller Block
+> +
+> +This bindings use the following binding:
+> +Dcumentation/devicetree/bindings/clock/clock-bindings.txt
 
-The nanosleep syscall is supposed to return an error code. If the 
-software does not pay attention to the syscall's return code, then the 
-bug is in the software, it is not up to the kernel to work around it.
+Typo: "Documentation"
+- but I don't see the clock bindings being used here at all.
+Maybe just drop this sentence?
 
-> Maybe the system can go busyloop
-> to somehow recover from this state and print a message to the log? At
-> the driver level it seems to be enough to fail the function without
-> printing logs.
->
->> BTW why min delta is MIN_OSCR_DELTA * 2 in
->> clockevents_config_and_register ?
->
-> All this just to be consistent with PXA. Maybe PXA works with lesser
-> values, e.g., 8. For vt8500, accessing the registers is more complex,
-> and this should consume more time. IIUC, if the driver does not support
-> too small delays, the system will handle it with busyloop?
+> +
+> +Required properties:
+> +- compatible: "hisilicon,hi3519-sysctrl".
+> +- reg: the register region of this block
+> +
+> +Examples:
+> +sysctrl: system-controller at 12010000 {
+> +	compatible = "hisilicon,hi3519-sysctrl", "syscon";
+> +	reg = <0x12010000 0x1000>;
+> +};
 
-[ Added John Stultz and Thomas Gleixner ] to answer those questions above.
-
-> Why multiply by two? Good question. Maybe there is a reserve for
-> stability. The value passed by the system to the set_next_event() should
-> be not lesser than this value, and theoretically, we should not
-> multiply MIN_OSCR_DELTA by two. As I can see, in many drivers there is
-> no such minimal values at all.
->
-> Added Robert
->
-> Regards,
-> Roman
->
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+regards
+Philipp
