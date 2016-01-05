@@ -1,62 +1,50 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 6 Jan 2016 08:29:55 +1100
-Subject: [PATCH v2 03/13] ARM: shmobile: r8a7793: add R-Car sound support
- to device tree
-In-Reply-To: <CAMuHMdVbExt45=sqXN-=F5sTH_v_j36Ahg-Ni=ZdVf8Fb_gLpA@mail.gmail.com>
-References: <1451946468-20499-1-git-send-email-horms+renesas@verge.net.au>
- <1451946468-20499-4-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdVbExt45=sqXN-=F5sTH_v_j36Ahg-Ni=ZdVf8Fb_gLpA@mail.gmail.com>
-Message-ID: <20160105212954.GC5126@verge.net.au>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 5 Jan 2016 15:42:06 -0600
+Subject: [PATCH v5 0/5] Qualcomm PCIe driver and designware fixes
+In-Reply-To: <1450442339-18765-1-git-send-email-stanimir.varbanov@linaro.org>
+References: <1450442339-18765-1-git-send-email-stanimir.varbanov@linaro.org>
+Message-ID: <20160105214206.GA23814@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 05, 2016 at 10:16:04AM +0100, Geert Uytterhoeven wrote:
-> Hi Simon,
+On Fri, Dec 18, 2015 at 02:38:54PM +0200, Stanimir Varbanov wrote:
+> Hi,
 > 
-> On Mon, Jan 4, 2016 at 11:27 PM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > Instantiate R-Car sound node in r8a7793 device tree.
-> > This only supports PIO transfers.
-> >
-> > Based on similar work for the r8a7791 by Kuninori Morimoto.
-> >
-> > Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >
-> > ---
-> > v2
-> > * Added audmapp
+> I'm sending v5 with following changes:
+> - in 1/5 - replace wmb() call with PCIE_ATU_CR2 register read.
+> - in 3/5 - addressed comments from Born Helgaas about usage of a
+> standard PCI capabilities register names and rename link training
+> function to the way that other Designware based drivers use.
+> - in 5/5 - addressed a comment from Bjorn Andersson about regulator
+> label duplication.
 > 
-> Really??
+> Comments are welcome!
 > 
-> > ---
-> >  arch/arm/boot/dts/r8a7793.dtsi | 83 ++++++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 83 insertions(+)
-> >
-> > diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
-> > index fa8a0d772d51..90959a925edd 100644
-> > --- a/arch/arm/boot/dts/r8a7793.dtsi
-> > +++ b/arch/arm/boot/dts/r8a7793.dtsi
-> > @@ -1101,4 +1101,87 @@
-> >                 #iommu-cells = <1>;
-> >                 status = "disabled";
-> >         };
-> > +
-> > +       rcar_sound: sound at ec500000 {
-> > +               /*
-> > +                * #sound-dai-cells is required
-> > +                *
-> > +                * Single DAI : #sound-dai-cells = <0>;         <&rcar_sound>;
-> > +                * Multi  DAI : #sound-dai-cells = <1>;         <&rcar_sound N>;
-> > +                */
-> > +               compatible =  "renesas,rcar_sound-r8a7793", "renesas,rcar_sound-gen2";
-> > +               reg =   <0 0xec500000 0 0x1000>, /* SCU */
-> > +                       <0 0xec5a0000 0 0x100>,  /* ADG */
-> > +                       <0 0xec540000 0 0x1000>, /* SSIU */
-> > +                       <0 0xec541000 0 0x280>;  /* SSI */
-> > +               reg-names = "scu", "adg", "ssiu", "ssi";
+> The previous v4 of the patch set can be found at [1].
 > 
-> No "audmapp"...
+> regards,
+> Stan
+> 
+> [1] https://lkml.org/lkml/2015/12/3/370
+> 
+> Stanimir Varbanov (5):
+>   PCI: designware: ensure ATU is enabled before IO/conf space accesses
+>   DT: PCI: qcom: Document PCIe devicetree bindings
+>   PCI: qcom: Add Qualcomm PCIe controller driver
+>   ARM: dts: apq8064: add pcie devicetree node
+>   ARM: dts: ifc6410: enable pcie dt node for this board
+> 
+>  .../devicetree/bindings/pci/qcom,pcie.txt          |  233 ++++++++
+>  MAINTAINERS                                        |    7 +
+>  arch/arm/boot/dts/qcom-apq8064-ifc6410.dts         |   26 +
+>  arch/arm/boot/dts/qcom-apq8064.dtsi                |   36 ++
+>  drivers/pci/host/Kconfig                           |   10 +
+>  drivers/pci/host/Makefile                          |    1 +
+>  drivers/pci/host/pcie-designware.c                 |    7 +
+>  drivers/pci/host/pcie-qcom.c                       |  617 ++++++++++++++++++++
+>  8 files changed, 937 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/qcom,pcie.txt
+>  create mode 100644 drivers/pci/host/pcie-qcom.c
 
-Sorry about that, audmapp is added by another patch
-"ARM: shmobile: r8a7793: enable Audio DMAC peri peri via sound driver".
+Applied to pci/host-qcom for v4.5, with Pratyush's ack on the first patch.
+Thanks!
