@@ -1,69 +1,30 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 5 Jan 2016 13:22:49 -0700
-Subject: Including Raspberry Pi -next trees in linux-next
-In-Reply-To: <87d1tfrdu0.fsf@eliezer.anholt.net>
-References: <87fuyozzax.fsf@eliezer.anholt.net>
- <20160104182614.4be3fa06@canb.auug.org.au>
- <87d1tfrdu0.fsf@eliezer.anholt.net>
-Message-ID: <568C2619.20705@wwwdotorg.org>
+From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
+Date: Tue, 5 Jan 2016 14:26:43 -0600
+Subject: [PATCH] ARM: dts: socfpga: add cap-sd-highspeed for SD/MMC node
+Message-ID: <1452025603-8801-1-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/05/2016 01:06 PM, Eric Anholt wrote:
-> Stephen Rothwell <sfr@canb.auug.org.au> writes:
->
->> Hi Eric,
->>
->> On Sat, 26 Dec 2015 13:15:50 -0800 Eric Anholt <eric@anholt.net> wrote:
->>>
->>> I'll be sending pull-requests to Florian soon, but I would like to get
->>> my trees included in linux-next to get increased testing coverage of
->>> them against everything else going on for 4.5.  I'm expecting to produce
->>> trees under these branch names for the forseeable future.
->>>
->>> Repo: https://github.com/anholt/linux.git
->>>
->>> branches:
->>> drm-vc4-next
->>> bcm2835-dt-next
->>> bcm2835-soc-next
->>> bcm2835-drivers-next
->>> bcm2385-defconfig-next
->>> (bcm2835-maintainers-next is a placeholder since we have nothing for it
->>> this round)
+From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-Typically maintainers merge everything together into a single "for-next" 
-to maintain a reasonable set of branches. I guess it doesn't affect me 
-so my opinion isn't too relevant though:-)
+Enable SD highspeed support for the SoCFPGA Arria10 devkit.
 
->> I have added the first 5 from today.  Can you tell me which trees they
->> will be merged via so I can position them in my list correctly,
->> please?
->
-> drm-vc4-next goes through airlied's drm-next.  bcm2835-* are intended to
-> go through Florian's stblinux tree, though things didn't go that way
-> this time because I'm still figuring out timelines.
->
-> Looking through Next/Trees, it looks like stblinux isn't in the list.
-> That seems like something that would be useful, given that Florian's
-> been successfully sending pull requests to arm-soc for at least a couple
-> of releases.  (<1445718981-13552-1-git-send-email-f.fainelli@gmail.com>,
-> for example).  His branches appear to be defconfig/next,
-> devicetree/next, maintainers/next, and soc/next, all on
-> https://github.com/Broadcom/stblinux.git.
->
->> Also, I was wondering how they relate to the bcm2835 tree I currently
->> have (git://git.kernel.org/pub/scm/linux/kernel/git/rpi/linux-rpi.git
->> for-next) currently maintained by Stephen Warren (cc'd).
->
-> Stephen and Lee have limited time to work on 2835 as it's only been a
-> free-time project for them afaict.  I offered to help on the merging
-> process, since it's job related.  I don't have kernel.org access any
-> more I think, and it turns out github process is familiar to 2835's
-> potential contributors, so it's working out quite well to host the
-> branches there.  They're still chiming in with acks and feedback when
-> time permits, though.
+Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+---
+ arch/arm/boot/dts/socfpga_arria10_socdk_sdmmc.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-It'd be quite easy to get you access to the existing kernel.org bcm2835 
-tree though; just get an account there and the admins can add you to the 
-ACL.
+diff --git a/arch/arm/boot/dts/socfpga_arria10_socdk_sdmmc.dts b/arch/arm/boot/dts/socfpga_arria10_socdk_sdmmc.dts
+index dbbb751..8a7dfa4 100644
+--- a/arch/arm/boot/dts/socfpga_arria10_socdk_sdmmc.dts
++++ b/arch/arm/boot/dts/socfpga_arria10_socdk_sdmmc.dts
+@@ -21,6 +21,7 @@
+ &mmc {
+ 	status = "okay";
+ 	num-slots = <1>;
++	cap-sd-highspeed;
+ 	broken-cd;
+ 	bus-width = <4>;
+ };
+-- 
+2.6.2
