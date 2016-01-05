@@ -1,81 +1,71 @@
-From: wangnan0@huawei.com (Wangnan (F))
-Date: Tue, 5 Jan 2016 09:41:26 +0800
-Subject: [PATCH v2] arm64: Store breakpoint single step state into pstate
-In-Reply-To: <20160104165535.GI1616@arm.com>
-References: <1450860731-194418-1-git-send-email-wangnan0@huawei.com>
- <1450921362-198371-1-git-send-email-wangnan0@huawei.com>
- <20160104165535.GI1616@arm.com>
-Message-ID: <568B1F46.8050206@huawei.com>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 5 Jan 2016 02:53:30 +0100
+Subject: [PATCH] doc: PCI: altera: Fix the 'ranges' property in example
+In-Reply-To: <E7E66AD1AD65064486AD57C361DF091C062AE3A4@PG-ITEXCH02.altera.priv.altera.com>
+References: <1450950330-28393-1-git-send-email-marex@denx.de>
+ <201601050147.40997.marex@denx.de>
+ <E7E66AD1AD65064486AD57C361DF091C062AE3A4@PG-ITEXCH02.altera.priv.altera.com>
+Message-ID: <201601050253.31043.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tuesday, January 05, 2016 at 02:18:18 AM, Ley Foon Tan wrote:
+> On Tue, 2016-01-05 at 01:47 +0100, Marek Vasut wrote:
+> > On Tuesday, January 05, 2016 at 01:45:45 AM, Ley Foon Tan wrote:
+> > > On Mon, 2016-01-04 at 02:12 +0100, Marek Vasut wrote:
+> > > > On Monday, January 04, 2016 at 01:53:22 AM, Ley Foon Tan wrote:
+> > > > > On Mon, 2016-01-04 at 01:37 +0100, Marek Vasut wrote:
+> > > > > > On Monday, January 04, 2016 at 01:10:13 AM, Ley Foon Tan wrote:
+> > > > > > 
+> > > > > > Hi!
+> > > > > > 
+> > > > > > > > > > Well, do you have a good explanation why the system works
+> > > > > > > > > > with this change and doesn't work without it on my design
+> > > > > > > > > > ? I'd really love to understand this.
+> > > > > > > > > 
+> > > > > > > > > Do you modify the driver to setup the translation table?
+> > > > > > > > 
+> > > > > > > > No, I didn't change the driver. What do you refer to please ?
+> > > > > > > 
+> > > > > > > There is Address Translation Table at address offset 0x1000 in
+> > > > > > > the IP.
+> > > > > > 
+> > > > > > Oh, I didn't configure that in any way. Should I or does the
+> > > > > > driver configure it in some way?
+> > > > > > 
+> > > > > > > Do you use the hardware design from the rocketboards.org or
+> > > > > > > your own design?
+> > > > > > 
+> > > > > > I use the one from rocketboards, I just ported it over to the
+> > > > > > MCVEVK (custom cyclone v soc board)
+> > > > > 
+> > > > > You may check again the base addresses use in the MCVEVK board.
+> > > > 
+> > > > The address map is attached ; I don't see anything which would differ
+> > > > from the reference design.
+> > > 
+> > > Address map looks fine.
+> > 
+> > Well do you have any other idea then ? I guess I should pull out the
+> > SOCDK, huh?
+> 
+> Can't think of any other thing that impact this, I expect the bus width
+> used in the pipeline/bridge are same with the example design.
+> Do you have our CV
 
+yes
 
-On 2016/1/5 0:55, Will Deacon wrote:
-> Hello,
->
-> On Thu, Dec 24, 2015 at 01:42:42AM +0000, Wang Nan wrote:
->> Two 'perf test' fail on arm64:
->>
->>   # perf test overflow
->>   17: Test breakpoint overflow signal handler                  : FAILED!
->>   18: Test breakpoint overflow sampling                        : FAILED!
->>
->> When breakpoint raises, after perf_bp_event, breakpoint_handler()
->> temporary disables breakpoint and enables single step. Then in
->> single_step_handler(), reenable breakpoint. Without doing this
->> the breakpoint would be triggered again.
->>
->> However, if there's a pending signal and it have signal handler,
->> control would be transfer to signal handler, so single step handler
->> would be applied to the first instruction of signal handler. After
->> the handler return, the instruction triggered the breakpoint would be
->> executed again. At this time the breakpoint is enabled, so the
->> breakpoint is triggered again.
-> Whilst I appreciate that you're just trying to get those tests passing
-> on arm64, I really don't think its a good idea for us to try and emulate
-> the x86 debug semantics here. This doesn't happen for ptrace, and I think
-> we're likely to break more than we fix if we try to do it for perf too.
->
-> The problem seems to be that we take the debug exception before the
-> breakpointed instruction has been executed and call perf_bp_event at
-> that moment, so when we single-step the faulting instruction we actually
-> step into the SIGIO handler and end up getting stuck.
+> AV 
 
-Understand.
+yes
 
-> Your fix doesn't really address this afaict,
+> A10 SoC devkit?
 
-I don't think so. After applying my patch, the entry of signal handler won't
-be single-stepped. Please have a look at signal_toggle_single_step(): when
-signal arises, single step handler is turned off, so signal handler won't
-be stepped.
+Not yet ;-)
 
-I thing the following 4 cases you mentioned should not causes error in 
-theory:
+I'll try to find some time to test it on CV SoCDK tomorrow.
 
->   in that you don't (can't?)
-> handle:
->
->    * A longjmp out of a signal handler
+[...]
 
-The signal frame is dropped so stepping is omitted.
-
->    * A watchpoint and a breakpoint that fire on the same instruction
-
-Watchpoints and breakpoints are controlled separatly. In this case it would
-generated twp nested signals. I will try this.
-
->    * User-controlled single-step from a signal handler that enables a
->      breakpoint explicitly
-
-debug_info->suspended_step controls this.
-
->    * Nested signals
-
-I think nested signals can be dealt correctly because we save state in 
-signal frame.
-
-However I'll try the above cases you mentioned above.
-
-Thank you.
+Best regards,
+Marek Vasut
