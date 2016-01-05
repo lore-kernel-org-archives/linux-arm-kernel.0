@@ -1,66 +1,142 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 5 Jan 2016 09:56:03 +0000
-Subject: [linux-next PATCH] arm64: fix kernel crash with 48-bit VA and
- 64KB granule
-In-Reply-To: <20160105084042.GF13942@arm.org>
-References: <1451960299-14123-1-git-send-email-dennis.chen@arm.com>
- <CAKv+Gu-pz8rA2EfU6NwCndmoYneOjYUt8_PodTdZkepV3cRXJQ@mail.gmail.com>
- <20160105083533.GD13942@arm.org>
- <CAKv+Gu9Q3CmC37dL3o+hcBeG-NJ7+bkOiLQihirje4YbazizJQ@mail.gmail.com>
- <20160105084042.GF13942@arm.org>
-Message-ID: <20160105095603.GG6301@e104818-lin.cambridge.arm.com>
+From: js07.lee@samsung.com (Jungseung Lee)
+Date: Tue, 05 Jan 2016 18:56:03 +0900
+Subject: [PATCH] ARM: mm: Speed up page list initialization during boot
+In-Reply-To: <20160102103722.GQ8644@n2100.arm.linux.org.uk>
+References: <004001d14158$114be8d0$33e3ba70$@samsung.com>
+ <005101d14158$b50842c0$1f18c840$@samsung.com>
+ <CAJFHJrpgHmcXBwuV5i4nH4SOL-OwrY2-+Fe7x9W2c6GWW=F7bg@mail.gmail.com>
+ <20160102103722.GQ8644@n2100.arm.linux.org.uk>
+Message-ID: <002c01d1479f$49ea2970$ddbe7c50$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 05, 2016 at 04:40:44PM +0800, Dennis Chen wrote:
-> On Tue, Jan 05, 2016 at 09:38:11AM +0100, Ard Biesheuvel wrote:
-> > >> On 5 January 2016 at 03:18, Dennis Chen <dennis.chen@arm.com> wrote:
-> > >> > The commit 3400749b5a22 ("arm64/efi: refactor EFI init and runtime
-> > >> > code for reuse by 32-bit ARM") uses pgd_alloc() to allocate space for
-> > >> > efi_mm.pgd while not the static efi_pgd[], since this function will be
-> > >> > called with early_initcall, which results in the pgd_cache used by
-> > >> > pgd_alloc() has not been initialized yet, kernel will hang in this
-> > >> > case. This patch is trying to make the pgd_cache_init() called before
-> > >> > arm_enable_runtime_services() by changing its core_initcall to
-> > >> > early_initcall.
-> > >> >
-> > >> > Signed-off-by: Dennis Chen <dennis.chen@arm.com>
-> > >> > Tested-by: Sudeep Holla <sudeep.holla@arm.com>
-> > >> >
-> > >> > Cc: Will Deacon <will.deacon@arm.com>
-> > >> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > >> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > >> > Cc: Sudeep Holla <sudeep.holla@arm.com>
-> > >> > ---
-> > >> >  arch/arm64/mm/pgd.c | 2 +-
-> > >> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > >> >
-> > >> > diff --git a/arch/arm64/mm/pgd.c b/arch/arm64/mm/pgd.c
-> > >> > index cb3ba1b..859a788 100644
-> > >> > --- a/arch/arm64/mm/pgd.c
-> > >> > +++ b/arch/arm64/mm/pgd.c
-> > >> > @@ -56,4 +56,4 @@ static int __init pgd_cache_init(void)
-> > >> >                                               SLAB_PANIC, NULL);
-> > >> >         return 0;
-> > >> >  }
-> > >> > -core_initcall(pgd_cache_init);
-> > >> > +early_initcall(pgd_cache_init);
-[...]
-> > Well, since arm_enable_runtime_services() is an early_initcall()
-> > itself, how are you guaranteeing the ordering between the two? Link
-> > order?
+> On Thu, Dec 31, 2015 at 05:05:54AM -0800, Chirantan Ekbote wrote:
+> > On Mon, Dec 28, 2015 at 2:15 AM, Jungseung Lee <js07.lee@samsung.com>
+> wrote:
+> > > Hi,
+> > >
+> > >>During boot, we populate the page lists by using the page freeing
+> > >>mechanism on every individual page.  Unfortunately, this is very
+> > >>inefficient because the memory manager spends a lot of time
+> > >>coalescing pairs of adjacent free pages into bigger blocks.
+> > >>
+> > >>Rather than adding a single order 0 page at a time, we can take
+> > >>advantage of the fact that we know that all the pages are available
+> > >>and free up big blocks of pages at a time instead.
+> > >>
+> > >>Signed-off-by: Chirantan Ekbote <chirantan@chromium.org>
+> > >>---
+> > >> arch/arm/mm/init.c  | 19 +++++++++++++++++--  include/linux/gfp.h |
+> > >>1
+> > >>+
+> > >> mm/internal.h       |  1 -
+> > >> 3 files changed, 18 insertions(+), 3 deletions(-)
+> > >>
+> > >>diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c index
+> > >>97c293e..c7fc2d8 100644
+> > >>--- a/arch/arm/mm/init.c
+> > >>+++ b/arch/arm/mm/init.c
+> > >>@@ -22,6 +22,7 @@
+> > >> #include <linux/memblock.h>
+> > >> #include <linux/dma-contiguous.h>
+> > >> #include <linux/sizes.h>
+> > >>+#include <linux/bitops.h>
+> > >>
+> > >> #include <asm/mach-types.h>
+> > >> #include <asm/memblock.h>
+> > >>@@ -469,8 +470,22 @@ static void __init free_unused_memmap(struct
+> > >>meminfo
+> > > *mi)
+> > >> #ifdef CONFIG_HIGHMEM
+> > >> static inline void free_area_high(unsigned long pfn, unsigned long
+> > >>end)  {
+> > >>-      for (; pfn < end; pfn++)
+> > >>-              free_highmem_page(pfn_to_page(pfn));
+> > >>+      while (pfn < end) {
+> > >>+              struct page *page = pfn_to_page(pfn);
+> > >>+              unsigned long order = min(__ffs(pfn), MAX_ORDER - 1);
+> > >>+              unsigned long nr_pages = 1 << order;
+> > >>+              unsigned long rem = end - pfn;
+> > >>+
+> > >>+              if (nr_pages > rem) {
+> > >>+                      order = __fls(rem);
+> > >>+                      nr_pages = 1 << order;
+> > >>+              }
+> > >>+
+> > >>+              __free_pages_bootmem(page, order);
+> > >>+              totalram_pages += nr_pages;
+> > >>+              totalhigh_pages += nr_pages;
+> > >>+              pfn += nr_pages;
+> > >>+      }
+> > >> }
+> > >> #endif
+> > >>
+> > >>diff --git a/include/linux/gfp.h b/include/linux/gfp.h index
+> > >>39b81dc..a63d666 100644
+> > >>--- a/include/linux/gfp.h
+> > >>+++ b/include/linux/gfp.h
+> > >>@@ -367,6 +367,7 @@ void *alloc_pages_exact_nid(int nid, size_t
+> > >>size, gfp_t
+> > > gfp_mask);
+> > >> #define __get_dma_pages(gfp_mask, order) \
+> > >>               __get_free_pages((gfp_mask) | GFP_DMA, (order))
+> > >>
+> > >>+extern void __free_pages_bootmem(struct page *page, unsigned int
+> > >>+order);
+> > >> extern void __free_pages(struct page *page, unsigned int order);
+> > >>extern void free_pages(unsigned long addr, unsigned int order);
+> > >>extern void free_hot_cold_page(struct page *page, int cold); diff
+> > >>--git a/mm/internal.h b/mm/internal.h index 29e1e76..d2b8738 100644
+> > >>--- a/mm/internal.h
+> > >>+++ b/mm/internal.h
+> > >>@@ -93,7 +93,6 @@ extern pmd_t *mm_find_pmd(struct mm_struct *mm,
+> > >>unsigned
+> > > long address);
+> > >> /*
+> > >>  * in mm/page_alloc.c
+> > >>  */
+> > >>-extern void __free_pages_bootmem(struct page *page, unsigned int
+> > >>order);  extern void prep_compound_page(struct page *page, unsigned
+> > >>long order);  #ifdef CONFIG_MEMORY_FAILURE  extern bool
+> > >>is_free_buddy_page(struct page *page);
+> > >>--
+> > >>1.9.1.423.g4596e3a
+> > >
+> > > This patch really could save boot time.
+> > > Is there any reason this patch is not merged to mainline kernel?
+> > >
+> >
+> > Well it was ignored when I originally posted it so I assumed mainline
+> > developers weren't really interested.  I can re-spin and send a new
+> > version if there's interest in getting it merged now.
+
+Chirantan, please send a new version. It really has benefit.
+
 > 
-> Link order.
+> Not getting a reply can be for many reasons: people may be too busy and
+> there may be too much other mail.  I generally have a major problem with
+> email in that it's all too easy for stuff to get buried and forgotten.
+> Remember, some of us get a lot of emails a day, and mails which should get
+> a reply do get dropped simply because there isn't enough time to read them
+> and properly write replies to every message that needs a response.
+> 
+> So, it's good practice to resend after a week or so if you think your
+> message has been missed; it may well have been missed and buried under a
+> thousand or more other messages by that time.
+> 
+> In any case, it would be nice for such "speed up" changes to be quantified
+> with some kind of measurement.  How much does it speed the boot process
+up,
+> and in what circumstances?
 
-And can you explain how this works, what guarantees it gives?
-
-> IMPORTANT NOTICE: The contents of this email and any attachments are
-> confidential and may also be privileged. If you are not the intended
-> recipient, please notify the sender immediately and do not disclose
-> the contents to any other person, use it for any purpose, or store or
-> copy the information in any medium. Thank you.
-
-BTW, please sort out the legal disclaimer (raise an IT ticket).
-
--- 
-Catalin
+In my circumstance CA15 with huge memory, 400ms is reduced.
+I can find below sentence from chromium review.
+https://chromium-review.googlesource.com/#/c/188971/
+This reduces boot time by 260ms on pit and 560ms on pi.
+> 
+> Thanks.
+> 
+> --
+> RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
