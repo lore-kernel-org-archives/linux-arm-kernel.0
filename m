@@ -1,27 +1,39 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 5 Jan 2016 12:59:28 +0300
-Subject: [PATCH v2 04/13] ARM: shmobile: r8a7793: add DVC support to
- device tree
-In-Reply-To: <1451946468-20499-5-git-send-email-horms+renesas@verge.net.au>
-References: <1451946468-20499-1-git-send-email-horms+renesas@verge.net.au>
- <1451946468-20499-5-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <568B9400.5030106@cogentembedded.com>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Tue, 5 Jan 2016 18:00:13 +0800
+Subject: [PATCH v2 5/6] reset: mediatek: mt2701 reset controller
+ dt-binding file
+In-Reply-To: <1451986291.3391.5.camel@pengutronix.de>
+References: <1451975422-31174-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1451975422-31174-6-git-send-email-jamesjj.liao@mediatek.com>
+ <1451986291.3391.5.camel@pengutronix.de>
+Message-ID: <1451988013.19662.2.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Philipp,
 
-On 1/5/2016 1:27 AM, Simon Horman wrote:
+On Tue, 2016-01-05 at 10:31 +0100, Philipp Zabel wrote:
+> Am Dienstag, den 05.01.2016, 14:30 +0800 schrieb James Liao:
+> > From: Shunli Wang <shunli.wang@mediatek.com>
+> > 
+> > Dt-binding file about reset controller is used to provide
+> > kinds of definition, which is referenced by dts file and
+> > IC-specified reset controller driver code.
+> > 
+> > Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
+> > ---
+> >  .../dt-bindings/reset-controller/mt2701-resets.h   | 74 ++++++++++++++++++++++
+> >  1 file changed, 74 insertions(+)
+> >  create mode 100644 include/dt-bindings/reset-controller/mt2701-resets.h
+> > 
+> > diff --git a/include/dt-bindings/reset-controller/mt2701-resets.h b/include/dt-bindings/reset-controller/mt2701-resets.h
+> 
+> No new files in include/dt-bindings/reset-controller, please.
+> This should go into include/dt-bindings/reset.
 
-> Add DVS support to sound node in r8a7793 device tree.
+OK, I'll move it to include/dt-bindings/reset/.
 
-    So it's DVC or DVS?
 
-> Based on similar work for the r8a7791 by Kuninori Morimoto.
->
-> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-[...]
+Best regards,
 
-MBR, Sergei
+James
