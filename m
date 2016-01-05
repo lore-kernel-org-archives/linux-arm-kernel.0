@@ -1,44 +1,63 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 5 Jan 2016 10:42:57 +0100 (CET)
-Subject: [PATCH] arm: kernel: utilize hrtimer based broadcast
-In-Reply-To: <20160102102955.GP8644@n2100.arm.linux.org.uk>
-References: <1437124312-44700-1-git-send-email-b18965@freescale.com>
- <20151027081834.GB1425@svinekod>
- <DB3PR04MB07407D83CC5F8F5F19A7207F4FB0@DB3PR04MB074.eurprd04.prod.outlook.com>
- <4875455.lvoc6XpkZc@wuerfel> <alpine.DEB.2.11.1512291449380.28591@nanos>
- <20160102102955.GP8644@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.11.1601051039320.3689@nanos>
+From: v1ron@mail.ru (Roman Volkov)
+Date: Tue, 5 Jan 2016 12:42:42 +0300
+Subject: [PATCH v3 1/3] clocksource/vt8500: Increase the minimum delta
+In-Reply-To: <568B8653.2010301@linaro.org>
+References: <1451654683-2401-1-git-send-email-v1ron@mail.ru>
+ <1451654683-2401-2-git-send-email-v1ron@mail.ru>
+ <568B8653.2010301@linaro.org>
+Message-ID: <20160105124242.17bbe09d@v1ron-s7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2 Jan 2016, Russell King - ARM Linux wrote:
-> On Tue, Dec 29, 2015 at 02:54:10PM +0100, Thomas Gleixner wrote:
-> > I have no real opinion about that patch. It does no harm to unconditionally
-> > setup the hrtimer based broadcast even if it's never used.
-> > 
-> > Up to the arch maintainer to decide. 
+? Tue, 5 Jan 2016 10:01:07 +0100
+Daniel Lezcano <daniel.lezcano@linaro.org> ?????:
+
+> On 01/01/2016 02:24 PM, Roman Volkov wrote:
+> > From: Roman Volkov <rvolkov@v1ros.org>
+> >
+> > The vt8500 clocksource driver declares itself as capable to handle
+> > the minimum delay of 4 cycles by passing the value into
+> > clockevents_config_and_register(). The vt8500_timer_set_next_event()
+> > requires the passed cycles value to be at least 16. The impact is
+> > that userspace hangs in nanosleep() calls with small delay
+> > intervals.
+> >
+> > This problem is reproducible in Linux 4.2 starting from:
+> > c6eb3f70d448 ('hrtimer: Get rid of hrtimer softirq')
+> >
+> > Signed-off-by: Roman Volkov <rvolkov@v1ros.org>
+> > Acked-by: Alexey Charkov <alchark@gmail.com>  
 > 
-> That's really not fair to keep shovelling these kinds of decisions onto
-> architecture maintainers without any kind of explanation about how an
-> architecture maintainer should make such a decision.
+> Hi Roman,
 > 
-> Do I roll a 6-face dice, and if it gives an odd number, I apply this
-> patch, otherwise I reject it?
-> 
-> Is there a technical basis for making the decision?  If so, please
-> explain what the technical arguments are against having or not having
-> this change.
+> I looked at the email thread, and IIUC if set_next_event fails, the 
+> system freeze. Your patch fixes the issue for your driver but not the 
+> real issue because if set_next_event fails, at least a warning should 
+> appear in the log or better nanosleep should fail gracefully.
 
-The hrtimer based broadcast device is used when you have per cpu timers which
-stop in deeper power states, but you have no other timer hardware on the chip
-which can backup the per cpu timer in deep power states. The trick is that it
-emulates a timer hardware via a hrtimer and then tells the cpu idle code not
-to go into deep power states on the cpu which owns that hrtimer. All other
-cpus can go as deep as they want and still get woken up.
+Hi Daniel,
 
-The only downside of adding this unconditionally is extra code in case that it
-is not needed on a particular platform.
+I agree, but if nanosleep will return immediately, this can lead to
+undefined behavior in the software. Maybe the system can go busyloop
+to somehow recover from this state and print a message to the log? At
+the driver level it seems to be enough to fail the function without
+printing logs.
+ 
+> BTW why min delta is MIN_OSCR_DELTA * 2 in
+> clockevents_config_and_register ?
 
-Hope that helps.
+All this just to be consistent with PXA. Maybe PXA works with lesser
+values, e.g., 8. For vt8500, accessing the registers is more complex,
+and this should consume more time. IIUC, if the driver does not support
+too small delays, the system will handle it with busyloop?
 
-     tglx
+Why multiply by two? Good question. Maybe there is a reserve for
+stability. The value passed by the system to the set_next_event() should
+be not lesser than this value, and theoretically, we should not
+multiply MIN_OSCR_DELTA by two. As I can see, in many drivers there is
+no such minimal values at all.
+
+Added Robert
+
+Regards,
+Roman
