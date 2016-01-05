@@ -1,44 +1,67 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 5 Jan 2016 11:08:06 +0000
-Subject: [PATCHv2 13/18] arm64: mm: add functions to walk tables in fixmap
-In-Reply-To: <568AF70A.6020004@redhat.com>
-References: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
- <1451930211-22460-14-git-send-email-mark.rutland@arm.com>
- <568AF70A.6020004@redhat.com>
-Message-ID: <20160105110805.GB24664@leverpostej>
+From: v1ron@mail.ru (Roman Volkov)
+Date: Tue, 5 Jan 2016 14:08:23 +0300
+Subject: [PATCH v3 1/3] clocksource/vt8500: Increase the minimum delta
+In-Reply-To: <568B9B89.5040001@linaro.org>
+References: <1451654683-2401-1-git-send-email-v1ron@mail.ru>
+ <1451654683-2401-2-git-send-email-v1ron@mail.ru>
+ <568B8653.2010301@linaro.org> <20160105124242.17bbe09d@v1ron-s7>
+ <20160105100054.GS19062@n2100.arm.linux.org.uk>
+ <568B9B89.5040001@linaro.org>
+Message-ID: <20160105140823.4b3e1fee@v1ron-s7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 04, 2016 at 02:49:46PM -0800, Laura Abbott wrote:
-> On 01/04/2016 09:56 AM, Mark Rutland wrote:
-> >As a prepratory step to allow us to allocate early page tables from
-> >unmapped memory using memblock_alloc, add new p??_fixmap* functions that
-> >can be used to walk page tables outside of the linear mapping by using
-> >fixmap slots.
+? Tue, 5 Jan 2016 11:31:37 +0100
+Daniel Lezcano <daniel.lezcano@linaro.org> ?????:
+
+> On 01/05/2016 11:00 AM, Russell King - ARM Linux wrote:
+> > On Tue, Jan 05, 2016 at 12:42:42PM +0300, Roman Volkov wrote:  
+> >> Why multiply by two? Good question. Maybe there is a reserve for
+> >> stability. The value passed by the system to the set_next_event()
+> >> should be not lesser than this value, and theoretically, we should
+> >> not multiply MIN_OSCR_DELTA by two. As I can see, in many drivers
+> >> there is no such minimal values at all.  
 > >
-> >Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> >Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >Cc: Catalin Marinas <catalin.marinas@arm.com>
-> >Cc: Jeremy Linton <jeremy.linton@arm.com>
-> >Cc: Laura Abbott <labbott@fedoraproject.org>
-> >Cc: Will Deacon <will.deacon@arm.com>
-> >---
-> >  arch/arm64/include/asm/fixmap.h  | 10 ++++++++++
-> >  arch/arm64/include/asm/pgtable.h | 26 ++++++++++++++++++++++++++
-> >  2 files changed, 36 insertions(+)
+> > It's a speciality of the StrongARM/PXA hardware.  It takes a certain
+> > number of OSCR cycles for the value written to hit the compare
+> > registers. So, if a very small delta is written (eg, the compare
+> > register is written with a value of OSCR + 1), the OSCR will have
+> > incremented past this value before it hits the underlying
+> > hardware.  The result is, that you end up waiting a very long time
+> > for the OSCR to wrap before the event fires.
+> >
+> > So, we introduce a check in set_next_event() to detect this and
+> > return -ETIME if the calculated delta is too small, which causes
+> > the generic clockevents code to retry after adding the min_delta
+> > specified in clockevents_config_and_register() to the current time
+> > value.
+> >
+> > min_delta must be sufficient that we don't re-trip the -ETIME check
+> > - if we do, we will return -ETIME, forward the next event time, try
+> > to set it, return -ETIME again, and basically lock the system up.
+> > So, min_delta must be larger than the check inside
+> > set_next_event().  A factor of two was chosen to ensure that this
+> > situation would never occur.  
+> 
+> Russell,
+> 
+> thank you for taking the time to write this detailed explanation. I 
+> believe that clarifies everything (the issue with the lockup and the 
+> value of the min delta).
 
-> >+#define pgd_fixmap(addr)		((pgd_t *)set_fixmap_offset(FIX_PGD, addr))
-> >+#define pgd_fixmap_unmap()		clear_fixmap(FIX_PGD)
+Yes, thanks for the explanation how this exactly works! Some points
+were not obvious.
 
-> Bikeshed: p??_fixmap_offset doesn't make it obvious that this is an
-> operation with a side effect. It seems more similar to
-> p??_offset_kernel which is read only. Perhaps it's the lack of set/map
-> in the name.
+> Roman,
+> 
+> If we are in the situation Russell is describing above, failing 
+> gracefully as mentioned before does not make sense.
+> 
+> Do you have a idea why this is happening with 4.2 and not before ?
 
-I agree.
+No, which change from c6eb3f70 caused this problem is unclear for me.
+Maybe the new IRQ handling revealed this defect. What is obvious now,
+the value passed to clockevents_config_and_register() was incorrect.
 
-I've locally changed them to p??_set_fixmap{,_offset}, p??_clear_fixmap,
-to match the usual fixmap function naming.
-
-Thanks,
-Mark.
+Regards,
+Roman
