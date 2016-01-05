@@ -1,124 +1,98 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Tue, 5 Jan 2016 19:51:55 +0800
-Subject: [Xen-devel] [PATCH v3 60/62] arm/acpi: Configure interrupts
- dynamically
-In-Reply-To: <565C6E4B.7020401@citrix.com>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-61-git-send-email-shannon.zhao@linaro.org>
- <565C6E4B.7020401@citrix.com>
-Message-ID: <568BAE5B.6060500@huawei.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 5 Jan 2016 11:54:14 +0000
+Subject: [PATCHv2 00/18] arm64: mm: rework page table creation
+In-Reply-To: <568B17AA.1050002@redhat.com>
+References: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
+ <568B17AA.1050002@redhat.com>
+Message-ID: <20160105115414.GC24664@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Jan 04, 2016 at 05:08:58PM -0800, Laura Abbott wrote:
+> On 01/04/2016 09:56 AM, Mark Rutland wrote:
+> >Hi all,
+> >
+> >This series reworks the arm64 early page table code, in order to:
+> >
+> >(a) Avoid issues with potentially-conflicting TTBR1 TLB entries (as raised in
+> >     Jeremy's thread [1]). This can happen when splitting/merging sections or
+> >     contiguous ranges, and per a pessimistic reading of the ARM ARM may happen
+> >     for changes to other fields in translation table entries.
+> >
+> >(b) Allow for more complex page table creation early on, with tables created
+> >     with fine-grained permissions as early as possible. In the cases where we
+> >     currently use fine-grained permissions (e.g. DEBUG_RODATA and marking .init
+> >     as non-executable), this is required for the same reasons as (a), as we
+> >     must ensure that changes to page tables do not split/merge sections or
+> >     contiguous regions for memory in active use.
 
-On 2015/11/30 23:42, Julien Grall wrote:
-> Hi Shannon,
-> 
-> On 17/11/15 09:40, shannon.zhao at linaro.org wrote:
->> From: Parth Dixit <parth.dixit@linaro.org>
->>
->> Interrupt information is described in DSDT and is not available at
->> the time of booting. Configure the interrupts dynamically when requested
->> by Dom0
-> 
-> Missing ".".
-> 
-> As said on a previous version of this patch [1], I'd like to keep the
-> ACPI changes very contained to Xen boot. Your change is not ACPI
-> specific and could be used for DT.
-> 
->>
->> Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
->> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->> ---
->>  xen/arch/arm/vgic.c | 19 +++++++++++++++++++
->>  1 file changed, 19 insertions(+)
->>
->> diff --git a/xen/arch/arm/vgic.c b/xen/arch/arm/vgic.c
->> index 7bb4570..d05abde 100644
->> --- a/xen/arch/arm/vgic.c
->> +++ b/xen/arch/arm/vgic.c
->> @@ -25,6 +25,7 @@
->>  #include <xen/irq.h>
->>  #include <xen/sched.h>
->>  #include <xen/perfc.h>
->> +#include <xen/acpi.h>
->>  
->>  #include <asm/current.h>
->>  
->> @@ -310,6 +311,8 @@ void vgic_disable_irqs(struct vcpu *v, uint32_t r, int n)
->>      }
->>  }
->>  
->> +#define VGIC_ICFG_MASK(intr) ( 1 << ( ( 2 * ( intr % 16 ) ) + 1 ) )
->> +
->>  void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n)
->>  {
->>      struct domain *d = v->domain;
->> @@ -321,7 +324,23 @@ void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n)
->>      struct vcpu *v_target;
->>  
->>      while ( (i = find_next_bit(&mask, 32, i)) < 32 ) {
->> +#ifdef CONFIG_ACPI
->> +        struct vgic_irq_rank *vr = vgic_get_rank(v, n);
->> +        uint32_t tr;
->> +
->>          irq = i + (32 * n);
->> +        if( ( !acpi_disabled ) && ( n != 0 ) && is_hardware_domain(d) )
-> 
-> You need to add a comment explaining the ( n != 0 ) i.e we don't SGIs
-> and PPIs are RO. It's implementation defined for PPI but it's preferable
-> to let Xen take care of it.
-> 
-> Also, we should set the type only for IRQ assigned to DOM0 (i.e p->desc
-> != NULL). With your current solution, DOM0 may change the configuration
-> of the serial IRQ by mistake and take down Xen because the physical IRQ
-> is enabled and the behavior will be unpredictable.
-> 
->> +        {
->> +            tr = vr->icfg[i >> 4] ;
->> +
->> +            if( ( tr & VGIC_ICFG_MASK(i) ) )
->> +                irq_set_type(irq, ACPI_IRQ_TYPE_EDGE_BOTH);
->> +            else
->> +                irq_set_type(irq, ACPI_IRQ_TYPE_LEVEL_MASK);
-> 
-> Given that only SPI can be configured it would have been better to call
-> irq_set_type.
-> 
-> Although, those 2 functions don't do what you think. They are setting
-> the type internally in Xen but don't change the GIC interrupt
-> configuration register.
-> 
-Here it wants to set the type according to the value of GIC ICFG.
+[...]
 
-I don't know this well. Does it need to set the type here when Dom0
-configures the interrupts since I have set them as ACPI_IRQ_TYPE_NONE in
-patch 55?
+> >There are still opportunities for improvement:
+> >
+> >* BUG() when splitting sections or creating overlapping entries in
+> >   create_mapping, as these both indicate serious bugs in kernel page table
+> >   creation.
+> >
+> >   This will require rework to the EFI runtime services pagetable creation, as
+> >   for >4K page kernels EFI memory descriptors may share pages (and currently
+> >   such overlap is assumed to be benign).
+> 
+> Given the split_{pmd,pud} were added for DEBUG_RODATA, is there any reason
+> those can't be dropped now since it sounds like the EFI problem is for overlapping
+> entries and not splitting?
 
-How about following way?
-1) In patch 55, it only permit the access of Dom0 to those irqs, not set
-the type.
-2) Then in this function or in the handler of writing GIC ICFG, check if
-the irq is permitted and set the irq type.
+Good point. I think they can be removed.
 
-> Lastly, they will fail because the configuration has been set earlier
-> (as you did in patch #55)
-> 
->> +        }
->> +#else
->> +        irq = i + (32 * n);
->> +#endif
->>          v_target = d->arch.vgic.handler->get_target_vcpu(v, irq);
->>          p = irq_to_pending(v_target, irq);
->>          set_bit(GIC_IRQ_GUEST_ENABLED, &p->status);
->>
-> 
-> Regards,
-> 
-> [1] http://lists.xen.org/archives/html/xen-devel/2015-06/msg01128.html
-> 
+I'll take a look into that.
 
--- 
-Shannon
+> This series points out that my attempt to allow set_memory_* to
+> work on regular kernel memory[1] is broken right now because it breaks down
+> the larger block sizes.
+
+What's the rationale for set_memory_* on kernel mappings? I see
+"security", but I couldn't figure out a concrete use-case. Is there any
+example of a subsystem that wants to use this?
+
+For statically-allocated data, an alternative approach would be for such
+memory to be mapped with minimal permissions from the outset (e.g. being
+placed in .rodata), and when elevated permissions are required a
+(temporary) memremap'd alias could be used, like what patch_map does to
+modify ROX kernel/module text.
+
+For dynamically-allocated data, we could create (minimal permission)
+mappings in the vmalloc region and pass those around. The linear map
+alias would still be writeable, but as the offset between the two isn't
+linear (and the owner of that allocation doesn't have to know/care about
+the linear map address), it would be much harder to find the linear map
+address to attack. An alias with elevated permissions could be used as
+required, or if it's a one-time RW->RO switch, the mapping could me
+modified in-place as the granularity wouldn't change.
+
+> Do you have any suggestions for a cleaner approach
+> short of requiring all memory mapped with 4K pages? The only solution I see
+> right now is having a separate copy of page tables to switch to. Any idea
+> other idea I come up with would have problems if we tried to invalidate an
+> entry before breaking it down.
+
+The other option I looked into was to have a completely independent
+TTBR0 mapping (like the idmap or efi runtime tables), and have that map
+code for modifying page tables. That way you could modify the tables
+in-place (with TTBR1 disabled for the duration of the modification).
+
+That ended up having its own set of problems, as you could only rely on
+self-contained position independent code, which ruled out most kernel
+APIs (including locking/atomic primitives due to debug paths). That gets
+worse when secondaries are online and you have to synchronise those
+disabling/invalidating/enabling the TTBR1 mapping.
+
+Other than that I haven't managed to come up with other functional
+ideas. The RCU-like approach is the cleanest I've found so far.
+
+Thanks,
+Mark.
+
+> Thanks,
+> Laura
+> 
+> [1]https://lkml.kernel.org/g/<1447207057-11323-1-git-send-email-labbott@fedoraproject.org>
