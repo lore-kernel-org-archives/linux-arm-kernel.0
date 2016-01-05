@@ -1,195 +1,96 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Tue,  5 Jan 2016 16:23:07 +0100
-Subject: [PATCH] net: filter: make JITs zero A for SKF_AD_ALU_XOR_X
-Message-ID: <1452007387-626-1-git-send-email-rabin@rab.in>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 5 Jan 2016 15:28:09 +0000
+Subject: [PATCH v3 2/2] ARM64: kernel: PSCI: move PSCI idle management
+ code to drivers/firmware
+In-Reply-To: <20160105133447.GW19062@n2100.arm.linux.org.uk>
+References: <1445011379-8787-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1445011379-8787-3-git-send-email-lorenzo.pieralisi@arm.com>
+ <20160105105900.GT19062@n2100.arm.linux.org.uk>
+ <20160105123134.GA1821@red-moon>
+ <20160105125142.GV19062@n2100.arm.linux.org.uk>
+ <20160105132701.GA17214@red-moon>
+ <20160105133447.GW19062@n2100.arm.linux.org.uk>
+Message-ID: <20160105152809.GA17461@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SKF_AD_ALU_XOR_X ancillary is not like the other ancillary data
-instructions since it XORs A with X while all the others replace A with
-some loaded value.  All the BPF JITs fail to clear A if this is used as
-the first instruction in a filter.  This was found using american fuzzy
-lop.
+On Tue, Jan 05, 2016 at 01:34:47PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Jan 05, 2016 at 01:27:01PM +0000, Lorenzo Pieralisi wrote:
+> > On Tue, Jan 05, 2016 at 12:51:42PM +0000, Russell King - ARM Linux wrote:
+> > > On ARM, that option is CONFIG_ARM_CPU_SUSPEND - that option solely
+> > > controls whether cpu_suspend/resume are present.  ARM64 just needs
+> > > to adopt this, and use that to control the code which is built in
+> > > drivers/firmware/psci.c.
+> > > 
+> > > However, I don't think it's as simple as just adding that to ARM64,
+> > > as you need to be careful of the Kconfig dependencies.  For ARM,
+> > > this is:
+> > > 
+> > > Generic code:
+> > > - SUSPEND defaults to y, depends on ARCH_SUSPEND_POSSIBLE (which is set for
+> > >    any cpu_suspend enabled CPU.)
+> > > - PM_SLEEP if SUSPEND || HIBERNATE_CALLBACKS
+> > > ARM sets:
+> > > - CPU_PM if SUSPEND || CPU_IDLE.
+> > > - ARM_CPU_SUSPEND if PM_SLEEP || BL_SWITCHER || (ARCH_PXA && PM)
+> > > 
+> > > What this means is that CPU_PM is entirely independent of
+> > > ARM_CPU_SUSPEND.  One does not imply the other, so I think you need
+> > > to consider carefully what ifdef you need in drivers/firmware/psci.c.
+> > > 
+> > > This is why I think fixing this is not simple as it first looks.
+> > 
+> > Not saying it is nice, but unless I find a cleaner way I was keener on
+> > adding a silent config entry in drivers/firmware, say:
+> > 
+> > config ARM_PSCI_CPU_IDLE
+> > 	def_bool ARM_PSCI_FW && CPU_IDLE
+> > 	select ARM_CPU_SUSPEND if ARM
+> > 
+> > and use that to either guard the code or stub it out and compile it
+> > if that config option is enabled.
+> 
+> That immediately worries me, because it bypasses the CPU dependencies
+> for ARM_CPU_SUSPEND implicitly applied via ARCH_SUSPEND_POSSIBLE.  I'd
+> prefer instead:
+> 
+> config ARM_PSCI_CPU_IDLE
+> 	def_bool ARM_PSCI_FW && CPU_IDLE && (!ARM || ARM_CPU_SUSPEND)
 
-Add a helper to determine if A needs to be cleared given the first
-instruction in a filter, and use this in the JITs.  Except for ARM, the
-rest have only been compile-tested.
+Ok, I think the above is reasonable, only question I have is if on ARM:
 
-Fixes: 3480593131e0 ("net: filter: get rid of BPF_S_* enum")
-Signed-off-by: Rabin Vincent <rabin@rab.in>
----
- arch/arm/net/bpf_jit_32.c       | 16 +---------------
- arch/mips/net/bpf_jit.c         | 16 +---------------
- arch/powerpc/net/bpf_jit_comp.c | 13 ++-----------
- arch/sparc/net/bpf_jit_comp.c   | 17 ++---------------
- include/linux/filter.h          | 19 +++++++++++++++++++
- 5 files changed, 25 insertions(+), 56 deletions(-)
+CONFIG_SUSPEND=n
+CONFIG_CPU_IDLE=y
 
-diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
-index 591f9db3bf40..e153eb065fe4 100644
---- a/arch/arm/net/bpf_jit_32.c
-+++ b/arch/arm/net/bpf_jit_32.c
-@@ -187,19 +187,6 @@ static inline int mem_words_used(struct jit_ctx *ctx)
- 	return fls(ctx->seen & SEEN_MEM);
- }
- 
--static inline bool is_load_to_a(u16 inst)
--{
--	switch (inst) {
--	case BPF_LD | BPF_W | BPF_LEN:
--	case BPF_LD | BPF_W | BPF_ABS:
--	case BPF_LD | BPF_H | BPF_ABS:
--	case BPF_LD | BPF_B | BPF_ABS:
--		return true;
--	default:
--		return false;
--	}
--}
--
- static void jit_fill_hole(void *area, unsigned int size)
- {
- 	u32 *ptr;
-@@ -211,7 +198,6 @@ static void jit_fill_hole(void *area, unsigned int size)
- static void build_prologue(struct jit_ctx *ctx)
- {
- 	u16 reg_set = saved_regs(ctx);
--	u16 first_inst = ctx->skf->insns[0].code;
- 	u16 off;
- 
- #ifdef CONFIG_FRAME_POINTER
-@@ -241,7 +227,7 @@ static void build_prologue(struct jit_ctx *ctx)
- 		emit(ARM_MOV_I(r_X, 0), ctx);
- 
- 	/* do not leak kernel data to userspace */
--	if ((first_inst != (BPF_RET | BPF_K)) && !(is_load_to_a(first_inst)))
-+	if (bpf_needs_clear_a(&ctx->skf->insns[0]))
- 		emit(ARM_MOV_I(r_A, 0), ctx);
- 
- 	/* stack space for the BPF_MEM words */
-diff --git a/arch/mips/net/bpf_jit.c b/arch/mips/net/bpf_jit.c
-index 77cb27309db2..1a8c96035716 100644
---- a/arch/mips/net/bpf_jit.c
-+++ b/arch/mips/net/bpf_jit.c
-@@ -521,19 +521,6 @@ static inline u16 align_sp(unsigned int num)
- 	return num;
- }
- 
--static bool is_load_to_a(u16 inst)
--{
--	switch (inst) {
--	case BPF_LD | BPF_W | BPF_LEN:
--	case BPF_LD | BPF_W | BPF_ABS:
--	case BPF_LD | BPF_H | BPF_ABS:
--	case BPF_LD | BPF_B | BPF_ABS:
--		return true;
--	default:
--		return false;
--	}
--}
--
- static void save_bpf_jit_regs(struct jit_ctx *ctx, unsigned offset)
- {
- 	int i = 0, real_off = 0;
-@@ -614,7 +601,6 @@ static unsigned int get_stack_depth(struct jit_ctx *ctx)
- 
- static void build_prologue(struct jit_ctx *ctx)
- {
--	u16 first_inst = ctx->skf->insns[0].code;
- 	int sp_off;
- 
- 	/* Calculate the total offset for the stack pointer */
-@@ -641,7 +627,7 @@ static void build_prologue(struct jit_ctx *ctx)
- 		emit_jit_reg_move(r_X, r_zero, ctx);
- 
- 	/* Do not leak kernel data to userspace */
--	if ((first_inst != (BPF_RET | BPF_K)) && !(is_load_to_a(first_inst)))
-+	if (bpf_needs_clear_a(&ctx->skf->insns[0]))
- 		emit_jit_reg_move(r_A, r_zero, ctx);
- }
- 
-diff --git a/arch/powerpc/net/bpf_jit_comp.c b/arch/powerpc/net/bpf_jit_comp.c
-index 04782164ee67..2d66a8446198 100644
---- a/arch/powerpc/net/bpf_jit_comp.c
-+++ b/arch/powerpc/net/bpf_jit_comp.c
-@@ -78,18 +78,9 @@ static void bpf_jit_build_prologue(struct bpf_prog *fp, u32 *image,
- 		PPC_LI(r_X, 0);
- 	}
- 
--	switch (filter[0].code) {
--	case BPF_RET | BPF_K:
--	case BPF_LD | BPF_W | BPF_LEN:
--	case BPF_LD | BPF_W | BPF_ABS:
--	case BPF_LD | BPF_H | BPF_ABS:
--	case BPF_LD | BPF_B | BPF_ABS:
--		/* first instruction sets A register (or is RET 'constant') */
--		break;
--	default:
--		/* make sure we dont leak kernel information to user */
-+	/* make sure we dont leak kernel information to user */
-+	if (bpf_needs_clear_a(&filter[0]))
- 		PPC_LI(r_A, 0);
--	}
- }
- 
- static void bpf_jit_build_epilogue(u32 *image, struct codegen_context *ctx)
-diff --git a/arch/sparc/net/bpf_jit_comp.c b/arch/sparc/net/bpf_jit_comp.c
-index 22564f5f2364..3e6e05a7c4c2 100644
---- a/arch/sparc/net/bpf_jit_comp.c
-+++ b/arch/sparc/net/bpf_jit_comp.c
-@@ -420,22 +420,9 @@ void bpf_jit_compile(struct bpf_prog *fp)
- 		}
- 		emit_reg_move(O7, r_saved_O7);
- 
--		switch (filter[0].code) {
--		case BPF_RET | BPF_K:
--		case BPF_LD | BPF_W | BPF_LEN:
--		case BPF_LD | BPF_W | BPF_ABS:
--		case BPF_LD | BPF_H | BPF_ABS:
--		case BPF_LD | BPF_B | BPF_ABS:
--			/* The first instruction sets the A register (or is
--			 * a "RET 'constant'")
--			 */
--			break;
--		default:
--			/* Make sure we dont leak kernel information to the
--			 * user.
--			 */
-+		/* Make sure we dont leak kernel information to the user. */
-+		if (bpf_needs_clear_a(&filter[0]))
- 			emit_clear(r_A); /* A = 0 */
--		}
- 
- 		for (i = 0; i < flen; i++) {
- 			unsigned int K = filter[i].k;
-diff --git a/include/linux/filter.h b/include/linux/filter.h
-index 4165e9ac9e36..5972ffe5719a 100644
---- a/include/linux/filter.h
-+++ b/include/linux/filter.h
-@@ -493,6 +493,25 @@ static inline void bpf_jit_free(struct bpf_prog *fp)
- 
- #define BPF_ANC		BIT(15)
- 
-+static inline bool bpf_needs_clear_a(const struct sock_filter *first)
-+{
-+	switch (first->code) {
-+	case BPF_RET | BPF_K:
-+	case BPF_LD | BPF_W | BPF_LEN:
-+		return false;
-+
-+	case BPF_LD | BPF_W | BPF_ABS:
-+	case BPF_LD | BPF_H | BPF_ABS:
-+	case BPF_LD | BPF_B | BPF_ABS:
-+		if (first->k == SKF_AD_OFF + SKF_AD_ALU_XOR_X)
-+			return true;
-+		return false;
-+
-+	default:
-+		return true;
-+	}
-+}
-+
- static inline u16 bpf_anc_helper(const struct sock_filter *ftest)
- {
- 	BUG_ON(ftest->code & BPF_ANC);
--- 
-2.6.4
+this would imply:
+
+CONFIG_ARM_CPU_SUSPEND=n => ARM_PSCI_CPU_IDLE=n
+
+(which is a questionable setup but possible) we can't do PSCI based
+CPUidle (I agree with you that bypassing the dependencies is not ideal
+or correct in the first place though), that's a problem for all
+subsystems "selecting" ARM_CPU_SUSPEND.
+
+> Really, the answer is to stop ARM64 diverging from ARM, so we stop
+> having these architecture conditionals all over the place.  If ARM64
+> builds its cpu_suspend code in the same way that ARM does (iow,
+> keyed off ARM_CPU_SUSPEND, which it can select), then we end up
+> with the above being:
+> 
+> config ARM_PSCI_CPU_IDLE
+> 	def_bool ARM_PSCI_FW && CPU_IDLE && ARM_CPU_SUSPEND
+
+Yes, we could do that, on ARM64 should be = SUSPEND || CPU_IDLE,
+ergo the value of CPU_PM on ARM64, that's why we do not have another
+config entry at present.
+
+> which is a helll of a lot simpler.  The dependency on ARM_PSCI_FW
+> could be regarded as redundant if we're only using ARM_PSCI_CPU_IDLE
+> to control code built within drivers/firmware/psci.c, as that won't
+> be built unless ARM_PSCI_FW is set.
+
+Yep, that's a good point and I will remove ARM_PSCI_FW from the first
+option you provided above.
+
+Thanks,
+Lorenzo
