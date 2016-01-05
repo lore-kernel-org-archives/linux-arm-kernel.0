@@ -1,54 +1,68 @@
-From: jolsa@redhat.com (Jiri Olsa)
-Date: Tue, 5 Jan 2016 10:09:03 +0100
-Subject: [RFC PATCH] arm64: perf test: Improbe bp_signal
-In-Reply-To: <1451969880-14877-1-git-send-email-wangnan0@huawei.com>
-References: <20160104165535.GI1616@arm.com>
- <1451969880-14877-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <20160105090903.GD2192@krava.brq.redhat.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 5 Jan 2016 10:16:04 +0100
+Subject: [PATCH v2 03/13] ARM: shmobile: r8a7793: add R-Car sound support
+ to device tree
+In-Reply-To: <1451946468-20499-4-git-send-email-horms+renesas@verge.net.au>
+References: <1451946468-20499-1-git-send-email-horms+renesas@verge.net.au>
+ <1451946468-20499-4-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdVbExt45=sqXN-=F5sTH_v_j36Ahg-Ni=ZdVf8Fb_gLpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 05, 2016 at 04:58:00AM +0000, Wang Nan wrote:
+Hi Simon,
 
-SNIP
+On Mon, Jan 4, 2016 at 11:27 PM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Instantiate R-Car sound node in r8a7793 device tree.
+> This only supports PIO transfers.
+>
+> Based on similar work for the r8a7791 by Kuninori Morimoto.
+>
+> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>
+> ---
+> v2
+> * Added audmapp
 
->  	 * Following processing should happen:
-> @@ -141,6 +203,21 @@ int test__bp_signal(int subtest __maybe_unused)
->  	 *   - fd1 event breakpoint hit -> count1 == 1
->  	 *   - SIGIO is delivered       -> overflows == 1
->  	 *   - fd2 event breakpoint hit -> count2 == 1
-> +	 *   - SIGUSR1 is delivered     -> overflows_2 == 1  (nested signal)
-> +	 *   - sig_handler_2 return
-> +	 *   - sig_handler return
-> +	 *   - fd3 event watchpoint hit -> count3 == 1       (wp and bp in one insn)
-> +	 *   - SIGIO is delivered       -> overflows == 2
-> +	 *   - fd2 event breakpoint hit -> count2 == 2
-> +	 *   - SIGUSR1 is delivered     -> overflows_2 == 2
-> +	 *   - sig_handler_2 return
-> +	 *   - sig_handler return
-> +	 *   - fd3 event watchpoint hit -> count3 == 2       (standalone wp)
-> +	 *   - SIGIO is delivered       -> overflows = 3
-> +	 *   - fd2 event breakpoint hit -> count2 == 3
-> +	 *   - SIGUSR1 is delivered     -> overflows_2 == 3
-> +	 *   - sig_handler_2 return
-> +	 *   - sig_handler return
+Really??
 
-also each line in here could be prefixed with 'code action'
-that led to the result on the line, like:
+> ---
+>  arch/arm/boot/dts/r8a7793.dtsi | 83 ++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 83 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
+> index fa8a0d772d51..90959a925edd 100644
+> --- a/arch/arm/boot/dts/r8a7793.dtsi
+> +++ b/arch/arm/boot/dts/r8a7793.dtsi
+> @@ -1101,4 +1101,87 @@
+>                 #iommu-cells = <1>;
+>                 status = "disabled";
+>         };
+> +
+> +       rcar_sound: sound at ec500000 {
+> +               /*
+> +                * #sound-dai-cells is required
+> +                *
+> +                * Single DAI : #sound-dai-cells = <0>;         <&rcar_sound>;
+> +                * Multi  DAI : #sound-dai-cells = <1>;         <&rcar_sound N>;
+> +                */
+> +               compatible =  "renesas,rcar_sound-r8a7793", "renesas,rcar_sound-gen2";
+> +               reg =   <0 0xec500000 0 0x1000>, /* SCU */
+> +                       <0 0xec5a0000 0 0x100>,  /* ADG */
+> +                       <0 0xec540000 0 0x1000>, /* SSIU */
+> +                       <0 0xec541000 0 0x280>;  /* SSI */
+> +               reg-names = "scu", "adg", "ssiu", "ssi";
 
+No "audmapp"...
 
-         * exec:              result:
-         *
-  	 * __test_function  - fd1 event breakpoint hit -> count1 == 1
-         *                  - SIGIO is delivered       -> overflows == 1
-         * sig_handler      - fd2 event breakpoint hit -> count2 == 1
-         *                  - SIGUSR1 is delivered     -> overflows_2 == 1  (nested signal)
-         *                  - sig_handler_2 return
-         *                  - sig_handler return
-         * incq (%rdi)      - fd3 event watchpoint hit -> count3 == 1       (wp and bp in one insn)
-         *                  - SIGIO is delivered       -> overflows == 2
+Gr{oetje,eeting}s,
 
+                        Geert
 
-hum.. but it might take all the fun out of it ;-)
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-jirka
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
