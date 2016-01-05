@@ -1,48 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 5 Jan 2016 17:51:14 +0000
-Subject: [PATCH] efi: stub: define DISABLE_BRANCH_PROFILING for all
- architectures
-In-Reply-To: <20160105153918.GA2714@codeblueprint.co.uk>
-References: <1450862968-20222-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160104123145.GB1616@arm.com>
- <CAKv+Gu-n-7tk1NXYAbf7+O79gYG82QOsbzLuYG1yX=LSizksWQ@mail.gmail.com>
- <20160105153918.GA2714@codeblueprint.co.uk>
-Message-ID: <20160105175114.GG10705@arm.com>
+From: alexei.starovoitov@gmail.com (Alexei Starovoitov)
+Date: Tue, 5 Jan 2016 09:55:58 -0800
+Subject: [PATCH] arm64: net: bpf: don't BUG() on large shifts
+In-Reply-To: <1452015543-6790-1-git-send-email-rabin@rab.in>
+References: <1452015543-6790-1-git-send-email-rabin@rab.in>
+Message-ID: <20160105175557.GC83548@ast-mbp.thefacebook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 05, 2016 at 03:39:18PM +0000, Matt Fleming wrote:
-> On Tue, 05 Jan, at 03:56:39PM, Ard Biesheuvel wrote:
-> > (+ Arnd)
-> > 
-> > On 4 January 2016 at 13:31, Will Deacon <will.deacon@arm.com> wrote:
-> > > On Wed, Dec 23, 2015 at 10:29:28AM +0100, Ard Biesheuvel wrote:
-> > >> This moves the DISABLE_BRANCH_PROFILING define from the x86 specific
-> > >> to the general CFLAGS definition for the stub. This fixes build errors
-> > >> when building for arm64 with CONFIG_PROFILE_ALL_BRANCHES_ENABLED.
-> > >>
-> > >> Reported-by: Will Deacon <will.deacon@arm.com>
-> > >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > >> ---
-> > >>  drivers/firmware/efi/libstub/Makefile | 4 ++--
-> > >>  1 file changed, 2 insertions(+), 2 deletions(-)
-> > >
-> > > Cheers, Ard. The kernel now builds and boots as an EFI application for
-> > > me when the dreaded #define if config option is enabled:
-> > >
-> > >   Tested-by: Will Deacon <will.deacon@arm.com>
-> > >
-> > > Will
-> > >
-> > 
-> > @Matt: this is causing randconfig build errors for ARM in -next. Mind
-> > if we take this through some other tree?
+On Tue, Jan 05, 2016 at 06:39:03PM +0100, Rabin Vincent wrote:
+> Attempting to generate UBFM/SBFM instructions with shifts that can't be
+> encoded in the immediate fields of the opcodes leads to a trigger of a
+> BUG() in the instruction generation code.  As the ARMv8 ARM says: "The
+> shift amounts must be in the range 0 to one less than the register width
+> of the instruction, inclusive."  Make the JIT reject unencodable shifts
+> instead of crashing.
 > 
-> Go ahead.
+>  ------------[ cut here ]------------
+>  kernel BUG at arch/arm64/kernel/insn.c:766!
+>  Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
+>  CPU: 0 PID: 669 Comm: insmod Not tainted 4.4.0-rc8+ #4
+>  PC is at aarch64_insn_gen_bitfield+0xcc/0xd4
+>  LR is at build_body+0x1000/0x2914
+>  ..
+>  Call trace:
+>  [<ffffffc00008c65c>] aarch64_insn_gen_bitfield+0xcc/0xd4
+>  [<ffffffc000096bfc>] build_body+0x1000/0x2914
+>  [<ffffffc000098590>] bpf_int_jit_compile+0x7c/0x1b4
+>  [<ffffffc000130d10>] bpf_prog_select_runtime+0x20/0xcc
+>  [<ffffffc0004afbac>] bpf_prepare_filter+0x3d8/0x3e8
+>  [<ffffffc0004afc30>] bpf_prog_create+0x74/0xa4
+>  [<ffffffbffc3de1d4>] test_bpf_init+0x1d4/0x748 [test_bpf]
+>  [<ffffffc00008293c>] do_one_initcall+0x90/0x1a8
+>  [<ffffffc000140c4c>] do_init_module+0x60/0x1c8
+>  [<ffffffc00011bdcc>] load_module+0x1554/0x1c98
+>  [<ffffffc00011c62c>] SyS_init_module+0x11c/0x140
+>  [<ffffffc000085cb0>] el0_svc_naked+0x24/0x28
 > 
-> Reviewed-by: Matt Fleming <matt@codeblueprint.co.uk>
+> Signed-off-by: Rabin Vincent <rabin@rab.in>
+> ---
+>  arch/arm64/net/bpf_jit_comp.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
 
-I can take this via the arm64 tree, unless Arnd wants to queue it in
-arm-soc. Arnd?
-
-Will
+this one is better to be addressed in verifier instead of eBPF JITs.
+Please reject it in check_alu_op() instead.
+Though this bug is arm64 only and doesn't affect x64, it's better
+to reject such invalid programs, since shifts with large constants
+can be only be created manually. llvm doesn't generate such things.
