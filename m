@@ -1,66 +1,55 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Mon, 04 Jan 2016 17:23:00 -0800
-Subject: [RFC 6/9] clk: ti: add support for omap4 module clocks
-In-Reply-To: <568AC4D8.2060509@ti.com>
-References: <1450447141-29936-1-git-send-email-t-kristo@ti.com>
- <1450447141-29936-7-git-send-email-t-kristo@ti.com>
- <20160101054815.21738.79820@quark.deferred.io> <568A20E5.6040005@ti.com>
- <CAMuHMdUZMUSYC1XHydVQHRibWtHw2=T-7nXe=5Pf4UCcb=mKTQ@mail.gmail.com>
- <568A735D.2060309@ti.com> <20160104144221.GA5783@n2100.arm.linux.org.uk>
- <20160104162853.GA12777@atomide.com> <568AC4D8.2060509@ti.com>
-Message-ID: <20160105012300.15239.77012@quark.deferred.io>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 4 Jan 2016 17:23:19 -0800
+Subject: [PATCH] ARM: Runtime patch udiv/sdiv instructions into
+ __aeabi_{u}idiv()
+In-Reply-To: <alpine.LFD.2.20.1512111842280.26920@knanqh.ubzr>
+References: <alpine.LFD.2.20.1512110105450.26920@knanqh.ubzr>
+ <alpine.LFD.2.20.1512111125330.26920@knanqh.ubzr>
+ <alpine.LFD.2.20.1512111216350.26920@knanqh.ubzr>
+ <1941958.3p422lB7Mz@wuerfel>
+ <alpine.LFD.2.20.1512111842280.26920@knanqh.ubzr>
+Message-ID: <20160105012319.GC22188@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tero Kristo (2016-01-04 11:15:36)
-> On 01/04/2016 06:37 PM, Tony Lindgren wrote:
-> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [160104 06:43]:
-> >> On Mon, Jan 04, 2016 at 03:27:57PM +0200, Tero Kristo wrote:
-> >>> On 01/04/2016 12:21 PM, Geert Uytterhoeven wrote:
-> >>>> FWIW, there are small loops with just a cpu_relax() in various clock drivers
-> >>>> under drivers/clk/shmobile/.
-> >>>
-> >>> Just did a quick profiling round, and the clk_enable/disable delay loops
-> >>> take anything from 0...1500ns, most typically consuming some 400-600ns. So,
-> >>> based on this, dropping the udelay and adding cpu_relax instead looks like a
-> >>> good change. I just verified that changing the udelay to cpu_relax works
-> >>> fine also, I just need to change the bail-out period to be something sane.
-> >>
-> >> Was that profiling done with lockdep/lock debugging enabled or disabled?
+On 12/11, Nicolas Pitre wrote:
+> On Fri, 11 Dec 2015, Arnd Bergmann wrote:
 > 
-> omap2plus_defconfig, so lockdep was enabled. The profiling was done 
-> around the while {} block though, which should not have any locks within 
-> it (except for the SCM clocks, which may explain some of the higher 
-> latency numbers seen.)
+> > On Friday 11 December 2015 12:22:20 Nicolas Pitre wrote:
+> > > Subject: [PATCH] ARM: Runtime patch udiv/sdiv instructions into __aeabi_{u}idiv()
+> > > 
 > 
-> > And also the thing to check from the hw folks is what all do these clkctrl
-> > bits really control. If they group together the OCP clock and an extra
-> > functional clock for some devices the delays could be larger.
+> Thanks.
 > 
-> Does it matter really? The latencies are only imposed to the device in 
-> question, and lets face it, the same latencies are there already with 
-> the hwmod implementation. This series moves the implementation under 
-> clock driver with as less modifications as possible to avoid any problems.
+> > Before you put it in the patch tracker, I think it would be good to
+> > give Stephen a chance to comment as well, since he did a lot of
+> > work upfront and this obsoletes his original patch series.
+> 
+> Given he'll get back from vacation only after the new year, I'll put the 
+> patch in the tracker now so it can go in before the next merge window.  
+> 
+> Stephen's series could still be relevant by extending what is done here, 
+> and it requires what this patch is doing anyway for those call sites 
+> that can't be substituted by a div instruction (like conditional 
+> branches, tail call optimizations, etc.)
+> 
 
-So long as we can all convince ourselves that the flaw is not a flaw
-then I'm OK with it. No bugs were ever introduced that way ;-)
+I'm back from vacation now. Where have we left off on this topic?
 
-But in fairness, we've had these delays in the .enable callbacks for a
-while, so this patch does not introduce the regression. Furthermore it
-does clean up some code that needs more work, and I don't want to delay
-that.
+I can update the patches to be based on this patch here and
+handle the conditional branches and tail call optimization cases
+by adding some safety checks like we have for the ftrace branch
+patching. But I'd rather not do that work unless we all agree
+that it's worthwhile pursuing it.
 
-I won't NACK the patch due to the delays, but it would be nice to
-revisit it some day.
+Is there still any concern about the benefit of patching each
+call site vs. patching the functions? The micro benchmark seems
+to show some theoretical improvement on cortex-a7 and I can run
+it on Scorpion and Krait processors to look for any potential
+benefits there, but I'm not sure of any good kernel benchmark for
+this. If it will be rejected due to complexity vs. benefit
+arguments I'd rather work on something else.
 
-Regards,
-Mike
-
-> 
-> > In general, I think we need to get rid of pm_runtime_irq_safe usage to
-> > allow clocks to sleep properly. The other option is to allow toggling
-> > pm_runtime_irq_safe but that probably gets super messy.
-> 
-> That is something not to be done with this set though.
-> 
-> -Tero
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
