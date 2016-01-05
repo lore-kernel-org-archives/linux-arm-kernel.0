@@ -1,46 +1,81 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 4 Jan 2016 20:42:29 -0500 (EST)
-Subject: [PATCH] ARM: Runtime patch udiv/sdiv instructions into
- __aeabi_{u}idiv()
-In-Reply-To: <20160105012319.GC22188@codeaurora.org>
-References: <alpine.LFD.2.20.1512110105450.26920@knanqh.ubzr>
- <alpine.LFD.2.20.1512111125330.26920@knanqh.ubzr>
- <alpine.LFD.2.20.1512111216350.26920@knanqh.ubzr>
- <1941958.3p422lB7Mz@wuerfel>
- <alpine.LFD.2.20.1512111842280.26920@knanqh.ubzr>
- <20160105012319.GC22188@codeaurora.org>
-Message-ID: <alpine.LFD.2.20.1601042035190.3603@knanqh.ubzr>
+From: wangnan0@huawei.com (Wangnan (F))
+Date: Tue, 5 Jan 2016 09:41:26 +0800
+Subject: [PATCH v2] arm64: Store breakpoint single step state into pstate
+In-Reply-To: <20160104165535.GI1616@arm.com>
+References: <1450860731-194418-1-git-send-email-wangnan0@huawei.com>
+ <1450921362-198371-1-git-send-email-wangnan0@huawei.com>
+ <20160104165535.GI1616@arm.com>
+Message-ID: <568B1F46.8050206@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 4 Jan 2016, Stephen Boyd wrote:
-
-> On 12/11, Nicolas Pitre wrote:
-> > Stephen's series could still be relevant by extending what is done here, 
-> > and it requires what this patch is doing anyway for those call sites 
-> > that can't be substituted by a div instruction (like conditional 
-> > branches, tail call optimizations, etc.)
-> > 
-> 
-> I'm back from vacation now. Where have we left off on this topic?
-> 
-> I can update the patches to be based on this patch here and
-> handle the conditional branches and tail call optimization cases
-> by adding some safety checks like we have for the ftrace branch
-> patching. But I'd rather not do that work unless we all agree
-> that it's worthwhile pursuing it.
-> 
-> Is there still any concern about the benefit of patching each
-> call site vs. patching the functions? The micro benchmark seems
-> to show some theoretical improvement on cortex-a7 and I can run
-> it on Scorpion and Krait processors to look for any potential
-> benefits there, but I'm not sure of any good kernel benchmark for
-> this. If it will be rejected due to complexity vs. benefit
-> arguments I'd rather work on something else.
-
-You could run the benchmark on Scorpion and Krait to start with. If 
-there is no improvement what so ever like on A15's then the answer might 
-be rather simple.
 
 
-Nicolas
+On 2016/1/5 0:55, Will Deacon wrote:
+> Hello,
+>
+> On Thu, Dec 24, 2015 at 01:42:42AM +0000, Wang Nan wrote:
+>> Two 'perf test' fail on arm64:
+>>
+>>   # perf test overflow
+>>   17: Test breakpoint overflow signal handler                  : FAILED!
+>>   18: Test breakpoint overflow sampling                        : FAILED!
+>>
+>> When breakpoint raises, after perf_bp_event, breakpoint_handler()
+>> temporary disables breakpoint and enables single step. Then in
+>> single_step_handler(), reenable breakpoint. Without doing this
+>> the breakpoint would be triggered again.
+>>
+>> However, if there's a pending signal and it have signal handler,
+>> control would be transfer to signal handler, so single step handler
+>> would be applied to the first instruction of signal handler. After
+>> the handler return, the instruction triggered the breakpoint would be
+>> executed again. At this time the breakpoint is enabled, so the
+>> breakpoint is triggered again.
+> Whilst I appreciate that you're just trying to get those tests passing
+> on arm64, I really don't think its a good idea for us to try and emulate
+> the x86 debug semantics here. This doesn't happen for ptrace, and I think
+> we're likely to break more than we fix if we try to do it for perf too.
+>
+> The problem seems to be that we take the debug exception before the
+> breakpointed instruction has been executed and call perf_bp_event at
+> that moment, so when we single-step the faulting instruction we actually
+> step into the SIGIO handler and end up getting stuck.
+
+Understand.
+
+> Your fix doesn't really address this afaict,
+
+I don't think so. After applying my patch, the entry of signal handler won't
+be single-stepped. Please have a look at signal_toggle_single_step(): when
+signal arises, single step handler is turned off, so signal handler won't
+be stepped.
+
+I thing the following 4 cases you mentioned should not causes error in 
+theory:
+
+>   in that you don't (can't?)
+> handle:
+>
+>    * A longjmp out of a signal handler
+
+The signal frame is dropped so stepping is omitted.
+
+>    * A watchpoint and a breakpoint that fire on the same instruction
+
+Watchpoints and breakpoints are controlled separatly. In this case it would
+generated twp nested signals. I will try this.
+
+>    * User-controlled single-step from a signal handler that enables a
+>      breakpoint explicitly
+
+debug_info->suspended_step controls this.
+
+>    * Nested signals
+
+I think nested signals can be dealt correctly because we save state in 
+signal frame.
+
+However I'll try the above cases you mentioned above.
+
+Thank you.
