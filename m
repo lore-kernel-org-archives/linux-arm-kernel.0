@@ -1,84 +1,100 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 5 Jan 2016 18:51:34 +0800
-Subject: [PATCH 06/11] mmc: sdhci-of-esdhc: use sdhci_pltfm_init for private
+Date: Tue, 5 Jan 2016 18:51:35 +0800
+Subject: [PATCH 07/11] mmc: sdhci-pxav3: use sdhci_pltfm_init for private
  allocation
 In-Reply-To: <1451991099-4946-1-git-send-email-jszhang@marvell.com>
 References: <1451991099-4946-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1451991099-4946-7-git-send-email-jszhang@marvell.com>
+Message-ID: <1451991099-4946-8-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Commit 0e748234293f ("mmc: sdhci: Add size for caller in init+register")
 allows users of sdhci_pltfm to allocate private space in calls to
-sdhci_pltfm_init+sdhci_pltfm_register. This patch migrates the
-sdhci-of-esdhc driver to this allocation.
+sdhci_pltfm_init+sdhci_pltfm_register. This patch migrates sdhci-pxav3
+to this allocation.
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
- drivers/mmc/host/sdhci-of-esdhc.c | 17 ++++++++---------
- 1 file changed, 8 insertions(+), 9 deletions(-)
+ drivers/mmc/host/sdhci-pxav3.c | 21 +++++++++------------
+ 1 file changed, 9 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/mmc/host/sdhci-of-esdhc.c b/drivers/mmc/host/sdhci-of-esdhc.c
-index 90e94a0..2fb8314 100644
---- a/drivers/mmc/host/sdhci-of-esdhc.c
-+++ b/drivers/mmc/host/sdhci-of-esdhc.c
-@@ -49,7 +49,7 @@ static u32 esdhc_readl_fixup(struct sdhci_host *host,
- 				     int spec_reg, u32 value)
+diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
+index f5edf9d..3d6df57 100644
+--- a/drivers/mmc/host/sdhci-pxav3.c
++++ b/drivers/mmc/host/sdhci-pxav3.c
+@@ -132,7 +132,7 @@ static int armada_38x_quirks(struct platform_device *pdev,
+ {
+ 	struct device_node *np = pdev->dev.of_node;
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+-	struct sdhci_pxa *pxa = pltfm_host->priv;
++	struct sdhci_pxa *pxa = sdhci_pltfm_priv(pltfm_host);
+ 	struct resource *res;
+ 
+ 	host->quirks &= ~SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN;
+@@ -201,7 +201,7 @@ static void pxav3_reset(struct sdhci_host *host, u8 mask)
+ static void pxav3_gen_init_74_clocks(struct sdhci_host *host, u8 power_mode)
  {
  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	struct sdhci_esdhc *esdhc = pltfm_host->priv;
-+	struct sdhci_esdhc *esdhc = sdhci_pltfm_priv(pltfm_host);
- 	u32 ret;
+-	struct sdhci_pxa *pxa = pltfm_host->priv;
++	struct sdhci_pxa *pxa = sdhci_pltfm_priv(pltfm_host);
+ 	u16 tmp;
+ 	int count;
+ 
+@@ -250,7 +250,7 @@ static void pxav3_gen_init_74_clocks(struct sdhci_host *host, u8 power_mode)
+ static void pxav3_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
+ {
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+-	struct sdhci_pxa *pxa = pltfm_host->priv;
++	struct sdhci_pxa *pxa = sdhci_pltfm_priv(pltfm_host);
+ 	u16 ctrl_2;
  
  	/*
-@@ -354,7 +354,7 @@ static void esdhc_le_writeb(struct sdhci_host *host, u8 val, int reg)
- static void esdhc_of_adma_workaround(struct sdhci_host *host, u32 intmask)
- {
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	struct sdhci_esdhc *esdhc = pltfm_host->priv;
-+	struct sdhci_esdhc *esdhc = sdhci_pltfm_priv(pltfm_host);
- 	bool applicable;
- 	dma_addr_t dmastart;
- 	dma_addr_t dmanow;
-@@ -404,7 +404,7 @@ static unsigned int esdhc_of_get_min_clock(struct sdhci_host *host)
- static void esdhc_of_set_clock(struct sdhci_host *host, unsigned int clock)
- {
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	struct sdhci_esdhc *esdhc = pltfm_host->priv;
-+	struct sdhci_esdhc *esdhc = sdhci_pltfm_priv(pltfm_host);
- 	int pre_div = 1;
- 	int div = 1;
- 	u32 temp;
-@@ -569,15 +569,12 @@ static void esdhc_init(struct platform_device *pdev, struct sdhci_host *host)
- 	u16 host_ver;
+@@ -370,16 +370,13 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
+ 	const struct of_device_id *match;
+ 	int ret;
  
- 	pltfm_host = sdhci_priv(host);
--	esdhc = devm_kzalloc(&pdev->dev, sizeof(struct sdhci_esdhc),
--			     GFP_KERNEL);
-+	esdhc = sdhci_pltfm_priv(pltfm_host);
- 
- 	host_ver = sdhci_readw(host, SDHCI_HOST_VERSION);
- 	esdhc->vendor_ver = (host_ver & SDHCI_VENDOR_VER_MASK) >>
- 			     SDHCI_VENDOR_VER_SHIFT;
- 	esdhc->spec_ver = host_ver & SDHCI_SPEC_VER_MASK;
+-	pxa = devm_kzalloc(&pdev->dev, sizeof(struct sdhci_pxa), GFP_KERNEL);
+-	if (!pxa)
+-		return -ENOMEM;
 -
--	pltfm_host->priv = esdhc;
- }
- 
- static int sdhci_esdhc_probe(struct platform_device *pdev)
-@@ -589,9 +586,11 @@ static int sdhci_esdhc_probe(struct platform_device *pdev)
- 	np = pdev->dev.of_node;
- 
- 	if (of_get_property(np, "little-endian", NULL))
--		host = sdhci_pltfm_init(pdev, &sdhci_esdhc_le_pdata, 0);
-+		host = sdhci_pltfm_init(pdev, &sdhci_esdhc_le_pdata,
-+					sizeof(struct sdhci_esdhc));
- 	else
--		host = sdhci_pltfm_init(pdev, &sdhci_esdhc_be_pdata, 0);
-+		host = sdhci_pltfm_init(pdev, &sdhci_esdhc_be_pdata,
-+					sizeof(struct sdhci_esdhc));
- 
+-	host = sdhci_pltfm_init(pdev, &sdhci_pxav3_pdata, 0);
++	host = sdhci_pltfm_init(pdev, &sdhci_pxav3_pdata,
++				sizeof(*pxa));
  	if (IS_ERR(host))
  		return PTR_ERR(host);
+ 
+ 	pltfm_host = sdhci_priv(host);
+-	pltfm_host->priv = pxa;
++	pxa = sdhci_pltfm_priv(pltfm_host);
+ 
+ 	pxa->clk_io = devm_clk_get(dev, "io");
+ 	if (IS_ERR(pxa->clk_io))
+@@ -486,7 +483,7 @@ static int sdhci_pxav3_remove(struct platform_device *pdev)
+ {
+ 	struct sdhci_host *host = platform_get_drvdata(pdev);
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+-	struct sdhci_pxa *pxa = pltfm_host->priv;
++	struct sdhci_pxa *pxa = sdhci_pltfm_priv(pltfm_host);
+ 
+ 	pm_runtime_get_sync(&pdev->dev);
+ 	pm_runtime_disable(&pdev->dev);
+@@ -535,7 +532,7 @@ static int sdhci_pxav3_runtime_suspend(struct device *dev)
+ {
+ 	struct sdhci_host *host = dev_get_drvdata(dev);
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+-	struct sdhci_pxa *pxa = pltfm_host->priv;
++	struct sdhci_pxa *pxa = sdhci_pltfm_priv(pltfm_host);
+ 	int ret;
+ 
+ 	ret = sdhci_runtime_suspend_host(host);
+@@ -553,7 +550,7 @@ static int sdhci_pxav3_runtime_resume(struct device *dev)
+ {
+ 	struct sdhci_host *host = dev_get_drvdata(dev);
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+-	struct sdhci_pxa *pxa = pltfm_host->priv;
++	struct sdhci_pxa *pxa = sdhci_pltfm_priv(pltfm_host);
+ 
+ 	clk_prepare_enable(pxa->clk_io);
+ 	if (!IS_ERR(pxa->clk_core))
 -- 
 2.6.4
