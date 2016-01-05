@@ -1,38 +1,39 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Tue, 5 Jan 2016 11:50:19 +0800
-Subject: [PATCH v3 47/62] arm/p2m: Add helper functions to map memory
- regions
-In-Reply-To: <565C69A7.1020806@citrix.com>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-48-git-send-email-shannon.zhao@linaro.org>
- <alpine.DEB.2.02.1511271203460.8984@kaball.uk.xensource.com>
- <565C69A7.1020806@citrix.com>
-Message-ID: <568B3D7B.3070901@huawei.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 4 Jan 2016 20:13:56 -0800
+Subject: [PATCH 2/2] memory: omap-gpmc: Add Kconfig option for debug
+In-Reply-To: <568AC0F9.2010304@gmail.com>
+References: <1432156863-19695-1-git-send-email-tony@atomide.com>
+ <568662FC.9050206@gmail.com> <20160104170206.GC12777@atomide.com>
+ <201601041834.56056@pali> <20160104174001.GD12777@atomide.com>
+ <568AC0F9.2010304@gmail.com>
+Message-ID: <20160105041356.GE12777@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2015/11/30 23:22, Julien Grall wrote:
+* Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [160104 10:59]:
 > Hi,
 > 
-> On 27/11/15 12:04, Stefano Stabellini wrote:
->> > On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
->>> >> From: Parth Dixit <parth.dixit@linaro.org>
->>> >>
->>> >> Create a helper function for mapping with cached attributes.
->>> >>
->>> >> Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
->>> >> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->> > 
->> > You might be able to use the existing guest_physmap_add_entry and
->> > guest_physmap_remove_page for your purposes.
-> I would rather avoid to do that, those function use the type p2m_ram_rw
-> which imply the memory is executable.
+> On  4.01.2016 19:40, Tony Lindgren wrote:
+> >>On Monday 04 January 2016 18:02:06 Tony Lindgren wrote:
+> >>>> >Care to boot with CONFIG_OMAP_GPMC_DEBUG=y and post the gpmc related
+> >>>> >dmesg output?
+> 
+> Here it is, including the pre-gpmc log, keep in mind this is with restored
+> HWMOD_INIT_NO_RESET flag so rootfs is functional and I can get dmesg output
+> from the syslog. Don't know if it is helpful :). Also, this device has
+> Numonyx onenand (HW rev. 2204), unlike most of the others which have Samsung
+> onenand (HW rev. 2101 etc), no idea if it is relevant.
 
-It could pass the type p2m_mmio_direct or p2m_ram_ro to
-guest_physmap_add_entry, right?
+Thanks. I got the problem reproduced here too.
 
-Thanks,
--- 
-Shannon
+[    1.915557] gpmc cs0 after gpmc_cs_set_timings:
+[    1.920410] cs0 GPMC_CS_CONFIG1: 0xfb001201
+
+Looks like in the failing case the clock rates are not properly
+calculated in GPMC and GPMCFCLKDIVIDER is set wrong in
+GPMC_CS_CONFIG1. Need to look at it more to figure out what's the
+best way to fix this.
+
+Regards,
+
+Tony
