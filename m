@@ -1,80 +1,69 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 5 Jan 2016 13:47:11 +0100
-Subject: [linux-next PATCH] arm64: fix kernel crash with 48-bit VA and
- 64KB granule
-In-Reply-To: <20160105123153.GE10705@arm.com>
-References: <1451960299-14123-1-git-send-email-dennis.chen@arm.com>
- <CAKv+Gu-pz8rA2EfU6NwCndmoYneOjYUt8_PodTdZkepV3cRXJQ@mail.gmail.com>
- <20160105123153.GE10705@arm.com>
-Message-ID: <CAKv+Gu-btc7FX9JG=aEoDcSPYXQuB+Vf9ynXbKNxVn25bxtW_Q@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 5 Jan 2016 20:47:37 +0800
+Subject: [PATCH 03/11] mmc: sdhci-msm: use sdhci_pltfm_init for private
+ allocation
+In-Reply-To: <1451991099-4946-4-git-send-email-jszhang@marvell.com>
+Message-ID: <201601052054.hzEzw4pe%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 January 2016 at 13:31, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, Jan 05, 2016 at 08:36:39AM +0100, Ard Biesheuvel wrote:
->> On 5 January 2016 at 03:18, Dennis Chen <dennis.chen@arm.com> wrote:
->> > The commit 3400749b5a22 ("arm64/efi: refactor EFI init and runtime
->> > code for reuse by 32-bit ARM") uses pgd_alloc() to allocate space for
->> > efi_mm.pgd while not the static efi_pgd[], since this function will be
->> > called with early_initcall, which results in the pgd_cache used by
->> > pgd_alloc() has not been initialized yet, kernel will hang in this
->> > case. This patch is trying to make the pgd_cache_init() called before
->> > arm_enable_runtime_services() by changing its core_initcall to
->> > early_initcall.
->> >
->> > Signed-off-by: Dennis Chen <dennis.chen@arm.com>
->> > Tested-by: Sudeep Holla <sudeep.holla@arm.com>
->> >
->> > Cc: Will Deacon <will.deacon@arm.com>
->> > Cc: Catalin Marinas <catalin.marinas@arm.com>
->> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> > Cc: Sudeep Holla <sudeep.holla@arm.com>
->> > ---
->> >  arch/arm64/mm/pgd.c | 2 +-
->> >  1 file changed, 1 insertion(+), 1 deletion(-)
->> >
->> > diff --git a/arch/arm64/mm/pgd.c b/arch/arm64/mm/pgd.c
->> > index cb3ba1b..859a788 100644
->> > --- a/arch/arm64/mm/pgd.c
->> > +++ b/arch/arm64/mm/pgd.c
->> > @@ -56,4 +56,4 @@ static int __init pgd_cache_init(void)
->> >                                               SLAB_PANIC, NULL);
->> >         return 0;
->> >  }
->> > -core_initcall(pgd_cache_init);
->> > +early_initcall(pgd_cache_init);
->>
->>
->> Hello all,
->>
->> Apologies for not spotting this before sending it out.
->>
->> The issue only occurs when PGD_SIZE != PAGE_SIZE, which is why I did
->> not see it myself. I only tested with 4k/39-bits and 64k/42-bits IIRC,
->> since the series this is part of primarily concerns ARM not arm64.
->>
->> Anyway, shuffling init ordering is my least favorite way of fixing
->> bugs. Since only ARM requires pgd_alloc() (for the kernel mappings),
->> we could also simply factor out pgd_alloc() into efi_pgd_alloc(), and
->> define it to mean '__get_free_page(PGALLOC_GFP)' on arm64.
->
-> Or we could put the pgd_cache initialisation in pgtable_cache_init, which
-> sounds like the right place for it anyway.
->
+Hi Jisheng,
 
-Indeed.
+[auto build test WARNING on v4.4-rc8]
+[also build test WARNING on next-20160105]
+[cannot apply to ulf.hansson-mmc/next]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-> Curious, but why are our EFI runtime services initialised off the back of
-> initcalls, whereas on x86 the initialisation is driven directly from
-> init/main.c? I'm not saying it should be changed, it just looks odd having
-> the two paths.
->
+url:    https://github.com/0day-ci/linux/commits/Jisheng-Zhang/mmc-sdhci-bcm2835-use-sdhci_pltfm_init-for-private-allocation/20160105-190232
+config: arm64-allmodconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-Simply because we tried not to pollute all core files with explicit
-EFI calls. The EFI init bits are called in line by setup_arch(),
-because they are needed so early, so there we had no choice. The
-runtime services bits are only needed much later, so there we used an
-initcall because we could.
+All warnings (new ones prefixed by >>):
 
--- 
-Ard.
+   drivers/mmc/host/sdhci-msm.c: In function 'sdhci_msm_probe':
+>> drivers/mmc/host/sdhci-msm.c:440:32: warning: 'msm_host' is used uninitialized in this function [-Wuninitialized]
+     host = sdhci_pltfm_init(pdev, &msm_host->sdhci_msm_pdata,
+                                   ^
+
+vim +/msm_host +440 drivers/mmc/host/sdhci-msm.c
+
+   424		.set_clock = sdhci_set_clock,
+   425		.set_bus_width = sdhci_set_bus_width,
+   426		.set_uhs_signaling = sdhci_set_uhs_signaling,
+   427	};
+   428	
+   429	static int sdhci_msm_probe(struct platform_device *pdev)
+   430	{
+   431		struct sdhci_host *host;
+   432		struct sdhci_pltfm_host *pltfm_host;
+   433		struct sdhci_msm_host *msm_host;
+   434		struct resource *core_memres;
+   435		int ret;
+   436		u16 host_version, core_minor;
+   437		u32 core_version, caps;
+   438		u8 core_major;
+   439	
+ > 440		host = sdhci_pltfm_init(pdev, &msm_host->sdhci_msm_pdata,
+   441					sizeof(*msm_host));
+   442		if (IS_ERR(host))
+   443			return PTR_ERR(host);
+   444	
+   445		pltfm_host = sdhci_priv(host);
+   446		msm_host = sdhci_pltfm_priv(pltfm_host);
+   447		msm_host->sdhci_msm_pdata.ops = &sdhci_msm_ops;
+   448		msm_host->mmc = host->mmc;
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 46668 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160105/966879d4/attachment-0001.obj>
