@@ -1,106 +1,235 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Tue, 5 Jan 2016 16:38:54 +0200
-Subject: [PATCH v2 17/32] arm: define __smp_xxx
-In-Reply-To: <20160104135934.GE19062@n2100.arm.linux.org.uk>
-References: <1451572003-2440-1-git-send-email-mst@redhat.com>
- <1451572003-2440-18-git-send-email-mst@redhat.com>
- <20160102112438.GU8644@n2100.arm.linux.org.uk>
- <20160103110158-mutt-send-email-mst@redhat.com>
- <20160104133658.GY6344@twins.programming.kicks-ass.net>
- <20160104135420.GS6373@twins.programming.kicks-ass.net>
- <20160104135934.GE19062@n2100.arm.linux.org.uk>
-Message-ID: <20160105163429-mutt-send-email-mst@redhat.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 5 Jan 2016 15:41:57 +0100
+Subject: [PATCH v2 05/13] arm64: kvm: deal with kernel symbols outside of
+ linear mapping
+In-Reply-To: <1451489172-17420-6-git-send-email-ard.biesheuvel@linaro.org>
+References: <1451489172-17420-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1451489172-17420-6-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160105144157.GE28354@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 04, 2016 at 01:59:34PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Jan 04, 2016 at 02:54:20PM +0100, Peter Zijlstra wrote:
-> > On Mon, Jan 04, 2016 at 02:36:58PM +0100, Peter Zijlstra wrote:
-> > > On Sun, Jan 03, 2016 at 11:12:44AM +0200, Michael S. Tsirkin wrote:
-> > > > On Sat, Jan 02, 2016 at 11:24:38AM +0000, Russell King - ARM Linux wrote:
-> > > 
-> > > > > My only concern is that it gives people an additional handle onto a
-> > > > > "new" set of barriers - just because they're prefixed with __*
-> > > > > unfortunately doesn't stop anyone from using it (been there with
-> > > > > other arch stuff before.)
-> > > > > 
-> > > > > I wonder whether we should consider making the smp memory barriers
-> > > > > inline functions, so these __smp_xxx() variants can be undef'd
-> > > > > afterwards, thereby preventing drivers getting their hands on these
-> > > > > new macros?
-> > > > 
-> > > > That'd be tricky to do cleanly since asm-generic depends on
-> > > > ifndef to add generic variants where needed.
-> > > > 
-> > > > But it would be possible to add a checkpatch test for this.
-> > > 
-> > > Wasn't the whole purpose of these things for 'drivers' (namely
-> > > virtio/xen hypervisor interaction) to use these?
-> > 
-> > Ah, I see, you add virt_*mb() stuff later on for that use case.
-> > 
-> > So, assuming everybody does include asm-generic/barrier.h, you could
-> > simply #undef the __smp version at the end of that, once we've generated
-> > all the regular primitives from it, no?
+On Wed, Dec 30, 2015 at 04:26:04PM +0100, Ard Biesheuvel wrote:
+> KVM on arm64 uses a fixed offset between the linear mapping at EL1 and
+> the HYP mapping at EL2. Before we can move the kernel virtual mapping
+> out of the linear mapping, we have to make sure that references to kernel
+> symbols that are accessed via the HYP mapping are translated to their
+> linear equivalent.
 > 
-> Not so simple - that's why I mentioned using inline functions.
+> To prevent inadvertent direct references from sneaking in later, change
+> the type of all extern declarations to HYP kernel symbols to the opaque
+> 'struct kvm_ksym', which does not decay to a pointer type like char arrays
+> and function references. This is not bullet proof, but at least forces the
+> user to take the address explicitly rather than referencing it directly.
 > 
-> The new smp_* _macros_ are:
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm/include/asm/kvm_asm.h   |  2 ++
+>  arch/arm/include/asm/kvm_mmu.h   |  2 ++
+>  arch/arm/kvm/arm.c               |  9 +++++----
+>  arch/arm/kvm/mmu.c               | 12 +++++------
+>  arch/arm64/include/asm/kvm_asm.h | 21 +++++++++++---------
+>  arch/arm64/include/asm/kvm_mmu.h |  2 ++
+>  arch/arm64/include/asm/virt.h    |  4 ----
+>  arch/arm64/kernel/vmlinux.lds.S  |  4 ++--
+>  arch/arm64/kvm/debug.c           |  4 +++-
+>  virt/kvm/arm/vgic-v3.c           |  2 +-
+>  10 files changed, 34 insertions(+), 28 deletions(-)
 > 
-> +#define smp_mb()       __smp_mb()
-> 
-> which means if we simply #undef __smp_mb(), smp_mb() then points at
-> something which is no longer available, and we'll end up with errors
-> saying that __smp_mb() doesn't exist.
-> 
-> My suggestion was to change:
-> 
-> #ifndef smp_mb
-> #define smp_mb()	__smp_mb()
-> #endif
-> 
-> to:
-> 
-> #ifndef smp_mb
-> static inline void smp_mb(void)
-> {
-> 	__smp_mb();
-> }
-> #endif
-> 
-> which then means __smp_mb() and friends can be #undef'd afterwards.
+> diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+> index 194c91b610ff..484ffdf7c70b 100644
+> --- a/arch/arm/include/asm/kvm_asm.h
+> +++ b/arch/arm/include/asm/kvm_asm.h
+> @@ -99,6 +99,8 @@ extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
+>  extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
+>  
+>  extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+> +
+> +extern char __hyp_idmap_text_start[], __hyp_idmap_text_end[];
+>  #endif
+>  
+>  #endif /* __ARM_KVM_ASM_H__ */
+> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+> index 405aa1883307..412b363f79e9 100644
+> --- a/arch/arm/include/asm/kvm_mmu.h
+> +++ b/arch/arm/include/asm/kvm_mmu.h
+> @@ -30,6 +30,8 @@
+>  #define HYP_PAGE_OFFSET		PAGE_OFFSET
+>  #define KERN_TO_HYP(kva)	(kva)
+>  
+> +#define kvm_ksym_ref(kva)	(kva)
+> +
+>  /*
+>   * Our virtual mapping for the boot-time MMU-enable code. Must be
+>   * shared across all the page-tables. Conveniently, we use the vectors
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index e06fd299de08..014b542ea658 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -427,7 +427,7 @@ static void update_vttbr(struct kvm *kvm)
+>  		 * shareable domain to make sure all data structures are
+>  		 * clean.
+>  		 */
+> -		kvm_call_hyp(__kvm_flush_vm_context);
+> +		kvm_call_hyp(kvm_ksym_ref(__kvm_flush_vm_context));
+>  	}
+>  
+>  	kvm->arch.vmid_gen = atomic64_read(&kvm_vmid_gen);
+> @@ -600,7 +600,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  		__kvm_guest_enter();
+>  		vcpu->mode = IN_GUEST_MODE;
+>  
+> -		ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);
+> +		ret = kvm_call_hyp(kvm_ksym_ref(__kvm_vcpu_run), vcpu);
+>  
+>  		vcpu->mode = OUTSIDE_GUEST_MODE;
+>  		/*
+> @@ -969,7 +969,7 @@ static void cpu_init_hyp_mode(void *dummy)
+>  	pgd_ptr = kvm_mmu_get_httbr();
+>  	stack_page = __this_cpu_read(kvm_arm_hyp_stack_page);
+>  	hyp_stack_ptr = stack_page + PAGE_SIZE;
+> -	vector_ptr = (unsigned long)__kvm_hyp_vector;
+> +	vector_ptr = (unsigned long)kvm_ksym_ref(__kvm_hyp_vector);
+>  
+>  	__cpu_init_hyp_mode(boot_pgd_ptr, pgd_ptr, hyp_stack_ptr, vector_ptr);
+>  
+> @@ -1061,7 +1061,8 @@ static int init_hyp_mode(void)
+>  	/*
+>  	 * Map the Hyp-code called directly from the host
+>  	 */
+> -	err = create_hyp_mappings(__kvm_hyp_code_start, __kvm_hyp_code_end);
+> +	err = create_hyp_mappings(kvm_ksym_ref(__kvm_hyp_code_start),
+> +				  kvm_ksym_ref(__kvm_hyp_code_end));
+>  	if (err) {
+>  		kvm_err("Cannot map world-switch code\n");
+>  		goto out_free_mappings;
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 7dace909d5cf..7c448b943e3a 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -31,8 +31,6 @@
+>  
+>  #include "trace.h"
+>  
+> -extern char  __hyp_idmap_text_start[], __hyp_idmap_text_end[];
+> -
+>  static pgd_t *boot_hyp_pgd;
+>  static pgd_t *hyp_pgd;
+>  static pgd_t *merged_hyp_pgd;
+> @@ -63,7 +61,7 @@ static bool memslot_is_logging(struct kvm_memory_slot *memslot)
+>   */
+>  void kvm_flush_remote_tlbs(struct kvm *kvm)
+>  {
+> -	kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
+> +	kvm_call_hyp(kvm_ksym_ref(__kvm_tlb_flush_vmid), kvm);
+>  }
+>  
+>  static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+> @@ -75,7 +73,7 @@ static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+>  	 * anything there.
+>  	 */
+>  	if (kvm)
+> -		kvm_call_hyp(__kvm_tlb_flush_vmid_ipa, kvm, ipa);
+> +		kvm_call_hyp(kvm_ksym_ref(__kvm_tlb_flush_vmid_ipa), kvm, ipa);
+>  }
+>  
+>  /*
+> @@ -1647,9 +1645,9 @@ int kvm_mmu_init(void)
+>  {
+>  	int err;
+>  
+> -	hyp_idmap_start = kvm_virt_to_phys(__hyp_idmap_text_start);
+> -	hyp_idmap_end = kvm_virt_to_phys(__hyp_idmap_text_end);
+> -	hyp_idmap_vector = kvm_virt_to_phys(__kvm_hyp_init);
+> +	hyp_idmap_start = kvm_virt_to_phys(&__hyp_idmap_text_start);
+> +	hyp_idmap_end = kvm_virt_to_phys(&__hyp_idmap_text_end);
+> +	hyp_idmap_vector = kvm_virt_to_phys(&__kvm_hyp_init);
+>  
+>  	/*
+>  	 * We rely on the linker script to ensure at build time that the HYP
+> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+> index 5e377101f919..830402f847e0 100644
+> --- a/arch/arm64/include/asm/kvm_asm.h
+> +++ b/arch/arm64/include/asm/kvm_asm.h
+> @@ -105,24 +105,27 @@
+>  #ifndef __ASSEMBLY__
+>  struct kvm;
+>  struct kvm_vcpu;
+> +struct kvm_ksym;
+>  
+>  extern char __kvm_hyp_init[];
+>  extern char __kvm_hyp_init_end[];
+>  
+> -extern char __kvm_hyp_vector[];
+> +extern struct kvm_ksym __kvm_hyp_vector;
+>  
+> -#define	__kvm_hyp_code_start	__hyp_text_start
+> -#define	__kvm_hyp_code_end	__hyp_text_end
+> +extern struct kvm_ksym __kvm_hyp_code_start;
+> +extern struct kvm_ksym __kvm_hyp_code_end;
+>  
+> -extern void __kvm_flush_vm_context(void);
+> -extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
+> -extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
+> +extern struct kvm_ksym __kvm_flush_vm_context;
+> +extern struct kvm_ksym __kvm_tlb_flush_vmid_ipa;
+> +extern struct kvm_ksym __kvm_tlb_flush_vmid;
+>  
+> -extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+> +extern struct kvm_ksym __kvm_vcpu_run;
+>  
+> -extern u64 __vgic_v3_get_ich_vtr_el2(void);
+> +extern struct kvm_ksym __hyp_idmap_text_start, __hyp_idmap_text_end;
+>  
+> -extern u32 __kvm_get_mdcr_el2(void);
+> +extern struct kvm_ksym __vgic_v3_get_ich_vtr_el2;
+> +
+> +extern struct kvm_ksym __kvm_get_mdcr_el2;
+>  
+>  #endif
+>  
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index 61505676d085..0899026a2821 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -73,6 +73,8 @@
+>  
+>  #define KERN_TO_HYP(kva)	((unsigned long)kva - PAGE_OFFSET + HYP_PAGE_OFFSET)
+>  
+> +#define kvm_ksym_ref(sym)	((void *)&sym - KIMAGE_VADDR + PAGE_OFFSET)
+> +
+>  /*
+>   * We currently only support a 40bit IPA.
+>   */
+> diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+> index 7a5df5252dd7..215ad4649dd7 100644
+> --- a/arch/arm64/include/asm/virt.h
+> +++ b/arch/arm64/include/asm/virt.h
+> @@ -50,10 +50,6 @@ static inline bool is_hyp_mode_mismatched(void)
+>  	return __boot_cpu_mode[0] != __boot_cpu_mode[1];
+>  }
+>  
+> -/* The section containing the hypervisor text */
+> -extern char __hyp_text_start[];
+> -extern char __hyp_text_end[];
+> -
+>  #endif /* __ASSEMBLY__ */
+>  
+>  #endif /* ! __ASM__VIRT_H */
+> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+> index 363c2f529951..f935f082188d 100644
+> --- a/arch/arm64/kernel/vmlinux.lds.S
+> +++ b/arch/arm64/kernel/vmlinux.lds.S
+> @@ -35,9 +35,9 @@ jiffies = jiffies_64;
+>  	VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;	\
+>  	*(.hyp.idmap.text)				\
+>  	VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;	\
+> -	VMLINUX_SYMBOL(__hyp_text_start) = .;		\
+> +	VMLINUX_SYMBOL(__kvm_hyp_code_start) = .;	\
+>  	*(.hyp.text)					\
+> -	VMLINUX_SYMBOL(__hyp_text_end) = .;
+> +	VMLINUX_SYMBOL(__kvm_hyp_code_end) = .;
 
-Absolutely, I got it.
-The issue is that e.g. tile has:
-#define __smp_mb__after_atomic()        do { } while (0)
+why this rename?
 
-and this is cheaper than barrier().
-
-For this reason I left
-#define smp_mb__after_atomic()  __smp_mb__after_atomic()
-in place there.
-
-Now, of course I can do (in asm-generic):
-
-#ifndef smp_mb__after_atomic
-static inline void smp_mb__after_atomic(void)
-{
-...
-}
-#endif
-
-but this seems ugly: architectures do defines, generic
-version does inline.
-
-
-And that is not all: APIs like smp_store_mb can take
-a variety of types as arguments so they pretty much
-must be implemented as macros.
-
-Teaching checkpatch.pl to complain about it seems like the cleanest
-approach.
-
-> -- 
-> RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+-Christoffer
