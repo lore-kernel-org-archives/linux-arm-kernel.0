@@ -1,32 +1,30 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Tue, 5 Jan 2016 10:23:08 -0600
-Subject: [PATCH v4 3/3] serial: amba-pl011: add ACPI support to AMBA probe
-In-Reply-To: <CAGCh1+ksWFLkE8Y_a5SW98tpgGBWdVH5TYJAoS17EExuPd65oQ@mail.gmail.com>
-References: <1450880383-29560-1-git-send-email-aleksey.makarov@linaro.org>
- <1450880383-29560-4-git-send-email-aleksey.makarov@linaro.org>
- <CAOZdJXUpjWi7Dy=GFi7_58FqD_UZxxrw_QKJ4sdHLKVOLCyNAA@mail.gmail.com>
- <CAGCh1+ksWFLkE8Y_a5SW98tpgGBWdVH5TYJAoS17EExuPd65oQ@mail.gmail.com>
-Message-ID: <568BEDEC.5010101@codeaurora.org>
+From: daniel@iogearbox.net (Daniel Borkmann)
+Date: Tue, 05 Jan 2016 17:36:47 +0100
+Subject: [PATCH] net: filter: make JITs zero A for SKF_AD_ALU_XOR_X
+In-Reply-To: <1452007387-626-1-git-send-email-rabin@rab.in>
+References: <1452007387-626-1-git-send-email-rabin@rab.in>
+Message-ID: <568BF11F.1060507@iogearbox.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-G Gregory wrote:
->> >I'm confused by this patch.  We already have code like this in
->> >tty-next, in the form of sbsa_uart_probe():
->> >
->> >https://kernel.googlesource.com/pub/scm/linux/kernel/git/gregkh/tty/+/tty-next/drivers/tty/serial/amba-pl011.c#2553
->> >
-> Because Russell expressed unhappiness at that code existing. So this
-> is an alternative method to do same thing with ACPI.
-
-FYI, this patch doesn't apply on tty-next as-is, so it would need to be 
-updated anyway.  Then again, considering the latest drama with that 
-driver, who knows what it will look like?
-
-> If the "arm,sbsa-uart" id was added to drivers/of/platform.c as an
-> AMBA id then the same could be done for DT as well.
+On 01/05/2016 04:23 PM, Rabin Vincent wrote:
+> The SKF_AD_ALU_XOR_X ancillary is not like the other ancillary data
+> instructions since it XORs A with X while all the others replace A with
+> some loaded value.  All the BPF JITs fail to clear A if this is used as
+> the first instruction in a filter.  This was found using american fuzzy
+> lop.
 >
-> Ultimately this patch is optional depending on maintainers opinion!
+> Add a helper to determine if A needs to be cleared given the first
+> instruction in a filter, and use this in the JITs.  Except for ARM, the
+> rest have only been compile-tested.
+>
+> Fixes: 3480593131e0 ("net: filter: get rid of BPF_S_* enum")
+> Signed-off-by: Rabin Vincent <rabin@rab.in>
 
-So with this patch, what is the difference between sbsa_uart_probe and 
-pl011_probe?  Shouldn't the patch also remove sbsa_uart_probe?
+Excellent catch, thanks a lot! The fix looks good to me and should
+go to -net tree.
+
+Acked-by: Daniel Borkmann <daniel@iogearbox.net>
+
+If you're interested, feel free to add a small test case for the
+SKF_AD_ALU_XOR_X issue to lib/test_bpf.c for -net-next tree. Thanks!
