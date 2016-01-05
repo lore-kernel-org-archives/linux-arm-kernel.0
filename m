@@ -1,237 +1,146 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue,  5 Jan 2016 16:19:40 +0100
-Subject: [PATCH v2 6/6] arm64: switch to relative exception tables
-In-Reply-To: <1452007180-27411-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1452007180-27411-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1452007180-27411-7-git-send-email-ard.biesheuvel@linaro.org>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Tue, 5 Jan 2016 16:20:04 +0100
+Subject: [linux-sunxi] reason for Allwinner SoC specific pinctrl drivers?
+In-Reply-To: <568BB190.1080006@arm.com>
+References: <568A514D.7070102@arm.com>
+ <CAEzqOZu8wkPKLp6bZZ7JuiM07ixDksdD=U-WK=3kFPYJZMon4Q@mail.gmail.com>
+ <CAOMqctQL3nmWECpQgtVdxgzEfn2obu4cdj67W1ESONO=5EpQdQ@mail.gmail.com>
+ <568BB190.1080006@arm.com>
+Message-ID: <CAOMqctQ_GKVt0eyU3DhvvpwajTeea_0+LMqBLfLgNbKpFwc=qg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of using absolute addresses for both the exception location
-and the fixup, use offsets relative to the exception table entry values.
-Not only does this cut the size of the exception table in half, it is
-also a prerequisite for KASLR, since absolute exception table entries
-are subject to dynamic relocation, which is incompatible with the sorting
-of the exception table that occurs at build time.
+On 5 January 2016 at 13:05, Andre Przywara <andre.przywara@arm.com> wrote:
+> Hi Michal,
+>
+> thanks for your input!
+>
+> On 04/01/16 21:36, Michal Suchanek wrote:
+>> Hello,
+>>
+>> On 4 January 2016 at 18:27, Vishnu Patekar <vishnupatekar0510@gmail.com> wrote:
+>>> Hello Andre,
+>>> This is something we can do for future SOCs.
+>>>
+>>> On 4 Jan 2016 19:02, "Andre Przywara" <andre.przywara@arm.com> wrote:
+>>>>
 
-This patch also introduces the _ASM_EXTABLE preprocessor macro (which
-exists on x86 as well) and its _asm_extable assembly counterpart, as
-shorthands to emit exception table entries.
+>>>>
+>>>>         uart0_pins_a: uart0 at 0 {
+>>>>                 allwinner,pins =   "PB22", "PB23";
+>>>> +               allwinner,muxval = <0x02    0x02>;
+>>>>                 allwinner,function = "uart0";
+>>
+>> As I understand it
+>>
+>> 1) uart0 is basically a mnemonic for muxval 2
+>
+> Not really. At the moment uart0 is used to lookup the (hard-coded) table
+> entry for pins PB22 and PB23, which returns the said value of 0x02 (in
+> this example, cf. line 246 in pinctrl-sun7i-a20.c).
+> But if there are other pins where UART0 can be muxed too, there is
+> another node describing them (cf. uart3_pins_a and uart3_pins_b in
+> sun7i-a20.dtsi). This one uses the "uart0" name as well, but the muxval
+> returned for _those pins_ can be different. So the string only makes
+> sense in connection with a certain pin.
+>
+>> 2) if you try to mux uart0 on pins for which it is not in the table it fails
+>
+> How would you mux them if they are not in the table?
 
-Acked-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/include/asm/assembler.h      | 15 +++++++---
- arch/arm64/include/asm/futex.h          | 12 +++-----
- arch/arm64/include/asm/uaccess.h        | 30 +++++++++++---------
- arch/arm64/include/asm/word-at-a-time.h |  7 ++---
- arch/arm64/kernel/armv8_deprecated.c    |  7 ++---
- arch/arm64/mm/extable.c                 |  2 +-
- scripts/sortextable.c                   |  2 +-
- 7 files changed, 38 insertions(+), 37 deletions(-)
+You cannot. The muxing fails because you request a function that is
+not in the table for that pin - as opposed to muxing some other random
+function on the pin silently.
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 12eff928ef8b..8c1c2f6a1b1b 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -94,12 +94,19 @@
- 	dmb	\opt
- 	.endm
- 
-+/*
-+ * Emit an entry into the exception table
-+ */
-+	.macro		_asm_extable, from, to
-+	.pushsection	__ex_table, "a"
-+	.align		3
-+	.long		(\from - .), (\to - .)
-+	.popsection
-+	.endm
-+
- #define USER(l, x...)				\
- 9999:	x;					\
--	.section __ex_table,"a";		\
--	.align	3;				\
--	.quad	9999b,l;			\
--	.previous
-+	_asm_extable	9999b, l
- 
- /*
-  * Register aliases.
-diff --git a/arch/arm64/include/asm/futex.h b/arch/arm64/include/asm/futex.h
-index 007a69fc4f40..1ab15a3b5a0e 100644
---- a/arch/arm64/include/asm/futex.h
-+++ b/arch/arm64/include/asm/futex.h
-@@ -42,10 +42,8 @@
- "4:	mov	%w0, %w5\n"						\
- "	b	3b\n"							\
- "	.popsection\n"							\
--"	.pushsection __ex_table,\"a\"\n"				\
--"	.align	3\n"							\
--"	.quad	1b, 4b, 2b, 4b\n"					\
--"	.popsection\n"							\
-+	_ASM_EXTABLE(1b, 4b)						\
-+	_ASM_EXTABLE(2b, 4b)						\
- 	ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN,		\
- 		    CONFIG_ARM64_PAN)					\
- 	: "=&r" (ret), "=&r" (oldval), "+Q" (*uaddr), "=&r" (tmp)	\
-@@ -133,10 +131,8 @@ futex_atomic_cmpxchg_inatomic(u32 *uval, u32 __user *uaddr,
- "4:	mov	%w0, %w6\n"
- "	b	3b\n"
- "	.popsection\n"
--"	.pushsection __ex_table,\"a\"\n"
--"	.align	3\n"
--"	.quad	1b, 4b, 2b, 4b\n"
--"	.popsection\n"
-+	_ASM_EXTABLE(1b, 4b)
-+	_ASM_EXTABLE(2b, 4b)
- 	: "+r" (ret), "=&r" (val), "+Q" (*uaddr), "=&r" (tmp)
- 	: "r" (oldval), "r" (newval), "Ir" (-EFAULT)
- 	: "memory");
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index b2ede967fe7d..dc11577fab7e 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -36,11 +36,11 @@
- #define VERIFY_WRITE 1
- 
- /*
-- * The exception table consists of pairs of addresses: the first is the
-- * address of an instruction that is allowed to fault, and the second is
-- * the address at which the program should continue.  No registers are
-- * modified, so it is entirely up to the continuation code to figure out
-- * what to do.
-+ * The exception table consists of pairs of relative offsets: the first
-+ * is the relative offset to an instruction that is allowed to fault,
-+ * and the second is the relative offset at which the program should
-+ * continue. No registers are modified, so it is entirely up to the
-+ * continuation code to figure out what to do.
-  *
-  * All the routines below use bits of fixup code that are out of line
-  * with the main instruction path.  This means when everything is well,
-@@ -50,9 +50,11 @@
- 
- struct exception_table_entry
- {
--	unsigned long insn, fixup;
-+	int insn, fixup;
- };
- 
-+#define ARCH_HAS_RELATIVE_EXTABLE
-+
- extern int fixup_exception(struct pt_regs *regs);
- 
- #define KERNEL_DS	(-1UL)
-@@ -105,6 +107,12 @@ static inline void set_fs(mm_segment_t fs)
- #define access_ok(type, addr, size)	__range_ok(addr, size)
- #define user_addr_max			get_fs
- 
-+#define _ASM_EXTABLE(from, to)						\
-+	"	.pushsection	__ex_table, \"a\"\n"			\
-+	"	.align		3\n"					\
-+	"	.long		(" #from " - .), (" #to " - .)\n"	\
-+	"	.popsection\n"
-+
- /*
-  * The "__xxx" versions of the user access functions do not verify the address
-  * space - it must have been done previously with a separate "access_ok()"
-@@ -123,10 +131,7 @@ static inline void set_fs(mm_segment_t fs)
- 	"	mov	%1, #0\n"					\
- 	"	b	2b\n"						\
- 	"	.previous\n"						\
--	"	.section __ex_table,\"a\"\n"				\
--	"	.align	3\n"						\
--	"	.quad	1b, 3b\n"					\
--	"	.previous"						\
-+	_ASM_EXTABLE(1b, 3b)						\
- 	: "+r" (err), "=&r" (x)						\
- 	: "r" (addr), "i" (-EFAULT))
- 
-@@ -190,10 +195,7 @@ do {									\
- 	"3:	mov	%w0, %3\n"					\
- 	"	b	2b\n"						\
- 	"	.previous\n"						\
--	"	.section __ex_table,\"a\"\n"				\
--	"	.align	3\n"						\
--	"	.quad	1b, 3b\n"					\
--	"	.previous"						\
-+	_ASM_EXTABLE(1b, 3b)						\
- 	: "+r" (err)							\
- 	: "r" (x), "r" (addr), "i" (-EFAULT))
- 
-diff --git a/arch/arm64/include/asm/word-at-a-time.h b/arch/arm64/include/asm/word-at-a-time.h
-index aab5bf09e9d9..6fe9b8efaff5 100644
---- a/arch/arm64/include/asm/word-at-a-time.h
-+++ b/arch/arm64/include/asm/word-at-a-time.h
-@@ -20,6 +20,8 @@
- 
- #include <linux/kernel.h>
- 
-+#include <asm/uaccess.h>
-+
- struct word_at_a_time {
- 	const unsigned long one_bits, high_bits;
- };
-@@ -81,10 +83,7 @@ static inline unsigned long load_unaligned_zeropad(const void *addr)
- #endif
- 	"	b	2b\n"
- 	"	.popsection\n"
--	"	.pushsection __ex_table,\"a\"\n"
--	"	.align	3\n"
--	"	.quad	1b, 3b\n"
--	"	.popsection"
-+	_ASM_EXTABLE(1b, 3b)
- 	: "=&r" (ret), "=&r" (offset)
- 	: "r" (addr), "Q" (*(unsigned long *)addr));
- 
-diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
-index 937f5e58a4d3..a6102eeda46c 100644
---- a/arch/arm64/kernel/armv8_deprecated.c
-+++ b/arch/arm64/kernel/armv8_deprecated.c
-@@ -297,11 +297,8 @@ static void register_insn_emulation_sysctl(struct ctl_table *table)
- 	"4:	mov		%w0, %w5\n"			\
- 	"	b		3b\n"				\
- 	"	.popsection"					\
--	"	.pushsection	 __ex_table,\"a\"\n"		\
--	"	.align		3\n"				\
--	"	.quad		0b, 4b\n"			\
--	"	.quad		1b, 4b\n"			\
--	"	.popsection\n"					\
-+	_ASM_EXTABLE(0b, 4b)					\
-+	_ASM_EXTABLE(1b, 4b)					\
- 	ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN,	\
- 		CONFIG_ARM64_PAN)				\
- 	: "=&r" (res), "+r" (data), "=&r" (temp)		\
-diff --git a/arch/arm64/mm/extable.c b/arch/arm64/mm/extable.c
-index 79444279ba8c..81acd4706878 100644
---- a/arch/arm64/mm/extable.c
-+++ b/arch/arm64/mm/extable.c
-@@ -11,7 +11,7 @@ int fixup_exception(struct pt_regs *regs)
- 
- 	fixup = search_exception_tables(instruction_pointer(regs));
- 	if (fixup)
--		regs->pc = fixup->fixup;
-+		regs->pc = (unsigned long)&fixup->fixup + fixup->fixup;
- 
- 	return fixup != NULL;
- }
-diff --git a/scripts/sortextable.c b/scripts/sortextable.c
-index c2423d913b46..af247c70fb66 100644
---- a/scripts/sortextable.c
-+++ b/scripts/sortextable.c
-@@ -282,12 +282,12 @@ do_file(char const *const fname)
- 	case EM_386:
- 	case EM_X86_64:
- 	case EM_S390:
-+	case EM_AARCH64:
- 		custom_sort = sort_relative_table;
- 		break;
- 	case EM_ARCOMPACT:
- 	case EM_ARCV2:
- 	case EM_ARM:
--	case EM_AARCH64:
- 	case EM_MICROBLAZE:
- 	case EM_MIPS:
- 	case EM_XTENSA:
--- 
-2.5.0
+>
+>> So it makes no sense to have both function and muxval - this is redundant.
+>
+> Kind of, but not if we want to keep compatibility with older and newer
+> DTs and older and newer kernels (drivers, really) - which is my goal.
+> So we just _add_ the muxval values. The existing chip-specific drivers
+> would naturally ignore the values and just use their built-in table for
+> lookup. The generic driver on the other hand would use the DT
+> information. An appropriate compatible string could then be added to
+> refer to the generic driver as a fallback.
+> For (future) SoCs (which would not have a specific driver) we could omit
+> the function string (if this isn't needed elsewhere, I have to check).
+> So I don't see how the redundancy would be an issue here.
+
+The function string is needed for the setting to make any sense.
+
+As you have pointed out yourself the function name may resolve to
+different muxval for different pins.
+
+You need those SoC pin tables so you know what you multiplexed to
+what. They are in the kernel where they IMHO belong. Not having them
+at all is a no-go because then you have no idea what functions you
+have enabled on the SoC.
+
+What you suggest is adding duplicate lower level information in the DT
+so higher level pinmux driver uses symbolic function name and lower
+level driver using raw mux number. This means that maintenance
+problems increase with these low level and high level pin mux
+descriptions potentially going out of sync in the DT.
+
+>
+>> And it does not make sense to move from function to muxval - it's like
+>> moving from assembly programing to raw machine code programming.
+>
+> But it removes the requirement of relying on the built-in lookup table.
+> So by using a more readable uart0 "mnemonic" we rely on some hardcoded,
+> chip specific table in each kernel, which is just wrong IMHO. Other DT
+> users (be it Xen or *BSD, for instance) would have to replicate this
+> table and since it's really SoC specific, it does not make any sense to
+> me to keep it separate. After all this DT node is SoC specific as well,
+> so I don't see the point of abstracting this with some string lookup.
+>
+> So to stay with your comparison: Yes, we move from assembly to machine
+> code, but we get rid of the need for a SoC specific assembler, which is
+> maintained separately.
+
+We cannot get rid of it. And really, the assembly is the same for all
+the SoCs. It's the machine code which isn't and which the assembly
+abstracts.
+
+>
+>> For compatibility it's not possible to move the table to the shared
+>> SoC DT
+>
+> Why is that? We have the actual pin tables in the shared SoC DT, each
+> board specific DT just refers to the actually connected pins by
+> reference. That wouldn't change at all. So the above example for
+> instance is from sun7i-a20.dtsi, board specific .dts files just use:
+> pinctrl-0 = <&uart0_pins_a>;
+
+Except as has been pointed out in DT unused features are not to be
+included so you would lose the functions which are included in the
+in-kernel tables but are not wired on any supported board.
+
+Also the uart0_pins_a part is just trashed AFAIK so once the kernel
+boots you have no idea what pins you got in the driver. So if the low
+level pinmux driver were to replace the high level pinmux driver it
+would have to parse the pin tables in the DT and reconstruct the
+currently hardcoded pin tables from the DT information so that when
+you look at the pinmux state later you know what it means without the
+in-kernel hardcoded table. Then all pinmux values are technically used
+by the pinmux driver to reconstruct the pinmux table and should be
+included in the DT.
+
+>
+>> although it would be possible to have the pin tables in DT.
+>> However, it would inflate the DT and make working in u-boot (SPL)
+>> where full DT parser is not available problematic.
+>
+> I don't get this. Having the actual values instead of a string lookup
+> would make it actually easier to lookup for more light-weight kernels.
+
+No. You can just include the pin table in the C code as opposed to
+linking in a DT parser as well as requiring heap space to parse the
+DT.
+
+well, you can always cut and paste the data from DT to any code you
+want, anyway. So long as you do have the data somewhere.
+
+Thanks
+
+Michal
