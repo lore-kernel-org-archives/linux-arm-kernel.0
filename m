@@ -1,40 +1,78 @@
 From: brian.starkey@arm.com (Brian Starkey)
-Date: Tue,  5 Jan 2016 16:41:25 +0000
-Subject: [RESEND PATCH 0/3] Add MEMREMAP_WC to fix dma_init_coherent_memory
-Message-ID: <cover.1452010802.git.brian.starkey@arm.com>
+Date: Tue,  5 Jan 2016 16:41:26 +0000
+Subject: [RESEND PATCH 1/3] memremap: add MEMREMAP_WC flag
+In-Reply-To: <cover.1452010802.git.brian.starkey@arm.com>
+References: <cover.1452010802.git.brian.starkey@arm.com>
+Message-ID: <9085d37fa97a762a46b9d58719c085368682c64f.1452010802.git.brian.starkey@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add a flag to memremap() for writecombine mappings. Mappings satisfied
+by this flag will not be cached, however writes may be delayed or
+combined into more efficient bursts. This is most suitable for
+buffers written sequentially by the CPU for use by other DMA devices.
 
-This may well have been buried with the holidays. It still applies
-fine on next-20160105, but I notice patch 2 will trivially conflict
-with [2] on some context lines.
+Signed-off-by: Brian Starkey <brian.starkey@arm.com>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ include/linux/io.h |    1 +
+ kernel/memremap.c  |   15 +++++++++++++--
+ 2 files changed, 14 insertions(+), 2 deletions(-)
 
-As discussed here[1], these patches implement a MEMREMAP_WC flag for
-memremap(), which can be used to obtain writecombine mappings. This
-is then used for setting up dma_coherent_mem regions which use the
-DMA_MEMORY_MAP flag.
-
-Patch 3 makes sure that the appropriate memset function is used
-when zeroing coherent allocations, which fixes an alignment fault on
-arm64.
-
-Best Regards,
-Brian
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/390857.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/397163.html
-
-Brian Starkey (3):
-  memremap: add MEMREMAP_WC flag
-  drivers: dma-coherent: use MEMREMAP_WC for DMA_MEMORY_MAP
-  drivers: dma-coherent: use memset_io for DMA_MEMORY_IO
-
- drivers/base/dma-coherent.c |   25 ++++++++++++++++++++-----
- include/linux/io.h          |    1 +
- kernel/memremap.c           |   15 +++++++++++++--
- 3 files changed, 34 insertions(+), 7 deletions(-)
-
+diff --git a/include/linux/io.h b/include/linux/io.h
+index 32403b5..e2c8419 100644
+--- a/include/linux/io.h
++++ b/include/linux/io.h
+@@ -135,6 +135,7 @@ enum {
+ 	/* See memremap() kernel-doc for usage description... */
+ 	MEMREMAP_WB = 1 << 0,
+ 	MEMREMAP_WT = 1 << 1,
++	MEMREMAP_WC = 1 << 2,
+ };
+ 
+ void *memremap(resource_size_t offset, size_t size, unsigned long flags);
+diff --git a/kernel/memremap.c b/kernel/memremap.c
+index e517a16..3849987 100644
+--- a/kernel/memremap.c
++++ b/kernel/memremap.c
+@@ -41,11 +41,13 @@ static void *try_ram_remap(resource_size_t offset, size_t size)
+  * memremap() - remap an iomem_resource as cacheable memory
+  * @offset: iomem resource start address
+  * @size: size of remap
+- * @flags: either MEMREMAP_WB or MEMREMAP_WT
++ * @flags: any of MEMREMAP_WB, MEMREMAP_WT and MEMREMAP_WC
+  *
+  * memremap() is "ioremap" for cases where it is known that the resource
+  * being mapped does not have i/o side effects and the __iomem
+- * annotation is not applicable.
++ * annotation is not applicable. In the case of multiple flags, the different
++ * mapping types will be attempted in the order listed below until one of
++ * them succeeds.
+  *
+  * MEMREMAP_WB - matches the default mapping for "System RAM" on
+  * the architecture.  This is usually a read-allocate write-back cache.
+@@ -57,6 +59,10 @@ static void *try_ram_remap(resource_size_t offset, size_t size)
+  * cache or are written through to memory and never exist in a
+  * cache-dirty state with respect to program visibility.  Attempts to
+  * map "System RAM" with this mapping type will fail.
++ *
++ * MEMREMAP_WC - establish a writecombine mapping, whereby writes may
++ * be coalesced together (e.g. in the CPU's write buffers), but is otherwise
++ * uncached. Attempts to map "System RAM" with this mapping type will fail.
+  */
+ void *memremap(resource_size_t offset, size_t size, unsigned long flags)
+ {
+@@ -101,6 +107,11 @@ void *memremap(resource_size_t offset, size_t size, unsigned long flags)
+ 		addr = ioremap_wt(offset, size);
+ 	}
+ 
++	if (!addr && (flags & MEMREMAP_WC)) {
++		flags &= ~MEMREMAP_WC;
++		addr = ioremap_wc(offset, size);
++	}
++
+ 	return addr;
+ }
+ EXPORT_SYMBOL(memremap);
 -- 
 1.7.9.5
