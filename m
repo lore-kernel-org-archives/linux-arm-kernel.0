@@ -1,62 +1,46 @@
-From: jonmason@broadcom.com (Jon Mason)
-Date: Tue, 5 Jan 2016 17:26:06 -0500
-Subject: [PATCH 3/3] arm: dts: bcm5301x: Add syscon based reboot in DT
-In-Reply-To: <2180042.V6T2Tnxp6B@wuerfel>
-References: <1450474676-10210-1-git-send-email-jonmason@broadcom.com>
- <1450474676-10210-3-git-send-email-jonmason@broadcom.com>
- <2180042.V6T2Tnxp6B@wuerfel>
-Message-ID: <20160105222605.GL31867@broadcom.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Wed, 6 Jan 2016 09:32:39 +1100
+Subject: Including Raspberry Pi -next trees in linux-next
+In-Reply-To: <3082544.lZk2r7IkWv@wuerfel>
+References: <87fuyozzax.fsf@eliezer.anholt.net>
+ <87d1tfrdu0.fsf@eliezer.anholt.net> <568C2619.20705@wwwdotorg.org>
+ <3082544.lZk2r7IkWv@wuerfel>
+Message-ID: <20160106093239.21848a48@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 10:44:28PM +0100, Arnd Bergmann wrote:
-> On Friday 18 December 2015 16:37:56 Jon Mason wrote:
-> > +       cru: cru at 1800c184 {
-> > +               compatible = "syscon";
-> > +               reg = <0x1800c184 0xc>;
-> > +       };
+Hi Eric,
+
+On Tue, 05 Jan 2016 22:26:33 +0100 Arnd Bergmann <arnd@arndb.de> wrote:
+>
+> On Tuesday 05 January 2016 13:22:49 Stephen Warren wrote:
+> > >>>
+> > >>> branches:
+> > >>> drm-vc4-next
+> > >>> bcm2835-dt-next
+> > >>> bcm2835-soc-next
+> > >>> bcm2835-drivers-next
+> > >>> bcm2385-defconfig-next
+> > >>> (bcm2835-maintainers-next is a placeholder since we have nothing for it
+> > >>> this round)  
+> > 
+> > Typically maintainers merge everything together into a single "for-next" 
+> > to maintain a reasonable set of branches. I guess it doesn't affect me 
+> > so my opinion isn't too relevant though:-)  
 > 
-> It's unusual for a device to start at such an odd address. Are you sure
-> it's not a larger device starting at 0x1800c000 or 0x18000000?
+> In my experience the common for-next branch works best because
+> you can change the set of branches that get merged into it as
+> needed. If there are 6 branches today, it's quite likely that there
+> will be another one in the future and if only one branch gets
+> merged into for-next, you don't need to worry about updating the list.
 
-The CRU (Clock and Reset Unit) starts at 0x1800c100, with the
-following layout:
+Certainly, that would be easier for me.  Though you may want to keep
+the drm-vc4-next branch separate since that get merged via a different
+tree (and can appear at a different point in my merge list).
 
-CRU Clock Management at 0x1800c100-0x1800c180
-CRU Reset at 0x1800c184
-CRU Period Sample Clock at 0x1800c188
-CRU Interrupt register at 0x1800c18c
-CRU MDIO Control at 0x1800c190
-CRU GPIO at 0x1800c1c0-0x1800c1e0
-CRU SDIO 0x1800c200-0x1800c214
-CRU RoboSW Interrupt at 0x1800c280
-CRU Straps Control at 0x1800c2a0
-
-The clock driver is already referencing the registers between
-0x1800c100-0x1800c180, and the GPIO driver is referencing registers
-between 0x1800c1c0-0x1800c1e0.
-
-The reset part of the syscon seems to be the only useful thing in this
-block.  Am I approaching this incorrectly?
-
-
-> Also, please provide a more specific compatible string based on the
-> name of the device in the data sheet. The node name in contrast should
-> be more generic, e.g.
-> 
-> 	cru: system-controller at 1800c000 {
-> 		compatible = "brcm,bcm53010-cru", "syscon";
-
-This is very similar between the NS and NSP (and NS2) platforms.  I'll
-verify the layout and see if this can't be "brcm,iproc-cru" or
-something similar.
-
-Thanks,
-Jon
-
-> 		reg = <0x1800c000 0x400>; /* whatever the data sheet says */
-> 	};
-> 
-> 
-> 	Arnd
-> 
+It does mean an extra step for you i.e. you would need to merge all the
+relevant branches into the single "for-next" branch, but that should
+not be too big an imposition.
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
