@@ -1,79 +1,75 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Tue, 5 Jan 2016 13:23:59 +0800
-Subject: [PATCH 4/4] soc: mediatek: Add MT2701/MT7623 scpsys driver
-In-Reply-To: <5684192B.4020806@gmail.com>
-References: <1451457706-14798-1-git-send-email-jamesjj.liao@mediatek.com>
- <1451457706-14798-5-git-send-email-jamesjj.liao@mediatek.com>
- <CAGS+omCwxB+4VFOA1hA9Rg-ekWCVM8Y_c7woTEXnvX6FG1y9mQ@mail.gmail.com>
- <1451470692.22426.11.camel@mtksdaap41> <5684192B.4020806@gmail.com>
-Message-ID: <1451971439.19026.3.camel@mtksdaap41>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 5 Jan 2016 13:22:43 +0800
+Subject: [PATCH v5 4/5] arm64: pci: Add ACPI support
+In-Reply-To: <1451884403-21437-5-git-send-email-jchandra@broadcom.com>
+Message-ID: <201601051319.7OgVNJxN%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthias,
-On Wed, 2015-12-30 at 18:49 +0100, Matthias Brugger wrote:
-> > On Wed, 2015-12-30 at 17:01 +0800, Daniel Kurtz wrote:
-> >> On Wed, Dec 30, 2015 at 2:41 PM, James Liao <jamesjj.liao@mediatek.com> wrote:
-> >>>
-> >>> From: Shunli Wang <shunli.wang@mediatek.com>
-> >>>
-> >>> Add scpsys driver for MT2701 and MT7623.
-> >>>
-> >>> Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
-> >>> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-> >>> ---
-> >>>   drivers/soc/mediatek/Kconfig             |  11 +++
-> >>>   drivers/soc/mediatek/Makefile            |   1 +
-> >>>   drivers/soc/mediatek/mtk-scpsys-mt2701.c | 161 +++++++++++++++++++++++++++++++
-> >>>   3 files changed, 173 insertions(+)
-> >>>   create mode 100644 drivers/soc/mediatek/mtk-scpsys-mt2701.c
-> >>>
-> >>> diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
-> >>> index eca6fb7..92cf838 100644
-> >>> --- a/drivers/soc/mediatek/Kconfig
-> >>> +++ b/drivers/soc/mediatek/Kconfig
-> >>> @@ -39,3 +39,14 @@ config MTK_SCPSYS_MT8173
-> >>>            driver.
-> >>>            The System Control Processor System (SCPSYS) has several power
-> >>>            management related tasks in the system.
-> >>> +
-> >>> +config MTK_SCPSYS_MT2701
-> >>> +       bool "SCPSYS Support MediaTek MT2701 and MT7623"
-> >>> +       depends on ARCH_MEDIATEK || COMPILE_TEST
-> >>> +       select MTK_SCPSYS
-> >>> +       default ARCH_MEDIATEK
-> >>> +       help
-> >>> +         Say yes here to add support for the MT2701/MT7623 SCPSYS power
-> >>> +         domain driver.
-> >>> +         The System Control Processor System (SCPSYS) has several power
-> >>> +         management related tasks in the system.
-> >>
-> >> I don't think we really want different drivers and Kconfig options.
-> >>
-> >> Can we just use different compatibles to select the appropriate scp_domain_data?
-> >
-> > Yes, we can. All scpsys drivers are built-in by default, and they will
-> > be activate by specific compatible string.
-> >
-> > But some projects don't want to build unused drivers into kernel to save
-> > code size. Use different Kconfig options for each SoC so that these
-> > projects can disable unused drivers.
-> >
-> 
-> Scpsys is a bool right now, you can disable it if you don't need it for 
-> your project.
-> 
-> I don't think the impact of adding scp_domain_data justifies adding SoC 
-> specific scpsys drivers and bloat the drivers/soc/mediatek folder.
+Hi Jayachandran,
 
-So you prefer to enable MT8173 and MT2701 scpsys drivers at the same
-time if MTK_SCPSYS is true?
+[auto build test ERROR on pm/linux-next]
+[also build test ERROR on v4.4-rc8 next-20160104]
+[cannot apply to pci/next]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-BTW, this patchset is based on 4.4-rc7, which lacks two patches from
-your v4.4-next/soc. Should I rebase to v4.4-next/soc when I send v2
-patch?
+url:    https://github.com/0day-ci/linux/commits/Jayachandran-C/ACPI-based-PCI-support-for-arm64/20160104-125550
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git linux-next
+config: arm64-allmodconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
+All errors (new ones prefixed by >>):
 
-Best regards,
+>> drivers/xen/pci.c:31:25: fatal error: asm/pci_x86.h: No such file or directory
+    #include <asm/pci_x86.h>
+                            ^
+   compilation terminated.
 
-James
+vim +31 drivers/xen/pci.c
+
+e28c31a9 Weidong Han           2010-10-27  15   * Place - Suite 330, Boston, MA 02111-1307 USA.
+e28c31a9 Weidong Han           2010-10-27  16   *
+e28c31a9 Weidong Han           2010-10-27  17   * Author: Weidong Han <weidong.han@intel.com>
+e28c31a9 Weidong Han           2010-10-27  18   */
+e28c31a9 Weidong Han           2010-10-27  19  
+e28c31a9 Weidong Han           2010-10-27  20  #include <linux/pci.h>
+55e901fc Jan Beulich           2011-09-22  21  #include <linux/acpi.h>
+0b97b03d Ross Lagerwall        2015-04-09  22  #include <linux/pci-acpi.h>
+e28c31a9 Weidong Han           2010-10-27  23  #include <xen/xen.h>
+e28c31a9 Weidong Han           2010-10-27  24  #include <xen/interface/physdev.h>
+e28c31a9 Weidong Han           2010-10-27  25  #include <xen/interface/xen.h>
+e28c31a9 Weidong Han           2010-10-27  26  
+e28c31a9 Weidong Han           2010-10-27  27  #include <asm/xen/hypervisor.h>
+e28c31a9 Weidong Han           2010-10-27  28  #include <asm/xen/hypercall.h>
+e28c31a9 Weidong Han           2010-10-27  29  #include "../pci/pci.h"
+b7ef4a6d Ben Hutchings         2013-12-31  30  #ifdef CONFIG_PCI_MMCONFIG
+8deb3eb1 Konrad Rzeszutek Wilk 2013-10-25 @31  #include <asm/pci_x86.h>
+b7ef4a6d Ben Hutchings         2013-12-31  32  #endif
+e28c31a9 Weidong Han           2010-10-27  33  
+55e901fc Jan Beulich           2011-09-22  34  static bool __read_mostly pci_seg_supported = true;
+55e901fc Jan Beulich           2011-09-22  35  
+e28c31a9 Weidong Han           2010-10-27  36  static int xen_add_device(struct device *dev)
+e28c31a9 Weidong Han           2010-10-27  37  {
+e28c31a9 Weidong Han           2010-10-27  38  	int r;
+e28c31a9 Weidong Han           2010-10-27  39  	struct pci_dev *pci_dev = to_pci_dev(dev);
+
+:::::: The code at line 31 was first introduced by commit
+:::::: 8deb3eb1461e4cb136c88d03ec5a6729ccf2f933 xen/mcfg: Call PHYSDEVOP_pci_mmcfg_reserved for MCFG areas.
+
+:::::: TO: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+:::::: CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 46720 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160105/14fada82/attachment-0001.obj>
