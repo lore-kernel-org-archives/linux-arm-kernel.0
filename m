@@ -1,81 +1,71 @@
-From: schwidefsky@de.ibm.com (Martin Schwidefsky)
-Date: Tue, 5 Jan 2016 09:13:19 +0100
-Subject: [PATCH v2 22/32] s390: define __smp_xxx
-In-Reply-To: <20160104221323-mutt-send-email-mst@redhat.com>
-References: <1451572003-2440-1-git-send-email-mst@redhat.com>
- <1451572003-2440-23-git-send-email-mst@redhat.com>
- <20160104134525.GA6344@twins.programming.kicks-ass.net>
- <20160104221323-mutt-send-email-mst@redhat.com>
-Message-ID: <20160105091319.59ddefc7@mschwide>
+From: dennis.chen@arm.com (Dennis Chen)
+Date: Tue, 5 Jan 2016 16:35:34 +0800
+Subject: [linux-next PATCH] arm64: fix kernel crash with 48-bit VA and
+ 64KB granule
+In-Reply-To: <CAKv+Gu-pz8rA2EfU6NwCndmoYneOjYUt8_PodTdZkepV3cRXJQ@mail.gmail.com>
+References: <1451960299-14123-1-git-send-email-dennis.chen@arm.com>
+ <CAKv+Gu-pz8rA2EfU6NwCndmoYneOjYUt8_PodTdZkepV3cRXJQ@mail.gmail.com>
+Message-ID: <20160105083533.GD13942@arm.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 4 Jan 2016 22:18:58 +0200
-"Michael S. Tsirkin" <mst@redhat.com> wrote:
+On Tue, Jan 05, 2016 at 08:36:39AM +0100, Ard Biesheuvel wrote:
+> On 5 January 2016 at 03:18, Dennis Chen <dennis.chen@arm.com> wrote:
+> > The commit 3400749b5a22 ("arm64/efi: refactor EFI init and runtime
+> > code for reuse by 32-bit ARM") uses pgd_alloc() to allocate space for
+> > efi_mm.pgd while not the static efi_pgd[], since this function will be
+> > called with early_initcall, which results in the pgd_cache used by
+> > pgd_alloc() has not been initialized yet, kernel will hang in this
+> > case. This patch is trying to make the pgd_cache_init() called before
+> > arm_enable_runtime_services() by changing its core_initcall to
+> > early_initcall.
+> >
+> > Signed-off-by: Dennis Chen <dennis.chen@arm.com>
+> > Tested-by: Sudeep Holla <sudeep.holla@arm.com>
+> >
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > Cc: Sudeep Holla <sudeep.holla@arm.com>
+> > ---
+> >  arch/arm64/mm/pgd.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm64/mm/pgd.c b/arch/arm64/mm/pgd.c
+> > index cb3ba1b..859a788 100644
+> > --- a/arch/arm64/mm/pgd.c
+> > +++ b/arch/arm64/mm/pgd.c
+> > @@ -56,4 +56,4 @@ static int __init pgd_cache_init(void)
+> >                                               SLAB_PANIC, NULL);
+> >         return 0;
+> >  }
+> > -core_initcall(pgd_cache_init);
+> > +early_initcall(pgd_cache_init);
+>
+>
+> Hello all,
+>
+> Apologies for not spotting this before sending it out.
+>
+> The issue only occurs when PGD_SIZE != PAGE_SIZE, which is why I did
+> not see it myself. I only tested with 4k/39-bits and 64k/42-bits IIRC,
+> since the series this is part of primarily concerns ARM not arm64.
+>
+> Anyway, shuffling init ordering is my least favorite way of fixing
+> bugs. Since only ARM requires pgd_alloc() (for the kernel mappings),
+> we could also simply factor out pgd_alloc() into efi_pgd_alloc(), and
+> define it to mean '__get_free_page(PGALLOC_GFP)' on arm64.
+>
+>
+Ard,
 
-> On Mon, Jan 04, 2016 at 02:45:25PM +0100, Peter Zijlstra wrote:
-> > On Thu, Dec 31, 2015 at 09:08:38PM +0200, Michael S. Tsirkin wrote:
-> > > This defines __smp_xxx barriers for s390,
-> > > for use by virtualization.
-> > > 
-> > > Some smp_xxx barriers are removed as they are
-> > > defined correctly by asm-generic/barriers.h
-> > > 
-> > > Note: smp_mb, smp_rmb and smp_wmb are defined as full barriers
-> > > unconditionally on this architecture.
-> > > 
-> > > Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
-> > > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > > ---
-> > >  arch/s390/include/asm/barrier.h | 15 +++++++++------
-> > >  1 file changed, 9 insertions(+), 6 deletions(-)
-> > > 
-> > > diff --git a/arch/s390/include/asm/barrier.h b/arch/s390/include/asm/barrier.h
-> > > index c358c31..fbd25b2 100644
-> > > --- a/arch/s390/include/asm/barrier.h
-> > > +++ b/arch/s390/include/asm/barrier.h
-> > > @@ -26,18 +26,21 @@
-> > >  #define wmb()				barrier()
-> > >  #define dma_rmb()			mb()
-> > >  #define dma_wmb()			mb()
-> > > -#define smp_mb()			mb()
-> > > -#define smp_rmb()			rmb()
-> > > -#define smp_wmb()			wmb()
-> > > -
-> > > -#define smp_store_release(p, v)						\
-> > > +#define __smp_mb()			mb()
-> > > +#define __smp_rmb()			rmb()
-> > > +#define __smp_wmb()			wmb()
-> > > +#define smp_mb()			__smp_mb()
-> > > +#define smp_rmb()			__smp_rmb()
-> > > +#define smp_wmb()			__smp_wmb()
-> > 
-> > Why define the smp_*mb() primitives here? Would not the inclusion of
-> > asm-generic/barrier.h do this?
-> 
-> No because the generic one is a nop on !SMP, this one isn't.
-> 
-> Pls note this patch is just reordering code without making
-> functional changes.
-> And at the moment, on s390 smp_xxx barriers are always non empty.
+Both arm and arm64 provide pgd_alloc(), I don't think it's a good idea to create
+another efi_pgd_alloc() used by efi only, which looks more like a temp workaround.
+Plus, for 64KB page granule when VA = 48bit, the PGD_SIZE = 0x200, it doesn't make
+sense to get an entire page as the space for the efi.pgd. Changing the init order
+sequence is a reasonable way to fix it unless you can see some potential issues there.
 
-The s390 kernel is SMP to 99.99%, we just didn't bother with a
-non-smp variant for the memory-barriers. If the generic header
-is used we'd get the non-smp version for free. It will save a
-small amount of text space for CONFIG_SMP=n. 
- 
-> Some of this could be sub-optimal, but
-> since on s390 Linux always runs on a hypervisor,
-> I am not sure it's safe to use the generic version -
-> in other words, it just might be that for s390 smp_ and virt_
-> barriers must be equivalent.
-
-The definition of the memory barriers is independent from the fact
-if the system is running on an hypervisor or not. Is there really
-an architecture where you need special virt_xxx barriers?!? 
-
--- 
-blue skies,
-   Martin.
-
-"Reality continues to ruin my life." - Calvin.
+> --
+> Ard.
+>
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
