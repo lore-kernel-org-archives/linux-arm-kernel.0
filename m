@@ -1,65 +1,55 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Tue, 5 Jan 2016 11:17:55 -0800
-Subject: [PATCHv2 00/18] arm64: mm: rework page table creation
-In-Reply-To: <20160105185818.GA31781@leverpostej>
-References: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
- <568B17AA.1050002@redhat.com> <20160105115414.GC24664@leverpostej>
- <568C0D40.4040204@redhat.com> <20160105185818.GA31781@leverpostej>
-Message-ID: <568C16E3.7010509@redhat.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 5 Jan 2016 19:24:04 +0000
+Subject: Widespread boot failures on ARM due to "mm/page_alloc.c:
+ calculate zone_start_pfn at zone_spanned_pages_in_node()"
+In-Reply-To: <568BB55F.2020709@arm.com>
+References: <20160104224233.GU16023@sirena.org.uk>
+ <20160104150946.373ed02b8e8b81221340b7c8@linux-foundation.org>
+ <20160104235512.GW16023@sirena.org.uk>
+ <20160104163528.be56a4b1.akpm@linux-foundation.org>
+ <20160105114549.GX16023@sirena.org.uk> <568BB55F.2020709@arm.com>
+Message-ID: <20160105192404.GS6588@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/05/2016 10:58 AM, Mark Rutland wrote:
->>>> This series points out that my attempt to allow set_memory_* to
->>>> work on regular kernel memory[1] is broken right now because it breaks down
->>>> the larger block sizes.
->>>
->>> What's the rationale for set_memory_* on kernel mappings? I see
->>> "security", but I couldn't figure out a concrete use-case. Is there any
->>> example of a subsystem that wants to use this?
->>
->>  From the description, it sounded like this was possibly new work but
->> the eBPF interpreter currently supports setting a page read only via
->> set_memory_ro (see 60a3b2253c413cf601783b070507d7dd6620c954
->> "net: bpf: make eBPF interpreter images read-only") so it's not
->> unheard of.
->
-> Oh. For some reason I thought that used the vmalloc area, but evidently
-> I was mistaken.
->
-> That is unfortunate, it would be good to protect the JITed code.
->
->>> For statically-allocated data, an alternative approach would be for such
->>> memory to be mapped with minimal permissions from the outset (e.g. being
->>> placed in .rodata), and when elevated permissions are required a
->>> (temporary) memremap'd alias could be used, like what patch_map does to
->>> modify ROX kernel/module text.
->>>
->>> For dynamically-allocated data, we could create (minimal permission)
->>> mappings in the vmalloc region and pass those around. The linear map
->>> alias would still be writeable, but as the offset between the two isn't
->>> linear (and the owner of that allocation doesn't have to know/care about
->>> the linear map address), it would be much harder to find the linear map
->>> address to attack. An alias with elevated permissions could be used as
->>> required, or if it's a one-time RW->RO switch, the mapping could me
->>> modified in-place as the granularity wouldn't change.
->>
->> This would work for new features but probably not for existing features
->> such as the eBPF interpreter.
->
-> Sure.
->
-> For eBPF it might be possible to rework the code to support using
-> separate aliases, but that's probably not going to be easy and that
-> probably works against some performance requirement. :/
+On Tue, Jan 05, 2016 at 12:21:51PM +0000, Sudeep Holla wrote:
+> On 05/01/16 11:45, Mark Brown wrote:
+> >On Mon, Jan 04, 2016 at 04:35:28PM -0800, Andrew Morton wrote:
+> >>On Mon, 4 Jan 2016 23:55:12 +0000 Mark Brown <broonie@kernel.org> wrote:
+> >>>On Mon, Jan 04, 2016 at 03:09:46PM -0800, Andrew Morton wrote:
 
-Ah no, you are correct, I misread how the code was working. The eBPF code
-does use vmalloc so that can easily be fixed up. I think your suggestion
-of either using vmalloc or a special static section is the best
-recommendation. If anyone really thinks they need to change any other
-memory they can make a proposal.
+> >>>>Thanks.  That patch has rather a blooper if
+> >>>>CONFIG_HAVE_MEMBLOCK_NODE_MAP=n.  Is that the case in your testing?
 
-Sorry for the confusion.
+> >>>Seems to be what's making a difference from a quick run through, yes.
 
-Thanks,
-Laura
+> >>OK, thanks.
+
+> >Seems like I was mistaken here somehow or there's some other problem -
+> >I've kicked off another bisect for today's -next:
+
+> >    https://ci.linaro.org/view/people/job/tbaker-boot-bisect-bot/137/console
+
+> >and will follow up with any results.
+
+> With both patches applied(one already in today's -next), I am able to
+> boot on ARM64 platform but I get huge load(for each pfn) of below warning:
+
+Bisect on today's -next with Arndale (an ARM platform) flags the same
+patch:
+
+  https://ci.linaro.org/view/people/job/tbaker-boot-bisect-bot/137/console
+
+as does Juno which is an arm64 platform:
+
+  https://ci.linaro.org/view/people/job/tbaker-boot-bisect-bot/138/console
+
+(it does get to a console but with lots of the backtraces Sudeep
+indicated).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160105/66d224f6/attachment.sig>
