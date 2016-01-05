@@ -1,142 +1,72 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 5 Jan 2016 16:00:40 +0100
-Subject: [PATCH v6 1/6] arm/arm64: KVM: Introduce armv7 fp/simd vcpu
- fields and helpers
-In-Reply-To: <1451166900-3711-2-git-send-email-m.smarduch@samsung.com>
-References: <1451166900-3711-1-git-send-email-m.smarduch@samsung.com>
- <1451166900-3711-2-git-send-email-m.smarduch@samsung.com>
-Message-ID: <20160105150040.GF28354@cbox>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue,  5 Jan 2016 16:19:34 +0100
+Subject: [PATCH v2 0/6] generic relative extable support
+Message-ID: <1452007180-27411-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 26, 2015 at 01:54:55PM -0800, Mario Smarduch wrote:
-> Add helper functions to enable access to fp/smid on guest entry and save host
-> fpexc on vcpu put, check if fp/simd registers are dirty and add new vcpu
-> fields.
-> 
-> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
-> ---
->  arch/arm/include/asm/kvm_emulate.h   | 42 ++++++++++++++++++++++++++++++++++++
->  arch/arm/include/asm/kvm_host.h      |  6 ++++++
->  arch/arm64/include/asm/kvm_emulate.h |  8 +++++++
->  3 files changed, 56 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-> index 3095df0..d4d9da1 100644
-> --- a/arch/arm/include/asm/kvm_emulate.h
-> +++ b/arch/arm/include/asm/kvm_emulate.h
-> @@ -24,6 +24,8 @@
->  #include <asm/kvm_mmio.h>
->  #include <asm/kvm_arm.h>
->  #include <asm/cputype.h>
-> +#include <asm/vfp.h>
-> +#include "../vfp/vfpinstr.h"
+There are currently four architectures (x86, ia64, alpha and s390) whose
+user-access exception tables are relative to the table entry address rather
+than absolute. Each of these architectures has its own search_extable() and
+sort_extable() implementation, which are not only mostly identical to each
+other, but also deviate very little from the generic absolute implementations
+in lib/extable.c that they override.
 
-this looks dodgy...
+So before making arm64 the fifth architecture that reimplements this, let's
+refactor the existing code so that all of these architectures use common code
+for searching and sorting the relative extables. Archs may set
+ARCH_HAS_RELATIVE_EXTABLE to indicate that the table consists of a pair of
+relative ints, and may define swap_ex_entry_fixup() if the fixup member needs
+special treatment in the swapping step of the sorting routine (such as alpha).
 
-can you move vfpinstr.h instead?
+Changes since v2:
+- introduce the _ASM_EXTABLE() cpp macro for arm64, and replace all open coded
+  exception table entries with it, including an instance I missed in v1 in
+  asm/word-at-a-time.h (suggested by hpa)
+- added acks to from arch maintainers
 
->  
->  unsigned long *vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num);
->  unsigned long *vcpu_spsr(struct kvm_vcpu *vcpu);
-> @@ -255,4 +257,44 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
->  	}
->  }
->  
-> +#ifdef CONFIG_VFPv3
-> +/* Called from vcpu_load - save fpexc and enable guest access to fp/simd unit */
+No acks yet for the arch/alpha patch.
+ 
+NOTE: I took the liberty of carrying over each arch specific ack to the generic
+shared first patch, since they are tightly coupled anyway. If anyone objects to
+this, please let me know.
 
-the comment is misleading, you're not enabling guest access to the
-fp/simd unit, you're just setting the enabled bit to ensure guest
-accesses trap.
+Also note that the s390 patch applies on top of the following patch:
 
-> +static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
-> +{
-> +	u32 fpexc;
-> +
-> +	/* Save host fpexc, and enable guest access to fp unit */
-> +	fpexc = fmrx(FPEXC);
-> +	vcpu->arch.host_fpexc = fpexc;
-> +	fpexc |= FPEXC_EN;
-> +	fmxr(FPEXC, fpexc);
-> +
-> +	/* Configure HCPTR to trap on tracing and fp/simd access */
-> +	vcpu->arch.hcptr = HCPTR_TTA | HCPTR_TCP(10)  | HCPTR_TCP(11);
-> +}
-> +
-> +/* Called from vcpu_put - restore host fpexc */
+  http://article.gmane.org/gmane.linux.kernel/2117036
 
-I would probably get rid of the "Called from" stuff and just describe
-what these functions do locally.  Comments like this are likely to be
-out of date soon'ish.
+which fixes a bug I spotted while working on this code. Since that probably
+needs to go to -stable, I broke it out and posted it separately.
 
-> +static inline void vcpu_restore_host_fpexc(struct kvm_vcpu *vcpu)
-> +{
-> +	fmxr(FPEXC, vcpu->arch.host_fpexc);
-> +}
-> +
-> +/* If trap bits are reset then fp/simd registers are dirty */
-> +static inline bool vcpu_vfp_isdirty(struct kvm_vcpu *vcpu)
-> +{
-> +	return !(vcpu->arch.hcptr & (HCPTR_TCP(10) | HCPTR_TCP(11)));
-> +}
-> +#else
-> +static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
-> +{
-> +	vcpu->arch.hcptr = HCPTR_TTA;
-> +}
-> +
-> +static inline void vcpu_restore_host_fpexc(struct kvm_vcpu *vcpu) {}
-> +static inline bool vcpu_vfp_isdirty(struct kvm_vcpu *vcpu)
-> +{
-> +	return false;
-> +}
-> +#endif
+Ard Biesheuvel (6):
+  extable: add support for relative extables to search and sort routines
+  alpha/extable: use generic search and sort routines
+  s390/extable: use generic search and sort routines
+  x86/extable: use generic search and sort routines
+  ia64/extable: use generic search and sort routines
+  arm64: switch to relative exception tables
 
-this kind of feels like it belongs in its own C-file instead of a header
-file, perhaps arch/arm/kvm/vfp.C.
+ arch/alpha/include/asm/uaccess.h        |  10 +-
+ arch/alpha/mm/Makefile                  |   2 +-
+ arch/alpha/mm/extable.c                 |  92 -----------------
+ arch/arm64/include/asm/assembler.h      |  15 ++-
+ arch/arm64/include/asm/futex.h          |  12 +--
+ arch/arm64/include/asm/uaccess.h        |  30 +++---
+ arch/arm64/include/asm/word-at-a-time.h |   7 +-
+ arch/arm64/kernel/armv8_deprecated.c    |   7 +-
+ arch/arm64/mm/extable.c                 |   2 +-
+ arch/ia64/include/asm/uaccess.h         |   8 +-
+ arch/ia64/mm/extable.c                  |  97 +-----------------
+ arch/s390/include/asm/uaccess.h         |   8 +-
+ arch/s390/mm/Makefile                   |   2 +-
+ arch/s390/mm/extable.c                  |  85 ----------------
+ arch/x86/include/asm/uaccess.h          |   5 +-
+ arch/x86/mm/extable.c                   | 106 +-------------------
+ lib/extable.c                           |  50 +++++++--
+ scripts/sortextable.c                   |   2 +-
+ 18 files changed, 98 insertions(+), 442 deletions(-)
+ delete mode 100644 arch/alpha/mm/extable.c
+ delete mode 100644 arch/s390/mm/extable.c
 
-Marc, what do you think?
-
-> +
->  #endif /* __ARM_KVM_EMULATE_H__ */
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index f9f2779..d3ef58a 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -105,6 +105,12 @@ struct kvm_vcpu_arch {
->  	/* HYP trapping configuration */
->  	u32 hcr;
->  
-> +	/* HYP Co-processor fp/simd and trace trapping configuration */
-> +	u32 hcptr;
-> +
-> +	/* Save host FPEXC register to later restore on vcpu put */
-> +	u32 host_fpexc;
-> +
->  	/* Interrupt related fields */
->  	u32 irq_lines;		/* IRQ and FIQ levels */
->  
-> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-> index 3066328..ffe8ccf 100644
-> --- a/arch/arm64/include/asm/kvm_emulate.h
-> +++ b/arch/arm64/include/asm/kvm_emulate.h
-> @@ -299,4 +299,12 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
->  	return data;		/* Leave LE untouched */
->  }
->  
-> +static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu) {}
-> +static inline void vcpu_restore_host_fpexc(struct kvm_vcpu *vcpu) {}
-> +
-> +static inline bool vcpu_vfp_isdirty(struct kvm_vcpu *vcpu)
-> +{
-> +	return false;
-> +}
-> +
->  #endif /* __ARM64_KVM_EMULATE_H__ */
-> -- 
-> 1.9.1
-> 
-
-Thanks,
--Christoffer
+-- 
+2.5.0
