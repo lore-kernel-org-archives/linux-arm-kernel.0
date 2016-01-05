@@ -1,63 +1,63 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Tue, 5 Jan 2016 18:04:00 +0200
-Subject: [PATCH v2 22/32] s390: define __smp_xxx
-In-Reply-To: <568BE3B9.8020901@de.ibm.com>
-References: <1451572003-2440-1-git-send-email-mst@redhat.com>
- <1451572003-2440-23-git-send-email-mst@redhat.com>
- <20160104134525.GA6344@twins.programming.kicks-ass.net>
- <20160104221323-mutt-send-email-mst@redhat.com>
- <20160105091319.59ddefc7@mschwide>
- <20160105105335-mutt-send-email-mst@redhat.com>
- <568BE3B9.8020901@de.ibm.com>
-Message-ID: <20160105180225-mutt-send-email-mst@redhat.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 5 Jan 2016 16:04:21 +0000
+Subject: [alsa-devel] [PATCH 0/9] dw-hdmi audio support
+In-Reply-To: <CAH-u=810V863yYhMvvtaQ7jxNgrOXAL4bi1mS506a-yOTbuYhQ@mail.gmail.com>
+References: <20150808160251.GM7557@n2100.arm.linux.org.uk>
+ <20150808160936.GN7557@n2100.arm.linux.org.uk>
+ <1440664941.3233.38.camel@pengutronix.de>
+ <CAH-u=810V863yYhMvvtaQ7jxNgrOXAL4bi1mS506a-yOTbuYhQ@mail.gmail.com>
+Message-ID: <20160105160421.GX19062@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 05, 2016 at 04:39:37PM +0100, Christian Borntraeger wrote:
-> On 01/05/2016 10:30 AM, Michael S. Tsirkin wrote:
+On Tue, Jan 05, 2016 at 04:40:54PM +0100, Jean-Michel Hautbois wrote:
+> Hi Russell,
 > 
-> > 
-> > arch/s390/kernel/vdso.c:        smp_mb();
-> > 
-> > Looking at
-> > 	Author: Christian Borntraeger <borntraeger@de.ibm.com>
-> > 	Date:   Fri Sep 11 16:23:06 2015 +0200
-> > 
-> > 	    s390/vdso: use correct memory barrier
-> > 
-> > 	    By definition smp_wmb only orders writes against writes. (Finish all
-> > 	    previous writes, and do not start any future write). To protect the
-> > 	    vdso init code against early reads on other CPUs, let's use a full
-> > 	    smp_mb at the end of vdso init. As right now smp_wmb is implemented
-> > 	    as full serialization, this needs no stable backport, but this change
-> > 	    will be necessary if we reimplement smp_wmb.
-> > 
-> > ok from hypervisor point of view, but it's also strange:
-> > 1. why isn't this paired with another mb somewhere?
-> >    this seems to violate barrier pairing rules.
-> > 2. how does smp_mb protect against early reads on other CPUs?
-> >    It normally does not: it orders reads from this CPU versus writes
-> >    from same CPU. But init code does not appear to read anything.
-> >    Maybe this is some s390 specific trick?
-> > 
-> > I could not figure out the above commit.
+> 2015-08-27 10:42 GMT+02:00 Philipp Zabel <p.zabel@pengutronix.de>:
+> >
+> > Am Samstag, den 08.08.2015, 17:09 +0100 schrieb Russell King - ARM
+> > Linux:
+> > > Following on from the previous sub-series, this sub-series adds audio
+> > > support to dw-hdmi.
+> > >
+> > > The two different variants are now in this patch: AHB audio support
+> > > found on iMX6 platforms, and I2S support found on Rockchip patches.
+> > > Thanks to Yakir Yang for contributing the I2S support.
+> > >
+> > > I suspect that there is still some discussion to be had on this
+> > > series, though I would like to see it moving forward so that we can
+> > > get something merged.
+> >
+> > Tested-by: Philipp Zabel <p.zabel@pengutronix.de>
+> > on i.MX6 GK802 via HDMI connected to a TV (stereo only).
+> >
+> > except for the i2s patch, which is broken in this series.
+> >
+> > regards
+> > Philipp
 > 
-> It was probably me misreading the code. I change a wmb into a full mb here
-> since I was changing the defintion of wmb to a compiler barrier. I tried to
-> fixup all users of wmb that really pair with other code. I assumed that there
-> must be some reader (as there was a wmb before) but I could not figure out
-> which. So I just played safe here.
 > 
-> But it probably can be removed.
-> 
-> > arch/s390/kvm/kvm-s390.c:       smp_mb();
-> 
-> This can go. If you have a patch, I can carry that via the kvms390 tree,
-> or I will spin a new patch with you as suggested-by.
-> 
-> Christian
+> What is the status of this series ?
+> I would like to use audio output in HDMI on my i.MX6 board, but I
+> don't know if you have some pending WIP on this ?
 
-I have both, will post shortly.
+The I2S part has been dropped.  The DesignWare HDMI block is configurable
+when it is synthesized - it can contain either the AHB audio interface or
+an I2S interface.  Freescale chose to synthesize it with the AHB audio
+interface, and this is what my patches are geared up to provide.
+
+On Rockchip devices, they chose to synthesize it with the I2S audio
+block, and so they need a different driver for it.  Yakir Yang has been
+working on that, but I've not seen anything recently.  After merging
+his I2S patch, I found some problems and decided with Yakir that the
+best thing to do was to drop it.
+
+So, the result is we support HDMI audio on iMX6.
+
+The changes were merged into mainline during the 4.4 merge window, so
+Linux 4.4 will support iMX6 HDMI audio.
 
 -- 
-MST
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
