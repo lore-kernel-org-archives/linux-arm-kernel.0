@@ -1,129 +1,131 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 5 Jan 2016 14:18:32 +0000
-Subject: [Xen-devel] [PATCH v3 60/62] arm/acpi: Configure interrupts
- dynamically
-In-Reply-To: <568BAE5B.6060500@huawei.com>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-61-git-send-email-shannon.zhao@linaro.org>
- <565C6E4B.7020401@citrix.com> <568BAE5B.6060500@huawei.com>
-Message-ID: <alpine.DEB.2.02.1601051418210.31111@kaball.uk.xensource.com>
+From: schwidefsky@de.ibm.com (Martin Schwidefsky)
+Date: Tue, 5 Jan 2016 15:21:16 +0100
+Subject: [PATCH v2 22/32] s390: define __smp_xxx
+In-Reply-To: <20160105144842-mutt-send-email-mst@redhat.com>
+References: <1451572003-2440-1-git-send-email-mst@redhat.com>
+ <1451572003-2440-23-git-send-email-mst@redhat.com>
+ <20160104134525.GA6344@twins.programming.kicks-ass.net>
+ <20160104221323-mutt-send-email-mst@redhat.com>
+ <20160105091319.59ddefc7@mschwide>
+ <20160105105335-mutt-send-email-mst@redhat.com>
+ <20160105130852.11148a7f@mschwide>
+ <20160105144842-mutt-send-email-mst@redhat.com>
+Message-ID: <20160105152116.60ae92f6@mschwide>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 5 Jan 2016, Shannon Zhao wrote:
-> Hi,
-> 
-> On 2015/11/30 23:42, Julien Grall wrote:
-> > Hi Shannon,
-> > 
-> > On 17/11/15 09:40, shannon.zhao at linaro.org wrote:
-> >> From: Parth Dixit <parth.dixit@linaro.org>
-> >>
-> >> Interrupt information is described in DSDT and is not available at
-> >> the time of booting. Configure the interrupts dynamically when requested
-> >> by Dom0
-> > 
-> > Missing ".".
-> > 
-> > As said on a previous version of this patch [1], I'd like to keep the
-> > ACPI changes very contained to Xen boot. Your change is not ACPI
-> > specific and could be used for DT.
-> > 
-> >>
-> >> Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
-> >> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> >> ---
-> >>  xen/arch/arm/vgic.c | 19 +++++++++++++++++++
-> >>  1 file changed, 19 insertions(+)
-> >>
-> >> diff --git a/xen/arch/arm/vgic.c b/xen/arch/arm/vgic.c
-> >> index 7bb4570..d05abde 100644
-> >> --- a/xen/arch/arm/vgic.c
-> >> +++ b/xen/arch/arm/vgic.c
-> >> @@ -25,6 +25,7 @@
-> >>  #include <xen/irq.h>
-> >>  #include <xen/sched.h>
-> >>  #include <xen/perfc.h>
-> >> +#include <xen/acpi.h>
-> >>  
-> >>  #include <asm/current.h>
-> >>  
-> >> @@ -310,6 +311,8 @@ void vgic_disable_irqs(struct vcpu *v, uint32_t r, int n)
-> >>      }
-> >>  }
-> >>  
-> >> +#define VGIC_ICFG_MASK(intr) ( 1 << ( ( 2 * ( intr % 16 ) ) + 1 ) )
-> >> +
-> >>  void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n)
-> >>  {
-> >>      struct domain *d = v->domain;
-> >> @@ -321,7 +324,23 @@ void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n)
-> >>      struct vcpu *v_target;
-> >>  
-> >>      while ( (i = find_next_bit(&mask, 32, i)) < 32 ) {
-> >> +#ifdef CONFIG_ACPI
-> >> +        struct vgic_irq_rank *vr = vgic_get_rank(v, n);
-> >> +        uint32_t tr;
-> >> +
-> >>          irq = i + (32 * n);
-> >> +        if( ( !acpi_disabled ) && ( n != 0 ) && is_hardware_domain(d) )
-> > 
-> > You need to add a comment explaining the ( n != 0 ) i.e we don't SGIs
-> > and PPIs are RO. It's implementation defined for PPI but it's preferable
-> > to let Xen take care of it.
-> > 
-> > Also, we should set the type only for IRQ assigned to DOM0 (i.e p->desc
-> > != NULL). With your current solution, DOM0 may change the configuration
-> > of the serial IRQ by mistake and take down Xen because the physical IRQ
-> > is enabled and the behavior will be unpredictable.
-> > 
-> >> +        {
-> >> +            tr = vr->icfg[i >> 4] ;
-> >> +
-> >> +            if( ( tr & VGIC_ICFG_MASK(i) ) )
-> >> +                irq_set_type(irq, ACPI_IRQ_TYPE_EDGE_BOTH);
-> >> +            else
-> >> +                irq_set_type(irq, ACPI_IRQ_TYPE_LEVEL_MASK);
-> > 
-> > Given that only SPI can be configured it would have been better to call
-> > irq_set_type.
-> > 
-> > Although, those 2 functions don't do what you think. They are setting
-> > the type internally in Xen but don't change the GIC interrupt
-> > configuration register.
-> > 
-> Here it wants to set the type according to the value of GIC ICFG.
-> 
-> I don't know this well. Does it need to set the type here when Dom0
-> configures the interrupts since I have set them as ACPI_IRQ_TYPE_NONE in
-> patch 55?
-> 
-> How about following way?
-> 1) In patch 55, it only permit the access of Dom0 to those irqs, not set
-> the type.
-> 2) Then in this function or in the handler of writing GIC ICFG, check if
-> the irq is permitted and set the irq type.
+On Tue, 5 Jan 2016 15:04:43 +0200
+"Michael S. Tsirkin" <mst@redhat.com> wrote:
 
-Sounds good
-
-
-> > Lastly, they will fail because the configuration has been set earlier
-> > (as you did in patch #55)
+> On Tue, Jan 05, 2016 at 01:08:52PM +0100, Martin Schwidefsky wrote:
+> > On Tue, 5 Jan 2016 11:30:19 +0200
+> > "Michael S. Tsirkin" <mst@redhat.com> wrote:
 > > 
-> >> +        }
-> >> +#else
-> >> +        irq = i + (32 * n);
-> >> +#endif
-> >>          v_target = d->arch.vgic.handler->get_target_vcpu(v, irq);
-> >>          p = irq_to_pending(v_target, irq);
-> >>          set_bit(GIC_IRQ_GUEST_ENABLED, &p->status);
-> >>
+> > > On Tue, Jan 05, 2016 at 09:13:19AM +0100, Martin Schwidefsky wrote:
+> > > > On Mon, 4 Jan 2016 22:18:58 +0200
+> > > > "Michael S. Tsirkin" <mst@redhat.com> wrote:
+> > > > 
+> > > > > On Mon, Jan 04, 2016 at 02:45:25PM +0100, Peter Zijlstra wrote:
+> > > > > > On Thu, Dec 31, 2015 at 09:08:38PM +0200, Michael S. Tsirkin wrote:
+> > > > > > > This defines __smp_xxx barriers for s390,
+> > > > > > > for use by virtualization.
+> > > > > > > 
+> > > > > > > Some smp_xxx barriers are removed as they are
+> > > > > > > defined correctly by asm-generic/barriers.h
+> > > > > > > 
+> > > > > > > Note: smp_mb, smp_rmb and smp_wmb are defined as full barriers
+> > > > > > > unconditionally on this architecture.
+> > > > > > > 
+> > > > > > > Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+> > > > > > > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > > > > > > ---
+> > > > > > >  arch/s390/include/asm/barrier.h | 15 +++++++++------
+> > > > > > >  1 file changed, 9 insertions(+), 6 deletions(-)
+> > > > > > > 
+> > > > > > > diff --git a/arch/s390/include/asm/barrier.h b/arch/s390/include/asm/barrier.h
+> > > > > > > index c358c31..fbd25b2 100644
+> > > > > > > --- a/arch/s390/include/asm/barrier.h
+> > > > > > > +++ b/arch/s390/include/asm/barrier.h
+> > > > > > > @@ -26,18 +26,21 @@
+> > > > > > >  #define wmb()				barrier()
+> > > > > > >  #define dma_rmb()			mb()
+> > > > > > >  #define dma_wmb()			mb()
+> > > > > > > -#define smp_mb()			mb()
+> > > > > > > -#define smp_rmb()			rmb()
+> > > > > > > -#define smp_wmb()			wmb()
+> > > > > > > -
+> > > > > > > -#define smp_store_release(p, v)						\
+> > > > > > > +#define __smp_mb()			mb()
+> > > > > > > +#define __smp_rmb()			rmb()
+> > > > > > > +#define __smp_wmb()			wmb()
+> > > > > > > +#define smp_mb()			__smp_mb()
+> > > > > > > +#define smp_rmb()			__smp_rmb()
+> > > > > > > +#define smp_wmb()			__smp_wmb()
+> > > > > > 
+> > > > > > Why define the smp_*mb() primitives here? Would not the inclusion of
+> > > > > > asm-generic/barrier.h do this?
+> > > > > 
+> > > > > No because the generic one is a nop on !SMP, this one isn't.
+> > > > > 
+> > > > > Pls note this patch is just reordering code without making
+> > > > > functional changes.
+> > > > > And at the moment, on s390 smp_xxx barriers are always non empty.
+> > > > 
+> > > > The s390 kernel is SMP to 99.99%, we just didn't bother with a
+> > > > non-smp variant for the memory-barriers. If the generic header
+> > > > is used we'd get the non-smp version for free. It will save a
+> > > > small amount of text space for CONFIG_SMP=n. 
+> > > 
+> > > OK, so I'll queue a patch to do this then?
 > > 
-> > Regards,
-> > 
-> > [1] http://lists.xen.org/archives/html/xen-devel/2015-06/msg01128.html
-> > 
+> > Yes please.
 > 
-> -- 
-> Shannon
+> OK, I'll add a patch on top in v3.
+
+Good, with this addition:
+
+Acked-by: Martin Schwidefsky <schwidefsky@de.ibm.com>
+
+> > > Just to make sure: the question would be, are smp_xxx barriers ever used
+> > > in s390 arch specific code to flush in/out memory accesses for
+> > > synchronization with the hypervisor?
+> > > 
+> > > I went over s390 arch code and it seems to me the answer is no
+> > > (except of course for virtio).
+> > 
+> > Correct. Guest to host communication either uses instructions which
+> > imply a memory barrier or QDIO which uses atomics.
 > 
+> And atomics imply a barrier on s390, right?
+
+Yes they do.
+
+> > > But I also see a lot of weirdness on this architecture.
+> > 
+> > Mostly historical, s390 actually is one of the easiest architectures in
+> > regard to memory barriers.
+> > 
+> > > I found these calls:
+> > > 
+> > > arch/s390/include/asm/bitops.h: smp_mb__before_atomic();
+> > > arch/s390/include/asm/bitops.h: smp_mb();
+> > > 
+> > > Not used in arch specific code so this is likely OK.
+> > 
+> > This has been introduced with git commit 5402ea6af11dc5a9, the smp_mb
+> > and smp_mb__before_atomic are used in clear_bit_unlock and
+> > __clear_bit_unlock which are 1:1 copies from the code in
+> > include/asm-generic/bitops/lock.h. Only test_and_set_bit_lock differs
+> > from the generic implementation.
+> 
+> something to keep in mind, but
+> I'd rather not touch bitops at the moment - this patchset is already too big.
+
+With the conversion smp_mb__before_atomic to a barrier() it does the
+correct thing. I don't think that any chance is necessary.
+
+-- 
+blue skies,
+   Martin.
+
+"Reality continues to ruin my life." - Calvin.
