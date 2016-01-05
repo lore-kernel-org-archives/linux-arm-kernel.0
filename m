@@ -1,33 +1,53 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 5 Jan 2016 18:51:39 +0800
-Subject: [PATCH 11/11] mmc: sdhci-pltfm: remove priv variable from
- sdhci_pltfm_host
-In-Reply-To: <1451991099-4946-1-git-send-email-jszhang@marvell.com>
-References: <1451991099-4946-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1451991099-4946-12-git-send-email-jszhang@marvell.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 5 Jan 2016 10:59:01 +0000
+Subject: [PATCH v3 2/2] ARM64: kernel: PSCI: move PSCI idle management
+ code to drivers/firmware
+In-Reply-To: <1445011379-8787-3-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1445011379-8787-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1445011379-8787-3-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20160105105900.GT19062@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now all clients migration to use sdhci_pltfm_init for private
-allocation is done and there's no users of the priv variable, so we can
-remove it from the sdhci_pltfm_host structure.
+On Fri, Oct 16, 2015 at 05:02:59PM +0100, Lorenzo Pieralisi wrote:
+> ARM64 PSCI kernel interfaces that initialize idle states and implement
+> the suspend API to enter them are generic and can be shared with the
+> ARM architecture.
+> 
+> To achieve that goal, this patch moves ARM64 PSCI idle management
+> code to drivers/firmware, so that the interface to initialize and
+> enter idle states can actually be shared by ARM and ARM64 arches
+> back-ends.
+> 
+> The ARM generic CPUidle implementation also requires the definition of
+> a cpuidle_ops section entry for the kernel to initialize the CPUidle
+> operations at boot based on the enable-method (ie ARM64 has the
+> statically initialized cpu_ops counterparts for that purpose); therefore
+> this patch also adds the required section entry on CONFIG_ARM for PSCI so
+> that the kernel can initialize the PSCI CPUidle back-end when PSCI is
+> the probed enable-method.
+> 
+> On ARM64 this patch provides no functional change.
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- drivers/mmc/host/sdhci-pltfm.h | 1 -
- 1 file changed, 1 deletion(-)
+On ARM64, it causes build breakage though:
 
-diff --git a/drivers/mmc/host/sdhci-pltfm.h b/drivers/mmc/host/sdhci-pltfm.h
-index 04bc248..d38053b 100644
---- a/drivers/mmc/host/sdhci-pltfm.h
-+++ b/drivers/mmc/host/sdhci-pltfm.h
-@@ -23,7 +23,6 @@ struct sdhci_pltfm_data {
- 
- struct sdhci_pltfm_host {
- 	struct clk *clk;
--	void *priv; /* to handle quirks across io-accessor calls */
- 
- 	/* migrate from sdhci_of_host */
- 	unsigned int clock;
+drivers/built-in.o: In function `psci_suspend_finisher':
+arm_pmu.c:(.text+0xc6494): undefined reference to `cpu_resume'
+arm_pmu.c:(.text+0xc6498): undefined reference to `cpu_resume'
+drivers/built-in.o: In function `psci_cpu_suspend_enter':
+arm_pmu.c:(.text+0xc66c0): undefined reference to `cpu_suspend'
+
+The code which has been moved looks similar.  However, when it lived
+in arch/arm64/kernel/psci.c, it was protected by
+#ifdef CONFIG_HOTPLUG_CPU.  In its new location, there are no ifdefs
+around it, and so if it gets built without CONFIG_ARM_CPU_SUSPEND on
+ARM, or CONFIG_CPU_PM for ARM64, it will error out like the above.
+
+As this is causing a regression, and I've now closed my tree, I will
+be doing what I said yesterday: I'll be dropping this patch for this
+merge window in order to stabilise my tree.  Sorry.
+
 -- 
-2.6.4
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
