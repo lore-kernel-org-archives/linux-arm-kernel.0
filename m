@@ -1,53 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 5 Jan 2016 10:59:01 +0000
-Subject: [PATCH v3 2/2] ARM64: kernel: PSCI: move PSCI idle management
- code to drivers/firmware
-In-Reply-To: <1445011379-8787-3-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1445011379-8787-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1445011379-8787-3-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20160105105900.GT19062@n2100.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 5 Jan 2016 11:08:06 +0000
+Subject: [PATCHv2 13/18] arm64: mm: add functions to walk tables in fixmap
+In-Reply-To: <568AF70A.6020004@redhat.com>
+References: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
+ <1451930211-22460-14-git-send-email-mark.rutland@arm.com>
+ <568AF70A.6020004@redhat.com>
+Message-ID: <20160105110805.GB24664@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 16, 2015 at 05:02:59PM +0100, Lorenzo Pieralisi wrote:
-> ARM64 PSCI kernel interfaces that initialize idle states and implement
-> the suspend API to enter them are generic and can be shared with the
-> ARM architecture.
-> 
-> To achieve that goal, this patch moves ARM64 PSCI idle management
-> code to drivers/firmware, so that the interface to initialize and
-> enter idle states can actually be shared by ARM and ARM64 arches
-> back-ends.
-> 
-> The ARM generic CPUidle implementation also requires the definition of
-> a cpuidle_ops section entry for the kernel to initialize the CPUidle
-> operations at boot based on the enable-method (ie ARM64 has the
-> statically initialized cpu_ops counterparts for that purpose); therefore
-> this patch also adds the required section entry on CONFIG_ARM for PSCI so
-> that the kernel can initialize the PSCI CPUidle back-end when PSCI is
-> the probed enable-method.
-> 
-> On ARM64 this patch provides no functional change.
+On Mon, Jan 04, 2016 at 02:49:46PM -0800, Laura Abbott wrote:
+> On 01/04/2016 09:56 AM, Mark Rutland wrote:
+> >As a prepratory step to allow us to allocate early page tables from
+> >unmapped memory using memblock_alloc, add new p??_fixmap* functions that
+> >can be used to walk page tables outside of the linear mapping by using
+> >fixmap slots.
+> >
+> >Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> >Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >Cc: Catalin Marinas <catalin.marinas@arm.com>
+> >Cc: Jeremy Linton <jeremy.linton@arm.com>
+> >Cc: Laura Abbott <labbott@fedoraproject.org>
+> >Cc: Will Deacon <will.deacon@arm.com>
+> >---
+> >  arch/arm64/include/asm/fixmap.h  | 10 ++++++++++
+> >  arch/arm64/include/asm/pgtable.h | 26 ++++++++++++++++++++++++++
+> >  2 files changed, 36 insertions(+)
 
-On ARM64, it causes build breakage though:
+> >+#define pgd_fixmap(addr)		((pgd_t *)set_fixmap_offset(FIX_PGD, addr))
+> >+#define pgd_fixmap_unmap()		clear_fixmap(FIX_PGD)
 
-drivers/built-in.o: In function `psci_suspend_finisher':
-arm_pmu.c:(.text+0xc6494): undefined reference to `cpu_resume'
-arm_pmu.c:(.text+0xc6498): undefined reference to `cpu_resume'
-drivers/built-in.o: In function `psci_cpu_suspend_enter':
-arm_pmu.c:(.text+0xc66c0): undefined reference to `cpu_suspend'
+> Bikeshed: p??_fixmap_offset doesn't make it obvious that this is an
+> operation with a side effect. It seems more similar to
+> p??_offset_kernel which is read only. Perhaps it's the lack of set/map
+> in the name.
 
-The code which has been moved looks similar.  However, when it lived
-in arch/arm64/kernel/psci.c, it was protected by
-#ifdef CONFIG_HOTPLUG_CPU.  In its new location, there are no ifdefs
-around it, and so if it gets built without CONFIG_ARM_CPU_SUSPEND on
-ARM, or CONFIG_CPU_PM for ARM64, it will error out like the above.
+I agree.
 
-As this is causing a regression, and I've now closed my tree, I will
-be doing what I said yesterday: I'll be dropping this patch for this
-merge window in order to stabilise my tree.  Sorry.
+I've locally changed them to p??_set_fixmap{,_offset}, p??_clear_fixmap,
+to match the usual fixmap function naming.
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thanks,
+Mark.
