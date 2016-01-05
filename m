@@ -1,86 +1,65 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Tue, 05 Jan 2016 20:02:41 +0100
-Subject: [RESEND PATCH 2/3] drivers: dma-coherent: use MEMREMAP_WC for
- DMA_MEMORY_MAP
-In-Reply-To: <a85c534af867534e6693ce50a746fda096426586.1452010803.git.brian.starkey@arm.com>
-References: <cover.1452010802.git.brian.starkey@arm.com>
- <a85c534af867534e6693ce50a746fda096426586.1452010803.git.brian.starkey@arm.com>
-Message-ID: <xa1tfuybu9wu.fsf@mina86.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Tue, 5 Jan 2016 11:17:55 -0800
+Subject: [PATCHv2 00/18] arm64: mm: rework page table creation
+In-Reply-To: <20160105185818.GA31781@leverpostej>
+References: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
+ <568B17AA.1050002@redhat.com> <20160105115414.GC24664@leverpostej>
+ <568C0D40.4040204@redhat.com> <20160105185818.GA31781@leverpostej>
+Message-ID: <568C16E3.7010509@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 05 2016, Brian Starkey wrote:
-> When the DMA_MEMORY_MAP flag is used, memory which can be accessed
-> directly should be returned, so use memremap(..., MEMREMAP_WC) to
-> provide a writecombine mapping.
+On 01/05/2016 10:58 AM, Mark Rutland wrote:
+>>>> This series points out that my attempt to allow set_memory_* to
+>>>> work on regular kernel memory[1] is broken right now because it breaks down
+>>>> the larger block sizes.
+>>>
+>>> What's the rationale for set_memory_* on kernel mappings? I see
+>>> "security", but I couldn't figure out a concrete use-case. Is there any
+>>> example of a subsystem that wants to use this?
+>>
+>>  From the description, it sounded like this was possibly new work but
+>> the eBPF interpreter currently supports setting a page read only via
+>> set_memory_ro (see 60a3b2253c413cf601783b070507d7dd6620c954
+>> "net: bpf: make eBPF interpreter images read-only") so it's not
+>> unheard of.
 >
-> Signed-off-by: Brian Starkey <brian.starkey@arm.com>
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-
-Acked-by: Michal Nazarewicz <mina86@mina86.com>
-
-> ---
->  drivers/base/dma-coherent.c |   20 ++++++++++++++++----
->  1 file changed, 16 insertions(+), 4 deletions(-)
+> Oh. For some reason I thought that used the vmalloc area, but evidently
+> I was mistaken.
 >
-> diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
-> index 55b8398..f98359a 100644
-> --- a/drivers/base/dma-coherent.c
-> +++ b/drivers/base/dma-coherent.c
-> @@ -2,6 +2,7 @@
->   * Coherent per-device memory handling.
->   * Borrowed from i386
->   */
-> +#include <linux/io.h>
->  #include <linux/slab.h>
->  #include <linux/kernel.h>
->  #include <linux/module.h>
-> @@ -31,7 +32,10 @@ static int dma_init_coherent_memory(phys_addr_t phys_addr, dma_addr_t device_add
->  	if (!size)
->  		goto out;
->  
-> -	mem_base = ioremap(phys_addr, size);
-> +	if (flags & DMA_MEMORY_MAP)
-> +		mem_base = memremap(phys_addr, size, MEMREMAP_WC);
-> +	else
-> +		mem_base = ioremap(phys_addr, size);
->  	if (!mem_base)
->  		goto out;
->  
-> @@ -58,8 +62,12 @@ static int dma_init_coherent_memory(phys_addr_t phys_addr, dma_addr_t device_add
->  
->  out:
->  	kfree(dma_mem);
-> -	if (mem_base)
-> -		iounmap(mem_base);
-> +	if (mem_base) {
-> +		if (flags & DMA_MEMORY_MAP)
-> +			memunmap(mem_base);
-> +		else
-> +			iounmap(mem_base);
-> +	}
->  	return 0;
->  }
->  
-> @@ -67,7 +75,11 @@ static void dma_release_coherent_memory(struct dma_coherent_mem *mem)
->  {
->  	if (!mem)
->  		return;
-> -	iounmap(mem->virt_base);
-> +
-> +	if (mem->flags & DMA_MEMORY_MAP)
-> +		memunmap(mem->virt_base);
-> +	else
-> +		iounmap(mem->virt_base);
->  	kfree(mem->bitmap);
->  	kfree(mem);
->  }
-> -- 
-> 1.7.9.5
+> That is unfortunate, it would be good to protect the JITed code.
 >
+>>> For statically-allocated data, an alternative approach would be for such
+>>> memory to be mapped with minimal permissions from the outset (e.g. being
+>>> placed in .rodata), and when elevated permissions are required a
+>>> (temporary) memremap'd alias could be used, like what patch_map does to
+>>> modify ROX kernel/module text.
+>>>
+>>> For dynamically-allocated data, we could create (minimal permission)
+>>> mappings in the vmalloc region and pass those around. The linear map
+>>> alias would still be writeable, but as the offset between the two isn't
+>>> linear (and the owner of that allocation doesn't have to know/care about
+>>> the linear map address), it would be much harder to find the linear map
+>>> address to attack. An alias with elevated permissions could be used as
+>>> required, or if it's a one-time RW->RO switch, the mapping could me
+>>> modified in-place as the granularity wouldn't change.
+>>
+>> This would work for new features but probably not for existing features
+>> such as the eBPF interpreter.
+>
+> Sure.
+>
+> For eBPF it might be possible to rework the code to support using
+> separate aliases, but that's probably not going to be easy and that
+> probably works against some performance requirement. :/
 
--- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  ??? ?mina86? ??????  (o o)
-ooo +--<mpn@google.com>--<xmpp:mina86@jabber.org>--ooO--(_)--Ooo--
+Ah no, you are correct, I misread how the code was working. The eBPF code
+does use vmalloc so that can easily be fixed up. I think your suggestion
+of either using vmalloc or a special static section is the best
+recommendation. If anyone really thinks they need to change any other
+memory they can make a proposal.
+
+Sorry for the confusion.
+
+Thanks,
+Laura
