@@ -1,73 +1,65 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 05 Jan 2016 13:19:48 +0100
-Subject: [PATCH v1 3/3] ARM64 LPC: update binding doc
-In-Reply-To: <568BB035.1050801@huawei.com>
-References: <1451396032-23708-1-git-send-email-zourongrong@gmail.com>
- <6384244.Uhpjfgly6O@wuerfel> <568BB035.1050801@huawei.com>
-Message-ID: <2550495.K9prJVsVEi@wuerfel>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 5 Jan 2016 12:21:51 +0000
+Subject: Widespread boot failures on ARM due to "mm/page_alloc.c:
+ calculate zone_start_pfn at zone_spanned_pages_in_node()"
+In-Reply-To: <20160105114549.GX16023@sirena.org.uk>
+References: <20160104224233.GU16023@sirena.org.uk>
+ <20160104150946.373ed02b8e8b81221340b7c8@linux-foundation.org>
+ <20160104235512.GW16023@sirena.org.uk>
+ <20160104163528.be56a4b1.akpm@linux-foundation.org>
+ <20160105114549.GX16023@sirena.org.uk>
+Message-ID: <568BB55F.2020709@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 January 2016 19:59:49 Rongrong Zou wrote:
-> ? 2016/1/5 0:34, Arnd Bergmann ??:
-> > On Tuesday 05 January 2016 00:04:19 Rongrong Zou wrote:
-> >> ? 2016/1/4 19:13, Arnd Bergmann ??:
-> >>> On Sunday 03 January 2016 20:24:14 Rongrong Zou wrote:
-> >>>> ? 2015/12/31 23:00, Rongrong Zou ??:
-> >> Ranges property can set empty, but this means 1:1 translation. the I/O
-> >> port range is translated to MMIO address 0x00000001 00000000 to
-> >> 0x00000001 00000004, it looks wrong else. I wonder if anyone get legacy
-> >> I/O port resource from dts.
-> >
-> > As I said, nothing should really require the ranges property here, unless
-> > you have a valid IORESOURCE_MEM translation. The code that requires
-> > the ranges to be present is wrong.
-> >
-> 
-> I think the openfirmware(DT) do not support for those unmapped I/O ports, because I
-> must get resource by calling of_address_to_resource(), which have to call
-> pci_address_to_pio() when resource type is IORESOURCE_IO. I'm sorry I have no
-> better idea for this now. Maybe liviu can give me some opinions.
 
-I think on x86 it works (or used to work, few people use open firmware on
-x86 these days, and it may be broken), and the pci_address_to_pio() call
-behaves differently when PCI_IOBASE is set. x86 never maps I/O ports into
-memory mapped I/O addresses, they have their own way of accessing them
-just like your platform.
 
-> /**
->   * of_address_to_resource - Translate device tree address and return as resource
->   *
->   * Note that if your address is a PIO address, the conversion will fail if
->   * the physical address can't be internally converted to an IO token with
->   * pci_address_to_pio(), that is because it's either called to early or it
->   * can't be matched to any host bridge IO space
->   */
-> int of_address_to_resource(struct device_node *dev, int index,
-> 			   struct resource *r)
+On 05/01/16 11:45, Mark Brown wrote:
+> On Mon, Jan 04, 2016 at 04:35:28PM -0800, Andrew Morton wrote:
+>> On Mon, 4 Jan 2016 23:55:12 +0000 Mark Brown <broonie@kernel.org> wrote:
+>>> On Mon, Jan 04, 2016 at 03:09:46PM -0800, Andrew Morton wrote:
+>
+>>>> Thanks.  That patch has rather a blooper if
+>>>> CONFIG_HAVE_MEMBLOCK_NODE_MAP=n.  Is that the case in your testing?
+>
+>>> Seems to be what's making a difference from a quick run through, yes.
+>
+>> OK, thanks.
+>
+> Seems like I was mistaken here somehow or there's some other problem -
+> I've kicked off another bisect for today's -next:
+>
+>     https://ci.linaro.org/view/people/job/tbaker-boot-bisect-bot/137/console
+>
+> and will follow up with any results.
+>
 
-The problem here seems to be that the code assumes that either the I/O ports
-are always mapped or they are never mapped (no PCI_IOBASE). We need to extend
-it because now we can have the combination of the two.
+With both patches applied(one already in today's -next), I am able to
+boot on ARM64 platform but I get huge load(for each pfn) of below warning:
 
-> >> For ipmi driver, I can get I/O port resource by DMI rather than dts.
-> >
-> > No, the ipmi driver uses the resource that belongs to the platform
-> > device already, you can't rely on DMI data to be present there.
-> 
-> Ipmi has a lot of way to be discovered(ACPI, DMI, hardcoded, hot-add,
-> openfirmware and a few other), I think we just use one of them, not all of them.
-> It depend on vendor's hardware solution actually.
+-->8
 
-I don't think we should mix multiple methods here: if the bus is described
-in DT, all its children should be there as well. Otherwise you get into problems
-e.g. if you have multiple instances of the LPC bus and the Linux I/O addresses
-for one or more of them have an offset to the bus specific addresses.
+BUG: Bad page state in process swapper  pfn:900000
+page:ffffffbde4000000 count:0 mapcount:1 mapping: (null) index:0x0
+flags: 0x0()
+page dumped because: nonzero mapcount
+Modules linked in:
+Hardware name: ARM Juno development board (r0) (DT)
+Call trace:
+[<ffffffc000089830>] dump_backtrace+0x0/0x180
+[<ffffffc0000899c4>] show_stack+0x14/0x20
+[<ffffffc000335008>] dump_stack+0x90/0xc8
+[<ffffffc0001531f8>] bad_page+0xd8/0x138
+[<ffffffc000153470>] free_pages_prepare+0x218/0x290
+[<ffffffc000154d4c>] __free_pages_ok+0x1c/0xb8
+[<ffffffc000155638>] __free_pages+0x30/0x50
+[<ffffffc00092fa9c>] __free_pages_bootmem+0xa0/0xa8
+[<ffffffc0009321d0>] free_all_bootmem+0x11c/0x184
+[<ffffffc000925264>] mem_init+0x48/0x1b4
+[<ffffffc0009217e0>] start_kernel+0x224/0x3b4
+[<0000000080663000>] 0x80663000
+Disabling lock debugging due to kernel taint
 
-The bus probe code decides what the Linux I/O port numbers are, but DMI
-and other methods have no idea of the mapping. As long as there is only
-one instance, using the first 0x1000 addresses with a 1:1 mapping saves
-us a bit of trouble, but I'd be worried about relying on that assumption
-too much.
-
-	Arnd
+-- 
+Regards,
+Sudeep
