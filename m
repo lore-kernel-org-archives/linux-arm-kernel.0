@@ -1,247 +1,62 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 5 Jan 2016 15:56:28 +0100
-Subject: [PATCH v2 05/13] arm64: kvm: deal with kernel symbols outside of
- linear mapping
-In-Reply-To: <CAKv+Gu80JG=hHJ1mbBpYXYVSd3AqSf3S6rSduxARHY0nY7josw@mail.gmail.com>
-References: <1451489172-17420-1-git-send-email-ard.biesheuvel@linaro.org>
- <1451489172-17420-6-git-send-email-ard.biesheuvel@linaro.org>
- <20160105144157.GE28354@cbox>
- <CAKv+Gu80JG=hHJ1mbBpYXYVSd3AqSf3S6rSduxARHY0nY7josw@mail.gmail.com>
-Message-ID: <20160105145628.GA3234@cbox>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 5 Jan 2016 15:56:39 +0100
+Subject: [PATCH] efi: stub: define DISABLE_BRANCH_PROFILING for all
+ architectures
+In-Reply-To: <20160104123145.GB1616@arm.com>
+References: <1450862968-20222-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20160104123145.GB1616@arm.com>
+Message-ID: <CAKv+Gu-n-7tk1NXYAbf7+O79gYG82QOsbzLuYG1yX=LSizksWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 05, 2016 at 03:51:58PM +0100, Ard Biesheuvel wrote:
-> On 5 January 2016 at 15:41, Christoffer Dall
-> <christoffer.dall@linaro.org> wrote:
-> > On Wed, Dec 30, 2015 at 04:26:04PM +0100, Ard Biesheuvel wrote:
-> >> KVM on arm64 uses a fixed offset between the linear mapping at EL1 and
-> >> the HYP mapping at EL2. Before we can move the kernel virtual mapping
-> >> out of the linear mapping, we have to make sure that references to kernel
-> >> symbols that are accessed via the HYP mapping are translated to their
-> >> linear equivalent.
-> >>
-> >> To prevent inadvertent direct references from sneaking in later, change
-> >> the type of all extern declarations to HYP kernel symbols to the opaque
-> >> 'struct kvm_ksym', which does not decay to a pointer type like char arrays
-> >> and function references. This is not bullet proof, but at least forces the
-> >> user to take the address explicitly rather than referencing it directly.
-> >>
-> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> ---
-> >>  arch/arm/include/asm/kvm_asm.h   |  2 ++
-> >>  arch/arm/include/asm/kvm_mmu.h   |  2 ++
-> >>  arch/arm/kvm/arm.c               |  9 +++++----
-> >>  arch/arm/kvm/mmu.c               | 12 +++++------
-> >>  arch/arm64/include/asm/kvm_asm.h | 21 +++++++++++---------
-> >>  arch/arm64/include/asm/kvm_mmu.h |  2 ++
-> >>  arch/arm64/include/asm/virt.h    |  4 ----
-> >>  arch/arm64/kernel/vmlinux.lds.S  |  4 ++--
-> >>  arch/arm64/kvm/debug.c           |  4 +++-
-> >>  virt/kvm/arm/vgic-v3.c           |  2 +-
-> >>  10 files changed, 34 insertions(+), 28 deletions(-)
-> >>
-> >> diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-> >> index 194c91b610ff..484ffdf7c70b 100644
-> >> --- a/arch/arm/include/asm/kvm_asm.h
-> >> +++ b/arch/arm/include/asm/kvm_asm.h
-> >> @@ -99,6 +99,8 @@ extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
-> >>  extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
-> >>
-> >>  extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
-> >> +
-> >> +extern char __hyp_idmap_text_start[], __hyp_idmap_text_end[];
-> >>  #endif
-> >>
-> >>  #endif /* __ARM_KVM_ASM_H__ */
-> >> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-> >> index 405aa1883307..412b363f79e9 100644
-> >> --- a/arch/arm/include/asm/kvm_mmu.h
-> >> +++ b/arch/arm/include/asm/kvm_mmu.h
-> >> @@ -30,6 +30,8 @@
-> >>  #define HYP_PAGE_OFFSET              PAGE_OFFSET
-> >>  #define KERN_TO_HYP(kva)     (kva)
-> >>
-> >> +#define kvm_ksym_ref(kva)    (kva)
-> >> +
-> >>  /*
-> >>   * Our virtual mapping for the boot-time MMU-enable code. Must be
-> >>   * shared across all the page-tables. Conveniently, we use the vectors
-> >> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> >> index e06fd299de08..014b542ea658 100644
-> >> --- a/arch/arm/kvm/arm.c
-> >> +++ b/arch/arm/kvm/arm.c
-> >> @@ -427,7 +427,7 @@ static void update_vttbr(struct kvm *kvm)
-> >>                * shareable domain to make sure all data structures are
-> >>                * clean.
-> >>                */
-> >> -             kvm_call_hyp(__kvm_flush_vm_context);
-> >> +             kvm_call_hyp(kvm_ksym_ref(__kvm_flush_vm_context));
-> >>       }
-> >>
-> >>       kvm->arch.vmid_gen = atomic64_read(&kvm_vmid_gen);
-> >> @@ -600,7 +600,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> >>               __kvm_guest_enter();
-> >>               vcpu->mode = IN_GUEST_MODE;
-> >>
-> >> -             ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);
-> >> +             ret = kvm_call_hyp(kvm_ksym_ref(__kvm_vcpu_run), vcpu);
-> >>
-> >>               vcpu->mode = OUTSIDE_GUEST_MODE;
-> >>               /*
-> >> @@ -969,7 +969,7 @@ static void cpu_init_hyp_mode(void *dummy)
-> >>       pgd_ptr = kvm_mmu_get_httbr();
-> >>       stack_page = __this_cpu_read(kvm_arm_hyp_stack_page);
-> >>       hyp_stack_ptr = stack_page + PAGE_SIZE;
-> >> -     vector_ptr = (unsigned long)__kvm_hyp_vector;
-> >> +     vector_ptr = (unsigned long)kvm_ksym_ref(__kvm_hyp_vector);
-> >>
-> >>       __cpu_init_hyp_mode(boot_pgd_ptr, pgd_ptr, hyp_stack_ptr, vector_ptr);
-> >>
-> >> @@ -1061,7 +1061,8 @@ static int init_hyp_mode(void)
-> >>       /*
-> >>        * Map the Hyp-code called directly from the host
-> >>        */
-> >> -     err = create_hyp_mappings(__kvm_hyp_code_start, __kvm_hyp_code_end);
-> >> +     err = create_hyp_mappings(kvm_ksym_ref(__kvm_hyp_code_start),
-> >> +                               kvm_ksym_ref(__kvm_hyp_code_end));
-> >>       if (err) {
-> >>               kvm_err("Cannot map world-switch code\n");
-> >>               goto out_free_mappings;
-> >> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> >> index 7dace909d5cf..7c448b943e3a 100644
-> >> --- a/arch/arm/kvm/mmu.c
-> >> +++ b/arch/arm/kvm/mmu.c
-> >> @@ -31,8 +31,6 @@
-> >>
-> >>  #include "trace.h"
-> >>
-> >> -extern char  __hyp_idmap_text_start[], __hyp_idmap_text_end[];
-> >> -
-> >>  static pgd_t *boot_hyp_pgd;
-> >>  static pgd_t *hyp_pgd;
-> >>  static pgd_t *merged_hyp_pgd;
-> >> @@ -63,7 +61,7 @@ static bool memslot_is_logging(struct kvm_memory_slot *memslot)
-> >>   */
-> >>  void kvm_flush_remote_tlbs(struct kvm *kvm)
-> >>  {
-> >> -     kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
-> >> +     kvm_call_hyp(kvm_ksym_ref(__kvm_tlb_flush_vmid), kvm);
-> >>  }
-> >>
-> >>  static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
-> >> @@ -75,7 +73,7 @@ static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
-> >>        * anything there.
-> >>        */
-> >>       if (kvm)
-> >> -             kvm_call_hyp(__kvm_tlb_flush_vmid_ipa, kvm, ipa);
-> >> +             kvm_call_hyp(kvm_ksym_ref(__kvm_tlb_flush_vmid_ipa), kvm, ipa);
-> >>  }
-> >>
-> >>  /*
-> >> @@ -1647,9 +1645,9 @@ int kvm_mmu_init(void)
-> >>  {
-> >>       int err;
-> >>
-> >> -     hyp_idmap_start = kvm_virt_to_phys(__hyp_idmap_text_start);
-> >> -     hyp_idmap_end = kvm_virt_to_phys(__hyp_idmap_text_end);
-> >> -     hyp_idmap_vector = kvm_virt_to_phys(__kvm_hyp_init);
-> >> +     hyp_idmap_start = kvm_virt_to_phys(&__hyp_idmap_text_start);
-> >> +     hyp_idmap_end = kvm_virt_to_phys(&__hyp_idmap_text_end);
-> >> +     hyp_idmap_vector = kvm_virt_to_phys(&__kvm_hyp_init);
-> >>
-> >>       /*
-> >>        * We rely on the linker script to ensure at build time that the HYP
-> >> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-> >> index 5e377101f919..830402f847e0 100644
-> >> --- a/arch/arm64/include/asm/kvm_asm.h
-> >> +++ b/arch/arm64/include/asm/kvm_asm.h
-> >> @@ -105,24 +105,27 @@
-> >>  #ifndef __ASSEMBLY__
-> >>  struct kvm;
-> >>  struct kvm_vcpu;
-> >> +struct kvm_ksym;
-> >>
-> >>  extern char __kvm_hyp_init[];
-> >>  extern char __kvm_hyp_init_end[];
-> >>
-> >> -extern char __kvm_hyp_vector[];
-> >> +extern struct kvm_ksym __kvm_hyp_vector;
-> >>
-> >> -#define      __kvm_hyp_code_start    __hyp_text_start
-> >> -#define      __kvm_hyp_code_end      __hyp_text_end
-> >> +extern struct kvm_ksym __kvm_hyp_code_start;
-> >> +extern struct kvm_ksym __kvm_hyp_code_end;
-> >>
-> >> -extern void __kvm_flush_vm_context(void);
-> >> -extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
-> >> -extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
-> >> +extern struct kvm_ksym __kvm_flush_vm_context;
-> >> +extern struct kvm_ksym __kvm_tlb_flush_vmid_ipa;
-> >> +extern struct kvm_ksym __kvm_tlb_flush_vmid;
-> >>
-> >> -extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
-> >> +extern struct kvm_ksym __kvm_vcpu_run;
-> >>
-> >> -extern u64 __vgic_v3_get_ich_vtr_el2(void);
-> >> +extern struct kvm_ksym __hyp_idmap_text_start, __hyp_idmap_text_end;
-> >>
-> >> -extern u32 __kvm_get_mdcr_el2(void);
-> >> +extern struct kvm_ksym __vgic_v3_get_ich_vtr_el2;
-> >> +
-> >> +extern struct kvm_ksym __kvm_get_mdcr_el2;
-> >>
-> >>  #endif
-> >>
-> >> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> >> index 61505676d085..0899026a2821 100644
-> >> --- a/arch/arm64/include/asm/kvm_mmu.h
-> >> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> >> @@ -73,6 +73,8 @@
-> >>
-> >>  #define KERN_TO_HYP(kva)     ((unsigned long)kva - PAGE_OFFSET + HYP_PAGE_OFFSET)
-> >>
-> >> +#define kvm_ksym_ref(sym)    ((void *)&sym - KIMAGE_VADDR + PAGE_OFFSET)
-> >> +
-> >>  /*
-> >>   * We currently only support a 40bit IPA.
-> >>   */
-> >> diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-> >> index 7a5df5252dd7..215ad4649dd7 100644
-> >> --- a/arch/arm64/include/asm/virt.h
-> >> +++ b/arch/arm64/include/asm/virt.h
-> >> @@ -50,10 +50,6 @@ static inline bool is_hyp_mode_mismatched(void)
-> >>       return __boot_cpu_mode[0] != __boot_cpu_mode[1];
-> >>  }
-> >>
-> >> -/* The section containing the hypervisor text */
-> >> -extern char __hyp_text_start[];
-> >> -extern char __hyp_text_end[];
-> >> -
-> >>  #endif /* __ASSEMBLY__ */
-> >>
-> >>  #endif /* ! __ASM__VIRT_H */
-> >> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-> >> index 363c2f529951..f935f082188d 100644
-> >> --- a/arch/arm64/kernel/vmlinux.lds.S
-> >> +++ b/arch/arm64/kernel/vmlinux.lds.S
-> >> @@ -35,9 +35,9 @@ jiffies = jiffies_64;
-> >>       VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;     \
-> >>       *(.hyp.idmap.text)                              \
-> >>       VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;       \
-> >> -     VMLINUX_SYMBOL(__hyp_text_start) = .;           \
-> >> +     VMLINUX_SYMBOL(__kvm_hyp_code_start) = .;       \
-> >>       *(.hyp.text)                                    \
-> >> -     VMLINUX_SYMBOL(__hyp_text_end) = .;
-> >> +     VMLINUX_SYMBOL(__kvm_hyp_code_end) = .;
-> >
-> > why this rename?
-> >
-> 
-> I already got rid of it based on Marc's feedback. The only reason was
-> to align between ARM and arm64, but he is already doing the same in
-> the opposite direction
+(+ Arnd)
 
-ah, now I understand what Marc was referring to in his comment, thanks.
+On 4 January 2016 at 13:31, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Dec 23, 2015 at 10:29:28AM +0100, Ard Biesheuvel wrote:
+>> This moves the DISABLE_BRANCH_PROFILING define from the x86 specific
+>> to the general CFLAGS definition for the stub. This fixes build errors
+>> when building for arm64 with CONFIG_PROFILE_ALL_BRANCHES_ENABLED.
+>>
+>> Reported-by: Will Deacon <will.deacon@arm.com>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  drivers/firmware/efi/libstub/Makefile | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> Cheers, Ard. The kernel now builds and boots as an EFI application for
+> me when the dreaded #define if config option is enabled:
+>
+>   Tested-by: Will Deacon <will.deacon@arm.com>
+>
+> Will
+>
 
--Christoffer
+@Matt: this is causing randconfig build errors for ARM in -next. Mind
+if we take this through some other tree?
+
+
+>> diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
+>> index 3c0467d3688c..c0ddd1b8dca3 100644
+>> --- a/drivers/firmware/efi/libstub/Makefile
+>> +++ b/drivers/firmware/efi/libstub/Makefile
+>> @@ -8,7 +8,7 @@ cflags-$(CONFIG_X86_32)               := -march=i386
+>>  cflags-$(CONFIG_X86_64)              := -mcmodel=small
+>>  cflags-$(CONFIG_X86)         += -m$(BITS) -D__KERNEL__ $(LINUX_INCLUDE) -O2 \
+>>                                  -fPIC -fno-strict-aliasing -mno-red-zone \
+>> -                                -mno-mmx -mno-sse -DDISABLE_BRANCH_PROFILING
+>> +                                -mno-mmx -mno-sse
+>>
+>>  cflags-$(CONFIG_ARM64)               := $(subst -pg,,$(KBUILD_CFLAGS))
+>>  cflags-$(CONFIG_ARM)         := $(subst -pg,,$(KBUILD_CFLAGS)) \
+>> @@ -16,7 +16,7 @@ cflags-$(CONFIG_ARM)                := $(subst -pg,,$(KBUILD_CFLAGS)) \
+>>
+>>  cflags-$(CONFIG_EFI_ARMSTUB) += -I$(srctree)/scripts/dtc/libfdt
+>>
+>> -KBUILD_CFLAGS                        := $(cflags-y) \
+>> +KBUILD_CFLAGS                        := $(cflags-y) -DDISABLE_BRANCH_PROFILING \
+>>                                  $(call cc-option,-ffreestanding) \
+>>                                  $(call cc-option,-fno-stack-protector)
+>>
+>> --
+>> 2.5.0
+>>
