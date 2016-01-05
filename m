@@ -1,34 +1,24 @@
 From: alexei.starovoitov@gmail.com (Alexei Starovoitov)
-Date: Tue, 5 Jan 2016 09:43:10 -0800
-Subject: [PATCH] net: filter: make JITs zero A for SKF_AD_ALU_XOR_X
-In-Reply-To: <568BF11F.1060507@iogearbox.net>
-References: <1452007387-626-1-git-send-email-rabin@rab.in>
- <568BF11F.1060507@iogearbox.net>
-Message-ID: <20160105174309.GA83548@ast-mbp.thefacebook.com>
+Date: Tue, 5 Jan 2016 09:50:39 -0800
+Subject: [PATCH] ARM: net: bpf: fix zero right shift
+In-Reply-To: <1452015244-1230-1-git-send-email-rabin@rab.in>
+References: <1452015244-1230-1-git-send-email-rabin@rab.in>
+Message-ID: <20160105175038.GB83548@ast-mbp.thefacebook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 05, 2016 at 05:36:47PM +0100, Daniel Borkmann wrote:
-> On 01/05/2016 04:23 PM, Rabin Vincent wrote:
-> >The SKF_AD_ALU_XOR_X ancillary is not like the other ancillary data
-> >instructions since it XORs A with X while all the others replace A with
-> >some loaded value.  All the BPF JITs fail to clear A if this is used as
-> >the first instruction in a filter.  This was found using american fuzzy
-> >lop.
-> >
-> >Add a helper to determine if A needs to be cleared given the first
-> >instruction in a filter, and use this in the JITs.  Except for ARM, the
-> >rest have only been compile-tested.
-> >
-> >Fixes: 3480593131e0 ("net: filter: get rid of BPF_S_* enum")
-> >Signed-off-by: Rabin Vincent <rabin@rab.in>
+On Tue, Jan 05, 2016 at 06:34:04PM +0100, Rabin Vincent wrote:
+> The LSR instruction cannot be used to perform a zero right shift since a
+> 0 as the immediate value (imm5) in the LSR instruction encoding means
+> that a shift of 32 is perfomed.  See DecodeIMMShift() in the ARM ARM.
 > 
-> Excellent catch, thanks a lot! The fix looks good to me and should
-> go to -net tree.
+> Make the JIT skip generation of the LSR if a zero-shift is requested.
 > 
-> Acked-by: Daniel Borkmann <daniel@iogearbox.net>
+> This was found using american fuzzy lop.
+> 
+> Signed-off-by: Rabin Vincent <rabin@rab.in>
 
-good catch indeed.
-Classic bpf jits didn't have much love. Great to see this work.
+Looks good as a fix for classic jit. For eBPF we would want to check
+this in verifier.
 
 Acked-by: Alexei Starovoitov <ast@kernel.org>
