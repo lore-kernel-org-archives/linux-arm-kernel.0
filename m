@@ -1,24 +1,44 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 05 Jan 2016 10:31:56 +0100
-Subject: [PATCH v2 6/6] reset: mediatek: mt2701 reset driver
-In-Reply-To: <1451975422-31174-7-git-send-email-jamesjj.liao@mediatek.com>
-References: <1451975422-31174-1-git-send-email-jamesjj.liao@mediatek.com>
- <1451975422-31174-7-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <1451986316.3391.6.camel@pengutronix.de>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 5 Jan 2016 10:42:57 +0100 (CET)
+Subject: [PATCH] arm: kernel: utilize hrtimer based broadcast
+In-Reply-To: <20160102102955.GP8644@n2100.arm.linux.org.uk>
+References: <1437124312-44700-1-git-send-email-b18965@freescale.com>
+ <20151027081834.GB1425@svinekod>
+ <DB3PR04MB07407D83CC5F8F5F19A7207F4FB0@DB3PR04MB074.eurprd04.prod.outlook.com>
+ <4875455.lvoc6XpkZc@wuerfel> <alpine.DEB.2.11.1512291449380.28591@nanos>
+ <20160102102955.GP8644@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.11.1601051039320.3689@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 05.01.2016, 14:30 +0800 schrieb James Liao:
-> From: Shunli Wang <shunli.wang@mediatek.com>
+On Sat, 2 Jan 2016, Russell King - ARM Linux wrote:
+> On Tue, Dec 29, 2015 at 02:54:10PM +0100, Thomas Gleixner wrote:
+> > I have no real opinion about that patch. It does no harm to unconditionally
+> > setup the hrtimer based broadcast even if it's never used.
+> > 
+> > Up to the arch maintainer to decide. 
 > 
-> In infrasys and perifsys, there are many reset
-> control bits for kinds of modules. These bits are
-> used as actual reset controllers to be registered
-> into kernel's generic reset controller framework.
+> That's really not fair to keep shovelling these kinds of decisions onto
+> architecture maintainers without any kind of explanation about how an
+> architecture maintainer should make such a decision.
 > 
-> Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
+> Do I roll a 6-face dice, and if it gives an odd number, I apply this
+> patch, otherwise I reject it?
+> 
+> Is there a technical basis for making the decision?  If so, please
+> explain what the technical arguments are against having or not having
+> this change.
 
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+The hrtimer based broadcast device is used when you have per cpu timers which
+stop in deeper power states, but you have no other timer hardware on the chip
+which can backup the per cpu timer in deep power states. The trick is that it
+emulates a timer hardware via a hrtimer and then tells the cpu idle code not
+to go into deep power states on the cpu which owns that hrtimer. All other
+cpus can go as deep as they want and still get woken up.
 
-regards
-Philipp
+The only downside of adding this unconditionally is extra code in case that it
+is not needed on a particular platform.
+
+Hope that helps.
+
+     tglx
