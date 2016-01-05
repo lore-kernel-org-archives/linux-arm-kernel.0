@@ -1,63 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 5 Jan 2016 16:04:21 +0000
-Subject: [alsa-devel] [PATCH 0/9] dw-hdmi audio support
-In-Reply-To: <CAH-u=810V863yYhMvvtaQ7jxNgrOXAL4bi1mS506a-yOTbuYhQ@mail.gmail.com>
-References: <20150808160251.GM7557@n2100.arm.linux.org.uk>
- <20150808160936.GN7557@n2100.arm.linux.org.uk>
- <1440664941.3233.38.camel@pengutronix.de>
- <CAH-u=810V863yYhMvvtaQ7jxNgrOXAL4bi1mS506a-yOTbuYhQ@mail.gmail.com>
-Message-ID: <20160105160421.GX19062@n2100.arm.linux.org.uk>
+From: Frank.Li@nxp.com (Frank Li)
+Date: Tue, 5 Jan 2016 11:17:14 -0600
+Subject: [PATCH v2 1/4] ARM: dts: imx7d: add arch timer
+Message-ID: <1452014237-12848-1-git-send-email-Frank.Li@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 05, 2016 at 04:40:54PM +0100, Jean-Michel Hautbois wrote:
-> Hi Russell,
-> 
-> 2015-08-27 10:42 GMT+02:00 Philipp Zabel <p.zabel@pengutronix.de>:
-> >
-> > Am Samstag, den 08.08.2015, 17:09 +0100 schrieb Russell King - ARM
-> > Linux:
-> > > Following on from the previous sub-series, this sub-series adds audio
-> > > support to dw-hdmi.
-> > >
-> > > The two different variants are now in this patch: AHB audio support
-> > > found on iMX6 platforms, and I2S support found on Rockchip patches.
-> > > Thanks to Yakir Yang for contributing the I2S support.
-> > >
-> > > I suspect that there is still some discussion to be had on this
-> > > series, though I would like to see it moving forward so that we can
-> > > get something merged.
-> >
-> > Tested-by: Philipp Zabel <p.zabel@pengutronix.de>
-> > on i.MX6 GK802 via HDMI connected to a TV (stereo only).
-> >
-> > except for the i2s patch, which is broken in this series.
-> >
-> > regards
-> > Philipp
-> 
-> 
-> What is the status of this series ?
-> I would like to use audio output in HDMI on my i.MX6 board, but I
-> don't know if you have some pending WIP on this ?
+From: Frank Li <Frank.Li@freescale.com>
 
-The I2S part has been dropped.  The DesignWare HDMI block is configurable
-when it is synthesized - it can contain either the AHB audio interface or
-an I2S interface.  Freescale chose to synthesize it with the AHB audio
-interface, and this is what my patches are geared up to provide.
+Since uboot v2016.01-rc2, which supported basic psci for i.mx7d.
+So imx7d's second core can be enabled by psci.
 
-On Rockchip devices, they chose to synthesize it with the I2S audio
-block, and so they need a different driver for it.  Yakir Yang has been
-working on that, but I've not seen anything recently.  After merging
-his I2S patch, I found some problems and decided with Yakir that the
-best thing to do was to drop it.
+Without arch timer, every timer event will be boardcasted to each core.
+arch timer has local timer irq for each core.
 
-So, the result is we support HDMI audio on iMX6.
+Signed-off-by: Frank Li <Frank.Li@freescale.com>
+---
 
-The changes were merged into mainline during the 4.4 merge window, so
-Linux 4.4 will support iMX6 HDMI audio.
+Change from v1 to v2:
+ * refine commit message show the relationship between smp and arch timer
 
+ arch/arm/boot/dts/imx7d.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+index 489604a..a621af6 100644
+--- a/arch/arm/boot/dts/imx7d.dtsi
++++ b/arch/arm/boot/dts/imx7d.dtsi
+@@ -119,6 +119,15 @@
+ 		clock-output-names = "osc";
+ 	};
+ 
++	timer {
++		compatible = "arm,armv7-timer";
++		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
++		interrupt-parent = <&intc>;
++	};
++
+ 	etr at 30086000 {
+ 		compatible = "arm,coresight-tmc", "arm,primecell";
+ 		reg = <0x30086000 0x1000>;
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.5.2
