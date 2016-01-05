@@ -1,48 +1,51 @@
-From: alexei.starovoitov@gmail.com (Alexei Starovoitov)
-Date: Tue, 5 Jan 2016 09:55:58 -0800
-Subject: [PATCH] arm64: net: bpf: don't BUG() on large shifts
-In-Reply-To: <1452015543-6790-1-git-send-email-rabin@rab.in>
-References: <1452015543-6790-1-git-send-email-rabin@rab.in>
-Message-ID: <20160105175557.GC83548@ast-mbp.thefacebook.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 5 Jan 2016 18:01:02 +0000
+Subject: [PATCH v9 08/13] arch/arm64: adopt prepare_exit_to_usermode()
+ model from x86
+In-Reply-To: <CALCETrUyB5dHn0OQwwYwB28pEDqMeGmnFv1mQLfHXhW-4YWCjg@mail.gmail.com>
+References: <1451936091-29247-1-git-send-email-cmetcalf@ezchip.com>
+ <1451936091-29247-9-git-send-email-cmetcalf@ezchip.com>
+ <20160104203316.GE17127@leverpostej>
+ <CALCETrUyB5dHn0OQwwYwB28pEDqMeGmnFv1mQLfHXhW-4YWCjg@mail.gmail.com>
+Message-ID: <20160105180101.GA29455@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 05, 2016 at 06:39:03PM +0100, Rabin Vincent wrote:
-> Attempting to generate UBFM/SBFM instructions with shifts that can't be
-> encoded in the immediate fields of the opcodes leads to a trigger of a
-> BUG() in the instruction generation code.  As the ARMv8 ARM says: "The
-> shift amounts must be in the range 0 to one less than the register width
-> of the instruction, inclusive."  Make the JIT reject unencodable shifts
-> instead of crashing.
+On Mon, Jan 04, 2016 at 02:31:42PM -0800, Andy Lutomirski wrote:
+> On Mon, Jan 4, 2016 at 12:33 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > Hi,
+> >
+> > On Mon, Jan 04, 2016 at 02:34:46PM -0500, Chris Metcalf wrote:
+> >> This change is a prerequisite change for TASK_ISOLATION but also
+> >> stands on its own for readability and maintainability.
+> >
+> > I have also been looking into converting the userspace return path from
+> > assembly to C [1], for the latter two reasons. Based on that, I have a
+> > couple of comments.
+> >
 > 
->  ------------[ cut here ]------------
->  kernel BUG at arch/arm64/kernel/insn.c:766!
->  Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
->  CPU: 0 PID: 669 Comm: insmod Not tainted 4.4.0-rc8+ #4
->  PC is at aarch64_insn_gen_bitfield+0xcc/0xd4
->  LR is at build_body+0x1000/0x2914
->  ..
->  Call trace:
->  [<ffffffc00008c65c>] aarch64_insn_gen_bitfield+0xcc/0xd4
->  [<ffffffc000096bfc>] build_body+0x1000/0x2914
->  [<ffffffc000098590>] bpf_int_jit_compile+0x7c/0x1b4
->  [<ffffffc000130d10>] bpf_prog_select_runtime+0x20/0xcc
->  [<ffffffc0004afbac>] bpf_prepare_filter+0x3d8/0x3e8
->  [<ffffffc0004afc30>] bpf_prog_create+0x74/0xa4
->  [<ffffffbffc3de1d4>] test_bpf_init+0x1d4/0x748 [test_bpf]
->  [<ffffffc00008293c>] do_one_initcall+0x90/0x1a8
->  [<ffffffc000140c4c>] do_init_module+0x60/0x1c8
->  [<ffffffc00011bdcc>] load_module+0x1554/0x1c98
->  [<ffffffc00011c62c>] SyS_init_module+0x11c/0x140
->  [<ffffffc000085cb0>] el0_svc_naked+0x24/0x28
+> >
+> > [1] https://git.kernel.org/cgit/linux/kernel/git/mark/linux.git/log/?h=arm64/entry-deasm
 > 
-> Signed-off-by: Rabin Vincent <rabin@rab.in>
-> ---
->  arch/arm64/net/bpf_jit_comp.c | 7 +++++++
->  1 file changed, 7 insertions(+)
+> Neat!
+> 
+> In case you want to compare notes, I have a branch with the entire
+> syscall path on x86 in C except for cleanly separated asm fast path
+> optimizations:
+> 
+> https://git.kernel.org/cgit/linux/kernel/git/luto/linux.git/log/?h=x86/entry_compat
 
-this one is better to be addressed in verifier instead of eBPF JITs.
-Please reject it in check_alu_op() instead.
-Though this bug is arm64 only and doesn't affect x64, it's better
-to reject such invalid programs, since shifts with large constants
-can be only be created manually. llvm doesn't generate such things.
+It was in fact your x86 effort that inspired me to look at this!
+
+Thanks for the pointer, I'm almost certainly going to steal an idea or
+two.
+
+Currently it looks like arm64's conversion will be less painful than
+that for x86 as the entry assembly is smaller and relatively uniform.
+It looks like all but the register save/restore is possible in C.
+
+That said, I have yet to stress/validate everything with tracing, irq
+debugging, and so on, so my confidence may be misplaced.
+
+Thanks,
+Mark.
