@@ -1,37 +1,64 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 5 Jan 2016 10:59:24 -0500 (EST)
-Subject: [PATCH v2 0/3] USB: add generic onboard USB HUB driver
-In-Reply-To: <CAL_Jsq+P8SBmWzNURrmNgz8soCn4QPOPid4SXF0a3TYL_SH27A@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1601051058050.1666-100000@iolanthe.rowland.org>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Tue, 5 Jan 2016 10:59:32 -0500
+Subject: [PATCH] drivers/bus: make uniphier-system-bus.c explicitly
+ non-modular
+In-Reply-To: <CAK7LNARdg5UCU99mL6Jhz_rHgyOkQ=pugdSMz_BmFRxH-eYSsA@mail.gmail.com>
+References: <1451935379-14107-1-git-send-email-paul.gortmaker@windriver.com>
+ <CAK7LNASK5GCQ-Jk7ApmSinnW2PAaSmD-k2X9BbGg66-_b5kASg@mail.gmail.com>
+ <CAK7LNASDdpt0zVHUe=EMdKCH6N25CwBLtR0A4jXP=P8zAaaqRA@mail.gmail.com>
+ <CAK7LNASU3OMhhPTQvEUKEX_5RNiCeaF-QUBgvuSVpEvd4awWww@mail.gmail.com>
+ <CAK7LNARdg5UCU99mL6Jhz_rHgyOkQ=pugdSMz_BmFRxH-eYSsA@mail.gmail.com>
+Message-ID: <20160105155932.GT12458@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 5 Jan 2016, Rob Herring wrote:
+[Re: [PATCH] drivers/bus: make uniphier-system-bus.c explicitly non-modular] On 05/01/2016 (Tue 11:31) Masahiro Yamada wrote:
 
-> >>> > It's not clear (to me, anyway) how this is meant to work.  USB is a
-> >>> > completely discoverable bus: There is no way to represent devices
-> >>> > statically; they have to be discovered.  But a device can't be
-> >>> > discovered unless it is functional, so if an onboard hub (or any other
-> >>> > sort of USB device) requires power, clocks, or something similar in
-> >>> > order to function, it won't be discovered.  There won't be any device
-> >>> > structure to probe, and "forcing driver probe" won't accomplish
-> >>> > anything.
-> >>> >
-> >>> > It seems to me that the only way something like this could be made to
-> >>> > work is if the necessary actions are keyed off the host controller (and
-> >>> > in particular, _not_ the hub driver), presumably at the time the
-> >>> > controller is probed.
+> 2016-01-05 11:26 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> > Hi Paul,
+> >
+
+[...]
+
+> >
+> >
+> > I assume commit 326ea45aa827 ("bus: uniphier: allow only built-in driver")
+> > is a temporary fix.
+> >
+> > I'd like to revive the tristate for this driver
+> > by hook or by crook.
+> >
+> >
+> > I've sent the following to fix the build error.
+> > http://www.thefreedictionary.com/
 > 
-> The problem with putting this in the the host controller driver is it
-> assumes the initialization sequence is generic enough to be described
-> in DT and that initialization is the only time we need DT data. The
-> MFD example is a perfect example of another case. Suspend/resume also
-> comes to mind. Even if we could put the control in both places, that
-> is poor design IMO. I'd rather just make it a requirement that the
-> bootloader do enough setup that devices can be discovered.
+> Sorry, I mean this one:
+> https://patchwork.kernel.org/patch/7952361/
 
-That would be okay with me.  It would make things a lot simpler (but it 
-would also waste energy in situations where the devices weren't being 
-used).
+Sure, I'll shelf it and assume it will get back to tristate.
 
-Alan Stern
+Note however that the patch I was looking at was not 326ea. It was
+
+commit 6c741c74092c61465af206672ba567940a23d709
+Author: Daniel Kurtz <djkurtz@chromium.org>
+Date:   Tue Dec 22 21:46:37 2015 +0800
+
+    pinctrl: mediatek: convert to arch_initcall
+
+..and if you make it tristate again, you defeat the above change,
+since if you look at module.h, you will see for the =m config:
+
+ #define arch_initcall(fn)               module_init(fn)
+
+...meaning that the change in 6c741c does nothing if =m is set.
+I don't know if that is an issue or not, perhaps Daniel can comment.
+
+Paul.
+--
+
+> 
+> 
+> 
+> -- 
+> Best Regards
+> Masahiro Yamada
