@@ -1,34 +1,60 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 05 Jan 2016 16:43:20 -0500 (EST)
-Subject: [PATCH] net: hns: avoid uninitialized variable warning:
-In-Reply-To: <6649249.INrAY8KJG0@wuerfel>
-References: <6649249.INrAY8KJG0@wuerfel>
-Message-ID: <20160105.164320.2255971055498857833.davem@davemloft.net>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Tue, 05 Jan 2016 21:50:54 +0000
+Subject: [PATCH v3 1/3] spi: atmel: add support for the internal
+ chip-select of the spi controller
+In-Reply-To: <c05f4d9abfdabb62b3b3cfeb57a3f9c138b4e45d.1433850255.git.cyrille.pitchen@atmel.com>
+ (Cyrille Pitchen's message of "Tue, 9 Jun 2015 13:53:52 +0200")
+References: <cover.1433850255.git.cyrille.pitchen@atmel.com>
+ <c05f4d9abfdabb62b3b3cfeb57a3f9c138b4e45d.1433850255.git.cyrille.pitchen@atmel.com>
+Message-ID: <yw1xvb771yrl.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Fri, 01 Jan 2016 23:27:57 +0100
+Cyrille Pitchen <cyrille.pitchen@atmel.com> writes:
 
-> gcc fails to see that the use of the 'last_offset' variable
-> in hns_nic_reuse_page() is used correctly and issues a bogus
-> warning:
-> 
-> drivers/net/ethernet/hisilicon/hns/hns_enet.c: In function 'hns_nic_reuse_page':
-> drivers/net/ethernet/hisilicon/hns/hns_enet.c:541:6: warning: 'last_offset' may be used uninitialized in this function [-Wmaybe-uninitialized]
-> 
-> This simplifies the function to make it more obvious what is
-> going on to both readers and compilers, which makes the warning
-> go away.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> This patch relies on the CSAAT (Chip Select Active After Transfer) feature
+> introduced by the version 2 of the spi controller. This new mode allows to
+> use properly the internal chip-select output pin of the spi controller
+> instead of using external gpios. Consequently, the "cs-gpios" device-tree
+> property becomes optional.
+>
+> When the new CSAAT bit is set into the Chip Select Register, the internal
+> chip-select output pin remains asserted till both the following conditions
+> become true:
+> - the LASTXFER bit is set into the Control Register (or the Transmit Data
+>   Register)
+> - the Transmit Data Register and its shift register are empty.
+>
+> WARNING: if the LASTXFER bit is set into the Control Register then new
+> data are written into the Transmit Data Register fast enough to keep its
+> shifter not empty, the chip-select output pin remains asserted. Only when
+> the shifter becomes empty, the chip-select output pin is unasserted.
+>
+> When the CSAAT bit is clear in the Chip Select Register, the LASTXFER bit
+> is ignored in both the Control Register and the Transmit Data Register.
+> The internal chip-select output pin remains active as long as the Transmit
+> Data Register or its shift register are not empty.
+>
+> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 > ---
-> Compile-tested only, and complex enough that this requires a proper
-> review and testing before it gets apply. Please have a look at this.
+>  drivers/spi/spi-atmel.c | 37 ++++++++++++++++++++++++++++---------
+>  1 file changed, 28 insertions(+), 9 deletions(-)
 
-If this goes yet another day without being reviewed, I'm just applying
-it.
+[...]
 
-You hisilicon folks can't just let patches rot, you must review them
-in a timely manner or else I'm applying them without waiting for you
-to look at them.
+> @@ -1338,6 +1350,13 @@ static int atmel_spi_probe(struct platform_device *pdev)
+>
+>  	atmel_get_caps(as);
+>
+> +	as->use_cs_gpios = true;
+> +	if (atmel_spi_is_v2(as) &&
+> +	    !of_get_property(pdev->dev.of_node, "cs-gpios", NULL)) {
+> +		as->use_cs_gpios = false;
+> +		master->num_chipselect = 4;
+> +	}
+
+This part breaks the AVR32 boards and probably anything else that
+doesn't use devicetree but does use GPIOs for chip select.
+
+-- 
+M?ns Rullg?rd
