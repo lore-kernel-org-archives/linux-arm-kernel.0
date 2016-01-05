@@ -1,43 +1,58 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 04 Jan 2016 21:54:59 -0500 (EST)
-Subject: [PATCH] fsl/fman: allow modular build
-In-Reply-To: <4109142.02mezJXbJM@wuerfel>
-References: <4109142.02mezJXbJM@wuerfel>
-Message-ID: <20160104.215459.1264934689312091785.davem@davemloft.net>
+From: jay.xu@rock-chips.com (jianqun.xu)
+Date: Tue,  5 Jan 2016 11:02:18 +0800
+Subject: [PATCH] i2c: rk3x: init module as subsys call
+Message-ID: <1451962938-17398-1-git-send-email-jay.xu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Fri, 01 Jan 2016 14:55:24 +0100
+From: Xu Jianqun <jay.xu@rock-chips.com>
 
-> ARM allmodconfig fails because of the addition of the FMAN driver:
-> 
-> drivers/built-in.o: In function `dtsec_restart_autoneg':
-> binder.c:(.text+0x173328): undefined reference to `mdiobus_read'
-> binder.c:(.text+0x173348): undefined reference to `mdiobus_write'
-> drivers/built-in.o: In function `dtsec_config':
-> binder.c:(.text+0x173d24): undefined reference to `of_phy_find_device'
-> drivers/built-in.o: In function `init_phy':
-> binder.c:(.text+0x1763b0): undefined reference to `of_phy_connect'
-> drivers/built-in.o: In function `stop':
-> binder.c:(.text+0x176014): undefined reference to `phy_stop'
-> drivers/built-in.o: In function `start':
-> binder.c:(.text+0x176078): undefined reference to `phy_start'
-> 
-> The reason is that the driver uses PHYLIB, but that is a loadable
-> module here, and fman itself is built-in.
-> 
-> This patch makes it possible to configure fman as a module as well
-> so we don't change the status of PHYLIB in an allmodconfig kernel,
-> and it adds a 'select PHYLIB' statement to ensure that phylib is
-> always built-in when fman is.
-> 
-> The driver uses "builtin_platform_driver(fman_driver);", which means
-> it cannot be unloaded, but it's still possible to have it as a loadable
-> module that gets loaded once and never removed.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 5adae51a64b8 ("fsl/fman: Add FMan MURAM support")
+There is a requirement from pmic device, which is on the i2c bus,
+that the pmic needs to be called earlier then devices powered by
+the outputs of the pmic, if not, the devices maybe fail to probe.
 
-Applied, sorry I didn't catch this but nobody else was even attempting
-to review that huge patch series so I did the best that I could... :-/
+For example, a pmic on i2c0, and touchscreen device on i2c2,
+i2c0: - pmic(rk818)
+i2c2: - ts(gt911), powered by rk818 on i2c0
+
+The problem will happen if the i2c2 node in dts file is ordered
+before i2c0 node, then ts(gt911) will be probed before pmic(rk818),
+since the power from the pmic(rk818) for ts(gt911) hasn't enabled,
+so ts(gt911) will fail to probe due to the failure of i2c test.
+
+But if we set the i2c0 node before i2c2, there is no this issue.
+
+The stable way to make sure that pmic can be intalized before other
+peripher devices is to make the pmic module be subsys call, the i2c
+module need to be subsys call firstly.
+
+Signed-off-by: Xu Jianqun <jay.xu@rock-chips.com>
+---
+ drivers/i2c/busses/i2c-rk3x.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+index c1935eb..00e5959 100644
+--- a/drivers/i2c/busses/i2c-rk3x.c
++++ b/drivers/i2c/busses/i2c-rk3x.c
+@@ -1037,7 +1037,17 @@ static struct platform_driver rk3x_i2c_driver = {
+ 	},
+ };
+ 
+-module_platform_driver(rk3x_i2c_driver);
++static int __init rk3x_i2c_init(void)
++{
++	return platform_driver_register(&rk3x_i2c_driver);
++}
++subsys_initcall(rk3x_i2c_init);
++
++static void __exit rk3x_i2c_exit(void)
++{
++	platform_driver_unregister(&rk3x_i2c_driver);
++}
++module_exit(rk3x_i2c_exit);
+ 
+ MODULE_DESCRIPTION("Rockchip RK3xxx I2C Bus driver");
+ MODULE_AUTHOR("Max Schwarz <max.schwarz@online.de>");
+-- 
+1.9.1
