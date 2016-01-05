@@ -1,32 +1,39 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Tue, 5 Jan 2016 14:37:03 +0100
-Subject: [PATCH v4 05/12] arm-cci: PMU: Add support for transactions
-In-Reply-To: <20151221105528.GA19617@e106634-lin.cambridge.arm.com>
-References: <1450374559-23315-1-git-send-email-suzuki.poulose@arm.com>
- <1450374559-23315-6-git-send-email-suzuki.poulose@arm.com>
- <20151217184255.GI6344@twins.programming.kicks-ass.net>
- <5673DFC7.6060406@arm.com>
- <20151218104234.GN6344@twins.programming.kicks-ass.net>
- <5673E6C9.7040304@arm.com>
- <20151218114751.GP6344@twins.programming.kicks-ass.net>
- <20151221105528.GA19617@e106634-lin.cambridge.arm.com>
-Message-ID: <20160105133703.GN6344@twins.programming.kicks-ass.net>
+From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
+Date: Tue, 5 Jan 2016 19:11:16 +0530
+Subject: [PATCH] ARM: OMAP2+: AM43x debug_ll Kconfig help
+In-Reply-To: <1447225886-2940-1-git-send-email-afzal.mohd.ma@gmail.com>
+References: <1447225886-2940-1-git-send-email-afzal.mohd.ma@gmail.com>
+Message-ID: <20160105134116.GA7667@afzalpc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 21, 2015 at 10:55:29AM +0000, Suzuki K. Poulose wrote:
-> Thanks for that hint. Here is what I cam up with. We don't reschedule
-> the events, all we need to do is group the writes to the counters. Hence
-> we could as well add a flag for those events which need programming
-> and perform the write in pmu::pmu_enable().
+Hi Tony,
 
-I'm still somewhat confused..
+On Wed, Nov 11, 2015 at 12:41:26PM +0530, Afzal Mohammed wrote:
 
-> Grouping the writes to counters can ammortise the cost of the operation
-> on PMUs where it is expensive (e.g, CCI-500).
+> Mention about AM43x debug_ll ports - same as AM335x.
 
-This rationale makes me think you want to reduce the number of counter
-writes, not batch them per-se.
+If this patch is okay, what should be the route for this to reach
+mainline ?
 
-So why are you unconditionally writing all counters, instead of only
-those that changed?
+Regards
+afzal
+
+>  arch/arm/Kconfig.debug | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index 259c0ca9c99a..adc40fccfafa 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -689,7 +689,7 @@ choice
+>  		select DEBUG_OMAP2PLUS_UART
+>  
+>  	config DEBUG_AM33XXUART1
+> -		bool "Kernel low-level debugging messages via AM33XX UART1"
+> +		bool "Kernel low-level debugging messages via AM335x/AM43x UART1"
+>  		depends on ARCH_OMAP2PLUS
+>  		select DEBUG_OMAP2PLUS_UART
+>  
+> -- 
+> 2.5.1
