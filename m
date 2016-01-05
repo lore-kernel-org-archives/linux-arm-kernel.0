@@ -1,226 +1,65 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 5 Jan 2016 20:38:17 +0000
-Subject: [PATCH RFC 2/2] drm: sunxi: Add a basic DRM driver for Allwinner
- DE2
-In-Reply-To: <58463fd5b674c7eedec4ae05567ee56770a12996.1452021349.git.moinejf@free.fr>
-References: <cover.1452021349.git.moinejf@free.fr>
- <58463fd5b674c7eedec4ae05567ee56770a12996.1452021349.git.moinejf@free.fr>
-Message-ID: <20160105203817.GZ19062@n2100.arm.linux.org.uk>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 5 Jan 2016 12:40:21 -0800
+Subject: [PATCH v7 0/4] Allow customizable random offset to mmap_base
+ address.
+In-Reply-To: <1450718817-7082-1-git-send-email-dcashman@android.com>
+References: <1450718817-7082-1-git-send-email-dcashman@android.com>
+Message-ID: <CAGXu5jJcwZJCDE9adzdvYJct+w2Yk2ySDfzTyqwf=AvrbAqJ4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some comments from an ARM architecture point of view.  I haven't
-reviewed it from a DRM point of view yet.
+On Mon, Dec 21, 2015 at 9:26 AM, Daniel Cashman <dcashman@android.com> wrote:
+> Address Space Layout Randomization (ASLR) provides a barrier to exploitation of user-space processes in the presence of security vulnerabilities by making it more difficult to find desired code/data which could help an attack. This is done by adding a random offset to the location of regions in the process address space, with a greater range of potential offset values corresponding to better protection/a larger search-space for brute force, but also to greater potential for fragmentation.
+>
+> The offset added to the mmap_base address, which provides the basis for the majority of the mappings for a process, is set once on process exec in arch_pick_mmap_layout() and is done via hard-coded per-arch values, which reflect, hopefully, the best compromise for all systems. The trade-off between increased entropy in the offset value generation and the corresponding increased variability in address space fragmentation is not absolute, however, and some platforms may tolerate higher amounts of entropy. This patch introduces both new Kconfig values and a sysctl interface which may be used to change the amount of entropy used for offset generation on a system.
+>
+> The direct motivation for this change was in response to the libstagefright vulnerabilities that affected Android, specifically to information provided by Google's project zero at:
+>
+> http://googleprojectzero.blogspot.com/2015/09/stagefrightened.html
+>
+> The attack presented therein, by Google's project zero, specifically targeted the limited randomness used to generate the offset added to the mmap_base address in order to craft a brute-force-based attack. Concretely, the attack was against the mediaserver process, which was limited to respawning every 5 seconds, on an arm device. The hard-coded 8 bits used resulted in an average expected success rate of defeating the mmap ASLR after just over 10 minutes (128 tries at 5 seconds a piece). With this patch, and an accompanying increase in the entropy value to 16 bits, the same attack would take an average expected time of over 45 hours (32768 tries), which makes it both less feasible and more likely to be noticed.
+>
+> The introduced Kconfig and sysctl options are limited by per-arch minimum and maximum values, the minimum of which was chosen to match the current hard-coded value and the maximum of which was chosen so as to give the greatest flexibility without generating an invalid mmap_base address, generally a 3-4 bits less than the number of bits in the user-space accessible virtual address space.
+>
+> When decided whether or not to change the default value, a system developer should consider that mmap_base address could be placed anywhere up to 2^(value) bits away from the non-randomized location, which would introduce variable-sized areas above and below the mmap_base address such that the maximum vm_area_struct size may be reduced, preventing very large allocations.
+>
+> Changes in v7:
+> * changed random bit-grabbing to explicit '&' rather than '%'
+> * removed unsupported ARM64 combinations for CONFIG_ARCH_MMAP_RND_BITS_MAX
+> * aligned default CONFIG_ARCH_MMAP_RND_BITS_MAX to match ARCH_MMAP_RND_BITS_MIN
+> * whitespace change for x86 Kconfig
+>
+> dcashman (4):
+>   mm: mmap: Add new /proc tunable for mmap_base ASLR.
+>   arm: mm: support ARCH_MMAP_RND_BITS.
+>   arm64: mm: support ARCH_MMAP_RND_BITS.
+>   x86: mm: support ARCH_MMAP_RND_BITS.
+>
+>  Documentation/sysctl/vm.txt | 29 +++++++++++++++++++
+>  arch/Kconfig                | 68 +++++++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/Kconfig            |  9 ++++++
+>  arch/arm/mm/mmap.c          |  3 +-
+>  arch/arm64/Kconfig          | 29 +++++++++++++++++++
+>  arch/arm64/mm/mmap.c        |  8 ++++--
+>  arch/x86/Kconfig            | 16 +++++++++++
+>  arch/x86/mm/mmap.c          | 12 ++++----
+>  include/linux/mm.h          | 11 ++++++++
+>  kernel/sysctl.c             | 22 +++++++++++++++
+>  mm/mmap.c                   | 12 ++++++++
+>  11 files changed, 209 insertions(+), 10 deletions(-)
+>
+> --
+> 2.6.0.rc2.230.g3dd15c0
+>
 
-On Tue, Jan 05, 2016 at 07:40:11PM +0100, Jean-Francois Moine wrote:
-> +struct tcon {
-> +	u32 gctl;
-> +#define		TCON_GCTL_TCON_En 0x80000000
-> +	u32 gint0;
-> +#define		TCON_GINT0_TCON1_Vb_Int_En 0x40000000
-> +#define		TCON_GINT0_TCON1_Vb_Int_Flag 0x00001000
-> +	u32 gint1;
-> +	u32 dum0[13];
-> +	u32 tcon0_ctl;
-> +#define		TCON0_CTL_TCON_En 0x80000000
-> +	u32 dum1[19];
-> +	u32 tcon1_ctl;
-> +#define		TCON1_CTL_TCON_En 0x80000000
-> +#define		TCON1_CTL_Interlace_En 0x00100000
-> +#define		TCON1_CTL_Start_Delay_SHIFT 4
-> +#define		TCON1_CTL_Start_Delay_MASK 0x000001f0
-> +	u32 basic0;			/* XI/YI */
-> +	u32 basic1;			/* LS_XO/LS_YO */
-> +	u32 basic2;			/* XO/YO */
-> +	u32 basic3;			/* HT/HBP */
-> +	u32 basic4;			/* VT/VBP */
-> +	u32 basic5;			/* HSPW/VSPW */
-> +	u32 dum2;
-> +	u32 ps_sync;
-> +	u32 dum3[15];
-> +	u32 io_pol;
-> +#define		TCON1_IO_POL_IO0_inv 0x01000000
-> +#define		TCON1_IO_POL_IO1_inv 0x02000000
-> +#define		TCON1_IO_POL_IO2_inv 0x04000000
-> +	u32 io_tri;
-> +	u32 dum4[2];
-> +
-> +	u32 ceu_ctl;			/* 100 */
-> +#define     TCON_CEU_CTL_ceu_en 0x80000000
-> +	u32 dum5[3];
-> +	u32 ceu_rr;
-> +	u32 ceu_rg;
-> +	u32 ceu_rb;
-> +	u32 ceu_rc;
-> +	u32 ceu_gr;
-> +	u32 ceu_gg;
-> +	u32 ceu_gb;
-> +	u32 ceu_gc;
-> +	u32 ceu_br;
-> +	u32 ceu_bg;
-> +	u32 ceu_bb;
-> +	u32 ceu_bc;
-> +	u32 ceu_rv;
-> +	u32 ceu_gv;
-> +	u32 ceu_bv;
-> +	u32 dum6[45];
-> +
-> +	u32 mux_ctl;			/* 200 */
-> +#define		TCON_MUX_CTL_HDMI_SRC_SHIFT 8
-> +#define		TCON_MUX_CTL_HDMI_SRC_MASK 0x00000300
-> +	u32 dum7[63];
-> +
-> +	u32 fill_ctl;			/* 300 */
-> +	u32 fill_start0;
-> +	u32 fill_end0;
-> +	u32 fill_data0;
-> +};
+Please consider this series:
 
-This sets off warnings bells for me...
+Acked-by: Kees Cook <keescook@chromium.org>
 
-> +static void de2_set_frame_timings(struct lcd *lcd)
-> +{
-> +	struct drm_crtc *crtc = &lcd->crtc;
-> +	const struct drm_display_mode *mode = &crtc->mode;
-> +	struct tcon *p_tcon = lcd->mmio;
-> +	int interlace = mode->flags & DRM_MODE_FLAG_INTERLACE ? 2 : 1;
-> +	int start_delay;
-> +	u32 data;
-> +
-> +	DRM_DEBUG_DRIVER("\n");
-> +
-> +	data = XY(mode->hdisplay - 1, mode->vdisplay / interlace - 1);
-> +	p_tcon->basic0 = data;
-> +	p_tcon->basic1 = data;
-> +	p_tcon->basic2 = data;
-> +	p_tcon->basic3 = XY(mode->htotal - 1,
-> +				mode->htotal - mode->hsync_start - 1);
-> +	p_tcon->basic4 = XY(mode->vtotal * (3 - interlace),
-> +				mode->vtotal - mode->vsync_start - 1);
-> +	p_tcon->basic5 = XY(mode->hsync_end - mode->hsync_start - 1,
-> +				mode->vsync_end - mode->vsync_start - 1);
-> +
-> +	p_tcon->ps_sync = XY(1, 1);
-> +
-> +	data = TCON1_IO_POL_IO2_inv;
-> +	if (mode->flags & DRM_MODE_FLAG_PVSYNC)
-> +		data |= TCON1_IO_POL_IO0_inv;
-> +	if (mode->flags & DRM_MODE_FLAG_PHSYNC)
-> +		data |= TCON1_IO_POL_IO1_inv;
-> +	p_tcon->io_pol = data;
-> +
-> +	p_tcon->ceu_ctl &= ~TCON_CEU_CTL_ceu_en;
-> +
-> +	if (interlace == 2)
-> +		p_tcon->tcon1_ctl |= TCON1_CTL_Interlace_En;
-> +	else
-> +		p_tcon->tcon1_ctl &= ~TCON1_CTL_Interlace_En;
-> +
-> +	p_tcon->fill_ctl = 0;
-> +	p_tcon->fill_start0 = mode->vtotal + 1;
-> +	p_tcon->fill_end0 = mode->vtotal;
-> +	p_tcon->fill_data0 = 0;
-> +
-> +	start_delay = (mode->vtotal - mode->vdisplay) / interlace - 5;
-> +	if (start_delay > 31)
-> +		start_delay = 31;
-> +	p_tcon->tcon1_ctl &= ~TCON1_CTL_Start_Delay_MASK;
-> +	p_tcon->tcon1_ctl |= start_delay << TCON1_CTL_Start_Delay_SHIFT;
+Thanks for chipping away at it! :)
 
-Here, the compiler might read tcon1_ctl, clear the bits, merge the
-new bits in, and write them back.  Or it might decide to read,
-clear bits, write back, set the new bits, and write back again.
-What happens if start_delay were written as zero?
-
-> +
-> +	p_tcon->io_tri = 0x0fffffff;
-
-This whole thing even more so - the compiler is free to reorder
-these accesses, merge them together, etc.  If the compiler decides
-to inline this into callers, then it can merge these accesses with
-accesses in the caller functions too.
-
-This is why we have IO accessors; they prevent the compiler doing
-these kinds of optimisations, and to ensure correctness, we have
-sparse, and we mark MMIO memory with __iomem to prevent this kind
-of programming mistake.
-
-Please use sparse to check your work, and also use the IO accessors.
-
-The same comments apply elsewhere.
-
-> +}
-> +
-> +static void de2_crtc_enable(struct drm_crtc *crtc)
-> +{
-> +	struct lcd *lcd = crtc_to_lcd(crtc);
-> +	struct drm_display_mode *mode = &crtc->mode;
-> +	struct tcon *p_tcon = lcd->mmio;
-> +
-> +	DRM_DEBUG_DRIVER("clock %d\n", mode->clock);
-> +
-> +	if (mode->clock == 0) {
-> +		dev_err(lcd->dev, "crtc_start: no clock!\n");
-> +		return;
-> +	}
-
-Why do you need to check this here?
-
-> +
-> +	de2_set_frame_timings(lcd);
-> +
-> +	clk_set_rate(lcd->clk, mode->clock * 1000);
-
-What if the clock can't support the rate?
-
-...
-
-> +	/* set the VI/UIs channels */
-> +	for (chan = 0; chan < 4; chan++) {
-> +		int chan_o = mux_o + DE_MUX_CHAN_REGS +
-> +				DE_MUX_CHAN_SZ * chan;
-> +
-> +		if (chan == 0)
-> +			memset(priv->mmio + chan_o, 0, sizeof(struct de_vi));
-> +		else
-> +			memset(priv->mmio + chan_o, 0, sizeof(struct de_ui));
-
-The compiler is allowed to optimise memset() any way it chooses; it makes
-no guarantees what so ever, and the compiler is allowed to assume that it
-is accessing memory which has no side effects.  It's even allowed to use
-unaligned accesses if it so pleases, which are illegal for MMIO memory on
-ARM.  memset_io() must be used instead.  Sparse would have found this
-as well.
-
-...
-
-> +static int de2_hdmi_connector_mode_valid(struct drm_connector *connector,
-> +					struct drm_display_mode *mode)
-> +{
-> +	if (!drm_match_cea_mode(mode))
-> +		return MODE_NOMODE;
-
-Maybe detect modes with a zero clock here instead?
-
-> +	return MODE_OK;
-> +}
-
-...
-
-> +static void hdmi_phy_init(struct de2_hdmi_priv *priv)
-> +{
-> +	int to_cnt;
-> +	u32 tmp;
-> +
-> +	hdmi_writel(priv, 0x10020, 0);
-> +	hdmi_writel(priv, 0x10020, 1 << 0);
-> +	udelay(5);
-
-udelay() does not delay precisely; it may return slightly short of the
-requested delay.  I hope you've made allowance for that.
-
+-Kees
 
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Kees Cook
+Chrome OS & Brillo Security
