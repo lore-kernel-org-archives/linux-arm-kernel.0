@@ -1,33 +1,151 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Tue, 5 Jan 2016 09:50:49 +0000
-Subject: [PATCH v5 01/11] arm-cci: Define CCI counter period
-In-Reply-To: <20160104181940.GA17127@leverpostej>
-References: <1451908490-2615-1-git-send-email-suzuki.poulose@arm.com>
- <1451908490-2615-2-git-send-email-suzuki.poulose@arm.com>
- <20160104181940.GA17127@leverpostej>
-Message-ID: <568B91F9.6010307@arm.com>
+From: boqun.feng@gmail.com (Boqun Feng)
+Date: Tue, 5 Jan 2016 17:53:41 +0800
+Subject: [PATCH v2 15/32] powerpc: define __smp_xxx
+In-Reply-To: <20160105085117.GA11858@redhat.com>
+References: <1451572003-2440-1-git-send-email-mst@redhat.com>
+ <1451572003-2440-16-git-send-email-mst@redhat.com>
+ <20160105013648.GA1256@fixme-laptop.cn.ibm.com>
+ <20160105085117.GA11858@redhat.com>
+Message-ID: <20160105095341.GA5321@fixme-laptop.cn.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/01/16 18:27, Mark Rutland wrote:
-> On Mon, Jan 04, 2016 at 11:54:40AM +0000, Suzuki K. Poulose wrote:
->> Instead of hard coding the period we program on the PMU
->> counters, define a symbol.
->>
+On Tue, Jan 05, 2016 at 10:51:17AM +0200, Michael S. Tsirkin wrote:
+> On Tue, Jan 05, 2016 at 09:36:55AM +0800, Boqun Feng wrote:
+> > Hi Michael,
+> > 
+> > On Thu, Dec 31, 2015 at 09:07:42PM +0200, Michael S. Tsirkin wrote:
+> > > This defines __smp_xxx barriers for powerpc
+> > > for use by virtualization.
+> > > 
+> > > smp_xxx barriers are removed as they are
+> > > defined correctly by asm-generic/barriers.h
+> 
+> I think this is the part that was missed in review.
+> 
 
->> -	u64 val = 1ULL << 31;
->> -	local64_set(&hwc->prev_count, val);
->> -	pmu_write_counter(event, val);
->> +	local64_set(&hwc->prev_count, CCI_CNTR_PERIOD);
->> +	pmu_write_counter(event, CCI_CNTR_PERIOD);
->
-> I think this is a little misleading (and confusing), as we're conflating
-> the period with its inverse. This wouldn't work for any other value of
-> CCI_CNTR_PERIOD.
->
-> Perhaps s/PERIOD/START_VAL/, leaving everything else as-is?
+Yes, I realized my mistake after reread the series. But smp_lwsync() is
+not defined in asm-generic/barriers.h, right?
 
-You are right, will change it.
+> > > This reduces the amount of arch-specific boiler-plate code.
+> > > 
+> > > Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+> > > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > > ---
+> > >  arch/powerpc/include/asm/barrier.h | 24 ++++++++----------------
+> > >  1 file changed, 8 insertions(+), 16 deletions(-)
+> > > 
+> > > diff --git a/arch/powerpc/include/asm/barrier.h b/arch/powerpc/include/asm/barrier.h
+> > > index 980ad0c..c0deafc 100644
+> > > --- a/arch/powerpc/include/asm/barrier.h
+> > > +++ b/arch/powerpc/include/asm/barrier.h
+> > > @@ -44,19 +44,11 @@
+> > >  #define dma_rmb()	__lwsync()
+> > >  #define dma_wmb()	__asm__ __volatile__ (stringify_in_c(SMPWMB) : : :"memory")
+> > >  
+> > > -#ifdef CONFIG_SMP
+> > > -#define smp_lwsync()	__lwsync()
+> > > +#define __smp_lwsync()	__lwsync()
+> > >  
+> > 
+> > so __smp_lwsync() is always mapped to lwsync, right?
+> 
+> Yes.
+> 
+> > > -#define smp_mb()	mb()
+> > > -#define smp_rmb()	__lwsync()
+> > > -#define smp_wmb()	__asm__ __volatile__ (stringify_in_c(SMPWMB) : : :"memory")
+> > > -#else
+> > > -#define smp_lwsync()	barrier()
+> > > -
+> > > -#define smp_mb()	barrier()
+> > > -#define smp_rmb()	barrier()
+> > > -#define smp_wmb()	barrier()
+> > > -#endif /* CONFIG_SMP */
+> > > +#define __smp_mb()	mb()
+> > > +#define __smp_rmb()	__lwsync()
+> > > +#define __smp_wmb()	__asm__ __volatile__ (stringify_in_c(SMPWMB) : : :"memory")
+> > >  
+> > >  /*
+> > >   * This is a barrier which prevents following instructions from being
+> > > @@ -67,18 +59,18 @@
+> > >  #define data_barrier(x)	\
+> > >  	asm volatile("twi 0,%0,0; isync" : : "r" (x) : "memory");
+> > >  
+> > > -#define smp_store_release(p, v)						\
+> > > +#define __smp_store_release(p, v)						\
+> > >  do {									\
+> > >  	compiletime_assert_atomic_type(*p);				\
+> > > -	smp_lwsync();							\
+> > > +	__smp_lwsync();							\
+> > 
+> > , therefore this will emit an lwsync no matter SMP or UP.
+> 
+> Absolutely. But smp_store_release (without __) will not.
+> 
+> Please note I did test this: for ppc code before and after
+> this patch generates exactly the same binary on SMP and UP.
+> 
 
-Cheers
-Suzuki
+Yes, you're right, sorry for my mistake...
+
+> 
+> > Another thing is that smp_lwsync() may have a third user(other than
+> > smp_load_acquire() and smp_store_release()):
+> > 
+> > http://article.gmane.org/gmane.linux.ports.ppc.embedded/89877
+> > 
+> > I'm OK to change my patch accordingly, but do we really want
+> > smp_lwsync() get involved in this cleanup? If I understand you
+> > correctly, this cleanup focuses on external API like smp_{r,w,}mb(),
+> > while smp_lwsync() is internal to PPC.
+> > 
+> > Regards,
+> > Boqun
+> 
+> I think you missed the leading ___ :)
+> 
+
+What I mean here was smp_lwsync() was originally internal to PPC, but
+never mind ;-)
+
+> smp_store_release is external and it needs __smp_lwsync as
+> defined here.
+> 
+> I can duplicate some code and have smp_lwsync *not* call __smp_lwsync
+
+You mean bringing smp_lwsync() back? because I haven't seen you defining
+in asm-generic/barriers.h in previous patches and you just delete it in
+this patch.
+
+> but why do this? Still, if you prefer it this way,
+> please let me know.
+> 
+
+I think deleting smp_lwsync() is fine, though I need to change atomic
+variants patches on PPC because of it ;-/
+
+Regards,
+Boqun
+
+> > >  	WRITE_ONCE(*p, v);						\
+> > >  } while (0)
+> > >  
+> > > -#define smp_load_acquire(p)						\
+> > > +#define __smp_load_acquire(p)						\
+> > >  ({									\
+> > >  	typeof(*p) ___p1 = READ_ONCE(*p);				\
+> > >  	compiletime_assert_atomic_type(*p);				\
+> > > -	smp_lwsync();							\
+> > > +	__smp_lwsync();							\
+> > >  	___p1;								\
+> > >  })
+> > >  
+> > > -- 
+> > > MST
+> > > 
+> > > --
+> > > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> > > the body of a message to majordomo at vger.kernel.org
+> > > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > > Please read the FAQ at  http://www.tux.org/lkml/
