@@ -1,244 +1,122 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Mon, 04 Jan 2016 00:36:29 -0800
-Subject: [PATCH v2,
- RESEND] clk: uniphier: add clock drivers for UniPhier SoCs
-In-Reply-To: <CAK7LNARHuogHfsSyXVkkoakOq61xfhYJOa08cC7tvvn1kdPRoQ@mail.gmail.com>
-References: <1451298058-28910-1-git-send-email-yamada.masahiro@socionext.com>
- <20151231013511.21505.59601@quark.deferred.io>
- <CAK7LNARHuogHfsSyXVkkoakOq61xfhYJOa08cC7tvvn1kdPRoQ@mail.gmail.com>
-Message-ID: <20160104083629.15239.29413@quark.deferred.io>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Tue, 5 Jan 2016 00:09:30 +0000
+Subject: [PATCH v2 20/32] metag: define __smp_xxx
+In-Reply-To: <1451572003-2440-21-git-send-email-mst@redhat.com>
+References: <1451572003-2440-1-git-send-email-mst@redhat.com>
+ <1451572003-2440-21-git-send-email-mst@redhat.com>
+Message-ID: <20160105000929.GM17861@jhogan-linux.le.imgtec.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Masahiro Yamada (2016-01-01 17:26:05)
-> Hi Michael,
-> 
-> 
-> 2015-12-31 10:35 GMT+09:00 Michael Turquette <mturquette@baylibre.com>:
-> > Hello Yamada-san,
-> >
-> > Quoting Masahiro Yamada (2015-12-28 02:20:58)
-> >> diff --git a/drivers/clk/uniphier/Kconfig b/drivers/clk/uniphier/Kconfig
-> >> new file mode 100644
-> >> index 0000000..7606f27
-> >> --- /dev/null
-> >> +++ b/drivers/clk/uniphier/Kconfig
-> >> @@ -0,0 +1,35 @@
-> >> +menuconfig CLK_UNIPHIER
-> >> +       bool "Clock drivers for UniPhier SoCs"
-> >> +       depends on ARCH_UNIPHIER
-> >
-> > Might want to make the above line:
-> >
-> >         depends on ARCH_UNIPHIER || COMPILE_TEST
-> >
-> >> +       depends on OF
-> >> +       default y
-> >> +       help
-> >> +         Supports clock drivers for UniPhier SoCs.
-> >
-> > Why menuconfig? Can we make this a non-visible config option selected by
-> > the UniPhier platform?
-> 
-> Yes, I can do that if you like.
+Hi Michael,
 
-Thanks, and the other questions I asked in my previous reply are
-relevant here: can you make these into platform_drivers and compile them
-as loadable modules? That would be ideal.
+On Thu, Dec 31, 2015 at 09:08:22PM +0200, Michael S. Tsirkin wrote:
+> This defines __smp_xxx barriers for metag,
+> for use by virtualization.
+> 
+> smp_xxx barriers are removed as they are
+> defined correctly by asm-generic/barriers.h
+> 
+> Note: as __smp_XX macros should not depend on CONFIG_SMP, they can not
+> use the existing fence() macro since that is defined differently between
+> SMP and !SMP.  For this reason, this patch introduces a wrapper
+> metag_fence() that doesn't depend on CONFIG_SMP.
+> fence() is then defined using that, depending on CONFIG_SMP.
+
+I'm not a fan of the inconsistent commit message wrapping. I wrap to 72
+columns (although I now notice SubmittingPatches says to use 75...).
 
 > 
-> Do you prefer to making it flat, like all clocks are shown in the
-> "Common Clock Framework" menu?
+> Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/metag/include/asm/barrier.h | 32 +++++++++++++++-----------------
+>  1 file changed, 15 insertions(+), 17 deletions(-)
 > 
-> Or, is it better to categorize SoC clocks with "menu" for each SoC family?
+> diff --git a/arch/metag/include/asm/barrier.h b/arch/metag/include/asm/barrier.h
+> index b5b778b..84880c9 100644
+> --- a/arch/metag/include/asm/barrier.h
+> +++ b/arch/metag/include/asm/barrier.h
+> @@ -44,13 +44,6 @@ static inline void wr_fence(void)
+>  #define rmb()		barrier()
+>  #define wmb()		mb()
+>  
+> -#ifndef CONFIG_SMP
+> -#define fence()		do { } while (0)
+> -#define smp_mb()        barrier()
+> -#define smp_rmb()       barrier()
+> -#define smp_wmb()       barrier()
+> -#else
 
-The precedent is to do it flat. I'm fine with a menu though. Your
-choice.
+!SMP kernel text differs, but only because of new presence of unused
+metag_fence() inline function. If I #if 0 that out, then it matches, so
+thats fine.
 
-> 
-> 
-> 
-> >> +
-> >> +if CLK_UNIPHIER
-> >
-> > Please drop the if statement here and have the below options 'depends'
-> > on CLK_UNIPHIER.
-> 
-> Why is it bad?
-> 
-> I think surrounding all the options with "if CLK_UNIPHIER" ... "endif"
-> is easier than adding "depends on CLK_UNIPHIER" to each of them.
+> -
+>  #ifdef CONFIG_METAG_SMP_WRITE_REORDERING
+>  /*
+>   * Write to the atomic memory unlock system event register (command 0). This is
+> @@ -60,26 +53,31 @@ static inline void wr_fence(void)
+>   * incoherence). It is therefore ineffective if used after and on the same
+>   * thread as a write.
+>   */
+> -static inline void fence(void)
+> +static inline void metag_fence(void)
+>  {
+>  	volatile int *flushptr = (volatile int *) LINSYSEVENT_WR_ATOMIC_UNLOCK;
+>  	barrier();
+>  	*flushptr = 0;
+>  	barrier();
+>  }
+> -#define smp_mb()        fence()
+> -#define smp_rmb()       fence()
+> -#define smp_wmb()       barrier()
+> +#define __smp_mb()        metag_fence()
+> +#define __smp_rmb()       metag_fence()
+> +#define __smp_wmb()       barrier()
+>  #else
+> -#define fence()		do { } while (0)
+> -#define smp_mb()        barrier()
+> -#define smp_rmb()       barrier()
+> -#define smp_wmb()       barrier()
+> +#define metag_fence()		do { } while (0)
+> +#define __smp_mb()        barrier()
+> +#define __smp_rmb()       barrier()
+> +#define __smp_wmb()       barrier()
 
-I find it more readable to clearly define the dependencies for each
-config option.
+Whitespace is now messed up. Admitedly its already inconsistent
+tabs/spaces, but it'd be nice if the definitions at least still all
+lined up. You're touching all the definitions which use spaces anyway,
+so feel free to convert them to tabs while you're at it.
 
-> 
-> 
-> 
-> >> +
-> >> +config CLK_UNIPHIER_PH1_SLD3
-> >> +       bool "Clock driver for UniPhier PH1-sLD3 SoC"
-> >> +       default y
-> >
-> > Can you make these drivers into loadable modules? If so you might
-> > consider tristate.
-> 
-> For some, I can.
-> For some, I can't (because they must provide an input clock for the timer.)
-> 
-> 
-> >> +
-> >> +static void __init ph1_ld4_clk_init(struct device_node *np)
-> >> +{
-> >> +       uniphier_clk_init(np, ph1_ld4_clk_idata);
-> >> +}
-> >> +CLK_OF_DECLARE(ph1_ld4_clk, "socionext,ph1-ld4-sysctrl", ph1_ld4_clk_init);
-> >
-> > Can you avoid using CLK_OF_DECLARE and instead make this into a
-> > platform_driver? For examples please see drivers/clk/qcom*.c
-> 
-> 
-> For clk-uniphier-peri.c and clk-uniphier-mio.c, yes.
-> They provide clocks for peripheral devices like USB, MMC, etc., so I
-> can delay them.
-> 
-> 
-> For clk-ph1-*.c, I am afraid I can't.
-> They provide an input clock for the timer (ARM global timer).
-> I think they should be initialized very early.
-> 
-> 
-> Is platform_driver better than CLK_OF_DECLARE() where it is possible?
+Other than those niggles, it looks sensible to me:
+Acked-by: James Hogan <james.hogan@imgtec.com>
 
-Yes.
+Cheers
+James
 
-> 
-> I just chose CLK_OF_DECLARE() for consistency
-> and it seems the majority.
-
-I'm trying to change that.
-
-> 
-> 
-> 
-> >> +
-> >> +static void __init uniphier_clk_update_parent_name(struct device_node *np,
-> >> +                                                  const char **parent_name)
-> >> +{
-> >> +       const char *new_name;
-> >> +       int index;
-> >> +
-> >> +       if (!parent_name || !*parent_name)
-> >> +               return;
-> >> +
-> >> +       if (strncmp(*parent_name, UNIPHIER_CLK_EXT, strlen(UNIPHIER_CLK_EXT)))
-> >> +               return;
-> >> +
-> >> +       index = of_property_match_string(np, "clock-names",
-> >> +                               *parent_name + strlen(UNIPHIER_CLK_EXT));
-> >> +       new_name = of_clk_get_parent_name(np, index);
-> >> +       if (new_name)
-> >> +               *parent_name = new_name;
-> >
-> > Where can I find the DT binding description and DTS for this clock
-> > controller?
-
-Any update on the above question? I wasn't able to find the DT binding
-description anywhere.
-
-> I'm confused why the parent name function is necessary and
-> > I'd like to see the data.
-> 
-> 
-> clk_register() needs the name strings of parent clocks,
-> not pointers to parent clocks.
-> (It looks a bit odd to me, although it allows us to register clocks in
-> any order.
-> In stead, we have to think about orphan-walking.)
-
-Actually, I'd like to allow a clk_register() that takes pointers to
-struct clk_core for the parent. This is useful for registering clocks
-whose parents are inside the same clock provider/generator/driver.
-
-We might still need the clock parent names for registering parents across
-the clock provider/generator/driver boundary. Or maybe not ... Since we
-can use the phandle to fetch a struct clk_core for a clock that has
-already been registered. But these are ideas for the future.
-
-> So, we need to exactly know the names of parent clocks.
-> 
-> Let's assume the clock system that consists of some hardware blocks.
-> 
-> 
->   root_clk: root_clk {
->         compatible = "foo-clk";
->         reg = <0x10000000 0x1000>;
->         #clock-cells = <1>;
->   };
-> 
->   bar_clk {
->         compatible = "bar-clk";
->         reg = <0x20000000 0x1000>;
->         #clock-cells = <1>;
->         clock-names = "input"
->         clocks = <&root_clk 0>;
->    };
-> 
->   baz_clk {
->         compatible = "baz-clk";
->         reg = <0x30000000 0x1000>;
->         #clock-cells = <1>;
->         clock-names = "input"
->         clocks = <&root_clk 1>;
->    };
-> 
-> 
-> 
-> The "bar_clk" is a clock provider for other peripherals,
-> and also a consumer of "root_clk".
-> 
-> The "bar_clk" wants to know the name of index 0 of root_clk
-> because it is needed when calling clk_register().
-> 
-> 
-> Let's say the names of clocks provided root_clk are, "for-bar123", "for-baz456".
-> 
-> The "bar_clk" needs the string "for-bar123", but it does not know.
-> (Likewise, the "baz_clk" needs the string "for-baz456", but it does not know.)
-> 
-> Of course, I can hard-code "for-bar123" in the driver of "bar_clk",
-> but I think it is annoying to keep the name synced between the
-> provider and the consumer.
-
-For on-chip clock providers and consumers it is usually safe to
-hard-code the names since the clock configuration of the IC/SoC is
-well-defined. For making board-level connections it is less safe.
-
-Still, many clk drivers do indeed hard-code the string names for their
-parent clocks.
-
-> 
-> So, I implemented uniphier_clk_update_parent_name()
-> to convert the clock-names into the parent clock name.
-> In this case, this function takes "input" and converts it into "for-bar123".
-> 
-> 
-> Is there any good idea to solve this problem?
-
-Well, using the clock-output-names DT property in conjunction with
-of_clk_get_parent_name() solves this for you in a common way. However I
-would like to get rid of clock-output-names in the future. In general
-I'm working slowy to reduce the reliance on clock string names, but it
-is a long-term side project.
-
-How bad is it for you to hard-code the string names in your driver? Are
-the foo, bar and baz clock providers all on the same chip?
-
-Regards,
-Mike
-
-> 
-> 
+>  #endif
+> +
+> +#ifdef CONFIG_SMP
+> +#define fence() metag_fence()
+> +#else
+> +#define fence()		do { } while (0)
+>  #endif
+>  
+> -#define smp_mb__before_atomic()	barrier()
+> -#define smp_mb__after_atomic()	barrier()
+> +#define __smp_mb__before_atomic()	barrier()
+> +#define __smp_mb__after_atomic()	barrier()
+>  
+>  #include <asm-generic/barrier.h>
+>  
 > -- 
-> Best Regards
-> Masahiro Yamada
+> MST
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160105/822d84d1/attachment-0001.sig>
