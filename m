@@ -1,58 +1,100 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 5 Jan 2016 08:36:39 +0100
-Subject: [linux-next PATCH] arm64: fix kernel crash with 48-bit VA and
- 64KB granule
-In-Reply-To: <1451960299-14123-1-git-send-email-dennis.chen@arm.com>
-References: <1451960299-14123-1-git-send-email-dennis.chen@arm.com>
-Message-ID: <CAKv+Gu-pz8rA2EfU6NwCndmoYneOjYUt8_PodTdZkepV3cRXJQ@mail.gmail.com>
+From: huangtao@rock-chips.com (Huang, Tao)
+Date: Tue, 5 Jan 2016 15:42:32 +0800
+Subject: [PATCH] i2c: rk3x: init module as subsys call
+In-Reply-To: <2513923.8oltbpbAin@phil>
+References: <1451962938-17398-1-git-send-email-jay.xu@rock-chips.com>
+ <2513923.8oltbpbAin@phil>
+Message-ID: <568B73E8.3010901@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 January 2016 at 03:18, Dennis Chen <dennis.chen@arm.com> wrote:
-> The commit 3400749b5a22 ("arm64/efi: refactor EFI init and runtime
-> code for reuse by 32-bit ARM") uses pgd_alloc() to allocate space for
-> efi_mm.pgd while not the static efi_pgd[], since this function will be
-> called with early_initcall, which results in the pgd_cache used by
-> pgd_alloc() has not been initialized yet, kernel will hang in this
-> case. This patch is trying to make the pgd_cache_init() called before
-> arm_enable_runtime_services() by changing its core_initcall to
-> early_initcall.
->
-> Signed-off-by: Dennis Chen <dennis.chen@arm.com>
-> Tested-by: Sudeep Holla <sudeep.holla@arm.com>
->
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->  arch/arm64/mm/pgd.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/mm/pgd.c b/arch/arm64/mm/pgd.c
-> index cb3ba1b..859a788 100644
-> --- a/arch/arm64/mm/pgd.c
-> +++ b/arch/arm64/mm/pgd.c
-> @@ -56,4 +56,4 @@ static int __init pgd_cache_init(void)
->                                               SLAB_PANIC, NULL);
->         return 0;
->  }
-> -core_initcall(pgd_cache_init);
-> +early_initcall(pgd_cache_init);
+Hi, Heiko:
+
+On 2016?01?05? 15:02, Heiko Stuebner wrote:
+> Hi Jianqun,
+> 
+> Am Dienstag, 5. Januar 2016, 11:02:18 schrieb jianqun.xu:
+>> From: Xu Jianqun <jay.xu@rock-chips.com>
+>>
+>> There is a requirement from pmic device, which is on the i2c bus,
+>> that the pmic needs to be called earlier then devices powered by
+>> the outputs of the pmic, if not, the devices maybe fail to probe.
+>>
+>> For example, a pmic on i2c0, and touchscreen device on i2c2,
+>> i2c0: - pmic(rk818)
+>> i2c2: - ts(gt911), powered by rk818 on i2c0
+>>
+>> The problem will happen if the i2c2 node in dts file is ordered
+>> before i2c0 node, then ts(gt911) will be probed before pmic(rk818),
+>> since the power from the pmic(rk818) for ts(gt911) hasn't enabled,
+>> so ts(gt911) will fail to probe due to the failure of i2c test.
+>>
+>> But if we set the i2c0 node before i2c2, there is no this issue.
+>>
+>> The stable way to make sure that pmic can be intalized before other
+>> peripher devices is to make the pmic module be subsys call, the i2c
+>> module need to be subsys call firstly.
+> 
+> I do believe that came up in the past already and the direction from then 
+> was (and most likely still is) that drivers should make use of the probe-
+> deferral mechanism instead of wiggling with the initcall ordering.
 
 
-Hello all,
+I don't think this is a good idea. This will trigger a lots of init call
+failed. Before pmic init, all i2c device driver transmit will failed,
+and because i2c is slow bus, and i2c transmit may failed by other
+reasons, so the i2c driver and i2c device driver will try many times to
+make sure the transmit completion. These unnecessary transmission will
+make Linux boot very slow.
 
-Apologies for not spotting this before sending it out.
+I2C bus should be subsys, and we can easy resolve this problem, why we
+depends on a complicated and slow implementation?
 
-The issue only occurs when PGD_SIZE != PAGE_SIZE, which is why I did
-not see it myself. I only tested with 4k/39-bits and 64k/42-bits IIRC,
-since the series this is part of primarily concerns ARM not arm64.
+> 
+> Your touchscreen will have a "xyz-supply" property and I think the 
+> regulator-framework should already emit a -EPROBE_DEFER at regulator_get, 
+> when the regulator is specified but not available yet.
 
-Anyway, shuffling init ordering is my least favorite way of fixing
-bugs. Since only ARM requires pgd_alloc() (for the kernel mappings),
-we could also simply factor out pgd_alloc() into efi_pgd_alloc(), and
-define it to mean '__get_free_page(PGALLOC_GFP)' on arm64.
+Unfortunately, mostly driver do not support regulator api. They are
+suppose power is on.
 
--- 
-Ard.
+Thanks.
+Huang, Tao
+
+> 
+> 
+> Heiko
+> 
+>>
+>> Signed-off-by: Xu Jianqun <jay.xu@rock-chips.com>
+>> ---
+>>  drivers/i2c/busses/i2c-rk3x.c | 12 +++++++++++-
+>>  1 file changed, 11 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+>> index c1935eb..00e5959 100644
+>> --- a/drivers/i2c/busses/i2c-rk3x.c
+>> +++ b/drivers/i2c/busses/i2c-rk3x.c
+>> @@ -1037,7 +1037,17 @@ static struct platform_driver rk3x_i2c_driver = {
+>>  	},
+>>  };
+>>
+>> -module_platform_driver(rk3x_i2c_driver);
+>> +static int __init rk3x_i2c_init(void)
+>> +{
+>> +	return platform_driver_register(&rk3x_i2c_driver);
+>> +}
+>> +subsys_initcall(rk3x_i2c_init);
+>> +
+>> +static void __exit rk3x_i2c_exit(void)
+>> +{
+>> +	platform_driver_unregister(&rk3x_i2c_driver);
+>> +}
+>> +module_exit(rk3x_i2c_exit);
+>>
+>>  MODULE_DESCRIPTION("Rockchip RK3xxx I2C Bus driver");
+>>  MODULE_AUTHOR("Max Schwarz <max.schwarz@online.de>");
+> 
+> 
+> 
+> 
