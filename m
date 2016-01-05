@@ -1,75 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 5 Jan 2016 13:34:47 +0000
-Subject: [PATCH v3 2/2] ARM64: kernel: PSCI: move PSCI idle management
- code to drivers/firmware
-In-Reply-To: <20160105132701.GA17214@red-moon>
-References: <1445011379-8787-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1445011379-8787-3-git-send-email-lorenzo.pieralisi@arm.com>
- <20160105105900.GT19062@n2100.arm.linux.org.uk>
- <20160105123134.GA1821@red-moon>
- <20160105125142.GV19062@n2100.arm.linux.org.uk>
- <20160105132701.GA17214@red-moon>
-Message-ID: <20160105133447.GW19062@n2100.arm.linux.org.uk>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Tue, 5 Jan 2016 14:37:03 +0100
+Subject: [PATCH v4 05/12] arm-cci: PMU: Add support for transactions
+In-Reply-To: <20151221105528.GA19617@e106634-lin.cambridge.arm.com>
+References: <1450374559-23315-1-git-send-email-suzuki.poulose@arm.com>
+ <1450374559-23315-6-git-send-email-suzuki.poulose@arm.com>
+ <20151217184255.GI6344@twins.programming.kicks-ass.net>
+ <5673DFC7.6060406@arm.com>
+ <20151218104234.GN6344@twins.programming.kicks-ass.net>
+ <5673E6C9.7040304@arm.com>
+ <20151218114751.GP6344@twins.programming.kicks-ass.net>
+ <20151221105528.GA19617@e106634-lin.cambridge.arm.com>
+Message-ID: <20160105133703.GN6344@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 05, 2016 at 01:27:01PM +0000, Lorenzo Pieralisi wrote:
-> On Tue, Jan 05, 2016 at 12:51:42PM +0000, Russell King - ARM Linux wrote:
-> > On ARM, that option is CONFIG_ARM_CPU_SUSPEND - that option solely
-> > controls whether cpu_suspend/resume are present.  ARM64 just needs
-> > to adopt this, and use that to control the code which is built in
-> > drivers/firmware/psci.c.
-> > 
-> > However, I don't think it's as simple as just adding that to ARM64,
-> > as you need to be careful of the Kconfig dependencies.  For ARM,
-> > this is:
-> > 
-> > Generic code:
-> > - SUSPEND defaults to y, depends on ARCH_SUSPEND_POSSIBLE (which is set for
-> >    any cpu_suspend enabled CPU.)
-> > - PM_SLEEP if SUSPEND || HIBERNATE_CALLBACKS
-> > ARM sets:
-> > - CPU_PM if SUSPEND || CPU_IDLE.
-> > - ARM_CPU_SUSPEND if PM_SLEEP || BL_SWITCHER || (ARCH_PXA && PM)
-> > 
-> > What this means is that CPU_PM is entirely independent of
-> > ARM_CPU_SUSPEND.  One does not imply the other, so I think you need
-> > to consider carefully what ifdef you need in drivers/firmware/psci.c.
-> > 
-> > This is why I think fixing this is not simple as it first looks.
-> 
-> Not saying it is nice, but unless I find a cleaner way I was keener on
-> adding a silent config entry in drivers/firmware, say:
-> 
-> config ARM_PSCI_CPU_IDLE
-> 	def_bool ARM_PSCI_FW && CPU_IDLE
-> 	select ARM_CPU_SUSPEND if ARM
-> 
-> and use that to either guard the code or stub it out and compile it
-> if that config option is enabled.
+On Mon, Dec 21, 2015 at 10:55:29AM +0000, Suzuki K. Poulose wrote:
+> Thanks for that hint. Here is what I cam up with. We don't reschedule
+> the events, all we need to do is group the writes to the counters. Hence
+> we could as well add a flag for those events which need programming
+> and perform the write in pmu::pmu_enable().
 
-That immediately worries me, because it bypasses the CPU dependencies
-for ARM_CPU_SUSPEND implicitly applied via ARCH_SUSPEND_POSSIBLE.  I'd
-prefer instead:
+I'm still somewhat confused..
 
-config ARM_PSCI_CPU_IDLE
-	def_bool ARM_PSCI_FW && CPU_IDLE && (!ARM || ARM_CPU_SUSPEND)
+> Grouping the writes to counters can ammortise the cost of the operation
+> on PMUs where it is expensive (e.g, CCI-500).
 
-Really, the answer is to stop ARM64 diverging from ARM, so we stop
-having these architecture conditionals all over the place.  If ARM64
-builds its cpu_suspend code in the same way that ARM does (iow,
-keyed off ARM_CPU_SUSPEND, which it can select), then we end up
-with the above being:
+This rationale makes me think you want to reduce the number of counter
+writes, not batch them per-se.
 
-config ARM_PSCI_CPU_IDLE
-	def_bool ARM_PSCI_FW && CPU_IDLE && ARM_CPU_SUSPEND
-
-which is a helll of a lot simpler.  The dependency on ARM_PSCI_FW
-could be regarded as redundant if we're only using ARM_PSCI_CPU_IDLE
-to control code built within drivers/firmware/psci.c, as that won't
-be built unless ARM_PSCI_FW is set.
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+So why are you unconditionally writing all counters, instead of only
+those that changed?
