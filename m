@@ -1,31 +1,33 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 5 Jan 2016 11:49:18 +1100
-Subject: Widespread boot failures on ARM due to "mm/page_alloc.c:
- calculate zone_start_pfn at zone_spanned_pages_in_node()"
-In-Reply-To: <20160104163528.be56a4b1.akpm@linux-foundation.org>
-References: <20160104224233.GU16023@sirena.org.uk>
- <20160104150946.373ed02b8e8b81221340b7c8@linux-foundation.org>
- <20160104235512.GW16023@sirena.org.uk>
- <20160104163528.be56a4b1.akpm@linux-foundation.org>
-Message-ID: <20160105114918.2641f95d@canb.auug.org.au>
+From: rafael.j.wysocki@intel.com (Rafael J. Wysocki)
+Date: Tue, 5 Jan 2016 02:04:11 +0100
+Subject: next-20160104 build: 3 failures 15 warnings (next-20160104)
+In-Reply-To: <20160104153502.GK16023@sirena.org.uk>
+References: <E1aG3zo-0000gt-2t@optimist> <20160104153502.GK16023@sirena.org.uk>
+Message-ID: <568B168B.9060001@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
-
-On Mon, 4 Jan 2016 16:35:28 -0800 Andrew Morton <akpm@linux-foundation.org> wrote:
+On 1/4/2016 4:35 PM, Mark Brown wrote:
+> On Mon, Jan 04, 2016 at 12:12:20PM +0000, Build bot for Mark Brown wrote:
 >
-> Stephen, can we please retain
-> 
-> mm-calculate-zone_start_pfn-at-zone_spanned_pages_in_node.patch
-> mm-introduce-kernelcore=mirror-option.patch
-> mm-introduce-kernelcore=mirror-option-fix.patch
-> mm-introduce-kernelcore=mirror-option-fix-2.patch
-> 
-> and add the below?
+> Today's linux-next fails to build for arm64 due to 44d3d051253 (ARM64:
+> dts: mt8173: Add CPU OPP, clock and regulator supply properties)
 
-Sure, that is easier than dropping the above patches, anyway.
+Thanks for letting me know, I've dropped this one.
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+> in one of Raphael's trees:
+>
+>> 	arm64-allmodconfig
+>> Error: ../arch/arm64/boot/dts/mediatek/mt8173.dtsi:132.24-25 syntax error
+>> Error: ../arch/arm64/boot/dts/mediatek/mt8173.dtsi:132.24-25 syntax error
+>> 	arm64-defconfig
+>> Error: ../arch/arm64/boot/dts/mediatek/mt8173.dtsi:132.24-25 syntax error
+> which is failing because at least CLK_INFRA_CA53SEL is used but never
+> defined, presumably there is some dependency which wasn't integrated.
+> Normally we merge DT changes via the architecture to help avoid these
+> issues.
+
+Yes, that would be better.
+
+Thanks,
+Rafael
