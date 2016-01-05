@@ -1,98 +1,82 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Mon, 04 Jan 2016 16:23:51 -0800
-Subject: [GIT PULL 1/5] clk: tegra: Changes for v4.5-rc1
-In-Reply-To: <1450356639-7758-1-git-send-email-thierry.reding@gmail.com>
-References: <1450356639-7758-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <20160105002351.15239.82225@quark.deferred.io>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Mon, 4 Jan 2016 16:35:28 -0800
+Subject: Widespread boot failures on ARM due to
+ "mm/page_alloc.c: calculate zone_start_pfn at zone_spanned_pages_in_node()"
+In-Reply-To: <20160104235512.GW16023@sirena.org.uk>
+References: <20160104224233.GU16023@sirena.org.uk>
+ <20160104150946.373ed02b8e8b81221340b7c8@linux-foundation.org>
+ <20160104235512.GW16023@sirena.org.uk>
+Message-ID: <20160104163528.be56a4b1.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Thierry Reding (2015-12-17 04:50:35)
-> Hi Mike, Stephen,
-> 
-> The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
-> 
->   Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.5-clk
+On Mon, 4 Jan 2016 23:55:12 +0000 Mark Brown <broonie@kernel.org> wrote:
 
-Pulled.
+> On Mon, Jan 04, 2016 at 03:09:46PM -0800, Andrew Morton wrote:
+> > On Mon, 4 Jan 2016 22:42:33 +0000 Mark Brown <broonie@kernel.org> wrote:
+> 
+> > > platforms in the kernelci.org boot tests[1].  Doing bisections with
+> > > Arndale and BeagleBone Black identifies 904769ac82ebf (mm/page_alloc.c:
+> > > calculate zone_start_pfn at zone_spanned_pages_in_node()) from the akpm
+> > > tree as the first broken commit[2,3].  An example bootlog from the
+> > > failure is:
+> 
+> > Thanks.  That patch has rather a blooper if
+> > CONFIG_HAVE_MEMBLOCK_NODE_MAP=n.  Is that the case in your testing?
+> 
+> Seems to be what's making a difference from a quick run through, yes.
 
-Regards,
-Mike
+OK, thanks.
 
-> 
-> for you to fetch changes up to 2d7f61f37731f635af47615a8a331ffe7f884934:
-> 
->   clk: tegra: Read correct IDDQ register in PLL_SS registration (2015-12-17 13:37:58 +0100)
-> 
-> Note that the first commit in this set adds the device tree bindings for
-> Tegra210. This is a dependency for the for-4.5/dt branch because it adds
-> the dt-bindings include file used by the Tegra210 DTS files.
-> 
-> Thanks,
-> Thierry
-> 
-> ----------------------------------------------------------------
-> clk: tegra: Changes for v4.5-rc1
-> 
-> This set of changes adds support for the Tegra210 SoC and contains a
-> couple fixes and cleanups.
-> 
-> ----------------------------------------------------------------
-> Andrew Bresticker (1):
->       clk: tegra: pll: Fix issues with rates for VCO PLLs
-> 
-> Bill Huang (8):
->       clk: tegra: pll: Change misc_reg count from 3 to 6
->       clk: tegra: pll: Add code to handle if resets are supported by PLL
->       clk: tegra: pll: Adjust vco_min if SDM present
->       clk: tegra: pll: Add Set_default logic
->       clk: tegra: pll: Add logic for SS
->       clk: tegra: Add Super Gen5 Logic
->       clk: tegra: Fix WARN_ON in PLL_RE registration
->       clk: tegra: Read correct IDDQ register in PLL_SS registration
-> 
-> Danny Huang (1):
->       clk: tegra: pll: Update PLLM handling
-> 
-> Rhyland Klein (12):
->       clk: tegra: periph: Add new periph clks and muxes for Tegra210
->       clk: tegra: pll: Add tegra_pll_wait_for_lock to clk header
->       clk: tegra: pll: Simplify clk_enable_path
->       clk: tegra: pll: Update warning message
->       clk: tegra: pll: Don't unconditionally set LOCK flags
->       clk: tegra: pll: Add logic for handling SDM data
->       clk: tegra: pll: Add logic for out-of-table rates for T210
->       clk: tegra: pll: Fix _pll_ramp_calc_pll logic and _calc_dynamic_ramp_rate
->       clk: tegra: pll: Add specialized logic for Tegra210
->       clk: tegra: pll: Add support for PLLMB for Tegra210
->       clk: tegra: pll: Add dyn_ramp callback
->       clk: tegra: Add support for Tegra210 clocks
-> 
-> Thierry Reding (5):
->       clk: tegra: Add Tegra210 device tree binding
->       clk: tegra: Fix 26 MHz oscillator frequency
->       clk: tegra: Miscellaneous coding style cleanups
->       clk: tegra: Format tables consistently
->       clk: tegra: Constify pdiv-to-hw mappings
-> 
->  .../bindings/clock/nvidia,tegra210-car.txt         |   56 +
->  drivers/clk/tegra/Makefile                         |    1 +
->  drivers/clk/tegra/clk-id.h                         |   75 +-
->  drivers/clk/tegra/clk-pll.c                        |  838 ++++--
->  drivers/clk/tegra/clk-tegra-periph.c               |  371 ++-
->  drivers/clk/tegra/clk-tegra-super-gen4.c           |  142 +-
->  drivers/clk/tegra/clk-tegra114.c                   |  339 +--
->  drivers/clk/tegra/clk-tegra124.c                   |  453 ++--
->  drivers/clk/tegra/clk-tegra20.c                    |  314 ++-
->  drivers/clk/tegra/clk-tegra210.c                   | 2852 ++++++++++++++++++++
->  drivers/clk/tegra/clk-tegra30.c                    |  426 +--
->  drivers/clk/tegra/clk.h                            |  101 +-
->  include/dt-bindings/clock/tegra210-car.h           |  401 +++
->  13 files changed, 5439 insertions(+), 930 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/nvidia,tegra210-car.txt
->  create mode 100644 drivers/clk/tegra/clk-tegra210.c
->  create mode 100644 include/dt-bindings/clock/tegra210-car.h
+Stephen, can we please retain
+
+mm-calculate-zone_start_pfn-at-zone_spanned_pages_in_node.patch
+mm-introduce-kernelcore=mirror-option.patch
+mm-introduce-kernelcore=mirror-option-fix.patch
+mm-introduce-kernelcore=mirror-option-fix-2.patch
+
+and add the below?
+
+Or don't bother - I'll do an mmotm tomorrow with these in it.
+
+I'd still like reviewing and testing from Taku Izumi please.
+
+
+
+From: Arnd Bergmann <arnd@arndb.de>
+Subject: mm/page_alloc.c: set a zone_start_pfn value in zone_spanned_pages_in_node
+
+We got a new build warning in linux-next:
+
+mm/page_alloc.c: In function 'free_area_init_node':
+mm/page_alloc.c:5278:25: warning: 'zone_start_pfn' may be used uninitialized in this function [-Wmaybe-uninitialized]
+    zone->zone_start_pfn = zone_start_pfn;
+mm/page_alloc.c:5265:17: note: 'zone_start_pfn' was declared here
+   unsigned long zone_start_pfn, zone_end_pfn;
+
+The code indeed looks wrong, but this is just a guess of what the
+fix might be: I have not looked it in detail, so please treat this
+as a bug report.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Taku Izumi <izumi.taku@jp.fujitsu.com>
+Cc: Tony Luck <tony.luck@intel.com>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+---
+
+ mm/page_alloc.c |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff -puN mm/page_alloc.c~mm-calculate-zone_start_pfn-at-zone_spanned_pages_in_node-fix mm/page_alloc.c
+--- a/mm/page_alloc.c~mm-calculate-zone_start_pfn-at-zone_spanned_pages_in_node-fix
++++ a/mm/page_alloc.c
+@@ -5013,6 +5013,8 @@ static inline unsigned long __meminit zo
+ 					unsigned long *zone_end_pfn,
+ 					unsigned long *zones_size)
+ {
++	*zone_start_pfn = node_start_pfn;
++	*zone_end_pfn = node_end_pfn;
+ 	return zones_size[zone_type];
+ }
+ 
+_
