@@ -1,39 +1,58 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 5 Jan 2016 10:23:37 -0200
-Subject: [PATCH 2/2] ARM: dts: imx6qdl-microsom-ar8035: Adjust Ethernet
- PHY reset duration
-In-Reply-To: <20160104224234.GR19062@n2100.arm.linux.org.uk>
-References: <1451934700-28060-1-git-send-email-festevam@gmail.com>
- <1451934700-28060-2-git-send-email-festevam@gmail.com>
- <20160104224234.GR19062@n2100.arm.linux.org.uk>
-Message-ID: <CAOMZO5ByFwYk7JT=U-y-ECpDHLXwwk3XSiRWpsini2E34qmLbA@mail.gmail.com>
+From: xuejiancheng@huawei.com (xuejiancheng)
+Date: Tue, 5 Jan 2016 20:19:02 +0800
+Subject: [PATCH v4 5/6] mfd: dt-bindings: add device tree bindings for
+ Hi3519 sysctrl
+In-Reply-To: <1451988742.3391.22.camel@pengutronix.de>
+References: <1451439832-13927-1-git-send-email-xuejiancheng@huawei.com>
+ <1451439832-13927-6-git-send-email-xuejiancheng@huawei.com>
+ <1451988742.3391.22.camel@pengutronix.de>
+Message-ID: <568BB4B6.20507@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 4, 2016 at 8:42 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Jan 04, 2016 at 05:11:40PM -0200, Fabio Estevam wrote:
->> From: Fabio Estevam <fabio.estevam@nxp.com>
->>
->> As per the AR8035 datasheet:
->>
->> "For a reliable power on reset, suggest to keep asserting the reset
->> low long enough (10ms) to ensure the clock is stable and clock-to-reset
->> 1ms requirement is satisfied."
->
-> This is questionable.  The quote you indicate above is "For a reliable
-> POWER ON RESET".  It depends what use this DT is being put to.  Given
-> that the only boot loader which is trustworthy on SoldRun hardware is
-> their uboot versions, and these don't use DT, I would say that the
-> only time that this is used is when the kernel is booting.
->
-> That reset is not a power on reset, the phy has been powered for a
-> comparitively long time by the time the kernel gets to use it.  So, I
-> think on balance I'm going to NAK this change until there is a reason
-> for it to be made - iow, when there _is_ a boot loader where the
-> requirement for this parameter to be used at power on is required.
 
-Ok, understood. I was working on a fix for U-boot where the 2ms reset
-was not enough, so I thought about extending it to the kernel. I see
-your point and agree that for the kernel we could keep the existing
-2ms reset delay.
+On 2016/1/5 18:12, Philipp Zabel wrote:
+> Am Mittwoch, den 30.12.2015, 09:43 +0800 schrieb Jiancheng Xue:
+>> Add device tree bindings for Hi3519 system controller.
+>>
+>> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
+>> ---
+>>  Documentation/devicetree/bindings/mfd/hi3519.txt | 14 ++++++++++++++
+>>  1 file changed, 14 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/mfd/hi3519.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/mfd/hi3519.txt b/Documentation/devicetree/bindings/mfd/hi3519.txt
+>> new file mode 100644
+>> index 0000000..2536edc
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mfd/hi3519.txt
+>> @@ -0,0 +1,14 @@
+>> +* Hisilicon Hi3519 System Controller Block
+>> +
+>> +This bindings use the following binding:
+>> +Dcumentation/devicetree/bindings/clock/clock-bindings.txt
+> 
+> Typo: "Documentation"
+> - but I don't see the clock bindings being used here at all.
+> Maybe just drop this sentence?
+> 
+
+Sorry about this mistake. Thank you very much.
+
+>> +
+>> +Required properties:
+>> +- compatible: "hisilicon,hi3519-sysctrl".
+>> +- reg: the register region of this block
+>> +
+>> +Examples:
+>> +sysctrl: system-controller at 12010000 {
+>> +	compatible = "hisilicon,hi3519-sysctrl", "syscon";
+>> +	reg = <0x12010000 0x1000>;
+>> +};
+> 
+> regards
+> Philipp
+> 
+> 
+> .
+> 
