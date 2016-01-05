@@ -1,42 +1,57 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 5 Jan 2016 18:51:28 +0800
-Subject: [PATCH 00/11] mmc: use sdhci_pltfm_init for private allocation and
- clean up
-Message-ID: <1451991099-4946-1-git-send-email-jszhang@marvell.com>
+Date: Tue, 5 Jan 2016 18:51:31 +0800
+Subject: [PATCH 03/11] mmc: sdhci-msm: use sdhci_pltfm_init for private
+ allocation
+In-Reply-To: <1451991099-4946-1-git-send-email-jszhang@marvell.com>
+References: <1451991099-4946-1-git-send-email-jszhang@marvell.com>
+Message-ID: <1451991099-4946-4-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches are to complete the TODO in Commit 0e748234293f ("mmc:
-sdhci: Add size for caller in init+register"), I.E:
+Commit 0e748234293f ("mmc: sdhci: Add size for caller in init+register")
+allows users of sdhci_pltfm to allocate private space in calls to
+sdhci_pltfm_init+sdhci_pltfm_register. This patch migrates sdhci-msm
+to this allocation.
 
-- todo: migrate clients to using allocation this way
-- todo: remove priv variable once migration is complete
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ drivers/mmc/host/sdhci-msm.c | 13 +++++--------
+ 1 file changed, 5 insertions(+), 8 deletions(-)
 
-Jisheng Zhang (11):
-  mmc: sdhci-bcm2835: use sdhci_pltfm_init for private allocation
-  mmc: sdhci-esdhc-imx: use sdhci_pltfm_init for private allocation
-  mmc: sdhci-msm: use sdhci_pltfm_init for private allocation
-  mmc: sdhci-of-arasan: use sdhci_pltfm_init for private allocation
-  mmc: sdhci-of-at91: use sdhci_pltfm_init for private allocation
-  mmc: sdhci-of-esdhc: use sdhci_pltfm_init for private allocation
-  mmc: sdhci-pxav3: use sdhci_pltfm_init for private allocation
-  mmc: sdhci-st: use sdhci_pltfm_init for private allocation
-  mmc: sdhci-tegra: use sdhci_pltfm_init for private allocation
-  mmc: sdhci-pxav2: remove unnecessary assignment of pltfm_host->priv
-  mmc: sdhci-pltfm: remove priv variable from sdhci_pltfm_host
-
- drivers/mmc/host/sdhci-bcm2835.c   | 14 +++-----------
- drivers/mmc/host/sdhci-esdhc-imx.c | 38 +++++++++++++++++---------------------
- drivers/mmc/host/sdhci-msm.c       | 13 +++++--------
- drivers/mmc/host/sdhci-of-arasan.c | 25 ++++++++++---------------
- drivers/mmc/host/sdhci-of-at91.c   | 21 ++++++++-------------
- drivers/mmc/host/sdhci-of-esdhc.c  | 17 ++++++++---------
- drivers/mmc/host/sdhci-pltfm.h     |  1 -
- drivers/mmc/host/sdhci-pxav2.c     |  1 -
- drivers/mmc/host/sdhci-pxav3.c     | 21 +++++++++------------
- drivers/mmc/host/sdhci-st.c        | 36 ++++++++++++++++++------------------
- drivers/mmc/host/sdhci-tegra.c     | 19 ++++++-------------
- 11 files changed, 84 insertions(+), 122 deletions(-)
-
+diff --git a/drivers/mmc/host/sdhci-msm.c b/drivers/mmc/host/sdhci-msm.c
+index 4695bee..0109446 100644
+--- a/drivers/mmc/host/sdhci-msm.c
++++ b/drivers/mmc/host/sdhci-msm.c
+@@ -437,17 +437,14 @@ static int sdhci_msm_probe(struct platform_device *pdev)
+ 	u32 core_version, caps;
+ 	u8 core_major;
+ 
+-	msm_host = devm_kzalloc(&pdev->dev, sizeof(*msm_host), GFP_KERNEL);
+-	if (!msm_host)
+-		return -ENOMEM;
+-
+-	msm_host->sdhci_msm_pdata.ops = &sdhci_msm_ops;
+-	host = sdhci_pltfm_init(pdev, &msm_host->sdhci_msm_pdata, 0);
++	host = sdhci_pltfm_init(pdev, &msm_host->sdhci_msm_pdata,
++				sizeof(*msm_host));
+ 	if (IS_ERR(host))
+ 		return PTR_ERR(host);
+ 
+ 	pltfm_host = sdhci_priv(host);
+-	pltfm_host->priv = msm_host;
++	msm_host = sdhci_pltfm_priv(pltfm_host);
++	msm_host->sdhci_msm_pdata.ops = &sdhci_msm_ops;
+ 	msm_host->mmc = host->mmc;
+ 	msm_host->pdev = pdev;
+ 
+@@ -570,7 +567,7 @@ static int sdhci_msm_remove(struct platform_device *pdev)
+ {
+ 	struct sdhci_host *host = platform_get_drvdata(pdev);
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+-	struct sdhci_msm_host *msm_host = pltfm_host->priv;
++	struct sdhci_msm_host *msm_host = sdhci_pltfm_priv(pltfm_host);
+ 	int dead = (readl_relaxed(host->ioaddr + SDHCI_INT_STATUS) ==
+ 		    0xffffffff);
+ 
 -- 
 2.6.4
