@@ -1,114 +1,105 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Mon, 04 Jan 2016 17:29:54 -0800
-Subject: [RFC 6/9] clk: ti: add support for omap4 module clocks
-In-Reply-To: <568A20E5.6040005@ti.com>
-References: <1450447141-29936-1-git-send-email-t-kristo@ti.com>
- <1450447141-29936-7-git-send-email-t-kristo@ti.com>
- <20160101054815.21738.79820@quark.deferred.io> <568A20E5.6040005@ti.com>
-Message-ID: <20160105012954.15239.57130@quark.deferred.io>
+From: boqun.feng@gmail.com (Boqun Feng)
+Date: Tue, 5 Jan 2016 09:36:55 +0800
+Subject: [PATCH v2 15/32] powerpc: define __smp_xxx
+In-Reply-To: <1451572003-2440-16-git-send-email-mst@redhat.com>
+References: <1451572003-2440-1-git-send-email-mst@redhat.com>
+ <1451572003-2440-16-git-send-email-mst@redhat.com>
+Message-ID: <20160105013648.GA1256@fixme-laptop.cn.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tero Kristo (2016-01-03 23:36:05)
-> On 01/01/2016 07:48 AM, Michael Turquette wrote:
-> > Hi Tero,
-> >
-> > Quoting Tero Kristo (2015-12-18 05:58:58)
-> >> Previously, hwmod core has been used for controlling the hwmod level
-> >> clocks. This has certain drawbacks, like being unable to share the
-> >> clocks for multiple users, missing usecounting and generally being
-> >> totally incompatible with common clock framework.
-> >>
-> >> Add support for new clock type under the TI clock driver, which will
-> >> be used to convert all the existing hwmdo clocks to. This helps to
-> >> get rid of the clock related hwmod data from kernel and instead
-> >> parsing this from DT.
-> >
-> > I'm really happy to see this series. Looks pretty good to me.
-> >
-> >> +static int _omap4_hwmod_clk_enable(struct clk_hw *hw)
-> >> +{
-> >> +       struct clk_hw_omap *clk = to_clk_hw_omap(hw);
-> >> +       u32 val;
-> >> +       int timeout = 0;
-> >> +       int ret;
-> >> +
-> >> +       if (!clk->enable_bit)
-> >> +               return 0;
-> >> +
-> >> +       if (clk->clkdm) {
-> >> +               ret = ti_clk_ll_ops->clkdm_clk_enable(clk->clkdm, hw->clk);
-> >> +               if (ret) {
-> >> +                       WARN(1,
-> >> +                            "%s: could not enable %s's clockdomain %s: %d\n",
-> >> +                            __func__, clk_hw_get_name(hw),
-> >> +                            clk->clkdm_name, ret);
-> >> +                       return ret;
-> >> +               }
-> >> +       }
-> >> +
-> >> +       val = ti_clk_ll_ops->clk_readl(clk->enable_reg);
-> >> +
-> >> +       val &= ~OMAP4_MODULEMODE_MASK;
-> >> +       val |= clk->enable_bit;
-> >> +
-> >> +       ti_clk_ll_ops->clk_writel(val, clk->enable_reg);
-> >> +
-> >> +       /* Wait until module is enabled */
-> >> +       while (!_omap4_is_ready(val)) {
-> >> +               udelay(1);
-> >
-> > This should really be a .prepare callback if you plan to keep the delays
-> > in there.
+Hi Michael,
+
+On Thu, Dec 31, 2015 at 09:07:42PM +0200, Michael S. Tsirkin wrote:
+> This defines __smp_xxx barriers for powerpc
+> for use by virtualization.
 > 
-> If this is changed to a .prepare, then all OMAP power management is 
-> effectively ruined as all clocks are going to be enabled all the time. 
-
-Let's not ruin system PM.
-
-> hwmod core doesn't support .prepare/.enable at the moment that well, and 
-> changing that is going to be a big burden (educated guess, haven't 
-> checked this yet)... The call chain that comes here is:
+> smp_xxx barriers are removed as they are
+> defined correctly by asm-generic/barriers.h
 > 
-> device driver -> pm_runtime -> hwmod_core -> hwmod_clk_enable / disable.
-
-Right, and for calls to pm_runtime_get/put from process context it
-should result in a call to clk_prepare_enable/clk_disable_unprepare. I
-guess that change is hugely invasive from your statements above?
-
+> This reduces the amount of arch-specific boiler-plate code.
 > 
-> The delay within this function should usually be pretty short, just to 
-> wait that the module comes up from idle.
+> Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/powerpc/include/asm/barrier.h | 24 ++++++++----------------
+>  1 file changed, 8 insertions(+), 16 deletions(-)
 > 
-> I recall the discussions regarding the udelays within clk_enable/disable 
-> calls, but what is the preferred approach then?
+> diff --git a/arch/powerpc/include/asm/barrier.h b/arch/powerpc/include/asm/barrier.h
+> index 980ad0c..c0deafc 100644
+> --- a/arch/powerpc/include/asm/barrier.h
+> +++ b/arch/powerpc/include/asm/barrier.h
+> @@ -44,19 +44,11 @@
+>  #define dma_rmb()	__lwsync()
+>  #define dma_wmb()	__asm__ __volatile__ (stringify_in_c(SMPWMB) : : :"memory")
+>  
+> -#ifdef CONFIG_SMP
+> -#define smp_lwsync()	__lwsync()
+> +#define __smp_lwsync()	__lwsync()
+>  
 
-There are many cases where a clk only provides .{un}prepare ops and does
-NOT provide any .{en,dis}able ops.
+so __smp_lwsync() is always mapped to lwsync, right?
 
-> Typically 
-> clk_enable/disable just becomes a NOP
+> -#define smp_mb()	mb()
+> -#define smp_rmb()	__lwsync()
+> -#define smp_wmb()	__asm__ __volatile__ (stringify_in_c(SMPWMB) : : :"memory")
+> -#else
+> -#define smp_lwsync()	barrier()
+> -
+> -#define smp_mb()	barrier()
+> -#define smp_rmb()	barrier()
+> -#define smp_wmb()	barrier()
+> -#endif /* CONFIG_SMP */
+> +#define __smp_mb()	mb()
+> +#define __smp_rmb()	__lwsync()
+> +#define __smp_wmb()	__asm__ __volatile__ (stringify_in_c(SMPWMB) : : :"memory")
+>  
+>  /*
+>   * This is a barrier which prevents following instructions from being
+> @@ -67,18 +59,18 @@
+>  #define data_barrier(x)	\
+>  	asm volatile("twi 0,%0,0; isync" : : "r" (x) : "memory");
+>  
+> -#define smp_store_release(p, v)						\
+> +#define __smp_store_release(p, v)						\
+>  do {									\
+>  	compiletime_assert_atomic_type(*p);				\
+> -	smp_lwsync();							\
+> +	__smp_lwsync();							\
 
-Yes, it becomes a NOP (though it is critical that drivers with knowledge
-of this do not try to skip the step of calling clk_enable).
+, therefore this will emit an lwsync no matter SMP or UP.
 
-> if it is not allowed to wait for 
-> hardware to complete transitioning before exiting the function.
+Another thing is that smp_lwsync() may have a third user(other than
+smp_load_acquire() and smp_store_release()):
 
-The clk.h api clearly states that clk_prepare must be called and
-complete before calling clk_enable. So if a clk only provides a .prepare
-with delays but no .enable, and a consumer driver complies with that api
-rule then we're guaranteed to have a toggling line when clk_enable
-returns.
+http://article.gmane.org/gmane.linux.ports.ppc.embedded/89877
+
+I'm OK to change my patch accordingly, but do we really want
+smp_lwsync() get involved in this cleanup? If I understand you
+correctly, this cleanup focuses on external API like smp_{r,w,}mb(),
+while smp_lwsync() is internal to PPC.
 
 Regards,
-Mike
+Boqun
 
+>  	WRITE_ONCE(*p, v);						\
+>  } while (0)
+>  
+> -#define smp_load_acquire(p)						\
+> +#define __smp_load_acquire(p)						\
+>  ({									\
+>  	typeof(*p) ___p1 = READ_ONCE(*p);				\
+>  	compiletime_assert_atomic_type(*p);				\
+> -	smp_lwsync();							\
+> +	__smp_lwsync();							\
+>  	___p1;								\
+>  })
+>  
+> -- 
+> MST
 > 
-> -Tero
-> 
-> >
-> > Regards,
-> > Mike
-> >
-> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
