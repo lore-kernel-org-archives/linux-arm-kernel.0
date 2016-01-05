@@ -1,22 +1,32 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 6 Jan 2016 08:24:38 +1100
-Subject: [PATCH v2 04/13] ARM: shmobile: r8a7793: add DVC support to
- device tree
-In-Reply-To: <568B9400.5030106@cogentembedded.com>
-References: <1451946468-20499-1-git-send-email-horms+renesas@verge.net.au>
- <1451946468-20499-5-git-send-email-horms+renesas@verge.net.au>
- <568B9400.5030106@cogentembedded.com>
-Message-ID: <20160105212438.GB5126@verge.net.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 05 Jan 2016 22:26:33 +0100
+Subject: Including Raspberry Pi -next trees in linux-next
+In-Reply-To: <568C2619.20705@wwwdotorg.org>
+References: <87fuyozzax.fsf@eliezer.anholt.net>
+ <87d1tfrdu0.fsf@eliezer.anholt.net> <568C2619.20705@wwwdotorg.org>
+Message-ID: <3082544.lZk2r7IkWv@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 05, 2016 at 12:59:28PM +0300, Sergei Shtylyov wrote:
-> Hello.
+On Tuesday 05 January 2016 13:22:49 Stephen Warren wrote:
+> >>>
+> >>> branches:
+> >>> drm-vc4-next
+> >>> bcm2835-dt-next
+> >>> bcm2835-soc-next
+> >>> bcm2835-drivers-next
+> >>> bcm2385-defconfig-next
+> >>> (bcm2835-maintainers-next is a placeholder since we have nothing for it
+> >>> this round)
 > 
-> On 1/5/2016 1:27 AM, Simon Horman wrote:
-> 
-> >Add DVS support to sound node in r8a7793 device tree.
-> 
->    So it's DVC or DVS?
+> Typically maintainers merge everything together into a single "for-next" 
+> to maintain a reasonable set of branches. I guess it doesn't affect me 
+> so my opinion isn't too relevant though:-)
 
-Thanks, I have updated the changelog to refer to DVC.
+In my experience the common for-next branch works best because
+you can change the set of branches that get merged into it as
+needed. If there are 6 branches today, it's quite likely that there
+will be another one in the future and if only one branch gets
+merged into for-next, you don't need to worry about updating the list.
+
+	Arnd
