@@ -1,50 +1,48 @@
 From: mark.yao@rock-chips.com (Mark yao)
-Date: Wed, 06 Jan 2016 16:24:44 +0800
-Subject: [GIT PULL] drm/rockchip: new features to support Synopsys DW MIPI DSI
-Message-ID: <568CCF4C.3070003@rock-chips.com>
+Date: Wed, 06 Jan 2016 16:39:24 +0800
+Subject: [PATCH v7 0/5] Add mipi dsi support for rk3288
+In-Reply-To: <1452053038-32098-1-git-send-email-zyw@rock-chips.com>
+References: <1452053038-32098-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <568CD2BC.7080800@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave
+On 2016?01?06? 12:03, Chris Zhong wrote:
+> The rk3288 MIPI DSI is a Synopsys DesignWare MIPI DSI host controller
+> IP. This series adds support for a Synopsys DesignWare MIPI DSI host
+> controller DRM driver.
+>
+> The MIPI DSI feature is tested on rk3288 evb board, backport them to
+> chrome os kernel chrome_v3.14, and it can display normally.
+>
+> This patchset is base on the patchset from Ying.liu at freescale.com.
+> <http://www.spinics.net/lists/dri-devel/msg77181.html>
+>
+> According to the suggestion from Thierry, I have get rid of the bridge,
+> and register the encoder & connecter in drm/rockchip/dw-mipi-dsi.c.
+>
+> After backport below patches from linux-next, I can merge this serial into
+> Dave's drm-next branch.
+>
+> 94d5d6a0fbf3 clk: rockchip: add an id for rk3288 crypto clk
+> c6d49fbcfcc4 clk: rockchip: add id for mipidsi sclk on rk3288
+> a2f4c560f18e clk: rockchip: add mipidsi clock on rk3288
+> 69c923743640 ARM: dts: rockchip: correct the name of REG8 for rk3288-evb-act8846
+> 662513a14c9d ARM: dts: rockchip: add 2 regulators for rk3288-evb-act8846
+> b04061e6599b ARM: dts: rockchip: move the public part to rk3288-evb common
+>
+>
+>
+Hi Chris
 
-Now seems there is no doubt on these patches, Documentation is Acked-by 
-Rob Herring, and it looks good for me.
+I had picked following three patches and send a pull-request to Dave
+       [PATCH v7 1/5] drm/rockchip: return a true clock rate to 
+adjusted_mode
+       [PATCH v7 2/5] Documentation: dt-bindings: Add bindings for 
+rk3288 DW MIPI DSI driver
+       [PATCH v7.2 3/5] drm: rockchip: Support Synopsys DW MIPI DSI
 
-So I'd like you can land them.
-
-The following changes since commit c11b8989635166c5a1e6aac1853a847bd664f8db:
-
-   Merge tag 'omapdrm-4.5-resolved' of 
-git://git.kernel.org/pub/scm/linux/kernel/git/tomba/linux into drm-next 
-(2016-01-01 07:41:52 +1000)
-
-are available in the git repository at:
-
-
-   https://github.com/markyzq/kernel-drm-rockchip.git 
-drm-rockchip-next-2016-01-06
-
-for you to fetch changes up to 84e05408fcfefb9b28050f701e1e94fe9f86804b:
-
-   drm: rockchip: Support Synopsys DW MIPI DSI (2016-01-06 16:16:39 +0800)
-
-----------------------------------------------------------------
-Chris Zhong (3):
-       drm/rockchip: return a true clock rate to adjusted_mode
-       Documentation: dt-bindings: Add bindings for rk3288 DW MIPI DSI 
-driver
-       drm: rockchip: Support Synopsys DW MIPI DSI
-
-  .../display/rockchip/dw_mipi_dsi_rockchip.txt      |   60 +
-  drivers/gpu/drm/rockchip/Kconfig                   |   10 +
-  drivers/gpu/drm/rockchip/Makefile                  |    1 +
-  drivers/gpu/drm/rockchip/dw-mipi-dsi.c             | 1194 
-++++++++++++++++++++
-  drivers/gpu/drm/rockchip/rockchip_drm_vop.c        |    8 +
-  5 files changed, 1273 insertions(+)
-  create mode 100644 
-Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
-  create mode 100644 drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+Thanks.
 
 -- 
 ?ark Yao
