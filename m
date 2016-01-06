@@ -1,72 +1,49 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 6 Jan 2016 17:23:14 -0600
-Subject: [PATCH v2] ARM: psci: Fix indentation in DT bindings
-In-Reply-To: <1450173359-2261-1-git-send-email-geert+renesas@glider.be>
-References: <1450173359-2261-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20160106232314.GA1499@rob-hp-laptop>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 6 Jan 2016 15:36:56 -0800
+Subject: [PATCH v3] ARM: fix atags_to_fdt with stack-protector-strong
+Message-ID: <20160106233656.GA9316@www.outflux.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 15, 2015 at 10:55:59AM +0100, Geert Uytterhoeven wrote:
-> Fix bogus indentation of the PSCI compatible values, reformat.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Building with CONFIG_CC_STACKPROTECTOR_STRONG triggers protection code
+generation under CONFIG_ARM_ATAG_DTB_COMPAT but this is too early for
+being able to use any of the stack_chk code. Explicitly disable it for
+only the atags_to_fdt bits.
 
-Applied, thanks.
+Suggested-by: zhxihu <zhxihu@marvell.com>
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+v3:
+- actually send to everyone correctly
+v2:
+- use call cc-option unconditionally, arnd
+---
+ arch/arm/boot/compressed/Makefile | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Rob
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index 3f9a9ebc77c3..d7d2c2981f65 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -106,6 +106,14 @@ ORIG_CFLAGS := $(KBUILD_CFLAGS)
+ KBUILD_CFLAGS = $(subst -pg, , $(ORIG_CFLAGS))
+ endif
+ 
++# -fstack-protector-strong triggers protection checks in this code,
++# but it is being used too early to link to meaningful stack_chk logic.
++CFLAGS_atags_to_fdt.o := $(call cc-option, -fno-stack-protector)
++CFLAGS_fdt.o := $(call cc-option, -fno-stack-protector)
++CFLAGS_fdt_ro.o := $(call cc-option, -fno-stack-protector)
++CFLAGS_fdt_rw.o := $(call cc-option, -fno-stack-protector)
++CFLAGS_fdt_wip.o := $(call cc-option, -fno-stack-protector)
++
+ ccflags-y := -fpic -mno-single-pic-base -fno-builtin -I$(obj)
+ asflags-y := -DZIMAGE
+ 
+-- 
+2.6.3
 
-> ---
-> v2:
->   - Add Acked-by,
->   - Align second line with first word after colon,
->   - Capitalize "For" after colon,
->   - Insert linebreak after first sentence.
-> ---
->  Documentation/devicetree/bindings/arm/psci.txt | 25 ++++++++++++++-----------
->  1 file changed, 14 insertions(+), 11 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
-> index a9adab84e2feb785..a2c4f1d524929bb7 100644
-> --- a/Documentation/devicetree/bindings/arm/psci.txt
-> +++ b/Documentation/devicetree/bindings/arm/psci.txt
-> @@ -23,17 +23,20 @@ Main node required properties:
->  
->   - compatible    : should contain at least one of:
->  
-> -				 * "arm,psci" : for implementations complying to PSCI versions prior to
-> -					0.2. For these cases function IDs must be provided.
-> -
-> -				 * "arm,psci-0.2" : for implementations complying to PSCI 0.2. Function
-> -					IDs are not required and should be ignored by an OS with PSCI 0.2
-> -					support, but are permitted to be present for compatibility with
-> -					existing software when "arm,psci" is later in the compatible list.
-> -
-> -				* "arm,psci-1.0" : for implementations complying to PSCI 1.0. PSCI 1.0 is
-> -					backward compatible with PSCI 0.2 with minor specification updates,
-> -					as defined in the PSCI specification[2].
-> +     * "arm,psci"     : For implementations complying to PSCI versions prior
-> +			to 0.2.
-> +			For these cases function IDs must be provided.
-> +
-> +     * "arm,psci-0.2" : For implementations complying to PSCI 0.2.
-> +			Function IDs are not required and should be ignored by
-> +			an OS with PSCI 0.2 support, but are permitted to be
-> +			present for compatibility with existing software when
-> +			"arm,psci" is later in the compatible list.
-> +
-> +     * "arm,psci-1.0" : For implementations complying to PSCI 1.0.
-> +			PSCI 1.0 is backward compatible with PSCI 0.2 with
-> +			minor specification updates, as defined in the PSCI
-> +			specification[2].
->  
->   - method        : The method of calling the PSCI firmware. Permitted
->                     values are:
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+-- 
+Kees Cook
+Chrome OS & Brillo Security
