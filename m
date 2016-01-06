@@ -1,121 +1,103 @@
-From: henryc.chen@mediatek.com (Henry Chen)
-Date: Wed, 6 Jan 2016 16:52:44 +0800
-Subject: [PATCH] soc: mediatek: PMIC wrap: Enable STAUPD_PRD before
- WDT_SRC_EN enabled.
-In-Reply-To: <CAGS+omBAa_n2zk0-tCyV_g3D1Nxu4j1A4q_5eRBJ-xT=PUv1sg@mail.gmail.com>
-References: <1451478961-5668-1-git-send-email-henryc.chen@mediatek.com>
- <CAGS+omBc2XVESu1t+_iKj1gTk-7JVDK1KDoQEJR_-wcL4m0qWg@mail.gmail.com>
- <1451876703.11408.10.camel@mtksdaap41>
- <CAGS+omBAa_n2zk0-tCyV_g3D1Nxu4j1A4q_5eRBJ-xT=PUv1sg@mail.gmail.com>
-Message-ID: <1452070364.31834.60.camel@mtksdaap41>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 6 Jan 2016 09:54:42 +0100
+Subject: [linux-next PATCH] arm64: fix kernel crash with 48-bit VA and
+ 64KB granule
+In-Reply-To: <20160106085216.GA7879@arm.org>
+References: <1451960299-14123-1-git-send-email-dennis.chen@arm.com>
+ <CAKv+Gu-pz8rA2EfU6NwCndmoYneOjYUt8_PodTdZkepV3cRXJQ@mail.gmail.com>
+ <20160105083533.GD13942@arm.org>
+ <CAKv+Gu9Q3CmC37dL3o+hcBeG-NJ7+bkOiLQihirje4YbazizJQ@mail.gmail.com>
+ <20160105084042.GF13942@arm.org>
+ <20160105095603.GG6301@e104818-lin.cambridge.arm.com>
+ <20160106061407.GA7082@arm.org>
+ <CAKv+Gu8t56rfdN1ot08BgsteaaincFek0uzoDAroefMWQ+kKEA@mail.gmail.com>
+ <20160106073847.GA7608@arm.org>
+ <CAKv+Gu_sqAuA_iHf_sNRJyaQUFG5n_eXxYYOHwmV0hf0GTUxow@mail.gmail.com>
+ <20160106085216.GA7879@arm.org>
+Message-ID: <CAKv+Gu_ivfmfFyK79g63ciBD3Jv7bzzu5t_NYW2aVy8NhgHdSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-01-06 at 10:37 +0800, Daniel Kurtz wrote:
-> On Mon, Jan 4, 2016 at 11:05 AM, Henry Chen <henryc.chen@mediatek.com> wrote:
-> > On Thu, 2015-12-31 at 22:19 +0800, Daniel Kurtz wrote:
-> >> On Wed, Dec 30, 2015 at 8:36 PM, Henry Chen <henryc.chen@mediatek.com> wrote:
-> >> >
-> >> > The STAUPD_TRIG will be enable when WDT_INT enable on probe function, if
-> >> > doesn't enable STAUPD_PRD together, interrupt will be triggered because
-> >> > STAUPD timeout. To avoid unexpected interrupt, enable periodic status
-> >> > update which will be updated to PMIC every selected time period.
-> >>
-> >> Sorry, I don't really understand this.
-> >>
-> >> What exactly is triggering the unexpected watchdog interrupt (WDT_INT)?
-> >>
-> >> How does setting STAUPD_PRD disable this "unexpected interrupt"?
-> >>
-> > Yes, WDT_INT was triggered because the bit[25] of WDT_SRC_EN was
-> > enabled:
-> >
-> > bit[25] STAUPD_TRIG: STAUPD trigger signal timeout monitor
-> >
-> > Setting STAUPD_PRD will update the status of PMIC periodic to avoid this
-> > watchdog timeout.
-> 
-> Sorry, I still don't understand.
-Sorry, I will try to explain the behavior more clearly.
-> 
-> IIUC, setting STAUPD_PRD sets the period at which status updates are
-> reported (announced via the shared STAUPD/WDT interrupt).
-> 
-> So, setting STAUPD_PRD=5 should set the reporting period to 98.5 us.
-> But, how does changing this period fix the "unexpected interrupt"?
+On 6 January 2016 at 09:52, Dennis Chen <dennis.chen@arm.com> wrote:
+> On Wed, Jan 06, 2016 at 08:42:20AM +0100, Ard Biesheuvel wrote:
+>> On 6 January 2016 at 08:38, Dennis Chen <dennis.chen@arm.com> wrote:
+>> > On Wed, Jan 06, 2016 at 08:13:24AM +0100, Ard Biesheuvel wrote:
+>> >> On 6 January 2016 at 07:14, Dennis Chen <dennis.chen@arm.com> wrote:
+>> >> > On Tue, Jan 05, 2016 at 09:56:03AM +0000, Catalin Marinas wrote:
+>> >> >> On Tue, Jan 05, 2016 at 04:40:44PM +0800, Dennis Chen wrote:
+>> >> >> > On Tue, Jan 05, 2016 at 09:38:11AM +0100, Ard Biesheuvel wrote:
+>> >> >> > > >> On 5 January 2016 at 03:18, Dennis Chen <dennis.chen@arm.com> wrote:
+>> >> >> > > >> > The commit 3400749b5a22 ("arm64/efi: refactor EFI init and runtime
+>> >> >> > > >> > code for reuse by 32-bit ARM") uses pgd_alloc() to allocate space for
+>> >> >> > > >> > efi_mm.pgd while not the static efi_pgd[], since this function will be
+>> >> >> > > >> > called with early_initcall, which results in the pgd_cache used by
+>> >> >> > > >> > pgd_alloc() has not been initialized yet, kernel will hang in this
+>> >> >> > > >> > case. This patch is trying to make the pgd_cache_init() called before
+>> >> >> > > >> > arm_enable_runtime_services() by changing its core_initcall to
+>> >> >> > > >> > early_initcall.
+>> >> >> > > >> >
+>> >> >> > > >> > Signed-off-by: Dennis Chen <dennis.chen@arm.com>
+>> >> >> > > >> > Tested-by: Sudeep Holla <sudeep.holla@arm.com>
+>> >> >> > > >> >
+>> >> >> > > >> > Cc: Will Deacon <will.deacon@arm.com>
+>> >> >> > > >> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> >> >> > > >> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> >> >> > > >> > Cc: Sudeep Holla <sudeep.holla@arm.com>
+>> >> >> > > >> > ---
+>> >> >> > > >> >  arch/arm64/mm/pgd.c | 2 +-
+>> >> >> > > >> >  1 file changed, 1 insertion(+), 1 deletion(-)
+>> >> >> > > >> >
+>> >> >> > > >> > diff --git a/arch/arm64/mm/pgd.c b/arch/arm64/mm/pgd.c
+>> >> >> > > >> > index cb3ba1b..859a788 100644
+>> >> >> > > >> > --- a/arch/arm64/mm/pgd.c
+>> >> >> > > >> > +++ b/arch/arm64/mm/pgd.c
+>> >> >> > > >> > @@ -56,4 +56,4 @@ static int __init pgd_cache_init(void)
+>> >> >> > > >> >                                               SLAB_PANIC, NULL);
+>> >> >> > > >> >         return 0;
+>> >> >> > > >> >  }
+>> >> >> > > >> > -core_initcall(pgd_cache_init);
+>> >> >> > > >> > +early_initcall(pgd_cache_init);
+>> >> >> [...]
+>> >> >> > > Well, since arm_enable_runtime_services() is an early_initcall()
+>> >> >> > > itself, how are you guaranteeing the ordering between the two? Link
+>> >> >> > > order?
+>> >> >> >
+>> >> >> > Link order.
+>> >> >>
+>> >> >> And can you explain how this works, what guarantees it gives?
+>> >> >>
+>> >> > You can take a look at include/asm-generic/vmlinux.ldx.h: INIT_CALLS macro,
+>> >> > for the init call section, early_initcall is the first chuck in the section,
+>> >> > followed by LEVEL[0-7]. For the same level, the layout order is determined
+>> >> > by the link order, ARCH is always precedence over the drivers. Catalin, are
+>> >> > you giving me a kernel examination? :)
+>> >> >
+>> >>
+>> >> We all know how initcalls are implemented. The question is how you are
+>> >> going to ensure that the early_initcall() that initializes the PGD
+>> >> cache is always invoked before the early_initcall() that creates the
+>> >> UEFI runtime page tables.
+>> >>
+>> >> And saying that the currently observed link order happens to be
+>> >> correct is not good enough. We need to be sure that, even if we change
+>> >> the link order, or switch to LTO at some point, things don't suddenly
+>> >> break again.
+>> >>
+>> > Well, if the build system changes the link order, it can't make sure it will break something
+>> > unexpectedly, needless to say the pgd_cache_init here at all.
+>>
+>> That is no excuse to introduce yet another failure mode.
+>>
+>> > Do you think the kernel
+>> > will change its currently link order policy? If the answer is yes, what's the benefit?
+>> >
+>>
+>> It does not matter what I think. You seem to think that the link order
+>> is set in stone, so it is you who should argue why that is a
+>> reasonable assumption.
+>>
+> OK, If you think the link order is volatile, how can you guarantee the arm_enable_runtime_services with early_initcall
+> always work in a volatile link order environment?
+>
 
-Setting STAUPD_PRD which means pmic wrap will get the status from PMIC
-every 98.5us. Each time watchdog saw the STAUPD update, the interrupt
-won't be trigger.
-
-> I can understand how it might change the timing of the interrupt, but
-> why does it make the interrupt no longer occur?
-
-STAUPD_PRD was not the timer to trigger interrupt, I think what you said
-was WDT_UNIT.
-
-> We are still triggering the interrupt when we write bit[25]
-> (STAUPD_TRIG) of WDT_SRC_EN, two lines later.
-
-if STAUPD_TRIG was set, STAUPD_PRD=5 => STAUPD will trigger signal to
-get the status from PMIC every 98.5us => the interrupt will not trigger,
-because STAUPD_PRD working.
- 
-if STAUPD_TRIG was set, STAUPD_PRD=0 => STAUPD disable.=> the interrupt
-will trigger by watchdog because STAUPD won't trigger the signal.
-
-> Isn't this still requesting a STAUPD interrupt 98.5 us later?  (which,
-> since STAUPD interrupts aren't handled, is an "unexpected interrupt")
-> Wouldn't a better fix be to just clear the STAUPD_TRIG bit of
-> WDT_SRC_EN, and just not trigger STAUPD in the first place if we can't
-> handle them?
-Yes. Maybe to clear the STAUPD_TRIG bit of WDT_SRC_EN was better to fix
-the problem.
-
-Henry
-> 
-> -Dan
-> 
-> >> From the MT8173 Datasheet, I can see that the value written to
-> >> STAUPD_PRD is the "periodic status update timing (period)".
-> >>
-> >> > Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
-> >> > ---
-> >> >  drivers/soc/mediatek/mtk-pmic-wrap.c | 5 +++++
-> >> >  1 file changed, 5 insertions(+)
-> >> >
-> >> > diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> >> > index a8cde17..6e5c20f 100644
-> >> > --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
-> >> > +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> >> > @@ -904,6 +904,11 @@ static int pwrap_probe(struct platform_device *pdev)
-> >> >                 return -ENODEV;
-> >> >         }
-> >> >
-> >> > +       /*
-> >> > +        * Enable periodic status update which will be updated to PMIC
-> >> > +        * every selected time period.
-> >> > +        */
-> >> > +       pwrap_writel(wrp, 0x5, PWRAP_STAUPD_PRD);
-> >>
-> >> nit: Perhaps use a define for 5, and specify the real period value.
-> >> Something like this:
-> >>
-> >> #define PWRAP_STAUPD_98_5US  5
-> >>
-> > ok.
-> >
-> >>
-> >> >         /* Initialize watchdog, may not be done by the bootloader */
-> >> >         pwrap_writel(wrp, 0xf, PWRAP_WDT_UNIT);
-> >> >         pwrap_writel(wrp, 0xffffffff, PWRAP_WDT_SRC_EN);
-> >> > --
-> >> > 1.9.1
-> >> >
-> >> > --
-> >> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> >> > the body of a message to majordomo at vger.kernel.org
-> >> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> >> > Please read the FAQ at  http://www.tux.org/lkml/
-> >
-> >
+By not relying on other early_initcalls
