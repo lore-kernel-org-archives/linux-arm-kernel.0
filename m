@@ -1,47 +1,135 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 6 Jan 2016 11:05:02 +0100 (CET)
-Subject: [PATCH] dmaengine: xgene-dma: Fix double IRQ issue by setting
- IRQ_DISABLE_UNLAZY flag
-In-Reply-To: <20160106093121.GB11778@localhost>
-References: <1450875495-2229-1-git-send-email-rsahu@apm.com>
- <20160106091323.GP2940@localhost>
- <CAFd313xhh_4OFP6W2yuApM8ppYMX20DUCCQHJ9YEtCMbzr6Hgg@mail.gmail.com>
- <20160106093121.GB11778@localhost>
-Message-ID: <alpine.DEB.2.11.1601061103000.3689@nanos>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 6 Jan 2016 10:07:00 +0000
+Subject: [PATCH 1/2] tty: amba-pl011: fix earlycon register offsets
+In-Reply-To: <20160106024302.GA20634@kroah.com>
+References: <1450972189-22639-1-git-send-email-timur@codeaurora.org>
+ <20151224164723.GK8644@n2100.arm.linux.org.uk>
+ <CAPKp9ubdS+R8U-W+LxYEp_sGxZVBDGBJ48+N7Pw3k9A+=F4pww@mail.gmail.com>
+ <20160105123018.GU19062@n2100.arm.linux.org.uk>
+ <20160106024302.GA20634@kroah.com>
+Message-ID: <20160106100700.GA19062@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 6 Jan 2016, Vinod Koul wrote:
-> On Wed, Jan 06, 2016 at 02:51:07PM +0530, Rameshwar Sahu wrote:
-> > >> @@ -1610,6 +1611,7 @@ static int xgene_dma_request_irqs(struct xgene_dma *pdma)
-> > >>       /* Register DMA channel rx irq */
-> > >>       for (i = 0; i < XGENE_DMA_MAX_CHANNEL; i++) {
-> > >>               chan = &pdma->chan[i];
-> > >> +             irq_set_status_flags(chan->rx_irq, IRQ_DISABLE_UNLAZY);
-> > >
-> > > Why not use irq_settings_disable_unlazy(), at least read the reference you
-> > > pointed out!
+On Tue, Jan 05, 2016 at 06:43:02PM -0800, Greg Kroah-Hartman wrote:
+> On Tue, Jan 05, 2016 at 12:30:19PM +0000, Russell King - ARM Linux wrote:
+> > On Tue, Jan 05, 2016 at 12:12:31PM +0000, Sudeep Holla wrote:
+> > > Hi Russell,
+> > > 
+> > > On Thu, Dec 24, 2015 at 4:47 PM, Russell King - ARM Linux
+> > > <linux@arm.linux.org.uk> wrote:
+> > > > On Thu, Dec 24, 2015 at 09:49:48AM -0600, Timur Tabi wrote:
+> > > >> The REG_x macros are indices into a table, not register offsets.  Since
+> > > >> earlycon does not have access to the vendor data, we can currently only
+> > > >> support standard ARM PL011 devices.
+> > > >>
+> > > >> Signed-off-by: Timur Tabi <timur@codeaurora.org>
+> > > >
+> > > > Please credit me with the change; this was obviously a change I made
+> > > > when I posted the updated patches, which Greg had failed to take
+> > > > instead of the original set.  Thanks.
+> > > >
+> > > 
+> > > I don't see this patch in linux-next. Without this it fails to boot(panics) on
+> > > ARM64 when earlycon is enabled.
 > > 
-> > irq_settings_disable_unlazy() is helper function to test
-> > IRQ_DISABLE_UNLAZY flag is set or not, it's not for setting this flag.
-> > FYI...
-> > +static inline bool irq_settings_disable_unlazy(struct irq_desc *desc)
-> > +{
-> > + return desc->status_use_accessors & _IRQ_DISABLE_UNLAZY;
-> > +}
+> > I guess that's the way 4.4 is going to be then, because GregKH has not
+> > been anywhere near "responsive" during the last cycle, but he did say
+> > yesterday (in response to questions about driver model stuff) that he's
+> > closed his trees for the merge window last week.
+> > 
+> > All in all, this situation is entirely GregKH's making, as he took the
+> > wrong set of patches, and has yet to respond to _any_ of the resulting
+> > mails about it... I guess GregKH knows what he's doing as he's one of
+> > the top (and vocal) kernel developers far more than I do, so I guess he
+> > has his reasons for crapping up the AMBA PL011 driver...
 > 
-> Ah yes, I saw clear API and assumed there would be set. Then I think we
-> should add a set helper as well as the usage is intended for drivers to
-> set this flag
+> "plenty of time"?  I see Timur's patches to fix this were sent on
+> December 24th.  Then fixed up and resent on January 4th. I see nothing
+> in my todo queue that were sent earlier to resolve any of this horrid
+> mess.
 > 
-> Thomas,
-> 
-> Any reason why you didn't add a set helper, only test and clear?
+> So yes, I haven't done anything with the Jan 04 patch, given that it's
+> been 24 hours since it was sent, that's totally reasonable.
 
-Why would I? Those helpers are core internal and not usable in random drivers.
+The first series of 11 patches was sent on November 3rd.  The problem at
+the root of this issue was discovered on the very same day, and is a part
+of the thread.  People reviewed and tested it, and other comments were
+made.
 
-Drivers have irq_set_status_flags()/irq_clear_status_flags() ...
+These were addressed, and the next series of 12 patches were sent on the
+16th November.
 
-Thanks,
+On the 12th November, you decided it was time to pick up the first series
+of patches and ignore the second series, despite the comments against the
+first series indicating that there were problems.
 
-	tglx
+It was only realised on the 24th that you'd picked up the wrong set of
+patches.
+
+> You all were throwing huge numbers of patches here for this tiny driver
+> and digging through the mess was a major pain.
+
+That statement is doing nothing but trying to deflect the blame for
+this mistake on to other people.
+
+11 or 12 patches is not "huge numbers of patches" and a driver of 2600
+lines is not "tiny".  In total, it's _only_ 11 + 12 patches.  That is
+not "huge" by any sense of the word.
+
+What would you prefer?  One patch making multiple changes?  Aren't we
+always telling people to split up their changes?  I guess you're
+different because of your patch load...
+
+> Turned out I guessed
+> wrong, and asked for a patch to fix up the mess once that was
+> determined.
+
+I don't see why there should've been any guessing.  One series of 11
+patches posted on 3rd November vs a second series of 12 patches posted
+on the 16th November.  Later date, one more patch.  How could there
+have been any guessing?
+
+> That didn't arrive until the yesterday in a format that
+> might be acceptable.  Quite a while after this all was determined to be
+> "broken".
+
+The original patch set was found to be broken on the 3rd November, and
+there's emails to prove it.
+
+> If you all think you could do better with the patch load you all were
+> throwing at me, well, good for you.  It's mighty easy to complain when
+> it isn't your inbox...  And I really don't care at all about this little
+> driver, you all do, and yet you all can't agree what to do about it, so
+> to somehow claim that I know better is a joke.
+
+Right, so what you're saying is that you're overloaded, and can't cope
+with the amount of work that you've chosen to take on.  The one thing
+that's missing from your message is to ask whether someone is willing
+to take on maintanence of the driver.  Well, that's an interesting
+subject, because in theory, I _never_ delegated maintanence and patch
+handling to anyone else:
+
+ARM PRIMECELL UART PL010 AND PL011 DRIVERS
+M:      Russell King <linux@arm.linux.org.uk>
+S:      Maintained
+F:      drivers/tty/serial/amba-pl01*.c
+F:      include/linux/amba/serial.h
+
+but someone decided "I own drivers/tty..., so all patches _must_
+come through me" which is a frequent pattern I've seen forming over
+the years that we've had the kernel in SCMs.
+
+So, I guess the answer is for me to take back responsibility for
+merging patches for this driver and send pull requests for it
+directly to Linus.
+
+Please merge what you have, and when it's merged, I'll resolve the
+differences between what you have merged and what _should_ have been
+merged.  I'll send fixes directly to Linus, and from then on I'll be
+looking after this driver.
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
