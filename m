@@ -1,178 +1,76 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 6 Jan 2016 11:55:55 +0800
-Subject: [PATCH v2 02/12] mmc: sdhci-esdhc-imx: use sdhci_pltfm_init for
- private allocation
+Date: Wed, 6 Jan 2016 11:55:56 +0800
+Subject: [PATCH v2 03/12] mmc: sdhci-msm: factorise sdhci_msm_pdata outisde of
+ sdhci_msm_host
 In-Reply-To: <1452052565-4232-1-git-send-email-jszhang@marvell.com>
 References: <1452052565-4232-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1452052565-4232-3-git-send-email-jszhang@marvell.com>
+Message-ID: <1452052565-4232-4-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 0e748234293f ("mmc: sdhci: Add size for caller in init+register")
-allows users of sdhci_pltfm to allocate private space in calls to
-sdhci_pltfm_init+sdhci_pltfm_register. This patch migrates the sdhci
-esdhc-imx driver to this allocation.
+There's no need to allocate one sdhci_msm_pdata for each sdhci_msm_host.
+This patch removes the sdhci_msm_pdata member from sdhci_msm_host and
+uses one static global sdhci_msm_pdata for all sdhci msm hosts. It also
+marks sdhci_msm_ops as const.
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/mmc/host/sdhci-esdhc-imx.c | 38 +++++++++++++++++---------------------
- 1 file changed, 17 insertions(+), 21 deletions(-)
+ drivers/mmc/host/sdhci-msm.c | 15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index 1f1582f..594a753 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -259,7 +259,7 @@ static inline void esdhc_clrset_le(struct sdhci_host *host, u32 mask, u32 val, i
- static u32 esdhc_readl_le(struct sdhci_host *host, int reg)
- {
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	struct pltfm_imx_data *imx_data = pltfm_host->priv;
-+	struct pltfm_imx_data *imx_data = sdhci_pltfm_priv(pltfm_host);
- 	u32 val = readl(host->ioaddr + reg);
+diff --git a/drivers/mmc/host/sdhci-msm.c b/drivers/mmc/host/sdhci-msm.c
+index 4695bee..ffac9b4 100644
+--- a/drivers/mmc/host/sdhci-msm.c
++++ b/drivers/mmc/host/sdhci-msm.c
+@@ -60,7 +60,6 @@ struct sdhci_msm_host {
+ 	struct clk *pclk;	/* SDHC peripheral bus clock */
+ 	struct clk *bus_clk;	/* SDHC bus voter clock */
+ 	struct mmc_host *mmc;
+-	struct sdhci_pltfm_data sdhci_msm_pdata;
+ };
  
- 	if (unlikely(reg == SDHCI_PRESENT_STATE)) {
-@@ -337,7 +337,7 @@ static u32 esdhc_readl_le(struct sdhci_host *host, int reg)
- static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
- {
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	struct pltfm_imx_data *imx_data = pltfm_host->priv;
-+	struct pltfm_imx_data *imx_data = sdhci_pltfm_priv(pltfm_host);
- 	u32 data;
+ /* Platform specific tuning */
+@@ -418,7 +417,7 @@ static const struct of_device_id sdhci_msm_dt_match[] = {
  
- 	if (unlikely(reg == SDHCI_INT_ENABLE || reg == SDHCI_SIGNAL_ENABLE)) {
-@@ -387,7 +387,7 @@ static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
- static u16 esdhc_readw_le(struct sdhci_host *host, int reg)
- {
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	struct pltfm_imx_data *imx_data = pltfm_host->priv;
-+	struct pltfm_imx_data *imx_data = sdhci_pltfm_priv(pltfm_host);
- 	u16 ret = 0;
- 	u32 val;
+ MODULE_DEVICE_TABLE(of, sdhci_msm_dt_match);
  
-@@ -447,7 +447,7 @@ static u16 esdhc_readw_le(struct sdhci_host *host, int reg)
- static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
- {
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	struct pltfm_imx_data *imx_data = pltfm_host->priv;
-+	struct pltfm_imx_data *imx_data = sdhci_pltfm_priv(pltfm_host);
- 	u32 new_val = 0;
+-static struct sdhci_ops sdhci_msm_ops = {
++static const struct sdhci_ops sdhci_msm_ops = {
+ 	.platform_execute_tuning = sdhci_msm_execute_tuning,
+ 	.reset = sdhci_reset,
+ 	.set_clock = sdhci_set_clock,
+@@ -426,6 +425,12 @@ static struct sdhci_ops sdhci_msm_ops = {
+ 	.set_uhs_signaling = sdhci_set_uhs_signaling,
+ };
  
- 	switch (reg) {
-@@ -553,7 +553,7 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
- static void esdhc_writeb_le(struct sdhci_host *host, u8 val, int reg)
++static const struct sdhci_pltfm_data sdhci_msm_pdata = {
++	.quirks = SDHCI_QUIRK_BROKEN_CARD_DETECTION |
++		  SDHCI_QUIRK_SINGLE_POWER_WRITE,
++	.ops = &sdhci_msm_ops,
++};
++
+ static int sdhci_msm_probe(struct platform_device *pdev)
  {
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	struct pltfm_imx_data *imx_data = pltfm_host->priv;
-+	struct pltfm_imx_data *imx_data = sdhci_pltfm_priv(pltfm_host);
- 	u32 new_val;
- 	u32 mask;
+ 	struct sdhci_host *host;
+@@ -441,8 +446,7 @@ static int sdhci_msm_probe(struct platform_device *pdev)
+ 	if (!msm_host)
+ 		return -ENOMEM;
  
-@@ -630,7 +630,7 @@ static inline void esdhc_pltfm_set_clock(struct sdhci_host *host,
- 					 unsigned int clock)
- {
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	struct pltfm_imx_data *imx_data = pltfm_host->priv;
-+	struct pltfm_imx_data *imx_data = sdhci_pltfm_priv(pltfm_host);
- 	unsigned int host_clock = pltfm_host->clock;
- 	int pre_div = 2;
- 	int div = 1;
-@@ -689,7 +689,7 @@ static inline void esdhc_pltfm_set_clock(struct sdhci_host *host,
- static unsigned int esdhc_pltfm_get_ro(struct sdhci_host *host)
- {
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	struct pltfm_imx_data *imx_data = pltfm_host->priv;
-+	struct pltfm_imx_data *imx_data = sdhci_pltfm_priv(pltfm_host);
- 	struct esdhc_platform_data *boarddata = &imx_data->boarddata;
- 
- 	switch (boarddata->wp_type) {
-@@ -791,7 +791,7 @@ static int esdhc_change_pinstate(struct sdhci_host *host,
- 						unsigned int uhs)
- {
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	struct pltfm_imx_data *imx_data = pltfm_host->priv;
-+	struct pltfm_imx_data *imx_data = sdhci_pltfm_priv(pltfm_host);
- 	struct pinctrl_state *pinctrl;
- 
- 	dev_dbg(mmc_dev(host->mmc), "change pinctrl state for uhs %d\n", uhs);
-@@ -861,7 +861,7 @@ static void esdhc_set_uhs_signaling(struct sdhci_host *host, unsigned timing)
- {
- 	u32 m;
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	struct pltfm_imx_data *imx_data = pltfm_host->priv;
-+	struct pltfm_imx_data *imx_data = sdhci_pltfm_priv(pltfm_host);
- 	struct esdhc_platform_data *boarddata = &imx_data->boarddata;
- 
- 	/* disable ddr mode and disable HS400 mode */
-@@ -914,7 +914,7 @@ static void esdhc_reset(struct sdhci_host *host, u8 mask)
- static unsigned int esdhc_get_max_timeout_count(struct sdhci_host *host)
- {
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	struct pltfm_imx_data *imx_data = pltfm_host->priv;
-+	struct pltfm_imx_data *imx_data = sdhci_pltfm_priv(pltfm_host);
- 
- 	return esdhc_is_usdhc(imx_data) ? 1 << 28 : 1 << 27;
- }
-@@ -922,7 +922,7 @@ static unsigned int esdhc_get_max_timeout_count(struct sdhci_host *host)
- static void esdhc_set_timeout(struct sdhci_host *host, struct mmc_command *cmd)
- {
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	struct pltfm_imx_data *imx_data = pltfm_host->priv;
-+	struct pltfm_imx_data *imx_data = sdhci_pltfm_priv(pltfm_host);
- 
- 	/* use maximum timeout counter */
- 	sdhci_writeb(host, esdhc_is_usdhc(imx_data) ? 0xF : 0xE,
-@@ -1097,21 +1097,17 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
- 	int err;
- 	struct pltfm_imx_data *imx_data;
- 
--	host = sdhci_pltfm_init(pdev, &sdhci_esdhc_imx_pdata, 0);
-+	host = sdhci_pltfm_init(pdev, &sdhci_esdhc_imx_pdata,
-+				sizeof(*imx_data));
+-	msm_host->sdhci_msm_pdata.ops = &sdhci_msm_ops;
+-	host = sdhci_pltfm_init(pdev, &msm_host->sdhci_msm_pdata, 0);
++	host = sdhci_pltfm_init(pdev, &sdhci_msm_pdata, 0);
  	if (IS_ERR(host))
  		return PTR_ERR(host);
  
- 	pltfm_host = sdhci_priv(host);
+@@ -522,9 +526,6 @@ static int sdhci_msm_probe(struct platform_device *pdev)
+ 	/* Set HC_MODE_EN bit in HC_MODE register */
+ 	writel_relaxed(HC_MODE_EN, (msm_host->core_mem + CORE_HC_MODE));
  
--	imx_data = devm_kzalloc(&pdev->dev, sizeof(*imx_data), GFP_KERNEL);
--	if (!imx_data) {
--		err = -ENOMEM;
--		goto free_sdhci;
--	}
-+	imx_data = sdhci_pltfm_priv(pltfm_host);
- 
- 	imx_data->socdata = of_id ? of_id->data : (struct esdhc_soc_data *)
- 						  pdev->id_entry->driver_data;
--	pltfm_host->priv = imx_data;
- 
- 	imx_data->clk_ipg = devm_clk_get(&pdev->dev, "ipg");
- 	if (IS_ERR(imx_data->clk_ipg)) {
-@@ -1238,7 +1234,7 @@ static int sdhci_esdhc_imx_remove(struct platform_device *pdev)
- {
- 	struct sdhci_host *host = platform_get_drvdata(pdev);
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	struct pltfm_imx_data *imx_data = pltfm_host->priv;
-+	struct pltfm_imx_data *imx_data = sdhci_pltfm_priv(pltfm_host);
- 	int dead = (readl(host->ioaddr + SDHCI_INT_STATUS) == 0xffffffff);
- 
- 	pm_runtime_get_sync(&pdev->dev);
-@@ -1261,7 +1257,7 @@ static int sdhci_esdhc_runtime_suspend(struct device *dev)
- {
- 	struct sdhci_host *host = dev_get_drvdata(dev);
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	struct pltfm_imx_data *imx_data = pltfm_host->priv;
-+	struct pltfm_imx_data *imx_data = sdhci_pltfm_priv(pltfm_host);
- 	int ret;
- 
- 	ret = sdhci_runtime_suspend_host(host);
-@@ -1279,7 +1275,7 @@ static int sdhci_esdhc_runtime_resume(struct device *dev)
- {
- 	struct sdhci_host *host = dev_get_drvdata(dev);
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	struct pltfm_imx_data *imx_data = pltfm_host->priv;
-+	struct pltfm_imx_data *imx_data = sdhci_pltfm_priv(pltfm_host);
- 
- 	if (!sdhci_sdio_irq_enabled(host)) {
- 		clk_prepare_enable(imx_data->clk_per);
+-	host->quirks |= SDHCI_QUIRK_BROKEN_CARD_DETECTION;
+-	host->quirks |= SDHCI_QUIRK_SINGLE_POWER_WRITE;
+-
+ 	host_version = readw_relaxed((host->ioaddr + SDHCI_HOST_VERSION));
+ 	dev_dbg(&pdev->dev, "Host Version: 0x%x Vendor Version 0x%x\n",
+ 		host_version, ((host_version & SDHCI_VENDOR_VER_MASK) >>
 -- 
 2.7.0.rc3
