@@ -1,74 +1,86 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 6 Jan 2016 11:10:28 +0000
-Subject: [PATCHv2 00/18] arm64: mm: rework page table creation
-In-Reply-To: <568C16E3.7010509@redhat.com>
-References: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
- <568B17AA.1050002@redhat.com> <20160105115414.GC24664@leverpostej>
- <568C0D40.4040204@redhat.com> <20160105185818.GA31781@leverpostej>
- <568C16E3.7010509@redhat.com>
-Message-ID: <20160106111027.GC563@leverpostej>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 6 Jan 2016 12:12:45 +0100
+Subject: [PATCH 2/2] arm64: use memset to clear BSS
+In-Reply-To: <1452078327-9635-2-git-send-email-mark.rutland@arm.com>
+References: <1452078327-9635-1-git-send-email-mark.rutland@arm.com>
+ <1452078327-9635-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <CAKv+Gu9xsLk2hDB_RxYn9kytgCOEk3WTYq0Vvegh4NsE7ERTtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 05, 2016 at 11:17:55AM -0800, Laura Abbott wrote:
-> On 01/05/2016 10:58 AM, Mark Rutland wrote:
-> >>>>This series points out that my attempt to allow set_memory_* to
-> >>>>work on regular kernel memory[1] is broken right now because it breaks down
-> >>>>the larger block sizes.
-> >>>
-> >>>What's the rationale for set_memory_* on kernel mappings? I see
-> >>>"security", but I couldn't figure out a concrete use-case. Is there any
-> >>>example of a subsystem that wants to use this?
-> >>
-> >> From the description, it sounded like this was possibly new work but
-> >>the eBPF interpreter currently supports setting a page read only via
-> >>set_memory_ro (see 60a3b2253c413cf601783b070507d7dd6620c954
-> >>"net: bpf: make eBPF interpreter images read-only") so it's not
-> >>unheard of.
-> >
-> >Oh. For some reason I thought that used the vmalloc area, but evidently
-> >I was mistaken.
-> >
-> >That is unfortunate, it would be good to protect the JITed code.
-> >
-> >>>For statically-allocated data, an alternative approach would be for such
-> >>>memory to be mapped with minimal permissions from the outset (e.g. being
-> >>>placed in .rodata), and when elevated permissions are required a
-> >>>(temporary) memremap'd alias could be used, like what patch_map does to
-> >>>modify ROX kernel/module text.
-> >>>
-> >>>For dynamically-allocated data, we could create (minimal permission)
-> >>>mappings in the vmalloc region and pass those around. The linear map
-> >>>alias would still be writeable, but as the offset between the two isn't
-> >>>linear (and the owner of that allocation doesn't have to know/care about
-> >>>the linear map address), it would be much harder to find the linear map
-> >>>address to attack. An alias with elevated permissions could be used as
-> >>>required, or if it's a one-time RW->RO switch, the mapping could me
-> >>>modified in-place as the granularity wouldn't change.
-> >>
-> >>This would work for new features but probably not for existing features
-> >>such as the eBPF interpreter.
-> >
-> >Sure.
-> >
-> >For eBPF it might be possible to rework the code to support using
-> >separate aliases, but that's probably not going to be easy and that
-> >probably works against some performance requirement. :/
-> 
-> Ah no, you are correct, I misread how the code was working. The eBPF code
-> does use vmalloc so that can easily be fixed up.
+On 6 January 2016 at 12:05, Mark Rutland <mark.rutland@arm.com> wrote:
+> Currently we use an open-coded memzero to clear the BSS. As it is a
+> trivial implementation, it is sub-optimal.
+>
+> Our optimised memset doesn't use the stack, is position-independent, and
+> for the memzero case can use of DC ZVA to clear large blocks
+> efficiently. In __mmap_switched the MMU is on and there are no live
+> caller-saved registers, so we can safely call an uninstrumented memset.
+>
+> This patch changes __mmap_switched to use memset when clearing the BSS.
+> We use the __pi_memset alias so as to avoid any instrumentation in all
+> kernel configurations. As with the head symbols, we must get the linker
+> to generate __bss_size, as there is no ELF relocation for the
+> subtraction of two symbols.
+>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/kernel/head.S  | 14 ++++++--------
+>  arch/arm64/kernel/image.h |  2 ++
+>  2 files changed, 8 insertions(+), 8 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index 23cfc08..247a97b 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -415,14 +415,12 @@ ENDPROC(__create_page_tables)
+>   */
+>         .set    initial_sp, init_thread_union + THREAD_START_SP
+>  __mmap_switched:
+> -       adr_l   x6, __bss_start
+> -       adr_l   x7, __bss_stop
+> -
+> -1:     cmp     x6, x7
+> -       b.hs    2f
+> -       str     xzr, [x6], #8                   // Clear BSS
+> -       b       1b
+> -2:
+> +       // clear BSS
+> +       adr_l   x0, __bss_start
+> +       mov     x1, xzr
+> +       mov_l   x2, __bss_size
 
-Ah, phew. Thanks for digging into that.
+Is it such a big deal to do
 
-> I think your suggestion of either using vmalloc or a special static
-> section is the best recommendation. If anyone really thinks they need
-> to change any other memory they can make a proposal.
+adr_l x2, __bss_stop
+sub x2, x2, x0
 
-Sounds good to me.
+instead?
 
-> Sorry for the confusion.
+Either way:
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-No worries.
 
-Thanks,
-Mark.
+> +       bl      __pi_memset
+> +
+>         adr_l   sp, initial_sp, x4
+>         str_l   x21, __fdt_pointer, x5          // Save FDT pointer
+>         str_l   x24, memstart_addr, x6          // Save PHYS_OFFSET
+> diff --git a/arch/arm64/kernel/image.h b/arch/arm64/kernel/image.h
+> index bc2abb8..5fd76b5 100644
+> --- a/arch/arm64/kernel/image.h
+> +++ b/arch/arm64/kernel/image.h
+> @@ -95,4 +95,6 @@ __efistub__edata              = _edata;
+>
+>  #endif
+>
+> +__bss_size                     = __bss_stop - __bss_start;
+> +
+>  #endif /* __ASM_IMAGE_H */
+> --
+> 1.9.1
+>
