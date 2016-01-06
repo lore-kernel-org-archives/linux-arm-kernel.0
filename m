@@ -1,52 +1,61 @@
-From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
-Date: Wed, 6 Jan 2016 20:39:16 +0200
-Subject: [PATCH 2/2] memory: omap-gpmc: Add Kconfig option for debug
-In-Reply-To: <20160106182650.GM12777@atomide.com>
-References: <20160104170206.GC12777@atomide.com> <201601041834.56056@pali>
- <20160104174001.GD12777@atomide.com> <568AC0F9.2010304@gmail.com>
- <20160105041356.GE12777@atomide.com> <20160105084947.GG22661@pali>
- <20160105224929.GF12777@atomide.com> <20160106174039.GA14271@earth>
- <20160106174713.GL12777@atomide.com> <568D5669.4040801@gmail.com>
- <20160106182650.GM12777@atomide.com>
-Message-ID: <568D5F54.7040900@gmail.com>
+From: dianders@chromium.org (Douglas Anderson)
+Date: Wed,  6 Jan 2016 11:36:42 -0800
+Subject: [PATCH v3 0/3] dma-mapping: Patches for speeding up allocation
+Message-ID: <1452109005-19517-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This series of 3 patches will speed up memory allocation in dma-mapping
+quite a bit.
 
-On  6.01.2016 20:26, Tony Lindgren wrote:
+The first patch ("ARM: dma-mapping: Optimize allocation") is hopefully
+not terribly controversial: it merely doesn't try as hard to allocate
+big chunks once it gets the first failure.  Since it's unlikely that
+further big chunks will help (they're not likely to be virtually aligned
+anyway), this should give a big speedup with no real regression to speak
+of.  Yes, things could be made better, but this seems like a sane start.
 
->
-> Hmm. Care to verify that your onenand really gets detected at 83 MHz like
-> your earlier logs show? Below is a patch that should show it.
+The second patch ("common: DMA-mapping: add DMA_ATTR_SEQUENTIAL
+attribute") models MADV_SEQUENTIAL as I understand it.  Hopefully folks
+are happy with following that lead.  It does nothing by itself.
 
-before the corruption appeared, I looked a couple of times in syslog and 
-the freq there was 83MHz. Including after I disabled CONFIG_OMAP_GPMC_DEBUG.
+The third patch ("ARM: dma-mapping: Use DMA_ATTR_SEQUENTIAL hint to
+optimize allocation") simply applies the 2nd patch.  Again it's pretty
+simple.  ...and again it does nothing by itself.
 
->
-> Also, do things now work reliably for you with CONFIG_OMAP_GPMC_DEBUG
-> enabled? Or does that also produce corruption after few reboots?
+Notably missing from this series is the fourth patch that adds teeth to
+the second and third.  You can find that out of tree at
+<https://chromium-review.googlesource.com/#/c/320498/>.  Unfortunately
+the rk3288_vpu, which is what I'm working on, is out of tree.
 
-CONFIG_OMAP_GPMC_DEBUG is disabled, shall I enable it?
+All testing was done on the chromeos kernel-3.14.  Sanity (compile /
+boot) testing was done on a v4.4-rc6-based kernel.
 
-> --- a/arch/arm/mach-omap2/gpmc-onenand.c
-> +++ b/arch/arm/mach-omap2/gpmc-onenand.c
-> @@ -153,6 +153,8 @@ static int omap2_onenand_get_freq(struct omap_onenand_platform_data *cfg,
->   		freq = 0;
->   	}
->
-> +	pr_info("onenand rate detected: %i\n", freq);
-> +
->   	return freq;
->   }
->
+Also note that v2 of this series had an extra patch
+<https://patchwork.kernel.org/patch/7888861/> that would attempt to sort
+the allocation results to opportunistically get some extra alignment.  I
+dropped that, but it could be re-introduced if there was interest.  I
+found that it did give a little extra alignment sometimes, but maybe not
+enough to justify the extra complexity.  It also was a bit half-baked
+since it really should have tried harder to ensure alignment.
 
-Where am I supposed to get the output from ^^^ if rootfs become 
-corrupted? The problem appears after poweroff/restart when it is already 
-too late to get the syslog.
+Changes in v3:
+- add DMA_ATTR_SEQUENTIAL attribute new for v3
+- Use DMA_ATTR_SEQUENTIAL hint patch new for v3.
 
-BTW, did you compare all the GPMC registers with and without 
-HWMOD_INIT_NO_RESET?
+Changes in v2:
+- No longer just 1 page at a time, but gives up higher order quickly.
+- Only tries important higher order allocations that might help us.
 
-Regards,
-Ivo
+Douglas Anderson (3):
+  ARM: dma-mapping: Optimize allocation
+  common: DMA-mapping: add DMA_ATTR_SEQUENTIAL attribute
+  ARM: dma-mapping: Use DMA_ATTR_SEQUENTIAL hint to optimize allocation
+
+ Documentation/DMA-attributes.txt | 11 +++++++++++
+ arch/arm/mm/dma-mapping.c        | 41 ++++++++++++++++++++++++++--------------
+ include/linux/dma-attrs.h        |  1 +
+ 3 files changed, 39 insertions(+), 14 deletions(-)
+
+-- 
+2.6.0.rc2.230.g3dd15c0
