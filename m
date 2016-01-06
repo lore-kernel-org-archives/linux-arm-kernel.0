@@ -1,83 +1,89 @@
-From: dennis.chen@arm.com (Dennis Chen)
-Date: Wed, 6 Jan 2016 14:14:09 +0800
-Subject: [linux-next PATCH] arm64: fix kernel crash with 48-bit VA and
- 64KB granule
-In-Reply-To: <20160105095603.GG6301@e104818-lin.cambridge.arm.com>
-References: <1451960299-14123-1-git-send-email-dennis.chen@arm.com>
- <CAKv+Gu-pz8rA2EfU6NwCndmoYneOjYUt8_PodTdZkepV3cRXJQ@mail.gmail.com>
- <20160105083533.GD13942@arm.org>
- <CAKv+Gu9Q3CmC37dL3o+hcBeG-NJ7+bkOiLQihirje4YbazizJQ@mail.gmail.com>
- <20160105084042.GF13942@arm.org>
- <20160105095603.GG6301@e104818-lin.cambridge.arm.com>
-Message-ID: <20160106061407.GA7082@arm.org>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Wed, 06 Jan 2016 14:30:19 +0800
+Subject: [PATCH v7 3/5] drm: rockchip: Support Synopsys DW MIPI DSI
+In-Reply-To: <1452053038-32098-4-git-send-email-zyw@rock-chips.com>
+References: <1452053038-32098-1-git-send-email-zyw@rock-chips.com>
+ <1452053038-32098-4-git-send-email-zyw@rock-chips.com>
+Message-ID: <568CB47B.1010205@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 05, 2016 at 09:56:03AM +0000, Catalin Marinas wrote:
-> On Tue, Jan 05, 2016 at 04:40:44PM +0800, Dennis Chen wrote:
-> > On Tue, Jan 05, 2016 at 09:38:11AM +0100, Ard Biesheuvel wrote:
-> > > >> On 5 January 2016 at 03:18, Dennis Chen <dennis.chen@arm.com> wrote:
-> > > >> > The commit 3400749b5a22 ("arm64/efi: refactor EFI init and runtime
-> > > >> > code for reuse by 32-bit ARM") uses pgd_alloc() to allocate space for
-> > > >> > efi_mm.pgd while not the static efi_pgd[], since this function will be
-> > > >> > called with early_initcall, which results in the pgd_cache used by
-> > > >> > pgd_alloc() has not been initialized yet, kernel will hang in this
-> > > >> > case. This patch is trying to make the pgd_cache_init() called before
-> > > >> > arm_enable_runtime_services() by changing its core_initcall to
-> > > >> > early_initcall.
-> > > >> >
-> > > >> > Signed-off-by: Dennis Chen <dennis.chen@arm.com>
-> > > >> > Tested-by: Sudeep Holla <sudeep.holla@arm.com>
-> > > >> >
-> > > >> > Cc: Will Deacon <will.deacon@arm.com>
-> > > >> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > > >> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > > >> > Cc: Sudeep Holla <sudeep.holla@arm.com>
-> > > >> > ---
-> > > >> >  arch/arm64/mm/pgd.c | 2 +-
-> > > >> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > >> >
-> > > >> > diff --git a/arch/arm64/mm/pgd.c b/arch/arm64/mm/pgd.c
-> > > >> > index cb3ba1b..859a788 100644
-> > > >> > --- a/arch/arm64/mm/pgd.c
-> > > >> > +++ b/arch/arm64/mm/pgd.c
-> > > >> > @@ -56,4 +56,4 @@ static int __init pgd_cache_init(void)
-> > > >> >                                               SLAB_PANIC, NULL);
-> > > >> >         return 0;
-> > > >> >  }
-> > > >> > -core_initcall(pgd_cache_init);
-> > > >> > +early_initcall(pgd_cache_init);
-> [...]
-> > > Well, since arm_enable_runtime_services() is an early_initcall()
-> > > itself, how are you guaranteeing the ordering between the two? Link
-> > > order?
-> >
-> > Link order.
->
-> And can you explain how this works, what guarantees it gives?
->
-You can take a look at include/asm-generic/vmlinux.ldx.h: INIT_CALLS macro,
-for the init call section, early_initcall is the first chuck in the section,
-followed by LEVEL[0-7]. For the same level, the layout order is determined
-by the link order, ARCH is always precedence over the drivers. Catalin, are
-you giving me a kernel examination? :)
+Hi Chris
 
->
-> > IMPORTANT NOTICE: The contents of this email and any attachments are
-> > confidential and may also be privileged. If you are not the intended
-> > recipient, please notify the sender immediately and do not disclose
-> > the contents to any other person, use it for any purpose, or store or
-> > copy the information in any medium. Thank you.
->
-> BTW, please sort out the legal disclaimer (raise an IT ticket).
->
-Hmm, the ticket has been raised.
-> --
-> Catalin
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+Looks good for me except some tiny issues.
+
+
+On 2016?01?06? 12:03, Chris Zhong wrote:
+> +struct dw_mipi_dsi {
+> +	struct drm_encoder encoder;
+> +	struct drm_connector connector;
+> +	struct mipi_dsi_host dsi_host;
+> +	struct drm_panel *panel;
+> +	struct device *dev;
+> +	struct regmap *grf_regmap;
+> +	void __iomem *base;
+> +
+> +	struct clk *pllref_clk;
+> +	struct clk *pclk;
+> +
+> +	unsigned int lane_mbps; /* per lane */
+> +	u32 channel;
+> +	u32 lanes;
+> +	u32 format;
+> +	u16 input_div;
+> +	u16 feedback_div;
+> +	struct drm_display_mode *mode;
+> +
+> +	const struct dw_mipi_dsi_plat_data *pdata;
+> +
+
+remove this blank line.
+
+> +};
+> +
+
+[...]
+
+> +static void dw_mipi_dsi_encoder_mode_set(struct drm_encoder *encoder,
+> +					struct drm_display_mode *mode,
+> +					struct drm_display_mode *adjusted_mode)
+> +{
+> +	struct dw_mipi_dsi *dsi = encoder_to_dsi(encoder);
+> +	int ret;
+> +
+> +	dsi->mode = adjusted_mode;
+> +
+> +	ret = dw_mipi_dsi_get_lane_bps(dsi);
+> +	if (ret < 0)
+> +		return;
+> +
+> +	if (clk_prepare_enable(dsi->pclk)) {
+> +		dev_err(dsi->dev, "%s: Failed to enable pclk\n", __func__);
+> +		return;
+> +	}
+> +
+> +	dw_mipi_dsi_init(dsi);
+> +	dw_mipi_dsi_dpi_config(dsi, mode);
+> +	dw_mipi_dsi_packet_handler_config(dsi);
+> +	dw_mipi_dsi_video_mode_config(dsi);
+> +	dw_mipi_dsi_video_packet_config(dsi, mode);
+> +	dw_mipi_dsi_command_mode_config(dsi);
+> +	dw_mipi_dsi_line_timer_config(dsi);
+> +	dw_mipi_dsi_vertical_timing_config(dsi);
+> +	dw_mipi_dsi_dphy_timing_config(dsi);
+> +	dw_mipi_dsi_dphy_interface_config(dsi);
+> +	dw_mipi_dsi_clear_err(dsi);
+> +	if (drm_panel_prepare(dsi->panel)) {
+> +		dev_err(dsi->dev, "failed to prepare panel\n");
+
+Don't forget doing clk_disable_unprepare when run into error path.
+
+> +		return;
+> +	}
+> +	clk_disable_unprepare(dsi->pclk);
+> +}
+> +
+
+
+-- 
+?ark Yao
