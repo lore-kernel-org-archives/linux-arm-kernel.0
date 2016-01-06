@@ -1,76 +1,57 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 6 Jan 2016 12:34:05 +0000
-Subject: [PATCH 2/2] arm64: use memset to clear BSS
-In-Reply-To: <20160106114039.GE563@leverpostej>
+Date: Wed, 6 Jan 2016 12:37:41 +0000
+Subject: [PATCH 1/2] arm64: add macro to handle large immediates
+In-Reply-To: <CAKv+Gu95+F2HhoirhyfoKSs7oUY_5qBdDGcKfXmZi2sS8mERNg@mail.gmail.com>
 References: <1452078327-9635-1-git-send-email-mark.rutland@arm.com>
- <1452078327-9635-2-git-send-email-mark.rutland@arm.com>
- <CAKv+Gu9xsLk2hDB_RxYn9kytgCOEk3WTYq0Vvegh4NsE7ERTtQ@mail.gmail.com>
- <20160106114039.GE563@leverpostej>
-Message-ID: <20160106123404.GG563@leverpostej>
+ <CAKv+Gu_Oo1=Wwr9jRQBTn7bs2KVisSkwkFvJASocCS26taeo-w@mail.gmail.com>
+ <20160106122104.GF563@leverpostej>
+ <CAKv+Gu95+F2HhoirhyfoKSs7oUY_5qBdDGcKfXmZi2sS8mERNg@mail.gmail.com>
+Message-ID: <20160106123740.GH563@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 06, 2016 at 11:40:39AM +0000, Mark Rutland wrote:
-> On Wed, Jan 06, 2016 at 12:12:45PM +0100, Ard Biesheuvel wrote:
-> > On 6 January 2016 at 12:05, Mark Rutland <mark.rutland@arm.com> wrote:
-> > > Currently we use an open-coded memzero to clear the BSS. As it is a
-> > > trivial implementation, it is sub-optimal.
-> > >
-> > > Our optimised memset doesn't use the stack, is position-independent, and
-> > > for the memzero case can use of DC ZVA to clear large blocks
-> > > efficiently. In __mmap_switched the MMU is on and there are no live
-> > > caller-saved registers, so we can safely call an uninstrumented memset.
-> > >
-> > > This patch changes __mmap_switched to use memset when clearing the BSS.
-> > > We use the __pi_memset alias so as to avoid any instrumentation in all
-> > > kernel configurations. As with the head symbols, we must get the linker
-> > > to generate __bss_size, as there is no ELF relocation for the
-> > > subtraction of two symbols.
-> > >
-> > > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > > Cc: Marc Zyngier <marc.zyngier@arm.com>
-> > > Cc: Will Deacon <will.deacon@arm.com>
-> > > ---
-> > >  arch/arm64/kernel/head.S  | 14 ++++++--------
-> > >  arch/arm64/kernel/image.h |  2 ++
-> > >  2 files changed, 8 insertions(+), 8 deletions(-)
-> > >
-> > > diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> > > index 23cfc08..247a97b 100644
-> > > --- a/arch/arm64/kernel/head.S
-> > > +++ b/arch/arm64/kernel/head.S
-> > > @@ -415,14 +415,12 @@ ENDPROC(__create_page_tables)
-> > >   */
-> > >         .set    initial_sp, init_thread_union + THREAD_START_SP
-> > >  __mmap_switched:
-> > > -       adr_l   x6, __bss_start
-> > > -       adr_l   x7, __bss_stop
-> > > -
-> > > -1:     cmp     x6, x7
-> > > -       b.hs    2f
-> > > -       str     xzr, [x6], #8                   // Clear BSS
-> > > -       b       1b
-> > > -2:
-> > > +       // clear BSS
-> > > +       adr_l   x0, __bss_start
-> > > +       mov     x1, xzr
-> > > +       mov_l   x2, __bss_size
-> > 
-> > Is it such a big deal to do
-> > 
-> > adr_l x2, __bss_stop
-> > sub x2, x2, x0
-> > 
-> > instead?
+> >> Ack for the general idea, but for correctness, you should pair the
+> >> movk instructions with the _nc relocations (i.e., keep movz first, but
+> >> invert the order of the relocs)
+> >
+> > Ah, I hadn't spotted the restriction. I'll change that to:
+> >
+> >         movz    \dst, :abs_g3:\val
+> >         movk    \dst, :abs_g2:\val
+> >         movk    \dst, :abs_g1:\val
+> >         movk    \dst, :abs_g0:\val
+> >
 > 
-> I'm happy either way.
-> 
-> It no-one else has a use for mov_l I'll drop it and move to that.
+> Yes, but with the _nc suffix on the latter three.
 
->From a discussion with Will, it sounds like the sub form is preferable,
-so I'll drop mov_l for now.
+Yup.
+
+> > That raises a related question. Is it the linker's responsibility to
+> > fill in the shift encoding in the hw field as part of the g{3,2,1}
+> > relocs?
+> >
+> 
+> This
+> 
+> movz x0, :abs_g3:val
+> movk x0, :abs_g2_nc:val
+> movk x0, :abs_g1_nc:val
+> movk x0, :abs_g0_nc:val
+> 
+> assembles to
+> 
+> 0000000000000000 <.text>:
+>    0: d2e00000 movz x0, #0x0, lsl #48
+>    4: f2c00000 movk x0, #0x0, lsl #32
+>    8: f2a00000 movk x0, #0x0, lsl #16
+>    c: f2800000 movk x0, #0x0
+> 
+> so it is in fact the assembler that sets the hw field.
+
+Interesting!
+
+As I mentioned in another reply, for the moment I'm going to drop mov_l
+unless we have another need for it.
 
 Thanks,
 Mark.
