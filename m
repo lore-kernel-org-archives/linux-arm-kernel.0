@@ -1,33 +1,55 @@
 From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 6 Jan 2016 17:12:36 +0100
-Subject: [PATCH v2 2/5] MAINTAINERS: add entry for Atmel ADC 8xx driver
+Date: Wed, 6 Jan 2016 17:12:37 +0100
+Subject: [PATCH v2 3/5] ARM: at91/dt: sama5d2: add adc device
 In-Reply-To: <1452096759-19438-1-git-send-email-ludovic.desroches@atmel.com>
 References: <1452096759-19438-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1452096759-19438-3-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1452096759-19438-4-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add the ADC device, and remove the adc_op_clk which is useless since the
+adc sampling frequency is configured with sysfs.
+
 Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 ---
- MAINTAINERS | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/sama5d2.dtsi | 18 ++++++++++++------
+ 1 file changed, 12 insertions(+), 6 deletions(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 248828d..827bc83 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1945,6 +1945,12 @@ M:	Nicolas Ferre <nicolas.ferre@atmel.com>
- S:	Supported
- F:	drivers/tty/serial/atmel_serial.c
+diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+index 3f750f6..1bd8899 100644
+--- a/arch/arm/boot/dts/sama5d2.dtsi
++++ b/arch/arm/boot/dts/sama5d2.dtsi
+@@ -88,12 +88,6 @@
+ 			#clock-cells = <0>;
+ 			clock-frequency = <0>;
+ 		};
+-
+-		adc_op_clk: adc_op_clk{
+-			compatible = "fixed-clock";
+-			#clock-cells = <0>;
+-			clock-frequency = <1000000>;
+-		};
+ 	};
  
-+ATMEL ADC 8xx DRIVER
-+M:	Ludovic Desroches <ludovic.desroches@atmel.com>
-+L:	linux-iio at vger.kernel.org
-+S:	Supported
-+F:	drivers/iio/adc/at91_adc8xx.c
+ 	ns_sram: sram at 00200000 {
+@@ -1085,6 +1079,18 @@
+ 				status = "disabled";
+ 			};
+ 
++			adc: adc at fc030000 {
++				compatible = "atmel,sama5d2-adc";
++				reg = <0xfc030000 0x100>;
++				interrupts = <40 IRQ_TYPE_LEVEL_HIGH 7>;
++				clocks = <&adc_clk>;
++				clock-names = "adc_clk";
++				atmel,min-sample-rate = <200000>;
++				atmel,max-sample-rate = <20000000>;
++				atmel,startup-time-ms = <4>;
++				status = "disabled";
++			};
 +
- ATMEL Audio ALSA driver
- M:	Nicolas Ferre <nicolas.ferre@atmel.com>
- L:	alsa-devel at alsa-project.org (moderated for non-subscribers)
+ 			pioA: pinctrl at fc038000 {
+ 				compatible = "atmel,sama5d2-pinctrl";
+ 				reg = <0xfc038000 0x600>;
 -- 
 2.5.0
