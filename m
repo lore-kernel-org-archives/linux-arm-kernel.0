@@ -1,73 +1,347 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 6 Jan 2016 10:36:28 +0800
-Subject: [PATCH 03/11] mmc: sdhci-msm: use sdhci_pltfm_init for private
- allocation
-In-Reply-To: <201601052054.hzEzw4pe%fengguang.wu@intel.com>
-References: <1451991099-4946-4-git-send-email-jszhang@marvell.com>
- <201601052054.hzEzw4pe%fengguang.wu@intel.com>
-Message-ID: <20160106103628.05a8f9c4@xhacker>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 6 Jan 2016 10:39:51 +0800
+Subject: [PATCH RFC 1/2] clk: sunxi: Add sun8i display support
+In-Reply-To: <9cc33c3701844a07c43ee6c0c1072be4e2073cc1.1452021349.git.moinejf@free.fr>
+References: <cover.1452021349.git.moinejf@free.fr>
+ <9cc33c3701844a07c43ee6c0c1072be4e2073cc1.1452021349.git.moinejf@free.fr>
+Message-ID: <CAGb2v66mhbRKPTYDfLe8Tf6-otvy5a7J9K35Bwxc6_-y0a+avw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 5 Jan 2016 20:47:37 +0800 kbuild test robot wrote:
+Hi,
 
-> Hi Jisheng,
-> 
-> [auto build test WARNING on v4.4-rc8]
-> [also build test WARNING on next-20160105]
-> [cannot apply to ulf.hansson-mmc/next]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
-> 
-> url:    https://github.com/0day-ci/linux/commits/Jisheng-Zhang/mmc-sdhci-bcm2835-use-sdhci_pltfm_init-for-private-allocation/20160105-190232
-> config: arm64-allmodconfig (attached as .config)
-> reproduce:
->         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         # save the attached .config to linux build tree
->         make.cross ARCH=arm64 
-> 
-> All warnings (new ones prefixed by >>):
-> 
->    drivers/mmc/host/sdhci-msm.c: In function 'sdhci_msm_probe':
-> >> drivers/mmc/host/sdhci-msm.c:440:32: warning: 'msm_host' is used uninitialized in this function [-Wuninitialized]  
->      host = sdhci_pltfm_init(pdev, &msm_host->sdhci_msm_pdata,
+First of all, please include the clk subsystem maintainers and the
+linux-clk mailing list for all clk related patches.
 
-OOPS, I'll fix it.
+On Wed, Jan 6, 2016 at 2:28 AM, Jean-Francois Moine <moinejf@free.fr> wrote:
+> Add the clock types which are used by the sun8i family for video.
 
-Thanks a lot,
-Jisheng
+These clocks first appeared in the A31.
 
-
->                                    ^
-> 
-> vim +/msm_host +440 drivers/mmc/host/sdhci-msm.c
-> 
->    424		.set_clock = sdhci_set_clock,
->    425		.set_bus_width = sdhci_set_bus_width,
->    426		.set_uhs_signaling = sdhci_set_uhs_signaling,
->    427	};
->    428	
->    429	static int sdhci_msm_probe(struct platform_device *pdev)
->    430	{
->    431		struct sdhci_host *host;
->    432		struct sdhci_pltfm_host *pltfm_host;
->    433		struct sdhci_msm_host *msm_host;
->    434		struct resource *core_memres;
->    435		int ret;
->    436		u16 host_version, core_minor;
->    437		u32 core_version, caps;
->    438		u8 core_major;
->    439	
->  > 440		host = sdhci_pltfm_init(pdev, &msm_host->sdhci_msm_pdata,  
->    441					sizeof(*msm_host));
->    442		if (IS_ERR(host))
->    443			return PTR_ERR(host);
->    444	
->    445		pltfm_host = sdhci_priv(host);
->    446		msm_host = sdhci_pltfm_priv(pltfm_host);
->    447		msm_host->sdhci_msm_pdata.ops = &sdhci_msm_ops;
->    448		msm_host->mmc = host->mmc;
-> 
+> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
 > ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+>  drivers/clk/sunxi/Makefile            |   1 +
+>  drivers/clk/sunxi/clk-sun8i-display.c | 247 ++++++++++++++++++++++++++++++++++
+
+Please split this into 2 patches, and 2 files: one for PLL3, named
+clk-sun6i-pll3.c, and one for the display mod clocks, named
+clk-sun6i-display.c
+
+>  2 files changed, 258 insertions(+)
+>  create mode 100644 drivers/clk/sunxi/clk-sun8i-display.c
+>
+> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
+> index cb4c299..145c078 100644
+> --- a/drivers/clk/sunxi/Makefile
+> +++ b/drivers/clk/sunxi/Makefile
+> @@ -10,6 +10,7 @@ obj-y += clk-a10-pll2.o
+>  obj-y += clk-a20-gmac.o
+>  obj-y += clk-mod0.o
+>  obj-y += clk-simple-gates.o
+> +obj-y += clk-sun8i-display.o
+>  obj-y += clk-sun8i-mbus.o
+>  obj-y += clk-sun9i-core.o
+>  obj-y += clk-sun9i-mmc.o
+> diff --git a/drivers/clk/sunxi/clk-sun8i-display.c b/drivers/clk/sunxi/clk-sun8i-display.c
+> new file mode 100644
+> index 0000000..eded572
+> --- /dev/null
+> +++ b/drivers/clk/sunxi/clk-sun8i-display.c
+> @@ -0,0 +1,247 @@
+> +/*
+> + * Copyright 2015 Jean-Francois Moine <moinejf@free.fr>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/of_address.h>
+> +#include <linux/slab.h>
+> +#include <linux/spinlock.h>
+> +#include <linux/rational.h>
+> +#include <linux/delay.h>
+> +
+> +static DEFINE_SPINLOCK(sun8i_display_lock);
+> +
+> +/* PLL3 (video) and PLL10 (de) */
+> +struct clk_fact {
+> +       struct clk_hw hw;
+> +       void __iomem *reg;
+> +};
+> +#define to_clk_fact(_hw) container_of(_hw, struct clk_fact, hw)
+
+What does fact stand for?
+
+> +
+> +#define SUN8I_PLL3_MSHIFT      0
+> +#define SUN8I_PLL3_MMASK       0x0f
+
+You can use GENMASK for these. Note that GENMASK is inclusive on both ends.
+
+> +#define SUN8I_PLL3_NSHIFT      8
+> +#define SUN8I_PLL3_NMASK       0x7f
+> +#define SUN8I_PLL3_MODE_SEL    0x01000000
+> +#define SUN8I_PLL3_FRAC_CLK    0x02000000
+
+Please use the BIT() macros.
+
+> +
+> +static int sun8i_pll3_get_fact(unsigned long rate,
+> +                       unsigned long parent_rate,
+> +                       unsigned long *n, unsigned long *m)
+> +{
+> +       if (rate == 297000000)
+> +               return 1;
+> +       if (rate == 270000000)
+> +               return 0;
+> +       rational_best_approximation(rate, parent_rate,
+> +                               SUN8I_PLL3_NMASK + 1, SUN8I_PLL3_MMASK + 1,
+> +                               n, m);
+> +       return -1;
+> +}
+> +
+> +static unsigned long sun8i_pll3_recalc_rate(struct clk_hw *hw,
+> +                                       unsigned long parent_rate)
+> +{
+> +       struct clk_fact *fact = to_clk_fact(hw);
+> +       u32 reg;
+> +       u32 n, m;
+> +
+> +       reg = readl(fact->reg);
+> +       if (reg & SUN8I_PLL3_MODE_SEL) {
+> +               n = (reg >> SUN8I_PLL3_NSHIFT) & SUN8I_PLL3_NMASK;
+> +               m = (reg >> SUN8I_PLL3_MSHIFT) & SUN8I_PLL3_MMASK;
+> +               return parent_rate / (m + 1) * (n + 1);
+> +       }
+> +       if (reg & SUN8I_PLL3_FRAC_CLK)
+> +               return 297000000;
+> +       return 270000000;
+> +}
+> +
+> +static long sun8i_pll3_round_rate(struct clk_hw *hw, unsigned long rate,
+> +                               unsigned long *parent_rate)
+> +{
+> +       int frac;
+> +       unsigned long n, m;
+> +
+> +       frac = sun8i_pll3_get_fact(rate, *parent_rate, &n, &m);
+> +       if (frac == 1)
+> +               return 297000000;
+> +       if (frac == 0)
+> +               return 270000000;
+> +       return (*parent_rate * n) / m;
+
+The ordering is different from the one in recalc_rate. Considering
+integer rounding, would the results be different?
+
+> +}
+> +
+> +static int sun8i_pll3_set_rate(struct clk_hw *hw, unsigned long rate,
+> +                       unsigned long parent_rate)
+> +{
+> +       struct clk_fact *fact = to_clk_fact(hw);
+> +       u32 reg;
+> +       int frac;
+> +       unsigned long n, m;
+> +
+> +       reg = readl(fact->reg) &
+> +                       ~(SUN8I_PLL3_MODE_SEL |
+> +                         SUN8I_PLL3_FRAC_CLK |
+> +                         (SUN8I_PLL3_NMASK << SUN8I_PLL3_NSHIFT) |
+> +                         (SUN8I_PLL3_MMASK << SUN8I_PLL3_MSHIFT));
+> +
+> +       frac = sun8i_pll3_get_fact(rate, parent_rate, &n, &m);
+> +       if (frac == 1)
+> +               reg |= SUN8I_PLL3_FRAC_CLK;     /* 297MHz */
+> +       else if (frac == 0)
+> +               ;                               /* 270MHz */
+> +       else
+> +               reg |= SUN8I_PLL3_MODE_SEL |
+> +                       ((n - 1) << SUN8I_PLL3_NSHIFT) |
+> +                       ((m - 1) << SUN8I_PLL3_MSHIFT);
+> +
+> +       writel(reg, fact->reg);
+> +
+> +       /* delay 500us so pll stabilizes */
+> +       __delay(500);
+
+Bit 28 indicates PLL lock, please use readl_poll_timeout() to check it.
+
+> +
+> +       return 0;
+> +}
+> +
+> +static const struct clk_ops clk_sun8i_pll3_fact_ops = {
+> +       .recalc_rate = sun8i_pll3_recalc_rate,
+> +       .round_rate = sun8i_pll3_round_rate,
+> +       .set_rate = sun8i_pll3_set_rate,
+> +};
+> +
+> +static void __init sun8i_pll3_setup(struct device_node *node)
+> +{
+> +       const char *clk_name = node->name, *parent;
+> +       struct clk_fact *fact;
+> +       struct clk_gate *gate;
+> +       void __iomem *reg;
+> +       struct clk *clk;
+> +
+> +       of_property_read_string(node, "clock-output-names", &clk_name);
+> +       parent = of_clk_get_parent_name(node, 0);
+> +
+> +       reg = of_io_request_and_map(node, 0, of_node_full_name(node));
+> +       if (IS_ERR(reg)) {
+> +               pr_err("%s: Could not map the clock registers\n", clk_name);
+> +               return;
+> +       }
+> +
+> +       gate = kzalloc(sizeof(*gate), GFP_KERNEL);
+> +       if (!gate)
+> +               return;
+
+You should call release_mem_region() to release the iomem region you
+requested with of_io_request_and_map().
+
+> +
+> +       gate->reg = reg;
+> +       gate->bit_idx = 31;
+> +       gate->lock = &sun8i_display_lock;
+> +
+> +       fact = kzalloc(sizeof(*fact), GFP_KERNEL);
+> +       if (!fact)
+> +               goto free_gate;
+> +
+> +       fact->reg = reg;
+> +
+> +       clk = clk_register_composite(NULL, clk_name,
+> +                                    &parent, 1,
+> +                                    NULL, NULL,
+> +                                    &fact->hw, &clk_sun8i_pll3_fact_ops,
+> +                                    &gate->hw, &clk_gate_ops,
+> +                                    0);
+> +       if (IS_ERR(clk)) {
+> +               pr_err("%s: Couldn't register the clock\n", clk_name);
+> +               goto free_fact;
+> +       }
+> +
+> +       of_clk_add_provider(node, of_clk_src_simple_get, clk);
+
+Would this fail?
+
+> +
+> +       return;
+> +
+> +free_fact:
+> +       kfree(fact);
+> +free_gate:
+> +       kfree(gate);
+> +}
+> +
+> +CLK_OF_DECLARE(sun8i_pll3, "allwinner,sun8i-pll3-clk", sun8i_pll3_setup);
+> +
+> +/* DE, TCON0, TVE, HDMI, DEINTERLACE  */
+> +static void __init sun8i_display_setup(struct device_node *node)
+> +{
+> +       const char *clk_name = node->name;
+> +       const char *parents[2];
+
+There are as many as six parents for display mod clocks on A31.
+A23/A33 mod clocks have holes in there parent array, as some
+PLLs are missing. We may need a different driver to deal with
+that.
+
+> +       struct clk_mux *mux = NULL;
+> +       struct clk_divider *div;
+> +       struct clk_gate *gate;
+> +       void __iomem *reg;
+> +       struct clk *clk;
+> +       int n;
+> +
+> +       of_property_read_string(node, "clock-output-names", &clk_name);
+> +
+> +       reg = of_io_request_and_map(node, 0, of_node_full_name(node));
+> +       if (IS_ERR(reg)) {
+> +               pr_err("%s: Could not map the clock registers\n", clk_name);
+> +               return;
+> +       }
+> +
+> +       n = of_clk_parent_fill(node, parents, ARRAY_SIZE(parents));
+> +
+> +       if (n > 1) {                            /* many possible sources */
+> +               mux = kzalloc(sizeof(*mux), GFP_KERNEL);
+> +               if (!mux)
+> +                       return;
+
+release_mem_region().
+
+> +               mux->reg = reg;
+> +               mux->shift = 24;
+> +               mux->mask = 0x07;
+
+Macros for these, please.
+
+> +               mux->lock = &sun8i_display_lock;
+> +       }
+> +
+> +       gate = kzalloc(sizeof(*gate), GFP_KERNEL);
+> +       if (!gate)
+> +               goto free_gate;
+
+Label name is confusing. Another "free_mux" wouldn't harm.
+
+> +
+> +       gate->reg = reg;
+> +       gate->bit_idx = 31;
+> +       gate->lock = &sun8i_display_lock;
+> +
+> +       div = kzalloc(sizeof(*div), GFP_KERNEL);
+> +       if (!div)
+> +               goto free_gate;
+> +
+> +       div->reg = reg;
+> +       div->shift = 0;
+> +       div->width = 4;
+
+Macros, please.
+
+> +       div->lock = &sun8i_display_lock;
+> +
+> +       clk = clk_register_composite(NULL, clk_name,
+> +                                    parents, n,
+> +                                    mux ? &mux->hw : NULL, &clk_mux_ops,
+> +                                    &div->hw, &clk_divider_ops,
+> +                                    &gate->hw, &clk_gate_ops,
+> +                                    0);
+> +       if (IS_ERR(clk)) {
+> +               pr_err("%s: Couldn't register the clock\n", clk_name);
+> +               goto free_div;
+> +       }
+> +
+> +       of_clk_add_provider(node, of_clk_src_simple_get, clk);
+
+Would this fail?
+
+> +
+> +       return;
+> +
+> +free_div:
+> +       kfree(div);
+> +free_gate:
+> +       kfree(gate);
+> +       kfree(mux);
+> +}
+> +
+> +CLK_OF_DECLARE(sun8i_display, "allwinner,sun8i-display-clk", sun8i_display_setup);
+> --
+> 2.6.4
+
+
+Regards
+ChenYu
