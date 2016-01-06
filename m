@@ -1,65 +1,51 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 6 Jan 2016 09:46:16 +0000
-Subject: [PATCH] ARM64: tegra: Add support for Google Pixel C
-In-Reply-To: <1452073222-2956-1-git-send-email-jonathanh@nvidia.com>
-References: <1452073222-2956-1-git-send-email-jonathanh@nvidia.com>
-Message-ID: <20160106094616.GA563@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 6 Jan 2016 09:51:07 +0000
+Subject: [linux-next PATCH] arm64: fix kernel crash with 48-bit VA and
+ 64KB granule
+In-Reply-To: <20160106085929.GB7879@arm.org>
+References: <CAKv+Gu9Q3CmC37dL3o+hcBeG-NJ7+bkOiLQihirje4YbazizJQ@mail.gmail.com>
+ <20160105084042.GF13942@arm.org>
+ <20160105095603.GG6301@e104818-lin.cambridge.arm.com>
+ <20160106061407.GA7082@arm.org>
+ <CAKv+Gu8t56rfdN1ot08BgsteaaincFek0uzoDAroefMWQ+kKEA@mail.gmail.com>
+ <20160106073847.GA7608@arm.org>
+ <CAKv+Gu_sqAuA_iHf_sNRJyaQUFG5n_eXxYYOHwmV0hf0GTUxow@mail.gmail.com>
+ <20160106085216.GA7879@arm.org>
+ <CAKv+Gu_ivfmfFyK79g63ciBD3Jv7bzzu5t_NYW2aVy8NhgHdSA@mail.gmail.com>
+ <20160106085929.GB7879@arm.org>
+Message-ID: <20160106095107.GA16580@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dennis,
 
-On Wed, Jan 06, 2016 at 09:40:22AM +0000, Jon Hunter wrote:
-> Add initial device-tree support for Google Pixel C (a.k.a. Smaug) based
-> upon Tegra210 SoC with 3 GiB of LPDDR4 RAM.
-> 
-> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
-> ---
->  arch/arm64/boot/dts/nvidia/Makefile           |  1 +
->  arch/arm64/boot/dts/nvidia/tegra210-smaug.dts | 42 +++++++++++++++++++++++++++
->  2 files changed, 43 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
-> 
-> diff --git a/arch/arm64/boot/dts/nvidia/Makefile b/arch/arm64/boot/dts/nvidia/Makefile
-> index a7e865da1005..0f7cdf3e05c1 100644
-> --- a/arch/arm64/boot/dts/nvidia/Makefile
-> +++ b/arch/arm64/boot/dts/nvidia/Makefile
-> @@ -2,6 +2,7 @@ dtb-$(CONFIG_ARCH_TEGRA_132_SOC) += tegra132-norrin.dtb
->  dtb-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-p2371-0000.dtb
->  dtb-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-p2371-2180.dtb
->  dtb-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-p2571.dtb
-> +dtb-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-smaug.dtb
->  
->  always		:= $(dtb-y)
->  clean-files	:= *.dtb
-> diff --git a/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts b/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
-> new file mode 100644
-> index 000000000000..a7474f5fcbcc
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
-> @@ -0,0 +1,42 @@
-> +/dts-v1/;
-> +
-> +#include "tegra210.dtsi"
-> +
-> +/ {
-> +	model = "Google Pixel C";
-> +	compatible = "google,smaug-rev8", "google,smaug-rev7",
-> +		     "google,smaug-rev6", "google,smaug-rev5",
-> +		     "google,smaug-rev4", "google,smaug-rev3",
-> +		     "google,smaug-rev1", "google,smaug", "nvidia,tegra210";
+On Wed, Jan 06, 2016 at 04:59:30PM +0800, Dennis Chen wrote:
+> On Wed, Jan 06, 2016 at 09:54:42AM +0100, Ard Biesheuvel wrote:
+> > On 6 January 2016 at 09:52, Dennis Chen <dennis.chen@arm.com> wrote:
+> > > On Wed, Jan 06, 2016 at 08:42:20AM +0100, Ard Biesheuvel wrote:
+> > >> On 6 January 2016 at 08:38, Dennis Chen <dennis.chen@arm.com> wrote:
+> > >> > Well, if the build system changes the link order, it can't make sure it will break something
+> > >> > unexpectedly, needless to say the pgd_cache_init here at all.
+> > >>
+> > >> That is no excuse to introduce yet another failure mode.
+> > >>
+> > >> > Do you think the kernel
+> > >> > will change its currently link order policy? If the answer is yes, what's the benefit?
+> > >> >
+> > >>
+> > >> It does not matter what I think. You seem to think that the link order
+> > >> is set in stone, so it is you who should argue why that is a
+> > >> reasonable assumption.
+> > >>
+> > > OK, If you think the link order is volatile, how can you guarantee the arm_enable_runtime_services with early_initcall
+> > > always work in a volatile link order environment?
+> > >
+> > 
+> > By not relying on other early_initcalls
+> > 
+> You're limiting the scope of the link order
 
-This looks a little funky. Is each revision a strict superset of the
-previous version?
+Please stop this mindless bickering. It's a waste of everybody's time and
+we have a kernel to test.
 
-> +
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200n8 earlycon=uart8250,mmio32,0x70006000";
-> +	};
-
-Use stdout-path.
-
-Otherwise this looks ok.
-
-Thanks,
-Mark.
+Will
