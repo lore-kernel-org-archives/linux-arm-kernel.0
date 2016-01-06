@@ -1,35 +1,78 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Wed, 06 Jan 2016 10:04:43 +0800
-Subject: [PATCH v6.3 4/6] drm: rockchip: Support Synopsys DW MIPI DSI
-In-Reply-To: <1450842215-10883-1-git-send-email-zyw@rock-chips.com>
-References: <1450260616-21160-5-git-send-email-zyw@rock-chips.com>
- <1450842215-10883-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <568C763B.1030900@rock-chips.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 5 Jan 2016 20:13:09 -0600
+Subject: [PATCH v2] PCI: imx6:don't sleep in atomic context
+In-Reply-To: <1449042196-25710-1-git-send-email-sanjeev_sharma@mentor.com>
+References: <1447066080-5859-1-git-send-email-sanjeev_sharma@mentor.com>
+ <1449042196-25710-1-git-send-email-sanjeev_sharma@mentor.com>
+Message-ID: <20160106021309.GC23814@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?12?23? 11:43, Chris Zhong wrote:
-> @@ -34,3 +34,13 @@ config ROCKCHIP_ANALOGIX_DP
->   	  This selects support for Rockchip SoC specific extensions
->   	  for the Analogix Core DP driver. If you want to enable DP
->   	  on RK3288 based SoC, you should selet this option.
-> +
-> +config ROCKCHIP_DW_MIPI_DSI
-> +	bool "Rockchip specific extensions for Synopsys DW MIPI DSI"
+On Wed, Dec 02, 2015 at 01:13:16PM +0530, Sanjeev Sharma wrote:
+> From: David Mueller <dave.mueller@gmx.ch>
+> 
+> If additional PCIe switch get connected between the
+> host and the NIC,the kernel crashes with "BUG:
+> scheduling while atomic". To handle this we need to
+> call mdelay() instead of usleep_range().
+> 
+> This is currently called from atomic context through
+> pci_config_{read,write).
+> 
+> For more detail please refer bugzilla.kernel.org, Bug
+> 100031
 
-I think "bool" should be "tristate", so dw mipi can build as modules,  
-since ROCKCHIP_DW_HDMI use tristate.
+Bug reports have URLs; please use them.  I'll save you the trouble:
 
-Thanks.
+  Link: https://bugzilla.kernel.org/show_bug.cgi?id=100031
 
-> +	depends on DRM_ROCKCHIP
-> +	select DRM_MIPI_DSI
-> +	help
-> +	 This selects support for Rockchip SoC specific extensions
-> +	 for the Synopsys DesignWare HDMI driver. If you want to
-> +	 enable MIPI DSI on RK3288 based SoC, you should selet this
-> +	 option.
+In that bug report, I said: "My first question on the list will be:
+Besides imx6, there are five other DesignWare-based drivers, and
+imx6_pcie_link_up() looks nothing like the other
+pcie_host_ops.link_up() methods.  We need to explain why imx6 is
+special, and whether all the .link_up() methods can be made similar."
 
+The only response was that i.MX6 is special because of a hardware bug,
+so we need to start at Gen1, wait, try to change to Gen2, etc.  That
+all sounds like work that should be done in
+imx6_pcie_establish_link().
 
--- 
-?ark Yao
+This patch doesn't seem to make anything *worse*, so I might take it
+anyway, but I'm a little disappointed that we didn't make any progress
+toward making imx6 more like the other drivers.  I know this sounds
+pedantic, but it's a lot easier to let things slowly diverge than it
+is to keep them uniform, and bugs hide in differences like this.
+
+> Signed-off-by: David Mueller <dave.mueller@gmx.ch>
+> Signed-off-by: Sanjeev Sharma <sanjeev_sharma@mentor.com>
+> 
+> Changes in v2:
+> 	-order of signoff has been change
+> 	-Author of patch has been change
+> 	-A mdelay(1000) is different timescale than
+> a usleep(1000).change it to correct scale i.e mdelay(1)
+> 	-updated comment
+> ---
+>  drivers/pci/host/pci-imx6.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+> index 233a196..c03527f 100644
+> --- a/drivers/pci/host/pci-imx6.c
+> +++ b/drivers/pci/host/pci-imx6.c
+> @@ -499,7 +499,7 @@ static int imx6_pcie_link_up(struct pcie_port *pp)
+>  		 * Wait a little bit, then re-check if the link finished
+>  		 * the training.
+>  		 */
+> -		usleep_range(1000, 2000);
+> +		mdelay(1);
+>  	}
+>  	/*
+>  	 * From L0, initiate MAC entry to gen2 if EP/RC supports gen2.
+> -- 
+> 1.7.11.7
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
