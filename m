@@ -1,68 +1,70 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 6 Jan 2016 08:44:00 -0800
-Subject: [PATCH 2/2] memory: omap-gpmc: Add Kconfig option for debug
-In-Reply-To: <20160106090543.GC11364@pali>
-References: <568662FC.9050206@gmail.com> <20160104170206.GC12777@atomide.com>
- <201601041834.56056@pali> <20160104174001.GD12777@atomide.com>
- <568AC0F9.2010304@gmail.com> <20160105041356.GE12777@atomide.com>
- <20160105084947.GG22661@pali> <20160105224929.GF12777@atomide.com>
- <568CD697.9060800@gmail.com> <20160106090543.GC11364@pali>
-Message-ID: <20160106164400.GJ12777@atomide.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 6 Jan 2016 16:55:45 +0000
+Subject: [PATCH v3 2/2] ARM64: kernel: PSCI: move PSCI idle management
+ code to drivers/firmware
+In-Reply-To: <20160105133447.GW19062@n2100.arm.linux.org.uk>
+References: <1445011379-8787-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1445011379-8787-3-git-send-email-lorenzo.pieralisi@arm.com>
+ <20160105105900.GT19062@n2100.arm.linux.org.uk>
+ <20160105123134.GA1821@red-moon>
+ <20160105125142.GV19062@n2100.arm.linux.org.uk>
+ <20160105132701.GA17214@red-moon>
+ <20160105133447.GW19062@n2100.arm.linux.org.uk>
+Message-ID: <20160106165545.GA19886@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pali Roh?r <pali.rohar@gmail.com> [160106 01:06]:
-> On Wednesday 06 January 2016 10:55:51 Ivaylo Dimitrov wrote:
-> > On  6.01.2016 00:49, Tony Lindgren wrote:
-> > >
-> > >Suggested fix below, please test and reply with your Tested-by's if
-> > >it solves the problem so we may still be able to get this into v4.4.
-> > >
-> > >8< ---------------
-> > >From: Tony Lindgren <tony@atomide.com>
-> > >Date: Tue, 5 Jan 2016 12:04:20 -0800
-> > >Subject: [PATCH] ARM: OMAP2+: Fix onenand rate detection to avoid filesystem
-> > >  corruption
-> > >
-> > >Commit 63aa945b1013 ("memory: omap-gpmc: Add Kconfig option for debug")
-> > >unified the GPMC debug for the SoCs with GPMC. The commit also left
-> > >out the option for HWMOD_INIT_NO_RESET as we now require proper timings
-> > >for GPMC to be able to remap GPMC devices out of address 0.
-> > >
-> > >Unfortunately on 900, onenand now only partially works with the device
-> > >tree provided timings. It works enough to get detected but the clock
-> > >rate supported by the onenand chip gets misdetected. This in turn causes
-> > >the GPMC timings to be miscalculated and this leads into file system
-> > >corruption on n900.
-> > >
-> > >Looks like onenand needs CS_CONFIG1 bit 27 WRITETYPE set for for sync
-> > >write. This is needed also for async timings when we write to onenand
-> > >with omap2_onenand_set_async_mode(). Without sync write bit set, the
-> > >async read for the onenand ONENAND_REG_VERSION_ID will return 0xfff.
-> > >
-> > >Let's exit with an error if onenand rate is not detected. And let's
-> > >remove the extra call to omap2_onenand_set_async_mode() as we only
-> > >need to do this once at the end of omap2_onenand_setup_async().
-> > >
-> > >Reported-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
-> > >Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > >
-> > >--- a/arch/arm/mach-omap2/gpmc-onenand.c
-> > >+++ b/arch/arm/mach-omap2/gpmc-onenand.c
+On Tue, Jan 05, 2016 at 01:34:47PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Jan 05, 2016 at 01:27:01PM +0000, Lorenzo Pieralisi wrote:
+> > On Tue, Jan 05, 2016 at 12:51:42PM +0000, Russell King - ARM Linux wrote:
+> > > On ARM, that option is CONFIG_ARM_CPU_SUSPEND - that option solely
+> > > controls whether cpu_suspend/resume are present.  ARM64 just needs
+> > > to adopt this, and use that to control the code which is built in
+> > > drivers/firmware/psci.c.
+> > > 
+> > > However, I don't think it's as simple as just adding that to ARM64,
+> > > as you need to be careful of the Kconfig dependencies.  For ARM,
+> > > this is:
+> > > 
+> > > Generic code:
+> > > - SUSPEND defaults to y, depends on ARCH_SUSPEND_POSSIBLE (which is set for
+> > >    any cpu_suspend enabled CPU.)
+> > > - PM_SLEEP if SUSPEND || HIBERNATE_CALLBACKS
+> > > ARM sets:
+> > > - CPU_PM if SUSPEND || CPU_IDLE.
+> > > - ARM_CPU_SUSPEND if PM_SLEEP || BL_SWITCHER || (ARCH_PXA && PM)
+> > > 
+> > > What this means is that CPU_PM is entirely independent of
+> > > ARM_CPU_SUSPEND.  One does not imply the other, so I think you need
+> > > to consider carefully what ifdef you need in drivers/firmware/psci.c.
+> > > 
+> > > This is why I think fixing this is not simple as it first looks.
 > > 
-> > Bellow is gpmc dmesg output with that fix. I also disabled
-> > CONFIG_OMAP_GPMC_DEBUG and am still able to boot to maemo with no obvious
-> > problems.
+> > Not saying it is nice, but unless I find a cleaner way I was keener on
+> > adding a silent config entry in drivers/firmware, say:
 > > 
-> > So, seems that fixes the problem, feel free to  add:
+> > config ARM_PSCI_CPU_IDLE
+> > 	def_bool ARM_PSCI_FW && CPU_IDLE
+> > 	select ARM_CPU_SUSPEND if ARM
 > > 
-> > Tested-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
+> > and use that to either guard the code or stub it out and compile it
+> > if that config option is enabled.
 > 
-> Great! Thank you for fixing and testing this problem!
+> That immediately worries me, because it bypasses the CPU dependencies
+> for ARM_CPU_SUSPEND implicitly applied via ARCH_SUSPEND_POSSIBLE.  I'd
+> prefer instead:
+> 
+> config ARM_PSCI_CPU_IDLE
+> 	def_bool ARM_PSCI_FW && CPU_IDLE && (!ARM || ARM_CPU_SUSPEND)
 
-Good to hear it fixes the issue. I'll wait to hear from Aaro before
-committing.
+If you are not against it, I could make ARM_PSCI select ARM_CPU_SUSPEND,
+the CPU dependency would be taken into account (ie CPU_V7) and this
+would mirror what's done for the eg BL_SWITCHER.
 
-Regards,
+This would remove the need for ARM_PSCI_CPU_IDLE above altogether and
+I could guard the code in drivers/firmware/psci.c through CONFIG_CPU_IDLE.
 
-Tony
+It is just an option, please let me know.
+
+Thanks,
+Lorenzo
