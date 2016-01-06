@@ -1,106 +1,97 @@
-From: dennis.chen@arm.com (Dennis Chen)
-Date: Wed, 6 Jan 2016 16:59:30 +0800
-Subject: [linux-next PATCH] arm64: fix kernel crash with 48-bit VA and
- 64KB granule
-In-Reply-To: <CAKv+Gu_ivfmfFyK79g63ciBD3Jv7bzzu5t_NYW2aVy8NhgHdSA@mail.gmail.com>
-References: <20160105083533.GD13942@arm.org>
- <CAKv+Gu9Q3CmC37dL3o+hcBeG-NJ7+bkOiLQihirje4YbazizJQ@mail.gmail.com>
- <20160105084042.GF13942@arm.org>
- <20160105095603.GG6301@e104818-lin.cambridge.arm.com>
- <20160106061407.GA7082@arm.org>
- <CAKv+Gu8t56rfdN1ot08BgsteaaincFek0uzoDAroefMWQ+kKEA@mail.gmail.com>
- <20160106073847.GA7608@arm.org>
- <CAKv+Gu_sqAuA_iHf_sNRJyaQUFG5n_eXxYYOHwmV0hf0GTUxow@mail.gmail.com>
- <20160106085216.GA7879@arm.org>
- <CAKv+Gu_ivfmfFyK79g63ciBD3Jv7bzzu5t_NYW2aVy8NhgHdSA@mail.gmail.com>
-Message-ID: <20160106085929.GB7879@arm.org>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 6 Jan 2016 10:02:15 +0100
+Subject: [PATCH v2 06/12] mmc: sdhci-of-at91: use sdhci_pltfm_init for
+ private allocation
+In-Reply-To: <1452052565-4232-7-git-send-email-jszhang@marvell.com>
+References: <1452052565-4232-1-git-send-email-jszhang@marvell.com>
+ <1452052565-4232-7-git-send-email-jszhang@marvell.com>
+Message-ID: <20160106090215.GG2334@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 06, 2016 at 09:54:42AM +0100, Ard Biesheuvel wrote:
-> On 6 January 2016 at 09:52, Dennis Chen <dennis.chen@arm.com> wrote:
-> > On Wed, Jan 06, 2016 at 08:42:20AM +0100, Ard Biesheuvel wrote:
-> >> On 6 January 2016 at 08:38, Dennis Chen <dennis.chen@arm.com> wrote:
-> >> > On Wed, Jan 06, 2016 at 08:13:24AM +0100, Ard Biesheuvel wrote:
-> >> >> On 6 January 2016 at 07:14, Dennis Chen <dennis.chen@arm.com> wrote:
-> >> >> > On Tue, Jan 05, 2016 at 09:56:03AM +0000, Catalin Marinas wrote:
-> >> >> >> On Tue, Jan 05, 2016 at 04:40:44PM +0800, Dennis Chen wrote:
-> >> >> >> > On Tue, Jan 05, 2016 at 09:38:11AM +0100, Ard Biesheuvel wrote:
-> >> >> >> > > >> On 5 January 2016 at 03:18, Dennis Chen <dennis.chen@arm.com> wrote:
-> >> >> >> > > >> > The commit 3400749b5a22 ("arm64/efi: refactor EFI init and runtime
-> >> >> >> > > >> > code for reuse by 32-bit ARM") uses pgd_alloc() to allocate space for
-> >> >> >> > > >> > efi_mm.pgd while not the static efi_pgd[], since this function will be
-> >> >> >> > > >> > called with early_initcall, which results in the pgd_cache used by
-> >> >> >> > > >> > pgd_alloc() has not been initialized yet, kernel will hang in this
-> >> >> >> > > >> > case. This patch is trying to make the pgd_cache_init() called before
-> >> >> >> > > >> > arm_enable_runtime_services() by changing its core_initcall to
-> >> >> >> > > >> > early_initcall.
-> >> >> >> > > >> >
-> >> >> >> > > >> > Signed-off-by: Dennis Chen <dennis.chen@arm.com>
-> >> >> >> > > >> > Tested-by: Sudeep Holla <sudeep.holla@arm.com>
-> >> >> >> > > >> >
-> >> >> >> > > >> > Cc: Will Deacon <will.deacon@arm.com>
-> >> >> >> > > >> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> >> >> >> > > >> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> >> >> > > >> > Cc: Sudeep Holla <sudeep.holla@arm.com>
-> >> >> >> > > >> > ---
-> >> >> >> > > >> >  arch/arm64/mm/pgd.c | 2 +-
-> >> >> >> > > >> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >> >> >> > > >> >
-> >> >> >> > > >> > diff --git a/arch/arm64/mm/pgd.c b/arch/arm64/mm/pgd.c
-> >> >> >> > > >> > index cb3ba1b..859a788 100644
-> >> >> >> > > >> > --- a/arch/arm64/mm/pgd.c
-> >> >> >> > > >> > +++ b/arch/arm64/mm/pgd.c
-> >> >> >> > > >> > @@ -56,4 +56,4 @@ static int __init pgd_cache_init(void)
-> >> >> >> > > >> >                                               SLAB_PANIC, NULL);
-> >> >> >> > > >> >         return 0;
-> >> >> >> > > >> >  }
-> >> >> >> > > >> > -core_initcall(pgd_cache_init);
-> >> >> >> > > >> > +early_initcall(pgd_cache_init);
-> >> >> >> [...]
-> >> >> >> > > Well, since arm_enable_runtime_services() is an early_initcall()
-> >> >> >> > > itself, how are you guaranteeing the ordering between the two? Link
-> >> >> >> > > order?
-> >> >> >> >
-> >> >> >> > Link order.
-> >> >> >>
-> >> >> >> And can you explain how this works, what guarantees it gives?
-> >> >> >>
-> >> >> > You can take a look at include/asm-generic/vmlinux.ldx.h: INIT_CALLS macro,
-> >> >> > for the init call section, early_initcall is the first chuck in the section,
-> >> >> > followed by LEVEL[0-7]. For the same level, the layout order is determined
-> >> >> > by the link order, ARCH is always precedence over the drivers. Catalin, are
-> >> >> > you giving me a kernel examination? :)
-> >> >> >
-> >> >>
-> >> >> We all know how initcalls are implemented. The question is how you are
-> >> >> going to ensure that the early_initcall() that initializes the PGD
-> >> >> cache is always invoked before the early_initcall() that creates the
-> >> >> UEFI runtime page tables.
-> >> >>
-> >> >> And saying that the currently observed link order happens to be
-> >> >> correct is not good enough. We need to be sure that, even if we change
-> >> >> the link order, or switch to LTO at some point, things don't suddenly
-> >> >> break again.
-> >> >>
-> >> > Well, if the build system changes the link order, it can't make sure it will break something
-> >> > unexpectedly, needless to say the pgd_cache_init here at all.
-> >>
-> >> That is no excuse to introduce yet another failure mode.
-> >>
-> >> > Do you think the kernel
-> >> > will change its currently link order policy? If the answer is yes, what's the benefit?
-> >> >
-> >>
-> >> It does not matter what I think. You seem to think that the link order
-> >> is set in stone, so it is you who should argue why that is a
-> >> reasonable assumption.
-> >>
-> > OK, If you think the link order is volatile, how can you guarantee the arm_enable_runtime_services with early_initcall
-> > always work in a volatile link order environment?
-> >
->
-> By not relying on other early_initcalls
->
-You're limiting the scope of the link order
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+Hi Jisheng,
+
+Thanks for your patch but it needs to be updated since it breaks this
+driver.
+
+-       struct sdhci_at91_priv  *priv = pltfm_host->priv;
++       struct sdhci_at91_priv  *priv = sdhci_pltfm_priv(pltfm_host);
+
+is missing in sdhci_at91_runtime_suspend and sdhci_at91_runtime_resume
+causing a NULL pointer dereference.
+
+On Wed, Jan 06, 2016 at 11:55:59AM +0800, Jisheng Zhang wrote:
+> Commit 0e748234293f ("mmc: sdhci: Add size for caller in init+register")
+> allows users of sdhci_pltfm to allocate private space in calls to
+> sdhci_pltfm_init+sdhci_pltfm_register. This patch migrates the
+> sdhci-of-at91 driver to this allocation.
+> 
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/mmc/host/sdhci-of-at91.c | 21 ++++++++-------------
+>  1 file changed, 8 insertions(+), 13 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci-of-at91.c b/drivers/mmc/host/sdhci-of-at91.c
+> index 06d0b50..765eb09 100644
+> --- a/drivers/mmc/host/sdhci-of-at91.c
+> +++ b/drivers/mmc/host/sdhci-of-at91.c
+> @@ -68,11 +68,13 @@ static int sdhci_at91_probe(struct platform_device *pdev)
+>  		return -EINVAL;
+>  	soc_data = match->data;
+>  
+> -	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
+> -	if (!priv) {
+> -		dev_err(&pdev->dev, "unable to allocate private data\n");
+> -		return -ENOMEM;
+> -	}
+> +	host = sdhci_pltfm_init(pdev, soc_data,
+> +				sizeof(*priv));
+
+Can be on the same line.
+
+Regards
+
+Ludovic
+
+> +	if (IS_ERR(host))
+> +		return PTR_ERR(host);
+> +
+> +	pltfm_host = sdhci_priv(host);
+> +	priv = sdhci_pltfm_priv(pltfm_host);
+>  
+>  	priv->mainck = devm_clk_get(&pdev->dev, "baseclk");
+>  	if (IS_ERR(priv->mainck)) {
+> @@ -92,10 +94,6 @@ static int sdhci_at91_probe(struct platform_device *pdev)
+>  		return PTR_ERR(priv->gck);
+>  	}
+>  
+> -	host = sdhci_pltfm_init(pdev, soc_data, 0);
+> -	if (IS_ERR(host))
+> -		return PTR_ERR(host);
+> -
+>  	/*
+>  	 * The mult clock is provided by as a generated clock by the PMC
+>  	 * controller. In order to set the rate of gck, we have to get the
+> @@ -135,9 +133,6 @@ static int sdhci_at91_probe(struct platform_device *pdev)
+>  	clk_prepare_enable(priv->mainck);
+>  	clk_prepare_enable(priv->gck);
+>  
+> -	pltfm_host = sdhci_priv(host);
+> -	pltfm_host->priv = priv;
+> -
+>  	ret = mmc_of_parse(host->mmc);
+>  	if (ret)
+>  		goto clocks_disable_unprepare;
+> @@ -163,7 +158,7 @@ static int sdhci_at91_remove(struct platform_device *pdev)
+>  {
+>  	struct sdhci_host	*host = platform_get_drvdata(pdev);
+>  	struct sdhci_pltfm_host	*pltfm_host = sdhci_priv(host);
+> -	struct sdhci_at91_priv	*priv = pltfm_host->priv;
+> +	struct sdhci_at91_priv	*priv = sdhci_pltfm_priv(pltfm_host);
+>  
+>  	sdhci_pltfm_unregister(pdev);
+>  
+> -- 
+> 2.7.0.rc3
+> 
