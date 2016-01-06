@@ -1,62 +1,104 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Wed, 06 Jan 2016 09:48:08 +0800
-Subject: [PATCH v6.3 4/6] drm: rockchip: Support Synopsys DW MIPI DSI
-In-Reply-To: <1450842215-10883-1-git-send-email-zyw@rock-chips.com>
-References: <1450260616-21160-5-git-send-email-zyw@rock-chips.com>
- <1450842215-10883-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <568C7258.3010104@rock-chips.com>
+From: boqun.feng@gmail.com (Boqun Feng)
+Date: Wed, 6 Jan 2016 09:51:52 +0800
+Subject: [PATCH v2 15/32] powerpc: define __smp_xxx
+In-Reply-To: <20160105180938-mutt-send-email-mst@redhat.com>
+References: <1451572003-2440-1-git-send-email-mst@redhat.com>
+ <1451572003-2440-16-git-send-email-mst@redhat.com>
+ <20160105013648.GA1256@fixme-laptop.cn.ibm.com>
+ <20160105085117.GA11858@redhat.com>
+ <20160105095341.GA5321@fixme-laptop.cn.ibm.com>
+ <20160105180938-mutt-send-email-mst@redhat.com>
+Message-ID: <20160106015152.GA14605@fixme-laptop.cn.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?12?23? 11:43, Chris Zhong wrote:
-> +static int dw_mipi_dsi_register(struct drm_device *drm,
-> +				      struct dw_mipi_dsi *dsi)
-> +{
-> +	struct drm_encoder *encoder = &dsi->encoder;
-> +	struct drm_connector *connector = &dsi->connector;
-> +	struct device *dev = dsi->dev;
-> +	int ret;
-> +
-> +	encoder->possible_crtcs = drm_of_find_possible_crtcs(drm,
-> +							     dev->of_node);
-> +	/*
-> +	 * If we failed to find the CRTC(s) which this encoder is
-> +	 * supposed to be connected to, it's because the CRTC has
-> +	 * not been registered yet.  Defer probing, and hope that
-> +	 * the required CRTC is added later.
-> +	 */
-> +	if (encoder->possible_crtcs == 0)
-> +		return -EPROBE_DEFER;
-> +
-> +	drm_encoder_helper_add(&dsi->encoder,
-> +			       &dw_mipi_dsi_encoder_helper_funcs);
-> +	ret = drm_encoder_init(drm, &dsi->encoder, &dw_mipi_dsi_encoder_funcs,
-> +			 DRM_MODE_ENCODER_DSI);
-> +	if (ret) {
-> +		dev_err(dev, "Failed to initialize encoder with drm\n");
-> +		return ret;
-> +	}
-> +
-> +	drm_connector_helper_add(connector,
-> +			&dw_mipi_dsi_connector_helper_funcs);
-> +
-> +	drm_connector_init(drm, &dsi->connector,
-> +			   &dw_mipi_dsi_atomic_connector_funcs,
-> +			   DRM_MODE_CONNECTOR_DSI);
-> +
-Hi Chris
+On Tue, Jan 05, 2016 at 06:16:48PM +0200, Michael S. Tsirkin wrote:
+[snip]
+> > > > Another thing is that smp_lwsync() may have a third user(other than
+> > > > smp_load_acquire() and smp_store_release()):
+> > > > 
+> > > > http://article.gmane.org/gmane.linux.ports.ppc.embedded/89877
+> > > > 
+> > > > I'm OK to change my patch accordingly, but do we really want
+> > > > smp_lwsync() get involved in this cleanup? If I understand you
+> > > > correctly, this cleanup focuses on external API like smp_{r,w,}mb(),
+> > > > while smp_lwsync() is internal to PPC.
+> > > > 
+> > > > Regards,
+> > > > Boqun
+> > > 
+> > > I think you missed the leading ___ :)
+> > > 
+> > 
+> > What I mean here was smp_lwsync() was originally internal to PPC, but
+> > never mind ;-)
+> > 
+> > > smp_store_release is external and it needs __smp_lwsync as
+> > > defined here.
+> > > 
+> > > I can duplicate some code and have smp_lwsync *not* call __smp_lwsync
+> > 
+> > You mean bringing smp_lwsync() back? because I haven't seen you defining
+> > in asm-generic/barriers.h in previous patches and you just delete it in
+> > this patch.
+> > 
+> > > but why do this? Still, if you prefer it this way,
+> > > please let me know.
+> > > 
+> > 
+> > I think deleting smp_lwsync() is fine, though I need to change atomic
+> > variants patches on PPC because of it ;-/
+> > 
+> > Regards,
+> > Boqun
+> 
+> Sorry, I don't understand - why do you have to do anything?
+> I changed all users of smp_lwsync so they
+> use __smp_lwsync on SMP and barrier() on !SMP.
+> 
+> This is exactly the current behaviour, I also tested that
+> generated code does not change at all.
+> 
+> Is there a patch in your tree that conflicts with this?
+> 
 
-I try to pick your patches, but found following issues:
+Because in a patchset which implements atomic relaxed/acquire/release
+variants on PPC I use smp_lwsync(), this makes it have another user,
+please see this mail:
 
-drivers/gpu/drm/rockchip/dw-mipi-dsi.c: ????dw_mipi_dsi_register??:
-drivers/gpu/drm/rockchip/dw-mipi-dsi.c:1024:5: ??? ????? 
-?drm_encoder_init??????
-include/drm/drm_crtc.h:2220:5: ??? ????
-make[4]: *** [drivers/gpu/drm/rockchip/dw-mipi-dsi.o] ?? 1
+http://article.gmane.org/gmane.linux.ports.ppc.embedded/89877
 
-Can you rebase to newest Dave's drm-next and fix this problem?
+in definition of PPC's __atomic_op_release().
 
-Thanks.
 
--- 
-?ark Yao
+But I think removing smp_lwsync() is a good idea and actually I think we
+can go further to remove __smp_lwsync() and let __smp_load_acquire and
+__smp_store_release call __lwsync() directly, but that is another thing.
+
+Anyway, I will modify my patch.
+
+Regards,
+Boqun
+
+> 
+> > > > >  	WRITE_ONCE(*p, v);						\
+> > > > >  } while (0)
+> > > > >  
+> > > > > -#define smp_load_acquire(p)						\
+> > > > > +#define __smp_load_acquire(p)						\
+> > > > >  ({									\
+> > > > >  	typeof(*p) ___p1 = READ_ONCE(*p);				\
+> > > > >  	compiletime_assert_atomic_type(*p);				\
+> > > > > -	smp_lwsync();							\
+> > > > > +	__smp_lwsync();							\
+> > > > >  	___p1;								\
+> > > > >  })
+> > > > >  
+> > > > > -- 
+> > > > > MST
+> > > > > 
+> > > > > --
+> > > > > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> > > > > the body of a message to majordomo at vger.kernel.org
+> > > > > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > > > > Please read the FAQ at  http://www.tux.org/lkml/
