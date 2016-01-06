@@ -1,56 +1,110 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 6 Jan 2016 21:18:03 +0100
-Subject: [PATCH] mm/kasan: map KASAN zero page read only
-In-Reply-To: <CAPAsAGxmjF-_ZZFwtaxZsXN9g7J2sn6O0L+pBiPdARsKC_644g@mail.gmail.com>
-References: <1452095687-18136-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAPAsAGxmjF-_ZZFwtaxZsXN9g7J2sn6O0L+pBiPdARsKC_644g@mail.gmail.com>
-Message-ID: <CAKv+Gu9b_2WWYhgQmdnAUk0G0W3dwWXdWmpEmMtKW+=-KaJYgw@mail.gmail.com>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Wed, 6 Jan 2016 22:23:51 +0200
+Subject: [PATCH v2 15/32] powerpc: define __smp_xxx
+In-Reply-To: <20160106015152.GA14605@fixme-laptop.cn.ibm.com>
+References: <1451572003-2440-1-git-send-email-mst@redhat.com>
+ <1451572003-2440-16-git-send-email-mst@redhat.com>
+ <20160105013648.GA1256@fixme-laptop.cn.ibm.com>
+ <20160105085117.GA11858@redhat.com>
+ <20160105095341.GA5321@fixme-laptop.cn.ibm.com>
+ <20160105180938-mutt-send-email-mst@redhat.com>
+ <20160106015152.GA14605@fixme-laptop.cn.ibm.com>
+Message-ID: <20160106222337-mutt-send-email-mst@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 January 2016 at 20:48, Andrey Ryabinin <ryabinin.a.a@gmail.com> wrote:
-> 2016-01-06 18:54 GMT+03:00 Ard Biesheuvel <ard.biesheuvel@linaro.org>:
->> The original x86_64-only version of KASAN mapped its zero page
->> read-only, but this got lost when the code was generalised and
->> ported to arm64, since, at the time, the PAGE_KERNEL_RO define
->> did not exist. It has been added to arm64 in the mean time, so
->> let's use it.
->>
->
-> Read-only wasn't lost. Just look at the next line:
->      zero_pte = pte_wrprotect(zero_pte);
->
-> PAGE_KERNEL_RO is not available on all architectures, thus it would be better
-> to not use it in generic code.
->
+On Wed, Jan 06, 2016 at 09:51:52AM +0800, Boqun Feng wrote:
+> On Tue, Jan 05, 2016 at 06:16:48PM +0200, Michael S. Tsirkin wrote:
+> [snip]
+> > > > > Another thing is that smp_lwsync() may have a third user(other than
+> > > > > smp_load_acquire() and smp_store_release()):
+> > > > > 
+> > > > > http://article.gmane.org/gmane.linux.ports.ppc.embedded/89877
+> > > > > 
+> > > > > I'm OK to change my patch accordingly, but do we really want
+> > > > > smp_lwsync() get involved in this cleanup? If I understand you
+> > > > > correctly, this cleanup focuses on external API like smp_{r,w,}mb(),
+> > > > > while smp_lwsync() is internal to PPC.
+> > > > > 
+> > > > > Regards,
+> > > > > Boqun
+> > > > 
+> > > > I think you missed the leading ___ :)
+> > > > 
+> > > 
+> > > What I mean here was smp_lwsync() was originally internal to PPC, but
+> > > never mind ;-)
+> > > 
+> > > > smp_store_release is external and it needs __smp_lwsync as
+> > > > defined here.
+> > > > 
+> > > > I can duplicate some code and have smp_lwsync *not* call __smp_lwsync
+> > > 
+> > > You mean bringing smp_lwsync() back? because I haven't seen you defining
+> > > in asm-generic/barriers.h in previous patches and you just delete it in
+> > > this patch.
+> > > 
+> > > > but why do this? Still, if you prefer it this way,
+> > > > please let me know.
+> > > > 
+> > > 
+> > > I think deleting smp_lwsync() is fine, though I need to change atomic
+> > > variants patches on PPC because of it ;-/
+> > > 
+> > > Regards,
+> > > Boqun
+> > 
+> > Sorry, I don't understand - why do you have to do anything?
+> > I changed all users of smp_lwsync so they
+> > use __smp_lwsync on SMP and barrier() on !SMP.
+> > 
+> > This is exactly the current behaviour, I also tested that
+> > generated code does not change at all.
+> > 
+> > Is there a patch in your tree that conflicts with this?
+> > 
+> 
+> Because in a patchset which implements atomic relaxed/acquire/release
+> variants on PPC I use smp_lwsync(), this makes it have another user,
+> please see this mail:
+> 
+> http://article.gmane.org/gmane.linux.ports.ppc.embedded/89877
+> 
+> in definition of PPC's __atomic_op_release().
+> 
+> 
+> But I think removing smp_lwsync() is a good idea and actually I think we
+> can go further to remove __smp_lwsync() and let __smp_load_acquire and
+> __smp_store_release call __lwsync() directly, but that is another thing.
+> 
+> Anyway, I will modify my patch.
+> 
+> Regards,
+> Boqun
 
-OK, I didn't see that. For some reason, it is not working for me on
-arm64, though.
-I will investigate.
 
--- 
-Ard.
+Thanks!
+Could you send an ack then please?
 
-
->
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  mm/kasan/kasan_init.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/mm/kasan/kasan_init.c b/mm/kasan/kasan_init.c
->> index 3f9a41cf0ac6..8726a92604ad 100644
->> --- a/mm/kasan/kasan_init.c
->> +++ b/mm/kasan/kasan_init.c
->> @@ -49,7 +49,7 @@ static void __init zero_pte_populate(pmd_t *pmd, unsigned long addr,
->>         pte_t *pte = pte_offset_kernel(pmd, addr);
->>         pte_t zero_pte;
->>
->> -       zero_pte = pfn_pte(PFN_DOWN(__pa(kasan_zero_page)), PAGE_KERNEL);
->> +       zero_pte = pfn_pte(PFN_DOWN(__pa(kasan_zero_page)), PAGE_KERNEL_RO);
->>         zero_pte = pte_wrprotect(zero_pte);
->>
->>         while (addr + PAGE_SIZE <= end) {
->> --
->> 2.5.0
->>
+> > 
+> > > > > >  	WRITE_ONCE(*p, v);						\
+> > > > > >  } while (0)
+> > > > > >  
+> > > > > > -#define smp_load_acquire(p)						\
+> > > > > > +#define __smp_load_acquire(p)						\
+> > > > > >  ({									\
+> > > > > >  	typeof(*p) ___p1 = READ_ONCE(*p);				\
+> > > > > >  	compiletime_assert_atomic_type(*p);				\
+> > > > > > -	smp_lwsync();							\
+> > > > > > +	__smp_lwsync();							\
+> > > > > >  	___p1;								\
+> > > > > >  })
+> > > > > >  
+> > > > > > -- 
+> > > > > > MST
+> > > > > > 
+> > > > > > --
+> > > > > > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> > > > > > the body of a message to majordomo at vger.kernel.org
+> > > > > > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > > > > > Please read the FAQ at  http://www.tux.org/lkml/
