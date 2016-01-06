@@ -1,75 +1,93 @@
 From: zyw@rock-chips.com (Chris Zhong)
-Date: Wed,  6 Jan 2016 12:03:57 +0800
-Subject: [PATCH v7 5/5] ARM: dts: rockchip: add support mipi panel tv080wum-nl0
+Date: Wed,  6 Jan 2016 12:03:56 +0800
+Subject: [PATCH v7 4/5] ARM: dts: rockchip: add rk3288 mipi_dsi nodes
 In-Reply-To: <1452053038-32098-1-git-send-email-zyw@rock-chips.com>
 References: <1452053038-32098-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <1452053038-32098-6-git-send-email-zyw@rock-chips.com>
+Message-ID: <1452053038-32098-5-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This tv080wum-nl0 panel is a mipi panel, it can use in MIPI_TX socket
-of rk3288 evb board.
+Add a mipi_dsi node, and also add mipi_dsi endpoints to vopb and vopl
+output port nodes.
 
 Signed-off-by: Chris Zhong <zyw@rock-chips.com>
 
 ---
 
-Changes in v7:
-- Move the lcd_en control to act8846 dts
-
+Changes in v7: None
 Changes in v6: None
 Changes in v5:
-- add a blank line befor lcd_en
+- modify the clk name to SCLK_MIPIDSI_24M
 
 Changes in v4: None
 Changes in v3: None
 
- arch/arm/boot/dts/rk3288-evb-act8846.dts |  2 ++
- arch/arm/boot/dts/rk3288-evb.dtsi        | 12 +++++++++++-
- 2 files changed, 13 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/rk3288.dtsi | 39 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
-diff --git a/arch/arm/boot/dts/rk3288-evb-act8846.dts b/arch/arm/boot/dts/rk3288-evb-act8846.dts
-index e662147..7d5475b 100644
---- a/arch/arm/boot/dts/rk3288-evb-act8846.dts
-+++ b/arch/arm/boot/dts/rk3288-evb-act8846.dts
-@@ -50,6 +50,8 @@
- 		gpio = <&gpio7 3 GPIO_ACTIVE_HIGH>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&lcd_en>;
-+		regulator-always-on;
-+		regulator-boot-on;
- 		regulator-name = "vcc_lcd";
- 		vin-supply = <&vcc_io>;
- 	};
-diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
-index 4faabdb..0c91858 100644
---- a/arch/arm/boot/dts/rk3288-evb.dtsi
-+++ b/arch/arm/boot/dts/rk3288-evb.dtsi
-@@ -47,7 +47,7 @@
- 		reg = <0x0 0x80000000>;
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 04ea209..6b21a87 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -800,6 +800,10 @@
+ 				reg = <0>;
+ 				remote-endpoint = <&hdmi_in_vopb>;
+ 			};
++			vopb_out_mipi: endpoint at 2 {
++				reg = <2>;
++				remote-endpoint = <&mipi_in_vopb>;
++			};
+ 		};
  	};
  
--	backlight {
-+	backlight: backlight {
- 		compatible = "pwm-backlight";
- 		brightness-levels = <
- 			  0   1   2   3   4   5   6   7
-@@ -183,6 +183,16 @@
- 	status = "okay";
- };
+@@ -833,6 +837,10 @@
+ 				reg = <0>;
+ 				remote-endpoint = <&hdmi_in_vopl>;
+ 			};
++			vopl_out_mipi: endpoint at 2 {
++				reg = <2>;
++				remote-endpoint = <&mipi_in_vopl>;
++			};
+ 		};
+ 	};
  
-+&mipi_dsi {
-+	status = "okay";
-+	panel {
-+		compatible ="boe,tv080wum-nl0";
-+		reg = <0>;
-+		backlight = <&backlight>;
-+		status = "okay";
-+	};
-+};
+@@ -873,6 +881,37 @@
+ 		};
+ 	};
+ 
++	mipi_dsi: mipi at ff960000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "rockchip,rk3288-mipi-dsi", "snps,dw-mipi-dsi";
++		reg = <0xff960000 0x4000>;
++		interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru SCLK_MIPIDSI_24M>, <&cru PCLK_MIPI_DSI0>;
++		clock-names = "ref", "pclk";
++		rockchip,grf = <&grf>;
++		status = "disabled";
 +
- &sdmmc {
- 	bus-width = <4>;
- 	cap-mmc-highspeed;
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <1>;
++
++			mipi_in: port {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				mipi_in_vopb: endpoint at 0 {
++					reg = <0>;
++					remote-endpoint = <&vopb_out_mipi>;
++				};
++				mipi_in_vopl: endpoint at 1 {
++					reg = <1>;
++					remote-endpoint = <&vopl_out_mipi>;
++				};
++			};
++		};
++	};
++
+ 	gic: interrupt-controller at ffc01000 {
+ 		compatible = "arm,gic-400";
+ 		interrupt-controller;
 -- 
 2.6.3
