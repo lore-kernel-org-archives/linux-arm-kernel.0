@@ -1,153 +1,500 @@
-From: ggdavisiv@gmail.com (George G. Davis)
-Date: Wed, 6 Jan 2016 09:55:00 -0500
-Subject: [PATCH V3 1/1] ARM: perf: Set suniden bit
-In-Reply-To: <20140807173316.GH31101@arm.com>
-References: <20140805144831.25462.18149.stgit@localhost>
- <20140805144833.25462.46011.stgit@localhost>
- <20140806104947.GD25953@arm.com> <53E22E0B.7080907@parkeon.com>
- <20140807173316.GH31101@arm.com>
-Message-ID: <20160106145500.GA92797@gandalf.middle.earth.net>
+From: geliangtang@163.com (Geliang Tang)
+Date: Wed,  6 Jan 2016 23:00:19 +0800
+Subject: [PATCH] clk: move the common clock's to_clk_*(_hw) macros to
+ clk-provider.h
+Message-ID: <f5ba26023b1f4027b3ca4d3dd5370ea511249b46.1452092074.git.geliangtang@163.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Martin Fuzzey <mfuzzey@parkeon.com>
+to_clk_*(_hw) macros have been repeatedly defined in many places.
+This patch moves all the to_clk_*(_hw) definations in the common
+clock framework to public header clk-provider.h, and drop the local
+definations.
 
-Counters other than the CPU cycle counter only work if the security module
-SUNIDEN bit is set.
-
-Since access to this register is only possible in secure mode it will
-only be done if the device tree property "secure-reg-access" is set.
-
-Without this:
-# perf stat -e cycles,instructions sleep 1
-
- Performance counter stats for 'sleep 1':
-
-          14606094 cycles                    #    0.000 GHz
-                 0 instructions              #    0.00  insns per cycle
-
-After applying:
-# perf stat -e cycles,instructions sleep 1
-
- Performance counter stats for 'sleep 1':
-
-           5843809      cycles                   
-           2566484      instructions              #    0.44  insns per cycle        
-
-       1.020144000 seconds time elapsed
-
-
-Some platforms (eg i.MX53) may also need additional platform specific setup.
-
-Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
-Signed-off-by: Pooya Keshavarzi <Pooya.Keshavarzi@de.bosch.com>
-Signed-off-by: George G. Davis <george_davis@mentor.com>
+Signed-off-by: Geliang Tang <geliangtang@163.com>
 ---
+ drivers/clk/clk-composite.c          |  2 --
+ drivers/clk/clk-divider.c            |  2 --
+ drivers/clk/clk-fixed-factor.c       |  2 --
+ drivers/clk/clk-fixed-rate.c         |  2 --
+ drivers/clk/clk-fractional-divider.c |  2 --
+ drivers/clk/clk-gate.c               |  2 --
+ drivers/clk/clk-gpio.c               |  2 --
+ drivers/clk/clk-multiplier.c         |  2 --
+ drivers/clk/clk-mux.c                |  2 --
+ drivers/clk/imx/clk-busy.c           |  4 ++--
+ drivers/clk/imx/clk-fixup-div.c      |  5 ++---
+ drivers/clk/imx/clk-fixup-mux.c      |  2 --
+ drivers/clk/imx/clk-gate-exclusive.c |  2 +-
+ drivers/clk/mediatek/clk-gate.c      |  8 ++++----
+ drivers/clk/mediatek/clk-gate.h      |  2 +-
+ drivers/clk/mvebu/common.c           |  2 --
+ drivers/clk/mvebu/kirkwood.c         |  2 --
+ drivers/clk/mxs/clk-div.c            |  2 +-
+ drivers/clk/nxp/clk-lpc18xx-ccu.c    |  2 --
+ drivers/clk/st/clkgen-mux.c          |  9 ++++-----
+ drivers/clk/ti/composite.c           |  2 --
+ drivers/clk/ti/divider.c             |  2 --
+ drivers/clk/ti/gate.c                |  2 --
+ drivers/clk/ti/mux.c                 |  2 --
+ include/linux/clk-provider.h         | 18 ++++++++++++++++++
+ 25 files changed, 33 insertions(+), 51 deletions(-)
 
-Changes in v3:
-- Pooya Keshavarzi:
-  * v2 review comment fixups
-  * Use on_each_cpu() to set SUNIDEN on all CPUs
-  * Move armv7pmu_enable_secure_access() call from armv7pmu_start() to
-    armv7_a8_map_event() such that is called only once instead of each
-    time `perf` is executed
-- George G. Davis:
-  * Fixup to apply after file renames due to commit fa8ad78 (arm: perf:
-    factor arm_pmu core out to drivers)
-  * Fix checkpatch 'CHECK: Prefer using the BIT macro' issue
-
- Documentation/devicetree/bindings/arm/pmu.txt |  8 ++++++++
- arch/arm/kernel/perf_event_v7.c               | 17 +++++++++++++++++
- drivers/perf/arm_pmu.c                        |  3 +++
- include/linux/perf/arm_pmu.h                  |  1 +
- 4 files changed, 29 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
-index 97ba45a..8d4b831 100644
---- a/Documentation/devicetree/bindings/arm/pmu.txt
-+++ b/Documentation/devicetree/bindings/arm/pmu.txt
-@@ -45,6 +45,14 @@ Optional properties:
- - qcom,no-pc-write : Indicates that this PMU doesn't support the 0xc and 0xd
-                      events.
+diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
+index 4735de0..1f903e1f8 100644
+--- a/drivers/clk/clk-composite.c
++++ b/drivers/clk/clk-composite.c
+@@ -19,8 +19,6 @@
+ #include <linux/err.h>
+ #include <linux/slab.h>
  
-+- secure-reg-access : Indicates that secure mode access is available.
-+		This will cause the driver to do any setup required that
-+		is only possible in secure mode.
-+		If not present the secure registers will not be touched,
-+		which means the PMU may fail to operate unless external
-+		code (bootloader or security monitor) has performed the
-+		appropriate initialisation.
-+
- Example:
- 
- pmu {
-diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
-index 126dc67..8dc5582 100644
---- a/arch/arm/kernel/perf_event_v7.c
-+++ b/arch/arm/kernel/perf_event_v7.c
-@@ -600,6 +600,11 @@ static const unsigned scorpion_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
- #define	ARMV7_EXCLUDE_USER	(1 << 30)
- #define	ARMV7_INCLUDE_HYP	(1 << 27)
- 
-+/*
-+ * Secure debug enable reg
-+ */
-+#define ARMV7_SDER_SUNIDEN	BIT(1) /* Permit non-invasive debug */
-+
- static inline u32 armv7_pmnc_read(void)
+-#define to_clk_composite(_hw) container_of(_hw, struct clk_composite, hw)
+-
+ static u8 clk_composite_get_parent(struct clk_hw *hw)
  {
+ 	struct clk_composite *composite = to_clk_composite(hw);
+diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+index ded3ff4..c8bea2b 100644
+--- a/drivers/clk/clk-divider.c
++++ b/drivers/clk/clk-divider.c
+@@ -28,8 +28,6 @@
+  * parent - fixed parent.  No clk_set_parent support
+  */
+ 
+-#define to_clk_divider(_hw) container_of(_hw, struct clk_divider, hw)
+-
+ #define div_mask(width)	((1 << (width)) - 1)
+ 
+ static unsigned int _get_table_maxdiv(const struct clk_div_table *table,
+diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
+index 83de57a..f0ddf37 100644
+--- a/drivers/clk/clk-fixed-factor.c
++++ b/drivers/clk/clk-fixed-factor.c
+@@ -23,8 +23,6 @@
+  * parent - fixed parent.  No clk_set_parent support
+  */
+ 
+-#define to_clk_fixed_factor(_hw) container_of(_hw, struct clk_fixed_factor, hw)
+-
+ static unsigned long clk_factor_recalc_rate(struct clk_hw *hw,
+ 		unsigned long parent_rate)
+ {
+diff --git a/drivers/clk/clk-fixed-rate.c b/drivers/clk/clk-fixed-rate.c
+index f85ec8d..e156beb 100644
+--- a/drivers/clk/clk-fixed-rate.c
++++ b/drivers/clk/clk-fixed-rate.c
+@@ -26,8 +26,6 @@
+  * parent - fixed parent.  No clk_set_parent support
+  */
+ 
+-#define to_clk_fixed_rate(_hw) container_of(_hw, struct clk_fixed_rate, hw)
+-
+ static unsigned long clk_fixed_rate_recalc_rate(struct clk_hw *hw,
+ 		unsigned long parent_rate)
+ {
+diff --git a/drivers/clk/clk-fractional-divider.c b/drivers/clk/clk-fractional-divider.c
+index 5c4955e..1abcd76 100644
+--- a/drivers/clk/clk-fractional-divider.c
++++ b/drivers/clk/clk-fractional-divider.c
+@@ -16,8 +16,6 @@
+ #include <linux/slab.h>
+ #include <linux/rational.h>
+ 
+-#define to_clk_fd(_hw) container_of(_hw, struct clk_fractional_divider, hw)
+-
+ static unsigned long clk_fd_recalc_rate(struct clk_hw *hw,
+ 					unsigned long parent_rate)
+ {
+diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
+index de0b322..d0d8ec8 100644
+--- a/drivers/clk/clk-gate.c
++++ b/drivers/clk/clk-gate.c
+@@ -26,8 +26,6 @@
+  * parent - fixed parent.  No clk_set_parent support
+  */
+ 
+-#define to_clk_gate(_hw) container_of(_hw, struct clk_gate, hw)
+-
+ /*
+  * It works on following logic:
+  *
+diff --git a/drivers/clk/clk-gpio.c b/drivers/clk/clk-gpio.c
+index 19fed65..cbbea29 100644
+--- a/drivers/clk/clk-gpio.c
++++ b/drivers/clk/clk-gpio.c
+@@ -31,8 +31,6 @@
+  * parent - fixed parent.  No clk_set_parent support
+  */
+ 
+-#define to_clk_gpio(_hw) container_of(_hw, struct clk_gpio, hw)
+-
+ static int clk_gpio_gate_enable(struct clk_hw *hw)
+ {
+ 	struct clk_gpio *clk = to_clk_gpio(hw);
+diff --git a/drivers/clk/clk-multiplier.c b/drivers/clk/clk-multiplier.c
+index fe78065..9e449c7 100644
+--- a/drivers/clk/clk-multiplier.c
++++ b/drivers/clk/clk-multiplier.c
+@@ -14,8 +14,6 @@
+ #include <linux/of.h>
+ #include <linux/slab.h>
+ 
+-#define to_clk_multiplier(_hw) container_of(_hw, struct clk_multiplier, hw)
+-
+ static unsigned long __get_mult(struct clk_multiplier *mult,
+ 				unsigned long rate,
+ 				unsigned long parent_rate)
+diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
+index 5ed03c8..252188f 100644
+--- a/drivers/clk/clk-mux.c
++++ b/drivers/clk/clk-mux.c
+@@ -26,8 +26,6 @@
+  * parent - parent is adjustable through clk_set_parent
+  */
+ 
+-#define to_clk_mux(_hw) container_of(_hw, struct clk_mux, hw)
+-
+ static u8 clk_mux_get_parent(struct clk_hw *hw)
+ {
+ 	struct clk_mux *mux = to_clk_mux(hw);
+diff --git a/drivers/clk/imx/clk-busy.c b/drivers/clk/imx/clk-busy.c
+index 4bb1bc4..5cc9959 100644
+--- a/drivers/clk/imx/clk-busy.c
++++ b/drivers/clk/imx/clk-busy.c
+@@ -38,7 +38,7 @@ struct clk_busy_divider {
+ 
+ static inline struct clk_busy_divider *to_clk_busy_divider(struct clk_hw *hw)
+ {
+-	struct clk_divider *div = container_of(hw, struct clk_divider, hw);
++	struct clk_divider *div = to_clk_divider(hw);
+ 
+ 	return container_of(div, struct clk_busy_divider, div);
+ }
+@@ -123,7 +123,7 @@ struct clk_busy_mux {
+ 
+ static inline struct clk_busy_mux *to_clk_busy_mux(struct clk_hw *hw)
+ {
+-	struct clk_mux *mux = container_of(hw, struct clk_mux, hw);
++	struct clk_mux *mux = to_clk_mux(hw);
+ 
+ 	return container_of(mux, struct clk_busy_mux, mux);
+ }
+diff --git a/drivers/clk/imx/clk-fixup-div.c b/drivers/clk/imx/clk-fixup-div.c
+index 21db020..ce572273 100644
+--- a/drivers/clk/imx/clk-fixup-div.c
++++ b/drivers/clk/imx/clk-fixup-div.c
+@@ -15,7 +15,6 @@
+ #include <linux/slab.h>
+ #include "clk.h"
+ 
+-#define to_clk_div(_hw) container_of(_hw, struct clk_divider, hw)
+ #define div_mask(d)	((1 << (d->width)) - 1)
+ 
+ /**
+@@ -35,7 +34,7 @@ struct clk_fixup_div {
+ 
+ static inline struct clk_fixup_div *to_clk_fixup_div(struct clk_hw *hw)
+ {
+-	struct clk_divider *divider = to_clk_div(hw);
++	struct clk_divider *divider = to_clk_divider(hw);
+ 
+ 	return container_of(divider, struct clk_fixup_div, divider);
+ }
+@@ -60,7 +59,7 @@ static int clk_fixup_div_set_rate(struct clk_hw *hw, unsigned long rate,
+ 			    unsigned long parent_rate)
+ {
+ 	struct clk_fixup_div *fixup_div = to_clk_fixup_div(hw);
+-	struct clk_divider *div = to_clk_div(hw);
++	struct clk_divider *div = to_clk_divider(hw);
+ 	unsigned int divider, value;
+ 	unsigned long flags = 0;
  	u32 val;
-@@ -994,6 +999,15 @@ static void armv7pmu_reset(void *info)
- 	armv7_pmnc_write(ARMV7_PMNC_P | ARMV7_PMNC_C);
+diff --git a/drivers/clk/imx/clk-fixup-mux.c b/drivers/clk/imx/clk-fixup-mux.c
+index 0d40b35..c9b327e 100644
+--- a/drivers/clk/imx/clk-fixup-mux.c
++++ b/drivers/clk/imx/clk-fixup-mux.c
+@@ -15,8 +15,6 @@
+ #include <linux/slab.h>
+ #include "clk.h"
+ 
+-#define to_clk_mux(_hw) container_of(_hw, struct clk_mux, hw)
+-
+ /**
+  * struct clk_fixup_mux - imx integer fixup multiplexer clock
+  * @mux: the parent class
+diff --git a/drivers/clk/imx/clk-gate-exclusive.c b/drivers/clk/imx/clk-gate-exclusive.c
+index c12f5f2..3bd9dee 100644
+--- a/drivers/clk/imx/clk-gate-exclusive.c
++++ b/drivers/clk/imx/clk-gate-exclusive.c
+@@ -31,7 +31,7 @@ struct clk_gate_exclusive {
+ 
+ static int clk_gate_exclusive_enable(struct clk_hw *hw)
+ {
+-	struct clk_gate *gate = container_of(hw, struct clk_gate, hw);
++	struct clk_gate *gate = to_clk_gate(hw);
+ 	struct clk_gate_exclusive *exgate = container_of(gate,
+ 					struct clk_gate_exclusive, gate);
+ 	u32 val = readl(gate->reg);
+diff --git a/drivers/clk/mediatek/clk-gate.c b/drivers/clk/mediatek/clk-gate.c
+index 576bdb7..2a76901 100644
+--- a/drivers/clk/mediatek/clk-gate.c
++++ b/drivers/clk/mediatek/clk-gate.c
+@@ -25,7 +25,7 @@
+ 
+ static int mtk_cg_bit_is_cleared(struct clk_hw *hw)
+ {
+-	struct mtk_clk_gate *cg = to_clk_gate(hw);
++	struct mtk_clk_gate *cg = to_mtk_clk_gate(hw);
+ 	u32 val;
+ 
+ 	regmap_read(cg->regmap, cg->sta_ofs, &val);
+@@ -37,7 +37,7 @@ static int mtk_cg_bit_is_cleared(struct clk_hw *hw)
+ 
+ static int mtk_cg_bit_is_set(struct clk_hw *hw)
+ {
+-	struct mtk_clk_gate *cg = to_clk_gate(hw);
++	struct mtk_clk_gate *cg = to_mtk_clk_gate(hw);
+ 	u32 val;
+ 
+ 	regmap_read(cg->regmap, cg->sta_ofs, &val);
+@@ -49,14 +49,14 @@ static int mtk_cg_bit_is_set(struct clk_hw *hw)
+ 
+ static void mtk_cg_set_bit(struct clk_hw *hw)
+ {
+-	struct mtk_clk_gate *cg = to_clk_gate(hw);
++	struct mtk_clk_gate *cg = to_mtk_clk_gate(hw);
+ 
+ 	regmap_write(cg->regmap, cg->set_ofs, BIT(cg->bit));
  }
  
-+static void armv7pmu_enable_secure_access(void *data)
-+{
-+	u32 val;
-+
-+	asm volatile("mrc p15, 0, %0, c1, c1, 1" : "=r" (val));
-+	val |= ARMV7_SDER_SUNIDEN;
-+	asm volatile("mcr p15, 0, %0, c1, c1, 1" : : "r" (val));
-+}
-+
- static int armv7_a8_map_event(struct perf_event *event)
+ static void mtk_cg_clr_bit(struct clk_hw *hw)
  {
- 	return armpmu_map_event(event, &armv7_a8_perf_map,
-@@ -1060,6 +1074,9 @@ static void armv7pmu_init(struct arm_pmu *cpu_pmu)
- 	cpu_pmu->stop		= armv7pmu_stop;
- 	cpu_pmu->reset		= armv7pmu_reset;
- 	cpu_pmu->max_period	= (1LLU << 32) - 1;
-+
-+	if (cpu_pmu->secure_access)
-+		on_each_cpu(armv7pmu_enable_secure_access, NULL, 1);
+-	struct mtk_clk_gate *cg = to_clk_gate(hw);
++	struct mtk_clk_gate *cg = to_mtk_clk_gate(hw);
+ 
+ 	regmap_write(cg->regmap, cg->clr_ofs, BIT(cg->bit));
+ }
+diff --git a/drivers/clk/mediatek/clk-gate.h b/drivers/clk/mediatek/clk-gate.h
+index 11e25c9..b182160 100644
+--- a/drivers/clk/mediatek/clk-gate.h
++++ b/drivers/clk/mediatek/clk-gate.h
+@@ -29,7 +29,7 @@ struct mtk_clk_gate {
+ 	u8		bit;
  };
  
- static void armv7_read_num_pmnc_events(void *info)
-diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index be3755c..972e6b7 100644
---- a/drivers/perf/arm_pmu.c
-+++ b/drivers/perf/arm_pmu.c
-@@ -895,6 +895,9 @@ int arm_pmu_device_probe(struct platform_device *pdev,
- 	if (node && (of_id = of_match_node(of_table, pdev->dev.of_node))) {
- 		init_fn = of_id->data;
+-static inline struct mtk_clk_gate *to_clk_gate(struct clk_hw *hw)
++static inline struct mtk_clk_gate *to_mtk_clk_gate(struct clk_hw *hw)
+ {
+ 	return container_of(hw, struct mtk_clk_gate, hw);
+ }
+diff --git a/drivers/clk/mvebu/common.c b/drivers/clk/mvebu/common.c
+index 28aac67..daa6ebd 100644
+--- a/drivers/clk/mvebu/common.c
++++ b/drivers/clk/mvebu/common.c
+@@ -199,8 +199,6 @@ struct clk_gating_ctrl {
+ 	u32 saved_reg;
+ };
  
-+		pmu->secure_access = of_property_read_bool(pdev->dev.of_node,
-+							   "secure-reg-access");
+-#define to_clk_gate(_hw) container_of(_hw, struct clk_gate, hw)
+-
+ static struct clk_gating_ctrl *ctrl;
+ 
+ static struct clk *clk_gating_get_src(
+diff --git a/drivers/clk/mvebu/kirkwood.c b/drivers/clk/mvebu/kirkwood.c
+index 99550f2..a2a8d61 100644
+--- a/drivers/clk/mvebu/kirkwood.c
++++ b/drivers/clk/mvebu/kirkwood.c
+@@ -256,8 +256,6 @@ static const struct clk_muxing_soc_desc kirkwood_mux_desc[] __initconst = {
+ 		11, 1, 0 },
+ };
+ 
+-#define to_clk_mux(_hw) container_of(_hw, struct clk_mux, hw)
+-
+ static struct clk *clk_muxing_get_src(
+ 	struct of_phandle_args *clkspec, void *data)
+ {
+diff --git a/drivers/clk/mxs/clk-div.c b/drivers/clk/mxs/clk-div.c
+index 049ee27..f75e989 100644
+--- a/drivers/clk/mxs/clk-div.c
++++ b/drivers/clk/mxs/clk-div.c
+@@ -33,7 +33,7 @@ struct clk_div {
+ 
+ static inline struct clk_div *to_clk_div(struct clk_hw *hw)
+ {
+-	struct clk_divider *divider = container_of(hw, struct clk_divider, hw);
++	struct clk_divider *divider = to_clk_divider(hw);
+ 
+ 	return container_of(divider, struct clk_div, divider);
+ }
+diff --git a/drivers/clk/nxp/clk-lpc18xx-ccu.c b/drivers/clk/nxp/clk-lpc18xx-ccu.c
+index 13aabbb..08ab3c5 100644
+--- a/drivers/clk/nxp/clk-lpc18xx-ccu.c
++++ b/drivers/clk/nxp/clk-lpc18xx-ccu.c
+@@ -28,8 +28,6 @@
+ #define CCU_BRANCH_IS_BUS	BIT(0)
+ #define CCU_BRANCH_HAVE_DIV2	BIT(1)
+ 
+-#define to_clk_gate(_hw) container_of(_hw, struct clk_gate, hw)
+-
+ struct lpc18xx_branch_clk_data {
+ 	const char **name;
+ 	int num;
+diff --git a/drivers/clk/st/clkgen-mux.c b/drivers/clk/st/clkgen-mux.c
+index 5dc5ce2..0d9a74b 100644
+--- a/drivers/clk/st/clkgen-mux.c
++++ b/drivers/clk/st/clkgen-mux.c
+@@ -822,11 +822,10 @@ err:
+ 		if (!clk_data->clks[i])
+ 			continue;
+ 
+-		composite = container_of(__clk_get_hw(clk_data->clks[i]),
+-					 struct clk_composite, hw);
+-		kfree(container_of(composite->gate_hw, struct clk_gate, hw));
+-		kfree(container_of(composite->rate_hw, struct clk_divider, hw));
+-		kfree(container_of(composite->mux_hw, struct clk_mux, hw));
++		composite = to_clk_composite(__clk_get_hw(clk_data->clks[i]));
++		kfree(to_clk_gate(composite->gate_hw));
++		kfree(to_clk_divider(composite->rate_hw));
++		kfree(to_clk_mux(composite->mux_hw));
+ 	}
+ 
+ 	kfree(clk_data->clks);
+diff --git a/drivers/clk/ti/composite.c b/drivers/clk/ti/composite.c
+index dbef218..43345c4 100644
+--- a/drivers/clk/ti/composite.c
++++ b/drivers/clk/ti/composite.c
+@@ -28,8 +28,6 @@
+ #undef pr_fmt
+ #define pr_fmt(fmt) "%s: " fmt, __func__
+ 
+-#define to_clk_divider(_hw) container_of(_hw, struct clk_divider, hw)
+-
+ static unsigned long ti_composite_recalc_rate(struct clk_hw *hw,
+ 					      unsigned long parent_rate)
+ {
+diff --git a/drivers/clk/ti/divider.c b/drivers/clk/ti/divider.c
+index df25583..b4e5de1 100644
+--- a/drivers/clk/ti/divider.c
++++ b/drivers/clk/ti/divider.c
+@@ -26,8 +26,6 @@
+ #undef pr_fmt
+ #define pr_fmt(fmt) "%s: " fmt, __func__
+ 
+-#define to_clk_divider(_hw) container_of(_hw, struct clk_divider, hw)
+-
+ #define div_mask(d)	((1 << ((d)->width)) - 1)
+ 
+ static unsigned int _get_table_maxdiv(const struct clk_div_table *table)
+diff --git a/drivers/clk/ti/gate.c b/drivers/clk/ti/gate.c
+index 5429d35..bc05f27 100644
+--- a/drivers/clk/ti/gate.c
++++ b/drivers/clk/ti/gate.c
+@@ -24,8 +24,6 @@
+ 
+ #include "clock.h"
+ 
+-#define to_clk_divider(_hw) container_of(_hw, struct clk_divider, hw)
+-
+ #undef pr_fmt
+ #define pr_fmt(fmt) "%s: " fmt, __func__
+ 
+diff --git a/drivers/clk/ti/mux.c b/drivers/clk/ti/mux.c
+index dab9ba8..618ded9 100644
+--- a/drivers/clk/ti/mux.c
++++ b/drivers/clk/ti/mux.c
+@@ -26,8 +26,6 @@
+ #undef pr_fmt
+ #define pr_fmt(fmt) "%s: " fmt, __func__
+ 
+-#define to_clk_mux(_hw) container_of(_hw, struct clk_mux, hw)
+-
+ static u8 ti_clk_mux_get_parent(struct clk_hw *hw)
+ {
+ 	struct clk_mux *mux = to_clk_mux(hw);
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 1143e38..ad1d69c 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -276,6 +276,8 @@ struct clk_fixed_rate {
+ 	u8		flags;
+ };
+ 
++#define to_clk_fixed_rate(_hw) container_of(_hw, struct clk_fixed_rate, hw)
 +
- 		ret = of_pmu_irq_cfg(pmu);
- 		if (!ret)
- 			ret = init_fn(pmu);
-diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
-index bfa673b..4b8dc13 100644
---- a/include/linux/perf/arm_pmu.h
-+++ b/include/linux/perf/arm_pmu.h
-@@ -104,6 +104,7 @@ struct arm_pmu {
- 	atomic_t	active_events;
- 	struct mutex	reserve_mutex;
- 	u64		max_period;
-+	bool		secure_access;
- 	struct platform_device	*plat_device;
- 	struct pmu_hw_events	__percpu *hw_events;
- 	struct notifier_block	hotplug_nb;
+ extern const struct clk_ops clk_fixed_rate_ops;
+ struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
+ 		const char *parent_name, unsigned long flags,
+@@ -314,6 +316,8 @@ struct clk_gate {
+ 	spinlock_t	*lock;
+ };
+ 
++#define to_clk_gate(_hw) container_of(_hw, struct clk_gate, hw)
++
+ #define CLK_GATE_SET_TO_DISABLE		BIT(0)
+ #define CLK_GATE_HIWORD_MASK		BIT(1)
+ 
+@@ -376,6 +380,8 @@ struct clk_divider {
+ 	spinlock_t	*lock;
+ };
+ 
++#define to_clk_divider(_hw) container_of(_hw, struct clk_divider, hw)
++
+ #define CLK_DIVIDER_ONE_BASED		BIT(0)
+ #define CLK_DIVIDER_POWER_OF_TWO	BIT(1)
+ #define CLK_DIVIDER_ALLOW_ZERO		BIT(2)
+@@ -440,6 +446,8 @@ struct clk_mux {
+ 	spinlock_t	*lock;
+ };
+ 
++#define to_clk_mux(_hw) container_of(_hw, struct clk_mux, hw)
++
+ #define CLK_MUX_INDEX_ONE		BIT(0)
+ #define CLK_MUX_INDEX_BIT		BIT(1)
+ #define CLK_MUX_HIWORD_MASK		BIT(2)
+@@ -483,6 +491,8 @@ struct clk_fixed_factor {
+ 	unsigned int	div;
+ };
+ 
++#define to_clk_fixed_factor(_hw) container_of(_hw, struct clk_fixed_factor, hw)
++
+ extern const struct clk_ops clk_fixed_factor_ops;
+ struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
+ 		const char *parent_name, unsigned long flags,
+@@ -514,6 +524,8 @@ struct clk_fractional_divider {
+ 	spinlock_t	*lock;
+ };
+ 
++#define to_clk_fd(_hw) container_of(_hw, struct clk_fractional_divider, hw)
++
+ extern const struct clk_ops clk_fractional_divider_ops;
+ struct clk *clk_register_fractional_divider(struct device *dev,
+ 		const char *name, const char *parent_name, unsigned long flags,
+@@ -550,6 +562,8 @@ struct clk_multiplier {
+ 	spinlock_t	*lock;
+ };
+ 
++#define to_clk_multiplier(_hw) container_of(_hw, struct clk_multiplier, hw)
++
+ #define CLK_MULTIPLIER_ZERO_BYPASS		BIT(0)
+ #define CLK_MULTIPLIER_ROUND_CLOSEST	BIT(1)
+ 
+@@ -579,6 +593,8 @@ struct clk_composite {
+ 	const struct clk_ops	*gate_ops;
+ };
+ 
++#define to_clk_composite(_hw) container_of(_hw, struct clk_composite, hw)
++
+ struct clk *clk_register_composite(struct device *dev, const char *name,
+ 		const char * const *parent_names, int num_parents,
+ 		struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
+@@ -601,6 +617,8 @@ struct clk_gpio {
+ 	struct gpio_desc *gpiod;
+ };
+ 
++#define to_clk_gpio(_hw) container_of(_hw, struct clk_gpio, hw)
++
+ extern const struct clk_ops clk_gpio_gate_ops;
+ struct clk *clk_register_gpio_gate(struct device *dev, const char *name,
+ 		const char *parent_name, unsigned gpio, bool active_low,
 -- 
-1.9.3
+2.5.0
