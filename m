@@ -1,78 +1,77 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Wed, 6 Jan 2016 10:27:43 +0100
-Subject: [PATCH] ARM: tango: Fix UP build issues
-Message-ID: <568CDE0F.2090303@sigmadesigns.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 6 Jan 2016 15:01:21 +0530
+Subject: [PATCH] dmaengine: xgene-dma: Fix double IRQ issue by setting
+ IRQ_DISABLE_UNLAZY flag
+In-Reply-To: <CAFd313xhh_4OFP6W2yuApM8ppYMX20DUCCQHJ9YEtCMbzr6Hgg@mail.gmail.com>
+References: <1450875495-2229-1-git-send-email-rsahu@apm.com>
+ <20160106091323.GP2940@localhost>
+ <CAFd313xhh_4OFP6W2yuApM8ppYMX20DUCCQHJ9YEtCMbzr6Hgg@mail.gmail.com>
+Message-ID: <20160106093121.GB11778@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move SMP setup to platsmp.c for consistency with other platforms.
+On Wed, Jan 06, 2016 at 02:51:07PM +0530, Rameshwar Sahu wrote:
+> Hi Vinod,
+> 
+> On Wed, Jan 6, 2016 at 2:43 PM, Vinod Koul <vinod.koul@intel.com> wrote:
+> > On Wed, Dec 23, 2015 at 06:28:15PM +0530, Rameshswar Prasad Sahu wrote:
+> >> From: Rameshwar Prasad Sahu <rsahu@apm.com>
+> >>
+> >> For interrupt controller that doesn't support irq_disable and hardware
+> >> with level interrupt, an extra interrupt can be pending. This patch fixes
+> >> the issue by setting IRQ_DISABLE_UNLAZY flag for the interrupt line.
+> >>
+> >> Reference: http://git.kernel.org/tip/e9849777d0e27cdd2902805be51da73e7c79578c
+> >
+> > I seem to have got this patch thrice :(
+> Due to mail failure (some issue was in my email client) to some
+> email-id it was multiple times,
 
-Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
----
- arch/arm/mach-tango/Makefile  |  4 +++-
- arch/arm/mach-tango/platsmp.c | 16 ++++++++++++++++
- arch/arm/mach-tango/setup.c   | 14 --------------
- 3 files changed, 19 insertions(+), 15 deletions(-)
- create mode 100644 arch/arm/mach-tango/platsmp.c
+git send-email ?
 
-diff --git a/arch/arm/mach-tango/Makefile b/arch/arm/mach-tango/Makefile
-index 99422ea743fd..f33935e42e77 100644
---- a/arch/arm/mach-tango/Makefile
-+++ b/arch/arm/mach-tango/Makefile
-@@ -1,3 +1,5 @@
- plus_sec := $(call as-instr,.arch_extension sec,+sec)
--AFLAGS_smc.o		:=-Wa,-march=armv7-a$(plus_sec)
-+AFLAGS_smc.o := -Wa,-march=armv7-a$(plus_sec)
-+
- obj-y += setup.o smc.o
-+obj-$(CONFIG_SMP) += platsmp.o
-diff --git a/arch/arm/mach-tango/platsmp.c b/arch/arm/mach-tango/platsmp.c
-new file mode 100644
-index 000000000000..a18d5a34e2f5
---- /dev/null
-+++ b/arch/arm/mach-tango/platsmp.c
-@@ -0,0 +1,16 @@
-+#include <linux/init.h>
-+#include <linux/smp.h>
-+#include "smc.h"
-+
-+static int tango_boot_secondary(unsigned int cpu, struct task_struct *idle)
-+{
-+	tango_set_aux_boot_addr(virt_to_phys(secondary_startup));
-+	tango_start_aux_core(cpu);
-+	return 0;
-+}
-+
-+static struct smp_operations tango_smp_ops __initdata = {
-+	.smp_boot_secondary	= tango_boot_secondary,
-+};
-+
-+CPU_METHOD_OF_DECLARE(tango4_smp, "sigma,tango4-smp", &tango_smp_ops);
-diff --git a/arch/arm/mach-tango/setup.c b/arch/arm/mach-tango/setup.c
-index d86900550e63..f14b6c7d255b 100644
---- a/arch/arm/mach-tango/setup.c
-+++ b/arch/arm/mach-tango/setup.c
-@@ -1,21 +1,7 @@
--#include <linux/smp.h>
- #include <asm/mach/arch.h>
- #include <asm/hardware/cache-l2x0.h>
- #include "smc.h"
- 
--static int tango4_boot_secondary(unsigned int cpu, struct task_struct *idle)
--{
--	tango_set_aux_boot_addr(virt_to_phys(secondary_startup));
--	tango_start_aux_core(cpu);
--	return 0;
--}
--
--static struct smp_operations tango4_smp_ops __initdata = {
--	.smp_boot_secondary	= tango4_boot_secondary,
--};
--
--CPU_METHOD_OF_DECLARE(tango4_smp, "sigma,tango4-smp", &tango4_smp_ops);
--
- static void tango_l2c_write(unsigned long val, unsigned int reg)
- {
- 	if (reg == L2X0_CTRL)
+> >
+> >>
+> >> Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
+> >> ---
+> >>  drivers/dma/xgene-dma.c |    4 ++++
+> >>  1 files changed, 4 insertions(+), 0 deletions(-)
+> >>
+> >> diff --git a/drivers/dma/xgene-dma.c b/drivers/dma/xgene-dma.c
+> >> index 9dfa2b0..6363e84 100644
+> >> --- a/drivers/dma/xgene-dma.c
+> >> +++ b/drivers/dma/xgene-dma.c
+> >> @@ -29,6 +29,7 @@
+> >>  #include <linux/dmapool.h>
+> >>  #include <linux/interrupt.h>
+> >>  #include <linux/io.h>
+> >> +#include <linux/irq.h>
+> >>  #include <linux/module.h>
+> >>  #include <linux/of_device.h>
+> >>
+> >> @@ -1610,6 +1611,7 @@ static int xgene_dma_request_irqs(struct xgene_dma *pdma)
+> >>       /* Register DMA channel rx irq */
+> >>       for (i = 0; i < XGENE_DMA_MAX_CHANNEL; i++) {
+> >>               chan = &pdma->chan[i];
+> >> +             irq_set_status_flags(chan->rx_irq, IRQ_DISABLE_UNLAZY);
+> >
+> > Why not use irq_settings_disable_unlazy(), at least read the reference you
+> > pointed out!
+> 
+> irq_settings_disable_unlazy() is helper function to test
+> IRQ_DISABLE_UNLAZY flag is set or not, it's not for setting this flag.
+> FYI...
+> +static inline bool irq_settings_disable_unlazy(struct irq_desc *desc)
+> +{
+> + return desc->status_use_accessors & _IRQ_DISABLE_UNLAZY;
+> +}
+
+Ah yes, I saw clear API and assumed there would be set. Then I think we
+should add a set helper as well as the usage is intended for drivers to
+set this flag
+
+Thomas,
+
+Any reason why you didn't add a set helper, only test and clear?
+
 -- 
-2.6.3
+~Vinod
