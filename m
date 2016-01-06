@@ -1,78 +1,122 @@
-From: greg@kroah.com (Greg Kroah-Hartman)
-Date: Tue, 5 Jan 2016 18:43:02 -0800
-Subject: [PATCH 1/2] tty: amba-pl011: fix earlycon register offsets
-In-Reply-To: <20160105123018.GU19062@n2100.arm.linux.org.uk>
-References: <1450972189-22639-1-git-send-email-timur@codeaurora.org>
- <20151224164723.GK8644@n2100.arm.linux.org.uk>
- <CAPKp9ubdS+R8U-W+LxYEp_sGxZVBDGBJ48+N7Pw3k9A+=F4pww@mail.gmail.com>
- <20160105123018.GU19062@n2100.arm.linux.org.uk>
-Message-ID: <20160106024302.GA20634@kroah.com>
+From: dennis.chen@arm.com (Dennis Chen)
+Date: Wed, 6 Jan 2016 10:55:21 +0800
+Subject: [linux-next PATCH] arm64: fix kernel crash with 48-bit VA and
+ 64KB granule
+In-Reply-To: <20160105154444.GF10705@arm.com>
+References: <1451960299-14123-1-git-send-email-dennis.chen@arm.com>
+ <CAKv+Gu-pz8rA2EfU6NwCndmoYneOjYUt8_PodTdZkepV3cRXJQ@mail.gmail.com>
+ <20160105123153.GE10705@arm.com>
+ <CAKv+Gu-btc7FX9JG=aEoDcSPYXQuB+Vf9ynXbKNxVn25bxtW_Q@mail.gmail.com>
+ <20160105154444.GF10705@arm.com>
+Message-ID: <20160106025520.GG13942@arm.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 05, 2016 at 12:30:19PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Jan 05, 2016 at 12:12:31PM +0000, Sudeep Holla wrote:
-> > Hi Russell,
-> > 
-> > On Thu, Dec 24, 2015 at 4:47 PM, Russell King - ARM Linux
-> > <linux@arm.linux.org.uk> wrote:
-> > > On Thu, Dec 24, 2015 at 09:49:48AM -0600, Timur Tabi wrote:
-> > >> The REG_x macros are indices into a table, not register offsets.  Since
-> > >> earlycon does not have access to the vendor data, we can currently only
-> > >> support standard ARM PL011 devices.
+On Tue, Jan 05, 2016 at 03:44:44PM +0000, Will Deacon wrote:
+> On Tue, Jan 05, 2016 at 01:47:11PM +0100, Ard Biesheuvel wrote:
+> > On 5 January 2016 at 13:31, Will Deacon <will.deacon@arm.com> wrote:
+> > > On Tue, Jan 05, 2016 at 08:36:39AM +0100, Ard Biesheuvel wrote:
+> > >> The issue only occurs when PGD_SIZE != PAGE_SIZE, which is why I did
+> > >> not see it myself. I only tested with 4k/39-bits and 64k/42-bits IIRC,
+> > >> since the series this is part of primarily concerns ARM not arm64.
 > > >>
-> > >> Signed-off-by: Timur Tabi <timur@codeaurora.org>
+> > >> Anyway, shuffling init ordering is my least favorite way of fixing
+> > >> bugs. Since only ARM requires pgd_alloc() (for the kernel mappings),
+> > >> we could also simply factor out pgd_alloc() into efi_pgd_alloc(), and
+> > >> define it to mean '__get_free_page(PGALLOC_GFP)' on arm64.
 > > >
-> > > Please credit me with the change; this was obviously a change I made
-> > > when I posted the updated patches, which Greg had failed to take
-> > > instead of the original set.  Thanks.
+> > > Or we could put the pgd_cache initialisation in pgtable_cache_init, which
+> > > sounds like the right place for it anyway.
 > > >
-> > 
-> > I don't see this patch in linux-next. Without this it fails to boot(panics) on
-> > ARM64 when earlycon is enabled.
-> 
-> I guess that's the way 4.4 is going to be then, because GregKH has not
-> been anywhere near "responsive" during the last cycle, but he did say
-> yesterday (in response to questions about driver model stuff) that he's
-> closed his trees for the merge window last week.
-> 
-> All in all, this situation is entirely GregKH's making, as he took the
-> wrong set of patches, and has yet to respond to _any_ of the resulting
-> mails about it... I guess GregKH knows what he's doing as he's one of
-> the top (and vocal) kernel developers far more than I do, so I guess he
-> has his reasons for crapping up the AMBA PL011 driver...
+> >
+> > Indeed.
+>
+> Patch below. Seems to do the job on my Juno.
+>
+> Will
+>
+> --->8
+>
+> From 39b5be9b4233a9f212b98242bddf008f379b5122 Mon Sep 17 00:00:00 2001
+> From: Will Deacon <will.deacon@arm.com>
+> Date: Tue, 5 Jan 2016 15:36:59 +0000
+> Subject: [PATCH] arm64: mm: move pgd_cache initialisation to
+>  pgtable_cache_init
+>
+> Initialising the suppport for EFI runtime services requires us to
+> allocate a pgd off the back of an early_initcall. On systems where the
+> PGD_SIZE is smaller than PAGE_SIZE (e.g. 64k pages and 48-bit VA), the
+> pgd_cache isn't initialised at this stage, and we panic with a NULL
+> dereference during boot:
+>
+>   Unable to handle kernel NULL pointer dereference at virtual address 00000000
+>
+>   __create_mapping.isra.5+0x84/0x350
+>   create_pgd_mapping+0x20/0x28
+>   efi_create_mapping+0x5c/0x6c
+>   arm_enable_runtime_services+0x154/0x1e4
+>   do_one_initcall+0x8c/0x190
+>   kernel_init_freeable+0x84/0x1ec
+>   kernel_init+0x10/0xe0
+>   ret_from_fork+0x10/0x50
+>
+> This patch fixes the problem by initialising the pgd_cache earlier, in
+> the pgtable_cache_init callback, which sounds suspiciously like what it
+> was intended for.
+>
+> Reported-by: Dennis Chen <dennis.chen@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/include/asm/pgtable.h |  3 ++-
+>  arch/arm64/mm/pgd.c              | 12 ++++++------
+>  2 files changed, 8 insertions(+), 7 deletions(-)
+>
+> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+> index 35a318c2fd87..a87e964d2791 100644
+> --- a/arch/arm64/include/asm/pgtable.h
+> +++ b/arch/arm64/include/asm/pgtable.h
+> @@ -676,7 +676,8 @@ extern int kern_addr_valid(unsigned long addr);
+>
+>  #include <asm-generic/pgtable.h>
+>
+> -#define pgtable_cache_init() do { } while (0)
+> +void pgd_cache_init(void);
+> +#define pgtable_cache_init   pgd_cache_init
+>
+>  /*
+>   * On AArch64, the cache coherency is handled via the set_pte_at() function.
+> diff --git a/arch/arm64/mm/pgd.c b/arch/arm64/mm/pgd.c
+> index cb3ba1b812e7..ae11d4e03d0e 100644
+> --- a/arch/arm64/mm/pgd.c
+> +++ b/arch/arm64/mm/pgd.c
+> @@ -46,14 +46,14 @@ void pgd_free(struct mm_struct *mm, pgd_t *pgd)
+>               kmem_cache_free(pgd_cache, pgd);
+>  }
+>
+> -static int __init pgd_cache_init(void)
+> +void __init pgd_cache_init(void)
+>  {
+> +     if (PGD_SIZE == PAGE_SIZE)
+> +             return;
+> +
+It doesn't need to add a new if statement here.
+>       /*
+>        * Naturally aligned pgds required by the architecture.
+>        */
+> -     if (PGD_SIZE != PAGE_SIZE)
+> -             pgd_cache = kmem_cache_create("pgd_cache", PGD_SIZE, PGD_SIZE,
+> -                                           SLAB_PANIC, NULL);
+The deleted code here is more better, seems we don't need to change it here
+> -     return 0;
+Nice.
+> +     pgd_cache = kmem_cache_create("pgd_cache", PGD_SIZE, PGD_SIZE,
+> +                                   SLAB_PANIC, NULL);
 
-"plenty of time"?  I see Timur's patches to fix this were sent on
-December 24th.  Then fixed up and resent on January 4th. I see nothing
-in my todo queue that were sent earlier to resolve any of this horrid
-mess.
+>  }
+> -core_initcall(pgd_cache_init);
+The new patch is reasonable for me.
 
-So yes, I haven't done anything with the Jan 04 patch, given that it's
-been 24 hours since it was sent, that's totally reasonable.
-
-> I rather wish that I'd decided to do the same with the AMBA PL011 driver,
-> because this seems to be the only sensible way of ensuring that the right
-> set of patches get to Linus.
-> 
-> I had put the _right_ set of AMBA PL011 driver changes into linux-next
-> just before Christmas, but Stephen Rothwell tells me that they merge
-> without conflict with the set that Greg merged, and we still end up with
-> the broken code.  So there's nothing I can do about it at this point.
-> 
-> As far as 4.4 goes, I think it's fate was sealed when Greg took the
-> wrong set of patches.  It's Greg's problem to sort out now.
-
-You all were throwing huge numbers of patches here for this tiny driver
-and digging through the mess was a major pain.  Turned out I guessed
-wrong, and asked for a patch to fix up the mess once that was
-determined.  That didn't arrive until the yesterday in a format that
-might be acceptable.  Quite a while after this all was determined to be
-"broken".
-
-If you all think you could do better with the patch load you all were
-throwing at me, well, good for you.  It's mighty easy to complain when
-it isn't your inbox...  And I really don't care at all about this little
-driver, you all do, and yet you all can't agree what to do about it, so
-to somehow claim that I know better is a joke.
-
-greg k-h
+> --
+> 2.1.4
+>
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
