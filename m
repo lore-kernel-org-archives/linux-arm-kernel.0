@@ -1,34 +1,118 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 5 Jan 2016 16:22:01 -0800
-Subject: Widespread boot failures on ARM due to "mm/page_alloc.c:
- calculate zone_start_pfn at zone_spanned_pages_in_node()"
-In-Reply-To: <20160104224233.GU16023@sirena.org.uk>
-References: <20160104224233.GU16023@sirena.org.uk>
-Message-ID: <20160106002201.GA16273@roeck-us.net>
+From: Yisen.zhuang@huawei.com (Yisen Zhuang)
+Date: Wed, 6 Jan 2016 08:56:01 +0800
+Subject: [PATCH] net: hns: avoid uninitialized variable warning:
+In-Reply-To: <6649249.INrAY8KJG0@wuerfel>
+References: <6649249.INrAY8KJG0@wuerfel>
+Message-ID: <568C6621.5090500@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 04, 2016 at 10:42:33PM +0000, Mark Brown wrote:
-> Since 20151231 -next has been failing to boot on a wide range of ARM
-> platforms in the kernelci.org boot tests[1].  Doing bisections with
-> Arndale and BeagleBone Black identifies 904769ac82ebf (mm/page_alloc.c:
-> calculate zone_start_pfn at zone_spanned_pages_in_node()) from the akpm
-> tree as the first broken commit[2,3].  An example bootlog from the
-> failure is:
-> 
->    http://storage.kernelci.org/next/next-20151231/arm-multi_v7_defconfig/lab-cambridge/boot-exynos5250-arndale.html
-> 
-> which shows no output on the console once we start the kernel, a brief
-> sampling of failing boards suggests this is the normal failure mode.
-> x86 and arm64 targets seem fine (juno shows up as failing but the boot
-> log seems fine so it's probably a false positive, Mustang was failing
-> already) and there are a small number of ARM platforms that boot.  I've
-> not yet had any time to investigate further than that (including trying
-> a revert of that commit), sorry.
-> 
-I see the same problem with my qemu tests for arm.
 
-Reverting the offending commit together with cd31fe16b585 ("mm/page_alloc.c:
-set a zone_start_pfn value in zone_spanned_pages_in_node") fixes the problem.
 
-Guenter
+? 2016/1/2 6:27, Arnd Bergmann ??:
+> gcc fails to see that the use of the 'last_offset' variable
+> in hns_nic_reuse_page() is used correctly and issues a bogus
+> warning:
+> 
+> drivers/net/ethernet/hisilicon/hns/hns_enet.c: In function 'hns_nic_reuse_page':
+> drivers/net/ethernet/hisilicon/hns/hns_enet.c:541:6: warning: 'last_offset' may be used uninitialized in this function [-Wmaybe-uninitialized]
+> 
+> This simplifies the function to make it more obvious what is
+> going on to both readers and compilers, which makes the warning
+> go away.
+> 
+
+
+Hi Arnd,
+
+This patch is fine to me.
+
+Many thanks,
+Yisen
+
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> Compile-tested only, and complex enough that this requires a proper
+> review and testing before it gets apply. Please have a look at this.
+> 
+> diff --git a/drivers/net/ethernet/hisilicon/hns/hns_enet.c b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
+> index 5a81dafd725e..0e30846a24f8 100644
+> --- a/drivers/net/ethernet/hisilicon/hns/hns_enet.c
+> +++ b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
+> @@ -499,50 +499,47 @@ static void hns_nic_reuse_page(struct sk_buff *skb, int i,
+>  	struct hnae_desc *desc;
+>  	int truesize, size;
+>  	int last_offset;
+> +	bool twobufs;
+> +
+> +	twobufs = ((PAGE_SIZE < 8192) && hnae_buf_size(ring) == HNS_BUFFER_SIZE_2048);
+>  
+>  	desc = &ring->desc[ring->next_to_clean];
+>  	size = le16_to_cpu(desc->rx.size);
+>  
+> -#if (PAGE_SIZE < 8192)
+> -	if (hnae_buf_size(ring) == HNS_BUFFER_SIZE_2048) {
+> +	if (twobufs) {
+>  		truesize = hnae_buf_size(ring);
+>  	} else {
+>  		truesize = ALIGN(size, L1_CACHE_BYTES);
+>  		last_offset = hnae_page_size(ring) - hnae_buf_size(ring);
+>  	}
+>  
+> -#else
+> -	truesize = ALIGN(size, L1_CACHE_BYTES);
+> -	last_offset = hnae_page_size(ring) - hnae_buf_size(ring);
+> -#endif
+> -
+>  	skb_add_rx_frag(skb, i, desc_cb->priv, desc_cb->page_offset + pull_len,
+>  			size - pull_len, truesize - pull_len);
+>  
+>  	 /* avoid re-using remote pages,flag default unreuse */
+> -	if (likely(page_to_nid(desc_cb->priv) == numa_node_id())) {
+> -#if (PAGE_SIZE < 8192)
+> -		if (hnae_buf_size(ring) == HNS_BUFFER_SIZE_2048) {
+> -			/* if we are only owner of page we can reuse it */
+> -			if (likely(page_count(desc_cb->priv) == 1)) {
+> -				/* flip page offset to other buffer */
+> -				desc_cb->page_offset ^= truesize;
+> -
+> -				desc_cb->reuse_flag = 1;
+> -				/* bump ref count on page before it is given*/
+> -				get_page(desc_cb->priv);
+> -			}
+> -			return;
+> -		}
+> -#endif
+> -		/* move offset up to the next cache line */
+> -		desc_cb->page_offset += truesize;
+> +	if (unlikely(page_to_nid(desc_cb->priv) != numa_node_id()))
+> +		return;
+> +
+> +	if (twobufs) {
+> +		/* if we are only owner of page we can reuse it */
+> +		if (likely(page_count(desc_cb->priv) == 1)) {
+> +			/* flip page offset to other buffer */
+> +			desc_cb->page_offset ^= truesize;
+>  
+> -		if (desc_cb->page_offset <= last_offset) {
+>  			desc_cb->reuse_flag = 1;
+>  			/* bump ref count on page before it is given*/
+>  			get_page(desc_cb->priv);
+>  		}
+> +		return;
+> +	}
+> +
+> +	/* move offset up to the next cache line */
+> +	desc_cb->page_offset += truesize;
+> +
+> +	if (desc_cb->page_offset <= last_offset) {
+> +		desc_cb->reuse_flag = 1;
+> +		/* bump ref count on page before it is given*/
+> +		get_page(desc_cb->priv);
+>  	}
+>  }
+>  
+> 
+> 
+> .
+> 
