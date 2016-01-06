@@ -1,93 +1,26 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Wed,  6 Jan 2016 12:03:56 +0800
-Subject: [PATCH v7 4/5] ARM: dts: rockchip: add rk3288 mipi_dsi nodes
-In-Reply-To: <1452053038-32098-1-git-send-email-zyw@rock-chips.com>
-References: <1452053038-32098-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <1452053038-32098-5-git-send-email-zyw@rock-chips.com>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 06 Jan 2016 00:01:12 -0500 (EST)
+Subject: [PATCH] net: hns: avoid uninitialized variable warning:
+In-Reply-To: <6649249.INrAY8KJG0@wuerfel>
+References: <6649249.INrAY8KJG0@wuerfel>
+Message-ID: <20160106.000112.1783241133330740168.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a mipi_dsi node, and also add mipi_dsi endpoints to vopb and vopl
-output port nodes.
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Fri, 01 Jan 2016 23:27:57 +0100
 
-Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> gcc fails to see that the use of the 'last_offset' variable
+> in hns_nic_reuse_page() is used correctly and issues a bogus
+> warning:
+> 
+> drivers/net/ethernet/hisilicon/hns/hns_enet.c: In function 'hns_nic_reuse_page':
+> drivers/net/ethernet/hisilicon/hns/hns_enet.c:541:6: warning: 'last_offset' may be used uninitialized in this function [-Wmaybe-uninitialized]
+> 
+> This simplifies the function to make it more obvious what is
+> going on to both readers and compilers, which makes the warning
+> go away.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
----
-
-Changes in v7: None
-Changes in v6: None
-Changes in v5:
-- modify the clk name to SCLK_MIPIDSI_24M
-
-Changes in v4: None
-Changes in v3: None
-
- arch/arm/boot/dts/rk3288.dtsi | 39 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
-
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 04ea209..6b21a87 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -800,6 +800,10 @@
- 				reg = <0>;
- 				remote-endpoint = <&hdmi_in_vopb>;
- 			};
-+			vopb_out_mipi: endpoint at 2 {
-+				reg = <2>;
-+				remote-endpoint = <&mipi_in_vopb>;
-+			};
- 		};
- 	};
- 
-@@ -833,6 +837,10 @@
- 				reg = <0>;
- 				remote-endpoint = <&hdmi_in_vopl>;
- 			};
-+			vopl_out_mipi: endpoint at 2 {
-+				reg = <2>;
-+				remote-endpoint = <&mipi_in_vopl>;
-+			};
- 		};
- 	};
- 
-@@ -873,6 +881,37 @@
- 		};
- 	};
- 
-+	mipi_dsi: mipi at ff960000 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "rockchip,rk3288-mipi-dsi", "snps,dw-mipi-dsi";
-+		reg = <0xff960000 0x4000>;
-+		interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru SCLK_MIPIDSI_24M>, <&cru PCLK_MIPI_DSI0>;
-+		clock-names = "ref", "pclk";
-+		rockchip,grf = <&grf>;
-+		status = "disabled";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <1>;
-+
-+			mipi_in: port {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				mipi_in_vopb: endpoint at 0 {
-+					reg = <0>;
-+					remote-endpoint = <&vopb_out_mipi>;
-+				};
-+				mipi_in_vopl: endpoint at 1 {
-+					reg = <1>;
-+					remote-endpoint = <&vopl_out_mipi>;
-+				};
-+			};
-+		};
-+	};
-+
- 	gic: interrupt-controller at ffc01000 {
- 		compatible = "arm,gic-400";
- 		interrupt-controller;
--- 
-2.6.3
+Applied, thanks.
