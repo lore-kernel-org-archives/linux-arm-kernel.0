@@ -1,63 +1,75 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 6 Jan 2016 11:36:37 +0000
-Subject: [PATCHv2 00/18] arm64: mm: rework page table creation
-In-Reply-To: <20160106102448.GI6301@e104818-lin.cambridge.arm.com>
-References: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
- <20160106102448.GI6301@e104818-lin.cambridge.arm.com>
-Message-ID: <20160106113637.GD563@leverpostej>
+Date: Wed, 6 Jan 2016 11:40:39 +0000
+Subject: [PATCH 2/2] arm64: use memset to clear BSS
+In-Reply-To: <CAKv+Gu9xsLk2hDB_RxYn9kytgCOEk3WTYq0Vvegh4NsE7ERTtQ@mail.gmail.com>
+References: <1452078327-9635-1-git-send-email-mark.rutland@arm.com>
+ <1452078327-9635-2-git-send-email-mark.rutland@arm.com>
+ <CAKv+Gu9xsLk2hDB_RxYn9kytgCOEk3WTYq0Vvegh4NsE7ERTtQ@mail.gmail.com>
+Message-ID: <20160106114039.GE563@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 06, 2016 at 10:24:49AM +0000, Catalin Marinas wrote:
-> On Mon, Jan 04, 2016 at 05:56:33PM +0000, Mark Rutland wrote:
-> > Mark Rutland (18):
-> >   asm-generic: make __set_fixmap_offset a static inline
-> >   arm64: mm: specialise pagetable allocators
-> >   arm64: mm: place empty_zero_page in bss
-> >   arm64: unify idmap removal
-> >   arm64: unmap idmap earlier
-> >   arm64: add function to install the idmap
-> >   arm64: mm: add code to safely replace TTBR1_EL1
-> >   arm64: kasan: avoid TLB conflicts
-> >   arm64: mm: move pte_* macros
-> >   arm64: mm: add functions to walk page tables by PA
-> >   arm64: mm: avoid redundant __pa(__va(x))
-> >   arm64: mm: add __{pud,pgd}_populate
-> >   arm64: mm: add functions to walk tables in fixmap
-> >   arm64: mm: use fixmap when creating page tables
-> >   arm64: mm: allocate pagetables anywhere
-> >   arm64: mm: allow passing a pgdir to alloc_init_*
-> >   arm64: ensure _stext and _etext are page-aligned
-> >   arm64: mm: create new fine-grained mappings at boot
+On Wed, Jan 06, 2016 at 12:12:45PM +0100, Ard Biesheuvel wrote:
+> On 6 January 2016 at 12:05, Mark Rutland <mark.rutland@arm.com> wrote:
+> > Currently we use an open-coded memzero to clear the BSS. As it is a
+> > trivial implementation, it is sub-optimal.
+> >
+> > Our optimised memset doesn't use the stack, is position-independent, and
+> > for the memzero case can use of DC ZVA to clear large blocks
+> > efficiently. In __mmap_switched the MMU is on and there are no live
+> > caller-saved registers, so we can safely call an uninstrumented memset.
+> >
+> > This patch changes __mmap_switched to use memset when clearing the BSS.
+> > We use the __pi_memset alias so as to avoid any instrumentation in all
+> > kernel configurations. As with the head symbols, we must get the linker
+> > to generate __bss_size, as there is no ELF relocation for the
+> > subtraction of two symbols.
+> >
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  arch/arm64/kernel/head.S  | 14 ++++++--------
+> >  arch/arm64/kernel/image.h |  2 ++
+> >  2 files changed, 8 insertions(+), 8 deletions(-)
+> >
+> > diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> > index 23cfc08..247a97b 100644
+> > --- a/arch/arm64/kernel/head.S
+> > +++ b/arch/arm64/kernel/head.S
+> > @@ -415,14 +415,12 @@ ENDPROC(__create_page_tables)
+> >   */
+> >         .set    initial_sp, init_thread_union + THREAD_START_SP
+> >  __mmap_switched:
+> > -       adr_l   x6, __bss_start
+> > -       adr_l   x7, __bss_stop
+> > -
+> > -1:     cmp     x6, x7
+> > -       b.hs    2f
+> > -       str     xzr, [x6], #8                   // Clear BSS
+> > -       b       1b
+> > -2:
+> > +       // clear BSS
+> > +       adr_l   x0, __bss_start
+> > +       mov     x1, xzr
+> > +       mov_l   x2, __bss_size
 > 
-> The patches look fine (once you fix the issues Laura raised). Thanks for
-> putting them together.
+> Is it such a big deal to do
 > 
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+> adr_l x2, __bss_stop
+> sub x2, x2, x0
+> 
+> instead?
+
+I'm happy either way.
+
+It no-one else has a use for mov_l I'll drop it and move to that.
+
+> Either way:
+> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
 Thanks!
 
-I assume that applies to everything even without the suggested
-split_{pmd,pud} removal [1], for which I'll cook up a follow-up patch.
-
-> I'll queue them sometime after -rc1, in the meantime keep you branch up
-> to date so that Ard and Jeremy can base their patches on top.
-
-Will do.
-
-FWIW I've just updated the branch [2] with said fixes and your
-Reviewed-by. I won't send out a v3 just yet to give people time to
-digest this version.
-
-Ard, you'll find when rebasing that the compiler will scream at you due
-to the p??_fixmap* function renaming. It's fairly mechanical, and if you
-have vim handy you just need to run:
-
-:%s /\(pgd\|pud\|pmd\|pte\)_fixmap_unmap/\1_clear_fixmap/g
-:%s /\(pgd\|pud\|pmd\|pte\)_fixmap/\1_set_fixmap/g
-
-Thanks,
 Mark.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/397208.html
-[2] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arm64/pagetable-rework
