@@ -1,78 +1,98 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 6 Jan 2016 17:10:47 +0000
-Subject: [PATCH v6 12/20] arm64:ilp32: add sys_ilp32.c and a separate
- table (in entry.S) to use it
-In-Reply-To: <13371161.AI9IgZN0G2@wuerfel>
-References: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
- <2634904.E1fnEZUKo9@wuerfel> <20160105152657.GA31598@yury-N73SV>
- <13371161.AI9IgZN0G2@wuerfel>
-Message-ID: <20160106171047.GP6301@e104818-lin.cambridge.arm.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Wed, 6 Jan 2016 19:36:24 +0200
+Subject: [PATCH 2/2] memory: omap-gpmc: Add Kconfig option for debug
+In-Reply-To: <20160105224929.GF12777@atomide.com>
+References: <1432156863-19695-1-git-send-email-tony@atomide.com>
+ <568662FC.9050206@gmail.com> <20160104170206.GC12777@atomide.com>
+ <201601041834.56056@pali> <20160104174001.GD12777@atomide.com>
+ <568AC0F9.2010304@gmail.com> <20160105041356.GE12777@atomide.com>
+ <20160105084947.GG22661@pali> <20160105224929.GF12777@atomide.com>
+Message-ID: <20160106173624.GG1587@darkstar.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 05, 2016 at 10:12:20PM +0100, Arnd Bergmann wrote:
-> On Tuesday 05 January 2016 18:26:57 Yury Norov wrote:
-> > > So the calling conventions avoid the problem of being able to set
-> > > the upper bits from malicious user space when the kernel assumes they
-> > > are zeroed out (we had security bugs in this area, before we introduced
-> > > SYSCALL_DEFINEx()), but it means that we need wrappers around each
-> > > syscall that takes an argument that is different length between user
-> > > and kernel space (as Catalin guessed). arch/s390 has the same problem and
-> > > works around it with code in arch/s390/kernel/compat_wrapper.c, while
-> > > other architectures (at least powerpc, x86 and tile IIRC, don't know much
-> > > about mips, parisc and sparc) don't have the problem because of their
-> > > calling conventions.
-> > > 
-> > > This also means that we cannot work around it in glibc at all, because
-> > > we have to be able to handle malicious user space, so it has to be
-> > > done in the kernel using something similar to what s390 does.
-> > 
-> > So it seems like we (should) have 2 compat modes - with and without access
-> > to upper half of register. I'm thinking now on how put it in generic
-> > unistd.h less painfull way.
+Hi,
+
+On Tue, Jan 05, 2016 at 02:49:29PM -0800, Tony Lindgren wrote:
+> From: Tony Lindgren <tony@atomide.com>
+> Date: Tue, 5 Jan 2016 12:04:20 -0800
+> Subject: [PATCH] ARM: OMAP2+: Fix onenand rate detection to avoid filesystem
+>  corruption
 > 
-> I think we can do that by slightly modifying the existing __SYSCALL/__SC_3264/
-> __SC_COMP/__SC_COMP_3264 macros: The first two need extra wrappers for
-> arm64-ilp32 and s390, the other two don't.
+> Commit 63aa945b1013 ("memory: omap-gpmc: Add Kconfig option for debug")
+> unified the GPMC debug for the SoCs with GPMC. The commit also left
+> out the option for HWMOD_INIT_NO_RESET as we now require proper timings
+> for GPMC to be able to remap GPMC devices out of address 0.
 > 
-> We can use some clever string concatenation to add a ##_wrapper to the name
-> of the handler where needed and then just have a file that implements
-> the wrappers, copied from s390.
+> Unfortunately on 900, onenand now only partially works with the device
+> tree provided timings. It works enough to get detected but the clock
+> rate supported by the onenand chip gets misdetected. This in turn causes
+> the GPMC timings to be miscalculated and this leads into file system
+> corruption on n900.
 > 
-> Unfortunately, we can't just zero out all the upper halves and be done with
-> it: even if we went back to passing 64-bit arguments as separate 32-bit
-> registers, we'd still need to deal with sign-extending negative 32-bit
-> numbers.
-
-How many syscalls would we need sign-extension for? Most are probably
-already handled by specific compat_sys_* functions, otherwise A32 compat
-wouldn't work properly.
-
-Anyway, I think we can get away with not modifying the generic __SYSCALL
-definition and only use something like
-arch/s390/kernel/compat_wrapper.c. In sys_ilp32.c, we would make
-__SYSCALL expand the function name with some ilp32_ prefix.
-
-For existing compat_* syscalls, we only need to handle the pointer types
-(something like the s390's __TYPE_IS_PTR). I think other types are
-already handled by defining the prototype with compat_ulong_t etc.
-
-For native syscalls like sys_read, apart from pointers we also need to
-handle size_t. The wrapper would need to be defined using compat types:
-
-ILP32_SYSCALL_DEFINE3(read, unsigned int, fd, char __user *, buf, compat_size_t, count)
-
-and let the compiler handle the conversion to size_t automatically when
-calling sys_read from the wrapper.
-
-> > Beside of that, I think I almost finished with all current comments. As
-> > this issue is not related to ILP32 directly, I think, it's better to show
-> > it now, as there is pretty massive rework. What do you think?
+> Looks like onenand needs CS_CONFIG1 bit 27 WRITETYPE set for for sync
+> write. This is needed also for async timings when we write to onenand
+> with omap2_onenand_set_async_mode(). Without sync write bit set, the
+> async read for the onenand ONENAND_REG_VERSION_ID will return 0xfff.
 > 
-> Good idea, yes.
+> Let's exit with an error if onenand rate is not detected. And let's
+> remove the extra call to omap2_onenand_set_async_mode() as we only
+> need to do this once at the end of omap2_onenand_setup_async().
+> 
+> Reported-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-Note that we still need to sort the 0/sign extension out before we
-"declare" the ILP32 ABI stable.
+This fixes also the detection issue on N950. Also tested the patch
+with N810.
 
--- 
-Catalin
+Tested-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+
+A.
+
+> --- a/arch/arm/mach-omap2/gpmc-onenand.c
+> +++ b/arch/arm/mach-omap2/gpmc-onenand.c
+> @@ -149,8 +149,8 @@ static int omap2_onenand_get_freq(struct omap_onenand_platform_data *cfg,
+>  		freq = 104;
+>  		break;
+>  	default:
+> -		freq = 54;
+> -		break;
+> +		pr_err("onenand rate not detected, bad GPMC async timings?\n");
+> +		freq = 0;
+>  	}
+>  
+>  	return freq;
+> @@ -271,6 +271,11 @@ static int omap2_onenand_setup_async(void __iomem *onenand_base)
+>  	struct gpmc_timings t;
+>  	int ret;
+>  
+> +	/*
+> +	 * Note that we need to keep sync_write set for the call to
+> +	 * omap2_onenand_set_async_mode() to work to detect the onenand
+> +	 * supported clock rate for the sync timings.
+> +	 */
+>  	if (gpmc_onenand_data->of_node) {
+>  		gpmc_read_settings_dt(gpmc_onenand_data->of_node,
+>  				      &onenand_async);
+> @@ -281,12 +286,9 @@ static int omap2_onenand_setup_async(void __iomem *onenand_base)
+>  			else
+>  				gpmc_onenand_data->flags |= ONENAND_SYNC_READ;
+>  			onenand_async.sync_read = false;
+> -			onenand_async.sync_write = false;
+>  		}
+>  	}
+>  
+> -	omap2_onenand_set_async_mode(onenand_base);
+> -
+>  	omap2_onenand_calc_async_timings(&t);
+>  
+>  	ret = gpmc_cs_program_settings(gpmc_onenand_data->cs, &onenand_async);
+> @@ -310,6 +312,8 @@ static int omap2_onenand_setup_sync(void __iomem *onenand_base, int *freq_ptr)
+>  	if (!freq) {
+>  		/* Very first call freq is not known */
+>  		freq = omap2_onenand_get_freq(gpmc_onenand_data, onenand_base);
+> +		if (!freq)
+> +			return -ENODEV;
+>  		set_onenand_cfg(onenand_base);
+>  	}
+>  
