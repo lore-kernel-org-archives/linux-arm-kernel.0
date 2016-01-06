@@ -1,34 +1,103 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 6 Jan 2016 09:51:18 +0100
-Subject: [PATCH v2] ARM: shmobile: gose: add i2c2 bus to device tree
-In-Reply-To: <1451945780-17558-1-git-send-email-horms+renesas@verge.net.au>
-References: <1451945780-17558-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20160106085118.GF1525@katana>
+From: dennis.chen@arm.com (Dennis Chen)
+Date: Wed, 6 Jan 2016 16:52:19 +0800
+Subject: [linux-next PATCH] arm64: fix kernel crash with 48-bit VA and
+ 64KB granule
+In-Reply-To: <CAKv+Gu_sqAuA_iHf_sNRJyaQUFG5n_eXxYYOHwmV0hf0GTUxow@mail.gmail.com>
+References: <1451960299-14123-1-git-send-email-dennis.chen@arm.com>
+ <CAKv+Gu-pz8rA2EfU6NwCndmoYneOjYUt8_PodTdZkepV3cRXJQ@mail.gmail.com>
+ <20160105083533.GD13942@arm.org>
+ <CAKv+Gu9Q3CmC37dL3o+hcBeG-NJ7+bkOiLQihirje4YbazizJQ@mail.gmail.com>
+ <20160105084042.GF13942@arm.org>
+ <20160105095603.GG6301@e104818-lin.cambridge.arm.com>
+ <20160106061407.GA7082@arm.org>
+ <CAKv+Gu8t56rfdN1ot08BgsteaaincFek0uzoDAroefMWQ+kKEA@mail.gmail.com>
+ <20160106073847.GA7608@arm.org>
+ <CAKv+Gu_sqAuA_iHf_sNRJyaQUFG5n_eXxYYOHwmV0hf0GTUxow@mail.gmail.com>
+Message-ID: <20160106085216.GA7879@arm.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 05, 2016 at 09:16:20AM +1100, Simon Horman wrote:
-> Activate i2c2 bus in r8a7793/gose device tree.
-> 
-> Based on similar work for the r8a7791/koelsch by Wolfram Sang.
-> 
-> Cc: Wolfram Sang <wsa@sang-engineering.com>
-> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+On Wed, Jan 06, 2016 at 08:42:20AM +0100, Ard Biesheuvel wrote:
+> On 6 January 2016 at 08:38, Dennis Chen <dennis.chen@arm.com> wrote:
+> > On Wed, Jan 06, 2016 at 08:13:24AM +0100, Ard Biesheuvel wrote:
+> >> On 6 January 2016 at 07:14, Dennis Chen <dennis.chen@arm.com> wrote:
+> >> > On Tue, Jan 05, 2016 at 09:56:03AM +0000, Catalin Marinas wrote:
+> >> >> On Tue, Jan 05, 2016 at 04:40:44PM +0800, Dennis Chen wrote:
+> >> >> > On Tue, Jan 05, 2016 at 09:38:11AM +0100, Ard Biesheuvel wrote:
+> >> >> > > >> On 5 January 2016 at 03:18, Dennis Chen <dennis.chen@arm.com> wrote:
+> >> >> > > >> > The commit 3400749b5a22 ("arm64/efi: refactor EFI init and runtime
+> >> >> > > >> > code for reuse by 32-bit ARM") uses pgd_alloc() to allocate space for
+> >> >> > > >> > efi_mm.pgd while not the static efi_pgd[], since this function will be
+> >> >> > > >> > called with early_initcall, which results in the pgd_cache used by
+> >> >> > > >> > pgd_alloc() has not been initialized yet, kernel will hang in this
+> >> >> > > >> > case. This patch is trying to make the pgd_cache_init() called before
+> >> >> > > >> > arm_enable_runtime_services() by changing its core_initcall to
+> >> >> > > >> > early_initcall.
+> >> >> > > >> >
+> >> >> > > >> > Signed-off-by: Dennis Chen <dennis.chen@arm.com>
+> >> >> > > >> > Tested-by: Sudeep Holla <sudeep.holla@arm.com>
+> >> >> > > >> >
+> >> >> > > >> > Cc: Will Deacon <will.deacon@arm.com>
+> >> >> > > >> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> >> >> > > >> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> >> > > >> > Cc: Sudeep Holla <sudeep.holla@arm.com>
+> >> >> > > >> > ---
+> >> >> > > >> >  arch/arm64/mm/pgd.c | 2 +-
+> >> >> > > >> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >> >> > > >> >
+> >> >> > > >> > diff --git a/arch/arm64/mm/pgd.c b/arch/arm64/mm/pgd.c
+> >> >> > > >> > index cb3ba1b..859a788 100644
+> >> >> > > >> > --- a/arch/arm64/mm/pgd.c
+> >> >> > > >> > +++ b/arch/arm64/mm/pgd.c
+> >> >> > > >> > @@ -56,4 +56,4 @@ static int __init pgd_cache_init(void)
+> >> >> > > >> >                                               SLAB_PANIC, NULL);
+> >> >> > > >> >         return 0;
+> >> >> > > >> >  }
+> >> >> > > >> > -core_initcall(pgd_cache_init);
+> >> >> > > >> > +early_initcall(pgd_cache_init);
+> >> >> [...]
+> >> >> > > Well, since arm_enable_runtime_services() is an early_initcall()
+> >> >> > > itself, how are you guaranteeing the ordering between the two? Link
+> >> >> > > order?
+> >> >> >
+> >> >> > Link order.
+> >> >>
+> >> >> And can you explain how this works, what guarantees it gives?
+> >> >>
+> >> > You can take a look at include/asm-generic/vmlinux.ldx.h: INIT_CALLS macro,
+> >> > for the init call section, early_initcall is the first chuck in the section,
+> >> > followed by LEVEL[0-7]. For the same level, the layout order is determined
+> >> > by the link order, ARCH is always precedence over the drivers. Catalin, are
+> >> > you giving me a kernel examination? :)
+> >> >
+> >>
+> >> We all know how initcalls are implemented. The question is how you are
+> >> going to ensure that the early_initcall() that initializes the PGD
+> >> cache is always invoked before the early_initcall() that creates the
+> >> UEFI runtime page tables.
+> >>
+> >> And saying that the currently observed link order happens to be
+> >> correct is not good enough. We need to be sure that, even if we change
+> >> the link order, or switch to LTO at some point, things don't suddenly
+> >> break again.
+> >>
+> > Well, if the build system changes the link order, it can't make sure it will break something
+> > unexpectedly, needless to say the pgd_cache_init here at all.
+>
+> That is no excuse to introduce yet another failure mode.
+>
+> > Do you think the kernel
+> > will change its currently link order policy? If the answer is yes, what's the benefit?
+> >
+>
+> It does not matter what I think. You seem to think that the link order
+> is set in stone, so it is you who should argue why that is a
+> reasonable assumption.
+>
+OK, If you think the link order is volatile, how can you guarantee the arm_enable_runtime_services with early_initcall
+always work in a volatile link order environment?
 
-Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-
-> * Update eprom compat strings to "renesas,r1ex24002", "atmel,24c02".
->   The former needs to be documented once the desired mechanism
->   for documenting eprom compat strings has been confirmed
->   with the maintainer.
-
-I'll take care of this now.
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160106/e38b612e/attachment.sig>
+> --
+> Ard.
+>
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
