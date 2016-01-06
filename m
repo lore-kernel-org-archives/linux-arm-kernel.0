@@ -1,78 +1,98 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 5 Jan 2016 20:13:09 -0600
-Subject: [PATCH v2] PCI: imx6:don't sleep in atomic context
-In-Reply-To: <1449042196-25710-1-git-send-email-sanjeev_sharma@mentor.com>
-References: <1447066080-5859-1-git-send-email-sanjeev_sharma@mentor.com>
- <1449042196-25710-1-git-send-email-sanjeev_sharma@mentor.com>
-Message-ID: <20160106021309.GC23814@localhost>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Wed, 6 Jan 2016 10:37:31 +0800
+Subject: [PATCH] soc: mediatek: PMIC wrap: Enable STAUPD_PRD before
+ WDT_SRC_EN enabled.
+In-Reply-To: <1451876703.11408.10.camel@mtksdaap41>
+References: <1451478961-5668-1-git-send-email-henryc.chen@mediatek.com>
+ <CAGS+omBc2XVESu1t+_iKj1gTk-7JVDK1KDoQEJR_-wcL4m0qWg@mail.gmail.com>
+ <1451876703.11408.10.camel@mtksdaap41>
+Message-ID: <CAGS+omBAa_n2zk0-tCyV_g3D1Nxu4j1A4q_5eRBJ-xT=PUv1sg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 02, 2015 at 01:13:16PM +0530, Sanjeev Sharma wrote:
-> From: David Mueller <dave.mueller@gmx.ch>
-> 
-> If additional PCIe switch get connected between the
-> host and the NIC,the kernel crashes with "BUG:
-> scheduling while atomic". To handle this we need to
-> call mdelay() instead of usleep_range().
-> 
-> This is currently called from atomic context through
-> pci_config_{read,write).
-> 
-> For more detail please refer bugzilla.kernel.org, Bug
-> 100031
+On Mon, Jan 4, 2016 at 11:05 AM, Henry Chen <henryc.chen@mediatek.com> wrote:
+> On Thu, 2015-12-31 at 22:19 +0800, Daniel Kurtz wrote:
+>> On Wed, Dec 30, 2015 at 8:36 PM, Henry Chen <henryc.chen@mediatek.com> wrote:
+>> >
+>> > The STAUPD_TRIG will be enable when WDT_INT enable on probe function, if
+>> > doesn't enable STAUPD_PRD together, interrupt will be triggered because
+>> > STAUPD timeout. To avoid unexpected interrupt, enable periodic status
+>> > update which will be updated to PMIC every selected time period.
+>>
+>> Sorry, I don't really understand this.
+>>
+>> What exactly is triggering the unexpected watchdog interrupt (WDT_INT)?
+>>
+>> How does setting STAUPD_PRD disable this "unexpected interrupt"?
+>>
+> Yes, WDT_INT was triggered because the bit[25] of WDT_SRC_EN was
+> enabled:
+>
+> bit[25] STAUPD_TRIG: STAUPD trigger signal timeout monitor
+>
+> Setting STAUPD_PRD will update the status of PMIC periodic to avoid this
+> watchdog timeout.
 
-Bug reports have URLs; please use them.  I'll save you the trouble:
+Sorry, I still don't understand.
 
-  Link: https://bugzilla.kernel.org/show_bug.cgi?id=100031
+IIUC, setting STAUPD_PRD sets the period at which status updates are
+reported (announced via the shared STAUPD/WDT interrupt).
 
-In that bug report, I said: "My first question on the list will be:
-Besides imx6, there are five other DesignWare-based drivers, and
-imx6_pcie_link_up() looks nothing like the other
-pcie_host_ops.link_up() methods.  We need to explain why imx6 is
-special, and whether all the .link_up() methods can be made similar."
+So, setting STAUPD_PRD=5 should set the reporting period to 98.5 us.
+But, how does changing this period fix the "unexpected interrupt"?
+I can understand how it might change the timing of the interrupt, but
+why does it make the interrupt no longer occur?
+We are still triggering the interrupt when we write bit[25]
+(STAUPD_TRIG) of WDT_SRC_EN, two lines later.
 
-The only response was that i.MX6 is special because of a hardware bug,
-so we need to start at Gen1, wait, try to change to Gen2, etc.  That
-all sounds like work that should be done in
-imx6_pcie_establish_link().
+Isn't this still requesting a STAUPD interrupt 98.5 us later?  (which,
+since STAUPD interrupts aren't handled, is an "unexpected interrupt")
+Wouldn't a better fix be to just clear the STAUPD_TRIG bit of
+WDT_SRC_EN, and just not trigger STAUPD in the first place if we can't
+handle them?
 
-This patch doesn't seem to make anything *worse*, so I might take it
-anyway, but I'm a little disappointed that we didn't make any progress
-toward making imx6 more like the other drivers.  I know this sounds
-pedantic, but it's a lot easier to let things slowly diverge than it
-is to keep them uniform, and bugs hide in differences like this.
+-Dan
 
-> Signed-off-by: David Mueller <dave.mueller@gmx.ch>
-> Signed-off-by: Sanjeev Sharma <sanjeev_sharma@mentor.com>
-> 
-> Changes in v2:
-> 	-order of signoff has been change
-> 	-Author of patch has been change
-> 	-A mdelay(1000) is different timescale than
-> a usleep(1000).change it to correct scale i.e mdelay(1)
-> 	-updated comment
-> ---
->  drivers/pci/host/pci-imx6.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-> index 233a196..c03527f 100644
-> --- a/drivers/pci/host/pci-imx6.c
-> +++ b/drivers/pci/host/pci-imx6.c
-> @@ -499,7 +499,7 @@ static int imx6_pcie_link_up(struct pcie_port *pp)
->  		 * Wait a little bit, then re-check if the link finished
->  		 * the training.
->  		 */
-> -		usleep_range(1000, 2000);
-> +		mdelay(1);
->  	}
->  	/*
->  	 * From L0, initiate MAC entry to gen2 if EP/RC supports gen2.
-> -- 
-> 1.7.11.7
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> From the MT8173 Datasheet, I can see that the value written to
+>> STAUPD_PRD is the "periodic status update timing (period)".
+>>
+>> > Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
+>> > ---
+>> >  drivers/soc/mediatek/mtk-pmic-wrap.c | 5 +++++
+>> >  1 file changed, 5 insertions(+)
+>> >
+>> > diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
+>> > index a8cde17..6e5c20f 100644
+>> > --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
+>> > +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
+>> > @@ -904,6 +904,11 @@ static int pwrap_probe(struct platform_device *pdev)
+>> >                 return -ENODEV;
+>> >         }
+>> >
+>> > +       /*
+>> > +        * Enable periodic status update which will be updated to PMIC
+>> > +        * every selected time period.
+>> > +        */
+>> > +       pwrap_writel(wrp, 0x5, PWRAP_STAUPD_PRD);
+>>
+>> nit: Perhaps use a define for 5, and specify the real period value.
+>> Something like this:
+>>
+>> #define PWRAP_STAUPD_98_5US  5
+>>
+> ok.
+>
+>>
+>> >         /* Initialize watchdog, may not be done by the bootloader */
+>> >         pwrap_writel(wrp, 0xf, PWRAP_WDT_UNIT);
+>> >         pwrap_writel(wrp, 0xffffffff, PWRAP_WDT_SRC_EN);
+>> > --
+>> > 1.9.1
+>> >
+>> > --
+>> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>> > the body of a message to majordomo at vger.kernel.org
+>> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> > Please read the FAQ at  http://www.tux.org/lkml/
+>
+>
