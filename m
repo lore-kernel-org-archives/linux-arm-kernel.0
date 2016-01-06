@@ -1,70 +1,54 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed,  6 Jan 2016 11:19:25 +0100
-Subject: [PATCH 4/8] drm: atmel-hlcdc: remove leftovers from atomic mode
- setting migration
-In-Reply-To: <1452075569-8545-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1452075569-8545-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1452075569-8545-5-git-send-email-boris.brezillon@free-electrons.com>
+Date: Wed,  6 Jan 2016 11:19:21 +0100
+Subject: [PATCH 0/8] drm: atmel-hlcdc: various fixes/improvements
+Message-ID: <1452075569-8545-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ->dpms field is no longer used and can be removed.
-The same goes for the dummy ->mode_fixup() implementation which always
-returns true.
+Hello,
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c | 12 ------------
- 1 file changed, 12 deletions(-)
+This series is a collection of fixes and improvements for the
+atmel-hlcdc driver.
 
-diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
-index 49494e9..2255dc9 100644
---- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
-+++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
-@@ -44,13 +44,11 @@ enum atmel_hlcdc_connector_rgb_mode {
-  * @connector: DRM connector
-  * @encoder: DRM encoder
-  * @dc: pointer to the atmel_hlcdc_dc structure
-- * @dpms: current DPMS mode
-  */
- struct atmel_hlcdc_rgb_output {
- 	struct drm_connector connector;
- 	struct drm_encoder encoder;
- 	struct atmel_hlcdc_dc *dc;
--	int dpms;
- };
- 
- static inline struct atmel_hlcdc_rgb_output *
-@@ -104,14 +102,6 @@ static void atmel_hlcdc_panel_encoder_disable(struct drm_encoder *encoder)
- 	drm_panel_disable(panel->panel);
- }
- 
--static bool
--atmel_hlcdc_panel_encoder_mode_fixup(struct drm_encoder *encoder,
--				     const struct drm_display_mode *mode,
--				     struct drm_display_mode *adjusted)
--{
--	return true;
--}
--
- static void
- atmel_hlcdc_rgb_encoder_mode_set(struct drm_encoder *encoder,
- 				 struct drm_display_mode *mode,
-@@ -147,7 +137,6 @@ atmel_hlcdc_rgb_encoder_mode_set(struct drm_encoder *encoder,
- }
- 
- static const struct drm_encoder_helper_funcs atmel_hlcdc_panel_encoder_helper_funcs = {
--	.mode_fixup = atmel_hlcdc_panel_encoder_mode_fixup,
- 	.mode_set = atmel_hlcdc_rgb_encoder_mode_set,
- 	.disable = atmel_hlcdc_panel_encoder_disable,
- 	.enable = atmel_hlcdc_panel_encoder_enable,
-@@ -248,7 +237,6 @@ static int atmel_hlcdc_create_panel_output(struct drm_device *dev,
- 	if (!panel)
- 		return -EINVAL;
- 
--	panel->base.dpms = DRM_MODE_DPMS_OFF;
- 
- 	panel->base.dc = dc;
- 
+The main feature added here is the support for external RGB -> XXX
+bridges (patch 6 and 7).
+
+The first patch is a fix preventing a potential memory leak.
+Patch 2 is adding support for asynchronous mode setting, which was
+supported before the migration to atomic mode setting.
+
+Patch 3 is just a minor fix to expose the real encoder and connector
+types (we are currently exposing an LVDS encoder/connector, which is
+wrong since the display controller output the pixel stream in raw
+RGB).
+
+Patch 4 is removing useless fields and functions which were left
+when moving to atomic modesetting.
+
+And patch 8 is just a cosmetic patch moving the mode checking code
+from ->atomic_check() to ->mode_fixup().
+
+Best Regards,
+
+Boris
+
+Boris Brezillon (8):
+  drm: atmel-hlcdc: add a ->cleanup_fb() operation
+  drm: atmel-hlcdc: support asynchronous atomic commit operations
+  drm: atmel-hlcdc: fix connector and encoder types
+  drm: atmel-hlcdc: remove leftovers from atomic mode setting migration
+  drm: atmel-hlcdc: support extended timing ranges on sama5d4 and
+    sama5d2
+  drm: atmel-hlcdc: move output mode selection in CRTC implementation
+  drm: atmel-hlcdc: rework the output code to support drm bridges
+  drm: atmel-hlcdc: check display mode validity in crtc->mode_fixup()
+
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c   | 148 +++++++++++++-
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c     | 123 ++++++++++-
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h     |  16 ++
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c | 249 ++++++++++-------------
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c  |  22 +-
+ 5 files changed, 400 insertions(+), 158 deletions(-)
+
 -- 
 2.1.4
