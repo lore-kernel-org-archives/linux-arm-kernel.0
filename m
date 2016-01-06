@@ -1,89 +1,64 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Wed, 06 Jan 2016 21:05:56 +0800
-Subject: [RESEND PATCH v1 4/4] clk: rockchip: rk3036: fix and add node
- id for emac clock
-In-Reply-To: <01110793-A349-4006-82A2-4489CE832B19@rock-chips.com>
-References: <1451293433-32392-1-git-send-email-zhengxing@rock-chips.com>
- <5681E8E4.2010303@rock-chips.com> <5681F121.3070307@rock-chips.com>
- <1562268.fb58QJ4jV7@diego>
- <01110793-A349-4006-82A2-4489CE832B19@rock-chips.com>
-Message-ID: <568D1134.9010305@rock-chips.com>
+From: vishnupatekar0510@gmail.com (Vishnu Patekar)
+Date: Wed,  6 Jan 2016 21:11:51 +0800
+Subject: [PATCH v4 0/3] Add basic support for Allwinner A83T SOC
+Message-ID: <1452085914-29340-1-git-send-email-vishnupatekar0510@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+Hello,
 
-On 2016?01?02? 10:34, Xing Zheng wrote:
-> Hi Heiko,
->     Thank you for your patch, I will apply and test it later.
->
-> Thanks.
->
->> ? 2016?1?2??06:10?Heiko St?bner <heiko@sntech.de> ???
->>
->> Hi Xing,
->>
->> Am Dienstag, 29. Dezember 2015, 10:34:09 schrieb Xing Zheng:
->>> On 2015?12?29? 09:59, Yakir Yang wrote:
->>>> On 12/28/2015 08:41 PM, Heiko St?bner wrote:
->>>>> Am Montag, 28. Dezember 2015, 17:03:53 schrieb Xing Zheng:
->>>>>> Due to referred old version TRM, there is incorrect emac clock node,
->>>>>> we should fix it. The SEL_21_9 is the parent of SEL_21_4.
->>>>>>
->>>>>> In the emac driver, we need to refer HCLK_MAC, and because There are
->>>>>> only 3PLLs (APLL/GPLL/DPLL) on the rk3036, most clock are under the
->>>>>> GPLL, and it is unable to provide the accurate rate for mac_ref which
->>>>>> need to 50MHz probability, we should let it under the APLL and are
->>>>>> able to set the freq which integer multiples of 50MHz, so we add these
->>>>>> emac node for reference.
->>>>> I don't really follow here. While I do understand that the emac needs
->>>>> 50MHz, I
->>>>> don't think using the APLL as source is helpful.
->>>>>
->>>>> The APLL is the main clocksource for the cpu-cores, including frequency
->>>>> scaling, and while it currently only lists 816MHz as sole frequency,
->>>>> you're
->>>>> pretty much guaranteed to not get your correct multiple of 50MHz from
->>>>> there
->>>>> either. And limiting the cpu to just do 600MHz to get the mac working
->>>>> sounds
->>>>> pretty bad ;-) .
->>>>>
->>>>>
->>>>> In the rk3036 cru-node the gpll gets set to 594MHz. Is there a
->>>>> special reason
->>>>> why it needs to be 594MHz and cannot be a round 600MHz? Because that
->>>>> would
->>>>> also provide your 50MHz-multiple nicely.
->>>> Yes, this magic 594MHz would help to support the standard HDMI
->>>> resolutions, here are the math:
->>>>
->>>> 1920x1080-60Hz DCLK = 148.5MHz = 594MHz / 4
->>>> 1280x720-60Hz DCLK = 74.25MHz = 594MHz / 8
->>>> 720x480-60Hz DCLK = 27MHz = 594MHz / 22
->>>>
->>>> Thanks,
->>>> - Yakir
->>> Thanks Yakir.
->>>
->>> Hi Heiko,
->>> From the above, do you have better idea for the RK3036's emac without
->>> ext-oscillator?
->> During the last days I did play a bit with the clock framework. As I don't 
->> have a Kylin (or any rk3036) board, I did build a test-case with pclk_cpu on 
->> the rk3188 (which can be affected by the armclk if not reparented to the 
->> gpll), which got sucessfully adapted to get back to (or near) the originally 
->> requested frequency.
->>
->> So ideally you could roll back your mux/div split here and try the attached 
->> diff. In theory it should help :-) .
->> As can be seen by the FIXMEs, not fully finished, but I'd like to determine if 
->> it fixes the issue at least.
->>
->>
->> Heiko
->> <clk-keep-req-rate.diff>
+Re-sending after corrections, I've some more patches on top of this will send
+them separately to avoid delaying this one with new comments.
 
-I tested your patch just now, it seems to work well. I will do more tests.
+This patch series adds very basic support for Allwinner A83T SOC.
+Clock, peripherals, smp support will be added later.
 
-Thank you. :-)
+Allwinner A83T is octa-core cortex-a7 based SoC.
+It's clock control unit and prcm, pinmux are different from previous sun8i
+series.
+Its processor cores are arragned in two clusters 4 cores each,
+similar to A80.
+
+Note: A83T pincontroller patch is already applied by Linus, so not added in this
+patch.
+
+changes from v3->v4
+1. arranged sub nodes in soc as per address.
+2. removed memory node.
+3. corrected style problem in dtsi.
+
+changes from v2->v3
+1. removed "Not Supported" for A83T in sunxi/README
+2. removed un-unsed nodes from dtsi.
+3. corrected GIC_SPI number for PH_EINT in dtsi.
+4. removed address at soc node which was un-necessary.
+5. corrected reg<> addresses for cpu nodes.
+6. changed cpu mask to 8 in gic and archtimer node.
+
+
+changes from v1->v2:
+1. used UART0 header with PB9, PB10 pins.
+2. removed unnecessary includes and comments from dtsi.
+3. arranged nodes in alphabatical order.
+4. arrnaged compatible in alphabatical order.
+5. changed cpu nodes to use cpu at 100 -cpu at -103.
+6. changed dts filename.
+
+Vishnu Patekar (3):
+  ARM: sunxi: Introduce Allwinner for A83T support
+  ARM: dts: sun8i: Add Allwinner A83T dtsi
+  ARM: dts: sun8i: Add A83T HomletV2 Board by Allwinner
+
+ Documentation/arm/sunxi/README                     |   1 -
+ Documentation/devicetree/bindings/arm/sunxi.txt    |   1 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ .../boot/dts/sun8i-a83t-allwinner-h8homlet-v2.dts  |  64 +++++++
+ arch/arm/boot/dts/sun8i-a83t.dtsi                  | 204 +++++++++++++++++++++
+ arch/arm/mach-sunxi/sunxi.c                        |   1 +
+ drivers/clk/sunxi/clk-sunxi.c                      |   6 +
+ 7 files changed, 277 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/sun8i-a83t-allwinner-h8homlet-v2.dts
+ create mode 100644 arch/arm/boot/dts/sun8i-a83t.dtsi
+
+-- 
+1.9.1
