@@ -1,54 +1,88 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed,  6 Jan 2016 11:19:21 +0100
-Subject: [PATCH 0/8] drm: atmel-hlcdc: various fixes/improvements
-Message-ID: <1452075569-8545-1-git-send-email-boris.brezillon@free-electrons.com>
+Date: Wed,  6 Jan 2016 11:19:22 +0100
+Subject: [PATCH 1/8] drm: atmel-hlcdc: add a ->cleanup_fb() operation
+In-Reply-To: <1452075569-8545-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1452075569-8545-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1452075569-8545-2-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Add a ->cleanup_fb() operation to avoid memory leaks when the atomic
+operation is interrupted after the ->prepare_fb() call.
 
-This series is a collection of fixes and improvements for the
-atmel-hlcdc driver.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Fixes 2389fc1 ("drm: atmel-hlcdc: Atomic mode-setting conversion")
+---
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h    |  2 ++
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c | 22 +++++++++++++++++++---
+ 2 files changed, 21 insertions(+), 3 deletions(-)
 
-The main feature added here is the support for external RGB -> XXX
-bridges (patch 6 and 7).
-
-The first patch is a fix preventing a potential memory leak.
-Patch 2 is adding support for asynchronous mode setting, which was
-supported before the migration to atomic mode setting.
-
-Patch 3 is just a minor fix to expose the real encoder and connector
-types (we are currently exposing an LVDS encoder/connector, which is
-wrong since the display controller output the pixel stream in raw
-RGB).
-
-Patch 4 is removing useless fields and functions which were left
-when moving to atomic modesetting.
-
-And patch 8 is just a cosmetic patch moving the mode checking code
-from ->atomic_check() to ->mode_fixup().
-
-Best Regards,
-
-Boris
-
-Boris Brezillon (8):
-  drm: atmel-hlcdc: add a ->cleanup_fb() operation
-  drm: atmel-hlcdc: support asynchronous atomic commit operations
-  drm: atmel-hlcdc: fix connector and encoder types
-  drm: atmel-hlcdc: remove leftovers from atomic mode setting migration
-  drm: atmel-hlcdc: support extended timing ranges on sama5d4 and
-    sama5d2
-  drm: atmel-hlcdc: move output mode selection in CRTC implementation
-  drm: atmel-hlcdc: rework the output code to support drm bridges
-  drm: atmel-hlcdc: check display mode validity in crtc->mode_fixup()
-
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c   | 148 +++++++++++++-
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c     | 123 ++++++++++-
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h     |  16 ++
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c | 249 ++++++++++-------------
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c  |  22 +-
- 5 files changed, 400 insertions(+), 158 deletions(-)
-
+diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
+index cf6b375..e88e349 100644
+--- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
++++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
+@@ -81,11 +81,13 @@ struct atmel_hlcdc_plane_properties {
+  * @layer: HLCDC layer structure
+  * @properties: pointer to the property definitions structure
+  * @rotation: current rotation status
++ * @prepared: flagging the plane has prepared for an atomic update
+  */
+ struct atmel_hlcdc_plane {
+ 	struct drm_plane base;
+ 	struct atmel_hlcdc_layer layer;
+ 	struct atmel_hlcdc_plane_properties *properties;
++	bool prepared;
+ };
+ 
+ static inline struct atmel_hlcdc_plane *
+diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
+index 1ffe9c3..35027d0 100644
+--- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
++++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
+@@ -715,11 +715,25 @@ static int atmel_hlcdc_plane_prepare_fb(struct drm_plane *p,
+ 					const struct drm_plane_state *new_state)
+ {
+ 	struct atmel_hlcdc_plane *plane = drm_plane_to_atmel_hlcdc_plane(p);
++	int ret;
+ 
+-	if (!new_state->fb)
+-		return 0;
++	ret = atmel_hlcdc_layer_update_start(&plane->layer);
++	if (!ret)
++		plane->prepared = true;
++
++	return ret;
++}
++
++static void atmel_hlcdc_plane_cleanup_fb(struct drm_plane *p,
++				const struct drm_plane_state *old_state)
++{
++	struct atmel_hlcdc_plane *plane = drm_plane_to_atmel_hlcdc_plane(p);
++
++	if (!plane->prepared)
++		return;
+ 
+-	return atmel_hlcdc_layer_update_start(&plane->layer);
++	atmel_hlcdc_layer_update_rollback(&plane->layer);
++	plane->prepared = false;
+ }
+ 
+ static void atmel_hlcdc_plane_atomic_update(struct drm_plane *p,
+@@ -739,6 +753,7 @@ static void atmel_hlcdc_plane_atomic_update(struct drm_plane *p,
+ 	atmel_hlcdc_plane_update_disc_area(plane, state);
+ 
+ 	atmel_hlcdc_layer_update_commit(&plane->layer);
++	plane->prepared = false;
+ }
+ 
+ static void atmel_hlcdc_plane_atomic_disable(struct drm_plane *p,
+@@ -844,6 +859,7 @@ static void atmel_hlcdc_plane_init_properties(struct atmel_hlcdc_plane *plane,
+ 
+ static struct drm_plane_helper_funcs atmel_hlcdc_layer_plane_helper_funcs = {
+ 	.prepare_fb = atmel_hlcdc_plane_prepare_fb,
++	.cleanup_fb = atmel_hlcdc_plane_cleanup_fb,
+ 	.atomic_check = atmel_hlcdc_plane_atomic_check,
+ 	.atomic_update = atmel_hlcdc_plane_atomic_update,
+ 	.atomic_disable = atmel_hlcdc_plane_atomic_disable,
 -- 
 2.1.4
