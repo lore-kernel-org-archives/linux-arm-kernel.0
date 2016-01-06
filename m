@@ -1,75 +1,32 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 6 Jan 2016 11:40:39 +0000
-Subject: [PATCH 2/2] arm64: use memset to clear BSS
-In-Reply-To: <CAKv+Gu9xsLk2hDB_RxYn9kytgCOEk3WTYq0Vvegh4NsE7ERTtQ@mail.gmail.com>
-References: <1452078327-9635-1-git-send-email-mark.rutland@arm.com>
- <1452078327-9635-2-git-send-email-mark.rutland@arm.com>
- <CAKv+Gu9xsLk2hDB_RxYn9kytgCOEk3WTYq0Vvegh4NsE7ERTtQ@mail.gmail.com>
-Message-ID: <20160106114039.GE563@leverpostej>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 6 Jan 2016 12:15:25 +0000
+Subject: [PATCH 1/2] arm64: entry: remove pointless SPSR mode check
+In-Reply-To: <1452015215-29506-1-git-send-email-mark.rutland@arm.com>
+References: <20160105172106.GA7088@leverpostej>
+ <1452015215-29506-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20160106121524.GL6301@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 06, 2016 at 12:12:45PM +0100, Ard Biesheuvel wrote:
-> On 6 January 2016 at 12:05, Mark Rutland <mark.rutland@arm.com> wrote:
-> > Currently we use an open-coded memzero to clear the BSS. As it is a
-> > trivial implementation, it is sub-optimal.
-> >
-> > Our optimised memset doesn't use the stack, is position-independent, and
-> > for the memzero case can use of DC ZVA to clear large blocks
-> > efficiently. In __mmap_switched the MMU is on and there are no live
-> > caller-saved registers, so we can safely call an uninstrumented memset.
-> >
-> > This patch changes __mmap_switched to use memset when clearing the BSS.
-> > We use the __pi_memset alias so as to avoid any instrumentation in all
-> > kernel configurations. As with the head symbols, we must get the linker
-> > to generate __bss_size, as there is no ELF relocation for the
-> > subtraction of two symbols.
-> >
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Marc Zyngier <marc.zyngier@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm64/kernel/head.S  | 14 ++++++--------
-> >  arch/arm64/kernel/image.h |  2 ++
-> >  2 files changed, 8 insertions(+), 8 deletions(-)
-> >
-> > diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> > index 23cfc08..247a97b 100644
-> > --- a/arch/arm64/kernel/head.S
-> > +++ b/arch/arm64/kernel/head.S
-> > @@ -415,14 +415,12 @@ ENDPROC(__create_page_tables)
-> >   */
-> >         .set    initial_sp, init_thread_union + THREAD_START_SP
-> >  __mmap_switched:
-> > -       adr_l   x6, __bss_start
-> > -       adr_l   x7, __bss_stop
-> > -
-> > -1:     cmp     x6, x7
-> > -       b.hs    2f
-> > -       str     xzr, [x6], #8                   // Clear BSS
-> > -       b       1b
-> > -2:
-> > +       // clear BSS
-> > +       adr_l   x0, __bss_start
-> > +       mov     x1, xzr
-> > +       mov_l   x2, __bss_size
+On Tue, Jan 05, 2016 at 05:33:34PM +0000, Mark Rutland wrote:
+> In work_pending  we may skip work if the stacked SPSR value represents
+> anything other than an EL0 context. We then immediately invoke the
+> kernel_exit 0 macro as part of ret_to_user, assuming a return to EL0.
+> This is somewhat confusing.
 > 
-> Is it such a big deal to do
+> We use work_pending as part of the ret_to_user/ret_fast_syscall state
+> machine. We only use ret_fast_syscall in the return from an SVC issued
+> from EL0. We use ret_to_user for return from EL0 exception handlers and
+> also for return from ret_from_fork in the case the task was not a kernel
+> thread (i.e. it is a user task).
 > 
-> adr_l x2, __bss_stop
-> sub x2, x2, x0
+> Thus in all cases the stacked SPSR value must represent an EL0 context,
+> and the check is redundant. This patch removes it, along with the now
+> unused no_work_pending label.
 > 
-> instead?
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Chris Metcalf <cmetcalf@ezchip.com>
+> Cc: Will Deacon <will.deacon@arm.com>
 
-I'm happy either way.
-
-It no-one else has a use for mov_l I'll drop it and move to that.
-
-> Either way:
-> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
-Thanks!
-
-Mark.
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
