@@ -1,90 +1,48 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 6 Jan 2016 22:12:29 +0100
-Subject: [linux-sunxi] [RFC PATCH] drivers: pinctrl: add driver for
- Allwinner A64 SoC
-In-Reply-To: <568BB04B.30100@arm.com>
-References: <1451582246-32373-1-git-send-email-andre.przywara@arm.com>
- <CAEzqOZsE_kDChAbLkwmwjqdDbovv1e0G1tTffhhp25PkwJQ0+Q@mail.gmail.com>
- <568A4972.8030602@arm.com> <20160104203059.GG11722@lukather>
- <568BB04B.30100@arm.com>
-Message-ID: <20160106211229.GC9631@lukather>
+Date: Wed, 6 Jan 2016 22:20:46 +0100
+Subject: [PATCH RFC 0/2] Add a display driver to the Allwinner H3
+In-Reply-To: <cover.1452021349.git.moinejf@free.fr>
+References: <cover.1452021349.git.moinejf@free.fr>
+Message-ID: <20160106212046.GD9631@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
+Hi,
 
-On Tue, Jan 05, 2016 at 12:00:11PM +0000, Andre Przywara wrote:
-> Hi Maxime,
+Thanks a lot for your work!
+
+On Tue, Jan 05, 2016 at 08:15:49PM +0100, Jean-Francois Moine wrote:
+> The proposed DRM driver works on a Orange PI 2 with a kernel 4.4-rc1
+> and the H3 patches found in Hans de Goede's GIT repository.
 > 
-> On 04/01/16 20:30, Maxime Ripard wrote:
-> > Hi Andre,
-> > 
-> > On Mon, Jan 04, 2016 at 10:29:06AM +0000, Andre Przywara wrote:
-> >>>> diff --git a/drivers/pinctrl/sunxi/Makefile b/drivers/pinctrl/sunxi/Makefile
-> >>>> index e080290..130e7bc 100644
-> >>>> --- a/drivers/pinctrl/sunxi/Makefile
-> >>>> +++ b/drivers/pinctrl/sunxi/Makefile
-> >>>> @@ -12,5 +12,6 @@ obj-$(CONFIG_PINCTRL_SUN7I_A20)               += pinctrl-sun7i-a20.o
-> >>>>  obj-$(CONFIG_PINCTRL_SUN8I_A23)                += pinctrl-sun8i-a23.o
-> >>>>  obj-$(CONFIG_PINCTRL_SUN8I_A23_R)      += pinctrl-sun8i-a23-r.o
-> >>>>  obj-$(CONFIG_PINCTRL_SUN8I_A33)                += pinctrl-sun8i-a33.o
-> >>>> +obj-$(CONFIG_PINCTRL_A64)              += pinctrl-a64.o
-> >>>
-> >>> Shouldn't this follow pinctrl config name like other sunXi SOCs?
-> >>> This should be PINCTRL_SUN??_A64.
-> >>
-> >> I never really got the reason we use those sunxi names in addition to
-> >> the SoC name in the first place, maybe apart from copying from some
-> >> Allwinner code.
-> >> Since I decided to not look at Allwinner's BSP at all (if avoidable), I
-> >> also thought it would be time to drop that sunxi naming, which looks
-> >> redundant to me.
-> >> Is there any reason why we would need this (beside having a rather
-> >> unique identifier prefix)?
-> > 
-> > It's mostly historical.
-> > 
-> > 
-> > Back when we started this, There was a few SoCs already out: A10,
-> > A10s, A12 and A13, which was very similar to the Cortex-A naming
-> > scheme (and I think the Cortex-A12 was also announced at the time).
-> > 
-> > We couldn't really use the SoC family either, since there was already
-> > multiple SoCs that were part of the same family (the A10s, A12 and
-> > A13, part of the sun5i family).
-> > 
-> > In order to avoid any confusion, we chose to go with both to uniquely
-> > and without any confusion possible, and we just went on with that
-> > naming scheme for consistency.
-> 
-> I see, thanks for the explanation.
-> I was wondering since we now move to a new architecture as well to avoid
-> this historic "ballast", but I have no problems with adding "_sun50i_"
-> to the identifiers and file names.
-> To me as only a casual sunxi user I found it mostly hard to memorize the
-> connections between the sunxi numbering and the SoC names (I just know
-> that the A20 is sun7i ;-). So for finding a specific dts for instance,
-> you have to start with the sunxi number to get it TAB completed ...
+> As there is no documentation about the DE2 nor about the HDMI which
+> are found in the H3, this driver has been built from Allwiiner's
+> sources.
 
-I guess it doesn't really matter for arm64, since it seems like
-there's a sub-folder per SoC family.
+That's unfortunate :/
 
-However, having an a12.dtsi in arch/arm/boot/dts will probably bring a
-lot of confusion :)
+Have you checked in the A64 BSP if there was some useful information?
 
-I still think that we should maintain the current compatible scheme
-though, in order to keep consistency.
+> So, there may be license problems, especially for the file
+> de2_hdmi_h3.c which contains a lot of magic values.
 
-> With that being said: Would you prefer to have a sun50i prefix? I see
-> that having just "a64" on itself is not very specific.
+I guess it's the biggest issue with your code right now. What licenses
+issues are we talking about here?
 
-I'd say that having a DTSI in arch/arm64/boot/dts/sunxi/a64.dtsi would
-not bring a lot of confusion. If you're there, you know what you're
-dealing with already.
+Remember that having your Signed-off-by tag on a commit means that you
+certify that you have the right to submit the patch under the license
+you indicate in the files added and / or modified.
 
-If you feel like it makes the life easier to new or casual users, go
-ahead.
+If you don't have such right, for example because you don't have the
+right and / or authorization from the initial author to re-license
+that code, you cannot put your SoB.
 
+> The associated DT and documentation will be submitted when the H3 DTs
+> will be in the kernel.
+
+Having the DT binding documentation would really help in the review.
+
+Thanks!
 Maxime
 
 -- 
@@ -97,4 +55,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160106/22bccb52/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160106/80c37335/attachment.sig>
