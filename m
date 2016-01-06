@@ -1,44 +1,53 @@
-From: salil.mehta@huawei.com (Salil Mehta)
-Date: Wed, 6 Jan 2016 15:35:46 +0000
-Subject: [PATCH] net: hns: avoid uninitialized variable warning:
-In-Reply-To: <20160105.164320.2255971055498857833.davem@davemloft.net>
-References: <6649249.INrAY8KJG0@wuerfel>
- <20160105.164320.2255971055498857833.davem@davemloft.net>
-Message-ID: <568D3452.80508@huawei.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 6 Jan 2016 15:43:49 +0000
+Subject: [PATCH] efi: stub: define DISABLE_BRANCH_PROFILING for all
+ architectures
+In-Reply-To: <20160105175114.GG10705@arm.com>
+References: <1450862968-20222-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20160104123145.GB1616@arm.com>
+ <CAKv+Gu-n-7tk1NXYAbf7+O79gYG82QOsbzLuYG1yX=LSizksWQ@mail.gmail.com>
+ <20160105153918.GA2714@codeblueprint.co.uk>
+ <20160105175114.GG10705@arm.com>
+Message-ID: <20160106154348.GF16580@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jan 05, 2016 at 05:51:14PM +0000, Will Deacon wrote:
+> On Tue, Jan 05, 2016 at 03:39:18PM +0000, Matt Fleming wrote:
+> > On Tue, 05 Jan, at 03:56:39PM, Ard Biesheuvel wrote:
+> > > (+ Arnd)
+> > > 
+> > > On 4 January 2016 at 13:31, Will Deacon <will.deacon@arm.com> wrote:
+> > > > On Wed, Dec 23, 2015 at 10:29:28AM +0100, Ard Biesheuvel wrote:
+> > > >> This moves the DISABLE_BRANCH_PROFILING define from the x86 specific
+> > > >> to the general CFLAGS definition for the stub. This fixes build errors
+> > > >> when building for arm64 with CONFIG_PROFILE_ALL_BRANCHES_ENABLED.
+> > > >>
+> > > >> Reported-by: Will Deacon <will.deacon@arm.com>
+> > > >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > > >> ---
+> > > >>  drivers/firmware/efi/libstub/Makefile | 4 ++--
+> > > >>  1 file changed, 2 insertions(+), 2 deletions(-)
+> > > >
+> > > > Cheers, Ard. The kernel now builds and boots as an EFI application for
+> > > > me when the dreaded #define if config option is enabled:
+> > > >
+> > > >   Tested-by: Will Deacon <will.deacon@arm.com>
+> > > >
+> > > > Will
+> > > >
+> > > 
+> > > @Matt: this is causing randconfig build errors for ARM in -next. Mind
+> > > if we take this through some other tree?
+> > 
+> > Go ahead.
+> > 
+> > Reviewed-by: Matt Fleming <matt@codeblueprint.co.uk>
+> 
+> I can take this via the arm64 tree, unless Arnd wants to queue it in
+> arm-soc. Arnd?
 
-On 1/5/2016 9:43 PM, David Miller wrote:
-> From: Arnd Bergmann <arnd@arndb.de>
-> Date: Fri, 01 Jan 2016 23:27:57 +0100
->
->> gcc fails to see that the use of the 'last_offset' variable
->> in hns_nic_reuse_page() is used correctly and issues a bogus
->> warning:
->>
->> drivers/net/ethernet/hisilicon/hns/hns_enet.c: In function 'hns_nic_reuse_page':
->> drivers/net/ethernet/hisilicon/hns/hns_enet.c:541:6: warning: 'last_offset' may be used uninitialized in this function [-Wmaybe-uninitialized]
->>
->> This simplifies the function to make it more obvious what is
->> going on to both readers and compilers, which makes the warning
->> go away.
->>
->> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->> ---
->> Compile-tested only, and complex enough that this requires a proper
->> review and testing before it gets apply. Please have a look at this.
-> If this goes yet another day without being reviewed, I'm just applying
-> it.
->
-> You hisilicon folks can't just let patches rot, you must review them
-> in a timely manner or else I'm applying them without waiting for you
-> to look at them.
-Hi David and Arnd,
-Apologies for the delay in response and the review. Most of us were on 
-the Annual Holidays and have just returned back.
+Given that this fixes build errors, I've applied it in the arm64 tree,
+so it should appear in -next soon.
 
-Change looks good to me!
-
-Best Regards
-Salil
+Will
