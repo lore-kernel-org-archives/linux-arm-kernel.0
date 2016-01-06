@@ -1,55 +1,90 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 6 Jan 2016 22:03:24 +0100
-Subject: [RFC PATCH 5/5] arm64: Introduce Allwinner SoC config option
-In-Reply-To: <12966735.VQfHhlD3ne@wuerfel>
-References: <1450787267-26836-1-git-send-email-andre.przywara@arm.com>
- <1450787267-26836-6-git-send-email-andre.przywara@arm.com>
- <20160104112648.GD11722@lukather> <12966735.VQfHhlD3ne@wuerfel>
-Message-ID: <20160106210324.GB9631@lukather>
+Date: Wed, 6 Jan 2016 22:12:29 +0100
+Subject: [linux-sunxi] [RFC PATCH] drivers: pinctrl: add driver for
+ Allwinner A64 SoC
+In-Reply-To: <568BB04B.30100@arm.com>
+References: <1451582246-32373-1-git-send-email-andre.przywara@arm.com>
+ <CAEzqOZsE_kDChAbLkwmwjqdDbovv1e0G1tTffhhp25PkwJQ0+Q@mail.gmail.com>
+ <568A4972.8030602@arm.com> <20160104203059.GG11722@lukather>
+ <568BB04B.30100@arm.com>
+Message-ID: <20160106211229.GC9631@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Andre,
 
-On Mon, Jan 04, 2016 at 01:12:53PM +0100, Arnd Bergmann wrote:
-> On Monday 04 January 2016 12:26:48 Maxime Ripard wrote:
-> > Hi Andre, Arnd,
-> > 
-> > On Tue, Dec 22, 2015 at 12:27:47PM +0000, Andre Przywara wrote:
-> > > To prepare for supporting the Allwinner A64 SoC, introduce a config
-> > > option to allow compiling Allwinner (aka. sunxi) specific drivers
-> > > for ARM64.
-> > > This patch just defines the ARCH_SUNXI symbol to allow Allwinner
-> > > specific drivers to be selected during kernel configuration.
-> > > 
-> > > Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> > 
-> > I'm ok taking this patch.
-> > 
-> > I'm not quite sure how the process works though with arm64. Should I
-> > send a PR with this patch to Catalin, or does it go through the usual
-> > arm-soc maintainers?
+On Tue, Jan 05, 2016 at 12:00:11PM +0000, Andre Przywara wrote:
+> Hi Maxime,
 > 
-> We usually take these through arm-soc. 
-
-Ok.
-
-> > We should also probably extend the MAINTAINERS entry, shouldn't we?
+> On 04/01/16 20:30, Maxime Ripard wrote:
+> > Hi Andre,
 > > 
+> > On Mon, Jan 04, 2016 at 10:29:06AM +0000, Andre Przywara wrote:
+> >>>> diff --git a/drivers/pinctrl/sunxi/Makefile b/drivers/pinctrl/sunxi/Makefile
+> >>>> index e080290..130e7bc 100644
+> >>>> --- a/drivers/pinctrl/sunxi/Makefile
+> >>>> +++ b/drivers/pinctrl/sunxi/Makefile
+> >>>> @@ -12,5 +12,6 @@ obj-$(CONFIG_PINCTRL_SUN7I_A20)               += pinctrl-sun7i-a20.o
+> >>>>  obj-$(CONFIG_PINCTRL_SUN8I_A23)                += pinctrl-sun8i-a23.o
+> >>>>  obj-$(CONFIG_PINCTRL_SUN8I_A23_R)      += pinctrl-sun8i-a23-r.o
+> >>>>  obj-$(CONFIG_PINCTRL_SUN8I_A33)                += pinctrl-sun8i-a33.o
+> >>>> +obj-$(CONFIG_PINCTRL_A64)              += pinctrl-a64.o
+> >>>
+> >>> Shouldn't this follow pinctrl config name like other sunXi SOCs?
+> >>> This should be PINCTRL_SUN??_A64.
+> >>
+> >> I never really got the reason we use those sunxi names in addition to
+> >> the SoC name in the first place, maybe apart from copying from some
+> >> Allwinner code.
+> >> Since I decided to not look at Allwinner's BSP at all (if avoidable), I
+> >> also thought it would be time to drop that sunxi naming, which looks
+> >> redundant to me.
+> >> Is there any reason why we would need this (beside having a rather
+> >> unique identifier prefix)?
+> > 
+> > It's mostly historical.
+> > 
+> > 
+> > Back when we started this, There was a few SoCs already out: A10,
+> > A10s, A12 and A13, which was very similar to the Cortex-A naming
+> > scheme (and I think the Cortex-A12 was also announced at the time).
+> > 
+> > We couldn't really use the SoC family either, since there was already
+> > multiple SoCs that were part of the same family (the A10s, A12 and
+> > A13, part of the sun5i family).
+> > 
+> > In order to avoid any confusion, we chose to go with both to uniquely
+> > and without any confusion possible, and we just went on with that
+> > naming scheme for consistency.
 > 
-> A lot of the arm64 changes get sent to arm-soc from random developers that
-> are not in the MAINTAINERS file at the moment, and I'd like to reduce
-> that, so please pick up whatever arm64 sunxi changes you see that look ok
-> and send a separate pull request as you do for arm32. Sending patches
-> separately is fine too, but I'd like to see them come from you to arm at kernel.org
-> so I don't need to guess whether we should pick them up or not.
-> 
-> This time around, we have two arm64 branches, one for boot/dts and one
-> combined for Kconfig and defconfig (MAINTAINERS can also go in there). We
-> are still experimenting with that model though, and it may change in
-> the future.
+> I see, thanks for the explanation.
+> I was wondering since we now move to a new architecture as well to avoid
+> this historic "ballast", but I have no problems with adding "_sun50i_"
+> to the identifiers and file names.
+> To me as only a casual sunxi user I found it mostly hard to memorize the
+> connections between the sunxi numbering and the SoC names (I just know
+> that the A20 is sun7i ;-). So for finding a specific dts for instance,
+> you have to start with the sunxi number to get it TAB completed ...
 
-Understood. Thanks a lot!
+I guess it doesn't really matter for arm64, since it seems like
+there's a sub-folder per SoC family.
+
+However, having an a12.dtsi in arch/arm/boot/dts will probably bring a
+lot of confusion :)
+
+I still think that we should maintain the current compatible scheme
+though, in order to keep consistency.
+
+> With that being said: Would you prefer to have a sun50i prefix? I see
+> that having just "a64" on itself is not very specific.
+
+I'd say that having a DTSI in arch/arm64/boot/dts/sunxi/a64.dtsi would
+not bring a lot of confusion. If you're there, you know what you're
+dealing with already.
+
+If you feel like it makes the life easier to new or casual users, go
+ahead.
+
 Maxime
 
 -- 
@@ -62,4 +97,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160106/e8aec8cf/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160106/22bccb52/attachment.sig>
