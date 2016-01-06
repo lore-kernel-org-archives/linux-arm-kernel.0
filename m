@@ -1,82 +1,103 @@
-From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
-Date: Wed, 6 Jan 2016 20:01:13 +0200
-Subject: [PATCH 2/2] memory: omap-gpmc: Add Kconfig option for debug
-In-Reply-To: <20160106174713.GL12777@atomide.com>
-References: <1432156863-19695-1-git-send-email-tony@atomide.com>
- <568662FC.9050206@gmail.com> <20160104170206.GC12777@atomide.com>
- <201601041834.56056@pali> <20160104174001.GD12777@atomide.com>
- <568AC0F9.2010304@gmail.com> <20160105041356.GE12777@atomide.com>
- <20160105084947.GG22661@pali> <20160105224929.GF12777@atomide.com>
- <20160106174039.GA14271@earth> <20160106174713.GL12777@atomide.com>
-Message-ID: <568D5669.4040801@gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 6 Jan 2016 12:20:03 -0600
+Subject: [PATCH v5 1/5] PCI: designware: ensure ATU is enabled before
+ IO/conf space accesses
+In-Reply-To: <1450442339-18765-2-git-send-email-stanimir.varbanov@linaro.org>
+References: <1450442339-18765-1-git-send-email-stanimir.varbanov@linaro.org>
+ <1450442339-18765-2-git-send-email-stanimir.varbanov@linaro.org>
+Message-ID: <20160106182003.GA16231@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+[+cc Jisheng]
 
+On Fri, Dec 18, 2015 at 02:38:55PM +0200, Stanimir Varbanov wrote:
+> There is no guarantees that enabling ATU will hit the hardware
+> immediately, and subsequent accesses to configuration / IO spaces
+> are reliable. So fixing this by read back PCIE_ATU_CR2 register
+> just after writing.
+> 
+> Without such a fix the PCI device enumeration during kernel boot
+> is not reliable, and reading configuration space for particular
+> PCI device on the bus returns zero aka no device.
+> 
+> Signed-off-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
+> ---
+>  drivers/pci/host/pcie-designware.c |    7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+> index 02a7452bdf23..7880de63895d 100644
+> --- a/drivers/pci/host/pcie-designware.c
+> +++ b/drivers/pci/host/pcie-designware.c
+> @@ -154,6 +154,8 @@ static int dw_pcie_wr_own_conf(struct pcie_port *pp, int where, int size,
+>  static void dw_pcie_prog_outbound_atu(struct pcie_port *pp, int index,
+>  		int type, u64 cpu_addr, u64 pci_addr, u32 size)
+>  {
+> +	u32 val;
+> +
+>  	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | index,
+>  			  PCIE_ATU_VIEWPORT);
+>  	dw_pcie_writel_rc(pp, lower_32_bits(cpu_addr), PCIE_ATU_LOWER_BASE);
+> @@ -164,6 +166,11 @@ static void dw_pcie_prog_outbound_atu(struct pcie_port *pp, int index,
+>  	dw_pcie_writel_rc(pp, upper_32_bits(pci_addr), PCIE_ATU_UPPER_TARGET);
+>  	dw_pcie_writel_rc(pp, type, PCIE_ATU_CR1);
+>  	dw_pcie_writel_rc(pp, PCIE_ATU_ENABLE, PCIE_ATU_CR2);
+> +	/*
+> +	 * ensure that the ATU enable has been happaned before accessing
+> +	 * pci configuration/io spaces through dw_pcie_cfg_[read|write].
+> +	 */
+> +	dw_pcie_readl_rc(pp, PCIE_ATU_CR2, &val);
 
-On  6.01.2016 19:47, Tony Lindgren wrote:
-> * Sebastian Reichel <sre@kernel.org> [160106 09:41]:
->> Hi,
->>
->> On Tue, Jan 05, 2016 at 02:49:29PM -0800, Tony Lindgren wrote:
->>> Commit 63aa945b1013 ("memory: omap-gpmc: Add Kconfig option for debug")
->>> unified the GPMC debug for the SoCs with GPMC. The commit also left
->>> out the option for HWMOD_INIT_NO_RESET as we now require proper timings
->>> for GPMC to be able to remap GPMC devices out of address 0.
->>>
->>> Unfortunately on 900, onenand now only partially works with the device
->>
->> You may want to change 900 to n900 (maybe even Nokia N900) before
->> actually committing this.
->
-> Thanks will do.
->
-> Tony
->
->
+This particular fix makes sense to me.
 
-Unfortunately, it seems there is more to be fixed. It booted several 
-times to the userspace, but after a couple of shutdowns, rootfs became 
-corrupted again. I flashed, installed linux 4.4, but the same happened 
-after the first shutdown with 4.4:
+But I have a larger question about how the ATU works.  I see these
+definitions:
 
-<5>[    8.159179] UBIFS (ubi0:0): background thread "ubifs_bgt0_0" stops
-<3>[    8.184631] UBIFS error (ubi0:0 pid 1): ubifs_read_node: bad node 
-type (255 but expected 9)
-<3>[    8.197937] UBIFS error (ubi0:0 pid 1): ubifs_read_node: bad node 
-at LEB 1934:6936, LEB mapping status 0
-<3:[    8.216522] Not a node, first 24 bytes:
-<3>[    8.220520] 00000000: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff 
-ff ff ff ff ff ff ff ff ff                          ........................
-<4>[    8.247772] CPU: 0 PID: 1 Comm: swapper Not tainted 4.4.0-rc7+ #4
-<4>[    8.258911] Hardware name: Nokia RX-51 board
-<4>[    8.268096] [<c0013a98>] (unwind_backtrace) from Y<c0011db8>] 
-(show_stack+0x10/0x14)
-<4>[    8.281097] [<c0011db8>] (show_stack) from [<c01aa7b4>] 
-(ubifs_read_node+0x29c/0x2d4)
-<4>[    8.294097] [<c01aa7b4>] (ubifs_read_node) from [<c01b2ae0>] 
-(dbg_old_index_check_init+0x60/0x9c)
-<4>[    8.308258] [<c01b2ae0>] (dbg_old_index_check_init) from 
-[<c01a6d00>] (ubifs_mount+0xd90/0x15f0)
-<4>[    8.322357] [<c01a6d00>] (ubifs_mount) from [<c00df77c>] 
-(mount_fs+0x70/0x148)
-<4>[    8.334747] [<c00df77c>] (mount_fs) from [<c00f86bc>] 
-(vfs_kern_mount+0x4c/0x110)
-<4>[    8.347412] [<c00f86bc>] (vfs_kern_mount) from [<c00fb5c4>] 
-(do_mount+0xadc/0xc34)
-<4>[    8.360168] [<c00fb5c4>] (do_mount) from [<c00fb940>] 
-(SyS_mount+0x70/0x9c)
-<4>[    8.372253] [<c00fb940>] (SyS_mount) from [<c0602038>] 
-(mount_block_root+0xf0/0x28c)
-<4>[    8.385162] [<c0602038>] (mount_block_root) from [<c06023b8>] 
-(prepare_namespace+0x88/0x1bc)
-<4>[    8.398834] [<c06023b8>] (prepare_namespace) from [<c0601df4>] 
-(kernel_init_freeable+0x178/0x1c4)
-<4>[    8.412963] [<c0601df4>] (kernel_init_freeabme) from [<c04375d8>] 
-(kernel_init+0x8/0xe4)
-<4>[    8.426300] [<c04375d8>] (kernel_init) from [<c000f098>] 
-(ret_from_fork+0x14/0x3c)
+  #define PCIE_ATU_TYPE_MEM
+  #define PCIE_ATU_TYPE_IO
+  #define PCIE_ATU_TYPE_CFG0
+  #define PCIE_ATU_TYPE_CFG1
 
-P.S.
-(Pali, sorry for not having time to read the kernel docs re e-mail 
-clients :) )
+and these uses:
+
+  - In dw_pcie_host_init(), set PCIE_ATU_TYPE_MEM for unit 1
+    (but only if rd_other_conf is not overridden)
+
+  - In dw_pcie_rd_other_conf() and dw_pcie_wr_other_conf(),
+    set PCIE_ATU_TYPE_CFG0 before config access to own bus;
+    set PCIE_ATU_TYPE_CFG1 before config access to other bus;
+    set PCIE_ATU_TYPE_IO after completion
+
+I'm confused:
+
+1) I assume PCIE_ATU_TYPE_MEM is for access to PCI memory space.  Why
+is that initialization related to rd_other_conf?  Shouldn't that be
+set up always?  A comment here would be nice, to clarify that this is
+not related to the subsequent dw_pcie_wr_own_conf() calls.
+
+2) Why doesn't dw_pcie_host_init() use dw_pcie_rd_conf() instead of
+dw_pcie_rd_own_conf()?  Using pci_read_config_dword() might be even
+better.  Using the internal interfaces piecemeal like we do today is
+just an opportunity for doing it wrong.
+
+3) The definitions and your comment about "accessing PCI
+configuration/io spaces" suggest that the ATU must be programmed
+differently for accesses to PCI config space vs. I/O space.  If that's
+the case, we'd need some kind of mutex to protect inl(), etc., during
+config accesses.  For example, in this scenario:
+
+  thread A                                         thread B
+  ---------------------------------------------    ----------
+  pci_read_config_dword()
+  dw_pcie_prog_outbound_atu(PCIE_ATU_TYPE_CFG0)
+                                                   inl()
+  dw_pcie_cfg_read()
+  readl()
+  dw_pcie_prog_outbound_atu(PCIE_ATU_TYPE_IO)
+                                                   inl()
+
+Do both inl() calls by thread B work correctly, even though the ATU
+seems to be programmed for CFG0 for the first but IO for the second?
+
+Bjorn
