@@ -1,129 +1,154 @@
-From: zourongrong@huawei.com (Rongrong Zou)
-Date: Wed, 6 Jan 2016 21:36:33 +0800
-Subject: [PATCH v1 3/3] ARM64 LPC: update binding doc
-In-Reply-To: <2550495.K9prJVsVEi@wuerfel>
-References: <1451396032-23708-1-git-send-email-zourongrong@gmail.com>
- <6384244.Uhpjfgly6O@wuerfel> <568BB035.1050801@huawei.com>
- <2550495.K9prJVsVEi@wuerfel>
-Message-ID: <568D1861.1070201@huawei.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 6 Jan 2016 13:43:14 +0000
+Subject: [PATCH 2/2] arm64: factor work_pending state machine to C
+In-Reply-To: <1452015215-29506-2-git-send-email-mark.rutland@arm.com>
+References: <20160105172106.GA7088@leverpostej>
+ <1452015215-29506-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <20160106134313.GK563@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2016/1/5 20:19, Arnd Bergmann ??:
-> On Tuesday 05 January 2016 19:59:49 Rongrong Zou wrote:
->> ? 2016/1/5 0:34, Arnd Bergmann ??:
->>> On Tuesday 05 January 2016 00:04:19 Rongrong Zou wrote:
->>>> ? 2016/1/4 19:13, Arnd Bergmann ??:
->>>>> On Sunday 03 January 2016 20:24:14 Rongrong Zou wrote:
->>>>>> ? 2015/12/31 23:00, Rongrong Zou ??:
->>>> Ranges property can set empty, but this means 1:1 translation. the I/O
->>>> port range is translated to MMIO address 0x00000001 00000000 to
->>>> 0x00000001 00000004, it looks wrong else. I wonder if anyone get legacy
->>>> I/O port resource from dts.
->>>
->>> As I said, nothing should really require the ranges property here, unless
->>> you have a valid IORESOURCE_MEM translation. The code that requires
->>> the ranges to be present is wrong.
->>>
->>
->> I think the openfirmware(DT) do not support for those unmapped I/O ports, because I
->> must get resource by calling of_address_to_resource(), which have to call
->> pci_address_to_pio() when resource type is IORESOURCE_IO. I'm sorry I have no
->> better idea for this now. Maybe liviu can give me some opinions.
->
-> I think on x86 it works (or used to work, few people use open firmware on
-> x86 these days, and it may be broken), and the pci_address_to_pio() call
-> behaves differently when PCI_IOBASE is set. x86 never maps I/O ports into
-> memory mapped I/O addresses, they have their own way of accessing them
-> just like your platform.
->
->> /**
->>    * of_address_to_resource - Translate device tree address and return as resource
->>    *
->>    * Note that if your address is a PIO address, the conversion will fail if
->>    * the physical address can't be internally converted to an IO token with
->>    * pci_address_to_pio(), that is because it's either called to early or it
->>    * can't be matched to any host bridge IO space
->>    */
->> int of_address_to_resource(struct device_node *dev, int index,
->> 			   struct resource *r)
->
-> The problem here seems to be that the code assumes that either the I/O ports
-> are always mapped or they are never mapped (no PCI_IOBASE). We need to extend
-> it because now we can have the combination of the two.
+On Tue, Jan 05, 2016 at 05:33:35PM +0000, Mark Rutland wrote:
+> Currently ret_fast_syscall, work_pending, and ret_to_user form an ad-hoc
+> state machine that can be difficult to reason about due to duplicated
+> code and a large number of branch targets.
+> 
+> This patch factors the common logic out into the existing
+> do_notify_resume function, converting the code to C in the process,
+> making the code more legible.
+> 
+> This patch tries to mirror the existing behaviour as closely as possible
+> while using the usual C control flow primitives. There should be no
+> functional change as a result of this patch.
 
+I realised there is a problem with this for kernel built with
+TRACE_IRQFLAGS, as local_irq_{enable,disable}() will verify that the IRQ
+state is as expected.
 
-I am considering the following solution:
+In ret_fast_syscall we disable irqs behind the back of the tracer, so
+when we get into do_notify_resume we'll get a splat.
 
-Adding unmapped isa io functions in
+In the non-syscall cases we do not disable interrupts first, so we can't
+balance things in do_notify_resume.
 
-drivers/of/address.c,
+We can either add a trace_hardirqs_off call to ret_fast_syscall, or we
+can use raw_local_irq_{disable,enable}. The latter would match the
+current behaviour (and is a nicer diff). Once the syscall path is moved
+to C it would be possible to use the non-raw variants all-over.
 
-static LIST_HEAD(legacy_io_range_list);
-int isa_register_io_range(phys_addr_t addr, resource_size_t size);
-
-/* before I call isa(LPC) bus driver, the input I/O port must be translated to phys_addr_t
-(the least 16bit means port addr on bus, the second 16bit means bus id)*/
-
-phys_addr_t isa_pio_to_bus_addr(unsigned long pio);
-
-/* the returned PIO do not conflict with PIO get from pci_address_to_pio*/
-unsigned long isa_bus_addr_to_pio(phys_addr_t address);
-
-drivers/bus/lpc.c
-
-lpc_bus_probe()
-{
-	isa_register_io_range(phys_addr_t addr, resource_size_t size);
-}
-
-inb(unsigned long port)
-{
-	unsigned short bus;
-	phys_addr_t addr;
-	/*hit isa port range*/
-	if(addr = isa_pio_to_bus_addr(port))
-	{
-		bus = (addr >> 16) & 0xffff;
-
-		call lpc driver with addr;
-		return lpc_read_byte(bus, addr);
-	}
-	else /*not hit*/
-	{
-		return readb(PCI_IOBASE + port);
-	}
-}
-
-
-
->
->>>> For ipmi driver, I can get I/O port resource by DMI rather than dts.
->>>
->>> No, the ipmi driver uses the resource that belongs to the platform
->>> device already, you can't rely on DMI data to be present there.
->>
->> Ipmi has a lot of way to be discovered(ACPI, DMI, hardcoded, hot-add,
->> openfirmware and a few other), I think we just use one of them, not all of them.
->> It depend on vendor's hardware solution actually.
->
-> I don't think we should mix multiple methods here: if the bus is described
-> in DT, all its children should be there as well. Otherwise you get into problems
-> e.g. if you have multiple instances of the LPC bus and the Linux I/O addresses
-> for one or more of them have an offset to the bus specific addresses.
->
-> The bus probe code decides what the Linux I/O port numbers are, but DMI
-> and other methods have no idea of the mapping. As long as there is only
-> one instance, using the first 0x1000 addresses with a 1:1 mapping saves
-> us a bit of trouble, but I'd be worried about relying on that assumption
-> too much.
->
-> 	Arnd
->
->
-> .
->
+Catalin, are you happy with using the raw accessors in do_notify_resume,
+or would you prefer using trace_hardirqs_off?
 
 Thanks,
+Mark.
 
-Rongrong
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Chris Metcalf <cmetcalf@ezchip.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/kernel/entry.S  | 24 +++---------------------
+>  arch/arm64/kernel/signal.c | 36 ++++++++++++++++++++++++++----------
+>  2 files changed, 29 insertions(+), 31 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index 6b30ab1..41f5dfc 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -612,35 +612,17 @@ ret_fast_syscall:
+>  	ldr	x1, [tsk, #TI_FLAGS]		// re-check for syscall tracing
+>  	and	x2, x1, #_TIF_SYSCALL_WORK
+>  	cbnz	x2, ret_fast_syscall_trace
+> -	and	x2, x1, #_TIF_WORK_MASK
+> -	cbnz	x2, work_pending
+> -	enable_step_tsk x1, x2
+> -	kernel_exit 0
+> +	b	ret_to_user
+>  ret_fast_syscall_trace:
+>  	enable_irq				// enable interrupts
+>  	b	__sys_trace_return_skipped	// we already saved x0
+>  
+>  /*
+> - * Ok, we need to do extra processing, enter the slow path.
+> - */
+> -work_pending:
+> -	tbnz	x1, #TIF_NEED_RESCHED, work_resched
+> -	/* TIF_SIGPENDING, TIF_NOTIFY_RESUME or TIF_FOREIGN_FPSTATE case */
+> -	mov	x0, sp				// 'regs'
+> -	enable_irq				// enable interrupts for do_notify_resume()
+> -	bl	do_notify_resume
+> -	b	ret_to_user
+> -work_resched:
+> -	bl	schedule
+> -
+> -/*
+>   * "slow" syscall return path.
+>   */
+>  ret_to_user:
+> -	disable_irq				// disable interrupts
+> -	ldr	x1, [tsk, #TI_FLAGS]
+> -	and	x2, x1, #_TIF_WORK_MASK
+> -	cbnz	x2, work_pending
+> +	bl	do_notify_resume
+> +	ldr	x1, [tsk, #TI_FLAGS]		// re-check for single-step
+>  	enable_step_tsk x1, x2
+>  	kernel_exit 0
+>  ENDPROC(ret_to_user)
+> diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+> index e18c48c..3a6c60b 100644
+> --- a/arch/arm64/kernel/signal.c
+> +++ b/arch/arm64/kernel/signal.c
+> @@ -399,18 +399,34 @@ static void do_signal(struct pt_regs *regs)
+>  	restore_saved_sigmask();
+>  }
+>  
+> -asmlinkage void do_notify_resume(struct pt_regs *regs,
+> -				 unsigned int thread_flags)
+> +asmlinkage void do_notify_resume(void)
+>  {
+> -	if (thread_flags & _TIF_SIGPENDING)
+> -		do_signal(regs);
+> +	struct pt_regs *regs = task_pt_regs(current);
+> +	unsigned long thread_flags;
+>  
+> -	if (thread_flags & _TIF_NOTIFY_RESUME) {
+> -		clear_thread_flag(TIF_NOTIFY_RESUME);
+> -		tracehook_notify_resume(regs);
+> -	}
+> +	for (;;) {
+> +		local_irq_disable();
+
+This should be raw_local_irq_disable()...
+
+> +
+> +		thread_flags = READ_ONCE(current_thread_info()->flags);
+> +		if (!(thread_flags & _TIF_WORK_MASK))
+> +			break;
+> +
+> +		if (thread_flags & _TIF_NEED_RESCHED) {
+> +			schedule();
+> +			continue;
+> +		}
+>  
+> -	if (thread_flags & _TIF_FOREIGN_FPSTATE)
+> -		fpsimd_restore_current_state();
+> +		local_irq_enable();
+
+... likewise, raw_local_irq_enable() here.
+
+>  
+> +		if (thread_flags & _TIF_SIGPENDING)
+> +			do_signal(regs);
+> +
+> +		if (thread_flags & _TIF_NOTIFY_RESUME) {
+> +			clear_thread_flag(TIF_NOTIFY_RESUME);
+> +			tracehook_notify_resume(regs);
+> +		}
+> +
+> +		if (thread_flags & _TIF_FOREIGN_FPSTATE)
+> +			fpsimd_restore_current_state();
+> +	}
+>  }
+> -- 
+> 1.9.1
+> 
