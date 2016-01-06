@@ -1,70 +1,78 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 6 Jan 2016 16:55:45 +0000
-Subject: [PATCH v3 2/2] ARM64: kernel: PSCI: move PSCI idle management
- code to drivers/firmware
-In-Reply-To: <20160105133447.GW19062@n2100.arm.linux.org.uk>
-References: <1445011379-8787-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1445011379-8787-3-git-send-email-lorenzo.pieralisi@arm.com>
- <20160105105900.GT19062@n2100.arm.linux.org.uk>
- <20160105123134.GA1821@red-moon>
- <20160105125142.GV19062@n2100.arm.linux.org.uk>
- <20160105132701.GA17214@red-moon>
- <20160105133447.GW19062@n2100.arm.linux.org.uk>
-Message-ID: <20160106165545.GA19886@red-moon>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 6 Jan 2016 17:10:47 +0000
+Subject: [PATCH v6 12/20] arm64:ilp32: add sys_ilp32.c and a separate
+ table (in entry.S) to use it
+In-Reply-To: <13371161.AI9IgZN0G2@wuerfel>
+References: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
+ <2634904.E1fnEZUKo9@wuerfel> <20160105152657.GA31598@yury-N73SV>
+ <13371161.AI9IgZN0G2@wuerfel>
+Message-ID: <20160106171047.GP6301@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 05, 2016 at 01:34:47PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Jan 05, 2016 at 01:27:01PM +0000, Lorenzo Pieralisi wrote:
-> > On Tue, Jan 05, 2016 at 12:51:42PM +0000, Russell King - ARM Linux wrote:
-> > > On ARM, that option is CONFIG_ARM_CPU_SUSPEND - that option solely
-> > > controls whether cpu_suspend/resume are present.  ARM64 just needs
-> > > to adopt this, and use that to control the code which is built in
-> > > drivers/firmware/psci.c.
+On Tue, Jan 05, 2016 at 10:12:20PM +0100, Arnd Bergmann wrote:
+> On Tuesday 05 January 2016 18:26:57 Yury Norov wrote:
+> > > So the calling conventions avoid the problem of being able to set
+> > > the upper bits from malicious user space when the kernel assumes they
+> > > are zeroed out (we had security bugs in this area, before we introduced
+> > > SYSCALL_DEFINEx()), but it means that we need wrappers around each
+> > > syscall that takes an argument that is different length between user
+> > > and kernel space (as Catalin guessed). arch/s390 has the same problem and
+> > > works around it with code in arch/s390/kernel/compat_wrapper.c, while
+> > > other architectures (at least powerpc, x86 and tile IIRC, don't know much
+> > > about mips, parisc and sparc) don't have the problem because of their
+> > > calling conventions.
 > > > 
-> > > However, I don't think it's as simple as just adding that to ARM64,
-> > > as you need to be careful of the Kconfig dependencies.  For ARM,
-> > > this is:
-> > > 
-> > > Generic code:
-> > > - SUSPEND defaults to y, depends on ARCH_SUSPEND_POSSIBLE (which is set for
-> > >    any cpu_suspend enabled CPU.)
-> > > - PM_SLEEP if SUSPEND || HIBERNATE_CALLBACKS
-> > > ARM sets:
-> > > - CPU_PM if SUSPEND || CPU_IDLE.
-> > > - ARM_CPU_SUSPEND if PM_SLEEP || BL_SWITCHER || (ARCH_PXA && PM)
-> > > 
-> > > What this means is that CPU_PM is entirely independent of
-> > > ARM_CPU_SUSPEND.  One does not imply the other, so I think you need
-> > > to consider carefully what ifdef you need in drivers/firmware/psci.c.
-> > > 
-> > > This is why I think fixing this is not simple as it first looks.
+> > > This also means that we cannot work around it in glibc at all, because
+> > > we have to be able to handle malicious user space, so it has to be
+> > > done in the kernel using something similar to what s390 does.
 > > 
-> > Not saying it is nice, but unless I find a cleaner way I was keener on
-> > adding a silent config entry in drivers/firmware, say:
-> > 
-> > config ARM_PSCI_CPU_IDLE
-> > 	def_bool ARM_PSCI_FW && CPU_IDLE
-> > 	select ARM_CPU_SUSPEND if ARM
-> > 
-> > and use that to either guard the code or stub it out and compile it
-> > if that config option is enabled.
+> > So it seems like we (should) have 2 compat modes - with and without access
+> > to upper half of register. I'm thinking now on how put it in generic
+> > unistd.h less painfull way.
 > 
-> That immediately worries me, because it bypasses the CPU dependencies
-> for ARM_CPU_SUSPEND implicitly applied via ARCH_SUSPEND_POSSIBLE.  I'd
-> prefer instead:
+> I think we can do that by slightly modifying the existing __SYSCALL/__SC_3264/
+> __SC_COMP/__SC_COMP_3264 macros: The first two need extra wrappers for
+> arm64-ilp32 and s390, the other two don't.
 > 
-> config ARM_PSCI_CPU_IDLE
-> 	def_bool ARM_PSCI_FW && CPU_IDLE && (!ARM || ARM_CPU_SUSPEND)
+> We can use some clever string concatenation to add a ##_wrapper to the name
+> of the handler where needed and then just have a file that implements
+> the wrappers, copied from s390.
+> 
+> Unfortunately, we can't just zero out all the upper halves and be done with
+> it: even if we went back to passing 64-bit arguments as separate 32-bit
+> registers, we'd still need to deal with sign-extending negative 32-bit
+> numbers.
 
-If you are not against it, I could make ARM_PSCI select ARM_CPU_SUSPEND,
-the CPU dependency would be taken into account (ie CPU_V7) and this
-would mirror what's done for the eg BL_SWITCHER.
+How many syscalls would we need sign-extension for? Most are probably
+already handled by specific compat_sys_* functions, otherwise A32 compat
+wouldn't work properly.
 
-This would remove the need for ARM_PSCI_CPU_IDLE above altogether and
-I could guard the code in drivers/firmware/psci.c through CONFIG_CPU_IDLE.
+Anyway, I think we can get away with not modifying the generic __SYSCALL
+definition and only use something like
+arch/s390/kernel/compat_wrapper.c. In sys_ilp32.c, we would make
+__SYSCALL expand the function name with some ilp32_ prefix.
 
-It is just an option, please let me know.
+For existing compat_* syscalls, we only need to handle the pointer types
+(something like the s390's __TYPE_IS_PTR). I think other types are
+already handled by defining the prototype with compat_ulong_t etc.
 
-Thanks,
-Lorenzo
+For native syscalls like sys_read, apart from pointers we also need to
+handle size_t. The wrapper would need to be defined using compat types:
+
+ILP32_SYSCALL_DEFINE3(read, unsigned int, fd, char __user *, buf, compat_size_t, count)
+
+and let the compiler handle the conversion to size_t automatically when
+calling sys_read from the wrapper.
+
+> > Beside of that, I think I almost finished with all current comments. As
+> > this issue is not related to ILP32 directly, I think, it's better to show
+> > it now, as there is pretty massive rework. What do you think?
+> 
+> Good idea, yes.
+
+Note that we still need to sort the 0/sign extension out before we
+"declare" the ILP32 ABI stable.
+
+-- 
+Catalin
