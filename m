@@ -1,160 +1,52 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed,  6 Jan 2016 11:19:23 +0100
-Subject: [PATCH 2/8] drm: atmel-hlcdc: support asynchronous atomic commit
- operations
+Date: Wed,  6 Jan 2016 11:19:29 +0100
+Subject: [PATCH 8/8] drm: atmel-hlcdc: check display mode validity in
+ crtc->mode_fixup()
 In-Reply-To: <1452075569-8545-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1452075569-8545-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1452075569-8545-3-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1452075569-8545-9-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-drm_atomic_helper_commit() does not support asynchronous commits.
-Replace it by a specific commit function supporting these kind of requests.
+Move the adjusted display mode check into ->mode_fixup().
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c | 94 +++++++++++++++++++++++++++-
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h |  5 ++
- 2 files changed, 98 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-index a45b32b..d760475 100644
---- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-+++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-@@ -427,11 +427,102 @@ static void atmel_hlcdc_fb_output_poll_changed(struct drm_device *dev)
- 	}
+diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+index be30bd2..d5a028f 100644
+--- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
++++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+@@ -142,11 +142,13 @@ static void atmel_hlcdc_crtc_mode_set_nofb(struct drm_crtc *c)
+ 			   cfg);
  }
  
-+struct atmel_hlcdc_dc_commit {
-+	struct work_struct work;
-+	struct drm_device *dev;
-+	struct drm_atomic_state *state;
-+};
+-static bool atmel_hlcdc_crtc_mode_fixup(struct drm_crtc *crtc,
++static bool atmel_hlcdc_crtc_mode_fixup(struct drm_crtc *c,
+ 					const struct drm_display_mode *mode,
+ 					struct drm_display_mode *adjusted_mode)
+ {
+-	return true;
++	struct atmel_hlcdc_crtc *crtc = drm_crtc_to_atmel_hlcdc_crtc(c);
 +
-+static void
-+atmel_hlcdc_dc_atomic_complete(struct atmel_hlcdc_dc_commit *commit)
-+{
-+	struct drm_device *dev = commit->dev;
-+	struct atmel_hlcdc_dc *dc = dev->dev_private;
-+	struct drm_atomic_state *old_state = commit->state;
-+
-+	/* Apply the atomic update. */
-+	drm_atomic_helper_commit_modeset_disables(dev, old_state);
-+	drm_atomic_helper_commit_planes(dev, old_state, false);
-+	drm_atomic_helper_commit_modeset_enables(dev, old_state);
-+
-+	drm_atomic_helper_wait_for_vblanks(dev, old_state);
-+
-+	drm_atomic_helper_cleanup_planes(dev, old_state);
-+
-+	drm_atomic_state_free(old_state);
-+
-+	/* Complete the commit, wake up any waiter. */
-+	spin_lock(&dc->commit.wait.lock);
-+	dc->commit.pending = false;
-+	wake_up_all_locked(&dc->commit.wait);
-+	spin_unlock(&dc->commit.wait.lock);
-+
-+	kfree(commit);
-+}
-+
-+static void atmel_hlcdc_dc_atomic_work(struct work_struct *work)
-+{
-+	struct atmel_hlcdc_dc_commit *commit =
-+		container_of(work, struct atmel_hlcdc_dc_commit, work);
-+
-+	atmel_hlcdc_dc_atomic_complete(commit);
-+}
-+
-+static int atmel_hlcdc_dc_atomic_commit(struct drm_device *dev,
-+					struct drm_atomic_state *state,
-+					bool async)
-+{
-+	struct atmel_hlcdc_dc *dc = dev->dev_private;
-+	struct atmel_hlcdc_dc_commit *commit;
-+	int ret;
-+
-+	ret = drm_atomic_helper_prepare_planes(dev, state);
-+	if (ret)
-+		return ret;
-+
-+	/* Allocate the commit object. */
-+	commit = kzalloc(sizeof(*commit), GFP_KERNEL);
-+	if (!commit) {
-+		ret = -ENOMEM;
-+		goto error;
-+	}
-+
-+	INIT_WORK(&commit->work, atmel_hlcdc_dc_atomic_work);
-+	commit->dev = dev;
-+	commit->state = state;
-+
-+	spin_lock(&dc->commit.wait.lock);
-+	ret = wait_event_interruptible_locked(dc->commit.wait,
-+					      !dc->commit.pending);
-+	if (ret == 0)
-+		dc->commit.pending = true;
-+	spin_unlock(&dc->commit.wait.lock);
-+
-+	if (ret) {
-+		kfree(commit);
-+		goto error;
-+	}
-+
-+	/* Swap the state, this is the point of no return. */
-+	drm_atomic_helper_swap_state(dev, state);
-+
-+	if (async)
-+		queue_work(dc->wq, &commit->work);
-+	else
-+		atmel_hlcdc_dc_atomic_complete(commit);
-+
-+	return 0;
-+
-+error:
-+	drm_atomic_helper_cleanup_planes(dev, state);
-+	return ret;
-+}
-+
- static const struct drm_mode_config_funcs mode_config_funcs = {
- 	.fb_create = atmel_hlcdc_fb_create,
- 	.output_poll_changed = atmel_hlcdc_fb_output_poll_changed,
- 	.atomic_check = drm_atomic_helper_check,
--	.atomic_commit = drm_atomic_helper_commit,
-+	.atomic_commit = atmel_hlcdc_dc_atomic_commit,
- };
++	return atmel_hlcdc_dc_mode_valid(crtc->dc, adjusted_mode) == MODE_OK;
+ }
  
- static int atmel_hlcdc_dc_modeset_init(struct drm_device *dev)
-@@ -509,6 +600,7 @@ static int atmel_hlcdc_dc_load(struct drm_device *dev)
- 	if (!dc->wq)
- 		return -ENOMEM;
+ static void atmel_hlcdc_crtc_disable(struct drm_crtc *c)
+@@ -311,12 +313,8 @@ static int atmel_hlcdc_crtc_select_output_mode(struct drm_crtc_state *state)
+ static int atmel_hlcdc_crtc_atomic_check(struct drm_crtc *c,
+ 					 struct drm_crtc_state *s)
+ {
+-	struct atmel_hlcdc_crtc *crtc = drm_crtc_to_atmel_hlcdc_crtc(c);
+ 	int ret;
  
-+	init_waitqueue_head(&dc->commit.wait);
- 	dc->desc = match->data;
- 	dc->hlcdc = dev_get_drvdata(dev->dev->parent);
- 	dev->dev_private = dc;
-diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
-index e88e349..6a762c9 100644
---- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
-+++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
-@@ -130,6 +130,7 @@ struct atmel_hlcdc_planes {
-  * @planes: instantiated planes
-  * @layers: active HLCDC layer
-  * @wq: display controller workqueue
-+ * @commit: used for async commit handling
-  */
- struct atmel_hlcdc_dc {
- 	const struct atmel_hlcdc_dc_desc *desc;
-@@ -139,6 +140,10 @@ struct atmel_hlcdc_dc {
- 	struct atmel_hlcdc_planes *planes;
- 	struct atmel_hlcdc_layer *layers[ATMEL_HLCDC_MAX_LAYERS];
- 	struct workqueue_struct *wq;
-+	struct {
-+		wait_queue_head_t wait;
-+		bool pending;
-+	} commit;
- };
- 
- extern struct atmel_hlcdc_formats atmel_hlcdc_plane_rgb_formats;
+-	if (atmel_hlcdc_dc_mode_valid(crtc->dc, &s->adjusted_mode) != MODE_OK)
+-		return -EINVAL;
+-
+ 	ret = atmel_hlcdc_crtc_select_output_mode(s);
+ 	if (ret)
+ 		return ret;
 -- 
 2.1.4
