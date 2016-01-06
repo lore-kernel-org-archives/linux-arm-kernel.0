@@ -1,148 +1,53 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed,  6 Jan 2016 16:07:41 +0000
-Subject: [PATCHv2 2/2] arm64: factor work_pending state machine to C
-In-Reply-To: <1452096461-15232-1-git-send-email-mark.rutland@arm.com>
-References: <1452096461-15232-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1452096461-15232-2-git-send-email-mark.rutland@arm.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 6 Jan 2016 17:12:34 +0100
+Subject: [PATCH v2 0/5] Introduce at91_adc8xx driver
+Message-ID: <1452096759-19438-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently ret_fast_syscall, work_pending, and ret_to_user form an ad-hoc
-state machine that can be difficult to reason about due to duplicated
-code and a large number of branch targets.
 
-This patch factors the common logic out into the existing
-do_notify_resume function, converting the code to C in the process,
-making the code more legible.
+Hi,
 
-This patch tries to closely mirror the existing behaviour while using
-the usual C control flow primitives. As local_irq_{disable,enable} may
-be instrumented, we balance exception entry (where we will almost most
-likely enable IRQs) with a call to trace_hardirqs_on just before the
-return to userspace.
+This is the very basic support for the adc introduced with the SAMA5D2 SoC
+family.
 
-In the ret_fast_syscall path, the syscall tracing check is now performed
-with interrupts enabled. As this is only ever checked once, with
-interrupts enabled before the actual tracing or the work_pending state
-machine, there was always a race with concurrent modification. This
-change also allows for the removal of the irq enable and branch in
-ret_fast_syscall_trace, allowing falling through to ret_to_user in the
-fast path.
+The goal is to provide something to the user as soon as possible instead of
+waiting for a full featured driver.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Chris Metcalf <cmetcalf@ezchip.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/entry.S  | 33 +++++++--------------------------
- arch/arm64/kernel/signal.c | 36 ++++++++++++++++++++++++++----------
- 2 files changed, 33 insertions(+), 36 deletions(-)
+Only unsigned conversions on a software tigger are supported. Next steps are
+signed conversions, differential channels, hardware triggers, dma support,
+touchscreen support, and others.
 
-Since v1:
-* Balance IRQs state for CONFIG_TRACE_IRQFLAGS
-* Simplify ret_fast_syscall
-* Fall through to ret_to_user from ret_fast_sysycall
+Changes:
+- v2:
+  - Cleanup thanks to Peter Meerwald-Stadler comments (add prefix for macros,
+    remove useless stuff, etc).
+  - Move parameters relative to the SoC to the device tree (min/max sampling
+    rate and startup time).
+  - Use sysfs to configure the sampling frequency.
+  - vddana supply is no more optionnal.
+  - No change for irq since I am not sure it will simplify the code (interrupt
+    is cleared when reading channel conversion result). Jonathan, tell me if
+    I need to rework this part.
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 6b30ab1..98ddf8d 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -607,40 +607,21 @@ ENDPROC(cpu_switch_to)
-  * and this includes saving x0 back into the kernel stack.
-  */
- ret_fast_syscall:
--	disable_irq				// disable interrupts
- 	str	x0, [sp, #S_X0]			// returned x0
- 	ldr	x1, [tsk, #TI_FLAGS]		// re-check for syscall tracing
- 	and	x2, x1, #_TIF_SYSCALL_WORK
--	cbnz	x2, ret_fast_syscall_trace
--	and	x2, x1, #_TIF_WORK_MASK
--	cbnz	x2, work_pending
--	enable_step_tsk x1, x2
--	kernel_exit 0
--ret_fast_syscall_trace:
--	enable_irq				// enable interrupts
--	b	__sys_trace_return_skipped	// we already saved x0
--
--/*
-- * Ok, we need to do extra processing, enter the slow path.
-- */
--work_pending:
--	tbnz	x1, #TIF_NEED_RESCHED, work_resched
--	/* TIF_SIGPENDING, TIF_NOTIFY_RESUME or TIF_FOREIGN_FPSTATE case */
--	mov	x0, sp				// 'regs'
--	enable_irq				// enable interrupts for do_notify_resume()
--	bl	do_notify_resume
--	b	ret_to_user
--work_resched:
--	bl	schedule
-+	cbnz	x2, __sys_trace_return_skipped	// we already saved x0
-+	/* fall-through to ret_to_user */
- 
- /*
-  * "slow" syscall return path.
-  */
- ret_to_user:
--	disable_irq				// disable interrupts
--	ldr	x1, [tsk, #TI_FLAGS]
--	and	x2, x1, #_TIF_WORK_MASK
--	cbnz	x2, work_pending
-+	bl	do_notify_resume
-+#ifdef CONFIG_TRACE_IRQFLAGS
-+	bl	trace_hardirqs_on		// enabled while in userspace
-+#endif
-+	ldr	x1, [tsk, #TI_FLAGS]		// re-check for single-step
- 	enable_step_tsk x1, x2
- 	kernel_exit 0
- ENDPROC(ret_to_user)
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index e18c48c..3a6c60b 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -399,18 +399,34 @@ static void do_signal(struct pt_regs *regs)
- 	restore_saved_sigmask();
- }
- 
--asmlinkage void do_notify_resume(struct pt_regs *regs,
--				 unsigned int thread_flags)
-+asmlinkage void do_notify_resume(void)
- {
--	if (thread_flags & _TIF_SIGPENDING)
--		do_signal(regs);
-+	struct pt_regs *regs = task_pt_regs(current);
-+	unsigned long thread_flags;
- 
--	if (thread_flags & _TIF_NOTIFY_RESUME) {
--		clear_thread_flag(TIF_NOTIFY_RESUME);
--		tracehook_notify_resume(regs);
--	}
-+	for (;;) {
-+		local_irq_disable();
-+
-+		thread_flags = READ_ONCE(current_thread_info()->flags);
-+		if (!(thread_flags & _TIF_WORK_MASK))
-+			break;
-+
-+		if (thread_flags & _TIF_NEED_RESCHED) {
-+			schedule();
-+			continue;
-+		}
- 
--	if (thread_flags & _TIF_FOREIGN_FPSTATE)
--		fpsimd_restore_current_state();
-+		local_irq_enable();
- 
-+		if (thread_flags & _TIF_SIGPENDING)
-+			do_signal(regs);
-+
-+		if (thread_flags & _TIF_NOTIFY_RESUME) {
-+			clear_thread_flag(TIF_NOTIFY_RESUME);
-+			tracehook_notify_resume(regs);
-+		}
-+
-+		if (thread_flags & _TIF_FOREIGN_FPSTATE)
-+			fpsimd_restore_current_state();
-+	}
- }
+Ludovic Desroches (5):
+  iio:adc:at91_adc8xx: introduce new atmel adc driver
+  MAINTAINERS: add entry for Atmel ADC 8xx driver
+  ARM: at91/dt: sama5d2: add adc device
+  ARM: at91/dt: sama5d2 Xplained: enable the adc device
+  ARM: at91/defconfig: add sama5d2 adc support in sama5_defconfig
+
+ .../devicetree/bindings/iio/adc/at91_adc8xx.txt    |  28 ++
+ MAINTAINERS                                        |   6 +
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts        |  22 +
+ arch/arm/boot/dts/sama5d2.dtsi                     |  18 +-
+ arch/arm/configs/sama5_defconfig                   |   1 +
+ drivers/iio/adc/Kconfig                            |  11 +
+ drivers/iio/adc/Makefile                           |   1 +
+ drivers/iio/adc/at91_adc8xx.c                      | 461 +++++++++++++++++++++
+ 8 files changed, 542 insertions(+), 6 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/iio/adc/at91_adc8xx.txt
+ create mode 100644 drivers/iio/adc/at91_adc8xx.c
+
 -- 
-1.9.1
+2.5.0
