@@ -1,57 +1,43 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 6 Jan 2016 12:37:41 +0000
-Subject: [PATCH 1/2] arm64: add macro to handle large immediates
-In-Reply-To: <CAKv+Gu95+F2HhoirhyfoKSs7oUY_5qBdDGcKfXmZi2sS8mERNg@mail.gmail.com>
-References: <1452078327-9635-1-git-send-email-mark.rutland@arm.com>
- <CAKv+Gu_Oo1=Wwr9jRQBTn7bs2KVisSkwkFvJASocCS26taeo-w@mail.gmail.com>
- <20160106122104.GF563@leverpostej>
- <CAKv+Gu95+F2HhoirhyfoKSs7oUY_5qBdDGcKfXmZi2sS8mERNg@mail.gmail.com>
-Message-ID: <20160106123740.GH563@leverpostej>
+Date: Wed, 6 Jan 2016 12:47:53 +0000
+Subject: [PATCH 2/2] arm64: factor work_pending state machine to C
+In-Reply-To: <20160106123011.GN6301@e104818-lin.cambridge.arm.com>
+References: <20160105172106.GA7088@leverpostej>
+ <1452015215-29506-2-git-send-email-mark.rutland@arm.com>
+ <20160106123011.GN6301@e104818-lin.cambridge.arm.com>
+Message-ID: <20160106124753.GI563@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >> Ack for the general idea, but for correctness, you should pair the
-> >> movk instructions with the _nc relocations (i.e., keep movz first, but
-> >> invert the order of the relocs)
-> >
-> > Ah, I hadn't spotted the restriction. I'll change that to:
-> >
-> >         movz    \dst, :abs_g3:\val
-> >         movk    \dst, :abs_g2:\val
-> >         movk    \dst, :abs_g1:\val
-> >         movk    \dst, :abs_g0:\val
-> >
+On Wed, Jan 06, 2016 at 12:30:11PM +0000, Catalin Marinas wrote:
+> On Tue, Jan 05, 2016 at 05:33:35PM +0000, Mark Rutland wrote:
+> > Currently ret_fast_syscall, work_pending, and ret_to_user form an ad-hoc
+> > state machine that can be difficult to reason about due to duplicated
+> > code and a large number of branch targets.
+> > 
+> > This patch factors the common logic out into the existing
+> > do_notify_resume function, converting the code to C in the process,
+> > making the code more legible.
+> > 
+> > This patch tries to mirror the existing behaviour as closely as possible
+> > while using the usual C control flow primitives. There should be no
+> > functional change as a result of this patch.
+> > 
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Chris Metcalf <cmetcalf@ezchip.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
 > 
-> Yes, but with the _nc suffix on the latter three.
+> This is definitely cleaner. The only downside is slightly more expensive
+> ret_fast_syscall. I guess it's not noticeable (though we could do some
+> quick benchmark like getpid in a loop). Anyway, I'm fine with the patch:
+> 
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
-Yup.
+Cheers!
 
-> > That raises a related question. Is it the linker's responsibility to
-> > fill in the shift encoding in the hw field as part of the g{3,2,1}
-> > relocs?
-> >
-> 
-> This
-> 
-> movz x0, :abs_g3:val
-> movk x0, :abs_g2_nc:val
-> movk x0, :abs_g1_nc:val
-> movk x0, :abs_g0_nc:val
-> 
-> assembles to
-> 
-> 0000000000000000 <.text>:
->    0: d2e00000 movz x0, #0x0, lsl #48
->    4: f2c00000 movk x0, #0x0, lsl #32
->    8: f2a00000 movk x0, #0x0, lsl #16
->    c: f2800000 movk x0, #0x0
-> 
-> so it is in fact the assembler that sets the hw field.
-
-Interesting!
-
-As I mentioned in another reply, for the moment I'm going to drop mov_l
-unless we have another need for it.
+While any additional overhead hasn't been noticeable, I'll try to get
+some numbers out as part of the larger deasm testing/benchmarking.
 
 Thanks,
 Mark.
