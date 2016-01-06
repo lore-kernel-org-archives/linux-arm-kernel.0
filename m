@@ -1,94 +1,33 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 6 Jan 2016 13:26:40 +0100
-Subject: [PATCH 1/2] arm64: add macro to handle large immediates
-In-Reply-To: <20160106122104.GF563@leverpostej>
-References: <1452078327-9635-1-git-send-email-mark.rutland@arm.com>
- <CAKv+Gu_Oo1=Wwr9jRQBTn7bs2KVisSkwkFvJASocCS26taeo-w@mail.gmail.com>
- <20160106122104.GF563@leverpostej>
-Message-ID: <CAKv+Gu95+F2HhoirhyfoKSs7oUY_5qBdDGcKfXmZi2sS8mERNg@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 6 Jan 2016 12:30:11 +0000
+Subject: [PATCH 2/2] arm64: factor work_pending state machine to C
+In-Reply-To: <1452015215-29506-2-git-send-email-mark.rutland@arm.com>
+References: <20160105172106.GA7088@leverpostej>
+ <1452015215-29506-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <20160106123011.GN6301@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 January 2016 at 13:21, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Wed, Jan 06, 2016 at 12:15:14PM +0100, Ard Biesheuvel wrote:
->> On 6 January 2016 at 12:05, Mark Rutland <mark.rutland@arm.com> wrote:
->> > Sometimes we want to be able to load values greater than 0xff into a
->> > register, without placing said values in a literal pool. Arranging for
->> > the value to be split up across a number of movz and movk instructions
->> > is tedious and error-prone.
->> >
->> > Following the example of {adr,str,ldr}_l, this patch adds a new mov_l
->> > macro which can be used to load immediate values of up to 64 bits into a
->> > register.
->> >
->> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
->> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> > Cc: Catalin Marinas <catalin.marinas@arm.com>
->> > Cc: Marc Zyngier <marc.zyngier@arm.com>
->> > Cc: Will Deacon <will.deacon@arm.com>
->> > ---
->> >  arch/arm64/include/asm/assembler.h | 13 +++++++++++++
->> >  1 file changed, 13 insertions(+)
->> >
->> > diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
->> > index 12eff92..64fd0a2 100644
->> > --- a/arch/arm64/include/asm/assembler.h
->> > +++ b/arch/arm64/include/asm/assembler.h
->> > @@ -193,6 +193,19 @@ lr .req    x30             // link register
->> >         str     \src, [\tmp, :lo12:\sym]
->> >         .endm
->> >
->> > +       /*
->> > +        * Move a large immediate up to 64-bits.
->> > +        *
->> > +        * @dst: destination register (64 bit wide)
->> > +        * @val: value
->> > +        */
->> > +       .macro  mov_l, dst, val
->> > +       movz    \dst, :abs_g0_nc:\val
->> > +       movk    \dst, :abs_g1_nc:\val
->> > +       movk    \dst, :abs_g2_nc:\val
->> > +       movk    \dst, :abs_g3:\val
->> > +       .endm
->> > +
->>
->> Ack for the general idea, but for correctness, you should pair the
->> movk instructions with the _nc relocations (i.e., keep movz first, but
->> invert the order of the relocs)
->
-> Ah, I hadn't spotted the restriction. I'll change that to:
->
->         movz    \dst, :abs_g3:\val
->         movk    \dst, :abs_g2:\val
->         movk    \dst, :abs_g1:\val
->         movk    \dst, :abs_g0:\val
->
+On Tue, Jan 05, 2016 at 05:33:35PM +0000, Mark Rutland wrote:
+> Currently ret_fast_syscall, work_pending, and ret_to_user form an ad-hoc
+> state machine that can be difficult to reason about due to duplicated
+> code and a large number of branch targets.
+> 
+> This patch factors the common logic out into the existing
+> do_notify_resume function, converting the code to C in the process,
+> making the code more legible.
+> 
+> This patch tries to mirror the existing behaviour as closely as possible
+> while using the usual C control flow primitives. There should be no
+> functional change as a result of this patch.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Chris Metcalf <cmetcalf@ezchip.com>
+> Cc: Will Deacon <will.deacon@arm.com>
 
-Yes, but with the _nc suffix on the latter three.
+This is definitely cleaner. The only downside is slightly more expensive
+ret_fast_syscall. I guess it's not noticeable (though we could do some
+quick benchmark like getpid in a loop). Anyway, I'm fine with the patch:
 
-> That raises a related question. Is it the linker's responsibility to
-> fill in the shift encoding in the hw field as part of the g{3,2,1}
-> relocs?
->
-
-This
-
-movz x0, :abs_g3:val
-movk x0, :abs_g2_nc:val
-movk x0, :abs_g1_nc:val
-movk x0, :abs_g0_nc:val
-
-assembles to
-
-0000000000000000 <.text>:
-   0: d2e00000 movz x0, #0x0, lsl #48
-   4: f2c00000 movk x0, #0x0, lsl #32
-   8: f2a00000 movk x0, #0x0, lsl #16
-   c: f2800000 movk x0, #0x0
-
-so it is in fact the assembler that sets the hw field.
-
-> Mine seems to, but I don't know if that's strictly required or correct
-> as the AArrch64 ELF spec only mentions the immediate field for *ABS_G*,
-> and the shift is encoded in hw rather than imm16.
->
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
