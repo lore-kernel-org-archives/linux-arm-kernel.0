@@ -1,98 +1,73 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Wed, 6 Jan 2016 10:37:31 +0800
-Subject: [PATCH] soc: mediatek: PMIC wrap: Enable STAUPD_PRD before
- WDT_SRC_EN enabled.
-In-Reply-To: <1451876703.11408.10.camel@mtksdaap41>
-References: <1451478961-5668-1-git-send-email-henryc.chen@mediatek.com>
- <CAGS+omBc2XVESu1t+_iKj1gTk-7JVDK1KDoQEJR_-wcL4m0qWg@mail.gmail.com>
- <1451876703.11408.10.camel@mtksdaap41>
-Message-ID: <CAGS+omBAa_n2zk0-tCyV_g3D1Nxu4j1A4q_5eRBJ-xT=PUv1sg@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 6 Jan 2016 10:36:28 +0800
+Subject: [PATCH 03/11] mmc: sdhci-msm: use sdhci_pltfm_init for private
+ allocation
+In-Reply-To: <201601052054.hzEzw4pe%fengguang.wu@intel.com>
+References: <1451991099-4946-4-git-send-email-jszhang@marvell.com>
+ <201601052054.hzEzw4pe%fengguang.wu@intel.com>
+Message-ID: <20160106103628.05a8f9c4@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 4, 2016 at 11:05 AM, Henry Chen <henryc.chen@mediatek.com> wrote:
-> On Thu, 2015-12-31 at 22:19 +0800, Daniel Kurtz wrote:
->> On Wed, Dec 30, 2015 at 8:36 PM, Henry Chen <henryc.chen@mediatek.com> wrote:
->> >
->> > The STAUPD_TRIG will be enable when WDT_INT enable on probe function, if
->> > doesn't enable STAUPD_PRD together, interrupt will be triggered because
->> > STAUPD timeout. To avoid unexpected interrupt, enable periodic status
->> > update which will be updated to PMIC every selected time period.
->>
->> Sorry, I don't really understand this.
->>
->> What exactly is triggering the unexpected watchdog interrupt (WDT_INT)?
->>
->> How does setting STAUPD_PRD disable this "unexpected interrupt"?
->>
-> Yes, WDT_INT was triggered because the bit[25] of WDT_SRC_EN was
-> enabled:
->
-> bit[25] STAUPD_TRIG: STAUPD trigger signal timeout monitor
->
-> Setting STAUPD_PRD will update the status of PMIC periodic to avoid this
-> watchdog timeout.
+On Tue, 5 Jan 2016 20:47:37 +0800 kbuild test robot wrote:
 
-Sorry, I still don't understand.
+> Hi Jisheng,
+> 
+> [auto build test WARNING on v4.4-rc8]
+> [also build test WARNING on next-20160105]
+> [cannot apply to ulf.hansson-mmc/next]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+> 
+> url:    https://github.com/0day-ci/linux/commits/Jisheng-Zhang/mmc-sdhci-bcm2835-use-sdhci_pltfm_init-for-private-allocation/20160105-190232
+> config: arm64-allmodconfig (attached as .config)
+> reproduce:
+>         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=arm64 
+> 
+> All warnings (new ones prefixed by >>):
+> 
+>    drivers/mmc/host/sdhci-msm.c: In function 'sdhci_msm_probe':
+> >> drivers/mmc/host/sdhci-msm.c:440:32: warning: 'msm_host' is used uninitialized in this function [-Wuninitialized]  
+>      host = sdhci_pltfm_init(pdev, &msm_host->sdhci_msm_pdata,
 
-IIUC, setting STAUPD_PRD sets the period at which status updates are
-reported (announced via the shared STAUPD/WDT interrupt).
+OOPS, I'll fix it.
 
-So, setting STAUPD_PRD=5 should set the reporting period to 98.5 us.
-But, how does changing this period fix the "unexpected interrupt"?
-I can understand how it might change the timing of the interrupt, but
-why does it make the interrupt no longer occur?
-We are still triggering the interrupt when we write bit[25]
-(STAUPD_TRIG) of WDT_SRC_EN, two lines later.
+Thanks a lot,
+Jisheng
 
-Isn't this still requesting a STAUPD interrupt 98.5 us later?  (which,
-since STAUPD interrupts aren't handled, is an "unexpected interrupt")
-Wouldn't a better fix be to just clear the STAUPD_TRIG bit of
-WDT_SRC_EN, and just not trigger STAUPD in the first place if we can't
-handle them?
 
--Dan
-
->> From the MT8173 Datasheet, I can see that the value written to
->> STAUPD_PRD is the "periodic status update timing (period)".
->>
->> > Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
->> > ---
->> >  drivers/soc/mediatek/mtk-pmic-wrap.c | 5 +++++
->> >  1 file changed, 5 insertions(+)
->> >
->> > diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
->> > index a8cde17..6e5c20f 100644
->> > --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
->> > +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
->> > @@ -904,6 +904,11 @@ static int pwrap_probe(struct platform_device *pdev)
->> >                 return -ENODEV;
->> >         }
->> >
->> > +       /*
->> > +        * Enable periodic status update which will be updated to PMIC
->> > +        * every selected time period.
->> > +        */
->> > +       pwrap_writel(wrp, 0x5, PWRAP_STAUPD_PRD);
->>
->> nit: Perhaps use a define for 5, and specify the real period value.
->> Something like this:
->>
->> #define PWRAP_STAUPD_98_5US  5
->>
-> ok.
->
->>
->> >         /* Initialize watchdog, may not be done by the bootloader */
->> >         pwrap_writel(wrp, 0xf, PWRAP_WDT_UNIT);
->> >         pwrap_writel(wrp, 0xffffffff, PWRAP_WDT_SRC_EN);
->> > --
->> > 1.9.1
->> >
->> > --
->> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->> > the body of a message to majordomo at vger.kernel.org
->> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> > Please read the FAQ at  http://www.tux.org/lkml/
->
->
+>                                    ^
+> 
+> vim +/msm_host +440 drivers/mmc/host/sdhci-msm.c
+> 
+>    424		.set_clock = sdhci_set_clock,
+>    425		.set_bus_width = sdhci_set_bus_width,
+>    426		.set_uhs_signaling = sdhci_set_uhs_signaling,
+>    427	};
+>    428	
+>    429	static int sdhci_msm_probe(struct platform_device *pdev)
+>    430	{
+>    431		struct sdhci_host *host;
+>    432		struct sdhci_pltfm_host *pltfm_host;
+>    433		struct sdhci_msm_host *msm_host;
+>    434		struct resource *core_memres;
+>    435		int ret;
+>    436		u16 host_version, core_minor;
+>    437		u32 core_version, caps;
+>    438		u8 core_major;
+>    439	
+>  > 440		host = sdhci_pltfm_init(pdev, &msm_host->sdhci_msm_pdata,  
+>    441					sizeof(*msm_host));
+>    442		if (IS_ERR(host))
+>    443			return PTR_ERR(host);
+>    444	
+>    445		pltfm_host = sdhci_priv(host);
+>    446		msm_host = sdhci_pltfm_priv(pltfm_host);
+>    447		msm_host->sdhci_msm_pdata.ops = &sdhci_msm_ops;
+>    448		msm_host->mmc = host->mmc;
+> 
+> ---
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
