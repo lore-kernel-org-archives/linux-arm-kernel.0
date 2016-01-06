@@ -1,53 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 6 Jan 2016 15:43:49 +0000
-Subject: [PATCH] efi: stub: define DISABLE_BRANCH_PROFILING for all
- architectures
-In-Reply-To: <20160105175114.GG10705@arm.com>
-References: <1450862968-20222-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160104123145.GB1616@arm.com>
- <CAKv+Gu-n-7tk1NXYAbf7+O79gYG82QOsbzLuYG1yX=LSizksWQ@mail.gmail.com>
- <20160105153918.GA2714@codeblueprint.co.uk>
- <20160105175114.GG10705@arm.com>
-Message-ID: <20160106154348.GF16580@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed,  6 Jan 2016 16:54:47 +0100
+Subject: [PATCH] mm/kasan: map KASAN zero page read only
+Message-ID: <1452095687-18136-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 05, 2016 at 05:51:14PM +0000, Will Deacon wrote:
-> On Tue, Jan 05, 2016 at 03:39:18PM +0000, Matt Fleming wrote:
-> > On Tue, 05 Jan, at 03:56:39PM, Ard Biesheuvel wrote:
-> > > (+ Arnd)
-> > > 
-> > > On 4 January 2016 at 13:31, Will Deacon <will.deacon@arm.com> wrote:
-> > > > On Wed, Dec 23, 2015 at 10:29:28AM +0100, Ard Biesheuvel wrote:
-> > > >> This moves the DISABLE_BRANCH_PROFILING define from the x86 specific
-> > > >> to the general CFLAGS definition for the stub. This fixes build errors
-> > > >> when building for arm64 with CONFIG_PROFILE_ALL_BRANCHES_ENABLED.
-> > > >>
-> > > >> Reported-by: Will Deacon <will.deacon@arm.com>
-> > > >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > > >> ---
-> > > >>  drivers/firmware/efi/libstub/Makefile | 4 ++--
-> > > >>  1 file changed, 2 insertions(+), 2 deletions(-)
-> > > >
-> > > > Cheers, Ard. The kernel now builds and boots as an EFI application for
-> > > > me when the dreaded #define if config option is enabled:
-> > > >
-> > > >   Tested-by: Will Deacon <will.deacon@arm.com>
-> > > >
-> > > > Will
-> > > >
-> > > 
-> > > @Matt: this is causing randconfig build errors for ARM in -next. Mind
-> > > if we take this through some other tree?
-> > 
-> > Go ahead.
-> > 
-> > Reviewed-by: Matt Fleming <matt@codeblueprint.co.uk>
-> 
-> I can take this via the arm64 tree, unless Arnd wants to queue it in
-> arm-soc. Arnd?
+The original x86_64-only version of KASAN mapped its zero page
+read-only, but this got lost when the code was generalised and
+ported to arm64, since, at the time, the PAGE_KERNEL_RO define
+did not exist. It has been added to arm64 in the mean time, so
+let's use it.
 
-Given that this fixes build errors, I've applied it in the arm64 tree,
-so it should appear in -next soon.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ mm/kasan/kasan_init.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Will
+diff --git a/mm/kasan/kasan_init.c b/mm/kasan/kasan_init.c
+index 3f9a41cf0ac6..8726a92604ad 100644
+--- a/mm/kasan/kasan_init.c
++++ b/mm/kasan/kasan_init.c
+@@ -49,7 +49,7 @@ static void __init zero_pte_populate(pmd_t *pmd, unsigned long addr,
+ 	pte_t *pte = pte_offset_kernel(pmd, addr);
+ 	pte_t zero_pte;
+ 
+-	zero_pte = pfn_pte(PFN_DOWN(__pa(kasan_zero_page)), PAGE_KERNEL);
++	zero_pte = pfn_pte(PFN_DOWN(__pa(kasan_zero_page)), PAGE_KERNEL_RO);
+ 	zero_pte = pte_wrprotect(zero_pte);
+ 
+ 	while (addr + PAGE_SIZE <= end) {
+-- 
+2.5.0
