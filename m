@@ -1,154 +1,41 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 6 Jan 2016 13:43:14 +0000
-Subject: [PATCH 2/2] arm64: factor work_pending state machine to C
-In-Reply-To: <1452015215-29506-2-git-send-email-mark.rutland@arm.com>
-References: <20160105172106.GA7088@leverpostej>
- <1452015215-29506-2-git-send-email-mark.rutland@arm.com>
-Message-ID: <20160106134313.GK563@leverpostej>
+From: stripathi@apm.com (Suman Tripathi)
+Date: Wed, 6 Jan 2016 19:20:26 +0530
+Subject: [PATCH 0/2] ata: Introduce the AHCI_HFLAG_EDGE_IRQ_BROKEN in
+ libahci and enabling it for ahci_xgene driver.
+In-Reply-To: <1450942289-12660-1-git-send-email-stripathi@apm.com>
+References: <1450942289-12660-1-git-send-email-stripathi@apm.com>
+Message-ID: <CAOHikRAMhdGuqYsajJPD0e+iSVtYn4Ymxc7sR7WdN_1mo_x_bQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 05, 2016 at 05:33:35PM +0000, Mark Rutland wrote:
-> Currently ret_fast_syscall, work_pending, and ret_to_user form an ad-hoc
-> state machine that can be difficult to reason about due to duplicated
-> code and a large number of branch targets.
-> 
-> This patch factors the common logic out into the existing
-> do_notify_resume function, converting the code to C in the process,
-> making the code more legible.
-> 
-> This patch tries to mirror the existing behaviour as closely as possible
-> while using the usual C control flow primitives. There should be no
-> functional change as a result of this patch.
+Happy new  year !!
 
-I realised there is a problem with this for kernel built with
-TRACE_IRQFLAGS, as local_irq_{enable,disable}() will verify that the IRQ
-state is as expected.
+Any comments on this patchset ?
 
-In ret_fast_syscall we disable irqs behind the back of the tracer, so
-when we get into do_notify_resume we'll get a splat.
+On Thu, Dec 24, 2015 at 1:01 PM, Suman Tripathi <stripathi@apm.com> wrote:
+> This patch set implements a workaround for an errate in the APM
+> X-Gene SATA host controller with edge interrupt. The HOST_IRQ_STAT
+> misses the edge interrupt from the PORT_IRQ_STAT when clearing the
+> HOST_IRQ_STAT and reporting the PORT_IRQ_STAT happens in same clock
+> cycle.
+>
+> Signed-off-by: Suman Tripathi <stripathi@apm.com>
+>
+> Suman Tripathi (2):
+>   libahci: Implement the workaround to fix the missing of edge
+>     interrupt for HOST_IRQ_STAT
+>   ahci_xgene: Enable AHCI_HFLAG_EDGE_IRQ_BROKEN for APM X-Gen2 SATA
+>     host controller
+>
+>  drivers/ata/ahci.h       |    2 ++
+>  drivers/ata/ahci_xgene.c |    3 ++-
+>  drivers/ata/libahci.c    |   45 +++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 49 insertions(+), 1 deletions(-)
+>
 
-In the non-syscall cases we do not disable interrupts first, so we can't
-balance things in do_notify_resume.
 
-We can either add a trace_hardirqs_off call to ret_fast_syscall, or we
-can use raw_local_irq_{disable,enable}. The latter would match the
-current behaviour (and is a nicer diff). Once the syscall path is moved
-to C it would be possible to use the non-raw variants all-over.
 
-Catalin, are you happy with using the raw accessors in do_notify_resume,
-or would you prefer using trace_hardirqs_off?
-
+-- 
 Thanks,
-Mark.
-
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Chris Metcalf <cmetcalf@ezchip.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/kernel/entry.S  | 24 +++---------------------
->  arch/arm64/kernel/signal.c | 36 ++++++++++++++++++++++++++----------
->  2 files changed, 29 insertions(+), 31 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 6b30ab1..41f5dfc 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -612,35 +612,17 @@ ret_fast_syscall:
->  	ldr	x1, [tsk, #TI_FLAGS]		// re-check for syscall tracing
->  	and	x2, x1, #_TIF_SYSCALL_WORK
->  	cbnz	x2, ret_fast_syscall_trace
-> -	and	x2, x1, #_TIF_WORK_MASK
-> -	cbnz	x2, work_pending
-> -	enable_step_tsk x1, x2
-> -	kernel_exit 0
-> +	b	ret_to_user
->  ret_fast_syscall_trace:
->  	enable_irq				// enable interrupts
->  	b	__sys_trace_return_skipped	// we already saved x0
->  
->  /*
-> - * Ok, we need to do extra processing, enter the slow path.
-> - */
-> -work_pending:
-> -	tbnz	x1, #TIF_NEED_RESCHED, work_resched
-> -	/* TIF_SIGPENDING, TIF_NOTIFY_RESUME or TIF_FOREIGN_FPSTATE case */
-> -	mov	x0, sp				// 'regs'
-> -	enable_irq				// enable interrupts for do_notify_resume()
-> -	bl	do_notify_resume
-> -	b	ret_to_user
-> -work_resched:
-> -	bl	schedule
-> -
-> -/*
->   * "slow" syscall return path.
->   */
->  ret_to_user:
-> -	disable_irq				// disable interrupts
-> -	ldr	x1, [tsk, #TI_FLAGS]
-> -	and	x2, x1, #_TIF_WORK_MASK
-> -	cbnz	x2, work_pending
-> +	bl	do_notify_resume
-> +	ldr	x1, [tsk, #TI_FLAGS]		// re-check for single-step
->  	enable_step_tsk x1, x2
->  	kernel_exit 0
->  ENDPROC(ret_to_user)
-> diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-> index e18c48c..3a6c60b 100644
-> --- a/arch/arm64/kernel/signal.c
-> +++ b/arch/arm64/kernel/signal.c
-> @@ -399,18 +399,34 @@ static void do_signal(struct pt_regs *regs)
->  	restore_saved_sigmask();
->  }
->  
-> -asmlinkage void do_notify_resume(struct pt_regs *regs,
-> -				 unsigned int thread_flags)
-> +asmlinkage void do_notify_resume(void)
->  {
-> -	if (thread_flags & _TIF_SIGPENDING)
-> -		do_signal(regs);
-> +	struct pt_regs *regs = task_pt_regs(current);
-> +	unsigned long thread_flags;
->  
-> -	if (thread_flags & _TIF_NOTIFY_RESUME) {
-> -		clear_thread_flag(TIF_NOTIFY_RESUME);
-> -		tracehook_notify_resume(regs);
-> -	}
-> +	for (;;) {
-> +		local_irq_disable();
-
-This should be raw_local_irq_disable()...
-
-> +
-> +		thread_flags = READ_ONCE(current_thread_info()->flags);
-> +		if (!(thread_flags & _TIF_WORK_MASK))
-> +			break;
-> +
-> +		if (thread_flags & _TIF_NEED_RESCHED) {
-> +			schedule();
-> +			continue;
-> +		}
->  
-> -	if (thread_flags & _TIF_FOREIGN_FPSTATE)
-> -		fpsimd_restore_current_state();
-> +		local_irq_enable();
-
-... likewise, raw_local_irq_enable() here.
-
->  
-> +		if (thread_flags & _TIF_SIGPENDING)
-> +			do_signal(regs);
-> +
-> +		if (thread_flags & _TIF_NOTIFY_RESUME) {
-> +			clear_thread_flag(TIF_NOTIFY_RESUME);
-> +			tracehook_notify_resume(regs);
-> +		}
-> +
-> +		if (thread_flags & _TIF_FOREIGN_FPSTATE)
-> +			fpsimd_restore_current_state();
-> +	}
->  }
-> -- 
-> 1.9.1
-> 
+with regards,
+Suman Tripathi
