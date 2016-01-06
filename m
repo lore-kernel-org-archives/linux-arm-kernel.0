@@ -1,58 +1,148 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed,  6 Jan 2016 16:07:40 +0000
-Subject: [PATCHv2 1/2] arm64: entry: remove pointless SPSR mode check
-Message-ID: <1452096461-15232-1-git-send-email-mark.rutland@arm.com>
+Date: Wed,  6 Jan 2016 16:07:41 +0000
+Subject: [PATCHv2 2/2] arm64: factor work_pending state machine to C
+In-Reply-To: <1452096461-15232-1-git-send-email-mark.rutland@arm.com>
+References: <1452096461-15232-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1452096461-15232-2-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In work_pending  we may skip work if the stacked SPSR value represents
-anything other than an EL0 context. We then immediately invoke the
-kernel_exit 0 macro as part of ret_to_user, assuming a return to EL0.
-This is somewhat confusing.
+Currently ret_fast_syscall, work_pending, and ret_to_user form an ad-hoc
+state machine that can be difficult to reason about due to duplicated
+code and a large number of branch targets.
 
-We use work_pending as part of the ret_to_user/ret_fast_syscall state
-machine. We only use ret_fast_syscall in the return from an SVC issued
-from EL0. We use ret_to_user for return from EL0 exception handlers and
-also for return from ret_from_fork in the case the task was not a kernel
-thread (i.e. it is a user task).
+This patch factors the common logic out into the existing
+do_notify_resume function, converting the code to C in the process,
+making the code more legible.
 
-Thus in all cases the stacked SPSR value must represent an EL0 context,
-and the check is redundant. This patch removes it, along with the now
-unused no_work_pending label.
+This patch tries to closely mirror the existing behaviour while using
+the usual C control flow primitives. As local_irq_{disable,enable} may
+be instrumented, we balance exception entry (where we will almost most
+likely enable IRQs) with a call to trace_hardirqs_on just before the
+return to userspace.
+
+In the ret_fast_syscall path, the syscall tracing check is now performed
+with interrupts enabled. As this is only ever checked once, with
+interrupts enabled before the actual tracing or the work_pending state
+machine, there was always a race with concurrent modification. This
+change also allows for the removal of the irq enable and branch in
+ret_fast_syscall_trace, allowing falling through to ret_to_user in the
+fast path.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Chris Metcalf <cmetcalf@ezchip.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/entry.S | 4 ----
- 1 file changed, 4 deletions(-)
+ arch/arm64/kernel/entry.S  | 33 +++++++--------------------------
+ arch/arm64/kernel/signal.c | 36 ++++++++++++++++++++++++++----------
+ 2 files changed, 33 insertions(+), 36 deletions(-)
 
 Since v1:
-* No changes
+* Balance IRQs state for CONFIG_TRACE_IRQFLAGS
+* Simplify ret_fast_syscall
+* Fall through to ret_to_user from ret_fast_sysycall
 
 diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 7ed3d75..6b30ab1 100644
+index 6b30ab1..98ddf8d 100644
 --- a/arch/arm64/kernel/entry.S
 +++ b/arch/arm64/kernel/entry.S
-@@ -626,10 +626,7 @@ ret_fast_syscall_trace:
- work_pending:
- 	tbnz	x1, #TIF_NEED_RESCHED, work_resched
- 	/* TIF_SIGPENDING, TIF_NOTIFY_RESUME or TIF_FOREIGN_FPSTATE case */
--	ldr	x2, [sp, #S_PSTATE]
- 	mov	x0, sp				// 'regs'
--	tst	x2, #PSR_MODE_MASK		// user mode regs?
--	b.ne	no_work_pending			// returning to kernel
- 	enable_irq				// enable interrupts for do_notify_resume()
- 	bl	do_notify_resume
- 	b	ret_to_user
-@@ -645,7 +642,6 @@ ret_to_user:
- 	and	x2, x1, #_TIF_WORK_MASK
- 	cbnz	x2, work_pending
+@@ -607,40 +607,21 @@ ENDPROC(cpu_switch_to)
+  * and this includes saving x0 back into the kernel stack.
+  */
+ ret_fast_syscall:
+-	disable_irq				// disable interrupts
+ 	str	x0, [sp, #S_X0]			// returned x0
+ 	ldr	x1, [tsk, #TI_FLAGS]		// re-check for syscall tracing
+ 	and	x2, x1, #_TIF_SYSCALL_WORK
+-	cbnz	x2, ret_fast_syscall_trace
+-	and	x2, x1, #_TIF_WORK_MASK
+-	cbnz	x2, work_pending
+-	enable_step_tsk x1, x2
+-	kernel_exit 0
+-ret_fast_syscall_trace:
+-	enable_irq				// enable interrupts
+-	b	__sys_trace_return_skipped	// we already saved x0
+-
+-/*
+- * Ok, we need to do extra processing, enter the slow path.
+- */
+-work_pending:
+-	tbnz	x1, #TIF_NEED_RESCHED, work_resched
+-	/* TIF_SIGPENDING, TIF_NOTIFY_RESUME or TIF_FOREIGN_FPSTATE case */
+-	mov	x0, sp				// 'regs'
+-	enable_irq				// enable interrupts for do_notify_resume()
+-	bl	do_notify_resume
+-	b	ret_to_user
+-work_resched:
+-	bl	schedule
++	cbnz	x2, __sys_trace_return_skipped	// we already saved x0
++	/* fall-through to ret_to_user */
+ 
+ /*
+  * "slow" syscall return path.
+  */
+ ret_to_user:
+-	disable_irq				// disable interrupts
+-	ldr	x1, [tsk, #TI_FLAGS]
+-	and	x2, x1, #_TIF_WORK_MASK
+-	cbnz	x2, work_pending
++	bl	do_notify_resume
++#ifdef CONFIG_TRACE_IRQFLAGS
++	bl	trace_hardirqs_on		// enabled while in userspace
++#endif
++	ldr	x1, [tsk, #TI_FLAGS]		// re-check for single-step
  	enable_step_tsk x1, x2
--no_work_pending:
  	kernel_exit 0
  ENDPROC(ret_to_user)
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index e18c48c..3a6c60b 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -399,18 +399,34 @@ static void do_signal(struct pt_regs *regs)
+ 	restore_saved_sigmask();
+ }
  
+-asmlinkage void do_notify_resume(struct pt_regs *regs,
+-				 unsigned int thread_flags)
++asmlinkage void do_notify_resume(void)
+ {
+-	if (thread_flags & _TIF_SIGPENDING)
+-		do_signal(regs);
++	struct pt_regs *regs = task_pt_regs(current);
++	unsigned long thread_flags;
+ 
+-	if (thread_flags & _TIF_NOTIFY_RESUME) {
+-		clear_thread_flag(TIF_NOTIFY_RESUME);
+-		tracehook_notify_resume(regs);
+-	}
++	for (;;) {
++		local_irq_disable();
++
++		thread_flags = READ_ONCE(current_thread_info()->flags);
++		if (!(thread_flags & _TIF_WORK_MASK))
++			break;
++
++		if (thread_flags & _TIF_NEED_RESCHED) {
++			schedule();
++			continue;
++		}
+ 
+-	if (thread_flags & _TIF_FOREIGN_FPSTATE)
+-		fpsimd_restore_current_state();
++		local_irq_enable();
+ 
++		if (thread_flags & _TIF_SIGPENDING)
++			do_signal(regs);
++
++		if (thread_flags & _TIF_NOTIFY_RESUME) {
++			clear_thread_flag(TIF_NOTIFY_RESUME);
++			tracehook_notify_resume(regs);
++		}
++
++		if (thread_flags & _TIF_FOREIGN_FPSTATE)
++			fpsimd_restore_current_state();
++	}
+ }
 -- 
 1.9.1
