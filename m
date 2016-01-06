@@ -1,96 +1,174 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 6 Jan 2016 08:42:20 +0100
-Subject: [linux-next PATCH] arm64: fix kernel crash with 48-bit VA and
- 64KB granule
-In-Reply-To: <20160106073847.GA7608@arm.org>
-References: <1451960299-14123-1-git-send-email-dennis.chen@arm.com>
- <CAKv+Gu-pz8rA2EfU6NwCndmoYneOjYUt8_PodTdZkepV3cRXJQ@mail.gmail.com>
- <20160105083533.GD13942@arm.org>
- <CAKv+Gu9Q3CmC37dL3o+hcBeG-NJ7+bkOiLQihirje4YbazizJQ@mail.gmail.com>
- <20160105084042.GF13942@arm.org>
- <20160105095603.GG6301@e104818-lin.cambridge.arm.com>
- <20160106061407.GA7082@arm.org>
- <CAKv+Gu8t56rfdN1ot08BgsteaaincFek0uzoDAroefMWQ+kKEA@mail.gmail.com>
- <20160106073847.GA7608@arm.org>
-Message-ID: <CAKv+Gu_sqAuA_iHf_sNRJyaQUFG5n_eXxYYOHwmV0hf0GTUxow@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 6 Jan 2016 15:45:40 +0800
+Subject: [RFC] spi: dw: support setting tmode dynamically
+In-Reply-To: <CAFLsZf3pdk6EdTRoax7Mp5GGZoGKm4PuwMdG2nC-hr+StYwYQQ@mail.gmail.com>
+References: <20151223192338.128e95a4@xhacker>
+ <20151223121512.GV16023@sirena.org.uk>	<20151223202952.28be5bab@xhacker>
+ <20160105161231.GG6588@sirena.org.uk>
+ <CAFLsZf0LvrQ60GdLzp_5nPLVxSxVaPadgzT_7aL4SQzgvswQbA@mail.gmail.com>
+ <20160106142340.34e2d334@xhacker>
+ <CAFLsZf31bt+-uwTo3zBWkho3UxquRCeTmK3hNMrGLXkjwHanwA@mail.gmail.com>
+ <20160106152201.7829bdd7@xhacker>
+ <CAFLsZf3pdk6EdTRoax7Mp5GGZoGKm4PuwMdG2nC-hr+StYwYQQ@mail.gmail.com>
+Message-ID: <20160106154540.15ff75a8@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 January 2016 at 08:38, Dennis Chen <dennis.chen@arm.com> wrote:
-> On Wed, Jan 06, 2016 at 08:13:24AM +0100, Ard Biesheuvel wrote:
->> On 6 January 2016 at 07:14, Dennis Chen <dennis.chen@arm.com> wrote:
->> > On Tue, Jan 05, 2016 at 09:56:03AM +0000, Catalin Marinas wrote:
->> >> On Tue, Jan 05, 2016 at 04:40:44PM +0800, Dennis Chen wrote:
->> >> > On Tue, Jan 05, 2016 at 09:38:11AM +0100, Ard Biesheuvel wrote:
->> >> > > >> On 5 January 2016 at 03:18, Dennis Chen <dennis.chen@arm.com> wrote:
->> >> > > >> > The commit 3400749b5a22 ("arm64/efi: refactor EFI init and runtime
->> >> > > >> > code for reuse by 32-bit ARM") uses pgd_alloc() to allocate space for
->> >> > > >> > efi_mm.pgd while not the static efi_pgd[], since this function will be
->> >> > > >> > called with early_initcall, which results in the pgd_cache used by
->> >> > > >> > pgd_alloc() has not been initialized yet, kernel will hang in this
->> >> > > >> > case. This patch is trying to make the pgd_cache_init() called before
->> >> > > >> > arm_enable_runtime_services() by changing its core_initcall to
->> >> > > >> > early_initcall.
->> >> > > >> >
->> >> > > >> > Signed-off-by: Dennis Chen <dennis.chen@arm.com>
->> >> > > >> > Tested-by: Sudeep Holla <sudeep.holla@arm.com>
->> >> > > >> >
->> >> > > >> > Cc: Will Deacon <will.deacon@arm.com>
->> >> > > >> > Cc: Catalin Marinas <catalin.marinas@arm.com>
->> >> > > >> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> >> > > >> > Cc: Sudeep Holla <sudeep.holla@arm.com>
->> >> > > >> > ---
->> >> > > >> >  arch/arm64/mm/pgd.c | 2 +-
->> >> > > >> >  1 file changed, 1 insertion(+), 1 deletion(-)
->> >> > > >> >
->> >> > > >> > diff --git a/arch/arm64/mm/pgd.c b/arch/arm64/mm/pgd.c
->> >> > > >> > index cb3ba1b..859a788 100644
->> >> > > >> > --- a/arch/arm64/mm/pgd.c
->> >> > > >> > +++ b/arch/arm64/mm/pgd.c
->> >> > > >> > @@ -56,4 +56,4 @@ static int __init pgd_cache_init(void)
->> >> > > >> >                                               SLAB_PANIC, NULL);
->> >> > > >> >         return 0;
->> >> > > >> >  }
->> >> > > >> > -core_initcall(pgd_cache_init);
->> >> > > >> > +early_initcall(pgd_cache_init);
->> >> [...]
->> >> > > Well, since arm_enable_runtime_services() is an early_initcall()
->> >> > > itself, how are you guaranteeing the ordering between the two? Link
->> >> > > order?
->> >> >
->> >> > Link order.
->> >>
->> >> And can you explain how this works, what guarantees it gives?
->> >>
->> > You can take a look at include/asm-generic/vmlinux.ldx.h: INIT_CALLS macro,
->> > for the init call section, early_initcall is the first chuck in the section,
->> > followed by LEVEL[0-7]. For the same level, the layout order is determined
->> > by the link order, ARCH is always precedence over the drivers. Catalin, are
->> > you giving me a kernel examination? :)
->> >
->>
->> We all know how initcalls are implemented. The question is how you are
->> going to ensure that the early_initcall() that initializes the PGD
->> cache is always invoked before the early_initcall() that creates the
->> UEFI runtime page tables.
->>
->> And saying that the currently observed link order happens to be
->> correct is not good enough. We need to be sure that, even if we change
->> the link order, or switch to LTO at some point, things don't suddenly
->> break again.
->>
-> Well, if the build system changes the link order, it can't make sure it will break something
-> unexpectedly, needless to say the pgd_cache_init here at all.
++ linux arm kernel
 
-That is no excuse to introduce yet another failure mode.
+Dear Khoa,
 
-> Do you think the kernel
-> will change its currently link order policy? If the answer is yes, what's the benefit?
->
+On Wed, 6 Jan 2016 14:36:08 +0700 Khoa Dang Pham  wrote:
 
-It does not matter what I think. You seem to think that the link order
-is set in stone, so it is you who should argue why that is a
-reasonable assumption.
+> Hi Jisheng,
+> 
+> For me, I use the "EEPROM Read" mode as well, but I am not sure if any
+> other solution. We may need some feedbacks from other experienced
+> developers.
 
--- 
-Ard.
+Indeed, this is a common issue for spi-dw controllers, all spi-dw users
+(FWICT, most users are arm based SoCs) are impacted.
+
+> Could you please provide your solution? Any suggestion would be appreciated.
+
+My solution is: implement and export one function dw_spi_set_mode(),
+NOR flash driver call this function before and after transfer.
+
+Thanks,
+Jisheng
+
+> Regards,
+> Khoa Pham
+> 
+> 
+> On Wed, Jan 6, 2016 at 2:22 PM, Jisheng Zhang <jszhang@marvell.com> wrote:
+> > Dear Khoa,
+> >
+> > On Wed, 6 Jan 2016 14:04:30 +0700 Khoa Dang Pham wrote:
+> >  
+> >> Hi Jisheng,
+> >>
+> >> On Wed, Jan 6, 2016 at 1:23 PM, Jisheng Zhang wrote:  
+> >> > Dear Khoa, Mark,
+> >> >
+> >> > On Wed, 6 Jan 2016 08:45:38 +0700 Khoa Dang Pham wrote:
+> >> >  
+> >> >> Hi Mark,
+> >> >>
+> >> >> May I provide a bit more info about the "EEPROM read" on this controller?
+> >> >>
+> >> >> According to the "DesignWare DW_apb_ssi Databook" (version 3.21b) provided
+> >> >> by Synopsys, the EEPROM read is:
+> >> >>
+> >> >> "When TMOD = 2?b11, the transmit data is used to transmit an opcode and/or
+> >> >> an address to the EEPROM
+> >> >> device. Typically this takes three data frames (8-bit opcode followed by
+> >> >> 8-bit upper address and 8-bit lower
+> >> >> address). During the transmission of the opcode and address, no data is
+> >> >> captured by the receive logic (as
+> >> >> long as the DW_apb_ssi master is transmitting data on its txd line, data on
+> >> >> the rxd line is ignored). The
+> >> >> DW_apb_ssi master continues to transmit data until the transmit FIFO is
+> >> >> empty. Therefore, you should
+> >> >> ONLY have enough data frames in the transmit FIFO to supply the opcode and
+> >> >> address to the EEPROM. If
+> >> >> more data frames are in the transmit FIFO than are needed, then read data
+> >> >> is lost.
+> >> >> When the transmit FIFO becomes empty (all control information has been
+> >> >> sent), data on the receive line
+> >> >> (rxd) is valid and is stored in the receive FIFO; the txd output is held at
+> >> >> a constant logic level. The serial
+> >> >> transfer continues until the number of data frames received by the
+> >> >> DW_apb_ssi master matches the value of
+> >> >> the NDF field in the CTRLR1 register + 1."  
+> >> >
+> >> > I tried the following combinations:
+> >> >
+> >> > 1. "Transmit only" to send opcode and address, "Receive only" to read the
+> >> > response
+> >> >
+> >> > 2. "Transmit and Receive" to send opcode and address, "Receive only" to read
+> >> > the response
+> >> >
+> >> > 3. "Transmit and Receive" to send opcode and address, "Transmit and Receive"
+> >> > to read the response
+> >> >
+> >> > 4. "Transmit and Receive" only to send opcode and address
+> >> >
+> >> > None of the above succeed. I only succeed when using
+> >> >
+> >> > 5. EEPROM Read to send opcode, address. I can get the correct NOR flash
+> >> > content from the response.
+> >> >  
+> >>
+> >> I met the same issue before. The issue might be caused by the CS
+> >> signal is toggled
+> >> when we changed the transfer modes during opcode transmission and data
+> >> receiption.
+> >>
+> >> According to the document I referred before:
+> >> "The slave select line is held high when the DW_apb_ssi is idle or
+> >> disabled."
+> >>
+> >> In your first 4 options, you need to disable this controller to write
+> >> to the CTRLR0 register
+> >> in order to switch the transfer modes. The CS line changes from low
+> >> level (active) to high
+> >> level (inactive) during the configuration. The NOR flash sees this CS
+> >> toggle as a reset and
+> >> stops outputting requested data.  
+> >
+> > Thanks for the information. This could explain what I saw. So how to
+> > patch the spi-dw driver to support reading from NOR flash? Except
+> > configure the tmode dynamically, is there any other solution?
+> >
+> > Thanks very much for your input,
+> > Jisheng
+> >  
+> >>
+> >> Regards,
+> >> Khoa Pham
+> >>  
+> >> > Thanks,
+> >> > Jisheng
+> >> >  
+> >> >>
+> >> >> Regards,
+> >> >> Khoa Pham
+> >> >>
+> >> >> On Tue, Jan 5, 2016 at 11:12 PM, Mark Brown  wrote:
+> >> >>  
+> >> >> > On Wed, Dec 23, 2015 at 08:29:52PM +0800, Jisheng Zhang wrote:  
+> >> >> > > On Wed, 23 Dec 2015 12:15:12 +0000 Mark Brown wrote:  
+> >> >> > > > On Wed, Dec 23, 2015 at 07:23:38PM +0800, Jisheng Zhang wrote:  
+> >> >> >  
+> >> >> > > > > Currently the spi-dw tmode is fixed to SPI_TMOD_TR if cs_control is  
+> >> >> > NULL, but we  
+> >> >> > > > > need to set it as SPI_TMOD_EPROMREAD to read nor flash, my solution  
+> >> >> > is to add and  
+> >> >> > > > > export one functions to set the tmode, then the nor flash driver  
+> >> >> > call it  
+> >> >> > > > > before reading and set back to SPI_TMOD_TR after done.  
+> >> >> >  
+> >> >> > > > What does this mean - what is TMOD and why do we need to set it to read
+> >> >> > > > NOR flash?  I've no information on this controller...  
+> >> >> >  
+> >> >> > > TMOD is one field of DW_SPI_CTRL0. Its available value could be:  
+> >> >> >  
+> >> >> > > 0: Transmit and Receive
+> >> >> > > 1: Transmit only
+> >> >> > > 2: Receive only
+> >> >> > > 3: EEPROM Read  
+> >> >> >  
+> >> >> > > If the one spi nor flash is connected to the SPI host, so far I can only  
+> >> >> > succeed  
+> >> >> > > to read the nor flash content after setting the TMOD field as 3.  
+> >> >> >
+> >> >> > Why?  What does this mean in practical terms at the hardware level, what
+> >> >> > is "EEPROM read"?  It sounds like there's some bigger issue here.
+> >> >> >  
+> >> >>  
+> >> >  
+> >>  
+> >  
+> 
