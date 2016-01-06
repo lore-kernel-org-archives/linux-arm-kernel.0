@@ -1,48 +1,34 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Wed, 06 Jan 2016 16:39:24 +0800
-Subject: [PATCH v7 0/5] Add mipi dsi support for rk3288
-In-Reply-To: <1452053038-32098-1-git-send-email-zyw@rock-chips.com>
-References: <1452053038-32098-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <568CD2BC.7080800@rock-chips.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 6 Jan 2016 09:51:18 +0100
+Subject: [PATCH v2] ARM: shmobile: gose: add i2c2 bus to device tree
+In-Reply-To: <1451945780-17558-1-git-send-email-horms+renesas@verge.net.au>
+References: <1451945780-17558-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20160106085118.GF1525@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016?01?06? 12:03, Chris Zhong wrote:
-> The rk3288 MIPI DSI is a Synopsys DesignWare MIPI DSI host controller
-> IP. This series adds support for a Synopsys DesignWare MIPI DSI host
-> controller DRM driver.
->
-> The MIPI DSI feature is tested on rk3288 evb board, backport them to
-> chrome os kernel chrome_v3.14, and it can display normally.
->
-> This patchset is base on the patchset from Ying.liu at freescale.com.
-> <http://www.spinics.net/lists/dri-devel/msg77181.html>
->
-> According to the suggestion from Thierry, I have get rid of the bridge,
-> and register the encoder & connecter in drm/rockchip/dw-mipi-dsi.c.
->
-> After backport below patches from linux-next, I can merge this serial into
-> Dave's drm-next branch.
->
-> 94d5d6a0fbf3 clk: rockchip: add an id for rk3288 crypto clk
-> c6d49fbcfcc4 clk: rockchip: add id for mipidsi sclk on rk3288
-> a2f4c560f18e clk: rockchip: add mipidsi clock on rk3288
-> 69c923743640 ARM: dts: rockchip: correct the name of REG8 for rk3288-evb-act8846
-> 662513a14c9d ARM: dts: rockchip: add 2 regulators for rk3288-evb-act8846
-> b04061e6599b ARM: dts: rockchip: move the public part to rk3288-evb common
->
->
->
-Hi Chris
+On Tue, Jan 05, 2016 at 09:16:20AM +1100, Simon Horman wrote:
+> Activate i2c2 bus in r8a7793/gose device tree.
+> 
+> Based on similar work for the r8a7791/koelsch by Wolfram Sang.
+> 
+> Cc: Wolfram Sang <wsa@sang-engineering.com>
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-I had picked following three patches and send a pull-request to Dave
-       [PATCH v7 1/5] drm/rockchip: return a true clock rate to 
-adjusted_mode
-       [PATCH v7 2/5] Documentation: dt-bindings: Add bindings for 
-rk3288 DW MIPI DSI driver
-       [PATCH v7.2 3/5] drm: rockchip: Support Synopsys DW MIPI DSI
+Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-Thanks.
+> * Update eprom compat strings to "renesas,r1ex24002", "atmel,24c02".
+>   The former needs to be documented once the desired mechanism
+>   for documenting eprom compat strings has been confirmed
+>   with the maintainer.
 
--- 
-?ark Yao
+I'll take care of this now.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160106/e38b612e/attachment.sig>
