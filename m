@@ -1,46 +1,49 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Wed, 6 Jan 2016 11:20:27 +0800
-Subject: [PATCH v2 0/3] USB: add generic onboard USB HUB driver
-In-Reply-To: <CAL_Jsq+P8SBmWzNURrmNgz8soCn4QPOPid4SXF0a3TYL_SH27A@mail.gmail.com>
-References: <CAL411-rK6qfkbQsSjvXH5VPAQAm4tMyD6fVTEgFQrpLHNGMXeA@mail.gmail.com>
- <Pine.LNX.4.44L0.1512181030590.1682-100000@iolanthe.rowland.org>
- <CAL411-qKE=12VZAN9=tUWPqkC5BfSgpQb9aNgCU6rmPLasXNHQ@mail.gmail.com>
- <CAL_Jsq+P8SBmWzNURrmNgz8soCn4QPOPid4SXF0a3TYL_SH27A@mail.gmail.com>
-Message-ID: <20160106032027.GA23726@shlinux2>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 6 Jan 2016 11:55:53 +0800
+Subject: [PATCH v2 00/12] mmc: use sdhci_pltfm_init for private allocation and
+ clean up
+Message-ID: <1452052565-4232-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 05, 2016 at 08:36:31AM -0600, Rob Herring wrote:
-> > 2. There are MFD USB devices, which includes several interfaces under
-> > USB device,
-> > like i2c, gpios, etc. Due to lack of device tree support, USB
-> > class/device driver doesn't know
-> > which kinds of interfaces are needed for this board.
-> 
-> Are you talking about a device hard wired on the same board or
-> something like GPIOs on FTDI chip which could be hot-plugged in any
-> host (including non-DT based)?
+These patches are to complete the TODOs in Commit 0e748234293f ("mmc:
+sdhci: Add size for caller in init+register"), I.E:
 
-I talked about the case that the device hard wired on the board.
-Hot-plug device's bus topology is unknown, we can't describe it
-statically at dts.
+- todo: migrate clients to using allocation this way
+- todo: remove priv variable once migration is complete
 
-> 
-> For the hotplug case, we will need a way to associate a DT overlay
-> with the USB device and there may not even be a base DT to map the
-> overlay into. In this case, the USB device's driver will need to load
-> the overlay and trigger enumerating the child devices. Anyway, this is
-> a separate issue from your problem.
-> 
+Since v1:
+ - add new patch03 to factorise sdhci_msm_pdata outisde of sdhci_msm_host.
+   This is to fix drivers/mmc/host/sdhci-msm.c:440:32: warning: 'msm_host'
+   is used uninitialized in this function [-Wuninitialized]
+ - Add Arnd's Ack for all patches except patch3 which is new in v2
 
-Since both you and Alan agree with my problem should be fixed at
-bootloader, I give the kernel solution up. 
+Jisheng Zhang (12):
+  mmc: sdhci-bcm2835: use sdhci_pltfm_init for private allocation
+  mmc: sdhci-esdhc-imx: use sdhci_pltfm_init for private allocation
+  mmc: sdhci-msm: factorise sdhci_msm_pdata outisde of sdhci_msm_host
+  mmc: sdhci-msm: use sdhci_pltfm_init for private allocation
+  mmc: sdhci-of-arasan: use sdhci_pltfm_init for private allocation
+  mmc: sdhci-of-at91: use sdhci_pltfm_init for private allocation
+  mmc: sdhci-of-esdhc: use sdhci_pltfm_init for private allocation
+  mmc: sdhci-pxav3: use sdhci_pltfm_init for private allocation
+  mmc: sdhci-st: use sdhci_pltfm_init for private allocation
+  mmc: sdhci-tegra: use sdhci_pltfm_init for private allocation
+  mmc: sdhci-pxav2: remove unnecessary assignment of pltfm_host->priv
+  mmc: sdhci-pltfm: remove priv variable from sdhci_pltfm_host
 
-The another thing I open to discuss is how to let USB devices know its
-device node, the user reported issue that they can't handle interfaces
-below in USB device since that.
+ drivers/mmc/host/sdhci-bcm2835.c   | 14 +++-----------
+ drivers/mmc/host/sdhci-esdhc-imx.c | 38 +++++++++++++++++---------------------
+ drivers/mmc/host/sdhci-msm.c       | 24 +++++++++++-------------
+ drivers/mmc/host/sdhci-of-arasan.c | 25 ++++++++++---------------
+ drivers/mmc/host/sdhci-of-at91.c   | 21 ++++++++-------------
+ drivers/mmc/host/sdhci-of-esdhc.c  | 17 ++++++++---------
+ drivers/mmc/host/sdhci-pltfm.h     |  1 -
+ drivers/mmc/host/sdhci-pxav2.c     |  1 -
+ drivers/mmc/host/sdhci-pxav3.c     | 21 +++++++++------------
+ drivers/mmc/host/sdhci-st.c        | 36 ++++++++++++++++++------------------
+ drivers/mmc/host/sdhci-tegra.c     | 19 ++++++-------------
+ 11 files changed, 90 insertions(+), 127 deletions(-)
 
 -- 
-
-Best Regards,
-Peter Chen
+2.7.0.rc3
