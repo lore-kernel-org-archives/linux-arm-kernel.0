@@ -1,26 +1,26 @@
 From: davem@davemloft.net (David Miller)
-Date: Wed, 06 Jan 2016 00:01:12 -0500 (EST)
-Subject: [PATCH] net: hns: avoid uninitialized variable warning:
-In-Reply-To: <6649249.INrAY8KJG0@wuerfel>
-References: <6649249.INrAY8KJG0@wuerfel>
-Message-ID: <20160106.000112.1783241133330740168.davem@davemloft.net>
+Date: Wed, 06 Jan 2016 00:44:42 -0500 (EST)
+Subject: [PATCH] net: filter: make JITs zero A for SKF_AD_ALU_XOR_X
+In-Reply-To: <1452007387-626-1-git-send-email-rabin@rab.in>
+References: <1452007387-626-1-git-send-email-rabin@rab.in>
+Message-ID: <20160106.004442.109655096478479740.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Fri, 01 Jan 2016 23:27:57 +0100
+From: Rabin Vincent <rabin@rab.in>
+Date: Tue,  5 Jan 2016 16:23:07 +0100
 
-> gcc fails to see that the use of the 'last_offset' variable
-> in hns_nic_reuse_page() is used correctly and issues a bogus
-> warning:
+> The SKF_AD_ALU_XOR_X ancillary is not like the other ancillary data
+> instructions since it XORs A with X while all the others replace A with
+> some loaded value.  All the BPF JITs fail to clear A if this is used as
+> the first instruction in a filter.  This was found using american fuzzy
+> lop.
 > 
-> drivers/net/ethernet/hisilicon/hns/hns_enet.c: In function 'hns_nic_reuse_page':
-> drivers/net/ethernet/hisilicon/hns/hns_enet.c:541:6: warning: 'last_offset' may be used uninitialized in this function [-Wmaybe-uninitialized]
+> Add a helper to determine if A needs to be cleared given the first
+> instruction in a filter, and use this in the JITs.  Except for ARM, the
+> rest have only been compile-tested.
 > 
-> This simplifies the function to make it more obvious what is
-> going on to both readers and compilers, which makes the warning
-> go away.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 3480593131e0 ("net: filter: get rid of BPF_S_* enum")
+> Signed-off-by: Rabin Vincent <rabin@rab.in>
 
-Applied, thanks.
+Applied and queued up for -stable, thanks!
