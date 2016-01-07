@@ -1,49 +1,90 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 6 Jan 2016 15:36:56 -0800
-Subject: [PATCH v3] ARM: fix atags_to_fdt with stack-protector-strong
-Message-ID: <20160106233656.GA9316@www.outflux.net>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 6 Jan 2016 18:10:47 -0600
+Subject: [PATCH] PCI: iproc: fix msi driver selection
+In-Reply-To: <1541985.1Jq5kHC7MS@wuerfel>
+References: <1541985.1Jq5kHC7MS@wuerfel>
+Message-ID: <20160107001046.GA7083@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Building with CONFIG_CC_STACKPROTECTOR_STRONG triggers protection code
-generation under CONFIG_ARM_ATAG_DTB_COMPAT but this is too early for
-being able to use any of the stack_chk code. Explicitly disable it for
-only the atags_to_fdt bits.
+On Fri, Dec 18, 2015 at 03:57:53PM +0100, Arnd Bergmann wrote:
+> The newly added MSI support for iproc causes a link error when its
+> Kconfig option is disabled:
+> 
+> ERROR: "iproc_msi_exit" [drivers/pci/host/pcie-iproc.ko] undefined!
+> ERROR: "iproc_msi_init" [drivers/pci/host/pcie-iproc.ko] undefined!
+> 
+> This changes the header file so we use stub functions whenever
+> the driver is not built, even when CONFIG_MSI is enabled.
+> 
+> As the Kconfig logic for the driver is a bit off, I'm rectifying
+> that as well, by making it depend on the specific drivers that
+> call into the driver, and moving the option behind those instead
+> of before them.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 610894347cbf ("PCI: iproc: Add iProc PCIe MSI support")
 
-Suggested-by: zhxihu <zhxihu@marvell.com>
-Signed-off-by: Kees Cook <keescook@chromium.org>
----
-v3:
-- actually send to everyone correctly
-v2:
-- use call cc-option unconditionally, arnd
----
- arch/arm/boot/compressed/Makefile | 8 ++++++++
- 1 file changed, 8 insertions(+)
+Applied with Ray's Reviewed-by to pci/host-iproc for v4.5, thanks!
 
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 3f9a9ebc77c3..d7d2c2981f65 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -106,6 +106,14 @@ ORIG_CFLAGS := $(KBUILD_CFLAGS)
- KBUILD_CFLAGS = $(subst -pg, , $(ORIG_CFLAGS))
- endif
- 
-+# -fstack-protector-strong triggers protection checks in this code,
-+# but it is being used too early to link to meaningful stack_chk logic.
-+CFLAGS_atags_to_fdt.o := $(call cc-option, -fno-stack-protector)
-+CFLAGS_fdt.o := $(call cc-option, -fno-stack-protector)
-+CFLAGS_fdt_ro.o := $(call cc-option, -fno-stack-protector)
-+CFLAGS_fdt_rw.o := $(call cc-option, -fno-stack-protector)
-+CFLAGS_fdt_wip.o := $(call cc-option, -fno-stack-protector)
-+
- ccflags-y := -fpic -mno-single-pic-base -fno-builtin -I$(obj)
- asflags-y := -DZIMAGE
- 
--- 
-2.6.3
+Actually, since 610894347cbf hasn't been merged upstream yet, I just
+squashed this fix into it and updated "pci/host-iproc" and "next".
 
-
--- 
-Kees Cook
-Chrome OS & Brillo Security
+> ---
+> Found on ARM randconfig builds a couple of days ago
+> 
+> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> index 490476e172fd..d7c05894af70 100644
+> --- a/drivers/pci/host/Kconfig
+> +++ b/drivers/pci/host/Kconfig
+> @@ -124,15 +124,6 @@ config PCIE_IPROC
+>  	  iProc family of SoCs. An appropriate bus interface driver needs
+>  	  to be enabled to select this.
+>  
+> -config PCIE_IPROC_MSI
+> -	bool "Broadcom iProc PCIe MSI support"
+> -	depends on ARCH_BCM_IPROC && PCI_MSI
+> -	select PCI_MSI_IRQ_DOMAIN
+> -	default ARCH_BCM_IPROC
+> -	help
+> -	  Say Y here if you want to enable MSI support for Broadcom's iProc
+> -	  PCIe controller
+> -
+>  config PCIE_IPROC_PLATFORM
+>  	tristate "Broadcom iProc PCIe platform bus driver"
+>  	depends on ARCH_BCM_IPROC || (ARM && COMPILE_TEST)
+> @@ -154,6 +145,16 @@ config PCIE_IPROC_BCMA
+>  	  Say Y here if you want to use the Broadcom iProc PCIe controller
+>  	  through the BCMA bus interface
+>  
+> +config PCIE_IPROC_MSI
+> +	bool "Broadcom iProc PCIe MSI support"
+> +	depends on PCIE_IPROC_PLATFORM || PCIE_IPROC_BCMA
+> +	depends on PCI_MSI
+> +	select PCI_MSI_IRQ_DOMAIN
+> +	default ARCH_BCM_IPROC
+> +	help
+> +	  Say Y here if you want to enable MSI support for Broadcom's iProc
+> +	  PCIe controller
+> +
+>  config PCIE_ALTERA
+>  	bool "Altera PCIe controller"
+>  	depends on ARM || NIOS2
+> diff --git a/drivers/pci/host/pcie-iproc.h b/drivers/pci/host/pcie-iproc.h
+> index 6def23a7eb54..e84d93c53c7b 100644
+> --- a/drivers/pci/host/pcie-iproc.h
+> +++ b/drivers/pci/host/pcie-iproc.h
+> @@ -79,7 +79,7 @@ struct iproc_pcie {
+>  int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res);
+>  int iproc_pcie_remove(struct iproc_pcie *pcie);
+>  
+> -#ifdef CONFIG_PCI_MSI
+> +#ifdef CONFIG_PCIE_IPROC_MSI
+>  int iproc_msi_init(struct iproc_pcie *pcie, struct device_node *node);
+>  void iproc_msi_exit(struct iproc_pcie *pcie);
+>  #else
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
