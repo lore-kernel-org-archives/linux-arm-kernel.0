@@ -1,35 +1,24 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu,  7 Jan 2016 12:01:59 +0000
-Subject: [PATCH] arm64/dts: Add missing DMA Abort interrupt to Juno
-Message-ID: <6a66d2ac442925e066fe9b67ee2883de5894b0d3.1452168063.git.robin.murphy@arm.com>
+From: louis.yu@mediatek.com (Louis Yu)
+Date: Thu, 7 Jan 2016 20:09:42 +0800
+Subject: [PATCH 0/2] Add Mediatek MT2701 SMP support
+Message-ID: <1452168584-25394-1-git-send-email-louis.yu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DMA-330 has an "irq_abort" interrupt line on which it signals faults
-separately from the "irq[n:0]" channel interrupts. On Juno, this is
-wired up to SPI 92; add it to the DT so that DMAC faults are correctly
-reported for the driver to reset the thing, rather than leaving it
-locked up and waiting to time out.
+This patchset is based on 4.4-rc8 and [1], and contains smp support
+for Mediatek MT2701. MT2701 contains 4 CA7 cores.
 
-CC: Liviu Dudau <liviu.dudau@arm.com>
-CC: Sudeep Holla <sudeep.holla@arm.com>
-CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- arch/arm64/boot/dts/arm/juno-base.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+This patchset adds related SMP support for Mediatek MT2701.
 
-diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
-index dd5158e..e5b59ca 100644
---- a/arch/arm64/boot/dts/arm/juno-base.dtsi
-+++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
-@@ -115,6 +115,7 @@
- 			     <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>,
- 			     <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>,
- 			     <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>,
- 			     <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>,
- 			     <GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH>,
- 			     <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>,
--- 
-1.9.1
+[1] https://patchwork.kernel.org/patch/7248471/
+
+Louis Yu (2):
+  ARM: mediatek: add mt2701 smp bringup code
+  ARM: dts: mt2701: enable basic SMP bringup for mt2701
+
+ arch/arm/boot/dts/mt2701.dtsi    |   12 ++++++++++++
+ arch/arm/mach-mediatek/platsmp.c |    1 +
+ 2 files changed, 13 insertions(+)
+
+--
+1.7.9.5
