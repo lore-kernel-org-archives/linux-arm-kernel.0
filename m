@@ -1,36 +1,48 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Thu,  7 Jan 2016 16:25:55 +0800
-Subject: [PATCH v2 12/12] ARM: dts: Add pl330-broken-no-flushp quirk for
- rk3036 SoCs
-In-Reply-To: <1452155155-16232-1-git-send-email-wxt@rock-chips.com>
-References: <1452155155-16232-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1452155155-16232-13-git-send-email-wxt@rock-chips.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 7 Jan 2016 14:14:22 +0530
+Subject: [PATCH] arm: pci: mark the dra7xx driver as broken
+In-Reply-To: <20160107081102.GA6243@localhost.localdomain>
+References: <20160106214518.GA6106@localhost.localdomain>
+ <568DF4FE.5010704@ti.com> <20160107081102.GA6243@localhost.localdomain>
+Message-ID: <568E2566.6000209@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pl330 integrated in rk3036platform doesn't support
-DMAFLUSHP function. So we add arm,pl330-broken-no-flushp quirk
-for it.
+Hi Richard,
 
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
----
+On Thursday 07 January 2016 01:41 PM, Richard Cochran wrote:
+> This patch marks the dra7xx pci host driver as broken.  This driver
+> was first merged in v3.17 and has never worked.  Although the driver
+> compiles just fine, it is missing an essential device reset.  If the
+> driver is included, the kernel locks up hard shortly after booting,
+> before any console output appears.
+> 
+> Signed-off-by: Richard Cochran <richardcochran@gmail.com>
+> 
+> ---
+>  drivers/pci/host/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> index d5e58ba..d83e8f0 100644
+> --- a/drivers/pci/host/Kconfig
+> +++ b/drivers/pci/host/Kconfig
+> @@ -5,6 +5,7 @@ config PCI_DRA7XX
+>  	bool "TI DRA7xx PCIe controller"
+>  	select PCIE_DW
+>  	depends on OF && HAS_IOMEM && TI_PIPE3
+> +	depends on BROKEN
 
-Changes in v2: None
+In my point of view the driver is not broken as such but an independent piece
+(reset) which is missing, since this driver compiles and works fine if that
+reset piece is added. You are right in that this shouldn't have been probed
+since it's known that the reset piece is missing. Maybe we should just set
+"status = disabled" in dra7.dtsi and when that reset piece is added enable it
+back in dra7-evm.dts?
 
- arch/arm/boot/dts/rk3036.dtsi | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
-index 6ff03e3..0168817 100644
---- a/arch/arm/boot/dts/rk3036.dtsi
-+++ b/arch/arm/boot/dts/rk3036.dtsi
-@@ -102,6 +102,7 @@
- 		pdma: pdma at 20078000 {
- 			compatible = "arm,pl330", "arm,primecell";
- 			reg = <0x20078000 0x4000>;
-+			arm,pl330-broken-no-flushp;
- 			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
- 				     <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
- 			#dma-cells = <1>;
--- 
-1.9.1
+Thanks
+Kishon
+>  	help
+>  	 Enables support for the PCIe controller in the DRA7xx SoC.  There
+>  	 are two instances of PCIe controller in DRA7xx.  This controller can
+> 
