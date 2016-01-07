@@ -1,148 +1,413 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Fri, 8 Jan 2016 02:34:25 +0300
-Subject: [PATCH v6 07/21] thread: move thread bits accessors to separated file
+Date: Fri, 8 Jan 2016 02:34:26 +0300
+Subject: [PATCH v6 08/21] arm64: introduce is_a32_task and is_a32_thread (for
+ AArch32 compat)
 In-Reply-To: <1452209679-19445-1-git-send-email-ynorov@caviumnetworks.com>
 References: <1452209679-19445-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1452209679-19445-8-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1452209679-19445-9-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-They may be accessed from low-level code, so isolating is a measure to
-avoid circular dependencies in header files.
+Based on patch of Andrew Pinski.
 
-The exact reason for circular dependency is WARN_ON() macro added in
-patch edd63a27 (set_restore_sigmask() is never called without SIGPENDING
-(and never should be)).
+This patch introduces is_a32_compat_task and is_a32_thread so it is
+easier to say this is a a32 specific thread or a generic compat thread/task.
+Corresponding functions are located in <asm/is_compat.h> to avoid mess in
+headers.
 
+Some files include both <linux/compat.h> and <asm/compat.h>,
+and this is wrong because <linux/compat.h> has <asm/compat.h> already
+included. It was fixed too.
+
+Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
+Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
 Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+Reviewed-by: David Daney <ddaney@caviumnetworks.com>
 ---
- include/linux/thread_bits.h | 55 +++++++++++++++++++++++++++++++++++++++++++++
- include/linux/thread_info.h | 44 +-----------------------------------
- 2 files changed, 56 insertions(+), 43 deletions(-)
- create mode 100644 include/linux/thread_bits.h
+ arch/arm64/include/asm/compat.h      | 19 ++----------
+ arch/arm64/include/asm/elf.h         |  7 ++---
+ arch/arm64/include/asm/is_compat.h   | 58 ++++++++++++++++++++++++++++++++++++
+ arch/arm64/include/asm/memory.h      |  3 +-
+ arch/arm64/include/asm/processor.h   |  5 ++--
+ arch/arm64/include/asm/thread_info.h |  2 +-
+ arch/arm64/kernel/hw_breakpoint.c    | 10 +++----
+ arch/arm64/kernel/perf_regs.c        |  2 +-
+ arch/arm64/kernel/process.c          |  5 ++--
+ arch/arm64/kernel/ptrace.c           |  9 +++---
+ arch/arm64/kernel/signal.c           |  4 +--
+ arch/arm64/kernel/traps.c            |  3 +-
+ 12 files changed, 84 insertions(+), 43 deletions(-)
+ create mode 100644 arch/arm64/include/asm/is_compat.h
 
-diff --git a/include/linux/thread_bits.h b/include/linux/thread_bits.h
+diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
+index eb8432b..df2f72d 100644
+--- a/arch/arm64/include/asm/compat.h
++++ b/arch/arm64/include/asm/compat.h
+@@ -24,6 +24,8 @@
+ #include <linux/types.h>
+ #include <linux/sched.h>
+ 
++#include <asm/is_compat.h>
++
+ #define COMPAT_USER_HZ		100
+ #ifdef __AARCH64EB__
+ #define COMPAT_UTS_MACHINE	"armv8b\0\0"
+@@ -298,23 +300,6 @@ struct compat_shmid64_ds {
+ 	compat_ulong_t __unused5;
+ };
+ 
+-static inline int is_compat_task(void)
+-{
+-	return test_thread_flag(TIF_32BIT);
+-}
+-
+-static inline int is_compat_thread(struct thread_info *thread)
+-{
+-	return test_ti_thread_flag(thread, TIF_32BIT);
+-}
+-
+-#else /* !CONFIG_COMPAT */
+-
+-static inline int is_compat_thread(struct thread_info *thread)
+-{
+-	return 0;
+-}
+-
+ #endif /* CONFIG_COMPAT */
+ #endif /* __KERNEL__ */
+ #endif /* __ASM_COMPAT_H */
+diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+index faad6df..2f62ded 100644
+--- a/arch/arm64/include/asm/elf.h
++++ b/arch/arm64/include/asm/elf.h
+@@ -16,6 +16,7 @@
+ #ifndef __ASM_ELF_H
+ #define __ASM_ELF_H
+ 
++#include <linux/compat.h>
+ #include <asm/hwcap.h>
+ 
+ /*
+@@ -148,13 +149,9 @@ extern int arch_setup_additional_pages(struct linux_binprm *bprm,
+ 				       int uses_interp);
+ 
+ /* 1GB of VA */
+-#ifdef CONFIG_COMPAT
+-#define STACK_RND_MASK			(test_thread_flag(TIF_32BIT) ? \
++#define STACK_RND_MASK			(is_compat_task() ? \
+ 						0x7ff >> (PAGE_SHIFT - 12) : \
+ 						0x3ffff >> (PAGE_SHIFT - 12))
+-#else
+-#define STACK_RND_MASK			(0x3ffff >> (PAGE_SHIFT - 12))
+-#endif
+ 
+ #ifdef CONFIG_COMPAT
+ 
+diff --git a/arch/arm64/include/asm/is_compat.h b/arch/arm64/include/asm/is_compat.h
 new file mode 100644
-index 0000000..0d05d16
+index 0000000..6139b5a
 --- /dev/null
-+++ b/include/linux/thread_bits.h
-@@ -0,0 +1,55 @@
-+
-+/* thread_bits.h: common low-level thread bits accessors */
-+
-+#ifndef _LINUX_THREAD_BITS_H
-+#define _LINUX_THREAD_BITS_H
-+
-+#ifndef __ASSEMBLY__
-+
-+#include <linux/bitops.h>
-+#include <asm/thread_info.h>
-+
++++ b/arch/arm64/include/asm/is_compat.h
+@@ -0,0 +1,58 @@
 +/*
-+ * flag set/clear/test wrappers
-+ * - pass TIF_xxxx constants to these functions
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+static inline void set_ti_thread_flag(struct thread_info *ti, int flag)
++#ifndef __ASM_IS_COMPAT_H
++#define __ASM_IS_COMPAT_H
++#ifndef __ASSEMBLY__
++
++#include <linux/thread_bits.h>
++
++#ifdef CONFIG_AARCH32_EL0
++
++static inline int is_a32_compat_task(void)
 +{
-+	set_bit(flag, (unsigned long *)&ti->flags);
++	return test_thread_flag(TIF_32BIT);
 +}
 +
-+static inline void clear_ti_thread_flag(struct thread_info *ti, int flag)
++static inline int is_a32_compat_thread(struct thread_info *thread)
 +{
-+	clear_bit(flag, (unsigned long *)&ti->flags);
++	return test_ti_thread_flag(thread, TIF_32BIT);
 +}
 +
-+static inline int test_and_set_ti_thread_flag(struct thread_info *ti, int flag)
++#else
++
++static inline int is_a32_compat_task(void)
++
 +{
-+	return test_and_set_bit(flag, (unsigned long *)&ti->flags);
++	return 0;
 +}
 +
-+static inline int test_and_clear_ti_thread_flag(struct thread_info *ti, int flag)
++static inline int is_a32_compat_thread(struct thread_info *thread)
 +{
-+	return test_and_clear_bit(flag, (unsigned long *)&ti->flags);
++	return 0;
 +}
 +
-+static inline int test_ti_thread_flag(struct thread_info *ti, int flag)
++#endif /* CONFIG_AARCH32_EL0 */
++
++#ifdef CONFIG_COMPAT
++
++static inline int is_compat_task(void)
 +{
-+	return test_bit(flag, (unsigned long *)&ti->flags);
++	return is_a32_compat_task();
 +}
 +
-+#define set_thread_flag(flag) \
-+	set_ti_thread_flag(current_thread_info(), flag)
-+#define clear_thread_flag(flag) \
-+	clear_ti_thread_flag(current_thread_info(), flag)
-+#define test_and_set_thread_flag(flag) \
-+	test_and_set_ti_thread_flag(current_thread_info(), flag)
-+#define test_and_clear_thread_flag(flag) \
-+	test_and_clear_ti_thread_flag(current_thread_info(), flag)
-+#define test_thread_flag(flag) \
-+	test_ti_thread_flag(current_thread_info(), flag)
++#endif /* CONFIG_COMPAT */
 +
 +#endif /* !__ASSEMBLY__ */
-+#endif /* _LINUX_THREAD_BITS_H */
-+
-diff --git a/include/linux/thread_info.h b/include/linux/thread_info.h
-index ff307b5..c905fec 100644
---- a/include/linux/thread_info.h
-+++ b/include/linux/thread_info.h
-@@ -50,8 +50,7 @@ struct restart_block {
++#endif /* __ASM_IS_COMPAT_H */
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index 853953c..5ec1b74 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -25,6 +25,7 @@
+ #include <linux/const.h>
+ #include <linux/types.h>
+ #include <asm/sizes.h>
++#include <asm/is_compat.h>
  
- extern long do_no_restart_syscall(struct restart_block *parm);
+ /*
+  * Allow for constants defined here to be used from assembly code
+@@ -60,7 +61,7 @@
  
--#include <linux/bitops.h>
--#include <asm/thread_info.h>
-+#include <linux/thread_bits.h>
+ #ifdef CONFIG_COMPAT
+ #define TASK_SIZE_32		UL(0x100000000)
+-#define TASK_SIZE		(test_thread_flag(TIF_32BIT) ? \
++#define TASK_SIZE		(is_compat_task() ?		\
+ 				TASK_SIZE_32 : TASK_SIZE_64)
+ #define TASK_SIZE_OF(tsk)	(test_tsk_thread_flag(tsk, TIF_32BIT) ? \
+ 				TASK_SIZE_32 : TASK_SIZE_64)
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index 9c4d95d..e4e56ae 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -29,6 +29,7 @@
  
- #ifdef __KERNEL__
+ #include <linux/string.h>
  
-@@ -61,47 +60,6 @@ extern long do_no_restart_syscall(struct restart_block *parm);
- # define THREADINFO_GFP		(GFP_KERNEL | __GFP_NOTRACK)
++#include <asm/is_compat.h>
+ #include <asm/fpsimd.h>
+ #include <asm/hw_breakpoint.h>
+ #include <asm/pgtable-hwdef.h>
+@@ -39,7 +40,7 @@
+ #define STACK_TOP_MAX		TASK_SIZE_64
+ #ifdef CONFIG_COMPAT
+ #define AARCH32_VECTORS_BASE	0xffff0000
+-#define STACK_TOP		(test_thread_flag(TIF_32BIT) ? \
++#define STACK_TOP		(is_compat_task() ? \
+ 				AARCH32_VECTORS_BASE : STACK_TOP_MAX)
+ #else
+ #define STACK_TOP		STACK_TOP_MAX
+@@ -92,7 +93,7 @@ struct thread_struct {
+ #define task_user_tls(t)						\
+ ({									\
+ 	unsigned long *__tls;						\
+-	if (is_compat_thread(task_thread_info(t)))			\
++	if (is_a32_compat_thread(task_thread_info(t)))			\
+ 		__tls = &(t)->thread.tp2_value;				\
+ 	else								\
+ 		__tls = &(t)->thread.tp_value;				\
+diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+index 90c7ff2..dd046c5 100644
+--- a/arch/arm64/include/asm/thread_info.h
++++ b/arch/arm64/include/asm/thread_info.h
+@@ -112,7 +112,7 @@ static inline struct thread_info *current_thread_info(void)
+ #define TIF_FREEZE		19
+ #define TIF_RESTORE_SIGMASK	20
+ #define TIF_SINGLESTEP		21
+-#define TIF_32BIT		22	/* 32bit process */
++#define TIF_32BIT		22	/* AARCH32 process */
+ 
+ #define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)
+ #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
+diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
+index b45c95d..baa1eba 100644
+--- a/arch/arm64/kernel/hw_breakpoint.c
++++ b/arch/arm64/kernel/hw_breakpoint.c
+@@ -164,7 +164,7 @@ enum hw_breakpoint_ops {
+ 	HW_BREAKPOINT_RESTORE
+ };
+ 
+-static int is_compat_bp(struct perf_event *bp)
++static int is_a32_compat_bp(struct perf_event *bp)
+ {
+ 	struct task_struct *tsk = bp->hw.target;
+ 
+@@ -175,7 +175,7 @@ static int is_compat_bp(struct perf_event *bp)
+ 	 * deprecated behaviour if we use unaligned watchpoints in
+ 	 * AArch64 state.
+ 	 */
+-	return tsk && is_compat_thread(task_thread_info(tsk));
++	return tsk && is_a32_compat_thread(task_thread_info(tsk));
+ }
+ 
+ /**
+@@ -435,7 +435,7 @@ static int arch_build_bp_info(struct perf_event *bp)
+ 	 * Watchpoints can be of length 1, 2, 4 or 8 bytes.
+ 	 */
+ 	if (info->ctrl.type == ARM_BREAKPOINT_EXECUTE) {
+-		if (is_compat_bp(bp)) {
++		if (is_a32_compat_bp(bp)) {
+ 			if (info->ctrl.len != ARM_BREAKPOINT_LEN_2 &&
+ 			    info->ctrl.len != ARM_BREAKPOINT_LEN_4)
+ 				return -EINVAL;
+@@ -492,7 +492,7 @@ int arch_validate_hwbkpt_settings(struct perf_event *bp)
+ 	 * AArch32 tasks expect some simple alignment fixups, so emulate
+ 	 * that here.
+ 	 */
+-	if (is_compat_bp(bp)) {
++	if (is_a32_compat_bp(bp)) {
+ 		if (info->ctrl.len == ARM_BREAKPOINT_LEN_8)
+ 			alignment_mask = 0x7;
+ 		else
+@@ -679,7 +679,7 @@ static int watchpoint_handler(unsigned long addr, unsigned int esr,
+ 
+ 		info = counter_arch_bp(wp);
+ 		/* AArch32 watchpoints are either 4 or 8 bytes aligned. */
+-		if (is_compat_task()) {
++		if (is_a32_compat_task()) {
+ 			if (info->ctrl.len == ARM_BREAKPOINT_LEN_8)
+ 				alignment_mask = 0x7;
+ 			else
+diff --git a/arch/arm64/kernel/perf_regs.c b/arch/arm64/kernel/perf_regs.c
+index 3f62b35..a79058f 100644
+--- a/arch/arm64/kernel/perf_regs.c
++++ b/arch/arm64/kernel/perf_regs.c
+@@ -45,7 +45,7 @@ int perf_reg_validate(u64 mask)
+ 
+ u64 perf_reg_abi(struct task_struct *task)
+ {
+-	if (is_compat_thread(task_thread_info(task)))
++	if (is_a32_compat_thread(task_thread_info(task)))
+ 		return PERF_SAMPLE_REGS_ABI_32;
+ 	else
+ 		return PERF_SAMPLE_REGS_ABI_64;
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index f75b540..251e1f7 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -46,7 +46,6 @@
+ #include <linux/notifier.h>
+ #include <trace/events/power.h>
+ 
+-#include <asm/compat.h>
+ #include <asm/cacheflush.h>
+ #include <asm/fpsimd.h>
+ #include <asm/mmu_context.h>
+@@ -262,7 +261,7 @@ int copy_thread(unsigned long clone_flags, unsigned long stack_start,
+ 		asm("mrs %0, tpidr_el0" : "=r" (*task_user_tls(p)));
+ 
+ 		if (stack_start) {
+-			if (is_compat_thread(task_thread_info(p)))
++			if (is_a32_compat_thread(task_thread_info(p)))
+ 				childregs->compat_sp = stack_start;
+ 			/* 16-byte aligned stack mandatory on AArch64 */
+ 			else if (stack_start & 15)
+@@ -299,7 +298,7 @@ static void tls_thread_switch(struct task_struct *next)
+ 	*task_user_tls(current) = tpidr;
+ 
+ 	tpidr = *task_user_tls(next);
+-	tpidrro = is_compat_thread(task_thread_info(next)) ?
++	tpidrro = is_a32_compat_thread(task_thread_info(next)) ?
+ 		  next->thread.tp_value : 0;
+ 
+ 	asm(
+diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+index 6b02f26..c166548 100644
+--- a/arch/arm64/kernel/ptrace.c
++++ b/arch/arm64/kernel/ptrace.c
+@@ -38,7 +38,6 @@
+ #include <linux/tracehook.h>
+ #include <linux/elf.h>
+ 
+-#include <asm/compat.h>
+ #include <asm/debug-monitors.h>
+ #include <asm/pgtable.h>
+ #include <asm/syscall.h>
+@@ -79,7 +78,7 @@ static void ptrace_hbptriggered(struct perf_event *bp,
+ #ifdef CONFIG_AARCH32_EL0
+ 	int i;
+ 
+-	if (!is_compat_task())
++	if (!is_a32_compat_task())
+ 		goto send_sig;
+ 
+ 	for (i = 0; i < ARM_MAX_BRP; ++i) {
+@@ -1197,9 +1196,9 @@ const struct user_regset_view *task_user_regset_view(struct task_struct *task)
+ 	 * 32-bit children use an extended user_aarch32_ptrace_view to allow
+ 	 * access to the TLS register.
+ 	 */
+-	if (is_compat_task())
++	if (is_a32_compat_task())
+ 		return &user_aarch32_view;
+-	else if (is_compat_thread(task_thread_info(task)))
++	else if (is_a32_compat_thread(task_thread_info(task)))
+ 		return &user_aarch32_ptrace_view;
  #endif
+ 	return &user_aarch64_view;
+@@ -1226,7 +1225,7 @@ static void tracehook_report_syscall(struct pt_regs *regs,
+ 	 * A scratch register (ip(r12) on AArch32, x7 on AArch64) is
+ 	 * used to denote syscall entry/exit:
+ 	 */
+-	regno = (is_compat_task() ? 12 : 7);
++	regno = (is_a32_compat_task() ? 12 : 7);
+ 	saved_reg = regs->regs[regno];
+ 	regs->regs[regno] = dir;
  
--/*
-- * flag set/clear/test wrappers
-- * - pass TIF_xxxx constants to these functions
-- */
--
--static inline void set_ti_thread_flag(struct thread_info *ti, int flag)
--{
--	set_bit(flag, (unsigned long *)&ti->flags);
--}
--
--static inline void clear_ti_thread_flag(struct thread_info *ti, int flag)
--{
--	clear_bit(flag, (unsigned long *)&ti->flags);
--}
--
--static inline int test_and_set_ti_thread_flag(struct thread_info *ti, int flag)
--{
--	return test_and_set_bit(flag, (unsigned long *)&ti->flags);
--}
--
--static inline int test_and_clear_ti_thread_flag(struct thread_info *ti, int flag)
--{
--	return test_and_clear_bit(flag, (unsigned long *)&ti->flags);
--}
--
--static inline int test_ti_thread_flag(struct thread_info *ti, int flag)
--{
--	return test_bit(flag, (unsigned long *)&ti->flags);
--}
--
--#define set_thread_flag(flag) \
--	set_ti_thread_flag(current_thread_info(), flag)
--#define clear_thread_flag(flag) \
--	clear_ti_thread_flag(current_thread_info(), flag)
--#define test_and_set_thread_flag(flag) \
--	test_and_set_ti_thread_flag(current_thread_info(), flag)
--#define test_and_clear_thread_flag(flag) \
--	test_and_clear_ti_thread_flag(current_thread_info(), flag)
--#define test_thread_flag(flag) \
--	test_ti_thread_flag(current_thread_info(), flag)
--
- #define tif_need_resched() test_thread_flag(TIF_NEED_RESCHED)
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index e18c48c..65baaef 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -276,7 +276,7 @@ static int setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
  
- #if defined TIF_RESTORE_SIGMASK && !defined HAVE_SET_RESTORE_SIGMASK
+ static void setup_restart_syscall(struct pt_regs *regs)
+ {
+-	if (is_compat_task())
++	if (is_a32_compat_task())
+ 		compat_setup_restart_syscall(regs);
+ 	else
+ 		regs->regs[8] = __NR_restart_syscall;
+@@ -295,7 +295,7 @@ static void handle_signal(struct ksignal *ksig, struct pt_regs *regs)
+ 	/*
+ 	 * Set up the stack frame
+ 	 */
+-	if (is_compat_task()) {
++	if (is_a32_compat_task()) {
+ 		if (ksig->ka.sa.sa_flags & SA_SIGINFO)
+ 			ret = compat_setup_rt_frame(usig, ksig, oldset, regs);
+ 		else
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index b50fced..4115c44 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -18,6 +18,7 @@
+  */
+ 
+ #include <linux/bug.h>
++#include <linux/compat.h>
+ #include <linux/signal.h>
+ #include <linux/personality.h>
+ #include <linux/kallsyms.h>
+@@ -370,7 +371,7 @@ asmlinkage long do_ni_syscall(struct pt_regs *regs)
+ {
+ #ifdef CONFIG_AARCH32_EL0
+ 	long ret;
+-	if (is_compat_task()) {
++	if (is_a32_compat_task()) {
+ 		ret = compat_arm_syscall(regs);
+ 		if (ret != -ENOSYS)
+ 			return ret;
 -- 
 2.5.0
