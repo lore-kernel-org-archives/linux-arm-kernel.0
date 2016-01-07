@@ -1,82 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 7 Jan 2016 09:42:50 +0000
-Subject: [BUG 4.4-rc4]: oops around sock_recvmsg
-In-Reply-To: <87d1td6a1l.fsf@gmail.com>
-References: <87d1td6a1l.fsf@gmail.com>
-Message-ID: <20160107094249.GD19062@n2100.arm.linux.org.uk>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 7 Jan 2016 09:46:44 +0000
+Subject: [PATCH v3 2/2] ARM64: kernel: PSCI: move PSCI idle management
+ code to drivers/firmware
+In-Reply-To: <20160106214439.GB19062@n2100.arm.linux.org.uk>
+References: <1445011379-8787-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1445011379-8787-3-git-send-email-lorenzo.pieralisi@arm.com>
+ <20160105105900.GT19062@n2100.arm.linux.org.uk>
+ <20160105123134.GA1821@red-moon>
+ <20160105125142.GV19062@n2100.arm.linux.org.uk>
+ <20160105132701.GA17214@red-moon>
+ <20160105133447.GW19062@n2100.arm.linux.org.uk>
+ <20160106165545.GA19886@red-moon>
+ <20160106214439.GB19062@n2100.arm.linux.org.uk>
+Message-ID: <20160107094644.GA23819@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 07, 2016 at 09:58:14AM +0100, Holger Schurig wrote:
-> This oops with sock_recvmsg() inside it now happened 3 times, just not
-> at my test box, only at one very remote from me. That's also the reason
-> why the log is truncated, the people that grabbed it from Windows with
-> Putty over the serial line just did give this to me ... :-(
+On Wed, Jan 06, 2016 at 09:44:39PM +0000, Russell King - ARM Linux wrote:
+> On Wed, Jan 06, 2016 at 04:55:45PM +0000, Lorenzo Pieralisi wrote:
+> > On Tue, Jan 05, 2016 at 01:34:47PM +0000, Russell King - ARM Linux wrote:
+> > > That immediately worries me, because it bypasses the CPU dependencies
+> > > for ARM_CPU_SUSPEND implicitly applied via ARCH_SUSPEND_POSSIBLE.  I'd
+> > > prefer instead:
+> > > 
+> > > config ARM_PSCI_CPU_IDLE
+> > > 	def_bool ARM_PSCI_FW && CPU_IDLE && (!ARM || ARM_CPU_SUSPEND)
+> > 
+> > If you are not against it, I could make ARM_PSCI select ARM_CPU_SUSPEND,
+> > the CPU dependency would be taken into account (ie CPU_V7) and this
+> > would mirror what's done for the eg BL_SWITCHER.
+> 
+> If you're proposing to always build the code in psci.c when ARM_PSCI_FW
+> is enabled, I'd rather do this:
+> 
+> config ARM_CPU_SUSPEND
+>         def_bool PM_SLEEP || BL_SWITCHER || ARM_PSCI_FW
+> 	depends on ARCH_SUSPEND_POSSIBLE
+> 
+> rather than have stuff select this option.
 
-It's a little incomplete, but luckily we have some useful information
-buried in it.
+Agreed, I will do that with two patches (ie one to update the
+BL_SWITCHER config entry). It has the side effect of pulling in
+ARM_CPU_SUSPEND even if !SUSPEND && !CPU_IDLE when ARM_PSCI
+is selected but I do not think that's a real issue, to be confirmed.
 
-> BTW, are several places with "???" below. Is this just a "grabbing from
-> Windows" artifact? Or an indication that the processor/memory of the
-> system got completely insane?
+Still, some ARM CPUidle drivers will have to select ARM_CPU_SUSPEND
+on a case by case basis, I do not know how we can improve that, but
+that's not related to this patch series per-se.
 
-No idea, sorry.
-
-...
-> [<c00171c4>] (do_page_fault) from [<c000934c>] (do_PrefetchAbort+0x3c/0xa0)
-> r10:c0037790 r9:00000001 r8:00000001 r7:ed9a9bf8 r6:fffffffe r5:c055fbc4
-> r4:00000007
-> [<c0009310>] (do_PrefetchAbort) from [<c001354c>] (__pabt_svc+0x4c/0x80)
-> Exception stack(0xed9a9bf8 to 0xed9a9c40)
-> 9be0:?????????????????????????????????????????????????????? ebaa3d18 00000001
-> 9c00: 00000001 00000304 ee1c2c04 fffffff3 00000001 00000304 00000001 00000001
-> 9c20: c0037790 ed9a9c74 ffffffff ed9a9c48 c004febc fffffffe 800100b3 ffffffff
-
-These are the registers - r0 to pc, cpsr and "orig_r0".  The PC value
-triggering the prefetch abort was 0xfffffffe, and the link register
-was 0xc004febc - this should be the instruction after the call.
-
-To do any diagnosis, I'd need the disassembly around the link
-register - it may be best if you can send me the vmlinux file itself
-by private mail in case I need to reference other functions too.
-
-I've left the remainder of the trace in place - please retain it when
-you reply with the disassembly so I can refer directly to it in my
-next reply without having to find the previous email.  Thanks.
-
-> r7:ed9a9c2c r6:ffffffff r5:800100b3 r4:fffffffe
-> [<c004fe68>] (__wake_up_common) from [<c00504ac>] (__wake_up_sync_key+0x4c/0x60)
-> r10:00000000 r9:00000010 r8:00000304 r7:00000001 r6:00000001 r5:a0010013
-> r4:ee1c2c00 r3:00000001
-> [<c0050460>] (__wake_up_sync_key) from [<c03cf9d0>] (unix_write_space+0x60/0x90)
-> r8:ed9a9df4 r7:eb9decc0 r6:ed95d5e4 r5:ed95f02c r4:ed95ef80
-> [<c03cf970>] (unix_write_space) from [<c0347674>] (sock_wfree+0x4c/0x84)
-> r4:ed95ef80 r3:c03cf970
-> [<c0347628>] (sock_wfree) from [<c03cf2b8>] (unix_destruct_scm+0x6c/0x74)
-> r5:00000000 r4:eb9decc0
-> [<c03cf24c>] (unix_destruct_scm) from [<c0348768>] (skb_release_head_state+0x70/0xb0)
-> r4:eb9decc0
-> [<c03486f8>] (skb_release_head_state) from [<c034b280>] (skb_release_all+0x14/0x2c)
-> r4:eb9decc0 r3:00000001
-> [<c034b26c>] (skb_release_all) from [<c034b2ac>] (__kfree_skb+0x14/0x94)
-> r4:eb9decc0 r3:00000001
-> [<c034b298>] (__kfree_skb) from [<c034b610>] (consume_skb+0x58/0x5c)
-> r4:ed95d400 r3:00000001
-> [<c034b5b8>] (consume_skb) from [<c03d050c>] (unix_stream_read_generic+0x5ec/0x750)
-> [<c03cff20>] (unix_stream_read_generic) from [<c03d0754>] (unix_stream_recvmsg+0x50/0x5c)
-> r10:ecc13800 r9:ed9a9e88 r8:bee12988 r7:00000040 r6:ecc13800 r5:ed9a9f4c
-> r4:00001000
-> [<c03d0704>] (unix_stream_recvmsg) from [<c0341250>] (sock_recvmsg+0x18/0x1c)
-> r7:bee1296c r6:00000040 r5:00000000 r4:ed9a9f4c
-> [<c0341238>] (sock_recvmsg) from [<c0342fa0>] (___sys_recvmsg+0x98/0x170)
-> [<c0342f08>] (___sys_recvmsg) from [<c0343d34>] (__sys_recvmsg+0x44/0x68)
-> r10:00000000 r9:ed9a8000 r8:c000f1e4 r7:00000129 r6:bee1296c r5:00000000
-> r4:ecc13800
-> [<c0343cf0>] (__sys_recvmsg) from [<c0343d68>] (SyS_recvmsg+0x10/0x14)
-> r6:b6f7df10 r5:81196c08 r4:bee12988
-> [<c0343d58>] (SyS_recvmsg) from [<c000f020>] (ret_fast_syscall+0x0/0x3c)
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thanks,
+Lorenzo
