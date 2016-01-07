@@ -1,51 +1,96 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 7 Jan 2016 15:45:15 +0000
-Subject: [PATCH] arm64/dts: Add missing DMA Abort interrupt to Juno
-In-Reply-To: <2736927.0LiVxGZzgm@wuerfel>
-References: <6a66d2ac442925e066fe9b67ee2883de5894b0d3.1452168063.git.robin.murphy@arm.com>
- <2736927.0LiVxGZzgm@wuerfel>
-Message-ID: <568E880B.2090602@arm.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Thu,  7 Jan 2016 16:46:11 +0100
+Subject: [PATCH v12 0/4] Allow USB devices to remain runtime-suspended when
+ sleeping
+Message-ID: <1452181575-9206-1-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/01/16 14:36, Arnd Bergmann wrote:
-> On Thursday 07 January 2016 12:01:59 Robin Murphy wrote:
->> The DMA-330 has an "irq_abort" interrupt line on which it signals faults
->> separately from the "irq[n:0]" channel interrupts. On Juno, this is
->> wired up to SPI 92; add it to the DT so that DMAC faults are correctly
->> reported for the driver to reset the thing, rather than leaving it
->> locked up and waiting to time out.
->>
->> CC: Liviu Dudau <liviu.dudau@arm.com>
->> CC: Sudeep Holla <sudeep.holla@arm.com>
->> CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->>
->
-> Nothing wrong with the patch, but could you please come up with
-> a more structured way to get patches for Juno into the kernel?
->
-> You have addressed the patch "to:" the arm-soc maintainers, but
-> you are not listed in the maintainers file for the directory, so
-> it's not clear what you expect to happen here.
+Hi,
 
-I'll admit I got to the addressing point and wasn't entirely sure either 
-- there still seemed to be a precedent of patches going to arm-soc 
-picking up acks along the way, rather than via a sub-maintainer pull, 
-hence what I ended up with.
+this is v12 of an attempt to make it easier for devices to remain in
+runtime PM when the system goes to sleep, mainly to reduce the time
+spent resuming devices.
 
-> Ideally, we'd get patches from just one of the people listed
-> in the MAINTAINERS file normally, and let us know if the
-> primary maintainer changes, or if one of the others sends a
-> patch because that person is unavailable.
+For this, we interpret the absence of all PM callback implementations as
+it being safe to do direct_complete, so their ancestors aren't prevented
+from remaining runtime-suspended.
 
-Sure, I'll bear that in mind in future, especially when sending from an 
-email domain which doesn't really make clear the context that I'm just 
-another end-user posting a fix for something I found, rather than trying 
-to assume any "official" capacity ;)
+Additionally, the prepare() callback of USB devices will return 1 if
+runtime PM is enabled and the current wakeup settings are correct.
 
-As a side note, the Juno dts* files don't actually seem to be covered by 
-MAINTAINERS at all, which can't help the situation.
+With these changes, a uvcvideo device (for example) stays in runtime
+suspend when the system goes to sleep and is left in that state when the
+system resumes, not delaying it unnecessarily.
 
-Sorry for the confusion,
-Robin.
+Thanks,
+
+Tomeu
+
+Changes in v12:
+- Include linux/pm_domain.h in vga_switcheroo.c for dev_pm_domain_set()
+
+Changes in v11:
+- Move calls to dev_pm_domain_set() out from &dev->power.lock as that
+  isn't needed for dev->pm_domain.
+
+Changes in v10:
+- Remove superfluous call to pm_runtime_enabled() as suggested by Alan
+
+Changes in v9:
+- Add docs noting the need for the device lock to be held before calling
+  device_is_bound()
+- Add docs noting the need for the device lock to be held before calling
+  dev_pm_domain_set()
+- Move to CONFIG_PM_SLEEP as suggested by Rafael and Ulf.
+- Rename from device_check_pm_callbacks to device_pm_check_callbacks to
+  follow with the naming convention of existing API.
+- Re-add calling to device_pm_check_callbacks from device registration
+  and when updating the PM domain of a device.
+
+Changes in v8:
+- Add device_is_bound()
+- Add dev_pm_domain_set() and update code to use it
+- Move no_pm_callbacks field into CONFIG_PM_SLEEP
+- Call device_check_pm_callbacks only after a device is bound or unbound
+
+Changes in v7:
+- Reduce indentation by adding a label in device_prepare()
+
+Changes in v6:
+- Add stub for !CONFIG_PM.
+- Move implementation of device_check_pm_callbacks to power/main.c as it
+  doesn't belong to CONFIG_PM_SLEEP.
+- Take dev->power.lock before modifying flag.
+
+Changes in v5:
+- Check for all dev_pm_ops instances associated to a device, updating a
+  no_pm_callbacks flag at the times when that could change.
+
+Tomeu Vizoso (4):
+  device core: add device_is_bound()
+  PM / Domains: add setter for dev.pm_domain
+  PM / sleep: Go direct_complete if driver has no callbacks
+  USB / PM: Allow USB devices to remain runtime-suspended when sleeping
+
+ arch/arm/mach-omap2/omap_device.c |  7 ++++---
+ drivers/acpi/acpi_lpss.c          |  5 ++++-
+ drivers/acpi/device_pm.c          |  5 +++--
+ drivers/base/dd.c                 | 21 +++++++++++++++++++--
+ drivers/base/power/clock_ops.c    |  5 +++--
+ drivers/base/power/common.c       | 24 ++++++++++++++++++++++++
+ drivers/base/power/domain.c       |  8 ++++++--
+ drivers/base/power/main.c         | 35 +++++++++++++++++++++++++++++++++++
+ drivers/base/power/power.h        |  3 +++
+ drivers/gpu/vga/vga_switcheroo.c  | 11 ++++++-----
+ drivers/misc/mei/pci-me.c         |  5 +++--
+ drivers/misc/mei/pci-txe.c        |  5 +++--
+ drivers/usb/core/port.c           |  6 ++++++
+ drivers/usb/core/usb.c            |  8 +++++++-
+ include/linux/device.h            |  2 ++
+ include/linux/pm.h                |  1 +
+ include/linux/pm_domain.h         |  3 +++
+ 17 files changed, 132 insertions(+), 22 deletions(-)
+
+-- 
+2.5.0
