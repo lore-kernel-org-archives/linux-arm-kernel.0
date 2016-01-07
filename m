@@ -1,43 +1,33 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 7 Jan 2016 16:56:27 +0000
-Subject: [Qemu-devel] arm64 qemu tests failing in linux-next since 'arm64:
- kernel: enforce pmuserenr_el0 initialization and restore'
-In-Reply-To: <20160107163722.GB4064@red-moon>
-References: <567B41E3.5060800@roeck-us.net>
- <CAFEAcA_c9DicGF+is6ST3NJv+c5Bi4dHYo2t8Q2n9AS9G4q0+Q@mail.gmail.com>
- <20160107155310.GA4064@red-moon>
- <CAFEAcA_vP93=PE6LNNHodCsdk0gL0kBQPX=xzLJU5RzkvNs2vw@mail.gmail.com>
- <20160107163722.GB4064@red-moon>
-Message-ID: <CAFEAcA9D58-EOh9aoAmFtEBBx=BWQxWyzynvM893Dd7fqZH5wA@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 7 Jan 2016 16:56:57 +0000
+Subject: next boot: 564 boots: 59 failed, 448 passed with 57 offline
+ (next-20160107)
+In-Reply-To: <20160107162810.GA25177@ulmo>
+References: <568e8740.01941c0a.31072.ffffb67b@mx.google.com>
+ <20160107155958.GG6588@sirena.org.uk> <20160107162810.GA25177@ulmo>
+Message-ID: <20160107165657.GH6588@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 January 2016 at 16:37, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> On Thu, Jan 07, 2016 at 03:58:15PM +0000, Peter Maydell wrote:
->> On 7 January 2016 at 15:53, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
->> > Ok, thanks for looking into this. I wonder why reading pmcr_el0 does
->> > not suffer from the same problem though.
->>
->> Just a pragmatic thing on QEMU's end, I expect -- the kernel already
->> touched PMCR_EL0 and we wanted to be able to boot it, so we have an
->> implementation of it.
->
-> If that's the case, that was the wrong approach IMHO. QEMU has to comply
-> with the Aarch64 architecture which means that either the CPU it models
-> has a Performance Monitors extension or it does not. If reading pmcr_el0
-> does not fault I could tell you this is a QEMU regression because currently
-> it _does_ model pmcr_el0 while (hopefully) ID_AA64DFR0_EL1 PMUVer reports
-> it should not.
+On Thu, Jan 07, 2016 at 05:28:10PM +0100, Thierry Reding wrote:
 
-I agree it's a bug, but QEMU simply doesn't have enough
-developers to become fully compliant with the architecture (ie to
-implement every part of it completely). So we concentrate on the
-parts that people are actually using, and fill in the rest and
-fix the bugs as time permits or as real guest software starts to
-use it.
+> These should all be fixed by this patch:
 
-If you want a guaranteed matches-the-architecture software model
-of an ARM CPU then other models are available :-)
+> 	serial: 8250: of: Fix the driver and actually compile the 8250_of
 
-thanks
--- PMM
+> which can be found in patchwork here:
+
+> 	https://patchwork.kernel.org/patch/7883541/
+
+> I think this is merely waiting to be picked up into the tty tree. I
+
+Ah, good - hopefully that'll get picked up quickly, I suspect it's going
+to turn out to be responsible for a bunch of the other failures we're
+seeing at the minute.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160107/2d36c905/attachment-0001.sig>
