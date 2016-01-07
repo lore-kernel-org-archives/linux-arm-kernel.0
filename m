@@ -1,49 +1,110 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 07 Jan 2016 17:50:24 +0100
-Subject: [RFC PATCH v2 3/4] drm: rockchip: hdmi: add RK3229 HDMI support
-In-Reply-To: <568E3AD0.1020904@rock-chips.com>
-References: <1452156811-18150-1-git-send-email-ykk@rock-chips.com>
- <1452157373-18783-1-git-send-email-ykk@rock-chips.com>
- <1452161052.4776.7.camel@pengutronix.de> <568E3AD0.1020904@rock-chips.com>
-Message-ID: <1452185424.4776.36.camel@pengutronix.de>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Thu, 7 Jan 2016 16:53:24 +0000
+Subject: [PATCH] ARM64: tegra: Add support for Google Pixel C
+In-Reply-To: <4442990.rM1mk43t6M@wuerfel>
+References: <1452073222-2956-1-git-send-email-jonathanh@nvidia.com>
+ <568D0D70.4020309@nvidia.com> <568E65F0.2070201@nvidia.com>
+ <4442990.rM1mk43t6M@wuerfel>
+Message-ID: <568E9804.5020503@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yakir,
 
-Am Donnerstag, den 07.01.2016, 18:15 +0800 schrieb Yakir Yang:
-> Hi Philipp,
+On 07/01/16 14:11, Arnd Bergmann wrote:
+> On Thursday 07 January 2016 13:19:44 Jon Hunter wrote:
+>>
+>> Adding Arnd.
+>>
+>> Hmmm ... well apparently stdout-path does not work for tegra and in
+>> order to make this work I had to do the following ...
+>>
+>>
+>> [PATCH] serial: 8250: of: Add earlycon support for Tegra
+>>
+>> Currently, early console support only works for Tegra when the serial
+>> port information is passed via the earlycon boot parameter. If the
+>> serial port information is specified via device-tree using the
+>> "stdout-path" then the early console does not work because:
+>>
+>> 1. The tegra serial ports compatibility parameter does not match any
+>>    of the supported serial drivers for early console.
+>> 2. The of_setup_earlycon() function assumes that serial port registers
+>>    are byte aligned and for tegra they are 32-bit aligned.
+>>
+>> Add an early console setup function for tegra so that the early console
+>> can be specified via the device-tree "stdout-path" variable.
+>>
+>> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+>> ---
+>>  drivers/tty/serial/8250/8250_of.c | 10 ++++++++++
+>>  1 file changed, 10 insertions(+)
+>>
+>> diff --git a/drivers/tty/serial/8250/8250_of.c b/drivers/tty/serial/8250/8250_of.c
+>> index 33021c1f7d55..98adf83e83c2 100644
+>> --- a/drivers/tty/serial/8250/8250_of.c
+>> +++ b/drivers/tty/serial/8250/8250_of.c
+>> @@ -44,6 +44,16 @@ void tegra_serial_handle_break(struct uart_port *p)
+>>                 udelay(1);
+>>         } while (1);
+>>  }
+>> +
+>> +int __init tegra_earlycon_setup(struct earlycon_device *device,
+>> +                               const char *options)
+>> +{
+>> +       device->port.iotype = UPIO_MEM32;
+>> +       device->port.regshift = 2;
+>> +
+>> +       return early_serial8250_setup(device, options);
+>> +}
+>> +OF_EARLYCON_DECLARE(tegra20_uart, "nvidia,tegra20-uart", tegra_earlycon_setup);
+>>  #else
+>>  static inline void tegra_serial_handle_break(struct uart_port *port)
+>>  {
+>>
+>>
+>> Arnd, does the above look ok, or should there be a generic
+>> early_serial8250x32_setup() somewhere?
 > 
-> Thanks for your fast respond :)
-> 
-> On 01/07/2016 06:04 PM, Philipp Zabel wrote:
-> > Am Donnerstag, den 07.01.2016, 17:02 +0800 schrieb Yakir Yang:
-> >> RK3229 integrate an DesignedWare HDMI2.0 controller and an INNO HDMI2.0 phy,
-> >> the max output resolution is 4K.
-> >>
-> >> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> > It sounds like the INNO HDMI2.0 phy is not necessarily specific to
-> > RK3229 but might also appear in other SoCs? If so, I think this should
-> > be implemented in a separate phy driver and be used by dw_hdmi-rockchip.
-> 
-> Do you mean I should create a new phy driver that place in "driver/phy" 
-> directly ?
+> I think it would be better to put it into 8250_early.c rather than 
+> 8250_of.c, as there are already some other definitions in there,
+> and the #ifdef CONFIG_TEGRA in 8250_of.c is for some other workaround.
 
-Possibly, yes. The exynos video phys are already there. I have kept the
-mediatek dsi/hdmi phys together with the DRM driver, but I suppose I
-could move them there, too.
+Ok so something like this ...
 
-> I have think about this idea, and it would make things much clean. But 
-> INNO PHY
-> driver need the target pixel clock in drm_display_mode, I didn't find a 
-> good way
-> to pass this variable to separate phy driver. Do you have some idea ?
+diff --git a/drivers/tty/serial/8250/8250_early.c
+b/drivers/tty/serial/8250/8250_early.c
+index af62131af21e..4ce6e2b57534 100644
+--- a/drivers/tty/serial/8250/8250_early.c
++++ b/drivers/tty/serial/8250/8250_early.c
+@@ -141,7 +141,18 @@ int __init early_serial8250_setup(struct
+earlycon_device *device,
+        device->con->write = early_serial8250_write;
+        return 0;
+ }
++
++int __init early_serial8250_mem32_setup(struct earlycon_device *device,
++                                       const char *options)
++{
++       device->port.iotype = UPIO_MEM32;
++       device->port.regshift = 2;
++
++       return early_serial8250_setup(device, options);
++}
+ EARLYCON_DECLARE(uart8250, early_serial8250_setup);
+ EARLYCON_DECLARE(uart, early_serial8250_setup);
+ OF_EARLYCON_DECLARE(ns16550, "ns16550", early_serial8250_setup);
+ OF_EARLYCON_DECLARE(ns16550a, "ns16550a", early_serial8250_setup);
++OF_EARLYCON_DECLARE(tegra20_uart, "nvidia,tegra20-uart",
++                   early_serial8250_mem32_setup);
 
-We'd need to extend the PHY API for this. For the mediatek phys we have
-side-stepped the issue by wiring up the PLL output to the common clock
-framework.
-I expect besides the pixel clock frequency, it might also be necessary
-to inform the PHY about cycles per pixel for deep color modes.
+> Would it be possible to handle the "reg-io-width" parsing in
+> early_serial8250_setup instead of keying it off the string?
 
-regards
-Philipp
+Good point. I spent a bit of time looking at this, but I cannot see an
+easy way to do this unless we check for "reg-io-width" and "reg-shift"
+in early_init_dt_scan_chosen_serial() and pass to of_setup_earlycon(),
+however, I am guessing that this would not be ideal as this would happen
+for non-8250 devices. May be that would be ok, but I am not sure.
+
+Cheers
+Jon
