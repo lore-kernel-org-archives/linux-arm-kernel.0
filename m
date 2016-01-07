@@ -1,58 +1,42 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 7 Jan 2016 08:18:02 -0600
-Subject: [PATCH v2 0/3] USB: add generic onboard USB HUB driver
-In-Reply-To: <20160106032027.GA23726@shlinux2>
-References: <CAL411-rK6qfkbQsSjvXH5VPAQAm4tMyD6fVTEgFQrpLHNGMXeA@mail.gmail.com>
- <Pine.LNX.4.44L0.1512181030590.1682-100000@iolanthe.rowland.org>
- <CAL411-qKE=12VZAN9=tUWPqkC5BfSgpQb9aNgCU6rmPLasXNHQ@mail.gmail.com>
- <CAL_Jsq+P8SBmWzNURrmNgz8soCn4QPOPid4SXF0a3TYL_SH27A@mail.gmail.com>
- <20160106032027.GA23726@shlinux2>
-Message-ID: <CAL_Jsq+rqv1NBSUToX5BsbnBp_goUWhdczU7ETSxOrJ5D4D1rw@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 07 Jan 2016 14:21:48 +0000
+Subject: [PATCH v8 00/20] KVM: ARM64: Add guest PMU support
+In-Reply-To: <20160107141227.GE23028@arm.com>
+References: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>
+ <568E71DE.9030905@arm.com> <20160107141227.GE23028@arm.com>
+Message-ID: <568E747C.9060405@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 5, 2016 at 9:20 PM, Peter Chen <hzpeterchen@gmail.com> wrote:
-> On Tue, Jan 05, 2016 at 08:36:31AM -0600, Rob Herring wrote:
->> > 2. There are MFD USB devices, which includes several interfaces under
->> > USB device,
->> > like i2c, gpios, etc. Due to lack of device tree support, USB
->> > class/device driver doesn't know
->> > which kinds of interfaces are needed for this board.
+On 07/01/16 14:12, Will Deacon wrote:
+> On Thu, Jan 07, 2016 at 02:10:38PM +0000, Marc Zyngier wrote:
+>> On 22/12/15 08:07, Shannon Zhao wrote:
+>>> From: Shannon Zhao <shannon.zhao@linaro.org>
+>>>
+>>> This patchset adds guest PMU support for KVM on ARM64. It takes
+>>> trap-and-emulate approach. When guest wants to monitor one event, it
+>>> will be trapped by KVM and KVM will call perf_event API to create a perf
+>>> event and call relevant perf_event APIs to get the count value of event.
+>>>
+>>> Use perf to test this patchset in guest. When using "perf list", it
+>>> shows the list of the hardware events and hardware cache events perf
+>>> supports. Then use "perf stat -e EVENT" to monitor some event. For
+>>> example, use "perf stat -e cycles" to count cpu cycles and
+>>> "perf stat -e cache-misses" to count cache misses.
 >>
->> Are you talking about a device hard wired on the same board or
->> something like GPIOs on FTDI chip which could be hot-plugged in any
->> host (including non-DT based)?
->
-> I talked about the case that the device hard wired on the board.
-> Hot-plug device's bus topology is unknown, we can't describe it
-> statically at dts.
+>> I finally feel like we're pretty close to something we could merge. My
+>> current concerns are:
+> 
+> The merge window opens on Monday and I'm not prepared to take further
+> PMU changes at this point (unless they're bug fixes, of course).
+> 
+> This needs to wait until 4.6.
 
-Correct, upstream (the USB side) can't be described, but it is the
-downstream side we care about describing.
+Fair enough. I guess I'll continue the review process and queue that
+early in the next cycle.
 
->> For the hotplug case, we will need a way to associate a DT overlay
->> with the USB device and there may not even be a base DT to map the
->> overlay into. In this case, the USB device's driver will need to load
->> the overlay and trigger enumerating the child devices. Anyway, this is
->> a separate issue from your problem.
->>
->
-> Since both you and Alan agree with my problem should be fixed at
-> bootloader, I give the kernel solution up.
+Thanks,
 
-Surprising, no one ever seems to agree with that solution... There
-will be people with this problem and unable to update their
-bootloader.
-
-> The another thing I open to discuss is how to let USB devices know its
-> device node, the user reported issue that they can't handle interfaces
-> below in USB device since that.
-
-The driver for the USB device would need to load a DT overlay and from
-that it should be able to get its node and child nodes. The hard part
-is figuring out where to put the sub tree defined in the overlay as
-either there is no base DT (think x86) or there is but we don't want
-to describe the whole USB bus topology in DT (in theory we could
-populate USB nodes dynamically as USB devices are discovered).
-
-Rob
+	M.
+-- 
+Jazz is not dead. It just smells funny...
