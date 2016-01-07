@@ -1,47 +1,90 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 7 Jan 2016 09:13:22 -0800
-Subject: [Qemu-devel] arm64 qemu tests failing in linux-next since 'arm64:
- kernel: enforce pmuserenr_el0 initialization and restore'
-In-Reply-To: <CAFEAcA9D58-EOh9aoAmFtEBBx=BWQxWyzynvM893Dd7fqZH5wA@mail.gmail.com>
-References: <567B41E3.5060800@roeck-us.net>
- <CAFEAcA_c9DicGF+is6ST3NJv+c5Bi4dHYo2t8Q2n9AS9G4q0+Q@mail.gmail.com>
- <20160107155310.GA4064@red-moon>
- <CAFEAcA_vP93=PE6LNNHodCsdk0gL0kBQPX=xzLJU5RzkvNs2vw@mail.gmail.com>
- <20160107163722.GB4064@red-moon>
- <CAFEAcA9D58-EOh9aoAmFtEBBx=BWQxWyzynvM893Dd7fqZH5wA@mail.gmail.com>
-Message-ID: <568E9CB2.60301@roeck-us.net>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 7 Jan 2016 09:17:00 -0800
+Subject: [PATCH v4 55/58] mtd: nand: add helpers to access ->priv
+In-Reply-To: <20160107155237.7271aa7e@bbrezillon>
+References: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1449734442-18672-56-git-send-email-boris.brezillon@free-electrons.com>
+ <20151218221758.GQ10460@google.com>
+ <20151219040124.7ffe4274@bbrezillon>
+ <20160106231323.GM109450@google.com>
+ <20160107155237.7271aa7e@bbrezillon>
+Message-ID: <20160107171700.GE109450@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/2016 08:56 AM, Peter Maydell wrote:
-> On 7 January 2016 at 16:37, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
->> On Thu, Jan 07, 2016 at 03:58:15PM +0000, Peter Maydell wrote:
->>> On 7 January 2016 at 15:53, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
->>>> Ok, thanks for looking into this. I wonder why reading pmcr_el0 does
->>>> not suffer from the same problem though.
->>>
->>> Just a pragmatic thing on QEMU's end, I expect -- the kernel already
->>> touched PMCR_EL0 and we wanted to be able to boot it, so we have an
->>> implementation of it.
->>
->> If that's the case, that was the wrong approach IMHO. QEMU has to comply
->> with the Aarch64 architecture which means that either the CPU it models
->> has a Performance Monitors extension or it does not. If reading pmcr_el0
->> does not fault I could tell you this is a QEMU regression because currently
->> it _does_ model pmcr_el0 while (hopefully) ID_AA64DFR0_EL1 PMUVer reports
->> it should not.
->
-> I agree it's a bug, but QEMU simply doesn't have enough
-> developers to become fully compliant with the architecture (ie to
-> implement every part of it completely). So we concentrate on the
-> parts that people are actually using, and fill in the rest and
-> fix the bugs as time permits or as real guest software starts to
-> use it.
->
-> If you want a guaranteed matches-the-architecture software model
-> of an ARM CPU then other models are available :-)
->
-I think it would be better to convince ARM to put some manpower into
-enhancing qemu, instead of telling them to use some other model ;-).
+Hi Boris,
 
-Guenter
+On Thu, Jan 07, 2016 at 03:52:37PM +0100, Boris Brezillon wrote:
+> On Wed, 6 Jan 2016 15:13:23 -0800
+> Brian Norris <computersforpeace@gmail.com> wrote:
+> > On Sat, Dec 19, 2015 at 04:01:24AM +0100, Boris Brezillon wrote:
+
+> > > Now, the reason I explicitly specified the data usage instead of using
+> > > a generic name like nand_{get,set}_data() is because I plan to define
+> > 
+> > I never suggested just "_data"; I said "_drvdata".
+> 
+> Not sure it clarifies the per-chip aspect ;), and driver is, IMHO, too
+> generic: I also consider manufacturer specific code as drivers (but in
+> this case they are chip drivers, not controller drivers).
+> 
+> How about nand_{get,set}_ctrldrvdata()?
+
+That's just more confusing :)
+
+> > 
+> > > other helpers to allow NAND manufacturer code to manipulate its own
+> > > private data. This is required if we want to support read-retry on some
+> > > chips who are requiring a read OTP area step to retrieve some register
+> > > values which will later be used to change from one read-retry mode to
+> > > another.
+> > > The plan was to define the nand_{set,get}_manufacturer_data() helpers,
+> > > and create or reuse an existing priv field (mtd->priv?) to store this
+> > > private data.
+
+[...]
+
+> > > Also note that the spi framework provides the same kind of helpers [1].
+> > 
+> > Hmm, OK. FWIW, they have both "driver data" and "controller state". It's
+> > not perfectly clear to me why both exist.
+> 
+> Well, "driver data" in this case is the data used by the i2c device
+> driver (the driver communicating with the device on the i2c bus), while
+> the "controller state" is the per-device controller specific data.
+> If we do the analogy with the NAND framework, I'd consider the
+> "SPI controller state" as what I call here the "NAND controller per-chip
+> data", and the "SPI driver data" as the "manufacturer data".
+> 
+> I know the names are not necessarily better in the SPI framework, but I
+> think we should find names that describe as much as possible which
+> data is used by which part of the code. 
+
+Re-reviewing the SPI framework helpers suggests to me that their usage
+scheme is actually not too bad. And it's actually pretty similar to your
+current naming scheme.
+
+> > > This being said, I'm perfectly fine changing the function names, but
+> > > I'd like to replace it by something explicitly telling the user that
+> > > this field should only be set by NAND controller drivers. 
+> > 
+> > Sure. I though a "driver data"-based name did this. But I'll leave it to
+> > you. I could even be OK with "controller data", if you still think this
+> > fits your overall controller refactoring plan, and communicates its
+> > purpose best.
+> 
+> If you're OK with that I'd like to keep a name containing the
+> 'controller' or 'ctrl' word in it:
+> 1/ nand_{get,set}_controller_data() (the names originally proposed)
+> 2/ nand_{get,set}_ctrldrv_data() or nand_{get,set}_ctrldrvdata()
+> 
+> What do you prefer?
+
+I guess (1) is not that bad in the end. I at least prefer it to (2).
+Sorry for the bikeshedding!
+
+So are these last few patches still applicable as-is, or should I await
+a new submission?
+
+Thanks,
+Brian
