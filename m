@@ -1,40 +1,66 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Thu,  7 Jan 2016 16:53:31 +0800
-Subject: [RFC PATCH v2 0/4] Add RK3229 HDMI support
-Message-ID: <1452156811-18150-1-git-send-email-ykk@rock-chips.com>
+From: lftan@altera.com (Ley Foon Tan)
+Date: Thu, 7 Jan 2016 16:56:06 +0800
+Subject: [PATCH] doc: PCI: altera: Fix the 'ranges' property in example
+In-Reply-To: <201601051449.49757.marex@denx.de>
+References: <1450950330-28393-1-git-send-email-marex@denx.de>
+ <201601050147.40997.marex@denx.de>
+ <E7E66AD1AD65064486AD57C361DF091C062AE3A4@PG-ITEXCH02.altera.priv.altera.com>
+ <201601051449.49757.marex@denx.de>
+Message-ID: <1452156966.3051.44.camel@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, 2016-01-05 at 14:49 +0100, Marek Vasut wrote:
+> On Tuesday, January 05, 2016 at 02:18:18 AM, Ley Foon Tan wrote:
+> > On Tue, 2016-01-05 at 01:47 +0100, Marek Vasut wrote:
+> > > On Tuesday, January 05, 2016 at 01:45:45 AM, Ley Foon Tan wrote:
+> > > > On Mon, 2016-01-04 at 02:12 +0100, Marek Vasut wrote:
+> > > > > On Monday, January 04, 2016 at 01:53:22 AM, Ley Foon Tan wrote:
+> > > > > > On Mon, 2016-01-04 at 01:37 +0100, Marek Vasut wrote:
+> > > > > > > On Monday, January 04, 2016 at 01:10:13 AM, Ley Foon Tan wrote:
+> > > > > > > 
+> > > > > > > Hi!
+> > > > > > > 
+> > > > > > > > > > > Well, do you have a good explanation why the system works
+> > > > > > > > > > > with this change and doesn't work without it on my design
+> > > > > > > > > > > ? I'd really love to understand this.
+> > > > > > > > > > 
+> > > > > > > > > > Do you modify the driver to setup the translation table?
+> > > > > > > > > 
+> > > > > > > > > No, I didn't change the driver. What do you refer to please ?
+> > > > > > > > 
+> > > > > > > > There is Address Translation Table at address offset 0x1000 in
+> > > > > > > > the IP.
+> > > > > > > 
+> > > > > > > Oh, I didn't configure that in any way. Should I or does the
+> > > > > > > driver configure it in some way?
+> > > > > > > 
+> > > > > > > > Do you use the hardware design from the rocketboards.org or
+> > > > > > > > your own design?
+> > > > > > > 
+> > > > > > > I use the one from rocketboards, I just ported it over to the
+> > > > > > > MCVEVK (custom cyclone v soc board)
+> > > > > > 
+> > > > > > You may check again the base addresses use in the MCVEVK board.
+> > > > > 
+> > > > > The address map is attached ; I don't see anything which would differ
+> > > > > from the reference design.
+> > > > 
+> > > > Address map looks fine.
+> > > 
+> > > Well do you have any other idea then ? I guess I should pull out the
+> > > SOCDK, huh?
+> > 
+> > Can't think of any other thing that impact this, I expect the bus width
+> > used in the pipeline/bridge are same with the example design.
+> > Do you have our CV, AV or A10 SoC devkit?
+> 
+> I tested CV SoCDK just now and you're right, the provided quartus project
+> works without this change on the CV SoCDK. Do you have any suggestion for
+> me where I should try looking then please ?
 
-RK3229 have integrated an DesignedWare HDMI controller and an INNO HDMI phy,
-so we can still reuse the dw-hdmi driver for RK3229 HDMI controller, but
-we need to create an separate driver for RK3229 HDMI PHY.
+Do you check the hardware pipeline bridge in Qsys? Are they same
+configuration as CV SoCDK design?
 
-This series is based on Mark Yao's drm-next branch
-[https://github.com/markyzq/kernel-drm-rockchip/tree/drm-rockchip-next-2015-12-28]
-
-After picking my "Add RK3229 vop support" series, HDMI monitor could light up
-normally on RK3229 SDK board.
-
-
-Changes in v2:
-- Split some dw-hdmi driver changes into separate patches [01/04] & [02/04]
-
-Yakir Yang (4):
-  drm: dw-hdmi: make it easy to recovery the platform data for platform
-    driver
-  drm: dw-hdmi: passing the "plat_data" when calling platform mode_valid
-  drm: rockchip: hdmi: add RK3229 HDMI support
-  dt-bindings: add document for rk3229-hdmi
-
- .../bindings/display/rockchip/dw_hdmi-rockchip.txt |   4 +-
- drivers/gpu/drm/bridge/dw-hdmi.c                   |  32 +-
- drivers/gpu/drm/imx/dw_hdmi-imx.c                  |  17 +-
- drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c        | 376 +++++++++++++++++++--
- drivers/gpu/drm/rockchip/dw_hdmi-rockchip.h        | 137 ++++++++
- include/drm/bridge/dw_hdmi.h                       |   5 +-
- 6 files changed, 529 insertions(+), 42 deletions(-)
- create mode 100644 drivers/gpu/drm/rockchip/dw_hdmi-rockchip.h
-
--- 
-2.1.2
+Regards
+Ley Foon
