@@ -1,90 +1,79 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 7 Jan 2016 17:23:29 +0000
-Subject: [PATCH v6 12/20] arm64:ilp32: add sys_ilp32.c and a separate
- table (in entry.S) to use it
-In-Reply-To: <2605790.14f8aape6N@wuerfel>
-References: <1450215766-14765-1-git-send-email-ynorov@caviumnetworks.com>
- <13371161.AI9IgZN0G2@wuerfel>
- <20160106171047.GP6301@e104818-lin.cambridge.arm.com>
- <2605790.14f8aape6N@wuerfel>
-Message-ID: <20160107172328.GE16432@e104818-lin.cambridge.arm.com>
+From: kernel@martin.sperl.org (kernel at martin.sperl.org)
+Date: Thu,  7 Jan 2016 17:32:58 +0000
+Subject: [PATCH V2 0/8] dmaengine: bcm2835: enhancement of driver
+Message-ID: <1452187987-2605-1-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 07, 2016 at 03:13:37PM +0100, Arnd Bergmann wrote:
-> On Wednesday 06 January 2016 17:10:47 Catalin Marinas wrote:
-> > On Tue, Jan 05, 2016 at 10:12:20PM +0100, Arnd Bergmann wrote:
-> > > On Tuesday 05 January 2016 18:26:57 Yury Norov wrote:
-> > > > > So the calling conventions avoid the problem of being able to set
-> > > > > the upper bits from malicious user space when the kernel assumes they
-> > > > > are zeroed out (we had security bugs in this area, before we introduced
-> > > > > SYSCALL_DEFINEx()), but it means that we need wrappers around each
-> > > > > syscall that takes an argument that is different length between user
-> > > > > and kernel space (as Catalin guessed). arch/s390 has the same problem and
-> > > > > works around it with code in arch/s390/kernel/compat_wrapper.c, while
-> > > > > other architectures (at least powerpc, x86 and tile IIRC, don't know much
-> > > > > about mips, parisc and sparc) don't have the problem because of their
-> > > > > calling conventions.
-> > > > > 
-> > > > > This also means that we cannot work around it in glibc at all, because
-> > > > > we have to be able to handle malicious user space, so it has to be
-> > > > > done in the kernel using something similar to what s390 does.
-> > > > 
-> > > > So it seems like we (should) have 2 compat modes - with and without access
-> > > > to upper half of register. I'm thinking now on how put it in generic
-> > > > unistd.h less painfull way.
-> > > 
-> > > I think we can do that by slightly modifying the existing __SYSCALL/__SC_3264/
-> > > __SC_COMP/__SC_COMP_3264 macros: The first two need extra wrappers for
-> > > arm64-ilp32 and s390, the other two don't.
-> > > 
-> > > We can use some clever string concatenation to add a ##_wrapper to the name
-> > > of the handler where needed and then just have a file that implements
-> > > the wrappers, copied from s390.
-> > > 
-> > > Unfortunately, we can't just zero out all the upper halves and be done with
-> > > it: even if we went back to passing 64-bit arguments as separate 32-bit
-> > > registers, we'd still need to deal with sign-extending negative 32-bit
-> > > numbers.
-> > 
-> > How many syscalls would we need sign-extension for? Most are probably
-> > already handled by specific compat_sys_* functions, otherwise A32 compat
-> > wouldn't work properly.
-> 
-> Good point. I suppose any system call that expects a negative argument
-> may run into this on all architectures and require a COMPAT_SYSCALL handler,
-> but only s390 cares about doing the extension for the entire set of syscalls.
-> 
-> This may be to work around a peculiarity of s390, which has now two
-> but three possible 32-to-64 extension modes: signed int, unsigned int
-> and pointer. The third one sets the top 33 bits to zero, clearing the
-> top bit of the 31-bit pointer value in the process. Nothing else needs
-> this, so if we just clear the upper bits on all system calls and go
-> back to passing 64-bit arguments as pairs, we are fine and have a much
-> simpler solution.
+From: Martin Sperl <kernel@martin.sperl.org>
 
-It would be indeed simpler from a kernel perspective. I'm not sure about
-the performance impact (a wrapper which does "mov wn, wn" for the first
-6 registers, on top of existing wrappers). OTOH, with explicit wrappers
-we have the overhead of an additional function call, so we may be better
-off with the former.
+This patchset fixes several issues:
+* missing residue_granularity to allow better support for I2S
+* dma-channels are artificially restricted (channel 0 and 2)
+* added correct support for dma-channels 11-14 by using the correct
+  shared irq line
+  * dma-channel 12 used the "trigger for all" irq resulting in
+    a lockup when used
+  * note that care was taken so that no change to the device-tree
+    was necessary to avoid a break...
 
-> > For native syscalls like sys_read, apart from pointers we also need to
-> > handle size_t. The wrapper would need to be defined using compat types:
-> > 
-> > ILP32_SYSCALL_DEFINE3(read, unsigned int, fd, char __user *, buf, compat_size_t, count)
-> > 
-> > and let the compiler handle the conversion to size_t automatically when
-> > calling sys_read from the wrapper.
-> 
-> Correct. I don't think we need an ILP32_SYSCALL_DEFINEx set of macros
-> though, the existing COMPAT_SYSCALL_DEFINEx ones should get this right
-> already.
+With this now 11 DMA channels available instead of 7 - the
+additional HW-DMA-channels are:
+* 0, 2 (masking of channels)
+* 13, 14 (shared interrupts - see also note on channel 12)
 
-The existing COMPAT_SYSCALL_DEFINEx macros generate the wrapper and
-definition for the compat_sys_* functions. What I meant by an
-ILP32_SYSCALL_DEFINEx is a macro which only generates a wrapper that
-calls into the native syscall (after sanitizing the arguments).
+It also adds several new features:
+* slave_sg support
+* dma_memcopy support
 
--- 
-Catalin
+For these a consolidated method for creating standard control-block
+chains was created to share common between cyclic, slave_sg and
+memcopy.
+
+Additional support for memset, memset_sg and interleave
+are in the pipeline.
+
+Testing:
+* slave_sg
+  * spi-bcm2835:
+    * fb_st7735r framebuffer
+      * tested using mplayer
+* cyclic
+  * bcm2835-i2s
+    * Audio output with a Hifiberry I2S card.
+      * tested using mplayer and aplay
+* memcopy
+  * dmatest
+
+Tests using both slave_sg and cyclic concurrently were also conducted
+using mplayer to play BigBuckBunny.
+
+To test that interrupt line sharing was working propperly the same
+audio/video test was run only using dma channel 11 to 14 - these
+channels are sharing the same interrupt line -
+
+Note that the bcm2835-i2s driver that is currenlty in the kernel
+fails to work since:
+commit 94cb7f76caa0b337 ("Switch to using the new clock driver support")
+and requires modifications to use the clock-driver framework.
+
+For testing a quick and dirty patch had to be used - a patch to use
+the clock framework is in the pipeline.
+
+Martin Sperl (8):
+  dmaengine: bcm2835: set residue_granularity field
+  dmaengine: bcm2835: remove unnecessary masking of dma channels
+  dmaengine: bcm2835: use shared interrupt for channel 11 to 14.
+  dmaengine: bcm2835: add additional defines for DMA-registers
+  dmaengine: bcm2835: move cyclic member from bcm2835_chan into
+    bcm2835_desc
+  dmaengine: bcm2835: move controlblock chain generation into separate
+    method
+  dmaengine: bcm2835: add slave_sg support to bcm2835-dma
+  dmaengine: bcm2835: add dma_memcopy support to bcm2835-dma
+
+ drivers/dma/bcm2835-dma.c |  541 +++++++++++++++++++++++++++++++++++----------
+ 1 file changed, 419 insertions(+), 122 deletions(-)
+
+--
+1.7.10.4
