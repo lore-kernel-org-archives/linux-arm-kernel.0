@@ -1,65 +1,121 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Thu, 07 Jan 2016 10:33:28 +0900
-Subject: [PATCH] mmc: host: arasan: sdhci-of-arasan: Remove no-hispd and
- no-cmd23 quirks for sdhci-arasan4.9a
-In-Reply-To: <CAFd313ziJ_zgxQ11J6e=ueRLFKXFOsDPg_evRDK2FGQC5rOmfA@mail.gmail.com>
-References: <1450877391-3029-1-git-send-email-rsahu@apm.com>
- <CAFd313ziJ_zgxQ11J6e=ueRLFKXFOsDPg_evRDK2FGQC5rOmfA@mail.gmail.com>
-Message-ID: <568DC068.6020602@samsung.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed,  6 Jan 2016 17:37:41 -0800
+Subject: [PATCH v2 2/3] pinctrl: qcom: Use platform_irq_count() instead of
+ of_irq_count()
+In-Reply-To: <CAJAp7OhNxTzsRSq7MHfBCbp3F+vaw6tS99eMBw8FbWLunudiKQ@mail.gmail.com>
+References: <CAJAp7OhNxTzsRSq7MHfBCbp3F+vaw6tS99eMBw8FbWLunudiKQ@mail.gmail.com>
+Message-ID: <1452130661-13157-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+of_irq_count() is not an exported symbol (and it shouldn't be
+used by platform drivers anyway) so use platform_irq_count()
+instead. This allows us to make the qcom pinctrl drivers modular
+again.
 
-On 01/05/2016 07:25 PM, Rameshwar Sahu wrote:
-> Hi Ulf,
-> 
-> On Wed, Dec 23, 2015 at 6:59 PM, Rameshswar Prasad Sahu <rsahu@apm.com> wrote:
->> From: Rameshwar Prasad Sahu <rsahu@apm.com>
->>
->> The Arason SD host controller supports set block count command (cmd23)
->> and high speed mode. This patch re-enable both of these features that
->> was disabled. For device that doesn't support high speed, it should
->> configure its capability register accordingly instead disables it
->> explicitly.
->>
->> Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
->> ---
->>  drivers/mmc/host/sdhci-of-arasan.c |    5 -----
->>  1 files changed, 0 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
->> index 75379cb..5d9fdb3 100644
->> --- a/drivers/mmc/host/sdhci-of-arasan.c
->> +++ b/drivers/mmc/host/sdhci-of-arasan.c
->> @@ -172,11 +172,6 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
->>                 goto clk_disable_all;
->>         }
->>
->> -       if (of_device_is_compatible(pdev->dev.of_node, "arasan,sdhci-4.9a")) {
->> -               host->quirks |= SDHCI_QUIRK_NO_HISPD_BIT;
->> -               host->quirks2 |= SDHCI_QUIRK2_HOST_NO_CMD23;
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Andy Gross <andy.gross@linaro.org>
+Cc: Bjorn Andersson <bjorn@kryo.se>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
 
-I'm not sure what's correct since i didn't have any information for arasan.
-But in case of exynos, SDHCI_QUIRK_NO_HISPD_BIT is used because that bit is used as other purpose.
-If your SoC is not used anymore, i think this patch looks good.
+Changes from v1:
+ * Fixed one wrong of_irq_count() noticed by Bjorn
 
-Best Regards,
-Jaehoon Chung
+ drivers/pinctrl/qcom/pinctrl-spmi-gpio.c | 4 +++-
+ drivers/pinctrl/qcom/pinctrl-spmi-mpp.c  | 4 +++-
+ drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c | 9 ++++++---
+ drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c  | 9 ++++++---
+ 4 files changed, 18 insertions(+), 8 deletions(-)
 
->> -       }
->> -
->>         sdhci_get_of_property(pdev);
->>         pltfm_host = sdhci_priv(host);
->>         pltfm_host->priv = sdhci_arasan;
->> --
->> 1.7.1
->>
-> 
-> Any comment on this patch ??
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> 
+diff --git a/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c b/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
+index f46dbbf7ff25..4e12ded3c773 100644
+--- a/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
++++ b/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
+@@ -697,9 +697,11 @@ static int pmic_gpio_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
+-	npins = of_irq_count(dev->of_node);
++	npins = platform_irq_count(pdev);
+ 	if (!npins)
+ 		return -EINVAL;
++	if (npins < 0)
++		return npins;
+ 
+ 	BUG_ON(npins > ARRAY_SIZE(pmic_gpio_groups));
+ 
+diff --git a/drivers/pinctrl/qcom/pinctrl-spmi-mpp.c b/drivers/pinctrl/qcom/pinctrl-spmi-mpp.c
+index 5c7935012e3a..2f18323571a6 100644
+--- a/drivers/pinctrl/qcom/pinctrl-spmi-mpp.c
++++ b/drivers/pinctrl/qcom/pinctrl-spmi-mpp.c
+@@ -799,9 +799,11 @@ static int pmic_mpp_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
+-	npins = of_irq_count(dev->of_node);
++	npins = platform_irq_count(pdev);
+ 	if (!npins)
+ 		return -EINVAL;
++	if (npins < 0)
++		return npins;
+ 
+ 	BUG_ON(npins > ARRAY_SIZE(pmic_mpp_groups));
+ 
+diff --git a/drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c b/drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c
+index f75e482073b7..cd8580d9741d 100644
+--- a/drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c
++++ b/drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c
+@@ -667,16 +667,19 @@ static int pm8xxx_gpio_probe(struct platform_device *pdev)
+ 	struct pinctrl_pin_desc *pins;
+ 	struct pm8xxx_gpio *pctrl;
+ 	int ret;
+-	int i;
++	int i, npins;
+ 
+ 	pctrl = devm_kzalloc(&pdev->dev, sizeof(*pctrl), GFP_KERNEL);
+ 	if (!pctrl)
+ 		return -ENOMEM;
+ 
+ 	pctrl->dev = &pdev->dev;
+-	pctrl->npins = of_irq_count(pdev->dev.of_node);
+-	if (!pctrl->npins)
++	npins = platform_irq_count(pdev);
++	if (!npins)
+ 		return -EINVAL;
++	if (npins < 0)
++		return npins;
++	pctrl->npins = npins;
+ 
+ 	pctrl->regmap = dev_get_regmap(pdev->dev.parent, NULL);
+ 	if (!pctrl->regmap) {
+diff --git a/drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c b/drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c
+index 3e19c12a315a..54a5402a9079 100644
+--- a/drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c
++++ b/drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c
+@@ -758,16 +758,19 @@ static int pm8xxx_mpp_probe(struct platform_device *pdev)
+ 	struct pinctrl_pin_desc *pins;
+ 	struct pm8xxx_mpp *pctrl;
+ 	int ret;
+-	int i;
++	int i, npins;
+ 
+ 	pctrl = devm_kzalloc(&pdev->dev, sizeof(*pctrl), GFP_KERNEL);
+ 	if (!pctrl)
+ 		return -ENOMEM;
+ 
+ 	pctrl->dev = &pdev->dev;
+-	pctrl->npins = of_irq_count(pdev->dev.of_node);
+-	if (!pctrl->npins)
++	npins = platform_irq_count(pdev);
++	if (!npins)
+ 		return -EINVAL;
++	if (npins < 0)
++		return npins;
++	pctrl->npins = npins;
+ 
+ 	pctrl->regmap = dev_get_regmap(pdev->dev.parent, NULL);
+ 	if (!pctrl->regmap) {
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
