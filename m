@@ -1,40 +1,80 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 7 Jan 2016 08:42:47 -0600
-Subject: [PATCH] arm: pci: mark the dra7xx driver as broken
-In-Reply-To: <20160107092553.GA7378@localhost.localdomain>
-References: <20160106214518.GA6106@localhost.localdomain>
- <568DF4FE.5010704@ti.com>
- <20160107081102.GA6243@localhost.localdomain> <568E2566.6000209@ti.com>
- <20160107092553.GA7378@localhost.localdomain>
-Message-ID: <CAErSpo4HdsB0Rqj3P+GkLwLFDyajfRWOiV_LptGsZVrE7cGOow@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 07 Jan 2016 15:45:32 +0100
+Subject: [PATCH 3/3] arm: dts: bcm5301x: Add syscon based reboot in DT
+In-Reply-To: <20160105222605.GL31867@broadcom.com>
+References: <1450474676-10210-1-git-send-email-jonmason@broadcom.com>
+ <2180042.V6T2Tnxp6B@wuerfel> <20160105222605.GL31867@broadcom.com>
+Message-ID: <2695666.f4UPYAJLqz@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 7, 2016 at 3:25 AM, Richard Cochran
-<richardcochran@gmail.com> wrote:
-> On Thu, Jan 07, 2016 at 02:14:22PM +0530, Kishon Vijay Abraham I wrote:
->> In my point of view the driver is not broken as such but an independent piece
->> (reset) which is missing, since this driver compiles and works fine if that
->> reset piece is added. You are right in that this shouldn't have been probed
->> since it's known that the reset piece is missing. Maybe we should just set
->> "status = disabled" in dra7.dtsi and when that reset piece is added enable it
->> back in dra7-evm.dts?
->
-> That isn't strong enough, IMHO, since status=disabled is the default
-> for most every DTS item.  Maybe you could comment the PCI block out or
-> remove it and put a comment in about the missing piece and the lock up
-> behavior.  It is really a nasty bug to have the machine freeze up with
-> no output at all.  It took me some time to figure out what was going
-> on, and it would be a shame if someone else sets status=okay in their
-> board file and has to repeat the whole exercise.
+On Tuesday 05 January 2016 17:26:06 Jon Mason wrote:
+> On Fri, Dec 18, 2015 at 10:44:28PM +0100, Arnd Bergmann wrote:
+> > On Friday 18 December 2015 16:37:56 Jon Mason wrote:
+> > > +       cru: cru at 1800c184 {
+> > > +               compatible = "syscon";
+> > > +               reg = <0x1800c184 0xc>;
+> > > +       };
+> > 
+> > It's unusual for a device to start at such an odd address. Are you sure
+> > it's not a larger device starting at 0x1800c000 or 0x18000000?
+> 
+> The CRU (Clock and Reset Unit) starts at 0x1800c100, with the
+> following layout:
+> 
+> CRU Clock Management at 0x1800c100-0x1800c180
+> CRU Reset at 0x1800c184
+> CRU Period Sample Clock at 0x1800c188
+> CRU Interrupt register at 0x1800c18c
+> CRU MDIO Control at 0x1800c190
+> CRU GPIO at 0x1800c1c0-0x1800c1e0
+> CRU SDIO 0x1800c200-0x1800c214
+> CRU RoboSW Interrupt at 0x1800c280
+> CRU Straps Control at 0x1800c2a0
+> 
+> The clock driver is already referencing the registers between
+> 0x1800c100-0x1800c180, and the GPIO driver is referencing registers
+> between 0x1800c1c0-0x1800c1e0.
+> 
+> The reset part of the syscon seems to be the only useful thing in this
+> block.  Am I approaching this incorrectly?
 
-It sounds like dra7xx is missing a piece of essential functionality.
-If that's the case, what is the benefit of having it in the kernel at
-all?  It makes work for everybody else (adapting to changes outside
-the driver), but it sounds like nobody gets any benefit.
+I think the problem is how the gpio controller has a device node
+that overlaps with one of the devices of the chip.
 
-If somebody posts a patch to remove the driver entirely to
-linux-pci at vger.kernel.org, we can discuss whether that's the right
-thing to do.
+If the data sheet lists a "Clock and Reset Unit" at those addresses,
+that is a strong indication that this is actually a specific
+piece of hardware, and it should be represented as one device node
+in DT, with the sub-registers being exposed by that driver in
+some way. A typical way would be to have a syscon node like
 
-Bjorn
+	cru: syscon at 1800c100 {
+		compatible = "brcm,bcm53010-clock-reset-unit", "syscon";
+		reg = <0x1800c100 100>;
+	};
+
+that represents the entire unit. You can then have syscon references
+in each driver that uses it, and/or create a high-level driver that
+binds to the "brcm,bcm53010-clock-reset-unit" compatible string and that
+exports a set of functions for other drivers to be used if you prefer
+to do this as functional abstraction rather than register based.
+
+> > Also, please provide a more specific compatible string based on the
+> > name of the device in the data sheet. The node name in contrast should
+> > be more generic, e.g.
+> > 
+> > 	cru: system-controller at 1800c000 {
+> > 		compatible = "brcm,bcm53010-cru", "syscon";
+> 
+> This is very similar between the NS and NSP (and NS2) platforms.  I'll
+> verify the layout and see if this can't be "brcm,iproc-cru" or
+> something similar.
+
+If it's only "very similar" but not identical, don't use the same compatible
+string, at least not as the only one. You should be able to identify the
+specific device by looking at its compatible string in case you want to
+write a high-level driver that knows about the differences later (the driver
+should not need to inquire the chip name, it should only look at one device
+node).
+
+	Arnd
