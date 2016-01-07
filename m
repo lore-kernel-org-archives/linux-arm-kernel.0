@@ -1,25 +1,22 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 7 Jan 2016 06:03:07 +0100
-Subject: [GIT PULL 3/9] ARM64: EXYNOS: clk: Clock dependency for ARM64
- for v4.5
-In-Reply-To: <567A7B10.3030501@samsung.com>
+Date: Thu, 7 Jan 2016 06:06:49 +0100
+Subject: [GIT PULL 6/9] ARM: EXYNOS: clk: Another clock dependency,
+ ARMv7, for v4.5
+In-Reply-To: <567A7D8F.3010209@samsung.com>
 References: <1449020386-20250-1-git-send-email-k.kozlowski@samsung.com>
- <1449020386-20250-4-git-send-email-k.kozlowski@samsung.com>
- <20151222044636.GD30172@localhost> <567A7B10.3030501@samsung.com>
-Message-ID: <20160107050307.GA26875@localhost>
+ <1449020386-20250-7-git-send-email-k.kozlowski@samsung.com>
+ <20151222045135.GG30172@localhost> <567A7D8F.3010209@samsung.com>
+Message-ID: <20160107050649.GB26875@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Sorry for the slow reply, holidays and vacation and all that.
-
-On Wed, Dec 23, 2015 at 07:44:32PM +0900, Krzysztof Kozlowski wrote:
-> W dniu 22.12.2015 o 13:46, Olof Johansson pisze:
-> > On Wed, Dec 02, 2015 at 10:39:40AM +0900, Krzysztof Kozlowski wrote:
+On Wed, Dec 23, 2015 at 07:55:11PM +0900, Krzysztof Kozlowski wrote:
+> W dniu 22.12.2015 o 13:51, Olof Johansson pisze:
+> > On Wed, Dec 02, 2015 at 10:39:43AM +0900, Krzysztof Kozlowski wrote:
 > >> Hi Kukjin,
 > >>
-> >> Dependency for soc64 changes.
+> >> This is also clock dependency. I put it in separate tag in case clock
+> >> folks want to pull it also.
 > >>
 > >> Best regards,
 > >> Krzysztof
@@ -31,30 +28,29 @@ On Wed, Dec 23, 2015 at 07:44:32PM +0900, Krzysztof Kozlowski wrote:
 > >>
 > >> are available in the git repository at:
 > >>
-> >>   https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-clk-arm64-symbols-4.5
+> >>   https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-clk-exynos4-4.5
 > >>
-> >> for you to fetch changes up to 8c2a90ed18a74e8b9cdbba679403faa44d6024fc:
+> >> for you to fetch changes up to 94af7a3c310f5877dc6f756179b92f24f89a9b08:
 > >>
-> >>   clk: samsung: Don't build ARMv8 clock drivers on ARMv7 (2015-11-22 19:25:29 +0900)
+> >>   clk: samsung: exynos4: Add SSS gate clock (2015-11-18 22:02:02 +0900)
 > > 
-> > Hi,
+> > Again, this should probably go through the clk maintainer (or have an ack).
+> > It's just two one-line changes though, so if they're slow to respond we can
+> > take it as a fallback. Resend if that's the case.
 > > 
-> > Looks like this lacks ack from any of the clock maintainers.
 > 
-> It got the ack from Sylwester and Tomasz - Samsung clock maintainers. If
-> it is not sufficient... then let's wait with it for v4.6. I am on
-> holidays now so I cannot really do anything meaningful with it.
-
-Ok -- even though we have per-driver maintainers, we still look for acks from
-the overall subsystem maintainers on these drivers. 
-
-> > Given that EXYNOS_ARM64_COMMON_CLK is not yet introduced, this will cause
-> > a breakage in bisectability on some of these platforms as well.
+> Wait, I am missing something. This contains only one patch which has the
+> Stephen's Boyd ack:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/379230.html
+> (this is in commit message already)
 > 
-> The patch introduces EXYNOS_ARM64_COMMON_CLK which will be enabled by
-> default on our platforms. What kind of breakage do you have in mind?
+> What kind of ack do you expect here? Ack for pull-request?
 
-Ah, I probably missed that.
+Yeah, looks good. I likely mixed up branch contents when I replied to this one.
+
+I'll merge it into drivers. Still, for patches that only touches clock
+subsystem, the default of merging through those subsystem maintainers is
+preferred. Complications, of course, are when there's dependencies.
 
 
 -Olof
