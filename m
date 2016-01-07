@@ -1,46 +1,168 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Fri, 8 Jan 2016 02:34:30 +0300
-Subject: [PATCH v6 12/21] arm64:ilp32: share HWCAP between LP64 and ILP32
+Date: Fri, 8 Jan 2016 02:34:32 +0300
+Subject: [PATCH v6 14/21] arm64:ilp32: add sys_ilp32.c and a separate table
+ (in entry.S) to use it
 In-Reply-To: <1452209679-19445-1-git-send-email-ynorov@caviumnetworks.com>
 References: <1452209679-19445-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1452209679-19445-13-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1452209679-19445-15-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andrew Pinski <apinski@cavium.com>
 
-Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
-Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
-Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
-Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-Reviewed-by: David Daney <ddaney@caviumnetworks.com>
----
- arch/arm64/include/asm/hwcap.h | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+Add a separate syscall-table for ILP32, which dispatches either to native
+LP64 system call implementation or to compat-syscalls, as appropriate.
 
-diff --git a/arch/arm64/include/asm/hwcap.h b/arch/arm64/include/asm/hwcap.h
-index 400b80b..bdb1ae6 100644
---- a/arch/arm64/include/asm/hwcap.h
-+++ b/arch/arm64/include/asm/hwcap.h
-@@ -47,9 +47,17 @@
- #define ELF_HWCAP		(elf_hwcap)
- 
- #ifdef CONFIG_COMPAT
--#define COMPAT_ELF_HWCAP	(compat_elf_hwcap)
--#define COMPAT_ELF_HWCAP2	(compat_elf_hwcap2)
- extern unsigned int compat_elf_hwcap, compat_elf_hwcap2;
-+#define COMPAT_ELF_HWCAP	\
-+	(is_a32_compat_task()	\
-+	  ? compat_elf_hwcap	\
-+	  : (u32) elf_hwcap)
+Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
+Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+---
+ arch/arm64/include/asm/unistd.h | 11 ++++++-
+ arch/arm64/kernel/Makefile      |  2 +-
+ arch/arm64/kernel/entry.S       | 12 +++++++-
+ arch/arm64/kernel/sys_ilp32.c   | 66 +++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 88 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm64/kernel/sys_ilp32.c
+
+diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
+index 2971dea..5ea18ef 100644
+--- a/arch/arm64/include/asm/unistd.h
++++ b/arch/arm64/include/asm/unistd.h
+@@ -13,9 +13,18 @@
+  * You should have received a copy of the GNU General Public License
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
 +
-+#define COMPAT_ELF_HWCAP2	\
-+	(is_a32_compat_task()	\
-+	  ? compat_elf_hwcap2	\
-+	  : (u32) (elf_hwcap >> 32))
++#ifdef CONFIG_COMPAT
++#define __ARCH_WANT_COMPAT_STAT64
++#endif
 +
- #endif
++#ifdef CONFIG_ARM64_ILP32
++#define __ARCH_WANT_COMPAT_SYS_PREADV64
++#define __ARCH_WANT_COMPAT_SYS_PWRITEV64
++#endif
++
+ #ifdef CONFIG_AARCH32_EL0
+ #define __ARCH_WANT_COMPAT_SYS_GETDENTS64
+-#define __ARCH_WANT_COMPAT_STAT64
+ #define __ARCH_WANT_SYS_GETHOSTNAME
+ #define __ARCH_WANT_SYS_PAUSE
+ #define __ARCH_WANT_SYS_GETPGRP
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index ad7158c..a35f2f8 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -28,7 +28,7 @@ $(obj)/%.stub.o: $(obj)/%.o FORCE
+ arm64-obj-$(CONFIG_AARCH32_EL0)		+= sys32.o kuser32.o signal32.o 	\
+ 					   sys_compat.o entry32.o		\
+ 					   ../../arm/kernel/opcodes.o binfmt_elf32.o
+-arm64-obj-$(CONFIG_ARM64_ILP32)		+= binfmt_ilp32.o
++arm64-obj-$(CONFIG_ARM64_ILP32)		+= binfmt_ilp32.o sys_ilp32.o
+ arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
+ arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
+ arm64-obj-$(CONFIG_PERF_EVENTS)		+= perf_regs.o perf_callchain.o
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 5eb1bb7..f348f58 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -666,9 +666,13 @@ ENDPROC(ret_from_fork)
+  */
+ 	.align	6
+ el0_svc:
+-	adrp	stbl, sys_call_table		// load syscall table pointer
+ 	uxtw	scno, w8			// syscall number in w8
+ 	mov	sc_nr, #__NR_syscalls
++#ifdef CONFIG_ARM64_ILP32
++	ldr	x16, [tsk, #TI_FLAGS]
++	tbnz	x16, #TIF_32BIT_AARCH64, el0_ilp32_svc // We are using ILP32
++#endif
++	adrp	stbl, sys_call_table		// load syscall table pointer
+ el0_svc_naked:					// compat entry point
+ 	stp	x0, scno, [sp, #S_ORIG_X0]	// save the original x0 and syscall number
+ 	enable_dbg_and_irq
+@@ -688,6 +692,12 @@ ni_sys:
+ 	b	ret_fast_syscall
+ ENDPROC(el0_svc)
  
- enum {
++#ifdef CONFIG_ARM64_ILP32
++el0_ilp32_svc:
++	adrp	stbl, sys_call_ilp32_table // load syscall table pointer
++	b el0_svc_naked
++#endif
++
+ 	/*
+ 	 * This is the really slow path.  We're going to be doing context
+ 	 * switches, and waiting for our parent to respond.
+diff --git a/arch/arm64/kernel/sys_ilp32.c b/arch/arm64/kernel/sys_ilp32.c
+new file mode 100644
+index 0000000..71912b0
+--- /dev/null
++++ b/arch/arm64/kernel/sys_ilp32.c
+@@ -0,0 +1,66 @@
++/*
++ * AArch64- ILP32 specific system calls implementation
++ *
++ * Copyright (C) 2016 Cavium Inc.
++ * Author: Andrew Pinski <apinski@cavium.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/compiler.h>
++#include <linux/errno.h>
++#include <linux/fs.h>
++#include <linux/mm.h>
++#include <linux/msg.h>
++#include <linux/export.h>
++#include <linux/sched.h>
++#include <linux/slab.h>
++#include <linux/syscalls.h>
++#include <linux/compat.h>
++
++/* Using non-compat syscalls where necessary */
++#define compat_sys_fadvise64_64        sys_fadvise64_64
++#define compat_sys_fallocate           sys_fallocate
++#define compat_sys_ftruncate64         sys_ftruncate
++#define compat_sys_lookup_dcookie      sys_lookup_dcookie
++#define compat_sys_pread64             sys_pread64
++#define compat_sys_pwrite64            sys_pwrite64
++#define compat_sys_readahead           sys_readahead
++#define compat_sys_shmat               sys_shmat
++#define compat_sys_sync_file_range     sys_sync_file_range
++#define compat_sys_truncate64          sys_truncate
++#define sys_llseek                     sys_lseek
++
++asmlinkage long sys_mmap(unsigned long addr, unsigned long len,
++			 unsigned long prot, unsigned long flags,
++			 unsigned long fd, off_t off);
++#define sys_mmap2		       sys_mmap
++
++#include <asm/syscall.h>
++
++#undef __SYSCALL
++#undef __SC_COMP
++#undef __SC_3264
++#undef __SC_COMP_3264
++
++#define __SYSCALL_COMPAT
++#define __SYSCALL(nr, sym)	[nr] = sym,
++
++/*
++ * The sys_call_ilp32_table array must be 4K aligned to be accessible from
++ * kernel/entry.S.
++ */
++void *sys_call_ilp32_table[__NR_syscalls] __aligned(4096) = {
++	[0 ... __NR_syscalls - 1] = sys_ni_syscall,
++#include <asm/unistd.h>
++};
 -- 
 2.5.0
