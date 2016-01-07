@@ -1,83 +1,76 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu,  7 Jan 2016 15:58:17 +0000
-Subject: [PATCH 1/2] crypto: sunxi-ss-cipher: promote variables to match types
- in min3() calls
-In-Reply-To: <1452182298-4653-1-git-send-email-andre.przywara@arm.com>
-References: <1452182298-4653-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1452182298-4653-2-git-send-email-andre.przywara@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 7 Jan 2016 15:59:58 +0000
+Subject: next boot: 564 boots: 59 failed, 448 passed with 57 offline
+ (next-20160107)
+In-Reply-To: <568e8740.01941c0a.31072.ffffb67b@mx.google.com>
+References: <568e8740.01941c0a.31072.ffffb67b@mx.google.com>
+Message-ID: <20160107155958.GG6588@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The min3() macro expects all arguments to be of the same type (or
-size at least).
-Change the type of some local variables in sun4i-ss-cipher.c to
-size_t to match the type used in some generic structures we
-compare against.
-That shouldn't change anything for 32-bit (as size_t is unsigned int
-there anyway), but allows compilation for 64-bit architectures.
+On Thu, Jan 07, 2016 at 07:41:52AM -0800, kernelci.org bot wrote:
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- drivers/crypto/sunxi-ss/sun4i-ss-cipher.c | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+> Tree: next
+> Branch: local/master
+> Git Describe: next-20160107
+> Git Commit: 0f023a298a7d2a8e99c54913f7277b3c08c1f5c9
+> Git URL: git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git
+> Tested: 95 unique boards, 25 SoC families, 28 builds out of 135
+> 
+> Boot Failures Detected: https://kernelci.org/boot/?next-20160107&fail
 
-diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c b/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c
-index a19ee12..707f30f 100644
---- a/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c
-+++ b/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c
-@@ -25,13 +25,13 @@ static int sun4i_ss_opti_poll(struct ablkcipher_request *areq)
- 	struct sun4i_cipher_req_ctx *ctx = ablkcipher_request_ctx(areq);
- 	u32 mode = ctx->mode;
- 	/* when activating SS, the default FIFO space is SS_RX_DEFAULT(32) */
--	u32 rx_cnt = SS_RX_DEFAULT;
--	u32 tx_cnt = 0;
-+	size_t rx_cnt = SS_RX_DEFAULT;
-+	size_t tx_cnt = 0;
- 	u32 spaces;
- 	u32 v;
- 	int i, err = 0;
--	unsigned int ileft = areq->nbytes;
--	unsigned int oleft = areq->nbytes;
-+	size_t ileft = areq->nbytes;
-+	size_t oleft = areq->nbytes;
- 	unsigned int todo;
- 	struct sg_mapping_iter mi, mo;
- 	unsigned int oi, oo; /* offset for in and out */
-@@ -134,13 +134,13 @@ static int sun4i_ss_cipher_poll(struct ablkcipher_request *areq)
- 	struct sun4i_cipher_req_ctx *ctx = ablkcipher_request_ctx(areq);
- 	u32 mode = ctx->mode;
- 	/* when activating SS, the default FIFO space is SS_RX_DEFAULT(32) */
--	u32 rx_cnt = SS_RX_DEFAULT;
--	u32 tx_cnt = 0;
-+	size_t rx_cnt = SS_RX_DEFAULT;
-+	size_t tx_cnt = 0;
- 	u32 v;
- 	u32 spaces;
- 	int i, err = 0;
--	unsigned int ileft = areq->nbytes;
--	unsigned int oleft = areq->nbytes;
-+	size_t ileft = areq->nbytes;
-+	size_t oleft = areq->nbytes;
- 	unsigned int todo;
- 	struct sg_mapping_iter mi, mo;
- 	unsigned int oi, oo;	/* offset for in and out */
-@@ -148,7 +148,7 @@ static int sun4i_ss_cipher_poll(struct ablkcipher_request *areq)
- 	char bufo[4 * SS_TX_MAX]; /* buffer for linearize SG dst */
- 	unsigned int ob = 0;	/* offset in buf */
- 	unsigned int obo = 0;	/* offset in bufo*/
--	unsigned int obl = 0;	/* length of data in bufo */
-+	size_t obl = 0;	/* length of data in bufo */
- 
- 	if (areq->nbytes == 0)
- 		return 0;
-@@ -251,7 +251,7 @@ static int sun4i_ss_cipher_poll(struct ablkcipher_request *areq)
- 		spaces = readl(ss->base + SS_FCSR);
- 		rx_cnt = SS_RXFIFO_SPACES(spaces);
- 		tx_cnt = SS_TXFIFO_SPACES(spaces);
--		dev_dbg(ss->dev, "%x %u/%u %u/%u cnt=%u %u/%u %u/%u cnt=%u %u %u\n",
-+		dev_dbg(ss->dev, "%x %u/%zu %zu/%u cnt=%zu %u/%zu %zu/%u cnt=%zu %u %u\n",
- 			mode,
- 			oi, mi.length, ileft, areq->nbytes, rx_cnt,
- 			oo, mo.length, oleft, areq->nbytes, tx_cnt,
--- 
-2.6.4
+For the past couple of days -next has been failing to boot on various
+Tegra platforms, there are failures involving either no kernel output or
+(with tegra_defconfig) backtraces during CMA allocation from USB, for
+example:
+
+   http://storage.kernelci.org/next/next-20160107/arm-tegra_defconfig/lab-khilman/boot-tegra30-beaver.html
+
+>     multi_v7_defconfig+CONFIG_THUMB2_KERNEL=y:
+>         tegra124-jetson-tk1: 2 failed labs
+>         tegra30-beaver: 1 failed lab
+> 
+>     tegra_defconfig:
+>         tegra124-jetson-tk1: 2 failed labs
+>         tegra124-jetson-tk1_rootfs:nfs: 1 failed lab
+>         tegra124-nyan-big: 1 failed lab
+>         tegra30-beaver: 1 failed lab
+> 
+>     multi_v7_defconfig+CONFIG_ARM_LPAE=y:
+>         tegra124-jetson-tk1: 1 failed lab
+>         tegra124-nyan-big: 1 failed lab
+> 
+>     multi_v7_defconfig:
+>         tegra124-jetson-tk1: 2 failed labs
+>         tegra30-beaver: 1 failed lab
+> 
+>     multi_v7_defconfig+CONFIG_LKDTM=y:
+>         tegra124-jetson-tk1: 2 failed labs
+>         tegra30-beaver: 1 failed lab
+> 
+>     multi_v7_defconfig+CONFIG_PROVE_LOCKING=y:
+>         tegra124-jetson-tk1: 2 failed labs
+>         tegra30-beaver: 1 failed lab
+
+I did bisects yesterday but they were a bit inconclusive, showing a
+series of skipped commits in the TTY tree as being the culprits:
+
+afd7f88f157796e586fc99d62da13a54024e0731 serial: 8250: move of_serial code to 8250 directory
+4e33870b3bb691996354a8f9e8f69458b4fc34d9 serial: of: CONFIG_SERIAL_8250 is always set
+d1b5c87fa8058a3f477ae05555916dd1cea934ad serial: remove NWP serial support
+
+which seems more than a little surprising and like they might be false
+positives, especially in the cases that do produce output.  The errors
+today look the same.  I've not investigated further than the bisects.
+
+Full bisect logs:
+
+ https://ci.linaro.org/view/people/job/tbaker-boot-bisect-bot/140/console
+ https://ci.linaro.org/view/people/job/tbaker-boot-bisect-bot/141/console
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160107/819e76d9/attachment-0001.sig>
