@@ -1,32 +1,35 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 07 Jan 2016 14:31:26 +0000
-Subject: [PATCH 4.4-rc5 v22 1/4] irqchip: gic: Optimize locking in
- gic_raise_softirq
-In-Reply-To: <1450644757-18734-2-git-send-email-daniel.thompson@linaro.org>
+Date: Thu, 07 Jan 2016 14:35:46 +0000
+Subject: [PATCH 4.4-rc5 v22 2/4] irqchip: gic: Make gic_raise_softirq
+ FIQ-safe
+In-Reply-To: <1450644757-18734-3-git-send-email-daniel.thompson@linaro.org>
 References: <1450644757-18734-1-git-send-email-daniel.thompson@linaro.org>
- <1450644757-18734-2-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <568E76BE.3010702@arm.com>
+ <1450644757-18734-3-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <568E77C2.9060002@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 20/12/15 20:52, Daniel Thompson wrote:
-> Currently gic_raise_softirq() is locked using irq_controller_lock.
-> This lock is primarily used to make register read-modify-write sequences
-> atomic but gic_raise_softirq() uses it instead to ensure that the
-> big.LITTLE migration logic can figure out when it is safe to migrate
-> interrupts between physical cores.
+> It is currently possible for FIQ handlers to re-enter gic_raise_softirq()
+> and lock up.
 > 
-> This is sub-optimal in closely related ways:
+>     	gic_raise_softirq()
+> 	   lock(x);
+> -~-> FIQ
+>         handle_fiq()
+> 	   gic_raise_softirq()
+> 	      lock(x);		<-- Lockup
 > 
-> 1. No locking at all is required on systems where the b.L switcher is
->    not configured.
+> arch/arm/ uses IPIs to implement arch_irq_work_raise(), thus this issue
+> renders it difficult for FIQ handlers to safely defer work to less
+> restrictive calling contexts.
 > 
-> 2. Finer grain locking can be used on systems where the b.L switcher is
->    present.
+> This patch fixes the problem by converting the cpu_map_migration_lock
+> into a rwlock making it safe to re-enter the function.
 > 
-> This patch resolves both of the above by introducing a separate finer
-> grain lock and providing conditionally compiled inlines to lock/unlock
-> it.
+> Note that having made it safe to re-enter gic_raise_softirq() we no
+> longer need to mask interrupts during gic_raise_softirq() because the
+> b.L migration is always performed from task context.
 > 
 > Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
 > Cc: Thomas Gleixner <tglx@linutronix.de>
