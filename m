@@ -1,55 +1,68 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Thu, 7 Jan 2016 15:26:18 -0600
-Subject: dra7xx pci driver broken on dra7xx-evm
-In-Reply-To: <568DF4FE.5010704@ti.com>
-References: <20160106214518.GA6106@localhost.localdomain>
- <568DF4FE.5010704@ti.com>
-Message-ID: <568ED7FA.4000508@ti.com>
+From: dgdegra@tycho.nsa.gov (Daniel De Graaf)
+Date: Thu, 7 Jan 2016 16:40:09 -0500
+Subject: [PATCH v3 59/62] xen/arm: Add a hypercall for device mmio mapping
+In-Reply-To: <568E511402000078000C44C6@prv-mh.provo.novell.com>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-60-git-send-email-shannon.zhao@linaro.org>
+ <564B17EA02000078000B5D34@prv-mh.provo.novell.com>
+ <568E0CA9.4090307@huawei.com>
+ <568E25A702000078000C43EA@prv-mh.provo.novell.com>
+ <568E2BB4.8080802@huawei.com>
+ <568E511402000078000C44C6@prv-mh.provo.novell.com>
+Message-ID: <568EDB39.6050804@tycho.nsa.gov>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/06/2016 11:17 PM, Kishon Vijay Abraham I wrote:
-> Hi,
-
-+ Tero, Tony and linux-omap
-
-> 
-> On Thursday 07 January 2016 03:15 AM, Richard Cochran wrote:
+On 01/07/2016 05:50 AM, Jan Beulich wrote:
+>>>> On 07.01.16 at 10:11, <zhaoshenglong@huawei.com> wrote:
+>> Hi Jan,
 >>
->> The dra7xx-evm box freezes hard at the very first PCI bus access, the
->> call to in dra7xx_pcie_readl() in dra7xx_pcie_probe().
+>> On 2016/1/7 15:45, Jan Beulich wrote:
+>>>>>> On 07.01.16 at 07:58, <zhaoshenglong@huawei.com> wrote:
+>>>>> On 2015/11/17 19:04, Jan Beulich wrote:
+>>>>>>>>>>>>> On 17.11.15 at 10:40, <shannon.zhao@linaro.org> wrote:
+>>>>>>>>>>> --- a/xen/arch/arm/mm.c
+>>>>>>>>>>> +++ b/xen/arch/arm/mm.c
+>>>>>>>>>>> @@ -1138,6 +1138,10 @@ int xenmem_add_to_physmap_one(
+>>>>>>>>>>>           rcu_unlock_domain(od);
+>>>>>>>>>>>           break;
+>>>>>>>>>>>       }
+>>>>>>>>>>> +    case XENMAPSPACE_dev_mmio:
+>>>>>>>>>>> +        rc = map_dev_mmio_region(d, gpfn, 1, idx);
+>>>>>>>>>>> +        return rc;
+>>>>>>>>>>> +        break;
+>>>>>>> Blindly for any kind of domain? The XSM check in the
+>>>>>>> XENMEM_add_to_physmap_batch handler (in common code) doesn't
+>>>>>>> even know which map space is to be used...
+>>>>>
+>>>>> Sorry, I know little about XSM. Could you suggest me how to add the
+>>>>> check for this new type here?
+>>> I'm sorry to push back here, but did you at least try to derive
+>>> what is wanted from the multitude of other XSM checks present
+>>> throughout the tree?
 >>
->> The out-of-tree 3.14.53 TI driver performs a reset via platform data,
->> calling omap_device_assert_hardreset() by hook and crook.
+>> IIUC, you mean that it doean't need to change the XSM check itself, but
+>> we should check if the current->domain is hardware domain and it maps
+>> the space to itself before the XSM check, right?
+>
+> No, I actually think that you need to add a new, secondary XSM
+> check. But you may want to consult with Daniel (who so far wasn't
+> even Cc-ed).
 
-Yeah, this is the only feasible way and not break multi-arch atm until a
-reset framework is in place. We have couple of drivers (omap_iommu and
-wkup_m3_rproc) following this approach.
+Looking at the original patch, I am not sure if I understand the
+checks: it seems like the iomem_access_permitted check is being done
+on the guest's page range instead of the actual IO memory, which
+ends up allowing the guest to map anything as long as it maps it in
+the right guest area.  The iomem_permit_access call there also seems
+to be redundant because it is the same range that was just checked.
 
->>
->> Adding the reset into the mainline driver cures the freeze.
+If the [start_gfn, start_gfn + nr) memory range actually describes
+the physical addresses, then this operation is taking advantage of
+the existing XSM checks on XEN_DOMCTL_iomem_permission, and the
+only XSM check that is needed would be that current->domain has
+permission to modify (d)'s mappings - and this is done by the
+xsm_add_to_physmap check in XENMEM_add_to_physmap.
 
-
->>
->> Question: How on earth is this driver supposed to work?
-> 
-> It doesn't work out of the box in mainline. (Every time I post a PCI patch, I
-> add the pdata-quirks mechanism to test it). The pdata-quirks mechanism used in
-> TI tree is not an upstream-able solution. Something like this [1] was done for
-> performing reset. Not sure the latest state of that. Dan? Suman?
-
-Yeah, [1] is very old, and it doesn't deal with the hwmod integration
-for pm_runtime API usage. Tero has posted another revamped series [2]
-with hwmod integration, and it needs to be refreshed with few additional
-patches and fixes. It will probably take couple of releases before it
-hits mainline. So, I guess it is then a question of picking up the pdata
-quirks solution for interim to get the driver functional until the reset
-framework hits mainline, or mark the driver as broken.
-
-regards
-Suman
-
-> 
-> [1] -> https://patches.linaro.org/33797/
-
-[2] http://marc.info/?l=linux-omap&m=144310496514782&w=2
+-- 
+Daniel De Graaf
+National Security Agency
