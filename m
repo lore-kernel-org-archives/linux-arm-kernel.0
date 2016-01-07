@@ -1,46 +1,73 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Thu,  7 Jan 2016 20:26:18 +0800
-Subject: [PATCH v2 5/5] clk: rockchip: rk3036: add HCLK_MAC id for emac
-In-Reply-To: <1452169057-24467-1-git-send-email-zhengxing@rock-chips.com>
-References: <1452169057-24467-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <1452169578-24565-1-git-send-email-zhengxing@rock-chips.com>
+From: rsahu@apm.com (Rameshwar Sahu)
+Date: Thu, 7 Jan 2016 18:02:09 +0530
+Subject: [PATCH] mmc: host: arasan: sdhci-of-arasan: Remove no-hispd and
+ no-cmd23 quirks for sdhci-arasan4.9a
+In-Reply-To: <568DC068.6020602@samsung.com>
+References: <1450877391-3029-1-git-send-email-rsahu@apm.com>
+ <CAFd313ziJ_zgxQ11J6e=ueRLFKXFOsDPg_evRDK2FGQC5rOmfA@mail.gmail.com>
+ <568DC068.6020602@samsung.com>
+Message-ID: <CAFd313y53tpopYFmzrnfhxQEV6GMLzXqPy2sCy+Qbk-pPaHf8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to add HCLK_MAC id explicitly because that it is referred
-by hclk in the emac driver.
+Hi Jaehoon,
 
-Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
----
+On Thu, Jan 7, 2016 at 7:03 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+> Hi,
+>
+> On 01/05/2016 07:25 PM, Rameshwar Sahu wrote:
+>> Hi Ulf,
+>>
+>> On Wed, Dec 23, 2015 at 6:59 PM, Rameshswar Prasad Sahu <rsahu@apm.com> wrote:
+>>> From: Rameshwar Prasad Sahu <rsahu@apm.com>
+>>>
+>>> The Arason SD host controller supports set block count command (cmd23)
+>>> and high speed mode. This patch re-enable both of these features that
+>>> was disabled. For device that doesn't support high speed, it should
+>>> configure its capability register accordingly instead disables it
+>>> explicitly.
+>>>
+>>> Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
+>>> ---
+>>>  drivers/mmc/host/sdhci-of-arasan.c |    5 -----
+>>>  1 files changed, 0 insertions(+), 5 deletions(-)
+>>>
+>>> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
+>>> index 75379cb..5d9fdb3 100644
+>>> --- a/drivers/mmc/host/sdhci-of-arasan.c
+>>> +++ b/drivers/mmc/host/sdhci-of-arasan.c
+>>> @@ -172,11 +172,6 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
+>>>                 goto clk_disable_all;
+>>>         }
+>>>
+>>> -       if (of_device_is_compatible(pdev->dev.of_node, "arasan,sdhci-4.9a")) {
+>>> -               host->quirks |= SDHCI_QUIRK_NO_HISPD_BIT;
+>>> -               host->quirks2 |= SDHCI_QUIRK2_HOST_NO_CMD23;
+>
+> I'm not sure what's correct since i didn't have any information for arasan.
+> But in case of exynos, SDHCI_QUIRK_NO_HISPD_BIT is used because that bit is used as other purpose.
+> If your SoC is not used anymore, i think this patch looks good.
 
- drivers/clk/rockchip/clk-rk3036.c      |    2 +-
- include/dt-bindings/clock/rk3036-cru.h |    1 +
- 2 files changed, 2 insertions(+), 1 deletion(-)
+Our SoC doesn't need that bit, that's why we are going to remove it.
 
-diff --git a/drivers/clk/rockchip/clk-rk3036.c b/drivers/clk/rockchip/clk-rk3036.c
-index bc7fbac..15cd29a 100644
---- a/drivers/clk/rockchip/clk-rk3036.c
-+++ b/drivers/clk/rockchip/clk-rk3036.c
-@@ -404,7 +404,7 @@ static struct rockchip_clk_branch rk3036_clk_branches[] __initdata = {
- 	GATE(HCLK_OTG1, "hclk_otg1", "hclk_peri", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(7), 3, GFLAGS),
- 	GATE(HCLK_I2S, "hclk_i2s", "hclk_peri", 0, RK2928_CLKGATE_CON(7), 2, GFLAGS),
- 	GATE(0, "hclk_sfc", "hclk_peri", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(3), 14, GFLAGS),
--	GATE(0, "hclk_mac", "hclk_peri", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(3), 15, GFLAGS),
-+	GATE(HCLK_MAC, "hclk_mac", "hclk_peri", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(3), 15, GFLAGS),
- 
- 	/* pclk_peri gates */
- 	GATE(0, "pclk_peri_matrix", "pclk_peri", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(4), 1, GFLAGS),
-diff --git a/include/dt-bindings/clock/rk3036-cru.h b/include/dt-bindings/clock/rk3036-cru.h
-index ebc7a7b..3396591 100644
---- a/include/dt-bindings/clock/rk3036-cru.h
-+++ b/include/dt-bindings/clock/rk3036-cru.h
-@@ -92,6 +92,7 @@
- #define HCLK_SDMMC		456
- #define HCLK_SDIO		457
- #define HCLK_EMMC		459
-+#define HCLK_MAC		460
- #define HCLK_I2S		462
- #define HCLK_LCDC		465
- #define HCLK_ROM		467
--- 
-1.7.9.5
+>
+> Best Regards,
+> Jaehoon Chung
+>
+>>> -       }
+>>> -
+>>>         sdhci_get_of_property(pdev);
+>>>         pltfm_host = sdhci_priv(host);
+>>>         pltfm_host->priv = sdhci_arasan;
+>>> --
+>>> 1.7.1
+>>>
+>>
+>> Any comment on this patch ??
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
+>>
+>
