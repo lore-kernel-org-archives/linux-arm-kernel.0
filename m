@@ -1,41 +1,61 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 7 Jan 2016 17:19:59 +0000
-Subject: [Qemu-devel] arm64 qemu tests failing in linux-next since 'arm64:
- kernel: enforce pmuserenr_el0 initialization and restore'
-In-Reply-To: <568E9BF6.6020809@roeck-us.net>
-References: <567B41E3.5060800@roeck-us.net>
- <CAFEAcA_c9DicGF+is6ST3NJv+c5Bi4dHYo2t8Q2n9AS9G4q0+Q@mail.gmail.com>
- <20160107155310.GA4064@red-moon>
- <CAFEAcA_vP93=PE6LNNHodCsdk0gL0kBQPX=xzLJU5RzkvNs2vw@mail.gmail.com>
- <20160107163722.GB4064@red-moon> <568E9BF6.6020809@roeck-us.net>
-Message-ID: <CAFEAcA8rhU93urnqVRFy78Q0JNRD=1mUPe2fjXbUs4WRYWoHoA@mail.gmail.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Thu, 7 Jan 2016 11:20:45 -0600
+Subject: [PATCH] ARM64: tegra: Add support for Google Pixel C
+In-Reply-To: <568E9804.5020503@nvidia.com>
+References: <1452073222-2956-1-git-send-email-jonathanh@nvidia.com>
+ <568D0D70.4020309@nvidia.com> <568E65F0.2070201@nvidia.com>
+ <4442990.rM1mk43t6M@wuerfel> <568E9804.5020503@nvidia.com>
+Message-ID: <CAL_Jsq++DkgJA--40YBqGZd5BJFkzXfKt_st1kN+ZiVY7yb8OA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 January 2016 at 17:10, Guenter Roeck <linux@roeck-us.net> wrote:
-> Strictly speaking you may be right (regression is a bit strong, though),
-> but for my part I tend to be pragmatic.
+On Thu, Jan 7, 2016 at 10:53 AM, Jon Hunter <jonathanh@nvidia.com> wrote:
 >
-> A warning message such as "Access to unimplemented register X" may be
-> useful
+> On 07/01/16 14:11, Arnd Bergmann wrote:
+>> On Thursday 07 January 2016 13:19:44 Jon Hunter wrote:
 
-You can get these from QEMU if you pass it "-d unimp", which logs
-various kinds of things-not-yet-implemented, with a couple of caveats:
- * the warning is when we translate the code, not when we execute it
- * it won't warn for registers which we implement but not completely
-   (eg only partial functionality or dummy reads-as-written)
+[...]
 
-In this case it printed
-"write access to unsupported AArch64 system register op0:3 op1:3 crn:9
-crm:14 op2:0"
+> Ok so something like this ...
+>
+> diff --git a/drivers/tty/serial/8250/8250_early.c
+> b/drivers/tty/serial/8250/8250_early.c
+> index af62131af21e..4ce6e2b57534 100644
+> --- a/drivers/tty/serial/8250/8250_early.c
+> +++ b/drivers/tty/serial/8250/8250_early.c
+> @@ -141,7 +141,18 @@ int __init early_serial8250_setup(struct
+> earlycon_device *device,
+>         device->con->write = early_serial8250_write;
+>         return 0;
+>  }
+> +
+> +int __init early_serial8250_mem32_setup(struct earlycon_device *device,
+> +                                       const char *options)
+> +{
+> +       device->port.iotype = UPIO_MEM32;
+> +       device->port.regshift = 2;
+> +
+> +       return early_serial8250_setup(device, options);
+> +}
+>  EARLYCON_DECLARE(uart8250, early_serial8250_setup);
+>  EARLYCON_DECLARE(uart, early_serial8250_setup);
+>  OF_EARLYCON_DECLARE(ns16550, "ns16550", early_serial8250_setup);
+>  OF_EARLYCON_DECLARE(ns16550a, "ns16550a", early_serial8250_setup);
+> +OF_EARLYCON_DECLARE(tegra20_uart, "nvidia,tegra20-uart",
+> +                   early_serial8250_mem32_setup);
+>
+>> Would it be possible to handle the "reg-io-width" parsing in
+>> early_serial8250_setup instead of keying it off the string?
+>
+> Good point. I spent a bit of time looking at this, but I cannot see an
+> easy way to do this unless we check for "reg-io-width" and "reg-shift"
+> in early_init_dt_scan_chosen_serial() and pass to of_setup_earlycon(),
+> however, I am guessing that this would not be ideal as this would happen
+> for non-8250 devices. May be that would be ok, but I am not sure.
 
-The 'guest_errors' suboption to -d warns about things which appear
-to be errors in the guest OS, for instance some kinds of UNPREDICTABLE,
-and may also be of interest.
+There's been one attempt[1] already. It had a few issues easily
+solved, but I haven't seen a follow-up.
 
-Neither guest_errors nor unimp are comprehensive (there are many
-more situations where we don't warn than where we do) but they can
-be helpful sometimes.
+Rob
 
-thanks
--- PMM
+[1] https://lkml.org/lkml/2015/11/30/513
