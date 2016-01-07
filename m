@@ -1,76 +1,75 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 7 Jan 2016 15:59:58 +0000
-Subject: next boot: 564 boots: 59 failed, 448 passed with 57 offline
- (next-20160107)
-In-Reply-To: <568e8740.01941c0a.31072.ffffb67b@mx.google.com>
-References: <568e8740.01941c0a.31072.ffffb67b@mx.google.com>
-Message-ID: <20160107155958.GG6588@sirena.org.uk>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 7 Jan 2016 17:05:20 +0100
+Subject: [PATCH] doc: PCI: altera: Fix the 'ranges' property in example
+In-Reply-To: <1452156966.3051.44.camel@ubuntu>
+References: <1450950330-28393-1-git-send-email-marex@denx.de>
+ <201601051449.49757.marex@denx.de> <1452156966.3051.44.camel@ubuntu>
+Message-ID: <201601071705.20552.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 07, 2016 at 07:41:52AM -0800, kernelci.org bot wrote:
-
-> Tree: next
-> Branch: local/master
-> Git Describe: next-20160107
-> Git Commit: 0f023a298a7d2a8e99c54913f7277b3c08c1f5c9
-> Git URL: git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git
-> Tested: 95 unique boards, 25 SoC families, 28 builds out of 135
+On Thursday, January 07, 2016 at 09:56:06 AM, Ley Foon Tan wrote:
+> On Tue, 2016-01-05 at 14:49 +0100, Marek Vasut wrote:
+> > On Tuesday, January 05, 2016 at 02:18:18 AM, Ley Foon Tan wrote:
+> > > On Tue, 2016-01-05 at 01:47 +0100, Marek Vasut wrote:
+> > > > On Tuesday, January 05, 2016 at 01:45:45 AM, Ley Foon Tan wrote:
+> > > > > On Mon, 2016-01-04 at 02:12 +0100, Marek Vasut wrote:
+> > > > > > On Monday, January 04, 2016 at 01:53:22 AM, Ley Foon Tan wrote:
+> > > > > > > On Mon, 2016-01-04 at 01:37 +0100, Marek Vasut wrote:
+> > > > > > > > On Monday, January 04, 2016 at 01:10:13 AM, Ley Foon Tan
+> > > > > > > > wrote:
+> > > > > > > > 
+> > > > > > > > Hi!
+> > > > > > > > 
+> > > > > > > > > > > > Well, do you have a good explanation why the system
+> > > > > > > > > > > > works with this change and doesn't work without it
+> > > > > > > > > > > > on my design ? I'd really love to understand this.
+> > > > > > > > > > > 
+> > > > > > > > > > > Do you modify the driver to setup the translation
+> > > > > > > > > > > table?
+> > > > > > > > > > 
+> > > > > > > > > > No, I didn't change the driver. What do you refer to
+> > > > > > > > > > please ?
+> > > > > > > > > 
+> > > > > > > > > There is Address Translation Table at address offset 0x1000
+> > > > > > > > > in the IP.
+> > > > > > > > 
+> > > > > > > > Oh, I didn't configure that in any way. Should I or does the
+> > > > > > > > driver configure it in some way?
+> > > > > > > > 
+> > > > > > > > > Do you use the hardware design from the rocketboards.org or
+> > > > > > > > > your own design?
+> > > > > > > > 
+> > > > > > > > I use the one from rocketboards, I just ported it over to the
+> > > > > > > > MCVEVK (custom cyclone v soc board)
+> > > > > > > 
+> > > > > > > You may check again the base addresses use in the MCVEVK board.
+> > > > > > 
+> > > > > > The address map is attached ; I don't see anything which would
+> > > > > > differ from the reference design.
+> > > > > 
+> > > > > Address map looks fine.
+> > > > 
+> > > > Well do you have any other idea then ? I guess I should pull out the
+> > > > SOCDK, huh?
+> > > 
+> > > Can't think of any other thing that impact this, I expect the bus width
+> > > used in the pipeline/bridge are same with the example design.
+> > > Do you have our CV, AV or A10 SoC devkit?
+> > 
+> > I tested CV SoCDK just now and you're right, the provided quartus project
+> > works without this change on the CV SoCDK. Do you have any suggestion for
+> > me where I should try looking then please ?
 > 
-> Boot Failures Detected: https://kernelci.org/boot/?next-20160107&fail
+> Do you check the hardware pipeline bridge in Qsys? Are they same
+> configuration as CV SoCDK design?
 
-For the past couple of days -next has been failing to boot on various
-Tegra platforms, there are failures involving either no kernel output or
-(with tegra_defconfig) backtraces during CMA allocation from USB, for
-example:
+If you mean ccb_h2f_50_to_125 , then yes, they are exactly the same.
 
-   http://storage.kernelci.org/next/next-20160107/arm-tegra_defconfig/lab-khilman/boot-tegra30-beaver.html
+The only difference I can think of is in altr_xcvr_reconfig_0 , where I have
+2 reconfiguration interfaces instead of 5 because I am using only PCIe x1
+instead of x4 as it is on the CV SoCDK. The pcie_cv_hip_avmm_0 is configured
+exactly the same too (but for x1 Gen1 port instead of x4 Gen1 port).
 
->     multi_v7_defconfig+CONFIG_THUMB2_KERNEL=y:
->         tegra124-jetson-tk1: 2 failed labs
->         tegra30-beaver: 1 failed lab
-> 
->     tegra_defconfig:
->         tegra124-jetson-tk1: 2 failed labs
->         tegra124-jetson-tk1_rootfs:nfs: 1 failed lab
->         tegra124-nyan-big: 1 failed lab
->         tegra30-beaver: 1 failed lab
-> 
->     multi_v7_defconfig+CONFIG_ARM_LPAE=y:
->         tegra124-jetson-tk1: 1 failed lab
->         tegra124-nyan-big: 1 failed lab
-> 
->     multi_v7_defconfig:
->         tegra124-jetson-tk1: 2 failed labs
->         tegra30-beaver: 1 failed lab
-> 
->     multi_v7_defconfig+CONFIG_LKDTM=y:
->         tegra124-jetson-tk1: 2 failed labs
->         tegra30-beaver: 1 failed lab
-> 
->     multi_v7_defconfig+CONFIG_PROVE_LOCKING=y:
->         tegra124-jetson-tk1: 2 failed labs
->         tegra30-beaver: 1 failed lab
-
-I did bisects yesterday but they were a bit inconclusive, showing a
-series of skipped commits in the TTY tree as being the culprits:
-
-afd7f88f157796e586fc99d62da13a54024e0731 serial: 8250: move of_serial code to 8250 directory
-4e33870b3bb691996354a8f9e8f69458b4fc34d9 serial: of: CONFIG_SERIAL_8250 is always set
-d1b5c87fa8058a3f477ae05555916dd1cea934ad serial: remove NWP serial support
-
-which seems more than a little surprising and like they might be false
-positives, especially in the cases that do produce output.  The errors
-today look the same.  I've not investigated further than the bisects.
-
-Full bisect logs:
-
- https://ci.linaro.org/view/people/job/tbaker-boot-bisect-bot/140/console
- https://ci.linaro.org/view/people/job/tbaker-boot-bisect-bot/141/console
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160107/819e76d9/attachment-0001.sig>
+Best regards,
+Marek Vasut
