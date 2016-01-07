@@ -1,87 +1,42 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 07 Jan 2016 10:44:47 +0000
-Subject: [PATCH v8 06/20] KVM: ARM64: Add access handler for PMCEID0 and
- PMCEID1 register
-In-Reply-To: <1450771695-11948-7-git-send-email-zhaoshenglong@huawei.com>
-References: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>
- <1450771695-11948-7-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <568E419F.6080107@arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 7 Jan 2016 11:49:32 +0100
+Subject: [PATCH v3 0/3] clocksource/vt8500: Fix hangs in small delays
+In-Reply-To: <20160106183038.7e600409@v1ron-s7>
+References: <1451654683-2401-1-git-send-email-v1ron@mail.ru>
+ <568D2387.4060708@linaro.org> <20160106183038.7e600409@v1ron-s7>
+Message-ID: <568E42BC.5030608@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/12/15 08:08, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> Add access handler which gets host value of PMCEID0 or PMCEID1 when
-> guest access these registers. Writing action to PMCEID0 or PMCEID1 is
-> UNDEFINED.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  arch/arm64/kvm/sys_regs.c | 27 +++++++++++++++++++++++----
->  1 file changed, 23 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index f9985fc..2552db1 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -486,6 +486,25 @@ static bool access_pmselr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
->  	return true;
->  }
->  
-> +static bool access_pmceid(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
-> +			  const struct sys_reg_desc *r)
-> +{
-> +	u64 pmceid;
-> +
-> +	if (p->is_write) {
-> +		kvm_inject_undefined(vcpu);
+On 01/06/2016 04:30 PM, Roman Volkov wrote:
+> ? Wed, 6 Jan 2016 15:24:07 +0100
+> Daniel Lezcano <daniel.lezcano@linaro.org> ?????:
+>
+>> On 01/01/2016 02:24 PM, Roman Volkov wrote:
+>>> From: Roman Volkov <rvolkov@v1ros.org>
+>>>
+>>> vt8500 hangs in nanosleep() function, starting from commit
+>>> c6eb3f70d4482806dc2d3e1e3c7736f497b1d418, making the system
+>>> unusable. Per investigation, looks like set_next_event() now
+>>> receives too small delta and fails with -ETIME.
+>>
+>>
+>> Hi Roman,
+>>
+>> I think the patch 1/3 should go as a fix for 4.4-rc7 and stable and
+>> the two other should go for the next version as they are improvements
+>> regarding the current code.
+>>
+>
+> Hi Daniel,
+>
+> I agree, -stable can live without the patches 2 an 3.
 
-Just "return false", which will do the right thing.
+Ok, I applied patch 1 for fix/urgent + stable and 2/3 for the next release.
 
-> +	} else {
-> +		if (!(p->Op2 & 1))
-> +			asm volatile("mrs %0, pmceid0_el0\n" : "=r" (pmceid));
-> +		else
-> +			asm volatile("mrs %0, pmceid1_el0\n" : "=r" (pmceid));
-> +
-> +		p->regval = pmceid;
-> +	}
-> +
-> +	return true;
-> +}
-> +
->  /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
->  #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
->  	/* DBGBVRn_EL1 */						\
-> @@ -688,10 +707,10 @@ static const struct sys_reg_desc sys_reg_descs[] = {
->  	  access_pmselr, reset_unknown, PMSELR_EL0 },
->  	/* PMCEID0_EL0 */
->  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b110),
-> -	  trap_raz_wi },
-> +	  access_pmceid },
->  	/* PMCEID1_EL0 */
->  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b111),
-> -	  trap_raz_wi },
-> +	  access_pmceid },
->  	/* PMCCNTR_EL0 */
->  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b000),
->  	  trap_raz_wi },
-> @@ -937,8 +956,8 @@ static const struct sys_reg_desc cp15_regs[] = {
->  	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), trap_raz_wi },
->  	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), trap_raz_wi },
->  	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), access_pmselr },
-> -	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), trap_raz_wi },
-> -	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), trap_raz_wi },
-> +	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), access_pmceid },
-> +	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), access_pmceid },
->  	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), trap_raz_wi },
->  	{ Op1( 0), CRn( 9), CRm(13), Op2( 1), trap_raz_wi },
->  	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), trap_raz_wi },
-> 
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
