@@ -1,31 +1,48 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 7 Jan 2016 10:27:09 -0800
-Subject: [PATCH v4 55/58] mtd: nand: add helpers to access ->priv
-In-Reply-To: <20160107182140.02111dc1@bbrezillon>
-References: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
- <1449734442-18672-56-git-send-email-boris.brezillon@free-electrons.com>
- <20151218221758.GQ10460@google.com>
- <20151219040124.7ffe4274@bbrezillon>
- <20160106231323.GM109450@google.com>
- <20160107155237.7271aa7e@bbrezillon>
- <20160107171700.GE109450@google.com>
- <20160107182140.02111dc1@bbrezillon>
-Message-ID: <20160107182709.GA79906@google.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu,  7 Jan 2016 15:27:14 -0300
+Subject: [PATCH 0/8] [media] Check v4l2_of_parse_endpoint() ret val in all
+ drivers
+Message-ID: <1452191248-15847-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Re-constructing CC list)
+Hello,
 
-On Thu, Jan 07, 2016 at 06:21:40PM +0100, Boris Brezillon wrote:
-> On Thu, 7 Jan 2016 09:17:00 -0800
-> Brian Norris <computersforpeace@gmail.com> wrote:
-> > So are these last few patches still applicable as-is, or should I await
-> > a new submission?
-> 
-> It still applies correctly (I rebased it on l2-mtd/master).
-> You may want to adapt the jz4780 driver to make use of these helpers.
+When discussing a patch [0] with Laurent Pinchart for another series I
+mentioned to him that most callers of v4l2_of_parse_endpoint() weren't
+checking the return value. This is likely due the function kernel-doc
+stating incorrectly that the return value is always 0 but can return a
+negative error code on failure.
 
-OK. Fixed some small conflicts and pushed patches 55-58 to l2-mtd.git.
-Thanks!
+This trivial patch series fixes the function kernel-doc and add proper
+error checking in all the drivers that are currently not doing so.
 
-Brian
+[0]: https://lkml.org/lkml/2016/1/6/307
+
+Best regards,
+Javier
+
+
+Javier Martinez Canillas (8):
+  [media] v4l: of: Correct v4l2_of_parse_endpoint() kernel-doc
+  [media] adv7604: Check v4l2_of_parse_endpoint() return value
+  [media] s5c73m3: Check v4l2_of_parse_endpoint() return value
+  [media] s5k5baf: Check v4l2_of_parse_endpoint() return value
+  [media] tvp514x: Check v4l2_of_parse_endpoint() return value
+  [media] tvp7002: Check v4l2_of_parse_endpoint() return value
+  [media] exynos4-is: Check v4l2_of_parse_endpoint() return value
+  [media] omap3isp: Check v4l2_of_parse_endpoint() return value
+
+ drivers/media/i2c/adv7604.c                   |  7 ++++++-
+ drivers/media/i2c/s5c73m3/s5c73m3-core.c      |  4 +++-
+ drivers/media/i2c/s5k5baf.c                   |  5 ++++-
+ drivers/media/i2c/tvp514x.c                   |  4 +++-
+ drivers/media/i2c/tvp7002.c                   |  4 +++-
+ drivers/media/platform/exynos4-is/media-dev.c |  8 +++++++-
+ drivers/media/platform/exynos4-is/mipi-csis.c | 10 +++++++---
+ drivers/media/platform/omap3isp/isp.c         |  5 ++++-
+ drivers/media/v4l2-core/v4l2-of.c             |  2 +-
+ 9 files changed, 38 insertions(+), 11 deletions(-)
+
+-- 
+2.4.3
