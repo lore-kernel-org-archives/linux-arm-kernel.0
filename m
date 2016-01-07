@@ -1,140 +1,319 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 7 Jan 2016 14:33:23 +0800
-Subject: [PATCH v5 1/5] PCI: designware: ensure ATU is enabled before
- IO/conf space accesses
-In-Reply-To: <20160106182003.GA16231@localhost>
-References: <1450442339-18765-1-git-send-email-stanimir.varbanov@linaro.org>
- <1450442339-18765-2-git-send-email-stanimir.varbanov@linaro.org>
- <20160106182003.GA16231@localhost>
-Message-ID: <20160107143323.396797bb@xhacker>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 06 Jan 2016 22:38:24 -0800
+Subject: [PATCH v2 2/2] ARM: dts: imx6: Add support for Toradex Ixora
+ carrier board
+In-Reply-To: <1452011942-11940-3-git-send-email-marcel.ziswiler@toradex.com>
+References: <1452011942-11940-1-git-send-email-marcel.ziswiler@toradex.com>
+ <1452011942-11940-3-git-send-email-marcel.ziswiler@toradex.com>
+Message-ID: <f2639aa8a966b4d0a36d0a5c4e27863f@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Bjorn,
+Hi Marcel,
 
-On Wed, 6 Jan 2016 12:20:03 -0600 Bjorn Helgaas wrote:
-
-> [+cc Jisheng]
+On 2016-01-05 08:39, Marcel Ziswiler wrote:
+> From: Petr ?tetiar <ynezz@true.cz>
 > 
-> On Fri, Dec 18, 2015 at 02:38:55PM +0200, Stanimir Varbanov wrote:
-> > There is no guarantees that enabling ATU will hit the hardware
-> > immediately, and subsequent accesses to configuration / IO spaces
-> > are reliable. So fixing this by read back PCIE_ATU_CR2 register
-> > just after writing.
-> > 
-> > Without such a fix the PCI device enumeration during kernel boot
-> > is not reliable, and reading configuration space for particular
-> > PCI device on the bus returns zero aka no device.
-> > 
-> > Signed-off-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
-> > ---
-> >  drivers/pci/host/pcie-designware.c |    7 +++++++
-> >  1 file changed, 7 insertions(+)
-> > 
-> > diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> > index 02a7452bdf23..7880de63895d 100644
-> > --- a/drivers/pci/host/pcie-designware.c
-> > +++ b/drivers/pci/host/pcie-designware.c
-> > @@ -154,6 +154,8 @@ static int dw_pcie_wr_own_conf(struct pcie_port *pp, int where, int size,
-> >  static void dw_pcie_prog_outbound_atu(struct pcie_port *pp, int index,
-> >  		int type, u64 cpu_addr, u64 pci_addr, u32 size)
-> >  {
-> > +	u32 val;
-> > +
-> >  	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | index,
-> >  			  PCIE_ATU_VIEWPORT);
-> >  	dw_pcie_writel_rc(pp, lower_32_bits(cpu_addr), PCIE_ATU_LOWER_BASE);
-> > @@ -164,6 +166,11 @@ static void dw_pcie_prog_outbound_atu(struct pcie_port *pp, int index,
-> >  	dw_pcie_writel_rc(pp, upper_32_bits(pci_addr), PCIE_ATU_UPPER_TARGET);
-> >  	dw_pcie_writel_rc(pp, type, PCIE_ATU_CR1);
-> >  	dw_pcie_writel_rc(pp, PCIE_ATU_ENABLE, PCIE_ATU_CR2);
-> > +	/*
-> > +	 * ensure that the ATU enable has been happaned before accessing
-> > +	 * pci configuration/io spaces through dw_pcie_cfg_[read|write].
-> > +	 */
-> > +	dw_pcie_readl_rc(pp, PCIE_ATU_CR2, &val);  
+> Signed-off-by: Petr ?tetiar <ynezz@true.cz>
+> Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+> ---
 > 
-> This particular fix makes sense to me.
+> Changes in v2: None
 > 
-> But I have a larger question about how the ATU works.  I see these
-> definitions:
+>  arch/arm/boot/dts/Makefile               |   1 +
+>  arch/arm/boot/dts/imx6q-apalis-ixora.dts | 256 +++++++++++++++++++++++++++++++
+>  2 files changed, 257 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx6q-apalis-ixora.dts
 > 
->   #define PCIE_ATU_TYPE_MEM
->   #define PCIE_ATU_TYPE_IO
->   #define PCIE_ATU_TYPE_CFG0
->   #define PCIE_ATU_TYPE_CFG1
-> 
-> and these uses:
-> 
->   - In dw_pcie_host_init(), set PCIE_ATU_TYPE_MEM for unit 1
->     (but only if rd_other_conf is not overridden)
-> 
->   - In dw_pcie_rd_other_conf() and dw_pcie_wr_other_conf(),
->     set PCIE_ATU_TYPE_CFG0 before config access to own bus;
->     set PCIE_ATU_TYPE_CFG1 before config access to other bus;
->     set PCIE_ATU_TYPE_IO after completion
-> 
-> I'm confused:
-> 
-> 1) I assume PCIE_ATU_TYPE_MEM is for access to PCI memory space.  Why
-> is that initialization related to rd_other_conf?  Shouldn't that be
-> set up always?  A comment here would be nice, to clarify that this is
-> not related to the subsequent dw_pcie_wr_own_conf() calls.
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 44508dc..29b1aae 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -315,6 +315,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+>  	imx6dl-udoo.dtb \
+>  	imx6dl-wandboard.dtb \
+>  	imx6dl-wandboard-revb1.dtb \
+> +	imx6q-apalis-ixora.dtb \
+>  	imx6q-apf6dev.dtb \
+>  	imx6q-arm2.dtb \
+>  	imx6q-cm-fx6.dtb \
+> diff --git a/arch/arm/boot/dts/imx6q-apalis-ixora.dts
+> b/arch/arm/boot/dts/imx6q-apalis-ixora.dts
+> new file mode 100644
+> index 0000000..5494a13
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6q-apalis-ixora.dts
+> @@ -0,0 +1,256 @@
+> +/*
+> + * Copyright 2014-2016 Toradex AG
+> + * Copyright 2012 Freescale Semiconductor, Inc.
+> + * Copyright 2011 Linaro Ltd.
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License
+> + *     version 2 as published by the Free Software Foundation.
+> + *
+> + *     This file is distributed in the hope that it will be useful
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/input/input.h>
+> +#include <dt-bindings/interrupt-controller/irq.h>
+> +#include "imx6q.dtsi"
+> +#include "imx6qdl-apalis.dtsi"
+> +
+> +/ {
+> +	model = "Toradex Apalis iMX6Q/D Module on Ixora Carrier Board";
+> +	compatible = "toradex,apalis_imx6q-ixora", "toradex,apalis_imx6q",
+> +		     "fsl,imx6q";
+> +
+> +	aliases {
+> +		i2c0 = &i2cddc;
+> +		i2c1 = &i2c1;
+> +		i2c2 = &i2c2;
+> +		i2c3 = &i2c3;
+> +	};
+> +
+> +	aliases {
+> +		rtc0 = &rtc_i2c;
+> +		rtc1 = "/soc/aips-bus at 02000000/snvs at 020cc000/snvs-rtc-lp at 34";
 
-Indeed, the comment is necessary. I forget the reason until read the code
-carefully again. The reason here is
+Probably easier and better readable when using the label here
+("&snvs_rtc").
 
-If the platform provides ->rd_other_conf, it means the platform
-doesn't support ATU, it uses its own address translation component
-rather than ATU, so we should ignore ATU programming for this
-kind of platform.
+> +	};
+> +
+> +	gpio-keys {
+> +		compatible = "gpio-keys";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_gpio_keys>;
+> +
+> +		wakeup {
+> +			label = "Wake-Up";
+> +			gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
+> +			linux,code = <KEY_WAKEUP>;
+> +			debounce-interval = <10>;
+> +			gpio-key,wakeup;
+> +		};
+> +	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_leds_ixora>;
+> +
+> +		led4-green {
+> +			label = "LED_4_GREEN";
+> +			gpios = <&gpio1 17 GPIO_ACTIVE_HIGH>;
+> +		};
+> +
+> +		led4-red {
+> +			label = "LED_4_RED";
+> +			gpios = <&gpio1 21 GPIO_ACTIVE_HIGH>;
+> +		};
+> +
+> +		led5-green {
+> +			label = "LED_5_GREEN";
+> +			gpios = <&gpio2 1 GPIO_ACTIVE_HIGH>;
+> +		};
+> +
+> +		led5-red {
+> +			label = "LED_5_RED";
+> +			gpios = <&gpio2 2 GPIO_ACTIVE_HIGH>;
+> +		};
+> +	};
+> +
+> +	pwmleds {
+> +		compatible = "pwm-leds";
+> +		ledpwm1 {
+> +			label = "PWM1";
+> +			pwms = <&pwm1 0 50000>;
+> +			max-brightness = <255>;
+> +		};
+> +
+> +		ledpwm2 {
+> +			label = "PWM2";
+> +			pwms = <&pwm2 0 50000>;
+> +			max-brightness = <255>;
+> +		};
+> +
+> +		ledpwm3 {
+> +			label = "PWM3";
+> +			pwms = <&pwm3 0 50000>;
+> +			max-brightness = <255>;
+> +		};
+> +	};
+> +
+> +	regulators {
+> +		reg_usb_otg_vbus: usb_otg_vbus {
+> +			status = "okay";
+> +		};
+> +
+> +		reg_usb_host_vbus: usb_host_vbus {
+> +			status = "okay";
+> +		};
+> +	};
+> +};
+> +
+> +&backlight {
+> +	brightness-levels = <0 127 191 223 239 247 251 255>;
+> +	default-brightness-level = <1>;
+> +	status = "okay";
+> +};
+> +
+> +&can1 {
+> +	status = "okay";
+> +};
+> +
+> +&can2 {
+> +	status = "okay";
+> +};
+> +
+> +/* GEN1_I2C: I2C1_SDA/SCL on MXM3 209/211 (e.g. RTC on carrier board) */
+> +&i2c1 {
+> +	status = "okay";
+> +
+> +	cat24c02 at 50 {
 
-I have sent out one patch to add this comment.
+According to devicetree.org, nodes are named according to what kind of
+device it represents. Hence this should be eeprom at 50.
 
-> 
-> 2) Why doesn't dw_pcie_host_init() use dw_pcie_rd_conf() instead of
-> dw_pcie_rd_own_conf()?  Using pci_read_config_dword() might be even
-> better.  Using the internal interfaces piecemeal like we do today is
-> just an opportunity for doing it wrong.
+> +		compatible = "atmel,24c02";
+> +		reg = <0x50>;
+> +	};
+> +
+> +	/* M41T0M6 real time clock on carrier board */
+> +	rtc_i2c: rtc at 68 {
+> +		compatible = "st,m41t00";
+> +		reg = <0x68>;
+> +	};
+> +};
+> +
+> +&iomuxc {
 
-IMHO, the reason is during host_init, the pci bus etc. are not initialized,
-from another side, the code is really accessing its own conf registers.
+This should go to the end of the device tree.
 
-> 
-> 3) The definitions and your comment about "accessing PCI
-> configuration/io spaces" suggest that the ATU must be programmed
-> differently for accesses to PCI config space vs. I/O space.  If that's
+Otherwise looks good to me:
+Reviewed-by: Stefan Agner <stefan@agner.ch>
 
-Yes.
+--
+Stefan
 
-> the case, we'd need some kind of mutex to protect inl(), etc., during
-> config accesses.  For example, in this scenario:
-> 
->   thread A                                         thread B
->   ---------------------------------------------    ----------
->   pci_read_config_dword()
->   dw_pcie_prog_outbound_atu(PCIE_ATU_TYPE_CFG0)
->                                                    inl()
->   dw_pcie_cfg_read()
->   readl()
->   dw_pcie_prog_outbound_atu(PCIE_ATU_TYPE_IO)
->                                                    inl()
-> 
-> Do both inl() calls by thread B work correctly, even though the ATU
-> seems to be programmed for CFG0 for the first but IO for the second?
-> 
-
-Indeed, there's such race issue as you and RMK pointed out.
-
-IMHO, we need support:
-
-1. platforms which contain three or more iATUs, there's no need to mux
-iATU usage: one ATU for IO, one for cfg and another for MEM. But how to
-get the number of iATUs, DT? eg. "snps,atu_num = 3"
-
-2. platforms which contain only two iATUs, add mechanism to protect
-the cfg vs IO race. Could you please give suggestions to how to achieve
-this goal?
-
-Thanks,
-Jisheng
+> +	/*
+> +	 * Mux the Apalis GPIOs, GPIO7 used for PCIe reset,
+> +	 * GPIO5, 6 used by optional fusion_F0710A kernel module
+> +	 */
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_apalis_gpio1 &pinctrl_apalis_gpio2
+> +		     &pinctrl_apalis_gpio3 &pinctrl_apalis_gpio4
+> +		     &pinctrl_apalis_gpio5 &pinctrl_apalis_gpio6
+> +		     &pinctrl_apalis_gpio7 &pinctrl_apalis_gpio8>;
+> +
+> +	leds_ixora {
+> +		pinctrl_leds_ixora: leds-ixora {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD1_DAT1__GPIO1_IO17 PAD_CTRL_HYS_PU
+> +				MX6QDL_PAD_SD1_DAT3__GPIO1_IO21 PAD_CTRL_HYS_PU
+> +				MX6QDL_PAD_NANDF_D1__GPIO2_IO01 PAD_CTRL_HYS_PU
+> +				MX6QDL_PAD_NANDF_D2__GPIO2_IO02 PAD_CTRL_HYS_PU
+> +			>;
+> +		};
+> +	};
+> +};
+> +
+> +&pcie {
+> +	/* active-low meaning opposite of regular PERST# active-low polarity */
+> +	reset-gpio = <&gpio1 28 GPIO_ACTIVE_LOW>;
+> +	status = "okay";
+> +};
+> +
+> +&pwm1 {
+> +	status = "okay";
+> +};
+> +
+> +&pwm2 {
+> +	status = "okay";
+> +};
+> +
+> +&pwm3 {
+> +	status = "okay";
+> +};
+> +
+> +&pwm4 {
+> +	status = "okay";
+> +};
+> +
+> +&sata {
+> +	status = "okay";
+> +};
+> +
+> +&sound_spdif {
+> +	status = "okay";
+> +};
+> +
+> +&spdif {
+> +	status = "okay";
+> +};
+> +
+> +&uart1 {
+> +	status = "okay";
+> +};
+> +
+> +&uart2 {
+> +	status = "okay";
+> +};
+> +
+> +&uart4 {
+> +	status = "okay";
+> +};
+> +
+> +&uart5 {
+> +	status = "okay";
+> +};
+> +
+> +&usbh1 {
+> +	status = "okay";
+> +};
+> +
+> +&usbotg {
+> +	status = "okay";
+> +};
+> +
+> +/* SD1 */
+> +&usdhc2 {
+> +	status = "okay";
+> +};
