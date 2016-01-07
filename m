@@ -1,52 +1,40 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 7 Jan 2016 09:46:44 +0000
-Subject: [PATCH v3 2/2] ARM64: kernel: PSCI: move PSCI idle management
- code to drivers/firmware
-In-Reply-To: <20160106214439.GB19062@n2100.arm.linux.org.uk>
-References: <1445011379-8787-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1445011379-8787-3-git-send-email-lorenzo.pieralisi@arm.com>
- <20160105105900.GT19062@n2100.arm.linux.org.uk>
- <20160105123134.GA1821@red-moon>
- <20160105125142.GV19062@n2100.arm.linux.org.uk>
- <20160105132701.GA17214@red-moon>
- <20160105133447.GW19062@n2100.arm.linux.org.uk>
- <20160106165545.GA19886@red-moon>
- <20160106214439.GB19062@n2100.arm.linux.org.uk>
-Message-ID: <20160107094644.GA23819@red-moon>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 7 Jan 2016 09:51:28 +0000
+Subject: [PATCH] mm/kasan: map KASAN zero page read only
+In-Reply-To: <CAKv+Gu9b_2WWYhgQmdnAUk0G0W3dwWXdWmpEmMtKW+=-KaJYgw@mail.gmail.com>
+References: <1452095687-18136-1-git-send-email-ard.biesheuvel@linaro.org>
+ <CAPAsAGxmjF-_ZZFwtaxZsXN9g7J2sn6O0L+pBiPdARsKC_644g@mail.gmail.com>
+ <CAKv+Gu9b_2WWYhgQmdnAUk0G0W3dwWXdWmpEmMtKW+=-KaJYgw@mail.gmail.com>
+Message-ID: <20160107095127.GQ6301@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 06, 2016 at 09:44:39PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Jan 06, 2016 at 04:55:45PM +0000, Lorenzo Pieralisi wrote:
-> > On Tue, Jan 05, 2016 at 01:34:47PM +0000, Russell King - ARM Linux wrote:
-> > > That immediately worries me, because it bypasses the CPU dependencies
-> > > for ARM_CPU_SUSPEND implicitly applied via ARCH_SUSPEND_POSSIBLE.  I'd
-> > > prefer instead:
-> > > 
-> > > config ARM_PSCI_CPU_IDLE
-> > > 	def_bool ARM_PSCI_FW && CPU_IDLE && (!ARM || ARM_CPU_SUSPEND)
-> > 
-> > If you are not against it, I could make ARM_PSCI select ARM_CPU_SUSPEND,
-> > the CPU dependency would be taken into account (ie CPU_V7) and this
-> > would mirror what's done for the eg BL_SWITCHER.
+On Wed, Jan 06, 2016 at 09:18:03PM +0100, Ard Biesheuvel wrote:
+> On 6 January 2016 at 20:48, Andrey Ryabinin <ryabinin.a.a@gmail.com> wrote:
+> > 2016-01-06 18:54 GMT+03:00 Ard Biesheuvel <ard.biesheuvel@linaro.org>:
+> >> The original x86_64-only version of KASAN mapped its zero page
+> >> read-only, but this got lost when the code was generalised and
+> >> ported to arm64, since, at the time, the PAGE_KERNEL_RO define
+> >> did not exist. It has been added to arm64 in the mean time, so
+> >> let's use it.
+> >>
+> >
+> > Read-only wasn't lost. Just look at the next line:
+> >      zero_pte = pte_wrprotect(zero_pte);
+> >
+> > PAGE_KERNEL_RO is not available on all architectures, thus it would be better
+> > to not use it in generic code.
 > 
-> If you're proposing to always build the code in psci.c when ARM_PSCI_FW
-> is enabled, I'd rather do this:
-> 
-> config ARM_CPU_SUSPEND
->         def_bool PM_SLEEP || BL_SWITCHER || ARM_PSCI_FW
-> 	depends on ARCH_SUSPEND_POSSIBLE
-> 
-> rather than have stuff select this option.
+> OK, I didn't see that. For some reason, it is not working for me on
+> arm64, though.
 
-Agreed, I will do that with two patches (ie one to update the
-BL_SWITCHER config entry). It has the side effect of pulling in
-ARM_CPU_SUSPEND even if !SUSPEND && !CPU_IDLE when ARM_PSCI
-is selected but I do not think that's a real issue, to be confirmed.
+It's because the arm64 set_pte_at() doesn't bother checking for
+!PTE_WRITE to set PTE_RDONLY when mapping kernel pages. It works fine
+for user though. That's because usually all read-only kernel mappings
+already have PTE_RDONLY set via PAGE_KERNEL_RO.
 
-Still, some ARM CPUidle drivers will have to select ARM_CPU_SUSPEND
-on a case by case basis, I do not know how we can improve that, but
-that's not related to this patch series per-se.
+We may need to change the set_pte_at logic a bit to cover the above
+case.
 
-Thanks,
-Lorenzo
+-- 
+Catalin
