@@ -1,110 +1,43 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Thu, 7 Jan 2016 16:53:24 +0000
-Subject: [PATCH] ARM64: tegra: Add support for Google Pixel C
-In-Reply-To: <4442990.rM1mk43t6M@wuerfel>
-References: <1452073222-2956-1-git-send-email-jonathanh@nvidia.com>
- <568D0D70.4020309@nvidia.com> <568E65F0.2070201@nvidia.com>
- <4442990.rM1mk43t6M@wuerfel>
-Message-ID: <568E9804.5020503@nvidia.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Thu, 7 Jan 2016 16:56:27 +0000
+Subject: [Qemu-devel] arm64 qemu tests failing in linux-next since 'arm64:
+ kernel: enforce pmuserenr_el0 initialization and restore'
+In-Reply-To: <20160107163722.GB4064@red-moon>
+References: <567B41E3.5060800@roeck-us.net>
+ <CAFEAcA_c9DicGF+is6ST3NJv+c5Bi4dHYo2t8Q2n9AS9G4q0+Q@mail.gmail.com>
+ <20160107155310.GA4064@red-moon>
+ <CAFEAcA_vP93=PE6LNNHodCsdk0gL0kBQPX=xzLJU5RzkvNs2vw@mail.gmail.com>
+ <20160107163722.GB4064@red-moon>
+Message-ID: <CAFEAcA9D58-EOh9aoAmFtEBBx=BWQxWyzynvM893Dd7fqZH5wA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 7 January 2016 at 16:37, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+> On Thu, Jan 07, 2016 at 03:58:15PM +0000, Peter Maydell wrote:
+>> On 7 January 2016 at 15:53, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+>> > Ok, thanks for looking into this. I wonder why reading pmcr_el0 does
+>> > not suffer from the same problem though.
+>>
+>> Just a pragmatic thing on QEMU's end, I expect -- the kernel already
+>> touched PMCR_EL0 and we wanted to be able to boot it, so we have an
+>> implementation of it.
+>
+> If that's the case, that was the wrong approach IMHO. QEMU has to comply
+> with the Aarch64 architecture which means that either the CPU it models
+> has a Performance Monitors extension or it does not. If reading pmcr_el0
+> does not fault I could tell you this is a QEMU regression because currently
+> it _does_ model pmcr_el0 while (hopefully) ID_AA64DFR0_EL1 PMUVer reports
+> it should not.
 
-On 07/01/16 14:11, Arnd Bergmann wrote:
-> On Thursday 07 January 2016 13:19:44 Jon Hunter wrote:
->>
->> Adding Arnd.
->>
->> Hmmm ... well apparently stdout-path does not work for tegra and in
->> order to make this work I had to do the following ...
->>
->>
->> [PATCH] serial: 8250: of: Add earlycon support for Tegra
->>
->> Currently, early console support only works for Tegra when the serial
->> port information is passed via the earlycon boot parameter. If the
->> serial port information is specified via device-tree using the
->> "stdout-path" then the early console does not work because:
->>
->> 1. The tegra serial ports compatibility parameter does not match any
->>    of the supported serial drivers for early console.
->> 2. The of_setup_earlycon() function assumes that serial port registers
->>    are byte aligned and for tegra they are 32-bit aligned.
->>
->> Add an early console setup function for tegra so that the early console
->> can be specified via the device-tree "stdout-path" variable.
->>
->> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
->> ---
->>  drivers/tty/serial/8250/8250_of.c | 10 ++++++++++
->>  1 file changed, 10 insertions(+)
->>
->> diff --git a/drivers/tty/serial/8250/8250_of.c b/drivers/tty/serial/8250/8250_of.c
->> index 33021c1f7d55..98adf83e83c2 100644
->> --- a/drivers/tty/serial/8250/8250_of.c
->> +++ b/drivers/tty/serial/8250/8250_of.c
->> @@ -44,6 +44,16 @@ void tegra_serial_handle_break(struct uart_port *p)
->>                 udelay(1);
->>         } while (1);
->>  }
->> +
->> +int __init tegra_earlycon_setup(struct earlycon_device *device,
->> +                               const char *options)
->> +{
->> +       device->port.iotype = UPIO_MEM32;
->> +       device->port.regshift = 2;
->> +
->> +       return early_serial8250_setup(device, options);
->> +}
->> +OF_EARLYCON_DECLARE(tegra20_uart, "nvidia,tegra20-uart", tegra_earlycon_setup);
->>  #else
->>  static inline void tegra_serial_handle_break(struct uart_port *port)
->>  {
->>
->>
->> Arnd, does the above look ok, or should there be a generic
->> early_serial8250x32_setup() somewhere?
-> 
-> I think it would be better to put it into 8250_early.c rather than 
-> 8250_of.c, as there are already some other definitions in there,
-> and the #ifdef CONFIG_TEGRA in 8250_of.c is for some other workaround.
+I agree it's a bug, but QEMU simply doesn't have enough
+developers to become fully compliant with the architecture (ie to
+implement every part of it completely). So we concentrate on the
+parts that people are actually using, and fill in the rest and
+fix the bugs as time permits or as real guest software starts to
+use it.
 
-Ok so something like this ...
+If you want a guaranteed matches-the-architecture software model
+of an ARM CPU then other models are available :-)
 
-diff --git a/drivers/tty/serial/8250/8250_early.c
-b/drivers/tty/serial/8250/8250_early.c
-index af62131af21e..4ce6e2b57534 100644
---- a/drivers/tty/serial/8250/8250_early.c
-+++ b/drivers/tty/serial/8250/8250_early.c
-@@ -141,7 +141,18 @@ int __init early_serial8250_setup(struct
-earlycon_device *device,
-        device->con->write = early_serial8250_write;
-        return 0;
- }
-+
-+int __init early_serial8250_mem32_setup(struct earlycon_device *device,
-+                                       const char *options)
-+{
-+       device->port.iotype = UPIO_MEM32;
-+       device->port.regshift = 2;
-+
-+       return early_serial8250_setup(device, options);
-+}
- EARLYCON_DECLARE(uart8250, early_serial8250_setup);
- EARLYCON_DECLARE(uart, early_serial8250_setup);
- OF_EARLYCON_DECLARE(ns16550, "ns16550", early_serial8250_setup);
- OF_EARLYCON_DECLARE(ns16550a, "ns16550a", early_serial8250_setup);
-+OF_EARLYCON_DECLARE(tegra20_uart, "nvidia,tegra20-uart",
-+                   early_serial8250_mem32_setup);
-
-> Would it be possible to handle the "reg-io-width" parsing in
-> early_serial8250_setup instead of keying it off the string?
-
-Good point. I spent a bit of time looking at this, but I cannot see an
-easy way to do this unless we check for "reg-io-width" and "reg-shift"
-in early_init_dt_scan_chosen_serial() and pass to of_setup_earlycon(),
-however, I am guessing that this would not be ideal as this would happen
-for non-8250 devices. May be that would be ok, but I am not sure.
-
-Cheers
-Jon
+thanks
+-- PMM
