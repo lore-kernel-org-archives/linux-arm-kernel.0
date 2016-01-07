@@ -1,57 +1,39 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Thu, 7 Jan 2016 21:36:47 +0100
-Subject: [PATCH v8 20/20] KVM: ARM64: Add a new kvm ARM PMU device
-In-Reply-To: <CAFEAcA-Qcda7TSFLSeykLHqZYdP6tYdEjPe2uHN6f_+omqWFZg@mail.gmail.com>
-References: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>
- <1450771695-11948-21-git-send-email-zhaoshenglong@huawei.com>
- <CAFEAcA_MDiOphseZ7RGNE3G=4ZDF5SFV5krOjanPbVuhgg9gnQ@mail.gmail.com>
- <568E7AF1.9040103@huawei.com>
- <CAFEAcA-Qcda7TSFLSeykLHqZYdP6tYdEjPe2uHN6f_+omqWFZg@mail.gmail.com>
-Message-ID: <20160107203647.GJ6199@hawk.localdomain>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Thu, 7 Jan 2016 21:38:43 +0100
+Subject: net-thunder: One check less in nicvf_register_interrupts() after
+ error detection
+In-Reply-To: <1452198530.4028.43.camel@perches.com>
+References: <566ABCD9.1060404@users.sourceforge.net>
+ <5685A273.6070607@users.sourceforge.net>
+ <20160107110701.GE25086@rric.localdomain>
+ <568EBCE7.4060502@users.sourceforge.net>
+ <1452195846.4028.24.camel@perches.com>
+ <568EC2FD.9000702@users.sourceforge.net>
+ <1452196790.4028.33.camel@perches.com> <568EC56A.402@users.sourceforge.net>
+ <1452198530.4028.43.camel@perches.com>
+Message-ID: <568ECCD3.1020700@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 07, 2016 at 02:56:15PM +0000, Peter Maydell wrote:
-> On 7 January 2016 at 14:49, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
-> >>> +
-> >>> +Groups:
-> >>> +  KVM_DEV_ARM_PMU_GRP_IRQ
-> >>> +  Attributes:
-> >>> +    The attr field of kvm_device_attr encodes one value:
-> >>> +    bits:     | 63 .... 32 | 31 ....  0 |
-> >>> +    values:   |  reserved  | vcpu_index |
-> >>> +    A value describing the PMU overflow interrupt number for the specified
-> >>> +    vcpu_index vcpu. This interrupt could be a PPI or SPI, but for one VM the
-> >>> +    interrupt type must be same for each vcpu. As a PPI, the interrupt number is
-> >>> +    same for all vcpus, while as a SPI it must be different for each vcpu.
-> >>
-> >> I see we're using vcpu_index rather than MPIDR affinity value
-> >> for specifying which CPU we're configuring. Is this in line with
-> >> our planned API for GICv3 configuration?
-> >>
-> > Here vcpu_index is used to indexing the vCPU, no special use.
-> 
-> Yes, but you can identify the CPU by index, or by its MPIDR.
-> We had a discussion about which was the best way for doing
-> the VGIC API, and I can't remember which way round we ended up
-> going for. Whichever we chose, we should do the same thing here.
+> Some prefer that source code be "templatized" regardless
+> of the number of exit points that any particular use of a
+> specific function type.
 
-I think we should start up a new discussion on this. My understanding,
-after a chat with Igor, who was involved in the untangling of vcpu-id and
-apic-id for x86, is that using vcpu-id is preferred, unless of course
-the device expects an apic-id/mpidr, in which case there's no reason to
-translate it on both sides.
+This is another interesting view on involved implementation details.
 
-Other things to discuss are
-1) Consistent use of the term vcpu-id vs. vcpu-index in the documentation.
-   I just brought that up in my last reply to this patch.
-2) Extending a vcpu-index [id] beyond 8-bits.
-3) Should vcpu-ids be reusable after hotunplugging them?
-4) Devices like this pmu and the vgic have some global (all vcpus wide)
-   properties, but then also vcpu specific registers, which require the
-   vcpu-index parameter. Should we instead create a "vcpu device ioctl"
-   for these? I.e. extend SET/GET_DEVICE_ATTR to also be of type
-   'vcpu ioctl', allowing the vcpu-index parameter to be dropped?
 
-Thanks,
-drew
+> Some of your patches are converting these templatized
+> functions to a different form for no added value.
+
+Would you like to distinguish a bit more between my evolving
+collection of update suggestions and the concrete proposal
+for the function "nicvf_register_interrupts"?
+
+
+> These patches make the local source code inconsistent
+> and generally goes against the authors preferred style.
+
+Which programming approach will be the leading one here finally?
+
+Regards,
+Markus
