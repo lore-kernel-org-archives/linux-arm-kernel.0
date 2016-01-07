@@ -1,102 +1,106 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 7 Jan 2016 15:52:37 +0100
-Subject: [PATCH v4 55/58] mtd: nand: add helpers to access ->priv
-In-Reply-To: <20160106231323.GM109450@google.com>
-References: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
- <1449734442-18672-56-git-send-email-boris.brezillon@free-electrons.com>
- <20151218221758.GQ10460@google.com>
- <20151219040124.7ffe4274@bbrezillon>
- <20160106231323.GM109450@google.com>
-Message-ID: <20160107155237.7271aa7e@bbrezillon>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Thu, 7 Jan 2016 22:49:21 +0800
+Subject: [PATCH v8 20/20] KVM: ARM64: Add a new kvm ARM PMU device
+In-Reply-To: <CAFEAcA_MDiOphseZ7RGNE3G=4ZDF5SFV5krOjanPbVuhgg9gnQ@mail.gmail.com>
+References: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>
+ <1450771695-11948-21-git-send-email-zhaoshenglong@huawei.com>
+ <CAFEAcA_MDiOphseZ7RGNE3G=4ZDF5SFV5krOjanPbVuhgg9gnQ@mail.gmail.com>
+Message-ID: <568E7AF1.9040103@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian,
 
-On Wed, 6 Jan 2016 15:13:23 -0800
-Brian Norris <computersforpeace@gmail.com> wrote:
 
-> On Sat, Dec 19, 2015 at 04:01:24AM +0100, Boris Brezillon wrote:
-> > Actually the nand_{get,set}_controller_data() helpers are not about
-> > assigning NAND controller private data (as you pointed those can
-> > already be retrieved thanks to the ->controller field using the
-> > container_of() trick), but per-chip private data instantiated by the
-> > NAND controller and attached to a specific chip. For example, some
-> > controllers pre-compute some register values or a clk rate to set when
-> > a specific chip is selected. This is what per-chip controller data is
-> > meant for.
+On 2016/1/7 22:36, Peter Maydell wrote:
+> On 22 December 2015 at 08:08, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+>> From: Shannon Zhao <shannon.zhao@linaro.org>
+>>
+>> Add a new kvm device type KVM_DEV_TYPE_ARM_PMU_V3 for ARM PMU. Implement
+>> the kvm_device_ops for it.
+>>
+>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>> ---
+>>  Documentation/virtual/kvm/devices/arm-pmu.txt |  24 +++++
+>>  arch/arm64/include/uapi/asm/kvm.h             |   4 +
+>>  include/linux/kvm_host.h                      |   1 +
+>>  include/uapi/linux/kvm.h                      |   2 +
+>>  virt/kvm/arm/pmu.c                            | 128 ++++++++++++++++++++++++++
+>>  virt/kvm/kvm_main.c                           |   4 +
+>>  6 files changed, 163 insertions(+)
+>>  create mode 100644 Documentation/virtual/kvm/devices/arm-pmu.txt
+>>
+>> diff --git a/Documentation/virtual/kvm/devices/arm-pmu.txt b/Documentation/virtual/kvm/devices/arm-pmu.txt
+>> new file mode 100644
+>> index 0000000..dda864e
+>> --- /dev/null
+>> +++ b/Documentation/virtual/kvm/devices/arm-pmu.txt
+>> @@ -0,0 +1,24 @@
+>> +ARM Virtual Performance Monitor Unit (vPMU)
+>> +===========================================
+>> +
+>> +Device types supported:
+>> +  KVM_DEV_TYPE_ARM_PMU_V3         ARM Performance Monitor Unit v3
+>> +
+>> +Instantiate one PMU instance for per VCPU through this API.
 > 
-> Sure. Really, it's just anything the controller driver needs to store on
-> a per-chip basis. All I'm suggesting is picking a name that doesn't
-> imply it's a per-controller instance, when it's actually a
-> per-flash-chip instance.
+> Do you mean that userspace has to call this API once per vCPU to
+> create each PMU, or that calling the device create ioctl once makes
+> the kernel instantiate a PMU for each vCPU?
 > 
-> > Now, the reason I explicitly specified the data usage instead of using
-> > a generic name like nand_{get,set}_data() is because I plan to define
+Call the device create ioctl once and kvm will create a PMU for each
+vCPU. But userspace should set the irqs for each PMU since for SPI they
+are different.
+
+> (It's a little bit confusing that we say "this API" to mean
+> "not the API documented in this file at all but actually
+> the KVM_CREATE_DEVICE ioctl", but I see we do that in the GIC
+> API docs too.)
 > 
-> I never suggested just "_data"; I said "_drvdata".
-
-Not sure it clarifies the per-chip aspect ;), and driver is, IMHO, too
-generic: I also consider manufacturer specific code as drivers (but in
-this case they are chip drivers, not controller drivers).
-
-How about nand_{get,set}_ctrldrvdata()?
-
+>> +
+>> +Groups:
+>> +  KVM_DEV_ARM_PMU_GRP_IRQ
+>> +  Attributes:
+>> +    The attr field of kvm_device_attr encodes one value:
+>> +    bits:     | 63 .... 32 | 31 ....  0 |
+>> +    values:   |  reserved  | vcpu_index |
+>> +    A value describing the PMU overflow interrupt number for the specified
+>> +    vcpu_index vcpu. This interrupt could be a PPI or SPI, but for one VM the
+>> +    interrupt type must be same for each vcpu. As a PPI, the interrupt number is
+>> +    same for all vcpus, while as a SPI it must be different for each vcpu.
 > 
-> > other helpers to allow NAND manufacturer code to manipulate its own
-> > private data. This is required if we want to support read-retry on some
-> > chips who are requiring a read OTP area step to retrieve some register
-> > values which will later be used to change from one read-retry mode to
-> > another.
-> > The plan was to define the nand_{set,get}_manufacturer_data() helpers,
-> > and create or reuse an existing priv field (mtd->priv?) to store this
-> > private data.
+> I see we're using vcpu_index rather than MPIDR affinity value
+> for specifying which CPU we're configuring. Is this in line with
+> our planned API for GICv3 configuration?
 > 
-> That's interesting. Sounds like an OK idea. (Personally, I wouldn't
-> try to use mtd->priv for this, but otherwise looks OK.)
+Here vcpu_index is used to indexing the vCPU, no special use.
 
-Yes, I don't like the idea of using mtd->priv to store that, but it's
-shame to have this unused field and create another one :p.
-
+>> +  Errors:
+>> +    -ENXIO: Unsupported attribute group
+>> +    -EBUSY: The PMU overflow interrupt is already set
+>> +    -ENODEV: Getting the PMU overflow interrupt number while it's not set
+>> +    -EINVAL: Invalid vcpu_index or PMU overflow interrupt number supplied
 > 
-> > Also note that the spi framework provides the same kind of helpers [1].
+> What happens if you create a PMU but then never set the IRQ number?
+> Is there a default or does the VM refuse to run or something?
 > 
-> Hmm, OK. FWIW, they have both "driver data" and "controller state". It's
-> not perfectly clear to me why both exist.
+If userspace doesn't specify the irq number, the guest will not receive
+the PMU interrupt because we check if the irq is initialized when we
+inject the interrupt. But guest could still use the vPMU if QEMU
+generates a proper DTB or ACPI.
 
-Well, "driver data" in this case is the data used by the i2c device
-driver (the driver communicating with the device on the i2c bus), while
-the "controller state" is the per-device controller specific data.
-If we do the analogy with the NAND framework, I'd consider the
-"SPI controller state" as what I call here the "NAND controller per-chip
-data", and the "SPI driver data" as the "manufacturer data".
-
-I know the names are not necessarily better in the SPI framework, but I
-think we should find names that describe as much as possible which
-data is used by which part of the code. 
-
+> Do we want an attribute like KVM_DEV_ARM_VGIC_CTRL_INIT so userspace
+> can say "I have definitely completed configuration of this device now" ?
 > 
-> > This being said, I'm perfectly fine changing the function names, but
-> > I'd like to replace it by something explicitly telling the user that
-> > this field should only be set by NAND controller drivers. 
+> We wound up with a fair amount of legacy mess to deal with in the
+> GIC code because we didn't put one of those in from the start.
+> (Perhaps we should aim to standardize on all kvm devices having one?)
 > 
-> Sure. I though a "driver data"-based name did this. But I'll leave it to
-> you. I could even be OK with "controller data", if you still think this
-> fits your overall controller refactoring plan, and communicates its
-> purpose best.
+> thanks
+> -- PMM
+> 
+> .
+> 
 
-If you're OK with that I'd like to keep a name containing the
-'controller' or 'ctrl' word in it:
-1/ nand_{get,set}_controller_data() (the names originally proposed)
-2/ nand_{get,set}_ctrldrv_data() or nand_{get,set}_ctrldrvdata()
-
-What do you prefer?
-
-Best Regards,
-
-Boris
-
+Thanks,
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Shannon
