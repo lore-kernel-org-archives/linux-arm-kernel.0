@@ -1,37 +1,34 @@
-From: JBeulich@suse.com (Jan Beulich)
-Date: Thu, 07 Jan 2016 00:45:27 -0700
-Subject: [PATCH v3 59/62] xen/arm: Add a hypercall for device mmio mapping
-In-Reply-To: <568E0CA9.4090307@huawei.com>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-60-git-send-email-shannon.zhao@linaro.org>
- <564B17EA02000078000B5D34@prv-mh.provo.novell.com>
- <568E0CA9.4090307@huawei.com>
-Message-ID: <568E25A702000078000C43EA@prv-mh.provo.novell.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Thu, 7 Jan 2016 09:11:02 +0100
+Subject: [PATCH] arm: pci: mark the dra7xx driver as broken
+In-Reply-To: <568DF4FE.5010704@ti.com>
+References: <20160106214518.GA6106@localhost.localdomain>
+ <568DF4FE.5010704@ti.com>
+Message-ID: <20160107081102.GA6243@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>> On 07.01.16 at 07:58, <zhaoshenglong@huawei.com> wrote:
-> On 2015/11/17 19:04, Jan Beulich wrote:
->>>>> On 17.11.15 at 10:40, <shannon.zhao@linaro.org> wrote:
->>> > --- a/xen/arch/arm/mm.c
->>> > +++ b/xen/arch/arm/mm.c
->>> > @@ -1138,6 +1138,10 @@ int xenmem_add_to_physmap_one(
->>> >          rcu_unlock_domain(od);
->>> >          break;
->>> >      }
->>> > +    case XENMAPSPACE_dev_mmio:
->>> > +        rc = map_dev_mmio_region(d, gpfn, 1, idx);
->>> > +        return rc;
->>> > +        break;
->> Blindly for any kind of domain? The XSM check in the
->> XENMEM_add_to_physmap_batch handler (in common code) doesn't
->> even know which map space is to be used...
-> 
-> Sorry, I know little about XSM. Could you suggest me how to add the
-> check for this new type here?
+This patch marks the dra7xx pci host driver as broken.  This driver
+was first merged in v3.17 and has never worked.  Although the driver
+compiles just fine, it is missing an essential device reset.  If the
+driver is included, the kernel locks up hard shortly after booting,
+before any console output appears.
 
-I'm sorry to push back here, but did you at least try to derive
-what is wanted from the multitude of other XSM checks present
-throughout the tree?
+Signed-off-by: Richard Cochran <richardcochran@gmail.com>
 
-Jan
+---
+ drivers/pci/host/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+index d5e58ba..d83e8f0 100644
+--- a/drivers/pci/host/Kconfig
++++ b/drivers/pci/host/Kconfig
+@@ -5,6 +5,7 @@ config PCI_DRA7XX
+ 	bool "TI DRA7xx PCIe controller"
+ 	select PCIE_DW
+ 	depends on OF && HAS_IOMEM && TI_PIPE3
++	depends on BROKEN
+ 	help
+ 	 Enables support for the PCIe controller in the DRA7xx SoC.  There
+ 	 are two instances of PCIe controller in DRA7xx.  This controller can
