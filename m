@@ -1,65 +1,73 @@
-From: boqun.feng@gmail.com (Boqun Feng)
-Date: Thu, 7 Jan 2016 08:43:56 +0800
-Subject: [PATCH v2 15/32] powerpc: define __smp_xxx
-In-Reply-To: <20160106222337-mutt-send-email-mst@redhat.com>
-References: <1451572003-2440-1-git-send-email-mst@redhat.com>
- <1451572003-2440-16-git-send-email-mst@redhat.com>
- <20160105013648.GA1256@fixme-laptop.cn.ibm.com>
- <20160105085117.GA11858@redhat.com>
- <20160105095341.GA5321@fixme-laptop.cn.ibm.com>
- <20160105180938-mutt-send-email-mst@redhat.com>
- <20160106015152.GA14605@fixme-laptop.cn.ibm.com>
- <20160106222337-mutt-send-email-mst@redhat.com>
-Message-ID: <20160107004356.GB14605@fixme-laptop.cn.ibm.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed,  6 Jan 2016 17:12:47 -0800
+Subject: [PATCH 1/3] driver-core: platform: Add platform_irq_count()
+In-Reply-To: <1452129169-2014-1-git-send-email-sboyd@codeaurora.org>
+References: <1452129169-2014-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1452129169-2014-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 06, 2016 at 10:23:51PM +0200, Michael S. Tsirkin wrote:
-[...]
-> > > 
-> > > Sorry, I don't understand - why do you have to do anything?
-> > > I changed all users of smp_lwsync so they
-> > > use __smp_lwsync on SMP and barrier() on !SMP.
-> > > 
-> > > This is exactly the current behaviour, I also tested that
-> > > generated code does not change at all.
-> > > 
-> > > Is there a patch in your tree that conflicts with this?
-> > > 
-> > 
-> > Because in a patchset which implements atomic relaxed/acquire/release
-> > variants on PPC I use smp_lwsync(), this makes it have another user,
-> > please see this mail:
-> > 
-> > http://article.gmane.org/gmane.linux.ports.ppc.embedded/89877
-> > 
-> > in definition of PPC's __atomic_op_release().
-> > 
-> > 
-> > But I think removing smp_lwsync() is a good idea and actually I think we
-> > can go further to remove __smp_lwsync() and let __smp_load_acquire and
-> > __smp_store_release call __lwsync() directly, but that is another thing.
-> > 
-> > Anyway, I will modify my patch.
-> > 
-> > Regards,
-> > Boqun
-> 
-> 
-> Thanks!
-> Could you send an ack then please?
-> 
+A recent patch added calls to of_irq_count() in the qcom pinctrl
+drivers and that caused module build failures because
+of_irq_count() is not an exported symbol. We shouldn't export
+of_irq_count() to modules because it's an internal OF API that
+shouldn't be used by drivers. Platform drivers should use
+platform device APIs instead. Therefore, add a platform_irq_count()
+API that mirrors the of_irq_count() API so that platform drivers
+can stay DT agnostic.
 
-Sure, if you need one from me, feel free to add my ack for this patch:
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Andy Gross <andy.gross@linaro.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/base/platform.c         | 20 ++++++++++++++++++++
+ include/linux/platform_device.h |  1 +
+ 2 files changed, 21 insertions(+)
 
-Acked-by: Boqun Feng <boqun.feng@gmail.com>
-
-Regards,
-Boqun
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160107/b3ca90ab/attachment-0001.sig>
+diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+index d77ed0c946dd..8dcbb266643b 100644
+--- a/drivers/base/platform.c
++++ b/drivers/base/platform.c
+@@ -118,6 +118,26 @@ int platform_get_irq(struct platform_device *dev, unsigned int num)
+ EXPORT_SYMBOL_GPL(platform_get_irq);
+ 
+ /**
++ * platform_irq_count - Count the number of IRQs a platform device uses
++ * @dev: platform device
++ *
++ * Return: Number of IRQs a platform device uses or EPROBE_DEFER
++ */
++int platform_irq_count(struct platform_device *dev)
++{
++	int ret, nr = 0;
++
++	while ((ret = platform_get_irq(dev, nr)) >= 0)
++		nr++;
++
++	if (ret == -EPROBE_DEFER)
++		return ret;
++
++	return nr;
++}
++EXPORT_SYMBOL_GPL(platform_irq_count);
++
++/**
+  * platform_get_resource_byname - get a resource for a device by name
+  * @dev: platform device
+  * @type: resource type
+diff --git a/include/linux/platform_device.h b/include/linux/platform_device.h
+index dba40b1c41dc..03b755521fd9 100644
+--- a/include/linux/platform_device.h
++++ b/include/linux/platform_device.h
+@@ -52,6 +52,7 @@ extern void arch_setup_pdev_archdata(struct platform_device *);
+ extern struct resource *platform_get_resource(struct platform_device *,
+ 					      unsigned int, unsigned int);
+ extern int platform_get_irq(struct platform_device *, unsigned int);
++extern int platform_irq_count(struct platform_device *);
+ extern struct resource *platform_get_resource_byname(struct platform_device *,
+ 						     unsigned int,
+ 						     const char *);
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
