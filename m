@@ -1,75 +1,92 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 7 Jan 2016 17:05:20 +0100
-Subject: [PATCH] doc: PCI: altera: Fix the 'ranges' property in example
-In-Reply-To: <1452156966.3051.44.camel@ubuntu>
-References: <1450950330-28393-1-git-send-email-marex@denx.de>
- <201601051449.49757.marex@denx.de> <1452156966.3051.44.camel@ubuntu>
-Message-ID: <201601071705.20552.marex@denx.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu,  7 Jan 2016 16:07:20 +0000
+Subject: [PATCH] arm64: Honour !PTE_WRITE in set_pte_at() for kernel mappings
+Message-ID: <1452182840-5120-1-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, January 07, 2016 at 09:56:06 AM, Ley Foon Tan wrote:
-> On Tue, 2016-01-05 at 14:49 +0100, Marek Vasut wrote:
-> > On Tuesday, January 05, 2016 at 02:18:18 AM, Ley Foon Tan wrote:
-> > > On Tue, 2016-01-05 at 01:47 +0100, Marek Vasut wrote:
-> > > > On Tuesday, January 05, 2016 at 01:45:45 AM, Ley Foon Tan wrote:
-> > > > > On Mon, 2016-01-04 at 02:12 +0100, Marek Vasut wrote:
-> > > > > > On Monday, January 04, 2016 at 01:53:22 AM, Ley Foon Tan wrote:
-> > > > > > > On Mon, 2016-01-04 at 01:37 +0100, Marek Vasut wrote:
-> > > > > > > > On Monday, January 04, 2016 at 01:10:13 AM, Ley Foon Tan
-> > > > > > > > wrote:
-> > > > > > > > 
-> > > > > > > > Hi!
-> > > > > > > > 
-> > > > > > > > > > > > Well, do you have a good explanation why the system
-> > > > > > > > > > > > works with this change and doesn't work without it
-> > > > > > > > > > > > on my design ? I'd really love to understand this.
-> > > > > > > > > > > 
-> > > > > > > > > > > Do you modify the driver to setup the translation
-> > > > > > > > > > > table?
-> > > > > > > > > > 
-> > > > > > > > > > No, I didn't change the driver. What do you refer to
-> > > > > > > > > > please ?
-> > > > > > > > > 
-> > > > > > > > > There is Address Translation Table at address offset 0x1000
-> > > > > > > > > in the IP.
-> > > > > > > > 
-> > > > > > > > Oh, I didn't configure that in any way. Should I or does the
-> > > > > > > > driver configure it in some way?
-> > > > > > > > 
-> > > > > > > > > Do you use the hardware design from the rocketboards.org or
-> > > > > > > > > your own design?
-> > > > > > > > 
-> > > > > > > > I use the one from rocketboards, I just ported it over to the
-> > > > > > > > MCVEVK (custom cyclone v soc board)
-> > > > > > > 
-> > > > > > > You may check again the base addresses use in the MCVEVK board.
-> > > > > > 
-> > > > > > The address map is attached ; I don't see anything which would
-> > > > > > differ from the reference design.
-> > > > > 
-> > > > > Address map looks fine.
-> > > > 
-> > > > Well do you have any other idea then ? I guess I should pull out the
-> > > > SOCDK, huh?
-> > > 
-> > > Can't think of any other thing that impact this, I expect the bus width
-> > > used in the pipeline/bridge are same with the example design.
-> > > Do you have our CV, AV or A10 SoC devkit?
-> > 
-> > I tested CV SoCDK just now and you're right, the provided quartus project
-> > works without this change on the CV SoCDK. Do you have any suggestion for
-> > me where I should try looking then please ?
-> 
-> Do you check the hardware pipeline bridge in Qsys? Are they same
-> configuration as CV SoCDK design?
+Currently, set_pte_at() only checks the software PTE_WRITE bit for user
+mappings when it sets or clears the hardware PTE_RDONLY accordingly. The
+kernel ptes are written directly without any modification, relying
+solely on the protection bits in macros like PAGE_KERNEL. However,
+modifying kernel pte attributes via pte_wrprotect() would be ignored by
+set_pte_at(). Since pte_wrprotect() does not set PTE_RDONLY (it only
+clears PTE_WRITE), the new permission is not taken into account.
 
-If you mean ccb_h2f_50_to_125 , then yes, they are exactly the same.
+This patch changes set_pte_at() to adjust the read-only permission for
+kernel ptes as well. As a side effect, existing PROT_* definitions used
+for kernel ioremap*() need to include PTE_DIRTY | PTE_WRITE.
 
-The only difference I can think of is in altr_xcvr_reconfig_0 , where I have
-2 reconfiguration interfaces instead of 5 because I am using only PCIe x1
-instead of x4 as it is on the CV SoCDK. The pcie_cv_hip_avmm_0 is configured
-exactly the same too (but for x1 Gen1 port instead of x4 Gen1 port).
+(additionally, white space fix for PTE_KERNEL_ROX)
 
-Best regards,
-Marek Vasut
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Reported-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/pgtable.h | 21 ++++++++++-----------
+ 1 file changed, 10 insertions(+), 11 deletions(-)
+
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 63f52b55defe..8bdf47cd1bc3 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -67,11 +67,11 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
+ #define PROT_DEFAULT		(PTE_TYPE_PAGE | PTE_AF | PTE_SHARED)
+ #define PROT_SECT_DEFAULT	(PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S)
+ 
+-#define PROT_DEVICE_nGnRnE	(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_ATTRINDX(MT_DEVICE_nGnRnE))
+-#define PROT_DEVICE_nGnRE	(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_ATTRINDX(MT_DEVICE_nGnRE))
+-#define PROT_NORMAL_NC		(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_ATTRINDX(MT_NORMAL_NC))
+-#define PROT_NORMAL_WT		(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_ATTRINDX(MT_NORMAL_WT))
+-#define PROT_NORMAL		(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_ATTRINDX(MT_NORMAL))
++#define PROT_DEVICE_nGnRnE	(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_DEVICE_nGnRnE))
++#define PROT_DEVICE_nGnRE	(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_DEVICE_nGnRE))
++#define PROT_NORMAL_NC		(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_NORMAL_NC))
++#define PROT_NORMAL_WT		(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_NORMAL_WT))
++#define PROT_NORMAL		(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_NORMAL))
+ 
+ #define PROT_SECT_DEVICE_nGnRE	(PROT_SECT_DEFAULT | PMD_SECT_PXN | PMD_SECT_UXN | PMD_ATTRINDX(MT_DEVICE_nGnRE))
+ #define PROT_SECT_NORMAL	(PROT_SECT_DEFAULT | PMD_SECT_PXN | PMD_SECT_UXN | PMD_ATTRINDX(MT_NORMAL))
+@@ -81,7 +81,7 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
+ 
+ #define PAGE_KERNEL		__pgprot(_PAGE_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE)
+ #define PAGE_KERNEL_RO		__pgprot(_PAGE_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_RDONLY)
+-#define PAGE_KERNEL_ROX	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_RDONLY)
++#define PAGE_KERNEL_ROX		__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_RDONLY)
+ #define PAGE_KERNEL_EXEC	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE)
+ #define PAGE_KERNEL_EXEC_CONT	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_CONT)
+ 
+@@ -153,6 +153,7 @@ extern struct page *empty_zero_page;
+ #define pte_write(pte)		(!!(pte_val(pte) & PTE_WRITE))
+ #define pte_exec(pte)		(!(pte_val(pte) & PTE_UXN))
+ #define pte_cont(pte)		(!!(pte_val(pte) & PTE_CONT))
++#define pte_user(pte)		(!!(pte_val(pte) & PTE_USER))
+ 
+ #ifdef CONFIG_ARM64_HW_AFDBM
+ #define pte_hw_dirty(pte)	(pte_write(pte) && !(pte_val(pte) & PTE_RDONLY))
+@@ -163,8 +164,6 @@ extern struct page *empty_zero_page;
+ #define pte_dirty(pte)		(pte_sw_dirty(pte) || pte_hw_dirty(pte))
+ 
+ #define pte_valid(pte)		(!!(pte_val(pte) & PTE_VALID))
+-#define pte_valid_user(pte) \
+-	((pte_val(pte) & (PTE_VALID | PTE_USER)) == (PTE_VALID | PTE_USER))
+ #define pte_valid_not_user(pte) \
+ 	((pte_val(pte) & (PTE_VALID | PTE_USER)) == PTE_VALID)
+ 
+@@ -262,13 +261,13 @@ extern void __sync_icache_dcache(pte_t pteval, unsigned long addr);
+ static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
+ 			      pte_t *ptep, pte_t pte)
+ {
+-	if (pte_valid_user(pte)) {
+-		if (!pte_special(pte) && pte_exec(pte))
+-			__sync_icache_dcache(pte, addr);
++	if (pte_valid(pte)) {
+ 		if (pte_sw_dirty(pte) && pte_write(pte))
+ 			pte_val(pte) &= ~PTE_RDONLY;
+ 		else
+ 			pte_val(pte) |= PTE_RDONLY;
++		if (pte_user(pte) && pte_exec(pte) && !pte_special(pte))
++			__sync_icache_dcache(pte, addr);
+ 	}
+ 
+ 	/*
