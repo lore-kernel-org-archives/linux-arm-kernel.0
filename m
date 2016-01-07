@@ -1,35 +1,116 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 07 Jan 2016 15:36:43 +0100
-Subject: [PATCH] arm64/dts: Add missing DMA Abort interrupt to Juno
-In-Reply-To: <6a66d2ac442925e066fe9b67ee2883de5894b0d3.1452168063.git.robin.murphy@arm.com>
-References: <6a66d2ac442925e066fe9b67ee2883de5894b0d3.1452168063.git.robin.murphy@arm.com>
-Message-ID: <2736927.0LiVxGZzgm@wuerfel>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Thu, 7 Jan 2016 22:35:53 +0800
+Subject: [PATCH v8 20/20] KVM: ARM64: Add a new kvm ARM PMU device
+In-Reply-To: <568E6E94.8090106@arm.com>
+References: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>
+ <1450771695-11948-21-git-send-email-zhaoshenglong@huawei.com>
+ <568E6E94.8090106@arm.com>
+Message-ID: <568E77C9.4060004@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 07 January 2016 12:01:59 Robin Murphy wrote:
-> The DMA-330 has an "irq_abort" interrupt line on which it signals faults
-> separately from the "irq[n:0]" channel interrupts. On Juno, this is
-> wired up to SPI 92; add it to the DT so that DMAC faults are correctly
-> reported for the driver to reset the thing, rather than leaving it
-> locked up and waiting to time out.
+
+
+On 2016/1/7 21:56, Marc Zyngier wrote:
+> On 22/12/15 08:08, Shannon Zhao wrote:
+>> > From: Shannon Zhao <shannon.zhao@linaro.org>
+>> > 
+>> > Add a new kvm device type KVM_DEV_TYPE_ARM_PMU_V3 for ARM PMU. Implement
+>> > the kvm_device_ops for it.
+>> > 
+>> > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>> > ---
+>> >  Documentation/virtual/kvm/devices/arm-pmu.txt |  24 +++++
+>> >  arch/arm64/include/uapi/asm/kvm.h             |   4 +
+>> >  include/linux/kvm_host.h                      |   1 +
+>> >  include/uapi/linux/kvm.h                      |   2 +
+>> >  virt/kvm/arm/pmu.c                            | 128 ++++++++++++++++++++++++++
+>> >  virt/kvm/kvm_main.c                           |   4 +
+>> >  6 files changed, 163 insertions(+)
+>> >  create mode 100644 Documentation/virtual/kvm/devices/arm-pmu.txt
+>> > 
+>> > diff --git a/Documentation/virtual/kvm/devices/arm-pmu.txt b/Documentation/virtual/kvm/devices/arm-pmu.txt
+>> > new file mode 100644
+>> > index 0000000..dda864e
+>> > --- /dev/null
+>> > +++ b/Documentation/virtual/kvm/devices/arm-pmu.txt
+>> > @@ -0,0 +1,24 @@
+>> > +ARM Virtual Performance Monitor Unit (vPMU)
+>> > +===========================================
+>> > +
+>> > +Device types supported:
+>> > +  KVM_DEV_TYPE_ARM_PMU_V3         ARM Performance Monitor Unit v3
+>> > +
+>> > +Instantiate one PMU instance for per VCPU through this API.
+>> > +
+>> > +Groups:
+>> > +  KVM_DEV_ARM_PMU_GRP_IRQ
+>> > +  Attributes:
+>> > +    The attr field of kvm_device_attr encodes one value:
+>> > +    bits:     | 63 .... 32 | 31 ....  0 |
+>> > +    values:   |  reserved  | vcpu_index |
+>> > +    A value describing the PMU overflow interrupt number for the specified
+>> > +    vcpu_index vcpu. This interrupt could be a PPI or SPI, but for one VM the
+>> > +    interrupt type must be same for each vcpu. As a PPI, the interrupt number is
+>> > +    same for all vcpus, while as a SPI it must be different for each vcpu.
+> I don't see anything enforcing these restrictions in the code (you can
+> program different PPIs on each vcpu, or the same SPI everywhere, and
+> nothing will generate an error).
 > 
-> CC: Liviu Dudau <liviu.dudau@arm.com>
-> CC: Sudeep Holla <sudeep.holla@arm.com>
-> CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> Is that something we want to enforce? Or we're happy just to leave it as
+> an unsupported corner case?
 > 
 
-Nothing wrong with the patch, but could you please come up with
-a more structured way to get patches for Juno into the kernel?
+Yeah, it should add the check. How about below check?
 
-You have addressed the patch "to:" the arm-soc maintainers, but
-you are not listed in the maintainers file for the directory, so
-it's not clear what you expect to happen here.
+diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+index 0ccf273..c3347e9 100644
+--- a/virt/kvm/arm/pmu.c
++++ b/virt/kvm/arm/pmu.c
+@@ -435,6 +435,29 @@ static void kvm_arm_pmu_destroy(struct kvm_device *dev)
+        kfree(dev);
+ }
 
-Ideally, we'd get patches from just one of the people listed
-in the MAINTAINERS file normally, and let us know if the
-primary maintainer changes, or if one of the others sends a
-patch because that person is unavailable.
++static bool irq_is_invalid(kvm_device *dev, int irq, bool is_ppi)
++{
++       int i;
++       struct kvm_vcpu *vcpu;
++       struct kvm *kvm = dev->kvm;
++
++       kvm_for_each_vcpu(i, vcpu, kvm) {
++               struct kvm_pmu *pmu = &vcpu->arch.pmu;
++
++               if (!kvm_arm_pmu_initialized(vcpu))
++                       continue;
++
++               if (is_ppi)
++                       if (pmu->irq_num != irq)
++                               return true;
++               else
++                       if (pmu->irq_num == irq)
++                               return true;
++       }
++
++       return false;
++}
++
+ static int kvm_arm_pmu_set_attr(struct kvm_device *dev,
+                                struct kvm_device_attr *attr)
+ {
+@@ -452,7 +475,8 @@ static int kvm_arm_pmu_set_attr(struct kvm_device *dev,
+                 * the interrupt number is same for all vcpus, while as
+a SPI it
+                 * must be different for each vcpu.
+                 */
+-               if (reg < VGIC_NR_SGIS || reg >=
+dev->kvm->arch.vgic.nr_irqs)
++               if (reg < VGIC_NR_SGIS || reg >=
+dev->kvm->arch.vgic.nr_irqs ||
++                   irq_is_invalid(dev, reg, reg < VGIC_NR_PRIVATE_IRQS))
+                        return -EINVAL;
 
-	Arnd
+                return kvm_arm_pmu_irq_access(dev->kvm, attr, &reg, true);
+
+Thanks,
+-- 
+Shannon
