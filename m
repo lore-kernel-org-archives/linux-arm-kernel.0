@@ -1,35 +1,65 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 7 Jan 2016 13:59:47 -0800
-Subject: dra7xx pci driver broken on dra7xx-evm
-In-Reply-To: <568ED7FA.4000508@ti.com>
-References: <20160106214518.GA6106@localhost.localdomain>
- <568DF4FE.5010704@ti.com> <568ED7FA.4000508@ti.com>
-Message-ID: <20160107215946.GP12777@atomide.com>
+From: brijesh.singh@amd.com (Brijesh Singh)
+Date: Thu, 7 Jan 2016 16:24:22 -0600
+Subject: [PATCH] ata: add AMD Seattle platform driver
+In-Reply-To: <4652600.rUhSEOUPkl@wuerfel>
+References: <1452200002-31590-1-git-send-email-brijesh.singh@amd.com>
+ <4652600.rUhSEOUPkl@wuerfel>
+Message-ID: <568EE596.3060005@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Suman Anna <s-anna@ti.com> [160107 13:26]:
-> On 01/06/2016 11:17 PM, Kishon Vijay Abraham I wrote:
-> > Hi,
-> 
-> + Tero, Tony and linux-omap
-> 
-> > 
-> > On Thursday 07 January 2016 03:15 AM, Richard Cochran wrote:
-> >>
-> >> The dra7xx-evm box freezes hard at the very first PCI bus access, the
-> >> call to in dra7xx_pcie_readl() in dra7xx_pcie_probe().
-> >>
-> >> The out-of-tree 3.14.53 TI driver performs a reset via platform data,
-> >> calling omap_device_assert_hardreset() by hook and crook.
-> 
-> Yeah, this is the only feasible way and not break multi-arch atm until a
-> reset framework is in place. We have couple of drivers (omap_iommu and
-> wkup_m3_rproc) following this approach.
+Hi,
 
-Sounds like doing reset with platform data is the way to go until the
-reset controller works.
 
-Regards,
+>> +
+>> +Examples:
+>> +        sata0 at e0300000 {
+>> +		compatible = "amd,seattle-ahci";
+>> +		reg = <0x0 0xe0300000 0x0 0xf0000>, <0x0 0xe0000078 0x0 0x1>;
+> 
+> Looking at the register values, I doubt that the SGPIO is actually part of the
+> sata device. More likely, you are pointing in the middle of an actual
+> GPIO controller.
+> 
 
-Tony
+That address is SGPIO control register for SATA. The current hardware implementation to control activity LED is not ideal.
+
+A57 does not have access to GPIO's connected to backplane controller instead SoC has exposed two SGPIO 
+control registers (LSIOC_SGPIO_CONTROL0: 0xE000_0078 and LSIOC_SGPIO_CONTROL1: 0xE000_007C) to A57. All we 
+need to do is to program these registers based on the disk activity. The firmware running on A5 reads the values
+and generate proper SGPIO timing and toggles the LEDs etc.
+
+These registers are defined in SATA0/1 DSDT resource template and also documented in SoC BKDG. I just noticed that BKDG has wrong register definition so will ask documentation folks to fix that.
+
+This driver is using SGPIO LED control similar to sata_highbank [1] except bit bang GPIO (which is done by firmware).
+
+[1] http://lxr.free-electrons.com/source/drivers/ata/sata_highbank.c#L140
+
+
+> If so, please implement a GPIO driver for that device, and use the gpio-leds
+> driver to drive the LEDs. IIRC there is already a generic way to communicate
+> with the LEDs interface from libata, if not you can implement that in order
+> to keep the special case out of the platform driver.
+> 
+>> +		interrupts = <0x0 0x163 0x4>;
+>> +		clocks = <0x2>
+> 
+> This is not a valid property.
+> 
+>> +/* SGPIO Control Register definition
+>> + *
+>> + * Bit		Type		Description
+>> + * 31		RW		OD7.2 (activity)
+>> + * 30		RW		OD7.1 (locate)
+>> + * 29		RW		OD7.0 (fault)
+>> + * 28...8	RW		OD6.2...OD0.0 (3bits per port, 1 bit per LED)
+>> + * 7		RO		SGPIO feature flag
+>> + * 6:4		RO		Reserved
+>> + * 3:0		RO		Number of ports (0 means no port supported)
+>> + */
+> 
+> The 'reg' property in your example is only 8 bits wide, the above lists
+> 32 bits.
+> 
+> 	Arnd
+> 
