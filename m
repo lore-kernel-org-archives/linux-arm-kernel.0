@@ -1,98 +1,65 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Thu,  7 Jan 2016 16:57:53 +0800
-Subject: [RFC PATCH v2 1/4] drm: dw-hdmi: make it easy to recovery the
- platform data for platform driver
-In-Reply-To: <1452156811-18150-1-git-send-email-ykk@rock-chips.com>
-References: <1452156811-18150-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1452157073-18576-1-git-send-email-ykk@rock-chips.com>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Thu, 7 Jan 2016 16:59:28 +0800
+Subject: [PATCH 1/2] arm: KVM: Do not update PC if the trap handler has
+ updated it
+In-Reply-To: <568E26CD.8020500@arm.com>
+References: <1450778118-12715-1-git-send-email-marc.zyngier@arm.com>
+ <1450778118-12715-2-git-send-email-marc.zyngier@arm.com>
+ <CAFEAcA8F2TJuRR5ELvit0FPa3XFMJ847S8WK25i5aVdGBU=PUA@mail.gmail.com>
+ <20151222143947.GA5631@cbox>
+ <CAFEAcA9dALQv8Xcyg5FLAvRaJfH5UT2u4jrLjofLh5Ff2yo=8Q@mail.gmail.com>
+ <568E26CD.8020500@arm.com>
+Message-ID: <568E28F0.9010405@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
----
-Changes in v2: None
 
- drivers/gpu/drm/imx/dw_hdmi-imx.c           | 7 ++++---
- drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 7 ++++---
- 2 files changed, 8 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/gpu/drm/imx/dw_hdmi-imx.c b/drivers/gpu/drm/imx/dw_hdmi-imx.c
-index 063825f..0968610 100644
---- a/drivers/gpu/drm/imx/dw_hdmi-imx.c
-+++ b/drivers/gpu/drm/imx/dw_hdmi-imx.c
-@@ -26,6 +26,7 @@ struct imx_hdmi {
- 	struct device *dev;
- 	struct drm_encoder encoder;
- 	struct regmap *regmap;
-+	struct dw_hdmi_plat_data plat_data;
- };
- 
- static const struct dw_hdmi_mpll_config imx_mpll_cfg[] = {
-@@ -204,7 +205,6 @@ static int dw_hdmi_imx_bind(struct device *dev, struct device *master,
- 			    void *data)
- {
- 	struct platform_device *pdev = to_platform_device(dev);
--	const struct dw_hdmi_plat_data *plat_data;
- 	const struct of_device_id *match;
- 	struct drm_device *drm = data;
- 	struct drm_encoder *encoder;
-@@ -221,7 +221,7 @@ static int dw_hdmi_imx_bind(struct device *dev, struct device *master,
- 		return -ENOMEM;
- 
- 	match = of_match_node(dw_hdmi_imx_dt_ids, pdev->dev.of_node);
--	plat_data = match->data;
-+	hdmi->plat_data = *(const struct dw_hdmi_plat_data *)match->data;
- 	hdmi->dev = &pdev->dev;
- 	encoder = &hdmi->encoder;
- 
-@@ -253,7 +253,8 @@ static int dw_hdmi_imx_bind(struct device *dev, struct device *master,
- 	drm_encoder_init(drm, encoder, &dw_hdmi_imx_encoder_funcs,
- 			 DRM_MODE_ENCODER_TMDS, NULL);
- 
--	return dw_hdmi_bind(dev, master, data, encoder, iores, irq, plat_data);
-+	return dw_hdmi_bind(dev, master, data, encoder, iores, irq,
-+			    &hdmi->plat_data);
- }
- 
- static void dw_hdmi_imx_unbind(struct device *dev, struct device *master,
-diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-index c65ce8c..d5816b3 100644
---- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-+++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-@@ -28,6 +28,7 @@ struct rockchip_hdmi {
- 	struct device *dev;
- 	struct regmap *regmap;
- 	struct drm_encoder encoder;
-+	struct dw_hdmi_plat_data plat_data;
- };
- 
- #define to_rockchip_hdmi(x)	container_of(x, struct rockchip_hdmi, x)
-@@ -242,7 +243,6 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
- 				 void *data)
- {
- 	struct platform_device *pdev = to_platform_device(dev);
--	const struct dw_hdmi_plat_data *plat_data;
- 	const struct of_device_id *match;
- 	struct drm_device *drm = data;
- 	struct drm_encoder *encoder;
-@@ -259,7 +259,7 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
- 		return -ENOMEM;
- 
- 	match = of_match_node(dw_hdmi_rockchip_dt_ids, pdev->dev.of_node);
--	plat_data = match->data;
-+	hdmi->plat_data = *(const struct dw_hdmi_plat_data *)match->data;
- 	hdmi->dev = &pdev->dev;
- 	encoder = &hdmi->encoder;
- 
-@@ -293,7 +293,8 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
- 	drm_encoder_init(drm, encoder, &dw_hdmi_rockchip_encoder_funcs,
- 			 DRM_MODE_ENCODER_TMDS, NULL);
- 
--	return dw_hdmi_bind(dev, master, data, encoder, iores, irq, plat_data);
-+	return dw_hdmi_bind(dev, master, data, encoder, iores, irq,
-+			    &hdmi->plat_data);
- }
- 
- static void dw_hdmi_rockchip_unbind(struct device *dev, struct device *master,
+On 2016/1/7 16:50, Marc Zyngier wrote:
+> On 22/12/15 14:50, Peter Maydell wrote:
+>> On 22 December 2015 at 14:39, Christoffer Dall
+>> <christoffer.dall@linaro.org> wrote:
+>>> On Tue, Dec 22, 2015 at 11:08:10AM +0000, Peter Maydell wrote:
+>>>> Won't this result in our incorrectly skipping the first insn
+>>>> in the fault handler if the original offending instruction
+>>>> was itself the first insn in the fault handler?
+>>>>
+>>> Wouldn't that then loop with the exception forever?
+>>
+>> Yes, but so would real hardware...
+> 
+> Indeed. As it is, this patch is not doing what it should. On the other
+> hand, I came to the conclusion that we do not need to fix this just yet,
+> as long as we only let KVM inject an UNDEF, and that's what the PMU code
+> requires.
+> 
+> I'll comment on the PMU thread, but the gist of it is:
+> 1) fix the arm64 UNDEF/PABRT/DABRT code to properly account for the the
+> source EL (Table D1-7 of the ARMv8 ARM).
+This looks like something we add in the PMU patch set.
+
++		switch (cpsr & (PSR_MODE_MASK | PSR_MODE32_BIT)) {
++		case PSR_MODE_EL0t:
++			exc_offset = EL0_EXCEPT_SYNC_OFFSET_64;
++			break;
++		case PSR_MODE_EL1t:
++			exc_offset = EL1_EXCEPT_BAD_SYNC_OFFSET;
++			break;
++		case PSR_MODE_EL1h:
++			exc_offset = EL1_EXCEPT_SYNC_OFFSET;
++			break;
++		default:
++			exc_offset = EL0_EXCEPT_SYNC_OFFSET_32;
++		}
++
+
+> 2) instead of crafting an exception that modifies the PC, fail the
+> sysreg access and let KVM inject an UNDEF.
+> 
+> I'll post another patch today to address 1), and I'll finish reviewing
+> the PMU thread (I have a separate patch addressing 2)).
+> 
+Thanks!
+
 -- 
-2.1.2
+Shannon
