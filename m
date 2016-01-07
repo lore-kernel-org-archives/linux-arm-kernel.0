@@ -1,30 +1,45 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 6 Jan 2016 17:47:58 -0800
-Subject: [PATCH 1/3] driver-core: platform: Add platform_irq_count()
-In-Reply-To: <1452129169-2014-2-git-send-email-sboyd@codeaurora.org>
-References: <1452129169-2014-1-git-send-email-sboyd@codeaurora.org>
- <1452129169-2014-2-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20160107014758.GB17796@kroah.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 6 Jan 2016 17:50:14 -0800
+Subject: [PATCH] mfd: qcom-spmi-pmic: Don't access non-existing registers
+In-Reply-To: <1447805204-32483-1-git-send-email-sboyd@codeaurora.org>
+References: <1447805204-32483-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <568DC456.9060300@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 06, 2016 at 05:12:47PM -0800, Stephen Boyd wrote:
-> A recent patch added calls to of_irq_count() in the qcom pinctrl
-> drivers and that caused module build failures because
-> of_irq_count() is not an exported symbol. We shouldn't export
-> of_irq_count() to modules because it's an internal OF API that
-> shouldn't be used by drivers. Platform drivers should use
-> platform device APIs instead. Therefore, add a platform_irq_count()
-> API that mirrors the of_irq_count() API so that platform drivers
-> can stay DT agnostic.
-> 
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Andy Gross <andy.gross@linaro.org>
+On 11/17/15 16:06, Stephen Boyd wrote:
+> From: "Ivan T. Ivanov" <ivan.ivanov@linaro.org>
+>
+> Revision ID registers are available only on devices with
+> Slave IDs that are even, so don't make access to unavailable
+> registers.
+>
+> Signed-off-by: Ivan T. Ivanov <ivan.ivanov@linaro.org>
+> [sboyd at codeaurora.org: Consider all slave ids that are even]
 > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 > ---
->  drivers/base/platform.c         | 20 ++++++++++++++++++++
->  include/linux/platform_device.h |  1 +
->  2 files changed, 21 insertions(+)
 
-Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org
+Ping?
+
+>  drivers/mfd/qcom-spmi-pmic.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/mfd/qcom-spmi-pmic.c b/drivers/mfd/qcom-spmi-pmic.c
+> index af6ac1c4b45c..8653e8b9bb4f 100644
+> --- a/drivers/mfd/qcom-spmi-pmic.c
+> +++ b/drivers/mfd/qcom-spmi-pmic.c
+> @@ -127,7 +127,9 @@ static int pmic_spmi_probe(struct spmi_device *sdev)
+>  	if (IS_ERR(regmap))
+>  		return PTR_ERR(regmap);
+>  
+> -	pmic_spmi_show_revid(regmap, &sdev->dev);
+> +	/* Only the first slave id for a PMIC contains this information */
+> +	if (sdev->usid % 2 == 0)
+> +		pmic_spmi_show_revid(regmap, &sdev->dev);
+>  
+>  	return of_platform_populate(root, NULL, NULL, &sdev->dev);
+>  }
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
