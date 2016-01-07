@@ -1,91 +1,52 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Thu, 7 Jan 2016 13:19:44 +0000
-Subject: [PATCH] ARM64: tegra: Add support for Google Pixel C
-In-Reply-To: <568D0D70.4020309@nvidia.com>
-References: <1452073222-2956-1-git-send-email-jonathanh@nvidia.com>
- <20160106094616.GA563@leverpostej> <568D0D70.4020309@nvidia.com>
-Message-ID: <568E65F0.2070201@nvidia.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Thu, 7 Jan 2016 13:25:35 +0000
+Subject: [Qemu-devel] arm64 qemu tests failing in linux-next since 'arm64:
+ kernel: enforce pmuserenr_el0 initialization and restore'
+In-Reply-To: <567B41E3.5060800@roeck-us.net>
+References: <567B41E3.5060800@roeck-us.net>
+Message-ID: <CAFEAcA_c9DicGF+is6ST3NJv+c5Bi4dHYo2t8Q2n9AS9G4q0+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 24 December 2015 at 00:52, Guenter Roeck <linux@roeck-us.net> wrote:
+> Hi all,
+>
+> since commit 60792ad349f3 ("arm64: kernel: enforce pmuserenr_el0
+> initialization
+> and restore"), my arm64 qemu tests of linux-next are failing. After this
+> commit,
+> qemu does not display any output.
+>
+> Qemu version is 2.5.0. Linux kernel configuration is arm64:defconfig.
+>
+> qemu command line is as follows:
+>
+>         qemu-system-aarch64 -machine virt -cpu cortex-a57 -machine type=virt
+> -nographic -smp 1 \
+>                 -m 512 -kernel arch/arm64/boot/Image -initrd
+> rootfs.arm64.cpio -no-reboot \
+>                 -append "console=ttyAMA0"
+>
+> Any idea what might cause this problem and how to fix it (presumably in
+> qemu) ?
 
-On 06/01/16 12:49, Jon Hunter wrote: 
-> On 06/01/16 09:46, Mark Rutland wrote:
->> Hi,
->>
->> On Wed, Jan 06, 2016 at 09:40:22AM +0000, Jon Hunter wrote:
->>> Add initial device-tree support for Google Pixel C (a.k.a. Smaug) based
->>> upon Tegra210 SoC with 3 GiB of LPDDR4 RAM.
->>>
->>> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
->>> ---
->>>  arch/arm64/boot/dts/nvidia/Makefile           |  1 +
->>>  arch/arm64/boot/dts/nvidia/tegra210-smaug.dts | 42 +++++++++++++++++++++++++++
->>>  2 files changed, 43 insertions(+)
->>>  create mode 100644 arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
+This turns out to be because QEMU doesn't currently implement
+PMUSERENR_EL0 for AArch64 (we do have an AArch32 implementation),
+so you get an immediate UNDEF when the kernel touches it, followed
+by an infinite loop of UNDEF exceptions because the instruction
+at the UNDEF vector entrypoint is unallocated at this point in
+execution.
 
-[snip]
+We had previously been relying on the kernel not attempting to
+touch the PMU if the ID_AA64DFR0_EL1 PMUVer bits read 0000
+("Performance Monitors extension System registers not implemented").
 
->>> +
->>> +	chosen {
->>> +		bootargs = "console=ttyS0,115200n8 earlycon=uart8250,mmio32,0x70006000";
->>> +	};
->>
->> Use stdout-path.
-> 
-> Ok.
+Since the v8 ARM ARM states that the Performance Monitors Extension is
+an optional feature of an implementation, this seems like a kernel
+bug to me. (QEMU should probably get round to implementing the PMU
+at some point for feature parity with v7, but this has not been
+a priority for us since they're not actually very useful in a
+fully emulated setup.)
 
-Adding Arnd.
-
-Hmmm ... well apparently stdout-path does not work for tegra and in
-order to make this work I had to do the following ...
-
-
-[PATCH] serial: 8250: of: Add earlycon support for Tegra
-
-Currently, early console support only works for Tegra when the serial
-port information is passed via the earlycon boot parameter. If the
-serial port information is specified via device-tree using the
-"stdout-path" then the early console does not work because:
-
-1. The tegra serial ports compatibility parameter does not match any
-   of the supported serial drivers for early console.
-2. The of_setup_earlycon() function assumes that serial port registers
-   are byte aligned and for tegra they are 32-bit aligned.
-
-Add an early console setup function for tegra so that the early console
-can be specified via the device-tree "stdout-path" variable.
-
-Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
----
- drivers/tty/serial/8250/8250_of.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
-
-diff --git a/drivers/tty/serial/8250/8250_of.c b/drivers/tty/serial/8250/8250_of.c
-index 33021c1f7d55..98adf83e83c2 100644
---- a/drivers/tty/serial/8250/8250_of.c
-+++ b/drivers/tty/serial/8250/8250_of.c
-@@ -44,6 +44,16 @@ void tegra_serial_handle_break(struct uart_port *p)
- 		udelay(1);
- 	} while (1);
- }
-+
-+int __init tegra_earlycon_setup(struct earlycon_device *device,
-+				const char *options)
-+{
-+	device->port.iotype = UPIO_MEM32;
-+	device->port.regshift = 2;
-+
-+	return early_serial8250_setup(device, options);
-+}
-+OF_EARLYCON_DECLARE(tegra20_uart, "nvidia,tegra20-uart", tegra_earlycon_setup);
- #else
- static inline void tegra_serial_handle_break(struct uart_port *port)
- {
-
-
-Arnd, does the above look ok, or should there be a generic
-early_serial8250x32_setup() somewhere?
-
-Cheers
-Jon
+thanks
+-- PMM
