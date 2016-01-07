@@ -1,37 +1,65 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed,  6 Jan 2016 16:20:10 -0800
-Subject: [PATCH -next] gpio: xilinx: Do not use gpiochip_get_data() in
- xgpio_save_regs()
-Message-ID: <1452126010-1111-1-git-send-email-linux@roeck-us.net>
+From: boqun.feng@gmail.com (Boqun Feng)
+Date: Thu, 7 Jan 2016 08:43:56 +0800
+Subject: [PATCH v2 15/32] powerpc: define __smp_xxx
+In-Reply-To: <20160106222337-mutt-send-email-mst@redhat.com>
+References: <1451572003-2440-1-git-send-email-mst@redhat.com>
+ <1451572003-2440-16-git-send-email-mst@redhat.com>
+ <20160105013648.GA1256@fixme-laptop.cn.ibm.com>
+ <20160105085117.GA11858@redhat.com>
+ <20160105095341.GA5321@fixme-laptop.cn.ibm.com>
+ <20160105180938-mutt-send-email-mst@redhat.com>
+ <20160106015152.GA14605@fixme-laptop.cn.ibm.com>
+ <20160106222337-mutt-send-email-mst@redhat.com>
+Message-ID: <20160107004356.GB14605@fixme-laptop.cn.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 097d88e94c44 ("gpio: xilinx: use gpiochip data pointer") replaces
-the use of container_of() with gpiochip_get_data(). Unfortunately, the
-data pointer is not yet set by the time xgpio_save_regs() is called,
-causing a system hang.
+On Wed, Jan 06, 2016 at 10:23:51PM +0200, Michael S. Tsirkin wrote:
+[...]
+> > > 
+> > > Sorry, I don't understand - why do you have to do anything?
+> > > I changed all users of smp_lwsync so they
+> > > use __smp_lwsync on SMP and barrier() on !SMP.
+> > > 
+> > > This is exactly the current behaviour, I also tested that
+> > > generated code does not change at all.
+> > > 
+> > > Is there a patch in your tree that conflicts with this?
+> > > 
+> > 
+> > Because in a patchset which implements atomic relaxed/acquire/release
+> > variants on PPC I use smp_lwsync(), this makes it have another user,
+> > please see this mail:
+> > 
+> > http://article.gmane.org/gmane.linux.ports.ppc.embedded/89877
+> > 
+> > in definition of PPC's __atomic_op_release().
+> > 
+> > 
+> > But I think removing smp_lwsync() is a good idea and actually I think we
+> > can go further to remove __smp_lwsync() and let __smp_load_acquire and
+> > __smp_store_release call __lwsync() directly, but that is another thing.
+> > 
+> > Anyway, I will modify my patch.
+> > 
+> > Regards,
+> > Boqun
+> 
+> 
+> Thanks!
+> Could you send an ack then please?
+> 
 
-Fixes: 097d88e94c44 ("gpio: xilinx: use gpiochip data pointer")
-Signed-off-by: Guenter Roeck <linux@roeck-us.net>
----
-It might make sense to merge this patch with the patch introducing the problem.
+Sure, if you need one from me, feel free to add my ack for this patch:
 
- drivers/gpio/gpio-xilinx.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Acked-by: Boqun Feng <boqun.feng@gmail.com>
 
-diff --git a/drivers/gpio/gpio-xilinx.c b/drivers/gpio/gpio-xilinx.c
-index 3345ab0ba1b3..d0fbb7f99523 100644
---- a/drivers/gpio/gpio-xilinx.c
-+++ b/drivers/gpio/gpio-xilinx.c
-@@ -207,7 +207,8 @@ static int xgpio_dir_out(struct gpio_chip *gc, unsigned int gpio, int val)
-  */
- static void xgpio_save_regs(struct of_mm_gpio_chip *mm_gc)
- {
--	struct xgpio_instance *chip = gpiochip_get_data(&mm_gc->gc);
-+	struct xgpio_instance *chip =
-+		container_of(mm_gc, struct xgpio_instance, mmchip);
- 
- 	xgpio_writereg(mm_gc->regs + XGPIO_DATA_OFFSET,	chip->gpio_state[0]);
- 	xgpio_writereg(mm_gc->regs + XGPIO_TRI_OFFSET, chip->gpio_dir[0]);
--- 
-2.1.4
+Regards,
+Boqun
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160107/b3ca90ab/attachment-0001.sig>
