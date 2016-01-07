@@ -1,103 +1,60 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 7 Jan 2016 14:56:15 +0000
-Subject: [PATCH v8 20/20] KVM: ARM64: Add a new kvm ARM PMU device
-In-Reply-To: <568E7AF1.9040103@huawei.com>
-References: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>
- <1450771695-11948-21-git-send-email-zhaoshenglong@huawei.com>
- <CAFEAcA_MDiOphseZ7RGNE3G=4ZDF5SFV5krOjanPbVuhgg9gnQ@mail.gmail.com>
- <568E7AF1.9040103@huawei.com>
-Message-ID: <CAFEAcA-Qcda7TSFLSeykLHqZYdP6tYdEjPe2uHN6f_+omqWFZg@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 7 Jan 2016 06:03:07 +0100
+Subject: [GIT PULL 3/9] ARM64: EXYNOS: clk: Clock dependency for ARM64
+ for v4.5
+In-Reply-To: <567A7B10.3030501@samsung.com>
+References: <1449020386-20250-1-git-send-email-k.kozlowski@samsung.com>
+ <1449020386-20250-4-git-send-email-k.kozlowski@samsung.com>
+ <20151222044636.GD30172@localhost> <567A7B10.3030501@samsung.com>
+Message-ID: <20160107050307.GA26875@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 January 2016 at 14:49, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
->
->
-> On 2016/1/7 22:36, Peter Maydell wrote:
->> On 22 December 2015 at 08:08, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
->>> From: Shannon Zhao <shannon.zhao@linaro.org>
->>>
->>> Add a new kvm device type KVM_DEV_TYPE_ARM_PMU_V3 for ARM PMU. Implement
->>> the kvm_device_ops for it.
->>>
->>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->>> ---
->>>  Documentation/virtual/kvm/devices/arm-pmu.txt |  24 +++++
->>>  arch/arm64/include/uapi/asm/kvm.h             |   4 +
->>>  include/linux/kvm_host.h                      |   1 +
->>>  include/uapi/linux/kvm.h                      |   2 +
->>>  virt/kvm/arm/pmu.c                            | 128 ++++++++++++++++++++++++++
->>>  virt/kvm/kvm_main.c                           |   4 +
->>>  6 files changed, 163 insertions(+)
->>>  create mode 100644 Documentation/virtual/kvm/devices/arm-pmu.txt
->>>
->>> diff --git a/Documentation/virtual/kvm/devices/arm-pmu.txt b/Documentation/virtual/kvm/devices/arm-pmu.txt
->>> new file mode 100644
->>> index 0000000..dda864e
->>> --- /dev/null
->>> +++ b/Documentation/virtual/kvm/devices/arm-pmu.txt
->>> @@ -0,0 +1,24 @@
->>> +ARM Virtual Performance Monitor Unit (vPMU)
->>> +===========================================
->>> +
->>> +Device types supported:
->>> +  KVM_DEV_TYPE_ARM_PMU_V3         ARM Performance Monitor Unit v3
->>> +
->>> +Instantiate one PMU instance for per VCPU through this API.
->>
->> Do you mean that userspace has to call this API once per vCPU to
->> create each PMU, or that calling the device create ioctl once makes
->> the kernel instantiate a PMU for each vCPU?
->>
-> Call the device create ioctl once and kvm will create a PMU for each
-> vCPU. But userspace should set the irqs for each PMU since for SPI they
-> are different.
->
->> (It's a little bit confusing that we say "this API" to mean
->> "not the API documented in this file at all but actually
->> the KVM_CREATE_DEVICE ioctl", but I see we do that in the GIC
->> API docs too.)
->>
->>> +
->>> +Groups:
->>> +  KVM_DEV_ARM_PMU_GRP_IRQ
->>> +  Attributes:
->>> +    The attr field of kvm_device_attr encodes one value:
->>> +    bits:     | 63 .... 32 | 31 ....  0 |
->>> +    values:   |  reserved  | vcpu_index |
->>> +    A value describing the PMU overflow interrupt number for the specified
->>> +    vcpu_index vcpu. This interrupt could be a PPI or SPI, but for one VM the
->>> +    interrupt type must be same for each vcpu. As a PPI, the interrupt number is
->>> +    same for all vcpus, while as a SPI it must be different for each vcpu.
->>
->> I see we're using vcpu_index rather than MPIDR affinity value
->> for specifying which CPU we're configuring. Is this in line with
->> our planned API for GICv3 configuration?
->>
-> Here vcpu_index is used to indexing the vCPU, no special use.
+Hi,
 
-Yes, but you can identify the CPU by index, or by its MPIDR.
-We had a discussion about which was the best way for doing
-the VGIC API, and I can't remember which way round we ended up
-going for. Whichever we chose, we should do the same thing here.
+Sorry for the slow reply, holidays and vacation and all that.
 
->>> +  Errors:
->>> +    -ENXIO: Unsupported attribute group
->>> +    -EBUSY: The PMU overflow interrupt is already set
->>> +    -ENODEV: Getting the PMU overflow interrupt number while it's not set
->>> +    -EINVAL: Invalid vcpu_index or PMU overflow interrupt number supplied
->>
->> What happens if you create a PMU but then never set the IRQ number?
->> Is there a default or does the VM refuse to run or something?
->>
-> If userspace doesn't specify the irq number, the guest will not receive
-> the PMU interrupt because we check if the irq is initialized when we
-> inject the interrupt. But guest could still use the vPMU if QEMU
-> generates a proper DTB or ACPI.
+On Wed, Dec 23, 2015 at 07:44:32PM +0900, Krzysztof Kozlowski wrote:
+> W dniu 22.12.2015 o 13:46, Olof Johansson pisze:
+> > On Wed, Dec 02, 2015 at 10:39:40AM +0900, Krzysztof Kozlowski wrote:
+> >> Hi Kukjin,
+> >>
+> >> Dependency for soc64 changes.
+> >>
+> >> Best regards,
+> >> Krzysztof
+> >>
+> >>
+> >> The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+> >>
+> >>   Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+> >>
+> >> are available in the git repository at:
+> >>
+> >>   https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-clk-arm64-symbols-4.5
+> >>
+> >> for you to fetch changes up to 8c2a90ed18a74e8b9cdbba679403faa44d6024fc:
+> >>
+> >>   clk: samsung: Don't build ARMv8 clock drivers on ARMv7 (2015-11-22 19:25:29 +0900)
+> > 
+> > Hi,
+> > 
+> > Looks like this lacks ack from any of the clock maintainers.
+> 
+> It got the ack from Sylwester and Tomasz - Samsung clock maintainers. If
+> it is not sufficient... then let's wait with it for v4.6. I am on
+> holidays now so I cannot really do anything meaningful with it.
 
-So is it a valid use case to create a PMU with the interrupt not wired
-up to anything? (If it's never valid it would be nice to diagnose it
-rather than just silently letting the guest run but not work right.)
+Ok -- even though we have per-driver maintainers, we still look for acks from
+the overall subsystem maintainers on these drivers. 
 
-thanks
--- PMM
+> > Given that EXYNOS_ARM64_COMMON_CLK is not yet introduced, this will cause
+> > a breakage in bisectability on some of these platforms as well.
+> 
+> The patch introduces EXYNOS_ARM64_COMMON_CLK which will be enabled by
+> default on our platforms. What kind of breakage do you have in mind?
+
+Ah, I probably missed that.
+
+
+-Olof
