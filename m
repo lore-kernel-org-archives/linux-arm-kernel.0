@@ -1,140 +1,91 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 7 Jan 2016 13:15:20 +0000
-Subject: [PATCH v8 08/20] KVM: ARM64: Add access handler for event typer
- register
-In-Reply-To: <568E5BDD.6010908@huawei.com>
-References: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>
- <1450771695-11948-9-git-send-email-zhaoshenglong@huawei.com>
- <568E4607.6090308@arm.com> <568E5BDD.6010908@huawei.com>
-Message-ID: <20160107131520.173fa49a@arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Thu, 7 Jan 2016 13:19:44 +0000
+Subject: [PATCH] ARM64: tegra: Add support for Google Pixel C
+In-Reply-To: <568D0D70.4020309@nvidia.com>
+References: <1452073222-2956-1-git-send-email-jonathanh@nvidia.com>
+ <20160106094616.GA563@leverpostej> <568D0D70.4020309@nvidia.com>
+Message-ID: <568E65F0.2070201@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 7 Jan 2016 20:36:45 +0800
-Shannon Zhao <zhaoshenglong@huawei.com> wrote:
 
-> 
-> 
-> On 2016/1/7 19:03, Marc Zyngier wrote:
-> > On 22/12/15 08:08, Shannon Zhao wrote:
-> >> > From: Shannon Zhao <shannon.zhao@linaro.org>
-> >> > 
-> >> > These kind of registers include PMEVTYPERn, PMCCFILTR and PMXEVTYPER
-> >> > which is mapped to PMEVTYPERn or PMCCFILTR.
-> >> > 
-> >> > The access handler translates all aarch32 register offsets to aarch64
-> >> > ones and uses vcpu_sys_reg() to access their values to avoid taking care
-> >> > of big endian.
-> >> > 
-> >> > When writing to these registers, create a perf_event for the selected
-> >> > event type.
-> >> > 
-> >> > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> >> > ---
-> >> >  arch/arm64/kvm/sys_regs.c | 156 +++++++++++++++++++++++++++++++++++++++++++++-
-> >> >  1 file changed, 154 insertions(+), 2 deletions(-)
-> >> > 
-> >> > diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> >> > index 2552db1..ed2939b 100644
-> >> > --- a/arch/arm64/kvm/sys_regs.c
-> >> > +++ b/arch/arm64/kvm/sys_regs.c
-> >> > @@ -505,6 +505,70 @@ static bool access_pmceid(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
-> >> >  	return true;
-> >> >  }
-> >> >  
-> >> > +static inline bool pmu_counter_idx_valid(struct kvm_vcpu *vcpu, u64 idx)
-> >> > +{
-> >> > +	u64 pmcr, val;
-> >> > +
-> >> > +	pmcr = vcpu_sys_reg(vcpu, PMCR_EL0);
-> >> > +	val = (pmcr >> ARMV8_PMCR_N_SHIFT) & ARMV8_PMCR_N_MASK;
-> >> > +	if (idx >= val && idx != ARMV8_CYCLE_IDX)
-> >> > +		return false;
-> >> > +
-> >> > +	return true;
-> >> > +}
-> >> > +
-> >> > +static bool access_pmu_evtyper(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
-> >> > +			       const struct sys_reg_desc *r)
-> >> > +{
-> >> > +	u64 idx, reg;
-> >> > +
-> >> > +	if (r->CRn == 9) {
-> >> > +		/* PMXEVTYPER_EL0 */
-> >> > +		reg = 0;
-> > Is there any particular reason why you're not setting reg to PMSELR_EL0,
-> > since this is what you're using?
-> > 
-> >> > +	} else {
-> >> > +		if (!p->is_aarch32) {
-> >> > +			/* PMEVTYPERn_EL0 or PMCCFILTR_EL0 */
-> >> > +			reg = r->reg;
-> >> > +		} else {
-> >> > +			if (r->CRn == 14 && r->CRm == 15 && r->Op2 == 7) {
-> >> > +				reg = PMCCFILTR_EL0;
-> >> > +			} else {
-> >> > +				reg = ((r->CRm & 3) << 3) | (r->Op2 & 7);
-> >> > +				reg += PMEVTYPER0_EL0;
-> >> > +			}
-> >> > +		}
-> >> > +	}
-> >> > +
-> >> > +	switch (reg) {
-> >> > +	case PMEVTYPER0_EL0 ... PMEVTYPER30_EL0:
-> >> > +		idx = reg - PMEVTYPER0_EL0;
-> >> > +		if (!pmu_counter_idx_valid(vcpu, idx))
-> >> > +			return true;
-> >> > +		break;
-> >> > +	case PMCCFILTR_EL0:
-> >> > +		idx = ARMV8_CYCLE_IDX;
-> >> > +		break;
-> >> > +	default:
-> > This would allow this case to be more precise, and we could have the
-> > default case as a bug handler.
-> > 
-> 
-> It turns out that I refactor this function like below:
-> 
-> +static bool access_pmu_evtyper(struct kvm_vcpu *vcpu, struct
-> sys_reg_params *p,
-> +                              const struct sys_reg_desc *r)
-> +{
-> +       u64 idx, reg = 0;
-> +
-> +       if (r->CRn == 9) {
-> +               /* PMXEVTYPER_EL0 */
-> +               idx = vcpu_sys_reg(vcpu, PMSELR_EL0) & ARMV8_COUNTER_MASK;
-> +               reg = PMEVTYPER0_EL0 + idx;
-> +       } else {
-> +               if (r->CRm == 15 && r->Op2 == 7) {
-> +                       idx = ARMV8_CYCLE_IDX;
-> +                       reg = PMCCFILTR_EL0;
-> +               } else {
-> +                       /* PMEVTYPERn_EL0 */
-> +                       idx = ((r->CRm & 3) << 3) | (r->Op2 & 7);
-> +                       reg = PMEVTYPER0_EL0 + idx;
-> +               }
-> +       }
-> +
-> +       BUG_ON(reg == 0);
-> +
-> +       if (!pmu_counter_idx_valid(vcpu, idx))
-> +               return false;
-> +
-> +       if (p->is_write) {
-> +               kvm_pmu_set_counter_event_type(vcpu, p->regval, idx);
-> +               vcpu_sys_reg(vcpu, reg) = p->regval & ARMV8_EVTYPE_MASK;
-> +       } else {
-> +               p->regval = vcpu_sys_reg(vcpu, reg) & ARMV8_EVTYPE_MASK;
-> +       }
-> +
-> +       return true;
-> +}
-> 
-> How about this?
+On 06/01/16 12:49, Jon Hunter wrote: 
+> On 06/01/16 09:46, Mark Rutland wrote:
+>> Hi,
+>>
+>> On Wed, Jan 06, 2016 at 09:40:22AM +0000, Jon Hunter wrote:
+>>> Add initial device-tree support for Google Pixel C (a.k.a. Smaug) based
+>>> upon Tegra210 SoC with 3 GiB of LPDDR4 RAM.
+>>>
+>>> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+>>> ---
+>>>  arch/arm64/boot/dts/nvidia/Makefile           |  1 +
+>>>  arch/arm64/boot/dts/nvidia/tegra210-smaug.dts | 42 +++++++++++++++++++++++++++
+>>>  2 files changed, 43 insertions(+)
+>>>  create mode 100644 arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
 
-Yup, looks good to me.
+[snip]
 
-	M.
--- 
-Jazz is not dead. It just smells funny.
+>>> +
+>>> +	chosen {
+>>> +		bootargs = "console=ttyS0,115200n8 earlycon=uart8250,mmio32,0x70006000";
+>>> +	};
+>>
+>> Use stdout-path.
+> 
+> Ok.
+
+Adding Arnd.
+
+Hmmm ... well apparently stdout-path does not work for tegra and in
+order to make this work I had to do the following ...
+
+
+[PATCH] serial: 8250: of: Add earlycon support for Tegra
+
+Currently, early console support only works for Tegra when the serial
+port information is passed via the earlycon boot parameter. If the
+serial port information is specified via device-tree using the
+"stdout-path" then the early console does not work because:
+
+1. The tegra serial ports compatibility parameter does not match any
+   of the supported serial drivers for early console.
+2. The of_setup_earlycon() function assumes that serial port registers
+   are byte aligned and for tegra they are 32-bit aligned.
+
+Add an early console setup function for tegra so that the early console
+can be specified via the device-tree "stdout-path" variable.
+
+Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+---
+ drivers/tty/serial/8250/8250_of.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/drivers/tty/serial/8250/8250_of.c b/drivers/tty/serial/8250/8250_of.c
+index 33021c1f7d55..98adf83e83c2 100644
+--- a/drivers/tty/serial/8250/8250_of.c
++++ b/drivers/tty/serial/8250/8250_of.c
+@@ -44,6 +44,16 @@ void tegra_serial_handle_break(struct uart_port *p)
+ 		udelay(1);
+ 	} while (1);
+ }
++
++int __init tegra_earlycon_setup(struct earlycon_device *device,
++				const char *options)
++{
++	device->port.iotype = UPIO_MEM32;
++	device->port.regshift = 2;
++
++	return early_serial8250_setup(device, options);
++}
++OF_EARLYCON_DECLARE(tegra20_uart, "nvidia,tegra20-uart", tegra_earlycon_setup);
+ #else
+ static inline void tegra_serial_handle_break(struct uart_port *port)
+ {
+
+
+Arnd, does the above look ok, or should there be a generic
+early_serial8250x32_setup() somewhere?
+
+Cheers
+Jon
