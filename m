@@ -1,29 +1,53 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 07 Jan 2016 11:05:06 +0100
-Subject: [PATCH v2 04/12] clk: rockchip: rk3036: enable the
- CLK_IGNORE_UNUSED flag for sclk_i2s_out
-In-Reply-To: <1452155155-16232-5-git-send-email-wxt@rock-chips.com>
-References: <1452155155-16232-1-git-send-email-wxt@rock-chips.com>
- <1452155155-16232-5-git-send-email-wxt@rock-chips.com>
-Message-ID: <290434099.8XFZ9qmNRz@phil>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 7 Jan 2016 11:06:58 +0100
+Subject: reason for Allwinner SoC specific pinctrl drivers?
+In-Reply-To: <20160105131006.GI11722@lukather>
+References: <568A514D.7070102@arm.com>
+	<20160105131006.GI11722@lukather>
+Message-ID: <CACRpkdZ+mGBr42Q4E+5tL80-+pFLWTQug8TJu64TVHDaCzE8_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Caesar,
+On Tue, Jan 5, 2016 at 2:10 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
 
-Am Donnerstag, 7. Januar 2016, 16:25:47 schrieb Caesar Wang:
-> SCLk_I2S_OUT is the noc bus clock for i2s module, this clock is used by
-> extra codecs.
-> 
-> Due to it shouldn't belong to any driver, but we need it enabled,
-> so just mark it as the CLK_IGNORE_UNUSED flag.
+> This was actually requested during the initial driver submission
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/136809.html
+>
+> And I actually came to like it, even though the initial port is indeed
+> quite painful, for several reasons:
+>
+> 1) In those times, we didn't have a datasheet available for all these
+> SoCs, so no easy way to find out the value to set in the register to
+> mux a particular function in. These days are mostly over, but we're
+> still in that situation for a few SoCs (mostly the R* and H* SoCs
+> though).
+>
+> 2) It's quite easy to read and debug, at least from the DT PoV. The
+> pain mostly comes from writing that table in the first place, but the
+> alternative other SoCs have picked to have something readable in the
+> DT is a SoC specific header file with the defines of all the functions
+> availables for all the pins, which is just as painful to write and
+> review, and is essentialy the same thing.
+>
+> 3) It's easy to maintain. If one of the entry in the table came to be
+> wrong, we simply have to update the table, it's completely contained
+> in the kernel itself and doesn't require fixing (and updating) the DT.
+>
+> 4) It allows to catch misconfiguration in the cases where you set a
+> function on a pin that doesn't support it as well, which is also quite
+> convenient, and wouldn't be possible at all in the case of a header,
+> or simply open-coding the value.
 
-What makes you think it shouldn't belong to any driver?
+They call it Stockholm Syndrome when you start to sympathize with
+your kidnappers :D
 
-In most schematics I have, i2s_clkout is going to some clock-input of the 
-audio codec - probably the MCLK input on your rt5616. And while the new 
-rt5616 driver does not seem to do clock handling, it should just handle the 
-clock using the normal APIs.
+On a serious note, we are in violent agreement on these bullets.
+This driver is easy to maintain and debug, and easy for new developers
+to get into precisely because so much knowledge is in the kernel
+and not in DT. A quick tour in /sys/kernel/debug/pinctrl/*
+should convince anyone that this is actually very helpful to get
+things right.
 
-
-Heiko
+Yours,
+Linus Walleij
