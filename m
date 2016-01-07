@@ -1,45 +1,40 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 07 Jan 2016 08:50:21 +0000
-Subject: [PATCH 1/2] arm: KVM: Do not update PC if the trap handler has
- updated it
-In-Reply-To: <CAFEAcA9dALQv8Xcyg5FLAvRaJfH5UT2u4jrLjofLh5Ff2yo=8Q@mail.gmail.com>
-References: <1450778118-12715-1-git-send-email-marc.zyngier@arm.com>
- <1450778118-12715-2-git-send-email-marc.zyngier@arm.com>
- <CAFEAcA8F2TJuRR5ELvit0FPa3XFMJ847S8WK25i5aVdGBU=PUA@mail.gmail.com>
- <20151222143947.GA5631@cbox>
- <CAFEAcA9dALQv8Xcyg5FLAvRaJfH5UT2u4jrLjofLh5Ff2yo=8Q@mail.gmail.com>
-Message-ID: <568E26CD.8020500@arm.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Thu,  7 Jan 2016 16:53:31 +0800
+Subject: [RFC PATCH v2 0/4] Add RK3229 HDMI support
+Message-ID: <1452156811-18150-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/12/15 14:50, Peter Maydell wrote:
-> On 22 December 2015 at 14:39, Christoffer Dall
-> <christoffer.dall@linaro.org> wrote:
->> On Tue, Dec 22, 2015 at 11:08:10AM +0000, Peter Maydell wrote:
->>> Won't this result in our incorrectly skipping the first insn
->>> in the fault handler if the original offending instruction
->>> was itself the first insn in the fault handler?
->>>
->> Wouldn't that then loop with the exception forever?
-> 
-> Yes, but so would real hardware...
 
-Indeed. As it is, this patch is not doing what it should. On the other
-hand, I came to the conclusion that we do not need to fix this just yet,
-as long as we only let KVM inject an UNDEF, and that's what the PMU code
-requires.
+RK3229 have integrated an DesignedWare HDMI controller and an INNO HDMI phy,
+so we can still reuse the dw-hdmi driver for RK3229 HDMI controller, but
+we need to create an separate driver for RK3229 HDMI PHY.
 
-I'll comment on the PMU thread, but the gist of it is:
-1) fix the arm64 UNDEF/PABRT/DABRT code to properly account for the the
-source EL (Table D1-7 of the ARMv8 ARM).
-2) instead of crafting an exception that modifies the PC, fail the
-sysreg access and let KVM inject an UNDEF.
+This series is based on Mark Yao's drm-next branch
+[https://github.com/markyzq/kernel-drm-rockchip/tree/drm-rockchip-next-2015-12-28]
 
-I'll post another patch today to address 1), and I'll finish reviewing
-the PMU thread (I have a separate patch addressing 2)).
+After picking my "Add RK3229 vop support" series, HDMI monitor could light up
+normally on RK3229 SDK board.
 
-Thanks,
 
-	M.
+Changes in v2:
+- Split some dw-hdmi driver changes into separate patches [01/04] & [02/04]
+
+Yakir Yang (4):
+  drm: dw-hdmi: make it easy to recovery the platform data for platform
+    driver
+  drm: dw-hdmi: passing the "plat_data" when calling platform mode_valid
+  drm: rockchip: hdmi: add RK3229 HDMI support
+  dt-bindings: add document for rk3229-hdmi
+
+ .../bindings/display/rockchip/dw_hdmi-rockchip.txt |   4 +-
+ drivers/gpu/drm/bridge/dw-hdmi.c                   |  32 +-
+ drivers/gpu/drm/imx/dw_hdmi-imx.c                  |  17 +-
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c        | 376 +++++++++++++++++++--
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.h        | 137 ++++++++
+ include/drm/bridge/dw_hdmi.h                       |   5 +-
+ 6 files changed, 529 insertions(+), 42 deletions(-)
+ create mode 100644 drivers/gpu/drm/rockchip/dw_hdmi-rockchip.h
+
 -- 
-Jazz is not dead. It just smells funny...
+2.1.2
