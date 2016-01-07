@@ -1,45 +1,47 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Fri, 8 Jan 2016 02:34:23 +0300
-Subject: [PATCH v6 05/21] arm64: compat: fix wrong dependency
+Date: Fri, 8 Jan 2016 02:34:24 +0300
+Subject: [PATCH v6 06/21] arm64:uapi: set __BITS_PER_LONG correctly for ILP32
+ and LP64
 In-Reply-To: <1452209679-19445-1-git-send-email-ynorov@caviumnetworks.com>
 References: <1452209679-19445-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1452209679-19445-6-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1452209679-19445-7-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bamvor Jian Zhang <bamvor.zhangjian@linaro.org>
+From: Andrew Pinski <apinski@cavium.com>
 
-With the patches of ILP32, COMPAT is not equivalent to AARCH32 in EL0.
-This patch fix this by updating the dependency from COMPAT to
-AARCH32_EL0 for ARMV8_DEPRECATED and ARM64_ERRATUM_845719.
+Define __BITS_PER_LONG depending on the ABI used (i.e. check whether
+__ILP32__ or __LP64__ is defined).  This is necessary for glibc to
+determine the appropriate type definitions for the system call interface.
 
-Signed-off-by: Bamvor Jian Zhang <bamvor.zhangjian@linaro.org>
+Signed-off-by: Andrew Pinski <apinski@cavium.com>
+Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
 Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+Reviewed-by: David Daney <ddaney@caviumnetworks.com>
 ---
- arch/arm64/Kconfig | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/include/uapi/asm/bitsperlong.h | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 09d7b7e..aeddddd 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -339,7 +339,7 @@ config ARM64_ERRATUM_834220
+diff --git a/arch/arm64/include/uapi/asm/bitsperlong.h b/arch/arm64/include/uapi/asm/bitsperlong.h
+index fce9c29..4265243 100644
+--- a/arch/arm64/include/uapi/asm/bitsperlong.h
++++ b/arch/arm64/include/uapi/asm/bitsperlong.h
+@@ -16,7 +16,14 @@
+ #ifndef __ASM_BITSPERLONG_H
+ #define __ASM_BITSPERLONG_H
  
- config ARM64_ERRATUM_845719
- 	bool "Cortex-A53: 845719: a load might read incorrect data"
--	depends on COMPAT
-+	depends on AARCH32_EL0
- 	default y
- 	help
- 	  This option adds an alternative code sequence to work around ARM
-@@ -592,7 +592,7 @@ config FORCE_MAX_ZONEORDER
+-#define __BITS_PER_LONG 64
++#if defined(__LP64__)
++/* Assuming __LP64__ will be defined for native ELF64's and not for ILP32. */
++#  define __BITS_PER_LONG 64
++#elif defined(__ILP32__)
++#  define __BITS_PER_LONG 32
++#else
++#  error "Neither LP64 nor ILP32: unsupported ABI in asm/bitsperlong.h"
++#endif
  
- menuconfig ARMV8_DEPRECATED
- 	bool "Emulate deprecated/obsolete ARMv8 instructions"
--	depends on COMPAT
-+	depends on AARCH32_EL0
- 	help
- 	  Legacy software support may require certain instructions
- 	  that have been deprecated or obsoleted in the architecture.
+ #include <asm-generic/bitsperlong.h>
+ 
 -- 
 2.5.0
