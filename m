@@ -1,20 +1,106 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 07 Jan 2016 11:39:38 +0100
-Subject: [PATCH v3] ARM: fix atags_to_fdt with stack-protector-strong
-In-Reply-To: <20160106233656.GA9316@www.outflux.net>
-References: <20160106233656.GA9316@www.outflux.net>
-Message-ID: <3057830.IhsDfpk1rP@wuerfel>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 07 Jan 2016 10:43:09 +0000
+Subject: [PATCH v8 04/20] KVM: ARM64: Add access handler for PMCR register
+In-Reply-To: <1450771695-11948-5-git-send-email-zhaoshenglong@huawei.com>
+References: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>
+ <1450771695-11948-5-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <568E413D.8010701@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 06 January 2016 15:36:56 Kees Cook wrote:
-> Building with CONFIG_CC_STACKPROTECTOR_STRONG triggers protection code
-> generation under CONFIG_ARM_ATAG_DTB_COMPAT but this is too early for
-> being able to use any of the stack_chk code. Explicitly disable it for
-> only the atags_to_fdt bits.
+On 22/12/15 08:07, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> Suggested-by: zhxihu <zhxihu@marvell.com>
-> Signed-off-by: Kees Cook <keescook@chromium.org>
+> Add reset handler which gets host value of PMCR_EL0 and make writable
+> bits architecturally UNKNOWN except PMCR.E which is zero. Add an access
+> handler for PMCR.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  arch/arm64/kvm/sys_regs.c | 39 +++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 37 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index e8bf374..c60047e 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -34,6 +34,7 @@
+>  #include <asm/kvm_emulate.h>
+>  #include <asm/kvm_host.h>
+>  #include <asm/kvm_mmu.h>
+> +#include <asm/pmu.h>
+>  
+>  #include <trace/events/kvm.h>
+>  
+> @@ -439,6 +440,40 @@ static void reset_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+>  	vcpu_sys_reg(vcpu, MPIDR_EL1) = (1ULL << 31) | mpidr;
+>  }
+>  
+> +static void reset_pmcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+> +{
+> +	u64 pmcr, val;
+> +
+> +	asm volatile("mrs %0, pmcr_el0\n" : "=r" (pmcr));
+> +	/* Writable bits of PMCR_EL0 (ARMV8_PMCR_MASK) is reset to UNKNOWN
+> +	 * except PMCR.E resetting to zero.
+> +	 */
+> +	val = ((pmcr & ~ARMV8_PMCR_MASK) | (ARMV8_PMCR_MASK & 0xdecafbad))
+> +	      & (~ARMV8_PMCR_E);
+> +	vcpu_sys_reg(vcpu, r->reg) = val;
+> +}
+> +
+> +static bool access_pmcr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+> +			const struct sys_reg_desc *r)
+> +{
+> +	u64 val;
+> +
+> +	if (p->is_write) {
+> +		/* Only update writeable bits of PMCR */
+> +		val = vcpu_sys_reg(vcpu, r->reg);
+> +		val &= ~ARMV8_PMCR_MASK;
+> +		val |= p->regval & ARMV8_PMCR_MASK;
+> +		vcpu_sys_reg(vcpu, r->reg) = val;
+> +	} else {
+> +		/* PMCR.P & PMCR.C are RAZ */
+> +		val = vcpu_sys_reg(vcpu, r->reg)
+> +		      & ~(ARMV8_PMCR_P | ARMV8_PMCR_C);
+> +		p->regval = val;
+> +	}
+
+How can that work for 32bit, where r->reg is not populated from the trap
+table? You *know* that you are accessing PMCR, so just use PMCR_EL0 as
+an index into vcpu_sys_reg() in all cases. You can then drop PMCR_EL0
+from the 64bit trap table entry.
+
+> +
+> +	return true;
+> +}
+> +
+>  /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
+>  #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
+>  	/* DBGBVRn_EL1 */						\
+> @@ -623,7 +658,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+>  
+>  	/* PMCR_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b000),
+> -	  trap_raz_wi },
+> +	  access_pmcr, reset_pmcr, PMCR_EL0, },
+>  	/* PMCNTENSET_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b001),
+>  	  trap_raz_wi },
+> @@ -885,7 +920,7 @@ static const struct sys_reg_desc cp15_regs[] = {
+>  	{ Op1( 0), CRn( 7), CRm(14), Op2( 2), access_dcsw },
+>  
+>  	/* PMU */
+> -	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), trap_raz_wi },
+> +	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), access_pmcr },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), trap_raz_wi },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), trap_raz_wi },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), trap_raz_wi },
 > 
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
