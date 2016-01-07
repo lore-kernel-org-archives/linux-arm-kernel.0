@@ -1,71 +1,57 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 07 Jan 2016 14:52:32 +0100
-Subject: [PATCH v3 0/3] dma-mapping: Patches for speeding up allocation
-In-Reply-To: <1452109005-19517-1-git-send-email-dianders@chromium.org>
-References: <1452109005-19517-1-git-send-email-dianders@chromium.org>
-Message-ID: <568E6DA0.4000201@samsung.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 7 Jan 2016 07:53:55 -0600
+Subject: [PATCH 2/2] ARM: versatile: fix MMC/SD interrupt assignment
+In-Reply-To: <CACRpkdZc3tNnMUfkVBkJ6XctpuDQ1YHDeyxsLD4_u84P8=3nTQ@mail.gmail.com>
+References: <1451984370-16932-1-git-send-email-linus.walleij@linaro.org>
+ <CAL_Jsq+8JOSpUefSUMakAsESbjFgfGFpFsH=7utZWP_H6HPM6w@mail.gmail.com>
+ <CACRpkdZc3tNnMUfkVBkJ6XctpuDQ1YHDeyxsLD4_u84P8=3nTQ@mail.gmail.com>
+Message-ID: <CAL_JsqKajTbJc7Gm1h8c4GY=F8t5MoWtj4o3ipGswkn3QR993Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thu, Jan 7, 2016 at 3:58 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Wed, Jan 6, 2016 at 12:43 AM, Rob Herring <robh@kernel.org> wrote:
+>> On Tue, Jan 5, 2016 at 2:59 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>
+>>> diff --git a/arch/arm/boot/dts/versatile-ab.dts b/arch/arm/boot/dts/versatile-ab.dts
+>>> index 01f40197ea13..3279bf1a17a1 100644
+>>> --- a/arch/arm/boot/dts/versatile-ab.dts
+>>> +++ b/arch/arm/boot/dts/versatile-ab.dts
+>>> @@ -110,7 +110,11 @@
+>>>                         interrupt-parent = <&vic>;
+>>>                         interrupts = <31>; /* Cascaded to vic */
+>>>                         clear-mask = <0xffffffff>;
+>>> -                       valid-mask = <0xffc203f8>;
+>>> +                       /*
+>>> +                        * Valid interrupt lines mask according to
+>>> +                        * table 4-36 page 4-50 of ARM DUI 0225D
+>>> +                        */
+>>> +                       valid-mask = <0x0760031b>;
+>>
+>> I never really liked valid-mask in the first place. Valid interrupts
+>> are the ones specified by devices and we don't need this extra data.
+>> If we do, then *every* interrupt controller needs this property.
+>> Perhaps the driver should just ignore it. But you've already done the
+>> work here, so this is okay too.
+>
+> It's a migrated feature from the boardfile days as it happens.
 
-On 2016-01-06 20:36, Douglas Anderson wrote:
-> This series of 3 patches will speed up memory allocation in dma-mapping
-> quite a bit.
->
-> The first patch ("ARM: dma-mapping: Optimize allocation") is hopefully
-> not terribly controversial: it merely doesn't try as hard to allocate
-> big chunks once it gets the first failure.  Since it's unlikely that
-> further big chunks will help (they're not likely to be virtually aligned
-> anyway), this should give a big speedup with no real regression to speak
-> of.  Yes, things could be made better, but this seems like a sane start.
->
-> The second patch ("common: DMA-mapping: add DMA_ATTR_SEQUENTIAL
-> attribute") models MADV_SEQUENTIAL as I understand it.  Hopefully folks
-> are happy with following that lead.  It does nothing by itself.
->
-> The third patch ("ARM: dma-mapping: Use DMA_ATTR_SEQUENTIAL hint to
-> optimize allocation") simply applies the 2nd patch.  Again it's pretty
-> simple.  ...and again it does nothing by itself.
->
-> Notably missing from this series is the fourth patch that adds teeth to
-> the second and third.  You can find that out of tree at
-> <https://chromium-review.googlesource.com/#/c/320498/>.  Unfortunately
-> the rk3288_vpu, which is what I'm working on, is out of tree.
->
-> All testing was done on the chromeos kernel-3.14.  Sanity (compile /
-> boot) testing was done on a v4.4-rc6-based kernel.
->
-> Also note that v2 of this series had an extra patch
-> <https://patchwork.kernel.org/patch/7888861/> that would attempt to sort
-> the allocation results to opportunistically get some extra alignment.  I
-> dropped that, but it could be re-introduced if there was interest.  I
-> found that it did give a little extra alignment sometimes, but maybe not
-> enough to justify the extra complexity.  It also was a bit half-baked
-> since it really should have tried harder to ensure alignment.
->
-> Changes in v3:
-> - add DMA_ATTR_SEQUENTIAL attribute new for v3
-> - Use DMA_ATTR_SEQUENTIAL hint patch new for v3.
->
-> Changes in v2:
-> - No longer just 1 page at a time, but gives up higher order quickly.
-> - Only tries important higher order allocations that might help us.
->
-> Douglas Anderson (3):
->    ARM: dma-mapping: Optimize allocation
->    common: DMA-mapping: add DMA_ATTR_SEQUENTIAL attribute
->    ARM: dma-mapping: Use DMA_ATTR_SEQUENTIAL hint to optimize allocation
->
->   Documentation/DMA-attributes.txt | 11 +++++++++++
->   arch/arm/mm/dma-mapping.c        | 41 ++++++++++++++++++++++++++--------------
->   include/linux/dma-attrs.h        |  1 +
->   3 files changed, 39 insertions(+), 14 deletions(-)
+[...]
 
-Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> I think it's because the Integrator will crash if you try to even
+> clear a non-existing interrupt by writing a '1' in the wrong bit,
+> and that is why we have the clear-mask. And valid-mask is
+> to avoid even mapping one of these non-existing IRQs.
+> The issue doesn't seem to exist on the Versatile (I tried
+> with 0xffffffff and it worked) and probably not on Integrator
+> QEMU either, but on the real hardware I've experienced it.
+>
+> So the FPGA interrupt controller is sensitive stuff ... and it
+> seemed natural to preserve this overzealous code
+> (and bindings).
 
+Okay, well this is certainly a better reason than I had heard before.
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Acked-by: Rob Herring <robh@kernel.org>
+
+Rob
