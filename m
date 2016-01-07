@@ -1,57 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 07 Jan 2016 15:48:33 +0100
-Subject: [GIT PULL 2/4] BCM2835 drivers changes for 4.5
-In-Reply-To: <1451365282-10505-3-git-send-email-eric@anholt.net>
-References: <1451365282-10505-1-git-send-email-eric@anholt.net>
- <1451365282-10505-3-git-send-email-eric@anholt.net>
-Message-ID: <4103866.sgZeef1xdh@wuerfel>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 7 Jan 2016 06:49:12 -0800
+Subject: [PATCH -next] gpio: xilinx: Do not use gpiochip_get_data() in
+ xgpio_save_regs()
+In-Reply-To: <CACRpkdYG77Q30J4hodKEqR2Cth==XfyqU5wi5gk3wz+YS6qJ8g@mail.gmail.com>
+References: <1452126010-1111-1-git-send-email-linux@roeck-us.net>
+ <CACRpkdYG77Q30J4hodKEqR2Cth==XfyqU5wi5gk3wz+YS6qJ8g@mail.gmail.com>
+Message-ID: <568E7AE8.3060207@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 28 December 2015 21:01:20 Eric Anholt wrote:
+On 01/07/2016 01:07 AM, Linus Walleij wrote:
+> On Thu, Jan 7, 2016 at 1:20 AM, Guenter Roeck <linux@roeck-us.net> wrote:
+>
+>> Commit 097d88e94c44 ("gpio: xilinx: use gpiochip data pointer") replaces
+>> the use of container_of() with gpiochip_get_data(). Unfortunately, the
+>> data pointer is not yet set by the time xgpio_save_regs() is called,
+>> causing a system hang.
+>>
+>> Fixes: 097d88e94c44 ("gpio: xilinx: use gpiochip data pointer")
+>> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+>> ---
+>> It might make sense to merge this patch with the patch introducing the problem.
+>
+> Patch applied, thanks for finding and fixing this so quick!
+>
+Code inspection shows that there are two more - I'll send patches today.
 
-> ----------------------------------------------------------------
-> This pull request includes the bcm2835 changes for 4.5 targeting the
-> arm-soc next/drivers branch.
-
-(sorry for the late mail, this was stuck in my outbox because of
-one failed recipient address)
-
-I've applied this one on top, following the output of the build bot.
-
-	Arnd
-
->From d635e88df44c8b9860b05d4df22c90bf96e9f986 Mon Sep 17 00:00:00 2001
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Thu, 31 Dec 2015 23:39:14 +0100
-Subject: [PATCH] ARM: bcm2835: clarify RASPBERRYPI_FIRMWARE dependency
-
-The firmware driver can be a loadable module, but the power domain
-can only be built-in, so we get a build error in an allmodconfig
-kernel:
-
-:(.text+0x17e59c): undefined reference to `rpi_firmware_property'
-:(.text+0x17e51c): undefined reference to `rpi_firmware_get'
-:(.text+0x17e244): undefined reference to `rpi_firmware_property'
-
-This changes the dependency to only allow the power domain code
-to be enabled when the firmware driver is built-in. Other users
-of the firmware driver may still be loadable modules and not
-everyone needs the power domains, so we don't change the firmware
-code.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/drivers/soc/bcm/Kconfig b/drivers/soc/bcm/Kconfig
-index 5ba1827fe36f..3066edea184d 100644
---- a/drivers/soc/bcm/Kconfig
-+++ b/drivers/soc/bcm/Kconfig
-@@ -1,7 +1,7 @@
- config RASPBERRYPI_POWER
- 	bool "Raspberry Pi power domain driver"
- 	depends on ARCH_BCM2835 || COMPILE_TEST
--	depends on RASPBERRYPI_FIRMWARE
-+	depends on RASPBERRYPI_FIRMWARE=y
- 	select PM_GENERIC_DOMAINS if PM
- 	select PM_GENERIC_DOMAINS_OF if PM
- 	help
+Guenter
