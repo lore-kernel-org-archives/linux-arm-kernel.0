@@ -1,50 +1,47 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Thu, 7 Jan 2016 22:42:24 +0530
-Subject: [PATCH 2/2] ARM: exynos_defconfig: Enable s5p-secss driver
-In-Reply-To: <1452132905-8587-2-git-send-email-k.kozlowski@samsung.com>
-References: <1452132905-8587-1-git-send-email-k.kozlowski@samsung.com>
- <1452132905-8587-2-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <CANAwSgSDuwQdgsfa6nHc5WwW-ZiRbifPHeNAvS5LNxWiQ0oNiQ@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 7 Jan 2016 09:13:22 -0800
+Subject: [Qemu-devel] arm64 qemu tests failing in linux-next since 'arm64:
+ kernel: enforce pmuserenr_el0 initialization and restore'
+In-Reply-To: <CAFEAcA9D58-EOh9aoAmFtEBBx=BWQxWyzynvM893Dd7fqZH5wA@mail.gmail.com>
+References: <567B41E3.5060800@roeck-us.net>
+ <CAFEAcA_c9DicGF+is6ST3NJv+c5Bi4dHYo2t8Q2n9AS9G4q0+Q@mail.gmail.com>
+ <20160107155310.GA4064@red-moon>
+ <CAFEAcA_vP93=PE6LNNHodCsdk0gL0kBQPX=xzLJU5RzkvNs2vw@mail.gmail.com>
+ <20160107163722.GB4064@red-moon>
+ <CAFEAcA9D58-EOh9aoAmFtEBBx=BWQxWyzynvM893Dd7fqZH5wA@mail.gmail.com>
+Message-ID: <568E9CB2.60301@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+On 01/07/2016 08:56 AM, Peter Maydell wrote:
+> On 7 January 2016 at 16:37, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+>> On Thu, Jan 07, 2016 at 03:58:15PM +0000, Peter Maydell wrote:
+>>> On 7 January 2016 at 15:53, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+>>>> Ok, thanks for looking into this. I wonder why reading pmcr_el0 does
+>>>> not suffer from the same problem though.
+>>>
+>>> Just a pragmatic thing on QEMU's end, I expect -- the kernel already
+>>> touched PMCR_EL0 and we wanted to be able to boot it, so we have an
+>>> implementation of it.
+>>
+>> If that's the case, that was the wrong approach IMHO. QEMU has to comply
+>> with the Aarch64 architecture which means that either the CPU it models
+>> has a Performance Monitors extension or it does not. If reading pmcr_el0
+>> does not fault I could tell you this is a QEMU regression because currently
+>> it _does_ model pmcr_el0 while (hopefully) ID_AA64DFR0_EL1 PMUVer reports
+>> it should not.
+>
+> I agree it's a bug, but QEMU simply doesn't have enough
+> developers to become fully compliant with the architecture (ie to
+> implement every part of it completely). So we concentrate on the
+> parts that people are actually using, and fill in the rest and
+> fix the bugs as time permits or as real guest software starts to
+> use it.
+>
+> If you want a guaranteed matches-the-architecture software model
+> of an ARM CPU then other models are available :-)
+>
+I think it would be better to convince ARM to put some manpower into
+enhancing qemu, instead of telling them to use some other model ;-).
 
-On 7 January 2016 at 07:45, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
-> The Exynos SoC provides a Security SubSystem block for accelerating some
-> cryptographic operations. Enable the driver for it - s5p-secss to
-> utilize the hardware acceleration.
->
-> Currently the s5p-secss driver supports AES in CBC and ECB modes.
-> However on Odroid XU4 (Exynos5422) and Trats2 (Exynos4412) boards this
-> change introduces one booting error:
->
->         alg: skcipher: encryption failed on chunk test 1 for ecb-aes-s5p: ret=22
->
-> The cbc-aes-s5p properly registers itself and passes self-tests.
->
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  arch/arm/configs/exynos_defconfig | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index 0aee1e035be9..c47c7e069873 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -240,6 +240,7 @@ CONFIG_DEBUG_RT_MUTEXES=y
->  CONFIG_DEBUG_SPINLOCK=y
->  CONFIG_DEBUG_MUTEXES=y
->  CONFIG_DEBUG_USER=y
-> +CONFIG_CRYPTO_DEV_S5P=y
->  CONFIG_ARM_CRYPTO=y
->  CONFIG_CRYPTO_SHA1_ARM_NEON=m
->  CONFIG_CRYPTO_SHA256_ARM=m
-> --
-> 1.9.1
->
-
-Reviewed-by: Anand Moon <linux.amoon@gmail.com>
-
-Best Regards,
--Anand Moon
+Guenter
