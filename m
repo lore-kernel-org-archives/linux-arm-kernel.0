@@ -1,56 +1,46 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Fri, 8 Jan 2016 02:34:31 +0300
-Subject: [PATCH v6 13/21] arm64: ptrace: handle ptrace_request differently for
- aarch32 and ilp32
+Date: Fri, 8 Jan 2016 02:34:30 +0300
+Subject: [PATCH v6 12/21] arm64:ilp32: share HWCAP between LP64 and ILP32
 In-Reply-To: <1452209679-19445-1-git-send-email-ynorov@caviumnetworks.com>
 References: <1452209679-19445-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1452209679-19445-14-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1452209679-19445-13-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
----
- arch/arm64/kernel/ptrace.c | 19 ++++++++++++++++++-
- 1 file changed, 18 insertions(+), 1 deletion(-)
+From: Andrew Pinski <apinski@cavium.com>
 
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index c166548..f95fb89 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -1108,7 +1108,7 @@ static int compat_ptrace_sethbpregs(struct task_struct *tsk, compat_long_t num,
- }
- #endif	/* CONFIG_HAVE_HW_BREAKPOINT */
+Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
+Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
+Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+Reviewed-by: David Daney <ddaney@caviumnetworks.com>
+---
+ arch/arm64/include/asm/hwcap.h | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/include/asm/hwcap.h b/arch/arm64/include/asm/hwcap.h
+index 400b80b..bdb1ae6 100644
+--- a/arch/arm64/include/asm/hwcap.h
++++ b/arch/arm64/include/asm/hwcap.h
+@@ -47,9 +47,17 @@
+ #define ELF_HWCAP		(elf_hwcap)
  
--long compat_arch_ptrace(struct task_struct *child, compat_long_t request,
-+long compat_a32_ptrace(struct task_struct *child, compat_long_t request,
- 			compat_ulong_t caddr, compat_ulong_t cdata)
- {
- 	unsigned long addr = caddr;
-@@ -1185,8 +1185,25 @@ long compat_arch_ptrace(struct task_struct *child, compat_long_t request,
+ #ifdef CONFIG_COMPAT
+-#define COMPAT_ELF_HWCAP	(compat_elf_hwcap)
+-#define COMPAT_ELF_HWCAP2	(compat_elf_hwcap2)
+ extern unsigned int compat_elf_hwcap, compat_elf_hwcap2;
++#define COMPAT_ELF_HWCAP	\
++	(is_a32_compat_task()	\
++	  ? compat_elf_hwcap	\
++	  : (u32) elf_hwcap)
++
++#define COMPAT_ELF_HWCAP2	\
++	(is_a32_compat_task()	\
++	  ? compat_elf_hwcap2	\
++	  : (u32) (elf_hwcap >> 32))
++
+ #endif
  
- 	return ret;
- }
-+#else
-+
-+#define compat_a32_ptrace(child, request, caddr, cdata) (-1)
-+
- #endif /* CONFIG_AARCH32_EL0 */
- 
-+#ifdef CONFIG_COMPAT
-+
-+long compat_arch_ptrace(struct task_struct *child, compat_long_t request,
-+			compat_ulong_t caddr, compat_ulong_t cdata)
-+{
-+	if (is_a32_compat_task())
-+		return compat_a32_ptrace(child, request, caddr, cdata);
-+
-+	return compat_ptrace_request(child, request, caddr, cdata);
-+}
-+
-+#endif /* CONFIG_COMPAT */
-+
- const struct user_regset_view *task_user_regset_view(struct task_struct *task)
- {
- #ifdef CONFIG_AARCH32_EL0
+ enum {
 -- 
 2.5.0
