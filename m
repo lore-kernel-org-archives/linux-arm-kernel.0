@@ -1,34 +1,94 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 07 Jan 2016 17:24:54 +0100
-Subject: [PATCH v7 3/5] memory: mediatek: Add SMI driver
-In-Reply-To: <1451890598.11799.3.camel@mhfsdcap03>
-References: <1450426183-1571-1-git-send-email-yong.wu@mediatek.com>
- <1450426183-1571-4-git-send-email-yong.wu@mediatek.com>
- <1451890598.11799.3.camel@mhfsdcap03>
-Message-ID: <1452183894.4776.29.camel@pengutronix.de>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 7 Jan 2016 17:28:10 +0100
+Subject: next boot: 564 boots: 59 failed, 448 passed with 57 offline
+ (next-20160107)
+In-Reply-To: <20160107155958.GG6588@sirena.org.uk>
+References: <568e8740.01941c0a.31072.ffffb67b@mx.google.com>
+ <20160107155958.GG6588@sirena.org.uk>
+Message-ID: <20160107162810.GA25177@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Am Montag, den 04.01.2016, 14:56 +0800 schrieb Yong Wu:
-> On Fri, 2015-12-18 at 16:09 +0800, Yong Wu wrote:
-> > This patch add SMI(Smart Multimedia Interface) driver. This driver
-> > is responsible to enable/disable iommu and control the power domain
-> > and clocks of each local arbiter.
+On Thu, Jan 07, 2016 at 03:59:58PM +0000, Mark Brown wrote:
+> On Thu, Jan 07, 2016 at 07:41:52AM -0800, kernelci.org bot wrote:
 > 
-> Hi Matthias,
->     What's your opinion about the SMI in this version?
->     Sorry to disturb you again since SMI need your review before Joerg
-> accept it.
+> > Tree: next
+> > Branch: local/master
+> > Git Describe: next-20160107
+> > Git Commit: 0f023a298a7d2a8e99c54913f7277b3c08c1f5c9
+> > Git URL: git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git
+> > Tested: 95 unique boards, 25 SoC families, 28 builds out of 135
+> > 
+> > Boot Failures Detected: https://kernelci.org/boot/?next-20160107&fail
+> 
+> For the past couple of days -next has been failing to boot on various
+> Tegra platforms, there are failures involving either no kernel output or
+> (with tegra_defconfig) backtraces during CMA allocation from USB, for
+> example:
+> 
+>    http://storage.kernelci.org/next/next-20160107/arm-tegra_defconfig/lab-khilman/boot-tegra30-beaver.html
+> 
+> >     multi_v7_defconfig+CONFIG_THUMB2_KERNEL=y:
+> >         tegra124-jetson-tk1: 2 failed labs
+> >         tegra30-beaver: 1 failed lab
+> > 
+> >     tegra_defconfig:
+> >         tegra124-jetson-tk1: 2 failed labs
+> >         tegra124-jetson-tk1_rootfs:nfs: 1 failed lab
+> >         tegra124-nyan-big: 1 failed lab
+> >         tegra30-beaver: 1 failed lab
+> > 
+> >     multi_v7_defconfig+CONFIG_ARM_LPAE=y:
+> >         tegra124-jetson-tk1: 1 failed lab
+> >         tegra124-nyan-big: 1 failed lab
+> > 
+> >     multi_v7_defconfig:
+> >         tegra124-jetson-tk1: 2 failed labs
+> >         tegra30-beaver: 1 failed lab
+> > 
+> >     multi_v7_defconfig+CONFIG_LKDTM=y:
+> >         tegra124-jetson-tk1: 2 failed labs
+> >         tegra30-beaver: 1 failed lab
+> > 
+> >     multi_v7_defconfig+CONFIG_PROVE_LOCKING=y:
+> >         tegra124-jetson-tk1: 2 failed labs
+> >         tegra30-beaver: 1 failed lab
+> 
+> I did bisects yesterday but they were a bit inconclusive, showing a
+> series of skipped commits in the TTY tree as being the culprits:
+> 
+> afd7f88f157796e586fc99d62da13a54024e0731 serial: 8250: move of_serial code to 8250 directory
+> 4e33870b3bb691996354a8f9e8f69458b4fc34d9 serial: of: CONFIG_SERIAL_8250 is always set
+> d1b5c87fa8058a3f477ae05555916dd1cea934ad serial: remove NWP serial support
+> 
+> which seems more than a little surprising and like they might be false
+> positives, especially in the cases that do produce output.  The errors
+> today look the same.  I've not investigated further than the bisects.
+> 
+> Full bisect logs:
+> 
+>  https://ci.linaro.org/view/people/job/tbaker-boot-bisect-bot/140/console
+>  https://ci.linaro.org/view/people/job/tbaker-boot-bisect-bot/141/console
 
-How is this going to be merged, eventually? If it could be put on a
-separate branch, that would allow me to also include it in the DRM pull
-request that will build-depend on the SMI driver.
+These should all be fixed by this patch:
 
-> > Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+	serial: 8250: of: Fix the driver and actually compile the 8250_of
 
-Tested-by: Philipp Zabel <p.zabel@pengutronix.de>
+which can be found in patchwork here:
 
-regards
-Philipp
+	https://patchwork.kernel.org/patch/7883541/
+
+I think this is merely waiting to be picked up into the tty tree. I
+suspect the reason why there's output in the first place is because
+of earlyprintk. I've seen recent linux-next work properly, with the
+serial console hanging at some point (fbcon shows login prompt). If
+I apply the above patch things are back to normal.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160107/35b01838/attachment.sig>
