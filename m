@@ -1,55 +1,66 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 7 Jan 2016 09:10:14 -0800
-Subject: [Qemu-devel] arm64 qemu tests failing in linux-next since 'arm64:
- kernel: enforce pmuserenr_el0 initialization and restore'
-In-Reply-To: <20160107163722.GB4064@red-moon>
-References: <567B41E3.5060800@roeck-us.net>
- <CAFEAcA_c9DicGF+is6ST3NJv+c5Bi4dHYo2t8Q2n9AS9G4q0+Q@mail.gmail.com>
- <20160107155310.GA4064@red-moon>
- <CAFEAcA_vP93=PE6LNNHodCsdk0gL0kBQPX=xzLJU5RzkvNs2vw@mail.gmail.com>
- <20160107163722.GB4064@red-moon>
-Message-ID: <568E9BF6.6020809@roeck-us.net>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Thu, 7 Jan 2016 22:40:22 +0530
+Subject: [PATCH 1/2] ARM: exynos_defconfig: Enable NEON, accelerated
+ crypto and cpufreq stats
+In-Reply-To: <1452132905-8587-1-git-send-email-k.kozlowski@samsung.com>
+References: <1452132905-8587-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <CANAwSgTJ1Gx8zHKp3F=VAwfLh-n1fs1Yd+hdc-o76tPY6L2h0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/2016 08:37 AM, Lorenzo Pieralisi wrote:
-> On Thu, Jan 07, 2016 at 03:58:15PM +0000, Peter Maydell wrote:
->> On 7 January 2016 at 15:53, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
->>> On Thu, Jan 07, 2016 at 01:25:35PM +0000, Peter Maydell wrote:
->>>> We had previously been relying on the kernel not attempting to
->>>> touch the PMU if the ID_AA64DFR0_EL1 PMUVer bits read 0000
->>>> ("Performance Monitors extension System registers not implemented").
->>>
->>> Ok, thanks for looking into this. I wonder why reading pmcr_el0 does
->>> not suffer from the same problem though.
->>
->> Just a pragmatic thing on QEMU's end, I expect -- the kernel already
->> touched PMCR_EL0 and we wanted to be able to boot it, so we have an
->> implementation of it.
+Hi Krzysztof,
+
+On 7 January 2016 at 07:45, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
+> Enable the kernel NEON mode and asm/NEON accelerated crypto algorithms
+> which should bring performance benefits on Exynos SoCs. Enable these as
+> modules because they are optional, not essential anyhow for platform
+> booting nor related directly to Exynos Soc. All accelerated algorithms
+> pass booting self-tests on Odroid XU4 (Exynos5422) and Trats2 (Exynos4412).
 >
-> If that's the case, that was the wrong approach IMHO. QEMU has to comply
-> with the Aarch64 architecture which means that either the CPU it models
-> has a Performance Monitors extension or it does not. If reading pmcr_el0
-> does not fault I could tell you this is a QEMU regression because currently
-> it _does_ model pmcr_el0 while (hopefully) ID_AA64DFR0_EL1 PMUVer reports
-> it should not.
+> Additionally enable cpufreq statistics as they are useful for debugging.
+>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  arch/arm/configs/exynos_defconfig | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+> index 24dcd2bb1215..0aee1e035be9 100644
+> --- a/arch/arm/configs/exynos_defconfig
+> +++ b/arch/arm/configs/exynos_defconfig
+> @@ -26,12 +26,14 @@ CONFIG_ARM_APPENDED_DTB=y
+>  CONFIG_ARM_ATAG_DTB_COMPAT=y
+>  CONFIG_CMDLINE="root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M console=ttySAC1,115200 init=/linuxrc mem=256M"
+>  CONFIG_CPU_FREQ=y
+> +CONFIG_CPU_FREQ_STAT_DETAILS=y
+>  CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
+>  CONFIG_CPUFREQ_DT=y
+>  CONFIG_CPU_IDLE=y
+>  CONFIG_ARM_EXYNOS_CPUIDLE=y
+>  CONFIG_VFP=y
+>  CONFIG_NEON=y
+> +CONFIG_KERNEL_MODE_NEON=y
+>  CONFIG_NET=y
+>  CONFIG_PACKET=y
+>  CONFIG_UNIX=y
+> @@ -238,7 +240,11 @@ CONFIG_DEBUG_RT_MUTEXES=y
+>  CONFIG_DEBUG_SPINLOCK=y
+>  CONFIG_DEBUG_MUTEXES=y
+>  CONFIG_DEBUG_USER=y
+> -CONFIG_CRYPTO_SHA256=y
+> +CONFIG_ARM_CRYPTO=y
+> +CONFIG_CRYPTO_SHA1_ARM_NEON=m
+> +CONFIG_CRYPTO_SHA256_ARM=m
+> +CONFIG_CRYPTO_SHA512_ARM=m
+> +CONFIG_CRYPTO_AES_ARM_BS=m
+>  CONFIG_CRC_CCITT=y
+>  CONFIG_FONTS=y
+>  CONFIG_FONT_7x14=y
+> --
+> 1.9.1
 >
 
-Strictly speaking you may be right (regression is a bit strong, though),
-but for my part I tend to be pragmatic.
+Reviewed-by: Anand Moon <linux.amoon@gmail.com>
 
-A warning message such as "Access to unimplemented register X" may be useful,
-but effectively disabling all (older) aarch64 Linux kernels in qemu could be
-seen as a bit dogmatic and would not be very helpful.
-
-> I will add code that guards both register accesses to fix both bugs at
-> once.
->
-
-I assume you'll fix the the unconditional access(es) to pmcr_el0.
-
-Question here is the scope of registers associated with PMUVer. Are there
-any other registers which would need to be guarded ?
-
-Thanks,
-Guenter
+Best Regards,
+-Anand Moon
