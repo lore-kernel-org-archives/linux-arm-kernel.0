@@ -1,39 +1,51 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Fri, 8 Jan 2016 02:34:19 +0300
-Subject: [PATCH v6 01/21] arm64: ilp32: add documentation on the ILP32 ABI for
- ARM64
+Date: Fri, 8 Jan 2016 02:34:20 +0300
+Subject: [PATCH v6 02/21] arm64: ensure the kernel is compiled for LP64
 In-Reply-To: <1452209679-19445-1-git-send-email-ynorov@caviumnetworks.com>
 References: <1452209679-19445-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1452209679-19445-2-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1452209679-19445-3-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based on Andrew Pinski's patch-series.
+From: Andrew Pinski <apinski@cavium.com>
 
+The kernel needs to be compiled as a LP64 binary for ARM64, even when
+using a compiler that defaults to code-generation for the ILP32 ABI.
+Consequently, we need to explicitly pass '-mabi=lp64' (supported on
+gcc-4.9 and newer).
+
+Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
+Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
 Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+Reviewed-by: David Daney <ddaney@caviumnetworks.com>
 ---
- Documentation/arm64/ilp32.txt | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
- create mode 100644 Documentation/arm64/ilp32.txt
+ arch/arm64/Makefile | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/Documentation/arm64/ilp32.txt b/Documentation/arm64/ilp32.txt
-new file mode 100644
-index 0000000..d14af62
---- /dev/null
-+++ b/Documentation/arm64/ilp32.txt
-@@ -0,0 +1,13 @@
-+ILP32 AARCH64 SYSCALL ABI
-+=========================
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index cd822d8..d6668a8 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -29,14 +29,19 @@ endif
+ KBUILD_CFLAGS	+= -mgeneral-regs-only $(lseinstr)
+ KBUILD_AFLAGS	+= $(lseinstr)
+ 
++KBUILD_CFLAGS	+= $(call cc-option,-mabi=lp64)
++KBUILD_AFLAGS	+= $(call cc-option,-mabi=lp64)
 +
-+This document describes the ILP32 syscall ABI and where it differs
-+from the generic compat linux syscall interface.
-+
-+Syscalls which normally would pass 64bit values as two arguments;
-+now pass the 64bit value as one argument.
-+
-+struct rt_sigframe is redefined and contains struct compat_siginfo,
-+as compat syscalls expects, and struct sigframe, taken from lp64 to
-+handle AARCH64 register set.
-+
+ ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
+ KBUILD_CPPFLAGS	+= -mbig-endian
+ AS		+= -EB
+ LD		+= -EB
++LDFLAGS		+= -maarch64linuxb
+ else
+ KBUILD_CPPFLAGS	+= -mlittle-endian
+ AS		+= -EL
+ LD		+= -EL
++LDFLAGS		+= -maarch64linux
+ endif
+ 
+ CHECKFLAGS	+= -D__aarch64__
 -- 
 2.5.0
