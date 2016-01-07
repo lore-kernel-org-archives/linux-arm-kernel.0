@@ -1,58 +1,53 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 7 Jan 2016 18:31:44 +0000
-Subject: [Qemu-devel] arm64 qemu tests failing in linux-next since
- 'arm64: kernel: enforce pmuserenr_el0 initialization and restore'
-In-Reply-To: <568E9BF6.6020809@roeck-us.net>
-References: <567B41E3.5060800@roeck-us.net>
- <CAFEAcA_c9DicGF+is6ST3NJv+c5Bi4dHYo2t8Q2n9AS9G4q0+Q@mail.gmail.com>
- <20160107155310.GA4064@red-moon>
- <CAFEAcA_vP93=PE6LNNHodCsdk0gL0kBQPX=xzLJU5RzkvNs2vw@mail.gmail.com>
- <20160107163722.GB4064@red-moon> <568E9BF6.6020809@roeck-us.net>
-Message-ID: <20160107183144.GA3869@red-moon>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 7 Jan 2016 10:40:46 -0800
+Subject: [PATCH v3] ARM: fix atags_to_fdt with stack-protector-strong
+In-Reply-To: <20160107113029.GE19062@n2100.arm.linux.org.uk>
+References: <20160106233656.GA9316@www.outflux.net>
+ <20160107113029.GE19062@n2100.arm.linux.org.uk>
+Message-ID: <CAGXu5jJS1RTpwA9TRCP1y1Qm-g0OXADSb1omr_5rNFirVTovuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 07, 2016 at 09:10:14AM -0800, Guenter Roeck wrote:
+On Thu, Jan 7, 2016 at 3:30 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Jan 06, 2016 at 03:36:56PM -0800, Kees Cook wrote:
+>> diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+>> index 3f9a9ebc77c3..d7d2c2981f65 100644
+>> --- a/arch/arm/boot/compressed/Makefile
+>> +++ b/arch/arm/boot/compressed/Makefile
+>> @@ -106,6 +106,14 @@ ORIG_CFLAGS := $(KBUILD_CFLAGS)
+>>  KBUILD_CFLAGS = $(subst -pg, , $(ORIG_CFLAGS))
+>>  endif
+>>
+>> +# -fstack-protector-strong triggers protection checks in this code,
+>> +# but it is being used too early to link to meaningful stack_chk logic.
+>> +CFLAGS_atags_to_fdt.o := $(call cc-option, -fno-stack-protector)
+>> +CFLAGS_fdt.o := $(call cc-option, -fno-stack-protector)
+>> +CFLAGS_fdt_ro.o := $(call cc-option, -fno-stack-protector)
+>> +CFLAGS_fdt_rw.o := $(call cc-option, -fno-stack-protector)
+>> +CFLAGS_fdt_wip.o := $(call cc-option, -fno-stack-protector)
+>
+> This will result in "$(call cc-option, -fno-stack-protector)" being
+> called five times when this Makefile is parsed, which seems very
+> wasteful.  I'm sure there's better solutions to that - maybe caching
+> the value in a variable in a higher level makefile (eg,
+> arch/arm/Makefile) ?
 
-[...]
+Good point; I will adjust this to get a single invocation.
 
-> >If that's the case, that was the wrong approach IMHO. QEMU has to comply
-> >with the Aarch64 architecture which means that either the CPU it models
-> >has a Performance Monitors extension or it does not. If reading pmcr_el0
-> >does not fault I could tell you this is a QEMU regression because currently
-> >it _does_ model pmcr_el0 while (hopefully) ID_AA64DFR0_EL1 PMUVer reports
-> >it should not.
-> >
-> 
-> Strictly speaking you may be right (regression is a bit strong, though),
-> but for my part I tend to be pragmatic.
+> Also, I suspect that all of the decompressor should be built with
+> -fno-stack-protector as we don't have sufficient environment here.
+> Maybe it should be placed in the global CFLAGS for the decompressor?
 
-It is a kernel bug and I will fix it. Regardless, I still think that
-modelling pmcr_el0 to make sure the kernel boot even with ID_AA64DFR0_EL1
-PMUVer reporting that the CPU is not implementing a Performance Monitors
-extension was wrong.
+I prefer keeping it disabled in as narrow a range as possible. If
+other code gains a level of complexity that it triggers the stack
+protector code insertion, I think that's worth examining when it
+happens. If this ever becomes an actual burden, then yeah, let's do it
+for the whole decompressor, but I think it'd be best to revisit it if
+it happens again.
 
-> A warning message such as "Access to unimplemented register X" may be useful,
-> but effectively disabling all (older) aarch64 Linux kernels in qemu could be
-> seen as a bit dogmatic and would not be very helpful.
-> 
-> >I will add code that guards both register accesses to fix both bugs at
-> >once.
-> >
-> 
-> I assume you'll fix the the unconditional access(es) to pmcr_el0.
+-Kees
 
-Yes.
-
-> Question here is the scope of registers associated with PMUVer. Are there
-> any other registers which would need to be guarded ?
-
-None that I am aware of, other PMU registers are accessed only if PMUs
-are probed (since they are present in DT or ACPI), which means that at
-that point QEMU will have to model the Performance Monitors extension
-entirely since it advertises them in the respective FW.
-
-I could add a warning in the v8 PMU probing path to check PMUVer if we
-think that's helpful.
-
-Lorenzo
+-- 
+Kees Cook
+Chrome OS & Brillo Security
