@@ -1,61 +1,46 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 7 Jan 2016 15:02:00 +0100
-Subject: [PATCH v2 03/13] arm64: use more granular reservations for static
- page table allocations
-In-Reply-To: <20160107135518.GB15917@leverpostej>
-References: <1451489172-17420-1-git-send-email-ard.biesheuvel@linaro.org>
- <1451489172-17420-4-git-send-email-ard.biesheuvel@linaro.org>
- <20160107135518.GB15917@leverpostej>
-Message-ID: <CAKv+Gu-qdTDwnLajLw_hT6odessdi4Ndbe80CSvY6o1N6HDOmA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 07 Jan 2016 15:03:06 +0100
+Subject: [PATCH] gpio: moxart: fix build regression
+In-Reply-To: <4110228.QqTjkKaKSX@wuerfel>
+References: <4110228.QqTjkKaKSX@wuerfel>
+Message-ID: <3740193.jff4NfDRv6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 January 2016 at 14:55, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Wed, Dec 30, 2015 at 04:26:02PM +0100, Ard Biesheuvel wrote:
->> Before introducing new statically allocated page tables and increasing
->> their alignment in subsequent patches, update the reservation logic
->> so that only pages that are in actual use end up as reserved with
->> memblock.
->
-> Could you add something to the commit message about what this will gain
-> us (i.e. which pages we don't have to reserve)? It's not immediately
-> obvious why we'd have page tables we wouldn't want to reserve.
->
+On Thursday 07 January 2016 14:55:34 Arnd Bergmann wrote:
+> A cleanup patch replaced bgpio_chip with gpio_chip but missed
+> two references to the bgpio_chip:
+> 
+> drivers/gpio/gpio-moxart.c:60:19: error: use of undeclared identifier 'bgc'; did you mean 'gc'?
+>         gc->bgpio_data = bgc->read_reg(bgc->reg_set);
+> drivers/gpio/gpio-moxart.c:35:20: note: 'gc' declared here
+> drivers/gpio/gpio-moxart.c:60:33: error: use of undeclared identifier 'bgc'; did you mean 'gc'?
+>         gc->bgpio_data = bgc->read_reg(bgc->reg_set);
+> 
+> This adds the missing change.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 0f4630f3720e ("gpio: generic: factor into gpio_chip struct")
+> ---
 
-OK. In the original series, I also aligned the pgdir section to a log2
-upper bound of its size, but that is not necessary anymore with your
-changes. So the original goal was to avoid reserving the alignment
-padding as well as the pgdirs that end up unused
+Adding Jonas to Cc, sorry for forgetting him first.
 
-> From the looks of the next patch we won't have redundant levels of
-> fixmap table for a given configuration, so I guess we're catering for
-> the case the fixmap shares a pgd/pud/pmd entry with the image mapping?
->
-> Does that happen? If so that would invalidate the assumption I make when
-> copying the fixmap over in [1] (see map_kernel).
->
-
-It is a lot less likely to happen now that I moved the kernel to the
-start of the vmalloc area rather than right below PAGE_OFFSET. But in
-general, it seems sensible to only populate entries after confirming
-that they are in fact vacant.
-
-> To handle that either we need some special logic to copy over the
-> relevant bits for the fixmap (as with kasan_copy_shadow), or we need to
-> avoid sharing a pgd entry.
->
-> Thoughts?
->
-
-Yes, I have added that to my v3 version of the vmalloc base move patch here
-
-https://git.linaro.org/people/ard.biesheuvel/linux-arm.git/commitdiff/0beef2c1a6bfc90cc116a6ba1b24f2ba35e7e5f6
-
-but I think 16k/4 levels is the only config affected when the kernel
-is always in the lower half of the vmalloc area. That also implies
-that the fixmap pgd is either always shared, or never, depending on
-the build time config, so I could probably simplify that part
-somewhat.
-
--- 
-Ard.
+> diff --git a/drivers/gpio/gpio-moxart.c b/drivers/gpio/gpio-moxart.c
+> index 71c13c4e12b5..ca604538ebf7 100644
+> --- a/drivers/gpio/gpio-moxart.c
+> +++ b/drivers/gpio/gpio-moxart.c
+> @@ -57,7 +57,7 @@ static int moxart_gpio_probe(struct platform_device *pdev)
+>  	gc->label = "moxart-gpio";
+>  	gc->request = gpiochip_generic_request;
+>  	gc->free = gpiochip_generic_free;
+> -	gc->bgpio_data = bgc->read_reg(bgc->reg_set);
+> +	gc->bgpio_data = gc->read_reg(gc->reg_set);
+>  	gc->base = 0;
+>  	gc->ngpio = 32;
+>  	gc->parent = dev;
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
