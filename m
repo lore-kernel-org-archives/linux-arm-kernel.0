@@ -1,52 +1,32 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 7 Jan 2016 13:25:35 +0000
-Subject: [Qemu-devel] arm64 qemu tests failing in linux-next since 'arm64:
- kernel: enforce pmuserenr_el0 initialization and restore'
-In-Reply-To: <567B41E3.5060800@roeck-us.net>
-References: <567B41E3.5060800@roeck-us.net>
-Message-ID: <CAFEAcA_c9DicGF+is6ST3NJv+c5Bi4dHYo2t8Q2n9AS9G4q0+Q@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 7 Jan 2016 13:28:27 +0000
+Subject: [PATCH v8 17/20] KVM: ARM64: Add PMU overflow interrupt routing
+In-Reply-To: <1450771695-11948-18-git-send-email-zhaoshenglong@huawei.com>
+References: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>
+ <1450771695-11948-18-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <20160107132827.402b11f0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 December 2015 at 00:52, Guenter Roeck <linux@roeck-us.net> wrote:
-> Hi all,
->
-> since commit 60792ad349f3 ("arm64: kernel: enforce pmuserenr_el0
-> initialization
-> and restore"), my arm64 qemu tests of linux-next are failing. After this
-> commit,
-> qemu does not display any output.
->
-> Qemu version is 2.5.0. Linux kernel configuration is arm64:defconfig.
->
-> qemu command line is as follows:
->
->         qemu-system-aarch64 -machine virt -cpu cortex-a57 -machine type=virt
-> -nographic -smp 1 \
->                 -m 512 -kernel arch/arm64/boot/Image -initrd
-> rootfs.arm64.cpio -no-reboot \
->                 -append "console=ttyAMA0"
->
-> Any idea what might cause this problem and how to fix it (presumably in
-> qemu) ?
+On Tue, 22 Dec 2015 16:08:12 +0800
+Shannon Zhao <zhaoshenglong@huawei.com> wrote:
 
-This turns out to be because QEMU doesn't currently implement
-PMUSERENR_EL0 for AArch64 (we do have an AArch32 implementation),
-so you get an immediate UNDEF when the kernel touches it, followed
-by an infinite loop of UNDEF exceptions because the instruction
-at the UNDEF vector entrypoint is unallocated at this point in
-execution.
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> When calling perf_event_create_kernel_counter to create perf_event,
+> assign a overflow handler. Then when the perf event overflows, set the
+> corresponding bit of guest PMOVSSET register. If this counter is enabled
+> and its interrupt is enabled as well, kick the vcpu to sync the
+> interrupt.
+> 
+> On VM entry, if there is counter overflowed, inject the interrupt with
+> the level set to 1. Otherwise, inject the interrupt with the level set
+> to 0.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 
-We had previously been relying on the kernel not attempting to
-touch the PMU if the ID_AA64DFR0_EL1 PMUVer bits read 0000
-("Performance Monitors extension System registers not implemented").
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Since the v8 ARM ARM states that the Performance Monitors Extension is
-an optional feature of an implementation, this seems like a kernel
-bug to me. (QEMU should probably get round to implementing the PMU
-at some point for feature parity with v7, but this has not been
-a priority for us since they're not actually very useful in a
-fully emulated setup.)
-
-thanks
--- PMM
+	M.
+-- 
+Jazz is not dead. It just smells funny.
