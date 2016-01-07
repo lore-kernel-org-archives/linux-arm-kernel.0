@@ -1,40 +1,53 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Thu,  7 Jan 2016 12:39:33 +0800
-Subject: [RFC PATCH v1 2/2] dt-bindings: add document for rk3229-hdmi
-In-Reply-To: <1452141288-9292-1-git-send-email-ykk@rock-chips.com>
-References: <1452141288-9292-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1452141573-9490-1-git-send-email-ykk@rock-chips.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 7 Jan 2016 10:19:09 +0530
+Subject: [PATCH] dmaengine: xgene-dma: Fix double IRQ issue by setting
+ IRQ_DISABLE_UNLAZY flag
+In-Reply-To: <alpine.DEB.2.11.1601061103000.3689@nanos>
+References: <1450875495-2229-1-git-send-email-rsahu@apm.com>
+ <20160106091323.GP2940@localhost>
+ <CAFd313xhh_4OFP6W2yuApM8ppYMX20DUCCQHJ9YEtCMbzr6Hgg@mail.gmail.com>
+ <20160106093121.GB11778@localhost>
+ <alpine.DEB.2.11.1601061103000.3689@nanos>
+Message-ID: <20160107044909.GF11778@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
----
- .../devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt         | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+On Wed, Jan 06, 2016 at 11:05:02AM +0100, Thomas Gleixner wrote:
+> On Wed, 6 Jan 2016, Vinod Koul wrote:
+> > On Wed, Jan 06, 2016 at 02:51:07PM +0530, Rameshwar Sahu wrote:
+> > > >> @@ -1610,6 +1611,7 @@ static int xgene_dma_request_irqs(struct xgene_dma *pdma)
+> > > >>       /* Register DMA channel rx irq */
+> > > >>       for (i = 0; i < XGENE_DMA_MAX_CHANNEL; i++) {
+> > > >>               chan = &pdma->chan[i];
+> > > >> +             irq_set_status_flags(chan->rx_irq, IRQ_DISABLE_UNLAZY);
+> > > >
+> > > > Why not use irq_settings_disable_unlazy(), at least read the reference you
+> > > > pointed out!
+> > > 
+> > > irq_settings_disable_unlazy() is helper function to test
+> > > IRQ_DISABLE_UNLAZY flag is set or not, it's not for setting this flag.
+> > > FYI...
+> > > +static inline bool irq_settings_disable_unlazy(struct irq_desc *desc)
+> > > +{
+> > > + return desc->status_use_accessors & _IRQ_DISABLE_UNLAZY;
+> > > +}
+> > 
+> > Ah yes, I saw clear API and assumed there would be set. Then I think we
+> > should add a set helper as well as the usage is intended for drivers to
+> > set this flag
+> > 
+> > Thomas,
+> > 
+> > Any reason why you didn't add a set helper, only test and clear?
+> 
+> Why would I? Those helpers are core internal and not usable in random drivers.
+> 
+> Drivers have irq_set_status_flags()/irq_clear_status_flags() ...
 
-diff --git a/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
-index 668091f..1cdc627 100644
---- a/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
-+++ b/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
-@@ -2,7 +2,7 @@ Rockchip specific extensions to the Synopsys Designware HDMI
- ================================
- 
- Required properties:
--- compatible: "rockchip,rk3288-dw-hdmi";
-+- compatible: "rockchip,rk3288-dw-hdmi", "rockchip,rk3229-dw-hdmi";
- - reg: Physical base address and length of the controller's registers.
- - clocks: phandle to hdmi iahb and isfr clocks.
- - clock-names: should be "iahb" "isfr"
-@@ -15,8 +15,10 @@ Required properties:
-   rk3288 platform
- 
- Optional properties
-+- reg: Physical base address and length of the external HDMI PHY's registers.
- - ddc-i2c-bus: phandle of an I2C controller used for DDC EDID probing
- - clocks, clock-names: phandle to the HDMI CEC clock, name should be "cec"
-+		       phandle to the external HDMI PHY clock, name should be "extphy"
- 
- Example:
- hdmi: hdmi at ff980000 {
+The effect of irq_set_status_flags(irq, IRQ_DISABLE_UNLAZY) is same as
+providing a helper. If your recommendation is to use this by driver then I
+am find with the approach too
+
+Thanks
 -- 
-2.1.2
+~Vinod
