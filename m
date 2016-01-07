@@ -1,68 +1,155 @@
-From: dgdegra@tycho.nsa.gov (Daniel De Graaf)
-Date: Thu, 7 Jan 2016 16:40:09 -0500
-Subject: [PATCH v3 59/62] xen/arm: Add a hypercall for device mmio mapping
-In-Reply-To: <568E511402000078000C44C6@prv-mh.provo.novell.com>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-60-git-send-email-shannon.zhao@linaro.org>
- <564B17EA02000078000B5D34@prv-mh.provo.novell.com>
- <568E0CA9.4090307@huawei.com>
- <568E25A702000078000C43EA@prv-mh.provo.novell.com>
- <568E2BB4.8080802@huawei.com>
- <568E511402000078000C44C6@prv-mh.provo.novell.com>
-Message-ID: <568EDB39.6050804@tycho.nsa.gov>
+From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
+Date: Thu, 7 Jan 2016 23:45:49 +0200
+Subject: [PATCH 2/2] memory: omap-gpmc: Add Kconfig option for debug
+In-Reply-To: <20160107180700.GN12777@atomide.com>
+References: <20160104174001.GD12777@atomide.com> <568AC0F9.2010304@gmail.com>
+ <20160105041356.GE12777@atomide.com> <20160105084947.GG22661@pali>
+ <20160105224929.GF12777@atomide.com> <20160106174039.GA14271@earth>
+ <20160106174713.GL12777@atomide.com> <568D5669.4040801@gmail.com>
+ <20160106182650.GM12777@atomide.com> <568D5F54.7040900@gmail.com>
+ <20160107180700.GN12777@atomide.com>
+Message-ID: <568EDC8D.7070205@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/2016 05:50 AM, Jan Beulich wrote:
->>>> On 07.01.16 at 10:11, <zhaoshenglong@huawei.com> wrote:
->> Hi Jan,
->>
->> On 2016/1/7 15:45, Jan Beulich wrote:
->>>>>> On 07.01.16 at 07:58, <zhaoshenglong@huawei.com> wrote:
->>>>> On 2015/11/17 19:04, Jan Beulich wrote:
->>>>>>>>>>>>> On 17.11.15 at 10:40, <shannon.zhao@linaro.org> wrote:
->>>>>>>>>>> --- a/xen/arch/arm/mm.c
->>>>>>>>>>> +++ b/xen/arch/arm/mm.c
->>>>>>>>>>> @@ -1138,6 +1138,10 @@ int xenmem_add_to_physmap_one(
->>>>>>>>>>>           rcu_unlock_domain(od);
->>>>>>>>>>>           break;
->>>>>>>>>>>       }
->>>>>>>>>>> +    case XENMAPSPACE_dev_mmio:
->>>>>>>>>>> +        rc = map_dev_mmio_region(d, gpfn, 1, idx);
->>>>>>>>>>> +        return rc;
->>>>>>>>>>> +        break;
->>>>>>> Blindly for any kind of domain? The XSM check in the
->>>>>>> XENMEM_add_to_physmap_batch handler (in common code) doesn't
->>>>>>> even know which map space is to be used...
->>>>>
->>>>> Sorry, I know little about XSM. Could you suggest me how to add the
->>>>> check for this new type here?
->>> I'm sorry to push back here, but did you at least try to derive
->>> what is wanted from the multitude of other XSM checks present
->>> throughout the tree?
->>
->> IIUC, you mean that it doean't need to change the XSM check itself, but
->> we should check if the current->domain is hardware domain and it maps
->> the space to itself before the XSM check, right?
+Hi,
+
+
+On  7.01.2016 20:07, Tony Lindgren wrote:
 >
-> No, I actually think that you need to add a new, secondary XSM
-> check. But you may want to consult with Daniel (who so far wasn't
-> even Cc-ed).
+> OK well at least that part of the bug is fixed then.
+>
 
-Looking at the original patch, I am not sure if I understand the
-checks: it seems like the iomem_access_permitted check is being done
-on the guest's page range instead of the actual IO memory, which
-ends up allowing the guest to map anything as long as it maps it in
-the right guest area.  The iomem_permit_access call there also seems
-to be redundant because it is the same range that was just checked.
+Yes, seems so
 
-If the [start_gfn, start_gfn + nr) memory range actually describes
-the physical addresses, then this operation is taking advantage of
-the existing XSM checks on XEN_DOMCTL_iomem_permission, and the
-only XSM check that is needed would be that current->domain has
-permission to modify (d)'s mappings - and this is done by the
-xsm_add_to_physmap check in XENMEM_add_to_physmap.
+>>> Also, do things now work reliably for you with CONFIG_OMAP_GPMC_DEBUG
+>>> enabled? Or does that also produce corruption after few reboots?
 
--- 
-Daniel De Graaf
-National Security Agency
+I'll make further experiments as I am a bit lost what and when happens. 
+What is for sure is that corruptions occurs immediately after boot 
+without your patch and with CONFIG_OMAP_GPMC_DEBUG disabled. So maybe 
+there is another problem in ubfs or mtd driver.
+
+>>
+>> CONFIG_OMAP_GPMC_DEBUG is disabled, shall I enable it?
+>
+> Yes please.
+
+Already did, every reflash and install of upstream kernel compatible SW 
+takes me about 3 hours I'd rather spend on something else :). Though it 
+seems that reboot issue happens no matter if CONFIG_OMAP_GPMC_DEBUG is 
+enabled or not.
+
+>
+>> Where am I supposed to get the output from ^^^ if rootfs become corrupted?
+>> The problem appears after poweroff/restart when it is already too late to
+>> get the syslog.
+>
+> Hmm good point. Can you boot with root on MMC? So far no luck here
+> reproducing the corruption here with my fix applied.
+
+Will do, when we exhaust the other options. What I am afraid of, is that 
+if I boot from mmc, I won't be able to reproduce the problem, as there 
+will be no pressure on ubifs/mtd/onenand drivers.
+
+>
+>> BTW, did you compare all the GPMC registers with and without
+>> HWMOD_INIT_NO_RESET?
+>
+> Well the timings now for me both with and without GPMC reset are:
+>
+> cs0 GPMC_CS_CONFIG1: 0xfb001201
+> cs0 GPMC_CS_CONFIG2: 0x00101000
+> cs0 GPMC_CS_CONFIG3: 0x00020200
+> cs0 GPMC_CS_CONFIG4: 0x10001003
+> cs0 GPMC_CS_CONFIG5: 0x020f1313
+> cs0 GPMC_CS_CONFIG6: 0x8f050000
+>
+> These timings also match the current mainline timings without the
+> fix I posted when CONFIG_OMAP_GPMC_DEBUG is enabled.
+>
+> The nolo set timings I have are:
+> cs0 GPMC_CS_CONFIG1: 0xfb001201
+> cs0 GPMC_CS_CONFIG2: 0x00101000
+> cs0 GPMC_CS_CONFIG3: 0x00020200
+> cs0 GPMC_CS_CONFIG4: 0x10001002 <- OEONTIME is still different in nolo
+> cs0 GPMC_CS_CONFIG5: 0x020f1313
+> cs0 GPMC_CS_CONFIG6: 0x8f050000
+>
+
+Same here
+
+> So there seems to be OEONTIME difference. Once the legacy boot is
+> gone, we can probably remove the OEONTIME calculations and rely
+> on the dts provide values as it seems that currently the dts value
+> is ignored in gpmc_calc_sync_read_timings().
+>
+> To dump your nolo provided timings, you can add the following
+> line to gpmc_probe_onenand_child() before gpmc_onenand_init:
+>
+> 	gpmc_cs_show_timings(gpmc_onenand_data->cs,
+> 		"before gpmc_cs_program_settings");
+>
+
+The problem is that between NOLO and kernel there is u-boot. And even if 
+I am almost sure it doesn't touch onenand configs, I can't be absolutely 
+sure. So those timings are not 100% reliable IMO, though close to that.
+
+> Note that will show the wrong GPMC default values after reset
+> unless you have CONFIG_OMAP_GPMC_DEBUG enabled.
+>
+> Then below is a better debug patch to dump out the values after
+> reset. Note that in that case the above "before" timings must
+> be ignored.
+>
+> Regards,
+>
+> Tony
+>
+> 8< --------------------
+> --- a/arch/arm/mach-omap2/gpmc-onenand.c
+> +++ b/arch/arm/mach-omap2/gpmc-onenand.c
+> @@ -153,6 +153,8 @@ static int omap2_onenand_get_freq(struct omap_onenand_platform_data *cfg,
+>   		freq = 0;
+>   	}
+>
+> +	gpmc_cs_show_timings(cs, "before gpmc_cs_program_settings");
+> +
+>   	return freq;
+>   }
+>
+> --- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> @@ -2150,8 +2150,7 @@ static struct omap_hwmod omap3xxx_gpmc_hwmod = {
+>   	.clkdm_name	= "core_l3_clkdm",
+>   	.mpu_irqs	= omap3xxx_gpmc_irqs,
+>   	.main_clk	= "gpmc_fck",
+> -	/* Skip reset for CONFIG_OMAP_GPMC_DEBUG for bootloader timings */
+> -	.flags		= HWMOD_NO_IDLEST | DEBUG_OMAP_GPMC_HWMOD_FLAGS,
+> +	.flags		= HWMOD_NO_IDLEST,
+>   };
+>
+>   /*
+> --- a/drivers/memory/omap-gpmc.c
+> +++ b/drivers/memory/omap-gpmc.c
+> @@ -1987,7 +1987,7 @@ static int gpmc_probe_generic_child(struct platform_device *pdev,
+>   	if (ret < 0)
+>   		goto err;
+>
+> -	gpmc_cs_show_timings(cs, "before gpmc_cs_program_settings");
+> +	dev_info(&pdev->dev, "GPMC reset, not showing default timings\n");
+>   	ret = gpmc_cs_program_settings(cs, &gpmc_s);
+>   	if (ret < 0)
+>   		goto err;
+>
+
+I'll play a bit more with printing the values with both 
+CONFIG_OMAP_GPMC_DEBUG enabled and disabled and whatever I can think of, 
+including dumping cs0 config from u-boot, nokia kernel and/or REing NOLO 
+onenand init (already did that for N9 DDR timings, shouldn't be that 
+hard for N900 GPMC). Will keep you informed on the progress. In the 
+meanwhile I think your patch should make it as without it onenand is 
+unusable.
+
+Thanks,
+Ivo
