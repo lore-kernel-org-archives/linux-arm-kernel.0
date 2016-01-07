@@ -1,787 +1,1137 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Thu, 7 Jan 2016 14:22:02 +0800
-Subject: [RFC PATCH v1 1/2] drm: rockchip: hdmi: add RK3229 HDMI support
-In-Reply-To: <1452141447-9441-1-git-send-email-ykk@rock-chips.com>
-References: <1452141288-9292-1-git-send-email-ykk@rock-chips.com>
- <1452141447-9441-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <568E040A.4020907@rock-chips.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 06 Jan 2016 22:29:33 -0800
+Subject: [PATCH v2 1/2] ARM: dts: imx6: Add support for Toradex Apalis
+ iMX6Q/D SoM
+In-Reply-To: <1452011942-11940-2-git-send-email-marcel.ziswiler@toradex.com>
+References: <1452011942-11940-1-git-send-email-marcel.ziswiler@toradex.com>
+ <1452011942-11940-2-git-send-email-marcel.ziswiler@toradex.com>
+Message-ID: <7e21f1c5e2e30fb2c7bfd9d47ba6e9d9@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for "Kbuild test robot" reminding, I forget to update 
-"mode_valid" function define in imx-hdmi side, would send new version out,
+Hi Marcel,
+
+On 2016-01-05 08:39, Marcel Ziswiler wrote:
+> From: Petr ?tetiar <ynezz@true.cz>
+> 
+> Signed-off-by: Petr ?tetiar <ynezz@true.cz>
+> Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+> ---
+> 
+> Changes in v2:
+> - clarify exact Apalis iMX6Q/D SoM type in cover letter
+> - clarify exact Apalis iMX6Q/D module type and Ixora carrier board in model
+>   node
+> - got rid of obsolete mmc aliases
+> - working SGTL5000 audio/sound integration
+> - working STMPE811 touch screen controller integration
+> - integrated review feedback from Lucas
+> - left and even added some more comments as I don't see why putting any
+>   explanatory comments in dts' should be such a bad thing to do
+> - completely got rid of the memory node as that is something typically filled
+>   in by the boot loader e.g. U-Boot
+> - without the regulators simple-bus it no longer boots
+> - even though we supposedly shipped a few hundred V1.0a modules drop DCE UART
+>   support for now and simplify file layout
+> - replaced obsolete no-1-8-v by mainline supported voltage-ranges = <3300 3300>
+>   usdhc property and yes card detects are indeed active low (;-p)
+> - integrated review feedback from Stefan
+> - fixed Ethernet PHY reset & interrupt (requires Micrel PHY driver to be
+>   enabled)
+> - fixed HDMI DDC (requires GPIO-based bitbanging I2C to be enabled)
+> - fixed SPDIF
+> 
+>  arch/arm/boot/dts/imx6qdl-apalis.dtsi | 1040 +++++++++++++++++++++++++++++++++
+>  1 file changed, 1040 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx6qdl-apalis.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl-apalis.dtsi
+> b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
+> new file mode 100644
+> index 0000000..6104e2e
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
+> @@ -0,0 +1,1040 @@
+> +/*
+> + * Copyright 2014-2016 Toradex AG
+> + * Copyright 2012 Freescale Semiconductor, Inc.
+> + * Copyright 2011 Linaro Ltd.
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License
+> + *     version 2 as published by the Free Software Foundation.
+> + *
+> + *     This file is distributed in the hope that it will be useful
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +#include <dt-bindings/gpio/gpio.h>
+> +
+> +/ {
+> +	model = "Toradex Apalis iMX6Q/D Module";
+> +	compatible = "toradex,apalis_imx6q", "fsl,imx6q";
+> +
+> +	backlight: backlight {
+> +		compatible = "pwm-backlight";
+> +		pwms = <&pwm4 0 5000000>;
+> +		status = "disabled";
+> +	};
+> +
+> +	/* DDC_I2C: I2C2_SDA/SCL on MXM3 205/207 */
+> +	i2cddc: i2c at 0 {
+> +		compatible = "i2c-gpio";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_i2c_ddc>;
+> +		gpios = <&gpio3 16 GPIO_ACTIVE_HIGH /* sda */
+> +			 &gpio2 30 GPIO_ACTIVE_HIGH /* scl */
+> +			>;
+> +		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
+> +		status = "okay";
+> +	};
+> +
+> +	regulators {
+> +		compatible = "simple-bus";
+> +
+> +		reg_1p8v: 1p8v {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "1P8V";
+> +			regulator-min-microvolt = <1800000>;
+> +			regulator-max-microvolt = <1800000>;
+> +			regulator-always-on;
+> +		};
+> +
+> +		reg_2p5v: 2p5v {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "2P5V";
+> +			regulator-min-microvolt = <2500000>;
+> +			regulator-max-microvolt = <2500000>;
+> +			regulator-always-on;
+> +		};
+> +
+> +		reg_3p3v: 3p3v {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "3P3V";
+> +			regulator-min-microvolt = <3300000>;
+> +			regulator-max-microvolt = <3300000>;
+> +			regulator-always-on;
+> +		};
+> +
+> +		reg_usb_otg_vbus: usb_otg_vbus {
+> +			compatible = "regulator-fixed";
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&pinctrl_regulator_usbotg_pwr>;
+> +			regulator-name = "usb_otg_vbus";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +			gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
+> +			enable-active-high;
+> +			status = "disabled";
+> +		};
+> +
+> +		/* on module usb hub */
+> +		reg_usb_host_vbus_hub: usb_host_vbus_hub {
+> +			compatible = "regulator-fixed";
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&pinctrl_regulator_usbhub_pwr>;
+> +			regulator-name = "usb_host_vbus_hub";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +			gpio = <&gpio3 28 GPIO_ACTIVE_HIGH>;
+> +			startup-delay-us = <2000>;
+> +			enable-active-high;
+> +			status = "okay";
+> +		};
+> +
+> +		reg_usb_host_vbus: usb_host_vbus {
+> +			compatible = "regulator-fixed";
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&pinctrl_regulator_usbh_pwr>;
+> +			regulator-name = "usb_host_vbus";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +			gpio =  <&gpio1 0 GPIO_ACTIVE_HIGH>;
+> +			enable-active-high;
+> +			vin-supply = <&reg_usb_host_vbus_hub>;
+> +			status = "disabled";
+> +		};
+> +	};
+> +
+> +	sound {
+> +		compatible = "fsl,imx-audio-sgtl5000";
+> +		model = "imx6q-apalis-sgtl5000";
+> +		ssi-controller = <&ssi1>;
+> +		audio-codec = <&codec>;
+> +		audio-routing =
+> +			"LINE_IN", "Line In Jack",
+> +			"MIC_IN", "Mic Jack",
+> +			"Mic Jack", "Mic Bias",
+> +			"Headphone Jack", "HP_OUT";
+> +		mux-int-port = <1>;
+> +		mux-ext-port = <4>;
+> +	};
+> +
+> +	sound_spdif: sound-spdif {
+> +		compatible = "fsl,imx-audio-spdif";
+> +		model = "imx-spdif";
+> +		spdif-controller = <&spdif>;
+> +		spdif-in;
+> +		spdif-out;
+> +		status = "disabled";
+> +	};
+> +};
+> +
+> +&audmux {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_audmux &pinctrl_audmux_mclk>;
+> +	status = "okay";
+> +};
+> +
+> +/* Apalis SPI1 */
+> +&ecspi1 {
+> +	fsl,spi-num-chipselects = <1>;
+> +	cs-gpios = <&gpio5 25 GPIO_ACTIVE_HIGH>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_ecspi1 &pinctrl_spi_cs1>;
+> +	status = "disabled";
+> +};
+> +
+> +/* Apalis SPI2 */
+> +&ecspi2 {
+> +	fsl,spi-num-chipselects = <1>;
+> +	cs-gpios = <&gpio2 26 GPIO_ACTIVE_HIGH>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_ecspi2 &pinctrl_spi_cs2>;
+> +	status = "disabled";
+> +};
+> +
+> +&fec {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_enet &pinctrl_enet_ctrl>;
+> +	phy-mode = "rgmii";
+> +	phy-handle = <&ethphy>;
+> +	phy-reset-duration = <10>;
+> +	phy-reset-gpios = <&gpio1 25 GPIO_ACTIVE_LOW>;
+> +	status = "okay";
+> +
+> +	mdio {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		ethphy: ethernet-phy at 7 {
+> +			interrupt-parent = <&gpio1>;
+> +			interrupts = <30 IRQ_TYPE_LEVEL_LOW>;
+> +			reg = <7>;
+> +		};
+> +	};
+> +};
+> +
+> +&can1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_flexcan1>;
+> +	status = "disabled";
+> +};
+> +
+> +&can2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_flexcan2>;
+> +	status = "disabled";
+> +};
+> +
+> +&hdmi {
+> +	ddc-i2c-bus = <&i2cddc>;
+> +	status = "okay";
+> +};
+> +
+> +/*
+> + * GEN1_I2C: I2C1_SDA/SCL on MXM3 209/211 (e.g. RTC on carrier
+> + * board)
+> + */
+> +&i2c1 {
+> +	clock-frequency = <100000>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_i2c1>;
+> +	status = "disabled";
+> +};
+> +
+> +&i2c2 {
+> +	clock-frequency = <100000>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_i2c2>;
+> +	status = "okay";
+> +
+> +	pmic: pfuze100 at 08 {
+> +		compatible = "fsl,pfuze100";
+> +		reg = <0x08>;
+> +
+> +		regulators {
+> +			sw1a_reg: sw1ab {
+> +				regulator-min-microvolt = <300000>;
+> +				regulator-max-microvolt = <1875000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +				regulator-ramp-delay = <6250>;
+> +			};
+> +
+> +			sw1c_reg: sw1c {
+> +				regulator-min-microvolt = <300000>;
+> +				regulator-max-microvolt = <1875000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +				regulator-ramp-delay = <6250>;
+> +			};
+> +
+> +			sw3a_reg: sw3a {
+> +				regulator-min-microvolt = <400000>;
+> +				regulator-max-microvolt = <1975000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			swbst_reg: swbst {
+> +				regulator-min-microvolt = <5000000>;
+> +				regulator-max-microvolt = <5150000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			snvs_reg: vsnvs {
+> +				regulator-min-microvolt = <1000000>;
+> +				regulator-max-microvolt = <3000000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			vref_reg: vrefddr {
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			vgen1_reg: vgen1 {
+> +				regulator-min-microvolt = <800000>;
+> +				regulator-max-microvolt = <1550000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			vgen2_reg: vgen2 {
+> +				regulator-min-microvolt = <800000>;
+> +				regulator-max-microvolt = <1550000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			vgen3_reg: vgen3 {
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			vgen4_reg: vgen4 {
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			vgen5_reg: vgen5 {
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			vgen6_reg: vgen6 {
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +		};
+> +	};
+> +
+> +	codec: sgtl5000 at 0a {
+> +		compatible = "fsl,sgtl5000";
+> +		reg = <0x0a>;
+> +		clocks = <&clks 201>;
+> +		VDDA-supply = <&reg_2p5v>;
+> +		VDDIO-supply = <&reg_3p3v>;
+
+Nit: The device tree bindings mention two more properties as required
+properties:
+micbias-resistor-k-ohms
+micbias-voltage-m-volts
+
+However, both have "If this node is not mentioned", hence I guess they
+are actually optional, but maybe we want to set an explicit value here?
+
+
+> +	};
+> +
+> +	/* STMPE811 touch screen controller */
+> +	stmpe811 at 41 {
+> +		compatible = "st,stmpe811";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_touch_int>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		reg = <0x41>;
+> +		interrupts = <10 IRQ_TYPE_LEVEL_LOW>;
+> +		interrupt-parent = <&gpio4>;
+> +		interrupt-controller;
+> +		id = <0>;
+> +		blocks = <0x5>;
+> +		irq-trigger = <0x1>;
+> +		stmpe_touchscreen {
+> +			compatible = "st,stmpe-ts";
+> +			reg = <0>;
+> +			/* 3.25 MHz ADC clock speed */
+> +			st,adc-freq = <1>;
+> +			/* 8 sample average control */
+> +			st,ave-ctrl = <3>;
+> +			/* 7 length fractional part in z */
+> +			st,fraction-z = <7>;
+> +			/*
+> +			 * 50 mA typical 80 mA max touchscreen drivers
+> +			 * current limit value
+> +			 */
+> +			st,i-drive = <1>;
+> +			/* 12-bit ADC */
+> +			st,mod-12b = <1>;
+> +			/* internal ADC reference */
+> +			st,ref-sel = <0>;
+> +			/* ADC converstion time: 80 clocks */
+> +			st,sample-time = <4>;
+> +			/* 1 ms panel driver settling time */
+> +			st,settling = <3>;
+> +			/* 5 ms touch detect interrupt delay */
+> +			st,touch-det-delay = <5>;
+> +		};
+> +	};
+> +};
+> +
+> +/*
+> + * GEN2_I2C, CAM: I2C3_SDA/SCL on MXM3 201/203 (unused)
+> + */
+> +&i2c3 {
+> +	clock-frequency = <100000>;
+> +	pinctrl-names = "default", "recovery";
+> +	pinctrl-0 = <&pinctrl_i2c3>;
+> +	pinctrl-1 = <&pinctrl_i2c3_recovery>;
+> +	scl-gpios = <&gpio3 17 GPIO_ACTIVE_HIGH>;
+> +	sda-gpios = <&gpio3 18 GPIO_ACTIVE_HIGH>;
+> +	status = "disabled";
+> +};
+> +
+> +/* PAD Ctrl values for common settings */
+> +/*
+> + * (PAD_CTL_HYS | PAD_CTL_PUS_100K_UP | PAD_CTL_PUE | PAD_CTL_PKE |
+> + *  PAD_CTL_SPEED_MED | PAD_CTL_DSE_40ohm)
+> + */
+> +#define PAD_CTRL_HYS_PU 0x1b0b0
+> +
+> +/*
+> + * (PAD_CTL_HYS | PAD_CTL_PUE | PAD_CTL_PKE | PAD_CTL_SPEED_MED |
+> + *  PAD_CTL_DSE_40ohm)
+> + */
+> +#define PAD_CTRL_HYS_PD 0x130b0
+> +
+> +/*
+> + * (PAD_CTL_PUS_22K_UP | PAD_CTL_PUE | PAD_CTL_PKE | PAD_CTL_SPEED_LOW |
+> + *  PAD_CTL_DSE_80ohm)
+> + */
+> +#define PAD_CTRL_PU_22k 0x0f058
+> +
+> +&iomuxc {
+
+I think it is a convention to move iomuxc at the very end for better
+readability of the rest. At least the Vybrid dts and the more recently
+added imx7d-sdb.dts follow this rule.
+
+> +	ecspi {
+> +		pinctrl_ecspi1: ecspi1grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_CSI0_DAT6__ECSPI1_MISO 0x100b1
+> +				MX6QDL_PAD_CSI0_DAT5__ECSPI1_MOSI 0x100b1
+> +				MX6QDL_PAD_CSI0_DAT4__ECSPI1_SCLK 0x100b1
+> +			>;
+> +		};
+> +		pinctrl_ecspi2: ecspi2grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_EIM_OE__ECSPI2_MISO 0x100b1
+> +				MX6QDL_PAD_EIM_CS1__ECSPI2_MOSI 0x100b1
+> +				MX6QDL_PAD_EIM_CS0__ECSPI2_SCLK 0x100b1
+> +			>;
+> +		};
+> +		pinctrl_spi_cs1: spi_cs1 {
+> +			fsl,pins = <
+> +				/* SPI1 cs */
+> +				MX6QDL_PAD_CSI0_DAT7__GPIO5_IO25	0x000b1
+> +			>;
+> +		};
+> +		pinctrl_spi_cs2: spi_cs2 {
+> +			fsl,pins = <
+> +				/* SPI2 cs */
+> +				MX6QDL_PAD_EIM_RW__GPIO2_IO26		0x000b1
+> +			>;
+> +		};
+> +	};
+> +
+> +	flexcan {
+> +		pinctrl_flexcan1: flexcan1grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_GPIO_7__FLEXCAN1_TX 0x1b0b0
+> +				MX6QDL_PAD_GPIO_8__FLEXCAN1_RX 0x1b0b0
+> +			>;
+> +		};
+> +		pinctrl_flexcan2: flexcan2grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_KEY_COL4__FLEXCAN2_TX 0x1b0b0
+> +				MX6QDL_PAD_KEY_ROW4__FLEXCAN2_RX 0x1b0b0
+> +			>;
+> +		};
+> +	};
+> +
+> +	gpio {
+> +		pinctrl_apalis_gpio1: apalis_gpio1 {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_NANDF_D4__GPIO2_IO04 PAD_CTRL_HYS_PD
+> +			>;
+> +		};
+> +		pinctrl_apalis_gpio2: apalis_gpio2 {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_NANDF_D5__GPIO2_IO05 PAD_CTRL_HYS_PD
+> +			>;
+> +		};
+> +		pinctrl_apalis_gpio3: apalis_gpio3 {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_NANDF_D6__GPIO2_IO06 PAD_CTRL_HYS_PD
+> +			>;
+> +		};
+> +		pinctrl_apalis_gpio4: apalis_gpio4 {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_NANDF_D7__GPIO2_IO07 PAD_CTRL_HYS_PD
+> +			>;
+> +		};
+> +		pinctrl_apalis_gpio5: apalis_gpio5 {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_NANDF_RB0__GPIO6_IO10 PAD_CTRL_HYS_PD
+> +			>;
+> +		};
+> +		pinctrl_apalis_gpio6: apalis_gpio6 {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_NANDF_WP_B__GPIO6_IO09
+> +						PAD_CTRL_HYS_PD
+
+The 80 character limit normally is not enforced for device trees, hence
+I would remove that line break here...
+
+> +			>;
+> +		};
+> +		pinctrl_apalis_gpio7: apalis_gpio7 {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_GPIO_2__GPIO1_IO02 PAD_CTRL_HYS_PD
+> +			>;
+> +		};
+> +		pinctrl_apalis_gpio8: apalis_gpio8 {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_GPIO_6__GPIO1_IO06 PAD_CTRL_HYS_PD
+> +			>;
+> +		};
+> +		pinctrl_gpio_keys: gpio_keys {
+> +			fsl,pins = <
+> +				/* Power Button */
+> +				MX6QDL_PAD_GPIO_4__GPIO1_IO04 PAD_CTRL_HYS_PU
+> +			>;
+> +		};
+> +	};
+> +
+> +	hdmi {
+> +		pinctrl_hdmi_cec: hdmicecgrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_KEY_ROW2__HDMI_TX_CEC_LINE 0x1f8b0
+> +			>;
+> +		};
+> +	};
+> +
+> +	i2c {
+> +		pinctrl_i2c_ddc: i2c_ddc {
+> +			fsl,pins = <
+> +				/* DDC bitbang */
+> +				MX6QDL_PAD_EIM_EB2__GPIO2_IO30 PAD_CTRL_HYS_PU
+> +				MX6QDL_PAD_EIM_D16__GPIO3_IO16 PAD_CTRL_HYS_PU
+> +			>;
+> +		};
+> +		pinctrl_i2c1: i2c1grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_CSI0_DAT8__I2C1_SDA 0x4001b8b1
+> +				MX6QDL_PAD_CSI0_DAT9__I2C1_SCL 0x4001b8b1
+> +			>;
+> +		};
+> +		pinctrl_i2c3: i2c3grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_EIM_D17__I2C3_SCL 0x4001b8b1
+> +				MX6QDL_PAD_EIM_D18__I2C3_SDA 0x4001b8b1
+> +			>;
+> +		};
+> +		pinctrl_i2c3_recovery: i2c3-recoverygrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_EIM_D17__GPIO3_IO17 0x4001b8b1
+> +				MX6QDL_PAD_EIM_D18__GPIO3_IO18 0x4001b8b1
+> +			>;
+> +		};
+> +	};
+> +
+> +	/* pins used on module */
+> +	imx6q-apalis {
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_reset_moci &pinctrl_emmc_reset>;
+> +		pinctrl_audmux: audmuxgrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_DISP0_DAT20__AUD4_TXC	0x130b0
+> +				MX6QDL_PAD_DISP0_DAT21__AUD4_TXD	0x130b0
+> +				MX6QDL_PAD_DISP0_DAT22__AUD4_TXFS	0x130b0
+> +				MX6QDL_PAD_DISP0_DAT23__AUD4_RXD	0x130b0
+> +			>;
+> +		};
+> +		pinctrl_audmux_mclk: audmux_mclk {
+> +			fsl,pins = <
+> +				/* SGTL5000 sys_mclk */
+> +				MX6QDL_PAD_GPIO_5__CCM_CLKO1 0x130b0
+> +			>;
+> +		};
+> +		pinctrl_emmc_reset: emmc_reset {
+> +			fsl,pins = <
+> +				/* eMMC reset, leave it alone */
+> +				MX6QDL_PAD_SD3_RST__GPIO7_IO08 PAD_CTRL_PU_22k
+> +			>;
+> +		};
+> +		pinctrl_enet: enetgrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x100b0
+> +				MX6QDL_PAD_ENET_MDC__ENET_MDC		0x100b0
+> +				MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x100b0
+> +				MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x100b0
+> +				MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x100b0
+> +				MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x100b0
+> +				MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x100b0
+> +				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x100b0
+> +				MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x100b0
+> +				MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0
+> +				MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x1b0b0
+> +				MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x1b0b0
+> +				MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b0b0
+> +				MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b0b0
+> +				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x1b0b0
+> +			>;
+> +		};
+> +		pinctrl_enet_ctrl: enet_ctrlgrp {
+> +			fsl,pins = <
+> +				/* Ethernet PHY reset */
+> +				MX6QDL_PAD_ENET_CRS_DV__GPIO1_IO25	0x000b0
+> +				/* Ethernet PHY interrupt */
+> +				MX6QDL_PAD_ENET_TXD0__GPIO1_IO30	0x000b1
+> +			>;
+> +		};
+> +		pinctrl_i2c2: i2c2grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_KEY_COL3__I2C2_SCL 0x4001b8b1
+> +				MX6QDL_PAD_KEY_ROW3__I2C2_SDA 0x4001b8b1
+> +			>;
+> +		};
+> +		pinctrl_ipu2_vdac: ipu2vdacgrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_DI0_DISP_CLK__IPU2_DI0_DISP_CLK 0xd1
+> +				MX6QDL_PAD_DI0_PIN15__IPU2_DI0_PIN15       0xd1
+> +				MX6QDL_PAD_DI0_PIN2__IPU2_DI0_PIN02        0xd1
+> +				MX6QDL_PAD_DI0_PIN3__IPU2_DI0_PIN03        0xd1
+> +				MX6QDL_PAD_DISP0_DAT0__IPU2_DISP0_DATA00   0xf9
+> +				MX6QDL_PAD_DISP0_DAT1__IPU2_DISP0_DATA01   0xf9
+> +				MX6QDL_PAD_DISP0_DAT2__IPU2_DISP0_DATA02   0xf9
+> +				MX6QDL_PAD_DISP0_DAT3__IPU2_DISP0_DATA03   0xf9
+> +				MX6QDL_PAD_DISP0_DAT4__IPU2_DISP0_DATA04   0xf9
+> +				MX6QDL_PAD_DISP0_DAT5__IPU2_DISP0_DATA05   0xf9
+> +				MX6QDL_PAD_DISP0_DAT6__IPU2_DISP0_DATA06   0xf9
+> +				MX6QDL_PAD_DISP0_DAT7__IPU2_DISP0_DATA07   0xf9
+> +				MX6QDL_PAD_DISP0_DAT8__IPU2_DISP0_DATA08   0xf9
+> +				MX6QDL_PAD_DISP0_DAT9__IPU2_DISP0_DATA09   0xf9
+> +				MX6QDL_PAD_DISP0_DAT10__IPU2_DISP0_DATA10  0xf9
+> +				MX6QDL_PAD_DISP0_DAT11__IPU2_DISP0_DATA11  0xf9
+> +				MX6QDL_PAD_DISP0_DAT12__IPU2_DISP0_DATA12  0xf9
+> +				MX6QDL_PAD_DISP0_DAT13__IPU2_DISP0_DATA13  0xf9
+> +				MX6QDL_PAD_DISP0_DAT14__IPU2_DISP0_DATA14  0xf9
+> +				MX6QDL_PAD_DISP0_DAT15__IPU2_DISP0_DATA15  0xf9
+> +			>;
+> +		};
+> +		pinctrl_regulator_usbhub_pwr: gpio_regulator_usbhub_pwr {
+> +			fsl,pins = <
+> +				/* USBH_HUB_EN */
+> +				MX6QDL_PAD_EIM_D28__GPIO3_IO28 PAD_CTRL_PU_22k
+> +			>;
+> +		};
+> +		pinctrl_reset_moci: gpio_reset_moci {
+> +			fsl,pins = <
+> +				/* RESET_MOCI control */
+> +				MX6QDL_PAD_ENET_TX_EN__GPIO1_IO28
+> +						PAD_CTRL_PU_22k
+> +			>;
+> +		};
+> +		pinctrl_touch_int: touch_intgrp {
+> +			fsl,pins = <
+> +				/* STMPE811 interrupt */
+> +				MX6QDL_PAD_KEY_COL2__GPIO4_IO10 PAD_CTRL_HYS_PU
+> +			>;
+> +		};
+> +		pinctrl_usdhc3: usdhc3grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD3_CMD__SD3_CMD    0x17059
+> +				MX6QDL_PAD_SD3_CLK__SD3_CLK    0x10059
+> +				MX6QDL_PAD_SD3_DAT0__SD3_DATA0 0x17059
+> +				MX6QDL_PAD_SD3_DAT1__SD3_DATA1 0x17059
+> +				MX6QDL_PAD_SD3_DAT2__SD3_DATA2 0x17059
+> +				MX6QDL_PAD_SD3_DAT3__SD3_DATA3 0x17059
+> +				MX6QDL_PAD_SD3_DAT4__SD3_DATA4 0x17059
+> +				MX6QDL_PAD_SD3_DAT5__SD3_DATA5 0x17059
+> +				MX6QDL_PAD_SD3_DAT6__SD3_DATA6 0x17059
+> +				MX6QDL_PAD_SD3_DAT7__SD3_DATA7 0x17059
+> +			>;
+> +		};
+> +		pinctrl_usdhc3_100mhz: usdhc3grp-100mhz { /* 100Mhz */
+
+I do not have a strong opinion on comments, but if they are pure
+duplication of what is already there, I kind of prefer to not add
+them...
+
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD3_CMD__SD3_CMD 0x170B9
+> +				MX6QDL_PAD_SD3_CLK__SD3_CLK 0x100B9
+> +				MX6QDL_PAD_SD3_DAT0__SD3_DATA0 0x170B9
+> +				MX6QDL_PAD_SD3_DAT1__SD3_DATA1 0x170B9
+> +				MX6QDL_PAD_SD3_DAT2__SD3_DATA2 0x170B9
+> +				MX6QDL_PAD_SD3_DAT3__SD3_DATA3 0x170B9
+> +				MX6QDL_PAD_SD3_DAT4__SD3_DATA4 0x170B9
+> +				MX6QDL_PAD_SD3_DAT5__SD3_DATA5 0x170B9
+> +				MX6QDL_PAD_SD3_DAT6__SD3_DATA6 0x170B9
+> +				MX6QDL_PAD_SD3_DAT7__SD3_DATA7 0x170B9
+> +			>;
+> +		};
+> +		pinctrl_usdhc3_200mhz: usdhc3grp-200mhz { /* 200Mhz */
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD3_CMD__SD3_CMD 0x170F9
+> +				MX6QDL_PAD_SD3_CLK__SD3_CLK 0x100F9
+> +				MX6QDL_PAD_SD3_DAT0__SD3_DATA0 0x170F9
+> +				MX6QDL_PAD_SD3_DAT1__SD3_DATA1 0x170F9
+> +				MX6QDL_PAD_SD3_DAT2__SD3_DATA2 0x170F9
+> +				MX6QDL_PAD_SD3_DAT3__SD3_DATA3 0x170F9
+> +				MX6QDL_PAD_SD3_DAT4__SD3_DATA4 0x170F9
+> +				MX6QDL_PAD_SD3_DAT5__SD3_DATA5 0x170F9
+> +				MX6QDL_PAD_SD3_DAT6__SD3_DATA6 0x170F9
+> +				MX6QDL_PAD_SD3_DAT7__SD3_DATA7 0x170F9
+> +			>;
+> +		};
+> +	};
+> +
+> +	ipu1 {
+> +		pinctrl_ipu1_lcdif: ipu1lcdifgrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_EIM_A16__IPU1_DI1_DISP_CLK	0x61
+> +				/* DE */
+> +				MX6QDL_PAD_EIM_DA10__IPU1_DI1_PIN15	0x61
+> +				/* HSync */
+> +				MX6QDL_PAD_EIM_DA11__IPU1_DI1_PIN02	0x61
+> +				/* VSync */
+> +				MX6QDL_PAD_EIM_DA12__IPU1_DI1_PIN03	0x61
+> +				MX6QDL_PAD_EIM_DA9__IPU1_DISP1_DATA00	0x61
+> +				MX6QDL_PAD_EIM_DA8__IPU1_DISP1_DATA01	0x61
+> +				MX6QDL_PAD_EIM_DA7__IPU1_DISP1_DATA02	0x61
+> +				MX6QDL_PAD_EIM_DA6__IPU1_DISP1_DATA03	0x61
+> +				MX6QDL_PAD_EIM_DA5__IPU1_DISP1_DATA04	0x61
+> +				MX6QDL_PAD_EIM_DA4__IPU1_DISP1_DATA05	0x61
+> +				MX6QDL_PAD_EIM_DA3__IPU1_DISP1_DATA06	0x61
+> +				MX6QDL_PAD_EIM_DA2__IPU1_DISP1_DATA07	0x61
+> +				MX6QDL_PAD_EIM_DA1__IPU1_DISP1_DATA08	0x61
+> +				MX6QDL_PAD_EIM_DA0__IPU1_DISP1_DATA09	0x61
+> +				MX6QDL_PAD_EIM_EB1__IPU1_DISP1_DATA10	0x61
+> +				MX6QDL_PAD_EIM_EB0__IPU1_DISP1_DATA11	0x61
+> +				MX6QDL_PAD_EIM_A17__IPU1_DISP1_DATA12	0x61
+> +				MX6QDL_PAD_EIM_A18__IPU1_DISP1_DATA13	0x61
+> +				MX6QDL_PAD_EIM_A19__IPU1_DISP1_DATA14	0x61
+> +				MX6QDL_PAD_EIM_A20__IPU1_DISP1_DATA15	0x61
+> +				MX6QDL_PAD_EIM_A21__IPU1_DISP1_DATA16	0x61
+> +				MX6QDL_PAD_EIM_A22__IPU1_DISP1_DATA17	0x61
+> +				MX6QDL_PAD_EIM_A23__IPU1_DISP1_DATA18	0x61
+> +				MX6QDL_PAD_EIM_A24__IPU1_DISP1_DATA19	0x61
+> +				MX6QDL_PAD_EIM_D31__IPU1_DISP1_DATA20	0x61
+> +				MX6QDL_PAD_EIM_D30__IPU1_DISP1_DATA21	0x61
+> +				MX6QDL_PAD_EIM_D26__IPU1_DISP1_DATA22	0x61
+> +				MX6QDL_PAD_EIM_D27__IPU1_DISP1_DATA23	0x61
+> +			>;
+> +		};
+> +		pinctrl_cam_mclk: cam_mclk {
+> +			fsl,pins = <
+> +				/* CAM sys_mclk */
+> +				MX6QDL_PAD_NANDF_CS2__CCM_CLKO2 0x00b0
+> +			>;
+> +		};
+> +		pinctrl_ipu1_csi0: ipu1csi0grp { /* parallel camera */
+> +			fsl,pins = <
+> +				MX6QDL_PAD_CSI0_DAT12__IPU1_CSI0_DATA12  0xb0b1
+> +				MX6QDL_PAD_CSI0_DAT13__IPU1_CSI0_DATA13  0xb0b1
+> +				MX6QDL_PAD_CSI0_DAT14__IPU1_CSI0_DATA14  0xb0b1
+> +				MX6QDL_PAD_CSI0_DAT15__IPU1_CSI0_DATA15  0xb0b1
+> +				MX6QDL_PAD_CSI0_DAT16__IPU1_CSI0_DATA16  0xb0b1
+> +				MX6QDL_PAD_CSI0_DAT17__IPU1_CSI0_DATA17  0xb0b1
+> +				MX6QDL_PAD_CSI0_DAT18__IPU1_CSI0_DATA18  0xb0b1
+> +				MX6QDL_PAD_CSI0_DAT19__IPU1_CSI0_DATA19  0xb0b1
+> +				MX6QDL_PAD_CSI0_PIXCLK__IPU1_CSI0_PIXCLK 0xb0b1
+> +				MX6QDL_PAD_CSI0_MCLK__IPU1_CSI0_HSYNC    0xb0b1
+> +				MX6QDL_PAD_CSI0_VSYNC__IPU1_CSI0_VSYNC   0xb0b1
+> +			>;
+> +		};
+> +	};
+> +
+> +	pwm {
+> +		pinctrl_pwm1: pwm1grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_GPIO_9__PWM1_OUT 0x1b0b1
+> +			>;
+> +		};
+> +		pinctrl_pwm2: pwm2grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_GPIO_1__PWM2_OUT 0x1b0b1
+> +			>;
+> +		};
+> +		pinctrl_pwm3: pwm3grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD4_DAT1__PWM3_OUT 0x1b0b1
+> +			>;
+> +		};
+> +		pinctrl_pwm4: pwm4grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD4_DAT2__PWM4_OUT 0x1b0b1
+> +			>;
+> +		};
+> +	};
+> +
+> +	spdif {
+> +		pinctrl_spdif: spdifgrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_GPIO_16__SPDIF_IN  0x1b0b0
+> +				MX6QDL_PAD_GPIO_17__SPDIF_OUT 0x1b0b0
+> +			>;
+> +		};
+> +	};
+> +
+> +	uart1 {
+> +		pinctrl_uart1_dce: uart1-dcegrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_CSI0_DAT10__UART1_TX_DATA 0x1b0b1
+> +				MX6QDL_PAD_CSI0_DAT11__UART1_RX_DATA 0x1b0b1
+> +			>;
+> +		};
+> +
+> +		/* DTE mode */
+> +		pinctrl_uart1_dte: uart1-dtegrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_CSI0_DAT10__UART1_RX_DATA 0x1b0b1
+> +				MX6QDL_PAD_CSI0_DAT11__UART1_TX_DATA 0x1b0b1
+> +				MX6QDL_PAD_EIM_D19__UART1_RTS_B 0x1b0b1
+> +				MX6QDL_PAD_EIM_D20__UART1_CTS_B 0x1b0b1
+> +			>;
+> +		};
+> +
+> +		/* Additional DTR, DSR, DCD */
+> +		pinctrl_uart1_ctrl: uart1-ctrlgrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_EIM_D23__UART1_DCD_B 0x1b0b0
+> +				MX6QDL_PAD_EIM_D24__UART1_DTR_B 0x1b0b0
+> +				MX6QDL_PAD_EIM_D25__UART1_DSR_B 0x1b0b0
+> +			>;
+> +		};
+> +	};
+> +
+> +	uart2 {
+> +		pinctrl_uart2_dce: uart2-dcegrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD4_DAT4__UART2_RX_DATA	0x1b0b1
+> +				MX6QDL_PAD_SD4_DAT7__UART2_TX_DATA	0x1b0b1
+> +			>;
+> +		};
+> +
+> +		/* DTE mode */
+> +		pinctrl_uart2_dte: uart2grp-dte {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD4_DAT4__UART2_TX_DATA	0x1b0b1
+> +				MX6QDL_PAD_SD4_DAT7__UART2_RX_DATA	0x1b0b1
+> +				MX6QDL_PAD_SD4_DAT6__UART2_RTS_B	0x1b0b1
+> +				MX6QDL_PAD_SD4_DAT5__UART2_CTS_B	0x1b0b1
+> +			>;
+> +		};
+> +	};
+> +
+> +	uart4 {
+> +		pinctrl_uart4_dce: uart4-dcegrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_KEY_COL0__UART4_TX_DATA 0x1b0b1
+> +				MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA 0x1b0b1
+> +			>;
+> +		};
+> +
+> +		/* DTE mode */
+> +		pinctrl_uart4_dte: uart4-dtegrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_KEY_COL0__UART4_RX_DATA 0x1b0b1
+> +				MX6QDL_PAD_KEY_ROW0__UART4_TX_DATA 0x1b0b1
+> +			>;
+> +		};
+> +	};
+> +
+> +	uart5 {
+> +		pinctrl_uart5_dce: uart5-dcegrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_KEY_COL1__UART5_TX_DATA 0x1b0b1
+> +				MX6QDL_PAD_KEY_ROW1__UART5_RX_DATA 0x1b0b1
+> +			>;
+> +		};
+> +
+> +		/* DTE mode */
+> +		pinctrl_uart5_dte: uart5-dtegrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_KEY_COL1__UART5_RX_DATA 0x1b0b1
+> +				MX6QDL_PAD_KEY_ROW1__UART5_TX_DATA 0x1b0b1
+> +			>;
+> +		};
+> +	};
+> +
+> +	usbh {
+> +		pinctrl_regulator_usbh_pwr: gpio_regulator_usbh_pwr {
+> +			fsl,pins = <
+> +				/* USBH_EN */
+> +				MX6QDL_PAD_GPIO_0__GPIO1_IO00 PAD_CTRL_PU_22k
+> +			>;
+> +		};
+> +	};
+> +
+> +	usbotg {
+> +		pinctrl_usbotg: usbotggrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID 0x17059
+> +			>;
+> +		};
+> +		pinctrl_regulator_usbotg_pwr: gpio_regulator_usbotg_pwr {
+> +			fsl,pins = <
+> +				/* USBO power en */
+> +				MX6QDL_PAD_EIM_D22__GPIO3_IO22 PAD_CTRL_PU_22k
+> +			>;
+> +		};
+> +	};
+> +
+> +	usdhc {
+> +		pinctrl_mmc_cd: gpio_mmc_cd {
+> +			fsl,pins = <
+> +				 /* MMC1 CD */
+> +				MX6QDL_PAD_DI0_PIN4__GPIO4_IO20 0x000b0
+> +			>;
+> +		};
+> +		pinctrl_sd_cd: gpio_sd_cd {
+> +			fsl,pins = <
+> +				/* SD1 CD */
+> +				MX6QDL_PAD_NANDF_CS1__GPIO6_IO14 0x000b0
+> +			>;
+> +		};
+> +		pinctrl_usdhc1: usdhc1grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD1_CMD__SD1_CMD    0x17071
+> +				MX6QDL_PAD_SD1_CLK__SD1_CLK    0x10071
+> +				MX6QDL_PAD_SD1_DAT0__SD1_DATA0 0x17071
+> +				MX6QDL_PAD_SD1_DAT1__SD1_DATA1 0x17071
+> +				MX6QDL_PAD_SD1_DAT2__SD1_DATA2 0x17071
+> +				MX6QDL_PAD_SD1_DAT3__SD1_DATA3 0x17071
+> +				MX6QDL_PAD_NANDF_D0__SD1_DATA4 0x17071
+> +				MX6QDL_PAD_NANDF_D1__SD1_DATA5 0x17071
+> +				MX6QDL_PAD_NANDF_D2__SD1_DATA6 0x17071
+> +				MX6QDL_PAD_NANDF_D3__SD1_DATA7 0x17071
+> +			>;
+> +		};
+> +		pinctrl_usdhc2: usdhc2grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD2_CMD__SD2_CMD    0x17071
+> +				MX6QDL_PAD_SD2_CLK__SD2_CLK    0x10071
+> +				MX6QDL_PAD_SD2_DAT0__SD2_DATA0 0x17071
+> +				MX6QDL_PAD_SD2_DAT1__SD2_DATA1 0x17071
+> +				MX6QDL_PAD_SD2_DAT2__SD2_DATA2 0x17071
+> +				MX6QDL_PAD_SD2_DAT3__SD2_DATA3 0x17071
+> +			>;
+> +		};
+> +	};
+> +};
+> +
+> +&ldb {
+> +	status = "okay";
+> +};
+> +
+> +&pwm1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_pwm1>;
+> +	status = "disabled";
+> +};
+> +
+> +&pwm2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_pwm2>;
+> +	status = "disabled";
+> +};
+> +
+> +&pwm3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_pwm3>;
+> +	status = "disabled";
+> +};
+> +
+> +&pwm4 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_pwm4>;
+> +	status = "disabled";
+> +};
+> +
+> +&spdif {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_spdif>;
+> +	status = "disabled";
+> +};
+> +
+> +&ssi1 {
+> +	fsl,mode = "i2s-slave";
+> +	status = "okay";
+> +};
+> +
+> +&uart1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart1_dte &pinctrl_uart1_ctrl>;
+> +	fsl,dte-mode;
+> +	fsl,uart-has-rtscts;
+> +	status = "disabled";
+> +};
+> +
+> +&uart2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart2_dte>;
+> +	fsl,dte-mode;
+> +	fsl,uart-has-rtscts;
+> +	status = "disabled";
+> +};
+> +
+> +&uart4 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart4_dte>;
+> +	fsl,dte-mode;
+> +	status = "disabled";
+> +};
+> +
+> +&uart5 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart5_dte>;
+> +	fsl,dte-mode;
+> +	status = "disabled";
+> +};
+> +
+> +&usbh1 {
+> +	vbus-supply = <&reg_usb_host_vbus>;
+> +	status = "disabled";
+> +};
+> +
+> +&usbotg {
+> +	vbus-supply = <&reg_usb_otg_vbus>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usbotg>;
+> +	disable-over-current;
+> +	status = "disabled";
+> +};
+> +
+> +/* MMC1 */
+> +&usdhc1 {
+> +	label = "MMC1";
+
+This...
+
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usdhc1 &pinctrl_mmc_cd>;
+> +	cd-gpios = <&gpio4 20 GPIO_ACTIVE_LOW>;
+> +	vmmc-supply = <&reg_3p3v>;
+> +	bus-width = <8>;
+> +	voltage-ranges = <3300 3300>;
+> +	status = "disabled";
+> +};
+> +
+> +/* SD1 */
+> +&usdhc2 {
+> +	label = "SD1";
+
+...and this seem not to be specified upstream? (at least not in
+Documentation/devicetree/bindings/mmc/mmc.txt?)
+Not sure about this... Or is label a common convention and hence
+available for all nodes?
+
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usdhc2 &pinctrl_sd_cd>;
+> +	cd-gpios = <&gpio6 14 GPIO_ACTIVE_LOW>;
+> +	vmmc-supply = <&reg_3p3v>;
+> +	bus-width = <4>;
+> +	voltage-ranges = <3300 3300>;
+> +	status = "disabled";
+> +};
+> +
+> +/* eMMC */
+> +&usdhc3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usdhc3>;
+> +	vmmc-supply = <&reg_3p3v>;
+> +	bus-width = <8>;
+> +	voltage-ranges = <3300 3300>;
+> +	non-removable;
+> +	status = "okay";
+> +};
+> +
+> +&weim {
+> +	status = "disabled"; /* weim signals not accessible on i.MX6 */
+
+They are accessible on the i.MX6 SoC.. but maybe "on Apalis iMX6Q/D". Or
+just remove the comment, since that is kind of what disabled says?
+
+> +};
+
+Otherwise:
+Reviewed-by: Stefan Agner <stefan@agner.ch>
 
 --
-
->> drivers/gpu/drm/imx/dw_hdmi-imx.c:181:2: warning: initialization from incompatible pointer type
-
-      .mode_valid = imx6q_hdmi_mode_valid,
-      ^
-    drivers/gpu/drm/imx/dw_hdmi-imx.c:181:2: warning: (near initialization for 'imx6q_hdmi_drv_data.mode_valid')
-    drivers/gpu/drm/imx/dw_hdmi-imx.c:189:2: warning: initialization from incompatible pointer type
-      .mode_valid = imx6dl_hdmi_mode_valid,
-      ^
-    drivers/gpu/drm/imx/dw_hdmi-imx.c:189:2: warning: (near initialization for 'imx6dl_hdmi_drv_data.mode_valid')
-
-Sorry,
-- Yakir
-
-
-On 01/07/2016 12:37 PM, Yakir Yang wrote:
-> RK3229 integrate an DesignedWare HDMI2.0 controller and an INNO HDMI2.0 phy,
-> the max output resolution is 4K.
->
-> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> ---
->   drivers/gpu/drm/bridge/dw-hdmi.c            |  33 ++-
->   drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 380 +++++++++++++++++++++++++---
->   drivers/gpu/drm/rockchip/dw_hdmi-rockchip.h | 137 ++++++++++
->   include/drm/bridge/dw_hdmi.h                |   5 +-
->   4 files changed, 516 insertions(+), 39 deletions(-)
->   create mode 100644 drivers/gpu/drm/rockchip/dw_hdmi-rockchip.h
->
-> diff --git a/drivers/gpu/drm/bridge/dw-hdmi.c b/drivers/gpu/drm/bridge/dw-hdmi.c
-> index 6fbec99..60b1dcf 100644
-> --- a/drivers/gpu/drm/bridge/dw-hdmi.c
-> +++ b/drivers/gpu/drm/bridge/dw-hdmi.c
-> @@ -735,10 +735,12 @@ static int hdmi_phy_configure(struct dw_hdmi *hdmi, unsigned char prep,
->   {
->   	unsigned res_idx;
->   	u8 val, msec;
-> +	int ret;
->   	const struct dw_hdmi_plat_data *pdata = hdmi->plat_data;
->   	const struct dw_hdmi_mpll_config *mpll_config = pdata->mpll_cfg;
->   	const struct dw_hdmi_curr_ctrl *curr_ctrl = pdata->cur_ctr;
->   	const struct dw_hdmi_phy_config *phy_config = pdata->phy_config;
-> +	int mpixelclock = hdmi->hdmi_data.video_mode.mpixelclock;
->   
->   	if (prep)
->   		return -EINVAL;
-> @@ -758,27 +760,38 @@ static int hdmi_phy_configure(struct dw_hdmi *hdmi, unsigned char prep,
->   		return -EINVAL;
->   	}
->   
-> +	if (hdmi->plat_data->extphy_config) {
-> +		/* gen2 tx power off */
-> +		dw_hdmi_phy_gen2_txpwron(hdmi, 0);
-> +		dw_hdmi_phy_gen2_pddq(hdmi, 1);
-> +
-> +		ret = hdmi->plat_data->extphy_config(hdmi->plat_data, res_idx,
-> +						     mpixelclock);
-> +		/* gen2 tx power on */
-> +		dw_hdmi_phy_gen2_txpwron(hdmi, 1);
-> +		dw_hdmi_phy_gen2_pddq(hdmi, 0);
-> +
-> +		return ret;
-> +	}
-> +
->   	/* PLL/MPLL Cfg - always match on final entry */
->   	for (; mpll_config->mpixelclock != ~0UL; mpll_config++)
-> -		if (hdmi->hdmi_data.video_mode.mpixelclock <=
-> -		    mpll_config->mpixelclock)
-> +		if (mpixelclock <= mpll_config->mpixelclock)
->   			break;
->   
->   	for (; curr_ctrl->mpixelclock != ~0UL; curr_ctrl++)
-> -		if (hdmi->hdmi_data.video_mode.mpixelclock <=
-> -		    curr_ctrl->mpixelclock)
-> +		if (mpixelclock <= curr_ctrl->mpixelclock)
->   			break;
->   
->   	for (; phy_config->mpixelclock != ~0UL; phy_config++)
-> -		if (hdmi->hdmi_data.video_mode.mpixelclock <=
-> -		    phy_config->mpixelclock)
-> +		if (mpixelclock <= phy_config->mpixelclock)
->   			break;
->   
->   	if (mpll_config->mpixelclock == ~0UL ||
->   	    curr_ctrl->mpixelclock == ~0UL ||
->   	    phy_config->mpixelclock == ~0UL) {
->   		dev_err(hdmi->dev, "Pixel clock %d - unsupported by HDMI\n",
-> -			hdmi->hdmi_data.video_mode.mpixelclock);
-> +			mpixelclock);
->   		return -EINVAL;
->   	}
->   
-> @@ -1476,14 +1489,16 @@ dw_hdmi_connector_mode_valid(struct drm_connector *connector,
->   {
->   	struct dw_hdmi *hdmi = container_of(connector,
->   					   struct dw_hdmi, connector);
-> +	struct dw_hdmi_plat_data *plat_data = hdmi->plat_data;
->   	enum drm_mode_status mode_status = MODE_OK;
->   
->   	/* We don't support double-clocked modes */
->   	if (mode->flags & DRM_MODE_FLAG_DBLCLK)
->   		return MODE_BAD;
->   
-> -	if (hdmi->plat_data->mode_valid)
-> -		mode_status = hdmi->plat_data->mode_valid(connector, mode);
-> +	if (plat_data->mode_valid)
-> +		mode_status = plat_data->mode_valid(plat_data, mode);
-> +
->   
->   	return mode_status;
->   }
-> diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-> index c65ce8c..424d548 100644
-> --- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-> +++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-> @@ -7,6 +7,7 @@
->    * (at your option) any later version.
->    */
->   
-> +#include <linux/clk.h>
->   #include <linux/module.h>
->   #include <linux/platform_device.h>
->   #include <linux/mfd/syscon.h>
-> @@ -21,18 +22,135 @@
->   #include "rockchip_drm_drv.h"
->   #include "rockchip_drm_vop.h"
->   
-> -#define GRF_SOC_CON6                    0x025c
-> -#define HDMI_SEL_VOP_LIT                (1 << 4)
-> +#include "dw_hdmi-rockchip.h"
->   
->   struct rockchip_hdmi {
->   	struct device *dev;
->   	struct regmap *regmap;
->   	struct drm_encoder encoder;
-> +	struct dw_hdmi_plat_data plat_data;
-> +
-> +	void __iomem *extphy_regbase;
-> +	struct clk *extphy_pclk;
->   };
->   
->   #define to_rockchip_hdmi(x)	container_of(x, struct rockchip_hdmi, x)
->   
-> -static const struct dw_hdmi_mpll_config rockchip_mpll_cfg[] = {
-> +static const struct extphy_config_tab rk3229_extphy_cfg[] = {
-> +	{ .mpixelclock = 165000000,
-> +	  .pre_emphasis = 0, .slopeboost = 0, .clk_level = 4,
-> +	  .data0_level = 4, 4, 4,
-> +	},
-> +
-> +	{ .mpixelclock = 225000000,
-> +	  .pre_emphasis = 0, .slopeboost = 0, .clk_level = 6,
-> +	  .data0_level = 6, 6, 6,
-> +	},
-> +
-> +	{ .mpixelclock = 340000000,
-> +	  .pre_emphasis = 1, .slopeboost = 0, .clk_level = 6,
-> +	  .data0_level = 10, 10, 10,
-> +	},
-> +
-> +	{ .mpixelclock = 594000000,
-> +	  .pre_emphasis = 1, .slopeboost = 0, .clk_level = 7,
-> +	  .data0_level = 10, 10, 10,
-> +	},
-> +
-> +	{ .mpixelclock = ~0UL},
-> +};
-> +
-> +static const struct extphy_pll_config_tab rk3229_extphy_pll_cfg[] = {
-> +	{
-> +		.mpixelclock = 27000000, .param = {
-> +			{ .pll_nd = 1, .pll_nf = 45,
-> +			  .tmsd_divider_a = 3, 1, 1,
-> +			  .pclk_divider_a = 1, 3, 3, 4,
-> +			  .vco_div_5 = 0,
-> +			  .ppll_nd = 1, .ppll_nf = 40, .ppll_no = 8,
-> +			},
-> +			{ .pll_nd = 1, .pll_nf = 45,
-> +			  .tmsd_divider_a = 0, 3, 3,
-> +			  .pclk_divider_a = 1, 3, 3, 4,
-> +			  .vco_div_5 = 0,
-> +			  .ppll_nd = 1, .ppll_nf = 40, .ppll_no = 8,
-> +			},
-> +		},
-> +	}, {
-> +		.mpixelclock = 59400000, .param = {
-> +			{ .pll_nd = 2, .pll_nf = 99,
-> +			  .tmsd_divider_a = 3, 1, 1,
-> +			  .pclk_divider_a = 1, 3, 2, 2,
-> +			  .vco_div_5 = 0,
-> +			  .ppll_nd = 1, .ppll_nf = 40, .ppll_no = 8,
-> +			},
-> +			{ .pll_nd = 2, .pll_nf = 99,
-> +			  .tmsd_divider_a = 1, 1, 1,
-> +			  .pclk_divider_a = 1, 3, 2, 2,
-> +			  .vco_div_5 = 0,
-> +			  .ppll_nd = 1, .ppll_nf = 40, .ppll_no = 8,
-> +			},
-> +		},
-> +	}, {
-> +		.mpixelclock = 74250000, .param = {
-> +			{ .pll_nd = 2, .pll_nf = 99,
-> +			  .tmsd_divider_a = 1, 1, 1,
-> +			  .pclk_divider_a = 1, 2, 2, 2,
-> +			  .vco_div_5 = 0,
-> +			  .ppll_nd = 1, .ppll_nf = 40, .ppll_no = 8,
-> +			},
-> +			{ .pll_nd = 4, .pll_nf = 495,
-> +			  .tmsd_divider_a = 1, 2, 2,
-> +			  .pclk_divider_a = 1, 3, 3, 4,
-> +			  .vco_div_5 = 0,
-> +			  .ppll_nd = 2, .ppll_nf = 40, .ppll_no = 4,
-> +			},
-> +		},
-> +	}, {
-> +		.mpixelclock = 148500000, .param = {
-> +			{ .pll_nd = 2, .pll_nf = 99,
-> +			  .tmsd_divider_a = 1, 0, 0,
-> +			  .pclk_divider_a = 1, 2, 1, 1,
-> +			  .vco_div_5 = 0,
-> +			  .ppll_nd = 2, .ppll_nf = 40, .ppll_no = 4,
-> +			},
-> +			{ .pll_nd = 4, .pll_nf = 495,
-> +			  .tmsd_divider_a = 0, 2, 2,
-> +			  .pclk_divider_a = 1, 3, 2, 2,
-> +			  .vco_div_5 = 0,
-> +			  .ppll_nd = 4, .ppll_nf = 40, .ppll_no = 2,
-> +			},
-> +		},
-> +	}, {
-> +		.mpixelclock = 297000000, .param = {
-> +			{ .pll_nd = 2, .pll_nf = 99,
-> +			  .tmsd_divider_a = 0, 0, 0,
-> +			  .pclk_divider_a = 1, 0, 1, 1,
-> +			  .vco_div_5 = 0,
-> +			  .ppll_nd = 4, .ppll_nf = 40, .ppll_no = 2,
-> +			},
-> +			{ .pll_nd = 4, .pll_nf = 495,
-> +			  .tmsd_divider_a = 1, 2, 0,
-> +			  .pclk_divider_a = 1, 3, 1, 1,
-> +			  .vco_div_5 = 0,
-> +			  .ppll_nd = 8, .ppll_nf = 40, .ppll_no = 1,
-> +			},
-> +		},
-> +	}, {
-> +		.mpixelclock = 594000000, .param = {
-> +			{ .pll_nd = 1, .pll_nf = 99,
-> +			  .tmsd_divider_a = 0, 2, 0,
-> +			  .pclk_divider_a = 1, 0, 1, 1,
-> +			  .vco_div_5 = 0,
-> +			  .ppll_nd = 8, .ppll_nf = 40, .ppll_no = 1,
-> +			},
-> +		}
-> +	}, {
-> +		.mpixelclock = ~0UL,
-> +	}
-> +};
-> +
-> +static const struct dw_hdmi_mpll_config rk3288_mpll_cfg[] = {
->   	{
->   		27000000, {
->   			{ 0x00b3, 0x0000},
-> @@ -112,7 +230,7 @@ static const struct dw_hdmi_mpll_config rockchip_mpll_cfg[] = {
->   	}
->   };
->   
-> -static const struct dw_hdmi_curr_ctrl rockchip_cur_ctr[] = {
-> +static const struct dw_hdmi_curr_ctrl rk3288_cur_ctr[] = {
->   	/*      pixelclk    bpp8    bpp10   bpp12 */
->   	{
->   		40000000,  { 0x0018, 0x0018, 0x0018 },
-> @@ -133,7 +251,7 @@ static const struct dw_hdmi_curr_ctrl rockchip_cur_ctr[] = {
->   	}
->   };
->   
-> -static const struct dw_hdmi_phy_config rockchip_phy_config[] = {
-> +static const struct dw_hdmi_phy_config rk3288_phy_config[] = {
->   	/*pixelclk   symbol   term   vlev*/
->   	{ 74250000,  0x8009, 0x0004, 0x0272},
->   	{ 148500000, 0x802b, 0x0004, 0x028d},
-> @@ -141,9 +259,158 @@ static const struct dw_hdmi_phy_config rockchip_phy_config[] = {
->   	{ ~0UL,	     0x0000, 0x0000, 0x0000}
->   };
->   
-> +static int hdmi_ext_phy_write(struct rockchip_hdmi *hdmi, unsigned short data,
-> +			      unsigned char addr)
-> +{
-> +	writel_relaxed(data, hdmi->extphy_regbase + (addr) * 0x04);
-> +	return 0;
-> +}
-> +
-> +static unsigned int hdmi_phy_i2c_read(struct rockchip_hdmi *hdmi,
-> +				      unsigned char addr)
-> +{
-> +	return readl_relaxed(hdmi->extphy_regbase + (addr) * 0x04);
-> +}
-> +
-> +static int rk3229_extphy_config(struct dw_hdmi_plat_data *plat_data,
-> +				  int res, int pixelclock)
-> +{
-> +	struct rockchip_hdmi *hdmi = to_rockchip_hdmi(plat_data);
-> +	const struct extphy_pll_config_tab *mpll = rk3229_extphy_pll_cfg;
-> +	const struct extphy_config_tab *ctrl = rk3229_extphy_cfg;
-> +	unsigned long timeout;
-> +	int i, stat;
-> +
-> +	/* Find out the extphy MPLL configure parameters */
-> +	for (i = 0; mpll[i].mpixelclock != ~0UL; i++)
-> +		if (pixelclock == mpll[i].mpixelclock)
-> +			break;
-> +	if (mpll[i].mpixelclock == ~0UL) {
-> +		dev_err(hdmi->dev, "Extphy couldn't support %dHz\n", pixelclock);
-> +		return -EINVAL;
-> +	}
-> +
-> +	regmap_write(hdmi->regmap, RK3229_GRF_SOC_CON2,
-> +		     RK3229_PLL_POWER_DOWN | RK3229_PLL_PDATA_DEN);
-> +
-> +	/*
-> +	 * Configure external phy PLL registers.
-> +	 */
-> +	stat = ((mpll[i].param[res].pll_nf >> 1) & EXT_PHY_PLL_FB_BIT8_MASK) |
-> +	       ((mpll[i].param[res].vco_div_5 & 1) << 5) |
-> +	       (mpll[i].param[res].pll_nd & EXT_PHY_PLL_PRE_DIVIDER_MASK);
-> +	hdmi_ext_phy_write(hdmi, stat, EXT_PHY_PLL_PRE_DIVIDER);
-> +
-> +	hdmi_ext_phy_write(hdmi, mpll[i].param[res].pll_nf, EXT_PHY_PLL_FB_DIVIDER);
-> +
-> +	stat = (mpll[i].param[res].pclk_divider_a & EXT_PHY_PCLK_DIVIDERA_MASK) |
-> +	       ((mpll[i].param[res].pclk_divider_b & 3) << 5);
-> +	hdmi_ext_phy_write(hdmi, stat, EXT_PHY_PCLK_DIVIDER1);
-> +
-> +	stat = (mpll[i].param[res].pclk_divider_d & EXT_PHY_PCLK_DIVIDERD_MASK) |
-> +	       ((mpll[i].param[res].pclk_divider_c & 3) << 5);
-> +	hdmi_ext_phy_write(hdmi, stat, EXT_PHY_PCLK_DIVIDER2);
-> +
-> +	stat = ((mpll[i].param[res].tmsd_divider_c & 3) << 4) |
-> +	       ((mpll[i].param[res].tmsd_divider_a & 3) << 2) |
-> +	       (mpll[i].param[res].tmsd_divider_b & 3);
-> +	hdmi_ext_phy_write(hdmi, stat, EXT_PHY_TMDSCLK_DIVIDER);
-> +
-> +	hdmi_ext_phy_write(hdmi, mpll[i].param[res].ppll_nf, EXT_PHY_PPLL_FB_DIVIDER);
-> +
-> +	if (mpll[i].param[res].ppll_no == 1) {
-> +		hdmi_ext_phy_write(hdmi, 0, EXT_PHY_PPLL_POST_DIVIDER);
-> +
-> +		stat = 0x20 | mpll[i].param[res].ppll_nd;
-> +		hdmi_ext_phy_write(hdmi, stat, EXT_PHY_PPLL_PRE_DIVIDER);
-> +	} else {
-> +		stat = ((mpll[i].param[res].ppll_no / 2) - 1) << 4;
-> +		hdmi_ext_phy_write(hdmi, stat, EXT_PHY_PPLL_POST_DIVIDER);
-> +
-> +		stat = 0xe0 | mpll[i].param[res].ppll_nd;
-> +		hdmi_ext_phy_write(hdmi, stat, EXT_PHY_PPLL_PRE_DIVIDER);
-> +	}
-> +
-> +
-> +	/* Find out the extphy driver configure parameters */
-> +	for (i = 0; ctrl[i].mpixelclock != ~0UL; i++)
-> +		if (pixelclock <= ctrl[i].mpixelclock)
-> +			break;
-> +	if (ctrl[i].mpixelclock == ~0UL) {
-> +		dev_err(hdmi->dev, "Extphy couldn't support %dHz\n", pixelclock);
-> +		return -EINVAL;
-> +	}
-> +
-> +	/*
-> +	 * Configure the extphy driver registers.
-> +	 */
-> +	if (ctrl[i].slopeboost) {
-> +		hdmi_ext_phy_write(hdmi, 0xff, EXT_PHY_SIGNAL_CTRL);
-> +
-> +		stat = (ctrl[i].slopeboost - 1) & 3;
-> +		stat = (stat << 6) | (stat << 4) | (stat << 2) | stat;
-> +		hdmi_ext_phy_write(hdmi, stat, EXT_PHY_SLOPEBOOST);
-> +	} else
-> +		hdmi_ext_phy_write(hdmi, 0x0f, EXT_PHY_SIGNAL_CTRL);
-> +
-> +	stat = ctrl[i].pre_emphasis & 3;
-> +	stat = (stat << 4) | (stat << 2) | stat;
-> +	hdmi_ext_phy_write(hdmi, stat, EXT_PHY_PREEMPHASIS);
-> +
-> +	stat = ((ctrl[i].clk_level & 0xf) << 4) | (ctrl[i].data2_level & 0xf);
-> +	hdmi_ext_phy_write(hdmi, stat, EXT_PHY_LEVEL1);
-> +
-> +	stat = ((ctrl[i].data1_level & 0xf) << 4) | (ctrl[i].data0_level & 0xf);
-> +	hdmi_ext_phy_write(hdmi, stat, EXT_PHY_LEVEL2);
-> +
-> +	hdmi_ext_phy_write(hdmi, 0x22, 0xf3);
-> +
-> +	stat = clk_get_rate(hdmi->extphy_pclk) / 100000;
-> +	hdmi_ext_phy_write(hdmi, ((stat >> 8) & 0xff) | 0x80, EXT_PHY_TERM_CAL);
-> +	hdmi_ext_phy_write(hdmi,  stat & 0xff, EXT_PHY_TERM_CAL_DIV_L);
-> +
-> +	if (pixelclock > 340000000)
-> +		stat = EXT_PHY_AUTO_R100_OHMS;
-> +	else if (pixelclock > 200000000)
-> +		stat = EXT_PHY_AUTO_R50_OHMS;
-> +	else
-> +		stat = EXT_PHY_AUTO_ROPEN_CIRCUIT;
-> +	hdmi_ext_phy_write(hdmi, stat | 0x20, EXT_PHY_TERM_RESIS_AUTO);
-> +	hdmi_ext_phy_write(hdmi, (stat >> 8) & 0xff, EXT_PHY_TERM_CAL);
-> +
-> +	stat = (pixelclock > 200000000) ? 0 : 0x11;
-> +	hdmi_ext_phy_write(hdmi, stat, EXT_PHY_PLL_BW);
-> +	hdmi_ext_phy_write(hdmi, 0x27, EXT_PHY_PPLL_BW);
-> +
-> +	regmap_write(hdmi->regmap, RK3229_GRF_SOC_CON2, RK3229_PLL_POWER_UP);
-> +
-> +	/* Detect whether PLL is lock or not */
-> +	timeout = jiffies + msecs_to_jiffies(100);
-> +	while (!time_after(jiffies, timeout)) {
-> +		usleep_range(1000, 2000);
-> +		stat = hdmi_phy_i2c_read(hdmi, EXT_PHY_PPLL_POST_DIVIDER);
-> +		if (stat & EXT_PHY_PPLL_LOCK_STATUS_MASK)
-> +			break;
-> +	}
-> +
-> +	regmap_write(hdmi->regmap, RK3229_GRF_SOC_CON2, RK3229_PLL_PDATA_EN);
-> +
-> +	if ((stat & EXT_PHY_PPLL_LOCK_STATUS_MASK) == 0) {
-> +		dev_err(hdmi->dev, "EXT PHY PLL not locked\n");
-> +		return -EBUSY;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
->   static int rockchip_hdmi_parse_dt(struct rockchip_hdmi *hdmi)
->   {
->   	struct device_node *np = hdmi->dev->of_node;
-> +	struct platform_device *pdev;
-> +	struct resource *iores;
-> +	int ret;
-> +
-> +	pdev = container_of(hdmi->dev, struct platform_device, dev);
->   
->   	hdmi->regmap = syscon_regmap_lookup_by_phandle(np, "rockchip,grf");
->   	if (IS_ERR(hdmi->regmap)) {
-> @@ -151,24 +418,62 @@ static int rockchip_hdmi_parse_dt(struct rockchip_hdmi *hdmi)
->   		return PTR_ERR(hdmi->regmap);
->   	}
->   
-> +	if (hdmi->plat_data.dev_type == RK3229_HDMI) {
-> +		iores = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-> +		if (!iores)
-> +			return -ENXIO;
-> +
-> +		hdmi->extphy_regbase = devm_ioremap_resource(hdmi->dev, iores);
-> +		if (IS_ERR(hdmi->extphy_regbase)) {
-> +			dev_err(hdmi->dev, "failed to map extphy regbase\n");
-> +			return PTR_ERR(hdmi->extphy_regbase);
-> +		}
-> +
-> +		hdmi->extphy_pclk = devm_clk_get(hdmi->dev, "extphy");
-> +		if (IS_ERR(hdmi->extphy_pclk)) {
-> +			dev_err(hdmi->dev, "failed to get extphy clock\n");
-> +			return PTR_ERR(hdmi->extphy_pclk);
-> +		}
-> +
-> +		ret = clk_prepare_enable(hdmi->extphy_pclk);
-> +		if (ret) {
-> +			dev_err(hdmi->dev, "failed to enable extphy clk: %d\n",
-> +				ret);
-> +			return ret;
-> +		}
-> +
-> +		regmap_write(hdmi->regmap, RK3229_GRF_SOC_CON6,
-> +			     RK3229_IO_3V_DOMAIN);
-> +
-> +		regmap_write(hdmi->regmap, RK3229_GRF_SOC_CON2,
-> +			     RK3229_DDC_MASK_EN);
-> +	}
-> +
->   	return 0;
->   }
->   
->   static enum drm_mode_status
-> -dw_hdmi_rockchip_mode_valid(struct drm_connector *connector,
-> +dw_hdmi_rockchip_mode_valid(const struct dw_hdmi_plat_data *plat_data,
->   			    struct drm_display_mode *mode)
->   {
-> -	const struct dw_hdmi_mpll_config *mpll_cfg = rockchip_mpll_cfg;
->   	int pclk = mode->clock * 1000;
->   	bool valid = false;
->   	int i;
->   
-> -	for (i = 0; mpll_cfg[i].mpixelclock != (~0UL); i++) {
-> -		if (pclk == mpll_cfg[i].mpixelclock) {
-> -			valid = true;
-> -			break;
-> +	if (plat_data->dev_type == RK3288_HDMI)
-> +		for (i = 0; rk3288_mpll_cfg[i].mpixelclock != (~0UL); i++)
-> +			if (pclk == rk3288_mpll_cfg[i].mpixelclock) {
-> +				valid = true;
-> +				break;
-> +			}
-> +
-> +	if (plat_data->dev_type == RK3229_HDMI)
-> +		for (i = 0; rk3229_extphy_pll_cfg[i].mpixelclock != ~0UL; i++) {
-> +			if (pclk == rk3229_extphy_pll_cfg[i].mpixelclock) {
-> +				valid = true;
-> +				break;
-> +			}
->   		}
-> -	}
->   
->   	return (valid) ? MODE_OK : MODE_BAD;
->   }
-> @@ -198,21 +503,29 @@ static void dw_hdmi_rockchip_encoder_mode_set(struct drm_encoder *encoder,
->   static void dw_hdmi_rockchip_encoder_enable(struct drm_encoder *encoder)
->   {
->   	struct rockchip_hdmi *hdmi = to_rockchip_hdmi(encoder);
-> +	int out_mode = ROCKCHIP_OUT_MODE_AAAA;
->   	u32 val;
->   	int mux;
->   
-> +	if (hdmi->plat_data.dev_type == RK3229_HDMI)
-> +		out_mode = ROCKCHIP_OUT_MODE_P888;
-> +
->   	rockchip_drm_crtc_mode_config(encoder->crtc, DRM_MODE_CONNECTOR_HDMIA,
-> -				      ROCKCHIP_OUT_MODE_AAAA);
-> +				      out_mode);
->   
-> -	mux = rockchip_drm_encoder_get_mux_id(hdmi->dev->of_node, encoder);
-> -	if (mux)
-> -		val = HDMI_SEL_VOP_LIT | (HDMI_SEL_VOP_LIT << 16);
-> -	else
-> -		val = HDMI_SEL_VOP_LIT << 16;
-> +	if (hdmi->plat_data.dev_type == RK3288_HDMI) {
-> +		mux = rockchip_drm_encoder_get_mux_id(hdmi->dev->of_node,
-> +						      encoder);
-> +		if (mux)
-> +			val = RK3288_HDMI_SEL_VOP_LIT |
-> +			      (RK3288_HDMI_SEL_VOP_LIT << 16);
-> +		else
-> +			val = RK3288_HDMI_SEL_VOP_LIT << 16;
->   
-> -	regmap_write(hdmi->regmap, GRF_SOC_CON6, val);
-> -	dev_dbg(hdmi->dev, "vop %s output to hdmi\n",
-> -		(mux) ? "LIT" : "BIG");
-> +		regmap_write(hdmi->regmap, RK3288_GRF_SOC_CON6, val);
-> +
-> +		dev_dbg(hdmi->dev, "vop %s output to hdmi\n", (mux) ? "LIT" : "BIG");
-> +	}
->   }
->   
->   static const struct drm_encoder_helper_funcs dw_hdmi_rockchip_encoder_helper_funcs = {
-> @@ -222,17 +535,26 @@ static const struct drm_encoder_helper_funcs dw_hdmi_rockchip_encoder_helper_fun
->   	.disable    = dw_hdmi_rockchip_encoder_disable,
->   };
->   
-> -static const struct dw_hdmi_plat_data rockchip_hdmi_drv_data = {
-> +static const struct dw_hdmi_plat_data rk3288_hdmi_drv_data = {
->   	.mode_valid = dw_hdmi_rockchip_mode_valid,
-> -	.mpll_cfg   = rockchip_mpll_cfg,
-> -	.cur_ctr    = rockchip_cur_ctr,
-> -	.phy_config = rockchip_phy_config,
-> +	.mpll_cfg   = rk3288_mpll_cfg,
-> +	.cur_ctr    = rk3288_cur_ctr,
-> +	.phy_config = rk3288_phy_config,
->   	.dev_type   = RK3288_HDMI,
->   };
->   
-> +static const struct dw_hdmi_plat_data rk3229_hdmi_drv_data = {
-> +	.mode_valid = dw_hdmi_rockchip_mode_valid,
-> +	.extphy_config = rk3229_extphy_config,
-> +	.dev_type   = RK3229_HDMI,
-> +};
-> +
->   static const struct of_device_id dw_hdmi_rockchip_dt_ids[] = {
->   	{ .compatible = "rockchip,rk3288-dw-hdmi",
-> -	  .data = &rockchip_hdmi_drv_data
-> +	  .data = &rk3288_hdmi_drv_data
-> +	},
-> +	{ .compatible = "rockchip,rk3229-dw-hdmi",
-> +	  .data = &rk3229_hdmi_drv_data
->   	},
->   	{},
->   };
-> @@ -242,7 +564,6 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
->   				 void *data)
->   {
->   	struct platform_device *pdev = to_platform_device(dev);
-> -	const struct dw_hdmi_plat_data *plat_data;
->   	const struct of_device_id *match;
->   	struct drm_device *drm = data;
->   	struct drm_encoder *encoder;
-> @@ -259,7 +580,7 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
->   		return -ENOMEM;
->   
->   	match = of_match_node(dw_hdmi_rockchip_dt_ids, pdev->dev.of_node);
-> -	plat_data = match->data;
-> +	hdmi->plat_data = *(struct dw_hdmi_plat_data *)(match->data);
->   	hdmi->dev = &pdev->dev;
->   	encoder = &hdmi->encoder;
->   
-> @@ -293,7 +614,8 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
->   	drm_encoder_init(drm, encoder, &dw_hdmi_rockchip_encoder_funcs,
->   			 DRM_MODE_ENCODER_TMDS, NULL);
->   
-> -	return dw_hdmi_bind(dev, master, data, encoder, iores, irq, plat_data);
-> +	return dw_hdmi_bind(dev, master, data, encoder, iores, irq,
-> +			    &hdmi->plat_data);
->   }
->   
->   static void dw_hdmi_rockchip_unbind(struct device *dev, struct device *master,
-> diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.h b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.h
-> new file mode 100644
-> index 0000000..aca2543
-> --- /dev/null
-> +++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.h
-> @@ -0,0 +1,137 @@
-> +#ifndef __DW_HDMI_ROCKCHIP__
-> +#define __DW_HDMI_ROCKCHIP__
-> +
-> +struct extphy_config_tab {
-> +	u32 mpixelclock;
-> +	int pre_emphasis;
-> +	int slopeboost;
-> +	int clk_level;
-> +	int data0_level;
-> +	int data1_level;
-> +	int data2_level;
-> +};
-> +
-> +struct extphy_pll_config_tab {
-> +	unsigned long mpixelclock;
-> +	struct {
-> +		u8	pll_nd;
-> +		u16	pll_nf;
-> +		u8	tmsd_divider_a;
-> +		u8	tmsd_divider_b;
-> +		u8	tmsd_divider_c;
-> +		u8	pclk_divider_a;
-> +		u8	pclk_divider_b;
-> +		u8	pclk_divider_c;
-> +		u8	pclk_divider_d;
-> +		u8	vco_div_5;
-> +		u8	ppll_nd;
-> +		u8	ppll_nf;
-> +		u8	ppll_no;
-> +	} param[DW_HDMI_RES_MAX];
-> +};
-> +
-> +#define RK3288_GRF_SOC_CON6			0x025c
-> +#define RK3288_HDMI_SEL_VOP_LIT			(1 << 4)
-> +
-> +#define RK3229_GRF_SOC_CON6			0x0418
-> +#define RK3229_IO_3V_DOMAIN			((7 << 4) | (7 << (4 + 16)))
-> +
-> +#define RK3229_GRF_SOC_CON2			0x0408
-> +#define RK3229_DDC_MASK_EN			((3 << 13) | (3 << (13 + 16)))
-> +
-> +#define RK3229_PLL_POWER_DOWN			(BIT(12) | BIT(12 + 16))
-> +#define RK3229_PLL_POWER_UP			BIT(12 + 16)
-> +#define RK3229_PLL_PDATA_DEN			BIT(11 + 16)
-> +#define RK3229_PLL_PDATA_EN			(BIT(11) | BIT(11 + 16))
-> +
-> +/* PHY Defined for RK322X */
-> +#define EXT_PHY_CONTROL				0
-> +#define EXT_PHY_ANALOG_RESET_MASK		0x80
-> +#define EXT_PHY_DIGITAL_RESET_MASK		0x40
-> +#define EXT_PHY_PCLK_INVERT_MASK		0x08
-> +#define EXT_PHY_PREPCLK_INVERT_MASK		0x04
-> +#define EXT_PHY_TMDSCLK_INVERT_MASK		0x02
-> +#define EXT_PHY_SRC_SELECT_MASK			0x01
-> +
-> +#define EXT_PHY_TERM_CAL			0x03
-> +#define EXT_PHY_TERM_CAL_EN_MASK		0x80
-> +#define EXT_PHY_TERM_CAL_DIV_H_MASK		0x7f
-> +
-> +#define EXT_PHY_TERM_CAL_DIV_L			0x04
-> +
-> +#define EXT_PHY_PLL_PRE_DIVIDER			0xe2
-> +#define EXT_PHY_PLL_FB_BIT8_MASK		0x80
-> +#define EXT_PHY_PLL_PCLK_DIV5_EN_MASK		0x20
-> +#define EXT_PHY_PLL_PRE_DIVIDER_MASK		0x1f
-> +
-> +#define EXT_PHY_PLL_FB_DIVIDER			0xe3
-> +
-> +#define EXT_PHY_PCLK_DIVIDER1			0xe4
-> +#define EXT_PHY_PCLK_DIVIDERB_MASK		0x60
-> +#define EXT_PHY_PCLK_DIVIDERA_MASK		0x1f
-> +
-> +#define EXT_PHY_PCLK_DIVIDER2			0xe5
-> +#define EXT_PHY_PCLK_DIVIDERC_MASK		0x60
-> +#define EXT_PHY_PCLK_DIVIDERD_MASK		0x1f
-> +
-> +#define EXT_PHY_TMDSCLK_DIVIDER			0xe6
-> +#define EXT_PHY_TMDSCLK_DIVIDERC_MASK		0x30
-> +#define EXT_PHY_TMDSCLK_DIVIDERA_MASK		0x0c
-> +#define EXT_PHY_TMDSCLK_DIVIDERB_MASK		0x03
-> +
-> +#define EXT_PHY_PLL_BW				0xe7
-> +
-> +#define EXT_PHY_PPLL_PRE_DIVIDER		0xe9
-> +#define EXT_PHY_PPLL_ENABLE_MASK		0xc0
-> +#define EXT_PHY_PPLL_PRE_DIVIDER_MASK		0x1f
-> +
-> +#define EXT_PHY_PPLL_FB_DIVIDER			0xea
-> +
-> +#define EXT_PHY_PPLL_POST_DIVIDER		0xeb
-> +#define EXT_PHY_PPLL_FB_DIVIDER_BIT8_MASK	0x80
-> +#define EXT_PHY_PPLL_POST_DIVIDER_MASK		0x30
-> +#define EXT_PHY_PPLL_LOCK_STATUS_MASK		0x01
-> +
-> +#define EXT_PHY_PPLL_BW				0xec
-> +
-> +#define EXT_PHY_SIGNAL_CTRL			0xee
-> +#define EXT_PHY_TRANSITION_CLK_EN_MASK		0x80
-> +#define EXT_PHY_TRANSITION_D0_EN_MASK		0x40
-> +#define EXT_PHY_TRANSITION_D1_EN_MASK		0x20
-> +#define EXT_PHY_TRANSITION_D2_EN_MASK		0x10
-> +#define EXT_PHY_LEVEL_CLK_EN_MASK		0x08
-> +#define EXT_PHY_LEVEL_D0_EN_MASK		0x04
-> +#define EXT_PHY_LEVEL_D1_EN_MASK		0x02
-> +#define EXT_PHY_LEVEL_D2_EN_MASK		0x01
-> +
-> +#define EXT_PHY_SLOPEBOOST			0xef
-> +#define EXT_PHY_SLOPEBOOST_CLK_MASK		0x03
-> +#define EXT_PHY_SLOPEBOOST_D0_MASK		0x0c
-> +#define EXT_PHY_SLOPEBOOST_D1_MASK		0x30
-> +#define EXT_PHY_SLOPEBOOST_D2_MASK		0xc0
-> +
-> +#define EXT_PHY_PREEMPHASIS			0xf0
-> +#define EXT_PHY_PREEMPHASIS_D0_MASK		0x03
-> +#define EXT_PHY_PREEMPHASIS_D1_MASK		0x0c
-> +#define EXT_PHY_PREEMPHASIS_D2_MASK		0x30
-> +
-> +#define EXT_PHY_LEVEL1				0xf1
-> +#define EXT_PHY_LEVEL_CLK_MASK			0xf0
-> +#define EXT_PHY_LEVEL_D2_MASK			0x0f
-> +
-> +#define EXT_PHY_LEVEL2				0xf2
-> +#define EXT_PHY_LEVEL_D1_MASK			0xf0
-> +#define EXT_PHY_LEVEL_D0_MASK			0x0f
-> +
-> +#define EXT_PHY_TERM_RESIS_AUTO			0xf4
-> +#define EXT_PHY_AUTO_R50_OHMS			0
-> +#define EXT_PHY_AUTO_R75_OHMS			(1 << 2)
-> +#define EXT_PHY_AUTO_R100_OHMS			(2 << 2)
-> +#define EXT_PHY_AUTO_ROPEN_CIRCUIT		(3 << 2)
-> +
-> +#define EXT_PHY_TERM_RESIS_MANUAL_CLK		0xfb
-> +#define EXT_PHY_TERM_RESIS_MANUAL_D2		0xfc
-> +#define EXT_PHY_TERM_RESIS_MANUAL_D1		0xfd
-> +#define EXT_PHY_TERM_RESIS_MANUAL_D0		0xfe
-> +
-> +#endif /* __DW_HDMI_ROCKCHIP__ */
-> diff --git a/include/drm/bridge/dw_hdmi.h b/include/drm/bridge/dw_hdmi.h
-> index bae79f3..44084e8 100644
-> --- a/include/drm/bridge/dw_hdmi.h
-> +++ b/include/drm/bridge/dw_hdmi.h
-> @@ -24,6 +24,7 @@ enum {
->   enum dw_hdmi_devtype {
->   	IMX6Q_HDMI,
->   	IMX6DL_HDMI,
-> +	RK3229_HDMI,
->   	RK3288_HDMI,
->   };
->   
-> @@ -52,8 +53,10 @@ struct dw_hdmi_plat_data {
->   	const struct dw_hdmi_mpll_config *mpll_cfg;
->   	const struct dw_hdmi_curr_ctrl *cur_ctr;
->   	const struct dw_hdmi_phy_config *phy_config;
-> -	enum drm_mode_status (*mode_valid)(struct drm_connector *connector,
-> +	enum drm_mode_status (*mode_valid)(const struct dw_hdmi_plat_data *plat_data,
->   					   struct drm_display_mode *mode);
-> +	int (*extphy_config)(struct dw_hdmi_plat_data *plat_data,
-> +			     int bpp, int pixelclock);
->   };
->   
->   void dw_hdmi_unbind(struct device *dev, struct device *master, void *data);
+Stefan
