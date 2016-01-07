@@ -1,42 +1,16 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 08 Jan 2016 01:20:08 +0100
-Subject: [PATCH v11 2/4] PM / Domains: add setter for dev.pm_domain
-In-Reply-To: <CAAObsKC1jTzLWmMtwGWVStuMtzZwvMuA_731dsn4YX7aKMtFKQ@mail.gmail.com>
-References: <1445956731-6304-1-git-send-email-tomeu.vizoso@collabora.com>
- <CAGS+omBMJXOgsd2x9agtt7yi-y+EPgHWSTr7B3JqbN9Hg_2W5A@mail.gmail.com>
- <CAAObsKC1jTzLWmMtwGWVStuMtzZwvMuA_731dsn4YX7aKMtFKQ@mail.gmail.com>
-Message-ID: <1638223.v1Ed2MLOOC@vostro.rjw.lan>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 7 Jan 2016 21:51:28 -0200
+Subject: [PATCH V2] serial: imx: Fix suspend / resume.
+In-Reply-To: <CAOMZO5BES=YkYjtjPE_=t9Qa11JsgE0TT8-v0CxmtgSuBwWnmw@mail.gmail.com>
+References: <20160105155331.6024.7211.stgit@localhost>
+ <CAOMZO5BES=YkYjtjPE_=t9Qa11JsgE0TT8-v0CxmtgSuBwWnmw@mail.gmail.com>
+Message-ID: <CAOMZO5ADYomDf5EbGAAPJSjEQFOfKi_r7j+xytSuQA5dQh=V0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, January 07, 2016 03:47:01 PM Tomeu Vizoso wrote:
-> On 10 November 2015 at 10:33, Daniel Kurtz <djkurtz@chromium.org> wrote:
-> [snip]
-> >
-> > The problem appears to be that:
-> >   * On boot, platform_drv_probe() calls dev_pm_domain_attach() before
-> > drv->probe(); thus, it calls dev_pm_domain_attach() while the device
-> > is unbound.
-> >
-> >  * However, for a platform_device, the reboot path calls
-> > device_shutdown(), but not __device_release_driver():
-> > device_shutdown()
-> >   dev->driver->shutdown => platform_drv_shutdown()
-> >     dev_pm_domain_detach()
-> >        dev->pm_domain->detach() => genpd_dev_pm_detach()
-> >          pm_genpd_remove_device()
-> >             dev_pm_domain_set(dev, NULL);
-> >
-> > So, for a platform_device in a genpd power domain with .shutdown
-> > installed, platform_drv_shutdown() calls dev_pm_domain_detach() while
-> > the device is still bound, which triggers the WARN().
-> 
-> Hi Rafael, Alan and Ulf,
-> 
-> do you have any suggestion about this? I don't really understand why
-> the device is detached from the domain on shutdown.
+On Thu, Jan 7, 2016 at 9:17 PM, Fabio Estevam <festevam@gmail.com> wrote:
 
-Well, this looks like a bug to me.
+> [   39.487313] [<c05844d0>] (snd_soc_suspend) from [<c03c31f0>]
 
-Thanks,
-Rafael
+Ok, in this case it is an ALSA issue, so will start a thread at the
+alsa mailing list.
