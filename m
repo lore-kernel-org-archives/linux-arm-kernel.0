@@ -1,67 +1,42 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 07 Jan 2016 09:05:06 +0000
-Subject: [PATCH 1/2] arm: KVM: Do not update PC if the trap handler has
- updated it
-In-Reply-To: <568E28F0.9010405@huawei.com>
-References: <1450778118-12715-1-git-send-email-marc.zyngier@arm.com>
- <1450778118-12715-2-git-send-email-marc.zyngier@arm.com>
- <CAFEAcA8F2TJuRR5ELvit0FPa3XFMJ847S8WK25i5aVdGBU=PUA@mail.gmail.com>
- <20151222143947.GA5631@cbox>
- <CAFEAcA9dALQv8Xcyg5FLAvRaJfH5UT2u4jrLjofLh5Ff2yo=8Q@mail.gmail.com>
- <568E26CD.8020500@arm.com> <568E28F0.9010405@huawei.com>
-Message-ID: <568E2A42.7040606@arm.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Thu,  7 Jan 2016 17:05:11 +0800
+Subject: [RFC PATCH v2 4/4] dt-bindings: add document for rk3229-hdmi
+In-Reply-To: <1452156811-18150-1-git-send-email-ykk@rock-chips.com>
+References: <1452156811-18150-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1452157511-18891-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/01/16 08:59, Shannon Zhao wrote:
-> 
-> 
-> On 2016/1/7 16:50, Marc Zyngier wrote:
->> On 22/12/15 14:50, Peter Maydell wrote:
->>> On 22 December 2015 at 14:39, Christoffer Dall
->>> <christoffer.dall@linaro.org> wrote:
->>>> On Tue, Dec 22, 2015 at 11:08:10AM +0000, Peter Maydell wrote:
->>>>> Won't this result in our incorrectly skipping the first insn
->>>>> in the fault handler if the original offending instruction
->>>>> was itself the first insn in the fault handler?
->>>>>
->>>> Wouldn't that then loop with the exception forever?
->>>
->>> Yes, but so would real hardware...
->>
->> Indeed. As it is, this patch is not doing what it should. On the other
->> hand, I came to the conclusion that we do not need to fix this just yet,
->> as long as we only let KVM inject an UNDEF, and that's what the PMU code
->> requires.
->>
->> I'll comment on the PMU thread, but the gist of it is:
->> 1) fix the arm64 UNDEF/PABRT/DABRT code to properly account for the the
->> source EL (Table D1-7 of the ARMv8 ARM).
-> This looks like something we add in the PMU patch set.
-> 
-> +		switch (cpsr & (PSR_MODE_MASK | PSR_MODE32_BIT)) {
-> +		case PSR_MODE_EL0t:
-> +			exc_offset = EL0_EXCEPT_SYNC_OFFSET_64;
-> +			break;
-> +		case PSR_MODE_EL1t:
-> +			exc_offset = EL1_EXCEPT_BAD_SYNC_OFFSET;
-> +			break;
-> +		case PSR_MODE_EL1h:
-> +			exc_offset = EL1_EXCEPT_SYNC_OFFSET;
-> +			break;
-> +		default:
-> +			exc_offset = EL0_EXCEPT_SYNC_OFFSET_32;
-> +		}
-> +
+Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+---
+Changes in v2: None
 
-Indeed, plus some additional code to select the actual vector and not be
-limited to a Synchronous exception (even if that's the only thing we use
-today).
+ .../devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt         | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-See the patch I've just posted for more details.
-
-Thanks,
-
-	M.
+diff --git a/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
+index 668091f..1cdc627 100644
+--- a/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
++++ b/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
+@@ -2,7 +2,7 @@ Rockchip specific extensions to the Synopsys Designware HDMI
+ ================================
+ 
+ Required properties:
+-- compatible: "rockchip,rk3288-dw-hdmi";
++- compatible: "rockchip,rk3288-dw-hdmi", "rockchip,rk3229-dw-hdmi";
+ - reg: Physical base address and length of the controller's registers.
+ - clocks: phandle to hdmi iahb and isfr clocks.
+ - clock-names: should be "iahb" "isfr"
+@@ -15,8 +15,10 @@ Required properties:
+   rk3288 platform
+ 
+ Optional properties
++- reg: Physical base address and length of the external HDMI PHY's registers.
+ - ddc-i2c-bus: phandle of an I2C controller used for DDC EDID probing
+ - clocks, clock-names: phandle to the HDMI CEC clock, name should be "cec"
++		       phandle to the external HDMI PHY clock, name should be "extphy"
+ 
+ Example:
+ hdmi: hdmi at ff980000 {
 -- 
-Jazz is not dead. It just smells funny...
+2.1.2
