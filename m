@@ -1,40 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 7 Jan 2016 11:30:29 +0000
-Subject: [PATCH v3] ARM: fix atags_to_fdt with stack-protector-strong
-In-Reply-To: <20160106233656.GA9316@www.outflux.net>
-References: <20160106233656.GA9316@www.outflux.net>
-Message-ID: <20160107113029.GE19062@n2100.arm.linux.org.uk>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 7 Jan 2016 12:34:09 +0100
+Subject: Nokia N900: u-SD card in v4.2+
+In-Reply-To: <568DFA4B.7030308@ti.com>
+References: <20160106204627.GA21477@amd>
+ <568DFA4B.7030308@ti.com>
+Message-ID: <20160107113408.GA26618@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 06, 2016 at 03:36:56PM -0800, Kees Cook wrote:
-> diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-> index 3f9a9ebc77c3..d7d2c2981f65 100644
-> --- a/arch/arm/boot/compressed/Makefile
-> +++ b/arch/arm/boot/compressed/Makefile
-> @@ -106,6 +106,14 @@ ORIG_CFLAGS := $(KBUILD_CFLAGS)
->  KBUILD_CFLAGS = $(subst -pg, , $(ORIG_CFLAGS))
->  endif
->  
-> +# -fstack-protector-strong triggers protection checks in this code,
-> +# but it is being used too early to link to meaningful stack_chk logic.
-> +CFLAGS_atags_to_fdt.o := $(call cc-option, -fno-stack-protector)
-> +CFLAGS_fdt.o := $(call cc-option, -fno-stack-protector)
-> +CFLAGS_fdt_ro.o := $(call cc-option, -fno-stack-protector)
-> +CFLAGS_fdt_rw.o := $(call cc-option, -fno-stack-protector)
-> +CFLAGS_fdt_wip.o := $(call cc-option, -fno-stack-protector)
+Hi!
 
-This will result in "$(call cc-option, -fno-stack-protector)" being
-called five times when this Makefile is parsed, which seems very
-wasteful.  I'm sure there's better solutions to that - maybe caching
-the value in a variable in a higher level makefile (eg,
-arch/arm/Makefile) ?
+> On Thursday 07 January 2016 02:16 AM, Pavel Machek wrote:
+> > Hi!
+> > 
+> > In v4.1, both internal MMC and u-SD cards work ok.
+> > 
+> > In v4.2, only the internal MMC is detected. In v4.3, not even internal
+> > MMC works. In v4.4, only the internal MMC is detected.
+> > 
+> > Does it work for you? Any patches?
+> 
+> I don't have Nokia N900 to check this, but can you share your config and kernel
+> logs? Check if CONFIG_REGULATOR_PBIAS is present in your config.
+> CONFIG_REGULATOR_PBIAS is now mandatory for all omap3+ SoCs to work.
 
-Also, I suspect that all of the decompressor should be built with
--fno-stack-protector as we don't have sufficient environment here.
-Maybe it should be placed in the global CFLAGS for the decompressor?
+I enabled CONFIG_REGULATOR_PBIAS and both MMCs now work.
 
+I wonder if we should add some selects, so that users updating from
+old kernels don't break their system?
+
+Thanks,
+									
+									Pavel
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
