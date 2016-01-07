@@ -1,27 +1,38 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 7 Jan 2016 15:58:15 +0000
-Subject: [Qemu-devel] arm64 qemu tests failing in linux-next since 'arm64:
- kernel: enforce pmuserenr_el0 initialization and restore'
-In-Reply-To: <20160107155310.GA4064@red-moon>
-References: <567B41E3.5060800@roeck-us.net>
- <CAFEAcA_c9DicGF+is6ST3NJv+c5Bi4dHYo2t8Q2n9AS9G4q0+Q@mail.gmail.com>
- <20160107155310.GA4064@red-moon>
-Message-ID: <CAFEAcA_vP93=PE6LNNHodCsdk0gL0kBQPX=xzLJU5RzkvNs2vw@mail.gmail.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu,  7 Jan 2016 15:58:16 +0000
+Subject: [PATCH 0/2] crypto: sunxi-ss: fix 64-bit compilation
+Message-ID: <1452182298-4653-1-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 January 2016 at 15:53, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> On Thu, Jan 07, 2016 at 01:25:35PM +0000, Peter Maydell wrote:
->> We had previously been relying on the kernel not attempting to
->> touch the PMU if the ID_AA64DFR0_EL1 PMUVer bits read 0000
->> ("Performance Monitors extension System registers not implemented").
->
-> Ok, thanks for looking into this. I wonder why reading pmcr_el0 does
-> not suffer from the same problem though.
+Hi,
 
-Just a pragmatic thing on QEMU's end, I expect -- the kernel already
-touched PMCR_EL0 and we wanted to be able to boot it, so we have an
-implementation of it.
+these two patches provide a different approach to an issue I tried
+to fix lately [1].
+Instead of casting everything I now promote local types to size_t, so
+that the min3() arguments naturally match in type.
+As size_t is defined as "unsigned int" on 32-bit architectures
+anyway, that actually does not change anything there, but instead
+provides a clean approach to get it compiled for arm64.
 
-thanks
--- PMM
+I split this up because 1/2 seems much cleaner to me than 2/2, so we
+can have a separate discussion/merge process on this.
+
+Cheers,
+Andre.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/395689.html
+
+Andre Przywara (2):
+  crypto: sunxi-ss-cipher: promote variables to match types in min3()
+    calls
+  crypto: sunxi-ss-hash: promote variables to match types in min3()
+    calls
+
+ drivers/crypto/sunxi-ss/sun4i-ss-cipher.c | 20 ++++++++++----------
+ drivers/crypto/sunxi-ss/sun4i-ss-hash.c   | 12 ++++++------
+ drivers/crypto/sunxi-ss/sun4i-ss.h        |  2 +-
+ 3 files changed, 17 insertions(+), 17 deletions(-)
+
+-- 
+2.6.4
