@@ -1,112 +1,33 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 7 Jan 2016 11:32:16 -0800
-Subject: [RESEND][PATCH v2] clk_register_clkdev: remove format string interface
-Message-ID: <20160107193216.GA6824@www.outflux.net>
+From: joe@perches.com (Joe Perches)
+Date: Thu, 07 Jan 2016 11:44:06 -0800
+Subject: [PATCH] net-thunder: One check less in
+ nicvf_register_interrupts() after error detection
+In-Reply-To: <568EBCE7.4060502@users.sourceforge.net>
+References: <566ABCD9.1060404@users.sourceforge.net>
+ <5685A273.6070607@users.sourceforge.net>
+ <20160107110701.GE25086@rric.localdomain>
+ <568EBCE7.4060502@users.sourceforge.net>
+Message-ID: <1452195846.4028.24.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many callers either use NULL or const strings for the third argument of
-clk_register_clkdev. For those that do not and use a non-const string,
-this is a risk for format strings being accidentally processed (for
-example in device names). As this interface is already used as if it
-weren't a format string (prints nothing when NULL), and there are zero
-users of the format strings, remove the format string interface to make
-sure format strings will not leak into the clkdev.
+On Thu, 2016-01-07 at 20:30 +0100, SF Markus Elfring wrote:
+> > > Adjust a jump target to eliminate a check before error logging.
+> > > Use the identifier "report_failure" instead of "err".
+> > I don't see much value in those changes
+> Thanks for your feedback.
+> > Using the 'err' label is ok as it is not misleading and common use.
+> Is such a short jump label enough explanation for the information
+> "what" and "why"?
 
-$ git grep '\bclk_register_clkdev\b' | grep % | wc -l
-0
+When there is only one type of error possible, yes.
 
-Unfortunately, all the internals expect a va_list even though they treat
-a NULL format string as special. To deal with this, we must pass either
-(..., "%s", string) or (..., NULL) so that a the va_list will be created
-correctly (passing the name as an argument, not as a format string).
+> > And, there is no need to optimize the check since this is not the
+> > fast path
+> Really? - Is it a bit more efficient to avoid a double check for the
+> variable "ret" at the end of the current implementation for the
+> discussed function?
 
-Signed-off-by: Kees Cook <keescook@chromium.org>
----
-v2:
-- make calling logic more clear, thanks to rmk.
----
- drivers/clk/clkdev.c   | 31 +++++++++++++++++++++++++------
- include/linux/clkdev.h |  3 +--
- 2 files changed, 26 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-index 779b6ff0c7ad..eb20b941154b 100644
---- a/drivers/clk/clkdev.c
-+++ b/drivers/clk/clkdev.c
-@@ -353,11 +353,25 @@ void clkdev_drop(struct clk_lookup *cl)
- }
- EXPORT_SYMBOL(clkdev_drop);
- 
-+static struct clk_lookup *__clk_register_clkdev(struct clk_hw *hw,
-+						const char *con_id,
-+						const char *dev_id, ...)
-+{
-+	struct clk_lookup *cl;
-+	va_list ap;
-+
-+	va_start(ap, dev_id);
-+	cl = vclkdev_create(hw, con_id, dev_id, ap);
-+	va_end(ap);
-+
-+	return cl;
-+}
-+
- /**
-  * clk_register_clkdev - register one clock lookup for a struct clk
-  * @clk: struct clk to associate with all clk_lookups
-  * @con_id: connection ID string on device
-- * @dev_id: format string describing device name
-+ * @dev_id: string describing device name
-  *
-  * con_id or dev_id may be NULL as a wildcard, just as in the rest of
-  * clkdev.
-@@ -368,17 +382,22 @@ EXPORT_SYMBOL(clkdev_drop);
-  * after clk_register().
-  */
- int clk_register_clkdev(struct clk *clk, const char *con_id,
--	const char *dev_fmt, ...)
-+	const char *dev_id)
- {
- 	struct clk_lookup *cl;
--	va_list ap;
- 
- 	if (IS_ERR(clk))
- 		return PTR_ERR(clk);
- 
--	va_start(ap, dev_fmt);
--	cl = vclkdev_create(__clk_get_hw(clk), con_id, dev_fmt, ap);
--	va_end(ap);
-+	/*
-+	 * Since dev_id can be NULL, and NULL is handled specially, we must
-+	 * pass it as either a NULL format string, or with "%s".
-+	 */
-+	if (dev_id)
-+		cl = __clk_register_clkdev(__clk_get_hw(clk), con_id, "%s",
-+					   dev_id);
-+	else
-+		cl = __clk_register_clkdev(__clk_get_hw(clk), con_id, NULL);
- 
- 	return cl ? 0 : -ENOMEM;
- }
-diff --git a/include/linux/clkdev.h b/include/linux/clkdev.h
-index 08bffcc466de..c2c04f7cbe8a 100644
---- a/include/linux/clkdev.h
-+++ b/include/linux/clkdev.h
-@@ -44,8 +44,7 @@ struct clk_lookup *clkdev_create(struct clk *clk, const char *con_id,
- void clkdev_add_table(struct clk_lookup *, size_t);
- int clk_add_alias(const char *, const char *, const char *, struct device *);
- 
--int clk_register_clkdev(struct clk *, const char *, const char *, ...)
--	__printf(3, 4);
-+int clk_register_clkdev(struct clk *, const char *, const char *);
- int clk_register_clkdevs(struct clk *, struct clk_lookup *, size_t);
- 
- #ifdef CONFIG_COMMON_CLK
--- 
-2.6.3
-
-
--- 
-Kees Cook
-Chrome OS & Brillo Security
+Before asking questions you could answer yourself,
+please look at object code produced by the compiler
+before and after your proposed changes.
