@@ -1,53 +1,78 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 7 Jan 2016 11:06:58 +0100
-Subject: reason for Allwinner SoC specific pinctrl drivers?
-In-Reply-To: <20160105131006.GI11722@lukather>
-References: <568A514D.7070102@arm.com>
-	<20160105131006.GI11722@lukather>
-Message-ID: <CACRpkdZ+mGBr42Q4E+5tL80-+pFLWTQug8TJu64TVHDaCzE8_g@mail.gmail.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Thu,  7 Jan 2016 18:07:10 +0800
+Subject: [PATCH v2 2/2] dt-bindings: add document for Innosilicon HDMI on
+ Rockchip platform
+In-Reply-To: <1452160896-27096-1-git-send-email-ykk@rock-chips.com>
+References: <1452160896-27096-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1452161230-27315-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 5, 2016 at 2:10 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
+Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+Changes in v2:
+- Correct the misspell "rk3036-dw-hdmi" (Heiko)
 
-> This was actually requested during the initial driver submission
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/136809.html
->
-> And I actually came to like it, even though the initial port is indeed
-> quite painful, for several reasons:
->
-> 1) In those times, we didn't have a datasheet available for all these
-> SoCs, so no easy way to find out the value to set in the register to
-> mux a particular function in. These days are mostly over, but we're
-> still in that situation for a few SoCs (mostly the R* and H* SoCs
-> though).
->
-> 2) It's quite easy to read and debug, at least from the DT PoV. The
-> pain mostly comes from writing that table in the first place, but the
-> alternative other SoCs have picked to have something readable in the
-> DT is a SoC specific header file with the defines of all the functions
-> availables for all the pins, which is just as painful to write and
-> review, and is essentialy the same thing.
->
-> 3) It's easy to maintain. If one of the entry in the table came to be
-> wrong, we simply have to update the table, it's completely contained
-> in the kernel itself and doesn't require fixing (and updating) the DT.
->
-> 4) It allows to catch misconfiguration in the cases where you set a
-> function on a pin that doesn't support it as well, which is also quite
-> convenient, and wouldn't be possible at all in the case of a header,
-> or simply open-coding the value.
+ .../display/rockchip/inno_hdmi-rockchip.txt        | 50 ++++++++++++++++++++++
+ 1 file changed, 50 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt
 
-They call it Stockholm Syndrome when you start to sympathize with
-your kidnappers :D
-
-On a serious note, we are in violent agreement on these bullets.
-This driver is easy to maintain and debug, and easy for new developers
-to get into precisely because so much knowledge is in the kernel
-and not in DT. A quick tour in /sys/kernel/debug/pinctrl/*
-should convince anyone that this is actually very helpful to get
-things right.
-
-Yours,
-Linus Walleij
+diff --git a/Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt
+new file mode 100644
+index 0000000..8096a29
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt
+@@ -0,0 +1,50 @@
++Rockchip specific extensions to the Innosilicon HDMI
++================================
++
++Required properties:
++- compatible:
++	"rockchip,rk3036-inno-hdmi";
++- reg:
++	Physical base address and length of the controller's registers.
++- clocks, clock-names:
++	Phandle to hdmi controller clock, name should be "pclk"
++- interrupts:
++	HDMI interrupt number
++- ports:
++	Contain one port node with endpoint definitions as defined in
++	Documentation/devicetree/bindings/graph.txt.
++- pinctrl-0, pinctrl-name:
++	Switch the iomux of HPD/CEC pins to HDMI function.
++
++Example:
++hdmi: hdmi at 20034000 {
++	compatible = "rockchip,rk3036-inno-hdmi";
++	reg = <0x20034000 0x4000>;
++	interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
++	clocks = <&cru  PCLK_HDMI>;
++	clock-names = "pclk";
++	pinctrl-names = "default";
++	pinctrl-0 = <&hdmi_ctl>;
++	status = "disabled";
++
++	hdmi_in: port {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		hdmi_in_lcdc: endpoint at 0 {
++			reg = <0>;
++			remote-endpoint = <&lcdc_out_hdmi>;
++		};
++	};
++};
++
++&pinctrl {
++	hdmi {
++		hdmi_ctl: hdmi-ctl {
++			rockchip,pins = <1 8  RK_FUNC_1 &pcfg_pull_none>,
++					<1 9  RK_FUNC_1 &pcfg_pull_none>,
++					<1 10 RK_FUNC_1 &pcfg_pull_none>,
++					<1 11 RK_FUNC_1 &pcfg_pull_none>;
++		};
++	};
++
++};
+-- 
+2.1.2
