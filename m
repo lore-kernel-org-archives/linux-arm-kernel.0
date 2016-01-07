@@ -1,39 +1,49 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 7 Jan 2016 16:37:22 +0000
-Subject: [Qemu-devel] arm64 qemu tests failing in linux-next since
- 'arm64: kernel: enforce pmuserenr_el0 initialization and restore'
-In-Reply-To: <CAFEAcA_vP93=PE6LNNHodCsdk0gL0kBQPX=xzLJU5RzkvNs2vw@mail.gmail.com>
-References: <567B41E3.5060800@roeck-us.net>
- <CAFEAcA_c9DicGF+is6ST3NJv+c5Bi4dHYo2t8Q2n9AS9G4q0+Q@mail.gmail.com>
- <20160107155310.GA4064@red-moon>
- <CAFEAcA_vP93=PE6LNNHodCsdk0gL0kBQPX=xzLJU5RzkvNs2vw@mail.gmail.com>
-Message-ID: <20160107163722.GB4064@red-moon>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 07 Jan 2016 17:50:24 +0100
+Subject: [RFC PATCH v2 3/4] drm: rockchip: hdmi: add RK3229 HDMI support
+In-Reply-To: <568E3AD0.1020904@rock-chips.com>
+References: <1452156811-18150-1-git-send-email-ykk@rock-chips.com>
+ <1452157373-18783-1-git-send-email-ykk@rock-chips.com>
+ <1452161052.4776.7.camel@pengutronix.de> <568E3AD0.1020904@rock-chips.com>
+Message-ID: <1452185424.4776.36.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 07, 2016 at 03:58:15PM +0000, Peter Maydell wrote:
-> On 7 January 2016 at 15:53, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> > On Thu, Jan 07, 2016 at 01:25:35PM +0000, Peter Maydell wrote:
-> >> We had previously been relying on the kernel not attempting to
-> >> touch the PMU if the ID_AA64DFR0_EL1 PMUVer bits read 0000
-> >> ("Performance Monitors extension System registers not implemented").
-> >
-> > Ok, thanks for looking into this. I wonder why reading pmcr_el0 does
-> > not suffer from the same problem though.
+Hi Yakir,
+
+Am Donnerstag, den 07.01.2016, 18:15 +0800 schrieb Yakir Yang:
+> Hi Philipp,
 > 
-> Just a pragmatic thing on QEMU's end, I expect -- the kernel already
-> touched PMCR_EL0 and we wanted to be able to boot it, so we have an
-> implementation of it.
+> Thanks for your fast respond :)
+> 
+> On 01/07/2016 06:04 PM, Philipp Zabel wrote:
+> > Am Donnerstag, den 07.01.2016, 17:02 +0800 schrieb Yakir Yang:
+> >> RK3229 integrate an DesignedWare HDMI2.0 controller and an INNO HDMI2.0 phy,
+> >> the max output resolution is 4K.
+> >>
+> >> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+> > It sounds like the INNO HDMI2.0 phy is not necessarily specific to
+> > RK3229 but might also appear in other SoCs? If so, I think this should
+> > be implemented in a separate phy driver and be used by dw_hdmi-rockchip.
+> 
+> Do you mean I should create a new phy driver that place in "driver/phy" 
+> directly ?
 
-If that's the case, that was the wrong approach IMHO. QEMU has to comply
-with the Aarch64 architecture which means that either the CPU it models
-has a Performance Monitors extension or it does not. If reading pmcr_el0
-does not fault I could tell you this is a QEMU regression because currently
-it _does_ model pmcr_el0 while (hopefully) ID_AA64DFR0_EL1 PMUVer reports
-it should not.
+Possibly, yes. The exynos video phys are already there. I have kept the
+mediatek dsi/hdmi phys together with the DRM driver, but I suppose I
+could move them there, too.
 
-I will add code that guards both register accesses to fix both bugs at
-once.
+> I have think about this idea, and it would make things much clean. But 
+> INNO PHY
+> driver need the target pixel clock in drm_display_mode, I didn't find a 
+> good way
+> to pass this variable to separate phy driver. Do you have some idea ?
 
-Thanks,
-Lorenzo
+We'd need to extend the PHY API for this. For the mediatek phys we have
+side-stepped the issue by wiring up the PLL output to the common clock
+framework.
+I expect besides the pixel clock frequency, it might also be necessary
+to inform the PHY about cycles per pixel for deep color modes.
+
+regards
+Philipp
