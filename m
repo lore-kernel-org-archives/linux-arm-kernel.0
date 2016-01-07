@@ -1,47 +1,65 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 6 Jan 2016 17:28:29 -0800
-Subject: [PATCH 2/3] pinctrl: qcom: Use platform_irq_count() instead of
- of_irq_count()
-In-Reply-To: <CAJAp7OhNxTzsRSq7MHfBCbp3F+vaw6tS99eMBw8FbWLunudiKQ@mail.gmail.com>
-References: <1452129169-2014-1-git-send-email-sboyd@codeaurora.org>
- <1452129169-2014-3-git-send-email-sboyd@codeaurora.org>
- <CAJAp7OhNxTzsRSq7MHfBCbp3F+vaw6tS99eMBw8FbWLunudiKQ@mail.gmail.com>
-Message-ID: <568DBF3D.7090701@codeaurora.org>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Thu, 07 Jan 2016 10:33:28 +0900
+Subject: [PATCH] mmc: host: arasan: sdhci-of-arasan: Remove no-hispd and
+ no-cmd23 quirks for sdhci-arasan4.9a
+In-Reply-To: <CAFd313ziJ_zgxQ11J6e=ueRLFKXFOsDPg_evRDK2FGQC5rOmfA@mail.gmail.com>
+References: <1450877391-3029-1-git-send-email-rsahu@apm.com>
+ <CAFd313ziJ_zgxQ11J6e=ueRLFKXFOsDPg_evRDK2FGQC5rOmfA@mail.gmail.com>
+Message-ID: <568DC068.6020602@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/06/16 17:19, Bjorn Andersson wrote:
-> On Wed, Jan 6, 2016 at 5:12 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> of_irq_count() is not an exported symbol (and it shouldn't be
->> used by platform drivers anyway) so use platform_irq_count()
->> instead. This allows us to make the qcom pinctrl drivers modular
->> again.
->>
-> [..]
->> diff --git a/drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c b/drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c
->> index 3ddb4cc38f1c..37ae6b72ea35 100644
->> --- a/drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c
->> +++ b/drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c
->> @@ -758,16 +758,19 @@ static int pm8xxx_mpp_probe(struct platform_device *pdev)
->>         struct pinctrl_pin_desc *pins;
->>         struct pm8xxx_mpp *pctrl;
->>         int ret;
->> -       int i;
->> +       int i, npins;
->>
->>         pctrl = devm_kzalloc(&pdev->dev, sizeof(*pctrl), GFP_KERNEL);
->>         if (!pctrl)
->>                 return -ENOMEM;
->>
->>         pctrl->dev = &pdev->dev;
->> -       pctrl->npins = of_irq_count(pdev->dev.of_node);
->> -       if (!pctrl->npins)
->> +       npins = of_irq_count(pdev->dev.of_node);
-> platform_irq_count(pdev)
+Hi,
 
-Ouch. So many duplicates the odds were against me.
+On 01/05/2016 07:25 PM, Rameshwar Sahu wrote:
+> Hi Ulf,
+> 
+> On Wed, Dec 23, 2015 at 6:59 PM, Rameshswar Prasad Sahu <rsahu@apm.com> wrote:
+>> From: Rameshwar Prasad Sahu <rsahu@apm.com>
+>>
+>> The Arason SD host controller supports set block count command (cmd23)
+>> and high speed mode. This patch re-enable both of these features that
+>> was disabled. For device that doesn't support high speed, it should
+>> configure its capability register accordingly instead disables it
+>> explicitly.
+>>
+>> Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
+>> ---
+>>  drivers/mmc/host/sdhci-of-arasan.c |    5 -----
+>>  1 files changed, 0 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
+>> index 75379cb..5d9fdb3 100644
+>> --- a/drivers/mmc/host/sdhci-of-arasan.c
+>> +++ b/drivers/mmc/host/sdhci-of-arasan.c
+>> @@ -172,11 +172,6 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
+>>                 goto clk_disable_all;
+>>         }
+>>
+>> -       if (of_device_is_compatible(pdev->dev.of_node, "arasan,sdhci-4.9a")) {
+>> -               host->quirks |= SDHCI_QUIRK_NO_HISPD_BIT;
+>> -               host->quirks2 |= SDHCI_QUIRK2_HOST_NO_CMD23;
 
+I'm not sure what's correct since i didn't have any information for arasan.
+But in case of exynos, SDHCI_QUIRK_NO_HISPD_BIT is used because that bit is used as other purpose.
+If your SoC is not used anymore, i think this patch looks good.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Best Regards,
+Jaehoon Chung
+
+>> -       }
+>> -
+>>         sdhci_get_of_property(pdev);
+>>         pltfm_host = sdhci_priv(host);
+>>         pltfm_host->priv = sdhci_arasan;
+>> --
+>> 1.7.1
+>>
+> 
+> Any comment on this patch ??
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> 
