@@ -1,42 +1,71 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 07 Jan 2016 14:21:48 +0000
-Subject: [PATCH v8 00/20] KVM: ARM64: Add guest PMU support
-In-Reply-To: <20160107141227.GE23028@arm.com>
-References: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>
- <568E71DE.9030905@arm.com> <20160107141227.GE23028@arm.com>
-Message-ID: <568E747C.9060405@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 7 Jan 2016 14:25:54 +0000
+Subject: [PATCH v2 03/13] arm64: use more granular reservations for
+ static page table allocations
+In-Reply-To: <CAKv+Gu-qdTDwnLajLw_hT6odessdi4Ndbe80CSvY6o1N6HDOmA@mail.gmail.com>
+References: <1451489172-17420-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1451489172-17420-4-git-send-email-ard.biesheuvel@linaro.org>
+ <20160107135518.GB15917@leverpostej>
+ <CAKv+Gu-qdTDwnLajLw_hT6odessdi4Ndbe80CSvY6o1N6HDOmA@mail.gmail.com>
+Message-ID: <20160107142541.GC15917@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/01/16 14:12, Will Deacon wrote:
-> On Thu, Jan 07, 2016 at 02:10:38PM +0000, Marc Zyngier wrote:
->> On 22/12/15 08:07, Shannon Zhao wrote:
->>> From: Shannon Zhao <shannon.zhao@linaro.org>
->>>
->>> This patchset adds guest PMU support for KVM on ARM64. It takes
->>> trap-and-emulate approach. When guest wants to monitor one event, it
->>> will be trapped by KVM and KVM will call perf_event API to create a perf
->>> event and call relevant perf_event APIs to get the count value of event.
->>>
->>> Use perf to test this patchset in guest. When using "perf list", it
->>> shows the list of the hardware events and hardware cache events perf
->>> supports. Then use "perf stat -e EVENT" to monitor some event. For
->>> example, use "perf stat -e cycles" to count cpu cycles and
->>> "perf stat -e cache-misses" to count cache misses.
->>
->> I finally feel like we're pretty close to something we could merge. My
->> current concerns are:
+On Thu, Jan 07, 2016 at 03:02:00PM +0100, Ard Biesheuvel wrote:
+> On 7 January 2016 at 14:55, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Wed, Dec 30, 2015 at 04:26:02PM +0100, Ard Biesheuvel wrote:
+> >> Before introducing new statically allocated page tables and increasing
+> >> their alignment in subsequent patches, update the reservation logic
+> >> so that only pages that are in actual use end up as reserved with
+> >> memblock.
+> >
+> > Could you add something to the commit message about what this will gain
+> > us (i.e. which pages we don't have to reserve)? It's not immediately
+> > obvious why we'd have page tables we wouldn't want to reserve.
+> >
 > 
-> The merge window opens on Monday and I'm not prepared to take further
-> PMU changes at this point (unless they're bug fixes, of course).
-> 
-> This needs to wait until 4.6.
+> OK. In the original series, I also aligned the pgdir section to a log2
+> upper bound of its size, but that is not necessary anymore with your
+> changes. So the original goal was to avoid reserving the alignment
+> padding as well as the pgdirs that end up unused
 
-Fair enough. I guess I'll continue the review process and queue that
-early in the next cycle.
+Ah, I see.
+
+> > From the looks of the next patch we won't have redundant levels of
+> > fixmap table for a given configuration, so I guess we're catering for
+> > the case the fixmap shares a pgd/pud/pmd entry with the image mapping?
+> >
+> > Does that happen? If so that would invalidate the assumption I make when
+> > copying the fixmap over in [1] (see map_kernel).
+> >
+> 
+> It is a lot less likely to happen now that I moved the kernel to the
+> start of the vmalloc area rather than right below PAGE_OFFSET. But in
+> general, it seems sensible to only populate entries after confirming
+> that they are in fact vacant.
+
+Sure.
+
+> > To handle that either we need some special logic to copy over the
+> > relevant bits for the fixmap (as with kasan_copy_shadow), or we need to
+> > avoid sharing a pgd entry.
+> >
+> > Thoughts?
+> >
+> 
+> Yes, I have added that to my v3 version of the vmalloc base move patch here
+> 
+> https://git.linaro.org/people/ard.biesheuvel/linux-arm.git/commitdiff/0beef2c1a6bfc90cc116a6ba1b24f2ba35e7e5f6
+
+Ah, great!
+
+> but I think 16k/4 levels is the only config affected when the kernel
+> is always in the lower half of the vmalloc area. That also implies
+> that the fixmap pgd is either always shared, or never, depending on
+> the build time config, so I could probably simplify that part
+> somewhat.
+
+Ok.
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Mark.
