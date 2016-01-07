@@ -1,24 +1,27 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 07 Jan 2016 10:23:12 +0000
-Subject: [PATCH v8 03/20] KVM: ARM64: Add offset defines for PMU registers
-In-Reply-To: <1450771695-11948-4-git-send-email-zhaoshenglong@huawei.com>
-References: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>
- <1450771695-11948-4-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <568E3C90.4010305@arm.com>
+From: qnguyen@apm.com (Quan Nguyen)
+Date: Thu,  7 Jan 2016 17:27:05 +0700
+Subject: [PATCH v3 0/3] Enable X-Gene standby GPIO as interrupt controller
+Message-ID: <1452162428-26839-1-git-send-email-qnguyen@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/12/15 08:07, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> We are about to trap and emulate accesses to each PMU register
-> individually. This adds the context offsets for the AArch64 PMU
-> registers.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+V3 Changes:
+        - Picking up from version 2 of "Y Vo <yvo@apm.com>"
+        - Get HW resource information from DT
+        - Avoid keeping parent IRQ controller
+V2 Changes:
+        - Support X-Gene standby GPIO as an interrupt controller.
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Quan Nguyen (3):
+  gpio: xgene: Enable X-Gene standby GPIO as interrupt controller
+  Documentation: gpio: Update description for X-Gene standby GPIO
+    controller DTS binding
+  arm64: dts: Update X-Gene standby GPIO controller DTS entries
 
-	M.
+ .../devicetree/bindings/gpio/gpio-xgene-sb.txt     |  49 +++-
+ arch/arm64/boot/dts/apm/apm-storm.dtsi             |   5 +-
+ drivers/gpio/gpio-xgene-sb.c                       | 289 ++++++++++++++++++---
+ 3 files changed, 289 insertions(+), 54 deletions(-)
+
 -- 
-Jazz is not dead. It just smells funny...
+2.2.0
