@@ -1,42 +1,72 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 07 Jan 2016 14:10:38 +0000
-Subject: [PATCH v8 00/20] KVM: ARM64: Add guest PMU support
-In-Reply-To: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>
-References: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <568E71DE.9030905@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 07 Jan 2016 15:11:15 +0100
+Subject: [PATCH] ARM64: tegra: Add support for Google Pixel C
+In-Reply-To: <568E65F0.2070201@nvidia.com>
+References: <1452073222-2956-1-git-send-email-jonathanh@nvidia.com>
+ <568D0D70.4020309@nvidia.com> <568E65F0.2070201@nvidia.com>
+Message-ID: <4442990.rM1mk43t6M@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/12/15 08:07, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
+On Thursday 07 January 2016 13:19:44 Jon Hunter wrote:
 > 
-> This patchset adds guest PMU support for KVM on ARM64. It takes
-> trap-and-emulate approach. When guest wants to monitor one event, it
-> will be trapped by KVM and KVM will call perf_event API to create a perf
-> event and call relevant perf_event APIs to get the count value of event.
+> Adding Arnd.
 > 
-> Use perf to test this patchset in guest. When using "perf list", it
-> shows the list of the hardware events and hardware cache events perf
-> supports. Then use "perf stat -e EVENT" to monitor some event. For
-> example, use "perf stat -e cycles" to count cpu cycles and
-> "perf stat -e cache-misses" to count cache misses.
+> Hmmm ... well apparently stdout-path does not work for tegra and in
+> order to make this work I had to do the following ...
+> 
+> 
+> [PATCH] serial: 8250: of: Add earlycon support for Tegra
+> 
+> Currently, early console support only works for Tegra when the serial
+> port information is passed via the earlycon boot parameter. If the
+> serial port information is specified via device-tree using the
+> "stdout-path" then the early console does not work because:
+> 
+> 1. The tegra serial ports compatibility parameter does not match any
+>    of the supported serial drivers for early console.
+> 2. The of_setup_earlycon() function assumes that serial port registers
+>    are byte aligned and for tegra they are 32-bit aligned.
+> 
+> Add an early console setup function for tegra so that the early console
+> can be specified via the device-tree "stdout-path" variable.
+> 
+> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+> ---
+>  drivers/tty/serial/8250/8250_of.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/drivers/tty/serial/8250/8250_of.c b/drivers/tty/serial/8250/8250_of.c
+> index 33021c1f7d55..98adf83e83c2 100644
+> --- a/drivers/tty/serial/8250/8250_of.c
+> +++ b/drivers/tty/serial/8250/8250_of.c
+> @@ -44,6 +44,16 @@ void tegra_serial_handle_break(struct uart_port *p)
+>                 udelay(1);
+>         } while (1);
+>  }
+> +
+> +int __init tegra_earlycon_setup(struct earlycon_device *device,
+> +                               const char *options)
+> +{
+> +       device->port.iotype = UPIO_MEM32;
+> +       device->port.regshift = 2;
+> +
+> +       return early_serial8250_setup(device, options);
+> +}
+> +OF_EARLYCON_DECLARE(tegra20_uart, "nvidia,tegra20-uart", tegra_earlycon_setup);
+>  #else
+>  static inline void tegra_serial_handle_break(struct uart_port *port)
+>  {
+> 
+> 
+> Arnd, does the above look ok, or should there be a generic
+> early_serial8250x32_setup() somewhere?
 
-I finally feel like we're pretty close to something we could merge. My
-current concerns are:
+I think it would be better to put it into 8250_early.c rather than 
+8250_of.c, as there are already some other definitions in there,
+and the #ifdef CONFIG_TEGRA in 8250_of.c is for some other workaround.
 
-- the 32bit bugs, and the fact that it has obviously not been tested
-with a 32bit guest. It would be good to give it a go (you'll probably
-have to lie about the nature of the PMU in your QEMU code by pretending
-it is a Cortex-A15 PMU, for example).
+Would it be possible to handle the "reg-io-width" parsing in
+early_serial8250_setup instead of keying it off the string?
 
-- The UNDEF path and the patch I've posted today. I've quickly tested
-it, and it seems to do the right thing, but this warrant a thorough review.
-
-- I'd like Peter Maydell (cc'd) to give his Ack to the last patch, as we
-need the userspace ABI to be agreed upon.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+	Arnd
