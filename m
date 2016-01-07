@@ -1,140 +1,99 @@
 From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Thu,  7 Jan 2016 17:33:01 +0000
-Subject: [PATCH V2 3/8] dmaengine: bcm2835: use shared interrupt for channel
- 11 to 14.
+Date: Thu,  7 Jan 2016 17:33:02 +0000
+Subject: [PATCH V2 4/8] dmaengine: bcm2835: add additional defines for
+ DMA-registers
 In-Reply-To: <1452187987-2605-1-git-send-email-kernel@martin.sperl.org>
 References: <1452187987-2605-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <1452187987-2605-4-git-send-email-kernel@martin.sperl.org>
+Message-ID: <1452187987-2605-5-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Martin Sperl <kernel@martin.sperl.org>
 
-The bcm2835 dma channel 11 to 14 only have a single shared irq line,
-so this patch implements shared interrupts for these channels.
-
-To avoid changes to the device tree (with regards to interrupts listed,
-which reflects on pdev->num_resources) a fixed channel count had
-to get used in the code instead.
-
-With this patch applied we now have 11 dma channels available to
-the ARM side of the SOC.
+Add additional defines describing the DMA registers
+as well as adding some more documentation to those registers.
 
 Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 ---
- drivers/dma/bcm2835-dma.c |   46 ++++++++++++++++++++++++++++++++++++++++-----
- 1 file changed, 41 insertions(+), 5 deletions(-)
+ drivers/dma/bcm2835-dma.c |   54 ++++++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 46 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
-index e4ca980..0c04236 100644
+index 0c04236..7905327 100644
 --- a/drivers/dma/bcm2835-dma.c
 +++ b/drivers/dma/bcm2835-dma.c
-@@ -81,7 +81,9 @@ struct bcm2835_chan {
- 	struct dma_pool *cb_pool;
+@@ -99,26 +99,64 @@ struct bcm2835_desc {
  
- 	void __iomem *chan_base;
+ #define BCM2835_DMA_CS		0x00
+ #define BCM2835_DMA_ADDR	0x04
++#define BCM2835_DMA_TI		0x08
+ #define BCM2835_DMA_SOURCE_AD	0x0c
+ #define BCM2835_DMA_DEST_AD	0x10
+-#define BCM2835_DMA_NEXTCB	0x1C
++#define BCM2835_DMA_LEN		0x14
++#define BCM2835_DMA_STIDE	0x18
++#define BCM2835_DMA_NEXTCB	0x1c
++#define BCM2835_DMA_DEBUG	0x20
+ 
+ /* DMA CS Control and Status bits */
+-#define BCM2835_DMA_ACTIVE	BIT(0)
+-#define BCM2835_DMA_INT	BIT(2)
++#define BCM2835_DMA_ACTIVE	BIT(0)  /* activate the DMA */
++#define BCM2835_DMA_END		BIT(1)  /* current CB has ended */
++#define BCM2835_DMA_INT		BIT(2)  /* interrupt status */
++#define BCM2835_DMA_DREQ	BIT(3)  /* DREQ state */
+ #define BCM2835_DMA_ISPAUSED	BIT(4)  /* Pause requested or not active */
+ #define BCM2835_DMA_ISHELD	BIT(5)  /* Is held by DREQ flow control */
+-#define BCM2835_DMA_ERR	BIT(8)
++#define BCM2835_DMA_WAITING_FOR_WRITES BIT(6) /* waiting for last
++					       * AXI-write to ack
++					       */
++#define BCM2835_DMA_ERR		BIT(8)
++#define BCM2835_DMA_PRIORITY(x) ((x & 15) << 16) /* AXI priority */
++#define BCM2835_DMA_PANIC_PRIORITY(x) ((x & 15) << 20) /* panic priority */
++#define BCM2835_DMA_WAIT_FOR_WRITES BIT(28) /* current value of
++					     * TI.BCM2835_DMA_WAIT_RESP
++					     */
++#define BCM2835_DMA_DIS_DEBUG	BIT(29) /* disable debug pause signal */
+ #define BCM2835_DMA_ABORT	BIT(30) /* Stop current CB, go to next, WO */
+ #define BCM2835_DMA_RESET	BIT(31) /* WO, self clearing */
+ 
++/* Transfer information bits - also bcm2835_cb.info field */
+ #define BCM2835_DMA_INT_EN	BIT(0)
++#define BCM2835_DMA_TDMODE	BIT(1) /* 2D-Mode */
++#define BCM2835_DMA_WAIT_RESP	BIT(3) /* wait for AXI-write to be acked */
+ #define BCM2835_DMA_D_INC	BIT(4)
+-#define BCM2835_DMA_D_DREQ	BIT(6)
++#define BCM2835_DMA_D_WIDTH	BIT(5) /* 128bit writes if set */
++#define BCM2835_DMA_D_DREQ	BIT(6) /* enable DREQ for destination */
++#define BCM2835_DMA_D_IGNORE	BIT(7) /* ignore destination writes */
+ #define BCM2835_DMA_S_INC	BIT(8)
+-#define BCM2835_DMA_S_DREQ	BIT(10)
+-
+-#define BCM2835_DMA_PER_MAP(x)	((x) << 16)
++#define BCM2835_DMA_S_WIDTH	BIT(9) /* 128bit writes if set */
++#define BCM2835_DMA_S_DREQ	BIT(10) /* enable SREQ for source */
++#define BCM2835_DMA_S_IGNORE	BIT(11) /* ignore source reads - read 0 */
++#define BCM2835_DMA_BURST_LENGTH(x) ((x & 15) << 12)
++#define BCM2835_DMA_PER_MAP(x)	((x & 31) << 16) /* REQ source */
++#define BCM2835_DMA_WAIT(x)	((x & 31) << 21) /* add DMA-wait cycles */
++#define BCM2835_DMA_NO_WIDE_BURSTS BIT(26) /* no 2 beat write bursts */
 +
- 	int irq_number;
-+	unsigned long irq_flags;
- };
++/* debug register bits */
++#define BCM2835_DMA_DEBUG_LAST_NOT_SET_ERR	BIT(0)
++#define BCM2835_DMA_DEBUG_FIFO_ERR		BIT(1)
++#define BCM2835_DMA_DEBUG_READ_ERR		BIT(2)
++#define BCM2835_DMA_DEBUG_OUTSTANDING_WRITES_SHIFT 4
++#define BCM2835_DMA_DEBUG_OUTSTANDING_WRITES_BITS 4
++#define BCM2835_DMA_DEBUG_ID_SHIFT		16
++#define BCM2835_DMA_DEBUG_ID_BITS		9
++#define BCM2835_DMA_DEBUG_STATE_SHIFT		16
++#define BCM2835_DMA_DEBUG_STATE_BITS		9
++#define BCM2835_DMA_DEBUG_VERSION_SHIFT		25
++#define BCM2835_DMA_DEBUG_VERSION_BITS		3
++#define BCM2835_DMA_DEBUG_LITE			BIT(28)
  
- struct bcm2835_desc {
-@@ -127,6 +129,19 @@ struct bcm2835_desc {
- #define BCM2835_DMA_CHAN(n)	((n) << 8) /* Base address */
- #define BCM2835_DMA_CHANIO(base, n) ((base) + BCM2835_DMA_CHAN(n))
- 
-+/*
-+ * number of dma channels we support
-+ * we do not support DMA channel 15, as it is in a separate IO range,
-+ * does not have a separate IRQ line except for the "catch all IRQ line"
-+ * finally this channel is used by the firmware so is not available
-+ */
-+#define BCM2835_DMA_MAX_CHANNEL_NUMBER	14
-+
-+/* the DMA channels 11 to 14 share a common interrupt */
-+#define BCM2835_DMA_IRQ_SHARED_MASK (BIT(11) | BIT(12) | BIT(13) | BIT(14))
-+#define BCM2835_DMA_IRQ_SHARED		11
-+#define BCM2835_DMA_IRQ_ALL		12
-+
- static inline struct bcm2835_dmadev *to_bcm2835_dma_dev(struct dma_device *d)
- {
- 	return container_of(d, struct bcm2835_dmadev, ddev);
-@@ -215,6 +230,15 @@ static irqreturn_t bcm2835_dma_callback(int irq, void *data)
- 	struct bcm2835_desc *d;
- 	unsigned long flags;
- 
-+	/* check the shared interrupt */
-+	if (c->irq_flags & IRQF_SHARED) {
-+		/* check if the interrupt is enabled */
-+		flags = readl(c->chan_base + BCM2835_DMA_CS);
-+		/* if not set then we are not the reason for the irq */
-+		if (!(flags & BCM2835_DMA_INT))
-+			return IRQ_NONE;
-+	}
-+
- 	spin_lock_irqsave(&c->vc.lock, flags);
- 
- 	/* Acknowledge interrupt */
-@@ -250,7 +274,8 @@ static int bcm2835_dma_alloc_chan_resources(struct dma_chan *chan)
- 	}
- 
- 	return request_irq(c->irq_number,
--			bcm2835_dma_callback, 0, "DMA IRQ", c);
-+			   bcm2835_dma_callback,
-+			   c->irq_flags, "DMA IRQ", c);
- }
- 
- static void bcm2835_dma_free_chan_resources(struct dma_chan *chan)
-@@ -526,7 +551,8 @@ static int bcm2835_dma_terminate_all(struct dma_chan *chan)
- 	return 0;
- }
- 
--static int bcm2835_dma_chan_init(struct bcm2835_dmadev *d, int chan_id, int irq)
-+static int bcm2835_dma_chan_init(struct bcm2835_dmadev *d, int chan_id,
-+				 int irq, unsigned long irq_flags)
- {
- 	struct bcm2835_chan *c;
- 
-@@ -541,6 +567,7 @@ static int bcm2835_dma_chan_init(struct bcm2835_dmadev *d, int chan_id, int irq)
- 	c->chan_base = BCM2835_DMA_CHANIO(d->base, chan_id);
- 	c->ch = chan_id;
- 	c->irq_number = irq;
-+	c->irq_flags = irq_flags;
- 
- 	return 0;
- }
-@@ -586,6 +613,7 @@ static int bcm2835_dma_probe(struct platform_device *pdev)
- 	int rc;
- 	int i;
- 	int irq;
-+	unsigned long irq_flags;
- 	uint32_t chans_available;
- 
- 	if (!pdev->dev.dma_mask)
-@@ -638,13 +666,21 @@ static int bcm2835_dma_probe(struct platform_device *pdev)
- 		goto err_no_dma;
- 	}
- 
--	for (i = 0; i < pdev->num_resources; i++) {
--		irq = platform_get_irq(pdev, i);
-+	for (i = 0; i <= BCM2835_DMA_MAX_CHANNEL_NUMBER; i++) {
-+		if (BCM2835_DMA_IRQ_SHARED_MASK & BIT(i)) {
-+			irq = platform_get_irq(pdev,
-+					       BCM2835_DMA_IRQ_SHARED);
-+			irq_flags = IRQF_SHARED;
-+		} else {
-+			irq = platform_get_irq(pdev, i);
-+			irq_flags = 0;
-+		}
-+
- 		if (irq < 0)
- 			break;
- 
- 		if (chans_available & (1 << i)) {
--			rc = bcm2835_dma_chan_init(od, i, irq);
-+			rc = bcm2835_dma_chan_init(od, i, irq, irq_flags);
- 			if (rc)
- 				goto err_no_dma;
- 		}
+ #define BCM2835_DMA_DATA_TYPE_S8	1
+ #define BCM2835_DMA_DATA_TYPE_S16	2
 -- 
 1.7.10.4
