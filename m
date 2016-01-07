@@ -1,116 +1,40 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Thu, 7 Jan 2016 22:35:53 +0800
-Subject: [PATCH v8 20/20] KVM: ARM64: Add a new kvm ARM PMU device
-In-Reply-To: <568E6E94.8090106@arm.com>
-References: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>
- <1450771695-11948-21-git-send-email-zhaoshenglong@huawei.com>
- <568E6E94.8090106@arm.com>
-Message-ID: <568E77C9.4060004@huawei.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 7 Jan 2016 08:42:47 -0600
+Subject: [PATCH] arm: pci: mark the dra7xx driver as broken
+In-Reply-To: <20160107092553.GA7378@localhost.localdomain>
+References: <20160106214518.GA6106@localhost.localdomain>
+ <568DF4FE.5010704@ti.com>
+ <20160107081102.GA6243@localhost.localdomain> <568E2566.6000209@ti.com>
+ <20160107092553.GA7378@localhost.localdomain>
+Message-ID: <CAErSpo4HdsB0Rqj3P+GkLwLFDyajfRWOiV_LptGsZVrE7cGOow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Jan 7, 2016 at 3:25 AM, Richard Cochran
+<richardcochran@gmail.com> wrote:
+> On Thu, Jan 07, 2016 at 02:14:22PM +0530, Kishon Vijay Abraham I wrote:
+>> In my point of view the driver is not broken as such but an independent piece
+>> (reset) which is missing, since this driver compiles and works fine if that
+>> reset piece is added. You are right in that this shouldn't have been probed
+>> since it's known that the reset piece is missing. Maybe we should just set
+>> "status = disabled" in dra7.dtsi and when that reset piece is added enable it
+>> back in dra7-evm.dts?
+>
+> That isn't strong enough, IMHO, since status=disabled is the default
+> for most every DTS item.  Maybe you could comment the PCI block out or
+> remove it and put a comment in about the missing piece and the lock up
+> behavior.  It is really a nasty bug to have the machine freeze up with
+> no output at all.  It took me some time to figure out what was going
+> on, and it would be a shame if someone else sets status=okay in their
+> board file and has to repeat the whole exercise.
 
+It sounds like dra7xx is missing a piece of essential functionality.
+If that's the case, what is the benefit of having it in the kernel at
+all?  It makes work for everybody else (adapting to changes outside
+the driver), but it sounds like nobody gets any benefit.
 
-On 2016/1/7 21:56, Marc Zyngier wrote:
-> On 22/12/15 08:08, Shannon Zhao wrote:
->> > From: Shannon Zhao <shannon.zhao@linaro.org>
->> > 
->> > Add a new kvm device type KVM_DEV_TYPE_ARM_PMU_V3 for ARM PMU. Implement
->> > the kvm_device_ops for it.
->> > 
->> > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->> > ---
->> >  Documentation/virtual/kvm/devices/arm-pmu.txt |  24 +++++
->> >  arch/arm64/include/uapi/asm/kvm.h             |   4 +
->> >  include/linux/kvm_host.h                      |   1 +
->> >  include/uapi/linux/kvm.h                      |   2 +
->> >  virt/kvm/arm/pmu.c                            | 128 ++++++++++++++++++++++++++
->> >  virt/kvm/kvm_main.c                           |   4 +
->> >  6 files changed, 163 insertions(+)
->> >  create mode 100644 Documentation/virtual/kvm/devices/arm-pmu.txt
->> > 
->> > diff --git a/Documentation/virtual/kvm/devices/arm-pmu.txt b/Documentation/virtual/kvm/devices/arm-pmu.txt
->> > new file mode 100644
->> > index 0000000..dda864e
->> > --- /dev/null
->> > +++ b/Documentation/virtual/kvm/devices/arm-pmu.txt
->> > @@ -0,0 +1,24 @@
->> > +ARM Virtual Performance Monitor Unit (vPMU)
->> > +===========================================
->> > +
->> > +Device types supported:
->> > +  KVM_DEV_TYPE_ARM_PMU_V3         ARM Performance Monitor Unit v3
->> > +
->> > +Instantiate one PMU instance for per VCPU through this API.
->> > +
->> > +Groups:
->> > +  KVM_DEV_ARM_PMU_GRP_IRQ
->> > +  Attributes:
->> > +    The attr field of kvm_device_attr encodes one value:
->> > +    bits:     | 63 .... 32 | 31 ....  0 |
->> > +    values:   |  reserved  | vcpu_index |
->> > +    A value describing the PMU overflow interrupt number for the specified
->> > +    vcpu_index vcpu. This interrupt could be a PPI or SPI, but for one VM the
->> > +    interrupt type must be same for each vcpu. As a PPI, the interrupt number is
->> > +    same for all vcpus, while as a SPI it must be different for each vcpu.
-> I don't see anything enforcing these restrictions in the code (you can
-> program different PPIs on each vcpu, or the same SPI everywhere, and
-> nothing will generate an error).
-> 
-> Is that something we want to enforce? Or we're happy just to leave it as
-> an unsupported corner case?
-> 
+If somebody posts a patch to remove the driver entirely to
+linux-pci at vger.kernel.org, we can discuss whether that's the right
+thing to do.
 
-Yeah, it should add the check. How about below check?
-
-diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-index 0ccf273..c3347e9 100644
---- a/virt/kvm/arm/pmu.c
-+++ b/virt/kvm/arm/pmu.c
-@@ -435,6 +435,29 @@ static void kvm_arm_pmu_destroy(struct kvm_device *dev)
-        kfree(dev);
- }
-
-+static bool irq_is_invalid(kvm_device *dev, int irq, bool is_ppi)
-+{
-+       int i;
-+       struct kvm_vcpu *vcpu;
-+       struct kvm *kvm = dev->kvm;
-+
-+       kvm_for_each_vcpu(i, vcpu, kvm) {
-+               struct kvm_pmu *pmu = &vcpu->arch.pmu;
-+
-+               if (!kvm_arm_pmu_initialized(vcpu))
-+                       continue;
-+
-+               if (is_ppi)
-+                       if (pmu->irq_num != irq)
-+                               return true;
-+               else
-+                       if (pmu->irq_num == irq)
-+                               return true;
-+       }
-+
-+       return false;
-+}
-+
- static int kvm_arm_pmu_set_attr(struct kvm_device *dev,
-                                struct kvm_device_attr *attr)
- {
-@@ -452,7 +475,8 @@ static int kvm_arm_pmu_set_attr(struct kvm_device *dev,
-                 * the interrupt number is same for all vcpus, while as
-a SPI it
-                 * must be different for each vcpu.
-                 */
--               if (reg < VGIC_NR_SGIS || reg >=
-dev->kvm->arch.vgic.nr_irqs)
-+               if (reg < VGIC_NR_SGIS || reg >=
-dev->kvm->arch.vgic.nr_irqs ||
-+                   irq_is_invalid(dev, reg, reg < VGIC_NR_PRIVATE_IRQS))
-                        return -EINVAL;
-
-                return kvm_arm_pmu_irq_access(dev->kvm, attr, &reg, true);
-
-Thanks,
--- 
-Shannon
+Bjorn
