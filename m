@@ -1,37 +1,44 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Thu, 7 Jan 2016 13:17:22 +0200
-Subject: [PATCH v2] mmc: sdhci: restore behavior when setting VDD via
- external regulator
-In-Reply-To: <CAPDyKFqf=L=dwjLx5G7oU0_YLE3Ow39_b2+H7z0Gu_Lh-T+3Dg@mail.gmail.com>
-References: <1449840989-563-1-git-send-email-jszhang@marvell.com>
- <CAPDyKFpVqQREdiKm42cM7OxXHDpJffp3OMN6GqLAkn-gep6xOw@mail.gmail.com>
- <20151218081138.GB15968@odux.rfo.atmel.com>
- <CAPDyKFqf=L=dwjLx5G7oU0_YLE3Ow39_b2+H7z0Gu_Lh-T+3Dg@mail.gmail.com>
-Message-ID: <568E4942.7030800@intel.com>
+From: uri.mashiach@compulab.co.il (Uri Mashiach)
+Date: Thu, 7 Jan 2016 13:20:28 +0200
+Subject: [PATCH v4 3/3] wlcore/wl12xx: spi: add wifi support to cm-t335
+In-Reply-To: <87io35lq2p.fsf@kamboji.qca.qualcomm.com>
+References: <1451482533-8624-1-git-send-email-uri.mashiach@compulab.co.il>
+ <1451482533-8624-4-git-send-email-uri.mashiach@compulab.co.il>
+ <87io35lq2p.fsf@kamboji.qca.qualcomm.com>
+Message-ID: <568E49FC.3090808@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/12/15 11:55, Ulf Hansson wrote:
-> On 18 December 2015 at 09:11, Ludovic Desroches
-> <ludovic.desroches@atmel.com> wrote:
->> Hi Ulf, Jisheng,
+Hi Kalle Valo,
+
+On 01/07/2016 11:02 AM, Kalle Valo wrote:
+> Uri Mashiach <uri.mashiach@compulab.co.il> writes:
+>
+>> Device tree modifications:
+>> - Pinmux for SPI0 and WiFi GPIOs.
+>> - SPI0 node with wlcore as a child node.
 >>
->> On Fri, Dec 11, 2015 at 03:48:04PM +0100, Ulf Hansson wrote:
->>> + Ludovic (We had some discussions around this code recently as well)
->>>
->>> On 11 December 2015 at 14:36, Jisheng Zhang <jszhang@marvell.com> wrote:
->>>> After commit 52221610dd84 ("mmc: sdhci: Improve external VDD regulator
->>>> support"), for the VDD is supplied via external regulators, we ignore
->>>> the code to convert a VDD voltage request into one of the standard
->>>> SDHCI voltage levels, then program it in the SDHCI_POWER_CONTROL. This
->>>> brings two issues:
->>>>
->>>> 1. SDHCI_QUIRK2_CARD_ON_NEEDS_BUS_ON quirk isn't handled properly any
->>>> more.
+>> Cc: Tony Lindgren <tony@atomide.com>
+>> Signed-off-by: Uri Mashiach <uri.mashiach@compulab.co.il>
+>> ---
+>> v1 -> v2: Replace interrupts and interrupt-parent with interrupts-extended.
+>> v2 -> v3: Move the pinctrl-0 = <&wifi_pins> to the wlcore node.
+>> v3 -> v4: replace interrupts-extended with interrupts and interrupt-parent. (revert v2 modification).
+>>            According to Rob Herring and Documentation/devicetree/bindings/interrupt-controller/interrupts.txt,
+>> 	  interrupts-extended should only be used when a device has multiple interrupt parents.
+>>
+>>   arch/arm/boot/dts/am335x-cm-t335.dts | 55 ++++++++++++++++++++++++++++++++++++
+>>   1 file changed, 55 insertions(+)
+>
+> To what tree should this patch go? My wireless-drivers-next tree doesn't
+> even have this file.
 
-For the record, the way it was working made more sense to me i.e. if you
-have control of an external regulator then you know the power is not
-disrupted by runtime suspend.
+Should be applied into omap-for-v4.x/dt
 
-Also AFAIK Intel is the only user of SDHCI_QUIRK2_CARD_ON_NEEDS_BUS_ON, so I
-am surprised you listed it as an issue that you have.
+>
+> https://patchwork.kernel.org/patch/7933441/
+>
+
+-- 
+Thanks,
+Uri
