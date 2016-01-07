@@ -1,90 +1,41 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 7 Jan 2016 09:17:00 -0800
-Subject: [PATCH v4 55/58] mtd: nand: add helpers to access ->priv
-In-Reply-To: <20160107155237.7271aa7e@bbrezillon>
-References: <1449734442-18672-1-git-send-email-boris.brezillon@free-electrons.com>
- <1449734442-18672-56-git-send-email-boris.brezillon@free-electrons.com>
- <20151218221758.GQ10460@google.com>
- <20151219040124.7ffe4274@bbrezillon>
- <20160106231323.GM109450@google.com>
- <20160107155237.7271aa7e@bbrezillon>
-Message-ID: <20160107171700.GE109450@google.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Thu, 7 Jan 2016 17:19:59 +0000
+Subject: [Qemu-devel] arm64 qemu tests failing in linux-next since 'arm64:
+ kernel: enforce pmuserenr_el0 initialization and restore'
+In-Reply-To: <568E9BF6.6020809@roeck-us.net>
+References: <567B41E3.5060800@roeck-us.net>
+ <CAFEAcA_c9DicGF+is6ST3NJv+c5Bi4dHYo2t8Q2n9AS9G4q0+Q@mail.gmail.com>
+ <20160107155310.GA4064@red-moon>
+ <CAFEAcA_vP93=PE6LNNHodCsdk0gL0kBQPX=xzLJU5RzkvNs2vw@mail.gmail.com>
+ <20160107163722.GB4064@red-moon> <568E9BF6.6020809@roeck-us.net>
+Message-ID: <CAFEAcA8rhU93urnqVRFy78Q0JNRD=1mUPe2fjXbUs4WRYWoHoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+On 7 January 2016 at 17:10, Guenter Roeck <linux@roeck-us.net> wrote:
+> Strictly speaking you may be right (regression is a bit strong, though),
+> but for my part I tend to be pragmatic.
+>
+> A warning message such as "Access to unimplemented register X" may be
+> useful
 
-On Thu, Jan 07, 2016 at 03:52:37PM +0100, Boris Brezillon wrote:
-> On Wed, 6 Jan 2016 15:13:23 -0800
-> Brian Norris <computersforpeace@gmail.com> wrote:
-> > On Sat, Dec 19, 2015 at 04:01:24AM +0100, Boris Brezillon wrote:
+You can get these from QEMU if you pass it "-d unimp", which logs
+various kinds of things-not-yet-implemented, with a couple of caveats:
+ * the warning is when we translate the code, not when we execute it
+ * it won't warn for registers which we implement but not completely
+   (eg only partial functionality or dummy reads-as-written)
 
-> > > Now, the reason I explicitly specified the data usage instead of using
-> > > a generic name like nand_{get,set}_data() is because I plan to define
-> > 
-> > I never suggested just "_data"; I said "_drvdata".
-> 
-> Not sure it clarifies the per-chip aspect ;), and driver is, IMHO, too
-> generic: I also consider manufacturer specific code as drivers (but in
-> this case they are chip drivers, not controller drivers).
-> 
-> How about nand_{get,set}_ctrldrvdata()?
+In this case it printed
+"write access to unsupported AArch64 system register op0:3 op1:3 crn:9
+crm:14 op2:0"
 
-That's just more confusing :)
+The 'guest_errors' suboption to -d warns about things which appear
+to be errors in the guest OS, for instance some kinds of UNPREDICTABLE,
+and may also be of interest.
 
-> > 
-> > > other helpers to allow NAND manufacturer code to manipulate its own
-> > > private data. This is required if we want to support read-retry on some
-> > > chips who are requiring a read OTP area step to retrieve some register
-> > > values which will later be used to change from one read-retry mode to
-> > > another.
-> > > The plan was to define the nand_{set,get}_manufacturer_data() helpers,
-> > > and create or reuse an existing priv field (mtd->priv?) to store this
-> > > private data.
+Neither guest_errors nor unimp are comprehensive (there are many
+more situations where we don't warn than where we do) but they can
+be helpful sometimes.
 
-[...]
-
-> > > Also note that the spi framework provides the same kind of helpers [1].
-> > 
-> > Hmm, OK. FWIW, they have both "driver data" and "controller state". It's
-> > not perfectly clear to me why both exist.
-> 
-> Well, "driver data" in this case is the data used by the i2c device
-> driver (the driver communicating with the device on the i2c bus), while
-> the "controller state" is the per-device controller specific data.
-> If we do the analogy with the NAND framework, I'd consider the
-> "SPI controller state" as what I call here the "NAND controller per-chip
-> data", and the "SPI driver data" as the "manufacturer data".
-> 
-> I know the names are not necessarily better in the SPI framework, but I
-> think we should find names that describe as much as possible which
-> data is used by which part of the code. 
-
-Re-reviewing the SPI framework helpers suggests to me that their usage
-scheme is actually not too bad. And it's actually pretty similar to your
-current naming scheme.
-
-> > > This being said, I'm perfectly fine changing the function names, but
-> > > I'd like to replace it by something explicitly telling the user that
-> > > this field should only be set by NAND controller drivers. 
-> > 
-> > Sure. I though a "driver data"-based name did this. But I'll leave it to
-> > you. I could even be OK with "controller data", if you still think this
-> > fits your overall controller refactoring plan, and communicates its
-> > purpose best.
-> 
-> If you're OK with that I'd like to keep a name containing the
-> 'controller' or 'ctrl' word in it:
-> 1/ nand_{get,set}_controller_data() (the names originally proposed)
-> 2/ nand_{get,set}_ctrldrv_data() or nand_{get,set}_ctrldrvdata()
-> 
-> What do you prefer?
-
-I guess (1) is not that bad in the end. I at least prefer it to (2).
-Sorry for the bikeshedding!
-
-So are these last few patches still applicable as-is, or should I await
-a new submission?
-
-Thanks,
-Brian
+thanks
+-- PMM
