@@ -1,29 +1,50 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 7 Jan 2016 06:30:25 +0100
-Subject: [PATCH] ARM: nomadik: set latencies to 8 cycles
-In-Reply-To: <1451870308-19245-1-git-send-email-linus.walleij@linaro.org>
-References: <1451870308-19245-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20160107053025.GF26875@localhost>
+Date: Thu, 7 Jan 2016 06:33:18 +0100
+Subject: [PATCH 2/2] ARM: versatile: fix MMC/SD interrupt assignment
+In-Reply-To: <1451984370-16932-1-git-send-email-linus.walleij@linaro.org>
+References: <1451984370-16932-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20160107053318.GH26875@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 04, 2016 at 02:18:28AM +0100, Linus Walleij wrote:
-> The Nomadik has sporadic crashes because of these latencies, setting
-> them to max makes the platform work nicely, so use this values for
-> now.
+On Tue, Jan 05, 2016 at 09:59:30AM +0100, Linus Walleij wrote:
+> Commit 0976c946a610d06e907335b7a3afa6db046f8e1b
+> "arm/versatile: Fix versatile irq specifications"
+> has an off-by-one error on the Versatile AB that has
+> been regressing the Versatile AB hardware for some time.
 > 
-> These latencies were set to 2 since the Nomadik platform was merged,
-> but I suspect they never took effect until the right size and
-> associativity for the cache was specified in the device tree and
-> that is why the crash comes now.
+> However it seems like the interrupt assignments have
+> never been correct and I have now adjusted them according
+> to the specification. The masks for the valid interrupts
+> made it impossible to assign the right SIC interrupt
+> for the MMCI, so I went in and fixed these to correspond
+> to the specifications, and added references if anyone
+> wants to double-check.
 > 
+> Due to the Versatile PB including the Versatile AB
+> as a base DTS file, we need to override and correct
+> some values to correspond to the actual changes in the
+> hardware.
+> 
+> For the Versatile PB I don't think the IRQ line
+> assignment for MMCI has ever been correct for either of
+> the two MMCI blocks. It would be nice if someone with the
+> physical PB board could test this.
+> 
+> Patch tested on the Versatile AB, QEMU for Versatile AB
+> and QEMU for Versatile PB.
+> 
+> Cc: Rob Herring <robh@kernel.org>
+> Cc: Grant Likely <grant.likely@linaro.org>
 > Cc: stable at vger.kernel.org
+> Fixes: 0976c946a610 ("arm/versatile: Fix versatile irq specifications")
 > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
-> ARM SoC folks: please apply this directly for fixes at your
-> convenience.
+> ARM SoC people: please apply this directly for fixes if
+> you find it OK.
 
-Applied to fixes. THanks.
+Applied to fixes. Seems like Rob's comments were concerns but not
+blockers, so picking up the fix seems to make sense.
 
 
 -Olof
