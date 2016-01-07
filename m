@@ -1,86 +1,40 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Thu, 7 Jan 2016 20:09:22 +0800
-Subject: [PATCH v8 08/20] KVM: ARM64: Add access handler for event typer
- register
-In-Reply-To: <1450771695-11948-9-git-send-email-zhaoshenglong@huawei.com>
-References: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>
- <1450771695-11948-9-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <568E5572.5020806@huawei.com>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Thu,  7 Jan 2016 20:17:34 +0800
+Subject: [PATCH v2 2/5] clk: rockchip: rk3036: fix uarts clock error
+In-Reply-To: <1452169057-24467-1-git-send-email-zhengxing@rock-chips.com>
+References: <1452169057-24467-1-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <1452169057-24467-3-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Due to a copy-paste error the uart1 and uart2 clock div set
+incorrect, we should to fix it.
 
+Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+---
 
-On 2015/12/22 16:08, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> These kind of registers include PMEVTYPERn, PMCCFILTR and PMXEVTYPER
-> which is mapped to PMEVTYPERn or PMCCFILTR.
-> 
-> The access handler translates all aarch32 register offsets to aarch64
-> ones and uses vcpu_sys_reg() to access their values to avoid taking care
-> of big endian.
-> 
-> When writing to these registers, create a perf_event for the selected
-> event type.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  arch/arm64/kvm/sys_regs.c | 156 +++++++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 154 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index 2552db1..ed2939b 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -505,6 +505,70 @@ static bool access_pmceid(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
->  	return true;
->  }
->  
-> +static inline bool pmu_counter_idx_valid(struct kvm_vcpu *vcpu, u64 idx)
-> +{
-> +	u64 pmcr, val;
-> +
-> +	pmcr = vcpu_sys_reg(vcpu, PMCR_EL0);
-> +	val = (pmcr >> ARMV8_PMCR_N_SHIFT) & ARMV8_PMCR_N_MASK;
-> +	if (idx >= val && idx != ARMV8_CYCLE_IDX)
-> +		return false;
-> +
-> +	return true;
-> +}
-> +
-> +static bool access_pmu_evtyper(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
-> +			       const struct sys_reg_desc *r)
-> +{
-> +	u64 idx, reg;
-> +
-> +	if (r->CRn == 9) {
-> +		/* PMXEVTYPER_EL0 */
-> +		reg = 0;
-> +	} else {
-> +		if (!p->is_aarch32) {
-> +			/* PMEVTYPERn_EL0 or PMCCFILTR_EL0 */
-> +			reg = r->reg;
-> +		} else {
-> +			if (r->CRn == 14 && r->CRm == 15 && r->Op2 == 7) {
-> +				reg = PMCCFILTR_EL0;
-> +			} else {
-> +				reg = ((r->CRm & 3) << 3) | (r->Op2 & 7);
-> +				reg += PMEVTYPER0_EL0;
-> +			}
-> +		}
-> +	}
-> +
-> +	switch (reg) {
-> +	case PMEVTYPER0_EL0 ... PMEVTYPER30_EL0:
-> +		idx = reg - PMEVTYPER0_EL0;
-> +		if (!pmu_counter_idx_valid(vcpu, idx))
-> +			return true;
-Hi Marc,
+ drivers/clk/rockchip/clk-rk3036.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Here should we return false to inject an UND since there is no
-PMEVTYPER(idx)_EL0? The ARMv8 spec says it should.
-
-Thanks,
+diff --git a/drivers/clk/rockchip/clk-rk3036.c b/drivers/clk/rockchip/clk-rk3036.c
+index 7e3b41c..04b5249 100644
+--- a/drivers/clk/rockchip/clk-rk3036.c
++++ b/drivers/clk/rockchip/clk-rk3036.c
+@@ -242,11 +242,11 @@ static struct rockchip_clk_branch rk3036_clk_branches[] __initdata = {
+ 			RK2928_CLKSEL_CON(13), 0, 7, DFLAGS,
+ 			RK2928_CLKGATE_CON(1), 8, GFLAGS),
+ 	COMPOSITE_NOMUX(0, "uart1_src", "uart_pll_clk", 0,
+-			RK2928_CLKSEL_CON(13), 0, 7, DFLAGS,
+-			RK2928_CLKGATE_CON(1), 8, GFLAGS),
++			RK2928_CLKSEL_CON(14), 0, 7, DFLAGS,
++			RK2928_CLKGATE_CON(1), 10, GFLAGS),
+ 	COMPOSITE_NOMUX(0, "uart2_src", "uart_pll_clk", 0,
+-			RK2928_CLKSEL_CON(13), 0, 7, DFLAGS,
+-			RK2928_CLKGATE_CON(1), 8, GFLAGS),
++			RK2928_CLKSEL_CON(15), 0, 7, DFLAGS,
++			RK2928_CLKGATE_CON(1), 12, GFLAGS),
+ 	COMPOSITE_FRACMUX(0, "uart0_frac", "uart0_src", CLK_SET_RATE_PARENT,
+ 			RK2928_CLKSEL_CON(17), 0,
+ 			RK2928_CLKGATE_CON(1), 9, GFLAGS,
 -- 
-Shannon
+1.7.9.5
