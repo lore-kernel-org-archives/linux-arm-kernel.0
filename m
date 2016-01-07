@@ -1,90 +1,37 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 6 Jan 2016 18:10:47 -0600
-Subject: [PATCH] PCI: iproc: fix msi driver selection
-In-Reply-To: <1541985.1Jq5kHC7MS@wuerfel>
-References: <1541985.1Jq5kHC7MS@wuerfel>
-Message-ID: <20160107001046.GA7083@localhost>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed,  6 Jan 2016 16:20:10 -0800
+Subject: [PATCH -next] gpio: xilinx: Do not use gpiochip_get_data() in
+ xgpio_save_regs()
+Message-ID: <1452126010-1111-1-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 03:57:53PM +0100, Arnd Bergmann wrote:
-> The newly added MSI support for iproc causes a link error when its
-> Kconfig option is disabled:
-> 
-> ERROR: "iproc_msi_exit" [drivers/pci/host/pcie-iproc.ko] undefined!
-> ERROR: "iproc_msi_init" [drivers/pci/host/pcie-iproc.ko] undefined!
-> 
-> This changes the header file so we use stub functions whenever
-> the driver is not built, even when CONFIG_MSI is enabled.
-> 
-> As the Kconfig logic for the driver is a bit off, I'm rectifying
-> that as well, by making it depend on the specific drivers that
-> call into the driver, and moving the option behind those instead
-> of before them.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 610894347cbf ("PCI: iproc: Add iProc PCIe MSI support")
+Commit 097d88e94c44 ("gpio: xilinx: use gpiochip data pointer") replaces
+the use of container_of() with gpiochip_get_data(). Unfortunately, the
+data pointer is not yet set by the time xgpio_save_regs() is called,
+causing a system hang.
 
-Applied with Ray's Reviewed-by to pci/host-iproc for v4.5, thanks!
+Fixes: 097d88e94c44 ("gpio: xilinx: use gpiochip data pointer")
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+---
+It might make sense to merge this patch with the patch introducing the problem.
 
-Actually, since 610894347cbf hasn't been merged upstream yet, I just
-squashed this fix into it and updated "pci/host-iproc" and "next".
+ drivers/gpio/gpio-xilinx.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-> ---
-> Found on ARM randconfig builds a couple of days ago
-> 
-> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-> index 490476e172fd..d7c05894af70 100644
-> --- a/drivers/pci/host/Kconfig
-> +++ b/drivers/pci/host/Kconfig
-> @@ -124,15 +124,6 @@ config PCIE_IPROC
->  	  iProc family of SoCs. An appropriate bus interface driver needs
->  	  to be enabled to select this.
->  
-> -config PCIE_IPROC_MSI
-> -	bool "Broadcom iProc PCIe MSI support"
-> -	depends on ARCH_BCM_IPROC && PCI_MSI
-> -	select PCI_MSI_IRQ_DOMAIN
-> -	default ARCH_BCM_IPROC
-> -	help
-> -	  Say Y here if you want to enable MSI support for Broadcom's iProc
-> -	  PCIe controller
-> -
->  config PCIE_IPROC_PLATFORM
->  	tristate "Broadcom iProc PCIe platform bus driver"
->  	depends on ARCH_BCM_IPROC || (ARM && COMPILE_TEST)
-> @@ -154,6 +145,16 @@ config PCIE_IPROC_BCMA
->  	  Say Y here if you want to use the Broadcom iProc PCIe controller
->  	  through the BCMA bus interface
->  
-> +config PCIE_IPROC_MSI
-> +	bool "Broadcom iProc PCIe MSI support"
-> +	depends on PCIE_IPROC_PLATFORM || PCIE_IPROC_BCMA
-> +	depends on PCI_MSI
-> +	select PCI_MSI_IRQ_DOMAIN
-> +	default ARCH_BCM_IPROC
-> +	help
-> +	  Say Y here if you want to enable MSI support for Broadcom's iProc
-> +	  PCIe controller
-> +
->  config PCIE_ALTERA
->  	bool "Altera PCIe controller"
->  	depends on ARM || NIOS2
-> diff --git a/drivers/pci/host/pcie-iproc.h b/drivers/pci/host/pcie-iproc.h
-> index 6def23a7eb54..e84d93c53c7b 100644
-> --- a/drivers/pci/host/pcie-iproc.h
-> +++ b/drivers/pci/host/pcie-iproc.h
-> @@ -79,7 +79,7 @@ struct iproc_pcie {
->  int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res);
->  int iproc_pcie_remove(struct iproc_pcie *pcie);
->  
-> -#ifdef CONFIG_PCI_MSI
-> +#ifdef CONFIG_PCIE_IPROC_MSI
->  int iproc_msi_init(struct iproc_pcie *pcie, struct device_node *node);
->  void iproc_msi_exit(struct iproc_pcie *pcie);
->  #else
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/drivers/gpio/gpio-xilinx.c b/drivers/gpio/gpio-xilinx.c
+index 3345ab0ba1b3..d0fbb7f99523 100644
+--- a/drivers/gpio/gpio-xilinx.c
++++ b/drivers/gpio/gpio-xilinx.c
+@@ -207,7 +207,8 @@ static int xgpio_dir_out(struct gpio_chip *gc, unsigned int gpio, int val)
+  */
+ static void xgpio_save_regs(struct of_mm_gpio_chip *mm_gc)
+ {
+-	struct xgpio_instance *chip = gpiochip_get_data(&mm_gc->gc);
++	struct xgpio_instance *chip =
++		container_of(mm_gc, struct xgpio_instance, mmchip);
+ 
+ 	xgpio_writereg(mm_gc->regs + XGPIO_DATA_OFFSET,	chip->gpio_state[0]);
+ 	xgpio_writereg(mm_gc->regs + XGPIO_TRI_OFFSET, chip->gpio_dir[0]);
+-- 
+2.1.4
