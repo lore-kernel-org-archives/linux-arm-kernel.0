@@ -1,93 +1,136 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 7 Jan 2016 10:57:39 -0800
-Subject: next boot: 564 boots: 59 failed, 448 passed with 57 offline
- (next-20160107)
-In-Reply-To: <20160107162810.GA25177@ulmo>
-References: <568e8740.01941c0a.31072.ffffb67b@mx.google.com>
- <20160107155958.GG6588@sirena.org.uk> <20160107162810.GA25177@ulmo>
-Message-ID: <20160107185739.GA29951@kroah.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Thu, 7 Jan 2016 20:07:49 +0100
+Subject: [PATCH v8 02/20] KVM: ARM64: Define PMU data structure for each
+ vcpu
+In-Reply-To: <1450771695-11948-3-git-send-email-zhaoshenglong@huawei.com>
+References: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>
+ <1450771695-11948-3-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <20160107190749.GG6199@hawk.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 07, 2016 at 05:28:10PM +0100, Thierry Reding wrote:
-> On Thu, Jan 07, 2016 at 03:59:58PM +0000, Mark Brown wrote:
-> > On Thu, Jan 07, 2016 at 07:41:52AM -0800, kernelci.org bot wrote:
-> > 
-> > > Tree: next
-> > > Branch: local/master
-> > > Git Describe: next-20160107
-> > > Git Commit: 0f023a298a7d2a8e99c54913f7277b3c08c1f5c9
-> > > Git URL: git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git
-> > > Tested: 95 unique boards, 25 SoC families, 28 builds out of 135
-> > > 
-> > > Boot Failures Detected: https://kernelci.org/boot/?next-20160107&fail
-> > 
-> > For the past couple of days -next has been failing to boot on various
-> > Tegra platforms, there are failures involving either no kernel output or
-> > (with tegra_defconfig) backtraces during CMA allocation from USB, for
-> > example:
-> > 
-> >    http://storage.kernelci.org/next/next-20160107/arm-tegra_defconfig/lab-khilman/boot-tegra30-beaver.html
-> > 
-> > >     multi_v7_defconfig+CONFIG_THUMB2_KERNEL=y:
-> > >         tegra124-jetson-tk1: 2 failed labs
-> > >         tegra30-beaver: 1 failed lab
-> > > 
-> > >     tegra_defconfig:
-> > >         tegra124-jetson-tk1: 2 failed labs
-> > >         tegra124-jetson-tk1_rootfs:nfs: 1 failed lab
-> > >         tegra124-nyan-big: 1 failed lab
-> > >         tegra30-beaver: 1 failed lab
-> > > 
-> > >     multi_v7_defconfig+CONFIG_ARM_LPAE=y:
-> > >         tegra124-jetson-tk1: 1 failed lab
-> > >         tegra124-nyan-big: 1 failed lab
-> > > 
-> > >     multi_v7_defconfig:
-> > >         tegra124-jetson-tk1: 2 failed labs
-> > >         tegra30-beaver: 1 failed lab
-> > > 
-> > >     multi_v7_defconfig+CONFIG_LKDTM=y:
-> > >         tegra124-jetson-tk1: 2 failed labs
-> > >         tegra30-beaver: 1 failed lab
-> > > 
-> > >     multi_v7_defconfig+CONFIG_PROVE_LOCKING=y:
-> > >         tegra124-jetson-tk1: 2 failed labs
-> > >         tegra30-beaver: 1 failed lab
-> > 
-> > I did bisects yesterday but they were a bit inconclusive, showing a
-> > series of skipped commits in the TTY tree as being the culprits:
-> > 
-> > afd7f88f157796e586fc99d62da13a54024e0731 serial: 8250: move of_serial code to 8250 directory
-> > 4e33870b3bb691996354a8f9e8f69458b4fc34d9 serial: of: CONFIG_SERIAL_8250 is always set
-> > d1b5c87fa8058a3f477ae05555916dd1cea934ad serial: remove NWP serial support
-> > 
-> > which seems more than a little surprising and like they might be false
-> > positives, especially in the cases that do produce output.  The errors
-> > today look the same.  I've not investigated further than the bisects.
-> > 
-> > Full bisect logs:
-> > 
-> >  https://ci.linaro.org/view/people/job/tbaker-boot-bisect-bot/140/console
-> >  https://ci.linaro.org/view/people/job/tbaker-boot-bisect-bot/141/console
+On Tue, Dec 22, 2015 at 04:07:57PM +0800, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> These should all be fixed by this patch:
+> Here we plan to support virtual PMU for guest by full software
+> emulation, so define some basic structs and functions preparing for
+> futher steps. Define struct kvm_pmc for performance monitor counter and
+> struct kvm_pmu for performance monitor unit for each vcpu. According to
+> ARMv8 spec, the PMU contains at most 32(ARMV8_MAX_COUNTERS) counters.
 > 
-> 	serial: 8250: of: Fix the driver and actually compile the 8250_of
+> Since this only supports ARM64 (or PMUv3), add a separate config symbol
+> for it.
 > 
-> which can be found in patchwork here:
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  arch/arm64/include/asm/kvm_host.h |  2 ++
+>  arch/arm64/kvm/Kconfig            |  7 +++++++
+>  include/kvm/arm_pmu.h             | 42 +++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 51 insertions(+)
+>  create mode 100644 include/kvm/arm_pmu.h
 > 
-> 	https://patchwork.kernel.org/patch/7883541/
-> 
-> I think this is merely waiting to be picked up into the tty tree. I
-> suspect the reason why there's output in the first place is because
-> of earlyprintk. I've seen recent linux-next work properly, with the
-> serial console hanging at some point (fbcon shows login prompt). If
-> I apply the above patch things are back to normal.
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 689d4c9..6f0241f 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -36,6 +36,7 @@
+>  
+>  #include <kvm/arm_vgic.h>
+>  #include <kvm/arm_arch_timer.h>
+> +#include <kvm/arm_pmu.h>
+>  
+>  #define KVM_MAX_VCPUS VGIC_V3_MAX_CPUS
+>  
+> @@ -211,6 +212,7 @@ struct kvm_vcpu_arch {
+>  	/* VGIC state */
+>  	struct vgic_cpu vgic_cpu;
+>  	struct arch_timer_cpu timer_cpu;
+> +	struct kvm_pmu pmu;
+>  
+>  	/*
+>  	 * Anything that is not used directly from assembly code goes
+> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+> index a5272c0..de7450d 100644
+> --- a/arch/arm64/kvm/Kconfig
+> +++ b/arch/arm64/kvm/Kconfig
+> @@ -36,6 +36,7 @@ config KVM
+>  	select HAVE_KVM_EVENTFD
+>  	select HAVE_KVM_IRQFD
+>  	select KVM_ARM_VGIC_V3
+> +	select KVM_ARM_PMU if HW_PERF_EVENTS
+>  	---help---
+>  	  Support hosting virtualized guest machines.
+>  	  We don't support KVM with 16K page tables yet, due to the multiple
+> @@ -48,6 +49,12 @@ config KVM_ARM_HOST
+>  	---help---
+>  	  Provides host support for ARM processors.
+>  
+> +config KVM_ARM_PMU
+> +	bool
+> +	---help---
+> +	  Adds support for a virtual Performance Monitoring Unit (PMU) in
+> +	  virtual machines.
+> +
+>  source drivers/vhost/Kconfig
+>  
+>  endif # VIRTUALIZATION
+> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+> new file mode 100644
+> index 0000000..ddcb5b2
+> --- /dev/null
+> +++ b/include/kvm/arm_pmu.h
+> @@ -0,0 +1,42 @@
+> +/*
+> + * Copyright (C) 2015 Linaro Ltd.
+> + * Author: Shannon Zhao <shannon.zhao@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#ifndef __ASM_ARM_KVM_PMU_H
+> +#define __ASM_ARM_KVM_PMU_H
+> +
+> +#ifdef CONFIG_KVM_ARM_PMU
+> +
+> +#include <linux/perf_event.h>
+> +#include <asm/pmu.h>
+> +
+> +struct kvm_pmc {
+> +	u8 idx;/* index into the pmu->pmc array */
+> +	struct perf_event *perf_event;
+> +	u64 bitmask;
+> +};
+> +
+> +struct kvm_pmu {
+> +	/* PMU IRQ Number per VCPU */
 
-I'll go queue that up later, but how is this suddenly showing up in
--next?  The tty tree has been pretty quiet for a while now..
+This whole structure is per vcpu, so I find the above comment
+unnecessary, and even a bit confusing.
 
-thanks,
-
-greg k-h
+> +	int irq_num;
+> +	struct kvm_pmc pmc[ARMV8_MAX_COUNTERS];
+> +};
+> +#else
+> +struct kvm_pmu {
+> +};
+> +#endif
+> +
+> +#endif
+> -- 
+> 2.0.4
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
