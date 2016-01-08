@@ -1,130 +1,86 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 08 Jan 2016 23:47:53 +0100
-Subject: [PATCH] ata: add AMD Seattle platform driver
-In-Reply-To: <5690367E.8060609@amd.com>
-References: <1452200002-31590-1-git-send-email-brijesh.singh@amd.com>
- <10869853.plxna0HzWE@wuerfel> <5690367E.8060609@amd.com>
-Message-ID: <9923043.nz8DJ6lRiJ@wuerfel>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Fri, 8 Jan 2016 17:50:13 -0500 (EST)
+Subject: [RFC PATCH 1/2] USB: core: let USB device know device node
+In-Reply-To: <1452231864-11171-2-git-send-email-peter.chen@freescale.com>
+Message-ID: <Pine.LNX.4.44L0.1601081746080.21467-100000@netrider.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 08 January 2016 16:21:50 Brijesh Singh wrote:
-> >> Should I consider adding a property "sgpio-ctrl" to pass the register 
-> >> address ?
-> >>
-> >> e.g
-> >>
-> >> sata0 at e0300000 {
-> >>    compatible = "amd,seattle-ahci";
-> >>    reg = <0 0xe0300000 0 0x800>;
-> >>    amd,sgpio-ctrl = <0xe0000078>;
-> >>    interrupts = <0 355 4>;
-> >>    clocks = <&sataclk_333mhz>;
-> >>    dma-coherent;
-> >> };
-> > 
-> > We generally don't refer to register locations with properties other than
-> > 'reg', so that approach would be worse. What I'd suggest you do is to
-> > have the sgpio registers in a separate device node, and use the LED
-> > binding to access it, see
-> >  
-> > Documentation/devicetree/bindings/leds/common.txt
-> > 
-> > It seems that none of the drivers/ata/ drivers use the leds interface
-> > today, but that can be added to libata-*.c whenever the appropriate
-> > properties are there.
-> >
+On Fri, 8 Jan 2016, Peter Chen wrote:
+
+> Although most of USB devices are hot-plug's, there are still some devices
+> are hard wired on the board, eg, for HSIC and SSIC interface USB devices.
+> If these kinds of USB devices are multiple functions, and they can supply
+> other interfaces like i2c, gpios for other devices, we may need to
+> descirbe these at device tree.
 > 
-> libata-*.c implements the "Enclosure management" style led messages but also has hooks
-> to register a custom led control callback. Since Seattle platform does not support
-> the "Enclosure management" registers hence ata_port_info we are setting a ATA_FLAG_EM | ATA_FLAG_SW_ACIVITY 
-> to indicate that we can still handle the led messages by our registered callback. I see
-> that sata_highbank driver is doing something similar.
-
-But if the LEDs are the only thing that is special, I think it makes
-more sense to extend the generic driver. This is similar to how the
-ahci driver knows how to deal with external PHY, clk, regulator etc
-resources. All of those are not part of the AHCI spec, but are common
-enough that we want to have them done in a single driver.
-
-We really should not need a special driver just for handling LEDs
-when we already deal with more complex stuff, and we have a proper
-abstraction for LEDs in the kernel.
-
-> > 
-> > That way, any driver that ends up needing a register from this block
-> > can use the syscon interface to get hold of a mapping, and/or you can
-> > have a high-level driver to expose other functionalities. It's probably
-> > best to start doing it either entirely using syscon references from
-> > other drivers, or using no syscon references, and putting everything into
-> > a driver for the register set, but as I said it depends a lot on what
-> > else is in there.
-> > 
-> > Can you send me a register list of the 0xe0000000 segment for reference?
-> >
-> Thanks for pointing syncon, are you thinking something like this ?
+> In this commit, it uses "reg" in dts as port number to match the port
+> number decided by USB core, if they are the same, then the device node
+> is for the device we are creating for USB core.
 > 
->                 sgpio0: syscon at e0000078 {
->                         compatible = "amd, seattle-sgpio", syscon";
->                         reg = <0x0 0xe0000078 0x0 0x1>;
->                 };
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> ---
 
-A syscon is defined as (roughly) a group of otherwise unrelated registers
-that happen to be part of the same physical register area because the SoC
-designer couldn't find a proper abstraction for them. When you define
-a register area with a single byte in it, that is not a syscon.
+> +#include <linux/module.h>
+> +#include <linux/moduleparam.h>
 
-> 
->                 sata at e0300000 {
->                         compatible = "amd,seattle-ahci";
->                         reg = <0x0 0xe0300000 0x0 0xf0000>;
->                         interrupts = <0x0 0x163 0x4>;
->                         amd,sgpio-ctrl = <&sgpio0>;
->                         dma-coherent;
->                 };
-> 
+Do you need those two #include's?
 
-
-The sata node should list "generic-ahci" so we can bind the normal
-driver. You can leave the "amd,seattle-ahci" in addition in case we
-ever need to know the difference to work around a bug, but it's really
-not needed for the LED.
-
-> SGPIO0 (0xe0000078) and SGPIO1 (0xe000007C) does not belong to any system control register set.
-> They are meant to be used by SATA driver only and no other driver should every touch it. It almost feels
-> its just extension of the IP block but it just happened to be way out of the IP block range.
-> Other register near to 0xe000_0078 and 0xe000_007C should not be mapped by OS.
-
-That is quite normal, a lot of chips have register blocks where one
-register is meant for one device only. E.g. the clock controller may have
-one register for controlling the clocks of the AHCI device. In the old
-days, we would have hacks like what you did to turn on the clocks by poking
-the register from the SATA driver, but now we abstract those things using
-generic subsystems.
-
-I think you either want a special led controller device node that
-refers to the syscon device and exports the LEDs so they can be
-accessed by the AHCI device, or do it in the device that contains
-the registers.
-
-> But this syscon approach also brings another problem. Currently my code is pretty simple for mapping this regs
-> 
-> +       plat_data->sgpio_ctrl = devm_ioremap_resource(dev,
-> +                             platform_get_resource(pdev, IORESOURCE_MEM, 1));
-> +       if (IS_ERR(plat_data->sgpio_ctrl))
-> +               return &ahci_port_info;
+> +#include <linux/of.h>
 > +
-> 
-> The above code works on ACPI and DT cases. But if we go with syncon approach
-> then we need to handle DT and ACPI differently. Because sycon will provide
-> struct regmap instead of struct resources and also make reading/writing a 
-> bit different. I was trying to minimize the DT vs ACPI changes in the driver
-> (other than binding) hence I think defining two ranges in sata controller
-> reg property was much cleaner and it aligns with DSDT.
+> +/**
+> + * usb_of_find_node - Find the device node match port number
+> + * @dev: the parent device node
 
-Isn't this the thing that ACPI based firmware would handle using AML anyway?
-I don't think the server people would be too happy to add a new driver
-each time a SATA controller does the LEDs slightly differently, and this
-is really the kind of platform specific hack that AML is meant for.
+The parameter is actually named "parent".
 
-	Arnd
+> + * @portnum: the port number which device is connecting 
+> + *
+> + * Find the node from device tree according to its port number.
+> + *
+> + * Return: On success, a pointer to the device node, %NULL on failure.
+> + */
+> +struct device_node *usb_of_find_node(struct device_node *parent, int portnum)
+> +{
+> +	struct device_node *node;
+> +	u32 port;
+> +
+> +	for_each_child_of_node(parent, node) {
+> +		if (!of_property_read_u32(node, "reg", &port)) {
+> +			if (port == portnum)
+> +				return node;
+> +		}
+> +	}
+> +
+> +	return NULL;
+> +}
+> +EXPORT_SYMBOL_GPL(usb_of_find_node);
+> +
+
+> diff --git a/include/linux/usb.h b/include/linux/usb.h
+> index 89533ba..a3a0b07 100644
+> --- a/include/linux/usb.h
+> +++ b/include/linux/usb.h
+> @@ -21,6 +21,7 @@
+>  #include <linux/sched.h>	/* for current && schedule_timeout */
+>  #include <linux/mutex.h>	/* for struct mutex */
+>  #include <linux/pm_runtime.h>	/* for runtime PM */
+> +#include <linux/of.h>		/* for device tree */
+
+I think you don't need this line.  You can simply write:
+
+	struct device_node;
+
+just like the two lines below.
+
+>  struct usb_device;
+>  struct usb_driver;
+> @@ -616,6 +617,7 @@ struct usb_device {
+>  	struct usb3_lpm_parameters u1_params;
+>  	struct usb3_lpm_parameters u2_params;
+>  	unsigned lpm_disable_count;
+> +	struct device_node	*of_node; /* associated device tree node */
+>  };
+>  #define	to_usb_device(d) container_of(d, struct usb_device, dev)
+
+Alan Stern
