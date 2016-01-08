@@ -1,267 +1,44 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Fri, 8 Jan 2016 17:02:20 +0100
-Subject: [PATCH linux-next v2 08/14] mtd: spi-nor: configure the number of
- dummy clock cycles by manufacturer
-In-Reply-To: <cover.1452268345.git.cyrille.pitchen@atmel.com>
-References: <cover.1452268345.git.cyrille.pitchen@atmel.com>
-Message-ID: <7f2f8d9a2097393e64dbc0d324a7d5de74095651.1452268345.git.cyrille.pitchen@atmel.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sat, 9 Jan 2016 01:06:55 +0900
+Subject: range operation of outer cache when start >= end?
+In-Reply-To: <20160108150618.GL19062@n2100.arm.linux.org.uk>
+References: <CAK7LNATi5CE3Uc5UgQ6OncC5b=bDavAyNfqi_nqvcVkOrbFhRQ@mail.gmail.com>
+ <20160108150618.GL19062@n2100.arm.linux.org.uk>
+Message-ID: <CAK7LNARod6AVBC7KsPRieONgoRwVE-uhfGhJjtRyu6kHgFRYTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a transitional patch which let us set the number of dummy clock
-cycles by manufacturer.
+Hi Russell,
 
-More patches will follow by manufacturer to actually configure the
-relevant number of dummy clock cycles following the dedicated procedure.
 
-For instance, some manufacturers like Spansion configure the number of
-dummy clock cycles to be used by Fast Read command through some
-non-volatile register. In such a case, we should avoid updating its value
-but instead read it then set the nor->read_dummy accordingly.
+2016-01-09 0:06 GMT+09:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Fri, Jan 08, 2016 at 11:54:30AM +0900, Masahiro Yamada wrote:
+>> I know I am nitpicking.  Forgive me if I am asking a silly question.
+>>
+>>
+>> How should the outer-cache handle such an insane case like  start >= end?
+>
+> Passing start >= end isn't defined, code should not pass start >= end.
+>
+>> Assumed answers are:
+>>
+>> [1] Do not care about that.  It should never happen.  If it does, fix
+>> the caller.
+>
+> This applies.  What situation are you seeing start >= end?
 
-On the other hand, some manufacturers like Micron use some volatile
-register. In this case, we'd rather update this register to use a number
-of dummy clock cycles, which is a multiple of 8.
-Indeed some drivers, like m25p80, only support writing bytes, hence
-multiples of 8 bits.
+I never see such a case at all.
+When I saw l2c210_inv_range(), I just wondered whether it should be
+cared or not.
 
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
----
- drivers/mtd/spi-nor/spi-nor.c | 99 ++++++++++++++++++++++++++++++++-----------
- 1 file changed, 74 insertions(+), 25 deletions(-)
 
-diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
-index 067425c7a0ff..353a0f6ac3fe 100644
---- a/drivers/mtd/spi-nor/spi-nor.c
-+++ b/drivers/mtd/spi-nor/spi-nor.c
-@@ -139,24 +139,6 @@ static int read_cr(struct spi_nor *nor)
- }
- 
- /*
-- * Dummy Cycle calculation for different type of read.
-- * It can be used to support more commands with
-- * different dummy cycle requirements.
-- */
--static inline int spi_nor_read_dummy_cycles(struct spi_nor *nor)
--{
--	switch (nor->flash_read) {
--	case SPI_NOR_FAST:
--	case SPI_NOR_DUAL:
--	case SPI_NOR_QUAD:
--		return 8;
--	case SPI_NOR_NORMAL:
--		return 0;
--	}
--	return 0;
--}
--
--/*
-  * Write status register 1 byte
-  * Returns negative if error occurred.
-  */
-@@ -1225,6 +1207,7 @@ static int macronix_set_quad_mode(struct spi_nor *nor)
- 		 * read (performance enhance) mode by mistake!
- 		 */
- 		nor->read_opcode = SPINOR_OP_READ_1_4_4;
-+		nor->read_dummy = 8;
- 		return 0;
- 	}
- 
-@@ -1246,6 +1229,7 @@ static int macronix_set_quad_mode(struct spi_nor *nor)
- 	}
- 	nor->read_proto = SNOR_PROTO_1_1_4;
- 	nor->read_opcode = SPINOR_OP_READ_1_1_4;
-+	nor->read_dummy = 8;
- 	return 0;
- }
- 
-@@ -1259,12 +1243,27 @@ static int macronix_set_dual_mode(struct spi_nor *nor)
- {
- 	nor->read_proto = SNOR_PROTO_1_1_2;
- 	nor->read_opcode = SPINOR_OP_READ_1_1_2;
-+	nor->read_dummy = 8;
- 	return 0;
- }
- 
- static int macronix_set_single_mode(struct spi_nor *nor)
- {
-+	u8 read_dummy;
-+
-+	switch (nor->read_opcode) {
-+	case SPINOR_OP_READ:
-+	case SPINOR_OP_READ4:
-+		read_dummy = 0;
-+		break;
-+
-+	default:
-+		read_dummy = 8;
-+		break;
-+	}
-+
- 	nor->read_proto = SNOR_PROTO_1_1_1;
-+	nor->read_dummy = read_dummy;
- 	return 0;
- }
- 
-@@ -1285,6 +1284,7 @@ static int winbond_set_quad_mode(struct spi_nor *nor)
- 		 * Hence the Fast Read 1-1-1 (0x0b) op code is chosen.
- 		 */
- 		nor->read_opcode = SPINOR_OP_READ_FAST;
-+		nor->read_dummy = 8;
- 		return 0;
- 	}
- 
-@@ -1303,6 +1303,7 @@ static int winbond_set_quad_mode(struct spi_nor *nor)
- 	}
- 	nor->read_proto = SNOR_PROTO_1_1_4;
- 	nor->read_opcode = SPINOR_OP_READ_1_1_4;
-+	nor->read_dummy = 8;
- 	return 0;
- }
- 
-@@ -1316,12 +1317,27 @@ static int winbond_set_dual_mode(struct spi_nor *nor)
- {
- 	nor->read_proto = SNOR_PROTO_1_1_2;
- 	nor->read_opcode = SPINOR_OP_READ_1_1_2;
-+	nor->read_dummy = 8;
- 	return 0;
- }
- 
- static int winbond_set_single_mode(struct spi_nor *nor)
- {
-+	u8 read_dummy;
-+
-+	switch (nor->read_opcode) {
-+	case SPINOR_OP_READ:
-+	case SPINOR_OP_READ4:
-+		read_dummy = 0;
-+		break;
-+
-+	default:
-+		read_dummy = 8;
-+		break;
-+	}
-+
- 	nor->read_proto = SNOR_PROTO_1_1_1;
-+	nor->read_dummy = read_dummy;
- 	return 0;
- }
- 
-@@ -1413,6 +1429,7 @@ static int micron_set_quad_mode(struct spi_nor *nor)
- 	if (nor->read_proto != SNOR_PROTO_4_4_4)
- 		nor->read_proto = SNOR_PROTO_1_1_4;
- 	nor->read_opcode = SPINOR_OP_READ_1_1_4;
-+	nor->read_dummy = 8;
- 	return 0;
- }
- 
-@@ -1442,11 +1459,14 @@ static int micron_set_dual_mode(struct spi_nor *nor)
- 	if (nor->read_proto != SNOR_PROTO_2_2_2)
- 		nor->read_proto = SNOR_PROTO_1_1_2;
- 	nor->read_opcode = SPINOR_OP_READ_1_1_2;
-+	nor->read_dummy = 8;
- 	return 0;
- }
- 
- static int micron_set_single_mode(struct spi_nor *nor)
- {
-+	u8 read_dummy;
-+
- 	/* Check whether either the Dual or Quad mode is enabled. */
- 	if (unlikely(nor->read_proto != SNOR_PROTO_1_1_1)) {
- 		int ret;
-@@ -1463,6 +1483,18 @@ static int micron_set_single_mode(struct spi_nor *nor)
- 		nor->read_proto = SNOR_PROTO_1_1_1;
- 	}
- 
-+	/* Force the number of dummy cycles to 8 for Fast Read, 0 for Read. */
-+	switch (nor->read_opcode) {
-+	case SPINOR_OP_READ:
-+	case SPINOR_OP_READ4:
-+		read_dummy = 0;
-+		break;
-+
-+	default:
-+		read_dummy = 8;
-+		break;
-+	}
-+	nor->read_dummy = read_dummy;
- 	return 0;
- }
- 
-@@ -1477,6 +1509,7 @@ static int spansion_set_quad_mode(struct spi_nor *nor)
- 	}
- 	nor->read_proto = SNOR_PROTO_1_1_4;
- 	nor->read_opcode = SPINOR_OP_READ_1_1_4;
-+	nor->read_dummy = 8;
- 	return 0;
- }
- 
-@@ -1484,12 +1517,27 @@ static int spansion_set_dual_mode(struct spi_nor *nor)
- {
- 	nor->read_proto = SNOR_PROTO_1_1_2;
- 	nor->read_opcode = SPINOR_OP_READ_1_1_2;
-+	nor->read_dummy = 8;
- 	return 0;
- }
- 
- static int spansion_set_single_mode(struct spi_nor *nor)
- {
-+	u8 read_dummy;
-+
-+	switch (nor->read_opcode) {
-+	case SPINOR_OP_READ:
-+	case SPINOR_OP_READ4:
-+		read_dummy = 0;
-+		break;
-+
-+	default:
-+		read_dummy = 8;
-+		break;
-+	}
-+
- 	nor->read_proto = SNOR_PROTO_1_1_1;
-+	nor->read_dummy = read_dummy;
- 	return 0;
- }
- 
-@@ -1704,11 +1752,14 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
- 	if (info->flags & SPI_NOR_NO_FR)
- 		nor->flash_read = SPI_NOR_NORMAL;
- 
--	/* Default commands */
--	if (nor->flash_read == SPI_NOR_NORMAL)
-+	/* Default commands and number of dummy cycles */
-+	if (nor->flash_read == SPI_NOR_NORMAL) {
- 		nor->read_opcode = SPINOR_OP_READ;
--	else
-+		nor->read_dummy = 0;
-+	} else {
- 		nor->read_opcode = SPINOR_OP_READ_FAST;
-+		nor->read_dummy = 8;
-+	}
- 
- 	nor->program_opcode = SPINOR_OP_PP;
- 
-@@ -1723,8 +1774,8 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
- 	 *  - SNOR_PROTO_2_2_2 is either:
- 	 *    + Micron Dual mode enabled
- 	 *
--	 * The opcodes and the protocols are updated depending on the
--	 * manufacturer.
-+	 * The opcodes, the protocols and the number of dummy cycles are updated
-+	 * depending on the manufacturer.
- 	 * The read opcode and protocol should be updated by the relevant
- 	 * function when entering Quad or Dual mode.
- 	 */
-@@ -1788,8 +1839,6 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
- 		return -EINVAL;
- 	}
- 
--	nor->read_dummy = spi_nor_read_dummy_cycles(nor);
--
- 	dev_info(dev, "%s (%lld Kbytes)\n", info->name,
- 			(long long)mtd->size >> 10);
- 
+> What you will get with the existing code is potentially some cache
+> cleaning and a sync, but nothing apart from that.  __l2c210_op_pa_range()
+> becomes a no-op of start >= end.  However, that behaviour is not
+> guaranteed.
+
+Thanks for your explanation!
+
 -- 
-1.8.2.2
+Best Regards
+Masahiro Yamada
