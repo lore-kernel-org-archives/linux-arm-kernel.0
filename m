@@ -1,40 +1,45 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Fri, 08 Jan 2016 10:22:24 +0000
-Subject: [Question] Any restriction for the location of initramdisk?
-In-Reply-To: <CAK7LNAQS--QobTNyAvxqqZY2gvy4zB_eBOGju69Pjs-1FAJ+tQ@mail.gmail.com>
-References: <CAK7LNAQS--QobTNyAvxqqZY2gvy4zB_eBOGju69Pjs-1FAJ+tQ@mail.gmail.com>
-Message-ID: <1452248544.3006.2.camel@linaro.org>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Fri, 8 Jan 2016 10:24:01 +0000
+Subject: [PATCH v8 20/20] KVM: ARM64: Add a new kvm ARM PMU device
+In-Reply-To: <568F27A8.80808@huawei.com>
+References: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>
+ <1450771695-11948-21-git-send-email-zhaoshenglong@huawei.com>
+ <CAFEAcA_MDiOphseZ7RGNE3G=4ZDF5SFV5krOjanPbVuhgg9gnQ@mail.gmail.com>
+ <568E7AF1.9040103@huawei.com>
+ <CAFEAcA-Qcda7TSFLSeykLHqZYdP6tYdEjPe2uHN6f_+omqWFZg@mail.gmail.com>
+ <568F27A8.80808@huawei.com>
+Message-ID: <CAFEAcA8DO5VksiP55vnuOD3NERJTfr1q=une4n6N=Oj8JUa1_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-01-08 at 16:16 +0900, Masahiro Yamada wrote:
-> Hi.
-> 
-> 
-> I know DTB should be located within the reach of the kernel
-> so that the kernel can get access to it at the early boot stage.
-> In other words, DTB should be put in the low memory area.
-> 
-> Does initramdisk has the similar restriction?
+On 8 January 2016 at 03:06, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+>
+>
+> On 2016/1/7 22:56, Peter Maydell wrote:
+>>>>> +  Errors:
+>>>>> >>> +    -ENXIO: Unsupported attribute group
+>>>>> >>> +    -EBUSY: The PMU overflow interrupt is already set
+>>>>> >>> +    -ENODEV: Getting the PMU overflow interrupt number while it's not set
+>>>>> >>> +    -EINVAL: Invalid vcpu_index or PMU overflow interrupt number supplied
+>>>> >>
+>>>> >> What happens if you create a PMU but then never set the IRQ number?
+>>>> >> Is there a default or does the VM refuse to run or something?
+>>>> >>
+>>> > If userspace doesn't specify the irq number, the guest will not receive
+>>> > the PMU interrupt because we check if the irq is initialized when we
+>>> > inject the interrupt. But guest could still use the vPMU if QEMU
+>>> > generates a proper DTB or ACPI.
+>> So is it a valid use case to create a PMU with the interrupt not wired
+>> up to anything? (If it's never valid it would be nice to diagnose it
+>> rather than just silently letting the guest run but not work right.)
+> So how about adding a helper to check if the PMU is completely
+> initialized and if not, return trap_raz_wi when guest access PMU registers?
 
-I assume so, as that's what Documentation/arm/Booting says ...
+That would still be letting the guest run and not work right.
 
+If we have an "I have now completed config" ioctl like the GIC does,
+then you could make that ioctl return an error if the config is not
+valid.
 
-5. Load initramfs.
-------------------
-
-Existing boot loaders:		OPTIONAL
-New boot loaders:		OPTIONAL
-
-If an initramfs is in use then, as with the dtb, it must be placed in
-a region of memory where the kernel decompressor will not overwrite it
-while also with the region which will be covered by the kernel's
-low-memory mapping.
-
-A safe location is just above the device tree blob which itself will
-be loaded just above the 128MiB boundary from the start of RAM as
-recommended above.
-
-
--- 
-Tixy
+thanks
+-- PMM
