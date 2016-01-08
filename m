@@ -1,127 +1,36 @@
-From: brijesh.singh@amd.com (Brijesh Singh)
-Date: Fri, 8 Jan 2016 16:21:50 -0600
-Subject: [PATCH] ata: add AMD Seattle platform driver
-In-Reply-To: <10869853.plxna0HzWE@wuerfel>
-References: <1452200002-31590-1-git-send-email-brijesh.singh@amd.com>
- <4983521.tEaWggKCCv@wuerfel> <568F14E0.4060107@amd.com>
- <10869853.plxna0HzWE@wuerfel>
-Message-ID: <5690367E.8060609@amd.com>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Fri, 8 Jan 2016 14:33:39 -0800
+Subject: bcm4708-smartrg-sr400ac boot failures in next/arm-soc
+Message-ID: <CANMBJr6LW=y7g4_CCutHf4vu5NkzoeXt_RvPSJAsTE2nFpGwqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Hauke, Rafal, Alison,
 
+The kernelci.org bot detected a boot regression[1] in -next/arm-soc
+which bisected to b02ec7658c ("ARM: multi_v7_defconfig: Enable some
+drivers for LS1021A"). Reverting this patch fixes the issue I was
+seeing.
 
->> Should I consider adding a property "sgpio-ctrl" to pass the register 
->> address ?
->>
->> e.g
->>
->> sata0 at e0300000 {
->>    compatible = "amd,seattle-ahci";
->>    reg = <0 0xe0300000 0 0x800>;
->>    amd,sgpio-ctrl = <0xe0000078>;
->>    interrupts = <0 355 4>;
->>    clocks = <&sataclk_333mhz>;
->>    dma-coherent;
->> };
-> 
-> We generally don't refer to register locations with properties other than
-> 'reg', so that approach would be worse. What I'd suggest you do is to
-> have the sgpio registers in a separate device node, and use the LED
-> binding to access it, see
->  
-> Documentation/devicetree/bindings/leds/common.txt
-> 
-> It seems that none of the drivers/ata/ drivers use the leds interface
-> today, but that can be added to libata-*.c whenever the appropriate
-> properties are there.
->
+After a bit of investigation, I determined that CONFIG_BLK_DEV_RAM was
+causing the issue and disabling it fixed the boot issue. Essentially,
+the kernel cannot find the initrd that has been loaded into memory by
+CFE bootloader with this option enabled as I inject the following
+command line into the DT before it's loaded over tftp.
 
-libata-*.c implements the "Enclosure management" style led messages but also has hooks
-to register a custom led control callback. Since Seattle platform does not support
-the "Enclosure management" registers hence ata_port_info we are setting a ATA_FLAG_EM | ATA_FLAG_SW_ACIVITY 
-to indicate that we can still handle the led messages by our registered callback. I see
-that sata_highbank driver is doing something similar.
- 
->> Yes, its regular AHCI implementation and works well with ahci_platform 
->> driver. In standard ahci_platform driver activity LEDs are blinked 
->> through enclosure management interface. Given the current hardware 
->> limitation it seems like creating a new driver would be cleaner. I am 
->> open to suggestion.
-> 
-> I'd say the code in drivers/ata should be kept completely generic, referring
-> only to the include/linux/leds.h interfaces and properties added to
-> Documentation/devicetree/bindings/ata/ahci-platform.txt (if any).
-> 
-> For the driver that actually owns the register, it depends a bit on how
-> the hardware is structured, and you'd need to look at the datasheet (or
-> talk to a hardware designer) for that.
-> 
-> I suspect we should have a node for the entire block of registers
-> around the SGPIO, presumably something like
-> 
-> 	syscon at 0xe0000000 {
-> 		compatible = "amd,$SOC_ID"-lsioc", "syscon";
-> 		reg = <0xe0000000 0x1000>; /* find the actual length in the datasheet */
-> 	};
-> 
-> That way, any driver that ends up needing a register from this block
-> can use the syscon interface to get hold of a mapping, and/or you can
-> have a high-level driver to expose other functionalities. It's probably
-> best to start doing it either entirely using syscon references from
-> other drivers, or using no syscon references, and putting everything into
-> a driver for the register set, but as I said it depends a lot on what
-> else is in there.
-> 
-> Can you send me a register list of the 0xe0000000 segment for reference?
->
-Thanks for pointing syncon, are you thinking something like this ?
+Loaded in CFE by: 'load -raw -tftp -addr=0x4000000 -max=0x900000
+192.168.2.2:tmpqC9zOv/ramdisk.cpio.gz'
 
-                sgpio0: syscon at e0000078 {
-                        compatible = "amd, seattle-sgpio", syscon";
-                        reg = <0x0 0xe0000078 0x0 0x1>;
-                };
+Kernel arguments injected into DT: 'console=ttyS0,115200
+initrd=0x4000000,8M root=/dev/ram0 ip=dhcp'
 
-                sata at e0300000 {
-                        compatible = "amd,seattle-ahci";
-                        reg = <0x0 0xe0300000 0x0 0xf0000>;
-                        interrupts = <0x0 0x163 0x4>;
-                        amd,sgpio-ctrl = <&sgpio0>;
-                        dma-coherent;
-                };
+I'm wondering how we should proceed forward here. Alison, Is it a firm
+requirement you need CONFIG_BLK_DEV_RAM enabled by default? Hauke,
+Rafal, Is there another way to configure this platform to boot a
+kernel/ramdisk without passing the initrd option on the command line?
 
-SGPIO0 (0xe0000078) and SGPIO1 (0xe000007C) does not belong to any system control register set.
-They are meant to be used by SATA driver only and no other driver should every touch it. It almost feels
-its just extension of the IP block but it just happened to be way out of the IP block range.
-Other register near to 0xe000_0078 and 0xe000_007C should not be mapped by OS.
+Cheers,
 
-But this syscon approach also brings another problem. Currently my code is pretty simple for mapping this regs
+Tyler
 
-+       plat_data->sgpio_ctrl = devm_ioremap_resource(dev,
-+                             platform_get_resource(pdev, IORESOURCE_MEM, 1));
-+       if (IS_ERR(plat_data->sgpio_ctrl))
-+               return &ahci_port_info;
-+
-
-The above code works on ACPI and DT cases. But if we go with syncon approach then we need to handle DT and ACPI differently. Because sycon will provide struct regmap instead of struct resources and also make reading/writing a bit different. I was trying to minimize the DT vs ACPI changes in the driver (other than binding) hence I think defining two ranges in sata controller reg property was much cleaner and it aligns with DSDT.
-
-Just for reference the SATA DSDT looks like this:
-
-Device (SATA0)
-{
-	.....
-
-	Name(_CRS, ResourceTemplate()
-	{
-		Memory32Fixed(ReadWrite, 0xE03000000, 0x000010000)
-		Interrupt(ResourceConsumer, Level, ActiveHigh Exclusive,,,) { 387}
-		Memory32Fixed(ReadWrite, 0xE00000078, 1)
-	}
-
-	......
-}
-
-> 
-> 	Arnd
-> 
+[1] http://kernelci.org/boot/bcm4708-smartrg-sr400ac/?fail
