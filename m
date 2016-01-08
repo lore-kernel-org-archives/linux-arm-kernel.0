@@ -1,140 +1,87 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Fri,  8 Jan 2016 09:37:06 +0800
-Subject: [PATCH] ARM: dts: rockchip: Add support emac for RK3036
-Message-ID: <1452217026-21155-1-git-send-email-zhengxing@rock-chips.com>
+From: brijesh.singh@amd.com (Brijesh Singh)
+Date: Thu, 7 Jan 2016 19:46:08 -0600
+Subject: [PATCH] ata: add AMD Seattle platform driver
+In-Reply-To: <4983521.tEaWggKCCv@wuerfel>
+References: <1452200002-31590-1-git-send-email-brijesh.singh@amd.com>
+ <4652600.rUhSEOUPkl@wuerfel> <568EE596.3060005@amd.com>
+ <4983521.tEaWggKCCv@wuerfel>
+Message-ID: <568F14E0.4060107@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch describe the emac, and we need to let mac clock under
-the APLL which is able to provide the accurate 50MHz what mac_ref
-need.
+Hi,
 
-Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
----
+On 01/07/2016 05:42 PM, Arnd Bergmann wrote:
+> On Thursday 07 January 2016 16:24:22 Brijesh Singh wrote:
+>>>> +
+>>>> +Examples:
+>>>> +        sata0 at e0300000 {
+>>>> +            compatible = "amd,seattle-ahci";
+>>>> +            reg = <0x0 0xe0300000 0x0 0xf0000>, <0x0 0xe0000078 0x0 0x1>;
+>>>
+>>> Looking at the register values, I doubt that the SGPIO is actually part of the
+>>> sata device. More likely, you are pointing in the middle of an actual
+>>> GPIO controller.
+>>>
+>>
+>> That address is SGPIO control register for SATA. The current hardware implementation to control activity LED is not ideal.
+>
+> Of course its a control register "for" SATA, what I meant is that it's
+> not part "of" the SATA IP block, which is hopefully a standard AHCI
+> compliant part as required by SBSA.
+>
+Yes, its not part of SATA IP block. We just need a method of pass  SGPIO 
+control register address to driver.
 
- arch/arm/boot/dts/rk3036-evb.dts   |   23 +++++++++++++++++++++++
- arch/arm/boot/dts/rk3036-kylin.dts |   21 +++++++++++++++++++++
- arch/arm/boot/dts/rk3036.dtsi      |   32 ++++++++++++++++++++++++++++++++
- 3 files changed, 76 insertions(+)
+Should I consider adding a property "sgpio-ctrl" to pass the register 
+address ?
 
-diff --git a/arch/arm/boot/dts/rk3036-evb.dts b/arch/arm/boot/dts/rk3036-evb.dts
-index 0a2367e..2505b9a 100644
---- a/arch/arm/boot/dts/rk3036-evb.dts
-+++ b/arch/arm/boot/dts/rk3036-evb.dts
-@@ -74,3 +74,26 @@
- &uart2 {
- 	status = "okay";
- };
-+
-+&emac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emac_xfer>, <&emac_mdio>, <&rmii_rst>;
-+	phy = <&phy0>;
-+	status = "okay";
-+
-+	phy0: ethernet-phy at 0 {
-+		reg = <0>;
-+	};
-+};
-+
-+&pinctrl {
-+	pcfg_output_high: pcfg-output-high {
-+		output-high;
-+	};
-+
-+	emac {
-+		rmii_rst: rmii-rst {
-+			rockchip,pins = <2 22 RK_FUNC_GPIO &pcfg_output_high>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/rk3036-kylin.dts b/arch/arm/boot/dts/rk3036-kylin.dts
-index 992f9ca..b6ba852 100644
---- a/arch/arm/boot/dts/rk3036-kylin.dts
-+++ b/arch/arm/boot/dts/rk3036-kylin.dts
-@@ -285,7 +285,22 @@
- 	status = "okay";
- };
- 
-+&emac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emac_xfer>, <&emac_mdio>, <&rmii_rst>;
-+	phy = <&phy0>;
-+	status = "okay";
-+
-+	phy0: ethernet-phy at 0 {
-+		reg = <0>;
-+	};
-+};
-+
- &pinctrl {
-+	pcfg_output_high: pcfg-output-high {
-+		output-high;
-+	};
-+
- 	pmic {
- 		pmic_int: pmic-int {
- 			rockchip,pins = <2 2 RK_FUNC_GPIO &pcfg_pull_default>;
-@@ -297,4 +312,10 @@
- 			rockchip,pins = <2 7 RK_FUNC_1 &pcfg_pull_none>;
- 		};
- 	};
-+
-+	emac {
-+		rmii_rst: rmii-rst {
-+			rockchip,pins = <2 22 RK_FUNC_GPIO &pcfg_output_high>;
-+		};
-+	};
- };
-diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
-index b9567c1..1cb5877 100644
---- a/arch/arm/boot/dts/rk3036.dtsi
-+++ b/arch/arm/boot/dts/rk3036.dtsi
-@@ -186,6 +186,20 @@
- 		status = "disabled";
- 	};
- 
-+	emac: ethernet at 10200000 {
-+		compatible = "rockchip,rk3036-emac", "snps,arc-emac";
-+		reg = <0x10200000 0x4000>;
-+		interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		rockchip,grf = <&grf>;
-+		clocks = <&cru HCLK_MAC>, <&cru SCLK_MACREF>, <&cru SCLK_MAC>;
-+		clock-names = "hclk", "macref", "macclk";
-+		max-speed = <100>;
-+		phy-mode = "rmii";
-+		status = "disabled";
-+	};
-+
- 	sdmmc: dwmmc at 10214000 {
- 		compatible = "rockchip,rk3036-dw-mshc", "rockchip,rk3288-dw-mshc";
- 		reg = <0x10214000 0x4000>;
-@@ -556,6 +570,24 @@
- 			};
- 		};
- 
-+		emac {
-+			emac_xfer: emac-xfer {
-+				rockchip,pins = <2 10 RK_FUNC_1 &pcfg_pull_default>, /* crs_dvalid */
-+						<2 13 RK_FUNC_1 &pcfg_pull_default>, /* tx_en */
-+						<2 14 RK_FUNC_1 &pcfg_pull_default>, /* mac_clk */
-+						<2 15 RK_FUNC_1 &pcfg_pull_default>, /* rx_err */
-+						<2 16 RK_FUNC_1 &pcfg_pull_default>, /* rxd1 */
-+						<2 17 RK_FUNC_1 &pcfg_pull_default>, /* rxd0 */
-+						<2 18 RK_FUNC_1 &pcfg_pull_default>, /* txd1 */
-+						<2 19 RK_FUNC_1 &pcfg_pull_default>; /* txd0 */
-+			};
-+
-+			emac_mdio: emac-mdio {
-+				rockchip,pins = <2 12 RK_FUNC_1 &pcfg_pull_default>, /* mac_md */
-+						<2 25 RK_FUNC_1 &pcfg_pull_default>; /* mac_mdclk */
-+			};
-+		};
-+
- 		i2c0 {
- 			i2c0_xfer: i2c0-xfer {
- 				rockchip,pins = <0 0 RK_FUNC_1 &pcfg_pull_none>,
--- 
-1.7.9.5
+e.g
+
+sata0 at e0300000 {
+   compatible = "amd,seattle-ahci";
+   reg = <0 0xe0300000 0 0x800>;
+   amd,sgpio-ctrl = <0xe0000078>;
+   interrupts = <0 355 4>;
+   clocks = <&sataclk_333mhz>;
+   dma-coherent;
+};
+
+
+>> A57 does not have access to GPIO's connected to backplane controller
+>> instead SoC has exposed two SGPIO control registers (LSIOC_SGPIO_CONTROL0:
+>> 0xE000_0078 and LSIOC_SGPIO_CONTROL1: 0xE000_007C) to A57. All we
+>> need to do is to program these registers based on the disk activity.
+>> The firmware running on A5 reads the values and generate proper SGPIO
+>> timing and toggles the LEDs etc.
+>
+> It still sounds like SGPIO is not part of the AHCI standard spec, but
+> rather a subset of a device called LSIOC.
+>
+>> These registers are defined in SATA0/1 DSDT resource template and also
+>> documented in SoC BKDG. I just noticed that BKDG has wrong register
+>> definition so will ask documentation folks to fix that.
+>>
+>> This driver is using SGPIO LED control similar to sata_highbank [1]
+>> except bit bang GPIO (which is done by firmware).
+>>
+>> [1] http://lxr.free-electrons.com/source/drivers/ata/sata_highbank.c#L140
+>
+> This one is rather different: there is a single device that combines
+> registers for AHCI, the PHY attached to it and the LED. This is not
+> SBSA compliant of course, and it requires having a special driver.
+>
+> What you have instead looks like a regular AHCI implementation that
+> should just work with the standard driver as long as you describe how
+> it gets its LEDs.
+>
+Yes, its regular AHCI implementation and works well with ahci_platform 
+driver. In standard ahci_platform driver activity LEDs are blinked 
+through enclosure management interface. Given the current hardware 
+limitation it seems like creating a new driver would be cleaner. I am 
+open to suggestion.
+
+Thanks for all your review feedbacks.
+
+> 	Arnd
+>
