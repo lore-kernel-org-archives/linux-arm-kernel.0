@@ -1,73 +1,55 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 8 Jan 2016 19:15:47 +0000
-Subject: [PATCHv2 00/18] arm64: mm: rework page table creation
-In-Reply-To: <20160105115414.GC24664@leverpostej>
-References: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
- <568B17AA.1050002@redhat.com> <20160105115414.GC24664@leverpostej>
-Message-ID: <20160108191547.GE32692@leverpostej>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 08 Jan 2016 20:16:19 +0100
+Subject: [RESEND RFC PATCH 2/2] ARM: dts: rockchip: Update the cpu freqs
+ table
+In-Reply-To: <1452252698-16765-3-git-send-email-zhengxing@rock-chips.com>
+References: <1452252698-16765-1-git-send-email-zhengxing@rock-chips.com>
+ <1452252698-16765-3-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <4951150.PYM4FhWu6V@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 05, 2016 at 11:54:14AM +0000, Mark Rutland wrote:
-> On Mon, Jan 04, 2016 at 05:08:58PM -0800, Laura Abbott wrote:
-> > On 01/04/2016 09:56 AM, Mark Rutland wrote:
-> > >Hi all,
-> > >
-> > >This series reworks the arm64 early page table code, in order to:
-> > >
-> > >(a) Avoid issues with potentially-conflicting TTBR1 TLB entries (as raised in
-> > >     Jeremy's thread [1]). This can happen when splitting/merging sections or
-> > >     contiguous ranges, and per a pessimistic reading of the ARM ARM may happen
-> > >     for changes to other fields in translation table entries.
-> > >
-> > >(b) Allow for more complex page table creation early on, with tables created
-> > >     with fine-grained permissions as early as possible. In the cases where we
-> > >     currently use fine-grained permissions (e.g. DEBUG_RODATA and marking .init
-> > >     as non-executable), this is required for the same reasons as (a), as we
-> > >     must ensure that changes to page tables do not split/merge sections or
-> > >     contiguous regions for memory in active use.
+Hi Xing,
+
+Am Freitag, 8. Januar 2016, 19:31:38 schrieb Xing Zheng:
+> Actually, we need more cpu freqs which are 50MHz integer multiples.
 > 
-> [...]
+> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+> ---
 > 
-> > >There are still opportunities for improvement:
-> > >
-> > >* BUG() when splitting sections or creating overlapping entries in
-> > >   create_mapping, as these both indicate serious bugs in kernel page table
-> > >   creation.
-> > >
-> > >   This will require rework to the EFI runtime services pagetable creation, as
-> > >   for >4K page kernels EFI memory descriptors may share pages (and currently
-> > >   such overlap is assumed to be benign).
-> > 
-> > Given the split_{pmd,pud} were added for DEBUG_RODATA, is there any reason
-> > those can't be dropped now since it sounds like the EFI problem is for overlapping
-> > entries and not splitting?
+>  arch/arm/boot/dts/rk3036.dtsi |   13 ++++++++++++-
+>  1 file changed, 12 insertions(+), 1 deletion(-)
 > 
-> Good point. I think they can be removed.
-> 
-> I'll take a look into that.
+> diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
+> index 1cb5877..1a773eb 100644
+> --- a/arch/arm/boot/dts/rk3036.dtsi
+> +++ b/arch/arm/boot/dts/rk3036.dtsi
+> @@ -79,7 +79,18 @@
+>  			resets = <&cru SRST_CORE0>;
+>  			operating-points = <
+>  				/* KHz    uV */
+> -				 816000 1000000
+> +				1200000 1200000
+> +				1100000 1200000
+> +				1000000 1200000
+> +				 900000 1200000
+> +				 800000 1200000
+> +				 700000 1200000
+> +				 600000 1200000
+> +				 500000 1200000
+> +				 400000 1200000
+> +				 300000 1200000
+> +				 200000 1200000
+> +				 100000 1200000
 
-Looking into this further, it turns out there is a set of cases where
-we'll try to split currently for !4K page kernels.
+what about reducing the voltage as well?
 
-Say you have a region starting at a PMD/PUD boundary, which ends somewhere
-up to PAGE_SIZE short of the next PMD/PUD boundary. We'll round the end
-up to the next PAGE_SIZE boundary and can create a PMD/PUD block entry.
+>From rk3288-specific discussions I remember that reducing the frequency 
+without touching the voltage, didn't really save so much energy.
+And it looks like it was running 816MHz at 1.0V just fine as well.
 
-Say another region shares some of that PAGE_SIZE gap. Its gets mapped at
-PAGE_SIZE granularity, and we try to create a PTE page entry for the
-overlap. The pmd entry is valid, so we decide we must split it. Bang.
+I guess you should find out which voltages are really necessary for each 
+step.
 
-A similar set of problems would apply for contiguous PTEs, once we
-support those.
 
-For EFI, we could skip the overlap as the spec requires that attributes
-are the same within a 64K frame, efi_create_mapping contrives to
-ensure that permissions are the same, and we create the mappings in
-ascending VA/PA order.
-
-However, we don't want to do that in any other case. Perhaps we can pass
-a "strict" parameter and skip in the non-strict case.
-
-Thanks,
-Mark.
+Heiko
