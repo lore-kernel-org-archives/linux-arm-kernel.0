@@ -1,52 +1,36 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sat, 9 Jan 2016 01:13:46 +0900
-Subject: [Question] Any restriction for the location of initramdisk?
-In-Reply-To: <1452248544.3006.2.camel@linaro.org>
-References: <CAK7LNAQS--QobTNyAvxqqZY2gvy4zB_eBOGju69Pjs-1FAJ+tQ@mail.gmail.com>
- <1452248544.3006.2.camel@linaro.org>
-Message-ID: <CAK7LNAQ4jnBC3Q3wPMLD0E7e=5y2yOvBL-3oG_N44KO2K_kRdg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 8 Jan 2016 09:01:38 -0800
+Subject: [GIT PULL] urgent onenand file system corruption fix for n900
+In-Reply-To: <9046751.uROfOxQcxi@wuerfel>
+References: <20160108163250.GT12777@atomide.com> <9046751.uROfOxQcxi@wuerfel>
+Message-ID: <20160108170138.GU12777@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+* Arnd Bergmann <arnd@arndb.de> [160108 08:50]:
+> On Friday 08 January 2016 08:32:50 Tony Lindgren wrote:
+> > Last minute urgent pull request to prevent file system corruption
+> > on Nokia N900.
+> > 
+> > Looks like we have a GPMC bus timing bug that has gone unnoticed
+> > because of bootloader configured registers until few days ago. We
+> > are not detecting the onenand clock rate properly unless we have
+> > CONFIG_OMAP_GPMC_DEBUG set and this causes onenand corruption
+> > that can be easily be reproduced.
+> > 
+> > There seems to be also an additional bug still lurking around for
+> > onenand corruption. But that is still being investigated and
+> > it does not seem to be GPMC timings related.
+> > 
+> > Meanwhile, it would be good to get this fix into v4.4 to prevent
+> > wrong timings from corrupting onenand.
+> > 
+> 
+> Pulled into fixes, thanks.
+> 
+> I'll try to get the fixes pull request out tonight, there are a
+> small number of other fixes.
 
-2016-01-08 19:22 GMT+09:00 Jon Medhurst (Tixy) <tixy@linaro.org>:
-> On Fri, 2016-01-08 at 16:16 +0900, Masahiro Yamada wrote:
->> Hi.
->>
->>
->> I know DTB should be located within the reach of the kernel
->> so that the kernel can get access to it at the early boot stage.
->> In other words, DTB should be put in the low memory area.
->>
->> Does initramdisk has the similar restriction?
->
-> I assume so, as that's what Documentation/arm/Booting says ...
->
->
-> 5. Load initramfs.
-> ------------------
->
-> Existing boot loaders:          OPTIONAL
-> New boot loaders:               OPTIONAL
->
-> If an initramfs is in use then, as with the dtb, it must be placed in
-> a region of memory where the kernel decompressor will not overwrite it
-> while also with the region which will be covered by the kernel's
-> low-memory mapping.
->
-> A safe location is just above the device tree blob which itself will
-> be loaded just above the 128MiB boundary from the start of RAM as
-> recommended above.
+Great thanks!
 
-
-Uh, the document states that clearly.
-
-Thanks!
-
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+Tony
