@@ -1,44 +1,41 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Fri, 8 Jan 2016 16:58:37 +0100
-Subject: [PATCH] arm64: net: bpf: don't BUG() on large shifts
-In-Reply-To: <568E5EB0.8020102@iogearbox.net>
-References: <1452015543-6790-1-git-send-email-rabin@rab.in>
- <20160105175557.GC83548@ast-mbp.thefacebook.com>
- <20160106203127.GA16059@debian>
- <20160106221247.GA95332@ast-mbp.thefacebook.com>
- <063D6719AE5E284EB5DD2968C1650D6D1CCBF08E@AcuExch.aculab.com>
- <568E5EB0.8020102@iogearbox.net>
-Message-ID: <20160108155837.GA28291@debian>
+From: drjones@redhat.com (Andrew Jones)
+Date: Fri, 8 Jan 2016 16:59:11 +0100
+Subject: [PATCH v8 20/20] KVM: ARM64: Add a new kvm ARM PMU device
+In-Reply-To: <20160108152028.GD3458@hawk.localdomain>
+References: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>
+ <1450771695-11948-21-git-send-email-zhaoshenglong@huawei.com>
+ <20160107201859.GI6199@hawk.localdomain>
+ <568F248F.7020602@huawei.com>
+ <20160108112213.GA3458@hawk.localdomain>
+ <20160108152028.GD3458@hawk.localdomain>
+Message-ID: <20160108155911.GF3458@hawk.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 07, 2016 at 01:48:48PM +0100, Daniel Borkmann wrote:
-> The question is what is less risky in terms of uabi. To reject such
-> filters with such K shift vals upfront in verifier, or to just allow
-> [0, reg_size - 1] values and handle outliers silently. I think both
-> might be possible, the latter just needs to be clearly specified in
-> the documentation somewhere. If we go for the latter, then probably
-> just rewriting that K value as masked one might seem better. Broken
-> programs might then still be loadable (and still be broken) ... afaik
-> in case of register (case of shifts with X) with large shift vals
-> ARM64 is doing 'modulo reg_size' implicitly.
+On Fri, Jan 08, 2016 at 04:20:28PM +0100, Andrew Jones wrote:
+> On Fri, Jan 08, 2016 at 12:22:13PM +0100, Andrew Jones wrote:
+> > When we want more than 256 vcpus we'll need a new kvm-irq-line ioctl,
+> > but, as for the arm devices, we could avoid the problem completely by
+> > extending the SET/GET_DEVICE_ATTR ioctl to also be a vcpu ioctl.
+> 
+> Replying to myself on this comment. The arm-gic device is fine as is, as
+> it really is a vm device. However I'm convincing myself more and more
+> (and with the help of Radim Krcmar being my sounding board) that using
+> the device api for the pmu is wrong (at least as a per-vm device). The
+> pmu is a per-vcpu device.
+> 
+> I think we should consider adding KVM_CREATE_DEVICE, KVM_SET/GET_DEVICE_ATTR
+> to the vcpu ioctl to allow per-vcpu devices. Then, instead of looping vcpus
+> in the kernel to init the pmu per vcpu on the call to KVM_CREATE_DEVICE,
+> we'd have the more natural looping in userspace. Also, the set-attr for the
+> irq would be part of that loop, and no longer need a vcpu-index parameter.
+>
 
-The case of what happens with such shifts with X is also already
-architecture-specific, even when using the interpreters.  For example, the
-following program returns 1 on ARM64 but 0 on ARM.
+Another note, for this pmu device we don't actually need KVM_CREATE_DEVICE
+to be a vcpu ioctl. We can just add another vcpu-init feature flag that we
+set with KVM_ARM_VCPU_INIT in order to "create" the pmu. We still need to
+add KVM_SET/GET_DEVICE_ATTR to the vcpu ioctl though, allowing the irq to
+be set. KVM_ARM_PMU_GRP_IRQ will just become a vcpu attribute.
 
-	BPF_STMT(BPF_LD | BPF_IMM, 1),
-	BPF_STMT(BPF_LDX | BPF_IMM, 32),
-	BPF_STMT(BPF_ALU | BPF_LSH | BPF_X, 0),
-	BPF_STMT(BPF_RET | BPF_A, 0)
-
-To start rejecting large K shifts in the verifier because they are
-architecture-specific while continuing to allow the equally
-architecture-specific large X shifts (because we can't verify them
-statically) would be rather inconsistent.
-
-If it is desired to enforce uniformity across architectures despite the
-risk for subtly changing the behaviour of existing programs, then the
-desired uniform semantics of these shifts should really be implemented
-both for the K and X shifts, which would mean modifiying the interpreter
-and the various arch JITs too.
+Thanks,
+drew
