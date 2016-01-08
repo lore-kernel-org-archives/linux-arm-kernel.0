@@ -1,52 +1,47 @@
-From: mfuzzey@parkeon.com (Martin Fuzzey)
-Date: Fri, 8 Jan 2016 12:13:33 +0100
-Subject: [PATCH V2] serial: imx: Fix suspend / resume.
-In-Reply-To: <CAOMZO5ADYomDf5EbGAAPJSjEQFOfKi_r7j+xytSuQA5dQh=V0Q@mail.gmail.com>
-References: <20160105155331.6024.7211.stgit@localhost>
- <CAOMZO5BES=YkYjtjPE_=t9Qa11JsgE0TT8-v0CxmtgSuBwWnmw@mail.gmail.com>
- <CAOMZO5ADYomDf5EbGAAPJSjEQFOfKi_r7j+xytSuQA5dQh=V0Q@mail.gmail.com>
-Message-ID: <568F99DD.50809@parkeon.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Fri, 8 Jan 2016 14:13:18 +0300
+Subject: [PATCH v6 14/21] arm64:ilp32: add sys_ilp32.c and a separate
+ table (in entry.S) to use it
+In-Reply-To: <8354919.jOyEk0znB5@wuerfel>
+References: <1452209679-19445-1-git-send-email-ynorov@caviumnetworks.com>
+ <1452209679-19445-15-git-send-email-ynorov@caviumnetworks.com>
+ <8354919.jOyEk0znB5@wuerfel>
+Message-ID: <20160108111318.GA24066@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/01/16 00:51, Fabio Estevam wrote:
-> On Thu, Jan 7, 2016 at 9:17 PM, Fabio Estevam <festevam@gmail.com> wrote:
->
->> [   39.487313] [<c05844d0>] (snd_soc_suspend) from [<c03c31f0>]
-> Ok, in this case it is an ALSA issue, so will start a thread at the
-> alsa mailing list.
-Ah,
+On Fri, Jan 08, 2016 at 10:21:06AM +0100, Arnd Bergmann wrote:
+> On Friday 08 January 2016 02:34:32 Yury Norov wrote:
+> 
+> > @@ -688,6 +692,12 @@ ni_sys:
+> >  	b	ret_fast_syscall
+> >  ENDPROC(el0_svc)
+> >  
+> > +#ifdef CONFIG_ARM64_ILP32
+> > +el0_ilp32_svc:
+> > +	adrp	stbl, sys_call_ilp32_table // load syscall table pointer
+> > +	b el0_svc_naked
+> > +#endif
+> 
+> Don't we still need some code that clears the top halves of the 32-bit
+> arguments? That thread has taken so many turns now that I'm confused
+> about what we actually need, but I thought we had concluded that your
+> current approach has at some some problems.
 
-Just seen I have this in my tree for that:
+We are discussing how to do it better - make a generic solution from
+s390 with individual syscall handling, or reproduce s390 solution for
+ILP32, or zero top-half registers and not use top half of register at
+all. As I understand, we stand on 1st option, and agreed to introduce
+it separately.
 
-diff --git a/sound/soc/soc-core.c b/sound/soc/soc-core.c
-index a1305f8..a7ddf69 100644
---- a/sound/soc/soc-core.c
-+++ b/sound/soc/soc-core.c
-@@ -584,6 +584,9 @@ int snd_soc_suspend(struct device *dev)
-         if (!card->instantiated)
-                 return 0;
-
-+       if (!card->snd_card)
-+               return 0;
-+
-         /* Due to the resume being scheduled into a workqueue we could
-         * suspend before that's finished - wait for it to complete.
-          */
-@@ -814,6 +817,9 @@ int snd_soc_resume(struct device *dev)
-         if (!card->instantiated)
-                 return 0;
-
-+       if (!card->snd_card)
-+               return 0;
-+
-         /* activate pins from sleep state */
-
-
-
-I have that in my old 3.19 tree too so it's not new.
-
-I didn't submit it because I haven't investigated further to see if it 
-was just papering over the real problem..
-
-Martin
+> 
+> > +#include <asm/syscall.h>
+> > +
+> > +#undef __SYSCALL
+> > +#undef __SC_COMP
+> > +#undef __SC_3264
+> > +#undef __SC_COMP_3264
+> 
+> The four #undef are not needed, right?
+> 
+> 	Arnd
