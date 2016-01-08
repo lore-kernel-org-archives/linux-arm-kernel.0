@@ -1,32 +1,61 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Fri, 8 Jan 2016 16:20:28 +0100
-Subject: [PATCH v8 20/20] KVM: ARM64: Add a new kvm ARM PMU device
-In-Reply-To: <20160108112213.GA3458@hawk.localdomain>
-References: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>
- <1450771695-11948-21-git-send-email-zhaoshenglong@huawei.com>
- <20160107201859.GI6199@hawk.localdomain>
- <568F248F.7020602@huawei.com>
- <20160108112213.GA3458@hawk.localdomain>
-Message-ID: <20160108152028.GD3458@hawk.localdomain>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 8 Jan 2016 15:27:38 +0000
+Subject: [PATCH v2 11/13] arm64: allow kernel Image to be loaded anywhere
+ in physical memory
+In-Reply-To: <1451489172-17420-12-git-send-email-ard.biesheuvel@linaro.org>
+References: <1451489172-17420-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1451489172-17420-12-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160108152738.GG16432@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 08, 2016 at 12:22:13PM +0100, Andrew Jones wrote:
-> When we want more than 256 vcpus we'll need a new kvm-irq-line ioctl,
-> but, as for the arm devices, we could avoid the problem completely by
-> extending the SET/GET_DEVICE_ATTR ioctl to also be a vcpu ioctl.
+On Wed, Dec 30, 2015 at 04:26:10PM +0100, Ard Biesheuvel wrote:
+> +static void __init enforce_memory_limit(void)
+> +{
+> +	const phys_addr_t kbase = round_down(__pa(_text), MIN_KIMG_ALIGN);
+> +	u64 to_remove = memblock_phys_mem_size() - memory_limit;
+> +	phys_addr_t max_addr = 0;
+> +	struct memblock_region *r;
+> +
+> +	if (memory_limit == (phys_addr_t)ULLONG_MAX)
+> +		return;
+> +
+> +	/*
+> +	 * The kernel may be high up in physical memory, so try to apply the
+> +	 * limit below the kernel first, and only let the generic handling
+> +	 * take over if it turns out we haven't clipped enough memory yet.
+> +	 */
+> +	for_each_memblock(memory, r) {
+> +		if (r->base + r->size > kbase) {
+> +			u64 rem = min(to_remove, kbase - r->base);
+> +
+> +			max_addr = r->base + rem;
+> +			to_remove -= rem;
+> +			break;
+> +		}
+> +		if (to_remove <= r->size) {
+> +			max_addr = r->base + to_remove;
+> +			to_remove = 0;
+> +			break;
+> +		}
+> +		to_remove -= r->size;
+> +	}
+> +
+> +	memblock_remove(0, max_addr);
+> +
+> +	if (to_remove)
+> +		memblock_enforce_memory_limit(memory_limit);
+> +}
 
-Replying to myself on this comment. The arm-gic device is fine as is, as
-it really is a vm device. However I'm convincing myself more and more
-(and with the help of Radim Krcmar being my sounding board) that using
-the device api for the pmu is wrong (at least as a per-vm device). The
-pmu is a per-vcpu device.
+IIUC, this is changing the user expectations a bit. There are people
+using the mem= limit to hijack some top of the RAM for other needs
+(though they could do it in a saner way like changing the DT memory
+nodes). Your patch first tries to remove the memory below the kernel
+image and only remove the top if additional limitation is necessary.
 
-I think we should consider adding KVM_CREATE_DEVICE, KVM_SET/GET_DEVICE_ATTR
-to the vcpu ioctl to allow per-vcpu devices. Then, instead of looping vcpus
-in the kernel to init the pmu per vcpu on the call to KVM_CREATE_DEVICE,
-we'd have the more natural looping in userspace. Also, the set-attr for the
-irq would be part of that loop, and no longer need a vcpu-index parameter.
+Can you not remove memory from the top and block the limit if it goes
+below the end of the kernel image, with some warning that memory limit
+was not entirely fulfilled?
 
-Thanks,
-drew
+-- 
+Catalin
