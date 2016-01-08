@@ -1,45 +1,31 @@
-From: mfuzzey@parkeon.com (Martin Fuzzey)
-Date: Fri, 08 Jan 2016 10:59:17 +0100
-Subject: [PATCH] mmc: pwrseq_simple: Support assigned-clocks
-Message-ID: <20160108095917.32335.11094.stgit@localhost>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Fri, 8 Jan 2016 18:59:59 +0900
+Subject: [PATCH 0/2] crypto: sunxi-ss: fix 64-bit compilation
+In-Reply-To: <1452182298-4653-1-git-send-email-andre.przywara@arm.com>
+References: <1452182298-4653-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160108095959.GC3472@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clock subsystem now allows clock rates and parents to be configured
-in the device tree.
+On Thu, Jan 07, 2016 at 03:58:16PM +0000, Andre Przywara wrote:
+> Hi,
+> 
+> these two patches provide a different approach to an issue I tried
+> to fix lately [1].
+> Instead of casting everything I now promote local types to size_t, so
+> that the min3() arguments naturally match in type.
+> As size_t is defined as "unsigned int" on 32-bit architectures
+> anyway, that actually does not change anything there, but instead
+> provides a clean approach to get it compiled for arm64.
+> 
+> I split this up because 1/2 seems much cleaner to me than 2/2, so we
+> can have a separate discussion/merge process on this.
 
-This requires calling of_clk_set_defaults() which is done automatically
-for platform, i2c, spi devices. Since pwrseq_simple does not fit into
-those catagories we must do it ourself.
+If this is meant for the crypto tree it needs to go to the linux-crypto
+list.
 
-With this patch the standard assigned-clocks, assigned-clock-rates,
-assigned-clock-parents DT properties to be used in pwrseq_simple nodes.
-
-Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
----
- drivers/mmc/core/pwrseq_simple.c |    5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/drivers/mmc/core/pwrseq_simple.c b/drivers/mmc/core/pwrseq_simple.c
-index 4d2962b..fd8f38e 100644
---- a/drivers/mmc/core/pwrseq_simple.c
-+++ b/drivers/mmc/core/pwrseq_simple.c
-@@ -8,6 +8,7 @@
-  *  Simple MMC power sequence management
-  */
- #include <linux/clk.h>
-+#include <linux/clk/clk-conf.h>
- #include <linux/kernel.h>
- #include <linux/slab.h>
- #include <linux/device.h>
-@@ -108,6 +109,10 @@ struct mmc_pwrseq *mmc_pwrseq_simple_alloc(struct mmc_host *host,
- 	if (!pwrseq)
- 		return ERR_PTR(-ENOMEM);
- 
-+	ret = of_clk_set_defaults(dev->of_node, false);
-+	if (ret)
-+		goto free;
-+
- 	pwrseq->ext_clk = clk_get(dev, "ext_clock");
- 	if (IS_ERR(pwrseq->ext_clk) &&
- 	    PTR_ERR(pwrseq->ext_clk) != -ENOENT) {
+Thanks,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
