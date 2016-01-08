@@ -1,62 +1,53 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Fri, 8 Jan 2016 10:13:45 +0800
-Subject: [PATCH 2/2] power: add documentation for ACT8945A's charger DT
- bindings
-In-Reply-To: <1452219225-10510-1-git-send-email-wenyou.yang@atmel.com>
-References: <1452219225-10510-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1452219225-10510-3-git-send-email-wenyou.yang@atmel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 7 Jan 2016 18:26:20 -0800
+Subject: [PATCH 2/2] memory: omap-gpmc: Add Kconfig option for debug
+In-Reply-To: <568EDC8D.7070205@gmail.com>
+References: <20160105041356.GE12777@atomide.com> <20160105084947.GG22661@pali>
+ <20160105224929.GF12777@atomide.com> <20160106174039.GA14271@earth>
+ <20160106174713.GL12777@atomide.com> <568D5669.4040801@gmail.com>
+ <20160106182650.GM12777@atomide.com> <568D5F54.7040900@gmail.com>
+ <20160107180700.GN12777@atomide.com> <568EDC8D.7070205@gmail.com>
+Message-ID: <20160108022619.GS12777@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds documentation for the DT bindings of the charger
-subdevice of ACT8945A MFD.
+* Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [160107 13:46]:
+> On  7.01.2016 20:07, Tony Lindgren wrote:
+> 
+> >>>Also, do things now work reliably for you with CONFIG_OMAP_GPMC_DEBUG
+> >>>enabled? Or does that also produce corruption after few reboots?
+> 
+> I'll make further experiments as I am a bit lost what and when happens. What
+> is for sure is that corruptions occurs immediately after boot without your
+> patch and with CONFIG_OMAP_GPMC_DEBUG disabled. So maybe there is another
+> problem in ubfs or mtd driver.
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
+Yes it seems there's some other issue too. Maybe you can run git bisect
+again and carry the fix along as an extra patch?
 
- .../devicetree/bindings/power/act8945a-charger.txt |   34 ++++++++++++++++++++
- 1 file changed, 34 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/power/act8945a-charger.txt
+> Already did, every reflash and install of upstream kernel compatible SW
+> takes me about 3 hours I'd rather spend on something else :). Though it
+> seems that reboot issue happens no matter if CONFIG_OMAP_GPMC_DEBUG is
+> enabled or not.
 
-diff --git a/Documentation/devicetree/bindings/power/act8945a-charger.txt b/Documentation/devicetree/bindings/power/act8945a-charger.txt
-new file mode 100644
-index 0000000..868e0164
---- /dev/null
-+++ b/Documentation/devicetree/bindings/power/act8945a-charger.txt
-@@ -0,0 +1,34 @@
-+Device-Tree bindings for charger of Active-semi ACT8945A Multi-Function Device
-+
-+Required properties:
-+ - compatible: "active-semi,act8945a-charger"
-+ - active-semi,chglev-gpio = Specifies a gpio that uses to select
-+   the charge current level.
-+
-+Optional properties:
-+ - active-semi,battery_temperature: Indicates if it is allowed to check
-+   the battery temperature. If it is missing, assume the battery temperature
-+   is not allowed to check.
-+ - active-semi,input_voltage_threshold: unit: mV;
-+   Specifies the charger's input over-voltage threshold value;
-+   The value can be: 6600, 7000, 7500, 8000; default: 6600
-+ - active-semi,precondition_timeout: unit: minutes;
-+   Specifies the charger's PRECONDITION safety timer setting value;
-+   The value can be: 40, 60, 80, 0; If 0, it means to disable this timer;
-+   default: 40.
-+ - active-semi,total_timeout: unit: hours;
-+   Specifies the charger's total safety timer setting value;
-+   The value can be: 3, 4, 5, 0; If 0, it means to disable this timer;
-+   default: 3.
-+
-+Example:
-+
-+	charger {
-+		compatible = "active-semi,act8945a-charger";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_charger_chglev>;
-+		active-semi,chglev-gpio = <&pioA 12 GPIO_ACTIVE_HIGH>;
-+		active-semi,input_voltage_threshold = <6600>;
-+		active-semi,precondition_timeout = <40>;
-+		active-semi,total_timeout = <3>;
-+	};
--- 
-1.7.9.5
+OK then it really seems like we do have another bug lurking around.
+Maybe you can figure out an easier way to reproduce it?
+
+> The problem is that between NOLO and kernel there is u-boot. And even if I
+> am almost sure it doesn't touch onenand configs, I can't be absolutely sure.
+> So those timings are not 100% reliable IMO, though close to that.
+
+Hmm yes I'm only booting with u-boot here as my device sits in my rack.
+
+> I'll play a bit more with printing the values with both
+> CONFIG_OMAP_GPMC_DEBUG enabled and disabled and whatever I can think of,
+> including dumping cs0 config from u-boot, nokia kernel and/or REing NOLO
+> onenand init (already did that for N9 DDR timings, shouldn't be that hard
+> for N900 GPMC). Will keep you informed on the progress. In the meanwhile I
+> think your patch should make it as without it onenand is unusable.
+
+OK will push it out then.
+
+Regards,
+
+Tony
