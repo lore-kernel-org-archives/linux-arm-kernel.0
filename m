@@ -1,67 +1,32 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 8 Jan 2016 15:12:17 +0000
-Subject: [PATCH V2 22/23] pci, acpi: Match PCI config space accessors
- against platfrom specific quirks.
-In-Reply-To: <20160108150137.GH3097@leverpostej>
-References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
- <1450278993-12664-23-git-send-email-tn@semihalf.com>
- <1452262581.31901.26.camel@redhat.com>
- <20160108150137.GH3097@leverpostej>
-Message-ID: <20160108151216.GJ3097@leverpostej>
+From: drjones@redhat.com (Andrew Jones)
+Date: Fri, 8 Jan 2016 16:20:28 +0100
+Subject: [PATCH v8 20/20] KVM: ARM64: Add a new kvm ARM PMU device
+In-Reply-To: <20160108112213.GA3458@hawk.localdomain>
+References: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>
+ <1450771695-11948-21-git-send-email-zhaoshenglong@huawei.com>
+ <20160107201859.GI6199@hawk.localdomain>
+ <568F248F.7020602@huawei.com>
+ <20160108112213.GA3458@hawk.localdomain>
+Message-ID: <20160108152028.GD3458@hawk.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 08, 2016 at 03:01:37PM +0000, Mark Rutland wrote:
-> On Fri, Jan 08, 2016 at 09:16:21AM -0500, Mark Salter wrote:
-> > On Wed, 2015-12-16 at 16:16 +0100, Tomasz Nowicki wrote:
-> > > Some platforms may not be fully compliant with generic set of PCI config
-> > > accessors. For these cases we implement the way to overwrite accessors
-> > > set before PCI buses enumeration. Algorithm that overwrite accessors
-> > > matches against platform ID (DMI), domain and bus number, hopefully
-> > > enough for all cases. All quirks can be defined using:
-> > > DECLARE_ACPI_MCFG_FIXUP() and keep self contained.
-> > > 
-> > > example:
-> > > 
-> > > static const struct dmi_system_id yyy[] = {
-> > > ????????{
-> > > ????????????????.ident = "<Platform ident string>",
-> > > ????????????????.callback = <handler>,
-> > > ????????????????.matches = {
-> > > ????????????????????????DMI_MATCH(DMI_SYS_VENDOR, "<system vendor>"),
-> > > ????????????????????????DMI_MATCH(DMI_PRODUCT_NAME, "<product name>"),
-> > > ????????????????????????DMI_MATCH(DMI_PRODUCT_VERSION, "product version"),
-> > > ????????????????},
-> > > ????????},
-> > > ????????{ }
-> > > };
-> > > 
-> > 
-> > This seems awkward to me in the case where the quirk is SoC-based and there
-> > may be multiple platforms affected. Needing a DECLARE_ACPI_MCFG_FIXUP for
-> > each platform using such a SoC (i.e. Mustang and Moonshot) doesn't seem
-> > right. In that case, I think it'd be better to check CPUID and possibly
-> > some SoC register to cover all platforms affected.
-> 
-> CPUs get reused across SoCs, so as you've implicitly noted, the CPUID
-> alone is insufficient.
-> 
-> Given that IP blocks get moved around between SoC variants, I don't
-> think you can check "some SoC register" based on the CPU ID -- you can
-> end up bringing the board down at that point.
-> 
-> If the CPU ID alone is insufficient to tell you about a component, it
-> cannot give you enough information about a component you can use to
-> query more information from.
-> 
-> If your platform requires a quirk, it's always going to be painful (and
-> to some extent, rightfulyl so). We should aim for correctness here with
-> explicit matching.
+On Fri, Jan 08, 2016 at 12:22:13PM +0100, Andrew Jones wrote:
+> When we want more than 256 vcpus we'll need a new kvm-irq-line ioctl,
+> but, as for the arm devices, we could avoid the problem completely by
+> extending the SET/GET_DEVICE_ATTR ioctl to also be a vcpu ioctl.
 
-Further, if there is going to be an ever-expanding set of platforms
-requring quirks, then we need a standard mechanism in ACPI to enable the
-platform to tell us explicitly either which specific PCI implementation
-is used, or which common quirk is necessary.
+Replying to myself on this comment. The arm-gic device is fine as is, as
+it really is a vm device. However I'm convincing myself more and more
+(and with the help of Radim Krcmar being my sounding board) that using
+the device api for the pmu is wrong (at least as a per-vm device). The
+pmu is a per-vcpu device.
+
+I think we should consider adding KVM_CREATE_DEVICE, KVM_SET/GET_DEVICE_ATTR
+to the vcpu ioctl to allow per-vcpu devices. Then, instead of looping vcpus
+in the kernel to init the pmu per vcpu on the call to KVM_CREATE_DEVICE,
+we'd have the more natural looping in userspace. Also, the set-attr for the
+irq would be part of that loop, and no longer need a vcpu-index parameter.
 
 Thanks,
-Mark.
+drew
