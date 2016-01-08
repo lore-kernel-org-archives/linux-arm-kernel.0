@@ -1,74 +1,27 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Fri, 8 Jan 2016 09:28:37 +0800
-Subject: [RESEND PATCH v2] usb: xhci-mtk: fix AHB bus hang up caused by
- roothubs polling
-Message-ID: <1452216517-3765-1-git-send-email-chunfeng.yun@mediatek.com>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Fri,  8 Jan 2016 09:34:59 +0800
+Subject: [PATCH v2 0/3] Add support emac for the RK3036 SoC platform
+Message-ID: <1452216902-21063-1-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-when ip fails to enter sleep mode, register access protection will
-be disabled, at the same time if all clocks are disabled, access
-register will hang up AHB bus.
-the common case causes ip sleep failure is that after all ports
-enter U3 but before ip enters sleep mode, a port receives a resume
-signal('K'). this will happens when such as clicks mouse to try to
-do remote-wakeup to stop system enter suspend.
-so stop polling root hubs to avoid access xHCI register on bus
-suspend, and restart it when bus resumes.
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
----
- drivers/usb/host/xhci-mtk.c | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+Hi,
+  We have supported the emac for RK3066/RK3188, but the RK3036 have
+some configuration different with them. We should let the driver of
+emac_rockchip compatible with other Rockchip SoCs.
 
-diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
-index c9ab6a4..9532f5a 100644
---- a/drivers/usb/host/xhci-mtk.c
-+++ b/drivers/usb/host/xhci-mtk.c
-@@ -696,9 +696,24 @@ static int xhci_mtk_remove(struct platform_device *dev)
- }
- 
- #ifdef CONFIG_PM_SLEEP
-+/*
-+ * if ip sleep fails, and all clocks are disabled, access register will hang
-+ * AHB bus, so stop polling roothubs to avoid regs access on bus suspend.
-+ * and no need to check whether ip sleep failed or not; this will cause SPM
-+ * to wake up system immediately after system suspend complete if ip sleep
-+ * fails, it is what we wanted.
-+ */
- static int xhci_mtk_suspend(struct device *dev)
- {
- 	struct xhci_hcd_mtk *mtk = dev_get_drvdata(dev);
-+	struct usb_hcd *hcd = mtk->hcd;
-+	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
-+
-+	xhci_dbg(xhci, "%s: stop port polling\n", __func__);
-+	clear_bit(HCD_FLAG_POLL_RH, &hcd->flags);
-+	del_timer_sync(&hcd->rh_timer);
-+	clear_bit(HCD_FLAG_POLL_RH, &xhci->shared_hcd->flags);
-+	del_timer_sync(&xhci->shared_hcd->rh_timer);
- 
- 	xhci_mtk_host_disable(mtk);
- 	xhci_mtk_phy_power_off(mtk);
-@@ -710,11 +725,19 @@ static int xhci_mtk_suspend(struct device *dev)
- static int xhci_mtk_resume(struct device *dev)
- {
- 	struct xhci_hcd_mtk *mtk = dev_get_drvdata(dev);
-+	struct usb_hcd *hcd = mtk->hcd;
-+	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
- 
- 	usb_wakeup_disable(mtk);
- 	xhci_mtk_clks_enable(mtk);
- 	xhci_mtk_phy_power_on(mtk);
- 	xhci_mtk_host_enable(mtk);
-+
-+	xhci_dbg(xhci, "%s: restart port polling\n", __func__);
-+	set_bit(HCD_FLAG_POLL_RH, &hcd->flags);
-+	usb_hcd_poll_rh_status(hcd);
-+	set_bit(HCD_FLAG_POLL_RH, &xhci->shared_hcd->flags);
-+	usb_hcd_poll_rh_status(xhci->shared_hcd);
- 	return 0;
- }
- 
+Changes in v2:
+- Separate DTS from patch series.
+
+Xing Zheng (3):
+  net: ethernet: arc: Probe emac after set RMII clock
+  net: ethernet: arc: Keep emac compatibility for more Rockchip SoCs
+  net: ethernet: arc: Add support emac for RK3036
+
+ drivers/net/ethernet/arc/Kconfig         |    4 +-
+ drivers/net/ethernet/arc/emac_rockchip.c |   88 ++++++++++++++++++++----------
+ 2 files changed, 61 insertions(+), 31 deletions(-)
+
 -- 
-1.8.1.1.dirty
+1.7.9.5
