@@ -1,68 +1,31 @@
-From: ynezz@true.cz (Petr =?iso-8859-2?Q?=A9tetiar?=)
-Date: Fri, 8 Jan 2016 09:42:47 +0100
-Subject: [PATCH v2 1/2] ARM: dts: imx6: Add support for Toradex Apalis
- iMX6Q/D SoM
-In-Reply-To: <1452071716.30372.61.camel@toradex.com>
-References: <1452011942-11940-1-git-send-email-marcel.ziswiler@toradex.com>
- <1452011942-11940-2-git-send-email-marcel.ziswiler@toradex.com>
- <20160106080358.GD9030@ibawizard.net> <1452071716.30372.61.camel@toradex.com>
-Message-ID: <20160108084247.GB27359@ibawizard.net>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 8 Jan 2016 09:45:22 +0100 (CET)
+Subject: [PATCH v3 1/3] gpio: xgene: Enable X-Gene standby GPIO as
+ interrupt controller
+In-Reply-To: <1452162428-26839-2-git-send-email-qnguyen@apm.com>
+References: <1452162428-26839-1-git-send-email-qnguyen@apm.com>
+ <1452162428-26839-2-git-send-email-qnguyen@apm.com>
+Message-ID: <alpine.DEB.2.11.1601080942270.3575@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marcel Ziswiler <marcel.ziswiler@toradex.com> [2016-01-06 09:15:18]:
+On Thu, 7 Jan 2016, Quan Nguyen wrote:
+> -static int apm_gpio_sb_to_irq(struct gpio_chip *gc, u32 gpio)
+> +static void xgene_gpio_sb_irq_ack(struct irq_data *d)
+> +{
+> +	struct irq_data *irqdata;
+> +	struct xgene_gpio_sb *priv = irq_data_get_irq_chip_data(d);
+> +
+> +	irqdata = irq_get_irq_data(priv->gic_virq[d->hwirq]);
+> +	if (!irqdata || !irqdata->chip)
+> +		return;
 
-> > > <&pinctrl_regulator_usbotg_pwr>;
-> > > +			regulator-name = "usb_otg_vbus";
-> > > +			regulator-min-microvolt = <5000000>;
-> > > +			regulator-max-microvolt = <5000000>;
-> > > +			gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
-> > > +			enable-active-high;
-> > > +			status = "disabled";
-> > > +		};
-> > 
-> > I'm not sure, but it seems to me, that we should move this regulator into
-> > the carrier board DTS. On our custom carrier board we've this regulator
-> > always on and we use this GPIO for heartbeat LED, so I've this in our
-> > carrier board DTS[2]:
-> 
-> Yes, you are absolutely right and e.g. on Apalis T30 [1] that is exactly how
-> we did it.
+What the heck is this? Why are you looking up some random other irq and fiddle
+with its irq chip?
 
-And what about usdhc? It leads to the same overrides in the carrier board
-file:
+This is a 1:1 mapping from your gpio irq to a gic irq. We have hierarchical
+interrupt domains for this.
 
-&iomuxc {
-	usdhc {
-		/* GPIO4_IO20 is LVDS */
-		pinctrl_mmc_cd: gpio_mmc_cd {
-		};
+Thanks,
 
-		/* Used as misc GPIOs */
-		pinctrl_usdhc1: usdhc1grp {
-		};
-	};
-};
-
-> > > +/* PAD Ctrl values for common settings */
-> > > +/*
-> > > + * (PAD_CTL_HYS | PAD_CTL_PUS_100K_UP | PAD_CTL_PUE | PAD_CTL_PKE
-> > > |
-> > > + *??PAD_CTL_SPEED_MED | PAD_CTL_DSE_40ohm)
-> > > + */
-> > > +#define PAD_CTRL_HYS_PU 0x1b0b0
-> > 
-> > This was requested to be reworked. I've simply replaced all the
-> > macros with
-> > hex values.
-> 
-> I don't think the reviewers really concluded on the action to be taken
-> on here and just using hex values is probably the most stupid solution.
-
-It's simple, if you just leave it as it is, then it will never get merged.
-That's how kernel development works :) We've at least two options here:
-
-1. Follow the old path and just convert those macros to hex values
-2. Rework it - move those macros to some header file etc.
-
--- ynezz
+	tglx
