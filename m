@@ -1,103 +1,86 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sat, 09 Jan 2016 00:33:58 +0100
-Subject: [PATCH v12 0/4] Allow USB devices to remain runtime-suspended
- when sleeping
-In-Reply-To: <1452181575-9206-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1452181575-9206-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <2332373.7EgmNivg4W@vostro.rjw.lan>
+From: dianders@chromium.org (Douglas Anderson)
+Date: Fri,  8 Jan 2016 15:05:27 -0800
+Subject: [PATCH v5 0/5] dma-mapping: Patches for speeding up allocation
+Message-ID: <1452294332-23415-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, January 07, 2016 04:46:11 PM Tomeu Vizoso wrote:
-> Hi,
-> 
-> this is v12 of an attempt to make it easier for devices to remain in
-> runtime PM when the system goes to sleep, mainly to reduce the time
-> spent resuming devices.
-> 
-> For this, we interpret the absence of all PM callback implementations as
-> it being safe to do direct_complete, so their ancestors aren't prevented
-> from remaining runtime-suspended.
-> 
-> Additionally, the prepare() callback of USB devices will return 1 if
-> runtime PM is enabled and the current wakeup settings are correct.
-> 
-> With these changes, a uvcvideo device (for example) stays in runtime
-> suspend when the system goes to sleep and is left in that state when the
-> system resumes, not delaying it unnecessarily.
-> 
-> Thanks,
-> 
-> Tomeu
-> 
-> Changes in v12:
-> - Include linux/pm_domain.h in vga_switcheroo.c for dev_pm_domain_set()
-> 
-> Changes in v11:
-> - Move calls to dev_pm_domain_set() out from &dev->power.lock as that
->   isn't needed for dev->pm_domain.
-> 
-> Changes in v10:
-> - Remove superfluous call to pm_runtime_enabled() as suggested by Alan
-> 
-> Changes in v9:
-> - Add docs noting the need for the device lock to be held before calling
->   device_is_bound()
-> - Add docs noting the need for the device lock to be held before calling
->   dev_pm_domain_set()
-> - Move to CONFIG_PM_SLEEP as suggested by Rafael and Ulf.
-> - Rename from device_check_pm_callbacks to device_pm_check_callbacks to
->   follow with the naming convention of existing API.
-> - Re-add calling to device_pm_check_callbacks from device registration
->   and when updating the PM domain of a device.
-> 
-> Changes in v8:
-> - Add device_is_bound()
-> - Add dev_pm_domain_set() and update code to use it
-> - Move no_pm_callbacks field into CONFIG_PM_SLEEP
-> - Call device_check_pm_callbacks only after a device is bound or unbound
-> 
-> Changes in v7:
-> - Reduce indentation by adding a label in device_prepare()
-> 
-> Changes in v6:
-> - Add stub for !CONFIG_PM.
-> - Move implementation of device_check_pm_callbacks to power/main.c as it
->   doesn't belong to CONFIG_PM_SLEEP.
-> - Take dev->power.lock before modifying flag.
-> 
-> Changes in v5:
-> - Check for all dev_pm_ops instances associated to a device, updating a
->   no_pm_callbacks flag at the times when that could change.
-> 
-> Tomeu Vizoso (4):
->   device core: add device_is_bound()
->   PM / Domains: add setter for dev.pm_domain
->   PM / sleep: Go direct_complete if driver has no callbacks
->   USB / PM: Allow USB devices to remain runtime-suspended when sleeping
-> 
->  arch/arm/mach-omap2/omap_device.c |  7 ++++---
->  drivers/acpi/acpi_lpss.c          |  5 ++++-
->  drivers/acpi/device_pm.c          |  5 +++--
->  drivers/base/dd.c                 | 21 +++++++++++++++++++--
->  drivers/base/power/clock_ops.c    |  5 +++--
->  drivers/base/power/common.c       | 24 ++++++++++++++++++++++++
->  drivers/base/power/domain.c       |  8 ++++++--
->  drivers/base/power/main.c         | 35 +++++++++++++++++++++++++++++++++++
->  drivers/base/power/power.h        |  3 +++
->  drivers/gpu/vga/vga_switcheroo.c  | 11 ++++++-----
->  drivers/misc/mei/pci-me.c         |  5 +++--
->  drivers/misc/mei/pci-txe.c        |  5 +++--
->  drivers/usb/core/port.c           |  6 ++++++
->  drivers/usb/core/usb.c            |  8 +++++++-
->  include/linux/device.h            |  2 ++
->  include/linux/pm.h                |  1 +
->  include/linux/pm_domain.h         |  3 +++
->  17 files changed, 132 insertions(+), 22 deletions(-)
+This series of patches will speed up memory allocation in dma-mapping
+quite a bit.
 
-Series applied, thanks!
+The first patch ("ARM: dma-mapping: Optimize allocation") is hopefully
+not terribly controversial: it merely doesn't try as hard to allocate
+big chunks once it gets the first failure.  Since it's unlikely that
+further big chunks will help (they're not likely to be virtually aligned
+anyway), this should give a big speedup with no real regression to speak
+of.  Yes, things could be made better, but this seems like a sane start.
 
+The second patch ("common: DMA-mapping: add DMA_ATTR_NO_HUGE_PAGE
+attribute") models MADV_NOHUGEPAGE as I understand it.  Hopefully folks
+are happy with following that lead.  It does nothing by itself.
+
+The third patch ("ARM: dma-mapping: Use DMA_ATTR_NO_HUGE_PAGE hint to
+optimize allocation") simply applies the 2nd patch.  Again it's pretty
+simple.  ...and again it does nothing by itself.
+
+Thue fourth patch ("[media] videobuf2-dc: Let drivers specify DMA
+attrs") comes from the ChromeOS tree (authored by Tomasz Figa) and
+allows the fifth patch.
+
+The fifth patch ("[media] s5p-mfc: Set DMA_ATTR_NO_HUGE_PAGE") uses the
+new attribute.  For a second user, you can see the out of tree patch for
+rk3288 at <https://chromium-review.googlesource.com/#/c/320498/>.
+
+All testing was done on the chromeos kernel-3.8 and kernel-3.14.
+Sanity (compile / boot) testing was done on a v4.4-rc6-based kernel on
+rk3288, though the video codec isn't there.  I don't have graphics / MFC
+working well on exynos, so the MFC change was only compile-tested
+upstream.  Hopefully someone upstream whose setup for MFC can give a
+Tested-by for these?
+
+Also note that v2 of this series had an extra patch
+<https://patchwork.kernel.org/patch/7888861/> that would attempt to sort
+the allocation results to opportunistically get some extra alignment.  I
+dropped that, but it could be re-introduced if there was interest.  I
+found that it did give a little extra alignment sometimes, but maybe not
+enough to justify the extra complexity.  It also was a bit half-baked
+since it really should have tried harder to ensure alignment.
+
+Changes in v5:
+- renamed DMA_ATTR_NOHUGEPAGE to DMA_ATTR_NO_HUGE_PAGE
+- s/ping ping/ping pong/
+- Let drivers specify DMA attrs new for v5
+- s5p-mfc patch new for v5
+
+Changes in v4:
+- renamed DMA_ATTR_SEQUENTIAL to DMA_ATTR_NOHUGEPAGE
+- added Marek's ack
+
+Changes in v3:
+- add DMA_ATTR_SEQUENTIAL attribute new for v3
+- Use DMA_ATTR_SEQUENTIAL hint patch new for v3.
+
+Changes in v2:
+- No longer just 1 page at a time, but gives up higher order quickly.
+- Only tries important higher order allocations that might help us.
+
+Douglas Anderson (4):
+  ARM: dma-mapping: Optimize allocation
+  common: DMA-mapping: add DMA_ATTR_NO_HUGE_PAGE attribute
+  ARM: dma-mapping: Use DMA_ATTR_NO_HUGE_PAGE hint to optimize
+    allocation
+  [media] s5p-mfc: Set DMA_ATTR_NO_HUGE_PAGE
+
+Tomasz Figa (1):
+  [media] videobuf2-dc: Let drivers specify DMA attrs
+
+ Documentation/DMA-attributes.txt               | 23 ++++++++++++++++
+ arch/arm/mm/dma-mapping.c                      | 38 ++++++++++++++++----------
+ drivers/media/platform/s5p-mfc/s5p_mfc.c       | 13 +++++++--
+ drivers/media/v4l2-core/videobuf2-dma-contig.c | 33 ++++++++++++++--------
+ include/linux/dma-attrs.h                      |  1 +
+ include/media/videobuf2-dma-contig.h           | 11 +++++++-
+ 6 files changed, 91 insertions(+), 28 deletions(-)
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+2.6.0.rc2.230.g3dd15c0
