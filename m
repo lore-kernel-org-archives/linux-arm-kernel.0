@@ -1,76 +1,163 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 8 Jan 2016 10:15:10 +0100
-Subject: [PATCH] clk: mediatek: Allow changing PLL rate when it is off
-In-Reply-To: <1452240997-35316-1-git-send-email-jamesjj.liao@mediatek.com>
-References: <1452240997-35316-1-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <20160108091510.GC13058@pengutronix.de>
+From: zhangqing@rock-chips.com (zhangqing)
+Date: Fri, 08 Jan 2016 09:15:07 -0800
+Subject: [PATCH] soc: rockchip: power-domain: Modify power domain driver
+ for rk3368
+In-Reply-To: <3979294.oVXyhiFhfI@phil>
+References: <1452269144-15389-1-git-send-email-zhangqing@rock-chips.com>
+ <3979294.oVXyhiFhfI@phil>
+Message-ID: <568FEE9B.3000909@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
-
-On Fri, Jan 08, 2016 at 04:16:37PM +0800, James Liao wrote:
-> Some modules may need to change its clock rate before turn on it.
-> So changing PLL's rate when it is off should be allowed.
-> This patch removes PLL enabled check before set rate, so that
-> PLLs can set new frequency even if they are off.
-
-This sounds like the software refused to change the rate on disabled
-PLLs, but this is not the case.
-
-> 
-> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-> ---
->  drivers/clk/mediatek/clk-pll.c | 9 ++-------
->  1 file changed, 2 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/clk/mediatek/clk-pll.c b/drivers/clk/mediatek/clk-pll.c
-> index 966cab1..8e31fae 100644
-> --- a/drivers/clk/mediatek/clk-pll.c
-> +++ b/drivers/clk/mediatek/clk-pll.c
-> @@ -91,9 +91,6 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
->  		int postdiv)
->  {
->  	u32 con1, val;
-> -	int pll_en;
-> -
-> -	pll_en = readl(pll->base_addr + REG_CON0) & CON0_BASE_EN;
->  
->  	/* set postdiv */
->  	val = readl(pll->pd_addr);
-> @@ -114,15 +111,13 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
->  
->  	con1 = readl(pll->base_addr + REG_CON1);
->  
-> -	if (pll_en)
-> -		con1 |= CON0_PCW_CHG;
-> +	con1 |= CON0_PCW_CHG;
-
-This bit is described as "Feedback divide ratio update". To me this
-sounds like we have to inform the hardware that the PLL registers have
-been updated. The current code only sets this bit when the PLL is
-enabled which sounds sane to me.
-
->  
->  	writel(con1, pll->base_addr + REG_CON1);
->  	if (pll->tuner_addr)
->  		writel(con1 + 1, pll->tuner_addr);
->  
-> -	if (pll_en)
-> -		udelay(20);
-> +	udelay(20);
-
-We seem to have to wait here until the PLL is really running at the new
-frequency. Normally we don't have to do this when the PLL is disabled.
-
-I'm sure this patch solves a real problem, from looking at it it's just
-not clear to me what the problem is. Could you clarify this a bit?
-
-Sascha
 
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+On 01/08/2016 12:25 AM, Heiko Stuebner wrote:
+> Hi Elaine,
+>
+> Am Freitag, 8. Januar 2016, 08:05:44 schrieb zhangqing:
+>> This driver is modified to support RK3368 SoC.
+>>
+>> Signed-off-by: zhangqing <zhangqing@rock-chips.com>
+>> ---
+>>   drivers/soc/rockchip/pm_domains.c        | 33
+>> ++++++++++++++++++++++++++++++++ include/dt-bindings/power/rk3368-power.h
+>> | 28 +++++++++++++++++++++++++++ 2 files changed, 61 insertions(+)
+>>   create mode 100644 include/dt-bindings/power/rk3368-power.h
+>>
+>> diff --git a/drivers/soc/rockchip/pm_domains.c
+>> b/drivers/soc/rockchip/pm_domains.c index 534c589..6cdffb1 100644
+>> --- a/drivers/soc/rockchip/pm_domains.c
+>> +++ b/drivers/soc/rockchip/pm_domains.c
+>> @@ -18,6 +18,7 @@
+>>   #include <linux/regmap.h>
+>>   #include <linux/mfd/syscon.h>
+>>   #include <dt-bindings/power/rk3288-power.h>
+>> +#include <dt-bindings/power/rk3368-power.h>
+>>
+>>   struct rockchip_domain_info {
+>>   	int pwr_mask;
+>> @@ -75,6 +76,9 @@ struct rockchip_pmu {
+>>   #define DOMAIN_RK3288(pwr, status, req)		\
+>>   	DOMAIN(pwr, status, req, req, (req) + 16)
+>>
+>> +#define DOMAIN_RK3368(pwr, status, req)		\
+>> +	DOMAIN(pwr, status, req, (req) + 16, req)
+>> +
+>>   static bool rockchip_pmu_domain_is_idle(struct rockchip_pm_domain *pd)
+>>   {
+>>   	struct rockchip_pmu *pmu = pd->pmu;
+>> @@ -444,6 +448,14 @@ static const struct rockchip_domain_info
+>> rk3288_pm_domains[] = { [RK3288_PD_GPU]		= DOMAIN_RK3288(9, 9, 2),
+>>   };
+>>
+>> +static const struct rockchip_domain_info rk3368_pm_domains[] = {
+>> +	[RK3368_PD_PERI]	= DOMAIN_RK3368(13, 12, 6),
+>> +	[RK3368_PD_VIO]		= DOMAIN_RK3368(15, 14, 8),
+>> +	[RK3368_PD_VIDEO]	= DOMAIN_RK3368(14, 13, 7),
+>> +	[RK3368_PD_GPU_0]	= DOMAIN_RK3368(16, 15, 2),
+>> +	[RK3368_PD_GPU_1]	= DOMAIN_RK3368(17, 16, 2),
+>> +};
+>
+> The structure in the registers (and thus the macros you define above) is the
+> same between rk3288 and rk3368, so there is no need to define that a second
+> time. It is perfectly fine to re-use the DOMAIN_RK3288 macro here and saves
+> double-definitions. [see our clock-drivers which already do this for the
+> common parts].
+
+The ack_mask bit and idle_mask bit is different in rk3368.
+you can check:
++#define DOMAIN_RK3368(pwr, status, req)		\
++	DOMAIN(pwr, status, req, (req) + 16, req)
++
+
+But the rk3288 is :
+#define DOMAIN_RK3288(pwr, status, req)		\
+  	DOMAIN(pwr, status, req, req, (req) + 16)
+
+>
+>> +
+>>   static const struct rockchip_pmu_info rk3288_pmu = {
+>>   	.pwr_offset = 0x08,
+>>   	.status_offset = 0x0c,
+>> @@ -461,11 +473,32 @@ static const struct rockchip_pmu_info rk3288_pmu = {
+>> .domain_info = rk3288_pm_domains,
+>>   };
+>>
+>> +static const struct rockchip_pmu_info rk3368_pmu = {
+>> +	.pwr_offset = 0x0c,
+>> +	.status_offset = 0x10,
+>> +	.req_offset = 0x3c,
+>> +	.idle_offset = 0x40,
+>> +	.ack_offset = 0x40,
+>> +
+>> +	.core_pwrcnt_offset = 0x48,
+>> +	.gpu_pwrcnt_offset = 0x50,
+>> +
+>> +	.core_power_transition_time = 24,
+>> +	.gpu_power_transition_time = 24,
+>> +
+>> +	.num_domains = ARRAY_SIZE(rk3368_pm_domains),
+>> +	.domain_info = rk3368_pm_domains,
+>> +};
+>> +
+>>   static const struct of_device_id rockchip_pm_domain_dt_match[] = {
+>>   	{
+>>   		.compatible = "rockchip,rk3288-power-controller",
+>>   		.data = (void *)&rk3288_pmu,
+>>   	},
+>> +	{
+>> +		.compatible = "rockchip,rk3368-power-controller",
+>> +		.data = (void *)&rk3368_pmu,
+>> +	},
+>>   	{ /* sentinel */ },
+>>   };
+>>
+>> diff --git a/include/dt-bindings/power/rk3368-power.h
+>> b/include/dt-bindings/power/rk3368-power.h new file mode 100644
+>> index 0000000..93633d5
+>> --- /dev/null
+>> +++ b/include/dt-bindings/power/rk3368-power.h
+>
+> Please split the addition of the binding-header into a separate patch. We
+> will need the header in both the soc-specific code as well as the devicetree
+> side, which requires the header being in a shared branch.
+>
+> Otherwise patch looks great.
+>
+>
+> Thanks
+> Heiko
+>
+>> @@ -0,0 +1,28 @@
+>> +#ifndef __DT_BINDINGS_POWER_RK3368_POWER_H__
+>> +#define __DT_BINDINGS_POWER_RK3368_POWER_H__
+>> +
+>> +/* VD_CORE */
+>> +#define RK3368_PD_A53_L0	0
+>> +#define RK3368_PD_A53_L1	1
+>> +#define RK3368_PD_A53_L2	2
+>> +#define RK3368_PD_A53_L3	3
+>> +#define RK3368_PD_SCU_L		4
+>> +#define RK3368_PD_A53_B0	5
+>> +#define RK3368_PD_A53_B1	6
+>> +#define RK3368_PD_A53_B2	7
+>> +#define RK3368_PD_A53_B3	8
+>> +#define RK3368_PD_SCU_B		9
+>> +
+>> +/* VD_LOGIC */
+>> +#define RK3368_PD_BUS		10
+>> +#define RK3368_PD_PERI		11
+>> +#define RK3368_PD_VIO		12
+>> +#define RK3368_PD_ALIVE		13
+>> +#define RK3368_PD_VIDEO		14
+>> +#define RK3368_PD_GPU_0		15
+>> +#define RK3368_PD_GPU_1		16
+>> +
+>> +/* VD_PMU */
+>> +#define RK3368_PD_PMU		17
+>> +
+>> +#endif
+>
+>
+>
+>
