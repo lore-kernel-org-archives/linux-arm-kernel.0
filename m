@@ -1,64 +1,44 @@
-From: shannon.zhao@linaro.org (Shannon Zhao)
-Date: Fri, 08 Jan 2016 20:15:29 +0800
-Subject: [PATCH v8 20/20] KVM: ARM64: Add a new kvm ARM PMU device
-In-Reply-To: <CAFEAcA8DO5VksiP55vnuOD3NERJTfr1q=une4n6N=Oj8JUa1_A@mail.gmail.com>
-References: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>
- <1450771695-11948-21-git-send-email-zhaoshenglong@huawei.com>
- <CAFEAcA_MDiOphseZ7RGNE3G=4ZDF5SFV5krOjanPbVuhgg9gnQ@mail.gmail.com>
- <568E7AF1.9040103@huawei.com>
- <CAFEAcA-Qcda7TSFLSeykLHqZYdP6tYdEjPe2uHN6f_+omqWFZg@mail.gmail.com>
- <568F27A8.80808@huawei.com>
- <CAFEAcA8DO5VksiP55vnuOD3NERJTfr1q=une4n6N=Oj8JUa1_A@mail.gmail.com>
-Message-ID: <568FA861.1080307@linaro.org>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Fri,  8 Jan 2016 13:16:46 +0100
+Subject: [PATCH] ARM: multi_v7_defconfig: Add rockchip audio support
+Message-ID: <1452255406-2439-1-git-send-email-sjoerd.simons@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+As the rockchip SPDIF driver landed for 4.4 and the required clock
+patches to make it work properly are scheduled for the 4.5 merge window
+it seems time to support for audio device found on rockchip boards in
+the defconfig as well.
 
+Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
 
-On 2016/1/8 18:24, Peter Maydell wrote:
-> On 8 January 2016 at 03:06, Shannon Zhao<zhaoshenglong@huawei.com>  wrote:
->> >
->> >
->> >On 2016/1/7 22:56, Peter Maydell wrote:
->>>>>> >>>>>+  Errors:
->>>>>>>>> >>>>> >>>+    -ENXIO: Unsupported attribute group
->>>>>>>>> >>>>> >>>+    -EBUSY: The PMU overflow interrupt is already set
->>>>>>>>> >>>>> >>>+    -ENODEV: Getting the PMU overflow interrupt number while it's not set
->>>>>>>>> >>>>> >>>+    -EINVAL: Invalid vcpu_index or PMU overflow interrupt number supplied
->>>>>>> >>>> >>
->>>>>>> >>>> >>What happens if you create a PMU but then never set the IRQ number?
->>>>>>> >>>> >>Is there a default or does the VM refuse to run or something?
->>>>>>> >>>> >>
->>>>> >>> >If userspace doesn't specify the irq number, the guest will not receive
->>>>> >>> >the PMU interrupt because we check if the irq is initialized when we
->>>>> >>> >inject the interrupt. But guest could still use the vPMU if QEMU
->>>>> >>> >generates a proper DTB or ACPI.
->>> >>So is it a valid use case to create a PMU with the interrupt not wired
->>> >>up to anything? (If it's never valid it would be nice to diagnose it
->>> >>rather than just silently letting the guest run but not work right.)
->> >So how about adding a helper to check if the PMU is completely
->> >initialized and if not, return trap_raz_wi when guest access PMU registers?
-> That would still be letting the guest run and not work right.
->
-> If we have an "I have now completed config" ioctl like the GIC does,
-> then you could make that ioctl return an error if the config is not
-> valid.
+---
 
-Firstly, userspace will call kvm device ioctl to create the PMU device, 
-if it fails it will return an error.
-Secondly, userspace will call SET_DEVICE_ATTR ioctl to configure the PMU 
-irq number. If the irq is invalid, this will return an error and the 
-userspace will stop if it takes care the error. If the irq is valid, the 
-PMU is well initialized.
+ arch/arm/configs/multi_v7_defconfig | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-If userspace doesn't call SET_ATTR ioctl to configure the PMU irq, the 
-PMU is not well initialized and guest can't use the PMU.
-
-I didn't see anywhere that needs to call something like 
-KVM_DEV_ARM_VGIC_CTRL_INIT to let kvm initialize PMU because it will be 
-initialized when userspace configure the irq correctly. This is a little 
-different with the vGIC I think.
-
-Thanks,
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index f6e104d..089b4da 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -548,6 +548,10 @@ CONFIG_SND_SOC=m
+ CONFIG_SND_ATMEL_SOC=m
+ CONFIG_SND_ATMEL_SOC_WM8904=m
+ CONFIG_SND_SOC_FSL_SAI=m
++CONFIG_SND_SOC_ROCKCHIP=m
++CONFIG_SND_SOC_ROCKCHIP_SPDIF=m
++CONFIG_SND_SOC_ROCKCHIP_MAX98090=m
++CONFIG_SND_SOC_ROCKCHIP_RT5645=m
+ CONFIG_SND_SOC_SH4_FSI=m
+ CONFIG_SND_SOC_RCAR=m
+ CONFIG_SND_SOC_RSRC_CARD=m
+@@ -564,6 +568,7 @@ CONFIG_SND_SOC_TEGRA_ALC5632=m
+ CONFIG_SND_SOC_TEGRA_MAX98090=m
+ CONFIG_SND_SOC_AK4642=m
+ CONFIG_SND_SOC_SGTL5000=m
++CONFIG_SND_SOC_SPDIF=m
+ CONFIG_SND_SOC_WM8978=m
+ CONFIG_USB=y
+ CONFIG_USB_XHCI_HCD=y
 -- 
-Shannon
+2.7.0.rc3
