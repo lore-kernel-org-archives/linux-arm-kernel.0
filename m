@@ -1,44 +1,74 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sat, 9 Jan 2016 01:06:55 +0900
-Subject: range operation of outer cache when start >= end?
-In-Reply-To: <20160108150618.GL19062@n2100.arm.linux.org.uk>
-References: <CAK7LNATi5CE3Uc5UgQ6OncC5b=bDavAyNfqi_nqvcVkOrbFhRQ@mail.gmail.com>
- <20160108150618.GL19062@n2100.arm.linux.org.uk>
-Message-ID: <CAK7LNARod6AVBC7KsPRieONgoRwVE-uhfGhJjtRyu6kHgFRYTg@mail.gmail.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Fri, 08 Jan 2016 11:07:16 -0500
+Subject: [PATCH V2 22/23] pci, acpi: Match PCI config space accessors
+ against platfrom specific quirks.
+In-Reply-To: <20160108151216.GJ3097@leverpostej>
+References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
+ <1450278993-12664-23-git-send-email-tn@semihalf.com>
+ <1452262581.31901.26.camel@redhat.com> <20160108150137.GH3097@leverpostej>
+ <20160108151216.GJ3097@leverpostej>
+Message-ID: <1452269236.31901.46.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Fri, 2016-01-08 at 15:12 +0000, Mark Rutland wrote:
+> On Fri, Jan 08, 2016 at 03:01:37PM +0000, Mark Rutland wrote:
+> > On Fri, Jan 08, 2016 at 09:16:21AM -0500, Mark Salter wrote:
+> > > On Wed, 2015-12-16 at 16:16 +0100, Tomasz Nowicki wrote:
+> > > > Some platforms may not be fully compliant with generic set of PCI config
+> > > > accessors. For these cases we implement the way to overwrite accessors
+> > > > set before PCI buses enumeration. Algorithm that overwrite accessors
+> > > > matches against platform ID (DMI), domain and bus number, hopefully
+> > > > enough for all cases. All quirks can be defined using:
+> > > > DECLARE_ACPI_MCFG_FIXUP() and keep self contained.
+> > > > 
+> > > > example:
+> > > > 
+> > > > static const struct dmi_system_id yyy[] = {
+> > > > ????????{
+> > > > ????????????????.ident = "<Platform ident string>",
+> > > > ????????????????.callback = <handler>,
+> > > > ????????????????.matches = {
+> > > > ????????????????????????DMI_MATCH(DMI_SYS_VENDOR, "<system vendor>"),
+> > > > ????????????????????????DMI_MATCH(DMI_PRODUCT_NAME, "<product name>"),
+> > > > ????????????????????????DMI_MATCH(DMI_PRODUCT_VERSION, "product version"),
+> > > > ????????????????},
+> > > > ????????},
+> > > > ????????{ }
+> > > > };
+> > > > 
+> > > 
+> > > This seems awkward to me in the case where the quirk is SoC-based and there
+> > > may be multiple platforms affected. Needing a DECLARE_ACPI_MCFG_FIXUP for
+> > > each platform using such a SoC (i.e. Mustang and Moonshot) doesn't seem
+> > > right. In that case, I think it'd be better to check CPUID and possibly
+> > > some SoC register to cover all platforms affected.
+> > 
+> > CPUs get reused across SoCs, so as you've implicitly noted, the CPUID
+> > alone is insufficient.
+> > 
+> > Given that IP blocks get moved around between SoC variants, I don't
+> > think you can check "some SoC register" based on the CPU ID -- you can
+> > end up bringing the board down at that point.
+> > 
+> > If the CPU ID alone is insufficient to tell you about a component, it
+> > cannot give you enough information about a component you can use to
+> > query more information from.
+> > 
+> > If your platform requires a quirk, it's always going to be painful (and
+> > to some extent, rightfulyl so). We should aim for correctness here with
+> > explicit matching.
+> 
+> Further, if there is going to be an ever-expanding set of platforms
+> requring quirks, then we need a standard mechanism in ACPI to enable the
+> platform to tell us explicitly either which specific PCI implementation
+> is used, or which common quirk is necessary.
+> 
 
-
-2016-01-09 0:06 GMT+09:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Fri, Jan 08, 2016 at 11:54:30AM +0900, Masahiro Yamada wrote:
->> I know I am nitpicking.  Forgive me if I am asking a silly question.
->>
->>
->> How should the outer-cache handle such an insane case like  start >= end?
->
-> Passing start >= end isn't defined, code should not pass start >= end.
->
->> Assumed answers are:
->>
->> [1] Do not care about that.  It should never happen.  If it does, fix
->> the caller.
->
-> This applies.  What situation are you seeing start >= end?
-
-I never see such a case at all.
-When I saw l2c210_inv_range(), I just wondered whether it should be
-cared or not.
-
-
-> What you will get with the existing code is potentially some cache
-> cleaning and a sync, but nothing apart from that.  __l2c210_op_pa_range()
-> becomes a no-op of start >= end.  However, that behaviour is not
-> guaranteed.
-
-Thanks for your explanation!
-
--- 
-Best Regards
-Masahiro Yamada
+No, an ever-expanding set is exactly what we don't want. I think you've convinced
+me that I'm taking a wrong view of the problem. Putting something in the ACPI
+standard would be going too far and I think a hard sell to the standards folk.
+There really is no foolproof way to match a plug and play ACPI PCIe root to
+specific hardware without considering the exact platform and/or BIOS info. So
+yeah, it should be painful in order to give incentive to the silicon vendors to
+get it right.
