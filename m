@@ -1,53 +1,57 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri,  8 Jan 2016 15:54:13 -0800
-Subject: [PATCH] thermal: qcom-spmi: Treat reg property as a single cell
-Message-ID: <1452297253-5747-1-git-send-email-sboyd@codeaurora.org>
+Date: Fri,  8 Jan 2016 15:57:09 -0800
+Subject: [PATCH] arm64: dts: Add L2 cache node to msm8916
+Message-ID: <1452297429-6382-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We only read the first element of the reg property to figure out
-the offset of the temperature sensor inside the PMIC.
-Furthermore, we want to remove the second element in DT, so just
-don't read the second element so that probe keeps working if we
-change the DT in the future.
+The msm8916 SoC has an L2 cache for all 4 CPUs. Add it to the
+dtsi file so that the cache hierarchy can be probed.
 
-Cc: Ivan T. Ivanov <iivanov.xz@gmail.com>
+Cc: <devicetree@vger.kernel.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/thermal/qcom-spmi-temp-alarm.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm64/boot/dts/qcom/msm8916.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/thermal/qcom-spmi-temp-alarm.c b/drivers/thermal/qcom-spmi-temp-alarm.c
-index bf3da3cf2019..4644e7219725 100644
---- a/drivers/thermal/qcom-spmi-temp-alarm.c
-+++ b/drivers/thermal/qcom-spmi-temp-alarm.c
-@@ -200,7 +200,7 @@ static int qpnp_tm_probe(struct platform_device *pdev)
- 	struct qpnp_tm_chip *chip;
- 	struct device_node *node;
- 	u8 type, subtype;
--	u32 res[2];
-+	u32 res;
- 	int ret, irq;
+diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+index ba8184d0f948..42573a7d4a94 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+@@ -61,24 +61,33 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0x0>;
++			next-level-cache = <&L2_0>;
+ 		};
  
- 	node = pdev->dev.of_node;
-@@ -215,7 +215,7 @@ static int qpnp_tm_probe(struct platform_device *pdev)
- 	if (!chip->map)
- 		return -ENXIO;
+ 		CPU1: cpu at 1 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0x1>;
++			next-level-cache = <&L2_0>;
+ 		};
  
--	ret = of_property_read_u32_array(node, "reg", res, 2);
-+	ret = of_property_read_u32(node, "reg", &res);
- 	if (ret < 0)
- 		return ret;
+ 		CPU2: cpu at 2 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0x2>;
++			next-level-cache = <&L2_0>;
+ 		};
  
-@@ -228,7 +228,7 @@ static int qpnp_tm_probe(struct platform_device *pdev)
- 	if (PTR_ERR(chip->adc) == -EPROBE_DEFER)
- 		return PTR_ERR(chip->adc);
+ 		CPU3: cpu at 3 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0x3>;
++			next-level-cache = <&L2_0>;
++		};
++
++		L2_0: l2-cache {
++		      compatible = "cache";
++		      cache-level = <2>;
+ 		};
+ 	};
  
--	chip->base = res[0];
-+	chip->base = res;
- 
- 	ret = qpnp_tm_read(chip, QPNP_TM_REG_TYPE, &type);
- 	if (ret < 0) {
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
