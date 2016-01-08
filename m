@@ -1,37 +1,29 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 08 Jan 2016 09:58 +0100
-Subject: [PATCH v6 12/21] arm64:ilp32: share HWCAP between LP64 and ILP32
-In-Reply-To: <1452209679-19445-13-git-send-email-ynorov@caviumnetworks.com>
+Date: Fri, 08 Jan 2016 10:01:55 +0100
+Subject: [PATCH v6 13/21] arm64: ptrace: handle ptrace_request differently
+ for aarch32 and ilp32
+In-Reply-To: <1452209679-19445-14-git-send-email-ynorov@caviumnetworks.com>
 References: <1452209679-19445-1-git-send-email-ynorov@caviumnetworks.com>
- <1452209679-19445-13-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <4813942.8ZHz91B9Af@wuerfel>
+ <1452209679-19445-14-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <7056596.KRbB42JIuZ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 08 January 2016 02:34:30 Yury Norov wrote:
->  #define ELF_HWCAP              (elf_hwcap)
->  
->  #ifdef CONFIG_COMPAT
-> -#define COMPAT_ELF_HWCAP       (compat_elf_hwcap)
-> -#define COMPAT_ELF_HWCAP2      (compat_elf_hwcap2)
->  extern unsigned int compat_elf_hwcap, compat_elf_hwcap2;
-> +#define COMPAT_ELF_HWCAP       \
-> +       (is_a32_compat_task()   \
-> +         ? compat_elf_hwcap    \
-> +         : (u32) elf_hwcap)
+On Friday 08 January 2016 02:34:31 Yury Norov wrote:
+> +long compat_arch_ptrace(struct task_struct *child, compat_long_t request,
+> +                       compat_ulong_t caddr, compat_ulong_t cdata)
+> +{
+> +       if (is_a32_compat_task())
+> +               return compat_a32_ptrace(child, request, caddr, cdata);
 > +
-> +#define COMPAT_ELF_HWCAP2      \
-> +       (is_a32_compat_task()   \
-> +         ? compat_elf_hwcap2   \
-> +         : (u32) (elf_hwcap >> 32))
+> +       return compat_ptrace_request(child, request, caddr, cdata);
+> +}
 > +
->  #endif
->  
-> 
 
-This should no longer be needed after patch 11: just define the ELF_HWCAP
-and ELF_HWCAP2 values for the right mode when including fs/binfmt_elf.c.
-You know what it should be at build time, so don't bother doing a runtime
-check.
+Looking at this again, I think we can avoid this runtime check
+if we duplicate the compat_sys_ptrace function and make a special one
+for a32 that is copied from the regular handler and but calls
+compat_a32_ptrace directly. Or maybe make a separate handler for
+arm64-ilp32 if that is smaller.
 
 	Arnd
