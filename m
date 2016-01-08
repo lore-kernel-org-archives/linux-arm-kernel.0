@@ -1,59 +1,27 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 8 Jan 2016 14:31:02 -0600
-Subject: [PATCH 00/10] drivers/pci: avoid module_init in non-modular
- host/pci*
-In-Reply-To: <20151215151624.GB2772@windriver.com>
-References: <1449970917-12633-1-git-send-email-paul.gortmaker@windriver.com>
- <CAFiDJ5-Y8afg5kDRQLK1pain-k1kPQAn3vhWrVkB1ADPRHvx+A@mail.gmail.com>
- <20151214091940.GA15126@ulmo.nvidia.com>
- <3302340.SIljl1qYTl@wuerfel> <20151215151624.GB2772@windriver.com>
-Message-ID: <20160108203102.GH5354@localhost>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 8 Jan 2016 15:04:57 -0600
+Subject: [PATCH v5 5/6] mfd: dt-bindings: add device tree bindings for
+ Hi3519 sysctrl
+In-Reply-To: <1452219400-32478-6-git-send-email-xuejiancheng@huawei.com>
+References: <1452219400-32478-1-git-send-email-xuejiancheng@huawei.com>
+ <1452219400-32478-6-git-send-email-xuejiancheng@huawei.com>
+Message-ID: <20160108210457.GA24079@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 15, 2015 at 10:16:24AM -0500, Paul Gortmaker wrote:
-> [Re: [PATCH 00/10] drivers/pci: avoid module_init in non-modular host/pci*] On 14/12/2015 (Mon 11:27) Arnd Bergmann wrote:
+On Fri, Jan 08, 2016 at 10:16:39AM +0800, Jiancheng Xue wrote:
+> Add device tree bindings for Hi3519 system controller.
 > 
-> > On Monday 14 December 2015 10:19:40 Thierry Reding wrote:
-> > > > PCIe host driver that use fixup (DECLARE_PCI_FIXUP_*) can't use tristate.
-> > > > Fixup region is in kernel region and this region if not updated when
-> > > > loading a module.
-> > > 
-> > > Interesting, I hadn't thought about that. I suppose this means that the
-> > > module will end up containing an unused section with the fixup code. It
-> > > might be useful to add a way for that to trigger a warning at build
-> > > time.
-> > > 
-> > > Perhaps to fix this a mechanism could be introduced to add a table of
-> > > fixups to a host controller driver and that will get applied to all
-> > > children of the bridge. It could be problematic to cover all of the
-> > > different fixup stages, though.
-> > 
-> > I think a lot of the fixups shouldn't really be there in the first place,
-> > they are about stuff that we can fix up in the probe function, or that should
-> > be fixed up in the probe function with some appropriate core support added.
-> 
-> So, the feedback on this is a bit all over the map, leaving me unsure
-> what to do next.  And is the choice we make on a per board/bsp basis or
-> ideally across all platforms?  I see the choices as:
-> 
-> 1) do nothing; which IMHO is least desirable as it leaves the code
-> misrepresenting itself as modular; one of the key issues I wanted to fix
-> 
-> 2) use the patches I've sent ; then as they are genuinely made modular,
-> the person doing so essentially "patch -R" or reverts the change as
-> step one.  This has the advantage of solving the "we'll get to it
-> someday" issue if someday never comes.
-> 
-> 3) make them all tristate;  beat it with a stick until it compiles [M]
-> and modposts -- leaving the fixups and functional testing to people with
-> the boards and low level knowledge to make it _work_ as a module.  The
-> downside here is the code is still kind of misrepresenting itself as
-> modularly functional -- a ban of unloading might mitigate that some.
+> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
+> ---
+>  Documentation/devicetree/bindings/mfd/hi3519.txt | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/hi3519.txt
 
-I'd like to preserve the mind-set that host controller drivers are
-*expected* to be modular, even if we aren't there yet.  I guess that
-means I'm in favor of option 3, at least for drivers that don't use
-fixups.
+This seems like it could be combined with other HiSi system controller 
+bindings if the compatible string is the only difference. But it is fine 
+like this:
 
-Bjorn
+Acked-by: Rob Herring <robh@kernel.org>
+
+Rob
