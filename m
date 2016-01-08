@@ -1,27 +1,90 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Fri, 8 Jan 2016 11:30:36 -0500
-Subject: [PATCH 2/4] ata: ahci_brcmstb: disable DIPM support
-In-Reply-To: <1452211413-1350-3-git-send-email-f.fainelli@gmail.com>
-References: <1452211413-1350-1-git-send-email-f.fainelli@gmail.com>
- <1452211413-1350-3-git-send-email-f.fainelli@gmail.com>
-Message-ID: <20160108163036.GR1898@mtj.duckdns.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 8 Jan 2016 08:32:50 -0800
+Subject: [GIT PULL] urgent onenand file system corruption fix for n900
+Message-ID: <20160108163250.GT12777@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 07, 2016 at 04:03:31PM -0800, Florian Fainelli wrote:
-> From: Danesh Petigara <dpetigara@broadcom.com>
-> 
-> The Broadcom STB SATA host controller does not support device
-> initiated power management. Disable support for this feature
-> so the driver never sends SETFEATURES commands to the device
-> to enable/disable DIPM.
-> 
-> Signed-off-by: Danesh Petigara <dpetigara@broadcom.com>
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+The following changes since commit 0b4d6972d7b052b23d33ff9bdbb52958664fbb26:
 
-Applied to libata/for-4.5.
+  ARM: dts: Fix UART wakeirq for omap4 duovero parlor (2015-12-18 16:43:22 -0800)
 
-Thanks.
+are available in the git repository at:
 
--- 
-tejun
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.4/onenand-corruption
+
+for you to fetch changes up to e7b11dc7b77bfce0a351230a5feeadc1d0bba997:
+
+  ARM: OMAP2+: Fix onenand rate detection to avoid filesystem corruption (2016-01-06 09:21:09 -0800)
+
+----------------------------------------------------------------
+Last minute urgent pull request to prevent file system corruption
+on Nokia N900.
+
+Looks like we have a GPMC bus timing bug that has gone unnoticed
+because of bootloader configured registers until few days ago. We
+are not detecting the onenand clock rate properly unless we have
+CONFIG_OMAP_GPMC_DEBUG set and this causes onenand corruption
+that can be easily be reproduced.
+
+There seems to be also an additional bug still lurking around for
+onenand corruption. But that is still being investigated and
+it does not seem to be GPMC timings related.
+
+Meanwhile, it would be good to get this fix into v4.4 to prevent
+wrong timings from corrupting onenand.
+
+----------------------------------------------------------------
+Tony Lindgren (1):
+      ARM: OMAP2+: Fix onenand rate detection to avoid filesystem corruption
+
+ arch/arm/mach-omap2/gpmc-onenand.c | 14 +++++++++-----
+ 1 file changed, 9 insertions(+), 5 deletions(-)
+
+--- a/arch/arm/mach-omap2/gpmc-onenand.c
++++ b/arch/arm/mach-omap2/gpmc-onenand.c
+@@ -149,8 +149,8 @@ static int omap2_onenand_get_freq(struct omap_onenand_platform_data *cfg,
+ 		freq = 104;
+ 		break;
+ 	default:
+-		freq = 54;
+-		break;
++		pr_err("onenand rate not detected, bad GPMC async timings?\n");
++		freq = 0;
+ 	}
+ 
+ 	return freq;
+@@ -271,6 +271,11 @@ static int omap2_onenand_setup_async(void __iomem *onenand_base)
+ 	struct gpmc_timings t;
+ 	int ret;
+ 
++	/*
++	 * Note that we need to keep sync_write set for the call to
++	 * omap2_onenand_set_async_mode() to work to detect the onenand
++	 * supported clock rate for the sync timings.
++	 */
+ 	if (gpmc_onenand_data->of_node) {
+ 		gpmc_read_settings_dt(gpmc_onenand_data->of_node,
+ 				      &onenand_async);
+@@ -281,12 +286,9 @@ static int omap2_onenand_setup_async(void __iomem *onenand_base)
+ 			else
+ 				gpmc_onenand_data->flags |= ONENAND_SYNC_READ;
+ 			onenand_async.sync_read = false;
+-			onenand_async.sync_write = false;
+ 		}
+ 	}
+ 
+-	omap2_onenand_set_async_mode(onenand_base);
+-
+ 	omap2_onenand_calc_async_timings(&t);
+ 
+ 	ret = gpmc_cs_program_settings(gpmc_onenand_data->cs, &onenand_async);
+@@ -310,6 +312,8 @@ static int omap2_onenand_setup_sync(void __iomem *onenand_base, int *freq_ptr)
+ 	if (!freq) {
+ 		/* Very first call freq is not known */
+ 		freq = omap2_onenand_get_freq(gpmc_onenand_data, onenand_base);
++		if (!freq)
++			return -ENODEV;
+ 		set_onenand_cfg(onenand_base);
+ 	}
+ 
