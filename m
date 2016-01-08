@@ -1,50 +1,70 @@
-From: tyler.baker@linaro.org (Tyler Baker)
-Date: Fri, 8 Jan 2016 15:17:19 -0800
-Subject: bcm4708-smartrg-sr400ac boot failures in next/arm-soc
-In-Reply-To: <20160108225032.GO19062@n2100.arm.linux.org.uk>
-References: <CANMBJr6LW=y7g4_CCutHf4vu5NkzoeXt_RvPSJAsTE2nFpGwqw@mail.gmail.com>
- <20160108225032.GO19062@n2100.arm.linux.org.uk>
-Message-ID: <CANMBJr6DR=y2oOqnEyUAxhzhXn1twXozGacOpcVRx8NcWf-mfw@mail.gmail.com>
+From: dpetigara@broadcom.com (Danesh Petigara)
+Date: Fri, 8 Jan 2016 15:20:44 -0800
+Subject: [PATCH 3/4] drivers: ata: wake port before DMA stop for ALPM
+In-Reply-To: <20160108163610.GS1898@mtj.duckdns.org>
+References: <1452211413-1350-1-git-send-email-f.fainelli@gmail.com>
+ <1452211413-1350-4-git-send-email-f.fainelli@gmail.com>
+ <20160108163610.GS1898@mtj.duckdns.org>
+Message-ID: <5690444C.2090200@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 January 2016 at 14:50, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Jan 08, 2016 at 02:33:39PM -0800, Tyler Baker wrote:
->> After a bit of investigation, I determined that CONFIG_BLK_DEV_RAM was
->> causing the issue and disabling it fixed the boot issue. Essentially,
->> the kernel cannot find the initrd that has been loaded into memory by
->> CFE bootloader with this option enabled as I inject the following
->> command line into the DT before it's loaded over tftp.
->>
->> Loaded in CFE by: 'load -raw -tftp -addr=0x4000000 -max=0x900000
->> 192.168.2.2:tmpqC9zOv/ramdisk.cpio.gz'
->>
->> Kernel arguments injected into DT: 'console=ttyS0,115200
->> initrd=0x4000000,8M root=/dev/ram0 ip=dhcp'
+Hi Tejun,
+
+On 1/8/2016 8:36 AM, Tejun Heo wrote:
+> Hello,
+> 
+> On Thu, Jan 07, 2016 at 04:03:32PM -0800, Florian Fainelli wrote:
+>> diff --git a/drivers/ata/libahci.c b/drivers/ata/libahci.c
+>> index d61740e78d6d..b6664c579f9a 100644
+>> --- a/drivers/ata/libahci.c
+>> +++ b/drivers/ata/libahci.c
+>> @@ -595,6 +595,58 @@ int ahci_stop_engine(struct ata_port *ap)
+>>  	void __iomem *port_mmio = ahci_port_base(ap);
+>>  	u32 tmp;
+>>  
+>> +	/*
+>> +	 * On some controllers, stopping a port's DMA engine
+>> +	 * while the port is in ALPM state (partial or slumber)
+>> +	 * results in failures on subsequent DMA engine starts.
+>> +	 * For those controllers, put the port back in active
+>> +	 * state before stopping it's DMA engine.
+>> +	 */
+>> +	if (ap->flags2 & ATA_FLAG2_WAKE_BEFORE_STOP) {
+> ...
+> 
+> So, I'm not too comfortable with open coding ALPM switching in
+> ahci_stop_engine().  Shouldn't it be possible to update and/or
+> refactor and reuse ahci_set_lpm()?
 >
-> What is the problem that the kernel is reporting?
+ahci_set_lpm in it's current form cannot be used here as it also
+modifies the ALPE/ASP bits. The idea is to wake the link before DMA stop
+without changing the ALPM bits so the link can return to it's configured
+low power state when it's idle.
 
-The kernel complaining that there is no file system to mount, and
-panics. Here is a plain text version of the issue if you want to have
-a look[1].
+We could however update that function by introducing a new hints flag
+that allows us to skip unneeded logic for this scenario. ahci_set_lpm
+can then be called from ahci_stop_engine.
 
-> I'm asking because kernelci.org uses javascript, which is not elinks
-> friendly, and it otherwise means I need to walk over to a different
-> machine to look at it, and then return to a different machine to finish
-> writing the email - as a result, I hardly ever look at the kernelci.org
-> results, and just rely on Olof's results.
+>> --- a/include/linux/libata.h
+>> +++ b/include/linux/libata.h
+>> @@ -236,6 +236,8 @@ enum {
+>>  
+>>  	/* bits 24:31 of ap->flags are reserved for LLD specific flags */
+>>  
+>> +	/* struct ata_port flags2 */
+>> +	ATA_FLAG2_WAKE_BEFORE_STOP = (1 << 0), /* wake link before DMA stop */
+> 
+> What's wrong with bits 2-5 in ATA_FLAG_* space?  Also, should this be
+> a ahci priv flag?
 
-Apologies, we are trying our best to find a happy medium for all
-users, and clearly we aren't there yet. We have the ability to provide
-plain text e-mail, instead of the multi-part html ones we typically
-send out. If that is helpful for you at all, we can setup a hook to
-send the plain text e-mails directly to you. Unfortunately, there
-isn't much we can do about the javascript elink issue without
-re-writing the front end :\
+I wasn't sure whether those bits were left unused on purpose, so I did
+not use them. The point to make this a AHCI_HFLAG_ flag makes perfect sense.
 
-Cheers,
+> 
+> Thanks.
+> 
 
-Tyler
+Thanks for the feedback.
 
-[1]http://storage.kernelci.org/arm-soc/v4.4-rc3-1097-g80f7f7e00215/arm-multi_v7_defconfig/lab-tbaker/boot-bcm4708-smartrg-sr400ac.txt
+Danesh
