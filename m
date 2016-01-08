@@ -1,23 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 08 Jan 2016 11:46:50 +0100
-Subject: [PATCH 2/2] ARM: versatile: enable the right LEDs
-In-Reply-To: <1452002529-3335-3-git-send-email-linus.walleij@linaro.org>
+Date: Fri, 08 Jan 2016 11:47:32 +0100
+Subject: [PATCH 1/2] ARM: versatile: add the syscon LEDs to the DT
+In-Reply-To: <1452002529-3335-2-git-send-email-linus.walleij@linaro.org>
 References: <1452002529-3335-1-git-send-email-linus.walleij@linaro.org>
- <1452002529-3335-3-git-send-email-linus.walleij@linaro.org>
-Message-ID: <8577276.zfs8bcEaSQ@wuerfel>
+ <1452002529-3335-2-git-send-email-linus.walleij@linaro.org>
+Message-ID: <6267161.VOui2c95BW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 January 2016 15:02:09 Linus Walleij wrote:
-> The Versatile now only has device tree boot support, and the
-> device tree version does not support CONFIG_LEDS_VERSATILE.
-> Instead select CONFIG_LEDS_SYSCON and MFD_SYSCON, so we can
-> get LEDs support from the same generic driver that drives
-> most other ARM reference boards.
+On Tuesday 05 January 2016 15:02:08 Linus Walleij wrote:
+> The device tree version of Versatile AP/PB never had LED support
+> so we are missing LEDs from our hardware boards. Add this as
+> syscon LEDs like we did for Integrator and Juno. We need to
+> spawn devices in the syscon with "simple-mfd" for this to work.
 > 
 > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > 
 
-Applied to next/defconfig, thanks!
+Applied to next/dt, thanks!
 
 	Arnd
