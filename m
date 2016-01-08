@@ -1,75 +1,40 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 8 Jan 2016 13:44:24 +0800
-Subject: [RFC PATCH 2/2] usb: Example for how to use device node at usb device
- driver
-In-Reply-To: <1452231864-11171-1-git-send-email-peter.chen@freescale.com>
-References: <1452231864-11171-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1452231864-11171-3-git-send-email-peter.chen@freescale.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 8 Jan 2016 11:37:09 +0530
+Subject: dra7xx pci driver broken on dra7xx-evm
+In-Reply-To: <20160107215946.GP12777@atomide.com>
+References: <20160106214518.GA6106@localhost.localdomain>
+ <568DF4FE.5010704@ti.com> <568ED7FA.4000508@ti.com>
+ <20160107215946.GP12777@atomide.com>
+Message-ID: <568F520D.9050807@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In this example, we take HUB driver as an example to show how
-to get properties in USB device driver if this device has device
-node.
+Hi,
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
----
- arch/arm/boot/dts/imx6sx-sdb.dtsi | 9 +++++++++
- drivers/usb/core/hub.c            | 8 ++++++++
- 2 files changed, 17 insertions(+)
+On Friday 08 January 2016 03:29 AM, Tony Lindgren wrote:
+> * Suman Anna <s-anna@ti.com> [160107 13:26]:
+>> On 01/06/2016 11:17 PM, Kishon Vijay Abraham I wrote:
+>>> Hi,
+>>
+>> + Tero, Tony and linux-omap
+>>
+>>>
+>>> On Thursday 07 January 2016 03:15 AM, Richard Cochran wrote:
+>>>>
+>>>> The dra7xx-evm box freezes hard at the very first PCI bus access, the
+>>>> call to in dra7xx_pcie_readl() in dra7xx_pcie_probe().
+>>>>
+>>>> The out-of-tree 3.14.53 TI driver performs a reset via platform data,
+>>>> calling omap_device_assert_hardreset() by hook and crook.
+>>
+>> Yeah, this is the only feasible way and not break multi-arch atm until a
+>> reset framework is in place. We have couple of drivers (omap_iommu and
+>> wkup_m3_rproc) following this approach.
+> 
+> Sounds like doing reset with platform data is the way to go until the
+> reset controller works.
 
-diff --git a/arch/arm/boot/dts/imx6sx-sdb.dtsi b/arch/arm/boot/dts/imx6sx-sdb.dtsi
-index 94ac400..fe0fd95 100644
---- a/arch/arm/boot/dts/imx6sx-sdb.dtsi
-+++ b/arch/arm/boot/dts/imx6sx-sdb.dtsi
-@@ -275,6 +275,15 @@
- 	vbus-supply = <&reg_usb_otg2_vbus>;
- 	dr_mode = "host";
- 	status = "okay";
-+
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	hub: genesys at 01 {
-+		compatible = "05e3,0608";
-+		reg = <0x01>;
-+		delay-duration-us = <50>;
-+	};
-+
- };
- 
- &usdhc2 {
-diff --git a/drivers/usb/core/hub.c b/drivers/usb/core/hub.c
-index 4c77001..1babfd4 100644
---- a/drivers/usb/core/hub.c
-+++ b/drivers/usb/core/hub.c
-@@ -27,6 +27,7 @@
- #include <linux/random.h>
- #include <linux/pm_qos.h>
- #include <linux/of_platform.h>
-+#include <linux/of.h>
- 
- #include <asm/uaccess.h>
- #include <asm/byteorder.h>
-@@ -1748,6 +1749,7 @@ static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
- 	struct usb_device *hdev;
- 	struct usb_hub *hub;
- 	int ret;
-+	u32 duration_us = 0;
- 
- 	desc = intf->cur_altsetting;
- 	hdev = interface_to_usbdev(intf);
-@@ -1873,6 +1875,12 @@ descriptor_error:
- 		return ret;
- 	}
- 
-+	of_property_read_u32(hdev->dev.of_node, "delay-duration-us", &duration_us);
-+	if (duration_us > 0) {
-+		usleep_range(duration_us, duration_us + 10);
-+		dev_info(&hdev->dev, "The delay is %d us\n", duration_us);
-+	}
-+
- 	if (hub_configure(hub, endpoint) >= 0)
- 		return 0;
- 
--- 
-1.9.1
+All right. I'll post the patch to do reset using platform data.
+
+Thanks
+Kishon
