@@ -1,27 +1,65 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 7 Jan 2016 21:02:14 -0800
-Subject: ION DTS changes for HiKey in -next
-In-Reply-To: <20160107173744.GJ6588@sirena.org.uk>
-References: <20160107173744.GJ6588@sirena.org.uk>
-Message-ID: <20160108050214.GD30293@kroah.com>
+From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
+Date: Fri, 8 Jan 2016 07:13:58 +0200
+Subject: [PATCH 2/2] memory: omap-gpmc: Add Kconfig option for debug
+In-Reply-To: <20160108022619.GS12777@atomide.com>
+References: <20160105041356.GE12777@atomide.com> <20160105084947.GG22661@pali>
+ <20160105224929.GF12777@atomide.com> <20160106174039.GA14271@earth>
+ <20160106174713.GL12777@atomide.com> <568D5669.4040801@gmail.com>
+ <20160106182650.GM12777@atomide.com> <568D5F54.7040900@gmail.com>
+ <20160107180700.GN12777@atomide.com> <568EDC8D.7070205@gmail.com>
+ <20160108022619.GS12777@atomide.com>
+Message-ID: <568F4596.8020206@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 07, 2016 at 05:37:44PM +0000, Mark Brown wrote:
-> Hi Greg,
-> 
-> I was just looking at DTs in -next and noticed that there is a patch
-> 59dfafd03fc (arm64: dts: Add dts files to enable ION on Hi6220 SoC)
-> which adds at DT doing something for ION.  Are we sure this should be
-> going into the main production DT?  The bindings haven't been reviewed
-> as far as I can tell, the matching driver is only in staging and hasn't
-> been posted upstream.
+Hi
 
-Isn't "staging" upstream enough for this?  :)
+On  8.01.2016 04:26, Tony Lindgren wrote:
+>
+> Yes it seems there's some other issue too. Maybe you can run git bisect
+> again and carry the fix along as an extra patch?
+>
 
-If not, let me know and I'll be glad to drop this patch, it was on the
-list for a while with no objections.
+No sane way to bisect, I don't really know what triggers the issue. 
+Neither it is triggered regularly. It might happen on the first reboot 
+or on the tenth, or ... And it looks like the problems happens sometimes 
+on oops too. Not to say that it seems I should have fully booted 
+userspace (so there is enough pressure on the ubi/mdt/nand subsystems), 
+which is impossible with upstream without some n900 specific patches :(
 
-thanks,
+Maybe we can get some ideas on what and where to look from ubifs people? 
+Though I don't know whom to cc, feel free to help :)
 
-greg k-h
+My best bet aiui, is comparing what nokia omap1 kernel does vs upstream. 
+Or looking at the commit log in ubi/mtd/onenand - who knows, I might get 
+lucky once again the same way as with that phonet oops in 
+__netif_receive_skb_core.
+
+>
+> OK then it really seems like we do have another bug lurking around.
+
+:nod:
+
+> Maybe you can figure out an easier way to reproduce it?
+>
+
+I doubt, but who knows.
+
+>> The problem is that between NOLO and kernel there is u-boot. And even if I
+>> am almost sure it doesn't touch onenand configs, I can't be absolutely sure.
+>> So those timings are not 100% reliable IMO, though close to that.
+>
+> Hmm yes I'm only booting with u-boot here as my device sits in my rack.
+>
+
+I booted the device via flasher with initrd from the so-called rescueos 
+(https://n900.quitesimple.org/rescueOS/rescueOS-1.2/) - it provides 
+shell with tons of useful tools if your device is in bootloop etc. CS0 
+registers were the same as with u-boot, so it is not that one.
+
+>
+> OK will push it out then.
+>
+
+Thanks,
+Ivo
