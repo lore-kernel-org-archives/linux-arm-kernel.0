@@ -1,61 +1,64 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 8 Jan 2016 13:05:14 +0100
-Subject: [PATCH v2 04/13] arm64: decouple early fixmap init from linear
- mapping
-In-Reply-To: <20160108120008.GF16432@e104818-lin.cambridge.arm.com>
-References: <1451489172-17420-1-git-send-email-ard.biesheuvel@linaro.org>
- <1451489172-17420-5-git-send-email-ard.biesheuvel@linaro.org>
- <20160108120008.GF16432@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu9CRMqtDzHmdk3ZHDzA=12KNua9zKJXzz3Ug3HN9yybBA@mail.gmail.com>
+From: shannon.zhao@linaro.org (Shannon Zhao)
+Date: Fri, 08 Jan 2016 20:15:29 +0800
+Subject: [PATCH v8 20/20] KVM: ARM64: Add a new kvm ARM PMU device
+In-Reply-To: <CAFEAcA8DO5VksiP55vnuOD3NERJTfr1q=une4n6N=Oj8JUa1_A@mail.gmail.com>
+References: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>
+ <1450771695-11948-21-git-send-email-zhaoshenglong@huawei.com>
+ <CAFEAcA_MDiOphseZ7RGNE3G=4ZDF5SFV5krOjanPbVuhgg9gnQ@mail.gmail.com>
+ <568E7AF1.9040103@huawei.com>
+ <CAFEAcA-Qcda7TSFLSeykLHqZYdP6tYdEjPe2uHN6f_+omqWFZg@mail.gmail.com>
+ <568F27A8.80808@huawei.com>
+ <CAFEAcA8DO5VksiP55vnuOD3NERJTfr1q=une4n6N=Oj8JUa1_A@mail.gmail.com>
+Message-ID: <568FA861.1080307@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 January 2016 at 13:00, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Wed, Dec 30, 2015 at 04:26:03PM +0100, Ard Biesheuvel wrote:
->> @@ -583,33 +555,42 @@ void __init early_fixmap_init(void)
->>       unsigned long addr = FIXADDR_START;
->>
->>       pgd = pgd_offset_k(addr);
->> -     pgd_populate(&init_mm, pgd, bm_pud);
->> -     pud = pud_offset(pgd, addr);
->> -     pud_populate(&init_mm, pud, bm_pmd);
->> -     pmd = pmd_offset(pud, addr);
->> -     pmd_populate_kernel(&init_mm, pmd, bm_pte);
->> +#if CONFIG_PGTABLE_LEVELS > 3
->> +     if (pgd_none(*pgd)) {
->> +             static pud_t bm_pud[PTRS_PER_PUD] __pgdir;
->> +
->> +             pgd_populate(&init_mm, pgd, bm_pud);
->> +             memblock_reserve(__pa(bm_pud), sizeof(bm_pud));
->> +     }
->> +     pud = (pud_t *)__phys_to_kimg(pud_offset_phys(pgd, addr));
->> +#else
->> +     pud = (pud_t *)pgd;
->> +#endif
->> +#if CONFIG_PGTABLE_LEVELS > 2
->> +     if (pud_none(*pud)) {
->> +             static pmd_t bm_pmd[PTRS_PER_PMD] __pgdir;
->> +
->> +             pud_populate(&init_mm, pud, bm_pmd);
->> +             memblock_reserve(__pa(bm_pmd), sizeof(bm_pmd));
->> +     }
->> +     pmd = (pmd_t *)__phys_to_kimg(pmd_offset_phys(pud, addr));
->> +#else
->> +     pmd = (pmd_t *)pud;
->> +#endif
->> +     if (pmd_none(*pmd)) {
->> +             static pte_t bm_pte[PTRS_PER_PTE] __pgdir;
->> +
->> +             pmd_populate_kernel(&init_mm, pmd, bm_pte);
->> +             memblock_reserve(__pa(bm_pte), sizeof(bm_pte));
->> +     }
->> +     __fixmap_pte = (pte_t *)__phys_to_kimg(pmd_page_paddr(*pmd));
->
-> I haven't tried but could you not avoid the #if and just rely on the
-> pud_none() etc. definitions to be 0 and the compiler+linker optimising
-> the irrelevant code out?
->
 
-I tried but it requires some tinkering so I gave up. I can have
-another go based on the latest version (which will look a bit
-different)
+
+On 2016/1/8 18:24, Peter Maydell wrote:
+> On 8 January 2016 at 03:06, Shannon Zhao<zhaoshenglong@huawei.com>  wrote:
+>> >
+>> >
+>> >On 2016/1/7 22:56, Peter Maydell wrote:
+>>>>>> >>>>>+  Errors:
+>>>>>>>>> >>>>> >>>+    -ENXIO: Unsupported attribute group
+>>>>>>>>> >>>>> >>>+    -EBUSY: The PMU overflow interrupt is already set
+>>>>>>>>> >>>>> >>>+    -ENODEV: Getting the PMU overflow interrupt number while it's not set
+>>>>>>>>> >>>>> >>>+    -EINVAL: Invalid vcpu_index or PMU overflow interrupt number supplied
+>>>>>>> >>>> >>
+>>>>>>> >>>> >>What happens if you create a PMU but then never set the IRQ number?
+>>>>>>> >>>> >>Is there a default or does the VM refuse to run or something?
+>>>>>>> >>>> >>
+>>>>> >>> >If userspace doesn't specify the irq number, the guest will not receive
+>>>>> >>> >the PMU interrupt because we check if the irq is initialized when we
+>>>>> >>> >inject the interrupt. But guest could still use the vPMU if QEMU
+>>>>> >>> >generates a proper DTB or ACPI.
+>>> >>So is it a valid use case to create a PMU with the interrupt not wired
+>>> >>up to anything? (If it's never valid it would be nice to diagnose it
+>>> >>rather than just silently letting the guest run but not work right.)
+>> >So how about adding a helper to check if the PMU is completely
+>> >initialized and if not, return trap_raz_wi when guest access PMU registers?
+> That would still be letting the guest run and not work right.
+>
+> If we have an "I have now completed config" ioctl like the GIC does,
+> then you could make that ioctl return an error if the config is not
+> valid.
+
+Firstly, userspace will call kvm device ioctl to create the PMU device, 
+if it fails it will return an error.
+Secondly, userspace will call SET_DEVICE_ATTR ioctl to configure the PMU 
+irq number. If the irq is invalid, this will return an error and the 
+userspace will stop if it takes care the error. If the irq is valid, the 
+PMU is well initialized.
+
+If userspace doesn't call SET_ATTR ioctl to configure the PMU irq, the 
+PMU is not well initialized and guest can't use the PMU.
+
+I didn't see anywhere that needs to call something like 
+KVM_DEV_ARM_VGIC_CTRL_INIT to let kvm initialize PMU because it will be 
+initialized when userspace configure the irq correctly. This is a little 
+different with the vGIC I think.
+
+Thanks,
+-- 
+Shannon
