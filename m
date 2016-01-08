@@ -1,65 +1,46 @@
 From: jamesjj.liao@mediatek.com (James Liao)
-Date: Fri, 8 Jan 2016 11:32:46 +0800
-Subject: [PATCH v2 2/4] soc: mediatek: Init MT8173 scpsys driver earlier
-In-Reply-To: <1452223968-6566-1-git-send-email-jamesjj.liao@mediatek.com>
-References: <1452223968-6566-1-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <1452223968-6566-3-git-send-email-jamesjj.liao@mediatek.com>
+Date: Fri, 8 Jan 2016 11:32:44 +0800
+Subject: [PATCH v2 0/4] Mediatek MT2701 SCPSYS power domain support
+Message-ID: <1452223968-6566-1-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some power domain comsumers may init before module_init.
-So the power domain provider (scpsys) need to be initialized
-earlier too.
+This patchset is based on 4.4-rc7, add scpsys power domain support for
+Mediatek MT2701.
 
-Take an example for our IOMMU (M4U) and SMI. SMI is a bridge
-between IOMMU and multimedia HW. SMI is responsible to
-enable/disable iommu and help transfer data for each multimedia
-HW. Both of them have to wait until the power and clocks are
-enabled.
+This patchset also separate MT8173 scpsys driver into common part
+(mtk-scpsys.c) and platform part (mtk-scpsys-mt8173.c), so that MT2701
+scpsys driver can share most implementation with MT8173.
 
-So scpsys driver should be initialized before SMI, and SMI should
-be initialized before IOMMU, and then init IOMMU consumers
-(display/vdec/venc/camera etc.).
+MT8173 and MT2701 scpsys init level are now subsys_init. Please refer to [1]
+to see discussion details.
 
-IOMMU is subsys_init by default. So we need to init scpsys driver
-before subsys_init.
+changes since v1:
+- Make MTK_SCPSYS in Kconfig invisible from users.
+- Add comments for changing scpsys init level to subsys_init.
 
-Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
----
- drivers/soc/mediatek/mtk-scpsys-mt8173.c | 24 +++++++++++++++++++++++-
- 1 file changed, 23 insertions(+), 1 deletion(-)
+[1] http://lists.infradead.org/pipermail/linux-mediatek/2015-December/003416.html
 
-diff --git a/drivers/soc/mediatek/mtk-scpsys-mt8173.c b/drivers/soc/mediatek/mtk-scpsys-mt8173.c
-index 3c7b569..4d7b341 100644
---- a/drivers/soc/mediatek/mtk-scpsys-mt8173.c
-+++ b/drivers/soc/mediatek/mtk-scpsys-mt8173.c
-@@ -176,4 +176,26 @@ static struct platform_driver scpsys_drv = {
- 	},
- };
- 
--module_platform_driver_probe(scpsys_drv, scpsys_probe);
-+static int __init scpsys_drv_init(void)
-+{
-+	return platform_driver_probe(&scpsys_drv, scpsys_probe);
-+}
-+
-+static void __exit scpsys_drv_exit(void)
-+{
-+	platform_driver_unregister(&scpsys_drv);
-+}
-+
-+/*
-+ * There are some Mediatek drivers which depend on the power domain driver need
-+ * to probe in earlier initcall levels. So scpsys driver also need to probe
-+ * earlier.
-+ *
-+ * IOMMU(M4U) and SMI drivers for example. SMI is a bridge between IOMMU and
-+ * multimedia HW. IOMMU depends on SMI, and SMI is a power domain consumer,
-+ * so the proper probe sequence should be scpsys -> SMI -> IOMMU driver.
-+ * IOMMU drivers are initialized during subsys_init by default, so we need to
-+ * move SMI and scpsys drivers to subsys_init or earlier init levels.
-+ */
-+subsys_initcall(scpsys_drv_init);
-+module_exit(scpsys_drv_exit);
--- 
+James Liao (2):
+  soc: mediatek: Separate scpsys driver common code
+  soc: mediatek: Init MT8173 scpsys driver earlier
+
+Shunli Wang (2):
+  soc: mediatek: Add MT2701 power dt-bindings
+  soc: mediatek: Add MT2701 scpsys driver
+
+ drivers/soc/mediatek/Kconfig             |  27 ++-
+ drivers/soc/mediatek/Makefile            |   2 +
+ drivers/soc/mediatek/mtk-scpsys-mt2701.c | 172 ++++++++++++++++++
+ drivers/soc/mediatek/mtk-scpsys-mt8173.c | 201 +++++++++++++++++++++
+ drivers/soc/mediatek/mtk-scpsys.c        | 301 ++++++++-----------------------
+ drivers/soc/mediatek/mtk-scpsys.h        |  54 ++++++
+ include/dt-bindings/power/mt2701-power.h |  27 +++
+ 7 files changed, 554 insertions(+), 230 deletions(-)
+ create mode 100644 drivers/soc/mediatek/mtk-scpsys-mt2701.c
+ create mode 100644 drivers/soc/mediatek/mtk-scpsys-mt8173.c
+ create mode 100644 drivers/soc/mediatek/mtk-scpsys.h
+ create mode 100644 include/dt-bindings/power/mt2701-power.h
+
+--
 1.9.1
