@@ -1,55 +1,34 @@
-From: lho@apm.com (Loc Ho)
-Date: Fri, 8 Jan 2016 11:05:38 -0800
-Subject: [PATCH v2] ARM64: kernel: implement ACPI parking protocol
-In-Reply-To: <20160108150142.GB10630@red-moon>
-References: <CAPw-ZTmsLqgh6W6R0uLgQjueV7XjaGOD49CYCRYufJ43zT8Kyg@mail.gmail.com>
- <20160108150142.GB10630@red-moon>
-Message-ID: <CAPw-ZT=zm_giCsC1Y6N2vCjCuAh6jDQjuP6SQry029Buztg08Q@mail.gmail.com>
+From: alexei.starovoitov@gmail.com (Alexei Starovoitov)
+Date: Fri, 8 Jan 2016 11:09:44 -0800
+Subject: [PATCH] arm64: net: bpf: don't BUG() on large shifts
+In-Reply-To: <20160108154423.GC11228@arm.com>
+References: <1452015543-6790-1-git-send-email-rabin@rab.in>
+ <20160108154423.GC11228@arm.com>
+Message-ID: <20160108190943.GA11561@ast-mbp.thefacebook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Jan 08, 2016 at 03:44:23PM +0000, Will Deacon wrote:
+> On Tue, Jan 05, 2016 at 06:39:03PM +0100, Rabin Vincent wrote:
+> > Attempting to generate UBFM/SBFM instructions with shifts that can't be
+> > encoded in the immediate fields of the opcodes leads to a trigger of a
+> > BUG() in the instruction generation code.  As the ARMv8 ARM says: "The
+> > shift amounts must be in the range 0 to one less than the register width
+> > of the instruction, inclusive."  Make the JIT reject unencodable shifts
+> > instead of crashing.
+> 
+> I moaned about those BUG_ONs when they were introduced:
+> 
+>   https://lkml.org/lkml/2014/7/17/438
+> 
+> The response then was that the verifier would catch these issues so
+> there was nothing to worry about. Has something changed so that is no
+> longer the case? Do we need to consider a different way of rejecting
+> invalid instructions at the encoding stage rather than bringing down the
+> kernel?
 
->
-> [CC'ed Jeremy - I know he is testing this on m400]
->
-> On Fri, Dec 18, 2015 at 06:12:20PM -0800, Loc Ho wrote:
->
-> [...]
->
->> >> I put it together to make sure that it is there if any platform
->> >> compliant with it relies on it and more importantly to prevent
->> >> non-compliant implentations from trickling into the kernel,
->> >> basically to prevent broken firmware implementations from being
->> >> considered compliant and "working".
->> >
->> > That's a good point. However, AFAIK, AMD are using PSCI already in their
->> > firmware implementation and that's what we recommend anyway if EL3 is
->> > available.
->> >
->> > So this patch is mainly aimed at X-Gene since other implementations I'm
->> > aware of have EL3 already. What are the chances of Applied Micro fixing
->> > their firmware and actually using this patch? (not a question for you;
->> > I'm hoping some Applied engineers would comment).
->> >
->>
->> Sorry that I missed this. This FW is now fixed and tested with Lorenzo
->> patch. Though some minor manual patch will be required with recent
->> kernel. I was going to get some one to ack the patch but got tied up
->> with other matter. As for availability of the FW, it is currently
->> internally only and will be available sometime next year for the next
->> FW release. If any one interested in the FW, you can contact me.
->
-> I guess that by "some minor manual patch" you meant you had to rebase
-> the patch on top of mainline, I can post an updated version for you to
-> test.
-
-Yes... It don't apply cleanly with newer kernel.
-
->
-> Mind giving a tested-by if FW has been updated to comply with the specs
-> and tested with my patch applied ?
-
-Yes... Let me know when an newer version is available.
-
--Loc
+that discussion lead to replacement of all BUG_ONs in
+arch/arm64/net/bpf_jit_comp.c with pr_err_once(), but looks like
+arch/arm64/kernel/insn.c wasn't addressed.
+The amount of BUG_ONs there is indeed overkill regardless of what
+verifier and other JITs do. btw, x64 JIT doesn't have runtime BUG_ONs.
