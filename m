@@ -1,47 +1,37 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Fri, 8 Jan 2016 14:13:18 +0300
-Subject: [PATCH v6 14/21] arm64:ilp32: add sys_ilp32.c and a separate
- table (in entry.S) to use it
-In-Reply-To: <8354919.jOyEk0znB5@wuerfel>
-References: <1452209679-19445-1-git-send-email-ynorov@caviumnetworks.com>
- <1452209679-19445-15-git-send-email-ynorov@caviumnetworks.com>
- <8354919.jOyEk0znB5@wuerfel>
-Message-ID: <20160108111318.GA24066@yury-N73SV>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 8 Jan 2016 11:15:05 +0000
+Subject: [PATCH 0/2] crypto: sunxi-ss: fix 64-bit compilation
+In-Reply-To: <20160108095959.GC3472@gondor.apana.org.au>
+References: <1452182298-4653-1-git-send-email-andre.przywara@arm.com>
+ <20160108095959.GC3472@gondor.apana.org.au>
+Message-ID: <568F9A39.9030400@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 08, 2016 at 10:21:06AM +0100, Arnd Bergmann wrote:
-> On Friday 08 January 2016 02:34:32 Yury Norov wrote:
-> 
-> > @@ -688,6 +692,12 @@ ni_sys:
-> >  	b	ret_fast_syscall
-> >  ENDPROC(el0_svc)
-> >  
-> > +#ifdef CONFIG_ARM64_ILP32
-> > +el0_ilp32_svc:
-> > +	adrp	stbl, sys_call_ilp32_table // load syscall table pointer
-> > +	b el0_svc_naked
-> > +#endif
-> 
-> Don't we still need some code that clears the top halves of the 32-bit
-> arguments? That thread has taken so many turns now that I'm confused
-> about what we actually need, but I thought we had concluded that your
-> current approach has at some some problems.
+Hi Herbert,
 
-We are discussing how to do it better - make a generic solution from
-s390 with individual syscall handling, or reproduce s390 solution for
-ILP32, or zero top-half registers and not use top half of register at
-all. As I understand, we stand on 1st option, and agreed to introduce
-it separately.
+On 08/01/16 09:59, Herbert Xu wrote:
+> On Thu, Jan 07, 2016 at 03:58:16PM +0000, Andre Przywara wrote:
+>> Hi,
+>>
+>> these two patches provide a different approach to an issue I tried
+>> to fix lately [1].
+>> Instead of casting everything I now promote local types to size_t, so
+>> that the min3() arguments naturally match in type.
+>> As size_t is defined as "unsigned int" on 32-bit architectures
+>> anyway, that actually does not change anything there, but instead
+>> provides a clean approach to get it compiled for arm64.
+>>
+>> I split this up because 1/2 seems much cleaner to me than 2/2, so we
+>> can have a separate discussion/merge process on this.
+> 
+> If this is meant for the crypto tree it needs to go to the linux-crypto
+> list.
 
-> 
-> > +#include <asm/syscall.h>
-> > +
-> > +#undef __SYSCALL
-> > +#undef __SC_COMP
-> > +#undef __SC_3264
-> > +#undef __SC_COMP_3264
-> 
-> The four #undef are not needed, right?
-> 
-> 	Arnd
+Oh dear, I planned on adding the list, but eventually forgot it. Sorry
+for that, I will resend it to linux-crypto.
+
+Thanks for pointing this out!
+
+Cheers,
+Andre.
