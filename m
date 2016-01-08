@@ -1,123 +1,121 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 8 Jan 2016 16:18:37 +0000
-Subject: [PATCH] arm64: kernel: fix PMUv3 registers unconditional access
-In-Reply-To: <20160108153300.GB11228@arm.com>
-References: <1452257667-7967-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20160108153300.GB11228@arm.com>
-Message-ID: <20160108161837.GA32491@red-moon>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 8 Jan 2016 16:14:47 +0000
+Subject: [PATCH v2 11/13] arm64: allow kernel Image to be loaded anywhere
+ in physical memory
+In-Reply-To: <20160108154814.GI16432@e104818-lin.cambridge.arm.com>
+References: <1451489172-17420-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1451489172-17420-12-git-send-email-ard.biesheuvel@linaro.org>
+ <20160108152738.GG16432@e104818-lin.cambridge.arm.com>
+ <20160108153653.GB32692@leverpostej>
+ <20160108154814.GI16432@e104818-lin.cambridge.arm.com>
+Message-ID: <20160108161446.GC32692@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 08, 2016 at 03:33:00PM +0000, Will Deacon wrote:
+Hi Catalin,
 
-[...]
+I think we agree w.r.t. the code you suggest. I just disagree with the
+suggestion that using mem= for carveouts is something we must, or even
+could support -- it's already fragile.
 
-> >  	/* EL2 debug */
-> > +	mrs	x0, id_aa64dfr0_el1		// Check ID_AA64DFR0_EL1 PMUVer
-> > +	ubfx	x0, x0, #8, #4
-> > +	cmp	x0, #1
-> > +	b.ne	4f				// Skip if no PMUv3 present
+More on that below.
+
+On Fri, Jan 08, 2016 at 03:48:15PM +0000, Catalin Marinas wrote:
+> On Fri, Jan 08, 2016 at 03:36:54PM +0000, Mark Rutland wrote:
+> > On Fri, Jan 08, 2016 at 03:27:38PM +0000, Catalin Marinas wrote:
+> > > On Wed, Dec 30, 2015 at 04:26:10PM +0100, Ard Biesheuvel wrote:
+> > > > +static void __init enforce_memory_limit(void)
+> > > > +{
+> > > > +	const phys_addr_t kbase = round_down(__pa(_text), MIN_KIMG_ALIGN);
+> > > > +	u64 to_remove = memblock_phys_mem_size() - memory_limit;
+> > > > +	phys_addr_t max_addr = 0;
+> > > > +	struct memblock_region *r;
+> > > > +
+> > > > +	if (memory_limit == (phys_addr_t)ULLONG_MAX)
+> > > > +		return;
+> > > > +
+> > > > +	/*
+> > > > +	 * The kernel may be high up in physical memory, so try to apply the
+> > > > +	 * limit below the kernel first, and only let the generic handling
+> > > > +	 * take over if it turns out we haven't clipped enough memory yet.
+> > > > +	 */
+> > > > +	for_each_memblock(memory, r) {
+> > > > +		if (r->base + r->size > kbase) {
+> > > > +			u64 rem = min(to_remove, kbase - r->base);
+> > > > +
+> > > > +			max_addr = r->base + rem;
+> > > > +			to_remove -= rem;
+> > > > +			break;
+> > > > +		}
+> > > > +		if (to_remove <= r->size) {
+> > > > +			max_addr = r->base + to_remove;
+> > > > +			to_remove = 0;
+> > > > +			break;
+> > > > +		}
+> > > > +		to_remove -= r->size;
+> > > > +	}
+> > > > +
+> > > > +	memblock_remove(0, max_addr);
+> > > > +
+> > > > +	if (to_remove)
+> > > > +		memblock_enforce_memory_limit(memory_limit);
+> > > > +}
+> > > 
+> > > IIUC, this is changing the user expectations a bit. There are people
+> > > using the mem= limit to hijack some top of the RAM for other needs
+> > > (though they could do it in a saner way like changing the DT memory
+> > > nodes).
+> > 
+> > Which will be hopelessly broken in the presence of KASLR, the kernel
+> > being loaded at a different address, pages betting reserved differently
+> > due to page size, etc.
 > 
-> This will fail if and when PMUVer gets newer revisions of the PMU
-> architecture (e.g. value 2 to indicate some extended PMU). It looks like
-> we should be treating it as a signed 4-bit field, so we can use sbfx to
-> extract a signed value and then we know the PMU is not present if the
-> value is (signed) less than 1.
+> With KASLR disabled, I think we should aim for the existing behaviour as
+> much as possible. The original aim of these patches was to relax the
+> kernel image placement rules, to make it easier for boot loaders rather
+> than completely randomising it.
 
-Sorry about that. Updated patch below, hopefully this time I have got
-it right (I restested on Juno and QEMU and kept Guenter tested-by tag).
+Sure. My point was there were other reasons this is extremely fragile
+currently, regardless of KASLR. For example, due to reservations
+occurring differently.
 
-Please let me know.
+Consider that when we add memory we may shave off portions of memory due
+to page size, as we do in early_init_dt_add_memory_arch. Regions may be
+fused or split for other reasons which may change over time, leading to
+a different amount of memory being shaved off.
+
+Afterwards memblock_enforce_memory_limit figures out the max address to keep
+with:
+
+        /* find out max address */
+        for_each_memblock(memory, r) { 
+                if (limit <= r->size) {
+                        max_addr = r->base + limit;
+                        break;
+                }    
+                limit -= r->size;
+        }
+
+Given all that, you cannot use mem= to prevent use of some memory, except for a
+specific kernel binary with some value found by experimentation.
+
+I think we need to make it clear that this is completely and hopelessly broken,
+and should not pretend to support that.
+
+> With KASLR enabled, I agree it's hard to make any assumptions about what
+> memory is available.
+
+As above, I do not think this is safe at all across kernel binaries.
+
+> But removing memory only from the top would also > help with the point
+> you already raised - keeping lower memory for > devices with narrower
+> DMA mask.
+
+I'm happy with the logic you suggest for the purpose of keeping low DMA
+memory.
+
+I think we must make it clear that mem= cannot be used to protect or
+carve out memory -- it's a best effort tool for test purposes.
 
 Thanks,
-Lorenzo
-
--- >8 --
-Subject: [PATCH] arm64: kernel: fix PMUv3 registers unconditional access
-
-The Performance Monitors extension is an optional feature of the
-AArch64 architecture, therefore, in order to access Performance
-Monitors registers safely, the kernel should detect the PMUv3 unit
-presence through the ID_AA64DFR0_EL1 register PMUVer field before
-accessing them.
-
-This patch implements a guard by reading the ID_AA64DFR0_EL1 register
-PMUVer field to detect the PMUv3 presence and prevent accessing PMUv3
-system registers if the Performance Monitors extension is not
-implemented in the core.
-
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Reported-by: Guenter Roeck <linux@roeck-us.net>
-Tested-by: Guenter Roeck <linux@roeck-us.net>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Peter Maydell <peter.maydell@linaro.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
----
- arch/arm64/kernel/head.S    |  5 +++++
- arch/arm64/mm/proc-macros.S | 12 ++++++++++++
- arch/arm64/mm/proc.S        |  4 ++--
- 3 files changed, 19 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 23cfc08..b685257 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -512,9 +512,14 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
- #endif
- 
- 	/* EL2 debug */
-+	mrs	x0, id_aa64dfr0_el1		// Check ID_AA64DFR0_EL1 PMUVer
-+	sbfx	x0, x0, #8, #4
-+	cmp	x0, #1
-+	b.lt	4f				// Skip if no PMU present
- 	mrs	x0, pmcr_el0			// Disable debug access traps
- 	ubfx	x0, x0, #11, #5			// to EL2 and allow access to
- 	msr	mdcr_el2, x0			// all PMU counters from EL1
-+4:
- 
- 	/* Stage-2 translation */
- 	msr	vttbr_el2, xzr
-diff --git a/arch/arm64/mm/proc-macros.S b/arch/arm64/mm/proc-macros.S
-index 4c4d93c..d69dfff 100644
---- a/arch/arm64/mm/proc-macros.S
-+++ b/arch/arm64/mm/proc-macros.S
-@@ -62,3 +62,15 @@
- 	bfi	\valreg, \tmpreg, #TCR_T0SZ_OFFSET, #TCR_TxSZ_WIDTH
- #endif
- 	.endm
-+
-+/*
-+ * reset_pmuserenr_el0 - reset PMUSERENR_EL0 if PMUv3 present
-+ */
-+	.macro	reset_pmuserenr_el0, tmpreg
-+	mrs	\tmpreg, id_aa64dfr0_el1	// Check ID_AA64DFR0_EL1 PMUVer
-+	sbfx	\tmpreg, \tmpreg, #8, #4
-+	cmp	\tmpreg, #1			// Skip if no PMU present
-+	b.lt	9000f
-+	msr	pmuserenr_el0, xzr		// Disable PMU access from EL0
-+9000:
-+	.endm
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 9c4dce3..b8f04b3 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -117,7 +117,7 @@ ENTRY(cpu_do_resume)
- 	 */
- 	ubfx	x11, x11, #1, #1
- 	msr	oslar_el1, x11
--	msr	pmuserenr_el0, xzr		// Disable PMU access from EL0
-+	reset_pmuserenr_el0 x0			// Disable PMU access from EL0
- 	mov	x0, x12
- 	dsb	nsh		// Make sure local tlb invalidation completed
- 	isb
-@@ -156,7 +156,7 @@ ENTRY(__cpu_setup)
- 	msr	cpacr_el1, x0			// Enable FP/ASIMD
- 	mov	x0, #1 << 12			// Reset mdscr_el1 and disable
- 	msr	mdscr_el1, x0			// access to the DCC from EL0
--	msr	pmuserenr_el0, xzr		// Disable PMU access from EL0
-+	reset_pmuserenr_el0 x0			// Disable PMU access from EL0
- 	/*
- 	 * Memory region attributes for LPAE:
- 	 *
--- 
-2.5.1
+Mark.
