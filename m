@@ -1,99 +1,70 @@
-From: jcliang@chromium.org (Ricky Liang)
-Date: Fri, 8 Jan 2016 10:43:52 +0800
-Subject: [RESEND PATCH v2] soc: mediatek: PMIC wrap: Clear the vldclr if
- state machine stay on FSM_VLDCLR state.
-In-Reply-To: <1451908972-11882-1-git-send-email-henryc.chen@mediatek.com>
-References: <1451908972-11882-1-git-send-email-henryc.chen@mediatek.com>
-Message-ID: <CAAJzSMdr_kKP=AuhodFSVN5KVKkVPBC9b3hie8F6a63C9QnZ9A@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 7 Jan 2016 18:44:29 -0800
+Subject: [PATCH] ARM: Runtime patch udiv/sdiv instructions into
+ __aeabi_{u}idiv()
+In-Reply-To: <alpine.LFD.2.20.1601042035190.3603@knanqh.ubzr>
+References: <alpine.LFD.2.20.1512110105450.26920@knanqh.ubzr>
+ <alpine.LFD.2.20.1512111125330.26920@knanqh.ubzr>
+ <alpine.LFD.2.20.1512111216350.26920@knanqh.ubzr>
+ <1941958.3p422lB7Mz@wuerfel>
+ <alpine.LFD.2.20.1512111842280.26920@knanqh.ubzr>
+ <20160105012319.GC22188@codeaurora.org>
+ <alpine.LFD.2.20.1601042035190.3603@knanqh.ubzr>
+Message-ID: <20160108024429.GF22188@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 4, 2016 at 8:02 PM, Henry Chen <henryc.chen@mediatek.com> wrote:
->
-> Sometimes PMIC is too busy to send data in time to cause pmic wrap timeout,
-> because pmic wrap is waiting for FSM_VLDCLR after finishing WACS2_CMD. It
-> just return error when issue happened, so the state machine will stay on
-> FSM_VLDCLR state when data send back later by PMIC and timeout again in next
-> time because pmic wrap waiting for FSM_IDLE state at the beginning of the
-> read/write function.
->
-> Clear the vldclr when timeout if state machine stay on FSM_VLDCLR.
->
-> Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
-> ---
-> Changes since v1:
-> Encapsulated the code in a inline function, and add a descriptive comment.
-> ---
->  drivers/soc/mediatek/mtk-pmic-wrap.c | 30 ++++++++++++++++++++++++++++--
->  1 file changed, 28 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> index 105597a..af919b1 100644
-> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
-> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> @@ -412,6 +412,12 @@ static bool pwrap_is_fsm_vldclr(struct pmic_wrapper *wrp)
->         return PWRAP_GET_WACS_FSM(val) == PWRAP_WACS_FSM_WFVLDCLR;
->  }
->
-> +static inline void pwrap_leave_fsm_vldclr(struct pmic_wrapper *wrp)
-> +{
-> +       if (pwrap_is_fsm_vldclr(wrp))
-> +               pwrap_writel(wrp, 1, PWRAP_WACS2_VLDCLR);
-> +}
-> +
->  static bool pwrap_is_sync_idle(struct pmic_wrapper *wrp)
->  {
->         return pwrap_readl(wrp, PWRAP_WACS2_RDATA) & PWRAP_STATE_SYNC_IDLE0;
-> @@ -445,8 +451,18 @@ static int pwrap_write(struct pmic_wrapper *wrp, u32 adr, u32 wdata)
->         int ret;
->
->         ret = pwrap_wait_for_state(wrp, pwrap_is_fsm_idle);
-> -       if (ret)
-> +       if (ret) {
-> +               /*
-> +                * Timeout issue sometimes caused by the last read command
-> +                * failed because pmic wrap could not got the FSM_VLDCLR
-> +                * in time after finishing WACS2_CMD. It made state machine
-> +                * still on FSM_VLDCLR and timeout next time.
-> +                * Check the status of FSM and clear the vldclr to recovery the
-> +                * error.
-> +                */
-> +               pwrap_leave_fsm_vldclr(wrp);
->                 return ret;
-> +       }
->
->         pwrap_writel(wrp, (1 << 31) | ((adr >> 1) << 16) | wdata,
->                         PWRAP_WACS2_CMD);
-> @@ -459,8 +475,18 @@ static int pwrap_read(struct pmic_wrapper *wrp, u32 adr, u32 *rdata)
->         int ret;
->
->         ret = pwrap_wait_for_state(wrp, pwrap_is_fsm_idle);
-> -       if (ret)
-> +       if (ret) {
-> +               /*
-> +                * Timeout issue sometimes caused by the last read command
-> +                * failed because pmic wrap could not got the FSM_VLDCLR
-> +                * in time after finishing WACS2_CMD. It made state machine
-> +                * still on FSM_VLDCLR and timeout next time.
-> +                * Check the status of FSM and clear the vldclr to recovery the
-> +                * error.
-> +                */
-> +               pwrap_leave_fsm_vldclr(wrp);
->                 return ret;
-> +       }
->
->         pwrap_writel(wrp, (adr >> 1) << 16, PWRAP_WACS2_CMD);
->
-> --
-> 1.9.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+On 01/04, Nicolas Pitre wrote:
+> On Mon, 4 Jan 2016, Stephen Boyd wrote:
+> > 
+> > I can update the patches to be based on this patch here and
+> > handle the conditional branches and tail call optimization cases
+> > by adding some safety checks like we have for the ftrace branch
+> > patching. But I'd rather not do that work unless we all agree
+> > that it's worthwhile pursuing it.
+> > 
+> > Is there still any concern about the benefit of patching each
+> > call site vs. patching the functions? The micro benchmark seems
+> > to show some theoretical improvement on cortex-a7 and I can run
+> > it on Scorpion and Krait processors to look for any potential
+> > benefits there, but I'm not sure of any good kernel benchmark for
+> > this. If it will be rejected due to complexity vs. benefit
+> > arguments I'd rather work on something else.
+> 
+> You could run the benchmark on Scorpion and Krait to start with. If 
+> there is no improvement what so ever like on A15's then the answer might 
+> be rather simple.
+> 
 
+So running the benchmark on Scorpion is not useful because we
+don't have the idiv instruction there. On Krait I get the
+following results. I ran this on a dragonboard apq8074 with
+maxcpus=1 on the kernel command line.
 
-Tested-by: Ricky Liang <jcliang@chromium.org>
+Testing INLINE_DIV ...
+real    0m 13.56s
+user    0m 13.56s
+sys     0m 0.00s
 
-On our test platform this patch fixes PMIC communication erros.
+Testing PATCHED_DIV ...
+real    0m 15.15s
+user    0m 15.14s
+sys     0m 0.00s
+
+Testing OUTOFLINE_DIV ...
+real    0m 18.09s
+user    0m 18.09s
+sys     0m 0.00s
+
+Testing LIBGCC_DIV ...
+real    0m 24.26s
+user    0m 24.25s
+sys     0m 0.00s
+
+It looks like the branch actually costs us some time here.
+Patching isn't as good as the compiler inserting the instruction
+itself, but it is better than branching to the division routine.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
