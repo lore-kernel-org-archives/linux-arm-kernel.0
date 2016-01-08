@@ -1,21 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 08 Jan 2016 13:53:29 +0100
-Subject: [PATCH] ARM: multi_v7_defconfig: Add rockchip audio support
-In-Reply-To: <1452255406-2439-1-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1452255406-2439-1-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <4970673.6FENizv1M6@wuerfel>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Fri, 8 Jan 2016 12:56:15 +0000
+Subject: [PATCH v8 20/20] KVM: ARM64: Add a new kvm ARM PMU device
+In-Reply-To: <568FA861.1080307@linaro.org>
+References: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>
+ <1450771695-11948-21-git-send-email-zhaoshenglong@huawei.com>
+ <CAFEAcA_MDiOphseZ7RGNE3G=4ZDF5SFV5krOjanPbVuhgg9gnQ@mail.gmail.com>
+ <568E7AF1.9040103@huawei.com>
+ <CAFEAcA-Qcda7TSFLSeykLHqZYdP6tYdEjPe2uHN6f_+omqWFZg@mail.gmail.com>
+ <568F27A8.80808@huawei.com>
+ <CAFEAcA8DO5VksiP55vnuOD3NERJTfr1q=une4n6N=Oj8JUa1_A@mail.gmail.com>
+ <568FA861.1080307@linaro.org>
+Message-ID: <CAFEAcA9O7WUtPzETvjAwHQeJ8h65bxTjsYtr5_McE26k-5rdUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 08 January 2016 13:16:46 Sjoerd Simons wrote:
-> As the rockchip SPDIF driver landed for 4.4 and the required clock
-> patches to make it work properly are scheduled for the 4.5 merge window
-> it seems time to support for audio device found on rockchip boards in
-> the defconfig as well.
-> 
-> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-> 
+On 8 January 2016 at 12:15, Shannon Zhao <shannon.zhao@linaro.org> wrote:
+> Firstly, userspace will call kvm device ioctl to create the PMU device, if
+> it fails it will return an error.
+> Secondly, userspace will call SET_DEVICE_ATTR ioctl to configure the PMU irq
+> number. If the irq is invalid, this will return an error and the userspace
+> will stop if it takes care the error. If the irq is valid, the PMU is well
+> initialized.
+>
+> If userspace doesn't call SET_ATTR ioctl to configure the PMU irq, the PMU
+> is not well initialized and guest can't use the PMU.
 
-Applied to next/defconfig with Heiko's Ack as discussed on IRC.
+Yes, this is my point. If you require userspace to do:
+ * create PMU device
+ * configure PMU device via SET_DEVICE_ATTR
+ * complete init of PMU device via a KVM_DEV_ARM_PMU_CTRL_INIT attr
 
-	Arnd
+then any bugs on the userspace side where it isn't configuring
+correctly can be easily caught, and will turn into a "VM fails
+to start with helpful error message", rather than "VM starts but
+doesn't work in an obscure way".
+
+This is particularly important for devices which have userspace
+visible registers, because userspace will also want to be able
+to read and write state of those registers before first vcpu run.
+If there is no "init is complete" ioctl then the kernel code ends
+up having to guess when init has completed for various entry points
+where the guest does something else (register access, vcpu start, etc).
+
+It might happen to not be so important for the PMU, but I think it
+would be very useful if we have a pattern where every device that
+is created via this API works in the same way (and it means that if
+we end up extending the PMU in future we will already have the API
+in place and don't need to worry about legacy userspace).
+
+Speaking of userspace access to registers, what is the intended API
+for migrating the PMU register state ?
+
+thanks
+-- PMM
