@@ -1,187 +1,75 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 8 Jan 2016 13:44:23 +0800
-Subject: [RFC PATCH 1/2] USB: core: let USB device know device node
+Date: Fri, 8 Jan 2016 13:44:24 +0800
+Subject: [RFC PATCH 2/2] usb: Example for how to use device node at usb device
+ driver
 In-Reply-To: <1452231864-11171-1-git-send-email-peter.chen@freescale.com>
 References: <1452231864-11171-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1452231864-11171-2-git-send-email-peter.chen@freescale.com>
+Message-ID: <1452231864-11171-3-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Although most of USB devices are hot-plug's, there are still some devices
-are hard wired on the board, eg, for HSIC and SSIC interface USB devices.
-If these kinds of USB devices are multiple functions, and they can supply
-other interfaces like i2c, gpios for other devices, we may need to
-descirbe these at device tree.
-
-In this commit, it uses "reg" in dts as port number to match the port
-number decided by USB core, if they are the same, then the device node
-is for the device we are creating for USB core.
+In this example, we take HUB driver as an example to show how
+to get properties in USB device driver if this device has device
+node.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- .../devicetree/bindings/usb/usb-device.txt         |  8 ++++
- drivers/usb/core/Makefile                          |  2 +-
- drivers/usb/core/of.c                              | 48 ++++++++++++++++++++++
- drivers/usb/core/usb.c                             |  8 +++-
- include/linux/usb.h                                |  2 +
- include/linux/usb/of.h                             |  6 +++
- 6 files changed, 71 insertions(+), 3 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/usb/usb-device.txt
- create mode 100644 drivers/usb/core/of.c
+ arch/arm/boot/dts/imx6sx-sdb.dtsi | 9 +++++++++
+ drivers/usb/core/hub.c            | 8 ++++++++
+ 2 files changed, 17 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/usb/usb-device.txt b/Documentation/devicetree/bindings/usb/usb-device.txt
-new file mode 100644
-index 0000000..d35facd
---- /dev/null
-+++ b/Documentation/devicetree/bindings/usb/usb-device.txt
-@@ -0,0 +1,8 @@
-+Generic USB Device Properties
+diff --git a/arch/arm/boot/dts/imx6sx-sdb.dtsi b/arch/arm/boot/dts/imx6sx-sdb.dtsi
+index 94ac400..fe0fd95 100644
+--- a/arch/arm/boot/dts/imx6sx-sdb.dtsi
++++ b/arch/arm/boot/dts/imx6sx-sdb.dtsi
+@@ -275,6 +275,15 @@
+ 	vbus-supply = <&reg_usb_otg2_vbus>;
+ 	dr_mode = "host";
+ 	status = "okay";
 +
-+Usually, we only use device tree for hard wired USB device. 
-+The reference binding doc is from:
-+http://playground.sun.com/1275/bindings/usb/usb-1_0.ps.
++	#address-cells = <1>;
++	#size-cells = <0>;
++	hub: genesys at 01 {
++		compatible = "05e3,0608";
++		reg = <0x01>;
++		delay-duration-us = <50>;
++	};
 +
-+Required properties:
-+- reg: the port number which this device is connecting to.
-diff --git a/drivers/usb/core/Makefile b/drivers/usb/core/Makefile
-index 2f6f932..9780877 100644
---- a/drivers/usb/core/Makefile
-+++ b/drivers/usb/core/Makefile
-@@ -5,7 +5,7 @@
- usbcore-y := usb.o hub.o hcd.o urb.o message.o driver.o
- usbcore-y += config.o file.o buffer.o sysfs.o endpoint.o
- usbcore-y += devio.o notify.o generic.o quirks.o devices.o
--usbcore-y += port.o
-+usbcore-y += port.o of.o
+ };
  
- usbcore-$(CONFIG_PCI)		+= hcd-pci.o
- usbcore-$(CONFIG_ACPI)		+= usb-acpi.o
-diff --git a/drivers/usb/core/of.c b/drivers/usb/core/of.c
-new file mode 100644
-index 0000000..008ae6a
---- /dev/null
-+++ b/drivers/usb/core/of.c
-@@ -0,0 +1,48 @@
-+/*
-+ * of.c		The helpers for hcd device tree support
-+ *
-+ * Copyright (C) 2016 Freescale Semiconductor, Inc.
-+ * Author: Peter Chen <peter.chen@freescale.com>
-+ *
-+ * This program is free software: you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2  of
-+ * the License as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/moduleparam.h>
+ &usdhc2 {
+diff --git a/drivers/usb/core/hub.c b/drivers/usb/core/hub.c
+index 4c77001..1babfd4 100644
+--- a/drivers/usb/core/hub.c
++++ b/drivers/usb/core/hub.c
+@@ -27,6 +27,7 @@
+ #include <linux/random.h>
+ #include <linux/pm_qos.h>
+ #include <linux/of_platform.h>
 +#include <linux/of.h>
-+
-+/**
-+ * usb_of_find_node - Find the device node match port number
-+ * @dev: the parent device node
-+ * @portnum: the port number which device is connecting 
-+ *
-+ * Find the node from device tree according to its port number.
-+ *
-+ * Return: On success, a pointer to the device node, %NULL on failure.
-+ */
-+struct device_node *usb_of_find_node(struct device_node *parent, int portnum)
-+{
-+	struct device_node *node;
-+	u32 port;
-+
-+	for_each_child_of_node(parent, node) {
-+		if (!of_property_read_u32(node, "reg", &port)) {
-+			if (port == portnum)
-+				return node;
-+		}
+ 
+ #include <asm/uaccess.h>
+ #include <asm/byteorder.h>
+@@ -1748,6 +1749,7 @@ static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
+ 	struct usb_device *hdev;
+ 	struct usb_hub *hub;
+ 	int ret;
++	u32 duration_us = 0;
+ 
+ 	desc = intf->cur_altsetting;
+ 	hdev = interface_to_usbdev(intf);
+@@ -1873,6 +1875,12 @@ descriptor_error:
+ 		return ret;
+ 	}
+ 
++	of_property_read_u32(hdev->dev.of_node, "delay-duration-us", &duration_us);
++	if (duration_us > 0) {
++		usleep_range(duration_us, duration_us + 10);
++		dev_info(&hdev->dev, "The delay is %d us\n", duration_us);
 +	}
 +
-+	return NULL;
-+}
-+EXPORT_SYMBOL_GPL(usb_of_find_node);
-+
-diff --git a/drivers/usb/core/usb.c b/drivers/usb/core/usb.c
-index 77e4c9b..211cb6e 100644
---- a/drivers/usb/core/usb.c
-+++ b/drivers/usb/core/usb.c
-@@ -36,6 +36,7 @@
- #include <linux/mutex.h>
- #include <linux/workqueue.h>
- #include <linux/debugfs.h>
-+#include <linux/usb/of.h>
+ 	if (hub_configure(hub, endpoint) >= 0)
+ 		return 0;
  
- #include <asm/io.h>
- #include <linux/scatterlist.h>
-@@ -502,11 +503,14 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent,
- 	dev->connect_time = jiffies;
- 	dev->active_duration = -jiffies;
- #endif
--	if (root_hub)	/* Root hub always ok [and always wired] */
-+	if (root_hub) {	/* Root hub always ok [and always wired] */
- 		dev->authorized = 1;
--	else {
-+		dev->of_node = bus->controller->of_node;
-+	} else {
- 		dev->authorized = !!HCD_DEV_AUTHORIZED(usb_hcd);
- 		dev->wusb = usb_bus_is_wusb(bus) ? 1 : 0;
-+		dev->dev.of_node = usb_of_find_node
-+			(parent->of_node, dev->portnum);
- 	}
- 	return dev;
- }
-diff --git a/include/linux/usb.h b/include/linux/usb.h
-index 89533ba..a3a0b07 100644
---- a/include/linux/usb.h
-+++ b/include/linux/usb.h
-@@ -21,6 +21,7 @@
- #include <linux/sched.h>	/* for current && schedule_timeout */
- #include <linux/mutex.h>	/* for struct mutex */
- #include <linux/pm_runtime.h>	/* for runtime PM */
-+#include <linux/of.h>		/* for device tree */
- 
- struct usb_device;
- struct usb_driver;
-@@ -616,6 +617,7 @@ struct usb_device {
- 	struct usb3_lpm_parameters u1_params;
- 	struct usb3_lpm_parameters u2_params;
- 	unsigned lpm_disable_count;
-+	struct device_node	*of_node; /* associated device tree node */
- };
- #define	to_usb_device(d) container_of(d, struct usb_device, dev)
- 
-diff --git a/include/linux/usb/of.h b/include/linux/usb/of.h
-index 974bce9..94340cb 100644
---- a/include/linux/usb/of.h
-+++ b/include/linux/usb/of.h
-@@ -16,6 +16,7 @@ enum usb_dr_mode of_usb_get_dr_mode_by_phy(struct device_node *phy_np);
- bool of_usb_host_tpl_support(struct device_node *np);
- int of_usb_update_otg_caps(struct device_node *np,
- 			struct usb_otg_caps *otg_caps);
-+struct device_node *usb_of_find_node(struct device_node *parent, int portnum);
- #else
- static inline enum usb_dr_mode
- of_usb_get_dr_mode_by_phy(struct device_node *phy_np)
-@@ -31,6 +32,11 @@ static inline int of_usb_update_otg_caps(struct device_node *np,
- {
- 	return 0;
- }
-+struct inline device_node *usb_of_find_node(struct device_node *parent,
-+				int portnum)
-+{
-+	return NULL;
-+}
- #endif
- 
- #if IS_ENABLED(CONFIG_OF) && IS_ENABLED(CONFIG_USB_SUPPORT)
 -- 
 1.9.1
