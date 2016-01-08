@@ -1,176 +1,65 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu,  7 Jan 2016 16:03:32 -0800
-Subject: [PATCH 3/4] drivers: ata: wake port before DMA stop for ALPM
-In-Reply-To: <1452211413-1350-1-git-send-email-f.fainelli@gmail.com>
-References: <1452211413-1350-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1452211413-1350-4-git-send-email-f.fainelli@gmail.com>
+From: dianders@chromium.org (Douglas Anderson)
+Date: Thu,  7 Jan 2016 16:36:42 -0800
+Subject: [PATCH v4 0/3] dma-mapping: Patches for speeding up allocation
+Message-ID: <1452213405-22942-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Danesh Petigara <dpetigara@broadcom.com>
+This series of 3 patches will speed up memory allocation in dma-mapping
+quite a bit.
 
-The AHCI driver code stops and starts port DMA engines at will
-without considering the power state of the particular port. The
-AHCI specification isn't very clear on how to handle this scenario,
-leaving implementation open to interpretation.
+The first patch ("ARM: dma-mapping: Optimize allocation") is hopefully
+not terribly controversial: it merely doesn't try as hard to allocate
+big chunks once it gets the first failure.  Since it's unlikely that
+further big chunks will help (they're not likely to be virtually aligned
+anyway), this should give a big speedup with no real regression to speak
+of.  Yes, things could be made better, but this seems like a sane start.
 
-Broadcom's STB SATA host controller is unable to handle port DMA
-controller restarts when the port in question is in low power mode.
-When a port enters partial or slumber mode, it's PHY is powered down.
-When a controller restart is requested, the controller's internal
-state machine expects the PHY to be brought back up by software which
-never happens in this case, resulting in failures.
+The second patch ("common: DMA-mapping: add DMA_ATTR_NOHUGEPAGE
+attribute") models MADV_NOHUGEPAGE as I understand it.  Hopefully folks
+are happy with following that lead.  It does nothing by itself.
 
-To avoid this situation, logic is added to manually wake up the port
-just before it's DMA engine is stopped, if the port happens to be in
-a low power state. HBA initiated power management ensures that the port
-eventually returns to it's configured low power state, when the link is
-idle (as per the conditions listed in the spec). A new host flag is also
-added to ensure this logic is only exercised for hosts with the above
-limitation.
+The third patch ("ARM: dma-mapping: Use DMA_ATTR_NOHUGEPAGE hint to
+optimize allocation") simply applies the 2nd patch.  Again it's pretty
+simple.  ...and again it does nothing by itself.
 
-Signed-off-by: Danesh Petigara <dpetigara@broadcom.com>
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- drivers/ata/ahci.h         |  6 ++++++
- drivers/ata/ahci_brcmstb.c |  1 +
- drivers/ata/libahci.c      | 52 ++++++++++++++++++++++++++++++++++++++++++++++
- drivers/ata/libata-core.c  |  1 +
- include/linux/libata.h     |  4 ++++
- 5 files changed, 64 insertions(+)
+Notably missing from this series is the fourth patch that adds teeth to
+the second and third.  You can find that out of tree at
+<https://chromium-review.googlesource.com/#/c/320498/>.  Unfortunately
+the rk3288_vpu, which is what I'm working on, is out of tree.
 
-diff --git a/drivers/ata/ahci.h b/drivers/ata/ahci.h
-index a4faa438889c..03453e6b7d9d 100644
---- a/drivers/ata/ahci.h
-+++ b/drivers/ata/ahci.h
-@@ -198,6 +198,12 @@ enum {
- 	PORT_CMD_ICC_PARTIAL	= (0x2 << 28), /* Put i/f in partial state */
- 	PORT_CMD_ICC_SLUMBER	= (0x6 << 28), /* Put i/f in slumber state */
- 
-+	/* PORT SCR STAT bits */
-+	PORT_SCR_STAT_IPM_MASK	  = (0xf << 8), /* i/f IPM state mask */
-+	PORT_SCR_STAT_IPM_ACTIVE  = (0x1 << 8), /* i/f in active state */
-+	PORT_SCR_STAT_IPM_PARTIAL = (0x2 << 8), /* i/f in partial state */
-+	PORT_SCR_STAT_IPM_SLUMBER = (0x6 << 8), /* i/f in slumber state */
-+
- 	/* PORT_FBS bits */
- 	PORT_FBS_DWE_OFFSET	= 16, /* FBS device with error offset */
- 	PORT_FBS_ADO_OFFSET	= 12, /* FBS active dev optimization offset */
-diff --git a/drivers/ata/ahci_brcmstb.c b/drivers/ata/ahci_brcmstb.c
-index f51e3d9ba86e..e518a992e774 100644
---- a/drivers/ata/ahci_brcmstb.c
-+++ b/drivers/ata/ahci_brcmstb.c
-@@ -85,6 +85,7 @@ struct brcm_ahci_priv {
- 
- static const struct ata_port_info ahci_brcm_port_info = {
- 	.flags		= AHCI_FLAG_COMMON | ATA_FLAG_NO_DIPM,
-+	.flags2		= ATA_FLAG2_WAKE_BEFORE_STOP,
- 	.pio_mask	= ATA_PIO4,
- 	.udma_mask	= ATA_UDMA6,
- 	.port_ops	= &ahci_platform_ops,
-diff --git a/drivers/ata/libahci.c b/drivers/ata/libahci.c
-index d61740e78d6d..b6664c579f9a 100644
---- a/drivers/ata/libahci.c
-+++ b/drivers/ata/libahci.c
-@@ -595,6 +595,58 @@ int ahci_stop_engine(struct ata_port *ap)
- 	void __iomem *port_mmio = ahci_port_base(ap);
- 	u32 tmp;
- 
-+	/*
-+	 * On some controllers, stopping a port's DMA engine
-+	 * while the port is in ALPM state (partial or slumber)
-+	 * results in failures on subsequent DMA engine starts.
-+	 * For those controllers, put the port back in active
-+	 * state before stopping it's DMA engine.
-+	 */
-+	if (ap->flags2 & ATA_FLAG2_WAKE_BEFORE_STOP) {
-+		u32 sts, retries = 10;
-+		struct ahci_host_priv *hpriv = ap->host->private_data;
-+
-+		if (!(hpriv->cap & HOST_CAP_ALPM))
-+			goto skip_wake_up;
-+
-+		tmp = readl(port_mmio + PORT_CMD);
-+		if (!(tmp & PORT_CMD_ALPE))
-+			goto skip_wake_up;
-+
-+		sts = readl(port_mmio + PORT_SCR_STAT) &
-+			PORT_SCR_STAT_IPM_MASK;
-+		if ((sts != PORT_SCR_STAT_IPM_PARTIAL) &&
-+		    (sts != PORT_SCR_STAT_IPM_SLUMBER))
-+			goto skip_wake_up;
-+
-+		tmp |= PORT_CMD_ICC_ACTIVE;
-+		writel(tmp, port_mmio + PORT_CMD);
-+
-+		do {
-+			/*
-+			 * The exit latency for partial state is upto 10usec
-+			 * whereas it is upto 10msec for slumber state. Use
-+			 * this information to choose appropriate waiting
-+			 * calls so the time spent in the loop is minimized.
-+			 */
-+			if (sts == PORT_SCR_STAT_IPM_PARTIAL)
-+				udelay(1);
-+			else
-+				ata_msleep(ap, 1);
-+			sts = readl(port_mmio + PORT_SCR_STAT) &
-+				PORT_SCR_STAT_IPM_MASK;
-+			if (sts == PORT_SCR_STAT_IPM_ACTIVE)
-+				break;
-+		} while (--retries);
-+
-+		if (!retries) {
-+			dev_err(ap->host->dev,
-+				"failed to wake up port\n");
-+			return -EIO;
-+		}
-+	}
-+
-+skip_wake_up:
- 	tmp = readl(port_mmio + PORT_CMD);
- 
- 	/* check if the HBA is idle */
-diff --git a/drivers/ata/libata-core.c b/drivers/ata/libata-core.c
-index 60e368610c74..c6117e1ad373 100644
---- a/drivers/ata/libata-core.c
-+++ b/drivers/ata/libata-core.c
-@@ -5803,6 +5803,7 @@ struct ata_host *ata_host_alloc_pinfo(struct device *dev,
- 		ap->mwdma_mask = pi->mwdma_mask;
- 		ap->udma_mask = pi->udma_mask;
- 		ap->flags |= pi->flags;
-+		ap->flags2 |= pi->flags2;
- 		ap->link.flags |= pi->link_flags;
- 		ap->ops = pi->port_ops;
- 
-diff --git a/include/linux/libata.h b/include/linux/libata.h
-index 600c1e0626a5..f278ca897274 100644
---- a/include/linux/libata.h
-+++ b/include/linux/libata.h
-@@ -236,6 +236,8 @@ enum {
- 
- 	/* bits 24:31 of ap->flags are reserved for LLD specific flags */
- 
-+	/* struct ata_port flags2 */
-+	ATA_FLAG2_WAKE_BEFORE_STOP = (1 << 0), /* wake link before DMA stop */
- 
- 	/* struct ata_port pflags */
- 	ATA_PFLAG_EH_PENDING	= (1 << 0), /* EH pending */
-@@ -812,6 +814,7 @@ struct ata_port {
- 	/* Flags owned by the EH context. Only EH should touch these once the
- 	   port is active */
- 	unsigned long		flags;	/* ATA_FLAG_xxx */
-+	unsigned long		flags2; /* ATA_FLAG2_xxx */
- 	/* Flags that change dynamically, protected by ap->lock */
- 	unsigned int		pflags; /* ATA_PFLAG_xxx */
- 	unsigned int		print_id; /* user visible unique port ID */
-@@ -996,6 +999,7 @@ struct ata_port_operations {
- 
- struct ata_port_info {
- 	unsigned long		flags;
-+	unsigned long		flags2;
- 	unsigned long		link_flags;
- 	unsigned long		pio_mask;
- 	unsigned long		mwdma_mask;
+All testing was done on the chromeos kernel-3.14.  Sanity (compile /
+boot) testing was done on a v4.4-rc6-based kernel.
+
+Also note that v2 of this series had an extra patch
+<https://patchwork.kernel.org/patch/7888861/> that would attempt to sort
+the allocation results to opportunistically get some extra alignment.  I
+dropped that, but it could be re-introduced if there was interest.  I
+found that it did give a little extra alignment sometimes, but maybe not
+enough to justify the extra complexity.  It also was a bit half-baked
+since it really should have tried harder to ensure alignment.
+
+Changes in v4:
+- renamed DMA_ATTR_SEQUENTIAL to DMA_ATTR_NOHUGEPAGE
+- added Marek's ack
+
+Changes in v3:
+- add DMA_ATTR_SEQUENTIAL attribute new for v3
+- Use DMA_ATTR_SEQUENTIAL hint patch new for v3.
+
+Changes in v2:
+- No longer just 1 page at a time, but gives up higher order quickly.
+- Only tries important higher order allocations that might help us.
+
+Douglas Anderson (3):
+  ARM: dma-mapping: Optimize allocation
+  common: DMA-mapping: add DMA_ATTR_NOHUGEPAGE attribute
+  ARM: dma-mapping: Use DMA_ATTR_NOHUGEPAGE hint to optimize allocation
+
+ Documentation/DMA-attributes.txt | 23 +++++++++++++++++++++++
+ arch/arm/mm/dma-mapping.c        | 38 ++++++++++++++++++++++++--------------
+ include/linux/dma-attrs.h        |  1 +
+ 3 files changed, 48 insertions(+), 14 deletions(-)
+
 -- 
-2.1.0
+2.6.0.rc2.230.g3dd15c0
