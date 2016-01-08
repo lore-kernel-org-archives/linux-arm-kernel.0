@@ -1,66 +1,62 @@
-From: dianders@chromium.org (Douglas Anderson)
-Date: Fri,  8 Jan 2016 15:05:32 -0800
-Subject: [PATCH v5 5/5] [media] s5p-mfc: Set DMA_ATTR_NO_HUGE_PAGE
-In-Reply-To: <1452294332-23415-1-git-send-email-dianders@chromium.org>
-References: <1452294332-23415-1-git-send-email-dianders@chromium.org>
-Message-ID: <1452294332-23415-6-git-send-email-dianders@chromium.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 09 Jan 2016 00:07:11 +0100
+Subject: ARM: SoC fixes for 4.4-rc
+Message-ID: <4470295.CVKI4nqEPx@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We do video allocation all the time and we need it to be fast.  Plus TLB
-efficiency isn't terribly important for video.
+Hi Linus,
 
-That means we want to set DMA_ATTR_NO_HUGE_PAGE.
+one last minute pull request here, only a few but all highly anticipated fixes
+so I hope we can still make it into the final release.
 
-See also the previous change ("ARM: dma-mapping: Use
-DMA_ATTR_NO_HUGE_PAGE hint to optimize allocation").
+The following changes since commit 80373d37bee562060ce4d3e5272b708e8db5d1fc:
 
-Signed-off-by: Douglas Anderson <dianders@chromium.org>
----
-Changes in v5:
-- s5p-mfc patch new for v5
+  ARM: tegra: Fix suspend hang on Tegra124 Chromebooks (2015-12-22 15:41:37 -0800)
 
-Changes in v4: None
-Changes in v3: None
-Changes in v2: None
+are available in the git repository at:
 
- drivers/media/platform/s5p-mfc/s5p_mfc.c | 13 +++++++++++--
- 1 file changed, 11 insertions(+), 2 deletions(-)
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
 
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-index 927ab4928779..7ea5d0d262bb 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-@@ -1095,6 +1095,7 @@ static int s5p_mfc_alloc_memdevs(struct s5p_mfc_dev *dev)
- /* MFC probe function */
- static int s5p_mfc_probe(struct platform_device *pdev)
- {
-+	DEFINE_DMA_ATTRS(attrs);
- 	struct s5p_mfc_dev *dev;
- 	struct video_device *vfd;
- 	struct resource *res;
-@@ -1164,12 +1165,20 @@ static int s5p_mfc_probe(struct platform_device *pdev)
- 		}
- 	}
- 
--	dev->alloc_ctx[0] = vb2_dma_contig_init_ctx(dev->mem_dev_l);
-+	/*
-+	 * We'll do mostly sequential access, so sacrifice TLB efficiency for
-+	 * faster allocation.
-+	 */
-+	dma_set_attr(DMA_ATTR_NO_HUGE_PAGE, &attrs);
-+
-+	dev->alloc_ctx[0] = vb2_dma_contig_init_ctx_attrs(dev->mem_dev_l,
-+							  &attrs);
- 	if (IS_ERR(dev->alloc_ctx[0])) {
- 		ret = PTR_ERR(dev->alloc_ctx[0]);
- 		goto err_res;
- 	}
--	dev->alloc_ctx[1] = vb2_dma_contig_init_ctx(dev->mem_dev_r);
-+	dev->alloc_ctx[1] = vb2_dma_contig_init_ctx_attrs(dev->mem_dev_r,
-+							  &attrs);
- 	if (IS_ERR(dev->alloc_ctx[1])) {
- 		ret = PTR_ERR(dev->alloc_ctx[1]);
- 		goto err_mem_init_ctx_1;
--- 
-2.6.0.rc2.230.g3dd15c0
+for you to fetch changes up to 841bcd2e5014f83ed99e88bd550645d8848ce19a:
+
+  Merge tag 'omap-for-v4.4/onenand-corruption' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into fixes (2016-01-08 17:46:45 +0100)
+
+----------------------------------------------------------------
+ARM: SoC fixes for 4.4-rc
+
+This is the final small set of ARM SoC bug fixes for linux-4.4,
+almost all regressions:
+
+OMAP:		data corruption on the Nokia N900 flash
+Allwinner:	Two defconfig change to get USB working again
+ARM Versatile:	Interrupt numbers gone bad after an older bug fix
+Nomadik:	Crashes from incorrect L2 cache settings
+VIA vt8500:	SD/MMC support on WM8650 never worked
+
+----------------------------------------------------------------
+Arnd Bergmann (1):
+      Merge tag 'omap-for-v4.4/onenand-corruption' of git://git.kernel.org/.../tmlind/linux-omap into fixes
+
+Linus Walleij (2):
+      ARM: nomadik: set latencies to 8 cycles
+      ARM: versatile: fix MMC/SD interrupt assignment
+
+Roman Volkov (1):
+      dts: vt8500: Add SDHC node to DTS file for WM8650
+
+Timo Sigurdsson (2):
+      ARM: Fix broken USB support in sunxi_defconfig
+      ARM: Fix broken USB support in multi_v7_defconfig for sunxi devices
+
+Tony Lindgren (1):
+      ARM: OMAP2+: Fix onenand rate detection to avoid filesystem corruption
+
+ arch/arm/boot/dts/ste-nomadik-stn8815.dtsi |  6 +++---
+ arch/arm/boot/dts/versatile-ab.dts         | 10 +++++++---
+ arch/arm/boot/dts/versatile-pb.dts         | 20 +++++++++++++++++++-
+ arch/arm/boot/dts/wm8650.dtsi              |  9 +++++++++
+ arch/arm/configs/multi_v7_defconfig        |  1 +
+ arch/arm/configs/sunxi_defconfig           |  1 +
+ arch/arm/mach-omap2/gpmc-onenand.c         | 14 +++++++++-----
+ 7 files changed, 49 insertions(+), 12 deletions(-)
