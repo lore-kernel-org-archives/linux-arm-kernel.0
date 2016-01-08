@@ -1,65 +1,34 @@
-From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
-Date: Fri, 8 Jan 2016 07:13:58 +0200
-Subject: [PATCH 2/2] memory: omap-gpmc: Add Kconfig option for debug
-In-Reply-To: <20160108022619.GS12777@atomide.com>
-References: <20160105041356.GE12777@atomide.com> <20160105084947.GG22661@pali>
- <20160105224929.GF12777@atomide.com> <20160106174039.GA14271@earth>
- <20160106174713.GL12777@atomide.com> <568D5669.4040801@gmail.com>
- <20160106182650.GM12777@atomide.com> <568D5F54.7040900@gmail.com>
- <20160107180700.GN12777@atomide.com> <568EDC8D.7070205@gmail.com>
- <20160108022619.GS12777@atomide.com>
-Message-ID: <568F4596.8020206@gmail.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Fri, 8 Jan 2016 13:44:22 +0800
+Subject: [RFC PATCH 0/2] USB: let the USB device know device node
+Message-ID: <1452231864-11171-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hi all,
 
-On  8.01.2016 04:26, Tony Lindgren wrote:
->
-> Yes it seems there's some other issue too. Maybe you can run git bisect
-> again and carry the fix along as an extra patch?
->
+For some hard wired USB devices[1], we may need to use device tree to
+describe them, the first patch is teach USB device to know device
+node, the second patch is an example to show how to get properties
+through device node at USB device (class) driver.
 
-No sane way to bisect, I don't really know what triggers the issue. 
-Neither it is triggered regularly. It might happen on the first reboot 
-or on the tenth, or ... And it looks like the problems happens sometimes 
-on oops too. Not to say that it seems I should have fully booted 
-userspace (so there is enough pressure on the ubi/mdt/nand subsystems), 
-which is impossible with upstream without some n900 specific patches :(
+[1] http://marc.info/?l=linux-usb&m=142772952730243&w=2
 
-Maybe we can get some ideas on what and where to look from ubifs people? 
-Though I don't know whom to cc, feel free to help :)
+Peter Chen (2):
+  USB: core: let USB device know device node
+  usb: Example for how to use device node at usb device driver
 
-My best bet aiui, is comparing what nokia omap1 kernel does vs upstream. 
-Or looking at the commit log in ubi/mtd/onenand - who knows, I might get 
-lucky once again the same way as with that phonet oops in 
-__netif_receive_skb_core.
+ .../devicetree/bindings/usb/usb-device.txt         |  8 ++++
+ arch/arm/boot/dts/imx6sx-sdb.dtsi                  |  9 ++++
+ drivers/usb/core/Makefile                          |  2 +-
+ drivers/usb/core/hub.c                             |  8 ++++
+ drivers/usb/core/of.c                              | 48 ++++++++++++++++++++++
+ drivers/usb/core/usb.c                             |  8 +++-
+ include/linux/usb.h                                |  2 +
+ include/linux/usb/of.h                             |  6 +++
+ 8 files changed, 88 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/usb/usb-device.txt
+ create mode 100644 drivers/usb/core/of.c
 
->
-> OK then it really seems like we do have another bug lurking around.
-
-:nod:
-
-> Maybe you can figure out an easier way to reproduce it?
->
-
-I doubt, but who knows.
-
->> The problem is that between NOLO and kernel there is u-boot. And even if I
->> am almost sure it doesn't touch onenand configs, I can't be absolutely sure.
->> So those timings are not 100% reliable IMO, though close to that.
->
-> Hmm yes I'm only booting with u-boot here as my device sits in my rack.
->
-
-I booted the device via flasher with initrd from the so-called rescueos 
-(https://n900.quitesimple.org/rescueOS/rescueOS-1.2/) - it provides 
-shell with tons of useful tools if your device is in bootloop etc. CS0 
-registers were the same as with u-boot, so it is not that one.
-
->
-> OK will push it out then.
->
-
-Thanks,
-Ivo
+-- 
+1.9.1
