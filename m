@@ -1,22 +1,33 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 08 Jan 2016 11:47:32 +0100
-Subject: [PATCH 1/2] ARM: versatile: add the syscon LEDs to the DT
-In-Reply-To: <1452002529-3335-2-git-send-email-linus.walleij@linaro.org>
+Date: Fri, 08 Jan 2016 11:48:23 +0100
+Subject: [PATCH 0/2] Add LEDs support for the ARM Versatile DT
+In-Reply-To: <1452002529-3335-1-git-send-email-linus.walleij@linaro.org>
 References: <1452002529-3335-1-git-send-email-linus.walleij@linaro.org>
- <1452002529-3335-2-git-send-email-linus.walleij@linaro.org>
-Message-ID: <6267161.VOui2c95BW@wuerfel>
+Message-ID: <4424714.7WQ7ShA7WE@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 January 2016 15:02:08 Linus Walleij wrote:
-> The device tree version of Versatile AP/PB never had LED support
-> so we are missing LEDs from our hardware boards. Add this as
-> syscon LEDs like we did for Integrator and Juno. We need to
-> spawn devices in the syscon with "simple-mfd" for this to work.
+On Tuesday 05 January 2016 15:02:07 Linus Walleij wrote:
+> This adds support for the board LEDs to the ARM Versatile device tree
+> version.
 > 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> I can't decice if this is a regression or not. The board file version
+> of Versatile supported the LEDs, the Device Tree version never did
+> until now.
+> 
+> The board file version of Versatile was deleted in
+> commit 16956fed35fecde2201e23458cda193526b19559
+> "ARM: versatile: switch to DT only booting and remove legacy code"
+> 
+> If we consider the DT version a full drop-in replacement for the
+> board file version, then this should go in as a regression fix. If
+> it is not, we can delay it to the next merge window.
+> 
+> Sending this to arm at kernel.org anyway so the ARM SoC maintainers can
+> decide.
 > 
 
-Applied to next/dt, thanks!
+It's really late, but I'd consider them sort-of fixes, and they seem
+rather harmless, so I've put them in.
 
 	Arnd
