@@ -1,55 +1,157 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Fri, 8 Jan 2016 12:56:15 +0000
-Subject: [PATCH v8 20/20] KVM: ARM64: Add a new kvm ARM PMU device
-In-Reply-To: <568FA861.1080307@linaro.org>
-References: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>
- <1450771695-11948-21-git-send-email-zhaoshenglong@huawei.com>
- <CAFEAcA_MDiOphseZ7RGNE3G=4ZDF5SFV5krOjanPbVuhgg9gnQ@mail.gmail.com>
- <568E7AF1.9040103@huawei.com>
- <CAFEAcA-Qcda7TSFLSeykLHqZYdP6tYdEjPe2uHN6f_+omqWFZg@mail.gmail.com>
- <568F27A8.80808@huawei.com>
- <CAFEAcA8DO5VksiP55vnuOD3NERJTfr1q=une4n6N=Oj8JUa1_A@mail.gmail.com>
- <568FA861.1080307@linaro.org>
-Message-ID: <CAFEAcA9O7WUtPzETvjAwHQeJ8h65bxTjsYtr5_McE26k-5rdUw@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 8 Jan 2016 21:03:09 +0800
+Subject: Armada XP (MV78460): BUG in netdevice.h with maxcpus=2
+In-Reply-To: <20160108204523.43b4d473@xhacker>
+References: <568F6A47.6010905@gmail.com>	<20160108182537.0a68630c@xhacker>
+ <20160108105721.GG19062@n2100.arm.linux.org.uk>
+ <20160108204523.43b4d473@xhacker>
+Message-ID: <20160108210309.5a728bd7@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 January 2016 at 12:15, Shannon Zhao <shannon.zhao@linaro.org> wrote:
-> Firstly, userspace will call kvm device ioctl to create the PMU device, if
-> it fails it will return an error.
-> Secondly, userspace will call SET_DEVICE_ATTR ioctl to configure the PMU irq
-> number. If the irq is invalid, this will return an error and the userspace
-> will stop if it takes care the error. If the irq is valid, the PMU is well
-> initialized.
->
-> If userspace doesn't call SET_ATTR ioctl to configure the PMU irq, the PMU
-> is not well initialized and guest can't use the PMU.
+On Fri, 8 Jan 2016 20:45:23 +0800
+Jisheng Zhang <jszhang@marvell.com> wrote:
 
-Yes, this is my point. If you require userspace to do:
- * create PMU device
- * configure PMU device via SET_DEVICE_ATTR
- * complete init of PMU device via a KVM_DEV_ARM_PMU_CTRL_INIT attr
+> Dear Russell,
+> 
+> On Fri, 8 Jan 2016 10:57:21 +0000 Russell King - ARM Linux wrote:
+> 
+> > On Fri, Jan 08, 2016 at 06:25:37PM +0800, Jisheng Zhang wrote:  
+> > > diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+> > > index ed622fa..e1242f4 100644
+> > > --- a/drivers/net/ethernet/marvell/mvneta.c
+> > > +++ b/drivers/net/ethernet/marvell/mvneta.c
+> > > @@ -2446,7 +2446,7 @@ static void mvneta_start_dev(struct mvneta_port *pp)
+> > >  	mvneta_port_enable(pp);
+> > >  
+> > >  	/* Enable polling on the port */
+> > > -	for_each_present_cpu(cpu) {
+> > > +	for_each_online_cpu(cpu) {
+> > >  		struct mvneta_pcpu_port *port = per_cpu_ptr(pp->ports, cpu);
+> > >  
+> > >  		napi_enable(&port->napi);
+> > > @@ -2472,7 +2472,7 @@ static void mvneta_stop_dev(struct mvneta_port *pp)
+> > >  
+> > >  	phy_stop(pp->phy_dev);
+> > >  
+> > > -	for_each_present_cpu(cpu) {
+> > > +	for_each_online_cpu(cpu) {
+> > >  		struct mvneta_pcpu_port *port = per_cpu_ptr(pp->ports, cpu);
+> > >  
+> > >  		napi_disable(&port->napi);
+> > > @@ -2907,7 +2907,7 @@ static int mvneta_stop(struct net_device *dev)
+> > >  	mvneta_stop_dev(pp);
+> > >  	mvneta_mdio_remove(pp);
+> > >  	unregister_cpu_notifier(&pp->cpu_notifier);
+> > > -	for_each_present_cpu(cpu)
+> > > +	for_each_online_cpu(cpu)
+> > >  		smp_call_function_single(cpu, mvneta_percpu_disable, pp, true);
+> > >  	free_percpu_irq(dev->irq, pp->ports);
+> > >  	mvneta_cleanup_rxqs(pp);    
+> > 
+> > I'm not convinced that this isn't racy - what happens if a CPU is
+> > brought online between unregister_cpu_notifier(&pp->cpu_notifier)
+> > and the following loop?  We'll end up calling mvneta_percpu_disable()
+> > for the new CPU - is that harmless?
+> > 
+> > Similarly, what if the online CPUs change between mvneta_stop_dev()
+> > and mvneta_stop(), and also what about hotplug CPU changes during
+> > the startup path?
+> > 
+> > Secondly, is there a reason for:
+> > 
+> > 	for_each_online_cpu(cpu)
+> > 		smp_call_function_single(cpu, ...)
+> > 
+> > as opposed to:
+> > 
+> > 	smp_call_function(mvneta_percpu_disable, pp, true);
+> >   
+> 
+> Yep, thanks for pointing out the race. Before sending out the patch, I prepared
+> another *wrong*(IMHO) patch to patch smp_prepare_cpus() in arch/arm/kernel/smp.c.
 
-then any bugs on the userspace side where it isn't configuring
-correctly can be easily caught, and will turn into a "VM fails
-to start with helpful error message", rather than "VM starts but
-doesn't work in an obscure way".
+Here is the patch. I think it could also fix the issue.
 
-This is particularly important for devices which have userspace
-visible registers, because userspace will also want to be able
-to read and write state of those registers before first vcpu run.
-If there is no "init is complete" ioctl then the kernel code ends
-up having to guess when init has completed for various entry points
-where the guest does something else (register access, vcpu start, etc).
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index b263613..f94c755 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -443,15 +443,31 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+ 	 */
+ 	if (max_cpus > ncores)
+ 		max_cpus = ncores;
+-	if (ncores > 1 && max_cpus) {
+-		/*
+-		 * Initialise the present map, which describes the set of CPUs
+-		 * actually populated at the present time. A platform should
+-		 * re-initialize the map in the platforms smp_prepare_cpus()
+-		 * if present != possible (e.g. physical hotplug).
+-		 */
+-		init_cpu_present(cpu_possible_mask);
+ 
++	/* Don't bother if we're effectively UP */
++	if (max_cpus <= 1)
++		return;
++
++	/*
++	 * Initialise the present map (which describes the set of CPUs
++	 * actually populated at the present time) and release the
++	 * secondaries from the bootloader.
++	 *
++	 * Make sure we online@most (max_cpus - 1) additional CPUs.
++	 */
++	max_cpus--;
++	for_each_possible_cpu(cpu) {
++		if (max_cpus == 0)
++			break;
++
++		if (cpu == smp_processor_id())
++			continue;
++
++		set_cpu_present(cpu, true);
++		max_cpus--;
++	}
++
++	if (ncores > 1 && max_cpus) {
+ 		/*
+ 		 * Initialise the SCU if there are more than one CPU
+ 		 * and let them know where to start.
 
-It might happen to not be so important for the PMU, but I think it
-would be very useful if we have a pattern where every device that
-is created via this API works in the same way (and it means that if
-we end up extending the PMU in future we will already have the API
-in place and don't need to worry about legacy userspace).
 
-Speaking of userspace access to registers, what is the intended API
-for migrating the PMU register state ?
-
-thanks
--- PMM
+> 
+> Here is the background:
+> I can reproduce this issue on arm but failed to reproduce it on arm64. The key
+> is what's present cpu.
+> 
+> let's assume a quad core system, boot with maxcpus=2, after booting.
+> 
+> on arm64, present cpus is cpu0, cpu1
+> 
+> on arm, present cpus is cpu0, cpu1, cpu2 and cpu3.
+> 
+> the arm core code requires every platform to update the present map in
+> platforms' smp_prepare_cpus(), but only two or three platforms do so.
+> 
+> Then get back to mvneta issue, during startup, mvneta_start_dev() calls
+> napi_enable() for each present cpu's port. If userspace ask for online
+> cpu2, mvneta_percpu_notifier() will call napi_enable() for cpu2 again,
+> so BUG_ON() is triggered.
+> 
+> I have two solutions:
+> 
+> 1. as the above patch did, then prevent the race as pointed out by
+> get_online_cpus().
+> 
+> 2. make arm platforms smp_prepare_cpus to update the present map or even
+> patch arm core smp_prepare_cpus().
+> 
+> What's the better solution? Could you please guide me?
+> 
+> Thanks in advance,
+> Jisheng
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
