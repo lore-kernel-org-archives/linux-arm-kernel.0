@@ -1,62 +1,184 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 8 Jan 2016 12:40:56 +0000
-Subject: [PATCH v2 12/13] arm64: add support for relocatable kernel
-In-Reply-To: <CAKv+Gu9rp945-1cfn1iz01WBi+H5sWxTQPLGPduvG__wxVdK3g@mail.gmail.com>
-References: <1451489172-17420-1-git-send-email-ard.biesheuvel@linaro.org>
- <1451489172-17420-13-git-send-email-ard.biesheuvel@linaro.org>
- <20160108123614.GC3097@leverpostej>
- <CAKv+Gu9rp945-1cfn1iz01WBi+H5sWxTQPLGPduvG__wxVdK3g@mail.gmail.com>
-Message-ID: <20160108124055.GD3097@leverpostej>
+Date: Fri,  8 Jan 2016 12:41:49 +0000
+Subject: [PATCH] arm64: split elf relocs into a separate header.
+In-Reply-To: <20160108123614.GC3097@leverpostej>
+References: <20160108123614.GC3097@leverpostej>
+Message-ID: <1452256909-30881-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 08, 2016 at 01:38:54PM +0100, Ard Biesheuvel wrote:
-> On 8 January 2016 at 13:36, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Wed, Dec 30, 2015 at 04:26:11PM +0100, Ard Biesheuvel wrote:
-> >> +
-> >> +     /*
-> >> +      * Iterate over each entry in the relocation table, and apply the
-> >> +      * relocations in place.
-> >> +      */
-> >> +     adr_l   x8, __dynsym_start              // start of symbol table
-> >> +     adr_l   x9, __reloc_start               // start of reloc table
-> >> +     adr_l   x10, __reloc_end                // end of reloc table
-> >> +
-> >> +0:   cmp     x9, x10
-> >> +     b.hs    2f
-> >> +     ldp     x11, x12, [x9], #24
-> >> +     ldr     x13, [x9, #-8]
-> >> +     cmp     w12, #R_AARCH64_RELATIVE
-> >> +     b.ne    1f
-> >> +     add     x13, x13, x23                   // relocate
-> >> +     str     x13, [x11, x23]
-> >> +     b       0b
-> >> +
-> >> +1:   cmp     w12, #R_AARCH64_ABS64
-> >> +     b.ne    0b
-> >> +     add     x12, x12, x12, lsl #1           // symtab offset: 24x top word
-> >> +     add     x12, x8, x12, lsr #(32 - 3)     // ... shifted into bottom word
-> >> +     ldrsh   w14, [x12, #6]                  // Elf64_Sym::st_shndx
-> >> +     ldr     x15, [x12, #8]                  // Elf64_Sym::st_value
-> >> +     cmp     w14, #-0xf                      // SHN_ABS (0xfff1) ?
-> >> +     add     x14, x15, x23                   // relocate
-> >> +     csel    x15, x14, x15, ne
-> >> +     add     x15, x13, x15
-> >> +     str     x15, [x11, x23]
-> >> +     b       0b
-> >
-> > We need to clean each of these relocated instructions to the PoU to be
-> > visible for I-cache fetches.
-> >
-> > As this is normal-cacheable we can post the maintenance with a DC CVAU
-> > immediately after the store (no barriers necessary), and rely on the DSB
-> > at 2f to complete all of those.
-> >
-> 
-> Dynamic relocations never apply to instructions, so i don't think that
-> is necessary here.
+Currently asm/elf.h contains a mixture of simple constants, C structure
+definitions, and some constants defined terms of constants from other
+headers (which are themselves mixtures).
 
-Ah, yes. I was being thick. Sorry for the noise!
+To enable the use of AArch64 ELF reloc constants from assembly code (s
+we will need for relocatable kernel support), we need an include without
+C structure definitions or incldues of other files with such
+definitions.
 
-Thanks,
-Mark.
+This patch factors out the relocs into a new header specifically for ELF
+reloc types.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/elf.h        | 54 +--------------------------
+ arch/arm64/include/asm/elf_relocs.h | 73 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 74 insertions(+), 53 deletions(-)
+ create mode 100644 arch/arm64/include/asm/elf_relocs.h
+
+diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+index faad6df..e4b3cdc 100644
+--- a/arch/arm64/include/asm/elf.h
++++ b/arch/arm64/include/asm/elf.h
+@@ -16,6 +16,7 @@
+ #ifndef __ASM_ELF_H
+ #define __ASM_ELF_H
+ 
++#include <asm/elf_relocs.h>
+ #include <asm/hwcap.h>
+ 
+ /*
+@@ -34,59 +35,6 @@ typedef elf_greg_t elf_gregset_t[ELF_NGREG];
+ typedef struct user_fpsimd_state elf_fpregset_t;
+ 
+ /*
+- * AArch64 static relocation types.
+- */
+-
+-/* Miscellaneous. */
+-#define R_ARM_NONE			0
+-#define R_AARCH64_NONE			256
+-
+-/* Data. */
+-#define R_AARCH64_ABS64			257
+-#define R_AARCH64_ABS32			258
+-#define R_AARCH64_ABS16			259
+-#define R_AARCH64_PREL64		260
+-#define R_AARCH64_PREL32		261
+-#define R_AARCH64_PREL16		262
+-
+-/* Instructions. */
+-#define R_AARCH64_MOVW_UABS_G0		263
+-#define R_AARCH64_MOVW_UABS_G0_NC	264
+-#define R_AARCH64_MOVW_UABS_G1		265
+-#define R_AARCH64_MOVW_UABS_G1_NC	266
+-#define R_AARCH64_MOVW_UABS_G2		267
+-#define R_AARCH64_MOVW_UABS_G2_NC	268
+-#define R_AARCH64_MOVW_UABS_G3		269
+-
+-#define R_AARCH64_MOVW_SABS_G0		270
+-#define R_AARCH64_MOVW_SABS_G1		271
+-#define R_AARCH64_MOVW_SABS_G2		272
+-
+-#define R_AARCH64_LD_PREL_LO19		273
+-#define R_AARCH64_ADR_PREL_LO21		274
+-#define R_AARCH64_ADR_PREL_PG_HI21	275
+-#define R_AARCH64_ADR_PREL_PG_HI21_NC	276
+-#define R_AARCH64_ADD_ABS_LO12_NC	277
+-#define R_AARCH64_LDST8_ABS_LO12_NC	278
+-
+-#define R_AARCH64_TSTBR14		279
+-#define R_AARCH64_CONDBR19		280
+-#define R_AARCH64_JUMP26		282
+-#define R_AARCH64_CALL26		283
+-#define R_AARCH64_LDST16_ABS_LO12_NC	284
+-#define R_AARCH64_LDST32_ABS_LO12_NC	285
+-#define R_AARCH64_LDST64_ABS_LO12_NC	286
+-#define R_AARCH64_LDST128_ABS_LO12_NC	299
+-
+-#define R_AARCH64_MOVW_PREL_G0		287
+-#define R_AARCH64_MOVW_PREL_G0_NC	288
+-#define R_AARCH64_MOVW_PREL_G1		289
+-#define R_AARCH64_MOVW_PREL_G1_NC	290
+-#define R_AARCH64_MOVW_PREL_G2		291
+-#define R_AARCH64_MOVW_PREL_G2_NC	292
+-#define R_AARCH64_MOVW_PREL_G3		293
+-
+-/*
+  * These are used to set parameters in the core dumps.
+  */
+ #define ELF_CLASS	ELFCLASS64
+diff --git a/arch/arm64/include/asm/elf_relocs.h b/arch/arm64/include/asm/elf_relocs.h
+new file mode 100644
+index 0000000..3f6b930
+--- /dev/null
++++ b/arch/arm64/include/asm/elf_relocs.h
+@@ -0,0 +1,73 @@
++/*
++ * Copyright (C) 2016 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __ASM_ELF_RELOCS_H
++#define __ASM_ELF_RELOCS_H
++
++/*
++ * AArch64 static relocation types.
++ */
++
++/* Miscellaneous. */
++#define R_ARM_NONE			0
++#define R_AARCH64_NONE			256
++
++/* Data. */
++#define R_AARCH64_ABS64			257
++#define R_AARCH64_ABS32			258
++#define R_AARCH64_ABS16			259
++#define R_AARCH64_PREL64		260
++#define R_AARCH64_PREL32		261
++#define R_AARCH64_PREL16		262
++
++/* Instructions. */
++#define R_AARCH64_MOVW_UABS_G0		263
++#define R_AARCH64_MOVW_UABS_G0_NC	264
++#define R_AARCH64_MOVW_UABS_G1		265
++#define R_AARCH64_MOVW_UABS_G1_NC	266
++#define R_AARCH64_MOVW_UABS_G2		267
++#define R_AARCH64_MOVW_UABS_G2_NC	268
++#define R_AARCH64_MOVW_UABS_G3		269
++
++#define R_AARCH64_MOVW_SABS_G0		270
++#define R_AARCH64_MOVW_SABS_G1		271
++#define R_AARCH64_MOVW_SABS_G2		272
++
++#define R_AARCH64_LD_PREL_LO19		273
++#define R_AARCH64_ADR_PREL_LO21		274
++#define R_AARCH64_ADR_PREL_PG_HI21	275
++#define R_AARCH64_ADR_PREL_PG_HI21_NC	276
++#define R_AARCH64_ADD_ABS_LO12_NC	277
++#define R_AARCH64_LDST8_ABS_LO12_NC	278
++
++#define R_AARCH64_TSTBR14		279
++#define R_AARCH64_CONDBR19		280
++#define R_AARCH64_JUMP26		282
++#define R_AARCH64_CALL26		283
++#define R_AARCH64_LDST16_ABS_LO12_NC	284
++#define R_AARCH64_LDST32_ABS_LO12_NC	285
++#define R_AARCH64_LDST64_ABS_LO12_NC	286
++#define R_AARCH64_LDST128_ABS_LO12_NC	299
++
++#define R_AARCH64_MOVW_PREL_G0		287
++#define R_AARCH64_MOVW_PREL_G0_NC	288
++#define R_AARCH64_MOVW_PREL_G1		289
++#define R_AARCH64_MOVW_PREL_G1_NC	290
++#define R_AARCH64_MOVW_PREL_G2		291
++#define R_AARCH64_MOVW_PREL_G2_NC	292
++#define R_AARCH64_MOVW_PREL_G3		293
++
++#endif /* __ASM_ELF_RELOCS_H */
++
+-- 
+1.9.1
