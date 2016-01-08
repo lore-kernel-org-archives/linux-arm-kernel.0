@@ -1,45 +1,64 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Fri, 08 Jan 2016 09:16:21 -0500
-Subject: [PATCH V2 22/23] pci, acpi: Match PCI config space accessors
- against platfrom specific quirks.
-In-Reply-To: <1450278993-12664-23-git-send-email-tn@semihalf.com>
-References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
- <1450278993-12664-23-git-send-email-tn@semihalf.com>
-Message-ID: <1452262581.31901.26.camel@redhat.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 8 Jan 2016 14:28:33 +0000
+Subject: [PATCH v2 1/2] dt-bindings: add power-domain header for RK3368
+ SoCs
+In-Reply-To: <1452278261-16864-2-git-send-email-zhangqing@rock-chips.com>
+References: <1452278261-16864-1-git-send-email-zhangqing@rock-chips.com>
+ <1452278261-16864-2-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <20160108142833.GF3097@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-12-16 at 16:16 +0100, Tomasz Nowicki wrote:
-> Some platforms may not be fully compliant with generic set of PCI config
-> accessors. For these cases we implement the way to overwrite accessors
-> set before PCI buses enumeration. Algorithm that overwrite accessors
-> matches against platform ID (DMI), domain and bus number, hopefully
-> enough for all cases. All quirks can be defined using:
-> DECLARE_ACPI_MCFG_FIXUP() and keep self contained.
+On Fri, Jan 08, 2016 at 10:37:40AM -0800, zhangqing wrote:
+> According to a description from TRM, add all the power domains.
 > 
-> example:
-> 
-> static const struct dmi_system_id yyy[] = {
-> ????????{
-> ????????????????.ident = "<Platform ident string>",
-> ????????????????.callback = <handler>,
-> ????????????????.matches = {
-> ????????????????????????DMI_MATCH(DMI_SYS_VENDOR, "<system vendor>"),
-> ????????????????????????DMI_MATCH(DMI_PRODUCT_NAME, "<product name>"),
-> ????????????????????????DMI_MATCH(DMI_PRODUCT_VERSION, "product version"),
-> ????????????????},
-> ????????},
-> ????????{ }
-> };
-> 
+> Signed-off-by: zhangqing <zhangqing@rock-chips.com>
+> ---
+>  include/dt-bindings/power/rk3368-power.h | 28 ++++++++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+>  create mode 100644 include/dt-bindings/power/rk3368-power.h
 
-This seems awkward to me in the case where the quirk is SoC-based and there
-may be multiple platforms affected. Needing a DECLARE_ACPI_MCFG_FIXUP for
-each platform using such a SoC (i.e. Mustang and Moonshot) doesn't seem
-right. In that case, I think it'd be better to check CPUID and possibly
-some SoC register to cover all platforms affected.
+You also need to update the related binding file, for the new compatible
+string.
 
-Also, there doesn't seem to be a way to connect a given quirk check to the
-MCFG/device requesting the ops. So if there is a platform with multiple PCIE
-roots and not all of them have quirks, how does one no whether to override the
-default ecam ops?
+Mark.
+
+> 
+> diff --git a/include/dt-bindings/power/rk3368-power.h b/include/dt-bindings/power/rk3368-power.h
+> new file mode 100644
+> index 0000000..93633d5
+> --- /dev/null
+> +++ b/include/dt-bindings/power/rk3368-power.h
+> @@ -0,0 +1,28 @@
+> +#ifndef __DT_BINDINGS_POWER_RK3368_POWER_H__
+> +#define __DT_BINDINGS_POWER_RK3368_POWER_H__
+> +
+> +/* VD_CORE */
+> +#define RK3368_PD_A53_L0	0
+> +#define RK3368_PD_A53_L1	1
+> +#define RK3368_PD_A53_L2	2
+> +#define RK3368_PD_A53_L3	3
+> +#define RK3368_PD_SCU_L		4
+> +#define RK3368_PD_A53_B0	5
+> +#define RK3368_PD_A53_B1	6
+> +#define RK3368_PD_A53_B2	7
+> +#define RK3368_PD_A53_B3	8
+> +#define RK3368_PD_SCU_B		9
+> +
+> +/* VD_LOGIC */
+> +#define RK3368_PD_BUS		10
+> +#define RK3368_PD_PERI		11
+> +#define RK3368_PD_VIO		12
+> +#define RK3368_PD_ALIVE		13
+> +#define RK3368_PD_VIDEO		14
+> +#define RK3368_PD_GPU_0		15
+> +#define RK3368_PD_GPU_1		16
+> +
+> +/* VD_PMU */
+> +#define RK3368_PD_PMU		17
+> +
+> +#endif
+> -- 
+> 1.9.1
+> 
+> 
