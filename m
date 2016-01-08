@@ -1,55 +1,51 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 8 Jan 2016 18:06:39 +0000
-Subject: [PATCH] arm64, pci, numa: Adding helper functions as required by
- pci
-In-Reply-To: <20160108180131.GB5354@localhost>
-References: <1450780730-13667-1-git-send-email-gkulkarni@caviumnetworks.com>
- <20160108180131.GB5354@localhost>
-Message-ID: <20160108180638.GF11228@arm.com>
+From: laura@labbott.name (Laura Abbott)
+Date: Fri, 8 Jan 2016 10:14:35 -0800
+Subject: ION DTS changes for HiKey in -next
+In-Reply-To: <20160108135552.GE3097@leverpostej>
+References: <20160107173744.GJ6588@sirena.org.uk>
+ <20160108050214.GD30293@kroah.com> <20160108124439.GL6588@sirena.org.uk>
+ <20160108135552.GE3097@leverpostej>
+Message-ID: <568FFC8B.3090101@labbott.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 08, 2016 at 12:01:31PM -0600, Bjorn Helgaas wrote:
-> On Tue, Dec 22, 2015 at 04:08:50PM +0530, Ganapatrao Kulkarni wrote:
-> > Adding helper functions and necessary code to make
-> > pci driver(pci-host-generic) numa aware.
-> > 
-> > This patch is on top of arm64-numa v7.
-> > http://www.spinics.net/lists/arm-kernel/msg460813.html
-> > 
-> > Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
-> > ---
-> >  arch/arm64/include/asm/numa.h       | 8 +++++---
-> >  arch/arm64/kernel/pci.c             | 8 ++++++++
-> >  drivers/pci/host/pci-host-generic.c | 1 +
-> >  3 files changed, 14 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/arch/arm64/include/asm/numa.h b/arch/arm64/include/asm/numa.h
-> > index b8c2a3f..1eca4db 100644
-> > --- a/arch/arm64/include/asm/numa.h
-> > +++ b/arch/arm64/include/asm/numa.h
-> > @@ -15,9 +15,11 @@
-> >  extern int __node_distance(int from, int to);
-> >  #define node_distance(a, b) __node_distance(a, b)
-> >  
-> > -/* dummy definitions for pci functions */
-> > -#define pcibus_to_node(node)	0
-> > -#define cpumask_of_pcibus(bus)	0
-> > +struct pci_bus;
-> > +extern int pcibus_to_node(struct pci_bus *bus);
-> > +#define cpumask_of_pcibus(bus)	(pcibus_to_node(bus) == -1 ?		\
-> > +				 cpu_all_mask :				\
-> > +				 cpumask_of_node(pcibus_to_node(bus)))
-> 
-> All the arch definitions of cpumask_of_pcibus() are pretty similar;
-> could they be made more generic?  At the very least, can you drop the
-> definition here and use the one in include/asm-generic/topology.h,
-> which is identical to what you're defining here?
+On 1/8/16 5:55 AM, Mark Rutland wrote:
+> On Fri, Jan 08, 2016 at 12:44:39PM +0000, Mark Brown wrote:
+>> On Thu, Jan 07, 2016 at 09:02:14PM -0800, Greg Kroah-Hartman wrote:
+>>> On Thu, Jan 07, 2016 at 05:37:44PM +0000, Mark Brown wrote:
+>>
+>>>> I was just looking at DTs in -next and noticed that there is a patch
+>>>> 59dfafd03fc (arm64: dts: Add dts files to enable ION on Hi6220 SoC)
+>>>> which adds at DT doing something for ION.  Are we sure this should be
+>>>> going into the main production DT?  The bindings haven't been reviewed
+>>>> as far as I can tell, the matching driver is only in staging and hasn't
+>>>> been posted upstream.
+>>
+>>> Isn't "staging" upstream enough for this?  :)
+>>
+>> I wouldn't have thought so, DTs are supposed to be an ABI so we want
+>> proper review and having had a quick glance this doesn't look like it's
+>> a hardware description so it's not clear to me it should be in DT at all.
+>
+> Indeed.
+>
+> The driver and the binding before that don't really belong either,
+> I would have NAK'd those on devicetree at vger.kernel.org, though it
+> appears I either missed them or they never made it to that list.
+>
+>  From my PoV there should not be a platform-specific ION binding. If we
+> need one at all, people should work on the proposed generic binding [1]
+> or figure out how to do this with the existing reserved-memory bindings.
+>
+> Thanks,
+> Mark.
+>
+> [1] https://lkml.org/lkml/2015/10/6/854
 
-+1 on that. I asked for exactly the same thing in my review of v7:
+I posted v2 back in November
+(http://article.gmane.org/gmane.linux.drivers.driver-project.devel/80475)
+but there wasn't much in the way of review comments. More feedback there
+would be appreciated or I can resend.
 
-  http://www.spinics.net/lists/arm-kernel/msg469592.html
-
-but it looks like I was just ignored.
-
-Will
+Thanks,
+Laura
