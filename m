@@ -1,33 +1,25 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 08 Jan 2016 11:48:23 +0100
-Subject: [PATCH 0/2] Add LEDs support for the ARM Versatile DT
-In-Reply-To: <1452002529-3335-1-git-send-email-linus.walleij@linaro.org>
-References: <1452002529-3335-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <4424714.7WQ7ShA7WE@wuerfel>
+Date: Fri, 08 Jan 2016 11:49:20 +0100
+Subject: [PATCH] ARM: zx_defconfig: remove CONFIG_MMC_DW_IDMAC
+In-Reply-To: <568B1E85.1040604@linaro.org>
+References: <1451877536-21603-1-git-send-email-shawn.lin@rock-chips.com>
+ <568B1E85.1040604@linaro.org>
+Message-ID: <3975644.savFXEa5eR@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 January 2016 15:02:07 Linus Walleij wrote:
-> This adds support for the board LEDs to the ARM Versatile device tree
-> version.
+On Tuesday 05 January 2016 09:38:13 Jun Nie wrote:
+> On 2016?01?04? 11:18, Shawn Lin wrote:
+> > dw_mmc driver never use this macro, so remove it from
+> > zx_defconfig
+> >
+> > Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+
+
 > 
-> I can't decice if this is a regression or not. The board file version
-> of Versatile supported the LEDs, the Device Tree version never did
-> until now.
-> 
-> The board file version of Versatile was deleted in
-> commit 16956fed35fecde2201e23458cda193526b19559
-> "ARM: versatile: switch to DT only booting and remove legacy code"
-> 
-> If we consider the DT version a full drop-in replacement for the
-> board file version, then this should go in as a regression fix. If
-> it is not, we can delay it to the next merge window.
-> 
-> Sending this to arm at kernel.org anyway so the ARM SoC maintainers can
-> decide.
+> Reviewed-by: Jun Nie <jun.nie@linaro.org>
 > 
 
-It's really late, but I'd consider them sort-of fixes, and they seem
-rather harmless, so I've put them in.
+Applied, thanks!
 
 	Arnd
