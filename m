@@ -1,33 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 08 Jan 2016 17:49:20 +0100
-Subject: [GIT PULL] urgent onenand file system corruption fix for n900
-In-Reply-To: <20160108163250.GT12777@atomide.com>
-References: <20160108163250.GT12777@atomide.com>
-Message-ID: <9046751.uROfOxQcxi@wuerfel>
+From: tj@kernel.org (Tejun Heo)
+Date: Fri, 8 Jan 2016 11:50:43 -0500
+Subject: [PATCH 4/4] libata: skip debounce delay on link resume
+In-Reply-To: <1452211413-1350-5-git-send-email-f.fainelli@gmail.com>
+References: <1452211413-1350-1-git-send-email-f.fainelli@gmail.com>
+ <1452211413-1350-5-git-send-email-f.fainelli@gmail.com>
+Message-ID: <20160108165043.GT1898@mtj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 08 January 2016 08:32:50 Tony Lindgren wrote:
-> Last minute urgent pull request to prevent file system corruption
-> on Nokia N900.
+On Thu, Jan 07, 2016 at 04:03:33PM -0800, Florian Fainelli wrote:
+> From: Danesh Petigara <dpetigara@broadcom.com>
 > 
-> Looks like we have a GPMC bus timing bug that has gone unnoticed
-> because of bootloader configured registers until few days ago. We
-> are not detecting the onenand clock rate properly unless we have
-> CONFIG_OMAP_GPMC_DEBUG set and this causes onenand corruption
-> that can be easily be reproduced.
+> The link resume logic uses a 200msec delay while debouncing
+> the SControl register. The rationale behind that delay is
+> to accommodate some PHYs that behave badly if their SStatus/
+> SControl registers are pounded immediately on resume.
+> The Broadcom STB SATA PHY does not seem to have this issue.
+> This patch introduces a new link flag that allows platforms
+> to skip the debounce delay if it isn't needed.
 > 
-> There seems to be also an additional bug still lurking around for
-> onenand corruption. But that is still being investigated and
-> it does not seem to be GPMC timings related.
-> 
-> Meanwhile, it would be good to get this fix into v4.4 to prevent
-> wrong timings from corrupting onenand.
-> 
+> Signed-off-by: Danesh Petigara <dpetigara@broadcom.com>
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 
-Pulled into fixes, thanks.
+Applied to libata/for-4.5.
 
-I'll try to get the fixes pull request out tonight, there are a
-small number of other fixes.
+Thanks.
 
-	Arnd
+-- 
+tejun
