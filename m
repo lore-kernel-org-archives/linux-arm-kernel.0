@@ -1,91 +1,59 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri,  8 Jan 2016 12:25:53 -0800
-Subject: [PATCH] pinctrl: qcom: spmi-mpp: Skip pullup on ULT type MPPs
-Message-ID: <1452284753-5450-1-git-send-email-sboyd@codeaurora.org>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 8 Jan 2016 14:31:02 -0600
+Subject: [PATCH 00/10] drivers/pci: avoid module_init in non-modular
+ host/pci*
+In-Reply-To: <20151215151624.GB2772@windriver.com>
+References: <1449970917-12633-1-git-send-email-paul.gortmaker@windriver.com>
+ <CAFiDJ5-Y8afg5kDRQLK1pain-k1kPQAn3vhWrVkB1ADPRHvx+A@mail.gmail.com>
+ <20151214091940.GA15126@ulmo.nvidia.com>
+ <3302340.SIljl1qYTl@wuerfel> <20151215151624.GB2772@windriver.com>
+Message-ID: <20160108203102.GH5354@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ULT type of MPPs don't have a pullup. Skip configuring the
-pullup on these types of pins.
+On Tue, Dec 15, 2015 at 10:16:24AM -0500, Paul Gortmaker wrote:
+> [Re: [PATCH 00/10] drivers/pci: avoid module_init in non-modular host/pci*] On 14/12/2015 (Mon 11:27) Arnd Bergmann wrote:
+> 
+> > On Monday 14 December 2015 10:19:40 Thierry Reding wrote:
+> > > > PCIe host driver that use fixup (DECLARE_PCI_FIXUP_*) can't use tristate.
+> > > > Fixup region is in kernel region and this region if not updated when
+> > > > loading a module.
+> > > 
+> > > Interesting, I hadn't thought about that. I suppose this means that the
+> > > module will end up containing an unused section with the fixup code. It
+> > > might be useful to add a way for that to trigger a warning at build
+> > > time.
+> > > 
+> > > Perhaps to fix this a mechanism could be introduced to add a table of
+> > > fixups to a host controller driver and that will get applied to all
+> > > children of the bridge. It could be problematic to cover all of the
+> > > different fixup stages, though.
+> > 
+> > I think a lot of the fixups shouldn't really be there in the first place,
+> > they are about stuff that we can fix up in the probe function, or that should
+> > be fixed up in the probe function with some appropriate core support added.
+> 
+> So, the feedback on this is a bit all over the map, leaving me unsure
+> what to do next.  And is the choice we make on a per board/bsp basis or
+> ideally across all platforms?  I see the choices as:
+> 
+> 1) do nothing; which IMHO is least desirable as it leaves the code
+> misrepresenting itself as modular; one of the key issues I wanted to fix
+> 
+> 2) use the patches I've sent ; then as they are genuinely made modular,
+> the person doing so essentially "patch -R" or reverts the change as
+> step one.  This has the advantage of solving the "we'll get to it
+> someday" issue if someday never comes.
+> 
+> 3) make them all tristate;  beat it with a stick until it compiles [M]
+> and modposts -- leaving the fixups and functional testing to people with
+> the boards and low level knowledge to make it _work_ as a module.  The
+> downside here is the code is still kind of misrepresenting itself as
+> modularly functional -- a ban of unloading might mitigate that some.
 
-Cc: Andy Gross <andy.gross@linaro.org>
-Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/pinctrl/qcom/pinctrl-spmi-mpp.c | 30 ++++++++++++++++++++----------
- 1 file changed, 20 insertions(+), 10 deletions(-)
+I'd like to preserve the mind-set that host controller drivers are
+*expected* to be modular, even if we aren't there yet.  I guess that
+means I'm in favor of option 3, at least for drivers that don't use
+fixups.
 
-diff --git a/drivers/pinctrl/qcom/pinctrl-spmi-mpp.c b/drivers/pinctrl/qcom/pinctrl-spmi-mpp.c
-index 2f18323571a6..2a3e5490a483 100644
---- a/drivers/pinctrl/qcom/pinctrl-spmi-mpp.c
-+++ b/drivers/pinctrl/qcom/pinctrl-spmi-mpp.c
-@@ -117,6 +117,7 @@
-  * @output_enabled: Set to true if MPP output logic is enabled.
-  * @input_enabled: Set to true if MPP input buffer logic is enabled.
-  * @paired: Pin operates in paired mode
-+ * @has_pullup: Pin has support to configure pullup
-  * @num_sources: Number of power-sources supported by this MPP.
-  * @power_source: Current power-source used.
-  * @amux_input: Set the source for analog input.
-@@ -134,6 +135,7 @@ struct pmic_mpp_pad {
- 	bool		output_enabled;
- 	bool		input_enabled;
- 	bool		paired;
-+	bool		has_pullup;
- 	unsigned int	num_sources;
- 	unsigned int	power_source;
- 	unsigned int	amux_input;
-@@ -477,11 +479,14 @@ static int pmic_mpp_config_set(struct pinctrl_dev *pctldev, unsigned int pin,
- 	if (ret < 0)
- 		return ret;
- 
--	val = pad->pullup << PMIC_MPP_REG_PULL_SHIFT;
-+	if (pad->has_pullup) {
-+		val = pad->pullup << PMIC_MPP_REG_PULL_SHIFT;
- 
--	ret = pmic_mpp_write(state, pad, PMIC_MPP_REG_DIG_PULL_CTL, val);
--	if (ret < 0)
--		return ret;
-+		ret = pmic_mpp_write(state, pad, PMIC_MPP_REG_DIG_PULL_CTL,
-+				     val);
-+		if (ret < 0)
-+			return ret;
-+	}
- 
- 	val = pad->amux_input & PMIC_MPP_REG_AIN_ROUTE_MASK;
- 
-@@ -534,7 +539,8 @@ static void pmic_mpp_config_dbg_show(struct pinctrl_dev *pctldev,
- 		seq_printf(s, " %-7s", pmic_mpp_functions[pad->function]);
- 		seq_printf(s, " vin-%d", pad->power_source);
- 		seq_printf(s, " %d", pad->aout_level);
--		seq_printf(s, " %-8s", biases[pad->pullup]);
-+		if (pad->has_pullup)
-+			seq_printf(s, " %-8s", biases[pad->pullup]);
- 		seq_printf(s, " %-4s", pad->out_value ? "high" : "low");
- 		if (pad->dtest)
- 			seq_printf(s, " dtest%d", pad->dtest);
-@@ -748,12 +754,16 @@ static int pmic_mpp_populate(struct pmic_mpp_state *state,
- 	pad->power_source = val >> PMIC_MPP_REG_VIN_SHIFT;
- 	pad->power_source &= PMIC_MPP_REG_VIN_MASK;
- 
--	val = pmic_mpp_read(state, pad, PMIC_MPP_REG_DIG_PULL_CTL);
--	if (val < 0)
--		return val;
-+	if (subtype != PMIC_MPP_SUBTYPE_ULT_4CH_NO_ANA_OUT &&
-+	    subtype != PMIC_MPP_SUBTYPE_ULT_4CH_NO_SINK) {
-+		val = pmic_mpp_read(state, pad, PMIC_MPP_REG_DIG_PULL_CTL);
-+		if (val < 0)
-+			return val;
- 
--	pad->pullup = val >> PMIC_MPP_REG_PULL_SHIFT;
--	pad->pullup &= PMIC_MPP_REG_PULL_MASK;
-+		pad->pullup = val >> PMIC_MPP_REG_PULL_SHIFT;
-+		pad->pullup &= PMIC_MPP_REG_PULL_MASK;
-+		pad->has_pullup = true;
-+	}
- 
- 	val = pmic_mpp_read(state, pad, PMIC_MPP_REG_AIN_CTL);
- 	if (val < 0)
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Bjorn
