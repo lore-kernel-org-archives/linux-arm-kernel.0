@@ -1,45 +1,66 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Fri, 8 Jan 2016 10:24:01 +0000
-Subject: [PATCH v8 20/20] KVM: ARM64: Add a new kvm ARM PMU device
-In-Reply-To: <568F27A8.80808@huawei.com>
-References: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>
- <1450771695-11948-21-git-send-email-zhaoshenglong@huawei.com>
- <CAFEAcA_MDiOphseZ7RGNE3G=4ZDF5SFV5krOjanPbVuhgg9gnQ@mail.gmail.com>
- <568E7AF1.9040103@huawei.com>
- <CAFEAcA-Qcda7TSFLSeykLHqZYdP6tYdEjPe2uHN6f_+omqWFZg@mail.gmail.com>
- <568F27A8.80808@huawei.com>
-Message-ID: <CAFEAcA8DO5VksiP55vnuOD3NERJTfr1q=une4n6N=Oj8JUa1_A@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 8 Jan 2016 11:25:14 +0100
+Subject: [PATCH v2 12/13] arm64: add support for relocatable kernel
+In-Reply-To: <568F8C9E.1010608@arm.com>
+References: <1451489172-17420-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1451489172-17420-13-git-send-email-ard.biesheuvel@linaro.org>
+ <568F8C9E.1010608@arm.com>
+Message-ID: <CAKv+Gu_-VHrPH90-UUSf+yQWhMomRaq3kFNwwiLTUrHsdHJT+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 January 2016 at 03:06, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+On 8 January 2016 at 11:17, James Morse <james.morse@arm.com> wrote:
+> Hi Ard!
+>
+> On 30/12/15 15:26, Ard Biesheuvel wrote:
+>> This adds support for runtime relocation of the kernel Image, by
+>> building it as a PIE (ET_DYN) executable and applying the dynamic
+>> relocations in the early boot code.
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>
+>> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+>> index 01a33e42ed70..ab582ee58b58 100644
+>> --- a/arch/arm64/kernel/head.S
+>> +++ b/arch/arm64/kernel/head.S
+>> @@ -243,6 +253,16 @@ ENDPROC(stext)
+>>  preserve_boot_args:
+>>       mov     x21, x0                         // x21=FDT
+>>
+>> +#ifdef CONFIG_ARM64_RELOCATABLE_KERNEL
+>> +     /*
+>> +      * Mask off the bits of the random value supplied in x1 so it can serve
+>> +      * as a KASLR displacement value which will move the kernel image to a
+>> +      * random offset in the lower half of the VMALLOC area.
+>> +      */
+>> +     mov     x23, #(1 << (VA_BITS - 2)) - 1
+>> +     and     x23, x23, x1, lsl #SWAPPER_BLOCK_SHIFT
+>> +#endif
+>
+> I've managed to make this fail to boot by providing a seed that caused
+> the kernel to overlap a 1G boundary on a 4K system.
+>
+
+Ah, yes. Thanks for spotting that.
+
+> (It looks like your v3 may have the same issue - but I haven't tested it.)
 >
 >
-> On 2016/1/7 22:56, Peter Maydell wrote:
->>>>> +  Errors:
->>>>> >>> +    -ENXIO: Unsupported attribute group
->>>>> >>> +    -EBUSY: The PMU overflow interrupt is already set
->>>>> >>> +    -ENODEV: Getting the PMU overflow interrupt number while it's not set
->>>>> >>> +    -EINVAL: Invalid vcpu_index or PMU overflow interrupt number supplied
->>>> >>
->>>> >> What happens if you create a PMU but then never set the IRQ number?
->>>> >> Is there a default or does the VM refuse to run or something?
->>>> >>
->>> > If userspace doesn't specify the irq number, the guest will not receive
->>> > the PMU interrupt because we check if the irq is initialized when we
->>> > inject the interrupt. But guest could still use the vPMU if QEMU
->>> > generates a proper DTB or ACPI.
->> So is it a valid use case to create a PMU with the interrupt not wired
->> up to anything? (If it's never valid it would be nice to diagnose it
->> rather than just silently letting the guest run but not work right.)
-> So how about adding a helper to check if the PMU is completely
-> initialized and if not, return trap_raz_wi when guest access PMU registers?
 
-That would still be letting the guest run and not work right.
+Yes, it does. It probably makes sense to sacrifice some entropy bits
+and simply round up the kaslr offset to a log2 upper bound of the
+kernel Image size, rather than hacking up some logic in assembly to
+test whether we are crossing a PMD/PUD boundary
 
-If we have an "I have now completed config" ioctl like the GIC does,
-then you could make that ioctl return an error if the config is not
-valid.
 
-thanks
--- PMM
+>> +
+>>       adr_l   x0, boot_args                   // record the contents of
+>>       stp     x21, x1, [x0]                   // x0 .. x3 at kernel entry
+>>       stp     x2, x3, [x0, #16]
+>
+>
+> Thanks!
+>
+> James
+>
