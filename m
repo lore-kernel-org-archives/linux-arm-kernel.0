@@ -1,51 +1,35 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Fri, 8 Jan 2016 16:16:37 +0800
-Subject: [PATCH] clk: mediatek: Allow changing PLL rate when it is off
-Message-ID: <1452240997-35316-1-git-send-email-jamesjj.liao@mediatek.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 08 Jan 2016 09:22:22 +0100
+Subject: [RFC PATCH 1/2] USB: core: let USB device know device node
+In-Reply-To: <1452231864-11171-2-git-send-email-peter.chen@freescale.com>
+References: <1452231864-11171-1-git-send-email-peter.chen@freescale.com>
+ <1452231864-11171-2-git-send-email-peter.chen@freescale.com>
+Message-ID: <11330516.E3pzCBVn95@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some modules may need to change its clock rate before turn on it.
-So changing PLL's rate when it is off should be allowed.
-This patch removes PLL enabled check before set rate, so that
-PLLs can set new frequency even if they are off.
+On Friday 08 January 2016 13:44:23 Peter Chen wrote:
+> +struct device_node *usb_of_find_node(struct device_node *parent, int portnum)
+> +{
+> +       struct device_node *node;
+> +       u32 port;
+> +
+> +       for_each_child_of_node(parent, node) {
+> +               if (!of_property_read_u32(node, "reg", &port)) {
+> +                       if (port == portnum)
+> +                               return node;
+> +               }
+> +       }
+> +
+> +       return NULL;
+> +}
+> +EXPORT_SYMBOL_GPL(usb_of_find_node);
 
-Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
----
- drivers/clk/mediatek/clk-pll.c | 9 ++-------
- 1 file changed, 2 insertions(+), 7 deletions(-)
+The implementation looks good to me, but I find the function name slightly
+confusing. We use "*find_node" or similar names in other subsystems to
+scan the entire tree, when this one just looks at the immediate children
+of the device.
 
-diff --git a/drivers/clk/mediatek/clk-pll.c b/drivers/clk/mediatek/clk-pll.c
-index 966cab1..8e31fae 100644
---- a/drivers/clk/mediatek/clk-pll.c
-+++ b/drivers/clk/mediatek/clk-pll.c
-@@ -91,9 +91,6 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
- 		int postdiv)
- {
- 	u32 con1, val;
--	int pll_en;
--
--	pll_en = readl(pll->base_addr + REG_CON0) & CON0_BASE_EN;
- 
- 	/* set postdiv */
- 	val = readl(pll->pd_addr);
-@@ -114,15 +111,13 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
- 
- 	con1 = readl(pll->base_addr + REG_CON1);
- 
--	if (pll_en)
--		con1 |= CON0_PCW_CHG;
-+	con1 |= CON0_PCW_CHG;
- 
- 	writel(con1, pll->base_addr + REG_CON1);
- 	if (pll->tuner_addr)
- 		writel(con1 + 1, pll->tuner_addr);
- 
--	if (pll_en)
--		udelay(20);
-+	udelay(20);
- }
- 
- /*
--- 
-1.9.1
+Maybe something like "usb_of_get_child_node()" instead?
+
+	Arnd
