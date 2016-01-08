@@ -1,28 +1,74 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 8 Jan 2016 15:44:23 +0000
-Subject: [PATCH] arm64: net: bpf: don't BUG() on large shifts
-In-Reply-To: <1452015543-6790-1-git-send-email-rabin@rab.in>
-References: <1452015543-6790-1-git-send-email-rabin@rab.in>
-Message-ID: <20160108154423.GC11228@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 8 Jan 2016 15:48:15 +0000
+Subject: [PATCH v2 11/13] arm64: allow kernel Image to be loaded anywhere
+ in physical memory
+In-Reply-To: <20160108153653.GB32692@leverpostej>
+References: <1451489172-17420-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1451489172-17420-12-git-send-email-ard.biesheuvel@linaro.org>
+ <20160108152738.GG16432@e104818-lin.cambridge.arm.com>
+ <20160108153653.GB32692@leverpostej>
+Message-ID: <20160108154814.GI16432@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 05, 2016 at 06:39:03PM +0100, Rabin Vincent wrote:
-> Attempting to generate UBFM/SBFM instructions with shifts that can't be
-> encoded in the immediate fields of the opcodes leads to a trigger of a
-> BUG() in the instruction generation code.  As the ARMv8 ARM says: "The
-> shift amounts must be in the range 0 to one less than the register width
-> of the instruction, inclusive."  Make the JIT reject unencodable shifts
-> instead of crashing.
+On Fri, Jan 08, 2016 at 03:36:54PM +0000, Mark Rutland wrote:
+> On Fri, Jan 08, 2016 at 03:27:38PM +0000, Catalin Marinas wrote:
+> > On Wed, Dec 30, 2015 at 04:26:10PM +0100, Ard Biesheuvel wrote:
+> > > +static void __init enforce_memory_limit(void)
+> > > +{
+> > > +	const phys_addr_t kbase = round_down(__pa(_text), MIN_KIMG_ALIGN);
+> > > +	u64 to_remove = memblock_phys_mem_size() - memory_limit;
+> > > +	phys_addr_t max_addr = 0;
+> > > +	struct memblock_region *r;
+> > > +
+> > > +	if (memory_limit == (phys_addr_t)ULLONG_MAX)
+> > > +		return;
+> > > +
+> > > +	/*
+> > > +	 * The kernel may be high up in physical memory, so try to apply the
+> > > +	 * limit below the kernel first, and only let the generic handling
+> > > +	 * take over if it turns out we haven't clipped enough memory yet.
+> > > +	 */
+> > > +	for_each_memblock(memory, r) {
+> > > +		if (r->base + r->size > kbase) {
+> > > +			u64 rem = min(to_remove, kbase - r->base);
+> > > +
+> > > +			max_addr = r->base + rem;
+> > > +			to_remove -= rem;
+> > > +			break;
+> > > +		}
+> > > +		if (to_remove <= r->size) {
+> > > +			max_addr = r->base + to_remove;
+> > > +			to_remove = 0;
+> > > +			break;
+> > > +		}
+> > > +		to_remove -= r->size;
+> > > +	}
+> > > +
+> > > +	memblock_remove(0, max_addr);
+> > > +
+> > > +	if (to_remove)
+> > > +		memblock_enforce_memory_limit(memory_limit);
+> > > +}
+> > 
+> > IIUC, this is changing the user expectations a bit. There are people
+> > using the mem= limit to hijack some top of the RAM for other needs
+> > (though they could do it in a saner way like changing the DT memory
+> > nodes).
+> 
+> Which will be hopelessly broken in the presence of KASLR, the kernel
+> being loaded at a different address, pages betting reserved differently
+> due to page size, etc.
 
-I moaned about those BUG_ONs when they were introduced:
+With KASLR disabled, I think we should aim for the existing behaviour as
+much as possible. The original aim of these patches was to relax the
+kernel image placement rules, to make it easier for boot loaders rather
+than completely randomising it.
 
-  https://lkml.org/lkml/2014/7/17/438
+With KASLR enabled, I agree it's hard to make any assumptions about what
+memory is available. But removing memory only from the top would also
+help with the point you already raised - keeping lower memory for
+devices with narrower DMA mask.
 
-The response then was that the verifier would catch these issues so
-there was nothing to worry about. Has something changed so that is no
-longer the case? Do we need to consider a different way of rejecting
-invalid instructions at the encoding stage rather than bringing down the
-kernel?
-
-Will
+-- 
+Catalin
