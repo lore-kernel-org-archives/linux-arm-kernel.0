@@ -1,93 +1,91 @@
-From: csotoalonso@gmail.com (Carlos Soto)
-Date: Fri, 8 Jan 2016 21:18:41 +0100
-Subject: imxfb does not turn on automatically
-In-Reply-To: <CAOMZO5CZ3aFGbfb39XoXpFvbn4TTrCbTHOXtQKruruCis3Ptvw@mail.gmail.com>
-References: <CAOMZO5CZ3aFGbfb39XoXpFvbn4TTrCbTHOXtQKruruCis3Ptvw@mail.gmail.com>
-Message-ID: <CAD7j7Q8gANUxM5zGmn3YyhUr9yZv02x4oxi_WWLnxCYemBRYZA@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri,  8 Jan 2016 12:25:53 -0800
+Subject: [PATCH] pinctrl: qcom: spmi-mpp: Skip pullup on ULT type MPPs
+Message-ID: <1452284753-5450-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-02-21 16:18 GMT+01:00 Fabio Estevam <festevam@gmail.com>:
->
-> Hi,
->
-> Carlos Soto uses a Karo mx25 and he noticed that the LCD only works if we do:
->
-> echo 1 > /sys/class/graphics/fb0/blank
-> echo 0 > /sys/class/graphics/fb0/blank
->
-> I can confirm the same on mx25pdk running 3.19 [1], but I could not
-> understand why the display does not start turned on by default.
->
-> [1] http://www.spinics.net/lists/arm-kernel/msg399949.html
->
-> Any ideas?
->
-> Thanks,
->
-> Fabio Estevam
+The ULT type of MPPs don't have a pullup. Skip configuring the
+pullup on these types of pins.
 
+Cc: Andy Gross <andy.gross@linaro.org>
+Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/pinctrl/qcom/pinctrl-spmi-mpp.c | 30 ++++++++++++++++++++----------
+ 1 file changed, 20 insertions(+), 10 deletions(-)
 
-
-Hi,
-I know it's been a long time since Fabio posted the issue but recently
-I had some time to work on it again, and I've narrowed it down a
-little.
-
-The problem seems to be related to the IPG clock used by the iMX25
-framebuffer. All clocks used by the fb are enabled in
-imxfb_enable_controller(...)
-
-...
-clk_prepare_enable(fbi->clk_ipg);
-clk_prepare_enable(fbi->clk_ahb);
-clk_prepare_enable(fbi->clk_per);
-fbi->enabled = true;
-
-...
-
-
-But if the IPG clock is disabled and enabled right after, the LCD
-works fine.
-
-The changes made in imxfb.c were:
-...
-
-clk_prepare_enable(fbi->clk_ipg);
-clk_disable_unprepare(fbi->clk_ipg);
-clk_prepare_enable(fbi->clk_ipg);
-
-clk_prepare_enable(fbi->clk_ahb);
-clk_prepare_enable(fbi->clk_per);
-fbi->enabled = true;
-
-...
-
-It was suggested by Fabio that this could be caused by a wrong clock
-reference count which prevented the IPG fb clock to be enabled, but
-I've checked in debugfs, and both enable_cnt  and prepare_cnt seem OK
-for all three FB clocks.
-
-So, I'm really stuck here. Any hints would be greatly appreciated.
-
-Thanks,
-Carlos Soto
-
-2015-02-21 16:18 GMT+01:00 Fabio Estevam <festevam@gmail.com>:
-> Hi,
->
-> Carlos Soto uses a Karo mx25 and he noticed that the LCD only works if we do:
->
-> echo 1 > /sys/class/graphics/fb0/blank
-> echo 0 > /sys/class/graphics/fb0/blank
->
-> I can confirm the same on mx25pdk running 3.19 [1], but I could not
-> understand why the display does not start turned on by default.
->
-> [1] http://www.spinics.net/lists/arm-kernel/msg399949.html
->
-> Any ideas?
->
-> Thanks,
->
-> Fabio Estevam
+diff --git a/drivers/pinctrl/qcom/pinctrl-spmi-mpp.c b/drivers/pinctrl/qcom/pinctrl-spmi-mpp.c
+index 2f18323571a6..2a3e5490a483 100644
+--- a/drivers/pinctrl/qcom/pinctrl-spmi-mpp.c
++++ b/drivers/pinctrl/qcom/pinctrl-spmi-mpp.c
+@@ -117,6 +117,7 @@
+  * @output_enabled: Set to true if MPP output logic is enabled.
+  * @input_enabled: Set to true if MPP input buffer logic is enabled.
+  * @paired: Pin operates in paired mode
++ * @has_pullup: Pin has support to configure pullup
+  * @num_sources: Number of power-sources supported by this MPP.
+  * @power_source: Current power-source used.
+  * @amux_input: Set the source for analog input.
+@@ -134,6 +135,7 @@ struct pmic_mpp_pad {
+ 	bool		output_enabled;
+ 	bool		input_enabled;
+ 	bool		paired;
++	bool		has_pullup;
+ 	unsigned int	num_sources;
+ 	unsigned int	power_source;
+ 	unsigned int	amux_input;
+@@ -477,11 +479,14 @@ static int pmic_mpp_config_set(struct pinctrl_dev *pctldev, unsigned int pin,
+ 	if (ret < 0)
+ 		return ret;
+ 
+-	val = pad->pullup << PMIC_MPP_REG_PULL_SHIFT;
++	if (pad->has_pullup) {
++		val = pad->pullup << PMIC_MPP_REG_PULL_SHIFT;
+ 
+-	ret = pmic_mpp_write(state, pad, PMIC_MPP_REG_DIG_PULL_CTL, val);
+-	if (ret < 0)
+-		return ret;
++		ret = pmic_mpp_write(state, pad, PMIC_MPP_REG_DIG_PULL_CTL,
++				     val);
++		if (ret < 0)
++			return ret;
++	}
+ 
+ 	val = pad->amux_input & PMIC_MPP_REG_AIN_ROUTE_MASK;
+ 
+@@ -534,7 +539,8 @@ static void pmic_mpp_config_dbg_show(struct pinctrl_dev *pctldev,
+ 		seq_printf(s, " %-7s", pmic_mpp_functions[pad->function]);
+ 		seq_printf(s, " vin-%d", pad->power_source);
+ 		seq_printf(s, " %d", pad->aout_level);
+-		seq_printf(s, " %-8s", biases[pad->pullup]);
++		if (pad->has_pullup)
++			seq_printf(s, " %-8s", biases[pad->pullup]);
+ 		seq_printf(s, " %-4s", pad->out_value ? "high" : "low");
+ 		if (pad->dtest)
+ 			seq_printf(s, " dtest%d", pad->dtest);
+@@ -748,12 +754,16 @@ static int pmic_mpp_populate(struct pmic_mpp_state *state,
+ 	pad->power_source = val >> PMIC_MPP_REG_VIN_SHIFT;
+ 	pad->power_source &= PMIC_MPP_REG_VIN_MASK;
+ 
+-	val = pmic_mpp_read(state, pad, PMIC_MPP_REG_DIG_PULL_CTL);
+-	if (val < 0)
+-		return val;
++	if (subtype != PMIC_MPP_SUBTYPE_ULT_4CH_NO_ANA_OUT &&
++	    subtype != PMIC_MPP_SUBTYPE_ULT_4CH_NO_SINK) {
++		val = pmic_mpp_read(state, pad, PMIC_MPP_REG_DIG_PULL_CTL);
++		if (val < 0)
++			return val;
+ 
+-	pad->pullup = val >> PMIC_MPP_REG_PULL_SHIFT;
+-	pad->pullup &= PMIC_MPP_REG_PULL_MASK;
++		pad->pullup = val >> PMIC_MPP_REG_PULL_SHIFT;
++		pad->pullup &= PMIC_MPP_REG_PULL_MASK;
++		pad->has_pullup = true;
++	}
+ 
+ 	val = pmic_mpp_read(state, pad, PMIC_MPP_REG_AIN_CTL);
+ 	if (val < 0)
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
