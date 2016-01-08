@@ -1,25 +1,67 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 8 Jan 2016 15:10:58 +0000
-Subject: [PATCH v5 6/6] ARM: dts: add dts files for Hi3519
-In-Reply-To: <1452219400-32478-7-git-send-email-xuejiancheng@huawei.com>
-References: <1452219400-32478-1-git-send-email-xuejiancheng@huawei.com>
- <1452219400-32478-7-git-send-email-xuejiancheng@huawei.com>
-Message-ID: <20160108151058.GN19062@n2100.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 8 Jan 2016 15:12:17 +0000
+Subject: [PATCH V2 22/23] pci, acpi: Match PCI config space accessors
+ against platfrom specific quirks.
+In-Reply-To: <20160108150137.GH3097@leverpostej>
+References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
+ <1450278993-12664-23-git-send-email-tn@semihalf.com>
+ <1452262581.31901.26.camel@redhat.com>
+ <20160108150137.GH3097@leverpostej>
+Message-ID: <20160108151216.GJ3097@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 08, 2016 at 10:16:40AM +0800, Jiancheng Xue wrote:
-> +		uart0: serial at 12100000 {
-> +			compatible = "arm,pl011", "arm,primecell";
-> +			reg = <0x12100000 0x1000>;
-> +			interrupts = <0 4 4>;
+On Fri, Jan 08, 2016 at 03:01:37PM +0000, Mark Rutland wrote:
+> On Fri, Jan 08, 2016 at 09:16:21AM -0500, Mark Salter wrote:
+> > On Wed, 2015-12-16 at 16:16 +0100, Tomasz Nowicki wrote:
+> > > Some platforms may not be fully compliant with generic set of PCI config
+> > > accessors. For these cases we implement the way to overwrite accessors
+> > > set before PCI buses enumeration. Algorithm that overwrite accessors
+> > > matches against platform ID (DMI), domain and bus number, hopefully
+> > > enough for all cases. All quirks can be defined using:
+> > > DECLARE_ACPI_MCFG_FIXUP() and keep self contained.
+> > > 
+> > > example:
+> > > 
+> > > static const struct dmi_system_id yyy[] = {
+> > > ????????{
+> > > ????????????????.ident = "<Platform ident string>",
+> > > ????????????????.callback = <handler>,
+> > > ????????????????.matches = {
+> > > ????????????????????????DMI_MATCH(DMI_SYS_VENDOR, "<system vendor>"),
+> > > ????????????????????????DMI_MATCH(DMI_PRODUCT_NAME, "<product name>"),
+> > > ????????????????????????DMI_MATCH(DMI_PRODUCT_VERSION, "product version"),
+> > > ????????????????},
+> > > ????????},
+> > > ????????{ }
+> > > };
+> > > 
+> > 
+> > This seems awkward to me in the case where the quirk is SoC-based and there
+> > may be multiple platforms affected. Needing a DECLARE_ACPI_MCFG_FIXUP for
+> > each platform using such a SoC (i.e. Mustang and Moonshot) doesn't seem
+> > right. In that case, I think it'd be better to check CPUID and possibly
+> > some SoC register to cover all platforms affected.
+> 
+> CPUs get reused across SoCs, so as you've implicitly noted, the CPUID
+> alone is insufficient.
+> 
+> Given that IP blocks get moved around between SoC variants, I don't
+> think you can check "some SoC register" based on the CPU ID -- you can
+> end up bringing the board down at that point.
+> 
+> If the CPU ID alone is insufficient to tell you about a component, it
+> cannot give you enough information about a component you can use to
+> query more information from.
+> 
+> If your platform requires a quirk, it's always going to be painful (and
+> to some extent, rightfulyl so). We should aim for correctness here with
+> explicit matching.
 
-Should the last digit there be IRQ_TYPE_LEVEL_HIGH (and same for the
-other interrupts= after this?)
+Further, if there is going to be an ever-expanding set of platforms
+requring quirks, then we need a standard mechanism in ACPI to enable the
+platform to tell us explicitly either which specific PCI implementation
+is used, or which common quirk is necessary.
 
-Thanks.
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thanks,
+Mark.
