@@ -1,68 +1,31 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri,  8 Jan 2016 10:50:30 -0800
-Subject: [PATCH] pinctrl: freescale: imx: implement gpio_disable_free for
- Vybrid
-Message-ID: <1452279030-5459-1-git-send-email-stefan@agner.ch>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri,  8 Jan 2016 11:00:11 -0800
+Subject: [PATCH] arm64: dts: Rename qcom,gcc node to clock-controller
+Message-ID: <1452279611-10283-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Freescale Vybrid SoC has GPIO capabilities as part of the
-IOMUXC. To enable GPIO's, the gpio_request_enable callback has
-been implemented, however the corsponding gpio_disable_free
-callback is missing. So far, disabling (unexporting) a GPIO left
-the pin in its last state.
+Use the standard name for clock controller nodes instead of a
+qcom specific name.
 
-Implement a proper gpio_disable_free function which clears the
-three enable bits which influence the state (IBE, OBE and PUE).
-
-Signed-off-by: Stefan Agner <stefan@agner.ch>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/pinctrl/freescale/pinctrl-imx.c | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ arch/arm64/boot/dts/qcom/msm8916.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c b/drivers/pinctrl/freescale/pinctrl-imx.c
-index a5bb939..4c435cf 100644
---- a/drivers/pinctrl/freescale/pinctrl-imx.c
-+++ b/drivers/pinctrl/freescale/pinctrl-imx.c
-@@ -341,6 +341,31 @@ mux_pin:
- 	return 0;
- }
+diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+index 915321479998..ba8184d0f948 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+@@ -134,7 +134,7 @@
+ 			#interrupt-cells = <2>;
+ 		};
  
-+static void imx_pmx_gpio_disable_free(struct pinctrl_dev *pctldev,
-+			struct pinctrl_gpio_range *range, unsigned offset)
-+{
-+	struct imx_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
-+	const struct imx_pinctrl_soc_info *info = ipctl->info;
-+	const struct imx_pin_reg *pin_reg;
-+	u32 reg;
-+
-+	/*
-+	 * Only Vybrid has the input/output buffer enable flags (IBE/OBE)
-+	 * They are part of the shared mux/conf register.
-+	 */
-+	if (!(info->flags & SHARE_MUX_CONF_REG))
-+		return;
-+
-+	pin_reg = &info->pin_regs[offset];
-+	if (pin_reg->mux_reg == -1)
-+		return;
-+
-+	/* Clear IBE/OBE/PUE to disable the pin (Hi-Z) */
-+	reg = readl(ipctl->base + pin_reg->mux_reg);
-+	reg &= ~0x7;
-+	writel(reg, ipctl->base + pin_reg->mux_reg);
-+}
-+
- static int imx_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
- 	   struct pinctrl_gpio_range *range, unsigned offset, bool input)
- {
-@@ -377,6 +402,7 @@ static const struct pinmux_ops imx_pmx_ops = {
- 	.get_function_groups = imx_pmx_get_groups,
- 	.set_mux = imx_pmx_set,
- 	.gpio_request_enable = imx_pmx_gpio_request_enable,
-+	.gpio_disable_free = imx_pmx_gpio_disable_free,
- 	.gpio_set_direction = imx_pmx_gpio_set_direction,
- };
- 
+-		gcc: qcom,gcc at 1800000 {
++		gcc: clock-controller at 1800000 {
+ 			compatible = "qcom,gcc-msm8916";
+ 			#clock-cells = <1>;
+ 			#reset-cells = <1>;
 -- 
-2.6.4
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
