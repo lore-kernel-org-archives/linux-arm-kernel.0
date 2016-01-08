@@ -1,42 +1,44 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 8 Jan 2016 13:55:52 +0000
-Subject: ION DTS changes for HiKey in -next
-In-Reply-To: <20160108124439.GL6588@sirena.org.uk>
-References: <20160107173744.GJ6588@sirena.org.uk>
- <20160108050214.GD30293@kroah.com>
- <20160108124439.GL6588@sirena.org.uk>
-Message-ID: <20160108135552.GE3097@leverpostej>
+From: juri.lelli@arm.com (Juri Lelli)
+Date: Fri,  8 Jan 2016 14:09:29 +0000
+Subject: [RFC PATCH v2 1/4] ARM: initialize cpu_scale to its default
+In-Reply-To: <1452262172-31861-1-git-send-email-juri.lelli@arm.com>
+References: <1452262172-31861-1-git-send-email-juri.lelli@arm.com>
+Message-ID: <1452262172-31861-2-git-send-email-juri.lelli@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 08, 2016 at 12:44:39PM +0000, Mark Brown wrote:
-> On Thu, Jan 07, 2016 at 09:02:14PM -0800, Greg Kroah-Hartman wrote:
-> > On Thu, Jan 07, 2016 at 05:37:44PM +0000, Mark Brown wrote:
-> 
-> > > I was just looking at DTs in -next and noticed that there is a patch
-> > > 59dfafd03fc (arm64: dts: Add dts files to enable ION on Hi6220 SoC)
-> > > which adds at DT doing something for ION.  Are we sure this should be
-> > > going into the main production DT?  The bindings haven't been reviewed
-> > > as far as I can tell, the matching driver is only in staging and hasn't
-> > > been posted upstream.
-> 
-> > Isn't "staging" upstream enough for this?  :)
-> 
-> I wouldn't have thought so, DTs are supposed to be an ABI so we want
-> proper review and having had a quick glance this doesn't look like it's
-> a hardware description so it's not clear to me it should be in DT at all.
+Instead of looping through all cpus calling set_capacity_scale, we can
+initialise cpu_scale per-cpu variables to SCHED_CAPACITY_SCALE with their
+definition.
 
-Indeed.
+Cc: Russell King <linux@arm.linux.org.uk>
+Acked-by: Vincent Guittot <vincent.guittot@linaro.org>
+Signed-off-by: Juri Lelli <juri.lelli@arm.com>
+---
+ arch/arm/kernel/topology.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-The driver and the binding before that don't really belong either,
-I would have NAK'd those on devicetree at vger.kernel.org, though it
-appears I either missed them or they never made it to that list.
-
->From my PoV there should not be a platform-specific ION binding. If we
-need one at all, people should work on the proposed generic binding [1]
-or figure out how to do this with the existing reserved-memory bindings.
-
-Thanks,
-Mark.
-
-[1] https://lkml.org/lkml/2015/10/6/854
+diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+index 08b7847..ec279d1 100644
+--- a/arch/arm/kernel/topology.c
++++ b/arch/arm/kernel/topology.c
+@@ -40,7 +40,7 @@
+  * to run the rebalance_domains for all idle cores and the cpu_capacity can be
+  * updated during this sequence.
+  */
+-static DEFINE_PER_CPU(unsigned long, cpu_scale);
++static DEFINE_PER_CPU(unsigned long, cpu_scale) = SCHED_CAPACITY_SCALE;
+ 
+ unsigned long arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
+ {
+@@ -306,8 +306,6 @@ void __init init_cpu_topology(void)
+ 		cpu_topo->socket_id = -1;
+ 		cpumask_clear(&cpu_topo->core_sibling);
+ 		cpumask_clear(&cpu_topo->thread_sibling);
+-
+-		set_capacity_scale(cpu, SCHED_CAPACITY_SCALE);
+ 	}
+ 	smp_wmb();
+ 
+-- 
+2.2.2
