@@ -1,54 +1,74 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Fri, 8 Jan 2016 09:26:26 +0800
-Subject: [RESEND PATCH] usb: xhci-mtk: fix bpkts value of LS/HS periodic eps
- not behind TT
-Message-ID: <1452216386-3285-1-git-send-email-chunfeng.yun@mediatek.com>
+Date: Fri, 8 Jan 2016 09:28:37 +0800
+Subject: [RESEND PATCH v2] usb: xhci-mtk: fix AHB bus hang up caused by
+ roothubs polling
+Message-ID: <1452216517-3765-1-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-when a LS or FS device doesn't connect though a HS hub,
-the @bPkts field of its periodic endpoint context should
-be set to 1.
+when ip fails to enter sleep mode, register access protection will
+be disabled, at the same time if all clocks are disabled, access
+register will hang up AHB bus.
+the common case causes ip sleep failure is that after all ports
+enter U3 but before ip enters sleep mode, a port receives a resume
+signal('K'). this will happens when such as clicks mouse to try to
+do remote-wakeup to stop system enter suspend.
+so stop polling root hubs to avoid access xHCI register on bus
+suspend, and restart it when bus resumes.
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- drivers/usb/host/xhci-mtk-sch.c | 16 +++++++++++++---
- 1 file changed, 13 insertions(+), 3 deletions(-)
+ drivers/usb/host/xhci-mtk.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-diff --git a/drivers/usb/host/xhci-mtk-sch.c b/drivers/usb/host/xhci-mtk-sch.c
-index c30de7c..73f763c 100644
---- a/drivers/usb/host/xhci-mtk-sch.c
-+++ b/drivers/usb/host/xhci-mtk-sch.c
-@@ -275,8 +275,9 @@ static bool need_bw_sch(struct usb_host_endpoint *ep,
- 		return false;
+diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
+index c9ab6a4..9532f5a 100644
+--- a/drivers/usb/host/xhci-mtk.c
++++ b/drivers/usb/host/xhci-mtk.c
+@@ -696,9 +696,24 @@ static int xhci_mtk_remove(struct platform_device *dev)
+ }
  
- 	/*
--	 * for LS & FS periodic endpoints which its device don't attach
--	 * to TT are also ignored, root-hub will schedule them directly
-+	 * for LS & FS periodic endpoints which its device is not behind
-+	 * a TT are also ignored, root-hub will schedule them directly,
-+	 * but need set @bpkts field of endpoint context to 1.
- 	 */
- 	if (is_fs_or_ls(speed) && !has_tt)
- 		return false;
-@@ -339,8 +340,17 @@ int xhci_mtk_add_ep_quirk(struct usb_hcd *hcd, struct usb_device *udev,
- 		GET_MAX_PACKET(usb_endpoint_maxp(&ep->desc)),
- 		usb_endpoint_dir_in(&ep->desc), ep);
- 
--	if (!need_bw_sch(ep, udev->speed, slot_ctx->tt_info & TT_SLOT))
-+	if (!need_bw_sch(ep, udev->speed, slot_ctx->tt_info & TT_SLOT)) {
-+		/*
-+		 * set @bpkts to 1 if it is LS or FS periodic endpoint, and its
-+		 * device does not connected through an external HS hub
-+		 */
-+		if (usb_endpoint_xfer_int(&ep->desc)
-+			|| usb_endpoint_xfer_isoc(&ep->desc))
-+			ep_ctx->reserved[0] |= cpu_to_le32(EP_BPKTS(1));
+ #ifdef CONFIG_PM_SLEEP
++/*
++ * if ip sleep fails, and all clocks are disabled, access register will hang
++ * AHB bus, so stop polling roothubs to avoid regs access on bus suspend.
++ * and no need to check whether ip sleep failed or not; this will cause SPM
++ * to wake up system immediately after system suspend complete if ip sleep
++ * fails, it is what we wanted.
++ */
+ static int xhci_mtk_suspend(struct device *dev)
+ {
+ 	struct xhci_hcd_mtk *mtk = dev_get_drvdata(dev);
++	struct usb_hcd *hcd = mtk->hcd;
++	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
 +
- 		return 0;
-+	}
++	xhci_dbg(xhci, "%s: stop port polling\n", __func__);
++	clear_bit(HCD_FLAG_POLL_RH, &hcd->flags);
++	del_timer_sync(&hcd->rh_timer);
++	clear_bit(HCD_FLAG_POLL_RH, &xhci->shared_hcd->flags);
++	del_timer_sync(&xhci->shared_hcd->rh_timer);
  
- 	bw_index = get_bw_index(xhci, udev, ep);
- 	sch_bw = &sch_array[bw_index];
+ 	xhci_mtk_host_disable(mtk);
+ 	xhci_mtk_phy_power_off(mtk);
+@@ -710,11 +725,19 @@ static int xhci_mtk_suspend(struct device *dev)
+ static int xhci_mtk_resume(struct device *dev)
+ {
+ 	struct xhci_hcd_mtk *mtk = dev_get_drvdata(dev);
++	struct usb_hcd *hcd = mtk->hcd;
++	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
+ 
+ 	usb_wakeup_disable(mtk);
+ 	xhci_mtk_clks_enable(mtk);
+ 	xhci_mtk_phy_power_on(mtk);
+ 	xhci_mtk_host_enable(mtk);
++
++	xhci_dbg(xhci, "%s: restart port polling\n", __func__);
++	set_bit(HCD_FLAG_POLL_RH, &hcd->flags);
++	usb_hcd_poll_rh_status(hcd);
++	set_bit(HCD_FLAG_POLL_RH, &xhci->shared_hcd->flags);
++	usb_hcd_poll_rh_status(xhci->shared_hcd);
+ 	return 0;
+ }
+ 
 -- 
 1.8.1.1.dirty
