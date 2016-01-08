@@ -1,74 +1,162 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Fri, 08 Jan 2016 11:07:16 -0500
-Subject: [PATCH V2 22/23] pci, acpi: Match PCI config space accessors
- against platfrom specific quirks.
-In-Reply-To: <20160108151216.GJ3097@leverpostej>
-References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
- <1450278993-12664-23-git-send-email-tn@semihalf.com>
- <1452262581.31901.26.camel@redhat.com> <20160108150137.GH3097@leverpostej>
- <20160108151216.GJ3097@leverpostej>
-Message-ID: <1452269236.31901.46.camel@redhat.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Fri, 8 Jan 2016 17:02:21 +0100
+Subject: [PATCH linux-next v2 09/14] mtd: spi-nor: configure the number of
+ dummy clock cycles on Micron memories
+In-Reply-To: <cover.1452268345.git.cyrille.pitchen@atmel.com>
+References: <cover.1452268345.git.cyrille.pitchen@atmel.com>
+Message-ID: <c1f9c880b2da19c03e846a2f61597b6639678308.1452268345.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-01-08 at 15:12 +0000, Mark Rutland wrote:
-> On Fri, Jan 08, 2016 at 03:01:37PM +0000, Mark Rutland wrote:
-> > On Fri, Jan 08, 2016 at 09:16:21AM -0500, Mark Salter wrote:
-> > > On Wed, 2015-12-16 at 16:16 +0100, Tomasz Nowicki wrote:
-> > > > Some platforms may not be fully compliant with generic set of PCI config
-> > > > accessors. For these cases we implement the way to overwrite accessors
-> > > > set before PCI buses enumeration. Algorithm that overwrite accessors
-> > > > matches against platform ID (DMI), domain and bus number, hopefully
-> > > > enough for all cases. All quirks can be defined using:
-> > > > DECLARE_ACPI_MCFG_FIXUP() and keep self contained.
-> > > > 
-> > > > example:
-> > > > 
-> > > > static const struct dmi_system_id yyy[] = {
-> > > > ????????{
-> > > > ????????????????.ident = "<Platform ident string>",
-> > > > ????????????????.callback = <handler>,
-> > > > ????????????????.matches = {
-> > > > ????????????????????????DMI_MATCH(DMI_SYS_VENDOR, "<system vendor>"),
-> > > > ????????????????????????DMI_MATCH(DMI_PRODUCT_NAME, "<product name>"),
-> > > > ????????????????????????DMI_MATCH(DMI_PRODUCT_VERSION, "product version"),
-> > > > ????????????????},
-> > > > ????????},
-> > > > ????????{ }
-> > > > };
-> > > > 
-> > > 
-> > > This seems awkward to me in the case where the quirk is SoC-based and there
-> > > may be multiple platforms affected. Needing a DECLARE_ACPI_MCFG_FIXUP for
-> > > each platform using such a SoC (i.e. Mustang and Moonshot) doesn't seem
-> > > right. In that case, I think it'd be better to check CPUID and possibly
-> > > some SoC register to cover all platforms affected.
-> > 
-> > CPUs get reused across SoCs, so as you've implicitly noted, the CPUID
-> > alone is insufficient.
-> > 
-> > Given that IP blocks get moved around between SoC variants, I don't
-> > think you can check "some SoC register" based on the CPU ID -- you can
-> > end up bringing the board down at that point.
-> > 
-> > If the CPU ID alone is insufficient to tell you about a component, it
-> > cannot give you enough information about a component you can use to
-> > query more information from.
-> > 
-> > If your platform requires a quirk, it's always going to be painful (and
-> > to some extent, rightfulyl so). We should aim for correctness here with
-> > explicit matching.
-> 
-> Further, if there is going to be an ever-expanding set of platforms
-> requring quirks, then we need a standard mechanism in ACPI to enable the
-> platform to tell us explicitly either which specific PCI implementation
-> is used, or which common quirk is necessary.
-> 
+The spi-nor framework currently expects all Fast Read operations to use 8
+dummy clock cycles. Especially some drivers like m25p80 can only support
+multiple of 8 dummy clock cycles.
 
-No, an ever-expanding set is exactly what we don't want. I think you've convinced
-me that I'm taking a wrong view of the problem. Putting something in the ACPI
-standard would be going too far and I think a hard sell to the standards folk.
-There really is no foolproof way to match a plug and play ACPI PCIe root to
-specific hardware without considering the exact platform and/or BIOS info. So
-yeah, it should be painful in order to give incentive to the silicon vendors to
-get it right.
+On Micron memories, the number of dummy clock cycles to be used by Fast
+Read commands can be safely set to 8 by updating the Volatile
+Configuration Register (VCR).
+
+Also the XIP bit is set at the same time when updating the VCR so the
+Continuous Read mode is disabled: this prevents us from entering it by
+mistake.
+
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+---
+ drivers/mtd/spi-nor/spi-nor.c | 72 ++++++++++++++++++++++++++++++++++++++-----
+ include/linux/mtd/spi-nor.h   |  2 ++
+ 2 files changed, 67 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
+index 353a0f6ac3fe..3f79619aea52 100644
+--- a/drivers/mtd/spi-nor/spi-nor.c
++++ b/drivers/mtd/spi-nor/spi-nor.c
+@@ -1341,6 +1341,53 @@ static int winbond_set_single_mode(struct spi_nor *nor)
+ 	return 0;
+ }
+ 
++static int micron_set_dummy_cycles(struct spi_nor *nor, u8 read_dummy)
++{
++	u8 vcr, val, mask;
++	int ret;
++
++	/* Set bit3 (XIP) to disable the Continuous Read mode */
++	mask = GENMASK(7, 4) | BIT(3);
++	val = ((read_dummy << 4) | BIT(3)) & mask;
++
++	/* Read the Volatile Configuration Register (VCR). */
++	ret = nor->read_reg(nor, SPINOR_OP_RD_VCR, &vcr, 1);
++	if (ret < 0) {
++		dev_err(nor->dev, "error while reading VCR register\n");
++		return ret;
++	}
++
++	/* Check whether we need to update the number of dummy cycles. */
++	if ((vcr & mask) == val) {
++		nor->read_dummy = read_dummy;
++		return 0;
++	}
++
++	/* Update the number of dummy into the VCR. */
++	write_enable(nor);
++	vcr = (vcr & ~mask) | val;
++	ret = nor->write_reg(nor, SPINOR_OP_WR_VCR, &vcr, 1);
++	if (ret < 0) {
++		dev_err(nor->dev, "error while writing VCR register\n");
++		return ret;
++	}
++
++	ret = spi_nor_wait_till_ready(nor);
++	if (ret)
++		return ret;
++
++	/* Read VCR and check it. */
++	ret = nor->read_reg(nor, SPINOR_OP_RD_VCR, &vcr, 1);
++	if (ret < 0 || (vcr & mask) != val) {
++		dev_err(nor->dev, "Micron VCR dummy cycles not updated\n");
++		return -EINVAL;
++	}
++
++	/* Save the number of dummy cycles to use with Fast Read commands */
++	nor->read_dummy = read_dummy;
++	return 0;
++}
++
+ static int micron_set_protocol(struct spi_nor *nor, u8 mask, u8 val,
+ 			       enum spi_nor_protocol proto)
+ {
+@@ -1425,12 +1472,15 @@ static int micron_set_quad_mode(struct spi_nor *nor)
+ 	/*
+ 	 * Whatever the Quad mode is enabled or not, the
+ 	 * Fast Read Quad Output 1-1-4 (0x6b) op code is supported.
++	 * Force the number of dummy cycles to 8 and disable the Continuous Read
++	 * mode to prevent some drivers from using it by mistake (m25p80).
++	 * We can change these settings safely as we write into a volatile
++	 * register.
+ 	 */
+ 	if (nor->read_proto != SNOR_PROTO_4_4_4)
+ 		nor->read_proto = SNOR_PROTO_1_1_4;
+ 	nor->read_opcode = SPINOR_OP_READ_1_1_4;
+-	nor->read_dummy = 8;
+-	return 0;
++	return micron_set_dummy_cycles(nor, 8);
+ }
+ 
+ static int micron_set_dual_mode(struct spi_nor *nor)
+@@ -1455,12 +1505,15 @@ static int micron_set_dual_mode(struct spi_nor *nor)
+ 	/*
+ 	 * Whatever the Dual mode is enabled or not, the
+ 	 * Fast Read Dual Output 1-1-2 (0x3b) op code is supported.
++	 * Force the number of dummy cycles to 8 and disable the Continuous Read
++	 * mode to prevent some drivers from using it by mistake (m25p80).
++	 * We can change these settings safely as we write into a volatile
++	 * register.
+ 	 */
+ 	if (nor->read_proto != SNOR_PROTO_2_2_2)
+ 		nor->read_proto = SNOR_PROTO_1_1_2;
+ 	nor->read_opcode = SPINOR_OP_READ_1_1_2;
+-	nor->read_dummy = 8;
+-	return 0;
++	return micron_set_dummy_cycles(nor, 8);
+ }
+ 
+ static int micron_set_single_mode(struct spi_nor *nor)
+@@ -1483,7 +1536,13 @@ static int micron_set_single_mode(struct spi_nor *nor)
+ 		nor->read_proto = SNOR_PROTO_1_1_1;
+ 	}
+ 
+-	/* Force the number of dummy cycles to 8 for Fast Read, 0 for Read. */
++	/*
++	 * Force the number of dummy cycles to 8 for Fast Read, 0 for Read
++	 * and disable the Continuous Read mode to prevent some drivers from
++	 * using it by mistake (m25p80).
++	 * We can change these settings safely as we write into a volatile
++	 * register.
++	 */
+ 	switch (nor->read_opcode) {
+ 	case SPINOR_OP_READ:
+ 	case SPINOR_OP_READ4:
+@@ -1494,8 +1553,7 @@ static int micron_set_single_mode(struct spi_nor *nor)
+ 		read_dummy = 8;
+ 		break;
+ 	}
+-	nor->read_dummy = read_dummy;
+-	return 0;
++	return micron_set_dummy_cycles(nor, read_dummy);
+ }
+ 
+ static int spansion_set_quad_mode(struct spi_nor *nor)
+diff --git a/include/linux/mtd/spi-nor.h b/include/linux/mtd/spi-nor.h
+index d0a6f343a063..2dc0f8b429ca 100644
+--- a/include/linux/mtd/spi-nor.h
++++ b/include/linux/mtd/spi-nor.h
+@@ -86,6 +86,8 @@
+ 
+ /* Used for Micron flashes only. */
+ #define SPINOR_OP_MIO_RDID	0xaf	/* Multiple I/O Read JEDEC ID */
++#define SPINOR_OP_RD_VCR	0x85	/* Read VCR register */
++#define SPINOR_OP_WR_VCR	0x81	/* Write VCR register */
+ #define SPINOR_OP_RD_EVCR	0x65    /* Read EVCR register */
+ #define SPINOR_OP_WD_EVCR	0x61    /* Write EVCR register */
+ 
+-- 
+1.8.2.2
