@@ -1,31 +1,102 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 8 Jan 2016 09:45:22 +0100 (CET)
-Subject: [PATCH v3 1/3] gpio: xgene: Enable X-Gene standby GPIO as
- interrupt controller
-In-Reply-To: <1452162428-26839-2-git-send-email-qnguyen@apm.com>
-References: <1452162428-26839-1-git-send-email-qnguyen@apm.com>
- <1452162428-26839-2-git-send-email-qnguyen@apm.com>
-Message-ID: <alpine.DEB.2.11.1601080942270.3575@nanos>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 08 Jan 2016 09:46:50 +0100
+Subject: [PATCH] ata: add AMD Seattle platform driver
+In-Reply-To: <568F14E0.4060107@amd.com>
+References: <1452200002-31590-1-git-send-email-brijesh.singh@amd.com>
+ <4983521.tEaWggKCCv@wuerfel> <568F14E0.4060107@amd.com>
+Message-ID: <10869853.plxna0HzWE@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 7 Jan 2016, Quan Nguyen wrote:
-> -static int apm_gpio_sb_to_irq(struct gpio_chip *gc, u32 gpio)
-> +static void xgene_gpio_sb_irq_ack(struct irq_data *d)
-> +{
-> +	struct irq_data *irqdata;
-> +	struct xgene_gpio_sb *priv = irq_data_get_irq_chip_data(d);
-> +
-> +	irqdata = irq_get_irq_data(priv->gic_virq[d->hwirq]);
-> +	if (!irqdata || !irqdata->chip)
-> +		return;
+On Thursday 07 January 2016 19:46:08 Brijesh Singh wrote:
+> Hi,
+> 
+> On 01/07/2016 05:42 PM, Arnd Bergmann wrote:
+> > On Thursday 07 January 2016 16:24:22 Brijesh Singh wrote:
+> >>>> +
+> >>>> +Examples:
+> >>>> +        sata0 at e0300000 {
+> >>>> +            compatible = "amd,seattle-ahci";
+> >>>> +            reg = <0x0 0xe0300000 0x0 0xf0000>, <0x0 0xe0000078 0x0 0x1>;
+> >>>
+> >>> Looking at the register values, I doubt that the SGPIO is actually part of the
+> >>> sata device. More likely, you are pointing in the middle of an actual
+> >>> GPIO controller.
+> >>>
+> >>
+> >> That address is SGPIO control register for SATA. The current hardware implementation to control activity LED is not ideal.
+> >
+> > Of course its a control register "for" SATA, what I meant is that it's
+> > not part "of" the SATA IP block, which is hopefully a standard AHCI
+> > compliant part as required by SBSA.
+> >
+> Yes, its not part of SATA IP block. We just need a method of pass  SGPIO 
+> control register address to driver.
+> 
+> Should I consider adding a property "sgpio-ctrl" to pass the register 
+> address ?
+> 
+> e.g
+> 
+> sata0 at e0300000 {
+>    compatible = "amd,seattle-ahci";
+>    reg = <0 0xe0300000 0 0x800>;
+>    amd,sgpio-ctrl = <0xe0000078>;
+>    interrupts = <0 355 4>;
+>    clocks = <&sataclk_333mhz>;
+>    dma-coherent;
+> };
 
-What the heck is this? Why are you looking up some random other irq and fiddle
-with its irq chip?
+We generally don't refer to register locations with properties other than
+'reg', so that approach would be worse. What I'd suggest you do is to
+have the sgpio registers in a separate device node, and use the LED
+binding to access it, see
+ 
+Documentation/devicetree/bindings/leds/common.txt
 
-This is a 1:1 mapping from your gpio irq to a gic irq. We have hierarchical
-interrupt domains for this.
+It seems that none of the drivers/ata/ drivers use the leds interface
+today, but that can be added to libata-*.c whenever the appropriate
+properties are there.
 
-Thanks,
+> > This one is rather different: there is a single device that combines
+> > registers for AHCI, the PHY attached to it and the LED. This is not
+> > SBSA compliant of course, and it requires having a special driver.
+> >
+> > What you have instead looks like a regular AHCI implementation that
+> > should just work with the standard driver as long as you describe how
+> > it gets its LEDs.
+> >
+> Yes, its regular AHCI implementation and works well with ahci_platform 
+> driver. In standard ahci_platform driver activity LEDs are blinked 
+> through enclosure management interface. Given the current hardware 
+> limitation it seems like creating a new driver would be cleaner. I am 
+> open to suggestion.
 
-	tglx
+I'd say the code in drivers/ata should be kept completely generic, referring
+only to the include/linux/leds.h interfaces and properties added to
+Documentation/devicetree/bindings/ata/ahci-platform.txt (if any).
+
+For the driver that actually owns the register, it depends a bit on how
+the hardware is structured, and you'd need to look at the datasheet (or
+talk to a hardware designer) for that.
+
+I suspect we should have a node for the entire block of registers
+around the SGPIO, presumably something like
+
+	syscon at 0xe0000000 {
+		compatible = "amd,$SOC_ID"-lsioc", "syscon";
+		reg = <0xe0000000 0x1000>; /* find the actual length in the datasheet */
+	};
+
+That way, any driver that ends up needing a register from this block
+can use the syscon interface to get hold of a mapping, and/or you can
+have a high-level driver to expose other functionalities. It's probably
+best to start doing it either entirely using syscon references from
+other drivers, or using no syscon references, and putting everything into
+a driver for the register set, but as I said it depends a lot on what
+else is in there.
+
+Can you send me a register list of the 0xe0000000 segment for reference?
+
+
+	Arnd
