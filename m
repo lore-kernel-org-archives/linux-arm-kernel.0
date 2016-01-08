@@ -1,106 +1,86 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Fri, 8 Jan 2016 10:08:58 +0800
-Subject: [PATCH 2/2] regulator: add documentation for ACT8945A's regulator DT
- bindings
-In-Reply-To: <1452218938-10621-1-git-send-email-wenyou.yang@atmel.com>
-References: <1452218938-10621-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1452218938-10621-3-git-send-email-wenyou.yang@atmel.com>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Fri, 8 Jan 2016 10:12:05 +0800
+Subject: [PATCH v3 59/62] xen/arm: Add a hypercall for device mmio mapping
+In-Reply-To: <568EDB39.6050804@tycho.nsa.gov>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-60-git-send-email-shannon.zhao@linaro.org>
+ <564B17EA02000078000B5D34@prv-mh.provo.novell.com>
+ <568E0CA9.4090307@huawei.com>
+ <568E25A702000078000C43EA@prv-mh.provo.novell.com>
+ <568E2BB4.8080802@huawei.com>
+ <568E511402000078000C44C6@prv-mh.provo.novell.com>
+ <568EDB39.6050804@tycho.nsa.gov>
+Message-ID: <568F1AF5.7010509@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds documentation for the DT bindings of the regulator
-subdevice of ACT8945A MFD.
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
 
- .../bindings/regulator/act8945a-regulator.txt      |   78 ++++++++++++++++++++
- 1 file changed, 78 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/regulator/act8945a-regulator.txt
+On 2016/1/8 5:40, Daniel De Graaf wrote:
+> On 01/07/2016 05:50 AM, Jan Beulich wrote:
+>>>>> On 07.01.16 at 10:11, <zhaoshenglong@huawei.com> wrote:
+>>> Hi Jan,
+>>>
+>>> On 2016/1/7 15:45, Jan Beulich wrote:
+>>>>>>> On 07.01.16 at 07:58, <zhaoshenglong@huawei.com> wrote:
+>>>>>> On 2015/11/17 19:04, Jan Beulich wrote:
+>>>>>>>>>>>>>> On 17.11.15 at 10:40, <shannon.zhao@linaro.org> wrote:
+>>>>>>>>>>>> --- a/xen/arch/arm/mm.c
+>>>>>>>>>>>> +++ b/xen/arch/arm/mm.c
+>>>>>>>>>>>> @@ -1138,6 +1138,10 @@ int xenmem_add_to_physmap_one(
+>>>>>>>>>>>>           rcu_unlock_domain(od);
+>>>>>>>>>>>>           break;
+>>>>>>>>>>>>       }
+>>>>>>>>>>>> +    case XENMAPSPACE_dev_mmio:
+>>>>>>>>>>>> +        rc = map_dev_mmio_region(d, gpfn, 1, idx);
+>>>>>>>>>>>> +        return rc;
+>>>>>>>>>>>> +        break;
+>>>>>>>> Blindly for any kind of domain? The XSM check in the
+>>>>>>>> XENMEM_add_to_physmap_batch handler (in common code) doesn't
+>>>>>>>> even know which map space is to be used...
+>>>>>>
+>>>>>> Sorry, I know little about XSM. Could you suggest me how to add the
+>>>>>> check for this new type here?
+>>>> I'm sorry to push back here, but did you at least try to derive
+>>>> what is wanted from the multitude of other XSM checks present
+>>>> throughout the tree?
+>>>
+>>> IIUC, you mean that it doean't need to change the XSM check itself, but
+>>> we should check if the current->domain is hardware domain and it maps
+>>> the space to itself before the XSM check, right?
+>>
+>> No, I actually think that you need to add a new, secondary XSM
+>> check. But you may want to consult with Daniel (who so far wasn't
+>> even Cc-ed).
+> 
+> Looking at the original patch, I am not sure if I understand the
+> checks: it seems like the iomem_access_permitted check is being done
+> on the guest's page range instead of the actual IO memory, which
+> ends up allowing the guest to map anything as long as it maps it in
+> the right guest area. 
+Yeah, since it's hard to know the MMIO range from the DSDT in XEN, we
+permit full mmio capabilities for Dom0 and deny mmio access for some
+devices e.g. uart. Then when Dom0 add those devices, call
+XENMEM_add_to_physmap to map their MMIO ranges. This looks similar with
+what x86 does.
 
-diff --git a/Documentation/devicetree/bindings/regulator/act8945a-regulator.txt b/Documentation/devicetree/bindings/regulator/act8945a-regulator.txt
-new file mode 100644
-index 0000000..f67ff86
---- /dev/null
-+++ b/Documentation/devicetree/bindings/regulator/act8945a-regulator.txt
-@@ -0,0 +1,78 @@
-+Device-Tree bindings for regulators of Active-semi ACT8945A Multi-Function Device
-+
-+Required properties:
-+ - compatible: "active-semi,act8945a-regulator"
-+
-+Optional properties:
-+- active-semi,vsel-high: Indicates if the VSEL pin is set to logic-high.
-+  If this property is missing, assume the VSEL pin is set to logic-low.
-+
-+Optional input supply properties:
-+  - vp1-supply: The input supply for DCDC_REG1
-+  - vp2-supply: The input supply for DCDC_REG2
-+  - vp3-supply: The input supply for DCDC_REG3
-+  - inl45-supply: The input supply for LDO_REG1 and LDO_REG2
-+  - inl67-supply: The input supply for LDO_REG3 and LDO_REG4
-+
-+Any standard regulator properties can be used to configure the single regulator.
-+
-+The valid names for regulators are:
-+	DCDC_REG1, DCDC_REG2, DCDC_REG3, LDO_REG1, LDO_REG2, LDO_REG3, LDO_REG4.
-+
-+Example:
-+
-+	pmic {
-+		compatible = "active-semi,act8945a-regulator";
-+		active-semi,vsel-high;
-+
-+		regulators {
-+			vdd_1v35_reg: DCDC_REG1 {
-+				regulator-name = "VDD_1V35";
-+				regulator-min-microvolt = <1350000>;
-+				regulator-max-microvolt = <1350000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_1v2_reg: DCDC_REG2 {
-+				regulator-name = "VDD_1V2";
-+				regulator-min-microvolt = <1100000>;
-+				regulator-max-microvolt = <1300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_3v3_reg: DCDC_REG3 {
-+				regulator-name = "VDD_3V3";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_fuse_reg: LDO_REG1 {
-+				regulator-name = "VDD_FUSE";
-+				regulator-min-microvolt = <2500000>;
-+				regulator-max-microvolt = <2500000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_3v3_lp_reg: LDO_REG2 {
-+				regulator-name = "VDD_3V3_LP";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_led_reg: LDO_REG3 {
-+				regulator-name = "VDD_LED";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_sdhc_1v8_reg: LDO_REG4 {
-+				regulator-name = "VDD_SDHC_1V8";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+			};
-+		};
-+	};
+    /* The hardware domain is initially permitted full I/O capabilities. */
+    rc |= ioports_permit_access(d, 0, 0xFFFF);
+    rc |= iomem_permit_access(d, 0UL, ~0UL);
+    rc |= irqs_permit_access(d, 1, nr_irqs_gsi - 1);
+
+> The iomem_permit_access call there also seems
+> to be redundant because it is the same range that was just checked.
+>
+Ah, I'll drop this at next version.
+
+> If the [start_gfn, start_gfn + nr) memory range actually describes
+> the physical addresses, then this operation is taking advantage of
+> the existing XSM checks on XEN_DOMCTL_iomem_permission, and the
+> only XSM check that is needed would be that current->domain has
+> permission to modify (d)'s mappings - and this is done by the
+> xsm_add_to_physmap check in XENMEM_add_to_physmap.
+
+Thanks,
 -- 
-1.7.9.5
+Shannon
