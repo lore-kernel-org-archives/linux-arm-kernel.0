@@ -1,27 +1,52 @@
 From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Fri,  8 Jan 2016 09:34:59 +0800
-Subject: [PATCH v2 0/3] Add support emac for the RK3036 SoC platform
-Message-ID: <1452216902-21063-1-git-send-email-zhengxing@rock-chips.com>
+Date: Fri,  8 Jan 2016 09:35:00 +0800
+Subject: [PATCH v2 1/3] net: ethernet: arc: Probe emac after set RMII clock
+In-Reply-To: <1452216902-21063-1-git-send-email-zhengxing@rock-chips.com>
+References: <1452216902-21063-1-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <1452216902-21063-2-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+After enter arc_emac_probe, emac will get_phy_id, phy_poll_reset and
+other connecting PHY via mdiobus_read, so we need to set correct
+ref clock rate for emac before probe emac.
 
-Hi,
-  We have supported the emac for RK3066/RK3188, but the RK3036 have
-some configuration different with them. We should let the driver of
-emac_rockchip compatible with other Rockchip SoCs.
+Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+---
 
-Changes in v2:
-- Separate DTS from patch series.
+Changes in v2: None
 
-Xing Zheng (3):
-  net: ethernet: arc: Probe emac after set RMII clock
-  net: ethernet: arc: Keep emac compatibility for more Rockchip SoCs
-  net: ethernet: arc: Add support emac for RK3036
+ drivers/net/ethernet/arc/emac_rockchip.c |   11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
 
- drivers/net/ethernet/arc/Kconfig         |    4 +-
- drivers/net/ethernet/arc/emac_rockchip.c |   88 ++++++++++++++++++++----------
- 2 files changed, 61 insertions(+), 31 deletions(-)
-
+diff --git a/drivers/net/ethernet/arc/emac_rockchip.c b/drivers/net/ethernet/arc/emac_rockchip.c
+index c31c740..36e9eb1 100644
+--- a/drivers/net/ethernet/arc/emac_rockchip.c
++++ b/drivers/net/ethernet/arc/emac_rockchip.c
+@@ -164,10 +164,6 @@ static int emac_rockchip_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
+-	err = arc_emac_probe(ndev, interface);
+-	if (err)
+-		goto out_regulator_disable;
+-
+ 	/* write-enable bits */
+ 	data = GRF_MODE_ENABLE_BIT | GRF_SPEED_ENABLE_BIT;
+ 
+@@ -184,6 +180,13 @@ static int emac_rockchip_probe(struct platform_device *pdev)
+ 	err = clk_set_rate(priv->refclk, 50000000);
+ 	if (err)
+ 		dev_err(dev, "failed to change reference clock rate (%d)\n", err);
++
++	err = arc_emac_probe(ndev, interface);
++	if (err) {
++		dev_err(dev, "failed to probe arc emac (%d)\n", err);
++		goto out_regulator_disable;
++	}
++
+ 	return 0;
+ 
+ out_regulator_disable:
 -- 
 1.7.9.5
