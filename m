@@ -1,35 +1,42 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Fri, 8 Jan 2016 02:45:43 +0300
-Subject: [PATCH v6 11/21] arm64: ilp32: introduce binfmt_ilp32.c
-In-Reply-To: <1452209679-19445-12-git-send-email-ynorov@caviumnetworks.com>
-References: <1452209679-19445-1-git-send-email-ynorov@caviumnetworks.com>
- <1452209679-19445-12-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <20160107234543.GA19526@yury-N73SV>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 08 Jan 2016 01:20:08 +0100
+Subject: [PATCH v11 2/4] PM / Domains: add setter for dev.pm_domain
+In-Reply-To: <CAAObsKC1jTzLWmMtwGWVStuMtzZwvMuA_731dsn4YX7aKMtFKQ@mail.gmail.com>
+References: <1445956731-6304-1-git-send-email-tomeu.vizoso@collabora.com>
+ <CAGS+omBMJXOgsd2x9agtt7yi-y+EPgHWSTr7B3JqbN9Hg_2W5A@mail.gmail.com>
+ <CAAObsKC1jTzLWmMtwGWVStuMtzZwvMuA_731dsn4YX7aKMtFKQ@mail.gmail.com>
+Message-ID: <1638223.v1Ed2MLOOC@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 08, 2016 at 02:34:29AM +0300, Yury Norov wrote:
-> to handle ILP32 binaries
+On Thursday, January 07, 2016 03:47:01 PM Tomeu Vizoso wrote:
+> On 10 November 2015 at 10:33, Daniel Kurtz <djkurtz@chromium.org> wrote:
+> [snip]
+> >
+> > The problem appears to be that:
+> >   * On boot, platform_drv_probe() calls dev_pm_domain_attach() before
+> > drv->probe(); thus, it calls dev_pm_domain_attach() while the device
+> > is unbound.
+> >
+> >  * However, for a platform_device, the reboot path calls
+> > device_shutdown(), but not __device_release_driver():
+> > device_shutdown()
+> >   dev->driver->shutdown => platform_drv_shutdown()
+> >     dev_pm_domain_detach()
+> >        dev->pm_domain->detach() => genpd_dev_pm_detach()
+> >          pm_genpd_remove_device()
+> >             dev_pm_domain_set(dev, NULL);
+> >
+> > So, for a platform_device in a genpd power domain with .shutdown
+> > installed, platform_drv_shutdown() calls dev_pm_domain_detach() while
+> > the device is still bound, which triggers the WARN().
 > 
-> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-> ---
-[...]
-> diff --git a/arch/arm64/kernel/binfmt_ilp32.c b/arch/arm64/kernel/binfmt_ilp32.c
-> new file mode 100644
-> index 0000000..02a7a6c
-> --- /dev/null
-> +++ b/arch/arm64/kernel/binfmt_ilp32.c
-> @@ -0,0 +1,21 @@
-> +/*
-> + * Support for ILP32 Linux/aarch64 ELF binaries.
-> + */
-> +
-> +/* AARCH64 ILP32 EABI. */
-> +#define compat_elf_check_arch(x)	(((x)->e_machine == EM_AARCH64)	\
-> +					&& (x)->e_ident[EI_CLASS] == ELFCLASS32)
-> +
+> Hi Rafael, Alan and Ulf,
+> 
+> do you have any suggestion about this? I don't really understand why
+> the device is detached from the domain on shutdown.
 
-Not sure about this. Originally it was just:
-        #define compat_elf_check_arch(x)	(((x)->e_machine == EM_AARCH64)	\
+Well, this looks like a bug to me.
 
-But how than distinguish aarch64 and aarch64/ilp32 elfs? 
+Thanks,
+Rafael
