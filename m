@@ -1,34 +1,58 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 08 Jan 2016 22:52:44 +0100
-Subject: [PATCH] ext4: fix ext4_ioctl_setproject return code
-Message-ID: <4720038.3sLXXjk50c@wuerfel>
+Date: Fri, 08 Jan 2016 23:03:49 +0100
+Subject: [PATCH] ARM: turn init_new_context into an inline function
+Message-ID: <16176240.edsgIdRrJJ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly introduced ext4_ioctl_setproject() functions comes in two
-versions, one is fine and the other has an undefined return value,
-as indicated by a compiler warning:
+Almost all architectures define init_new_context() as a function,
+but on ARM, it's a macro and that causes a compiler warning when
+its return code is not used:
 
-fs/ext4/ioctl.c:426:1: warning: control reaches end of non-void function [-Wreturn-type]
-fs/ext4/ioctl.c: In function 'ext4_ioctl_setproject':
+drivers/firmware/efi/arm-runtime.c: In function 'efi_virtmap_init':
+arch/arm/include/asm/mmu_context.h:88:34: warning: statement with no effect [-Wunused-value]
+ #define init_new_context(tsk,mm) 0
+drivers/firmware/efi/arm-runtime.c:47:2: note: in expansion of macro 'init_new_context'
+  init_new_context(NULL, &efi_mm);
 
-This changes the function to return zero on success, as the other
-version does.
+This changes the definition into an inline function, which gcc does
+not warn about.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: e14c6dbc6429 ("ext4: add FS_IOC_FSSETXATTR/FS_IOC_FSGETXATTR interface support")
+Fixes: f7d924894265 ("arm64/efi: refactor EFI init and runtime code for reuse by 32-bit ARM")
 ---
-Found on ARM randconfig testing on the last two linux-next releases.
 
-diff --git a/fs/ext4/ioctl.c b/fs/ext4/ioctl.c
-index c1d45aaa7d55..946560cb3fe6 100644
---- a/fs/ext4/ioctl.c
-+++ b/fs/ext4/ioctl.c
-@@ -423,6 +423,7 @@ static int ext4_ioctl_setproject(struct file *filp, __u32 projid)
- {
- 	if (projid != EXT4_DEF_PROJID)
- 		return -EOPNOTSUPP;
+This has newly showed up in ARM randconfig builds
+
+diff --git a/arch/arm/include/asm/mmu_context.h b/arch/arm/include/asm/mmu_context.h
+index 432ce8176498..fa5b42d44985 100644
+--- a/arch/arm/include/asm/mmu_context.h
++++ b/arch/arm/include/asm/mmu_context.h
+@@ -26,7 +26,12 @@ void __check_vmalloc_seq(struct mm_struct *mm);
+ #ifdef CONFIG_CPU_HAS_ASID
+ 
+ void check_and_switch_context(struct mm_struct *mm, struct task_struct *tsk);
+-#define init_new_context(tsk,mm)	({ atomic64_set(&(mm)->context.id, 0); 0; })
++static inline int
++init_new_context(struct task_struct *tsk, struct mm_struct *mm)
++{
++	atomic64_set(&mm->context.id, 0);
 +	return 0;
- }
- #endif
++}
+ 
+ #ifdef CONFIG_ARM_ERRATA_798181
+ void a15_erratum_get_cpumask(int this_cpu, struct mm_struct *mm,
+@@ -85,7 +90,12 @@ static inline void finish_arch_post_lock_switch(void)
+ 
+ #endif	/* CONFIG_MMU */
+ 
+-#define init_new_context(tsk,mm)	0
++static inline int
++init_new_context(struct task_struct *tsk, struct mm_struct *mm)
++{
++	return 0;
++}
++
+ 
+ #endif	/* CONFIG_CPU_HAS_ASID */
  
