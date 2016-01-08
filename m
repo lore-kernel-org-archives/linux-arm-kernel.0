@@ -1,58 +1,33 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 08 Jan 2016 17:45:58 +0100
-Subject: [PATCH v6 14/21] arm64:ilp32: add sys_ilp32.c and a separate
- table (in entry.S) to use it
-In-Reply-To: <20160108111318.GA24066@yury-N73SV>
-References: <1452209679-19445-1-git-send-email-ynorov@caviumnetworks.com>
- <8354919.jOyEk0znB5@wuerfel> <20160108111318.GA24066@yury-N73SV>
-Message-ID: <5545727.LTSeGgXLjb@wuerfel>
+Date: Fri, 08 Jan 2016 17:49:20 +0100
+Subject: [GIT PULL] urgent onenand file system corruption fix for n900
+In-Reply-To: <20160108163250.GT12777@atomide.com>
+References: <20160108163250.GT12777@atomide.com>
+Message-ID: <9046751.uROfOxQcxi@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 08 January 2016 14:13:18 Yury Norov wrote:
-> On Fri, Jan 08, 2016 at 10:21:06AM +0100, Arnd Bergmann wrote:
-> > On Friday 08 January 2016 02:34:32 Yury Norov wrote:
-> > 
-> > > @@ -688,6 +692,12 @@ ni_sys:
-> > >     b       ret_fast_syscall
-> > >  ENDPROC(el0_svc)
-> > >  
-> > > +#ifdef CONFIG_ARM64_ILP32
-> > > +el0_ilp32_svc:
-> > > +   adrp    stbl, sys_call_ilp32_table // load syscall table pointer
-> > > +   b el0_svc_naked
-> > > +#endif
-> > 
-> > Don't we still need some code that clears the top halves of the 32-bit
-> > arguments? That thread has taken so many turns now that I'm confused
-> > about what we actually need, but I thought we had concluded that your
-> > current approach has at some some problems.
+On Friday 08 January 2016 08:32:50 Tony Lindgren wrote:
+> Last minute urgent pull request to prevent file system corruption
+> on Nokia N900.
 > 
-> We are discussing how to do it better - make a generic solution from
-> s390 with individual syscall handling, or reproduce s390 solution for
-> ILP32, or zero top-half registers and not use top half of register at
-> all. As I understand, we stand on 1st option, and agreed to introduce
-> it separately.
+> Looks like we have a GPMC bus timing bug that has gone unnoticed
+> because of bootloader configured registers until few days ago. We
+> are not detecting the onenand clock rate properly unless we have
+> CONFIG_OMAP_GPMC_DEBUG set and this causes onenand corruption
+> that can be easily be reproduced.
+> 
+> There seems to be also an additional bug still lurking around for
+> onenand corruption. But that is still being investigated and
+> it does not seem to be GPMC timings related.
+> 
+> Meanwhile, it would be good to get this fix into v4.4 to prevent
+> wrong timings from corrupting onenand.
+> 
 
-Ok. At some point I thought there was a security hole if we don't
-do the explicit expansion, but now I can't remember what I was thinking
-of or if that was actually real. Let me try to recall my understanding:
+Pulled into fixes, thanks.
 
-We know that the existing DEFINE_SYSCALL wrappers work fine for
-32-bit (__u32, int, unsigned int, ...) or smaller (char, short, __u8,
-__u16, ...) arguments as well as the explicitly 64-bit arguments (loff_t,
-__u64, __s64). Entering a syscall with a 'long' (or size_t, pointer, ...)
-argument means that user space expects the kernel to ignore the upper
-half, but the kernel will treat it as part of the register. This means
-anything we pass into the kernel will follow the ELF ABI for function
-calls, and I don't see a security problem here either, just the question
-of how the ABI should be defined.
-
-(sorry for the excursion, I needed to write that down to get my own
-thoughts sorted)
-
-I still think that the first option from Catalin's email is best here,
-and it would be good if you could implement that so we can see if
-there are any complications we have not thought of yet.
+I'll try to get the fixes pull request out tonight, there are a
+small number of other fixes.
 
 	Arnd
