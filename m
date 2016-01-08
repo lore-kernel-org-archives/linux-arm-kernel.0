@@ -1,51 +1,68 @@
-From: laura@labbott.name (Laura Abbott)
-Date: Fri, 8 Jan 2016 10:14:35 -0800
-Subject: ION DTS changes for HiKey in -next
-In-Reply-To: <20160108135552.GE3097@leverpostej>
-References: <20160107173744.GJ6588@sirena.org.uk>
- <20160108050214.GD30293@kroah.com> <20160108124439.GL6588@sirena.org.uk>
- <20160108135552.GE3097@leverpostej>
-Message-ID: <568FFC8B.3090101@labbott.name>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri,  8 Jan 2016 10:50:30 -0800
+Subject: [PATCH] pinctrl: freescale: imx: implement gpio_disable_free for
+ Vybrid
+Message-ID: <1452279030-5459-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/8/16 5:55 AM, Mark Rutland wrote:
-> On Fri, Jan 08, 2016 at 12:44:39PM +0000, Mark Brown wrote:
->> On Thu, Jan 07, 2016 at 09:02:14PM -0800, Greg Kroah-Hartman wrote:
->>> On Thu, Jan 07, 2016 at 05:37:44PM +0000, Mark Brown wrote:
->>
->>>> I was just looking at DTs in -next and noticed that there is a patch
->>>> 59dfafd03fc (arm64: dts: Add dts files to enable ION on Hi6220 SoC)
->>>> which adds at DT doing something for ION.  Are we sure this should be
->>>> going into the main production DT?  The bindings haven't been reviewed
->>>> as far as I can tell, the matching driver is only in staging and hasn't
->>>> been posted upstream.
->>
->>> Isn't "staging" upstream enough for this?  :)
->>
->> I wouldn't have thought so, DTs are supposed to be an ABI so we want
->> proper review and having had a quick glance this doesn't look like it's
->> a hardware description so it's not clear to me it should be in DT at all.
->
-> Indeed.
->
-> The driver and the binding before that don't really belong either,
-> I would have NAK'd those on devicetree at vger.kernel.org, though it
-> appears I either missed them or they never made it to that list.
->
->  From my PoV there should not be a platform-specific ION binding. If we
-> need one at all, people should work on the proposed generic binding [1]
-> or figure out how to do this with the existing reserved-memory bindings.
->
-> Thanks,
-> Mark.
->
-> [1] https://lkml.org/lkml/2015/10/6/854
+The Freescale Vybrid SoC has GPIO capabilities as part of the
+IOMUXC. To enable GPIO's, the gpio_request_enable callback has
+been implemented, however the corsponding gpio_disable_free
+callback is missing. So far, disabling (unexporting) a GPIO left
+the pin in its last state.
 
-I posted v2 back in November
-(http://article.gmane.org/gmane.linux.drivers.driver-project.devel/80475)
-but there wasn't much in the way of review comments. More feedback there
-would be appreciated or I can resend.
+Implement a proper gpio_disable_free function which clears the
+three enable bits which influence the state (IBE, OBE and PUE).
 
-Thanks,
-Laura
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ drivers/pinctrl/freescale/pinctrl-imx.c | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+
+diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c b/drivers/pinctrl/freescale/pinctrl-imx.c
+index a5bb939..4c435cf 100644
+--- a/drivers/pinctrl/freescale/pinctrl-imx.c
++++ b/drivers/pinctrl/freescale/pinctrl-imx.c
+@@ -341,6 +341,31 @@ mux_pin:
+ 	return 0;
+ }
+ 
++static void imx_pmx_gpio_disable_free(struct pinctrl_dev *pctldev,
++			struct pinctrl_gpio_range *range, unsigned offset)
++{
++	struct imx_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
++	const struct imx_pinctrl_soc_info *info = ipctl->info;
++	const struct imx_pin_reg *pin_reg;
++	u32 reg;
++
++	/*
++	 * Only Vybrid has the input/output buffer enable flags (IBE/OBE)
++	 * They are part of the shared mux/conf register.
++	 */
++	if (!(info->flags & SHARE_MUX_CONF_REG))
++		return;
++
++	pin_reg = &info->pin_regs[offset];
++	if (pin_reg->mux_reg == -1)
++		return;
++
++	/* Clear IBE/OBE/PUE to disable the pin (Hi-Z) */
++	reg = readl(ipctl->base + pin_reg->mux_reg);
++	reg &= ~0x7;
++	writel(reg, ipctl->base + pin_reg->mux_reg);
++}
++
+ static int imx_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
+ 	   struct pinctrl_gpio_range *range, unsigned offset, bool input)
+ {
+@@ -377,6 +402,7 @@ static const struct pinmux_ops imx_pmx_ops = {
+ 	.get_function_groups = imx_pmx_get_groups,
+ 	.set_mux = imx_pmx_set,
+ 	.gpio_request_enable = imx_pmx_gpio_request_enable,
++	.gpio_disable_free = imx_pmx_gpio_disable_free,
+ 	.gpio_set_direction = imx_pmx_gpio_set_direction,
+ };
+ 
+-- 
+2.6.4
