@@ -1,56 +1,58 @@
-From: daniel@iogearbox.net (Daniel Borkmann)
-Date: Fri, 08 Jan 2016 17:44:42 +0100
-Subject: [PATCH] arm64: net: bpf: don't BUG() on large shifts
-In-Reply-To: <20160108155837.GA28291@debian>
-References: <1452015543-6790-1-git-send-email-rabin@rab.in>
- <20160105175557.GC83548@ast-mbp.thefacebook.com>
- <20160106203127.GA16059@debian>
- <20160106221247.GA95332@ast-mbp.thefacebook.com>
- <063D6719AE5E284EB5DD2968C1650D6D1CCBF08E@AcuExch.aculab.com>
- <568E5EB0.8020102@iogearbox.net> <20160108155837.GA28291@debian>
-Message-ID: <568FE77A.3090107@iogearbox.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 08 Jan 2016 17:45:58 +0100
+Subject: [PATCH v6 14/21] arm64:ilp32: add sys_ilp32.c and a separate
+ table (in entry.S) to use it
+In-Reply-To: <20160108111318.GA24066@yury-N73SV>
+References: <1452209679-19445-1-git-send-email-ynorov@caviumnetworks.com>
+ <8354919.jOyEk0znB5@wuerfel> <20160108111318.GA24066@yury-N73SV>
+Message-ID: <5545727.LTSeGgXLjb@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08/2016 04:58 PM, Rabin Vincent wrote:
-> On Thu, Jan 07, 2016 at 01:48:48PM +0100, Daniel Borkmann wrote:
->> The question is what is less risky in terms of uabi. To reject such
->> filters with such K shift vals upfront in verifier, or to just allow
->> [0, reg_size - 1] values and handle outliers silently. I think both
->> might be possible, the latter just needs to be clearly specified in
->> the documentation somewhere. If we go for the latter, then probably
->> just rewriting that K value as masked one might seem better. Broken
->> programs might then still be loadable (and still be broken) ... afaik
->> in case of register (case of shifts with X) with large shift vals
->> ARM64 is doing 'modulo reg_size' implicitly.
->
-> The case of what happens with such shifts with X is also already
-> architecture-specific, even when using the interpreters.  For example, the
-> following program returns 1 on ARM64 but 0 on ARM.
->
-> 	BPF_STMT(BPF_LD | BPF_IMM, 1),
-> 	BPF_STMT(BPF_LDX | BPF_IMM, 32),
-> 	BPF_STMT(BPF_ALU | BPF_LSH | BPF_X, 0),
-> 	BPF_STMT(BPF_RET | BPF_A, 0)
->
-> To start rejecting large K shifts in the verifier because they are
-> architecture-specific while continuing to allow the equally
-> architecture-specific large X shifts (because we can't verify them
-> statically) would be rather inconsistent.
+On Friday 08 January 2016 14:13:18 Yury Norov wrote:
+> On Fri, Jan 08, 2016 at 10:21:06AM +0100, Arnd Bergmann wrote:
+> > On Friday 08 January 2016 02:34:32 Yury Norov wrote:
+> > 
+> > > @@ -688,6 +692,12 @@ ni_sys:
+> > >     b       ret_fast_syscall
+> > >  ENDPROC(el0_svc)
+> > >  
+> > > +#ifdef CONFIG_ARM64_ILP32
+> > > +el0_ilp32_svc:
+> > > +   adrp    stbl, sys_call_ilp32_table // load syscall table pointer
+> > > +   b el0_svc_naked
+> > > +#endif
+> > 
+> > Don't we still need some code that clears the top halves of the 32-bit
+> > arguments? That thread has taken so many turns now that I'm confused
+> > about what we actually need, but I thought we had concluded that your
+> > current approach has at some some problems.
+> 
+> We are discussing how to do it better - make a generic solution from
+> s390 with individual syscall handling, or reproduce s390 solution for
+> ILP32, or zero top-half registers and not use top half of register at
+> all. As I understand, we stand on 1st option, and agreed to introduce
+> it separately.
 
-Hmm, yeah, agree with you that this would be inconsistent. Last time we
-actually had this topic [1], I believe the consensus was that such BPF
-programs are to be considered "undefined".
+Ok. At some point I thought there was a security hole if we don't
+do the explicit expansion, but now I can't remember what I was thinking
+of or if that was actually real. Let me try to recall my understanding:
 
-In that case, I think just masking the K value silently into its allowed
-range for classic and eBPF might be better. It would eventually not be
-uniform with regards to shifts where X is involved, but if we consider
-it "undefined" behaviour, such uniformity is probably not needed.
+We know that the existing DEFINE_SYSCALL wrappers work fine for
+32-bit (__u32, int, unsigned int, ...) or smaller (char, short, __u8,
+__u16, ...) arguments as well as the explicitly 64-bit arguments (loff_t,
+__u64, __s64). Entering a syscall with a 'long' (or size_t, pointer, ...)
+argument means that user space expects the kernel to ignore the upper
+half, but the kernel will treat it as part of the register. This means
+anything we pass into the kernel will follow the ELF ABI for function
+calls, and I don't see a security problem here either, just the question
+of how the ABI should be defined.
 
-> If it is desired to enforce uniformity across architectures despite the
-> risk for subtly changing the behaviour of existing programs, then the
-> desired uniform semantics of these shifts should really be implemented
-> both for the K and X shifts, which would mean modifiying the interpreter
-> and the various arch JITs too.
+(sorry for the excursion, I needed to write that down to get my own
+thoughts sorted)
 
-   [1] https://lkml.org/lkml/2015/12/4/148
+I still think that the first option from Catalin's email is best here,
+and it would be good if you could implement that so we can see if
+there are any complications we have not thought of yet.
+
+	Arnd
