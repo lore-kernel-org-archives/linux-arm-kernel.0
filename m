@@ -1,39 +1,24 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 08 Jan 2016 09:07:50 +0000
-Subject: [PATCH v3 1/3] gpio: xgene: Enable X-Gene standby GPIO as
- interrupt controller
-In-Reply-To: <alpine.DEB.2.11.1601080942270.3575@nanos>
-References: <1452162428-26839-1-git-send-email-qnguyen@apm.com>
- <1452162428-26839-2-git-send-email-qnguyen@apm.com>
- <alpine.DEB.2.11.1601080942270.3575@nanos>
-Message-ID: <568F7C66.2050000@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 08 Jan 2016 10:08:44 +0100
+Subject: [PATCH v6 11/21] arm64: ilp32: introduce binfmt_ilp32.c
+In-Reply-To: <1452209679-19445-12-git-send-email-ynorov@caviumnetworks.com>
+References: <1452209679-19445-1-git-send-email-ynorov@caviumnetworks.com>
+ <1452209679-19445-12-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <5115829.mX1Uk4EoYk@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/01/16 08:45, Thomas Gleixner wrote:
-> On Thu, 7 Jan 2016, Quan Nguyen wrote:
->> -static int apm_gpio_sb_to_irq(struct gpio_chip *gc, u32 gpio)
->> +static void xgene_gpio_sb_irq_ack(struct irq_data *d)
->> +{
->> +	struct irq_data *irqdata;
->> +	struct xgene_gpio_sb *priv = irq_data_get_irq_chip_data(d);
->> +
->> +	irqdata = irq_get_irq_data(priv->gic_virq[d->hwirq]);
->> +	if (!irqdata || !irqdata->chip)
->> +		return;
+On Friday 08 January 2016 02:34:29 Yury Norov wrote:
+> +
+> +#include "../../../fs/compat_binfmt_elf.c"
 > 
-> What the heck is this? Why are you looking up some random other irq and fiddle
-> with its irq chip?
-> 
-> This is a 1:1 mapping from your gpio irq to a gic irq. We have hierarchical
-> interrupt domains for this.
 
-I've said the exact same thing back in October:
+This is the wrong file, you have to include fs/binfmt_elf.c, otherwise
+you pick up the same definitions that you have for the other one.
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/381996.html
+Alternatively, you can also change binfmt_elf32.c to include fs/binfmt_elf.c
+and use fs/compat_binfmt_elf.c here if that makes the code nicer, you
+just can use the compat file for both or things get ugly because of
+the extra indirections.
 
-but obviously I wasn't clear enough...
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+	Arnd
