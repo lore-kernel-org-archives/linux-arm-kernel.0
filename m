@@ -1,69 +1,26 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 8 Jan 2016 15:36:54 +0000
-Subject: [PATCH v2 11/13] arm64: allow kernel Image to be loaded anywhere
- in physical memory
-In-Reply-To: <20160108152738.GG16432@e104818-lin.cambridge.arm.com>
-References: <1451489172-17420-1-git-send-email-ard.biesheuvel@linaro.org>
- <1451489172-17420-12-git-send-email-ard.biesheuvel@linaro.org>
- <20160108152738.GG16432@e104818-lin.cambridge.arm.com>
-Message-ID: <20160108153653.GB32692@leverpostej>
+From: rth@twiddle.net (Richard Henderson)
+Date: Fri, 8 Jan 2016 07:42:49 -0800
+Subject: [PATCH v2 2/6] alpha/extable: use generic search and sort routines
+In-Reply-To: <1452007180-27411-3-git-send-email-ard.biesheuvel@linaro.org>
+References: <1452007180-27411-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1452007180-27411-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <568FD8F9.4050602@twiddle.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 08, 2016 at 03:27:38PM +0000, Catalin Marinas wrote:
-> On Wed, Dec 30, 2015 at 04:26:10PM +0100, Ard Biesheuvel wrote:
-> > +static void __init enforce_memory_limit(void)
-> > +{
-> > +	const phys_addr_t kbase = round_down(__pa(_text), MIN_KIMG_ALIGN);
-> > +	u64 to_remove = memblock_phys_mem_size() - memory_limit;
-> > +	phys_addr_t max_addr = 0;
-> > +	struct memblock_region *r;
-> > +
-> > +	if (memory_limit == (phys_addr_t)ULLONG_MAX)
-> > +		return;
-> > +
-> > +	/*
-> > +	 * The kernel may be high up in physical memory, so try to apply the
-> > +	 * limit below the kernel first, and only let the generic handling
-> > +	 * take over if it turns out we haven't clipped enough memory yet.
-> > +	 */
-> > +	for_each_memblock(memory, r) {
-> > +		if (r->base + r->size > kbase) {
-> > +			u64 rem = min(to_remove, kbase - r->base);
-> > +
-> > +			max_addr = r->base + rem;
-> > +			to_remove -= rem;
-> > +			break;
-> > +		}
-> > +		if (to_remove <= r->size) {
-> > +			max_addr = r->base + to_remove;
-> > +			to_remove = 0;
-> > +			break;
-> > +		}
-> > +		to_remove -= r->size;
-> > +	}
-> > +
-> > +	memblock_remove(0, max_addr);
-> > +
-> > +	if (to_remove)
-> > +		memblock_enforce_memory_limit(memory_limit);
-> > +}
+On 01/05/2016 07:19 AM, Ard Biesheuvel wrote:
+> Replace the arch specific versions of search_extable() and sort_extable()
+> with calls to the generic ones, which now support relative exception
+> tables as well.
 > 
-> IIUC, this is changing the user expectations a bit. There are people
-> using the mem= limit to hijack some top of the RAM for other needs
-> (though they could do it in a saner way like changing the DT memory
-> nodes).
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/alpha/include/asm/uaccess.h | 10 ++-
+>  arch/alpha/mm/Makefile           |  2 +-
+>  arch/alpha/mm/extable.c          | 92 --------------------
+>  3 files changed, 9 insertions(+), 95 deletions(-)
 
-Which will be hopelessly broken in the presence of KASLR, the kernel
-being loaded at a different address, pages betting reserved differently
-due to page size, etc.
+Acked-by: Richard Henderson <rth@twiddle.net>
 
-I hope that no-one usees this for anything other than testing low-memory
-conditions. If they want to steal memory they need to carve it out
-explicitly.
 
-We can behave as we used to, but we shouldn't give the impression that
-such usage is supported.
-
-Thanks,
-Mark.
+r~
