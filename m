@@ -1,46 +1,60 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Fri, 8 Jan 2016 12:00:13 -0300
-Subject: [PATCH 1/2] power: act8945a: add charger driver for ACT8945A
-In-Reply-To: <1452219225-10510-2-git-send-email-wenyou.yang@atmel.com>
-References: <1452219225-10510-1-git-send-email-wenyou.yang@atmel.com>
- <1452219225-10510-2-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <CABxcv=mQoDxb7oHh0DdC_t1_m-j=4Hp-sPNoq4Apy4c7CneSng@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 8 Jan 2016 15:01:37 +0000
+Subject: [PATCH V2 22/23] pci, acpi: Match PCI config space accessors
+ against platfrom specific quirks.
+In-Reply-To: <1452262581.31901.26.camel@redhat.com>
+References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
+ <1450278993-12664-23-git-send-email-tn@semihalf.com>
+ <1452262581.31901.26.camel@redhat.com>
+Message-ID: <20160108150137.GH3097@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Wenyou,
+On Fri, Jan 08, 2016 at 09:16:21AM -0500, Mark Salter wrote:
+> On Wed, 2015-12-16 at 16:16 +0100, Tomasz Nowicki wrote:
+> > Some platforms may not be fully compliant with generic set of PCI config
+> > accessors. For these cases we implement the way to overwrite accessors
+> > set before PCI buses enumeration. Algorithm that overwrite accessors
+> > matches against platform ID (DMI), domain and bus number, hopefully
+> > enough for all cases. All quirks can be defined using:
+> > DECLARE_ACPI_MCFG_FIXUP() and keep self contained.
+> > 
+> > example:
+> > 
+> > static const struct dmi_system_id yyy[] = {
+> > ????????{
+> > ????????????????.ident = "<Platform ident string>",
+> > ????????????????.callback = <handler>,
+> > ????????????????.matches = {
+> > ????????????????????????DMI_MATCH(DMI_SYS_VENDOR, "<system vendor>"),
+> > ????????????????????????DMI_MATCH(DMI_PRODUCT_NAME, "<product name>"),
+> > ????????????????????????DMI_MATCH(DMI_PRODUCT_VERSION, "product version"),
+> > ????????????????},
+> > ????????},
+> > ????????{ }
+> > };
+> > 
+> 
+> This seems awkward to me in the case where the quirk is SoC-based and there
+> may be multiple platforms affected. Needing a DECLARE_ACPI_MCFG_FIXUP for
+> each platform using such a SoC (i.e. Mustang and Moonshot) doesn't seem
+> right. In that case, I think it'd be better to check CPUID and possibly
+> some SoC register to cover all platforms affected.
 
-On Thu, Jan 7, 2016 at 11:13 PM, Wenyou Yang <wenyou.yang@atmel.com> wrote:
-> This patch adds new driver for Active-semi ACT8945A ActivePath
-> charger (part of ACT8945A MFD driver) providing power supply class
-> information to userspace.
->
-> The driver is configured through DTS (battery and system related
-> settings) and sysfs entries (timers and input over-voltage threshold).
->
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> ---
->
+CPUs get reused across SoCs, so as you've implicitly noted, the CPUID
+alone is insufficient.
 
-[snip]
+Given that IP blocks get moved around between SoC variants, I don't
+think you can check "some SoC register" based on the CPU ID -- you can
+end up bringing the board down at that point.
 
-> +
-> +static struct platform_driver act8945a_charger_driver = {
-> +       .driver = {
-> +               .name = "act8945a-charger",
-> +       },
-> +       .probe  = act8945a_charger_probe,
-> +       .remove = act8945a_charger_remove,
-> +};
-> +
+If the CPU ID alone is insufficient to tell you about a component, it
+cannot give you enough information about a component you can use to
+query more information from.
 
-The driver is missing an OF match table (and also a platform ID match
-table if non-DT is supported) so this means that module autoloading
-will be broken for this driver since the platform uevent function will
-report a MODALIAS=of:N*T*Cactive-semi,act8945a-charger
+If your platform requires a quirk, it's always going to be painful (and
+to some extent, rightfulyl so). We should aim for correctness here with
+explicit matching.
 
-Matching is only working because the platform bus match function use
-as a fallback the driver name.
-
-Best regards,
-Javier
+Thanks,
+Mark.
