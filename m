@@ -1,264 +1,99 @@
-From: xuejiancheng@huawei.com (Jiancheng Xue)
-Date: Fri, 8 Jan 2016 10:16:40 +0800
-Subject: [PATCH v5 6/6] ARM: dts: add dts files for Hi3519
-In-Reply-To: <1452219400-32478-1-git-send-email-xuejiancheng@huawei.com>
-References: <1452219400-32478-1-git-send-email-xuejiancheng@huawei.com>
-Message-ID: <1452219400-32478-7-git-send-email-xuejiancheng@huawei.com>
+From: jcliang@chromium.org (Ricky Liang)
+Date: Fri, 8 Jan 2016 10:43:52 +0800
+Subject: [RESEND PATCH v2] soc: mediatek: PMIC wrap: Clear the vldclr if
+ state machine stay on FSM_VLDCLR state.
+In-Reply-To: <1451908972-11882-1-git-send-email-henryc.chen@mediatek.com>
+References: <1451908972-11882-1-git-send-email-henryc.chen@mediatek.com>
+Message-ID: <CAAJzSMdr_kKP=AuhodFSVN5KVKkVPBC9b3hie8F6a63C9QnZ9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add dts files for Hi3519
+On Mon, Jan 4, 2016 at 8:02 PM, Henry Chen <henryc.chen@mediatek.com> wrote:
+>
+> Sometimes PMIC is too busy to send data in time to cause pmic wrap timeout,
+> because pmic wrap is waiting for FSM_VLDCLR after finishing WACS2_CMD. It
+> just return error when issue happened, so the state machine will stay on
+> FSM_VLDCLR state when data send back later by PMIC and timeout again in next
+> time because pmic wrap waiting for FSM_IDLE state at the beginning of the
+> read/write function.
+>
+> Clear the vldclr when timeout if state machine stay on FSM_VLDCLR.
+>
+> Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
+> ---
+> Changes since v1:
+> Encapsulated the code in a inline function, and add a descriptive comment.
+> ---
+>  drivers/soc/mediatek/mtk-pmic-wrap.c | 30 ++++++++++++++++++++++++++++--
+>  1 file changed, 28 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> index 105597a..af919b1 100644
+> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
+> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> @@ -412,6 +412,12 @@ static bool pwrap_is_fsm_vldclr(struct pmic_wrapper *wrp)
+>         return PWRAP_GET_WACS_FSM(val) == PWRAP_WACS_FSM_WFVLDCLR;
+>  }
+>
+> +static inline void pwrap_leave_fsm_vldclr(struct pmic_wrapper *wrp)
+> +{
+> +       if (pwrap_is_fsm_vldclr(wrp))
+> +               pwrap_writel(wrp, 1, PWRAP_WACS2_VLDCLR);
+> +}
+> +
+>  static bool pwrap_is_sync_idle(struct pmic_wrapper *wrp)
+>  {
+>         return pwrap_readl(wrp, PWRAP_WACS2_RDATA) & PWRAP_STATE_SYNC_IDLE0;
+> @@ -445,8 +451,18 @@ static int pwrap_write(struct pmic_wrapper *wrp, u32 adr, u32 wdata)
+>         int ret;
+>
+>         ret = pwrap_wait_for_state(wrp, pwrap_is_fsm_idle);
+> -       if (ret)
+> +       if (ret) {
+> +               /*
+> +                * Timeout issue sometimes caused by the last read command
+> +                * failed because pmic wrap could not got the FSM_VLDCLR
+> +                * in time after finishing WACS2_CMD. It made state machine
+> +                * still on FSM_VLDCLR and timeout next time.
+> +                * Check the status of FSM and clear the vldclr to recovery the
+> +                * error.
+> +                */
+> +               pwrap_leave_fsm_vldclr(wrp);
+>                 return ret;
+> +       }
+>
+>         pwrap_writel(wrp, (1 << 31) | ((adr >> 1) << 16) | wdata,
+>                         PWRAP_WACS2_CMD);
+> @@ -459,8 +475,18 @@ static int pwrap_read(struct pmic_wrapper *wrp, u32 adr, u32 *rdata)
+>         int ret;
+>
+>         ret = pwrap_wait_for_state(wrp, pwrap_is_fsm_idle);
+> -       if (ret)
+> +       if (ret) {
+> +               /*
+> +                * Timeout issue sometimes caused by the last read command
+> +                * failed because pmic wrap could not got the FSM_VLDCLR
+> +                * in time after finishing WACS2_CMD. It made state machine
+> +                * still on FSM_VLDCLR and timeout next time.
+> +                * Check the status of FSM and clear the vldclr to recovery the
+> +                * error.
+> +                */
+> +               pwrap_leave_fsm_vldclr(wrp);
+>                 return ret;
+> +       }
+>
+>         pwrap_writel(wrp, (adr >> 1) << 16, PWRAP_WACS2_CMD);
+>
+> --
+> 1.9.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
 
-Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
----
- arch/arm/boot/dts/Makefile        |   2 +
- arch/arm/boot/dts/hi3519-demb.dts |  42 +++++++++
- arch/arm/boot/dts/hi3519.dtsi     | 175 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 219 insertions(+)
- create mode 100644 arch/arm/boot/dts/hi3519-demb.dts
- create mode 100644 arch/arm/boot/dts/hi3519.dtsi
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 30bbc37..1ff3ed9 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -135,6 +135,8 @@ dtb-$(CONFIG_ARCH_EXYNOS5) += \
- 	exynos5800-peach-pi.dtb
- dtb-$(CONFIG_ARCH_HI3xxx) += \
- 	hi3620-hi4511.dtb
-+dtb-$(CONFIG_ARCH_HISI) += \
-+	hi3519-demb.dtb
- dtb-$(CONFIG_ARCH_HIX5HD2) += \
- 	hisi-x5hd2-dkb.dtb
- dtb-$(CONFIG_ARCH_HIGHBANK) += \
-diff --git a/arch/arm/boot/dts/hi3519-demb.dts b/arch/arm/boot/dts/hi3519-demb.dts
-new file mode 100644
-index 0000000..6991ab6
---- /dev/null
-+++ b/arch/arm/boot/dts/hi3519-demb.dts
-@@ -0,0 +1,42 @@
-+/*
-+ * Copyright (c) 2015 HiSilicon Technologies Co., Ltd.
-+ *
-+ * This program is free software; you can redistribute  it and/or modify it
-+ * under  the terms of  the GNU General  Public License as published by the
-+ * Free Software Foundation;  either version 2 of the  License, or (at your
-+ * option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ */
-+
-+/dts-v1/;
-+#include "hi3519.dtsi"
-+
-+/ {
-+	model = "HiSilicon HI3519 DEMO Board";
-+	compatible = "hisilicon,hi3519";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x40000000>;
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-+
-+&dual_timer0 {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/hi3519.dtsi b/arch/arm/boot/dts/hi3519.dtsi
-new file mode 100644
-index 0000000..95137c7
---- /dev/null
-+++ b/arch/arm/boot/dts/hi3519.dtsi
-@@ -0,0 +1,175 @@
-+/*
-+ * Copyright (c) 2015 HiSilicon Technologies Co., Ltd.
-+ *
-+ * This program is free software; you can redistribute  it and/or modify it
-+ * under  the terms of  the GNU General  Public License as published by the
-+ * Free Software Foundation;  either version 2 of the  License, or (at your
-+ * option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ */
-+
-+#include <dt-bindings/clock/hi3519-clock.h>
-+/ {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	chosen { };
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0>;
-+		};
-+	};
-+
-+	gic: interrupt-controller at 10300000 {
-+		compatible = "arm,cortex-a7-gic";
-+		#interrupt-cells = <3>;
-+		interrupt-controller;
-+		reg = <0x10301000 0x1000>, <0x10302000 0x1000>;
-+	};
-+
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		interrupt-parent = <&gic>;
-+		ranges;
-+
-+
-+		uart0: serial at 12100000 {
-+			compatible = "arm,pl011", "arm,primecell";
-+			reg = <0x12100000 0x1000>;
-+			interrupts = <0 4 4>;
-+			clocks = <&crg HI3519_UART0_CLK>;
-+			clock-names = "apb_pclk";
-+			status = "disable";
-+		};
-+
-+		uart1: serial at 12101000 {
-+			compatible = "arm,pl011", "arm,primecell";
-+			reg = <0x12101000 0x1000>;
-+			interrupts = <0 5 4>;
-+			clocks = <&crg HI3519_UART1_CLK>;
-+			clock-names = "apb_pclk";
-+			status = "disable";
-+		};
-+
-+		uart2: serial at 12102000 {
-+			compatible = "arm,pl011", "arm,primecell";
-+			reg = <0x12102000 0x1000>;
-+			interrupts = <0 6 4>;
-+			clocks = <&crg HI3519_UART2_CLK>;
-+			clock-names = "apb_pclk";
-+			status = "disable";
-+		};
-+
-+		uart3: serial at 12103000 {
-+			compatible = "arm,pl011", "arm,primecell";
-+			reg = <0x12103000 0x1000>;
-+			interrupts = <0 7 4>;
-+			clocks = <&crg HI3519_UART3_CLK>;
-+			clock-names = "apb_pclk";
-+			status = "disable";
-+		};
-+
-+		uart4: serial at 12104000 {
-+			compatible = "arm,pl011", "arm,primecell";
-+			reg = <0x12104000 0x1000>;
-+			interrupts = <0 8 4>;
-+			clocks = <&crg HI3519_UART4_CLK>;
-+			clock-names = "apb_pclk";
-+			status = "disable";
-+		};
-+
-+		dual_timer0: timer at 12000000 {
-+			compatible = "arm,sp804", "arm,primecell";
-+			interrupts = <0 64 4>, <0 65 4>;
-+			reg = <0x12000000 0x1000>;
-+			clocks = <&crg HI3519_FIXED_3M>;
-+			status = "disable";
-+		};
-+
-+		dual_timer1: timer at 12001000 {
-+			compatible = "arm,sp804", "arm,primecell";
-+			interrupts = <0 66 4>, <0 67 4>;
-+			reg = <0x12001000 0x1000>;
-+			clocks = <&crg HI3519_FIXED_3M>;
-+			status = "disable";
-+		};
-+
-+		dual_timer2: timer at 12002000 {
-+			compatible = "arm,sp804", "arm,primecell";
-+			interrupts = <0 68 4>, <0 69 4>;
-+			reg = <0x12002000 0x1000>;
-+			clocks = <&crg HI3519_FIXED_3M>;
-+			status = "disable";
-+		};
-+
-+		spi_bus0: spi at 12120000 {
-+			compatible = "arm,pl022", "arm,primecell";
-+			reg = <0x12120000 0x1000>;
-+			interrupts = <0 9 4>;
-+			clocks = <&crg HI3519_SPI0_CLK>;
-+			clock-names = "apb_pclk";
-+			num-cs = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disable";
-+		};
-+
-+		spi_bus1: spi at 12121000 {
-+			compatible = "arm,pl022", "arm,primecell";
-+			reg = <0x12121000 0x1000>;
-+			interrupts = <0 10 4>;
-+			clocks = <&crg HI3519_SPI1_CLK>;
-+			clock-names = "apb_pclk";
-+			num-cs = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disable";
-+		};
-+
-+		spi_bus2: spi at 12122000 {
-+			compatible = "arm,pl022", "arm,primecell";
-+			reg = <0x12122000 0x1000>;
-+			interrupts = <0 11 4>;
-+			clocks = <&crg HI3519_SPI2_CLK>;
-+			clock-names = "apb_pclk";
-+			num-cs = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disable";
-+		};
-+
-+		sysctrl: system-controller at 12020000 {
-+			compatible = "hisilicon,hi3519-sysctrl", "syscon";
-+			reg = <0x12020000 0x1000>;
-+		};
-+
-+		reboot {
-+			compatible = "syscon-reboot";
-+			regmap = <&sysctrl>;
-+			offset = <0x4>;
-+			mask = <0xdeadbeef>;
-+		};
-+
-+		crg: clock-reset-controller at 12010000 {
-+			compatible = "hisilicon,hi3519-crg";
-+			#clock-cells = <1>;
-+			#reset-cells = <2>;
-+			reg = <0x12010000 0x10000>;
-+		};
-+	};
-+};
--- 
-1.9.1
+Tested-by: Ricky Liang <jcliang@chromium.org>
+
+On our test platform this patch fixes PMIC communication erros.
