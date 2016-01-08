@@ -1,87 +1,89 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Fri,  8 Jan 2016 19:25:09 +0800
-Subject: [RFC PATCH 1/2] clk: rockchip: rk3036: Add to 100MHz integer
- multiples of cpu freq table
-Message-ID: <1452252311-13908-1-git-send-email-zhengxing@rock-chips.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 8 Jan 2016 12:26:29 +0100
+Subject: [PATCH 4/4] soc: mediatek: Add MT2701/MT7623 scpsys driver
+In-Reply-To: <1451971439.19026.3.camel@mtksdaap41>
+References: <1451457706-14798-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1451457706-14798-5-git-send-email-jamesjj.liao@mediatek.com>
+ <CAGS+omCwxB+4VFOA1hA9Rg-ekWCVM8Y_c7woTEXnvX6FG1y9mQ@mail.gmail.com>
+ <1451470692.22426.11.camel@mtksdaap41> <5684192B.4020806@gmail.com>
+ <1451971439.19026.3.camel@mtksdaap41>
+Message-ID: <568F9CE5.7040601@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need the cpu changing freqs capability, and considering that emac ref
-which is need 50MHz might is under the APLL, meanwhile, we don't need
-too many freqs because it may spend more time to find the correct freq.
-Therefore, we should add 100MHz integer multiples cpu freqs for emac.
 
-Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
----
 
- drivers/clk/rockchip/clk-rk3036.c |   27 ++++++++++++++++++++++++---
- 1 file changed, 24 insertions(+), 3 deletions(-)
+On 05/01/16 06:23, James Liao wrote:
+> Hi Matthias,
+> On Wed, 2015-12-30 at 18:49 +0100, Matthias Brugger wrote:
+>>> On Wed, 2015-12-30 at 17:01 +0800, Daniel Kurtz wrote:
+>>>> On Wed, Dec 30, 2015 at 2:41 PM, James Liao <jamesjj.liao@mediatek.com> wrote:
+>>>>>
+>>>>> From: Shunli Wang <shunli.wang@mediatek.com>
+>>>>>
+>>>>> Add scpsys driver for MT2701 and MT7623.
+>>>>>
+>>>>> Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
+>>>>> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+>>>>> ---
+>>>>>    drivers/soc/mediatek/Kconfig             |  11 +++
+>>>>>    drivers/soc/mediatek/Makefile            |   1 +
+>>>>>    drivers/soc/mediatek/mtk-scpsys-mt2701.c | 161 +++++++++++++++++++++++++++++++
+>>>>>    3 files changed, 173 insertions(+)
+>>>>>    create mode 100644 drivers/soc/mediatek/mtk-scpsys-mt2701.c
+>>>>>
+>>>>> diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
+>>>>> index eca6fb7..92cf838 100644
+>>>>> --- a/drivers/soc/mediatek/Kconfig
+>>>>> +++ b/drivers/soc/mediatek/Kconfig
+>>>>> @@ -39,3 +39,14 @@ config MTK_SCPSYS_MT8173
+>>>>>             driver.
+>>>>>             The System Control Processor System (SCPSYS) has several power
+>>>>>             management related tasks in the system.
+>>>>> +
+>>>>> +config MTK_SCPSYS_MT2701
+>>>>> +       bool "SCPSYS Support MediaTek MT2701 and MT7623"
+>>>>> +       depends on ARCH_MEDIATEK || COMPILE_TEST
+>>>>> +       select MTK_SCPSYS
+>>>>> +       default ARCH_MEDIATEK
+>>>>> +       help
+>>>>> +         Say yes here to add support for the MT2701/MT7623 SCPSYS power
+>>>>> +         domain driver.
+>>>>> +         The System Control Processor System (SCPSYS) has several power
+>>>>> +         management related tasks in the system.
+>>>>
+>>>> I don't think we really want different drivers and Kconfig options.
+>>>>
+>>>> Can we just use different compatibles to select the appropriate scp_domain_data?
+>>>
+>>> Yes, we can. All scpsys drivers are built-in by default, and they will
+>>> be activate by specific compatible string.
+>>>
+>>> But some projects don't want to build unused drivers into kernel to save
+>>> code size. Use different Kconfig options for each SoC so that these
+>>> projects can disable unused drivers.
+>>>
+>>
+>> Scpsys is a bool right now, you can disable it if you don't need it for
+>> your project.
+>>
+>> I don't think the impact of adding scp_domain_data justifies adding SoC
+>> specific scpsys drivers and bloat the drivers/soc/mediatek folder.
+>
+> So you prefer to enable MT8173 and MT2701 scpsys drivers at the same
+> time if MTK_SCPSYS is true?
 
-diff --git a/drivers/clk/rockchip/clk-rk3036.c b/drivers/clk/rockchip/clk-rk3036.c
-index bf9dd9b..f60273c 100644
---- a/drivers/clk/rockchip/clk-rk3036.c
-+++ b/drivers/clk/rockchip/clk-rk3036.c
-@@ -32,18 +32,22 @@ enum rk3036_plls {
- static struct rockchip_pll_rate_table rk3036_pll_rates[] = {
- 	/* _mhz, _refdiv, _fbdiv, _postdiv1, _postdiv2, _dsmpd, _frac */
- 	RK3036_PLL_RATE(1608000000, 1, 67, 1, 1, 1, 0),
-+	RK3036_PLL_RATE(1600000000, 6, 400, 1, 1, 1, 0),
- 	RK3036_PLL_RATE(1584000000, 1, 66, 1, 1, 1, 0),
- 	RK3036_PLL_RATE(1560000000, 1, 65, 1, 1, 1, 0),
- 	RK3036_PLL_RATE(1536000000, 1, 64, 1, 1, 1, 0),
- 	RK3036_PLL_RATE(1512000000, 1, 63, 1, 1, 1, 0),
-+	RK3036_PLL_RATE(1500000000, 6, 375, 1, 1, 1, 0),
- 	RK3036_PLL_RATE(1488000000, 1, 62, 1, 1, 1, 0),
- 	RK3036_PLL_RATE(1464000000, 1, 61, 1, 1, 1, 0),
- 	RK3036_PLL_RATE(1440000000, 1, 60, 1, 1, 1, 0),
- 	RK3036_PLL_RATE(1416000000, 1, 59, 1, 1, 1, 0),
-+	RK3036_PLL_RATE(1400000000, 6, 350, 1, 1, 1, 0),
- 	RK3036_PLL_RATE(1392000000, 1, 58, 1, 1, 1, 0),
- 	RK3036_PLL_RATE(1368000000, 1, 57, 1, 1, 1, 0),
- 	RK3036_PLL_RATE(1344000000, 1, 56, 1, 1, 1, 0),
- 	RK3036_PLL_RATE(1320000000, 1, 55, 1, 1, 1, 0),
-+	RK3036_PLL_RATE(1300000000, 6, 325, 1, 1, 1, 0),
- 	RK3036_PLL_RATE(1296000000, 1, 54, 1, 1, 1, 0),
- 	RK3036_PLL_RATE(1272000000, 1, 53, 1, 1, 1, 0),
- 	RK3036_PLL_RATE(1248000000, 1, 52, 1, 1, 1, 0),
-@@ -70,8 +74,12 @@ static struct rockchip_pll_rate_table rk3036_pll_rates[] = {
- 	RK3036_PLL_RATE( 504000000, 1, 63, 3, 1, 1, 0),
- 	RK3036_PLL_RATE( 500000000, 6, 250, 2, 1, 1, 0),
- 	RK3036_PLL_RATE( 408000000, 1, 68, 2, 2, 1, 0),
-+	RK3036_PLL_RATE( 400000000, 1, 100, 3, 2, 1, 0),
- 	RK3036_PLL_RATE( 312000000, 1, 52, 2, 2, 1, 0),
-+	RK3036_PLL_RATE( 300000000, 1, 50, 2, 2, 1, 0),
- 	RK3036_PLL_RATE( 216000000, 1, 72, 4, 2, 1, 0),
-+	RK3036_PLL_RATE( 200000000, 1, 50, 3, 2, 1, 0),
-+	RK3036_PLL_RATE( 100000000, 6, 400, 4, 4, 1, 0),
- 	RK3036_PLL_RATE(  96000000, 1, 64, 4, 4, 1, 0),
- 	{ /* sentinel */ },
- };
-@@ -104,9 +112,22 @@ static struct rockchip_pll_rate_table rk3036_pll_rates[] = {
- 	}
- 
- static struct rockchip_cpuclk_rate_table rk3036_cpuclk_rates[] __initdata = {
--	RK3036_CPUCLK_RATE(816000000, 4),
--	RK3036_CPUCLK_RATE(600000000, 4),
--	RK3036_CPUCLK_RATE(312000000, 4),
-+	RK3036_CPUCLK_RATE(1600000000, 8),
-+	RK3036_CPUCLK_RATE(1500000000, 7),
-+	RK3036_CPUCLK_RATE(1400000000, 7),
-+	RK3036_CPUCLK_RATE(1300000000, 6),
-+	RK3036_CPUCLK_RATE(1200000000, 6),
-+	RK3036_CPUCLK_RATE(1100000000, 5),
-+	RK3036_CPUCLK_RATE(1000000000, 5),
-+	RK3036_CPUCLK_RATE( 900000000, 4),
-+	RK3036_CPUCLK_RATE( 800000000, 4),
-+	RK3036_CPUCLK_RATE( 700000000, 3),
-+	RK3036_CPUCLK_RATE( 600000000, 3),
-+	RK3036_CPUCLK_RATE( 500000000, 3),
-+	RK3036_CPUCLK_RATE( 400000000, 3),
-+	RK3036_CPUCLK_RATE( 300000000, 2),
-+	RK3036_CPUCLK_RATE( 200000000, 1),
-+	RK3036_CPUCLK_RATE( 100000000, 1),
- };
- 
- static const struct rockchip_cpuclk_reg_data rk3036_cpuclk_data = {
--- 
-1.7.9.5
+Well the driver gets enabled by the compatible string from the DT 
+binding passed to the system. But yes, I prefer to have the code shared 
+and just add the necessary data structures.
+
+>
+> BTW, this patchset is based on 4.4-rc7, which lacks two patches from
+> your v4.4-next/soc. Should I rebase to v4.4-next/soc when I send v2
+> patch?
+>
+
+That would be a nice to have.
+
+Thanks,
+Matthias
