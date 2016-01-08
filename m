@@ -1,70 +1,59 @@
-From: dpetigara@broadcom.com (Danesh Petigara)
-Date: Fri, 8 Jan 2016 15:20:44 -0800
-Subject: [PATCH 3/4] drivers: ata: wake port before DMA stop for ALPM
-In-Reply-To: <20160108163610.GS1898@mtj.duckdns.org>
-References: <1452211413-1350-1-git-send-email-f.fainelli@gmail.com>
- <1452211413-1350-4-git-send-email-f.fainelli@gmail.com>
- <20160108163610.GS1898@mtj.duckdns.org>
-Message-ID: <5690444C.2090200@broadcom.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 8 Jan 2016 23:44:32 +0000
+Subject: bcm4708-smartrg-sr400ac boot failures in next/arm-soc
+In-Reply-To: <CANMBJr6DR=y2oOqnEyUAxhzhXn1twXozGacOpcVRx8NcWf-mfw@mail.gmail.com>
+References: <CANMBJr6LW=y7g4_CCutHf4vu5NkzoeXt_RvPSJAsTE2nFpGwqw@mail.gmail.com>
+ <20160108225032.GO19062@n2100.arm.linux.org.uk>
+ <CANMBJr6DR=y2oOqnEyUAxhzhXn1twXozGacOpcVRx8NcWf-mfw@mail.gmail.com>
+Message-ID: <20160108234432.GQ19062@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tejun,
-
-On 1/8/2016 8:36 AM, Tejun Heo wrote:
-> Hello,
+On Fri, Jan 08, 2016 at 03:17:19PM -0800, Tyler Baker wrote:
+> On 8 January 2016 at 14:50, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Fri, Jan 08, 2016 at 02:33:39PM -0800, Tyler Baker wrote:
+> >> After a bit of investigation, I determined that CONFIG_BLK_DEV_RAM was
+> >> causing the issue and disabling it fixed the boot issue. Essentially,
+> >> the kernel cannot find the initrd that has been loaded into memory by
+> >> CFE bootloader with this option enabled as I inject the following
+> >> command line into the DT before it's loaded over tftp.
+> >>
+> >> Loaded in CFE by: 'load -raw -tftp -addr=0x4000000 -max=0x900000
+> >> 192.168.2.2:tmpqC9zOv/ramdisk.cpio.gz'
+> >>
+> >> Kernel arguments injected into DT: 'console=ttyS0,115200
+> >> initrd=0x4000000,8M root=/dev/ram0 ip=dhcp'
+> >
+> > What is the problem that the kernel is reporting?
 > 
-> On Thu, Jan 07, 2016 at 04:03:32PM -0800, Florian Fainelli wrote:
->> diff --git a/drivers/ata/libahci.c b/drivers/ata/libahci.c
->> index d61740e78d6d..b6664c579f9a 100644
->> --- a/drivers/ata/libahci.c
->> +++ b/drivers/ata/libahci.c
->> @@ -595,6 +595,58 @@ int ahci_stop_engine(struct ata_port *ap)
->>  	void __iomem *port_mmio = ahci_port_base(ap);
->>  	u32 tmp;
->>  
->> +	/*
->> +	 * On some controllers, stopping a port's DMA engine
->> +	 * while the port is in ALPM state (partial or slumber)
->> +	 * results in failures on subsequent DMA engine starts.
->> +	 * For those controllers, put the port back in active
->> +	 * state before stopping it's DMA engine.
->> +	 */
->> +	if (ap->flags2 & ATA_FLAG2_WAKE_BEFORE_STOP) {
-> ...
-> 
-> So, I'm not too comfortable with open coding ALPM switching in
-> ahci_stop_engine().  Shouldn't it be possible to update and/or
-> refactor and reuse ahci_set_lpm()?
->
-ahci_set_lpm in it's current form cannot be used here as it also
-modifies the ALPE/ASP bits. The idea is to wake the link before DMA stop
-without changing the ALPM bits so the link can return to it's configured
-low power state when it's idle.
+> The kernel complaining that there is no file system to mount, and
+> panics. Here is a plain text version of the issue if you want to have
+> a look[1].
 
-We could however update that function by introducing a new hints flag
-that allows us to skip unneeded logic for this scenario. ahci_set_lpm
-can then be called from ahci_stop_engine.
+Thanks.
 
->> --- a/include/linux/libata.h
->> +++ b/include/linux/libata.h
->> @@ -236,6 +236,8 @@ enum {
->>  
->>  	/* bits 24:31 of ap->flags are reserved for LLD specific flags */
->>  
->> +	/* struct ata_port flags2 */
->> +	ATA_FLAG2_WAKE_BEFORE_STOP = (1 << 0), /* wake link before DMA stop */
-> 
-> What's wrong with bits 2-5 in ATA_FLAG_* space?  Also, should this be
-> a ahci priv flag?
+The error is:
 
-I wasn't sure whether those bits were left unused on purpose, so I did
-not use them. The point to make this a AHCI_HFLAG_ flag makes perfect sense.
+[   16.557922] RAMDISK: EOF while reading compressed data
 
-> 
-> Thanks.
-> 
+which is not surprising given:
 
-Thanks for the feedback.
+initrd=0x4000000,8M
 
-Danesh
+is given on the kernel command line, but:
+
+Loader:raw Filesys:tftp Dev:eth0 File:192.168.2.2:tmpd9L7xr/ramdisk.cpio.gz Options:(null)
+... 8450989 bytes read
+
+the actual ramdisk is larger than 8M.  8M would've been 8388608 bytes,
+but you're about 64k over that.
+
+Hence, the decompression into /dev/ram0 fails when BLK_DEV_RAM is
+enabled (that decompressor strictly follows the initrd limit), which
+then goes on to cause the failure to mount the rootfs.
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
