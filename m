@@ -1,43 +1,128 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Fri,  8 Jan 2016 19:31:38 +0800
-Subject: [RESEND RFC PATCH 2/2] ARM: dts: rockchip: Update the cpu freqs table
-In-Reply-To: <1452252698-16765-1-git-send-email-zhengxing@rock-chips.com>
-References: <1452252698-16765-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <1452252698-16765-3-git-send-email-zhengxing@rock-chips.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 8 Jan 2016 12:34:18 +0100
+Subject: [PATCH v2 11/13] arm64: allow kernel Image to be loaded anywhere
+ in physical memory
+In-Reply-To: <20160108112622.GA3097@leverpostej>
+References: <1451489172-17420-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1451489172-17420-12-git-send-email-ard.biesheuvel@linaro.org>
+ <20160108112622.GA3097@leverpostej>
+Message-ID: <CAKv+Gu8uGyoxvR0zYyrXiGTg5F4kO9p3Jbr-EZAozHYQS68T8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Actually, we need more cpu freqs which are 50MHz integer multiples.
+On 8 January 2016 at 12:26, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi,
+>
+> On Wed, Dec 30, 2015 at 04:26:10PM +0100, Ard Biesheuvel wrote:
+>> This relaxes the kernel Image placement requirements, so that it
+>> may be placed at any 2 MB aligned offset in physical memory.
+>>
+>> This is accomplished by ignoring PHYS_OFFSET when installing
+>> memblocks, and accounting for the apparent virtual offset of
+>> the kernel Image. As a result, virtual address references
+>> below PAGE_OFFSET are correctly mapped onto physical references
+>> into the kernel Image regardless of where it sits in memory.
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  Documentation/arm64/booting.txt  | 12 ++---
+>>  arch/arm64/include/asm/boot.h    |  5 ++
+>>  arch/arm64/include/asm/kvm_mmu.h |  2 +-
+>>  arch/arm64/include/asm/memory.h  | 15 +++---
+>>  arch/arm64/kernel/head.S         |  6 ++-
+>>  arch/arm64/mm/init.c             | 50 +++++++++++++++++++-
+>>  arch/arm64/mm/mmu.c              | 12 +++++
+>>  7 files changed, 86 insertions(+), 16 deletions(-)
+>>
+>> diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+>> index 701d39d3171a..03e02ebc1b0c 100644
+>> --- a/Documentation/arm64/booting.txt
+>> +++ b/Documentation/arm64/booting.txt
+>> @@ -117,14 +117,14 @@ Header notes:
+>>    depending on selected features, and is effectively unbound.
+>>
+>>  The Image must be placed text_offset bytes from a 2MB aligned base
+>> -address near the start of usable system RAM and called there. Memory
+>> -below that base address is currently unusable by Linux, and therefore it
+>> -is strongly recommended that this location is the start of system RAM.
+>> -The region between the 2 MB aligned base address and the start of the
+>> -image has no special significance to the kernel, and may be used for
+>> -other purposes.
+>> +address anywhere in usable system RAM and called there. The region
+>> +between the 2 MB aligned base address and the start of the image has no
+>> +special significance to the kernel, and may be used for other purposes.
+>>  At least image_size bytes from the start of the image must be free for
+>>  use by the kernel.
+>> +NOTE: versions prior to v4.6 cannot make use of memory below the
+>> +physical offset of the Image so it is recommended that the Image be
+>> +placed as close as possible to the start of system RAM.
+>
+> We need a head flag for this so that a bootloader can determine whether
+> it can load the kernel anywhere or should try for the lowest possible
+> address. Then the note would describe the recommended behaviour in the
+> absence of the flag.
+>
+> The flag for KASLR isn't sufficient as you can build without it (and it
+> only tells the bootloader that the kernel accepts entropy in x1).
+>
 
-Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
----
+Indeed, I will change that.
 
- arch/arm/boot/dts/rk3036.dtsi |   13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
+> We might also want to consider if we need to determine whether or not
+> the bootloader actually provided entropy, (and if we need a more general
+> handshake between the bootlaoder and kernel to determine that kind of
+> thing).
+>
 
-diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
-index 1cb5877..1a773eb 100644
---- a/arch/arm/boot/dts/rk3036.dtsi
-+++ b/arch/arm/boot/dts/rk3036.dtsi
-@@ -79,7 +79,18 @@
- 			resets = <&cru SRST_CORE0>;
- 			operating-points = <
- 				/* KHz    uV */
--				 816000 1000000
-+				1200000 1200000
-+				1100000 1200000
-+				1000000 1200000
-+				 900000 1200000
-+				 800000 1200000
-+				 700000 1200000
-+				 600000 1200000
-+				 500000 1200000
-+				 400000 1200000
-+				 300000 1200000
-+				 200000 1200000
-+				 100000 1200000
- 			>;
- 			clock-latency = <40000>;
- 			clocks = <&cru ARMCLK>;
--- 
-1.7.9.5
+Yes, that is interesting. We should also think about how to handle
+'nokaslr' if it appears on the command line, since in the !EFI case,
+we will be way too late to parse this, and a capable kernel will
+already be running from a randomized offset. That means it is the
+bootloader's responsibility to ensure that the presence of 'nokaslr'
+and the entropy in x1 are consistent with each other.
+
+>>  Any memory described to the kernel (even that below the start of the
+>>  image) which is not marked as reserved from the kernel (e.g., with a
+>> diff --git a/arch/arm64/include/asm/boot.h b/arch/arm64/include/asm/boot.h
+>> index 81151b67b26b..984cb0fa61ce 100644
+>> --- a/arch/arm64/include/asm/boot.h
+>> +++ b/arch/arm64/include/asm/boot.h
+>> @@ -11,4 +11,9 @@
+>>  #define MIN_FDT_ALIGN                8
+>>  #define MAX_FDT_SIZE         SZ_2M
+>>
+>> +/*
+>> + * arm64 requires the kernel image to be 2 MB aligned
+>
+> Nit: The image is TEXT_OFFSET from that 2M-aligned base.
+> s/image/mapping/?
+>
+> [...]
+>
+
+Yep. I hate TEXT_OFFSET, did I mention that?
+
+>> +static void __init enforce_memory_limit(void)
+>> +{
+>> +     const phys_addr_t kbase = round_down(__pa(_text), MIN_KIMG_ALIGN);
+>> +     u64 to_remove = memblock_phys_mem_size() - memory_limit;
+>> +     phys_addr_t max_addr = 0;
+>> +     struct memblock_region *r;
+>> +
+>> +     if (memory_limit == (phys_addr_t)ULLONG_MAX)
+>> +             return;
+>> +
+>> +     /*
+>> +      * The kernel may be high up in physical memory, so try to apply the
+>> +      * limit below the kernel first, and only let the generic handling
+>> +      * take over if it turns out we haven't clipped enough memory yet.
+>> +      */
+>
+> We might want ot preserve the low 4GB if possible, for those IOMMU-less
+> devices which can only do 32-bit addressing.
+>
+> Otherwise this looks good to me!
+>
+
+Thanks,
+Ard.
