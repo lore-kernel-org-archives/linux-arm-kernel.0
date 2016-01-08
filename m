@@ -1,26 +1,28 @@
-From: rth@twiddle.net (Richard Henderson)
-Date: Fri, 8 Jan 2016 07:42:49 -0800
-Subject: [PATCH v2 2/6] alpha/extable: use generic search and sort routines
-In-Reply-To: <1452007180-27411-3-git-send-email-ard.biesheuvel@linaro.org>
-References: <1452007180-27411-1-git-send-email-ard.biesheuvel@linaro.org>
- <1452007180-27411-3-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <568FD8F9.4050602@twiddle.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 8 Jan 2016 15:44:23 +0000
+Subject: [PATCH] arm64: net: bpf: don't BUG() on large shifts
+In-Reply-To: <1452015543-6790-1-git-send-email-rabin@rab.in>
+References: <1452015543-6790-1-git-send-email-rabin@rab.in>
+Message-ID: <20160108154423.GC11228@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/05/2016 07:19 AM, Ard Biesheuvel wrote:
-> Replace the arch specific versions of search_extable() and sort_extable()
-> with calls to the generic ones, which now support relative exception
-> tables as well.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/alpha/include/asm/uaccess.h | 10 ++-
->  arch/alpha/mm/Makefile           |  2 +-
->  arch/alpha/mm/extable.c          | 92 --------------------
->  3 files changed, 9 insertions(+), 95 deletions(-)
+On Tue, Jan 05, 2016 at 06:39:03PM +0100, Rabin Vincent wrote:
+> Attempting to generate UBFM/SBFM instructions with shifts that can't be
+> encoded in the immediate fields of the opcodes leads to a trigger of a
+> BUG() in the instruction generation code.  As the ARMv8 ARM says: "The
+> shift amounts must be in the range 0 to one less than the register width
+> of the instruction, inclusive."  Make the JIT reject unencodable shifts
+> instead of crashing.
 
-Acked-by: Richard Henderson <rth@twiddle.net>
+I moaned about those BUG_ONs when they were introduced:
 
+  https://lkml.org/lkml/2014/7/17/438
 
-r~
+The response then was that the verifier would catch these issues so
+there was nothing to worry about. Has something changed so that is no
+longer the case? Do we need to consider a different way of rejecting
+invalid instructions at the encoding stage rather than bringing down the
+kernel?
+
+Will
