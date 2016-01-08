@@ -1,66 +1,39 @@
-From: mfuzzey@parkeon.com (Martin Fuzzey)
-Date: Fri, 08 Jan 2016 10:07:26 +0100
-Subject: [PATCH] mmc: pwrseq_simple: Make reset-gpios optional to match doc
-Message-ID: <20160108090726.13066.66125.stgit@localhost>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 08 Jan 2016 09:07:50 +0000
+Subject: [PATCH v3 1/3] gpio: xgene: Enable X-Gene standby GPIO as
+ interrupt controller
+In-Reply-To: <alpine.DEB.2.11.1601080942270.3575@nanos>
+References: <1452162428-26839-1-git-send-email-qnguyen@apm.com>
+ <1452162428-26839-2-git-send-email-qnguyen@apm.com>
+ <alpine.DEB.2.11.1601080942270.3575@nanos>
+Message-ID: <568F7C66.2050000@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DT binding doc says reset-gpios is an optional property but the code
-currently bails out if it is omitted.
+On 08/01/16 08:45, Thomas Gleixner wrote:
+> On Thu, 7 Jan 2016, Quan Nguyen wrote:
+>> -static int apm_gpio_sb_to_irq(struct gpio_chip *gc, u32 gpio)
+>> +static void xgene_gpio_sb_irq_ack(struct irq_data *d)
+>> +{
+>> +	struct irq_data *irqdata;
+>> +	struct xgene_gpio_sb *priv = irq_data_get_irq_chip_data(d);
+>> +
+>> +	irqdata = irq_get_irq_data(priv->gic_virq[d->hwirq]);
+>> +	if (!irqdata || !irqdata->chip)
+>> +		return;
+> 
+> What the heck is this? Why are you looking up some random other irq and fiddle
+> with its irq chip?
+> 
+> This is a 1:1 mapping from your gpio irq to a gic irq. We have hierarchical
+> interrupt domains for this.
 
-Make the code match the documentation.
+I've said the exact same thing back in October:
 
-Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
----
- drivers/mmc/core/pwrseq_simple.c |   21 +++++++++++++--------
- 1 file changed, 13 insertions(+), 8 deletions(-)
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/381996.html
 
-diff --git a/drivers/mmc/core/pwrseq_simple.c b/drivers/mmc/core/pwrseq_simple.c
-index d10538b..4d2962b 100644
---- a/drivers/mmc/core/pwrseq_simple.c
-+++ b/drivers/mmc/core/pwrseq_simple.c
-@@ -29,15 +29,18 @@ struct mmc_pwrseq_simple {
- static void mmc_pwrseq_simple_set_gpios_value(struct mmc_pwrseq_simple *pwrseq,
- 					      int value)
- {
--	int i;
- 	struct gpio_descs *reset_gpios = pwrseq->reset_gpios;
--	int values[reset_gpios->ndescs];
- 
--	for (i = 0; i < reset_gpios->ndescs; i++)
--		values[i] = value;
-+	if (!IS_ERR(reset_gpios)) {
-+		int i;
-+		int values[reset_gpios->ndescs];
- 
--	gpiod_set_array_value_cansleep(reset_gpios->ndescs, reset_gpios->desc,
--				       values);
-+		for (i = 0; i < reset_gpios->ndescs; i++)
-+			values[i] = value;
-+
-+		gpiod_set_array_value_cansleep(
-+			reset_gpios->ndescs, reset_gpios->desc, values);
-+	}
- }
- 
- static void mmc_pwrseq_simple_pre_power_on(struct mmc_host *host)
-@@ -79,7 +82,8 @@ static void mmc_pwrseq_simple_free(struct mmc_host *host)
- 	struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
- 					struct mmc_pwrseq_simple, pwrseq);
- 
--	gpiod_put_array(pwrseq->reset_gpios);
-+	if (!IS_ERR(pwrseq->reset_gpios))
-+		gpiod_put_array(pwrseq->reset_gpios);
- 
- 	if (!IS_ERR(pwrseq->ext_clk))
- 		clk_put(pwrseq->ext_clk);
-@@ -112,7 +116,8 @@ struct mmc_pwrseq *mmc_pwrseq_simple_alloc(struct mmc_host *host,
- 	}
- 
- 	pwrseq->reset_gpios = gpiod_get_array(dev, "reset", GPIOD_OUT_HIGH);
--	if (IS_ERR(pwrseq->reset_gpios)) {
-+	if (IS_ERR(pwrseq->reset_gpios) &&
-+	    PTR_ERR(pwrseq->reset_gpios) != -ENOENT) {
- 		ret = PTR_ERR(pwrseq->reset_gpios);
- 		goto clk_put;
- 	}
+but obviously I wasn't clear enough...
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
