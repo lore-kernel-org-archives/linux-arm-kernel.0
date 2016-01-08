@@ -1,62 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 09 Jan 2016 00:07:11 +0100
-Subject: ARM: SoC fixes for 4.4-rc
-Message-ID: <4470295.CVKI4nqEPx@wuerfel>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Fri, 8 Jan 2016 15:17:19 -0800
+Subject: bcm4708-smartrg-sr400ac boot failures in next/arm-soc
+In-Reply-To: <20160108225032.GO19062@n2100.arm.linux.org.uk>
+References: <CANMBJr6LW=y7g4_CCutHf4vu5NkzoeXt_RvPSJAsTE2nFpGwqw@mail.gmail.com>
+ <20160108225032.GO19062@n2100.arm.linux.org.uk>
+Message-ID: <CANMBJr6DR=y2oOqnEyUAxhzhXn1twXozGacOpcVRx8NcWf-mfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 8 January 2016 at 14:50, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Jan 08, 2016 at 02:33:39PM -0800, Tyler Baker wrote:
+>> After a bit of investigation, I determined that CONFIG_BLK_DEV_RAM was
+>> causing the issue and disabling it fixed the boot issue. Essentially,
+>> the kernel cannot find the initrd that has been loaded into memory by
+>> CFE bootloader with this option enabled as I inject the following
+>> command line into the DT before it's loaded over tftp.
+>>
+>> Loaded in CFE by: 'load -raw -tftp -addr=0x4000000 -max=0x900000
+>> 192.168.2.2:tmpqC9zOv/ramdisk.cpio.gz'
+>>
+>> Kernel arguments injected into DT: 'console=ttyS0,115200
+>> initrd=0x4000000,8M root=/dev/ram0 ip=dhcp'
+>
+> What is the problem that the kernel is reporting?
 
-one last minute pull request here, only a few but all highly anticipated fixes
-so I hope we can still make it into the final release.
+The kernel complaining that there is no file system to mount, and
+panics. Here is a plain text version of the issue if you want to have
+a look[1].
 
-The following changes since commit 80373d37bee562060ce4d3e5272b708e8db5d1fc:
+> I'm asking because kernelci.org uses javascript, which is not elinks
+> friendly, and it otherwise means I need to walk over to a different
+> machine to look at it, and then return to a different machine to finish
+> writing the email - as a result, I hardly ever look at the kernelci.org
+> results, and just rely on Olof's results.
 
-  ARM: tegra: Fix suspend hang on Tegra124 Chromebooks (2015-12-22 15:41:37 -0800)
+Apologies, we are trying our best to find a happy medium for all
+users, and clearly we aren't there yet. We have the ability to provide
+plain text e-mail, instead of the multi-part html ones we typically
+send out. If that is helpful for you at all, we can setup a hook to
+send the plain text e-mails directly to you. Unfortunately, there
+isn't much we can do about the javascript elink issue without
+re-writing the front end :\
 
-are available in the git repository at:
+Cheers,
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
+Tyler
 
-for you to fetch changes up to 841bcd2e5014f83ed99e88bd550645d8848ce19a:
-
-  Merge tag 'omap-for-v4.4/onenand-corruption' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into fixes (2016-01-08 17:46:45 +0100)
-
-----------------------------------------------------------------
-ARM: SoC fixes for 4.4-rc
-
-This is the final small set of ARM SoC bug fixes for linux-4.4,
-almost all regressions:
-
-OMAP:		data corruption on the Nokia N900 flash
-Allwinner:	Two defconfig change to get USB working again
-ARM Versatile:	Interrupt numbers gone bad after an older bug fix
-Nomadik:	Crashes from incorrect L2 cache settings
-VIA vt8500:	SD/MMC support on WM8650 never worked
-
-----------------------------------------------------------------
-Arnd Bergmann (1):
-      Merge tag 'omap-for-v4.4/onenand-corruption' of git://git.kernel.org/.../tmlind/linux-omap into fixes
-
-Linus Walleij (2):
-      ARM: nomadik: set latencies to 8 cycles
-      ARM: versatile: fix MMC/SD interrupt assignment
-
-Roman Volkov (1):
-      dts: vt8500: Add SDHC node to DTS file for WM8650
-
-Timo Sigurdsson (2):
-      ARM: Fix broken USB support in sunxi_defconfig
-      ARM: Fix broken USB support in multi_v7_defconfig for sunxi devices
-
-Tony Lindgren (1):
-      ARM: OMAP2+: Fix onenand rate detection to avoid filesystem corruption
-
- arch/arm/boot/dts/ste-nomadik-stn8815.dtsi |  6 +++---
- arch/arm/boot/dts/versatile-ab.dts         | 10 +++++++---
- arch/arm/boot/dts/versatile-pb.dts         | 20 +++++++++++++++++++-
- arch/arm/boot/dts/wm8650.dtsi              |  9 +++++++++
- arch/arm/configs/multi_v7_defconfig        |  1 +
- arch/arm/configs/sunxi_defconfig           |  1 +
- arch/arm/mach-omap2/gpmc-onenand.c         | 14 +++++++++-----
- 7 files changed, 49 insertions(+), 12 deletions(-)
+[1]http://storage.kernelci.org/arm-soc/v4.4-rc3-1097-g80f7f7e00215/arm-multi_v7_defconfig/lab-tbaker/boot-bcm4708-smartrg-sr400ac.txt
