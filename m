@@ -1,47 +1,49 @@
-From: joe@perches.com (Joe Perches)
-Date: Fri, 08 Jan 2016 11:59:53 -0800
-Subject: [PATCH] ata: add AMD Seattle platform driver
-In-Reply-To: <1452200002-31590-1-git-send-email-brijesh.singh@amd.com>
-References: <1452200002-31590-1-git-send-email-brijesh.singh@amd.com>
-Message-ID: <1452283193.4028.84.camel@perches.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 08 Jan 2016 21:06:43 +0100
+Subject: [PATCH] regulator: max8973: add THERMAL_OF dependency
+Message-ID: <7607130.s0M7SSqlJV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-01-07 at 14:53 -0600, Brijesh Singh wrote:
-> AMD Seattle SATA controller mostly conforms to AHCI interface with some
-> special register to control SGPIO interface. In the case of an AHCI
-> controller, the SGPIO feature is ideally implemented using the
-> "Enclosure Management" register of the AHCI controller, but those
-> registeres are not implemented in the Seattle SoC. Instead SoC
-> (Rev B0 onwards) provides a 32-bit SGPIO control register which should
-> be programmed to control the activity, locate and fault LEDs.
+>From 9f5ddfc667eb45dc2c5459e5acc5de45572456cd Mon Sep 17 00:00:00 2001
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Fri, 8 Jan 2016 20:59:29 +0100
+Subject: [PATCH] regulator: max8973: add THERMAL_OF dependency
 
-trivia:
+The max8973 regulator driver has gained thermal support, but it
+now fails to link when the driver is built-in and CONFIG_THERMAL=m:
 
-> diff --git a/drivers/ata/ahci_seattle.c b/drivers/ata/ahci_seattle.c
-[]
-> +static ssize_t seattle_transmit_led_message(struct ata_port *ap, u32 state,
-> +					????ssize_t size)
-> +{
-> +	struct ahci_host_priv *hpriv = ap->host->private_data;
-> +	struct ahci_port_priv *pp = ap->private_data;
-> +	struct seattle_plat_data *plat_data = hpriv->plat_data;
-> +	unsigned long flags;
-> +	int pmp;
-> +	struct ahci_em_priv *emp;
-> +	u32 val;
-> +
-> +	/* get the slot number from the message */
-> +	pmp = (state & EM_MSG_LED_PMP_SLOT) >> 8;
-> +	if (pmp < EM_MAX_SLOTS)
-> +		emp = &pp->em_priv[pmp];
-> +	else
-> +		return -EINVAL;
+drivers/built-in.o: In function `max8973_remove':
+console.c:(.text+0x94ac4): undefined reference to `thermal_zone_of_sensor_unregister'
+drivers/built-in.o: In function `max8973_probe':
+console.c:(.text+0x95710): undefined reference to `thermal_zone_of_sensor_register'
 
-This is generally done using a inverted test that
-returns immediately
+This adds a dependency "depends on THERMAL || !THERMAL_OF" to ensure
+that the driver cannot be built-in when THERMAL=m but is forced to
+be a module as well, unless THERMAL_OF is disabled.
 
-	if (pmp >= EMP_MAX_SLOTS)
-		return -EINVAL;
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 1b7a4c6a9eea ("regulator: max8973: add support for junction thermal warning")
+---
+I've run into the same problem a couple of times now, with every driver
+that calls thermal_zone_of_sensor_register(). I think we need a better
+solution in general, but this fixes the immediate build error for now.
 
-	emp = &pp->em_priv[pmp];
+Maybe we should replace the "#ifdef CONFIG_THERMAL_OF" with "#if
+IS_REACHABLE(CONFIG_THERMAL) && IS_ENABLED(CONFIG_THERMAL_OF)"?
+The disadvantage of that is that the thermal management would be
+silently disabled rather than cause a link error, and that may also
+not be desired.
+
+diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
+index 8155e80dd3f8..7df9da82f592 100644
+--- a/drivers/regulator/Kconfig
++++ b/drivers/regulator/Kconfig
+@@ -383,6 +383,7 @@ config REGULATOR_MAX8952
+ config REGULATOR_MAX8973
+ 	tristate "Maxim MAX8973 voltage regulator "
+ 	depends on I2C
++	depends on THERMAL || !THERMAL_OF
+ 	select REGMAP_I2C
+ 	help
+ 	  The MAXIM MAX8973 high-efficiency. three phase, DC-DC step-down
