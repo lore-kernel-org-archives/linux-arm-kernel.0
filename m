@@ -1,23 +1,32 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 08 Jan 2016 10:04:05 +0100
-Subject: [PATCH v6 14/21] arm64:ilp32: add sys_ilp32.c and a separate
- table (in entry.S) to use it
-In-Reply-To: <1452209679-19445-15-git-send-email-ynorov@caviumnetworks.com>
+Date: Fri, 08 Jan 2016 10:05:42 +0100
+Subject: [PATCH v6 20/21] arm64:ilp32: change COMPAT_ELF_PLATFORM to
+ report a a subplatform for ILP32
+In-Reply-To: <1452209679-19445-21-git-send-email-ynorov@caviumnetworks.com>
 References: <1452209679-19445-1-git-send-email-ynorov@caviumnetworks.com>
- <1452209679-19445-15-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <4166007.lQt4DvC0e2@wuerfel>
+ <1452209679-19445-21-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <68486474.QWvJHzOUAH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 08 January 2016 02:34:32 Yury Norov wrote:
-> +asmlinkage long sys_mmap(unsigned long addr, unsigned long len,
-> +                        unsigned long prot, unsigned long flags,
-> +                        unsigned long fd, off_t off);
-> +#define sys_mmap2                     sys_mmap
+On Friday 08 January 2016 02:34:38 Yury Norov wrote:
+> diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+> index a519233..392301b 100644
+> --- a/arch/arm64/include/asm/elf.h
+> +++ b/arch/arm64/include/asm/elf.h
+> @@ -160,9 +160,9 @@ extern int arch_setup_additional_pages(struct linux_binprm *bprm,
+>  #ifdef CONFIG_COMPAT
+>  
+>  #ifdef __AARCH64EB__
+> -#define COMPAT_ELF_PLATFORM            ("v8b")
+> +#define COMPAT_ELF_PLATFORM            (is_ilp32_compat_task() ? "aarch64_be:ilp32" : "v8b")
+>  #else
+> -#define COMPAT_ELF_PLATFORM            ("v8l")
+> +#define COMPAT_ELF_PLATFORM            (is_ilp32_compat_task() ? "aarch64:ilp32" : "v8l")
+>  #endif
 > 
 
-Why do you need a separate declaration for sys_mmap here? There
-is one in include/asm-generic/syscalls.h that should be visible
-in this file.
+Same comment as for patch 12: you know which one to use at compile-time,
+so just drop the runtime check and use different macros.
 
 	Arnd
