@@ -1,69 +1,76 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Fri, 8 Jan 2016 17:13:52 +0800
-Subject: [RFC PATCH v2 3/4] drm: rockchip: hdmi: add RK3229 HDMI support
-In-Reply-To: <1452185424.4776.36.camel@pengutronix.de>
-References: <1452156811-18150-1-git-send-email-ykk@rock-chips.com>
- <1452157373-18783-1-git-send-email-ykk@rock-chips.com>
- <1452161052.4776.7.camel@pengutronix.de> <568E3AD0.1020904@rock-chips.com>
- <1452185424.4776.36.camel@pengutronix.de>
-Message-ID: <568F7DD0.7090707@rock-chips.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 8 Jan 2016 10:15:10 +0100
+Subject: [PATCH] clk: mediatek: Allow changing PLL rate when it is off
+In-Reply-To: <1452240997-35316-1-git-send-email-jamesjj.liao@mediatek.com>
+References: <1452240997-35316-1-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <20160108091510.GC13058@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+Hi James,
 
-On 01/08/2016 12:50 AM, Philipp Zabel wrote:
-> Hi Yakir,
->
-> Am Donnerstag, den 07.01.2016, 18:15 +0800 schrieb Yakir Yang:
->> Hi Philipp,
->>
->> Thanks for your fast respond :)
->>
->> On 01/07/2016 06:04 PM, Philipp Zabel wrote:
->>> Am Donnerstag, den 07.01.2016, 17:02 +0800 schrieb Yakir Yang:
->>>> RK3229 integrate an DesignedWare HDMI2.0 controller and an INNO HDMI2.0 phy,
->>>> the max output resolution is 4K.
->>>>
->>>> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
->>> It sounds like the INNO HDMI2.0 phy is not necessarily specific to
->>> RK3229 but might also appear in other SoCs? If so, I think this should
->>> be implemented in a separate phy driver and be used by dw_hdmi-rockchip.
->> Do you mean I should create a new phy driver that place in "driver/phy"
->> directly ?
-> Possibly, yes. The exynos video phys are already there. I have kept the
-> mediatek dsi/hdmi phys together with the DRM driver, but I suppose I
-> could move them there, too.
->
->> I have think about this idea, and it would make things much clean. But
->> INNO PHY
->> driver need the target pixel clock in drm_display_mode, I didn't find a
->> good way
->> to pass this variable to separate phy driver. Do you have some idea ?
-> We'd need to extend the PHY API for this. For the mediatek phys we have
-> side-stepped the issue by wiring up the PLL output to the common clock
-> framework.
+On Fri, Jan 08, 2016 at 04:16:37PM +0800, James Liao wrote:
+> Some modules may need to change its clock rate before turn on it.
+> So changing PLL's rate when it is off should be allowed.
+> This patch removes PLL enabled check before set rate, so that
+> PLLs can set new frequency even if they are off.
 
-Wow, I have look at your "drm/mediatek: Add HDMI support" patch, it's 
-great to
-registers a common clock framework.
+This sounds like the software refused to change the rate on disabled
+PLLs, but this is not the case.
 
-> I expect besides the pixel clock frequency, it might also be necessary
-> to inform the PHY about cycles per pixel for deep color modes.
+> 
+> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> ---
+>  drivers/clk/mediatek/clk-pll.c | 9 ++-------
+>  1 file changed, 2 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/clk/mediatek/clk-pll.c b/drivers/clk/mediatek/clk-pll.c
+> index 966cab1..8e31fae 100644
+> --- a/drivers/clk/mediatek/clk-pll.c
+> +++ b/drivers/clk/mediatek/clk-pll.c
+> @@ -91,9 +91,6 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
+>  		int postdiv)
+>  {
+>  	u32 con1, val;
+> -	int pll_en;
+> -
+> -	pll_en = readl(pll->base_addr + REG_CON0) & CON0_BASE_EN;
+>  
+>  	/* set postdiv */
+>  	val = readl(pll->pd_addr);
+> @@ -114,15 +111,13 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
+>  
+>  	con1 = readl(pll->base_addr + REG_CON1);
+>  
+> -	if (pll_en)
+> -		con1 |= CON0_PCW_CHG;
+> +	con1 |= CON0_PCW_CHG;
 
-INNO PHY didn't need the color depth directly, driver could get the 
-input pixel
-clock rate, and then hdmi core driver could set TMDS rate though common
-clock framework.
+This bit is described as "Feedback divide ratio update". To me this
+sounds like we have to inform the hardware that the PLL registers have
+been updated. The current code only sets this bit when the PLL is
+enabled which sounds sane to me.
 
-Anyway it's great material, I would update the new version out.
+>  
+>  	writel(con1, pll->base_addr + REG_CON1);
+>  	if (pll->tuner_addr)
+>  		writel(con1 + 1, pll->tuner_addr);
+>  
+> -	if (pll_en)
+> -		udelay(20);
+> +	udelay(20);
 
-Thanks a lot
-- Yakir
+We seem to have to wait here until the PLL is really running at the new
+frequency. Normally we don't have to do this when the PLL is disabled.
 
-> regards
-> Philipp
->
->
->
->
+I'm sure this patch solves a real problem, from looking at it it's just
+not clear to me what the problem is. Could you clarify this a bit?
+
+Sascha
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
