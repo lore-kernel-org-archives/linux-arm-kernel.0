@@ -1,71 +1,49 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Fri, 08 Jan 2016 09:51:23 -0500
-Subject: [PATCH V2 22/23] pci, acpi: Match PCI config space accessors
- against platfrom specific quirks.
-In-Reply-To: <568FC969.8060909@semihalf.com>
-References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
- <1450278993-12664-23-git-send-email-tn@semihalf.com>
- <1452262581.31901.26.camel@redhat.com> <568FC969.8060909@semihalf.com>
-Message-ID: <1452264683.31901.32.camel@redhat.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 8 Jan 2016 15:01:42 +0000
+Subject: [PATCH v2] ARM64: kernel: implement ACPI parking protocol
+In-Reply-To: <CAPw-ZTmsLqgh6W6R0uLgQjueV7XjaGOD49CYCRYufJ43zT8Kyg@mail.gmail.com>
+References: <CAPw-ZTmsLqgh6W6R0uLgQjueV7XjaGOD49CYCRYufJ43zT8Kyg@mail.gmail.com>
+Message-ID: <20160108150142.GB10630@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-01-08 at 15:36 +0100, Tomasz Nowicki wrote:
-> On 08.01.2016 15:16, Mark Salter wrote:
-> > On Wed, 2015-12-16 at 16:16 +0100, Tomasz Nowicki wrote:
-> > > Some platforms may not be fully compliant with generic set of PCI config
-> > > accessors. For these cases we implement the way to overwrite accessors
-> > > set before PCI buses enumeration. Algorithm that overwrite accessors
-> > > matches against platform ID (DMI), domain and bus number, hopefully
-> > > enough for all cases. All quirks can be defined using:
-> > > DECLARE_ACPI_MCFG_FIXUP() and keep self contained.
-> > > 
-> > > example:
-> > > 
-> > > static const struct dmi_system_id yyy[] = {
-> > > ?????????{
-> > > ?????????????????.ident = "<Platform ident string>",
-> > > ?????????????????.callback = <handler>,
-> > > ?????????????????.matches = {
-> > > ?????????????????????????DMI_MATCH(DMI_SYS_VENDOR, "<system vendor>"),
-> > > ?????????????????????????DMI_MATCH(DMI_PRODUCT_NAME, "<product name>"),
-> > > ?????????????????????????DMI_MATCH(DMI_PRODUCT_VERSION, "product version"),
-> > > ?????????????????},
-> > > ?????????},
-> > > ?????????{ }
-> > > };
-> > > 
-> > 
-> > This seems awkward to me in the case where the quirk is SoC-based and there
-> > may be multiple platforms affected. Needing a DECLARE_ACPI_MCFG_FIXUP for
-> > each platform using such a SoC (i.e. Mustang and Moonshot) doesn't seem
-> > right. In that case, I think it'd be better to check CPUID and possibly
-> > some SoC register to cover all platforms affected.
-> 
-> Right, my next version already has alternative to DMI match handler, so?
-> there will be two ways to match:
-> 1. DMI, like in this patch set
-> 2. int (*match)(struct pci_mcfg_fixup *) where you can read CPUID, and?
-> whatever is necessary.
-> 
+Hi Loc,
 
-Great. Thanks.
+[CC'ed Jeremy - I know he is testing this on m400]
 
-> > 
-> > Also, there doesn't seem to be a way to connect a given quirk check to the
-> > MCFG/device requesting the ops. So if there is a platform with multiple PCIE
-> > roots and not all of them have quirks, how does one no whether to override the
-> > default ecam ops?
-> > 
-> 
-> Then we can identify them using <domain:bus>. I was wondering to pass?
-> acpi device handler to match handler for the case where we need e.g.?
-> extra properties from related DSDT device descriptor. Does it make sense?
-> to you?
-> 
+On Fri, Dec 18, 2015 at 06:12:20PM -0800, Loc Ho wrote:
 
-The thing with domain:bus is that it is really a firmware setting. So on one
-platform domain 0 may be associated with hwdev X but on another platform it
-may be associated with hwdev Y. But yes, an acpi handle would make it much
-easier for the match handler to find out which hw dev it is being asked to
-match.
+[...]
+
+> >> I put it together to make sure that it is there if any platform
+> >> compliant with it relies on it and more importantly to prevent
+> >> non-compliant implentations from trickling into the kernel,
+> >> basically to prevent broken firmware implementations from being
+> >> considered compliant and "working".
+> >
+> > That's a good point. However, AFAIK, AMD are using PSCI already in their
+> > firmware implementation and that's what we recommend anyway if EL3 is
+> > available.
+> >
+> > So this patch is mainly aimed at X-Gene since other implementations I'm
+> > aware of have EL3 already. What are the chances of Applied Micro fixing
+> > their firmware and actually using this patch? (not a question for you;
+> > I'm hoping some Applied engineers would comment).
+> >
+> 
+> Sorry that I missed this. This FW is now fixed and tested with Lorenzo
+> patch. Though some minor manual patch will be required with recent
+> kernel. I was going to get some one to ack the patch but got tied up
+> with other matter. As for availability of the FW, it is currently
+> internally only and will be available sometime next year for the next
+> FW release. If any one interested in the FW, you can contact me.
+
+I guess that by "some minor manual patch" you meant you had to rebase
+the patch on top of mainline, I can post an updated version for you to
+test.
+
+Mind giving a tested-by if FW has been updated to comply with the specs
+and tested with my patch applied ?
+
+Thanks,
+Lorenzo
