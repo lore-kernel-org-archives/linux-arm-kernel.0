@@ -1,55 +1,174 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 8 Jan 2016 09:10:14 -0800
-Subject: [PATCH 2/2] memory: omap-gpmc: Add Kconfig option for debug
-In-Reply-To: <568F4596.8020206@gmail.com>
-References: <20160105224929.GF12777@atomide.com> <20160106174039.GA14271@earth>
- <20160106174713.GL12777@atomide.com> <568D5669.4040801@gmail.com>
- <20160106182650.GM12777@atomide.com> <568D5F54.7040900@gmail.com>
- <20160107180700.GN12777@atomide.com> <568EDC8D.7070205@gmail.com>
- <20160108022619.GS12777@atomide.com> <568F4596.8020206@gmail.com>
-Message-ID: <20160108171013.GW12777@atomide.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Fri, 8 Jan 2016 18:13:06 +0100
+Subject: [PATCH RFC 0/2] Add a display driver to the Allwinner H3
+In-Reply-To: <20160106212046.GD9631@lukather>
+References: <cover.1452021349.git.moinejf@free.fr>
+ <20160106212046.GD9631@lukather>
+Message-ID: <20160108181306.4a5a7370f0e3f3daa7c9e285@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [160107 21:14]:
-> Hi
+On Wed, 6 Jan 2016 22:20:46 +0100
+Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+
+> > As there is no documentation about the DE2 nor about the HDMI which
+> > are found in the H3, this driver has been built from Allwiiner's
+> > sources.
 > 
-> On  8.01.2016 04:26, Tony Lindgren wrote:
-> >
-> >Yes it seems there's some other issue too. Maybe you can run git bisect
-> >again and carry the fix along as an extra patch?
+> That's unfortunate :/
 > 
-> No sane way to bisect, I don't really know what triggers the issue. Neither
-> it is triggered regularly. It might happen on the first reboot or on the
-> tenth, or ... And it looks like the problems happens sometimes on oops too.
-> Not to say that it seems I should have fully booted userspace (so there is
-> enough pressure on the ubi/mdt/nand subsystems), which is impossible with
-> upstream without some n900 specific patches :(
+> Have you checked in the A64 BSP if there was some useful information?
 
-Hmm OK. Can you check if disabling deeper idle states helps?
+Same as the H3: no more information about the display system.
 
-Just set the UART timeouts to -1. You may also want to disable off mode
-with echo 0 > /sys/kernel/debug/pm_debug/enable_off_mode.
-
-If it happens during booting, chances are idle is not even hit though.
-
-> Maybe we can get some ideas on what and where to look from ubifs people?
-> Though I don't know whom to cc, feel free to help :)
+> > So, there may be license problems, especially for the file
+> > de2_hdmi_h3.c which contains a lot of magic values.
 > 
-> My best bet aiui, is comparing what nokia omap1 kernel does vs upstream. Or
-> looking at the commit log in ubi/mtd/onenand - who knows, I might get lucky
-> once again the same way as with that phonet oops in
-> __netif_receive_skb_core.
+> I guess it's the biggest issue with your code right now. What licenses
+> issues are we talking about here?
 
-Well maybe we now have error messages that actually make sense?
+The documentation about the H3, as the other Allwinner documentations,
+starts with:
 
-> >OK then it really seems like we do have another bug lurking around.
+	This documentation is the original work and copyrighted
+	property of Allwinner Technology ("Allwinner"). Reproduction in
+	whole or in part must obtain the written approval of Allwinner
+	and give clear acknowledgement to the copyright owner.
+
+Then, the DE2 sources contain only:
+
+	All Winner Tech, All Right Reserved. 2014-2015 Copyright (c)
+
+Eventually, there is no copyright/author/history in the HDMI sources.
+
+> Remember that having your Signed-off-by tag on a commit means that you
+> certify that you have the right to submit the patch under the license
+> you indicate in the files added and / or modified.
 > 
-> :nod:
+> If you don't have such right, for example because you don't have the
+> right and / or authorization from the initial author to re-license
+> that code, you cannot put your SoB.
 
-I've sent out the pull request and Arnd pulled the fix into arm-soc
-so we should have it merged for v4.4 FYI.
+OK, sorry. So, please, ignore the whole patch series.
 
-Regards,
+> > The associated DT and documentation will be submitted when the H3 DTs
+> > will be in the kernel.
+> 
+> Having the DT binding documentation would really help in the review.
 
-Tony
+Here it is, as a sunxi specific documentation, but it could be generic.
+
+--- /dev/null	1970-01-01 01:00:10.240000002 +0100
++++ Documentation/devicetree/bindings/display/sunxi.txt	2016-01-08 17:48:01.775903901 +0100
+@@ -0,0 +1,107 @@
++Allwinner sunxi display subsystem
++=================================
++
++The sunxi display subsystems contain a display controller (DE),
++one or two LCD controllers (TCON) and their external interfaces.
++
++Display controller
++==================
++
++Required properties:
++
++- compatible: value should be one of the following
++		"allwinner,sun8i-h3-display-engine"
++
++- clocks: must include clock specifiers corresponding to entries in the
++		clock-names property.
++
++- clock-names: must contain
++		gate: for DE activation
++		clock: DE clock
++
++- resets: phandle to the reset of the device
++
++- ports: phandle's to the LCD ports
++
++LCD controller
++==============
++
++Required properties:
++
++- compatible: value should be one of the following
++		"allwinner,sun8i-h3-lcd"
++
++- clocks: must include clock specifiers corresponding to entries in the
++		clock-names property.
++
++- clock-names: must contain
++		gate: for LCD activation
++		clock: pixel clock
++
++- resets: phandle to the reset of the device
++
++- port: port node with endpoint definitions as defined in
++	Documentation/devicetree/bindings/media/video-interfaces.txt
++
++HDMI support
++============
++
++Required properties:
++
++- compatible: value should be one of the following
++		"allwinner,sun8i-h3-hdmi"
++
++- clocks: must include clock specifiers corresponding to entries in the
++		clock-names property.
++
++- clock-names: must contain
++		gate: for HDMI activation
++		clock: pixel clock
++		ddc-clock: for the HDMI protocol
++
++- resets: one or two phandle's to the reset of the device
++
++- port: port node with endpoint definitions as defined in
++	Documentation/devicetree/bindings/media/video-interfaces.txt
++
++Example:
++
++	de: de-controller at 01000000 {
++		compatible = "allwinner,sun8i-h3-display-engine";
++		...
++		clocks = <&bus_gates 44>, <&de_clk>;
++		clock-names = "gate", "clock";
++		resets = <&bus_rst 44>;
++		ports = <&lcd0_p>;
++	};
++
++	lcd0: lcd-controller at 01c0c000 {
++		compatible = "allwinner,sun8i-h3-lcd";
++		...
++		clocks = <&bus_gates 35>, <&tcon0_clk>;
++		clock-names = "gate", "clock";
++		resets = <&bus_rst 35>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		lcd0_p: port {
++			lcd0_ep: endpoint {
++				remote-endpoint = <&hdmi_ep>;
++			};
++		};
++	};
++
++	hdmi: hdmi at 01ee0000 {
++		compatible = "allwinner,sun8i-h3-hdmi";
++		...
++		clocks = <&bus_gates 43>, <&hdmi_clk>,
++			 <&hdmi_slow_clk 31>;
++		clock-names = "gate", "clock", "ddc-clock";
++		resets = <&bus_rst 42>, <&bus_rst 43>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		port {
++			hdmi_ep: endpoint {
++				remote-endpoint = <&lcd0_ep>;
++			};
++		};
++	};
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
