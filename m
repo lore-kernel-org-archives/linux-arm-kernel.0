@@ -1,44 +1,55 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 8 Jan 2016 09:04:46 -0800
+Date: Fri, 8 Jan 2016 09:10:14 -0800
 Subject: [PATCH 2/2] memory: omap-gpmc: Add Kconfig option for debug
-In-Reply-To: <20160108075636.GM11364@pali>
+In-Reply-To: <568F4596.8020206@gmail.com>
 References: <20160105224929.GF12777@atomide.com> <20160106174039.GA14271@earth>
  <20160106174713.GL12777@atomide.com> <568D5669.4040801@gmail.com>
  <20160106182650.GM12777@atomide.com> <568D5F54.7040900@gmail.com>
  <20160107180700.GN12777@atomide.com> <568EDC8D.7070205@gmail.com>
- <20160108022619.GS12777@atomide.com> <20160108075636.GM11364@pali>
-Message-ID: <20160108170445.GV12777@atomide.com>
+ <20160108022619.GS12777@atomide.com> <568F4596.8020206@gmail.com>
+Message-ID: <20160108171013.GW12777@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pali Roh?r <pali.rohar@gmail.com> [160107 23:57]:
-> On Thursday 07 January 2016 18:26:20 Tony Lindgren wrote:
-> > > The problem is that between NOLO and kernel there is u-boot. And even if I
-> > > am almost sure it doesn't touch onenand configs, I can't be absolutely sure.
-> > > So those timings are not 100% reliable IMO, though close to that.
-> > 
-> > Hmm yes I'm only booting with u-boot here as my device sits in my rack.
+* Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [160107 21:14]:
+> Hi
 > 
-> U-boot try to configure N900 device similar like (some older version of)
-> linux kernel. So testing these bugs should be done also directly from
-> NOLO without U-boot.
-
-OK
-
-> Btw, if you have usb connection to your device in your rack, you can use
-> 0xFFFF tool (open source) which can send kernel image to NOLO which will
-> boot it without flashing NAND.
+> On  8.01.2016 04:26, Tony Lindgren wrote:
+> >
+> >Yes it seems there's some other issue too. Maybe you can run git bisect
+> >again and carry the fix along as an extra patch?
 > 
-> https://github.com/pali/0xFFFF
-> 
-> Original Nokia flasher-3.5 could support also serial connection (not
-> only usb), but do not know. I have never used serial connector on my
-> N900, so I do not know and this is reason why also 0xFFFF has no serial
-> support...
+> No sane way to bisect, I don't really know what triggers the issue. Neither
+> it is triggered regularly. It might happen on the first reboot or on the
+> tenth, or ... And it looks like the problems happens sometimes on oops too.
+> Not to say that it seems I should have fully booted userspace (so there is
+> enough pressure on the ubi/mdt/nand subsystems), which is impossible with
+> upstream without some n900 specific patches :(
 
-Yup I'm using 0xFFFF for loading images on 770 and n800 here. Well once
-I get my rack put together again over next few days..
+Hmm OK. Can you check if disabling deeper idle states helps?
+
+Just set the UART timeouts to -1. You may also want to disable off mode
+with echo 0 > /sys/kernel/debug/pm_debug/enable_off_mode.
+
+If it happens during booting, chances are idle is not even hit though.
+
+> Maybe we can get some ideas on what and where to look from ubifs people?
+> Though I don't know whom to cc, feel free to help :)
+> 
+> My best bet aiui, is comparing what nokia omap1 kernel does vs upstream. Or
+> looking at the commit log in ubi/mtd/onenand - who knows, I might get lucky
+> once again the same way as with that phonet oops in
+> __netif_receive_skb_core.
+
+Well maybe we now have error messages that actually make sense?
+
+> >OK then it really seems like we do have another bug lurking around.
+> 
+> :nod:
+
+I've sent out the pull request and Arnd pulled the fix into arm-soc
+so we should have it merged for v4.4 FYI.
 
 Regards,
 
-TOny
+Tony
