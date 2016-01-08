@@ -1,52 +1,56 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 8 Jan 2016 10:43:52 -0600
-Subject: [PATCH] PCI: provide of_pci_get_host_bridge_resources helper
-In-Reply-To: <8759253.sZisGJ6Km3@wuerfel>
-References: <8759253.sZisGJ6Km3@wuerfel>
-Message-ID: <20160108164351.GC31005@localhost>
+From: daniel@iogearbox.net (Daniel Borkmann)
+Date: Fri, 08 Jan 2016 17:44:42 +0100
+Subject: [PATCH] arm64: net: bpf: don't BUG() on large shifts
+In-Reply-To: <20160108155837.GA28291@debian>
+References: <1452015543-6790-1-git-send-email-rabin@rab.in>
+ <20160105175557.GC83548@ast-mbp.thefacebook.com>
+ <20160106203127.GA16059@debian>
+ <20160106221247.GA95332@ast-mbp.thefacebook.com>
+ <063D6719AE5E284EB5DD2968C1650D6D1CCBF08E@AcuExch.aculab.com>
+ <568E5EB0.8020102@iogearbox.net> <20160108155837.GA28291@debian>
+Message-ID: <568FE77A.3090107@iogearbox.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 18, 2015 at 04:02:41PM +0100, Arnd Bergmann wrote:
-> The pcie-rcar driver can be built for any ARM platform (for COMPILE_TEST)
-> including those without CONFIG_OF enabled, and that results in a compile-time
-> error:
-> 
-> drivers/pci/host/pcie-rcar.c: In function 'rcar_pcie_parse_request_of_pci_ranges':
-> drivers/pci/host/pcie-rcar.c:939:8: error: implicit declaration of function 'of_pci_get_host_bridge_resources' [-Werror=implicit-function-declaration]
->   err = of_pci_get_host_bridge_resources(np, 0, 0xff, &pci->resources, &iobase);
-> 
-> In order to allow compile-testing on all platforms, this adds a
-> of_pci_get_host_bridge_resources() helper stub function that gets
-> used when CONFIG_OF_ADDRESS is disabled. This mirrors what we do for
-> other OF-specific functions.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 5d2917d469fa ("PCI: rcar: Convert to DT resource parsing API")
+On 01/08/2016 04:58 PM, Rabin Vincent wrote:
+> On Thu, Jan 07, 2016 at 01:48:48PM +0100, Daniel Borkmann wrote:
+>> The question is what is less risky in terms of uabi. To reject such
+>> filters with such K shift vals upfront in verifier, or to just allow
+>> [0, reg_size - 1] values and handle outliers silently. I think both
+>> might be possible, the latter just needs to be clearly specified in
+>> the documentation somewhere. If we go for the latter, then probably
+>> just rewriting that K value as masked one might seem better. Broken
+>> programs might then still be loadable (and still be broken) ... afaik
+>> in case of register (case of shifts with X) with large shift vals
+>> ARM64 is doing 'modulo reg_size' implicitly.
+>
+> The case of what happens with such shifts with X is also already
+> architecture-specific, even when using the interpreters.  For example, the
+> following program returns 1 on ARM64 but 0 on ARM.
+>
+> 	BPF_STMT(BPF_LD | BPF_IMM, 1),
+> 	BPF_STMT(BPF_LDX | BPF_IMM, 32),
+> 	BPF_STMT(BPF_ALU | BPF_LSH | BPF_X, 0),
+> 	BPF_STMT(BPF_RET | BPF_A, 0)
+>
+> To start rejecting large K shifts in the verifier because they are
+> architecture-specific while continuing to allow the equally
+> architecture-specific large X shifts (because we can't verify them
+> statically) would be rather inconsistent.
 
-Applied with acks from Wolfram and Simon to pci/host for v4.5, thanks!
+Hmm, yeah, agree with you that this would be inconsistent. Last time we
+actually had this topic [1], I believe the consensus was that such BPF
+programs are to be considered "undefined".
 
-> diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-> index 2c51ee78b1c0..874d68f50a40 100644
-> --- a/include/linux/of_pci.h
-> +++ b/include/linux/of_pci.h
-> @@ -59,6 +59,14 @@ static inline void of_pci_check_probe_only(void) { }
->  int of_pci_get_host_bridge_resources(struct device_node *dev,
->  			unsigned char busno, unsigned char bus_max,
->  			struct list_head *resources, resource_size_t *io_base);
-> +#else
-> +static inline
-> +int of_pci_get_host_bridge_resources(struct device_node *dev,
-> +			unsigned char busno, unsigned char bus_max,
-> +			struct list_head *resources, resource_size_t *io_base)
-> +{
-> +	return -EINVAL;
-> +}
->  #endif
->  
->  #if defined(CONFIG_OF) && defined(CONFIG_PCI_MSI)
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+In that case, I think just masking the K value silently into its allowed
+range for classic and eBPF might be better. It would eventually not be
+uniform with regards to shifts where X is involved, but if we consider
+it "undefined" behaviour, such uniformity is probably not needed.
+
+> If it is desired to enforce uniformity across architectures despite the
+> risk for subtly changing the behaviour of existing programs, then the
+> desired uniform semantics of these shifts should really be implemented
+> both for the K and X shifts, which would mean modifiying the interpreter
+> and the various arch JITs too.
+
+   [1] https://lkml.org/lkml/2015/12/4/148
