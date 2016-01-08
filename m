@@ -1,30 +1,40 @@
 From: xuejiancheng@huawei.com (Jiancheng Xue)
-Date: Fri, 8 Jan 2016 10:16:37 +0800
-Subject: [PATCH v5 3/6] ARM: config: hisi: enable CONFIG_RESET_CONTROLLER
+Date: Fri, 8 Jan 2016 10:16:39 +0800
+Subject: [PATCH v5 5/6] mfd: dt-bindings: add device tree bindings for Hi3519
+ sysctrl
 In-Reply-To: <1452219400-32478-1-git-send-email-xuejiancheng@huawei.com>
 References: <1452219400-32478-1-git-send-email-xuejiancheng@huawei.com>
-Message-ID: <1452219400-32478-4-git-send-email-xuejiancheng@huawei.com>
+Message-ID: <1452219400-32478-6-git-send-email-xuejiancheng@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-enable CONFIG_RESET_CONTROLLER in hisi_defconfig
+Add device tree bindings for Hi3519 system controller.
 
 Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
 ---
- arch/arm/configs/hisi_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/devicetree/bindings/mfd/hi3519.txt | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/hi3519.txt
 
-diff --git a/arch/arm/configs/hisi_defconfig b/arch/arm/configs/hisi_defconfig
-index b2e340b..ba62c07 100644
---- a/arch/arm/configs/hisi_defconfig
-+++ b/arch/arm/configs/hisi_defconfig
-@@ -75,6 +75,7 @@ CONFIG_DMADEVICES=y
- CONFIG_DW_DMAC=y
- CONFIG_PL330_DMA=y
- CONFIG_PWM=y
-+CONFIG_RESET_CONTROLLER=y
- CONFIG_PHY_HIX5HD2_SATA=y
- CONFIG_EXT4_FS=y
- CONFIG_TMPFS=y
+diff --git a/Documentation/devicetree/bindings/mfd/hi3519.txt b/Documentation/devicetree/bindings/mfd/hi3519.txt
+new file mode 100644
+index 0000000..115c5be
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mfd/hi3519.txt
+@@ -0,0 +1,14 @@
++* Hisilicon Hi3519 System Controller Block
++
++This bindings use the following binding:
++Documentation/devicetree/bindings/mfd/syscon.txt
++
++Required properties:
++- compatible: "hisilicon,hi3519-sysctrl".
++- reg: the register region of this block
++
++Examples:
++sysctrl: system-controller at 12010000 {
++	compatible = "hisilicon,hi3519-sysctrl", "syscon";
++	reg = <0x12010000 0x1000>;
++};
 -- 
 1.9.1
