@@ -1,184 +1,38 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri,  8 Jan 2016 12:41:49 +0000
-Subject: [PATCH] arm64: split elf relocs into a separate header.
-In-Reply-To: <20160108123614.GC3097@leverpostej>
-References: <20160108123614.GC3097@leverpostej>
-Message-ID: <1452256909-30881-1-git-send-email-mark.rutland@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 8 Jan 2016 12:44:39 +0000
+Subject: ION DTS changes for HiKey in -next
+In-Reply-To: <20160108050214.GD30293@kroah.com>
+References: <20160107173744.GJ6588@sirena.org.uk>
+ <20160108050214.GD30293@kroah.com>
+Message-ID: <20160108124439.GL6588@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently asm/elf.h contains a mixture of simple constants, C structure
-definitions, and some constants defined terms of constants from other
-headers (which are themselves mixtures).
+On Thu, Jan 07, 2016 at 09:02:14PM -0800, Greg Kroah-Hartman wrote:
+> On Thu, Jan 07, 2016 at 05:37:44PM +0000, Mark Brown wrote:
 
-To enable the use of AArch64 ELF reloc constants from assembly code (s
-we will need for relocatable kernel support), we need an include without
-C structure definitions or incldues of other files with such
-definitions.
+> > I was just looking at DTs in -next and noticed that there is a patch
+> > 59dfafd03fc (arm64: dts: Add dts files to enable ION on Hi6220 SoC)
+> > which adds at DT doing something for ION.  Are we sure this should be
+> > going into the main production DT?  The bindings haven't been reviewed
+> > as far as I can tell, the matching driver is only in staging and hasn't
+> > been posted upstream.
 
-This patch factors out the relocs into a new header specifically for ELF
-reloc types.
+> Isn't "staging" upstream enough for this?  :)
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/elf.h        | 54 +--------------------------
- arch/arm64/include/asm/elf_relocs.h | 73 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 74 insertions(+), 53 deletions(-)
- create mode 100644 arch/arm64/include/asm/elf_relocs.h
+I wouldn't have thought so, DTs are supposed to be an ABI so we want
+proper review and having had a quick glance this doesn't look like it's
+a hardware description so it's not clear to me it should be in DT at all.
 
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index faad6df..e4b3cdc 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -16,6 +16,7 @@
- #ifndef __ASM_ELF_H
- #define __ASM_ELF_H
- 
-+#include <asm/elf_relocs.h>
- #include <asm/hwcap.h>
- 
- /*
-@@ -34,59 +35,6 @@ typedef elf_greg_t elf_gregset_t[ELF_NGREG];
- typedef struct user_fpsimd_state elf_fpregset_t;
- 
- /*
-- * AArch64 static relocation types.
-- */
--
--/* Miscellaneous. */
--#define R_ARM_NONE			0
--#define R_AARCH64_NONE			256
--
--/* Data. */
--#define R_AARCH64_ABS64			257
--#define R_AARCH64_ABS32			258
--#define R_AARCH64_ABS16			259
--#define R_AARCH64_PREL64		260
--#define R_AARCH64_PREL32		261
--#define R_AARCH64_PREL16		262
--
--/* Instructions. */
--#define R_AARCH64_MOVW_UABS_G0		263
--#define R_AARCH64_MOVW_UABS_G0_NC	264
--#define R_AARCH64_MOVW_UABS_G1		265
--#define R_AARCH64_MOVW_UABS_G1_NC	266
--#define R_AARCH64_MOVW_UABS_G2		267
--#define R_AARCH64_MOVW_UABS_G2_NC	268
--#define R_AARCH64_MOVW_UABS_G3		269
--
--#define R_AARCH64_MOVW_SABS_G0		270
--#define R_AARCH64_MOVW_SABS_G1		271
--#define R_AARCH64_MOVW_SABS_G2		272
--
--#define R_AARCH64_LD_PREL_LO19		273
--#define R_AARCH64_ADR_PREL_LO21		274
--#define R_AARCH64_ADR_PREL_PG_HI21	275
--#define R_AARCH64_ADR_PREL_PG_HI21_NC	276
--#define R_AARCH64_ADD_ABS_LO12_NC	277
--#define R_AARCH64_LDST8_ABS_LO12_NC	278
--
--#define R_AARCH64_TSTBR14		279
--#define R_AARCH64_CONDBR19		280
--#define R_AARCH64_JUMP26		282
--#define R_AARCH64_CALL26		283
--#define R_AARCH64_LDST16_ABS_LO12_NC	284
--#define R_AARCH64_LDST32_ABS_LO12_NC	285
--#define R_AARCH64_LDST64_ABS_LO12_NC	286
--#define R_AARCH64_LDST128_ABS_LO12_NC	299
--
--#define R_AARCH64_MOVW_PREL_G0		287
--#define R_AARCH64_MOVW_PREL_G0_NC	288
--#define R_AARCH64_MOVW_PREL_G1		289
--#define R_AARCH64_MOVW_PREL_G1_NC	290
--#define R_AARCH64_MOVW_PREL_G2		291
--#define R_AARCH64_MOVW_PREL_G2_NC	292
--#define R_AARCH64_MOVW_PREL_G3		293
--
--/*
-  * These are used to set parameters in the core dumps.
-  */
- #define ELF_CLASS	ELFCLASS64
-diff --git a/arch/arm64/include/asm/elf_relocs.h b/arch/arm64/include/asm/elf_relocs.h
-new file mode 100644
-index 0000000..3f6b930
---- /dev/null
-+++ b/arch/arm64/include/asm/elf_relocs.h
-@@ -0,0 +1,73 @@
-+/*
-+ * Copyright (C) 2016 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __ASM_ELF_RELOCS_H
-+#define __ASM_ELF_RELOCS_H
-+
-+/*
-+ * AArch64 static relocation types.
-+ */
-+
-+/* Miscellaneous. */
-+#define R_ARM_NONE			0
-+#define R_AARCH64_NONE			256
-+
-+/* Data. */
-+#define R_AARCH64_ABS64			257
-+#define R_AARCH64_ABS32			258
-+#define R_AARCH64_ABS16			259
-+#define R_AARCH64_PREL64		260
-+#define R_AARCH64_PREL32		261
-+#define R_AARCH64_PREL16		262
-+
-+/* Instructions. */
-+#define R_AARCH64_MOVW_UABS_G0		263
-+#define R_AARCH64_MOVW_UABS_G0_NC	264
-+#define R_AARCH64_MOVW_UABS_G1		265
-+#define R_AARCH64_MOVW_UABS_G1_NC	266
-+#define R_AARCH64_MOVW_UABS_G2		267
-+#define R_AARCH64_MOVW_UABS_G2_NC	268
-+#define R_AARCH64_MOVW_UABS_G3		269
-+
-+#define R_AARCH64_MOVW_SABS_G0		270
-+#define R_AARCH64_MOVW_SABS_G1		271
-+#define R_AARCH64_MOVW_SABS_G2		272
-+
-+#define R_AARCH64_LD_PREL_LO19		273
-+#define R_AARCH64_ADR_PREL_LO21		274
-+#define R_AARCH64_ADR_PREL_PG_HI21	275
-+#define R_AARCH64_ADR_PREL_PG_HI21_NC	276
-+#define R_AARCH64_ADD_ABS_LO12_NC	277
-+#define R_AARCH64_LDST8_ABS_LO12_NC	278
-+
-+#define R_AARCH64_TSTBR14		279
-+#define R_AARCH64_CONDBR19		280
-+#define R_AARCH64_JUMP26		282
-+#define R_AARCH64_CALL26		283
-+#define R_AARCH64_LDST16_ABS_LO12_NC	284
-+#define R_AARCH64_LDST32_ABS_LO12_NC	285
-+#define R_AARCH64_LDST64_ABS_LO12_NC	286
-+#define R_AARCH64_LDST128_ABS_LO12_NC	299
-+
-+#define R_AARCH64_MOVW_PREL_G0		287
-+#define R_AARCH64_MOVW_PREL_G0_NC	288
-+#define R_AARCH64_MOVW_PREL_G1		289
-+#define R_AARCH64_MOVW_PREL_G1_NC	290
-+#define R_AARCH64_MOVW_PREL_G2		291
-+#define R_AARCH64_MOVW_PREL_G2_NC	292
-+#define R_AARCH64_MOVW_PREL_G3		293
-+
-+#endif /* __ASM_ELF_RELOCS_H */
-+
--- 
-1.9.1
+> If not, let me know and I'll be glad to drop this patch, it was on the
+> list for a while with no objections.
+
+Which list?  I did look for the original thread to reply to but it
+seemed to be only on the Linux driver project list.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160108/f3396d79/attachment.sig>
