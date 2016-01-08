@@ -1,82 +1,57 @@
 From: xuejiancheng@huawei.com (Jiancheng Xue)
-Date: Fri, 8 Jan 2016 10:16:34 +0800
-Subject: [PATCH v5 0/6] ARM: hisi: Add initial support including clock driver
- for Hi3519 soc.
-Message-ID: <1452219400-32478-1-git-send-email-xuejiancheng@huawei.com>
+Date: Fri, 8 Jan 2016 10:16:36 +0800
+Subject: [PATCH v5 2/6] ARM: hisi: add compatible string for Hi3519 soc
+In-Reply-To: <1452219400-32478-1-git-send-email-xuejiancheng@huawei.com>
+References: <1452219400-32478-1-git-send-email-xuejiancheng@huawei.com>
+Message-ID: <1452219400-32478-3-git-send-email-xuejiancheng@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+add compatible string for Hi3519 soc.
 
-Hi3519 soc is mainly used for ip camera and sport DV solutions. This patchset adds initial support
-for Hi3519 soc. It includes clock driver, arch configuration, debug uart configuration and device tree.
-It has been tested on hi3519 reference board.
+Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
+---
+ arch/arm/mach-hisi/hisilicon.c | 23 ++++-------------------
+ 1 file changed, 4 insertions(+), 19 deletions(-)
 
-Any comments will be appreciated!
-
-Thanks!
-
-Change Log
-----------
-v5:
--Adjust clock and reset controller driver code
-
-v4:
--Rebase to v4.4-rc7
--Divide patches according to Rob's comments
--Add spi nodes in hi3519-demb.dts
-
-v3:
--Rebase to v4.4-rc4
--Adjust according to Arnd's comments
--Remove ARCH_HI3519, using ARCH_HISI directly
-
-v2:
--Rebase to v4.4-rc3
--Put dt-binding doc and header file in a separate patch.
--Delete unused clocks definitions.
--Adjust the ARCH_xxx order in Kconfig file
--Rename ARCH_HI3xxx to ARCH_36xx
-
-Jiancheng Xue (6):
-  clk: hisilicon: add CRG driver for hi3519 soc
-  ARM: hisi: add compatible string for Hi3519 soc
-  ARM: config: hisi: enable CONFIG_RESET_CONTROLLER
-  ARM: debug: add hi3519 debug uart
-  mfd: dt-bindings: add device tree bindings for Hi3519 sysctrl
-  ARM: dts: add dts files for Hi3519
-
-Jiancheng Xue (6):
-  clk: hisilicon: add CRG driver for hi3519 soc
-  ARM: hisi: add compatible string for Hi3519 soc
-  ARM: config: hisi: enable CONFIG_RESET_CONTROLLER
-  ARM: debug: add hi3519 debug uart
-  mfd: dt-bindings: add device tree bindings for Hi3519 sysctrl
-  ARM: dts: add dts files for Hi3519
-
- .../devicetree/bindings/clock/hi3519-crg.txt       |  46 ++++++
- Documentation/devicetree/bindings/mfd/hi3519.txt   |  14 ++
- arch/arm/Kconfig.debug                             |  10 ++
- arch/arm/boot/dts/Makefile                         |   2 +
- arch/arm/boot/dts/hi3519-demb.dts                  |  42 +++++
- arch/arm/boot/dts/hi3519.dtsi                      | 175 +++++++++++++++++++++
- arch/arm/configs/hisi_defconfig                    |   1 +
- arch/arm/mach-hisi/hisilicon.c                     |  23 +--
- drivers/clk/hisilicon/Kconfig                      |   7 +
- drivers/clk/hisilicon/Makefile                     |   2 +
- drivers/clk/hisilicon/clk-hi3519.c                 | 105 +++++++++++++
- drivers/clk/hisilicon/reset.c                      | 129 +++++++++++++++
- drivers/clk/hisilicon/reset.h                      |  32 ++++
- include/dt-bindings/clock/hi3519-clock.h           |  43 +++++
- 14 files changed, 612 insertions(+), 19 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/hi3519-crg.txt
- create mode 100644 Documentation/devicetree/bindings/mfd/hi3519.txt
- create mode 100644 arch/arm/boot/dts/hi3519-demb.dts
- create mode 100644 arch/arm/boot/dts/hi3519.dtsi
- create mode 100644 drivers/clk/hisilicon/clk-hi3519.c
- create mode 100644 drivers/clk/hisilicon/reset.c
- create mode 100644 drivers/clk/hisilicon/reset.h
- create mode 100644 include/dt-bindings/clock/hi3519-clock.h
-
+diff --git a/arch/arm/mach-hisi/hisilicon.c b/arch/arm/mach-hisi/hisilicon.c
+index 8cc6215..00dae89 100644
+--- a/arch/arm/mach-hisi/hisilicon.c
++++ b/arch/arm/mach-hisi/hisilicon.c
+@@ -54,30 +54,15 @@ DT_MACHINE_START(HI3620, "Hisilicon Hi3620 (Flattened Device Tree)")
+ 	.dt_compat	= hi3xxx_compat,
+ MACHINE_END
+ 
+-static const char *const hix5hd2_compat[] __initconst = {
++static const char *const hisilicon_compat[] __initconst = {
+ 	"hisilicon,hix5hd2",
+-	NULL,
+-};
+-
+-DT_MACHINE_START(HIX5HD2_DT, "Hisilicon HIX5HD2 (Flattened Device Tree)")
+-	.dt_compat	= hix5hd2_compat,
+-MACHINE_END
+-
+-static const char *const hip04_compat[] __initconst = {
+ 	"hisilicon,hip04-d01",
+-	NULL,
+-};
+-
+-DT_MACHINE_START(HIP04, "Hisilicon HiP04 (Flattened Device Tree)")
+-	.dt_compat	= hip04_compat,
+-MACHINE_END
+-
+-static const char *const hip01_compat[] __initconst = {
+ 	"hisilicon,hip01",
+ 	"hisilicon,hip01-ca9x2",
++	"hisilicon,hi3519",
+ 	NULL,
+ };
+ 
+-DT_MACHINE_START(HIP01, "Hisilicon HIP01 (Flattened Device Tree)")
+-	.dt_compat      = hip01_compat,
++DT_MACHINE_START(HISILICON_DT, "HiSilicon Soc")
++	.dt_compat	= hisilicon_compat,
+ MACHINE_END
 -- 
 1.9.1
