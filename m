@@ -1,57 +1,65 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri,  8 Jan 2016 15:57:09 -0800
-Subject: [PATCH] arm64: dts: Add L2 cache node to msm8916
-Message-ID: <1452297429-6382-1-git-send-email-sboyd@codeaurora.org>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Fri, 8 Jan 2016 15:59:16 -0800
+Subject: bcm4708-smartrg-sr400ac boot failures in next/arm-soc
+In-Reply-To: <20160108234432.GQ19062@n2100.arm.linux.org.uk>
+References: <CANMBJr6LW=y7g4_CCutHf4vu5NkzoeXt_RvPSJAsTE2nFpGwqw@mail.gmail.com>
+ <20160108225032.GO19062@n2100.arm.linux.org.uk>
+ <CANMBJr6DR=y2oOqnEyUAxhzhXn1twXozGacOpcVRx8NcWf-mfw@mail.gmail.com>
+ <20160108234432.GQ19062@n2100.arm.linux.org.uk>
+Message-ID: <CANMBJr6o=kwa_jm1wXFUrOdK+raAO5A505Z27jDqNM1bWOh0ag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The msm8916 SoC has an L2 cache for all 4 CPUs. Add it to the
-dtsi file so that the cache hierarchy can be probed.
+On 8 January 2016 at 15:44, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Jan 08, 2016 at 03:17:19PM -0800, Tyler Baker wrote:
+>> On 8 January 2016 at 14:50, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Fri, Jan 08, 2016 at 02:33:39PM -0800, Tyler Baker wrote:
+>> >> After a bit of investigation, I determined that CONFIG_BLK_DEV_RAM was
+>> >> causing the issue and disabling it fixed the boot issue. Essentially,
+>> >> the kernel cannot find the initrd that has been loaded into memory by
+>> >> CFE bootloader with this option enabled as I inject the following
+>> >> command line into the DT before it's loaded over tftp.
+>> >>
+>> >> Loaded in CFE by: 'load -raw -tftp -addr=0x4000000 -max=0x900000
+>> >> 192.168.2.2:tmpqC9zOv/ramdisk.cpio.gz'
+>> >>
+>> >> Kernel arguments injected into DT: 'console=ttyS0,115200
+>> >> initrd=0x4000000,8M root=/dev/ram0 ip=dhcp'
+>> >
+>> > What is the problem that the kernel is reporting?
+>>
+>> The kernel complaining that there is no file system to mount, and
+>> panics. Here is a plain text version of the issue if you want to have
+>> a look[1].
+>
+> Thanks.
+>
+> The error is:
+>
+> [   16.557922] RAMDISK: EOF while reading compressed data
+>
+> which is not surprising given:
+>
+> initrd=0x4000000,8M
+>
+> is given on the kernel command line, but:
+>
+> Loader:raw Filesys:tftp Dev:eth0 File:192.168.2.2:tmpd9L7xr/ramdisk.cpio.gz Options:(null)
+> ... 8450989 bytes read
+>
+> the actual ramdisk is larger than 8M.  8M would've been 8388608 bytes,
+> but you're about 64k over that.
 
-Cc: <devicetree@vger.kernel.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm64/boot/dts/qcom/msm8916.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+Right, this was my initial reaction when I saw this issue. I've
+attempted increase initrd limit passed to the kernel, the load size in
+the bootloader (10MB+) and still the same issue occurs when I do this.
+I am suspicious that the CFE bootloader may have some limitation on
+initrd size it will load, even though it does not complain when I
+increase the size. I was hoping Hauke or Rafal might be able help us
+understand a bit more here, as they are maintainers of this platform.
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index ba8184d0f948..42573a7d4a94 100644
---- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -61,24 +61,33 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a53", "arm,armv8";
- 			reg = <0x0>;
-+			next-level-cache = <&L2_0>;
- 		};
- 
- 		CPU1: cpu at 1 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a53", "arm,armv8";
- 			reg = <0x1>;
-+			next-level-cache = <&L2_0>;
- 		};
- 
- 		CPU2: cpu at 2 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a53", "arm,armv8";
- 			reg = <0x2>;
-+			next-level-cache = <&L2_0>;
- 		};
- 
- 		CPU3: cpu at 3 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a53", "arm,armv8";
- 			reg = <0x3>;
-+			next-level-cache = <&L2_0>;
-+		};
-+
-+		L2_0: l2-cache {
-+		      compatible = "cache";
-+		      cache-level = <2>;
- 		};
- 	};
- 
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Cheers,
+
+Tyler
