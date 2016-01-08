@@ -1,53 +1,82 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 7 Jan 2016 18:26:20 -0800
-Subject: [PATCH 2/2] memory: omap-gpmc: Add Kconfig option for debug
-In-Reply-To: <568EDC8D.7070205@gmail.com>
-References: <20160105041356.GE12777@atomide.com> <20160105084947.GG22661@pali>
- <20160105224929.GF12777@atomide.com> <20160106174039.GA14271@earth>
- <20160106174713.GL12777@atomide.com> <568D5669.4040801@gmail.com>
- <20160106182650.GM12777@atomide.com> <568D5F54.7040900@gmail.com>
- <20160107180700.GN12777@atomide.com> <568EDC8D.7070205@gmail.com>
-Message-ID: <20160108022619.GS12777@atomide.com>
+From: xuejiancheng@huawei.com (Jiancheng Xue)
+Date: Fri, 8 Jan 2016 10:16:34 +0800
+Subject: [PATCH v5 0/6] ARM: hisi: Add initial support including clock driver
+ for Hi3519 soc.
+Message-ID: <1452219400-32478-1-git-send-email-xuejiancheng@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [160107 13:46]:
-> On  7.01.2016 20:07, Tony Lindgren wrote:
-> 
-> >>>Also, do things now work reliably for you with CONFIG_OMAP_GPMC_DEBUG
-> >>>enabled? Or does that also produce corruption after few reboots?
-> 
-> I'll make further experiments as I am a bit lost what and when happens. What
-> is for sure is that corruptions occurs immediately after boot without your
-> patch and with CONFIG_OMAP_GPMC_DEBUG disabled. So maybe there is another
-> problem in ubfs or mtd driver.
+Hello,
 
-Yes it seems there's some other issue too. Maybe you can run git bisect
-again and carry the fix along as an extra patch?
+Hi3519 soc is mainly used for ip camera and sport DV solutions. This patchset adds initial support
+for Hi3519 soc. It includes clock driver, arch configuration, debug uart configuration and device tree.
+It has been tested on hi3519 reference board.
 
-> Already did, every reflash and install of upstream kernel compatible SW
-> takes me about 3 hours I'd rather spend on something else :). Though it
-> seems that reboot issue happens no matter if CONFIG_OMAP_GPMC_DEBUG is
-> enabled or not.
+Any comments will be appreciated!
 
-OK then it really seems like we do have another bug lurking around.
-Maybe you can figure out an easier way to reproduce it?
+Thanks!
 
-> The problem is that between NOLO and kernel there is u-boot. And even if I
-> am almost sure it doesn't touch onenand configs, I can't be absolutely sure.
-> So those timings are not 100% reliable IMO, though close to that.
+Change Log
+----------
+v5:
+-Adjust clock and reset controller driver code
 
-Hmm yes I'm only booting with u-boot here as my device sits in my rack.
+v4:
+-Rebase to v4.4-rc7
+-Divide patches according to Rob's comments
+-Add spi nodes in hi3519-demb.dts
 
-> I'll play a bit more with printing the values with both
-> CONFIG_OMAP_GPMC_DEBUG enabled and disabled and whatever I can think of,
-> including dumping cs0 config from u-boot, nokia kernel and/or REing NOLO
-> onenand init (already did that for N9 DDR timings, shouldn't be that hard
-> for N900 GPMC). Will keep you informed on the progress. In the meanwhile I
-> think your patch should make it as without it onenand is unusable.
+v3:
+-Rebase to v4.4-rc4
+-Adjust according to Arnd's comments
+-Remove ARCH_HI3519, using ARCH_HISI directly
 
-OK will push it out then.
+v2:
+-Rebase to v4.4-rc3
+-Put dt-binding doc and header file in a separate patch.
+-Delete unused clocks definitions.
+-Adjust the ARCH_xxx order in Kconfig file
+-Rename ARCH_HI3xxx to ARCH_36xx
 
-Regards,
+Jiancheng Xue (6):
+  clk: hisilicon: add CRG driver for hi3519 soc
+  ARM: hisi: add compatible string for Hi3519 soc
+  ARM: config: hisi: enable CONFIG_RESET_CONTROLLER
+  ARM: debug: add hi3519 debug uart
+  mfd: dt-bindings: add device tree bindings for Hi3519 sysctrl
+  ARM: dts: add dts files for Hi3519
 
-Tony
+Jiancheng Xue (6):
+  clk: hisilicon: add CRG driver for hi3519 soc
+  ARM: hisi: add compatible string for Hi3519 soc
+  ARM: config: hisi: enable CONFIG_RESET_CONTROLLER
+  ARM: debug: add hi3519 debug uart
+  mfd: dt-bindings: add device tree bindings for Hi3519 sysctrl
+  ARM: dts: add dts files for Hi3519
+
+ .../devicetree/bindings/clock/hi3519-crg.txt       |  46 ++++++
+ Documentation/devicetree/bindings/mfd/hi3519.txt   |  14 ++
+ arch/arm/Kconfig.debug                             |  10 ++
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/hi3519-demb.dts                  |  42 +++++
+ arch/arm/boot/dts/hi3519.dtsi                      | 175 +++++++++++++++++++++
+ arch/arm/configs/hisi_defconfig                    |   1 +
+ arch/arm/mach-hisi/hisilicon.c                     |  23 +--
+ drivers/clk/hisilicon/Kconfig                      |   7 +
+ drivers/clk/hisilicon/Makefile                     |   2 +
+ drivers/clk/hisilicon/clk-hi3519.c                 | 105 +++++++++++++
+ drivers/clk/hisilicon/reset.c                      | 129 +++++++++++++++
+ drivers/clk/hisilicon/reset.h                      |  32 ++++
+ include/dt-bindings/clock/hi3519-clock.h           |  43 +++++
+ 14 files changed, 612 insertions(+), 19 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/hi3519-crg.txt
+ create mode 100644 Documentation/devicetree/bindings/mfd/hi3519.txt
+ create mode 100644 arch/arm/boot/dts/hi3519-demb.dts
+ create mode 100644 arch/arm/boot/dts/hi3519.dtsi
+ create mode 100644 drivers/clk/hisilicon/clk-hi3519.c
+ create mode 100644 drivers/clk/hisilicon/reset.c
+ create mode 100644 drivers/clk/hisilicon/reset.h
+ create mode 100644 include/dt-bindings/clock/hi3519-clock.h
+
+-- 
+1.9.1
