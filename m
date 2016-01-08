@@ -1,68 +1,42 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 8 Jan 2016 21:48:32 +0800
-Subject: Armada XP (MV78460): BUG in netdevice.h with maxcpus=2
-In-Reply-To: <20160108133104.GJ19062@n2100.arm.linux.org.uk>
-References: <568F6A47.6010905@gmail.com>	<20160108182537.0a68630c@xhacker>
- <20160108105721.GG19062@n2100.arm.linux.org.uk>
- <20160108204523.43b4d473@xhacker>
- <20160108133104.GJ19062@n2100.arm.linux.org.uk>
-Message-ID: <20160108214832.0c3f3a1e@xhacker>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 8 Jan 2016 13:55:52 +0000
+Subject: ION DTS changes for HiKey in -next
+In-Reply-To: <20160108124439.GL6588@sirena.org.uk>
+References: <20160107173744.GJ6588@sirena.org.uk>
+ <20160108050214.GD30293@kroah.com>
+ <20160108124439.GL6588@sirena.org.uk>
+Message-ID: <20160108135552.GE3097@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Russell,
+On Fri, Jan 08, 2016 at 12:44:39PM +0000, Mark Brown wrote:
+> On Thu, Jan 07, 2016 at 09:02:14PM -0800, Greg Kroah-Hartman wrote:
+> > On Thu, Jan 07, 2016 at 05:37:44PM +0000, Mark Brown wrote:
+> 
+> > > I was just looking at DTs in -next and noticed that there is a patch
+> > > 59dfafd03fc (arm64: dts: Add dts files to enable ION on Hi6220 SoC)
+> > > which adds at DT doing something for ION.  Are we sure this should be
+> > > going into the main production DT?  The bindings haven't been reviewed
+> > > as far as I can tell, the matching driver is only in staging and hasn't
+> > > been posted upstream.
+> 
+> > Isn't "staging" upstream enough for this?  :)
+> 
+> I wouldn't have thought so, DTs are supposed to be an ABI so we want
+> proper review and having had a quick glance this doesn't look like it's
+> a hardware description so it's not clear to me it should be in DT at all.
 
-On Fri, 8 Jan 2016 13:31:04 +0000 Russell King - ARM Linux wrote:
+Indeed.
 
-> On Fri, Jan 08, 2016 at 08:45:23PM +0800, Jisheng Zhang wrote:
-> > let's assume a quad core system, boot with maxcpus=2, after booting.
-> > 
-> > on arm64, present cpus is cpu0, cpu1
-> > 
-> > on arm, present cpus is cpu0, cpu1, cpu2 and cpu3.
-> > 
-> > the arm core code requires every platform to update the present map in
-> > platforms' smp_prepare_cpus(), but only two or three platforms do so.  
-> 
-> The behaviour of maxcpus= is architecture specific.  Some architectures
-> take notice of this to limit the number of present and possible CPUs,
-> others ignore it.  In any case, it limits the number of CPUs that come
-> online at boot.
-> 
-> However, that is a complete red herring, because what we're talking
-> about is bringing up the network interface at some point later, when
-> CPU hotplug may have changed the online state already: the kernel may
-> have booted with CPU0-3 online, but CPUs 2 and 3 may have been taken
-> offline before the network interface is brought up.
+The driver and the binding before that don't really belong either,
+I would have NAK'd those on devicetree at vger.kernel.org, though it
+appears I either missed them or they never made it to that list.
 
-Oh yeah! On arm64, the BUG_ON can be reproduced in this case. So the driver
-need a fix. Thanks a lot
+>From my PoV there should not be a platform-specific ION binding. If we
+need one at all, people should work on the proposed generic binding [1]
+or figure out how to do this with the existing reserved-memory bindings.
 
-> 
-> > What's the better solution? Could you please guide me?  
-> 
-> I would suggest that you need to track the state of each CPU within
-> your percpu specific code with appropriate locks to prevent concurrency,
-> and ensure that you register the CPU hotplug notifier just before
-> walking the currently on-line CPUs.
-> 
-> Also, walk the list of currently on-line CPUs (using, eg,
-> smp_call_function) just before unregistering the hotplug notifier.
-> 
-> Remember that your per-CPU bringup/takedown may be executed twice
-> for the same CPU - once via the hotplug notifier and once via
-> smp_call_function() - hence why you need locking and state tracking.
+Thanks,
+Mark.
 
-Got it. Thanks for the guidance, I'll try.
-
-> 
-> That fixes two of the sites.  For the other site, I wonder whether
-> it's possible to restructure the code so there's no need to have
-> three sites, since it's fairly obvious when thinking about the
-> CPU hotplug case, you only have notification of the CPU coming
-> online and the CPU going away.  It's been a while since I looked
-> at the mvneta code to really comment on that though.
-> 
-
-Thank you very much,
-Jisheng
+[1] https://lkml.org/lkml/2015/10/6/854
