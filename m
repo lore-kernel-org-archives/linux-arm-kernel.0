@@ -1,40 +1,53 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Fri, 8 Jan 2016 12:14:48 +0200
-Subject: [PATCH 3/3] checkpatch: add virt barriers
-In-Reply-To: <1451945497.4334.107.camel@perches.com>
-References: <1451907395-15978-1-git-send-email-mst@redhat.com>
- <1451907395-15978-4-git-send-email-mst@redhat.com>
- <1451926073.4334.90.camel@perches.com>
- <20160104230528-mutt-send-email-mst@redhat.com>
- <1451945497.4334.107.camel@perches.com>
-Message-ID: <20160108121352-mutt-send-email-mst@redhat.com>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 08 Jan 2016 10:17:02 +0000
+Subject: [PATCH v2 12/13] arm64: add support for relocatable kernel
+In-Reply-To: <1451489172-17420-13-git-send-email-ard.biesheuvel@linaro.org>
+References: <1451489172-17420-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1451489172-17420-13-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <568F8C9E.1010608@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 04, 2016 at 02:11:37PM -0800, Joe Perches wrote:
-> On Mon, 2016-01-04 at 23:07 +0200, Michael S. Tsirkin wrote:
-> > On Mon, Jan 04, 2016 at 08:47:53AM -0800, Joe Perches wrote:
-> > > On Mon, 2016-01-04 at 13:37 +0200, Michael S. Tsirkin wrote:
-> > > > Add virt_ barriers to list of barriers to check for
-> > > > presence of a comment.
-> > > 
-> > > Are these virt_ barriers used anywhere?
-> > > 
-> > > I see some virtio_ barrier like uses.
-> > 
-> > They will be :) They are added and used by patchset
-> > 	????????arch: barrier cleanup + barriers for virt
-> > 
-> > See
-> > http://article.gmane.org/gmane.linux.kernel.virtualization/26555
+Hi Ard!
+
+On 30/12/15 15:26, Ard Biesheuvel wrote:
+> This adds support for runtime relocation of the kernel Image, by
+> building it as a PIE (ET_DYN) executable and applying the dynamic
+> relocations in the early boot code.
 > 
-> Ah, OK, thanks.
-> 
-> Are the virtio_ barriers going away?
-> If not, maybe those should be added too.
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
 
-I don't mind. I'll queue a patch like that.
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index 01a33e42ed70..ab582ee58b58 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -243,6 +253,16 @@ ENDPROC(stext)
+>  preserve_boot_args:
+>  	mov	x21, x0				// x21=FDT
+>  
+> +#ifdef CONFIG_ARM64_RELOCATABLE_KERNEL
+> +	/*
+> +	 * Mask off the bits of the random value supplied in x1 so it can serve
+> +	 * as a KASLR displacement value which will move the kernel image to a
+> +	 * random offset in the lower half of the VMALLOC area.
+> +	 */
+> +	mov	x23, #(1 << (VA_BITS - 2)) - 1
+> +	and	x23, x23, x1, lsl #SWAPPER_BLOCK_SHIFT
+> +#endif
+
+I've managed to make this fail to boot by providing a seed that caused
+the kernel to overlap a 1G boundary on a 4K system.
+
+(It looks like your v3 may have the same issue - but I haven't tested it.)
 
 
--- 
-MST
+> +
+>  	adr_l	x0, boot_args			// record the contents of
+>  	stp	x21, x1, [x0]			// x0 .. x3 at kernel entry
+>  	stp	x2, x3, [x0, #16]
+
+
+Thanks!
+
+James
