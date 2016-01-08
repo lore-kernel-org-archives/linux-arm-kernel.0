@@ -1,49 +1,46 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 8 Jan 2016 15:01:42 +0000
-Subject: [PATCH v2] ARM64: kernel: implement ACPI parking protocol
-In-Reply-To: <CAPw-ZTmsLqgh6W6R0uLgQjueV7XjaGOD49CYCRYufJ43zT8Kyg@mail.gmail.com>
-References: <CAPw-ZTmsLqgh6W6R0uLgQjueV7XjaGOD49CYCRYufJ43zT8Kyg@mail.gmail.com>
-Message-ID: <20160108150142.GB10630@red-moon>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Fri, 8 Jan 2016 12:00:13 -0300
+Subject: [PATCH 1/2] power: act8945a: add charger driver for ACT8945A
+In-Reply-To: <1452219225-10510-2-git-send-email-wenyou.yang@atmel.com>
+References: <1452219225-10510-1-git-send-email-wenyou.yang@atmel.com>
+ <1452219225-10510-2-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <CABxcv=mQoDxb7oHh0DdC_t1_m-j=4Hp-sPNoq4Apy4c7CneSng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Loc,
+Hello Wenyou,
 
-[CC'ed Jeremy - I know he is testing this on m400]
+On Thu, Jan 7, 2016 at 11:13 PM, Wenyou Yang <wenyou.yang@atmel.com> wrote:
+> This patch adds new driver for Active-semi ACT8945A ActivePath
+> charger (part of ACT8945A MFD driver) providing power supply class
+> information to userspace.
+>
+> The driver is configured through DTS (battery and system related
+> settings) and sysfs entries (timers and input over-voltage threshold).
+>
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> ---
+>
 
-On Fri, Dec 18, 2015 at 06:12:20PM -0800, Loc Ho wrote:
+[snip]
 
-[...]
+> +
+> +static struct platform_driver act8945a_charger_driver = {
+> +       .driver = {
+> +               .name = "act8945a-charger",
+> +       },
+> +       .probe  = act8945a_charger_probe,
+> +       .remove = act8945a_charger_remove,
+> +};
+> +
 
-> >> I put it together to make sure that it is there if any platform
-> >> compliant with it relies on it and more importantly to prevent
-> >> non-compliant implentations from trickling into the kernel,
-> >> basically to prevent broken firmware implementations from being
-> >> considered compliant and "working".
-> >
-> > That's a good point. However, AFAIK, AMD are using PSCI already in their
-> > firmware implementation and that's what we recommend anyway if EL3 is
-> > available.
-> >
-> > So this patch is mainly aimed at X-Gene since other implementations I'm
-> > aware of have EL3 already. What are the chances of Applied Micro fixing
-> > their firmware and actually using this patch? (not a question for you;
-> > I'm hoping some Applied engineers would comment).
-> >
-> 
-> Sorry that I missed this. This FW is now fixed and tested with Lorenzo
-> patch. Though some minor manual patch will be required with recent
-> kernel. I was going to get some one to ack the patch but got tied up
-> with other matter. As for availability of the FW, it is currently
-> internally only and will be available sometime next year for the next
-> FW release. If any one interested in the FW, you can contact me.
+The driver is missing an OF match table (and also a platform ID match
+table if non-DT is supported) so this means that module autoloading
+will be broken for this driver since the platform uevent function will
+report a MODALIAS=of:N*T*Cactive-semi,act8945a-charger
 
-I guess that by "some minor manual patch" you meant you had to rebase
-the patch on top of mainline, I can post an updated version for you to
-test.
+Matching is only working because the platform bus match function use
+as a fallback the driver name.
 
-Mind giving a tested-by if FW has been updated to comply with the specs
-and tested with my patch applied ?
-
-Thanks,
-Lorenzo
+Best regards,
+Javier
