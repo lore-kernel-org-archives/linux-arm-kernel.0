@@ -1,55 +1,69 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 8 Jan 2016 12:35:15 -0300
-Subject: [PATCH 2/2] ARM: exynos_defconfig: Enable s5p-secss driver
-In-Reply-To: <1452132905-8587-2-git-send-email-k.kozlowski@samsung.com>
-References: <1452132905-8587-1-git-send-email-k.kozlowski@samsung.com>
- <1452132905-8587-2-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <568FD733.8030601@osg.samsung.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 8 Jan 2016 15:36:54 +0000
+Subject: [PATCH v2 11/13] arm64: allow kernel Image to be loaded anywhere
+ in physical memory
+In-Reply-To: <20160108152738.GG16432@e104818-lin.cambridge.arm.com>
+References: <1451489172-17420-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1451489172-17420-12-git-send-email-ard.biesheuvel@linaro.org>
+ <20160108152738.GG16432@e104818-lin.cambridge.arm.com>
+Message-ID: <20160108153653.GB32692@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+On Fri, Jan 08, 2016 at 03:27:38PM +0000, Catalin Marinas wrote:
+> On Wed, Dec 30, 2015 at 04:26:10PM +0100, Ard Biesheuvel wrote:
+> > +static void __init enforce_memory_limit(void)
+> > +{
+> > +	const phys_addr_t kbase = round_down(__pa(_text), MIN_KIMG_ALIGN);
+> > +	u64 to_remove = memblock_phys_mem_size() - memory_limit;
+> > +	phys_addr_t max_addr = 0;
+> > +	struct memblock_region *r;
+> > +
+> > +	if (memory_limit == (phys_addr_t)ULLONG_MAX)
+> > +		return;
+> > +
+> > +	/*
+> > +	 * The kernel may be high up in physical memory, so try to apply the
+> > +	 * limit below the kernel first, and only let the generic handling
+> > +	 * take over if it turns out we haven't clipped enough memory yet.
+> > +	 */
+> > +	for_each_memblock(memory, r) {
+> > +		if (r->base + r->size > kbase) {
+> > +			u64 rem = min(to_remove, kbase - r->base);
+> > +
+> > +			max_addr = r->base + rem;
+> > +			to_remove -= rem;
+> > +			break;
+> > +		}
+> > +		if (to_remove <= r->size) {
+> > +			max_addr = r->base + to_remove;
+> > +			to_remove = 0;
+> > +			break;
+> > +		}
+> > +		to_remove -= r->size;
+> > +	}
+> > +
+> > +	memblock_remove(0, max_addr);
+> > +
+> > +	if (to_remove)
+> > +		memblock_enforce_memory_limit(memory_limit);
+> > +}
+> 
+> IIUC, this is changing the user expectations a bit. There are people
+> using the mem= limit to hijack some top of the RAM for other needs
+> (though they could do it in a saner way like changing the DT memory
+> nodes).
 
-On 01/06/2016 11:15 PM, Krzysztof Kozlowski wrote:
-> The Exynos SoC provides a Security SubSystem block for accelerating some
-> cryptographic operations. Enable the driver for it - s5p-secss to
-> utilize the hardware acceleration.
-> 
-> Currently the s5p-secss driver supports AES in CBC and ECB modes.
-> However on Odroid XU4 (Exynos5422) and Trats2 (Exynos4412) boards this
-> change introduces one booting error:
-> 
-> 	alg: skcipher: encryption failed on chunk test 1 for ecb-aes-s5p: ret=22
-> 
-> The cbc-aes-s5p properly registers itself and passes self-tests.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  arch/arm/configs/exynos_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index 0aee1e035be9..c47c7e069873 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -240,6 +240,7 @@ CONFIG_DEBUG_RT_MUTEXES=y
->  CONFIG_DEBUG_SPINLOCK=y
->  CONFIG_DEBUG_MUTEXES=y
->  CONFIG_DEBUG_USER=y
-> +CONFIG_CRYPTO_DEV_S5P=y
+Which will be hopelessly broken in the presence of KASLR, the kernel
+being loaded at a different address, pages betting reserved differently
+due to page size, etc.
 
-I noticed that this is not enabled in multi_v7_defconfig.
-Are you planing to do it as well?
+I hope that no-one usees this for anything other than testing low-memory
+conditions. If they want to steal memory they need to carve it out
+explicitly.
 
->  CONFIG_ARM_CRYPTO=y
->  CONFIG_CRYPTO_SHA1_ARM_NEON=m
->  CONFIG_CRYPTO_SHA256_ARM=m
-> 
+We can behave as we used to, but we shouldn't give the impression that
+such usage is supported.
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Thanks,
+Mark.
