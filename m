@@ -1,27 +1,43 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 09 Jan 2016 21:56:39 +0100
-Subject: [PATCH 2/5] clk: bcm2835: enable management of PCM clock
-In-Reply-To: <1452331558-2520-3-git-send-email-kernel@martin.sperl.org>
-References: <1452331558-2520-1-git-send-email-kernel@martin.sperl.org>
- <1452331558-2520-3-git-send-email-kernel@martin.sperl.org>
-Message-ID: <4332640.jBKM55TPAo@wuerfel>
+Date: Sat, 09 Jan 2016 22:16:42 +0100
+Subject: [PATCH] gpio: generic: make bgpio_pdata always visible
+Message-ID: <21095568.bdP2eOAsBs@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 09 January 2016 09:25:54 kernel at martin.sperl.org wrote:
-> --- a/include/dt-bindings/clock/bcm2835.h
-> +++ b/include/dt-bindings/clock/bcm2835.h
-> @@ -44,5 +44,6 @@
->  #define BCM2835_CLOCK_EMMC             28
->  #define BCM2835_CLOCK_PERI_IMAGE       29
->  #define BCM2835_CLOCK_PWM              30
-> +#define BCM2835_CLOCK_PCM              31
->  
-> -#define BCM2835_CLOCK_COUNT            31
-> +#define BCM2835_CLOCK_COUNT            32
+Board files that define their own bgpio_pdata are broken when
+CONFIG_GPIO_GENERIC is disabled and the bgpio_pdata structure
+definition is hidden by the #ifdef:
 
-The last line contains an incompatible change, please don't do that.
-If you have to add another clock, do that after the BCM2835_CLOCK_COUNT
-definition to avoid changing dts files that use that number.
+arch/arm/mach-clps711x/board-autcpu12.c:148:15: error: variable 'autcpu12_mmgpio_pdata' has initializer but incomplete type
+ static struct bgpio_pdata autcpu12_mmgpio_pdata __initdata = {
+arch/arm/mach-clps711x/board-autcpu12.c:149:2: error: unknown field 'base' specified in initializer
+  .base = AUTCPU12_MMGPIO_BASE,
 
-	Arnd
+Since the board files should generally not care what drivers are
+enabled, this makes the structure definition visible again.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 0f4630f3720e ("gpio: generic: factor into gpio_chip struct")
+
+diff --git a/include/linux/gpio/driver.h b/include/linux/gpio/driver.h
+index e2d05fd0e6e3..82fda487453f 100644
+--- a/include/linux/gpio/driver.h
++++ b/include/linux/gpio/driver.h
+@@ -220,14 +220,14 @@ static inline void *gpiochip_get_data(struct gpio_chip *chip)
+ 
+ struct gpio_chip *gpiod_to_chip(const struct gpio_desc *desc);
+ 
+-#if IS_ENABLED(CONFIG_GPIO_GENERIC)
+-
+ struct bgpio_pdata {
+ 	const char *label;
+ 	int base;
+ 	int ngpio;
+ };
+ 
++#if IS_ENABLED(CONFIG_GPIO_GENERIC)
++
+ int bgpio_init(struct gpio_chip *gc, struct device *dev,
+ 	       unsigned long sz, void __iomem *dat, void __iomem *set,
+ 	       void __iomem *clr, void __iomem *dirout, void __iomem *dirin,
