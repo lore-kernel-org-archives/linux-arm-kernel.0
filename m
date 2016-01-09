@@ -1,16 +1,14 @@
 From: andy.gross@linaro.org (Andy Gross)
-Date: Fri, 8 Jan 2016 22:39:48 -0600
-Subject: [V5,5/6] dts: msm8974: Add blsp2_bam dma node
-In-Reply-To: <1447760727-4897-6-git-send-email-sricharan@codeaurora.org>
-References: <1447760727-4897-6-git-send-email-sricharan@codeaurora.org>
-Message-ID: <20160109043948.GD4616@hector.attlocal.net>
+Date: Fri, 8 Jan 2016 22:40:26 -0600
+Subject: [V5,6/6] dts: msm8974: Add dma channels for blsp2_i2c1 node
+In-Reply-To: <1447760727-4897-7-git-send-email-sricharan@codeaurora.org>
+References: <1447760727-4897-7-git-send-email-sricharan@codeaurora.org>
+Message-ID: <20160109044026.GE4616@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2015 at 05:15:26PM +0530, Sricharan R wrote:
+On Tue, Nov 17, 2015 at 05:15:27PM +0530, Sricharan R wrote:
 > Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 > ---
-
-I'd say a description would be nice, but maybe not necessary for this.
 
 Reviewed-by: Andy Gross <andy.gross@linaro.org>
