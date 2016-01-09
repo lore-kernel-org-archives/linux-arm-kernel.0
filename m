@@ -1,95 +1,100 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Sat, 9 Jan 2016 09:24:22 -0600
-Subject: [PATCH] arm64, pci, numa: Adding helper functions as required by
- pci
-In-Reply-To: <CAFpQJXUaVS7tBqjQ4Dh201yrOWFxa3Bk2q-ZCFtK4mk-te=Q7w@mail.gmail.com>
-References: <1450780730-13667-1-git-send-email-gkulkarni@caviumnetworks.com>
- <20160108180131.GB5354@localhost> <20160108180638.GF11228@arm.com>
- <CAFpQJXUaVS7tBqjQ4Dh201yrOWFxa3Bk2q-ZCFtK4mk-te=Q7w@mail.gmail.com>
-Message-ID: <20160109152422.GA30802@localhost>
+From: robh@kernel.org (Rob Herring)
+Date: Sat, 9 Jan 2016 09:33:22 -0600
+Subject: [PATCH v5 1/6] clk: hisilicon: add CRG driver for hi3519 soc
+In-Reply-To: <1452219400-32478-2-git-send-email-xuejiancheng@huawei.com>
+References: <1452219400-32478-1-git-send-email-xuejiancheng@huawei.com>
+ <1452219400-32478-2-git-send-email-xuejiancheng@huawei.com>
+Message-ID: <20160109153322.GA19311@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 09, 2016 at 11:35:17AM +0530, Ganapatrao Kulkarni wrote:
-> On Fri, Jan 8, 2016 at 11:36 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Fri, Jan 08, 2016 at 12:01:31PM -0600, Bjorn Helgaas wrote:
-> >> On Tue, Dec 22, 2015 at 04:08:50PM +0530, Ganapatrao Kulkarni wrote:
-> >> > Adding helper functions and necessary code to make
-> >> > pci driver(pci-host-generic) numa aware.
-> >> >
-> >> > This patch is on top of arm64-numa v7.
-> >> > http://www.spinics.net/lists/arm-kernel/msg460813.html
-> >> >
-> >> > Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
-> >> > ---
-> >> >  arch/arm64/include/asm/numa.h       | 8 +++++---
-> >> >  arch/arm64/kernel/pci.c             | 8 ++++++++
-> >> >  drivers/pci/host/pci-host-generic.c | 1 +
-> >> >  3 files changed, 14 insertions(+), 3 deletions(-)
-> >> >
-> >> > diff --git a/arch/arm64/include/asm/numa.h b/arch/arm64/include/asm/numa.h
-> >> > index b8c2a3f..1eca4db 100644
-> >> > --- a/arch/arm64/include/asm/numa.h
-> >> > +++ b/arch/arm64/include/asm/numa.h
-> >> > @@ -15,9 +15,11 @@
-> >> >  extern int __node_distance(int from, int to);
-> >> >  #define node_distance(a, b) __node_distance(a, b)
-> >> >
-> >> > -/* dummy definitions for pci functions */
-> >> > -#define pcibus_to_node(node)       0
-> >> > -#define cpumask_of_pcibus(bus)     0
-> >> > +struct pci_bus;
-> >> > +extern int pcibus_to_node(struct pci_bus *bus);
-> >> > +#define cpumask_of_pcibus(bus)     (pcibus_to_node(bus) == -1 ?            \
-> >> > +                            cpu_all_mask :                         \
-> >> > +                            cpumask_of_node(pcibus_to_node(bus)))
-> >>
-> >> All the arch definitions of cpumask_of_pcibus() are pretty similar;
-> >> could they be made more generic?  At the very least, can you drop the
-> >> definition here and use the one in include/asm-generic/topology.h,
-> >> which is identical to what you're defining here?
-> macro cpumask_of_pcibus is defined under #ifndef CONFIG_NUMA in
-> include/asm-generic/topology.h
-> and this macro is defined again for NUMA in respective arch header files.
-> i think moving this macro from ifndef will allow us to use without redefinition.
+On Fri, Jan 08, 2016 at 10:16:35AM +0800, Jiancheng Xue wrote:
+> The CRG(Clock and Reset Generator) block provides clock
+> and reset signals for other modules in hi3519 soc.
 > 
-> --- a/include/asm-generic/topology.h
-> +++ b/include/asm-generic/topology.h
-> @@ -54,14 +54,14 @@
->  #define pcibus_to_node(bus)    ((void)(bus), -1)
->  #endif
-> 
-> +#endif /* CONFIG_NUMA */
+> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
+
+[...]
+
+> diff --git a/drivers/clk/hisilicon/clk-hi3519.c b/drivers/clk/hisilicon/clk-hi3519.c
+> new file mode 100644
+> index 0000000..72d3a7b0
+> --- /dev/null
+> +++ b/drivers/clk/hisilicon/clk-hi3519.c
+> @@ -0,0 +1,105 @@
+> +/*
+> + * Hi3519 Clock Driver
+> + *
+> + * Copyright (c) 2015-2016 HiSilicon Technologies Co., Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program. If not, see <http://www.gnu.org/licenses/>.
+> + */
 > +
->  #ifndef cpumask_of_pcibus
->  #define cpumask_of_pcibus(bus) (pcibus_to_node(bus) == -1 ?            \
->                                  cpu_all_mask :                         \
->                                  cpumask_of_node(pcibus_to_node(bus)))
->  #endif
-> 
-> -#endif /* CONFIG_NUMA */
-> -
->  #if !defined(CONFIG_NUMA) || !defined(CONFIG_HAVE_MEMORYLESS_NODES)
-> 
->  #ifndef set_numa_mem
-> 
-> i have got below compilation error withour macro defined in arch code.
-> 
-> drivers/pci/pci-sysfs.c: In function ?cpuaffinity_show?:
-> drivers/pci/pci-sysfs.c:114:15: error: implicit declaration of
-> function ?cpumask_of_pcibus? [-Werror=implicit-function-declaration]
-> drivers/pci/pci-sysfs.c:114:34: warning: initialization makes pointer
-> from integer without a cast [enabled by default]
-> drivers/pci/pci-sysfs.c: In function ?cpulistaffinity_show?:
-> drivers/pci/pci-sysfs.c:123:34: warning: initialization makes pointer
-> from integer without a cast [enabled by default]
-> cc1: some warnings being treated as errors
-> 
-> 
-> i can send this as separate patch( as a  fix patch).
+> +#include <dt-bindings/clock/hi3519-clock.h>
+> +#include <linux/delay.h>
+> +#include <linux/of_address.h>
+> +#include <linux/slab.h>
+> +#include "clk.h"
+> +#include "reset.h"
+> +
+> +#define HI3519_FIXED_24M	(HI3519_EXT_CLKS + 1)
 
-Unless your series has already been merged, I don't like the idea of a
-separate fix patch.  The whole point of reviews is to try to fix as
-many things as we can *before* merging.
+This is fragile because HI3519_EXT_CLKS will change every time you 
+add a clock to DT and means you have to keep the kernel and DT in sync. 
 
-Bjorn
+I'd be less worried if your clock definitions were more complete, but 
+I'm guess the SOC has more than 19 clocks coming out of the clock 
+controller.
+
+> +#define HI3519_FIXED_50M	(HI3519_EXT_CLKS + 2)
+> +#define HI3519_FIXED_75M	(HI3519_EXT_CLKS + 3)
+> +#define HI3519_FIXED_125M	(HI3519_EXT_CLKS + 4)
+> +#define HI3519_FIXED_150M	(HI3519_EXT_CLKS + 5)
+> +#define HI3519_FIXED_200M	(HI3519_EXT_CLKS + 6)
+> +#define HI3519_FIXED_250M	(HI3519_EXT_CLKS + 7)
+> +#define HI3519_FIXED_300M	(HI3519_EXT_CLKS + 8)
+> +#define HI3519_FIXED_400M	(HI3519_EXT_CLKS + 9)
+> +#define HI3519_FMC_MUX		(HI3519_EXT_CLKS + 10)
+> +
+> +#define HI3519_NR_CLKS	128
+
+You only have 29 clocks defined.
+
+
+> +#ifndef __DTS_HI3519_CLOCK_H
+> +#define __DTS_HI3519_CLOCK_H
+> +
+> +#define HI3519_FIXED_3M			1
+> +#define HI3519_FMC_CLK			2
+> +#define HI3519_USB2_BUS_CLK		3
+> +#define HI3519_USB2_PORT_CLK		4
+> +#define HI3519_USB3_CLK			5
+> +#define HI3519_ETH_PHY_CLK		6
+> +#define HI3519_ETH_MAC_CLK		7
+> +#define HI3519_ETH_MACIF_CLK		8
+> +#define HI3519_PWM_CLK			9
+> +#define HI3519_DMA_CLK			10
+> +#define HI3519_SPI0_CLK			11
+> +#define HI3519_SPI1_CLK			12
+> +#define HI3519_SPI2_CLK			13
+> +#define HI3519_IR_CLK			14
+> +#define HI3519_UART0_CLK		15
+> +#define HI3519_UART1_CLK		16
+> +#define HI3519_UART2_CLK		17
+> +#define HI3519_UART3_CLK		18
+> +#define HI3519_UART4_CLK		19
+> +
+> +#define HI3519_EXT_CLKS			19
+> +
+> +#endif	/* __DTS_HI3519_CLOCK_H */
