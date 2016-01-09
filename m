@@ -1,41 +1,99 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Sat, 9 Jan 2016 09:19:42 -0600
-Subject: [GIT PULL] PCI fixes for v4.4
-Message-ID: <20160109151942.GA30623@localhost>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Sat, 9 Jan 2016 09:20:21 -0600
+Subject: [RFC PATCH 1/2] USB: core: let USB device know device node
+In-Reply-To: <20160109090512.GD27759@shlinux2>
+References: <1452231864-11171-1-git-send-email-peter.chen@freescale.com>
+ <1452231864-11171-2-git-send-email-peter.chen@freescale.com>
+ <CAL_JsqKwATxGiqJ_MNV6_pur1dUEVOzH+iB8yY+kWA0y2gWbNg@mail.gmail.com>
+ <20160109090512.GD27759@shlinux2>
+Message-ID: <CAL_Jsq+nc40EFwHH2aNAA9O4i5mS4aXiF65ZbU559wF1nqyrwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Sat, Jan 9, 2016 at 3:05 AM, Peter Chen <hzpeterchen@gmail.com> wrote:
+> On Fri, Jan 08, 2016 at 08:32:45AM -0600, Rob Herring wrote:
+>> On Thu, Jan 7, 2016 at 11:44 PM, Peter Chen <peter.chen@freescale.com> wrote:
+>> > Although most of USB devices are hot-plug's, there are still some devices
+>> > are hard wired on the board, eg, for HSIC and SSIC interface USB devices.
+>> > If these kinds of USB devices are multiple functions, and they can supply
+>> > other interfaces like i2c, gpios for other devices, we may need to
+>> > descirbe these at device tree.
+>> >
+>> > In this commit, it uses "reg" in dts as port number to match the port
+>> > number decided by USB core, if they are the same, then the device node
+>> > is for the device we are creating for USB core.
+>> >
+>> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+>> > ---
+>> >  .../devicetree/bindings/usb/usb-device.txt         |  8 ++++
+>> >  drivers/usb/core/Makefile                          |  2 +-
+>> >  drivers/usb/core/of.c                              | 48 ++++++++++++++++++++++
+>> >  drivers/usb/core/usb.c                             |  8 +++-
+>> >  include/linux/usb.h                                |  2 +
+>> >  include/linux/usb/of.h                             |  6 +++
+>> >  6 files changed, 71 insertions(+), 3 deletions(-)
+>> >  create mode 100644 Documentation/devicetree/bindings/usb/usb-device.txt
+>> >  create mode 100644 drivers/usb/core/of.c
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/usb/usb-device.txt b/Documentation/devicetree/bindings/usb/usb-device.txt
+>> > new file mode 100644
+>> > index 0000000..d35facd
+>> > --- /dev/null
+>> > +++ b/Documentation/devicetree/bindings/usb/usb-device.txt
+>> > @@ -0,0 +1,8 @@
+>> > +Generic USB Device Properties
+>> > +
+>> > +Usually, we only use device tree for hard wired USB device.
+>> > +The reference binding doc is from:
+>> > +http://playground.sun.com/1275/bindings/usb/usb-1_0.ps.
+>>
+>> This path doesn't exist anymore. Use
+>> http://www.firmware.org/1275/bindings/usb/usb-1_0.ps
+>>
+>
+> Ok.
+>
+>> > +
+>> > +Required properties:
+>> > +- reg: the port number which this device is connecting to.
+>>
+>> At least compatible should also be here.
+>>
+>
+> What format for USB device compatible string has still not been decided.
+> Would you suggest something? At my example, I use "vid,pid".
 
-Sorry about this last-minute pull request.  This marks the TI DRA7xx host
-bridge driver as broken.  Apparently it has never worked without some
-additional out-of-tree code, so I'm going to mark it broken now and remove
-it completely next cycle unless it's fixed.
+Yes, it is. They are defined in OpenFirmware USB binding doc above.
+However, the compatible strings and nodes are supposed to reflect the
+USB descriptors and interfaces. I don't think we need that much detail
+here, so I'd suggest we limit it to a subset such as:
 
-Bjorn
+usbVID.PID.REV
+usbVID.PID
+usbVID.classDC
+usb.classDC
+usbifVID.classIC
+usbif.classIC
 
+>> > +struct device_node *usb_of_find_node(struct device_node *parent, int portnum)
+>> > +{
+>> > +       struct device_node *node;
+>> > +       u32 port;
+>> > +
+>> > +       for_each_child_of_node(parent, node) {
+>> > +               if (!of_property_read_u32(node, "reg", &port)) {
+>> > +                       if (port == portnum)
+>> > +                               return node;
+>>
+>> This needs to match on the compatible string too. Otherwise, this
+>> could match in lots of cases.
+>>
+>
+> No, the port number is unique under the USB HUB (including host
+> controller, which is roothub), and there are some many compatible
+> string for USB devices.
 
-The following changes since commit 1dbe162d53e11665b48a1c122899ffc2c068bef4:
+Assuming the parent node pointer is correct. You could pass a SPI host
+node to this function and it will return a valid device node pointer.
 
-  PCI: hisi: Fix hisi_pcie_cfg_read() 32-bit reads (2015-12-04 16:32:25 -0600)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git tags/pci-v4.4-fixes-4
-
-for you to fetch changes up to 5c3b99d057525fe2befe6a7db9b1309035d93eee:
-
-  PCI: dra7xx: Mark driver as broken (2016-01-08 09:58:31 -0600)
-
-----------------------------------------------------------------
-PCI updates for v4.4:
-
-  TI DRA7xx host bridge driver
-    Mark driver as broken (Richard Cochran)
-
-----------------------------------------------------------------
-Richard Cochran (1):
-      PCI: dra7xx: Mark driver as broken
-
- drivers/pci/host/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+Rob
