@@ -1,14 +1,18 @@
 From: andy.gross@linaro.org (Andy Gross)
-Date: Fri, 8 Jan 2016 22:40:26 -0600
-Subject: [V5,6/6] dts: msm8974: Add dma channels for blsp2_i2c1 node
-In-Reply-To: <1447760727-4897-7-git-send-email-sricharan@codeaurora.org>
-References: <1447760727-4897-7-git-send-email-sricharan@codeaurora.org>
-Message-ID: <20160109044026.GE4616@hector.attlocal.net>
+Date: Fri, 8 Jan 2016 22:41:30 -0600
+Subject: [PATCH] arm64: dts: Add L2 cache node to msm8916
+In-Reply-To: <1452297429-6382-1-git-send-email-sboyd@codeaurora.org>
+References: <1452297429-6382-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20160109044130.GA20052@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2015 at 05:15:27PM +0530, Sricharan R wrote:
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+On Fri, Jan 08, 2016 at 03:57:09PM -0800, Stephen Boyd wrote:
+> The msm8916 SoC has an L2 cache for all 4 CPUs. Add it to the
+> dtsi file so that the cache hierarchy can be probed.
+> 
+> Cc: <devicetree@vger.kernel.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 > ---
 
 Reviewed-by: Andy Gross <andy.gross@linaro.org>
