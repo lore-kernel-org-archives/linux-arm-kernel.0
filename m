@@ -1,43 +1,98 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri, 8 Jan 2016 21:05:21 -0800
-Subject: ION DTS changes for HiKey in -next
-In-Reply-To: <20160108135552.GE3097@leverpostej>
-References: <20160107173744.GJ6588@sirena.org.uk>
- <20160108050214.GD30293@kroah.com>
- <20160108124439.GL6588@sirena.org.uk>
- <20160108135552.GE3097@leverpostej>
-Message-ID: <20160109050521.GB4489@kroah.com>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Sat, 9 Jan 2016 11:35:17 +0530
+Subject: [PATCH] arm64, pci,
+ numa: Adding helper functions as required by pci
+In-Reply-To: <20160108180638.GF11228@arm.com>
+References: <1450780730-13667-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <20160108180131.GB5354@localhost> <20160108180638.GF11228@arm.com>
+Message-ID: <CAFpQJXUaVS7tBqjQ4Dh201yrOWFxa3Bk2q-ZCFtK4mk-te=Q7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 08, 2016 at 01:55:52PM +0000, Mark Rutland wrote:
-> On Fri, Jan 08, 2016 at 12:44:39PM +0000, Mark Brown wrote:
-> > On Thu, Jan 07, 2016 at 09:02:14PM -0800, Greg Kroah-Hartman wrote:
-> > > On Thu, Jan 07, 2016 at 05:37:44PM +0000, Mark Brown wrote:
-> > 
-> > > > I was just looking at DTs in -next and noticed that there is a patch
-> > > > 59dfafd03fc (arm64: dts: Add dts files to enable ION on Hi6220 SoC)
-> > > > which adds at DT doing something for ION.  Are we sure this should be
-> > > > going into the main production DT?  The bindings haven't been reviewed
-> > > > as far as I can tell, the matching driver is only in staging and hasn't
-> > > > been posted upstream.
-> > 
-> > > Isn't "staging" upstream enough for this?  :)
-> > 
-> > I wouldn't have thought so, DTs are supposed to be an ABI so we want
-> > proper review and having had a quick glance this doesn't look like it's
-> > a hardware description so it's not clear to me it should be in DT at all.
-> 
-> Indeed.
-> 
-> The driver and the binding before that don't really belong either,
-> I would have NAK'd those on devicetree at vger.kernel.org, though it
-> appears I either missed them or they never made it to that list.
-> 
-> From my PoV there should not be a platform-specific ION binding. If we
-> need one at all, people should work on the proposed generic binding [1]
-> or figure out how to do this with the existing reserved-memory bindings.
+On Fri, Jan 8, 2016 at 11:36 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Jan 08, 2016 at 12:01:31PM -0600, Bjorn Helgaas wrote:
+>> On Tue, Dec 22, 2015 at 04:08:50PM +0530, Ganapatrao Kulkarni wrote:
+>> > Adding helper functions and necessary code to make
+>> > pci driver(pci-host-generic) numa aware.
+>> >
+>> > This patch is on top of arm64-numa v7.
+>> > http://www.spinics.net/lists/arm-kernel/msg460813.html
+>> >
+>> > Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+>> > ---
+>> >  arch/arm64/include/asm/numa.h       | 8 +++++---
+>> >  arch/arm64/kernel/pci.c             | 8 ++++++++
+>> >  drivers/pci/host/pci-host-generic.c | 1 +
+>> >  3 files changed, 14 insertions(+), 3 deletions(-)
+>> >
+>> > diff --git a/arch/arm64/include/asm/numa.h b/arch/arm64/include/asm/numa.h
+>> > index b8c2a3f..1eca4db 100644
+>> > --- a/arch/arm64/include/asm/numa.h
+>> > +++ b/arch/arm64/include/asm/numa.h
+>> > @@ -15,9 +15,11 @@
+>> >  extern int __node_distance(int from, int to);
+>> >  #define node_distance(a, b) __node_distance(a, b)
+>> >
+>> > -/* dummy definitions for pci functions */
+>> > -#define pcibus_to_node(node)       0
+>> > -#define cpumask_of_pcibus(bus)     0
+>> > +struct pci_bus;
+>> > +extern int pcibus_to_node(struct pci_bus *bus);
+>> > +#define cpumask_of_pcibus(bus)     (pcibus_to_node(bus) == -1 ?            \
+>> > +                            cpu_all_mask :                         \
+>> > +                            cpumask_of_node(pcibus_to_node(bus)))
+>>
+>> All the arch definitions of cpumask_of_pcibus() are pretty similar;
+>> could they be made more generic?  At the very least, can you drop the
+>> definition here and use the one in include/asm-generic/topology.h,
+>> which is identical to what you're defining here?
+macro cpumask_of_pcibus is defined under #ifndef CONFIG_NUMA in
+include/asm-generic/topology.h
+and this macro is defined again for NUMA in respective arch header files.
+i think moving this macro from ifndef will allow us to use without redefinition.
 
-Ok, I've now reverted that commit, thanks for letting me know.
+--- a/include/asm-generic/topology.h
++++ b/include/asm-generic/topology.h
+@@ -54,14 +54,14 @@
+ #define pcibus_to_node(bus)    ((void)(bus), -1)
+ #endif
 
-greg k-h
++#endif /* CONFIG_NUMA */
++
+ #ifndef cpumask_of_pcibus
+ #define cpumask_of_pcibus(bus) (pcibus_to_node(bus) == -1 ?            \
+                                 cpu_all_mask :                         \
+                                 cpumask_of_node(pcibus_to_node(bus)))
+ #endif
+
+-#endif /* CONFIG_NUMA */
+-
+ #if !defined(CONFIG_NUMA) || !defined(CONFIG_HAVE_MEMORYLESS_NODES)
+
+ #ifndef set_numa_mem
+
+i have got below compilation error withour macro defined in arch code.
+
+drivers/pci/pci-sysfs.c: In function ?cpuaffinity_show?:
+drivers/pci/pci-sysfs.c:114:15: error: implicit declaration of
+function ?cpumask_of_pcibus? [-Werror=implicit-function-declaration]
+drivers/pci/pci-sysfs.c:114:34: warning: initialization makes pointer
+from integer without a cast [enabled by default]
+drivers/pci/pci-sysfs.c: In function ?cpulistaffinity_show?:
+drivers/pci/pci-sysfs.c:123:34: warning: initialization makes pointer
+from integer without a cast [enabled by default]
+cc1: some warnings being treated as errors
+
+
+i can send this as separate patch( as a  fix patch).
+
+>
+> +1 on that. I asked for exactly the same thing in my review of v7:
+>
+>   http://www.spinics.net/lists/arm-kernel/msg469592.html
+>
+> but it looks like I was just ignored.
+>
+> Will
+thanks
+ganapat
