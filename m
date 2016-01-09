@@ -1,77 +1,53 @@
-From: akshay.bhat@timesys.com (Akshay Bhat)
-Date: Sat, 9 Jan 2016 16:02:17 +0530
-Subject: [PATCH v6 0/7] ARM: dts: Add Advantech board support
-In-Reply-To: <1450908016-17384-1-git-send-email-akshay.bhat@timesys.com>
-References: <1450908016-17384-1-git-send-email-akshay.bhat@timesys.com>
-Message-ID: <CACrMeVC+-D3a4pUccQMb0BXwcTts9EAagC4EDcvb=HYMhuD03w@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sat, 9 Jan 2016 13:29:56 +0100
+Subject: [PATCH v8 20/20] KVM: ARM64: Add a new kvm ARM PMU device
+In-Reply-To: <20160107203647.GJ6199@hawk.localdomain>
+References: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>
+ <1450771695-11948-21-git-send-email-zhaoshenglong@huawei.com>
+ <CAFEAcA_MDiOphseZ7RGNE3G=4ZDF5SFV5krOjanPbVuhgg9gnQ@mail.gmail.com>
+ <568E7AF1.9040103@huawei.com>
+ <CAFEAcA-Qcda7TSFLSeykLHqZYdP6tYdEjPe2uHN6f_+omqWFZg@mail.gmail.com>
+ <20160107203647.GJ6199@hawk.localdomain>
+Message-ID: <20160109122956.GA30867@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn,
+On Thu, Jan 07, 2016 at 09:36:47PM +0100, Andrew Jones wrote:
+> On Thu, Jan 07, 2016 at 02:56:15PM +0000, Peter Maydell wrote:
+> > On 7 January 2016 at 14:49, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+> > >>> +
+> > >>> +Groups:
+> > >>> +  KVM_DEV_ARM_PMU_GRP_IRQ
+> > >>> +  Attributes:
+> > >>> +    The attr field of kvm_device_attr encodes one value:
+> > >>> +    bits:     | 63 .... 32 | 31 ....  0 |
+> > >>> +    values:   |  reserved  | vcpu_index |
+> > >>> +    A value describing the PMU overflow interrupt number for the specified
+> > >>> +    vcpu_index vcpu. This interrupt could be a PPI or SPI, but for one VM the
+> > >>> +    interrupt type must be same for each vcpu. As a PPI, the interrupt number is
+> > >>> +    same for all vcpus, while as a SPI it must be different for each vcpu.
+> > >>
+> > >> I see we're using vcpu_index rather than MPIDR affinity value
+> > >> for specifying which CPU we're configuring. Is this in line with
+> > >> our planned API for GICv3 configuration?
+> > >>
+> > > Here vcpu_index is used to indexing the vCPU, no special use.
+> > 
+> > Yes, but you can identify the CPU by index, or by its MPIDR.
+> > We had a discussion about which was the best way for doing
+> > the VGIC API, and I can't remember which way round we ended up
+> > going for. Whichever we chose, we should do the same thing here.
+> 
+> I think we should start up a new discussion on this. My understanding,
+> after a chat with Igor, who was involved in the untangling of vcpu-id and
+> apic-id for x86, is that using vcpu-id is preferred, unless of course
+> the device expects an apic-id/mpidr, in which case there's no reason to
+> translate it on both sides.
+> 
 
-Did you have any further feedback on this patch set? If not can it be applied?
+I'm fairly strongly convinced that we should use the full 32-bit
+compressed MPIDR for everything ARM related going forward, as this will
+cover any case required and leverages and architecturally defined way of
+uniquely identifying a (v)CPU.
 
-Thanks,
-Akshay
-
-On Thu, Dec 24, 2015 at 3:30 AM, Akshay Bhat <akshay.bhat@timesys.com> wrote:
-> This series aims to add Advantech BA-16 module (iMX6 based) and GE board support.
->
-> This series has been tested against linux-next tag next-20151223.
->
-> Modifications:
-> v5->v6:
-> - BA16:
-> Add missing dlg,da9063-onkey compatibility
-> Revert partitions container for spi-nor flash
-> Address below comments from Shawn:
-> Update to GPL/X11 dual license
-> Add new line between properties and sub-nodes; between nodes
-> Consistently use lowercase for hex values
-> Move iomux node to bottom of dts file for easier readability
-> Get rid of imx6q-ba16 container to save on indentation
-> Reduce the number of entries in hog group
-> Sort pinctrl nodes alphabetically
-> Explicitly call out pad configuration value instead of 0x80000000
-> - Bx50v3:
-> Update to GPL/X11 dual license
-> Remove @unit-address for regulators as per Shawn's suggestion
-> - B450v3, B650v3 and B850v3:
-> Update to GPL/X11 dual license
->
-> History:
-> --------
-> [v1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/381872.html
-> [v2]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/383276.html
-> [v3]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/384202.html
-> [v4]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/390373.html
-> [v5]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/390788.html
->
-> Akshay Bhat (5):
->   of: Add vendor prefix for Advantech Corporation
->   of: Add vendor prefix for General Electric Company
->   ARM: dts: imx: Add support for Advantech/GE B450v3
->   ARM: dts: imx: Add support for Advantech/GE B650v3
->   ARM: dts: imx: Add support for Advantech/GE B850v3
->
-> Justin Waters (2):
->   ARM: dts: imx: Add Advantech BA-16 Qseven module
->   ARM: dts: imx: Add support for Advantech/GE Bx50v3
->
->  .../devicetree/bindings/vendor-prefixes.txt        |   2 +
->  arch/arm/boot/dts/Makefile                         |   3 +
->  arch/arm/boot/dts/imx6q-b450v3.dts                 | 114 ++++
->  arch/arm/boot/dts/imx6q-b650v3.dts                 | 114 ++++
->  arch/arm/boot/dts/imx6q-b850v3.dts                 | 157 +++++
->  arch/arm/boot/dts/imx6q-ba16.dtsi                  | 641 +++++++++++++++++++++
->  arch/arm/boot/dts/imx6q-bx50v3.dtsi                | 237 ++++++++
->  7 files changed, 1268 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx6q-b450v3.dts
->  create mode 100644 arch/arm/boot/dts/imx6q-b650v3.dts
->  create mode 100644 arch/arm/boot/dts/imx6q-b850v3.dts
->  create mode 100644 arch/arm/boot/dts/imx6q-ba16.dtsi
->  create mode 100644 arch/arm/boot/dts/imx6q-bx50v3.dtsi
->
-> --
-> 2.6.3
->
+-Christoffer
