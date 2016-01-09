@@ -1,43 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 09 Jan 2016 22:16:42 +0100
-Subject: [PATCH] gpio: generic: make bgpio_pdata always visible
-Message-ID: <21095568.bdP2eOAsBs@wuerfel>
+From: robh@kernel.org (Rob Herring)
+Date: Sat, 9 Jan 2016 16:28:10 -0600
+Subject: [PATCH v3 2/3] Documentation: gpio: Update description for
+ X-Gene standby GPIO controller DTS binding
+In-Reply-To: <1452162428-26839-3-git-send-email-qnguyen@apm.com>
+References: <1452162428-26839-1-git-send-email-qnguyen@apm.com>
+ <1452162428-26839-3-git-send-email-qnguyen@apm.com>
+Message-ID: <20160109222810.GA11205@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Board files that define their own bgpio_pdata are broken when
-CONFIG_GPIO_GENERIC is disabled and the bgpio_pdata structure
-definition is hidden by the #ifdef:
+On Thu, Jan 07, 2016 at 05:27:07PM +0700, Quan Nguyen wrote:
+> Update description for X-Gene standby GPIO controller DTS binding to
+> support GPIO line configuration as input, output or external IRQ pin.
+> 
+> Signed-off-by: Y Vo <yvo@apm.com>
+> Signed-off-by: Quan Nguyen <qnguyen@apm.com>
+> ---
+>  .../devicetree/bindings/gpio/gpio-xgene-sb.txt     | 49 +++++++++++++++++-----
+>  1 file changed, 38 insertions(+), 11 deletions(-)
 
-arch/arm/mach-clps711x/board-autcpu12.c:148:15: error: variable 'autcpu12_mmgpio_pdata' has initializer but incomplete type
- static struct bgpio_pdata autcpu12_mmgpio_pdata __initdata = {
-arch/arm/mach-clps711x/board-autcpu12.c:149:2: error: unknown field 'base' specified in initializer
-  .base = AUTCPU12_MMGPIO_BASE,
-
-Since the board files should generally not care what drivers are
-enabled, this makes the structure definition visible again.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 0f4630f3720e ("gpio: generic: factor into gpio_chip struct")
-
-diff --git a/include/linux/gpio/driver.h b/include/linux/gpio/driver.h
-index e2d05fd0e6e3..82fda487453f 100644
---- a/include/linux/gpio/driver.h
-+++ b/include/linux/gpio/driver.h
-@@ -220,14 +220,14 @@ static inline void *gpiochip_get_data(struct gpio_chip *chip)
- 
- struct gpio_chip *gpiod_to_chip(const struct gpio_desc *desc);
- 
--#if IS_ENABLED(CONFIG_GPIO_GENERIC)
--
- struct bgpio_pdata {
- 	const char *label;
- 	int base;
- 	int ngpio;
- };
- 
-+#if IS_ENABLED(CONFIG_GPIO_GENERIC)
-+
- int bgpio_init(struct gpio_chip *gc, struct device *dev,
- 	       unsigned long sz, void __iomem *dat, void __iomem *set,
- 	       void __iomem *clr, void __iomem *dirout, void __iomem *dirin,
+Acked-by: Rob Herring <robh@kernel.org>
