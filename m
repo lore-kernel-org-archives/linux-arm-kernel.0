@@ -1,38 +1,24 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 09 Jan 2016 21:10:21 +0100
-Subject: [PATCH v2 0/5] fix some clock configuration for the RK3036
- platform
-In-Reply-To: <1452169057-24467-1-git-send-email-zhengxing@rock-chips.com>
-References: <1452169057-24467-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <2423996.DXmZSXDRX7@phil>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 09 Jan 2016 21:53:47 +0100
+Subject: [PATCH V2 1/2] dt/bindings: serial: bcm2835: add binding
+ documentation for bcm2835-aux-uart
+In-Reply-To: <1452344854-2576-2-git-send-email-kernel@martin.sperl.org>
+References: <1452344854-2576-1-git-send-email-kernel@martin.sperl.org>
+ <1452344854-2576-2-git-send-email-kernel@martin.sperl.org>
+Message-ID: <10159898.8xe3rmYdEi@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Xing
+On Saturday 09 January 2016 13:07:32 kernel at martin.sperl.org wrote:
+> +
+> +       uart1: uart at 7e215040 {
+> +               compatible = "brcm,bcm2835-aux-uart";
+> +               reg = <0x7e215040 0x40>;
+> +               interrupts = <1 29>;
+> +               clocks = <&aux BCM2835_AUX_CLOCK_UART>;
+> +       };
+> 
 
-Am Donnerstag, 7. Januar 2016, 20:17:32 schrieb Xing Zheng:
->   In the development work, we found that some of the previous
-> incorrect clock configuration on the RK3036 platform, we should
-> fix them.
+The node name should always be "serial at ...", not "uart at ..."
 
-I've applied patches 1-4 as fixes for 4.5 [0] and will apply patch 5
-regularly once 4.5-rc1 is released and I have stable base again.
-
-
-> Xing Zheng (5):
->   clk: rockchip: rk3036: fix the FLAGs for clock mux
->   clk: rockchip: rk3036: fix uarts clock error
->   clk: rockchip: rk3036: fix the div offset for emac clock
->   clk: rockchip: rk3036: rename emac ext source clock
-
-please make sure to also update the binding document in such cases.
-I've done it myself for this one.
-
-[for people reading along: the rk3036 clock-driver + binding is new in
-4.5 so we should be ok to fix the naming before it is actually released]
-
-
-Heiko
-
-
-[0] https://git.kernel.org/cgit/linux/kernel/git/mmind/linux-rockchip.git/log/?h=v4.5-clk/fixes
+	Arnd
