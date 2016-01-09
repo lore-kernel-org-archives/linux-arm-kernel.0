@@ -1,41 +1,85 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 9 Jan 2016 14:24:44 +0800
-Subject: [PATCH v5 1/6] clk: hisilicon: add CRG driver for hi3519 soc
-In-Reply-To: <1452219400-32478-2-git-send-email-xuejiancheng@huawei.com>
-Message-ID: <201601091407.Ep5LfNku%fengguang.wu@intel.com>
+From: dirk.behme@gmail.com (Dirk Behme)
+Date: Sat, 9 Jan 2016 07:36:42 +0100
+Subject: [PATCH 05/10] arm64: dts: r8a7795: Add pmu device nodes
+In-Reply-To: <5673E437.7020300@arm.com>
+References: <cover.1450401186.git.horms+renesas@verge.net.au>
+ <a6b6b478459be0c5614626ba6ac95df05a7fc5e9.1450401186.git.horms+renesas@verge.net.au>
+ <5673DCF7.1050008@arm.com> <5673E39C.6050206@gmail.com>
+ <5673E437.7020300@arm.com>
+Message-ID: <5690AA7A.4000303@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jiancheng,
+On 18.12.2015 11:47, Sudeep Holla wrote:
+>
+>
+> On 18/12/15 10:44, Dirk Behme wrote:
+>> On 18.12.2015 11:16, Sudeep Holla wrote:
+>>>
+>>>
+>>> On 18/12/15 02:29, Simon Horman wrote:
+>>>> From: Yoshifumi Hosoya <yoshifumi.hosoya.wj@renesas.com>
+>>>>
+>>>> Enabling the performance monitor unit on r8a7795.
+>>>>
+>>>> Signed-off-by: Masaru Nagai <masaru.nagai.vx@renesas.com>
+>>>> Signed-off-by: Yoshifumi Hosoya <yoshifumi.hosoya.wj@renesas.com>
+>>>> Signed-off-by: Dirk Behme <dirk.behme@gmail.com>
+>>>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>>>> ---
+>>>>   arch/arm64/boot/dts/renesas/r8a7795.dtsi | 12 ++++++++++++
+>>>>   1 file changed, 12 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+>>>> b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+>>>> index 4d43cf31418f..b9229a49dabc 100644
+>>>> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+>>>> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+>>>> @@ -230,6 +230,18 @@
+>>>>               power-domains = <&cpg>;
+>>>>           };
+>>>>
+>>>> +        pmu {
+>>>> +            compatible = "arm,armv8-pmuv3";
+>>>
+>>> Please use arm,cortex-a57-pmu to be more specific. IIRC I mentioned
+>>> this
+>>> for some shmobile platform recently.
+>>
+>>
+>> Yes. But as this patch has been applied already to some branches, I
+>> incorporated your a57-pmu hint with an additional update patch:
+>>
+>> http://marc.info/?l=linux-sh&m=145011467914857
+>>
+>> Feel free to squash if still possible.
+>>
+>
+> Ah OK, I didn't know the exact dts name, sorry for the noise.
+> Better if it was posted as part of this series :)
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.4-rc8 next-20160108]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-url:    https://github.com/0day-ci/linux/commits/Jiancheng-Xue/ARM-hisi-Add-initial-support-including-clock-driver-for-Hi3519-soc/20160108-103510
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
-config: arm-allmodconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+I finally found some time to test this
 
-All errors (new ones prefixed by >>):
+http://marc.info/?l=linux-sh&m=145011467914857
 
->> ERROR: "hisi_reset_init" [drivers/clk/hisilicon/clk-hi3519.ko] undefined!
->> ERROR: "hisi_clk_register_gate" [drivers/clk/hisilicon/clk-hi3519.ko] undefined!
->> ERROR: "hisi_clk_register_mux" [drivers/clk/hisilicon/clk-hi3519.ko] undefined!
->> ERROR: "hisi_clk_register_fixed_rate" [drivers/clk/hisilicon/clk-hi3519.ko] undefined!
->> ERROR: "hisi_clk_init" [drivers/clk/hisilicon/clk-hi3519.ko] undefined!
+and surprisingly it doesn't seem to work:
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 54589 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160109/57ae82aa/attachment-0001.obj>
+Using "arm,cortex-a57-pmu" results in
+
+hw perfevents: enabled with armv8_cortex_a57 PMU driver, 7 counters 
+available
+hw perfevents: failed to probe PMU!
+hw perfevents: failed to register PMU devices!
+
+while switching back to "arm,armv8-pmuv3" successfully gives
+
+hw perfevents: enabled with armv8_pmuv3 PMU driver, 7 counters available
+
+without any further error messages.
+
+Any idea?
+
+Best regards
+
+Dirk
