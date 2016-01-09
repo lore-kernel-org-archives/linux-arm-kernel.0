@@ -1,52 +1,93 @@
-From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Sat,  9 Jan 2016 09:25:57 +0000
-Subject: [PATCH 5/5] dt-bindings: bsm2835: fix bindings documentation to use
- new clock framework
-In-Reply-To: <1452331558-2520-1-git-send-email-kernel@martin.sperl.org>
-References: <1452331558-2520-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <1452331558-2520-6-git-send-email-kernel@martin.sperl.org>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Sat, 9 Jan 2016 17:32:39 +0800
+Subject: [RFC PATCH 1/2] USB: core: let USB device know device node
+In-Reply-To: <Pine.LNX.4.44L0.1601081746080.21467-100000@netrider.rowland.org>
+References: <1452231864-11171-2-git-send-email-peter.chen@freescale.com>
+ <Pine.LNX.4.44L0.1601081746080.21467-100000@netrider.rowland.org>
+Message-ID: <20160109093239.GE27759@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Martin Sperl <kernel@martin.sperl.org>
+On Fri, Jan 08, 2016 at 05:50:13PM -0500, Alan Stern wrote:
+> On Fri, 8 Jan 2016, Peter Chen wrote:
+> 
+> > Although most of USB devices are hot-plug's, there are still some devices
+> > are hard wired on the board, eg, for HSIC and SSIC interface USB devices.
+> > If these kinds of USB devices are multiple functions, and they can supply
+> > other interfaces like i2c, gpios for other devices, we may need to
+> > descirbe these at device tree.
+> > 
+> > In this commit, it uses "reg" in dts as port number to match the port
+> > number decided by USB core, if they are the same, then the device node
+> > is for the device we are creating for USB core.
+> > 
+> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > ---
+> 
+> > +#include <linux/module.h>
+> > +#include <linux/moduleparam.h>
+> 
+> Do you need those two #include's?
 
-The bcm2835-i2s driver has been updated to use the new clock framework
-for the bcm2835 SOC.
+Will remove
 
-This patch documents the required changes to the bindings.
+> 
+> > +#include <linux/of.h>
+> > +
+> > +/**
+> > + * usb_of_find_node - Find the device node match port number
+> > + * @dev: the parent device node
+> 
+> The parameter is actually named "parent".
+> 
 
-Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
----
- Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt |    7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+Sorry, I copied some code, will change.
 
-diff --git a/Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt b/Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt
-index 65783de..b331f26 100644
---- a/Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt
-+++ b/Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt
-@@ -4,11 +4,10 @@ Required properties:
- - compatible: "brcm,bcm2835-i2s"
- - reg: A list of base address and size entries:
- 	* The first entry should cover the PCM registers
--	* The second entry should cover the PCM clock registers
-+- clocks: the (PCM) clock to use
- - dmas: List of DMA controller phandle and DMA request line ordered pairs.
- - dma-names: Identifier string for each DMA request line in the dmas property.
-   These strings correspond 1:1 with the ordered pairs in dmas.
--
-   One of the DMA channels will be responsible for transmission (should be
-   named "tx") and one for reception (should be named "rx").
- 
-@@ -16,8 +15,8 @@ Example:
- 
- bcm2835_i2s: i2s at 7e203000 {
- 	compatible = "brcm,bcm2835-i2s";
--	reg = <0x7e203000 0x20>,
--	      <0x7e101098 0x02>;
-+	reg = <0x7e203000 0x24>;
-+	clocks = <&clocks BCM2835_CLOCK_PCM>;
- 
- 	dmas = <&dma 2>,
- 	       <&dma 3>;
+> > + * @portnum: the port number which device is connecting 
+> > + *
+> > + * Find the node from device tree according to its port number.
+> > + *
+> > + * Return: On success, a pointer to the device node, %NULL on failure.
+> > + */
+> > +struct device_node *usb_of_find_node(struct device_node *parent, int portnum)
+> > +{
+> > +	struct device_node *node;
+> > +	u32 port;
+> > +
+> > +	for_each_child_of_node(parent, node) {
+> > +		if (!of_property_read_u32(node, "reg", &port)) {
+> > +			if (port == portnum)
+> > +				return node;
+> > +		}
+> > +	}
+> > +
+> > +	return NULL;
+> > +}
+> > +EXPORT_SYMBOL_GPL(usb_of_find_node);
+> > +
+> 
+> > diff --git a/include/linux/usb.h b/include/linux/usb.h
+> > index 89533ba..a3a0b07 100644
+> > --- a/include/linux/usb.h
+> > +++ b/include/linux/usb.h
+> > @@ -21,6 +21,7 @@
+> >  #include <linux/sched.h>	/* for current && schedule_timeout */
+> >  #include <linux/mutex.h>	/* for struct mutex */
+> >  #include <linux/pm_runtime.h>	/* for runtime PM */
+> > +#include <linux/of.h>		/* for device tree */
+> 
+> I think you don't need this line.  You can simply write:
+> 
+> 	struct device_node;
+> 
+> just like the two lines below.
+> 
+> >  struct usb_device;
+> >  struct usb_driver;
+
+Yes, you are right.
+
 -- 
-1.7.10.4
+
+Best Regards,
+Peter Chen
