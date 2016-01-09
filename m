@@ -1,99 +1,95 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Sat, 9 Jan 2016 09:20:21 -0600
-Subject: [RFC PATCH 1/2] USB: core: let USB device know device node
-In-Reply-To: <20160109090512.GD27759@shlinux2>
-References: <1452231864-11171-1-git-send-email-peter.chen@freescale.com>
- <1452231864-11171-2-git-send-email-peter.chen@freescale.com>
- <CAL_JsqKwATxGiqJ_MNV6_pur1dUEVOzH+iB8yY+kWA0y2gWbNg@mail.gmail.com>
- <20160109090512.GD27759@shlinux2>
-Message-ID: <CAL_Jsq+nc40EFwHH2aNAA9O4i5mS4aXiF65ZbU559wF1nqyrwg@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Sat, 9 Jan 2016 09:24:22 -0600
+Subject: [PATCH] arm64, pci, numa: Adding helper functions as required by
+ pci
+In-Reply-To: <CAFpQJXUaVS7tBqjQ4Dh201yrOWFxa3Bk2q-ZCFtK4mk-te=Q7w@mail.gmail.com>
+References: <1450780730-13667-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <20160108180131.GB5354@localhost> <20160108180638.GF11228@arm.com>
+ <CAFpQJXUaVS7tBqjQ4Dh201yrOWFxa3Bk2q-ZCFtK4mk-te=Q7w@mail.gmail.com>
+Message-ID: <20160109152422.GA30802@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 9, 2016 at 3:05 AM, Peter Chen <hzpeterchen@gmail.com> wrote:
-> On Fri, Jan 08, 2016 at 08:32:45AM -0600, Rob Herring wrote:
->> On Thu, Jan 7, 2016 at 11:44 PM, Peter Chen <peter.chen@freescale.com> wrote:
->> > Although most of USB devices are hot-plug's, there are still some devices
->> > are hard wired on the board, eg, for HSIC and SSIC interface USB devices.
->> > If these kinds of USB devices are multiple functions, and they can supply
->> > other interfaces like i2c, gpios for other devices, we may need to
->> > descirbe these at device tree.
->> >
->> > In this commit, it uses "reg" in dts as port number to match the port
->> > number decided by USB core, if they are the same, then the device node
->> > is for the device we are creating for USB core.
->> >
->> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
->> > ---
->> >  .../devicetree/bindings/usb/usb-device.txt         |  8 ++++
->> >  drivers/usb/core/Makefile                          |  2 +-
->> >  drivers/usb/core/of.c                              | 48 ++++++++++++++++++++++
->> >  drivers/usb/core/usb.c                             |  8 +++-
->> >  include/linux/usb.h                                |  2 +
->> >  include/linux/usb/of.h                             |  6 +++
->> >  6 files changed, 71 insertions(+), 3 deletions(-)
->> >  create mode 100644 Documentation/devicetree/bindings/usb/usb-device.txt
->> >  create mode 100644 drivers/usb/core/of.c
->> >
->> > diff --git a/Documentation/devicetree/bindings/usb/usb-device.txt b/Documentation/devicetree/bindings/usb/usb-device.txt
->> > new file mode 100644
->> > index 0000000..d35facd
->> > --- /dev/null
->> > +++ b/Documentation/devicetree/bindings/usb/usb-device.txt
->> > @@ -0,0 +1,8 @@
->> > +Generic USB Device Properties
->> > +
->> > +Usually, we only use device tree for hard wired USB device.
->> > +The reference binding doc is from:
->> > +http://playground.sun.com/1275/bindings/usb/usb-1_0.ps.
->>
->> This path doesn't exist anymore. Use
->> http://www.firmware.org/1275/bindings/usb/usb-1_0.ps
->>
->
-> Ok.
->
->> > +
->> > +Required properties:
->> > +- reg: the port number which this device is connecting to.
->>
->> At least compatible should also be here.
->>
->
-> What format for USB device compatible string has still not been decided.
-> Would you suggest something? At my example, I use "vid,pid".
+On Sat, Jan 09, 2016 at 11:35:17AM +0530, Ganapatrao Kulkarni wrote:
+> On Fri, Jan 8, 2016 at 11:36 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Fri, Jan 08, 2016 at 12:01:31PM -0600, Bjorn Helgaas wrote:
+> >> On Tue, Dec 22, 2015 at 04:08:50PM +0530, Ganapatrao Kulkarni wrote:
+> >> > Adding helper functions and necessary code to make
+> >> > pci driver(pci-host-generic) numa aware.
+> >> >
+> >> > This patch is on top of arm64-numa v7.
+> >> > http://www.spinics.net/lists/arm-kernel/msg460813.html
+> >> >
+> >> > Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+> >> > ---
+> >> >  arch/arm64/include/asm/numa.h       | 8 +++++---
+> >> >  arch/arm64/kernel/pci.c             | 8 ++++++++
+> >> >  drivers/pci/host/pci-host-generic.c | 1 +
+> >> >  3 files changed, 14 insertions(+), 3 deletions(-)
+> >> >
+> >> > diff --git a/arch/arm64/include/asm/numa.h b/arch/arm64/include/asm/numa.h
+> >> > index b8c2a3f..1eca4db 100644
+> >> > --- a/arch/arm64/include/asm/numa.h
+> >> > +++ b/arch/arm64/include/asm/numa.h
+> >> > @@ -15,9 +15,11 @@
+> >> >  extern int __node_distance(int from, int to);
+> >> >  #define node_distance(a, b) __node_distance(a, b)
+> >> >
+> >> > -/* dummy definitions for pci functions */
+> >> > -#define pcibus_to_node(node)       0
+> >> > -#define cpumask_of_pcibus(bus)     0
+> >> > +struct pci_bus;
+> >> > +extern int pcibus_to_node(struct pci_bus *bus);
+> >> > +#define cpumask_of_pcibus(bus)     (pcibus_to_node(bus) == -1 ?            \
+> >> > +                            cpu_all_mask :                         \
+> >> > +                            cpumask_of_node(pcibus_to_node(bus)))
+> >>
+> >> All the arch definitions of cpumask_of_pcibus() are pretty similar;
+> >> could they be made more generic?  At the very least, can you drop the
+> >> definition here and use the one in include/asm-generic/topology.h,
+> >> which is identical to what you're defining here?
+> macro cpumask_of_pcibus is defined under #ifndef CONFIG_NUMA in
+> include/asm-generic/topology.h
+> and this macro is defined again for NUMA in respective arch header files.
+> i think moving this macro from ifndef will allow us to use without redefinition.
+> 
+> --- a/include/asm-generic/topology.h
+> +++ b/include/asm-generic/topology.h
+> @@ -54,14 +54,14 @@
+>  #define pcibus_to_node(bus)    ((void)(bus), -1)
+>  #endif
+> 
+> +#endif /* CONFIG_NUMA */
+> +
+>  #ifndef cpumask_of_pcibus
+>  #define cpumask_of_pcibus(bus) (pcibus_to_node(bus) == -1 ?            \
+>                                  cpu_all_mask :                         \
+>                                  cpumask_of_node(pcibus_to_node(bus)))
+>  #endif
+> 
+> -#endif /* CONFIG_NUMA */
+> -
+>  #if !defined(CONFIG_NUMA) || !defined(CONFIG_HAVE_MEMORYLESS_NODES)
+> 
+>  #ifndef set_numa_mem
+> 
+> i have got below compilation error withour macro defined in arch code.
+> 
+> drivers/pci/pci-sysfs.c: In function ?cpuaffinity_show?:
+> drivers/pci/pci-sysfs.c:114:15: error: implicit declaration of
+> function ?cpumask_of_pcibus? [-Werror=implicit-function-declaration]
+> drivers/pci/pci-sysfs.c:114:34: warning: initialization makes pointer
+> from integer without a cast [enabled by default]
+> drivers/pci/pci-sysfs.c: In function ?cpulistaffinity_show?:
+> drivers/pci/pci-sysfs.c:123:34: warning: initialization makes pointer
+> from integer without a cast [enabled by default]
+> cc1: some warnings being treated as errors
+> 
+> 
+> i can send this as separate patch( as a  fix patch).
 
-Yes, it is. They are defined in OpenFirmware USB binding doc above.
-However, the compatible strings and nodes are supposed to reflect the
-USB descriptors and interfaces. I don't think we need that much detail
-here, so I'd suggest we limit it to a subset such as:
+Unless your series has already been merged, I don't like the idea of a
+separate fix patch.  The whole point of reviews is to try to fix as
+many things as we can *before* merging.
 
-usbVID.PID.REV
-usbVID.PID
-usbVID.classDC
-usb.classDC
-usbifVID.classIC
-usbif.classIC
-
->> > +struct device_node *usb_of_find_node(struct device_node *parent, int portnum)
->> > +{
->> > +       struct device_node *node;
->> > +       u32 port;
->> > +
->> > +       for_each_child_of_node(parent, node) {
->> > +               if (!of_property_read_u32(node, "reg", &port)) {
->> > +                       if (port == portnum)
->> > +                               return node;
->>
->> This needs to match on the compatible string too. Otherwise, this
->> could match in lots of cases.
->>
->
-> No, the port number is unique under the USB HUB (including host
-> controller, which is roothub), and there are some many compatible
-> string for USB devices.
-
-Assuming the parent node pointer is correct. You could pass a SPI host
-node to this function and it will return a valid device node pointer.
-
-Rob
+Bjorn
