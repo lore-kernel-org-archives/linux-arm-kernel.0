@@ -1,28 +1,52 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 09 Jan 2016 03:39:45 +0100
-Subject: [PATCH v2 02/12] ARM: dts: rockchip: add the sound codec for
- kylin board
-In-Reply-To: <1452155155-16232-3-git-send-email-wxt@rock-chips.com>
-References: <1452155155-16232-1-git-send-email-wxt@rock-chips.com>
- <1452155155-16232-3-git-send-email-wxt@rock-chips.com>
-Message-ID: <37250066.V9Rju7m7TL@phil>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Sat, 9 Jan 2016 11:46:12 +0900
+Subject: [PATCH 2/2] ARM: exynos_defconfig: Enable s5p-secss driver
+In-Reply-To: <568FD733.8030601@osg.samsung.com>
+References: <1452132905-8587-1-git-send-email-k.kozlowski@samsung.com>
+ <1452132905-8587-2-git-send-email-k.kozlowski@samsung.com>
+ <568FD733.8030601@osg.samsung.com>
+Message-ID: <CAJKOXPdie=mAPFxdnn_Ue+kNVTKQ1bFJigti35JMz7hmkYJ9cw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 7. Januar 2016, 16:25:45 schrieb Caesar Wang:
-> Support the rt5616 codec for kylin board, but we need
-> enable the i2s firstly.
-> Also, this patch adds the CPU/CODEC information for simple card
-> to make the happy work.
-> 
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+2016-01-09 0:35 GMT+09:00 Javier Martinez Canillas <javier@osg.samsung.com>:
+> Hello Krzysztof,
+>
+> On 01/06/2016 11:15 PM, Krzysztof Kozlowski wrote:
+>> The Exynos SoC provides a Security SubSystem block for accelerating some
+>> cryptographic operations. Enable the driver for it - s5p-secss to
+>> utilize the hardware acceleration.
+>>
+>> Currently the s5p-secss driver supports AES in CBC and ECB modes.
+>> However on Odroid XU4 (Exynos5422) and Trats2 (Exynos4412) boards this
+>> change introduces one booting error:
+>>
+>>       alg: skcipher: encryption failed on chunk test 1 for ecb-aes-s5p: ret=22
+>>
+>> The cbc-aes-s5p properly registers itself and passes self-tests.
+>>
+>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> ---
+>>  arch/arm/configs/exynos_defconfig | 1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+>> index 0aee1e035be9..c47c7e069873 100644
+>> --- a/arch/arm/configs/exynos_defconfig
+>> +++ b/arch/arm/configs/exynos_defconfig
+>> @@ -240,6 +240,7 @@ CONFIG_DEBUG_RT_MUTEXES=y
+>>  CONFIG_DEBUG_SPINLOCK=y
+>>  CONFIG_DEBUG_MUTEXES=y
+>>  CONFIG_DEBUG_USER=y
+>> +CONFIG_CRYPTO_DEV_S5P=y
+>
+> I noticed that this is not enabled in multi_v7_defconfig.
+> Are you planing to do it as well?
 
-applied to my dts branch for 4.6.
+Thanks for feedback and review. I noticed that as well but I am not
+convinced because one of two of supported algorithms fails the
+tests... which makes 50% of driver non-working. :) Maybe it is
+harmless - just pollutes the dmesg... Maybe after fixing it.
 
-I've adapted the commit message, to make it a bit more clear. [0]
-
-
-Thanks
-Heiko
-
-[0] https://git.kernel.org/cgit/linux/kernel/git/mmind/linux-rockchip.git/commit/?h=v4.6-armsoc/dts32&id=1a21fe2a6f00226d126cd4ba4ac2484208c58b71
+Best regards,
+Krzysztof
