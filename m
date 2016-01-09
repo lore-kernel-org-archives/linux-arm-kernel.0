@@ -1,26 +1,35 @@
-From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
-Date: Sat, 9 Jan 2016 02:23:26 +0200
-Subject: [PATCH 2/2] memory: omap-gpmc: Add Kconfig option for debug
-In-Reply-To: <20160108075913.GN11364@pali>
-References: <20160105224929.GF12777@atomide.com>
- <20160106174039.GA14271@earth> <20160106174713.GL12777@atomide.com>
- <568D5669.4040801@gmail.com> <20160106182650.GM12777@atomide.com>
- <568D5F54.7040900@gmail.com> <20160107180700.GN12777@atomide.com>
- <568EDC8D.7070205@gmail.com> <20160108022619.GS12777@atomide.com>
- <568F4596.8020206@gmail.com> <20160108075913.GN11364@pali>
-Message-ID: <569052FE.1040008@gmail.com>
+From: lho@apm.com (Loc Ho)
+Date: Fri, 8 Jan 2016 16:30:48 -0800
+Subject: [PATCH v3 0/2] acpi: apei: Bug fix to enable APEI support for
+ ARMv8
+In-Reply-To: <1446857519-5908-1-git-send-email-lho@apm.com>
+References: <1446857519-5908-1-git-send-email-lho@apm.com>
+Message-ID: <CAPw-ZT=Kor1E7NpAkoAyJtULiCGuCCsoSES05Dr6-eUUS8dDHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Borislav/Doung/etc,
 
-On  8.01.2016 09:59, Pali Roh?r wrote:
-> On Friday 08 January 2016 07:13:58 Ivaylo Dimitrov wrote:
->> And it looks like the problems happens sometimes on oops too.
+> v3
+> * Change the title of the patch to reflect the patch
+> * Completely dropped the driver. Instead, move completely to the FW by
+>   accessing the GIC directly.
+> * Fix a bug with function acpi_gsi_to_irq
+> * Enable APEI multiple GHES source to share an single external IRQ
 >
-> In linux-n900 tree is enabled mtdoops driver which store oops to
-> specified MTD device. So maybe this access cause it?
+> v2
+> * Make all code more generic naming
+> * Still waiting for comment from Linaro folks on APEI
 >
+> ---
+> Loc Ho (2):
+>   acpi: Fix proper return code for function acpi_gsi_to_irq
+>   acpi: apei: Enable APEI multiple GHES source to share an single
+>     external IRQ
 
-The key word here is "sometimes". i.e sometimes it hapens on normal 
-reboot, sometimes it happens on oops.
+It has been awhile and I thought I check again on this. Any issue with
+these two changes as it is needed for ARMv8 64-bit APEI support.
+Without these two changes, APEI support will NOT work with X-Gene
+platforms.
+
+-Loc
