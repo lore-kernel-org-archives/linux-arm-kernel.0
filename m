@@ -1,36 +1,32 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 09 Jan 2016 23:45:52 +0100
-Subject: [PATCH] ARM: multi_v7_defconfig: Change RTC_DRV_HYM8563 to builtin
-In-Reply-To: <4578616.QcQm44RoCq@phil>
-References: <1452367683-11160-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <4578616.QcQm44RoCq@phil>
-Message-ID: <2746599.O3XccuMTWz@phil>
+From: robh@kernel.org (Rob Herring)
+Date: Sat, 9 Jan 2016 16:53:21 -0600
+Subject: [PATCH v3 2/2] pci, pci-thunder-pem: Add PCIe host driver for
+ ThunderX processors.
+In-Reply-To: <1452297553-19911-3-git-send-email-ddaney.cavm@gmail.com>
+References: <1452297553-19911-1-git-send-email-ddaney.cavm@gmail.com>
+ <1452297553-19911-3-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20160109225321.GA22053@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Samstag, 9. Januar 2016, 20:33:51 schrieb Heiko Stuebner:
-> Am Samstag, 9. Januar 2016, 20:28:02 schrieb Sjoerd Simons:
-> > Apart from providing an RTC the hym8563 chip on some rockchip boards
-> > (e.g. rock2 square and firefly) also provide the 32khz clock used by the
-> > SoCs thermal sensors.
-> > 
-> > Switch the driver from a module to builtin such that the thermal
-> > protection can work even if modules aren't used/loaded.
-> > 
-> > Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+On Fri, Jan 08, 2016 at 03:59:13PM -0800, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
 > 
-> Personally I'm ok with the reasoning for requiring rtc to be build in,
-> but I guess others might disagree. Nevertheless
+> Some Cavium ThunderX processors require quirky access methods for the
+> config space of the PCIe bridge.  Add a driver to provide these config
+> space accessor functions.  The pci-host-common code is used to
+> configure the PCI machinery.
 > 
-> Acked-by: Heiko Stuebner <heiko@sntech.de>
-> 
-> and we'll let armsoc-people decide ;-) .
-> 
-> 
-> Ideally we would do the same for the rk808 rtc as well - as it is exactly
-> the same argument / case.
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> ---
+>  .../devicetree/bindings/pci/pci-thunder-pem.txt    |  43 ++++
 
-just so nobody gets the wrong idea, on the rk808, the needed clkout is 
-separate in CONFIG_COMMON_CLK_RK808, not in the rtc. Still currently build 
-as module, so depending on if we can build-in the hym8563, we should change 
-the rk808-clkout accordingly.
+Acked-by: Rob Herring <robh@kernel.org>
+
+>  MAINTAINERS                                        |   8 +
+>  drivers/pci/host/Kconfig                           |   7 +
+>  drivers/pci/host/Makefile                          |   1 +
+>  drivers/pci/host/pci-thunder-pem.c                 | 283 +++++++++++++++++++++
+>  5 files changed, 342 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/pci-thunder-pem.txt
+>  create mode 100644 drivers/pci/host/pci-thunder-pem.c
