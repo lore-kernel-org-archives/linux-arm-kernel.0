@@ -1,7 +1,7 @@
-From: tyler.baker@linaro.org (Tyler Baker)
-Date: Fri, 8 Jan 2016 16:58:05 -0800
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 9 Jan 2016 01:29:13 +0000
 Subject: bcm4708-smartrg-sr400ac boot failures in next/arm-soc
-In-Reply-To: <CANMBJr4yijtDy1H24ofhHTt1pKacRRk+hx88-z8i=H+Me3Yx7Q@mail.gmail.com>
+In-Reply-To: <CANMBJr7+X0nj8-DLQ7vLLEowj1SbZxqqikHDBUP-GawZAG0a6w@mail.gmail.com>
 References: <CANMBJr6LW=y7g4_CCutHf4vu5NkzoeXt_RvPSJAsTE2nFpGwqw@mail.gmail.com>
  <20160108225032.GO19062@n2100.arm.linux.org.uk>
  <CANMBJr6DR=y2oOqnEyUAxhzhXn1twXozGacOpcVRx8NcWf-mfw@mail.gmail.com>
@@ -9,81 +9,57 @@ References: <CANMBJr6LW=y7g4_CCutHf4vu5NkzoeXt_RvPSJAsTE2nFpGwqw@mail.gmail.com>
  <CANMBJr6o=kwa_jm1wXFUrOdK+raAO5A505Z27jDqNM1bWOh0ag@mail.gmail.com>
  <20160109000709.GR19062@n2100.arm.linux.org.uk>
  <CANMBJr4yijtDy1H24ofhHTt1pKacRRk+hx88-z8i=H+Me3Yx7Q@mail.gmail.com>
-Message-ID: <CANMBJr7+X0nj8-DLQ7vLLEowj1SbZxqqikHDBUP-GawZAG0a6w@mail.gmail.com>
+ <CANMBJr7+X0nj8-DLQ7vLLEowj1SbZxqqikHDBUP-GawZAG0a6w@mail.gmail.com>
+Message-ID: <20160109012912.GS19062@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 January 2016 at 16:21, Tyler Baker <tyler.baker@linaro.org> wrote:
-> On 8 January 2016 at 16:07, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Fri, Jan 08, 2016 at 03:59:16PM -0800, Tyler Baker wrote:
->>> On 8 January 2016 at 15:44, Russell King - ARM Linux
->>> <linux@arm.linux.org.uk> wrote:
->>> > On Fri, Jan 08, 2016 at 03:17:19PM -0800, Tyler Baker wrote:
->>> >> On 8 January 2016 at 14:50, Russell King - ARM Linux
->>> >> <linux@arm.linux.org.uk> wrote:
->>> >> > On Fri, Jan 08, 2016 at 02:33:39PM -0800, Tyler Baker wrote:
->>> >> >> After a bit of investigation, I determined that CONFIG_BLK_DEV_RAM was
->>> >> >> causing the issue and disabling it fixed the boot issue. Essentially,
->>> >> >> the kernel cannot find the initrd that has been loaded into memory by
->>> >> >> CFE bootloader with this option enabled as I inject the following
->>> >> >> command line into the DT before it's loaded over tftp.
->>> >> >>
->>> >> >> Loaded in CFE by: 'load -raw -tftp -addr=0x4000000 -max=0x900000
->>> >> >> 192.168.2.2:tmpqC9zOv/ramdisk.cpio.gz'
->>> >> >>
->>> >> >> Kernel arguments injected into DT: 'console=ttyS0,115200
->>> >> >> initrd=0x4000000,8M root=/dev/ram0 ip=dhcp'
->>> >> >
->>> >> > What is the problem that the kernel is reporting?
->>> >>
->>> >> The kernel complaining that there is no file system to mount, and
->>> >> panics. Here is a plain text version of the issue if you want to have
->>> >> a look[1].
->>> >
->>> > Thanks.
->>> >
->>> > The error is:
->>> >
->>> > [   16.557922] RAMDISK: EOF while reading compressed data
->>> >
->>> > which is not surprising given:
->>> >
->>> > initrd=0x4000000,8M
->>> >
->>> > is given on the kernel command line, but:
->>> >
->>> > Loader:raw Filesys:tftp Dev:eth0 File:192.168.2.2:tmpd9L7xr/ramdisk.cpio.gz Options:(null)
->>> > ... 8450989 bytes read
->>> >
->>> > the actual ramdisk is larger than 8M.  8M would've been 8388608 bytes,
->>> > but you're about 64k over that.
->>>
->>> Right, this was my initial reaction when I saw this issue. I've
->>> attempted increase initrd limit passed to the kernel, the load size in
->>> the bootloader (10MB+) and still the same issue occurs when I do this.
->>
->> Your ramdisk is 8450989 bytes.  You're telling _the kernel_ that it is
->> only 8388608 bytes.  The kernel is reporting that it reached the last
->> byte of the 8388608 and the decompression was not complete.
->>
->> You need to tell the kernel that the ramdisk is bigger.  It's not the
->> bootloader, it's your "initrd=0x4000000,8M" argument to the kernel that's
->> causing the problem.
->>
->> Increase that ",8M" to the kernel.
->
-> I agree, and in my last reply I stated I did this. To be very
-> specific, I used "initrd=0x4000000,10M" which still did not work. Give
-> me a moment to reconfigure the scripts and I'll post and updated boot
-> log.
+On Fri, Jan 08, 2016 at 04:58:05PM -0800, Tyler Baker wrote:
+> On 8 January 2016 at 16:21, Tyler Baker <tyler.baker@linaro.org> wrote:
+> > I agree, and in my last reply I stated I did this. To be very
+> > specific, I used "initrd=0x4000000,10M" which still did not work. Give
+> > me a moment to reconfigure the scripts and I'll post and updated boot
+> > log.
+> 
+> Here is the boot log when using "initrd=0x4000000,10M" [1]. Obviously,
+> it does resolve the 'RAMDISK: EOF while reading compressed data'
+> error, but still fails to mount.
 
-Here is the boot log when using "initrd=0x4000000,10M" [1]. Obviously,
-it does resolve the 'RAMDISK: EOF while reading compressed data'
-error, but still fails to mount.
+Okay, thanks.  Things are better - there's another change in there.
+We've gone from:
 
-Cheers,
+[    0.156295] Trying to unpack rootfs image as initramfs...
+[    0.990981] rootfs image is not initramfs (read error); looks like an initrd
 
-Tyler
+note the "read error" because we hit EOF while trying to read the
+initramfs, which now has become:
 
-[1] http://people.linaro.org/~tyler.baker/bcm4708-smartrg-sr400ac-arm-soc-boot.txt
+[    0.156226] Trying to unpack rootfs image as initramfs...
+[    0.993838] rootfs image is not initramfs (junk in compressed archive); looks like an initrd
+
+I suspect the kernel has always complained about this, the difference
+is that with BLK_DEV_RAM enabled, we will clean the initial rootfs,
+which will return it to a pristine state after failed initramfs unpack.
+
+Either way, turning off BLK_DEV_RAM doesn't _actually_ fix the problem -
+it merely masks that the initramfs failed to properly unpack.
+
+This is because unpack_to_rootfs() wants to consume all the data in the
+passed image, so if you say it's 10MB in size, it will want 10MB of data.
+So, I think the only proper solution is to set
+"initrd=0x4000000,<actual-size>" and not "something that's larger"
+which will prevent unpack_to_rootfs() reporting an error.
+
+To prove this, if you look at a successful boot log from a kernel without
+BLK_DEV_RAM enabled, I suspect you'll see:
+
+Unpacking initramfs...
+Initramfs unpacking failed: junk in compressed archive
+
+in your log, which is just another symptom of the incorrect size being
+passed.
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
