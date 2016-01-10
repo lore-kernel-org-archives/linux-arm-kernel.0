@@ -1,33 +1,51 @@
 From: mst@redhat.com (Michael S. Tsirkin)
-Date: Sun, 10 Jan 2016 16:21:31 +0200
-Subject: [PATCH v3 36/41] checkpatch: add virt barriers
+Date: Sun, 10 Jan 2016 16:21:15 +0200
+Subject: [PATCH v3 34/41] checkpatch.pl: add missing memory barriers
 In-Reply-To: <1452426622-4471-1-git-send-email-mst@redhat.com>
 References: <1452426622-4471-1-git-send-email-mst@redhat.com>
-Message-ID: <1452426622-4471-37-git-send-email-mst@redhat.com>
+Message-ID: <1452426622-4471-35-git-send-email-mst@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add virt_ barriers to list of barriers to check for
-presence of a comment.
+SMP-only barriers were missing in checkpatch.pl
+
+Refactor code slightly to make adding more variants easier.
 
 Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
 ---
- scripts/checkpatch.pl | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ scripts/checkpatch.pl | 20 +++++++++++++++++++-
+ 1 file changed, 19 insertions(+), 1 deletion(-)
 
 diff --git a/scripts/checkpatch.pl b/scripts/checkpatch.pl
-index a96adcb..5ca272b 100755
+index 2b3c228..97b8b62 100755
 --- a/scripts/checkpatch.pl
 +++ b/scripts/checkpatch.pl
-@@ -5131,7 +5131,8 @@ sub process {
- 		}x;
- 		my $all_barriers = qr{
- 			$barriers|
--			smp_($smp_barriers)
-+			smp_($smp_barriers)|
-+			virt_($smp_barriers)
- 		}x;
- 
- 		if ($line =~ /\b($all_barriers)\s*\(/) {
+@@ -5116,7 +5116,25 @@ sub process {
+ 			}
+ 		}
+ # check for memory barriers without a comment.
+-		if ($line =~ /\b(mb|rmb|wmb|read_barrier_depends|smp_mb|smp_rmb|smp_wmb|smp_read_barrier_depends)\(/) {
++
++		my $barriers = qr{
++			mb|
++			rmb|
++			wmb|
++			read_barrier_depends
++		}x;
++		my $smp_barriers = qr{
++			store_release|
++			load_acquire|
++			store_mb|
++			($barriers)
++		}x;
++		my $all_barriers = qr{
++			$barriers|
++			smp_($smp_barriers)
++		}x;
++
++		if ($line =~ /\b($all_barriers)\s*\(/) {
+ 			if (!ctx_has_comment($first_line, $linenr)) {
+ 				WARN("MEMORY_BARRIER",
+ 				     "memory barrier without comment\n" . $herecurr);
 -- 
 MST
