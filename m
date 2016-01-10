@@ -1,134 +1,64 @@
 From: mst@redhat.com (Michael S. Tsirkin)
-Date: Sun, 10 Jan 2016 16:20:59 +0200
-Subject: [PATCH v3 32/41] sh: move xchg_cmpxchg to a header by itself
+Date: Sun, 10 Jan 2016 16:19:10 +0200
+Subject: [PATCH v3 19/41] ia64: define __smp_xxx
 In-Reply-To: <1452426622-4471-1-git-send-email-mst@redhat.com>
 References: <1452426622-4471-1-git-send-email-mst@redhat.com>
-Message-ID: <1452426622-4471-33-git-send-email-mst@redhat.com>
+Message-ID: <1452426622-4471-20-git-send-email-mst@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks like future sh variants will support a 4-byte cas which will be
-used to implement 1 and 2 byte xchg.
+This defines __smp_xxx barriers for ia64,
+for use by virtualization.
 
-This is exactly what we do for llsc now, move the portable part of the
-code into a separate header so it's easy to reuse.
+smp_xxx barriers are removed as they are
+defined correctly by asm-generic/barriers.h
 
-Suggested-by:  Rich Felker <dalias@libc.org>
+This reduces the amount of arch-specific boiler-plate code.
+
 Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+Acked-by: Tony Luck <tony.luck@intel.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/sh/include/asm/cmpxchg-llsc.h | 35 +-------------------------
- arch/sh/include/asm/cmpxchg-xchg.h | 51 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 52 insertions(+), 34 deletions(-)
- create mode 100644 arch/sh/include/asm/cmpxchg-xchg.h
+ arch/ia64/include/asm/barrier.h | 14 +++++---------
+ 1 file changed, 5 insertions(+), 9 deletions(-)
 
-diff --git a/arch/sh/include/asm/cmpxchg-llsc.h b/arch/sh/include/asm/cmpxchg-llsc.h
-index e754794..fcfd322 100644
---- a/arch/sh/include/asm/cmpxchg-llsc.h
-+++ b/arch/sh/include/asm/cmpxchg-llsc.h
-@@ -1,9 +1,6 @@
- #ifndef __ASM_SH_CMPXCHG_LLSC_H
- #define __ASM_SH_CMPXCHG_LLSC_H
+diff --git a/arch/ia64/include/asm/barrier.h b/arch/ia64/include/asm/barrier.h
+index 2f93348..588f161 100644
+--- a/arch/ia64/include/asm/barrier.h
++++ b/arch/ia64/include/asm/barrier.h
+@@ -42,28 +42,24 @@
+ #define dma_rmb()	mb()
+ #define dma_wmb()	mb()
  
--#include <linux/bitops.h>
--#include <asm/byteorder.h>
--
- static inline unsigned long xchg_u32(volatile u32 *m, unsigned long val)
- {
- 	unsigned long retval;
-@@ -50,36 +47,6 @@ __cmpxchg_u32(volatile u32 *m, unsigned long old, unsigned long new)
- 	return retval;
- }
- 
--static inline u32 __xchg_cmpxchg(volatile void *ptr, u32 x, int size)
--{
--	int off = (unsigned long)ptr % sizeof(u32);
--	volatile u32 *p = ptr - off;
--#ifdef __BIG_ENDIAN
--	int bitoff = (sizeof(u32) - 1 - off) * BITS_PER_BYTE;
+-#ifdef CONFIG_SMP
+-# define smp_mb()	mb()
 -#else
--	int bitoff = off * BITS_PER_BYTE;
+-# define smp_mb()	barrier()
 -#endif
--	u32 bitmask = ((0x1 << size * BITS_PER_BYTE) - 1) << bitoff;
--	u32 oldv, newv;
--	u32 ret;
--
--	do {
--		oldv = READ_ONCE(*p);
--		ret = (oldv & bitmask) >> bitoff;
--		newv = (oldv & ~bitmask) | (x << bitoff);
--	} while (__cmpxchg_u32(p, oldv, newv) != oldv);
--
--	return ret;
--}
--
--static inline unsigned long xchg_u16(volatile u16 *m, unsigned long val)
--{
--	return __xchg_cmpxchg(m, val, sizeof *m);
--}
--
--static inline unsigned long xchg_u8(volatile u8 *m, unsigned long val)
--{
--	return __xchg_cmpxchg(m, val, sizeof *m);
--}
-+#include <asm/cmpxchg-xchg.h>
++# define __smp_mb()	mb()
  
- #endif /* __ASM_SH_CMPXCHG_LLSC_H */
-diff --git a/arch/sh/include/asm/cmpxchg-xchg.h b/arch/sh/include/asm/cmpxchg-xchg.h
-new file mode 100644
-index 0000000..7219719
---- /dev/null
-+++ b/arch/sh/include/asm/cmpxchg-xchg.h
-@@ -0,0 +1,51 @@
-+#ifndef __ASM_SH_CMPXCHG_XCHG_H
-+#define __ASM_SH_CMPXCHG_XCHG_H
-+
-+/*
-+ * Copyright (C) 2016 Red Hat, Inc.
-+ * Author: Michael S. Tsirkin <mst@redhat.com>
-+ *
-+ * This work is licensed under the terms of the GNU GPL, version 2.  See the
-+ * file "COPYING" in the main directory of this archive for more details.
-+ */
-+#include <linux/bitops.h>
-+#include <asm/byteorder.h>
-+
-+/*
-+ * Portable implementations of 1 and 2 byte xchg using a 4 byte cmpxchg.
-+ * Note: this header isn't self-contained: before including it, __cmpxchg_u32
-+ * must be defined first.
-+ */
-+static inline u32 __xchg_cmpxchg(volatile void *ptr, u32 x, int size)
-+{
-+	int off = (unsigned long)ptr % sizeof(u32);
-+	volatile u32 *p = ptr - off;
-+#ifdef __BIG_ENDIAN
-+	int bitoff = (sizeof(u32) - 1 - off) * BITS_PER_BYTE;
-+#else
-+	int bitoff = off * BITS_PER_BYTE;
-+#endif
-+	u32 bitmask = ((0x1 << size * BITS_PER_BYTE) - 1) << bitoff;
-+	u32 oldv, newv;
-+	u32 ret;
-+
-+	do {
-+		oldv = READ_ONCE(*p);
-+		ret = (oldv & bitmask) >> bitoff;
-+		newv = (oldv & ~bitmask) | (x << bitoff);
-+	} while (__cmpxchg_u32(p, oldv, newv) != oldv);
-+
-+	return ret;
-+}
-+
-+static inline unsigned long xchg_u16(volatile u16 *m, unsigned long val)
-+{
-+	return __xchg_cmpxchg(m, val, sizeof *m);
-+}
-+
-+static inline unsigned long xchg_u8(volatile u8 *m, unsigned long val)
-+{
-+	return __xchg_cmpxchg(m, val, sizeof *m);
-+}
-+
-+#endif /* __ASM_SH_CMPXCHG_XCHG_H */
+-#define smp_mb__before_atomic()	barrier()
+-#define smp_mb__after_atomic()	barrier()
++#define __smp_mb__before_atomic()	barrier()
++#define __smp_mb__after_atomic()	barrier()
+ 
+ /*
+  * IA64 GCC turns volatile stores into st.rel and volatile loads into ld.acq no
+  * need for asm trickery!
+  */
+ 
+-#define smp_store_release(p, v)						\
++#define __smp_store_release(p, v)						\
+ do {									\
+ 	compiletime_assert_atomic_type(*p);				\
+ 	barrier();							\
+ 	WRITE_ONCE(*p, v);						\
+ } while (0)
+ 
+-#define smp_load_acquire(p)						\
++#define __smp_load_acquire(p)						\
+ ({									\
+ 	typeof(*p) ___p1 = READ_ONCE(*p);				\
+ 	compiletime_assert_atomic_type(*p);				\
 -- 
 MST
