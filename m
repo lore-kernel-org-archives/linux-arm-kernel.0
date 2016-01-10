@@ -1,54 +1,29 @@
 From: mst@redhat.com (Michael S. Tsirkin)
-Date: Sun, 10 Jan 2016 13:42:28 +0200
-Subject: [PATCH 1/3] checkpatch.pl: add missing memory barriers
-In-Reply-To: <1451945750.4334.111.camel@perches.com>
-References: <1451907395-15978-1-git-send-email-mst@redhat.com>
- <1451907395-15978-2-git-send-email-mst@redhat.com>
- <1451923660.4334.83.camel@perches.com>
- <20160104224415-mutt-send-email-mst@redhat.com>
- <1451945750.4334.111.camel@perches.com>
-Message-ID: <20160110134133-mutt-send-email-mst@redhat.com>
+Date: Sun, 10 Jan 2016 13:56:50 +0200
+Subject: [PATCH v2 0/3] checkpatch: handling of memory barriers
+Message-ID: <1452427000-4520-1-git-send-email-mst@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 04, 2016 at 02:15:50PM -0800, Joe Perches wrote:
-> On Mon, 2016-01-04 at 22:45 +0200, Michael S. Tsirkin wrote:
-> > On Mon, Jan 04, 2016 at 08:07:40AM -0800, Joe Perches wrote:
-> > > On Mon, 2016-01-04 at 13:36 +0200, Michael S. Tsirkin wrote:
-> > > > SMP-only barriers were missing in checkpatch.pl
-> > > > 
-> > > > Refactor code slightly to make adding more variants easier.
-> > > > 
-> > > > Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
-> > > > ---
-> > > > ?scripts/checkpatch.pl | 9 ++++++++-
-> > > > ?1 file changed, 8 insertions(+), 1 deletion(-)
-> > > > 
-> > > > diff --git a/scripts/checkpatch.pl b/scripts/checkpatch.pl
-> > > > index 2b3c228..0245bbe 100755
-> > > > --- a/scripts/checkpatch.pl
-> > > > +++ b/scripts/checkpatch.pl
-> > > > @@ -5116,7 +5116,14 @@ sub process {
-> > > > ?			}
-> > > > ?		}
-> > > > ?# check for memory barriers without a comment.
-> > > > -		if ($line =~ /\b(mb|rmb|wmb|read_barrier_depends|smp_mb|smp_rmb|smp_wmb|smp_read_barrier_depends)\(/) {
-> > > > +
-> > > > +		my @barriers = ('mb', 'rmb', 'wmb', 'read_barrier_depends');
-> > > > +		my @smp_barriers = ('smp_store_release', 'smp_load_acquire', 'smp_store_mb');
-> > > > +
-> > > > +		@smp_barriers = (@smp_barriers, map {"smp_" . $_} @barriers);
-> > > 
-> > > I think using map, which so far checkpatch doesn't use,
-> > > makes smp_barriers harder to understand and it'd be
-> > > better to enumerate them.
-> > 
-> > Okay - I'll rewrite using foreach.
-> > 
-> 
-> I think using the qr form (like 'our $Attribute' and
-> a bunch of others) is the general style that should
-> be used for checkpatch.
+As part of memory barrier cleanup, this patchset
+extends checkpatch to make it easier to stop
+incorrect memory barrier usage.
 
-Thanks - that's what I did in the new version (included in
-v3 of the arch cleanup patchset now).
+This applies on top of my series
+	arch: barrier cleanup + barriers for virt
+and will be included in the next version of the series.
+
+Changes from v2:
+	catch optional\s* before () in barriers
+	rewrite using qr{} instead of map
+
+Michael S. Tsirkin (3):
+  checkpatch.pl: add missing memory barriers
+  checkpatch: check for __smp outside barrier.h
+  checkpatch: add virt barriers
+
+ scripts/checkpatch.pl | 31 ++++++++++++++++++++++++++++++-
+ 1 file changed, 30 insertions(+), 1 deletion(-)
+
+-- 
+MST
