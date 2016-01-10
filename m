@@ -1,300 +1,250 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sun, 10 Jan 2016 09:08:22 -0500
-Subject: [PATCH V9 2/5] dma: add Qualcomm Technologies HIDMA management
- driver
-In-Reply-To: <20151214120339.GA21356@leverpostej>
-References: <1449850623-32214-1-git-send-email-okaya@codeaurora.org>
- <1449850623-32214-3-git-send-email-okaya@codeaurora.org>
- <20151211164137.GA23638@leverpostej> <566B1F64.9010500@codeaurora.org>
- <20151211193742.GD23638@leverpostej> <566B4ACC.3070005@codeaurora.org>
- <20151214120339.GA21356@leverpostej>
-Message-ID: <569265D6.5060407@codeaurora.org>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Sun, 10 Jan 2016 16:16:22 +0200
+Subject: [PATCH v3 00/41] arch: barrier cleanup + barriers for virt
+Message-ID: <1452426622-4471-1-git-send-email-mst@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/14/2015 7:05 AM, Mark Rutland wrote:
->>>>>> +Required properties:
->>>>>> +- compatible: "qcom,hidma-mgmt-1.0";
->>>>>> +- reg: Address range for DMA device
->>>>>
->>>>> Does this cover just the management registers, or those for channels as
->>>>> well?
->>>>
->>>> just management.
->>>>
->>>>>
->>>>>> +- dma-channels: Number of channels supported by this DMA controller.
->>>>>
->>>>> Surely this is discoverable, or can be derived from the set of channels
->>>>> described in the DT?
->>>>
->>>> No, this is a HW configuration. Each hardware instance supports certain
->>>> number of channels based on the HW build. The number of active channels
->>>> on the running operating system does not necessarily represent the
->>>> maximum possible.
->>>
->>> I don't follow.
->>>
->>> If you aren't using some channels, why do you need to know about them?
->>>
->>
->> I mean the hypervisor OS may not be using the channels. It could be the
->> guest machines that are using it. I need the number of the channels not
->> the memory addresses where each channel is.
-> 
-> I still don't follow. Knowing the number of channels alone is clearly
-> insufficient.
-> 
-> The hypervisor is in charge of handing these out to guests. So it needs
-> to know the set of of channels (i.e. the address of each channel, and
-> which index the channel has in the control interface). Otherwise it
-> cannot possibly allocate them to guests, and cannot possibly control
-> those channels at runtime.
-> 
-> Given the hypervisor is in chage of allocating channels to guests, it
-> knows which channels are in use, and can decide whether or not to use
-> channels for its own purposes.
-> 
->>> The driver seems to assume it can access registers for all (linearly
->>> indexed) channels up to the value it read from dt for dma-channels. That
->>> doesn't seem right if the driver is not dealing with all of those
->>> channels.
->>
->> I assume you are talking about this. Feel free to be specific if not
->> this one.
->>
->> 	for (i = 0; i < mgmtdev->dma_channels; i++) {
->> 		u32 weight = mgmtdev->weight[i];
->> 		u32 priority = mgmtdev->priority[i];
->>
->> 		val = readl(mgmtdev->virtaddr + HIDMA_QOS_N_OFFSET + (4 * i));
->> 		val &= ~(1 << HIDMA_PRIORITY_BIT_POS);
->> 		val |= (priority & 0x1) << HIDMA_PRIORITY_BIT_POS;
->> 		val &= ~(HIDMA_WEIGHT_MASK << HIDMA_WRR_BIT_POS);
->> 		val |= (weight & HIDMA_WEIGHT_MASK) << HIDMA_WRR_BIT_POS;
->> 		writel(val, mgmtdev->virtaddr + HIDMA_QOS_N_OFFSET + (4 * i));
->> 	}
->>
->> The management driver is configuring the priority and weight registers
->> inside the management address space. It is not accessing the channel
->> address space where data transfer descriptors are set up. There is one
->> register for priority & weight of the each channel inside the management
->> address space.
-> 
-> My point was that this implies that the driver has no idea as to the
-> relationship between these configuration registers and the actual
-> channel address spaces. It has no idea which channel address spaces are
-> being configured here. That does not seem right.
-> 
->>>>> Why can this information not be associated with the channel directly?
->>>>>
->>>> Two reasons:
->>>> 1. The channel doesn't have the capability to change the priority and
->>>> weight. HW design. Management HW can do this only.
->>>
->>> You can describe the channels directly to the hypervisor which talks to
->>> the management HW.
->>
->> Not a use case, I don't want to allow guest machine to change their
->> priority and weight.
-> 
-> I didn't suggest that the guest would. Regardless, it seems these should
-> be runtime configured anyway, at which point you need to know the
-> relationship.
-> 
->>>>> There's no relationship to channels defined here. What happens if/when
->>>>> you have a system with multiple instances?
->>>>>
->>>>
->>>> I do support multiple instances. I tested with 4 instances (6 channels
->>>> each). This driver is only responsible for management which it can do
->>>> through its own dedicated HW interface. It doesn't need access to the
->>>> channel address space. There will be 4 HIDMA management instances in
->>>> this case.
->>>
->>> I don't follow.
->>>
->>> How do you know which channels are associated with which management
->>> interface?
->>
->> The association is the other way around. User need to know the
->> management interface for a channel rather than the channel needing to
->> know the management interface.
->>
->> I'll think about it.
-> 
-> Ok. I agree that's the way the user will look at it.
-> 
->>> How can your sysfs interface work if that relationship is not described?
->>
->> Here is the sysfs documentation. Each management object has one channel
->> directory under it. I still don't need to access the channel object in
->> order to change its weight and priority.
->>
->> What:           /sys/devices/platform/hidma-mgmt*/chan*/priority
->>                 /sys/devices/platform/QCOM8060:*/chan*/priority
->> Date:           Nov 2015
->> KernelVersion:  4.4
->> Contact:        "Sinan Kaya <okaya@cudeaurora.org>"
->> Description:
->>                 Contains either 0 or 1 and indicates if the DMA channel is a
->>                 low priority (0) or high priority (1) channel.
-> 
-> What I was trying to ask is: given a write to a channel's priority file,
-> how do you figure out which bits in which management interface to poke?
-> 
-> As far as I can see, the relationship between a channel and the
-> management interface is not described in teh DT, so I cannot see how you
-> figure this out.
-> 
->>>>> I don't understand why you don't have a single binding for both the
->>>>> management interface and channels, e.g.
->>>>>
->>>>> hidma {
->>>>> 	compatible - "qcom,hidma-1.0";
->>>>>
->>>>> 	/* OPTIONAL management interface registers */
->>>>> 	reg = < ... ... >;
->>>>>
->>>>> 	...
->>>>>
->>>>> 	channels {
->>>>> 		channel0 {
->>>>> 			compatible = "qcom,
->>>>> 			reg = < ... ... >;
->>>>>
->>>>> 			...
->>>>> 		};
->>>>>
->>>>> 		...
->>>>> 	};
->>>>> };
->>>>>
->>>>> That would be more in keeping with what we do for other componenents
->>>>> with hyp control elements (e.g. the GIC) and keeps everything
->>>>> associated.
->>>>
->>>> This was discussed before with the previous versions of the patch. This
->>>> split and loose coupling design is on purpose.
->>>
->>> I understand it was a deliberate choice. I am disagreeing with that
->>> choice.
->>>
->>
->> In order to be able to use the same channel driver in the guest machine
->> context with the hierarchy you want, I need to create this.
->>
->> fake management object {
->> 	fake values;
-> 
-> There'd be no fake values here, they'd just be ommitted entirely.
-> 
->> 	channels {
->> 		real DMA channel {
->> 			...
->> 		}
->> 	}
->> }
->>
->> This looks really ugly to me. I need to deal with a fake management
->> driver and object that could be hypervisor specific.
-> 
-> You don't need a fake management driver. I don't understand what you
-> mean w.r.t. being hypervisor specific.
-> 
->> Here is a fact:
->>
->> QEMU is not capable of generating complex device-tree nodes for platform
->> devices that are being virtualized. QEMU only generates a very simple
->> device object with compatible ID and memory and interrupt resources. No
->> parent, child relationship and no device-specific attributes. Here is an
->> example:
-> 
-> So? The above _is_ simple, and trivial to generate.
-> 
-> I've not seen your patches for QEMU, so perhaps I'm missing something.
-> 
-> Regardless, QEMU is not the only thing that matters here. We shouldn't
-> do something _only_ because it makes a patch to QEMU simpler.
-> 
->>
->> device {
->> 	compatible-id;
->> 	reg;
->> 	interrupt;
->> }
->>
->> This is plain and simple. It works too. No need to create some fake device.
->>
->> The other issue is the ACPI. I know device-tree has all kinds of nice
->> gadgets for traversing the parent/child relationship and object
->> pointers. I can't implement this if the solution does not scale to ACPI.
-> 
-> It sounds like ACPI is incapable of describing this device, then.
-> 
->>> No guest should care which particular physical channels it's provided
->>> with.
->>>
->>>> Only the hidma channel driver gets executed in the guest machine. There
->>>> is no management driver and device entity in the guest. Therefore,
->>>> child-parent relationship does not exist.
->>>
->>> The management driver needs to know details of the channels it's
->>> managing, even if it never accesses them directly. Otherwise how can you
->>> allocate a channel to a guest and manage it through the correct portion
->>> of the correct management interface?
->>
->> I'll add support for both. Both having a parent-child relationship while
->> inside the hypervisor and flat hierarchy while running in the guest
->> machine for QEMU.
-> 
-> I'm happy with that.
-> 
->> I just created a child object of the management driver and channel
->> driver got probed properly. So, it just a matter of device-tree
->> documentation at this point.
->>
->> It will be like this though.
->>
->>>>> hidma {
->>>>> 	compatible - "qcom,hidma-1.0";
->>>>>
->>>>> 	/* OPTIONAL management interface registers */
->>>>> 	reg = < ... ... >;
->>>>>
->>>>> 	...
->>>>>
->>>>> 	channel0 {
->>>>> 		compatible = "qcom,
->>>>> 		reg = < ... ... >;
->>>>>
->>>>> 		...
->>>>> 	};
->>>>>
->>>>> 	...
->>>>> };
->>
->> This seems to have worked without requiring any work from me.
->>
->> I need to associate sysfs next.
-> 
-> Ok. I look forward to seeing those patches.
-> 
-> Thanks,
-> Mark.
-> 
+Changes since v2:
+	- extended checkpatch tests for barriers, and added patches
+	teaching it to warn about incorrect usage of barriers
+	(__smp_xxx barriers are for use by asm-generic code only),
+	should help prevent misuse by arch code
+	to address comments by Russell King
+	- patched more instances of xen to use virt_ barriers
+	as suggested by  Stefano Stabellini
+	- implemented a 2 byte xchg on sh instead of hacking around it
+	as suggested by Peter Zijlstra and  Rich Felker
+	- added a patch to drop some s390 arch-specific smp_xxx barriers - generic
+	versions are more efficient
+	as suggested by Peter Zijlstra and Martin Schwidefsky
+	- added a patch to replace before/after atomic barriers with barrier()
+	on s390 as suggested by Peter Zijlstra and Martin Schwidefsky
+	- included acks from multiple arch maintainers
+	thanks a lot for the review!
 
-Mark,
-The patch has been posted here. Please review.
+Changes since v1:
+	- replaced an asm-generic patch with an equivalent patch already in tip
+	- add wrappers with virt_ prefix for better code annotation,
+	  as suggested by David Miller
+	- dropped XXX in patch names as this makes vger choke, Cc all relevant
+	  mailing lists on all patches (not personal email, as the list becomes
+	  too long then)
 
-https://lkml.org/lkml/2016/1/3/246
+I parked this in vhost tree for now, though the inclusion of patch 1 from tip
+creates a merge conflict - but one that is trivial to resolve.
 
-Sinan
+So I intend to just merge it all through my tree, including the
+duplicate patch, and assume conflict will be resolved.
+
+I would really appreciate some feedback on arch bits (especially the x86 bits),
+and acks for merging this through the vhost tree.
+
+Thanks!
+
+What really started me off is trying to cleanup some virt code, as suggested by
+Peter, who said
+> You could of course go fix that instead of mutilating things into
+> sort-of functional state.
+
+This work is needed for virtio, so it's probably easiest to
+merge it through my tree - is this fine by everyone?
+
+Note to arch maintainers: please don't cherry-pick patches out of this patchset
+as it's been structured in this order to avoid breaking bisect.
+Please send acks instead!
+
+=====
+
+Sometimes, virtualization is weird. For example, virtio does this (conceptually):
+
+#ifdef CONFIG_SMP
+                smp_mb();
+#else
+                mb();
+#endif
+
+Similarly, Xen calls mb() when it's not doing any MMIO at all.
+
+Of course it's wrong in the sense that it's suboptimal. What we would really
+like is to have, on UP, exactly the same barrier as on SMP.  This is because a
+UP guest can run on an SMP host.
+
+But Linux doesn't provide this ability: if CONFIG_SMP is not defined is
+optimizes most barriers out to a compiler barrier.
+
+Consider for example x86: what we want is xchg (NOT mfence - there's no real IO
+going on here - just switching out of the VM - more like a function call
+really) but if built without CONFIG_SMP smp_store_mb does not include this.
+
+Virt in general is probably the only use-case, because this really is an
+artifact of interfacing with an SMP host while running an UP kernel,
+but since we have (at least) two users, it seems to make sense to
+put these APIs in a central place.
+
+In fact, smp_ barriers are stubs on !SMP, so they can be defined as follows:
+
+arch/XXX/include/asm/barrier.h:
+
+#define __smp_mb() DOSOMETHING
+
+include/asm-generic/barrier.h:
+
+#ifdef CONFIG_SMP
+#define smp_mb() __smp_mb()
+#else
+#define smp_mb() barrier()
+#endif
+
+This has the benefit of cleaning out a bunch of duplicated
+ifdefs on a bunch of architectures - this patchset brings
+about a net reduction in LOC, more than compensated for
+later by performance enhancements, extra documentation and tools :)
+
+Then virt can use __smp_XXX when talking to an SMP host.
+To make those users explicit, this patchset adds virt_xxx wrappers
+for them.
+
+Touching all archs is a tad tedious, but its fairly straight forward.
+
+The patchset is structured as follows:
 
 
+-. Patch 1 fixes a bug in asm-generic.
+   It is already in tip, included here for completeness.
 
+-. Patches 2-12 make sure barrier.h on all remaining
+   architectures includes asm-generic/barrier.h:
+   after the change in Patch 1, code there matches
+   asm-generic/barrier.h almost verbatim.
+   Minor code tweaks were required in a couple of places.
+   Macros duplicated from asm-generic/barrier.h are dropped
+   in the process.
+
+After all that preparatory work, we are getting to the actual change.
+
+-. Patch 13 adds generic smp_XXX wrappers in asm-generic:
+   these select __smp_XXX or barrier() depending on CONFIG_SMP
+
+-. Patches 14-27 change all architectures to
+   define __smp_XXX macros; the generic code in asm-generic/barrier.h
+   then defines smp_XXX macros
+
+   I compiled the affected arches before and after the changes,
+   dumped the .text section (using objdump -O binary) and
+   made sure that the object code is exactly identical
+   before and after the change.
+
+   Note: the changes were intentionally done in a way
+   that avoids generated code changes.
+   When I got feedback from arch maintainers that the
+   barriers can be improved, I made this in a separate
+   patch on top, to allow this testing by binary comparisons.
+
+Unfortunately, I don't have a metag cross-build toolset ready.
+Hoping for some acks on this architecture.
+
+Next, the following patches put the __smp_xxx APIs to work for virt:
+
+-. Patch 28 adds virt_ wrappers for __smp_, and documents them.
+   After all this work, this requires very few lines of code in
+   the generic header.
+
+-. Patches 29,30 convert virtio drivers to use the virt_xxx APIs
+   tested on x86
+
+-. Patches 31-33 teach virtio to use virt_store_mb
+   sh architecture was missing a 2-byte xchg,
+   needed for 2 byte smp_store_mb,
+   so I had to add this support for sh
+
+-. Patches 34-36 teach checkpatch to warn about
+   misuse of the new barriers
+
+-. Patches 37-39 convert xen drivers to use the virt_xxx APIs
+   compiled only (by intel 0-day infrastructure)
+
+-. Patch 40 makes some smp barriers on s390 more efficient
+   included here to avoid merge conflicts, at maintainer's request
+
+   tested on x86
+Davidlohr Bueso (1):
+  lcoking/barriers, arch: Use smp barriers in smp_store_release()
+
+Michael S. Tsirkin (40):
+  asm-generic: guard smp_store_release/load_acquire
+  ia64: rename nop->iosapic_nop
+  ia64: reuse asm-generic/barrier.h
+  powerpc: reuse asm-generic/barrier.h
+  s390: reuse asm-generic/barrier.h
+  sparc: reuse asm-generic/barrier.h
+  arm: reuse asm-generic/barrier.h
+  arm64: reuse asm-generic/barrier.h
+  metag: reuse asm-generic/barrier.h
+  mips: reuse asm-generic/barrier.h
+  x86/um: reuse asm-generic/barrier.h
+  x86: reuse asm-generic/barrier.h
+  asm-generic: add __smp_xxx wrappers
+  powerpc: define __smp_xxx
+  arm64: define __smp_xxx
+  arm: define __smp_xxx
+  blackfin: define __smp_xxx
+  ia64: define __smp_xxx
+  metag: define __smp_xxx
+  mips: define __smp_xxx
+  s390: define __smp_xxx
+  sh: define __smp_xxx, fix smp_store_mb for !SMP
+  sparc: define __smp_xxx
+  tile: define __smp_xxx
+  xtensa: define __smp_xxx
+  x86: define __smp_xxx
+  asm-generic: implement virt_xxx memory barriers
+  Revert "virtio_ring: Update weak barriers to use dma_wmb/rmb"
+  virtio_ring: update weak barriers to use virt_xxx
+  sh: support 1 and 2 byte xchg
+  sh: move xchg_cmpxchg to a header by itself
+  virtio_ring: use virt_store_mb
+  checkpatch.pl: add missing memory barriers
+  checkpatch: check for __smp outside barrier.h
+  checkpatch: add virt barriers
+  xenbus: use virt_xxx barriers
+  xen/io: use virt_xxx barriers
+  xen/events: use virt_xxx barriers
+  s390: use generic memory barriers
+  s390: more efficient smp barriers
+
+ arch/arm/include/asm/barrier.h      |  35 ++----------
+ arch/arm64/include/asm/barrier.h    |  19 ++-----
+ arch/blackfin/include/asm/barrier.h |   4 +-
+ arch/ia64/include/asm/barrier.h     |  24 +++-----
+ arch/metag/include/asm/barrier.h    |  55 ++++++-------------
+ arch/mips/include/asm/barrier.h     |  51 ++++++-----------
+ arch/powerpc/include/asm/barrier.h  |  33 ++++-------
+ arch/s390/include/asm/barrier.h     |  23 ++++----
+ arch/sh/include/asm/barrier.h       |   3 +-
+ arch/sh/include/asm/cmpxchg-grb.h   |  22 ++++++++
+ arch/sh/include/asm/cmpxchg-irq.h   |  11 ++++
+ arch/sh/include/asm/cmpxchg-llsc.h  |  25 +--------
+ arch/sh/include/asm/cmpxchg-xchg.h  |  51 +++++++++++++++++
+ arch/sh/include/asm/cmpxchg.h       |   3 +
+ arch/sparc/include/asm/barrier_32.h |   1 -
+ arch/sparc/include/asm/barrier_64.h |  29 ++--------
+ arch/sparc/include/asm/processor.h  |   3 -
+ arch/tile/include/asm/barrier.h     |   9 +--
+ arch/x86/include/asm/barrier.h      |  36 +++++-------
+ arch/x86/um/asm/barrier.h           |   9 +--
+ arch/xtensa/include/asm/barrier.h   |   4 +-
+ include/asm-generic/barrier.h       | 106 +++++++++++++++++++++++++++++++++---
+ include/linux/virtio_ring.h         |  21 +++++--
+ include/xen/interface/io/ring.h     |  16 +++---
+ arch/ia64/kernel/iosapic.c          |   6 +-
+ drivers/virtio/virtio_ring.c        |  15 +++--
+ drivers/xen/events/events_fifo.c    |   3 +-
+ drivers/xen/xenbus/xenbus_comms.c   |   8 +--
+ Documentation/memory-barriers.txt   |  28 ++++++++--
+ scripts/checkpatch.pl               |  31 ++++++++++-
+ 30 files changed, 382 insertions(+), 302 deletions(-)
+ create mode 100644 arch/sh/include/asm/cmpxchg-xchg.h
 
 -- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+MST
