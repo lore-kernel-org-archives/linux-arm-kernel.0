@@ -1,20 +1,32 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Sat, 9 Jan 2016 22:18:46 -0800
-Subject: [PATCH LINUX v5 0/8] tty: xuartps: Fix lock ups
-In-Reply-To: <1451126636-13699-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1451126636-13699-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <5691F7C6.5050107@hurleysoftware.com>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Sun, 10 Jan 2016 15:22:37 +0800
+Subject: [PATCH] dt-bindings: Fix the external clock name for the RK3036 EMAC
+Message-ID: <1452410557-29208-1-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/26/2015 02:43 AM, Soren Brinkmann wrote:
-> Hi,
-> 
-> as requested by Peter, this is the first part of my series which has the
-> patches reviewed by Peter. I'll submit the second part separately. There
-> are no new changes within the patches.
+Because the RK3036 doesn't support EMAC, and only support the RMII mode
+in the EMAC IP, we refer to the TRM CRU and update the new external
+clock name for EMAC.
 
-Thanks. Looks good.
+Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+---
 
-Regards,
-Peter Hurley
+ .../bindings/clock/rockchip,rk3036-cru.txt         |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/clock/rockchip,rk3036-cru.txt b/Documentation/devicetree/bindings/clock/rockchip,rk3036-cru.txt
+index ace0599..20df350 100644
+--- a/Documentation/devicetree/bindings/clock/rockchip,rk3036-cru.txt
++++ b/Documentation/devicetree/bindings/clock/rockchip,rk3036-cru.txt
+@@ -30,7 +30,7 @@ that they are defined using standard clock bindings with following
+ clock-output-names:
+  - "xin24m" - crystal input - required,
+  - "ext_i2s" - external I2S clock - optional,
+- - "ext_gmac" - external GMAC clock - optional
++ - "rmii_clkin" - external EMAC clock - optional
+ 
+ Example: Clock controller node:
+ 
+-- 
+1.7.9.5
