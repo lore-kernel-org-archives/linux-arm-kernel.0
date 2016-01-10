@@ -1,48 +1,89 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sun, 10 Jan 2016 20:01:58 +0100
-Subject: [PATCH] ARM: dts: imx28: add pinmux for USB1 overcurrent on pwm2
-In-Reply-To: <89586980.506110.cb24b396-67be-4b7b-9938-7cb30ef4fe05.open-xchange@email.1und1.de>
-References: <1452429613-28783-1-git-send-email-mans@mansr.com>
- <1473600647.505612.cb24b396-67be-4b7b-9938-7cb30ef4fe05.open-xchange@email.1und1.de>
- <yw1xoacty3uz.fsf@unicorn.mansr.com>
- <89586980.506110.cb24b396-67be-4b7b-9938-7cb30ef4fe05.open-xchange@email.1und1.de>
-Message-ID: <20160110190158.GK24441@pengutronix.de>
+From: kernel@martin.sperl.org (Martin Sperl)
+Date: Sun, 10 Jan 2016 20:07:32 +0100
+Subject: [PATCH 2/5] clk: bcm2835: enable management of PCM clock
+In-Reply-To: <CAMuHMdVG+ox4JJWAiNRVgTtV_Lz4Njhekp0=dOyY-G+=mxby3Q@mail.gmail.com>
+References: <1452331558-2520-1-git-send-email-kernel@martin.sperl.org>
+ <1452331558-2520-3-git-send-email-kernel@martin.sperl.org>
+ <4332640.jBKM55TPAo@wuerfel>
+ <CAMuHMdWOt4aCzu8Ode0ZrQ-c80nqAhwD5dd17nhgVbLrRYT5og@mail.gmail.com>
+ <4B891DE1-6340-4D3D-BEE3-F61D9A5D289B@martin.sperl.org>
+ <20160110115858.GV6588@sirena.org.uk>
+ <39E8C95F-C7DC-46C3-B29A-93A865485942@martin.sperl.org>
+ <CAMuHMdXan4aM76aAx_wbnrib7wH5W7tkg60jgRkyQjGFmUEo=A@mail.gmail.com>
+ <D415BD6A-6BE1-4B87-B0D4-D0AC6D39785A@martin.sperl.org>
+ <CAMuHMdVG+ox4JJWAiNRVgTtV_Lz4Njhekp0=dOyY-G+=mxby3Q@mail.gmail.com>
+Message-ID: <93C244A0-20B7-4E21-A183-E09F83CFE035@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
 
-On Sun, Jan 10, 2016 at 02:38:00PM +0100, Stefan Wahren wrote:
-> > M?ns Rullg?rd <mans@mansr.com> hat am 10. Januar 2016 um 14:13 geschrieben:
-> > Stefan Wahren <stefan.wahren@i2se.com> writes:
-> >
-> > > Hi Mans,
-> > >
-> > >> Mans Rullgard <mans@mansr.com> hat am 10. Januar 2016 um 13:40 geschrieben:
-> > >>
-> > >>
-> > >> Add pinmux setting for USB1 overcurrent on pwm2 pad.
-> > >
-> > > could you please change your patch to describe why you need to add
-> > > this pinmux?
-> >
-> > I'm working on a board that is wired that way. I can of course put this
-> > in the board-specific dts if that's preferable.
+> On 10.01.2016, at 19:56, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
 > 
-> So the board isn't submitted to mainline?
+> Hi Martin,
 > 
-> IMHO the change is okay, but the description doesn't explain why is it needed.
+> On Sun, Jan 10, 2016 at 7:01 PM, Martin Sperl <kernel@martin.sperl.org> wrote:
+>>> On 10.01.2016, at 14:02, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+>>> I wrote:
+>>> | Hence it can better be replaced (it seems to be unused in dts files, but you
+>>> | can keep the definition to be 100% sure) by an ARRAY_SIZE() in the C driver.
+>>> | This requires changing the driver to e.g. initialize clks[] in
+>>> |bcm2835_clk_probe() based on a table instead of explicit code.
+>>> 
+>>> If you fill in clks[] from a static table, you can take ARRAY_SIZE of
+>>> the static table.
+>> 
+>> You mean something like the below?
+>> (note: copy/paste from console issues - spaces instead of tabs)
 > 
-> So a suitable description would be that it's needed for board xy.
+> More or less.
+> 
+>> };
+>> 
+>> static inline void cprman_write(struct bcm2835_cprman *cprman, u32 reg, u32 val
+>> @@ -496,6 +496,14 @@ static const struct bcm2835_pll_data bcm2835_pllh_data = {
+>>        .max_fb_rate = BCM2835_MAX_FB_RATE,
+>> };
+>> 
+>> +static const struct bcm2835_pll_data *bcm2835_plls[] = {
+>> +       [BCM2835_PLLA] = &bcm2835_plla_data,
+>> +       [BCM2835_PLLB] = &bcm2835_pllb_data,
+>> +       [BCM2835_PLLC] = &bcm2835_pllc_data,
+>> +       [BCM2835_PLLD] = &bcm2835_plld_data,
+>> +       [BCM2835_PLLH] = &bcm2835_pllh_data,
+>> +};
+> 
+> This is a sparse array?
+Yes - for all.
 
-The problem with pinmuxing on i.MX23/28 is that the order of pinmux
-groups is to a certain degree important. So not everything is possible
-in the machine specific dts. (I didn't have an eye on this issue, maybe
-it's fixed in the meantime?)
+> 
+>> struct bcm2835_pll {
+>>        struct clk_hw hw;
+>>        struct bcm2835_cprman *cprman;
+>> @@ -1560,8 +1600,13 @@ static int bcm2835_clk_probe(struct platform_device *pdev)
+>>        struct clk **clks;
+>>        struct bcm2835_cprman *cprman;
+>>        struct resource *res;
+>> +       const int clks_cnt = max(ARRAY_SIZE(bcm2835_plls),
+>> +                                max(ARRAY_SIZE(bcm2835_pll_divs),
+>> +                                    ARRAY_SIZE(bcm2835_clks))) + 1;
+>> +       size_t alloc = sizeof(*cprman) + clks_cnt * sizeof(*clks);
+>> +       size_t i;
+> 
+> If you combine all 3 arrays in a single non-sparse array, you could get rid
+> of the dynamic allocation using the maximum of the 3 sizes, and can just
+> use a single ARRAY_SIZE().
 
-Best regards
-Uwe
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+The problem is that we need different initialization methods for pll, pll-dividers
+and derived clocks, so we can not easily make them a common setting unless we
+would use function and void pointers to work arround this, which would make it
+less readable (and more code again just for the - repeated - assignment).
+
+As far as I can tell from my testing the patched version works and the kernel
+boots correctly.
+
+I will respin the patchset tomorrow - it might take slightly longer, as I
+found that the fractional clock divider is not working unless the MASH
+functionality is activated in the registers. This results in ?frequency shifts?
+for audio, which we want to avoid - this means we need another patch to
+enable this MASH feature.
