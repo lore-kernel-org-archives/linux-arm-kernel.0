@@ -1,89 +1,66 @@
-From: rbthomas@pobox.com (Rick Thomas)
-Date: Sun, 10 Jan 2016 13:19:51 -0800
-Subject: mvsdio not working on OpenRD
-In-Reply-To: <20160110153843.GA22229@lunn.ch>
-References: <20160110042619.GA22738@jirafa.cyrius.com>
- <20160110153843.GA22229@lunn.ch>
-Message-ID: <55F9489C-1BCE-46F2-ABDC-C3E842306646@pobox.com>
+From: mweseloh42@gmail.com (Marcus Weseloh)
+Date: Sun, 10 Jan 2016 22:37:21 +0100
+Subject: [PATCH v6 2/3] spi: sun4i: Fix clock calculations to be
+ predictable and never exceed the requested rate
+In-Reply-To: <20160110194450.GI9631@lukather>
+References: <1451145186-14235-1-git-send-email-mweseloh42@gmail.com>
+ <1451145186-14235-3-git-send-email-mweseloh42@gmail.com>
+ <20151227210946.GL30359@lukather>
+ <CAGNoLaPcBAqDqFuff7sWWADjVH3Z-LWhZatSmzvEm4mLSrSNvw@mail.gmail.com>
+ <CAGNoLaMsdPe4BE7+skYR45doEcXkZGA7QdFOidUA_yPZmiE9eg@mail.gmail.com>
+ <20160110194450.GI9631@lukather>
+Message-ID: <CAGNoLaOnpCLALNMscQC1XsnPjf55rXMomYdJPJFdpk=FuFgK4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-On Jan 10, 2016, at 7:38 AM, Andrew Lunn <andrew@lunn.ch> wrote:
+2016-01-10 20:44 GMT+01:00 Maxime Ripard <maxime.ripard@free-electrons.com>:
+> On Mon, Dec 28, 2015 at 05:22:35PM +0100, Marcus Weseloh wrote:
+>> 2015-12-28 0:29 GMT+01:00 Marcus Weseloh <mweseloh42@gmail.com>:
+>> > 2015-12-27 22:09 GMT+01:00 Maxime Ripard <maxime.ripard@free-electrons.com>:
+[...]
+>> > Oh, and I just noticed a mistake in the comment: the clock driver
+>> > rounds up _or_ down, so I should drop the "up".
+>>
+>> As I'm looking further into this, I think the comment should read
+>> "possibly rounded down", as the clk framework is expected to set a
+>> frequency that is less or equal to the requested frequency.
+>
+> AFAIK, there's no such expectation in the clock framework. You
+> treating this from a maximum frequency perspective, but it would be
+> the exact opposite if you were talking about a minimum frequency, as
+> might be the case for other consumers.
 
-> On Sat, Jan 09, 2016 at 08:26:19PM -0800, Martin Michlmayr wrote:
->> Rick Thomas reported that MMC no longer works on his OpenRD Base.
->> 
->> With Debian's 3.16 kernel (using mach ID):
->> 
->> mvsdio mvsdio: no pins associated
->> mmc0: host does not support reading read-only switch.  assuming write-enable.
->> mmc0: new high speed SDHC card at address 0007
->> mmcblk0: mmc0:0007 SD4GB 3.70 GiB?
->> mmcblk0: p1
->> 
->> With Debian's 4.3 and 4.4-rc8 kernels (using Device Tree):
->> 
->> kirkwood-pinctrl f1010000.pin-controller: pin PIN13 already requested by f1012100.serial; cannot claim for f1090000.mvsdio
->> kirkwood-pinctrl f1010000.pin-controller: pin-13 (f1090000.mvsdio) status -22
->> kirkwood-pinctrl f1010000.pin-controller: could not request pin 13 (PIN13) from group mpp13  on device f1010000.pin-controller
->> mvsdio f1090000.mvsdio: Error applying setting, reverse things back
->> mvsdio f1090000.mvsdio: Got CD GPIO
->> [and no mmc0 or mmcblk0]
->> 
->> -- 
->> Martin Michlmayr
->> http://www.cyrius.com/
-> 
-> Hi Rick, Martin
-> 
-> If i remember correctly, the OpenRD has some odd muxing going on with
-> MMC and the second serial port. This fits the error message:
-> 
->                        pmx_uart1: pmx-uart1 {
->                                marvell,pins = "mpp13", "mpp14";
->                                marvell,function = "uart1";
->                        };
-> 
-> and
-> 
->                        pmx_sdio: pmx-sdio {
->                                marvell,pins = "mpp12", "mpp13", "mpp14",
->                                               "mpp15", "mpp16", "mpp17";
->                                marvell,function = "sdio";
-> 			};
-> 
-> Either you can have MMC, or you can have the RS-232/RS485 on a DB9 or
-> you can have MMC. You cannot have both.
-> 
-> It seems like older Debian kernels has defaulted to MMC, so we should
-> probably disable the serial port.
-> 
-> Please can you try the following patch. If this works, i can add it to
-> mainline. The issue we might run into is that somebody else wants
-> serial not MMC....
-> 
->       Andrew
-> 
-> diff --git a/arch/arm/boot/dts/kirkwood-openrd-base.dts b/arch/arm/boot/dts/kirkwood-openrd-base.dts
-> index 8af58999606d..883bd416ba0b 100644
-> --- a/arch/arm/boot/dts/kirkwood-openrd-base.dts
-> +++ b/arch/arm/boot/dts/kirkwood-openrd-base.dts
-> @@ -18,11 +18,6 @@
-> / {
->        model = "OpenRD Base";
->        compatible = "marvell,openrd-base", "marvell,openrd", "marvell,kirkwood-88f6281", "marvell,kirkwood";
-> -
-> -       ocp at f1000000 {
-> -               serial at 12100 {
-> -                       status = "okay";
-> -               };
->        };
-> };
+I was looking though the clk driver source and found this comment in
+drivers/clk/sunxi/clk-factors.c (Line 89):
 
-OK, I understand the issue, and what the patch would mean.  Given that Debian releases up thru Jessie have chosen to support MMC rather than RS-232/RS485, I don?t think there will be many Debian users who would complain.
+/* find the parent that can help provide the fastest rate <= rate */
 
-Unfortuntaely, I?m not set up to build kernels here.  If someone can apply this patch and send me a link to the resulting binary or .deb or .dts, or ? I?ll be happy to try it out on my test machine.
+And that comments seems to be correct, because that is what the code
+is doing (and the comment is copied from the core clk framework). So
+it checks every parent to see if that parent could be used to get a
+clock rate that is less or equal to the requested clock. If it can't
+find one, i.e. all parents can only supply a larger clock, then
+-EINVAL is returned. Or am I missing something here?
 
-Thanks!
-Rick
+Up to now this driver would never return -EINVAL, because of the
+problems in the mod0 clock driver I mentioned. But the intended effect
+seems to be actual rate <= requested rate. And it seems like clk
+drivers on other platforms do this as well.
+
+[...]
+>> That clk_set_rate sets a higher frequency than requested seems to be a
+>> problem in itself. I had a look at clk/sunxi/clk-mod0.c and noticed a
+>> few small problems there. Will post an RFC patch in a couple of
+>> minutes.
+>
+> Did you post these patches already? I think I missed them if that's
+> the case.
+
+Yes, I've posted the patch to the clk-mod0.c here:
+https://groups.google.com/d/msg/linux-sunxi/BQWhOHGqliI/fMtirUFsBgAJ
+
+Cheers,
+
+  Marcus
