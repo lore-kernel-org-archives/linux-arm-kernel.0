@@ -1,73 +1,52 @@
-From: kernel@martin.sperl.org (Martin Sperl)
-Date: Sun, 10 Jan 2016 12:05:52 +0100
-Subject: [PATCH 5/5] dt-bindings: bsm2835: fix bindings documentation to
- use new clock framework
-In-Reply-To: <20160109224523.GA17329@rob-hp-laptop>
-References: <1452331558-2520-1-git-send-email-kernel@martin.sperl.org>
- <1452331558-2520-6-git-send-email-kernel@martin.sperl.org>
- <20160109224523.GA17329@rob-hp-laptop>
-Message-ID: <ED21A42A-EE91-495D-857E-04C533CD718C@martin.sperl.org>
+From: bp@alien8.de (Borislav Petkov)
+Date: Sun, 10 Jan 2016 12:07:14 +0100
+Subject: [PATCH v3 1/2] acpi: Fix proper return code for function
+ acpi_gsi_to_irq
+In-Reply-To: <1446857519-5908-2-git-send-email-lho@apm.com>
+References: <1446857519-5908-1-git-send-email-lho@apm.com>
+ <1446857519-5908-2-git-send-email-lho@apm.com>
+Message-ID: <20160110110714.GA22896@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> On 09.01.2016, at 23:45, Rob Herring <robh@kernel.org> wrote:
+On Fri, Nov 06, 2015 at 05:51:58PM -0700, Loc Ho wrote:
+> The function acpi_gsi_to_irq should returns 0 on success as upper function
+> caller expect an 0 for sucesss.
 > 
-> On Sat, Jan 09, 2016 at 09:25:57AM +0000, kernel at martin.sperl.org wrote:
->> From: Martin Sperl <kernel@martin.sperl.org>
->> 
->> The bcm2835-i2s driver has been updated to use the new clock framework
->> for the bcm2835 SOC.
+> Signed-off-by: Tuan Phan <tphan@apm.com>
+> Signed-off-by: Loc Ho <lho@apm.com>
+> ---
+>  drivers/acpi/gsi.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
 > 
-> You are breaking compatibility with the driver change. New kernels will 
-> not work with old dtbs as you have found. What should be done is fix the 
-> driver to work with the old and new dtb.
+> diff --git a/drivers/acpi/gsi.c b/drivers/acpi/gsi.c
+> index fa4585a..0ed1003 100644
+> --- a/drivers/acpi/gsi.c
+> +++ b/drivers/acpi/gsi.c
+> @@ -43,7 +43,7 @@ static unsigned int acpi_gsi_get_irq_type(int trigger, int polarity)
+>   *
+>   * irq location updated with irq value [>0 on success, 0 on failure]
+>   *
+> - * Returns: linux IRQ number on success (>0)
+> + * Returns: 0 on success
+>   *          -EINVAL on failure
+>   */
+>  int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
+> @@ -56,7 +56,7 @@ int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
+>  	 * *irq == 0 means no mapping, that should
+>  	 * be reported as a failure
+>  	 */
+> -	return (*irq > 0) ? *irq : -EINVAL;
+> +	return (*irq > 0) ? 0 : -EINVAL;
+>  }
+>  EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
 
-Actually the driver/device-tree is already broken with commit 94cb7f76caa0
-("ARM: bcm2835: Switch to using the new clock driver support?)
+That function can be simplified. It should be made to return the irq
+number on success and 0 on failure. No need for that *irq output
+argument.
 
-Because there we already have the following conflicting definitions:
+-- 
+Regards/Gruss,
+    Boris.
 
-clocks: cprman at 7e101000 {
-	compatible = "brcm,bcm2835-cprman";
-	#clock-cells = <1>;
-	reg = <0x7e101000 0x2000>;
-	/* CPRMAN derives everything from the platform's
-	* oscillator.
-	*/
-	clocks = <&clk_osc>;
-};
-
-i2s: i2s at 7e203000 {
-	compatible = "brcm,bcm2835-i2s";
-	reg = <0x7e203000 0x20>,
-	      <0x7e101098 0x02>;
-	dmas = <&dma 2>,
-	       <&dma 3>;
-	dma-names = "tx", "rx";
-	status = "disabled";
-};
-
-The i2s driver fails to load because the second reg range
-overlaps with the range from clocks (which was introduced
-with the commit mentioned above.
-
-This patch only changes the driver to work again without
-this second reg address range and using the clocks property
-instead.
-
-> 
->> This patch documents the required changes to the bindings.
->> 
->> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
->> ---
->> Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt |    7 +++----
->> 1 file changed, 3 insertions(+), 4 deletions(-)
-> 
-> But I leave it to platform maintainers to decide if breaking 
-> compatibility is okay, so:
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
-
-Thanks,
-	Martin
+ECO tip #101: Trim your mails when you reply.
