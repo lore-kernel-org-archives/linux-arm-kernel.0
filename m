@@ -1,79 +1,29 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Sun, 10 Jan 2016 16:21:07 +0200
-Subject: [PATCH v3 33/41] virtio_ring: use virt_store_mb
-In-Reply-To: <1452426622-4471-1-git-send-email-mst@redhat.com>
-References: <1452426622-4471-1-git-send-email-mst@redhat.com>
-Message-ID: <1452426622-4471-34-git-send-email-mst@redhat.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sun, 10 Jan 2016 16:05:51 +0100 (CET)
+Subject: [PATCH V2 0/2] serial: bcm2835: add bcm2835 auxiliar uart driver
+In-Reply-To: <1452344854-2576-1-git-send-email-kernel@martin.sperl.org>
+References: <1452344854-2576-1-git-send-email-kernel@martin.sperl.org>
+Message-ID: <1057226922.507844.cb24b396-67be-4b7b-9938-7cb30ef4fe05.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need a full barrier after writing out event index, using
-virt_store_mb there seems better than open-coding.  As usual, we need a
-wrapper to account for strong barriers.
+Hi Martin,
 
-It's tempting to use this in vhost as well, for that, we'll
-need a variant of smp_store_mb that works on __user pointers.
+> kernel at martin.sperl.org hat am 9. Januar 2016 um 14:07 geschrieben:
+>
+>
+> From: Martin Sperl <kernel@martin.sperl.org>
+>
+> This patch series adds the bcm2835aux uart driver, which is created
+> as a wrapper arround the 8250 driver (based on recommendations by
+> Stephen Warren)
+>
+> The device tree patch itself is not included yet because this
+> patch requires the clk-bcm2835aux driver, which is right now only
+> in clk-next, but should become available with 4.5.
 
-Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
----
- include/linux/virtio_ring.h  | 11 +++++++++++
- drivers/virtio/virtio_ring.c | 15 +++++++++------
- 2 files changed, 20 insertions(+), 6 deletions(-)
+it doesn't make sense without the device tree patch. IMHO it's okay as long as
+you point out the dependency and set the node status to disable.
 
-diff --git a/include/linux/virtio_ring.h b/include/linux/virtio_ring.h
-index f3fa55b..a156e2b 100644
---- a/include/linux/virtio_ring.h
-+++ b/include/linux/virtio_ring.h
-@@ -45,6 +45,17 @@ static inline void virtio_wmb(bool weak_barriers)
- 		wmb();
- }
- 
-+static inline void virtio_store_mb(bool weak_barriers,
-+				   __virtio16 *p, __virtio16 v)
-+{
-+	if (weak_barriers) {
-+		virt_store_mb(*p, v);
-+	} else {
-+		WRITE_ONCE(*p, v);
-+		mb();
-+	}
-+}
-+
- struct virtio_device;
- struct virtqueue;
- 
-diff --git a/drivers/virtio/virtio_ring.c b/drivers/virtio/virtio_ring.c
-index ee663c4..e12e385 100644
---- a/drivers/virtio/virtio_ring.c
-+++ b/drivers/virtio/virtio_ring.c
-@@ -517,10 +517,10 @@ void *virtqueue_get_buf(struct virtqueue *_vq, unsigned int *len)
- 	/* If we expect an interrupt for the next entry, tell host
- 	 * by writing event index and flush out the write before
- 	 * the read in the next get_buf call. */
--	if (!(vq->avail_flags_shadow & VRING_AVAIL_F_NO_INTERRUPT)) {
--		vring_used_event(&vq->vring) = cpu_to_virtio16(_vq->vdev, vq->last_used_idx);
--		virtio_mb(vq->weak_barriers);
--	}
-+	if (!(vq->avail_flags_shadow & VRING_AVAIL_F_NO_INTERRUPT))
-+		virtio_store_mb(vq->weak_barriers,
-+				&vring_used_event(&vq->vring),
-+				cpu_to_virtio16(_vq->vdev, vq->last_used_idx));
- 
- #ifdef DEBUG
- 	vq->last_add_time_valid = false;
-@@ -653,8 +653,11 @@ bool virtqueue_enable_cb_delayed(struct virtqueue *_vq)
- 	}
- 	/* TODO: tune this threshold */
- 	bufs = (u16)(vq->avail_idx_shadow - vq->last_used_idx) * 3 / 4;
--	vring_used_event(&vq->vring) = cpu_to_virtio16(_vq->vdev, vq->last_used_idx + bufs);
--	virtio_mb(vq->weak_barriers);
-+
-+	virtio_store_mb(vq->weak_barriers,
-+			&vring_used_event(&vq->vring),
-+			cpu_to_virtio16(_vq->vdev, vq->last_used_idx + bufs));
-+
- 	if (unlikely((u16)(virtio16_to_cpu(_vq->vdev, vq->vring.used->idx) - vq->last_used_idx) > bufs)) {
- 		END_USE(vq);
- 		return false;
--- 
-MST
+Best regards
+Stefan
