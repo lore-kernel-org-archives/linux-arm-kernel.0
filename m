@@ -1,877 +1,297 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sun, 10 Jan 2016 09:03:57 -0500
-Subject: [PATCH V11 5/7] dma: qcom_hidma: implement lower level hardware
- interface
-In-Reply-To: <CAHp75VdxiZnHZcw6GXw58-tn-oAHphy9EyQgyODoDuoX1JD8wA@mail.gmail.com>
-References: <1451865996-12808-1-git-send-email-okaya@codeaurora.org>
- <1451865996-12808-6-git-send-email-okaya@codeaurora.org>
- <CAHp75VdxiZnHZcw6GXw58-tn-oAHphy9EyQgyODoDuoX1JD8wA@mail.gmail.com>
-Message-ID: <569264CD.3050608@codeaurora.org>
+Date: Sun, 10 Jan 2016 09:08:22 -0500
+Subject: [PATCH V9 2/5] dma: add Qualcomm Technologies HIDMA management
+ driver
+In-Reply-To: <20151214120339.GA21356@leverpostej>
+References: <1449850623-32214-1-git-send-email-okaya@codeaurora.org>
+ <1449850623-32214-3-git-send-email-okaya@codeaurora.org>
+ <20151211164137.GA23638@leverpostej> <566B1F64.9010500@codeaurora.org>
+ <20151211193742.GD23638@leverpostej> <566B4ACC.3070005@codeaurora.org>
+ <20151214120339.GA21356@leverpostej>
+Message-ID: <569265D6.5060407@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/4/2016 2:01 PM, Andy Shevchenko wrote:
-> On Mon, Jan 4, 2016 at 2:06 AM, Sinan Kaya <okaya@codeaurora.org> wrote:
->> +
->> +#define EVRE_SIZE                      16      /* each EVRE is 16 bytes */
->> +
->> +#define TRCA_CTRLSTS_OFFSET            0x0
->> +#define TRCA_RING_LOW_OFFSET           0x8
->> +#define TRCA_RING_HIGH_OFFSET          0xC
->> +#define TRCA_RING_LEN_OFFSET           0x10
->> +#define TRCA_READ_PTR_OFFSET           0x18
->> +#define TRCA_WRITE_PTR_OFFSET          0x20
->> +#define TRCA_DOORBELL_OFFSET           0x400
-> 
-> I would rather have same precision for all offsets
-> like
-> ...CTRLSTS_OFFSET  0x000
-> and so on
-> 
-
-ok
-
->> +
->> +#define EVCA_CTRLSTS_OFFSET            0x0
->> +#define EVCA_INTCTRL_OFFSET            0x4
->> +#define EVCA_RING_LOW_OFFSET           0x8
->> +#define EVCA_RING_HIGH_OFFSET          0xC
->> +#define EVCA_RING_LEN_OFFSET           0x10
->> +#define EVCA_READ_PTR_OFFSET           0x18
->> +#define EVCA_WRITE_PTR_OFFSET          0x20
->> +#define EVCA_DOORBELL_OFFSET           0x400
-> 
-> Ditto.
-> 
-ok
-
->> +
->> +#define EVCA_IRQ_STAT_OFFSET           0x100
->> +#define EVCA_IRQ_CLR_OFFSET            0x108
->> +#define EVCA_IRQ_EN_OFFSET             0x110
->> +
->> +#define EVRE_CFG_IDX                   0
->> +#define EVRE_LEN_IDX                   1
->> +#define EVRE_DEST_LOW_IDX              2
->> +#define EVRE_DEST_HI_IDX               3
->> +
->> +#define EVRE_ERRINFO_BIT_POS           24
->> +#define EVRE_CODE_BIT_POS              28
->> +
->> +#define EVRE_ERRINFO_MASK              GENMASK(3, 0)
->> +#define EVRE_CODE_MASK                 GENMASK(3, 0)
->> +
->> +#define CH_CONTROL_MASK                GENMASK(7, 0)
->> +#define CH_STATE_MASK                  GENMASK(7, 0)
->> +#define CH_STATE_BIT_POS               0x8
->> +
->> +#define IRQ_EV_CH_EOB_IRQ_BIT_POS      0
->> +#define IRQ_EV_CH_WR_RESP_BIT_POS      1
->> +#define IRQ_TR_CH_TRE_RD_RSP_ER_BIT_POS 9
->> +#define IRQ_TR_CH_DATA_RD_ER_BIT_POS   10
->> +#define IRQ_TR_CH_DATA_WR_ER_BIT_POS   11
->> +#define IRQ_TR_CH_INVALID_TRE_BIT_POS  14
->> +
->> +#define        ENABLE_IRQS (BIT(IRQ_EV_CH_EOB_IRQ_BIT_POS)     | \
->> +               BIT(IRQ_EV_CH_WR_RESP_BIT_POS)          | \
->> +               BIT(IRQ_TR_CH_TRE_RD_RSP_ER_BIT_POS)    | \
->> +               BIT(IRQ_TR_CH_DATA_RD_ER_BIT_POS)       | \
->> +               BIT(IRQ_TR_CH_DATA_WR_ER_BIT_POS)       | \
->> +               BIT(IRQ_TR_CH_INVALID_TRE_BIT_POS))
->> +
->> +enum ch_command {
->> +       CH_DISABLE = 0,
->> +       CH_ENABLE = 1,
->> +       CH_SUSPEND = 2,
->> +       CH_RESET = 9,
->> +};
->> +
->> +enum ch_state {
->> +       CH_DISABLED = 0,
->> +       CH_ENABLED = 1,
->> +       CH_RUNNING = 2,
->> +       CH_SUSPENDED = 3,
->> +       CH_STOPPED = 4,
->> +       CH_ERROR = 5,
->> +       CH_IN_RESET = 9,
->> +};
->> +
->> +enum tre_type {
->> +       TRE_MEMCPY = 3,
->> +       TRE_MEMSET = 4,
->> +};
->> +
->> +enum evre_type {
->> +       EVRE_DMA_COMPLETE = 0x23,
->> +       EVRE_IMM_DATA = 0x24,
->> +};
->> +
->> +enum err_code {
->> +       EVRE_STATUS_COMPLETE = 1,
->> +       EVRE_STATUS_ERROR = 4,
->> +};
->> +
->> +void hidma_ll_free(struct hidma_lldev *lldev, u32 tre_ch)
->> +{
->> +       struct hidma_tre *tre;
->> +
->> +       if (tre_ch >= lldev->nr_tres) {
->> +               dev_err(lldev->dev, "invalid TRE number in free:%d", tre_ch);
->> +               return;
->> +       }
->> +
->> +       tre = &lldev->trepool[tre_ch];
->> +       if (atomic_read(&tre->allocated) != true) {
->> +               dev_err(lldev->dev, "trying to free an unused TRE:%d", tre_ch);
->> +               return;
->> +       }
->> +
->> +       atomic_set(&tre->allocated, 0);
->> +}
->> +
->> +int hidma_ll_request(struct hidma_lldev *lldev, u32 dma_sig,
->> +                    const char *dev_name,
->> +                    void (*callback)(void *data), void *data, u32 *tre_ch)
->> +{
->> +       unsigned int i;
->> +       struct hidma_tre *tre;
->> +       u32 *tre_local;
->> +
->> +       if (!tre_ch || !lldev)
->> +               return -EINVAL;
->> +
->> +       /* need to have at least one empty spot in the queue */
->> +       for (i = 0; i < lldev->nr_tres - 1; i++) {
->> +               if (atomic_add_unless(&lldev->trepool[i].allocated, 1, 1))
->> +                       break;
->> +       }
->> +
->> +       if (i == (lldev->nr_tres - 1))
->> +               return -ENOMEM;
->> +
->> +       tre = &lldev->trepool[i];
->> +       tre->dma_sig = dma_sig;
->> +       tre->dev_name = dev_name;
->> +       tre->callback = callback;
->> +       tre->data = data;
->> +       tre->idx = i;
->> +       tre->status = 0;
->> +       tre->queued = 0;
->> +       lldev->tx_status_list[i].err_code = 0;
->> +       tre->lldev = lldev;
->> +       tre_local = &tre->tre_local[0];
->> +       tre_local[TRE_CFG_IDX] = TRE_MEMCPY;
->> +       tre_local[TRE_CFG_IDX] |= (lldev->chidx & 0xFF) << 8;
->> +       tre_local[TRE_CFG_IDX] |= BIT(16);      /* set IEOB */
->> +       *tre_ch = i;
->> +       if (callback)
->> +               callback(data);
->> +       return 0;
->> +}
->> +
->> +/*
->> + * Multiple TREs may be queued and waiting in the
->> + * pending queue.
->> + */
->> +static void hidma_ll_tre_complete(unsigned long arg)
->> +{
->> +       struct hidma_lldev *lldev = (struct hidma_lldev *)arg;
->> +       struct hidma_tre *tre;
->> +
->> +       while (kfifo_out(&lldev->handoff_fifo, &tre, 1)) {
->> +               /* call the user if it has been read by the hardware */
->> +               if (tre->callback)
->> +                       tre->callback(tre->data);
->> +       }
->> +}
->> +
->> +/*
->> + * Called to handle the interrupt for the channel.
->> + * Return a positive number if TRE or EVRE were consumed on this run.
->> + * Return a positive number if there are pending TREs or EVREs.
->> + * Return 0 if there is nothing to consume or no pending TREs/EVREs found.
->> + */
->> +static int hidma_handle_tre_completion(struct hidma_lldev *lldev)
->> +{
->> +       struct hidma_tre *tre;
->> +       u32 evre_write_off;
->> +       u32 evre_ring_size = lldev->evre_ring_size;
->> +       u32 tre_ring_size = lldev->tre_ring_size;
->> +       u32 num_completed = 0, tre_iterator, evre_iterator;
->> +       unsigned long flags;
->> +
->> +       evre_write_off = readl_relaxed(lldev->evca + EVCA_WRITE_PTR_OFFSET);
->> +       tre_iterator = lldev->tre_processed_off;
->> +       evre_iterator = lldev->evre_processed_off;
->> +
->> +       if ((evre_write_off > evre_ring_size) ||
->> +           ((evre_write_off % EVRE_SIZE) != 0)) {
->> +               dev_err(lldev->dev, "HW reports invalid EVRE write offset\n");
->> +               return 0;
->> +       }
->> +
->> +       /*
->> +        * By the time control reaches here the number of EVREs and TREs
->> +        * may not match. Only consume the ones that hardware told us.
->> +        */
->> +       while ((evre_iterator != evre_write_off)) {
->> +               u32 *current_evre = lldev->evre_ring + evre_iterator;
->> +               u32 cfg;
->> +               u8 err_info;
->> +
->> +               spin_lock_irqsave(&lldev->lock, flags);
->> +               tre = lldev->pending_tre_list[tre_iterator / TRE_SIZE];
->> +               if (!tre) {
->> +                       spin_unlock_irqrestore(&lldev->lock, flags);
->> +                       dev_warn(lldev->dev,
->> +                                "tre_index [%d] and tre out of sync\n",
->> +                                tre_iterator / TRE_SIZE);
->> +                       tre_iterator += TRE_SIZE;
->> +                       if (tre_iterator >= tre_ring_size)
->> +                               tre_iterator -= tre_ring_size;
-> 
-> Could it be refactored to macro
-> increment_iterator(iter,size,ring_size) ?
-> 
-OK
-
->> +                       evre_iterator += EVRE_SIZE;
->> +                       if (evre_iterator >= evre_ring_size)
->> +                               evre_iterator -= evre_ring_size;
-> 
-> Ditto.
-ok
-> 
->> +
->> +                       continue;
->> +               }
->> +               lldev->pending_tre_list[tre->tre_index] = NULL;
->> +
->> +               /*
->> +                * Keep track of pending TREs that SW is expecting to receive
->> +                * from HW. We got one now. Decrement our counter.
->> +                */
->> +               lldev->pending_tre_count--;
->> +               if (lldev->pending_tre_count < 0) {
->> +                       dev_warn(lldev->dev,
->> +                                "tre count mismatch on completion");
->> +                       lldev->pending_tre_count = 0;
->> +               }
->> +
->> +               spin_unlock_irqrestore(&lldev->lock, flags);
->> +
->> +               cfg = current_evre[EVRE_CFG_IDX];
->> +               err_info = cfg >> EVRE_ERRINFO_BIT_POS;
->> +               err_info &= EVRE_ERRINFO_MASK;
->> +               lldev->tx_status_list[tre->idx].err_info = err_info;
->> +               lldev->tx_status_list[tre->idx].err_code =
->> +                   (cfg >> EVRE_CODE_BIT_POS) & EVRE_CODE_MASK;
->> +               tre->queued = 0;
->> +
->> +               kfifo_put(&lldev->handoff_fifo, tre);
->> +               tasklet_schedule(&lldev->task);
->> +
->> +               tre_iterator += TRE_SIZE;
->> +               if (tre_iterator >= tre_ring_size)
->> +                       tre_iterator -= tre_ring_size;
-> 
-> Ditto.
-
-done
-
-> 
->> +               evre_iterator += EVRE_SIZE;
->> +               if (evre_iterator >= evre_ring_size)
->> +                       evre_iterator -= evre_ring_size;
-> 
-> Ditto.
-
-done
-> 
->> +
->> +
->> +       tre_iterator = lldev->tre_processed_off;
->> +       while (lldev->pending_tre_count) {
->> +               int tre_index = tre_iterator / TRE_SIZE;
->> +
->> +               spin_lock_irqsave(&lldev->lock, flags);
->> +               tre = lldev->pending_tre_list[tre_index];
->> +               if (!tre) {
->> +                       spin_unlock_irqrestore(&lldev->lock, flags);
->> +                       tre_iterator += TRE_SIZE;
->> +                       if (tre_iterator >= tre_ring_size)
->> +                               tre_iterator -= tre_ring_size;
-> 
-> Ditto.
-
-done
-
-> 
->> +                       continue;
->> +               }
->> +               lldev->pending_tre_list[tre_index] = NULL;
->> +               lldev->pending_tre_count--;
->> +               if (lldev->pending_tre_count < 0) {
->> +                       dev_warn(lldev->dev,
->> +                                "tre count mismatch on completion");
->> +                       lldev->pending_tre_count = 0;
->> +               }
->> +               spin_unlock_irqrestore(&lldev->lock, flags);
->> +
->> +               lldev->tx_status_list[tre->idx].err_info = err_info;
->> +               lldev->tx_status_list[tre->idx].err_code = err_code;
->> +               tre->queued = 0;
->> +
->> +               kfifo_put(&lldev->handoff_fifo, tre);
->> +               tasklet_schedule(&lldev->task);
->> +
->> +               tre_iterator += TRE_SIZE;
->> +               if (tre_iterator >= tre_ring_size)
->> +                       tre_iterator -= tre_ring_size;
-> 
-> Ditto.
-> 
-done
-
->> +
->> +               num_completed++;
->> +       }
->> +       tre_read_off = (lldev->tre_processed_off + TRE_SIZE * num_completed);
->> +
->> +       tre_read_off = tre_read_off % tre_ring_size;
->> +
->> +       /* record the last processed tre offset */
->> +       lldev->tre_processed_off = tre_read_off;
->> +}
->> +
->> +static int hidma_ll_reset(struct hidma_lldev *lldev)
->> +{
->> +       u32 val;
->> +       int ret;
->> +
->> +       val = readl(lldev->trca + TRCA_CTRLSTS_OFFSET);
->> +       val &= ~(CH_CONTROL_MASK << 16);
->> +       val |= CH_RESET << 16;
->> +       writel(val, lldev->trca + TRCA_CTRLSTS_OFFSET);
->> +
->> +       /*
->> +        * Delay 10ms after reset to allow DMA logic to quiesce.
->> +        * Do a polled read up to 1ms and 10ms maximum.
->> +        */
->> +       ret = readl_poll_timeout(lldev->trca + TRCA_CTRLSTS_OFFSET, val,
->> +                                (((val >> CH_STATE_BIT_POS) & CH_STATE_MASK) ==
->> +                                 CH_DISABLED), 1000, 10000);
->> +       if (ret) {
->> +               dev_err(lldev->dev, "transfer channel did not reset\n");
->> +               return ret;
->> +       }
->> +
->> +       val = readl(lldev->evca + EVCA_CTRLSTS_OFFSET);
->> +       val &= ~(CH_CONTROL_MASK << 16);
->> +       val |= CH_RESET << 16;
->> +       writel(val, lldev->evca + EVCA_CTRLSTS_OFFSET);
->> +
->> +       /*
->> +        * Delay 10ms after reset to allow DMA logic to quiesce.
->> +        * Do a polled read up to 1ms and 10ms maximum.
->> +        */
->> +       ret = readl_poll_timeout(lldev->evca + EVCA_CTRLSTS_OFFSET, val,
->> +                                (((val >> CH_STATE_BIT_POS) & CH_STATE_MASK) ==
->> +                                 CH_DISABLED), 1000, 10000);
->> +       if (ret)
->> +               return ret;
->> +
->> +       lldev->trch_state = CH_DISABLED;
->> +       lldev->evch_state = CH_DISABLED;
->> +       return 0;
->> +}
->> +
->> +static void hidma_ll_enable_irq(struct hidma_lldev *lldev, u32 irq_bits)
->> +{
->> +       writel(irq_bits, lldev->evca + EVCA_IRQ_EN_OFFSET);
->> +}
->> +
->> +/*
->> + * The interrupt handler for HIDMA will try to consume as many pending
->> + * EVRE from the event queue as possible. Each EVRE has an associated
->> + * TRE that holds the user interface parameters. EVRE reports the
->> + * result of the transaction. Hardware guarantees ordering between EVREs
->> + * and TREs. We use last processed offset to figure out which TRE is
->> + * associated with which EVRE. If two TREs are consumed by HW, the EVREs
->> + * are in order in the event ring.
->> + *
->> + * This handler will do a one pass for consuming EVREs. Other EVREs may
->> + * be delivered while we are working. It will try to consume incoming
->> + * EVREs one more time and return.
->> + *
->> + * For unprocessed EVREs, hardware will trigger another interrupt until
->> + * all the interrupt bits are cleared.
->> + *
->> + * Hardware guarantees that by the time interrupt is observed, all data
->> + * transactions in flight are delivered to their respective places and
->> + * are visible to the CPU.
->> + *
->> + * On demand paging for IOMMU is only supported for PCIe via PRI
->> + * (Page Request Interface) not for HIDMA. All other hardware instances
->> + * including HIDMA work on pinned DMA addresses.
->> + *
->> + * HIDMA is not aware of IOMMU presence since it follows the DMA API. All
->> + * IOMMU latency will be built into the data movement time. By the time
->> + * interrupt happens, IOMMU lookups + data movement has already taken place.
->> + *
->> + * While the first read in a typical PCI endpoint ISR flushes all outstanding
->> + * requests traditionally to the destination, this concept does not apply
->> + * here for this HW.
->> + */
->> +static void hidma_ll_int_handler_internal(struct hidma_lldev *lldev)
->> +{
->> +       u32 status;
->> +       u32 enable;
->> +       u32 cause;
->> +       int repeat = 2;
->> +       unsigned long timeout;
->> +
->> +       /*
->> +        * Fine tuned for this HW...
->> +        *
->> +        * This ISR has been designed for this particular hardware. Relaxed
->> +        * read and write accessors are used for performance reasons due to
->> +        * interrupt delivery guarantees. Do not copy this code blindly and
->> +        * expect that to work.
->> +        */
->> +       status = readl_relaxed(lldev->evca + EVCA_IRQ_STAT_OFFSET);
->> +       enable = readl_relaxed(lldev->evca + EVCA_IRQ_EN_OFFSET);
->> +       cause = status & enable;
->> +
->> +       if ((cause & (BIT(IRQ_TR_CH_INVALID_TRE_BIT_POS))) ||
->> +           (cause & BIT(IRQ_TR_CH_TRE_RD_RSP_ER_BIT_POS)) ||
->> +           (cause & BIT(IRQ_EV_CH_WR_RESP_BIT_POS)) ||
->> +           (cause & BIT(IRQ_TR_CH_DATA_RD_ER_BIT_POS)) ||
->> +           (cause & BIT(IRQ_TR_CH_DATA_WR_ER_BIT_POS))) {
->> +               u8 err_code = EVRE_STATUS_ERROR;
->> +               u8 err_info = 0xFF;
->> +
->> +               /* Clear out pending interrupts */
->> +               writel(cause, lldev->evca + EVCA_IRQ_CLR_OFFSET);
->> +
->> +               dev_err(lldev->dev, "error 0x%x, resetting...\n", cause);
->> +
->> +               hidma_cleanup_pending_tre(lldev, err_info, err_code);
->> +
->> +               /* reset the channel for recovery */
->> +               if (hidma_ll_setup(lldev)) {
->> +                       dev_err(lldev->dev,
->> +                               "channel reinitialize failed after error\n");
->> +                       return;
->> +               }
->> +               hidma_ll_enable_irq(lldev, ENABLE_IRQS);
->> +               return;
->> +       }
->> +
->> +       /*
->> +        * Try to consume as many EVREs as possible.
->> +        * skip this loop if the interrupt is spurious.
->> +        */
->> +       while (cause && repeat) {
->> +               unsigned long start = jiffies;
->> +
->> +               /* This timeout should be sufficent for core to finish */
->> +               timeout = start + msecs_to_jiffies(500);
->> +
->> +               while (lldev->pending_tre_count) {
->> +                       hidma_handle_tre_completion(lldev);
->> +                       if (time_is_before_jiffies(timeout)) {
->> +                               dev_warn(lldev->dev,
->> +                                        "ISR timeout %lx-%lx from %lx [%d]\n",
->> +                                        jiffies, timeout, start,
->> +                                        lldev->pending_tre_count);
->> +                               break;
->> +                       }
->> +               }
->> +
->> +               /* We consumed TREs or there are pending TREs or EVREs. */
->> +               writel_relaxed(cause, lldev->evca + EVCA_IRQ_CLR_OFFSET);
->> +
->> +               /*
->> +                * Another interrupt might have arrived while we are
->> +                * processing this one. Read the new cause.
->> +                */
->> +               status = readl_relaxed(lldev->evca + EVCA_IRQ_STAT_OFFSET);
->> +               enable = readl_relaxed(lldev->evca + EVCA_IRQ_EN_OFFSET);
->> +               cause = status & enable;
->> +
->> +               repeat--;
->> +       }
->> +}
->> +
->> +static int hidma_ll_enable(struct hidma_lldev *lldev)
->> +{
->> +       u32 val;
->> +       int ret;
->> +
->> +       val = readl(lldev->evca + EVCA_CTRLSTS_OFFSET);
->> +       val &= ~(CH_CONTROL_MASK << 16);
->> +       val |= CH_ENABLE << 16;
->> +       writel(val, lldev->evca + EVCA_CTRLSTS_OFFSET);
->> +
->> +       ret = readl_poll_timeout(lldev->evca + EVCA_CTRLSTS_OFFSET, val,
->> +                                ((((val >> CH_STATE_BIT_POS) & CH_STATE_MASK)
->> +                                  == CH_ENABLED)
->> +                                 ||
->> +                                 (((val >> CH_STATE_BIT_POS) & CH_STATE_MASK)
->> +                                  == CH_RUNNING)), 1000, 10000);
->> +       if (ret) {
->> +               dev_err(lldev->dev, "event channel did not get enabled\n");
->> +               return ret;
->> +       }
->> +
->> +       val = readl(lldev->trca + TRCA_CTRLSTS_OFFSET);
->> +       val &= ~(CH_CONTROL_MASK << 16);
->> +       val |= CH_ENABLE << 16;
->> +       writel(val, lldev->trca + TRCA_CTRLSTS_OFFSET);
->> +
->> +       ret = readl_poll_timeout(lldev->trca + TRCA_CTRLSTS_OFFSET, val,
->> +                                ((((val >> CH_STATE_BIT_POS) & CH_STATE_MASK)
->> +                                  == CH_ENABLED)
->> +                                 ||
->> +                                 (((val >> CH_STATE_BIT_POS) & CH_STATE_MASK)
->> +                                  == CH_RUNNING)), 1000, 10000);
-> 
-> u32 val, state;
-> 
-> state = (val >> CH_STATE_BIT_POS) & CH_STATE_MASK;
-> 
-> ...
-> 
-> And above.
-
-the third argument to readl_poll_timeout is the condition. This logic condition needs to be 
-evaluated every 4th argument time until 5th argument timeout is reached. I'll add a macro to make
-code readable a little bit better. Something like this.
-
-#define HIDMA_CH_STATE(val)	\
-((val >> CH_STATE_BIT_POS) & CH_STATE_MASK)
-
-
-> 
->> +       if (ret) {
->> +               dev_err(lldev->dev, "transfer channel did not get enabled\n");
->> +               return ret;
->> +       }
->> +
->> +       lldev->trch_state = CH_ENABLED;
->> +       lldev->evch_state = CH_ENABLED;
->> +
->> +       return 0;
->> +}
->> +
->> +int hidma_ll_resume(struct hidma_lldev *lldev)
->> +{
->> +       return hidma_ll_enable(lldev);
->> +}
->> +
->> +static void hidma_ll_hw_start(struct hidma_lldev *lldev)
->> +{
->> +       unsigned long irqflags;
->> +
->> +       spin_lock_irqsave(&lldev->lock, irqflags);
->> +       writel(lldev->tre_write_offset, lldev->trca + TRCA_DOORBELL_OFFSET);
->> +       spin_unlock_irqrestore(&lldev->lock, irqflags);
->> +}
->> +
->> +bool hidma_ll_isenabled(struct hidma_lldev *lldev)
->> +{
->> +       u32 val;
->> +
->> +       val = readl(lldev->trca + TRCA_CTRLSTS_OFFSET);
->> +       lldev->trch_state = (val >> CH_STATE_BIT_POS) & CH_STATE_MASK;
->> +       val = readl(lldev->evca + EVCA_CTRLSTS_OFFSET);
->> +       lldev->evch_state = (val >> CH_STATE_BIT_POS) & CH_STATE_MASK;
-> 
-> Even macro
-> 
-> #define CH_STATE(v) ...
-> 
-ok
-
->> +
->> +       /* both channels have to be enabled before calling this function */
->> +       if (((lldev->trch_state == CH_ENABLED) ||
->> +            (lldev->trch_state == CH_RUNNING)) &&
->> +           ((lldev->evch_state == CH_ENABLED) ||
->> +            (lldev->evch_state == CH_RUNNING)))
->> +               return true;
->> +
->> +       return false;
->> +}
->> +
->> +void hidma_ll_queue_request(struct hidma_lldev *lldev, u32 tre_ch)
->> +{
->> +       struct hidma_tre *tre;
->> +       unsigned long flags;
->> +
->> +       tre = &lldev->trepool[tre_ch];
->> +
->> +       /* copy the TRE into its location in the TRE ring */
->> +       spin_lock_irqsave(&lldev->lock, flags);
->> +       tre->tre_index = lldev->tre_write_offset / TRE_SIZE;
->> +       lldev->pending_tre_list[tre->tre_index] = tre;
->> +       memcpy(lldev->tre_ring + lldev->tre_write_offset, &tre->tre_local[0],
->> +              TRE_SIZE);
->> +       lldev->tx_status_list[tre->idx].err_code = 0;
->> +       lldev->tx_status_list[tre->idx].err_info = 0;
->> +       tre->queued = 1;
->> +       lldev->pending_tre_count++;
->> +       lldev->tre_write_offset = (lldev->tre_write_offset + TRE_SIZE)
->> +           % lldev->tre_ring_size;
->> +       spin_unlock_irqrestore(&lldev->lock, flags);
->> +}
->> +
->> +void hidma_ll_start(struct hidma_lldev *lldev)
->> +{
->> +       hidma_ll_hw_start(lldev);
->> +}
->> +
->> +/*
->> + * Note that even though we stop this channel
->> + * if there is a pending transaction in flight
->> + * it will complete and follow the callback.
->> + * This request will prevent further requests
->> + * to be made.
->> + */
->> +int hidma_ll_pause(struct hidma_lldev *lldev)
->> +{
->> +       u32 val;
->> +       int ret;
->> +
->> +       val = readl(lldev->evca + EVCA_CTRLSTS_OFFSET);
->> +       lldev->evch_state = (val >> CH_STATE_BIT_POS) & CH_STATE_MASK;
->> +       val = readl(lldev->trca + TRCA_CTRLSTS_OFFSET);
->> +       lldev->trch_state = (val >> CH_STATE_BIT_POS) & CH_STATE_MASK;
-> 
-> 
-> Ditto.
-> 
-yes, done
-
->> +
->> +       /* already suspended by this OS */
->> +       if ((lldev->trch_state == CH_SUSPENDED) ||
->> +           (lldev->evch_state == CH_SUSPENDED))
->> +               return 0;
->> +
->> +       /* already stopped by the manager */
->> +       if ((lldev->trch_state == CH_STOPPED) ||
->> +           (lldev->evch_state == CH_STOPPED))
->> +               return 0;
->> +
->> +       val = readl(lldev->trca + TRCA_CTRLSTS_OFFSET);
->> +       val &= ~(CH_CONTROL_MASK << 16);
->> +       val |= CH_SUSPEND << 16;
->> +       writel(val, lldev->trca + TRCA_CTRLSTS_OFFSET);
->> +
->> +       /*
->> +        * Start the wait right after the suspend is confirmed.
->> +        * Do a polled read up to 1ms and 10ms maximum.
->> +        */
->> +       ret = readl_poll_timeout(lldev->trca + TRCA_CTRLSTS_OFFSET, val,
->> +                                (((val >> CH_STATE_BIT_POS) & CH_STATE_MASK) ==
-> 
-> Ditto. And everywhere else.
-> 
-yep
-
->> +
->> +struct hidma_lldev *hidma_ll_init(struct device *dev, u32 nr_tres,
->> +                                 void __iomem *trca, void __iomem *evca,
->> +                                 u8 chidx)
->> +{
->> +       u32 required_bytes;
->> +       struct hidma_lldev *lldev;
->> +       int rc;
->> +
->> +       if (!trca || !evca || !dev || !nr_tres)
->> +               return NULL;
->> +
->> +       /* need at least four TREs */
->> +       if (nr_tres < 4)
->> +               return NULL;
->> +
->> +       /* need an extra space */
->> +       nr_tres += 1;
->> +
->> +       lldev = devm_kzalloc(dev, sizeof(struct hidma_lldev), GFP_KERNEL);
->> +       if (!lldev)
->> +               return NULL;
->> +
->> +       lldev->evca = evca;
->> +       lldev->trca = trca;
->> +       lldev->dev = dev;
->> +       required_bytes = sizeof(struct hidma_tre) * nr_tres;
->> +       lldev->trepool = devm_kzalloc(lldev->dev, required_bytes, GFP_KERNEL);
->> +       if (!lldev->trepool)
->> +               return NULL;
->> +
->> +       required_bytes = sizeof(lldev->pending_tre_list[0]) * nr_tres;
->> +       lldev->pending_tre_list = devm_kzalloc(dev, required_bytes, GFP_KERNEL);
-> 
-> devm_kcalloc for each?
-
-By the time, code was implemented around 3.15 devm_kcalloc did not exist. That's why, 
-I used devm_kzalloc. Now is a good time to change it.
-
-> 
->> +       if (!lldev->pending_tre_list)
->> +               return NULL;
->> +
->> +       required_bytes = sizeof(lldev->tx_status_list[0]) * nr_tres;
->> +       lldev->tx_status_list = devm_kzalloc(dev, required_bytes, GFP_KERNEL);
-> 
-> Ditto.
-
-ok
-
-> 
->> +       if (!lldev->tx_status_list)
->> +               return NULL;
->> +
->> +       lldev->tre_ring = dmam_alloc_coherent(dev, (TRE_SIZE + 1) * nr_tres,
->> +                                             &lldev->tre_ring_handle,
->> +                                             GFP_KERNEL);
->> +       if (!lldev->tre_ring)
->> +               return NULL;
->> +
->> +       memset(lldev->tre_ring, 0, (TRE_SIZE + 1) * nr_tres);
->> +       lldev->tre_ring_size = TRE_SIZE * nr_tres;
->> +       lldev->nr_tres = nr_tres;
->> +
->> +       /* the TRE ring has to be TRE_SIZE aligned */
->> +       if (!IS_ALIGNED(lldev->tre_ring_handle, TRE_SIZE)) {
->> +               u8 tre_ring_shift;
->> +
->> +               tre_ring_shift = lldev->tre_ring_handle % TRE_SIZE;
->> +               tre_ring_shift = TRE_SIZE - tre_ring_shift;
->> +               lldev->tre_ring_handle += tre_ring_shift;
->> +               lldev->tre_ring += tre_ring_shift;
->> +       }
->> +
->> +       lldev->evre_ring = dmam_alloc_coherent(dev, (EVRE_SIZE + 1) * nr_tres,
->> +                                              &lldev->evre_ring_handle,
->> +                                              GFP_KERNEL);
->> +       if (!lldev->evre_ring)
->> +               return NULL;
->> +
->> +       memset(lldev->evre_ring, 0, (EVRE_SIZE + 1) * nr_tres);
->> +       lldev->evre_ring_size = EVRE_SIZE * nr_tres;
->> +
->> +       /* the EVRE ring has to be EVRE_SIZE aligned */
->> +       if (!IS_ALIGNED(lldev->evre_ring_handle, EVRE_SIZE)) {
->> +               u8 evre_ring_shift;
->> +
->> +               evre_ring_shift = lldev->evre_ring_handle % EVRE_SIZE;
->> +               evre_ring_shift = EVRE_SIZE - evre_ring_shift;
->> +               lldev->evre_ring_handle += evre_ring_shift;
->> +               lldev->evre_ring += evre_ring_shift;
->> +       }
->> +       lldev->nr_tres = nr_tres;
->> +       lldev->chidx = chidx;
->> +
->> +       rc = kfifo_alloc(&lldev->handoff_fifo,
->> +                        nr_tres * sizeof(struct hidma_tre *), GFP_KERNEL);
->> +       if (rc)
->> +               return NULL;
->> +
->> +       rc = hidma_ll_setup(lldev);
->> +       if (rc)
->> +               return NULL;
->> +
->> +       spin_lock_init(&lldev->lock);
->> +       tasklet_init(&lldev->task, hidma_ll_tre_complete, (unsigned long)lldev);
->> +       lldev->initialized = 1;
->> +       hidma_ll_enable_irq(lldev, ENABLE_IRQS);
->> +       return lldev;
->> +}
->> +
->> +int hidma_ll_uninit(struct hidma_lldev *lldev)
->> +{
->> +       int rc = 0;
->> +       u32 val;
->> +
->> +       if (!lldev)
->> +               return -ENODEV;
->> +
->> +       if (lldev->initialized) {
->> +               u32 required_bytes;
->> +
->> +               lldev->initialized = 0;
->> +
->> +               required_bytes = sizeof(struct hidma_tre) * lldev->nr_tres;
-> 
->> +               tasklet_kill(&lldev->task);
-> 
-> Can this be moved up? Or you afraid of racing?
-
-This function will get called from driver remove function only. I'll keep it like this as moving
-it around doesn't gain anything. 
-
-> 
->> +               memset(lldev->trepool, 0, required_bytes);
->> +               lldev->trepool = NULL;
->> +               lldev->pending_tre_count = 0;
->> +               lldev->tre_write_offset = 0;
->> +
->> +               rc = hidma_ll_reset(lldev);
->> +
->> +               /*
->> +                * Clear all pending interrupts again.
->> +                * Otherwise, we observe reset complete interrupts.
->> +                */
->> +               val = readl(lldev->evca + EVCA_IRQ_STAT_OFFSET);
->> +               writel(val, lldev->evca + EVCA_IRQ_CLR_OFFSET);
->> +               hidma_ll_enable_irq(lldev, 0);
->> +       }
->> +       return rc;
->> +}
->> +
->> +irqreturn_t hidma_ll_inthandler(int chirq, void *arg)
->> +{
->> +       struct hidma_lldev *lldev = arg;
->> +
->> +       hidma_ll_int_handler_internal(lldev);
->> +       return IRQ_HANDLED;
->> +}
->> +
->> +enum dma_status hidma_ll_status(struct hidma_lldev *lldev, u32 tre_ch)
->> +{
->> +       enum dma_status ret = DMA_ERROR;
->> +       unsigned long flags;
->> +       u8 err_code;
->> +
->> +       spin_lock_irqsave(&lldev->lock, flags);
->> +       err_code = lldev->tx_status_list[tre_ch].err_code;
->> +
->> +       if (err_code & EVRE_STATUS_COMPLETE)
->> +               ret = DMA_COMPLETE;
->> +       else if (err_code & EVRE_STATUS_ERROR)
->> +               ret = DMA_ERROR;
->> +       else
->> +               ret = DMA_IN_PROGRESS;
->> +       spin_unlock_irqrestore(&lldev->lock, flags);
->> +
->> +       return ret;
->> +}
->> --
->> Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
->> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+On 12/14/2015 7:05 AM, Mark Rutland wrote:
+>>>>>> +Required properties:
+>>>>>> +- compatible: "qcom,hidma-mgmt-1.0";
+>>>>>> +- reg: Address range for DMA device
+>>>>>
+>>>>> Does this cover just the management registers, or those for channels as
+>>>>> well?
+>>>>
+>>>> just management.
+>>>>
+>>>>>
+>>>>>> +- dma-channels: Number of channels supported by this DMA controller.
+>>>>>
+>>>>> Surely this is discoverable, or can be derived from the set of channels
+>>>>> described in the DT?
+>>>>
+>>>> No, this is a HW configuration. Each hardware instance supports certain
+>>>> number of channels based on the HW build. The number of active channels
+>>>> on the running operating system does not necessarily represent the
+>>>> maximum possible.
+>>>
+>>> I don't follow.
+>>>
+>>> If you aren't using some channels, why do you need to know about them?
+>>>
 >>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> Please read the FAQ at  http://www.tux.org/lkml/
+>> I mean the hypervisor OS may not be using the channels. It could be the
+>> guest machines that are using it. I need the number of the channels not
+>> the memory addresses where each channel is.
 > 
+> I still don't follow. Knowing the number of channels alone is clearly
+> insufficient.
 > 
+> The hypervisor is in charge of handing these out to guests. So it needs
+> to know the set of of channels (i.e. the address of each channel, and
+> which index the channel has in the control interface). Otherwise it
+> cannot possibly allocate them to guests, and cannot possibly control
+> those channels at runtime.
 > 
+> Given the hypervisor is in chage of allocating channels to guests, it
+> knows which channels are in use, and can decide whether or not to use
+> channels for its own purposes.
+> 
+>>> The driver seems to assume it can access registers for all (linearly
+>>> indexed) channels up to the value it read from dt for dma-channels. That
+>>> doesn't seem right if the driver is not dealing with all of those
+>>> channels.
+>>
+>> I assume you are talking about this. Feel free to be specific if not
+>> this one.
+>>
+>> 	for (i = 0; i < mgmtdev->dma_channels; i++) {
+>> 		u32 weight = mgmtdev->weight[i];
+>> 		u32 priority = mgmtdev->priority[i];
+>>
+>> 		val = readl(mgmtdev->virtaddr + HIDMA_QOS_N_OFFSET + (4 * i));
+>> 		val &= ~(1 << HIDMA_PRIORITY_BIT_POS);
+>> 		val |= (priority & 0x1) << HIDMA_PRIORITY_BIT_POS;
+>> 		val &= ~(HIDMA_WEIGHT_MASK << HIDMA_WRR_BIT_POS);
+>> 		val |= (weight & HIDMA_WEIGHT_MASK) << HIDMA_WRR_BIT_POS;
+>> 		writel(val, mgmtdev->virtaddr + HIDMA_QOS_N_OFFSET + (4 * i));
+>> 	}
+>>
+>> The management driver is configuring the priority and weight registers
+>> inside the management address space. It is not accessing the channel
+>> address space where data transfer descriptors are set up. There is one
+>> register for priority & weight of the each channel inside the management
+>> address space.
+> 
+> My point was that this implies that the driver has no idea as to the
+> relationship between these configuration registers and the actual
+> channel address spaces. It has no idea which channel address spaces are
+> being configured here. That does not seem right.
+> 
+>>>>> Why can this information not be associated with the channel directly?
+>>>>>
+>>>> Two reasons:
+>>>> 1. The channel doesn't have the capability to change the priority and
+>>>> weight. HW design. Management HW can do this only.
+>>>
+>>> You can describe the channels directly to the hypervisor which talks to
+>>> the management HW.
+>>
+>> Not a use case, I don't want to allow guest machine to change their
+>> priority and weight.
+> 
+> I didn't suggest that the guest would. Regardless, it seems these should
+> be runtime configured anyway, at which point you need to know the
+> relationship.
+> 
+>>>>> There's no relationship to channels defined here. What happens if/when
+>>>>> you have a system with multiple instances?
+>>>>>
+>>>>
+>>>> I do support multiple instances. I tested with 4 instances (6 channels
+>>>> each). This driver is only responsible for management which it can do
+>>>> through its own dedicated HW interface. It doesn't need access to the
+>>>> channel address space. There will be 4 HIDMA management instances in
+>>>> this case.
+>>>
+>>> I don't follow.
+>>>
+>>> How do you know which channels are associated with which management
+>>> interface?
+>>
+>> The association is the other way around. User need to know the
+>> management interface for a channel rather than the channel needing to
+>> know the management interface.
+>>
+>> I'll think about it.
+> 
+> Ok. I agree that's the way the user will look at it.
+> 
+>>> How can your sysfs interface work if that relationship is not described?
+>>
+>> Here is the sysfs documentation. Each management object has one channel
+>> directory under it. I still don't need to access the channel object in
+>> order to change its weight and priority.
+>>
+>> What:           /sys/devices/platform/hidma-mgmt*/chan*/priority
+>>                 /sys/devices/platform/QCOM8060:*/chan*/priority
+>> Date:           Nov 2015
+>> KernelVersion:  4.4
+>> Contact:        "Sinan Kaya <okaya@cudeaurora.org>"
+>> Description:
+>>                 Contains either 0 or 1 and indicates if the DMA channel is a
+>>                 low priority (0) or high priority (1) channel.
+> 
+> What I was trying to ask is: given a write to a channel's priority file,
+> how do you figure out which bits in which management interface to poke?
+> 
+> As far as I can see, the relationship between a channel and the
+> management interface is not described in teh DT, so I cannot see how you
+> figure this out.
+> 
+>>>>> I don't understand why you don't have a single binding for both the
+>>>>> management interface and channels, e.g.
+>>>>>
+>>>>> hidma {
+>>>>> 	compatible - "qcom,hidma-1.0";
+>>>>>
+>>>>> 	/* OPTIONAL management interface registers */
+>>>>> 	reg = < ... ... >;
+>>>>>
+>>>>> 	...
+>>>>>
+>>>>> 	channels {
+>>>>> 		channel0 {
+>>>>> 			compatible = "qcom,
+>>>>> 			reg = < ... ... >;
+>>>>>
+>>>>> 			...
+>>>>> 		};
+>>>>>
+>>>>> 		...
+>>>>> 	};
+>>>>> };
+>>>>>
+>>>>> That would be more in keeping with what we do for other componenents
+>>>>> with hyp control elements (e.g. the GIC) and keeps everything
+>>>>> associated.
+>>>>
+>>>> This was discussed before with the previous versions of the patch. This
+>>>> split and loose coupling design is on purpose.
+>>>
+>>> I understand it was a deliberate choice. I am disagreeing with that
+>>> choice.
+>>>
+>>
+>> In order to be able to use the same channel driver in the guest machine
+>> context with the hierarchy you want, I need to create this.
+>>
+>> fake management object {
+>> 	fake values;
+> 
+> There'd be no fake values here, they'd just be ommitted entirely.
+> 
+>> 	channels {
+>> 		real DMA channel {
+>> 			...
+>> 		}
+>> 	}
+>> }
+>>
+>> This looks really ugly to me. I need to deal with a fake management
+>> driver and object that could be hypervisor specific.
+> 
+> You don't need a fake management driver. I don't understand what you
+> mean w.r.t. being hypervisor specific.
+> 
+>> Here is a fact:
+>>
+>> QEMU is not capable of generating complex device-tree nodes for platform
+>> devices that are being virtualized. QEMU only generates a very simple
+>> device object with compatible ID and memory and interrupt resources. No
+>> parent, child relationship and no device-specific attributes. Here is an
+>> example:
+> 
+> So? The above _is_ simple, and trivial to generate.
+> 
+> I've not seen your patches for QEMU, so perhaps I'm missing something.
+> 
+> Regardless, QEMU is not the only thing that matters here. We shouldn't
+> do something _only_ because it makes a patch to QEMU simpler.
+> 
+>>
+>> device {
+>> 	compatible-id;
+>> 	reg;
+>> 	interrupt;
+>> }
+>>
+>> This is plain and simple. It works too. No need to create some fake device.
+>>
+>> The other issue is the ACPI. I know device-tree has all kinds of nice
+>> gadgets for traversing the parent/child relationship and object
+>> pointers. I can't implement this if the solution does not scale to ACPI.
+> 
+> It sounds like ACPI is incapable of describing this device, then.
+> 
+>>> No guest should care which particular physical channels it's provided
+>>> with.
+>>>
+>>>> Only the hidma channel driver gets executed in the guest machine. There
+>>>> is no management driver and device entity in the guest. Therefore,
+>>>> child-parent relationship does not exist.
+>>>
+>>> The management driver needs to know details of the channels it's
+>>> managing, even if it never accesses them directly. Otherwise how can you
+>>> allocate a channel to a guest and manage it through the correct portion
+>>> of the correct management interface?
+>>
+>> I'll add support for both. Both having a parent-child relationship while
+>> inside the hypervisor and flat hierarchy while running in the guest
+>> machine for QEMU.
+> 
+> I'm happy with that.
+> 
+>> I just created a child object of the management driver and channel
+>> driver got probed properly. So, it just a matter of device-tree
+>> documentation at this point.
+>>
+>> It will be like this though.
+>>
+>>>>> hidma {
+>>>>> 	compatible - "qcom,hidma-1.0";
+>>>>>
+>>>>> 	/* OPTIONAL management interface registers */
+>>>>> 	reg = < ... ... >;
+>>>>>
+>>>>> 	...
+>>>>>
+>>>>> 	channel0 {
+>>>>> 		compatible = "qcom,
+>>>>> 		reg = < ... ... >;
+>>>>>
+>>>>> 		...
+>>>>> 	};
+>>>>>
+>>>>> 	...
+>>>>> };
+>>
+>> This seems to have worked without requiring any work from me.
+>>
+>> I need to associate sysfs next.
+> 
+> Ok. I look forward to seeing those patches.
+> 
+> Thanks,
+> Mark.
+> 
+
+Mark,
+The patch has been posted here. Please review.
+
+https://lkml.org/lkml/2016/1/3/246
+
+Sinan
+
+
 
 
 -- 
