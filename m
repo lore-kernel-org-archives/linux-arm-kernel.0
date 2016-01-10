@@ -1,45 +1,49 @@
 From: mst@redhat.com (Michael S. Tsirkin)
-Date: Sun, 10 Jan 2016 16:21:23 +0200
-Subject: [PATCH v3 35/41] checkpatch: check for __smp outside barrier.h
+Date: Sun, 10 Jan 2016 16:18:54 +0200
+Subject: [PATCH v3 17/41] arm: define __smp_xxx
 In-Reply-To: <1452426622-4471-1-git-send-email-mst@redhat.com>
 References: <1452426622-4471-1-git-send-email-mst@redhat.com>
-Message-ID: <1452426622-4471-36-git-send-email-mst@redhat.com>
+Message-ID: <1452426622-4471-18-git-send-email-mst@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduction of __smp barriers cleans up a bunch of duplicate code, but
-it gives people an additional handle onto a "new" set of barriers - just
-because they're prefixed with __* unfortunately doesn't stop anyone from
-using it (as happened with other arch stuff before.)
+This defines __smp_xxx barriers for arm,
+for use by virtualization.
 
-Add a checkpatch test so it will trigger a warning.
+smp_xxx barriers are removed as they are
+defined correctly by asm-generic/barriers.h
 
-Reported-by: Russell King <linux@arm.linux.org.uk>
+This reduces the amount of arch-specific boiler-plate code.
+
 Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- scripts/checkpatch.pl | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/include/asm/barrier.h | 12 +++---------
+ 1 file changed, 3 insertions(+), 9 deletions(-)
 
-diff --git a/scripts/checkpatch.pl b/scripts/checkpatch.pl
-index 97b8b62..a96adcb 100755
---- a/scripts/checkpatch.pl
-+++ b/scripts/checkpatch.pl
-@@ -5141,6 +5141,16 @@ sub process {
- 			}
- 		}
+diff --git a/arch/arm/include/asm/barrier.h b/arch/arm/include/asm/barrier.h
+index 31152e8..112cc1a 100644
+--- a/arch/arm/include/asm/barrier.h
++++ b/arch/arm/include/asm/barrier.h
+@@ -60,15 +60,9 @@ extern void arm_heavy_mb(void);
+ #define dma_wmb()	barrier()
+ #endif
  
-+		my $underscore_smp_barriers = qr{__smp_($smp_barriers)}x;
-+
-+		if ($realfile !~ m@^include/asm-generic/@ &&
-+		    $realfile !~ m@/barrier\.h$@ &&
-+		    $line =~ m/\b($underscore_smp_barriers)\s*\(/ &&
-+		    $line !~ m/^.\s*\#\s*define\s+($underscore_smp_barriers)\s*\(/) {
-+			WARN("MEMORY_BARRIER",
-+			     "__smp memory barriers shouldn't be used outside barrier.h and asm-generic\n" . $herecurr);
-+		}
-+
- # check for waitqueue_active without a comment.
- 		if ($line =~ /\bwaitqueue_active\s*\(/) {
- 			if (!ctx_has_comment($first_line, $linenr)) {
+-#ifndef CONFIG_SMP
+-#define smp_mb()	barrier()
+-#define smp_rmb()	barrier()
+-#define smp_wmb()	barrier()
+-#else
+-#define smp_mb()	dmb(ish)
+-#define smp_rmb()	smp_mb()
+-#define smp_wmb()	dmb(ishst)
+-#endif
++#define __smp_mb()	dmb(ish)
++#define __smp_rmb()	__smp_mb()
++#define __smp_wmb()	dmb(ishst)
+ 
+ #include <asm-generic/barrier.h>
+ 
 -- 
 MST
