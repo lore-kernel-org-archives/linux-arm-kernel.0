@@ -1,88 +1,87 @@
 From: mst@redhat.com (Michael S. Tsirkin)
-Date: Sun, 10 Jan 2016 16:20:42 +0200
-Subject: [PATCH v3 30/41] virtio_ring: update weak barriers to use virt_xxx
+Date: Sun, 10 Jan 2016 16:21:47 +0200
+Subject: [PATCH v3 38/41] xen/io: use virt_xxx barriers
 In-Reply-To: <1452426622-4471-1-git-send-email-mst@redhat.com>
 References: <1452426622-4471-1-git-send-email-mst@redhat.com>
-Message-ID: <1452426622-4471-31-git-send-email-mst@redhat.com>
+Message-ID: <1452426622-4471-39-git-send-email-mst@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-virtio ring uses smp_wmb on SMP and wmb on !SMP,
-the reason for the later being that it might be
-talking to another kernel on the same SMP machine.
+include/xen/interface/io/ring.h uses
+full memory barriers to communicate with the other side.
 
-This is exactly what virt_xxx barriers do,
-so switch to these instead of homegrown ifdef hacks.
+For guests compiled with CONFIG_SMP, smp_wmb and smp_mb
+would be sufficient, so mb() and wmb() here are only needed if
+a non-SMP guest runs on an SMP host.
 
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Alexander Duyck <alexander.duyck@gmail.com>
+Switch to virt_xxx barriers which serve this exact purpose.
+
 Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+Acked-by: David Vrabel <david.vrabel@citrix.com>
 ---
- include/linux/virtio_ring.h | 25 ++++---------------------
- 1 file changed, 4 insertions(+), 21 deletions(-)
+ include/xen/interface/io/ring.h | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/include/linux/virtio_ring.h b/include/linux/virtio_ring.h
-index 67e06fe..f3fa55b 100644
---- a/include/linux/virtio_ring.h
-+++ b/include/linux/virtio_ring.h
-@@ -12,7 +12,7 @@
-  * anyone care?
-  *
-  * For virtio_pci on SMP, we don't need to order with respect to MMIO
-- * accesses through relaxed memory I/O windows, so smp_mb() et al are
-+ * accesses through relaxed memory I/O windows, so virt_mb() et al are
-  * sufficient.
-  *
-  * For using virtio to talk to real devices (eg. other heterogeneous
-@@ -21,11 +21,10 @@
-  * actually quite cheap.
-  */
+diff --git a/include/xen/interface/io/ring.h b/include/xen/interface/io/ring.h
+index 7dc685b..21f4fbd 100644
+--- a/include/xen/interface/io/ring.h
++++ b/include/xen/interface/io/ring.h
+@@ -208,12 +208,12 @@ struct __name##_back_ring {						\
  
--#ifdef CONFIG_SMP
- static inline void virtio_mb(bool weak_barriers)
- {
- 	if (weak_barriers)
--		smp_mb();
-+		virt_mb();
- 	else
- 		mb();
- }
-@@ -33,7 +32,7 @@ static inline void virtio_mb(bool weak_barriers)
- static inline void virtio_rmb(bool weak_barriers)
- {
- 	if (weak_barriers)
--		smp_rmb();
-+		virt_rmb();
- 	else
- 		rmb();
- }
-@@ -41,26 +40,10 @@ static inline void virtio_rmb(bool weak_barriers)
- static inline void virtio_wmb(bool weak_barriers)
- {
- 	if (weak_barriers)
--		smp_wmb();
-+		virt_wmb();
- 	else
- 		wmb();
- }
--#else
--static inline void virtio_mb(bool weak_barriers)
--{
--	mb();
--}
--
--static inline void virtio_rmb(bool weak_barriers)
--{
--	rmb();
--}
--
--static inline void virtio_wmb(bool weak_barriers)
--{
--	wmb();
--}
--#endif
  
- struct virtio_device;
- struct virtqueue;
+ #define RING_PUSH_REQUESTS(_r) do {					\
+-    wmb(); /* back sees requests /before/ updated producer index */	\
++    virt_wmb(); /* back sees requests /before/ updated producer index */	\
+     (_r)->sring->req_prod = (_r)->req_prod_pvt;				\
+ } while (0)
+ 
+ #define RING_PUSH_RESPONSES(_r) do {					\
+-    wmb(); /* front sees responses /before/ updated producer index */	\
++    virt_wmb(); /* front sees responses /before/ updated producer index */	\
+     (_r)->sring->rsp_prod = (_r)->rsp_prod_pvt;				\
+ } while (0)
+ 
+@@ -250,9 +250,9 @@ struct __name##_back_ring {						\
+ #define RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(_r, _notify) do {		\
+     RING_IDX __old = (_r)->sring->req_prod;				\
+     RING_IDX __new = (_r)->req_prod_pvt;				\
+-    wmb(); /* back sees requests /before/ updated producer index */	\
++    virt_wmb(); /* back sees requests /before/ updated producer index */	\
+     (_r)->sring->req_prod = __new;					\
+-    mb(); /* back sees new requests /before/ we check req_event */	\
++    virt_mb(); /* back sees new requests /before/ we check req_event */	\
+     (_notify) = ((RING_IDX)(__new - (_r)->sring->req_event) <		\
+ 		 (RING_IDX)(__new - __old));				\
+ } while (0)
+@@ -260,9 +260,9 @@ struct __name##_back_ring {						\
+ #define RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(_r, _notify) do {		\
+     RING_IDX __old = (_r)->sring->rsp_prod;				\
+     RING_IDX __new = (_r)->rsp_prod_pvt;				\
+-    wmb(); /* front sees responses /before/ updated producer index */	\
++    virt_wmb(); /* front sees responses /before/ updated producer index */	\
+     (_r)->sring->rsp_prod = __new;					\
+-    mb(); /* front sees new responses /before/ we check rsp_event */	\
++    virt_mb(); /* front sees new responses /before/ we check rsp_event */	\
+     (_notify) = ((RING_IDX)(__new - (_r)->sring->rsp_event) <		\
+ 		 (RING_IDX)(__new - __old));				\
+ } while (0)
+@@ -271,7 +271,7 @@ struct __name##_back_ring {						\
+     (_work_to_do) = RING_HAS_UNCONSUMED_REQUESTS(_r);			\
+     if (_work_to_do) break;						\
+     (_r)->sring->req_event = (_r)->req_cons + 1;			\
+-    mb();								\
++    virt_mb();								\
+     (_work_to_do) = RING_HAS_UNCONSUMED_REQUESTS(_r);			\
+ } while (0)
+ 
+@@ -279,7 +279,7 @@ struct __name##_back_ring {						\
+     (_work_to_do) = RING_HAS_UNCONSUMED_RESPONSES(_r);			\
+     if (_work_to_do) break;						\
+     (_r)->sring->rsp_event = (_r)->rsp_cons + 1;			\
+-    mb();								\
++    virt_mb();								\
+     (_work_to_do) = RING_HAS_UNCONSUMED_RESPONSES(_r);			\
+ } while (0)
+ 
 -- 
 MST
