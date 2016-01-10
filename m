@@ -1,31 +1,69 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Sun, 10 Jan 2016 12:29:29 -0500
-Subject: [PATCH 3/4] drivers: ata: wake port before DMA stop for ALPM
-In-Reply-To: <5690444C.2090200@broadcom.com>
-References: <1452211413-1350-1-git-send-email-f.fainelli@gmail.com>
- <1452211413-1350-4-git-send-email-f.fainelli@gmail.com>
- <20160108163610.GS1898@mtj.duckdns.org>
- <5690444C.2090200@broadcom.com>
-Message-ID: <20160110172929.GK3660@htj.duckdns.org>
+From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
+Date: Sun, 10 Jan 2016 19:46:30 +0200
+Subject: [PATCH] ARM: dts: omap3-n900: Allow gpio keys to be disabled
+Message-ID: <1452447990-22775-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, Danesh.
+Add linux,can-disable; to all gpios exported from gpio-keys driver, so
+userspace can disable them
 
-On Fri, Jan 08, 2016 at 03:20:44PM -0800, Danesh Petigara wrote:
-> ahci_set_lpm in it's current form cannot be used here as it also
-> modifies the ALPE/ASP bits. The idea is to wake the link before DMA stop
-> without changing the ALPM bits so the link can return to it's configured
-> low power state when it's idle.
-> 
-> We could however update that function by introducing a new hints flag
-> that allows us to skip unneeded logic for this scenario. ahci_set_lpm
-> can then be called from ahci_stop_engine.
+Signed-off-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
+---
+ arch/arm/boot/dts/omap3-n900.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Yeah, please either update the function or factor the necessary part
-out.
-
-Thanks.
-
+diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
+index 8ea924c..b58e8a0 100644
+--- a/arch/arm/boot/dts/omap3-n900.dts
++++ b/arch/arm/boot/dts/omap3-n900.dts
+@@ -68,6 +68,7 @@
+ 			linux,input-type = <EV_SW>;
+ 			linux,code = <SW_CAMERA_LENS_COVER>;
+ 			gpio-key,wakeup;
++			linux,can-disable;
+ 		};
+ 
+ 		camera_focus {
+@@ -75,6 +76,7 @@
+ 			gpios = <&gpio3 4 GPIO_ACTIVE_LOW>; /* 68 */
+ 			linux,code = <KEY_CAMERA_FOCUS>;
+ 			gpio-key,wakeup;
++			linux,can-disable;
+ 		};
+ 
+ 		camera_capture {
+@@ -82,6 +84,7 @@
+ 			gpios = <&gpio3 5 GPIO_ACTIVE_LOW>; /* 69 */
+ 			linux,code = <KEY_CAMERA>;
+ 			gpio-key,wakeup;
++			linux,can-disable;
+ 		};
+ 
+ 		lock_button {
+@@ -89,6 +92,7 @@
+ 			gpios = <&gpio4 17 GPIO_ACTIVE_LOW>; /* 113 */
+ 			linux,code = <KEY_SCREENLOCK>;
+ 			gpio-key,wakeup;
++			linux,can-disable;
+ 		};
+ 
+ 		keypad_slide {
+@@ -97,6 +101,7 @@
+ 			linux,input-type = <EV_SW>;
+ 			linux,code = <SW_KEYPAD_SLIDE>;
+ 			gpio-key,wakeup;
++			linux,can-disable;
+ 		};
+ 
+ 		proximity_sensor {
+@@ -104,6 +109,7 @@
+ 			gpios = <&gpio3 25 GPIO_ACTIVE_HIGH>; /* 89 */
+ 			linux,input-type = <EV_SW>;
+ 			linux,code = <SW_FRONT_PROXIMITY>;
++			linux,can-disable;
+ 		};
+ 	};
+ 
 -- 
-tejun
+1.9.1
