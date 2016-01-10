@@ -1,28 +1,90 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Sun, 10 Jan 2016 13:13:24 +0000
-Subject: [PATCH] ARM: dts: imx28: add pinmux for USB1 overcurrent on pwm2
-In-Reply-To: <1473600647.505612.cb24b396-67be-4b7b-9938-7cb30ef4fe05.open-xchange@email.1und1.de>
- (Stefan Wahren's message of "Sun, 10 Jan 2016 14:08:40 +0100 (CET)")
-References: <1452429613-28783-1-git-send-email-mans@mansr.com>
- <1473600647.505612.cb24b396-67be-4b7b-9938-7cb30ef4fe05.open-xchange@email.1und1.de>
-Message-ID: <yw1xoacty3uz.fsf@unicorn.mansr.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Sun, 10 Jan 2016 08:14:11 -0500
+Subject: [PATCH V11 3/7] dma: add Qualcomm Technologies HIDMA management
+ driver
+In-Reply-To: <CAHp75Vd49-1H+1dkDmJzLpVhov1g+uJV+YiTBC9Xd3hVTmwRVg@mail.gmail.com>
+References: <1451865996-12808-1-git-send-email-okaya@codeaurora.org>
+ <1451865996-12808-4-git-send-email-okaya@codeaurora.org>
+ <CAHp75Vd49-1H+1dkDmJzLpVhov1g+uJV+YiTBC9Xd3hVTmwRVg@mail.gmail.com>
+Message-ID: <56925923.6080007@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren <stefan.wahren@i2se.com> writes:
 
-> Hi Mans,
+>> +
+>> +static int set_priority(struct hidma_mgmt_dev *mdev, unsigned int i, u64 val)
+>> +{
+>> +       u64 tmp;
+>> +       int rc;
+>> +
+>> +       if (i > mdev->dma_channels)
+> 
+> Shouldn't be >= ? I somehow missed that.
 >
->> Mans Rullgard <mans@mansr.com> hat am 10. Januar 2016 um 13:40 geschrieben:
->>
->>
->> Add pinmux setting for USB1 overcurrent on pwm2 pad.
->
-> could you please change your patch to describe why you need to add
-> this pinmux?
+Corrected.
 
-I'm working on a board that is wired that way.  I can of course put this
-in the board-specific dts if that's preferable.
+ 
+>> +               return -EINVAL;
+>> +
+>> +       tmp = mdev->priority[i];
+>> +       mdev->priority[i] = val;
+>> +       rc = hidma_mgmt_setup(mdev);
+>> +       if (rc)
+>> +               mdev->priority[i] = tmp;
+>> +       return rc;
+>> +}
+>> +
+>> +static int set_weight(struct hidma_mgmt_dev *mdev, unsigned int i, u64 val)
+>> +{
+>> +       u64 tmp;
+>> +       int rc;
+>> +
+>> +       if (i > mdev->dma_channels)
+> 
+> Ditto.
+OK
+
+> 
+>> +               return -EINVAL;
+>> +
+>> +       tmp = mdev->weight[i];
+>> +       mdev->weight[i] = val;
+>> +       rc = hidma_mgmt_setup(mdev);
+>> +       if (rc)
+>> +               mdev->weight[i] = tmp;
+>> +       return rc;
+>> +}
+>> +
+
+>> +
+>> +int hidma_mgmt_init_sys(struct hidma_mgmt_dev *mdev)
+>> +{
+>> +       unsigned int i;
+>> +       int rc;
+>> +       int required;
+>> +       struct kobject *chanops;
+>> +
+>> +       required = sizeof(*mdev->chroots) * mdev->dma_channels;
+>> +       mdev->chroots = devm_kmalloc(&mdev->pdev->dev, required, GFP_KERNEL);
+>> +       if (!mdev->chroots)
+>> +               return -ENOMEM;
+>> +
+>> +       chanops = kobject_create_and_add("chanops", &mdev->pdev->dev.kobj);
+>> +       if (!chanops)
+>> +               return -ENOMEM;
+>> +
+>> +       /* create each channel directory here */
+>> +       for (i = 0; i < mdev->dma_channels; i++) {
+>> +               char name[10];
+> 
+> I would make this bigger just in case i comes bigger by some reason.
+> 16 or 20 looks reasonable.
+> 
+made 20
+
+
 
 -- 
-M?ns Rullg?rd
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
