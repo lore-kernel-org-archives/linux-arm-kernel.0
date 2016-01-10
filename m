@@ -1,36 +1,37 @@
 From: mst@redhat.com (Michael S. Tsirkin)
-Date: Sun, 10 Jan 2016 16:22:05 +0200
-Subject: [PATCH v3 40/41] s390: use generic memory barriers
+Date: Sun, 10 Jan 2016 16:22:14 +0200
+Subject: [PATCH v3 41/41] s390: more efficient smp barriers
 In-Reply-To: <1452426622-4471-1-git-send-email-mst@redhat.com>
 References: <1452426622-4471-1-git-send-email-mst@redhat.com>
-Message-ID: <1452426622-4471-41-git-send-email-mst@redhat.com>
+Message-ID: <1452426622-4471-42-git-send-email-mst@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The s390 kernel is SMP to 99.99%, we just didn't bother with a
-non-smp variant for the memory-barriers. If the generic header
-is used we'd get the non-smp version for free. It will save a
-small amount of text space for CONFIG_SMP=n.
+As per: lkml.kernel.org/r/20150921112252.3c2937e1 at mschwide
+atomics imply a barrier on s390, so s390 should change
+smp_mb__before_atomic and smp_mb__after_atomic to barrier() instead of
+smp_mb() and hence should not use the generic versions.
 
+Suggested-by: Peter Zijlstra <peterz@infradead.org>
 Suggested-by: Martin Schwidefsky <schwidefsky@de.ibm.com>
 Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
 ---
- arch/s390/include/asm/barrier.h | 3 ---
- 1 file changed, 3 deletions(-)
+ arch/s390/include/asm/barrier.h | 3 +++
+ 1 file changed, 3 insertions(+)
 
 diff --git a/arch/s390/include/asm/barrier.h b/arch/s390/include/asm/barrier.h
-index fbd25b2..4d26fa4 100644
+index 4d26fa4..5c8db3c 100644
 --- a/arch/s390/include/asm/barrier.h
 +++ b/arch/s390/include/asm/barrier.h
-@@ -29,9 +29,6 @@
- #define __smp_mb()			mb()
- #define __smp_rmb()			rmb()
- #define __smp_wmb()			wmb()
--#define smp_mb()			__smp_mb()
--#define smp_rmb()			__smp_rmb()
--#define smp_wmb()			__smp_wmb()
+@@ -45,6 +45,9 @@ do {									\
+ 	___p1;								\
+ })
  
- #define __smp_store_release(p, v)					\
- do {									\
++#define __smp_mb__before_atomic()	barrier()
++#define __smp_mb__after_atomic()	barrier()
++
+ #include <asm-generic/barrier.h>
+ 
+ #endif /* __ASM_BARRIER_H */
 -- 
 MST
