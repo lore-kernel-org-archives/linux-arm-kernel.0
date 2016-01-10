@@ -1,55 +1,87 @@
 From: mst@redhat.com (Michael S. Tsirkin)
-Date: Sun, 10 Jan 2016 16:18:45 +0200
-Subject: [PATCH v3 16/41] arm64: define __smp_xxx
+Date: Sun, 10 Jan 2016 16:20:34 +0200
+Subject: [PATCH v3 29/41] Revert "virtio_ring: Update weak barriers to use
+ dma_wmb/rmb"
 In-Reply-To: <1452426622-4471-1-git-send-email-mst@redhat.com>
 References: <1452426622-4471-1-git-send-email-mst@redhat.com>
-Message-ID: <1452426622-4471-17-git-send-email-mst@redhat.com>
+Message-ID: <1452426622-4471-30-git-send-email-mst@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This defines __smp_xxx barriers for arm64,
-for use by virtualization.
+This reverts commit 9e1a27ea42691429e31f158cce6fc61bc79bb2e9.
 
-smp_xxx barriers are removed as they are
-defined correctly by asm-generic/barriers.h
+While that commit optimizes !CONFIG_SMP, it mixes
+up DMA and SMP concepts, making the code hard
+to figure out.
 
-Note: arm64 does not support !SMP config,
-so smp_xxx and __smp_xxx are always equivalent.
+A better way to optimize this is with the new __smp_XXX
+barriers.
 
+As a first step, go back to full rmb/wmb barriers
+for !SMP.
+We switch to __smp_XXX barriers in the next patch.
+
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Alexander Duyck <alexander.duyck@gmail.com>
 Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm64/include/asm/barrier.h | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ include/linux/virtio_ring.h | 23 +++++++++++++++++++----
+ 1 file changed, 19 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/include/asm/barrier.h b/arch/arm64/include/asm/barrier.h
-index 91a43f4..dae5c49 100644
---- a/arch/arm64/include/asm/barrier.h
-+++ b/arch/arm64/include/asm/barrier.h
-@@ -35,11 +35,11 @@
- #define dma_rmb()	dmb(oshld)
- #define dma_wmb()	dmb(oshst)
+diff --git a/include/linux/virtio_ring.h b/include/linux/virtio_ring.h
+index 8e50888..67e06fe 100644
+--- a/include/linux/virtio_ring.h
++++ b/include/linux/virtio_ring.h
+@@ -21,20 +21,19 @@
+  * actually quite cheap.
+  */
  
--#define smp_mb()	dmb(ish)
--#define smp_rmb()	dmb(ishld)
--#define smp_wmb()	dmb(ishst)
-+#define __smp_mb()	dmb(ish)
-+#define __smp_rmb()	dmb(ishld)
-+#define __smp_wmb()	dmb(ishst)
++#ifdef CONFIG_SMP
+ static inline void virtio_mb(bool weak_barriers)
+ {
+-#ifdef CONFIG_SMP
+ 	if (weak_barriers)
+ 		smp_mb();
+ 	else
+-#endif
+ 		mb();
+ }
  
--#define smp_store_release(p, v)						\
-+#define __smp_store_release(p, v)						\
- do {									\
- 	compiletime_assert_atomic_type(*p);				\
- 	switch (sizeof(*p)) {						\
-@@ -62,7 +62,7 @@ do {									\
- 	}								\
- } while (0)
+ static inline void virtio_rmb(bool weak_barriers)
+ {
+ 	if (weak_barriers)
+-		dma_rmb();
++		smp_rmb();
+ 	else
+ 		rmb();
+ }
+@@ -42,10 +41,26 @@ static inline void virtio_rmb(bool weak_barriers)
+ static inline void virtio_wmb(bool weak_barriers)
+ {
+ 	if (weak_barriers)
+-		dma_wmb();
++		smp_wmb();
+ 	else
+ 		wmb();
+ }
++#else
++static inline void virtio_mb(bool weak_barriers)
++{
++	mb();
++}
++
++static inline void virtio_rmb(bool weak_barriers)
++{
++	rmb();
++}
++
++static inline void virtio_wmb(bool weak_barriers)
++{
++	wmb();
++}
++#endif
  
--#define smp_load_acquire(p)						\
-+#define __smp_load_acquire(p)						\
- ({									\
- 	union { typeof(*p) __val; char __c[1]; } __u;			\
- 	compiletime_assert_atomic_type(*p);				\
+ struct virtio_device;
+ struct virtqueue;
 -- 
 MST
