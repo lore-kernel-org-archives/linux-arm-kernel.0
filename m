@@ -1,57 +1,73 @@
 From: kernel@martin.sperl.org (Martin Sperl)
-Date: Sun, 10 Jan 2016 11:55:48 +0100
-Subject: [PATCH 2/5] clk: bcm2835: enable management of PCM clock
-In-Reply-To: <CAMuHMdWOt4aCzu8Ode0ZrQ-c80nqAhwD5dd17nhgVbLrRYT5og@mail.gmail.com>
+Date: Sun, 10 Jan 2016 12:05:52 +0100
+Subject: [PATCH 5/5] dt-bindings: bsm2835: fix bindings documentation to
+ use new clock framework
+In-Reply-To: <20160109224523.GA17329@rob-hp-laptop>
 References: <1452331558-2520-1-git-send-email-kernel@martin.sperl.org>
- <1452331558-2520-3-git-send-email-kernel@martin.sperl.org>
- <4332640.jBKM55TPAo@wuerfel>
- <CAMuHMdWOt4aCzu8Ode0ZrQ-c80nqAhwD5dd17nhgVbLrRYT5og@mail.gmail.com>
-Message-ID: <4B891DE1-6340-4D3D-BEE3-F61D9A5D289B@martin.sperl.org>
+ <1452331558-2520-6-git-send-email-kernel@martin.sperl.org>
+ <20160109224523.GA17329@rob-hp-laptop>
+Message-ID: <ED21A42A-EE91-495D-857E-04C533CD718C@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-> On 10.01.2016, at 10:30, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> On 09.01.2016, at 23:45, Rob Herring <robh@kernel.org> wrote:
 > 
-> Hi Arnd,
-> 
-> On Sat, Jan 9, 2016 at 9:56 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Saturday 09 January 2016 09:25:54 kernel at martin.sperl.org wrote:
->>> --- a/include/dt-bindings/clock/bcm2835.h
->>> +++ b/include/dt-bindings/clock/bcm2835.h
->>> @@ -44,5 +44,6 @@
->>> #define BCM2835_CLOCK_EMMC             28
->>> #define BCM2835_CLOCK_PERI_IMAGE       29
->>> #define BCM2835_CLOCK_PWM              30
->>> +#define BCM2835_CLOCK_PCM              31
->>> 
->>> -#define BCM2835_CLOCK_COUNT            31
->>> +#define BCM2835_CLOCK_COUNT            32
+> On Sat, Jan 09, 2016 at 09:25:57AM +0000, kernel at martin.sperl.org wrote:
+>> From: Martin Sperl <kernel@martin.sperl.org>
 >> 
->> The last line contains an incompatible change, please don't do that.
->> If you have to add another clock, do that after the BCM2835_CLOCK_COUNT
->> definition to avoid changing dts files that use that number.
+>> The bcm2835-i2s driver has been updated to use the new clock framework
+>> for the bcm2835 SOC.
 > 
-> While I agree this changes dts files (in an unexpected way?), not updating
-> BCM2835_CLOCK_COUNT makes it definition useless. Which teaches that
-> having such definitions in DT headers is not a good idea in the first place...
+> You are breaking compatibility with the driver change. New kernels will 
+> not work with old dtbs as you have found. What should be done is fix the 
+> driver to work with the old and new dtb.
+
+Actually the driver/device-tree is already broken with commit 94cb7f76caa0
+("ARM: bcm2835: Switch to using the new clock driver support?)
+
+Because there we already have the following conflicting definitions:
+
+clocks: cprman at 7e101000 {
+	compatible = "brcm,bcm2835-cprman";
+	#clock-cells = <1>;
+	reg = <0x7e101000 0x2000>;
+	/* CPRMAN derives everything from the platform's
+	* oscillator.
+	*/
+	clocks = <&clk_osc>;
+};
+
+i2s: i2s at 7e203000 {
+	compatible = "brcm,bcm2835-i2s";
+	reg = <0x7e203000 0x20>,
+	      <0x7e101098 0x02>;
+	dmas = <&dma 2>,
+	       <&dma 3>;
+	dma-names = "tx", "rx";
+	status = "disabled";
+};
+
+The i2s driver fails to load because the second reg range
+overlaps with the range from clocks (which was introduced
+with the commit mentioned above.
+
+This patch only changes the driver to work again without
+this second reg address range and using the clocks property
+instead.
+
 > 
-> Hence it can better be replaced (it seems to be unused in dts files, but you
-> can keep the definition to be 100% sure) by an ARRAY_SIZE() in the C driver.
-> This requires changing the driver to e.g. initialize clks[] in
-> bcm2835_clk_probe() based on a table instead of explicit code.
-
-That is a more general issue with the clock driver (and there
-have been already some discussions around this when implementing
-the PWM clock.
-
-So if someone with a better idea how to keep those dt-binding includes
-synchronized with the definitions used by the code step forward and
-propose a better solution how to get that implemented?
-
-I guess there will be a few more occurrences of clocks that are
-currently not defined, which will need to get introduced in the future
-PWM and PCM were just the last in this series.
+>> This patch documents the required changes to the bindings.
+>> 
+>> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+>> ---
+>> Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt |    7 +++----
+>> 1 file changed, 3 insertions(+), 4 deletions(-)
+> 
+> But I leave it to platform maintainers to decide if breaking 
+> compatibility is okay, so:
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
 
 Thanks,
 	Martin
