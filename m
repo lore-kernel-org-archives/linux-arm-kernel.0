@@ -1,44 +1,34 @@
 From: mst@redhat.com (Michael S. Tsirkin)
-Date: Sun, 10 Jan 2016 21:29:06 +0200
-Subject: [PATCH v2 1/3] checkpatch.pl: add missing memory barriers
-In-Reply-To: <1452439051.7773.27.camel@perches.com>
-References: <1452427000-4520-1-git-send-email-mst@redhat.com>
- <1452427000-4520-2-git-send-email-mst@redhat.com>
- <1452438425.7773.21.camel@perches.com>
- <1452439051.7773.27.camel@perches.com>
-Message-ID: <20160110212531-mutt-send-email-mst@redhat.com>
+Date: Sun, 10 Jan 2016 21:30:27 +0200
+Subject: [PATCH v3 0/3] checkpatch: handling of memory barriers
+Message-ID: <1452454200-8844-1-git-send-email-mst@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 10, 2016 at 07:17:31AM -0800, Joe Perches wrote:
-> On Sun, 2016-01-10 at 07:07 -0800, Joe Perches wrote:
-> > On Sun, 2016-01-10 at 13:56 +0200, Michael S. Tsirkin wrote:
-> > > SMP-only barriers were missing in checkpatch.pl
-> > > 
-> > > Refactor code slightly to make adding more variants easier.
-> > []
-> > > diff --git a/scripts/checkpatch.pl b/scripts/checkpatch.pl
-> []
-> > If I use a variable called $smp_barriers, I'd expect
-> > it to actually be the smp_barriers, not to have to
-> > prefix it with smp_ before using it.
-> > 
-> > 		my $smp_barriers = qr{
-> > 			smp_store_release|
-> > 			smp_load_acquire|
-> > 			smp_store_mb|
-> > 			smp_read_barrier_depends
-> 
-> That's missing (?:barriers) too.
+As part of memory barrier cleanup, this patchset
+extends checkpatch to make it easier to stop
+incorrect memory barrier usage.
 
-My version has it but need to add ?: to avoid
-a capture group.
+This replaces the checkpatch patches in my series
+	arch: barrier cleanup + barriers for virt
+and will be included in the next version of the series.
 
-> btw: shouldn't this also have
-> 	smp_mb__(?:before|after)_atomic
-> ?
+changes from v2:
+	address comments by Joe Perches:
+	use (?: ... ) to avoid unnecessary capture groups
+	rename smp_barriers to smp_barrier_stems for clarity
+	add barriers before/after atomic
+Changes from v1:
+	catch optional\s* before () in barriers
+	rewrite using qr{} instead of map
 
-Good catch, included in the next version.
+Michael S. Tsirkin (3):
+  checkpatch.pl: add missing memory barriers
+  checkpatch: check for __smp outside barrier.h
+  checkpatch: add virt barriers
+
+ scripts/checkpatch.pl | 33 ++++++++++++++++++++++++++++++++-
+ 1 file changed, 32 insertions(+), 1 deletion(-)
 
 -- 
 MST
