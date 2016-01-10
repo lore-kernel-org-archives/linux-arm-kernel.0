@@ -1,29 +1,75 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sun, 10 Jan 2016 16:05:51 +0100 (CET)
-Subject: [PATCH V2 0/2] serial: bcm2835: add bcm2835 auxiliar uart driver
-In-Reply-To: <1452344854-2576-1-git-send-email-kernel@martin.sperl.org>
-References: <1452344854-2576-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <1057226922.507844.cb24b396-67be-4b7b-9938-7cb30ef4fe05.open-xchange@email.1und1.de>
+From: joe@perches.com (Joe Perches)
+Date: Sun, 10 Jan 2016 07:07:05 -0800
+Subject: [PATCH v2 1/3] checkpatch.pl: add missing memory barriers
+In-Reply-To: <1452427000-4520-2-git-send-email-mst@redhat.com>
+References: <1452427000-4520-1-git-send-email-mst@redhat.com>
+ <1452427000-4520-2-git-send-email-mst@redhat.com>
+Message-ID: <1452438425.7773.21.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Martin,
+On Sun, 2016-01-10 at 13:56 +0200, Michael S. Tsirkin wrote:
+> SMP-only barriers were missing in checkpatch.pl
+> 
+> Refactor code slightly to make adding more variants easier.
+[]
+> diff --git a/scripts/checkpatch.pl b/scripts/checkpatch.pl
+[]
+> @@ -5116,7 +5116,25 @@ sub process {
+> ?			}
+> ?		}
+> ?# check for memory barriers without a comment.
+> -		if ($line =~ /\b(mb|rmb|wmb|read_barrier_depends|smp_mb|smp_rmb|smp_wmb|smp_read_barrier_depends)\(/) {
+> +
+> +		my $barriers = qr{
+> +			mb|
+> +			rmb|
+> +			wmb|
+> +			read_barrier_depends
+> +		}x;
+> +		my $smp_barriers = qr{
+> +			store_release|
+> +			load_acquire|
+> +			store_mb|
+> +			($barriers)
+> +		}x;
 
-> kernel at martin.sperl.org hat am 9. Januar 2016 um 14:07 geschrieben:
->
->
-> From: Martin Sperl <kernel@martin.sperl.org>
->
-> This patch series adds the bcm2835aux uart driver, which is created
-> as a wrapper arround the 8250 driver (based on recommendations by
-> Stephen Warren)
->
-> The device tree patch itself is not included yet because this
-> patch requires the clk-bcm2835aux driver, which is right now only
-> in clk-next, but should become available with 4.5.
+If I use a variable called $smp_barriers, I'd expect
+it to actually be the smp_barriers, not to have to
+prefix it with smp_ before using it.
 
-it doesn't make sense without the device tree patch. IMHO it's okay as long as
-you point out the dependency and set the node status to disable.
+		my $smp_barriers = qr{
+			smp_store_release|
+			smp_load_acquire|
+			smp_store_mb|
+			smp_read_barrier_depends
+		}x;
 
-Best regards
-Stefan
+or
+
+		my $smp_barriers = qr{
+			smp_(?:store_release|load_acquire|store_mb|read_barrier_depends)
+		}x;
+
+?
+> +		my $all_barriers = qr{
+> +			$barriers|
+> +			smp_($smp_barriers)
+> +		}x;
+
+And this shouldn't have a capture group.
+
+		my $all_barriers = qr{
+			$barriers|
+			$smp_barriers
+		}x;		
+> +
+> +		if ($line =~ /\b($all_barriers)\s*\(/) {
+
+This doesn't need the capture group either (?:all_barriers)
+
+> ?			if (!ctx_has_comment($first_line, $linenr))
+> {
+> ?				WARN("MEMORY_BARRIER",
+> ?				?????"memory barrier without
+> comment\n" . $herecurr);
