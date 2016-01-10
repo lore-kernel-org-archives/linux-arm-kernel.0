@@ -1,55 +1,239 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 10 Jan 2016 09:06:34 +0100
-Subject: /sys/class/power_supply/bq27200-0/capacity changed meaning
- between 4.1 and 4.4?
-In-Reply-To: <20160109230709.GA30551@amd>
-References: <20160109230709.GA30551@amd>
-Message-ID: <20160110080621.GA3929@amd>
+From: zourongrong@gmail.com (Rolland Chau)
+Date: Sun, 10 Jan 2016 17:29:58 +0800
+Subject: [PATCH v1 3/3] ARM64 LPC: update binding doc
+In-Reply-To: <2550495.K9prJVsVEi@wuerfel>
+References: <1451396032-23708-1-git-send-email-zourongrong@gmail.com>
+ <6384244.Uhpjfgly6O@wuerfel> <568BB035.1050801@huawei.com>
+ <2550495.K9prJVsVEi@wuerfel>
+Message-ID: <56922496.3080402@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On 2016/1/5 20:19, Arnd Bergmann wrote:
+> On Tuesday 05 January 2016 19:59:49 Rongrong Zou wrote:
+>> ? 2016/1/5 0:34, Arnd Bergmann ??:
+>>> On Tuesday 05 January 2016 00:04:19 Rongrong Zou wrote:
+>>>> ? 2016/1/4 19:13, Arnd Bergmann ??:
+>>>>> On Sunday 03 January 2016 20:24:14 Rongrong Zou wrote:
+>>>>>> ? 2015/12/31 23:00, Rongrong Zou ??:
+>>>> Ranges property can set empty, but this means 1:1 translation. the I/O
+>>>> port range is translated to MMIO address 0x00000001 00000000 to
+>>>> 0x00000001 00000004, it looks wrong else. I wonder if anyone get legacy
+>>>> I/O port resource from dts.
+>>>
+>>> As I said, nothing should really require the ranges property here, unless
+>>> you have a valid IORESOURCE_MEM translation. The code that requires
+>>> the ranges to be present is wrong.
+>>>
+>>
+>> I think the openfirmware(DT) do not support for those unmapped I/O ports, because I
+>> must get resource by calling of_address_to_resource(), which have to call
+>> pci_address_to_pio() when resource type is IORESOURCE_IO. I'm sorry I have no
+>> better idea for this now. Maybe liviu can give me some opinions.
+>
+> I think on x86 it works (or used to work, few people use open firmware on
+> x86 these days, and it may be broken), and the pci_address_to_pio() call
+> behaves differently when PCI_IOBASE is set. x86 never maps I/O ports into
+> memory mapped I/O addresses, they have their own way of accessing them
+> just like your platform.
+>
+>> /**
+>>    * of_address_to_resource - Translate device tree address and return as resource
+>>    *
+>>    * Note that if your address is a PIO address, the conversion will fail if
+>>    * the physical address can't be internally converted to an IO token with
+>>    * pci_address_to_pio(), that is because it's either called to early or it
+>>    * can't be matched to any host bridge IO space
+>>    */
+>> int of_address_to_resource(struct device_node *dev, int index,
+>> 			   struct resource *r)
+>
+> The problem here seems to be that the code assumes that either the I/O ports
+> are always mapped or they are never mapped (no PCI_IOBASE). We need to extend
+> it because now we can have the combination of the two.
 
-> Did /sys/class/power_supply/bq27200-0/capacity change meaning between
-> 4.1 and 4.4?
-> 
-> It used to report battery capacity remaining in percent.
-> 
-> Not sure what it reports now, but ain't in percent....
 
-> The patch does not compile, but I should be sleeping, not trying to
-> understand crazy code. Whoever wrote it, please fix it. Maybe you can
-> just do
+Arnd , please take a look at the new solution when you have a moment,thanks.
+I modify the "drivers/of/address.c" to address the problem above.
 
-...and more crazy code :-(.
+There are some assumptions:
 
-        cache.flags = bq27xxx_read(di, BQ27XXX_REG_FLAGS, has_singe_flag);
-		if ((cache.flags & 0xff) == 0xff)
-		                cache.flags = -1; /* read error */
-				        /* WTF? bq27xxx returns -ERRNO
-        on error, we mask some bits off it, and then make it -1... */
-	
+1) ISA(LPC) Like bus must be scanned before PCI.
+2) a property "unmapped-size" is introduced to ISA bus DT config, it means the address
+  range of the bus. if bus-A have a port range(0-99), bus-B have a port range(0-199), then
+the cpu port range (0-99) is reserved for bus-A and cpu port range is reserved for bus-B.
+3) It it
+---
+  drivers/of/address.c | 76 +++++++++++++++++++++++++++++++++++++++++++++++-----
+  1 file changed, 70 insertions(+), 6 deletions(-)
 
-...and one crazy optimalization...
+diff --git a/drivers/of/address.c b/drivers/of/address.c
+index 9582c57..d3c71e5 100644
+--- a/drivers/of/address.c
++++ b/drivers/of/address.c
+@@ -682,8 +682,16 @@ struct io_range {
 
-        if (memcmp(&di->cache, &cache, sizeof(cache)) != 0)
-	                di->cache = cache;
+  static LIST_HEAD(io_range_list);
+  static DEFINE_SPINLOCK(io_range_lock);
++phy_addr_t pci_pio_start = 0;
++EXPORT_SYMBOL(pci_pio_start)
+  #endif
 
-...are we playing obfuscated C code contest, yet?
++int isa_register_unmapped_io_range(resource_size_t size)
++{
++       pci_pio_start += size;
++}
++
++
+  /*
+   * Record the PCI IO range (expressed as CPU physical address + size).
+   * Return a negative value if an error has occured, zero otherwise
+@@ -694,7 +702,7 @@ int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
 
-        case POWER_SUPPLY_PROP_PRESENT:
-	                val->intval = di->cache.flags < 0 ? 0 : 1;
+  #ifdef PCI_IOBASE
+         struct io_range *range;
+-       resource_size_t allocated_size = 0;
++       resource_size_t allocated_size = pci_pio_start;
 
-...to decidegree C?
-                if (ret == 0)
-		   	        pval->intval -= 2731; /* convert decidegree k to c */
+         /* check if the range hasn't been previously recorded */
+         spin_lock(&io_range_lock);
+@@ -743,7 +751,7 @@ phys_addr_t pci_pio_to_address(unsigned long pio)
 
-as read takes enum, make it enum like this?
-static inline int bq27xxx_read(struct bq27xxx_device_info *di, enum bq27xxx_reg_index reg_index,
-		                         bool single)
-					 
+  #ifdef PCI_IOBASE
+         struct io_range *range;
+-       resource_size_t allocated_size = 0;
++       resource_size_t allocated_size = pci_pio_start;
 
-									Pavel
+         if (pio > IO_SPACE_LIMIT)
+                 return address;
+@@ -766,7 +774,7 @@ unsigned long __weak pci_address_to_pio(phys_addr_t address)
+  {
+  #ifdef PCI_IOBASE
+         struct io_range *res;
+-       resource_size_t offset = 0;
++       resource_size_t offset = pci_pio_start;
+         unsigned long addr = -1;
+
+         spin_lock(&io_range_lock);
+@@ -788,21 +796,77 @@ unsigned long __weak pci_address_to_pio(phys_addr_t address)
+  #endif
+  }
+
++static u64 of_get_unmapped_pio(struct device_node *dev, const __be32 *inaddr)
++{
++       struct device_node *np, *parent = NULL;
++       struct of_bus * bus, *pbus;
++       struct property *p_property;
++       int rlen;
++       u32 size = 0;
++       u32 port_base = 0;
++
++       /*IF NOT I/O port*/
++       if(*(in_addr) != 0x01)
++               return OF_BAD_ADDR;
++       else
++               *in_addr = 0;
++
++       parent = of_get_parent(dev);
++       if(parent == NULL)
++               return result;
++       bus = of_match_bus(parent);
++       if(!strcmp(bus->name, "isa")) {
++               p_property = of_find_property(parent, "ranges", &rlen);
++               /*no ranges property, this is a non-bridged isa bus, and the port on it is unmapped*/
++               if(p_property == NULL) {
++                       for_each_node_by_name(np, "isa") {
++                               if((np != parent) &&
++                                  !of_find_property(parent, "ranges", &rlen) &&
++                                  !of_property_read_u32(parent, "unmapped-size", &size)) {
++                                       port_base += size;
++                               }
++                               else if (np == parent) {
++                                       of_bus_default_translate(in_addr + 1, port_base, 1);
++                                       break;
++                               }
++                               else {
++                                       continue;
++                               }
++                       }
++                       return of_read_number(in_addr, 2);
++
++               }
++
++       }
++       return OF_BAD_ADDR;
++}
++
+  static int __of_address_to_resource(struct device_node *dev,
+                 const __be32 *addrp, u64 size, unsigned int flags,
+                 const char *name, struct resource *r)
+  {
+         u64 taddr;
++       u8 addr_type = 0;
+
+         if ((flags & (IORESOURCE_IO | IORESOURCE_MEM)) == 0)
+                 return -EINVAL;
+         taddr = of_translate_address(dev, addrp);
+-       if (taddr == OF_BAD_ADDR)
+-               return -EINVAL;
++       if (taddr == OF_BAD_ADDR) {
++
++               taddr == of_get_unmapped_pio(dev, addrp);
++               if(taddr == OF_BAD_ADDR)
++                       return -EINVAL
++               else    /*we get unmapped I/O port successfully*/
++                       addr_type = 1;
++       }
++
+         memset(r, 0, sizeof(struct resource));
+         if (flags & IORESOURCE_IO) {
+                 unsigned long port;
+-               port = pci_address_to_pio(taddr);
++               if(!addr_type)
++                       port = pci_address_to_pio(taddr);
++               else
++                       port = (unsigned long)taddr;
+                 if (port == (unsigned long)-1)
+                         return -EINVAL;
+                 r->start = port;
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+
+
+In bus device probe code
+static int lpc_probe(struct platform_device *pdev)
+{
+	...
+	if(ret = of_property_read_u32((pdev->dev).of_node, "unmapped-size", &io_ranges))
+		return ret;
+	
+	lpc_dev->bus_size = io_ranges;
+	isa_register_io_range(io_ranges);
+	ret = of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
+	...
+	
+	return 0;
+}
+
+>
+>>>> For ipmi driver, I can get I/O port resource by DMI rather than dts.
+>>>
+>>> No, the ipmi driver uses the resource that belongs to the platform
+>>> device already, you can't rely on DMI data to be present there.
+>>
+>> Ipmi has a lot of way to be discovered(ACPI, DMI, hardcoded, hot-add,
+>> openfirmware and a few other), I think we just use one of them, not all of them.
+>> It depend on vendor's hardware solution actually.
+>
+> I don't think we should mix multiple methods here: if the bus is described
+> in DT, all its children should be there as well. Otherwise you get into problems
+> e.g. if you have multiple instances of the LPC bus and the Linux I/O addresses
+> for one or more of them have an offset to the bus specific addresses.
+>
+> The bus probe code decides what the Linux I/O port numbers are, but DMI
+> and other methods have no idea of the mapping. As long as there is only
+> one instance, using the first 0x1000 addresses with a 1:1 mapping saves
+> us a bit of trouble, but I'd be worried about relying on that assumption
+> too much.
+>
+> 	Arnd
+>
