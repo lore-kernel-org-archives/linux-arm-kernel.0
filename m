@@ -1,52 +1,57 @@
 From: kernel@martin.sperl.org (Martin Sperl)
-Date: Sun, 10 Jan 2016 11:49:19 +0100
-Subject: [PATCH V2 1/2] dt/bindings: serial: bcm2835: add binding
- documentation for bcm2835-aux-uart
-In-Reply-To: <10159898.8xe3rmYdEi@wuerfel>
-References: <1452344854-2576-1-git-send-email-kernel@martin.sperl.org>
- <1452344854-2576-2-git-send-email-kernel@martin.sperl.org>
- <10159898.8xe3rmYdEi@wuerfel>
-Message-ID: <175E89CE-581C-48AB-B7FF-6E9A41B033D5@martin.sperl.org>
+Date: Sun, 10 Jan 2016 11:55:48 +0100
+Subject: [PATCH 2/5] clk: bcm2835: enable management of PCM clock
+In-Reply-To: <CAMuHMdWOt4aCzu8Ode0ZrQ-c80nqAhwD5dd17nhgVbLrRYT5og@mail.gmail.com>
+References: <1452331558-2520-1-git-send-email-kernel@martin.sperl.org>
+ <1452331558-2520-3-git-send-email-kernel@martin.sperl.org>
+ <4332640.jBKM55TPAo@wuerfel>
+ <CAMuHMdWOt4aCzu8Ode0ZrQ-c80nqAhwD5dd17nhgVbLrRYT5og@mail.gmail.com>
+Message-ID: <4B891DE1-6340-4D3D-BEE3-F61D9A5D289B@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-> On 09.01.2016, at 21:53, Arnd Bergmann <arnd@arndb.de> wrote:
+> On 10.01.2016, at 10:30, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
 > 
-> On Saturday 09 January 2016 13:07:32 kernel at martin.sperl.org wrote:
->> +
->> +       uart1: uart at 7e215040 {
->> +               compatible = "brcm,bcm2835-aux-uart";
->> +               reg = <0x7e215040 0x40>;
->> +               interrupts = <1 29>;
->> +               clocks = <&aux BCM2835_AUX_CLOCK_UART>;
->> +       };
+> Hi Arnd,
+> 
+> On Sat, Jan 9, 2016 at 9:56 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Saturday 09 January 2016 09:25:54 kernel at martin.sperl.org wrote:
+>>> --- a/include/dt-bindings/clock/bcm2835.h
+>>> +++ b/include/dt-bindings/clock/bcm2835.h
+>>> @@ -44,5 +44,6 @@
+>>> #define BCM2835_CLOCK_EMMC             28
+>>> #define BCM2835_CLOCK_PERI_IMAGE       29
+>>> #define BCM2835_CLOCK_PWM              30
+>>> +#define BCM2835_CLOCK_PCM              31
+>>> 
+>>> -#define BCM2835_CLOCK_COUNT            31
+>>> +#define BCM2835_CLOCK_COUNT            32
 >> 
+>> The last line contains an incompatible change, please don't do that.
+>> If you have to add another clock, do that after the BCM2835_CLOCK_COUNT
+>> definition to avoid changing dts files that use that number.
 > 
-> The node name should always be "serial at ...", not "uart at ..."
+> While I agree this changes dts files (in an unexpected way?), not updating
+> BCM2835_CLOCK_COUNT makes it definition useless. Which teaches that
+> having such definitions in DT headers is not a good idea in the first place...
 > 
-> 	Arnd
+> Hence it can better be replaced (it seems to be unused in dts files, but you
+> can keep the definition to be 100% sure) by an ARRAY_SIZE() in the C driver.
+> This requires changing the driver to e.g. initialize clks[] in
+> bcm2835_clk_probe() based on a table instead of explicit code.
 
-The existing dts arch/arm/boot/dts/bcm2835.dtsi already contains:
-                uart0: uart at 7e201000 {
-                        compatible = "brcm,bcm2835-pl011", "arm,pl011", "arm,primecell";
-                        reg = <0x7e201000 0x1000>;
-                        interrupts = <2 25>;
-                        clocks = <&clocks BCM2835_CLOCK_UART>,
-                                 <&clocks BCM2835_CLOCK_VPU>;
-                        clock-names = "uartclk", "apb_pclk";
-                        arm,primecell-periphid = <0x00241011>;
-                };
-for the primary uart.
+That is a more general issue with the clock driver (and there
+have been already some discussions around this when implementing
+the PWM clock.
 
-So I was just following that example and would hesitate to
-use a different nomenclature in the same file (even though I
-saw serial examples elsewhere).
+So if someone with a better idea how to keep those dt-binding includes
+synchronized with the definitions used by the code step forward and
+propose a better solution how to get that implemented?
 
-I guess this is a more general thing that needs to get resolved.
-
-If you tell me to re-spin the patch because of this then I can do that,
-but that would not solve the issue with uart0.
+I guess there will be a few more occurrences of clocks that are
+currently not defined, which will need to get introduced in the future
+PWM and PCM were just the last in this series.
 
 Thanks,
 	Martin
