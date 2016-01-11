@@ -1,131 +1,100 @@
-From: kuro2357509@gmail.com (Johann)
-Date: Mon, 11 Jan 2016 16:43:23 +0000 (UTC)
-Subject: [linux-pm] ARM hibernation / suspend-to-disk
-References: <20130529081005.GA25561@hal> <51A6399D.4090606@ti.com>
- <20140128141458.GD8713@xo-6d-61-c0.localdomain>
- <20140128182245.18840.51279@capellas-linux>
- <loom.20140216T140206-196@post.gmane.org>
- <20140224215443.9748.65580@capellas-linux> <5312E46B.8020900@gmail.com>
- <531560aa.e7d5440a.0e5f.5f57@mx.google.com> <5315B328.9030306@gmail.com>
- <53166cef.43bd440a.2ff1.472e@mx.google.com>
-Message-ID: <loom.20160111T162128-272@post.gmane.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 11 Jan 2016 16:51:04 +0000
+Subject: [PATCH v3 04/21] arm64: decouple early fixmap init from linear
+ mapping
+In-Reply-To: <20160111162737.GQ6499@leverpostej>
+References: <1452518355-4606-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1452518355-4606-5-git-send-email-ard.biesheuvel@linaro.org>
+ <20160111160906.GO6499@leverpostej>
+ <CAKv+Gu8KbcJEfpjRMpaQHcsDo0ziv-2xmWowE9Syn_8pOX0WTw@mail.gmail.com>
+ <20160111162737.GQ6499@leverpostej>
+Message-ID: <20160111165103.GA29503@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sebastian Capella <sebastian.capella <at> linaro.org> writes:
-
-> 
-> Quoting TonyHo (2014-03-04 03:04:08)
-> > Hi Sebastian:
-> >      Thank you. And I'm in Shanghai, it's not far from the Macao, 
-both 
-> > in China, ha.
-> > The system can boot up normal now. And I want to make the 
-hibernation, 
-> > but error occurs. I want to save the hibernation image in 
-> > /dev/mmcblk0p3(device id 179:3), and I configure this in menuconfig:
-> > / # cat /sys/power/resume 179:3
-> > When I echo a disk to /sys/power/state , it hints(partly log):
-> > [ 49.426656] omap_uart 44e09000.serial: no wakeirq for uart0
-> > [ 49.594385] PM: thaw of devices complete after 171.291 msecs
-> > [ 49.661876] PM: Cannot find swap device, try swapon -a.
-> > [ 49.667356] PM: Cannot get swap writer
-> > [ 49.722677] Restarting tasks ... done. ash: write error: No such 
-device
+On Mon, Jan 11, 2016 at 04:27:38PM +0000, Mark Rutland wrote:
+> On Mon, Jan 11, 2016 at 05:15:13PM +0100, Ard Biesheuvel wrote:
+> > On 11 January 2016 at 17:09, Mark Rutland <mark.rutland@arm.com> wrote:
+> > > On Mon, Jan 11, 2016 at 02:18:57PM +0100, Ard Biesheuvel wrote:
+> > >> Since the early fixmap page tables are populated using pages that are
+> > >> part of the static footprint of the kernel, they are covered by the
+> > >> initial kernel mapping, and we can refer to them without using __va/__pa
+> > >> translations, which are tied to the linear mapping.
+> > >>
+> > >> Since the fixmap page tables are disjoint from the kernel mapping up
+> > >> to the top level pgd entry, we can refer to bm_pte[] directly, and there
+> > >> is no need to walk the page tables and perform __pa()/__va() translations
+> > >> at each step.
+> > >>
+> > >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > >> ---
+> > >>  arch/arm64/mm/mmu.c | 32 ++++++--------------
+> > >>  1 file changed, 9 insertions(+), 23 deletions(-)
+> > >>
+> > >> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> > >> index 7711554a94f4..75b5f0dc3bdc 100644
+> > >> --- a/arch/arm64/mm/mmu.c
+> > >> +++ b/arch/arm64/mm/mmu.c
+> > >> @@ -570,38 +570,24 @@ void vmemmap_free(unsigned long start, unsigned long end)
+> > >>  #endif       /* CONFIG_SPARSEMEM_VMEMMAP */
+> > >>
+> > >>  static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
+> > >> -#if CONFIG_PGTABLE_LEVELS > 2
+> > >>  static pmd_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss;
+> > >> -#endif
+> > >> -#if CONFIG_PGTABLE_LEVELS > 3
+> > >>  static pud_t bm_pud[PTRS_PER_PUD] __page_aligned_bss;
+> > >> -#endif
+> > >>
+> > >>  static inline pud_t * fixmap_pud(unsigned long addr)
+> > >>  {
+> > >> -     pgd_t *pgd = pgd_offset_k(addr);
+> > >> -
+> > >> -     BUG_ON(pgd_none(*pgd) || pgd_bad(*pgd));
+> > >> -
+> > >> -     return pud_offset(pgd, addr);
+> > >> +     return (CONFIG_PGTABLE_LEVELS > 3) ? &bm_pud[pud_index(addr)]
+> > >> +                                        : (pud_t *)pgd_offset_k(addr);
+> > >
+> > > If we move patch 6 earlier, we could use pud_offset_kimg here, and avoid
+> > > the cast, at the cost of passing the pgd into fixmap_pud.
+> > >
+> > > Similarly for fixmap_pmd.
+> > >
 > > 
-> > But I can find my device /dev/mmcblk0p3, and its size is about 2GB, 
-and 
-> > it's not mounted in system,it can be mounted with ext4 filesystem.
-> > / # ls -l /dev/mmcblk*
-> > brw-rw---- 1 0 0 179, 3 Jan 1 00:01 /dev/mmcblk0p3
-> > 
-> > It says cannot find swap device, but the CONFIG_SWAP=y is checked.
-> > It seems I miss something?
+> > Is that necessarily an improvement? I know it hides the cast, but I
+> > think having an explicit pgd_t* to pud_t* cast that so obviously
+> > applies to CONFIG_PGTABLE_LEVELS < 4 only is fine as well.
 > 
-> Hi tony,
-> 
-> Two things are?missing:
-> 
-> 1) you must format the partition as swap using the mkswap command. 
-?This can be
->    done on target or on your laptop. ?
-> 
-> 2) after booting, on target you have to add the swap to the system 
-using the
->    swapon command. ?I usually do:
-> 
->     swapon /dev/mmcblk0p3
-> 
-> If you want to do swapon -a you may have to modify the
-> /etc/fstab or mnttab but I don't do it?this way. ?
-> 
-> Sebastian
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel <at> lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> True; it's not a big thing either way.
 
-Hi Sebastian ,tonyho ,Pavel ,Russ:
+Sorry,  I'm gonig to change my mind on that again. I think using
+p?d_offset_kimg is preferable. e.g.
 
-I want to build the kernel https://github.com/russdill/linux/commits/arm-
-hibernation-am33xx-v3.12 to be used in BeagleBone black Rev C too, I 
-watched all discussion between Sebastian and tonyho, but I still can't 
-work fine.
+static inline pud_t * fixmap_pud(unsigned long addr)
+{
+        pgd_t *pgd = pgd_offset_k(addr);
 
-Below is my question:
-On 02/24/2014 22:54 , Sebastian Capella wrote:
-> I use omap2plus_defconfig.  
-> 
-> I have been working with BeagleBone Black (bbb) for hibernation on 
-this branch:
-> 
-> http://git.linaro.org/git-ro/people/sebastian.capella/linux.git 
-hibernation_3.13_russMerge
-> 
-> I ran into a few minor issues on Russ' branch for bbb that I had to 
-work
-> around.  In the end it worked fine, but I know I had to add some 
-entries
-> in the dts files at least for it to work.
+        BUG_ON(pgd_none(*pgd) || pgd_bad(*pgd));
 
-1. I can't find the branch: http://git.linaro.org/git-
-ro/people/sebastian.capella/linux.git hibernation_3.13_russMerge
+        return pud_offset_kimg(pgd, addr);
+}
 
-Does the repositories still working? Or where can I find it?
+static inline pmd_t * fixmap_pmd(unsigned long addr)
+{
+        pud_t *pud = fixmap_pud(addr);
 
-2. Because I can't use Sebastian's branch above, I still use Russ's 
-branch(arm-hibernation-am33xx-v3.12),and I built zImage and am335x-
-boneblack.dtb succesfully. When I boot beanglebone black using rootfs, 
-it hints(partly log):
-[    1.626927] tps65217 0-0024: TPS65217 ID 0xe version 1.2
-[    1.632587] omap_i2c 44e0b000.i2c: bus 0 rev0.11 at 400 kHz
-[    1.714583] davinci_mdio 4a101000.mdio: davinci mdio revision 1.6
-[    1.721043] davinci_mdio 4a101000.mdio: detected phy mask fffffffe
-[    1.730995] libphy: 4a101000.mdio: probed
-[    1.735391] davinci_mdio 4a101000.mdio: phy[0]: device 
-4a101000.mdio:00, driver SMSC LAN8710/LAN8720
-[    1.745665] Random MACID = e6:ed:f5:55:73:33
-[    1.756429] omap_rtc 44e3e000.rtc: setting system clock to 2000-01-01 
-00:00:01 UTC (946684801)
-[    1.770213] Waiting for root device /dev/mmcblk0p2...
+        BUG_ON(pud_none(*pud) || pud_bad(*pud));
 
-I guess this problem is caused by device tree hasn't support mmc.
+        return pmd_offset_kimg(pud, addr);
+}
 
-I want to ask how to add some entries in the dts files? or if there 
-would be some modification to be done before compile russ's source code? 
+That avoids having to check CONFIG_PGTABLE_LEVELS check and perform a cast,
+avoids duplicating details about bm_{pud,pmd}, and keeps the existing structure
+so it's easier to reason about the change. I was wrong about having to pass the
+pgd or pud in, so callers don't need upating.
 
-Below is my operation:
-1. Build russ's kernel branch:
-$ git clone https://github.com/russdill/linux.git
-$ git checkout arm-hibernation-am33xx-v3.12
-$ make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- omap2plus_defconfig
-$ make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- menuconfig
-$ make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- zImage dtbs -j4
+>From my PoV that is preferable.
 
-2. Build russ's u-boot(https://github.com/russdill/u-
-boot/tree/hibernation-v2013.10):
-$make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- am335x_boneblack
-
-Thank you very much!
+Thanks,
+Mark.
