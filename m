@@ -1,145 +1,196 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Mon, 11 Jan 2016 23:40:27 +0800
-Subject: [PATCH 1/4] arm64: dts: Reserve memory regions for hi6220
-In-Reply-To: <20151106011937.GA5960@leoy-linaro>
-References: <1444365376-10728-2-git-send-email-leo.yan@linaro.org>
- <CAL_JsqJapPM6CpaG+AYDAUQajZ4V5jREdCwA5F4vkD5jqC3bzg@mail.gmail.com>
- <20151009133028.GB21629@leverpostej>
- <CAL_Jsq+TrsS39L4nsRgqszTxKHyc00fLUf+BmftHnn=EV0PxhA@mail.gmail.com>
- <20151009142034.GB528@leoy-linaro>
- <CAL_JsqLhu03B_ADYvCYdduH2d38kajOyc=9eX_FHy4QYYhZGxQ@mail.gmail.com>
- <20151029083301.GB16063@leoy-linaro>
- <20151105135449.GD27192@leoy-linaro>
- <20151105161315.GE32247@leverpostej>
- <20151106011937.GA5960@leoy-linaro>
-Message-ID: <20160111154027.GC30974@leoy-linaro>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Mon, 11 Jan 2016 15:43:11 +0000
+Subject: [PATCH] spi: atmel: improve internal vs gpio chip-select choice
+In-Reply-To: <5693C9A3.9040403@atmel.com> (Nicolas Ferre's message of "Mon, 11
+ Jan 2016 16:26:27 +0100")
+References: <1452211907-16074-1-git-send-email-mans@mansr.com>
+ <5693C9A3.9040403@atmel.com>
+Message-ID: <yw1xh9ikw29c.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 06, 2015 at 09:19:37AM +0800, Leo Yan wrote:
-> On Thu, Nov 05, 2015 at 04:13:15PM +0000, Mark Rutland wrote:
-> > On Thu, Nov 05, 2015 at 09:54:50PM +0800, Leo Yan wrote:
-> > > On Thu, Oct 29, 2015 at 04:33:01PM +0800, Leo Yan wrote:
-> > > > On Wed, Oct 28, 2015 at 11:32:29PM -0500, Rob Herring wrote:
-> > > > > On Fri, Oct 9, 2015 at 9:20 AM, Leo Yan <leo.yan@linaro.org> wrote:
-> > > > > > On Fri, Oct 09, 2015 at 08:50:13AM -0500, Rob Herring wrote:
-> > > > > >> On Fri, Oct 9, 2015 at 8:30 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > > > > >> > On Fri, Oct 09, 2015 at 08:17:16AM -0500, Rob Herring wrote:
-> > > > > >> >> On Thu, Oct 8, 2015 at 11:36 PM, Leo Yan <leo.yan@linaro.org> wrote:
-> > > > > >> >> > On Hi6220, below memory regions in DDR have specific purpose:
-> > > > > >> >> >
-> > > > > >> >> >   0x05e0,0000 - 0x05ef,ffff: For MCU firmware using at runtime;
-> > > > > >> >> >   0x06df,f000 - 0x06df,ffff: For mailbox message data;
-> > > > > >> >> >   0x0740,f000 - 0x0740,ffff: For MCU firmware's section;
-> > > > > >> >> >   0x3e00,0000 - 0x3fff,ffff: For OP-TEE.
-> > > > > >> >> >
-> > > > > >> >> > This patch reserves these memory regions in DT.
-> > > > > >> >> >
-> > > > > >> >> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> > > > > >> >> > ---
-> > > > > >> >> >  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 16 ++++++++++++----
-> > > > > >> >> >  1 file changed, 12 insertions(+), 4 deletions(-)
-> > > > > >> >> >
-> > > > > >> >> > diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> > > > > >> >> > index e36a539..e3f4cb3 100644
-> > > > > >> >> > --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> > > > > >> >> > +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> > > > > >> >> > @@ -7,9 +7,6 @@
-> > > > > >> >> >
-> > > > > >> >> >  /dts-v1/;
-> > > > > >> >> >
-> > > > > >> >> > -/*Reserved 1MB memory for MCU*/
-> > > > > >> >> > -/memreserve/ 0x05e00000 0x00100000;
-> > > > > >> >> > -
-> > > > > >> >>
-> > > > > >> >> Why does memreserve not work for you? You can have multiple entries.
-> > > > > >> >>
-> > > > > >> >> >  #include "hi6220.dtsi"
-> > > > > >> >> >
-> > > > > >> >> >  / {
-> > > > > >> >> > @@ -24,8 +21,19 @@
-> > > > > >> >> >                 stdout-path = "serial0:115200n8";
-> > > > > >> >> >         };
-> > > > > >> >> >
-> > > > > >> >> > +       /*
-> > > > > >> >> > +        * Reserve below regions from memory node:
-> > > > > >> >> > +        *
-> > > > > >> >> > +        *  - 0x05e0,0000 - 0x05ef,ffff: MCU firmware runtime using
-> > > > > >> >> > +        *  - 0x06df,f000 - 0x06df,ffff: Mailbox message data
-> > > > > >> >> > +        *  - 0x0740,f000 - 0x0740,ffff: MCU firmware section
-> > > > > >> >> > +        *  - 0x3e00,0000 - 0x3fff,ffff: OP-TEE
-> > > > > >> >> > +        */
-> > > > > >> >> >         memory at 0 {
-> > > > > >> >> >                 device_type = "memory";
-> > > > > >> >> > -               reg = <0x0 0x0 0x0 0x40000000>;
-> > > > > >> >> > +               reg = <0x00000000 0x00000000 0x00000000 0x05e00000>,
-> > > > > >> >> > +                     <0x00000000 0x05f00000 0x00000000 0x00eff000>,
-> > > > > >> >> > +                     <0x00000000 0x06e00000 0x00000000 0x0060f000>,
-> > > > > >> >> > +                     <0x00000000 0x07410000 0x00000000 0x36bf0000>;
-> > > > > >> >>
+Nicolas Ferre <nicolas.ferre@atmel.com> writes:
 
-[...]
+> Le 08/01/2016 01:11, Mans Rullgard a ?crit :
+>> The driver currently chooses between internal chip-select or gpio
+>> based on the existence of the cs-gpios DT property which fails on
+>> non-DT systems and also enforces the same choice for all devices.
+>
+> Well, I fear that such a per-device choice may impact further the driver
+> than just moving a field from one structure to another...
 
-> > > > > I've read thru the thread and see 2 main conclusions. Using
-> > > > > reserved-memory is problematic since things like grub don't support
-> > > > > that. That is fine and we should stick with /mem-reserve/ for now.
-> > > > >
-> > > > > The other thing is the desire to have the memory presented to the kernel
-> > > > > be the same whether it comes from UEFI or DT structures. I can see why
-> > > > > there is some desire to have that alignment, but that doesn't really
-> > > > > buy us anything. We can't eliminate some code path in the kernel doing
-> > > > > so. So I still think that the memory node should reflect all of memory
-> > > > > as defined by the h/w and mem-reserve should be used for any software
-> > > > > defined reserved regions.
+Could you please elaborate?
 
-[...]
+> Moreover, I have the feeling that it was not the objective of this
+> patch.
 
-> > Sorry for the delay.
-> > 
-> > I'm still of the opinion that given the kernel has no business even
-> > reading this memory, it does not make sense to use a memreserve.
-> > 
-> > Given that, and the points about other software not knowing aobut
-> > /reserved-memory/, I don't think it makes sense to describe the region
-> > in the memory nodes.
+Your feeling is mistaken.  If it's somehow impossible to mix CS types,
+please explain why.
 
-[...]
+>> This patch makes the method per device instead of per controller
+>> and fixes the selection on non-DT systems.  With these changes,
+>> the chip-select method for each device is chosen according to the
+>> following priority:
+>> 
+>> 1. GPIO from device tree
+>> 2. GPIO from platform data
+>> 3. Internal chip-select
+>> 
+>> Tested on AVR32 ATSTK1000.
+>
+> This patch breaks the SAMA5D2 SPI support at least on most recent
+> linux-next (tested by Cyrille).
 
-Hi Rob, Mark,
+How did it fail?
 
-Sorry its taken me so long to bump this thread.
+> more remarks below...
+>
+>> Signed-off-by: Mans Rullgard <mans@mansr.com>
+>> ---
+>>  drivers/spi/spi-atmel.c | 44 ++++++++++++++++++++++----------------------
+>>  1 file changed, 22 insertions(+), 22 deletions(-)
+>> 
+>> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+>> index aebad36391c9..8be07fb67d4d 100644
+>> --- a/drivers/spi/spi-atmel.c
+>> +++ b/drivers/spi/spi-atmel.c
+>> @@ -310,7 +310,6 @@ struct atmel_spi {
+>>  
+>>  	bool			use_dma;
+>>  	bool			use_pdc;
+>> -	bool			use_cs_gpios;
+>>  	/* dmaengine data */
+>>  	struct atmel_spi_dma	dma;
+>>  
+>> @@ -324,6 +323,7 @@ struct atmel_spi {
+>>  struct atmel_spi_device {
+>>  	unsigned int		npcs_pin;
+>>  	u32			csr;
+>> +	bool			use_cs_gpio;
+>>  };
+>>  
+>>  #define BUFFER_SIZE		PAGE_SIZE
+>> @@ -388,7 +388,7 @@ static void cs_activate(struct atmel_spi *as, struct spi_device *spi)
+>>  		}
+>>  
+>>  		mr = spi_readl(as, MR);
+>> -		if (as->use_cs_gpios)
+>> +		if (asd->use_cs_gpio)
+>>  			gpio_set_value(asd->npcs_pin, active);
+>>  	} else {
+>>  		u32 cpol = (spi->mode & SPI_CPOL) ? SPI_BIT(CPOL) : 0;
+>> @@ -405,7 +405,7 @@ static void cs_activate(struct atmel_spi *as, struct spi_device *spi)
+>>  
+>>  		mr = spi_readl(as, MR);
+>>  		mr = SPI_BFINS(PCS, ~(1 << spi->chip_select), mr);
+>> -		if (as->use_cs_gpios && spi->chip_select != 0)
+>> +		if (asd->use_cs_gpio && spi->chip_select != 0)
+>>  			gpio_set_value(asd->npcs_pin, active);
+>>  		spi_writel(as, MR, mr);
+>>  	}
+>> @@ -434,7 +434,7 @@ static void cs_deactivate(struct atmel_spi *as, struct spi_device *spi)
+>>  			asd->npcs_pin, active ? " (low)" : "",
+>>  			mr);
+>>  
+>> -	if (!as->use_cs_gpios)
+>> +	if (!asd->use_cs_gpio)
+>>  		spi_writel(as, CR, SPI_BIT(LASTXFER));
+>>  	else if (atmel_spi_is_v2(as) || spi->chip_select != 0)
+>>  		gpio_set_value(asd->npcs_pin, !active);
+>> @@ -1221,8 +1221,6 @@ static int atmel_spi_setup(struct spi_device *spi)
+>>  		csr |= SPI_BIT(CPOL);
+>>  	if (!(spi->mode & SPI_CPHA))
+>>  		csr |= SPI_BIT(NCPHA);
+>> -	if (!as->use_cs_gpios)
+>> -		csr |= SPI_BIT(CSAAT);
+>>  
+>>  	/* DLYBS is mostly irrelevant since we manage chipselect using GPIOs.
+>>  	 *
+>> @@ -1233,21 +1231,28 @@ static int atmel_spi_setup(struct spi_device *spi)
+>>  	csr |= SPI_BF(DLYBS, 0);
+>>  	csr |= SPI_BF(DLYBCT, 0);
+>>  
+>> -	/* chipselect must have been muxed as GPIO (e.g. in board setup) */
+>> -	npcs_pin = (unsigned long)spi->controller_data;
+>> -
+>> -	if (!as->use_cs_gpios)
+>> -		npcs_pin = spi->chip_select;
+>> -	else if (gpio_is_valid(spi->cs_gpio))
+>> -		npcs_pin = spi->cs_gpio;
+>> -
+>>  	asd = spi->controller_state;
+>>  	if (!asd) {
+>>  		asd = kzalloc(sizeof(struct atmel_spi_device), GFP_KERNEL);
+>>  		if (!asd)
+>>  			return -ENOMEM;
+>>  
+>> -		if (as->use_cs_gpios) {
+>> +		npcs_pin = (unsigned long)spi->controller_data;
+>> +
+>> +		if (gpio_is_valid(spi->cs_gpio)) {
+>
+> The bug may come from here as the logic is somehow inverted and a "0" is
+> a valid gpio according to this gpio_is_valid() function. So we may take
+> this conditional branch instead of the third one in the sama5d2 case.
 
-So I can have more confidence discussing this I have reviewed the
-existing files in arch/arm/boot and arch/arm64/boot and done a bit of
-analysis. My summary is below:
+spi->cs_gpio is set to -ENOENT if none is specified so I don't think
+this should be a problem.
 
-In arch/arm/boot:
+>> +			/* GPIO from DT */
+>> +			npcs_pin = spi->cs_gpio;
+>> +			asd->use_cs_gpio = true;
+>> +		} else if (npcs_pin && gpio_is_valid(npcs_pin)) {
+>> +			/* GPIO from platform data */
+>> +			asd->use_cs_gpio = true;
+>> +		} else {
+>> +			/* internal chip-select */
+>> +			npcs_pin = spi->chip_select;
+>> +			asd->use_cs_gpio = false;
+>> +		}
+>> +
+>> +		if (asd->use_cs_gpio) {
+>>  			ret = gpio_request(npcs_pin, dev_name(&spi->dev));
+>>  			if (ret) {
+>>  				kfree(asd);
+>> @@ -1262,6 +1267,8 @@ static int atmel_spi_setup(struct spi_device *spi)
+>>  		spi->controller_state = asd;
+>>  	}
+>>  
+>> +	if (!asd->use_cs_gpio)
+>> +		csr |= SPI_BIT(CSAAT);
+>>  	asd->csr = csr;
+>>  
+>>  	dev_dbg(&spi->dev,
+>> @@ -1569,13 +1576,6 @@ static int atmel_spi_probe(struct platform_device *pdev)
+>>  
+>>  	atmel_get_caps(as);
+>>  
+>> -	as->use_cs_gpios = true;
+>> -	if (atmel_spi_is_v2(as) &&
+>
+> I don't see this atmel_spi_is_v2() test in the resulting code anymore:
+> did you make sure that the v1 of the peripheral is protected?
 
-- In arch/arm, Using /reserved-memory/ and /memreserve/ are very common
-  case to reserve memory regions;
-- /memreserve/ is mainly used to reserve memory for spin-table which
-  used by SMP booting;
-- /reserved-memory/ are used to reserve memory regions for security
-  (TrustZone, secure RAM, etc), message transferring; So we can say
-  usually use this method to reserve memory for device driver or other
-  modules which maps these memory regions later.
-- There also have some DT files using memory node to carve out memory
-  regions, but from roughly analysis we can see the most cases are
-  introduced by memory controller for discontinuous memory space for
-  DDR; or there have some silicon bug so some regions are not stable
-  so need get rid of them (Armada-xp);
+You're right, that check seems to have fallen by the wayside.
 
-In arch/arm64/boot:
+>> -	    !of_get_property(pdev->dev.of_node, "cs-gpios", NULL)) {
+>> -		as->use_cs_gpios = false;
+>> -		master->num_chipselect = 4;
+>
+> This line is pretty important: you mustn't remove it blindly!
 
-- There have no any file using /reserved-memory/;
-- Several files are using /memreserve/ for spin-table boot method;
-- ARM platforms (Juno, FVP) use memory nodes to carve out memory regions
-  for security;
-- DT files in arch/arm64 are quite consistent with Mark's suggestion.
+That may be the real cause of whatever problem you saw.
 
-In my review I haven't really found anything that pushes me in one
-direction or the other so, without consensus from the DT maintainers, I
-really don't know how to progress here.
+>> -	}
+>> -
+>>  	as->use_dma = false;
+>>  	as->use_pdc = false;
+>>  	if (as->caps.has_dma_support) {
+>> 
+>
+> So, sorry but it's a NACK for me.
 
-Thanks,
-Leo Yan
+Thanks for reviewing.
+
+-- 
+M?ns Rullg?rd
