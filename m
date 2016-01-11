@@ -1,36 +1,85 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 11 Jan 2016 16:47:44 +0000
-Subject: [PATCH] regulator: max8973: add THERMAL_OF dependency
-In-Reply-To: <7607130.s0M7SSqlJV@wuerfel>
-References: <7607130.s0M7SSqlJV@wuerfel>
-Message-ID: <20160111164744.GM6588@sirena.org.uk>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 11 Jan 2016 13:47:15 -0300
+Subject: [PATCH v2 7/8] [media] exynos4-is: Check v4l2_of_parse_endpoint()
+ return value
+In-Reply-To: <1452530844-30609-1-git-send-email-javier@osg.samsung.com>
+References: <1452530844-30609-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <1452530844-30609-8-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 08, 2016 at 09:06:43PM +0100, Arnd Bergmann wrote:
+The v4l2_of_parse_endpoint() function can fail so check the return value.
 
-> I've run into the same problem a couple of times now, with every driver
-> that calls thermal_zone_of_sensor_register(). I think we need a better
-> solution in general, but this fixes the immediate build error for now.
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+---
 
-Yes, this doesn't feel very clever especially in this use case where
-we're mostly providing data into the thermal framework and not really
-relying on it for anything.
+Changes in v2: None
 
-> Maybe we should replace the "#ifdef CONFIG_THERMAL_OF" with "#if
-> IS_REACHABLE(CONFIG_THERMAL) && IS_ENABLED(CONFIG_THERMAL_OF)"?
-> The disadvantage of that is that the thermal management would be
-> silently disabled rather than cause a link error, and that may also
-> not be desired.
+ drivers/media/platform/exynos4-is/media-dev.c |  8 +++++++-
+ drivers/media/platform/exynos4-is/mipi-csis.c | 10 +++++++---
+ 2 files changed, 14 insertions(+), 4 deletions(-)
 
-Perhaps we should ensure that at least some glue code is bool rather
-than modular?  That's got downsides too, it increases the amount of code
-that gets built into the kernel but perhaps that's an acceptable
-tradeoff here.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160111/74a24dcc/attachment.sig>
+diff --git a/drivers/media/platform/exynos4-is/media-dev.c b/drivers/media/platform/exynos4-is/media-dev.c
+index f3b2dd30ec77..662d4a5c584e 100644
+--- a/drivers/media/platform/exynos4-is/media-dev.c
++++ b/drivers/media/platform/exynos4-is/media-dev.c
+@@ -332,13 +332,19 @@ static int fimc_md_parse_port_node(struct fimc_md *fmd,
+ 	struct fimc_source_info *pd = &fmd->sensor[index].pdata;
+ 	struct device_node *rem, *ep, *np;
+ 	struct v4l2_of_endpoint endpoint;
++	int ret;
+ 
+ 	/* Assume here a port node can have only one endpoint node. */
+ 	ep = of_get_next_child(port, NULL);
+ 	if (!ep)
+ 		return 0;
+ 
+-	v4l2_of_parse_endpoint(ep, &endpoint);
++	ret = v4l2_of_parse_endpoint(ep, &endpoint);
++	if (ret) {
++		of_node_put(ep);
++		return ret;
++	}
++
+ 	if (WARN_ON(endpoint.base.port == 0) || index >= FIMC_MAX_SENSORS)
+ 		return -EINVAL;
+ 
+diff --git a/drivers/media/platform/exynos4-is/mipi-csis.c b/drivers/media/platform/exynos4-is/mipi-csis.c
+index ac5e50e595be..bd5c46c3d4b7 100644
+--- a/drivers/media/platform/exynos4-is/mipi-csis.c
++++ b/drivers/media/platform/exynos4-is/mipi-csis.c
+@@ -736,6 +736,7 @@ static int s5pcsis_parse_dt(struct platform_device *pdev,
+ {
+ 	struct device_node *node = pdev->dev.of_node;
+ 	struct v4l2_of_endpoint endpoint;
++	int ret;
+ 
+ 	if (of_property_read_u32(node, "clock-frequency",
+ 				 &state->clk_frequency))
+@@ -751,7 +752,9 @@ static int s5pcsis_parse_dt(struct platform_device *pdev,
+ 		return -EINVAL;
+ 	}
+ 	/* Get port node and validate MIPI-CSI channel id. */
+-	v4l2_of_parse_endpoint(node, &endpoint);
++	ret = v4l2_of_parse_endpoint(node, &endpoint);
++	if (ret)
++		goto err;
+ 
+ 	state->index = endpoint.base.port - FIMC_INPUT_MIPI_CSI2_0;
+ 	if (state->index >= CSIS_MAX_ENTITIES)
+@@ -764,9 +767,10 @@ static int s5pcsis_parse_dt(struct platform_device *pdev,
+ 					"samsung,csis-wclk");
+ 
+ 	state->num_lanes = endpoint.bus.mipi_csi2.num_data_lanes;
+-	of_node_put(node);
+ 
+-	return 0;
++err:
++	of_node_put(node);
++	return ret;
+ }
+ 
+ static int s5pcsis_pm_resume(struct device *dev, bool runtime);
+-- 
+2.4.3
