@@ -1,44 +1,80 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 11 Jan 2016 12:14:56 +0000
-Subject: [PATCH v5 08/11] arm-cci: Provide hook for writing to PMU counters
-In-Reply-To: <20160111105454.GG6499@leverpostej>
-References: <1451908490-2615-1-git-send-email-suzuki.poulose@arm.com>
- <1451908490-2615-9-git-send-email-suzuki.poulose@arm.com>
- <20160111105454.GG6499@leverpostej>
-Message-ID: <56939CC0.1@arm.com>
+From: ariel@vanguardiasur.com.ar (Ariel D'Alessandro)
+Date: Mon, 11 Jan 2016 09:15:08 -0300
+Subject: [PATCH v4 0/4] Add support for NXP LPC18xx EEPROM using nvmem
+In-Reply-To: <1447790576-29410-1-git-send-email-ariel@vanguardiasur.com.ar>
+References: <1447790576-29410-1-git-send-email-ariel@vanguardiasur.com.ar>
+Message-ID: <56939CCC.1040508@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/16 10:54, Mark Rutland wrote:
-> On Mon, Jan 04, 2016 at 11:54:47AM +0000, Suzuki K. Poulose wrote:
+Hi Srinivas,
 
->>   static struct cci_pmu_model cci_pmu_models[];
->> @@ -846,7 +847,15 @@ static void pmu_write_counter(struct perf_event *event, u32 value)
->>   		dev_err(&cci_pmu->plat_device->dev, "Invalid CCI PMU counter %d\n", idx);
->>   		return;
->>   	}
->> -	__pmu_write_counter(cci_pmu, value, idx);
->> +
->> +	if (cci_pmu->model->write_counters) {
->> +		unsigned long mask[BITS_TO_LONGS(cci_pmu->num_cntrs)];
->> +
->> +		memset(mask, 0, BITS_TO_LONGS(cci_pmu->num_cntrs) * sizeof(unsigned long));
->> +		set_bit(idx, mask);
->> +		cci_pmu->model->write_counters(cci_pmu, mask, value);
->> +	} else
->> +		__pmu_write_counter(cci_pmu, value, idx);
->>   }
->
-> It would be much simpler to always log writes here, and only do the real
-> wirtes in batches when we re-enable the PMU (with appropriate
-> disable/enable calls in the IRQ handler).
->
-> We'd still need special hooks for CCIs which require a special dance to
-> program them, but all the logic to handle the writes would be in one
-> place.
+I just realized that these patches (1/4, 2/4) didn't get picked up.
+Could you please check this?
 
-This one is only there for the writes from the irq handler. Now that
-we have decided to disable pmu there, we could batch this one too.
+Thanks,
 
-Cheers
-Suzuki
+El 17/11/15 a las 17:02, Ariel D'Alessandro escribi?:
+> This patch series adds support for NXP LPC18xx EEPROM memory found in
+> NXP LPC185x/3x and LPC435x/3x/2x/1x devices.
+> 
+> This patchset is based on tag next-20151116 of the linux-next
+> repository. It has been successfully tested on a LPC4337 CIAA-NXP
+> Board.
+> 
+> EEPROM notes:
+> ------------
+> 
+> EEPROM size is 16384 bytes and it can be entirely read and 
+> written/erased with 1 word (4 bytes) granularity. The last page
+> (128 bytes) contains the EEPROM initialization data and is not writable.
+> 
+> Erase/program time is less than 3ms. The EEPROM device requires a
+> ~1500 kHz clock (min 800 kHz, max 1600 kHz) that is generated dividing
+> the system bus clock by the division factor, contained in the divider
+> register (minus 1 encoded).
+> 
+> EEPROM will be kept in Power Down mode except during read/write calls.
+> 
+> Changeset:
+> ---------
+> v3 -> v4:
+> * Added busywait polling for erase/program operation to finish.
+> 
+> v2 -> v3:
+> * Documented 'resets' property in devicetree bindings.
+> * Added dynamic power on/off when writing/reading the EEPROM.
+> * Added check for aligned offset in EEPROM writes.
+> * Properly remove the driver in the reverse order of initialization.
+> * Minor fixes.
+> 
+> v1 -> v2:
+> * Moved dt-bindings to be the first patch.
+> * Changed compatible name from lpc1850 to lpc1857 as the former doesn't have EEPROM.
+> * Fix hardware description which contained SoCs models without EEPROM.
+> * Disabled fast_io and changed mdelay for msleep in regmap writes.
+> * Replaced BUG_ON() in write function for an -EINVAL return.
+> * Add patches for defconfig and devicetree files.
+> 
+> Thanks,
+> 
+> Ariel D'Alessandro (4):
+>   DT: nvmem: Add NXP LPC18xx EEPROM memory binding documentation
+>   nvmem: NXP LPC18xx EEPROM memory NVMEM driver
+>   ARM: dts: lpc18xx: add EEPROM memory node
+>   ARM: configs: lpc18xx: enable EEPROM NVMEM driver
+> 
+>  .../devicetree/bindings/nvmem/lpc1857-eeprom.txt   |  28 ++
+>  arch/arm/boot/dts/lpc18xx.dtsi                     |  12 +
+>  arch/arm/configs/lpc18xx_defconfig                 |   2 +
+>  drivers/nvmem/Kconfig                              |   9 +
+>  drivers/nvmem/Makefile                             |   2 +
+>  drivers/nvmem/lpc18xx_eeprom.c                     | 330 +++++++++++++++++++++
+>  6 files changed, 383 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/nvmem/lpc1857-eeprom.txt
+>  create mode 100644 drivers/nvmem/lpc18xx_eeprom.c
+> 
+
+-- 
+Ariel D'Alessandro, VanguardiaSur
+www.vanguardiasur.com.ar
