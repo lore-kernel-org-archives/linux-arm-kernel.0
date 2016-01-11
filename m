@@ -1,37 +1,90 @@
-From: mlangsdo@redhat.com (Mark Langsdorf)
-Date: Mon, 11 Jan 2016 09:33:21 -0600
-Subject: [PATCH] ata: add AMD Seattle platform driver
-In-Reply-To: <5690367E.8060609@amd.com>
-References: <1452200002-31590-1-git-send-email-brijesh.singh@amd.com>
- <4983521.tEaWggKCCv@wuerfel> <568F14E0.4060107@amd.com>
- <10869853.plxna0HzWE@wuerfel> <5690367E.8060609@amd.com>
-Message-ID: <5693CB41.70408@redhat.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 11 Jan 2016 15:39:49 +0000
+Subject: [PATCH V2 00/23] MMCONFIG refactoring and support for ARM64 PCI
+ hostbridge init based on ACPI
+In-Reply-To: <b3750d7918712f6035ea875d90c25471.squirrel@www.codeaurora.org>
+References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
+ <20151221121050.GB11145@red-moon> <5677F3C8.8040200@semihalf.com>
+ <201512211515.55447.arnd@arndb.de>
+ <b3750d7918712f6035ea875d90c25471.squirrel@www.codeaurora.org>
+Message-ID: <20160111153949.GA2366@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08/2016 04:21 PM, Brijesh Singh wrote:
-> Hi,
+On Mon, Dec 21, 2015 at 03:26:14PM +0000, Okaya at codeaurora.org wrote:
+> > On Monday 21 December 2015, Tomasz Nowicki wrote:
+> >> On 21.12.2015 13:10, Lorenzo Pieralisi wrote:
+> >> > On Fri, Dec 18, 2015 at 06:56:39PM +0000, okaya at codeaurora.org wrote:
+> >
+> >> >> I have multiple root ports with the same IO port configuration in the
+> >> >> current ACPI table.
+> >> >>
+> >> >> Root port 0 = IO range 0x1000-0x10FFF
+> >> >> Root port 1 = IO range 0x1000-0x10FFF
+> >> >> Root port 2 = IO range 0x1000-0x10FFF
+> >> >
+> >> > It is fine. You end up mapping for each of those a 4k window of the
+> >> > virtual address space allocated to IO and that's what you will have in
+> >> > the kernel PCI resources (not in the HW BARs though). If that was a
+> >> problem
+> >> > it would be even for the current DT host controllers eg:
+> >> >
+> >> > arch/arm64/boot/dts/apm/apm-storm.dtsi
+> >> >
+> >> > it should not be (again I will let Arnd comment on this since he may
+> >> be
+> >> > aware of issues encountered on other arches/platforms).
+> >> >
+> >>
+> >> Root port 0 = IO range 0x1000-0x10FFF
+> >> Root port 1 = IO range 0x1000-0x10FFF
+> >> Root port 2 = IO range 0x1000-0x10FFF
+> >>
+> >> If above ranges are mapped into different CPU windows, then yes, it is
+> >> fine.
+> >
+> > Ideally, they should all be the same CPU address so we only have to map
+> > the window
+> > once, each device gets an address below 64K, and you can have legacy port
+> > numbers
+> > (below 4K) on any bus, which is required to make certain GPUs work.
+> >
+> > I haven't actually seen anyone do that on ARM though, every implementation
+> > so
+> > far has a separate mapping per host bridge, and we can cope with that too,
+> > and we can live with either overlapping bus addresses or unique bus
+> > addresses,
+> > any of them can be expressed by the PCI core in Linux, we just have to
+> > make sure
+> > that we correctly translate the firmware tables into our internal
+> > structures.
+> >
+> > 	Arnd
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >
+> 
+> Thanks, I won't be touching the acpi tables then and I will assume the
+> hack had a problem. It was trying to remap the io range of the second root
+> port  to the first port io address map.
+> 
+> I was getting a warning from resource.c
+> 
+> Btw, when I tested the io ranges before, kernel didn't accept anything
+> below 1k like 0. That is why my range starts at 1k.
 
->> We generally don't refer to register locations with properties other than
->> 'reg', so that approach would be worse. What I'd suggest you do is to
->> have the sgpio registers in a separate device node, and use the LED
->> binding to access it, see
->>
->> Documentation/devicetree/bindings/leds/common.txt
->>
->> It seems that none of the drivers/ata/ drivers use the leds interface
->> today, but that can be added to libata-*.c whenever the appropriate
->> properties are there.
->>
->
-> libata-*.c implements the "Enclosure management" style led messages but also has hooks
-> to register a custom led control callback. Since Seattle platform does not support
-> the "Enclosure management" registers hence ata_port_info we are setting a ATA_FLAG_EM | ATA_FLAG_SW_ACIVITY
-> to indicate that we can still handle the led messages by our registered callback. I see
-> that sata_highbank driver is doing something similar.
+And that's what you should not do. ACPI tables have to have a 1:1
+correspondence with HW resources and you must not change them to
+make the kernel (which version by the way, given that ARM64 ACPI PCI
+support is not in the mainline) work. I already said that: we must not
+interpret ACPI tables, we must define them according to specifications,
+and that's what everyone should follow to write FW.
 
-The sata_highbank driver is doing it wrong and shouldn't have been
-accepted in its current condition. Enclosure management really should
-be a separate device. Please don't use it as an example.
+So, why does your PCI IO range starts at 1k ? Please define what you
+mean by "kernel didn't accept anything below 1k", I want to understand
+what you are referring to.
 
---Mark Langsdorf
+Thanks,
+Lorenzo
