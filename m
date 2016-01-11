@@ -1,150 +1,42 @@
-From: laura@labbott.name (Laura Abbott)
-Date: Mon, 11 Jan 2016 13:39:24 -0800
-Subject: [RESEND][PATCHv2 3/3] NOMERGE: Sample driver
-In-Reply-To: <1452548364-9522-1-git-send-email-laura@labbott.name>
-References: <1452548364-9522-1-git-send-email-laura@labbott.name>
-Message-ID: <1452548364-9522-4-git-send-email-laura@labbott.name>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 11 Jan 2016 22:42:47 +0100
+Subject: /sys/class/power_supply/bq27200-0/capacity changed meaning
+ between 4.1 and 4.4?
+In-Reply-To: <5693BB75.70409@ti.com>
+References: <20160109230709.GA30551@amd>
+ <5693BB75.70409@ti.com>
+Message-ID: <20160111214247.GA9735@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi!
 
+> >Did /sys/class/power_supply/bq27200-0/capacity change meaning between
+> >4.1 and 4.4?
 
-Small sample driver to show what setup would look like with the dt
-bindings
+> There was a resent overhaul of this driver and a lot of code is
+> vestigial as you have seen. I've been meaning to continue
+> cleaning it up, my next step would probably to bring up regmap
 
-Signed-off-by: Laura Abbott <laura@labbott.name>
----
- drivers/staging/android/ion/Kconfig         |  6 ++
- drivers/staging/android/ion/Makefile        |  1 +
- drivers/staging/android/ion/ion_of_sample.c | 96 +++++++++++++++++++++++++++++
- 3 files changed, 103 insertions(+)
- create mode 100644 drivers/staging/android/ion/ion_of_sample.c
+Ok, 1wire is probably reasonable approach. But we have an regression
+between 4.1 and 4.4, and to debug it is probably by reading code.
 
-diff --git a/drivers/staging/android/ion/Kconfig b/drivers/staging/android/ion/Kconfig
-index 9b6d65d..c2afb35 100644
---- a/drivers/staging/android/ion/Kconfig
-+++ b/drivers/staging/android/ion/Kconfig
-@@ -43,3 +43,9 @@ config ION_OF
- 	  extensions
- 
- 	  If using Ion and devicetree, you should say Y here
-+
-+config ION_OF_SAMPLE
-+	bool "Sample driver"
-+	depends on ION_OF
-+	help
-+	  Small sample driver showing the Ion OF interface
-diff --git a/drivers/staging/android/ion/Makefile b/drivers/staging/android/ion/Makefile
-index a77417b..1309b91 100644
---- a/drivers/staging/android/ion/Makefile
-+++ b/drivers/staging/android/ion/Makefile
-@@ -8,4 +8,5 @@ endif
- obj-$(CONFIG_ION_DUMMY) += ion_dummy_driver.o
- obj-$(CONFIG_ION_TEGRA) += tegra/
- obj-$(CONFIG_ION_OF) += ion_of.o ion_physmem.o
-+obj-$(CONFIG_ION_OF_SAMPLE) += ion_of_sample.o
- 
-diff --git a/drivers/staging/android/ion/ion_of_sample.c b/drivers/staging/android/ion/ion_of_sample.c
-new file mode 100644
-index 0000000..bbcdf4d
---- /dev/null
-+++ b/drivers/staging/android/ion/ion_of_sample.c
-@@ -0,0 +1,96 @@
-+/*
-+ * Copyright (C) 2015 RC Module
-+ * Andrew Andrianov <andrew@ncrmnt.org>
-+ * Also based on work from Google, The Linux Foundation
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+#include <linux/of.h>
-+#include <linux/of_platform.h>
-+#include <linux/of_address.h>
-+#include <linux/clk.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/io.h>
-+#include "ion.h"
-+#include "ion_priv.h"
-+#include "ion_of.h"
-+
-+struct sample_ion_dev {
-+        struct ion_heap         **heaps;
-+        struct ion_device       *idev;
-+};
-+
-+static struct ion_of_heap heaps[] = {
-+	PLATFORM_HEAP("sample-system", 0, ION_HEAP_TYPE_SYSTEM, "system"),
-+	PLATFORM_HEAP("sample-camera", 1, ION_HEAP_TYPE_DMA, "camera"),
-+	PLATFORM_HEAP("sample-fb", 2, ION_HEAP_TYPE_DMA, "fb"),
-+	{}
-+};
-+
-+static int ion_sample_probe(struct platform_device *pdev)
-+{
-+	struct ion_platform_data *data;
-+	struct sample_ion_dev *ipdev;
-+	int i;
-+
-+	ipdev = devm_kzalloc(&pdev->dev, sizeof(*ipdev), GFP_KERNEL);
-+	if (!ipdev)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(pdev, ipdev);
-+
-+	ipdev->idev = ion_device_create(NULL);
-+	if (!ipdev->idev)
-+		return -ENOMEM;
-+
-+	data = ion_parse_dt(pdev, heaps);
-+	if (IS_ERR(data))
-+		return PTR_ERR(data);
-+
-+	ipdev->heaps = devm_kzalloc(&pdev->dev,
-+				sizeof(struct ion_heap)*data->nr, GFP_KERNEL);
-+
-+	if (!ipdev->heaps)
-+		return -ENOMEM;
-+
-+	for (i = 0; i < data->nr; i++) {
-+		ipdev->heaps[i] = ion_heap_create(&data->heaps[i]);
-+		if (!ipdev->heaps[i])
-+			return -ENOMEM;
-+		ion_device_add_heap(ipdev->idev, ipdev->heaps[i]);
-+	}
-+	return 0;
-+}
-+
-+static int ion_sample_remove(struct platform_device *pdev)
-+{
-+	/* Everything should be devm */
-+	return 0;
-+}
-+
-+static const struct of_device_id of_match_table[] = {
-+	{ .compatible = "sample-ion", },
-+	{ /* end of list */ }
-+};
-+
-+static struct platform_driver ion_sample_driver = {
-+	.probe		= ion_sample_probe,
-+	.remove		= ion_sample_remove,
-+	.driver		= {
-+		.name	= "ion-of",
-+		.of_match_table = of_match_ptr(of_match_table),
-+	},
-+};
-+
-+static int __init ion_sample_init(void)
-+{
-+	return platform_driver_register(&ion_sample_driver);
-+}
-+device_initcall(ion_sample_init);
+I can't prove you caused the regression, but you basically rewrote the
+driver, so it should be easier for you to spot the bug.
+
+n900 has this variant:
+
+      	 bq27200: bq27200 at 55 {
+	                 compatible = "ti,bq27200";
+ 			 reg = <0x55>;
+ 	};
+
+Will you try?
+
+If not, tell me, and I can do it, but it will involve a lot of swaring...
+
+Thanks,
+									Pavel
 -- 
-2.5.0
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
