@@ -1,90 +1,102 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Mon, 11 Jan 2016 18:26:00 +0200
-Subject: [PATCH v5 2/2] ACPI: amba bus probing support
-In-Reply-To: <20160111152732.GU19062@n2100.arm.linux.org.uk>
-References: <1452518790-27053-1-git-send-email-aleksey.makarov@linaro.org>
- <1452518790-27053-3-git-send-email-aleksey.makarov@linaro.org>
- <CAHp75Vew8HMMrc2vdKbSVuB2reOCrwZZg3-a4nBUyfiQ=c0Y4A@mail.gmail.com>
- <20160111152732.GU19062@n2100.arm.linux.org.uk>
-Message-ID: <CAHp75VfND6Gq5XW91mbgN+ZQnxh_SCm9LKNz_zNFvaVd1dgvWg@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 11 Jan 2016 16:27:38 +0000
+Subject: [PATCH v3 04/21] arm64: decouple early fixmap init from linear
+ mapping
+In-Reply-To: <CAKv+Gu8KbcJEfpjRMpaQHcsDo0ziv-2xmWowE9Syn_8pOX0WTw@mail.gmail.com>
+References: <1452518355-4606-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1452518355-4606-5-git-send-email-ard.biesheuvel@linaro.org>
+ <20160111160906.GO6499@leverpostej>
+ <CAKv+Gu8KbcJEfpjRMpaQHcsDo0ziv-2xmWowE9Syn_8pOX0WTw@mail.gmail.com>
+Message-ID: <20160111162737.GQ6499@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2016 at 5:27 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Jan 11, 2016 at 05:13:20PM +0200, Andy Shevchenko wrote:
->> On Mon, Jan 11, 2016 at 3:26 PM, Aleksey Makarov
->> <aleksey.makarov@linaro.org> wrote:
->> > From: Graeme Gregory <graeme.gregory@linaro.org>
+On Mon, Jan 11, 2016 at 05:15:13PM +0100, Ard Biesheuvel wrote:
+> On 11 January 2016 at 17:09, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Mon, Jan 11, 2016 at 02:18:57PM +0100, Ard Biesheuvel wrote:
+> >> Since the early fixmap page tables are populated using pages that are
+> >> part of the static footprint of the kernel, they are covered by the
+> >> initial kernel mapping, and we can refer to them without using __va/__pa
+> >> translations, which are tied to the linear mapping.
+> >>
+> >> Since the fixmap page tables are disjoint from the kernel mapping up
+> >> to the top level pgd entry, we can refer to bm_pte[] directly, and there
+> >> is no need to walk the page tables and perform __pa()/__va() translations
+> >> at each step.
+> >>
+> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> ---
+> >>  arch/arm64/mm/mmu.c | 32 ++++++--------------
+> >>  1 file changed, 9 insertions(+), 23 deletions(-)
+> >>
+> >> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> >> index 7711554a94f4..75b5f0dc3bdc 100644
+> >> --- a/arch/arm64/mm/mmu.c
+> >> +++ b/arch/arm64/mm/mmu.c
+> >> @@ -570,38 +570,24 @@ void vmemmap_free(unsigned long start, unsigned long end)
+> >>  #endif       /* CONFIG_SPARSEMEM_VMEMMAP */
+> >>
+> >>  static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
+> >> -#if CONFIG_PGTABLE_LEVELS > 2
+> >>  static pmd_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss;
+> >> -#endif
+> >> -#if CONFIG_PGTABLE_LEVELS > 3
+> >>  static pud_t bm_pud[PTRS_PER_PUD] __page_aligned_bss;
+> >> -#endif
+> >>
+> >>  static inline pud_t * fixmap_pud(unsigned long addr)
+> >>  {
+> >> -     pgd_t *pgd = pgd_offset_k(addr);
+> >> -
+> >> -     BUG_ON(pgd_none(*pgd) || pgd_bad(*pgd));
+> >> -
+> >> -     return pud_offset(pgd, addr);
+> >> +     return (CONFIG_PGTABLE_LEVELS > 3) ? &bm_pud[pud_index(addr)]
+> >> +                                        : (pud_t *)pgd_offset_k(addr);
+> >
+> > If we move patch 6 earlier, we could use pud_offset_kimg here, and avoid
+> > the cast, at the cost of passing the pgd into fixmap_pud.
+> >
+> > Similarly for fixmap_pmd.
+> >
+> 
+> Is that necessarily an improvement? I know it hides the cast, but I
+> think having an explicit pgd_t* to pud_t* cast that so obviously
+> applies to CONFIG_PGTABLE_LEVELS < 4 only is fine as well.
 
->> > +static int amba_handler_attach(struct acpi_device *adev,
->> > +                               const struct acpi_device_id *id)
->> > +{
->> > +       struct amba_device *dev;
->> > +       struct resource_entry *rentry;
->> > +       struct list_head resource_list;
->> > +       bool address_found = false;
->> > +       int irq_no = 0;
->> > +       int ret;
->> > +
->> > +       /* If the ACPI node already has a physical device attached, skip it. */
->> > +       if (adev->physical_node_count)
->> > +               return 0;
->> > +
->> > +       dev = amba_device_alloc(dev_name(&adev->dev), 0, 0);
->> > +       if (!dev) {
->> > +               dev_err(&adev->dev, "%s(): amba_device_alloc() failed\n",
->> > +                       __func__);
->> > +               return -ENOMEM;
->> > +       }
->> > +
->> > +       INIT_LIST_HEAD(&resource_list);
->> > +       ret = acpi_dev_get_resources(adev, &resource_list, NULL, NULL);
->> > +       if (ret < 0)
->> > +               goto err_free;
->> > +
->> > +       list_for_each_entry(rentry, &resource_list, node) {
->> > +               switch (resource_type(rentry->res)) {
->> > +               case IORESOURCE_MEM:
->> > +                       if (!address_found) {
->> > +                               dev->res = *rentry->res;
->>
->> dev->res is 0 before this one, right? Could you use this fact instead
->> of address_found flag?
->
-> amba_device_alloc() zero-initialises everything.  However, dev->res is
-> a struct resource, and I'd prefer _this_ method that the OT is using
-> to testing some random part of struct resource.
+True; it's not a big thing either way.
 
-So, you mean resource->start = 0 is not enough reliable?
+> >>  }
+> >>
+> >> -static inline pmd_t * fixmap_pmd(unsigned long addr)
+> >> +static inline pte_t * fixmap_pmd(unsigned long addr)
+> >>  {
+> >> -     pud_t *pud = fixmap_pud(addr);
+> >> -
+> >> -     BUG_ON(pud_none(*pud) || pud_bad(*pud));
+> >> -
+> >> -     return pmd_offset(pud, addr);
+> >> +     return (CONFIG_PGTABLE_LEVELS > 2) ? &bm_pmd[pmd_index(addr)]
+> >> +                                        : (pmd_t *)pgd_offset_k(addr);
+> >>  }
+> >
+> > I assume the return type change was unintentional?
+> >
+> 
+> Yes. Thanks for spotting that.
 
->> > +               default:
->> > +                       dev_warn(&adev->dev, "Invalid resource\n");
->>
->> Why? Isn't possible to have other resources for the devices?
->
-> AMBA primecell devices have one memory region, and a number of
-> interrupts.  Other resource types don't make sense.
+With that fixed:
 
-But isn't warning on the other side too noisy?
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 
->> > +       ret = amba_device_add(dev, &iomem_resource);
->> > +       if (ret) {
->>
->> ret < 0?
->>
->> What to do if ret > 0? It will be considered as not error. Please,
->> check what function returns and adjust this.
->
-> Non-zero is treated as an error by amba_device_add().
+> > Side note: is there any reason we can't/shouldn't make
+> > STRICT_MM_TYPECHECKS a common config option? Or simply have it on by
+> > default for arm64?
+> >
+> 
+> I wouldn't mind at all.
 
-> Doing otherwise
-> here puts it at odds to the outcome of that function.  This code is fine.
+I'll dig into that a bit futher then...
 
-Yes, and in this case ret > 0 should be converted to an appropriate
-error code, otherwise ACPI core will consider this as a normal
-execution, right?
-
--- 
-With Best Regards,
-Andy Shevchenko
+Thanks,
+Mark.
