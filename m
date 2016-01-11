@@ -1,24 +1,53 @@
 From: zhangqing@rock-chips.com (zhangqing)
-Date: Mon, 11 Jan 2016 02:36:37 -0800
-Subject: [PATCH v3 0/3] SoC: rockchip: support power domain for RK3368
-Message-ID: <1452508600-3512-1-git-send-email-zhangqing@rock-chips.com>
+Date: Mon, 11 Jan 2016 02:36:38 -0800
+Subject: [PATCH v3 1/3] dt-bindings: add power-domain header for RK3368 SoCs
+In-Reply-To: <1452508600-3512-1-git-send-email-zhangqing@rock-chips.com>
+References: <1452508600-3512-1-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <1452508600-3512-2-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add pd id in rk3368-power.h
-modify pm_domains.c to support RK3368 SoC
-add RK3368 document for Rockchip power domains
+According to a description from TRM, add all the power domains.
 
-zhangqing (3):
-  dt-bindings: add power-domain header for RK3368 SoCs
-  soc: rockchip: power-domain: Modify power domain driver for rk3368
-  dt-bindings: modify document of Rockchip power domains
-
- .../bindings/soc/rockchip/power_domain.txt         | 21 ++++++++++++++
- drivers/soc/rockchip/pm_domains.c                  | 33 ++++++++++++++++++++++
- include/dt-bindings/power/rk3368-power.h           | 28 ++++++++++++++++++
- 3 files changed, 82 insertions(+)
+Signed-off-by: zhangqing <zhangqing@rock-chips.com>
+---
+ include/dt-bindings/power/rk3368-power.h | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
  create mode 100644 include/dt-bindings/power/rk3368-power.h
 
+diff --git a/include/dt-bindings/power/rk3368-power.h b/include/dt-bindings/power/rk3368-power.h
+new file mode 100644
+index 0000000..93633d5
+--- /dev/null
++++ b/include/dt-bindings/power/rk3368-power.h
+@@ -0,0 +1,28 @@
++#ifndef __DT_BINDINGS_POWER_RK3368_POWER_H__
++#define __DT_BINDINGS_POWER_RK3368_POWER_H__
++
++/* VD_CORE */
++#define RK3368_PD_A53_L0	0
++#define RK3368_PD_A53_L1	1
++#define RK3368_PD_A53_L2	2
++#define RK3368_PD_A53_L3	3
++#define RK3368_PD_SCU_L		4
++#define RK3368_PD_A53_B0	5
++#define RK3368_PD_A53_B1	6
++#define RK3368_PD_A53_B2	7
++#define RK3368_PD_A53_B3	8
++#define RK3368_PD_SCU_B		9
++
++/* VD_LOGIC */
++#define RK3368_PD_BUS		10
++#define RK3368_PD_PERI		11
++#define RK3368_PD_VIO		12
++#define RK3368_PD_ALIVE		13
++#define RK3368_PD_VIDEO		14
++#define RK3368_PD_GPU_0		15
++#define RK3368_PD_GPU_1		16
++
++/* VD_PMU */
++#define RK3368_PD_PMU		17
++
++#endif
 -- 
 1.9.1
