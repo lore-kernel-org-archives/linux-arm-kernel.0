@@ -1,65 +1,29 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 11 Jan 2016 08:55:55 +0000
-Subject: [PATCH v5 5/6] mfd: dt-bindings: add device tree bindings for
- Hi3519 sysctrl
-In-Reply-To: <56935EA8.4060801@huawei.com>
-References: <1452219400-32478-1-git-send-email-xuejiancheng@huawei.com>
- <1452219400-32478-6-git-send-email-xuejiancheng@huawei.com>
- <20160111054846.GD3331@x1> <56935EA8.4060801@huawei.com>
-Message-ID: <20160111085555.GE14104@x1>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 11 Jan 2016 14:28:18 +0530
+Subject: dra7xx pci driver broken on dra7xx-evm
+In-Reply-To: <20160108092249.GC2344@localhost.localdomain>
+References: <20160106214518.GA6106@localhost.localdomain>
+ <568DF4FE.5010704@ti.com> <568ED7FA.4000508@ti.com>
+ <20160107215946.GP12777@atomide.com> <568F520D.9050807@ti.com>
+ <20160108092249.GC2344@localhost.localdomain>
+Message-ID: <56936EAA.1040203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 11 Jan 2016, xuejiancheng wrote:
-> On 2016/1/11 13:48, Lee Jones wrote:
-> > On Fri, 08 Jan 2016, Jiancheng Xue wrote:
-> > 
-> >> Add device tree bindings for Hi3519 system controller.
-> >>
-> >> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
-> >> ---
-> >>  Documentation/devicetree/bindings/mfd/hi3519.txt | 14 ++++++++++++++
-> >>  1 file changed, 14 insertions(+)
-> >>  create mode 100644 Documentation/devicetree/bindings/mfd/hi3519.txt
-> > 
-> > I have this patch, but none of the others in the set, thus I am
-> > lacking context.
-> > 
-> I can forward other patches in the set to you. Thank you.
+Hi,
+
+On Friday 08 January 2016 02:52 PM, Richard Cochran wrote:
+> On Fri, Jan 08, 2016 at 11:37:09AM +0530, Kishon Vijay Abraham I wrote:
+>> All right. I'll post the patch to do reset using platform data.
 > 
-> >> diff --git a/Documentation/devicetree/bindings/mfd/hi3519.txt b/Documentation/devicetree/bindings/mfd/hi3519.txt
-> >> new file mode 100644
-> >> index 0000000..115c5be
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/mfd/hi3519.txt
-> >> @@ -0,0 +1,14 @@
-> >> +* Hisilicon Hi3519 System Controller Block
-> >> +
-> >> +This bindings use the following binding:
-> >> +Documentation/devicetree/bindings/mfd/syscon.txt
-> >> +
-> >> +Required properties:
-> >> +- compatible: "hisilicon,hi3519-sysctrl".
-> >> +- reg: the register region of this block
-> >> +
-> >> +Examples:
-> >> +sysctrl: system-controller at 12010000 {
-> >> +	compatible = "hisilicon,hi3519-sysctrl", "syscon";
-> >> +	reg = <0x12010000 0x1000>;
-> >> +};
-> > 
-> > There is no requirement (nor want) for binding documents where the
-> > given device is simply using highly generic bindings.  This just
-> > amounts to churn.
-> > 
-> This block is specific for Hi3519 SOC, and may has its own driver.
+> Thanks for taking care of this.
+> 
+> BTW, I am trying to get a new board working.  Are there any *other*
+> dra7xx peripherals I should know about, or is the mainline stuff all
+> working?
 
-Does it have its own driver currently?
+Nothing that I'm aware of. I've tested Ethernet, USB, SATA, MMC and PCIe (with
+reset changes) myself. PCI was the only device that needed out of tree patches.
 
-> So I think it's better to keep this binding.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks
+Kishon
