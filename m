@@ -1,31 +1,98 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Mon, 11 Jan 2016 16:16:31 +0000
-Subject: [PATCH v2] spi: atmel: improve internal vs gpio chip-select choice
-In-Reply-To: <20160111161333.GK6588@sirena.org.uk> (Mark Brown's message of
- "Mon, 11 Jan 2016 16:13:33 +0000")
-References: <1452528102-26458-1-git-send-email-mans@mansr.com>
- <20160111161333.GK6588@sirena.org.uk>
-Message-ID: <yw1xd1t8w0ps.fsf@unicorn.mansr.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Mon, 11 Jan 2016 11:16:48 -0500
+Subject: [PATCH 1/2] libahci: Implement the workaround to fix the missing
+ of edge interrupt for HOST_IRQ_STAT
+In-Reply-To: <1452506763-18649-2-git-send-email-stripathi@apm.com>
+References: <1452506763-18649-1-git-send-email-stripathi@apm.com>
+ <1452506763-18649-2-git-send-email-stripathi@apm.com>
+Message-ID: <20160111161648.GE1898@mtj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown <broonie@kernel.org> writes:
+Hello,
 
-> On Mon, Jan 11, 2016 at 04:01:42PM +0000, Mans Rullgard wrote:
->> The driver currently chooses between internal chip-select or gpio
->> based on the existence of the cs-gpios DT property which fails on
->> non-DT systems and also enforces the same choice for all devices.
->
-> Normally you shouldn't send incremental patches against patches that
-> have already been applied.
+On Mon, Jan 11, 2016 at 03:36:02PM +0530, Suman Tripathi wrote:
+> Due to H/W errata, the HOST_IRQ_STAT register misses the edge interrupt
+> when clearing the HOST_IRQ_STAT register and hardware reporting the
+> PORT_IRQ_STAT register at the same clock cycle. As such, the
+> algorithm below outlines the workaround.
+> 
+> 1. Read HOST_IRQ_STAT register and save the state.
+> 2. Clear the HOST_IRQ_STAT register.
+> 3. Read back the HOST_IRQ_STAT register.
+> 4. If HOST_IRQ_STAT register equals to zero, then
+>    traverse the rest of port's PORT_IRQ_STAT register
+>    to check if an interrupt is triggered at that point else
+>    go to step 6.
+> 5. If PORT_IRQ_STAT register of rest ports is not equal to zero
+>    then update the state of HOST_IRQ_STAT saved in step 1.
+> 6. Handle port interrupts.
+> 7. Exit
+...
+> +static void ahci_handle_broken_edge_irq(struct ata_host *host,
+> +					u32 *irq_masked)
+> +{
+> +	struct ahci_host_priv *hpriv = host->private_data;
+> +	void __iomem *mmio = hpriv->mmio;
+> +	unsigned int i, temp_irq_masked;
+> +	struct ata_port *next_ap;
+> +	void __iomem *port_mmio;
+> +	int j;
+> +
+> +	if (!readl(mmio + HOST_IRQ_STAT)) {
+> +		temp_irq_masked = *irq_masked;
+> +
+> +		for (i = 0; i < __sw_hweight32(hpriv->port_map);
+> +		     i++) {
+                     ^^^^^^
+		     Doesn't this fit on the same line?
 
-Should or shouldn't?
+> +			if (*irq_masked & (1 << i)) {
+> +				for (j = 0;
+> +				     j < __sw_hweight32(hpriv->port_map);
+> +				     j++) {
 
-> However in this case I'm going to drop your original patch anyway due
-> to the issue that was found so it's OK.
+Heh, if (!COND) continue; can be your friend.
 
-Sorry, I hadn't noticed it was already applied.  Too many trees to keep
-track of.
+> +					if (i == j)
+> +						continue;
+> +
+> +					next_ap = host->ports[j];
+> +					port_mmio = ahci_port_base(next_ap);
+> +					if (readl(port_mmio + PORT_IRQ_STAT))
+> +						temp_irq_masked |= (1 << j);
+> +				}
+> +			}
+> +		}
+> +		*irq_masked = temp_irq_masked;
+> +	}
+> +
+> +}
+
+So, this is really specific to the controller.
+
+>  static u32 ahci_handle_port_intr(struct ata_host *host, u32 irq_masked)
+>  {
+> +	struct ahci_host_priv *hpriv = host->private_data;
+>  	unsigned int i, handled = 0;
+> 
+> +	/*
+> +	 * For hardware with broken edge trigger latch
+> +	 * the HOST_IRQ_STAT register misses the edge interrupt
+> +	 * when clearing of HOST_IRQ_STAT register and hardware
+> +	 * reporting the PORT_IRQ_STAT register at the
+> +	 * same clock cycle.
+> +	 */
+> +	if (hpriv->flags & AHCI_HFLAG_EDGE_IRQ_BROKEN)
+> +		ahci_handle_broken_edge_irq(host, &irq_masked);
+> +
+
+And all it needs is doing some extra processing at the beginning of
+port interrupt handling.  I think it'd be better to implement
+ahci_xgene specific IRQ handler which does the special processing and
+call the generic ahci_handle_port_intr().
+
+Thanks.
 
 -- 
-M?ns Rullg?rd
+tejun
