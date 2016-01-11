@@ -1,44 +1,24 @@
-From: xuejiancheng@huawei.com (xuejiancheng)
-Date: Mon, 11 Jan 2016 10:32:52 +0800
-Subject: [PATCH v5 4/6] ARM: debug: add hi3519 debug uart
-In-Reply-To: <20160108150828.GM19062@n2100.arm.linux.org.uk>
-References: <1452219400-32478-1-git-send-email-xuejiancheng@huawei.com>
- <1452219400-32478-5-git-send-email-xuejiancheng@huawei.com>
- <20160108150828.GM19062@n2100.arm.linux.org.uk>
-Message-ID: <56931454.6090300@huawei.com>
+From: zhangqing@rock-chips.com (zhangqing)
+Date: Mon, 11 Jan 2016 02:36:37 -0800
+Subject: [PATCH v3 0/3] SoC: rockchip: support power domain for RK3368
+Message-ID: <1452508600-3512-1-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+add pd id in rk3368-power.h
+modify pm_domains.c to support RK3368 SoC
+add RK3368 document for Rockchip power domains
 
-On 2016/1/8 23:08, Russell King - ARM Linux wrote:
-> On Fri, Jan 08, 2016 at 10:16:38AM +0800, Jiancheng Xue wrote:
->> @@ -1449,6 +1457,7 @@ config DEBUG_UART_PHYS
->>  	default 0xf7fc9000 if DEBUG_BERLIN_UART
->>  	default 0xf8b00000 if DEBUG_HIX5HD2_UART
->>  	default 0xf991e000 if DEBUG_QCOM_UARTDM
->> +	default 0x12100000 if DEBUG_HI3519_UART
->>  	default 0xfcb00000 if DEBUG_HI3620_UART
->>  	default 0xfd883000 if DEBUG_ALPINE_UART0
->>  	default 0xfe800000 if ARCH_IOP32X
-> 
-> Please insert at the appropriate location - examination of the list
-> of defaults will show that it's sorted numerically, please keep this
-> sorted numerically.
-> 
+zhangqing (3):
+  dt-bindings: add power-domain header for RK3368 SoCs
+  soc: rockchip: power-domain: Modify power domain driver for rk3368
+  dt-bindings: modify document of Rockchip power domains
 
-OK. Thank you!
+ .../bindings/soc/rockchip/power_domain.txt         | 21 ++++++++++++++
+ drivers/soc/rockchip/pm_domains.c                  | 33 ++++++++++++++++++++++
+ include/dt-bindings/power/rk3368-power.h           | 28 ++++++++++++++++++
+ 3 files changed, 82 insertions(+)
+ create mode 100644 include/dt-bindings/power/rk3368-power.h
 
->> @@ -1529,6 +1538,7 @@ config DEBUG_UART_VIRT
->>  	default 0xfe230000 if DEBUG_PICOXCELL_UART
->>  	default 0xfe300000 if DEBUG_BCM_KONA_UART
->>  	default 0xfe800000 if ARCH_IOP32X
->> +	default 0xfef00000 if DEBUG_HI3519_UART
->>  	default 0xfeb00000 if DEBUG_HI3620_UART || DEBUG_HIX5HD2_UART
->>  	default 0xfeb24000 if DEBUG_RK3X_UART0
->>  	default 0xfeb26000 if DEBUG_RK3X_UART1
-> 
-> Same for here.
-> 
-> Thanks.
-> 
+-- 
+1.9.1
