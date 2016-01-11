@@ -1,30 +1,34 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 11 Jan 2016 13:00:00 +0900
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable XHCI_RCAR
-In-Reply-To: <1452484800-7470-1-git-send-email-horms+renesas@verge.net.au>
-References: <1452484800-7470-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1452484800-7470-3-git-send-email-horms+renesas@verge.net.au>
+From: tbm@cyrius.com (Martin Michlmayr)
+Date: Sun, 10 Jan 2016 20:25:12 -0800
+Subject: ARM: mvebu_v5_defconfig: Remove obsolete SND_KIRKWOOD_SOC_T5325
+Message-ID: <20160111042512.GA30997@jirafa.cyrius.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is used by Renesas R-Car SoCs.
+The kirkwood-t5325 driver driver was removed in commit 270a85c80c86
+("ASoC: kirkwood: Remove unused drivers") in favour of DT based
+simple-card equivalents.  Remove the obsolete config option.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Martin Michlmayr <tbm@cyrius.com>
 ---
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/configs/mvebu_v5_defconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 653d3c6ac525..33f96b587a8e 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -526,6 +526,7 @@ CONFIG_SND_SOC_WM8978=m
- CONFIG_USB=y
- CONFIG_USB_XHCI_HCD=y
- CONFIG_USB_XHCI_MVEBU=y
-+CONFIG_USB_XHCI_RCAR=m
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_MSM=m
- CONFIG_USB_EHCI_EXYNOS=y
+diff --git a/arch/arm/configs/mvebu_v5_defconfig b/arch/arm/configs/mvebu_v5_defconfig
+index 824de49..79e6260 100644
+--- a/arch/arm/configs/mvebu_v5_defconfig
++++ b/arch/arm/configs/mvebu_v5_defconfig
+@@ -108,7 +108,6 @@ CONFIG_SOUND=y
+ CONFIG_SND=y
+ CONFIG_SND_SOC=y
+ CONFIG_SND_KIRKWOOD_SOC=y
+-CONFIG_SND_KIRKWOOD_SOC_T5325=y
+ CONFIG_SND_SOC_ALC5623=y
+ CONFIG_SND_SIMPLE_CARD=y
+ CONFIG_REGULATOR=y
 -- 
-2.7.0.rc3.207.g0ac5344
+2.1.4
+
+-- 
+Martin Michlmayr
+http://www.cyrius.com/
