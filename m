@@ -1,61 +1,94 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 11 Jan 2016 06:54:41 +0000
-Subject: [PATCH v10 4/8] mfd: fsl imx25 Touchscreen ADC driver
-In-Reply-To: <1450101234-2191-5-git-send-email-mpa@pengutronix.de>
-References: <1450101234-2191-1-git-send-email-mpa@pengutronix.de>
- <1450101234-2191-5-git-send-email-mpa@pengutronix.de>
-Message-ID: <20160111065441.GW3331@x1>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 11 Jan 2016 08:16:31 +0100
+Subject: imxfb does not turn on automatically
+In-Reply-To: <CAD7j7Q8gANUxM5zGmn3YyhUr9yZv02x4oxi_WWLnxCYemBRYZA@mail.gmail.com>
+References: <CAOMZO5CZ3aFGbfb39XoXpFvbn4TTrCbTHOXtQKruruCis3Ptvw@mail.gmail.com>
+ <CAD7j7Q8gANUxM5zGmn3YyhUr9yZv02x4oxi_WWLnxCYemBRYZA@mail.gmail.com>
+Message-ID: <20160111071631.GI13058@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Dec 2015, Markus Pargmann wrote:
+Hi Carlos,
 
-> This is the core driver for imx25 touchscreen/adc driver. The module
-> has one shared ADC and two different conversion queues which use the
-> ADC. The two queues are identical. Both can be used for general purpose
-> ADC but one is meant to be used for touchscreens.
+On Fri, Jan 08, 2016 at 09:18:41PM +0100, Carlos Soto wrote:
+> 2015-02-21 16:18 GMT+01:00 Fabio Estevam <festevam@gmail.com>:
+> >
+> > Hi,
+> >
+> > Carlos Soto uses a Karo mx25 and he noticed that the LCD only works if we do:
+> >
+> > echo 1 > /sys/class/graphics/fb0/blank
+> > echo 0 > /sys/class/graphics/fb0/blank
+> >
+> > I can confirm the same on mx25pdk running 3.19 [1], but I could not
+> > understand why the display does not start turned on by default.
+> >
+> > [1] http://www.spinics.net/lists/arm-kernel/msg399949.html
+> >
+> > Any ideas?
+> >
+> > Thanks,
+> >
+> > Fabio Estevam
 > 
-> This driver is the core which manages the central components and
-> registers of the TSC/ADC unit. It manages the IRQs and forwards them to
-> the correct components.
 > 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
 > 
-> [ensure correct ADC clock depending on the IPG clock]
-> Signed-off-by: Juergen Borleis <jbe@pengutronix.de>
-> Acked-by: Jonathan Cameron <jic23@kernel.org>
-> ---
+> Hi,
+> I know it's been a long time since Fabio posted the issue but recently
+> I had some time to work on it again, and I've narrowed it down a
+> little.
 > 
-> Notes:
->     Changes in v7:
->      - Cleanup bit defines in header files to be more readable
->      - Fix irq check to return with an error for irq <= 0
->      - Add COMPILE_TEST in Kconfig file
->     
->     Changes in v5:
->      - Remove ifdef CONFIG_OF as this driver is only for DT usage
->      - Remove module owner
->      - Add Kconfig dependencies ARCH_MX25 and OF
+> The problem seems to be related to the IPG clock used by the iMX25
+> framebuffer. All clocks used by the fb are enabled in
+> imxfb_enable_controller(...)
 > 
->  drivers/mfd/Kconfig             |   9 ++
->  drivers/mfd/Makefile            |   2 +
->  drivers/mfd/fsl-imx25-tsadc.c   | 203 ++++++++++++++++++++++++++++++++++++++++
->  include/linux/mfd/imx25-tsadc.h | 140 +++++++++++++++++++++++++++
->  4 files changed, 354 insertions(+)
->  create mode 100644 drivers/mfd/fsl-imx25-tsadc.c
->  create mode 100644 include/linux/mfd/imx25-tsadc.h
+> ...
+> clk_prepare_enable(fbi->clk_ipg);
+> clk_prepare_enable(fbi->clk_ahb);
+> clk_prepare_enable(fbi->clk_per);
+> fbi->enabled = true;
+> 
+> ...
+> 
+> 
+> But if the IPG clock is disabled and enabled right after, the LCD
+> works fine.
+> 
+> The changes made in imxfb.c were:
+> ...
+> 
+> clk_prepare_enable(fbi->clk_ipg);
+> clk_disable_unprepare(fbi->clk_ipg);
+> clk_prepare_enable(fbi->clk_ipg);
+> 
+> clk_prepare_enable(fbi->clk_ahb);
+> clk_prepare_enable(fbi->clk_per);
+> fbi->enabled = true;
+> 
+> ...
+> 
+> It was suggested by Fabio that this could be caused by a wrong clock
+> reference count which prevented the IPG fb clock to be enabled, but
+> I've checked in debugfs, and both enable_cnt  and prepare_cnt seem OK
+> for all three FB clocks.
 
-For my own reference:
-  Acked-by: Lee Jones <lee.jones@linaro.org>
+Unfortunately this LCD controller does not have an enable bit. The
+controller starts directly when the clocks are enabled. If the clocks
+are enabled when the controller is not yet programmed with proper
+register values then it just goes into some undefined state. What I
+suspect is that the clocks already were enabled before driver probe,
+presumably by the bootloader, so the controller is already in undefined
+state when entering Linux. Now by dis/enabling the ipg clock you
+effectively reset the controller. Since you have programmed it with
+valid register values in the mean time it starts working after this
+reset.
+To verify you could try to disable the LCDC related clock gates with
+direct register writes in drivers/clk/imx/clk-imx25.c.
 
-I will apply this and sent out pull-requests to the relevant
-maintainers once -rc1 is out.
-
-[...]
+Sascha
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
