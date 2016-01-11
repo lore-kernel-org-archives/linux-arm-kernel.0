@@ -1,32 +1,31 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 11 Jan 2016 13:11:24 +0100
-Subject: [PATCH] PCI: designware: remove unused variable
-Message-ID: <4643317.WUGgxPjcvu@wuerfel>
+Date: Mon, 11 Jan 2016 13:13:01 +0100
+Subject: [PATCH] ASoC: AMD: add missing include
+Message-ID: <4595844.NIUnxKiA0y@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A cleanup patch removed the only use of the 'ret' variable
-in wr_conf but forgot to remove the variable:
+The newly added AMD acp driver is missing an include for linux/io.h
+and fails to build on ARM:
 
-pci/host/pcie-designware.c: In function 'dw_pcie_wr_conf':
-pci/host/pcie-designware.c:683:6: warning: unused variable 'ret' [-Wunused-variable]
+sound/soc/amd/acp-pcm-dma.c: In function 'acp_reg_read':
+sound/soc/amd/acp-pcm-dma.c:83:9: error: implicit declaration of function 'readl' [-Werror=implicit-function-declaration]
 
-This cleans that part up as well.
+This adds the missing line.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 50a1a3b06ddd ("PCI: designware: Simplify control flow")
 ---
-This came up this morning on linux-next with ARM randconfig builds
+This build error also appeared today on linux-next with ARM randconfig
 
-diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-index 9a666dbff127..21716827847a 100644
---- a/drivers/pci/host/pcie-designware.c
-+++ b/drivers/pci/host/pcie-designware.c
-@@ -680,7 +680,6 @@ static int dw_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
- 			int where, int size, u32 val)
- {
- 	struct pcie_port *pp = bus->sysdata;
--	int ret;
+diff --git a/sound/soc/amd/acp-pcm-dma.c b/sound/soc/amd/acp-pcm-dma.c
+index cc8b841b69b6..fa0311e4faed 100644
+--- a/sound/soc/amd/acp-pcm-dma.c
++++ b/sound/soc/amd/acp-pcm-dma.c
+@@ -17,6 +17,7 @@
+ #include <linux/delay.h>
+ #include <linux/sizes.h>
+ #include <linux/pm_runtime.h>
++#include <linux/io.h>
  
- 	if (dw_pcie_valid_config(pp, bus, PCI_SLOT(devfn)) == 0)
- 		return PCIBIOS_DEVICE_NOT_FOUND;
+ #include <sound/soc.h>
+ 
