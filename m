@@ -1,86 +1,71 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 11 Jan 2016 22:57:05 +0100
-Subject: [PATCH] clocksource/drivers/vt8500: Increase the minimum delta
-In-Reply-To: <daniel.lezcano@linaro.org>
-References: <daniel.lezcano@linaro.org>
-Message-ID: <1452549425-9140-1-git-send-email-daniel.lezcano@linaro.org>
+From: tphan@apm.com (Tuan Phan)
+Date: Mon, 11 Jan 2016 14:04:52 -0800
+Subject: [PATCH v3 1/2] acpi: Fix proper return code for function
+ acpi_gsi_to_irq
+In-Reply-To: <20160110110714.GA22896@pd.tnic>
+References: <1446857519-5908-1-git-send-email-lho@apm.com>
+ <1446857519-5908-2-git-send-email-lho@apm.com>
+ <20160110110714.GA22896@pd.tnic>
+Message-ID: <CAGDN=zYa1r23EphdYQTFe2YXRhg_P-RDiaZVms9rdbFA3Y-x3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Roman Volkov <rvolkov@v1ros.org>
+On Sun, Jan 10, 2016 at 3:07 AM, Borislav Petkov <bp@alien8.de> wrote:
+>
+> On Fri, Nov 06, 2015 at 05:51:58PM -0700, Loc Ho wrote:
+> > The function acpi_gsi_to_irq should returns 0 on success as upper function
+> > caller expect an 0 for sucesss.
+> >
+> > Signed-off-by: Tuan Phan <tphan@apm.com>
+> > Signed-off-by: Loc Ho <lho@apm.com>
+> > ---
+> >  drivers/acpi/gsi.c |    4 ++--
+> >  1 files changed, 2 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/drivers/acpi/gsi.c b/drivers/acpi/gsi.c
+> > index fa4585a..0ed1003 100644
+> > --- a/drivers/acpi/gsi.c
+> > +++ b/drivers/acpi/gsi.c
+> > @@ -43,7 +43,7 @@ static unsigned int acpi_gsi_get_irq_type(int trigger, int polarity)
+> >   *
+> >   * irq location updated with irq value [>0 on success, 0 on failure]
+> >   *
+> > - * Returns: linux IRQ number on success (>0)
+> > + * Returns: 0 on success
+> >   *          -EINVAL on failure
+> >   */
+> >  int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
+> > @@ -56,7 +56,7 @@ int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
+> >        * *irq == 0 means no mapping, that should
+> >        * be reported as a failure
+> >        */
+> > -     return (*irq > 0) ? *irq : -EINVAL;
+> > +     return (*irq > 0) ? 0 : -EINVAL;
+> >  }
+> >  EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
+>
+> That function can be simplified. It should be made to return the irq
+> number on success and 0 on failure. No need for that *irq output
+> argument.
+>
+> --
+> Regards/Gruss,
+>     Boris.
+>
+> ECO tip #101: Trim your mails when you reply.
 
-The vt8500 clocksource driver declares itself as capable to handle the
-minimum delay of 4 cycles by passing the value into
-clockevents_config_and_register(). The vt8500_timer_set_next_event()
-requires the passed cycles value to be at least 16. The impact is that
-userspace hangs in nanosleep() calls with small delay intervals.
+Hi Boris,
+The same function which is implemented for x86
+(arch/x86/kernel/acpi/boot.c) also returns 0 on success and -1 on
+failure. If we need to change the API, need to change for X86 too
+which we don't have a way to test it.
 
-This problem is reproducible in Linux 4.2 starting from:
-c6eb3f70d448 ('hrtimer: Get rid of hrtimer softirq')
-
->From Russell King, more detailed explanation:
-
-"It's a speciality of the StrongARM/PXA hardware. It takes a certain
-number of OSCR cycles for the value written to hit the compare registers.
-So, if a very small delta is written (eg, the compare register is written
-with a value of OSCR + 1), the OSCR will have incremented past this value
-before it hits the underlying hardware. The result is, that you end up
-waiting a very long time for the OSCR to wrap before the event fires.
-
-So, we introduce a check in set_next_event() to detect this and return
--ETIME if the calculated delta is too small, which causes the generic
-clockevents code to retry after adding the min_delta specified in
-clockevents_config_and_register() to the current time value.
-
-min_delta must be sufficient that we don't re-trip the -ETIME check - if
-we do, we will return -ETIME, forward the next event time, try to set it,
-return -ETIME again, and basically lock the system up. So, min_delta
-must be larger than the check inside set_next_event(). A factor of two
-was chosen to ensure that this situation would never occur.
-
-The PXA code worked on PXA systems for years, and I'd suggest no one
-changes this mechanism without access to a wide range of PXA systems,
-otherwise they're risking breakage."
-
-Cc: stable at vger.kernel.org
-Cc: Russell King <linux@arm.linux.org.uk>
-Acked-by: Alexey Charkov <alchark@gmail.com>
-Signed-off-by: Roman Volkov <rvolkov@v1ros.org>
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- drivers/clocksource/vt8500_timer.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/clocksource/vt8500_timer.c b/drivers/clocksource/vt8500_timer.c
-index a92e94b..dfc3bb4 100644
---- a/drivers/clocksource/vt8500_timer.c
-+++ b/drivers/clocksource/vt8500_timer.c
-@@ -50,6 +50,8 @@
- 
- #define msecs_to_loops(t) (loops_per_jiffy / 1000 * HZ * t)
- 
-+#define MIN_OSCR_DELTA		16
-+
- static void __iomem *regbase;
- 
- static cycle_t vt8500_timer_read(struct clocksource *cs)
-@@ -80,7 +82,7 @@ static int vt8500_timer_set_next_event(unsigned long cycles,
- 		cpu_relax();
- 	writel((unsigned long)alarm, regbase + TIMER_MATCH_VAL);
- 
--	if ((signed)(alarm - clocksource.read(&clocksource)) <= 16)
-+	if ((signed)(alarm - clocksource.read(&clocksource)) <= MIN_OSCR_DELTA)
- 		return -ETIME;
- 
- 	writel(1, regbase + TIMER_IER_VAL);
-@@ -151,7 +153,7 @@ static void __init vt8500_timer_init(struct device_node *np)
- 		pr_err("%s: setup_irq failed for %s\n", __func__,
- 							clockevent.name);
- 	clockevents_config_and_register(&clockevent, VT8500_TIMER_HZ,
--					4, 0xf0000000);
-+					MIN_OSCR_DELTA * 2, 0xf0000000);
- }
- 
- CLOCKSOURCE_OF_DECLARE(vt8500, "via,vt8500-timer", vt8500_timer_init);
 -- 
-1.9.1
+CONFIDENTIALITY NOTICE: This e-mail message, including any attachments, is 
+for the sole use of the intended recipient(s) and contains information that 
+is confidential and proprietary to Applied Micro Circuits Corporation or 
+its subsidiaries. It is to be used solely for the purpose of furthering the 
+parties' business relationship. All unauthorized review, use, disclosure or 
+distribution is prohibited. If you are not the intended recipient, please 
+contact the sender by reply e-mail and destroy all copies of the original 
+message.
