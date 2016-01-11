@@ -1,65 +1,82 @@
-From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
-Date: Mon, 11 Jan 2016 12:06:22 +0300
-Subject: [PATCH] arm64: Honour !PTE_WRITE in set_pte_at() for kernel
- mappings
-In-Reply-To: <CAKv+Gu9RbzCNi-UHbL52rP=vtfutxqy8Vkn=WkQ-UQqo2Csdmg@mail.gmail.com>
-References: <1452182840-5120-1-git-send-email-catalin.marinas@arm.com>
- <CAKv+Gu9RbzCNi-UHbL52rP=vtfutxqy8Vkn=WkQ-UQqo2Csdmg@mail.gmail.com>
-Message-ID: <CAPAsAGxSgKvSC8kX3Zh6V+YMBLNMm08TPd=Xsd6zsUNpe5E1Fg@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 11 Jan 2016 10:13:46 +0100
+Subject: [PATCH v2 0/3] mtd: nand: add randomizer support
+In-Reply-To: <1449054067-16751-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1449054067-16751-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20160111101346.3c94deeb@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-01-08 13:59 GMT+03:00 Ard Biesheuvel <ard.biesheuvel@linaro.org>:
->
-> This works, as far as I can tell. However, I still need the patch
-> below to make sure that the KAsan zero page is mapped read-only. (The
-> reason is that, depending on the alignment of the regions,
-> kasan_populate_zero_shadow() may never call
-> zero_[pud|pmd|pte]_populate())
->
-> Before this patch (and my change), the KAsan shadow regions looks like this:
->
-> 0xffffff8000000000-0xffffff8200800000  8200M RW NX SHD AF     UXN MEM/NORMAL
-> 0xffffff8200800000-0xffffff8200c00000     4M RW NX SHD AF BLK UXN MEM/NORMAL
-> 0xffffff8200c00000-0xffffff8800000000 24564M RW NX SHD AF     UXN MEM/NORMAL
-> 0xffffff8800000000-0xffffff8820200000   514M RW NX SHD AF BLK UXN MEM/NORMAL
->
-> and after:
->
-> 0xffffff8000000000-0xffffff8200800000  8200M ro NX SHD AF     UXN MEM/NORMAL
-> 0xffffff8200800000-0xffffff8200c00000     4M RW NX SHD AF BLK UXN MEM/NORMAL
-> 0xffffff8200c00000-0xffffff8800000000 24564M ro NX SHD AF     UXN MEM/NORMAL
-> 0xffffff8800000000-0xffffff8820200000   514M RW NX SHD AF BLK UXN MEM/NORMAL
->
->
+Hi Brian,
 
-Acked-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
+Anything blocking in this series?
+I was expecting to get it into 4.5, but it's too late now. Could you
+consider reviewing it (in order to take it into 4.6 if everything is
+OK for you)?
 
-> ---------8<--------------
-> diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
-> index 72fe2978b38a..c3c14204d196 100644
-> --- a/arch/arm64/mm/kasan_init.c
-> +++ b/arch/arm64/mm/kasan_init.c
-> @@ -140,6 +140,7 @@ void __init kasan_init(void)
->  {
->         u64 kimg_shadow_start, kimg_shadow_end;
->         struct memblock_region *reg;
-> +       int i;
->
->         kimg_shadow_start = round_down((u64)kasan_mem_to_shadow(_text),
->                                        SWAPPER_BLOCK_SIZE);
-> @@ -185,6 +186,14 @@ void __init kasan_init(void)
->                                 pfn_to_nid(virt_to_pfn(start)));
->         }
->
-> +       /*
-> +        * KAsan may reuse the current contents of kasan_zero_pte
-> directly, so we
-> +        * should make sure that it maps the zero page read-only.
-> +        */
-> +       for (i = 0; i < PTRS_PER_PTE; i++)
-> +               set_pte(&kasan_zero_pte[i],
-> +                       pfn_pte(virt_to_pfn(kasan_zero_page), PAGE_KERNEL_RO));
-> +
->         memset(kasan_zero_page, 0, PAGE_SIZE);
->         cpu_replace_ttbr1(swapper_pg_dir);
+The reason I'd like to get this into Linux rather quickly is because I
+want to port the sunxi-nand driver to u-boot, and these randomizer
+stuff are required on most sunxi boards.
+IOW, u-boot users would not understand if I port a NAND driver that
+appears to be useless for their board(s) :-/.
+
+Thanks,
+
+Boris
+
+On Wed,  2 Dec 2015 12:01:04 +0100
+Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+
+> Hello,
+> 
+> This series is a proposal to add support for randomizers (either software
+> or hardware) to NAND flash controller drivers.
+> 
+> The last patch is the sunxi HW randomizer implementation and is just given
+> as an example (it won't apply on the MTD tree, because it depends on other
+> stuff not yet posted on the MTD ML, but if you want a full overview of the
+> NAND Flash controller driver you can take a look at this series [2]).
+> 
+> I can also provide a software implementation based on LFSR (Left Feedback
+> Shift Register) algorithm, thought I haven't tested it yet, hence why it's
+> not part of this series. Let me know if you're interested in this
+> implementation.
+> 
+> This series depends on the "per-partition ECC" series [1], because I need
+> the randomizer seed to be different depending on the partition (for the
+> same reason I needed ECC config to be different for each partition: the
+> bootrom config might not fit the NAND chip requirements).
+> 
+> I'd like to have feedback from both MTD maintainers and driver
+> developers who might need to implement (or use) a randomizer in their
+> system, so feel free to comment on this series.
+> 
+> Best Regards,
+> 
+> Boris
+> 
+> [1] https://lkml.org/lkml/2014/2/12/627
+> [2] https://groups.google.com/forum/#!msg/linux-sunxi/s3lBb01I0Js/z2NoCFJ83g4J 
+> 
+> Changes since v1:
+> - add some comments to explain how the sunxi randomizer works
+> - fix a few minor bugs and coding style issues
+> 
+> Boris Brezillon (3):
+>   mtd: nand: add NAND_NEED_SCRAMBLING option flag
+>   mtd: nand: add NAND_NEED_SCRAMBLING flag to the H27UCG8T2ATR-BC
+>     definition
+>   mtd: nand: sunxi: add randomizer support
+> 
+>  drivers/mtd/nand/nand_ids.c   |   4 +-
+>  drivers/mtd/nand/sunxi_nand.c | 287 ++++++++++++++++++++++++++++++++++++++----
+>  include/linux/mtd/nand.h      |   6 +
+>  3 files changed, 269 insertions(+), 28 deletions(-)
+> 
+
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
