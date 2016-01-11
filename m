@@ -1,43 +1,30 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Mon, 11 Jan 2016 22:06:14 +1100
-Subject: [PATCH v4 0/3] checkpatch: handling of memory barriers
-In-Reply-To: <20160111130334-mutt-send-email-mst@redhat.com>
-References: <1452509968-19778-1-git-send-email-mst@redhat.com>
- <20160111130334-mutt-send-email-mst@redhat.com>
-Message-ID: <CAGRGNgXnxjmvjD8_vT17ZWwK0uCsGNmXq_KdVj9KoT6NRZQvPA@mail.gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Mon, 11 Jan 2016 11:08:27 +0000
+Subject: [PATCH v5 05/11] arm-cci PMU: Delay counter writes to pmu_enable
+In-Reply-To: <20160111104609.GE6499@leverpostej>
+References: <1451908490-2615-1-git-send-email-suzuki.poulose@arm.com>
+ <1451908490-2615-6-git-send-email-suzuki.poulose@arm.com>
+ <20160104192401.GD17127@leverpostej> <568B93F1.8050202@arm.com>
+ <20160111104609.GE6499@leverpostej>
+Message-ID: <56938D2B.7050700@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michael,
-
-On Mon, Jan 11, 2016 at 10:04 PM, Michael S. Tsirkin <mst@redhat.com> wrote:
-> On Mon, Jan 11, 2016 at 12:59:25PM +0200, Michael S. Tsirkin wrote:
->> As part of memory barrier cleanup, this patchset
->> extends checkpatch to make it easier to stop
->> incorrect memory barrier usage.
->>
->> This replaces the checkpatch patches in my series
->>       arch: barrier cleanup + barriers for virt
->> and will be included in the pull request including
->> the series.
->>
->> changes from v3:
->>       rename smp_barrier_stems to barrier_stems
->>       as suggested by Julian Calaby.
+On 11/01/16 10:46, Mark Rutland wrote:
+> On Tue, Jan 05, 2016 at 09:59:13AM +0000, Suzuki K. Poulose wrote:
+>> On 04/01/16 19:24, Mark Rutland wrote:
+>>> On Mon, Jan 04, 2016 at 11:54:44AM +0000, Suzuki K. Poulose wrote:
+>> The pmu is not disabled while we are in overflow irq handler. Hence there may
+>> not be a pmu_enable() which would set the period for the counter which
+>> overflowed, if defer the write in that case. Is that assumption wrong ?
 >
-> In fact it was Joe Perches that suggested it.
-> Sorry about the confusion.
+> As the driver stands today, yes.
+>
+> However, wouldn't it make more sense to disable the PMU for the overflow
+> handler, such that we can reuse the batching logic?
 
-I was about to point that out.
+None of the PMU drivers do that AFAIK. Hence, didn't want to change it for
+CCI. We could use the batching logic, if decide to do so. I can go ahead
+with that if there are no other side effects with that.
 
-FWIW this entire series is:
-
-Acked-by: Julian Calaby <julian.calaby@gmail.com>
-
-Thanks,
-
--- 
-Julian Calaby
-
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
+Suzuki
