@@ -1,68 +1,70 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Mon, 11 Jan 2016 16:45:05 +0800
-Subject: [PATCH v8 20/20] KVM: ARM64: Add a new kvm ARM PMU device
-In-Reply-To: <20160109150339.10576e81@arm.com>
-References: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>	<1450771695-11948-21-git-send-email-zhaoshenglong@huawei.com>	<CAFEAcA_MDiOphseZ7RGNE3G=4ZDF5SFV5krOjanPbVuhgg9gnQ@mail.gmail.com>	<568E7AF1.9040103@huawei.com>	<CAFEAcA-Qcda7TSFLSeykLHqZYdP6tYdEjPe2uHN6f_+omqWFZg@mail.gmail.com>	<20160107203647.GJ6199@hawk.localdomain>	<20160109122956.GA30867@cbox>
- <20160109150339.10576e81@arm.com>
-Message-ID: <56936B91.301@huawei.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 11 Jan 2016 16:54:21 +0800
+Subject: [PATCH 1/1] USB: core: let USB device know device node
+In-Reply-To: <1452501535-8580-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <201601111658.gmkaFolV%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Peter,
 
+[auto build test ERROR on usb/usb-testing]
+[also build test ERROR on v4.4 next-20160108]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-On 2016/1/9 23:03, Marc Zyngier wrote:
-> On Sat, 9 Jan 2016 13:29:56 +0100
-> Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> 
->> > On Thu, Jan 07, 2016 at 09:36:47PM +0100, Andrew Jones wrote:
->>> > > On Thu, Jan 07, 2016 at 02:56:15PM +0000, Peter Maydell wrote:
->>>> > > > On 7 January 2016 at 14:49, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
->>>>>>> > > > >>> +
->>>>>>> > > > >>> +Groups:
->>>>>>> > > > >>> +  KVM_DEV_ARM_PMU_GRP_IRQ
->>>>>>> > > > >>> +  Attributes:
->>>>>>> > > > >>> +    The attr field of kvm_device_attr encodes one value:
->>>>>>> > > > >>> +    bits:     | 63 .... 32 | 31 ....  0 |
->>>>>>> > > > >>> +    values:   |  reserved  | vcpu_index |
->>>>>>> > > > >>> +    A value describing the PMU overflow interrupt number for the specified
->>>>>>> > > > >>> +    vcpu_index vcpu. This interrupt could be a PPI or SPI, but for one VM the
->>>>>>> > > > >>> +    interrupt type must be same for each vcpu. As a PPI, the interrupt number is
->>>>>>> > > > >>> +    same for all vcpus, while as a SPI it must be different for each vcpu.
->>>>>> > > > >>
->>>>>> > > > >> I see we're using vcpu_index rather than MPIDR affinity value
->>>>>> > > > >> for specifying which CPU we're configuring. Is this in line with
->>>>>> > > > >> our planned API for GICv3 configuration?
->>>>>> > > > >>
->>>>> > > > > Here vcpu_index is used to indexing the vCPU, no special use.
->>>> > > > 
->>>> > > > Yes, but you can identify the CPU by index, or by its MPIDR.
->>>> > > > We had a discussion about which was the best way for doing
->>>> > > > the VGIC API, and I can't remember which way round we ended up
->>>> > > > going for. Whichever we chose, we should do the same thing here.
->>> > > 
->>> > > I think we should start up a new discussion on this. My understanding,
->>> > > after a chat with Igor, who was involved in the untangling of vcpu-id and
->>> > > apic-id for x86, is that using vcpu-id is preferred, unless of course
->>> > > the device expects an apic-id/mpidr, in which case there's no reason to
->>> > > translate it on both sides.
->>> > > 
->> > 
->> > I'm fairly strongly convinced that we should use the full 32-bit
->> > compressed MPIDR for everything ARM related going forward, as this will
->> > cover any case required and leverages and architecturally defined way of
->> > uniquely identifying a (v)CPU.
-> +1.
-> 
-> vcpu_ids, indexes or any other constructs are just a bunch
-> of KVM-specific definitions that do not describe the VM from an
-> architecture PoV. In contrast, the MPIDR is guaranteed to be unique
-> stable, and identifies a given (v)CPU.
-> 
-> As for the PMU: either 1) we instantiate it together with the CPU
-> (with a new capability/feature), 
-So spare some bits(e.g. 10 bits) of the features array to pass the PMU
-irq number or add KVM_SET/GET_DEVICE_ATTR for vcpu ioctl?
+url:    https://github.com/0day-ci/linux/commits/Peter-Chen/USB-core-let-USB-device-know-device-node/20160111-164533
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb.git usb-testing
+config: x86_64-randconfig-x002-201602 (attached as .config)
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-Thanks,
--- 
-Shannon
+All error/warnings (new ones prefixed by >>):
+
+   In file included from include/linux/compiler.h:56:0,
+                    from include/uapi/linux/stddef.h:1,
+                    from include/linux/stddef.h:4,
+                    from include/uapi/linux/posix_types.h:4,
+                    from include/uapi/linux/types.h:13,
+                    from include/linux/types.h:5,
+                    from include/linux/list.h:4,
+                    from include/linux/module.h:9,
+                    from drivers/usb/core/usb.c:24:
+>> include/linux/compiler-gcc.h:73:17: error: expected '{' before 'inline'
+    #define inline  inline  __attribute__((always_inline)) notrace
+                    ^
+>> include/linux/usb/of.h:36:8: note: in expansion of macro 'inline'
+    struct inline device_node * usb_of_get_child_node(struct device_node *parent,
+           ^
+   drivers/usb/core/usb.c: In function 'usb_alloc_dev':
+>> drivers/usb/core/usb.c:512:22: error: implicit declaration of function 'usb_of_get_child_node' [-Werror=implicit-function-declaration]
+      dev->dev.of_node = usb_of_get_child_node
+                         ^
+>> drivers/usb/core/usb.c:512:20: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
+      dev->dev.of_node = usb_of_get_child_node
+                       ^
+   cc1: some warnings being treated as errors
+
+vim +/usb_of_get_child_node +512 drivers/usb/core/usb.c
+
+   506		if (root_hub) {	/* Root hub always ok [and always wired] */
+   507			dev->authorized = 1;
+   508			dev->of_node = bus->controller->of_node;
+   509		} else {
+   510			dev->authorized = !!HCD_DEV_AUTHORIZED(usb_hcd);
+   511			dev->wusb = usb_bus_is_wusb(bus) ? 1 : 0;
+ > 512			dev->dev.of_node = usb_of_get_child_node
+   513				(parent->of_node, dev->portnum);
+   514		}
+   515		return dev;
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 22943 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160111/f002a197/attachment-0001.obj>
