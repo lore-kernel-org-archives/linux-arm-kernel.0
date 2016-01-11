@@ -1,34 +1,91 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 11 Jan 2016 10:39:20 +0900
-Subject: [PATCH] serial: sh-sci: Add device tree support for r8a7792
-Message-ID: <1452476360-20972-1-git-send-email-horms+renesas@verge.net.au>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Mon, 11 Jan 2016 09:39:19 +0800
+Subject: [PATCH] clk: mediatek: Allow changing PLL rate when it is off
+In-Reply-To: <20160108112142.GF13058@pengutronix.de>
+References: <1452240997-35316-1-git-send-email-jamesjj.liao@mediatek.com>
+ <20160108091510.GC13058@pengutronix.de>
+ <1452246533.31362.10.camel@mtksdaap41>
+ <20160108112142.GF13058@pengutronix.de>
+Message-ID: <1452476359.13825.1.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simply document new compat strings.
-There appears to be no need for a driver updates.
+Hi Sascha,
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+On Fri, 2016-01-08 at 12:21 +0100, Sascha Hauer wrote:
+> On Fri, Jan 08, 2016 at 05:48:53PM +0800, James Liao wrote:
+> > On Fri, 2016-01-08 at 10:15 +0100, Sascha Hauer wrote:
+> > > On Fri, Jan 08, 2016 at 04:16:37PM +0800, James Liao wrote:
+> > > > Some modules may need to change its clock rate before turn on it.
+> > > > So changing PLL's rate when it is off should be allowed.
+> > > > This patch removes PLL enabled check before set rate, so that
+> > > > PLLs can set new frequency even if they are off.
+> > > 
+> > > This sounds like the software refused to change the rate on disabled
+> > > PLLs, but this is not the case.
+> > 
+> > In fact the major change of this patch is trigger (set) CON0_PCW_CHG no
+> > matter PLL is on or not.
+> > 
+> > > > 
+> > > > Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> > > > ---
+> > > >  drivers/clk/mediatek/clk-pll.c | 9 ++-------
+> > > >  1 file changed, 2 insertions(+), 7 deletions(-)
+> > > > 
+> > > > diff --git a/drivers/clk/mediatek/clk-pll.c b/drivers/clk/mediatek/clk-pll.c
+> > > > index 966cab1..8e31fae 100644
+> > > > --- a/drivers/clk/mediatek/clk-pll.c
+> > > > +++ b/drivers/clk/mediatek/clk-pll.c
+> > > > @@ -91,9 +91,6 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
+> > > >  		int postdiv)
+> > > >  {
+> > > >  	u32 con1, val;
+> > > > -	int pll_en;
+> > > > -
+> > > > -	pll_en = readl(pll->base_addr + REG_CON0) & CON0_BASE_EN;
+> > > >  
+> > > >  	/* set postdiv */
+> > > >  	val = readl(pll->pd_addr);
+> > > > @@ -114,15 +111,13 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
+> > > >  
+> > > >  	con1 = readl(pll->base_addr + REG_CON1);
+> > > >  
+> > > > -	if (pll_en)
+> > > > -		con1 |= CON0_PCW_CHG;
+> > > > +	con1 |= CON0_PCW_CHG;
+> > > 
+> > > This bit is described as "Feedback divide ratio update". To me this
+> > > sounds like we have to inform the hardware that the PLL registers have
+> > > been updated. The current code only sets this bit when the PLL is
+> > > enabled which sounds sane to me.
+> > > 
+> > > >  
+> > > >  	writel(con1, pll->base_addr + REG_CON1);
+> > > >  	if (pll->tuner_addr)
+> > > >  		writel(con1 + 1, pll->tuner_addr);
+> > > >  
+> > > > -	if (pll_en)
+> > > > -		udelay(20);
+> > > > +	udelay(20);
+> > > 
+> > > We seem to have to wait here until the PLL is really running at the new
+> > > frequency. Normally we don't have to do this when the PLL is disabled.
+> > > 
+> > > I'm sure this patch solves a real problem, from looking at it it's just
+> > > not clear to me what the problem is. Could you clarify this a bit?
+> > 
+> > On MT8173 for example, ARMPLL's enable bit can be controlled by other
+> > HW. That means ARMPLL may be turned on even if we (CPU / SW) set
+> > ARMPLL's enable bit as 0. In this case, SW may want and can still change
+> > ARMPLL's rate by changing its pcw and postdiv settings. But without this
+> > patch, new pcw setting will not be applied because its enable bit is 0.
+> 
+> Ok, thanks for explaining. Could you add that to the commit message?
 
----
-* Broken out of a larger patch the remainder of which has
-  already been accepted into tty-next
----
- Documentation/devicetree/bindings/serial/renesas,sci-serial.txt | 2 ++
- 1 file changed, 2 insertions(+)
+OK. I'll send a new patch with these comments.
 
-diff --git a/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt b/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
-index 401b1b33c2c4..528c3b90f23c 100644
---- a/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
-+++ b/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
-@@ -19,6 +19,8 @@ Required properties:
-     - "renesas,scifa-r8a7791" for R8A7791 (R-Car M2-W) SCIFA compatible UART.
-     - "renesas,scifb-r8a7791" for R8A7791 (R-Car M2-W) SCIFB compatible UART.
-     - "renesas,hscif-r8a7791" for R8A7791 (R-Car M2-W) HSCIF compatible UART.
-+    - "renesas,scif-r8a7792" for R8A7792 (R-Car V2H) SCIF compatible UART.
-+    - "renesas,hscif-r8a7792" for R8A7792 (R-Car V2H) HSCIF compatible UART.
-     - "renesas,scif-r8a7793" for R8A7793 (R-Car M2-N) SCIF compatible UART.
-     - "renesas,scifa-r8a7793" for R8A7793 (R-Car M2-N) SCIFA compatible UART.
-     - "renesas,scifb-r8a7793" for R8A7793 (R-Car M2-N) SCIFB compatible UART.
--- 
-2.7.0.rc3.207.g0ac5344
+
+Best regards,
+
+James
