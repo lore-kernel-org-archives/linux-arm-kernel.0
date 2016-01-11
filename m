@@ -1,102 +1,121 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 11 Jan 2016 18:08:57 +0100
-Subject: [PATCH v3 04/21] arm64: decouple early fixmap init from linear
- mapping
-In-Reply-To: <20160111165103.GA29503@leverpostej>
-References: <1452518355-4606-1-git-send-email-ard.biesheuvel@linaro.org>
- <1452518355-4606-5-git-send-email-ard.biesheuvel@linaro.org>
- <20160111160906.GO6499@leverpostej>
- <CAKv+Gu8KbcJEfpjRMpaQHcsDo0ziv-2xmWowE9Syn_8pOX0WTw@mail.gmail.com>
- <20160111162737.GQ6499@leverpostej>
- <20160111165103.GA29503@leverpostej>
-Message-ID: <CAKv+Gu8HJsz9tg7AQV2fek9xiMbFkbsDSoHRGGfYg0uJDWCkZQ@mail.gmail.com>
+From: mbrugger@suse.com (Matthias Brugger)
+Date: Mon, 11 Jan 2016 18:12:12 +0100
+Subject: [PATCH] arm64, pci, numa: Adding helper functions as required by
+ pci
+In-Reply-To: <CAFpQJXVBafgq864cNeOhccZAdr89EUfXdEdnW7jh1y66ModKAQ@mail.gmail.com>
+References: <1450780730-13667-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <20160108180131.GB5354@localhost> <20160108180638.GF11228@arm.com>
+ <CAFpQJXUaVS7tBqjQ4Dh201yrOWFxa3Bk2q-ZCFtK4mk-te=Q7w@mail.gmail.com>
+ <20160109152422.GA30802@localhost>
+ <CAFpQJXVBafgq864cNeOhccZAdr89EUfXdEdnW7jh1y66ModKAQ@mail.gmail.com>
+Message-ID: <5693E26C.2010501@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 January 2016 at 17:51, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Mon, Jan 11, 2016 at 04:27:38PM +0000, Mark Rutland wrote:
->> On Mon, Jan 11, 2016 at 05:15:13PM +0100, Ard Biesheuvel wrote:
->> > On 11 January 2016 at 17:09, Mark Rutland <mark.rutland@arm.com> wrote:
->> > > On Mon, Jan 11, 2016 at 02:18:57PM +0100, Ard Biesheuvel wrote:
->> > >> Since the early fixmap page tables are populated using pages that are
->> > >> part of the static footprint of the kernel, they are covered by the
->> > >> initial kernel mapping, and we can refer to them without using __va/__pa
->> > >> translations, which are tied to the linear mapping.
->> > >>
->> > >> Since the fixmap page tables are disjoint from the kernel mapping up
->> > >> to the top level pgd entry, we can refer to bm_pte[] directly, and there
->> > >> is no need to walk the page tables and perform __pa()/__va() translations
->> > >> at each step.
->> > >>
->> > >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> > >> ---
->> > >>  arch/arm64/mm/mmu.c | 32 ++++++--------------
->> > >>  1 file changed, 9 insertions(+), 23 deletions(-)
->> > >>
->> > >> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
->> > >> index 7711554a94f4..75b5f0dc3bdc 100644
->> > >> --- a/arch/arm64/mm/mmu.c
->> > >> +++ b/arch/arm64/mm/mmu.c
->> > >> @@ -570,38 +570,24 @@ void vmemmap_free(unsigned long start, unsigned long end)
->> > >>  #endif       /* CONFIG_SPARSEMEM_VMEMMAP */
->> > >>
->> > >>  static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
->> > >> -#if CONFIG_PGTABLE_LEVELS > 2
->> > >>  static pmd_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss;
->> > >> -#endif
->> > >> -#if CONFIG_PGTABLE_LEVELS > 3
->> > >>  static pud_t bm_pud[PTRS_PER_PUD] __page_aligned_bss;
->> > >> -#endif
->> > >>
->> > >>  static inline pud_t * fixmap_pud(unsigned long addr)
->> > >>  {
->> > >> -     pgd_t *pgd = pgd_offset_k(addr);
->> > >> -
->> > >> -     BUG_ON(pgd_none(*pgd) || pgd_bad(*pgd));
->> > >> -
->> > >> -     return pud_offset(pgd, addr);
->> > >> +     return (CONFIG_PGTABLE_LEVELS > 3) ? &bm_pud[pud_index(addr)]
->> > >> +                                        : (pud_t *)pgd_offset_k(addr);
->> > >
->> > > If we move patch 6 earlier, we could use pud_offset_kimg here, and avoid
->> > > the cast, at the cost of passing the pgd into fixmap_pud.
->> > >
->> > > Similarly for fixmap_pmd.
->> > >
->> >
->> > Is that necessarily an improvement? I know it hides the cast, but I
->> > think having an explicit pgd_t* to pud_t* cast that so obviously
->> > applies to CONFIG_PGTABLE_LEVELS < 4 only is fine as well.
->>
->> True; it's not a big thing either way.
->
-> Sorry,  I'm gonig to change my mind on that again. I think using
-> p?d_offset_kimg is preferable. e.g.
->
-> static inline pud_t * fixmap_pud(unsigned long addr)
-> {
->         pgd_t *pgd = pgd_offset_k(addr);
->
->         BUG_ON(pgd_none(*pgd) || pgd_bad(*pgd));
->
->         return pud_offset_kimg(pgd, addr);
-> }
->
-> static inline pmd_t * fixmap_pmd(unsigned long addr)
-> {
->         pud_t *pud = fixmap_pud(addr);
->
->         BUG_ON(pud_none(*pud) || pud_bad(*pud));
->
->         return pmd_offset_kimg(pud, addr);
-> }
->
-> That avoids having to check CONFIG_PGTABLE_LEVELS check and perform a cast,
-> avoids duplicating details about bm_{pud,pmd}, and keeps the existing structure
-> so it's easier to reason about the change. I was wrong about having to pass the
-> pgd or pud in, so callers don't need upating.
->
-> From my PoV that is preferable.
->
 
-OK. I think it looks better, indeed.
+
+On 09/01/16 16:35, Ganapatrao Kulkarni wrote:
+> Hi Bjorn,
+>
+> On Sat, Jan 9, 2016 at 8:54 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
+>> On Sat, Jan 09, 2016 at 11:35:17AM +0530, Ganapatrao Kulkarni wrote:
+>>> On Fri, Jan 8, 2016 at 11:36 PM, Will Deacon <will.deacon@arm.com> wrote:
+>>>> On Fri, Jan 08, 2016 at 12:01:31PM -0600, Bjorn Helgaas wrote:
+>>>>> On Tue, Dec 22, 2015 at 04:08:50PM +0530, Ganapatrao Kulkarni wrote:
+>>>>>> Adding helper functions and necessary code to make
+>>>>>> pci driver(pci-host-generic) numa aware.
+>>>>>>
+>>>>>> This patch is on top of arm64-numa v7.
+>>>>>> http://www.spinics.net/lists/arm-kernel/msg460813.html
+>>>>>>
+>>>>>> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+>>>>>> ---
+>>>>>>   arch/arm64/include/asm/numa.h       | 8 +++++---
+>>>>>>   arch/arm64/kernel/pci.c             | 8 ++++++++
+>>>>>>   drivers/pci/host/pci-host-generic.c | 1 +
+
+set_dev_node() in pci-host-generic.c is missing in v8 of your numa patches.
+Was this forgotten?
+
+Regards,
+Matthias
+
+>>>>>>   3 files changed, 14 insertions(+), 3 deletions(-)
+>>>>>>
+>>>>>> diff --git a/arch/arm64/include/asm/numa.h b/arch/arm64/include/asm/numa.h
+>>>>>> index b8c2a3f..1eca4db 100644
+>>>>>> --- a/arch/arm64/include/asm/numa.h
+>>>>>> +++ b/arch/arm64/include/asm/numa.h
+>>>>>> @@ -15,9 +15,11 @@
+>>>>>>   extern int __node_distance(int from, int to);
+>>>>>>   #define node_distance(a, b) __node_distance(a, b)
+>>>>>>
+>>>>>> -/* dummy definitions for pci functions */
+>>>>>> -#define pcibus_to_node(node)       0
+>>>>>> -#define cpumask_of_pcibus(bus)     0
+>>>>>> +struct pci_bus;
+>>>>>> +extern int pcibus_to_node(struct pci_bus *bus);
+>>>>>> +#define cpumask_of_pcibus(bus)     (pcibus_to_node(bus) == -1 ?            \
+>>>>>> +                            cpu_all_mask :                         \
+>>>>>> +                            cpumask_of_node(pcibus_to_node(bus)))
+>>>>>
+>>>>> All the arch definitions of cpumask_of_pcibus() are pretty similar;
+>>>>> could they be made more generic?  At the very least, can you drop the
+>>>>> definition here and use the one in include/asm-generic/topology.h,
+>>>>> which is identical to what you're defining here?
+>>> macro cpumask_of_pcibus is defined under #ifndef CONFIG_NUMA in
+>>> include/asm-generic/topology.h
+>>> and this macro is defined again for NUMA in respective arch header files.
+>>> i think moving this macro from ifndef will allow us to use without redefinition.
+>>>
+>>> --- a/include/asm-generic/topology.h
+>>> +++ b/include/asm-generic/topology.h
+>>> @@ -54,14 +54,14 @@
+>>>   #define pcibus_to_node(bus)    ((void)(bus), -1)
+>>>   #endif
+>>>
+>>> +#endif /* CONFIG_NUMA */
+>>> +
+>>>   #ifndef cpumask_of_pcibus
+>>>   #define cpumask_of_pcibus(bus) (pcibus_to_node(bus) == -1 ?            \
+>>>                                   cpu_all_mask :                         \
+>>>                                   cpumask_of_node(pcibus_to_node(bus)))
+>>>   #endif
+>>>
+>>> -#endif /* CONFIG_NUMA */
+>>> -
+>>>   #if !defined(CONFIG_NUMA) || !defined(CONFIG_HAVE_MEMORYLESS_NODES)
+>>>
+>>>   #ifndef set_numa_mem
+>>>
+>>> i have got below compilation error withour macro defined in arch code.
+>>>
+>>> drivers/pci/pci-sysfs.c: In function ?cpuaffinity_show?:
+>>> drivers/pci/pci-sysfs.c:114:15: error: implicit declaration of
+>>> function ?cpumask_of_pcibus? [-Werror=implicit-function-declaration]
+>>> drivers/pci/pci-sysfs.c:114:34: warning: initialization makes pointer
+>>> from integer without a cast [enabled by default]
+>>> drivers/pci/pci-sysfs.c: In function ?cpulistaffinity_show?:
+>>> drivers/pci/pci-sysfs.c:123:34: warning: initialization makes pointer
+>>> from integer without a cast [enabled by default]
+>>> cc1: some warnings being treated as errors
+>>>
+>>>
+>>> i can send this as separate patch( as a  fix patch).
+>>
+>> Unless your series has already been merged, I don't like the idea of a
+>> separate fix patch.  The whole point of reviews is to try to fix as
+>> many things as we can *before* merging.
+> thanks for the review.
+> sure, i will add  this as part of my numa patch series.
+>>
+>> Bjorn
+>
+> thanks
+> Ganapat
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
