@@ -1,37 +1,28 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 11 Jan 2016 15:26:12 -0600
-Subject: [PATCH] arm: omap2plus_defconfig: enable SPLIT and DWARF4
-Message-ID: <1452547572-23515-1-git-send-email-balbi@ti.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Mon, 11 Jan 2016 15:38:54 -0600
+Subject: [PATCH v4 3/3] serial: amba-pl011: add ACPI support to AMBA probe
+In-Reply-To: <20160106110350.GB3599@xora-haswell.xora.org.uk>
+References: <1450880383-29560-1-git-send-email-aleksey.makarov@linaro.org>
+ <1450880383-29560-4-git-send-email-aleksey.makarov@linaro.org>
+ <CAOZdJXUpjWi7Dy=GFi7_58FqD_UZxxrw_QKJ4sdHLKVOLCyNAA@mail.gmail.com>
+ <CAGCh1+ksWFLkE8Y_a5SW98tpgGBWdVH5TYJAoS17EExuPd65oQ@mail.gmail.com>
+ <568BEDEC.5010101@codeaurora.org>
+ <20160106110350.GB3599@xora-haswell.xora.org.uk>
+Message-ID: <569420EE.5060006@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_DEBUG_INFO_SPLIT will split debug info on
-.dwo files. This will generate a smaller vmlinux and
-smaller .ko modules, which will be easier to ship on
-certain products.
+Graeme Gregory wrote:
+>> >
+>> >So with this patch, what is the difference between sbsa_uart_probe and
+>> >pl011_probe?  Shouldn't the patch also remove sbsa_uart_probe?
+>> >
+> One is for amba_device and one is for platform_device and one maintainer
+> indicated displeasure at platfrom device being in an AMBA driver.
 
-CONFIG_DEBUG_INFO_DWARF4 will generate debug info in
-DWARF4 format, which ends up being larger, but
-improves the probability of resolving variables in
-optmized code.
+Ok, I'm still a little confused, but it sounds to me like your patch 
+should have also removed sbsa_uart_probe().
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
- arch/arm/configs/omap2plus_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index c5e1943e5427..0b3e471a4262 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -449,6 +449,8 @@ CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_ISO8859_1=y
- CONFIG_PRINTK_TIME=y
- CONFIG_DEBUG_INFO=y
-+CONFIG_DEBUG_INFO_SPLIT=y
-+CONFIG_DEBUG_INFO_DWARF4=y
- CONFIG_MAGIC_SYSRQ=y
- CONFIG_SCHEDSTATS=y
- CONFIG_TIMER_STATS=y
--- 
-2.7.0
+With your patches applied, under what circumstance would 
+sbsa_uart_probe() still be called?  The amba-pl011.c driver already 
+probes on ARMH0011, so shouldn't that be removed, to avoid a double probe?
