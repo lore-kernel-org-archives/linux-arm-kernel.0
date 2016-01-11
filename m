@@ -1,73 +1,28 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 11 Jan 2016 08:59:38 +0000
-Subject: [PATCH v8 20/20] KVM: ARM64: Add a new kvm ARM PMU device
-In-Reply-To: <56936B91.301@huawei.com>
-References: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>	<1450771695-11948-21-git-send-email-zhaoshenglong@huawei.com>	<CAFEAcA_MDiOphseZ7RGNE3G=4ZDF5SFV5krOjanPbVuhgg9gnQ@mail.gmail.com>	<568E7AF1.9040103@huawei.com>	<CAFEAcA-Qcda7TSFLSeykLHqZYdP6tYdEjPe2uHN6f_+omqWFZg@mail.gmail.com>	<20160107203647.GJ6199@hawk.localdomain>	<20160109122956.GA30867@cbox>
- <20160109150339.10576e81@arm.com> <56936B91.301@huawei.com>
-Message-ID: <56936EFA.1000404@arm.com>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Mon, 11 Jan 2016 10:02:21 +0100
+Subject: [PATCH] ASoC: mediatek: Enable 33bit memory address to support
+ 4GB DRAM
+In-Reply-To: <1452499250-5202-1-git-send-email-pc.liao@mediatek.com>
+References: <1452499250-5202-1-git-send-email-pc.liao@mediatek.com>
+Message-ID: <s5hwprgcwv6.wl-tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/16 08:45, Shannon Zhao wrote:
+On Mon, 11 Jan 2016 09:00:50 +0100,
+PC Liao wrote:
 > 
-> 
-> On 2016/1/9 23:03, Marc Zyngier wrote:
->> On Sat, 9 Jan 2016 13:29:56 +0100
->> Christoffer Dall <christoffer.dall@linaro.org> wrote:
->>
->>>> On Thu, Jan 07, 2016 at 09:36:47PM +0100, Andrew Jones wrote:
->>>>>> On Thu, Jan 07, 2016 at 02:56:15PM +0000, Peter Maydell wrote:
->>>>>>>> On 7 January 2016 at 14:49, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
->>>>>>>>>>>>>> +
->>>>>>>>>>>>>> +Groups:
->>>>>>>>>>>>>> +  KVM_DEV_ARM_PMU_GRP_IRQ
->>>>>>>>>>>>>> +  Attributes:
->>>>>>>>>>>>>> +    The attr field of kvm_device_attr encodes one value:
->>>>>>>>>>>>>> +    bits:     | 63 .... 32 | 31 ....  0 |
->>>>>>>>>>>>>> +    values:   |  reserved  | vcpu_index |
->>>>>>>>>>>>>> +    A value describing the PMU overflow interrupt number for the specified
->>>>>>>>>>>>>> +    vcpu_index vcpu. This interrupt could be a PPI or SPI, but for one VM the
->>>>>>>>>>>>>> +    interrupt type must be same for each vcpu. As a PPI, the interrupt number is
->>>>>>>>>>>>>> +    same for all vcpus, while as a SPI it must be different for each vcpu.
->>>>>>>>>>>>
->>>>>>>>>>>> I see we're using vcpu_index rather than MPIDR affinity value
->>>>>>>>>>>> for specifying which CPU we're configuring. Is this in line with
->>>>>>>>>>>> our planned API for GICv3 configuration?
->>>>>>>>>>>>
->>>>>>>>>> Here vcpu_index is used to indexing the vCPU, no special use.
->>>>>>>>
->>>>>>>> Yes, but you can identify the CPU by index, or by its MPIDR.
->>>>>>>> We had a discussion about which was the best way for doing
->>>>>>>> the VGIC API, and I can't remember which way round we ended up
->>>>>>>> going for. Whichever we chose, we should do the same thing here.
->>>>>>
->>>>>> I think we should start up a new discussion on this. My understanding,
->>>>>> after a chat with Igor, who was involved in the untangling of vcpu-id and
->>>>>> apic-id for x86, is that using vcpu-id is preferred, unless of course
->>>>>> the device expects an apic-id/mpidr, in which case there's no reason to
->>>>>> translate it on both sides.
->>>>>>
->>>>
->>>> I'm fairly strongly convinced that we should use the full 32-bit
->>>> compressed MPIDR for everything ARM related going forward, as this will
->>>> cover any case required and leverages and architecturally defined way of
->>>> uniquely identifying a (v)CPU.
->> +1.
->>
->> vcpu_ids, indexes or any other constructs are just a bunch
->> of KVM-specific definitions that do not describe the VM from an
->> architecture PoV. In contrast, the MPIDR is guaranteed to be unique
->> stable, and identifies a given (v)CPU.
->>
->> As for the PMU: either 1) we instantiate it together with the CPU
->> (with a new capability/feature), 
-> So spare some bits(e.g. 10 bits) of the features array to pass the PMU
-> irq number or add KVM_SET/GET_DEVICE_ATTR for vcpu ioctl?
+> @@ -603,7 +606,10 @@ static int mtk_afe_dais_hw_params(struct snd_pcm_substream *substream,
+>  	if (ret < 0)
+>  		return ret;
+>  
+> -	memif->phys_buf_addr = substream->runtime->dma_addr;
+> +	if (sizeof(dma_addr_t) > 4)
+> +		msb_at_bit33 = (substream->runtime->dma_addr & 0x100000000) ? 1 : 0;
 
-Using the device attributes seems more suitable, but I don't know if
-using GET/SET_DEVICE_ATTR without the actual creation of a device is
-acceptable...
+Better to put a proper suffix for the constant over 32bit.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Or use upper_32_bits().  Then sizeof() check can be omitted, as the
+compiler should be smart enough to know it beforehand.
+
+
+Takashi
