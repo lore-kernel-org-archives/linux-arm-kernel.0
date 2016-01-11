@@ -1,36 +1,82 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 12 Jan 2016 07:24:09 +0800
-Subject: [RESEND][PATCHv2 2/3] staging: ion: Add files for parsing the
- devicetree
-In-Reply-To: <1452548364-9522-3-git-send-email-laura@labbott.name>
-Message-ID: <201601120746.hJPgqCqR%fengguang.wu@intel.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Mon, 11 Jan 2016 17:28:23 -0600
+Subject: [RESEND][PATCHv2 1/3] ion: Devicetree bindings for Ion
+In-Reply-To: <1452548364-9522-2-git-send-email-laura@labbott.name>
+References: <1452548364-9522-1-git-send-email-laura@labbott.name>
+ <1452548364-9522-2-git-send-email-laura@labbott.name>
+Message-ID: <CAL_JsqLBk1TAa2bKnA6TpEfrXxVZ7JYojOgmszEKoWC0+Huuug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laura,
+On Mon, Jan 11, 2016 at 3:39 PM, Laura Abbott <laura@labbott.name> wrote:
+>
+> This adds a base set of devicetree bindings for the Ion memory
+> manager. This supports setting up the generic set of heaps and
+> their properties.
+>
+> Signed-off-by: Laura Abbott <laura@labbott.name>
+> ---
+>  drivers/staging/android/ion/devicetree.txt | 50 ++++++++++++++++++++++++++++++
+>  1 file changed, 50 insertions(+)
+>  create mode 100644 drivers/staging/android/ion/devicetree.txt
+>
+> diff --git a/drivers/staging/android/ion/devicetree.txt b/drivers/staging/android/ion/devicetree.txt
+> new file mode 100644
+> index 0000000..e1ea537
+> --- /dev/null
+> +++ b/drivers/staging/android/ion/devicetree.txt
+> @@ -0,0 +1,50 @@
+> +Ion Memory Manager
+> +
+> +Ion is a memory manager that allows for sharing of buffers via dma-buf.
+> +Ion allows for different types of allocation via an abstraction called
+> +a 'heap'. A heap represents a specific type of memory. Each heap has
+> +a different type. There can be multiple instances of the same heap
+> +type.
+> +
+> +Required properties for Ion
+> +
+> +- compatible: "linux,ion" PLUS a compatible property for the device
+> +
+> +All child nodes of a linux,ion node are interpreted as heaps
+> +
+> +required properties for heaps
+> +
+> +- compatible: compatible string for a heap type PLUS a compatible property
+> +for the specific instance of the heap. Current heap types
+> +-- linux,ion-heap-system
+> +-- linux,ion-heap-system-contig
+> +-- linux,ion-heap-carveout
+> +-- linux,ion-heap-chunk
+> +-- linux,ion-heap-dma
+> +-- linux,ion-heap-custom
+> +
+> +Optional properties
+> +- memory-region: A phandle to a memory region. Required for DMA heap type
+> +(see reserved-memory.txt for details on the reservation)
 
-[auto build test ERROR on v4.4-rc8]
-[cannot apply to staging/staging-testing next-20160111]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+Why would all of them not require a memory region other than system heap?
 
-url:    https://github.com/0day-ci/linux/commits/Laura-Abbott/Devicetree-bindings-for-Ion/20160112-054709
-config: x86_64-allmodconfig (attached as .config)
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+> +
+> +Example:
+> +
+> +       ion {
+> +               compatbile = "qcom,msm8916-ion", "linux,ion";
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               ion-system-heap {
+> +                       compatbile = "qcom,system-heap", "linux,ion-heap-system"
+> +               };
 
-All errors (new ones prefixed by >>):
+What is the purpose of this in DT? Don't we always want/need a system
+heap? How does it vary by platform?
 
->> make[5]: *** No rule to make target 'drivers/staging/android/ion/ion_physmem.o', needed by 'drivers/staging/android/ion/built-in.o'.
-   make[5]: Target '__build' not remade because of errors.
+> +               ion-camera-region {
+> +                       compatible = "qcom,camera-heap", "linux,ion-heap-dma"
+> +                       memory-region = <&camera_region>;
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 51055 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160112/84cc6eb8/attachment-0001.obj>
+Why not just add a property (or properties) to the camera_region node
+that ION drivers can search for?
+
+Rob
