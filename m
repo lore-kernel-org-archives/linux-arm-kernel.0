@@ -1,121 +1,153 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 11 Jan 2016 16:09:29 +0100
-Subject: [PATCH v8 20/20] KVM: ARM64: Add a new kvm ARM PMU device
-In-Reply-To: <20160111140717.GD3924@hawk.localdomain>
-References: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>
- <1450771695-11948-21-git-send-email-zhaoshenglong@huawei.com>
- <CAFEAcA_MDiOphseZ7RGNE3G=4ZDF5SFV5krOjanPbVuhgg9gnQ@mail.gmail.com>
- <568E7AF1.9040103@huawei.com>
- <CAFEAcA-Qcda7TSFLSeykLHqZYdP6tYdEjPe2uHN6f_+omqWFZg@mail.gmail.com>
- <20160107203647.GJ6199@hawk.localdomain>
- <20160109122956.GA30867@cbox> <20160109150339.10576e81@arm.com>
- <20160111140717.GD3924@hawk.localdomain>
-Message-ID: <20160111150929.GB15554@cbox>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Mon, 11 Jan 2016 17:13:20 +0200
+Subject: [PATCH v5 2/2] ACPI: amba bus probing support
+In-Reply-To: <1452518790-27053-3-git-send-email-aleksey.makarov@linaro.org>
+References: <1452518790-27053-1-git-send-email-aleksey.makarov@linaro.org>
+ <1452518790-27053-3-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <CAHp75Vew8HMMrc2vdKbSVuB2reOCrwZZg3-a4nBUyfiQ=c0Y4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2016 at 03:07:17PM +0100, Andrew Jones wrote:
-> On Sat, Jan 09, 2016 at 03:03:39PM +0000, Marc Zyngier wrote:
-> > On Sat, 9 Jan 2016 13:29:56 +0100
-> > Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> > 
-> > > On Thu, Jan 07, 2016 at 09:36:47PM +0100, Andrew Jones wrote:
-> > > > On Thu, Jan 07, 2016 at 02:56:15PM +0000, Peter Maydell wrote:
-> > > > > On 7 January 2016 at 14:49, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
-> > > > > >>> +
-> > > > > >>> +Groups:
-> > > > > >>> +  KVM_DEV_ARM_PMU_GRP_IRQ
-> > > > > >>> +  Attributes:
-> > > > > >>> +    The attr field of kvm_device_attr encodes one value:
-> > > > > >>> +    bits:     | 63 .... 32 | 31 ....  0 |
-> > > > > >>> +    values:   |  reserved  | vcpu_index |
-> > > > > >>> +    A value describing the PMU overflow interrupt number for the specified
-> > > > > >>> +    vcpu_index vcpu. This interrupt could be a PPI or SPI, but for one VM the
-> > > > > >>> +    interrupt type must be same for each vcpu. As a PPI, the interrupt number is
-> > > > > >>> +    same for all vcpus, while as a SPI it must be different for each vcpu.
-> > > > > >>
-> > > > > >> I see we're using vcpu_index rather than MPIDR affinity value
-> > > > > >> for specifying which CPU we're configuring. Is this in line with
-> > > > > >> our planned API for GICv3 configuration?
-> > > > > >>
-> > > > > > Here vcpu_index is used to indexing the vCPU, no special use.
-> > > > > 
-> > > > > Yes, but you can identify the CPU by index, or by its MPIDR.
-> > > > > We had a discussion about which was the best way for doing
-> > > > > the VGIC API, and I can't remember which way round we ended up
-> > > > > going for. Whichever we chose, we should do the same thing here.
-> > > > 
-> > > > I think we should start up a new discussion on this. My understanding,
-> > > > after a chat with Igor, who was involved in the untangling of vcpu-id and
-> > > > apic-id for x86, is that using vcpu-id is preferred, unless of course
-> > > > the device expects an apic-id/mpidr, in which case there's no reason to
-> > > > translate it on both sides.
-> > > > 
-> > > 
-> > > I'm fairly strongly convinced that we should use the full 32-bit
-> > > compressed MPIDR for everything ARM related going forward, as this will
-> > > cover any case required and leverages and architecturally defined way of
-> > > uniquely identifying a (v)CPU.
-> > 
-> > +1.
-> > 
-> > vcpu_ids, indexes or any other constructs are just a bunch
-> > of KVM-specific definitions that do not describe the VM from an
-> > architecture PoV. In contrast, the MPIDR is guaranteed to be unique
-> > stable, and identifies a given (v)CPU.
-> >
-> 
-> cpu-cpu and cpu-device interfaces should certainly use MPIDR, if they do
-> in real hardware, to allow us to match emulation code to specs and keep
-> sanity. But I assume those are the only places of "everything" you guys
-> are referring to, as everywhere else we should stick to using the concept
-> of vcpu-ids/indices. Since vcpu-indices are just counters they keep us
-> from needing all the data structures to be large, complex, sparse things.
-> Identifiers separate from MPIDR also allow hotunplug/plug to more easily
-> reuse resources, i.e. remap indices to other vcpus as necessary.
+On Mon, Jan 11, 2016 at 3:26 PM, Aleksey Makarov
+<aleksey.makarov@linaro.org> wrote:
+> From: Graeme Gregory <graeme.gregory@linaro.org>
+>
+> On ARM64 some devices use the AMBA device and not the platform bus for
+> probing so add support for this. Uses a dummy clock for apb_pclk as ACPI
+> does not have a suitable clock representation and to keep the core
+> AMBA bus code unchanged between probing methods.
+>
 
-Are vcpu ids already exposed to userspace (beyond the stupid
-KVM_IRQ_LINE) ioctl and as such we're bound to whatever upper limit and
-format they have?
+My comments below.
 
-If not, I think decoupling an internal ID and uniquely identifying a CPU
-is a good idea.
+> +++ b/drivers/acpi/acpi_amba.c
+> @@ -0,0 +1,122 @@
+> +
+> +/*
+> + * ACPI support for platform bus type.
+> + *
+> + * Copyright (C) 2015, Linaro Ltd
+> + * Author: Graeme Gregory <graeme.gregory@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/acpi.h>
+> +#include <linux/amba/bus.h>
+> +#include <linux/clkdev.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/device.h>
+> +#include <linux/err.h>
+> +#include <linux/ioport.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +
+> +#include "internal.h"
+> +
+> +static const struct acpi_device_id amba_id_list[] = {
+> +       {"ARMH0061", 0}, /* PL061 GPIO Device */
+> +       {"", 0},
+> +};
+> +
+> +static void amba_register_dummy_clk(void)
+> +{
+> +       static struct clk *amba_dummy_clk;
+> +
+> +       /* If clock already registered */
+> +       if (amba_dummy_clk)
+> +               return;
+> +
+> +       amba_dummy_clk = clk_register_fixed_rate(NULL, "apb_pclk", NULL,
+> +                                               CLK_IS_ROOT, 0);
+> +       clk_register_clkdev(amba_dummy_clk, "apb_pclk", NULL);
+> +}
+> +
+> +static int amba_handler_attach(struct acpi_device *adev,
+> +                               const struct acpi_device_id *id)
+> +{
+> +       struct amba_device *dev;
+> +       struct resource_entry *rentry;
+> +       struct list_head resource_list;
+> +       bool address_found = false;
+> +       int irq_no = 0;
+> +       int ret;
+> +
+> +       /* If the ACPI node already has a physical device attached, skip it. */
+> +       if (adev->physical_node_count)
+> +               return 0;
+> +
+> +       dev = amba_device_alloc(dev_name(&adev->dev), 0, 0);
+> +       if (!dev) {
+> +               dev_err(&adev->dev, "%s(): amba_device_alloc() failed\n",
+> +                       __func__);
+> +               return -ENOMEM;
+> +       }
+> +
+> +       INIT_LIST_HEAD(&resource_list);
+> +       ret = acpi_dev_get_resources(adev, &resource_list, NULL, NULL);
+> +       if (ret < 0)
+> +               goto err_free;
+> +
+> +       list_for_each_entry(rentry, &resource_list, node) {
+> +               switch (resource_type(rentry->res)) {
+> +               case IORESOURCE_MEM:
+> +                       if (!address_found) {
+> +                               dev->res = *rentry->res;
 
-> 
-> In the PMU case above it seems better to use a vcpu-index. KVM and KVM's
-> userspace both have unique vcpu-indices and unique MPIDRs per vcpu. The
-> use here isn't based on a hardware spec, so there's nowhere to look for
-> how MPIDR should/shouldn't be used. This is just a KVM spec. Here we might
-> as well use the easiest to use unique identifier.
+dev->res is 0 before this one, right? Could you use this fact instead
+of address_found flag?
 
-I think the only things that should matter here are (in no particular
-order):
- - Userspace convenience
- - Clarity
- - Avoiding ambiguity
+> +                               address_found = true;
+> +                       }
+> +                       break;
+> +               case IORESOURCE_IRQ:
+> +                       if (irq_no < AMBA_NR_IRQS)
+> +                               dev->irq[irq_no++] = rentry->res->start;
+> +                       break;
+> +               default:
+> +                       dev_warn(&adev->dev, "Invalid resource\n");
 
-> 
-> That said, I like the vcpu ioctl method much better. With that we avoid
-> the need for vcpu identifiers all together. I'm even having third
-> thoughts about the gic per vcpu registers. If we go with extending
-> GET/SET_DEVICE_ATTR here, then I think we should do the same there as
-> well. That would then leave only KVM_IRQ_LINE using a vcpu-index, which,
-> with its 8-bit vcpu-index, we've outgrown for gicv3 machine types already
-> anyway.
-> 
-For the GIC, I think we've discussed this in the past.  It really
-depends whether you think about the GIC as one device (the distributor)
-separate from the CPUs, with a bunch of separate devices attached to
-each CPU and wired together somehow, or if you think of this as one big
-coherent thing where parts of the device are specific to each CPU.
+Why? Isn't possible to have other resources for the devices?
 
-I tend to interpret the GIC as the latter and I think the kernel and
-userspace implementations are also done that way, suggesting we should
-stick with the device API for all GIC-related state (as was also the
-suggestion for the GICv3 save/restore API).
+> +                       break;
+> +               }
+> +       }
+> +
+> +       acpi_dev_free_resource_list(&resource_list);
+> +
+> +       /*
+> +        * If the ACPI node has a parent and that parent has a physical device
+> +        * attached to it, that physical device should be the parent of
+> +        * the amba device we are about to create.
+> +        */
+> +       if (adev->parent)
+> +               dev->dev.parent = acpi_get_first_physical_node(adev->parent);
+> +
+> +       ACPI_COMPANION_SET(&dev->dev, adev);
+> +
+> +       ret = amba_device_add(dev, &iomem_resource);
+> +       if (ret) {
 
-Similarly, because the GIC architecture refers to CPUs using the MPIDR,
-we should do the same in this interface.  Otherwise, I think you have to
-define stricly how the exposed VCPU ID maps to an MPIDR somehow.
+ret < 0?
 
--Christoffer
+What to do if ret > 0? It will be considered as not error. Please,
+check what function returns and adjust this.
+
+> +               dev_err(&adev->dev, "%s(): amba_device_add() failed (%d)\n",
+> +                      __func__, ret);
+> +               goto err_free;
+> +       }
+> +
+> +       return 1;
+> +
+> +err_free:
+> +       amba_device_put(dev);
+> +       return ret;
+> +}
+
+
+-- 
+With Best Regards,
+Andy Shevchenko
