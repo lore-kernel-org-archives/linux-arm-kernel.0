@@ -1,61 +1,34 @@
-From: xuejiancheng@huawei.com (xuejiancheng)
-Date: Mon, 11 Jan 2016 15:50:00 +0800
-Subject: [PATCH v5 5/6] mfd: dt-bindings: add device tree bindings for
- Hi3519 sysctrl
-In-Reply-To: <20160111054846.GD3331@x1>
-References: <1452219400-32478-1-git-send-email-xuejiancheng@huawei.com>
- <1452219400-32478-6-git-send-email-xuejiancheng@huawei.com>
- <20160111054846.GD3331@x1>
-Message-ID: <56935EA8.4060801@huawei.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 11 Jan 2016 08:53:20 +0100
+Subject: [PATCH v4 2/3] ARM: dts: sun8i: Add Allwinner A83T dtsi
+In-Reply-To: <1452085914-29340-3-git-send-email-vishnupatekar0510@gmail.com>
+References: <1452085914-29340-1-git-send-email-vishnupatekar0510@gmail.com>
+ <1452085914-29340-3-git-send-email-vishnupatekar0510@gmail.com>
+Message-ID: <20160111075320.GK9631@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee Jones,
+Hi,
 
-    Thanks for your comments.
+On Wed, Jan 06, 2016 at 09:11:53PM +0800, Vishnu Patekar wrote:
+> Allwinner A83T is new octa-core cortex-a7 SOC.
+> This adds the basic dtsi, the clocks differs from
+> earlier sun8i SOCs.
+> 
+> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
 
-On 2016/1/11 13:48, Lee Jones wrote:
-> On Fri, 08 Jan 2016, Jiancheng Xue wrote:
-> 
->> Add device tree bindings for Hi3519 system controller.
->>
->> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
->> ---
->>  Documentation/devicetree/bindings/mfd/hi3519.txt | 14 ++++++++++++++
->>  1 file changed, 14 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/mfd/hi3519.txt
-> 
-> I have this patch, but none of the others in the set, thus I am
-> lacking context.
-> 
-I can forward other patches in the set to you. Thank you.
+I removed the empty chosen node, and applied, thanks!
 
->> diff --git a/Documentation/devicetree/bindings/mfd/hi3519.txt b/Documentation/devicetree/bindings/mfd/hi3519.txt
->> new file mode 100644
->> index 0000000..115c5be
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mfd/hi3519.txt
->> @@ -0,0 +1,14 @@
->> +* Hisilicon Hi3519 System Controller Block
->> +
->> +This bindings use the following binding:
->> +Documentation/devicetree/bindings/mfd/syscon.txt
->> +
->> +Required properties:
->> +- compatible: "hisilicon,hi3519-sysctrl".
->> +- reg: the register region of this block
->> +
->> +Examples:
->> +sysctrl: system-controller at 12010000 {
->> +	compatible = "hisilicon,hi3519-sysctrl", "syscon";
->> +	reg = <0x12010000 0x1000>;
->> +};
-> 
-> There is no requirement (nor want) for binding documents where the
-> given device is simply using highly generic bindings.  This just
-> amounts to churn.
-> 
-This block is specific for Hi3519 SOC, and may has its own driver.
-So I think it's better to keep this binding.
+Maxime
 
-Jiancheng
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160111/cb9e00c6/attachment.sig>
