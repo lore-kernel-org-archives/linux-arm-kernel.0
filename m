@@ -1,403 +1,87 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon, 11 Jan 2016 12:02:06 +0000
-Subject: [PATCH 4.4-rc5 v22 3/4] irqchip: gic: Introduce plumbing for IPI
- FIQ
-In-Reply-To: <568E9B26.2060801@arm.com>
-References: <1450644757-18734-1-git-send-email-daniel.thompson@linaro.org>
- <1450644757-18734-4-git-send-email-daniel.thompson@linaro.org>
- <568E9B26.2060801@arm.com>
-Message-ID: <569399BE.6090107@linaro.org>
+From: shannon.zhao@linaro.org (Shannon Zhao)
+Date: Mon, 11 Jan 2016 20:03:20 +0800
+Subject: [PATCH v8 20/20] KVM: ARM64: Add a new kvm ARM PMU device
+In-Reply-To: <20160111115225.GC3924@hawk.localdomain>
+References: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>
+ <1450771695-11948-21-git-send-email-zhaoshenglong@huawei.com>
+ <CAFEAcA_MDiOphseZ7RGNE3G=4ZDF5SFV5krOjanPbVuhgg9gnQ@mail.gmail.com>
+ <568E7AF1.9040103@huawei.com>
+ <CAFEAcA-Qcda7TSFLSeykLHqZYdP6tYdEjPe2uHN6f_+omqWFZg@mail.gmail.com>
+ <20160107203647.GJ6199@hawk.localdomain> <20160109122956.GA30867@cbox>
+ <20160109150339.10576e81@arm.com> <56936B91.301@huawei.com>
+ <56936EFA.1000404@arm.com> <20160111115225.GC3924@hawk.localdomain>
+Message-ID: <56939A08.50603@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/01/16 17:06, Marc Zyngier wrote:
-> On 20/12/15 20:52, Daniel Thompson wrote:
->> Currently it is not possible to exploit FIQ for systems with a GIC, even
->> on systems are otherwise capable of it. This patch makes it possible
->> for IPIs to be delivered using FIQ.
->>
->> To do so it modifies the register state so that normal interrupts are
->> placed in group 1 and specific IPIs are placed into group 0. It also
->> configures the controller to raise group 0 interrupts using the FIQ
->> signal. Finally it provides a means for architecture code to define
->> which IPIs shall use FIQ and to acknowledge any IPIs that are raised.
->>
->> All GIC hardware except GICv1-without-TrustZone support provides a means
->> to group exceptions into group 0 and group 1 but the hardware
->> functionality is unavailable to the kernel when a secure monitor is
->> present because access to the grouping registers are prohibited outside
->> "secure world". However when grouping is not available (or on early
->> GICv1 implementations where it is available but tricky to enable) the
->> code to change groups does not deploy and all IPIs will be raised via
->> IRQ.
->>
->> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->> Cc: Jason Cooper <jason@lakedaemon.net>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Tested-by: Jon Medhurst <tixy@linaro.org>
->> ---
->>   drivers/irqchip/irq-gic.c       | 183 +++++++++++++++++++++++++++++++++++++---
->>   include/linux/irqchip/arm-gic.h |   6 ++
->>   2 files changed, 175 insertions(+), 14 deletions(-)
->>
->> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
->> index b6c1e96b52a1..8077edd0d38d 100644
->> --- a/drivers/irqchip/irq-gic.c
->> +++ b/drivers/irqchip/irq-gic.c
->> @@ -41,6 +41,7 @@
->>   #include <linux/irqchip.h>
->>   #include <linux/irqchip/chained_irq.h>
->>   #include <linux/irqchip/arm-gic.h>
->> +#include <linux/ratelimit.h>
->>
->>   #include <asm/cputype.h>
->>   #include <asm/irq.h>
->> @@ -63,6 +64,10 @@ static void gic_check_cpu_features(void)
->>   #define gic_check_cpu_features()	do { } while(0)
->>   #endif
->>
->> +#ifndef SMP_IPI_FIQ_MASK
->> +#define SMP_IPI_FIQ_MASK 0
->> +#endif
->> +
->>   union gic_base {
->>   	void __iomem *common_base;
->>   	void __percpu * __iomem *percpu_base;
->> @@ -82,6 +87,7 @@ struct gic_chip_data {
->>   #endif
->>   	struct irq_domain *domain;
->>   	unsigned int gic_irqs;
->> +	bool sgi_with_nsatt;
->>   #ifdef CONFIG_GIC_NON_BANKED
->>   	void __iomem *(*get_base)(union gic_base *);
->>   #endif
->> @@ -350,12 +356,52 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
->>   }
->>   #endif
->>
->> +/*
->> + * Fully acknowledge (ack, eoi and deactivate) any outstanding FIQ-based IPI,
->> + * otherwise do nothing.
->> + */
->> +static void __maybe_unused gic_handle_fiq(struct pt_regs *regs)
->> +{
->> +	struct gic_chip_data *gic = &gic_data[0];
->> +	void __iomem *cpu_base = gic_data_cpu_base(gic);
->> +	u32 hppstat, hppnr, irqstat, irqnr;
->> +
->> +	do {
->> +		hppstat = readl_relaxed(cpu_base + GIC_CPU_HIGHPRI);
->> +		hppnr = hppstat & GICC_IAR_INT_ID_MASK;
->> +		if (!(hppnr < 16 && BIT(hppnr) & SMP_IPI_FIQ_MASK))
->> +			break;
->> +
->> +		irqstat = readl_relaxed(cpu_base + GIC_CPU_INTACK);
->> +		irqnr = irqstat & GICC_IAR_INT_ID_MASK;
->> +
->> +		writel_relaxed(irqstat, cpu_base + GIC_CPU_EOI);
->> +		if (static_key_true(&supports_deactivate))
->> +			writel_relaxed(irqstat, cpu_base + GIC_CPU_DEACTIVATE);
->> +
->> +		if (WARN_RATELIMIT(irqnr > 16,
->
-> Shouldn't that be irqnr > 15?
-
-Yep. Will fix.
->
->> +			       "Unexpected irqnr %u (bad prioritization?)\n",
->> +			       irqnr))
->> +			continue;
->> +#ifdef CONFIG_SMP
->> +		handle_IPI(irqnr, regs);
->> +#endif
->> +	} while (1);
->> +}
->> +
->>   static void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
->>   {
->>   	u32 irqstat, irqnr;
->>   	struct gic_chip_data *gic = &gic_data[0];
->>   	void __iomem *cpu_base = gic_data_cpu_base(gic);
->>
->> +#ifdef CONFIG_ARM
->
-> What is the reason to make this 32bit specific?
-
-I have tried to keep the interfaces for my NMI-like for using arm/fiq 
-and arm64/gicv3 as similar as possible.
-
-However for arm/fiq then the arch code *must* tell the gic driver we are 
-handling a FIQ via in_nmi() so it can avoid acking the wrong interrupt. 
-Conversely, on arm64/gicv3 the arch code is *unable* to tell the gic 
-driver we are handling a high priority IRQ because we don't know that 
-until the gic driver acks the interrupt.
-
-In the end I can't think of any way for any arch/arm64 code to call into 
-gic_handle_irq() with a FIQ to handle and with nmi_enter() already 
-called. in_nmi() would always be false at this point, so having this 
-code present on arm64 is harmless but also pointless.
 
 
->> +	if (in_nmi()) {
->> +		gic_handle_fiq(regs);
->> +		return;
->> +	}
->> +#endif
->> +
->>   	do {
->>   		irqstat = readl_relaxed(cpu_base + GIC_CPU_INTACK);
->>   		irqnr = irqstat & GICC_IAR_INT_ID_MASK;
->> @@ -439,6 +485,55 @@ static struct irq_chip gic_eoimode1_chip = {
->>   				  IRQCHIP_MASK_ON_SUSPEND,
->>   };
->>
->> +/*
->> + * Shift an interrupt between Group 0 and Group 1.
->> + *
->> + * In addition to changing the group we also modify the priority to
->> + * match what "ARM strongly recommends" for a system where no Group 1
->> + * interrupt must ever preempt a Group 0 interrupt.
->> + *
->> + * It is safe to call this function on systems which do not support
->> + * grouping (it will have no effect).
->> + */
->> +static void gic_set_group_irq(struct gic_chip_data *gic, unsigned int hwirq,
->> +			      int group)
->> +{
->> +	void __iomem *base = gic_data_dist_base(gic);
->> +	unsigned int grp_reg = hwirq / 32 * 4;
->> +	u32 grp_mask = BIT(hwirq % 32);
->> +	u32 grp_val;
->> +
->
-> nit: spurious space.
+On 2016/1/11 19:52, Andrew Jones wrote:
+> On Mon, Jan 11, 2016 at 08:59:38AM +0000, Marc Zyngier wrote:
+>> >On 11/01/16 08:45, Shannon Zhao wrote:
+>>> > >
+>>> > >
+>>> > >On 2016/1/9 23:03, Marc Zyngier wrote:
+>>>> > >>On Sat, 9 Jan 2016 13:29:56 +0100
+>>>> > >>Christoffer Dall<christoffer.dall@linaro.org>  wrote:
+>>>> > >>
+>>>>>> > >>>>On Thu, Jan 07, 2016 at 09:36:47PM +0100, Andrew Jones wrote:
+>>>>>>>> > >>>>>>On Thu, Jan 07, 2016 at 02:56:15PM +0000, Peter Maydell wrote:
+>>>>>>>>>> > >>>>>>>>On 7 January 2016 at 14:49, Shannon Zhao<zhaoshenglong@huawei.com>  wrote:
+>>>>>>>>>>>>>>>> > >>>>>>>>>>>>>>+
+>>>>>>>>>>>>>>>> > >>>>>>>>>>>>>>+Groups:
+>>>>>>>>>>>>>>>> > >>>>>>>>>>>>>>+  KVM_DEV_ARM_PMU_GRP_IRQ
+>>>>>>>>>>>>>>>> > >>>>>>>>>>>>>>+  Attributes:
+>>>>>>>>>>>>>>>> > >>>>>>>>>>>>>>+    The attr field of kvm_device_attr encodes one value:
+>>>>>>>>>>>>>>>> > >>>>>>>>>>>>>>+    bits:     | 63 .... 32 | 31 ....  0 |
+>>>>>>>>>>>>>>>> > >>>>>>>>>>>>>>+    values:   |  reserved  | vcpu_index |
+>>>>>>>>>>>>>>>> > >>>>>>>>>>>>>>+    A value describing the PMU overflow interrupt number for the specified
+>>>>>>>>>>>>>>>> > >>>>>>>>>>>>>>+    vcpu_index vcpu. This interrupt could be a PPI or SPI, but for one VM the
+>>>>>>>>>>>>>>>> > >>>>>>>>>>>>>>+    interrupt type must be same for each vcpu. As a PPI, the interrupt number is
+>>>>>>>>>>>>>>>> > >>>>>>>>>>>>>>+    same for all vcpus, while as a SPI it must be different for each vcpu.
+>>>>>>>>>>>>>> > >>>>>>>>>>>>
+>>>>>>>>>>>>>> > >>>>>>>>>>>>I see we're using vcpu_index rather than MPIDR affinity value
+>>>>>>>>>>>>>> > >>>>>>>>>>>>for specifying which CPU we're configuring. Is this in line with
+>>>>>>>>>>>>>> > >>>>>>>>>>>>our planned API for GICv3 configuration?
+>>>>>>>>>>>>>> > >>>>>>>>>>>>
+>>>>>>>>>>>> > >>>>>>>>>>Here vcpu_index is used to indexing the vCPU, no special use.
+>>>>>>>>>> > >>>>>>>>
+>>>>>>>>>> > >>>>>>>>Yes, but you can identify the CPU by index, or by its MPIDR.
+>>>>>>>>>> > >>>>>>>>We had a discussion about which was the best way for doing
+>>>>>>>>>> > >>>>>>>>the VGIC API, and I can't remember which way round we ended up
+>>>>>>>>>> > >>>>>>>>going for. Whichever we chose, we should do the same thing here.
+>>>>>>>> > >>>>>>
+>>>>>>>> > >>>>>>I think we should start up a new discussion on this. My understanding,
+>>>>>>>> > >>>>>>after a chat with Igor, who was involved in the untangling of vcpu-id and
+>>>>>>>> > >>>>>>apic-id for x86, is that using vcpu-id is preferred, unless of course
+>>>>>>>> > >>>>>>the device expects an apic-id/mpidr, in which case there's no reason to
+>>>>>>>> > >>>>>>translate it on both sides.
+>>>>>>>> > >>>>>>
+>>>>>> > >>>>
+>>>>>> > >>>>I'm fairly strongly convinced that we should use the full 32-bit
+>>>>>> > >>>>compressed MPIDR for everything ARM related going forward, as this will
+>>>>>> > >>>>cover any case required and leverages and architecturally defined way of
+>>>>>> > >>>>uniquely identifying a (v)CPU.
+>>>> > >>+1.
+>>>> > >>
+>>>> > >>vcpu_ids, indexes or any other constructs are just a bunch
+>>>> > >>of KVM-specific definitions that do not describe the VM from an
+>>>> > >>architecture PoV. In contrast, the MPIDR is guaranteed to be unique
+>>>> > >>stable, and identifies a given (v)CPU.
+>>>> > >>
+>>>> > >>As for the PMU: either 1) we instantiate it together with the CPU
+>>>> > >>(with a new capability/feature),
+>>> > >So spare some bits(e.g. 10 bits) of the features array to pass the PMU
+>>> > >irq number or add KVM_SET/GET_DEVICE_ATTR for vcpu ioctl?
+>> >
+>> >Using the device attributes seems more suitable, but I don't know if
+>> >using GET/SET_DEVICE_ATTR without the actual creation of a device is
+>> >acceptable...
+> There's precedent set by s390 to take only the set/get/has api into a
+> new context, commit f206165620.
+Thanks Andrew. So adding the set/get/has api for only ARM VCPU is 
+acceptable? If so, I'll rewrite my patch.
 
-Will fix.
-
->> +	unsigned int pri_reg = (hwirq / 4) * 4;
->> +	u32 pri_mask = BIT(7 + ((hwirq % 4) * 8));
->> +	u32 pri_val;
->> +
->> +	/*
->> +	 * Systems which do not support grouping will have not have
->> +	 * the EnableGrp1 bit set.
->> +	 */
->> +	if (!(GICD_ENABLE_GRP1 & readl_relaxed(base + GIC_DIST_CTRL)))
->
-> nit: I tend to prefer expressions to be written the other way around
-> (readl() & v). But more importantly, you should be able to cache the
-> grouping state in the gic_chip_data structure (you seem to have similar
-> code below).
-
-Will do.
-
->> +		return;
->> +
->> +	raw_spin_lock(&irq_controller_lock);
->> +
->> +	grp_val = readl_relaxed(base + GIC_DIST_IGROUP + grp_reg);
->> +	pri_val = readl_relaxed(base + GIC_DIST_PRI + pri_reg);
->
-> The priority register is byte-accessible, so you can save yourself some
-> effort and just write the priority there.
-
-Will do (also, I have a really strong sense of dejavu here, I may have 
-neglected to apply previous comments from you as broadly as I should 
-have and, if so, then sorry).
-
->> +
->> +	if (group) {
->> +		grp_val |= grp_mask;
->> +		pri_val |= pri_mask;
->> +	} else {
->> +		grp_val &= ~grp_mask;
->> +		pri_val &= ~pri_mask;
->> +	}
->> +
->> +	writel_relaxed(grp_val, base + GIC_DIST_IGROUP + grp_reg);
->> +	writel_relaxed(pri_val, base + GIC_DIST_PRI + pri_reg);
->> +
->> +	raw_spin_unlock(&irq_controller_lock);
->> +}
->> +
->> +
->>   void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
->>   {
->>   	if (gic_nr >= MAX_GIC_NR)
->> @@ -469,19 +564,27 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
->>   static void gic_cpu_if_up(struct gic_chip_data *gic)
->>   {
->>   	void __iomem *cpu_base = gic_data_cpu_base(gic);
->> -	u32 bypass = 0;
->> -	u32 mode = 0;
->> +	void __iomem *dist_base = gic_data_dist_base(gic);
->> +	u32 ctrl = 0;
->>
->> -	if (static_key_true(&supports_deactivate))
->> -		mode = GIC_CPU_CTRL_EOImodeNS;
->> +	/*
->> +	 * Preserve bypass disable bits to be written back later
->> +	 */
->> +	ctrl = readl(cpu_base + GIC_CPU_CTRL);
->> +	ctrl &= GICC_DIS_BYPASS_MASK;
->>
->>   	/*
->> -	* Preserve bypass disable bits to be written back later
->> -	*/
->> -	bypass = readl(cpu_base + GIC_CPU_CTRL);
->> -	bypass &= GICC_DIS_BYPASS_MASK;
->> +	 * If EnableGrp1 is set in the distributor then enable group 1
->> +	 * support for this CPU (and route group 0 interrupts to FIQ).
->> +	 */
->> +	if (GICD_ENABLE_GRP1 & readl_relaxed(dist_base + GIC_DIST_CTRL))
->> +		ctrl |= GICC_COMMON_BPR | GICC_FIQ_EN | GICC_ACK_CTL |
->> +			GICC_ENABLE_GRP1;
->> +
->> +	if (static_key_true(&supports_deactivate))
->> +		ctrl |= GIC_CPU_CTRL_EOImodeNS;
->>
->> -	writel_relaxed(bypass | mode | GICC_ENABLE, cpu_base + GIC_CPU_CTRL);
->> +	writel_relaxed(ctrl | GICC_ENABLE, cpu_base + GIC_CPU_CTRL);
->>   }
->>
->>
->> @@ -505,7 +608,31 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
->>
->>   	gic_dist_config(base, gic_irqs, NULL);
->>
->> -	writel_relaxed(GICD_ENABLE, base + GIC_DIST_CTRL);
->> +	/*
->> +	 * Set EnableGrp1/EnableGrp0 (bit 1 and 0) or EnableGrp (bit 0 only,
->> +	 * bit 1 ignored) depending on current security mode.
->> +	 */
->> +	writel_relaxed(GICD_ENABLE_GRP1 | GICD_ENABLE, base + GIC_DIST_CTRL);
->> +
->> +	/*
->> +	 * Some GICv1 devices (even those with security extensions) do not
->> +	 * implement EnableGrp1 meaning some parts of the above write may
->> +	 * be ignored. We will only enable FIQ support if the bit can be set.
->> +	 */
->> +	if (GICD_ENABLE_GRP1 & readl_relaxed(base + GIC_DIST_CTRL)) {
->> +		/* Place all SPIs in group 1 (signally with IRQ). */
->> +		for (i = 32; i < gic_irqs; i += 32)
->> +			writel_relaxed(0xffffffff,
->> +				       base + GIC_DIST_IGROUP + i * 4 / 32);
->> +
->> +		/*
->> +		 * If the GIC supports the security extension then SGIs
->> +		 * will be filtered based on the value of NSATT. If the
->> +		 * GIC has this support then enable NSATT support.
->> +		 */
->> +		if (GICD_SECURITY_EXTN & readl_relaxed(base + GIC_DIST_CTR))
->> +			gic->sgi_with_nsatt = true;
->> +	}
->>   }
->>
->>   static void gic_cpu_init(struct gic_chip_data *gic)
->> @@ -514,6 +641,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
->>   	void __iomem *base = gic_data_cpu_base(gic);
->>   	unsigned int cpu_mask, cpu = smp_processor_id();
->>   	int i;
->> +	unsigned long ipi_fiq_mask, fiq;
->
-> Think of the children (arm64), do not make ipi_fiq_mask a long... If you
-> pass anything but u32 to writel, you're doing something wrong.
-
-Will do.
-
-
->>
->>   	/*
->>   	 * Setting up the CPU map is only relevant for the primary GIC
->> @@ -539,6 +667,23 @@ static void gic_cpu_init(struct gic_chip_data *gic)
->>
->>   	gic_cpu_config(dist_base, NULL);
->>
->> +	/*
->> +	 * If the distributor is configured to support interrupt grouping
->> +	 * then set all SGI and PPI interrupts that are not set in
->> +	 * SMP_IPI_FIQ_MASK to group1 and ensure any remaining group 0
->> +	 * interrupts have the right priority.
->> +	 *
->> +	 * Note that IGROUP[0] is banked, meaning that although we are
->> +	 * writing to a distributor register we are actually performing
->> +	 * part of the per-cpu initialization.
->> +	 */
->> +	if (GICD_ENABLE_GRP1 & readl_relaxed(dist_base + GIC_DIST_CTRL)) {
->> +		ipi_fiq_mask = SMP_IPI_FIQ_MASK;
->> +		writel_relaxed(~ipi_fiq_mask, dist_base + GIC_DIST_IGROUP + 0);
->
-> or just turn this into writel_relaxed(~SMP_IPI_FIQ_MASK...) and keep
-> ipi_fiq_mask as a long.
->
->> +		for_each_set_bit(fiq, &ipi_fiq_mask, 16)
->> +			gic_set_group_irq(gic, fiq, 0);
->> +	}
->> +
->>   	writel_relaxed(GICC_INT_PRI_THRESHOLD, base + GIC_CPU_PRIMASK);
->>   	gic_cpu_if_up(gic);
->>   }
->> @@ -553,7 +698,8 @@ int gic_cpu_if_down(unsigned int gic_nr)
->>
->>   	cpu_base = gic_data_cpu_base(&gic_data[gic_nr]);
->>   	val = readl(cpu_base + GIC_CPU_CTRL);
->> -	val &= ~GICC_ENABLE;
->> +	val &= ~(GICC_COMMON_BPR | GICC_FIQ_EN | GICC_ACK_CTL |
->> +		 GICC_ENABLE_GRP1 | GICC_ENABLE);
->>   	writel_relaxed(val, cpu_base + GIC_CPU_CTRL);
->>
->>   	return 0;
->> @@ -648,7 +794,8 @@ static void gic_dist_restore(unsigned int gic_nr)
->>   			dist_base + GIC_DIST_ACTIVE_SET + i * 4);
->>   	}
->>
->> -	writel_relaxed(GICD_ENABLE, dist_base + GIC_DIST_CTRL);
->> +	writel_relaxed(GICD_ENABLE_GRP1 | GICD_ENABLE,
->> +		       dist_base + GIC_DIST_CTRL);
->>   }
->>
->>   static void gic_cpu_save(unsigned int gic_nr)
->> @@ -794,6 +941,8 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
->>   {
->>   	int cpu;
->>   	unsigned long map = 0;
->> +	unsigned long softint;
->> +	void __iomem *dist_base;
->>
->>   	gic_migration_lock();
->>
->> @@ -801,14 +950,20 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
->>   	for_each_cpu(cpu, mask)
->>   		map |= gic_cpu_map[cpu];
->>
->> +	/* This always happens on GIC0 */
->> +	dist_base = gic_data_dist_base(&gic_data[0]);
->> +
->>   	/*
->>   	 * Ensure that stores to Normal memory are visible to the
->>   	 * other CPUs before they observe us issuing the IPI.
->>   	 */
->>   	dmb(ishst);
->>
->> -	/* this always happens on GIC0 */
->> -	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
->> +	softint = map << 16 | irq;
->> +
->> +	writel_relaxed(softint, dist_base + GIC_DIST_SOFTINT);
->> +	if (gic_data[0].sgi_with_nsatt)
->> +		writel_relaxed(softint | 0x8000, dist_base + GIC_DIST_SOFTINT);
->
-> Ah! No way. Writing twice to GICD_SGIR is horribly inefficient - just
-> think of a virtualized environment where you actually trap to HYP to
-> emulate SGIs (and some actual HW sucks almost as much...). A better
-> solution would be to keep track of which SGIs are secure and which are
-> not. A simple u16 would do.
-
-Will do. I remember why I wrote it like this (concern over whether the 
-cache could ever become inconsistent) but reading it back now that does 
-look rather paranoid.
-
-
-Daniel.
+Thanks,
+-- 
+Shannon
