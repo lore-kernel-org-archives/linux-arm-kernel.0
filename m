@@ -1,104 +1,199 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 11 Jan 2016 16:24:49 +0000
-Subject: [PATCH v3 06/21] arm64: pgtable: implement static
- [pte|pmd|pud]_offset variants
-In-Reply-To: <1452518355-4606-7-git-send-email-ard.biesheuvel@linaro.org>
-References: <1452518355-4606-1-git-send-email-ard.biesheuvel@linaro.org>
- <1452518355-4606-7-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160111162449.GP6499@leverpostej>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 11 Jan 2016 17:25:15 +0100
+Subject: [PATCHv3] ARM: mvebu: use regulator-boot-on for SATA regulators
+ on Armada 388 GP
+In-Reply-To: <877fk6r1hb.fsf@free-electrons.com> (Gregory CLEMENT's message of
+ "Tue, 22 Dec 2015 15:40:00 +0100")
+References: <1450794522-16483-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <877fk6r1hb.fsf@free-electrons.com>
+Message-ID: <87d1t8ytg4.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2016 at 02:18:59PM +0100, Ard Biesheuvel wrote:
-> The page table accessors pte_offset(), pud_offset() and pmd_offset()
-> rely on __va translations, so they can only be used after the linear
-> mapping has been installed. For the early fixmap and kasan init routines,
-> whose page tables are allocated statically in the kernel image, these
-> functions will return bogus values. So implement pmd_offset_kimg() and
-> pud_offset_kimg(), which can be used instead before any page tables have
-> been allocated dynamically.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Hi,
+ 
+ On mar., d?c. 22 2015, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
 
-This looks good to me. One possible suggsetion below, but either way:
+> Hi Thomas,
+>  
+>  On mar., d?c. 22 2015, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+>
+>> Really, what we meant by regulator-always-on is that the regulators
+>> are already turned on by the bootloader, for which regulator-boot-on
+>> is a better description.
+>>
+>> A net advantage of using regulator-boot-on is that the regulator is
+>> not touched at boot time by the kernel, which avoids having the hard
+>> drives spinning down and then up again, taking several (~5) seconds of
+>> additional boot time.
+>>
+>> In addition, there is no need to have such properties on the child
+>> regulators used for SATA. Having it on the parent regulator that
+>> really controls the GPIO is sufficient.
+>>
+>> Without the patch:
+>>
+>> [    3.945866] ata2: SATA link down (SStatus 0 SControl 300)
+>> [    3.995862] ata3: SATA link down (SStatus 0 SControl 300)
+>> [    4.005863] ata4: SATA link down (SStatus 0 SControl 300)
+>> [    9.125861] ata1: SATA link up 3.0 Gbps (SStatus 123 SControl 300)
+>> [    9.144575] ata1.00: ATA-8: WDC WD5003ABYX-01WERA1, 01.01S02, max UDMA/133
+>> [    9.151471] ata1.00: 976773168 sectors, multi 0: LBA48 NCQ (depth 31/32)
+>>
+>>  (and you can hear the disk spinning down and up during this 5.1
+>>  seconds delay)
+>>
+>> With the patch:
+>>
+>> [    3.945988] ata2: SATA link down (SStatus 0 SControl 300)
+>> [    4.005980] ata4: SATA link down (SStatus 0 SControl 300)
+>> [    4.011404] ata3: SATA link down (SStatus 0 SControl 300)
+>> [    4.145978] ata1: SATA link up 3.0 Gbps (SStatus 123 SControl 300)
+>> [    4.153701] ata1.00: ATA-8: WDC WD5003ABYX-01WERA1, 01.01S02, max UDMA/133
+>> [    4.160597] ata1.00: 976773168 sectors, multi 0: LBA48 NCQ (depth 31/32)
+>>
+>> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>
+> Applied on mvebu/dt
 
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+As for the other one, I didn't managed to do a pull request before the
+holidays period so I moved this commit to mvebu/dt-for-4.6
 
-> ---
->  arch/arm64/include/asm/pgtable.h | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index 6129f6755081..7b4e16068c9f 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -449,6 +449,9 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
->  
->  #define pmd_page(pmd)		pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
->  
-> +/* use ONLY for statically allocated translation tables */
-> +#define pte_offset_kimg(dir,addr)	((pte_t *)__phys_to_kimg(pte_offset_phys((dir), (addr))))
-> +
+Gregory
 
-Given that we're probably only going to use this during one-off setup,
-maybe it's worth something like:
-
-#define IN_KERNEL_IMAGE(p) ({						\
-	unsigned long __p = (unsigned long)p;				\
-	KIMAGE_VADDR <= __p && __p < _end;				\
-})
-
-#define pte_offset_kimg(dir,addr) ({					\
-	BUG_ON(!IN_KERNEL_IMAGE(dir));					\
-	((pte_t *)__phys_to_kimg(pte_offset_phys((dir), (addr))));	\
-})
-
-That might be overkill, though, given all it does is turn one runtime
-failure into another runtime failure.
-
-Mark.
-
->  /*
->   * Conversion functions: convert a page and protection to a page entry,
->   * and a page entry and page directory to the page they refer to.
-> @@ -492,6 +495,9 @@ static inline phys_addr_t pud_page_paddr(pud_t pud)
->  
->  #define pud_page(pud)		pfn_to_page(__phys_to_pfn(pud_val(pud) & PHYS_MASK))
->  
-> +/* use ONLY for statically allocated translation tables */
-> +#define pmd_offset_kimg(dir,addr)	((pmd_t *)__phys_to_kimg(pmd_offset_phys((dir), (addr))))
-> +
->  #else
->  
->  #define pud_page_paddr(pud)	({ BUILD_BUG(); 0; })
-> @@ -502,6 +508,8 @@ static inline phys_addr_t pud_page_paddr(pud_t pud)
->  #define pmd_set_fixmap_offset(pudp, addr)	((pmd_t *)pudp)
->  #define pmd_clear_fixmap()
->  
-> +#define pmd_offset_kimg(dir,addr)	((pmd_t *)dir)
-> +
->  #endif	/* CONFIG_PGTABLE_LEVELS > 2 */
->  
->  #if CONFIG_PGTABLE_LEVELS > 3
-> @@ -540,6 +548,9 @@ static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
->  
->  #define pgd_page(pgd)		pfn_to_page(__phys_to_pfn(pgd_val(pgd) & PHYS_MASK))
->  
-> +/* use ONLY for statically allocated translation tables */
-> +#define pud_offset_kimg(dir,addr)	((pud_t *)__phys_to_kimg(pud_offset_phys((dir), (addr))))
-> +
->  #else
->  
->  #define pgd_page_paddr(pgd)	({ BUILD_BUG(); 0;})
-> @@ -550,6 +561,8 @@ static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
->  #define pud_set_fixmap_offset(pgdp, addr)	((pud_t *)pgdp)
->  #define pud_clear_fixmap()
->  
-> +#define pud_offset_kimg(dir,addr)	((pud_t *)dir)
-> +
->  #endif  /* CONFIG_PGTABLE_LEVELS > 3 */
->  
->  #define pgd_ERROR(pgd)		__pgd_error(__FILE__, __LINE__, pgd_val(pgd))
+>
+> Thanks,
+>
+> Gregory
+>> ---
+>> Changes since v2:
+>>  - Use regulator-boot-on only for SATA regulators, not for USB
+>>    regulators.
+>> ---
+>>  arch/arm/boot/dts/armada-388-gp.dts | 16 ++++------------
+>>  1 file changed, 4 insertions(+), 12 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
+>> index d8dab0f..5e47291 100644
+>> --- a/arch/arm/boot/dts/armada-388-gp.dts
+>> +++ b/arch/arm/boot/dts/armada-388-gp.dts
+>> @@ -319,7 +319,7 @@
+>>  		regulator-min-microvolt = <12000000>;
+>>  		regulator-max-microvolt = <12000000>;
+>>  		enable-active-high;
+>> -		regulator-always-on;
+>> +		regulator-boot-on;
+>>  		gpio = <&expander0 2 GPIO_ACTIVE_HIGH>;
+>>  	};
+>>  
+>> @@ -328,7 +328,6 @@
+>>  		regulator-name = "v5.0-sata0";
+>>  		regulator-min-microvolt = <5000000>;
+>>  		regulator-max-microvolt = <5000000>;
+>> -		regulator-always-on;
+>>  		vin-supply = <&reg_sata0>;
+>>  	};
+>>  
+>> @@ -337,7 +336,6 @@
+>>  		regulator-name = "v12.0-sata0";
+>>  		regulator-min-microvolt = <12000000>;
+>>  		regulator-max-microvolt = <12000000>;
+>> -		regulator-always-on;
+>>  		vin-supply = <&reg_sata0>;
+>>  	};
+>>  
+>> @@ -347,7 +345,7 @@
+>>  		regulator-min-microvolt = <12000000>;
+>>  		regulator-max-microvolt = <12000000>;
+>>  		enable-active-high;
+>> -		regulator-always-on;
+>> +		regulator-boot-on;
+>>  		gpio = <&expander0 3 GPIO_ACTIVE_HIGH>;
+>>  	};
+>>  
+>> @@ -356,7 +354,6 @@
+>>  		regulator-name = "v5.0-sata1";
+>>  		regulator-min-microvolt = <5000000>;
+>>  		regulator-max-microvolt = <5000000>;
+>> -		regulator-always-on;
+>>  		vin-supply = <&reg_sata1>;
+>>  	};
+>>  
+>> @@ -365,7 +362,6 @@
+>>  		regulator-name = "v12.0-sata1";
+>>  		regulator-min-microvolt = <12000000>;
+>>  		regulator-max-microvolt = <12000000>;
+>> -		regulator-always-on;
+>>  		vin-supply = <&reg_sata1>;
+>>  	};
+>>  
+>> @@ -373,7 +369,7 @@
+>>  		compatible = "regulator-fixed";
+>>  		regulator-name = "pwr_en_sata2";
+>>  		enable-active-high;
+>> -		regulator-always-on;
+>> +		regulator-boot-on;
+>>  		gpio = <&expander0 11 GPIO_ACTIVE_HIGH>;
+>>  	};
+>>  
+>> @@ -382,7 +378,6 @@
+>>  		regulator-name = "v5.0-sata2";
+>>  		regulator-min-microvolt = <5000000>;
+>>  		regulator-max-microvolt = <5000000>;
+>> -		regulator-always-on;
+>>  		vin-supply = <&reg_sata2>;
+>>  	};
+>>  
+>> @@ -391,7 +386,6 @@
+>>  		regulator-name = "v12.0-sata2";
+>>  		regulator-min-microvolt = <12000000>;
+>>  		regulator-max-microvolt = <12000000>;
+>> -		regulator-always-on;
+>>  		vin-supply = <&reg_sata2>;
+>>  	};
+>>  
+>> @@ -399,7 +393,7 @@
+>>  		compatible = "regulator-fixed";
+>>  		regulator-name = "pwr_en_sata3";
+>>  		enable-active-high;
+>> -		regulator-always-on;
+>> +		regulator-boot-on;
+>>  		gpio = <&expander0 12 GPIO_ACTIVE_HIGH>;
+>>  	};
+>>  
+>> @@ -408,7 +402,6 @@
+>>  		regulator-name = "v5.0-sata3";
+>>  		regulator-min-microvolt = <5000000>;
+>>  		regulator-max-microvolt = <5000000>;
+>> -		regulator-always-on;
+>>  		vin-supply = <&reg_sata3>;
+>>  	};
+>>  
+>> @@ -417,7 +410,6 @@
+>>  		regulator-name = "v12.0-sata3";
+>>  		regulator-min-microvolt = <12000000>;
+>>  		regulator-max-microvolt = <12000000>;
+>> -		regulator-always-on;
+>>  		vin-supply = <&reg_sata3>;
+>>  	};
+>>  };
+>> -- 
+>> 2.6.4
+>>
+>
 > -- 
-> 2.5.0
-> 
+> Gregory Clement, Free Electrons
+> Kernel, drivers, real-time and embedded Linux
+> development, consulting, training and support.
+> http://free-electrons.com
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
