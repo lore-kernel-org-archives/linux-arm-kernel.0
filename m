@@ -1,80 +1,77 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 11 Jan 2016 10:46:10 +0000
-Subject: [PATCH v5 05/11] arm-cci PMU: Delay counter writes to pmu_enable
-In-Reply-To: <568B93F1.8050202@arm.com>
-References: <1451908490-2615-1-git-send-email-suzuki.poulose@arm.com>
- <1451908490-2615-6-git-send-email-suzuki.poulose@arm.com>
- <20160104192401.GD17127@leverpostej> <568B93F1.8050202@arm.com>
-Message-ID: <20160111104609.GE6499@leverpostej>
+From: liviu.dudau@arm.com (Liviu Dudau)
+Date: Mon, 11 Jan 2016 10:47:07 +0000
+Subject: [PATCH] arm64/dts: Add missing DMA Abort interrupt to Juno
+In-Reply-To: <568E7EF4.1020403@arm.com>
+References: <6a66d2ac442925e066fe9b67ee2883de5894b0d3.1452168063.git.robin.murphy@arm.com>
+ <2736927.0LiVxGZzgm@wuerfel> <568E7EF4.1020403@arm.com>
+Message-ID: <20160111104707.GB13633@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 05, 2016 at 09:59:13AM +0000, Suzuki K. Poulose wrote:
-> On 04/01/16 19:24, Mark Rutland wrote:
-> >On Mon, Jan 04, 2016 at 11:54:44AM +0000, Suzuki K. Poulose wrote:
-> >>Delay setting the event periods for enabled events to pmu::pmu_enable().
-> >>We mark the event.hw->state PERF_HES_ARCH for the events that we know
-> >>have their counts recorded and have been started.
+On Thu, Jan 07, 2016 at 03:06:28PM +0000, Sudeep Holla wrote:
+> 
+> 
+> On 07/01/16 14:36, Arnd Bergmann wrote:
+> >On Thursday 07 January 2016 12:01:59 Robin Murphy wrote:
+> >>The DMA-330 has an "irq_abort" interrupt line on which it signals faults
+> >>separately from the "irq[n:0]" channel interrupts. On Juno, this is
+> >>wired up to SPI 92; add it to the DT so that DMAC faults are correctly
+> >>reported for the driver to reset the thing, rather than leaving it
+> >>locked up and waiting to time out.
+> >>
+> >>CC: Liviu Dudau <liviu.dudau@arm.com>
+> >>CC: Sudeep Holla <sudeep.holla@arm.com>
+> >>CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >>Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> >>
 > >
-> >Please add a comment to the code stating exactly what PERF_HES_ARCH
-> >means for the CCI PMU driver, so it's easy to find.
+> >Nothing wrong with the patch, but could you please come up with
+> >a more structured way to get patches for Juno into the kernel?
 > >
 > 
-> Sure.
+> Sorry for that. Liviu is on holidays, he usually reviews Juno DTS change
+> and provides ack. But missed to check with him before he disappeared.
 > 
-> >>+void cci_pmu_update_counters(struct cci_pmu *cci_pmu)
-> >>+{
-> >>+	int i;
-> >>+	unsigned long mask[BITS_TO_LONGS(cci_pmu->num_cntrs)];
+> >You have addressed the patch "to:" the arm-soc maintainers, but
+> >you are not listed in the maintainers file for the directory, so
+> >it's not clear what you expect to happen here.
 > >
-> >I think this can be:
+> >Ideally, we'd get patches from just one of the people listed
+> >in the MAINTAINERS file normally, and let us know if the
+> >primary maintainer changes, or if one of the others sends a
+> >patch because that person is unavailable.
 > >
-> >	DECLARE_BITMAP(mask, cci_pmu->num_cntrs);
-> >
-> >>+
-> >>+	memset(mask, 0, BITS_TO_LONGS(cci_pmu->num_cntrs) * sizeof(unsigned long));
-> >
-> >Likewise:
-> >
-> >	bitmap_zero(mask, cci_pmu->num_cntrs);
 > 
-> OK
+> We(me along with Liviu and Lorenzo) will try to group them together and
+> one of us can send you pull request.
 > 
-> >>+		if (!cci_pmu->hw_events.events[i]) {
-> >>+			WARN_ON(1);
-> >>+			continue;
-> >>+		}
-> >>+
-> >
-> >		if (WARN_ON(!cci_pmu->hw_events.events[i]))
-> >			continue;
-> 
-> OK
-> >>@@ -980,8 +1015,11 @@ static void cci_pmu_start(struct perf_event *event, int pmu_flags)
-> >>  	/* Configure the counter unless you are counting a fixed event */
-> >>  	if (!pmu_fixed_hw_idx(cci_pmu, idx))
-> >>  		pmu_set_event(cci_pmu, idx, hwc->config_base);
-> >>-
-> >>-	pmu_event_set_period(event);
-> >>+	/*
-> >>+	 * Mark this counter, so that we can program the
-> >>+	 * counter with the event_period. see cci_pmu_enable()
-> >>+	 */
-> >>+	hwc->state = PERF_HES_ARCH;
-> >
-> >Why couldn't we have kept pmu_event_set_period here, and have that set
-> >prev_count and PERF_HES_ARCH?
-> >
-> >Then we'd be able to do the same betching for overflow too.
-> 
-> The pmu is not disabled while we are in overflow irq handler. Hence there may
-> not be a pmu_enable() which would set the period for the counter which
-> overflowed, if defer the write in that case. Is that assumption wrong ?
+> I don't think there's any other fixes on the list though there are few
+> feature additions which I assume is too late for v4.5 now. But still I
+> prefer to wait till next week so that I can check with Liviu to see if
+> there are any other Juno fixes that can be grouped.
 
-As the driver stands today, yes.
+Hi all,
 
-However, wouldn't it make more sense to disable the PMU for the overflow
-handler, such that we can reuse the batching logic?
+The only other changes queued for v4.5 are the HDLCD patches which touch
+on the .dts. Arnd, Olof: how do you prefer to handle this? Can you take
+Robin's patch in arm-soc and I'll queue the rest of the changes via David
+Airlie?
 
-Thanks,
-Mark.
+Best regards,
+Liviu
+
+> 
+> -- 
+> Regards,
+> Sudeep
+> 
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
