@@ -1,26 +1,92 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 11 Jan 2016 15:34:39 -0800
-Subject: [PATCH] arm: omap2plus_defconfig: enable SPLIT and DWARF4
-In-Reply-To: <1452547572-23515-1-git-send-email-balbi@ti.com>
-References: <1452547572-23515-1-git-send-email-balbi@ti.com>
-Message-ID: <20160111233438.GB12777@atomide.com>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Mon, 11 Jan 2016 15:39:21 -0800
+Subject: [PATCH v6 1/6] arm/arm64: KVM: Introduce armv7 fp/simd vcpu fields
+ and helpers
+In-Reply-To: <20160110163204.GD30867@cbox>
+References: <1451166900-3711-1-git-send-email-m.smarduch@samsung.com>
+ <1451166900-3711-2-git-send-email-m.smarduch@samsung.com>
+ <20160110163204.GD30867@cbox>
+Message-ID: <56943D29.3000002@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [160111 13:26]:
-> CONFIG_DEBUG_INFO_SPLIT will split debug info on
-> .dwo files. This will generate a smaller vmlinux and
-> smaller .ko modules, which will be easier to ship on
-> certain products.
+
+
+On 1/10/2016 8:32 AM, Christoffer Dall wrote:
+> Hi Mario,
 > 
-> CONFIG_DEBUG_INFO_DWARF4 will generate debug info in
-> DWARF4 format, which ends up being larger, but
-> improves the probability of resolving variables in
-> optmized code.
+> I spotted one more potential issue...
+> 
+> On Sat, Dec 26, 2015 at 01:54:55PM -0800, Mario Smarduch wrote:
+>> Add helper functions to enable access to fp/smid on guest entry and save host
+>> fpexc on vcpu put, check if fp/simd registers are dirty and add new vcpu
+>> fields.
+>>
+>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+>> ---
+>>  arch/arm/include/asm/kvm_emulate.h   | 42 ++++++++++++++++++++++++++++++++++++
+>>  arch/arm/include/asm/kvm_host.h      |  6 ++++++
+>>  arch/arm64/include/asm/kvm_emulate.h |  8 +++++++
+>>  3 files changed, 56 insertions(+)
+>>
+>> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+>> index 3095df0..d4d9da1 100644
+>> --- a/arch/arm/include/asm/kvm_emulate.h
+>> +++ b/arch/arm/include/asm/kvm_emulate.h
+>> @@ -24,6 +24,8 @@
+>>  #include <asm/kvm_mmio.h>
+>>  #include <asm/kvm_arm.h>
+>>  #include <asm/cputype.h>
+>> +#include <asm/vfp.h>
+>> +#include "../vfp/vfpinstr.h"
+>>  
+>>  unsigned long *vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num);
+>>  unsigned long *vcpu_spsr(struct kvm_vcpu *vcpu);
+>> @@ -255,4 +257,44 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
+>>  	}
+>>  }
+>>  
+>> +#ifdef CONFIG_VFPv3
+>> +/* Called from vcpu_load - save fpexc and enable guest access to fp/simd unit */
+>> +static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
+>> +{
+>> +	u32 fpexc;
+>> +
+>> +	/* Save host fpexc, and enable guest access to fp unit */
+>> +	fpexc = fmrx(FPEXC);
+>> +	vcpu->arch.host_fpexc = fpexc;
+>> +	fpexc |= FPEXC_EN;
+>> +	fmxr(FPEXC, fpexc);
+>> +
+>> +	/* Configure HCPTR to trap on tracing and fp/simd access */
+>> +	vcpu->arch.hcptr = HCPTR_TTA | HCPTR_TCP(10)  | HCPTR_TCP(11);
+>> +}
+>> +
+>> +/* Called from vcpu_put - restore host fpexc */
+>> +static inline void vcpu_restore_host_fpexc(struct kvm_vcpu *vcpu)
+>> +{
+>> +	fmxr(FPEXC, vcpu->arch.host_fpexc);
+>> +}
+>> +
+>> +/* If trap bits are reset then fp/simd registers are dirty */
+>> +static inline bool vcpu_vfp_isdirty(struct kvm_vcpu *vcpu)
+>> +{
+>> +	return !(vcpu->arch.hcptr & (HCPTR_TCP(10) | HCPTR_TCP(11)));
+>> +}
+>> +#else
+>> +static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
+>> +{
+>> +	vcpu->arch.hcptr = HCPTR_TTA;
+> 
+> Is it correct not to trap VFP registers when the host kernel does not
+> have CONFIG_VFPv3?  I think this is a change in functionality compared
+> to the current kernels is it not?
 
-Nice, this makes my initramfs go down from about 17MB
-to 4.7 MB :)
+With CPU_V7 VFPv3 gets selected, without it fp should be emulated,
+with exceptions taken in guest kernel. I don't see a reason why
+fp hcptr access should be enabled in that case.
 
-Regards,
-
-Tony
+> 
+> Thanks,
+> -Christoffer
+> 
