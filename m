@@ -1,10 +1,10 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 11 Jan 2016 13:32:59 +0900
-Subject: [PATCH 3/6] ARM: dts: koelsch: Add compatible property to
- "partitions" node
+Date: Mon, 11 Jan 2016 13:33:00 +0900
+Subject: [PATCH 4/6] ARM: dts: porter: Add compatible property to "partitions"
+ node
 In-Reply-To: <cover.1452486598.git.horms+renesas@verge.net.au>
 References: <cover.1452486598.git.horms+renesas@verge.net.au>
-Message-ID: <f6531bb50847af70aa95665e83873c455d7bf06e.1452486598.git.horms+renesas@verge.net.au>
+Message-ID: <947ef628414483b05eac32253f86ef7753fb4d4d.1452486598.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,14 +19,14 @@ Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Acked-by: Brian Norris <computersforpeace@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791-koelsch.dts | 1 +
+ arch/arm/boot/dts/r8a7791-porter.dts | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index c94a0fb807a2..45256f3cc835 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -489,6 +489,7 @@
+diff --git a/arch/arm/boot/dts/r8a7791-porter.dts b/arch/arm/boot/dts/r8a7791-porter.dts
+index 71ba7b6b3a33..6713b1ea732b 100644
+--- a/arch/arm/boot/dts/r8a7791-porter.dts
++++ b/arch/arm/boot/dts/r8a7791-porter.dts
+@@ -200,6 +200,7 @@
  		m25p,fast-read;
  
  		partitions {
