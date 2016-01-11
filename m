@@ -1,82 +1,216 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Mon, 11 Jan 2016 12:52:25 +0100
-Subject: [PATCH v8 20/20] KVM: ARM64: Add a new kvm ARM PMU device
-In-Reply-To: <56936EFA.1000404@arm.com>
-References: <1450771695-11948-1-git-send-email-zhaoshenglong@huawei.com>
- <1450771695-11948-21-git-send-email-zhaoshenglong@huawei.com>
- <CAFEAcA_MDiOphseZ7RGNE3G=4ZDF5SFV5krOjanPbVuhgg9gnQ@mail.gmail.com>
- <568E7AF1.9040103@huawei.com>
- <CAFEAcA-Qcda7TSFLSeykLHqZYdP6tYdEjPe2uHN6f_+omqWFZg@mail.gmail.com>
- <20160107203647.GJ6199@hawk.localdomain>
- <20160109122956.GA30867@cbox> <20160109150339.10576e81@arm.com>
- <56936B91.301@huawei.com> <56936EFA.1000404@arm.com>
-Message-ID: <20160111115225.GC3924@hawk.localdomain>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 11 Jan 2016 19:58:20 +0800
+Subject: [PATCH v6 6/9] mfd: axp20x: Add support for RSB based AXP223 PMIC
+In-Reply-To: <20160111092427.GI14104@x1>
+References: <1450283538-25067-1-git-send-email-wens@csie.org>
+ <1450283538-25067-7-git-send-email-wens@csie.org> <20160111092427.GI14104@x1>
+Message-ID: <CAGb2v67N_C5bLTPmQs2gcTkpYt=2=Dk8LjWLEzHqGU--qhu+9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2016 at 08:59:38AM +0000, Marc Zyngier wrote:
-> On 11/01/16 08:45, Shannon Zhao wrote:
-> > 
-> > 
-> > On 2016/1/9 23:03, Marc Zyngier wrote:
-> >> On Sat, 9 Jan 2016 13:29:56 +0100
-> >> Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> >>
-> >>>> On Thu, Jan 07, 2016 at 09:36:47PM +0100, Andrew Jones wrote:
-> >>>>>> On Thu, Jan 07, 2016 at 02:56:15PM +0000, Peter Maydell wrote:
-> >>>>>>>> On 7 January 2016 at 14:49, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
-> >>>>>>>>>>>>>> +
-> >>>>>>>>>>>>>> +Groups:
-> >>>>>>>>>>>>>> +  KVM_DEV_ARM_PMU_GRP_IRQ
-> >>>>>>>>>>>>>> +  Attributes:
-> >>>>>>>>>>>>>> +    The attr field of kvm_device_attr encodes one value:
-> >>>>>>>>>>>>>> +    bits:     | 63 .... 32 | 31 ....  0 |
-> >>>>>>>>>>>>>> +    values:   |  reserved  | vcpu_index |
-> >>>>>>>>>>>>>> +    A value describing the PMU overflow interrupt number for the specified
-> >>>>>>>>>>>>>> +    vcpu_index vcpu. This interrupt could be a PPI or SPI, but for one VM the
-> >>>>>>>>>>>>>> +    interrupt type must be same for each vcpu. As a PPI, the interrupt number is
-> >>>>>>>>>>>>>> +    same for all vcpus, while as a SPI it must be different for each vcpu.
-> >>>>>>>>>>>>
-> >>>>>>>>>>>> I see we're using vcpu_index rather than MPIDR affinity value
-> >>>>>>>>>>>> for specifying which CPU we're configuring. Is this in line with
-> >>>>>>>>>>>> our planned API for GICv3 configuration?
-> >>>>>>>>>>>>
-> >>>>>>>>>> Here vcpu_index is used to indexing the vCPU, no special use.
-> >>>>>>>>
-> >>>>>>>> Yes, but you can identify the CPU by index, or by its MPIDR.
-> >>>>>>>> We had a discussion about which was the best way for doing
-> >>>>>>>> the VGIC API, and I can't remember which way round we ended up
-> >>>>>>>> going for. Whichever we chose, we should do the same thing here.
-> >>>>>>
-> >>>>>> I think we should start up a new discussion on this. My understanding,
-> >>>>>> after a chat with Igor, who was involved in the untangling of vcpu-id and
-> >>>>>> apic-id for x86, is that using vcpu-id is preferred, unless of course
-> >>>>>> the device expects an apic-id/mpidr, in which case there's no reason to
-> >>>>>> translate it on both sides.
-> >>>>>>
-> >>>>
-> >>>> I'm fairly strongly convinced that we should use the full 32-bit
-> >>>> compressed MPIDR for everything ARM related going forward, as this will
-> >>>> cover any case required and leverages and architecturally defined way of
-> >>>> uniquely identifying a (v)CPU.
-> >> +1.
-> >>
-> >> vcpu_ids, indexes or any other constructs are just a bunch
-> >> of KVM-specific definitions that do not describe the VM from an
-> >> architecture PoV. In contrast, the MPIDR is guaranteed to be unique
-> >> stable, and identifies a given (v)CPU.
-> >>
-> >> As for the PMU: either 1) we instantiate it together with the CPU
-> >> (with a new capability/feature), 
-> > So spare some bits(e.g. 10 bits) of the features array to pass the PMU
-> > irq number or add KVM_SET/GET_DEVICE_ATTR for vcpu ioctl?
-> 
-> Using the device attributes seems more suitable, but I don't know if
-> using GET/SET_DEVICE_ATTR without the actual creation of a device is
-> acceptable...
+On Mon, Jan 11, 2016 at 5:24 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Thu, 17 Dec 2015, Chen-Yu Tsai wrote:
+>
+>> The AXP223 is a new PMIC commonly paired with Allwinner A23/A33 SoCs.
+>> It is functionally identical to AXP221; only the regulator default
+>> voltage/status and the external host interface are different.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  drivers/mfd/Kconfig        | 11 +++++++
+>>  drivers/mfd/Makefile       |  1 +
+>>  drivers/mfd/axp20x-rsb.c   | 78 ++++++++++++++++++++++++++++++++++++++++++++++
+>>  drivers/mfd/axp20x.c       |  2 ++
+>>  include/linux/mfd/axp20x.h |  1 +
+>>  5 files changed, 93 insertions(+)
+>>  create mode 100644 drivers/mfd/axp20x-rsb.c
+>>
+>> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+>> index 804cd3dcce32..13c565103e96 100644
+>> --- a/drivers/mfd/Kconfig
+>> +++ b/drivers/mfd/Kconfig
+>> @@ -107,6 +107,17 @@ config MFD_AXP20X_I2C
+>>         components like regulators or the PEK (Power Enable Key) under the
+>>         corresponding menus.
+>>
+>> +config MFD_AXP20X_RSB
+>> +     tristate "X-Powers AXP series PMICs with RSB"
+>> +     select MFD_AXP20X
+>> +     depends on SUNXI_RSB
+>> +     help
+>> +       If you say Y here you get support for the X-Powers AXP series power
+>> +       management ICs (PMICs) controlled with RSB.
+>> +       This driver include only the core APIs. You have to select individual
+>> +       components like regulators or the PEK (Power Enable Key) under the
+>> +       corresponding menus.
+>> +
+>>  config MFD_CROS_EC
+>>       tristate "ChromeOS Embedded Controller"
+>>       select MFD_CORE
+>> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+>> index a6913007d667..caea6637d5e8 100644
+>> --- a/drivers/mfd/Makefile
+>> +++ b/drivers/mfd/Makefile
+>> @@ -108,6 +108,7 @@ obj-$(CONFIG_MFD_DA9052_SPI)      += da9052-spi.o
+>>  obj-$(CONFIG_MFD_DA9052_I2C) += da9052-i2c.o
+>>  obj-$(CONFIG_MFD_AXP20X)     += axp20x.o
+>>  obj-$(CONFIG_MFD_AXP20X_I2C) += axp20x-i2c.o
+>> +obj-$(CONFIG_MFD_AXP20X_RSB) += axp20x-rsb.o
+>>
+>>  obj-$(CONFIG_MFD_LP3943)     += lp3943.o
+>>  obj-$(CONFIG_MFD_LP8788)     += lp8788.o lp8788-irq.o
+>> diff --git a/drivers/mfd/axp20x-rsb.c b/drivers/mfd/axp20x-rsb.c
+>> new file mode 100644
+>> index 000000000000..76ff02b96df0
+>> --- /dev/null
+>> +++ b/drivers/mfd/axp20x-rsb.c
+>> @@ -0,0 +1,78 @@
+>> +/*
+>> + * axp20x-rsb.c - RSB driver for the X-Powers' Power Management ICs
+>
+> Please remove the name of the file from the header.
+>
+> They have a habit of becoming out of date.
 
-There's precedent set by s390 to take only the set/get/has api into a
-new context, commit f206165620.
+OK.
 
-Thanks,
-drew
+>> + * AXP20x typically comprises an adaptive USB-Compatible PWM charger, BUCK DC-DC
+>> + * converters, LDOs, multiple 12-bit ADCs of voltage, current and temperature
+>> + * as well as configurable GPIOs.
+>> + *
+>> + * This driver supports the RSB variants.
+>
+> No copyright line?
+
+Missed it. Will add it in the next version.
+
+>> + * Author: Chen-Yu Tsai <wens@csie.org>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+>> +#include <linux/acpi.h>
+>> +#include <linux/err.h>
+>> +#include <linux/module.h>
+>> +#include <linux/mfd/axp20x.h>
+>
+> 'f' comes before 'o'.
+
+Right.
+
+>> +#include <linux/of.h>
+>> +#include <linux/regmap.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/sunxi-rsb.h>
+>> +
+>> +static int axp20x_rsb_probe(struct sunxi_rsb_device *rdev)
+>> +{
+>> +     struct axp20x_dev *axp20x;
+>> +     int ret;
+>> +
+>> +     axp20x = devm_kzalloc(&rdev->dev, sizeof(*axp20x), GFP_KERNEL);
+>> +     if (!axp20x)
+>> +             return -ENOMEM;
+>> +
+>> +     axp20x->dev = &rdev->dev;
+>> +     axp20x->irq = rdev->irq;
+>> +     sunxi_rsb_device_set_drvdata(rdev, axp20x);
+>
+> What's the point of this call?  Why do you need a sunxi_ variant?
+
+This is an inline call defined in include/linux/sunxi-rsb.h,
+which is equivalent to dev_set_drvdata(&rdev->dev, data).
+
+It seems many subsystems or bus drivers have this pattern.
+
+    git grep void.*_set_drvdata include/linux/ | wc -l
+
+yields 34, not including dev_set_drvdata itself and this sunxi_rsb
+variant.
+
+Thanks for the review!
+
+
+Regards
+ChenYu
+
+>> +     ret = axp20x_match_device(axp20x);
+>> +     if (ret)
+>> +             return ret;
+>> +
+>> +     axp20x->regmap = devm_regmap_init_sunxi_rsb(rdev, axp20x->regmap_cfg);
+>> +     if (IS_ERR(axp20x->regmap)) {
+>> +             ret = PTR_ERR(axp20x->regmap);
+>> +             dev_err(&rdev->dev, "regmap init failed: %d\n", ret);
+>> +             return ret;
+>> +     }
+>> +
+>> +     return axp20x_device_probe(axp20x);
+>> +}
+>> +
+>> +static int axp20x_rsb_remove(struct sunxi_rsb_device *rdev)
+>> +{
+>> +     struct axp20x_dev *axp20x = sunxi_rsb_device_get_drvdata(rdev);
+>> +
+>> +     return axp20x_device_remove(axp20x);
+>> +}
+>> +
+>> +static const struct of_device_id axp20x_rsb_of_match[] = {
+>> +     { .compatible = "x-powers,axp223", .data = (void *)AXP223_ID },
+>> +     { },
+>> +};
+>> +MODULE_DEVICE_TABLE(of, axp20x_rsb_of_match);
+>> +
+>> +static struct sunxi_rsb_driver axp20x_rsb_driver = {
+>> +     .driver = {
+>> +             .name   = "axp20x-rsb",
+>> +             .of_match_table = of_match_ptr(axp20x_rsb_of_match),
+>> +     },
+>> +     .probe  = axp20x_rsb_probe,
+>> +     .remove = axp20x_rsb_remove,
+>> +};
+>> +module_sunxi_rsb_driver(axp20x_rsb_driver);
+>> +
+>> +MODULE_DESCRIPTION("PMIC MFD sunXi RSB driver for AXP20X");
+>> +MODULE_AUTHOR("Chen-Yu Tsai <wens@csie.org>");
+>> +MODULE_LICENSE("GPL v2");
+>> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+>> index 54a00168da26..968d77fb95d8 100644
+>> --- a/drivers/mfd/axp20x.c
+>> +++ b/drivers/mfd/axp20x.c
+>> @@ -33,6 +33,7 @@ static const char * const axp20x_model_names[] = {
+>>       "AXP202",
+>>       "AXP209",
+>>       "AXP221",
+>> +     "AXP223",
+>>       "AXP288",
+>>  };
+>>
+>> @@ -616,6 +617,7 @@ int axp20x_match_device(struct axp20x_dev *axp20x)
+>>               axp20x->regmap_irq_chip = &axp20x_regmap_irq_chip;
+>>               break;
+>>       case AXP221_ID:
+>> +     case AXP223_ID:
+>>               axp20x->nr_cells = ARRAY_SIZE(axp22x_cells);
+>>               axp20x->cells = axp22x_cells;
+>>               axp20x->regmap_cfg = &axp22x_regmap_config;
+>> diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
+>> index 00697c6ad8b0..d82e7d51372b 100644
+>> --- a/include/linux/mfd/axp20x.h
+>> +++ b/include/linux/mfd/axp20x.h
+>> @@ -18,6 +18,7 @@ enum {
+>>       AXP202_ID,
+>>       AXP209_ID,
+>>       AXP221_ID,
+>> +     AXP223_ID,
+>>       AXP288_ID,
+>>       NR_AXP20X_VARIANTS,
+>>  };
+>
+> --
+> Lee Jones
+> Linaro STMicroelectronics Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
