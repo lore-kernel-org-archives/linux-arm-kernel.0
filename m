@@ -1,89 +1,287 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 11 Jan 2016 10:06:16 +0000
-Subject: [PATCH] arm64: KVM: Fix AArch64 guest userspace exception
- injection
-In-Reply-To: <20160110194526.GB13541@cbox>
-References: <1452157416-9435-1-git-send-email-marc.zyngier@arm.com>
- <20160110194526.GB13541@cbox>
-Message-ID: <56937E98.9090200@arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 11 Jan 2016 11:08:30 +0100
+Subject: [PATCH linux-next v2 02/14] mtd: spi-nor: properly detect the
+ memory when it boots in Quad or Dual mode
+In-Reply-To: <fd8f4e779b050a1634f197baf748683099ec2445.1452268345.git.cyrille.pitchen@atmel.com>
+References: <cover.1452268345.git.cyrille.pitchen@atmel.com>
+ <fd8f4e779b050a1634f197baf748683099ec2445.1452268345.git.cyrille.pitchen@atmel.com>
+Message-ID: <20160111110830.605b2d54@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/01/16 19:45, Christoffer Dall wrote:
-> On Thu, Jan 07, 2016 at 09:03:36AM +0000, Marc Zyngier wrote:
->> At the moment, our fault injection is pretty limited. We always
->> generate a SYNC exception into EL1, as if the fault was actually
->> from EL1h, no matter how it was generated.
->>
->> This is obviously wrong, as EL0 can generate faults of its own
->> (not to mention the pretty-much unused EL1t mode).
->>
->> This patch fixes it by implementing section D1.10.2 of the ARMv8 ARM,
->> and in particular table D1-7 ("Vector offsets from vector table base
->> address"), which describes which vector to use depending on the source
->> exception level and type (synchronous, IRQ, FIQ or SError).
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm64/kvm/inject_fault.c | 38 +++++++++++++++++++++++++++++++++++---
->>  1 file changed, 35 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
->> index 648112e..4d1ac81 100644
->> --- a/arch/arm64/kvm/inject_fault.c
->> +++ b/arch/arm64/kvm/inject_fault.c
->> @@ -27,7 +27,11 @@
->>  
->>  #define PSTATE_FAULT_BITS_64 	(PSR_MODE_EL1h | PSR_A_BIT | PSR_F_BIT | \
->>  				 PSR_I_BIT | PSR_D_BIT)
->> -#define EL1_EXCEPT_SYNC_OFFSET	0x200
->> +
->> +#define CURRENT_EL_SP_EL0_VECTOR	0x0
->> +#define CURRENT_EL_SP_ELx_VECTOR	0x200
->> +#define LOWER_EL_AArch64_VECTOR		0x400
->> +#define LOWER_EL_AArch32_VECTOR		0x600
->>  
->>  static void prepare_fault32(struct kvm_vcpu *vcpu, u32 mode, u32 vect_offset)
->>  {
->> @@ -97,6 +101,34 @@ static void inject_abt32(struct kvm_vcpu *vcpu, bool is_pabt,
->>  		*fsr = 0x14;
->>  }
->>  
->> +enum exception_type {
->> +	except_type_sync	= 0,
->> +	except_type_irq		= 0x80,
->> +	except_type_fiq		= 0x100,
->> +	except_type_serror	= 0x180,
->> +};
->> +
->> +static u64 get_except_vector(struct kvm_vcpu *vcpu, enum exception_type type)
->> +{
->> +	u64 exc_offset;
->> +
->> +	switch (*vcpu_cpsr(vcpu) & (PSR_MODE_MASK | PSR_MODE32_BIT)) {
->> +	case PSR_MODE_EL1t:
->> +		exc_offset = CURRENT_EL_SP_EL0_VECTOR;
->> +		break;
->> +	case PSR_MODE_EL1h:
->> +		exc_offset = CURRENT_EL_SP_ELx_VECTOR;
->> +		break;
->> +	case PSR_MODE_EL0t:
->> +		exc_offset = LOWER_EL_AArch64_VECTOR;
->> +		break;
->> +	default:
->> +		exc_offset = LOWER_EL_AArch32_VECTOR;
+Hi Cyrille,
+
+Sorry for this pretty useless review, but I think you know more about
+SPI-NOR than I do. So, consider my comments as nitpicks, which shouldn't
+prevent your series from being applied.
+
+On Fri, 8 Jan 2016 17:02:14 +0100
+Cyrille Pitchen <cyrille.pitchen@atmel.com> wrote:
+
+> The quad (or dual) mode of a spi-nor memory may be enabled at boot time by
+> non-volatile bits in some setting register. Also such a mode may have
+> already been enabled at early stage by some boot loader.
 > 
-> so this catches any EL0 32-bit state, right?
-
-Indeed.
-
+> Hence, we should not guess the spi-nor memory is always configured for the
+> regular SPI 1-1-1 protocol.
 > 
-> If so:
+> Micron and Macronix memories, once their Quad (or dual for Micron) mode
+> enabled, no longer process the regular JEDEC Read ID (0x9f) command but
+> instead reply to a new command: JEDEC Read ID Multiple I/O (0xaf).
+> Besides, in Quad mode both memory manufacturers expect ALL commands to
+> use the SPI 4-4-4 protocol. For Micron memories, enabling their Dual mode
+> implies to use the SPI 2-2-2 protocol for ALL commands.
 > 
-> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Winbond memories, once their Quad mode enabled, expect ALL commands to use
+> the SPI 4-4-4 protocol. Unlike Micron and Macronix memories, they still
+> reply to the regular JEDEC Read ID (0x9f) command.
+> 
+> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> ---
+>  drivers/mtd/spi-nor/spi-nor.c | 83 ++++++++++++++++++++++++++++++++++++++++---
+>  include/linux/mtd/spi-nor.h   | 50 ++++++++++++++++++++++++--
+>  2 files changed, 127 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
+> index 3028c06547c1..8967319ea7da 100644
+> --- a/drivers/mtd/spi-nor/spi-nor.c
+> +++ b/drivers/mtd/spi-nor/spi-nor.c
+> @@ -73,6 +73,12 @@ struct flash_info {
+>  
+>  #define JEDEC_MFR(info)	((info)->id[0])
+>  
+> +struct read_id_config {
+> +	enum read_mode		mode;
+> +	enum spi_nor_protocol	proto;
+> +	u8			opcode;
+> +};
+> +
+>  static const struct flash_info *spi_nor_match_id(const char *name);
+>  
+>  /*
+> @@ -879,11 +885,22 @@ static const struct flash_info spi_nor_ids[] = {
+>  	{ },
+>  };
+>  
+> -static const struct flash_info *spi_nor_read_id(struct spi_nor *nor)
+> +static const struct flash_info *spi_nor_read_id(struct spi_nor *nor,
+> +						enum read_mode mode)
+>  {
+> -	int			tmp;
+> +	int			i, tmp;
+>  	u8			id[SPI_NOR_MAX_ID_LEN];
+>  	const struct flash_info	*info;
+> +	static const struct read_id_config configs[] = {
+> +		/* Winbond QPI mode */
+> +		{SPI_NOR_QUAD, SNOR_PROTO_4_4_4, SPINOR_OP_RDID},
+> +
+> +		/* Micron Quad mode & Macronix QPI mode */
+> +		{SPI_NOR_QUAD, SNOR_PROTO_4_4_4, SPINOR_OP_MIO_RDID},
+> +
+> +		/* Micron Dual mode */
+> +		{SPI_NOR_DUAL, SNOR_PROTO_2_2_2, SPINOR_OP_MIO_RDID}
+> +	};
+>  
+>  	tmp = nor->read_reg(nor, SPINOR_OP_RDID, id, SPI_NOR_MAX_ID_LEN);
+>  	if (tmp < 0) {
+> @@ -891,6 +908,58 @@ static const struct flash_info *spi_nor_read_id(struct spi_nor *nor)
+>  		return ERR_PTR(tmp);
+>  	}
+>  
+> +	/*
+> +	 * Check whether the SPI NOR memory has already been configured (at
+> +	 * reset or by some bootloader) to use a protocol other than SPI 1-1-1.
+> +	 */
+> +	for (i = 0; i < ARRAY_SIZE(configs); ++i) {
+> +		int len = SPI_NOR_MAX_ID_LEN;
+> +		bool is_multi = false;
+> +
+> +		/*
+> +		 * Check the latest read Manufacturer ID + Device ID (3 bytes):
+> +		 * if they are different from both 0x000000 and 0xffffff, we
+> +		 * assume that we succeeded in reading a valid JEDEC ID so we
+> +		 * don't need to try other SPI protocols.
+> +		 * Indeed when either the protocol or the op code are not valid,
+> +		 * the SPI NOR memory should not reply to the command. Hence the
+> +		 * SPI I/O lines remain in their default state: 1 when connected
+> +		 * to pull-up resistors or 0 with pull-down.
+> +		 */
+> +		if (!((id[0] == 0xff && id[1] == 0xff && id[2] == 0xff) ||
+> +		      (id[0] == 0x00 && id[1] == 0x00 && id[2] == 0x00)))
+> +			break;
 
-Thanks!
+Hopefully, you'll have all the pins configured with pull-up or
+pull-down resistors, but what if one of them is configured differently?
 
-	M.
+Shouldn't we try to find a valid chip definition by iterating over the
+spi_nor_ids[] table after each mode change?
+
+> +
+> +		/* Only try protocols supported by the user. */
+> +		if (configs[i].mode != mode)
+> +			continue;
+> +
+> +		/* Set this protocol for all commands. */
+> +		nor->reg_proto = configs[i].proto;
+> +		nor->read_proto = configs[i].proto;
+> +		nor->write_proto = configs[i].proto;
+> +		nor->erase_proto = configs[i].proto;
+> +
+> +		/*
+> +		 * Multiple I/O Read ID only returns the Manufacturer ID
+> +		 * (1 byte) and the Device ID (2 bytes). So we reset the
+> +		 * remaining bytes.
+> +		 */
+> +		if (configs[i].opcode == SPINOR_OP_MIO_RDID) {
+> +			is_multi = true;
+> +			len = 3;
+> +			memset(id + len, 0, sizeof(id) - len);
+> +		}
+> +
+> +		tmp = nor->read_reg(nor, configs[i].opcode, id, len);
+> +		if (tmp < 0) {
+> +			dev_dbg(nor->dev,
+> +				"error %d reading JEDEC ID%s\n",
+> +				tmp, (is_multi ? " Multi I/O" : ""));
+> +			return ERR_PTR(tmp);
+> +		}
+> +	}
+> +
+>  	for (tmp = 0; tmp < ARRAY_SIZE(spi_nor_ids) - 1; tmp++) {
+>  		info = &spi_nor_ids[tmp];
+>  		if (info->id_len) {
+> @@ -1148,11 +1217,17 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
+>  	if (ret)
+>  		return ret;
+>  
+> +	/* Reset SPI protocol for all commands */
+> +	nor->erase_proto = SNOR_PROTO_1_1_1;
+> +	nor->read_proto = SNOR_PROTO_1_1_1;
+> +	nor->write_proto = SNOR_PROTO_1_1_1;
+> +	nor->reg_proto = SNOR_PROTO_1_1_1;
+> +
+>  	if (name)
+>  		info = spi_nor_match_id(name);
+>  	/* Try to auto-detect if chip name wasn't specified or not found */
+>  	if (!info)
+> -		info = spi_nor_read_id(nor);
+> +		info = spi_nor_read_id(nor, mode);
+>  	if (IS_ERR_OR_NULL(info))
+>  		return -ENOENT;
+>  
+> @@ -1163,7 +1238,7 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
+>  	if (name && info->id_len) {
+>  		const struct flash_info *jinfo;
+>  
+> -		jinfo = spi_nor_read_id(nor);
+> +		jinfo = spi_nor_read_id(nor, mode);
+>  		if (IS_ERR(jinfo)) {
+>  			return PTR_ERR(jinfo);
+>  		} else if (jinfo != info) {
+> diff --git a/include/linux/mtd/spi-nor.h b/include/linux/mtd/spi-nor.h
+> index 62356d50815b..53932c87bcf2 100644
+> --- a/include/linux/mtd/spi-nor.h
+> +++ b/include/linux/mtd/spi-nor.h
+> @@ -75,8 +75,9 @@
+>  #define SPINOR_OP_BRWR		0x17	/* Bank register write */
+>  
+>  /* Used for Micron flashes only. */
+> -#define SPINOR_OP_RD_EVCR      0x65    /* Read EVCR register */
+> -#define SPINOR_OP_WD_EVCR      0x61    /* Write EVCR register */
+> +#define SPINOR_OP_MIO_RDID	0xaf	/* Multiple I/O Read JEDEC ID */
+> +#define SPINOR_OP_RD_EVCR	0x65    /* Read EVCR register */
+> +#define SPINOR_OP_WD_EVCR	0x61    /* Write EVCR register */
+>  
+>  /* Status Register bits. */
+>  #define SR_WIP			BIT(0)	/* Write in progress */
+> @@ -105,6 +106,43 @@ enum read_mode {
+>  	SPI_NOR_QUAD,
+>  };
+>  
+> +
+
+Extra blank line here ^
+
+> +#define SNOR_PROTO_CMD_OFF	8
+> +#define SNOR_PROTO_CMD_MASK	GENMASK(11, 8)
+> +#define SNOR_PROTO_CMD_TO_PROTO(cmd) \
+> +	(((cmd) << SNOR_PROTO_CMD_OFF) & SNOR_PROTO_CMD_MASK)
+> +#define SNOR_PROTO_CMD_FROM_PROTO(proto) \
+> +	((((u32)(proto)) & SNOR_PROTO_CMD_MASK) >> SNOR_PROTO_CMD_OFF)
+> +
+> +#define SNOR_PROTO_ADDR_OFF	4
+> +#define SNOR_PROTO_ADDR_MASK	GENMASK(7, 4)
+> +#define SNOR_PROTO_ADDR_TO_PROTO(addr) \
+> +	(((addr) << SNOR_PROTO_ADDR_OFF) & SNOR_PROTO_ADDR_MASK)
+> +#define SNOR_PROTO_ADDR_FROM_PROTO(proto) \
+> +	((((u32)(proto)) & SNOR_PROTO_ADDR_MASK) >> SNOR_PROTO_ADDR_OFF)
+> +
+> +#define SNOR_PROTO_DATA_OFF	0
+> +#define SNOR_PROTO_DATA_MASK	GENMASK(3, 0)
+
+Why not directly reserving 8 bits per cycle type. Your end result is
+stored on a 32 bit integer anyway, and since you'll always have only 3
+cycle types (ADDR, CMD and DATA). This way, you'll be ready for
+SPI-8-8-8 :-).
+
+> +#define SNOR_PROTO_DATA_TO_PROTO(data) \
+> +	(((data) << SNOR_PROTO_DATA_OFF) & SNOR_PROTO_DATA_MASK)
+> +#define SNOR_PROTO_DATA_FROM_PROTO(proto) \
+> +	((((u32)(proto)) & SNOR_PROTO_DATA_MASK) >> SNOR_PROTO_DATA_OFF)
+> +
+> +#define SNOR_PROTO(cmd, addr, data)	  \
+> +	(SNOR_PROTO_CMD_TO_PROTO(cmd) |   \
+> +	 SNOR_PROTO_ADDR_TO_PROTO(addr) | \
+> +	 SNOR_PROTO_DATA_TO_PROTO(data))
+> +
+> +enum spi_nor_protocol {
+> +	SNOR_PROTO_1_1_1 = SNOR_PROTO(1, 1, 1),	/* SPI */
+> +	SNOR_PROTO_1_1_2 = SNOR_PROTO(1, 1, 2),	/* Dual Output */
+> +	SNOR_PROTO_1_1_4 = SNOR_PROTO(1, 1, 4),	/* Quad Output */
+> +	SNOR_PROTO_1_2_2 = SNOR_PROTO(1, 2, 2),	/* Dual IO */
+> +	SNOR_PROTO_1_4_4 = SNOR_PROTO(1, 4, 4),	/* Quad IO */
+> +	SNOR_PROTO_2_2_2 = SNOR_PROTO(2, 2, 2),	/* Dual Command */
+> +	SNOR_PROTO_4_4_4 = SNOR_PROTO(4, 4, 4),	/* Quad Command */
+> +};
+
+Do you really need this enum definition? I mean, directly using
+SNOR_PROTO(X, Y, Z) is just as easy as using the SNOR_PROTO_X_Y_Z enum
+definitions, and you won't have to define new ones if spi-nor vendors
+decide to support new combinations.
+
+> +
+>  #define SPI_NOR_MAX_CMD_SIZE	8
+>  enum spi_nor_ops {
+>  	SPI_NOR_OPS_READ = 0,
+> @@ -132,6 +170,10 @@ enum spi_nor_option_flags {
+>   * @flash_read:		the mode of the read
+>   * @sst_write_second:	used by the SST write operation
+>   * @flags:		flag options for the current SPI-NOR (SNOR_F_*)
+> + * @erase_proto:	the SPI protocol used by erase operations
+> + * @read_proto:		the SPI protocol used by read operations
+> + * @write_proto:	the SPI protocol used by write operations
+> + * @reg_proto		the SPI protocol used by read_reg/write_reg operations
+>   * @cmd_buf:		used by the write_reg
+>   * @prepare:		[OPTIONAL] do some preparations for the
+>   *			read/write/erase/lock/unlock operations
+> @@ -160,6 +202,10 @@ struct spi_nor {
+>  	u8			read_opcode;
+>  	u8			read_dummy;
+>  	u8			program_opcode;
+> +	enum spi_nor_protocol	erase_proto;
+> +	enum spi_nor_protocol	read_proto;
+> +	enum spi_nor_protocol	write_proto;
+> +	enum spi_nor_protocol	reg_proto;
+
+Should be u32 fields if you decide to drop the enum definition.
+
+>  	enum read_mode		flash_read;
+>  	bool			sst_write_second;
+>  	u32			flags;
+
+
+
 -- 
-Jazz is not dead. It just smells funny...
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
