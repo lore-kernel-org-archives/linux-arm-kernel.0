@@ -1,48 +1,41 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 11 Jan 2016 14:18:54 +0100
-Subject: [PATCH v3 01/21] of/fdt: make memblock minimum physical address arch
- configurable
+Date: Mon, 11 Jan 2016 14:18:56 +0100
+Subject: [PATCH v3 03/21] arm64: pgtable: add dummy pud_index() and
+ pmd_index() definitions
 In-Reply-To: <1452518355-4606-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1452518355-4606-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1452518355-4606-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1452518355-4606-4-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-By default, early_init_dt_add_memory_arch() ignores memory below
-the base of the kernel image since it won't be addressable via the
-linear mapping. However, this is not appropriate anymore once we
-decouple the kernel text mapping from the linear mapping, so archs
-may want to drop the low limit entirely. So allow the minimum to be
-overridden by setting MIN_MEMBLOCK_ADDR.
+Add definitions of pud_index() and pmd_index() for configurations with
+fewer than 4 resp. 3 translation levels. This makes it easier to keep
+the users (e.g., the fixmap init code) generic.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/of/fdt.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/pgtable.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-index d2430298a309..0455564f8cbc 100644
---- a/drivers/of/fdt.c
-+++ b/drivers/of/fdt.c
-@@ -971,13 +971,16 @@ int __init early_init_dt_scan_chosen(unsigned long node, const char *uname,
- }
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index fe9bf47db5d3..6129f6755081 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -495,6 +495,7 @@ static inline phys_addr_t pud_page_paddr(pud_t pud)
+ #else
  
- #ifdef CONFIG_HAVE_MEMBLOCK
-+#ifndef MIN_MEMBLOCK_ADDR
-+#define MIN_MEMBLOCK_ADDR	__pa(PAGE_OFFSET)
-+#endif
- #ifndef MAX_MEMBLOCK_ADDR
- #define MAX_MEMBLOCK_ADDR	((phys_addr_t)~0)
- #endif
+ #define pud_page_paddr(pud)	({ BUILD_BUG(); 0; })
++#define pmd_index(addr)		({ BUILD_BUG(); 0; })
  
- void __init __weak early_init_dt_add_memory_arch(u64 base, u64 size)
- {
--	const u64 phys_offset = __pa(PAGE_OFFSET);
-+	const u64 phys_offset = MIN_MEMBLOCK_ADDR;
+ /* Match pmd_offset folding in <asm/generic/pgtable-nopmd.h> */
+ #define pmd_set_fixmap(addr)		NULL
+@@ -542,6 +543,7 @@ static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
+ #else
  
- 	if (!PAGE_ALIGNED(base)) {
- 		if (size < PAGE_SIZE - (base & ~PAGE_MASK)) {
+ #define pgd_page_paddr(pgd)	({ BUILD_BUG(); 0;})
++#define pud_index(addr)		({ BUILD_BUG(); 0;})
+ 
+ /* Match pud_offset folding in <asm/generic/pgtable-nopud.h> */
+ #define pud_set_fixmap(addr)		NULL
 -- 
 2.5.0
