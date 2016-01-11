@@ -1,73 +1,121 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Mon, 11 Jan 2016 11:48:15 +0800
-Subject: [RFC PATCH v2 4/4] dt-bindings: add document for rk3229-hdmi
-In-Reply-To: <20160111020618.GA20680@rob-hp-laptop>
-References: <1452156811-18150-1-git-send-email-ykk@rock-chips.com>
- <1452157511-18891-1-git-send-email-ykk@rock-chips.com>
- <20160111020618.GA20680@rob-hp-laptop>
-Message-ID: <569325FF.10902@rock-chips.com>
+From: xuejiancheng@huawei.com (xuejiancheng)
+Date: Mon, 11 Jan 2016 11:47:14 +0800
+Subject: [PATCH v5 1/6] clk: hisilicon: add CRG driver for hi3519 soc
+In-Reply-To: <20160109153322.GA19311@rob-hp-laptop>
+References: <1452219400-32478-1-git-send-email-xuejiancheng@huawei.com>
+ <1452219400-32478-2-git-send-email-xuejiancheng@huawei.com>
+ <20160109153322.GA19311@rob-hp-laptop>
+Message-ID: <569325C2.2090101@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Rob,
 
-On 01/11/2016 10:06 AM, Rob Herring wrote:
-> On Thu, Jan 07, 2016 at 05:05:11PM +0800, Yakir Yang wrote:
->> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
->> ---
->> Changes in v2: None
+On 2016/1/9 23:33, Rob Herring wrote:
+> On Fri, Jan 08, 2016 at 10:16:35AM +0800, Jiancheng Xue wrote:
+>> The CRG(Clock and Reset Generator) block provides clock
+>> and reset signals for other modules in hi3519 soc.
 >>
->>   .../devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt         | 4 +++-
->>   1 file changed, 3 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
->> index 668091f..1cdc627 100644
->> --- a/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
->> +++ b/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
->> @@ -2,7 +2,7 @@ Rockchip specific extensions to the Synopsys Designware HDMI
->>   ================================
->>   
->>   Required properties:
->> -- compatible: "rockchip,rk3288-dw-hdmi";
->> +- compatible: "rockchip,rk3288-dw-hdmi", "rockchip,rk3229-dw-hdmi";
->>   - reg: Physical base address and length of the controller's registers.
->>   - clocks: phandle to hdmi iahb and isfr clocks.
->>   - clock-names: should be "iahb" "isfr"
->> @@ -15,8 +15,10 @@ Required properties:
->>     rk3288 platform
->>   
->>   Optional properties
->> +- reg: Physical base address and length of the external HDMI PHY's registers.
-> This is already required...
->
+>> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
+> 
+> [...]
+> 
+>> diff --git a/drivers/clk/hisilicon/clk-hi3519.c b/drivers/clk/hisilicon/clk-hi3519.c
+>> new file mode 100644
+>> index 0000000..72d3a7b0
+>> --- /dev/null
+>> +++ b/drivers/clk/hisilicon/clk-hi3519.c
+>> @@ -0,0 +1,105 @@
+>> +/*
+>> + * Hi3519 Clock Driver
+>> + *
+>> + * Copyright (c) 2015-2016 HiSilicon Technologies Co., Ltd.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License, or
+>> + * (at your option) any later version.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program. If not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +
+>> +#include <dt-bindings/clock/hi3519-clock.h>
+>> +#include <linux/delay.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/slab.h>
+>> +#include "clk.h"
+>> +#include "reset.h"
+>> +
+>> +#define HI3519_FIXED_24M	(HI3519_EXT_CLKS + 1)
+> 
+> This is fragile because HI3519_EXT_CLKS will change every time you 
+> add a clock to DT and means you have to keep the kernel and DT in sync. 
+> 
 
-The original reg only include the DW HDMI controller registers:
-         reg = <0x200a0000 0x20000>;
+The dependence is indeed unneeded. Thank you.
 
-But for now, I need to pass the external HDMI PHY registers:
-         reg = <0x200a0000 0x20000>, <0x12030000 0x10000>;
+> I'd be less worried if your clock definitions were more complete, but 
+> I'm guess the SOC has more than 19 clocks coming out of the clock 
+> controller.
+> 
 
->>   - ddc-i2c-bus: phandle of an I2C controller used for DDC EDID probing
->>   - clocks, clock-names: phandle to the HDMI CEC clock, name should be "cec"
->> +		       phandle to the external HDMI PHY clock, name should be "extphy"
-> Does this change apply to rk3288 or just rk3229? If the latter, you
-> should make that clear. The driver needs to allow for old dtb's that
-> only have 1 clock.
+You are right. Some clocks in the SOC are not defined in this patch. Because
+there is no plan to upstream those blocks drivers using these clocks. The clocks
+defined in this file will not referred by the DT. So it's also not proper to
+put these definitions into the dt-bingdings header file.
 
-It's the latter one, driver have allowed that by judging the device type,
-but I should make the document more clear.
+I will change HI3519_EXT_CLKS to a large number to make sure that enough space
+is reserved for external clocks?  Is it OK?
 
-> Based on Philipp's feedback, you also need to add a phys property.
+Your advise will be appreciated. Thank you.
 
-Yes, I'm preparing the new patches that create a new separate phy
-driver for external HDMI phy, there would be much difference from
-this version.
-
-Thanks for your respond,
-- Yakir
-
->
-> Rob
->
->
->
+>> +#define HI3519_FIXED_50M	(HI3519_EXT_CLKS + 2)
+>> +#define HI3519_FIXED_75M	(HI3519_EXT_CLKS + 3)
+>> +#define HI3519_FIXED_125M	(HI3519_EXT_CLKS + 4)
+>> +#define HI3519_FIXED_150M	(HI3519_EXT_CLKS + 5)
+>> +#define HI3519_FIXED_200M	(HI3519_EXT_CLKS + 6)
+>> +#define HI3519_FIXED_250M	(HI3519_EXT_CLKS + 7)
+>> +#define HI3519_FIXED_300M	(HI3519_EXT_CLKS + 8)
+>> +#define HI3519_FIXED_400M	(HI3519_EXT_CLKS + 9)
+>> +#define HI3519_FMC_MUX		(HI3519_EXT_CLKS + 10)
+>> +
+>> +#define HI3519_NR_CLKS	128
+> 
+> You only have 29 clocks defined.
+> 
+> 
+>> +#ifndef __DTS_HI3519_CLOCK_H
+>> +#define __DTS_HI3519_CLOCK_H
+>> +
+>> +#define HI3519_FIXED_3M			1
+>> +#define HI3519_FMC_CLK			2
+>> +#define HI3519_USB2_BUS_CLK		3
+>> +#define HI3519_USB2_PORT_CLK		4
+>> +#define HI3519_USB3_CLK			5
+>> +#define HI3519_ETH_PHY_CLK		6
+>> +#define HI3519_ETH_MAC_CLK		7
+>> +#define HI3519_ETH_MACIF_CLK		8
+>> +#define HI3519_PWM_CLK			9
+>> +#define HI3519_DMA_CLK			10
+>> +#define HI3519_SPI0_CLK			11
+>> +#define HI3519_SPI1_CLK			12
+>> +#define HI3519_SPI2_CLK			13
+>> +#define HI3519_IR_CLK			14
+>> +#define HI3519_UART0_CLK		15
+>> +#define HI3519_UART1_CLK		16
+>> +#define HI3519_UART2_CLK		17
+>> +#define HI3519_UART3_CLK		18
+>> +#define HI3519_UART4_CLK		19
+>> +
+>> +#define HI3519_EXT_CLKS			19
+>> +
+>> +#endif	/* __DTS_HI3519_CLOCK_H */
+> 
+> .
+> 
