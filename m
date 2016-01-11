@@ -1,45 +1,50 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 11 Jan 2016 19:46:57 +0100
-Subject: r8a7794/alt and CONFIG_PROVE_LOCKING=y
-Message-ID: <CAMuHMdXGgbpsC+JdbGc5D0fd5YSdogpqvffPAB4PU-7H_-jM_Q@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 11 Jan 2016 10:55:00 -0800
+Subject: arm qemu boot failures in -next due to 'PM / Domains: add setter
+ for dev.pm_domain'
+In-Reply-To: <5693EB8A.40802@roeck-us.net>
+References: <5693EB8A.40802@roeck-us.net>
+Message-ID: <20160111185459.GZ12777@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_PROVE_LOCKING=y, r8a7794/alt doesn't boot (no output).
-Earlycon doesn't help, but DEBUG_LL=y and earlyprintk gave me:
+* Guenter Roeck <linux@roeck-us.net> [160111 09:51]:
+> Hi,
+> 
+> I see 6 out of 24 arm qemu tests failing in next-20160111. Bisect points
+> to commit 989561de9b51 ("PM / Domains: add setter for dev.pm_domain").
+> Failures are silent - there is no output on the console.
+> Affected tests are
+> 
+> arm:beagle:multi_v7_defconfig:omap3-beagle
+> arm:beaglexm:multi_v7_defconfig:omap3-beagle-xm
+> arm:overo:multi_v7_defconfig:omap3-overo-tobi
+> arm:beagle:omap2plus_defconfig:omap3-beagle
+> arm:beaglexm:omap2plus_defconfig:omap3-beagle-xm
+> arm:overo:omap2plus_defconfig:omap3-overo-tobi
+> 
+> For details please see the 'next' column at http://server.roeck-us.net:8010/builders.
+> 
+> Reverting the offending commit fixes the problems.
+> 
+> Please let me know if there is anything I can do to help tracking down the problem.
 
-    Error: unrecognized/unsupported machine ID (r1 = 0x18009008).
+The following fixes the booting, but I wonder if it's a
+proper fix?
 
-    Available machine support:
-
-    ID (hex) NAME
-    ffffffff    Generic DT based system
-    ffffffff Generic R8A7794 (Flattened Device Tree)
-
-    Please check your kernel config and/or bootloader.
-
-I'm booting using
-
-    tftp 41000000 alt/zImage
-    tftp 40f00000 alt/r8a7794-alt.dtb
-    bootz 41000000 - 40f00000
-
-just like on r8a7791/koelsch, where CONFIG_PROVE_LOCKING does work.
-
-If I disable CONFIG_PROVE_LOCKING (e.g. shmobile_defconfig), the same kernel
-boots fine.
-
-Anyone with a clue?
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+--- a/drivers/base/power/common.c
++++ b/drivers/base/power/common.c
+@@ -145,9 +145,10 @@ void dev_pm_domain_set(struct device *dev, struct dev_pm_domain *pd)
+ {
+ 	if (dev->pm_domain == pd)
+ 		return;
+-
+-	WARN(device_is_bound(dev),
+-	     "PM domains can only be changed for unbound devices\n");
++	if (device_is_registered(dev)) {
++		WARN(device_is_bound(dev),
++		     "PM domains can only be changed for unbound devices\n");
++	}
+ 	dev->pm_domain = pd;
+ 	device_pm_check_callbacks(dev);
+ }
