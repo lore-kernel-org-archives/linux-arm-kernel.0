@@ -1,21 +1,17 @@
-From: robh@kernel.org (Rob Herring)
-Date: Sun, 10 Jan 2016 20:55:10 -0600
-Subject: [PATCH v3 3/3] dt-bindings: modify document of Rockchip power
- domains
-In-Reply-To: <1452508600-3512-4-git-send-email-zhangqing@rock-chips.com>
-References: <1452508600-3512-1-git-send-email-zhangqing@rock-chips.com>
- <1452508600-3512-4-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <20160111025510.GA17050@rob-hp-laptop>
+From: davem@davemloft.net (David Miller)
+Date: Sun, 10 Jan 2016 22:21:51 -0500 (EST)
+Subject: [PATCH v2 0/3] Add support emac for the RK3036 SoC platform
+In-Reply-To: <1452216902-21063-1-git-send-email-zhengxing@rock-chips.com>
+References: <1452216902-21063-1-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <20160110.222151.599769321034656161.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2016 at 02:36:40AM -0800, zhangqing wrote:
-> Modify binding documentation for the power domains
-> found on Rockchip RK3368 SoCs.
-> 
-> Signed-off-by: zhangqing <zhangqing@rock-chips.com>
-> ---
->  .../bindings/soc/rockchip/power_domain.txt          | 21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
+From: Xing Zheng <zhengxing@rock-chips.com>
+Date: Fri,  8 Jan 2016 09:34:59 +0800
 
-Acked-by: Rob Herring <robh@kernel.org>
+>   We have supported the emac for RK3066/RK3188, but the RK3036 have
+> some configuration different with them. We should let the driver of
+> emac_rockchip compatible with other Rockchip SoCs.
+
+Series applied to net-next.
