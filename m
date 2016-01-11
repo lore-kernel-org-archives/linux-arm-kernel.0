@@ -1,44 +1,55 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 11 Jan 2016 05:50:00 +0000
-Subject: [PATCH] mfd: qcom-spmi-pmic: Don't access non-existing registers
-In-Reply-To: <1447805204-32483-1-git-send-email-sboyd@codeaurora.org>
-References: <1447805204-32483-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20160111055000.GK3331@x1>
+Date: Mon, 11 Jan 2016 06:21:14 +0000
+Subject: [PATCH] mfd: as3722: mark PM functions as __maybe_unused
+In-Reply-To: <2162790.qeSmLiztNV@wuerfel>
+References: <2162790.qeSmLiztNV@wuerfel>
+Message-ID: <20160111062114.GO3331@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Nov 2015, Stephen Boyd wrote:
+On Tue, 08 Dec 2015, Arnd Bergmann wrote:
 
-> From: "Ivan T. Ivanov" <ivan.ivanov@linaro.org>
+> The newly introduced as3722_i2c_suspend/resume functions are built
+> unconditionally, but only used when power management is enabled,
+> so we get a warning otherwise:
 > 
-> Revision ID registers are available only on devices with
-> Slave IDs that are even, so don't make access to unavailable
-> registers.
+> drivers/mfd/as3722.c:427:12: warning: 'as3722_i2c_suspend' defined but not used [-Wunused-function]
+> drivers/mfd/as3722.c:438:12: warning: 'as3722_i2c_resume' defined but not used [-Wunused-function]
 > 
-> Signed-off-by: Ivan T. Ivanov <ivan.ivanov@linaro.org>
-> [sboyd at codeaurora.org: Consider all slave ids that are even]
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> This marks them both as __maybe_unused, which avoids an ugly #ifdef
+> and gives us best compile-time coverage. When they are unused, the
+> compiler will silently drop the functions from its output.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 35deff7eb212 ("mfd: as3722: Handle interrupts on suspend")
 > ---
->  drivers/mfd/qcom-spmi-pmic.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
+>  drivers/mfd/as3722.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 
 Applied, thanks.
 
-> diff --git a/drivers/mfd/qcom-spmi-pmic.c b/drivers/mfd/qcom-spmi-pmic.c
-> index af6ac1c4b45c..8653e8b9bb4f 100644
-> --- a/drivers/mfd/qcom-spmi-pmic.c
-> +++ b/drivers/mfd/qcom-spmi-pmic.c
-> @@ -127,7 +127,9 @@ static int pmic_spmi_probe(struct spmi_device *sdev)
->  	if (IS_ERR(regmap))
->  		return PTR_ERR(regmap);
->  
-> -	pmic_spmi_show_revid(regmap, &sdev->dev);
-> +	/* Only the first slave id for a PMIC contains this information */
-> +	if (sdev->usid % 2 == 0)
-> +		pmic_spmi_show_revid(regmap, &sdev->dev);
->  
->  	return of_platform_populate(root, NULL, NULL, &sdev->dev);
+> diff --git a/drivers/mfd/as3722.c b/drivers/mfd/as3722.c
+> index 3b21eb4bc480..e1f597f97f86 100644
+> --- a/drivers/mfd/as3722.c
+> +++ b/drivers/mfd/as3722.c
+> @@ -424,7 +424,7 @@ static int as3722_i2c_remove(struct i2c_client *i2c)
+>  	return 0;
 >  }
+>  
+> -static int as3722_i2c_suspend(struct device *dev)
+> +static int __maybe_unused as3722_i2c_suspend(struct device *dev)
+>  {
+>  	struct as3722 *as3722 = dev_get_drvdata(dev);
+>  
+> @@ -435,7 +435,7 @@ static int as3722_i2c_suspend(struct device *dev)
+>  	return 0;
+>  }
+>  
+> -static int as3722_i2c_resume(struct device *dev)
+> +static int __maybe_unused as3722_i2c_resume(struct device *dev)
+>  {
+>  	struct as3722 *as3722 = dev_get_drvdata(dev);
+>  
 
 -- 
 Lee Jones
