@@ -1,33 +1,26 @@
-From: xuejiancheng@huawei.com (xuejiancheng)
-Date: Mon, 11 Jan 2016 10:05:57 +0800
-Subject: [PATCH v5 6/6] ARM: dts: add dts files for Hi3519
-In-Reply-To: <20160108151058.GN19062@n2100.arm.linux.org.uk>
-References: <1452219400-32478-1-git-send-email-xuejiancheng@huawei.com>
- <1452219400-32478-7-git-send-email-xuejiancheng@huawei.com>
- <20160108151058.GN19062@n2100.arm.linux.org.uk>
-Message-ID: <56930E05.1050009@huawei.com>
+From: robh@kernel.org (Rob Herring)
+Date: Sun, 10 Jan 2016 20:32:39 -0600
+Subject: [PATCH v2 1/5] iio:adc:at91_adc8xx: introduce new atmel adc driver
+In-Reply-To: <1452096759-19438-2-git-send-email-ludovic.desroches@atmel.com>
+References: <1452096759-19438-1-git-send-email-ludovic.desroches@atmel.com>
+ <1452096759-19438-2-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20160111023239.GA27025@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
-
-On 2016/1/8 23:10, Russell King - ARM Linux wrote:
-> On Fri, Jan 08, 2016 at 10:16:40AM +0800, Jiancheng Xue wrote:
->> +		uart0: serial at 12100000 {
->> +			compatible = "arm,pl011", "arm,primecell";
->> +			reg = <0x12100000 0x1000>;
->> +			interrupts = <0 4 4>;
+On Wed, Jan 06, 2016 at 05:12:35PM +0100, Ludovic Desroches wrote:
+> This driver supports the new version of the Atmel ADC device introduced
+> with the SAMA5D2 SoC family.
 > 
-> Should the last digit there be IRQ_TYPE_LEVEL_HIGH (and same for the
-> other interrupts= after this?)
-> 
-> Thanks.
-> 
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> ---
+>  .../devicetree/bindings/iio/adc/at91_adc8xx.txt    |  28 ++
 
-I'll include <dt-bindings/interrupt-controller/arm-gic.h> and use
-IRQ_TYPE_LEVEL_HIGH instead. The interrupts specifier will be wrote
-like this "interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;".
+For the binding:
 
-Thank you.
+Acked-by: Rob Herring <robh@kernel.org>
 
-Jiancheng
+>  drivers/iio/adc/Kconfig                            |  11 +
+>  drivers/iio/adc/Makefile                           |   1 +
+>  drivers/iio/adc/at91_adc8xx.c                      | 461 +++++++++++++++++++++
+>  4 files changed, 501 insertions(+)
