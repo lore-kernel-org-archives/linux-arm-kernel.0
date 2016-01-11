@@ -1,31 +1,67 @@
-From: tphan@apm.com (Tuan Phan)
-Date: Mon, 11 Jan 2016 14:41:41 -0800
-Subject: [PATCH v3 1/2] acpi: Fix proper return code for function
- acpi_gsi_to_irq
-In-Reply-To: <20160111221305.GH4665@pd.tnic>
-References: <1446857519-5908-1-git-send-email-lho@apm.com>
- <1446857519-5908-2-git-send-email-lho@apm.com>
- <20160110110714.GA22896@pd.tnic>
- <CAGDN=zYa1r23EphdYQTFe2YXRhg_P-RDiaZVms9rdbFA3Y-x3g@mail.gmail.com>
- <20160111221305.GH4665@pd.tnic>
-Message-ID: <CAGDN=zZOr6+q8aAdXB3gnSLfCm6gX-6KLaFPr+A4QMf+TPwR-w@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Mon, 11 Jan 2016 23:49:59 +0100
+Subject: arm qemu boot failures in -next due to 'PM / Domains: add setter
+ for dev.pm_domain'
+In-Reply-To: <20160111200450.GA16902@roeck-us.net>
+References: <5693EB8A.40802@roeck-us.net> <20160111185459.GZ12777@atomide.com>
+ <20160111200450.GA16902@roeck-us.net>
+Message-ID: <7302125.veLBHLkdLG@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2016 at 2:13 PM, Borislav Petkov <bp@alien8.de> wrote:
+On Monday, January 11, 2016 12:04:50 PM Guenter Roeck wrote:
+> On Mon, Jan 11, 2016 at 10:55:00AM -0800, Tony Lindgren wrote:
+> > * Guenter Roeck <linux@roeck-us.net> [160111 09:51]:
+> > > Hi,
+> > > 
+> > > I see 6 out of 24 arm qemu tests failing in next-20160111. Bisect points
+> > > to commit 989561de9b51 ("PM / Domains: add setter for dev.pm_domain").
+> > > Failures are silent - there is no output on the console.
+> > > Affected tests are
+> > > 
+> > > arm:beagle:multi_v7_defconfig:omap3-beagle
+> > > arm:beaglexm:multi_v7_defconfig:omap3-beagle-xm
+> > > arm:overo:multi_v7_defconfig:omap3-overo-tobi
+> > > arm:beagle:omap2plus_defconfig:omap3-beagle
+> > > arm:beaglexm:omap2plus_defconfig:omap3-beagle-xm
+> > > arm:overo:omap2plus_defconfig:omap3-overo-tobi
+> > > 
+> > > For details please see the 'next' column at http://server.roeck-us.net:8010/builders.
+> > > 
+> > > Reverting the offending commit fixes the problems.
+> > > 
+> > > Please let me know if there is anything I can do to help tracking down the problem.
+> > 
+> > The following fixes the booting, but I wonder if it's a
+> 
+> Yes, it does. 
+> 
+> Tested-by: Guenter Roeck <linux@roeck-us.net>
+> 
+> > proper fix?
+> > 
+> That I don't know.
 
->That function can be simplified. It should be made to return the irq
->number on success and 0 on failure. No need for that *irq output
->argument.
+If I'm not mistaken, what happens is that device_is_bound() tries to
+dereference dev->p which is NULL.  If that's the case, the appended one
+should help too.
 
-It will be problem because irq number can be 0 on X86?
+Can you please check?
 
--- 
-CONFIDENTIALITY NOTICE: This e-mail message, including any attachments, is 
-for the sole use of the intended recipient(s) and contains information that 
-is confidential and proprietary to Applied Micro Circuits Corporation or 
-its subsidiaries. It is to be used solely for the purpose of furthering the 
-parties' business relationship. All unauthorized review, use, disclosure or 
-distribution is prohibited. If you are not the intended recipient, please 
-contact the sender by reply e-mail and destroy all copies of the original 
-message.
+---
+ drivers/base/dd.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+Index: linux-pm/drivers/base/dd.c
+===================================================================
+--- linux-pm.orig/drivers/base/dd.c
++++ linux-pm/drivers/base/dd.c
+@@ -234,7 +234,7 @@ late_initcall(deferred_probe_initcall);
+  */
+ bool device_is_bound(struct device *dev)
+ {
+-	return klist_node_attached(&dev->p->knode_driver);
++	return dev->p && klist_node_attached(&dev->p->knode_driver);
+ }
+ 
+ static void driver_bound(struct device *dev)
