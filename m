@@ -1,216 +1,403 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 11 Jan 2016 19:58:20 +0800
-Subject: [PATCH v6 6/9] mfd: axp20x: Add support for RSB based AXP223 PMIC
-In-Reply-To: <20160111092427.GI14104@x1>
-References: <1450283538-25067-1-git-send-email-wens@csie.org>
- <1450283538-25067-7-git-send-email-wens@csie.org> <20160111092427.GI14104@x1>
-Message-ID: <CAGb2v67N_C5bLTPmQs2gcTkpYt=2=Dk8LjWLEzHqGU--qhu+9g@mail.gmail.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Mon, 11 Jan 2016 12:02:06 +0000
+Subject: [PATCH 4.4-rc5 v22 3/4] irqchip: gic: Introduce plumbing for IPI
+ FIQ
+In-Reply-To: <568E9B26.2060801@arm.com>
+References: <1450644757-18734-1-git-send-email-daniel.thompson@linaro.org>
+ <1450644757-18734-4-git-send-email-daniel.thompson@linaro.org>
+ <568E9B26.2060801@arm.com>
+Message-ID: <569399BE.6090107@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2016 at 5:24 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Thu, 17 Dec 2015, Chen-Yu Tsai wrote:
->
->> The AXP223 is a new PMIC commonly paired with Allwinner A23/A33 SoCs.
->> It is functionally identical to AXP221; only the regulator default
->> voltage/status and the external host interface are different.
+On 07/01/16 17:06, Marc Zyngier wrote:
+> On 20/12/15 20:52, Daniel Thompson wrote:
+>> Currently it is not possible to exploit FIQ for systems with a GIC, even
+>> on systems are otherwise capable of it. This patch makes it possible
+>> for IPIs to be delivered using FIQ.
 >>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> To do so it modifies the register state so that normal interrupts are
+>> placed in group 1 and specific IPIs are placed into group 0. It also
+>> configures the controller to raise group 0 interrupts using the FIQ
+>> signal. Finally it provides a means for architecture code to define
+>> which IPIs shall use FIQ and to acknowledge any IPIs that are raised.
+>>
+>> All GIC hardware except GICv1-without-TrustZone support provides a means
+>> to group exceptions into group 0 and group 1 but the hardware
+>> functionality is unavailable to the kernel when a secure monitor is
+>> present because access to the grouping registers are prohibited outside
+>> "secure world". However when grouping is not available (or on early
+>> GICv1 implementations where it is available but tricky to enable) the
+>> code to change groups does not deploy and all IPIs will be raised via
+>> IRQ.
+>>
+>> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>> Cc: Jason Cooper <jason@lakedaemon.net>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Tested-by: Jon Medhurst <tixy@linaro.org>
 >> ---
->>  drivers/mfd/Kconfig        | 11 +++++++
->>  drivers/mfd/Makefile       |  1 +
->>  drivers/mfd/axp20x-rsb.c   | 78 ++++++++++++++++++++++++++++++++++++++++++++++
->>  drivers/mfd/axp20x.c       |  2 ++
->>  include/linux/mfd/axp20x.h |  1 +
->>  5 files changed, 93 insertions(+)
->>  create mode 100644 drivers/mfd/axp20x-rsb.c
+>>   drivers/irqchip/irq-gic.c       | 183 +++++++++++++++++++++++++++++++++++++---
+>>   include/linux/irqchip/arm-gic.h |   6 ++
+>>   2 files changed, 175 insertions(+), 14 deletions(-)
 >>
->> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
->> index 804cd3dcce32..13c565103e96 100644
->> --- a/drivers/mfd/Kconfig
->> +++ b/drivers/mfd/Kconfig
->> @@ -107,6 +107,17 @@ config MFD_AXP20X_I2C
->>         components like regulators or the PEK (Power Enable Key) under the
->>         corresponding menus.
+>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+>> index b6c1e96b52a1..8077edd0d38d 100644
+>> --- a/drivers/irqchip/irq-gic.c
+>> +++ b/drivers/irqchip/irq-gic.c
+>> @@ -41,6 +41,7 @@
+>>   #include <linux/irqchip.h>
+>>   #include <linux/irqchip/chained_irq.h>
+>>   #include <linux/irqchip/arm-gic.h>
+>> +#include <linux/ratelimit.h>
 >>
->> +config MFD_AXP20X_RSB
->> +     tristate "X-Powers AXP series PMICs with RSB"
->> +     select MFD_AXP20X
->> +     depends on SUNXI_RSB
->> +     help
->> +       If you say Y here you get support for the X-Powers AXP series power
->> +       management ICs (PMICs) controlled with RSB.
->> +       This driver include only the core APIs. You have to select individual
->> +       components like regulators or the PEK (Power Enable Key) under the
->> +       corresponding menus.
+>>   #include <asm/cputype.h>
+>>   #include <asm/irq.h>
+>> @@ -63,6 +64,10 @@ static void gic_check_cpu_features(void)
+>>   #define gic_check_cpu_features()	do { } while(0)
+>>   #endif
+>>
+>> +#ifndef SMP_IPI_FIQ_MASK
+>> +#define SMP_IPI_FIQ_MASK 0
+>> +#endif
 >> +
->>  config MFD_CROS_EC
->>       tristate "ChromeOS Embedded Controller"
->>       select MFD_CORE
->> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
->> index a6913007d667..caea6637d5e8 100644
->> --- a/drivers/mfd/Makefile
->> +++ b/drivers/mfd/Makefile
->> @@ -108,6 +108,7 @@ obj-$(CONFIG_MFD_DA9052_SPI)      += da9052-spi.o
->>  obj-$(CONFIG_MFD_DA9052_I2C) += da9052-i2c.o
->>  obj-$(CONFIG_MFD_AXP20X)     += axp20x.o
->>  obj-$(CONFIG_MFD_AXP20X_I2C) += axp20x-i2c.o
->> +obj-$(CONFIG_MFD_AXP20X_RSB) += axp20x-rsb.o
+>>   union gic_base {
+>>   	void __iomem *common_base;
+>>   	void __percpu * __iomem *percpu_base;
+>> @@ -82,6 +87,7 @@ struct gic_chip_data {
+>>   #endif
+>>   	struct irq_domain *domain;
+>>   	unsigned int gic_irqs;
+>> +	bool sgi_with_nsatt;
+>>   #ifdef CONFIG_GIC_NON_BANKED
+>>   	void __iomem *(*get_base)(union gic_base *);
+>>   #endif
+>> @@ -350,12 +356,52 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+>>   }
+>>   #endif
 >>
->>  obj-$(CONFIG_MFD_LP3943)     += lp3943.o
->>  obj-$(CONFIG_MFD_LP8788)     += lp8788.o lp8788-irq.o
->> diff --git a/drivers/mfd/axp20x-rsb.c b/drivers/mfd/axp20x-rsb.c
->> new file mode 100644
->> index 000000000000..76ff02b96df0
->> --- /dev/null
->> +++ b/drivers/mfd/axp20x-rsb.c
->> @@ -0,0 +1,78 @@
 >> +/*
->> + * axp20x-rsb.c - RSB driver for the X-Powers' Power Management ICs
->
-> Please remove the name of the file from the header.
->
-> They have a habit of becoming out of date.
-
-OK.
-
->> + * AXP20x typically comprises an adaptive USB-Compatible PWM charger, BUCK DC-DC
->> + * converters, LDOs, multiple 12-bit ADCs of voltage, current and temperature
->> + * as well as configurable GPIOs.
->> + *
->> + * This driver supports the RSB variants.
->
-> No copyright line?
-
-Missed it. Will add it in the next version.
-
->> + * Author: Chen-Yu Tsai <wens@csie.org>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
+>> + * Fully acknowledge (ack, eoi and deactivate) any outstanding FIQ-based IPI,
+>> + * otherwise do nothing.
 >> + */
->> +
->> +#include <linux/acpi.h>
->> +#include <linux/err.h>
->> +#include <linux/module.h>
->> +#include <linux/mfd/axp20x.h>
->
-> 'f' comes before 'o'.
-
-Right.
-
->> +#include <linux/of.h>
->> +#include <linux/regmap.h>
->> +#include <linux/slab.h>
->> +#include <linux/sunxi-rsb.h>
->> +
->> +static int axp20x_rsb_probe(struct sunxi_rsb_device *rdev)
+>> +static void __maybe_unused gic_handle_fiq(struct pt_regs *regs)
 >> +{
->> +     struct axp20x_dev *axp20x;
->> +     int ret;
+>> +	struct gic_chip_data *gic = &gic_data[0];
+>> +	void __iomem *cpu_base = gic_data_cpu_base(gic);
+>> +	u32 hppstat, hppnr, irqstat, irqnr;
 >> +
->> +     axp20x = devm_kzalloc(&rdev->dev, sizeof(*axp20x), GFP_KERNEL);
->> +     if (!axp20x)
->> +             return -ENOMEM;
+>> +	do {
+>> +		hppstat = readl_relaxed(cpu_base + GIC_CPU_HIGHPRI);
+>> +		hppnr = hppstat & GICC_IAR_INT_ID_MASK;
+>> +		if (!(hppnr < 16 && BIT(hppnr) & SMP_IPI_FIQ_MASK))
+>> +			break;
 >> +
->> +     axp20x->dev = &rdev->dev;
->> +     axp20x->irq = rdev->irq;
->> +     sunxi_rsb_device_set_drvdata(rdev, axp20x);
+>> +		irqstat = readl_relaxed(cpu_base + GIC_CPU_INTACK);
+>> +		irqnr = irqstat & GICC_IAR_INT_ID_MASK;
+>> +
+>> +		writel_relaxed(irqstat, cpu_base + GIC_CPU_EOI);
+>> +		if (static_key_true(&supports_deactivate))
+>> +			writel_relaxed(irqstat, cpu_base + GIC_CPU_DEACTIVATE);
+>> +
+>> +		if (WARN_RATELIMIT(irqnr > 16,
 >
-> What's the point of this call?  Why do you need a sunxi_ variant?
+> Shouldn't that be irqnr > 15?
 
-This is an inline call defined in include/linux/sunxi-rsb.h,
-which is equivalent to dev_set_drvdata(&rdev->dev, data).
-
-It seems many subsystems or bus drivers have this pattern.
-
-    git grep void.*_set_drvdata include/linux/ | wc -l
-
-yields 34, not including dev_set_drvdata itself and this sunxi_rsb
-variant.
-
-Thanks for the review!
-
-
-Regards
-ChenYu
-
->> +     ret = axp20x_match_device(axp20x);
->> +     if (ret)
->> +             return ret;
->> +
->> +     axp20x->regmap = devm_regmap_init_sunxi_rsb(rdev, axp20x->regmap_cfg);
->> +     if (IS_ERR(axp20x->regmap)) {
->> +             ret = PTR_ERR(axp20x->regmap);
->> +             dev_err(&rdev->dev, "regmap init failed: %d\n", ret);
->> +             return ret;
->> +     }
->> +
->> +     return axp20x_device_probe(axp20x);
+Yep. Will fix.
+>
+>> +			       "Unexpected irqnr %u (bad prioritization?)\n",
+>> +			       irqnr))
+>> +			continue;
+>> +#ifdef CONFIG_SMP
+>> +		handle_IPI(irqnr, regs);
+>> +#endif
+>> +	} while (1);
 >> +}
 >> +
->> +static int axp20x_rsb_remove(struct sunxi_rsb_device *rdev)
->> +{
->> +     struct axp20x_dev *axp20x = sunxi_rsb_device_get_drvdata(rdev);
->> +
->> +     return axp20x_device_remove(axp20x);
->> +}
->> +
->> +static const struct of_device_id axp20x_rsb_of_match[] = {
->> +     { .compatible = "x-powers,axp223", .data = (void *)AXP223_ID },
->> +     { },
->> +};
->> +MODULE_DEVICE_TABLE(of, axp20x_rsb_of_match);
->> +
->> +static struct sunxi_rsb_driver axp20x_rsb_driver = {
->> +     .driver = {
->> +             .name   = "axp20x-rsb",
->> +             .of_match_table = of_match_ptr(axp20x_rsb_of_match),
->> +     },
->> +     .probe  = axp20x_rsb_probe,
->> +     .remove = axp20x_rsb_remove,
->> +};
->> +module_sunxi_rsb_driver(axp20x_rsb_driver);
->> +
->> +MODULE_DESCRIPTION("PMIC MFD sunXi RSB driver for AXP20X");
->> +MODULE_AUTHOR("Chen-Yu Tsai <wens@csie.org>");
->> +MODULE_LICENSE("GPL v2");
->> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
->> index 54a00168da26..968d77fb95d8 100644
->> --- a/drivers/mfd/axp20x.c
->> +++ b/drivers/mfd/axp20x.c
->> @@ -33,6 +33,7 @@ static const char * const axp20x_model_names[] = {
->>       "AXP202",
->>       "AXP209",
->>       "AXP221",
->> +     "AXP223",
->>       "AXP288",
->>  };
+>>   static void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
+>>   {
+>>   	u32 irqstat, irqnr;
+>>   	struct gic_chip_data *gic = &gic_data[0];
+>>   	void __iomem *cpu_base = gic_data_cpu_base(gic);
 >>
->> @@ -616,6 +617,7 @@ int axp20x_match_device(struct axp20x_dev *axp20x)
->>               axp20x->regmap_irq_chip = &axp20x_regmap_irq_chip;
->>               break;
->>       case AXP221_ID:
->> +     case AXP223_ID:
->>               axp20x->nr_cells = ARRAY_SIZE(axp22x_cells);
->>               axp20x->cells = axp22x_cells;
->>               axp20x->regmap_cfg = &axp22x_regmap_config;
->> diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
->> index 00697c6ad8b0..d82e7d51372b 100644
->> --- a/include/linux/mfd/axp20x.h
->> +++ b/include/linux/mfd/axp20x.h
->> @@ -18,6 +18,7 @@ enum {
->>       AXP202_ID,
->>       AXP209_ID,
->>       AXP221_ID,
->> +     AXP223_ID,
->>       AXP288_ID,
->>       NR_AXP20X_VARIANTS,
->>  };
+>> +#ifdef CONFIG_ARM
 >
-> --
-> Lee Jones
-> Linaro STMicroelectronics Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+> What is the reason to make this 32bit specific?
+
+I have tried to keep the interfaces for my NMI-like for using arm/fiq 
+and arm64/gicv3 as similar as possible.
+
+However for arm/fiq then the arch code *must* tell the gic driver we are 
+handling a FIQ via in_nmi() so it can avoid acking the wrong interrupt. 
+Conversely, on arm64/gicv3 the arch code is *unable* to tell the gic 
+driver we are handling a high priority IRQ because we don't know that 
+until the gic driver acks the interrupt.
+
+In the end I can't think of any way for any arch/arm64 code to call into 
+gic_handle_irq() with a FIQ to handle and with nmi_enter() already 
+called. in_nmi() would always be false at this point, so having this 
+code present on arm64 is harmless but also pointless.
+
+
+>> +	if (in_nmi()) {
+>> +		gic_handle_fiq(regs);
+>> +		return;
+>> +	}
+>> +#endif
+>> +
+>>   	do {
+>>   		irqstat = readl_relaxed(cpu_base + GIC_CPU_INTACK);
+>>   		irqnr = irqstat & GICC_IAR_INT_ID_MASK;
+>> @@ -439,6 +485,55 @@ static struct irq_chip gic_eoimode1_chip = {
+>>   				  IRQCHIP_MASK_ON_SUSPEND,
+>>   };
+>>
+>> +/*
+>> + * Shift an interrupt between Group 0 and Group 1.
+>> + *
+>> + * In addition to changing the group we also modify the priority to
+>> + * match what "ARM strongly recommends" for a system where no Group 1
+>> + * interrupt must ever preempt a Group 0 interrupt.
+>> + *
+>> + * It is safe to call this function on systems which do not support
+>> + * grouping (it will have no effect).
+>> + */
+>> +static void gic_set_group_irq(struct gic_chip_data *gic, unsigned int hwirq,
+>> +			      int group)
+>> +{
+>> +	void __iomem *base = gic_data_dist_base(gic);
+>> +	unsigned int grp_reg = hwirq / 32 * 4;
+>> +	u32 grp_mask = BIT(hwirq % 32);
+>> +	u32 grp_val;
+>> +
+>
+> nit: spurious space.
+
+Will fix.
+
+>> +	unsigned int pri_reg = (hwirq / 4) * 4;
+>> +	u32 pri_mask = BIT(7 + ((hwirq % 4) * 8));
+>> +	u32 pri_val;
+>> +
+>> +	/*
+>> +	 * Systems which do not support grouping will have not have
+>> +	 * the EnableGrp1 bit set.
+>> +	 */
+>> +	if (!(GICD_ENABLE_GRP1 & readl_relaxed(base + GIC_DIST_CTRL)))
+>
+> nit: I tend to prefer expressions to be written the other way around
+> (readl() & v). But more importantly, you should be able to cache the
+> grouping state in the gic_chip_data structure (you seem to have similar
+> code below).
+
+Will do.
+
+>> +		return;
+>> +
+>> +	raw_spin_lock(&irq_controller_lock);
+>> +
+>> +	grp_val = readl_relaxed(base + GIC_DIST_IGROUP + grp_reg);
+>> +	pri_val = readl_relaxed(base + GIC_DIST_PRI + pri_reg);
+>
+> The priority register is byte-accessible, so you can save yourself some
+> effort and just write the priority there.
+
+Will do (also, I have a really strong sense of dejavu here, I may have 
+neglected to apply previous comments from you as broadly as I should 
+have and, if so, then sorry).
+
+>> +
+>> +	if (group) {
+>> +		grp_val |= grp_mask;
+>> +		pri_val |= pri_mask;
+>> +	} else {
+>> +		grp_val &= ~grp_mask;
+>> +		pri_val &= ~pri_mask;
+>> +	}
+>> +
+>> +	writel_relaxed(grp_val, base + GIC_DIST_IGROUP + grp_reg);
+>> +	writel_relaxed(pri_val, base + GIC_DIST_PRI + pri_reg);
+>> +
+>> +	raw_spin_unlock(&irq_controller_lock);
+>> +}
+>> +
+>> +
+>>   void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
+>>   {
+>>   	if (gic_nr >= MAX_GIC_NR)
+>> @@ -469,19 +564,27 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
+>>   static void gic_cpu_if_up(struct gic_chip_data *gic)
+>>   {
+>>   	void __iomem *cpu_base = gic_data_cpu_base(gic);
+>> -	u32 bypass = 0;
+>> -	u32 mode = 0;
+>> +	void __iomem *dist_base = gic_data_dist_base(gic);
+>> +	u32 ctrl = 0;
+>>
+>> -	if (static_key_true(&supports_deactivate))
+>> -		mode = GIC_CPU_CTRL_EOImodeNS;
+>> +	/*
+>> +	 * Preserve bypass disable bits to be written back later
+>> +	 */
+>> +	ctrl = readl(cpu_base + GIC_CPU_CTRL);
+>> +	ctrl &= GICC_DIS_BYPASS_MASK;
+>>
+>>   	/*
+>> -	* Preserve bypass disable bits to be written back later
+>> -	*/
+>> -	bypass = readl(cpu_base + GIC_CPU_CTRL);
+>> -	bypass &= GICC_DIS_BYPASS_MASK;
+>> +	 * If EnableGrp1 is set in the distributor then enable group 1
+>> +	 * support for this CPU (and route group 0 interrupts to FIQ).
+>> +	 */
+>> +	if (GICD_ENABLE_GRP1 & readl_relaxed(dist_base + GIC_DIST_CTRL))
+>> +		ctrl |= GICC_COMMON_BPR | GICC_FIQ_EN | GICC_ACK_CTL |
+>> +			GICC_ENABLE_GRP1;
+>> +
+>> +	if (static_key_true(&supports_deactivate))
+>> +		ctrl |= GIC_CPU_CTRL_EOImodeNS;
+>>
+>> -	writel_relaxed(bypass | mode | GICC_ENABLE, cpu_base + GIC_CPU_CTRL);
+>> +	writel_relaxed(ctrl | GICC_ENABLE, cpu_base + GIC_CPU_CTRL);
+>>   }
+>>
+>>
+>> @@ -505,7 +608,31 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
+>>
+>>   	gic_dist_config(base, gic_irqs, NULL);
+>>
+>> -	writel_relaxed(GICD_ENABLE, base + GIC_DIST_CTRL);
+>> +	/*
+>> +	 * Set EnableGrp1/EnableGrp0 (bit 1 and 0) or EnableGrp (bit 0 only,
+>> +	 * bit 1 ignored) depending on current security mode.
+>> +	 */
+>> +	writel_relaxed(GICD_ENABLE_GRP1 | GICD_ENABLE, base + GIC_DIST_CTRL);
+>> +
+>> +	/*
+>> +	 * Some GICv1 devices (even those with security extensions) do not
+>> +	 * implement EnableGrp1 meaning some parts of the above write may
+>> +	 * be ignored. We will only enable FIQ support if the bit can be set.
+>> +	 */
+>> +	if (GICD_ENABLE_GRP1 & readl_relaxed(base + GIC_DIST_CTRL)) {
+>> +		/* Place all SPIs in group 1 (signally with IRQ). */
+>> +		for (i = 32; i < gic_irqs; i += 32)
+>> +			writel_relaxed(0xffffffff,
+>> +				       base + GIC_DIST_IGROUP + i * 4 / 32);
+>> +
+>> +		/*
+>> +		 * If the GIC supports the security extension then SGIs
+>> +		 * will be filtered based on the value of NSATT. If the
+>> +		 * GIC has this support then enable NSATT support.
+>> +		 */
+>> +		if (GICD_SECURITY_EXTN & readl_relaxed(base + GIC_DIST_CTR))
+>> +			gic->sgi_with_nsatt = true;
+>> +	}
+>>   }
+>>
+>>   static void gic_cpu_init(struct gic_chip_data *gic)
+>> @@ -514,6 +641,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+>>   	void __iomem *base = gic_data_cpu_base(gic);
+>>   	unsigned int cpu_mask, cpu = smp_processor_id();
+>>   	int i;
+>> +	unsigned long ipi_fiq_mask, fiq;
+>
+> Think of the children (arm64), do not make ipi_fiq_mask a long... If you
+> pass anything but u32 to writel, you're doing something wrong.
+
+Will do.
+
+
+>>
+>>   	/*
+>>   	 * Setting up the CPU map is only relevant for the primary GIC
+>> @@ -539,6 +667,23 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+>>
+>>   	gic_cpu_config(dist_base, NULL);
+>>
+>> +	/*
+>> +	 * If the distributor is configured to support interrupt grouping
+>> +	 * then set all SGI and PPI interrupts that are not set in
+>> +	 * SMP_IPI_FIQ_MASK to group1 and ensure any remaining group 0
+>> +	 * interrupts have the right priority.
+>> +	 *
+>> +	 * Note that IGROUP[0] is banked, meaning that although we are
+>> +	 * writing to a distributor register we are actually performing
+>> +	 * part of the per-cpu initialization.
+>> +	 */
+>> +	if (GICD_ENABLE_GRP1 & readl_relaxed(dist_base + GIC_DIST_CTRL)) {
+>> +		ipi_fiq_mask = SMP_IPI_FIQ_MASK;
+>> +		writel_relaxed(~ipi_fiq_mask, dist_base + GIC_DIST_IGROUP + 0);
+>
+> or just turn this into writel_relaxed(~SMP_IPI_FIQ_MASK...) and keep
+> ipi_fiq_mask as a long.
+>
+>> +		for_each_set_bit(fiq, &ipi_fiq_mask, 16)
+>> +			gic_set_group_irq(gic, fiq, 0);
+>> +	}
+>> +
+>>   	writel_relaxed(GICC_INT_PRI_THRESHOLD, base + GIC_CPU_PRIMASK);
+>>   	gic_cpu_if_up(gic);
+>>   }
+>> @@ -553,7 +698,8 @@ int gic_cpu_if_down(unsigned int gic_nr)
+>>
+>>   	cpu_base = gic_data_cpu_base(&gic_data[gic_nr]);
+>>   	val = readl(cpu_base + GIC_CPU_CTRL);
+>> -	val &= ~GICC_ENABLE;
+>> +	val &= ~(GICC_COMMON_BPR | GICC_FIQ_EN | GICC_ACK_CTL |
+>> +		 GICC_ENABLE_GRP1 | GICC_ENABLE);
+>>   	writel_relaxed(val, cpu_base + GIC_CPU_CTRL);
+>>
+>>   	return 0;
+>> @@ -648,7 +794,8 @@ static void gic_dist_restore(unsigned int gic_nr)
+>>   			dist_base + GIC_DIST_ACTIVE_SET + i * 4);
+>>   	}
+>>
+>> -	writel_relaxed(GICD_ENABLE, dist_base + GIC_DIST_CTRL);
+>> +	writel_relaxed(GICD_ENABLE_GRP1 | GICD_ENABLE,
+>> +		       dist_base + GIC_DIST_CTRL);
+>>   }
+>>
+>>   static void gic_cpu_save(unsigned int gic_nr)
+>> @@ -794,6 +941,8 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+>>   {
+>>   	int cpu;
+>>   	unsigned long map = 0;
+>> +	unsigned long softint;
+>> +	void __iomem *dist_base;
+>>
+>>   	gic_migration_lock();
+>>
+>> @@ -801,14 +950,20 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+>>   	for_each_cpu(cpu, mask)
+>>   		map |= gic_cpu_map[cpu];
+>>
+>> +	/* This always happens on GIC0 */
+>> +	dist_base = gic_data_dist_base(&gic_data[0]);
+>> +
+>>   	/*
+>>   	 * Ensure that stores to Normal memory are visible to the
+>>   	 * other CPUs before they observe us issuing the IPI.
+>>   	 */
+>>   	dmb(ishst);
+>>
+>> -	/* this always happens on GIC0 */
+>> -	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
+>> +	softint = map << 16 | irq;
+>> +
+>> +	writel_relaxed(softint, dist_base + GIC_DIST_SOFTINT);
+>> +	if (gic_data[0].sgi_with_nsatt)
+>> +		writel_relaxed(softint | 0x8000, dist_base + GIC_DIST_SOFTINT);
+>
+> Ah! No way. Writing twice to GICD_SGIR is horribly inefficient - just
+> think of a virtualized environment where you actually trap to HYP to
+> emulate SGIs (and some actual HW sucks almost as much...). A better
+> solution would be to keep track of which SGIs are secure and which are
+> not. A simple u16 would do.
+
+Will do. I remember why I wrote it like this (concern over whether the 
+cache could ever become inconsistent) but reading it back now that does 
+look rather paranoid.
+
+
+Daniel.
