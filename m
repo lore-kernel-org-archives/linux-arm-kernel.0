@@ -1,55 +1,79 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 11 Jan 2016 14:26:28 +0100
-Subject: [PATCH v3 14/21] arm64: [re]define SWAPPER_TABLE_[SHIFT|SIZE] for
- use in asm code
-In-Reply-To: <1452518355-4606-16-git-send-email-ard.biesheuvel@linaro.org>
-References: <1452518355-4606-1-git-send-email-ard.biesheuvel@linaro.org>
- <1452518355-4606-16-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu-dcH-2jpTQSgqq9NHuvVbwzB=gni-5Le6aNFyP7Pw2bg@mail.gmail.com>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Mon, 11 Jan 2016 19:26:25 +0600
+Subject: [PATCH v5 0/2] ACPI: amba bus probing support
+Message-ID: <1452518790-27053-1-git-send-email-aleksey.makarov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please disregard this patch, I accidentally sent out two versions of
-14/21, and this is the wrong one.
+As discussed when Shannon Zhao sent a patch to add platform_device support
+to pl061 driver. Russel and other maintainers prefered that ACPI learned
+how to create AMBA devices rather than converting/adding platform_device
+support to AMBA drivers.
 
+http://comments.gmane.org/gmane.linux.ports.arm.kernel/431364
 
-On 11 January 2016 at 14:19, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> The current definition of SWAPPER_TABLE_SHIFT can only be used in
-> asm code if the configured number of translation levels defines
-> PUD_SHIFT and/or PMD_SHIFT natively (4KB and 16KB/64KB granule,
-> respectively). Otherwise, it depends on the nopmd/nopud fixup
-> headers, which can only be included in C code.
->
-> So redefine SWAPPER_TABLE_SHIFT in a way that is independent of the
-> number of configured translation levels. Define SWAPPER_TABLE_SIZE
-> as well, we will need it later.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/include/asm/kernel-pgtable.h | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/kernel-pgtable.h b/arch/arm64/include/asm/kernel-pgtable.h
-> index daa8a7b9917a..eaac46097359 100644
-> --- a/arch/arm64/include/asm/kernel-pgtable.h
-> +++ b/arch/arm64/include/asm/kernel-pgtable.h
-> @@ -57,13 +57,14 @@
->  #if ARM64_SWAPPER_USES_SECTION_MAPS
->  #define SWAPPER_BLOCK_SHIFT    SECTION_SHIFT
->  #define SWAPPER_BLOCK_SIZE     SECTION_SIZE
-> -#define SWAPPER_TABLE_SHIFT    PUD_SHIFT
->  #else
->  #define SWAPPER_BLOCK_SHIFT    PAGE_SHIFT
->  #define SWAPPER_BLOCK_SIZE     PAGE_SIZE
-> -#define SWAPPER_TABLE_SHIFT    PMD_SHIFT
->  #endif
->
-> +#define SWAPPER_TABLE_SHIFT    (SWAPPER_BLOCK_SHIFT + PAGE_SHIFT - 3)
-> +#define SWAPPER_TABLE_SIZE     (1 << SWAPPER_TABLE_SHIFT)
-> +
->  /* The size of the initial kernel direct mapping */
->  #define SWAPPER_INIT_MAP_SIZE  (_AC(1, UL) << SWAPPER_TABLE_SHIFT)
->
-> --
-> 2.5.0
->
+This patchset
+
+1) Adds basic AMBA device probing support to ACPI, it uses a whitelist of
+device IDs as the number of AMBA devices is limited. Currently the only id
+present is of the GPIO device that is used in QEMU for arm64.
+
+2) Adds the plumbing into ACPI probe sequence.
+
+3) Factors out the code that finds the first physical node of an ACPI device.
+
+v5:
+- Introduce a new function acpi_get_first_physical_node() in a separate patch
+  (Andy Shevchenko)
+- Combine the patch "ACPI: amba bus probing support" with the one line patch
+  "ACPI: scan add in amba probing"
+- Drop patch "serial: amba-pl011: add ACPI support to AMBA probe" until maintainers
+  decide on the further directions (see [1, 2])
+- Don't initialize dev->dev.parent and set the device's name with amba_device_alloc()
+  (Russell King)
+- Fix minor bugs and style issues (Andy Shevchenko)
+
+[1] https://lkml.kernel.org/g/20160106100700.GA19062 at n2100.arm.linux.org.uk
+[2] https://lkml.kernel.org/g/20160106110350.GB3599 at xora-haswell.xora.org.uk
+
+v4:
+https://lkml.kernel.org/g/1450880383-29560-1-git-send-email-aleksey.makarov at linaro.org
+- A memory leak has been fixed (Vladimir Zapolskiy)
+- ACPI_COMPANION() -> has_acpi_companion() (Andy Shevchenko)
+- pr_err() -> dev_err() (Andy Shevchenko)
+- The call to amba_register_dummy_clk() has been moved to to acpi_amba_init()
+  (Vladimir Zapolskiy)
+- Return value has been fixed (Vladimir Zapolskiy)
+
+v3:
+https://lkml.kernel.org/g/1450716100-13688-1-git-send-email-aleksey.makarov at linaro.org
+- Compilation without CONFIG_ARM_AMBA has been fixed
+
+v2:
+https://lkml.kernel.org/g/1450709399-7246-1-git-send-email-aleksey.makarov at linaro.org
+- A new ACPI scan handler for AMBA devices has been implemented
+- The order of `if` branches in amba-pl011.c has been changed
+- A couple of `static`s have been added
+- The compilation of the acpi_amba.c unit has made conditional
+- A comment on SBSA UART has been added
+
+v1:
+https://lkml.kernel.org/g/1443609530-21524-1-git-send-email-graeme.gregory at linaro.org
+
+Aleksey Makarov (1):
+  ACPI: introduce a function to find the first physical device
+
+Graeme Gregory (1):
+  ACPI: amba bus probing support
+
+ drivers/acpi/Makefile        |   1 +
+ drivers/acpi/acpi_amba.c     | 122 +++++++++++++++++++++++++++++++++++++++++++
+ drivers/acpi/acpi_platform.c |  18 +------
+ drivers/acpi/bus.c           |  36 ++++++++-----
+ drivers/acpi/internal.h      |   6 +++
+ drivers/acpi/scan.c          |   1 +
+ 6 files changed, 156 insertions(+), 28 deletions(-)
+ create mode 100644 drivers/acpi/acpi_amba.c
+
+-- 
+2.7.0
