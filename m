@@ -1,24 +1,36 @@
-From: kernel@martin.sperl.org (Martin Sperl)
-Date: Mon, 11 Jan 2016 14:57:46 +0100
-Subject: [PATCH V2 1/2] dt/bindings: serial: bcm2835: add binding
- documentation for bcm2835-aux-uart
-In-Reply-To: <4288762.bCLxQBDvy4@wuerfel>
-References: <1452344854-2576-1-git-send-email-kernel@martin.sperl.org>
- <10159898.8xe3rmYdEi@wuerfel>
- <175E89CE-581C-48AB-B7FF-6E9A41B033D5@martin.sperl.org>
- <4288762.bCLxQBDvy4@wuerfel>
-Message-ID: <6035A0DD-AD61-48F7-B641-272BB23F3CD8@martin.sperl.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 11 Jan 2016 14:59:46 +0100
+Subject: [PATCH v2 0/6] generic relative extable support
+In-Reply-To: <1452007180-27411-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1452007180-27411-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu8WW7opaa2ck9kEP91BF=amBo=jejcjnKQB1DgLWvtK3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 5 January 2016 at 16:19, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> There are currently four architectures (x86, ia64, alpha and s390) whose
+> user-access exception tables are relative to the table entry address rather
+> than absolute. Each of these architectures has its own search_extable() and
+> sort_extable() implementation, which are not only mostly identical to each
+> other, but also deviate very little from the generic absolute implementations
+> in lib/extable.c that they override.
+>
+> So before making arm64 the fifth architecture that reimplements this, let's
+> refactor the existing code so that all of these architectures use common code
+> for searching and sorting the relative extables. Archs may set
+> ARCH_HAS_RELATIVE_EXTABLE to indicate that the table consists of a pair of
+> relative ints, and may define swap_ex_entry_fixup() if the fixup member needs
+> special treatment in the swapping step of the sorting routine (such as alpha).
+>
 
-> On 11.01.2016, at 13:21, Arnd Bergmann <arnd@arndb.de> wrote:
-> 
-> Please just add another patch to rename the existing uarts appropriately
-> first, then add this one on top with the correct name.
+[...]
 
-I can do that with the next incarnation of the patch.
+Now that I have collected acks for all the patches, I think this is
+good to go in.
 
-But would that not break dt-source files, that refer to uart0?
-Is this not considered an API change as well or does this only apply
-to the binary files?
+@Andrew: since this touches 5 different architectures, is this perhaps
+something that could go in via your tree after -rc1?
+(assuming that the s390 bugfix has been merged by then)
+
+Thanks,
+Ard.
