@@ -1,153 +1,111 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Mon, 11 Jan 2016 22:56:59 +0530
-Subject: [PATCH] arm64, pci,
- numa: Adding helper functions as required by pci
-In-Reply-To: <5693E26C.2010501@suse.com>
-References: <1450780730-13667-1-git-send-email-gkulkarni@caviumnetworks.com>
- <20160108180131.GB5354@localhost> <20160108180638.GF11228@arm.com>
- <CAFpQJXUaVS7tBqjQ4Dh201yrOWFxa3Bk2q-ZCFtK4mk-te=Q7w@mail.gmail.com>
- <20160109152422.GA30802@localhost>
- <CAFpQJXVBafgq864cNeOhccZAdr89EUfXdEdnW7jh1y66ModKAQ@mail.gmail.com>
- <5693E26C.2010501@suse.com>
-Message-ID: <CAFpQJXVVPMvj4AC9G7Gd71O_xFAKfxNkzWh1us4ENP77Do=ceA@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 11 Jan 2016 18:28:51 +0100
+Subject: [PATCH v3 06/21] arm64: pgtable: implement static
+ [pte|pmd|pud]_offset variants
+In-Reply-To: <20160111162449.GP6499@leverpostej>
+References: <1452518355-4606-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1452518355-4606-7-git-send-email-ard.biesheuvel@linaro.org>
+ <20160111162449.GP6499@leverpostej>
+Message-ID: <CAKv+Gu-T24A4nxP_+4fOSV+HOBM1fSAceOvQ2PtPgVosFBZriQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn, Will,
+On 11 January 2016 at 17:24, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Mon, Jan 11, 2016 at 02:18:59PM +0100, Ard Biesheuvel wrote:
+>> The page table accessors pte_offset(), pud_offset() and pmd_offset()
+>> rely on __va translations, so they can only be used after the linear
+>> mapping has been installed. For the early fixmap and kasan init routines,
+>> whose page tables are allocated statically in the kernel image, these
+>> functions will return bogus values. So implement pmd_offset_kimg() and
+>> pud_offset_kimg(), which can be used instead before any page tables have
+>> been allocated dynamically.
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>
+> This looks good to me. One possible suggsetion below, but either way:
+>
+> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+>
+>> ---
+>>  arch/arm64/include/asm/pgtable.h | 13 +++++++++++++
+>>  1 file changed, 13 insertions(+)
+>>
+>> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+>> index 6129f6755081..7b4e16068c9f 100644
+>> --- a/arch/arm64/include/asm/pgtable.h
+>> +++ b/arch/arm64/include/asm/pgtable.h
+>> @@ -449,6 +449,9 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
+>>
+>>  #define pmd_page(pmd)                pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
+>>
+>> +/* use ONLY for statically allocated translation tables */
+>> +#define pte_offset_kimg(dir,addr)    ((pte_t *)__phys_to_kimg(pte_offset_phys((dir), (addr))))
+>> +
+>
+> Given that we're probably only going to use this during one-off setup,
+> maybe it's worth something like:
+>
+> #define IN_KERNEL_IMAGE(p) ({                                           \
+>         unsigned long __p = (unsigned long)p;                           \
+>         KIMAGE_VADDR <= __p && __p < _end;                              \
+> })
+>
+> #define pte_offset_kimg(dir,addr) ({                                    \
+>         BUG_ON(!IN_KERNEL_IMAGE(dir));                                  \
+>         ((pte_t *)__phys_to_kimg(pte_offset_phys((dir), (addr))));      \
+> })
+>
+> That might be overkill, though, given all it does is turn one runtime
+> failure into another runtime failure.
+>
 
-On Mon, Jan 11, 2016 at 10:42 PM, Matthias Brugger <mbrugger@suse.com> wrote:
->
->
-> On 09/01/16 16:35, Ganapatrao Kulkarni wrote:
->>
->> Hi Bjorn,
->>
->> On Sat, Jan 9, 2016 at 8:54 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
->>>
->>> On Sat, Jan 09, 2016 at 11:35:17AM +0530, Ganapatrao Kulkarni wrote:
->>>>
->>>> On Fri, Jan 8, 2016 at 11:36 PM, Will Deacon <will.deacon@arm.com>
->>>> wrote:
->>>>>
->>>>> On Fri, Jan 08, 2016 at 12:01:31PM -0600, Bjorn Helgaas wrote:
->>>>>>
->>>>>> On Tue, Dec 22, 2015 at 04:08:50PM +0530, Ganapatrao Kulkarni wrote:
->>>>>>>
->>>>>>> Adding helper functions and necessary code to make
->>>>>>> pci driver(pci-host-generic) numa aware.
->>>>>>>
->>>>>>> This patch is on top of arm64-numa v7.
->>>>>>> http://www.spinics.net/lists/arm-kernel/msg460813.html
->>>>>>>
->>>>>>> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
->>>>>>> ---
->>>>>>>   arch/arm64/include/asm/numa.h       | 8 +++++---
->>>>>>>   arch/arm64/kernel/pci.c             | 8 ++++++++
->>>>>>>   drivers/pci/host/pci-host-generic.c | 1 +
->
->
-> set_dev_node() in pci-host-generic.c is missing in v8 of your numa patches.
-> Was this forgotten?
-i am not sure on adding numa required change(it is one line add) to
-pci-host-generic.c in numa patchset itself.
-Is it more appropriate to send as separate patch?
-please suggest.
+Yes. I did consider implementing them out of line, with __init
+annotations so you at least get complaints if you refer to them from
+non-init code, but I don't see how we would ever need these anywhere
+beyond fixmap and kasan anyway
 
-
-Thanks Matthias for your comment.
 >
-> Regards,
-> Matthias
->
->>>>>>>   3 files changed, 14 insertions(+), 3 deletions(-)
->>>>>>>
->>>>>>> diff --git a/arch/arm64/include/asm/numa.h
->>>>>>> b/arch/arm64/include/asm/numa.h
->>>>>>> index b8c2a3f..1eca4db 100644
->>>>>>> --- a/arch/arm64/include/asm/numa.h
->>>>>>> +++ b/arch/arm64/include/asm/numa.h
->>>>>>> @@ -15,9 +15,11 @@
->>>>>>>   extern int __node_distance(int from, int to);
->>>>>>>   #define node_distance(a, b) __node_distance(a, b)
->>>>>>>
->>>>>>> -/* dummy definitions for pci functions */
->>>>>>> -#define pcibus_to_node(node)       0
->>>>>>> -#define cpumask_of_pcibus(bus)     0
->>>>>>> +struct pci_bus;
->>>>>>> +extern int pcibus_to_node(struct pci_bus *bus);
->>>>>>> +#define cpumask_of_pcibus(bus)     (pcibus_to_node(bus) == -1 ?
->>>>>>> \
->>>>>>> +                            cpu_all_mask :                         \
->>>>>>> +                            cpumask_of_node(pcibus_to_node(bus)))
->>>>>>
->>>>>>
->>>>>> All the arch definitions of cpumask_of_pcibus() are pretty similar;
->>>>>> could they be made more generic?  At the very least, can you drop the
->>>>>> definition here and use the one in include/asm-generic/topology.h,
->>>>>> which is identical to what you're defining here?
->>>>
->>>> macro cpumask_of_pcibus is defined under #ifndef CONFIG_NUMA in
->>>> include/asm-generic/topology.h
->>>> and this macro is defined again for NUMA in respective arch header
->>>> files.
->>>> i think moving this macro from ifndef will allow us to use without
->>>> redefinition.
->>>>
->>>> --- a/include/asm-generic/topology.h
->>>> +++ b/include/asm-generic/topology.h
->>>> @@ -54,14 +54,14 @@
->>>>   #define pcibus_to_node(bus)    ((void)(bus), -1)
->>>>   #endif
->>>>
->>>> +#endif /* CONFIG_NUMA */
->>>> +
->>>>   #ifndef cpumask_of_pcibus
->>>>   #define cpumask_of_pcibus(bus) (pcibus_to_node(bus) == -1 ?
->>>> \
->>>>                                   cpu_all_mask :
->>>> \
->>>>                                   cpumask_of_node(pcibus_to_node(bus)))
->>>>   #endif
->>>>
->>>> -#endif /* CONFIG_NUMA */
->>>> -
->>>>   #if !defined(CONFIG_NUMA) || !defined(CONFIG_HAVE_MEMORYLESS_NODES)
->>>>
->>>>   #ifndef set_numa_mem
->>>>
->>>> i have got below compilation error withour macro defined in arch code.
->>>>
->>>> drivers/pci/pci-sysfs.c: In function ?cpuaffinity_show?:
->>>> drivers/pci/pci-sysfs.c:114:15: error: implicit declaration of
->>>> function ?cpumask_of_pcibus? [-Werror=implicit-function-declaration]
->>>> drivers/pci/pci-sysfs.c:114:34: warning: initialization makes pointer
->>>> from integer without a cast [enabled by default]
->>>> drivers/pci/pci-sysfs.c: In function ?cpulistaffinity_show?:
->>>> drivers/pci/pci-sysfs.c:123:34: warning: initialization makes pointer
->>>> from integer without a cast [enabled by default]
->>>> cc1: some warnings being treated as errors
->>>>
->>>>
->>>> i can send this as separate patch( as a  fix patch).
->>>
->>>
->>> Unless your series has already been merged, I don't like the idea of a
->>> separate fix patch.  The whole point of reviews is to try to fix as
->>> many things as we can *before* merging.
+>>  /*
+>>   * Conversion functions: convert a page and protection to a page entry,
+>>   * and a page entry and page directory to the page they refer to.
+>> @@ -492,6 +495,9 @@ static inline phys_addr_t pud_page_paddr(pud_t pud)
 >>
->> thanks for the review.
->> sure, i will add  this as part of my numa patch series.
->>>
->>>
->>> Bjorn
+>>  #define pud_page(pud)                pfn_to_page(__phys_to_pfn(pud_val(pud) & PHYS_MASK))
 >>
+>> +/* use ONLY for statically allocated translation tables */
+>> +#define pmd_offset_kimg(dir,addr)    ((pmd_t *)__phys_to_kimg(pmd_offset_phys((dir), (addr))))
+>> +
+>>  #else
 >>
->> thanks
->> Ganapat
+>>  #define pud_page_paddr(pud)  ({ BUILD_BUG(); 0; })
+>> @@ -502,6 +508,8 @@ static inline phys_addr_t pud_page_paddr(pud_t pud)
+>>  #define pmd_set_fixmap_offset(pudp, addr)    ((pmd_t *)pudp)
+>>  #define pmd_clear_fixmap()
 >>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> +#define pmd_offset_kimg(dir,addr)    ((pmd_t *)dir)
+>> +
+>>  #endif       /* CONFIG_PGTABLE_LEVELS > 2 */
 >>
->
+>>  #if CONFIG_PGTABLE_LEVELS > 3
+>> @@ -540,6 +548,9 @@ static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
+>>
+>>  #define pgd_page(pgd)                pfn_to_page(__phys_to_pfn(pgd_val(pgd) & PHYS_MASK))
+>>
+>> +/* use ONLY for statically allocated translation tables */
+>> +#define pud_offset_kimg(dir,addr)    ((pud_t *)__phys_to_kimg(pud_offset_phys((dir), (addr))))
+>> +
+>>  #else
+>>
+>>  #define pgd_page_paddr(pgd)  ({ BUILD_BUG(); 0;})
+>> @@ -550,6 +561,8 @@ static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
+>>  #define pud_set_fixmap_offset(pgdp, addr)    ((pud_t *)pgdp)
+>>  #define pud_clear_fixmap()
+>>
+>> +#define pud_offset_kimg(dir,addr)    ((pud_t *)dir)
+>> +
+>>  #endif  /* CONFIG_PGTABLE_LEVELS > 3 */
+>>
+>>  #define pgd_ERROR(pgd)               __pgd_error(__FILE__, __LINE__, pgd_val(pgd))
+>> --
+>> 2.5.0
+>>
