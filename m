@@ -1,57 +1,55 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 11 Jan 2016 13:21:44 +0000
-Subject: [PATCH 0/4] nvmem: new drivers for v4.5
-In-Reply-To: <1449485763-391-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1449485763-391-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <5693AC68.6040802@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 11 Jan 2016 14:26:28 +0100
+Subject: [PATCH v3 14/21] arm64: [re]define SWAPPER_TABLE_[SHIFT|SIZE] for
+ use in asm code
+In-Reply-To: <1452518355-4606-16-git-send-email-ard.biesheuvel@linaro.org>
+References: <1452518355-4606-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1452518355-4606-16-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu-dcH-2jpTQSgqq9NHuvVbwzB=gni-5Le6aNFyP7Pw2bg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Please disregard this patch, I accidentally sent out two versions of
+14/21, and this is the wrong one.
 
 
-On 07/12/15 10:56, Srinivas Kandagatla wrote:
-> Hi Greg,
+On 11 January 2016 at 14:19, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> The current definition of SWAPPER_TABLE_SHIFT can only be used in
+> asm code if the configured number of translation levels defines
+> PUD_SHIFT and/or PMD_SHIFT natively (4KB and 16KB/64KB granule,
+> respectively). Otherwise, it depends on the nopmd/nopud fixup
+> headers, which can only be included in C code.
 >
-> Here are 2 new nvmem drivers which are in the mailing list for long time
-> and are good to go for some testing and find its way to v4.5-rc*.
+> So redefine SWAPPER_TABLE_SHIFT in a way that is independent of the
+> number of configured translation levels. Define SWAPPER_TABLE_SIZE
+> as well, we will need it later.
 >
-> Could you please take these patches via char-misc tree.
-Hi Greg,
-
-I have not seen these patches or https://lkml.org/lkml/2015/12/14/169 
-appear in your char-misc tree/linux-next.
-
-Just wanted to know whats your plan on these patches?
-
-All these drivers are reviewed/tested and other parts of these driver 
-like Device tree are already making way to v4.5-rc1.
-
-Please let me know if you want me to resend them, in case you missed them.
-
-thanks,
-srini
-
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/include/asm/kernel-pgtable.h | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
 >
-> Thanks,
-> srini
+> diff --git a/arch/arm64/include/asm/kernel-pgtable.h b/arch/arm64/include/asm/kernel-pgtable.h
+> index daa8a7b9917a..eaac46097359 100644
+> --- a/arch/arm64/include/asm/kernel-pgtable.h
+> +++ b/arch/arm64/include/asm/kernel-pgtable.h
+> @@ -57,13 +57,14 @@
+>  #if ARM64_SWAPPER_USES_SECTION_MAPS
+>  #define SWAPPER_BLOCK_SHIFT    SECTION_SHIFT
+>  #define SWAPPER_BLOCK_SIZE     SECTION_SIZE
+> -#define SWAPPER_TABLE_SHIFT    PUD_SHIFT
+>  #else
+>  #define SWAPPER_BLOCK_SHIFT    PAGE_SHIFT
+>  #define SWAPPER_BLOCK_SIZE     PAGE_SIZE
+> -#define SWAPPER_TABLE_SHIFT    PMD_SHIFT
+>  #endif
 >
-> Andrew-CT Chen (2):
->    dt-bindings: add document of mediatek efuse driver
->    nvmem: mediatek: Add Mediatek EFUSE driver
+> +#define SWAPPER_TABLE_SHIFT    (SWAPPER_BLOCK_SHIFT + PAGE_SHIFT - 3)
+> +#define SWAPPER_TABLE_SIZE     (1 << SWAPPER_TABLE_SHIFT)
+> +
+>  /* The size of the initial kernel direct mapping */
+>  #define SWAPPER_INIT_MAP_SIZE  (_AC(1, UL) << SWAPPER_TABLE_SHIFT)
 >
-> Ariel D'Alessandro (2):
->    DT: nvmem: Add NXP LPC18xx EEPROM memory binding documentation
->    nvmem: NXP LPC18xx EEPROM memory NVMEM driver
->
->   .../devicetree/bindings/nvmem/lpc1857-eeprom.txt   |  28 ++
->   .../devicetree/bindings/nvmem/mtk-efuse.txt        |  36 +++
->   drivers/nvmem/Kconfig                              |  20 ++
->   drivers/nvmem/Makefile                             |   4 +
->   drivers/nvmem/lpc18xx_eeprom.c                     | 330 +++++++++++++++++++++
->   drivers/nvmem/mtk-efuse.c                          |  89 ++++++
->   6 files changed, 507 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/nvmem/lpc1857-eeprom.txt
->   create mode 100644 Documentation/devicetree/bindings/nvmem/mtk-efuse.txt
->   create mode 100644 drivers/nvmem/lpc18xx_eeprom.c
->   create mode 100644 drivers/nvmem/mtk-efuse.c
+> --
+> 2.5.0
 >
