@@ -1,79 +1,123 @@
 From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Mon, 11 Jan 2016 19:26:25 +0600
-Subject: [PATCH v5 0/2] ACPI: amba bus probing support
-Message-ID: <1452518790-27053-1-git-send-email-aleksey.makarov@linaro.org>
+Date: Mon, 11 Jan 2016 19:26:26 +0600
+Subject: [PATCH v5 1/2] ACPI: introduce a function to find the first physical
+ device
+In-Reply-To: <1452518790-27053-1-git-send-email-aleksey.makarov@linaro.org>
+References: <1452518790-27053-1-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <1452518790-27053-2-git-send-email-aleksey.makarov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As discussed when Shannon Zhao sent a patch to add platform_device support
-to pl061 driver. Russel and other maintainers prefered that ACPI learned
-how to create AMBA devices rather than converting/adding platform_device
-support to AMBA drivers.
+Factor out the code that finds the first physical device
+of a given ACPI device.  It is used in several places.
 
-http://comments.gmane.org/gmane.linux.ports.arm.kernel/431364
+Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+---
+ drivers/acpi/acpi_platform.c | 18 ++----------------
+ drivers/acpi/bus.c           | 36 ++++++++++++++++++++++++------------
+ drivers/acpi/internal.h      |  1 +
+ 3 files changed, 27 insertions(+), 28 deletions(-)
 
-This patchset
-
-1) Adds basic AMBA device probing support to ACPI, it uses a whitelist of
-device IDs as the number of AMBA devices is limited. Currently the only id
-present is of the GPIO device that is used in QEMU for arm64.
-
-2) Adds the plumbing into ACPI probe sequence.
-
-3) Factors out the code that finds the first physical node of an ACPI device.
-
-v5:
-- Introduce a new function acpi_get_first_physical_node() in a separate patch
-  (Andy Shevchenko)
-- Combine the patch "ACPI: amba bus probing support" with the one line patch
-  "ACPI: scan add in amba probing"
-- Drop patch "serial: amba-pl011: add ACPI support to AMBA probe" until maintainers
-  decide on the further directions (see [1, 2])
-- Don't initialize dev->dev.parent and set the device's name with amba_device_alloc()
-  (Russell King)
-- Fix minor bugs and style issues (Andy Shevchenko)
-
-[1] https://lkml.kernel.org/g/20160106100700.GA19062 at n2100.arm.linux.org.uk
-[2] https://lkml.kernel.org/g/20160106110350.GB3599 at xora-haswell.xora.org.uk
-
-v4:
-https://lkml.kernel.org/g/1450880383-29560-1-git-send-email-aleksey.makarov at linaro.org
-- A memory leak has been fixed (Vladimir Zapolskiy)
-- ACPI_COMPANION() -> has_acpi_companion() (Andy Shevchenko)
-- pr_err() -> dev_err() (Andy Shevchenko)
-- The call to amba_register_dummy_clk() has been moved to to acpi_amba_init()
-  (Vladimir Zapolskiy)
-- Return value has been fixed (Vladimir Zapolskiy)
-
-v3:
-https://lkml.kernel.org/g/1450716100-13688-1-git-send-email-aleksey.makarov at linaro.org
-- Compilation without CONFIG_ARM_AMBA has been fixed
-
-v2:
-https://lkml.kernel.org/g/1450709399-7246-1-git-send-email-aleksey.makarov at linaro.org
-- A new ACPI scan handler for AMBA devices has been implemented
-- The order of `if` branches in amba-pl011.c has been changed
-- A couple of `static`s have been added
-- The compilation of the acpi_amba.c unit has made conditional
-- A comment on SBSA UART has been added
-
-v1:
-https://lkml.kernel.org/g/1443609530-21524-1-git-send-email-graeme.gregory at linaro.org
-
-Aleksey Makarov (1):
-  ACPI: introduce a function to find the first physical device
-
-Graeme Gregory (1):
-  ACPI: amba bus probing support
-
- drivers/acpi/Makefile        |   1 +
- drivers/acpi/acpi_amba.c     | 122 +++++++++++++++++++++++++++++++++++++++++++
- drivers/acpi/acpi_platform.c |  18 +------
- drivers/acpi/bus.c           |  36 ++++++++-----
- drivers/acpi/internal.h      |   6 +++
- drivers/acpi/scan.c          |   1 +
- 6 files changed, 156 insertions(+), 28 deletions(-)
- create mode 100644 drivers/acpi/acpi_amba.c
-
+diff --git a/drivers/acpi/acpi_platform.c b/drivers/acpi/acpi_platform.c
+index 296b7a1..c99aed0 100644
+--- a/drivers/acpi/acpi_platform.c
++++ b/drivers/acpi/acpi_platform.c
+@@ -43,7 +43,6 @@ static const struct acpi_device_id forbidden_id_list[] = {
+ struct platform_device *acpi_create_platform_device(struct acpi_device *adev)
+ {
+ 	struct platform_device *pdev = NULL;
+-	struct acpi_device *acpi_parent;
+ 	struct platform_device_info pdevinfo;
+ 	struct resource_entry *rentry;
+ 	struct list_head resource_list;
+@@ -83,21 +82,8 @@ struct platform_device *acpi_create_platform_device(struct acpi_device *adev)
+ 	 * platform device we are about to create.
+ 	 */
+ 	pdevinfo.parent = NULL;
+-	acpi_parent = adev->parent;
+-	if (acpi_parent) {
+-		struct acpi_device_physical_node *entry;
+-		struct list_head *list;
+-
+-		mutex_lock(&acpi_parent->physical_node_lock);
+-		list = &acpi_parent->physical_node_list;
+-		if (!list_empty(list)) {
+-			entry = list_first_entry(list,
+-					struct acpi_device_physical_node,
+-					node);
+-			pdevinfo.parent = entry->dev;
+-		}
+-		mutex_unlock(&acpi_parent->physical_node_lock);
+-	}
++	if (adev->parent)
++		pdevinfo.parent = acpi_get_first_physical_node(adev->parent);
+ 	pdevinfo.name = dev_name(&adev->dev);
+ 	pdevinfo.id = -1;
+ 	pdevinfo.res = resources;
+diff --git a/drivers/acpi/bus.c b/drivers/acpi/bus.c
+index a212cef..2048c69 100644
+--- a/drivers/acpi/bus.c
++++ b/drivers/acpi/bus.c
+@@ -478,24 +478,36 @@ static void acpi_device_remove_notify_handler(struct acpi_device *device)
+                              Device Matching
+    -------------------------------------------------------------------------- */
+ 
+-static struct acpi_device *acpi_primary_dev_companion(struct acpi_device *adev,
+-						      const struct device *dev)
++/**
++ * acpi_device_fix_parent - Get first physical node of an ACPI device
++ * @adev: ACPI device in question
++ */
++struct device *acpi_get_first_physical_node(
++	struct acpi_device *adev)
+ {
+ 	struct mutex *physical_node_lock = &adev->physical_node_lock;
++	struct device *ret = NULL;
+ 
+ 	mutex_lock(physical_node_lock);
+-	if (list_empty(&adev->physical_node_list)) {
+-		adev = NULL;
+-	} else {
+-		const struct acpi_device_physical_node *node;
+ 
+-		node = list_first_entry(&adev->physical_node_list,
+-					struct acpi_device_physical_node, node);
+-		if (node->dev != dev)
+-			adev = NULL;
+-	}
++	if (!list_empty(&adev->physical_node_list))
++		ret = list_first_entry(&adev->physical_node_list,
++				struct acpi_device_physical_node, node)->dev;
++
+ 	mutex_unlock(physical_node_lock);
+-	return adev;
++
++	return ret;
++}
++
++static struct acpi_device *acpi_primary_dev_companion(struct acpi_device *adev,
++						      const struct device *dev)
++{
++	const struct device *pdev = acpi_get_first_physical_node(adev);
++
++	if (pdev && pdev == dev)
++		return adev;
++
++	return NULL;
+ }
+ 
+ /**
+diff --git a/drivers/acpi/internal.h b/drivers/acpi/internal.h
+index 11d87bf..ee9312ba 100644
+--- a/drivers/acpi/internal.h
++++ b/drivers/acpi/internal.h
+@@ -98,6 +98,7 @@ bool acpi_device_is_present(struct acpi_device *adev);
+ bool acpi_device_is_battery(struct acpi_device *adev);
+ bool acpi_device_is_first_physical_node(struct acpi_device *adev,
+ 					const struct device *dev);
++struct device *acpi_get_first_physical_node(struct acpi_device *adev);
+ 
+ /* --------------------------------------------------------------------------
+                      Device Matching and Notification
 -- 
 2.7.0
