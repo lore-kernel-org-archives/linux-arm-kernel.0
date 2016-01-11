@@ -1,69 +1,37 @@
-From: liviu.dudau@arm.com (Liviu Dudau)
-Date: Mon, 11 Jan 2016 12:26:44 +0000
-Subject: [PATCH 4/3] drm: arm-hdlcd: add explictit DRM dependency
-In-Reply-To: <10589993.Lxk3kTHnpj@wuerfel>
-References: <4194408.X82ccDjh5X@wuerfel> <4350671.DP0mBIml5S@wuerfel>
- <20160111111255.GE13633@e106497-lin.cambridge.arm.com>
- <10589993.Lxk3kTHnpj@wuerfel>
-Message-ID: <20160111122644.GH13633@e106497-lin.cambridge.arm.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Mon, 11 Jan 2016 18:16:38 +0530
+Subject: [PATCH] kexec: Add --lite option
+In-Reply-To: <20151209092839.GN16406@dhcppc13.redhat.com>
+References: <20151022031718.GB11227@dhcp-129-115.nay.redhat.com>
+ <20151022125012.GB20847@redhat.com>
+ <1445540891.30908.144.camel@infradead.org>
+ <1446703011.12676.83.camel@freescale.com>
+ <20151207114547.GE16406@dhcppc13.redhat.com>
+ <20151207114839.GF16406@dhcppc13.redhat.com>
+ <56658696.6070103@arm.com>
+ <20151207140755.GG16406@dhcppc13.redhat.com>
+ <5666FE91.5010302@arm.com>
+ <20151209092839.GN16406@dhcppc13.redhat.com>
+Message-ID: <20160111124638.GD21206@dhcppc13.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2016 at 01:18:55PM +0100, Arnd Bergmann wrote:
-> On Monday 11 January 2016 11:12:56 Liviu Dudau wrote:
-> > On Mon, Jan 04, 2016 at 09:39:46AM +0100, Arnd Bergmann wrote:
-> > > On Monday 04 January 2016 09:24:16 Thierry Reding wrote:
-> > > > 
-> > > > Ugh... wouldn't it be much simpler to get rid of DRM_ARM? It seems like
-> > > > a completely superfluous option to me. I don't think we've ever had the
-> > > > equivalent of "vendor" Kconfig options in DRM, and I don't see why we'd
-> > > > need to start now. If ARM was going to add another driver it can simply
-> > > > have a separate Kconfig entry. There should be no need to select the
-> > > > vendor option first.
-> > > 
-> > > Fine with me too. I vaguely remembered having seen some discussion about
-> > > this, so I decided to do a minimal fix, but I agree that would be more
-> > > in line with the other drivers.
-> > > 
-> > >       Arnd
-> > > 
-> > 
-> > Arnd,
-> > 
-> > I'm OK with the whole series of Kconfig clean-up/fixes and I offer my appologies
-> > for adding noise with my patchset. Please let me know how do you prefer to handle
-> > them. I'm OK with merging your changes into my series before sending the pull
-> > request to David Airlie.
-> 
-> Please merge them into your tree if you have some other changes to send to him.
-> 
-> I just realized that these are in your own git tree at the moment, not
-> in drm-next. I guess that means you will rebase the whole series after -rc1 and
-> submit it into linux-4.6, right?
++Fu
 
-Yes, that is the plan.
+Hi James,
 
-> 
-> If so, just fold my fixes into your patches when you rebase.
+> On 08/12/2015:04:00:17 PM, James Morse wrote:
+> > Hi Pratyush,
 
-OK, will do. Repeating the question on another thread: are you OK with me carrying
-the Juno .dts changes through drm-next for HDLCD and you picking up Robin Murphy's
-patch? AFAIK those are the only changes at the moment until Sudeep re-submits the
-Juno r2 dts changes.
+> > I haven't managed to get your kexec-tools branch to work with v10 of
 
-Best regards,
-Liviu
+Thanks for all your feedback. It helped to stabilize the code better. I took
+all your suggestions and also did few other modifications [1]. Now, purgatory
+does SHA verifications on mustang and seattle within a second. I think this
+would be helpful in handling few of the kdump issues with watchdog. May be you
+can give a try to the code in branch purgatory-enable-dcache of my tree. Any
+feedback would be welcome.
 
-> 
-> 	Arnd
-> 
+~Pratyush
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+[1] https://github.com/pratyushanand/kexec-tools/commit/5679d4baaa5e644f8302982c6f468214ed3d3f3d
