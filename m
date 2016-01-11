@@ -1,47 +1,77 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Mon, 11 Jan 2016 17:21:59 +0100
-Subject: [PATCH v8 20/20] KVM: ARM64: Add a new kvm ARM PMU device
-In-Reply-To: <20160111160927.GF3924@hawk.localdomain>
-References: <1450771695-11948-21-git-send-email-zhaoshenglong@huawei.com>
- <CAFEAcA_MDiOphseZ7RGNE3G=4ZDF5SFV5krOjanPbVuhgg9gnQ@mail.gmail.com>
- <568E7AF1.9040103@huawei.com>
- <CAFEAcA-Qcda7TSFLSeykLHqZYdP6tYdEjPe2uHN6f_+omqWFZg@mail.gmail.com>
- <20160107203647.GJ6199@hawk.localdomain>
- <20160109122956.GA30867@cbox> <20160109150339.10576e81@arm.com>
- <20160111140717.GD3924@hawk.localdomain>
- <20160111150929.GB15554@cbox>
- <20160111160927.GF3924@hawk.localdomain>
-Message-ID: <20160111162159.GG3924@hawk.localdomain>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 11 Jan 2016 17:24:28 +0100
+Subject: [PATCH 1/2] ARM: mvebu: adjust board name and compatible for
+ Armada 388 GP
+In-Reply-To: <87r3ifrbgg.fsf@free-electrons.com> (Gregory CLEMENT's message of
+ "Mon, 21 Dec 2015 17:52:15 +0100")
+References: <1450708916-15966-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1450708916-15966-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <87r3ifrbgg.fsf@free-electrons.com>
+Message-ID: <87h9ikythf.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2016 at 05:09:27PM +0100, Andrew Jones wrote:
-> On Mon, Jan 11, 2016 at 04:09:29PM +0100, Christoffer Dall wrote:
-> > Are vcpu ids already exposed to userspace (beyond the stupid
-> > KVM_IRQ_LINE) ioctl and as such we're bound to whatever upper limit and
-> > format they have?
-> 
-> The only other place I found is KVM_CREATE_VCPU. I suppose we could move
-> to MPIDR for that, and it would be a nice way to handle the "userspace
-> determines MPIDR" work that I plan to do. Both KVM and its userspaces
-> would still use some counter-based vcpu identifiers internally, to avoid
-> large, sparse structures, but I guess the advantage is that they don't
-> have to agree on how they do that. The 'vcpu id' used by KVM_CREATE_VCPU
-> is already 32-bits, and is supposed to be an arbitrary identifier. That
-> all looks good for converting to MPIDR.
+Hi,
+ 
+ On lun., d?c. 21 2015, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+
+> Hi Thomas,
+>  
+>  On lun., d?c. 21 2015, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 >
+>> As the name of the Device Tree file name suggests, the Armada 388 GP
+>> really contains an Armada 388 SoC, so this commit updates the board
+>> name and compatible string in the Device Tree file.
+>>
+>> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>
+> Applied on mvebu/dt
 
-Correction. I understand that vcpu-id is "supposed" to be an arbitrary
-identifier now, but it doesn't appear that all the assumptions that it's
-a counter are gone yet... virt/kvm/kvm_main.c has
+I didn't managed to do a pull request before the holidays period so I
+moved this commit to mvebu/dt-for-4.6
 
-static int kvm_vm_ioctl_create_vcpu(struct kvm *kvm, u32 id)
-...
-        if (id >= KVM_MAX_VCPUS)
-                return -EINVAL;
+Gregory
 
+>
+> Thanks,
+>
+> Gregory
+>> ---
+>>  arch/arm/boot/dts/armada-388-gp.dts | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
+>> index a633be3..d8dab0f 100644
+>> --- a/arch/arm/boot/dts/armada-388-gp.dts
+>> +++ b/arch/arm/boot/dts/armada-388-gp.dts
+>> @@ -44,8 +44,8 @@
+>>  #include <dt-bindings/gpio/gpio.h>
+>>  
+>>  / {
+>> -	model = "Marvell Armada 385 GP";
+>> -	compatible = "marvell,a385-gp", "marvell,armada388", "marvell,armada380";
+>> +	model = "Marvell Armada 388 DB-88F6820-GP";
+>> +	compatible = "marvell,a388-gp", "marvell,armada388", "marvell,armada380";
+>>  
+>>  	chosen {
+>>  		stdout-path = "serial0:115200n8";
+>> -- 
+>> 2.6.4
+>>
+>
+> -- 
+> Gregory Clement, Free Electrons
+> Kernel, drivers, real-time and embedded Linux
+> development, consulting, training and support.
+> http://free-electrons.com
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-
-More to do there I guess...
-
-drew 
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
