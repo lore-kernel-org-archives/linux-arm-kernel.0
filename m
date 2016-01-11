@@ -1,90 +1,145 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 11 Jan 2016 15:39:49 +0000
-Subject: [PATCH V2 00/23] MMCONFIG refactoring and support for ARM64 PCI
- hostbridge init based on ACPI
-In-Reply-To: <b3750d7918712f6035ea875d90c25471.squirrel@www.codeaurora.org>
-References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
- <20151221121050.GB11145@red-moon> <5677F3C8.8040200@semihalf.com>
- <201512211515.55447.arnd@arndb.de>
- <b3750d7918712f6035ea875d90c25471.squirrel@www.codeaurora.org>
-Message-ID: <20160111153949.GA2366@red-moon>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Mon, 11 Jan 2016 23:40:27 +0800
+Subject: [PATCH 1/4] arm64: dts: Reserve memory regions for hi6220
+In-Reply-To: <20151106011937.GA5960@leoy-linaro>
+References: <1444365376-10728-2-git-send-email-leo.yan@linaro.org>
+ <CAL_JsqJapPM6CpaG+AYDAUQajZ4V5jREdCwA5F4vkD5jqC3bzg@mail.gmail.com>
+ <20151009133028.GB21629@leverpostej>
+ <CAL_Jsq+TrsS39L4nsRgqszTxKHyc00fLUf+BmftHnn=EV0PxhA@mail.gmail.com>
+ <20151009142034.GB528@leoy-linaro>
+ <CAL_JsqLhu03B_ADYvCYdduH2d38kajOyc=9eX_FHy4QYYhZGxQ@mail.gmail.com>
+ <20151029083301.GB16063@leoy-linaro>
+ <20151105135449.GD27192@leoy-linaro>
+ <20151105161315.GE32247@leverpostej>
+ <20151106011937.GA5960@leoy-linaro>
+Message-ID: <20160111154027.GC30974@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 21, 2015 at 03:26:14PM +0000, Okaya at codeaurora.org wrote:
-> > On Monday 21 December 2015, Tomasz Nowicki wrote:
-> >> On 21.12.2015 13:10, Lorenzo Pieralisi wrote:
-> >> > On Fri, Dec 18, 2015 at 06:56:39PM +0000, okaya at codeaurora.org wrote:
-> >
-> >> >> I have multiple root ports with the same IO port configuration in the
-> >> >> current ACPI table.
-> >> >>
-> >> >> Root port 0 = IO range 0x1000-0x10FFF
-> >> >> Root port 1 = IO range 0x1000-0x10FFF
-> >> >> Root port 2 = IO range 0x1000-0x10FFF
-> >> >
-> >> > It is fine. You end up mapping for each of those a 4k window of the
-> >> > virtual address space allocated to IO and that's what you will have in
-> >> > the kernel PCI resources (not in the HW BARs though). If that was a
-> >> problem
-> >> > it would be even for the current DT host controllers eg:
-> >> >
-> >> > arch/arm64/boot/dts/apm/apm-storm.dtsi
-> >> >
-> >> > it should not be (again I will let Arnd comment on this since he may
-> >> be
-> >> > aware of issues encountered on other arches/platforms).
-> >> >
-> >>
-> >> Root port 0 = IO range 0x1000-0x10FFF
-> >> Root port 1 = IO range 0x1000-0x10FFF
-> >> Root port 2 = IO range 0x1000-0x10FFF
-> >>
-> >> If above ranges are mapped into different CPU windows, then yes, it is
-> >> fine.
-> >
-> > Ideally, they should all be the same CPU address so we only have to map
-> > the window
-> > once, each device gets an address below 64K, and you can have legacy port
-> > numbers
-> > (below 4K) on any bus, which is required to make certain GPUs work.
-> >
-> > I haven't actually seen anyone do that on ARM though, every implementation
-> > so
-> > far has a separate mapping per host bridge, and we can cope with that too,
-> > and we can live with either overlapping bus addresses or unique bus
-> > addresses,
-> > any of them can be expressed by the PCI core in Linux, we just have to
-> > make sure
-> > that we correctly translate the firmware tables into our internal
-> > structures.
-> >
-> > 	Arnd
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> >
-> 
-> Thanks, I won't be touching the acpi tables then and I will assume the
-> hack had a problem. It was trying to remap the io range of the second root
-> port  to the first port io address map.
-> 
-> I was getting a warning from resource.c
-> 
-> Btw, when I tested the io ranges before, kernel didn't accept anything
-> below 1k like 0. That is why my range starts at 1k.
+On Fri, Nov 06, 2015 at 09:19:37AM +0800, Leo Yan wrote:
+> On Thu, Nov 05, 2015 at 04:13:15PM +0000, Mark Rutland wrote:
+> > On Thu, Nov 05, 2015 at 09:54:50PM +0800, Leo Yan wrote:
+> > > On Thu, Oct 29, 2015 at 04:33:01PM +0800, Leo Yan wrote:
+> > > > On Wed, Oct 28, 2015 at 11:32:29PM -0500, Rob Herring wrote:
+> > > > > On Fri, Oct 9, 2015 at 9:20 AM, Leo Yan <leo.yan@linaro.org> wrote:
+> > > > > > On Fri, Oct 09, 2015 at 08:50:13AM -0500, Rob Herring wrote:
+> > > > > >> On Fri, Oct 9, 2015 at 8:30 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > > > > >> > On Fri, Oct 09, 2015 at 08:17:16AM -0500, Rob Herring wrote:
+> > > > > >> >> On Thu, Oct 8, 2015 at 11:36 PM, Leo Yan <leo.yan@linaro.org> wrote:
+> > > > > >> >> > On Hi6220, below memory regions in DDR have specific purpose:
+> > > > > >> >> >
+> > > > > >> >> >   0x05e0,0000 - 0x05ef,ffff: For MCU firmware using at runtime;
+> > > > > >> >> >   0x06df,f000 - 0x06df,ffff: For mailbox message data;
+> > > > > >> >> >   0x0740,f000 - 0x0740,ffff: For MCU firmware's section;
+> > > > > >> >> >   0x3e00,0000 - 0x3fff,ffff: For OP-TEE.
+> > > > > >> >> >
+> > > > > >> >> > This patch reserves these memory regions in DT.
+> > > > > >> >> >
+> > > > > >> >> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> > > > > >> >> > ---
+> > > > > >> >> >  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 16 ++++++++++++----
+> > > > > >> >> >  1 file changed, 12 insertions(+), 4 deletions(-)
+> > > > > >> >> >
+> > > > > >> >> > diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> > > > > >> >> > index e36a539..e3f4cb3 100644
+> > > > > >> >> > --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> > > > > >> >> > +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> > > > > >> >> > @@ -7,9 +7,6 @@
+> > > > > >> >> >
+> > > > > >> >> >  /dts-v1/;
+> > > > > >> >> >
+> > > > > >> >> > -/*Reserved 1MB memory for MCU*/
+> > > > > >> >> > -/memreserve/ 0x05e00000 0x00100000;
+> > > > > >> >> > -
+> > > > > >> >>
+> > > > > >> >> Why does memreserve not work for you? You can have multiple entries.
+> > > > > >> >>
+> > > > > >> >> >  #include "hi6220.dtsi"
+> > > > > >> >> >
+> > > > > >> >> >  / {
+> > > > > >> >> > @@ -24,8 +21,19 @@
+> > > > > >> >> >                 stdout-path = "serial0:115200n8";
+> > > > > >> >> >         };
+> > > > > >> >> >
+> > > > > >> >> > +       /*
+> > > > > >> >> > +        * Reserve below regions from memory node:
+> > > > > >> >> > +        *
+> > > > > >> >> > +        *  - 0x05e0,0000 - 0x05ef,ffff: MCU firmware runtime using
+> > > > > >> >> > +        *  - 0x06df,f000 - 0x06df,ffff: Mailbox message data
+> > > > > >> >> > +        *  - 0x0740,f000 - 0x0740,ffff: MCU firmware section
+> > > > > >> >> > +        *  - 0x3e00,0000 - 0x3fff,ffff: OP-TEE
+> > > > > >> >> > +        */
+> > > > > >> >> >         memory at 0 {
+> > > > > >> >> >                 device_type = "memory";
+> > > > > >> >> > -               reg = <0x0 0x0 0x0 0x40000000>;
+> > > > > >> >> > +               reg = <0x00000000 0x00000000 0x00000000 0x05e00000>,
+> > > > > >> >> > +                     <0x00000000 0x05f00000 0x00000000 0x00eff000>,
+> > > > > >> >> > +                     <0x00000000 0x06e00000 0x00000000 0x0060f000>,
+> > > > > >> >> > +                     <0x00000000 0x07410000 0x00000000 0x36bf0000>;
+> > > > > >> >>
 
-And that's what you should not do. ACPI tables have to have a 1:1
-correspondence with HW resources and you must not change them to
-make the kernel (which version by the way, given that ARM64 ACPI PCI
-support is not in the mainline) work. I already said that: we must not
-interpret ACPI tables, we must define them according to specifications,
-and that's what everyone should follow to write FW.
+[...]
 
-So, why does your PCI IO range starts at 1k ? Please define what you
-mean by "kernel didn't accept anything below 1k", I want to understand
-what you are referring to.
+> > > > > I've read thru the thread and see 2 main conclusions. Using
+> > > > > reserved-memory is problematic since things like grub don't support
+> > > > > that. That is fine and we should stick with /mem-reserve/ for now.
+> > > > >
+> > > > > The other thing is the desire to have the memory presented to the kernel
+> > > > > be the same whether it comes from UEFI or DT structures. I can see why
+> > > > > there is some desire to have that alignment, but that doesn't really
+> > > > > buy us anything. We can't eliminate some code path in the kernel doing
+> > > > > so. So I still think that the memory node should reflect all of memory
+> > > > > as defined by the h/w and mem-reserve should be used for any software
+> > > > > defined reserved regions.
+
+[...]
+
+> > Sorry for the delay.
+> > 
+> > I'm still of the opinion that given the kernel has no business even
+> > reading this memory, it does not make sense to use a memreserve.
+> > 
+> > Given that, and the points about other software not knowing aobut
+> > /reserved-memory/, I don't think it makes sense to describe the region
+> > in the memory nodes.
+
+[...]
+
+Hi Rob, Mark,
+
+Sorry its taken me so long to bump this thread.
+
+So I can have more confidence discussing this I have reviewed the
+existing files in arch/arm/boot and arch/arm64/boot and done a bit of
+analysis. My summary is below:
+
+In arch/arm/boot:
+
+- In arch/arm, Using /reserved-memory/ and /memreserve/ are very common
+  case to reserve memory regions;
+- /memreserve/ is mainly used to reserve memory for spin-table which
+  used by SMP booting;
+- /reserved-memory/ are used to reserve memory regions for security
+  (TrustZone, secure RAM, etc), message transferring; So we can say
+  usually use this method to reserve memory for device driver or other
+  modules which maps these memory regions later.
+- There also have some DT files using memory node to carve out memory
+  regions, but from roughly analysis we can see the most cases are
+  introduced by memory controller for discontinuous memory space for
+  DDR; or there have some silicon bug so some regions are not stable
+  so need get rid of them (Armada-xp);
+
+In arch/arm64/boot:
+
+- There have no any file using /reserved-memory/;
+- Several files are using /memreserve/ for spin-table boot method;
+- ARM platforms (Juno, FVP) use memory nodes to carve out memory regions
+  for security;
+- DT files in arch/arm64 are quite consistent with Mark's suggestion.
+
+In my review I haven't really found anything that pushes me in one
+direction or the other so, without consensus from the DT maintainers, I
+really don't know how to progress here.
 
 Thanks,
-Lorenzo
+Leo Yan
