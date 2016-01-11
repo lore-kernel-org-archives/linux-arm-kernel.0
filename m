@@ -1,58 +1,44 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 11 Jan 2016 12:18:15 +0000
-Subject: 16KB PAGE_SIZE not work on DB410C
-In-Reply-To: <6DB39B31-8902-4A03-A66B-DC75E90A1C1C@linaro.org>
-References: <5677795C.2060409@linaro.org>
- <CAKv+Gu9mUVn80Vqr5NT7jjkSGd6BY_0cB6gVJ8VakHHWeWxM2A@mail.gmail.com>
- <6DB39B31-8902-4A03-A66B-DC75E90A1C1C@linaro.org>
-Message-ID: <20160111121815.GK6499@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 11 Jan 2016 13:18:55 +0100
+Subject: [PATCH 4/3] drm: arm-hdlcd: add explictit DRM dependency
+In-Reply-To: <20160111111255.GE13633@e106497-lin.cambridge.arm.com>
+References: <4194408.X82ccDjh5X@wuerfel> <4350671.DP0mBIml5S@wuerfel>
+ <20160111111255.GE13633@e106497-lin.cambridge.arm.com>
+Message-ID: <10589993.Lxk3kTHnpj@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 25, 2015 at 08:24:59PM +0800, Pingbo Wen wrote:
-> Hi Ard
-> 
-> > ? 2015?12?21??15:06?Ard Biesheuvel <ard.biesheuvel@linaro.org> ???
+On Monday 11 January 2016 11:12:56 Liviu Dudau wrote:
+> On Mon, Jan 04, 2016 at 09:39:46AM +0100, Arnd Bergmann wrote:
+> > On Monday 04 January 2016 09:24:16 Thierry Reding wrote:
+> > > 
+> > > Ugh... wouldn't it be much simpler to get rid of DRM_ARM? It seems like
+> > > a completely superfluous option to me. I don't think we've ever had the
+> > > equivalent of "vendor" Kconfig options in DRM, and I don't see why we'd
+> > > need to start now. If ARM was going to add another driver it can simply
+> > > have a separate Kconfig entry. There should be no need to select the
+> > > vendor option first.
 > > 
-> > On 21 December 2015 at 05:00, Pingbo Wen <pingbo.wen@linaro.org> wrote:
-> >> Hello,
-> >> 
-> >> I want to do some tests over 16KB page size on dragonboard 410c. And I merged
-> >> arm64-upstream branch over
-> >> 
-> >>  https://git.linaro.org/landing-teams/working/qualcomm/kernel.git integration-linux-qcomlt
-> >> 
-> >> which is based on Linux Kernel 4.3.
-> >> 
-> >> The db410c can boot into ubuntu in 4KB / 64KB page size, but when I set 16K page size, with
-> >> 47bit VA, the kernel hang before kernel_start(), no log output.
-> >> 
-> >> Does db410c support 16K page size? What can I do to boot it up?
-> >> 
+> > Fine with me too. I vaguely remembered having seen some discussion about
+> > this, so I decided to do a minimal fix, but I agree that would be more
+> > in line with the other drivers.
 > > 
-> > Cortex-A5x does not support 16 KB page size
+> >       Arnd
+> > 
 > 
-> Is there any documents I can reference? As I have get from ARM document, the Cortex-A53 support 16k page size, and Cortex-A57 don?t. The document can be found at:
+> Arnd,
 > 
-> 	http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0024a/BABDJHAD.html
-> 
-> Reference it here:
-> 
-> The supported granule sizes are 4KB, 16KB, and 64KB, and it is implementation defined which of the three are supported. Code that creates page tables is able to read the system register ID_AA64MMFR0_EL1, to find out which are the supported sizes. The Cortex-A53 processor supports all three sizes, but this is not the case for early versions of some processors, such as the Cortex-A57, which did not support the 16K granule size. The size is configurable for each translation table within the Translation Control Register (TCR_EL1).
-> 
-> Did I miss something?
+> I'm OK with the whole series of Kconfig clean-up/fixes and I offer my appologies
+> for adding noise with my patchset. Please let me know how do you prefer to handle
+> them. I'm OK with merging your changes into my series before sending the pull
+> request to David Airlie.
 
-I think the documentation above is wrong. The Cortex-A Series
-Programmer?s Guide for ARMv8-A should not be taken as gospel; it says
-many things which are not quite correct.
+Please merge them into your tree if you have some other changes to send to him.
 
-If you take a look in the Cortex-A53 TRM, in "5.1 About the MMU", only
-4K and 64K translation granules are described.
+I just realized that these are in your own git tree at the moment, not
+in drm-next. I guess that means you will rebase the whole series after -rc1 and
+submit it into linux-4.6, right?
 
-Additionally, in the TRM's description of ID_AA64MMFR0_EL1 it describes
-that 4K and 64K are supported, and 16K is not, for all configurations.
+If so, just fold my fixes into your patches when you rebase.
 
-So Cortex-A53 does not support a 16K translation granule.
-
-Thanks,
-Mark.
+	Arnd
