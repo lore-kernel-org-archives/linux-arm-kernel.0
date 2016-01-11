@@ -1,45 +1,33 @@
 From: mst@redhat.com (Michael S. Tsirkin)
-Date: Mon, 11 Jan 2016 13:00:30 +0200
-Subject: [PATCH v4 2/3] checkpatch: check for __smp outside barrier.h
+Date: Mon, 11 Jan 2016 13:00:40 +0200
+Subject: [PATCH v4 3/3] checkpatch: add virt barriers
 In-Reply-To: <1452509968-19778-1-git-send-email-mst@redhat.com>
 References: <1452509968-19778-1-git-send-email-mst@redhat.com>
-Message-ID: <1452509968-19778-3-git-send-email-mst@redhat.com>
+Message-ID: <1452509968-19778-4-git-send-email-mst@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduction of __smp barriers cleans up a bunch of duplicate code, but
-it gives people an additional handle onto a "new" set of barriers - just
-because they're prefixed with __* unfortunately doesn't stop anyone from
-using it (as happened with other arch stuff before.)
+Add virt_ barriers to list of barriers to check for
+presence of a comment.
 
-Add a checkpatch test so it will trigger a warning.
-
-Reported-by: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
 ---
- scripts/checkpatch.pl | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ scripts/checkpatch.pl | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/scripts/checkpatch.pl b/scripts/checkpatch.pl
-index 94b4e33..25476c2 100755
+index 25476c2..c7bf1aa 100755
 --- a/scripts/checkpatch.pl
 +++ b/scripts/checkpatch.pl
-@@ -5143,6 +5143,16 @@ sub process {
- 			}
- 		}
+@@ -5133,7 +5133,8 @@ sub process {
+ 		}x;
+ 		my $all_barriers = qr{
+ 			(?:$barriers)|
+-			smp_(?:$barrier_stems)
++			smp_(?:$barrier_stems)|
++			virt_(?:$barrier_stems)
+ 		}x;
  
-+		my $underscore_smp_barriers = qr{__smp_(?:$barrier_stems)}x;
-+
-+		if ($realfile !~ m@^include/asm-generic/@ &&
-+		    $realfile !~ m@/barrier\.h$@ &&
-+		    $line =~ m/\b(?:$underscore_smp_barriers)\s*\(/ &&
-+		    $line !~ m/^.\s*\#\s*define\s+(?:$underscore_smp_barriers)\s*\(/) {
-+			WARN("MEMORY_BARRIER",
-+			     "__smp memory barriers shouldn't be used outside barrier.h and asm-generic\n" . $herecurr);
-+		}
-+
- # check for waitqueue_active without a comment.
- 		if ($line =~ /\bwaitqueue_active\s*\(/) {
- 			if (!ctx_has_comment($first_line, $linenr)) {
+ 		if ($line =~ /\b(?:$all_barriers)\s*\(/) {
 -- 
 MST
