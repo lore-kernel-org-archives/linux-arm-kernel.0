@@ -1,140 +1,52 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 11 Jan 2016 12:09:02 +0000
-Subject: [PATCH v6 6/9] mfd: axp20x: Add support for RSB based AXP223 PMIC
-In-Reply-To: <CAGb2v67N_C5bLTPmQs2gcTkpYt=2=Dk8LjWLEzHqGU--qhu+9g@mail.gmail.com>
-References: <1450283538-25067-1-git-send-email-wens@csie.org>
- <1450283538-25067-7-git-send-email-wens@csie.org>
- <20160111092427.GI14104@x1>
- <CAGb2v67N_C5bLTPmQs2gcTkpYt=2=Dk8LjWLEzHqGU--qhu+9g@mail.gmail.com>
-Message-ID: <20160111120902.GE19803@x1>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 11 Jan 2016 13:09:55 +0100
+Subject: [PATCH] ASoC: hdac_hdmi: remove unused hdac_hdmi_query_pin_connlist
+Message-ID: <4242434.H1qiCWaR2p@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 11 Jan 2016, Chen-Yu Tsai wrote:
-> On Mon, Jan 11, 2016 at 5:24 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> > On Thu, 17 Dec 2015, Chen-Yu Tsai wrote:
-> >
-> >> The AXP223 is a new PMIC commonly paired with Allwinner A23/A33 SoCs.
-> >> It is functionally identical to AXP221; only the regulator default
-> >> voltage/status and the external host interface are different.
-> >>
-> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >> ---
-> >>  drivers/mfd/Kconfig        | 11 +++++++
-> >>  drivers/mfd/Makefile       |  1 +
-> >>  drivers/mfd/axp20x-rsb.c   | 78 ++++++++++++++++++++++++++++++++++++++++++++++
-> >>  drivers/mfd/axp20x.c       |  2 ++
-> >>  include/linux/mfd/axp20x.h |  1 +
-> >>  5 files changed, 93 insertions(+)
-> >>  create mode 100644 drivers/mfd/axp20x-rsb.c
+A recent rework removed the only user of the hdac_hdmi_query_pin_connlist
+function, so we now get a warning when building the hdac_hdmi driver:
 
-[...]
+hdac_hdmi.c:313:12: warning: 'hdac_hdmi_query_pin_connlist' defined but not used [-Wunused-function]
 
-> >> +static int axp20x_rsb_probe(struct sunxi_rsb_device *rdev)
-> >> +{
-> >> +     struct axp20x_dev *axp20x;
-> >> +     int ret;
-> >> +
-> >> +     axp20x = devm_kzalloc(&rdev->dev, sizeof(*axp20x), GFP_KERNEL);
-> >> +     if (!axp20x)
-> >> +             return -ENOMEM;
-> >> +
-> >> +     axp20x->dev = &rdev->dev;
-> >> +     axp20x->irq = rdev->irq;
-> >> +     sunxi_rsb_device_set_drvdata(rdev, axp20x);
-> >
-> > What's the point of this call?  Why do you need a sunxi_ variant?
-> 
-> This is an inline call defined in include/linux/sunxi-rsb.h,
-> which is equivalent to dev_set_drvdata(&rdev->dev, data).
-> 
-> It seems many subsystems or bus drivers have this pattern.
-> 
->     git grep void.*_set_drvdata include/linux/ | wc -l
-> 
-> yields 34, not including dev_set_drvdata itself and this sunxi_rsb
-> variant.
+This removes the function, which makes the file build cleanly again.
 
-That doesn't answer my question.  Why is it required?
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 15b914476bf2 ("ASoC: hdac_hdmi: Use list to add pins and converters")
+---
+I saw this warning the first time on today's linux-next with ARM randconfig builds
 
-Looks like superfluous churn to me.  Aggregation for the sake of it.
-
-> >> +     ret = axp20x_match_device(axp20x);
-> >> +     if (ret)
-> >> +             return ret;
-> >> +
-> >> +     axp20x->regmap = devm_regmap_init_sunxi_rsb(rdev, axp20x->regmap_cfg);
-> >> +     if (IS_ERR(axp20x->regmap)) {
-> >> +             ret = PTR_ERR(axp20x->regmap);
-> >> +             dev_err(&rdev->dev, "regmap init failed: %d\n", ret);
-> >> +             return ret;
-> >> +     }
-> >> +
-> >> +     return axp20x_device_probe(axp20x);
-> >> +}
-> >> +
-> >> +static int axp20x_rsb_remove(struct sunxi_rsb_device *rdev)
-> >> +{
-> >> +     struct axp20x_dev *axp20x = sunxi_rsb_device_get_drvdata(rdev);
-> >> +
-> >> +     return axp20x_device_remove(axp20x);
-> >> +}
-> >> +
-> >> +static const struct of_device_id axp20x_rsb_of_match[] = {
-> >> +     { .compatible = "x-powers,axp223", .data = (void *)AXP223_ID },
-> >> +     { },
-> >> +};
-> >> +MODULE_DEVICE_TABLE(of, axp20x_rsb_of_match);
-> >> +
-> >> +static struct sunxi_rsb_driver axp20x_rsb_driver = {
-> >> +     .driver = {
-> >> +             .name   = "axp20x-rsb",
-> >> +             .of_match_table = of_match_ptr(axp20x_rsb_of_match),
-> >> +     },
-> >> +     .probe  = axp20x_rsb_probe,
-> >> +     .remove = axp20x_rsb_remove,
-> >> +};
-> >> +module_sunxi_rsb_driver(axp20x_rsb_driver);
-> >> +
-> >> +MODULE_DESCRIPTION("PMIC MFD sunXi RSB driver for AXP20X");
-> >> +MODULE_AUTHOR("Chen-Yu Tsai <wens@csie.org>");
-> >> +MODULE_LICENSE("GPL v2");
-> >> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-> >> index 54a00168da26..968d77fb95d8 100644
-> >> --- a/drivers/mfd/axp20x.c
-> >> +++ b/drivers/mfd/axp20x.c
-> >> @@ -33,6 +33,7 @@ static const char * const axp20x_model_names[] = {
-> >>       "AXP202",
-> >>       "AXP209",
-> >>       "AXP221",
-> >> +     "AXP223",
-> >>       "AXP288",
-> >>  };
-> >>
-> >> @@ -616,6 +617,7 @@ int axp20x_match_device(struct axp20x_dev *axp20x)
-> >>               axp20x->regmap_irq_chip = &axp20x_regmap_irq_chip;
-> >>               break;
-> >>       case AXP221_ID:
-> >> +     case AXP223_ID:
-> >>               axp20x->nr_cells = ARRAY_SIZE(axp22x_cells);
-> >>               axp20x->cells = axp22x_cells;
-> >>               axp20x->regmap_cfg = &axp22x_regmap_config;
-> >> diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
-> >> index 00697c6ad8b0..d82e7d51372b 100644
-> >> --- a/include/linux/mfd/axp20x.h
-> >> +++ b/include/linux/mfd/axp20x.h
-> >> @@ -18,6 +18,7 @@ enum {
-> >>       AXP202_ID,
-> >>       AXP209_ID,
-> >>       AXP221_ID,
-> >> +     AXP223_ID,
-> >>       AXP288_ID,
-> >>       NR_AXP20X_VARIANTS,
-> >>  };
-> >
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+diff --git a/sound/soc/codecs/hdac_hdmi.c b/sound/soc/codecs/hdac_hdmi.c
+index f5df7232405b..5a1ec0f7a1a6 100644
+--- a/sound/soc/codecs/hdac_hdmi.c
++++ b/sound/soc/codecs/hdac_hdmi.c
+@@ -310,28 +310,6 @@ hdac_hdmi_query_cvt_params(struct hdac_device *hdac, struct hdac_hdmi_cvt *cvt)
+ 	return err;
+ }
+ 
+-static int hdac_hdmi_query_pin_connlist(struct hdac_ext_device *hdac,
+-					struct hdac_hdmi_pin *pin)
+-{
+-	if (!(get_wcaps(&hdac->hdac, pin->nid) & AC_WCAP_CONN_LIST)) {
+-		dev_warn(&hdac->hdac.dev,
+-			"HDMI: pin %d wcaps %#x does not support connection list\n",
+-			pin->nid, get_wcaps(&hdac->hdac, pin->nid));
+-		return -EINVAL;
+-	}
+-
+-	pin->num_mux_nids = snd_hdac_get_connections(&hdac->hdac, pin->nid,
+-			pin->mux_nids, HDA_MAX_CONNECTIONS);
+-	if (pin->num_mux_nids == 0)
+-		dev_warn(&hdac->hdac.dev, "No connections found for pin: %d\n",
+-								pin->nid);
+-
+-	dev_dbg(&hdac->hdac.dev, "num_mux_nids %d for pin: %d\n",
+-			pin->num_mux_nids, pin->nid);
+-
+-	return pin->num_mux_nids;
+-}
+-
+ static void hdac_hdmi_fill_widget_info(struct snd_soc_dapm_widget *w,
+ 				enum snd_soc_dapm_type id,
+ 				const char *wname, const char *stream)
