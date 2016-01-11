@@ -1,35 +1,43 @@
-From: brijesh.singh@amd.com (Brijesh Singh)
-Date: Mon, 11 Jan 2016 10:55:54 -0600
-Subject: [PATCH] ata: add AMD Seattle platform driver
-In-Reply-To: <5693CB41.70408@redhat.com>
-References: <1452200002-31590-1-git-send-email-brijesh.singh@amd.com>
- <4983521.tEaWggKCCv@wuerfel> <568F14E0.4060107@amd.com>
- <10869853.plxna0HzWE@wuerfel> <5690367E.8060609@amd.com>
- <5693CB41.70408@redhat.com>
-Message-ID: <5693DE9A.9070101@amd.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 11 Jan 2016 09:00:49 -0800
+Subject: [PATCH -next] arm: Select GPIO_GENERIC_PLATFORM for CRAGG_6410
+Message-ID: <1452531649-14940-1-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Since commit 0f4630f3720e ("gpio: generic: factor into gpio_chip struct"),
+all users of struct bgpio_pdata depend on GPIO_GENERIC.
 
-Hi,
+This results in the following build error.
 
-On 01/11/2016 09:33 AM, Mark Langsdorf wrote:
-> On 01/08/2016 04:21 PM, Brijesh Singh wrote:
->>
->> libata-*.c implements the "Enclosure management" style led messages but also has hooks
->> to register a custom led control callback. Since Seattle platform does not support
->> the "Enclosure management" registers hence ata_port_info we are setting a ATA_FLAG_EM | ATA_FLAG_SW_ACIVITY
->> to indicate that we can still handle the led messages by our registered callback. I see
->> that sata_highbank driver is doing something similar.
-> 
-> The sata_highbank driver is doing it wrong and shouldn't have been
-> accepted in its current condition. Enclosure management really should
-> be a separate device. Please don't use it as an example.
-> 
+arch/arm/mach-s3c64xx/mach-crag6410.c:270:3: warning:
+	excess elements in struct initializer
+arch/arm/mach-s3c64xx/mach-crag6410.c:270:3: warning:
+	(near initialization for '(anonymous)')
+arch/arm/mach-s3c64xx/mach-crag6410.c:271:2: error:
+	invalid use of undefined type 'struct bgpio_pdata'
 
-Okay. Thanks for letting me know.
+Fixes: 0f4630f3720e ("gpio: generic: factor into gpio_chip struct")
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+---
+I don't know if this is the correct way to fix this problem.
+If not, please consider this to be a bug report.
 
-Should I consider extending the generic driver to handle this Seattle platform specific feature or go with a new
-platform driver approach (i.e the one I am doing right now) ? 
+ arch/arm/mach-s3c64xx/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
--Brijesh
+diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
+index 7c0c420c3016..98d2aa9393f1 100644
+--- a/arch/arm/mach-s3c64xx/Kconfig
++++ b/arch/arm/mach-s3c64xx/Kconfig
+@@ -310,6 +310,7 @@ config MACH_WLF_CRAGG_6410
+ 	depends on I2C=y
+ 	select CPU_S3C6410
+ 	select LEDS_GPIO_REGISTER
++	select GPIO_GENERIC_PLATFORM
+ 	select S3C64XX_DEV_SPI0
+ 	select S3C64XX_SETUP_FB_24BPP
+ 	select S3C64XX_SETUP_I2C1
+-- 
+2.1.4
