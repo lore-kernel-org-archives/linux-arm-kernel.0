@@ -1,64 +1,60 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Mon, 11 Jan 2016 21:40:18 +1100
-Subject: [PATCH v3 3/3] checkpatch: add virt barriers
-In-Reply-To: <20160111123423-mutt-send-email-mst@redhat.com>
-References: <1452454200-8844-1-git-send-email-mst@redhat.com>
- <1452454200-8844-4-git-send-email-mst@redhat.com>
- <CAGRGNgXQANbKD=VA0Qx4Wp1+MpZUVV7by8RrKxF9o=qu=vUQqA@mail.gmail.com>
- <1452466336.7773.46.camel@perches.com>
- <20160111123423-mutt-send-email-mst@redhat.com>
-Message-ID: <CAGRGNgU7=vNXZbgSwLs+bBueX1+rKACCRMi74hM+jP8MaX+-WA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 11 Jan 2016 10:44:07 +0000
+Subject: [PATCH v5 03/11] arm-cci: Group writes to counter
+In-Reply-To: <568BA043.2020302@arm.com>
+References: <1451908490-2615-1-git-send-email-suzuki.poulose@arm.com>
+ <1451908490-2615-4-git-send-email-suzuki.poulose@arm.com>
+ <20160104190353.GC17127@leverpostej> <568BA043.2020302@arm.com>
+Message-ID: <20160111104407.GD6499@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michael,
+On Tue, Jan 05, 2016 at 10:51:47AM +0000, Suzuki K. Poulose wrote:
+> On 04/01/16 19:03, Mark Rutland wrote:
+> >On Mon, Jan 04, 2016 at 11:54:42AM +0000, Suzuki K. Poulose wrote:
+> >>Add a helper to group the writes to PMU counter, this will be
+> >>used to delay setting the event period to pmu::pmu_enable()
+> >>
+> 
+> >>+/* Write a value to a given set of counters */
+> >>+static void __pmu_write_counters(struct cci_pmu *cci_pmu, unsigned long *mask, u32 value)
+> >>+{
+> >>+	int i;
+> >>+
+> >>+	for_each_set_bit(i, mask, cci_pmu->num_cntrs)
+> >>+		__pmu_write_counter(cci_pmu, value, i);
+> >>+}
+> >
+> >I don't understand this as-is. Why do all the counters have the same
+> >value?
+> 
+> The only value we write to the counters is the period. This routine writes
+> a given value to a set of counters specified by the mask (not to be confused
+> with the PMU->hw_events->mask). This will help to group the writes to the counters,
+> especially since preparatory steps to write to a single counter itself is costly.
+> So, we do all the preparation only once for a batch of counters.
+> 
+> The other option is to use hw_events->prev_count (which should be set before calling
+> the function) for each counter specified in the mask. I am fine with either of the
+> two.
 
-On Mon, Jan 11, 2016 at 9:35 PM, Michael S. Tsirkin <mst@redhat.com> wrote:
-> On Sun, Jan 10, 2016 at 02:52:16PM -0800, Joe Perches wrote:
->> On Mon, 2016-01-11 at 09:13 +1100, Julian Calaby wrote:
->> > On Mon, Jan 11, 2016 at 6:31 AM, Michael S. Tsirkin <mst@redhat.com> wrote:
->> > > Add virt_ barriers to list of barriers to check for
->> > > presence of a comment.
->> []
->> > > diff --git a/scripts/checkpatch.pl b/scripts/checkpatch.pl
->> []
->> > > @@ -5133,7 +5133,8 @@ sub process {
->> > >                 }x;
->> > >                 my $all_barriers = qr{
->> > >                         $barriers|
->> > > -                       smp_(?:$smp_barrier_stems)
->> > > +                       smp_(?:$smp_barrier_stems)|
->> > > +                       virt_(?:$smp_barrier_stems)
->> >
->> > Sorry I'm late to the party here, but would it make sense to write this as:
->> >
->> > (?:smp|virt)_(?:$smp_barrier_stems)
->>
->> Yes.  Perhaps the name might be better as barrier_stems.
->>
->> Also, ideally this would be longest match first or use \b
->> after the matches so that $all_barriers could work
->> successfully without a following \s*\(
->>
->> my $all_barriers = qr{
->>       (?:smp|virt)_(?:barrier_stems)|
->>       $barriers)
->> }x;
->>
->> or maybe add separate $smp_barriers and $virt_barriers
->>
->> <shrug>  it doesn't matter much in any case
->
-> OK just to clarify - are you OK with merging the patch as is?
-> Refactorings can come as patches on top if required.
+I think this would be clearer using prev_count.
 
-I don't really care either way, I was just asking if it was possible.
-If you don't see any value in that change, then don't make it.
+I guess it doesn't matter since we won't support sampling, but it would
+match the shape of other PMU drivers.
+
+> >>+static void __maybe_unused
+> >>+pmu_write_counters(struct cci_pmu *cci_pmu, unsigned long *mask, u32 value)
+> >>+{
+> >>+	__pmu_write_counters(cci_pmu, mask, value);
+> >>+}
+> >
+> >Why are these not just one function for now?
+> 
+> Yes, this could be just one function for now, until we introduce the hooks. This was
+> a written to avoid another refactoring in the later patch.
+
+Ok. Either way is fine.
 
 Thanks,
-
--- 
-Julian Calaby
-
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
+Mark.
