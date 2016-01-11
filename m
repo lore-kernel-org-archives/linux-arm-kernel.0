@@ -1,32 +1,43 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Mon, 11 Jan 2016 17:48:45 +0100
-Subject: [PATCH v8 20/20] KVM: ARM64: Add a new kvm ARM PMU device
-In-Reply-To: <CAFEAcA8ayUEoH7zX+cGrOcT7kCWnLzMfgo2NFTbPt3aSPwt-+Q@mail.gmail.com>
-References: <CAFEAcA_MDiOphseZ7RGNE3G=4ZDF5SFV5krOjanPbVuhgg9gnQ@mail.gmail.com>
- <568E7AF1.9040103@huawei.com>
- <CAFEAcA-Qcda7TSFLSeykLHqZYdP6tYdEjPe2uHN6f_+omqWFZg@mail.gmail.com>
- <20160107203647.GJ6199@hawk.localdomain>
- <20160109122956.GA30867@cbox> <20160109150339.10576e81@arm.com>
- <20160111140717.GD3924@hawk.localdomain>
- <20160111150929.GB15554@cbox>
- <20160111160927.GF3924@hawk.localdomain>
- <CAFEAcA8ayUEoH7zX+cGrOcT7kCWnLzMfgo2NFTbPt3aSPwt-+Q@mail.gmail.com>
-Message-ID: <20160111164845.GI3924@hawk.localdomain>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 11 Jan 2016 13:49:38 -0300
+Subject: [PATCH 0/8] [media] Check v4l2_of_parse_endpoint() ret val in all
+ drivers
+In-Reply-To: <20160109230330.GG576@valkosipuli.retiisi.org.uk>
+References: <1452191248-15847-1-git-send-email-javier@osg.samsung.com>
+ <20160109230330.GG576@valkosipuli.retiisi.org.uk>
+Message-ID: <5693DD22.9020805@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2016 at 04:13:12PM +0000, Peter Maydell wrote:
-> On 11 January 2016 at 16:09, Andrew Jones <drjones@redhat.com> wrote:
-> > I think the save/restore case is where I always flip to seeing it as a
-> > bunch of separate per cpu devices. It would feel better to me to
-> > save/restore the cpu-gic registers the same way we do all other cpu
-> > registers.
+Hello Sakari,
+
+On 01/09/2016 08:03 PM, Sakari Ailus wrote:
+> Hi Javier,
 > 
-> From QEMU's point of view this would be extremely awkward, which
-> is one reason I'm happy with the GICv3 API we came up with
-> and reviewed last year...
+> On Thu, Jan 07, 2016 at 03:27:14PM -0300, Javier Martinez Canillas wrote:
+>> Hello,
+>>
+>> When discussing a patch [0] with Laurent Pinchart for another series I
+>> mentioned to him that most callers of v4l2_of_parse_endpoint() weren't
+>> checking the return value. This is likely due the function kernel-doc
+>> stating incorrectly that the return value is always 0 but can return a
+>> negative error code on failure.
+>>
+>> This trivial patch series fixes the function kernel-doc and add proper
+>> error checking in all the drivers that are currently not doing so.
+> 
+> After fixing patches 5 and 6,
+> 
 
-OK, I'll shut up about this. As I didn't speak then, I shall now forever
-hold my peace :)
+Done, posted a v2 fixing the issues you pointed out.
 
-drew
+> Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+> 
+
+Thanks a lot for your feedback and review!
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
