@@ -1,35 +1,94 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 11 Jan 2016 14:32:11 -0200
-Subject: imxfb does not turn on automatically
-In-Reply-To: <20160111071631.GI13058@pengutronix.de>
-References: <CAOMZO5CZ3aFGbfb39XoXpFvbn4TTrCbTHOXtQKruruCis3Ptvw@mail.gmail.com>
- <CAD7j7Q8gANUxM5zGmn3YyhUr9yZv02x4oxi_WWLnxCYemBRYZA@mail.gmail.com>
- <20160111071631.GI13058@pengutronix.de>
-Message-ID: <CAOMZO5C9MtteWQMaXUF2M+BLr5=PgWUSgrYn1gES2S8jzDhdFA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 11 Jan 2016 16:31:55 +0000
+Subject: [PATCH v3 02/21] arm64: introduce KIMAGE_VADDR as the virtual
+ base of the kernel region
+In-Reply-To: <1452518355-4606-3-git-send-email-ard.biesheuvel@linaro.org>
+References: <1452518355-4606-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1452518355-4606-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160111163155.GR6499@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On Mon, Jan 11, 2016 at 02:18:55PM +0100, Ard Biesheuvel wrote:
+> This introduces the preprocessor symbol KIMAGE_VADDR which will serve as
+> the symbolic virtual base of the kernel region, i.e., the kernel's virtual
+> offset will be KIMAGE_VADDR + TEXT_OFFSET. For now, we define it as being
+> equal to PAGE_OFFSET, but in the future, it will be moved below it once
+> we move the kernel virtual mapping out of the linear mapping.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-On Mon, Jan 11, 2016 at 5:16 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 
-> Unfortunately this LCD controller does not have an enable bit. The
-> controller starts directly when the clocks are enabled. If the clocks
-> are enabled when the controller is not yet programmed with proper
-> register values then it just goes into some undefined state. What I
-> suspect is that the clocks already were enabled before driver probe,
-> presumably by the bootloader, so the controller is already in undefined
-> state when entering Linux. Now by dis/enabling the ipg clock you
-> effectively reset the controller. Since you have programmed it with
-> valid register values in the mean time it starts working after this
-> reset.
-> To verify you could try to disable the LCDC related clock gates with
-> direct register writes in drivers/clk/imx/clk-imx25.c.
+Mark.
 
-Excellent! I did as you suggested and now the LCD turns on by default.
-
-U-boot was enabling the LCD IPG clock.
-
-Will submit a formal patch soon.
-
-Thanks!
+> ---
+>  arch/arm64/include/asm/memory.h | 10 ++++++++--
+>  arch/arm64/kernel/head.S        |  2 +-
+>  arch/arm64/kernel/vmlinux.lds.S |  4 ++--
+>  3 files changed, 11 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+> index 853953cd1f08..bea9631b34a8 100644
+> --- a/arch/arm64/include/asm/memory.h
+> +++ b/arch/arm64/include/asm/memory.h
+> @@ -51,7 +51,8 @@
+>  #define VA_BITS			(CONFIG_ARM64_VA_BITS)
+>  #define VA_START		(UL(0xffffffffffffffff) << VA_BITS)
+>  #define PAGE_OFFSET		(UL(0xffffffffffffffff) << (VA_BITS - 1))
+> -#define MODULES_END		(PAGE_OFFSET)
+> +#define KIMAGE_VADDR		(PAGE_OFFSET)
+> +#define MODULES_END		(KIMAGE_VADDR)
+>  #define MODULES_VADDR		(MODULES_END - SZ_64M)
+>  #define PCI_IO_END		(MODULES_VADDR - SZ_2M)
+>  #define PCI_IO_START		(PCI_IO_END - PCI_IO_SIZE)
+> @@ -75,8 +76,13 @@
+>   * private definitions which should NOT be used outside memory.h
+>   * files.  Use virt_to_phys/phys_to_virt/__pa/__va instead.
+>   */
+> -#define __virt_to_phys(x)	(((phys_addr_t)(x) - PAGE_OFFSET + PHYS_OFFSET))
+> +#define __virt_to_phys(x) ({						\
+> +	phys_addr_t __x = (phys_addr_t)(x);				\
+> +	__x >= PAGE_OFFSET ? (__x - PAGE_OFFSET + PHYS_OFFSET) :	\
+> +			     (__x - KIMAGE_VADDR + PHYS_OFFSET); })
+> +
+>  #define __phys_to_virt(x)	((unsigned long)((x) - PHYS_OFFSET + PAGE_OFFSET))
+> +#define __phys_to_kimg(x)	((unsigned long)((x) - PHYS_OFFSET + KIMAGE_VADDR))
+>  
+>  /*
+>   * Convert a page to/from a physical address
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index 63335fa68426..350515276541 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -389,7 +389,7 @@ __create_page_tables:
+>  	 * Map the kernel image (starting with PHYS_OFFSET).
+>  	 */
+>  	mov	x0, x26				// swapper_pg_dir
+> -	mov	x5, #PAGE_OFFSET
+> +	ldr	x5, =KIMAGE_VADDR
+>  	create_pgd_entry x0, x5, x3, x6
+>  	ldr	x6, =KERNEL_END			// __va(KERNEL_END)
+>  	mov	x3, x24				// phys offset
+> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+> index 7de6c39858a5..ced0dedcabcc 100644
+> --- a/arch/arm64/kernel/vmlinux.lds.S
+> +++ b/arch/arm64/kernel/vmlinux.lds.S
+> @@ -88,7 +88,7 @@ SECTIONS
+>  		*(.discard.*)
+>  	}
+>  
+> -	. = PAGE_OFFSET + TEXT_OFFSET;
+> +	. = KIMAGE_VADDR + TEXT_OFFSET;
+>  
+>  	.head.text : {
+>  		_text = .;
+> @@ -185,4 +185,4 @@ ASSERT(__idmap_text_end - (__idmap_text_start & ~(SZ_4K - 1)) <= SZ_4K,
+>  /*
+>   * If padding is applied before .head.text, virt<->phys conversions will fail.
+>   */
+> -ASSERT(_text == (PAGE_OFFSET + TEXT_OFFSET), "HEAD is misaligned")
+> +ASSERT(_text == (KIMAGE_VADDR + TEXT_OFFSET), "HEAD is misaligned")
+> -- 
+> 2.5.0
+> 
