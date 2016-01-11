@@ -1,52 +1,58 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 11 Jan 2016 17:37:12 +0100
-Subject: [PATCH] ARM: mvebu: Add USB nop xceiv support in
- mvebu_v7_defconfig
-In-Reply-To: <1450884722-15529-1-git-send-email-gregory.clement@free-electrons.com>
- (Gregory CLEMENT's message of "Wed, 23 Dec 2015 16:32:02 +0100")
-References: <1450884722-15529-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <87ziwcxebr.fsf@free-electrons.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Mon, 11 Jan 2016 17:44:09 +0100
+Subject: [PATCH v8 20/20] KVM: ARM64: Add a new kvm ARM PMU device
+In-Reply-To: <CAFEAcA_=7nJz3Wh8py9OaSM_t0eFUcCUcb23-W2cDi-M65ZPYA@mail.gmail.com>
+References: <568E7AF1.9040103@huawei.com>
+ <CAFEAcA-Qcda7TSFLSeykLHqZYdP6tYdEjPe2uHN6f_+omqWFZg@mail.gmail.com>
+ <20160107203647.GJ6199@hawk.localdomain>
+ <20160109122956.GA30867@cbox> <20160109150339.10576e81@arm.com>
+ <20160111140717.GD3924@hawk.localdomain>
+ <20160111150929.GB15554@cbox>
+ <20160111160927.GF3924@hawk.localdomain>
+ <20160111162159.GG3924@hawk.localdomain>
+ <CAFEAcA_=7nJz3Wh8py9OaSM_t0eFUcCUcb23-W2cDi-M65ZPYA@mail.gmail.com>
+Message-ID: <20160111164409.GH3924@hawk.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
- 
- On mer., d?c. 23 2015, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+On Mon, Jan 11, 2016 at 04:29:03PM +0000, Peter Maydell wrote:
+> On 11 January 2016 at 16:21, Andrew Jones <drjones@redhat.com> wrote:
+> > On Mon, Jan 11, 2016 at 05:09:27PM +0100, Andrew Jones wrote:
+> >> On Mon, Jan 11, 2016 at 04:09:29PM +0100, Christoffer Dall wrote:
+> >> > Are vcpu ids already exposed to userspace (beyond the stupid
+> >> > KVM_IRQ_LINE) ioctl and as such we're bound to whatever upper limit and
+> >> > format they have?
+> >>
+> >> The only other place I found is KVM_CREATE_VCPU. I suppose we could move
+> >> to MPIDR for that, and it would be a nice way to handle the "userspace
+> >> determines MPIDR" work that I plan to do. Both KVM and its userspaces
+> >> would still use some counter-based vcpu identifiers internally, to avoid
+> >> large, sparse structures, but I guess the advantage is that they don't
+> >> have to agree on how they do that. The 'vcpu id' used by KVM_CREATE_VCPU
+> >> is already 32-bits, and is supposed to be an arbitrary identifier. That
+> >> all looks good for converting to MPIDR.
+> >>
+> >
+> > Correction. I understand that vcpu-id is "supposed" to be an arbitrary
+> > identifier now, but it doesn't appear that all the assumptions that it's
+> > a counter are gone yet... virt/kvm/kvm_main.c has
+> >
+> > static int kvm_vm_ioctl_create_vcpu(struct kvm *kvm, u32 id)
+> > ...
+> >         if (id >= KVM_MAX_VCPUS)
+> >                 return -EINVAL;
+> 
+> I think the last time we talked about supporting "userspace
+> determines MPIDR" the idea was to do it by allowing userspace to
+> write to the MPIDR register with KVM_SET_ONE_REG. So you'd
+> create a bunch of CPUs with vcpu-ids as usual, and then the
+> MPIDRs would be set for them later as appropriate (or not
+> at all, if userspace was an older qemu).
 
-> The Armada 38x based boards use this "PHY" with their xhci usb
-> controller. It would be also used for Armada 39x and Armada 375 base
-> boars which also had xhci controller.
->
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Yup, I recall that. I'm just expanding this discussion into that one.
+If we wanted to single vcpu identifier type, and we wanted it to be
+MPIDR, then I guess we'd want to pass it in to KVM_CREATE_VCPU too, at
+which point we no longer need to set it later with KVM_SET_ONE_REG.
 
-
-Applied to mvebu/defconfig-for-4.6
-
-Gregory
-
-
-> ---
->  arch/arm/configs/mvebu_v7_defconfig | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
-> index c6729bf0a8dd..cf363abd974e 100644
-> --- a/arch/arm/configs/mvebu_v7_defconfig
-> +++ b/arch/arm/configs/mvebu_v7_defconfig
-> @@ -109,6 +109,7 @@ CONFIG_USB_XHCI_MVEBU=y
->  CONFIG_USB_EHCI_HCD=y
->  CONFIG_USB_EHCI_ROOT_HUB_TT=y
->  CONFIG_USB_STORAGE=y
-> +CONFIG_NOP_USB_XCEIV=y
->  CONFIG_MMC=y
->  CONFIG_MMC_SDHCI=y
->  CONFIG_MMC_SDHCI_PLTFM=y
-> -- 
-> 2.5.0
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Thanks,
+drew
