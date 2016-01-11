@@ -1,58 +1,57 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Mon, 11 Jan 2016 17:44:09 +0100
-Subject: [PATCH v8 20/20] KVM: ARM64: Add a new kvm ARM PMU device
-In-Reply-To: <CAFEAcA_=7nJz3Wh8py9OaSM_t0eFUcCUcb23-W2cDi-M65ZPYA@mail.gmail.com>
-References: <568E7AF1.9040103@huawei.com>
- <CAFEAcA-Qcda7TSFLSeykLHqZYdP6tYdEjPe2uHN6f_+omqWFZg@mail.gmail.com>
- <20160107203647.GJ6199@hawk.localdomain>
- <20160109122956.GA30867@cbox> <20160109150339.10576e81@arm.com>
- <20160111140717.GD3924@hawk.localdomain>
- <20160111150929.GB15554@cbox>
- <20160111160927.GF3924@hawk.localdomain>
- <20160111162159.GG3924@hawk.localdomain>
- <CAFEAcA_=7nJz3Wh8py9OaSM_t0eFUcCUcb23-W2cDi-M65ZPYA@mail.gmail.com>
-Message-ID: <20160111164409.GH3924@hawk.localdomain>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 11 Jan 2016 13:47:08 -0300
+Subject: [PATCH v2 0/8] [media] Check v4l2_of_parse_endpoint() ret val in all
+ drivers
+Message-ID: <1452530844-30609-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2016 at 04:29:03PM +0000, Peter Maydell wrote:
-> On 11 January 2016 at 16:21, Andrew Jones <drjones@redhat.com> wrote:
-> > On Mon, Jan 11, 2016 at 05:09:27PM +0100, Andrew Jones wrote:
-> >> On Mon, Jan 11, 2016 at 04:09:29PM +0100, Christoffer Dall wrote:
-> >> > Are vcpu ids already exposed to userspace (beyond the stupid
-> >> > KVM_IRQ_LINE) ioctl and as such we're bound to whatever upper limit and
-> >> > format they have?
-> >>
-> >> The only other place I found is KVM_CREATE_VCPU. I suppose we could move
-> >> to MPIDR for that, and it would be a nice way to handle the "userspace
-> >> determines MPIDR" work that I plan to do. Both KVM and its userspaces
-> >> would still use some counter-based vcpu identifiers internally, to avoid
-> >> large, sparse structures, but I guess the advantage is that they don't
-> >> have to agree on how they do that. The 'vcpu id' used by KVM_CREATE_VCPU
-> >> is already 32-bits, and is supposed to be an arbitrary identifier. That
-> >> all looks good for converting to MPIDR.
-> >>
-> >
-> > Correction. I understand that vcpu-id is "supposed" to be an arbitrary
-> > identifier now, but it doesn't appear that all the assumptions that it's
-> > a counter are gone yet... virt/kvm/kvm_main.c has
-> >
-> > static int kvm_vm_ioctl_create_vcpu(struct kvm *kvm, u32 id)
-> > ...
-> >         if (id >= KVM_MAX_VCPUS)
-> >                 return -EINVAL;
-> 
-> I think the last time we talked about supporting "userspace
-> determines MPIDR" the idea was to do it by allowing userspace to
-> write to the MPIDR register with KVM_SET_ONE_REG. So you'd
-> create a bunch of CPUs with vcpu-ids as usual, and then the
-> MPIDRs would be set for them later as appropriate (or not
-> at all, if userspace was an older qemu).
+Hello,
 
-Yup, I recall that. I'm just expanding this discussion into that one.
-If we wanted to single vcpu identifier type, and we wanted it to be
-MPIDR, then I guess we'd want to pass it in to KVM_CREATE_VCPU too, at
-which point we no longer need to set it later with KVM_SET_ONE_REG.
+When discussing a patch [0] with Laurent Pinchart for another series I
+mentioned to him that most callers of v4l2_of_parse_endpoint() weren't
+checking the return value. This is likely due the function kernel-doc
+stating incorrectly that the return value is always 0 but can return a
+negative error code on failure.
 
-Thanks,
-drew
+This trivial patch series fixes the function kernel-doc and add proper
+error checking in all the drivers that are currently not doing so.
+
+This is the second version of the series that fixes some minot issues
+pointed out by Sakari Ailus. The v1 of the series can be found in [1].
+
+[0]: https://lkml.org/lkml/2016/1/6/307
+[1]: https://lkml.org/lkml/2016/1/7/508
+
+Best regards,
+Javier
+
+Changes in v2:
+- Assign pdata to NULL in case v4l2_of_parse_endpoint() fails before kzalloc.
+  Suggested by Sakari Ailus.
+- Assign pdata to NULL in case v4l2_of_parse_endpoint() fails before kzalloc.
+  Suggested by Sakari Ailus.
+
+Javier Martinez Canillas (8):
+  [media] v4l: of: Correct v4l2_of_parse_endpoint() kernel-doc
+  [media] adv7604: Check v4l2_of_parse_endpoint() return value
+  [media] s5c73m3: Check v4l2_of_parse_endpoint() return value
+  [media] s5k5baf: Check v4l2_of_parse_endpoint() return value
+  [media] tvp514x: Check v4l2_of_parse_endpoint() return value
+  [media] tvp7002: Check v4l2_of_parse_endpoint() return value
+  [media] exynos4-is: Check v4l2_of_parse_endpoint() return value
+  [media] omap3isp: Check v4l2_of_parse_endpoint() return value
+
+ drivers/media/i2c/adv7604.c                   |  7 ++++++-
+ drivers/media/i2c/s5c73m3/s5c73m3-core.c      |  4 +++-
+ drivers/media/i2c/s5k5baf.c                   |  5 ++++-
+ drivers/media/i2c/tvp514x.c                   |  6 ++++--
+ drivers/media/i2c/tvp7002.c                   |  6 ++++--
+ drivers/media/platform/exynos4-is/media-dev.c |  8 +++++++-
+ drivers/media/platform/exynos4-is/mipi-csis.c | 10 +++++++---
+ drivers/media/platform/omap3isp/isp.c         |  5 ++++-
+ drivers/media/v4l2-core/v4l2-of.c             |  2 +-
+ 9 files changed, 40 insertions(+), 13 deletions(-)
+
+-- 
+2.4.3
