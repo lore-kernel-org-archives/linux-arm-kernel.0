@@ -1,31 +1,24 @@
-From: mathias.nyman@linux.intel.com (Mathias Nyman)
-Date: Mon, 11 Jan 2016 16:01:44 +0200
-Subject: [RESEND PATCH v2] usb: xhci-mtk: fix AHB bus hang up caused by
- roothubs polling
-In-Reply-To: <1452216517-3765-1-git-send-email-chunfeng.yun@mediatek.com>
-References: <1452216517-3765-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <5693B5C8.6090201@linux.intel.com>
+From: kernel@martin.sperl.org (Martin Sperl)
+Date: Mon, 11 Jan 2016 14:57:46 +0100
+Subject: [PATCH V2 1/2] dt/bindings: serial: bcm2835: add binding
+ documentation for bcm2835-aux-uart
+In-Reply-To: <4288762.bCLxQBDvy4@wuerfel>
+References: <1452344854-2576-1-git-send-email-kernel@martin.sperl.org>
+ <10159898.8xe3rmYdEi@wuerfel>
+ <175E89CE-581C-48AB-B7FF-6E9A41B033D5@martin.sperl.org>
+ <4288762.bCLxQBDvy4@wuerfel>
+Message-ID: <6035A0DD-AD61-48F7-B641-272BB23F3CD8@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.01.2016 03:28, Chunfeng Yun wrote:
-> when ip fails to enter sleep mode, register access protection will
-> be disabled, at the same time if all clocks are disabled, access
-> register will hang up AHB bus.
-> the common case causes ip sleep failure is that after all ports
-> enter U3 but before ip enters sleep mode, a port receives a resume
-> signal('K'). this will happens when such as clicks mouse to try to
-> do remote-wakeup to stop system enter suspend.
-> so stop polling root hubs to avoid access xHCI register on bus
-> suspend, and restart it when bus resumes.
->
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> ---
->   drivers/usb/host/xhci-mtk.c | 23 +++++++++++++++++++++++
 
-The xhci Mediatek (xhci-mtk etc) support is in usb-next and should be available first time
-in 4.5-rc1 kernel.
+> On 11.01.2016, at 13:21, Arnd Bergmann <arnd@arndb.de> wrote:
+> 
+> Please just add another patch to rename the existing uarts appropriately
+> first, then add this one on top with the correct name.
 
-I'll forward fixes for it once 4.5-rc1 is out, they should end up in final 4.5
+I can do that with the next incarnation of the patch.
 
--Mathias
+But would that not break dt-source files, that refer to uart0?
+Is this not considered an API change as well or does this only apply
+to the binary files?
