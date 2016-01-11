@@ -1,53 +1,122 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 11 Jan 2016 12:09:12 +0100
-Subject: [linux-sunxi] Re: [PATCH 0/5] ARM: dts: sunxi: Add backlight node
- to q8 tablets
-In-Reply-To: <5693852A.1060604@gmail.com>
-References: <1442752251-20744-1-git-send-email-hdegoede@redhat.com>
- <fc4adcf5-4362-4d4c-b42e-729922c79f65@googlegroups.com>
- <5677F7CF.3050308@redhat.com> <5693852A.1060604@gmail.com>
-Message-ID: <56938D58.9020204@redhat.com>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Mon, 11 Jan 2016 13:10:54 +0200
+Subject: [PATCH v2 20/32] metag: define __smp_xxx
+In-Reply-To: <20160105000929.GM17861@jhogan-linux.le.imgtec.org>
+References: <1451572003-2440-1-git-send-email-mst@redhat.com>
+ <1451572003-2440-21-git-send-email-mst@redhat.com>
+ <20160105000929.GM17861@jhogan-linux.le.imgtec.org>
+Message-ID: <20160111131001-mutt-send-email-mst@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Jan 05, 2016 at 12:09:30AM +0000, James Hogan wrote:
+> Hi Michael,
+> 
+> On Thu, Dec 31, 2015 at 09:08:22PM +0200, Michael S. Tsirkin wrote:
+> > This defines __smp_xxx barriers for metag,
+> > for use by virtualization.
+> > 
+> > smp_xxx barriers are removed as they are
+> > defined correctly by asm-generic/barriers.h
+> > 
+> > Note: as __smp_XX macros should not depend on CONFIG_SMP, they can not
+> > use the existing fence() macro since that is defined differently between
+> > SMP and !SMP.  For this reason, this patch introduces a wrapper
+> > metag_fence() that doesn't depend on CONFIG_SMP.
+> > fence() is then defined using that, depending on CONFIG_SMP.
+> 
+> I'm not a fan of the inconsistent commit message wrapping. I wrap to 72
+> columns (although I now notice SubmittingPatches says to use 75...).
+> 
+> > 
+> > Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > ---
+> >  arch/metag/include/asm/barrier.h | 32 +++++++++++++++-----------------
+> >  1 file changed, 15 insertions(+), 17 deletions(-)
+> > 
+> > diff --git a/arch/metag/include/asm/barrier.h b/arch/metag/include/asm/barrier.h
+> > index b5b778b..84880c9 100644
+> > --- a/arch/metag/include/asm/barrier.h
+> > +++ b/arch/metag/include/asm/barrier.h
+> > @@ -44,13 +44,6 @@ static inline void wr_fence(void)
+> >  #define rmb()		barrier()
+> >  #define wmb()		mb()
+> >  
+> > -#ifndef CONFIG_SMP
+> > -#define fence()		do { } while (0)
+> > -#define smp_mb()        barrier()
+> > -#define smp_rmb()       barrier()
+> > -#define smp_wmb()       barrier()
+> > -#else
+> 
+> !SMP kernel text differs, but only because of new presence of unused
+> metag_fence() inline function. If I #if 0 that out, then it matches, so
+> thats fine.
+> 
+> > -
+> >  #ifdef CONFIG_METAG_SMP_WRITE_REORDERING
+> >  /*
+> >   * Write to the atomic memory unlock system event register (command 0). This is
+> > @@ -60,26 +53,31 @@ static inline void wr_fence(void)
+> >   * incoherence). It is therefore ineffective if used after and on the same
+> >   * thread as a write.
+> >   */
+> > -static inline void fence(void)
+> > +static inline void metag_fence(void)
+> >  {
+> >  	volatile int *flushptr = (volatile int *) LINSYSEVENT_WR_ATOMIC_UNLOCK;
+> >  	barrier();
+> >  	*flushptr = 0;
+> >  	barrier();
+> >  }
+> > -#define smp_mb()        fence()
+> > -#define smp_rmb()       fence()
+> > -#define smp_wmb()       barrier()
+> > +#define __smp_mb()        metag_fence()
+> > +#define __smp_rmb()       metag_fence()
+> > +#define __smp_wmb()       barrier()
+> >  #else
+> > -#define fence()		do { } while (0)
+> > -#define smp_mb()        barrier()
+> > -#define smp_rmb()       barrier()
+> > -#define smp_wmb()       barrier()
+> > +#define metag_fence()		do { } while (0)
+> > +#define __smp_mb()        barrier()
+> > +#define __smp_rmb()       barrier()
+> > +#define __smp_wmb()       barrier()
+> 
+> Whitespace is now messed up. Admitedly its already inconsistent
+> tabs/spaces, but it'd be nice if the definitions at least still all
+> lined up. You're touching all the definitions which use spaces anyway,
+> so feel free to convert them to tabs while you're at it.
+> 
+> Other than those niggles, it looks sensible to me:
+> Acked-by: James Hogan <james.hogan@imgtec.com>
+> 
+> Cheers
+> James
 
-On 11-01-16 11:34, 8001010 wrote:
-> Hans de Goede wrote:
->> Hi,
->>
->> On 21-12-15 11:56, Silvio Pellicano wrote:
->>>
->>>
->>>> Here is a slightly updated version of Chen-Yu's backlight
->>>> patches, also adding support for the backlight found on A13
->>>> based q8 tablets.
->>>>
->>>
->>> If i compile your dtsi with (obviously) pwm  support enable , backlight
->>> switch off after kernel start,
->>> if i disable pwm in menuconfig,it stay on, all seem correct (pwm on PB2 in
->>> original script.bin),
->>> but there is somewhere a bug in pwm or dtsi description of backlight.
->>
->> No there is not, if you enable the pwm driver you must also enable
->> the backlight-pwm driver / add CONFIG_BACKLIGHT_PWM=y to your .config
->> (and make sure it stays that way after a "make oldconfig").
->>
->> Regards,
->>
->> Hans
->>
-> Now work, but what flag  i have to enable to leave 5v usb otg ON?
-> uboot switch ON Usb Otg voltage but kernel switch off during boot (no usb devices work).
+Thanks!
 
-In order for otg to work you must load a gadget driver, e.g. do:
+I did this in my tree (replaced spaces with tabs in the new
+definitions); not reposting just because of this change.
 
-insmod libcomposite.ko
-insmod u_serial.ko
-insmod usb_f_acm.ko
-insmod g_serial.ko
-
-Regards,
-
-Hans
+> >  #endif
+> > +
+> > +#ifdef CONFIG_SMP
+> > +#define fence() metag_fence()
+> > +#else
+> > +#define fence()		do { } while (0)
+> >  #endif
+> >  
+> > -#define smp_mb__before_atomic()	barrier()
+> > -#define smp_mb__after_atomic()	barrier()
+> > +#define __smp_mb__before_atomic()	barrier()
+> > +#define __smp_mb__after_atomic()	barrier()
+> >  
+> >  #include <asm-generic/barrier.h>
+> >  
+> > -- 
+> > MST
+> > 
