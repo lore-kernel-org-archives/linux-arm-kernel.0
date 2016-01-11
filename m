@@ -1,77 +1,44 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Mon, 11 Jan 2016 21:03:52 +0200
-Subject: [PATCH v5 2/2] ACPI: amba bus probing support
-In-Reply-To: <20160111172433.GV19062@n2100.arm.linux.org.uk>
-References: <1452518790-27053-1-git-send-email-aleksey.makarov@linaro.org>
- <1452518790-27053-3-git-send-email-aleksey.makarov@linaro.org>
- <CAHp75Vew8HMMrc2vdKbSVuB2reOCrwZZg3-a4nBUyfiQ=c0Y4A@mail.gmail.com>
- <20160111152732.GU19062@n2100.arm.linux.org.uk>
- <CAHp75VfND6Gq5XW91mbgN+ZQnxh_SCm9LKNz_zNFvaVd1dgvWg@mail.gmail.com>
- <20160111172433.GV19062@n2100.arm.linux.org.uk>
-Message-ID: <CAHp75VdwsQu12+nkJLKaUL8_pbKmR=kmuK+CyED2-b2Np8EjVg@mail.gmail.com>
+From: xerofoify@gmail.com (Nicholas Krause)
+Date: Mon, 11 Jan 2016 14:10:24 -0500
+Subject: [PATCH RESEND] mpt3sas:Fix missing error checks for calls to
+ _transport_phy_reset in mpt3sas_transport.c
+Message-ID: <1452539424-22916-1-git-send-email-xerofoify@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2016 at 7:24 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Jan 11, 2016 at 06:26:00PM +0200, Andy Shevchenko wrote:
->> On Mon, Jan 11, 2016 at 5:27 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Mon, Jan 11, 2016 at 05:13:20PM +0200, Andy Shevchenko wrote:
->> >> On Mon, Jan 11, 2016 at 3:26 PM, Aleksey Makarov
->> >> <aleksey.makarov@linaro.org> wrote:
->> >> dev->res is 0 before this one, right? Could you use this fact instead
->> >> of address_found flag?
->> >
->> > amba_device_alloc() zero-initialises everything.  However, dev->res is
->> > a struct resource, and I'd prefer _this_ method that the OT is using
->> > to testing some random part of struct resource.
->>
->> So, you mean resource->start = 0 is not enough reliable?
->
-> I'd rather not make assumptions about what in a resource is valid
-> or not valid.
+This adds the missing error checks and paths for functions that
+call _transport_phy_reset and do not correctly check that the
+call to this particular function has succeeded by returning zero
+in the file, mpt3sas_transport.c.
 
-Fair enough.
+Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
+---
+ drivers/scsi/mpt3sas/mpt3sas_transport.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
->> >> > +               default:
->> >> > +                       dev_warn(&adev->dev, "Invalid resource\n");
->> >>
->> >> Why? Isn't possible to have other resources for the devices?
->> >
->> > AMBA primecell devices have one memory region, and a number of
->> > interrupts.  Other resource types don't make sense.
->>
->> But isn't warning on the other side too noisy?
->
-> Why would it be "too noisy" ?  Isn't it saying that the ACPI is in
-> error to include more resource types that aren't part of specifying
-> the AMBA primecell device?  Maybe it should be dev_err(), because
-> it's technically an error...
->
-> Are you expecting people to create ACPI tables with a lot of rubbish
-> resources attached to these devices?
-
-I'm expecting broken ACPI tables coming from some vendors which is
-often the case for some devices.
-I would rather leave it as a warning or move to less verbose level.
-
->> Yes, and in this case ret > 0 should be converted to an appropriate
->> error code, otherwise ACPI core will consider this as a normal
->> execution, right?
->
-> You are assuming that it does return a positive non-zero value in the
-> first place.
-
-Frankly, I didn't check what that function can return, but I'm sure
-that if it will return positive value at some point this will print a
-message and tell ACPI that everything okay when it's not.
-So, here I suppose to have explicit check for that, or at least (if
-you believe that above will never happen) to show that only negative
-numbers are possible as error values.
-
-However, I will not insist if Rafael is okay with the original code.
-
+diff --git a/drivers/scsi/mpt3sas/mpt3sas_transport.c b/drivers/scsi/mpt3sas/mpt3sas_transport.c
+index ca36d7e..bff5a11 100644
+--- a/drivers/scsi/mpt3sas/mpt3sas_transport.c
++++ b/drivers/scsi/mpt3sas/mpt3sas_transport.c
+@@ -1766,7 +1766,7 @@ _transport_phy_enable(struct sas_phy *phy, int enable)
+ 
+ 	/* link reset */
+ 	if (enable)
+-		_transport_phy_reset(phy, 0);
++		rc = _transport_phy_reset(phy, 0);
+ 
+  out:
+ 	kfree(sas_iounit_pg1);
+@@ -1870,7 +1870,9 @@ _transport_phy_speed(struct sas_phy *phy, struct sas_phy_linkrates *rates)
+ 	}
+ 
+ 	/* link reset */
+-	_transport_phy_reset(phy, 0);
++	rc = _transport_phy_reset(phy, 0);
++	if (rc)
++		goto out;
+ 
+ 	/* read phy page 0, then update the rates in the sas transport phy */
+ 	if (!mpt3sas_config_get_phy_pg0(ioc, &mpi_reply, &phy_pg0,
 -- 
-With Best Regards,
-Andy Shevchenko
+2.5.0
