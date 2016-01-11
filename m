@@ -1,60 +1,80 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 11 Jan 2016 10:44:07 +0000
-Subject: [PATCH v5 03/11] arm-cci: Group writes to counter
-In-Reply-To: <568BA043.2020302@arm.com>
+Date: Mon, 11 Jan 2016 10:46:10 +0000
+Subject: [PATCH v5 05/11] arm-cci PMU: Delay counter writes to pmu_enable
+In-Reply-To: <568B93F1.8050202@arm.com>
 References: <1451908490-2615-1-git-send-email-suzuki.poulose@arm.com>
- <1451908490-2615-4-git-send-email-suzuki.poulose@arm.com>
- <20160104190353.GC17127@leverpostej> <568BA043.2020302@arm.com>
-Message-ID: <20160111104407.GD6499@leverpostej>
+ <1451908490-2615-6-git-send-email-suzuki.poulose@arm.com>
+ <20160104192401.GD17127@leverpostej> <568B93F1.8050202@arm.com>
+Message-ID: <20160111104609.GE6499@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 05, 2016 at 10:51:47AM +0000, Suzuki K. Poulose wrote:
-> On 04/01/16 19:03, Mark Rutland wrote:
-> >On Mon, Jan 04, 2016 at 11:54:42AM +0000, Suzuki K. Poulose wrote:
-> >>Add a helper to group the writes to PMU counter, this will be
-> >>used to delay setting the event period to pmu::pmu_enable()
-> >>
+On Tue, Jan 05, 2016 at 09:59:13AM +0000, Suzuki K. Poulose wrote:
+> On 04/01/16 19:24, Mark Rutland wrote:
+> >On Mon, Jan 04, 2016 at 11:54:44AM +0000, Suzuki K. Poulose wrote:
+> >>Delay setting the event periods for enabled events to pmu::pmu_enable().
+> >>We mark the event.hw->state PERF_HES_ARCH for the events that we know
+> >>have their counts recorded and have been started.
+> >
+> >Please add a comment to the code stating exactly what PERF_HES_ARCH
+> >means for the CCI PMU driver, so it's easy to find.
+> >
 > 
-> >>+/* Write a value to a given set of counters */
-> >>+static void __pmu_write_counters(struct cci_pmu *cci_pmu, unsigned long *mask, u32 value)
+> Sure.
+> 
+> >>+void cci_pmu_update_counters(struct cci_pmu *cci_pmu)
 > >>+{
 > >>+	int i;
+> >>+	unsigned long mask[BITS_TO_LONGS(cci_pmu->num_cntrs)];
+> >
+> >I think this can be:
+> >
+> >	DECLARE_BITMAP(mask, cci_pmu->num_cntrs);
+> >
 > >>+
-> >>+	for_each_set_bit(i, mask, cci_pmu->num_cntrs)
-> >>+		__pmu_write_counter(cci_pmu, value, i);
-> >>+}
+> >>+	memset(mask, 0, BITS_TO_LONGS(cci_pmu->num_cntrs) * sizeof(unsigned long));
 > >
-> >I don't understand this as-is. Why do all the counters have the same
-> >value?
-> 
-> The only value we write to the counters is the period. This routine writes
-> a given value to a set of counters specified by the mask (not to be confused
-> with the PMU->hw_events->mask). This will help to group the writes to the counters,
-> especially since preparatory steps to write to a single counter itself is costly.
-> So, we do all the preparation only once for a batch of counters.
-> 
-> The other option is to use hw_events->prev_count (which should be set before calling
-> the function) for each counter specified in the mask. I am fine with either of the
-> two.
-
-I think this would be clearer using prev_count.
-
-I guess it doesn't matter since we won't support sampling, but it would
-match the shape of other PMU drivers.
-
-> >>+static void __maybe_unused
-> >>+pmu_write_counters(struct cci_pmu *cci_pmu, unsigned long *mask, u32 value)
-> >>+{
-> >>+	__pmu_write_counters(cci_pmu, mask, value);
-> >>+}
+> >Likewise:
 > >
-> >Why are these not just one function for now?
+> >	bitmap_zero(mask, cci_pmu->num_cntrs);
 > 
-> Yes, this could be just one function for now, until we introduce the hooks. This was
-> a written to avoid another refactoring in the later patch.
+> OK
+> 
+> >>+		if (!cci_pmu->hw_events.events[i]) {
+> >>+			WARN_ON(1);
+> >>+			continue;
+> >>+		}
+> >>+
+> >
+> >		if (WARN_ON(!cci_pmu->hw_events.events[i]))
+> >			continue;
+> 
+> OK
+> >>@@ -980,8 +1015,11 @@ static void cci_pmu_start(struct perf_event *event, int pmu_flags)
+> >>  	/* Configure the counter unless you are counting a fixed event */
+> >>  	if (!pmu_fixed_hw_idx(cci_pmu, idx))
+> >>  		pmu_set_event(cci_pmu, idx, hwc->config_base);
+> >>-
+> >>-	pmu_event_set_period(event);
+> >>+	/*
+> >>+	 * Mark this counter, so that we can program the
+> >>+	 * counter with the event_period. see cci_pmu_enable()
+> >>+	 */
+> >>+	hwc->state = PERF_HES_ARCH;
+> >
+> >Why couldn't we have kept pmu_event_set_period here, and have that set
+> >prev_count and PERF_HES_ARCH?
+> >
+> >Then we'd be able to do the same betching for overflow too.
+> 
+> The pmu is not disabled while we are in overflow irq handler. Hence there may
+> not be a pmu_enable() which would set the period for the counter which
+> overflowed, if defer the write in that case. Is that assumption wrong ?
 
-Ok. Either way is fine.
+As the driver stands today, yes.
+
+However, wouldn't it make more sense to disable the PMU for the overflow
+handler, such that we can reuse the batching logic?
 
 Thanks,
 Mark.
