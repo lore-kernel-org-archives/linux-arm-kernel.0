@@ -1,92 +1,70 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Mon, 11 Jan 2016 15:39:21 -0800
-Subject: [PATCH v6 1/6] arm/arm64: KVM: Introduce armv7 fp/simd vcpu fields
- and helpers
-In-Reply-To: <20160110163204.GD30867@cbox>
-References: <1451166900-3711-1-git-send-email-m.smarduch@samsung.com>
- <1451166900-3711-2-git-send-email-m.smarduch@samsung.com>
- <20160110163204.GD30867@cbox>
-Message-ID: <56943D29.3000002@samsung.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 11 Jan 2016 15:39:39 -0800
+Subject: arm qemu boot failures in -next due to 'PM / Domains: add setter
+ for dev.pm_domain'
+In-Reply-To: <7302125.veLBHLkdLG@vostro.rjw.lan>
+References: <5693EB8A.40802@roeck-us.net> <20160111185459.GZ12777@atomide.com>
+ <20160111200450.GA16902@roeck-us.net>
+ <7302125.veLBHLkdLG@vostro.rjw.lan>
+Message-ID: <56943D3B.8010600@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 1/10/2016 8:32 AM, Christoffer Dall wrote:
-> Hi Mario,
-> 
-> I spotted one more potential issue...
-> 
-> On Sat, Dec 26, 2015 at 01:54:55PM -0800, Mario Smarduch wrote:
->> Add helper functions to enable access to fp/smid on guest entry and save host
->> fpexc on vcpu put, check if fp/simd registers are dirty and add new vcpu
->> fields.
+On 01/11/2016 02:49 PM, Rafael J. Wysocki wrote:
+> On Monday, January 11, 2016 12:04:50 PM Guenter Roeck wrote:
+>> On Mon, Jan 11, 2016 at 10:55:00AM -0800, Tony Lindgren wrote:
+>>> * Guenter Roeck <linux@roeck-us.net> [160111 09:51]:
+>>>> Hi,
+>>>>
+>>>> I see 6 out of 24 arm qemu tests failing in next-20160111. Bisect points
+>>>> to commit 989561de9b51 ("PM / Domains: add setter for dev.pm_domain").
+>>>> Failures are silent - there is no output on the console.
+>>>> Affected tests are
+>>>>
+>>>> arm:beagle:multi_v7_defconfig:omap3-beagle
+>>>> arm:beaglexm:multi_v7_defconfig:omap3-beagle-xm
+>>>> arm:overo:multi_v7_defconfig:omap3-overo-tobi
+>>>> arm:beagle:omap2plus_defconfig:omap3-beagle
+>>>> arm:beaglexm:omap2plus_defconfig:omap3-beagle-xm
+>>>> arm:overo:omap2plus_defconfig:omap3-overo-tobi
+>>>>
+>>>> For details please see the 'next' column at http://server.roeck-us.net:8010/builders.
+>>>>
+>>>> Reverting the offending commit fixes the problems.
+>>>>
+>>>> Please let me know if there is anything I can do to help tracking down the problem.
+>>>
+>>> The following fixes the booting, but I wonder if it's a
 >>
->> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
->> ---
->>  arch/arm/include/asm/kvm_emulate.h   | 42 ++++++++++++++++++++++++++++++++++++
->>  arch/arm/include/asm/kvm_host.h      |  6 ++++++
->>  arch/arm64/include/asm/kvm_emulate.h |  8 +++++++
->>  3 files changed, 56 insertions(+)
+>> Yes, it does.
 >>
->> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
->> index 3095df0..d4d9da1 100644
->> --- a/arch/arm/include/asm/kvm_emulate.h
->> +++ b/arch/arm/include/asm/kvm_emulate.h
->> @@ -24,6 +24,8 @@
->>  #include <asm/kvm_mmio.h>
->>  #include <asm/kvm_arm.h>
->>  #include <asm/cputype.h>
->> +#include <asm/vfp.h>
->> +#include "../vfp/vfpinstr.h"
->>  
->>  unsigned long *vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num);
->>  unsigned long *vcpu_spsr(struct kvm_vcpu *vcpu);
->> @@ -255,4 +257,44 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
->>  	}
->>  }
->>  
->> +#ifdef CONFIG_VFPv3
->> +/* Called from vcpu_load - save fpexc and enable guest access to fp/simd unit */
->> +static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
->> +{
->> +	u32 fpexc;
->> +
->> +	/* Save host fpexc, and enable guest access to fp unit */
->> +	fpexc = fmrx(FPEXC);
->> +	vcpu->arch.host_fpexc = fpexc;
->> +	fpexc |= FPEXC_EN;
->> +	fmxr(FPEXC, fpexc);
->> +
->> +	/* Configure HCPTR to trap on tracing and fp/simd access */
->> +	vcpu->arch.hcptr = HCPTR_TTA | HCPTR_TCP(10)  | HCPTR_TCP(11);
->> +}
->> +
->> +/* Called from vcpu_put - restore host fpexc */
->> +static inline void vcpu_restore_host_fpexc(struct kvm_vcpu *vcpu)
->> +{
->> +	fmxr(FPEXC, vcpu->arch.host_fpexc);
->> +}
->> +
->> +/* If trap bits are reset then fp/simd registers are dirty */
->> +static inline bool vcpu_vfp_isdirty(struct kvm_vcpu *vcpu)
->> +{
->> +	return !(vcpu->arch.hcptr & (HCPTR_TCP(10) | HCPTR_TCP(11)));
->> +}
->> +#else
->> +static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
->> +{
->> +	vcpu->arch.hcptr = HCPTR_TTA;
-> 
-> Is it correct not to trap VFP registers when the host kernel does not
-> have CONFIG_VFPv3?  I think this is a change in functionality compared
-> to the current kernels is it not?
+>> Tested-by: Guenter Roeck <linux@roeck-us.net>
+>>
+>>> proper fix?
+>>>
+>> That I don't know.
+>
+> If I'm not mistaken, what happens is that device_is_bound() tries to
+> dereference dev->p which is NULL.  If that's the case, the appended one
+> should help too.
+>
+> Can you please check?
+>
+> ---
+>   drivers/base/dd.c |    2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> Index: linux-pm/drivers/base/dd.c
+> ===================================================================
+> --- linux-pm.orig/drivers/base/dd.c
+> +++ linux-pm/drivers/base/dd.c
+> @@ -234,7 +234,7 @@ late_initcall(deferred_probe_initcall);
+>    */
+>   bool device_is_bound(struct device *dev)
+>   {
+> -	return klist_node_attached(&dev->p->knode_driver);
+> +	return dev->p && klist_node_attached(&dev->p->knode_driver);
 
-With CPU_V7 VFPv3 gets selected, without it fp should be emulated,
-with exceptions taken in guest kernel. I don't see a reason why
-fp hcptr access should be enabled in that case.
+Yes, that fixes the problem as well.
 
-> 
-> Thanks,
-> -Christoffer
-> 
+Guenter
