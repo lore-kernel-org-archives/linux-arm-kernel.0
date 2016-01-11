@@ -1,58 +1,73 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 11 Jan 2016 10:09:02 +0000
-Subject: ION DTS changes for HiKey in -next
-In-Reply-To: <568FFC8B.3090101@labbott.name>
-References: <20160107173744.GJ6588@sirena.org.uk>
- <20160108050214.GD30293@kroah.com>
- <20160108124439.GL6588@sirena.org.uk>
- <20160108135552.GE3097@leverpostej> <568FFC8B.3090101@labbott.name>
-Message-ID: <20160111100902.GA6499@leverpostej>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 11 Jan 2016 10:18:46 +0000
+Subject: [PATCH 05/10] arm64: dts: r8a7795: Add pmu device nodes
+In-Reply-To: <5690AA7A.4000303@gmail.com>
+References: <cover.1450401186.git.horms+renesas@verge.net.au>
+ <a6b6b478459be0c5614626ba6ac95df05a7fc5e9.1450401186.git.horms+renesas@verge.net.au>
+ <5673DCF7.1050008@arm.com> <5673E39C.6050206@gmail.com>
+ <5673E437.7020300@arm.com> <5690AA7A.4000303@gmail.com>
+Message-ID: <56938186.3010202@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 08, 2016 at 10:14:35AM -0800, Laura Abbott wrote:
-> On 1/8/16 5:55 AM, Mark Rutland wrote:
-> >On Fri, Jan 08, 2016 at 12:44:39PM +0000, Mark Brown wrote:
-> >>On Thu, Jan 07, 2016 at 09:02:14PM -0800, Greg Kroah-Hartman wrote:
-> >>>On Thu, Jan 07, 2016 at 05:37:44PM +0000, Mark Brown wrote:
-> >>
-> >>>>I was just looking at DTs in -next and noticed that there is a patch
-> >>>>59dfafd03fc (arm64: dts: Add dts files to enable ION on Hi6220 SoC)
-> >>>>which adds at DT doing something for ION.  Are we sure this should be
-> >>>>going into the main production DT?  The bindings haven't been reviewed
-> >>>>as far as I can tell, the matching driver is only in staging and hasn't
-> >>>>been posted upstream.
-> >>
-> >>>Isn't "staging" upstream enough for this?  :)
-> >>
-> >>I wouldn't have thought so, DTs are supposed to be an ABI so we want
-> >>proper review and having had a quick glance this doesn't look like it's
-> >>a hardware description so it's not clear to me it should be in DT at all.
-> >
-> >Indeed.
-> >
-> >The driver and the binding before that don't really belong either,
-> >I would have NAK'd those on devicetree at vger.kernel.org, though it
-> >appears I either missed them or they never made it to that list.
-> >
-> > From my PoV there should not be a platform-specific ION binding. If we
-> >need one at all, people should work on the proposed generic binding [1]
-> >or figure out how to do this with the existing reserved-memory bindings.
-> >
-> >Thanks,
-> >Mark.
-> >
-> >[1] https://lkml.org/lkml/2015/10/6/854
-> 
-> I posted v2 back in November
-> (http://article.gmane.org/gmane.linux.drivers.driver-project.devel/80475)
-> but there wasn't much in the way of review comments. More feedback there
-> would be appreciated or I can resend.
 
-A resend would be appeciated, as that's easier to reply to.
 
-I'm still a little fuzzy on why this can't be done with reserved-memory,
-but that's a discussion better left for the thread with the patches.
+On 09/01/16 06:36, Dirk Behme wrote:
+> On 18.12.2015 11:47, Sudeep Holla wrote:
+>>
+>>
+>> On 18/12/15 10:44, Dirk Behme wrote:
+>>> On 18.12.2015 11:16, Sudeep Holla wrote:
 
-Thanks,
-Mark.
+[...]
+
+>>>>
+>>>> Please use arm,cortex-a57-pmu to be more specific. IIRC I mentioned
+>>>> this for some shmobile platform recently.
+>>>
+>>> Yes. But as this patch has been applied already to some branches, I
+>>> incorporated your a57-pmu hint with an additional update patch:
+>>>
+>>> http://marc.info/?l=linux-sh&m=145011467914857
+>>>
+>>> Feel free to squash if still possible.
+>>>
+>>
+>> Ah OK, I didn't know the exact dts name, sorry for the noise.
+>> Better if it was posted as part of this series :)
+>
+>
+> I finally found some time to test this
+>
+> http://marc.info/?l=linux-sh&m=145011467914857
+>
+> and surprisingly it doesn't seem to work:
+>
+> Using "arm,cortex-a57-pmu" results in
+>
+> hw perfevents: enabled with armv8_cortex_a57 PMU driver, 7 counters available
+
+I had a quick look at the DT in the link above and IIUC A57 PMU's are
+successfully probed.
+
+> hw perfevents: failed to probe PMU!
+> hw perfevents: failed to register PMU devices!
+>
+
+This must be for A53 PMUs. So I suspect if the update DT is passed
+correctly to the kernel.
+
+> while switching back to "arm,armv8-pmuv3" successfully gives
+>
+> hw perfevents: enabled with armv8_pmuv3 PMU driver, 7 counters available
+>
+> without any further error messages.
+>
+> Any idea?
+
+You need to check if of_pmu_irq_cfg is failing.
+Is the updated DT picked up correctly ?
+
+-- 
+Regards,
+Sudeep
