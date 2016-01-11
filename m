@@ -1,62 +1,90 @@
-From: liviu.dudau@arm.com (Liviu Dudau)
-Date: Mon, 11 Jan 2016 10:37:18 +0000
-Subject: [PATCH] drm: arm-hdlcd: remove DMA_CMA select
-In-Reply-To: <4194408.X82ccDjh5X@wuerfel>
-References: <4194408.X82ccDjh5X@wuerfel>
-Message-ID: <20160111103718.GA13633@e106497-lin.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 11 Jan 2016 10:39:17 +0000
+Subject: [PATCH 05/10] arm64: dts: r8a7795: Add pmu device nodes
+In-Reply-To: <5690AA7A.4000303@gmail.com>
+References: <cover.1450401186.git.horms+renesas@verge.net.au>
+ <a6b6b478459be0c5614626ba6ac95df05a7fc5e9.1450401186.git.horms+renesas@verge.net.au>
+ <5673DCF7.1050008@arm.com> <5673E39C.6050206@gmail.com>
+ <5673E437.7020300@arm.com> <5690AA7A.4000303@gmail.com>
+Message-ID: <20160111103916.GC6499@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 01, 2016 at 03:09:10PM +0100, Arnd Bergmann wrote:
-> The newly added DRM_HDLCD driver tries to select DMA_CMA, but that is
-> not necessarily possible, as not all configurations contain HAVE_DMA_CONTIGUOUS:
+On Sat, Jan 09, 2016 at 07:36:42AM +0100, Dirk Behme wrote:
+> On 18.12.2015 11:47, Sudeep Holla wrote:
+> >
+> >
+> >On 18/12/15 10:44, Dirk Behme wrote:
+> >>On 18.12.2015 11:16, Sudeep Holla wrote:
+> >>>
+> >>>
+> >>>On 18/12/15 02:29, Simon Horman wrote:
+> >>>>From: Yoshifumi Hosoya <yoshifumi.hosoya.wj@renesas.com>
+> >>>>
+> >>>>Enabling the performance monitor unit on r8a7795.
+> >>>>
+> >>>>Signed-off-by: Masaru Nagai <masaru.nagai.vx@renesas.com>
+> >>>>Signed-off-by: Yoshifumi Hosoya <yoshifumi.hosoya.wj@renesas.com>
+> >>>>Signed-off-by: Dirk Behme <dirk.behme@gmail.com>
+> >>>>Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >>>>---
+> >>>>  arch/arm64/boot/dts/renesas/r8a7795.dtsi | 12 ++++++++++++
+> >>>>  1 file changed, 12 insertions(+)
+> >>>>
+> >>>>diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> >>>>b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> >>>>index 4d43cf31418f..b9229a49dabc 100644
+> >>>>--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> >>>>+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> >>>>@@ -230,6 +230,18 @@
+> >>>>              power-domains = <&cpg>;
+> >>>>          };
+> >>>>
+> >>>>+        pmu {
+> >>>>+            compatible = "arm,armv8-pmuv3";
+> >>>
+> >>>Please use arm,cortex-a57-pmu to be more specific. IIRC I mentioned
+> >>>this
+> >>>for some shmobile platform recently.
+> >>
+> >>
+> >>Yes. But as this patch has been applied already to some branches, I
+> >>incorporated your a57-pmu hint with an additional update patch:
+> >>
+> >>http://marc.info/?l=linux-sh&m=145011467914857
+> >>
+> >>Feel free to squash if still possible.
+> >>
+> >
+> >Ah OK, I didn't know the exact dts name, sorry for the noise.
+> >Better if it was posted as part of this series :)
 > 
-> warning: (DRM_HDLCD) selects DMA_CMA which has unmet direct dependencies (HAVE_DMA_CONTIGUOUS && CMA)
-> drivers/built-in.o: In function `dma_alloc_from_contiguous':
-> :(.text+0x1dee00): undefined reference to `cma_alloc'
-> drivers/built-in.o: In function `dma_release_from_contiguous':
-> :(.text+0x1dee24): undefined reference to `cma_release'
 > 
-> This removes the 'select' statement. It is not needed because CMA is meant
-> to transparently change the behavior of dma_alloc_coherent to make it succeed
-> for larger allocations, but there is no actual build-time dependency, and
-> the driver can still work without CMA in many cases.
+> I finally found some time to test this
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 1561e558334d ("drm: Add support for ARM's HDLCD controller.")
-
-Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
-
-Arnd, are you going to send these corrections yourself or should I pull them
-into my tree (possibly squashing them before sending the pull request to
-Dave Airlie) ?
-
-Best regards,
-Liviu
-
-> ---
-> Found on ARM randconfig builds with yesterday's linux-next
+> http://marc.info/?l=linux-sh&m=145011467914857
 > 
-> diff --git a/drivers/gpu/drm/arm/Kconfig b/drivers/gpu/drm/arm/Kconfig
-> index 5e8c8a86860b..2f4d3b7fb871 100644
-> --- a/drivers/gpu/drm/arm/Kconfig
-> +++ b/drivers/gpu/drm/arm/Kconfig
-> @@ -10,7 +10,6 @@ config DRM_HDLCD
->  	depends on DRM_ARM
->  	depends on COMMON_CLK
->  	select COMMON_CLK_SCPI
-> -	select DMA_CMA
->  	select DRM_KMS_CMA_HELPER
->  	select DRM_GEM_CMA_HELPER
->  	help
+> and surprisingly it doesn't seem to work:
 > 
+> Using "arm,cortex-a57-pmu" results in
+> 
+> hw perfevents: enabled with armv8_cortex_a57 PMU driver, 7 counters
+> available
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+This means all the probing logic worked for the A57 PMU.
+
+> hw perfevents: failed to probe PMU!
+> hw perfevents: failed to register PMU devices!
+
+These are printed in arm_pmu_device_probe, and following the logic we
+must have succesfully allocated the struct pmu, but failed in either
+of_pmu_irq_cfg or init_fn (AKA armv8_a53_pmu_init).
+
+In armv8_a53_pmu_init we call armv8pmu_probe_num_events, which will try
+to SMP cross-call to an A53 core to probe the number of countesr
+implemented. Perhaps the cross-call is failing.
+
+Were the A53s online at this point?
+
+Thanks,
+Mark.
