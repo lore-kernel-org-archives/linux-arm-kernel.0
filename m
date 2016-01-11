@@ -1,153 +1,68 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Mon, 11 Jan 2016 17:13:20 +0200
-Subject: [PATCH v5 2/2] ACPI: amba bus probing support
-In-Reply-To: <1452518790-27053-3-git-send-email-aleksey.makarov@linaro.org>
-References: <1452518790-27053-1-git-send-email-aleksey.makarov@linaro.org>
- <1452518790-27053-3-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <CAHp75Vew8HMMrc2vdKbSVuB2reOCrwZZg3-a4nBUyfiQ=c0Y4A@mail.gmail.com>
+From: laura@labbott.name (Laura Abbott)
+Date: Mon, 11 Jan 2016 07:18:57 -0800
+Subject: ION DTS changes for HiKey in -next
+In-Reply-To: <20160109050503.GA4489@kroah.com>
+References: <20160107173744.GJ6588@sirena.org.uk>
+ <20160108050214.GD30293@kroah.com> <20160108124439.GL6588@sirena.org.uk>
+ <20160108135552.GE3097@leverpostej> <568FFC8B.3090101@labbott.name>
+ <20160109050503.GA4489@kroah.com>
+Message-ID: <5693C7E1.7080807@labbott.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2016 at 3:26 PM, Aleksey Makarov
-<aleksey.makarov@linaro.org> wrote:
-> From: Graeme Gregory <graeme.gregory@linaro.org>
+On 1/8/16 9:05 PM, Greg Kroah-Hartman wrote:
+> On Fri, Jan 08, 2016 at 10:14:35AM -0800, Laura Abbott wrote:
+>> On 1/8/16 5:55 AM, Mark Rutland wrote:
+>>> On Fri, Jan 08, 2016 at 12:44:39PM +0000, Mark Brown wrote:
+>>>> On Thu, Jan 07, 2016 at 09:02:14PM -0800, Greg Kroah-Hartman wrote:
+>>>>> On Thu, Jan 07, 2016 at 05:37:44PM +0000, Mark Brown wrote:
+>>>>
+>>>>>> I was just looking at DTs in -next and noticed that there is a patch
+>>>>>> 59dfafd03fc (arm64: dts: Add dts files to enable ION on Hi6220 SoC)
+>>>>>> which adds at DT doing something for ION.  Are we sure this should be
+>>>>>> going into the main production DT?  The bindings haven't been reviewed
+>>>>>> as far as I can tell, the matching driver is only in staging and hasn't
+>>>>>> been posted upstream.
+>>>>
+>>>>> Isn't "staging" upstream enough for this?  :)
+>>>>
+>>>> I wouldn't have thought so, DTs are supposed to be an ABI so we want
+>>>> proper review and having had a quick glance this doesn't look like it's
+>>>> a hardware description so it's not clear to me it should be in DT at all.
+>>>
+>>> Indeed.
+>>>
+>>> The driver and the binding before that don't really belong either,
+>>> I would have NAK'd those on devicetree at vger.kernel.org, though it
+>>> appears I either missed them or they never made it to that list.
+>>>
+>>>  From my PoV there should not be a platform-specific ION binding. If we
+>>> need one at all, people should work on the proposed generic binding [1]
+>>> or figure out how to do this with the existing reserved-memory bindings.
+>>>
+>>> Thanks,
+>>> Mark.
+>>>
+>>> [1] https://lkml.org/lkml/2015/10/6/854
+>>
+>> I posted v2 back in November
+>> (http://article.gmane.org/gmane.linux.drivers.driver-project.devel/80475)
+>> but there wasn't much in the way of review comments. More feedback there
+>> would be appreciated or I can resend.
 >
-> On ARM64 some devices use the AMBA device and not the platform bus for
-> probing so add support for this. Uses a dummy clock for apb_pclk as ACPI
-> does not have a suitable clock representation and to keep the core
-> AMBA bus code unchanged between probing methods.
+> I still have those in my queue, but was waiting for someone to chime in
+> on them.  I guess if no one objected, that means I should accept them?
+> :)
+
+Before accepting them. I'd rather have some acknowledgement from the DT
+maintainers that these bindings are moving in the right direction or
+at least a better idea than the per platform bindings.
+
+>
+> thanks,
+>
+> greg k-h
 >
 
-My comments below.
-
-> +++ b/drivers/acpi/acpi_amba.c
-> @@ -0,0 +1,122 @@
-> +
-> +/*
-> + * ACPI support for platform bus type.
-> + *
-> + * Copyright (C) 2015, Linaro Ltd
-> + * Author: Graeme Gregory <graeme.gregory@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/acpi.h>
-> +#include <linux/amba/bus.h>
-> +#include <linux/clkdev.h>
-> +#include <linux/clk-provider.h>
-> +#include <linux/device.h>
-> +#include <linux/err.h>
-> +#include <linux/ioport.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +
-> +#include "internal.h"
-> +
-> +static const struct acpi_device_id amba_id_list[] = {
-> +       {"ARMH0061", 0}, /* PL061 GPIO Device */
-> +       {"", 0},
-> +};
-> +
-> +static void amba_register_dummy_clk(void)
-> +{
-> +       static struct clk *amba_dummy_clk;
-> +
-> +       /* If clock already registered */
-> +       if (amba_dummy_clk)
-> +               return;
-> +
-> +       amba_dummy_clk = clk_register_fixed_rate(NULL, "apb_pclk", NULL,
-> +                                               CLK_IS_ROOT, 0);
-> +       clk_register_clkdev(amba_dummy_clk, "apb_pclk", NULL);
-> +}
-> +
-> +static int amba_handler_attach(struct acpi_device *adev,
-> +                               const struct acpi_device_id *id)
-> +{
-> +       struct amba_device *dev;
-> +       struct resource_entry *rentry;
-> +       struct list_head resource_list;
-> +       bool address_found = false;
-> +       int irq_no = 0;
-> +       int ret;
-> +
-> +       /* If the ACPI node already has a physical device attached, skip it. */
-> +       if (adev->physical_node_count)
-> +               return 0;
-> +
-> +       dev = amba_device_alloc(dev_name(&adev->dev), 0, 0);
-> +       if (!dev) {
-> +               dev_err(&adev->dev, "%s(): amba_device_alloc() failed\n",
-> +                       __func__);
-> +               return -ENOMEM;
-> +       }
-> +
-> +       INIT_LIST_HEAD(&resource_list);
-> +       ret = acpi_dev_get_resources(adev, &resource_list, NULL, NULL);
-> +       if (ret < 0)
-> +               goto err_free;
-> +
-> +       list_for_each_entry(rentry, &resource_list, node) {
-> +               switch (resource_type(rentry->res)) {
-> +               case IORESOURCE_MEM:
-> +                       if (!address_found) {
-> +                               dev->res = *rentry->res;
-
-dev->res is 0 before this one, right? Could you use this fact instead
-of address_found flag?
-
-> +                               address_found = true;
-> +                       }
-> +                       break;
-> +               case IORESOURCE_IRQ:
-> +                       if (irq_no < AMBA_NR_IRQS)
-> +                               dev->irq[irq_no++] = rentry->res->start;
-> +                       break;
-> +               default:
-> +                       dev_warn(&adev->dev, "Invalid resource\n");
-
-Why? Isn't possible to have other resources for the devices?
-
-> +                       break;
-> +               }
-> +       }
-> +
-> +       acpi_dev_free_resource_list(&resource_list);
-> +
-> +       /*
-> +        * If the ACPI node has a parent and that parent has a physical device
-> +        * attached to it, that physical device should be the parent of
-> +        * the amba device we are about to create.
-> +        */
-> +       if (adev->parent)
-> +               dev->dev.parent = acpi_get_first_physical_node(adev->parent);
-> +
-> +       ACPI_COMPANION_SET(&dev->dev, adev);
-> +
-> +       ret = amba_device_add(dev, &iomem_resource);
-> +       if (ret) {
-
-ret < 0?
-
-What to do if ret > 0? It will be considered as not error. Please,
-check what function returns and adjust this.
-
-> +               dev_err(&adev->dev, "%s(): amba_device_add() failed (%d)\n",
-> +                      __func__, ret);
-> +               goto err_free;
-> +       }
-> +
-> +       return 1;
-> +
-> +err_free:
-> +       amba_device_put(dev);
-> +       return ret;
-> +}
-
-
--- 
-With Best Regards,
-Andy Shevchenko
+Thanks,
+Laura
