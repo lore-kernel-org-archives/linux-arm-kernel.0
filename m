@@ -1,55 +1,58 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 11 Jan 2016 06:21:14 +0000
-Subject: [PATCH] mfd: as3722: mark PM functions as __maybe_unused
-In-Reply-To: <2162790.qeSmLiztNV@wuerfel>
-References: <2162790.qeSmLiztNV@wuerfel>
-Message-ID: <20160111062114.GO3331@x1>
+Date: Mon, 11 Jan 2016 06:54:41 +0000
+Subject: [PATCH v10 4/8] mfd: fsl imx25 Touchscreen ADC driver
+In-Reply-To: <1450101234-2191-5-git-send-email-mpa@pengutronix.de>
+References: <1450101234-2191-1-git-send-email-mpa@pengutronix.de>
+ <1450101234-2191-5-git-send-email-mpa@pengutronix.de>
+Message-ID: <20160111065441.GW3331@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 08 Dec 2015, Arnd Bergmann wrote:
+On Mon, 14 Dec 2015, Markus Pargmann wrote:
 
-> The newly introduced as3722_i2c_suspend/resume functions are built
-> unconditionally, but only used when power management is enabled,
-> so we get a warning otherwise:
+> This is the core driver for imx25 touchscreen/adc driver. The module
+> has one shared ADC and two different conversion queues which use the
+> ADC. The two queues are identical. Both can be used for general purpose
+> ADC but one is meant to be used for touchscreens.
 > 
-> drivers/mfd/as3722.c:427:12: warning: 'as3722_i2c_suspend' defined but not used [-Wunused-function]
-> drivers/mfd/as3722.c:438:12: warning: 'as3722_i2c_resume' defined but not used [-Wunused-function]
+> This driver is the core which manages the central components and
+> registers of the TSC/ADC unit. It manages the IRQs and forwards them to
+> the correct components.
 > 
-> This marks them both as __maybe_unused, which avoids an ugly #ifdef
-> and gives us best compile-time coverage. When they are unused, the
-> compiler will silently drop the functions from its output.
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 35deff7eb212 ("mfd: as3722: Handle interrupts on suspend")
+> [ensure correct ADC clock depending on the IPG clock]
+> Signed-off-by: Juergen Borleis <jbe@pengutronix.de>
+> Acked-by: Jonathan Cameron <jic23@kernel.org>
 > ---
->  drivers/mfd/as3722.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> Notes:
+>     Changes in v7:
+>      - Cleanup bit defines in header files to be more readable
+>      - Fix irq check to return with an error for irq <= 0
+>      - Add COMPILE_TEST in Kconfig file
+>     
+>     Changes in v5:
+>      - Remove ifdef CONFIG_OF as this driver is only for DT usage
+>      - Remove module owner
+>      - Add Kconfig dependencies ARCH_MX25 and OF
+> 
+>  drivers/mfd/Kconfig             |   9 ++
+>  drivers/mfd/Makefile            |   2 +
+>  drivers/mfd/fsl-imx25-tsadc.c   | 203 ++++++++++++++++++++++++++++++++++++++++
+>  include/linux/mfd/imx25-tsadc.h | 140 +++++++++++++++++++++++++++
+>  4 files changed, 354 insertions(+)
+>  create mode 100644 drivers/mfd/fsl-imx25-tsadc.c
+>  create mode 100644 include/linux/mfd/imx25-tsadc.h
 
-Applied, thanks.
+For my own reference:
+  Acked-by: Lee Jones <lee.jones@linaro.org>
 
-> diff --git a/drivers/mfd/as3722.c b/drivers/mfd/as3722.c
-> index 3b21eb4bc480..e1f597f97f86 100644
-> --- a/drivers/mfd/as3722.c
-> +++ b/drivers/mfd/as3722.c
-> @@ -424,7 +424,7 @@ static int as3722_i2c_remove(struct i2c_client *i2c)
->  	return 0;
->  }
->  
-> -static int as3722_i2c_suspend(struct device *dev)
-> +static int __maybe_unused as3722_i2c_suspend(struct device *dev)
->  {
->  	struct as3722 *as3722 = dev_get_drvdata(dev);
->  
-> @@ -435,7 +435,7 @@ static int as3722_i2c_suspend(struct device *dev)
->  	return 0;
->  }
->  
-> -static int as3722_i2c_resume(struct device *dev)
-> +static int __maybe_unused as3722_i2c_resume(struct device *dev)
->  {
->  	struct as3722 *as3722 = dev_get_drvdata(dev);
->  
+I will apply this and sent out pull-requests to the relevant
+maintainers once -rc1 is out.
+
+[...]
 
 -- 
 Lee Jones
