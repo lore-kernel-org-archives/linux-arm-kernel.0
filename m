@@ -1,96 +1,165 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 11 Jan 2016 10:56:30 -0500
-Subject: [PATCH V2 00/23] MMCONFIG refactoring and support for ARM64 PCI
- hostbridge init based on ACPI
-In-Reply-To: <20160111153949.GA2366@red-moon>
-References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
- <20151221121050.GB11145@red-moon> <5677F3C8.8040200@semihalf.com>
- <201512211515.55447.arnd@arndb.de>
- <b3750d7918712f6035ea875d90c25471.squirrel@www.codeaurora.org>
- <20160111153949.GA2366@red-moon>
-Message-ID: <5693D0AE.4020306@codeaurora.org>
+From: mans@mansr.com (Mans Rullgard)
+Date: Mon, 11 Jan 2016 16:01:42 +0000
+Subject: [PATCH v2] spi: atmel: improve internal vs gpio chip-select choice
+Message-ID: <1452528102-26458-1-git-send-email-mans@mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/11/2016 10:39 AM, Lorenzo Pieralisi wrote:
->> Thanks, I won't be touching the acpi tables then and I will assume the
->> > hack had a problem. It was trying to remap the io range of the second root
->> > port  to the first port io address map.
->> > 
->> > I was getting a warning from resource.c
->> > 
->> > Btw, when I tested the io ranges before, kernel didn't accept anything
->> > below 1k like 0. That is why my range starts at 1k.
-> And that's what you should not do. ACPI tables have to have a 1:1
-> correspondence with HW resources and you must not change them to
-> make the kernel (which version by the way, given that ARM64 ACPI PCI
-> support is not in the mainline) work. I already said that: we must not
-> interpret ACPI tables, we must define them according to specifications,
-> and that's what everyone should follow to write FW.
-> 
+The driver currently chooses between internal chip-select or gpio
+based on the existence of the cs-gpios DT property which fails on
+non-DT systems and also enforces the same choice for all devices.
 
-What confused me was the kernel view of IO addresses vs. PCI IO addresses. I looked at
-Mark Salter's patch and I realized that the kernel is maintaining global IO addresses with offsets 
-to real PCI IO addresses.
+This patch makes the method per device instead of per controller
+and fixes the selection on non-DT systems.  With these changes,
+the chip-select method for each device is chosen according to the
+following priority:
 
-I was expecting to see the PCI addresses to match kernel IO addresses. I wondered if somebody put some
-restriction into Linux or not which happened to me below.
+1. GPIO from device tree
+2. GPIO from platform data
+3. Internal chip-select
 
-_#_cat_/proc/ioports
-00000000-0000efff : PCI Bus 0000:00
-  00001000-00001fff : PCI Bus 0000:01
-0000f000-0001dfff : PCI Bus 0002:00
-  0000f000-0000ffff : PCI Bus 0002:01
-0001e000-0002cfff : PCI Bus 0006:00
-  0001e000-0001efff : PCI Bus 0006:01
-    0001e000-0001e01f : 0006:01:00.0
-    0001e020-0001e03f : 0006:01:00.1
-/ #
+Tested on AVR32 ATSTK1000.
 
-#_dmesg_|_grep_resource
-[    2.945762] pci_bus 0000:00: root bus resource [io  0x0000-0xefff window] (bus address [0x1000-0xffff])
-[    3.652201] pci_bus 0002:00: root bus resource [io  0xf000-0x1dfff window] (bus address [0x1000-0xffff])
-[    6.546716] pci_bus 0006:00: root bus resource [io  0x1e000-0x2cfff window] (bus address [0x1000-0xffff])
-/ #
+Signed-off-by: Mans Rullgard <mans@mansr.com>
+---
+Changes:
+- allow internal CS only hardware v2
+- retain seting of master->num_chipselect to 4 on hardware v2 if
+  cs-gpios property is missing
+---
+ drivers/spi/spi-atmel.c | 38 +++++++++++++++++++++++---------------
+ 1 file changed, 23 insertions(+), 15 deletions(-)
 
-Since we are talking about what ACPI dictates vs. what kernel does. Here is something that got me 
-while testing.
-
-Somebody sneaked in a 0x10003 upper limit on PCI addresses for some reason below. There is nothing magic
-about 0x10003 and I'm wonding why we have this limit.
-
-static void acpi_dev_ioresource_flags(struct resource *res, u64 len,
-				      u8 io_decode, u8 translation_type)
-{
-	res->flags = IORESOURCE_IO;
-
-	if (!acpi_dev_resource_len_valid(res->start, res->end, len, true))
-		res->flags |= IORESOURCE_DISABLED | IORESOURCE_UNSET;
-
-	if (res->end >= 0x10003)
-		res->flags |= IORESOURCE_DISABLED | IORESOURCE_UNSET;
-
-
-
-I did a debug session with Tomasz last week. He fixed the issue. The range for
-IO resources were not being registered properly. The second root port was causing
-a bug check in the kernel because the IO range was overlapping with the first root port.
-The issue is fixed now. 
-
-
-> So, why does your PCI IO range starts at 1k ? Please define what you
-> mean by "kernel didn't accept anything below 1k", I want to understand
-> what you are referring to.
-
-I created my own version of ACPI PCI root port patch by porting ia64 to ARMv7 two years ago
-and wrote the ACPI table on an ARMv7 platform. I have been reusing the same tables since
-then. 
-
-The issue was what Arnd described in his email to this thread. (PCIBIOS_MIN_IO) macro. 
-I have tested the IO range starting from 0 on Tomasz's patches. I'm not seeing any problems.
-
-
+diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+index 08cbb3e43c76..d4a806e24060 100644
+--- a/drivers/spi/spi-atmel.c
++++ b/drivers/spi/spi-atmel.c
+@@ -312,7 +312,6 @@ struct atmel_spi {
+ 
+ 	bool			use_dma;
+ 	bool			use_pdc;
+-	bool			use_cs_gpios;
+ 	/* dmaengine data */
+ 	struct atmel_spi_dma	dma;
+ 
+@@ -323,6 +322,7 @@ struct atmel_spi {
+ struct atmel_spi_device {
+ 	unsigned int		npcs_pin;
+ 	u32			csr;
++	bool			use_cs_gpio;
+ };
+ 
+ #define BUFFER_SIZE		PAGE_SIZE
+@@ -387,7 +387,7 @@ static void cs_activate(struct atmel_spi *as, struct spi_device *spi)
+ 		}
+ 
+ 		mr = spi_readl(as, MR);
+-		if (as->use_cs_gpios)
++		if (asd->use_cs_gpio)
+ 			gpio_set_value(asd->npcs_pin, active);
+ 	} else {
+ 		u32 cpol = (spi->mode & SPI_CPOL) ? SPI_BIT(CPOL) : 0;
+@@ -404,7 +404,7 @@ static void cs_activate(struct atmel_spi *as, struct spi_device *spi)
+ 
+ 		mr = spi_readl(as, MR);
+ 		mr = SPI_BFINS(PCS, ~(1 << spi->chip_select), mr);
+-		if (as->use_cs_gpios && spi->chip_select != 0)
++		if (asd->use_cs_gpio && spi->chip_select != 0)
+ 			gpio_set_value(asd->npcs_pin, active);
+ 		spi_writel(as, MR, mr);
+ 	}
+@@ -433,7 +433,7 @@ static void cs_deactivate(struct atmel_spi *as, struct spi_device *spi)
+ 			asd->npcs_pin, active ? " (low)" : "",
+ 			mr);
+ 
+-	if (!as->use_cs_gpios)
++	if (!asd->use_cs_gpio)
+ 		spi_writel(as, CR, SPI_BIT(LASTXFER));
+ 	else if (atmel_spi_is_v2(as) || spi->chip_select != 0)
+ 		gpio_set_value(asd->npcs_pin, !active);
+@@ -1539,6 +1539,7 @@ static int atmel_spi_setup(struct spi_device *spi)
+ 	unsigned int		bits = spi->bits_per_word;
+ 	unsigned int		npcs_pin;
+ 	int			ret;
++	bool			use_cs_gpio;
+ 
+ 	as = spi_master_get_devdata(spi->master);
+ 
+@@ -1565,8 +1566,6 @@ static int atmel_spi_setup(struct spi_device *spi)
+ 		csr |= SPI_BIT(CPOL);
+ 	if (!(spi->mode & SPI_CPHA))
+ 		csr |= SPI_BIT(NCPHA);
+-	if (!as->use_cs_gpios)
+-		csr |= SPI_BIT(CSAAT);
+ 
+ 	/* DLYBS is mostly irrelevant since we manage chipselect using GPIOs.
+ 	 *
+@@ -1577,13 +1576,22 @@ static int atmel_spi_setup(struct spi_device *spi)
+ 	csr |= SPI_BF(DLYBS, 0);
+ 	csr |= SPI_BF(DLYBCT, 0);
+ 
+-	/* chipselect must have been muxed as GPIO (e.g. in board setup) */
+ 	npcs_pin = (unsigned long)spi->controller_data;
+ 
+-	if (!as->use_cs_gpios)
+-		npcs_pin = spi->chip_select;
+-	else if (gpio_is_valid(spi->cs_gpio))
++	if (gpio_is_valid(spi->cs_gpio)) {
++		/* GPIO from DT */
+ 		npcs_pin = spi->cs_gpio;
++		use_cs_gpio = true;
++	} else if (npcs_pin && gpio_is_valid(npcs_pin)) {
++		/* GPIO from platform data */
++		use_cs_gpio = true;
++	} else if (atmel_spi_is_v2(as)) {
++		/* internal chip-select */
++		npcs_pin = spi->chip_select;
++		use_cs_gpio = false;
++	} else {
++		return -EINVAL;
++	}
+ 
+ 	asd = spi->controller_state;
+ 	if (!asd) {
+@@ -1591,7 +1599,7 @@ static int atmel_spi_setup(struct spi_device *spi)
+ 		if (!asd)
+ 			return -ENOMEM;
+ 
+-		if (as->use_cs_gpios) {
++		if (use_cs_gpio) {
+ 			ret = gpio_request(npcs_pin, dev_name(&spi->dev));
+ 			if (ret) {
+ 				kfree(asd);
+@@ -1603,6 +1611,7 @@ static int atmel_spi_setup(struct spi_device *spi)
+ 		}
+ 
+ 		asd->npcs_pin = npcs_pin;
++		asd->use_cs_gpio = use_cs_gpio;
+ 		spi->controller_state = asd;
+ 	} else {
+ 		atmel_spi_lock(as);
+@@ -1612,6 +1621,8 @@ static int atmel_spi_setup(struct spi_device *spi)
+ 		atmel_spi_unlock(as);
+ 	}
+ 
++	if (!asd->use_cs_gpio)
++		csr |= SPI_BIT(CSAAT);
+ 	asd->csr = csr;
+ 
+ 	dev_dbg(&spi->dev,
+@@ -1807,12 +1818,9 @@ static int atmel_spi_probe(struct platform_device *pdev)
+ 
+ 	atmel_get_caps(as);
+ 
+-	as->use_cs_gpios = true;
+ 	if (atmel_spi_is_v2(as) &&
+-	    !of_get_property(pdev->dev.of_node, "cs-gpios", NULL)) {
+-		as->use_cs_gpios = false;
++	    !of_get_property(pdev->dev.of_node, "cs-gpios", NULL))
+ 		master->num_chipselect = 4;
+-	}
+ 
+ 	as->use_dma = false;
+ 	as->use_pdc = false;
 -- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+2.7.0
