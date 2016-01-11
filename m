@@ -1,83 +1,80 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 11 Jan 2016 10:54:54 +0000
-Subject: [PATCH v5 08/11] arm-cci: Provide hook for writing to PMU counters
-In-Reply-To: <1451908490-2615-9-git-send-email-suzuki.poulose@arm.com>
-References: <1451908490-2615-1-git-send-email-suzuki.poulose@arm.com>
- <1451908490-2615-9-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20160111105454.GG6499@leverpostej>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Mon, 11 Jan 2016 12:56:35 +0200
+Subject: [PATCH v3 3/3] checkpatch: add virt barriers
+In-Reply-To: <CAGRGNgU7=vNXZbgSwLs+bBueX1+rKACCRMi74hM+jP8MaX+-WA@mail.gmail.com>
+References: <1452454200-8844-1-git-send-email-mst@redhat.com>
+ <1452454200-8844-4-git-send-email-mst@redhat.com>
+ <CAGRGNgXQANbKD=VA0Qx4Wp1+MpZUVV7by8RrKxF9o=qu=vUQqA@mail.gmail.com>
+ <1452466336.7773.46.camel@perches.com>
+ <20160111123423-mutt-send-email-mst@redhat.com>
+ <CAGRGNgU7=vNXZbgSwLs+bBueX1+rKACCRMi74hM+jP8MaX+-WA@mail.gmail.com>
+Message-ID: <20160111124509-mutt-send-email-mst@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 04, 2016 at 11:54:47AM +0000, Suzuki K. Poulose wrote:
-> Add a hook for writing to CCI PMU counters. This callback
-> can be used for CCI models which requires some extra work
-> to program the PMU counter values. To accommodate group writes
-> and single counter writes, the call back accepts a bitmask
-> of the counter indices which need to be programmed with the
-> given value.
+On Mon, Jan 11, 2016 at 09:40:18PM +1100, Julian Calaby wrote:
+> Hi Michael,
 > 
-> Cc: Punit Agrawal <punit.agrawal@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-> ---
->  drivers/bus/arm-cci.c |   16 ++++++++++++++--
->  1 file changed, 14 insertions(+), 2 deletions(-)
+> On Mon, Jan 11, 2016 at 9:35 PM, Michael S. Tsirkin <mst@redhat.com> wrote:
+> > On Sun, Jan 10, 2016 at 02:52:16PM -0800, Joe Perches wrote:
+> >> On Mon, 2016-01-11 at 09:13 +1100, Julian Calaby wrote:
+> >> > On Mon, Jan 11, 2016 at 6:31 AM, Michael S. Tsirkin <mst@redhat.com> wrote:
+> >> > > Add virt_ barriers to list of barriers to check for
+> >> > > presence of a comment.
+> >> []
+> >> > > diff --git a/scripts/checkpatch.pl b/scripts/checkpatch.pl
+> >> []
+> >> > > @@ -5133,7 +5133,8 @@ sub process {
+> >> > >                 }x;
+> >> > >                 my $all_barriers = qr{
+> >> > >                         $barriers|
+> >> > > -                       smp_(?:$smp_barrier_stems)
+> >> > > +                       smp_(?:$smp_barrier_stems)|
+> >> > > +                       virt_(?:$smp_barrier_stems)
+> >> >
+> >> > Sorry I'm late to the party here, but would it make sense to write this as:
+> >> >
+> >> > (?:smp|virt)_(?:$smp_barrier_stems)
+> >>
+> >> Yes.  Perhaps the name might be better as barrier_stems.
+> >>
+> >> Also, ideally this would be longest match first or use \b
+> >> after the matches so that $all_barriers could work
+> >> successfully without a following \s*\(
+> >>
+> >> my $all_barriers = qr{
+> >>       (?:smp|virt)_(?:barrier_stems)|
+> >>       $barriers)
+> >> }x;
+> >>
+> >> or maybe add separate $smp_barriers and $virt_barriers
+> >>
+> >> <shrug>  it doesn't matter much in any case
+> >
+> > OK just to clarify - are you OK with merging the patch as is?
+> > Refactorings can come as patches on top if required.
 > 
-> diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-> index 2f1fcf0..47c9581 100644
-> --- a/drivers/bus/arm-cci.c
-> +++ b/drivers/bus/arm-cci.c
-> @@ -134,6 +134,7 @@ struct cci_pmu_model {
->  	struct event_range event_ranges[CCI_IF_MAX];
->  	int (*validate_hw_event)(struct cci_pmu *, unsigned long);
->  	int (*get_event_idx)(struct cci_pmu *, struct cci_pmu_hw_events *, unsigned long);
-> +	void (*write_counters)(struct cci_pmu *, unsigned long *, u32 val);
->  };
->  
->  static struct cci_pmu_model cci_pmu_models[];
-> @@ -846,7 +847,15 @@ static void pmu_write_counter(struct perf_event *event, u32 value)
->  		dev_err(&cci_pmu->plat_device->dev, "Invalid CCI PMU counter %d\n", idx);
->  		return;
->  	}
-> -	__pmu_write_counter(cci_pmu, value, idx);
-> +
-> +	if (cci_pmu->model->write_counters) {
-> +		unsigned long mask[BITS_TO_LONGS(cci_pmu->num_cntrs)];
-> +
-> +		memset(mask, 0, BITS_TO_LONGS(cci_pmu->num_cntrs) * sizeof(unsigned long));
-> +		set_bit(idx, mask);
-> +		cci_pmu->model->write_counters(cci_pmu, mask, value);
-> +	} else
-> +		__pmu_write_counter(cci_pmu, value, idx);
->  }
-
-It would be much simpler to always log writes here, and only do the real
-wirtes in batches when we re-enable the PMU (with appropriate
-disable/enable calls in the IRQ handler).
-
-We'd still need special hooks for CCIs which require a special dance to
-program them, but all the logic to handle the writes would be in one
-place.
-
-This should work, regardless.
-
-Thanks,
-Mark.
-
->  
->  /* Write a value to a given set of counters */
-> @@ -861,7 +870,10 @@ static void __pmu_write_counters(struct cci_pmu *cci_pmu, unsigned long *mask, u
->  static void __maybe_unused
->  pmu_write_counters(struct cci_pmu *cci_pmu, unsigned long *mask, u32 value)
->  {
-> -	__pmu_write_counters(cci_pmu, mask, value);
-> +	if (cci_pmu->model->write_counters)
-> +		cci_pmu->model->write_counters(cci_pmu, mask, value);
-> +	else
-> +		__pmu_write_counters(cci_pmu, mask, value);
->  }
->  
->  static u64 pmu_event_update(struct perf_event *event)
+> I don't really care either way, I was just asking if it was possible.
+> If you don't see any value in that change, then don't make it.
+> 
+> Thanks,
+> 
 > -- 
-> 1.7.9.5
+> Julian Calaby
 > 
+> Email: julian.calaby at gmail.com
+> Profile: http://www.google.com/profiles/julian.calaby/
+
+OK, got it, thanks.
+
+I will rename smp_barrier_stems to barrier_stems since
+this doesn't need too much testing.
+
+I'd rather keep the regex code as is since changing it requires
+testing.  I might play with it some more in the future
+but I'd like to merge it in the current form to help make
+sure __smp barriers are not misused.
+
+I'll post v4 now - an ack will be appreciated.
+-- 
+MST
