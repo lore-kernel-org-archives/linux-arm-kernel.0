@@ -1,102 +1,51 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 11 Jan 2016 16:27:38 +0000
-Subject: [PATCH v3 04/21] arm64: decouple early fixmap init from linear
- mapping
-In-Reply-To: <CAKv+Gu8KbcJEfpjRMpaQHcsDo0ziv-2xmWowE9Syn_8pOX0WTw@mail.gmail.com>
-References: <1452518355-4606-1-git-send-email-ard.biesheuvel@linaro.org>
- <1452518355-4606-5-git-send-email-ard.biesheuvel@linaro.org>
- <20160111160906.GO6499@leverpostej>
- <CAKv+Gu8KbcJEfpjRMpaQHcsDo0ziv-2xmWowE9Syn_8pOX0WTw@mail.gmail.com>
-Message-ID: <20160111162737.GQ6499@leverpostej>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Mon, 11 Jan 2016 16:29:03 +0000
+Subject: [PATCH v8 20/20] KVM: ARM64: Add a new kvm ARM PMU device
+In-Reply-To: <20160111162159.GG3924@hawk.localdomain>
+References: <1450771695-11948-21-git-send-email-zhaoshenglong@huawei.com>
+ <CAFEAcA_MDiOphseZ7RGNE3G=4ZDF5SFV5krOjanPbVuhgg9gnQ@mail.gmail.com>
+ <568E7AF1.9040103@huawei.com>
+ <CAFEAcA-Qcda7TSFLSeykLHqZYdP6tYdEjPe2uHN6f_+omqWFZg@mail.gmail.com>
+ <20160107203647.GJ6199@hawk.localdomain> <20160109122956.GA30867@cbox>
+ <20160109150339.10576e81@arm.com> <20160111140717.GD3924@hawk.localdomain>
+ <20160111150929.GB15554@cbox> <20160111160927.GF3924@hawk.localdomain>
+ <20160111162159.GG3924@hawk.localdomain>
+Message-ID: <CAFEAcA_=7nJz3Wh8py9OaSM_t0eFUcCUcb23-W2cDi-M65ZPYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2016 at 05:15:13PM +0100, Ard Biesheuvel wrote:
-> On 11 January 2016 at 17:09, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Mon, Jan 11, 2016 at 02:18:57PM +0100, Ard Biesheuvel wrote:
-> >> Since the early fixmap page tables are populated using pages that are
-> >> part of the static footprint of the kernel, they are covered by the
-> >> initial kernel mapping, and we can refer to them without using __va/__pa
-> >> translations, which are tied to the linear mapping.
-> >>
-> >> Since the fixmap page tables are disjoint from the kernel mapping up
-> >> to the top level pgd entry, we can refer to bm_pte[] directly, and there
-> >> is no need to walk the page tables and perform __pa()/__va() translations
-> >> at each step.
-> >>
-> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> ---
-> >>  arch/arm64/mm/mmu.c | 32 ++++++--------------
-> >>  1 file changed, 9 insertions(+), 23 deletions(-)
-> >>
-> >> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> >> index 7711554a94f4..75b5f0dc3bdc 100644
-> >> --- a/arch/arm64/mm/mmu.c
-> >> +++ b/arch/arm64/mm/mmu.c
-> >> @@ -570,38 +570,24 @@ void vmemmap_free(unsigned long start, unsigned long end)
-> >>  #endif       /* CONFIG_SPARSEMEM_VMEMMAP */
-> >>
-> >>  static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
-> >> -#if CONFIG_PGTABLE_LEVELS > 2
-> >>  static pmd_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss;
-> >> -#endif
-> >> -#if CONFIG_PGTABLE_LEVELS > 3
-> >>  static pud_t bm_pud[PTRS_PER_PUD] __page_aligned_bss;
-> >> -#endif
-> >>
-> >>  static inline pud_t * fixmap_pud(unsigned long addr)
-> >>  {
-> >> -     pgd_t *pgd = pgd_offset_k(addr);
-> >> -
-> >> -     BUG_ON(pgd_none(*pgd) || pgd_bad(*pgd));
-> >> -
-> >> -     return pud_offset(pgd, addr);
-> >> +     return (CONFIG_PGTABLE_LEVELS > 3) ? &bm_pud[pud_index(addr)]
-> >> +                                        : (pud_t *)pgd_offset_k(addr);
-> >
-> > If we move patch 6 earlier, we could use pud_offset_kimg here, and avoid
-> > the cast, at the cost of passing the pgd into fixmap_pud.
-> >
-> > Similarly for fixmap_pmd.
-> >
-> 
-> Is that necessarily an improvement? I know it hides the cast, but I
-> think having an explicit pgd_t* to pud_t* cast that so obviously
-> applies to CONFIG_PGTABLE_LEVELS < 4 only is fine as well.
+On 11 January 2016 at 16:21, Andrew Jones <drjones@redhat.com> wrote:
+> On Mon, Jan 11, 2016 at 05:09:27PM +0100, Andrew Jones wrote:
+>> On Mon, Jan 11, 2016 at 04:09:29PM +0100, Christoffer Dall wrote:
+>> > Are vcpu ids already exposed to userspace (beyond the stupid
+>> > KVM_IRQ_LINE) ioctl and as such we're bound to whatever upper limit and
+>> > format they have?
+>>
+>> The only other place I found is KVM_CREATE_VCPU. I suppose we could move
+>> to MPIDR for that, and it would be a nice way to handle the "userspace
+>> determines MPIDR" work that I plan to do. Both KVM and its userspaces
+>> would still use some counter-based vcpu identifiers internally, to avoid
+>> large, sparse structures, but I guess the advantage is that they don't
+>> have to agree on how they do that. The 'vcpu id' used by KVM_CREATE_VCPU
+>> is already 32-bits, and is supposed to be an arbitrary identifier. That
+>> all looks good for converting to MPIDR.
+>>
+>
+> Correction. I understand that vcpu-id is "supposed" to be an arbitrary
+> identifier now, but it doesn't appear that all the assumptions that it's
+> a counter are gone yet... virt/kvm/kvm_main.c has
+>
+> static int kvm_vm_ioctl_create_vcpu(struct kvm *kvm, u32 id)
+> ...
+>         if (id >= KVM_MAX_VCPUS)
+>                 return -EINVAL;
 
-True; it's not a big thing either way.
+I think the last time we talked about supporting "userspace
+determines MPIDR" the idea was to do it by allowing userspace to
+write to the MPIDR register with KVM_SET_ONE_REG. So you'd
+create a bunch of CPUs with vcpu-ids as usual, and then the
+MPIDRs would be set for them later as appropriate (or not
+at all, if userspace was an older qemu).
 
-> >>  }
-> >>
-> >> -static inline pmd_t * fixmap_pmd(unsigned long addr)
-> >> +static inline pte_t * fixmap_pmd(unsigned long addr)
-> >>  {
-> >> -     pud_t *pud = fixmap_pud(addr);
-> >> -
-> >> -     BUG_ON(pud_none(*pud) || pud_bad(*pud));
-> >> -
-> >> -     return pmd_offset(pud, addr);
-> >> +     return (CONFIG_PGTABLE_LEVELS > 2) ? &bm_pmd[pmd_index(addr)]
-> >> +                                        : (pmd_t *)pgd_offset_k(addr);
-> >>  }
-> >
-> > I assume the return type change was unintentional?
-> >
-> 
-> Yes. Thanks for spotting that.
-
-With that fixed:
-
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-
-> > Side note: is there any reason we can't/shouldn't make
-> > STRICT_MM_TYPECHECKS a common config option? Or simply have it on by
-> > default for arm64?
-> >
-> 
-> I wouldn't mind at all.
-
-I'll dig into that a bit futher then...
-
-Thanks,
-Mark.
+thanks
+-- PMM
