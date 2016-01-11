@@ -1,111 +1,143 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 11 Jan 2016 18:28:51 +0100
-Subject: [PATCH v3 06/21] arm64: pgtable: implement static
- [pte|pmd|pud]_offset variants
-In-Reply-To: <20160111162449.GP6499@leverpostej>
-References: <1452518355-4606-1-git-send-email-ard.biesheuvel@linaro.org>
- <1452518355-4606-7-git-send-email-ard.biesheuvel@linaro.org>
- <20160111162449.GP6499@leverpostej>
-Message-ID: <CAKv+Gu-T24A4nxP_+4fOSV+HOBM1fSAceOvQ2PtPgVosFBZriQ@mail.gmail.com>
+From: dianders@chromium.org (Douglas Anderson)
+Date: Mon, 11 Jan 2016 09:30:23 -0800
+Subject: [PATCH v6 1/5] ARM: dma-mapping: Optimize allocation
+In-Reply-To: <1452533428-12762-1-git-send-email-dianders@chromium.org>
+References: <1452533428-12762-1-git-send-email-dianders@chromium.org>
+Message-ID: <1452533428-12762-2-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 January 2016 at 17:24, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Mon, Jan 11, 2016 at 02:18:59PM +0100, Ard Biesheuvel wrote:
->> The page table accessors pte_offset(), pud_offset() and pmd_offset()
->> rely on __va translations, so they can only be used after the linear
->> mapping has been installed. For the early fixmap and kasan init routines,
->> whose page tables are allocated statically in the kernel image, these
->> functions will return bogus values. So implement pmd_offset_kimg() and
->> pud_offset_kimg(), which can be used instead before any page tables have
->> been allocated dynamically.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->
-> This looks good to me. One possible suggsetion below, but either way:
->
-> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
->
->> ---
->>  arch/arm64/include/asm/pgtable.h | 13 +++++++++++++
->>  1 file changed, 13 insertions(+)
->>
->> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
->> index 6129f6755081..7b4e16068c9f 100644
->> --- a/arch/arm64/include/asm/pgtable.h
->> +++ b/arch/arm64/include/asm/pgtable.h
->> @@ -449,6 +449,9 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
->>
->>  #define pmd_page(pmd)                pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
->>
->> +/* use ONLY for statically allocated translation tables */
->> +#define pte_offset_kimg(dir,addr)    ((pte_t *)__phys_to_kimg(pte_offset_phys((dir), (addr))))
->> +
->
-> Given that we're probably only going to use this during one-off setup,
-> maybe it's worth something like:
->
-> #define IN_KERNEL_IMAGE(p) ({                                           \
->         unsigned long __p = (unsigned long)p;                           \
->         KIMAGE_VADDR <= __p && __p < _end;                              \
-> })
->
-> #define pte_offset_kimg(dir,addr) ({                                    \
->         BUG_ON(!IN_KERNEL_IMAGE(dir));                                  \
->         ((pte_t *)__phys_to_kimg(pte_offset_phys((dir), (addr))));      \
-> })
->
-> That might be overkill, though, given all it does is turn one runtime
-> failure into another runtime failure.
->
+The __iommu_alloc_buffer() is expected to be called to allocate pretty
+sizeable buffers.  Upon simple tests of video I saw it trying to
+allocate 4,194,304 bytes.  The function tries to allocate large chunks
+in order to optimize IOMMU TLB usage.
 
-Yes. I did consider implementing them out of line, with __init
-annotations so you at least get complaints if you refer to them from
-non-init code, but I don't see how we would ever need these anywhere
-beyond fixmap and kasan anyway
+The current function is very, very slow.
 
->
->>  /*
->>   * Conversion functions: convert a page and protection to a page entry,
->>   * and a page entry and page directory to the page they refer to.
->> @@ -492,6 +495,9 @@ static inline phys_addr_t pud_page_paddr(pud_t pud)
->>
->>  #define pud_page(pud)                pfn_to_page(__phys_to_pfn(pud_val(pud) & PHYS_MASK))
->>
->> +/* use ONLY for statically allocated translation tables */
->> +#define pmd_offset_kimg(dir,addr)    ((pmd_t *)__phys_to_kimg(pmd_offset_phys((dir), (addr))))
->> +
->>  #else
->>
->>  #define pud_page_paddr(pud)  ({ BUILD_BUG(); 0; })
->> @@ -502,6 +508,8 @@ static inline phys_addr_t pud_page_paddr(pud_t pud)
->>  #define pmd_set_fixmap_offset(pudp, addr)    ((pmd_t *)pudp)
->>  #define pmd_clear_fixmap()
->>
->> +#define pmd_offset_kimg(dir,addr)    ((pmd_t *)dir)
->> +
->>  #endif       /* CONFIG_PGTABLE_LEVELS > 2 */
->>
->>  #if CONFIG_PGTABLE_LEVELS > 3
->> @@ -540,6 +548,9 @@ static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
->>
->>  #define pgd_page(pgd)                pfn_to_page(__phys_to_pfn(pgd_val(pgd) & PHYS_MASK))
->>
->> +/* use ONLY for statically allocated translation tables */
->> +#define pud_offset_kimg(dir,addr)    ((pud_t *)__phys_to_kimg(pud_offset_phys((dir), (addr))))
->> +
->>  #else
->>
->>  #define pgd_page_paddr(pgd)  ({ BUILD_BUG(); 0;})
->> @@ -550,6 +561,8 @@ static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
->>  #define pud_set_fixmap_offset(pgdp, addr)    ((pud_t *)pgdp)
->>  #define pud_clear_fixmap()
->>
->> +#define pud_offset_kimg(dir,addr)    ((pud_t *)dir)
->> +
->>  #endif  /* CONFIG_PGTABLE_LEVELS > 3 */
->>
->>  #define pgd_ERROR(pgd)               __pgd_error(__FILE__, __LINE__, pgd_val(pgd))
->> --
->> 2.5.0
->>
+One problem is the way it keeps trying and trying to allocate big
+chunks.  Imagine a very fragmented memory that has 4M free but no
+contiguous pages at all.  Further imagine allocating 4M (1024 pages).
+We'll do the following memory allocations:
+- For page 1:
+  - Try to allocate order 10 (no retry)
+  - Try to allocate order 9 (no retry)
+  - ...
+  - Try to allocate order 0 (with retry, but not needed)
+- For page 2:
+  - Try to allocate order 9 (no retry)
+  - Try to allocate order 8 (no retry)
+  - ...
+  - Try to allocate order 0 (with retry, but not needed)
+- ...
+- ...
+
+Total number of calls to alloc() calls for this case is:
+  sum(int(math.log(i, 2)) + 1 for i in range(1, 1025))
+  => 9228
+
+The above is obviously worse case, but given how slow alloc can be we
+really want to try to avoid even somewhat bad cases.  I timed the old
+code with a device under memory pressure and it wasn't hard to see it
+take more than 120 seconds to allocate 4 megs of memory! (NOTE: testing
+was done on kernel 3.14, so possibly mainline would behave
+differently).
+
+A second problem is that allocating big chunks under memory pressure
+when we don't need them is just not a great idea anyway unless we really
+need them.  We can make due pretty well with smaller chunks so it's
+probably wise to leave bigger chunks for other users once memory
+pressure is on.
+
+Let's adjust the allocation like this:
+
+1. If a big chunk fails, stop trying to hard and bump down to lower
+   order allocations.
+2. Don't try useless orders.  The whole point of big chunks is to
+   optimize the TLB and it can really only make use of 2M, 1M, 64K and
+   4K sizes.
+
+We'll still tend to eat up a bunch of big chunks, but that might be the
+right answer for some users.  A future patch could possibly add a new
+DMA_ATTR that would let the caller decide that TLB optimization isn't
+important and that we should use smaller chunks.  Presumably this would
+be a sane strategy for some callers.
+
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
+Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+Changes in v6: None
+Changes in v5: None
+Changes in v4:
+- Added Marek's ack
+
+Changes in v3: None
+Changes in v2:
+- No longer just 1 page at a time, but gives up higher order quickly.
+- Only tries important higher order allocations that might help us.
+
+ arch/arm/mm/dma-mapping.c | 34 ++++++++++++++++++++--------------
+ 1 file changed, 20 insertions(+), 14 deletions(-)
+
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 0eca3812527e..bc9cebfa0891 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -1122,6 +1122,9 @@ static inline void __free_iova(struct dma_iommu_mapping *mapping,
+ 	spin_unlock_irqrestore(&mapping->lock, flags);
+ }
+ 
++/* We'll try 2M, 1M, 64K, and finally 4K; array must end with 0! */
++static const int iommu_order_array[] = { 9, 8, 4, 0 };
++
+ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
+ 					  gfp_t gfp, struct dma_attrs *attrs)
+ {
+@@ -1129,6 +1132,7 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
+ 	int count = size >> PAGE_SHIFT;
+ 	int array_size = count * sizeof(struct page *);
+ 	int i = 0;
++	int order_idx = 0;
+ 
+ 	if (array_size <= PAGE_SIZE)
+ 		pages = kzalloc(array_size, GFP_KERNEL);
+@@ -1162,22 +1166,24 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
+ 	while (count) {
+ 		int j, order;
+ 
+-		for (order = __fls(count); order > 0; --order) {
+-			/*
+-			 * We do not want OOM killer to be invoked as long
+-			 * as we can fall back to single pages, so we force
+-			 * __GFP_NORETRY for orders higher than zero.
+-			 */
+-			pages[i] = alloc_pages(gfp | __GFP_NORETRY, order);
+-			if (pages[i])
+-				break;
++		order = iommu_order_array[order_idx];
++
++		/* Drop down when we get small */
++		if (__fls(count) < order) {
++			order_idx++;
++			continue;
+ 		}
+ 
+-		if (!pages[i]) {
+-			/*
+-			 * Fall back to single page allocation.
+-			 * Might invoke OOM killer as last resort.
+-			 */
++		if (order) {
++			/* See if it's easy to allocate a high-order chunk */
++			pages[i] = alloc_pages(gfp | __GFP_NORETRY, order);
++
++			/* Go down a notch@first sign of pressure */
++			if (!pages[i]) {
++				order_idx++;
++				continue;
++			}
++		} else {
+ 			pages[i] = alloc_pages(gfp, 0);
+ 			if (!pages[i])
+ 				goto error;
+-- 
+2.6.0.rc2.230.g3dd15c0
