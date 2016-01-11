@@ -1,96 +1,37 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 11 Jan 2016 07:29:21 +0000
-Subject: [PATCH v10 1/8] ARM: dt: Binding documentation for imx25 ADC/TSC
-In-Reply-To: <1450101234-2191-2-git-send-email-mpa@pengutronix.de>
-References: <1450101234-2191-1-git-send-email-mpa@pengutronix.de>
- <1450101234-2191-2-git-send-email-mpa@pengutronix.de>
-Message-ID: <20160111072921.GX3331@x1>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 11 Jan 2016 08:48:47 +0100
+Subject: [PATCH v4 1/3] ARM: sunxi: Introduce Allwinner for A83T support
+In-Reply-To: <1452085914-29340-2-git-send-email-vishnupatekar0510@gmail.com>
+References: <1452085914-29340-1-git-send-email-vishnupatekar0510@gmail.com>
+ <1452085914-29340-2-git-send-email-vishnupatekar0510@gmail.com>
+Message-ID: <20160111074847.GJ9631@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Dec 2015, Markus Pargmann wrote:
+Hi,
 
-> This documentation describes the devicetree bindings for the
-> ADC/Touchscreen unit of the i.MX25 SoC.
+On Wed, Jan 06, 2016 at 09:11:52PM +0800, Vishnu Patekar wrote:
+> Allwinner A83T is octa-core cortex-a7 based SoC.
+> It's clock control unit and prcm, pinmux are different from previous sun8i
+> series.
+> Its processor cores are arragned in two clusters 4 cores each,
+> similar to A80.
 > 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> Acked-by: Jonathan Cameron <jic23@kernel.org>
+> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
 > Acked-by: Rob Herring <robh@kernel.org>
-> ---
-> 
-> Notes:
->     Changes in v9:
->      - Fixed some style things.
->     
->     Changes in v6:
->      - Removed adc-ref property and replaced it with refp and refn for positive and
->        negative references. The properties are optional now as the default
->        behaviour is a positive internal reference voltage and ADC GND as negative
->        reference.
-> 
->  .../devicetree/bindings/mfd/fsl-imx25-tsadc.txt    | 47 ++++++++++++++++++++++
->  1 file changed, 47 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
 
-Binding looks fine, but you need to change the subject line of the
-patch, for is it not an ARM, but MFD patch.
-
-> diff --git a/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt b/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
-> new file mode 100644
-> index 000000000000..b03505286997
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
-> @@ -0,0 +1,47 @@
-> +Freescale MX25 ADC/TSC MultiFunction Device (MFD)
-> +
-> +This device combines two general purpose conversion queues one used for general
-> +ADC and the other used for touchscreens.
-> +
-> +Required properties:
-> + - compatible:			Should be "fsl,imx25-tsadc".
-> + - reg:				Start address and size of the memory area of
-> + 					the device
-> + - interrupts:			Interrupt for this device
-> +					(See: ../interrupt-controller/interrupts.txt)
-> + - clocks:			An 'ipg' clock (See: ../clock/clock-bindings.txt)
-> + - interrupt-controller:	This device is an interrupt controller. It
-> +   					controls the interrupts of both
-> +					conversion queues.
-> + - #interrupt-cells:		Should be '<1>'.
-> + - #address-cells:		Should be '<1>'.
-> + - #size-cells:			Should be '<1>'.
-> +
-> +This device includes two conversion queues which can be added as subnodes.
-> +The first queue is for the touchscreen, the second for general purpose ADC.
-> +
-> +Example:
-> +	tscadc: tscadc at 50030000 {
-> +		compatible = "fsl,imx25-tsadc";
-> +		reg = <0x50030000 0xc>;
-> +		interrupts = <46>;
-> +		clocks = <&clks 119>;
-> +		clock-names = "ipg";
-> +		interrupt-controller;
-> +		#interrupt-cells = <1>;
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		tsc: tcq at 50030400 {
-> +			compatible = "fsl,imx25-tcq";
-> +			reg = <0x50030400 0x60>;
-> +			...
-> +		};
-> +
-> +		adc: gcq at 50030800 {
-> +			compatible = "fsl,imx25-gcq";
-> +			reg = <0x50030800 0x60>;
-> +			...
-> +		};
-> +	};
+Applied, thanks!
+Maxime
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160111/aebbff29/attachment.sig>
