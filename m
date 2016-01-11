@@ -1,196 +1,106 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Mon, 11 Jan 2016 19:26:27 +0600
-Subject: [PATCH v5 2/2] ACPI: amba bus probing support
-In-Reply-To: <1452518790-27053-1-git-send-email-aleksey.makarov@linaro.org>
-References: <1452518790-27053-1-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <1452518790-27053-3-git-send-email-aleksey.makarov@linaro.org>
+From: caesar.upstream@gmail.com (Caesar Wang)
+Date: Mon, 11 Jan 2016 21:27:45 +0800
+Subject: [PATCH v3 2/3] soc: rockchip: power-domain: Modify power domain
+ driver for rk3368
+In-Reply-To: <1452508600-3512-3-git-send-email-zhangqing@rock-chips.com>
+References: <1452508600-3512-1-git-send-email-zhangqing@rock-chips.com>
+ <1452508600-3512-3-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <5693ADD1.4000207@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Graeme Gregory <graeme.gregory@linaro.org>
+Hi zhangqin,
 
-On ARM64 some devices use the AMBA device and not the platform bus for
-probing so add support for this. Uses a dummy clock for apb_pclk as ACPI
-does not have a suitable clock representation and to keep the core
-AMBA bus code unchanged between probing methods.
+ From my datasheet "Rockchip RK3368 TRM V2.0.pdf"
+Maybe i'm missing something.
 
-Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
----
- drivers/acpi/Makefile    |   1 +
- drivers/acpi/acpi_amba.c | 122 +++++++++++++++++++++++++++++++++++++++++++++++
- drivers/acpi/internal.h  |   5 ++
- drivers/acpi/scan.c      |   1 +
- 4 files changed, 129 insertions(+)
- create mode 100644 drivers/acpi/acpi_amba.c
 
-diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-index 675eaf3..3cf732f 100644
---- a/drivers/acpi/Makefile
-+++ b/drivers/acpi/Makefile
-@@ -43,6 +43,7 @@ acpi-y				+= pci_root.o pci_link.o pci_irq.o
- acpi-y				+= acpi_lpss.o acpi_apd.o
- acpi-y				+= acpi_platform.o
- acpi-y				+= acpi_pnp.o
-+acpi-$(CONFIG_ARM_AMBA)	+= acpi_amba.o
- acpi-y				+= int340x_thermal.o
- acpi-y				+= power.o
- acpi-y				+= event.o
-diff --git a/drivers/acpi/acpi_amba.c b/drivers/acpi/acpi_amba.c
-new file mode 100644
-index 0000000..2a61b54
---- /dev/null
-+++ b/drivers/acpi/acpi_amba.c
-@@ -0,0 +1,122 @@
-+
-+/*
-+ * ACPI support for platform bus type.
-+ *
-+ * Copyright (C) 2015, Linaro Ltd
-+ * Author: Graeme Gregory <graeme.gregory@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/acpi.h>
-+#include <linux/amba/bus.h>
-+#include <linux/clkdev.h>
-+#include <linux/clk-provider.h>
-+#include <linux/device.h>
-+#include <linux/err.h>
-+#include <linux/ioport.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+
-+#include "internal.h"
-+
-+static const struct acpi_device_id amba_id_list[] = {
-+	{"ARMH0061", 0}, /* PL061 GPIO Device */
-+	{"", 0},
-+};
-+
-+static void amba_register_dummy_clk(void)
-+{
-+	static struct clk *amba_dummy_clk;
-+
-+	/* If clock already registered */
-+	if (amba_dummy_clk)
-+		return;
-+
-+	amba_dummy_clk = clk_register_fixed_rate(NULL, "apb_pclk", NULL,
-+						CLK_IS_ROOT, 0);
-+	clk_register_clkdev(amba_dummy_clk, "apb_pclk", NULL);
-+}
-+
-+static int amba_handler_attach(struct acpi_device *adev,
-+				const struct acpi_device_id *id)
-+{
-+	struct amba_device *dev;
-+	struct resource_entry *rentry;
-+	struct list_head resource_list;
-+	bool address_found = false;
-+	int irq_no = 0;
-+	int ret;
-+
-+	/* If the ACPI node already has a physical device attached, skip it. */
-+	if (adev->physical_node_count)
-+		return 0;
-+
-+	dev = amba_device_alloc(dev_name(&adev->dev), 0, 0);
-+	if (!dev) {
-+		dev_err(&adev->dev, "%s(): amba_device_alloc() failed\n",
-+			__func__);
-+		return -ENOMEM;
-+	}
-+
-+	INIT_LIST_HEAD(&resource_list);
-+	ret = acpi_dev_get_resources(adev, &resource_list, NULL, NULL);
-+	if (ret < 0)
-+		goto err_free;
-+
-+	list_for_each_entry(rentry, &resource_list, node) {
-+		switch (resource_type(rentry->res)) {
-+		case IORESOURCE_MEM:
-+			if (!address_found) {
-+				dev->res = *rentry->res;
-+				address_found = true;
-+			}
-+			break;
-+		case IORESOURCE_IRQ:
-+			if (irq_no < AMBA_NR_IRQS)
-+				dev->irq[irq_no++] = rentry->res->start;
-+			break;
-+		default:
-+			dev_warn(&adev->dev, "Invalid resource\n");
-+			break;
-+		}
-+	}
-+
-+	acpi_dev_free_resource_list(&resource_list);
-+
-+	/*
-+	 * If the ACPI node has a parent and that parent has a physical device
-+	 * attached to it, that physical device should be the parent of
-+	 * the amba device we are about to create.
-+	 */
-+	if (adev->parent)
-+		dev->dev.parent = acpi_get_first_physical_node(adev->parent);
-+
-+	ACPI_COMPANION_SET(&dev->dev, adev);
-+
-+	ret = amba_device_add(dev, &iomem_resource);
-+	if (ret) {
-+		dev_err(&adev->dev, "%s(): amba_device_add() failed (%d)\n",
-+		       __func__, ret);
-+		goto err_free;
-+	}
-+
-+	return 1;
-+
-+err_free:
-+	amba_device_put(dev);
-+	return ret;
-+}
-+
-+static struct acpi_scan_handler amba_handler = {
-+	.ids = amba_id_list,
-+	.attach = amba_handler_attach,
-+};
-+
-+void __init acpi_amba_init(void)
-+{
-+	amba_register_dummy_clk();
-+	acpi_scan_add_handler(&amba_handler);
-+}
-diff --git a/drivers/acpi/internal.h b/drivers/acpi/internal.h
-index ee9312ba..6086f66 100644
---- a/drivers/acpi/internal.h
-+++ b/drivers/acpi/internal.h
-@@ -29,6 +29,11 @@ void acpi_processor_init(void);
- void acpi_platform_init(void);
- void acpi_pnp_init(void);
- void acpi_int340x_thermal_init(void);
-+#ifdef CONFIG_ARM_AMBA
-+void acpi_amba_init(void);
-+#else
-+static inline void acpi_amba_init(void) {}
-+#endif
- int acpi_sysfs_init(void);
- void acpi_container_init(void);
- void acpi_memory_hotplug_init(void);
-diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
-index 78d5f02..20c8cba 100644
---- a/drivers/acpi/scan.c
-+++ b/drivers/acpi/scan.c
-@@ -1922,6 +1922,7 @@ int __init acpi_scan_init(void)
- 	acpi_memory_hotplug_init();
- 	acpi_pnp_init();
- 	acpi_int340x_thermal_init();
-+	acpi_amba_init();
- 
- 	acpi_scan_add_handler(&generic_device_handler);
- 
--- 
-2.7.0
+? 2016?01?11? 18:36, zhangqing ??:
+> This driver is modified to support RK3368 SoC.
+>
+> Signed-off-by: zhangqing <zhangqing@rock-chips.com>
+> ---
+>   drivers/soc/rockchip/pm_domains.c | 33 +++++++++++++++++++++++++++++++++
+>   1 file changed, 33 insertions(+)
+>
+> diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
+> index 534c589..6cdffb1 100644
+> --- a/drivers/soc/rockchip/pm_domains.c
+> +++ b/drivers/soc/rockchip/pm_domains.c
+> @@ -18,6 +18,7 @@
+>   #include <linux/regmap.h>
+>   #include <linux/mfd/syscon.h>
+>   #include <dt-bindings/power/rk3288-power.h>
+> +#include <dt-bindings/power/rk3368-power.h>
+>   
+>   struct rockchip_domain_info {
+>   	int pwr_mask;
+> @@ -75,6 +76,9 @@ struct rockchip_pmu {
+>   #define DOMAIN_RK3288(pwr, status, req)		\
+>   	DOMAIN(pwr, status, req, req, (req) + 16)
+>   
+> +#define DOMAIN_RK3368(pwr, status, req)		\
+> +	DOMAIN(pwr, status, req, (req) + 16, req)
+> +
+
+You should  remove it, that's seem same with the rk3288.
+
+The rk3368 datasheet:
+PMU_PMU_BUS_IDLE_ST  ----->idle_vio[24]----->ack
+PMU_PMU_BUS_IDLE_REQ ---->idle_req_vio[8]----->idle
+
+>   static bool rockchip_pmu_domain_is_idle(struct rockchip_pm_domain *pd)
+>   {
+>   	struct rockchip_pmu *pmu = pd->pmu;
+> @@ -444,6 +448,14 @@ static const struct rockchip_domain_info rk3288_pm_domains[] = {
+>   	[RK3288_PD_GPU]		= DOMAIN_RK3288(9, 9, 2),
+>   };
+>   
+> +static const struct rockchip_domain_info rk3368_pm_domains[] = {
+> +	[RK3368_PD_PERI]	= DOMAIN_RK3368(13, 12, 6),
+> +	[RK3368_PD_VIO]		= DOMAIN_RK3368(15, 14, 8),
+> +	[RK3368_PD_VIDEO]	= DOMAIN_RK3368(14, 13, 7),
+> +	[RK3368_PD_GPU_0]	= DOMAIN_RK3368(16, 15, 2),
+> +	[RK3368_PD_GPU_1]	= DOMAIN_RK3368(17, 16, 2),
+> +};
+> +
+>   static const struct rockchip_pmu_info rk3288_pmu = {
+>   	.pwr_offset = 0x08,
+>   	.status_offset = 0x0c,
+> @@ -461,11 +473,32 @@ static const struct rockchip_pmu_info rk3288_pmu = {
+>   	.domain_info = rk3288_pm_domains,
+>   };
+>   
+> +static const struct rockchip_pmu_info rk3368_pmu = {
+> +	.pwr_offset = 0x0c,
+> +	.status_offset = 0x10,
+> +	.req_offset = 0x3c,
+> +	.idle_offset = 0x40,
+> +	.ack_offset = 0x40,
+> +
+> +	.core_pwrcnt_offset = 0x48,
+> +	.gpu_pwrcnt_offset = 0x50,
+> +
+> +	.core_power_transition_time = 24,
+> +	.gpu_power_transition_time = 24,
+> +
+> +	.num_domains = ARRAY_SIZE(rk3368_pm_domains),
+> +	.domain_info = rk3368_pm_domains,
+> +};
+> +
+>   static const struct of_device_id rockchip_pm_domain_dt_match[] = {
+>   	{
+>   		.compatible = "rockchip,rk3288-power-controller",
+>   		.data = (void *)&rk3288_pmu,
+>   	},
+> +	{
+> +		.compatible = "rockchip,rk3368-power-controller",
+> +		.data = (void *)&rk3368_pmu,
+> +	},
+>   	{ /* sentinel */ },
+>   };
+>   
+>
+> -- 
+> Thanks,
+> Caesar
