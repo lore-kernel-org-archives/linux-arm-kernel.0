@@ -1,82 +1,26 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Mon, 11 Jan 2016 17:28:23 -0600
-Subject: [RESEND][PATCHv2 1/3] ion: Devicetree bindings for Ion
-In-Reply-To: <1452548364-9522-2-git-send-email-laura@labbott.name>
-References: <1452548364-9522-1-git-send-email-laura@labbott.name>
- <1452548364-9522-2-git-send-email-laura@labbott.name>
-Message-ID: <CAL_JsqLBk1TAa2bKnA6TpEfrXxVZ7JYojOgmszEKoWC0+Huuug@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 11 Jan 2016 15:34:39 -0800
+Subject: [PATCH] arm: omap2plus_defconfig: enable SPLIT and DWARF4
+In-Reply-To: <1452547572-23515-1-git-send-email-balbi@ti.com>
+References: <1452547572-23515-1-git-send-email-balbi@ti.com>
+Message-ID: <20160111233438.GB12777@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2016 at 3:39 PM, Laura Abbott <laura@labbott.name> wrote:
->
-> This adds a base set of devicetree bindings for the Ion memory
-> manager. This supports setting up the generic set of heaps and
-> their properties.
->
-> Signed-off-by: Laura Abbott <laura@labbott.name>
-> ---
->  drivers/staging/android/ion/devicetree.txt | 50 ++++++++++++++++++++++++++++++
->  1 file changed, 50 insertions(+)
->  create mode 100644 drivers/staging/android/ion/devicetree.txt
->
-> diff --git a/drivers/staging/android/ion/devicetree.txt b/drivers/staging/android/ion/devicetree.txt
-> new file mode 100644
-> index 0000000..e1ea537
-> --- /dev/null
-> +++ b/drivers/staging/android/ion/devicetree.txt
-> @@ -0,0 +1,50 @@
-> +Ion Memory Manager
-> +
-> +Ion is a memory manager that allows for sharing of buffers via dma-buf.
-> +Ion allows for different types of allocation via an abstraction called
-> +a 'heap'. A heap represents a specific type of memory. Each heap has
-> +a different type. There can be multiple instances of the same heap
-> +type.
-> +
-> +Required properties for Ion
-> +
-> +- compatible: "linux,ion" PLUS a compatible property for the device
-> +
-> +All child nodes of a linux,ion node are interpreted as heaps
-> +
-> +required properties for heaps
-> +
-> +- compatible: compatible string for a heap type PLUS a compatible property
-> +for the specific instance of the heap. Current heap types
-> +-- linux,ion-heap-system
-> +-- linux,ion-heap-system-contig
-> +-- linux,ion-heap-carveout
-> +-- linux,ion-heap-chunk
-> +-- linux,ion-heap-dma
-> +-- linux,ion-heap-custom
-> +
-> +Optional properties
-> +- memory-region: A phandle to a memory region. Required for DMA heap type
-> +(see reserved-memory.txt for details on the reservation)
+* Felipe Balbi <balbi@ti.com> [160111 13:26]:
+> CONFIG_DEBUG_INFO_SPLIT will split debug info on
+> .dwo files. This will generate a smaller vmlinux and
+> smaller .ko modules, which will be easier to ship on
+> certain products.
+> 
+> CONFIG_DEBUG_INFO_DWARF4 will generate debug info in
+> DWARF4 format, which ends up being larger, but
+> improves the probability of resolving variables in
+> optmized code.
 
-Why would all of them not require a memory region other than system heap?
+Nice, this makes my initramfs go down from about 17MB
+to 4.7 MB :)
 
-> +
-> +Example:
-> +
-> +       ion {
-> +               compatbile = "qcom,msm8916-ion", "linux,ion";
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +
-> +               ion-system-heap {
-> +                       compatbile = "qcom,system-heap", "linux,ion-heap-system"
-> +               };
+Regards,
 
-What is the purpose of this in DT? Don't we always want/need a system
-heap? How does it vary by platform?
-
-> +               ion-camera-region {
-> +                       compatible = "qcom,camera-heap", "linux,ion-heap-dma"
-> +                       memory-region = <&camera_region>;
-
-Why not just add a property (or properties) to the camera_region node
-that ION drivers can search for?
-
-Rob
+Tony
