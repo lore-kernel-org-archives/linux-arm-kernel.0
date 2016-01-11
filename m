@@ -1,199 +1,90 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 11 Jan 2016 17:25:15 +0100
-Subject: [PATCHv3] ARM: mvebu: use regulator-boot-on for SATA regulators
- on Armada 388 GP
-In-Reply-To: <877fk6r1hb.fsf@free-electrons.com> (Gregory CLEMENT's message of
- "Tue, 22 Dec 2015 15:40:00 +0100")
-References: <1450794522-16483-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <877fk6r1hb.fsf@free-electrons.com>
-Message-ID: <87d1t8ytg4.fsf@free-electrons.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Mon, 11 Jan 2016 18:26:00 +0200
+Subject: [PATCH v5 2/2] ACPI: amba bus probing support
+In-Reply-To: <20160111152732.GU19062@n2100.arm.linux.org.uk>
+References: <1452518790-27053-1-git-send-email-aleksey.makarov@linaro.org>
+ <1452518790-27053-3-git-send-email-aleksey.makarov@linaro.org>
+ <CAHp75Vew8HMMrc2vdKbSVuB2reOCrwZZg3-a4nBUyfiQ=c0Y4A@mail.gmail.com>
+ <20160111152732.GU19062@n2100.arm.linux.org.uk>
+Message-ID: <CAHp75VfND6Gq5XW91mbgN+ZQnxh_SCm9LKNz_zNFvaVd1dgvWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
- 
- On mar., d?c. 22 2015, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+On Mon, Jan 11, 2016 at 5:27 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Jan 11, 2016 at 05:13:20PM +0200, Andy Shevchenko wrote:
+>> On Mon, Jan 11, 2016 at 3:26 PM, Aleksey Makarov
+>> <aleksey.makarov@linaro.org> wrote:
+>> > From: Graeme Gregory <graeme.gregory@linaro.org>
 
-> Hi Thomas,
->  
->  On mar., d?c. 22 2015, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+>> > +static int amba_handler_attach(struct acpi_device *adev,
+>> > +                               const struct acpi_device_id *id)
+>> > +{
+>> > +       struct amba_device *dev;
+>> > +       struct resource_entry *rentry;
+>> > +       struct list_head resource_list;
+>> > +       bool address_found = false;
+>> > +       int irq_no = 0;
+>> > +       int ret;
+>> > +
+>> > +       /* If the ACPI node already has a physical device attached, skip it. */
+>> > +       if (adev->physical_node_count)
+>> > +               return 0;
+>> > +
+>> > +       dev = amba_device_alloc(dev_name(&adev->dev), 0, 0);
+>> > +       if (!dev) {
+>> > +               dev_err(&adev->dev, "%s(): amba_device_alloc() failed\n",
+>> > +                       __func__);
+>> > +               return -ENOMEM;
+>> > +       }
+>> > +
+>> > +       INIT_LIST_HEAD(&resource_list);
+>> > +       ret = acpi_dev_get_resources(adev, &resource_list, NULL, NULL);
+>> > +       if (ret < 0)
+>> > +               goto err_free;
+>> > +
+>> > +       list_for_each_entry(rentry, &resource_list, node) {
+>> > +               switch (resource_type(rentry->res)) {
+>> > +               case IORESOURCE_MEM:
+>> > +                       if (!address_found) {
+>> > +                               dev->res = *rentry->res;
+>>
+>> dev->res is 0 before this one, right? Could you use this fact instead
+>> of address_found flag?
 >
->> Really, what we meant by regulator-always-on is that the regulators
->> are already turned on by the bootloader, for which regulator-boot-on
->> is a better description.
->>
->> A net advantage of using regulator-boot-on is that the regulator is
->> not touched at boot time by the kernel, which avoids having the hard
->> drives spinning down and then up again, taking several (~5) seconds of
->> additional boot time.
->>
->> In addition, there is no need to have such properties on the child
->> regulators used for SATA. Having it on the parent regulator that
->> really controls the GPIO is sufficient.
->>
->> Without the patch:
->>
->> [    3.945866] ata2: SATA link down (SStatus 0 SControl 300)
->> [    3.995862] ata3: SATA link down (SStatus 0 SControl 300)
->> [    4.005863] ata4: SATA link down (SStatus 0 SControl 300)
->> [    9.125861] ata1: SATA link up 3.0 Gbps (SStatus 123 SControl 300)
->> [    9.144575] ata1.00: ATA-8: WDC WD5003ABYX-01WERA1, 01.01S02, max UDMA/133
->> [    9.151471] ata1.00: 976773168 sectors, multi 0: LBA48 NCQ (depth 31/32)
->>
->>  (and you can hear the disk spinning down and up during this 5.1
->>  seconds delay)
->>
->> With the patch:
->>
->> [    3.945988] ata2: SATA link down (SStatus 0 SControl 300)
->> [    4.005980] ata4: SATA link down (SStatus 0 SControl 300)
->> [    4.011404] ata3: SATA link down (SStatus 0 SControl 300)
->> [    4.145978] ata1: SATA link up 3.0 Gbps (SStatus 123 SControl 300)
->> [    4.153701] ata1.00: ATA-8: WDC WD5003ABYX-01WERA1, 01.01S02, max UDMA/133
->> [    4.160597] ata1.00: 976773168 sectors, multi 0: LBA48 NCQ (depth 31/32)
->>
->> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->
-> Applied on mvebu/dt
+> amba_device_alloc() zero-initialises everything.  However, dev->res is
+> a struct resource, and I'd prefer _this_ method that the OT is using
+> to testing some random part of struct resource.
 
-As for the other one, I didn't managed to do a pull request before the
-holidays period so I moved this commit to mvebu/dt-for-4.6
+So, you mean resource->start = 0 is not enough reliable?
 
-Gregory
+>> > +               default:
+>> > +                       dev_warn(&adev->dev, "Invalid resource\n");
+>>
+>> Why? Isn't possible to have other resources for the devices?
+>
+> AMBA primecell devices have one memory region, and a number of
+> interrupts.  Other resource types don't make sense.
 
->
-> Thanks,
->
-> Gregory
->> ---
->> Changes since v2:
->>  - Use regulator-boot-on only for SATA regulators, not for USB
->>    regulators.
->> ---
->>  arch/arm/boot/dts/armada-388-gp.dts | 16 ++++------------
->>  1 file changed, 4 insertions(+), 12 deletions(-)
+But isn't warning on the other side too noisy?
+
+>> > +       ret = amba_device_add(dev, &iomem_resource);
+>> > +       if (ret) {
 >>
->> diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
->> index d8dab0f..5e47291 100644
->> --- a/arch/arm/boot/dts/armada-388-gp.dts
->> +++ b/arch/arm/boot/dts/armada-388-gp.dts
->> @@ -319,7 +319,7 @@
->>  		regulator-min-microvolt = <12000000>;
->>  		regulator-max-microvolt = <12000000>;
->>  		enable-active-high;
->> -		regulator-always-on;
->> +		regulator-boot-on;
->>  		gpio = <&expander0 2 GPIO_ACTIVE_HIGH>;
->>  	};
->>  
->> @@ -328,7 +328,6 @@
->>  		regulator-name = "v5.0-sata0";
->>  		regulator-min-microvolt = <5000000>;
->>  		regulator-max-microvolt = <5000000>;
->> -		regulator-always-on;
->>  		vin-supply = <&reg_sata0>;
->>  	};
->>  
->> @@ -337,7 +336,6 @@
->>  		regulator-name = "v12.0-sata0";
->>  		regulator-min-microvolt = <12000000>;
->>  		regulator-max-microvolt = <12000000>;
->> -		regulator-always-on;
->>  		vin-supply = <&reg_sata0>;
->>  	};
->>  
->> @@ -347,7 +345,7 @@
->>  		regulator-min-microvolt = <12000000>;
->>  		regulator-max-microvolt = <12000000>;
->>  		enable-active-high;
->> -		regulator-always-on;
->> +		regulator-boot-on;
->>  		gpio = <&expander0 3 GPIO_ACTIVE_HIGH>;
->>  	};
->>  
->> @@ -356,7 +354,6 @@
->>  		regulator-name = "v5.0-sata1";
->>  		regulator-min-microvolt = <5000000>;
->>  		regulator-max-microvolt = <5000000>;
->> -		regulator-always-on;
->>  		vin-supply = <&reg_sata1>;
->>  	};
->>  
->> @@ -365,7 +362,6 @@
->>  		regulator-name = "v12.0-sata1";
->>  		regulator-min-microvolt = <12000000>;
->>  		regulator-max-microvolt = <12000000>;
->> -		regulator-always-on;
->>  		vin-supply = <&reg_sata1>;
->>  	};
->>  
->> @@ -373,7 +369,7 @@
->>  		compatible = "regulator-fixed";
->>  		regulator-name = "pwr_en_sata2";
->>  		enable-active-high;
->> -		regulator-always-on;
->> +		regulator-boot-on;
->>  		gpio = <&expander0 11 GPIO_ACTIVE_HIGH>;
->>  	};
->>  
->> @@ -382,7 +378,6 @@
->>  		regulator-name = "v5.0-sata2";
->>  		regulator-min-microvolt = <5000000>;
->>  		regulator-max-microvolt = <5000000>;
->> -		regulator-always-on;
->>  		vin-supply = <&reg_sata2>;
->>  	};
->>  
->> @@ -391,7 +386,6 @@
->>  		regulator-name = "v12.0-sata2";
->>  		regulator-min-microvolt = <12000000>;
->>  		regulator-max-microvolt = <12000000>;
->> -		regulator-always-on;
->>  		vin-supply = <&reg_sata2>;
->>  	};
->>  
->> @@ -399,7 +393,7 @@
->>  		compatible = "regulator-fixed";
->>  		regulator-name = "pwr_en_sata3";
->>  		enable-active-high;
->> -		regulator-always-on;
->> +		regulator-boot-on;
->>  		gpio = <&expander0 12 GPIO_ACTIVE_HIGH>;
->>  	};
->>  
->> @@ -408,7 +402,6 @@
->>  		regulator-name = "v5.0-sata3";
->>  		regulator-min-microvolt = <5000000>;
->>  		regulator-max-microvolt = <5000000>;
->> -		regulator-always-on;
->>  		vin-supply = <&reg_sata3>;
->>  	};
->>  
->> @@ -417,7 +410,6 @@
->>  		regulator-name = "v12.0-sata3";
->>  		regulator-min-microvolt = <12000000>;
->>  		regulator-max-microvolt = <12000000>;
->> -		regulator-always-on;
->>  		vin-supply = <&reg_sata3>;
->>  	};
->>  };
->> -- 
->> 2.6.4
+>> ret < 0?
 >>
+>> What to do if ret > 0? It will be considered as not error. Please,
+>> check what function returns and adjust this.
 >
-> -- 
-> Gregory Clement, Free Electrons
-> Kernel, drivers, real-time and embedded Linux
-> development, consulting, training and support.
-> http://free-electrons.com
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Non-zero is treated as an error by amba_device_add().
+
+> Doing otherwise
+> here puts it at odds to the outcome of that function.  This code is fine.
+
+Yes, and in this case ret > 0 should be converted to an appropriate
+error code, otherwise ACPI core will consider this as a normal
+execution, right?
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+With Best Regards,
+Andy Shevchenko
