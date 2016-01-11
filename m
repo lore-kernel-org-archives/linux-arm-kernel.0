@@ -1,64 +1,45 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 11 Jan 2016 10:58:45 +0000
-Subject: [PATCH v5 07/11] arm-cci: Add routines to save/restore all
- counters
-In-Reply-To: <20160111105006.GF6499@leverpostej>
-References: <1451908490-2615-1-git-send-email-suzuki.poulose@arm.com>
- <1451908490-2615-8-git-send-email-suzuki.poulose@arm.com>
- <20160111105006.GF6499@leverpostej>
-Message-ID: <56938AE5.9090702@arm.com>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Mon, 11 Jan 2016 13:00:09 +0200
+Subject: [PATCH v4 0/3] checkpatch: handling of memory barriers
+Message-ID: <1452509968-19778-1-git-send-email-mst@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/16 10:50, Mark Rutland wrote:
-> On Mon, Jan 04, 2016 at 11:54:46AM +0000, Suzuki K. Poulose wrote:
->> Adds helper routines to disable the counter controls for
->> all the counters on the CCI PMU and restore it back, by
->> preserving the original state in caller provided mask.
->>
->> Cc: Punit Agrawal <punit.agrawal@arm.com>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
->> ---
->>   drivers/bus/arm-cci.c |   38 ++++++++++++++++++++++++++++++++++++++
->>   1 file changed, 38 insertions(+)
->>
->> diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
->> index a3938ef..2f1fcf0 100644
->> --- a/drivers/bus/arm-cci.c
->> +++ b/drivers/bus/arm-cci.c
->> @@ -672,6 +672,44 @@ static void pmu_set_event(struct cci_pmu *cci_pmu, int idx, unsigned long event)
->>   }
->>
->>   /*
->> + * For all counters on the CCI-PMU, disable any 'enabled' counters,
->> + * saving the changed counters in the mask, so that we can restore
->> + * it later using pmu_restore_counters. The mask is private to the
->> + * caller. We cannot rely on the used_mask maintained by the CCI_PMU
->> + * as it only tells us if the counter is assigned to perf_event or not.
->> + * The state of the perf_event cannot be locked by the PMU layer, hence
->> + * we check the individual counter status (which can be locked by
->> + * cci_pm->hw_events->pmu_lock).
->> + *
->> + * @mask should be initialised by the caller.
->
-> We should probably state "initialised to zero", or "empty".
+As part of memory barrier cleanup, this patchset
+extends checkpatch to make it easier to stop
+incorrect memory barrier usage.
 
-Yep, will fix it.
+This replaces the checkpatch patches in my series
+	arch: barrier cleanup + barriers for virt
+and will be included in the pull request including
+the series.
 
->> +/*
->> + * Restore the status of the counters. Reversal of the pmu_disable_counters().
->> + * For each counter set in the mask, enable the counter back.
->> + */
->
-> Shouldn't that say pmu_save_counters?
+changes from v3:
+	rename smp_barrier_stems to barrier_stems
+	as suggested by Julian Calaby.
+	add (?: ... ) around a variable in regexp,
+	in case we change the value later so that it matters.
+changes from v2:
+	address comments by Joe Perches:
+	use (?: ... ) to avoid unnecessary capture groups
+	rename smp_barriers to smp_barrier_stems for clarity
+	add barriers before/after atomic
+Changes from v1:
+	catch optional\s* before () in barriers
+	rewrite using qr{} instead of map
 
-Yea, missed it in rebase.
+Michael S. Tsirkin (3):
+  checkpatch.pl: add missing memory barriers
+  checkpatch: check for __smp outside barrier.h
+  checkpatch: add virt barriers
 
-> With that:
->
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
->
+Michael S. Tsirkin (3):
+  checkpatch.pl: add missing memory barriers
+  checkpatch: check for __smp outside barrier.h
+  checkpatch: add virt barriers
 
-Thanks
-Suzuki
+ scripts/checkpatch.pl | 33 ++++++++++++++++++++++++++++++++-
+ 1 file changed, 32 insertions(+), 1 deletion(-)
+
+-- 
+MST
