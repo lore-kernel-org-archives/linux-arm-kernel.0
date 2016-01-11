@@ -1,97 +1,35 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 11 Jan 2016 17:29:58 +0100
-Subject: [PATCH] ARM: mvebu: use usb-nop-xceiv PHY for the xhci nodes on
- Armada 388 GP
-In-Reply-To: <1450880267-20558-1-git-send-email-gregory.clement@free-electrons.com>
- (Gregory CLEMENT's message of "Wed, 23 Dec 2015 15:17:47 +0100")
-References: <1450880267-20558-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <878u3wyt89.fsf@free-electrons.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 11 Jan 2016 14:32:11 -0200
+Subject: imxfb does not turn on automatically
+In-Reply-To: <20160111071631.GI13058@pengutronix.de>
+References: <CAOMZO5CZ3aFGbfb39XoXpFvbn4TTrCbTHOXtQKruruCis3Ptvw@mail.gmail.com>
+ <CAD7j7Q8gANUxM5zGmn3YyhUr9yZv02x4oxi_WWLnxCYemBRYZA@mail.gmail.com>
+ <20160111071631.GI13058@pengutronix.de>
+Message-ID: <CAOMZO5C9MtteWQMaXUF2M+BLr5=PgWUSgrYn1gES2S8jzDhdFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
- 
- On mer., d?c. 23 2015, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+Hi Sascha,
 
-> Using the usb-nop-xceiv PHY for the xhci nodes allows a better
-> representation of the hardware but also a better handling of the
-> regulator. By linking the regulator to the PHY there is no more need to
-> use the regulator-always-on property, then it allows a better power
-> management.
->
-> The remaining usb node uses the ehci-orion driver which can't be used
-> with the usb-nop-xceiv PHY and must keeps the direct link to the
-> regulator with the regulator-always-on property.
->
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+On Mon, Jan 11, 2016 at 5:16 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
 
+> Unfortunately this LCD controller does not have an enable bit. The
+> controller starts directly when the clocks are enabled. If the clocks
+> are enabled when the controller is not yet programmed with proper
+> register values then it just goes into some undefined state. What I
+> suspect is that the clocks already were enabled before driver probe,
+> presumably by the bootloader, so the controller is already in undefined
+> state when entering Linux. Now by dis/enabling the ipg clock you
+> effectively reset the controller. Since you have programmed it with
+> valid register values in the mean time it starts working after this
+> reset.
+> To verify you could try to disable the LCDC related clock gates with
+> direct register writes in drivers/clk/imx/clk-imx25.c.
 
-I applied this one on mvebu/dt-for-4.6
+Excellent! I did as you suggested and now the LCD turns on by default.
 
-Gregory
+U-boot was enabling the LCD IPG clock.
 
-> ---
->  arch/arm/boot/dts/armada-388-gp.dts | 16 ++++++++++++----
->  1 file changed, 12 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
-> index ac3c9445ce57..51943598d858 100644
-> --- a/arch/arm/boot/dts/armada-388-gp.dts
-> +++ b/arch/arm/boot/dts/armada-388-gp.dts
-> @@ -229,13 +229,13 @@
->  
->  			/* CON5 */
->  			usb3 at f0000 {
-> -				vcc-supply = <&reg_usb2_1_vbus>;
-> +				usb-phy = <&usb2_1_phy>;
->  				status = "okay";
->  			};
->  
->  			/* CON7 */
->  			usb3 at f8000 {
-> -				vcc-supply = <&reg_usb3_vbus>;
-> +				usb-phy = <&usb3_phy>;
->  				status = "okay";
->  			};
->  		};
-> @@ -273,13 +273,22 @@
->  		};
->  	};
->  
-> +	usb2_1_phy: usb2_1_phy {
-> +		compatible = "usb-nop-xceiv";
-> +		vcc-supply = <&reg_usb2_1_vbus>;
-> +	};
-> +
-> +	usb3_phy: usb3_phy {
-> +		compatible = "usb-nop-xceiv";
-> +		vcc-supply = <&reg_usb3_vbus>;
-> +	};
-> +
->  	reg_usb3_vbus: usb3-vbus {
->  		compatible = "regulator-fixed";
->  		regulator-name = "usb3-vbus";
->  		regulator-min-microvolt = <5000000>;
->  		regulator-max-microvolt = <5000000>;
->  		enable-active-high;
-> -		regulator-always-on;
->  		gpio = <&expander1 15 GPIO_ACTIVE_HIGH>;
->  	};
->  
-> @@ -299,7 +308,6 @@
->  		regulator-min-microvolt = <5000000>;
->  		regulator-max-microvolt = <5000000>;
->  		enable-active-high;
-> -		regulator-always-on;
->  		gpio = <&expander0 4 GPIO_ACTIVE_HIGH>;
->  	};
->  
-> -- 
-> 2.5.0
->
+Will submit a formal patch soon.
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Thanks!
