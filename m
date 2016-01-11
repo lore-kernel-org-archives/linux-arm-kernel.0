@@ -1,237 +1,153 @@
-From: afd@ti.com (Andrew F. Davis)
-Date: Mon, 11 Jan 2016 08:25:57 -0600
-Subject: /sys/class/power_supply/bq27200-0/capacity changed meaning
- between 4.1 and 4.4?
-In-Reply-To: <20160109230709.GA30551@amd>
-References: <20160109230709.GA30551@amd>
-Message-ID: <5693BB75.70409@ti.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Mon, 11 Jan 2016 15:30:32 +0100
+Subject: [PATCH linux-next v2 03/14] mtd: spi-nor: select op codes and SPI
+ NOR protocols by manufacturer
+In-Reply-To: <20160111112421.5919b531@bbrezillon>
+References: <cover.1452268345.git.cyrille.pitchen@atmel.com>
+ <fd5ca97795c35b3df5ffee95075e2e03a70c7e48.1452268345.git.cyrille.pitchen@atmel.com>
+ <20160111112421.5919b531@bbrezillon>
+Message-ID: <5693BC88.6070907@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/2016 05:07 PM, Pavel Machek wrote:
-> Hi!
->
-> Did /sys/class/power_supply/bq27200-0/capacity change meaning between
-> 4.1 and 4.4?
->
-> It used to report battery capacity remaining in percent.
->
-> Not sure what it reports now, but ain't in percent....
->
-> pavel at n900:/my/tui/ofone$ cat
-> /sys/class/power_supply/bq27200-0/capacity
-> 7497
-> pavel at n900:/my/tui/ofone$ uname -a
-> Linux n900 4.4.0-rc8-omap3-149467-g69aafd8-dirty #114 PREEMPT Sat Jan
-> 9 21:44:00 CET 2016 armv7l GNU/Linux
-> pavel at n900:/my/tui/ofone$
->
-> And power_supply_class.txt says:
->
-> ~ ~ ~ ~ ~ ~ ~  Charge/Energy/Capacity - how to not confuse  ~ ~ ~ ~ ~
-> ~ ~
-> ~
-> ~
-> ~ Because both "charge" (?Ah) and "energy" (?Wh) represents "capacity"
-> ~
-> ~ of battery, this class distinguish these terms. Don't mix them!
-> ~
-> ~
-> ~
-> ~ CHARGE_* attributes represents capacity in ?Ah only.
-> ~
-> ~ ENERGY_* attributes represents capacity in ?Wh only.
-> ~
-> ~ CAPACITY attribute represents capacity in *percents*, from 0 to
-> 100.  ~
->
-> --- hmm. So that seems to be a mistake.
->
-> pavel at n900:/my/tui/ofone$ cat /sys/class/power_supply/bq27200-0/capacity
-> 7497
-> pavel at n900:/my/tui/ofone$ cat /sys/class/power_supply/bq27200-0/capacity
-> 16713
-> pavel at n900:/my/tui/ofone$ cat /sys/class/power_supply/bq27200-0/capacity
-> 25162
->
-> Converting them to hex gives rather strange values.
->
-> Hmm. .... what is this? Git blames Andrew F. Davis.The first part of
-> code suggests whole cache needs to be initialized... but the second
-> part of the code only initializes cache.time_to_empty (for example)
-> conditionaly.
->
-> Are you sure?
->
->                  if (has_ci_flag && (cache.flags & BQ27000_FLAG_CI)) {
->                          dev_info(di->dev, "battery is not calibrated! ignoring capacity values\n");
->                          cache.capacity = -ENODATA;
->                          cache.energy = -ENODATA;
->                          cache.time_to_empty = -ENODATA;
->                          cache.time_to_empty_avg = -ENODATA;
->                          cache.time_to_full = -ENODATA;
->                          cache.charge_full = -ENODATA;
->                          cache.health = -ENODATA;
->                  } else {
->                          if (di->regs[BQ27XXX_REG_TTE] != INVALID_REG_ADDR)
->                                  cache.time_to_empty = bq27xxx_battery_read_time(di, BQ27XXX_REG_TTE);
->                          if (di->regs[BQ27XXX_REG_TTECP] != INVALID_REG_ADDR)
->                                  cache.time_to_empty_avg = bq27xxx_battery_read_time(di, BQ27XXX_REG_TT\
-> ECP);
->                          if (di->regs[BQ27XXX_REG_TTF] != INVALID_REG_ADDR)
->                                  cache.time_to_full = bq27xxx_battery_read_time(di, BQ27XXX_REG_TTF);
->                          cache.charge_full = bq27xxx_battery_read_fcc(di);
->                          cache.capacity = bq27xxx_battery_read_soc(di);
->                          if (di->regs[BQ27XXX_REG_AE] != INVALID_REG_ADDR)
->                                  cache.energy = bq27xxx_battery_read_energy(di);
->                          cache.health = bq27xxx_battery_read_health(di);
->                  }
->
-> But that does not explain the wrong capacity..
->
-> -static inline int bq27xxx_read(struct bq27xxx_device_info *di, u8  reg,
-> +static inline int bq27xxx_read(struct bq27xxx_device_info *di, int  reg_index,
->                                  bool single)
-> 				 {
->
->
-> This is pretty anti-social function now has completely different
-> meaning, yet same name and compatible enough not to catch mistakes.
->
-> And sure enough:
->
-> static int bq27xxx_battery_read_charge(struct bq27xxx_device_info *di,u8 reg)
-> {
->          int charge;
->
->          charge = bq27xxx_read(di, reg, false);
->
->
-> The internal functions already check for non-existent registers. We
-> can kill the debug prints and reuse that... its better than not
-> initializing half the struct.
->
-> The types should in bq27xxx_battery_read_time should be certainly
-> fixed like the patch below suggests.
->
-> The patch does not compile, but I should be sleeping, not trying to
-> understand crazy code. Whoever wrote it, please fix it. Maybe you can
-> just do
->
->                          cache.capacity = -ENODATA;
->                          cache.energy = -ENODATA;
->                          cache.time_to_empty = -ENODATA;
->                          cache.time_to_empty_avg = -ENODATA;
->                          cache.time_to_full = -ENODATA;
->                          cache.charge_full = -ENODATA;
->                          cache.health = -ENODATA;
->
-> undonditionaly so that half of file does not need updating.
->
->
-> 									Pavel
->
-> diff --git a/drivers/power/bq27xxx_battery.c b/drivers/power/bq27xxx_battery.c
-> index 880233c..e9f26f5 100644
-> --- a/drivers/power/bq27xxx_battery.c
-> +++ b/drivers/power/bq27xxx_battery.c
-> @@ -483,11 +483,11 @@ static int bq27xxx_battery_read_soc(struct bq27xxx_device_info *di)
->    * Return a battery charge value in ?Ah
->    * Or < 0 if something fails.
->    */
-> -static int bq27xxx_battery_read_charge(struct bq27xxx_device_info *di, u8 reg)
-> +static int bq27xxx_battery_read_charge(struct bq27xxx_device_info *di, int reg_index)
->   {
->   	int charge;
->
-> -	charge = bq27xxx_read(di, reg, false);
-> +	charge = bq27xxx_read(di, reg_index, false);
->   	if (charge < 0) {
->   		dev_dbg(di->dev, "error reading charge register %02x: %d\n",
->   			reg, charge);
-> @@ -561,7 +561,6 @@ static int bq27xxx_battery_read_energy(struct bq27xxx_device_info *di)
->
->   	ae = bq27xxx_read(di, BQ27XXX_REG_AE, false);
->   	if (ae < 0) {
-> -		dev_dbg(di->dev, "error reading available energy\n");
->   		return ae;
->   	}
->
-> @@ -602,8 +601,6 @@ static int bq27xxx_battery_read_cyct(struct bq27xxx_device_info *di)
->   	int cyct;
->
->   	cyct = bq27xxx_read(di, BQ27XXX_REG_CYCT, false);
-> -	if (cyct < 0)
-> -		dev_err(di->dev, "error reading cycle count total\n");
->
->   	return cyct;
->   }
-> @@ -612,14 +609,12 @@ static int bq27xxx_battery_read_cyct(struct bq27xxx_device_info *di)
->    * Read a time register.
->    * Return < 0 if something fails.
->    */
-> -static int bq27xxx_battery_read_time(struct bq27xxx_device_info *di, u8 reg)
-> +static int bq27xxx_battery_read_time(struct bq27xxx_device_info *di, int reg_index)
->   {
->   	int tval;
->
-> -	tval = bq27xxx_read(di, reg, false);
-> +	tval = bq27xxx_read(di, reg_index, false);
->   	if (tval < 0) {
-> -		dev_dbg(di->dev, "error reading time register %02x: %d\n",
-> -			reg, tval);
->   		return tval;
->   	}
->
-> @@ -639,8 +634,6 @@ static int bq27xxx_battery_read_pwr_avg(struct bq27xxx_device_info *di)
->
->   	tval = bq27xxx_read(di, BQ27XXX_REG_AP, false);
->   	if (tval < 0) {
-> -		dev_err(di->dev, "error reading average power register  %02x: %d\n",
-> -			BQ27XXX_REG_AP, tval);
->   		return tval;
->   	}
->
-> @@ -731,22 +724,16 @@ static void bq27xxx_battery_update(struct bq27xxx_device_info *di)
->   			cache.charge_full = -ENODATA;
->   			cache.health = -ENODATA;
->   		} else {
-> -			if (di->regs[BQ27XXX_REG_TTE] != INVALID_REG_ADDR)
-> -				cache.time_to_empty = bq27xxx_battery_read_time(di, BQ27XXX_REG_TTE);
-> -			if (di->regs[BQ27XXX_REG_TTECP] != INVALID_REG_ADDR)
-> -				cache.time_to_empty_avg = bq27xxx_battery_read_time(di, BQ27XXX_REG_TTECP);
-> -			if (di->regs[BQ27XXX_REG_TTF] != INVALID_REG_ADDR)
-> -				cache.time_to_full = bq27xxx_battery_read_time(di, BQ27XXX_REG_TTF);
-> +			cache.time_to_empty = bq27xxx_battery_read_time(di, BQ27XXX_REG_TTE);
-> +			cache.time_to_empty_avg = bq27xxx_battery_read_time(di, BQ27XXX_REG_TTECP);
-> +			cache.time_to_full = bq27xxx_battery_read_time(di, BQ27XXX_REG_TTF);
->   			cache.charge_full = bq27xxx_battery_read_fcc(di);
->   			cache.capacity = bq27xxx_battery_read_soc(di);
-> -			if (di->regs[BQ27XXX_REG_AE] != INVALID_REG_ADDR)
-> -				cache.energy = bq27xxx_battery_read_energy(di);
-> +			cache.energy = bq27xxx_battery_read_energy(di);
->   			cache.health = bq27xxx_battery_read_health(di);
->   		}
-> -		if (di->regs[BQ27XXX_REG_CYCT] != INVALID_REG_ADDR)
-> -			cache.cycle_count = bq27xxx_battery_read_cyct(di);
-> -		if (di->regs[BQ27XXX_REG_AP] != INVALID_REG_ADDR)
-> -			cache.power_avg = bq27xxx_battery_read_pwr_avg(di);
-> +		cache.cycle_count = bq27xxx_battery_read_cyct(di);
-> +		cache.power_avg = bq27xxx_battery_read_pwr_avg(di);
->
->   		/* We only have to read charge design full once */
->   		if (di->charge_design_full <= 0)
+Hi Boris,
+
+Le 11/01/2016 11:24, Boris Brezillon a ?crit :
+> Hi,
+> 
+> On Fri, 8 Jan 2016 17:02:15 +0100
+> Cyrille Pitchen <cyrille.pitchen@atmel.com> wrote:
+> 
+>> This is a transitional patch to prepare the split by Manufacturer of the
+>> support of Single/Dual/Quad SPI modes.
+>>
+>> Indeed every QSPI NOR manufacturer (Spansion, Micron, Macronix, Winbond)
+>> supports Dual or Quad SPI modes on its way. Especially the Fast Read op
+>> code and the SPI NOR protocols to use are not quite the same depending on
+>> the manufacturer.
+>>
+>> For instance Quad commands can use either the SPI 1-1-4, 1-4-4 or 4-4-4
+>> protocol.
+>>
+>> This is why this patch will be completed by fixes for each manufacturer.
+>>
+>> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+>> ---
+>>  drivers/mtd/spi-nor/spi-nor.c | 110 ++++++++++++++++++++++++++++++++----------
+>>  include/linux/mtd/spi-nor.h   |  12 +++--
+>>  2 files changed, 92 insertions(+), 30 deletions(-)
+>>
+>> diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
+>> index 8967319ea7da..8793cebbe5a9 100644
+>> --- a/drivers/mtd/spi-nor/spi-nor.c
+>> +++ b/drivers/mtd/spi-nor/spi-nor.c
+>> @@ -1180,17 +1180,61 @@ static int set_quad_mode(struct spi_nor *nor, const struct flash_info *info)
+>>  			dev_err(nor->dev, "Macronix quad-read not enabled\n");
+>>  			return -EINVAL;
+>>  		}
+>> -		return status;
+>> +		/* Check whether Macronix QPI mode is enabled. */
+>> +		if (nor->read_proto != SNOR_PROTO_4_4_4)
+>> +			nor->read_proto = SNOR_PROTO_1_1_4;
+>> +		break;
+>> +
+>>  	case SNOR_MFR_MICRON:
+>> -		return 0;
+>> -	default:
+>> +		/* Check whether Micron Quad mode is enabled. */
+>> +		if (nor->read_proto != SNOR_PROTO_4_4_4)
+>> +			nor->read_proto = SNOR_PROTO_1_1_4;
+>> +		break;
+>> +
+>> +	case SNOR_MFR_SPANSION:
+> 
+> The following comment is not only related to your changes, but after
+> looking at the spi_nor_scan() function and a few other functions in the
+> core, I see a lot of vendor specific initialization.
+> 
+> Would it make sense to somehow set a default configuration in
+> spi_nor_scan() and then overload this default config using a
+> per-manufacturer ->init() method. Something like that.
+> 
+> struct spi_nor_manufacturer {
+> 	int (*init)(struct spi_nor *nor, const struct flash_info *fi);
+> }
+> 
+> static const struct spi_nor_manufacturer manufacturers[] = {
+> 	[<manuf-id>] = {
+> 		.init = <manuf-init-callback>
+> 	},
+> };
+> 
+> Of course you could add other methods if you think this differentiation
+> is needed after the initialization step.
+> 
+
+It might be a good idea. I don't mind changing if needed. Brian, could you
+please comment on this point?
+
+>>  		status = spansion_quad_enable(nor);
+>>  		if (status) {
+>>  			dev_err(nor->dev, "Spansion quad-read not enabled\n");
+>>  			return -EINVAL;
+>>  		}
+>> -		return status;
+>> +		nor->read_proto = SNOR_PROTO_1_1_4;
+>> +		break;
+>> +
+>> +	default:
+>> +		return -EINVAL;
+>>  	}
+>> +
+>> +	nor->read_opcode = SPINOR_OP_READ_1_1_4;
+>> +	return 0;
+>> +}
+>> +
+>> +static int set_dual_mode(struct spi_nor *nor, const struct flash_info *info)
+>> +{
+>> +	switch (JEDEC_MFR(info)) {
+>> +	case SNOR_MFR_MICRON:
+>> +		/* Check whether Micron Dual mode is enabled. */
+>> +		if (nor->read_proto != SNOR_PROTO_2_2_2)
+>> +			nor->read_proto = SNOR_PROTO_1_1_2;
+>> +		break;
+>> +
+>> +	default:
+>> +		nor->read_proto = SNOR_PROTO_1_1_2;
+>> +		break;
+>> +	}
+>> +
+>> +	nor->read_opcode = SPINOR_OP_READ_1_1_2;
+>> +	return 0;
+>> +}
+>> +
+>> +static int set_single_mode(struct spi_nor *nor, const struct flash_info *info)
+>> +{
+>> +	switch (JEDEC_MFR(info)) {
+>> +	default:
+>> +		nor->read_proto = SNOR_PROTO_1_1_1;
+>> +		break;
+>> +	}
+> 
+> You can just put
+> 
+> 	nor->read_proto = SNOR_PROTO_1_1_1;
+> 
+> until you have a manufacturer specific case.
 >
 
-There was a resent overhaul of this driver and a lot of code is
-vestigial as you have seen. I've been meaning to continue
-cleaning it up, my next step would probably to bring up regmap
-on the 1wire bus, so that we could cut out a whole bunch of this
-stuff by using its built-in caching instead of this attempt at
-rolling our own.
+I did it on purpose: it is a transitional patch which was written only to ease
+the split of the QSPI support by manufacturer. So the diff producing the next
+patch of this series is a little bit more easy to review: it is just a new
+case in a switch statement instead of replacing a 'if' statement by a 'switch'
+one.
+Also it removes some (not all) constraints on the order the manufacturer
+specific patches should be applied, which makes it easier to remove some of
+them from the series if needed: the rebase job will be simplified.
+Ideally, all manufacturer patches should be totally independent.
 
-Beyond this, I see no immediate problems with these suggested
-changes, although attempting to call a function to read a value
-when that associated register is invalid doesn't make much
-sense ether, maybe clearing the cache to start would work better?
-Or maybe even just trashing the whole caching thing.
+[...]
+
+Best regards,
+
+Cyrille
