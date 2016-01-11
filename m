@@ -1,54 +1,68 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 11 Jan 2016 14:50:21 +0100
-Subject: [PATCH] arm64: kasan: ensure that the KASAN zero page is mapped
- read-only
-Message-ID: <1452520221-6219-1-git-send-email-ard.biesheuvel@linaro.org>
+From: kernel@martin.sperl.org (Martin Sperl)
+Date: Mon, 11 Jan 2016 14:53:36 +0100
+Subject: [PATCH 2/5] clk: bcm2835: enable management of PCM clock
+In-Reply-To: <4412078.STjb1rKkbV@wuerfel>
+References: <1452331558-2520-1-git-send-email-kernel@martin.sperl.org>
+ <20160110115858.GV6588@sirena.org.uk>
+ <39E8C95F-C7DC-46C3-B29A-93A865485942@martin.sperl.org>
+ <4412078.STjb1rKkbV@wuerfel>
+Message-ID: <A156F37A-76CF-4ECF-8C85-162A71877EC5@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When switching from the early KASAN shadow region, which maps the
-entire shadow space read-write, to the permanent KASAN shadow region,
-which uses a zero page to shadow regions that are not subject to
-instrumentation, the lowest level table kasan_zero_pte[] may be
-reused unmodified, which means that the mappings of the zero page
-that it contains will still be read-write.
 
-So update it explicitly to map the zero page read only when we
-activate the permanent mapping.
+> On 11.01.2016, at 14:38, Arnd Bergmann <arnd@arndb.de> wrote:
+> 
+> On Sunday 10 January 2016 13:17:17 Martin Sperl wrote:
+>> 
+>> What you propose is a major change to the clock framework, so I would
+>> hope that Eric (the original author of this clock-driver) would address
+>> it.
+>> 
+>> Maybe someone has a better idea for a pattern to use to achieve 
+>> the required while maintaining ?synchronization? between defines
+>> inside the dt-binding and the driver.
+> 
+> It's funny to look at the register list:
+> 
+> #define CM_VPUCTL               0x008
+> #define CM_VPUDIV               0x00c
+> #define CM_SYSCTL               0x010
+> #define CM_SYSDIV               0x014
+> #define CM_PERIACTL             0x018
+> #define CM_PERIADIV             0x01c
+> #define CM_PERIICTL             0x020
+> #define CM_PERIIDIV             0x024
+> #define CM_H264CTL              0x028
+> #define CM_H264DIV              0x02c
+> 
+> This one seems completely regular, there is always a pair of CTL and DIV
+> registers, so I would have guessed that we could just take the index
+> of that to completely avoid the need for the header file and just have
+> a lookup table of each index.
+> 
+> I can see two possible ways forward:
+> 
+> a) deprecate the existing binding and write a new simpler driver to
+>   replace it with one that does not need the header. We probably need
+>   to keep both drivers around indefinitely though to deal with people
+>   that have their own dtb files, so this is a bit awkward.
+I was thinking about this as well, but am concerned about the dt-changes.
 
-Acked-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/mm/kasan_init.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+Also initialization order may be an issue, so I have avoided that.
 
-diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
-index cf038c7d9fa9..cab7a5be40aa 100644
---- a/arch/arm64/mm/kasan_init.c
-+++ b/arch/arm64/mm/kasan_init.c
-@@ -120,6 +120,7 @@ static void __init cpu_set_ttbr1(unsigned long ttbr1)
- void __init kasan_init(void)
- {
- 	struct memblock_region *reg;
-+	int i;
- 
- 	/*
- 	 * We are going to perform proper setup of shadow memory.
-@@ -155,6 +156,14 @@ void __init kasan_init(void)
- 				pfn_to_nid(virt_to_pfn(start)));
- 	}
- 
-+	/*
-+	 * KAsan may reuse the contents of kasan_zero_pte directly, so we
-+	 * should make sure that it maps the zero page read-only.
-+	 */
-+	for (i = 0; i < PTRS_PER_PTE; i++)
-+		set_pte(&kasan_zero_pte[i],
-+			pfn_pte(virt_to_pfn(kasan_zero_page), PAGE_KERNEL_RO));
-+
- 	memset(kasan_zero_page, 0, PAGE_SIZE);
- 	cpu_set_ttbr1(__pa(swapper_pg_dir));
- 	flush_tlb_all();
--- 
-2.5.0
+> b) look at all the holes in the table and define new numbers for them
+>   now, then remove the count as the driver can simply hardcode the
+>   maximum number as it knows it will never change.
+There are clocks for most of them - See my patch I sent some time ago.
+
+Right now I have got a working version with the following patches:
+817176d clk: bcm2835: add missing clocks
+8f74701 clk: bcm2835: enable management of PCM clock
+62a7d94 clk: bcm2835: move to a different initialization scheme.
+
+There is one more thing that I would like to do before submitting those
+as a patch-set: enable the fractual divider, because right now
+we calculate the fractual divider value correctly, but we do not set
+the flag to enable it, so we are actually running too fast most
+of the times...
