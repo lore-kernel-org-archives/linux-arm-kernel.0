@@ -1,39 +1,59 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 11 Jan 2016 08:54:16 +0100
-Subject: [PATCH v4 3/3] ARM: dts: sun8i: Add A83T HomletV2 Board by
- Allwinner
-In-Reply-To: <1452085914-29340-4-git-send-email-vishnupatekar0510@gmail.com>
-References: <1452085914-29340-1-git-send-email-vishnupatekar0510@gmail.com>
- <1452085914-29340-4-git-send-email-vishnupatekar0510@gmail.com>
-Message-ID: <20160111075416.GL9631@lukather>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 11 Jan 2016 07:57:40 +0000
+Subject: [PATCH] backlight: adp8860: fix another uninitialized variable use
+In-Reply-To: <3284846.T0rzz6n1As@wuerfel>
+References: <3284846.T0rzz6n1As@wuerfel>
+Message-ID: <20160111075740.GP3331@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 06, 2016 at 09:11:54PM +0800, Vishnu Patekar wrote:
-> H8Homlet Proto v2.0 Board is A83T Dev Board by Allwinner.
-> It has UART, ethernet, USB, HDMI, etc ports on it.
-> 
-> A83T patches are tested on this board.
-> It has UART, ethernet, USB, HDMI, etc ports on it.
-> 
-> For FEL mode it needs USB A-A(Male) cable. I used uart0 which
-> is multiplexed to microsd pins PF2 and PF4.
-> 
-> Enabled UART0 Header(PB9, PB10 pins).
-> 
-> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
+On Mon, 30 Nov 2015, Arnd Bergmann wrote:
 
-Applied, thanks!
-Maxime
+> A recent patch I did fixed two potential uses of uninitialized
+> variables in the adp8870 and adp8860 drivers. Unfortunately,
+> I missed another one:
+> 
+> drivers/video/backlight/adp8860_bl.c: In function 'adp8860_bl_ambient_light_level_show':
+> drivers/video/backlight/adp8860_bl.c:570:11: warning: 'reg_val' may be used uninitialized in this function
+> 
+> This does the same change as before in one additional function,
+> and also changes the check for the return value in a way that
+> avoids another false positive warning with a similar message.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 6be3a5a9cd91 ("backlight: adp88x0: Fix uninitialized variable use")
+> ---
+> Sorry for missing this third hunk the first time around.
+
+Where's your diff?
+
+Applied anyway, thanks.
+
+> diff --git a/drivers/video/backlight/adp8860_bl.c b/drivers/video/backlight/adp8860_bl.c
+> index f0d4c0324580..510e559c060e 100644
+> --- a/drivers/video/backlight/adp8860_bl.c
+> +++ b/drivers/video/backlight/adp8860_bl.c
+> @@ -566,11 +566,13 @@ static ssize_t adp8860_bl_ambient_light_level_show(struct device *dev,
+>  
+>  	mutex_lock(&data->lock);
+>  	error = adp8860_read(data->client, ADP8860_PH1LEVL, &reg_val);
+> -	ret_val = reg_val;
+> -	error |= adp8860_read(data->client, ADP8860_PH1LEVH, &reg_val);
+> +	if (!error) {
+> +		ret_val = reg_val;
+> +		error = adp8860_read(data->client, ADP8860_PH1LEVH, &reg_val);
+> +	}
+>  	mutex_unlock(&data->lock);
+>  
+> -	if (error < 0)
+> +	if (error)
+>  		return error;
+>  
+>  	/* Return 13-bit conversion value for the first light sensor */
+> 
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160111/52d6924d/attachment.sig>
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
