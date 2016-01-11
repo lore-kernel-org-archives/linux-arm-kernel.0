@@ -1,64 +1,56 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Mon, 11 Jan 2016 12:06:04 -0800
-Subject: arm/arm64 HARDLOCKUP Detector and PERF NMI support
-In-Reply-To: <5693913D.5060308@linaro.org>
-References: <569199C0.9030500@samsung.com> <5691A23C.8060807@samsung.com>
- <20160111102658.GB6499@leverpostej> <5693913D.5060308@linaro.org>
-Message-ID: <56940B2C.8000409@samsung.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 11 Jan 2016 18:14:31 -0200
+Subject: arm qemu boot failures in -next due to 'PM / Domains: add setter
+ for dev.pm_domain'
+In-Reply-To: <20160111185459.GZ12777@atomide.com>
+References: <5693EB8A.40802@roeck-us.net> <20160111185459.GZ12777@atomide.com>
+Message-ID: <CAOMZO5CkfXcZV3LTOP0oT__012ena9kmTYLb83dY9+BMj5X3hw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+[Adding Rafael]
 
+On Mon, Jan 11, 2016 at 4:55 PM, Tony Lindgren <tony@atomide.com> wrote:
 
-On 1/11/2016 3:25 AM, Daniel Thompson wrote:
-> On 11/01/16 10:26, Mark Rutland wrote:
->> Hi,
+>> I see 6 out of 24 arm qemu tests failing in next-20160111. Bisect points
+>> to commit 989561de9b51 ("PM / Domains: add setter for dev.pm_domain").
+>> Failures are silent - there is no output on the console.
+>> Affected tests are
 >>
->> On Sat, Jan 09, 2016 at 04:13:48PM -0800, Mario Smarduch wrote:
->>> I'm trying to get HARDLOCKUP detector to work on arm (on foundation
->>> model and Juno, but armv7 should have the same issue). Turns out there is no
->>> PERF NMI support (HAVE_PERF_EVENTS_NMI), which I guess would be PMU NMI - I
->>> tested overflow on cycle counter and PMU interrupts can be masked. HARDLOCKUP
->>> assumes perf interrupts are non-maskable and uses the PMU to program an NMI to
->>> detect hard lockup and that in turn drives softlockup detection.
->>>
->>> Is there something, someplace in ARM manuals that addresses this, searched the
->>> manuals but couldn't find anything?
->>>
->>> Or other approaches that I'm not aware off or have floated on the mailing list.
+>> arm:beagle:multi_v7_defconfig:omap3-beagle
+>> arm:beaglexm:multi_v7_defconfig:omap3-beagle-xm
+>> arm:overo:multi_v7_defconfig:omap3-overo-tobi
+>> arm:beagle:omap2plus_defconfig:omap3-beagle
+>> arm:beaglexm:omap2plus_defconfig:omap3-beagle-xm
+>> arm:overo:omap2plus_defconfig:omap3-overo-tobi
 >>
->> Russell and Daniel did some work [1,2] to use FIQs as NMIs on arm, for
->> backtracing and PMU overflow.
->  >
->> For arm64 the kernel always runs on the non-secure side, so we don't
->> expect to have access to FIQ. It's possible to implement NMIs using
->> priorities (which it looks like Daniel was looking into [3]).
-> 
-> Thanks Mark.
-> 
-> The blog post is still pretty much describes my ambitions and the 
-> benefits these features can bring. It also has a link to a fairly 
-> elderly kernel that contains all the features fully integrated.
-> 
-> There are more patchsets for both ARM (if/f FIQ is available) and ARM64 
-> (if/f device has GICv3). However these only provide NMI backtrace.
-> 
-> arm:   http://thread.gmane.org/gmane.linux.kernel/2112583
-> 
-> arm64: http://thread.gmane.org/gmane.linux.kernel/2037735 (Mark's
->         link to my git repo is more up to date than this patchset)
-> 
-> To get the hard lockup and profiling support upstream then my old code 
-> to integrate NMIs into the irq subsystem (which was just a cut down 
-> clone of the existing irq infrastructure) needs to be redesigned. 
-> However I decided to put the rewrite on ice until I get the foundational 
-> patches right.
-> 
-> 
-> Daniel.
-> 
+>> For details please see the 'next' column at http://server.roeck-us.net:8010/builders.
+>>
+>> Reverting the offending commit fixes the problems.
+>>
+>> Please let me know if there is anything I can do to help tracking down the problem.
+>
+> The following fixes the booting, but I wonder if it's a
+> proper fix?
+>
+> --- a/drivers/base/power/common.c
+> +++ b/drivers/base/power/common.c
+> @@ -145,9 +145,10 @@ void dev_pm_domain_set(struct device *dev, struct dev_pm_domain *pd)
+>  {
+>         if (dev->pm_domain == pd)
+>                 return;
+> -
+> -       WARN(device_is_bound(dev),
+> -            "PM domains can only be changed for unbound devices\n");
+> +       if (device_is_registered(dev)) {
+> +               WARN(device_is_bound(dev),
+> +                    "PM domains can only be changed for unbound devices\n");
+> +       }
+>         dev->pm_domain = pd;
+>         device_pm_check_callbacks(dev);
 
-Daniel, Mark - thanks for the info. I'll research the work done so far and
-probably comeback later.
+Commit 989561de9b51 ("PM / Domains: add setter for dev.pm_domain")
+causes issues for me after doing a 'reboot' command.
 
-- Mario
+Rafael proposed a patch which fixed the 'reboot' problem:
+http://www.spinics.net/lists/arm-kernel/msg473562.html
