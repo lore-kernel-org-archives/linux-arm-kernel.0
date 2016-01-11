@@ -1,10 +1,10 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 11 Jan 2016 13:32:57 +0900
-Subject: [PATCH 1/6] ARM: dts: bockw: Add compatible property to "partitions"
+Date: Mon, 11 Jan 2016 13:32:58 +0900
+Subject: [PATCH 2/6] ARM: dts: lager: Add compatible property to "partitions"
  node
 In-Reply-To: <cover.1452486598.git.horms+renesas@verge.net.au>
 References: <cover.1452486598.git.horms+renesas@verge.net.au>
-Message-ID: <b66c1ebae17bf78eb915f1d22a82e1183b0deb8e.1452486598.git.horms+renesas@verge.net.au>
+Message-ID: <b88ddbdd36859a4dc99bddd9b5730944187530c0.1452486598.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,14 +19,14 @@ Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Acked-by: Brian Norris <computersforpeace@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7778-bockw.dts | 1 +
+ arch/arm/boot/dts/r8a7790-lager.dts | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/r8a7778-bockw.dts b/arch/arm/boot/dts/r8a7778-bockw.dts
-index b1aa02599229..a52b359e2ae2 100644
---- a/arch/arm/boot/dts/r8a7778-bockw.dts
-+++ b/arch/arm/boot/dts/r8a7778-bockw.dts
-@@ -199,6 +199,7 @@
+diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+index 44ba69b974a2..052dcee4790d 100644
+--- a/arch/arm/boot/dts/r8a7790-lager.dts
++++ b/arch/arm/boot/dts/r8a7790-lager.dts
+@@ -449,6 +449,7 @@
  		m25p,fast-read;
  
  		partitions {
