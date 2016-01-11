@@ -1,90 +1,69 @@
 From: dianders@chromium.org (Douglas Anderson)
-Date: Mon, 11 Jan 2016 09:30:25 -0800
-Subject: [PATCH v6 3/5] ARM: dma-mapping: Use DMA_ATTR_ALLOC_SINGLE_PAGES hint
- to optimize alloc
+Date: Mon, 11 Jan 2016 09:30:27 -0800
+Subject: [PATCH v6 5/5] s5p-mfc: Set DMA_ATTR_ALLOC_SINGLE_PAGES
 In-Reply-To: <1452533428-12762-1-git-send-email-dianders@chromium.org>
 References: <1452533428-12762-1-git-send-email-dianders@chromium.org>
-Message-ID: <1452533428-12762-4-git-send-email-dianders@chromium.org>
+Message-ID: <1452533428-12762-6-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we know that TLB efficiency will not be an issue when memory is
-accessed then it's not terribly important to allocate big chunks of
-memory.  The whole point of allocating the big chunks was that it would
-make TLB usage efficient.
+We do video allocation all the time and we need it to be fast.  Plus TLB
+efficiency isn't terribly important for video.
 
-As Marek Szyprowski indicated:
-    Please note that mapping memory with larger pages significantly
-    improves performance, especially when IOMMU has a little TLB
-    cache. This can be easily observed when multimedia devices do
-    processing of RGB data with 90/270 degree rotation
-Image rotation is distinctly an operation that needs to bounce around
-through memory, so it makes sense that TLB efficiency is important
-there.
+That means we want to set DMA_ATTR_ALLOC_SINGLE_PAGES.
 
-Video decoding, on the other hand, is a fairly sequential operation.
-During video decoding it's not expected that we'll be jumping all over
-memory.  Decoding video is also pretty heavy and the TLB misses aren't a
-huge deal.  Presumably most HW video acceleration users of dma-mapping
-will not care about huge pages and will set DMA_ATTR_ALLOC_SINGLE_PAGES.
-
-Allocating big chunks of memory is quite expensive, especially if we're
-doing it repeadly and memory is full.  In one (out of tree) usage model
-it is common that arm_iommu_alloc_attrs() is called 16 times in a row,
-each one trying to allocate 4 MB of memory.  This is called whenever the
-system encounters a new video, which could easily happen while the
-memory system is stressed out.  In fact, on certain social media
-websites that auto-play video and have infinite scrolling, it's quite
-common to see not just one of these 16x4MB allocations but 2 or 3 right
-after another.  Asking the system even to do a small amount of extra
-work to give us big chunks in this case is just not a good use of time.
-
-Allocating big chunks of memory is also expensive indirectly.  Even if
-we ask the system not to do ANY extra work to allocate _our_ memory,
-we're still potentially eating up all big chunks in the system.
-Presumably there are other users in the system that aren't quite as
-flexible and that actually need these big chunks.  By eating all the big
-chunks we're causing extra work for the rest of the system.  We also may
-start making other memory allocations fail.  While the system may be
-robust to such failures (as is the case with dwc2 USB trying to allocate
-buffers for Ethernet data and with WiFi trying to allocate buffers for
-WiFi data), it is yet another big performance hit.
+See also the previous change ("ARM: dma-mapping: Use
+DMA_ATTR_ALLOC_SINGLE_PAGES hint to optimize allocation").
 
 Signed-off-by: Douglas Anderson <dianders@chromium.org>
-Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
 Changes in v6:
 - renamed DMA_ATTR_NO_HUGE_PAGE to DMA_ATTR_ALLOC_SINGLE_PAGES
 
 Changes in v5:
-- renamed DMA_ATTR_NOHUGEPAGE to DMA_ATTR_NO_HUGE_PAGE
+- s5p-mfc patch new for v5
 
-Changes in v4:
-- renamed DMA_ATTR_SEQUENTIAL to DMA_ATTR_NOHUGEPAGE
-- added Marek's ack
-
-Changes in v3:
-- Use DMA_ATTR_SEQUENTIAL hint patch new for v3.
-
+Changes in v4: None
+Changes in v3: None
 Changes in v2: None
 
- arch/arm/mm/dma-mapping.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/media/platform/s5p-mfc/s5p_mfc.c | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index bc9cebfa0891..9f996a3d79f7 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -1158,6 +1158,10 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
- 		return pages;
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+index 927ab4928779..421d25a1aec1 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+@@ -1095,6 +1095,7 @@ static int s5p_mfc_alloc_memdevs(struct s5p_mfc_dev *dev)
+ /* MFC probe function */
+ static int s5p_mfc_probe(struct platform_device *pdev)
+ {
++	DEFINE_DMA_ATTRS(attrs);
+ 	struct s5p_mfc_dev *dev;
+ 	struct video_device *vfd;
+ 	struct resource *res;
+@@ -1164,12 +1165,20 @@ static int s5p_mfc_probe(struct platform_device *pdev)
+ 		}
  	}
  
-+	/* Go straight to 4K chunks if caller says it's OK. */
-+	if (dma_get_attr(DMA_ATTR_ALLOC_SINGLE_PAGES, attrs))
-+		order_idx = ARRAY_SIZE(iommu_order_array) - 1;
+-	dev->alloc_ctx[0] = vb2_dma_contig_init_ctx(dev->mem_dev_l);
++	/*
++	 * We'll do mostly sequential access, so sacrifice TLB efficiency for
++	 * faster allocation.
++	 */
++	dma_set_attr(DMA_ATTR_ALLOC_SINGLE_PAGES, &attrs);
 +
- 	/*
- 	 * IOMMU can map any pages, so himem can also be used here
- 	 */
++	dev->alloc_ctx[0] = vb2_dma_contig_init_ctx_attrs(dev->mem_dev_l,
++							  &attrs);
+ 	if (IS_ERR(dev->alloc_ctx[0])) {
+ 		ret = PTR_ERR(dev->alloc_ctx[0]);
+ 		goto err_res;
+ 	}
+-	dev->alloc_ctx[1] = vb2_dma_contig_init_ctx(dev->mem_dev_r);
++	dev->alloc_ctx[1] = vb2_dma_contig_init_ctx_attrs(dev->mem_dev_r,
++							  &attrs);
+ 	if (IS_ERR(dev->alloc_ctx[1])) {
+ 		ret = PTR_ERR(dev->alloc_ctx[1]);
+ 		goto err_mem_init_ctx_1;
 -- 
 2.6.0.rc2.230.g3dd15c0
