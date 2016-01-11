@@ -1,30 +1,34 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 11 Jan 2016 18:12:34 +0000
-Subject: [PATCH v5 05/11] arm-cci PMU: Delay counter writes to pmu_enable
-In-Reply-To: <20160111112443.GI6499@leverpostej>
-References: <1451908490-2615-1-git-send-email-suzuki.poulose@arm.com>
- <1451908490-2615-6-git-send-email-suzuki.poulose@arm.com>
- <20160104192401.GD17127@leverpostej> <568B93F1.8050202@arm.com>
- <20160111104609.GE6499@leverpostej> <56938D2B.7050700@arm.com>
- <20160111112443.GI6499@leverpostej>
-Message-ID: <5693F092.3080209@arm.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Mon, 11 Jan 2016 10:30:18 -0800
+Subject: [PATCH 0/4] nvmem: new drivers for v4.5
+In-Reply-To: <5693AC68.6040802@linaro.org>
+References: <1449485763-391-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <5693AC68.6040802@linaro.org>
+Message-ID: <20160111183018.GA10243@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/16 11:24, Mark Rutland wrote:
-> On Mon, Jan 11, 2016 at 11:08:27AM +0000, Suzuki K. Poulose wrote:
->> On 11/01/16 10:46, Mark Rutland wrote:
->>> On Tue, Jan 05, 2016 at 09:59:13AM +0000, Suzuki K. Poulose wrote:
->>>> On 04/01/16 19:24, Mark Rutland wrote:
->> Hence, didn't want to change it for CCI. We could use the batching
->> logic, if decide to do so. I can go ahead with that if there are no
->> other side effects with that.
->
-> We'll lose events regardless as our RMW sequence will race against the
-> counters. Batching will make that window slightly larger, but other than
-> that I don't see a problem.
+On Mon, Jan 11, 2016 at 01:21:44PM +0000, Srinivas Kandagatla wrote:
+> 
+> 
+> On 07/12/15 10:56, Srinivas Kandagatla wrote:
+> >Hi Greg,
+> >
+> >Here are 2 new nvmem drivers which are in the mailing list for long time
+> >and are good to go for some testing and find its way to v4.5-rc*.
+> >
+> >Could you please take these patches via char-misc tree.
+> Hi Greg,
+> 
+> I have not seen these patches or https://lkml.org/lkml/2015/12/14/169 appear
+> in your char-misc tree/linux-next.
+> 
+> Just wanted to know whats your plan on these patches?
 
-OK, will do that.
+To wait until after 4.5-rc1 is out, sorry, my patch backlog got huge
+during Nov/Dec due to other external issues, I'll be digging out from
+them after 4.5-rc1 is out.
 
-Cheers
-Suzuki
+thanks,
+
+greg k-h
