@@ -1,42 +1,44 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 11 Jan 2016 05:49:32 +0000
-Subject: [PATCH] mfd: mt6397: convert to arch_initcall
-In-Reply-To: <1450862711-22124-1-git-send-email-henryc.chen@mediatek.com>
-References: <1450862711-22124-1-git-send-email-henryc.chen@mediatek.com>
-Message-ID: <20160111054932.GH3331@x1>
+Date: Mon, 11 Jan 2016 05:50:00 +0000
+Subject: [PATCH] mfd: qcom-spmi-pmic: Don't access non-existing registers
+In-Reply-To: <1447805204-32483-1-git-send-email-sboyd@codeaurora.org>
+References: <1447805204-32483-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20160111055000.GK3331@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 23 Dec 2015, Henry Chen wrote:
+On Tue, 17 Nov 2015, Stephen Boyd wrote:
 
-> Since pinctrl or regulator of mt6396 need to initialize earlier to avoid
-> probe deferring, also change the core driver to arch_init.
-
-This is exactly what deferring probe was designed for; so that you
-don't have to mess around with initcall ordering.
-
-> Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
-> ---
->  drivers/mfd/mt6397-core.c | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
+> From: "Ivan T. Ivanov" <ivan.ivanov@linaro.org>
 > 
-> diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
-> index 1749c1c..af98b4b 100644
-> --- a/drivers/mfd/mt6397-core.c
-> +++ b/drivers/mfd/mt6397-core.c
-> @@ -285,7 +285,11 @@ static struct platform_driver mt6397_driver = {
->  	},
->  };
+> Revision ID registers are available only on devices with
+> Slave IDs that are even, so don't make access to unavailable
+> registers.
+> 
+> Signed-off-by: Ivan T. Ivanov <ivan.ivanov@linaro.org>
+> [sboyd at codeaurora.org: Consider all slave ids that are even]
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  drivers/mfd/qcom-spmi-pmic.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+
+Applied, thanks.
+
+> diff --git a/drivers/mfd/qcom-spmi-pmic.c b/drivers/mfd/qcom-spmi-pmic.c
+> index af6ac1c4b45c..8653e8b9bb4f 100644
+> --- a/drivers/mfd/qcom-spmi-pmic.c
+> +++ b/drivers/mfd/qcom-spmi-pmic.c
+> @@ -127,7 +127,9 @@ static int pmic_spmi_probe(struct spmi_device *sdev)
+>  	if (IS_ERR(regmap))
+>  		return PTR_ERR(regmap);
 >  
-> -module_platform_driver(mt6397_driver);
-> +static int __init mt6397_core_init(void)
-> +{
-> +	return platform_driver_register(&mt6397_driver);
-> +}
-> +arch_initcall(mt6397_core_init);
+> -	pmic_spmi_show_revid(regmap, &sdev->dev);
+> +	/* Only the first slave id for a PMIC contains this information */
+> +	if (sdev->usid % 2 == 0)
+> +		pmic_spmi_show_revid(regmap, &sdev->dev);
 >  
->  MODULE_AUTHOR("Flora Fu, MediaTek");
->  MODULE_DESCRIPTION("Driver for MediaTek MT6397 PMIC");
+>  	return of_platform_populate(root, NULL, NULL, &sdev->dev);
+>  }
 
 -- 
 Lee Jones
