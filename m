@@ -1,80 +1,64 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Mon, 11 Jan 2016 12:56:35 +0200
-Subject: [PATCH v3 3/3] checkpatch: add virt barriers
-In-Reply-To: <CAGRGNgU7=vNXZbgSwLs+bBueX1+rKACCRMi74hM+jP8MaX+-WA@mail.gmail.com>
-References: <1452454200-8844-1-git-send-email-mst@redhat.com>
- <1452454200-8844-4-git-send-email-mst@redhat.com>
- <CAGRGNgXQANbKD=VA0Qx4Wp1+MpZUVV7by8RrKxF9o=qu=vUQqA@mail.gmail.com>
- <1452466336.7773.46.camel@perches.com>
- <20160111123423-mutt-send-email-mst@redhat.com>
- <CAGRGNgU7=vNXZbgSwLs+bBueX1+rKACCRMi74hM+jP8MaX+-WA@mail.gmail.com>
-Message-ID: <20160111124509-mutt-send-email-mst@redhat.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Mon, 11 Jan 2016 10:58:45 +0000
+Subject: [PATCH v5 07/11] arm-cci: Add routines to save/restore all
+ counters
+In-Reply-To: <20160111105006.GF6499@leverpostej>
+References: <1451908490-2615-1-git-send-email-suzuki.poulose@arm.com>
+ <1451908490-2615-8-git-send-email-suzuki.poulose@arm.com>
+ <20160111105006.GF6499@leverpostej>
+Message-ID: <56938AE5.9090702@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2016 at 09:40:18PM +1100, Julian Calaby wrote:
-> Hi Michael,
-> 
-> On Mon, Jan 11, 2016 at 9:35 PM, Michael S. Tsirkin <mst@redhat.com> wrote:
-> > On Sun, Jan 10, 2016 at 02:52:16PM -0800, Joe Perches wrote:
-> >> On Mon, 2016-01-11 at 09:13 +1100, Julian Calaby wrote:
-> >> > On Mon, Jan 11, 2016 at 6:31 AM, Michael S. Tsirkin <mst@redhat.com> wrote:
-> >> > > Add virt_ barriers to list of barriers to check for
-> >> > > presence of a comment.
-> >> []
-> >> > > diff --git a/scripts/checkpatch.pl b/scripts/checkpatch.pl
-> >> []
-> >> > > @@ -5133,7 +5133,8 @@ sub process {
-> >> > >                 }x;
-> >> > >                 my $all_barriers = qr{
-> >> > >                         $barriers|
-> >> > > -                       smp_(?:$smp_barrier_stems)
-> >> > > +                       smp_(?:$smp_barrier_stems)|
-> >> > > +                       virt_(?:$smp_barrier_stems)
-> >> >
-> >> > Sorry I'm late to the party here, but would it make sense to write this as:
-> >> >
-> >> > (?:smp|virt)_(?:$smp_barrier_stems)
-> >>
-> >> Yes.  Perhaps the name might be better as barrier_stems.
-> >>
-> >> Also, ideally this would be longest match first or use \b
-> >> after the matches so that $all_barriers could work
-> >> successfully without a following \s*\(
-> >>
-> >> my $all_barriers = qr{
-> >>       (?:smp|virt)_(?:barrier_stems)|
-> >>       $barriers)
-> >> }x;
-> >>
-> >> or maybe add separate $smp_barriers and $virt_barriers
-> >>
-> >> <shrug>  it doesn't matter much in any case
-> >
-> > OK just to clarify - are you OK with merging the patch as is?
-> > Refactorings can come as patches on top if required.
-> 
-> I don't really care either way, I was just asking if it was possible.
-> If you don't see any value in that change, then don't make it.
-> 
-> Thanks,
-> 
-> -- 
-> Julian Calaby
-> 
-> Email: julian.calaby at gmail.com
-> Profile: http://www.google.com/profiles/julian.calaby/
+On 11/01/16 10:50, Mark Rutland wrote:
+> On Mon, Jan 04, 2016 at 11:54:46AM +0000, Suzuki K. Poulose wrote:
+>> Adds helper routines to disable the counter controls for
+>> all the counters on the CCI PMU and restore it back, by
+>> preserving the original state in caller provided mask.
+>>
+>> Cc: Punit Agrawal <punit.agrawal@arm.com>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+>> ---
+>>   drivers/bus/arm-cci.c |   38 ++++++++++++++++++++++++++++++++++++++
+>>   1 file changed, 38 insertions(+)
+>>
+>> diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+>> index a3938ef..2f1fcf0 100644
+>> --- a/drivers/bus/arm-cci.c
+>> +++ b/drivers/bus/arm-cci.c
+>> @@ -672,6 +672,44 @@ static void pmu_set_event(struct cci_pmu *cci_pmu, int idx, unsigned long event)
+>>   }
+>>
+>>   /*
+>> + * For all counters on the CCI-PMU, disable any 'enabled' counters,
+>> + * saving the changed counters in the mask, so that we can restore
+>> + * it later using pmu_restore_counters. The mask is private to the
+>> + * caller. We cannot rely on the used_mask maintained by the CCI_PMU
+>> + * as it only tells us if the counter is assigned to perf_event or not.
+>> + * The state of the perf_event cannot be locked by the PMU layer, hence
+>> + * we check the individual counter status (which can be locked by
+>> + * cci_pm->hw_events->pmu_lock).
+>> + *
+>> + * @mask should be initialised by the caller.
+>
+> We should probably state "initialised to zero", or "empty".
 
-OK, got it, thanks.
+Yep, will fix it.
 
-I will rename smp_barrier_stems to barrier_stems since
-this doesn't need too much testing.
+>> +/*
+>> + * Restore the status of the counters. Reversal of the pmu_disable_counters().
+>> + * For each counter set in the mask, enable the counter back.
+>> + */
+>
+> Shouldn't that say pmu_save_counters?
 
-I'd rather keep the regex code as is since changing it requires
-testing.  I might play with it some more in the future
-but I'd like to merge it in the current form to help make
-sure __smp barriers are not misused.
+Yea, missed it in rebase.
 
-I'll post v4 now - an ack will be appreciated.
--- 
-MST
+> With that:
+>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+>
+
+Thanks
+Suzuki
