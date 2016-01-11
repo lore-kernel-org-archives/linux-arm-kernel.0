@@ -1,66 +1,96 @@
-From: Annie.Wang@amd.com (Wang, Annie)
-Date: Mon, 11 Jan 2016 07:26:39 +0000
-Subject: [PATCH 1/6] 8250/Kconfig: add config option CONFIG_SERIAL_8250_AMD
-In-Reply-To: <20160106104602.GA19507@pd.tnic>
-References: <1451885501-2710-1-git-send-email-annie.wang@amd.com>
- <1451885501-2710-2-git-send-email-annie.wang@amd.com>
- <20160104144118.GJ22941@pd.tnic>
- <BLUPR12MB0433ABAC5C5D27D3FD0F4BF381F40@BLUPR12MB0433.namprd12.prod.outlook.com>
- <20160106104602.GA19507@pd.tnic>
-Message-ID: <BLUPR12MB043368006316A2FB11A0DE8B81C90@BLUPR12MB0433.namprd12.prod.outlook.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 11 Jan 2016 07:29:21 +0000
+Subject: [PATCH v10 1/8] ARM: dt: Binding documentation for imx25 ADC/TSC
+In-Reply-To: <1450101234-2191-2-git-send-email-mpa@pengutronix.de>
+References: <1450101234-2191-1-git-send-email-mpa@pengutronix.de>
+ <1450101234-2191-2-git-send-email-mpa@pengutronix.de>
+Message-ID: <20160111072921.GX3331@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 14 Dec 2015, Markus Pargmann wrote:
 
+> This documentation describes the devicetree bindings for the
+> ADC/Touchscreen unit of the i.MX25 SoC.
+> 
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> Acked-by: Jonathan Cameron <jic23@kernel.org>
+> Acked-by: Rob Herring <robh@kernel.org>
+> ---
+> 
+> Notes:
+>     Changes in v9:
+>      - Fixed some style things.
+>     
+>     Changes in v6:
+>      - Removed adc-ref property and replaced it with refp and refn for positive and
+>        negative references. The properties are optional now as the default
+>        behaviour is a positive internal reference voltage and ADC GND as negative
+>        reference.
+> 
+>  .../devicetree/bindings/mfd/fsl-imx25-tsadc.txt    | 47 ++++++++++++++++++++++
+>  1 file changed, 47 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
 
->-----Original Message-----
->From: Borislav Petkov [mailto:bp at alien8.de]
->Sent: Wednesday, January 06, 2016 6:46 PM
->To: Wang, Annie
->Cc: Andy Shevchenko; Vinod Koul; Mika Westerberg; Greg Kroah-Hartman; Rafael
->J. Wysocki; linux-acpi at vger.kernel.org; linux-kernel at vger.kernel.org; linux-
->serial at vger.kernel.org; dmaengine at vger.kernel.org; Huang, Ray; Wan, Vincent;
->Xue, Ken; Robin Murphy; Graeme Gregory; Li, Tony; Yu, Xiangliang
->Subject: Re: [PATCH 1/6] 8250/Kconfig: add config option
->CONFIG_SERIAL_8250_AMD
->
->On Wed, Jan 06, 2016 at 02:08:18AM +0000, Wang, Annie wrote:
->> How about I add select ARM_AMBA and SERIAL_8250 in arch/x86/Kconfig?
->
->Yeah, select sounds good in that case, except in that particular case ...
->
->>
->> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig index
->> db3622f..0fe6657 100644
->> --- a/arch/x86/Kconfig
->> +++ b/arch/x86/Kconfig
->> @@ -537,11 +537,15 @@ config X86_AMD_PLATFORM_DEVICE
->>         depends on ACPI
->>         select COMMON_CLK
->>         select PINCTRL
->> +       select SERIAL_8250
->> +       select ARM_AMBA
->
->... that's a X86_AMD_PLATFORM_DEVICE which selects ARM thing? i.e.,
->ARM_AMBA. Can that even work?
->
->[ Rant on the side: And that ARM_AMBA thing has, of course, no effing
->  help text. Dammit, people need to start explaining those cryptic
->  abbreviations. Somewhere in the code I found "Advanced Microcontroller
->  Bus Architecture". This is clearly suboptimal. ]
->
->So why does the X86 platform device need to select the AMBA crap?
+Binding looks fine, but you need to change the subject line of the
+patch, for is it not an ARM, but MFD patch.
 
+> diff --git a/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt b/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
+> new file mode 100644
+> index 000000000000..b03505286997
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
+> @@ -0,0 +1,47 @@
+> +Freescale MX25 ADC/TSC MultiFunction Device (MFD)
+> +
+> +This device combines two general purpose conversion queues one used for general
+> +ADC and the other used for touchscreens.
+> +
+> +Required properties:
+> + - compatible:			Should be "fsl,imx25-tsadc".
+> + - reg:				Start address and size of the memory area of
+> + 					the device
+> + - interrupts:			Interrupt for this device
+> +					(See: ../interrupt-controller/interrupts.txt)
+> + - clocks:			An 'ipg' clock (See: ../clock/clock-bindings.txt)
+> + - interrupt-controller:	This device is an interrupt controller. It
+> +   					controls the interrupts of both
+> +					conversion queues.
+> + - #interrupt-cells:		Should be '<1>'.
+> + - #address-cells:		Should be '<1>'.
+> + - #size-cells:			Should be '<1>'.
+> +
+> +This device includes two conversion queues which can be added as subnodes.
+> +The first queue is for the touchscreen, the second for general purpose ADC.
+> +
+> +Example:
+> +	tscadc: tscadc at 50030000 {
+> +		compatible = "fsl,imx25-tsadc";
+> +		reg = <0x50030000 0xc>;
+> +		interrupts = <46>;
+> +		clocks = <&clks 119>;
+> +		clock-names = "ipg";
+> +		interrupt-controller;
+> +		#interrupt-cells = <1>;
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		tsc: tcq at 50030400 {
+> +			compatible = "fsl,imx25-tcq";
+> +			reg = <0x50030400 0x60>;
+> +			...
+> +		};
+> +
+> +		adc: gcq at 50030800 {
+> +			compatible = "fsl,imx25-gcq";
+> +			reg = <0x50030800 0x60>;
+> +			...
+> +		};
+> +	};
 
-Russell, 
-
-The AMBA bus is already leveraged  in AMD X86 arch hardware design for UART
-controller and UART DMA. And may will be used in other arch as well, however,
-it is rather confusing if we select ARM_AMBA in other arch, such as X86.
-
-How about rename  CONFIG_ARM_AMBA to CONFIG_AMBA? So different arch
-can select it without causing misunderstanding. 
-
-Thank you very much.
-Regards,
-Hongcheng(Annie)
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
