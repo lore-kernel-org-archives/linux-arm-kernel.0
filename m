@@ -1,64 +1,38 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 11 Jan 2016 11:24:26 +0100
-Subject: [PATCH 1/1] USB: core: let USB device know device node
-In-Reply-To: <20160111095747.GA9239@shlinux2>
-References: <1452501535-8580-1-git-send-email-peter.chen@freescale.com>
- <201601111658.gmkaFolV%fengguang.wu@intel.com>
- <20160111095747.GA9239@shlinux2>
-Message-ID: <20160111102426.GN13058@pengutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 11 Jan 2016 10:26:58 +0000
+Subject: arm/arm64 HARDLOCKUP Detector and PERF NMI support
+In-Reply-To: <5691A23C.8060807@samsung.com>
+References: <569199C0.9030500@samsung.com>
+ <5691A23C.8060807@samsung.com>
+Message-ID: <20160111102658.GB6499@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2016 at 05:57:47PM +0800, Peter Chen wrote:
-> On Mon, Jan 11, 2016 at 04:54:21PM +0800, kbuild test robot wrote:
-> > Hi Peter,
-> > 
-> > [auto build test ERROR on usb/usb-testing]
-> > [also build test ERROR on v4.4 next-20160108]
-> > [if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
-> > 
-> > url:    https://github.com/0day-ci/linux/commits/Peter-Chen/USB-core-let-USB-device-know-device-node/20160111-164533
-> > base:   https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb.git usb-testing
-> > config: x86_64-randconfig-x002-201602 (attached as .config)
-> > reproduce:
-> >         # save the attached .config to linux build tree
-> >         make ARCH=x86_64 
-> > 
-> > All error/warnings (new ones prefixed by >>):
-> > 
-> >    In file included from include/linux/compiler.h:56:0,
-> >                     from include/uapi/linux/stddef.h:1,
-> >                     from include/linux/stddef.h:4,
-> >                     from include/uapi/linux/posix_types.h:4,
-> >                     from include/uapi/linux/types.h:13,
-> >                     from include/linux/types.h:5,
-> >                     from include/linux/list.h:4,
-> >                     from include/linux/module.h:9,
-> >                     from drivers/usb/core/usb.c:24:
-> > >> include/linux/compiler-gcc.h:73:17: error: expected '{' before 'inline'
-> >     #define inline  inline  __attribute__((always_inline)) notrace
-> >                     ^
-> > >> include/linux/usb/of.h:36:8: note: in expansion of macro 'inline'
-> >     struct inline device_node * usb_of_get_child_node(struct device_node *parent,
-> >            ^
+Hi,
+
+On Sat, Jan 09, 2016 at 04:13:48PM -0800, Mario Smarduch wrote:
+> I'm trying to get HARDLOCKUP detector to work on arm (on foundation
+> model and Juno, but armv7 should have the same issue). Turns out there is no
+> PERF NMI support (HAVE_PERF_EVENTS_NMI), which I guess would be PMU NMI - I
+> tested overflow on cycle counter and PMU interrupts can be masked. HARDLOCKUP
+> assumes perf interrupts are non-maskable and uses the PMU to program an NMI to
+> detect hard lockup and that in turn drives softlockup detection.
 > 
-> Would anybody explain what does above mean, thanks.
-> I just can't reproduce it at my env.
+> Is there something, someplace in ARM manuals that addresses this, searched the
+> manuals but couldn't find anything?
+> 
+> Or other approaches that I'm not aware off or have floated on the mailing list.
 
-The instructions to reproduce this is included in the kbuild test robot mail.
+Russell and Daniel did some work [1,2] to use FIQs as NMIs on arm, for
+backtracing and PMU overflow.
 
-Here you have to compile with CONFIG_OF disabled.
+For arm64 the kernel always runs on the non-secure side, so we don't
+expect to have access to FIQ. It's possible to implement NMIs using
+priorities (which it looks like Daniel was looking into [3]).
 
-struct inline device_node * usb_of_get_child_node(...)
+Thanks,
+Mark.
 
-should be:
-
-static inline struct device_node *usb_of_get_child_node(...)
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/353795/
+[2] http://www.linaro.org/blog/core-dump/debugging-arm-kernels-using-nmifiq/
+[3] https://git.linaro.org/people/daniel.thompson/linux.git/shortlog/refs/heads/dev/arm64_nmi-v5
