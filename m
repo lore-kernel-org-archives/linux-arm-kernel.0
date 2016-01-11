@@ -1,89 +1,90 @@
 From: dianders@chromium.org (Douglas Anderson)
-Date: Mon, 11 Jan 2016 09:30:22 -0800
-Subject: [PATCH v6 0/5] dma-mapping: Patches for speeding up allocation
-Message-ID: <1452533428-12762-1-git-send-email-dianders@chromium.org>
+Date: Mon, 11 Jan 2016 09:30:25 -0800
+Subject: [PATCH v6 3/5] ARM: dma-mapping: Use DMA_ATTR_ALLOC_SINGLE_PAGES hint
+ to optimize alloc
+In-Reply-To: <1452533428-12762-1-git-send-email-dianders@chromium.org>
+References: <1452533428-12762-1-git-send-email-dianders@chromium.org>
+Message-ID: <1452533428-12762-4-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series of patches will speed up memory allocation in dma-mapping
-quite a bit.
+If we know that TLB efficiency will not be an issue when memory is
+accessed then it's not terribly important to allocate big chunks of
+memory.  The whole point of allocating the big chunks was that it would
+make TLB usage efficient.
 
-The first patch ("ARM: dma-mapping: Optimize allocation") is hopefully
-not terribly controversial: it merely doesn't try as hard to allocate
-big chunks once it gets the first failure.  Since it's unlikely that
-further big chunks will help (they're not likely to be virtually aligned
-anyway), this should give a big speedup with no real regression to speak
-of.  Yes, things could be made better, but this seems like a sane start.
+As Marek Szyprowski indicated:
+    Please note that mapping memory with larger pages significantly
+    improves performance, especially when IOMMU has a little TLB
+    cache. This can be easily observed when multimedia devices do
+    processing of RGB data with 90/270 degree rotation
+Image rotation is distinctly an operation that needs to bounce around
+through memory, so it makes sense that TLB efficiency is important
+there.
 
-The second patch ("common: DMA-mapping: add DMA_ATTR_ALLOC_SINGLE_PAGES
-attribute") models MADV_NOHUGEPAGE as I understand it.  Hopefully folks
-are happy with following that lead.  It does nothing by itself.
+Video decoding, on the other hand, is a fairly sequential operation.
+During video decoding it's not expected that we'll be jumping all over
+memory.  Decoding video is also pretty heavy and the TLB misses aren't a
+huge deal.  Presumably most HW video acceleration users of dma-mapping
+will not care about huge pages and will set DMA_ATTR_ALLOC_SINGLE_PAGES.
 
-The third patch ("ARM: dma-mapping: Use DMA_ATTR_ALLOC_SINGLE_PAGES hint to
-optimize allocation") simply applies the 2nd patch.  Again it's pretty
-simple.  ...and again it does nothing by itself.
+Allocating big chunks of memory is quite expensive, especially if we're
+doing it repeadly and memory is full.  In one (out of tree) usage model
+it is common that arm_iommu_alloc_attrs() is called 16 times in a row,
+each one trying to allocate 4 MB of memory.  This is called whenever the
+system encounters a new video, which could easily happen while the
+memory system is stressed out.  In fact, on certain social media
+websites that auto-play video and have infinite scrolling, it's quite
+common to see not just one of these 16x4MB allocations but 2 or 3 right
+after another.  Asking the system even to do a small amount of extra
+work to give us big chunks in this case is just not a good use of time.
 
-Thue fourth patch ("[media] videobuf2-dc: Let drivers specify DMA
-attrs") comes from the ChromeOS tree (authored by Tomasz Figa) and
-allows the fifth patch.
+Allocating big chunks of memory is also expensive indirectly.  Even if
+we ask the system not to do ANY extra work to allocate _our_ memory,
+we're still potentially eating up all big chunks in the system.
+Presumably there are other users in the system that aren't quite as
+flexible and that actually need these big chunks.  By eating all the big
+chunks we're causing extra work for the rest of the system.  We also may
+start making other memory allocations fail.  While the system may be
+robust to such failures (as is the case with dwc2 USB trying to allocate
+buffers for Ethernet data and with WiFi trying to allocate buffers for
+WiFi data), it is yet another big performance hit.
 
-The fifth patch ("[media] s5p-mfc: Set DMA_ATTR_ALLOC_SINGLE_PAGES") uses the
-new attribute.  For a second user, you can see the out of tree patch for
-rk3288 at <https://chromium-review.googlesource.com/#/c/320498/>.
-
-All testing was done on the chromeos kernel-3.8 and kernel-3.14.
-Sanity (compile / boot) testing was done on a v4.4-rc6-based kernel on
-rk3288, though the video codec isn't there.  I don't have graphics / MFC
-working well on exynos, so the MFC change was only compile-tested
-upstream.  Hopefully someone upstream whose setup for MFC can give a
-Tested-by for these?
-
-Also note that v2 of this series had an extra patch
-<https://patchwork.kernel.org/patch/7888861/> that would attempt to sort
-the allocation results to opportunistically get some extra alignment.  I
-dropped that, but it could be re-introduced if there was interest.  I
-found that it did give a little extra alignment sometimes, but maybe not
-enough to justify the extra complexity.  It also was a bit half-baked
-since it really should have tried harder to ensure alignment.
-
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
+Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
 Changes in v6:
 - renamed DMA_ATTR_NO_HUGE_PAGE to DMA_ATTR_ALLOC_SINGLE_PAGES
 
 Changes in v5:
 - renamed DMA_ATTR_NOHUGEPAGE to DMA_ATTR_NO_HUGE_PAGE
-- s/ping ping/ping pong/
-- Let drivers specify DMA attrs new for v5
-- s5p-mfc patch new for v5
 
 Changes in v4:
-- Added Marek's ack
 - renamed DMA_ATTR_SEQUENTIAL to DMA_ATTR_NOHUGEPAGE
+- added Marek's ack
 
 Changes in v3:
-- add DMA_ATTR_SEQUENTIAL attribute new for v3
 - Use DMA_ATTR_SEQUENTIAL hint patch new for v3.
 
-Changes in v2:
-- No longer just 1 page at a time, but gives up higher order quickly.
-- Only tries important higher order allocations that might help us.
+Changes in v2: None
 
-Douglas Anderson (4):
-  ARM: dma-mapping: Optimize allocation
-  common: DMA-mapping: add DMA_ATTR_ALLOC_SINGLE_PAGES attribute
-  ARM: dma-mapping: Use DMA_ATTR_ALLOC_SINGLE_PAGES hint to optimize
-    alloc
-  s5p-mfc: Set DMA_ATTR_ALLOC_SINGLE_PAGES
+ arch/arm/mm/dma-mapping.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Tomasz Figa (1):
-  videobuf2-dc: Let drivers specify DMA attrs
-
- Documentation/DMA-attributes.txt               | 23 ++++++++++++++++
- arch/arm/mm/dma-mapping.c                      | 38 ++++++++++++++++----------
- drivers/media/platform/s5p-mfc/s5p_mfc.c       | 13 +++++++--
- drivers/media/v4l2-core/videobuf2-dma-contig.c | 33 ++++++++++++++--------
- include/linux/dma-attrs.h                      |  1 +
- include/media/videobuf2-dma-contig.h           | 11 +++++++-
- 6 files changed, 91 insertions(+), 28 deletions(-)
-
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index bc9cebfa0891..9f996a3d79f7 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -1158,6 +1158,10 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
+ 		return pages;
+ 	}
+ 
++	/* Go straight to 4K chunks if caller says it's OK. */
++	if (dma_get_attr(DMA_ATTR_ALLOC_SINGLE_PAGES, attrs))
++		order_idx = ARRAY_SIZE(iommu_order_array) - 1;
++
+ 	/*
+ 	 * IOMMU can map any pages, so himem can also be used here
+ 	 */
 -- 
 2.6.0.rc2.230.g3dd15c0
