@@ -1,41 +1,52 @@
-From: 8001010@gmail.com (8001010)
-Date: Mon, 11 Jan 2016 11:34:18 +0100
-Subject: [linux-sunxi] Re: [PATCH 0/5] ARM: dts: sunxi: Add backlight node
- to q8 tablets
-In-Reply-To: <5677F7CF.3050308@redhat.com>
-References: <1442752251-20744-1-git-send-email-hdegoede@redhat.com>
- <fc4adcf5-4362-4d4c-b42e-729922c79f65@googlegroups.com>
- <5677F7CF.3050308@redhat.com>
-Message-ID: <5693852A.1060604@gmail.com>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Mon, 11 Jan 2016 12:35:47 +0200
+Subject: [PATCH v3 3/3] checkpatch: add virt barriers
+In-Reply-To: <1452466336.7773.46.camel@perches.com>
+References: <1452454200-8844-1-git-send-email-mst@redhat.com>
+ <1452454200-8844-4-git-send-email-mst@redhat.com>
+ <CAGRGNgXQANbKD=VA0Qx4Wp1+MpZUVV7by8RrKxF9o=qu=vUQqA@mail.gmail.com>
+ <1452466336.7773.46.camel@perches.com>
+Message-ID: <20160111123423-mutt-send-email-mst@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hans de Goede wrote:
-> Hi,
->
-> On 21-12-15 11:56, Silvio Pellicano wrote:
->>
->>
->>> Here is a slightly updated version of Chen-Yu's backlight
->>> patches, also adding support for the backlight found on A13
->>> based q8 tablets.
->>>
->>
->> If i compile your dtsi with (obviously) pwm  support enable , backlight
->> switch off after kernel start,
->> if i disable pwm in menuconfig,it stay on, all seem correct (pwm on PB2 in
->> original script.bin),
->> but there is somewhere a bug in pwm or dtsi description of backlight.
->
-> No there is not, if you enable the pwm driver you must also enable
-> the backlight-pwm driver / add CONFIG_BACKLIGHT_PWM=y to your .config
-> (and make sure it stays that way after a "make oldconfig").
->
-> Regards,
->
-> Hans
->
-Now work, but what flag  i have to enable to leave 5v usb otg ON?
-uboot switch ON Usb Otg voltage but kernel switch off during boot (no usb devices work).
+On Sun, Jan 10, 2016 at 02:52:16PM -0800, Joe Perches wrote:
+> On Mon, 2016-01-11 at 09:13 +1100, Julian Calaby wrote:
+> > On Mon, Jan 11, 2016 at 6:31 AM, Michael S. Tsirkin <mst@redhat.com> wrote:
+> > > Add virt_ barriers to list of barriers to check for
+> > > presence of a comment.
+> []
+> > > diff --git a/scripts/checkpatch.pl b/scripts/checkpatch.pl
+> []
+> > > @@ -5133,7 +5133,8 @@ sub process {
+> > > ????????????????}x;
+> > > ????????????????my $all_barriers = qr{
+> > > ????????????????????????$barriers|
+> > > -???????????????????????smp_(?:$smp_barrier_stems)
+> > > +???????????????????????smp_(?:$smp_barrier_stems)|
+> > > +???????????????????????virt_(?:$smp_barrier_stems)
+> > 
+> > Sorry I'm late to the party here, but would it make sense to write this as:
+> > 
+> > (?:smp|virt)_(?:$smp_barrier_stems)
+> 
+> Yes.  Perhaps the name might be better as barrier_stems.
+> 
+> Also, ideally this would be longest match first or use \b
+> after the matches so that $all_barriers could work
+> successfully without a following \s*\(
+> 
+> my $all_barriers = qr{
+> 	(?:smp|virt)_(?:barrier_stems)|
+> 	$barriers)
+> }x;
+> 
+> or maybe add separate $smp_barriers and $virt_barriers
+> 
+> <shrug>  it doesn't matter much in any case
 
-Thanks
+OK just to clarify - are you OK with merging the patch as is?
+Refactorings can come as patches on top if required.
+
+-- 
+MST
