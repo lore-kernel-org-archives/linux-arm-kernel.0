@@ -1,78 +1,37 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 11 Jan 2016 20:27:56 +0100
-Subject: r8a7794/alt and CONFIG_PROVE_LOCKING=y
-In-Reply-To: <20160111185512.GW19062@n2100.arm.linux.org.uk>
-References: <CAMuHMdXGgbpsC+JdbGc5D0fd5YSdogpqvffPAB4PU-7H_-jM_Q@mail.gmail.com>
- <20160111185512.GW19062@n2100.arm.linux.org.uk>
-Message-ID: <CAMuHMdXET+Ls2gsoDhTQXne=sa4GDPCcdxXE7p1nRswBTFVm0A@mail.gmail.com>
+From: kernel@martin.sperl.org (kernel at martin.sperl.org)
+Date: Mon, 11 Jan 2016 19:55:52 +0000
+Subject: [PATCH V2 0/4] clk: bcm2835: add additinal clocks and add frac support
+Message-ID: <1452542157-2387-1-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+From: Martin Sperl <kernel@martin.sperl.org>
 
-On Mon, Jan 11, 2016 at 7:55 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Jan 11, 2016 at 07:46:57PM +0100, Geert Uytterhoeven wrote:
->> When CONFIG_PROVE_LOCKING=y, r8a7794/alt doesn't boot (no output).
->> Earlycon doesn't help, but DEBUG_LL=y and earlyprintk gave me:
->>
->>     Error: unrecognized/unsupported machine ID (r1 = 0x18009008).
->>
->>     Available machine support:
->>
->>     ID (hex) NAME
->>     ffffffff    Generic DT based system
->>     ffffffff Generic R8A7794 (Flattened Device Tree)
->>
->>     Please check your kernel config and/or bootloader.
->>
->> I'm booting using
->>
->>     tftp 41000000 alt/zImage
->>     tftp 40f00000 alt/r8a7794-alt.dtb
->>     bootz 41000000 - 40f00000
->>
->> just like on r8a7791/koelsch, where CONFIG_PROVE_LOCKING does work.
->>
->> If I disable CONFIG_PROVE_LOCKING (e.g. shmobile_defconfig), the same kernel
->> boots fine.
->>
->> Anyone with a clue?
->
-> You're probably overwriting the dtb.  Presumably, RAM starts at
-> 0x40000000, which means if your kernel is larger than 16MB-32k
-> after decompression, the dtb will get overwritten.
+The clk-bcm2835 driver right now relies on BCM2835_CLOCK_COUNT defined
+in include/dt-binding/clocks/bcm2835.h
+With every new clock introduced this value needs to increase,
+which is not what should happen for bindings.
 
-That's what I was assuming, too.
-But why would it work on the koelsch sister board, even with the same
-kernel config?
+So we reorganize the driver so that it is no longer necessary
+to define BCM2835_CLOCK_COUNT.
 
-Upon closer look, koelsch loads the DT a bit higher in memory:
+Also the driver calculates fractional clock dividers correctly,
+but it does not enable the bit to enable support in the register.
+As a minimal extension we now can also define higher order MASH
+support when defining the clocks.
 
-## Flattened Device Tree blob at 40f00000
-   Booting using the fdt blob at 0x40f00000
-      Loading Device Tree to 40fed000, end 40fff5b1 ... OK
+Finally we add all the 23 different HW clocks that have not been
+configured in the driver.
 
-than alt:
+Martin Sperl (4):
+  clk: bcm2835: avoid the use of BCM2835_CLOCK_COUNT in clk-bcm2835
+  clk: bcm2835: enable fractional and mash support
+  clk: bcm2835: enable management of PCM clock
+  clk: bcm2835: add missing 22 HW-clocks.
 
-## Flattened Device Tree blob at 40f00000
-   Booting using the fdt blob at 0x40f00000
-      Loading Device Tree to 40ef6000, end 40effc4b ... OK
-
-This extra ca. 1 MiB seems to make the difference. Adding a bit more to
-the kernel makes it fail on koelsch too, even without any output.
-
-Doh, newer board, more stringent kernel size limitation...
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
+ drivers/clk/bcm/clk-bcm2835.c       |  527 +++++++++++++++++++++++++++++++----
+ include/dt-bindings/clock/bcm2835.h |   25 +-
+ 2 files changed, 489 insertions(+), 63 deletions(-)
 
 --
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+1.7.10.4
