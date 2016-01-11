@@ -1,38 +1,54 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 11 Jan 2016 13:33:02 +0900
-Subject: [PATCH 6/6] ARM: dts: silk: Add compatible property to "partitions"
- node
-In-Reply-To: <cover.1452486598.git.horms+renesas@verge.net.au>
-References: <cover.1452486598.git.horms+renesas@verge.net.au>
-Message-ID: <8bc403b78ffb774d8dc944abb0826c46c0dca09d.1452486598.git.horms+renesas@verge.net.au>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 11 Jan 2016 05:48:46 +0000
+Subject: [PATCH v5 5/6] mfd: dt-bindings: add device tree bindings for
+ Hi3519 sysctrl
+In-Reply-To: <1452219400-32478-6-git-send-email-xuejiancheng@huawei.com>
+References: <1452219400-32478-1-git-send-email-xuejiancheng@huawei.com>
+ <1452219400-32478-6-git-send-email-xuejiancheng@huawei.com>
+Message-ID: <20160111054846.GD3331@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+On Fri, 08 Jan 2016, Jiancheng Xue wrote:
 
-As of commit e488ca9f8d4f62c2 ("doc: dt: mtd: partitions: add compatible
-property to "partitions" node"), the "partitions" subnode of an SPI
-FLASH device node must have a compatible property. The partitions are no
-longer detected if it is not present.
+> Add device tree bindings for Hi3519 system controller.
+> 
+> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
+> ---
+>  Documentation/devicetree/bindings/mfd/hi3519.txt | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/hi3519.txt
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Brian Norris <computersforpeace@gmail.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7794-silk.dts | 1 +
- 1 file changed, 1 insertion(+)
+I have this patch, but none of the others in the set, thus I am
+lacking context.
 
-diff --git a/arch/arm/boot/dts/r8a7794-silk.dts b/arch/arm/boot/dts/r8a7794-silk.dts
-index 5a8dcac37c8e..5153e3af25d9 100644
---- a/arch/arm/boot/dts/r8a7794-silk.dts
-+++ b/arch/arm/boot/dts/r8a7794-silk.dts
-@@ -204,6 +204,7 @@
- 		m25p,fast-read;
- 
- 		partitions {
-+			compatible = "fixed-partitions";
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 
+> diff --git a/Documentation/devicetree/bindings/mfd/hi3519.txt b/Documentation/devicetree/bindings/mfd/hi3519.txt
+> new file mode 100644
+> index 0000000..115c5be
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/hi3519.txt
+> @@ -0,0 +1,14 @@
+> +* Hisilicon Hi3519 System Controller Block
+> +
+> +This bindings use the following binding:
+> +Documentation/devicetree/bindings/mfd/syscon.txt
+> +
+> +Required properties:
+> +- compatible: "hisilicon,hi3519-sysctrl".
+> +- reg: the register region of this block
+> +
+> +Examples:
+> +sysctrl: system-controller at 12010000 {
+> +	compatible = "hisilicon,hi3519-sysctrl", "syscon";
+> +	reg = <0x12010000 0x1000>;
+> +};
+
+There is no requirement (nor want) for binding documents where the
+given device is simply using highly generic bindings.  This just
+amounts to churn.
+
 -- 
-2.7.0.rc3.207.g0ac5344
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
