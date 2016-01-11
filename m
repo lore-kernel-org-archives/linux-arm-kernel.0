@@ -1,32 +1,138 @@
-From: tbm@cyrius.com (Martin Michlmayr)
-Date: Mon, 11 Jan 2016 15:00:59 -0800
-Subject: I/O issues with writing to mtdblock devices on kirkwood
-In-Reply-To: <20151011153548.GA9808@lunn.ch>
-References: <1440159857.19360.50.camel@debian.org>
- <20150905210846.GF6040@lunn.ch>
- <CAKzmTe0Bq8itvKoOTwZ+ZjY5pTqFYWt0-ihO4jn0qew_NYGhFg@mail.gmail.com>
- <20151011153548.GA9808@lunn.ch>
-Message-ID: <20160111230059.GA12286@jirafa.cyrius.com>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Mon, 11 Jan 2016 15:17:13 -0800
+Subject: [PATCH v6 1/6] arm/arm64: KVM: Introduce armv7 fp/simd vcpu fields
+ and helpers
+In-Reply-To: <20160110163200.GC30867@cbox>
+References: <1451166900-3711-1-git-send-email-m.smarduch@samsung.com>
+ <1451166900-3711-2-git-send-email-m.smarduch@samsung.com>
+ <20160105150040.GF28354@cbox> <568C1952.3050002@samsung.com>
+ <20160110163200.GC30867@cbox>
+Message-ID: <569437F9.8080202@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A few months ago Debian users with QNAP devices (ARM Kirkwood)
-reported issues (mostly SATA timeouts) when doing kernel upgrades,
-specifically when the new ramdisk was being written to flash.
 
-cat file > /dev/mtdblockX worked fine on a 2 MB flash partition but
-resulted in SATA timeouts on a 9 MB flash partition.
 
-flascp file /dev/mtd2 works fine.
+On 1/10/2016 8:32 AM, Christoffer Dall wrote:
+> On Tue, Jan 05, 2016 at 11:28:18AM -0800, Mario Smarduch wrote:
+>>
+>>
+>> On 1/5/2016 7:00 AM, Christoffer Dall wrote:
+>>> On Sat, Dec 26, 2015 at 01:54:55PM -0800, Mario Smarduch wrote:
+>>>> Add helper functions to enable access to fp/smid on guest entry and save host
+>>>> fpexc on vcpu put, check if fp/simd registers are dirty and add new vcpu
+>>>> fields.
+>>>>
+>>>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+>>>> ---
+>>>>  arch/arm/include/asm/kvm_emulate.h   | 42 ++++++++++++++++++++++++++++++++++++
+>>>>  arch/arm/include/asm/kvm_host.h      |  6 ++++++
+>>>>  arch/arm64/include/asm/kvm_emulate.h |  8 +++++++
+>>>>  3 files changed, 56 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+>>>> index 3095df0..d4d9da1 100644
+>>>> --- a/arch/arm/include/asm/kvm_emulate.h
+>>>> +++ b/arch/arm/include/asm/kvm_emulate.h
+>>>> @@ -24,6 +24,8 @@
+>>>>  #include <asm/kvm_mmio.h>
+>>>>  #include <asm/kvm_arm.h>
+>>>>  #include <asm/cputype.h>
+>>>> +#include <asm/vfp.h>
+>>>> +#include "../vfp/vfpinstr.h"
+>>>
+>>> this looks dodgy...
+>>>
+>>> can you move vfpinstr.h instead?
+>> Sure I'll fix it up, it's in couple other places in kernel and kvm
+>>  - copied it.
+>>>
+>>>>  
+>>>>  unsigned long *vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num);
+>>>>  unsigned long *vcpu_spsr(struct kvm_vcpu *vcpu);
+>>>> @@ -255,4 +257,44 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
+>>>>  	}
+>>>>  }
+>>>>  
+>>>> +#ifdef CONFIG_VFPv3
+>>>> +/* Called from vcpu_load - save fpexc and enable guest access to fp/simd unit */
+>>>
+>>> the comment is misleading, you're not enabling guest access to the
+>>> fp/simd unit, you're just setting the enabled bit to ensure guest
+>>> accesses trap.
+>>
+>> That's more accurate.
+>>>
+>>>> +static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
+>>>> +{
+>>>> +	u32 fpexc;
+>>>> +
+>>>> +	/* Save host fpexc, and enable guest access to fp unit */
+>>>> +	fpexc = fmrx(FPEXC);
+>>>> +	vcpu->arch.host_fpexc = fpexc;
+>>>> +	fpexc |= FPEXC_EN;
+>>>> +	fmxr(FPEXC, fpexc);
+>>>> +
+>>>> +	/* Configure HCPTR to trap on tracing and fp/simd access */
+>>>> +	vcpu->arch.hcptr = HCPTR_TTA | HCPTR_TCP(10)  | HCPTR_TCP(11);
+>>>> +}
+>>>> +
+>>>> +/* Called from vcpu_put - restore host fpexc */
+>>>
+>>> I would probably get rid of the "Called from" stuff and just describe
+>>> what these functions do locally.  Comments like this are likely to be
+>>> out of date soon'ish.
+>>
+>> Yeah true, will do.
+>>>
+>>>> +static inline void vcpu_restore_host_fpexc(struct kvm_vcpu *vcpu)
+>>>> +{
+>>>> +	fmxr(FPEXC, vcpu->arch.host_fpexc);
+>>>> +}
+>>>> +
+>>>> +/* If trap bits are reset then fp/simd registers are dirty */
+>>>> +static inline bool vcpu_vfp_isdirty(struct kvm_vcpu *vcpu)
+>>>> +{
+>>>> +	return !(vcpu->arch.hcptr & (HCPTR_TCP(10) | HCPTR_TCP(11)));
+>>>> +}
+>>>> +#else
+>>>> +static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
+>>>> +{
+>>>> +	vcpu->arch.hcptr = HCPTR_TTA;
+>>>> +}
+>>>> +
+>>>> +static inline void vcpu_restore_host_fpexc(struct kvm_vcpu *vcpu) {}
+>>>> +static inline bool vcpu_vfp_isdirty(struct kvm_vcpu *vcpu)
+>>>> +{
+>>>> +	return false;
+>>>> +}
+>>>> +#endif
+>>>
+>>> this kind of feels like it belongs in its own C-file instead of a header
+>>> file, perhaps arch/arm/kvm/vfp.C.
+>>>
+>>> Marc, what do you think?
+>>>
+>>
+>> That would be starting from vcpu_trap_vfp_enable()? The file is getting
+>> little overloaded.
+> 
+> yes, starting from vcpu_trap_vfp_enable.
+> 
+> Which file is getting overloaded?
+> 
+> I'm thinking the assembly file you add in the next patch could be
+> inline assembly in a C-file combined with this code, perhaps.
 
-I've now bisected it down to this change:
-
- commit 0461a4149836c792d186027c8c859637a4cfb11a
- Author: Mark Brown <broonie@kernel.org>
- Date:   Tue Dec 9 21:38:05 2014 +0000
-
-     spi: Pump transfers inside calling context for spi_sync()
-
--- 
-Martin Michlmayr
-http://www.cyrius.com/
+Yes that makes sense, I'll convert it.
+> 
+>>
+>> I'm also thinking that 3rd patch should have one function call for vcpu_put
+>> like vcpu_load does instead of exposing arm32/arm64, arm32 only relevant logic.
+>> When you have a chance to review that patch please keep that in mind.
+>>
+> 
+> ok, will try ;)
+> 
+> -Christoffer
+> 
