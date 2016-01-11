@@ -1,37 +1,77 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Mon, 11 Jan 2016 16:45:20 +0200
-Subject: [PATCH v5 1/2] ACPI: introduce a function to find the first
- physical device
-In-Reply-To: <1452518790-27053-2-git-send-email-aleksey.makarov@linaro.org>
-References: <1452518790-27053-1-git-send-email-aleksey.makarov@linaro.org>
- <1452518790-27053-2-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <CAHp75Vc9U9Zw30i5gf-LPH+ms7zO9p=kSTVKjNe8MqTHf4TiCg@mail.gmail.com>
+From: afd@ti.com (Andrew F. Davis)
+Date: Mon, 11 Jan 2016 08:44:59 -0600
+Subject: /sys/class/power_supply/bq27200-0/capacity changed meaning
+ between 4.1 and 4.4?
+In-Reply-To: <20160110080621.GA3929@amd>
+References: <20160109230709.GA30551@amd> <20160110080621.GA3929@amd>
+Message-ID: <5693BFEB.3020500@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ One more thing
-
-On Mon, Jan 11, 2016 at 3:26 PM, Aleksey Makarov
-<aleksey.makarov@linaro.org> wrote:
-
-> --- a/drivers/acpi/bus.c
-> +++ b/drivers/acpi/bus.c
-> @@ -478,24 +478,36 @@ static void acpi_device_remove_notify_handler(struct acpi_device *device)
->                               Device Matching
->     -------------------------------------------------------------------------- */
+On 01/10/2016 02:06 AM, Pavel Machek wrote:
+> Hi!
 >
-> -static struct acpi_device *acpi_primary_dev_companion(struct acpi_device *adev,
-> -                                                     const struct device *dev)
-> +/**
-> + * acpi_device_fix_parent - Get first physical node of an ACPI device
-> + * @adev: ACPI device in question
-> + */
+>> Did /sys/class/power_supply/bq27200-0/capacity change meaning between
+>> 4.1 and 4.4?
+>>
+>> It used to report battery capacity remaining in percent.
+>>
+>> Not sure what it reports now, but ain't in percent....
+>
+>> The patch does not compile, but I should be sleeping, not trying to
+>> understand crazy code. Whoever wrote it, please fix it. Maybe you can
+>> just do
+>
+> ...and more crazy code :-(.
+>
+>          cache.flags = bq27xxx_read(di, BQ27XXX_REG_FLAGS, has_singe_flag);
+> 		if ((cache.flags & 0xff) == 0xff)
+> 		                cache.flags = -1; /* read error */
+> 				        /* WTF? bq27xxx returns -ERRNO
+>          on error, we mask some bits off it, and then make it -1... */
+> 	
 
-> +struct device *acpi_get_first_physical_node(
-> +       struct acpi_device *adev)
+This is probably left over from when the driver was 1wire only, which seems
+to fail by just reading back all ones. Not sure why the -1 though?
 
-One line (even if it goes a bit over 80)
+>
+> ...and one crazy optimalization...
+>
+>          if (memcmp(&di->cache, &cache, sizeof(cache)) != 0)
+> 	                di->cache = cache;
+>
 
--- 
-With Best Regards,
-Andy Shevchenko
+Hmmm, I think the lines above it:
+
+	if (di->cache.capacity != cache.capacity)
+		power_supply_changed(di->bat);
+
+were at one point rolled into this as so:
+
+	if (memcmp(&di->cache, &cache, sizeof(cache)) != 0) {
+		di->cache = cache;
+		power_supply_changed(di->bat);
+	}
+
+Otherwise that isn't an optimization, it probably takes more
+time comparing than just doing the copy every time...
+
+> ...are we playing obfuscated C code contest, yet?
+>
+>          case POWER_SUPPLY_PROP_PRESENT:
+> 	                val->intval = di->cache.flags < 0 ? 0 : 1;
+>
+> ...to decidegree C?
+>                  if (ret == 0)
+> 		   	        pval->intval -= 2731; /* convert decidegree k to c */
+>
+> as read takes enum, make it enum like this?
+> static inline int bq27xxx_read(struct bq27xxx_device_info *di, enum bq27xxx_reg_index reg_index,
+> 		                         bool single)
+> 					
+
+ACK
+
+>
+> 									Pavel
+>
